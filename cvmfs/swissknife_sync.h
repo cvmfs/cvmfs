@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "compression.h"
 #include "swissknife.h"
 #include "upload.h"
 
@@ -31,6 +32,7 @@ struct SyncParameters {
     garbage_collectable(false),
     include_xattrs(false),
     external_data(false),
+    compression_alg(zlib::kZlibDefault),
     catalog_entry_warn_threshold(kDefaultEntryWarnThreshold),
     min_file_chunk_size(kDefaultMinFileChunkSize),
     avg_file_chunk_size(kDefaultAvgFileChunkSize),
@@ -62,6 +64,7 @@ struct SyncParameters {
   bool             garbage_collectable;
   bool             include_xattrs;
   bool             external_data;
+  zlib::Algorithms compression_alg;
   uint64_t         catalog_entry_warn_threshold;
   size_t           min_file_chunk_size;
   size_t           avg_file_chunk_size;
@@ -91,7 +94,6 @@ class CommandCreate : public Command {
   ParameterList GetParams() {
     ParameterList r;
     r.push_back(Parameter::Mandatory('o', "manifest output file"));
-    r.push_back(Parameter::Switch('X', "enable external data"));
     r.push_back(Parameter::Mandatory('t', "directory for temporary storage"));
     r.push_back(Parameter::Mandatory('r', "spooler definition"));
     r.push_back(Parameter::Optional('l', "log level (0-4, default: 2)"));
@@ -101,8 +103,6 @@ class CommandCreate : public Command {
     r.push_back(Parameter::Switch('v', "repository containing volatile files"));
     r.push_back(Parameter::Switch(
       'z', "mark new repository as garbage collectable"));
-    r.push_back(Parameter::Optional(
-      'Z', "compression algorithm (default: zlib)"));
     r.push_back(Parameter::Optional('V', "VOMS authz requirement "
                                          "(default: none)"));
     return r;

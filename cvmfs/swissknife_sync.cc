@@ -107,22 +107,16 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
       return 1;
     }
   }
-  zlib::Algorithms compression_algorithm = zlib::kZlibDefault;
-  if (args.find('Z') != args.end()) {
-    compression_algorithm =
-      zlib::ParseCompressionAlgorithm(*args.find('Z')->second);
-  }
 
   const bool volatile_content    = (args.count('v') > 0);
   const bool garbage_collectable = (args.count('z') > 0);
-  const bool external_data       = (args.count('X') > 0);
   std::string voms_authz;
   if (args.find('V') != args.end()) {
     voms_authz = *args.find('V')->second;
   }
 
   const upload::SpoolerDefinition sd(spooler_definition,
-                                     hash_algorithm, compression_algorithm);
+                                     hash_algorithm, zlib::kZlibDefault);
   upload::Spooler *spooler = upload::Spooler::Construct(sd);
   assert(spooler);
 
@@ -131,8 +125,6 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
     catalog::WritableCatalogManager::CreateRepository(dir_temp,
                                                       volatile_content,
                                                       voms_authz,
-                                                      external_data ? kYes :
-                                                                      kUnset,
                                                       spooler);
   if (!manifest) {
     PrintError("Failed to create new repository");
@@ -544,9 +536,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
       return 1;
     }
   }
-  zlib::Algorithms compression_algorithm = zlib::kZlibDefault;
   if (args.find('Z') != args.end()) {
-    compression_algorithm =
+    params.compression_alg =
       zlib::ParseCompressionAlgorithm(*args.find('Z')->second);
   }
 
@@ -573,7 +564,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   upload::SpoolerDefinition spooler_definition(
     params.spooler_definition,
     hash_algorithm,
-    compression_algorithm,
+    params.compression_alg,
     params.use_file_chunking,
     params.min_file_chunk_size,
     params.avg_file_chunk_size,
@@ -601,6 +592,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
                     params.max_weight,
                     params.min_weight);
   catalog_manager.Init();
+
   publish::SyncMediator mediator(&catalog_manager, &params);
   publish::SyncUnion *sync;
   if (params.union_fs_type == "overlayfs") {
@@ -624,7 +616,6 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
                                     "engine failed");
     return 4;
   }
-  sync->SetExternalData(params.external_data);
 
   sync->Traverse();
 

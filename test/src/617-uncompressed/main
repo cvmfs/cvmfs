@@ -29,7 +29,7 @@ produce_files_in() {
 cvmfs_run_test() {
   logfile=$1
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
-  local rdonly_repo_dir = /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly
+  local rdonly_repo_dir=/var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly
 
   local scratch_dir=$(pwd)
   mkdir reference_dir
@@ -57,7 +57,7 @@ cvmfs_run_test() {
   publish_repo $CVMFS_TEST_REPO || return $?
 
   echo "Make sure the compression xattr is set correctly"
-  local attrval = `attr -qg compression $rdonly_repo_dir/file"
+  local attrval=`attr -qg compression $rdonly_repo_dir/file`
   if [ x"$attrval" != xnone ]; then
     return 5
   fi
@@ -72,6 +72,15 @@ cvmfs_run_test() {
   check_repository $CVMFS_TEST_REPO -i  || return $?
 
   rm -f $large_file
+
+  echo "overwrite compression algorithm"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  echo "zlib compressed" > /cvmfs/$CVMFS_TEST_REPO/zlib
+  publish_repo $CVMFS_TEST_REPO -Z zlib
+  attrval=`attr -qg compression $rdonly_repo_dir/zlib`
+  if [ x"$attrval" != xzlib ]; then
+    return 10
+  fi
 
   return 0
 }

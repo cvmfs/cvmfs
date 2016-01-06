@@ -9,12 +9,10 @@
 
 #include <string>
 
-#include "swissknife.h"
+#include "compression.h"
+#include "hash.h"
 
-// Forward dec'ls.
-namespace shash {
-  struct Any;
-}
+#include "swissknife.h"
 
 namespace swissknife {
 
@@ -31,6 +29,9 @@ class CommandGraft : public Command {
                                        "('-' for reading from stdin)"));
     r.push_back(Parameter::Optional('o', "Output location for graft file"));
     r.push_back(Parameter::Switch('v', "Verbose output"));
+    r.push_back(Parameter::Optional('Z', "Compression algorithm "
+                                    "(default: none)"));
+    r.push_back(Parameter::Optional('a', "hash algorithm (default: SHA-1)"));
     return r;
   }
 
@@ -49,6 +50,8 @@ class CommandGraft : public Command {
   std::string output_file_;
   std::string input_file_;
   bool verbose_;
+  zlib::Algorithms compression_alg_;
+  shash::Algorithms hash_alg_;
 };
 
 }  // namespace swissknife

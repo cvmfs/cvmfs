@@ -65,9 +65,6 @@ Catalog::Catalog(const PathString &path,
   int retval = pthread_mutex_init(lock_, NULL);
   assert(retval == 0);
 
-  atomic_init32(&external_data_status_);
-  ExternalDataStatus status = kExternalPublishUnknown;
-  atomic_write32(&external_data_status_, status);
   database_ = NULL;
   uid_map_ = NULL;
   gid_map_ = NULL;
@@ -414,30 +411,6 @@ void Catalog::DropDatabaseFileOwnership() {
   if (NULL != database_) {
     database_->DropFileOwnership();
   }
-}
-
-
-Catalog::ExternalDataStatus Catalog::GetExternalDataImpl() const {
-  if (!IsRoot()) {return kExternalPublishDisable;}
-  ExternalDataStatus status = \
-    static_cast<ExternalDataStatus>(atomic_read32(&external_data_status_));
-  if (status == kExternalPublishUnknown) {
-    MutexLockGuard guard(*lock_);
-    int attr_value = database().GetPropertyDefault<int>("external_data", 0);
-    status = attr_value ? kExternalPublishEnable : kExternalPublishDisable;
-    atomic_write32(&external_data_status_, status);
-  }
-  return status;
-}
-
-bool Catalog::GetExternalData() const {
-  if (IsRoot()) {
-    ExternalDataStatus status = GetExternalDataImpl();
-    return (status == kExternalPublishEnable);
-  } else if (HasParent()) {
-    return parent_->GetExternalData();
-  }
-  return false;
 }
 
 

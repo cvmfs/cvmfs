@@ -95,7 +95,6 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   const string      &dir_temp,
   const bool         volatile_content,
   const std::string &voms_authz,
-  CatalogProperty    external_data,
   upload::Spooler   *spooler)
 {
   // Create a new root catalog at file_path
@@ -124,7 +123,6 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
         !new_clg_db->InsertInitialValues(root_path,
                                          volatile_content,
                                          voms_authz,
-                                         external_data,
                                          root_entry))
     {
       LogCvmfs(kLogCatalog, kLogStderr, "creation of catalog '%s' failed",
@@ -335,7 +333,6 @@ void WritableCatalogManager::AddDirectory(const DirectoryEntryBase &entry,
 void WritableCatalogManager::AddFile(
   const DirectoryEntry  &entry,
   const XattrList       &xattrs,
-        bool             external_data,
   const std::string     &parent_directory)
 {
   const string parent_path = MakeRelativePath(parent_directory);
@@ -350,7 +347,8 @@ void WritableCatalogManager::AddFile(
   }
 
   assert(!entry.IsRegular() || !entry.checksum().IsNull());
-  catalog->AddEntry(entry, xattrs, file_path, parent_path, external_data);
+  assert(entry.IsRegular() || !entry.IsExternalFile());
+  catalog->AddEntry(entry, xattrs, file_path, parent_path);
   SyncUnlock();
 }
 
@@ -366,7 +364,7 @@ void WritableCatalogManager::AddChunkedFile(
   DirectoryEntry full_entry(entry);
   full_entry.set_is_chunked_file(true);
 
-  AddFile(full_entry, xattrs, false, parent_directory);
+  AddFile(full_entry, xattrs, parent_directory);
 
   const string parent_path = MakeRelativePath(parent_directory);
   const string file_path   = entry.GetFullPath(parent_path);
@@ -402,7 +400,7 @@ void WritableCatalogManager::AddHardlinkGroup(
   if (entries.size() == 1) {
     DirectoryEntry fix_linkcount(entries[0]);
     fix_linkcount.set_linkcount(1);
-    return AddFile(fix_linkcount, xattrs, false, parent_directory);
+    return AddFile(fix_linkcount, xattrs, parent_directory);
   }
 
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "adding hardlink group %s/%s",
@@ -529,7 +527,6 @@ void WritableCatalogManager::TouchDirectory(const DirectoryEntryBase &entry,
  * Create a new nested catalog.  Includes moving all entries belonging there
  * from it's parent catalog.
  * @param mountpoint the path of the directory to become a nested root
- * @param external_data whether data for this catalog is external to the repository
  * @return true on success, false otherwise
  */
 void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
@@ -566,7 +563,6 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
                                                volatile_content,
                                                "",  // At this point, only root
                                                     // catalog gets VOMS authz
-                                               kUnset,
                                                new_root_entry);
   assert(retval);
   // TODO(rmeusel): we need a way to attach a catalog directy from an open

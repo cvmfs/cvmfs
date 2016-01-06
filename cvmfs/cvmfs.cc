@@ -491,12 +491,17 @@ static bool CheckVoms(const fuse_ctx &fctx) {
              "properties", voms_requirements.c_str());
   }
 
-  // Get VOMS information, if any,
-#ifdef VOMS_AUTHZ
+  // Get VOMS information, if any.  If VOMS authz is present and VOMS is
+  // not compiled in, then deny authorization.
   if ((fctx.uid != 0) && voms_requirements.size()) {
+#ifdef VOMS_AUTHZ
     return CheckVOMSAuthz(&fctx, voms_requirements);
-  }
+#else
+    LogCvmfs(kLogCvmfs, kLogSyslogWarn | kLogDebug,  "VOMS requirements found "
+              "in catalog but client compiled without VOMS support");
+    return false;
 #endif
+  }
   return true;
 }
 
@@ -1099,27 +1104,11 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     return;
   }
 
-  std::string voms_requirements;
-  if (catalog_manager_->GetVOMSAuthz(&voms_requirements))
-  {
-    LogCvmfs(kLogCvmfs, kLogDebug, "Got VOMS authz %s from filesystem "
-             "properties", voms_requirements.c_str());
+  if (!CheckVoms(*fuse_ctx)) {
+    remount_fence_->Leave();
+    fuse_reply_err(req, EACCES);
+    return;
   }
-
-  // Get VOMS information, if any,
-  // TODO(jblomer): without VOMS, cvmfs will allow access.  This is probably
-  // not the right default.
-#ifdef VOMS_AUTHZ
-  if ((fuse_ctx->uid != 0) && !voms_requirements.empty())
-  {
-    if (!CheckVOMSAuthz(fuse_ctx, voms_requirements))
-    {
-      remount_fence_->Leave();
-      fuse_reply_err(req, EACCES);
-      return;
-    }
-  }
-#endif
 
   // Don't check.  Either done by the OS or one wants to purposefully work
   // around wrong open flags
@@ -1181,7 +1170,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       // Check again to avoid race
       if (!chunk_tables_->inode2chunks.Contains(ino)) {
         chunk_tables_->inode2chunks.Insert(
-          ino, FileChunkReflist(chunks, path, dirent.compression_algorithm()));
+          ino, FileChunkReflist(chunks, path, dirent.compression_algorithm(),
+                                dirent.IsExternalFile()));
         chunk_tables_->inode2references.Insert(ino, 1);
       } else {
         uint32_t refctr;
@@ -1310,13 +1300,25 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
       if ((chunk_fd.fd == -1) || (chunk_fd.chunk_idx != chunk_idx)) {
         if (chunk_fd.fd != -1) cache_manager_->Close(chunk_fd.fd);
         string verbose_path = "Part of " + chunks.path.ToString();
-        chunk_fd.fd = fetcher_->Fetch(
-          chunks.list->AtPtr(chunk_idx)->content_hash(),
-          chunks.list->AtPtr(chunk_idx)->size(),
-          verbose_path,
-          chunks.compression_alg,
-          volatile_repository_ ? cache::CacheManager::kTypeVolatile
-                               : cache::CacheManager::kTypeRegular);
+        if (chunks.external_data) {
+          chunk_fd.fd = external_fetcher_->Fetch(
+            chunks.list->AtPtr(chunk_idx)->content_hash(),
+            chunks.list->AtPtr(chunk_idx)->size(),
+            verbose_path,
+            chunks.compression_alg,
+            volatile_repository_ ? cache::CacheManager::kTypeVolatile
+                                 : cache::CacheManager::kTypeRegular,
+            chunks.path.ToString(),
+            chunks.list->AtPtr(chunk_idx)->offset());
+        } else {
+          chunk_fd.fd = fetcher_->Fetch(
+            chunks.list->AtPtr(chunk_idx)->content_hash(),
+            chunks.list->AtPtr(chunk_idx)->size(),
+            verbose_path,
+            chunks.compression_alg,
+            volatile_repository_ ? cache::CacheManager::kTypeVolatile
+                                 : cache::CacheManager::kTypeRegular);
+        }
         if (chunk_fd.fd < 0) {
           chunk_fd.fd = -1;
           chunk_tables_->Lock();
@@ -1617,6 +1619,32 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     } else {
       attribute_value = "DIRECT";
     }
+  } else if (attr == "user.chunks") {
+    if (d.IsRegular()) {
+      if (d.IsChunkedFile()) {
+        PathString path;
+        retval = GetPathForInode(ino, &path);
+        assert(retval);
+
+        FileChunkList chunks;
+        if (!catalog_manager_->ListFileChunks(path, d.hash_algorithm(),
+                                              &chunks) ||
+            chunks.IsEmpty())
+        {
+          LogCvmfs(kLogCvmfs, kLogDebug| kLogSyslogErr, "file %s is marked as "
+                   "'chunked', but no chunks found.", path.c_str());
+          fuse_reply_err(req, EIO);
+          return;
+        } else {
+          attribute_value = StringifyInt(chunks.size());
+        }
+      } else {
+        attribute_value = "1";
+      }
+    } else {
+      fuse_reply_err(req, ENOATTR);
+      return;
+    }
   } else if (attr == "user.external_file") {
     if (d.IsRegular()) {
       attribute_value = d.IsExternalFile() ? "1" : "0";
@@ -1624,8 +1652,6 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
       fuse_reply_err(req, ENOATTR);
       return;
     }
-  } else if (attr == "user.external_data") {
-    attribute_value = catalog_manager_->GetExternalDataRepository() ? "1" : "0";
   } else if (attr == "user.external_host") {
     vector<string> host_chain;
     vector<int> rtt;
@@ -1760,8 +1786,7 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
     "user.host\0user.proxy\0user.uptime\0user.nclg\0user.nopen\0"
     "user.ndownload\0user.timeout\0user.timeout_direct\0user.rx\0user.speed\0"
     "user.fqrn\0user.ndiropen\0user.inode_max\0user.tag\0user.host_list\0"
-    "user.external_host\0user.external_data\0user.external_timeout\0"
-    "user.pubkeys\0";
+    "user.external_host\0user.external_timeout\0user.pubkeys\0";
   string attribute_list;
   if (hide_magic_xattrs_) {
     LogCvmfs(kLogCvmfs, kLogDebug, "Hiding extended attributes");
@@ -1777,7 +1802,8 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
       const char symlink_list[] = "xfsroot.rawlink\0user.rawlink\0";
       attribute_list += string(symlink_list, sizeof(symlink_list)-1);
     } else if (d.IsRegular()) {
-      const char regular_file_list[] = "user.external_file\0user.compression\0";
+      const char regular_file_list[] = "user.external_file\0user.compression\0"
+                                       "user.chunks\0";
       attribute_list += string(regular_file_list, sizeof(regular_file_list)-1);
     }
 
@@ -1835,12 +1861,24 @@ bool Pin(const string &path) {
           false);
       if (!retval)
         return false;
-      int fd = fetcher_->Fetch(
-        chunks.AtPtr(i)->content_hash(),
-        chunks.AtPtr(i)->size(),
-        "Part of " + path,
-        dirent.compression_algorithm(),
-        cache::CacheManager::kTypePinned);
+      int fd = -1;
+      if (dirent.IsExternalFile()) {
+        fd = external_fetcher_->Fetch(
+          chunks.AtPtr(i)->content_hash(),
+          chunks.AtPtr(i)->size(),
+          "Part of " + path,
+          dirent.compression_algorithm(),
+          cache::CacheManager::kTypePinned,
+          path,
+          chunks.AtPtr(i)->offset());
+      } else {
+        fd = fetcher_->Fetch(
+          chunks.AtPtr(i)->content_hash(),
+          chunks.AtPtr(i)->size(),
+          "Part of " + path,
+          dirent.compression_algorithm(),
+          cache::CacheManager::kTypePinned);
+      }
       if (fd < 0) {
         return false;
       }

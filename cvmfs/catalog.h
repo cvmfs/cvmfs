@@ -168,7 +168,6 @@ class Catalog : public SingleCopy {
     return ((database_ != NULL) && database_->OwnsFile()) || managed_database_;
   }
 
-  bool GetExternalData() const;
   uint64_t GetTTL() const;
   uint64_t GetRevision() const;
   bool GetVOMSAuthz(std::string *authz) const;
@@ -257,16 +256,6 @@ class Catalog : public SingleCopy {
   void FixTransitionPoint(const shash::Md5 &md5path,
                           DirectoryEntry *dirent) const;
 
-  // Represents the status of the external data bit in the catalog.
-  // This only would be set in the root catalog and only affects the default
-  // behavior when publishing new files.
-  enum ExternalDataStatus {
-    kExternalPublishUnknown,  // Database has not been queried about external
-                              // data status.
-    kExternalPublishDisable,  // External data property is explicitly disabled.
-    kExternalPublishEnable,   // External data is explicitly enabled.
-  };
-
  private:
   enum VomsAuthzStatus {
     kVomsUnknown,  // Not yet looked up
@@ -276,7 +265,6 @@ class Catalog : public SingleCopy {
 
   bool LookupEntry(const shash::Md5 &md5path, const bool expand_symlink,
                    DirectoryEntry *dirent) const;
-  ExternalDataStatus GetExternalDataImpl() const;
   CatalogDatabase *database_;
   pthread_mutex_t *lock_;
 
@@ -286,8 +274,6 @@ class Catalog : public SingleCopy {
   bool volatile_flag_;
   const bool is_root_;
   bool managed_database_;
-
-  mutable atomic_int32 external_data_status_;
 
   Catalog *parent_;
   NestedCatalogMap children_;
