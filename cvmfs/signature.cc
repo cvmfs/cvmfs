@@ -609,10 +609,6 @@ bool SignatureManager::Verify(const unsigned char *buffer,
     )
   {
     result = true;
-    RSA *rsa = EVP_PKEY_get1_RSA(X509_get_pubkey(certificate_));
-    if (rsa) {
-      RSA_free(rsa);
-    }
   }
   EVP_MD_CTX_cleanup(&ctx);
 
