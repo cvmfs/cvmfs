@@ -60,7 +60,7 @@ class CommandGraft : public Command {
   bool verbose_;
   zlib::Algorithms compression_alg_;
   shash::Algorithms hash_alg_;
-  size_t chunk_size_;
+  uint64_t chunk_size_;
 };
 
 }  // namespace swissknife
