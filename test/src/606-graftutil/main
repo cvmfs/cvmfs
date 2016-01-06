@@ -136,7 +136,13 @@ cvmfs_run_test() {
     return $verify_result
   fi
 
-
+  echo "Test hash algorithm"
+  local shake_checksum=$(echo -n "abc" | cvmfs_swissknife graft -i - -a shake128 \
+    | grep ^checksum= | cut -d= -f2)
+  echo "checksum is $shake_checksum"
+  if [ x"$shake_checksum" != "x5881092dd818bf5cf8a3ddb793fbcba74097d5c5-shake128" ]; then
+    return 40
+  fi
 
   return 0
 }
