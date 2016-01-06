@@ -172,6 +172,7 @@ struct JobInfo {
 
     range_offset = -1;
     range_size = -1;
+    http_code = -1;
   }
 
   // One constructor per destination + head request
@@ -244,6 +245,7 @@ struct JobInfo {
   std::string proxy;
   bool nocache;
   Failures error_code;
+  int http_code;
   unsigned char num_used_proxies;
   unsigned char num_used_hosts;
   unsigned char num_retries;
@@ -329,6 +331,8 @@ class DownloadManager {
 
   DownloadManager();
   ~DownloadManager();
+
+  static int ParseHttpCode(const char digits[3]);
 
   void Init(const unsigned max_pool_handles, const bool use_system_proxy,
       perf::Statistics * statistics, const std::string &name = "download");
