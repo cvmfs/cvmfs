@@ -2988,6 +2988,9 @@ mkfs() {
 
   echo -n "Creating Initial Repository... "
   create_whitelist $name $cvmfs_user $upstream $temp_dir > /dev/null
+  local repoinfo_file=${temp_dir}/new_repoinfo
+  touch $repoinfo_file
+  create_repometa_skeleton $repoinfo_file
   local volatile_opt=
   if [ $volatile_content -eq 1 ]; then
     volatile_opt="-v"
@@ -3007,8 +3010,8 @@ mkfs() {
     create_cmd="$create_cmd -V $voms_authz"
     echo "CVMFS_VOMS_AUTHZ=$voms_authz" >> /etc/cvmfs/repositories.d/$name/server.conf
   fi
-  $user_shell "$create_cmd" > /dev/null        || die "fail! (cannot init repo)"
-  sign_manifest $name ${temp_dir}/new_manifest || die "fail! (cannot sign repo)"
+  $user_shell "$create_cmd" > /dev/null                       || die "fail! (cannot init repo)"
+  sign_manifest $name ${temp_dir}/new_manifest $repoinfo_file || die "fail! (cannot sign repo)"
   echo "done"
 
   echo -n "Mounting CernVM-FS Storage... "
