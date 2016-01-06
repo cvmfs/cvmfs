@@ -88,4 +88,6 @@ TEST(T_ClientCtx, Guard) {
   EXPECT_EQ(4U, uid);
   EXPECT_EQ(5U, gid);
   EXPECT_EQ(6, pid);
+  
+  ClientCtx::CleanupInstance();
 }
