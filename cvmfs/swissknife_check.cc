@@ -800,6 +800,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     return 1;
   }
 
+  LogCvmfs(kLogCvmfs, kLogStdout, "no problems found");
   return 0;
 }
 
