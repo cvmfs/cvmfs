@@ -491,12 +491,17 @@ static bool CheckVoms(const fuse_ctx &fctx) {
              "properties", voms_requirements.c_str());
   }
 
-  // Get VOMS information, if any,
-#ifdef VOMS_AUTHZ
+  // Get VOMS information, if any.  If VOMS authz is present and VOMS is
+  // not compiled in, then deny authorization.
   if ((fctx.uid != 0) && voms_requirements.size()) {
+#ifdef VOMS_AUTHZ
     return CheckVOMSAuthz(&fctx, voms_requirements);
-  }
+#else
+    LogCvmfs(kLogCvmfs, kLogSyslogWarn | kLogDebug,  "VOMS requirements found "
+              "in catalog but client compiled without VOMS support");
+    return false;
 #endif
+  }
   return true;
 }
 
@@ -1099,27 +1104,11 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     return;
   }
 
-  std::string voms_requirements;
-  if (catalog_manager_->GetVOMSAuthz(&voms_requirements))
-  {
-    LogCvmfs(kLogCvmfs, kLogDebug, "Got VOMS authz %s from filesystem "
-             "properties", voms_requirements.c_str());
+  if (!CheckVoms(*fuse_ctx)) {
+    remount_fence_->Leave();
+    fuse_reply_err(req, EACCES);
+    return;
   }
-
-  // Get VOMS information, if any,
-  // TODO(jblomer): without VOMS, cvmfs will allow access.  This is probably
-  // not the right default.
-#ifdef VOMS_AUTHZ
-  if ((fuse_ctx->uid != 0) && !voms_requirements.empty())
-  {
-    if (!CheckVOMSAuthz(fuse_ctx, voms_requirements))
-    {
-      remount_fence_->Leave();
-      fuse_reply_err(req, EACCES);
-      return;
-    }
-  }
-#endif
 
   // Don't check.  Either done by the OS or one wants to purposefully work
   // around wrong open flags
