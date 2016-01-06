@@ -22,7 +22,7 @@ cvmfs_run_test() {
 
   #################################################################
   echo "Test stdout"
-  output=$(echo 'Hello World!' | cvmfs_swissknife graft -i -)
+  output=$(echo 'Hello World!' | cvmfs_swissknife graft -i - -Z zlib)
   if [ $? -ne 0 ]; then
     return 1
   fi
@@ -48,7 +48,7 @@ cvmfs_run_test() {
     return $verify_result
   fi
 
-  local uncompressed_cksum=$(echo "hello world" | cvmfs_swissknife graft -i - -Z none | grep checksum | tr '=' ' ' | awk '{print $2;}')
+  local uncompressed_cksum=$(echo "hello world" | cvmfs_swissknife graft -i - | grep checksum | tr '=' ' ' | awk '{print $2;}')
   local uncompressed_cksum_real=$(echo "hello world" | sha1sum | awk '{print $1;}')
   if [ x"$uncompressed_cksum_real" != x"$uncompressed_cksum" ]; then
     echo "Uncompressed check failed; produced $uncompressed_cksum, expected $uncompressed_cksum_real"
@@ -59,7 +59,7 @@ cvmfs_run_test() {
   echo "Single file output"
   mkdir -p simple1
   echo "Hello World!" > hello_world
-  cvmfs_swissknife graft -i hello_world -o simple1
+  cvmfs_swissknife graft -i hello_world -o simple1 -Z zlib
   if [ $? -ne 0 ]; then
     return 4
   fi
@@ -76,7 +76,7 @@ cvmfs_run_test() {
   #################################################################
   echo "Single file output, absolute graft path"
   mkdir -p simple2
-  cvmfs_swissknife graft -i hello_world -o simple2/hello_world2
+  cvmfs_swissknife graft -i hello_world -o simple2/hello_world2 -Z zlib
   if [ $? -ne 0 ]; then
     return 4
   fi
@@ -97,7 +97,7 @@ cvmfs_run_test() {
   cp hello_world deep_input/
   cp hello_world deep_input/sub1/sub2
   echo "Break" > deep_input/sub1/sub2/check_break
-  cvmfs_swissknife graft -i deep_input -o deep_output
+  cvmfs_swissknife graft -i deep_input -o deep_output -Z zlib
   if [ $? -ne 0 ]; then
     return 6
   fi

@@ -57,7 +57,7 @@ int swissknife::CommandGraft::Main(const swissknife::ArgumentList &args) {
       (args.find('o') == args.end()) ? "" : *(args.find('o')->second);
   verbose_ = args.find('v') != args.end();
   compression_alg_ = (args.find('Z') == args.end()) ?
-                     zlib::kZlibDefault :
+                     zlib::kNoCompression :
                      zlib::ParseCompressionAlgorithm(*args.find('Z')->second);
 
   platform_stat64 sbuf;

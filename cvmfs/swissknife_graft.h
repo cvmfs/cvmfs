@@ -33,7 +33,8 @@ class CommandGraft : public Command {
                                        "('-' for reading from stdin)"));
     r.push_back(Parameter::Optional('o', "Output location for graft file"));
     r.push_back(Parameter::Switch('v', "Verbose output"));
-    r.push_back(Parameter::Optional('Z', "Compression algorithm"));
+    r.push_back(Parameter::Optional('Z', "Compression algorithm "
+                                    "(default: none)"));
     return r;
   }
 
