@@ -52,7 +52,7 @@ class CommandGraft : public Command {
   std::string output_file_;
   std::string input_file_;
   bool verbose_;
-  zlib::Algorithms alg_;
+  zlib::Algorithms compression_alg_;
 };
 
 }  // namespace swissknife
