@@ -503,7 +503,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (args.find('i') != args.end()) params.ignore_xdir_hardlinks = true;
   if (args.find('d') != args.end()) params.stop_for_catalog_tweaks = true;
   if (args.find('g') != args.end()) params.garbage_collectable = true;
-  if (args.find('V') != args.end()) params.voms_authz = *args.find('V')->second;
+  if (args.find('V') != args.end()) params.voms_authz = true;
+  if (args.find('F') != args.end()) params.authz_file = *args.find('F')->second;
   if (args.find('k') != args.end()) params.include_xattrs = true;
   if (args.find('Y') != args.end()) params.external_data = true;
   if (args.find('z') != args.end()) {
@@ -625,6 +626,30 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     catalog_manager.SetTTL(params.ttl_seconds);
   }
 
+  if (!params.authz_file.empty()) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "Adding contents of authz file %s to"
+                                   " root catalog.",
+                                   params.authz_file.c_str());
+    int fd = open(params.authz_file.c_str(), O_RDONLY);
+    if (fd == -1) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Unable to open authz file (%s)"
+               "from the publication process: %s", params.authz_file.c_str(),
+               strerror(errno));
+      return 7;
+    }
+
+    std::string new_authz;
+    if (!SafeReadToString(fd, &new_authz)) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to read authz file (%s): %s",
+               params.authz_file.c_str(),
+               strerror(errno));
+      return 8;
+    }
+
+    close(fd);
+    catalog_manager.SetVOMSAuthz(new_authz);
+  }
+
   LogCvmfs(kLogCvmfs, kLogStdout, "Exporting repository manifest");
   UniquePtr<manifest::Manifest> manifest(mediator.Commit());
 
@@ -633,7 +658,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     return 5;
   }
 
-  const bool needs_bootstrap_shortcuts = !params.voms_authz.empty();
+  const bool needs_bootstrap_shortcuts = params.voms_authz;
   manifest->set_garbage_collectability(params.garbage_collectable);
   manifest->set_has_alt_catalog_path(needs_bootstrap_shortcuts);
   g_download_manager->Fini();

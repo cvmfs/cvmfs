@@ -1619,6 +1619,12 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     } else {
       attribute_value = "DIRECT";
     }
+  } else if (attr == "user.authz") {
+    bool has_authz = catalog_manager_->GetVOMSAuthz(&attribute_value);
+    if (!has_authz) {
+      fuse_reply_err(req, ENOATTR);
+      return;
+    }
   } else if (attr == "user.chunks") {
     if (d.IsRegular()) {
       if (d.IsChunkedFile()) {
@@ -1807,6 +1813,9 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
       attribute_list += string(regular_file_list, sizeof(regular_file_list)-1);
     }
 
+    if (catalog_manager_->GetVOMSAuthz(NULL)) {
+      attribute_list += "user.authz\0";
+    }
     attribute_list = xattrs.ListKeysPosix(attribute_list);
   }
 
