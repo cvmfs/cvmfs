@@ -424,7 +424,7 @@ string CommandCheck::DownloadPiece(const shash::Any catalog_hash) {
   download::JobInfo download_catalog(&url, true, false, &dest, &catalog_hash);
   download::Failures retval = g_download_manager->Fetch(&download_catalog);
   if (retval != download::kFailOk) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "failed to download catalog %s (%d)",
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to download catalog %s (%d)",
              catalog_hash.ToString().c_str(), retval);
     return "";
   }
@@ -453,7 +453,7 @@ catalog::Catalog* CommandCheck::FetchCatalog(const string      &path,
     tmp_file = DownloadPiece(catalog_hash);
 
   if (tmp_file == "") {
-    LogCvmfs(kLogCvmfs, kLogStdout, "failed to load catalog %s",
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load catalog %s",
              catalog_hash.ToString().c_str());
     return NULL;
   }
@@ -465,7 +465,7 @@ catalog::Catalog* CommandCheck::FetchCatalog(const string      &path,
   unlink(tmp_file.c_str());
 
   if ((catalog_size > 0) && (uint64_t(catalog_file_size) != catalog_size)) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "catalog file size mismatch, "
+    LogCvmfs(kLogCvmfs, kLogStderr, "catalog file size mismatch, "
              "expected %"PRIu64", got %"PRIu64,
              catalog_size, catalog_file_size);
     delete catalog;
@@ -535,7 +535,7 @@ bool CommandCheck::InspectTree(const string                  &path,
                                                  catalog_hash,
                                                  catalog_size);
   if (catalog == NULL) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "failed to open catalog %s",
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to open catalog %s",
              catalog_hash.ToString().c_str());
     return false;
   }
@@ -764,7 +764,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     delete tag_db;
     unlink(tmp_file.c_str());
     if (!retval) {
-      LogCvmfs(kLogCvmfs, kLogStdout, "no such tag: %s", tag_name.c_str());
+      LogCvmfs(kLogCvmfs, kLogStderr, "no such tag: %s", tag_name.c_str());
       unlink(tmp_file.c_str());
       delete manifest;
       return 1;
@@ -779,7 +779,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   if (is_nested_catalog && !FindSubtreeRootCatalog( subtree_path,
                                                    &root_hash,
                                                    &root_size)) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "cannot find nested catalog at %s",
+    LogCvmfs(kLogCvmfs, kLogStderr, "cannot find nested catalog at %s",
              subtree_path.c_str());
     delete manifest;
     return 1;
