@@ -31,6 +31,7 @@ class CommandGraft : public Command {
     r.push_back(Parameter::Switch('v', "Verbose output"));
     r.push_back(Parameter::Optional('Z', "Compression algorithm "
                                     "(default: none)"));
+    r.push_back(Parameter::Optional('c', "Chunk size (in MB; default: 32)"));
     r.push_back(Parameter::Optional('a', "hash algorithm (default: SHA-1)"));
     return r;
   }
@@ -47,11 +48,19 @@ class CommandGraft : public Command {
   bool DirCallback(const std::string &relative_path,
                    const std::string &dir_name);
 
+  bool ChecksumFdWithChunks(int fd,
+                            zlib::Compressor *compressor,
+                            uint64_t *file_size,
+                            shash::Any *file_hash,
+                            std::vector<uint64_t> *chunk_offsets,
+                            std::vector<shash::Any> *chunk_checksums);
+
   std::string output_file_;
   std::string input_file_;
   bool verbose_;
   zlib::Algorithms compression_alg_;
   shash::Algorithms hash_alg_;
+  size_t chunk_size_;
 };
 
 }  // namespace swissknife

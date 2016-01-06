@@ -30,6 +30,8 @@ bool CopyPath2Mem(const std::string &path,
 
 namespace zlib {
 
+const unsigned kZChunk = 16384;
+
 enum StreamStates {
   kStreamDataError = 0,
   kStreamIOError,
