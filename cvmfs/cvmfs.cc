@@ -497,6 +497,8 @@ static bool CheckVoms(const fuse_ctx &fctx) {
 #ifdef VOMS_AUTHZ
     return CheckVOMSAuthz(&fctx, voms_requirements);
 #else
+    LogCvmfs(kLogCvmfs, kLogSyslogWarn | kLogDebug,  "VOMS requirements found "
+              "in catalog but client compiled without VOMS support");
     return false;
 #endif
   }
