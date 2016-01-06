@@ -32,6 +32,7 @@ struct SyncParameters {
     garbage_collectable(false),
     include_xattrs(false),
     external_data(false),
+    voms_authz(false),
     compression_alg(zlib::kZlibDefault),
     catalog_entry_warn_threshold(kDefaultEntryWarnThreshold),
     min_file_chunk_size(kDefaultMinFileChunkSize),
@@ -54,7 +55,7 @@ struct SyncParameters {
   std::string      manifest_path;
   std::string      spooler_definition;
   std::string      union_fs_type;
-  std::string      voms_authz;
+  std::string      authz_file;
   bool             print_changeset;
   bool             dry_run;
   bool             mucatalogs;
@@ -64,6 +65,7 @@ struct SyncParameters {
   bool             garbage_collectable;
   bool             include_xattrs;
   bool             external_data;
+  bool             voms_authz;
   zlib::Algorithms compression_alg;
   uint64_t         catalog_entry_warn_threshold;
   size_t           min_file_chunk_size;
@@ -233,8 +235,6 @@ class CommandSync : public Command {
     r.push_back(Parameter::Switch('d', "pause publishing to allow for "
                                           "catalog tweaks"));
     r.push_back(Parameter::Switch('g', "repo is garbage collectable"));
-    r.push_back(Parameter::Optional('V', "VOMS authz requirement "
-                                         "(default: none)"));
     r.push_back(Parameter::Switch('p', "enable file chunking"));
     r.push_back(Parameter::Switch('k', "include extended attributes"));
     r.push_back(Parameter::Optional('z', "log level (0-4, default: 2)"));
@@ -252,7 +252,9 @@ class CommandSync : public Command {
     r.push_back(Parameter::Optional('M', "minimum weight of the autocatalogs"));
     r.push_back(Parameter::Optional(
       'Z', "compression algorithm (default: zlib)"));
-    r.push_back(Parameter::Optional('V', "VOMS authz requirement "
+    r.push_back(Parameter::Switch('V', "Publish format compatible with "
+                                       "authenticated repos"));
+    r.push_back(Parameter::Optional('F', "Authz file listing "
                                          "(default: none)"));
     r.push_back(Parameter::Optional('T', "Root catalog TTL in seconds"));
     return r;
