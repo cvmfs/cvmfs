@@ -73,5 +73,14 @@ cvmfs_run_test() {
 
   rm -f $large_file
 
+  echo "overwrite compression algorithm"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  echo "zlib compressed" > /cvmfs/$CVMFS_TEST_REPO/zlib
+  publish_repo $CVMFS_TEST_REPO -Z zlib
+  attrval=`attr -qg compression $rdonly_repo_dir/zlib`
+  if [ x"$attrval" != xzlib ]; then
+    return 10
+  fi
+
   return 0
 }

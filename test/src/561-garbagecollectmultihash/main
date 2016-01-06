@@ -179,8 +179,10 @@ cvmfs_run_test() {
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -g -z || return $?
   root_clg_0="$(get_current_root_catalog $CVMFS_TEST_REPO)"
 
-  echo "disable automatic garbage collection"
+  local gc_log="${scratch_dir}/gc.log"
+  echo "disable automatic garbage collection and enable GC logging ($gc_log)"
   disable_auto_garbage_collection $CVMFS_TEST_REPO || return $?
+  echo "CVMFS_GC_DELETION_LOG=$gc_log" | sudo tee -a "/etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/server.conf" || return 100
 
   # ============================================================================
 
@@ -301,11 +303,23 @@ cvmfs_run_test() {
   peek_backend $CVMFS_TEST_REPO $chopped_shakespeare_2 && return 12
   peek_backend $CVMFS_TEST_REPO $chopped_shakespeare_3 && return 12
 
+  echo "check that deletion log contains shakespeare"
+  cat $gc_log | grep -q $shakespeare_object    || return 12
+  cat $gc_log | grep -q $chopped_shakespeare_1 || return 12
+  cat $gc_log | grep -q $chopped_shakespeare_2 || return 12
+  cat $gc_log | grep -q $chopped_shakespeare_3 || return 12
+
   echo "check if kafka is still there"
   peek_backend $CVMFS_TEST_REPO $kafka_object    || return 13
   peek_backend $CVMFS_TEST_REPO $chopped_kafka_1 || return 13
   peek_backend $CVMFS_TEST_REPO $chopped_kafka_2 || return 13
   peek_backend $CVMFS_TEST_REPO $chopped_kafka_3 || return 13
+
+  echo "check that deletion log doesn't contain kafka"
+  cat $gc_log | grep -q $kafka_object    && return 13
+  cat $gc_log | grep -q $chopped_kafka_1 && return 13
+  cat $gc_log | grep -q $chopped_kafka_2 && return 13
+  cat $gc_log | grep -q $chopped_kafka_3 && return 13
 
   echo "check if the catalog revisions 1-4 are gone"
   for clg_hash in $root_clg_0 $root_clg_1 $root_clg_2; do
@@ -324,8 +338,9 @@ cvmfs_run_test() {
   publish_repo $CVMFS_TEST_REPO > publish_5.log 2>&1 || return 17
   root_clg_5="$(get_current_root_catalog $CVMFS_TEST_REPO)"
 
-  echo "perform another garbage collection (should remove kafka)"
-  cvmfs_server gc -f $CVMFS_TEST_REPO || return 18
+  local manual_gc_log="${scratch_dir}/manual.gc.log"
+  echo "perform another garbage collection (should remove kafka) (logging to $manual_gc_log)"
+  cvmfs_server gc -fL $manual_gc_log $CVMFS_TEST_REPO || return 18
 
   echo "check if kafka is gone"
   peek_backend $CVMFS_TEST_REPO $kafka_object    && return 19
@@ -333,23 +348,35 @@ cvmfs_run_test() {
   peek_backend $CVMFS_TEST_REPO $chopped_kafka_2 && return 19
   peek_backend $CVMFS_TEST_REPO $chopped_kafka_3 && return 19
 
+  echo "check if kafka is in the manual deletion"
+  cat $manual_gc_log | grep -q $kafka_object    || return 19
+  cat $manual_gc_log | grep -q $chopped_kafka_1 || return 19
+  cat $manual_gc_log | grep -q $chopped_kafka_2 || return 19
+  cat $manual_gc_log | grep -q $chopped_kafka_3 || return 19
+
+  echo "check that shakespeare is not in the manual deletion log"
+  cat $manual_gc_log | grep -q $shakespeare_object    && return 20
+  cat $manual_gc_log | grep -q $chopped_shakespeare_1 && return 20
+  cat $manual_gc_log | grep -q $chopped_shakespeare_2 && return 20
+  cat $manual_gc_log | grep -q $chopped_shakespeare_3 && return 20
+
   echo "check if the catalog revisions 1-5 are gone"
   for clg_hash in $root_clg_0 $root_clg_1 $root_clg_2 $root_clg_3; do
-    peek_backend $CVMFS_TEST_REPO ${clg_hash}C && return 20
+    peek_backend $CVMFS_TEST_REPO ${clg_hash}C && return 21
   done
 
   echo "check if the catalog revisions 6-7 are preserved"
   for clg_hash in $root_clg_4 $root_clg_5; do
-    peek_backend $CVMFS_TEST_REPO ${clg_hash}C || return 21
+    peek_backend $CVMFS_TEST_REPO ${clg_hash}C || return 22
   done
 
   # ============================================================================
 
   echo "check if the repository is still sane"
-  check_repository $CVMFS_TEST_REPO -i || return 22
+  check_repository $CVMFS_TEST_REPO -i || return 23
 
   echo "check if the repository's previous revision is still sane"
-  check_repository $CVMFS_TEST_REPO -i -t trunk-previous || return 23
+  check_repository $CVMFS_TEST_REPO -i -t trunk-previous || return 24
 
   return 0
 }

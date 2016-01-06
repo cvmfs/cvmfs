@@ -276,7 +276,7 @@ CernVM-FS Server Tool $(cvmfs_version_string)
 Usage: cvmfs_server COMMAND [options] <parameters>
 
 Supported Commands:
-  mkfs          [-w stratum0 url] [-u upstream storage] [-o owner] [-X (enable external data)]
+  mkfs          [-w stratum0 url] [-u upstream storage] [-o owner] [-X (external data)]
                 [-m replicable] [-f union filesystem type] [-v volatile content]
                 [-g disable auto tags] [-a hash algorithm (default: SHA-1)]
                 [-z enable garbage collection] [-s S3 config file]
@@ -298,7 +298,9 @@ Supported Commands:
                 <fully qualified repository name>
                 Imports an old CernVM-FS repository into a fresh 2.1.x repo
   publish       [-p pause for tweaks] [-n manual revision number] [-v verbose]
-                [-a tag name] [-c tag channel] [-m tag description] [-X (external data)]
+                [-a tag name] [-c tag channel] [-m tag description]
+                [-X (force external data) | -N (force native data)]
+                [-Z compression algorithm]
                 <fully qualified name>
                 Make a new repository snapshot
   rmfs          [-p(reserve) repo data and keys] [-f don't ask again]
@@ -2081,6 +2083,7 @@ create_config_files_for_new_repository() {
   local garbage_collectable=$8
   local configure_apache=$9
   local compression_alg=${10}
+  local external_data=${11}
 
   # other configurations
   local spool_dir="/var/spool/cvmfs/${name}"
@@ -2111,6 +2114,7 @@ CVMFS_CATALOG_ENTRY_WARN_THRESHOLD=$CVMFS_DEFAULT_CATALOG_ENTRY_WARN_THRESHOLD
 CVMFS_UNION_FS_TYPE=$unionfs
 CVMFS_HASH_ALGORITHM=$hash_algo
 CVMFS_COMPRESSION_ALGORITHM=$compression_alg
+CVMFS_EXTERNAL_DATA=$external_data
 CVMFS_AUTO_TAG=$autotagging
 CVMFS_GARBAGE_COLLECTION=$garbage_collectable
 CVMFS_AUTO_REPAIR_MOUNTPOINT=true
@@ -2796,7 +2800,7 @@ mkfs() {
   local garbage_collectable=false
   local s3_config=""
   local keys_import_location
-  local external_data=0
+  local external_data=false
 
   local configure_apache=1
   local voms_authz=""
@@ -2806,7 +2810,7 @@ mkfs() {
   while getopts "Xw:u:o:mf:vga:zs:k:pV:Z:" option; do
     case $option in
       X)
-        external_data=1
+        external_data=true
       ;;
       w)
         stratum0=$OPTARG
@@ -2944,7 +2948,7 @@ mkfs() {
                                          "$garbage_collectable" \
                                          "$configure_apache"    \
                                          "$compression_alg"     \
-                                         || die "fail"
+                                         "$external_data" || die "fail"
   if is_local_upstream $upstream && [ $configure_apache -eq 1 ]; then
     reload_apache > /dev/null
   fi
@@ -2980,10 +2984,6 @@ mkfs() {
   local temp_dir="${CVMFS_SPOOL_DIR}/tmp"
   local rdonly_dir="${CVMFS_SPOOL_DIR}/rdonly"
   local scratch_dir="${CVMFS_SPOOL_DIR}/scratch"
-  local external_data_opt=""
-  if [ $external_data -eq 1 ]; then
-    external_data_opt="-X"
-  fi
 
   echo -n "Creating Initial Repository... "
   create_whitelist $name $cvmfs_user $upstream $temp_dir > /dev/null
@@ -2994,7 +2994,6 @@ mkfs() {
   fi
   local user_shell="$(get_user_shell $name)"
   local create_cmd="$(__swissknife_cmd) create  \
-    $external_data_opt                          \
     -t $temp_dir                                \
     -r $upstream                                \
     -a $hash_algo $volatile_opt                 \
@@ -3029,7 +3028,7 @@ mkfs() {
   # When publishing an external repository, it is the user's responsibility to
   # stage the actual data files to the web server - not the publication function.
   # Hence, the following is guaranteed to not work.
-  if [ $external_data -eq 0 ]; then
+  if [ $external_data = "false" ]; then
     cat $rdonly_dir/new_repository || die "fail (finish)"
   fi
 
@@ -3416,7 +3415,8 @@ import() {
                                          "true"        \
                                          "false"       \
                                          "$configure_apache" \
-                                         "default" || die "fail!"
+                                         "default"     \
+                                         "false" || die "fail!"
   echo "done"
 
   # import the old repository security keys
@@ -4312,10 +4312,14 @@ publish() {
   local manual_revision=""
   local gc_timespan=0
   local authz_file=""
+  local force_external=0
+  local force_native=0
+  local force_compression_algorithm=""
+  local external_option=""
 
   # optional parameter handling
   OPTIND=1
-  while getopts "F:Xpa:c:m:vn:" option
+  while getopts "F:NXZ:pa:c:m:vn:" option
   do
     case $option in
       p)
@@ -4337,7 +4341,13 @@ publish() {
         manual_revision="$OPTARG"
       ;;
       X)
-        external_option="-Y"
+        force_external=1
+      ;;
+      N)
+        force_native=1
+      ;;
+      Z)
+        force_compression_algorithm="$OPTARG"
       ;;
       F)
         authz_file="-F $OPTARG"
@@ -4348,6 +4358,10 @@ publish() {
       ;;
     esac
   done
+
+  if [ $(($force_external + $force_native)) -eq 2 ]; then
+    usage "Command publish: -N and -X are mutually exclusive"
+  fi
 
   # get repository names
   shift $(($OPTIND-1))
@@ -4376,6 +4390,14 @@ publish() {
     upstream=$CVMFS_UPSTREAM_STORAGE
     hash_algorithm="${CVMFS_HASH_ALGORITHM-sha1}"
     compression_alg="${CVMFS_COMPRESSION_ALGORITHM-default}"
+    if [ x"$force_compression_algorithm" != "x" ]; then
+      compression_alg="$force_compression_algorithm"
+    fi
+    if [ x"$CVMFS_EXTERNAL_DATA" = "xtrue" -o $force_external -eq 1 ]; then
+      if [ $force_native -eq 0 ]; then
+        external_option="-Y"
+      fi
+    fi
 
     # more sanity checks
     is_owner_or_root $name || { echo "Permission denied: Repository $name is owned by $user"; retcode=1; continue; }
@@ -4534,6 +4556,7 @@ publish() {
                $dry_run    \
                $manifest   \
                $trunk_hash \
+               ""          \
                -z $gc_timespan      || { local err=$?; publish_failed $name; die "Garbage collection failed ($err)"; }
       sign_manifest $name $manifest || { publish_failed $name; die "Signing failed"; }
     fi
@@ -4682,10 +4705,11 @@ gc() {
   local preserve_timestamp=0
   local timestamp_threshold=""
   local force=0
+  local deletion_log=""
 
   # optional parameter handling
   OPTIND=1
-  while getopts "ldr:t:f" option
+  while getopts "ldr:t:fL:" option
   do
     case $option in
       l)
@@ -4702,6 +4726,9 @@ gc() {
       ;;
       f)
         force=1
+      ;;
+      L)
+        deletion_log="$OPTARG"
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -4811,6 +4838,7 @@ gc() {
              "$dry_run"        \
              "$manifest"       \
              "$base_hash"      \
+             "$deletion_log"   \
              $additional_switches || die "Fail ($?)!"
 
     # sign the result
@@ -4837,7 +4865,8 @@ __run_gc() {
   local dry_run="$3"
   local manifest="$4"
   local base_hash="$5"
-  shift 5
+  local deletion_log="$6"
+  shift 6
   local additional_switches="$*"
 
   load_repo_config $name
@@ -4852,6 +4881,13 @@ __run_gc() {
   if is_stratum0 $name; then
     [ x"$manifest"  != x"" ] || return 4
     [ x"$base_hash" != x"" ] || return 5
+  fi
+
+  # handle a configured deletion log (manually passed log has precedence)
+  if [ x"$deletion_log" != x"" ]; then
+    additional_switches="$additional_switches -L $deletion_log"
+  elif [ ! -z $CVMFS_GC_DELETION_LOG ]; then
+    additional_switches="$additional_switches -L $CVMFS_GC_DELETION_LOG"
   fi
 
   # do it!
@@ -5068,6 +5104,7 @@ snapshot() {
       __run_gc "$alias_name" \
                "$stratum1"   \
                "$dry_run"    \
+               ""            \
                ""            \
                ""            \
                -z $gc_timespan || die "Garbage collection failed ($?)"

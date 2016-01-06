@@ -95,7 +95,6 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   const string      &dir_temp,
   const bool         volatile_content,
   const std::string &voms_authz,
-  CatalogProperty    external_data,
   upload::Spooler   *spooler)
 {
   // Create a new root catalog at file_path
@@ -124,7 +123,6 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
         !new_clg_db->InsertInitialValues(root_path,
                                          volatile_content,
                                          voms_authz,
-                                         external_data,
                                          root_entry))
     {
       LogCvmfs(kLogCatalog, kLogStderr, "creation of catalog '%s' failed",
@@ -529,7 +527,6 @@ void WritableCatalogManager::TouchDirectory(const DirectoryEntryBase &entry,
  * Create a new nested catalog.  Includes moving all entries belonging there
  * from it's parent catalog.
  * @param mountpoint the path of the directory to become a nested root
- * @param external_data whether data for this catalog is external to the repository
  * @return true on success, false otherwise
  */
 void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
@@ -566,7 +563,6 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
                                                volatile_content,
                                                "",  // At this point, only root
                                                     // catalog gets VOMS authz
-                                               kUnset,
                                                new_root_entry);
   assert(retval);
   // TODO(rmeusel): we need a way to attach a catalog directy from an open

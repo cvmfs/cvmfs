@@ -6,9 +6,12 @@
 #include "hash.h"
 
 #include <alloca.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <openssl/md5.h>
 #include <openssl/ripemd.h>
 #include <openssl/sha.h>
+#include <unistd.h>
 
 #include <cstdio>
 
@@ -311,11 +314,7 @@ void Hmac(
   Final(context_outer, any_digest);
 }
 
-bool HashFile(const std::string &filename, Any *any_digest) {
-  FILE *file = fopen(filename.c_str(), "r");
-  if (file == NULL)
-    return false;
-
+bool HashFd(int fd, Any *any_digest) {
   Algorithms algorithm = any_digest->algorithm;
   ContextPtr context(algorithm);
   context.buffer = alloca(context.size);
@@ -323,18 +322,27 @@ bool HashFile(const std::string &filename, Any *any_digest) {
   Init(context);
   unsigned char io_buffer[4096];
   int actual_bytes;
-  while ((actual_bytes = fread(io_buffer, 1, 4096, file))) {
+  while ((actual_bytes = read(fd, io_buffer, 4096)) != 0) {
+    if (actual_bytes == -1) {
+      if (errno == EINTR)
+        continue;
+      return false;
+    }
     Update(io_buffer, actual_bytes, context);
   }
-
-  if (ferror(file)) {
-    fclose(file);
-    return false;
-  }
-
   Final(context, any_digest);
-  fclose(file);
   return true;
+}
+
+
+bool HashFile(const std::string &filename, Any *any_digest) {
+  int fd = open(filename.c_str(), O_RDONLY);
+  if (fd == -1)
+    return false;
+
+  bool result = HashFd(fd, any_digest);
+  close(fd);
+  return result;
 }
 
 

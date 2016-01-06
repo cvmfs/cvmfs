@@ -307,7 +307,7 @@ bool SyncUnionOverlayfs::ObtainSysAdminCapability() const {
 
 void SyncUnionOverlayfs::PreprocessSyncItem(SyncItem *entry) const {
   SyncUnion::PreprocessSyncItem(entry);
-  if (entry->IsWhiteout() || entry->IsDirectory()) {
+  if (entry->IsGraftMarker() || entry->IsWhiteout() || entry->IsDirectory()) {
     return;
   }
 

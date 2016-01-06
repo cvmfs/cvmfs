@@ -184,7 +184,6 @@ bool CatalogDatabase::InsertInitialValues(
   const std::string    &root_path,
   const bool            volatile_content,
   const std::string    &voms_authz,
-  CatalogProperty       external_data,
   const DirectoryEntry &root_entry)
 {
   assert(read_write());
@@ -222,17 +221,6 @@ bool CatalogDatabase::InsertInitialValues(
   if (!voms_authz.empty()) {
     if (!SetVOMSAuthz(voms_authz)) {
       PrintSqlError("failed to insert VOMS authz flag into the newly created "
-                    "catalog tables.");
-      return false;
-    }
-  }
-  if (external_data != kUnset) {
-    if (!root_path.empty()) {
-      PrintSqlError("External data bit may not be set for nested catalog.");
-      return false;
-    }
-    if (!this->SetProperty("external_data", external_data == kYes ? 1 : 0)) {
-      PrintSqlError("failed to set external data flag into the newly created "
                     "catalog tables.");
       return false;
     }
@@ -361,13 +349,11 @@ unsigned SqlDirent::CreateDatabaseFlags(const DirectoryEntry &entry) const {
   } else {
     database_flags |= kFlagFile;
     database_flags |= entry.compression_algorithm() << kFlagPosCompression;
+    if (entry.IsChunkedFile())
+      database_flags |= kFlagFileChunk;
+    if (entry.IsExternalFile())
+      database_flags |= kFlagFileExternal;
   }
-
-  if (entry.IsChunkedFile())
-    database_flags |= kFlagFileChunk;
-
-  if (entry.IsExternalFile())
-    database_flags |= kFlagFileExternal;
 
   if (!entry.checksum_ptr()->IsNull())
     StoreHashAlgorithm(entry.checksum_ptr()->algorithm, &database_flags);
