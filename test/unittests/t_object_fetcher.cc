@@ -533,11 +533,16 @@ class T_ObjectFetcher : public ::testing::Test {
     const std::string txn_path = CreateTempPath(temp_directory + "/blob", 0600);
     ASSERT_TRUE(zlib::CompressPath2Path(tmp_path, txn_path, content_hash)) <<
       "failed to compress file " << tmp_path << " to " << txn_path;
+    InsertIntoStorage(txn_path, *content_hash);
+  }
+
+  void InsertIntoStorage(const std::string &txn_path,
+                         const shash::Any  &content_hash) {
     const std::string res_path = backend_storage + "/data/" +
-                                 content_hash->MakePath();
+                                 content_hash.MakePath();
     ASSERT_EQ(0, rename(txn_path.c_str(), res_path.c_str())) <<
       "failed to rename() compressed file " << txn_path << " to " << res_path <<
-      " with content hash " << content_hash->ToString() <<
+      " with content hash " << content_hash.ToString() <<
       " (errno: " << errno << ")";
   }
 
