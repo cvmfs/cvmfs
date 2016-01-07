@@ -43,6 +43,20 @@ struct ObjectFetcherFailures {
   };
 };
 
+inline const char* Code2Ascii(const ObjectFetcherFailures::Failures error) {
+  const char *texts[ObjectFetcherFailures::kFailNumEntries + 1];
+  texts[0] = "OK";
+  texts[1] = "object not found";
+  texts[2] = "local I/O failure";
+  texts[3] = "network failure";
+  texts[4] = "decompression failed";
+  texts[5] = "manifest name doesn't match";
+  texts[6] = "manifest signature is invalid";
+  texts[7] = "bad data received";
+  texts[8] = "no text";
+  return texts[error];
+}
+
 /**
  * This is the default class implementing the data object fetching strategy. It
  * is meant to be used when CVMFS specific data structures need to be downloaded
