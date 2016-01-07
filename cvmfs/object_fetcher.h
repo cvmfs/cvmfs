@@ -88,7 +88,8 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
    * Fetches and opens the manifest of the repository this object fetcher is
    * configured for. Note that the user is responsible to clean up this object.
    *
-   * @return  a manifest object or NULL on error
+   * @param manifest  pointer to a manifest object pointer
+   * @return          failure code, specifying the action's result
    */
   Failures FetchManifest(manifest::Manifest** manifest) {
     return static_cast<DerivedT*>(this)->FetchManifest(manifest);
@@ -100,9 +101,10 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
    * database file will be unlinked automatically during the destruction of the
    * HistoryTN object.
    *
+   * @param history       pointer to a history database object pointer
    * @param history_hash  (optional) the content hash of the history database
    *                                 if left blank, the latest one is downloaded
-   * @return              a history database object or NULL on error
+   * @return              failure code, specifying the action's result
    */
   Failures FetchHistory(      HistoryTN  **history,
                         const shash::Any  &history_hash = shash::Any()) {
@@ -139,9 +141,10 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
    *
    * @param catalog_hash   the content hash of the catalog object
    * @param catalog_path   the root_path the catalog is mounted on
+   * @param catalog        pointer to the fetched catalog object pointer
    * @param is_nested      a hint if the catalog to be loaded is a nested one
    * @param parent         (optional) parent catalog of the requested catalog
-   * @return               a catalog object or NULL on error
+   * @return               failure code, specifying the action's result
    */
   Failures FetchCatalog(const shash::Any   &catalog_hash,
                         const std::string  &catalog_path,
@@ -214,7 +217,7 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
    *
    * @param object_hash  the content hash of the object to be downloaded
    * @param file_path    temporary file path to store the download result
-   * @return             true on success (if false, file_path is invalid)
+   * @return             failure code (if not kFailOk, file_path is invalid)
    */
   Failures Fetch(const shash::Any &object_hash, std::string *file_path) {
     return static_cast<DerivedT*>(this)->Fetch(object_hash, file_path);
