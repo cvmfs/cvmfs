@@ -517,7 +517,7 @@ class T_ObjectFetcher : public ::testing::Test {
                                shash::Any   *content_hash) {
     const std::string txn_path = CreateTempPath(temp_directory + "/blob", 0600);
     ASSERT_TRUE(zlib::CompressPath2Path(tmp_path, txn_path, content_hash)) <<
-      "failed to compress file " << tmp_path << " to " << tmp_path;
+      "failed to compress file " << tmp_path << " to " << txn_path;
     const std::string res_path = backend_storage + "/data/" +
                                  content_hash->MakePath();
     ASSERT_EQ(0, rename(txn_path.c_str(), res_path.c_str())) <<
