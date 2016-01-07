@@ -362,7 +362,15 @@ class T_ObjectFetcher : public ::testing::Test {
   }
 
   bool IsHttpObjectFetcher() {
-    return IsHttpObjectFetcher(type<ObjectFetcherT>());
+    return GetObjectFetcherType(type<ObjectFetcherT>()) == "http";
+  }
+
+  bool IsLocalObjectFetcher() {
+    return GetObjectFetcherType(type<ObjectFetcherT>()) == "local";
+  }
+
+  bool IsMockObjectFetcher() {
+    return GetObjectFetcherType(type<ObjectFetcherT>()) == "mock";
   }
 
   typedef std::vector<std::string> DirectoryListing;
@@ -556,14 +564,14 @@ class T_ObjectFetcher : public ::testing::Test {
     return false;
   }
 
-  bool IsHttpObjectFetcher(const type<LocalObjectFetcher<> > type_spec) {
-    return false;
+  std::string GetObjectFetcherType(const type<LocalObjectFetcher<> > spec) {
+    return "local";
   }
-  bool IsHttpObjectFetcher(const type<MockObjectFetcher> type_spec) {
-    return false;
+  std::string GetObjectFetcherType(const type<MockObjectFetcher> spec) {
+    return "mock";
   }
-  bool IsHttpObjectFetcher(const type<HttpObjectFetcher<> > type_spec) {
-    return true;
+  std::string GetObjectFetcherType(const type<HttpObjectFetcher<> > spec) {
+    return "http";
   }
 
  private:
