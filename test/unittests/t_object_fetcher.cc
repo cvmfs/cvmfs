@@ -35,6 +35,9 @@ class T_ObjectFetcher : public ::testing::Test {
   static const std::string  master_key_path;
   static const unsigned int catalog_revision;
 
+  static const shash::Any broken_history_hash;
+  static const shash::Any broken_catalog_hash;
+
   // determined during setup
   static shash::Any root_hash;
   static shash::Any history_hash;
@@ -79,6 +82,9 @@ class T_ObjectFetcher : public ::testing::Test {
 
     // create a catalog
     CreateCatalog(&root_hash, "");
+
+    // create some 'broken' database objects
+    CreateBrokenDatabases();
 
     if (NeedsFilesystemSandbox()) {
       WriteKeychain();
@@ -425,6 +431,11 @@ class T_ObjectFetcher : public ::testing::Test {
     CreateSandboxHistory(content_hash, previous_revision);
   }
 
+  void CreateBrokenDatabases() {
+    MockHistory::RegisterObject(broken_history_hash, NULL);
+    MockCatalog::RegisterObject(broken_catalog_hash, NULL);
+  }
+
   void CreateSandboxHistory(
     shash::Any *content_hash,
     const shash::Any &previous_revision
@@ -605,6 +616,16 @@ const std::string T_ObjectFetcher<ObjectFetcherT>::master_key_path =
 
 template <class ObjectFetcherT>
 const unsigned int T_ObjectFetcher<ObjectFetcherT>::catalog_revision = 1;
+
+template <class ObjectFetcherT>
+const shash::Any T_ObjectFetcher<ObjectFetcherT>::broken_history_hash =
+                                  h("b904b56ffd47ba89f26d5a887063b4a1fbfb9307",
+                                    shash::kSuffixHistory);
+
+template <class ObjectFetcherT>
+const shash::Any T_ObjectFetcher<ObjectFetcherT>::broken_catalog_hash =
+                                  h("c4818243550ae6a46f55602043eb23f8c4f97910",
+                                    shash::kSuffixCatalog);
 
 template <class ObjectFetcherT>
 shash::Any T_ObjectFetcher<ObjectFetcherT>::root_hash;
