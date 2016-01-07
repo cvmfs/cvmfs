@@ -355,6 +355,10 @@ class T_ObjectFetcher : public ::testing::Test {
     return NeedsFilesystemSandbox(type<ObjectFetcherT>());
   }
 
+  bool IsHttpObjectFetcher() {
+    return IsHttpObjectFetcher(type<ObjectFetcherT>());
+  }
+
   typedef std::vector<std::string> DirectoryListing;
   void ListDirectory(const std::string &path, DirectoryListing *listing) const {
     ASSERT_TRUE(listing != NULL);
@@ -534,6 +538,16 @@ class T_ObjectFetcher : public ::testing::Test {
   }
   bool NeedsFilesystemSandbox(const type<MockObjectFetcher> type_spec) {
     return false;
+  }
+
+  bool IsHttpObjectFetcher(const type<LocalObjectFetcher<> > type_spec) {
+    return false;
+  }
+  bool IsHttpObjectFetcher(const type<MockObjectFetcher> type_spec) {
+    return false;
+  }
+  bool IsHttpObjectFetcher(const type<HttpObjectFetcher<> > type_spec) {
+    return true;
   }
 
  private:
