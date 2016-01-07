@@ -192,7 +192,7 @@ class T_ObjectFetcher : public ::testing::Test {
 
     certificate_hash = h("0000000000000000000000000000000000000000",
                          shash::kSuffixCertificate);
-    InsertIntoStorage(certificate_path, &certificate_hash);
+    CommitIntoStorage(certificate_path, &certificate_hash);
   }
 
   void WriteFile(const std::string &path, const std::string &content) {
@@ -452,7 +452,7 @@ class T_ObjectFetcher : public ::testing::Test {
 
     *content_hash = h("0000000000000000000000000000000000000000",
                       shash::kSuffixHistory);
-    InsertIntoStorage(tmp_path, content_hash);
+    CommitIntoStorage(tmp_path, content_hash);
   }
 
   void CreateHistory(const type<MockObjectFetcher>  type_spec,
@@ -511,7 +511,7 @@ class T_ObjectFetcher : public ::testing::Test {
 
     *content_hash = h("0000000000000000000000000000000000000000",
                       shash::kSuffixCatalog);
-    InsertIntoStorage(tmp_path, content_hash);
+    CommitIntoStorage(tmp_path, content_hash);
   }
 
   void CreateCatalog(const type<MockObjectFetcher >  type_spec,
@@ -528,7 +528,7 @@ class T_ObjectFetcher : public ::testing::Test {
     MockCatalog::RegisterObject(catalog->hash(), catalog);
   }
 
-  void InsertIntoStorage(const std::string  &tmp_path,
+  void CommitIntoStorage(const std::string  &tmp_path,
                                shash::Any   *content_hash) {
     const std::string txn_path = CreateTempPath(temp_directory + "/blob", 0600);
     ASSERT_TRUE(zlib::CompressPath2Path(tmp_path, txn_path, content_hash)) <<
