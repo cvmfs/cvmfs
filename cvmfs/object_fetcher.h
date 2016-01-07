@@ -156,6 +156,36 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
     return kFailOk;
   }
 
+  Failures FetchManifest(UniquePtr<manifest::Manifest> *manifest) {
+    manifest::Manifest *raw_manifest_ptr = NULL;
+    Failures failure = FetchManifest(&raw_manifest_ptr);
+    if (failure == kFailOk) *manifest = raw_manifest_ptr;
+    return failure;
+  }
+
+  Failures FetchHistory(UniquePtr<HistoryTN>  *history,
+                        const shash::Any      &history_hash = shash::Any()) {
+    HistoryTN *raw_history_ptr = NULL;
+    Failures failure = FetchHistory(&raw_history_ptr, history_hash);
+    if (failure == kFailOk) *history = raw_history_ptr;
+    return failure;
+  }
+
+  Failures FetchCatalog(const shash::Any            &catalog_hash,
+                        const std::string           &catalog_path,
+                              UniquePtr<CatalogTN>  *catalog,
+                        const bool                   is_nested = false,
+                              CatalogTN             *parent    = NULL) {
+    CatalogTN *raw_catalog_ptr = NULL;
+    Failures failure = FetchCatalog(catalog_hash,
+                                    catalog_path,
+                                    &raw_catalog_ptr,
+                                    is_nested,
+                                    parent);
+    if (failure == kFailOk) *catalog = raw_catalog_ptr;
+    return failure;
+  }
+
  public:
   bool HasHistory() {
     shash::Any history_hash = GetHistoryHash();
@@ -183,8 +213,12 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
    * @return  the content hash of the HEAD history db or a null-hash on error
    */
   shash::Any GetHistoryHash() {
-    UniquePtr<manifest::Manifest> manifest(FetchManifest());
-    if (!manifest || manifest->history().IsNull()) {
+    UniquePtr<manifest::Manifest> manifest;
+    const Failures retval = FetchManifest(&manifest);
+
+    if (retval != kFailOk    ||
+        ! manifest.IsValid() ||
+        manifest->history().IsNull()) {
       return shash::Any();
     }
 
