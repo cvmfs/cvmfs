@@ -177,7 +177,8 @@ std::string CommandScrub::CheckPathAndExtractHash(
       last_character != shash::kSuffixCatalog      &&
       last_character != shash::kSuffixPartial      &&
       last_character != shash::kSuffixCertificate  &&
-      last_character != shash::kSuffixMicroCatalog)
+      last_character != shash::kSuffixMicroCatalog &&
+      last_character != shash::kSuffixMetainfo)
   {
     PrintAlert(Alerts::kUnexpectedModifier, full_path);
     return "";
