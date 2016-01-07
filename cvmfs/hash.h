@@ -44,6 +44,10 @@ enum Algorithms {
   kAny,
 };
 
+/**
+ * NOTE: when adding a suffix here, one must edit `cvmfs_swissknife scrub`
+ *       accordingly, that checks for invalid hash suffixes
+ */
 const char kSuffixNone         = 0;
 const char kSuffixCatalog      = 'C';
 const char kSuffixHistory      = 'H';
