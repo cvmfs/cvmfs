@@ -27,6 +27,22 @@
 template <class ConcreteObjectFetcherT>
 struct object_fetcher_traits;
 
+struct ObjectFetcherFailures {
+  enum Failures {
+    kFailOk,
+    kFailNotFound,
+    kFailLocalIO,
+    kFailNetwork,
+    kFailDecompression,
+    kFailManifestNameMismatch,
+    kFailManifestSignatureMismatch,
+    kFailBadData,
+    kFailUnknown,
+
+    kFailNumEntries
+  };
+};
+
 /**
  * This is the default class implementing the data object fetching strategy. It
  * is meant to be used when CVMFS specific data structures need to be downloaded
