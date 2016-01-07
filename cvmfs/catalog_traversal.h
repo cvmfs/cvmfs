@@ -119,6 +119,7 @@ class CatalogTraversal
  public:
   typedef ObjectFetcherT                      ObjectFetcherTN;
   typedef typename ObjectFetcherT::CatalogTN  CatalogTN;
+  typedef typename ObjectFetcherT::HistoryTN  HistoryTN;
   typedef CatalogTraversalData<CatalogTN>     CallbackDataTN;
 
   /**
@@ -322,11 +323,23 @@ class CatalogTraversal
     TraversalContext ctx(Parameters::kNoHistory,
                          Parameters::kNoTimestampThreshold,
                          type);
-    const UniquePtr<history::History> tag_db(object_fetcher_->FetchHistory());
-    if (!tag_db.IsValid()) {
-      LogCvmfs(kLogCatalogTraversal, kLogDebug,
-               "didn't find a history database to traverse");
-      return true;
+    UniquePtr<HistoryTN> tag_db;
+    const typename ObjectFetcherT::Failures retval =
+                                         object_fetcher_->FetchHistory(&tag_db);
+    switch (retval) {
+      case ObjectFetcherT::kFailOk:
+        break;
+
+      case ObjectFetcherT::kFailNotFound:
+        LogCvmfs(kLogCatalogTraversal, kLogDebug,
+                 "didn't find a history database to traverse");
+        return true;
+
+      default:
+        LogCvmfs(kLogCatalogTraversal, kLogStderr,
+                 "failed to download history database (%d - %s)",
+                 retval, Code2Ascii(retval));
+        return false;
     }
 
     HashList root_hashes;
@@ -464,22 +477,30 @@ class CatalogTraversal
       return true;
     }
 
-    job->catalog = object_fetcher_->FetchCatalog(job->hash,
-                                                 job->path,
-                                                 !job->IsRootCatalog(),
-                                                 job->parent);
-    if (!job->catalog) {
-      if (ignore_load_failure_) {
-        LogCvmfs(kLogCatalogTraversal, kLogDebug, "ignoring missing catalog %s "
-                                                  "(possibly swept before)",
-                 job->hash.ToString().c_str());
-        job->ignore = true;
-        return true;
-      } else {
-        LogCvmfs(kLogCatalogTraversal, error_sink_, "failed to load catalog %s",
-                 job->hash.ToString().c_str());
+    const typename ObjectFetcherT::Failures retval = // TODO(meusel): C++11 auto
+      object_fetcher_->FetchCatalog(job->hash,
+                                    job->path,
+                                    &job->catalog,
+                                    !job->IsRootCatalog(),
+                                    job->parent);
+    switch (retval) {
+      case ObjectFetcherT::kFailOk:
+        break;
+
+      case ObjectFetcherT::kFailNotFound:
+        if (ignore_load_failure_) {
+          LogCvmfs(kLogCatalogTraversal, kLogDebug, "ignoring missing catalog "
+                                                    "%s (swept before?)",
+                   job->hash.ToString().c_str());
+          job->ignore = true;
+          return true;
+        }
+
+      default:
+        LogCvmfs(kLogCatalogTraversal, error_sink_, "failed to load catalog %s "
+                                                    "(%d - %s)",
+                 job->hash.ToString().c_str(), retval, Code2Ascii(retval));
         return false;
-      }
     }
 
     // catalogs returned by ObjectFetcher<> are managing their database files by
@@ -786,11 +807,17 @@ class CatalogTraversal
   shash::Any GetRepositoryRootCatalogHash() {
     // get the manifest of the repository to learn about the entry point or the
     // root catalog of the repository to be traversed
-    UniquePtr<manifest::Manifest> manifest(object_fetcher_->FetchManifest());
-    if (!manifest) {
+    UniquePtr<manifest::Manifest> manifest;
+    const typename ObjectFetcherT::Failures retval =
+                                      object_fetcher_->FetchManifest(&manifest);
+    if (retval != ObjectFetcherT::kFailOk) {
+      LogCvmfs(kLogCatalogTraversal, kLogStderr, "failed to load manifest "
+                                                 "(%d - %s)",
+                                                 retval, Code2Ascii(retval));
       return shash::Any();
     }
 
+    assert(manifest.IsValid());
     return manifest->catalog_hash();
   }
 
