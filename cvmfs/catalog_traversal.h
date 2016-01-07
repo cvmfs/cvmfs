@@ -499,7 +499,8 @@ class CatalogTraversal
       default:
         LogCvmfs(kLogCatalogTraversal, error_sink_, "failed to load catalog %s "
                                                     "(%d - %s)",
-                 job->hash.ToString().c_str(), retval, Code2Ascii(retval));
+                 job->hash.ToStringWithSuffix().c_str(),
+                 retval, Code2Ascii(retval));
         return false;
     }
 
