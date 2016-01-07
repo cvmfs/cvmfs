@@ -624,11 +624,16 @@ TYPED_TEST(T_ObjectFetcher, FetchManifestSlow) {
   UniquePtr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
   ASSERT_TRUE(object_fetcher.IsValid());
 
-  UniquePtr<manifest::Manifest> manifest(object_fetcher->FetchManifest());
-  ASSERT_TRUE(manifest.IsValid());
+  manifest::Manifest *manifest = NULL;
+  typename TypeParam::Failures retval =
+    object_fetcher->FetchManifest(&manifest);
+  EXPECT_EQ(TypeParam::kFailOk, retval);
+  ASSERT_NE(static_cast<manifest::Manifest*>(NULL), manifest);
 
   EXPECT_EQ(TestFixture::root_hash,    manifest->catalog_hash());
   EXPECT_EQ(TestFixture::history_hash, manifest->history());
+  delete manifest;
+
   if (TestFixture::NeedsFilesystemSandbox()) {
     EXPECT_EQ(0u, TestFixture::CountTemporaryFiles());
   }
@@ -641,12 +646,15 @@ TYPED_TEST(T_ObjectFetcher, FetchHistorySlow) {
 
   EXPECT_TRUE(object_fetcher->HasHistory());
 
-  UniquePtr<typename TypeParam::HistoryTN>
-    history(object_fetcher->FetchHistory());
-  ASSERT_TRUE(history.IsValid());
+  typename TypeParam::HistoryTN *history = NULL;
+  typename TypeParam::Failures retval = object_fetcher->FetchHistory(&history);
+  EXPECT_EQ(TypeParam::kFailOk, retval);
+  ASSERT_NE(static_cast<typename TypeParam::HistoryTN*>(NULL), history);
   EXPECT_EQ(TestFixture::previous_history_hash, history->previous_revision());
+  delete history;
+
   if (TestFixture::NeedsFilesystemSandbox()) {
-    EXPECT_LE(1u, TestFixture::CountTemporaryFiles());
+    EXPECT_EQ(0u, TestFixture::CountTemporaryFiles());
   }
 }
 
@@ -655,9 +663,11 @@ TYPED_TEST(T_ObjectFetcher, FetchLegacyHistorySlow) {
   UniquePtr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
   ASSERT_TRUE(object_fetcher.IsValid());
 
-  UniquePtr<typename TypeParam::HistoryTN> history(
-              object_fetcher->FetchHistory(TestFixture::previous_history_hash));
-  ASSERT_TRUE(history.IsValid())
+  typename TypeParam::HistoryTN *history = NULL;
+  typename TypeParam::Failures retval =
+    object_fetcher->FetchHistory(&history, TestFixture::previous_history_hash);
+  EXPECT_EQ(TypeParam::kFailOk, retval);
+  ASSERT_NE(static_cast<typename TypeParam::HistoryTN*>(NULL), history)
     << "didn't find: "
     << TestFixture::previous_history_hash.ToStringWithSuffix();
   EXPECT_TRUE(history->previous_revision().IsNull());
@@ -694,6 +704,7 @@ TYPED_TEST(T_ObjectFetcher, FetchCatalogSlow) {
   if (TestFixture::NeedsFilesystemSandbox()) {
     EXPECT_LE(1u, TestFixture::CountTemporaryFiles());
   }
+  delete history;
 }
 
 
