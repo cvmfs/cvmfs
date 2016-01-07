@@ -376,7 +376,7 @@ class HttpObjectFetcher :
         return BaseTN::kFailUnknown;
     }
 
-    assert(retval - manifest::kFailOk);
+    assert(retval == manifest::kFailOk);
     *manifest = new manifest::Manifest(*manifest_ensemble.manifest);
     return (*manifest != NULL) ? BaseTN::kFailOk
                                : BaseTN::kFailUnknown;
