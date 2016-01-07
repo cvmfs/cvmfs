@@ -2,7 +2,7 @@
 cvmfs_test_name="Detect Catalog Load Failures during Garbage Collection"
 cvmfs_test_autofs_on_startup=false
 
-produce_files_1_in() {
+produce_files_1_in() { # REVISION 3
   local working_dir=$1
   pushdir $working_dir
 
@@ -31,22 +31,12 @@ produce_files_1_in() {
   popdir
 }
 
-produce_files_2_in() {
+produce_files_2_in() { # REVISION 4
   local working_dir=$1
   pushdir $working_dir
 
   mkdir dir2
-  cp_bin dir2
-
-  popdir
-}
-
-produce_files_3_in() {
-  local working_dir=$1
-  pushdir $working_dir
-
   mkdir dir3
-  cp_bin dir3
 
   touch dir3/kafka
   echo "Deeply lost in the night."                                   >> dir3/kafka
@@ -78,12 +68,19 @@ produce_files_3_in() {
 
   touch dir3/.cvmfscatalog
 
+  popdir
+}
+
+produce_files_3_in() { # REVISION 5
+  local working_dir=$1
+  pushdir $working_dir
+
   rm -fR dir1
 
   popdir
 }
 
-produce_files_4_in() {
+produce_files_4_in() { # REVISION 6
   local working_dir=$1
   pushdir $working_dir
 
@@ -220,26 +217,6 @@ cvmfs_run_test() {
   # ============================================================================
 
   local clg5="${revision_5_clg}C"
-  if [ -z $CVMFS_TEST_S3_CONFIG ]; then
-    local clg5_path="$(get_local_repo_storage $CVMFS_TEST_REPO)/$(make_path $clg5)"
-    echo "locking up root catalog of (preserved) revision 5 ($clg5)"
-    chmod 0200 $clg5_path || return 9
-
-    local gc_log_1="gc_1.log"
-    echo "perform a basic garbage collection as dryrun (should fail) "
-    cvmfs_server gc -ldf $CVMFS_TEST_REPO > $gc_log_1 2>&1 && return 10
-
-    echo "check that the error was caught"
-    cat $gc_log_1 | grep -e "failed to load.*${clg5}.*network" || return 11
-
-    echo "repair the catalog"
-    chmod 0644 $clg5_path || return 12
-  else
-    echo "NOTE: skipping permission fiddling on S3"
-  fi
-
-  # ============================================================================
-
   echo "destroy root catalog of (preserved) revision 5 ($clg5)"
   local clg5_broken="${clg5}.broken"
   curl -o $clg5 $(get_object_url $CVMFS_TEST_REPO $clg5) || return 13
@@ -249,17 +226,55 @@ cvmfs_run_test() {
                       $clg5_broken     \
                       $(make_path $clg5) || return 16
 
-  local gc_log_2="gc_2.log"
+  local gc_log_1="gc_1.log"
+  local deletion_log="condemned_objects.log"
   echo "perform a basic garbage collection as dryrun (should fail) "
-  cvmfs_server gc -ldf $CVMFS_TEST_REPO > $gc_log_2 2>&1 && return 17
+  local gc_retcode=0
+  cvmfs_server gc -ldfL $deletion_log $CVMFS_TEST_REPO > $gc_log_1 2>&1 || gc_retcode=0
+
+  echo "---- Deletion Log ----"
+  cat $deletion_log
+  echo "---- ------------ ----"
+
+  echo "check that revision 5's root catalog ($clg5) is NOT in the deletion log"
+  cat $deletion_log | grep -q $clg5 && return 100
+
+  # before the fix was added, garbage collection would have swept $kafka_object
+  # but left revision5's root catalog intact (because it was falsely ignored)
+  local kafka_object="fd8370662e701313534bfc2d2b860a7bf0fbf5da"
+  echo "check that kafka ($kafka_object) is NOT in the deletion log (regression test CVM-966)"
+  cat $deletion_log | grep -q $kafka_object && return 101
+
+  echo "do defered GC retcode check (for the regression test)"
+  [ $gc_retcode -eq 0 ] || return 17
 
   echo "check that the error was caught"
-  cat $gc_log_2 | grep -e "failed to load.*${clg5}.*bad data" || return 18
+  cat $gc_log_1 | grep -e "failed to load.*${clg5}.*bad data" || return 18
 
   echo "repair catalog"
   upload_into_backend $CVMFS_TEST_REPO \
                       $clg5            \
                       $(make_path $clg5) || return 19
+
+  # ============================================================================
+
+  if [ -z $CVMFS_TEST_S3_CONFIG ]; then
+    local clg5_path="$(get_local_repo_storage $CVMFS_TEST_REPO)/$(make_path $clg5)"
+    echo "locking up root catalog of (preserved) revision 5 ($clg5)"
+    chmod 0200 $clg5_path || return 9
+
+    local gc_log_2="gc_2.log"
+    echo "perform a basic garbage collection as dryrun (should fail) "
+    cvmfs_server gc -ldf $CVMFS_TEST_REPO > $gc_log_2 2>&1 && return 10
+
+    echo "check that the error was caught"
+    cat $gc_log_2 | grep -e "failed to load.*${clg5}.*network" || return 11
+
+    echo "repair the catalog"
+    chmod 0644 $clg5_path || return 12
+  else
+    echo "NOTE: skipping permission fiddling on S3"
+  fi
 
   # ============================================================================
 
