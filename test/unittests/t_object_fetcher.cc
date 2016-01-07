@@ -442,6 +442,16 @@ class T_ObjectFetcher : public ::testing::Test {
   void CreateBrokenDatabases() {
     MockHistory::RegisterObject(broken_history_hash, NULL);
     MockCatalog::RegisterObject(broken_catalog_hash, NULL);
+
+    if (NeedsFilesystemSandbox()) {
+      const std::string history = CreateTempPath(sandbox + "/history", 0700);
+      ASSERT_FALSE(history.empty()) << "failed to create tmp in: " << sandbox;
+      InsertIntoStorage(history, broken_history_hash);
+
+      const std::string catalog = CreateTempPath(sandbox + "/catalog", 0700);
+      ASSERT_FALSE(catalog.empty()) << "failed to create tmp in: " << sandbox;
+      InsertIntoStorage(catalog, broken_catalog_hash);
+    }
   }
 
   void CreateSandboxHistory(
@@ -904,5 +914,39 @@ TYPED_TEST(T_ObjectFetcher, AutoCleanupFetchedFilesSlow) {
 
   delete catalog.Release();
   EXPECT_GT(files, TestFixture::CountTemporaryFiles());
+  EXPECT_EQ(0u, TestFixture::CountTemporaryFiles());
+}
+
+
+TYPED_TEST(T_ObjectFetcher, LoadBrokenDatabaseObjectsSlow) {
+  UniquePtr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
+  ASSERT_TRUE(object_fetcher.IsValid());
+
+  UniquePtr<typename TypeParam::CatalogTN> catalog;
+  UniquePtr<typename TypeParam::HistoryTN> history;
+  typename TypeParam::Failures retval;
+  const typename TypeParam::Failures expected_error =
+    TestFixture::IsHttpObjectFetcher()
+      ? TypeParam::kFailBadData
+      : TestFixture::IsLocalObjectFetcher()
+          ? TypeParam::kFailDecompression
+          : TestFixture::IsMockObjectFetcher()
+              ? TypeParam::kFailLocalIO
+              : TypeParam::kFailUnknown;
+
+  retval = object_fetcher->FetchCatalog(TestFixture::broken_catalog_hash, "",
+                                        &catalog);
+  EXPECT_EQ(expected_error, retval)
+    << "expected: " << Code2Ascii(expected_error) << std::endl
+    << "actual:   " << Code2Ascii(retval);
+  EXPECT_FALSE(catalog.IsValid());
+  EXPECT_EQ(0u, TestFixture::CountTemporaryFiles());
+
+  retval = object_fetcher->FetchHistory(&history,
+                                        TestFixture::broken_history_hash);
+  EXPECT_EQ(expected_error, retval)
+    << "expected: " << Code2Ascii(expected_error) << std::endl
+    << "actual:   " << Code2Ascii(retval);
+  EXPECT_FALSE(history.IsValid());
   EXPECT_EQ(0u, TestFixture::CountTemporaryFiles());
 }
