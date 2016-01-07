@@ -442,7 +442,15 @@ MockObjectFetcher::Fetch(const shash::Any   &object_hash,
                                std::string  *file_path) {
   assert(file_path != NULL);
   *file_path = object_hash.ToString();
+  if (!ObjectExists(object_hash)) {
+    return MockObjectFetcher::kFailNotFound;
+  }
   return MockObjectFetcher::kFailOk;
+}
+
+bool MockObjectFetcher::ObjectExists(const shash::Any &object_hash) const {
+  return MockCatalog::Exists(object_hash) ||
+         MockHistory::Exists(object_hash);
 }
 
 

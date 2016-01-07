@@ -234,6 +234,8 @@ class MockObjectStorage {
  public:
   static std::set<shash::Any> *s_deleted_objects;
 
+  friend class MockObjectFetcher;
+
  public:
   static void Reset() {
     MockObjectStorage::UnregisterObjects();
@@ -630,6 +632,8 @@ class MockHistory : public history::History,
   static const shash::Any  root_hash;
   static unsigned int      instances;
 
+  using MockObjectStorage<MockHistory>::Exists;
+
  public:
   static void ResetGlobalState();
 
@@ -774,6 +778,9 @@ class MockObjectFetcher : public AbstractObjectFetcher<MockObjectFetcher> {
   using BaseTN::FetchManifest; // un-hiding convenience overload
   Failures FetchManifest(manifest::Manifest** manifest);
   Failures Fetch(const shash::Any &object_hash, std::string *file_path);
+
+ private:
+  bool ObjectExists(const shash::Any &object_hash) const;
 };
 
 
