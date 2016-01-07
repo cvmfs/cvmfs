@@ -634,6 +634,16 @@ TYPED_TEST(T_ObjectFetcher, FetchManifestSlow) {
   EXPECT_EQ(TestFixture::history_hash, manifest->history());
   delete manifest;
 
+  UniquePtr<manifest::Manifest> manifest_ptr;
+  EXPECT_FALSE(manifest_ptr.IsValid());
+  typename TypeParam::Failures retval2 =
+    object_fetcher->FetchManifest(&manifest_ptr);
+  EXPECT_EQ(TypeParam::kFailOk, retval2);
+  ASSERT_TRUE(manifest_ptr.IsValid());
+
+  EXPECT_EQ(TestFixture::root_hash,    manifest_ptr->catalog_hash());
+  EXPECT_EQ(TestFixture::history_hash, manifest_ptr->history());
+
   if (TestFixture::NeedsFilesystemSandbox()) {
     EXPECT_EQ(0u, TestFixture::CountTemporaryFiles());
   }
@@ -656,6 +666,17 @@ TYPED_TEST(T_ObjectFetcher, FetchHistorySlow) {
   if (TestFixture::NeedsFilesystemSandbox()) {
     EXPECT_EQ(0u, TestFixture::CountTemporaryFiles());
   }
+
+  UniquePtr<typename TypeParam::HistoryTN> history_ptr;
+  EXPECT_FALSE(history_ptr.IsValid());
+  typename TypeParam::Failures retval2 =
+    object_fetcher->FetchHistory(&history_ptr);
+  EXPECT_EQ(TypeParam::kFailOk, retval2);
+  ASSERT_TRUE(history_ptr.IsValid());
+
+  if (TestFixture::NeedsFilesystemSandbox()) {
+    EXPECT_LE(1u, TestFixture::CountTemporaryFiles());
+  }
 }
 
 
@@ -677,6 +698,18 @@ TYPED_TEST(T_ObjectFetcher, FetchLegacyHistorySlow) {
   delete history;
   if (TestFixture::NeedsFilesystemSandbox()) {
     EXPECT_EQ(0u, TestFixture::CountTemporaryFiles());
+  }
+
+  UniquePtr<typename TypeParam::HistoryTN> history_ptr;
+  EXPECT_FALSE(history_ptr.IsValid());
+  typename TypeParam::Failures retval2 =
+    object_fetcher->FetchHistory(&history_ptr,
+                                 TestFixture::previous_history_hash);
+  EXPECT_EQ(TypeParam::kFailOk, retval2);
+  ASSERT_TRUE(history_ptr.IsValid());
+  EXPECT_TRUE(history_ptr->previous_revision().IsNull());
+  if (TestFixture::NeedsFilesystemSandbox()) {
+    EXPECT_LE(1u, TestFixture::CountTemporaryFiles());
   }
 }
 
@@ -720,6 +753,20 @@ TYPED_TEST(T_ObjectFetcher, FetchCatalogSlow) {
   if (TestFixture::NeedsFilesystemSandbox()) {
     EXPECT_EQ(0u, TestFixture::CountTemporaryFiles());
   }
+
+  UniquePtr<typename TypeParam::CatalogTN> catalog_ptr;
+  EXPECT_FALSE(catalog_ptr.IsValid());
+  typename TypeParam::Failures retval2 =
+    object_fetcher->FetchCatalog(TestFixture::root_hash, "", &catalog_ptr);
+  EXPECT_EQ(TypeParam::kFailOk, retval2);
+  ASSERT_TRUE(catalog_ptr.IsValid());
+
+  EXPECT_EQ("",                            catalog_ptr->path().ToString());
+  EXPECT_EQ(TestFixture::catalog_revision, catalog_ptr->revision());
+
+  if (TestFixture::NeedsFilesystemSandbox()) {
+    EXPECT_LE(0u, TestFixture::CountTemporaryFiles());
+  }
 }
 
 
@@ -738,6 +785,18 @@ TYPED_TEST(T_ObjectFetcher, FetchInvalidCatalogSlow) {
 
   if (TestFixture::NeedsFilesystemSandbox()) {
     EXPECT_EQ(0u, TestFixture::CountTemporaryFiles());
+  }
+
+  UniquePtr<typename TypeParam::CatalogTN> catalog_ptr;
+  EXPECT_FALSE(catalog_ptr.IsValid());
+  typename TypeParam::Failures retval2 =
+    object_fetcher->FetchCatalog(invalid_clg, "", &catalog_ptr);
+  EXPECT_EQ(TypeParam::kFailNotFound, retval2) << "code: "
+                                               << Code2Ascii(retval2);
+  EXPECT_FALSE(catalog_ptr.IsValid());
+
+  if (TestFixture::NeedsFilesystemSandbox()) {
+    EXPECT_LE(0u, TestFixture::CountTemporaryFiles());
   }
 }
 
