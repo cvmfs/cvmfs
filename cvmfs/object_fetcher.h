@@ -277,6 +277,7 @@ class LocalObjectFetcher :
     : base_path_(base_path)
     , temporary_directory_(temp_dir) {}
 
+  using BaseTN::FetchManifest; // un-hiding convenience overload
   Failures FetchManifest(manifest::Manifest** manifest) {
     const std::string path = BuildPath(BaseTN::kManifestFilename);
     if (!FileExists(path)) {
@@ -389,6 +390,7 @@ class HttpObjectFetcher :
     download_manager_(download_mgr), signature_manager_(signature_mgr) {}
 
  public:
+  using BaseTN::FetchManifest; // un-hiding convenience overload
   Failures FetchManifest(manifest::Manifest** manifest) {
     const std::string url = BuildUrl(BaseTN::kManifestFilename);
 

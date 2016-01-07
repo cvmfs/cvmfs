@@ -768,8 +768,10 @@ struct object_fetcher_traits<MockObjectFetcher> {
 class MockObjectFetcher : public AbstractObjectFetcher<MockObjectFetcher> {
  public:
   typedef typename AbstractObjectFetcher<MockObjectFetcher>::Failures Failures;
+  typedef AbstractObjectFetcher<MockObjectFetcher>                    BaseTN;
 
  public:
+  using BaseTN::FetchManifest; // un-hiding convenience overload
   Failures FetchManifest(manifest::Manifest** manifest);
   Failures Fetch(const shash::Any &object_hash, std::string *file_path);
 };
