@@ -230,7 +230,7 @@ set (CVMFS_SUID_HELPER_SOURCES
 set (CVMFS_PRELOADER_SOURCES
   download.cc download.h
   logging.cc logging.h
-  swissknife.h
+  swissknife.h swissknife.cc
   swissknife_pull.cc swissknife_pull.h
   signature.cc signature.h
   statistics.cc statistics.h
