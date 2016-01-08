@@ -38,20 +38,20 @@ class Manifest {
            const uint64_t publish_timestamp,
            const bool garbage_collectable,
            const bool has_alt_catalog_path,
-           const shash::Any &meta_info) :
-    catalog_hash_(catalog_hash),
-    catalog_size_(catalog_size),
-    root_path_(root_path),
-    ttl_(ttl),
-    revision_(revision),
-    micro_catalog_hash_(micro_catalog_hash),
-    repository_name_(repository_name),
-    certificate_(certificate),
-    history_(history),
-    publish_timestamp_(publish_timestamp),
-    garbage_collectable_(garbage_collectable),
-    has_alt_catalog_path_(has_alt_catalog_path),
-    meta_info_(meta_info) { }
+           const shash::Any &meta_info)
+  : catalog_hash_(catalog_hash)
+  , catalog_size_(catalog_size)
+  , root_path_(root_path)
+  , ttl_(ttl)
+  , revision_(revision)
+  , micro_catalog_hash_(micro_catalog_hash)
+  , repository_name_(repository_name)
+  , certificate_(certificate)
+  , history_(history)
+  , publish_timestamp_(publish_timestamp)
+  , garbage_collectable_(garbage_collectable)
+  , has_alt_catalog_path_(has_alt_catalog_path)
+  , meta_info_(meta_info) { }
 
   std::string ExportString() const;
   bool Export(const std::string &path) const;
