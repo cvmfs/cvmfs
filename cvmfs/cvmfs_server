@@ -4079,12 +4079,16 @@ check() {
   echo "Verifying Catalog Integrity of ${name}${subtree_msg}..."
   local user_shell="$(get_user_shell $name)"
   local check_cmd
-  check_cmd="$(__swissknife_cmd dbg) check $tag  \
-                     $check_chunks_param         \
-                     $log_level_param            \
-                     $subtree_param              \
-                     -r $stratum0                \
-                     -t ${CVMFS_SPOOL_DIR}/tmp"
+  check_cmd="$(__swissknife_cmd dbg) check $tag        \
+                     $check_chunks_param               \
+                     $log_level_param                  \
+                     $subtree_param                    \
+                     -r $stratum0                      \
+                     -t ${CVMFS_SPOOL_DIR}/tmp         \
+                     -k ${CVMFS_PUBLIC_KEY}            \
+                     -N ${name}                        \
+                     $(get_follow_http_redirects_flag) \
+                     -z /etc/cvmfs/repositories.d/${name}/trusted_certs"
   $user_shell "$check_cmd"
 }
 
