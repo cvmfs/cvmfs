@@ -252,53 +252,75 @@ int main(int argc, char **argv) {
     return 0;
   }
 
+  // find the command to be run
+  swissknife::Command *command = NULL;
   for (unsigned i = 0; i < swissknife::command_list.size(); ++i) {
     if (swissknife::command_list[i]->GetName() == string(argv[1])) {
-      swissknife::ArgumentList args;
-      optind = 1;
-      string option_string = "";
-      swissknife::ParameterList params =
-        swissknife::command_list[i]->GetParams();
-      for (unsigned j = 0; j < params.size(); ++j) {
-        option_string.push_back(params[j].key());
-        if (!params[j].switch_only())
-          option_string.push_back(':');
-      }
-      int c;
-      while ((c = getopt(argc, argv, option_string.c_str())) != -1) {
-        bool valid_option = false;
-        for (unsigned j = 0; j < params.size(); ++j) {
-          if (c == params[j].key()) {
-            valid_option = true;
-            string *argument = NULL;
-            if (!params[j].switch_only()) {
-              argument = new string(optarg);
-            }
-            args[c] = argument;
-            break;
-          }
-        }
-        if (!valid_option) {
-          swissknife::Usage();
-          return 1;
-        }
-      }
-      for (unsigned j = 0; j < params.size(); ++j) {
-        if (!params[j].optional()) {
-          if (args.find(params[j].key()) == args.end()) {
-            LogCvmfs(kLogCvmfs, kLogStderr, "parameter -%c missing",
-                     params[j].key());
-            return 1;
-          }
-        }
-      }
-      return swissknife::command_list[i]->Main(args);
+      command = swissknife::command_list[i];
+      break;
     }
   }
+
+  if (NULL == command) {
+    swissknife::Usage();
+    return 1;
+  }
+
+  // parse the command line arguments for the Command
+  swissknife::ArgumentList args;
+  optind = 1;
+  string option_string = "";
+  swissknife::ParameterList params = command->GetParams();
+  for (unsigned j = 0; j < params.size(); ++j) {
+    option_string.push_back(params[j].key());
+    if (!params[j].switch_only())
+      option_string.push_back(':');
+  }
+  int c;
+  while ((c = getopt(argc, argv, option_string.c_str())) != -1) {
+    bool valid_option = false;
+    for (unsigned j = 0; j < params.size(); ++j) {
+      if (c == params[j].key()) {
+        valid_option = true;
+        string *argument = NULL;
+        if (!params[j].switch_only()) {
+          argument = new string(optarg);
+        }
+        args[c] = argument;
+        break;
+      }
+    }
+    if (!valid_option) {
+      swissknife::Usage();
+      return 1;
+    }
+  }
+  for (unsigned j = 0; j < params.size(); ++j) {
+    if (!params[j].optional()) {
+      if (args.find(params[j].key()) == args.end()) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "parameter -%c missing",
+                 params[j].key());
+        return 1;
+      }
+    }
+  }
+
+  // run the command
+  const int retval = command->Main(args);
+
+  // delete the command list
+        vector<swissknife::Command *>::const_iterator i    =
+                                               swissknife::command_list.begin();
+  const vector<swissknife::Command *>::const_iterator iend =
+                                               swissknife::command_list.end();
+  for (; i != iend; ++i) { // TODO(rmeusel): C++11 range based for loop :-(
+    delete *i;
+  }
+  swissknife::command_list.clear();
 
   delete swissknife::g_signature_manager;
   delete swissknife::g_download_manager;
   delete swissknife::g_statistics;
-  swissknife::Usage();
-  return 1;
+
+  return retval;
 }
