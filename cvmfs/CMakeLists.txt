@@ -205,7 +205,9 @@ set (CVMFS_SWISSKNIFE_SOURCES
   swissknife_scrub.h swissknife_scrub.cc
   swissknife_gc.h swissknife_gc.cc
   swissknife_graft.h swissknife_graft.cc
-  swissknife.h swissknife.cc)
+  swissknife.h swissknife.cc
+  swissknife_main.cc
+  )
 
 if (VOMS_FOUND)
   set (CVMFS_SWISSKNIFE_SOURCES ${CVMFS_SWISSKNIFE_SOURCES}

@@ -31,8 +31,6 @@ class Manifest;
 
 namespace swissknife {
 
-void Usage();
-
 class Parameter {
  public:
   static Parameter Mandatory(const char key, const std::string &desc) {
