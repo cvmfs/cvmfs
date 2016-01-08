@@ -11,7 +11,7 @@ set -e # ESSENTIAL! Don't remove this!
        # the scratch area, giving us a chance to fix and retry the process.
 
 die() {
-  echo -e $1 >&2
+  ( [ x"$(echo -n -e)" = x"-e" ] && echo $1 >&2 || echo -e $1 ) >&2
   exit 1
 }
 
