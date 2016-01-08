@@ -4086,7 +4086,7 @@ check() {
                      -r $stratum0                      \
                      -t ${CVMFS_SPOOL_DIR}/tmp         \
                      -k ${CVMFS_PUBLIC_KEY}            \
-                     -N ${name}                        \
+                     -N ${CVMFS_REPOSITORY_NAME}       \
                      $(get_follow_http_redirects_flag) \
                      -z /etc/cvmfs/repositories.d/${name}/trusted_certs"
   $user_shell "$check_cmd"
