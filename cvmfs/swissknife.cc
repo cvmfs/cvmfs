@@ -36,8 +36,6 @@ using namespace std;  // NOLINT
 
 namespace swissknife {
 vector<Command *> command_list;
-download::DownloadManager *g_download_manager;
-signature::SignatureManager *g_signature_manager;
 perf::Statistics *g_statistics;
 
 void Usage() {
@@ -209,8 +207,6 @@ manifest::Manifest* Command::FetchRemoteManifest(
 
 
 int main(int argc, char **argv) {
-  swissknife::g_download_manager = new download::DownloadManager();
-  swissknife::g_signature_manager = new signature::SignatureManager();
   swissknife::g_statistics = new perf::Statistics();
 
   swissknife::command_list.push_back(new swissknife::CommandCreate());
@@ -318,8 +314,6 @@ int main(int argc, char **argv) {
   }
   swissknife::command_list.clear();
 
-  delete swissknife::g_signature_manager;
-  delete swissknife::g_download_manager;
   delete swissknife::g_statistics;
 
   return retval;
