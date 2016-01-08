@@ -139,25 +139,20 @@ int CommandMigrate::Main(const ArgumentList &args) {
   if (IsHttpUrl(repo_url)) {
     typedef HttpObjectFetcher<catalog::WritableCatalog> ObjectFetcher;
 
-    download::DownloadManager   download_manager;
-    signature::SignatureManager signature_manager;
-    download_manager.Init(1, true, g_statistics);
-    signature_manager.Init();
-    if (!signature_manager.LoadPublicRsaKeys(repo_keys)) {
-      LogCvmfs(kLogCatalog, kLogStderr, "Failed to load public key(s)");
+    const bool follow_redirects = false;
+    if (!this->InitDownloadManager(follow_redirects) ||
+        !this->InitSignatureManager(repo_keys)) {
+      LogCvmfs(kLogCatalog, kLogStderr, "Failed to init repo connection");
       return 1;
     }
 
     ObjectFetcher fetcher(repo_name,
                           repo_url,
                           tmp_dir,
-                          &download_manager,
-                          &signature_manager);
+                          download_manager(),
+                          signature_manager());
 
     loading_successful = LoadCatalogs(&fetcher);
-
-    download_manager.Fini();
-    signature_manager.Fini();
   } else {
     typedef LocalObjectFetcher<catalog::WritableCatalog> ObjectFetcher;
     ObjectFetcher fetcher(repo_url, tmp_dir);
