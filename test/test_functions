@@ -1392,6 +1392,7 @@ disable_auto_garbage_collection() {
     local tmp_cfg="$(mktemp)"
     cat $cfg_file | sed -e 's/^\(CVMFS_AUTO_GC\)=.*$/\1=false/' > $tmp_cfg || return 1
     sudo mv -f $tmp_cfg $cfg_file || return 2
+    sudo chmod 0644 $cfg_file     || return 3
   fi
 }
 
