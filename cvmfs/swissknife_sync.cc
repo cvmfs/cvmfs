@@ -589,6 +589,19 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (!this->InitDownloadManager(follow_redirects)) {
     return 3;
   }
+
+  if (!this->InitSignatureManager(params.public_keys, params.trusted_certs)) {
+    return 3;
+  }
+
+  UniquePtr<manifest::Manifest> manifest;
+  manifest = this->FetchRemoteManifest(params.stratum0,
+                                       params.repo_name,
+                                       params.base_hash);
+  if (!manifest) {
+    return 3;
+  }
+
   catalog::WritableCatalogManager
     catalog_manager(params.base_hash, params.stratum0, params.dir_temp,
                     params.spooler, download_manager(),
@@ -655,8 +668,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     catalog_manager.SetVOMSAuthz(new_authz);
   }
 
-  UniquePtr<manifest::Manifest> manifest(mediator.Commit());
-  if (!manifest.IsValid()) {
+  LogCvmfs(kLogCvmfs, kLogStdout, "Exporting repository manifest");
+  if (!mediator.Commit(manifest.weak_ref())) {
     PrintError("something went wrong during sync");
     return 5;
   }

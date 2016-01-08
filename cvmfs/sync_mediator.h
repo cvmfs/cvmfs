@@ -106,7 +106,7 @@ class SyncMediator {
   void EnterDirectory(const SyncItem &entry);
   void LeaveDirectory(const SyncItem &entry);
 
-  manifest::Manifest *Commit();
+  bool Commit(manifest::Manifest *manifest);
 
   // The sync union engine uses this information to create properly initialized
   // sync items

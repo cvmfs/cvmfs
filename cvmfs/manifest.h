@@ -92,6 +92,9 @@ class Manifest {
   void set_meta_info(const shash::Any &meta_info) {
     meta_info_ = meta_info;
   }
+  void set_root_path(const std::string &root_path) {
+    root_path_ = shash::Md5(shash::AsciiPtr(root_path));
+  }
 
   uint64_t revision() const { return revision_; }
   std::string repository_name() const { return repository_name_; }
