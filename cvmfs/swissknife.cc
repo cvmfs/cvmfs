@@ -36,7 +36,6 @@ using namespace std;  // NOLINT
 
 namespace swissknife {
 vector<Command *> command_list;
-perf::Statistics *g_statistics;
 
 void Usage() {
   LogCvmfs(kLogCvmfs, kLogStdout,
@@ -93,7 +92,7 @@ bool Command::InitDownloadManager(const bool     follow_redirects,
 
   download_manager_ = new download::DownloadManager();
   assert(download_manager_);
-  download_manager_->Init(max_pool_handles, use_system_proxy, g_statistics);
+  download_manager_->Init(max_pool_handles, use_system_proxy, statistics());
 
   if (follow_redirects) {
     download_manager_->EnableRedirects();
@@ -207,8 +206,6 @@ manifest::Manifest* Command::FetchRemoteManifest(
 
 
 int main(int argc, char **argv) {
-  swissknife::g_statistics = new perf::Statistics();
-
   swissknife::command_list.push_back(new swissknife::CommandCreate());
   swissknife::command_list.push_back(new swissknife::CommandUpload());
   swissknife::command_list.push_back(new swissknife::CommandRemove());
@@ -313,8 +310,6 @@ int main(int argc, char **argv) {
     delete *i;
   }
   swissknife::command_list.clear();
-
-  delete swissknife::g_statistics;
 
   return retval;
 }

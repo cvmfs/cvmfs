@@ -13,6 +13,7 @@
 #include "download.h"
 #include "manifest_fetch.h"
 #include "signature.h"
+#include "statistics.h"
 #include "util.h"
 
 namespace download {
@@ -29,8 +30,6 @@ class Manifest;
 }
 
 namespace swissknife {
-
-extern perf::Statistics *g_statistics;
 
 void Usage();
 
@@ -103,10 +102,12 @@ class Command {
 
   download::DownloadManager*   download_manager()  const;
   signature::SignatureManager* signature_manager() const;
+  perf::Statistics*            statistics() { return &statistics_; }
 
  private:
   UniquePtr<download::DownloadManager>    download_manager_;
   UniquePtr<signature::SignatureManager>  signature_manager_;
+  perf::Statistics                        statistics_;
 };
 
 }  // namespace swissknife

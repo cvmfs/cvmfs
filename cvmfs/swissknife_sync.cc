@@ -268,7 +268,7 @@ int swissknife::CommandApplyDirtab::Main(const ArgumentList &args) {
                                                 stratum0,
                                                 dir_temp,
                                                 download_manager(),
-                                                g_statistics,
+                                                statistics(),
                                                 auto_manage_catalog_files);
   catalog_manager.Init();
 
@@ -586,7 +586,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     catalog_manager(params.base_hash, params.stratum0, params.dir_temp,
                     params.spooler, download_manager(),
                     params.catalog_entry_warn_threshold,
-                    g_statistics,
+                    statistics(),
                     params.is_balanced,
                     params.max_weight,
                     params.min_weight);
