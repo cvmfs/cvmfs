@@ -38,7 +38,8 @@ class Manifest {
            const uint64_t publish_timestamp,
            const bool garbage_collectable,
            const bool has_alt_catalog_path,
-           const shash::Any &meta_info)
+           const shash::Any &meta_info,
+           const std::string &cvmfs_version)
   : catalog_hash_(catalog_hash)
   , catalog_size_(catalog_size)
   , root_path_(root_path)
@@ -51,7 +52,8 @@ class Manifest {
   , publish_timestamp_(publish_timestamp)
   , garbage_collectable_(garbage_collectable)
   , has_alt_catalog_path_(has_alt_catalog_path)
-  , meta_info_(meta_info) { }
+  , meta_info_(meta_info)
+  , creator_version_(cvmfs_version) { }
 
   std::string ExportString() const;
   bool Export(const std::string &path) const;
@@ -95,6 +97,9 @@ class Manifest {
   void set_root_path(const std::string &root_path) {
     root_path_ = shash::Md5(shash::AsciiPtr(root_path));
   }
+  void set_creator_version(const std::string &cvmfs_version) {
+    creator_version_ = cvmfs_version;
+  }
 
   uint64_t revision() const { return revision_; }
   std::string repository_name() const { return repository_name_; }
@@ -107,6 +112,7 @@ class Manifest {
   bool garbage_collectable() const { return garbage_collectable_; }
   bool has_alt_catalog_path() const { return has_alt_catalog_path_; }
   shash::Any meta_info() const { return meta_info_; }
+  std::string creator_version() const { return creator_version_; }
 
   std::string MakeCatalogPath() const {
     return has_alt_catalog_path_ ? catalog_hash_.MakeAlternativePath() :
@@ -144,6 +150,8 @@ class Manifest {
    * of recommended stratum 1s, ...)
    */
   shash::Any meta_info_;
+
+  std::string creator_version_;
 };  // class Manifest
 
 }  // namespace manifest

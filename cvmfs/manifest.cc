@@ -39,6 +39,7 @@ Manifest *Manifest::Load(const map<char, string> &content) {
   // Required keys
   shash::Any catalog_hash;
   shash::Md5 root_path;
+  std::string creator_version;
   uint32_t ttl;
   uint64_t revision;
 
@@ -56,6 +57,10 @@ Manifest *Manifest::Load(const map<char, string> &content) {
   if ((iter = content.find('S')) == content.end())
     return NULL;
   revision = String2Uint64(iter->second);
+  if ((iter = content.find('V')) == content.end())
+    return NULL;
+  creator_version = iter->second;
+
 
   // Optional keys
   uint64_t catalog_size = 0;
@@ -94,7 +99,7 @@ Manifest *Manifest::Load(const map<char, string> &content) {
   return new Manifest(catalog_hash, catalog_size, root_path, ttl, revision,
                       micro_catalog_hash, repository_name, certificate,
                       history, publish_timestamp, garbage_collectable,
-                      has_alt_catalog_path, meta_info);
+                      has_alt_catalog_path, meta_info, creator_version);
 }
 
 
@@ -123,7 +128,8 @@ string Manifest::ExportString() const {
     "D" + StringifyInt(ttl_) + "\n" +
     "S" + StringifyInt(revision_) + "\n" +
     "G" + StringifyBool(garbage_collectable_) + "\n" +
-    "A" + StringifyBool(has_alt_catalog_path_) + "\n";
+    "A" + StringifyBool(has_alt_catalog_path_) + "\n" +
+    "V" + creator_version_ + "\n";
 
   if (!micro_catalog_hash_.IsNull())
     manifest += "L" + micro_catalog_hash_.ToString() + "\n";
