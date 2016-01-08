@@ -73,6 +73,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   }
 
   // Load private key
+  // TODO(rmeusel): eliminiate code duplication with swissknife_letter.cc
   if (priv_key == "") {
     LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
              "Enter file name of private key file to your certificate []: ");
