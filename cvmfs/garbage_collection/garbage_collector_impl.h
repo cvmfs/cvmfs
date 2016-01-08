@@ -222,12 +222,20 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepHistoricRevisions()
   ObjectFetcherTN *fetcher = configuration_.object_fetcher;
 
   // find the content hash for the current HEAD history database
-  UniquePtr<HistoryTN> history(fetcher->FetchHistory());
-  if (!history.IsValid()) {
-    if (configuration_.verbose) {
-      LogCvmfs(kLogGc, kLogStdout, "No history found");
-    }
-    return true;
+  UniquePtr<HistoryTN> history;
+  const typename ObjectFetcherTN::Failures retval = // TODO(rmeusel): C++11 auto
+    fetcher->FetchHistory(&history);
+  switch (retval) {
+    case ObjectFetcherTN::kFailOk:
+      break;
+
+    case ObjectFetcherTN::kFailNotFound:
+      if (configuration_.verbose)
+        LogCvmfs(kLogGc, kLogStdout, "No history found");
+      return true;
+
+    default:
+      return false;
   }
 
   typename CatalogTraversalT::CallbackTN *callback =

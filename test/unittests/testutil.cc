@@ -425,22 +425,32 @@ catalog::LoadError catalog::MockCatalogManager::LoadCatalog(
 //------------------------------------------------------------------------------
 
 
-manifest::Manifest* MockObjectFetcher::FetchManifest() {
+ MockObjectFetcher::Failures
+ MockObjectFetcher::FetchManifest(manifest::Manifest** manifest) {
   const uint64_t    catalog_size = 0;
   const std::string root_path    = "";
-  manifest::Manifest* manifest = new manifest::Manifest(
+  *manifest = new manifest::Manifest(
       MockCatalog::root_hash,
       catalog_size,
       root_path);
-  manifest->set_history(MockHistory::root_hash);
-  return manifest;
+  (*manifest)->set_history(MockHistory::root_hash);
+  return MockObjectFetcher::kFailOk;
 }
 
-bool MockObjectFetcher::Fetch(const shash::Any &object_hash,
-                              std::string      *file_path) {
+MockObjectFetcher::Failures
+MockObjectFetcher::Fetch(const shash::Any   &object_hash,
+                               std::string  *file_path) {
   assert(file_path != NULL);
   *file_path = object_hash.ToString();
-  return true;
+  if (!ObjectExists(object_hash)) {
+    return MockObjectFetcher::kFailNotFound;
+  }
+  return MockObjectFetcher::kFailOk;
+}
+
+bool MockObjectFetcher::ObjectExists(const shash::Any &object_hash) const {
+  return MockCatalog::Exists(object_hash) ||
+         MockHistory::Exists(object_hash);
 }
 
 

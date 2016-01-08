@@ -95,9 +95,12 @@ int CommandGc::Main(const ArgumentList &args) {
                                &download_manager,
                                &signature_manager);
 
-  UniquePtr<manifest::Manifest> manifest(object_fetcher.FetchManifest());
-  if (!manifest.IsValid()) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load repository manifest");
+  UniquePtr<manifest::Manifest> manifest;
+  ObjectFetcher::Failures retval = object_fetcher.FetchManifest(&manifest);
+  if (retval != ObjectFetcher::kFailOk) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load repository manifest "
+                                    "(%d - %s)",
+                                    retval, Code2Ascii(retval));
     return 1;
   }
 

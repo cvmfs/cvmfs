@@ -1336,6 +1336,24 @@ peek_backend() {
 }
 
 
+# uploads a random file into the backend storage of a CVMFS repository
+#
+# @param repository   the repository name to uploaded into
+# @param file_path    the file to be uploaded
+# @param remote_path  the relative remote path to be uploaded into
+upload_into_backend() {
+  local repo_name="$1"
+  local file_path="$2"
+  local remote_path="$3"
+
+  load_repo_config $repo_name
+  cvmfs_swissknife upload -i $file_path              \
+                          -o $remote_path            \
+                          -r $CVMFS_UPSTREAM_STORAGE \
+                          -a $CVMFS_HASH_ALGORITHM
+}
+
+
 # reads the upstream config part of a CernVM-FS server configuration file
 # This is the third comma-separated field in the upstream string
 read_upstream_config() {
