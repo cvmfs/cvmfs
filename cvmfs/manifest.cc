@@ -39,7 +39,6 @@ Manifest *Manifest::Load(const map<char, string> &content) {
   // Required keys
   shash::Any catalog_hash;
   shash::Md5 root_path;
-  std::string creator_version;
   uint32_t ttl;
   uint64_t revision;
 
@@ -57,9 +56,6 @@ Manifest *Manifest::Load(const map<char, string> &content) {
   if ((iter = content.find('S')) == content.end())
     return NULL;
   revision = String2Uint64(iter->second);
-  if ((iter = content.find('V')) == content.end())
-    return NULL;
-  creator_version = iter->second;
 
 
   // Optional keys
@@ -72,6 +68,7 @@ Manifest *Manifest::Load(const map<char, string> &content) {
   bool garbage_collectable = false;
   bool has_alt_catalog_path = false;
   shash::Any meta_info;
+  std::string creator_version;
 
   if ((iter = content.find('B')) != content.end())
     catalog_size = String2Uint64(iter->second);
@@ -95,6 +92,8 @@ Manifest *Manifest::Load(const map<char, string> &content) {
   if ((iter = content.find('M')) != content.end())
     meta_info = MkFromHexPtr(shash::HexPtr(iter->second),
                              shash::kSuffixMetainfo);
+  if ((iter = content.find('V')) == content.end())
+    creator_version = iter->second;
 
   return new Manifest(catalog_hash, catalog_size, root_path, ttl, revision,
                       micro_catalog_hash, repository_name, certificate,
