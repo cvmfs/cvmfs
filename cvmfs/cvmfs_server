@@ -4506,9 +4506,6 @@ publish() {
     if [ "x$CVMFS_REPOSITORY_TTL" != "x" ]; then
       sync_command="$sync_command -T $CVMFS_REPOSITORY_TTL"
     fi
-    if [ "x$CVMFS_GARBAGE_COLLECTION" = "xtrue" ]; then
-      sync_command="$sync_command -g"
-    fi
     if [ "x$CVMFS_MAXIMAL_CONCURRENT_WRITES" != "x" ]; then
       sync_command="$sync_command -q $CVMFS_MAXIMAL_CONCURRENT_WRITES"
     fi

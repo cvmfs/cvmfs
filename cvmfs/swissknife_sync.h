@@ -29,7 +29,6 @@ struct SyncParameters {
     use_file_chunking(false),
     ignore_xdir_hardlinks(false),
     stop_for_catalog_tweaks(false),
-    garbage_collectable(false),
     include_xattrs(false),
     external_data(false),
     voms_authz(false),
@@ -65,7 +64,6 @@ struct SyncParameters {
   bool             use_file_chunking;
   bool             ignore_xdir_hardlinks;
   bool             stop_for_catalog_tweaks;
-  bool             garbage_collectable;
   bool             include_xattrs;
   bool             external_data;
   bool             voms_authz;
@@ -249,7 +247,6 @@ class CommandSync : public Command {
 
     r.push_back(Parameter::Switch('d', "pause publishing to allow for catalog "
                                        "tweaks"));
-    r.push_back(Parameter::Switch('g', "repo is garbage collectable"));
     r.push_back(Parameter::Switch('i', "ignore x-directory hardlinks"));
     r.push_back(Parameter::Switch('k', "include extended attributes"));
     r.push_back(Parameter::Switch('m', "create micro catalogs"));

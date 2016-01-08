@@ -504,7 +504,6 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (args.find('m') != args.end()) params.mucatalogs = true;
   if (args.find('i') != args.end()) params.ignore_xdir_hardlinks = true;
   if (args.find('d') != args.end()) params.stop_for_catalog_tweaks = true;
-  if (args.find('g') != args.end()) params.garbage_collectable = true;
   if (args.find('V') != args.end()) params.voms_authz = true;
   if (args.find('F') != args.end()) params.authz_file = *args.find('F')->second;
   if (args.find('k') != args.end()) params.include_xattrs = true;
@@ -668,18 +667,13 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     catalog_manager.SetVOMSAuthz(new_authz);
   }
 
-  LogCvmfs(kLogCvmfs, kLogStdout, "Exporting repository manifest");
   if (!mediator.Commit(manifest.weak_ref())) {
     PrintError("something went wrong during sync");
     return 5;
   }
 
-  LogCvmfs(kLogCvmfs, kLogStdout, "Exporting repository manifest");
-  const bool needs_bootstrap_shortcuts = params.voms_authz;
-  manifest->set_garbage_collectability(params.garbage_collectable);
-  manifest->set_has_alt_catalog_path(needs_bootstrap_shortcuts);
-
   // finalize the spooler
+  LogCvmfs(kLogCvmfs, kLogStdout, "Exporting repository manifest");
   params.spooler->WaitForUpload();
   delete params.spooler;
 
