@@ -9,13 +9,14 @@
 #include "cvmfs_config.h"
 #include "swissknife.h"
 
+#include <cassert>
 #include <unistd.h>
 
 #include <vector>
 
-#include "download.h"
 #include "logging.h"
-#include "signature.h"
+#include "manifest.h"
+#include "manifest_fetch.h"
 #include "swissknife_check.h"
 #include "swissknife_gc.h"
 #include "swissknife_graft.h"
@@ -71,6 +72,137 @@ void Usage() {
   }  // Command list
 
   LogCvmfs(kLogCvmfs, kLogStdout, "");
+}
+
+
+Command::~Command() {
+  if (download_manager_.IsValid()) {
+    download_manager_->Fini();
+  }
+
+  if (signature_manager_.IsValid()) {
+    signature_manager_->Fini();
+  }
+}
+
+
+bool Command::InitDownloadManager(const bool     follow_redirects,
+                                  const unsigned max_pool_handles,
+                                  const bool     use_system_proxy) {
+  if (download_manager_.IsValid()) {
+    return true;
+  }
+
+  download_manager_ = new download::DownloadManager();
+  assert(download_manager_);
+  download_manager_->Init(max_pool_handles, use_system_proxy, g_statistics);
+
+  if (follow_redirects) {
+    download_manager_->EnableRedirects();
+  }
+
+  return true;
+}
+
+bool Command::InitSignatureManager(const std::string pubkey_path,
+                                   const std::string trusted_certs) {
+  if (signature_manager_.IsValid()) {
+    return true;
+  }
+
+  signature_manager_ = new signature::SignatureManager();
+  assert(signature_manager_);
+  signature_manager_->Init();
+
+  if (!signature_manager_->LoadPublicRsaKeys(pubkey_path)) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load public repo key '%s'",
+             pubkey_path.c_str());
+    return false;
+  }
+
+  if (!trusted_certs.empty() &&
+      !signature_manager_->LoadTrustedCaCrl(trusted_certs)) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load trusted certificates");
+    return false;
+  }
+
+  return true;
+}
+
+
+download::DownloadManager* Command::download_manager()  const {
+  assert(download_manager_.IsValid());
+  return download_manager_.weak_ref();
+}
+
+signature::SignatureManager* Command::signature_manager() const {
+  assert(signature_manager_.IsValid());
+  return signature_manager_.weak_ref();
+}
+
+
+manifest::Manifest* Command::OpenLocalManifest(const std::string path) const {
+  return manifest::Manifest::LoadFile(path);
+}
+
+
+manifest::Failures Command::FetchRemoteManifestEnsemble(
+                             const std::string &repository_url,
+                             const std::string &repository_name,
+                                   manifest::ManifestEnsemble *ensemble) const {
+  const uint64_t    minimum_timestamp = 0;
+  const shash::Any *base_catalog      = NULL;
+  return manifest::Fetch(repository_url,
+                         repository_name,
+                         minimum_timestamp,
+                         base_catalog,
+                         signature_manager(),
+                         download_manager(),
+                         ensemble);
+}
+
+
+manifest::Manifest* Command::FetchRemoteManifest(
+                                          const std::string &repository_url,
+                                          const std::string &repository_name,
+                                          const shash::Any  &base_hash) const {
+  manifest::ManifestEnsemble manifest_ensemble;
+  UniquePtr<manifest::Manifest> manifest;
+
+  // fetch (and verify) the manifest
+  const manifest::Failures retval =
+                              FetchRemoteManifestEnsemble(repository_url,
+                                                          repository_name,
+                                                          &manifest_ensemble);
+
+  if (retval != manifest::kFailOk) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch repository manifest "
+                                    "(%d - %s)",
+             retval, manifest::Code2Ascii(retval));
+    return NULL;
+  } else {
+    // copy-construct a fresh manifest object because ManifestEnsemble will
+    // free manifest_ensemble.manifest when it goes out of scope
+    manifest = new manifest::Manifest(*manifest_ensemble.manifest);
+  }
+
+  // check if manifest fetching was successful
+  if (!manifest) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load repository manifest");
+    return NULL;
+  }
+
+  // check the provided base hash of the repository if provided
+  if (!base_hash.IsNull() && manifest->catalog_hash() != base_hash) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "base hash does not match manifest "
+                                    "(found: %s expected: %s)",
+             manifest->catalog_hash().ToString().c_str(),
+             base_hash.ToString().c_str());
+    return NULL;
+  }
+
+  // return the fetched manifest (releasing pointer ownership)
+  return manifest.Release();
 }
 
 }  // namespace swissknife

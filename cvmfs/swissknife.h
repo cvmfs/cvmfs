@@ -10,6 +10,11 @@
 #include <string>
 #include <vector>
 
+#include "download.h"
+#include "manifest_fetch.h"
+#include "signature.h"
+#include "util.h"
+
 namespace download {
 class DownloadManager;
 }
@@ -18,6 +23,9 @@ class SignatureManager;
 }
 namespace perf {
 class Statistics;
+}
+namespace manifest {
+class Manifest;
 }
 
 namespace swissknife {
@@ -72,11 +80,35 @@ typedef std::map<char, std::string *> ArgumentList;
 class Command {
  public:
   Command() { }
-  virtual ~Command() { }
+  virtual ~Command();
   virtual std::string GetName() = 0;
   virtual std::string GetDescription() = 0;
   virtual ParameterList GetParams() = 0;
   virtual int Main(const ArgumentList &args) = 0;
+
+ protected:
+  bool InitDownloadManager(const bool     follow_redirects,
+                           const unsigned max_pool_handles = 1,
+                           const bool     use_system_proxy = true);
+  bool InitSignatureManager(const std::string pubkey_path,
+                            const std::string trusted_certs = "");
+
+  manifest::Manifest* OpenLocalManifest(const std::string path) const;
+  manifest::Failures  FetchRemoteManifestEnsemble(
+                              const std::string &repository_url,
+                              const std::string &repository_name,
+                                    manifest::ManifestEnsemble *ensemble) const;
+  manifest::Manifest* FetchRemoteManifest(
+                             const std::string &repository_url,
+                             const std::string &repository_name,
+                             const shash::Any  &base_hash = shash::Any()) const;
+
+  download::DownloadManager*   download_manager()  const;
+  signature::SignatureManager* signature_manager() const;
+
+ private:
+  UniquePtr<download::DownloadManager>    download_manager_;
+  UniquePtr<signature::SignatureManager>  signature_manager_;
 };
 
 }  // namespace swissknife
