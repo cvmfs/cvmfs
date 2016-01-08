@@ -493,6 +493,9 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   params.manifest_path = *args.find('o')->second;
   params.spooler_definition = *args.find('r')->second;
 
+  params.public_keys = *args.find('K')->second;
+  params.repo_name = *args.find('N')->second;
+
   if (args.find('f') != args.end())
     params.union_fs_type = *args.find('f')->second;
   if (args.find('A') != args.end()) params.is_balanced = true;
@@ -539,6 +542,10 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (args.find('Z') != args.end()) {
     params.compression_alg =
       zlib::ParseCompressionAlgorithm(*args.find('Z')->second);
+  }
+
+  if (args.find('C') != args.end()) {
+    params.trusted_certs = *args.find('C')->second;
   }
 
   if (args.find('j') != args.end()) {

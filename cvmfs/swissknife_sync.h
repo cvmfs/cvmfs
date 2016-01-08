@@ -46,6 +46,7 @@ struct SyncParameters {
     min_weight(kDefaultMinWeight) {}
 
   upload::Spooler *spooler;
+  std::string      repo_name;
   std::string      dir_union;
   std::string      dir_scratch;
   std::string      dir_rdonly;
@@ -55,6 +56,8 @@ struct SyncParameters {
   std::string      manifest_path;
   std::string      spooler_definition;
   std::string      union_fs_type;
+  std::string      public_keys;
+  std::string      trusted_certs;
   std::string      authz_file;
   bool             print_changeset;
   bool             dry_run;
@@ -224,6 +227,8 @@ class CommandSync : public Command {
     r.push_back(Parameter::Mandatory('t', "directory for tee"));
     r.push_back(Parameter::Mandatory('u', "union volume"));
     r.push_back(Parameter::Mandatory('w', "stratum 0 base url"));
+    r.push_back(Parameter::Mandatory('K', "public key(s) for repo"));
+    r.push_back(Parameter::Mandatory('N', "fully qualified repository name"));
 
     r.push_back(Parameter::Optional('a', "desired average chunk size (bytes)"));
     r.push_back(Parameter::Optional('e', "hash algorithm (default: SHA-1)"));
@@ -234,6 +239,7 @@ class CommandSync : public Command {
     r.push_back(Parameter::Optional('q', "number of concurrent write jobs"));
     r.push_back(Parameter::Optional('v', "manual revision number"));
     r.push_back(Parameter::Optional('z', "log level (0-4, default: 2)"));
+    r.push_back(Parameter::Optional('C', "trusted certificates"));
     r.push_back(Parameter::Optional('F', "Authz file listing (default: none)"));
     r.push_back(Parameter::Optional('M', "minimum weight of the autocatalogs"));
     r.push_back(Parameter::Optional('T', "Root catalog TTL in seconds"));
