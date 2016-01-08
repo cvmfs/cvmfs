@@ -650,14 +650,13 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     catalog_manager.SetVOMSAuthz(new_authz);
   }
 
-  LogCvmfs(kLogCvmfs, kLogStdout, "Exporting repository manifest");
   UniquePtr<manifest::Manifest> manifest(mediator.Commit());
-
   if (!manifest.IsValid()) {
     PrintError("something went wrong during sync");
     return 5;
   }
 
+  LogCvmfs(kLogCvmfs, kLogStdout, "Exporting repository manifest");
   const bool needs_bootstrap_shortcuts = params.voms_authz;
   manifest->set_garbage_collectability(params.garbage_collectable);
   manifest->set_has_alt_catalog_path(needs_bootstrap_shortcuts);
