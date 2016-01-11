@@ -186,7 +186,7 @@ void SyncMediator::LeaveDirectory(const SyncItem &entry)
  * Do any pending processing and commit all changes to the catalogs.
  * To be called after change set traversal is finished.
  */
-manifest::Manifest *SyncMediator::Commit() {
+bool SyncMediator::Commit(manifest::Manifest *manifest) {
   if (!params_->print_changeset && changed_items_ >= processing_dot_interval) {
     // line break the 'progress bar', see SyncMediator::PrintChangesetNotice()
     LogCvmfs(kLogPublish, kLogStdout, "");
