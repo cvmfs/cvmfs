@@ -172,6 +172,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     manifest->set_certificate(certificate_hash);
     manifest->set_repository_name(repo_name);
     manifest->set_publish_timestamp(time(NULL));
+    manifest->set_creator_version(VERSION);
     if (!metainfo_hash.IsNull())
       manifest->set_meta_info(metainfo_hash);
 
