@@ -18,11 +18,14 @@
 
 #define _FILE_OFFSET_BITS 64
 
+#define __STDC_FORMAT_MACROS
+
 #include "cvmfs_config.h"
 #include "swissknife_sync.h"
 
 #include <fcntl.h>
 #include <glob.h>
+#include <inttypes.h>
 
 #include <cstdio>
 #include <cstdlib>
