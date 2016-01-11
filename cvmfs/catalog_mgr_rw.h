@@ -121,8 +121,9 @@ class WritableCatalogManager : public SimpleCatalogManager {
 
   void SetTTL(const uint64_t new_ttl);
   bool SetVOMSAuthz(const std::string &voms_authz);
-  manifest::Manifest *Commit(const bool     stop_for_tweaks,
-                             const uint64_t manual_revision);
+  bool Commit(const bool           stop_for_tweaks,
+              const uint64_t       manual_revision,
+              manifest::Manifest  *manifest);
   void Balance() {
       if (IsBalanceable()) {
           DoBalance();

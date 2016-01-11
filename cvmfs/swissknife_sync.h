@@ -29,7 +29,6 @@ struct SyncParameters {
     use_file_chunking(false),
     ignore_xdir_hardlinks(false),
     stop_for_catalog_tweaks(false),
-    garbage_collectable(false),
     include_xattrs(false),
     external_data(false),
     voms_authz(false),
@@ -46,6 +45,7 @@ struct SyncParameters {
     min_weight(kDefaultMinWeight) {}
 
   upload::Spooler *spooler;
+  std::string      repo_name;
   std::string      dir_union;
   std::string      dir_scratch;
   std::string      dir_rdonly;
@@ -55,6 +55,8 @@ struct SyncParameters {
   std::string      manifest_path;
   std::string      spooler_definition;
   std::string      union_fs_type;
+  std::string      public_keys;
+  std::string      trusted_certs;
   std::string      authz_file;
   bool             print_changeset;
   bool             dry_run;
@@ -62,7 +64,6 @@ struct SyncParameters {
   bool             use_file_chunking;
   bool             ignore_xdir_hardlinks;
   bool             stop_for_catalog_tweaks;
-  bool             garbage_collectable;
   bool             include_xattrs;
   bool             external_data;
   bool             voms_authz;
@@ -216,46 +217,48 @@ class CommandSync : public Command {
   }
   ParameterList GetParams() {
     ParameterList r;
-    r.push_back(Parameter::Mandatory('u', "union volume"));
-    r.push_back(Parameter::Mandatory('s', "scratch directory"));
-    r.push_back(Parameter::Mandatory('c', "r/o volume"));
-    r.push_back(Parameter::Mandatory('t', "directory for tee"));
     r.push_back(Parameter::Mandatory('b', "base hash"));
-    r.push_back(Parameter::Mandatory('w', "stratum 0 base url"));
+    r.push_back(Parameter::Mandatory('c', "r/o volume"));
     r.push_back(Parameter::Mandatory('o', "manifest output file"));
     r.push_back(Parameter::Mandatory('r', "spooler definition"));
-    r.push_back(Parameter::Switch('A', "autocatalog enabled/disabled"));
+    r.push_back(Parameter::Mandatory('s', "scratch directory"));
+    r.push_back(Parameter::Mandatory('t', "directory for tee"));
+    r.push_back(Parameter::Mandatory('u', "union volume"));
+    r.push_back(Parameter::Mandatory('w', "stratum 0 base url"));
+    r.push_back(Parameter::Mandatory('K', "public key(s) for repo"));
+    r.push_back(Parameter::Mandatory('N', "fully qualified repository name"));
+
+    r.push_back(Parameter::Optional('a', "desired average chunk size (bytes)"));
+    r.push_back(Parameter::Optional('e', "hash algorithm (default: SHA-1)"));
+    r.push_back(Parameter::Optional('f', "union filesystem type"));
+    r.push_back(Parameter::Optional('h', "maximal file chunk size in bytes"));
+    r.push_back(Parameter::Optional('j', "catalog entry warning threshold"));
+    r.push_back(Parameter::Optional('l', "minimal file chunk size in bytes"));
+    r.push_back(Parameter::Optional('q', "number of concurrent write jobs"));
+    r.push_back(Parameter::Optional('v', "manual revision number"));
+    r.push_back(Parameter::Optional('z', "log level (0-4, default: 2)"));
+    r.push_back(Parameter::Optional('C', "trusted certificates"));
+    r.push_back(Parameter::Optional('F', "Authz file listing (default: none)"));
+    r.push_back(Parameter::Optional('M', "minimum weight of the autocatalogs"));
+    r.push_back(Parameter::Optional('T', "Root catalog TTL in seconds"));
+    r.push_back(Parameter::Optional('X', "maximum weight of the autocatalogs"));
+    r.push_back(Parameter::Optional('Z', "compression algorithm "
+                                         "(default: zlib)"));
+
+    r.push_back(Parameter::Switch('d', "pause publishing to allow for catalog "
+                                       "tweaks"));
+    r.push_back(Parameter::Switch('i', "ignore x-directory hardlinks"));
+    r.push_back(Parameter::Switch('k', "include extended attributes"));
+    r.push_back(Parameter::Switch('m', "create micro catalogs"));
     r.push_back(Parameter::Switch('n', "create new repository"));
+    r.push_back(Parameter::Switch('p', "enable file chunking"));
     r.push_back(Parameter::Switch('x', "print change set"));
     r.push_back(Parameter::Switch('y', "dry run"));
+    r.push_back(Parameter::Switch('A', "autocatalog enabled/disabled"));
     r.push_back(Parameter::Switch('L', "enable HTTP redirects"));
-    r.push_back(Parameter::Switch('m', "create micro catalogs"));
-    r.push_back(Parameter::Switch('i', "ignore x-directory hardlinks"));
-    r.push_back(Parameter::Switch('d', "pause publishing to allow for "
-                                          "catalog tweaks"));
-    r.push_back(Parameter::Switch('g', "repo is garbage collectable"));
-    r.push_back(Parameter::Switch('p', "enable file chunking"));
-    r.push_back(Parameter::Switch('k', "include extended attributes"));
-    r.push_back(Parameter::Optional('z', "log level (0-4, default: 2)"));
-    r.push_back(Parameter::Optional('a',
-      "desired average chunk size in bytes"));
-    r.push_back(Parameter::Optional('l', "minimal file chunk size in bytes"));
-    r.push_back(Parameter::Optional('h', "maximal file chunk size in bytes"));
-    r.push_back(Parameter::Optional('f', "union filesystem type"));
-    r.push_back(Parameter::Optional('e', "hash algorithm (default: SHA-1)"));
-    r.push_back(Parameter::Optional('j', "catalog entry warning threshold"));
-    r.push_back(Parameter::Optional('v', "manual revision number"));
-    r.push_back(Parameter::Optional('q', "number of concurrent write jobs"));
-    r.push_back(Parameter::Switch('Y', "enable external data"));
-    r.push_back(Parameter::Optional('X', "maximum weight of the autocatalogs"));
-    r.push_back(Parameter::Optional('M', "minimum weight of the autocatalogs"));
-    r.push_back(Parameter::Optional(
-      'Z', "compression algorithm (default: zlib)"));
     r.push_back(Parameter::Switch('V', "Publish format compatible with "
                                        "authenticated repos"));
-    r.push_back(Parameter::Optional('F', "Authz file listing "
-                                         "(default: none)"));
-    r.push_back(Parameter::Optional('T', "Root catalog TTL in seconds"));
+    r.push_back(Parameter::Switch('Y', "enable external data"));
     return r;
   }
   int Main(const ArgumentList &args);

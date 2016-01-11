@@ -699,10 +699,9 @@ bool WritableCatalogManager::SetVOMSAuthz(const std::string &voms_authz) {
 }
 
 
-manifest::Manifest *WritableCatalogManager::Commit(
-  const bool     stop_for_tweaks,
-  const uint64_t manual_revision)
-{
+bool WritableCatalogManager::Commit(const bool           stop_for_tweaks,
+                                    const uint64_t       manual_revision,
+                                    manifest::Manifest  *manifest) {
   reinterpret_cast<WritableCatalog *>(GetRootCatalog())->SetDirty();
   WritableCatalogList catalogs_to_snapshot;
   GetModifiedCatalogs(&catalogs_to_snapshot);
@@ -710,7 +709,6 @@ manifest::Manifest *WritableCatalogManager::Commit(
   spooler_->RegisterListener(
     &WritableCatalogManager::CatalogUploadCallback, this);
 
-  manifest::Manifest *result = NULL;
   for (WritableCatalogList::iterator i = catalogs_to_snapshot.begin(),
        iEnd = catalogs_to_snapshot.end(); i != iEnd; ++i)
   {
@@ -752,23 +750,24 @@ manifest::Manifest *WritableCatalogManager::Commit(
       spooler_->WaitForUpload();
       if (spooler_->GetNumberOfErrors() > 0) {
         LogCvmfs(kLogCatalog, kLogStderr, "failed to commit catalogs");
-        return NULL;
+        return false;
       }
 
       // .cvmfspublished
       int64_t catalog_size = GetFileSize((*i)->database_path());
       if (catalog_size < 0)
-        return NULL;
+        return false;
       LogCvmfs(kLogCatalog, kLogVerboseMsg, "Committing repository manifest");
-      result = new manifest::Manifest(hash, catalog_size, "");
-      result->set_ttl((*i)->GetTTL());
-      result->set_revision((*i)->GetRevision());
+      manifest->set_catalog_hash(hash);
+      manifest->set_catalog_size(catalog_size);
+      manifest->set_root_path("");
+      manifest->set_ttl((*i)->GetTTL());
+      manifest->set_revision((*i)->GetRevision());
     }
   }
 
   spooler_->UnregisterListeners();
-
-  return result;
+  return true;
 }
 
 

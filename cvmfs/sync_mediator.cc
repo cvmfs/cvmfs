@@ -244,7 +244,7 @@ manifest::Manifest *SyncMediator::Commit() {
   LogCvmfs(kLogPublish, kLogStdout, "Committing file catalogs...");
   if (params_->spooler->GetNumberOfErrors() > 0) {
     LogCvmfs(kLogPublish, kLogStderr, "failed to commit files");
-    return NULL;
+    return false;
   }
 
   if (catalog_manager_->IsBalanceable()) {
@@ -252,7 +252,8 @@ manifest::Manifest *SyncMediator::Commit() {
   }
   catalog_manager_->PrecalculateListings();
   return catalog_manager_->Commit(params_->stop_for_catalog_tweaks,
-                                  params_->manual_revision);
+                                  params_->manual_revision,
+                                  manifest);
 }
 
 

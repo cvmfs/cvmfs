@@ -493,6 +493,9 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   params.manifest_path = *args.find('o')->second;
   params.spooler_definition = *args.find('r')->second;
 
+  params.public_keys = *args.find('K')->second;
+  params.repo_name = *args.find('N')->second;
+
   if (args.find('f') != args.end())
     params.union_fs_type = *args.find('f')->second;
   if (args.find('A') != args.end()) params.is_balanced = true;
@@ -501,7 +504,6 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (args.find('m') != args.end()) params.mucatalogs = true;
   if (args.find('i') != args.end()) params.ignore_xdir_hardlinks = true;
   if (args.find('d') != args.end()) params.stop_for_catalog_tweaks = true;
-  if (args.find('g') != args.end()) params.garbage_collectable = true;
   if (args.find('V') != args.end()) params.voms_authz = true;
   if (args.find('F') != args.end()) params.authz_file = *args.find('F')->second;
   if (args.find('k') != args.end()) params.include_xattrs = true;
@@ -539,6 +541,10 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (args.find('Z') != args.end()) {
     params.compression_alg =
       zlib::ParseCompressionAlgorithm(*args.find('Z')->second);
+  }
+
+  if (args.find('C') != args.end()) {
+    params.trusted_certs = *args.find('C')->second;
   }
 
   if (args.find('j') != args.end()) {
@@ -582,6 +588,19 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (!this->InitDownloadManager(follow_redirects)) {
     return 3;
   }
+
+  if (!this->InitSignatureManager(params.public_keys, params.trusted_certs)) {
+    return 3;
+  }
+
+  UniquePtr<manifest::Manifest> manifest;
+  manifest = this->FetchRemoteManifest(params.stratum0,
+                                       params.repo_name,
+                                       params.base_hash);
+  if (!manifest) {
+    return 3;
+  }
+
   catalog::WritableCatalogManager
     catalog_manager(params.base_hash, params.stratum0, params.dir_temp,
                     params.spooler, download_manager(),
@@ -648,18 +667,13 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     catalog_manager.SetVOMSAuthz(new_authz);
   }
 
-  UniquePtr<manifest::Manifest> manifest(mediator.Commit());
-  if (!manifest.IsValid()) {
+  if (!mediator.Commit(manifest.weak_ref())) {
     PrintError("something went wrong during sync");
     return 5;
   }
 
-  LogCvmfs(kLogCvmfs, kLogStdout, "Exporting repository manifest");
-  const bool needs_bootstrap_shortcuts = params.voms_authz;
-  manifest->set_garbage_collectability(params.garbage_collectable);
-  manifest->set_has_alt_catalog_path(needs_bootstrap_shortcuts);
-
   // finalize the spooler
+  LogCvmfs(kLogCvmfs, kLogStdout, "Exporting repository manifest");
   params.spooler->WaitForUpload();
   delete params.spooler;
 
