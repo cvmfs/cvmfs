@@ -32,12 +32,11 @@ static bool IsRemote(const string &repository) {
 /**
  * Checks for existance of a file either locally or via HTTP head
  */
-static bool Exists(const string &repository, const string &file)
-{
+bool CommandInfo::Exists(const string &repository, const string &file) const {
   if (IsRemote(repository)) {
     const string url = repository + "/" + file;
     download::JobInfo head(&url, false);
-    return g_download_manager->Fetch(&head) == download::kFailOk;
+    return download_manager()->Fetch(&head) == download::kFailOk;
   } else {
     return FileExists(file);
   }
@@ -72,7 +71,7 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
     unsigned log_level =
       1 << (kLogLevel0 + String2Uint64(*args.find('l')->second));
     if (log_level > kLogNone) {
-      swissknife::Usage();
+      LogCvmfs(kLogCvmfs, kLogStderr, "invalid log level");
       return 1;
     }
     SetLogVerbosity(static_cast<LogLevels>(log_level));
@@ -96,16 +95,14 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
   //       Possible Fix: Allow for a Manifest::Fetch with an empty name.
   manifest::Manifest *manifest = NULL;
   if (IsRemote(repository)) {
-    g_download_manager->Init(1, true, g_statistics);
-
     const bool follow_redirects = args.count('L') > 0;
-    if (follow_redirects) {
-      g_download_manager->EnableRedirects();
+    if (!this->InitDownloadManager(follow_redirects)) {
+      return 1;
     }
 
     const string url = repository + "/.cvmfspublished";
     download::JobInfo download_manifest(&url, false, false, NULL);
-    download::Failures retval = g_download_manager->Fetch(&download_manifest);
+    download::Failures retval = download_manager()->Fetch(&download_manifest);
     if (retval != download::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to download manifest (%d - %s)",
                retval, download::Code2Ascii(retval));
@@ -230,7 +227,7 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
     }
     const string url = repository + "/data/" + meta_info.MakePath();
     download::JobInfo download_metainfo(&url, true, false, &meta_info);
-    download::Failures retval = g_download_manager->Fetch(&download_metainfo);
+    download::Failures retval = download_manager()->Fetch(&download_metainfo);
     if (retval != download::kFailOk) {
       if (human_readable)
         LogCvmfs(kLogCvmfs, kLogStderr,

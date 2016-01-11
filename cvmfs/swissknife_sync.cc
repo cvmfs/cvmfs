@@ -94,7 +94,7 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
     unsigned log_level =
       1 << (kLogLevel0 + String2Uint64(*args.find('l')->second));
     if (log_level > kLogNone) {
-      swissknife::Usage();
+      LogCvmfs(kLogCvmfs, kLogStderr, "invalid log level");
       return 1;
     }
     SetLogVerbosity(static_cast<LogLevels>(log_level));
@@ -259,17 +259,16 @@ int swissknife::CommandApplyDirtab::Main(const ArgumentList &args) {
            dirtab->RuleCount(), dirtab_file.c_str());
 
   // initialize catalog infrastructure
-  g_download_manager->Init(1, true, g_statistics);
   const bool auto_manage_catalog_files = true;
   const bool follow_redirects = (args.count('L') > 0);
-  if (follow_redirects) {
-    g_download_manager->EnableRedirects();
+  if (!this->InitDownloadManager(follow_redirects)) {
+    return 1;
   }
   catalog::SimpleCatalogManager catalog_manager(base_hash,
                                                 stratum0,
                                                 dir_temp,
-                                                g_download_manager,
-                                                g_statistics,
+                                                download_manager(),
+                                                statistics(),
                                                 auto_manage_catalog_files);
   catalog_manager.Init();
 
@@ -511,7 +510,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     unsigned log_level =
     1 << (kLogLevel0 + String2Uint64(*args.find('z')->second));
     if (log_level > kLogNone) {
-      swissknife::Usage();
+      LogCvmfs(kLogCvmfs, kLogStderr, "invalid log level");
       return 1;
     }
     SetLogVerbosity(static_cast<LogLevels>(log_level));
@@ -579,16 +578,15 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (NULL == params.spooler)
     return 3;
 
-  g_download_manager->Init(1, true, g_statistics);
   const bool follow_redirects = (args.count('L') > 0);
-  if (follow_redirects) {
-    g_download_manager->EnableRedirects();
+  if (!this->InitDownloadManager(follow_redirects)) {
+    return 3;
   }
   catalog::WritableCatalogManager
     catalog_manager(params.base_hash, params.stratum0, params.dir_temp,
-                    params.spooler, g_download_manager,
+                    params.spooler, download_manager(),
                     params.catalog_entry_warn_threshold,
-                    g_statistics,
+                    statistics(),
                     params.is_balanced,
                     params.max_weight,
                     params.min_weight);
@@ -660,7 +658,6 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   const bool needs_bootstrap_shortcuts = params.voms_authz;
   manifest->set_garbage_collectability(params.garbage_collectable);
   manifest->set_has_alt_catalog_path(needs_bootstrap_shortcuts);
-  g_download_manager->Fini();
 
   // finalize the spooler
   params.spooler->WaitForUpload();

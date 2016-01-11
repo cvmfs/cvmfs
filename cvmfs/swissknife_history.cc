@@ -109,26 +109,29 @@ CommandTag::Environment* CommandTag::InitializeEnvironment(
   // Note: We use this encapsulation because we cannot be sure that the Command
   //       object gets deleted properly. With the Environment object at hand
   //       we have full control and can make heavy and safe use of RAII
-  UniquePtr<Environment> env(new Environment(repository_url,
-                                             tmp_path));
+  UniquePtr<Environment> env(new Environment(repository_url, tmp_path));
   env->manifest_path.Set(manifest_path);
   env->history_path.Set(CreateTempPath(tmp_path + "/history", 0600));
 
   // initialize the (swissknife global) download manager
-  g_download_manager->Init(1, true, g_statistics);
   const bool follow_redirects = (args.count('L') > 0);
-  if (follow_redirects) {
-    g_download_manager->EnableRedirects();
+  if (!this->InitDownloadManager(follow_redirects)) {
+    return NULL;
   }
+
+  // initialize the (swissknife global) signature manager (if possible)
+  if (!pubkey_path.empty() &&
+      !this->InitSignatureManager(pubkey_path, trusted_certs)) {
+    return NULL;
+  }
+
   // open the (yet unsigned) manifest file if it is there, otherwise load the
   // latest manifest from the server
   env->manifest = (FileExists(env->manifest_path.path()))
-                    ? manifest::Manifest::LoadFile(env->manifest_path.path())
-                    : FetchManifest(env->repository_url,
-                                    repo_name,
-                                    pubkey_path,
-                                    trusted_certs,
-                                    base_hash);
+                    ? OpenLocalManifest(env->manifest_path.path())
+                    : FetchRemoteManifest(env->repository_url,
+                                          repo_name,
+                                          base_hash);
 
   if (!env->manifest) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to load manifest file");
@@ -137,11 +140,9 @@ CommandTag::Environment* CommandTag::InitializeEnvironment(
 
   // figure out the hash of the history from the previous revision if needed
   if (read_write && env->manifest->history().IsNull() && !base_hash.IsNull()) {
-    env->previous_manifest = FetchManifest(env->repository_url,
-                                           repo_name,
-                                           pubkey_path,
-                                           trusted_certs,
-                                           base_hash);
+    env->previous_manifest = FetchRemoteManifest(env->repository_url,
+                                                 repo_name,
+                                                 base_hash);
     if (!env->previous_manifest) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to load previous manifest");
       return NULL;
@@ -151,9 +152,9 @@ CommandTag::Environment* CommandTag::InitializeEnvironment(
                                    "manifest (%s) as basis",
              env->previous_manifest->history().ToString().c_str(),
              env->previous_manifest->repository_name().c_str());
-    env->manifest->set_history(env->previous_manifest->history());
-    env->manifest->set_repository_name(
-      env->previous_manifest->repository_name());
+             env->manifest->set_history(env->previous_manifest->history());
+             env->manifest->set_repository_name(
+             env->previous_manifest->repository_name());
   }
 
   // download the history database referenced in the manifest
@@ -338,73 +339,6 @@ bool CommandTag::UpdateUndoTags(
 }
 
 
-manifest::Manifest* CommandTag::FetchManifest(
-                                           const std::string &repository_url,
-                                           const std::string &repository_name,
-                                           const std::string &pubkey_path,
-                                           const std::string &trusted_certs,
-                                           const shash::Any  &base_hash) const {
-  manifest::ManifestEnsemble *manifest_ensemble =
-    new manifest::ManifestEnsemble;
-  UniquePtr<manifest::Manifest> manifest;
-
-  // initialize the (global) signature manager
-  g_signature_manager->Init();
-  if (!g_signature_manager->LoadPublicRsaKeys(pubkey_path)) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load public repository key '%s'",
-             pubkey_path.c_str());
-    return NULL;
-  }
-
-  if (!trusted_certs.empty()) {
-    if (!g_signature_manager->LoadTrustedCaCrl(trusted_certs)) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "failed to load trusted certificates");
-      return NULL;
-    }
-  }
-
-  // fetch (and verify) the manifest
-  manifest::Failures retval;
-  retval = manifest::Fetch(repository_url, repository_name, 0, NULL,
-                           g_signature_manager, g_download_manager,
-                           manifest_ensemble);
-
-  if (retval != manifest::kFailOk) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch repository manifest "
-                                    "(%d - %s)",
-             retval, manifest::Code2Ascii(retval));
-    delete manifest_ensemble;
-    return NULL;
-  } else {
-    // ManifestEnsemble stays around! This is a memory leak, but otherwise
-    // the destructor of ManifestEnsemble would free the wrapped manifest
-    // object, but I want to return it.
-    // Sorry for that...
-    //
-    // TODO(rmeusel): Revise the manifest fetching.
-    manifest = manifest_ensemble->manifest;
-  }
-
-  // check if manifest fetching was successful
-  if (!manifest) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load repository manifest");
-    return NULL;
-  }
-
-  // check the provided base hash of the repository if provided
-  if (!base_hash.IsNull() && manifest->catalog_hash() != base_hash) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "base hash does not match manifest "
-                                    "(found: %s expected: %s)",
-             manifest->catalog_hash().ToString().c_str(),
-             base_hash.ToString().c_str());
-    return NULL;
-  }
-
-  // return the fetched manifest (releasing pointer ownership)
-  return manifest.Release();
-}
-
-
 bool CommandTag::FetchObject(const std::string    &repository_url,
                              const shash::Any     &object_hash,
                              const std::string    &destination_path) const {
@@ -415,7 +349,7 @@ bool CommandTag::FetchObject(const std::string    &repository_url,
 
   download::JobInfo download_object(&url, true, false, &destination_path,
                                     &object_hash);
-  dl_retval = g_download_manager->Fetch(&download_object);
+  dl_retval = download_manager()->Fetch(&download_object);
 
   if (dl_retval != download::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to download object '%s' (%d - %s)",

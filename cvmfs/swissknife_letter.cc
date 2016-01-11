@@ -136,9 +136,16 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
       return 2;
     }
 
-    download::DownloadManager download_manager;
-    download_manager.Init(2, false, g_statistics);
-    whitelist::Whitelist whitelist(fqrn, &download_manager, &signature_manager);
+
+    const bool     follow_redirects = false;
+    const unsigned max_pool_handles = 2;
+    if (!this->InitDownloadManager(follow_redirects, max_pool_handles)) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to init repo connection");
+      return 2;
+    }
+
+    whitelist::Whitelist whitelist(fqrn, download_manager(),
+                                   &signature_manager);
     retval_wl = whitelist.Load(repository_url);
     if (retval_wl != whitelist::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to load whitelist (%d): %s",
@@ -172,7 +179,7 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
 
       if ((time(NULL) + 3600*24*3) > whitelist.expires()) {
         LogCvmfs(kLogCvmfs, kLogStderr, "reloading whitelist");
-        whitelist::Whitelist refresh(fqrn, &download_manager,
+        whitelist::Whitelist refresh(fqrn, download_manager(),
                                      &signature_manager);
         retval_wl = refresh.Load(repository_url);
         if (retval_wl == whitelist::kFailOk)
@@ -216,7 +223,6 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
       }
       text = "";
     } while (erlang);
-    download_manager.Fini();
     signature_manager.Fini();
     return exit_code;
   }

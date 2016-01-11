@@ -80,20 +80,18 @@ int CommandGc::Main(const ArgumentList &args) {
     }
   }
 
-  download::DownloadManager   download_manager;
-  signature::SignatureManager signature_manager;
-  download_manager.Init(1, true, g_statistics);
-  signature_manager.Init();
-  if (!signature_manager.LoadPublicRsaKeys(repo_keys)) {
-    LogCvmfs(kLogCatalog, kLogStderr, "failed to load public key(s)");
+  const bool follow_redirects = false;
+  if (!this->InitDownloadManager(follow_redirects) ||
+      !this->InitSignatureManager(repo_keys)) {
+    LogCvmfs(kLogCatalog, kLogStderr, "failed to init repo connection");
     return 1;
   }
 
   ObjectFetcher object_fetcher(repo_name,
                                repo_url,
                                temp_directory,
-                               &download_manager,
-                               &signature_manager);
+                               download_manager(),
+                               signature_manager());
 
   UniquePtr<manifest::Manifest> manifest;
   ObjectFetcher::Failures retval = object_fetcher.FetchManifest(&manifest);
@@ -140,9 +138,6 @@ int CommandGc::Main(const ArgumentList &args) {
 
   GC collector(config);
   const bool success = collector.Collect();
-
-  download_manager.Fini();
-  signature_manager.Fini();
 
   if (deletion_log_file != NULL) {
     const int bytes_written = fprintf(deletion_log_file,
