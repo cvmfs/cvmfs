@@ -70,7 +70,9 @@ yum --disablerepo='*'             \
     --installroot=$DESTINATION    \
     -y install                    \
     $BASE_PACKAGES
-touch ${DESTINATION}/etc/mtab
+
+mtab="${DESTINATION}/etc/mtab"
+[ -e $mtab ] || [ -h $mtab ] || touch $mtab
 
 echo "fixing yum configuration files to architecture..."
 for f in $(find ${DESTINATION}/etc/yum.repos.d -type f); do
