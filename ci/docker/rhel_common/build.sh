@@ -9,6 +9,10 @@
 #   REPO_BASE_URL  URL to the base yum repository to be used for bootstrapping
 #   GPG_KEY_PATHS  URL to the GPG key to be used for RPM signature validation
 #   BASE_PACKAGES  list of packages to be installed for bootstrapping the system
+#
+# Additionally the following variables are optional:
+#
+#   PACKAGE_MGR    the package manager to use (defaults to 'yum')
 
 set -e
 
@@ -22,6 +26,7 @@ TARBALL_NAME="${SYSTEM_NAME}_${BASE_ARCH}.tar.gz"
 DESTINATION="$(mktemp -d)"
 YUM_REPO_CFG=/etc/yum/repos.d/${SYSTEM_NAME}_${BASE_ARCH}-bootstrap.repo
 YUM_REPO_NAME=${SYSTEM_NAME}-${BASE_ARCH}-os-bootstrap
+PACKAGE_MGR=${PACKAGE_MGR:=yum}
 
 echo "installing cleanup handler..."
 cleanup() {
@@ -89,7 +94,7 @@ chroot $DESTINATION /bin/rpm -ivh --justdb '/var/cache/yum/*/packages/*.rpm'
 rm -r ${DESTINATION}/var/cache/yum/
 
 echo "doing final housekeeping..."
-chroot $DESTINATION yum clean all
+chroot $DESTINATION $PACKAGE_MGR clean all
 rm -f ${DESTINATION}/etc/resolv.conf
 umount ${DESTINATION}/dev  || true # ignore failing umount
 umount ${DESTINATION}/proc || true # ignore failing umount
