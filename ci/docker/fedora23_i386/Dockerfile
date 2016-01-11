@@ -1,26 +1,30 @@
 FROM        scratch
 MAINTAINER  Rene Meusel <rene.meusel@cern.ch>
 
-ADD         fedora20_i386.tar.gz /
-RUN         yum -y update && yum -y install                     \
+ADD         fedora23_i386.tar.gz /
+RUN         dnf -y update && dnf -y install                     \
                                         cmake                   \
                                         curl-devel              \
                                         fuse-devel              \
                                         gcc                     \
                                         gcc-c++                 \
                                         git                     \
+                                        gridsite                \
                                         hardlink                \
                                         libattr-devel           \
                                         libcap-devel            \
                                         libuuid-devel           \
                                         make                    \
+                                        nfs-utils               \
                                         openssl-devel           \
+                                        perl-IO-Interface       \
                                         policycoreutils-python  \
                                         python-devel            \
                                         rpm-build               \
                                         selinux-policy-devel    \
                                         selinux-policy-targeted \
-                                        sysvinit-tools          \
+                                        sudo                    \
+                                        tree                    \
                                         which                   \
                                         zlib-devel
 
