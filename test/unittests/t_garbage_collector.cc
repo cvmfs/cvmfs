@@ -1304,13 +1304,13 @@ TEST_F(T_GarbageCollector, LogDeletionToFile) {
         std::vector<shash::Any>::const_iterator i    = preserved_hashes.begin();
   const std::vector<shash::Any>::const_iterator iend = preserved_hashes.end();
   for (; i != iend; ++i) {
-    EXPECT_EQ(0, log_lines.count(i->ToStringWithSuffix()));
+    EXPECT_EQ(0u, log_lines.count(i->ToStringWithSuffix()));
   }
 
         std::vector<shash::Any>::const_iterator j    = deleted_hashes.begin();
   const std::vector<shash::Any>::const_iterator jend = deleted_hashes.end();
   for (; j != jend; ++j) {
-    EXPECT_EQ(1, log_lines.count(j->ToStringWithSuffix()));
+    EXPECT_EQ(1u, log_lines.count(j->ToStringWithSuffix()));
   }
 }
 
