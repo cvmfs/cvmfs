@@ -38,6 +38,5 @@ fi
 # create CVMFS test user
 if ! id $CVMFS_TEST_USER > /dev/null 2>&1; then
   useradd $CVMFS_TEST_USER
-  usermod -a -G fuse $CVMFS_TEST_USER
   echo "$CVMFS_TEST_USER ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 fi
