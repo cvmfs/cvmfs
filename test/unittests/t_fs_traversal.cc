@@ -133,9 +133,9 @@ class T_FsTraversal : public ::testing::Test {
 
   virtual void SetUp() {
     // create a testbed directory
-    char *tmp_file =
-      strdupa((tmp_path_ + "/cvmfs_T_FsTraversal_testbed_XXXXXX").c_str());
-    char *testbed_path = mkdtemp(tmp_file);
+    const std::string path = tmp_path_ + "/cvmfs_T_FsTraversal_testbed_XXXXXX";
+    char *tmp_file_path = strdupa(path.c_str());
+    char *testbed_path = mkdtemp(tmp_file_path);
     ASSERT_NE(static_cast<char*>(NULL), testbed_path)
       << "can't create testbed from '" << tmp_file_path << "' "
       << "(errno: " << errno << ")";
