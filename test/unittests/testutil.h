@@ -771,8 +771,8 @@ struct object_fetcher_traits<MockObjectFetcher> {
  */
 class MockObjectFetcher : public AbstractObjectFetcher<MockObjectFetcher> {
  public:
-  typedef typename AbstractObjectFetcher<MockObjectFetcher>::Failures Failures;
-  typedef AbstractObjectFetcher<MockObjectFetcher>                    BaseTN;
+  typedef AbstractObjectFetcher<MockObjectFetcher>::Failures Failures;
+  typedef AbstractObjectFetcher<MockObjectFetcher>           BaseTN;
 
  public:
   using BaseTN::FetchManifest; // un-hiding convenience overload
