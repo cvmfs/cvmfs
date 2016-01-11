@@ -273,7 +273,8 @@ class MockObjectStorage {
   }
 
   static bool Exists(const shash::Any &hash) {
-    return available_objects.find(hash) != available_objects.end();
+    return available_objects.find(hash) != available_objects.end() &&
+           !IsDeleted(hash);
   }
 };
 

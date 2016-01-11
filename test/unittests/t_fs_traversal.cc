@@ -133,11 +133,14 @@ class T_FsTraversal : public ::testing::Test {
 
   virtual void SetUp() {
     // create a testbed directory
-    char *tmp_file =
-      strdupa((tmp_path_ + "/cvmfs_T_FsTraversal_testbed_XXXXXX").c_str());
-    char *testbed_path = mkdtemp(tmp_file);
-    ASSERT_NE(static_cast<char*>(NULL), testbed_path);
+    const std::string path = tmp_path_ + "/cvmfs_T_FsTraversal_testbed_XXXXXX";
+    char *tmp_file_path = strdupa(path.c_str());
+    char *testbed_path = mkdtemp(tmp_file_path);
+    ASSERT_NE(static_cast<char*>(NULL), testbed_path)
+      << "can't create testbed from '" << tmp_file_path << "' "
+      << "(errno: " << errno << ")";
     testbed_path_ = std::string(testbed_path);
+    ASSERT_FALSE(testbed_path_.empty());
 
     // save the root entry (the testbed) into the reference list
     reference_[""] = Checklist("", Checklist::RootDirectory);
@@ -152,7 +155,9 @@ class T_FsTraversal : public ::testing::Test {
                       &T_FsTraversal::delete_entry,
                       50,
                       FTW_DEPTH | FTW_PHYS);
-    EXPECT_EQ(0, retval) << "Failed to delete testbed directory";
+    EXPECT_EQ(0, retval) << "Failed to delete testbed directory "
+                         << "'" << testbed_path_ << "' "
+                         << "(errno: " << errno << ")";
   }
 
   static int delete_entry(const char         *path,
