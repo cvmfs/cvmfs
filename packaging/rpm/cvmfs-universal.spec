@@ -91,7 +91,7 @@ Requires: shadow-utils
 Requires: SysVinit
 Requires: e2fsprogs
   %else
-    %if 0%{?fc21} || 0%{?fc22}
+    %if 0%{?fedora}
 Requires: procps-ng
     %else
 Requires: sysvinit-tools
@@ -395,6 +395,8 @@ fi
 %doc COPYING AUTHORS README ChangeLog
 
 %changelog
+* Tue Jan 12 2016 Rene Meusel <rene.meusel@cern.ch> - 2.2.0
+- Fix dependency for Fedora 23
 * Tue Dec 15 2015 Jakob Blomer <jblomer@cern.ch> - 2.2.0
 - Unmount repositories when cvmfs is erased
 * Fri Dec 11 2015 Rene Meusel <rene.meusel@cern.ch> - 2.2.0
