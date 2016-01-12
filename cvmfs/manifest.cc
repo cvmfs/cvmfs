@@ -92,7 +92,7 @@ Manifest *Manifest::Load(const map<char, string> &content) {
   if ((iter = content.find('M')) != content.end())
     meta_info = MkFromHexPtr(shash::HexPtr(iter->second),
                              shash::kSuffixMetainfo);
-  if ((iter = content.find('V')) == content.end())
+  if ((iter = content.find('V')) != content.end())
     creator_version = iter->second;
 
   return new Manifest(catalog_hash, catalog_size, root_path, ttl, revision,
