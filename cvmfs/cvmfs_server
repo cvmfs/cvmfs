@@ -2294,8 +2294,10 @@ unmount_and_teardown_repository() {
   local name=$1
   load_repo_config $name
   sed -i -e "/added by CernVM-FS for ${name}/d" /etc/fstab
-  is_mounted "/cvmfs/$name"              && umount /cvmfs/$name
-  is_mounted "${CVMFS_SPOOL_DIR}/rdonly" && umount ${CVMFS_SPOOL_DIR}/rdonly
+  local rw_mnt="/cvmfs/$name"
+  local rdonly_mnt="${CVMFS_SPOOL_DIR}/rdonly"
+  is_mounted "$rw_mnt"     && ( umount $rw_mnt     || return 1; )
+  is_mounted "$rdonly_mnt" && ( umount $rdonly_mnt || return 2; )
   return 0
 }
 
