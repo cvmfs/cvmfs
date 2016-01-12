@@ -48,6 +48,8 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   string meta_info = "";
   if (args.find('M') != args.end()) meta_info = *args.find('M')->second;
   upload::Spooler *spooler = NULL;
+  const bool garbage_collectable = (args.count('g') > 0);
+  const bool bootstrap_shortcuts = (args.count('V') > 0);
 
   if (!DirectoryExists(temp_dir)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "%s does not exist", temp_dir.c_str());
@@ -173,8 +175,11 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     manifest->set_repository_name(repo_name);
     manifest->set_publish_timestamp(time(NULL));
     manifest->set_creator_version(VERSION);
-    if (!metainfo_hash.IsNull())
+    manifest->set_garbage_collectability(garbage_collectable);
+    manifest->set_has_alt_catalog_path(bootstrap_shortcuts);
+    if (!metainfo_hash.IsNull()) {
       manifest->set_meta_info(metainfo_hash);
+    }
 
     string signed_manifest = manifest->ExportString();
     shash::Any published_hash(manifest->GetHashAlgorithm());
