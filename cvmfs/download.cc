@@ -921,7 +921,7 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
 #ifdef VOMS_AUTHZ
     if (info->pid != -1) {
       ConfigureCurlHandle(curl_handle, info->pid, info->uid, info->gid,
-                          info->cred_fname);
+                          &info->cred_fname, &info->cred_data);
     }
 #endif
   }
@@ -1103,6 +1103,12 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     curl_easy_setopt(info->curl_handle, CURLOPT_SSLKEY, NULL);
     curl_easy_setopt(info->curl_handle, CURLOPT_FRESH_CONNECT, 0);
     curl_easy_setopt(info->curl_handle, CURLOPT_FORBID_REUSE, 0);
+  }
+  if (info->cred_data) {
+#ifdef VOMS_AUTHZ
+    ::ReleaseCurlHandle(info->cred_data);
+#endif
+    info->cred_data = NULL;
   }
 
   // Verification and error classification

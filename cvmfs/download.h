@@ -123,7 +123,9 @@ struct JobInfo {
   pid_t pid;
   uid_t uid;
   gid_t gid;
-  char *cred_fname;  ///< TODO(jblomer): transfer credentials in memory
+  char *cred_fname;  // TODO(bbockelm): This is a fallback method -
+                     // can we eliminate?
+  void *cred_data;  // Per-transfer credential data
   Destination destination;
   struct {
     size_t size;
@@ -151,6 +153,7 @@ struct JobInfo {
     uid = -1;
     gid = -1;
     cred_fname = NULL;
+    cred_data = NULL;
     destination = kDestinationNone;
     destination_mem.size = destination_mem.pos = 0;
     destination_mem.data = NULL;

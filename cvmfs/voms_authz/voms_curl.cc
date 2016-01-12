@@ -62,43 +62,29 @@ static CURLcode sslctx_config_function(CURL *curl, void *sslctx, void *parm) {
 
   STACK_OF(X509) *chain = p->chain;
   EVP_PKEY *pkey = p->pkey;
-  delete p;
-  p = NULL;
-
-  // The context will now own the memory - do not reuse.
-  curl_easy_setopt(curl, CURLOPT_SSL_CTX_DATA, NULL);
 
   LogCvmfs(kLogVoms, kLogDebug, "Customizing OpenSSL context.");
 
-  X509 *cert = sk_X509_shift(chain);
-  if (cert == NULL) {
+  int cert_count = sk_X509_num(chain);
+  if (cert_count == 0) {
     LogOpenSSLErrors("No certificate found in chain.");
-    EVP_PKEY_free(pkey);
-    sk_X509_free(chain);
   }
+  X509 *cert = sk_X509_value(chain, 0);
 
   // NOTE: SSL_CTX_use_certificate and _user_PrivateKey increase the ref count.
-  // Hence, we must call free afterward.
   if (!SSL_CTX_use_certificate(ctx, cert)) {
     LogOpenSSLErrors("Failed to set the user certificate in the SSL "
                      "connection");
-    X509_free(cert);
-    EVP_PKEY_free(pkey);
-    sk_X509_free(chain);
     return CURLE_SSL_CERTPROBLEM;
   }
-  X509_free(cert);
+
   if (!SSL_CTX_use_PrivateKey(ctx, pkey)) {
     LogOpenSSLErrors("Failed to set the private key in the SSL connection");
-    EVP_PKEY_free(pkey);
-    sk_X509_free(chain);
     return CURLE_SSL_CERTPROBLEM;
   }
-  EVP_PKEY_free(pkey);
 
   if (!SSL_CTX_check_private_key(ctx)) {
     LogOpenSSLErrors("Provided certificate and key do not match");
-    sk_X509_free(chain);
     return CURLE_SSL_CERTPROBLEM;
   } else {
     LogCvmfs(kLogVoms, kLogDebug, "Client certificate and key match.");
@@ -106,22 +92,37 @@ static CURLcode sslctx_config_function(CURL *curl, void *sslctx, void *parm) {
 
   // NOTE: SSL_CTX_add_extra_chain_cert DOES NOT increase the ref count
   // Instead, it now owns the pointer.  THIS IS DIFFERENT FROM ABOVE.
-  while ((cert = sk_X509_shift(chain))) {
-    if (!SSL_CTX_add_extra_chain_cert(ctx, cert)) {
+  for (int idx = 1; idx < cert_count; idx++) {
+    cert = sk_X509_value(chain, idx);
+    if (!SSL_CTX_add_extra_chain_cert(ctx, X509_dup(cert))) {
       LogOpenSSLErrors("Failed to add client cert to chain");
-      X509_free(cert);
     }
   }
-  sk_X509_free(chain);
 
   return CURLE_OK;
 }
 
+
+void
+ReleaseCurlHandle(void *info_data) {
+  sslctx_info * p = reinterpret_cast<sslctx_info *>(info_data);
+  STACK_OF(X509) *chain = p->chain;
+  EVP_PKEY *pkey = p->pkey;
+  delete p;
+
+  // Calls X509_free on each element, then frees the stack itself
+  sk_X509_pop_free(chain, X509_free);
+  EVP_PKEY_free(pkey);
+}
+
+
 bool
 ConfigureCurlHandle(CURL *curl_handle, pid_t pid, uid_t uid, gid_t gid,
-                    char *&info_fname)  // NOLINT
+                    char **info_fname, void **info_data)
 {
-    if (info_fname) {delete info_fname; info_fname = NULL;}
+    if (info_data && *info_data) {return true;}
+
+    if (info_fname && *info_fname) {delete info_fname; info_fname = NULL;}
 
     int fd = -1;
     FILE *fp = GetProxyFile(pid, uid, gid);
@@ -135,7 +136,7 @@ ConfigureCurlHandle(CURL *curl_handle, pid_t pid, uid_t uid, gid_t gid,
 
     // Prefer to load credentials into memory and not bother with temporary
     // files.
-    if (curl_easy_setopt(curl_handle, CURLOPT_SSL_CTX_FUNCTION,
+    if (info_data && curl_easy_setopt(curl_handle, CURLOPT_SSL_CTX_FUNCTION,
                          sslctx_config_function) == CURLE_OK)
     {
       LogCvmfs(kLogVoms, kLogDebug, "Configuring in-memory OpenSSL callback");
@@ -195,8 +196,9 @@ ConfigureCurlHandle(CURL *curl_handle, pid_t pid, uid_t uid, gid_t gid,
       }
 
       curl_easy_setopt(curl_handle, CURLOPT_SSL_CTX_DATA, parm);
+      *info_data = parm;
 
-    } else {
+    } else if (info_fname) {
       int fd_proxy = fileno(fp);
       char fname[] = "/tmp/cvmfs_credential_XXXXXX";
       fd = mkstemp(fname);
@@ -234,7 +236,11 @@ ConfigureCurlHandle(CURL *curl_handle, pid_t pid, uid_t uid, gid_t gid,
 
       curl_easy_setopt(curl_handle, CURLOPT_SSLCERT, fname);
       curl_easy_setopt(curl_handle, CURLOPT_SSLKEY, fname);
-      info_fname = strdup(fname);
+      *info_fname = strdup(fname);
+    } else {
+       fclose(fp);
+       close(fd);
+       return false;
     }
     fclose(fp);
     close(fd);
