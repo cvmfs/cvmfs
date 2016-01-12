@@ -2294,8 +2294,10 @@ unmount_and_teardown_repository() {
   local name=$1
   load_repo_config $name
   sed -i -e "/added by CernVM-FS for ${name}/d" /etc/fstab
-  is_mounted "/cvmfs/$name"              && umount /cvmfs/$name
-  is_mounted "${CVMFS_SPOOL_DIR}/rdonly" && umount ${CVMFS_SPOOL_DIR}/rdonly
+  local rw_mnt="/cvmfs/$name"
+  local rdonly_mnt="${CVMFS_SPOOL_DIR}/rdonly"
+  is_mounted "$rw_mnt"     && ( umount $rw_mnt     || return 1; )
+  is_mounted "$rdonly_mnt" && ( umount $rdonly_mnt || return 2; )
   return 0
 }
 
@@ -3351,6 +3353,7 @@ import() {
   check_autofs_on_cvmfs             && die "Autofs on /cvmfs has to be disabled"
   check_apache                      || die "Apache must be installed and running"
   is_local_upstream $upstream       || die "Import only works locally for the moment"
+  ensure_swissknife_suid $unionfs   || die "Need CAP_SYS_ADMIN for cvmfs_swissknife"
   lower_hardlink_restrictions
   ensure_enabled_apache_modules
   [ x"$keys_location" = "x" ] && die "Please provide the location of the repository security keys (-k)"

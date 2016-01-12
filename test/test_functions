@@ -1075,15 +1075,11 @@ get_apache_version() {
 # figure out apache config file mode
 #
 # @return   apache config mode (stdout) (see globals below)
-APACHE_CONF_MODE_OLD=1 # *.conf goes to ${APACHE_CONF}/conf.d
-APACHE_CONF_MODE_NEW=2 # *.conf goes to ${APACHE_CONF}/conf-available
+APACHE_CONF_MODE_CONFD=1     # *.conf goes to ${APACHE_CONF}/conf.d
+APACHE_CONF_MODE_CONFAVAIL=2 # *.conf goes to ${APACHE_CONF}/conf-available
 get_apache_conf_mode() {
-  local minor_apache_version=$(version_minor "$(get_apache_version)")
-  if [ $minor_apache_version -ge 4 ] || [ -d /etc/${APACHE_CONF}/conf-available ]; then
-    echo $APACHE_CONF_MODE_NEW
-  else
-    echo $APACHE_CONF_MODE_OLD
-  fi
+  [ -d /etc/${APACHE_CONF}/conf-available ] && echo $APACHE_CONF_MODE_CONFAVAIL \
+                                            || echo $APACHE_CONF_MODE_CONFD
 }
 
 
@@ -1092,8 +1088,10 @@ get_apache_conf_mode() {
 # @return   the location of apache configuration files (stdout)
 get_apache_conf_path() {
   local res_path="/etc/${APACHE_CONF}"
-  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_NEW" ]; then
+  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_CONFAVAIL" ]; then
     echo "${res_path}/conf-available"
+  elif [ -d "${res_path}/modules.d" ]; then
+    echo "${res_path}/modules.d"
   else
     echo "${res_path}/conf.d"
   fi
@@ -1105,7 +1103,8 @@ get_apache_conf_path() {
 #
 # @return   a configuration snippet to allow s'th from all hosts (stdout)
 get_compatible_apache_allow_from_all_config() {
-  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_NEW" ]; then
+  local minor_apache_version=$(version_minor "$(get_apache_version)")
+  if [ $minor_apache_version -ge 4 ]; then
     echo "Require all granted"
   else
     local nl='
@@ -1131,7 +1130,7 @@ create_apache_config_file() {
   cat - | sudo tee ${conf_path}/${file_name} > /dev/null || return 1
 
   # the new apache requires the enable the config afterwards
-  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_NEW" ]; then
+  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_CONFAVAIL" ]; then
     sudo a2enconf $file_name > /dev/null || return 2
   fi
 
@@ -1150,7 +1149,7 @@ remove_apache_config_file() {
   conf_path="$(get_apache_conf_path)/${file_name}"
 
   # disable configuration on newer apache versions
-  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_NEW" ]; then
+  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_CONFAVAIL" ]; then
     sudo a2disconf $file_name > /dev/null 2>&1 || return 1
   fi
 
