@@ -48,8 +48,9 @@ cvmfs_run_test() {
   echo "putting exactly the same stuff in the scratch space for comparison"
   produce_files_in $reference_dir || return 4
 
-  echo "creating CVMFS snapshot"
-  publish_repo $CVMFS_TEST_REPO || return $?
+  local publish_log_1="publish_1.log"
+  echo "creating CVMFS snapshot (logging to $publish_log_1)"
+  publish_repo $CVMFS_TEST_REPO > $publish_log_1 2>&1 || return $?
 
   echo "compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir || return $?
