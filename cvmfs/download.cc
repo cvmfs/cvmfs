@@ -527,7 +527,7 @@ void *DownloadManager::MainDownload(void *data) {
         if (download_mgr->watch_fds_[i].revents & (POLLIN | POLLPRI))
           ev_bitmask |= CURL_CSELECT_IN;
         if (download_mgr->watch_fds_[i].revents & (POLLOUT | POLLWRBAND))
-          ev_bitmask |= CURL_CSELECT_IN;
+          ev_bitmask |= CURL_CSELECT_OUT;
         if (download_mgr->watch_fds_[i].revents &
             (POLLERR | POLLHUP | POLLNVAL))
         {
