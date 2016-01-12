@@ -16,6 +16,9 @@ cvmfs_run_test() {
   local retval=0
   local stratum1="http://cvmfs-stratum-one.cern.ch/opt"
 
+  echo -n "checking for wget... "
+  which wget > /dev/null 2>&1 && echo "done" || { echo "not found"; return 1; }
+
   echo "restarting autofs"
   autofs_switch off || return 10
   autofs_switch on  || return 11

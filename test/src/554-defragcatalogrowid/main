@@ -35,8 +35,11 @@ cvmfs_run_test() {
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
   local scratch_dir=$(pwd)
 
-  echo "check for sqlite3 utility"
-  which sqlite3 || return 1
+  echo -n "checking for wget... "
+  which wget > /dev/null 2>&1 && echo "done" || { echo "not found"; return 1; }
+
+  echo -n "checking for sqlite3 utility... "
+  which sqlite3 > /dev/null 2>&1 && echo "done" || { echo "not found"; return 1; }
 
   echo "create test repository"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
