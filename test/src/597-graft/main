@@ -28,6 +28,10 @@ cvmfs_run_test() {
   publish_repo $CVMFS_TEST_REPO || return $?
 
   local hash=$(attr -qg hash /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/file1)
+  local attrval=$(attr -qg compression /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/file1)
+  if [ x"$attrval" != "xzlib" ]; then
+    return 22
+  fi
 
   start_transaction $CVMFS_TEST_REPO || return $?
   echo "Some other file" > /cvmfs/$CVMFS_TEST_REPO/file2
@@ -84,6 +88,32 @@ cvmfs_run_test() {
 
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
+
+  ############### Check chunk grafting ###############
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -Z none || return $?
+
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  touch /cvmfs/$CVMFS_TEST_REPO/chunks
+  cat << EOF > /cvmfs/$CVMFS_TEST_REPO/.cvmfsgraft-chunks
+size=12
+checksum=22596363b3de40b06f981fb85d82312e8c0ed511
+chunk_offsets=0,6
+chunk_checksums=c4d871ad13ad00fde9a7bb7ff7ed2543aec54241,9591818c07e900db7e1e0bc4b884c945e6a61b24
+EOF
+
+  mkdir -p /srv/cvmfs/$CVMFS_TEST_REPO/data/{2b,95}
+  echo -n "hello " > /srv/cvmfs/$CVMFS_TEST_REPO/data/c4/d871ad13ad00fde9a7bb7ff7ed2543aec54241P
+  echo "world" >  /srv/cvmfs/$CVMFS_TEST_REPO/data/95/91818c07e900db7e1e0bc4b884c945e6a61b24P
+
+  publish_repo $CVMFS_TEST_REPO -v || return $?
+
+  local chunk_hash=$(cat /cvmfs/$CVMFS_TEST_REPO/chunks | sha1sum | awk '{print $1;}')
+  if [ x"$chunk_hash" != x22596363b3de40b06f981fb85d82312e8c0ed511 ]; then
+    return 24
+  fi
 
   return 0
 }

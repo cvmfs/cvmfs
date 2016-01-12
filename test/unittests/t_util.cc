@@ -49,6 +49,9 @@ class T_Util : public ::testing::Test {
     path_without_slash = "/my/path";
     fake_path = "mypath";
     to_write = "Hello, world!\n";
+    while (to_write_large.size() < 1024*1024) {
+      to_write_large += to_write;
+    }
     sandbox = CreateTempDir(GetCurrentWorkingDirectory() + "/cvmfs_ut_util");
     socket_address = sandbox + "/mysocket";
     long_path = sandbox +
@@ -132,6 +135,7 @@ class T_Util : public ::testing::Test {
   string path_without_slash;
   string fake_path;
   string to_write;
+  std::string to_write_large;
 };
 
 
@@ -514,6 +518,71 @@ TEST_F(T_Util, SafeWrite) {
 
   EXPECT_FALSE(SafeWrite(-1, &stop, 1));
 }
+
+
+struct write_pipe_data {
+  int fd;
+  const char *data;
+  size_t dlen;
+};
+
+static void *MainWritePipe(void *void_data) {
+  struct write_pipe_data *data =
+    reinterpret_cast<struct write_pipe_data *>(void_data);
+  EXPECT_TRUE(SafeWrite(data->fd, data->data, data->dlen));
+  close(data->fd);
+  return NULL;
+}
+
+
+TEST_F(T_Util, SafeRead) {
+  // Small read
+  int fd[2];
+  void *buffer_output = scalloc(40, sizeof(char));
+  MakePipe(fd);
+  SafeWrite(fd[1], to_write.c_str(), to_write.length());
+  close(fd[1]);
+  EXPECT_EQ(SafeRead(fd[0], buffer_output, 2*to_write.length()),
+                     static_cast<ssize_t>(to_write.length()));
+  EXPECT_STREQ(to_write.c_str(), static_cast<const char*>(buffer_output));
+  free(buffer_output);
+  close(fd[0]);
+
+  // Large read
+  int size = to_write_large.size() + 1024;
+  EXPECT_GE(size, 1024*1024);
+  MakePipe(fd);
+  buffer_output = scalloc(size, 1);
+  pthread_t thread;
+  struct write_pipe_data pdata;
+  pdata.fd = fd[1];
+  pdata.data = to_write_large.c_str();
+  pdata.dlen = to_write_large.size();
+  int retval = pthread_create(&thread, NULL, MainWritePipe, &pdata);
+  EXPECT_EQ(0, retval);
+  EXPECT_EQ(SafeRead(fd[0], buffer_output, size),
+            static_cast<ssize_t>(to_write_large.size()));
+  pthread_join(thread, NULL);
+  free(buffer_output);
+  close(fd[0]);
+
+  // Read to string
+  buffer_output = scalloc(40, sizeof(char));
+  MakePipe(fd);
+  SafeWrite(fd[1], to_write.c_str(), to_write.length());
+  close(fd[1]);
+  std::string read_str;
+  EXPECT_TRUE(SafeReadToString(fd[0], &read_str));
+  EXPECT_EQ(to_write, read_str);
+  free(buffer_output);
+  close(fd[0]);
+
+  char fail;
+  EXPECT_EQ(SafeRead(-1, &fail, 1), -1);
+  std::string fail_str;
+  EXPECT_FALSE(SafeReadToString(-1, &fail_str));
+}
+
 
 TEST_F(T_Util, Nonblock2Block) {
   int fd[2];

@@ -32,12 +32,11 @@ static bool IsRemote(const string &repository) {
 /**
  * Checks for existance of a file either locally or via HTTP head
  */
-static bool Exists(const string &repository, const string &file)
-{
+bool CommandInfo::Exists(const string &repository, const string &file) const {
   if (IsRemote(repository)) {
     const string url = repository + "/" + file;
     download::JobInfo head(&url, false);
-    return g_download_manager->Fetch(&head) == download::kFailOk;
+    return download_manager()->Fetch(&head) == download::kFailOk;
   } else {
     return FileExists(file);
   }
@@ -59,6 +58,10 @@ ParameterList CommandInfo::GetParams() {
                                         "collectable"));
   r.push_back(Parameter::Switch('h', "print results in human readable form"));
   r.push_back(Parameter::Switch('L', "follow HTTP redirects"));
+  r.push_back(Parameter::Switch('X', "show whether external data is supported "
+                                        "in the root catalog."));
+  r.push_back(Parameter::Switch('M', "print repository meta info."));
+  r.push_back(Parameter::Switch('R', "print raw manifest."));
   return r;
 }
 
@@ -68,7 +71,7 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
     unsigned log_level =
       1 << (kLogLevel0 + String2Uint64(*args.find('l')->second));
     if (log_level > kLogNone) {
-      swissknife::Usage();
+      LogCvmfs(kLogCvmfs, kLogStderr, "invalid log level");
       return 1;
     }
     SetLogVerbosity(static_cast<LogLevels>(log_level));
@@ -92,16 +95,14 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
   //       Possible Fix: Allow for a Manifest::Fetch with an empty name.
   manifest::Manifest *manifest = NULL;
   if (IsRemote(repository)) {
-    g_download_manager->Init(1, true, g_statistics);
-
     const bool follow_redirects = args.count('L') > 0;
-    if (follow_redirects) {
-      g_download_manager->EnableRedirects();
+    if (!this->InitDownloadManager(follow_redirects)) {
+      return 1;
     }
 
     const string url = repository + "/.cvmfspublished";
     download::JobInfo download_manifest(&url, false, false, NULL);
-    download::Failures retval = g_download_manager->Fetch(&download_manifest);
+    download::Failures retval = download_manager()->Fetch(&download_manifest);
     if (retval != download::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to download manifest (%d - %s)",
                retval, download::Code2Ascii(retval));
@@ -159,6 +160,27 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
              root_hash.c_str());
   }
 
+  // Get information about external data
+  if (args.count('X') > 0) {
+    assert(!mount_point.empty());
+    const std::string external_data_xattr = "user.external_data";
+    std::string external_data;
+    const bool success = platform_getxattr(mount_point,
+                                           external_data_xattr,
+                                           &external_data);
+    if (!success) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to retrieve extended attribute "
+                                      " '%s' from '%s' (errno: %d)",
+                                      external_data_xattr.c_str(),
+                                      mount_point.c_str(),
+                                      errno);
+      return 1;
+    }
+    LogCvmfs(kLogCvmfs, kLogStdout, "%s%s",
+             (human_readable) ? "External data enabled:               " : "",
+             external_data.c_str());
+  }
+
   // Get information from the Manifest
   if (args.count('c') > 0) {
     LogCvmfs(kLogCvmfs, kLogStdout, "%s%s",
@@ -194,6 +216,33 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
     LogCvmfs(kLogCvmfs, kLogStdout, "%s%s",
              (human_readable) ? "Garbage Collectable:             " : "",
              (StringifyBool(manifest->garbage_collectable())).c_str());
+  }
+
+  if (args.count('M') > 0) {
+    shash::Any meta_info(manifest->meta_info());
+    if (meta_info.IsNull()) {
+      if (human_readable)
+        LogCvmfs(kLogCvmfs, kLogStderr, "no meta info available");
+      return 0;
+    }
+    const string url = repository + "/data/" + meta_info.MakePath();
+    download::JobInfo download_metainfo(&url, true, false, &meta_info);
+    download::Failures retval = download_manager()->Fetch(&download_metainfo);
+    if (retval != download::kFailOk) {
+      if (human_readable)
+        LogCvmfs(kLogCvmfs, kLogStderr,
+                 "failed to download meta info (%d - %s)",
+                 retval, download::Code2Ascii(retval));
+      return 1;
+    }
+    string info(download_metainfo.destination_mem.data,
+                download_metainfo.destination_mem.size);
+    LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "%s", info.c_str());
+  }
+
+  if (args.count('R') > 0) {
+    LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "%s",
+             manifest->ExportString().c_str());
   }
 
   delete manifest;

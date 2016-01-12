@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "bigvector.h"
+#include "compression.h"
 #include "hash.h"
 #include "platform.h"
 #include "shortstring.h"
@@ -50,6 +51,8 @@ enum SpecialDirents {
 /**
  * Wrapper around struct dirent.  Only contains file system related meta data
  * for a directory entry.
+ * TODO(jblomer): separation to DirectoryEntry not quite clear: this one also
+ * contains hash, compression algorithm and external flag
  */
 class DirectoryEntryBase {
   // For testing the catalog balancing
@@ -80,6 +83,7 @@ class DirectoryEntryBase {
     static const unsigned int kNestedCatalogTransitionFlags = 0x100;
     static const unsigned int kChunkedFileFlag              = 0x200;
     static const unsigned int kHasXattrsFlag                = 0x400;
+    static const unsigned int kExternalFileFlag             = 0x800;
   };
   typedef unsigned int Differences;
 
@@ -96,11 +100,14 @@ class DirectoryEntryBase {
     , mtime_(0)
     , linkcount_(1)  // generally a normal file has linkcount 1 -> default
     , has_xattrs_(false)
+    , is_external_file_(false)
+    , compression_algorithm_(zlib::kZlibDefault)
     { }
 
   inline bool IsRegular() const                 { return S_ISREG(mode_); }
   inline bool IsLink() const                    { return S_ISLNK(mode_); }
   inline bool IsDirectory() const               { return S_ISDIR(mode_); }
+  inline bool IsExternalFile() const            { return is_external_file_; }
   inline bool HasXattrs() const                 { return has_xattrs_;    }
 
   inline inode_t inode() const                  { return inode_; }
@@ -139,6 +146,10 @@ class DirectoryEntryBase {
   }
   inline void set_has_xattrs(const bool has_xattrs) {
     has_xattrs_ = has_xattrs;
+  }
+
+  inline zlib::Algorithms compression_algorithm() const {
+    return compression_algorithm_;
   }
 
   /**
@@ -196,6 +207,11 @@ class DirectoryEntryBase {
   // it can be computed just using the file contents.  We therefore put it in
   // this base class.
   shash::Any checksum_;
+
+  bool is_external_file_;
+
+  // The compression algorithm
+  zlib::Algorithms compression_algorithm_;
 };
 
 
@@ -301,6 +317,7 @@ class DirectoryEntry : public DirectoryEntryBase {
    */
   uint32_t hardlink_group_;
 
+  // TODO(jblomer): transform into bitfield to save memory
   bool is_nested_catalog_root_;
   bool is_nested_catalog_mountpoint_;
   bool is_chunked_file_;

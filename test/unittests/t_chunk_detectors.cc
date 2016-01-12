@@ -14,20 +14,19 @@ namespace upload {
 
 class T_ChunkDetectors : public ::testing::Test {
  protected:
+  static const size_t data_size_ = 104857600;  // 100 MiB
+
   void CreateBuffers(const size_t buffer_size) {
     ClearBuffers();
-
-    const size_t MB          = 1048576;
-    const size_t full_size   = 100 * MB;
 
     // make sure we always produce the same test data
     rng_.InitSeed(42);
 
     // produce some test data
     size_t i = 0;
-    while (i < full_size) {
+    while (i < data_size()) {
       CharBuffer * buffer = new CharBuffer(buffer_size);
-      buffer->SetUsedBytes(std::min(full_size - i, buffer_size));
+      buffer->SetUsedBytes(std::min(data_size() - i, buffer_size));
       buffer->SetBaseOffset(i);
 
       for (size_t j = 0; j < buffer->size(); ++j) {
@@ -39,9 +38,28 @@ class T_ChunkDetectors : public ::testing::Test {
     }
   }
 
+  void CreateZeroBuffers(const size_t buffer_size) {
+    ClearBuffers();
+
+    size_t i = 0;
+    while (i < data_size()) {
+      CharBuffer *buffer = new CharBuffer(buffer_size);
+      const size_t bytes_to_write = std::min(data_size() - i, buffer_size);
+
+      memset(buffer->free_space_ptr(), 0, bytes_to_write);
+      buffer->SetUsedBytes(bytes_to_write);
+      buffer->SetBaseOffset(i);
+
+      buffers_.push_back(buffer);
+      i += buffer->used_bytes();
+    }
+  }
+
   virtual void TearDown() {
     ClearBuffers();
   }
+
+  size_t data_size() const { return data_size_; }
 
  private:
   void ClearBuffers() {
@@ -251,6 +269,42 @@ TEST_F(T_ChunkDetectors, Xor32ChunkDetectorSlow) {
 
         last_cut = next_cut;
       }
+    }
+  }
+}
+
+
+TEST_F(T_ChunkDetectors, Xor32ChunkDetectorZerosBufferPowerOfTwo) {
+  // This is a regression test for CVM-957, describing a bug in the XOR 32 chunk
+  // detector that crashes with certain input. Namely, if the provided data does
+  // not contain any XOR32 cutmarks (i.e. it is cut at 'max chunk size') and the
+  // number of bytes are an exact multiple of 'max chunk size'.
+
+  ASSERT_EQ(0u, data_size() % 16);
+  ASSERT_EQ(0u, data_size() % 32);
+  ASSERT_EQ(0u, data_size() % 64);
+
+  const size_t min_chk_size = data_size() / 64;
+  const size_t avg_chk_size = data_size() / 32;
+  const size_t max_chk_size = data_size() / 16;
+  Xor32Detector xor32_detector(min_chk_size,
+                               avg_chk_size,
+                               max_chk_size);
+
+  CreateZeroBuffers(512000);
+
+  off_t next_cut = 0;
+  bool  fail     = false;
+  Buffers::const_iterator j    = buffers_.begin();
+  Buffers::const_iterator jend = buffers_.end();
+  for (; !fail && j != jend; ++j) {
+    while ((next_cut = xor32_detector.FindNextCutMark(*j)) != 0) {
+      ASSERT_LE(0u, next_cut);
+      EXPECT_EQ(0u, next_cut % max_chk_size);
+      // ChunkDetector might decide to cut right in the end of a file. This is
+      // because it works on CharBuffer-level and doesn't have a notion about
+      // the actual file's size.  Hence: EXPECT_GreaterEqual()
+      EXPECT_GE(data_size(), static_cast<size_t>(next_cut));
     }
   }
 }

@@ -18,11 +18,14 @@
 
 #define _FILE_OFFSET_BITS 64
 
+#define __STDC_FORMAT_MACROS
+
 #include "cvmfs_config.h"
 #include "swissknife_sync.h"
 
 #include <fcntl.h>
 #include <glob.h>
+#include <inttypes.h>
 
 #include <cstdio>
 #include <cstdlib>
@@ -94,7 +97,7 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
     unsigned log_level =
       1 << (kLogLevel0 + String2Uint64(*args.find('l')->second));
     if (log_level > kLogNone) {
-      swissknife::Usage();
+      LogCvmfs(kLogCvmfs, kLogStderr, "invalid log level");
       return 1;
     }
     SetLogVerbosity(static_cast<LogLevels>(log_level));
@@ -107,6 +110,7 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
       return 1;
     }
   }
+
   const bool volatile_content    = (args.count('v') > 0);
   const bool garbage_collectable = (args.count('z') > 0);
   std::string voms_authz;
@@ -114,7 +118,8 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
     voms_authz = *args.find('V')->second;
   }
 
-  const upload::SpoolerDefinition sd(spooler_definition, hash_algorithm);
+  const upload::SpoolerDefinition sd(spooler_definition,
+                                     hash_algorithm, zlib::kZlibDefault);
   upload::Spooler *spooler = upload::Spooler::Construct(sd);
   assert(spooler);
 
@@ -122,6 +127,7 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
   manifest::Manifest *manifest =
     catalog::WritableCatalogManager::CreateRepository(dir_temp,
                                                       volatile_content,
+                                                      voms_authz,
                                                       spooler);
   if (!manifest) {
     PrintError("Failed to create new repository");
@@ -256,17 +262,16 @@ int swissknife::CommandApplyDirtab::Main(const ArgumentList &args) {
            dirtab->RuleCount(), dirtab_file.c_str());
 
   // initialize catalog infrastructure
-  g_download_manager->Init(1, true, g_statistics);
   const bool auto_manage_catalog_files = true;
   const bool follow_redirects = (args.count('L') > 0);
-  if (follow_redirects) {
-    g_download_manager->EnableRedirects();
+  if (!this->InitDownloadManager(follow_redirects)) {
+    return 1;
   }
   catalog::SimpleCatalogManager catalog_manager(base_hash,
                                                 stratum0,
                                                 dir_temp,
-                                                g_download_manager,
-                                                g_statistics,
+                                                download_manager(),
+                                                statistics(),
                                                 auto_manage_catalog_files);
   catalog_manager.Init();
 
@@ -491,6 +496,9 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   params.manifest_path = *args.find('o')->second;
   params.spooler_definition = *args.find('r')->second;
 
+  params.public_keys = *args.find('K')->second;
+  params.repo_name = *args.find('N')->second;
+
   if (args.find('f') != args.end())
     params.union_fs_type = *args.find('f')->second;
   if (args.find('A') != args.end()) params.is_balanced = true;
@@ -499,14 +507,15 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (args.find('m') != args.end()) params.mucatalogs = true;
   if (args.find('i') != args.end()) params.ignore_xdir_hardlinks = true;
   if (args.find('d') != args.end()) params.stop_for_catalog_tweaks = true;
-  if (args.find('g') != args.end()) params.garbage_collectable = true;
-  if (args.find('V') != args.end()) params.voms_authz = *args.find('V')->second;
+  if (args.find('V') != args.end()) params.voms_authz = true;
+  if (args.find('F') != args.end()) params.authz_file = *args.find('F')->second;
   if (args.find('k') != args.end()) params.include_xattrs = true;
+  if (args.find('Y') != args.end()) params.external_data = true;
   if (args.find('z') != args.end()) {
     unsigned log_level =
     1 << (kLogLevel0 + String2Uint64(*args.find('z')->second));
     if (log_level > kLogNone) {
-      swissknife::Usage();
+      LogCvmfs(kLogCvmfs, kLogStderr, "invalid log level");
       return 1;
     }
     SetLogVerbosity(static_cast<LogLevels>(log_level));
@@ -532,6 +541,14 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
       return 1;
     }
   }
+  if (args.find('Z') != args.end()) {
+    params.compression_alg =
+      zlib::ParseCompressionAlgorithm(*args.find('Z')->second);
+  }
+
+  if (args.find('C') != args.end()) {
+    params.trusted_certs = *args.find('C')->second;
+  }
 
   if (args.find('j') != args.end()) {
     params.catalog_entry_warn_threshold =
@@ -556,6 +573,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   upload::SpoolerDefinition spooler_definition(
     params.spooler_definition,
     hash_algorithm,
+    params.compression_alg,
     params.use_file_chunking,
     params.min_file_chunk_size,
     params.avg_file_chunk_size,
@@ -569,20 +587,33 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (NULL == params.spooler)
     return 3;
 
-  g_download_manager->Init(1, true, g_statistics);
   const bool follow_redirects = (args.count('L') > 0);
-  if (follow_redirects) {
-    g_download_manager->EnableRedirects();
+  if (!this->InitDownloadManager(follow_redirects)) {
+    return 3;
   }
+
+  if (!this->InitSignatureManager(params.public_keys, params.trusted_certs)) {
+    return 3;
+  }
+
+  UniquePtr<manifest::Manifest> manifest;
+  manifest = this->FetchRemoteManifest(params.stratum0,
+                                       params.repo_name,
+                                       params.base_hash);
+  if (!manifest) {
+    return 3;
+  }
+
   catalog::WritableCatalogManager
     catalog_manager(params.base_hash, params.stratum0, params.dir_temp,
-                    params.spooler, g_download_manager,
+                    params.spooler, download_manager(),
                     params.catalog_entry_warn_threshold,
-                    g_statistics,
+                    statistics(),
                     params.is_balanced,
                     params.max_weight,
                     params.min_weight);
   catalog_manager.Init();
+
   publish::SyncMediator mediator(&catalog_manager, &params);
   publish::SyncUnion *sync;
   if (params.union_fs_type == "overlayfs") {
@@ -615,20 +646,37 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     catalog_manager.SetTTL(params.ttl_seconds);
   }
 
-  LogCvmfs(kLogCvmfs, kLogStdout, "Exporting repository manifest");
-  UniquePtr<manifest::Manifest> manifest(mediator.Commit());
+  if (!params.authz_file.empty()) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "Adding contents of authz file %s to"
+                                   " root catalog.",
+                                   params.authz_file.c_str());
+    int fd = open(params.authz_file.c_str(), O_RDONLY);
+    if (fd == -1) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Unable to open authz file (%s)"
+               "from the publication process: %s", params.authz_file.c_str(),
+               strerror(errno));
+      return 7;
+    }
 
-  if (!manifest.IsValid()) {
+    std::string new_authz;
+    if (!SafeReadToString(fd, &new_authz)) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to read authz file (%s): %s",
+               params.authz_file.c_str(),
+               strerror(errno));
+      return 8;
+    }
+
+    close(fd);
+    catalog_manager.SetVOMSAuthz(new_authz);
+  }
+
+  if (!mediator.Commit(manifest.weak_ref())) {
     PrintError("something went wrong during sync");
     return 5;
   }
 
-  const bool needs_bootstrap_shortcuts = !params.voms_authz.empty();
-  manifest->set_garbage_collectability(params.garbage_collectable);
-  manifest->set_has_alt_catalog_path(needs_bootstrap_shortcuts);
-  g_download_manager->Fini();
-
   // finalize the spooler
+  LogCvmfs(kLogCvmfs, kLogStdout, "Exporting repository manifest");
   params.spooler->WaitForUpload();
   delete params.spooler;
 

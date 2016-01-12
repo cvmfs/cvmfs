@@ -1,4 +1,20 @@
 2.2.0:
+  * Fix mistakenly ignoring catalogs during garbage collection (CVM-966)
+  * Fix mounting with a read-only cache directory
+  * Add user.pubkeys extended attribute
+  * Add `cvmfs_server snapshot -a` (CVM-813)
+  * Add support for a garbage collection deletion log (CVM-710)
+  * Print error message at the end of a failing `cvmfs_server check` (CVM-958)
+  * Use patched pacparser 1.3.5 for IPv6 support (CVM-903)
+  * Add support for VOMS authentication in fuse module (CVM-904)
+  * Add `cvmfs_server update-repoinfo` command (CVM-804)
+  * Add `cvmfs_talk cleanup rate` command (CVM-270)
+  * Read blacklist from config repository if available (CVM-901)
+  * Add support for uncompressed files (CVM-906)
+  * Add support for external data (CVM-907)
+  * Add CVMFS_IPFAMILY_PREFER=[4|6] to select preferred IP protocol for proxies
+  * Fix crash when publishing specific files which a size of a multiple of the
+    chunk size (CVM-957)
   * Immediately pick up new catalogs after idle period (CVM-636)
   * Add CVMFS_REPOSITORY_TTL server parameter for repository TTL in seconds
   * Move python library to a separate repository

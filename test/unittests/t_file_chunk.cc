@@ -30,7 +30,7 @@ class T_FileChunk : public ::testing::Test {
 
 TEST_F(T_FileChunk, FindChunkIdx) {
   FileChunkList single;
-  FileChunkReflist reflist(&single, PathString(""));
+  FileChunkReflist reflist(&single, PathString(""), zlib::kZlibDefault, false);
   EXPECT_DEATH(reflist.FindChunkIdx(0), ".*");
 
   single.PushBack(FileChunk());

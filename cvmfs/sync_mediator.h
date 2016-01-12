@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "catalog_mgr_rw.h"
+#include "compression.h"
 #include "platform.h"
 #include "swissknife_sync.h"
 #include "sync_item.h"
@@ -105,7 +106,14 @@ class SyncMediator {
   void EnterDirectory(const SyncItem &entry);
   void LeaveDirectory(const SyncItem &entry);
 
-  manifest::Manifest *Commit();
+  bool Commit(manifest::Manifest *manifest);
+
+  // The sync union engine uses this information to create properly initialized
+  // sync items
+  bool IsExternalData() const { return params_->external_data; }
+  zlib::Algorithms GetCompressionAlgorithm() const {
+    return params_->compression_alg;
+  }
 
  private:
   typedef std::stack<HardlinkGroupMap> HardlinkGroupMapStack;

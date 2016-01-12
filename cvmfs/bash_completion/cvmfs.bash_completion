@@ -94,7 +94,7 @@ _cvmfs_server()
 
   local -r cmds="mkfs add-replica import publish rollback rmfs \
     resign list info tag check transaction abort snapshot migrate \
-    list-catalogs"
+    list-catalogs update-info update-repoinfo"
 
   if [ $COMP_CWORD -le 1 ]; then
     COMPREPLY=( $(compgen -W "${cmds}" -- ${cur}) )
@@ -177,6 +177,12 @@ _cvmfs_server()
       COMPREPLY=( $(compgen -W "$(__hosted_repos)" ${cur}))
       return 0
       ;;
+
+    update-repoinfo)
+      COMPREPLY=( $(compgen -W "$(__hosted_repos '/stratum0/')" ${cur}) )
+      return 0
+      ;;
+
   esac
 }
 

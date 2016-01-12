@@ -9,6 +9,14 @@
 
 #include "swissknife.h"
 
+namespace catalog {
+  class Catalog;
+}
+
+namespace shash {
+  class Any;
+}
+
 namespace swissknife {
 
 class CommandPull : public Command {
@@ -41,6 +49,10 @@ class CommandPull : public Command {
     return r;
   }
   int Main(const ArgumentList &args);
+
+ protected:
+  bool PullRecursion(catalog::Catalog *catalog, const std::string &path);
+  bool Pull(const shash::Any &catalog_hash, const std::string &path);
 };
 
 }  // namespace swissknife

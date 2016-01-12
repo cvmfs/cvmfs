@@ -386,8 +386,8 @@ bool S3Uploader::UploadJobInfo(s3fanout::JobInfo *info) {
            "--> Host:   '%s'\n",
            info->origin_mem.data != NULL ? "buffer" : "file",
            info->object_key.c_str(),
-           info->hostname.c_str(),
-           info->bucket.c_str());
+           info->bucket.c_str(),
+           info->hostname.c_str());
 
   if (s3fanout_mgr_.PushNewJob(info) != 0) {
     LogCvmfs(kLogUploadS3, kLogStderr, "Failed to upload object: %s" ,
@@ -584,7 +584,7 @@ bool S3Uploader::Peek(const std::string& path) const {
 
 
 bool S3Uploader::PlaceBootstrappingShortcut(const shash::Any &object) const {
-  return false; // TODO(rmeusel): implement
+  return false;  // TODO(rmeusel): implement
 }
 
 }  // namespace upload

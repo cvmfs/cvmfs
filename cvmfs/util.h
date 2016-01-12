@@ -139,7 +139,8 @@ int64_t GetFileSize(const std::string &path);
 bool DirectoryExists(const std::string &path);
 bool SymlinkExists(const std::string &path);
 bool SymlinkForced(const std::string &src, const std::string &dest);
-bool MkdirDeep(const std::string &path, const mode_t mode);
+bool MkdirDeep(const std::string &path, const mode_t mode,
+               bool verify_writable = true);
 bool MakeCacheDirectories(const std::string &path, const mode_t mode);
 FILE *CreateTempFile(const std::string &path_prefix, const int mode,
                      const char *open_flags, std::string *final_path);
@@ -214,8 +215,13 @@ bool ManagedExec(const std::vector<std::string> &command_line,
                  pid_t *child_pid = NULL);
 
 void SafeSleepMs(const unsigned ms);
-bool SafeRead(int fd, void *buf, size_t nbyte);  // TODO(jblomer)
+// Note that SafeWrite cannot return partial results but
+// SafeRead can (as we may have hit the EOF).
+ssize_t SafeRead(int fd, void *buf, size_t nbyte);
 bool SafeWrite(int fd, const void *buf, size_t nbyte);
+
+// Read the contents of a file descriptor to a string.
+bool SafeReadToString(int fd, std::string *final_result);
 
 /**
  * Knuth's random shuffle algorithm.

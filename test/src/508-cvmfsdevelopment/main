@@ -199,6 +199,9 @@ cvmfs_run_test() {
   mkdir reference_dir
   local reference_dir=$scratch_dir/reference_dir
 
+  echo -n "checking for wget... "
+  which wget > /dev/null 2>&1 && echo "done" || { echo "not found"; return 1; }
+
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 

@@ -259,4 +259,19 @@ TEST_F(T_Download, ValidateGeoReply) {
   EXPECT_EQ(geo_order[3], 1U);
 }
 
+
+TEST_F(T_Download, ParseHttpCode) {
+  char digits[3];
+  digits[0] = '0';  digits[1] = '0';  digits[2] = 'a';
+  EXPECT_EQ(-1, DownloadManager::ParseHttpCode(digits));
+  digits[0] = '0';  digits[1] = '0';  digits[2] = '0';
+  EXPECT_EQ(0, DownloadManager::ParseHttpCode(digits));
+  digits[0] = '0';  digits[1] = '0';  digits[2] = '1';
+  EXPECT_EQ(1, DownloadManager::ParseHttpCode(digits));
+  digits[0] = '1';  digits[1] = '0';  digits[2] = '1';
+  EXPECT_EQ(101, DownloadManager::ParseHttpCode(digits));
+  digits[0] = '9';  digits[1] = '9';  digits[2] = '9';
+  EXPECT_EQ(999, DownloadManager::ParseHttpCode(digits));
+}
+
 }  // namespace download

@@ -147,7 +147,7 @@ class Catalog : public SingleCopy {
                               listing);
   }
   bool AllChunksBegin();
-  bool AllChunksNext(shash::Any *hash);
+  bool AllChunksNext(shash::Any *hash, zlib::Algorithms *compression_alg);
   bool AllChunksEnd();
 
   inline bool ListPathChunks(const PathString &path,
@@ -170,6 +170,7 @@ class Catalog : public SingleCopy {
 
   uint64_t GetTTL() const;
   uint64_t GetRevision() const;
+  bool GetVOMSAuthz(std::string *authz) const;
   uint64_t GetLastModified() const;
   uint64_t GetNumEntries() const;
   uint64_t GetNumChunks() const;
@@ -256,6 +257,12 @@ class Catalog : public SingleCopy {
                           DirectoryEntry *dirent) const;
 
  private:
+  enum VomsAuthzStatus {
+    kVomsUnknown,  // Not yet looked up
+    kVomsNone,     // No voms_authz key in properties table
+    kVomsPresent,  // voms_authz property available
+  };
+
   bool LookupEntry(const shash::Md5 &md5path, const bool expand_symlink,
                    DirectoryEntry *dirent) const;
   CatalogDatabase *database_;
@@ -272,6 +279,9 @@ class Catalog : public SingleCopy {
   NestedCatalogMap children_;
   mutable NestedCatalogList nested_catalog_cache_;
   mutable bool              nested_catalog_cache_dirty_;
+
+  mutable VomsAuthzStatus voms_authz_status_;
+  mutable std::string voms_authz_;
 
   bool initialized_;
   InodeRange inode_range_;

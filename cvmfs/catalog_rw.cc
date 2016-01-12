@@ -316,6 +316,11 @@ void WritableCatalog::SetTTL(const uint64_t new_ttl) {
 }
 
 
+bool WritableCatalog::SetVOMSAuthz(const std::string &voms_authz) {
+  return database().SetVOMSAuthz(voms_authz);
+}
+
+
 /**
  * Sets the content hash of the previous catalog revision.
  */

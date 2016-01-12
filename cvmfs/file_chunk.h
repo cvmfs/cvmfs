@@ -18,6 +18,7 @@
 
 #include "atomic.h"
 #include "bigvector.h"
+#include "compression.h"
 #include "hash.h"
 #include "shortstring.h"
 #include "smallhash.h"
@@ -51,13 +52,22 @@ typedef BigVector<FileChunk> FileChunkList;
 
 struct FileChunkReflist {
   FileChunkReflist() : list(NULL) { }
-  FileChunkReflist(FileChunkList *l, const PathString &p) :
-    list(l), path(p) { }
+  FileChunkReflist(
+    FileChunkList *l,
+    const PathString &p,
+    zlib::Algorithms alg,
+    bool external)
+    : list(l)
+    , path(p)
+    , compression_alg(alg)
+    , external_data(external) { }
 
   unsigned FindChunkIdx(const uint64_t offset);
 
   FileChunkList *list;
   PathString path;
+  zlib::Algorithms compression_alg;
+  bool external_data;
 };
 
 

@@ -53,14 +53,17 @@ const float CatalogDatabase::kLatestSchema = 2.5;
 const float CatalogDatabase::kLatestSupportedSchema = 2.5;  // + 1.X (r/o)
 
 // ChangeLog
-//   0 --> 1 (Jan  6 2014 - Git: 3667fe7a669d0d65e07275b753a7c6f23fc267df):
-//           * add size column to nested catalog table
-//           * add schema_revision property
-//   1 --> 2 (Jan 22 2014 - Git: 85e6680e52cfe56dc1213a5ad74a5cc62fd50ead):
-//           * add xattr column to catalog table
-//           * add self_xattrs and subtree_xattrs statistics counters
-const unsigned CatalogDatabase::kLatestSchemaRevision = 2;
-
+//   0 --> 1: (Jan  6 2014 - Git: 3667fe7a669d0d65e07275b753a7c6f23fc267df)
+//            * add size column to nested catalog table,
+//            * add schema_revision property
+//   1 --> 2: (Jan 22 2014 - Git: 85e6680e52cfe56dc1213a5ad74a5cc62fd50ead):
+//            * add xattr column to catalog table
+//            * add self_xattr and subtree_xattr statistics counters
+//   2 --> 3: (Sep 28 2015 - Git: f4171234b13ea448589820c1524ee52eae141bb4):
+//            * add kFlagFileExternal to entries in catalog table
+//            * add self_external and subtree_external statistics counters
+//            * store compression algorithm in flags
+const unsigned CatalogDatabase::kLatestSchemaRevision = 3;
 
 bool CatalogDatabase::CheckSchemaCompatibility() {
   return !( (schema_version() >= 2.0-kSchemaEpsilon)                   &&
@@ -111,6 +114,31 @@ bool CatalogDatabase::LiveSchemaUpgradeIfNecessary() {
     }
   }
 
+  if (IsEqualSchema(schema_version(), 2.5) && (schema_revision() == 2)) {
+    LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision (2 --> 3)");
+
+    Sql sql_upgrade4(*this,
+      "INSERT INTO statistics (counter, value) VALUES ('self_external', 0);");
+    Sql sql_upgrade5(*this, "INSERT INTO statistics (counter, value) VALUES "
+                            "('self_external_file_size', 0);");
+    Sql sql_upgrade6(*this, "INSERT INTO statistics (counter, value) VALUES "
+                            "('subtree_external', 0);");
+    Sql sql_upgrade7(*this, "INSERT INTO statistics (counter, value) VALUES "
+                            "('subtree_external_file_size', 0);");
+    if (!sql_upgrade4.Execute() || !sql_upgrade5.Execute() ||
+        !sql_upgrade6.Execute() || !sql_upgrade7.Execute())
+    {
+      LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade catalogs (2 --> 3)");
+      return false;
+    }
+
+    set_schema_revision(3);
+    if (!StoreSchemaRevision()) {
+      LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade schema revision");
+      return false;
+    }
+  }
+
   return true;
 }
 
@@ -155,6 +183,7 @@ bool CatalogDatabase::CreateEmptyDatabase() {
 bool CatalogDatabase::InsertInitialValues(
   const std::string    &root_path,
   const bool            volatile_content,
+  const std::string    &voms_authz,
   const DirectoryEntry &root_entry)
 {
   assert(read_write());
@@ -184,6 +213,14 @@ bool CatalogDatabase::InsertInitialValues(
   if (volatile_content) {
     if (!this->SetProperty("volatile", 1)) {
       PrintSqlError("failed to insert volatile flag into the newly created "
+                    "catalog tables.");
+      return false;
+    }
+  }
+
+  if (!voms_authz.empty()) {
+    if (!SetVOMSAuthz(voms_authz)) {
+      PrintSqlError("failed to insert VOMS authz flag into the newly created "
                     "catalog tables.");
       return false;
     }
@@ -223,6 +260,12 @@ bool CatalogDatabase::InsertInitialValues(
     }
   }
 
+  // Set creation timestamp
+  if (!this->SetProperty("last_modified", static_cast<uint64_t>(time(NULL)))) {
+    PrintSqlError("failed to store creation timestamp in the new catalog.");
+    return false;
+  }
+
   // Commit initial filling transaction
   retval = Sql(*this, "COMMIT;").Execute();
   if (!retval) {
@@ -231,6 +274,12 @@ bool CatalogDatabase::InsertInitialValues(
   }
 
   return true;
+}
+
+
+bool
+CatalogDatabase::SetVOMSAuthz(const std::string &voms_authz) {
+  return this->SetProperty("voms_authz", voms_authz);
 }
 
 
@@ -293,15 +342,18 @@ unsigned SqlDirent::CreateDatabaseFlags(const DirectoryEntry &entry) const {
   else if (entry.IsNestedCatalogMountpoint())
     database_flags |= kFlagDirNestedMountpoint;
 
-  if (entry.IsDirectory())
+  if (entry.IsDirectory()) {
     database_flags |= kFlagDir;
-  else if (entry.IsLink())
+  } else if (entry.IsLink()) {
     database_flags |= kFlagFile | kFlagLink;
-  else
+  } else {
     database_flags |= kFlagFile;
-
-  if (entry.IsChunkedFile())
-    database_flags |= kFlagFileChunk;
+    database_flags |= entry.compression_algorithm() << kFlagPosCompression;
+    if (entry.IsChunkedFile())
+      database_flags |= kFlagFileChunk;
+    if (entry.IsExternalFile())
+      database_flags |= kFlagFileExternal;
+  }
 
   if (!entry.checksum_ptr()->IsNull())
     StoreHashAlgorithm(entry.checksum_ptr()->algorithm, &database_flags);
@@ -324,6 +376,16 @@ shash::Algorithms SqlDirent::RetrieveHashAlgorithm(const unsigned flags) const {
   in_flags++;
   assert(in_flags < shash::kAny);
   return static_cast<shash::Algorithms>(in_flags);
+}
+
+
+zlib::Algorithms SqlDirent::RetrieveCompressionAlgorithm(const unsigned flags)
+  const
+{
+  // 3 bits, so use 7 (111) to only pull out the flags we want
+  unsigned in_flags =
+    ((7 << kFlagPosCompression) & flags) >> kFlagPosCompression;
+  return static_cast<zlib::Algorithms>(in_flags);
 }
 
 
@@ -561,9 +623,12 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
     result.inode_            = catalog->GetMangledInode(RetrieveInt64(12),
                                                         result.hardlink_group_);
     result.is_chunked_file_  = (database_flags & kFlagFileChunk);
+    result.is_external_file_ = (database_flags & kFlagFileExternal);
     result.has_xattrs_       = RetrieveInt(15) != 0;
     result.checksum_         =
       RetrieveHashBlob(0, RetrieveHashAlgorithm(database_flags));
+    result.compression_algorithm_ =
+      RetrieveCompressionAlgorithm(database_flags);
 
     if (g_claim_ownership) {
       result.uid_             = g_uid;
@@ -1043,6 +1108,12 @@ SqlAllChunks::SqlAllChunks(const CatalogDatabase &database) {
     " ((flags&" + StringifyInt(hash_mask) + ") >> " +
     StringifyInt(SqlDirent::kFlagPosHash) + ")+1 AS hash_algorithm ";
 
+  int compression_mask = 7 << SqlDirent::kFlagPosCompression;
+  string flags2compression =
+    " ((flags&" + StringifyInt(compression_mask) + ") >> " +
+    StringifyInt(SqlDirent::kFlagPosCompression) + ") " +
+    "AS compression_algorithm ";
+
   // TODO(reneme): this depends on shash::kSuffix* being a char!
   //               it should be more generic or replaced entirely
   // TODO(reneme): this is practically the same as SqlListContentHashes and
@@ -1052,13 +1123,15 @@ SqlAllChunks::SqlAllChunks(const CatalogDatabase &database) {
     StringifyInt(shash::kSuffixNone) + " " +
   "WHEN flags & " + StringifyInt(SqlDirent::kFlagDir) + " THEN " +
     StringifyInt(shash::kSuffixMicroCatalog) + " END " +
-  "AS chunk_type, " + flags2hash +
-  "FROM catalog WHERE hash IS NOT NULL";
+  "AS chunk_type, " + flags2hash + "," + flags2compression +
+  "FROM catalog WHERE (hash IS NOT NULL) AND "
+    "(flags & " + StringifyInt(SqlDirent::kFlagFileExternal) + " = 0)";
   if (database.schema_version() >= 2.4 - CatalogDatabase::kSchemaEpsilon) {
     sql +=
       " UNION "
       "SELECT DISTINCT chunks.hash, " + StringifyInt(shash::kSuffixPartial) +
-      ", " + flags2hash + "FROM chunks, catalog WHERE "
+      ", " + flags2hash + "," + flags2compression +
+      "FROM chunks, catalog WHERE "
       "chunks.md5path_1=catalog.md5path_1 AND "
       "chunks.md5path_2=catalog.md5path_2";
   }
@@ -1072,13 +1145,14 @@ bool SqlAllChunks::Open() {
 }
 
 
-bool SqlAllChunks::Next(shash::Any *hash) {
+bool SqlAllChunks::Next(shash::Any *hash, zlib::Algorithms *compression_alg) {
   if (!FetchRow()) {
     return false;
   }
 
   *hash = RetrieveHashBlob(0, static_cast<shash::Algorithms>(RetrieveInt(2)),
                               static_cast<shash::Suffix>(RetrieveInt(1)));
+  *compression_alg = static_cast<zlib::Algorithms>(RetrieveInt(3));
   return true;
 }
 

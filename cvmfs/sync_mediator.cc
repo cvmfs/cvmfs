@@ -186,8 +186,8 @@ void SyncMediator::LeaveDirectory(const SyncItem &entry)
  * Do any pending processing and commit all changes to the catalogs.
  * To be called after change set traversal is finished.
  */
-manifest::Manifest *SyncMediator::Commit() {
-  if (!params_->print_changeset) {
+bool SyncMediator::Commit(manifest::Manifest *manifest) {
+  if (!params_->print_changeset && changed_items_ >= processing_dot_interval) {
     // line break the 'progress bar', see SyncMediator::PrintChangesetNotice()
     LogCvmfs(kLogPublish, kLogStdout, "");
   }
@@ -244,7 +244,7 @@ manifest::Manifest *SyncMediator::Commit() {
   LogCvmfs(kLogPublish, kLogStdout, "Committing file catalogs...");
   if (params_->spooler->GetNumberOfErrors() > 0) {
     LogCvmfs(kLogPublish, kLogStderr, "failed to commit files");
-    return NULL;
+    return false;
   }
 
   if (catalog_manager_->IsBalanceable()) {
@@ -252,7 +252,8 @@ manifest::Manifest *SyncMediator::Commit() {
   }
   catalog_manager_->PrecalculateListings();
   return catalog_manager_->Commit(params_->stop_for_catalog_tweaks,
-                                  params_->manual_revision);
+                                  params_->manual_revision,
+                                  manifest);
 }
 
 
@@ -504,6 +505,7 @@ void SyncMediator::PublishFilesCallback(const upload::SpoolerResult &result) {
 
   SyncItem &item = itr->second;
   item.SetContentHash(result.content_hash);
+  item.SetCompressionAlgorithm(result.compression_alg);
 
   XattrList *xattrs = &default_xattrs;
   if (params_->include_xattrs) {
@@ -554,6 +556,7 @@ void SyncMediator::PublishHardlinksCallback(
            j != jend; ++j)
       {
         j->second.SetContentHash(result.content_hash);
+        j->second.SetCompressionAlgorithm(result.compression_alg);
       }
 
       break;
@@ -627,11 +630,19 @@ void SyncMediator::AddFile(const SyncItem &entry) {
   } else if (entry.HasGraftMarker()) {
     if (entry.IsValidGraft()) {
       // Graft files are added to catalog immediately.
-      catalog_manager_->AddFile(
-        entry.CreateBasicCatalogDirent(),
-        default_xattrs,  // TODO(bbockelm): For now, use default xattrs
-                         // on grafted files.
-        entry.relative_parent_path());
+      if (entry.IsChunkedGraft()) {
+        catalog_manager_->AddChunkedFile(
+          entry.CreateBasicCatalogDirent(),
+          default_xattrs,
+          entry.relative_parent_path(),
+          *(entry.GetGraftChunks()));
+      } else {
+        catalog_manager_->AddFile(
+          entry.CreateBasicCatalogDirent(),
+          default_xattrs,  // TODO(bbockelm): For now, use default xattrs
+                           // on grafted files.
+          entry.relative_parent_path());
+      }
     } else {
       // Unlike with regular files, grafted files can be "unpublishable" - i.e.,
       // the graft file is missing information.  It's not clear that continuing

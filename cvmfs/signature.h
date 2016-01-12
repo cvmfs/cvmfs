@@ -45,7 +45,7 @@ class SignatureManager {
   static shash::Any MkFromFingerprint(const std::string &fingerprint);
 
   bool LoadPublicRsaKeys(const std::string &path_list);
-  bool LoadBlacklist(const std::string &path_blacklist);
+  bool LoadBlacklist(const std::string &path_blacklist, bool append);
   std::vector<std::string> GetBlacklistedCertificates();
 
   bool LoadTrustedCaCrl(const std::string &path_list);
@@ -67,7 +67,13 @@ class SignatureManager {
                         unsigned *letter_length,
                         unsigned *pos_after_mark);
 
+  // Returns the PEM-encoded text of all loaded pubkeys (both raw RSA keys
+  // and that from the current certificate).
+  std::string GetActivePubkeys();
+
  private:
+  std::string GenerateKeyText(RSA *pubkey);
+
   void InitX509Store();
 
   EVP_PKEY *private_key_;

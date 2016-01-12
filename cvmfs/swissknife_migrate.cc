@@ -139,25 +139,20 @@ int CommandMigrate::Main(const ArgumentList &args) {
   if (IsHttpUrl(repo_url)) {
     typedef HttpObjectFetcher<catalog::WritableCatalog> ObjectFetcher;
 
-    download::DownloadManager   download_manager;
-    signature::SignatureManager signature_manager;
-    download_manager.Init(1, true, g_statistics);
-    signature_manager.Init();
-    if (!signature_manager.LoadPublicRsaKeys(repo_keys)) {
-      LogCvmfs(kLogCatalog, kLogStderr, "Failed to load public key(s)");
+    const bool follow_redirects = false;
+    if (!this->InitDownloadManager(follow_redirects) ||
+        !this->InitSignatureManager(repo_keys)) {
+      LogCvmfs(kLogCatalog, kLogStderr, "Failed to init repo connection");
       return 1;
     }
 
     ObjectFetcher fetcher(repo_name,
                           repo_url,
                           tmp_dir,
-                          &download_manager,
-                          &signature_manager);
+                          download_manager(),
+                          signature_manager());
 
     loading_successful = LoadCatalogs(&fetcher);
-
-    download_manager.Fini();
-    signature_manager.Fini();
   } else {
     typedef LocalObjectFetcher<catalog::WritableCatalog> ObjectFetcher;
     ObjectFetcher fetcher(repo_url, tmp_dir);
@@ -726,7 +721,7 @@ bool CommandMigrate::AbstractMigrationWorker<DerivedT>::CleanupNestedCatalogs(
  * both the catalog management and migration classes get updated.
  */
 const float    CommandMigrate::MigrationWorker_20x::kSchema         = 2.5;
-const unsigned CommandMigrate::MigrationWorker_20x::kSchemaRevision = 2;
+const unsigned CommandMigrate::MigrationWorker_20x::kSchemaRevision = 3;
 
 
 template<class DerivedT>
@@ -789,7 +784,7 @@ bool CommandMigrate::MigrationWorker_20x::CreateNewEmptyCatalog(
     UniquePtr<catalog::CatalogDatabase>
       new_clg_db(catalog::CatalogDatabase::Create(clg_db_path));
     if (!new_clg_db.IsValid() ||
-        !new_clg_db->InsertInitialValues(root_path, volatile_content)) {
+        !new_clg_db->InsertInitialValues(root_path, volatile_content, "")) {
       Error("Failed to create database for new catalog");
       unlink(clg_db_path.c_str());
       return false;

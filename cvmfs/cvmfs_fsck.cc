@@ -187,43 +187,52 @@ static void *MainCheck(void *data __attribute__((unused))) {
       atomic_inc32(&g_num_err_operational);
     } else {
       if (hash != expected_hash) {
-        if (g_fix_errors) {
-          const string quarantaine_path = "./quarantaine/" + hash_name;
-          bool fixed = false;
-          if (rename(relative_path.c_str(), quarantaine_path.c_str()) == 0) {
-            LogCvmfs(kLogCvmfs, kLogStdout,
-                     "Fix: %s is corrupted, moved to quarantaine folder",
-                     path.c_str());
-            fixed = true;
-          } else {
-            LogCvmfs(kLogCvmfs, kLogStdout,
-                     "Warning: failed to move %s into quarantaine folder",
-                     path.c_str());
-            if (unlink(relative_path.c_str()) == 0) {
+        // If the hashes don't match, try hashing the uncompressed file
+        if (!shash::HashFile(relative_path, &hash)) {
+          LogCvmfs(kLogCvmfs, kLogStdout, "Error: could not hash %s",
+                   path.c_str());
+          atomic_inc32(&g_num_err_operational);
+        }
+        if (hash != expected_hash) {
+          if (g_fix_errors) {
+            const string quarantaine_path = "./quarantaine/" + hash_name;
+            bool fixed = false;
+            if (rename(relative_path.c_str(), quarantaine_path.c_str()) == 0) {
               LogCvmfs(kLogCvmfs, kLogStdout,
-                       "Fix: %s is corrupted, file unlinked", path.c_str());
+                       "Fix: %s is corrupted, moved to quarantaine folder",
+                       path.c_str());
               fixed = true;
             } else {
               LogCvmfs(kLogCvmfs, kLogStdout,
-                       "Error: %s is corrupted, could not unlink",
+                       "Warning: failed to move %s into quarantaine folder",
                        path.c_str());
+              if (unlink(relative_path.c_str()) == 0) {
+                LogCvmfs(kLogCvmfs, kLogStdout,
+                         "Fix: %s is corrupted, file unlinked", path.c_str());
+                fixed = true;
+              } else {
+                LogCvmfs(kLogCvmfs, kLogStdout,
+                         "Error: %s is corrupted, could not unlink",
+                         path.c_str());
+              }
             }
-          }
 
-          if (fixed) {
-            atomic_inc32(&g_num_err_fixed);
+            if (fixed) {
+              atomic_inc32(&g_num_err_fixed);
 
-            // Changes made, we have to rebuild the managed cache db
-            atomic_cas32(&g_force_rebuild, 0, 1);
-            atomic_cas32(&g_modified_cache, 0, 1);
+              // Changes made, we have to rebuild the managed cache db
+              atomic_cas32(&g_force_rebuild, 0, 1);
+              atomic_cas32(&g_modified_cache, 0, 1);
+            } else {
+              atomic_inc32(&g_num_err_unfixed);
+            }
           } else {
+            LogCvmfs(kLogCvmfs, kLogStdout,
+                     "Error: %s has compressed checksum %s, "
+                     "delete this file from cache directory!",
+                     path.c_str(), hash.ToString().c_str());
             atomic_inc32(&g_num_err_unfixed);
           }
-        } else {
-          LogCvmfs(kLogCvmfs, kLogStdout, "Error: %s has compressed checksum %s"
-                   ", delete this file from cache directory!",
-                   path.c_str(), hash.ToString().c_str());
-          atomic_inc32(&g_num_err_unfixed);
         }
       }
     }

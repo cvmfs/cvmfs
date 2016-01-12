@@ -29,12 +29,22 @@ cvmfs_run_test() {
   echo "geo_probe: $geo_probe"
   echo "normal_probe: $normal_probe"
 
-  if hostname -f | grep -q cern.ch; then
+  local country=""
+  case `hostname -f` in
+    *.cern.ch) country=ch;;
+    *.fnal.gov|*.unl.edu) country=us;;
+  esac
+
+  if [ "$country" = "ch" ]; then
     if [ "$geo_probe" != "http://cvmfs-stratum-one.cern.ch/cvmfs/grid.cern.ch;http://cvmfs.fnal.gov:8000/cvmfs/grid.cern.ch;http://cvmfs02.grid.sinica.edu.tw:8000/cvmfs/grid.cern.ch" ]; then
       return 20;
     fi
+  elif [ "$country" = "us" ]; then
+    if [ "$geo_probe" != "http://cvmfs.fnal.gov:8000/cvmfs/grid.cern.ch;http://cvmfs-stratum-one.cern.ch/cvmfs/grid.cern.ch;http://cvmfs02.grid.sinica.edu.tw:8000/cvmfs/grid.cern.ch" ]; then
+      return 21;
+    fi
   else
-    echo "Warning: cannot check correct ordering of stratum 1s outside cern.ch domain"
+    echo "Warning: cannot check correct ordering of stratum 1s outside recognized domain"
     CVMFS_GENERAL_WARNING_FLAG=1
   fi
 
@@ -45,9 +55,12 @@ cvmfs_run_test() {
   fi
 
   cvmfs_umount grid.cern.ch
-  # change cmsbproxy.fnal.gov:3128 to cvmfsbproxy.fnal.gov:3126 when
-  #  it is in production (scheduled for December 2015), here and below
-  sudo sh -c 'echo "CVMFS_FALLBACK_PROXY=\"http://cvmfsbproxy.cern.ch:3126;http://cmsbproxy.fnal.gov:3128\"" >> /etc/cvmfs/config.d/grid.cern.ch.local' || return 301
+
+  # change cmsbproxy.fnal.gov:3128 to cvmfsbproxy.fnal.gov:3126 when it
+  #  is in production.  Meanwhile borrow the CMS frontier backup proxy.
+  local us_fbp="http://cmsbproxy.fnal.gov:3128"
+  local ch_fbp="http://cvmfsbproxy.cern.ch:3126"
+  sudo sh -c 'echo "CVMFS_FALLBACK_PROXY=\"'"$ch_fbp;$us_fbp"'\"" >> /etc/cvmfs/config.d/grid.cern.ch.local' || return 301
   cvmfs_mount grid.cern.ch || return 3
 
   sudo cvmfs_talk -i grid.cern.ch proxy info
@@ -63,32 +76,38 @@ cvmfs_run_test() {
     return 33
   fi
 
-  sudo cvmfs_talk -i grid.cern.ch proxy fallback "http://cmsbproxy.fnal.gov:3128;http://cvmfsbproxy.cern.ch:3126" || return 34
+  # make sure that the same one comes up as first no matter which order
+  #   they started in
+  sudo cvmfs_talk -i grid.cern.ch proxy fallback "$us_fbp;$ch_fbp" || return 34
   sudo cvmfs_talk -i grid.cern.ch proxy info
   sudo cvmfs_talk -i grid.cern.ch host probe geo || return 35
   sudo cvmfs_talk -i grid.cern.ch proxy info
   local second_fallback_proxy=$(get_first_proxyname)
   echo "second_fallback_proxy: $second_fallback_proxy"
-
-  # make sure that the same one comes up as first no matter which order
-  #   they started in
   if [ "$first_fallback_proxy" != "$second_fallback_proxy" ]; then
     return 36
   fi
 
-  # Use cvmfsbproxy also as a regular proxy here because it's one of the
-  #  few that are accessible from the anywhere in the world.  This is not
-  #  the use it is intended for, but one client doesn't hurt.
-  sudo cvmfs_talk -i grid.cern.ch proxy set "http://cvmfsbproxy.cern.ch:3126" || return 37
-  sudo cvmfs_talk -i grid.cern.ch proxy info
-  sudo cvmfs_talk -i grid.cern.ch host probe geo || return 38
-  sudo cvmfs_talk -i grid.cern.ch proxy info
-  local third_fallback_proxy=$(get_second_proxyname)
-  echo "third_fallback_proxy: $third_fallback_proxy"
-
-  # make sure that the ordering is unaffected by regular proxies
-  if [ "$third_fallback_proxy" != "$second_fallback_proxy" ]; then
-    return 39
+  # Use the fallback proxy also as a regular proxy here because it's one
+  #  of the few proxies that are accessible from anywhere in the world.
+  #  This is not a use it is intended for, but one client doesn't hurt.
+  local close_fbp=""
+  if [ "$country" = "ch" ]; then
+    close_fbp=$ch_fbp
+  elif [ "$country" = "us" ]; then
+    close_fbp=$us_fbp
+  fi
+  if [ -n "$close_fbp" ]; then
+    # make sure that the ordering is unaffected by regular proxies
+    sudo cvmfs_talk -i grid.cern.ch proxy set "$close_fbp" || return 37
+    sudo cvmfs_talk -i grid.cern.ch proxy info
+    sudo cvmfs_talk -i grid.cern.ch host probe geo || return 38
+    sudo cvmfs_talk -i grid.cern.ch proxy info
+    local third_fallback_proxy=$(get_second_proxyname)
+    echo "third_fallback_proxy: $third_fallback_proxy"
+    if [ "$third_fallback_proxy" != "$second_fallback_proxy" ]; then
+      return 39
+    fi
   fi
 
   sudo rm -f /etc/cvmfs/config.d/grid.cern.ch.local

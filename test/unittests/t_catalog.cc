@@ -88,8 +88,8 @@ class T_Catalog : public ::testing::Test {
       UniquePtr<catalog::CatalogDatabase>
         new_clg_db(catalog::CatalogDatabase::Create(db_file));
       EXPECT_TRUE(new_clg_db.IsValid());
-      bool retval =
-          new_clg_db->InsertInitialValues(root_path, volatile_content);
+      bool retval = new_clg_db->InsertInitialValues(
+        root_path, volatile_content, "");
       EXPECT_TRUE(retval);
     }
     return db_file;
@@ -291,10 +291,12 @@ TEST_F(T_Catalog, Chunks) {
                                            NULL,
                                            false);
   shash::Any hash;
+  zlib::Algorithms compression_alg;
   EXPECT_TRUE(catalog->AllChunksBegin());
   unsigned counter = 0;
-  while (catalog->AllChunksNext(&hash)) {
+  while (catalog->AllChunksNext(&hash, &compression_alg)) {
     ++counter;
+    EXPECT_EQ(zlib::kZlibDefault, compression_alg);
   }
   EXPECT_TRUE(catalog->AllChunksEnd());
   EXPECT_EQ(4u, counter);  // number of files with content + empty hash

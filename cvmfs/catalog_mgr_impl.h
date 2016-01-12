@@ -5,7 +5,9 @@
 #ifndef CVMFS_CATALOG_MGR_IMPL_H_
 #define CVMFS_CATALOG_MGR_IMPL_H_
 
+#ifndef __STDC_FORMAT_MACROS
 #define __STDC_FORMAT_MACROS
+#endif
 
 #include "cvmfs_config.h"
 
@@ -448,6 +450,14 @@ uint64_t AbstractCatalogManager<CatalogT>::GetRevision() const {
   const uint64_t revision = revision_cache_;
   Unlock();
   return revision;
+}
+
+template <class CatalogT>
+bool AbstractCatalogManager<CatalogT>::GetVOMSAuthz(std::string *authz) const {
+  ReadLock();
+  const bool has_authz = GetRootCatalog()->GetVOMSAuthz(authz);
+  Unlock();
+  return has_authz;
 }
 
 template <class CatalogT>

@@ -179,11 +179,15 @@ TEST_F(T_QuotaManager, Cleanup) {
 
   quota_mgr_->Insert(hash_null, 1, "");
   quota_mgr_->Insert(hash_rnd, 1, "");
+  EXPECT_EQ(0U, quota_mgr_->GetCleanupRate(60));
   EXPECT_TRUE(quota_mgr_->Cleanup(3));
+  EXPECT_EQ(0U, quota_mgr_->GetCleanupRate(60));
   EXPECT_EQ(2U, quota_mgr_->GetSize());
   EXPECT_TRUE(quota_mgr_->Cleanup(2));
+  EXPECT_EQ(0U, quota_mgr_->GetCleanupRate(60));
   EXPECT_EQ(2U, quota_mgr_->GetSize());
   EXPECT_TRUE(quota_mgr_->Cleanup(0));
+  EXPECT_EQ(1U, quota_mgr_->GetCleanupRate(60));
   EXPECT_EQ(0U, quota_mgr_->GetSize());
   EXPECT_FALSE(FileExists(tmp_path_ + "/" + hash_null.MakePath()));
   EXPECT_FALSE(FileExists(tmp_path_ + "/" + hash_rnd.MakePath()));

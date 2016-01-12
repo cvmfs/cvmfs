@@ -14,6 +14,7 @@
 #include "../../cvmfs/hash.h"
 #include "../../cvmfs/manifest.h"
 #include "../../cvmfs/prng.h"
+#include "../../cvmfs/util.h"
 #include "testutil.h"
 
 using swissknife::CatalogTraversal;
@@ -86,6 +87,11 @@ class T_GarbageCollector : public ::testing::Test {
     ASSERT_NE(static_cast<GC_MockUploader*>(NULL), uploader_);
     uploader_->TearDown();
     delete uploader_;
+  }
+
+  FILE *CreateTemporaryFile(std::string *path) const {
+    return CreateTempFile(GetCurrentWorkingDirectory() + "/cvmfs_ut_gc",
+                          0600, "w+", path);
   }
 
   GcConfiguration GetStandardGarbageCollectorConfiguration() {
@@ -1207,6 +1213,105 @@ TEST_F(T_GarbageCollector, NamedTagsInRecycleBin) {
 
   EXPECT_TRUE(upl->HasDeleted(h("380fe86b4cc68164afd5578eb21a32ab397e6d13")));
   EXPECT_TRUE(upl->HasDeleted(h("1a9ef17ae3597bf61d8229dc2bf6ec12ebb42d44")));
+}
+
+
+TEST_F(T_GarbageCollector, LogDeletionToFile) {
+  string dest_path;
+  FILE *deletion_log = CreateTemporaryFile(&dest_path);
+  ASSERT_TRUE(deletion_log != NULL);
+  UnlinkGuard unlink_guard(dest_path);
+
+  GcConfiguration config = GetStandardGarbageCollectorConfiguration();
+  config.keep_history_depth      = 0;             // no history preservation
+  config.deleted_objects_logfile = deletion_log;  // log deletion to tmp file
+
+  MyGarbageCollector gc(config);
+  const bool gc1 = gc.Collect();
+  EXPECT_TRUE(gc1);
+  EXPECT_EQ(11u, gc.preserved_catalog_count());
+  EXPECT_EQ(5u, gc.condemned_catalog_count());
+
+  RevisionMap     &c   = catalogs_;
+
+  std::vector<shash::Any> preserved_hashes;
+  preserved_hashes.push_back(h("b52945d780f8cc16711d4e670d82499dad99032d"));
+  preserved_hashes.push_back(h("d650d325d59ea9ca754f9b37293cd08d0b12584c"));
+  preserved_hashes.push_back(h("4083d30ba1f72e1dfad4cdbfc60ea3c38bfa600d"));
+  preserved_hashes.push_back(h("c308c87d518c86130d9b9d34723b2a7d4e232ce9"));
+  preserved_hashes.push_back(h("8967a86ddf51d89aaad5ad0b7f29bdfc7f7aef2a"));
+  preserved_hashes.push_back(h("372e393bb9f5c33440f842b47b8f6aa3ed4f2943"));
+  preserved_hashes.push_back(h("50c44954ab4348a6a3772ee5bd30ab7a1494c692"));
+  preserved_hashes.push_back(h("2dc2b87b8ac840e4fb1cad25c806395c931f7b31"));
+  preserved_hashes.push_back(h("a727b47d99fba5fe196400a3c7bc1738172dff71"));
+  preserved_hashes.push_back(h("80b59550342b6f5141b42e5b2d58ce453f12d710"));
+  preserved_hashes.push_back(
+    h("defae1853b929bbbdbc7c6d4e75531273f1ae4cb", 'P'));
+  preserved_hashes.push_back(
+    h("24bf4276fcdbe57e648b82af4e8fece5bd3581c7", 'P'));
+  preserved_hashes.push_back(
+    h("acc4c10cf875861ec8d6744a9ab81cb2abe433b4", 'P'));
+  preserved_hashes.push_back(
+    h("654be8b6938b3fb30be3e9476f3ed26db74e0a9e", 'P'));
+  preserved_hashes.push_back(
+    h("1a17be523120c7d3a7be745ada1658cc74e8507b", 'P'));
+  preserved_hashes.push_back(h("18588c597700a7e2d3b4ce91bdf5a947a4ad13fc"));
+  preserved_hashes.push_back(h("fea3b5156ebbeddb89c85bc14c8e9caa185c10c7"));
+  preserved_hashes.push_back(h("0aceb47a362df1522a69217736617493bef07d5a"));
+  preserved_hashes.push_back(h("d2068490d25c1bd4ef2f3d3a0568a76046466860"));
+  preserved_hashes.push_back(h("283144632474a0e553e3b61c1f272257942e7a61"));
+  preserved_hashes.push_back(h("213bec88ed6729219d94fc9281893ba93fca2a02"));
+  preserved_hashes.push_back(h("7d4d0ec225ebe13839d71c0dc0982567cc810402"));
+  preserved_hashes.push_back(h("bb5a7bbe8410f0268a9b12285b6f1fd26e038023"));
+  preserved_hashes.push_back(h("59b63e8478fb7fc02c54a85767c7116573907364"));
+  preserved_hashes.push_back(h("09fd3486d370013d859651eb164ec71a3a09f5cb"));
+  preserved_hashes.push_back(h("e0862f1d936037eb0c2be7ccf289f5dbf469244b"));
+  preserved_hashes.push_back(h("8031b9ad81b52cd772db9b1b12d38994fdd9dbe4"));
+  preserved_hashes.push_back(c[mp(5, "00")]->hash());
+  preserved_hashes.push_back(c[mp(5, "10")]->hash());
+  preserved_hashes.push_back(c[mp(5, "11")]->hash());
+  preserved_hashes.push_back(c[mp(5, "20")]->hash());
+  preserved_hashes.push_back(c[mp(2, "00")]->hash());
+  preserved_hashes.push_back(c[mp(2, "10")]->hash());
+  preserved_hashes.push_back(c[mp(2, "11")]->hash());
+  preserved_hashes.push_back(c[mp(4, "00")]->hash());
+  preserved_hashes.push_back(c[mp(4, "10")]->hash());
+  preserved_hashes.push_back(c[mp(4, "11")]->hash());
+  preserved_hashes.push_back(c[mp(4, "20")]->hash());
+
+  std::vector<shash::Any> deleted_hashes;
+  deleted_hashes.push_back(h("2e87adef242bc67cb66fcd61238ad808a7b44aab"));
+  deleted_hashes.push_back(h("3bf4854891899670727fc8e9c6e454f7e4058454"));
+  deleted_hashes.push_back(h("12ea064b069d98cb9da09219568ff2f8dd7d0a7e"));
+  deleted_hashes.push_back(h("20c2e6328f943003254693a66434ff01ebba26f0"));
+  deleted_hashes.push_back(h("219d1ca4c958bd615822f8c125701e73ce379428"));
+  deleted_hashes.push_back(c[mp(1, "00")]->hash());
+  deleted_hashes.push_back(c[mp(1, "10")]->hash());
+  deleted_hashes.push_back(c[mp(3, "00")]->hash());
+  deleted_hashes.push_back(c[mp(3, "10")]->hash());
+  deleted_hashes.push_back(c[mp(3, "11")]->hash());
+
+  std::set<std::string> log_lines;
+  std::string log_line;
+  ASSERT_EQ(0, fseek(deletion_log, 0, SEEK_SET));
+  while (GetLineFile(deletion_log, &log_line)) {
+    log_lines.insert(log_line);
+  }
+  fclose(deletion_log);
+
+  EXPECT_EQ(11u, log_lines.size());
+
+        std::vector<shash::Any>::const_iterator i    = preserved_hashes.begin();
+  const std::vector<shash::Any>::const_iterator iend = preserved_hashes.end();
+  for (; i != iend; ++i) {
+    EXPECT_EQ(0u, log_lines.count(i->ToStringWithSuffix()));
+  }
+
+        std::vector<shash::Any>::const_iterator j    = deleted_hashes.begin();
+  const std::vector<shash::Any>::const_iterator jend = deleted_hashes.end();
+  for (; j != jend; ++j) {
+    EXPECT_EQ(1u, log_lines.count(j->ToStringWithSuffix()));
+  }
 }
 
 

@@ -519,7 +519,12 @@ create_repo() {
     destroy_repo $repo || return 101
   fi
 
-  echo "Creating new repository $repo..."
+  echo -n "Creating new repository $repo "
+  if [ x"$extra_options" != x"" ]; then
+    echo "(with extra options $extra_options) ..."
+  else
+    echo "..."
+  fi
   local s3_config=""
   local stratum0=""
   local unionfs=""
@@ -644,9 +649,14 @@ get_stratum1_name() {
 }
 
 
+# creates a repository replica, as is done on stratum 1s
+# @param replica_name  the name of the new replica
+# @param replica_owner the owner of the new replica
+# @param stratum0_url  the url for the source repository
+# @param stratum0_pub  the public key the repository
 create_stratum1() {
   local replica_name=$1
-  local uid=$2
+  local replica_owner=$2
   local stratum0_url=$3
   local stratum0_pub=$4
   shift 4
@@ -659,7 +669,7 @@ create_stratum1() {
     echo "  Stratum1:  $stratum1_url"
     s3_config=" -s $CVMFS_TEST_S3_CONFIG -w $stratum1_url -a"
   fi
-  sudo cvmfs_server add-replica -o $CVMFS_TEST_USER    \
+  sudo cvmfs_server add-replica -o $replica_owner      \
                                 -n $replica_name       \
                                 $s3_config             \
                                 $additional_parameters \
@@ -1092,15 +1102,11 @@ get_apache_version() {
 # figure out apache config file mode
 #
 # @return   apache config mode (stdout) (see globals below)
-APACHE_CONF_MODE_OLD=1 # *.conf goes to ${APACHE_CONF}/conf.d
-APACHE_CONF_MODE_NEW=2 # *.conf goes to ${APACHE_CONF}/conf-available
+APACHE_CONF_MODE_CONFD=1     # *.conf goes to ${APACHE_CONF}/conf.d
+APACHE_CONF_MODE_CONFAVAIL=2 # *.conf goes to ${APACHE_CONF}/conf-available
 get_apache_conf_mode() {
-  local minor_apache_version=$(version_minor "$(get_apache_version)")
-  if [ $minor_apache_version -ge 4 ] || [ -d /etc/${APACHE_CONF}/conf-available ]; then
-    echo $APACHE_CONF_MODE_NEW
-  else
-    echo $APACHE_CONF_MODE_OLD
-  fi
+  [ -d /etc/${APACHE_CONF}/conf-available ] && echo $APACHE_CONF_MODE_CONFAVAIL \
+                                            || echo $APACHE_CONF_MODE_CONFD
 }
 
 
@@ -1109,8 +1115,10 @@ get_apache_conf_mode() {
 # @return   the location of apache configuration files (stdout)
 get_apache_conf_path() {
   local res_path="/etc/${APACHE_CONF}"
-  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_NEW" ]; then
+  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_CONFAVAIL" ]; then
     echo "${res_path}/conf-available"
+  elif [ -d "${res_path}/modules.d" ]; then
+    echo "${res_path}/modules.d"
   else
     echo "${res_path}/conf.d"
   fi
@@ -1122,7 +1130,8 @@ get_apache_conf_path() {
 #
 # @return   a configuration snippet to allow s'th from all hosts (stdout)
 get_compatible_apache_allow_from_all_config() {
-  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_NEW" ]; then
+  local minor_apache_version=$(version_minor "$(get_apache_version)")
+  if [ $minor_apache_version -ge 4 ]; then
     echo "Require all granted"
   else
     local nl='
@@ -1148,7 +1157,7 @@ create_apache_config_file() {
   cat - | sudo tee ${conf_path}/${file_name} > /dev/null || return 1
 
   # the new apache requires the enable the config afterwards
-  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_NEW" ]; then
+  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_CONFAVAIL" ]; then
     sudo a2enconf $file_name > /dev/null || return 2
   fi
 
@@ -1167,7 +1176,7 @@ remove_apache_config_file() {
   conf_path="$(get_apache_conf_path)/${file_name}"
 
   # disable configuration on newer apache versions
-  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_NEW" ]; then
+  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_CONFAVAIL" ]; then
     sudo a2disconf $file_name > /dev/null 2>&1 || return 1
   fi
 
@@ -1353,6 +1362,24 @@ peek_backend() {
 }
 
 
+# uploads a random file into the backend storage of a CVMFS repository
+#
+# @param repository   the repository name to uploaded into
+# @param file_path    the file to be uploaded
+# @param remote_path  the relative remote path to be uploaded into
+upload_into_backend() {
+  local repo_name="$1"
+  local file_path="$2"
+  local remote_path="$3"
+
+  load_repo_config $repo_name
+  cvmfs_swissknife upload -i $file_path              \
+                          -o $remote_path            \
+                          -r $CVMFS_UPSTREAM_STORAGE \
+                          -a $CVMFS_HASH_ALGORITHM
+}
+
+
 # reads the upstream config part of a CernVM-FS server configuration file
 # This is the third comma-separated field in the upstream string
 read_upstream_config() {
@@ -1391,6 +1418,7 @@ disable_auto_garbage_collection() {
     local tmp_cfg="$(mktemp)"
     cat $cfg_file | sed -e 's/^\(CVMFS_AUTO_GC\)=.*$/\1=false/' > $tmp_cfg || return 1
     sudo mv -f $tmp_cfg $cfg_file || return 2
+    sudo chmod 0644 $cfg_file     || return 3
   fi
 }
 
@@ -1888,6 +1916,7 @@ do_local_mount() {
   local repo_name="$2"
   local repo_url="$3"
   local config_file="$4"
+  local extra_option="$5"
   local cache="$(get_cache_directory $mountpoint)"
   local config="$(mktemp ${mountpoint}.conf.XXXXX)"
   local output="$(mktemp ${mountpoint}.log.XXXXX)"
@@ -1895,6 +1924,7 @@ do_local_mount() {
   mkdir $mountpoint $cache
   if [ -z $config_file ]; then
     cat > $config << EOF
+CVMFS_MOUNT_DIR=/cvmfs
 CVMFS_CACHE_BASE=$cache
 CVMFS_RELOAD_SOCKETS=$cache
 CVMFS_SERVER_URL=$repo_url
@@ -1906,6 +1936,9 @@ EOF
   else
     cat $config_file > $config
   fi
+  echo "$extra_option" >> $config
+  echo "  *** local mount config:"
+  cat "$config"
 
   cvmfs2 -d -o config=$config $repo_name $mountpoint >> $output 2>&1
 }

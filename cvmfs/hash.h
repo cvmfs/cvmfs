@@ -44,6 +44,10 @@ enum Algorithms {
   kAny,
 };
 
+/**
+ * NOTE: when adding a suffix here, one must edit `cvmfs_swissknife scrub`
+ *       accordingly, that checks for invalid hash suffixes
+ */
 const char kSuffixNone         = 0;
 const char kSuffixCatalog      = 'C';
 const char kSuffixHistory      = 'H';
@@ -51,6 +55,7 @@ const char kSuffixMicroCatalog = 'L';  // currently unused
 const char kSuffixPartial      = 'P';
 const char kSuffixTemporary    = 'T';
 const char kSuffixCertificate  = 'X';
+const char kSuffixMetainfo     = 'M';
 
 
 /**
@@ -480,6 +485,7 @@ void Update(const unsigned char *buffer, const unsigned buffer_size,
             ContextPtr context);
 void Final(ContextPtr context, Any *any_digest);
 bool HashFile(const std::string &filename, Any *any_digest);
+bool HashFd(int fd, Any *any_digest);
 void HashMem(const unsigned char *buffer, const unsigned buffer_size,
              Any *any_digest);
 void HashString(const std::string &content, Any *any_digest);

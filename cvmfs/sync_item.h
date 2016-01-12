@@ -10,6 +10,7 @@
 #include <string>
 
 #include "directory_entry.h"
+#include "file_chunk.h"
 #include "hash.h"
 #include "platform.h"
 #include "util.h"
@@ -47,6 +48,7 @@ class SyncItem {
 
  public:
   SyncItem();
+  ~SyncItem();
 
   inline bool IsDirectory()       const { return IsType(kItemDir);             }
   inline bool WasDirectory()      const { return WasType(kItemDir);            }
@@ -57,6 +59,7 @@ class SyncItem {
   inline bool IsNew()             const { return WasType(kItemNew);            }
   inline bool IsCharacterDevice() const { return IsType(kItemCharacterDevice); }
   inline bool IsGraftMarker()     const { return IsType(kItemMarker);          }
+  inline bool IsExternalData()    const { return external_data_;              }
 
   inline bool IsWhiteout()        const { return whiteout_;                    }
   inline bool IsCatalogMarker()   const { return filename_ == ".cvmfscatalog"; }
@@ -64,10 +67,20 @@ class SyncItem {
 
   bool HasGraftMarker()           const { return graft_marker_present_;        }
   bool IsValidGraft()             const { return valid_graft_;                 }
+  bool IsChunkedGraft()           const { return graft_chunklist_;             }
 
+  inline const FileChunkList* GetGraftChunks() const {return graft_chunklist_;}
   inline shash::Any GetContentHash() const { return content_hash_; }
   inline void SetContentHash(const shash::Any &hash) { content_hash_ = hash; }
   inline bool HasContentHash() const { return !content_hash_.IsNull(); }
+  void SetExternalData(bool val) {external_data_ = val;}
+
+  inline zlib::Algorithms GetCompressionAlgorithm() const {
+    return compression_algorithm_;
+  }
+  inline void SetCompressionAlgorithm(const zlib::Algorithms &alg) {
+    compression_algorithm_ = alg;
+  }
 
   /**
    * Generates a DirectoryEntry that can be directly stored into a catalog db.
@@ -210,8 +223,14 @@ class SyncItem {
   bool valid_graft_;                  /**< checksum and size in graft marker */
   bool graft_marker_present_;         /**< .cvmfsgraft-$filename exists */
 
+  bool external_data_;
   std::string relative_parent_path_;
   std::string filename_;
+
+  /**
+   * Chunklist from graft. Not initialized by default to save memory.
+   */
+  FileChunkList *graft_chunklist_;
   ssize_t graft_size_;
 
   mutable SyncItemType scratch_type_;
@@ -219,6 +238,9 @@ class SyncItem {
 
   // The hash of regular file's content
   shash::Any content_hash_;
+
+  // The compression algorithm for the file
+  zlib::Algorithms compression_algorithm_;
 
   // Lazy evaluation and caching of results of file stats
   inline void StatRdOnly(const bool refresh = false) const {

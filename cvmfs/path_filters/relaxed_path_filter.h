@@ -5,6 +5,8 @@
 #ifndef CVMFS_PATH_FILTERS_RELAXED_PATH_FILTER_H_
 #define CVMFS_PATH_FILTERS_RELAXED_PATH_FILTER_H_
 
+#include <string>
+
 #include "dirtab.h"
 
 namespace catalog {

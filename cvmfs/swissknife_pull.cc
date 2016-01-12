@@ -23,6 +23,7 @@
 
 #include "atomic.h"
 #include "catalog.h"
+#include "compression.h"
 #include "download.h"
 #include "hash.h"
 #include "history_sqlite.h"
@@ -49,11 +50,13 @@ class ChunkJob {
  public:
   ChunkJob()
     : suffix(shash::kSuffixNone)
-    , hash_algorithm(shash::kAny) {}
+    , hash_algorithm(shash::kAny)
+    , compression_alg(zlib::kZlibDefault) {}
 
-  explicit ChunkJob(const shash::Any &hash)
+  ChunkJob(const shash::Any &hash, zlib::Algorithms compression_alg)
     : suffix(hash.suffix)
     , hash_algorithm(hash.algorithm)
+    , compression_alg(compression_alg)
   {
     memcpy(digest, hash.digest, hash.GetDigestSize());
   }
@@ -71,6 +74,7 @@ class ChunkJob {
 
   const shash::Suffix      suffix;
   const shash::Algorithms  hash_algorithm;
+  const zlib::Algorithms   compression_alg;
   unsigned char            digest[shash::kMaxDigestSize];
 };
 
@@ -158,32 +162,50 @@ static void ReportDownloadError(const shash::Any &failed_hash,
 }
 
 
-static void Store(const string &local_path, const string &remote_path) {
+static void Store(
+  const string &local_path,
+  const string &remote_path,
+  const bool compressed_src)
+{
   if (preload_cache) {
-    string tmp_dest;
-    FILE *fdest = CreateTempFile(remote_path, 0660, "w", &tmp_dest);
-    if (fdest == NULL) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to create temporary file '%s'",
-               remote_path.c_str());
-      abort();
+    if (!compressed_src) {
+      int retval = rename(local_path.c_str(), remote_path.c_str());
+      if (retval != 0) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "Failed to move '%s' to '%s'",
+                 local_path.c_str(), remote_path.c_str());
+        abort();
+      }
+    } else {
+      // compressed input
+      string tmp_dest;
+      FILE *fdest = CreateTempFile(remote_path, 0660, "w", &tmp_dest);
+      if (fdest == NULL) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "Failed to create temporary file '%s'",
+                 remote_path.c_str());
+        abort();
+      }
+      int retval = zlib::DecompressPath2File(local_path, fdest);
+      if (!retval) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "Failed to preload %s to %s",
+                 local_path.c_str(), remote_path.c_str());
+        abort();
+      }
+      fclose(fdest);
+      retval = rename(tmp_dest.c_str(), remote_path.c_str());
+      assert(retval == 0);
+      unlink(local_path.c_str());
     }
-    int retval = zlib::DecompressPath2File(local_path, fdest);
-    if (!retval) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to preload %s to %s",
-               local_path.c_str(), remote_path.c_str());
-      abort();
-    }
-    fclose(fdest);
-    retval = rename(tmp_dest.c_str(), remote_path.c_str());
-    assert(retval == 0);
-    unlink(local_path.c_str());
   } else {
     spooler->Upload(local_path, remote_path);
   }
 }
 
-static void Store(const string &local_path, const shash::Any &remote_hash) {
-  Store(local_path, MakePath(remote_hash));
+static void Store(
+  const string &local_path,
+  const shash::Any &remote_hash,
+  const bool compressed_src = true)
+{
+  Store(local_path, MakePath(remote_hash), compressed_src);
 }
 
 
@@ -201,7 +223,7 @@ static void StoreBuffer(const unsigned char *buffer, const unsigned size,
   }
   assert(retval);
   fclose(ftmp);
-  Store(tmp_file, dest_path);
+  Store(tmp_file, dest_path, true);
 }
 
 static void StoreBuffer(const unsigned char *buffer, const unsigned size,
@@ -215,7 +237,14 @@ static void WaitForStorage() {
 }
 
 
+struct MainWorkerContext {
+  download::DownloadManager *download_manager;
+};
+
 static void *MainWorker(void *data) {
+  MainWorkerContext *mwc = static_cast<MainWorkerContext*>(data);
+  download::DownloadManager *download_manager = mwc->download_manager;
+
   while (1) {
     ChunkJob next_chunk;
     pthread_mutex_lock(&lock_pipe);
@@ -225,6 +254,7 @@ static void *MainWorker(void *data) {
       break;
 
     shash::Any chunk_hash = next_chunk.hash();
+    zlib::Algorithms compression_alg = next_chunk.compression_alg;
     LogCvmfs(kLogCvmfs, kLogVerboseMsg, "processing chunk %s",
              chunk_hash.ToString().c_str());
 
@@ -240,7 +270,7 @@ static void *MainWorker(void *data) {
       unsigned attempts = 0;
       download::Failures retval;
       do {
-        retval = g_download_manager->Fetch(&download_chunk);
+        retval = download_manager->Fetch(&download_chunk);
         if (retval != download::kFailOk) {
           ReportDownloadError(chunk_hash, retval);
           abort();
@@ -248,7 +278,8 @@ static void *MainWorker(void *data) {
         attempts++;
       } while ((retval != download::kFailOk) && (attempts < retries));
       fclose(fchunk);
-      Store(tmp_file, chunk_hash);
+      Store(tmp_file, chunk_hash,
+            (compression_alg == zlib::kZlibDefault) ? true : false);
       atomic_inc64(&overall_new);
     }
     if (atomic_xadd64(&overall_chunks, 1) % 1000 == 0)
@@ -259,8 +290,8 @@ static void *MainWorker(void *data) {
 }
 
 
-static bool Pull(const shash::Any &catalog_hash, const std::string &path);
-static bool PullRecursion(catalog::Catalog *catalog, const std::string &path) {
+bool CommandPull::PullRecursion(      catalog::Catalog  *catalog,
+                                const std::string       &path) {
   assert(catalog);
 
   // Previous catalogs
@@ -296,7 +327,8 @@ static bool PullRecursion(catalog::Catalog *catalog, const std::string &path) {
   return true;
 }
 
-static bool Pull(const shash::Any &catalog_hash, const std::string &path) {
+bool CommandPull::Pull(const shash::Any   &catalog_hash,
+                       const std::string  &path) {
   int retval;
   download::Failures dl_retval;
   assert(shash::kSuffixCatalog == catalog_hash.suffix);
@@ -339,6 +371,7 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path) {
 
   // Download and uncompress catalog
   shash::Any chunk_hash;
+  zlib::Algorithms compression_alg;
   catalog::Catalog *catalog = NULL;
   string file_catalog;
   string file_catalog_vanilla;
@@ -359,7 +392,7 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path) {
   const string url_catalog = *stratum0_url + "/data/" + catalog_hash.MakePath();
   download::JobInfo download_catalog(&url_catalog, false, false,
                                      fcatalog_vanilla, &catalog_hash);
-  dl_retval = g_download_manager->Fetch(&download_catalog);
+  dl_retval = download_manager()->Fetch(&download_catalog);
   fclose(fcatalog_vanilla);
   if (dl_retval != download::kFailOk) {
     if (path == "" && is_garbage_collectable) {
@@ -395,8 +428,8 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to gather chunks");
     goto pull_cleanup;
   }
-  while (catalog->AllChunksNext(&chunk_hash)) {
-    ChunkJob next_chunk(chunk_hash);
+  while (catalog->AllChunksNext(&chunk_hash, &compression_alg)) {
+    ChunkJob next_chunk(chunk_hash, compression_alg);
     WritePipe(pipe_chunks[1], &next_chunk, sizeof(next_chunk));
     atomic_inc64(&chunk_queue);
   }
@@ -438,6 +471,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   int fd_lockfile = -1;
   string spooler_definition_str;
   manifest::ManifestEnsemble ensemble;
+  shash::Any meta_info_hash;
+  string meta_info;
 
   // Option parsing
   if (args.find('c') != args.end())
@@ -446,7 +481,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     unsigned log_level =
     1 << (kLogLevel0 + String2Uint64(*args.find('l')->second));
     if (log_level > kLogNone) {
-      swissknife::Usage();
+      LogCvmfs(kLogCvmfs, kLogStderr, "invalid log level");
       return 1;
     }
     SetLogVerbosity(static_cast<LogLevels>(log_level));
@@ -486,18 +521,37 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
            stratum0_url->c_str());
 
   int result = 1;
-  const string url_sentinel = *stratum0_url + "/.cvmfs_master_replica";
-  download::JobInfo download_sentinel(&url_sentinel, false);
 
   // Initialization
   atomic_init64(&overall_chunks);
   atomic_init64(&overall_new);
   atomic_init64(&chunk_queue);
-  g_download_manager->Init(num_parallel+1, true, g_statistics);
+
+  const bool     follow_redirects = false;
+  const unsigned max_pool_handles = num_parallel+1;
+
+  if (!this->InitDownloadManager(follow_redirects, max_pool_handles)) {
+    return 1;
+  }
+
+  if (!this->InitSignatureManager(master_keys, trusted_certs)) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to initalize CVMFS signatures");
+    return 1;
+  } else {
+    LogCvmfs(kLogCvmfs, kLogStdout,
+             "CernVM-FS: using public key(s) %s",
+             JoinStrings(SplitString(master_keys, ':'), ", ").c_str());
+    if (!trusted_certs.empty()) {
+      LogCvmfs(kLogCvmfs, kLogStdout,
+               "CernVM-FS: using trusted certificates in %s",
+               JoinStrings(SplitString(trusted_certs, ':'), ", ").c_str());
+    }
+  }
+
   // download::ActivatePipelining();
   unsigned current_group;
   vector< vector<download::DownloadManager::ProxyInfo> > proxies;
-  g_download_manager->GetProxyInfo(&proxies, &current_group, NULL);
+  download_manager()->GetProxyInfo(&proxies, &current_group, NULL);
   if (proxies.size() > 0) {
     string proxy_str = "\nWarning, replicating through proxies\n";
     proxy_str += "  Load-balance groups:\n";
@@ -513,45 +567,43 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
                  proxies[current_group][0].url;
     LogCvmfs(kLogCvmfs, kLogStdout, "%s\n", proxy_str.c_str());
   }
-  g_download_manager->SetTimeout(timeout, timeout);
-  g_download_manager->SetRetryParameters(retries, timeout, 3*timeout);
-  g_download_manager->Spawn();
-  g_signature_manager->Init();
-  if (!g_signature_manager->LoadPublicRsaKeys(master_keys)) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-             "cvmfs public master key could not be loaded.");
-    goto fini;
-  } else {
-    LogCvmfs(kLogCvmfs, kLogStdout,
-             "CernVM-FS: using public key(s) %s",
-             JoinStrings(SplitString(master_keys, ':'), ", ").c_str());
-  }
-  if (trusted_certs != "") {
-    if (!g_signature_manager->LoadTrustedCaCrl(trusted_certs)) {
-      LogCvmfs(kLogCvmfs, kLogStderr,
-               "trusted certificates from %s could not be loaded",
-               trusted_certs.c_str());
-      goto fini;
-    }
-    LogCvmfs(kLogCvmfs, kLogStdout,
-             "CernVM-FS: using trusted certificates in %s",
-             JoinStrings(SplitString(trusted_certs, ':'), ", ").c_str());
-  }
+  download_manager()->SetTimeout(timeout, timeout);
+  download_manager()->SetRetryParameters(retries, timeout, 3*timeout);
+  download_manager()->Spawn();
 
   // Check if we have a replica-ready server
-  retval = g_download_manager->Fetch(&download_sentinel);
+  const string url_sentinel = *stratum0_url + "/.cvmfs_master_replica";
+  download::JobInfo download_sentinel(&url_sentinel, false);
+  retval = download_manager()->Fetch(&download_sentinel);
   if (retval != download::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogStderr,
              "This is not a CernVM-FS server for replication");
     goto fini;
   }
 
-  m_retval = manifest::Fetch(*stratum0_url, repository_name, 0, NULL,
-                           g_signature_manager, g_download_manager, &ensemble);
+  m_retval = FetchRemoteManifestEnsemble(*stratum0_url,
+                                          repository_name,
+                                          &ensemble);
   if (m_retval != manifest::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch manifest (%d - %s)",
              m_retval, manifest::Code2Ascii(m_retval));
     goto fini;
+  }
+
+  // Get meta info
+  meta_info_hash = ensemble.manifest->meta_info();
+  if (!meta_info_hash.IsNull()) {
+    meta_info_hash = ensemble.manifest->meta_info();
+    const string url = *stratum0_url + "/data/" + meta_info_hash.MakePath();
+    download::JobInfo download_metainfo(&url, true, false, &meta_info_hash);
+    dl_retval = download_manager()->Fetch(&download_metainfo);
+    if (dl_retval != download::kFailOk) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch meta info (%d - %s)",
+               dl_retval, download::Code2Ascii(dl_retval));
+      goto fini;
+    }
+    meta_info = string(download_metainfo.destination_mem.data,
+                       download_metainfo.destination_mem.size);
   }
 
   is_garbage_collectable = ensemble.manifest->garbage_collectable();
@@ -579,7 +631,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     download::JobInfo download_history(&history_url, false, false,
                                        &history_path,
                                        &history_hash);
-    dl_retval = g_download_manager->Fetch(&download_history);
+    dl_retval = download_manager()->Fetch(&download_history);
     if (dl_retval != download::kFailOk) {
       ReportDownloadError(history_hash, dl_retval);
       goto fini;
@@ -614,8 +666,11 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   // Starting threads
   MakePipe(pipe_chunks);
   LogCvmfs(kLogCvmfs, kLogStdout, "Starting %u workers", num_parallel);
+  MainWorkerContext mwc;
+  mwc.download_manager = download_manager();
   for (unsigned i = 0; i < num_parallel; ++i) {
-    int retval = pthread_create(&workers[i], NULL, MainWorker, NULL);
+    int retval = pthread_create(&workers[i], NULL, MainWorker,
+                                static_cast<void*>(&mwc));
     assert(retval == 0);
   }
 
@@ -656,6 +711,11 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
                   ensemble.cert_size,
                   ensemble.manifest->certificate(), true);
     }
+    if (!meta_info_hash.IsNull()) {
+      const unsigned char *info = reinterpret_cast<const unsigned char *>(
+        meta_info.data());
+      StoreBuffer(info, meta_info.size(), meta_info_hash, true);
+    }
     if (preload_cache) {
       bool retval = ensemble.manifest->ExportChecksum(*preload_cachedir, 0660);
       assert(retval);
@@ -684,8 +744,6 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   if (fd_lockfile >= 0)
     UnlockFile(fd_lockfile);
   free(workers);
-  g_signature_manager->Fini();
-  g_download_manager->Fini();
   delete spooler;
   delete pathfilter;
   return result;

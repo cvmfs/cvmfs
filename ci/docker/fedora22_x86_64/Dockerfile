@@ -9,6 +9,7 @@ RUN         dnf -y update && dnf -y install                     \
                                         gcc                     \
                                         gcc-c++                 \
                                         git                     \
+                                        gridsite                \
                                         hardlink                \
                                         libattr-devel           \
                                         libcap-devel            \

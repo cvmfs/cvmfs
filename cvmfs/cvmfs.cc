@@ -70,6 +70,7 @@
 #include "backoff.h"
 #include "cache.h"
 #include "catalog_mgr_client.h"
+#include "clientctx.h"
 #include "compat.h"
 #include "compression.h"
 #include "directory_entry.h"
@@ -101,8 +102,11 @@
 #include "util.h"
 #include "util_concurrency.h"
 #include "uuid.h"
+#include "voms_authz/voms_cred.h"
 #include "wpad.h"
 #include "xattr.h"
+
+#include "voms_authz/voms_authz.h"
 
 #ifdef FUSE_CAP_EXPORT_SUPPORT
 #define CVMFS_NFS_SUPPORT
@@ -187,8 +191,10 @@ quota::ListenerHandle *watchdog_listener_ = NULL;
 quota::ListenerHandle *unpin_listener_ = NULL;
 signature::SignatureManager *signature_manager_ = NULL;
 download::DownloadManager *download_manager_ = NULL;
+download::DownloadManager *external_download_manager_ = NULL;
 cache::CacheManager *cache_manager_ = NULL;
 Fetcher *fetcher_ = NULL;
+Fetcher *external_fetcher_ = NULL;
 lru::InodeCache *inode_cache_ = NULL;
 lru::PathCache *path_cache_ = NULL;
 lru::Md5PathCache *md5path_cache_ = NULL;
@@ -478,6 +484,27 @@ static void RemountCheck() {
 }
 
 
+static bool CheckVoms(const fuse_ctx &fctx) {
+  std::string voms_requirements;
+  if (catalog_manager_->GetVOMSAuthz(&voms_requirements)) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "Got VOMS authz %s from filesystem "
+             "properties", voms_requirements.c_str());
+  }
+
+  // Get VOMS information, if any.  If VOMS authz is present and VOMS is
+  // not compiled in, then deny authorization.
+  if ((fctx.uid != 0) && voms_requirements.size()) {
+#ifdef VOMS_AUTHZ
+    return CheckVOMSAuthz(&fctx, voms_requirements);
+#else
+    LogCvmfs(kLogCvmfs, kLogSyslogWarn | kLogDebug,  "VOMS requirements found "
+              "in catalog but client compiled without VOMS support");
+    return false;
+#endif
+  }
+  return true;
+}
+
 // TODO(jblomer): the remount functions need to move into a separate entity
 /**
  * Gets triggered by the alarm timer to start `RemountCheck()`.  This can't
@@ -635,6 +662,8 @@ static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
  */
 static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
   perf::Inc(n_fs_lookup_);
+  const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
+  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
   RemountCheck();
 
   remount_fence_->Enter();
@@ -764,12 +793,20 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
                           struct fuse_file_info *fi)
 {
   perf::Inc(n_fs_stat_);
+  const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
+  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
   RemountCheck();
 
   remount_fence_->Enter();
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_getattr (stat) for inode: %"PRIu64,
            uint64_t(ino));
+
+  if (!CheckVoms(*fuse_ctx)) {
+    remount_fence_->Leave();
+    fuse_reply_err(req, EACCES);
+    return;
+  }
 
   catalog::DirectoryEntry dirent;
   const bool found = GetDirentForInode(ino, &dirent);
@@ -791,6 +828,8 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
  */
 static void cvmfs_readlink(fuse_req_t req, fuse_ino_t ino) {
   perf::Inc(n_fs_readlink_);
+  const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
+  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
 
   remount_fence_->Enter();
   ino = catalog_manager_->MangleInode(ino);
@@ -845,12 +884,20 @@ static void AddToDirListing(const fuse_req_t req,
 static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
                           struct fuse_file_info *fi)
 {
+  const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
+  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
   RemountCheck();
 
   remount_fence_->Enter();
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_opendir on inode: %"PRIu64,
            uint64_t(ino));
+
+  if (!CheckVoms(*fuse_ctx)) {
+    remount_fence_->Leave();
+    fuse_reply_err(req, EACCES);
+    return;
+  }
 
   PathString path;
   catalog::DirectoryEntry d;
@@ -872,6 +919,7 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
     fuse_reply_err(req, ENOTDIR);
     return;
   }
+
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_opendir on inode: %"PRIu64", path %s",
            uint64_t(ino), path.c_str());
 
@@ -1033,6 +1081,8 @@ static void cvmfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
                        struct fuse_file_info *fi)
 {
+  const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
+  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
   remount_fence_->Enter();
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_open on inode: %"PRIu64, uint64_t(ino));
@@ -1051,6 +1101,12 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   if (!found) {
     remount_fence_->Leave();
     ReplyNegative(dirent, req);
+    return;
+  }
+
+  if (!CheckVoms(*fuse_ctx)) {
+    remount_fence_->Leave();
+    fuse_reply_err(req, EACCES);
     return;
   }
 
@@ -1113,7 +1169,9 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       chunk_tables_->Lock();
       // Check again to avoid race
       if (!chunk_tables_->inode2chunks.Contains(ino)) {
-        chunk_tables_->inode2chunks.Insert(ino, FileChunkReflist(chunks, path));
+        chunk_tables_->inode2chunks.Insert(
+          ino, FileChunkReflist(chunks, path, dirent.compression_algorithm(),
+                                dirent.IsExternalFile()));
         chunk_tables_->inode2references.Insert(ino, 1);
       } else {
         uint32_t refctr;
@@ -1142,10 +1200,11 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     return;
   }
 
-  fd = fetcher_->Fetch(
+  fd = (dirent.IsExternalFile() ? external_fetcher_ : fetcher_)->Fetch(
     dirent.checksum(),
     dirent.size(),
     string(path.GetChars(), path.GetLength()),
+    dirent.compression_algorithm(),
     volatile_repository_ ? cache::CacheManager::kTypeVolatile :
                            cache::CacheManager::kTypeRegular);
 
@@ -1209,6 +1268,9 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
 
   // Do we have a a chunked file?
   if (static_cast<int64_t>(fi->fh) < 0) {
+    const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
+    ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
+
     const uint64_t chunk_handle =
       static_cast<uint64_t>(-static_cast<int64_t>(fi->fh));
     ChunkFd chunk_fd;
@@ -1238,12 +1300,25 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
       if ((chunk_fd.fd == -1) || (chunk_fd.chunk_idx != chunk_idx)) {
         if (chunk_fd.fd != -1) cache_manager_->Close(chunk_fd.fd);
         string verbose_path = "Part of " + chunks.path.ToString();
-        chunk_fd.fd = fetcher_->Fetch(
-          chunks.list->AtPtr(chunk_idx)->content_hash(),
-          chunks.list->AtPtr(chunk_idx)->size(),
-          verbose_path,
-          volatile_repository_ ? cache::CacheManager::kTypeVolatile
-                               : cache::CacheManager::kTypeRegular);
+        if (chunks.external_data) {
+          chunk_fd.fd = external_fetcher_->Fetch(
+            chunks.list->AtPtr(chunk_idx)->content_hash(),
+            chunks.list->AtPtr(chunk_idx)->size(),
+            verbose_path,
+            chunks.compression_alg,
+            volatile_repository_ ? cache::CacheManager::kTypeVolatile
+                                 : cache::CacheManager::kTypeRegular,
+            chunks.path.ToString(),
+            chunks.list->AtPtr(chunk_idx)->offset());
+        } else {
+          chunk_fd.fd = fetcher_->Fetch(
+            chunks.list->AtPtr(chunk_idx)->content_hash(),
+            chunks.list->AtPtr(chunk_idx)->size(),
+            verbose_path,
+            chunks.compression_alg,
+            volatile_repository_ ? cache::CacheManager::kTypeVolatile
+                                 : cache::CacheManager::kTypeRegular);
+        }
         if (chunk_fd.fd < 0) {
           chunk_fd.fd = -1;
           chunk_tables_->Lock();
@@ -1423,17 +1498,27 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
                            size_t size)
 #endif
 {
+  const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
+  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
+
   remount_fence_->Enter();
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug,
            "cvmfs_getxattr on inode: %"PRIu64" for xattr: %s",
            uint64_t(ino), name);
 
+  if (!CheckVoms(*fuse_ctx)) {
+    remount_fence_->Leave();
+    fuse_reply_err(req, EACCES);
+    return;
+  }
+
   const string attr = name;
   catalog::DirectoryEntry d;
   const bool found = GetDirentForInode(ino, &d);
   bool retval;
   XattrList xattrs;
+
   if (d.HasXattrs()) {
     PathString path;
     retval = GetPathForInode(ino, &path);
@@ -1458,11 +1543,14 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   }
 
   string attribute_value;
+  std::string lookup_value;
 
   if (attr == "user.pid") {
     attribute_value = StringifyInt(pid_);
   } else if (attr == "user.version") {
     attribute_value = string(VERSION) + "." + string(CVMFS_PATCH_LEVEL);
+  } else if (attr == "user.pubkeys") {
+    attribute_value = cvmfs::signature_manager_->GetActivePubkeys();
   } else if (attr == "user.hash") {
     if (!d.checksum().IsNull()) {
       attribute_value = d.checksum().ToString();
@@ -1501,6 +1589,10 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     attribute_value = StringifyInt(revision);
   } else if (attr == "user.root_hash") {
     attribute_value = catalog_manager_->GetRootHash().ToString();
+  } else if ((attr == "user.voms_authz") &&
+             catalog_manager_->GetVOMSAuthz(&lookup_value))
+  {
+    attribute_value = lookup_value;
   } else if (attr == "user.tag") {
     attribute_value = *repository_tag_;
   } else if (attr == "user.expires") {
@@ -1526,6 +1618,62 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
       attribute_value = proxy_chain[current_group][0].url;
     } else {
       attribute_value = "DIRECT";
+    }
+  } else if (attr == "user.authz") {
+    bool has_authz = catalog_manager_->GetVOMSAuthz(&attribute_value);
+    if (!has_authz) {
+      fuse_reply_err(req, ENOATTR);
+      return;
+    }
+  } else if (attr == "user.chunks") {
+    if (d.IsRegular()) {
+      if (d.IsChunkedFile()) {
+        PathString path;
+        retval = GetPathForInode(ino, &path);
+        assert(retval);
+
+        FileChunkList chunks;
+        if (!catalog_manager_->ListFileChunks(path, d.hash_algorithm(),
+                                              &chunks) ||
+            chunks.IsEmpty())
+        {
+          LogCvmfs(kLogCvmfs, kLogDebug| kLogSyslogErr, "file %s is marked as "
+                   "'chunked', but no chunks found.", path.c_str());
+          fuse_reply_err(req, EIO);
+          return;
+        } else {
+          attribute_value = StringifyInt(chunks.size());
+        }
+      } else {
+        attribute_value = "1";
+      }
+    } else {
+      fuse_reply_err(req, ENOATTR);
+      return;
+    }
+  } else if (attr == "user.external_file") {
+    if (d.IsRegular()) {
+      attribute_value = d.IsExternalFile() ? "1" : "0";
+    } else {
+      fuse_reply_err(req, ENOATTR);
+      return;
+    }
+  } else if (attr == "user.external_host") {
+    vector<string> host_chain;
+    vector<int> rtt;
+    unsigned current_host;
+    external_download_manager_->GetHostInfo(&host_chain, &rtt, &current_host);
+    if (host_chain.size()) {
+      attribute_value = string(host_chain[current_host]);
+    } else {
+      attribute_value = "internal error: no hosts defined";
+    }
+  } else if (attr == "user.compression") {
+    if (d.IsRegular()) {
+      attribute_value = zlib::AlgorithmName(d.compression_algorithm());
+    } else {
+      fuse_reply_err(req, ENOATTR);
+      return;
     }
   } else if (attr == "user.host") {
     vector<string> host_chain;
@@ -1572,6 +1720,10 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     unsigned seconds, seconds_direct;
     download_manager_->GetTimeout(&seconds, &seconds_direct);
     attribute_value = StringifyInt(seconds_direct);
+  } else if (attr == "user.external_timeout") {
+    unsigned seconds, seconds_direct;
+    download_manager_->GetTimeout(&seconds, &seconds_direct);
+    attribute_value = StringifyInt(seconds_direct);
   } else if (attr == "user.rx") {
     int64_t rx =
       cvmfs::statistics_->Lookup("download.sz_transferred_bytes")->Get();
@@ -1609,6 +1761,9 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 
 
 static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
+  const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
+  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
+
   remount_fence_->Enter();
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug,
@@ -1636,7 +1791,8 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
     "user.root_hash\0user.expires\0user.maxfd\0user.usedfd\0user.nioerr\0"
     "user.host\0user.proxy\0user.uptime\0user.nclg\0user.nopen\0"
     "user.ndownload\0user.timeout\0user.timeout_direct\0user.rx\0user.speed\0"
-    "user.fqrn\0user.ndiropen\0user.inode_max\0user.tag\0user.host_list\0";
+    "user.fqrn\0user.ndiropen\0user.inode_max\0user.tag\0user.host_list\0"
+    "user.external_host\0user.external_timeout\0user.pubkeys\0";
   string attribute_list;
   if (hide_magic_xattrs_) {
     LogCvmfs(kLogCvmfs, kLogDebug, "Hiding extended attributes");
@@ -1647,9 +1803,18 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
       const char regular_file_list[] = "user.hash\0user.lhash\0";
       attribute_list += string(regular_file_list, sizeof(regular_file_list)-1);
     }
+
     if (d.IsLink()) {
       const char symlink_list[] = "xfsroot.rawlink\0user.rawlink\0";
       attribute_list += string(symlink_list, sizeof(symlink_list)-1);
+    } else if (d.IsRegular()) {
+      const char regular_file_list[] = "user.external_file\0user.compression\0"
+                                       "user.chunks\0";
+      attribute_list += string(regular_file_list, sizeof(regular_file_list)-1);
+    }
+
+    if (catalog_manager_->GetVOMSAuthz(NULL)) {
+      attribute_list += "user.authz\0";
     }
     attribute_list = xattrs.ListKeysPosix(attribute_list);
   }
@@ -1705,11 +1870,24 @@ bool Pin(const string &path) {
           false);
       if (!retval)
         return false;
-      int fd = fetcher_->Fetch(
-        chunks.AtPtr(i)->content_hash(),
-        chunks.AtPtr(i)->size(),
-        "Part of " + path,
-        cache::CacheManager::kTypePinned);
+      int fd = -1;
+      if (dirent.IsExternalFile()) {
+        fd = external_fetcher_->Fetch(
+          chunks.AtPtr(i)->content_hash(),
+          chunks.AtPtr(i)->size(),
+          "Part of " + path,
+          dirent.compression_algorithm(),
+          cache::CacheManager::kTypePinned,
+          path,
+          chunks.AtPtr(i)->offset());
+      } else {
+        fd = fetcher_->Fetch(
+          chunks.AtPtr(i)->content_hash(),
+          chunks.AtPtr(i)->size(),
+          "Part of " + path,
+          dirent.compression_algorithm(),
+          cache::CacheManager::kTypePinned);
+      }
       if (fd < 0) {
         return false;
       }
@@ -1723,8 +1901,9 @@ bool Pin(const string &path) {
     dirent.checksum(), dirent.size(), path, false);
   if (!retval)
     return false;
-  int fd = fetcher_->Fetch(
-    dirent.checksum(), dirent.size(), path, cache::CacheManager::kTypePinned);
+  int fd = (dirent.IsExternalFile() ? external_fetcher_ : fetcher_)->Fetch(
+    dirent.checksum(), dirent.size(), path, dirent.compression_algorithm(),
+    cache::CacheManager::kTypePinned);
   if (fd < 0) {
     return false;
   }
@@ -1791,6 +1970,7 @@ void UnregisterQuotaListener() {
 
 bool g_options_ready = false;
 bool g_download_ready = false;
+bool g_external_download_ready = false;
 bool g_nfs_maps_ready = false;
 bool g_monitor_ready = false;
 bool g_signature_ready = false;
@@ -1805,6 +1985,18 @@ string *g_boot_error = NULL;
 
 __attribute__((visibility("default")))
 loader::CvmfsExports *g_cvmfs_exports = NULL;
+
+
+static std::string CalculateHostString(
+    const std::string &fqrn,
+    const std::string &parameter) {
+  std::string host_str = parameter;
+  vector<string> tokens = SplitString(fqrn, '.');
+  const string org = tokens[0];
+  host_str = ReplaceAll(host_str, "@org@", org);
+  host_str = ReplaceAll(host_str, "@fqrn@", fqrn);
+  return host_str;
+}
 
 
 static void LogSqliteError(void *user_data __attribute__((unused)),
@@ -1843,6 +2035,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
   uint64_t mem_cache_size = cvmfs::kDefaultMemcache;
   unsigned timeout = cvmfs::kDefaultTimeout;
   unsigned timeout_direct = cvmfs::kDefaultTimeout;
+  unsigned external_timeout = cvmfs::kDefaultTimeout;
+  unsigned external_timeout_direct = cvmfs::kDefaultTimeout;
   unsigned low_speed_limit = cvmfs::kDefaultLowSpeedLimit;
   unsigned dns_timeout_ms = download::DownloadManager::kDnsDefaultTimeoutMs;
   unsigned dns_retries = download::DownloadManager::kDnsDefaultRetries;
@@ -1866,7 +2060,11 @@ static int Init(const loader::LoaderExports *loader_exports) {
   string hostname = "";
   string proxies = "";
   string fallback_proxies = "";
+  string external_proxies = "";
+  string fallback_external_proxies = "";
   string dns_server = "";
+  std::string external_host;
+  unsigned ipfamily_prefer = 0;
   string public_keys = "";
   string root_hash = "";
   bool alt_root_path = false;
@@ -1927,6 +2125,15 @@ static int Init(const loader::LoaderExports *loader_exports) {
     timeout = String2Uint64(parameter);
   if (cvmfs::options_manager_->GetValue("CVMFS_TIMEOUT_DIRECT", &parameter))
     timeout_direct = String2Uint64(parameter);
+  if (cvmfs::options_manager_->GetValue("CVMFS_EXTERNAL_TIMEOUT", &parameter))
+    external_timeout = String2Uint64(parameter);
+  else
+    external_timeout = timeout;
+  if (cvmfs::options_manager_->GetValue("CVMFS_EXTERNAL_TIMEOUT_DIRECT",
+      &parameter))
+    external_timeout_direct = String2Uint64(parameter);
+  else
+    external_timeout_direct = timeout_direct;
   if (cvmfs::options_manager_->GetValue("CVMFS_LOW_SPEED_LIMIT", &parameter))
     low_speed_limit = String2Uint64(parameter);
   if (cvmfs::options_manager_->GetValue("CVMFS_PROXY_RESET_AFTER", &parameter))
@@ -1975,8 +2182,24 @@ static int Init(const loader::LoaderExports *loader_exports) {
     proxies = parameter;
   if (cvmfs::options_manager_->GetValue("CVMFS_FALLBACK_PROXY", &parameter))
     fallback_proxies = parameter;
+  if (cvmfs::options_manager_->GetValue("CVMFS_EXTERNAL_HTTP_PROXY",
+      &parameter))
+    external_proxies = parameter;
+  else
+    external_proxies = "DIRECT";
+  if (cvmfs::options_manager_->GetValue("CVMFS_EXTERNAL_FALLBACK_PROXY",
+      &parameter))
+    fallback_external_proxies = parameter;
+  else
+    fallback_external_proxies = fallback_proxies;
   if (cvmfs::options_manager_->GetValue("CVMFS_DNS_SERVER", &parameter))
     dns_server = parameter;
+  if (cvmfs::options_manager_->GetValue("CVMFS_EXTERNAL_URL", &parameter)) {
+    external_host =
+      CalculateHostString(loader_exports->repository_name, parameter);
+  }
+  if (cvmfs::options_manager_->GetValue("CVMFS_IPFAMILY_PREFER", &parameter))
+    ipfamily_prefer = String2Int64(parameter);
   if (cvmfs::options_manager_->GetValue("CVMFS_TRUSTED_CERTS", &parameter))
     trusted_certs = parameter;
   if (cvmfs::options_manager_->GetValue("CVMFS_PUBLIC_KEY", &parameter)) {
@@ -2025,11 +2248,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
     g_raw_symlinks = true;
   }
   if (cvmfs::options_manager_->GetValue("CVMFS_SERVER_URL", &parameter)) {
-    vector<string> tokens = SplitString(loader_exports->repository_name, '.');
-    const string org = tokens[0];
-    hostname = parameter;
-    hostname = ReplaceAll(hostname, "@org@", org);
-    hostname = ReplaceAll(hostname, "@fqrn@", loader_exports->repository_name);
+    hostname = CalculateHostString(loader_exports->repository_name, parameter);
   }
   if (cvmfs::options_manager_->GetValue("CVMFS_CACHE_BASE", &parameter)) {
     cachedir = MakeCanonicalPath(parameter);
@@ -2180,7 +2399,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
       "Number of I/O errors");
 
   // Create cache directory, if necessary
-  if (!MkdirDeep(*cvmfs::cachedir_, 0700)) {
+  if (!MkdirDeep(*cvmfs::cachedir_, 0700, false)) {
     *g_boot_error = "cannot create cache directory " + *cvmfs::cachedir_;
     return loader::kFailCacheDir;
   }
@@ -2394,8 +2613,16 @@ static int Init(const loader::LoaderExports *loader_exports) {
                                                backoff_max);
   cvmfs::download_manager_->SetMaxIpaddrPerProxy(max_ipaddr_per_proxy);
   cvmfs::download_manager_->SetProxyTemplates(uuid->uuid(), proxy_template);
-  delete uuid;
-  uuid = NULL;
+  if (ipfamily_prefer != 0) {
+    switch (ipfamily_prefer) {
+      case 4:
+        cvmfs::download_manager_->SetIpPreference(dns::kIpPreferV4);
+        break;
+      case 6:
+        cvmfs::download_manager_->SetIpPreference(dns::kIpPreferV6);
+        break;
+    }
+  }
   if (send_info_header)
     cvmfs::download_manager_->EnableInfoHeader();
   proxies = download::ResolveProxyDescription(proxies,
@@ -2410,6 +2637,76 @@ static int Init(const loader::LoaderExports *loader_exports) {
   if (use_geo_api) {
     cvmfs::download_manager_->ProbeGeo();
   }
+
+  // Initialize the _external_ download manager.  Mostly the same as the
+  // primary except it has a different hostname and timeout.
+  cvmfs::external_download_manager_ = new download::DownloadManager();
+  cvmfs::external_download_manager_->Init(cvmfs::kDefaultNumConnections, false,
+      cvmfs::statistics_, "download-external");
+
+  cvmfs::external_download_manager_->SetHostChain(!external_host.empty() ?
+                                                  external_host : hostname);
+  if ((dns_timeout_ms != download::DownloadManager::kDnsDefaultTimeoutMs) ||
+      (dns_retries != download::DownloadManager::kDnsDefaultRetries))
+  {
+    cvmfs::external_download_manager_->SetDnsParameters(dns_retries,
+                                                        dns_timeout_ms);
+  }
+  if (!dns_server.empty()) {
+    cvmfs::external_download_manager_->SetDnsServer(dns_server);
+  }
+  if (follow_redirects) {
+    cvmfs::external_download_manager_->EnableRedirects();
+  }
+  cvmfs::external_download_manager_->SetTimeout(external_timeout,
+                                                external_timeout_direct);
+  cvmfs::external_download_manager_->SetLowSpeedLimit(low_speed_limit);
+  cvmfs::external_download_manager_->SetProxyGroupResetDelay(proxy_reset_after);
+  cvmfs::external_download_manager_->SetHostResetDelay(host_reset_after);
+  cvmfs::external_download_manager_->SetRetryParameters(max_retries,
+                                               backoff_init,
+                                               backoff_max);
+  cvmfs::external_download_manager_->SetMaxIpaddrPerProxy(max_ipaddr_per_proxy);
+  cvmfs::external_download_manager_->SetProxyTemplates(uuid->uuid(),
+                                                       proxy_template);
+  delete uuid;
+  uuid = NULL;
+  if (ipfamily_prefer != 0) {
+    switch (ipfamily_prefer) {
+      case 4:
+        cvmfs::external_download_manager_->SetIpPreference(dns::kIpPreferV4);
+        break;
+      case 6:
+        cvmfs::external_download_manager_->SetIpPreference(dns::kIpPreferV6);
+        break;
+    }
+  }
+  if (send_info_header)
+    cvmfs::external_download_manager_->EnableInfoHeader();
+  external_proxies = download::ResolveProxyDescription(external_proxies,
+                                            cvmfs::external_download_manager_);
+  if (external_proxies == "") {
+    *g_boot_error = "failed to discover HTTP proxy servers";
+    return loader::kFailWpad;
+  }
+  cvmfs::external_download_manager_->SetProxyChain(
+    external_proxies, fallback_external_proxies,
+    download::DownloadManager::kSetProxyBoth);
+  g_external_download_ready = true;
+  if (use_geo_api) {
+    std::vector<std::string> host_chain;
+    // If no external host was specified, reuse the geo API ordering
+    // of the regular download manager.
+    if (external_host.empty()) {
+      cvmfs::download_manager_->GetHostInfo(&host_chain, NULL, NULL);
+      cvmfs::external_download_manager_->SetHostChain(host_chain);
+    } else {
+      cvmfs::external_download_manager_->GetHostInfo(&host_chain, NULL, NULL);
+      cvmfs::download_manager_->GeoSortServers(&host_chain);
+      cvmfs::external_download_manager_->SetHostChain(host_chain);
+    }
+  }
+
 
   cvmfs::signature_manager_ = new signature::SignatureManager();
   cvmfs::signature_manager_->Init();
@@ -2427,9 +2724,25 @@ static int Init(const loader::LoaderExports *loader_exports) {
     }
   }
   g_signature_ready = true;
+  string config_repository_path = "";
   if (FileExists("/etc/cvmfs/blacklist")) {
-    if (!cvmfs::signature_manager_->LoadBlacklist("/etc/cvmfs/blacklist")) {
+    const bool append = false;
+    if (!cvmfs::signature_manager_->LoadBlacklist("/etc/cvmfs/blacklist",
+                                                  append))
+    {
       *g_boot_error = "failed to load blacklist";
+      return loader::kFailSignature;
+    }
+  }
+  if (cvmfs::options_manager_->HasConfigRepository(*cvmfs::repository_name_,
+                                                   &config_repository_path)
+      && FileExists(config_repository_path + "blacklist"))
+  {
+    const bool append = true;
+    if (!cvmfs::signature_manager_->LoadBlacklist(
+          config_repository_path + "blacklist", append))
+    {
+      *g_boot_error = "failed to load blacklist from config repository";
       return loader::kFailSignature;
     }
   }
@@ -2439,6 +2752,15 @@ static int Init(const loader::LoaderExports *loader_exports) {
     cvmfs::download_manager_,
     cvmfs::backoff_throttle_,
     cvmfs::statistics_);
+
+  const bool is_external_data = true;
+  cvmfs::external_fetcher_ = new cvmfs::Fetcher(
+    cvmfs::cache_manager_,
+    cvmfs::external_download_manager_,
+    cvmfs::backoff_throttle_,
+    cvmfs::statistics_,
+    "fetch-external",
+    is_external_data);
 
   // Load initial file catalog
   LogCvmfs(kLogCvmfs, kLogDebug, "fuse inode size is %d bits",
@@ -2550,6 +2872,10 @@ static int Init(const loader::LoaderExports *loader_exports) {
     cvmfs::volatile_repository_ = true;
   }
 
+  // Make sure client context TLS has been initialized
+  // (first initialization is not thread safe).
+  ClientCtx::GetInstance();
+
   cvmfs::pipe_remount_trigger_[0] = cvmfs::pipe_remount_trigger_[1] = -1;
   cvmfs::remount_fence_ = new cvmfs::RemountFence();
   auto_umount::SetMountpoint(*cvmfs::mountpoint_);
@@ -2598,6 +2924,7 @@ static void Spawn() {
     monitor::Spawn();
   }
   cvmfs::download_manager_->Spawn();
+  cvmfs::external_download_manager_->Spawn();
   cvmfs::cache_manager_->quota_mgr()->Spawn();
   if (cvmfs::cache_manager_->quota_mgr()->IsEnforcing()) {
     cvmfs::watchdog_listener_ = quota::RegisterWatchdogListener(
@@ -2652,6 +2979,7 @@ static void Fini() {
   tracer::Fini();
   if (g_signature_ready) cvmfs::signature_manager_->Fini();
   if (g_download_ready) cvmfs::download_manager_->Fini();
+  if (g_external_download_ready) cvmfs::external_download_manager_->Fini();
   if (g_nfs_maps_ready) nfs_maps::Fini();
   if (g_quota_ready) {
     if (cvmfs::unpin_listener_) {
@@ -2678,6 +3006,7 @@ static void Fini() {
   delete cvmfs::remount_fence_;
   delete cvmfs::signature_manager_;
   delete cvmfs::download_manager_;
+  delete cvmfs::external_download_manager_;
   delete cvmfs::inode_annotation_;
   delete cvmfs::directory_handles_;
   delete cvmfs::chunk_tables_;
@@ -2694,6 +3023,7 @@ static void Fini() {
   cvmfs::remount_fence_ = NULL;
   cvmfs::signature_manager_ = NULL;
   cvmfs::download_manager_ = NULL;
+  cvmfs::external_download_manager_ = NULL;
   cvmfs::inode_annotation_ = NULL;
   cvmfs::directory_handles_ = NULL;
   cvmfs::chunk_tables_ = NULL;
@@ -2732,6 +3062,10 @@ static void Fini() {
   cvmfs::backoff_throttle_ = NULL;
   delete cvmfs::statistics_;
   cvmfs::statistics_ = NULL;
+
+  // Make sure client context TLS is cleaned up
+  // (destruction is not thread safe)
+  ClientCtx::CleanupInstance();
 }
 
 
@@ -2742,6 +3076,11 @@ static int AltProcessFlavor(int argc, char **argv) {
   if (strcmp(argv[1], "__wpad__") == 0) {
     return download::MainResolveProxyDescription(argc, argv);
   }
+#ifdef VOMS_AUTHZ
+  if (strcmp(argv[1], "__cred_fetcher__") == 0) {
+    return CredentialsFetcher::MainCredentialsFetcher(argc, argv);
+  }
+#endif
   return 1;
 }
 
