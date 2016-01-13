@@ -5,7 +5,7 @@ CVMFS_TEST_045_PKG_MGR=
 
 configure_and_mount_oasis() {
   sudo rpm -Uvh http://repo.grid.iu.edu/osg/3.2/osg-3.2-el6-release-latest.rpm || return 1
-  sudo $CVMFS_TEST_045_PKG_MGR -y install oasis-config || retuen 2
+  sudo $CVMFS_TEST_045_PKG_MGR -y install oasis-config || return 2
   cvmfs_mount oasis.opensciencegrid.org,atlas.cern.ch \
     "CVMFS_HTTP_PROXY=DIRECT" || return 3
 
