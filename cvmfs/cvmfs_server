@@ -2544,6 +2544,17 @@ check_jq() {
 }
 
 
+validate_json() {
+  local json_file="$1"
+
+  if ! which jq > /dev/null 2>&1; then
+    return 0 # no jq -> assume JSON is valid
+  fi
+
+  jq '.' $json_file 2>&1
+}
+
+
 edit_json_until_valid() {
   local json_file="$1"
   local editor=$(get_editor)
@@ -2556,7 +2567,7 @@ edit_json_until_valid() {
 
     local jq_output=""
     local retry=""
-    if ! jq_output=$(jq '.' $json_file 2>&1); then
+    if ! jq_output=$(validate_json $json_file); then
       echo
       echo "Your JSON file is invalid, please check again:"
       echo "$jq_output"
