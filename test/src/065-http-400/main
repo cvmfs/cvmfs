@@ -7,7 +7,7 @@ cvmfs_run_test() {
 
   ${src_location}/../../common/mock_services/http_400.sh 9090 &
   local http_server_pid=$!
-  trap "kill $http_server_pid" EXIT HUP INT TERM
+  trap "kill -9 $http_server_pid" EXIT HUP INT TERM
 
   sudo cat << EOF > /etc/cvmfs/config.d/grid.cern.ch.conf
 CVMFS_SERVER_URL="http://localhost:9090/cvmfs/grid.cern.ch;http://cvmfs-stratum-one.cern.ch/cvmfs/grid.cern.ch"
