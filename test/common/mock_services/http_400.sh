@@ -2,6 +2,11 @@
 
 PORT=$1
 
+if ! which nc > /dev/null 2>&1; then
+  echo "utility 'nc' is not installed. aborting..."
+  exit 1
+fi
+
 tmpfile=$(mktemp /tmp/cvmfs-test.XXXXX)
 rm -f $tmpfile
 mkfifo $tmpfile
