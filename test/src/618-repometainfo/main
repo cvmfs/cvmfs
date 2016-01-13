@@ -34,5 +34,19 @@ cvmfs_run_test() {
   cvmfs_swissknife info -r http://localhost/cvmfs/${CVMFS_TEST_REPO} -M > downloaded || return 50
   diff reference downloaded || return 51
 
+  local json_file="test_json_file.json"
+  cat >> $json_file << EOF
+{
+  "administrator" : "Rene Meusel",
+  "email"         : "dont.send.me.spam@cern.ch",
+  "organisation"  : "CERN",
+  "description"   : "This is just a test repository"
+}
+EOF
+
+  cvmfs_server update-repoinfo -f $json_file $CVMFS_TEST_REPO || return 60
+  cvmfs_swissknife info -r http://localhost/cvmfs/${CVMFS_TEST_REPO} -M > downloaded1 || return 61
+  diff $json_file downloaded1 || return 62
+
   return 0
 }
