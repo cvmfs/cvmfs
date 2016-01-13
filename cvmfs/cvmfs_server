@@ -351,7 +351,8 @@ Supported Commands:
                   Updates the geo-IP database
   update-info     [-p no apache config] [-e don't edit /info/meta]
                   Open meta info JSON file for editing
-  update-repoinfo <fully qualified name>
+  update-repoinfo [-f path to JSON file]
+                  <fully qualified name>
                   Open repository meta info JSON file for editing
 "
 
