@@ -1930,3 +1930,39 @@ get_internal_value() {
 
   echo $(sudo cvmfs_talk -i $repo internal affairs | grep "^$key" | cut -d\| -f2)
 }
+
+# figures out where syslog is found on this system and prints it to stdout
+# If $CVMFS_TEST_SYSLOG_TARGET is set, additionally to the system's syslog the
+# path `cat $CVMFS_TEST_SYSLOG_TARGET` is sent to stdout
+# Note: This function also `cat`s all file paths that are additionally passed to
+#       it - appending the default syslog
+#
+# @param optional  a list of files that should be appended to stdout
+cat_syslog() {
+  local syslog_file=""
+  if [ -f "/var/log/syslog" ]; then
+    syslog_file="/var/log/syslog"
+  elif [ -f "/var/log/messages" ]; then
+    syslog_file="/var/log/messages"
+  fi
+
+  local cat_retval=0
+  if [ x"$syslog_file" != x"" ]; then
+    sudo cat $syslog_file || cat_retval=$?
+  elif which journalctl > /dev/null 2>&1; then
+    sudo journalctl || cat_retval=$?
+  else
+    echo "default syslog not found on this system"
+    cat_retval=1
+  fi
+
+  if [ x"$CVMFS_TEST_SYSLOG_TARGET" != x"" ]; then
+    sudo cat $CVMFS_TEST_SYSLOG_TARGET || cat_retval=$?
+  fi
+
+  if [ $# -gt 0 ]; then
+    sudo cat $@ || cat_retval=$?
+  fi
+
+  return $cat_retval
+}
