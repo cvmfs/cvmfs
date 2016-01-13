@@ -41,5 +41,5 @@ mkdir -p $CVMFS_TARBALL_RESULT_LOCATION
 echo "creating source tar ball '$tarball'..."
 create_cvmfs_source_tarball ${CVMFS_SOURCE_LOCATION} \
                             ${CVMFS_TARBALL_RESULT_LOCATION}/${tarball}
-cp ${CVMFS_TARBALL_RESULT_LOCATION}/${tarball}
+cp ${CVMFS_TARBALL_RESULT_LOCATION}/${tarball} \
    ${CVMFS_TARBALL_RESULT_LOCATION}/source.tar.gz
