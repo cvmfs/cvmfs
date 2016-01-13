@@ -1850,7 +1850,7 @@ EOF
     cat >> $xml_file << EOF
     <testcase name="$test_name" status="run" time="$(milliseconds_to_seconds $t_elapsed)" classname="$CVMFS_TEST_CLASS_NAME">
       <failure message="Failed with Retval $retval" type="">
-      <![CDATA[$(head -n $log_end $logfile | tail -n $log_length)]]>
+      <![CDATA[$(head -n $log_end $logfile | tail -n $log_length | sed 's/[[:cntrl:]]//g')]]>
       </failure>
     </testcase>
 EOF
