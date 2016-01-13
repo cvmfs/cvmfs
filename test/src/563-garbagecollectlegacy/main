@@ -92,7 +92,7 @@ cvmfs_run_test() {
     peek_backend $legacy_repo_name $hash || return 10
   done
 
-  echo "run a first garbage collection to delete all revision execept the last 4"
+  echo "run a first garbage collection to delete all revision except the last 4"
   cvmfs_server gc -r 3 -f $legacy_repo_name || return 11
 
   echo "check if some 2.0 catalogs are gone (5 expected)"

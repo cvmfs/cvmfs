@@ -1715,18 +1715,25 @@ sign_manifest() {
   load_repo_config $name
   local user_shell="$(get_user_shell $name)"
 
-  local metainfo=
-  if [ "x$metainfo_file" != "x" ]; then
-    metainfo="-M $metainfo_file"
+  local sign_command="$(__swissknife_cmd) sign \
+    -c /etc/cvmfs/keys/${name}.crt       \
+    -k /etc/cvmfs/keys/${name}.key       \
+    -n $name                             \
+    -m $unsigned_manifest                \
+    -t ${CVMFS_SPOOL_DIR}/tmp            \
+    -r $CVMFS_UPSTREAM_STORAGE"
+
+  if [ x"$metainfo_file" != x"" ]; then
+    sign_command="$sign_command -M $metainfo_file"
+  fi
+  if [ x"$CVMFS_GARBAGE_COLLECTION" = x"true" ]; then
+    sign_command="$sign_command -g"
+  fi
+  if [ x"${CVMFS_VOMS_AUTHZ}" != x"" ]; then
+    sign_command="$sign_command -V"
   fi
 
-  $user_shell "$(__swissknife_cmd) sign \
-    -c /etc/cvmfs/keys/${name}.crt      \
-    -k /etc/cvmfs/keys/${name}.key      \
-    -n $name                            \
-    -m $unsigned_manifest               \
-    -t ${CVMFS_SPOOL_DIR}/tmp           \
-    -r $CVMFS_UPSTREAM_STORAGE $metainfo" > /dev/null
+  $user_shell "$sign_command" > /dev/null
 }
 
 

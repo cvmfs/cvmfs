@@ -16,9 +16,9 @@ struct fuse_ctx;
 
 bool CheckVOMSAuthz(const struct fuse_ctx *ctx, const std::string &);
 
-// TODO(jblomer): change type of fname
 bool ConfigureCurlHandle(void *curl_handle, pid_t pid, uid_t uid, gid_t gid,
-                         char *&fname);  // NOLINT
+                         char **fname, void **data);
+void ReleaseCurlHandle(void *data);
 
 FILE *GetProxyFile(pid_t pid, uid_t uid, gid_t gid);
 
