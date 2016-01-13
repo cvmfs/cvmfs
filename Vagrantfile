@@ -60,13 +60,6 @@ Vagrant.configure(2) do |config|
     slc6.vm.provision :reload
   end
 
-  config.vm.define "yosemite" do |yosemite|
-    yosemite.vm.box = "yosemite"
-    yosemite.vm.network "private_network", ip: "192.168.33.15"
-    yosemite.vm.synced_folder '.', '/Users/vagrant/cvmfs', nfs: true
-    yosemite.vm.provision "shell", path: "vagrant/provision_osx.sh"
-  end
-
   config.vm.define "ubuntu" do |ub|
     ub.vm.box = "ubuntu/wily64"
     ub.vm.network "private_network", ip: "192.168.33.12"
