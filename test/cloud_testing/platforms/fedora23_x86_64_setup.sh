@@ -40,6 +40,10 @@ install_from_repo gcc
 install_from_repo gcc-c++
 install_from_repo rubygems
 install_from_repo java
+install_from_repo python
+install_from_repo nc
+install_from_repo wget
+install_from_repo bc
 
 # increase open file descriptor limits
 echo -n "increasing ulimit -n ... "
