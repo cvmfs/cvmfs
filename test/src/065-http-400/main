@@ -9,7 +9,7 @@ cvmfs_run_test() {
   local http_server_pid=$!
   trap "kill -9 $http_server_pid" EXIT HUP INT TERM
 
-  sudo cat << EOF > /etc/cvmfs/config.d/grid.cern.ch.conf
+  sudo tee /etc/cvmfs/config.d/grid.cern.ch.conf << EOF
 CVMFS_SERVER_URL="http://localhost:9090/cvmfs/grid.cern.ch;http://cvmfs-stratum-one.cern.ch/cvmfs/grid.cern.ch"
 CVMFS_USE_GEOAPI=no
 EOF
