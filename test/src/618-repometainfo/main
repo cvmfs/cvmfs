@@ -15,7 +15,7 @@ cvmfs_run_test() {
   sudo sh -c "echo 'echo reference' >> $tty_bin" || return 12
   sudo chmod +x $tty_bin || return 13
   touch reference
-  EDITOR="cat" cvmfs_server update-repoinfo $CVMFS_TEST_REPO
+  yes | EDITOR="cat" cvmfs_server update-repoinfo $CVMFS_TEST_REPO
   local retval=$?
   sudo mv ${tty_bin}.disabled $tty_bin || return 14
   if [ $retval -ne 0 ]; then
