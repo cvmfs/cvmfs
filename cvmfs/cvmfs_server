@@ -5749,6 +5749,8 @@ eliminate_hardlinks() {
 
   load_repo_config $name
 
+  is_root $name || die "Permission denied: Only root can do that"
+
   if [ $force -ne 1 ]; then
     echo "This will break up all hardlink relationships that are currently"
     echo "present in '$name'. This process cannot be undone!"
