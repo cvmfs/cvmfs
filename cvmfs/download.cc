@@ -477,7 +477,12 @@ void *DownloadManager::MainDownload(void *data) {
   while (true) {
     int timeout;
     if (still_running) {
-      timeout = 1;
+      // Specify a timeout for polling in ms; this allows us to return
+      // to libcurl once a second so it can look for internal operations
+      // which timed out.  libcurl has a more elaborate mechanism
+      // (CURLMOPT_TIMERFUNCTION) that would inform us of the next potential
+      // timeout.  TODO(bbockelm) we should switch to that in the future.
+      timeout = 1 * 1000;
     } else {
       timeout = -1;
       gettimeofday(&timeval_stop, NULL);
