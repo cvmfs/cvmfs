@@ -24,7 +24,7 @@ cvmfs_run_test() {
   # check if we got a stacktrace of a decent length
   sudo [ -f $stacktrace_path ] || return 4
   [ $(sudo cat $stacktrace_path | wc -l) -gt 20 ] || return 5
-  if ! sudo cat $stacktrace_path | grep '(gdb)' > /dev/null 2>&1; then
+  if ! sudo cat $stacktrace_path | grep '(gdb)' > /dev/null 2>&1 && ! sudo cat $stacktrace_path | grep '(lldb)' > /dev/null 2>&1; then
   	return 6
   fi
   sudo cat $stacktrace_path

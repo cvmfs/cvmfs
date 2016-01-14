@@ -28,6 +28,7 @@ sudo ./run.sh "$logfile"  src/000-dummy                 \
                           src/018-httpunreachable       \
                           src/019-httptimeout           \
                           src/020-emptyrepofailover     \
+                          src/021-stacktrace
 
 
 exit $retval
