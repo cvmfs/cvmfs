@@ -923,6 +923,12 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
       ConfigureCurlHandle(curl_handle, info->pid, info->uid, info->gid,
                           &info->cred_fname, &info->cred_data);
     }
+    // The download manager disables signal handling in the curl library;
+    // as OpenSSL's implementation of TLS will generate a sigpipe in some
+    // error paths, we must explicitly disable SIGPIPE here.  Since SIGPIPE
+    // only appears to happen with HTTPS, we only do this on VOMS builds.
+    signal(SIGPIPE, SIG_IGN);
+
 #endif
   }
 
