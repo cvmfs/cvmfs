@@ -351,7 +351,8 @@ Supported Commands:
                   Updates the geo-IP database
   update-info     [-p no apache config] [-e don't edit /info/meta]
                   Open meta info JSON file for editing
-  update-repoinfo <fully qualified name>
+  update-repoinfo [-f path to JSON file]
+                  <fully qualified name>
                   Open repository meta info JSON file for editing
 "
 
@@ -2544,6 +2545,17 @@ check_jq() {
 }
 
 
+validate_json() {
+  local json_file="$1"
+
+  if ! which jq > /dev/null 2>&1; then
+    return 0 # no jq -> assume JSON is valid
+  fi
+
+  jq '.' $json_file 2>&1
+}
+
+
 edit_json_until_valid() {
   local json_file="$1"
   local editor=$(get_editor)
@@ -2556,7 +2568,7 @@ edit_json_until_valid() {
 
     local jq_output=""
     local retry=""
-    if ! jq_output=$(jq '.' $json_file 2>&1); then
+    if ! jq_output=$(validate_json $json_file); then
       echo
       echo "Your JSON file is invalid, please check again:"
       echo "$jq_output"
@@ -5759,20 +5771,38 @@ eliminate_hardlinks() {
 ################################################################################
 
 _update_repoinfo_cleanup() {
+  local repo_name="$1"
+  shift 1
+
   while [ $# -gt 0 ]; do
     rm -f $1 > /dev/null 2>&1
     shift 1
   done
+
+  close_transaction $repo_name 0
 }
 
 update_repoinfo() {
   local name
-  local tmp_file
+  local json_file
+
+  OPTIND=1
+  while getopts "f:" option; do
+    case $option in
+      f)
+        json_file=$OPTARG
+      ;;
+      ?)
+        shift $(($OPTIND-2))
+        usage "Command update-repoinfo: Unrecognized option: $1"
+      ;;
+    esac
+  done
+  shift $(($OPTIND-1))
 
   # get repository name
-  shift $(($OPTIND-1))
   check_parameter_count_with_guessing $#
-  name=$(get_or_guess_repository_name $1)
+  name=$(get_or_guess_repository_name $@)
 
   # sanity checks
   check_repository_existence $name || die "The repository $name does not exist"
@@ -5781,14 +5811,14 @@ update_repoinfo() {
   is_stratum0 $name                || die "This is not a stratum 0 repository"
   ! is_publishing $name            || die "Repository is currently publishing"
   health_check $name $silence_warnings
+  is_in_transaction $name && die "Cannot edit repository meta info while in a transaction"
+  [ x"$json_file" = x"" ] || [ -f "$json_file" ] || die "Provided file '$json_file' doesn't exist"
 
   tmp_file_info=$(mktemp)
   tmp_file_manifest=$(mktemp)
-  chown $CVMFS_USER $tmp_file_info $tmp_file_manifest || \
-    die "Cannot change ownership of temporary files"
-  is_in_transaction $name && die "Cannot edit repository meta info while in a transaction"
-  trap "_update_repoinfo_cleanup $tmp_file_info $tmp_file_manifest; \
-    close_transaction $name 0" EXIT HUP INT TERM
+  chown $CVMFS_USER $tmp_file_info $tmp_file_manifest || die "Cannot change ownership of temporary files"
+
+  trap "_update_repoinfo_cleanup $name $tmp_file_info $tmp_file_manifest" EXIT HUP INT TERM
   open_transaction $name || die "Failed to open transaction for meta info editing"
 
   get_repo_info -M > $tmp_file_info || \
@@ -5796,11 +5826,21 @@ update_repoinfo() {
   get_repo_info -R > $tmp_file_manifest || \
     die "Failed getting repository manifest for $name"
 
-  if [ -f $tmp_file_info ] && [ ! -s $tmp_file_info ]; then
-    create_repometa_skeleton $tmp_file_info
+  if [ x"$json_file" = x"" ]; then
+    if [ -f $tmp_file_info ] && [ ! -s $tmp_file_info ]; then
+      create_repometa_skeleton $tmp_file_info
+    fi
+
+    edit_json_until_valid $tmp_file_info
+  else
+    local jq_output
+    if ! jq_output="$(validate_json $json_file)"; then
+      die "The provided JSON file is invalid. See below:\n${jq_output}"
+    fi
+
+    cat $json_file > $tmp_file_info
   fi
 
-  edit_json_until_valid $tmp_file_info
   sign_manifest $name $tmp_file_manifest $tmp_file_info
 }
 
