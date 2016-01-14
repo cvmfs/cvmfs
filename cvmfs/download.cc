@@ -2032,7 +2032,7 @@ bool DownloadManager::GeoSortServers(std::vector<std::string> *servers,
 
   // Request ordered list via Geo-API
   bool success = false;
-  unsigned max_attempts = std::min(servers->size(), size_t(3));
+  unsigned max_attempts = std::min(host_chain_shuffled.size(), size_t(3));
   vector<uint64_t> geo_order(servers->size());
   for (unsigned i = 0; i < max_attempts; ++i) {
     string url = host_chain_shuffled[i] + "/api/v1.0/geo/@proxy@/" + host_list;
