@@ -95,6 +95,7 @@ CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
                                  src/585-xattrs                               \
                                  --                                           \
                                  src/5*                                       \
+                                 src/6*                                       \
                               || retval=1
 
 

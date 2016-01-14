@@ -48,6 +48,7 @@ CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
                                  src/600-securecvmfs                          \
                                  --                                           \
                                  src/5*                                       \
+                                 src/6*                                       \
                               || retval=1
 
 
