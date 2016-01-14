@@ -64,6 +64,13 @@ die() {
   exit 1
 }
 
+show_mounted() {
+  if running_on_osx; then
+    mount
+  else
+    cat /proc/mounts
+  fi
+}
 
 # Find the service binary (or detect systemd)
 minpidof() {
@@ -354,7 +361,7 @@ cvmfs_umount() {
     fi
 
     local timeout=5
-    while mount | grep -q " /cvmfs/$r "; do
+    while show_mounted | grep -q " /cvmfs/$r "; do
       if [ $timeout -eq 0 ]; then
         return 101
       fi
