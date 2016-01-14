@@ -3613,7 +3613,14 @@ rmfs() {
     # better ask the user again!
     if [ $force -ne 1 ]; then
       local reply
-      read -p "You are about to WIPE OUT THE CERNVM-FS REPOSITORY $name INCLUDING SIGNING KEYS!  Are you sure (y/N)? " reply
+      local question=""
+      if [ $preserve_data -eq 0 ]; then
+        question="You are about to WIPE OUT THE CERNVM-FS REPOSITORY ${name} INCLUDING SIGNING KEYS!"
+      else
+        question="You are about to REMOVE THE CERNVM-FS REPOSITORY INFRASTRUCTURE for ${name}!"
+      fi
+
+      read -p "${question}  Are you sure (y/N)? " reply
       if [ "$reply" != "y" ] && [ "$reply" != "Y" ]; then
         continue
       fi
@@ -5741,6 +5748,8 @@ eliminate_hardlinks() {
   check_repository_existence "$name"
 
   load_repo_config $name
+
+  is_root $name || die "Permission denied: Only root can do that"
 
   if [ $force -ne 1 ]; then
     echo "This will break up all hardlink relationships that are currently"
