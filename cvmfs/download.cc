@@ -482,7 +482,7 @@ void *DownloadManager::MainDownload(void *data) {
       // which timed out.  libcurl has a more elaborate mechanism
       // (CURLMOPT_TIMERFUNCTION) that would inform us of the next potential
       // timeout.  TODO(bbockelm) we should switch to that in the future.
-      timeout = 1 * 1000;
+      timeout = 100;
     } else {
       timeout = -1;
       gettimeofday(&timeval_stop, NULL);
