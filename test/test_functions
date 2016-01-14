@@ -263,16 +263,16 @@ break_hardlink() {
 
 
 cvmfs_clean() {
-  sudo cvmfs_config umount > /dev/null || return 100
-  sudo sh -c "rm -rf /var/lib/cvmfs/*"
-  sudo rm -f /etc/cvmfs/default.local
-  sudo sh -c "rm -f /etc/cvmfs/config.d/*"
-  sudo sh -c "cat /dev/null > $CVMFS_TEST_SYSLOG_TARGET"
+  sudo cvmfs_config umount > /dev/null                   || return 100
+  sudo sh -c "rm -rf /var/lib/cvmfs/*"                   || return 101
+  sudo rm -f /etc/cvmfs/default.local                    || return 102
+  sudo sh -c "rm -f /etc/cvmfs/config.d/*"               || return 103
+  sudo sh -c "cat /dev/null > $CVMFS_TEST_SYSLOG_TARGET" || return 104
 
   local timeout=60
   while $(pgrep -u cvmfs cvmfs2 > /dev/null); do
     if [ $timeout -eq 0 ]; then
-      return 101
+      return 99
     fi
     timeout=$(($timeout-1))
     sleep 1

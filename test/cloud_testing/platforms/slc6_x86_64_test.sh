@@ -78,6 +78,7 @@ CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
                                  src/585-xattrs                               \
                                  --                                           \
                                  src/5*                                       \
+                                 src/6*                                       \
                               || retval=1
 
 
@@ -118,7 +119,9 @@ if [ $s3_retval -eq 0 ]; then
                                src/594-backendoverwrite                     \
                                src/595-geoipdbupdate                        \
                                --                                           \
-                               src/5* || retval=1
+                               src/5*                                       \
+                               src/6*                                       \
+                               || retval=1
 
   echo -n "killing FakeS3... "
   sudo kill -2 $fakes3_pid && echo "done" || echo "fail"

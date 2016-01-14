@@ -112,8 +112,10 @@ setup_environment() {
   local workdir=$2
 
   # make sure the environment is clean
-  if ! cvmfs_clean; then
-    echo "failed to clean environment"
+  local clean_retval=0
+  cvmfs_clean || clean_retval=$?
+  if [ $clean_retval -ne 0 ]; then
+    echo "failed to clean environment (retval: $clean_retval)"
     return 101
   fi
 
@@ -214,10 +216,15 @@ do
   fi
 
   # configure the environment for the test
-  if ! setup_environment $cvmfs_test_autofs_on_startup $workdir >> $logfile 2>&1; then
-    report_failure "failed to setup environment" >> $logfile
+  setup_retval=0
+  setup_environment $cvmfs_test_autofs_on_startup $workdir >> $logfile 2>&1 || setup_retval=$?
+  if [ $setup_retval -ne 0 ]; then
+    report_failure "failed to setup environment (retval: $setup_retval)" >> $logfile
     echo "Failed! (setup)"
-    echo "102" > ${scratchdir}/retval
+    echo "0"         > ${scratchdir}/elapsed
+    echo "102"       > ${scratchdir}/retval
+    wc -l < $logfile > ${scratchdir}/log_end
+    touch              ${scratchdir}/failure
     continue
   fi
 
