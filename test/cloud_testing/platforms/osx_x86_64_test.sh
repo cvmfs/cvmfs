@@ -14,22 +14,20 @@ cd "$workdir"
 # everything will be placed in the home folder
 echo "running CernVM-FS client test cases..."
 CVMFS_TEST_CLASS_NAME=ClientIntegrationTests
-sudo ./run.sh "$logfile"  000-dummy                 \
-                          001-chksetup              \
-                          002-probe                 \
-                          003-nested                \
-                          004-davinci               \
-                          005-asetup                \
-                          007-testjobs              \
-                          008-default_domain        \
-                          009-tar                   \
-                          010-du                    \
-                          012-ls-s                  \
-                          013-certificate_cache     \
-                          014-corrupt_lru           \
-                          017-dnstimeout            \
-                          018-httpunreachable       \
-                          019-httptimeout
+sudo ./run.sh "$logfile"  src/000-dummy                 \
+                          src/001-chksetup              \
+                          src/002-probe                 \
+                          src/003-nested                \
+                          src/009-tar                   \
+                          src/010-du                    \
+                          src/012-ls-s                  \
+                          src/013-certificate_cache     \
+                          src/014-corrupt_lru           \
+                          src/015-rebuild_on_crash      \
+                          src/017-dnstimeout            \
+                          src/018-httpunreachable       \
+                          src/019-httptimeout           \
+                          src/020-emptyrepofailover     \
 
 
 exit $retval
