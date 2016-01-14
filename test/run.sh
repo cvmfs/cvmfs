@@ -217,7 +217,10 @@ do
   if ! setup_environment $cvmfs_test_autofs_on_startup $workdir >> $logfile 2>&1; then
     report_failure "failed to setup environment" >> $logfile
     echo "Failed! (setup)"
-    echo "102" > ${scratchdir}/retval
+    echo "0"         > ${scratchdir}/elapsed
+    echo "102"       > ${scratchdir}/retval
+    wc -l < $logfile > ${scratchdir}/log_end
+    touch              ${scratchdir}/failure
     continue
   fi
 
