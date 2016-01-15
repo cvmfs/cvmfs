@@ -24,23 +24,66 @@ produce_files_in() {
   popdir
 }
 
-REPO_MOUNTPOINT=""
+build_preload() {
+  local source_dir="$1"
+  local build_dir="$2"
+
+  mkdir -p $build_dir || return 1
+  pushdir $build_dir  || return 2
+
+  cmake -DBUILD_PRELOADER=yes      \
+        -DBUILD_SERVER=no          \
+        -DBUILD_SERVER_DEBUG=no    \
+        -DBUILD_CVMFS=no           \
+        -DBUILD_UNITTESTS=no       \
+        -DBUILD_UNITTESTS_DEBUG=no \
+        -DBUILD_LIBCVMFS=no        \
+        -DINSTALL_MOUNT_SCRIPTS=no \
+        -DBUILD_DOCUMENTATION=no   \
+        $source_dir || return 3
+  make -j || return 4
+
+  popdir
+}
+
+CVMFS_TEST_598_MNT=""
 cleanup() {
   echo "running cleanup()"
-  if [ ! -z $REPO_MOUNTPOINT ]; then
-    sudo fusermount -u $REPO_MOUNTPOINT
-    sudo umount        $REPO_MOUNTPOINT
+  if [ ! -z $CVMFS_TEST_598_MNT ]; then
+    sudo fusermount -u $CVMFS_TEST_598_MNT
+    sudo umount        $CVMFS_TEST_598_MNT
   fi
 }
 
 cvmfs_run_test() {
+  local script_location=$2
+
   local working_dir="$(pwd)"
   local repo_dir="/cvmfs/$CVMFS_TEST_REPO"
   local preload_dir="$working_dir/preloadcache"
   local tmpdir="$preload_dir/tmpdir"
 
-  echo -n "checking if cvmfs_preload is available..."
-  which cvmfs_preload 2>&1 >/dev/null || return 1
+  local PRELOAD=
+
+  echo -n "checking if cvmfs_preload is available... "
+  if ! which cvmfs_preload >/dev/null 2>&1; then
+    echo "not found"
+
+    local source_tree="$(dirname $(dirname $(dirname $script_location)))"
+    local build_dir="${working_dir}/preload_build"
+    local build_log="preload_build.log"
+    echo -n "building from source ($source_tree) (logging to $build_log)... "
+    build_preload $source_tree $build_dir > $build_log 2>&1 && echo "done" || { echo "fail"; return 1; }
+
+    echo -n "extracting cvmfs_preload from build directory... "
+    [ $(find $build_dir -type f -name cvmfs_preload | wc -l) -eq 1 ] || { echo "fail"; return 2; }
+
+    PRELOAD="$(find $build_dir -type f -name cvmfs_preload)"
+    echo "found ($PRELOAD)"
+  else
+    PRELOAD=$(which cvmfs_preload)
+    echo "found ($PRELOAD)"
+  fi
 
   echo "prepare environment"
   mkdir -p "$tmpdir"      || return 2
@@ -65,11 +108,11 @@ cvmfs_run_test() {
 EOF
 
   echo "preloading the cache"
-  cvmfs_preload -u "http://localhost/cvmfs/$CVMFS_TEST_REPO"  \
-                -r "$preload_dir"                             \
-                -k "/etc/cvmfs/keys/$CVMFS_TEST_REPO.pub"     \
-                -m "$CVMFS_TEST_REPO"                         \
-                -d "$(pwd)/pathspec"                         || return $?
+  $PRELOAD -u "http://localhost/cvmfs/$CVMFS_TEST_REPO"  \
+           -r "$preload_dir"                             \
+           -k "/etc/cvmfs/keys/$CVMFS_TEST_REPO.pub"     \
+           -m "$CVMFS_TEST_REPO"                         \
+           -d "$(pwd)/pathspec"                         || return $?
 
   local local_conf=$(pwd)/local.conf
   echo "Create a local configuration file in $local_conf"
@@ -89,15 +132,14 @@ EOF
   cat $local_conf || return 9
   echo
 
-  echo "Mount the repository in $REPO_MOUNTPOINT to verify it"
-  REPO_MOUNTPOINT="$(pwd)/mnt"
-  mkdir "$REPO_MOUNTPOINT"
+  echo "Mount the repository in $CVMFS_TEST_598_MNT to verify it"
+  CVMFS_TEST_598_MNT="$(pwd)/mnt"
   trap cleanup EXIT HUP INT TERM
-  do_local_mount $REPO_MOUNTPOINT $CVMFS_TEST_REPO XXX $local_conf || return 10
+  do_local_mount $CVMFS_TEST_598_MNT $CVMFS_TEST_REPO XXX $local_conf || return 10
 
   echo "check everything is alright"
-    [ -f "$REPO_MOUNTPOINT/dir/ctlg1/FILE1" ]      || return 1
-  ! [ -f "$REPO_MOUNTPOINT/dir/ctlg2/FILE2" ]      || return 2
-    [ -f "$REPO_MOUNTPOINT/ctlg3/FILE3" ]          || return 3
-    [ -f "$REPO_MOUNTPOINT/FILE4" ]                || return 4
+    [ -f "${CVMFS_TEST_598_MNT}/dir/ctlg1/FILE1" ]      || return 1
+  ! [ -f "${CVMFS_TEST_598_MNT}/dir/ctlg2/FILE2" ]      || return 2
+    [ -f "${CVMFS_TEST_598_MNT}/ctlg3/FILE3" ]          || return 3
+    [ -f "${CVMFS_TEST_598_MNT}/FILE4" ]                || return 4
 }
