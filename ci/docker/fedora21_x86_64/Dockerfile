@@ -22,6 +22,7 @@ RUN         yum -y update && yum -y install                     \
                                         selinux-policy-targeted \
                                         sysvinit-tools          \
                                         which                   \
+                                        valgrind-devel          \
                                         zlib-devel
 
 RUN         useradd sftnight
