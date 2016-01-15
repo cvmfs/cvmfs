@@ -46,12 +46,12 @@ build_preload() {
   popdir
 }
 
-REPO_MOUNTPOINT=""
+CVMFS_TEST_598_MNT=""
 cleanup() {
   echo "running cleanup()"
-  if [ ! -z $REPO_MOUNTPOINT ]; then
-    sudo fusermount -u $REPO_MOUNTPOINT
-    sudo umount        $REPO_MOUNTPOINT
+  if [ ! -z $CVMFS_TEST_598_MNT ]; then
+    sudo fusermount -u $CVMFS_TEST_598_MNT
+    sudo umount        $CVMFS_TEST_598_MNT
   fi
 }
 
@@ -132,15 +132,14 @@ EOF
   cat $local_conf || return 9
   echo
 
-  echo "Mount the repository in $REPO_MOUNTPOINT to verify it"
-  REPO_MOUNTPOINT="$(pwd)/mnt"
-  mkdir "$REPO_MOUNTPOINT"
+  echo "Mount the repository in $CVMFS_TEST_598_MNT to verify it"
+  CVMFS_TEST_598_MNT="$(pwd)/mnt"
   trap cleanup EXIT HUP INT TERM
-  do_local_mount $REPO_MOUNTPOINT $CVMFS_TEST_REPO XXX $local_conf || return 10
+  do_local_mount $CVMFS_TEST_598_MNT $CVMFS_TEST_REPO XXX $local_conf || return 10
 
   echo "check everything is alright"
-    [ -f "$REPO_MOUNTPOINT/dir/ctlg1/FILE1" ]      || return 1
-  ! [ -f "$REPO_MOUNTPOINT/dir/ctlg2/FILE2" ]      || return 2
-    [ -f "$REPO_MOUNTPOINT/ctlg3/FILE3" ]          || return 3
-    [ -f "$REPO_MOUNTPOINT/FILE4" ]                || return 4
+    [ -f "${CVMFS_TEST_598_MNT}/dir/ctlg1/FILE1" ]      || return 1
+  ! [ -f "${CVMFS_TEST_598_MNT}/dir/ctlg2/FILE2" ]      || return 2
+    [ -f "${CVMFS_TEST_598_MNT}/ctlg3/FILE3" ]          || return 3
+    [ -f "${CVMFS_TEST_598_MNT}/FILE4" ]                || return 4
 }
