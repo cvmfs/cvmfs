@@ -26,6 +26,7 @@ RUN         dnf -y update && dnf -y install                     \
                                         sudo                    \
                                         tree                    \
                                         which                   \
+                                        valgrind-devel          \
                                         zlib-devel
 
 RUN         useradd sftnight

@@ -23,6 +23,7 @@ RUN        zypper -n update && zypper -n install          \
                                   selinux-policy-devel    \
                                   selinux-policy-targeted \
                                   unzip                   \
+                                  valgrind-devel          \
                                   zlib-devel
 
 RUN        useradd sftnight

@@ -23,6 +23,7 @@ RUN         yum -y update && yum -y install                     \
                                         selinux-policy-devel    \
                                         selinux-policy-targeted \
                                         which                   \
+                                        valgrind-devel          \
                                         zlib-devel
 
 RUN         useradd sftnight
