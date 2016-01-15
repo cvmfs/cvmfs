@@ -43,6 +43,8 @@ install_from_repo java
 install_from_repo nc
 install_from_repo wget
 install_from_repo bc
+install_from_repo openssl-devel
+install_from_repo libuuid-devel
 
 # increase open file descriptor limits
 echo -n "increasing ulimit -n ... "
