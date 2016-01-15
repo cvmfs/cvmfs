@@ -55,6 +55,7 @@ BuildRequires: patch
 BuildRequires: pkgconfig
 BuildRequires: python-devel
 BuildRequires: unzip
+BuildRequires: valgrind-devel
 
 Requires: bash
 Requires: coreutils
