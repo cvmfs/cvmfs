@@ -2154,6 +2154,7 @@ EOF
 CVMFS_CACHE_BASE=$cache_dir
 CVMFS_RELOAD_SOCKETS=$cache_dir
 CVMFS_QUOTA_LIMIT=4000
+CVMFS_MOUNT_DIR=/cvmfs
 CVMFS_SERVER_URL=$stratum0
 CVMFS_HTTP_PROXY=DIRECT
 CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${name}.pub
@@ -5523,6 +5524,7 @@ migrate_2_1_20() {
   [ -z "$CVMFS_HIDE_MAGIC_XATTRS" ] && echo "CVMFS_HIDE_MAGIC_XATTRS=yes" >> $client_conf
   [ -z "$CVMFS_FOLLOW_REDIRECTS"  ] && echo "CVMFS_FOLLOW_REDIRECTS=yes"  >> $client_conf
   [ -z "$CVMFS_SERVER_CACHE_MODE" ] && echo "CVMFS_SERVER_CACHE_MODE=yes" >> $client_conf
+  [ 0z "$CVMFS_MOUNT_DIR"         ] && echo "CVMFS_MOUNT_DIR=/cvmfs"      >> $client_conf
 
   echo "--> updating /etc/fstab"
   local tmp_fstab=$(mktemp)
