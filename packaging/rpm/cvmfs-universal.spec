@@ -46,6 +46,7 @@ BuildRequires: gcc4-c++
 %else
 BuildRequires: gcc
 BuildRequires: gcc-c++
+BuildRequires: valgrind-devel
 %endif
 BuildRequires: cmake
 BuildRequires: fuse-devel
@@ -55,10 +56,6 @@ BuildRequires: patch
 BuildRequires: pkgconfig
 BuildRequires: python-devel
 BuildRequires: unzip
-%if 0%{?el4}
-%else
-BuildRequires: valgrind-devel
-%endif
 
 Requires: bash
 Requires: coreutils
