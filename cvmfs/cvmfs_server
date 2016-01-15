@@ -921,7 +921,7 @@ is_mounted() {
   local regexp="$2"
 
   local absolute_mnt=
-  absolute_mnt="$(readlink --canonicalize $mountpoint)" || die "cannot access $mountpoint"
+  absolute_mnt="$(readlink --canonicalize $mountpoint)" || die "failed to access $mountpoint"
   local mnt_record="$(cat /proc/mounts 2>/dev/null | grep " $absolute_mnt ")"
   if [ x"$mnt_record" = x"" ]; then
     return 1
@@ -1718,12 +1718,12 @@ sign_manifest() {
   local user_shell="$(get_user_shell $name)"
 
   local sign_command="$(__swissknife_cmd) sign \
-    -c /etc/cvmfs/keys/${name}.crt       \
-    -k /etc/cvmfs/keys/${name}.key       \
-    -n $name                             \
-    -m $unsigned_manifest                \
-    -t ${CVMFS_SPOOL_DIR}/tmp            \
-    -r $CVMFS_UPSTREAM_STORAGE"
+          -c /etc/cvmfs/keys/${name}.crt       \
+          -k /etc/cvmfs/keys/${name}.key       \
+          -n $name                             \
+          -m $unsigned_manifest                \
+          -t ${CVMFS_SPOOL_DIR}/tmp            \
+          -r $CVMFS_UPSTREAM_STORAGE"
 
   if [ x"$metainfo_file" != x"" ]; then
     sign_command="$sign_command -M $metainfo_file"
@@ -1731,8 +1731,8 @@ sign_manifest() {
   if [ x"$CVMFS_GARBAGE_COLLECTION" = x"true" ]; then
     sign_command="$sign_command -g"
   fi
-  if [ x"${CVMFS_VOMS_AUTHZ}" != x"" ]; then
-    sign_command="$sign_command -V"
+  if [ x"$CVMFS_CATALOG_ALT_PATHS" = x"true" ]; then
+    sign_command="$sign_command -A"
   fi
 
   $user_shell "$sign_command" > /dev/null
@@ -2098,6 +2098,7 @@ create_config_files_for_new_repository() {
   local configure_apache=$9
   local compression_alg=${10}
   local external_data=${11}
+  local voms_authz=${12}
 
   # other configurations
   local spool_dir="/var/spool/cvmfs/${name}"
@@ -2134,6 +2135,11 @@ CVMFS_GARBAGE_COLLECTION=$garbage_collectable
 CVMFS_AUTO_REPAIR_MOUNTPOINT=true
 CVMFS_AUTOCATALOGS=false
 EOF
+
+  if [ x"$voms_authz" != x"" ]; then
+    echo "CVMFS_VOMS_AUTHZ=$voms_authz" >> $server_conf
+    echo "CVMFS_CATALOG_ALT_PATHS=true" >> $server_conf
+  fi
 
   # append GC specific configuration
   if [ x"$garbage_collectable" = x"true" ]; then
@@ -2976,7 +2982,8 @@ mkfs() {
                                          "$garbage_collectable" \
                                          "$configure_apache"    \
                                          "$compression_alg"     \
-                                         "$external_data" || die "fail"
+                                         "$external_data"       \
+                                         "$voms_authz" || die "fail"
   if is_local_upstream $upstream && [ $configure_apache -eq 1 ]; then
     reload_apache > /dev/null
   fi
@@ -3035,7 +3042,6 @@ mkfs() {
   if [ "x$voms_authz" != "x" ]; then
     echo -n "(repository will be accessible with VOMS credentials $voms_authz)... "
     create_cmd="$create_cmd -V $voms_authz"
-    echo "CVMFS_VOMS_AUTHZ=$voms_authz" >> /etc/cvmfs/repositories.d/$name/server.conf
   fi
   $user_shell "$create_cmd" > /dev/null                       || die "fail! (cannot init repo)"
   sign_manifest $name ${temp_dir}/new_manifest $repoinfo_file || die "fail! (cannot sign repo)"
@@ -3438,17 +3444,18 @@ import() {
   # create the configuration for the new repository
   # TODO(jblomer): make a better guess for hash and compression algorithm
   echo -n "Creating configuration files... "
-  create_config_files_for_new_repository "$name"       \
-                                         "$upstream"   \
-                                         "$stratum0"   \
-                                         "$cvmfs_user" \
-                                         "$unionfs"    \
-                                         "sha1"        \
-                                         "true"        \
-                                         "false"       \
+  create_config_files_for_new_repository "$name"             \
+                                         "$upstream"         \
+                                         "$stratum0"         \
+                                         "$cvmfs_user"       \
+                                         "$unionfs"          \
+                                         "sha1"              \
+                                         "true"              \
+                                         "false"             \
                                          "$configure_apache" \
-                                         "default"     \
-                                         "false" || die "fail!"
+                                         "default"           \
+                                         "false"             \
+                                         "" || die "fail!"
   echo "done"
 
   # import the old repository security keys
