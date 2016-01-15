@@ -558,7 +558,7 @@ if (BUILD_PRELOADER)
   endif (SPARSEHASH_BUILTIN)
 
   if (TBB_PRIVATE_LIB)
-    add_dependencies (cvmfs_swissknife libtbb)
+    add_dependencies (cvmfs_preload_bin libtbb)
   endif (TBB_PRIVATE_LIB)
 
   add_dependencies (cvmfs_preload_bin libsha2)
