@@ -83,7 +83,7 @@ Compile a static [libuuid](http://sourceforge.net/projects/libuuid):
 
     ./configure --prefix=/tmp/cvmfs/UUID --enable-static --disable-shared
     make 
-    make DESTDIR=/tmp/cvmfs/UUID install
+    make install
 
 To create libcvmfs.a in /tmp/cvmfs/INSTALLCVMFS, compile and install CernVM-FS with the following commands
 
