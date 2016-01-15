@@ -64,6 +64,13 @@ die() {
   exit 1
 }
 
+show_mounted() {
+  if running_on_osx; then
+    mount
+  else
+    cat /proc/mounts
+  fi
+}
 
 # Find the service binary (or detect systemd)
 minpidof() {
@@ -77,6 +84,8 @@ if ! pidof systemd > /dev/null 2>&1 || [ $(minpidof systemd) -ne 1 ]; then
     SERVICE_BIN="/usr/sbin/service" # Ubuntu
   elif [ -x /sbin/rc-service ]; then
     SERVICE_BIN="/sbin/rc-service" # OpenRC
+  elif [ running_on_osx ]; then
+    SERVICE_BIN="false" # we don't need to run any service on mac
   else
     die "Neither systemd nor service binary detected"
   fi
@@ -148,6 +157,8 @@ service_request() {
 service_switch() {
   local service_name=$1
   local state=$2
+
+  running_on_osx && return 0
 
   case $state in
     on)
@@ -303,9 +314,28 @@ cvmfs_mount() {
   if [ "x$CVMFS_TEST_DEBUGLOG" != "x" ]; then
     sudo sh -c "echo \"CVMFS_DEBUGLOG=$CVMFS_TEST_DEBUGLOG\" >> /etc/cvmfs/default.local" || return 100
   fi
+
+  if running_on_osx; then
+      eval $(cvmfs_config showconfig | grep -e ^CVMFS_CONFIG_REPOSITORY=)
+      if [ "x$CVMFS_CONFIG_REPOSITORY" != "x" ]; then
+        _cvmfs_mount_manually "$CVMFS_CONFIG_REPOSITORY"
+      fi
+      for i in $(echo "$repositories" | tr "," " "); do
+        _cvmfs_mount_manually "$i" || return 102
+      done
+  fi
+
   cvmfs_config probe > /dev/null 2>&1 || return 101
 
   return 0
+}
+
+
+_cvmfs_mount_manually() {
+  local repository=$1
+  cvmfs_config status | grep -q "/cvmfs/$repository" && return 0
+  mkdir -p "/cvmfs/$repository"
+  mount -t cvmfs "$repository" "/cvmfs/$repository" >/dev/null 2>&1
 }
 
 
@@ -331,7 +361,7 @@ cvmfs_umount() {
     fi
 
     local timeout=5
-    while cat /proc/mounts | grep -q " /cvmfs/$r "; do
+    while show_mounted | grep -q " /cvmfs/$r "; do
       if [ $timeout -eq 0 ]; then
         return 101
       fi
@@ -965,7 +995,11 @@ load_repo_config() {
 
 
 get_millisecond_epoch() {
-  echo $(( $(date +%s%N) / 1000000 ))
+  if running_on_osx; then
+    echo $(( $(date +%s) * 1000 ))
+  else
+    echo $(( $(date +%s%N) / 1000000 ))
+  fi
 }
 
 
@@ -1929,6 +1963,27 @@ get_internal_value() {
   local key=$2
 
   echo $(sudo cvmfs_talk -i $repo internal affairs | grep "^$key" | cut -d\| -f2)
+}
+
+running_on_osx() {
+  [ "x$(uname)" == "xDarwin" ]
+}
+
+purge_disk_cache() {
+  if running_on_osx; then
+    sudo purge
+  else
+    sudo sh -c "echo 3 > /proc/sys/vm/drop_caches"
+  fi
+}
+
+try_automount() {
+  local repo=$1
+  if running_on_osx; then
+    mount -t cvmfs "$repo" "/cvmfs/$repo"
+  else
+    ls /cvmfs/${repo}
+  fi
 }
 
 # figures out where syslog is found on this system and prints it to stdout
