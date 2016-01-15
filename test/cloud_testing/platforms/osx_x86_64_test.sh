@@ -30,7 +30,7 @@ sudo ./run.sh "$logfile"  src/000-dummy                           \
                           src/020-emptyrepofailover               \
                           src/021-stacktrace                      \
                           src/022-tacktrace_private_mnt           \
-                          stc/023-reload_safe_path_traversal
+                          src/023-reload_safe_path_traversal
 
 
 exit $retval
