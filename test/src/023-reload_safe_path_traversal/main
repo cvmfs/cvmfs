@@ -20,9 +20,15 @@ cvmfs_run_test() {
   local reload_cmd
 
   # mount sft repository
-  cvmfs_mount sft.cern.ch \
-    "CVMFS_KCACHE_TIMEOUT=5" \
-    "CVMFS_MAX_RETRIES=3" || return 1
+  if ! running_on_osx;then
+    cvmfs_mount sft.cern.ch \
+      "CVMFS_KCACHE_TIMEOUT=5" \
+      "CVMFS_MAX_RETRIES=3" || return 1
+  else
+    cvmfs_mount_direct sft.cern.ch \
+      "CVMFS_KCACHE_TIMEOUT=5" \
+      "CVMFS_MAX_RETRIES=3"
+  fi
 
   # decrease the kernel cache timeout to safe some time
   sudo cvmfs_config umount || return 4
