@@ -82,8 +82,8 @@ If you want to compile parrot+cvmfs from sources, please use the `libcvmfs-stabl
 Compile a static [libuuid](http://sourceforge.net/projects/libuuid):
 
     ./configure --prefix=/tmp/cvmfs/UUID --enable-static --disable-shared
-    make
-    make install
+    make 
+    make DESTDIR=/tmp/cvmfs/UUID install
 
 To create libcvmfs.a in /tmp/cvmfs/INSTALLCVMFS, compile and install CernVM-FS with the following commands
 
