@@ -509,9 +509,11 @@ endif (INSTALL_MOUNT_SCRIPTS)
 #
 # compile the unit tests, if necessary
 #
-enable_testing ()
-add_custom_target (check ${CMAKE_CTEST_COMMAND} -VV)
-add_subdirectory (test/unittests)
+if (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
+  enable_testing ()
+  add_custom_target (check ${CMAKE_CTEST_COMMAND} -VV)
+  add_subdirectory (test/unittests)
+endif (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
 
 #
 # Documentation
