@@ -53,16 +53,18 @@ cvmfs_run_test() {
 
   popdir
 
-  echo "syncing it to the new repository"
-  sudo -u $CVMFS_TEST_USER cvmfs_rsync -av $src_dir/ $repo_dir || return 1
+  local rsync_log_1="rsync_1.log"
+  echo "syncing it to the new repository (logging to: $rsync_log_1)"
+  sudo -u $CVMFS_TEST_USER cvmfs_rsync -av $src_dir/ $repo_dir > $rsync_log_1 2>&1 || return 1
 
   # testing .cvmfsautocatalog files without auto-generation because only
   #  need to show that they aren't removed until their source dir is removed
   AUTOCATFILE=/cvmfs/$CVMFS_TEST_REPO/People/Americans/.cvmfsautocatalog
   sudo -u $CVMFS_TEST_USER touch $AUTOCATFILE
 
-  echo "creating CVMFS snapshot"
-  publish_repo $CVMFS_TEST_REPO || return $?
+  local publish_log_1="publish_1.log"
+  echo "creating CVMFS snapshot (logging to $publish_log_1)"
+  publish_repo $CVMFS_TEST_REPO > $publish_log_1 2>&1 || return $?
 
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
@@ -84,11 +86,13 @@ cvmfs_run_test() {
   rm -rf Continents/NorthAmerica
   popdir
 
-  echo "syncing it to the new repository"
-  sudo -u $CVMFS_TEST_USER cvmfs_rsync -av --delete $src_dir/ $repo_dir || return 2
+  local rsync_log_2="rsync_2.log"
+  echo "syncing it to the new repository (logging to: $rsync_log_2)"
+  sudo -u $CVMFS_TEST_USER cvmfs_rsync -av --delete $src_dir/ $repo_dir > $rsync_log_2 2>&1 || return 2
 
-  echo "creating CVMFS snapshot"
-  publish_repo $CVMFS_TEST_REPO || return $?
+  local publish_log_2="publish_2.log"
+  echo "creating CVMFS snapshot (logging to $publish_log_2)"
+  publish_repo $CVMFS_TEST_REPO > $publish_log_2 2>&1 || return $?
 
   echo "check if the right number of catalogs are present in the repository (2)"
   [ $(get_catalog_count $CVMFS_TEST_REPO) -eq 6 ] || return 102
@@ -110,12 +114,15 @@ cvmfs_run_test() {
   rm -rf Continents/Europe/Germany
   popdir
 
-  echo "syncing it to the new repository in two steps"
-  sudo -u $CVMFS_TEST_USER cvmfs_rsync -av --delete $src_dir/People $repo_dir/ || return 3
-  sudo -u $CVMFS_TEST_USER cvmfs_rsync -av --delete $src_dir/Continents/ $repo_dir/Continents || return 4
+  local rsync_log_3="rsync_3.log"
+  local rsync_log_4="rsync_4.log"
+  echo "syncing it to the new repository in two steps (logging to: $rsync_log_3 and $rsync_log_4)"
+  sudo -u $CVMFS_TEST_USER cvmfs_rsync -av --delete $src_dir/People $repo_dir/                > $rsync_log_3 2>&1 || return 3
+  sudo -u $CVMFS_TEST_USER cvmfs_rsync -av --delete $src_dir/Continents/ $repo_dir/Continents > $rsync_log_4 2>&1 || return 4
 
-  echo "creating CVMFS snapshot"
-  publish_repo $CVMFS_TEST_REPO || return $?
+  local publish_log_3="publish_3.log"
+  echo "creating CVMFS snapshot (logging to $publish_log_3)"
+  publish_repo $CVMFS_TEST_REPO > $publish_log_3 2>&1 || return $?
 
   echo "check if the right number of catalogs are present in the repository (3)"
   [ $(get_catalog_count $CVMFS_TEST_REPO) -eq 4 ] || return 103
@@ -134,12 +141,15 @@ cvmfs_run_test() {
   rm -rf People/Russians/MikhailKalashnikov
   popdir
 
-  echo "syncing subdir to the new repository in two steps"
-  sudo -u $CVMFS_TEST_USER cvmfs_rsync -av --delete $src_dir/People/Germans/AlbertEinstein/ $repo_dir/People/Germans/AlbertEinstein || return 5
-  sudo -u $CVMFS_TEST_USER cvmfs_rsync -av --delete $src_dir/People/Russians $repo_dir/People || return 6
+  local rsync_log_5="rsync_5.log"
+  local rsync_log_6="rsync_6.log"
+  echo "syncing subdir to the new repository in two steps (logging to: $rsync_log_5 and $rsync_log_6)"
+  sudo -u $CVMFS_TEST_USER cvmfs_rsync -av --delete $src_dir/People/Germans/AlbertEinstein/ $repo_dir/People/Germans/AlbertEinstein > $rsync_log_5 2>&1 || return 5
+  sudo -u $CVMFS_TEST_USER cvmfs_rsync -av --delete $src_dir/People/Russians $repo_dir/People                                       > $rsync_log_6 2>&1 || return 6
 
-  echo "creating CVMFS snapshot"
-  publish_repo $CVMFS_TEST_REPO || return $?
+  local publish_log_4="publish_4.log"
+  echo "creating CVMFS snapshot (logging to $publish_log_4)"
+  publish_repo $CVMFS_TEST_REPO > $publish_log_4 2>&1 || return $?
 
   echo "check if the right number of catalogs are present in the repository (4)"
   [ $(get_catalog_count $CVMFS_TEST_REPO) -eq 4 ] || return 105
