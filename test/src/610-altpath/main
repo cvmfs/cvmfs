@@ -18,6 +18,8 @@ produce_files_in() {
 cvmfs_run_test() {
   logfile=$1
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local scratch_dir=$(pwd)
+  local backend_dir="/srv/cvmfs/$CVMFS_TEST_REPO"
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
@@ -38,7 +40,20 @@ cvmfs_run_test() {
   echo "check repository consistency"
   check_repository $CVMFS_TEST_REPO -i || return $?
 
-  local backend_dir="/srv/cvmfs/$CVMFS_TEST_REPO"
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+  echo "hide .cvmfsalt- symlinks"
+  local stash="${scratch_dir}/cvmfsalt-stash"
+  mkdir -p $stash || return 50
+  sudo find $backend_dir -maxdepth 1 -type l -exec mv -f {} $stash \; || return 51
+
+  echo "check that missing .cvmfsalt- symlinks are detected"
+  check_repository $CVMFS_TEST_REPO -i && return 20
+
+  echo "put .cvmfsalt- symlinks back in place"
+  sudo find $stash -maxdepth 1 -type l -exec mv -f {} $backend_dir \; || return 52
+
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
   echo "unmount both union fs and cvmfs"
   cvmfs_suid_helper rw_umount $CVMFS_TEST_REPO || return 10
@@ -67,12 +82,6 @@ cvmfs_run_test() {
   sudo rm -rf "/var/spool/cvmfs/${CVMFS_TEST_REPO}/cache/${CVMFS_TEST_REPO}"
   sudo rm -f "/var/spool/cvmfs/${CVMFS_TEST_REPO}/client.local"
   cvmfs_suid_helper rdonly_mount $CVMFS_TEST_REPO || return 14
-
-  echo "Detect missing alternative paths"
-  destroy_repo $CVMFS_TEST_REPO || return $?
-  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER "NO" "-V xyz" || return $?
-  sudo find $backend_dir -maxdepth 1 -type l -exec rm -f {} \;
-  check_repository $CVMFS_TEST_REPO -i && return 20
 
   return 0
 }
