@@ -1732,7 +1732,7 @@ sign_manifest() {
     sign_command="$sign_command -g"
   fi
   if [ x"$CVMFS_CATALOG_ALT_PATHS" = x"true" ]; then
-    sign_command="$sign_command -V"
+    sign_command="$sign_command -A"
   fi
 
   $user_shell "$sign_command" > /dev/null
