@@ -79,7 +79,7 @@ For feedback and bug reports, please write to either the [cctools mailing list](
 
 If you want to compile parrot+cvmfs from sources, please use the `libcvmfs-stable` git branch from the [CernVM-FS github repository](https://github.com/cvmfs/cvmfs/tree/libcvmfs-stable).  The `libcvmfs-stable` branch reflects a state between the head of development (`devel`) and the latest released version (`master`).
 
-Compile a using [libuuid](http://sourceforge.net/projects/libuuid):
+Compile a static [libuuid](http://sourceforge.net/projects/libuuid):
 
     ./configure --prefix=/tmp/cvmfs/UUID --enable-static --disable-shared
     make
