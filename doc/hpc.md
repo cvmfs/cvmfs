@@ -44,7 +44,7 @@ into the same cache directory.
 
 ## Access From the Nodes
 
-In order to access a preloaded cache from the nodes, [set the path to the directory as an _Alien Cache_](http://cernvm.cern.ch/portal/filesystem/parrot).  Since there won't be cache misses, parrot or fuse clients will never try to connect to the network.
+In order to access a preloaded cache from the nodes, [set the path to the directory as an _Alien Cache_](http://cernvm.cern.ch/portal/filesystem/parrot).  Since there won't be cache misses, parrot or fuse clients do not need to download additional files from the network.
 
 If clients do have network access, they might find a repository version online that is newer than the preloaded version in the cache.  This results in conflicts with `cvmfs_preload` or in errors if the cache directory is read-only.  Therefore, we recommend to explicitly disable network access for the parrot process on the nodes, for instance by setting
 
