@@ -55,7 +55,10 @@ BuildRequires: patch
 BuildRequires: pkgconfig
 BuildRequires: python-devel
 BuildRequires: unzip
+%if 0%{?el4}
+%else
 BuildRequires: valgrind-devel
+%endif
 
 Requires: bash
 Requires: coreutils
@@ -396,6 +399,8 @@ fi
 %doc COPYING AUTHORS README ChangeLog
 
 %changelog
+* Fri Jan 15 2016 Jakob Blomer <jblomer@cern.ch> - 2.2.0
+- Add valgrind-devel except for EL4
 * Tue Jan 12 2016 Rene Meusel <rene.meusel@cern.ch> - 2.2.0
 - Fix dependency for Fedora 23
 * Tue Dec 15 2015 Jakob Blomer <jblomer@cern.ch> - 2.2.0
