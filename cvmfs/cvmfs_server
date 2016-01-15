@@ -1731,7 +1731,7 @@ sign_manifest() {
   if [ x"$CVMFS_GARBAGE_COLLECTION" = x"true" ]; then
     sign_command="$sign_command -g"
   fi
-  if [ x"${CVMFS_VOMS_AUTHZ}" != x"" ]; then
+  if [ x"$CVMFS_CATALOG_ALT_PATHS" = x"true" ]; then
     sign_command="$sign_command -V"
   fi
 
@@ -2138,6 +2138,7 @@ EOF
 
   if [ x"$voms_authz" != x"" ]; then
     echo "CVMFS_VOMS_AUTHZ=$voms_authz" >> $server_conf
+    echo "CVMFS_CATALOG_ALT_PATHS=true" >> $server_conf
   fi
 
   # append GC specific configuration
