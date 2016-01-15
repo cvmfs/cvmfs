@@ -2889,8 +2889,16 @@ static int Init(const loader::LoaderExports *loader_exports) {
  */
 static void Spawn() {
   int retval;
+  
+  // First thing: fork off the watchdog while we still have a single-threaded
+  // well-defined state
+  cvmfs::pid_ = getpid();
+  if (cvmfs::UseWatchdog() && g_monitor_ready) {
+    monitor::RegisterOnCrash(auto_umount::UmountOnCrash);
+    monitor::Spawn();
+  }
 
-  // Setup catalog reload alarm (_after_ fork())
+  // Setup catalog reload alarm (_after_ forking into daemon mode)
   MakePipe(cvmfs::pipe_remount_trigger_);
   atomic_init32(&cvmfs::maintenance_mode_);
   atomic_init32(&cvmfs::drainout_mode_);
@@ -2918,11 +2926,6 @@ static void Spawn() {
                           cvmfs::MainRemountTrigger, NULL);
   assert(retval == 0);
 
-  cvmfs::pid_ = getpid();
-  if (cvmfs::UseWatchdog() && g_monitor_ready) {
-    monitor::RegisterOnCrash(auto_umount::UmountOnCrash);
-    monitor::Spawn();
-  }
   cvmfs::download_manager_->Spawn();
   cvmfs::external_download_manager_->Spawn();
   cvmfs::cache_manager_->quota_mgr()->Spawn();
