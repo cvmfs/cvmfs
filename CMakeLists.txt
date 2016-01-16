@@ -427,8 +427,7 @@ else (GOOGLETEST_BUILTIN)
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GTEST_INCLUDE_DIRS})
 endif (GOOGLETEST_BUILTIN)
 
-# required libraries for client and libcvmfs
-if (BUILD_CVMFS OR BUILD_LIBCVMFS)
+if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_UNITTESTS OR BUILD_PRELOADER)
   if (PACPARSER_BUILTIN)
     include (${PACPARSER_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
     set (PACPARSER_LIBRARIES "")
@@ -436,6 +435,10 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
     find_package (pacparser REQUIRED)
     set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${PACPARSER_INCLUDE_DIR})
   endif (PACPARSER_BUILTIN)
+endif (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_UNITTESTS OR BUILD_PRELOADER)
+
+# required libraries for client and libcvmfs
+if (BUILD_CVMFS OR BUILD_LIBCVMFS)
   if (SPARSEHASH_BUILTIN)
     include (${SPARSEHASH_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
     set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${SPARSEHASH_BUILTIN_LOCATION}/src)
@@ -544,7 +547,7 @@ if (BUILD_DOCUMENTATION)
   execute_process (
     COMMAND sh -c "/bin/sed -i -e 's/@VERSION@/${CernVM-FS_VERSION_STRING}/g' ${CMAKE_BINARY_DIR}/Doxyfile.in"
   )
-  execute_process (   
+  execute_process (
     COMMAND sh -c "/bin/sed -i -e 's,@SRC_DIR@,${CMAKE_SOURCE_DIR},g' ${CMAKE_BINARY_DIR}/Doxyfile.in"
   )
   include (cmake/Modules/UseDoxygen)
