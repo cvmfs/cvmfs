@@ -57,7 +57,9 @@ struct BufferEntry {
 
 struct FlushThreadStartData {
   pthread_cond_t *sig_flush;
+  pthread_mutex_t *sig_flush_mutex;
   pthread_cond_t *sig_continue_trace;
+  pthread_mutex_t *sig_continue_trace_mutex;
   BufferEntry *ring_buffer;
   atomic_int32 *commit_buffer;
   atomic_int32 *seq_no;
@@ -94,6 +96,7 @@ BufferEntry *ring_buffer_;
 atomic_int32 *commit_buffer_;
 pthread_t thread_flush_;
 pthread_cond_t sig_flush_;
+pthread_mutex_t sig_flush_mutex_;
 pthread_cond_t sig_continue_trace_;
 pthread_mutex_t sig_continue_trace_mutex_;
 
@@ -143,12 +146,8 @@ static int WriteCsvFile(FILE *fp, const string &field) {
 static void *MainFlush(void *data) {
   FlushThreadStartData *start_data =
     reinterpret_cast<FlushThreadStartData *>(data);
-  pthread_mutex_t sig_flush_mutex;
   int retval;
-  retval = pthread_mutex_init(&sig_flush_mutex, NULL);
-  assert(retval == 0 && "Could not initialize mutex for flush signal");
-  retval = pthread_mutex_lock(&sig_flush_mutex);
-  assert(retval == 0 && "Could not lock mutex for flush signal");
+  LockMutex(start_data->sig_flush_mutex);
   FILE *f = fopen(start_data->filename.c_str(), "a");
   assert(f != NULL && "Could not open trace file");
   struct timespec timeout;
@@ -162,7 +161,7 @@ static void *MainFlush(void *data) {
     {
       GetTimespecRel(2000, &timeout);
       retval = pthread_cond_timedwait(start_data->sig_flush,
-                                      &sig_flush_mutex, &timeout);
+                                      start_data->sig_flush_mutex, &timeout);
       assert(retval != EINVAL && "Error while waiting on flush signal");
     }
 
@@ -192,17 +191,17 @@ static void *MainFlush(void *data) {
     atomic_xadd32(start_data->flushed, i);
     atomic_cas32(start_data->flush_immediately, 1, 0);
 
+    LockMutex(start_data->sig_continue_trace_mutex);
     retval = pthread_cond_broadcast(start_data->sig_continue_trace);
     assert(retval == 0 && "Could not signal trace threads");
+    UnlockMutex(start_data->sig_continue_trace_mutex);
   } while ((atomic_read32(start_data->terminate) == 0) ||
            (atomic_read32(start_data->flushed) <
              atomic_read32(start_data->seq_no)));
 
+  UnlockMutex(start_data->sig_flush_mutex);
   retval = fclose(f);
   assert(retval == 0 && "Could not gracefully close trace file");
-  pthread_mutex_unlock(&sig_flush_mutex);
-  retval = pthread_mutex_destroy(&sig_flush_mutex);
-  assert(retval == 0 && "Could not gracefully destroy mutex for flush signal");
   delete start_data;
   return NULL;
 }
@@ -244,10 +243,14 @@ void Init(const int buffer_size, const int flush_threshold,
   assert(retval == 0 && "Could not create mutex for continue-trace signal");
   retval = pthread_cond_init(&sig_flush_, NULL);
   assert(retval == 0 && "Could not create flush signal");
+  retval = pthread_mutex_init(&sig_flush_mutex_, NULL);
+  assert(retval == 0 && "Could not create mutex for flush signal");
 
   FlushThreadStartData *start_data = new FlushThreadStartData;
   start_data->sig_flush = &sig_flush_;
+  start_data->sig_flush_mutex = &sig_flush_mutex_;
   start_data->sig_continue_trace = &sig_continue_trace_;
+  start_data->sig_continue_trace_mutex = &sig_continue_trace_mutex_;
   start_data->ring_buffer = ring_buffer_;
   start_data->commit_buffer = commit_buffer_;
   start_data->seq_no = &seq_no_;
@@ -286,8 +289,10 @@ void Fini() {
   // Trigger flushing and wait for it
   int retval;
   atomic_inc32(&terminate_flush_thread_);
+  LockMutex(&sig_flush_mutex_);
   retval = pthread_cond_signal(&sig_flush_);
   assert(retval == 0 && "Could not signal flush thread");
+  UnlockMutex(&sig_flush_mutex_);
   retval = pthread_join(thread_flush_, NULL);
   assert(retval == 0 && "Flush thread not gracefully terminated");
 
@@ -298,6 +303,8 @@ void Fini() {
          "Mutex for continue-trace signal could not be destroyed");
   retval = pthread_cond_destroy(&sig_flush_);
   assert(retval == 0 && "Flush signal could not be destroyed");
+  retval = pthread_mutex_destroy(&sig_flush_mutex_);
+  assert(retval == 0);
 
   delete[] ring_buffer_;
   delete[] commit_buffer_;
@@ -348,8 +355,10 @@ int32_t TraceInternal(const int event, const PathString &path,
   atomic_inc32(&commit_buffer_[pos]);
 
   if (my_seq_no - atomic_read32(&flushed_) == flush_threshold_) {
+    LockMutex(&sig_flush_mutex_);
     int err_code __attribute__((unused)) = pthread_cond_signal(&sig_flush_);
     assert(err_code == 0 && "Could not signal flush thread");
+    UnlockMutex(&sig_flush_mutex_);
   }
 
   return my_seq_no;
@@ -371,8 +380,10 @@ void Flush() {
     int retval;
 
     atomic_cas32(&flush_immediately_, 0, 1);
+    LockMutex(&sig_flush_mutex_);
     retval = pthread_cond_signal(&sig_flush_);
     assert(retval == 0 && "Could not signal flush thread");
+    UnlockMutex(&sig_flush_mutex_);
 
     GetTimespecRel(250, &timeout);
     retval = pthread_mutex_lock(&sig_continue_trace_mutex_);
