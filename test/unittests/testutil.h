@@ -448,6 +448,7 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
   bool ListingPath(const PathString &path,
                    catalog::DirectoryEntryList *listing) const;
 
+  bool GetVOMSAuthz(std::string *authz) { return false; }
 
  protected:
   // silence coverity

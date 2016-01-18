@@ -276,6 +276,14 @@ class AbstractCatalogManager : public SingleCopy {
   uint64_t inode_gauge_;  /**< highest issued inode */
   uint64_t revision_cache_;
   /**
+   * Saves the result of GetVOMSAuthz when a root catalog is attached
+   */
+  bool has_authz_cache_;
+  /**
+   * Saves the VOMS requirements when a root catalog is attached
+   */
+  std::string authz_cache_;
+  /**
    * Counts how often the inodes have been invalidated.
    */
   uint64_t incarnation_;
