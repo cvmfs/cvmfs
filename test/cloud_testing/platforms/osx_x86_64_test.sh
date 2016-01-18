@@ -19,7 +19,7 @@ sudo ./run.sh "$logfile"  src/000-dummy                           \
                           src/003-nested                          \
                           src/009-tar                             \
                           src/010-du                              \
-                          src/012-ls-s                            \
+                          src/012-ls-l                            \
                           src/013-certificate_cache               \
                           src/014-corrupt_lru                     \
                           src/015-rebuild_on_crash                \
