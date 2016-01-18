@@ -26,6 +26,15 @@ get_max_age() {
   get_header "$url" "Cache-Control" | sed -e 's/^max-age=\([0-9]*\)$/\1/'
 }
 
+
+CVMFS_TEST_626_REPLICA_NAME=""
+cleanup() {
+  echo "running cleanup()"
+  if [ ! -z $CVMFS_TEST_626_REPLICA_NAME ]; then
+    sudo cvmfs_server rmfs -f $CVMFS_TEST_626_REPLICA_NAME
+  fi
+}
+
 cvmfs_run_test() {
   logfile=$1
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
@@ -69,6 +78,51 @@ cvmfs_run_test() {
   [ $(get_epoch "2 days 23 hour") -lt $(get_expiry_time $rurl) ] || return 14
   [ $(get_epoch "3 days  1 hour") -gt $(get_expiry_time $rurl) ] || return 15
   [ $(get_max_age $rurl)          -eq $default_maxage          ] || return 16
+
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+  echo "install a desaster cleanup function"
+  trap cleanup EXIT HUP INT TERM || return $?
+
+  echo "create Stratum1 repository on the same machine"
+  local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
+  CVMFS_TEST_626_REPLICA_NAME="$replica_name"
+  load_repo_config $CVMFS_TEST_REPO
+  create_stratum1 $replica_name                          \
+                  $CVMFS_TEST_USER                       \
+                  $CVMFS_STRATUM0                        \
+                  /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub || return 30
+  url=$(get_repo_url $replica_name)
+
+  echo "do a snapshot"
+  cvmfs_server snapshot $replica_name || return 31
+
+  echo "check HTTP headers for .cvmfspublished"
+  murl="${url}/.cvmfspublished"
+  [ $(get_epoch "1 minutes") -lt $(get_expiry_time $murl) ] || return 32
+  [ $(get_epoch "3 minutes") -gt $(get_expiry_time $murl) ] || return 33
+  [ $(get_max_age $murl)     -eq $xcvmfs_maxage           ] || return 34
+  [ x"$(get_header $murl "Content-Type")" = x"$xcvmfs"    ] || return 35
+
+  echo "check HTTP headers for .cvmfswhitelist"
+  wurl="${url}/.cvmfswhitelist"
+  [ $(get_epoch "1 minutes") -lt $(get_expiry_time $wurl) ] || return 36
+  [ $(get_epoch "3 minutes") -gt $(get_expiry_time $wurl) ] || return 37
+  [ $(get_max_age $wurl)     -eq $xcvmfs_maxage           ] || return 38
+  [ x"$(get_header $wurl "Content-Type")" = x"$xcvmfs"    ] || return 39
+
+  echo "check HTTP headers for .cvmfs_last_snapshot"
+  surl="${url}/.cvmfs_last_snapshot"
+  [ $(get_epoch "1 minutes") -lt $(get_expiry_time $surl) ] || return 40
+  [ $(get_epoch "3 minutes") -gt $(get_expiry_time $surl) ] || return 41
+  [ $(get_max_age $surl)     -eq $xcvmfs_maxage           ] || return 42
+  [ x"$(get_header $surl "Content-Type")" = x"$xcvmfs"    ] || return 43
+
+  echo "check HTTP headers for root catalog ($root_clg)"
+  rurl="$(get_object_url $replica_name $root_clg)"
+  [ $(get_epoch "2 days 23 hour") -lt $(get_expiry_time $rurl) ] || return 44
+  [ $(get_epoch "3 days  1 hour") -gt $(get_expiry_time $rurl) ] || return 45
+  [ $(get_max_age $rurl)          -eq $default_maxage          ] || return 46
 
   return 0
 }
