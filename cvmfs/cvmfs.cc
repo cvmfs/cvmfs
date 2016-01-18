@@ -2970,7 +2970,20 @@ static void Fini() {
 
   if (g_talk_ready) talk::Fini();
 
-  // Must be before quota is stopped
+  // The unpin listener requires the catalog, so this must be unregistered
+  // before the catalog manager is removed
+  if (g_quota_ready) {
+    if (cvmfs::unpin_listener_) {
+      quota::UnregisterListener(cvmfs::unpin_listener_);
+      cvmfs::unpin_listener_ = NULL;
+    }
+    if (cvmfs::watchdog_listener_) {
+      quota::UnregisterListener(cvmfs::watchdog_listener_);
+      cvmfs::watchdog_listener_ = NULL;
+    }
+  }
+
+  // Must be before cache and quota are stopped
   delete cvmfs::catalog_manager_;
   cvmfs::catalog_manager_ = NULL;
 
@@ -2984,16 +2997,6 @@ static void Fini() {
   if (g_download_ready) cvmfs::download_manager_->Fini();
   if (g_external_download_ready) cvmfs::external_download_manager_->Fini();
   if (g_nfs_maps_ready) nfs_maps::Fini();
-  if (g_quota_ready) {
-    if (cvmfs::unpin_listener_) {
-      quota::UnregisterListener(cvmfs::unpin_listener_);
-      cvmfs::unpin_listener_ = NULL;
-    }
-    if (cvmfs::watchdog_listener_) {
-      quota::UnregisterListener(cvmfs::watchdog_listener_);
-      cvmfs::watchdog_listener_ = NULL;
-    }
-  }
   if (cvmfs::cache_manager_) {
     delete cvmfs::cache_manager_;
     cvmfs::cache_manager_ = NULL;
