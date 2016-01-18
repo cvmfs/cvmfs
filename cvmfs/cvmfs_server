@@ -5588,6 +5588,16 @@ migrate_2_1_20() {
     sed -i -e "s/^\(CVMFS_AUTO_REPAIR_MOUNTPOINT\)=.*/\1=true/" $server_conf
   fi
 
+  local apache_conf="$(get_apache_conf_path)/$(get_apache_conf_filename $name)"
+  local old_line='AddType application/x-cvmfs .cvmfspublished .cvmfswhitelist'
+  if [ -f "$apache_conf" ] && \
+     grep -q "$old_line" "$apache_conf"; then
+    echo "--> updating apache config ($(basename $apache_conf))"
+    sed -i -e "s/$old_line/<FilesMatch \"^\\\\.cvmfs\">\n        ForceType application\/x-cvmfs\n    <\/FilesMatch>/" \
+      $apache_conf
+    reload_apache > /dev/null
+  fi
+
   sed -i -e "s/^\(CVMFS_CREATOR_VERSION\)=.*/\1=$destination_version/" $server_conf
 
   # update repository information
