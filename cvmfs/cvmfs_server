@@ -2062,7 +2062,9 @@ Alias /cvmfs/${name} ${storage_dir}
     EnableMMAP Off
     EnableSendFile Off
 
-    AddType application/x-cvmfs .cvmfspublished .cvmfswhitelist
+    <FilesMatch "^\.cvmfs">
+        ForceType application/x-cvmfs
+    </FilesMatch>
 
     Header unset Last-Modified
     FileETag None
