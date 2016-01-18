@@ -1,14 +1,13 @@
 #!/bin/sh
-set -x
+
 retval=0
 
 #cvmfs_unittests --gtest_shuffle \
 #                --gtest_death_test_use_fork || retval=1
 
-logfile="/var/log/cvmfs-test"
-workdir="$HOME/cvmfs/test"
+logfile="$cvmfs_log_directory/integration_tests.log"
 
-cd "$workdir"
+cd "$cvmfs_workspace"
 
 
 # everything will be placed in the home folder
