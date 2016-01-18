@@ -703,6 +703,11 @@ get_apache_version() {
   ${APACHE_BIN} -v | head -n1 | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+'
 }
 
+get_apache_conf_filename() {
+  local name=$1
+  echo "cvmfs.${name}.conf"
+}
+
 # figure out apache config file mode
 #
 # @return   apache config mode (stdout) (see globals below)
@@ -2047,7 +2052,7 @@ create_apache_config_for_endpoint() {
   local storage_dir=$2
   local with_wsgi="$3"
 
-  create_apache_config_file "cvmfs.${name}.conf" << EOF
+  create_apache_config_file "$(get_apache_conf_filename $name)" << EOF
 # Created by cvmfs_server.  Don't touch.
 $(cat_wsgi_config $name $with_wsgi)
 
@@ -2078,8 +2083,7 @@ EOF
 }
 
 has_apache_config_for_global_info() {
-  local conf_file="cvmfs.info.conf"
-  has_apache_config_file $conf_file
+  has_apache_config_file $(get_apache_conf_filename "info")
 }
 
 create_apache_config_for_global_info() {
@@ -2159,7 +2163,7 @@ EOF
   if [ $configure_apache -eq 1 ] && is_local_upstream $upstream; then
     local repository_dir=$(get_upstream_config $upstream)
     # make sure that the config file does not exist, yet
-    remove_apache_config_file "cvmfs.${name}.conf" || true
+    remove_apache_config_file "$(get_apache_conf_filename $name)" || true
     create_apache_config_for_endpoint $name $repository_dir
     create_apache_config_for_global_info
   fi
@@ -2189,7 +2193,7 @@ remove_config_files() {
   local name=$1
   load_repo_config $name
 
-  local apache_conf_file_name="cvmfs.${name}.conf"
+  local apache_conf_file_name="$(get_apache_conf_filename $name)"
   if is_local_upstream $CVMFS_UPSTREAM_STORAGE &&
      has_apache_config_file "$apache_conf_file_name"; then
     remove_apache_config_file "$apache_conf_file_name"
@@ -5498,7 +5502,7 @@ migrate_2_1_15() {
   local name=$1
   local destination_version="2.1.20"
   local conf_file
-  conf_file="$(get_apache_conf_path)/cvmfs.${name}.conf"
+  conf_file="$(get_apache_conf_path)/$(get_apache_conf_filename $name)"
 
   # get repository information
   load_repo_config $name
