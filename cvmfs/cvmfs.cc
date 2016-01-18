@@ -291,6 +291,7 @@ class RemountFence : public SingleCopy {
 };
 RemountFence *remount_fence_;
 
+
 /**
  * The thread that triggers the reload of the root catalog is informed through
  * this pipe by the alarm signal handler when the TTL expires.
@@ -2889,7 +2890,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
  */
 static void Spawn() {
   int retval;
-  
+
   // First thing: fork off the watchdog while we still have a single-threaded
   // well-defined state
   cvmfs::pid_ = getpid();
