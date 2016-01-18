@@ -921,7 +921,7 @@ is_mounted() {
   local regexp="$2"
 
   local absolute_mnt=
-  absolute_mnt="$(readlink --canonicalize $mountpoint)" || die "failed to access $mountpoint"
+  absolute_mnt="$(readlink --canonicalize $mountpoint)" || return 2
   local mnt_record="$(cat /proc/mounts 2>/dev/null | grep " $absolute_mnt ")"
   if [ x"$mnt_record" = x"" ]; then
     return 1
