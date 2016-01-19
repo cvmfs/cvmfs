@@ -2439,7 +2439,7 @@ get_global_info_v1_path() {
 
 
 _write_info_file() {
-  local info_file="$1"
+  local info_file="${1}.json"
   local info_file_dir="$(get_global_info_v1_path)"
   local info_file_path="${info_file_dir}/${info_file}"
   local tmp_file=$(mktemp)
@@ -2452,7 +2452,7 @@ _write_info_file() {
 
 
 _check_info_file() {
-  local info_file="$1"
+  local info_file="${1}.json"
   [ -f "$(get_global_info_v1_path)/${info_file}" ]
 }
 
@@ -5942,7 +5942,7 @@ update_info() {
     # copy the meta information file for editing
     tmp_file=$(mktemp)
     trap "_update_info_cleanup $tmp_file" EXIT HUP INT TERM
-    cp -f "$(get_global_info_v1_path)/meta" $tmp_file
+    cp -f "$(get_global_info_v1_path)/meta.json" $tmp_file
 
     edit_json_until_valid $tmp_file || die "Aborting..."
   fi

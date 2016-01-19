@@ -16,8 +16,8 @@ cvmfs_run_test() {
   local scratch_dir=$(pwd)
 
   local info_dir=/srv/cvmfs/info
-  local info_file=/srv/cvmfs/info/v1/meta
-  local info_url="$(get_local_repo_url info)/v1/meta"
+  local info_file=/srv/cvmfs/info/v1/meta.json
+  local info_url="$(get_local_repo_url info)/v1/meta.json"
 
   echo "check if the jq utility is installed"
   which jq > /dev/null 2>&1 || return 1
