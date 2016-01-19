@@ -477,7 +477,12 @@ void *DownloadManager::MainDownload(void *data) {
   while (true) {
     int timeout;
     if (still_running) {
-      timeout = 1;
+      // Specify a timeout for polling in ms; this allows us to return
+      // to libcurl once a second so it can look for internal operations
+      // which timed out.  libcurl has a more elaborate mechanism
+      // (CURLMOPT_TIMERFUNCTION) that would inform us of the next potential
+      // timeout.  TODO(bbockelm) we should switch to that in the future.
+      timeout = 100;
     } else {
       timeout = -1;
       gettimeofday(&timeval_stop, NULL);
@@ -923,6 +928,12 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
       ConfigureCurlHandle(curl_handle, info->pid, info->uid, info->gid,
                           &info->cred_fname, &info->cred_data);
     }
+    // The download manager disables signal handling in the curl library;
+    // as OpenSSL's implementation of TLS will generate a sigpipe in some
+    // error paths, we must explicitly disable SIGPIPE here.  Since SIGPIPE
+    // only appears to happen with HTTPS, we only do this on VOMS builds.
+    signal(SIGPIPE, SIG_IGN);
+
 #endif
   }
 
@@ -2032,7 +2043,7 @@ bool DownloadManager::GeoSortServers(std::vector<std::string> *servers,
 
   // Request ordered list via Geo-API
   bool success = false;
-  unsigned max_attempts = std::min(servers->size(), size_t(3));
+  unsigned max_attempts = std::min(host_chain_shuffled.size(), size_t(3));
   vector<uint64_t> geo_order(servers->size());
   for (unsigned i = 0; i < max_attempts; ++i) {
     string url = host_chain_shuffled[i] + "/api/v1.0/geo/@proxy@/" + host_list;

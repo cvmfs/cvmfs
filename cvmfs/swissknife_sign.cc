@@ -49,7 +49,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   if (args.find('M') != args.end()) meta_info = *args.find('M')->second;
   upload::Spooler *spooler = NULL;
   const bool garbage_collectable = (args.count('g') > 0);
-  const bool bootstrap_shortcuts = (args.count('V') > 0);
+  const bool bootstrap_shortcuts = (args.count('A') > 0);
 
   if (!DirectoryExists(temp_dir)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "%s does not exist", temp_dir.c_str());

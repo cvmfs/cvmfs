@@ -107,9 +107,9 @@ cvmfs_run_test() {
   local logfile=$1
   local script_location=$2
 
-  local wiremock_wrapper="${script_location}/../../wiremock_wrapper.sh"
+  local wiremock_wrapper="${script_location}/../../common/mock_services/wiremock_wrapper.sh"
   echo "setup wiremock environment ($wiremock_wrapper)"
-  . ${script_location}/../../wiremock_wrapper.sh
+  . $wiremock_wrapper
   init_wiremock || return $?
 
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO

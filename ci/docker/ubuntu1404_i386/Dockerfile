@@ -17,4 +17,5 @@ RUN         apt-get -y update && apt-get -y install         \
                                               pkg-config    \
                                               python-dev    \
                                               unzip         \
-                                              uuid-dev
+                                              uuid-dev      \
+                                              valgrind

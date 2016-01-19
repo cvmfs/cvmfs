@@ -37,7 +37,7 @@ class CommandSign : public Command {
     r.push_back(Parameter::Switch('b', "generate symlinks for VOMS-secured "
                                        "repo backends"));
     r.push_back(Parameter::Switch('g', "repository is garbage collectible"));
-    r.push_back(Parameter::Switch('V', "repository has bootstrap shortcuts"));
+    r.push_back(Parameter::Switch('A', "repository has bootstrap shortcuts"));
     return r;
   }
   int Main(const ArgumentList &args);

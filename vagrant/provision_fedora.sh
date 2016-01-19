@@ -10,14 +10,6 @@ VAGRANT_WORKSPACE="/vagrant"
 export LANG="en_US.UTF-8"
 echo "LANG=\"$LANG\"" > /etc/sysconfig/i18n
 
-# create secondary hard drive as ext4 volume
-drive="/dev/sdb"
-mntpoint="/var/spool/cvmfs"
-mkfs.ext4 $drive
-mkdir -p $mntpoint
-echo "$drive $mntpoint ext4 defaults 0 0" >> /etc/fstab
-mount $mntpoint
-
 # update packages
 dnf -y update
 
@@ -28,11 +20,11 @@ dnf -y install libuuid-devel gcc gcc-c++ glibc-common cmake fuse fuse-devel  \
                shadow-utils util-linux-ng selinux-policy checkpolicy         \
                selinux-policy-devel hardlink selinux-policy-targeted         \
                python-devel initscripts bash coreutils grep sed sudo psmisc  \
-               curl attr httpd libcap-devel mod_wsgi
+               curl attr httpd libcap-devel mod_wsgi rpm-build java wget
 
 # install convenience packages for development
 dnf -y install git tig iftop htop jq rubygems rubygem-bundler ruby-devel \
-               screen nc python-unittest2 strace lsof
+               screen nc python-unittest2 strace lsof vim
 gem install fakes3
 
 # drop a FakeS3 default configuration for CVMFS server
@@ -65,12 +57,12 @@ EOF
 fi
 
 # allow user 'vagrant' to do everything
-sed -i -e 's/^vagrant.*/vagrant ALL=(ALL) NOPASSWD:ALL/' /etc/sudoers
+echo "vagrant ALL=(ALL:ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 # create CVMFS test user
 if ! id $CVMFS_TEST_USER > /dev/null 2>&1; then
   useradd $CVMFS_TEST_USER
-  echo "$CVMFS_TEST_USER ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+  echo "$CVMFS_TEST_USER ALL=(ALL:ALL) NOPASSWD:ALL" >> /etc/sudoers
 fi
 
 echo "all done"

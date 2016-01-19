@@ -351,7 +351,8 @@ Supported Commands:
                   Updates the geo-IP database
   update-info     [-p no apache config] [-e don't edit /info/meta]
                   Open meta info JSON file for editing
-  update-repoinfo <fully qualified name>
+  update-repoinfo [-f path to JSON file]
+                  <fully qualified name>
                   Open repository meta info JSON file for editing
 "
 
@@ -713,6 +714,14 @@ get_apache_conf_mode() {
 }
 
 
+set_selinux_httpd_context_if_needed() {
+  local directory="$1"
+  if has_selinux; then
+    chcon -Rv --type=httpd_sys_content_t ${directory}/ > /dev/null
+  fi
+}
+
+
 # find location of apache configuration files
 #
 # @return   the location of apache configuration files (stdout)
@@ -919,7 +928,8 @@ is_mounted() {
   local mountpoint="$1"
   local regexp="$2"
 
-  local absolute_mnt="$(readlink --canonicalize $mountpoint)"
+  local absolute_mnt=
+  absolute_mnt="$(readlink --canonicalize $mountpoint)" || return 2
   local mnt_record="$(cat /proc/mounts 2>/dev/null | grep " $absolute_mnt ")"
   if [ x"$mnt_record" = x"" ]; then
     return 1
@@ -1716,12 +1726,12 @@ sign_manifest() {
   local user_shell="$(get_user_shell $name)"
 
   local sign_command="$(__swissknife_cmd) sign \
-    -c /etc/cvmfs/keys/${name}.crt       \
-    -k /etc/cvmfs/keys/${name}.key       \
-    -n $name                             \
-    -m $unsigned_manifest                \
-    -t ${CVMFS_SPOOL_DIR}/tmp            \
-    -r $CVMFS_UPSTREAM_STORAGE"
+          -c /etc/cvmfs/keys/${name}.crt       \
+          -k /etc/cvmfs/keys/${name}.key       \
+          -n $name                             \
+          -m $unsigned_manifest                \
+          -t ${CVMFS_SPOOL_DIR}/tmp            \
+          -r $CVMFS_UPSTREAM_STORAGE"
 
   if [ x"$metainfo_file" != x"" ]; then
     sign_command="$sign_command -M $metainfo_file"
@@ -1729,8 +1739,8 @@ sign_manifest() {
   if [ x"$CVMFS_GARBAGE_COLLECTION" = x"true" ]; then
     sign_command="$sign_command -g"
   fi
-  if [ x"${CVMFS_VOMS_AUTHZ}" != x"" ]; then
-    sign_command="$sign_command -V"
+  if [ x"$CVMFS_CATALOG_ALT_PATHS" = x"true" ]; then
+    sign_command="$sign_command -A"
   fi
 
   $user_shell "$sign_command" > /dev/null
@@ -1914,9 +1924,7 @@ create_repository_skeleton() {
   if [ x$(id -un) != x$user ]; then
     chown -R $user ${directory}/
   fi
-  if has_selinux; then
-    chcon -Rv --type=httpd_sys_content_t ${directory}/ > /dev/null
-  fi
+  set_selinux_httpd_context_if_needed $directory
   echo "done"
 }
 
@@ -2096,6 +2104,7 @@ create_config_files_for_new_repository() {
   local configure_apache=$9
   local compression_alg=${10}
   local external_data=${11}
+  local voms_authz=${12}
 
   # other configurations
   local spool_dir="/var/spool/cvmfs/${name}"
@@ -2133,6 +2142,11 @@ CVMFS_AUTO_REPAIR_MOUNTPOINT=true
 CVMFS_AUTOCATALOGS=false
 EOF
 
+  if [ x"$voms_authz" != x"" ]; then
+    echo "CVMFS_VOMS_AUTHZ=$voms_authz" >> $server_conf
+    echo "CVMFS_CATALOG_ALT_PATHS=true" >> $server_conf
+  fi
+
   # append GC specific configuration
   if [ x"$garbage_collectable" = x"true" ]; then
     cat >> $server_conf << EOF
@@ -2153,6 +2167,7 @@ EOF
 CVMFS_CACHE_BASE=$cache_dir
 CVMFS_RELOAD_SOCKETS=$cache_dir
 CVMFS_QUOTA_LIMIT=4000
+CVMFS_MOUNT_DIR=/cvmfs
 CVMFS_SERVER_URL=$stratum0
 CVMFS_HTTP_PROXY=DIRECT
 CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${name}.pub
@@ -2257,6 +2272,7 @@ remove_repository_storage() {
 
 setup_and_mount_new_repository() {
   local name=$1
+  local http_timeout=15
 
   # get repository information
   load_repo_config $name
@@ -2292,6 +2308,18 @@ EOF
   fi
   local user_shell="$(get_user_shell $name)"
   $user_shell "touch ${CVMFS_SPOOL_DIR}/client.local"
+
+  # avoid racing against apache
+  local waiting=0
+  while ! curl -sIf ${CVMFS_STRATUM0}/.cvmfspublished > /dev/null && \
+        [ $http_timeout -gt 0 ]; do
+    [ $waiting -eq 1 ] || echo -n "waiting for apache... "
+    waiting=1
+    http_timeout=$(( $http_timeout - 1 ))
+    sleep 1
+  done
+  [ $http_timeout -gt 0 ] || return 1
+
   mount $rdonly_dir > /dev/null || return 1
   mount /cvmfs/$name
 }
@@ -2401,25 +2429,31 @@ has_file_descriptors_on_mount_point() {
 
 
 get_global_info_path() {
-  # TODO(rmeusel): make this a bit more flexible
-  echo "${DEFAULT_LOCAL_STORAGE}/info/v${LATEST_JSON_INFO_SCHEMA}"
+  echo "${DEFAULT_LOCAL_STORAGE}/info"
+}
+
+
+get_global_info_v1_path() {
+  echo "$(get_global_info_path)/v${LATEST_JSON_INFO_SCHEMA}"
 }
 
 
 _write_info_file() {
-  local info_file="$1"
-  local info_file_path="$(get_global_info_path)/${info_file}"
+  local info_file="${1}.json"
+  local info_file_dir="$(get_global_info_v1_path)"
+  local info_file_path="${info_file_dir}/${info_file}"
   local tmp_file=$(mktemp)
 
   cat - > $tmp_file
   chmod 0644 $tmp_file
   mv -f $tmp_file $info_file_path
+  set_selinux_httpd_context_if_needed $info_file_dir
 }
 
 
 _check_info_file() {
-  local info_file="$1"
-  [ -f "$(get_global_info_path)/${info_file}" ]
+  local info_file="${1}.json"
+  [ -f "$(get_global_info_v1_path)/${info_file}" ]
 }
 
 
@@ -2478,13 +2512,18 @@ _render_info_file() {
 
 
 has_global_info_path() {
-  [ -d $(get_global_info_path) ]
+  [ -d $(get_global_info_path) ] && [ -d $(get_global_info_v1_path) ]
 }
 
 
 create_global_info_skeleton() {
   local info_path="$(get_global_info_path)"
-  mkdir -p $info_path
+  local info_v1_path="$(get_global_info_v1_path)"
+
+  mkdir -p $info_path                               || return 1
+  mkdir -p $info_v1_path                            || return 2
+  set_selinux_httpd_context_if_needed $info_path    || return 3
+  set_selinux_httpd_context_if_needed $info_v1_path || return 4
 
   _check_info_file "repositories" || echo "{}" | _write_info_file "repositories"
   _check_info_file "meta" || _write_info_file "meta" << EOF
@@ -2544,6 +2583,17 @@ check_jq() {
 }
 
 
+validate_json() {
+  local json_file="$1"
+
+  if ! which jq > /dev/null 2>&1; then
+    return 0 # no jq -> assume JSON is valid
+  fi
+
+  jq '.' $json_file 2>&1
+}
+
+
 edit_json_until_valid() {
   local json_file="$1"
   local editor=$(get_editor)
@@ -2556,7 +2606,7 @@ edit_json_until_valid() {
 
     local jq_output=""
     local retry=""
-    if ! jq_output=$(jq '.' $json_file 2>&1); then
+    if ! jq_output=$(validate_json $json_file); then
       echo
       echo "Your JSON file is invalid, please check again:"
       echo "$jq_output"
@@ -2962,7 +3012,8 @@ mkfs() {
                                          "$garbage_collectable" \
                                          "$configure_apache"    \
                                          "$compression_alg"     \
-                                         "$external_data" || die "fail"
+                                         "$external_data"       \
+                                         "$voms_authz" || die "fail"
   if is_local_upstream $upstream && [ $configure_apache -eq 1 ]; then
     reload_apache > /dev/null
   fi
@@ -2988,7 +3039,7 @@ mkfs() {
   # create storage area
   if is_local_upstream $upstream; then
     echo -n "Creating Backend Storage... "
-    create_global_info_skeleton
+    create_global_info_skeleton     || die "fail"
     create_repository_storage $name || die "fail"
     echo "done"
   fi
@@ -3021,7 +3072,6 @@ mkfs() {
   if [ "x$voms_authz" != "x" ]; then
     echo -n "(repository will be accessible with VOMS credentials $voms_authz)... "
     create_cmd="$create_cmd -V $voms_authz"
-    echo "CVMFS_VOMS_AUTHZ=$voms_authz" >> /etc/cvmfs/repositories.d/$name/server.conf
   fi
   $user_shell "$create_cmd" > /dev/null                       || die "fail! (cannot init repo)"
   sign_manifest $name ${temp_dir}/new_manifest $repoinfo_file || die "fail! (cannot sign repo)"
@@ -3424,17 +3474,18 @@ import() {
   # create the configuration for the new repository
   # TODO(jblomer): make a better guess for hash and compression algorithm
   echo -n "Creating configuration files... "
-  create_config_files_for_new_repository "$name"       \
-                                         "$upstream"   \
-                                         "$stratum0"   \
-                                         "$cvmfs_user" \
-                                         "$unionfs"    \
-                                         "sha1"        \
-                                         "true"        \
-                                         "false"       \
+  create_config_files_for_new_repository "$name"             \
+                                         "$upstream"         \
+                                         "$stratum0"         \
+                                         "$cvmfs_user"       \
+                                         "$unionfs"          \
+                                         "sha1"              \
+                                         "true"              \
+                                         "false"             \
                                          "$configure_apache" \
-                                         "default"     \
-                                         "false" || die "fail!"
+                                         "default"           \
+                                         "false"             \
+                                         "" || die "fail!"
   echo "done"
 
   # import the old repository security keys
@@ -3459,9 +3510,7 @@ import() {
   if [ $chown_backend -ne 0 ]; then
     echo -n "Importing CernVM-FS storage... "
     chown -R $cvmfs_user $storage_location || die "fail!"
-    if has_selinux; then
-      chcon -Rv --type=httpd_sys_content_t $storage_location > /dev/null || die "fail!"
-    fi
+    set_selinux_httpd_context_if_needed $storage_location || die "fail!"
     echo "done"
   fi
 
@@ -3601,7 +3650,14 @@ rmfs() {
     # better ask the user again!
     if [ $force -ne 1 ]; then
       local reply
-      read -p "You are about to WIPE OUT THE CERNVM-FS REPOSITORY $name INCLUDING SIGNING KEYS!  Are you sure (y/N)? " reply
+      local question=""
+      if [ $preserve_data -eq 0 ]; then
+        question="You are about to WIPE OUT THE CERNVM-FS REPOSITORY ${name} INCLUDING SIGNING KEYS!"
+      else
+        question="You are about to REMOVE THE CERNVM-FS REPOSITORY INFRASTRUCTURE for ${name}!"
+      fi
+
+      read -p "${question}  Are you sure (y/N)? " reply
       if [ "$reply" != "y" ] && [ "$reply" != "Y" ]; then
         continue
       fi
@@ -5323,9 +5379,7 @@ migrate_2_1_6() {
     local tmp_dir=${storage_path}/data/txn
     mkdir $tmp_dir > /dev/null 2>&1 || echo "Warning: not able to create $tmp_dir"
     chown -R $CVMFS_USER $tmp_dir > /dev/null 2>&1 || echo "Warning: not able to chown $tmp_dir to $CVMFS_USER"
-    if has_selinux; then
-      chcon -Rv --type=httpd_sys_content_t $tmp_dir > /dev/null 2>&1 || echo "Warning: not able to chcon $tmp_dir to httpd_sys_content_t"
-    fi
+    set_selinux_httpd_context_if_needed $tmp_dir || echo "Warning: not able to chcon $tmp_dir to httpd_sys_content_t"
 
     echo "--> updating server.conf"
     mv /etc/cvmfs/repositories.d/${name}/server.conf /etc/cvmfs/repositories.d/${name}/server.conf.old
@@ -5504,6 +5558,7 @@ migrate_2_1_20() {
   [ -z "$CVMFS_HIDE_MAGIC_XATTRS" ] && echo "CVMFS_HIDE_MAGIC_XATTRS=yes" >> $client_conf
   [ -z "$CVMFS_FOLLOW_REDIRECTS"  ] && echo "CVMFS_FOLLOW_REDIRECTS=yes"  >> $client_conf
   [ -z "$CVMFS_SERVER_CACHE_MODE" ] && echo "CVMFS_SERVER_CACHE_MODE=yes" >> $client_conf
+  [ -z "$CVMFS_MOUNT_DIR"         ] && echo "CVMFS_MOUNT_DIR=/cvmfs"      >> $client_conf
 
   echo "--> updating /etc/fstab"
   local tmp_fstab=$(mktemp)
@@ -5730,6 +5785,8 @@ eliminate_hardlinks() {
 
   load_repo_config $name
 
+  is_root $name || die "Permission denied: Only root can do that"
+
   if [ $force -ne 1 ]; then
     echo "This will break up all hardlink relationships that are currently"
     echo "present in '$name'. This process cannot be undone!"
@@ -5759,20 +5816,38 @@ eliminate_hardlinks() {
 ################################################################################
 
 _update_repoinfo_cleanup() {
+  local repo_name="$1"
+  shift 1
+
   while [ $# -gt 0 ]; do
     rm -f $1 > /dev/null 2>&1
     shift 1
   done
+
+  close_transaction $repo_name 0
 }
 
 update_repoinfo() {
   local name
-  local tmp_file
+  local json_file
+
+  OPTIND=1
+  while getopts "f:" option; do
+    case $option in
+      f)
+        json_file=$OPTARG
+      ;;
+      ?)
+        shift $(($OPTIND-2))
+        usage "Command update-repoinfo: Unrecognized option: $1"
+      ;;
+    esac
+  done
+  shift $(($OPTIND-1))
 
   # get repository name
-  shift $(($OPTIND-1))
   check_parameter_count_with_guessing $#
-  name=$(get_or_guess_repository_name $1)
+  name=$(get_or_guess_repository_name $@)
 
   # sanity checks
   check_repository_existence $name || die "The repository $name does not exist"
@@ -5781,14 +5856,14 @@ update_repoinfo() {
   is_stratum0 $name                || die "This is not a stratum 0 repository"
   ! is_publishing $name            || die "Repository is currently publishing"
   health_check $name $silence_warnings
+  is_in_transaction $name && die "Cannot edit repository meta info while in a transaction"
+  [ x"$json_file" = x"" ] || [ -f "$json_file" ] || die "Provided file '$json_file' doesn't exist"
 
   tmp_file_info=$(mktemp)
   tmp_file_manifest=$(mktemp)
-  chown $CVMFS_USER $tmp_file_info $tmp_file_manifest || \
-    die "Cannot change ownership of temporary files"
-  is_in_transaction $name && die "Cannot edit repository meta info while in a transaction"
-  trap "_update_repoinfo_cleanup $tmp_file_info $tmp_file_manifest; \
-    close_transaction $name 0" EXIT HUP INT TERM
+  chown $CVMFS_USER $tmp_file_info $tmp_file_manifest || die "Cannot change ownership of temporary files"
+
+  trap "_update_repoinfo_cleanup $name $tmp_file_info $tmp_file_manifest" EXIT HUP INT TERM
   open_transaction $name || die "Failed to open transaction for meta info editing"
 
   get_repo_info -M > $tmp_file_info || \
@@ -5796,11 +5871,21 @@ update_repoinfo() {
   get_repo_info -R > $tmp_file_manifest || \
     die "Failed getting repository manifest for $name"
 
-  if [ -f $tmp_file_info ] && [ ! -s $tmp_file_info ]; then
-    create_repometa_skeleton $tmp_file_info
+  if [ x"$json_file" = x"" ]; then
+    if [ -f $tmp_file_info ] && [ ! -s $tmp_file_info ]; then
+      create_repometa_skeleton $tmp_file_info
+    fi
+
+    edit_json_until_valid $tmp_file_info
+  else
+    local jq_output
+    if ! jq_output="$(validate_json $json_file)"; then
+      die "The provided JSON file is invalid. See below:\n${jq_output}"
+    fi
+
+    cat $json_file > $tmp_file_info
   fi
 
-  edit_json_until_valid $tmp_file_info
   sign_manifest $name $tmp_file_manifest $tmp_file_info
 }
 
@@ -5857,7 +5942,7 @@ update_info() {
     # copy the meta information file for editing
     tmp_file=$(mktemp)
     trap "_update_info_cleanup $tmp_file" EXIT HUP INT TERM
-    cp -f "$(get_global_info_path)/meta" $tmp_file
+    cp -f "$(get_global_info_v1_path)/meta.json" $tmp_file
 
     edit_json_until_valid $tmp_file || die "Aborting..."
   fi

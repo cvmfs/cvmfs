@@ -71,7 +71,7 @@ swissknife::CommandGraft::ChecksumFdWithChunks(
 
     // If possible, make progress on deflate.
     unsigned char *cur_out_buf = out_buf;
-    size_t avail_out;
+    size_t avail_out = zlib::kZChunk;
     compressor->Deflate(flush, &cur_in_buf, &avail_in, &cur_out_buf, &avail_out);
     shash::Update(out_buf, avail_out, file_hash_context);
     if (do_chunk) shash::Update(out_buf, avail_out, chunk_hash_context);

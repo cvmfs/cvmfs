@@ -66,6 +66,13 @@ install_from_repo gcc-c++        || die "fail (installing gcc-c++)"
 install_from_repo python-sqlite2 || die "fail (installing python-sqlite2)"
 install_from_repo java           || die "fail (installing java)"
 
+# install `libcvmfs` build dependencies
+install_from_repo openssl-devel  || die "fail (installing openssl-devel)"
+
+# install `cvmfs_preload` build dependencies
+install_from_repo cmake          || die "fail (installing cmake)"
+install_from_repo libattr-devel  || die "fail (installing libattr-devel)"
+
 # increase open file descriptor limits
 echo -n "increasing ulimit -n ... "
 set_nofile_limit 65536 || die "fail"

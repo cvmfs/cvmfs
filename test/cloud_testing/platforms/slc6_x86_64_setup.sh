@@ -73,10 +73,18 @@ echo "done"
 
 # install additional stuff (needed for perl testing tools)
 echo "installing additional RPM packages..."
-install_from_repo gcc
-install_from_repo gcc-c++
-install_from_repo rubygems
-install_from_repo java
+install_from_repo gcc           || die "fail (installing gcc)"
+install_from_repo gcc-c++       || die "fail (installing gcc-c++)"
+install_from_repo rubygems      || die "fail (installing rubygems)"
+install_from_repo java          || die "fail (installing java)"
+
+# install `libcvmfs` build dependencies
+install_from_repo openssl-devel || die "fail (installing openssl-devel)"
+install_from_repo libuuid-devel || die "fail (installing libuuid-devel)"
+
+# install `cvmfs_preload` build dependencies
+install_from_repo cmake         || die "fail (installing cmake)"
+install_from_repo libattr-devel || die "fail (installing libattr-devel)"
 
 # install ruby gem for FakeS3
 install_ruby_gem fakes3 0.2.0  # latest is 0.2.1 (23.07.2015) that didn't work.

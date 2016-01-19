@@ -222,6 +222,13 @@ atomic_int32 reload_critical_section_;
 time_t drainout_deadline_;
 time_t catalogs_valid_until_;
 
+/**
+ * Caches if there is a VOMS requirement set in the root catalog.  Set on
+ * initial mount and on remount.
+ */
+bool has_voms_authz_;
+std::string *voms_authz_;
+
 typedef google::dense_hash_map<uint64_t, DirectoryListing,
                                hash_murmur<uint64_t> >
         DirectoryHandles;
@@ -290,6 +297,7 @@ class RemountFence : public SingleCopy {
   atomic_int32 blocking_;
 };
 RemountFence *remount_fence_;
+
 
 /**
  * The thread that triggers the reload of the root catalog is informed through
@@ -430,6 +438,7 @@ static void RemountFinish() {
         inode_annotation_->GetGeneration();
     }
     volatile_repository_ = catalog_manager_->GetVolatileFlag();
+    has_voms_authz_ = catalog_manager_->GetVOMSAuthz(voms_authz_);
     remount_fence_->Unblock();
 
     inode_cache_->Resume();
@@ -485,17 +494,16 @@ static void RemountCheck() {
 
 
 static bool CheckVoms(const fuse_ctx &fctx) {
-  std::string voms_requirements;
-  if (catalog_manager_->GetVOMSAuthz(&voms_requirements)) {
+  if (has_voms_authz_) {
     LogCvmfs(kLogCvmfs, kLogDebug, "Got VOMS authz %s from filesystem "
-             "properties", voms_requirements.c_str());
+             "properties", voms_authz_->c_str());
   }
 
   // Get VOMS information, if any.  If VOMS authz is present and VOMS is
   // not compiled in, then deny authorization.
-  if ((fctx.uid != 0) && voms_requirements.size()) {
+  if ((fctx.uid != 0) && voms_authz_->size()) {
 #ifdef VOMS_AUTHZ
-    return CheckVOMSAuthz(&fctx, voms_requirements);
+    return CheckVOMSAuthz(&fctx, *voms_authz_);
 #else
     LogCvmfs(kLogCvmfs, kLogSyslogWarn | kLogDebug,  "VOMS requirements found "
               "in catalog but client compiled without VOMS support");
@@ -2872,6 +2880,10 @@ static int Init(const loader::LoaderExports *loader_exports) {
     cvmfs::volatile_repository_ = true;
   }
 
+  cvmfs::voms_authz_ = new string();
+  cvmfs::has_voms_authz_ =
+    cvmfs::catalog_manager_->GetVOMSAuthz(cvmfs::voms_authz_);
+
   // Make sure client context TLS has been initialized
   // (first initialization is not thread safe).
   ClientCtx::GetInstance();
@@ -2890,7 +2902,15 @@ static int Init(const loader::LoaderExports *loader_exports) {
 static void Spawn() {
   int retval;
 
-  // Setup catalog reload alarm (_after_ fork())
+  // First thing: fork off the watchdog while we still have a single-threaded
+  // well-defined state
+  cvmfs::pid_ = getpid();
+  if (cvmfs::UseWatchdog() && g_monitor_ready) {
+    monitor::RegisterOnCrash(auto_umount::UmountOnCrash);
+    monitor::Spawn();
+  }
+
+  // Setup catalog reload alarm (_after_ forking into daemon mode)
   MakePipe(cvmfs::pipe_remount_trigger_);
   atomic_init32(&cvmfs::maintenance_mode_);
   atomic_init32(&cvmfs::drainout_mode_);
@@ -2918,11 +2938,6 @@ static void Spawn() {
                           cvmfs::MainRemountTrigger, NULL);
   assert(retval == 0);
 
-  cvmfs::pid_ = getpid();
-  if (cvmfs::UseWatchdog() && g_monitor_ready) {
-    monitor::RegisterOnCrash(auto_umount::UmountOnCrash);
-    monitor::Spawn();
-  }
   cvmfs::download_manager_->Spawn();
   cvmfs::external_download_manager_->Spawn();
   cvmfs::cache_manager_->quota_mgr()->Spawn();
@@ -2967,7 +2982,20 @@ static void Fini() {
 
   if (g_talk_ready) talk::Fini();
 
-  // Must be before quota is stopped
+  // The unpin listener requires the catalog, so this must be unregistered
+  // before the catalog manager is removed
+  if (g_quota_ready) {
+    if (cvmfs::unpin_listener_) {
+      quota::UnregisterListener(cvmfs::unpin_listener_);
+      cvmfs::unpin_listener_ = NULL;
+    }
+    if (cvmfs::watchdog_listener_) {
+      quota::UnregisterListener(cvmfs::watchdog_listener_);
+      cvmfs::watchdog_listener_ = NULL;
+    }
+  }
+
+  // Must be before cache and quota are stopped
   delete cvmfs::catalog_manager_;
   cvmfs::catalog_manager_ = NULL;
 
@@ -2981,16 +3009,6 @@ static void Fini() {
   if (g_download_ready) cvmfs::download_manager_->Fini();
   if (g_external_download_ready) cvmfs::external_download_manager_->Fini();
   if (g_nfs_maps_ready) nfs_maps::Fini();
-  if (g_quota_ready) {
-    if (cvmfs::unpin_listener_) {
-      quota::UnregisterListener(cvmfs::unpin_listener_);
-      cvmfs::unpin_listener_ = NULL;
-    }
-    if (cvmfs::watchdog_listener_) {
-      quota::UnregisterListener(cvmfs::watchdog_listener_);
-      cvmfs::watchdog_listener_ = NULL;
-    }
-  }
   if (cvmfs::cache_manager_) {
     delete cvmfs::cache_manager_;
     cvmfs::cache_manager_ = NULL;
@@ -3020,6 +3038,7 @@ static void Fini() {
   delete cvmfs::repository_name_;
   delete cvmfs::repository_tag_;
   delete cvmfs::mountpoint_;
+  delete cvmfs::voms_authz_;
   cvmfs::remount_fence_ = NULL;
   cvmfs::signature_manager_ = NULL;
   cvmfs::download_manager_ = NULL;
@@ -3037,6 +3056,7 @@ static void Fini() {
   cvmfs::repository_name_ = NULL;
   cvmfs::repository_tag_ = NULL;
   cvmfs::mountpoint_ = NULL;
+  cvmfs::voms_authz_ = NULL;
 
   sqlite::UnregisterVfsRdOnly();
   if (sqlite3_temp_directory) {

@@ -34,7 +34,7 @@ cvmfs_run_test() {
   local scratch_dir=$(pwd)
 
   local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
-  local info_url="$(get_local_repo_url info)/v1/repositories"
+  local info_url="$(get_local_repo_url info)/v1/repositories.json"
 
   echo "check if the jq utility is installed"
   which jq > /dev/null 2>&1 || return 1

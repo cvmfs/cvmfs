@@ -22,6 +22,7 @@ RUN        zypper -n update && zypper -n install   \
                                   python-devel     \
                                   tar              \
                                   unzip            \
+                                  valgrind-devel   \
                                   zlib-devel
 
 RUN        useradd sftnight
