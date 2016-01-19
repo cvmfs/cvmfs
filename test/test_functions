@@ -121,6 +121,10 @@ normalize_version() {
   echo "$version_string"
 }
 
+to_syslog() {
+  logger -t cvmfs_test $1
+}
+
 version_major() { echo $1 | cut --delimiter=. --fields=1; }
 version_minor() { echo $1 | cut --delimiter=. --fields=2; }
 version_patch() { echo $1 | cut --delimiter=. --fields=3; }
