@@ -2266,6 +2266,7 @@ remove_repository_storage() {
 
 setup_and_mount_new_repository() {
   local name=$1
+  local http_timeout=15
 
   # get repository information
   load_repo_config $name
@@ -2301,6 +2302,18 @@ EOF
   fi
   local user_shell="$(get_user_shell $name)"
   $user_shell "touch ${CVMFS_SPOOL_DIR}/client.local"
+
+  # avoid racing against apache
+  local waiting=0
+  while ! curl -sIf ${CVMFS_STRATUM0}/.cvmfspublished > /dev/null && \
+        [ $http_timeout -gt 0 ]; do
+    [ $waiting -eq 1 ] || echo -n "waiting for apache... "
+    waiting=1
+    http_timeout=$(( $http_timeout - 1 ))
+    sleep 1
+  done
+  [ $http_timeout -gt 0 ] || return 1
+
   mount $rdonly_dir > /dev/null || return 1
   mount /cvmfs/$name
 }
