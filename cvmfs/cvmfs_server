@@ -5589,12 +5589,12 @@ migrate_2_1_20() {
   fi
 
   local apache_conf="$(get_apache_conf_path)/$(get_apache_conf_filename $name)"
-  local old_line='AddType application/x-cvmfs .cvmfspublished .cvmfswhitelist'
-  if [ -f "$apache_conf" ] && \
-     grep -q "$old_line" "$apache_conf"; then
+  if [ -f "$apache_conf" ]; then
     echo "--> updating apache config ($(basename $apache_conf))"
-    sed -i -e "s/$old_line/<FilesMatch \"^\\\\.cvmfs\">\n        ForceType application\/x-cvmfs\n    <\/FilesMatch>/" \
-      $apache_conf
+    local storage_dir=$(get_upstream_config $CVMFS_UPSTREAM_STORAGE)
+    local wsgi=""
+    [ is_stratum1 $name ] && wsgi="enabled"
+    create_apache_config_for_endpoint $name $storage_dir $wsgi
     reload_apache > /dev/null
   fi
 
