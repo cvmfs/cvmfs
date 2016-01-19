@@ -124,6 +124,26 @@ cvmfs_run_test() {
   [ $(get_epoch "3 days  1 hour") -gt $(get_expiry_time $rurl) ] || return 45
   [ $(get_max_age $rurl)          -eq $default_maxage          ] || return 46
 
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+  url=$(get_repo_url info)
+  local jsontype="application/json"
+  local jsonmaxage=120
+
+  echo "check HTTP headers for /cvmfs/info/v1/repositories.json"
+  local irurl="${url}/v1/repositories.json"
+  [ $(get_epoch "1 minutes") -lt $(get_expiry_time $irurl) ] || return 47
+  [ $(get_epoch "3 minutes") -gt $(get_expiry_time $irurl) ] || return 48
+  [ $(get_max_age $irurl)    -eq $jsonmaxage               ] || return 49
+  [ x"$(get_header $irurl "Content-Type")" = x"$jsontype"  ] || return 50
+
+  echo "check HTTP headers for /cvmfs/info/v1/meta.json"
+  local imurl="${url}/v1/meta.json"
+  [ $(get_epoch "1 minutes") -lt $(get_expiry_time $imurl) ] || return 47
+  [ $(get_epoch "3 minutes") -gt $(get_expiry_time $imurl) ] || return 48
+  [ $(get_max_age $imurl)    -eq $jsonmaxage               ] || return 49
+  [ x"$(get_header $imurl "Content-Type")" = x"$jsontype"  ] || return 50
+
   return 0
 }
 
