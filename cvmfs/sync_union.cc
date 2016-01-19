@@ -261,7 +261,7 @@ bool ObtainSysAdminCapabilityInternal(cap_t caps) {
   }
 
   if (cap_state == CAP_SET) {
-    LogCvmfs(kLogUnionFs, kLogStderr, "CAP_SYS_ADMIN is already effective");
+    LogCvmfs(kLogUnionFs, kLogDebug, "CAP_SYS_ADMIN is already effective");
     return true;
   }
 
