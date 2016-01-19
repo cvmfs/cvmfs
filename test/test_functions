@@ -461,10 +461,7 @@ check_memory() {
   local rss_kb=$(echo $rss | awk '{print $2}')
 
   if [ $rss_kb -gt $limit ]; then
-    local inode_tracker="$(sudo cvmfs_talk -i $instance internal affairs | grep 'inode tracker')"
-    local inserts=$(sudo cvmfs_talk -i $instance internal affairs | grep '^inode_tracker.n_insert' | cut -d\| -f2)
-    local removes=$(sudo cvmfs_talk -i $instance internal affairs | grep '^inode_tracker.n_remove' | cut -d\| -f2)
-    local elements=$(( $inserts - $removes ))
+    local elements=$(sudo cvmfs_talk -i $instance internal affairs | grep '^inode_tracker.no_reference' | cut -d\| -f2)
 
     echo "Memory limit of $limit kB was exceeded by $instance which used $rss_kb kB"
     echo "We've had $elements items in the inode tracker"
