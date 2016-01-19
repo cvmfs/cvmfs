@@ -2447,6 +2447,7 @@ _write_info_file() {
   cat - > $tmp_file
   chmod 0644 $tmp_file
   mv -f $tmp_file $info_file_path
+  set_selinux_httpd_context_if_needed $info_file_dir
 }
 
 
@@ -2521,6 +2522,8 @@ create_global_info_skeleton() {
 
   mkdir -p $info_path                               || return 1
   mkdir -p $info_v1_path                            || return 2
+  set_selinux_httpd_context_if_needed $info_path    || return 3
+  set_selinux_httpd_context_if_needed $info_v1_path || return 4
 
   _check_info_file "repositories" || echo "{}" | _write_info_file "repositories"
   _check_info_file "meta" || _write_info_file "meta" << EOF
