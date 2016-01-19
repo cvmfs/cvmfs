@@ -61,12 +61,12 @@ EOF
   cvmfs_swissknife zpipe -d < /srv/cvmfs/${repo}/external_file > ${reference_dir}/external_file
 }
 
-desaster_cleanup() {
-  local mountpoint=$1
-  local replica_name=$2
-
-  sudo umount $mountpoint > /dev/null 2>&1
-  sudo cvmfs_server rmfs -f $replica_name > /dev/null 2>&1
+CVMFS_TEST_620_MOUNTPOINT=
+CVMFS_TEST_620_REPLICA=
+cleanup() {
+  echo "running cleanup()..."
+  [ -z $CVMFS_TEST_620_MOUNTPOINT ] || sudo umount $CVMFS_TEST_620_MOUNTPOINT            > /dev/null 2>&1
+  [ -z $CVMFS_TEST_620_REPLICA    ] || sudo cvmfs_server rmfs -f $CVMFS_TEST_620_REPLICA > /dev/null 2>&1
 }
 
 check_stratum1_tmp_dir_emptiness() {
@@ -146,13 +146,17 @@ cvmfs_run_test() {
 
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
+  echo "install a desaster cleanup"
+  trap cleanup EXIT HUP INT TERM
+
   echo "create Stratum1 repository on the same machine"
+  CVMFS_TEST_620_REPLICA=$replica_name
   load_repo_config $CVMFS_TEST_REPO
   create_stratum1 $replica_name                          \
                   $CVMFS_TEST_USER                       \
                   $CVMFS_STRATUM0                        \
                   /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub \
-    || { desaster_cleanup $mnt_point $replica_name; return 7; }
+    || return 7
 
   echo -n "get Stratum 1 spool directory: "
   load_repo_config $replica_name
@@ -161,22 +165,24 @@ cvmfs_run_test() {
   echo "$s1_spool_tmp_dir"
 
   echo "create a Snapshot of the Stratum0 repository in the just created Stratum1 replica"
-  sudo cvmfs_server snapshot $replica_name || { desaster_cleanup $mnt_point $replica_name; return 9; }
+  sudo cvmfs_server snapshot $replica_name || return 9
 
   echo "copy external file"
   cp /srv/cvmfs/${CVMFS_TEST_REPO}/external_file /srv/cvmfs/$replica_name/
 
   echo "check that Stratum1 spooler tmp dir is empty"
-  check_stratum1_tmp_dir_emptiness $s1_spool_tmp_dir || { desaster_cleanup $mnt_point $replica_name; return 101; }
+  check_stratum1_tmp_dir_emptiness $s1_spool_tmp_dir || return 101
 
   echo "mount the Stratum1 repository on a local mountpoint"
-  do_local_mount $mnt_point $CVMFS_TEST_REPO $(get_repo_url $replica_name) || { desaster_cleanup $mnt_point $replica_name; return 10; }
+  CVMFS_TEST_620_MOUNTPOINT=$mnt_point
+  do_local_mount $mnt_point $CVMFS_TEST_REPO $(get_repo_url $replica_name) || return 10
 
   echo "check if the Stratum1 repository contains exactly the same as the reference copy"
-  compare_directories $mnt_point $reference_dir || { desaster_cleanup $mnt_point $replica_name; return 11; }
+  compare_directories $mnt_point $reference_dir || return 11
 
   echo "unmount the Stratum1 repository"
-  sudo umount $mnt_point || { desaster_cleanup $mnt_point $replica_name; return 12; }
+  sudo umount $mnt_point || return 12
+  CVMFS_TEST_620_MOUNTPOINT=""
 
   echo "clean up"
   sudo cvmfs_server rmfs -f $replica_name
@@ -201,14 +207,13 @@ CVMFS_HTTP_PROXY=NOAVAIL
 CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/$CVMFS_TEST_REPO.pub
 EOF
 
-  echo "Mount the repository in $REPO_MOUNTPOINT to verify it"
-  REPO_MOUNTPOINT="$(pwd)/mnt"
+  echo "Mount the repository in $mnt_point to verify it"
   local retval=0
+  CVMFS_TEST_620_MOUNTPOINT=$mnt_point
   do_local_mount $mnt_point $CVMFS_TEST_REPO XXX $local_conf || retval=41
 
   ls $mnt_point || retval=42
   diff $mnt_point/large $reference_dir/large || retval=43
-  desaster_cleanup $mnt_point $replica_name
 
   return 0
 }
