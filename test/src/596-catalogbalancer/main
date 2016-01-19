@@ -22,19 +22,19 @@ cvmfs_run_test() {
   local repo="$CVMFS_TEST_REPO"
   local repo_dir="/cvmfs/$repo"
 
-  create_repo "$repo" $CVMFS_TEST_USER
+  create_repo "$repo" $CVMFS_TEST_USER || return 1
 
   sudo bash -c "echo 'CVMFS_AUTOCATALOGS=true
   CVMFS_AUTOCATALOGS_MAX_WEIGHT=20
   CVMFS_AUTOCATALOGS_MIN_WEIGHT=9' >> /etc/cvmfs/repositories.d/$repo/server.conf"
 
-  start_transaction "$repo"
+  start_transaction "$repo" || return 2
   add_files "$repo_dir" 25
   add_files "$repo_dir/dir100" 100
   add_files "$repo_dir/dir3" 3
   add_files "$repo_dir/dir4" 4
   add_catalog "$repo_dir/dir4"
-  publish_repo "$repo"
+  publish_repo "$repo" || return 3
 
   echo "Checking first iteration"
   ! [ -f "$repo_dir/dir3/.cvmfscatalog" ]                     || return 1
