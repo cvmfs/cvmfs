@@ -2025,3 +2025,56 @@ cat_syslog() {
 
   return $cat_retval
 }
+
+
+# look for the `cvmfs_preload` binary both installed in $PATH and
+# pre-built in /tmp. If both lookups fail, try to build it from
+# the provided source tree
+#
+# @param cvmfs_source_dir  absolute path to a CernVM-FS source tree
+# @return                  location of `cvmfs_preload` or retval 1
+find_or_build_cvmfs_preload() {
+  local cvmfs_source_dir="$1"
+  local cvmfs_preload_build_dir="/tmp/cvmfs_test_preload_build"
+  local cvmfs_preload_build_log="${cvmfs_preload_build_dir}/build.log"
+  local cvmfs_preload_path=
+
+  # check if cvmfs_preload is readily available (i.e. installed in $PATH)
+  if which cvmfs_preload > /dev/null 2>&1; then
+    which cvmfs_preload
+    return 0
+  fi
+
+  # check if cvmfs_preload has been built before
+  if [ -x ${cvmfs_preload_build_dir}/cvmfs/cvmfs_preload ]; then
+    echo "${cvmfs_preload_build_dir}/cvmfs/cvmfs_preload"
+    return 0
+  fi
+
+  # build cvmfs_preload from source $cvmfs_source_dir
+  rm -fR   $cvmfs_preload_build_dir > /dev/null 2>&1 || return 1
+  mkdir -p $cvmfs_preload_build_dir > /dev/null 2>&1 || return 2
+  pushdir  $cvmfs_preload_build_dir > /dev/null 2>&1 || return 3
+
+  cmake -DBUILD_PRELOADER=yes      \
+        -DBUILD_SERVER=no          \
+        -DBUILD_SERVER_DEBUG=no    \
+        -DBUILD_CVMFS=no           \
+        -DBUILD_UNITTESTS=no       \
+        -DBUILD_UNITTESTS_DEBUG=no \
+        -DBUILD_LIBCVMFS=no        \
+        -DINSTALL_MOUNT_SCRIPTS=no \
+        -DBUILD_DOCUMENTATION=no   \
+        $cvmfs_source_dir > $cvmfs_preload_build_log 2>&1 || return 4
+  make -j                 > $cvmfs_preload_build_log 2>&1 || return 5
+
+  popdir > /dev/null 2>&1
+
+  # check (again) if cvmfs_preload has been built properly and return
+  if [ -x ${cvmfs_preload_build_dir}/cvmfs/cvmfs_preload ]; then
+    echo "${cvmfs_preload_build_dir}/cvmfs/cvmfs_preload"
+    return 0
+  fi
+
+  return 1
+}
