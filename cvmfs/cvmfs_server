@@ -714,6 +714,14 @@ get_apache_conf_mode() {
 }
 
 
+set_selinux_httpd_context_if_needed() {
+  local directory="$1"
+  if has_selinux; then
+    chcon -Rv --type=httpd_sys_content_t ${directory}/ > /dev/null
+  fi
+}
+
+
 # find location of apache configuration files
 #
 # @return   the location of apache configuration files (stdout)
@@ -1916,9 +1924,7 @@ create_repository_skeleton() {
   if [ x$(id -un) != x$user ]; then
     chown -R $user ${directory}/
   fi
-  if has_selinux; then
-    chcon -Rv --type=httpd_sys_content_t ${directory}/ > /dev/null
-  fi
+  set_selinux_httpd_context_if_needed $directory
   echo "done"
 }
 
@@ -2266,6 +2272,7 @@ remove_repository_storage() {
 
 setup_and_mount_new_repository() {
   local name=$1
+  local http_timeout=15
 
   # get repository information
   load_repo_config $name
@@ -2301,6 +2308,18 @@ EOF
   fi
   local user_shell="$(get_user_shell $name)"
   $user_shell "touch ${CVMFS_SPOOL_DIR}/client.local"
+
+  # avoid racing against apache
+  local waiting=0
+  while ! curl -sIf ${CVMFS_STRATUM0}/.cvmfspublished > /dev/null && \
+        [ $http_timeout -gt 0 ]; do
+    [ $waiting -eq 1 ] || echo -n "waiting for apache... "
+    waiting=1
+    http_timeout=$(( $http_timeout - 1 ))
+    sleep 1
+  done
+  [ $http_timeout -gt 0 ] || return 1
+
   mount $rdonly_dir > /dev/null || return 1
   mount /cvmfs/$name
 }
@@ -2410,25 +2429,31 @@ has_file_descriptors_on_mount_point() {
 
 
 get_global_info_path() {
-  # TODO(rmeusel): make this a bit more flexible
-  echo "${DEFAULT_LOCAL_STORAGE}/info/v${LATEST_JSON_INFO_SCHEMA}"
+  echo "${DEFAULT_LOCAL_STORAGE}/info"
+}
+
+
+get_global_info_v1_path() {
+  echo "$(get_global_info_path)/v${LATEST_JSON_INFO_SCHEMA}"
 }
 
 
 _write_info_file() {
   local info_file="$1"
-  local info_file_path="$(get_global_info_path)/${info_file}"
+  local info_file_dir="$(get_global_info_v1_path)"
+  local info_file_path="${info_file_dir}/${info_file}"
   local tmp_file=$(mktemp)
 
   cat - > $tmp_file
   chmod 0644 $tmp_file
   mv -f $tmp_file $info_file_path
+  set_selinux_httpd_context_if_needed $info_file_dir
 }
 
 
 _check_info_file() {
   local info_file="$1"
-  [ -f "$(get_global_info_path)/${info_file}" ]
+  [ -f "$(get_global_info_v1_path)/${info_file}" ]
 }
 
 
@@ -2487,13 +2512,18 @@ _render_info_file() {
 
 
 has_global_info_path() {
-  [ -d $(get_global_info_path) ]
+  [ -d $(get_global_info_path) ] && [ -d $(get_global_info_v1_path) ]
 }
 
 
 create_global_info_skeleton() {
   local info_path="$(get_global_info_path)"
-  mkdir -p $info_path
+  local info_v1_path="$(get_global_info_v1_path)"
+
+  mkdir -p $info_path                               || return 1
+  mkdir -p $info_v1_path                            || return 2
+  set_selinux_httpd_context_if_needed $info_path    || return 3
+  set_selinux_httpd_context_if_needed $info_v1_path || return 4
 
   _check_info_file "repositories" || echo "{}" | _write_info_file "repositories"
   _check_info_file "meta" || _write_info_file "meta" << EOF
@@ -3009,7 +3039,7 @@ mkfs() {
   # create storage area
   if is_local_upstream $upstream; then
     echo -n "Creating Backend Storage... "
-    create_global_info_skeleton
+    create_global_info_skeleton     || die "fail"
     create_repository_storage $name || die "fail"
     echo "done"
   fi
@@ -3480,9 +3510,7 @@ import() {
   if [ $chown_backend -ne 0 ]; then
     echo -n "Importing CernVM-FS storage... "
     chown -R $cvmfs_user $storage_location || die "fail!"
-    if has_selinux; then
-      chcon -Rv --type=httpd_sys_content_t $storage_location > /dev/null || die "fail!"
-    fi
+    set_selinux_httpd_context_if_needed $storage_location || die "fail!"
     echo "done"
   fi
 
@@ -5351,9 +5379,7 @@ migrate_2_1_6() {
     local tmp_dir=${storage_path}/data/txn
     mkdir $tmp_dir > /dev/null 2>&1 || echo "Warning: not able to create $tmp_dir"
     chown -R $CVMFS_USER $tmp_dir > /dev/null 2>&1 || echo "Warning: not able to chown $tmp_dir to $CVMFS_USER"
-    if has_selinux; then
-      chcon -Rv --type=httpd_sys_content_t $tmp_dir > /dev/null 2>&1 || echo "Warning: not able to chcon $tmp_dir to httpd_sys_content_t"
-    fi
+    set_selinux_httpd_context_if_needed $tmp_dir || echo "Warning: not able to chcon $tmp_dir to httpd_sys_content_t"
 
     echo "--> updating server.conf"
     mv /etc/cvmfs/repositories.d/${name}/server.conf /etc/cvmfs/repositories.d/${name}/server.conf.old
@@ -5916,7 +5942,7 @@ update_info() {
     # copy the meta information file for editing
     tmp_file=$(mktemp)
     trap "_update_info_cleanup $tmp_file" EXIT HUP INT TERM
-    cp -f "$(get_global_info_path)/meta" $tmp_file
+    cp -f "$(get_global_info_v1_path)/meta" $tmp_file
 
     edit_json_until_valid $tmp_file || die "Aborting..."
   fi

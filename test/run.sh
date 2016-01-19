@@ -170,6 +170,8 @@ mkdir -p $scratch_basedir
 
 get_iso8601_timestamp > ${scratch_basedir}/starttime
 
+to_syslog "Test Suite started"
+
 # run the tests
 for t in $testsuite
 do
@@ -202,7 +204,9 @@ do
   fi
 
   # write some status info to the screen
-  echo "-- Testing ${cvmfs_test_name} ($(date) / test number $(basename $t | head -c3))" >> $logfile
+  TEST_NR="$(basename $t | head -c3)"
+  to_syslog "Test $TEST_NR (${cvmfs_test_name}) started"
+  echo "-- Testing ${cvmfs_test_name} ($(date) / test number $TEST_NR)" >> $logfile
   echo -n "Testing ${cvmfs_test_name}... "
   echo "$cvmfs_test_name"          > ${scratchdir}/name
   echo "$(basename $t | head -c3)" > ${scratchdir}/number
@@ -219,6 +223,7 @@ do
   setup_retval=0
   setup_environment $cvmfs_test_autofs_on_startup $workdir >> $logfile 2>&1 || setup_retval=$?
   if [ $setup_retval -ne 0 ]; then
+    to_syslog "Test $TEST_NR (${cvmfs_test_name}) failed (setup)"
     report_failure "failed to setup environment (retval: $setup_retval)" >> $logfile
     echo "Failed! (setup)"
     echo "0"         > ${scratchdir}/elapsed
@@ -254,18 +259,21 @@ do
   case $RETVAL in
     0)
       clean_workdir
+      to_syslog "Test $TEST_NR (${cvmfs_test_name}) finished successfully"
       report_passed "Test passed" >> $logfile
       touch ${scratchdir}/success
       echo "OK"
       ;;
     $CVMFS_MEMORY_WARNING)
       clean_workdir
+      to_syslog "Test $TEST_NR (${cvmfs_test_name}) finished with memory warning"
       report_warning "Memory limit exceeded!" >> $logfile
       touch ${scratchdir}/memorywarning
       echo "Memory Warning!"
       ;;
     $CVMFS_TIME_WARNING)
       clean_workdir
+      to_syslog "Test $TEST_NR (${cvmfs_test_name}) finished with time warning"
       report_warning "Time limit exceeded!" >> $logfile
       tail -n 50 /var/log/messages /var/log.syslog >> $logfile 2>/dev/null
       touch ${scratchdir}/timewarning
@@ -273,11 +281,13 @@ do
       ;;
     $CVMFS_GENERAL_WARNING)
       clean_workdir
+      to_syslog "Test $TEST_NR (${cvmfs_test_name}) finished with warning"
       report_warning "Test case finished with warnings!" >> $logfile
       touch ${scratchdir}/generalwarning
       echo "Warning!"
       ;;
     *)
+      to_syslog "Test $TEST_NR (${cvmfs_test_name}) failed"
       report_failure "Testcase failed with RETVAL $RETVAL" $workdir >> $logfile
       tail -n 50 /var/log/messages /var/log.syslog >> $logfile 2>/dev/null
       touch ${scratchdir}/failure
@@ -318,6 +328,8 @@ echo "Warnings: $num_warnings"
 echo "Failures: $num_failures"
 echo ""
 echo "took $(milliseconds_to_human_readable $testsuite_time_elapsed)"
+
+to_syslog "Test Suite finished"
 
 exit $num_failures
 
