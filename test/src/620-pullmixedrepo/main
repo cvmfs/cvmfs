@@ -80,6 +80,7 @@ check_stratum1_tmp_dir_emptiness() {
 
 cvmfs_run_test() {
   logfile=$1
+  local script_location=$2
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
 
   local scratch_dir=$(pwd)
@@ -88,6 +89,13 @@ cvmfs_run_test() {
 
   local mnt_point="$(pwd)/mountpount"
   local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
+
+  echo -n "checking if cvmfs_preload is available... "
+  local source_tree="$(dirname $(dirname $(dirname $script_location)))"
+  local PRELOAD=
+  PRELOAD=$(find_or_build_cvmfs_preload $source_tree)
+  [ -x "$PRELOAD" ] || { echo "fail"; return 1; }
+  echo "found ($PRELOAD)"
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
@@ -175,7 +183,7 @@ cvmfs_run_test() {
 
   echo "preloading a cache"
   local preload_dir=/srv/cvmfs/${CVMFS_TEST_REPO}/preloaded
-  cvmfs_preload -u "http://localhost/cvmfs/$CVMFS_TEST_REPO" \
+  $PRELOAD -u "http://localhost/cvmfs/$CVMFS_TEST_REPO" \
     -r $preload_dir \
     -k "/etc/cvmfs/keys/$CVMFS_TEST_REPO.pub" \
     -m "$CVMFS_TEST_REPO" || return $?
