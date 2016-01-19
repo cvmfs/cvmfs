@@ -771,7 +771,7 @@ create_apache_config_file() {
   conf_path="$(get_apache_conf_path)"
 
   # create (or append) the conf file
-  cat - >> ${conf_path}/${file_name} || return 1
+  cat - > ${conf_path}/${file_name} || return 1
 
   # the new apache requires the enable the config afterwards
   if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_CONFAVAIL" ]; then
