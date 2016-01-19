@@ -19,10 +19,10 @@ add_catalog() {
 
 cvmfs_run_test() {
   apache_switch on
-  local repo="test.local"
+  local repo="$CVMFS_TEST_REPO"
   local repo_dir="/cvmfs/$repo"
 
-  create_repo "$repo" $(whoami)
+  create_repo "$repo" $CVMFS_TEST_USER
 
   sudo bash -c "echo 'CVMFS_AUTOCATALOGS=true
   CVMFS_AUTOCATALOGS_MAX_WEIGHT=20
