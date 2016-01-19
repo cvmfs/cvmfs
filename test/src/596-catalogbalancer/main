@@ -53,7 +53,7 @@ cvmfs_run_test() {
   start_transaction "$repo"
   add_files "$repo_dir/dir/dir30" 30
   for i in $(ls "$repo_dir" | grep "file"); do
-    rm "$repo_dir/$i"
+    rm -f "$repo_dir/$i"
   done
   publish_repo "$repo"
 
@@ -100,7 +100,7 @@ cvmfs_run_test() {
 
   start_transaction "$repo"
   for i in $(ls $repo_dir/dir60 | grep "file"); do
-    rm "$repo_dir/dir60/$i"
+    rm -f "$repo_dir/dir60/$i"
   done
   add_files "$repo_dir/dir60" 1
   publish_repo "$repo"
@@ -197,7 +197,7 @@ cvmfs_run_test() {
 
   start_transaction "$repo"
   for i in $(ls $repo_dir/dir/dir30/dir/dir11 | grep "file"); do
-    rm "$repo_dir/dir/dir30/dir/dir11/$i"
+    rm -f "$repo_dir/dir/dir30/dir/dir11/$i"
   done
   add_files "$repo_dir/dir/dir30/dir/dir11" 5  # this should provoke an underflow
   touch "$repo_dir/dir/dir30/dir/dir7/file8"  # with this extra file $repo_dir/dir/dir30/dir/dir7 could be a catalog
@@ -236,6 +236,5 @@ cvmfs_run_test() {
     [ -f "$repo_dir/dir/dir30/dir/dir7/.cvmfsautocatalog" ]      || return 134
   if ! check_catalog_presence "/dir/dir30/dir/dir7" "$repo"; then return 135; fi
 
-
-  destroy_repo "$repo"
+  return 0
 }
