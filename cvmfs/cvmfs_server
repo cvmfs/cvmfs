@@ -703,6 +703,11 @@ get_apache_version() {
   ${APACHE_BIN} -v | head -n1 | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+'
 }
 
+get_apache_conf_filename() {
+  local name=$1
+  echo "cvmfs.${name}.conf"
+}
+
 # figure out apache config file mode
 #
 # @return   apache config mode (stdout) (see globals below)
@@ -766,7 +771,7 @@ create_apache_config_file() {
   conf_path="$(get_apache_conf_path)"
 
   # create (or append) the conf file
-  cat - >> ${conf_path}/${file_name} || return 1
+  cat - > ${conf_path}/${file_name} || return 1
 
   # the new apache requires the enable the config afterwards
   if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_CONFAVAIL" ]; then
@@ -2047,7 +2052,7 @@ create_apache_config_for_endpoint() {
   local storage_dir=$2
   local with_wsgi="$3"
 
-  create_apache_config_file "cvmfs.${name}.conf" << EOF
+  create_apache_config_file "$(get_apache_conf_filename $name)" << EOF
 # Created by cvmfs_server.  Don't touch.
 $(cat_wsgi_config $name $with_wsgi)
 
@@ -2062,22 +2067,23 @@ Alias /cvmfs/${name} ${storage_dir}
     EnableMMAP Off
     EnableSendFile Off
 
-    AddType application/x-cvmfs .cvmfspublished .cvmfswhitelist
+    <FilesMatch "^\.cvmfs">
+        ForceType application/x-cvmfs
+    </FilesMatch>
 
     Header unset Last-Modified
     FileETag None
 
     ExpiresActive On
     ExpiresDefault "access plus 3 days"
-    ExpiresByType text/html "access plus 5 minutes"
     ExpiresByType application/x-cvmfs "access plus 2 minutes"
+    ExpiresByType application/json    "access plus 2 minutes"
 </Directory>
 EOF
 }
 
 has_apache_config_for_global_info() {
-  local conf_file="cvmfs.info.conf"
-  has_apache_config_file $conf_file
+  has_apache_config_file $(get_apache_conf_filename "info")
 }
 
 create_apache_config_for_global_info() {
@@ -2157,7 +2163,7 @@ EOF
   if [ $configure_apache -eq 1 ] && is_local_upstream $upstream; then
     local repository_dir=$(get_upstream_config $upstream)
     # make sure that the config file does not exist, yet
-    remove_apache_config_file "cvmfs.${name}.conf" || true
+    remove_apache_config_file "$(get_apache_conf_filename $name)" || true
     create_apache_config_for_endpoint $name $repository_dir
     create_apache_config_for_global_info
   fi
@@ -2187,7 +2193,7 @@ remove_config_files() {
   local name=$1
   load_repo_config $name
 
-  local apache_conf_file_name="cvmfs.${name}.conf"
+  local apache_conf_file_name="$(get_apache_conf_filename $name)"
   if is_local_upstream $CVMFS_UPSTREAM_STORAGE &&
      has_apache_config_file "$apache_conf_file_name"; then
     remove_apache_config_file "$apache_conf_file_name"
@@ -5496,7 +5502,7 @@ migrate_2_1_15() {
   local name=$1
   local destination_version="2.1.20"
   local conf_file
-  conf_file="$(get_apache_conf_path)/cvmfs.${name}.conf"
+  conf_file="$(get_apache_conf_path)/$(get_apache_conf_filename $name)"
 
   # get repository information
   load_repo_config $name
@@ -5580,6 +5586,16 @@ migrate_2_1_20() {
     echo "CVMFS_AUTO_REPAIR_MOUNTPOINT=true" >> $server_confg
   else
     sed -i -e "s/^\(CVMFS_AUTO_REPAIR_MOUNTPOINT\)=.*/\1=true/" $server_conf
+  fi
+
+  local apache_conf="$(get_apache_conf_path)/$(get_apache_conf_filename $name)"
+  if [ -f "$apache_conf" ]; then
+    echo "--> updating apache config ($(basename $apache_conf))"
+    local storage_dir=$(get_upstream_config $CVMFS_UPSTREAM_STORAGE)
+    local wsgi=""
+    [ is_stratum1 $name ] && wsgi="enabled"
+    create_apache_config_for_endpoint $name $storage_dir $wsgi
+    reload_apache > /dev/null
   fi
 
   sed -i -e "s/^\(CVMFS_CREATOR_VERSION\)=.*/\1=$destination_version/" $server_conf
