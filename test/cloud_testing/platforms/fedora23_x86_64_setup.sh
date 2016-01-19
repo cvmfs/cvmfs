@@ -47,6 +47,11 @@ install_from_repo bc
 install_from_repo openssl-devel
 install_from_repo libuuid-devel
 
+# install stuff necessary to build `cvmfs_preload`
+install_from_repo cmake
+install_from_repo patch
+install_from_repo libattr-devel
+
 # increase open file descriptor limits
 echo -n "increasing ulimit -n ... "
 set_nofile_limit 65536 || die "fail"
