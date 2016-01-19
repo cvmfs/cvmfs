@@ -477,6 +477,7 @@ least CernVM-FS $creator to manipulate this repository."
   #     -> new (mandatory) parameters in client.conf (Stratum 0)
   #     -> adjustments in /etc/fstab
   #     -> CVMFS_AUTO_REPAIR_MOUNTPOINT=true becomes the enforced default
+  #     -> Apache configuration updated
   #
   # Note: I tried to make this code as verbose as possible
   #
@@ -513,8 +514,7 @@ least CernVM-FS $creator to manipulate this repository."
      [ "$creator" = "2.1.19"  ] || [ "$creator" = "2.1.20"  ] || \
      [ "$creator" = "2.2.0-0" ];
   then
-    if version_greater_or_equal "2.2.0" && \
-       is_stratum0 $name; then
+    if version_greater_or_equal "2.2.0"; then
       _repo_is_incompatible "$creator" $nokill
       return $?
     fi
