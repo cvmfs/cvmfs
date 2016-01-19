@@ -2076,7 +2076,6 @@ Alias /cvmfs/${name} ${storage_dir}
 
     ExpiresActive On
     ExpiresDefault "access plus 3 days"
-    ExpiresByType text/html "access plus 5 minutes"
     ExpiresByType application/x-cvmfs "access plus 2 minutes"
     ExpiresByType application/json    "access plus 2 minutes"
 </Directory>
