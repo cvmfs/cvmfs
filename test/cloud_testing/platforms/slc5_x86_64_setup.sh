@@ -70,8 +70,8 @@ install_from_repo java           || die "fail (installing java)"
 install_from_repo openssl-devel  || die "fail (installing openssl-devel)"
 
 # install `cvmfs_preload` build dependencies
-install_from_repo cmake
-install_from_repo libattr-devel
+install_from_repo cmake          || die "fail (installing cmake)"
+install_from_repo libattr-devel  || die "fail (installing libattr-devel)"
 
 # increase open file descriptor limits
 echo -n "increasing ulimit -n ... "
