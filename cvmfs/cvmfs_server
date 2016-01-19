@@ -2429,14 +2429,19 @@ has_file_descriptors_on_mount_point() {
 
 
 get_global_info_path() {
-  # TODO(rmeusel): make this a bit more flexible
-  echo "${DEFAULT_LOCAL_STORAGE}/info/v${LATEST_JSON_INFO_SCHEMA}"
+  echo "${DEFAULT_LOCAL_STORAGE}/info"
+}
+
+
+get_global_info_v1_path() {
+  echo "$(get_global_info_path)/v${LATEST_JSON_INFO_SCHEMA}"
 }
 
 
 _write_info_file() {
   local info_file="$1"
-  local info_file_path="$(get_global_info_path)/${info_file}"
+  local info_file_dir="$(get_global_info_v1_path)"
+  local info_file_path="${info_file_dir}/${info_file}"
   local tmp_file=$(mktemp)
 
   cat - > $tmp_file
@@ -2447,7 +2452,7 @@ _write_info_file() {
 
 _check_info_file() {
   local info_file="$1"
-  [ -f "$(get_global_info_path)/${info_file}" ]
+  [ -f "$(get_global_info_v1_path)/${info_file}" ]
 }
 
 
@@ -2506,13 +2511,16 @@ _render_info_file() {
 
 
 has_global_info_path() {
-  [ -d $(get_global_info_path) ]
+  [ -d $(get_global_info_path) ] && [ -d $(get_global_info_v1_path) ]
 }
 
 
 create_global_info_skeleton() {
   local info_path="$(get_global_info_path)"
-  mkdir -p $info_path
+  local info_v1_path="$(get_global_info_v1_path)"
+
+  mkdir -p $info_path                               || return 1
+  mkdir -p $info_v1_path                            || return 2
 
   _check_info_file "repositories" || echo "{}" | _write_info_file "repositories"
   _check_info_file "meta" || _write_info_file "meta" << EOF
@@ -3028,7 +3036,7 @@ mkfs() {
   # create storage area
   if is_local_upstream $upstream; then
     echo -n "Creating Backend Storage... "
-    create_global_info_skeleton
+    create_global_info_skeleton     || die "fail"
     create_repository_storage $name || die "fail"
     echo "done"
   fi
@@ -5931,7 +5939,7 @@ update_info() {
     # copy the meta information file for editing
     tmp_file=$(mktemp)
     trap "_update_info_cleanup $tmp_file" EXIT HUP INT TERM
-    cp -f "$(get_global_info_path)/meta" $tmp_file
+    cp -f "$(get_global_info_v1_path)/meta" $tmp_file
 
     edit_json_until_valid $tmp_file || die "Aborting..."
   fi
