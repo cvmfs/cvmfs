@@ -714,6 +714,14 @@ get_apache_conf_mode() {
 }
 
 
+set_selinux_httpd_context_if_needed() {
+  local directory="$1"
+  if has_selinux; then
+    chcon -Rv --type=httpd_sys_content_t ${directory}/ > /dev/null
+  fi
+}
+
+
 # find location of apache configuration files
 #
 # @return   the location of apache configuration files (stdout)
@@ -1916,9 +1924,7 @@ create_repository_skeleton() {
   if [ x$(id -un) != x$user ]; then
     chown -R $user ${directory}/
   fi
-  if has_selinux; then
-    chcon -Rv --type=httpd_sys_content_t ${directory}/ > /dev/null
-  fi
+  set_selinux_httpd_context_if_needed $directory
   echo "done"
 }
 
@@ -3493,9 +3499,7 @@ import() {
   if [ $chown_backend -ne 0 ]; then
     echo -n "Importing CernVM-FS storage... "
     chown -R $cvmfs_user $storage_location || die "fail!"
-    if has_selinux; then
-      chcon -Rv --type=httpd_sys_content_t $storage_location > /dev/null || die "fail!"
-    fi
+    set_selinux_httpd_context_if_needed $storage_location || die "fail!"
     echo "done"
   fi
 
@@ -5364,9 +5368,7 @@ migrate_2_1_6() {
     local tmp_dir=${storage_path}/data/txn
     mkdir $tmp_dir > /dev/null 2>&1 || echo "Warning: not able to create $tmp_dir"
     chown -R $CVMFS_USER $tmp_dir > /dev/null 2>&1 || echo "Warning: not able to chown $tmp_dir to $CVMFS_USER"
-    if has_selinux; then
-      chcon -Rv --type=httpd_sys_content_t $tmp_dir > /dev/null 2>&1 || echo "Warning: not able to chcon $tmp_dir to httpd_sys_content_t"
-    fi
+    set_selinux_httpd_context_if_needed $tmp_dir || echo "Warning: not able to chcon $tmp_dir to httpd_sys_content_t"
 
     echo "--> updating server.conf"
     mv /etc/cvmfs/repositories.d/${name}/server.conf /etc/cvmfs/repositories.d/${name}/server.conf.old
