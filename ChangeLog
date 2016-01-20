@@ -1,4 +1,5 @@
 2.2.0:
+  * Fix cache-control max-age time coming from .cvmfs* files on EL7 (CVM-974)
   * Fix rare deadlock on unmount
   * Fix ~10% performance hit in download code due to incorrect use of libcurl
   * Fix mistakenly ignoring catalogs during garbage collection (CVM-966)
