@@ -135,7 +135,7 @@ cvmfs_config_usage() {
  echo "  reload [-c | <repository>]"
  echo "  umount"
  echo "  wipecache"
- echo "  killall [-l(azy unmount)] [-k(ill cvmfs user sessions)]"
+ echo "  killall"
  echo "  bugreport"
 }
 
