@@ -220,8 +220,8 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
         // 404: the stratum 1 does not have the newest files
         info->error_code = kFailHostHttp;
       } else {
-        info->error_code = (info->proxy == "") ? kFailHostHttp :
-                                                 kFailProxyHttp;
+        info->error_code = (info->proxy == "DIRECT") ? kFailHostHttp :
+                                                       kFailProxyHttp;
       }
       return 0;
     }
@@ -887,8 +887,8 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
   if (!opt_proxy_groups_ ||
       ((*opt_proxy_groups_)[opt_proxy_groups_current_][0].url == "DIRECT"))
   {
-    info->proxy = "";
-    curl_easy_setopt(info->curl_handle, CURLOPT_PROXY, info->proxy.c_str());
+    info->proxy = "DIRECT";
+    curl_easy_setopt(info->curl_handle, CURLOPT_PROXY, "");
   } else {
     ProxyInfo proxy = (*opt_proxy_groups_)[opt_proxy_groups_current_][0];
     ValidateProxyIpsUnlocked(proxy.url, proxy.host);
@@ -903,7 +903,7 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     }
   }
   curl_easy_setopt(curl_handle, CURLOPT_LOW_SPEED_LIMIT, opt_low_speed_limit_);
-  if (info->proxy != "") {
+  if (info->proxy != "DIRECT") {
     curl_easy_setopt(curl_handle, CURLOPT_CONNECTTIMEOUT, opt_timeout_proxy_);
     curl_easy_setopt(curl_handle, CURLOPT_LOW_SPEED_TIME, opt_timeout_proxy_);
   } else {
@@ -941,7 +941,7 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     string replacement;
     if (proxy_template_forced_ != "") {
       replacement = proxy_template_forced_;
-    } else if (info->proxy == "") {
+    } else if (info->proxy == "DIRECT") {
       replacement = proxy_template_direct_;
     } else {
       if (opt_proxy_groups_current_ >= opt_proxy_groups_fallback_) {
@@ -949,8 +949,8 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
         // since the fallback proxies are supposed to get sorted, too.
         LogCvmfs(kLogDownload, kLogDebug,
                  "using direct connection instead of fallback proxy");
-        info->proxy = "";
-        curl_easy_setopt(info->curl_handle, CURLOPT_PROXY, info->proxy.c_str());
+        info->proxy = "DIRECT";
+        curl_easy_setopt(info->curl_handle, CURLOPT_PROXY, "");
         replacement = proxy_template_direct_;
       } else {
         replacement =
@@ -1102,8 +1102,9 @@ void DownloadManager::Backoff(JobInfo *info) {
  * \return true if another download should be performed, false otherwise
  */
 bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
-  LogCvmfs(kLogDownload, kLogDebug, "Verify downloaded url %s (curl error %d)",
-           info->url->c_str(), curl_error);
+  LogCvmfs(kLogDownload, kLogDebug,
+           "Verify downloaded url %s, proxy %s (curl error %d)",
+           info->url->c_str(), info->proxy.c_str(), curl_error);
   UpdateStatistics(info->curl_handle);
 
   if (info->cred_fname) {
@@ -1185,7 +1186,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     case CURLE_PARTIAL_FILE:
     case CURLE_GOT_NOTHING:
     case CURLE_RECV_ERROR:
-      if (info->proxy != "")
+      if (info->proxy != "DIRECT")
         // This is a guess.  Fail-over can still change to switching host
         info->error_code = kFailProxyConnection;
       else
@@ -1279,7 +1280,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
 
   if (try_again) {
     LogCvmfs(kLogDownload, kLogDebug, "Trying again on same curl handle, "
-             "same url: %d", same_url_retry);
+             "same url: %d, error code %d", same_url_retry, info->error_code);
     // Reset internal state and destination
     if ((info->destination == kDestinationMem) && info->destination_mem.data) {
       free(info->destination_mem.data);
