@@ -68,7 +68,6 @@ Manifest *Manifest::Load(const map<char, string> &content) {
   bool garbage_collectable = false;
   bool has_alt_catalog_path = false;
   shash::Any meta_info;
-  std::string creator_version;
 
   if ((iter = content.find('B')) != content.end())
     catalog_size = String2Uint64(iter->second);
@@ -92,13 +91,11 @@ Manifest *Manifest::Load(const map<char, string> &content) {
   if ((iter = content.find('M')) != content.end())
     meta_info = MkFromHexPtr(shash::HexPtr(iter->second),
                              shash::kSuffixMetainfo);
-  if ((iter = content.find('V')) != content.end())
-    creator_version = iter->second;
 
   return new Manifest(catalog_hash, catalog_size, root_path, ttl, revision,
                       micro_catalog_hash, repository_name, certificate,
                       history, publish_timestamp, garbage_collectable,
-                      has_alt_catalog_path, meta_info, creator_version);
+                      has_alt_catalog_path, meta_info);
 }
 
 
@@ -127,8 +124,7 @@ string Manifest::ExportString() const {
     "D" + StringifyInt(ttl_) + "\n" +
     "S" + StringifyInt(revision_) + "\n" +
     "G" + StringifyBool(garbage_collectable_) + "\n" +
-    "A" + StringifyBool(has_alt_catalog_path_) + "\n" +
-    "V" + creator_version_ + "\n";
+    "A" + StringifyBool(has_alt_catalog_path_) + "\n";
 
   if (!micro_catalog_hash_.IsNull())
     manifest += "L" + micro_catalog_hash_.ToString() + "\n";

@@ -174,7 +174,6 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     manifest->set_certificate(certificate_hash);
     manifest->set_repository_name(repo_name);
     manifest->set_publish_timestamp(time(NULL));
-    manifest->set_creator_version(VERSION);
     manifest->set_garbage_collectability(garbage_collectable);
     manifest->set_has_alt_catalog_path(bootstrap_shortcuts);
     if (!metainfo_hash.IsNull()) {
