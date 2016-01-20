@@ -15,11 +15,6 @@ cvmfs_run_test() {
   sudo rm -rf "${cache_dir}"
 
   sudo mkdir -p ${cache_dir}/10 ${cache_dir}/20
-  cvmfs_mount grid.cern.ch
-  if [ $? -eq 0 ]; then
-    return 10
-  fi
-
   sudo chown -R cvmfs:cvmfs ${cache_dir}
   ls -lah ${cache_dir}
   autofs_switch off
