@@ -69,7 +69,7 @@ running_on_osx() {
   [ "x$(uname)" == "xDarwin" ]
 }
 
-get_xattrs() {
+get_xattr() {
   local extended_attr="$1"
   local repo="$2"
   if running_on_osx; then
