@@ -87,6 +87,25 @@ show_mounted() {
   fi
 }
 
+get_user_data() {
+  local user=$1
+  if running_on_osx; then
+    id -P "$user"
+  else
+    getent passwd "$user"
+  fi
+}
+
+stat_wrapper() {
+  local format=$1
+  local repo=$2
+  if running_on_osx; then
+    stat -f $format $repo
+  else
+    stat -c $format $repo
+  fi
+}
+
 # Find the service binary (or detect systemd)
 minpidof() {
   pidof $1 | tr " " "\n" | sort --numeric-sort | head -n1
