@@ -382,7 +382,9 @@ cvmfs_umount() {
 
 
 has_selinux() {
-  [ -f /selinux/enforce ] && [ $(cat /selinux/enforce) -ne 0 ]
+  which sestatus   > /dev/null 2>&1 && \
+  which getenforce > /dev/null 2>&1 && \
+  getenforce | grep -qi "enforc" || return 1
 }
 
 
