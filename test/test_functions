@@ -69,6 +69,16 @@ running_on_osx() {
   [ "x$(uname)" == "xDarwin" ]
 }
 
+get_xattrs() {
+  local extended_attr="$1"
+  local repo="$2"
+  if running_on_osx; then
+    xattr -p user.$extended_attr "$repo"
+  else
+    attr -qg $extended_attr "$repo"
+  fi
+}
+
 show_mounted() {
   if running_on_osx; then
     mount
