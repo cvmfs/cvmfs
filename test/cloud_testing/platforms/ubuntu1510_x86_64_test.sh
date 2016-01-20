@@ -26,6 +26,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
 
 echo "running CernVM-FS server test cases..."
 CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
+CVMFS_TEST_UNIONFS=overlayfs                                                  \
 ./run.sh $SERVER_TEST_LOGFILE -o ${SERVER_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
                               -x src/523-corruptchunkfailover                 \
                                  src/524-corruptmanifestfailover              \
