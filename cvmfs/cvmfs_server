@@ -160,7 +160,7 @@ __swissknife() {
 
 
 to_syslog() {
-  logger -t cvmfs_server $1 > /dev/null 2>&1 || return 0
+  logger -t cvmfs_server "$1" > /dev/null 2>&1 || return 0
 }
 
 to_syslog_for_repo() {
