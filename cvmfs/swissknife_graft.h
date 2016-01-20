@@ -8,6 +8,7 @@
 #define CVMFS_SWISSKNIFE_GRAFT_H_
 
 #include <string>
+#include <vector>
 
 #include "compression.h"
 #include "hash.h"

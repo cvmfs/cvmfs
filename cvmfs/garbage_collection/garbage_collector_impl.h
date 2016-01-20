@@ -223,7 +223,7 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepHistoricRevisions()
 
   // find the content hash for the current HEAD history database
   UniquePtr<HistoryTN> history;
-  const typename ObjectFetcherTN::Failures retval = // TODO(rmeusel): C++11 auto
+  const typename ObjectFetcherTN::Failures retval =
     fetcher->FetchHistory(&history);
   switch (retval) {
     case ObjectFetcherTN::kFailOk:

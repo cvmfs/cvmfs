@@ -9,9 +9,9 @@
 #include "cvmfs_config.h"
 #include "swissknife.h"
 
-#include <cassert>
 #include <unistd.h>
 
+#include <cassert>
 #include <vector>
 
 #include "logging.h"
