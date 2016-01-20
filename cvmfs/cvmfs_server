@@ -204,6 +204,17 @@ is_subcommand() {
 }
 
 
+# makes sure that a version is always of the form x.y.z-b
+normalize_version() {
+  local version_string="$1"
+  while [ $(echo "$version_string" | grep -o '\.' | wc -l) -lt 2 ]; do
+    version_string="${version_string}.0"
+  done
+  while [ $(echo "$version_string" | grep -o '-' | wc -l) -lt 1 ]; do
+    version_string="${version_string}-1"
+  done
+  echo "$version_string"
+}
 # returns the version string of the current cvmfs installation
 cvmfs_version_string() {
   local version_string
@@ -215,18 +226,7 @@ cvmfs_version_string() {
   else
     version_string=$(__swissknife --version)
   fi
-  echo $version_string
-}
-# makes sure that a version is always of the form x.y.z-b
-normalize_version() {
-  local version_string="$1"
-  while [ $(echo "$version_string" | grep -o '\.' | wc -l) -lt 2 ]; do
-    version_string="${version_string}.0"
-  done
-  while [ $(echo "$version_string" | grep -o '-' | wc -l) -lt 1 ]; do
-    version_string="${version_string}-1"
-  done
-  echo "$version_string"
+  echo $(normalize_version $version_string)
 }
 version_major() { echo $1 | cut --delimiter=. --fields=1 | grep -oe '^[0-9]\+'; }
 version_minor() { echo $1 | cut --delimiter=. --fields=2 | grep -oe '^[0-9]\+'; }
@@ -395,12 +395,10 @@ repository_creator_version() {
                     # version... therefore this has to be handled as "<= 2.1.6"
                     # Note: see also `mangle_version_string()`
   elif [ x"$version" = x"2.2.0" ]; then
-    if [ -z "$CVMFS_SERVER_CACHE_MODE" ]; then
-      version="2.2.0-0" # CVMFS 2.2.0-0 was a server-only pre-release which did
-                        # not have some new mandatory config parameters yet
-    else
-      version="2.2.0-1"
-    fi
+    version="2.2.0-0" # CernVM-FS 2.2.0-0 was a server-only pre-release which is
+                      # incompatible with 2.2.0-1
+                      # 2.2.0-0 marks itself as CVMFS_CREATOR_VERSION=2.2.0
+                      # while 2.2.0-1 features  CVMFS_CREATOR_VERSION=2.2.0-1
   fi
   echo $version
 }
