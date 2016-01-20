@@ -5549,8 +5549,10 @@ migrate_2_1_15() {
 
 migrate_2_1_20() {
   local name=$1
-  local destination_version="2.2.0"
+  local destination_version="2.2.0-1"
   local creator=$(repository_creator_version $name)
+  local server_conf="/etc/cvmfs/repositories.d/${name}/server.conf"
+  local apache_conf="$(get_apache_conf_path)/$(get_apache_conf_filename $name)"
 
   # get repository information
   load_repo_config $name
@@ -5580,7 +5582,6 @@ migrate_2_1_20() {
     rm -f $tmp_fstab
 
     echo "--> updating server.conf"
-    local server_conf="/etc/cvmfs/repositories.d/${name}/server.conf"
     if ! grep -q "CVMFS_AUTO_REPAIR_MOUNTPOINT" $server_conf; then
       echo "CVMFS_AUTO_REPAIR_MOUNTPOINT=true" >> $server_confg
     else
@@ -5588,12 +5589,11 @@ migrate_2_1_20() {
     fi
   fi
 
-  local apache_conf="$(get_apache_conf_path)/$(get_apache_conf_filename $name)"
-  if is_local_upstream $name && [ -f "$apache_conf" ]; then
+  if is_local_upstream $CVMFS_UPSTREAM_STORAGE && [ -f "$apache_conf" ]; then
     echo "--> updating apache config ($(basename $apache_conf))"
     local storage_dir=$(get_upstream_config $CVMFS_UPSTREAM_STORAGE)
     local wsgi=""
-    [ is_stratum1 $name ] && wsgi="enabled"
+    is_stratum1 $name && wsgi="enabled"
     create_apache_config_for_endpoint $name $storage_dir $wsgi
     reload_apache > /dev/null
   fi
@@ -5658,13 +5658,13 @@ migrate() {
       migrate_2_1_15 $name
     fi
 
-    if [ x"$creator" = x"2.1.15" -o                                   \
-         x"$creator" = x"2.1.16" -o                                   \
-         x"$creator" = x"2.1.17" -o                                   \
-         x"$creator" = x"2.1.18" -o                                   \
-         x"$creator" = x"2.1.19" -o                                   \
-         x"$creator" = x"2.1.20" ]                                 || \
-       [ x"$creator" = x"2.2.0-0" -a -z "$CVMFS_SERVER_CACHE_MODE" ];
+    if [ x"$creator" = x"2.1.15" -o \
+         x"$creator" = x"2.1.16" -o \
+         x"$creator" = x"2.1.17" -o \
+         x"$creator" = x"2.1.18" -o \
+         x"$creator" = x"2.1.19" -o \
+         x"$creator" = x"2.1.20" -o \
+         x"$creator" = x"2.2.0-0" ];
     then
       migrate_2_1_20 $name
     fi
