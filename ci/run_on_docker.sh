@@ -10,7 +10,7 @@ set -e
 SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
 . ${SCRIPT_LOCATION}/common.sh
 
-if [ $# -lt 4 ]; then
+if [ $# -lt 3 ]; then
   echo "Usage: $0 <workspace>" "<docker image name>"
   echo "<build script invocation>"
   echo
