@@ -16,6 +16,7 @@ run_dns_test() {
   echo "127.0.0.3 round-robin.localdomain" >> host_tests
   cvmfs_mount aleph.cern.ch \
     "HOST_ALIASES=${PWD}/host_tests" \
+    "CVMFS_MAX_IPADDR_PER_PROXY=100" \
     "CVMFS_HTTP_PROXY='DIRECT;http://round-robin.localdomain:3128;http://no-such-host.localdomain:3128'" \
     "CVMFS_PROXY_RESET_AFTER=84600" || return 2
   ls /cvmfs/aleph.cern.ch
