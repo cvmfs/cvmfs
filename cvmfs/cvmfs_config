@@ -1144,8 +1144,9 @@ cvmfs_killall() {
   echo "OK"
 
   echo -n "Terminating cvmfs2 processes... "
-  killall -q -KILL ${INSTALL_BASE}/bin/cvmfs2
-  waitfor cvmfs2 10
+  # killall doesn't work because the cvmfs2 binary might have been replaced
+  pkill -SIGKILL -f ${INSTALL_BASE}/bin/cvmfs2 >/dev/null 2>&1
+  waitfor cvmfs2 10 ${INSTALL_BASE}/bin/cvmfs2
   if [ $? -ne 0 ]; then
     echo "Failed!"
     return 1
@@ -1272,6 +1273,7 @@ die() {
 waitfor() {
   local process=$1
   local timeout=$2
+  local fullpath="$3"
   local pid=$$
 
   local seconds=0
@@ -1285,8 +1287,15 @@ waitfor() {
       fi
       # No zombies
       local pstate=$(ps -p "$p" -o state=)
-      if echo "$pstate" | grep "Z"; then
+      if echo "$pstate" | grep -q "Z"; then
         continue
+      fi
+      # Only the processes started from the right location
+      if [ "x$fullpath" != "x" ]; then
+        local cmdline=$(ps -p "$p" -o command=)
+        if echo "$cmdline" | grep -v -q "^$fullpath"; then
+          continue
+        fi
       fi
       # Not the CernVM instance of cvmfs
       case $sys_arch in
