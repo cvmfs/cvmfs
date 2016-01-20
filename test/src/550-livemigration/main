@@ -15,6 +15,12 @@ get_apache_config_filename() {
   echo "${repo_name}.conf"
 }
 
+set_selinux_httpd_context_if_needed() {
+  local directory="$1"
+  if has_selinux; then
+    sudo chcon -Rv --type=httpd_sys_content_t ${directory}/ > /dev/null
+  fi
+}
 
 mock_apache_access_to_legacy_repo() {
   local legacy_repo_name="$1"
@@ -41,6 +47,7 @@ Alias /cvmfs/${legacy_repo_name} ${legacy_repo_storage}/pub/catalogs
   ExpiresByType application/x-cvmfs "access plus 1 minutes"
 </Directory>
 EOF
+  set_selinux_httpd_context_if_needed $legacy_repo_storage
   apache_switch off > /dev/null
   apache_switch on  > /dev/null
   curl --output /dev/null --silent --head --fail "$legacy_repo_url/.cvmfspublished" || die "fail (404 on .cvmfspublished)"
@@ -103,6 +110,7 @@ TEST550_S0_MOUNTPOINT=""
 TEST550_S1_MOUNTPOINT=""
 TEST550_NEW_REPO_NAME=""
 cleanup() {
+  echo "running cleanup()"
   [ -z "$TEST550_LEGACY_STORAGE" ] || sudo rm -fR $TEST550_LEGACY_STORAGE
   [ -z "$TEST550_APACHE_CONF" ]    || remove_apache_config_file $TEST550_APACHE_CONF
   [ -z "$TEST550_REPLICA_NAME" ]   || sudo cvmfs_server rmfs -f $TEST550_REPLICA_NAME
