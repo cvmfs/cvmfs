@@ -64,6 +64,10 @@ install_from_repo make                          || die "fail (installing make)"
 install_from_repo sqlite3                       || die "fail (installing sqlite3)"
 install_from_repo linux-image-extra-$(uname -r) || die "fail (installing AUFS)"
 
+# install 'cvmfs_preload' build dependencies
+install_from_repo cmake        || die "fail (installing cmake)"
+install_from_repo libattr1-dev || die "fail (installing libattr1-dev)"
+
 # setting up the AUFS kernel module
 echo -n "loading AUFS kernel module..."
 sudo modprobe aufs || die "fail"
