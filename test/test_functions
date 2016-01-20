@@ -2008,6 +2008,8 @@ cat_syslog() {
     syslog_file="/var/log/syslog"
   elif [ -f "/var/log/messages" ]; then
     syslog_file="/var/log/messages"
+  elif [ -f "/var/log/system.log" ]; then
+    syslog_file="/var/log/system.log"
   fi
 
   local cat_retval=0
