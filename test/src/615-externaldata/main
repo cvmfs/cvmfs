@@ -93,6 +93,9 @@ cvmfs_run_test() {
 
   # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
+  echo "Try reading chunked file (should fail - not served by external yet)"
+  cat ${repo_dir}/chunked_file > /dev/null && return 35
+
   echo "copy chunked file into external storage"
   cp chunked_file "${external_storage}/chunked_file" || return 52
 
@@ -127,6 +130,8 @@ cvmfs_run_test() {
 
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
+
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
   echo "publish file that is NOT marked as external (cvmfs_server publish -N)"
   start_transaction $CVMFS_TEST_REPO       || return $?
