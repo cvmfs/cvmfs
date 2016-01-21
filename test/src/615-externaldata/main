@@ -2,58 +2,66 @@
 cvmfs_test_name="External data"
 cvmfs_test_autofs_on_startup=false
 
-verify_external_data() {
-  local attr1=$(attr -qg external_file /var/spool/cvmfs/test.cern.ch/rdonly/external/file)
-  if [ "x$attr1" != "x1" ]; then
-    echo "ERROR: External file /var/spool/cvmfs/test.cern.ch/rdonly/external/file not marked as external."
-    return 20
-  fi
-  local contents=$(cat /cvmfs/$CVMFS_TEST_REPO/external/file)
-  if [ "x$contents" != "xHello World" ]; then
-    return 22
-  fi
-  return 0
+is_external_file() {
+  local full_file_path="$1"
+  [ x"$(attr -qg external_file "$full_file_path")" = x"1" ]
+}
+
+get_content_hash() {
+  local full_file_path="$1"
+  attr -qg hash "$full_file_path"
+}
+
+get_chunk_count() {
+  local full_file_path="$1"
+  attr -qg chunks "$full_file_path"
 }
 
 cvmfs_run_test() {
   logfile=$1
-  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local repo_dir="/cvmfs/${CVMFS_TEST_REPO}"
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  echo "Note: cvmfs_server mkfs -X --> enabled external files"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -X -Z none || return $?
 
-  start_transaction $CVMFS_TEST_REPO || return $?
-  mkdir -p /cvmfs/$CVMFS_TEST_REPO/external
-  mkdir -p /cvmfs/$CVMFS_TEST_REPO/internal
-  echo "Hello World" > /cvmfs/$CVMFS_TEST_REPO/external/file
-  cp /cvmfs/$CVMFS_TEST_REPO/external/file /cvmfs/$CVMFS_TEST_REPO/internal/file
+  echo "get some global base paths"
+  load_repo_config $CVMFS_TEST_REPO
+  local cvmfs_mnt="${CVMFS_SPOOL_DIR}/rdonly"
+  local cvmfs_cache="${CVMFS_SPOOL_DIR}/cache/$CVMFS_TEST_REPO"
 
-  # Create a large file to be chunked.
-  echo "creating large file to be chunked"
-  dd if=/dev/urandom of=chunked_file bs=1M count=32
-  cp chunked_file /cvmfs/$CVMFS_TEST_REPO/chunked_file
+  echo "fill repository with some files"
+  start_transaction $CVMFS_TEST_REPO                     || return $?
+  mkdir -p ${repo_dir}/external                          || return 1
+  mkdir -p ${repo_dir}/internal                          || return 2
+  echo "Hello World" > ${repo_dir}/external/file         || return 3
+  cp ${repo_dir}/external/file ${repo_dir}/internal/file || return 4
+
+  echo "create a large file to be chunked"
+  dd if=/dev/urandom of=chunked_file bs=1M count=32 || return 5
+  cp chunked_file ${repo_dir}/chunked_file          || return 6
 
   echo "creating CVMFS snapshot"
-  export CVMFS_LOG_LEVEL=4
   publish_repo $CVMFS_TEST_REPO -v || return $?
 
-  local hash=$(attr -qg hash /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/internal/file)
-  local cache_fname=$(echo $hash | cut -b 1-2)/$(echo $hash | cut -b 3-)
-  local cache_file=/srv/cvmfs/$CVMFS_TEST_REPO/data/$cache_fname
-  if [ ! -e "$cache_file" ]; then
-    return 23
-  fi
-  echo "File in cache is $cache_file"
-  mkdir -p /srv/cvmfs/$CVMFS_TEST_REPO/external
+  echo "Locating internal/file in backend storage"
+  local object_hash=$(get_content_hash ${cvmfs_mnt}/internal/file)
+  local object_file="$(get_local_repo_object $CVMFS_TEST_REPO $object_hash)"
+  [ -f "$object_file" ] || return 7
+  echo "File in backend is $object_file"
 
-  # Verify chunked files are really chunked, readable, and have the correct
-  cp chunked_file /srv/cvmfs/$CVMFS_TEST_REPO/chunked_file
+  local external_storage="$(get_local_repo_storage $CVMFS_TEST_REPO)/external"
+  echo "Creating external storage directory '$external_storage'"
+  mkdir -p $external_storage || return 51
+
+  echo "verify chunked files are really properly chunked and readable"
+  cp chunked_file "$(get_local_repo_storage $CVMFS_TEST_REPO)/chunked_file" || return 52
   local chunked_true_hash=$(cat chunked_file | sha1sum | awk '{print $1;}')
-  local chunked_cvmfs_hash=$(attr -qg hash /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/chunked_file)
-  local chunked_cvmfs_read=$(cat /cvmfs/$CVMFS_TEST_REPO/chunked_file | sha1sum | awk '{print $1;}')
-  local chunk_count=$(attr -qg chunks /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/chunked_file)
-  local chunk_external=$(attr -qg external_file /var/spool/cvmfs/test.cern.ch/rdonly/chunked_file)
-  if [ "x$chunk_external" != "x1" ]; then
+  local chunked_cvmfs_hash=$(get_content_hash ${cvmfs_mnt}/chunked_file)
+  local chunked_cvmfs_read=$(cat ${repo_dir}/chunked_file | sha1sum | awk '{print $1;}')
+  local chunk_count=$(get_chunk_count ${cvmfs_mnt}/chunked_file)
+
+  if ! is_external_file ${cvmfs_mnt}/chunked_file; then
     echo "Chunked file is not marked as external."
     return 24
   fi
@@ -70,40 +78,38 @@ cvmfs_run_test() {
     return 27
   fi
 
-  # Make sure file is NOT in the spool area but instead in the external area
-  mv "$cache_file" /srv/cvmfs/$CVMFS_TEST_REPO/external/file
+  echo "Make sure the file is NOT in the repository storage but instead in the external area"
+  mv "$object_file" ${external_storage}/file || return 52
 
-  verify_external_data
-  local verify_result=$?
-  if [ $verify_result -ne 0 ]; then
-    return $verify_result
-  fi
+  echo "Check the external file data"
+  is_external_file ${cvmfs_mnt}/external/file               || return 20
+  [ x"$(cat ${repo_dir}/external/file)" == x"Hello World" ] ||return 22
 
-  # Verify the expected file is in the cache.
-  if [ ! -e "/var/spool/cvmfs/test.cern.ch/cache/$CVMFS_TEST_REPO/$cache_fname" ]; then
-    return 25
-  fi
+  local cache_object="${cvmfs_cache}/$(get_hash_path $object_hash)"
+  echo "Verify the expected file ($cache_object) is in the cache."
+  sudo test -f "$cache_object" || return 53
 
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
 
-  echo "overwrite default"
-  start_transaction $CVMFS_TEST_REPO || return $?
-  echo "not external" > /cvmfs/$CVMFS_TEST_REPO/native
-  publish_repo $CVMFS_TEST_REPO -v -N || return $?
-  local is_external=$(attr -qg external_file /cvmfs/$CVMFS_TEST_REPO/native)
-  if [ "x$is_external" != "x0" ]; then
-    return 30
+  echo "publish file that is NOT marked as external (cvmfs_server publish -N)"
+  start_transaction $CVMFS_TEST_REPO       || return $?
+  echo "not external" > ${repo_dir}/native || return 60
+  publish_repo $CVMFS_TEST_REPO -v -N      || return $?
+
+  echo "check that 'native' is NOT external"
+  ! is_external_file ${cvmfs_mnt}/native || return 30
+
+  echo "Remove cached and external copy of the file; only copy"
+  echo "is in the backend storage, which should not be used."
+  mv ${external_storage}/file "$object_file" || return 55
+  sudo rm -f $cache_object                   || return 56
+
+  echo "Make sure access fails without the external copy."
+  if cat ${repo_dir}/external/file; then
+    echo "External file ${repo_dir}/external/file appears to be using internal data."
+    return 57
   fi
 
-  # Remove cached and external copy of the file; only copy is in the spool area,
-  # which should not be used.
-  mv /srv/cvmfs/$CVMFS_TEST_REPO/external/file "$cache_file"
-  rm -f /var/spool/cvmfs/test.cern.ch/cache/$CVMFS_TEST_REPO/$cache_fname
-
-  # Make sure access fails without the external copy.
-  cat /cvmfs/$CVMFS_TEST_REPO/external/file || return 0
-  echo "External file /cvmfs/$CVMFS_TEST_REPO/external/file appears to be using internal data."
-  return 24
+  return 0
 }
-
