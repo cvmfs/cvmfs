@@ -64,6 +64,9 @@ install_from_repo make                          || die "fail (installing make)"
 install_from_repo sqlite3                       || die "fail (installing sqlite3)"
 install_from_repo linux-image-extra-$(uname -r) || die "fail (installing AUFS)"
 
+# traffic shaping
+install_from_repo trickle || die "fail (installing trickle)"
+
 # install 'cvmfs_preload' build dependencies
 install_from_repo cmake        || die "fail (installing cmake)"
 install_from_repo libattr1-dev || die "fail (installing libattr1-dev)"
