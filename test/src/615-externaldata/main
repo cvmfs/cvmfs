@@ -134,17 +134,31 @@ cvmfs_run_test() {
   # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
   echo "publish file that is NOT marked as external (cvmfs_server publish -N)"
-  start_transaction $CVMFS_TEST_REPO       || return $?
-  echo "not external" > ${repo_dir}/native || return 60
-  publish_repo $CVMFS_TEST_REPO -v -N      || return $?
+  start_transaction $CVMFS_TEST_REPO                       || return $?
+  echo "not external" > ${repo_dir}/native                 || return 61
+  dd if=/dev/urandom of=chunked_file_native bs=1M count=32 || return 62
+  cp chunked_file_native ${repo_dir}/chunked_file_native   || return 63
+  publish_repo $CVMFS_TEST_REPO -v -N                      || return $?
 
   echo "check that 'native' is NOT external"
-  ! is_external_file ${cvmfs_mnt}/native || return 30
+  ! is_external_file ${cvmfs_mnt}/native              || return 30
+  ! is_external_file ${cvmfs_mnt}/chunked_file_native || return 31
 
   echo "Remove cached and external copy of the file; only copy"
   echo "is in the backend storage, which should not be used."
   mv ${external_storage}/external/file "$object_file" || return 55
   sudo rm -f $cache_object                            || return 56
+
+  echo "disable HTTP server (stop serving external files)"
+  sudo kill $CVMFS_TEST_615_HTTP_PID || return 70
+  CVMFS_TEST_615_HTTP_PID=""
+  sleep 1
+
+  echo "read and validate internal files"
+  [ x"$(cat ${repo_dir}/native)" = x"not external" ] || return 71
+  local chunked_file_native_hash="$(cat chunked_file_native | sha1sum)"
+  local chunked_file_native_hash_cvmfs="$(cat ${repo_dir}/chunked_file_native | sha1sum)"
+  [ x"$chunked_file_native_hash" = x"$chunked_file_native_hash_cvmfs" ] || return 72
 
   echo "Make sure access fails without the external copy."
   if cat ${repo_dir}/external/file; then
