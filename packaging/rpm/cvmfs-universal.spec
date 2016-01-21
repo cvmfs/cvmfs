@@ -63,7 +63,6 @@ Requires: grep
 Requires: gawk
 Requires: sed
 Requires: perl
-Requires: sudo
 Requires: psmisc
 Requires: autofs
 Requires: fuse
@@ -396,6 +395,8 @@ fi
 %doc COPYING AUTHORS README ChangeLog
 
 %changelog
+* Thu Jan 21 2016 Jakob Blomer <jblomer@cern.ch> - 2.2.0
+- Remove sudo dependency
 * Fri Jan 15 2016 Jakob Blomer <jblomer@cern.ch> - 2.2.0
 - Add valgrind-devel except for EL4
 * Tue Jan 12 2016 Rene Meusel <rene.meusel@cern.ch> - 2.2.0

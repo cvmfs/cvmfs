@@ -10,11 +10,11 @@
 #include "swissknife.h"
 
 namespace catalog {
-  class Catalog;
+class Catalog;
 }
 
 namespace shash {
-  class Any;
+class Any;
 }
 
 namespace swissknife {

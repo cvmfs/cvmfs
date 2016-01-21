@@ -106,7 +106,7 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
    *                                 if left blank, the latest one is downloaded
    * @return              failure code, specifying the action's result
    */
-  Failures FetchHistory(      HistoryTN  **history,
+  Failures FetchHistory(HistoryTN        **history,
                         const shash::Any  &history_hash = shash::Any()) {
     // retrieve the current HEAD history hash (if nothing else given)
     shash::Any effective_history_hash = (!history_hash.IsNull())
@@ -233,8 +233,8 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
     UniquePtr<manifest::Manifest> manifest;
     const Failures retval = FetchManifest(&manifest);
 
-    if (retval != kFailOk    ||
-        ! manifest.IsValid() ||
+    if (retval != kFailOk   ||
+        !manifest.IsValid() ||
         manifest->history().IsNull()) {
       return shash::Any();
     }
@@ -277,7 +277,7 @@ class LocalObjectFetcher :
     : base_path_(base_path)
     , temporary_directory_(temp_dir) {}
 
-  using BaseTN::FetchManifest; // un-hiding convenience overload
+  using BaseTN::FetchManifest;  // un-hiding convenience overload
   Failures FetchManifest(manifest::Manifest** manifest) {
     const std::string path = BuildPath(BaseTN::kManifestFilename);
     if (!FileExists(path)) {
@@ -390,7 +390,7 @@ class HttpObjectFetcher :
     download_manager_(download_mgr), signature_manager_(signature_mgr) {}
 
  public:
-  using BaseTN::FetchManifest; // un-hiding convenience overload
+  using BaseTN::FetchManifest;  // un-hiding convenience overload
   Failures FetchManifest(manifest::Manifest** manifest) {
     const std::string url = BuildUrl(BaseTN::kManifestFilename);
 
@@ -459,7 +459,7 @@ class HttpObjectFetcher :
     fclose(f);
 
     // check if download worked and remove temporary file if not
-    if (! success) {
+    if (!success) {
       LogCvmfs(kLogDownload, kLogDebug, "failed to download object "
                                         "%s to '%s' (%d - %s)",
                object_hash.ToString().c_str(), object_file->c_str(),

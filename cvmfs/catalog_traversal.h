@@ -477,7 +477,7 @@ class CatalogTraversal
       return true;
     }
 
-    const typename ObjectFetcherT::Failures retval = // TODO(meusel): C++11 auto
+    const typename ObjectFetcherT::Failures retval =
       object_fetcher_->FetchCatalog(job->hash,
                                     job->path,
                                     &job->catalog,

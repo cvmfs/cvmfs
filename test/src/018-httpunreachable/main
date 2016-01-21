@@ -22,14 +22,15 @@ cvmfs_run_test() {
   sudo sh -c "echo \"CVMFS_SERVER_URL=\\\"http://127.0.0.1:80;http://127.0.0.2:8080;http://cvmfs-stratum-one.cern.ch/opt/@org@\\\"\" > /etc/cvmfs/domain.d/cern.ch.local" || return 1
 
   echo "try to mount cvmfs"
-  seconds=$(stop_watch do_faulty_mount)
+  local milliseconds=$(stop_watch do_faulty_mount)
   sudo rm -f /etc/cvmfs/domain.d/cern.ch.local
 
   echo "try to list the repository"
   ls /cvmfs/atlas.cern.ch || return 2
 
-  if [ $seconds -gt 8 ]; then
-    echo "mounting took too long with $seconds seconds (expected 8)"
+  local expected_max=8000
+  if [ $milliseconds -gt $expected_max ]; then
+    echo "mounting took too long with $milliseconds seconds (expected $expected_max)"
     CVMFS_TIME_WARNING_FLAG=1
   fi
 

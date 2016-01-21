@@ -290,8 +290,8 @@ static void *MainWorker(void *data) {
 }
 
 
-bool CommandPull::PullRecursion(      catalog::Catalog  *catalog,
-                                const std::string       &path) {
+bool CommandPull::PullRecursion(catalog::Catalog   *catalog,
+                                const std::string  &path) {
   assert(catalog);
 
   // Previous catalogs

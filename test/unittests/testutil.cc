@@ -425,8 +425,8 @@ catalog::LoadError catalog::MockCatalogManager::LoadCatalog(
 //------------------------------------------------------------------------------
 
 
- MockObjectFetcher::Failures
- MockObjectFetcher::FetchManifest(manifest::Manifest** manifest) {
+MockObjectFetcher::Failures
+MockObjectFetcher::FetchManifest(manifest::Manifest** manifest) {
   const uint64_t    catalog_size = 0;
   const std::string root_path    = "";
   *manifest = new manifest::Manifest(

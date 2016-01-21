@@ -9,12 +9,12 @@ cvmfs_run_test() {
   sudo cvmfs_config fsck -j8 || return 2
 
   cvmfs_umount atlas.cern.ch,lhcb.cern.ch,cms.cern.ch || return 10
-  
+
   echo "Destroying data integrity in $cms_cachedir"
   cms_cachedir=$(get_cvmfs_cachedir cms.cern.ch)
   [ "x$cms_cachedir" = "x" ] && return 11
-  for f in $(find $cms_cachedir -mindepth 2 -type f); do
-    cat /dev/null > $f
+  for f in $(sudo find $cms_cachedir -mindepth 2 -type f); do
+    sudo sh -c "cat /dev/null > $f"
   done
   sudo cvmfs_config fsck -j8 -p
   if [ $? -ne 1 ]; then
