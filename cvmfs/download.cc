@@ -478,7 +478,7 @@ void *DownloadManager::MainDownload(void *data) {
     int timeout;
     if (still_running) {
       /* NOTE: The following might degrade the performance for many small files
-      /* use case. TODO(jblomer): look into it.
+       * use case. TODO(jblomer): look into it.
       // Specify a timeout for polling in ms; this allows us to return
       // to libcurl once a second so it can look for internal operations
       // which timed out.  libcurl has a more elaborate mechanism
