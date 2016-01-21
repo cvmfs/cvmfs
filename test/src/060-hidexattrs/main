@@ -1,14 +1,6 @@
 
 cvmfs_test_name="Hide extended attributes"
 
-list_xattrs() {
-  local repo=$1
-  if running_on_osx; then
-    xattr $repo
-  else
-    attr -ql $repo
-  fi
-}
 
 cvmfs_run_test() {
   logfile=$1

@@ -79,6 +79,15 @@ get_xattr() {
   fi
 }
 
+list_xattrs() {
+  local repo="$1"
+  if running_on_osx; then
+    xattr "$repo"
+  else
+    attr -ql "$repo"
+  fi
+}
+
 show_mounted() {
   if running_on_osx; then
     mount

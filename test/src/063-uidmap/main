@@ -12,7 +12,7 @@ cvmfs_run_test() {
   chmod 0444 "$uid_map" "$gid_map"
 
   cvmfs_mount grid.cern.ch "CVMFS_CLAIM_OWNERSHIP=no" \
-    "CVMFS_UID_MAP=$uid_map" "CVMFS_GID_MAP=$gid_map" "CVMFS_DEBUGLOG=/tmp/cvmfs-test.log"
+    "CVMFS_UID_MAP=$uid_map" "CVMFS_GID_MAP=$gid_map"
   local retval=$?
   rm -f "$uid_map" "$gid_map"
 
