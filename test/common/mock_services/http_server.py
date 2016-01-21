@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import SimpleHTTPServer
+import HTTPRangeServer
 import SocketServer
 import sys
 import os
@@ -22,6 +22,6 @@ print "changing directory to" , options.docroot
 os.chdir(options.docroot)
 
 print "start serving..."
-handler = SimpleHTTPServer.SimpleHTTPRequestHandler
+handler = HTTPRangeServer.HTTPRangeRequestHandler
 httpd = SocketServer.TCPServer(("", options.http_port), handler)
 httpd.serve_forever()
