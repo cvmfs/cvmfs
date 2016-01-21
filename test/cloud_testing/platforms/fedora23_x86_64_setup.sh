@@ -45,6 +45,9 @@ install_from_repo nc
 install_from_repo wget
 install_from_repo bc
 
+# traffic shaping
+install_from_repo trickle
+
 # install build dependencies for `libcvmfs`
 install_from_repo openssl-devel
 install_from_repo libuuid-devel

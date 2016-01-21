@@ -78,6 +78,9 @@ install_from_repo gcc-c++       || die "fail (installing gcc-c++)"
 install_from_repo rubygems      || die "fail (installing rubygems)"
 install_from_repo java          || die "fail (installing java)"
 
+# traffic shaping
+install_from_repo trickle || die "fail (installing trickle)"
+
 # install `libcvmfs` build dependencies
 install_from_repo openssl-devel || die "fail (installing openssl-devel)"
 install_from_repo libuuid-devel || die "fail (installing libuuid-devel)"

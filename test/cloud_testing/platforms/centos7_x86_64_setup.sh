@@ -38,6 +38,9 @@ install_from_repo rubygems
 install_from_repo wget
 install_from_repo redhat-lsb-core
 
+# traffic shaping
+install_from_repo trickle
+
 # install ruby gem for FakeS3
 install_ruby_gem fakes3
 

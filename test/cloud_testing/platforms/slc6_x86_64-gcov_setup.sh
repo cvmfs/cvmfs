@@ -112,6 +112,9 @@ install_from_repo openssl
 install_from_repo initscripts
 install_from_repo gzip
 
+# traffic shaping
+install_from_repo trickle
+
 # install ruby gem for FakeS3
 install_ruby_gem fakes3
 
