@@ -386,7 +386,7 @@ _cvmfs_mount_manually() {
   local repository=$1
   cvmfs_config status | grep -q "/cvmfs/$repository" && return 0
   mkdir -p "/cvmfs/$repository"
-  mount -t cvmfs "$repository" "/cvmfs/$repository" >/dev/null 2>&1
+  sudo mount -t cvmfs "$repository" "/cvmfs/$repository" >/dev/null 2>&1
 }
 
 
