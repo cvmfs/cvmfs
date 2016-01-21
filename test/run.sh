@@ -120,8 +120,8 @@ setup_environment() {
   fi
 
   # create a workspace for the test case
-  rm -rf "$workdir"
-  if ! mkdir -p "$workdir"; then
+  rm -rf "$workdir" && mkdir -p "$workdir"
+  if [ $? -ne 0 ]; then
     echo "failed to create test working directory"
     return 102
   fi

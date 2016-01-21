@@ -13,7 +13,7 @@ cd "$cvmfs_workspace"
 # everything will be placed in the home folder
 echo "running CernVM-FS client test cases..."
 CVMFS_TEST_CLASS_NAME=ClientIntegrationTests
-sudo ./run.sh "$logfile" -x   src/004-davinci                      \
+./run.sh "$logfile" -x        src/004-davinci                      \
                               src/005-asetup                       \
                               src/006-buildkernel                  \
                               src/007-testjobs                     \

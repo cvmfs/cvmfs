@@ -253,7 +253,11 @@ service_should_switch() {
 # checks if autofs is running on /cvmfs
 # @return   0 when autofs is mounted on /cvmfs
 autofs_check() {
-  cat /proc/mounts | grep -q "^/etc/auto.cvmfs /cvmfs "
+  if running_on_osx; then
+    return 0
+  else
+    cat /proc/mounts | grep -q "^/etc/auto.cvmfs /cvmfs "
+  fi
 }
 
 
