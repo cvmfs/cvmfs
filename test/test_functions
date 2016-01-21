@@ -866,6 +866,42 @@ open_silent_port() {
 }
 
 
+# spawns a mocked HTTP server on a given port and document root location
+# Note: The user is responsible to kill the server process once after usage
+#
+# @param document_root  absolute path to be served via HTTP
+# @param port           http port to be used
+# @param logfile        (optional) where to log the HTTP server's status info
+# @return               PID of HTTP server or >0 on error
+open_http_server() {
+  local document_root="$1"
+  local port="$2"
+  local logfile="${3:=/dev/null}"
+
+  local http_server="${TEST_ROOT}/common/mock_services/http_server.py"
+  local http_pid=
+  local http_sentinel="http://localhost:${port}/http_sentinel"
+
+  # spawning the server
+  http_pid=$(run_background_service $logfile "$http_server -p $port -r $document_root")
+  touch ${document_root}/$(basename $http_sentinel)
+
+  # waiting for the server to come up
+  local timeout=15
+  while ! curl -Is $url ${http_sentinel} | head -n1 | grep "200 OK" >> $logfile 2>&1 && \
+        [ $timeout -gt 0 ]; do
+    sleep 1
+    if ! kill -0 $http_pid > /dev/null 2>&1;then
+      return 1
+    fi
+    timeout=$(( $timeout - 1 ))
+  done
+
+  [ $timeout -gt 0 ] || return 2
+  echo "$http_pid"
+}
+
+
 # checks if a nested catalog is part of the current catalog configuration
 # of the repository
 # @param catalog_path  the catalog root path to be checked
