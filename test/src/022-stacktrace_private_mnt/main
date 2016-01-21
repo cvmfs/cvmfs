@@ -5,7 +5,7 @@ final_cleanup() {
   if ! running_on_osx; then
     sudo fusermount -u $(pwd)/mnt
   fi
-  sudo umount $(pwd)/mnt
+  sudo umount -f $(pwd)/mnt
 }
 
 cvmfs_run_test() {
