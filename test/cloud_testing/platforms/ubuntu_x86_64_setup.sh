@@ -51,7 +51,9 @@ echo -n "setting up CernVM-FS environment... "
 sudo cvmfs_config setup                          || die "fail (cvmfs_config setup)"
 sudo mkdir -p /var/log/cvmfs-test                || die "fail (mkdir /var/log/cvmfs-test)"
 sudo chown sftnight:sftnight /var/log/cvmfs-test || die "fail (chown /var/log/cvmfs-test)"
-attach_user_group fuse                           || die "fail (add fuse group to user)"
+if getent group fuse > /dev/null 2>&1; then
+  attach_user_group fuse                         || die "fail (add fuse group to user)"
+fi
 sudo service autofs restart > /dev/null          || die "fail (restart autofs)"
 sudo cvmfs_config chksetup > /dev/null           || die "fail (cvmfs_config chksetup)"
 echo "done"
