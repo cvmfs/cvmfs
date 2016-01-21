@@ -2026,7 +2026,7 @@ purge_disk_cache() {
 try_automount() {
   local repo=$1
   if running_on_osx; then
-    mount | grep "$repo" || sudo mount -t cvmfs $repo /cvmfs/$repo /dev/null 2>&1
+    mount | grep "$repo" || sudo mount -t cvmfs $repo /cvmfs/$repo >/dev/null 2>&1
   else
     ls /cvmfs/${repo}
   fi
