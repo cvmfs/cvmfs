@@ -63,9 +63,12 @@ cvmfs_run_test() {
 
   echo "Locating internal/file in backend storage"
   local object_hash=$(get_content_hash ${cvmfs_mnt}/internal/file)
-  local object_file="$(get_local_repo_object $CVMFS_TEST_REPO $object_hash)"
-  [ -f "$object_file" ] || return 7
-  echo "File in backend is $object_file"
+  local object_url="$(get_object_url $CVMFS_TEST_REPO $object_hash)"
+  local object_file="${scratch_dir}/${object_hash}"
+  echo "File in backend is $object_url"
+
+  echo "downloading the file to local scratch space '$object_file'"
+  download_from_backend $CVMFS_TEST_REPO $(make_path $object_hash) $object_file || return 7
 
   # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
@@ -75,7 +78,8 @@ cvmfs_run_test() {
 
   echo "Make sure the file is NOT in the repository storage but instead in the external area"
   mkdir -p ${external_storage}/external
-  mv "$object_file" ${external_storage}/external/file || return 52
+  delete_from_backend $CVMFS_TEST_REPO $(make_path $object_hash) || return 52
+  cp "$object_file" ${external_storage}/external/file            || return 53
 
   echo "Check the external file data (should fail to read - external storage not served yet)"
   is_external_file ${cvmfs_mnt}/external/file || return 20
@@ -146,8 +150,9 @@ cvmfs_run_test() {
 
   echo "Remove cached and external copy of the file; only copy"
   echo "is in the backend storage, which should not be used."
-  mv ${external_storage}/external/file "$object_file" || return 55
-  sudo rm -f $cache_object                            || return 56
+  upload_into_backend $CVMFS_TEST_REPO $object_file $(make_path $object_hash) || return 54
+  rm -f ${external_storage}/external/file                                     || return 55
+  sudo rm -f $cache_object                                                    || return 56
 
   echo "disable HTTP server (stop serving external files)"
   sudo kill $CVMFS_TEST_615_HTTP_PID || return 70

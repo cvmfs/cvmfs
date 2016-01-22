@@ -43,5 +43,7 @@ cvmfs_run_test() {
   done
 
   echo "check libcvmfs with the generated binary"
-  ./$bin_name "$base_name" "$num_repos"
+  ./$bin_name "$(get_repo_url)" "$base_name" "$num_repos" || return 9
+
+  return 0
 }

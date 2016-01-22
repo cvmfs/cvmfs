@@ -118,6 +118,13 @@ if [ $s3_retval -eq 0 ]; then
                                src/591-importrepo                           \
                                src/594-backendoverwrite                     \
                                src/595-geoipdbupdate                        \
+                               src/600-securecvmfs                          \
+                               src/605-resurrectancientcatalog              \
+                               src/607-noapache                             \
+                               src/608-infofile                             \
+                               src/614-geoservice                           \
+                               src/622-gracefulrmfs                         \
+                               src/626-cacheexpiry                          \
                                --                                           \
                                src/5*                                       \
                                src/6*                                       \

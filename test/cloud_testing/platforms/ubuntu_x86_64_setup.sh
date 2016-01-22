@@ -65,6 +65,7 @@ install_from_repo g++                           || die "fail (installing g++)"
 install_from_repo make                          || die "fail (installing make)"
 install_from_repo sqlite3                       || die "fail (installing sqlite3)"
 install_from_repo linux-image-extra-$(uname -r) || die "fail (installing AUFS)"
+install_from_repo bc                            || die "fail (installing bc)"
 
 # traffic shaping
 install_from_repo trickle || die "fail (installing trickle)"
@@ -72,6 +73,15 @@ install_from_repo trickle || die "fail (installing trickle)"
 # install 'cvmfs_preload' build dependencies
 install_from_repo cmake        || die "fail (installing cmake)"
 install_from_repo libattr1-dev || die "fail (installing libattr1-dev)"
+
+# install 'jq' (on 12.04 this needs the precise-backports repo)
+if [ x"$(lsb_release -cs)" = x"precise" ]; then
+  echo -n "enabling precise-backports... "
+  sudo sed -i -e 's/^# \(.*precise-backports.*\)$/\1/g' /etc/apt/sources.list || die "fail (updating sources.list)"
+  sudo apt-get update > /dev/null                                             || die "fail (apt-get update)"
+  echo "done"
+fi
+install_from_repo jq || die "fail (installing jq)"
 
 # setting up the AUFS kernel module
 echo -n "loading AUFS kernel module..."
