@@ -41,8 +41,8 @@ cvmfs_run_test() {
   local preload_dir="$working_dir/preloadcache"
   local tmpdir="$preload_dir/tmpdir"
 
-  echo -n "checking if cvmfs_preload is available... "
   local source_tree="$(dirname $(dirname $(dirname $script_location)))"
+  echo -n "checking if cvmfs_preload is available or build it from source ($source_tree)... "
   local PRELOAD=
   PRELOAD=$(find_or_build_cvmfs_preload $source_tree)
   [ -x "$PRELOAD" ] || { echo "fail"; return 1; }
@@ -71,7 +71,7 @@ cvmfs_run_test() {
 EOF
 
   echo "preloading the cache"
-  $PRELOAD -u "http://localhost/cvmfs/$CVMFS_TEST_REPO"  \
+  $PRELOAD -u "$(get_repo_url $CVMFS_TEST_REPO)"         \
            -r "$preload_dir"                             \
            -k "/etc/cvmfs/keys/$CVMFS_TEST_REPO.pub"     \
            -m "$CVMFS_TEST_REPO"                         \
