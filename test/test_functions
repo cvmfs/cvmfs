@@ -1433,6 +1433,10 @@ upload_into_backend() {
   local remote_path="$3"
 
   load_repo_config $repo_name
+
+  if [ x"$(echo "$CVMFS_UPSTREAM_STORAGE" | cut -f1 -d',')" = x"S3" ]; then
+    cvmfs_swissknife remove -o $remote_path -r $CVMFS_UPSTREAM_STORAGE
+  fi
   cvmfs_swissknife upload -i $file_path              \
                           -o $remote_path            \
                           -r $CVMFS_UPSTREAM_STORAGE \
