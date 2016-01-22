@@ -42,7 +42,9 @@ cvmfs_run_test() {
   echo "starting transaction to edit repository"
   start_transaction $CVMFS_TEST_REPO || return $?
 
-  local fingerprint=$(cat /srv/cvmfs/${CVMFS_TEST_REPO_MORE}/.cvmfswhitelist | grep -a -A1 ^N | tail -1)
+  echo "download whitelist for getting the fingeprint"
+  download_from_backend $CVMFS_TEST_REPO_MORE .cvmfswhitelist whitelist || return 50
+  local fingerprint=$(cat whitelist | grep -a -A1 ^N | tail -1)
 
   echo "creating blacklist"
   mkdir -p "${repo_dir}/etc/cvmfs"
