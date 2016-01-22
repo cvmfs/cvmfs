@@ -2,12 +2,17 @@
 cvmfs_test_name="Certificate blacklist in config repository"
 cvmfs_test_autofs_on_startup=false
 
-TEST_616_MOUNTPOINT=""
 TEST_616_MOUNTPOINT_MORE=""
+TEST_616_EXTRA_REPO=""
 cleanup() {
   if [ ! -z $TEST_616_MOUNTPOINT_MORE ]; then
     echo -n "umounting ${TEST_616_MOUNTPOINT_MORE}... "
     remove_local_mount $TEST_616_MOUNTPOINT_MORE && echo "done" || echo "fail"
+  fi
+
+  if [ ! -z $TEST_616_EXTRA_REPO ]; then
+    echo "removing ${TEST_616_EXTRA_REPO}..."
+    destroy_repo $TEST_616_EXTRA_REPO
   fi
 }
 
@@ -17,6 +22,7 @@ cvmfs_run_test() {
 
   echo "create a fresh repositories with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+  TEST_616_EXTRA_REPO=$CVMFS_TEST_REPO_MORE
   create_empty_repo $CVMFS_TEST_REPO_MORE $CVMFS_TEST_USER || return $?
 
   echo "set a trap for desaster cleanup"
