@@ -120,6 +120,7 @@ if [ $s3_retval -eq 0 ]; then
                                src/595-geoipdbupdate                        \
                                src/600-securecvmfs                          \
                                src/605-resurrectancientcatalog              \
+                               src/614-geoservice                           \
                                src/622-gracefulrmfs                         \
                                src/626-cacheexpiry                          \
                                --                                           \
