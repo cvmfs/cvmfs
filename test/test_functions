@@ -1422,6 +1422,34 @@ peek_backend() {
 }
 
 
+# downloads a random file from the backend storage of a CVMFS repository
+#
+# @param repository   the repository name to uploaded into
+# @param remote_path  the relative remote path to be uploaded into
+# @param local_path   the destination path to be downloaded into
+download_from_backend() {
+  local repo_name="$1"
+  local remote_path="$2"
+  local local_path="$3"
+
+  load_repo_config $repo_name
+  curl -o $local_path -s "$(get_repo_url $repo_name)/${remote_path}"
+}
+
+
+# removes a random file from the backend storage of a CVMFS repository
+#
+# @param repository   the repository name to uploaded into
+# @param remote_path  the relative remote path to be uploaded into
+delete_from_backend() {
+  local repo_name="$1"
+  local remote_path="$2"
+
+  load_repo_config $repo_name
+  cvmfs_swissknife remove -o $remote_path -r $CVMFS_UPSTREAM_STORAGE
+}
+
+
 # uploads a random file into the backend storage of a CVMFS repository
 #
 # @param repository   the repository name to uploaded into
@@ -1435,7 +1463,7 @@ upload_into_backend() {
   load_repo_config $repo_name
 
   if [ x"$(echo "$CVMFS_UPSTREAM_STORAGE" | cut -f1 -d',')" = x"S3" ]; then
-    cvmfs_swissknife remove -o $remote_path -r $CVMFS_UPSTREAM_STORAGE
+    delete_from_backend $repo_name $remote_path # S3 does a lazy upload
   fi
   cvmfs_swissknife upload -i $file_path              \
                           -o $remote_path            \
