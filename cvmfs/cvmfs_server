@@ -896,6 +896,8 @@ is_owner_or_root() {
 
 # create a shell invocation to be used by commands to impersonate the owner of
 # a specific CVMFS repository.
+# Note: when impersonating the non-root repository owner, root's environment is
+#       kept (usually including root's `umask` - see integration test 571)
 #
 # @param name   the name of the repository whose owner should be impersonated
 # @return       a shell invocation to impersonate $CVMFS_USER via stdout or
@@ -911,7 +913,7 @@ get_user_shell() {
     if [ $HAS_RUNUSER -ne 0 ]; then
       shell_cmd="runuser -m $CVMFS_USER -c"
     else
-      shell_cmd="su $CVMFS_USER -c"
+      shell_cmd="su -m $CVMFS_USER -c"
     fi
   fi
 
