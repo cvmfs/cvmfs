@@ -33,7 +33,11 @@ License: BSD
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
 # Build with voms-devel on Fedora / RHEL derivatives.
-%if 0%{?el5} || 0%{?el6} || 0%{?el7} || 0%{?fedora}
+# Note that we *load* VOMS at runtime, not link against it; this means that
+# the produced RPM will not depend on VOMS.
+%if 0%{?suse_version}
+# TODO(bbockelm): figure out solution for VOMS on SUSE.
+%else
 BuildRequires: voms-devel
 %endif
 
