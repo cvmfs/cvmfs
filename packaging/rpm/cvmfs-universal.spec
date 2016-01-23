@@ -404,6 +404,8 @@ fi
 %doc COPYING AUTHORS README ChangeLog
 
 %changelog
+* Sat Jan 23 2016 Brian Bockelman <bbockelm@cse.unl.edu> - 2.2.0
+- Build with VOMS support
 * Thu Jan 21 2016 Jakob Blomer <jblomer@cern.ch> - 2.2.0
 - Remove sudo dependency
 * Fri Jan 15 2016 Jakob Blomer <jblomer@cern.ch> - 2.2.0
