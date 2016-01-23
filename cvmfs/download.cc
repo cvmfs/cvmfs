@@ -936,6 +936,7 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     // The download manager disables signal handling in the curl library;
     // as OpenSSL's implementation of TLS will generate a sigpipe in some
     // error paths, we must explicitly disable SIGPIPE here.
+    // TODO(jblomer): it should be enough to do this once
     signal(SIGPIPE, SIG_IGN);
   }
 
