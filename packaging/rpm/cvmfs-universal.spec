@@ -32,6 +32,11 @@ Group: Applications/System
 License: BSD
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
+# Build with voms-devel on Fedora / RHEL derivatives.
+%if 0%{?el5} || 0%{?el6} || 0%{?el7} || 0%{?fedora}
+BuildRequires: voms-devel
+%endif
+
 %if 0%{?el5}
 BuildRequires: buildsys-macros
 %endif
