@@ -18,7 +18,7 @@ bool CheckVOMSAuthz(const struct fuse_ctx *ctx, const std::string &);
 
 bool ConfigureCurlHandle(void *curl_handle, pid_t pid, uid_t uid, gid_t gid,
                          char **fname, void **data);
-void ReleaseCurlHandle(void *data);
+void ReleaseCurlHandle(void *curl_handle, void *data);
 
 FILE *GetProxyFile(pid_t pid, uid_t uid, gid_t gid);
 
