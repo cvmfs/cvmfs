@@ -1116,12 +1116,10 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     info->cred_fname = NULL;
     curl_easy_setopt(info->curl_handle, CURLOPT_SSLCERT, NULL);
     curl_easy_setopt(info->curl_handle, CURLOPT_SSLKEY, NULL);
-    curl_easy_setopt(info->curl_handle, CURLOPT_FRESH_CONNECT, 0);
-    curl_easy_setopt(info->curl_handle, CURLOPT_FORBID_REUSE, 0);
   }
   if (info->cred_data) {
 #ifdef VOMS_AUTHZ
-    ::ReleaseCurlHandle(info->cred_data);
+    ::ReleaseCurlHandle(info->curl_handle, info->cred_data);
 #endif
     info->cred_data = NULL;
   }
