@@ -23,6 +23,7 @@ RUN         yum -y update && yum -y install                     \
                                         selinux-policy-devel    \
                                         selinux-policy-targeted \
                                         which                   \
+                                        voms-devel              \
                                         valgrind-devel          \
                                         zlib-devel
 

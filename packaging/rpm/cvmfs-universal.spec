@@ -32,6 +32,15 @@ Group: Applications/System
 License: BSD
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
+# Build with voms-devel on Fedora / RHEL derivatives.
+# Note that we *load* VOMS at runtime, not link against it; this means that
+# the produced RPM will not depend on VOMS.
+%if 0%{?suse_version}
+# TODO(bbockelm): figure out solution for VOMS on SUSE.
+%else
+BuildRequires: voms-devel
+%endif
+
 %if 0%{?el5}
 BuildRequires: buildsys-macros
 %endif
@@ -395,6 +404,8 @@ fi
 %doc COPYING AUTHORS README ChangeLog
 
 %changelog
+* Sat Jan 23 2016 Brian Bockelman <bbockelm@cse.unl.edu> - 2.2.0
+- Build with VOMS support
 * Thu Jan 21 2016 Jakob Blomer <jblomer@cern.ch> - 2.2.0
 - Remove sudo dependency
 * Fri Jan 15 2016 Jakob Blomer <jblomer@cern.ch> - 2.2.0

@@ -25,6 +25,7 @@ RUN         dnf -y update && dnf -y install                     \
                                         selinux-policy-targeted \
                                         sudo                    \
                                         tree                    \
+                                        voms-devel              \
                                         which                   \
                                         valgrind-devel          \
                                         zlib-devel
