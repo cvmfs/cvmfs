@@ -15,6 +15,13 @@ do_faulty_mount() {
               "CVMFS_MAX_RETRIES=0" $@
 }
 
+CVMFS_TEST_017_SILENT_PID=""
+cleanup() {
+  echo "running cleanup()"
+  [ -z $CVMFS_TEST_017_SILENT_PID ] || sudo kill $CVMFS_TEST_017_SILENT_PID
+}
+
+
 cvmfs_run_test() {
   local logfile=$1
 
@@ -32,10 +39,13 @@ cvmfs_run_test() {
   echo "unmounting and cleaning"
   cvmfs_clean || return 2
 
-  echo "starting mocked and silent DNS server"
-  server_pid=$(open_silent_port UDP 53 $logfile)
+  echo "install a desaster cleanup"
+  trap cleanup EXIT HUP INT TERM || return $?
 
-  echo "silent DNS server running as PID $server_pid"
+  echo "run a silent DNS server"
+  CVMFS_TEST_017_SILENT_PID=$(open_silent_port UDP 53 $logfile)
+  if [ $? -ne 0 ]; then return 3; fi
+  echo "silent server started with PID $CVMFS_TEST_017_SILENT_PID"
 
   echo "trying to mount again with unresponsive DNS"
   local milliseconds
@@ -55,7 +65,7 @@ cvmfs_run_test() {
     echo "timeout was too short: $milliseconds (expected at leat $expected_min)"
     retcode=19
   fi
-  
+
   echo "restarting autofs"
   autofs_switch off || return 10
   autofs_switch on  || return 11
@@ -74,9 +84,6 @@ cvmfs_run_test() {
     echo "timeout was too short: $milliseconds (expected at least $expected_min)"
     retcode=20
   fi
-
-  echo "killing the mocked DNS server"
-  sudo kill $server_pid || retcode=6
 
   return $retcode
 }

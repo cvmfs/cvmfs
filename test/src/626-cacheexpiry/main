@@ -139,10 +139,10 @@ cvmfs_run_test() {
 
   echo "check HTTP headers for /cvmfs/info/v1/meta.json"
   local imurl="${url}/v1/meta.json"
-  [ $(get_epoch "1 minutes") -lt $(get_expiry_time $imurl) ] || return 47
-  [ $(get_epoch "3 minutes") -gt $(get_expiry_time $imurl) ] || return 48
-  [ $(get_max_age $imurl)    -eq $jsonmaxage               ] || return 49
-  [ x"$(get_header $imurl "Content-Type")" = x"$jsontype"  ] || return 50
+  [ $(get_epoch "1 minutes") -lt $(get_expiry_time $imurl) ] || return 51
+  [ $(get_epoch "3 minutes") -gt $(get_expiry_time $imurl) ] || return 52
+  [ $(get_max_age $imurl)    -eq $jsonmaxage               ] || return 53
+  [ x"$(get_header $imurl "Content-Type")" = x"$jsontype"  ] || return 54
 
   return 0
 }
