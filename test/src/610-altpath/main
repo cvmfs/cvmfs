@@ -74,8 +74,8 @@ cvmfs_run_test() {
 
   echo "Force failed mount"
   cvmfs_suid_helper rdonly_umount $CVMFS_TEST_REPO || return 30
-  sudo sh -c "echo CVMFS_ALT_ROOT_PATH=no >> /var/spool/cvmfs/${CVMFS_TEST_REPO}/client.local"
-  sudo rm -rf "/var/spool/cvmfs/${CVMFS_TEST_REPO}/cache/${CVMFS_TEST_REPO}"
+  sudo sh -c "echo CVMFS_ALT_ROOT_PATH=no >> /var/spool/cvmfs/${CVMFS_TEST_REPO}/client.local" || return 51
+  sudo rm -rf "/var/spool/cvmfs/${CVMFS_TEST_REPO}/cache/${CVMFS_TEST_REPO}"                   || return 52
   cvmfs_suid_helper rdonly_mount $CVMFS_TEST_REPO && return 31
 
   echo "Mount latest"
