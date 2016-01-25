@@ -2057,6 +2057,7 @@ create_apache_config_for_endpoint() {
 $(cat_wsgi_config $name $with_wsgi)
 
 KeepAlive On
+AddType application/json .json
 # Translation URL to real pathname
 Alias /cvmfs/${name} ${storage_dir}
 <Directory "${storage_dir}">
