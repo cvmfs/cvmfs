@@ -26,6 +26,7 @@ addons:
       - selinux-policy-devel
       - hardlink
       - selinux-policy-targeted
+      - libattr-devel
 
 before_script:
   - mkdir -p build
