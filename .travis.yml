@@ -1,0 +1,37 @@
+
+language: cpp
+
+os:
+  - linux
+
+compiler:
+  - gcc
+  - clang
+
+sudo: false
+
+addons:
+  apt:
+    packages:
+      - libuuid-devel
+      - gcc-c++
+      - fuse-devel
+      - libattr-devel
+      - openssl-devel
+      - patch
+      - pkgconfig
+      - python-devel
+      - unzip
+      - checkpolicy
+      - selinux-policy-devel
+      - hardlink
+      - selinux-policy-targeted
+
+before_script:
+  - mkdir -p build
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update && brew install         ; fi
+
+script:
+  - cd build
+  - make
+
