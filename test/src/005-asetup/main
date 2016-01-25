@@ -10,11 +10,11 @@ cvmfs_run_test() {
   export ATLAS_LOCAL_ROOT_BASE=${ATL_LOCAL_ROOT}/ATLASLocalRootBase
   echo "asetup cold cache"
   . ${ATLAS_LOCAL_ROOT_BASE}/user/atlasLocalSetup.sh || return 2
-  ${AtlasSetup}/python/asetup.py --debugprint 17.0.0 || return 3
+  ${AtlasSetup}/python/asetup.py --debugprint 19.0.0 || return 3
 
   echo "asetup warm cache"
   start_time=`date -u +%s`
-  ${AtlasSetup}/python/asetup.py --debugprint 17.0.0 || return 4
+  ${AtlasSetup}/python/asetup.py --debugprint 19.0.0 || return 4
   end_time=`date -u +%s`
   rm -f '<undefined>'
   echo "$(($end_time-$start_time)) seconds required"

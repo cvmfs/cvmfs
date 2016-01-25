@@ -20,7 +20,6 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  src/006-buildkernel                          \
                                  src/007-testjobs                             \
                                  src/024-reload-during-asetup                 \
-                                 src/045-oasis                                \
                                  --                                           \
                                  src/0*                                       \
                               || retval=1
