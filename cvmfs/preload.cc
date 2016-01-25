@@ -22,7 +22,7 @@
 
 using namespace std;  // NOLINT
 
-const char *kVersion = "0.2 (Preview)";
+const char *kVersion = VERSION;
 
 namespace swissknife {
 download::DownloadManager *g_download_manager;
@@ -120,9 +120,13 @@ int main(int argc, char *argv[]) {
   string default_num_threads = "4";
   args['n'] = &default_num_threads;
 
-  string option_string = "u:r:k:m:x:d:n:";
+  string option_string = "u:r:k:m:x:d:n:vh";
   int c;
   while ((c = getopt(argc, argv, option_string.c_str())) != -1) {
+    if ((c == 'v') || (c == 'h')) {
+      swissknife::Usage();
+      return 0;
+    }
     args[c] = new string(optarg);
   }
 
