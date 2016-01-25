@@ -30,6 +30,7 @@ addons:
 
 before_script:
   - mkdir -p build
+  - sudo apt-get install libattr-devel fuse-devel pkgconfig python-devel
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update         ; fi
 
 script:
