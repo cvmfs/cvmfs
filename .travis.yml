@@ -8,6 +8,8 @@ compiler:
   - gcc
   - clang
 
+sudo: required
+
 addons:
   apt:
     packages:
@@ -27,7 +29,7 @@ addons:
 
 before_script:
   - mkdir -p build
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update && brew install         ; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update         ; fi
 
 script:
   - cd build && cmake -DBUILD_UNITTESTS=yes .. && make
