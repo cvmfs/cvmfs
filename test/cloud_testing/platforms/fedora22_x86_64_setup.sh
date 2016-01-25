@@ -36,6 +36,7 @@ echo "done"
 
 # install additional stuff (needed for perl testing tools)
 echo "installing additional RPM packages..."
+install_from_repo file
 install_from_repo gcc
 install_from_repo gcc-c++
 install_from_repo rubygems
