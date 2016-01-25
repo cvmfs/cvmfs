@@ -5689,7 +5689,7 @@ _run_catalog_migration() {
 
   # more sanity checks
   is_stratum0 $name       || die "This is not a stratum 0 repository"
-  is_root $name           || die "Permission denied: Only root can do that"
+  is_root                 || die "Permission denied: Only root can do that"
   is_in_transaction $name && die "Repository is already in a transaction"
   health_check $name
 
@@ -5803,7 +5803,7 @@ eliminate_hardlinks() {
 
   load_repo_config $name
 
-  is_root $name || die "Permission denied: Only root can do that"
+  is_root || die "Permission denied: Only root can do that"
 
   if [ $force -ne 1 ]; then
     echo "This will break up all hardlink relationships that are currently"
