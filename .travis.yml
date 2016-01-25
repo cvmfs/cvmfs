@@ -13,26 +13,29 @@ sudo: required
 addons:
   apt:
     packages:
-      - libuuid-devel
-      - gcc-c++
-      - fuse-devel
-      - libattr-devel
-      - openssl-devel
+      - autotools-dev
+      - libcap-dev
+      - libssl-dev
+      - g++
+      - libfuse-dev
+      - pkg-config
+      - libattr1-dev
       - patch
-      - pkgconfig
-      - python-devel
+      - python-dev
       - unzip
-      - checkpolicy
-      - selinux-policy-devel
-      - hardlink
-      - selinux-policy-targeted
-      - libattr-devel
+      - uuid-dev
+      - libc6-dev
+      - valgrind
+      - voms-dev
+      - gdb
+      - lldb
 
 before_script:
   - mkdir -p build
-  - sudo apt-get install libattr-devel fuse-devel pkgconfig python-devel
+  - python --version
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update         ; fi
 
 script:
-  - cd build && cmake -DBUILD_UNITTESTS=yes .. && make
+  - cd build && cmake -DBUILD_UNITTESTS=yes -DBUILD_PRELOADER=yes .. && make && test/unittests/cvmfs_unittests --gtest_shuffle --gtest_filter="-*Slow:T_Dns.CaresResolverLocalhost:T_Dns.NormalResolverCombined"
+  - ../ci/run_cpplint.sh
 

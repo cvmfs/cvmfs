@@ -526,7 +526,7 @@ class T_Uploaders : public FileSandbox {
         "CVMFS_S3_BUCKET=testbucket\n"
         "CVMFS_S3_MAX_NUMBER_OF_PARALLEL_CONNECTIONS=" +
         StringifyInt(parallel_connections) + "\n"
-        "CVMFS_S3_HOST=localhost\n"
+        "CVMFS_S3_HOST=127.0.0.1\n"
         "CVMFS_S3_PORT=" + StringifyInt(CVMFS_S3_TEST_MOCKUP_SERVER_PORT);
 
     fprintf(s3_conf, "%s\n", conf_str.c_str());
