@@ -30,7 +30,7 @@ cvmfs_run_test() {
 
   # do a detached find call
   # (sudo because sometimes the permissions in the repo are scrambled)
-  sudo find /cvmfs/sft.cern.ch -ignore_readdir_race > /tmp/find1 2>&1 &
+  sudo find /cvmfs/sft.cern.ch -ignore_readdir_race > /tmp/find1 2>/tmp/find1.errors &
   find_cmd=$!
 
   # reload the catalog every now and then
