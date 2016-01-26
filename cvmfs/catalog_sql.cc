@@ -1134,7 +1134,8 @@ SqlAllChunks::SqlAllChunks(const CatalogDatabase &database) {
       "FROM chunks, catalog WHERE "
       "chunks.md5path_1=catalog.md5path_1 AND "
       "chunks.md5path_2=catalog.md5path_2 AND "
-      "(catalog.flags & " + StringifyInt(SqlDirent::kFlagFileExternal) + " = 0)";
+      "(catalog.flags & " + StringifyInt(SqlDirent::kFlagFileExternal) +
+      " = 0)";
   }
   sql += ";";
   Init(database.sqlite_db(), sql);
