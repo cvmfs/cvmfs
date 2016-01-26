@@ -33,6 +33,9 @@ FAKE_S3_CONFIG=/etc/cvmfs/fakes3.conf
 FAKE_S3_BUCKET=cvmfs_test
 FAKE_S3_URL=http://localhost:${FAKE_S3_PORT}/${FAKE_S3_BUCKET}-1-1
 
+# download GeoIP database from a copy at CERN instead of directly from MaxMind
+export CVMFS_UPDATEGEO_URLBASE="https://ecsft.cern.ch/dist/cvmfs/geodb"
+
 usage() {
   local msg=$1
 

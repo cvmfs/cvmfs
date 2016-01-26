@@ -679,12 +679,12 @@ create_stratum1() {
     echo "  Stratum1:  $stratum1_url"
     s3_config=" -s $CVMFS_TEST_S3_CONFIG -w $stratum1_url -a"
   fi
-  sudo cvmfs_server add-replica -o $replica_owner      \
-                                -n $replica_name       \
-                                $s3_config             \
-                                $additional_parameters \
-                                $stratum0_url          \
-                                $stratum0_pub
+  sudo -E cvmfs_server add-replica -o $replica_owner      \
+                                   -n $replica_name       \
+                                   $s3_config             \
+                                   $additional_parameters \
+                                   $stratum0_url          \
+                                   $stratum0_pub
 }
 
 # creates a big file at a given location with a given size
