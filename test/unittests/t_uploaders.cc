@@ -74,7 +74,7 @@ class UploadCallbacks {
 template <class UploadersT>
 class T_Uploaders : public FileSandbox {
  private:
-  static const std::string sandbox_path;
+  static const char sandbox_path[];
   static const std::string dest_dir;
   static const std::string tmp_dir;
   std::string repo_alias;
@@ -95,7 +95,8 @@ class T_Uploaders : public FileSandbox {
   typedef std::vector<CharBuffer*>                       Buffers;
   typedef std::vector<std::pair<Buffers, StreamHandle> > BufferStreams;
 
-  T_Uploaders() : FileSandbox(T_Uploaders::sandbox_path), uploader_(NULL) {}
+  T_Uploaders() : FileSandbox(string(T_Uploaders::sandbox_path)),
+                  uploader_(NULL) {}
 
  protected:
   AbstractUploader *uploader_;
@@ -593,15 +594,15 @@ template <class UploadersT>
 atomic_int64 T_Uploaders<UploadersT>::gSeed = 0;
 
 template <class UploadersT>
-const std::string T_Uploaders<UploadersT>::sandbox_path = "./cvmfs_ut_uploader";
+const char T_Uploaders<UploadersT>::sandbox_path[] = "./cvmfs_ut_uploader";
 
 template <class UploadersT>
 const std::string T_Uploaders<UploadersT>::tmp_dir =
-    T_Uploaders::sandbox_path + "/tmp";
+    string(T_Uploaders::sandbox_path) + "/tmp";
 
 template <class UploadersT>
 const std::string T_Uploaders<UploadersT>::dest_dir =
-    T_Uploaders::sandbox_path + "/dest";
+    string(T_Uploaders::sandbox_path) + "/dest";
 
 typedef testing::Types<S3Uploader, LocalUploader> UploadTypes;
 TYPED_TEST_CASE(T_Uploaders, UploadTypes);

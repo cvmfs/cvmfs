@@ -3,6 +3,7 @@ language: cpp
 
 os:
   - linux
+  - osx
 
 compiler:
   - gcc
@@ -31,11 +32,17 @@ addons:
       - lldb
 
 before_script:
+  - ulimit -c unlimited -S
   - mkdir -p build
-  - python --version
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update         ; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update && brew install gdb Caskroom/cask/osxfuse ; fi
 
 script:
-  - cd build && cmake -DBUILD_UNITTESTS=yes -DBUILD_PRELOADER=yes .. && make && test/unittests/cvmfs_unittests --gtest_shuffle --gtest_filter="-*Slow:T_Dns.CaresResolverLocalhost:T_Dns.NormalResolverCombined"
-  - ../ci/run_cpplint.sh
+  - ci/run_cpplint.sh
+  # make -j stresses the memory of travis
+  - cd build && cmake -DBUILD_UNITTESTS=yes -DBUILD_PRELOADER=yes .. && make
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:$PWD/externals/build_tbb/build_release ; fi
+  - test/unittests/cvmfs_unittests --gtest_shuffle --gtest_filter="-*Slow:T_Dns.CaresResolverLocalhost:T_Dns.NormalResolverCombined:T_Dns.CaresResolverMany"
 
+
+after_failure:
+  - echo "t a a bt" | gdb -ex run --args test/unittests/cvmfs_unittests --gtest_shuffle --gtest_filter="-*Slow:T_Dns.CaresResolverLocalhost:T_Dns.NormalResolverCombined:T_Dns.CaresResolverMany"
