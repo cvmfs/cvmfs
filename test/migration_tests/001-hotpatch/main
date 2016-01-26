@@ -165,7 +165,7 @@ cvmfs_run_test() {
 
   # mount a repository
   echo "mounting sft.cern.ch and cernvm-prod.cern.ch"
-  cvmfs_mount sft.cern.ch,cernvm-prod.cern.ch "CVMFS_KCACHE_TIMEOUT=10" || return 7
+  cvmfs_mount sft.cern.ch,cernvm-prod.cern.ch "CVMFS_KCACHE_TIMEOUT=10" "CVMFS_DEBUGLOG=/tmp/hotpatch_test.log" || return 7
 
   # do some hammering on the file system (without interruption)
   echo "tar $src_dir (without interruption)"
