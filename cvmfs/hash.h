@@ -59,6 +59,8 @@ const char kSuffixMetainfo     = 'M';
 /**
  * Corresponds to Algorithms.  "Any" is the maximum of all the other
  * digest sizes.
+ * When the maximum digest size changes, the memory layout of DirectoryEntry and
+ * PosixQuotaManager::LruCommand changes, too!
  */
 const unsigned kDigestSizes[] =
   {16,  20,   20,     20,       20};
