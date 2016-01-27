@@ -107,6 +107,11 @@ cvmfs_run_test() {
   local script_location=$2
   local scratch_dir=$(pwd)
 
+  if [ -z $CVMFS_TEST_S3_CONFIG ]; then
+    echo "This is not yet implemented for S3"
+    return 1
+  fi
+
   local TEST600_GRID_SECURITY_DIR=${scratch_dir}/grid-security
   mkdir -p ${TEST600_GRID_SECURITY_DIR}/certificates ${scratch_dir}/vomsdir
   TEST600_HOSTCERT=${TEST600_GRID_SECURITY_DIR}/hostcert-cvmfs.pem
