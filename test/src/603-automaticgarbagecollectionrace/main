@@ -70,6 +70,8 @@ cvmfs_run_test() {
   local seconds=30
   local thresh_seconds=60 # Potential Race: Publishing is not supposed to take
                           #                 longer than thresh_seconds-seconds !
+                          #
+                          # Note: thresh_seconds should be 2 * seconds
 
   echo "create the culprit file"
   echo "I was pre-maturely deleted by 2.1.20 and 2.2.0-prerelease" > $culprit
