@@ -298,7 +298,7 @@ TEST(T_Shash, ToString) {
   shash::Any hash_shake128(shash::kShake128);
   hash_shake128.Randomize(&prng);
   ASSERT_FALSE(hash_shake128.IsNull());
-  EXPECT_EQ("dc477ee5734cc88160640ac90c2e45134474a9c0-shake128",
+  EXPECT_EQ("ea99bef923dd717df9309639b9480bbdf14f1d2a-shake128",
             hash_shake128.ToString());
 }
 
@@ -336,10 +336,10 @@ TEST(T_Shash, ToStringWithSuffix) {
   hash_shake128.suffix = 'L';
   ASSERT_FALSE(hash_shake128.IsNull());
   EXPECT_EQ(
-    "dc477ee5734cc88160640ac90c2e45134474a9c0-shake128L",
+    "ea99bef923dd717df9309639b9480bbdf14f1d2a-shake128L",
     hash_shake128.ToStringWithSuffix());
   EXPECT_EQ(
-    "dc477ee5734cc88160640ac90c2e45134474a9c0-shake128",
+    "ea99bef923dd717df9309639b9480bbdf14f1d2a-shake128",
     hash_shake128.ToString());
 }
 
@@ -455,13 +455,13 @@ TEST(T_Shash, MakePathExplicit) {
   shash::Any hash_shake128(shash::kShake128);
   hash_shake128.Randomize(&prng);
   ASSERT_FALSE(hash_shake128.IsNull());
-  EXPECT_EQ("c9/74ad1d26a43eef5780b48b2e9fe1a807c60911-shake128",
+  EXPECT_EQ("51/c00c437200dac16a2efcf04234ddde05e16655-shake128",
             hash_shake128.MakePathExplicit(1, 2));
-  EXPECT_EQ("c97/4ad/1d26a43eef5780b48b2e9fe1a807c60911-shake128",
+  EXPECT_EQ("51c/00c/437200dac16a2efcf04234ddde05e16655-shake128",
             hash_shake128.MakePathExplicit(2, 3));
-  EXPECT_EQ("c974ad1d26a43eef5780b48b2e9fe1a807c60911-shake128",
+  EXPECT_EQ("51c00c437200dac16a2efcf04234ddde05e16655-shake128",
             hash_shake128.MakePathExplicit(0, 3));
-  EXPECT_EQ("c/9/7/4ad1d26a43eef5780b48b2e9fe1a807c60911-shake128",
+  EXPECT_EQ("5/1/c/00c437200dac16a2efcf04234ddde05e16655-shake128",
             hash_shake128.MakePathExplicit(3, 1));
 }
 
@@ -496,10 +496,10 @@ TEST(T_Shash, MakePathDefault) {
   shash::Any hash_shake128(shash::kShake128);
   hash_shake128.Randomize(&prng);
   ASSERT_FALSE(hash_shake128.IsNull());
-  EXPECT_EQ("6a/a50e250bd3b7f77c965f310f99645330d403f0-shake128",
+  EXPECT_EQ("01/52bb2ee41313d8d63b9274230f90379adf9201-shake128",
             hash_shake128.MakePath());
   hash_shake128.suffix = 'L';
-  EXPECT_EQ("6a/a50e250bd3b7f77c965f310f99645330d403f0-shake128L",
+  EXPECT_EQ("01/52bb2ee41313d8d63b9274230f90379adf9201-shake128L",
             hash_shake128.MakePath());
 }
 
@@ -538,10 +538,10 @@ TEST(T_Shash, MakePathWithoutSuffix) {
   shash::Any hash_shake128(shash::kShake128);
   hash_shake128.Randomize(&prng);
   ASSERT_FALSE(hash_shake128.IsNull());
-  EXPECT_EQ("6a/a50e250bd3b7f77c965f310f99645330d403f0-shake128",
+  EXPECT_EQ("01/52bb2ee41313d8d63b9274230f90379adf9201-shake128",
             hash_shake128.MakePathWithoutSuffix());
   hash_shake128.suffix = 'L';
-  EXPECT_EQ("6a/a50e250bd3b7f77c965f310f99645330d403f0-shake128",
+  EXPECT_EQ("01/52bb2ee41313d8d63b9274230f90379adf9201-shake128",
             hash_shake128.MakePathWithoutSuffix());
 }
 
@@ -580,10 +580,10 @@ TEST(T_Shash, MakeAlternativePath) {
   shash::Any hash_shake128(shash::kShake128);
   hash_shake128.Randomize(&prng);
   ASSERT_FALSE(hash_shake128.IsNull());
-  EXPECT_EQ(".cvmfsalt-6aa50e250bd3b7f77c965f310f99645330d403f0-shake128",
+  EXPECT_EQ(".cvmfsalt-0152bb2ee41313d8d63b9274230f90379adf9201-shake128",
             hash_shake128.MakeAlternativePath());
   hash_shake128.suffix = 'L';
-  EXPECT_EQ(".cvmfsalt-6aa50e250bd3b7f77c965f310f99645330d403f0-shake128L",
+  EXPECT_EQ(".cvmfsalt-0152bb2ee41313d8d63b9274230f90379adf9201-shake128L",
             hash_shake128.MakeAlternativePath());
 }
 
@@ -952,7 +952,7 @@ TEST(T_Shash, Hmac) {
   const unsigned char *fox = reinterpret_cast<const unsigned char *>(
     "The quick brown fox jumps over the lazy dog");
   unsigned len_fox = strlen("The quick brown fox jumps over the lazy dog");
-  
+
   shash::Any md5(shash::kMd5);
   shash::Any sha1(shash::kSha1);
   shash::Any rmd160(shash::kRmd160);
