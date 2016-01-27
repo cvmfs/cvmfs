@@ -35,6 +35,7 @@ CVMFS_TEST_UNIONFS=overlayfs                                                  \
                                  src/579-garbagecollectstratum1legacytag      \
                                  src/585-xattrs                               \
                                  src/600-securecvmfs                          \
+                                 src/602-libcvmfs                             \
                                  --                                           \
                                  src/5*                                       \
                                  src/6*                                       \
