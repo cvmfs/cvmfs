@@ -67,8 +67,8 @@ cvmfs_run_test() {
   local root_catalog3=""
   local root_catalog4=""
 
-  local seconds=10
-  local thresh_seconds=20 # Potential Race: Publishing is not supposed to take
+  local seconds=30
+  local thresh_seconds=60 # Potential Race: Publishing is not supposed to take
                           #                 longer than thresh_seconds-seconds !
 
   echo "create the culprit file"
