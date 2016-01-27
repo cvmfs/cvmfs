@@ -15,7 +15,6 @@
 
 #include <cstdio>
 
-#include "sha2.h"
 #include "KeccakHash.h"
 
 using namespace std;  // NOLINT

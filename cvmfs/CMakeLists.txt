@@ -369,16 +369,16 @@ if (BUILD_CVMFS)
          ${LEVELDB_LIBRARIES} ${OPENSSL_LIBRARIES} ${FUSE_LIBRARIES}
          ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${ZLIB_LIBRARIES}
          ${PACPARSER_ARCHIVE} ${LEVELDB_ARCHIVE} ${CARES_ARCHIVE}
-         ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${UUID_LIBRARIES} ${SHA2_ARCHIVE}
+         ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${UUID_LIBRARIES}
          ${SHA3_ARCHIVE} pthread dl)
 
   target_link_libraries (cvmfs2 ${CVMFS_LOADER_LIBS} ${OPENSSL_LIBRARIES}
                                 ${LIBFUSE} ${RT_LIBRARY} ${UUID_LIBRARIES}
-                                ${SHA2_ARCHIVE} ${SHA3_ARCHIVE} pthread dl)
+                                ${SHA3_ARCHIVE} pthread dl)
   target_link_libraries (cvmfs_fuse_debug ${CVMFS2_DEBUG_LIBS} ${CVMFS_FUSE_LINK_LIBRARIES})
   target_link_libraries (cvmfs_fuse       ${CVMFS2_LIBS} ${CVMFS_FUSE_LINK_LIBRARIES})
   target_link_libraries (cvmfs_fsck       ${CVMFS_FSCK_LIBS} ${ZLIB_LIBRARIES}
-                                          ${OPENSSL_LIBRARIES} ${ZLIB_ARCHIVE} ${SHA2_ARCHIVE}
+                                          ${OPENSSL_LIBRARIES} ${ZLIB_ARCHIVE}
                                           ${SHA3_ARCHIVE} ${RT_LIBRARY} pthread)
 
 endif (BUILD_CVMFS)
@@ -415,7 +415,7 @@ if (BUILD_LIBCVMFS)
   endif (SPARSEHASH_BUILTIN)
 
   add_dependencies (cvmfs_only libsha3)
-  set (LIBCVMFS_LIBS ${SHA2_ARCHIVE} ${SHA3_ARCHIVE} ${LIBCVMFS_LIBS})
+  set (LIBCVMFS_LIBS ${SHA3_ARCHIVE} ${LIBCVMFS_LIBS})
 
   set_target_properties (cvmfs_only PROPERTIES COMPILE_FLAGS "${LIBCVMFS_CFLAGS}")
 
@@ -481,8 +481,7 @@ if (BUILD_SERVER)
                          ${CARES_LIBRARIES} ${CARES_ARCHIVE} ${TBB_LIBRARIES}
                          ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} ${OPENSSL_LIBRARIES}
                          ${SQLITE3_ARCHIVE} ${RT_LIBRARY} ${VJSON_ARCHIVE}
-                         ${SHA2_ARCHIVE} ${SHA3_ARCHIVE} ${CAP_LIBRARIES}
-                         pthread dl)
+                         ${SHA3_ARCHIVE} ${CAP_LIBRARIES} pthread dl)
 
   if (BUILD_SERVER_DEBUG)
     add_executable (cvmfs_swissknife_debug ${CVMFS_SWISSKNIFE_DEBUG_SOURCES})
@@ -517,8 +516,7 @@ if (BUILD_SERVER)
                            ${CARES_LIBRARIES} ${CARES_ARCHIVE} ${TBB_DEBUG_LIBRARIES}
                            ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} ${OPENSSL_LIBRARIES}
                            ${SQLITE3_ARCHIVE} ${RT_LIBRARY} ${VJSON_ARCHIVE}
-                           ${SHA2_ARCHIVE} ${SHA3_ARCHIVE} ${CAP_LIBRARIES}
-                           pthread dl)
+                           ${SHA3_ARCHIVE} ${CAP_LIBRARIES} pthread dl)
   endif (BUILD_SERVER_DEBUG)
 endif (BUILD_SERVER)
 
@@ -561,7 +559,7 @@ if (BUILD_PRELOADER)
                         ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE} ${ZLIB_LIBRARIES}
                         ${OPENSSL_LIBRARIES} ${CARES_ARCHIVE} ${SQLITE3_ARCHIVE}
                         ${ZLIB_ARCHIVE} ${TBB_LIBRARIES} ${RT_LIBRARY}
-                        ${VJSON_ARCHIVE} ${SHA2_ARCHIVE} ${SHA3_ARCHIVE}
+                        ${VJSON_ARCHIVE} ${SHA3_ARCHIVE}
                         pthread dl)
 endif (BUILD_PRELOADER)
 

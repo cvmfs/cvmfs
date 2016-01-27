@@ -256,7 +256,7 @@ struct Digest {
   /**
    * Generates a hexified repesentation of the digest including the identifier
    * string for newly added hashes.  Output is in the form of
-   * 'openssl x509 fingerprint', e.g. 00:AA:BB:...-SHA3
+   * 'openssl x509 fingerprint', e.g. 00:AA:BB:...-SHAKE128
    *
    * @param with_suffix  append the hash suffix (C,H,X, ...) to the result
    * @return             a string representation of the digest
@@ -430,8 +430,6 @@ struct Md5 : public Digest<16, kMd5> {
 
 struct Sha1 : public Digest<20, kSha1> { };
 struct Rmd160 : public Digest<20, kRmd160> { };
-//struct Sha256 : public Digest<32, kSha256> { };
-//struct Sha3 : public Digest<32, kSha3> { };
 struct Shake128 : public Digest<20, kShake128> { };
 
 /**
