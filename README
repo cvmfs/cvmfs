@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/cvmfs/cvmfs.svg?branch=devel)](https://travis-ci.org/cvmfs/cvmfs)
+
 CVMFS is a FUSE module which implements an HTTP read-only filesystem. The idea
 is based on the GROW-FS filesystem, which makes use of Parrot, a component of
 the CCTools package developed at the University of Notre Dame.
