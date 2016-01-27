@@ -1,5 +1,8 @@
 /**
  * This file is part of the CernVM File System.
+ *
+ * Note: should SHA3 and SHA256 be added, here's the hash of the commit that
+ * removed the corresponding unit tests: 45316f68b850c0d8461
  */
 
 #include <gtest/gtest.h>
