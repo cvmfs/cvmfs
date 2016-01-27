@@ -2911,12 +2911,13 @@ static void Spawn() {
   }
 
   // Setup catalog reload alarm (_after_ forking into daemon mode)
-  MakePipe(cvmfs::pipe_remount_trigger_);
   atomic_init32(&cvmfs::maintenance_mode_);
   atomic_init32(&cvmfs::drainout_mode_);
   atomic_init32(&cvmfs::reload_critical_section_);
   atomic_init32(&cvmfs::catalogs_expired_);
   if (!cvmfs::fixed_catalog_) {
+    MakePipe(cvmfs::pipe_remount_trigger_);
+    
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
     sa.sa_sigaction = cvmfs::AlarmReload;
