@@ -606,7 +606,7 @@ class MockCatalogManager : public AbstractCatalogManager<MockCatalog> {
 
  private:
   typedef struct {
-    shash::Algorithms GetHashAlgorithm() { return shash::kSha256; }
+    shash::Algorithms GetHashAlgorithm() { return shash::kShake128; }
   } Spooler;
 
   Spooler *spooler_;

@@ -24,6 +24,10 @@ desaster_cleanup() {
 
 cvmfs_run_test() {
   logfile=$1
+  echo "Warning: SHA-256 is currently not supported but it might be in the future. Skipping."
+  CVMFS_GENERAL_WARNING_FLAG=1
+  return 0
+
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
