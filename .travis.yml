@@ -32,15 +32,7 @@ addons:
       - lldb
 
 before_script:
-  - mkdir -p build
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update && brew install Caskroom/cask/osxfuse ; fi
 
 script:
-  - ci/run_cpplint.sh
-  - cd build && cmake -DBUILD_UNITTESTS=yes -DBUILD_PRELOADER=yes .. && make   # make -j stresses the memory of travis
-  # running the unit tests on mac fails because travis osx machines have limited resources
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then test/unittests/cvmfs_unittests --gtest_shuffle --gtest_filter="-*Slow:T_Dns.CaresResolverLocalhost:T_Dns.NormalResolverCombined:T_Dns.CaresResolverMany" ; fi
-
-
-after_failure:
-  - echo "t a a bt" | gdb -ex run --args test/unittests/cvmfs_unittests --gtest_shuffle --gtest_filter="-*Slow:T_Dns.CaresResolverLocalhost:T_Dns.NormalResolverCombined:T_Dns.CaresResolverMany"
+  - ci/run_travis.sh
