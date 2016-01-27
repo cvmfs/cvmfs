@@ -235,7 +235,6 @@ endif (BUILD_UNITTESTS)
 
 add_dependencies (${PROJECT_TEST_NAME} googletest)
 add_dependencies (${PROJECT_TEST_NAME} sparsehash)
-add_dependencies (${PROJECT_TEST_NAME} libsha2)
 add_dependencies (${PROJECT_TEST_NAME} libsha3)
 add_test (NAME ${PROJECT_TEST_NAME} COMMAND ${PROJECT_TEST_NAME} --gtest_filter=-*Slow)
 add_dependencies (check ${PROJECT_TEST_NAME})
@@ -292,7 +291,6 @@ if (BUILD_UNITTESTS_DEBUG)
     add_dependencies (${PROJECT_TEST_DEBUG_NAME} libtbb)
   endif (TBB_PRIVATE_LIB)
 
-  add_dependencies (${PROJECT_TEST_DEBUG_NAME} libsha2)
   add_dependencies (${PROJECT_TEST_DEBUG_NAME} libsha3)
 endif (BUILD_UNITTESTS_DEBUG)
 

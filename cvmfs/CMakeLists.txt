@@ -348,13 +348,9 @@ if (BUILD_CVMFS)
     add_dependencies (cvmfs_fuse libleveldb)
   endif (LEVELDB_BUILTIN)
 
-  add_dependencies (cvmfs_fuse_debug libsha2)
   add_dependencies (cvmfs_fuse_debug libsha3)
-  add_dependencies (cvmfs_fuse libsha2)
   add_dependencies (cvmfs_fuse libsha3)
-  add_dependencies (cvmfs2 libsha2)
   add_dependencies (cvmfs2 libsha3)
-  add_dependencies (cvmfs_fsck libsha2)
   add_dependencies (cvmfs_fsck libsha3)
 
   # set some properties
@@ -418,7 +414,6 @@ if (BUILD_LIBCVMFS)
     add_dependencies (cvmfs_only sparsehash)
   endif (SPARSEHASH_BUILTIN)
 
-  add_dependencies (cvmfs_only libsha2)
   add_dependencies (cvmfs_only libsha3)
   set (LIBCVMFS_LIBS ${SHA2_ARCHIVE} ${SHA3_ARCHIVE} ${LIBCVMFS_LIBS})
 
@@ -476,7 +471,6 @@ if (BUILD_SERVER)
     add_dependencies (cvmfs_swissknife libtbb)
   endif (TBB_PRIVATE_LIB)
 
-  add_dependencies (cvmfs_swissknife libsha2)
   add_dependencies (cvmfs_swissknife libsha3)
 
   set_target_properties (cvmfs_swissknife PROPERTIES COMPILE_FLAGS "${CVMFS_SWISSKNIFE_CFLAGS}" LINK_FLAGS "${CVMFS_SWISSKNIFE_LD_FLAGS}")
@@ -509,7 +503,6 @@ if (BUILD_SERVER)
       add_dependencies (cvmfs_swissknife_debug libtbb)
     endif (TBB_PRIVATE_LIB)
 
-    add_dependencies (cvmfs_swissknife_debug libsha2)
     add_dependencies (cvmfs_swissknife_debug libsha3)
 
     set_target_properties (cvmfs_swissknife_debug PROPERTIES COMPILE_FLAGS "${CVMFS_SWISSKNIFE_DEBUG_CFLAGS}" LINK_FLAGS "${CVMFS_SWISSKNIFE_DEBUG_LD_FLAGS}")
@@ -561,7 +554,6 @@ if (BUILD_PRELOADER)
     add_dependencies (cvmfs_preload_bin libtbb)
   endif (TBB_PRIVATE_LIB)
 
-  add_dependencies (cvmfs_preload_bin libsha2)
   add_dependencies (cvmfs_preload_bin libsha3)
   add_dependencies (cvmfs_preload_bin libvjson)
 

@@ -38,8 +38,6 @@ enum Algorithms {
   kMd5 = 0,
   kSha1,
   kRmd160,
-  kSha256,
-  kSha3,
   kShake128,  // with 160 output bits
   kAny,
 };
@@ -63,20 +61,20 @@ const char kSuffixMetainfo     = 'M';
  * digest sizes.
  */
 const unsigned kDigestSizes[] =
-  {16,  20,   20,     32,     32,       20,       32};
-// Md5  Sha1  Rmd160  Sha256  Sha3-256  Shake128  Any
-const unsigned kMaxDigestSize = 32;
+  {16,  20,   20,     20,       20};
+// Md5  Sha1  Rmd160  Shake128  Any
+const unsigned kMaxDigestSize = 20;
 
 /**
  * Hex representations of hashes with the same length need a suffix
  * to be distinguished from each other.  They should all have one but
  * for backwards compatibility MD5 and SHA-1 have none.  Initialized in hash.cc
- * like const char *kAlgorithmIds[] = {"", "", "-rmd160", "-sha256", ...
+ * like const char *kAlgorithmIds[] = {"", "", "-rmd160", ...
  */
 extern const char *kAlgorithmIds[];
 const unsigned kAlgorithmIdSizes[] =
-  {0,   0,    7,       7,       5,     9,         0};
-// Md5  Sha1  -rmd160  -sha256  -sha3  -shake128  Any
+  {0,   0,    7,       9,         0};
+// Md5  Sha1  -rmd160  -shake128  Any
 const unsigned kMaxAlgorithmIdentifierSize = 9;
 
 /**
@@ -84,8 +82,8 @@ const unsigned kMaxAlgorithmIdentifierSize = 9;
  * Is an HMAC for SHAKE well-defined?
  */
 const unsigned kBlockSizes[] =
-  {64,  64,   64,     64,     136,  168};
-// Md5  Sha1  Rmd160  Sha256  Sha3  Shake128
+  {64,  64,   64,     168};
+// Md5  Sha1  Rmd160  Shake128
 
 /**
  * Distinguishes between interpreting a string as hex hash and hashing over
@@ -430,8 +428,8 @@ struct Md5 : public Digest<16, kMd5> {
 
 struct Sha1 : public Digest<20, kSha1> { };
 struct Rmd160 : public Digest<20, kRmd160> { };
-struct Sha256 : public Digest<32, kSha256> { };
-struct Sha3 : public Digest<32, kSha3> { };
+//struct Sha256 : public Digest<32, kSha256> { };
+//struct Sha3 : public Digest<32, kSha3> { };
 struct Shake128 : public Digest<20, kShake128> { };
 
 /**
