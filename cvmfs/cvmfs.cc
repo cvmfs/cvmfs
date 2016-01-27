@@ -2928,15 +2928,15 @@ static void Spawn() {
       cvmfs::kShortTermTTL : cvmfs::GetEffectiveTTL();
     alarm(ttl);
     cvmfs::catalogs_valid_until_ = time(NULL) + ttl;
+
+    cvmfs::thread_remount_trigger_ = reinterpret_cast<pthread_t *>(
+      smalloc(sizeof(pthread_t)));
+    retval = pthread_create(cvmfs::thread_remount_trigger_, NULL,
+                            cvmfs::MainRemountTrigger, NULL);
+    assert(retval == 0);
   } else {
     cvmfs::catalogs_valid_until_ = cvmfs::kIndefiniteDeadline;
   }
-
-  cvmfs::thread_remount_trigger_ = reinterpret_cast<pthread_t *>(
-    smalloc(sizeof(pthread_t)));
-  retval = pthread_create(cvmfs::thread_remount_trigger_, NULL,
-                          cvmfs::MainRemountTrigger, NULL);
-  assert(retval == 0);
 
   cvmfs::download_manager_->Spawn();
   cvmfs::external_download_manager_->Spawn();
