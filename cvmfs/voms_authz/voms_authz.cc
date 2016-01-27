@@ -417,7 +417,7 @@ static bool CheckMultipleAuthz(const struct vomsdata *voms_ptr,
 
 bool CheckVOMSAuthz(const struct fuse_ctx *ctx, const std::string & authz) {
   if (g_VOMS_Init == NULL) {
-    LogCvmfs(kLogVoms, kLogSyslog,
+    LogCvmfs(kLogVoms, kLogSyslog | kLogDebug,
              "VOMS library not present; failing VOMS authz.");
     return false;
   }
@@ -434,15 +434,16 @@ bool CheckVOMSAuthz(const struct fuse_ctx *ctx, const std::string & authz) {
       LogCvmfs(kLogVoms, kLogDebug,
                "Caching user's VOMS credentials at address %p.", voms_ptr);
     } else {
-      LogCvmfs(kLogVoms, kLogDebug, "User has no VOMS credentials.");
+      LogCvmfs(kLogVoms, kLogSyslog | kLogDebug,
+               "User has no VOMS credentials.");
       return false;
     }
   } else {
     LogCvmfs(kLogVoms, kLogDebug, "Using cached VOMS credentials.");
   }
   if (!voms_ptr) {
-    LogCvmfs(kLogVoms, kLogDebug,
-             "ERROR: VOMS credentials are null pointer.");
+    LogCvmfs(kLogVoms, , kLogSyslog | kLogDebug,
+             "ERROR: Failed to generate VOMS data.");
     return false;
   }
   return CheckMultipleAuthz(voms_ptr, authz);

@@ -1,8 +1,6 @@
 cvmfs_test_name="Stratum1 / preloaded snapshot with uncompressed and external files"
 cvmfs_test_autofs_on_startup=false
 
-# TODO(rmeusel): make this S3 compliant
-
 produce_more_files_in() {
   local working_dir=$1
   local large_file=$2
