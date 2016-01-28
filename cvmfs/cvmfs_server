@@ -577,10 +577,7 @@ check_aufs() {
 # or if overlayfs is compiled in
 # @return   0 if the overlayfs kernel module is loaded
 check_overlayfs() {
-  local conf_gz="/proc/config.gz"
-  /sbin/modprobe -q overlayfs || test -d /sys/module/overlayfs || \
-  /sbin/modprobe -q overlay   || test -d /sys/module/overlay || \
-  [ x"$(zgrep OVERLAY_FS $conf_gz 2>/dev/null | awk -F = '{print $2}')" = x"y" ]
+  /sbin/modprobe -q overlay || test -d /sys/module/overlay
 }
 
 # check if at least one of the supported union file systems is available
@@ -595,40 +592,6 @@ get_available_union_fs() {
   else
     die "neither AUFS nor OverlayFS detected on the system!"
   fi
-}
-
-# gets the system's file system name of OverlayFS (overlay vs. overlayfs)
-get_overlayfs_name() {
-  check_overlayfs || die "overlayfs is not installed!"
-  if /sbin/modprobe -q overlayfs || [ -d /sys/module/overlayfs ]; then
-    echo "overlayfs"
-  elif /sbin/modprobe -q overlay || [ -d /sys/module/overlay ] || \
-       test x"$(zgrep OVERLAY_FS /proc/config.gz | awk -F = '{print $2}')" = xy ; then
-    echo "overlay"
-  else
-    die "cannot determine overlayfs name"
-  fi
-}
-
-# guess the installed OverlayFS version since starting from OverlayFS V22 it
-# requires to specify a 'workdir' and uses character devices for whiteouts
-# TODO: Is there a better way than guessing based on the kernel version?
-OFS_PRE_V22=1
-OFS_POST_V22=2
-get_overlayfs_type() {
-  ofs_name="$(get_overlayfs_name)"
-  vermagic="$(modinfo --field vermagic $ofs_name)"
-  krnl_version="$(echo "$vermagic" | grep -oe '^[0-9]\+\.[0-9]\+.[0-9]\+')"
-
-  post_v22_krnl_version="3.18.0"
-  if is_redhat; then post_v22_krnl_version="3.10.0"; fi
-
-  ofs_type=$OFS_POST_V22
-  if compare_versions "$krnl_version" -lt "$post_v22_krnl_version"; then
-    ofs_type=$OFS_PRE_V22
-  fi
-
-  echo "$ofs_type"
 }
 
 
@@ -2272,16 +2235,10 @@ setup_and_mount_new_repository() {
 
   local selinux_context=""
   if [ x"$CVMFS_UNION_FS_TYPE" = x"overlayfs" ]; then
-    local overlayfs_name="$(get_overlayfs_name)"
-    echo -n "($overlayfs_name) "
-    if [ x"$(get_overlayfs_type)" = x"$OFS_POST_V22" ]; then
-      ofs_workdir=",workdir=${ofs_workdir}"
-    else
-      ofs_workdir=""
-    fi
+    echo -n "(overlayfs) "
     cat >> /etc/fstab << EOF
 cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf:${CVMFS_SPOOL_DIR}/client.local,cvmfs_suid,noauto 0 0 # added by CernVM-FS for $name
-${overlayfs_name}_$name /cvmfs/$name $overlayfs_name upperdir=${scratch_dir},lowerdir=${rdonly_dir}$ofs_workdir,noauto,ro 0 0 # added by CernVM-FS for $name
+overlay_$name /cvmfs/$name overlay upperdir=${scratch_dir},lowerdir=${rdonly_dir},workdir=$ofs_workdir,noauto,ro 0 0 # added by CernVM-FS for $name
 EOF
   else
     echo -n "(aufs) "
