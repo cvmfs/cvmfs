@@ -648,7 +648,6 @@ import_repo() {
   fi
   sudo cvmfs_server import -o $uid $unionfs $extra_options $repo || return 102
 
-  local client_conf="/etc/cvmfs/repositories.d/${repo}/client.conf"
   apply_server_cache_config $repo || return 103
 }
 
