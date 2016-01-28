@@ -21,14 +21,18 @@ cvmfs_run_test() {
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
+  echo "gather some global information about $CVMFS_TEST_REPO"
+  load_repo_config $CVMFS_TEST_REPO
+  spool_dir="$CVMFS_SPOOL_DIR"
+
   start_transaction $CVMFS_TEST_REPO || return $?
   echo "Hello world" > /cvmfs/$CVMFS_TEST_REPO/file1
 
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO || return $?
 
-  local hash=$(attr -qg hash /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/file1)
-  local attrval=$(attr -qg compression /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/file1)
+  local hash=$(attr -qg hash ${spool_dir}/rdonly/file1)
+  local attrval=$(attr -qg compression ${spool_dir}/rdonly/file1)
   if [ x"$attrval" != "xzlib" ]; then
     return 22
   fi
