@@ -442,7 +442,7 @@ bool CheckVOMSAuthz(const struct fuse_ctx *ctx, const std::string & authz) {
     LogCvmfs(kLogVoms, kLogDebug, "Using cached VOMS credentials.");
   }
   if (!voms_ptr) {
-    LogCvmfs(kLogVoms, , kLogSyslog | kLogDebug,
+    LogCvmfs(kLogVoms, kLogSyslog | kLogDebug,
              "ERROR: Failed to generate VOMS data.");
     return false;
   }
