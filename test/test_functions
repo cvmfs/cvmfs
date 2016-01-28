@@ -581,6 +581,7 @@ create_repo() {
 
   if [ x$debug_log != x -a x$debug_log != xNO ]; then
     echo "CVMFS_DEBUGLOG=$debug_log" | sudo tee -a $client_conf
+    sudo sed -i.bak -e "s/^\(cvmfs2#$repo.*\)\(allow_other.*\)/\1debug,\2/" /etc/fstab
   fi
 }
 
