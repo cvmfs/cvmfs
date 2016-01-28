@@ -44,6 +44,10 @@ respawn_repository() {
   sudo cp -R ${repo_backend}/* $(get_local_repo_storage) || return 1
   sudo chown -R $user $(get_local_repo_storage $name)    || return 2
 
+  if has_selinux; then
+    chcon -Rv --type=httpd_sys_content_t $(get_local_repo_storage $name) > /dev/null || return 8
+  fi
+
   if [ x"$repo_keychain" != x"" ]; then
     sudo cp ${repo_keychain}/${CVMFS_TEST_REPO}.pub       /etc/cvmfs/keys || return 3
     sudo cp ${repo_keychain}/${CVMFS_TEST_REPO}.crt       /etc/cvmfs/keys || return 4
