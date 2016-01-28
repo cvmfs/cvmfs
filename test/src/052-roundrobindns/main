@@ -180,9 +180,15 @@ cleanup_dns_test() {
 cvmfs_run_test() {
   logfile=$1
 
+  # Necessary on Ubuntu 15.10
+  sudo systemctl stop systemd-timesyncd
+  local timesync_stopped=$?
   run_dns_test
   retval=$?
   cleanup_dns_test
+  if [ timesync_stopped -eq 0 ]; then
+    sudo systemctl start systemd-timesyncd
+  fi
 
   return $retval
 }
