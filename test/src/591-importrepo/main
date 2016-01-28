@@ -40,12 +40,15 @@ respawn_repository() {
   local user=$2
   local repo_backend=$3
   local repo_keychain="$4"
+  local dont_fix_permissions="$5"
 
   sudo cp -R ${repo_backend}/* $(get_local_repo_storage) || return 1
-  sudo chown -R $user $(get_local_repo_storage $name)    || return 2
 
-  if has_selinux; then
-    chcon -Rv --type=httpd_sys_content_t $(get_local_repo_storage $name) > /dev/null || return 8
+  if [ x"$dont_fix_permissions" = x"" ]; then
+    sudo chown -R $user $(get_local_repo_storage $name)    || return 2
+    if has_selinux; then
+      chcon -Rv --type=httpd_sys_content_t $(get_local_repo_storage $name) > /dev/null || return 8
+    fi
   fi
 
   if [ x"$repo_keychain" != x"" ]; then
@@ -150,6 +153,23 @@ cvmfs_run_test() {
 
   echo "importing repository with a provided keychain"
   import_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER -k $(pwd)/$repo_keychain || return 11
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+  # ============================================================================
+
+  echo "removing repository"
+  destroy_repo $CVMFS_TEST_REPO || return 50
+
+  echo "planting repository backend and keychain again (not fixing any permissions)"
+  respawn_repository $CVMFS_TEST_REPO $CVMFS_TEST_USER $repo_backend $repo_keychain DONT_FIX_PERMISSIONS || return $?
+
+  echo "importing repository to recreate the backend infrastructure (enable permission fixing)"
+  import_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER -g || return 51
 
   echo "compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir || return $?
