@@ -569,12 +569,12 @@ create_repo() {
     echo "  UnionFS: $CVMFS_TEST_UNIONFS"
     unionfs=" -f $CVMFS_TEST_UNIONFS"
   fi
-  sudo cvmfs_server mkfs -o $uid -m                \
-                         -a ${CVMFS_TEST_HASHALGO} \
-                         $s3_config                \
-                         $stratum0                 \
-                         $unionfs                  \
-                         $extra_options $repo || return 102
+  sudo -E cvmfs_server mkfs -o $uid -m                \
+                            -a ${CVMFS_TEST_HASHALGO} \
+                            $s3_config                \
+                            $stratum0                 \
+                            $unionfs                  \
+                            $extra_options $repo || return 102
 
   local client_conf="/etc/cvmfs/repositories.d/${repo}/client.conf"
   apply_server_cache_config $repo || return 103
@@ -666,7 +666,7 @@ import_repo() {
     echo "  UnionFS: $CVMFS_TEST_UNIONFS"
     unionfs=" -f $CVMFS_TEST_UNIONFS"
   fi
-  sudo cvmfs_server import -o $uid $unionfs $extra_options $repo || return 102
+  sudo -E cvmfs_server import -o $uid $unionfs $extra_options $repo || return 102
 
   apply_server_cache_config $repo || return 103
 }
