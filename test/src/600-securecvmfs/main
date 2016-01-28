@@ -137,7 +137,7 @@ cvmfs_run_test() {
   apache_switch on
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
-  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -V cvmfs:/cvmfs || return $?
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO || return $?
 
   echo "gather information about the just created repo"
   load_repo_config $CVMFS_TEST_REPO
@@ -168,16 +168,25 @@ cvmfs_run_test() {
   apache_switch off
   apache_switch on
 
+  echo "Setting CVMFS_SERVER_URL to https://"
   sed -i "s|CVMFS_SERVER_URL=$(get_repo_url $CVMFS_TEST_REPO)|CVMFS_SERVER_URL=https://$HOSTNAME:8443/cvmfs/$CVMFS_TEST_REPO|" /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/client.conf
   echo "X509_CERT_DIR=${TEST600_GRID_SECURITY_DIR}/certificates" >> /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/client.conf
+
   # TODO(jblomer): Fixed catalogs with alternative path should be properly solved
+  echo "reset CVMFS_ROOT_HASH"
   sed -i -e '/^CVMFS_ROOT_HASH=/d' ${spool_dir}/client.local
-  cvmfs_suid_helper rw_umount $CVMFS_TEST_REPO
-  cvmfs_suid_helper rdonly_umount $CVMFS_TEST_REPO
-  # Remove any cached files to make sure we reload over https.
-  rm -rf ${cache_base}/$CVMFS_TEST_REPO
+
+  echo "umount repository mountpoints to connect via https"
+  cvmfs_suid_helper rw_umount     $CVMFS_TEST_REPO || return 40
+  cvmfs_suid_helper rdonly_umount $CVMFS_TEST_REPO || return 41
+
+  echo "Remove any cached files to make sure we reload over https."
+  rm -rf ${cache_base}/$CVMFS_TEST_REPO || return 50
+
+  echo "remount repository mount points"
   cvmfs_suid_helper rdonly_mount $CVMFS_TEST_REPO || return $?
-  cvmfs_suid_helper rw_mount $CVMFS_TEST_REPO || return $?
+  cvmfs_suid_helper rw_mount     $CVMFS_TEST_REPO || return $?
+
   export X509_USER_PROXY=$(pwd)/certs/vomsproxy.pem
   cp $(pwd)/certs/vomsproxy.pem $(pwd)/certs/vomsproxy.pem.nobody
   chown nobody: $(pwd)/certs/vomsproxy.pem.nobody
