@@ -95,6 +95,25 @@ is_systemd() {
   [ x"$SERVICE_BIN" = x"false" ]
 }
 
+is_redhat() {
+  [ -e /etc/redhat-release ]
+}
+
+is_el7() {
+  is_redhat && which lsb_release > /dev/null 2>&1 && \
+  [ x"$(lsb_release -rs | cut -f1 -d'.')" = x"7" ]
+}
+
+is_el6() {
+  is_redhat && which lsb_release > /dev/null 2>&1 && \
+  [ x"$(lsb_release -rs | cut -f1 -d'.')" = x"6" ]
+}
+
+is_el5() {
+  is_redhat && which lsb_release > /dev/null 2>&1 && \
+  [ x"$(lsb_release -rs | cut -f1 -d'.')" = x"5" ]
+}
+
 # find the name of the httpd service
 
 
@@ -562,6 +581,7 @@ create_repo() {
 
   if [ x$debug_log != x -a x$debug_log != xNO ]; then
     echo "CVMFS_DEBUGLOG=$debug_log" | sudo tee -a $client_conf
+    sudo sed -i.bak -e "s/^\(cvmfs2#$repo.*\)\(allow_other.*\)/\1debug,\2/" /etc/fstab
   fi
 }
 
@@ -2000,12 +2020,14 @@ get_cache_directory() {
   echo "${mountpoint}c"
 }
 
-do_local_mount() {
-  local mountpoint="$1"
-  local repo_name="$2"
-  local repo_url="$3"
-  local config_file="$4"
-  local extra_option="$5"
+__do_local_mount() {
+  local as_root="$1"
+  local mountpoint="$2"
+  local repo_name="$3"
+  local repo_url="$4"
+  local config_file="$5"
+  local extra_option="$6"
+
   local cache="$(get_cache_directory $mountpoint)"
   local config="$(mktemp ${mountpoint}.conf.XXXXX)"
   local output="$(mktemp ${mountpoint}.log.XXXXX)"
@@ -2029,7 +2051,19 @@ EOF
   echo "  *** local mount config:"
   cat "$config"
 
-  cvmfs2 -d -o config=$config $repo_name $mountpoint >> $output 2>&1
+  if [ x"$as_root" != x"" ]; then
+    sudo cvmfs2 -d -o allow_other,config=$config $repo_name $mountpoint >> $output 2>&1
+  else
+    cvmfs2 -d -o allow_other,config=$config $repo_name $mountpoint >> $output 2>&1
+  fi
+}
+
+do_local_mount() {
+  __do_local_mount "" $@
+}
+
+do_local_mount_as_root() {
+  __do_local_mount "sudo" $@
 }
 
 remove_local_mount() {

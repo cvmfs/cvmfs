@@ -347,14 +347,20 @@ GenerateVOMSData(const struct fuse_ctx *ctx)
 
   struct vomsdata *voms_ptr = (*g_VOMS_Init)(NULL, NULL);
   int error = 0;
-  if (!(*g_VOMS_RetrieveFromFile)(fp, RECURSE_CHAIN, voms_ptr, &error)) {
+
+  const int retval = (*g_VOMS_RetrieveFromFile)(fp, RECURSE_CHAIN,
+                                                voms_ptr, &error);
+  fclose(fp);
+
+  if (!retval) {
     char *err_str = (*g_VOMS_ErrorMessage)(voms_ptr, error, NULL, 0);
     LogCvmfs(kLogVoms, kLogDebug, "Unable to parse VOMS file: %s\n",
              err_str);
     free(err_str);
     (*g_VOMS_Destroy)(voms_ptr);
-    return NULL;
+    voms_ptr = NULL;
   }
+
   return voms_ptr;
 }
 

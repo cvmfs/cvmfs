@@ -76,6 +76,9 @@ install_from_repo openssl-devel  || die "fail (installing openssl-devel)"
 install_from_repo cmake          || die "fail (installing cmake)"
 install_from_repo libattr-devel  || die "fail (installing libattr-devel)"
 
+# install test dependency for 600
+install_from_repo gridsite || die "fail (installing gridsite)"
+
 # increase open file descriptor limits
 echo -n "increasing ulimit -n ... "
 set_nofile_limit 65536 || die "fail"
