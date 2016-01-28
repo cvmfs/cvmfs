@@ -122,6 +122,7 @@ if [ $s3_retval -eq 0 ]; then
                                src/605-resurrectancientcatalog              \
                                src/607-noapache                             \
                                src/608-infofile                             \
+                               src/610-altpath                              \
                                src/614-geoservice                           \
                                src/622-gracefulrmfs                         \
                                src/626-cacheexpiry                          \
