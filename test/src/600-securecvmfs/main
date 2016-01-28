@@ -107,7 +107,7 @@ cvmfs_run_test() {
   local script_location=$2
   local scratch_dir=$(pwd)
 
-  if [ -z $CVMFS_TEST_S3_CONFIG ]; then
+  if [ ! -z $CVMFS_TEST_S3_CONFIG ]; then
     echo "This is not yet implemented for S3"
     return 1
   fi
