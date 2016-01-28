@@ -566,7 +566,7 @@ check_multiple_repository_existence() {
 
 
 # checks if the aufs kernel module is present
-# of if aufs is compiled in
+# or if aufs is compiled in
 # @return   0 if the aufs kernel module is loaded
 check_aufs() {
   /sbin/modprobe -q aufs || test -d /sys/fs/aufs
@@ -574,7 +574,7 @@ check_aufs() {
 
 
 # checks if the overlayfs kernel module is present
-# of if overlayfs is compiled in
+# or if overlayfs is compiled in
 # @return   0 if the overlayfs kernel module is loaded
 check_overlayfs() {
   local conf_gz="/proc/config.gz"
