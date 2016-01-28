@@ -37,8 +37,8 @@ cvmfs_run_test() {
   local root_catalog5=""
   local root_catalog6=""
 
-  local seconds=10
-  local thresh_seconds=20 # Potential Race: Publishing is not supposed to take
+  local seconds=30
+  local thresh_seconds=60 # Potential Race: Publishing is not supposed to take
                           #                 longer than thresh_seconds-seconds !
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER and disabled auto-tagging ($(display_timestamp now))"

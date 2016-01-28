@@ -56,14 +56,22 @@ cvmfs_unstash()
   sudo chown ${CVMFS_TEST_595_GEODB_OWNER}:${CVMFS_TEST_595_GEODB_GROUP} $source
 }
 
+recreate_server_hooks_from_stashed_if_needed() {
+  sudo rm -f $CVMFS_TEST_595_SERVER_HOOKS || true
+  if [ ! -z $CVMFS_TEST_595_SERVER_HOOKS_STASH ] && \
+     [   -f $CVMFS_TEST_595_SERVER_HOOKS_STASH ]; then
+    # copying over CVMFS_UPDATEGEO_URLBASE configuration if necessary
+    grep -e 'CVMFS_UPDATEGEO_URLBASE='  $CVMFS_TEST_595_SERVER_HOOKS_STASH | sudo tee --append $CVMFS_TEST_595_SERVER_HOOKS || return 50
+    grep -e 'CVMFS_UPDATEGEO_URLBASE6=' $CVMFS_TEST_595_SERVER_HOOKS_STASH | sudo tee --append $CVMFS_TEST_595_SERVER_HOOKS || return 51
+  fi
+}
+
 cvmfs_run_test() {
   logfile=$1
 
   # can't start out as root, it causes some of the tests below to fail
   echo "check if running as root"
   [ $(id -u) != 0 ] || return 1
-
-  echo "environment CVMFS_UPDATEGEO_URLBASE: $CVMFS_UPDATEGEO_URLBASE"
 
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
 
@@ -79,15 +87,18 @@ cvmfs_run_test() {
   CVMFS_TEST_595_GEODB_OWNER=$(stat --format='%U' $geodb_dir)
   CVMFS_TEST_595_GEODB_GROUP=$(stat --format='%G' $geodb_dir)
 
+  echo "install a disaster cleanup function"
+  trap cleanup EXIT HUP INT TERM || return $?
+
   cvmfs_stash GEODB
   cvmfs_stash GEODB2
   cvmfs_stash SERVER_HOOKS
 
+  echo "create initial $CVMFS_TEST_595_SERVER_HOOKS in necessary"
+  recreate_server_hooks_from_stashed_if_needed || return 50
+
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
-
-  echo "install a disaster cleanup function"
-  trap cleanup EXIT HUP INT TERM || return $?
 
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -254,7 +265,7 @@ cvmfs_run_test() {
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
   echo "removing $CVMFS_TEST_595_SERVER_HOOKS"
-  sudo rm -f $CVMFS_TEST_595_SERVER_HOOKS || return 42
+  recreate_server_hooks_from_stashed_if_needed || return 42
 
   echo "create a stratum1 snapshot (should find database up to date)"
   local snapshot_1_log="snapshot_1.log"
