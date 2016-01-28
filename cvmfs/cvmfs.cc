@@ -2917,7 +2917,7 @@ static void Spawn() {
   atomic_init32(&cvmfs::catalogs_expired_);
   if (!cvmfs::fixed_catalog_) {
     MakePipe(cvmfs::pipe_remount_trigger_);
-    
+
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
     sa.sa_sigaction = cvmfs::AlarmReload;
