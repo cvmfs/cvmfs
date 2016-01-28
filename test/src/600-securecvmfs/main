@@ -23,6 +23,7 @@ TEST600_CERTS_DIR=
 TEST600_GRID_SECURITY_TAINTED=
 
 cleanup() {
+  echo "running cleanup()..."
   sudo umount ${TEST600_GRID_MOUNTPOINT}
   [ "x$TEST600_GRID_SECURITY_TAINTED" = "xyes" ] && sudo umount /etc/grid-security
   [ -z "$TEST600_HTTPS_CONFIG" ] || sudo rm -f $TEST600_HTTPS_CONFIG
@@ -48,6 +49,7 @@ CVMFS_RELOAD_SOCKETS=$cache_dir
 CVMFS_CLAIM_OWNERSHIP=yes
 CVMFS_SERVER_URL=http://cvmfs-stratum-one.cern.ch/cvmfs/grid.cern.ch
 CVMFS_HTTP_PROXY="${CVMFS_TEST_PROXY}"
+CVMFS_KEYS_DIR=/etc/cvmfs/keys/cern.ch
 EOF
   cat ${cache_dir}/client.conf
 
@@ -142,9 +144,9 @@ cvmfs_run_test() {
   local spool_dir="$CVMFS_SPOOL_DIR"
   local cache_base="$CVMFS_CACHE_BASE"
 
-  start_transaction $CVMFS_TEST_REPO || return $?
-  echo "Hello World" > /cvmfs/$CVMFS_TEST_REPO/hello_world
-  publish_repo $CVMFS_TEST_REPO -v || return $?
+  start_transaction $CVMFS_TEST_REPO                       || return $?
+  echo "Hello World" > /cvmfs/$CVMFS_TEST_REPO/hello_world || return 3
+  publish_repo $CVMFS_TEST_REPO -v                         || return $?
 
   # ( . ${script_location}/../../common/migration_tests/common.sh; install_packages gridsite voms-clients-cpp )
 
