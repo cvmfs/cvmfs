@@ -107,6 +107,11 @@ cvmfs_run_test() {
   local script_location=$2
   local scratch_dir=$(pwd)
 
+  if [ -z $CVMFS_TEST_S3_CONFIG ]; then
+    echo "This is not yet implemented for S3"
+    return 1
+  fi
+
   local TEST600_GRID_SECURITY_DIR=${scratch_dir}/grid-security
   mkdir -p ${TEST600_GRID_SECURITY_DIR}/certificates ${scratch_dir}/vomsdir
   TEST600_HOSTCERT=${TEST600_GRID_SECURITY_DIR}/hostcert-cvmfs.pem
@@ -132,6 +137,11 @@ cvmfs_run_test() {
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -V cvmfs:/cvmfs || return $?
 
+  echo "gather information about the just created repo"
+  load_repo_config $CVMFS_TEST_REPO
+  local spool_dir="$CVMFS_SPOOL_DIR"
+  local cache_base="$CVMFS_CACHE_BASE"
+
   start_transaction $CVMFS_TEST_REPO || return $?
   echo "Hello World" > /cvmfs/$CVMFS_TEST_REPO/hello_world
   publish_repo $CVMFS_TEST_REPO -v || return $?
@@ -151,19 +161,19 @@ cvmfs_run_test() {
   cp $script_location/test600.cvmfs.secure.conf $TEST600_HTTPS_CONFIG
   sed -i "s/@REPONAME@/$CVMFS_TEST_REPO/" $TEST600_HTTPS_CONFIG
   sed -i "s,@GRIDSECURITYDIR@,$TEST600_GRID_SECURITY_DIR," $TEST600_HTTPS_CONFIG
-  cp $script_location/gacl /srv/cvmfs/$CVMFS_TEST_REPO/data/.gacl
+  cp $script_location/gacl $(get_local_repo_storage $CVMFS_TEST_REPO)/data/.gacl
   echo "restarting apache"
   apache_switch off
   apache_switch on
 
-  sed -i "s|CVMFS_SERVER_URL=http://localhost/cvmfs/$CVMFS_TEST_REPO|CVMFS_SERVER_URL=https://$HOSTNAME:8443/cvmfs/$CVMFS_TEST_REPO|" /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/client.conf
+  sed -i "s|CVMFS_SERVER_URL=$(get_repo_url $CVMFS_TEST_REPO)|CVMFS_SERVER_URL=https://$HOSTNAME:8443/cvmfs/$CVMFS_TEST_REPO|" /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/client.conf
   echo "X509_CERT_DIR=${TEST600_GRID_SECURITY_DIR}/certificates" >> /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/client.conf
   # TODO(jblomer): Fixed catalogs with alternative path should be properly solved
-  sed -i -e '/^CVMFS_ROOT_HASH=/d' /var/spool/cvmfs/${CVMFS_TEST_REPO}/client.local
+  sed -i -e '/^CVMFS_ROOT_HASH=/d' ${spool_dir}/client.local
   cvmfs_suid_helper rw_umount $CVMFS_TEST_REPO
   cvmfs_suid_helper rdonly_umount $CVMFS_TEST_REPO
   # Remove any cached files to make sure we reload over https.
-  rm -rf /var/spool/cvmfs/$CVMFS_TEST_REPO/cache/$CVMFS_TEST_REPO
+  rm -rf ${cache_base}/$CVMFS_TEST_REPO
   cvmfs_suid_helper rdonly_mount $CVMFS_TEST_REPO || return $?
   cvmfs_suid_helper rw_mount $CVMFS_TEST_REPO || return $?
   export X509_USER_PROXY=$(pwd)/certs/vomsproxy.pem
@@ -183,7 +193,7 @@ cvmfs_run_test() {
   fi
 
   # Check authz attr
-  if [ x"`attr -qg authz /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly`" != "xcvmfs:/cvmfs" ]; then
+  if [ x"`attr -qg authz ${spool_dir}/rdonly`" != "xcvmfs:/cvmfs" ]; then
     return 41
   fi
 
@@ -196,8 +206,8 @@ EOF
   set -x
   # TODO(bbockelm) Need to change test apache configuration to re-publish.
   # publish_repo $CVMFS_TEST_REPO -F new_authz
-  # $(attr -qg authz /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly | grep -q foo) || return 42
-  
+  # $(attr -qg authz ${spool_dir}/rdonly | grep -q foo) || return 42
+
 
   return 0
 }

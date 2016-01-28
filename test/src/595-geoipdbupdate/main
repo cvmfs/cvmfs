@@ -63,6 +63,8 @@ cvmfs_run_test() {
   echo "check if running as root"
   [ $(id -u) != 0 ] || return 1
 
+  echo "environment CVMFS_UPDATEGEO_URLBASE: $CVMFS_UPDATEGEO_URLBASE"
+
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
 
   local scratch_dir=$(pwd)
@@ -127,11 +129,11 @@ cvmfs_run_test() {
 
   echo "manually start a lazy GeoIP database update as 'root' (should work but not update)"
   local update_3_log="update_geodb_3.log"
-  sudo cvmfs_server update-geodb -l > $update_3_log 2>&1 || return 13
+  sudo -E cvmfs_server update-geodb -l > $update_3_log 2>&1 || return 13
 
   echo "manually start a GeoIP database update as 'root' (should work and update)"
   local update_4_log="update_geodb_4.log"
-  sudo cvmfs_server update-geodb > $update_4_log 2>&1 || return 14
+  sudo -E cvmfs_server update-geodb > $update_4_log 2>&1 || return 14
 
   echo "check output logs for the expected status messages"
   cat $update_3_log | grep "is up to date"           || return 15
@@ -171,18 +173,18 @@ cvmfs_run_test() {
 
   echo "do a lazy update as 'root' (should work and force the update)"
   local update_5_log="update_geodb_5.log"
-  sudo cvmfs_server update-geodb -l > $update_5_log 2>&1 || return 22
+  sudo -E cvmfs_server update-geodb -l > $update_5_log 2>&1 || return 22
 
   echo "do a lazy update as 'root' (should work but not update again)"
   local update_6_log="update_geodb_6.log"
-  sudo cvmfs_server update-geodb -l > $update_6_log 2>&1 || return 23
+  sudo -E cvmfs_server update-geodb -l > $update_6_log 2>&1 || return 23
 
   echo "set mtime of the GeoIP database to $old days ago (old)"
   sudo touch -d "$old days ago" $CVMFS_TEST_595_GEODB2 || return 24
 
   echo "do a lazy update as 'root' (should work and update)"
   local update_7_log="update_geodb_7.log"
-  sudo cvmfs_server update-geodb -l > $update_7_log 2>&1 || return 25
+  sudo -E cvmfs_server update-geodb -l > $update_7_log 2>&1 || return 25
 
   echo "check output logs for the expected status messages"
   cat $update_5_log | grep -e "very old.* Updating"   || return 26
@@ -206,7 +208,7 @@ cvmfs_run_test() {
 
     echo "do a lazy update as 'root' (should work but refrain from updating)"
     local update_8_log="update_geodb_8.log"
-    sudo cvmfs_server update-geodb -l > $update_8_log 2>&1 || return 31
+    sudo -E cvmfs_server update-geodb -l > $update_8_log 2>&1 || return 31
 
     echo "check output logs for the expected status messages"
     cat $update_8_log | grep -e "waiting for install time slot" || return 32
@@ -227,7 +229,7 @@ cvmfs_run_test() {
 
   echo "do a lazy update as 'root' (should work but refrain from updating)"
   local update_9_log="update_geodb_9.log"
-  sudo cvmfs_server update-geodb -l > $update_9_log 2>&1 || return 35
+  sudo -E cvmfs_server update-geodb -l > $update_9_log 2>&1 || return 35
 
   echo "check output logs for the expected status messages"
   cat $update_9_log | grep -e "waiting for install time slot" || return 36

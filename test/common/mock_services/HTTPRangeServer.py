@@ -208,7 +208,14 @@ class HTTPRangeRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
                              (1 + self.range_to - self.range_from))
         else:
             self.send_header("Content-Length", str(total_length))
-        self.send_header("Last-Modified", self.date_time_string(fs.st_mtime))
+
+        mtime = None
+        try:
+            mtime = self.date_time_string(fs.st_mtime)
+        except TypeError:
+            mtime = self.date_time_string()  # HOTFIX: for Python <= 2.4 without
+                                             #         the timestamp parameter
+        self.send_header("Last-Modified", mtime)
         self.end_headers()
         return f
 

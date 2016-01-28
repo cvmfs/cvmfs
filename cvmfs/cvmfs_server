@@ -2057,6 +2057,7 @@ create_apache_config_for_endpoint() {
 $(cat_wsgi_config $name $with_wsgi)
 
 KeepAlive On
+AddType application/json .json
 # Translation URL to real pathname
 Alias /cvmfs/${name} ${storage_dir}
 <Directory "${storage_dir}">
@@ -2448,7 +2449,7 @@ _write_info_file() {
   local info_file="${1}.json"
   local info_file_dir="$(get_global_info_v1_path)"
   local info_file_path="${info_file_dir}/${info_file}"
-  local tmp_file=$(mktemp)
+  local tmp_file="${info_file_dir}/${info_file}.txn.$(date +%s)"
 
   cat - > $tmp_file
   chmod 0644 $tmp_file
@@ -5688,7 +5689,7 @@ _run_catalog_migration() {
 
   # more sanity checks
   is_stratum0 $name       || die "This is not a stratum 0 repository"
-  is_root $name           || die "Permission denied: Only root can do that"
+  is_root                 || die "Permission denied: Only root can do that"
   is_in_transaction $name && die "Repository is already in a transaction"
   health_check $name
 
@@ -5802,7 +5803,7 @@ eliminate_hardlinks() {
 
   load_repo_config $name
 
-  is_root $name || die "Permission denied: Only root can do that"
+  is_root || die "Permission denied: Only root can do that"
 
   if [ $force -ne 1 ]; then
     echo "This will break up all hardlink relationships that are currently"

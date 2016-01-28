@@ -55,10 +55,15 @@ cvmfs_run_test() {
 
   # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
+  echo "load repository config to find the repository's cache location"
+  load_repo_config $CVMFS_TEST_REPO
+  local cache_location="${CVMFS_CACHE_BASE}/${CVMFS_TEST_REPO}"
+  echo "cache is at '${cache_location}'"
+
   echo "unmount both union fs and cvmfs"
   cvmfs_suid_helper rw_umount $CVMFS_TEST_REPO || return 10
   cvmfs_suid_helper rdonly_umount $CVMFS_TEST_REPO || return 11
-  sudo rm -rf "/var/spool/cvmfs/${CVMFS_TEST_REPO}/cache/${CVMFS_TEST_REPO}"
+  sudo rm -rf "$cache_location"
 
   echo "replace .cvmfsalt symlinks by the actual backend files"
   local f
@@ -67,20 +72,20 @@ cvmfs_run_test() {
     sudo rm -f $l
     sudo mv $f $l
   done
-  sudo sh -c "echo CVMFS_ALT_ROOT_PATH=yes >> /var/spool/cvmfs/${CVMFS_TEST_REPO}/client.local"
+  sudo sh -c "echo CVMFS_ALT_ROOT_PATH=yes >> ${CVMFS_SPOOL_DIR}/client.local"
 
   echo "Mount with fixed root hash"
   cvmfs_suid_helper rdonly_mount $CVMFS_TEST_REPO || return 12
 
   echo "Force failed mount"
   cvmfs_suid_helper rdonly_umount $CVMFS_TEST_REPO || return 30
-  sudo sh -c "echo CVMFS_ALT_ROOT_PATH=no >> /var/spool/cvmfs/${CVMFS_TEST_REPO}/client.local"
-  sudo rm -rf "/var/spool/cvmfs/${CVMFS_TEST_REPO}/cache/${CVMFS_TEST_REPO}"
+  sudo sh -c "echo CVMFS_ALT_ROOT_PATH=no >> ${CVMFS_SPOOL_DIR}/client.local" || return 51
+  sudo rm -rf "$cache_location"                                               || return 52
   cvmfs_suid_helper rdonly_mount $CVMFS_TEST_REPO && return 31
 
   echo "Mount latest"
-  sudo rm -rf "/var/spool/cvmfs/${CVMFS_TEST_REPO}/cache/${CVMFS_TEST_REPO}"
-  sudo rm -f "/var/spool/cvmfs/${CVMFS_TEST_REPO}/client.local"
+  sudo rm -rf "$cache_location"
+  sudo rm -f "${CVMFS_SPOOL_DIR}/client.local"
   cvmfs_suid_helper rdonly_mount $CVMFS_TEST_REPO || return 14
 
   return 0

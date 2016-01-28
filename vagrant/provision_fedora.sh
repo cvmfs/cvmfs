@@ -20,7 +20,8 @@ dnf -y install libuuid-devel gcc gcc-c++ glibc-common cmake fuse fuse-devel  \
                shadow-utils util-linux-ng selinux-policy checkpolicy         \
                selinux-policy-devel hardlink selinux-policy-targeted         \
                python-devel initscripts bash coreutils grep sed sudo psmisc  \
-               curl attr httpd libcap-devel mod_wsgi rpm-build java wget
+               curl attr httpd libcap-devel mod_wsgi rpm-build java wget     \
+               voms-devel
 
 # install convenience packages for development
 dnf -y install git tig iftop htop jq rubygems rubygem-bundler ruby-devel \

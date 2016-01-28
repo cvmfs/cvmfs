@@ -66,7 +66,8 @@ cvmfs_run_test() {
   compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return $?
 
   echo "validating the cvmfs cache"
-  sudo cvmfs_fsck /var/spool/cvmfs/${CVMFS_TEST_REPO}/cache/${CVMFS_TEST_REPO} || return 30
+  load_repo_config $CVMFS_TEST_REPO
+  sudo cvmfs_fsck ${CVMFS_CACHE_BASE}/${CVMFS_TEST_REPO} || return 30
 
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i  || return $?

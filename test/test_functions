@@ -679,12 +679,12 @@ create_stratum1() {
     echo "  Stratum1:  $stratum1_url"
     s3_config=" -s $CVMFS_TEST_S3_CONFIG -w $stratum1_url -a"
   fi
-  sudo cvmfs_server add-replica -o $replica_owner      \
-                                -n $replica_name       \
-                                $s3_config             \
-                                $additional_parameters \
-                                $stratum0_url          \
-                                $stratum0_pub
+  sudo -E cvmfs_server add-replica -o $replica_owner      \
+                                   -n $replica_name       \
+                                   $s3_config             \
+                                   $additional_parameters \
+                                   $stratum0_url          \
+                                   $stratum0_pub
 }
 
 # creates a big file at a given location with a given size
@@ -849,20 +849,18 @@ open_silent_port() {
   local protocol=$1
   local port=$2
   local logfile=$3
-  local pid
   local cmd
-  local retcode
+  local mock
 
-  cmd="sudo python ${TEST_ROOT}/common/mock_services/silent_socket.py $protocol $port"
-  pid=$(run_background_service $logfile "$cmd")
-  retcode=$?
+  mock="python ${TEST_ROOT}/common/mock_services/silent_socket.py $protocol $port"
 
-  if [ $retcode -ne 0 ]; then
-    return $retcode
-  fi
-
-  echo $pid
-  return $retcode
+  # Do similar fifo-trick as in run_background_service() to get the PID of the
+  # actual silent_socket.py process rather than just the `sudo` around it.
+  local fifo="pid_silent_port_fifo"
+  mkfifo $fifo || return 1
+  cmd="sudo sh -c \"echo \\\$\\\$ > $fifo; exec $mock\""
+  run_background_service $logfile "$cmd" > /dev/null 2>&1 || return $?
+  cat $fifo # return the PID of the `python silent_socket.py`
 }
 
 
