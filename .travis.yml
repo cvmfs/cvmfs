@@ -36,3 +36,6 @@ before_script:
 
 script:
   - ci/run_travis.sh
+
+notifications:
+  email: false

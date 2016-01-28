@@ -44,8 +44,8 @@ fi
 # Build CVMFS (make -j stresses the memory of travis machines)
 echo -n "BUILDING CernVM-FS ...................................................................................... "
 mkdir -p build && cd build
-cmake -DBUILD_UNITTESTS=yes -DBUILD_PRELOADER=yes .. > build.log 2>&1     || BUILD_FAILED=true report_error "$(pwd)/build.log"
-make >> build.log 2>&1                                                    || BUILD_FAILED=true report_error "$(pwd)/build.log"
+cmake -DBUILD_UNITTESTS=yes -DBUILD_PRELOADER=yes .. > build.log 2>&1  && \
+make >> "$(pwd)/build.log" 2>&1                                           || BUILD_FAILED=true report_error "$(pwd)/build.log"
 if ! $BUILD_FAILED ; then
   echo "Done"
 fi
