@@ -95,6 +95,25 @@ is_systemd() {
   [ x"$SERVICE_BIN" = x"false" ]
 }
 
+is_redhat() {
+  [ -e /etc/redhat-release ]
+}
+
+is_el7() {
+  is_redhat && which lsb_release > /dev/null 2>&1 && \
+  [ x"$(lsb_release -rs | cut -f1 -d'.')" = x"7" ]
+}
+
+is_el6() {
+  is_redhat && which lsb_release > /dev/null 2>&1 && \
+  [ x"$(lsb_release -rs | cut -f1 -d'.')" = x"6" ]
+}
+
+is_el5() {
+  is_redhat && which lsb_release > /dev/null 2>&1 && \
+  [ x"$(lsb_release -rs | cut -f1 -d'.')" = x"5" ]
+}
+
 # find the name of the httpd service
 
 
