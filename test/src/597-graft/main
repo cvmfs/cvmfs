@@ -108,9 +108,14 @@ chunk_offsets=0,6
 chunk_checksums=c4d871ad13ad00fde9a7bb7ff7ed2543aec54241,9591818c07e900db7e1e0bc4b884c945e6a61b24
 EOF
 
-  mkdir -p /srv/cvmfs/$CVMFS_TEST_REPO/data/{2b,95}
-  echo -n "hello " > /srv/cvmfs/$CVMFS_TEST_REPO/data/c4/d871ad13ad00fde9a7bb7ff7ed2543aec54241P
-  echo "world" >  /srv/cvmfs/$CVMFS_TEST_REPO/data/95/91818c07e900db7e1e0bc4b884c945e6a61b24P
+  local h1=c4d871ad13ad00fde9a7bb7ff7ed2543aec54241P
+  local h2=9591818c07e900db7e1e0bc4b884c945e6a61b24P
+
+  echo -n "hello " > $h1 || return 50
+  echo    "world"  > $h2 || return 51
+
+  upload_into_backend $CVMFS_TEST_REPO $h1 $(make_path $h1)
+  upload_into_backend $CVMFS_TEST_REPO $h2 $(make_path $h2)
 
   publish_repo $CVMFS_TEST_REPO -v || return $?
 
