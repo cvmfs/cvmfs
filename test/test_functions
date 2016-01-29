@@ -844,6 +844,8 @@ run_background_service() {
   rm -f $fifo
 
   # check if the background process is running
+  # TODO(rmeusel): Fix this race. If the background service is a short living
+  #                process it might have successfully terminated at this point.
   if ! sudo kill -0 $srv_pid > /dev/null 2>&1; then
     return 4
   fi
