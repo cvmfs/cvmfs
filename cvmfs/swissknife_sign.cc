@@ -255,6 +255,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   }
 
   delete spooler;
+  free(cert_buf);
   signature_manager.Fini();
   return 0;
 
