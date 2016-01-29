@@ -56,3 +56,8 @@ install_from_repo libattr-devel
 echo -n "increasing ulimit -n ... "
 set_nofile_limit 65536 || die "fail"
 echo "done"
+
+# rebooting the system (returning 0 value)
+echo "sleep 1 && reboot" > killme.sh
+sudo nohup sh < killme.sh &
+exit 0
