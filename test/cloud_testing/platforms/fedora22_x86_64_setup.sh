@@ -8,11 +8,6 @@ script_location=$(dirname $(readlink --canonicalize $0))
 echo "updating installed RPM packages..."
 sudo dnf -y update || die "fail (dnf update)"
 
-# disable SELinux (OverlayFS doesn't support it)
-echo -n "set SELinux into permissive mode..."
-sudo setenforce 0 || die "fail"
-echo "done"
-
 # install CernVM-FS RPM packages
 echo "installing RPM packages... "
 install_rpm "$CONFIG_PACKAGES"
