@@ -19,6 +19,9 @@
  * improvement.
  */
 
+// TODO(jblomer): the file system root should probably always return 1 for an
+// inode.  See also integration test #23.
+
 #define ENOATTR ENODATA  /**< instead of including attr/xattr.h */
 #define FUSE_USE_VERSION 26
 #define __STDC_FORMAT_MACROS
@@ -1900,7 +1903,6 @@ bool Pin(const string &path) {
         return false;
       }
       cache_manager_->Close(fd);
-      return true;
     }
     return true;
   }
