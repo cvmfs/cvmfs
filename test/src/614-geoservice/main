@@ -117,7 +117,7 @@ cvmfs_run_test() {
 
   if [ -n "$ipv6addr" ]; then
     echo "checking direct IPv6"
-    result="`curl -s http://$ipv6addr/$api/x/$fnal,$asgc,$cern|head -5`"
+    result="`curl -s -g http://[$ipv6addr]/$api/x/$fnal,$asgc,$cern|head -5`"
     cvmfs_check_georesult "$result" $me fnal,asgc,cern || return 8
   fi
 
