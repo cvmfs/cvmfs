@@ -580,6 +580,18 @@ check_overlayfs() {
   /sbin/modprobe -q overlay || test -d /sys/module/overlay
 }
 
+
+# ensure that the installed overlayfs is viable for CernVM-FS. Namely, it must
+# be part of the upstream kernel (since 3.18) and recent enough (kernel 4.2)
+# Note: More details are in CVM-835.
+# @return  0 if overlayfs is installed and viable
+check_overlayfs_version() {
+  [ -z "$CVMFS_DONT_CHECK_OVERLAYFS_VERSION" ] || return 0
+  local krnl_version=$(uname -r | grep -oe '^[0-9]\+\.[0-9]\+.[0-9]\+')
+  compare_versions "$krnl_version" -ge "4.2.0"
+}
+
+
 # check if at least one of the supported union file systems is available
 # currently AUFS get preference over OverlayFS if both are available
 #
@@ -2902,6 +2914,7 @@ mkfs() {
   check_upstream_validity $upstream
   if [ $unionfs = "overlayfs" ]; then
     check_overlayfs                 || die "overlayfs kernel module missing"
+    check_overlayfs_version         || die "Your version of OverlayFS is not supported"
     echo "Warning: CernVM-FS filesystems using overlayfs may not enforce hard link semantics during publishing."
   else
     check_aufs                      || die "aufs kernel module missing"
@@ -3361,6 +3374,7 @@ import() {
 
   if [ $unionfs = "overlayfs" ]; then
     check_overlayfs                 || die "overlayfs kernel module missing"
+    check_overlayfs_version         || die "Your version of OverlayFS is not supported"
     echo "Warning: CernVM-FS filesystems using overlayfs may not enforce hard link semantics during publishing."
   else
     check_aufs                      || die "aufs kernel module missing"
