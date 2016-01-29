@@ -2059,11 +2059,11 @@ EOF
 }
 
 do_local_mount() {
-  __do_local_mount "" $@
+  __do_local_mount "" "$@"
 }
 
 do_local_mount_as_root() {
-  __do_local_mount "sudo" $@
+  __do_local_mount "sudo" "$@"
 }
 
 remove_local_mount() {
