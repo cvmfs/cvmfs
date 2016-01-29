@@ -844,6 +844,8 @@ run_background_service() {
   rm -f $fifo
 
   # check if the background process is running
+  # TODO(rmeusel): Fix this race. If the background service is a short living
+  #                process it might have successfully terminated at this point.
   if ! sudo kill -0 $srv_pid > /dev/null 2>&1; then
     return 4
   fi
@@ -2059,11 +2061,11 @@ EOF
 }
 
 do_local_mount() {
-  __do_local_mount "" $@
+  __do_local_mount "" "$@"
 }
 
 do_local_mount_as_root() {
-  __do_local_mount "sudo" $@
+  __do_local_mount "sudo" "$@"
 }
 
 remove_local_mount() {
