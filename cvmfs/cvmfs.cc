@@ -2281,7 +2281,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
     }
   }
   if (cvmfs::options_manager_->GetValue("CVMFS_GID_MAP", &parameter)) {
-    gid_map.Read(parameter);
+    retval = gid_map.Read(parameter);
     if (!retval) {
       *g_boot_error = "failed to parse gid map " + parameter;
       return loader::kFailOptions;
