@@ -877,6 +877,7 @@ S3FanoutManager::S3FanoutManager() {
   opt_backoff_max_ms_ = 0;
   opt_ipv4_only_ = false;
 
+  available_jobs_ = 0;
   max_available_jobs_ = 0;
   thread_upload_ = 0;
   thread_upload_run_ = false;
