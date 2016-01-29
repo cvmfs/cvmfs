@@ -152,6 +152,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
 
     if (certificate_hash.IsNull()) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to upload certificate");
+      delete manifest;
       goto sign_fail;
     }
 
