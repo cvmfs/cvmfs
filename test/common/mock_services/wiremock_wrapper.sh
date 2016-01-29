@@ -18,7 +18,9 @@ install_wiremock() {
   local wiremock_launcher_install_path="/usr/bin/wiremock"
 
   echo -n "Downloading wiremock... "
-  wget --quiet $CVMFS_WIREMOCK_JAR_LOCATION || { echo "fail"; return 1; }
+  wget --quiet                \
+       --no-check-certificate \
+       $CVMFS_WIREMOCK_JAR_LOCATION || { echo "fail"; return 1; }
   echo "done"
 
   echo -n "Installing wiremock... "
