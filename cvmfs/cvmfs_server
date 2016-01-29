@@ -5509,7 +5509,7 @@ migrate_2_1_20() {
 
     echo "--> updating /etc/fstab"
     local tmp_fstab=$(mktemp)
-    awk  "/added by CernVM-FS for $name/"' {
+    awk  "/added by CernVM-FS for $name\$/"' {
             for (i = 1; i <= NF; i++) {
               if (i == 4) $i = $i",noauto";
               printf("%s ", $i);
