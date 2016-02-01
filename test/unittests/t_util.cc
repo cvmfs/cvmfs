@@ -400,9 +400,9 @@ TEST_F(T_Util, MakeSocket) {
   int socket_fd2;
 
   ASSERT_DEATH(MakeSocket(long_path, 0600), ".*");
-  EXPECT_NE(-1, socket_fd1 = MakeSocket(socket_address, 0777));
-  // the second time it should work as well (non socket-alrady-in-use error)
-  EXPECT_NE(-1, socket_fd2 = MakeSocket(socket_address, 0777));
+  ASSERT_NE(-1, socket_fd1 = MakeSocket(socket_address, 0777));
+  // the second time it should work as well (no socket-already-in-use error)
+  ASSERT_NE(-1, socket_fd2 = MakeSocket(socket_address, 0777));
   close(socket_fd1);
   close(socket_fd2);
 }
