@@ -5537,7 +5537,7 @@ migrate_2_1_20() {
 
     echo "--> updating server.conf"
     if ! grep -q "CVMFS_AUTO_REPAIR_MOUNTPOINT" $server_conf; then
-      echo "CVMFS_AUTO_REPAIR_MOUNTPOINT=true" >> $server_confg
+      echo "CVMFS_AUTO_REPAIR_MOUNTPOINT=true" >> $server_conf
     else
       sed -i -e "s/^\(CVMFS_AUTO_REPAIR_MOUNTPOINT\)=.*/\1=true/" $server_conf
     fi
