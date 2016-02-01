@@ -93,6 +93,7 @@ install_from_repo libattr-devel || die "fail (installing libattr-devel)"
 install_from_repo compat-expat1 || die "fail (installing compat-expat1)"
 install_from_repo openssl098e   || die "fail (installing openssl098e)"
 install_from_repo gridsite      || die "fail (installing gridsite)"
+install_from_repo voms          || die "fail (installing voms)"
 
 # install ruby gem for FakeS3
 install_ruby_gem fakes3 0.2.0  # latest is 0.2.1 (23.07.2015) that didn't work.
