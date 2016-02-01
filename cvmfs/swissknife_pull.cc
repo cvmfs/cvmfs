@@ -279,7 +279,7 @@ static void *MainWorker(void *data) {
           abort();
         }
         attempts++;
-      } while ((retval != download::kFailOk) && (attempts < retries));
+      } while (attempts < retries);
       fclose(fchunk);
       Store(tmp_file, chunk_hash,
             (compression_alg == zlib::kZlibDefault) ? true : false);
