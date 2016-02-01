@@ -70,16 +70,6 @@ int CommandGc::Main(const ArgumentList &args) {
     return 1;
   }
 
-  FILE *deletion_log_file = NULL;
-  if (!deletion_log_path.empty()) {
-    deletion_log_file = fopen(deletion_log_path.c_str(), "a+");
-    if (NULL == deletion_log_file) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "failed to open deletion log file "
-                                      "(errno: %d)", errno);
-      return 1;
-    }
-  }
-
   const bool follow_redirects = false;
   if (!this->InitDownloadManager(follow_redirects) ||
       !this->InitVerifyingSignatureManager(repo_keys)) {
@@ -115,9 +105,28 @@ int CommandGc::Main(const ArgumentList &args) {
     return 1;
   }
 
-  GcConfig config;
   const upload::SpoolerDefinition spooler_definition(spooler, shash::kAny);
-  config.uploader = upload::AbstractUploader::Construct(spooler_definition);
+  UniquePtr<upload::AbstractUploader> uploader(
+                       upload::AbstractUploader::Construct(spooler_definition));
+
+  if (!uploader.IsValid()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to initialize spooler for '%s'",
+             spooler.c_str());
+    return 1;
+  }
+
+  FILE *deletion_log_file = NULL;
+  if (!deletion_log_path.empty()) {
+    deletion_log_file = fopen(deletion_log_path.c_str(), "a+");
+    if (NULL == deletion_log_file) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to open deletion log file "
+                                      "(errno: %d)", errno);
+      return 1;
+    }
+  }
+
+  GcConfig config;
+  config.uploader = uploader.weak_ref();
   config.keep_history_depth = revisions;
   config.keep_history_timestamp = timestamp;
   config.dry_run = dry_run;
@@ -126,11 +135,6 @@ int CommandGc::Main(const ArgumentList &args) {
   config.reflog = reflog.weak_ref();
   config.deleted_objects_logfile = deletion_log_file;
 
-  if (config.uploader == NULL) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to initialize spooler for '%s'",
-             spooler.c_str());
-    return 1;
-  }
 
   if (deletion_log_file != NULL) {
     const int bytes_written = fprintf(deletion_log_file,
