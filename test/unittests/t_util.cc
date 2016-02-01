@@ -619,7 +619,8 @@ TEST_F(T_Util, SendMes2Socket) {
   SendMsg2Socket(client_fd, to_write);
   int new_connection = accept(server_fd, (struct sockaddr *) &client_addr,
       &client_length);
-  read(new_connection, buffer, to_write.length());
+  int bytes_read = read(new_connection, buffer, to_write.length());
+  EXPECT_EQ(bytes_read, to_write.length());
 
   EXPECT_STREQ(to_write.c_str(), static_cast<const char*>(buffer));
   close(new_connection);
