@@ -1062,6 +1062,7 @@ TEST_F(T_Util, ParseKeyvalPath) {
   EXPECT_FALSE(ParseKeyvalPath("/path/that/does/not/exists.txt", &map));
   EXPECT_FALSE(ParseKeyvalPath(sandbox + "/" + big_file, &map));
   EXPECT_TRUE(ParseKeyvalPath(sandbox + "/" + content_file, &map));
+  free(big_buffer);
 }
 
 TEST_F(T_Util, DiffTimeSeconds) {
