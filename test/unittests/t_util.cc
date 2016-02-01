@@ -617,7 +617,7 @@ TEST_F(T_Util, SendMes2Socket) {
   ASSERT_LT(0, server_fd);
   listen(server_fd, 1);
   int client_fd = ConnectSocket(socket_address);
-  ASSERT_LT(0, client_fd);
+  ASSERT_GE(0, client_fd);
   SendMsg2Socket(client_fd, to_write);
   int new_connection = accept(server_fd, (struct sockaddr *) &client_addr,
       &client_length);
