@@ -93,6 +93,7 @@ CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
                                  src/577-garbagecollecthiddenstratum1revision \
                                  src/579-garbagecollectstratum1legacytag      \
                                  src/585-xattrs                               \
+                                 src/600-securecvmfs                          \
                                  src/608-infofile                             \
                                  src/609-metainfofile                         \
                                  --                                           \
