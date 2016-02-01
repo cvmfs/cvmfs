@@ -289,6 +289,7 @@ class UniquePtr : SingleCopy {
   inline operator bool() const        { return IsValid(); }
   inline T& operator*() const         { return *ref_; }
   inline T* operator->() const        { return ref_; }
+  inline operator T*()                { return ref_; }
   inline UniquePtr& operator=(T* ref) {
     if (ref_ != ref) {
       delete ref_;
