@@ -126,13 +126,13 @@ int CommandGc::Main(const ArgumentList &args) {
   }
 
   GcConfig config;
-  config.uploader = uploader.weak_ref();
-  config.keep_history_depth = revisions;
-  config.keep_history_timestamp = timestamp;
-  config.dry_run = dry_run;
-  config.verbose = list_condemned_objects;
-  config.object_fetcher = &object_fetcher;
-  config.reflog = reflog.weak_ref();
+  config.uploader                = uploader.weak_ref();
+  config.keep_history_depth      = revisions;
+  config.keep_history_timestamp  = timestamp;
+  config.dry_run                 = dry_run;
+  config.verbose                 = list_condemned_objects;
+  config.object_fetcher          = &object_fetcher;
+  config.reflog                  = reflog.weak_ref();
   config.deleted_objects_logfile = deletion_log_file;
 
 
