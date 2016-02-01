@@ -181,11 +181,12 @@ cvmfs_run_test() {
   ls $TEST600_GRID_MOUNTPOINT
 
   echo "Generating certificates"
+  local vomsproxy=$(pwd)/certs/vomsproxy.pem
   generate_certs $script_location || return 4
-  cat $X509_USER_PROXY            || return 5
+  cat $vomsproxy                  || return 5
 
   echo "use vomsproxy certificate"
-  export X509_USER_PROXY=$(pwd)/certs/vomsproxy.pem
+  export X509_USER_PROXY=$vomsproxy
 
   echo "make '$TEST600_GRID_SECURITY_DIR' available as /etc/grid-security"
   sudo mkdir -p /etc/grid-security                                || return 20
