@@ -1269,7 +1269,8 @@ TEST_F(T_Util, ManagedExecCommandLine) {
       &pid);
   ASSERT_TRUE(success);
   close(fd_stdout[1]);
-  read(fd_stdout[0], buffer, message.length());
+  int bytes_read = read(fd_stdout[0], buffer, message.length());
+  EXPECT_EQ(bytes_read, message.length());
   string result(buffer);
   ASSERT_EQ(message, result);
   close(fd_stdout[0]);
