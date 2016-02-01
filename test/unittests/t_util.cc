@@ -1219,7 +1219,8 @@ TEST_F(T_Util, ExecuteBinary) {
       false,
       &gdb_pid);
   EXPECT_TRUE(result);
-  read(fd_stdout, buffer, message.length());
+  int bytes_read = read(fd_stdout, buffer, message.length());
+  EXPECT_EQ(bytes_read, message.length());
   string response(buffer, message.length());
   EXPECT_EQ(message, response);
 }
