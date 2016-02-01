@@ -1128,6 +1128,11 @@ TEST_F(T_Util, GetLineFd) {
   int fd3 = open(file3.c_str(), O_RDONLY);
   int fd4 = open(file4.c_str(), O_RDONLY);
 
+  ASSERT_GE(0, fd1);
+  ASSERT_GE(0, fd2);
+  ASSERT_GE(0, fd3);
+  ASSERT_GE(0, fd4);
+
   EXPECT_TRUE(GetLineFd(fd1, &result));
   EXPECT_EQ("first", result);
   EXPECT_TRUE(GetLineFd(fd2, &result));
