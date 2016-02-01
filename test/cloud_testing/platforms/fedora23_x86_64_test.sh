@@ -24,6 +24,8 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  src/0*                                       \
                               || retval=1
 
+echo -n "make sure apache is running... "
+sudo systemctl start httpd > /dev/null && echo "done" || echo "fail"
 
 echo "running CernVM-FS server test cases..."
 CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
