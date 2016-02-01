@@ -14,6 +14,10 @@ cleanup() {
 cvmfs_run_test() {
   logfile=$1
 
+  echo -n "checking for curl... "
+  which curl > /dev/null 2>&1 || { echo "fail"; return 1; }
+  echo "done"
+
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
@@ -30,7 +34,7 @@ cvmfs_run_test() {
 
   for num in 1 2 3; do
     create_stratum1 ${replica_name}-$num                   \
-                    root                                   \
+                    $CVMFS_TEST_USER                       \
                     $CVMFS_STRATUM0                        \
                     /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub \
                     || return $num
@@ -42,12 +46,17 @@ cvmfs_run_test() {
   echo "running cvmfs_server snapshot -a"
   sudo cvmfs_server snapshot -an || return 5
 
+  echo "download manifests of stratum 0 and replica 1 and 3"
+  curl -so mr1 "$(get_repo_url ${replica_name}-1)/.cvmfspublished" || return 6
+  curl -so mr3 "$(get_repo_url ${replica_name}-3)/.cvmfspublished" || return 7
+  curl -so ms0 "$(get_repo_url $CVMFS_TEST_REPO)/.cvmfspublished"  || return 8
+
   echo "checking if snapshot worked on replicas 1 and 3"
-  cmp /srv/cvmfs/${CVMFS_TEST_REPO}/.cvmfspublished /srv/cvmfs/${replica_name}-1/.cvmfspublished || return 6
-  cmp /srv/cvmfs/${CVMFS_TEST_REPO}/.cvmfspublished /srv/cvmfs/${replica_name}-3/.cvmfspublished || return 7
+  cmp ms0 mr1 || return  9
+  cmp ms0 mr3 || return 10
 
   echo "checking if replica 2 was skipped"
-  [ -f /srv/cvmfs/${replica_name}-2/.cvmfspublished ] && return 8
+  curl -f -sI "$(get_repo_url ${replica_name}-2)/.cvmfspublished" && return 11
 
   return 0
 }

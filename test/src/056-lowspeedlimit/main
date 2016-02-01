@@ -1,33 +1,85 @@
 
 cvmfs_test_name="Low speed limit"
+CVMFS_TEST056_MOUNTPOINT=
+
+mount_cvmfs_cernvm() {
+  local mountpoint=$1
+  local cache_dir=$2
+  local limit_kbps=$3
+  local shape_kbps=$4
+
+  mkdir -p $mountpoint $cache_dir
+
+  if [ "x$cache_dir" = "x" ]; then
+    return 80
+  fi
+  rm -rf "${cache_dir}"/*
+  ls -lah ${cache_dir}
+
+  echo "writing config in ${cache_dir}/client.conf"
+  cat << EOF > ${cache_dir}/client.conf
+CVMFS_CACHE_BASE=$cache_dir
+CVMFS_RELOAD_SOCKETS=$cache_dir
+CVMFS_CLAIM_OWNERSHIP=yes
+CVMFS_KEYS_DIR=/etc/cvmfs/keys/cern.ch
+CVMFS_SERVER_URL=http://cvmfs-stratum-one.cern.ch/cvmfs/cernvm-prod.cern.ch
+CVMFS_HTTP_PROXY="${CVMFS_TEST_PROXY}"
+CVMFS_LOW_SPEED_LIMIT=$(($limit_kbps * 1024))
+CVMFS_TIMEOUT=3
+CVMFS_TIMEOUT_DIRECT=3
+EOF
+  cat ${cache_dir}/client.conf
+
+  local trickle_cmd=
+  if [ "x$shape_kbps" != "x" ]; then
+    trickle_cmd="trickle -d $shape_kbps -s -v"
+    echo "trickle: $trickle_cmd"
+  fi
+  $trickle_cmd cvmfs2 -f -o config=${cache_dir}/client.conf,disable_watchdog,simple_options_parsing cernvm-prod.cern.ch $mountpoint &
+  local i=0
+  local timeout=20
+  echo "waiting $timeout seconds for mount"
+  while [ $i -lt $timeout ]; do
+    if grep "$mountpoint" /proc/mounts; then
+      break;
+    fi
+    i=$(($i + 1))
+    sleep 1
+  done
+  if [ $i -ge $timeout ]; then
+    return 20
+  fi
+
+  ls $mountpoint/cvm3
+  return $?
+}
+
+cleanup() {
+  sudo umount ${CVMFS_TEST056_MOUNTPOINT}
+}
+
 
 cvmfs_run_test() {
   logfile=$1
 
-  cvmfs_mount atlas.cern.ch "CVMFS_TIMEOUT=1" "CVMFS_TIMEOUT_DIRECT=1" "CVMFS_CONFIG_REPOSITORY=" || return 1
-  ls /cvmfs/atlas.cern.ch/repo || return 2
+  CVMFS_TEST056_MOUNTPOINT=$(pwd)/cvmfs-cernvm/mountpoint
+  local cache_dir=$(pwd)/cvmfs-cernvm/cache
 
-  local cache_dir=$(cvmfs_config showconfig atlas.cern.ch | grep CVMFS_CACHE_DIR | cut -d= -f2)
-  cvmfs_umount atlas.cern.ch
-  local umount_result=$?
-  cat /proc/mounts
+  echo "set a trap for system directory cleanup"
+  trap cleanup EXIT HUP INT TERM
+  mount_cvmfs_cernvm $CVMFS_TEST056_MOUNTPOINT $cache_dir 1 || return 1
+  cleanup
 
-  if [ $umount_result -ne 0 ]; then
-    return 5
-  fi
-
-  if [ "x$cache_dir" = x ]; then
-    return 20
-  fi
-  echo "Wiping out $cache_dir"
-  sudo rm -rf "$cache_dir"
-
-  # TODO: traffic shaping
-  cvmfs_mount atlas.cern.ch "CVMFS_TIMEOUT=1" "CVMFS_TIMEOUT_DIRECT=1" "CVMFS_CONFIG_REPOSITORY=" \
-     "CVMFS_LOW_SPEED_LIMIT=1073741824" && ls /cvmfs/atlas.cern.ch/repo
+  echo "Fail on speed limit"
+  mount_cvmfs_cernvm $CVMFS_TEST056_MOUNTPOINT $cache_dir 100 50
   if [ $? -eq 0 ]; then
     return 10
   fi
+
+  # TODO(jblomer): figure out why trickle overshapes
+  # cleanup
+  # echo "Again, be more generous"
+  # mount_cvmfs_cernvm $CVMFS_TEST056_MOUNTPOINT $cache_dir 10 2000 || return 20
 
   return 0
 }

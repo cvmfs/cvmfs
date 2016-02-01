@@ -7,25 +7,26 @@ cvmfs_run_test() {
   cvmfs_mount lhcb.cern.ch,atlas.cern.ch,atlas-condb.cern.ch,cms.cern.ch || return 1
 
   . /cvmfs/lhcb.cern.ch/etc/login.sh || return 2
-  . SetupProject.sh Brunel v44r9 || return 3
+  . SetupProject.sh Brunel || return 3
   gaudirun.py ${BRUNELSYSROOT}/tests/options/testBrunel.py || return 4
   check_memory lhcb.cern.ch 55000
 
-  # TODO: ask for current version
-  #export ATL_LOCAL_ROOT=/cvmfs/atlas.cern.ch/repo
-  #export ATLAS_LOCAL_ROOT_BASE=${ATL_LOCAL_ROOT}/ATLASLocalRootBase
-  #. ${ATLAS_LOCAL_ROOT_BASE}/user/atlasLocalSetup.sh || return 10
-  #${AtlasSetup}/python/asetup.py --debugprint 17.4.0 || return 11
-  #athena.py AthExHelloWorld/HelloWorldOptions.py || return 12
-  #check_memory atlas.cern.ch 25000
+  export ATL_LOCAL_ROOT=/cvmfs/atlas.cern.ch/repo
+  export ATLAS_LOCAL_ROOT_BASE=${ATL_LOCAL_ROOT}/ATLASLocalRootBase
+  . ${ATLAS_LOCAL_ROOT_BASE}/user/atlasLocalSetup.sh || return 10
+  . ${ATLAS_LOCAL_ROOT_BASE}/x86_64/AtlasSetup/current/AtlasSetup/scripts/asetup.sh 19.0.0 || return 11
+  /cvmfs/atlas.cern.ch/repo/sw/software/x86_64-slc6-gcc47-opt/19.0.0/AtlasCore/19.0.0/InstallArea/share/bin/athena.py AthExHelloWorld/HelloWorldOptions.py || return 12
+  check_memory atlas.cern.ch 25000
 
-  #. /cvmfs/cms.cern.ch/cmsset_default.sh || return 20
-  #scramv1 project CMSSW_5_2_3 || return 21
-  #cd CMSSW_5_2_3
-  #eval $(scramv1 runtime -sh)
-  #cmsDriver.py TTbar_Tauola_7TeV_cfi -conditions auto:startup -s GEN,SIM \
-  #  -datatier GEN-SIM -n 0 -relval 9000,50 -eventcontent RAWSIM -no_output || return 22
-  #check_memory cms.cern.ch 25000
+  source /cvmfs/cms.cern.ch/cmsset_default.sh || return 20
+  scramv1 project CMSSW CMSSW_6_2_3 || return 21
+  cd CMSSW_6_2_3
+  eval $(scramv1 runtime -sh)
+  cmsDriver.py TTbar_Tauola_8TeV_cfi -s GEN,SIM --conditions auto:startup \
+    --eventcontent FEVTDEBUG --datatier GEN-SIM -n 1 --no_exec || return 22
+  # TODO(jblomer): actually run
+  cd ..
+  check_memory cms.cern.ch 25000
 
   return 0
 }

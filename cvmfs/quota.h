@@ -244,8 +244,8 @@ class PosixQuotaManager : public QuotaManager {
     kUnregisterBackChannel,
     kGetProtocolRevision,
     kInsertVolatile,
-    kListVolatile,
     // as of protocol revision 2
+    kListVolatile,
     kCleanupRate,
   };
 

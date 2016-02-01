@@ -219,9 +219,9 @@ cvmfs_run_test() {
   local clg5="${revision_5_clg}C"
   echo "destroy root catalog of (preserved) revision 5 ($clg5)"
   local clg5_broken="${clg5}.broken"
-  curl -o $clg5 $(get_object_url $CVMFS_TEST_REPO $clg5) || return 13
-  echo "i am broken" >  $clg5_broken                     || return 14
-  cat $clg5          >> $clg5_broken                     || return 15
+  download_from_backend $CVMFS_TEST_REPO $(make_path $clg5) $clg5 || return 13
+  echo "i am broken" >  $clg5_broken                              || return 14
+  cat $clg5          >> $clg5_broken                              || return 15
   upload_into_backend $CVMFS_TEST_REPO \
                       $clg5_broken     \
                       $(make_path $clg5) || return 16
@@ -309,9 +309,9 @@ cvmfs_run_test() {
 
   echo "destroy root catalog of (condemned) revision 4 ($clg4)"
   local clg4_broken="${clg4}.broken"
-  curl -o $clg4 $(get_object_url $CVMFS_TEST_REPO $clg4) || return 26
-  echo "i am broken" >  $clg4_broken                     || return 27
-  cat $clg4          >> $clg4_broken                     || return 28
+  download_from_backend $CVMFS_TEST_REPO $(make_path $clg4) $clg4 || return 26
+  echo "i am broken" >  $clg4_broken                              || return 27
+  cat $clg4          >> $clg4_broken                              || return 28
   upload_into_backend $CVMFS_TEST_REPO \
                       $clg4_broken     \
                       $(make_path $clg4) || return 29
@@ -376,9 +376,9 @@ cvmfs_run_test() {
 
   echo "destroy nested catalog of (preserved) revision 5 ($clg5n)"
   local clg5n_broken="${clg5n}.broken"
-  curl -o $clg5n $(get_object_url $CVMFS_TEST_REPO $clg5n) || return 42
-  echo "i am broken" >  $clg5n_broken                      || return 43
-  cat $clg5n         >> $clg5n_broken                      || return 44
+  download_from_backend $CVMFS_TEST_REPO $(make_path $clg5n) $clg5n || return 42
+  echo "i am broken" >  $clg5n_broken                               || return 43
+  cat $clg5n         >> $clg5n_broken                               || return 44
   upload_into_backend $CVMFS_TEST_REPO \
                       $clg5n_broken    \
                       $(make_path $clg5n) || return 45

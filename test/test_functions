@@ -138,6 +138,25 @@ is_systemd() {
   [ x"$SERVICE_BIN" = x"false" ]
 }
 
+is_redhat() {
+  [ -e /etc/redhat-release ]
+}
+
+is_el7() {
+  is_redhat && which lsb_release > /dev/null 2>&1 && \
+  [ x"$(lsb_release -rs | cut -f1 -d'.')" = x"7" ]
+}
+
+is_el6() {
+  is_redhat && which lsb_release > /dev/null 2>&1 && \
+  [ x"$(lsb_release -rs | cut -f1 -d'.')" = x"6" ]
+}
+
+is_el5() {
+  is_redhat && which lsb_release > /dev/null 2>&1 && \
+  [ x"$(lsb_release -rs | cut -f1 -d'.')" = x"5" ]
+}
+
 # find the name of the httpd service
 
 
@@ -601,18 +620,19 @@ create_repo() {
     echo "  UnionFS: $CVMFS_TEST_UNIONFS"
     unionfs=" -f $CVMFS_TEST_UNIONFS"
   fi
-  sudo cvmfs_server mkfs -o $uid -m                \
-                         -a ${CVMFS_TEST_HASHALGO} \
-                         $s3_config                \
-                         $stratum0                 \
-                         $unionfs                  \
-                         $extra_options $repo || return 102
+  sudo -E cvmfs_server mkfs -o $uid -m                \
+                            -a ${CVMFS_TEST_HASHALGO} \
+                            $s3_config                \
+                            $stratum0                 \
+                            $unionfs                  \
+                            $extra_options $repo || return 102
 
   local client_conf="/etc/cvmfs/repositories.d/${repo}/client.conf"
   apply_server_cache_config $repo || return 103
 
   if [ x$debug_log != x -a x$debug_log != xNO ]; then
     echo "CVMFS_DEBUGLOG=$debug_log" | sudo tee -a $client_conf
+    sudo sed -i.bak -e "s/^\(cvmfs2#$repo.*\)\(allow_other.*\)/\1debug,\2/" /etc/fstab
   fi
 }
 
@@ -697,9 +717,8 @@ import_repo() {
     echo "  UnionFS: $CVMFS_TEST_UNIONFS"
     unionfs=" -f $CVMFS_TEST_UNIONFS"
   fi
-  sudo cvmfs_server import -o $uid $unionfs $extra_options $repo || return 102
+  sudo -E cvmfs_server import -o $uid $unionfs $extra_options $repo || return 102
 
-  local client_conf="/etc/cvmfs/repositories.d/${repo}/client.conf"
   apply_server_cache_config $repo || return 103
 }
 
@@ -730,12 +749,12 @@ create_stratum1() {
     echo "  Stratum1:  $stratum1_url"
     s3_config=" -s $CVMFS_TEST_S3_CONFIG -w $stratum1_url -a"
   fi
-  sudo cvmfs_server add-replica -o $replica_owner      \
-                                -n $replica_name       \
-                                $s3_config             \
-                                $additional_parameters \
-                                $stratum0_url          \
-                                $stratum0_pub
+  sudo -E cvmfs_server add-replica -o $replica_owner      \
+                                   -n $replica_name       \
+                                   $s3_config             \
+                                   $additional_parameters \
+                                   $stratum0_url          \
+                                   $stratum0_pub
 }
 
 # creates a big file at a given location with a given size
@@ -876,6 +895,8 @@ run_background_service() {
   rm -f $fifo
 
   # check if the background process is running
+  # TODO(rmeusel): Fix this race. If the background service is a short living
+  #                process it might have successfully terminated at this point.
   if ! sudo kill -0 $srv_pid > /dev/null 2>&1; then
     return 4
   fi
@@ -900,20 +921,54 @@ open_silent_port() {
   local protocol=$1
   local port=$2
   local logfile=$3
-  local pid
   local cmd
-  local retcode
+  local mock
 
-  cmd="sudo python ${TEST_ROOT}/common/mock_services/silent_socket.py $protocol $port"
-  pid=$(run_background_service $logfile "$cmd")
-  retcode=$?
+  mock="python ${TEST_ROOT}/common/mock_services/silent_socket.py $protocol $port"
 
-  if [ $retcode -ne 0 ]; then
-    return $retcode
-  fi
+  # Do similar fifo-trick as in run_background_service() to get the PID of the
+  # actual silent_socket.py process rather than just the `sudo` around it.
+  local fifo="pid_silent_port_fifo"
+  mkfifo $fifo || return 1
+  cmd="sudo sh -c \"echo \\\$\\\$ > $fifo; exec $mock\""
+  run_background_service $logfile "$cmd" > /dev/null 2>&1 || return $?
+  cat $fifo # return the PID of the `python silent_socket.py`
+}
 
-  echo $pid
-  return $retcode
+
+# spawns a mocked HTTP server on a given port and document root location
+# Note: The user is responsible to kill the server process once after usage
+#
+# @param document_root  absolute path to be served via HTTP
+# @param port           http port to be used
+# @param logfile        (optional) where to log the HTTP server's status info
+# @return               PID of HTTP server or >0 on error
+open_http_server() {
+  local document_root="$1"
+  local port="$2"
+  local logfile="${3:=/dev/null}"
+
+  local http_server="${TEST_ROOT}/common/mock_services/http_server.py"
+  local http_pid=
+  local http_sentinel="http://localhost:${port}/http_sentinel"
+
+  # spawning the server
+  http_pid=$(run_background_service $logfile "$http_server -p $port -r $document_root")
+  touch ${document_root}/$(basename $http_sentinel)
+
+  # waiting for the server to come up
+  local timeout=15
+  while ! curl -Is $url ${http_sentinel} | head -n1 | grep "200 OK" >> $logfile 2>&1 && \
+        [ $timeout -gt 0 ]; do
+    sleep 1
+    if ! kill -0 $http_pid > /dev/null 2>&1;then
+      return 1
+    fi
+    timeout=$(( $timeout - 1 ))
+  done
+
+  [ $timeout -gt 0 ] || return 2
+  echo "$http_pid"
 }
 
 
@@ -1246,9 +1301,23 @@ remove_apache_config_file() {
 }
 
 
+get_hash_path() {
+  local object_hash="$1"
+  local object_path="$(echo -n $object_hash | sed -e 's/^\(..\)\(.*\)$/\1\/\2/')"
+  echo "${object_path}"
+}
+
 get_local_repo_storage() {
   local repo_name="$1"
   echo "/srv/cvmfs/${repo_name}"
+}
+
+get_local_repo_object() {
+  local repo_name="$1"
+  local object_hash="$2"
+  local repo_storage="$(get_local_repo_storage $repo_name)"
+  local object_path="$(get_hash_path $object_hash)"
+  echo "${repo_storage}/data/${object_path}"
 }
 
 get_local_repo_url() {
@@ -1277,7 +1346,7 @@ get_object_url() {
   local repo_name="$1"
   local object_hash="$2"
   local repo_url="$(get_repo_url $repo_name)"
-  local object_path="$(echo -n $object_hash | sed -e 's/^\(..\)\(.*\)$/\1\/\2/')"
+  local object_path="$(get_hash_path $object_hash)"
   echo "${repo_url}/data/${object_path}"
 }
 
@@ -1423,6 +1492,34 @@ peek_backend() {
 }
 
 
+# downloads a random file from the backend storage of a CVMFS repository
+#
+# @param repository   the repository name to uploaded into
+# @param remote_path  the relative remote path to be uploaded into
+# @param local_path   the destination path to be downloaded into
+download_from_backend() {
+  local repo_name="$1"
+  local remote_path="$2"
+  local local_path="$3"
+
+  load_repo_config $repo_name
+  curl -o $local_path -s "$(get_repo_url $repo_name)/${remote_path}"
+}
+
+
+# removes a random file from the backend storage of a CVMFS repository
+#
+# @param repository   the repository name to uploaded into
+# @param remote_path  the relative remote path to be uploaded into
+delete_from_backend() {
+  local repo_name="$1"
+  local remote_path="$2"
+
+  load_repo_config $repo_name
+  cvmfs_swissknife remove -o $remote_path -r $CVMFS_UPSTREAM_STORAGE
+}
+
+
 # uploads a random file into the backend storage of a CVMFS repository
 #
 # @param repository   the repository name to uploaded into
@@ -1434,6 +1531,10 @@ upload_into_backend() {
   local remote_path="$3"
 
   load_repo_config $repo_name
+
+  if [ x"$(echo "$CVMFS_UPSTREAM_STORAGE" | cut -f1 -d',')" = x"S3" ]; then
+    delete_from_backend $repo_name $remote_path # S3 does a lazy upload
+  fi
   cvmfs_swissknife upload -i $file_path              \
                           -o $remote_path            \
                           -r $CVMFS_UPSTREAM_STORAGE \
@@ -1972,12 +2073,14 @@ get_cache_directory() {
   echo "${mountpoint}c"
 }
 
-do_local_mount() {
-  local mountpoint="$1"
-  local repo_name="$2"
-  local repo_url="$3"
-  local config_file="$4"
-  local extra_option="$5"
+__do_local_mount() {
+  local as_root="$1"
+  local mountpoint="$2"
+  local repo_name="$3"
+  local repo_url="$4"
+  local config_file="$5"
+  local extra_option="$6"
+
   local cache="$(get_cache_directory $mountpoint)"
   local config="$(mktemp ${mountpoint}.conf.XXXXX)"
   local output="$(mktemp ${mountpoint}.log.XXXXX)"
@@ -2001,7 +2104,19 @@ EOF
   echo "  *** local mount config:"
   cat "$config"
 
-  cvmfs2 -d -o config=$config $repo_name $mountpoint >> $output 2>&1
+  if [ x"$as_root" != x"" ]; then
+    sudo cvmfs2 -d -o allow_other,config=$config $repo_name $mountpoint >> $output 2>&1
+  else
+    cvmfs2 -d -o allow_other,config=$config $repo_name $mountpoint >> $output 2>&1
+  fi
+}
+
+do_local_mount() {
+  __do_local_mount "" "$@"
+}
+
+do_local_mount_as_root() {
+  __do_local_mount "sudo" "$@"
 }
 
 remove_local_mount() {

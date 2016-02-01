@@ -82,6 +82,20 @@ patch_external() {
   cd $cdir
 }
 
+replace_in_external() {
+  local library_name="$1"
+  local src="$2"
+  local dst="$3"
+  local cdir=$(pwd)
+
+  print_hint "Replacing $src with $dst in $library_name"
+
+  cd $(get_destination_dir $library_name)
+  mv "$dst" "${dst}.orig"
+  cp "$src" "$dst"
+  cd $cdir
+}
+
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 mkdir -p $externals_build_dir
@@ -103,13 +117,26 @@ do_copy     "sha2"
 do_copy     "sha3"
 
 patch_external "leveldb"     "dont_search_snappy.patch"           \
-                             "dont_search_tcmalloc.patch"
+                             "dont_search_tcmalloc.patch"         \
+                             "arm64_memory_barrier.patch"
 patch_external "pacparser"   "fix_find_proxy_ex.patch"
 patch_external "tbb"         "custom_library_suffix.patch"        \
                              "symlink_to_build_directories.patch" \
                              "32bit_mock.patch"
 patch_external "vjson"       "missing_include.patch"
 patch_external "sparsehash"  "fix_sl4_compilation.patch"
+
+replace_in_external "c-ares"      "config.guess.latest" "config.guess"
+replace_in_external "c-ares"      "config.sub.latest" "config.sub"
+replace_in_external "googletest"  "config.guess.latest" "build-aux/config.guess"
+replace_in_external "googletest"  "config.sub.latest" "build-aux/config.sub"
+replace_in_external "libcurl"     "config.guess.latest" "config.guess"
+replace_in_external "libcurl"     "config.sub.latest" "config.sub"
+replace_in_external "libgeoip"    "config.guess.latest" "config.guess"
+replace_in_external "libgeoip"    "config.sub.latest" "config.sub"
+replace_in_external "sparsehash"  "config.guess.latest" "config.guess"
+replace_in_external "sparsehash"  "config.sub.latest" "config.sub"
+
 
 # create a hint that bootstrapping is already done
 touch "$externals_build_dir/.decompressionDone"

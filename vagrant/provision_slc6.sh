@@ -46,10 +46,11 @@ yum -y install libuuid-devel gcc gcc-c++ glibc-common cmake fuse fuse-devel  \
                shadow-utils util-linux-ng selinux-policy checkpolicy         \
                selinux-policy-devel hardlink selinux-policy-targeted         \
                python-devel initscripts bash coreutils grep sed sudo psmisc  \
-               curl attr httpd libcap-devel
+               curl attr httpd libcap-devel voms-devel
 
 # install convenience packages for development
-yum -y install git tig iftop htop jq rubygems screen nc python-unittest2
+yum -y install git tig iftop htop jq rubygems screen nc python-unittest2 \
+               policycoreutils-python
 gem install fakes3 --version 0.2.0
 
 # setup and run a FakeS3 server

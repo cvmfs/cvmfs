@@ -691,6 +691,11 @@ cvmfs_chksetup() {
               proxy="$auto_proxy"
             fi
             if [ "x$proxy" != "xDIRECT" ]; then
+              if echo "$proxy" | grep -q -v ^http; then
+                echo "Warning: $proxy does not start with http(s)://"
+                num_warnings=$(($num_warnings+1))
+                continue
+              fi
               proxy_param="env http_proxy=$proxy"
               timeout=$CVMFS_TIMEOUT
             else
@@ -950,6 +955,11 @@ cvmfs_reload() {
     # Ensure that we capture the config repository as well
     cd "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" 2>/dev/null
   fi
+  # TODO(jblomer): here is a pretty big race: fuse clients could have passed
+  # the check for this directory in their mount helper but are not yet fully
+  # mounted.  This in result can lead to old quota manager staying alive during
+  # a reload.  Need to be fixed with the overhaul of the fuse client's
+  # initialization code.
   mkdir "$CVMFS_RELOAD_SOCKETS/cvmfs.pause" 2>/dev/null
   if [ $? -ne 0 ]; then
     echo "Another reload process has not finished yet"

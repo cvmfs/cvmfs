@@ -642,6 +642,7 @@ TEST_F(T_Dns, CaresResolverFinalDot) {
 }
 
 
+// TODO(jblomer): figure out why this fails on Travis
 TEST_F(T_Dns, CaresResolverLocalhost) {
   Host host = default_resolver->Resolve("localhost");
   // Not using ExpectResolvedName because the canonical name for localhost
@@ -954,6 +955,7 @@ TEST_F(T_Dns, NormalResolverLocalonly) {
 }
 
 
+// TODO(jblomer): figure out why this fails on Travis
 TEST_F(T_Dns, NormalResolverCombined) {
   UniquePtr<NormalResolver> resolver(NormalResolver::Create(false, 2, 2000));
   ASSERT_TRUE(resolver.IsValid());

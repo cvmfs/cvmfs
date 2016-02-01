@@ -53,6 +53,7 @@ RUN        yum -y update && yum -y install                      \
                                         shadow-utils            \
                                         SysVinit                \
                                         unzip                   \
+                                        voms-devel              \
                                         which                   \
                                         zlib
 

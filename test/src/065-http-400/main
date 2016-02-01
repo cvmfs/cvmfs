@@ -30,7 +30,7 @@ cvmfs_run_test() {
   CVMFS_TEST_065_FAULTY_PID=$(run_background_service $faulty_server_log "$faulty_server -p $faulty_port")
   if [ $? -ne 0 ]; then return 9; fi
 
-  echo "wait that $faulty_port actually returns HTTP 400"
+  echo "wait that $faulty_port (PID $CVMFS_TEST_065_FAULTY_PID) actually returns HTTP 400"
   sleep 1
   local timeout=10
   while ! faulty_server_running $CVMFS_TEST_065_FAULTY_PID $faulty_port && \

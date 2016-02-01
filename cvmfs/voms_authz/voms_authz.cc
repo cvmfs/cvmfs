@@ -347,14 +347,20 @@ GenerateVOMSData(const struct fuse_ctx *ctx)
 
   struct vomsdata *voms_ptr = (*g_VOMS_Init)(NULL, NULL);
   int error = 0;
-  if (!(*g_VOMS_RetrieveFromFile)(fp, RECURSE_CHAIN, voms_ptr, &error)) {
+
+  const int retval = (*g_VOMS_RetrieveFromFile)(fp, RECURSE_CHAIN,
+                                                voms_ptr, &error);
+  fclose(fp);
+
+  if (!retval) {
     char *err_str = (*g_VOMS_ErrorMessage)(voms_ptr, error, NULL, 0);
     LogCvmfs(kLogVoms, kLogDebug, "Unable to parse VOMS file: %s\n",
              err_str);
     free(err_str);
     (*g_VOMS_Destroy)(voms_ptr);
-    return NULL;
+    voms_ptr = NULL;
   }
+
   return voms_ptr;
 }
 
@@ -417,7 +423,7 @@ static bool CheckMultipleAuthz(const struct vomsdata *voms_ptr,
 
 bool CheckVOMSAuthz(const struct fuse_ctx *ctx, const std::string & authz) {
   if (g_VOMS_Init == NULL) {
-    LogCvmfs(kLogVoms, kLogSyslog,
+    LogCvmfs(kLogVoms, kLogSyslog | kLogDebug,
              "VOMS library not present; failing VOMS authz.");
     return false;
   }
@@ -434,15 +440,16 @@ bool CheckVOMSAuthz(const struct fuse_ctx *ctx, const std::string & authz) {
       LogCvmfs(kLogVoms, kLogDebug,
                "Caching user's VOMS credentials at address %p.", voms_ptr);
     } else {
-      LogCvmfs(kLogVoms, kLogDebug, "User has no VOMS credentials.");
+      LogCvmfs(kLogVoms, kLogSyslog | kLogDebug,
+               "User has no VOMS credentials.");
       return false;
     }
   } else {
     LogCvmfs(kLogVoms, kLogDebug, "Using cached VOMS credentials.");
   }
   if (!voms_ptr) {
-    LogCvmfs(kLogVoms, kLogDebug,
-             "ERROR: VOMS credentials are null pointer.");
+    LogCvmfs(kLogVoms, kLogSyslog | kLogDebug,
+             "ERROR: Failed to generate VOMS data.");
     return false;
   }
   return CheckMultipleAuthz(voms_ptr, authz);

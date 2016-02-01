@@ -477,12 +477,16 @@ void *DownloadManager::MainDownload(void *data) {
   while (true) {
     int timeout;
     if (still_running) {
+      /* NOTE: The following might degrade the performance for many small files
+       * use case. TODO(jblomer): look into it.
       // Specify a timeout for polling in ms; this allows us to return
       // to libcurl once a second so it can look for internal operations
       // which timed out.  libcurl has a more elaborate mechanism
       // (CURLMOPT_TIMERFUNCTION) that would inform us of the next potential
       // timeout.  TODO(bbockelm) we should switch to that in the future.
       timeout = 100;
+      */
+      timeout = 1;
     } else {
       timeout = -1;
       gettimeofday(&timeval_stop, NULL);
@@ -928,13 +932,12 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
       ConfigureCurlHandle(curl_handle, info->pid, info->uid, info->gid,
                           &info->cred_fname, &info->cred_data);
     }
+#endif
     // The download manager disables signal handling in the curl library;
     // as OpenSSL's implementation of TLS will generate a sigpipe in some
-    // error paths, we must explicitly disable SIGPIPE here.  Since SIGPIPE
-    // only appears to happen with HTTPS, we only do this on VOMS builds.
+    // error paths, we must explicitly disable SIGPIPE here.
+    // TODO(jblomer): it should be enough to do this once
     signal(SIGPIPE, SIG_IGN);
-
-#endif
   }
 
   if (url.find("@proxy@") != string::npos) {
@@ -1113,12 +1116,10 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     info->cred_fname = NULL;
     curl_easy_setopt(info->curl_handle, CURLOPT_SSLCERT, NULL);
     curl_easy_setopt(info->curl_handle, CURLOPT_SSLKEY, NULL);
-    curl_easy_setopt(info->curl_handle, CURLOPT_FRESH_CONNECT, 0);
-    curl_easy_setopt(info->curl_handle, CURLOPT_FORBID_REUSE, 0);
   }
   if (info->cred_data) {
 #ifdef VOMS_AUTHZ
-    ::ReleaseCurlHandle(info->cred_data);
+    ::ReleaseCurlHandle(info->curl_handle, info->cred_data);
 #endif
     info->cred_data = NULL;
   }

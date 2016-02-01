@@ -7,12 +7,12 @@ cvmfs_run_test() {
   cvmfs_mount grid.cern.ch || return 1
 
   cvmfs_umount grid.cern.ch
-  sudo cvmfs_config wipecache
+  sudo rm -rf "/var/lib/cvmfs/shared" "/var/lib/cvmfs/grid.cern.ch"
   cvmfs_mount grid.cern.ch "CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/egi.eu/egi.eu.pub"
   if [ $? -eq 0 ]; then
     return 10
   fi
-  
+
   autofs_switch off
   autofs_switch on
   cvmfs_mount grid.cern.ch \

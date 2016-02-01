@@ -1,0 +1,41 @@
+
+language: cpp
+
+os:
+  - linux
+  - osx
+
+compiler:
+  - gcc
+  - clang
+
+sudo: required
+
+addons:
+  apt:
+    packages:
+      - autotools-dev
+      - libcap-dev
+      - libssl-dev
+      - g++
+      - libfuse-dev
+      - pkg-config
+      - libattr1-dev
+      - patch
+      - python-dev
+      - unzip
+      - uuid-dev
+      - libc6-dev
+      - valgrind
+      - voms-dev
+      - gdb
+      - lldb
+
+before_script:
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update && brew install Caskroom/cask/osxfuse ; fi
+
+script:
+  - ci/run_travis.sh
+
+notifications:
+  email: false

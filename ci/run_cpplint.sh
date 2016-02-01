@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 #
 # This script runs the CppLint program and checks the general code style
@@ -42,4 +42,4 @@ SOURCE_DIRS="cvmfs mount test/unittests"
 cd $REPO_ROOT
 FILE_LIST="$(find $SOURCE_DIRS -type f -not -name '\._*' -and \( -name '*.h' -or -name '*.cc' -or -name '*.hpp' -or -name '*.c' \))"
 python $CPPLINT ${FILE_LIST} | tee ${SCRIPT_OUTPUT}
-
+exit ${PIPESTATUS[0]}

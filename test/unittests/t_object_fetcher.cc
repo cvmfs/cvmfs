@@ -21,18 +21,32 @@ using namespace std;  // NOLINT
 
 template <class ObjectFetcherT>
 class T_ObjectFetcher : public ::testing::Test {
+ public:
+  T_ObjectFetcher()
+  : sandbox(GetCurrentWorkingDirectory() + "/cvmfs_ut_object_fetcher"),
+    fqrn("test.cern.ch"),
+    backend_storage(sandbox + "/backend"),
+    backend_storage_dir(sandbox + "/backend/data"),
+    manifest_path(backend_storage + "/.cvmfspublished"),
+    whitelist_path(backend_storage + "/.cvmfswhitelist"),
+    temp_directory(sandbox + "/tmp"),
+    public_key_path(sandbox + "/" + fqrn + ".pub"),
+    private_key_path(sandbox + "/" + fqrn + ".key"),
+    certificate_path(sandbox + "/" + fqrn + ".crt"),
+    master_key_path(sandbox + "/" + fqrn + ".masterkey") { }
+
  protected:
-  static const std::string  sandbox;
-  static const std::string  fqrn;
-  static const std::string  backend_storage;
-  static const std::string  backend_storage_dir;
-  static const std::string  manifest_path;
-  static const std::string  whitelist_path;
-  static const std::string  temp_directory;
-  static const std::string  public_key_path;
-  static const std::string  private_key_path;
-  static const std::string  certificate_path;
-  static const std::string  master_key_path;
+  const std::string  sandbox;
+  const std::string  fqrn;
+  const std::string  backend_storage;
+  const std::string  backend_storage_dir;
+  const std::string  manifest_path;
+  const std::string  whitelist_path;
+  const std::string  temp_directory;
+  const std::string  public_key_path;
+  const std::string  private_key_path;
+  const std::string  certificate_path;
+  const std::string  master_key_path;
   static const unsigned int catalog_revision;
 
   static const shash::Any broken_history_hash;
@@ -589,53 +603,6 @@ class T_ObjectFetcher : public ::testing::Test {
   download::DownloadManager    download_manager_;
   signature::SignatureManager  signature_manager_;
 };
-
-template <class ObjectFetcherT>
-const std::string T_ObjectFetcher<ObjectFetcherT>::sandbox =
-  GetCurrentWorkingDirectory() + "/cvmfs_ut_object_fetcher";
-
-template <class ObjectFetcherT>
-const std::string T_ObjectFetcher<ObjectFetcherT>::fqrn = "test.cern.ch";
-
-template <class ObjectFetcherT>
-const std::string T_ObjectFetcher<ObjectFetcherT>::backend_storage =
-  T_ObjectFetcher<ObjectFetcherT>::sandbox + "/backend";
-
-template <class ObjectFetcherT>
-const std::string T_ObjectFetcher<ObjectFetcherT>::backend_storage_dir =
-  T_ObjectFetcher<ObjectFetcherT>::sandbox + "/backend/data";
-
-template <class ObjectFetcherT>
-const std::string T_ObjectFetcher<ObjectFetcherT>::manifest_path =
-  T_ObjectFetcher<ObjectFetcherT>::backend_storage + "/.cvmfspublished";
-
-template <class ObjectFetcherT>
-const std::string T_ObjectFetcher<ObjectFetcherT>::whitelist_path =
-  T_ObjectFetcher<ObjectFetcherT>::backend_storage + "/.cvmfswhitelist";
-
-template <class ObjectFetcherT>
-const std::string T_ObjectFetcher<ObjectFetcherT>::temp_directory =
-  T_ObjectFetcher<ObjectFetcherT>::sandbox + "/tmp";
-
-template <class ObjectFetcherT>
-const std::string T_ObjectFetcher<ObjectFetcherT>::public_key_path =
-  T_ObjectFetcher<ObjectFetcherT>::sandbox + "/" +
-  T_ObjectFetcher<ObjectFetcherT>::fqrn + ".pub";
-
-template <class ObjectFetcherT>
-const std::string T_ObjectFetcher<ObjectFetcherT>::private_key_path =
-  T_ObjectFetcher<ObjectFetcherT>::sandbox + "/" +
-  T_ObjectFetcher<ObjectFetcherT>::fqrn + ".key";
-
-template <class ObjectFetcherT>
-const std::string T_ObjectFetcher<ObjectFetcherT>::certificate_path =
-  T_ObjectFetcher<ObjectFetcherT>::sandbox + "/" +
-  T_ObjectFetcher<ObjectFetcherT>::fqrn + ".crt";
-
-template <class ObjectFetcherT>
-const std::string T_ObjectFetcher<ObjectFetcherT>::master_key_path =
-  T_ObjectFetcher<ObjectFetcherT>::sandbox + "/" +
-  T_ObjectFetcher<ObjectFetcherT>::fqrn + ".masterkey";
 
 template <class ObjectFetcherT>
 const unsigned int T_ObjectFetcher<ObjectFetcherT>::catalog_revision = 1;

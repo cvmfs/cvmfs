@@ -24,6 +24,10 @@ desaster_cleanup() {
 
 cvmfs_run_test() {
   logfile=$1
+  echo "Warning: SHA-256 is currently not supported but it might be in the future. Skipping."
+  CVMFS_GENERAL_WARNING_FLAG=1
+  return 0
+
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
@@ -51,15 +55,15 @@ cvmfs_run_test() {
   publish_repo $CVMFS_TEST_REPO || return $?
 
   echo "checking repository health after recreating nested catalog structure"
+  load_repo_config $CVMFS_TEST_REPO
   check_repository $CVMFS_TEST_REPO -i || return $?
 
   find /cvmfs/$CVMFS_TEST_REPO -type f -exec cat {} \; >/dev/null || return 10
-  sudo find /var/spool/cvmfs/$CVMFS_TEST_REPO/cache -type f | grep sha256 || return 11
+  sudo find $CVMFS_CACHE_BASE -type f | grep sha256 || return 11
 
   local mnt_point="$(pwd)/mountpoint"
   local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
   echo "create Stratum1 repository on the same machine"
-  load_repo_config $CVMFS_TEST_REPO
   create_stratum1 $replica_name                          \
                   $CVMFS_TEST_USER                       \
                   $CVMFS_STRATUM0                        \

@@ -78,6 +78,9 @@ install_from_repo gcc-c++       || die "fail (installing gcc-c++)"
 install_from_repo rubygems      || die "fail (installing rubygems)"
 install_from_repo java          || die "fail (installing java)"
 
+# traffic shaping
+install_from_repo trickle || die "fail (installing trickle)"
+
 # install `libcvmfs` build dependencies
 install_from_repo openssl-devel || die "fail (installing openssl-devel)"
 install_from_repo libuuid-devel || die "fail (installing libuuid-devel)"
@@ -85,6 +88,12 @@ install_from_repo libuuid-devel || die "fail (installing libuuid-devel)"
 # install `cvmfs_preload` build dependencies
 install_from_repo cmake         || die "fail (installing cmake)"
 install_from_repo libattr-devel || die "fail (installing libattr-devel)"
+
+# install test dependency for 600
+install_from_repo compat-expat1 || die "fail (installing compat-expat1)"
+install_from_repo openssl098e   || die "fail (installing openssl098e)"
+install_from_repo gridsite      || die "fail (installing gridsite)"
+install_from_repo voms          || die "fail (installing voms)"
 
 # install ruby gem for FakeS3
 install_ruby_gem fakes3 0.2.0  # latest is 0.2.1 (23.07.2015) that didn't work.

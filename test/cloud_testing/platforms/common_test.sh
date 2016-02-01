@@ -83,6 +83,12 @@ if [ x$SOURCE_DIRECTORY      = "x" ] ||
   exit 100
 fi
 
+sudo tee /etc/cvmfs/cvmfs_server_hooks.sh << EOF
+# download GeoIP database from a copy at CERN instead of directly from MaxMind
+CVMFS_UPDATEGEO_URLBASE="https://ecsft.cern.ch/dist/cvmfs/geodb"
+CVMFS_UPDATEGEO_URLBASE6="https://ecsft.cern.ch/dist/cvmfs/geodb/GeoLiteCityv6-beta"
+EOF
+
 CLIENT_TEST_LOGFILE="${LOG_DIRECTORY}/test_client.log"
 SERVER_TEST_LOGFILE="${LOG_DIRECTORY}/test_server.log"
 TEST_S3_LOGFILE="${LOG_DIRECTORY}/test_s3.log"

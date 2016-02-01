@@ -42,36 +42,14 @@ cvmfs_run_test() {
   mkdir -p $s1_location || return 2
   touch ${document_root}/sentinel || return 3
 
-  echo -n "spawning a simple HTTP server (logging to $http_logfile)... "
-  local http_server="${src_location}/../../common/mock_services/http_server.py"
-  local http_pid=
   local http_port=8888
+  echo -n "spawning a simple HTTP server (logging to $http_logfile)... "
+  CVMFS_TEST_607_HTTP_PID="$(open_http_server $document_root $http_port $http_logfile)"
+  kill -0 $CVMFS_TEST_607_HTTP_PID || { echo "fail"; return 4; }
   local http_base_url="http://localhost:${http_port}"
   local s0_http_address="${http_base_url}/cvmfs/${CVMFS_TEST_REPO}"
   local s1_http_address="${http_base_url}/cvmfs/${replica_name}"
-
-  http_pid=$(run_background_service $http_logfile "$http_server -p $http_port -r $document_root")
-  CVMFS_TEST_607_HTTP_PID=$http_pid
-  echo "done (PID: $http_pid)"
-
-  echo -n "waiting for the server to come up..."
-  local timeout=10
-  while ! get_http_response ${http_base_url}/sentinel | grep "200 OK" > /dev/null && \
-        [ $timeout -gt 0 ]; do
-    echo -n "."
-    sleep 1
-    if ! kill -0 $http_pid > /dev/null 2>&1;then
-      echo " broken"
-      return 3
-    fi
-    timeout=$(( $timeout - 1 ))
-  done
-  if [ $timeout -eq 0 ]; then
-    echo " timeout"
-    return 3
-  else
-    echo " done"
-  fi
+  echo "done"
 
   echo "create a repository without apache backend"
   local s0_upstream="local,${s0_location}/data/txn,${s0_location}"

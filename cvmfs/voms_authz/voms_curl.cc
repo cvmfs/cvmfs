@@ -104,15 +104,21 @@ static CURLcode sslctx_config_function(CURL *curl, void *sslctx, void *parm) {
 
 
 void
-ReleaseCurlHandle(void *info_data) {
+ReleaseCurlHandle(CURL *curl_handle, void *info_data) {
   sslctx_info * p = reinterpret_cast<sslctx_info *>(info_data);
   STACK_OF(X509) *chain = p->chain;
   EVP_PKEY *pkey = p->pkey;
+  p->chain = NULL;
+  p->pkey = NULL;
   delete p;
 
   // Calls X509_free on each element, then frees the stack itself
   sk_X509_pop_free(chain, X509_free);
   EVP_PKEY_free(pkey);
+
+  // Make sure that if CVMFS reuses this curl handle, curl doesn't try
+  // to reuse cert chain we just freed.
+  curl_easy_setopt(curl_handle, CURLOPT_SSL_CTX_DATA, 0);
 }
 
 
@@ -120,19 +126,24 @@ bool
 ConfigureCurlHandle(CURL *curl_handle, pid_t pid, uid_t uid, gid_t gid,
                     char **info_fname, void **info_data)
 {
-    if (info_data && *info_data) {return true;}
-
-    if (info_fname && *info_fname) {delete info_fname; info_fname = NULL;}
-
-    int fd = -1;
-    FILE *fp = GetProxyFile(pid, uid, gid);
-    if (fp == NULL) {return false;}
-
-    // We cannot rely on libcurl to pipeline, as cvmfs may
+    // We cannot rely on libcurl to pipeline (yet), as cvmfs may
     // bounce between different auth handles.
     curl_easy_setopt(curl_handle, CURLOPT_FRESH_CONNECT, 1);
     curl_easy_setopt(curl_handle, CURLOPT_FORBID_REUSE, 1);
     curl_easy_setopt(curl_handle, CURLOPT_SSL_SESSIONID_CACHE, 0);
+    curl_easy_setopt(curl_handle, CURLOPT_SSL_CTX_DATA, NULL);
+
+    // The calling layer is reusing data;
+    if (info_data && *info_data) {
+      curl_easy_setopt(curl_handle, CURLOPT_SSL_CTX_DATA, *info_data);
+      return true;
+    }
+
+    if (info_fname && *info_fname) {delete *info_fname; *info_fname = NULL;}
+
+    int fd = -1;
+    FILE *fp = GetProxyFile(pid, uid, gid);
+    if (fp == NULL) {return false;}
 
     // Prefer to load credentials into memory and not bother with temporary
     // files.

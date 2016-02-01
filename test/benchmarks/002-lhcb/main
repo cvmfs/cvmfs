@@ -9,7 +9,7 @@ FQRN=lhcb.cern.ch
 cvmfs_run_benchmark() {
   set -e
   source /cvmfs/lhcb.cern.ch/etc/login.sh
-  . SetupProject.sh Brunel v45r1 --use PRConfig
+  . SetupProject.sh Brunel v49r1 --use PRConfig
   gaudirun.py $test_location/PRTEST-COLLISION10-1evts.py
 }
 

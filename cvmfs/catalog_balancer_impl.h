@@ -5,7 +5,6 @@
 #ifndef CVMFS_CATALOG_BALANCER_IMPL_H_
 #define CVMFS_CATALOG_BALANCER_IMPL_H_
 
-#include "catalog_balancer.h"
 
 #include <inttypes.h>
 

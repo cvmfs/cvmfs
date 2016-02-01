@@ -19,7 +19,7 @@ using history::SqliteHistory;
 template <class HistoryT>
 class T_History : public ::testing::Test {
  protected:
-  static const std::string sandbox;
+  static const char sandbox[];
   static const std::string fqrn;
 
   static const std::string history_v1_r0;
@@ -34,7 +34,8 @@ class T_History : public ::testing::Test {
  protected:
   virtual void SetUp() {
     if (NeedsSandbox()) {
-      ASSERT_TRUE(MkdirDeep(sandbox, 0700)) << "failed to create sandbox";
+      ASSERT_TRUE(MkdirDeep(string(sandbox), 0700))
+                  << "failed to create sandbox";
       PrepareLegacyHistoryDBs();
     }
     prng_.InitSeed(42);
@@ -42,7 +43,7 @@ class T_History : public ::testing::Test {
 
   virtual void TearDown() {
     if (NeedsSandbox()) {
-      const bool retval = RemoveTree(sandbox);
+      const bool retval = RemoveTree(string(sandbox));
       ASSERT_TRUE(retval) << "failed to remove sandbox";
     }
 
@@ -160,7 +161,7 @@ class T_History : public ::testing::Test {
   std::string GetHistoryFilename() const {
     std::string path;
     if (NeedsSandbox()) {
-      path = CreateTempPath(sandbox + "/history", 0600);
+      path = CreateTempPath(string(sandbox) + "/history", 0600);
     } else {
       do {
         path = StringifyInt(prng_.Next(123652348));
@@ -304,18 +305,18 @@ class T_History : public ::testing::Test {
 };
 
 template <class HistoryT>
-const std::string T_History<HistoryT>::sandbox = "./cvmfs_ut_history";
+const char T_History<HistoryT>::sandbox[] = "./cvmfs_ut_history";
 
 template <class HistoryT>
 const std::string T_History<HistoryT>::fqrn    = "test.cern.ch";
 
 template <class HistoryT>
 const std::string T_History<HistoryT>::history_v1_r0_path =
-  T_History<HistoryT>::sandbox + "/history_v1_r0";
+  string(T_History<HistoryT>::sandbox) + "/history_v1_r0";
 
 template <class HistoryT>
 const std::string T_History<HistoryT>::history_v1_r1_path =
-  T_History<HistoryT>::sandbox + "/history_v1_r1";
+  string(T_History<HistoryT>::sandbox) + "/history_v1_r1";
 
 template <class HistoryT>
 const std::string T_History<HistoryT>::history_v1_r0 =

@@ -1,9 +1,10 @@
 2.2.0:
+  * Add VOMS as a build dependency on platforms where it is available.
+  * Detect missing 'http:// proxy prefix in chksetup (CVM-979)
   * Remove sudo dependency from Linux packages
   * Fix race when reloading at the same time as evicting data from the cache
   * Fix cache-control max-age time coming from .cvmfs* files on EL7 (CVM-974)
   * Fix rare deadlock on unmount
-  * Fix ~10% performance hit in download code due to incorrect use of libcurl
   * Fix mistakenly ignoring catalogs during garbage collection (CVM-966)
   * Fix mounting with a read-only cache directory
   * Add user.pubkeys extended attribute
@@ -84,7 +85,7 @@
   * Add support for chunked files in libcvmfs (CVM-687)
   * Fix rare race that can result in a hanging reload
   * Fix memory and file descriptor leak in the download manager during reload
-  * Add support for SHA-256, SHA3-256, SHAKE128 with 160 output bits
+  * Add support for SHA3-SHAKE128 with 160 output bits
   * Add listing of /var/run/cvmfs to bugreport tarball (CVM-868)
   * Prevent ctrl+c during cvmfs_config reload (CVM-869)
   * Avoid use of attr utility in the server (CVM-853)
