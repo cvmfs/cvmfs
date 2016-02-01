@@ -617,7 +617,7 @@ TEST_F(T_Util, SendMes2Socket) {
   ASSERT_LT(0, server_fd);
   listen(server_fd, 1);
   int client_fd = ConnectSocket(socket_address);
-  ASSERT_GE(0, client_fd);
+  ASSERT_LE(0, client_fd);
   SendMsg2Socket(client_fd, to_write);
   int new_connection = accept(server_fd, (struct sockaddr *) &client_addr,
       &client_length);
@@ -1131,10 +1131,10 @@ TEST_F(T_Util, GetLineFd) {
   int fd3 = open(file3.c_str(), O_RDONLY);
   int fd4 = open(file4.c_str(), O_RDONLY);
 
-  ASSERT_GE(0, fd1);
-  ASSERT_GE(0, fd2);
-  ASSERT_GE(0, fd3);
-  ASSERT_GE(0, fd4);
+  ASSERT_LE(0, fd1);
+  ASSERT_LE(0, fd2);
+  ASSERT_LE(0, fd3);
+  ASSERT_LE(0, fd4);
 
   EXPECT_TRUE(GetLineFd(fd1, &result));
   EXPECT_EQ("first", result);
