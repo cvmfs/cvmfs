@@ -437,7 +437,8 @@ TEST_F(T_Util, WritePipe) {
   void *buffer_output = scalloc(20, sizeof(char));
   MakePipe(fd);
   WritePipe(fd[1], to_write.c_str(), to_write.length());
-  read(fd[0], buffer_output, to_write.length());
+  int bytes_read = read(fd[0], buffer_output, to_write.length());
+  EXPECT_EQ(bytes_read, to_write.length());
 
   EXPECT_STREQ(to_write.c_str(), static_cast<const char*>(buffer_output));
   ASSERT_DEATH(WritePipe(-1, to_write.c_str(), to_write.length()),
