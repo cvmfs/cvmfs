@@ -140,8 +140,8 @@ cvmfs_config_usage() {
 }
 
 has_selinux() {
-  which sestatus   > /dev/null 2>&1 && \
   which getenforce > /dev/null 2>&1 && \
+  which semodule   > /dev/null 2>&1 && \
   getenforce | grep -qi "enforc" || return 1
 }
 
@@ -422,8 +422,7 @@ cvmfs_chksetup() {
   fi
 
   # Check SELinux label of cache directory
-  if has_selinux && which semodule > /dev/null 2>&1 && \
-     semodule --list-modules 2> /dev/null | grep -q cvmfs; then
+  if has_selinux && semodule --list-modules 2> /dev/null | grep -q cvmfs; then
     local expected_label="cvmfs_cache_t"
     local cache_ctx="$(stat --format='%C' $CVMFS_CACHE_BASE)"
     if [ $? -ne 0 ]; then
