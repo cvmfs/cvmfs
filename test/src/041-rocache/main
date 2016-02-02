@@ -22,12 +22,16 @@ ro_mount() {
 
 cleanup() {
   local tempdir=$1
-  lazy_umount $tmpdir
-  sudo rmdir $tmpdir
-
   # releasing the space in OSX
   if running_on_osx; then
+    # we have to force umount
+    cvmfs_umount atlas.cern.ch
+    sudo umount $tmpdir
     sudo hdiutil detach $mountpoint
+    sudo rmdir "$tmpdir"
+  else
+    lazy_umount $tmpdir
+    sudo rmdir $tmpdir
   fi
 }
 
