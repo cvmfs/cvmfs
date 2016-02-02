@@ -1,3 +1,5 @@
+2.3.0:
+
 2.2.0:
   * Add VOMS as a build dependency on platforms where it is available.
   * Detect missing 'http:// proxy prefix in chksetup (CVM-979)

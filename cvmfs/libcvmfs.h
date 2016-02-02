@@ -11,7 +11,7 @@
  */
 #define LIBCVMFS_VERSION 2
 #define LIBCVMFS_VERSION_MAJOR LIBCVMFS_VERSION
-#define LIBCVMFS_VERSION_MINOR 1
+#define LIBCVMFS_VERSION_MINOR 3
 // Revision Changelog
 // 13: revision introduced
 // 14: fix expand_path for absolute paths, add mountpoint to cvmfs_context
@@ -20,7 +20,8 @@
 // 17: apply new classes around the cache manager
 // 18: add cvmfs_pread and support for chunked files
 // 19: CernVM-FS 2.2.0
-#define LIBCVMFS_REVISION 19
+// 20: CernVM-FS 2.3.0
+#define LIBCVMFS_REVISION 20
 
 #include <sys/stat.h>
 #include <unistd.h>
