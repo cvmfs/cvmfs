@@ -614,6 +614,7 @@ TEST_F(T_Util, SendMes2Socket) {
   struct sockaddr_in client_addr;
   unsigned int client_length = sizeof(client_addr);
   int server_fd = MakeSocket(socket_address, 0777);
+  ASSERT_GE(0, server_fd);
   listen(server_fd, 1);
   int client_fd = ConnectSocket(socket_address);
   SendMsg2Socket(client_fd, to_write);
