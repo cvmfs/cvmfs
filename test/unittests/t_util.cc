@@ -478,7 +478,7 @@ TEST_F(T_Util, ReadHalfPipe) {
 
 TEST_F(T_Util, ClosePipe) {
   int fd[2];
-  UniquePtr<char> buffer_output(scalloc(20, sizeof(char)));
+  UniquePtr<void> buffer_output(scalloc(20, sizeof(char)));
   MakePipe(fd);
   ClosePipe(fd);
   ASSERT_DEATH(WritePipe(fd[1], to_write.c_str(), to_write.length()), ".*");
@@ -613,13 +613,13 @@ TEST_F(T_Util, SendMes2Socket) {
   struct sockaddr_in client_addr;
   unsigned int client_length = sizeof(client_addr);
   int server_fd = MakeSocket(socket_address, 0777);
-  ASSERT_GE(0, server_fd);
+  ASSERT_LT(0, server_fd);
   listen(server_fd, 1);
   int client_fd = ConnectSocket(socket_address);
   SendMsg2Socket(client_fd, to_write);
   int new_connection = accept(server_fd, (struct sockaddr *) &client_addr,
       &client_length);
-  ASSERT_GE(0, new_connection);
+  ASSERT_LE(0, new_connection);
   int bytes_read = read(new_connection, buffer, to_write.length());
   EXPECT_EQ(bytes_read, to_write.length());
 
