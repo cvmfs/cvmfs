@@ -580,7 +580,7 @@ TEST_F(T_Util, SafeRead) {
   close(fd[0]);
 
   char fail;
-  EXPECT_EQ(SafeRead(-1, &fail, 1), -1);
+  EXPECT_EQ(-1, SafeRead(-1, &fail, 1));
   std::string fail_str;
   EXPECT_FALSE(SafeReadToString(-1, &fail_str));
 }
