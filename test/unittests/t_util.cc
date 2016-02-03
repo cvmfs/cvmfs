@@ -756,7 +756,7 @@ TEST_F(T_Util, UnlockFile) {
   EXPECT_EQ(-2, TryLockFile(filename));
   UnlockFile(fd1);
   EXPECT_LE(0, fd2 = TryLockFile(filename));  // can be locked again
-  close(fd1);
+  // no need to close fd1
   close(fd2);
 }
 
