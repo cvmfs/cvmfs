@@ -289,7 +289,13 @@ class UniquePtrBase : SingleCopy {
   inline operator bool() const        { return IsValid(); }
   inline T* operator->() const        { return ref_; }
   inline operator T*()                { return ref_; }
-
+  inline DerivedT& operator=(T *ref) {
+    if (ref_ != ref) {
+      Free();
+      ref_ = ref;
+    }
+    return *(static_cast<DerivedT*>(this));
+  }
   inline T* weak_ref() const          { return ref_; }
   inline bool IsValid() const         { return (ref_ != NULL); }
   inline T*   Release()               { T* r = ref_; ref_ = NULL; return r; }
@@ -297,12 +303,6 @@ class UniquePtrBase : SingleCopy {
  protected:
   void Free() {
     static_cast<DerivedT*>(this)->Free();
-  }
-  void Assign(T *ref) {
-    if (ref_ != ref) {
-      Free();
-      ref_ = ref;
-    }
   }
   T *ref_;
 };
@@ -313,13 +313,10 @@ class UniquePtr : public UniquePtrBase<T, UniquePtr<T> > {
   typedef UniquePtrBase<T, UniquePtr<T> > BaseT;
  public:
   friend class UniquePtrBase<T, UniquePtr<T> >;
+  using BaseT::operator=;
   inline UniquePtr() : BaseT(NULL) { }
   inline explicit UniquePtr(T *ref) : BaseT(ref) { }
   inline T& operator*() const { return *BaseT::ref_; }
-  inline UniquePtr<T>& operator=(T* ref) {
-    BaseT::Assign(ref);
-    return *this;
-  }
  protected:
   void Free() {
     delete BaseT::ref_;
@@ -332,15 +329,14 @@ class UniquePtr<void> : public UniquePtrBase<void, UniquePtr<void> > {
   typedef UniquePtrBase<void, UniquePtr<void> > BaseT;
  public:
   friend class UniquePtrBase<void, UniquePtr<void> >;
+  using BaseT::operator=;
   inline UniquePtr() : BaseT(NULL) { }
   inline explicit UniquePtr(void *ref) : BaseT(ref) { }
-  inline UniquePtr<void>& operator=(void* ref) {
-    BaseT::Assign(ref);
-    return *this;
-  }
  protected:
   void Free() {
-    free(BaseT::ref_);
+    if (IsValid()) {
+      free(BaseT::ref_);
+    }
   }
 };
 
