@@ -409,6 +409,7 @@ TEST_F(T_Util, MakeSocket) {
 
 TEST_F(T_Util, ConnectSocket) {
   int server_fd = MakeSocket(socket_address, 0777);
+  ASSERT_LT(0, server_fd);
   listen(server_fd, 1);
   int client_fd = ConnectSocket(socket_address);
 
