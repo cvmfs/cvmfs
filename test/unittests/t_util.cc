@@ -478,12 +478,11 @@ TEST_F(T_Util, ReadHalfPipe) {
 
 TEST_F(T_Util, ClosePipe) {
   int fd[2];
-  void *buffer_output = scalloc(20, sizeof(char));
+  UniquePtr<char> buffer_output(scalloc(20, sizeof(char)));
   MakePipe(fd);
   ClosePipe(fd);
   ASSERT_DEATH(WritePipe(fd[1], to_write.c_str(), to_write.length()), ".*");
   ASSERT_DEATH(ReadPipe(fd[0], buffer_output, to_write.length()), ".*");
-  free(buffer_output);
 }
 
 
