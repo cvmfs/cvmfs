@@ -34,10 +34,9 @@ TEST(T_Smalloc, SmallRealloc) {
 }
 
 TEST(T_Smalloc, BigRealloc) {
-  void *mem = smalloc(kSmallAllocation);
+  UniquePtr<void> mem(smalloc(kSmallAllocation));
   ASSERT_DEATH(mem = srealloc(mem, kBigAllocation), ".*");
   EXPECT_NE(static_cast<void*>(NULL), mem);
-  free(mem);
 }
 
 TEST(T_Smalloc, SmallCalloc) {
