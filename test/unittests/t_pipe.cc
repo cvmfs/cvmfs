@@ -17,11 +17,6 @@ class T_Pipe : public ::testing::Test {
   }
 
 
-  virtual void TearDown() {
-    pipe.Close();
-  }
-
-
   struct Foo {
     Foo() : integer(42), character('T'), floating_point(13.37) {}
 

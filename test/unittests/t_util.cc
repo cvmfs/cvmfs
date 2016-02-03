@@ -1325,7 +1325,6 @@ TEST_F(T_Util, ManagedExecExecuteBinaryDoubleFork) {
   const char *quit = "quit\n";
   retval = shell_pipe.Write(quit, strlen(quit));
   EXPECT_TRUE(retval);
-  shell_pipe.Close();
   close(fd_stderr);
 
   // wait for the child process to terminate
@@ -1371,7 +1370,6 @@ TEST_F(T_Util, ManagedExecExecuteBinaryAsChild) {
   const char *quit = "quit\n";
   retval = shell_pipe.Write(quit, strlen(quit));
   EXPECT_TRUE(retval);
-  shell_pipe.Close();
   close(fd_stderr);
 
   // wait for the child process to terminate

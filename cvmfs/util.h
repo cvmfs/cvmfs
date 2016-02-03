@@ -62,6 +62,29 @@ class SingleCopy {
   SingleCopy& operator=(const SingleCopy &rhs);
 };
 
+class FileDescriptor : SingleCopy {
+ public:
+  FileDescriptor() : fd_(-1) { }
+  explicit FileDescriptor(int fd) : fd_(fd) { }
+  virtual ~FileDescriptor() { if (IsValid()) close(fd_); }
+  inline FileDescriptor& operator=(int fd) { fd_ = fd; return *this; }
+  inline operator int() const { return fd_; }
+  inline bool operator ==(const int other_fd) const { return fd_ == other_fd; }
+  inline bool operator !=(const int other_fd) const {
+    return fd_ != other_fd;
+  }
+  inline bool IsValid() const  { return fd_ >= 0; }
+  inline int Read(void *buffer, size_t size) {
+    return IsValid() ? read(fd_, buffer, size) : -1;
+  }
+  inline int Write(const void *buffer, size_t size) {
+    return IsValid() ? write(fd_, buffer, size) : -1;
+  }
+
+ private:
+  int fd_;
+};
+
 std::string MakeCanonicalPath(const std::string &path);
 std::string GetParentPath(const std::string &path);
 PathString GetParentPath(const PathString &path);
@@ -92,22 +115,17 @@ struct Pipe : public SingleCopy {
   Pipe(const int fd_read, const int fd_write) :
     read_end(fd_read), write_end(fd_write) {}
 
-  void Close() {
-    close(read_end);
-    close(write_end);
-  }
-
   template<typename T>
   bool Write(const T &data) {
     assert(!IsPointer<T>::value);  // TODO(rmeusel): C++11 static_assert
-    const int num_bytes = write(write_end, &data, sizeof(T));
+    const int num_bytes = write_end.Write(&data, sizeof(T));
     return (num_bytes >= 0) && (static_cast<size_t>(num_bytes) == sizeof(T));
   }
 
   template<typename T>
   bool Read(T *data) {
     assert(!IsPointer<T>::value);  // TODO(rmeusel): C++11 static_assert
-    int num_bytes = read(read_end, data, sizeof(T));
+    const int num_bytes = read_end.Read(data, sizeof(T));
     return (num_bytes >= 0) && (static_cast<size_t>(num_bytes) == sizeof(T));
   }
 
@@ -121,8 +139,8 @@ struct Pipe : public SingleCopy {
     return true;
   }
 
-  int read_end;
-  int write_end;
+  FileDescriptor read_end;
+  FileDescriptor write_end;
 };
 
 void Nonblock2Block(int filedes);
@@ -304,7 +322,6 @@ class UniquePtr : SingleCopy {
  private:
   T *ref_;
 };
-
 
 /**
  * RAII object to call `unlink()` on a containing file when it gets out of scope
