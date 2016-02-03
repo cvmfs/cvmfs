@@ -22,20 +22,145 @@
 #include "fuse/fuse_lowlevel.h"
 #include "voms/voms_apic.h"
 
+#include "globus/globus_gsi_credential.h"
+#include "globus/globus_gsi_cert_utils.h"
+#include "globus/globus_module.h"
+
 #include "../logging.h"
 #include "../platform.h"
+#include "../util.h"
 
 // TODO(jblomer): add unit tests for static functions
 
-// VOMS API declarations
 extern "C" {
-void (*g_VOMS_Destroy)(struct vomsdata *vd) = NULL;
+// VOMS API declarations
 struct vomsdata * (*g_VOMS_Init)(char *voms, char *cert) = NULL;
-int (*g_VOMS_RetrieveFromFile)(FILE *file, int how, struct vomsdata *vd,
-                               int *error) = NULL;
+void (*g_VOMS_Destroy)(struct vomsdata *vd) = NULL;
+int (*g_VOMS_Retrieve)(X509 *cert, STACK_OF(X509) *chain, int how,
+                         struct vomsdata *vd, int *error) = NULL;
 char * (*g_VOMS_ErrorMessage)(struct vomsdata *vd, int error, char *buffer,
                               int len) = NULL;
+
+// Globus API declarations
+
+// For activating / deactivating modules.
+int (*g_globus_module_activate)(
+    globus_module_descriptor_t * module_descriptor) = NULL;
+int (*g_globus_module_deactivate)(
+    globus_module_descriptor_t * module_descriptor) = NULL;
+int (*g_globus_thread_set_model)(
+    const char *                        model) = NULL;
+globus_object_t * (*g_globus_error_get)(
+    globus_result_t                     result) = NULL;
+char * (*g_globus_error_print_chain)(
+    globus_object_t *                   error) = NULL;
+globus_object_t *g_GLOBUS_ERROR_BASE_STATIC_PROTOTYPE = NULL;
+// Modules we'll want to use.
+globus_module_descriptor_t *g_globus_i_gsi_cert_utils_module = NULL;
+globus_module_descriptor_t *g_globus_i_gsi_credential_module = NULL;
+globus_module_descriptor_t *g_globus_i_gsi_callback_module = NULL;
+globus_module_descriptor_t *g_globus_i_gsi_sysconfig_module = NULL;
+
+// Actual functions we need to invoke.
+globus_result_t (*g_globus_gsi_cred_handle_init)(
+    globus_gsi_cred_handle_t *          handle,
+    globus_gsi_cred_handle_attrs_t      handle_attrs) = NULL;
+globus_result_t (*g_globus_gsi_cred_handle_destroy)(
+    globus_gsi_cred_handle_t            handle) = NULL;
+globus_result_t (*g_globus_gsi_cred_read_proxy_bio)(
+    globus_gsi_cred_handle_t            handle,
+    BIO *                               bio) = NULL;
+globus_result_t (*g_globus_gsi_cred_get_cert)(
+    globus_gsi_cred_handle_t            handle,
+    X509 **                             cert) = NULL;
+globus_result_t (*g_globus_gsi_cred_get_key)(
+    globus_gsi_cred_handle_t            handle,
+    EVP_PKEY **                         key) = NULL;
+globus_result_t (*g_globus_gsi_cred_get_cert_chain)(
+    globus_gsi_cred_handle_t            handle,
+    STACK_OF(X509) **                   cert_chain) = NULL;
+globus_result_t (*g_globus_gsi_cred_get_subject_name)(
+    globus_gsi_cred_handle_t            handle,
+    char **                             subject_name) = NULL;
+globus_result_t (*g_globus_gsi_cred_verify_cert_chain)(
+    globus_gsi_cred_handle_t            cred_handle,
+    globus_gsi_callback_data_t          callback_data) = NULL;
+globus_result_t (*g_globus_gsi_cert_utils_get_cert_type)(
+    X509 *                              cert,
+    globus_gsi_cert_utils_cert_type_t * type) = NULL;
+globus_result_t (*g_globus_gsi_callback_data_init)(
+    globus_gsi_callback_data_t *        callback_data) = NULL;
+globus_result_t (*g_globus_gsi_callback_data_destroy)(
+    globus_gsi_callback_data_t          callback_data) = NULL;
+globus_result_t (*g_globus_gsi_callback_set_cert_dir)(
+    globus_gsi_callback_data_t          callback_data,
+    char *                              cert_dir) = NULL;
+globus_result_t (*g_globus_gsi_sysconfig_get_cert_dir_unix)(
+    char **                             cert_dir) = NULL;
+
+
+
+// Although it is OK to use strcmp for 99% of DNs, there are some string rules
+// in X509 about handling of multiple spaces ("  "); this will take care of
+// the last 1% of cases.
+int (*g_globus_i_gsi_cert_utils_dn_cmp)(
+    const char *                        dn1,
+    const char *                        dn2) = NULL;
+bool g_globus_ok = false;  // Set to true if all globus initialization worked.
 }
+
+
+static bool
+OpenDynLib(void **handle, const char *name, const char *friendly_name) {
+  if (!handle) {return false;}
+  *handle = dlopen(name, RTLD_LAZY);
+  if (!(*handle)) {
+    LogCvmfs(kLogVoms, kLogDebug, "Failed to load %s library; "
+             "authz will not be available.  %s", friendly_name, dlerror());
+  }
+  return *handle;
+}
+
+
+static void
+CloseDynLib(void **handle, const char *name) {
+  if (!handle) {return;}
+  if (*handle && dlclose(*handle)) {
+    LogCvmfs(kLogVoms, kLogDebug, "Failed to unload %s library: %s",
+                                  name, dlerror());
+  }
+  *handle = NULL;
+}
+
+
+template<typename T>
+bool LoadSymbol(void *lib_handle, T *sym, const char *name) {
+  if (!sym) {return false;}
+  *sym = reinterpret_cast<typeof(T)>(dlsym(lib_handle, name));
+  if (!(*sym)) {
+    LogCvmfs(kLogVoms, kLogDebug, "Failed to load %s: %s", name, dlerror());
+  }
+  return *sym;
+}
+
+
+static void
+PrintGlobusError(globus_result_t result) {
+  globus_object_t *error_obj = (*g_globus_error_get)(result);
+  if (error_obj == g_GLOBUS_ERROR_BASE_STATIC_PROTOTYPE) {
+    LogCvmfs(kLogVoms, kLogDebug, "Globus error occurred (no further "
+                                  "information available)");
+    return;
+  }
+  char *error_full = (*g_globus_error_print_chain)(error_obj);
+  if (!error_full) {
+    LogCvmfs(kLogVoms, kLogDebug, "Globus error occurred (error unprintable)");
+    return;
+  }
+  LogCvmfs(kLogVoms, kLogDebug, "Globus error: %s", error_full);
+  free(error_full);
+}
+
 
 // TODO(jblomer): add comment
 // TODO(jblomer): unit test the class
@@ -43,18 +168,27 @@ char * (*g_VOMS_ErrorMessage)(struct vomsdata *vd, int error, char *buffer,
 // TODO(jblomer): put into anonymous namespace
 // TODO(jblomer): replace pthread_mutex_lock by MutexGuard
 // TODO(jblomer): member naming: trailing underscore, no m_ prefix
-// TODO(jblomer): naming VOMS --> Voms
-class VOMSSessionCache {
- public:
-  VOMSSessionCache()
+class AuthzSessionCache {
+
+  AuthzSessionCache()
     : m_zombie(true),
-      m_last_clean(platform_monotonic_time())
+      m_last_clean(platform_monotonic_time()),
+      m_globus_module_handle(NULL),
+      m_globus_gsi_cert_utils_handle(NULL),
+      m_globus_gsi_credential_handle(NULL),
+      m_globus_gsi_callback_handle(NULL)
   {
     pthread_mutex_init(&m_mutex, NULL);
     load_voms_library();
+    if (!m_zombie) {
+      m_zombie = true;
+      load_globus_library();
+    }
+    LogCvmfs(kLogVoms, kLogDebug|kLogSyslog, "Support for authz is %senabled.",
+      m_zombie ? "NOT " : "");
   }
 
-  ~VOMSSessionCache() {
+  ~AuthzSessionCache() {
     for (KeyToVOMS::const_iterator it = m_map.begin();
          it != m_map.end();
          it++)
@@ -62,9 +196,11 @@ class VOMSSessionCache {
       (*g_VOMS_Destroy)(it->second.first);
     }
     close_voms_library();
+    close_globus_library();
     pthread_mutex_destroy(&m_mutex);
   }
 
+ public:
   // TODO(jblomer): change type of vomsdata
   bool get(pid_t pid, struct vomsdata *&vomsinfo) {  // NOLINT
     if (m_zombie) {return false;}
@@ -123,6 +259,11 @@ class VOMSSessionCache {
     return result.first->second.first;
   }
 
+  static AuthzSessionCache &GetInstance()
+  {
+    return g_cache;
+  }
+
  private:
   struct KeyType {
     KeyType() : pid(-1), uid(-1), gid(-1), bday(0) {}
@@ -147,6 +288,8 @@ class VOMSSessionCache {
 
   typedef std::map<KeyType, KeyType> PidToSid;
   PidToSid m_pid_map;
+
+  AuthzSessionCache(const AuthzSessionCache&);
 
   // Lookup pid's sid and birthdy.
   // Returns false on failure and sets errno.
@@ -254,63 +397,188 @@ class VOMSSessionCache {
   }
 
   void load_voms_library() {
-    m_libvoms_handle = dlopen("libvomsapi.so.1", RTLD_LAZY);
-    if (!m_libvoms_handle) {
-      LogCvmfs(kLogVoms, kLogDebug, "Failed to load VOMS library; VOMS "
-               "authz will not be available.  %s", dlerror());
-      return;
+    if (!OpenDynLib(&m_libvoms_handle, "libvomsapi.so.1", "VOMS")) {return;}
+    if (
+       !LoadSymbol(m_libvoms_handle, &g_VOMS_Init, "VOMS_Init") ||
+       !LoadSymbol(m_libvoms_handle, &g_VOMS_Destroy, "VOMS_Destroy") ||
+       !LoadSymbol(m_libvoms_handle, &g_VOMS_Retrieve, "VOMS_Retrieve") ||
+       !LoadSymbol(m_libvoms_handle, &g_VOMS_Destroy, "VOMS_Destroy") ||
+       !LoadSymbol(m_libvoms_handle, &g_VOMS_ErrorMessage, "VOMS_ErrorMessage")
+      ) {
+        g_VOMS_Init = NULL;
+        return;
     }
-    // TODO(jblomer): the following if blocks can be factored out in a function
-    if (!(g_VOMS_Init =
-          reinterpret_cast<struct vomsdata*(*)(char *, char *)>
-            (dlsym(m_libvoms_handle, "VOMS_Init"))))
-    {
-      LogCvmfs(kLogVoms, kLogDebug, "Failed to load VOMS_Init from VOMS "
-               "library: %s", dlerror());
-      return;
-    }
-    if (!(g_VOMS_Destroy =
-          reinterpret_cast<void (*)(struct vomsdata *vd)>
-          (dlsym(m_libvoms_handle, "VOMS_Destroy"))))
-    {
-      LogCvmfs(kLogVoms, kLogDebug, "Failed to load VOMS_Destroy from "
-               "VOMS library: %s", dlerror());
-      return;
-    }
-    if (!(g_VOMS_RetrieveFromFile =
-          reinterpret_cast<int (*)(FILE *file, int how, struct vomsdata *vd,
-                                   int *error)>
-        (dlsym(m_libvoms_handle, "VOMS_RetrieveFromFile"))))
-    {
-      LogCvmfs(kLogVoms, kLogDebug, "Failed to load VOMS_RetrieveFromFile"
-               " from VOMS library: %s", dlerror());
-      return;
-    }
-    if (!(g_VOMS_ErrorMessage =
-        reinterpret_cast<char * (*)(struct vomsdata *vd, int error,
-                                    char *buffer, int len)>
-        (dlsym(m_libvoms_handle, "VOMS_ErrorMessage"))))
-    {
-      LogCvmfs(kLogVoms, kLogDebug, "Failed to load VOMS_ErrorMessage "
-               "from VOMS library: %s", dlerror());
-      return;
-    }
-    LogCvmfs(kLogVoms, kLogDebug, "Successfully loaded VOMS library; VOMS "
-            "authz will be available.");
+    LogCvmfs(kLogVoms, kLogDebug, "Successfully loaded VOMS library");
     m_zombie = false;
   }
 
-  void close_voms_library() {
-    if (m_libvoms_handle && dlclose(m_libvoms_handle)) {
-      LogCvmfs(kLogVoms, kLogDebug, "Failed to unload VOMS library: %s",
-               dlerror());
+
+  void load_globus_library() {
+    if (!OpenDynLib(&m_globus_module_handle, "libglobus_common.so.0",
+                    "Globus common")) {return;}
+    if (!OpenDynLib(&m_globus_gsi_cert_utils_handle,
+                    "libglobus_gsi_cert_utils.so.0",
+                    "Globus GSI cert utils")) {return;}
+    if (!OpenDynLib(&m_globus_gsi_credential_handle,
+                    "libglobus_gsi_credential.so.1",
+                    "Globus GSI credential")) {return;}
+    if (!OpenDynLib(&m_globus_gsi_callback_handle,
+                    "libglobus_gsi_callback.so.0",
+                    "Globus GSI callback")) {return;}
+    if (!OpenDynLib(&m_globus_gsi_sysconfig_handle,
+                    "libglobus_gsi_sysconfig.so.1",
+                    "Globus GSI sysconfig")) {return;}
+    if (
+       !LoadSymbol(m_globus_module_handle, &g_globus_module_activate,
+                   "globus_module_activate") ||
+       !LoadSymbol(m_globus_module_handle, &g_globus_module_deactivate,
+                   "globus_module_deactivate") ||
+       !LoadSymbol(m_globus_module_handle, &g_globus_thread_set_model,
+                   "globus_thread_set_model") ||
+       !LoadSymbol(m_globus_module_handle, &g_globus_error_get,
+                   "globus_error_get") ||
+       !LoadSymbol(m_globus_module_handle, &g_globus_error_print_chain,
+                   "globus_error_print_chain") ||
+       !LoadSymbol(m_globus_module_handle,
+                   &g_GLOBUS_ERROR_BASE_STATIC_PROTOTYPE,
+                   "GLOBUS_ERROR_BASE_STATIC_PROTOTYPE") ||
+       !LoadSymbol(m_globus_gsi_cert_utils_handle,
+                   &g_globus_i_gsi_cert_utils_module,
+                   "globus_i_gsi_cert_utils_module") ||
+       !LoadSymbol(m_globus_gsi_credential_handle,
+                   &g_globus_i_gsi_credential_module,
+                   "globus_i_gsi_credential_module") ||
+       !LoadSymbol(m_globus_gsi_callback_handle,
+                   &g_globus_i_gsi_callback_module,
+                   "globus_i_gsi_callback_module") ||
+       !LoadSymbol(m_globus_gsi_sysconfig_handle,
+                   &g_globus_i_gsi_sysconfig_module,
+                   "globus_i_gsi_sysconfig_module") ||
+       !LoadSymbol(m_globus_gsi_credential_handle,
+                   &g_globus_gsi_cred_handle_init,
+                   "globus_gsi_cred_handle_init") ||
+       !LoadSymbol(m_globus_gsi_credential_handle,
+                   &g_globus_gsi_cred_handle_destroy,
+                   "globus_gsi_cred_handle_destroy") ||
+       !LoadSymbol(m_globus_gsi_credential_handle,
+                   &g_globus_gsi_cred_read_proxy_bio,
+                   "globus_gsi_cred_read_proxy_bio") ||
+       !LoadSymbol(m_globus_gsi_credential_handle,
+                   &g_globus_gsi_cred_verify_cert_chain,
+                   "globus_gsi_cred_verify_cert_chain") ||
+       !LoadSymbol(m_globus_gsi_credential_handle,
+                   &g_globus_gsi_cred_get_cert,
+                   "globus_gsi_cred_get_cert") ||
+       !LoadSymbol(m_globus_gsi_credential_handle,
+                   &g_globus_gsi_cred_get_key,
+                   "globus_gsi_cred_get_key") ||
+       !LoadSymbol(m_globus_gsi_credential_handle,
+                   &g_globus_gsi_cred_get_cert_chain,
+                   "globus_gsi_cred_get_cert_chain") ||
+       !LoadSymbol(m_globus_gsi_credential_handle,
+                   &g_globus_gsi_cred_get_subject_name,
+                   "globus_gsi_cred_get_subject_name") ||
+       !LoadSymbol(m_globus_gsi_cert_utils_handle,
+                   &g_globus_gsi_cert_utils_get_cert_type,
+                   "globus_gsi_cert_utils_get_cert_type") ||
+       !LoadSymbol(m_globus_gsi_cert_utils_handle,
+                   &g_globus_i_gsi_cert_utils_dn_cmp,
+                   "globus_i_gsi_cert_utils_dn_cmp") ||
+       !LoadSymbol(m_globus_gsi_callback_handle,
+                   &g_globus_gsi_callback_data_init,
+                   "globus_gsi_callback_data_init") ||
+       !LoadSymbol(m_globus_gsi_callback_handle,
+                   &g_globus_gsi_callback_data_destroy,
+                   "globus_gsi_callback_data_destroy") ||
+       !LoadSymbol(m_globus_gsi_callback_handle,
+                   &g_globus_gsi_callback_set_cert_dir,
+                   "globus_gsi_callback_set_cert_dir") ||
+       !LoadSymbol(m_globus_gsi_sysconfig_handle,
+                   &g_globus_gsi_sysconfig_get_cert_dir_unix,
+                   "globus_gsi_sysconfig_get_cert_dir_unix")
+      ) {return;}
+    if (GLOBUS_SUCCESS !=
+        (g_globus_thread_set_model)("none")) {
+      LogCvmfs(kLogVoms, kLogDebug, "Failed to enable Globus thread model.");
+      return;
     }
-    m_libvoms_handle = NULL;
+    if (GLOBUS_SUCCESS !=
+        (*g_globus_module_activate)(g_globus_i_gsi_cert_utils_module)) {
+      LogCvmfs(kLogVoms, kLogDebug, "Failed to activate Globus GSI cert utils"
+                                    " module.");
+      return;
+    }
+    if (GLOBUS_SUCCESS !=
+        (*g_globus_module_activate)(g_globus_i_gsi_credential_module)) {
+      LogCvmfs(kLogVoms, kLogDebug, "Failed to activate Globus GSI credential"
+                                    " module.");
+      (*g_globus_module_deactivate)(g_globus_i_gsi_cert_utils_module);
+      return;
+    }
+    if (GLOBUS_SUCCESS !=
+        (*g_globus_module_activate)(g_globus_i_gsi_callback_module)) {
+      (*g_globus_module_deactivate)(g_globus_i_gsi_cert_utils_module);
+      (*g_globus_module_deactivate)(g_globus_i_gsi_credential_module);
+      return;
+    }
+    if (GLOBUS_SUCCESS !=
+        (*g_globus_module_activate)(g_globus_i_gsi_sysconfig_module)) {
+      (*g_globus_module_deactivate)(g_globus_i_gsi_cert_utils_module);
+      (*g_globus_module_deactivate)(g_globus_i_gsi_credential_module);
+      (*g_globus_module_deactivate)(g_globus_i_gsi_callback_module);
+    }
+    LogCvmfs(kLogVoms, kLogDebug, "Successfully loaded Globus library");
+    m_zombie = false;
+    g_globus_ok = true;
+  }
+
+
+  void close_voms_library() {
+    CloseDynLib(&m_libvoms_handle, "VOMS");
     g_VOMS_Init = NULL;
     g_VOMS_Destroy = NULL;
-    g_VOMS_RetrieveFromFile = NULL;
+    g_VOMS_Retrieve = NULL;
     g_VOMS_ErrorMessage = NULL;
   }
+
+
+  void close_globus_library() {
+    if (g_globus_ok) {
+      // TODO(bbockelm): Does not mix well with fork; re-enable but add fork-handlers.
+      (*g_globus_module_deactivate)(g_globus_i_gsi_cert_utils_module);
+      (*g_globus_module_deactivate)(g_globus_i_gsi_credential_module);
+      (*g_globus_module_deactivate)(g_globus_i_gsi_callback_module);
+      (*g_globus_module_deactivate)(g_globus_i_gsi_sysconfig_module);
+    }
+    CloseDynLib(&m_globus_module_handle, "Globus module");
+    CloseDynLib(&m_globus_gsi_cert_utils_handle, "Globus GSI cert utils");
+    CloseDynLib(&m_globus_gsi_credential_handle, "Globus GSI credential");
+    CloseDynLib(&m_globus_gsi_callback_handle, "Globus GSI callback");
+    CloseDynLib(&m_globus_gsi_sysconfig_handle, "Globus GSI sysconfig");
+    g_globus_thread_set_model = NULL;
+    g_globus_module_activate = NULL;
+    g_globus_module_deactivate = NULL;
+    g_globus_error_get = NULL;
+    g_globus_error_print_chain = NULL;
+    g_GLOBUS_ERROR_BASE_STATIC_PROTOTYPE = NULL;
+    g_globus_i_gsi_cert_utils_module = NULL;
+    g_globus_i_gsi_credential_module = NULL;
+    g_globus_i_gsi_callback_module = NULL;
+    g_globus_i_gsi_sysconfig_module = NULL;
+    g_globus_gsi_cred_handle_init = NULL;
+    g_globus_gsi_cred_handle_destroy = NULL;
+    g_globus_gsi_cred_get_key = NULL;
+    g_globus_gsi_cred_verify_cert_chain = NULL;
+    g_globus_gsi_cred_get_subject_name = NULL;
+    g_globus_gsi_cert_utils_get_cert_type = NULL;
+    g_globus_i_gsi_cert_utils_dn_cmp = NULL;
+    g_globus_gsi_callback_data_init = NULL;
+    g_globus_gsi_callback_data_destroy = NULL;
+    g_globus_gsi_callback_set_cert_dir = NULL;
+    g_globus_gsi_sysconfig_get_cert_dir_unix = NULL;
+    g_globus_ok = false;
+  }
+
 
   bool m_zombie;
   time_t m_last_clean;
@@ -318,12 +586,20 @@ class VOMSSessionCache {
 
   KeyToVOMS m_map;
 
+  // Various library handles.
   void *m_libvoms_handle;
+  void *m_globus_module_handle;
+  void *m_globus_gsi_cert_utils_handle;
+  void *m_globus_gsi_credential_handle;
+  void *m_globus_gsi_callback_handle;
+  void *m_globus_gsi_sysconfig_handle;
+
+  static AuthzSessionCache g_cache;
 };
 
-// TODO(jblomer): why static?
-// TODO(jblomer): use a singleton instead (well-defined initialization time)
-static VOMSSessionCache g_cache;
+
+AuthzSessionCache AuthzSessionCache::g_cache;
+
 
 static FILE *
 GetProxyFile(const struct fuse_ctx *ctx) {
@@ -348,8 +624,13 @@ GenerateVOMSData(const struct fuse_ctx *ctx)
   struct vomsdata *voms_ptr = (*g_VOMS_Init)(NULL, NULL);
   int error = 0;
 
+  /*  TODO: Update with new VOMS_Retrieve.
   const int retval = (*g_VOMS_RetrieveFromFile)(fp, RECURSE_CHAIN,
                                                 voms_ptr, &error);
+  */
+  const int retval = 0;
+  
+
   fclose(fp);
 
   if (!retval) {
@@ -422,7 +703,7 @@ static bool CheckMultipleAuthz(const struct vomsdata *voms_ptr,
 
 
 bool CheckVOMSAuthz(const struct fuse_ctx *ctx, const std::string & authz) {
-  if (g_VOMS_Init == NULL) {
+  if (g_VOMS_Init == NULL || !g_globus_ok) {
     LogCvmfs(kLogVoms, kLogSyslog | kLogDebug,
              "VOMS library not present; failing VOMS authz.");
     return false;
@@ -433,10 +714,10 @@ bool CheckVOMSAuthz(const struct fuse_ctx *ctx, const std::string & authz) {
 
   // Get VOMS information from cache; if not present, store it.
   struct vomsdata *voms_ptr;
-  if (!g_cache.get(ctx->pid, voms_ptr)) {
+  if (!AuthzSessionCache().get(ctx->pid, voms_ptr)) {
     voms_ptr = GenerateVOMSData(ctx);
     if (voms_ptr) {
-      voms_ptr = g_cache.try_put(ctx->pid, voms_ptr);
+      voms_ptr = AuthzSessionCache().try_put(ctx->pid, voms_ptr);
       LogCvmfs(kLogVoms, kLogDebug,
                "Caching user's VOMS credentials at address %p.", voms_ptr);
     } else {
