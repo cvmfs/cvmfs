@@ -384,11 +384,19 @@ else (SQLITE3_BUILTIN)
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${SQLITE3_INCLUDE_DIR})
 endif (SQLITE3_BUILTIN)
 
+# VOMS / globus libraries for secure CVMFS
 find_package (VOMS)
 if (VOMS_FOUND)
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${VOMS_INCLUDE_DIR})
   add_definitions(-DVOMS_AUTHZ)
 endif (VOMS_FOUND)
+
+include (FindPkgConfig)
+pkg_check_modules(GLOBUS globus-gsi-credential globus-gsi-cert-utils globus-common globus-gsi-sysconfig globus-gsi-callback)
+if (GLOBUS_FOUND)
+  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GLOBUS_INCLUDE_DIRS})
+  add_definitions(-DGLOBUS_AUTHZ)
+endif (GLOBUS_FOUND)
 
 find_package (Valgrind)
 if (VALGRIND_FOUND)

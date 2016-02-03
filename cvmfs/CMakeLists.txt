@@ -62,11 +62,11 @@ set (CVMFS_CLIENT_SOURCES
   sink.h
   clientctx.cc clientctx.h
 )
-if (VOMS_FOUND)
+if (VOMS_FOUND AND GLOBUS_FOUND)
   set (CVMFS_CLIENT_SOURCES ${CVMFS_CLIENT_SOURCES}
   voms_authz/voms_cred.h voms_authz/voms_cred.cc
   voms_authz/voms_authz.cc voms_authz/voms_authz.h voms_authz/voms_curl.cc)
-endif (VOMS_FOUND)
+endif (VOMS_FOUND AND GLOBUS_FOUND)
 
 
 set (CVMFS2_DEBUG_SOURCES
