@@ -612,37 +612,178 @@ GetProxyFile(const struct fuse_ctx *ctx) {
  *
  * Resulting memory is owned by caller and must be destroyed with VOMS_Destroy.
  */
-static struct vomsdata*
+struct authz_state {
+  FILE *m_fp;
+  struct vomsdata *m_voms;
+  globus_gsi_cred_handle_t m_cred;
+  BIO *m_bio;
+  X509 *m_cert;
+  EVP_PKEY *m_pkey;
+  STACK_OF(X509) *m_chain;
+  char *m_subject;
+  globus_gsi_callback_data_t m_callback;
+
+  authz_state() :
+    m_fp(NULL),
+    m_voms(NULL),
+    m_cred(NULL),
+    m_bio(NULL),
+    m_cert(NULL),
+    m_pkey(NULL),
+    m_chain(NULL),
+    m_subject(NULL),
+    m_callback(NULL)
+  {}
+
+  ~authz_state() {
+    if (m_fp) {fclose(m_fp);}
+    if (m_voms) {(*g_VOMS_Destroy)(m_voms);}
+    if (m_cred) {(*g_globus_gsi_cred_handle_destroy)(m_cred);}
+    if (m_bio) {BIO_free(m_bio);}
+    if (m_cert) {X509_free(m_cert);}
+    if (m_pkey) {EVP_PKEY_free(m_pkey);}
+    if (m_chain) {sk_X509_pop_free(m_chain, X509_free);}
+    if (m_subject) {OPENSSL_free(m_subject);}
+    if (m_callback) {(*g_globus_gsi_callback_data_destroy)(m_callback);}
+  }
+};
+
+
+struct authz_data {
+  struct vomsdata *voms_;
+  char *dn_;
+
+  authz_data() :
+    voms_(NULL),
+    dn_(NULL)
+  {}
+
+  ~authz_data() {
+    if (voms_) {(*g_VOMS_Destroy)(voms_);}
+    if (dn_) {OPENSSL_free(dn_);}
+  }
+};
+
+
+static authz_data*
 GenerateVOMSData(const struct fuse_ctx *ctx)
 {
-  FILE *fp = GetProxyFile(ctx);
-  if (!fp) {
+  authz_state state;
+
+  state.m_fp = GetProxyFile(ctx);
+  if (!state.m_fp) {
     LogCvmfs(kLogVoms, kLogDebug, "Could not find process's proxy file.");
     return NULL;
   }
 
-  struct vomsdata *voms_ptr = (*g_VOMS_Init)(NULL, NULL);
+  // Start of Globus proxy parsing and verification...
+  globus_result_t result =
+      (*g_globus_gsi_cred_handle_init)(&state.m_cred, NULL);
+  if (GLOBUS_SUCCESS != result) {
+    PrintGlobusError(result);
+    return NULL;
+  }
+
+  state.m_bio = BIO_new_fp(state.m_fp, 0);
+  if (!state.m_bio) {
+    LogCvmfs(kLogVoms, kLogDebug, "Unable to allocate new BIO object");
+    return NULL;
+  }
+
+  result = (*g_globus_gsi_cred_read_proxy_bio)(state.m_cred, state.m_bio);
+  if (GLOBUS_SUCCESS != result) {
+    LogCvmfs(kLogVoms, kLogDebug, "Failed to parse credentials");
+    PrintGlobusError(result);
+    return NULL;
+  }
+
+  // Setup Globus callback object.
+  result = (*g_globus_gsi_callback_data_init)(&state.m_callback);
+  if (GLOBUS_SUCCESS != result) {
+    PrintGlobusError(result);
+    return NULL;
+  }
+  char *cert_dir;
+  result = (*g_globus_gsi_sysconfig_get_cert_dir_unix)(&cert_dir);
+  if (GLOBUS_SUCCESS != result) {
+    LogCvmfs(kLogVoms, kLogDebug, "Failed to determine trusted certificates "
+                                  "directory.");
+    PrintGlobusError(result);
+    return NULL;
+  }
+  result = (*g_globus_gsi_callback_set_cert_dir)(state.m_callback, cert_dir);
+  free(cert_dir);
+  if (GLOBUS_SUCCESS != result) {
+    PrintGlobusError(result);
+    return NULL;
+  }
+
+  // Verify credential chain.
+  result = (*g_globus_gsi_cred_verify_cert_chain)(state.m_cred,
+                                                  state.m_callback);
+  if (GLOBUS_SUCCESS != result) {
+    LogCvmfs(kLogVoms, kLogDebug, "Failed to validate credentials");
+    PrintGlobusError(result);
+    return NULL;
+  }
+
+  // Load key and certificate from Globus handle
+  result = (*g_globus_gsi_cred_get_key)(state.m_cred, &state.m_pkey);
+  if (GLOBUS_SUCCESS != result) {
+    LogCvmfs(kLogVoms, kLogDebug, "Failed to get process private key.");
+    PrintGlobusError(result);
+    return NULL;
+  }
+  result = (*g_globus_gsi_cred_get_cert)(state.m_cred, &state.m_cert);
+  if (GLOBUS_SUCCESS != result) {
+    LogCvmfs(kLogVoms, kLogDebug, "Failed to get process certificate.");
+    PrintGlobusError(result);
+    return NULL;
+  }
+
+  // Check proxy public key and private key match.
+  if (!X509_check_private_key(state.m_cert, state.m_pkey)) {
+    LogCvmfs(kLogVoms, kLogDebug, "Process certificate and key do not match");
+    return NULL;
+  }
+
+  // Load certificate chain
+  result = (*g_globus_gsi_cred_get_cert_chain)(state.m_cred, &state.m_chain);
+  if (GLOBUS_SUCCESS != result) {
+    LogCvmfs(kLogVoms, kLogDebug, "Process does not have cert chain.");
+    PrintGlobusError(result);
+    return NULL;
+  }
+
+  result = (*g_globus_gsi_cred_get_subject_name)(state.m_cred, &state.m_subject);
+  if (GLOBUS_SUCCESS != result) {
+    PrintGlobusError(result);
+    return NULL;
+  }
+
+  state.m_voms = (*g_VOMS_Init)(NULL, NULL);
+  if (!state.m_voms) {
+    return NULL;
+  }
+
   int error = 0;
-
-  /*  TODO: Update with new VOMS_Retrieve.
-  const int retval = (*g_VOMS_RetrieveFromFile)(fp, RECURSE_CHAIN,
-                                                voms_ptr, &error);
-  */
-  const int retval = 0;
-  
-
-  fclose(fp);
-
+  const int retval = (*g_VOMS_Retrieve)(state.m_cert, state.m_chain, RECURSE_CHAIN,
+                                        state.m_voms, &error);
   if (!retval) {
-    char *err_str = (*g_VOMS_ErrorMessage)(voms_ptr, error, NULL, 0);
+    char *err_str = (*g_VOMS_ErrorMessage)(state.m_voms, error, NULL, 0);
     LogCvmfs(kLogVoms, kLogDebug, "Unable to parse VOMS file: %s\n",
              err_str);
     free(err_str);
-    (*g_VOMS_Destroy)(voms_ptr);
-    voms_ptr = NULL;
+    return NULL;
   }
 
-  return voms_ptr;
+  // Move pointers to returned authz_data structure
+  authz_data *authz = new authz_data();
+  authz->voms_ = state.m_voms;
+  authz->dn_ = state.m_subject;
+  state.m_voms = NULL;
+  state.m_subject = NULL;
+  return authz;
 }
 
 
@@ -714,10 +855,11 @@ bool CheckVOMSAuthz(const struct fuse_ctx *ctx, const std::string & authz) {
 
   // Get VOMS information from cache; if not present, store it.
   struct vomsdata *voms_ptr;
-  if (!AuthzSessionCache().get(ctx->pid, voms_ptr)) {
-    voms_ptr = GenerateVOMSData(ctx);
+  if (!AuthzSessionCache::GetInstance().get(ctx->pid, voms_ptr)) {
+    authz_data *authz = GenerateVOMSData(ctx);
+    voms_ptr = authz ? authz->voms_ : NULL;
     if (voms_ptr) {
-      voms_ptr = AuthzSessionCache().try_put(ctx->pid, voms_ptr);
+      voms_ptr = AuthzSessionCache::GetInstance().try_put(ctx->pid, voms_ptr);
       LogCvmfs(kLogVoms, kLogDebug,
                "Caching user's VOMS credentials at address %p.", voms_ptr);
     } else {
