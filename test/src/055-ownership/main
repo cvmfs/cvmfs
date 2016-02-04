@@ -5,12 +5,12 @@ cvmfs_run_test() {
   logfile=$1
 
   local cvmfs_user=$(sh -c '. /etc/cvmfs/default.conf && echo $CVMFS_USER')
-  local cvmfs_uid=$(getent passwd "$cvmfs_user" | cut -d: -f3)
-  local cvmfs_gid=$(getent passwd "$cvmfs_user" | cut -d: -f4)
+  local cvmfs_uid=$(get_user_data "$cvmfs_user" | cut -d: -f3)
+  local cvmfs_gid=$(get_user_data "$cvmfs_user" | cut -d: -f4)
 
   cvmfs_mount grid.cern.ch || return 1
-  local discovered_uid=$(stat -c %u /cvmfs/grid.cern.ch)
-  local discovered_gid=$(stat -c %g /cvmfs/grid.cern.ch)
+  local discovered_uid=$(stat_wrapper %u /cvmfs/grid.cern.ch)
+  local discovered_gid=$(stat_wrapper %g /cvmfs/grid.cern.ch)
 
   echo "$cvmfs_uid $cvmfs_gid $discovered_uid $discovered_gid"
   if [ "x$cvmfs_uid" != "x$discovered_uid" ]; then
@@ -22,8 +22,8 @@ cvmfs_run_test() {
 
   cvmfs_umount grid.cern.ch
   cvmfs_mount grid.cern.ch "CVMFS_CLAIM_OWNERSHIP=no" || return 20
-  discovered_uid=$(stat -c %u /cvmfs/grid.cern.ch)
-  discovered_gid=$(stat -c %g /cvmfs/grid.cern.ch)
+  discovered_uid=$(stat_wrapper %u /cvmfs/grid.cern.ch)
+  discovered_gid=$(stat_wrapper %g /cvmfs/grid.cern.ch)
 
   echo "$cvmfs_uid $cvmfs_gid $discovered_uid $discovered_gid"
   if [ "x$cvmfs_uid" = "x$discovered_uid" ]; then

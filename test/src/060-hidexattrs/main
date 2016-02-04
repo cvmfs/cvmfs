@@ -1,11 +1,12 @@
 
 cvmfs_test_name="Hide extended attributes"
 
+
 cvmfs_run_test() {
   logfile=$1
 
   cvmfs_mount grid.cern.ch || return 1
-  local attributes=$(attr -ql /cvmfs/grid.cern.ch)
+  local attributes=$(list_xattrs /cvmfs/grid.cern.ch)
   echo "Extended attributes: $attributes"
   if [ "x$attributes" = "x" ]; then
     return 10
@@ -13,14 +14,14 @@ cvmfs_run_test() {
 
   cvmfs_umount grid.cern.ch || return 2
   cvmfs_mount grid.cern.ch "CVMFS_HIDE_MAGIC_XATTRS=yes" || return 3
-  attributes=$(attr -ql /cvmfs/grid.cern.ch)
+  attributes=$(list_xattrs /cvmfs/grid.cern.ch)
   if [ "x$attributes" != "x" ]; then
     echo "Extended attributes (none expected): $attributes"
     return 20
   fi
 
   # Attributes are now hidden but they should still be retrievable
-  local fqrn=$(attr -qg fqrn /cvmfs/grid.cern.ch)
+  local fqrn=$(get_xattr fqrn /cvmfs/grid.cern.ch)
   echo "Fqrn retrieved: $fqrn"
   if [ "x$fqrn" != "xgrid.cern.ch" ]; then
     return 30

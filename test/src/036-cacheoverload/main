@@ -14,7 +14,11 @@ cvmfs_run_test() {
 
   pids_du=
   for d in /cvmfs/atlas.cern.ch/repo/sw/software/*; do
-    nohup du -ch --max-depth=3 $d/ >/dev/null 2>&1 &
+    if running_on_osx; then
+      nohup du -ch -d 3 $d/ >/dev/null 2>&1 &
+    else
+      nohup du -ch --max-depth 3 $d/ >/dev/null 2>&1 &
+    fi
     pids_du="$! $pids_du"
   done
   sleep 1200

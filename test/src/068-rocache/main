@@ -11,7 +11,8 @@ CVMFS_TEST068_TMPDIR=
 cvmfs_run_test() {
   logfile=$1
 
-  CVMFS_TEST068_TMPDIR=$(mktemp -d)
+  CVMFS_TEST068_TMPDIR="$(pwd)/tempdir"
+  mkdir $CVMFS_TEST068_TMPDIR
   trap cleanup EXIT HUP INT TERM
   sudo cvmfs2 __MK_ALIEN_CACHE__ "$CVMFS_TEST068_TMPDIR" $(id -u cvmfs) $(id -g cvmfs) || return 10
   if which chcon; then

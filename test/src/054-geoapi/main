@@ -21,10 +21,10 @@ cvmfs_run_test() {
   cvmfs_mount grid.cern.ch || return 1
 
   sudo cvmfs_talk -i grid.cern.ch host probe geo || return 10
-  local geo_probe=$(attr -qg host_list /cvmfs/grid.cern.ch)
+  local geo_probe=$(get_xattr host_list /cvmfs/grid.cern.ch)
 
   sudo cvmfs_talk -i grid.cern.ch host probe || return 2
-  local normal_probe=$(attr -qg host_list /cvmfs/grid.cern.ch)
+  local normal_probe=$(get_xattr host_list /cvmfs/grid.cern.ch)
 
   echo "geo_probe: $geo_probe"
   echo "normal_probe: $normal_probe"
