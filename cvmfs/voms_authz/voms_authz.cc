@@ -22,8 +22,8 @@
 #include "fuse/fuse_lowlevel.h"
 #include "voms/voms_apic.h"
 
-#include "globus/globus_gsi_credential.h"
 #include "globus/globus_gsi_cert_utils.h"
+#include "globus/globus_gsi_credential.h"
 #include "globus/globus_module.h"
 
 #include "../logging.h"
@@ -188,7 +188,6 @@ struct authz_data {
 // TODO(jblomer): replace pthread_mutex_lock by MutexGuard
 // TODO(jblomer): member naming: trailing underscore, no m_ prefix
 class AuthzSessionCache {
-
   AuthzSessionCache()
     : m_zombie(true),
       m_last_clean(platform_monotonic_time()),

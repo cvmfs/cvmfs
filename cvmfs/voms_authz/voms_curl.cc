@@ -196,8 +196,8 @@ ConfigureCurlHandle(CURL *curl_handle, pid_t pid, uid_t uid, gid_t gid,
         } else {
           sk_X509_free(certstack);
           fclose(fp);
-          LogCvmfs(kLogVoms, kLogStderr, "Credential did not contain a decrypted"
-                   " private key.");
+          LogCvmfs(kLogVoms, kLogStderr, "Credential did not contain a "
+                   "decrypted private key.");
           return false;
         }
       }
