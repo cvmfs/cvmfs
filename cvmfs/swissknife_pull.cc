@@ -569,6 +569,10 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   download_manager()->SetRetryParameters(retries, timeout, 3*timeout);
   download_manager()->Spawn();
 
+  // initializing the threads now in case of cleanup
+  pthread_t *workers =
+    reinterpret_cast<pthread_t *>(smalloc(sizeof(pthread_t) * num_parallel));
+
   // Check if we have a replica-ready server
   const string url_sentinel = *stratum0_url + "/.cvmfs_master_replica";
   download::JobInfo download_sentinel(&url_sentinel, false);
@@ -662,8 +666,6 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   }
 
   // Starting threads
-  pthread_t *workers =
-    reinterpret_cast<pthread_t *>(smalloc(sizeof(pthread_t) * num_parallel));
   MakePipe(pipe_chunks);
   LogCvmfs(kLogCvmfs, kLogStdout, "Starting %u workers", num_parallel);
   MainWorkerContext mwc;
