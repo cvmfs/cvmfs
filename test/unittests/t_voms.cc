@@ -13,7 +13,9 @@
 
 TEST(T_VOMS, VomsAuthz) {
   // Initialize the VOMS data structures
+  authz_data authz_info;
   struct vomsdata voms_info;
+  authz_info.voms_ = &voms_info;
   memset(&voms_info, '\0', sizeof(struct vomsdata));
   struct voms voms_entry;
   memset(&voms_entry, '\0', sizeof(struct voms));
@@ -34,6 +36,7 @@ TEST(T_VOMS, VomsAuthz) {
   std::vector<char> user_dn; user_dn.reserve(100);
   strncpy(&user_dn[0], TEST_DN, 99);
   voms_entry.user = &user_dn[0];
+  authz_info.dn_ = strdup(&user_dn[0]);
   char voname[] = "cms";
   voms_entry.voname = voname;
   std::vector<char> group1; group1.reserve(50);
@@ -51,41 +54,44 @@ TEST(T_VOMS, VomsAuthz) {
   voms_data[2].role = &role1[0];
 
   // Ok, now let's verify the authz checks.
-  EXPECT_EQ(CheckSingleAuthz(&voms_info, "cms:/cms"), true);
-  EXPECT_EQ(CheckSingleAuthz(&voms_info, "cms:/cms/uscms"), true);
-  EXPECT_EQ(CheckSingleAuthz(&voms_info, "atlas:/atlas"), false);
-  EXPECT_EQ(CheckSingleAuthz(&voms_info, TEST_DN), true);
-  EXPECT_EQ(CheckSingleAuthz(&voms_info, "cms:/cms/dcms"), false);
-  EXPECT_EQ(CheckSingleAuthz(&voms_info, "cms:/cms/Role=pilot"), true);
-  EXPECT_EQ(CheckSingleAuthz(&voms_info, "cms:/cms/escms/Role=pilot"), true);
-  EXPECT_EQ(CheckSingleAuthz(&voms_info, "cms:/cms/Role=prod"), false);
-  EXPECT_EQ(CheckSingleAuthz(&voms_info, "cms:/cms/uscms/Role=pilot"), false);
-  EXPECT_EQ(CheckSingleAuthz(&voms_info, "cms:/cms/dcms/Role=pilot"), false);
+  EXPECT_EQ(CheckSingleAuthz(&authz_info, "cms:/cms"), true);
+  EXPECT_EQ(CheckSingleAuthz(&authz_info, "cms:/cms/uscms"), true);
+  EXPECT_EQ(CheckSingleAuthz(&authz_info, "atlas:/atlas"), false);
+  EXPECT_EQ(CheckSingleAuthz(&authz_info, TEST_DN), true);
+  EXPECT_EQ(CheckSingleAuthz(&authz_info, "cms:/cms/dcms"), false);
+  EXPECT_EQ(CheckSingleAuthz(&authz_info, "cms:/cms/Role=pilot"), true);
+  EXPECT_EQ(CheckSingleAuthz(&authz_info, "cms:/cms/escms/Role=pilot"), true);
+  EXPECT_EQ(CheckSingleAuthz(&authz_info, "cms:/cms/Role=prod"), false);
+  EXPECT_EQ(CheckSingleAuthz(&authz_info, "cms:/cms/uscms/Role=pilot"), false);
+  EXPECT_EQ(CheckSingleAuthz(&authz_info, "cms:/cms/dcms/Role=pilot"), false);
 
   voms_data[0].group = NULL;
-  EXPECT_EQ(CheckSingleAuthz(&voms_info, "cms:/cms"), true);
-  EXPECT_EQ(CheckSingleAuthz(&voms_info, "cms:/cms/Role=pilot"), true);
+  EXPECT_EQ(CheckSingleAuthz(&authz_info, "cms:/cms"), true);
+  EXPECT_EQ(CheckSingleAuthz(&authz_info, "cms:/cms/Role=pilot"), true);
   voms_entry.user = NULL;
-  EXPECT_EQ(CheckSingleAuthz(&voms_info, TEST_DN), false);
+  char *old_dn = authz_info.dn_;
+  authz_info.dn_ = NULL;
+  EXPECT_EQ(CheckSingleAuthz(&authz_info, TEST_DN), false);
 
   // Switch to multiple authz functions.
-  EXPECT_EQ(CheckMultipleAuthz(&voms_info, ""), false);
-  EXPECT_EQ(CheckMultipleAuthz(&voms_info, "\n"), false);
-  EXPECT_EQ(CheckMultipleAuthz(&voms_info, "cms:/cms"), true);
-  EXPECT_EQ(CheckMultipleAuthz(&voms_info, "cms:/cms\n"), true);
-  EXPECT_EQ(CheckMultipleAuthz(&voms_info, "atlas:/atlas"), false);
-  EXPECT_EQ(CheckMultipleAuthz(&voms_info, "cms:/cms\natlas"), true);
-  EXPECT_EQ(CheckMultipleAuthz(&voms_info, "atlas:/atlas\ncms:/cms"), true);
-  EXPECT_EQ(CheckMultipleAuthz(&voms_info, "atlas:/atlas\n\ncms:/cms"), true);
+  EXPECT_EQ(CheckMultipleAuthz(&authz_info, ""), false);
+  EXPECT_EQ(CheckMultipleAuthz(&authz_info, "\n"), false);
+  EXPECT_EQ(CheckMultipleAuthz(&authz_info, "cms:/cms"), true);
+  EXPECT_EQ(CheckMultipleAuthz(&authz_info, "cms:/cms\n"), true);
+  EXPECT_EQ(CheckMultipleAuthz(&authz_info, "atlas:/atlas"), false);
+  EXPECT_EQ(CheckMultipleAuthz(&authz_info, "cms:/cms\natlas"), true);
+  EXPECT_EQ(CheckMultipleAuthz(&authz_info, "atlas:/atlas\ncms:/cms"), true);
+  EXPECT_EQ(CheckMultipleAuthz(&authz_info, "atlas:/atlas\n\ncms:/cms"), true);
   EXPECT_EQ(CheckMultipleAuthz(
-    &voms_info, "atlas:/atlas\n\ndteam:/dteam\n"), false);
-  EXPECT_EQ(CheckMultipleAuthz(&voms_info, TEST_DN), false);
-  EXPECT_EQ(CheckMultipleAuthz(&voms_info, TEST_DN "\n"), false);
+    &authz_info, "atlas:/atlas\n\ndteam:/dteam\n"), false);
+  EXPECT_EQ(CheckMultipleAuthz(&authz_info, TEST_DN), false);
+  EXPECT_EQ(CheckMultipleAuthz(&authz_info, TEST_DN "\n"), false);
   EXPECT_EQ(CheckMultipleAuthz(
-    &voms_info, TEST_DN "\ncms:/cms/Role=prod"), false);
+    &authz_info, TEST_DN "\ncms:/cms/Role=prod"), false);
   EXPECT_EQ(CheckMultipleAuthz(
-    &voms_info, TEST_DN "\ncms:/cms/Role=pilot"), true);
+    &authz_info, TEST_DN "\ncms:/cms/Role=pilot"), true);
   voms_entry.user = &user_dn[0];
+  authz_info.dn_ = old_dn;
   EXPECT_EQ(CheckMultipleAuthz(
-    &voms_info, TEST_DN "\ncms:/cms/Role=prod"), true);
+    &authz_info, TEST_DN "\ncms:/cms/Role=prod"), true);
 }

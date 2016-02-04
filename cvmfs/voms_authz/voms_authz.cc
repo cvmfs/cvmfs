@@ -88,6 +88,9 @@ globus_result_t (*g_globus_gsi_cred_verify_cert_chain)(
 globus_result_t (*g_globus_gsi_cert_utils_get_cert_type)(
     X509 *                              cert,
     globus_gsi_cert_utils_cert_type_t * type) = NULL;
+globus_result_t (*g_globus_gsi_cert_utils_get_identity_cert)(
+    STACK_OF(X509) *                    cert_chain,
+    X509 **                             eec) = NULL;
 globus_result_t (*g_globus_gsi_callback_data_init)(
     globus_gsi_callback_data_t *        callback_data) = NULL;
 globus_result_t (*g_globus_gsi_callback_data_destroy)(
@@ -162,6 +165,22 @@ PrintGlobusError(globus_result_t result) {
 }
 
 
+struct authz_data {
+  struct vomsdata *voms_;
+  char *dn_;
+
+  authz_data() :
+    voms_(NULL),
+    dn_(NULL)
+  {}
+
+  ~authz_data() {
+    if (voms_) {(*g_VOMS_Destroy)(voms_);}
+    if (dn_) {OPENSSL_free(dn_);}
+  }
+};
+
+
 // TODO(jblomer): add comment
 // TODO(jblomer): unit test the class
 // TODO(jblomer): Member functions should start with a capital letter
@@ -193,7 +212,7 @@ class AuthzSessionCache {
          it != m_map.end();
          it++)
     {
-      (*g_VOMS_Destroy)(it->second.first);
+      delete (it->second.first);
     }
     close_voms_library();
     close_globus_library();
@@ -201,8 +220,7 @@ class AuthzSessionCache {
   }
 
  public:
-  // TODO(jblomer): change type of vomsdata
-  bool get(pid_t pid, struct vomsdata *&vomsinfo) {  // NOLINT
+  bool get(pid_t pid, authz_data **authz) {  // NOLINT
     if (m_zombie) {return false;}
     time_t now = platform_monotonic_time();
     KeyType mykey;
@@ -221,7 +239,7 @@ class AuthzSessionCache {
     LogCvmfs(kLogVoms, kLogDebug, "Session %d, UID %d, GID %d, bday %llu "
              "has cached VOMS data", mykey.pid, mykey.uid, mykey.gid,
              mykey.bday);
-    vomsinfo = iter->second.first;
+    *authz = iter->second.first;
     return true;
   }
 
@@ -230,11 +248,11 @@ class AuthzSessionCache {
    * This function is thread safe.
    *
    * The returned pointer is the data in the map which is possibly not the
-   * input vomsdata.
+   * input authz data.
    *
    * If result is NULL, then the operation failed and errno is set.
    */
-  struct vomsdata *try_put(pid_t pid, struct vomsdata *voms_ptr)
+  authz_data *try_put(pid_t pid, authz_data *authz_ptr)
   {
     if (m_zombie) {return NULL;}
     KeyType mykey;
@@ -247,11 +265,11 @@ class AuthzSessionCache {
 
     pthread_mutex_lock(&m_mutex);
     std::pair<KeyToVOMS::iterator, bool> result =
-      m_map.insert(std::make_pair(mykey, std::make_pair(voms_ptr, now)));
+      m_map.insert(std::make_pair(mykey, std::make_pair(authz_ptr, now)));
     pthread_mutex_unlock(&m_mutex);
     if (!result.second)
     {
-      (*g_VOMS_Destroy)(voms_ptr);
+      delete authz_ptr;
     }
     LogCvmfs(kLogVoms, kLogDebug, "Cached VOMS data for session %d, "
              "UID %d, GID %d, bday %llu.", mykey.pid, mykey.uid,
@@ -283,7 +301,7 @@ class AuthzSessionCache {
     gid_t gid;
     unsigned long long bday;  // NOLINT
   };
-  typedef std::pair<struct vomsdata*, time_t> ValueType;
+  typedef std::pair<authz_data*, time_t> ValueType;
   typedef std::map<KeyType, ValueType> KeyToVOMS;
 
   typedef std::map<KeyType, KeyType> PidToSid;
@@ -388,7 +406,7 @@ class AuthzSessionCache {
     KeyToVOMS::iterator it = m_map.begin();
     while (it != m_map.end()) {
       if (it->second.second < expiry) {
-        (*g_VOMS_Destroy)(it->second.first);
+        delete (it->second.first);
         m_map.erase(it++);
       } else {
         ++it;
@@ -484,6 +502,9 @@ class AuthzSessionCache {
        !LoadSymbol(m_globus_gsi_cert_utils_handle,
                    &g_globus_i_gsi_cert_utils_dn_cmp,
                    "globus_i_gsi_cert_utils_dn_cmp") ||
+       !LoadSymbol(m_globus_gsi_cert_utils_handle,
+                   &g_globus_gsi_cert_utils_get_identity_cert,
+                   "globus_gsi_cert_utils_get_identity_cert") ||
        !LoadSymbol(m_globus_gsi_callback_handle,
                    &g_globus_gsi_callback_data_init,
                    "globus_gsi_callback_data_init") ||
@@ -544,7 +565,6 @@ class AuthzSessionCache {
 
   void close_globus_library() {
     if (g_globus_ok) {
-      // TODO(bbockelm): Does not mix well with fork; re-enable but add fork-handlers.
       (*g_globus_module_deactivate)(g_globus_i_gsi_cert_utils_module);
       (*g_globus_module_deactivate)(g_globus_i_gsi_credential_module);
       (*g_globus_module_deactivate)(g_globus_i_gsi_callback_module);
@@ -571,6 +591,7 @@ class AuthzSessionCache {
     g_globus_gsi_cred_verify_cert_chain = NULL;
     g_globus_gsi_cred_get_subject_name = NULL;
     g_globus_gsi_cert_utils_get_cert_type = NULL;
+    g_globus_gsi_cert_utils_get_identity_cert = NULL;
     g_globus_i_gsi_cert_utils_dn_cmp = NULL;
     g_globus_gsi_callback_data_init = NULL;
     g_globus_gsi_callback_data_destroy = NULL;
@@ -645,22 +666,6 @@ struct authz_state {
     if (m_chain) {sk_X509_pop_free(m_chain, X509_free);}
     if (m_subject) {OPENSSL_free(m_subject);}
     if (m_callback) {(*g_globus_gsi_callback_data_destroy)(m_callback);}
-  }
-};
-
-
-struct authz_data {
-  struct vomsdata *voms_;
-  char *dn_;
-
-  authz_data() :
-    voms_(NULL),
-    dn_(NULL)
-  {}
-
-  ~authz_data() {
-    if (voms_) {(*g_VOMS_Destroy)(voms_);}
-    if (dn_) {OPENSSL_free(dn_);}
   }
 };
 
@@ -755,9 +760,26 @@ GenerateVOMSData(const struct fuse_ctx *ctx)
     return NULL;
   }
 
-  result = (*g_globus_gsi_cred_get_subject_name)(state.m_cred, &state.m_subject);
+  // Look through certificates to find an EEC (which has the subject)
+  globus_gsi_cert_utils_cert_type_t cert_type;
+  X509 *eec_cert = state.m_cert;
+  result = (*g_globus_gsi_cert_utils_get_cert_type)(state.m_cert, &cert_type);
   if (GLOBUS_SUCCESS != result) {
     PrintGlobusError(result);
+    return NULL;
+  }
+  if (!(cert_type & GLOBUS_GSI_CERT_UTILS_TYPE_EEC)) {
+    result = (*g_globus_gsi_cert_utils_get_identity_cert)(state.m_chain,
+                                                          &eec_cert);
+    if (GLOBUS_SUCCESS != result) {
+      PrintGlobusError(result);
+      return NULL;
+    }
+  }
+  // From the EEC, use OpenSSL to determine the subject
+  state.m_subject = X509_NAME_oneline(X509_get_subject_name(eec_cert), NULL, 0);
+  if (!state.m_subject) {
+    LogCvmfs(kLogVoms, kLogDebug, "Unable to determine certificate DN.");
     return NULL;
   }
 
@@ -766,11 +788,13 @@ GenerateVOMSData(const struct fuse_ctx *ctx)
     return NULL;
   }
 
-  int error = 0;
-  const int retval = (*g_VOMS_Retrieve)(state.m_cert, state.m_chain, RECURSE_CHAIN,
-                                        state.m_voms, &error);
-  if (!retval) {
-    char *err_str = (*g_VOMS_ErrorMessage)(state.m_voms, error, NULL, 0);
+  int voms_error = 0;
+  const int retval = (*g_VOMS_Retrieve)(state.m_cert, state.m_chain,
+                                        RECURSE_CHAIN,
+                                        state.m_voms, &voms_error);
+  // If there is no VOMS extension (VERR_NOEXT), this shouldn't be fatal.
+  if (!retval && (voms_error != VERR_NOEXT)) {
+    char *err_str = (*g_VOMS_ErrorMessage)(state.m_voms, voms_error, NULL, 0);
     LogCvmfs(kLogVoms, kLogDebug, "Unable to parse VOMS file: %s\n",
              err_str);
     free(err_str);
@@ -779,10 +803,12 @@ GenerateVOMSData(const struct fuse_ctx *ctx)
 
   // Move pointers to returned authz_data structure
   authz_data *authz = new authz_data();
-  authz->voms_ = state.m_voms;
   authz->dn_ = state.m_subject;
-  state.m_voms = NULL;
   state.m_subject = NULL;
+  if (voms_error != VERR_NOEXT) {
+    authz->voms_ = state.m_voms;
+    state.m_voms = NULL;
+  }
   return authz;
 }
 
@@ -835,11 +861,11 @@ IsRoleMatching(const char *role1, const char *role2) {
 }
 
 
-static bool CheckSingleAuthz(const struct vomsdata *voms_ptr,
+static bool CheckSingleAuthz(const authz_data *authz_ptr,
                              const std::string & authz);
 
 
-static bool CheckMultipleAuthz(const struct vomsdata *voms_ptr,
+static bool CheckMultipleAuthz(const authz_data *authz_ptr,
                                const std::string  &authz_list);
 
 
@@ -854,14 +880,13 @@ bool CheckVOMSAuthz(const struct fuse_ctx *ctx, const std::string & authz) {
            ctx->uid, authz.c_str());
 
   // Get VOMS information from cache; if not present, store it.
-  struct vomsdata *voms_ptr;
-  if (!AuthzSessionCache::GetInstance().get(ctx->pid, voms_ptr)) {
-    authz_data *authz = GenerateVOMSData(ctx);
-    voms_ptr = authz ? authz->voms_ : NULL;
-    if (voms_ptr) {
-      voms_ptr = AuthzSessionCache::GetInstance().try_put(ctx->pid, voms_ptr);
+  authz_data *authz_ptr;
+  if (!AuthzSessionCache::GetInstance().get(ctx->pid, &authz_ptr)) {
+    authz_ptr = GenerateVOMSData(ctx);
+    if (authz_ptr) {
+      authz_ptr = AuthzSessionCache::GetInstance().try_put(ctx->pid, authz_ptr);
       LogCvmfs(kLogVoms, kLogDebug,
-               "Caching user's VOMS credentials at address %p.", voms_ptr);
+               "Caching user's VOMS credentials");
     } else {
       LogCvmfs(kLogVoms, kLogSyslog | kLogDebug,
                "User has no VOMS credentials.");
@@ -870,17 +895,17 @@ bool CheckVOMSAuthz(const struct fuse_ctx *ctx, const std::string & authz) {
   } else {
     LogCvmfs(kLogVoms, kLogDebug, "Using cached VOMS credentials.");
   }
-  if (!voms_ptr) {
+  if (!authz_ptr) {
     LogCvmfs(kLogVoms, kLogSyslog | kLogDebug,
              "ERROR: Failed to generate VOMS data.");
     return false;
   }
-  return CheckMultipleAuthz(voms_ptr, authz);
+  return CheckMultipleAuthz(authz_ptr, authz);
 }
 
 
 static bool
-CheckMultipleAuthz(const struct vomsdata *voms_ptr,
+CheckMultipleAuthz(const authz_data *authz_ptr,
                    const std::string &authz_list)
 {
   // Check all authorizations against our information
@@ -891,15 +916,15 @@ CheckMultipleAuthz(const struct vomsdata *voms_ptr,
     last_delim = delim + 1;
     delim = authz_list.find('\n', last_delim);
 
-    if (CheckSingleAuthz(voms_ptr, next_authz)) {return true;}
+    if (CheckSingleAuthz(authz_ptr, next_authz)) {return true;}
   }
   std::string next_authz = authz_list.substr(last_delim);
-  return CheckSingleAuthz(voms_ptr, next_authz);
+  return CheckSingleAuthz(authz_ptr, next_authz);
 }
 
 
 static bool
-CheckSingleAuthz(const struct vomsdata *voms_ptr, const std::string & authz)
+CheckSingleAuthz(const authz_data *authz_ptr, const std::string & authz)
 {
   // An empty entry should authorize nobody.
   if (authz.empty()) {return false;}
@@ -933,18 +958,16 @@ CheckSingleAuthz(const struct vomsdata *voms_ptr, const std::string & authz)
   std::vector<std::string> group_hierarchy;
   SplitGroupToPaths(group, group_hierarchy);
 
-  // Now we have valid VOMS data, check authz.
+  // Now we have valid data, check authz.
+  // First, check if it is a valid DN.
+  if (is_dn) {
+    return !(*g_globus_i_gsi_cert_utils_dn_cmp)(authz.c_str(), authz_ptr->dn_);
+  }
+  // If there is no VOMS info, return immediately..
+  if (!authz_ptr->voms_) {return false;}
   // Iterator through the VOs
-  for (int idx=0; voms_ptr->data[idx] != NULL; idx++) {
-    struct voms *it = voms_ptr->data[idx];
-    // Check first against the full DN.
-    if (is_dn) {
-      if (it->user && !strcmp(it->user, authz.c_str())) {
-        return true;
-      } else {
-        break;
-      }
-    }
+  for (int idx=0; authz_ptr->voms_->data[idx] != NULL; idx++) {
+    struct voms *it = authz_ptr->voms_->data[idx];
     if (!it->voname) {continue;}
     if (strcmp(vo.c_str(), it->voname)) {continue;}
 
