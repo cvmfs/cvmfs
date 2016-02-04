@@ -39,6 +39,11 @@ BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 # TODO(bbockelm): figure out solution for VOMS on SUSE.
 %else
 BuildRequires: voms-devel
+BuildRequires: globus-common-devel
+BuildRequires: globus-gsi-callback-devel
+BuildRequires: globus-gsi-cert-utils-devel
+BuildRequires: globus-gsi-credential-devel
+BuildRequires: globus-gsi-sysconfig-devel
 %endif
 
 %if 0%{?el5}
