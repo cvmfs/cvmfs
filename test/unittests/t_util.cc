@@ -396,27 +396,23 @@ TEST_F(T_Util, CreateFile) {
 }
 
 TEST_F(T_Util, MakeSocket) {
-  int socket_fd1;
-  int socket_fd2;
+  Socket socket_1;
+  Socket socket_2;
 
   ASSERT_DEATH(MakeSocket(long_path, 0600), ".*");
-  EXPECT_NE(-1, socket_fd1 = MakeSocket(socket_address, 0777));
+  EXPECT_NE(-1, socket_1 = MakeSocket(socket_address, 0777));
   // the second time it should work as well (non socket-alrady-in-use error)
-  EXPECT_NE(-1, socket_fd2 = MakeSocket(socket_address, 0777));
-  close(socket_fd1);
-  close(socket_fd2);
+  EXPECT_NE(-1, socket_2 = MakeSocket(socket_address, 0777));
 }
 
 TEST_F(T_Util, ConnectSocket) {
-  int server_fd = MakeSocket(socket_address, 0777);
-  listen(server_fd, 1);
-  int client_fd = ConnectSocket(socket_address);
+  Socket server(MakeSocket(socket_address, 0777));
+  server.Listen(1);
+  Socket client(ConnectSocket(socket_address));
 
   ASSERT_DEATH(ConnectSocket(long_path), ".*");
   ASSERT_EQ(-1, ConnectSocket(sandbox + "/fake_socket"));
-  ASSERT_NE(-1, client_fd);
-  close(client_fd);
-  close(server_fd);
+  ASSERT_NE(-1, client);
 }
 
 TEST_F(T_Util, MakePipe) {
@@ -610,18 +606,15 @@ TEST_F(T_Util, SendMes2Socket) {
   void *buffer = scalloc(20, sizeof(char));
   struct sockaddr_in client_addr;
   unsigned int client_length = sizeof(client_addr);
-  int server_fd = MakeSocket(socket_address, 0777);
-  listen(server_fd, 1);
-  int client_fd = ConnectSocket(socket_address);
-  SendMsg2Socket(client_fd, to_write);
-  int new_connection = accept(server_fd, (struct sockaddr *) &client_addr,
-      &client_length);
-  read(new_connection, buffer, to_write.length());
+  Socket server(MakeSocket(socket_address, 0777));
+  server.Listen(1);
+  Socket client(ConnectSocket(socket_address));
+  SendMsg2Socket(client, to_write);
+  FileDescriptor new_connection(server.Accept((struct sockaddr *) &client_addr,
+      &client_length));
+  new_connection.Read(buffer, to_write.length());
 
   EXPECT_STREQ(to_write.c_str(), static_cast<const char*>(buffer));
-  close(new_connection);
-  close(client_fd);
-  close(server_fd);
   free(buffer);
 }
 

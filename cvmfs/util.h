@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <gtest/gtest_prod.h>
 #include <pthread.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -69,10 +70,9 @@ class FileDescriptor : SingleCopy {
   virtual ~FileDescriptor() { if (IsValid()) close(fd_); }
   inline FileDescriptor& operator=(int fd) { fd_ = fd; return *this; }
   inline operator int() const { return fd_; }
+  inline operator int*() { return &fd_; }
   inline bool operator ==(const int other_fd) const { return fd_ == other_fd; }
-  inline bool operator !=(const int other_fd) const {
-    return fd_ != other_fd;
-  }
+  inline bool operator !=(const int other_fd) const { return fd_ != other_fd; }
   inline bool IsValid() const  { return fd_ >= 0; }
   inline int Read(void *buffer, size_t size) {
     return IsValid() ? read(fd_, buffer, size) : -1;
@@ -81,8 +81,20 @@ class FileDescriptor : SingleCopy {
     return IsValid() ? write(fd_, buffer, size) : -1;
   }
 
- private:
+ protected:
   int fd_;
+};
+
+class Socket : public FileDescriptor {
+ public:
+  using FileDescriptor::operator=;
+  using FileDescriptor::operator int;
+  Socket() : FileDescriptor() { }
+  explicit Socket(int fd) : FileDescriptor(fd) { }
+  inline int Listen(int backlog = 1) { return listen(fd_, backlog); }
+  inline int Accept(struct sockaddr *client_addr, unsigned int *length) {
+    return accept(fd_, client_addr, length);
+  }
 };
 
 std::string MakeCanonicalPath(const std::string &path);
