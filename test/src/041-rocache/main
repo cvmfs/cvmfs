@@ -1,15 +1,6 @@
 
 cvmfs_test_name="Read-only cache"
 
-lazy_umount() {
-  local dir=$1
-  if running_on_osx; then
-    sudo umount "$dir"
-  else
-    sudo umount -l "$dir"
-  fi
-}
-
 ro_mount() {
   local mountpoint=$1
   local dir=$2
@@ -30,7 +21,7 @@ cleanup() {
     sudo hdiutil detach $mountpoint
     sudo rmdir "$tmpdir"
   else
-    lazy_umount $tmpdir
+    sudo umount -l $tmpdir
     sudo rmdir $tmpdir
   fi
 }
