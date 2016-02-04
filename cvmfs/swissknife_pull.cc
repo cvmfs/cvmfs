@@ -512,8 +512,6 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     pull_history = true;
   if (args.find('z') != args.end())
     inspect_existing_catalogs = true;
-  pthread_t *workers =
-    reinterpret_cast<pthread_t *>(smalloc(sizeof(pthread_t) * num_parallel));
   typedef std::vector<history::History::Tag> TagVector;
   TagVector historic_tags;
 
@@ -536,7 +534,6 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
 
   if (!this->InitSignatureManager(master_keys, trusted_certs)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to initalize CVMFS signatures");
-    free(workers);
     return 1;
   } else {
     LogCvmfs(kLogCvmfs, kLogStdout,
@@ -665,6 +662,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   }
 
   // Starting threads
+  pthread_t *workers =
+    reinterpret_cast<pthread_t *>(smalloc(sizeof(pthread_t) * num_parallel));
   MakePipe(pipe_chunks);
   LogCvmfs(kLogCvmfs, kLogStdout, "Starting %u workers", num_parallel);
   MainWorkerContext mwc;

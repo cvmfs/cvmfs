@@ -756,10 +756,10 @@ bool GetGidOf(const std::string &groupname, gid_t *gid) {
   char buf[16*1024];
   struct group grp;
   struct group *result = NULL;
-  if (getgrnam_r(groupname.c_str(), &grp, buf, sizeof(buf), &result) == 0 &&
-        result != NULL) {
-      *gid = result->gr_gid;
-      return true;
+  getgrnam_r(groupname.c_str(), &grp, buf, sizeof(buf), &result);
+  if (result != NULL) {
+    *gid = result->gr_gid;
+    return true;
   }
   return false;
 }
