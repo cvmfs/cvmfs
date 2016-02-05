@@ -74,6 +74,7 @@ int main(int argc, char *argv[]) {
       printf("Failed to verify value: %d != %d", number, counter);
       return -3;
     }
+    cvmfs_close(ctx, fd);
 
     // second test: check that listing /${testname}/list produces
     // ${counter} entries
@@ -96,6 +97,31 @@ int main(int argc, char *argv[]) {
         "Current: %d       Expected: %d\n", num_elem, num_repos);
       return -6;
     }
+
+    // third test: read large file
+    string largefile_path = "/large";
+    fd = cvmfs_open(ctx, largefile_path.c_str());
+    if (fd < 0) {
+      printf("Couldn't perform the lookup operation in %s\n",
+             largefile_path.c_str());
+      return fd;
+    }
+    if (fd < (1 << 30)) {
+      printf("Expected a chunk file but this is not (%d)\n", fd);
+      return -7;
+    }
+    char page_buf[4096];
+    ssize_t nbytes;
+    off_t off = 0;
+    while ((nbytes = cvmfs_pread(ctx, fd, page_buf, 4096, off)) > 0) {
+      off += nbytes;
+    }
+    if (nbytes < 0) {
+      printf("Error reading chunked file %s (%d), read so far %u\n",
+             largefile_path.c_str(), errno, off);
+      return nbytes;
+    }
+    cvmfs_close(ctx, fd);
   }
 
   for (int i = 0; i < ctx_vector.size(); ++i) {
