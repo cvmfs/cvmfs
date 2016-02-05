@@ -20,7 +20,7 @@
 // 17: apply new classes around the cache manager
 // 18: add cvmfs_pread and support for chunked files
 // 19: CernVM-FS 2.2.0
-// 20: CernVM-FS 2.3.0
+// 20: fix reading of chunked files
 #define LIBCVMFS_REVISION 20
 
 #include <sys/stat.h>
@@ -112,7 +112,7 @@ int cvmfs_open(cvmfs_context *ctx, const char *path);
 
 /**
  * Reads from a file descriptor returned by cvmfs_open.  File descriptors that
- * have bit 31 set indicate chunked files.
+ * have bit 30 set indicate chunked files.
  */
 ssize_t cvmfs_pread(cvmfs_context *ctx,
                     int fd, void *buf, size_t size, off_t off);
