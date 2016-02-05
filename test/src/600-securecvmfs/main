@@ -11,9 +11,11 @@ TEST600_HOSTKEY=
 TEST600_VOMSDIR=
 TEST600_TESTCA=
 TEST600_TESTCRL=
-# These two variables will be updated later with the generated hash
+TEST600_TESTSIGNING=
+# These three variables will be updated later with the generated hash
 TEST600_TESTCA_HASH=
 TEST600_TESTCRL_HASH=
+TEST600_TESTSIGNING_HASH=
 # replacing /etc/grid-security
 TEST600_GRID_SECURITY_DIR=
 # Mountpoint and cache directory for grid.cern.ch private mount
@@ -38,8 +40,10 @@ cleanup() {
   [ -z "$TEST600_VOMSDIR"                      ] || sudo rm -fR $TEST600_VOMSDIR
   [ -z "$TEST600_TESTCA"                       ] || sudo rm -f $TEST600_TESTCA
   [ -z "$TEST600_TESTCRL"                      ] || sudo rm -f $TEST600_TESTCRL
+  [ -z "$TEST600_TESTSIGNING"                  ] || sudo rm -f $TEST600_TESTSIGNING
   [ -z "$TEST600_TESTCA_HASH"                  ] || sudo rm -f $TEST600_TESTCA_HASH
   [ -z "$TEST600_TESTCRL_HASH"                 ] || sudo rm -f $TEST600_TESTCRL_HASH
+  [ -z "$TEST600_TESTSIGNING_HASH"             ] || sudo rm -f $TEST600_TESTSIGNING_HASH
   [ -z "$TEST600_PRIVATE_MOUNT"                ] || sudo umount $TEST600_PRIVATE_MOUNT
   [ -z "$TEST600_HOSTNAME"                     ] || sudo sed -i -e "/$TEST600_HOSTNAME/d" /etc/hosts
   [ -z "$TEST600_SELINUX_DISABLED"             ] || sudo setenforce 1
@@ -89,13 +93,13 @@ generate_certs() {
   cp $script_location/openssl-cert-extensions-template.conf $TEST600_CERTS_DIR/
   cp $script_location/openssl.config $TEST600_CERTS_DIR/
 
-
   echo "generating vomsproxy.pem"
   pushdir $TEST600_CERTS_DIR
   ./ca-generate-certs ${TEST600_HOSTNAME}
   result=$?
   LD_LIBRARY_PATH=${voms_path}/usr/lib64 \
-     ${voms_path}/usr/bin/voms-proxy-fake -certdir ${TEST600_GRID_SECURITY_DIR}/certificates \
+  PATH=$PATH:${voms_path}/usr/bin/
+     voms-proxy-fake -certdir ${TEST600_GRID_SECURITY_DIR}/certificates \
       -cert usercert.pem -key userkey.pem -out vomsproxy.pem -rfc \
       -hostcert hostcert.pem -hostkey hostkey.pem -fqan /cvmfs/Role=NULL \
       -voms cvmfs -uri ${TEST600_HOSTNAME}:15000 || return 1
@@ -108,18 +112,21 @@ generate_certs() {
   echo "/DC=org/DC=Open Science Grid/O=OSG Test/CN=OSG Test CA" >> ${TEST600_GRID_SECURITY_DIR}/vomsdir/cvmfs/${TEST600_HOSTNAME}.lsc
 
   LD_LIBRARY_PATH=${voms_path}/usr/lib64 X509_CERT_DIR=${TEST600_GRID_SECURITY_DIR}/certificates \
-    ${voms_path}/usr/bin/voms-proxy-info -file $TEST600_CERTS_DIR/vomsproxy.pem \
-    -all
+  PATH=$PATH:${voms_path}/usr/bin/
+    voms-proxy-info -file $TEST600_CERTS_DIR/vomsproxy.pem -all
 
   sudo cp $TEST600_CERTS_DIR/hostcert.pem $TEST600_HOSTCERT || return 1
   sudo cp $TEST600_CERTS_DIR/hostkey.pem $TEST600_HOSTKEY || return 1
   sudo cp $TEST600_CERTS_DIR/OSG-Test-CA.pem $TEST600_TESTCA || return 1
   sudo cp $TEST600_CERTS_DIR/OSG-Test-CA.r0 $TEST600_TESTCRL || return 1
+  sudo cp $TEST600_CERTS_DIR/OSG-Test-CA.signing_policy $TEST600_TESTSIGNING || return 1
   local hash=`openssl x509 -in $TEST600_TESTCA -noout -hash`
   TEST600_TESTCA_HASH=${TEST600_GRID_SECURITY_DIR}/certificates/${hash}.0
   TEST600_TESTCRL_HASH=${TEST600_GRID_SECURITY_DIR}/certificates/${hash}.r0
+  TEST600_TESTSIGNING_HASH=${TEST600_GRID_SECURITY_DIR}/certificates/${hash}.signing_policy
   sudo ln -sf $TEST600_TESTCA $TEST600_TESTCA_HASH || return 1
   sudo ln -sf $TEST600_TESTCRL $TEST600_TESTCRL_HASH || return 1
+  sudo ln -sf $TEST600_TESTSIGNING $TEST600_TESTSIGNING_HASH || return 1
   set +x
 
   return $result;
@@ -142,9 +149,11 @@ cvmfs_run_test() {
   TEST600_VOMSDIR=${TEST600_GRID_SECURITY_DIR}/vomsdir/cvmfs
   TEST600_TESTCA=${TEST600_GRID_SECURITY_DIR}/certificates/OSG-Test-CA.pem
   TEST600_TESTCRL=${TEST600_GRID_SECURITY_DIR}/certificates/OSG-Test-CA.r0
-  # These two variables will be updated later with the generated hash
+  TEST600_TESTSIGNING=${TEST600_GRID_SECURITY_DIR}/certificates/OSG-Test-CA.signing_policy
+  # These three variables will be updated later with the generated hash
   TEST600_TESTCA_HASH=${TEST600_GRID_SECURITY_DIR}/certificates/OSG-Test-CA.pem
   TEST600_TESTCRL_HASH=${TEST600_GRID_SECURITY_DIR}/certificates/OSG-Test-CA.r0
+  TEST600_TESTSIGNING_HASH=${TEST600_GRID_SECURITY_DIR}/certificates/OSG-Test-CA.signing_policy
 
   TEST600_CERTS_DIR=$(pwd)/certs
   TEST600_GRID_MOUNTPOINT=$(pwd)/cvmfs-grid/mountpoint
@@ -160,7 +169,7 @@ cvmfs_run_test() {
   fi
 
   echo "set a trap for system directory cleanup"
-  trap cleanup EXIT HUP INT TERM
+  #trap cleanup EXIT HUP INT TERM
 
   echo "setting a dummy host name"
   TEST600_HOSTNAME='test-600-dummyhost'
@@ -196,7 +205,7 @@ cvmfs_run_test() {
   # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
-  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -V cvmfs:/cvmfs || return $?
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER /dev/stdout -V cvmfs:/cvmfs || return $?
 
   echo "gather information about the just created repo"
   load_repo_config $CVMFS_TEST_REPO
