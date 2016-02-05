@@ -400,9 +400,11 @@ TEST_F(T_Util, MakeSocket) {
   Socket socket_2;
 
   ASSERT_DEATH(MakeSocket(long_path, 0600), ".*");
-  EXPECT_NE(-1, socket_1 = MakeSocket(socket_address, 0777));
+  socket_1.Assign(MakeSocket(socket_address, 0777));
+  EXPECT_NE(-1, socket_1);
   // the second time it should work as well (non socket-alrady-in-use error)
-  EXPECT_NE(-1, socket_2 = MakeSocket(socket_address, 0777));
+  socket_2.Assign(MakeSocket(socket_address, 0777));
+  EXPECT_NE(-1, socket_2);
 }
 
 TEST_F(T_Util, ConnectSocket) {

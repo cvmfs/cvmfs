@@ -68,9 +68,8 @@ class FileDescriptor : SingleCopy {
   FileDescriptor() : fd_(-1) { }
   explicit FileDescriptor(int fd) : fd_(fd) { }
   virtual ~FileDescriptor() { if (IsValid()) close(fd_); }
-  inline FileDescriptor& operator=(int fd) { fd_ = fd; return *this; }
+  inline void Assign(int fd) { fd_ = fd; }
   inline operator int() const { return fd_; }
-  inline operator int*() { return &fd_; }
   inline bool operator ==(const int other_fd) const { return fd_ == other_fd; }
   inline bool operator !=(const int other_fd) const { return fd_ != other_fd; }
   inline bool IsValid() const  { return fd_ >= 0; }
@@ -87,7 +86,6 @@ class FileDescriptor : SingleCopy {
 
 class Socket : public FileDescriptor {
  public:
-  using FileDescriptor::operator=;
   using FileDescriptor::operator int;
   Socket() : FileDescriptor() { }
   explicit Socket(int fd) : FileDescriptor(fd) { }
@@ -120,8 +118,8 @@ struct Pipe : public SingleCopy {
   Pipe() {
     int pipe_fd[2];
     MakePipe(pipe_fd);
-    read_end = pipe_fd[0];
-    write_end = pipe_fd[1];
+    read_end.Assign(pipe_fd[0]);
+    write_end.Assign(pipe_fd[1]);
   }
 
   Pipe(const int fd_read, const int fd_write) :
