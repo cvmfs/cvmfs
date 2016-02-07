@@ -103,6 +103,14 @@ generate_certs() {
       -cert usercert.pem -key userkey.pem -out vomsproxy.pem -rfc \
       -hostcert hostcert.pem -hostkey hostkey.pem -fqan /cvmfs/Role=NULL \
       -voms cvmfs -uri ${TEST600_HOSTNAME}:15000 || return 1
+
+  LD_LIBRARY_PATH=${voms_path}/usr/lib64 \
+  PATH=$PATH:${voms_path}/usr/bin/
+     voms-proxy-fake -certdir ${TEST600_GRID_SECURITY_DIR}/certificates \
+      -cert usercert.pem -key userkey.pem -out vomsproxy2.pem -rfc \
+      -hostcert hostcert.pem -hostkey hostkey.pem -fqan /cvmfs/Role=NULL \
+      -voms cvmfs -uri ${TEST600_HOSTNAME}:15000 || return 1
+
   popdir
 
   mkdir -p ${TEST600_GRID_SECURITY_DIR}/vomsdir/cvmfs
@@ -169,7 +177,7 @@ cvmfs_run_test() {
   fi
 
   echo "set a trap for system directory cleanup"
-  #trap cleanup EXIT HUP INT TERM
+  trap cleanup EXIT HUP INT TERM
 
   echo "setting a dummy host name"
   TEST600_HOSTNAME='test-600-dummyhost'
@@ -213,18 +221,20 @@ cvmfs_run_test() {
   local cache_base="$CVMFS_CACHE_BASE"
 
   echo "put some stuff into $CVMFS_TEST_REPO"
-  start_transaction $CVMFS_TEST_REPO                       || return $?
-  echo "Hello World" > /cvmfs/$CVMFS_TEST_REPO/hello_world || return 3
-  publish_repo $CVMFS_TEST_REPO -v                         || return $?
+  start_transaction $CVMFS_TEST_REPO                           || return $?
+  echo "Hello World" > /cvmfs/$CVMFS_TEST_REPO/hello_world     || return 3
+  echo "Hello World v2" > /cvmfs/$CVMFS_TEST_REPO/hello_world2 || return 3
+  publish_repo $CVMFS_TEST_REPO -v                             || return $?
 
   # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
   # requires mod_gridsite from the gridsite package
   echo "Setting up apache configuration"
-  sudo cp $script_location/test600.cvmfs.secure.conf $TEST600_HTTPS_CONFIG            || return 60
-  sudo sed -i "s/@REPONAME@/$CVMFS_TEST_REPO/" $TEST600_HTTPS_CONFIG                  || return 61
-  sudo sed -i "s,@GRIDSECURITYDIR@,$TEST600_GRID_SECURITY_DIR," $TEST600_HTTPS_CONFIG || return 62
-  cp $script_location/gacl $(get_local_repo_storage $CVMFS_TEST_REPO)/data/.gacl      || return 63
+  sudo cp $script_location/test600.cvmfs.secure.conf $TEST600_HTTPS_CONFIG             || return 60
+  sudo sed -i "s/@REPONAME@/$CVMFS_TEST_REPO/" $TEST600_HTTPS_CONFIG                   || return 61
+  sudo sed -i "s,@GRIDSECURITYDIR@,$TEST600_GRID_SECURITY_DIR," $TEST600_HTTPS_CONFIG  || return 62
+  cp $script_location/gacl $(get_local_repo_storage $CVMFS_TEST_REPO)/data/.gacl       || return 63
+  cp $script_location/gacl-39 $(get_local_repo_storage $CVMFS_TEST_REPO)/data/39/.gacl || return 64
 
   echo "restarting apache"
   apache_switch off
@@ -251,6 +261,47 @@ cvmfs_run_test() {
 
   echo "This should not work"
   sudo -u nobody setsid /bin/sh -c "env && cat ${mntpnt}/hello_world" && return 32
+
+  # Put in incorrect key into proxy file. 
+  echo "make invalid vomsproxy for 'nobody'"
+  nobody_vomsproxy="$(pwd)/certs/vomsproxy2.pem.nobody"
+  openssl x509 -in "$(pwd)/certs/vomsproxy2.pem" > $nobody_vomsproxy
+  openssl rsa -in "$(pwd)/certs/vomsproxy.pem" >> $nobody_vomsproxy
+  cat "$(pwd)/certs/usercert.pem" >> $nobody_vomsproxy
+  chmod 600 $nobody_vomsproxy
+  cat $nobody_vomsproxy
+  sudo chown nobody:             $nobody_vomsproxy || return 21
+  echo "This should not work"
+  sudo -u nobody setsid /bin/sh -c "export X509_USER_PROXY=$nobody_vomsproxy; cat ${mntpnt}/hello_world" && return 33
+
+  # Take the second proxy and remove the private key - should be invalid.
+  echo "make second invalid vomsproxy for 'nobody'"
+  nobody_vomsproxy="$(pwd)/certs/vomsproxy3.pem.nobody"
+  openssl x509 -in "$(pwd)/certs/vomsproxy.pem" > $nobody_vomsproxy
+  cat "$(pwd)/certs/usercert.pem" >> $nobody_vomsproxy
+  chmod 600 $nobody_vomsproxy
+  sudo chown nobody:             $nobody_vomsproxy || return 21
+  cat $nobody_vomsproxy
+  echo "This should not work"
+  sudo -u nobody setsid /bin/sh -c "export X509_USER_PROXY=$nobody_vomsproxy; cat ${mntpnt}/hello_world" && return 33
+
+  # Make sure our second VOMS proxy was valid.
+  echo "This should work"
+  nobody_vomsproxy="$(pwd)/certs/vomsproxy3.pem.nobody"
+  cp $(pwd)/certs/vomsproxy2.pem $nobody_vomsproxy || return 20
+  sudo chown nobody:             $nobody_vomsproxy || return 21
+  sudo -u nobody /bin/sh -c "export X509_USER_PROXY=$nobody_vomsproxy; cat ${mntpnt}/hello_world" > /dev/null || return 34
+
+  # Try to access a file from the server using a PKCS8-formatted private key
+  # Note this is a "raw certificate" - no VOMS extension.
+  echo "This should work"
+  nobody_vomsproxy="$(pwd)/certs/proxy.pem.nobody"
+  cat "$(pwd)/certs/usercert.pem" > $nobody_vomsproxy
+  openssl pkcs8 -topk8 -inform PEM -in /tmp/cvmfs-test/workdir/600-securecvmfs/certs/userkey.pem -nocrypt >> $nobody_vomsproxy
+  chmod 600 $nobody_vomsproxy
+  cat $nobody_vomsproxy
+  sudo chown nobody:                $nobody_vomsproxy || return 21
+  sudo -u nobody /bin/sh -c "export X509_USER_PROXY=$nobody_vomsproxy; cat ${mntpnt}/hello_world2" > /dev/null || return 35
 
   echo "Check authz attr"
   local authz_attr=
