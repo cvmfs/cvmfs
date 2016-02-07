@@ -795,6 +795,36 @@ string AbstractCatalogManager<CatalogT>::PrintHierarchyRecursively(
   return output;
 }
 
+
+template <class CatalogT>
+std::string AbstractCatalogManager<CatalogT>::PrintMemStatsRecursively(
+  const CatalogT *catalog) const
+{
+  string result = catalog->PrintMemStatistics() + "\n";
+
+  CatalogList children = catalog->GetChildren();
+  typename CatalogList::const_iterator i = children.begin();
+  typename CatalogList::const_iterator iend = children.end();
+  for (; i != iend; ++i) {
+    result += PrintMemStatsRecursively(*i);
+  }
+  return result;
+}
+
+
+/**
+ * Statistics from all catalogs
+ */
+template <class CatalogT>
+std::string AbstractCatalogManager<CatalogT>::PrintAllMemStatistics() const {
+  string result;
+  ReadLock();
+  result = PrintMemStatsRecursively(GetRootCatalog());
+  Unlock();
+  return result;
+}
+
+
 template <class CatalogT>
 void AbstractCatalogManager<CatalogT>::EnforceSqliteMemLimit() {
   char *mem_enforced =

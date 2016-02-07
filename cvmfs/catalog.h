@@ -176,6 +176,7 @@ class Catalog : public SingleCopy {
   uint64_t GetNumChunks() const;
   shash::Any GetPreviousRevision() const;
   const Counters& GetCounters() const { return counters_; }
+  std::string PrintMemStatistics() const;
 
   inline float schema() const { return database().schema_version(); }
   inline PathString path() const { return path_; }

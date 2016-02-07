@@ -353,8 +353,46 @@ unsigned Database<DerivedT>::GetModifiedRowCount() const {
 }
 
 /**
- * Used to check if the database needs cleanup
+ * Ask SQlite for per-connection memory statistics
  */
+template <class DerivedT>
+void Database<DerivedT>::GetMemStatistics(MemStatistics *stats) const {
+  const int reset = 0;
+  int current;
+  int highwater;
+  int retval = SQLITE_OK;
+  retval |= sqlite3_db_status(sqlite_db(), SQLITE_DBSTATUS_LOOKASIDE_USED,
+                              &current, &highwater, reset);
+  stats->lookaside_slots_used = current;
+  stats->lookaside_slots_max = highwater;
+  retval |= sqlite3_db_status(sqlite_db(), SQLITE_DBSTATUS_LOOKASIDE_HIT,
+                              &current, &highwater, reset);
+  stats->lookaside_hit = highwater;
+  retval |= sqlite3_db_status(sqlite_db(), SQLITE_DBSTATUS_LOOKASIDE_MISS_SIZE,
+                              &current, &highwater, reset);
+  stats->lookaside_miss_size = highwater;
+  retval |= sqlite3_db_status(sqlite_db(), SQLITE_DBSTATUS_LOOKASIDE_MISS_FULL,
+                              &current, &highwater, reset);
+  stats->lookaside_miss_full = highwater;
+  retval |= sqlite3_db_status(sqlite_db(), SQLITE_DBSTATUS_CACHE_USED,
+                              &current, &highwater, reset);
+  stats->page_cache_used = current;
+  retval |= sqlite3_db_status(sqlite_db(), SQLITE_DBSTATUS_CACHE_HIT,
+                              &current, &highwater, reset);
+  stats->page_cache_hit = current;
+  retval |= sqlite3_db_status(sqlite_db(), SQLITE_DBSTATUS_CACHE_MISS,
+                              &current, &highwater, reset);
+  stats->page_cache_miss = current;
+  retval |= sqlite3_db_status(sqlite_db(), SQLITE_DBSTATUS_SCHEMA_USED,
+                              &current, &highwater, reset);
+  stats->schema_used = current;
+  retval |= sqlite3_db_status(sqlite_db(), SQLITE_DBSTATUS_STMT_USED,
+                              &current, &highwater, reset);
+  stats->stmt_used = current;
+  assert(retval == SQLITE_OK);
+}
+
+
 template <class DerivedT>
 double Database<DerivedT>::GetFreePageRatio() const {
   Sql free_page_count_query(this->sqlite_db(), "PRAGMA freelist_count;");

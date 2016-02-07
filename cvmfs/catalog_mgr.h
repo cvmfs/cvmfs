@@ -187,6 +187,7 @@ class AbstractCatalogManager : public SingleCopy {
   bool GetVOMSAuthz(std::string *authz) const;
   int GetNumCatalogs() const;
   std::string PrintHierarchy() const;
+  std::string PrintAllMemStatistics() const;
 
   /**
    * Get the inode number of the root DirectoryEntry
@@ -299,6 +300,7 @@ class AbstractCatalogManager : public SingleCopy {
   // Catalog *Inode2Catalog(const inode_t inode);
   std::string PrintHierarchyRecursively(const CatalogT *catalog,
                                         const int level) const;
+  std::string PrintMemStatsRecursively(const CatalogT *catalog) const;
 
   InodeRange AcquireInodes(uint64_t size);
   void ReleaseInodes(const InodeRange chunk);

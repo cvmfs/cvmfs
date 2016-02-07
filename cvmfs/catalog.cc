@@ -489,6 +489,25 @@ shash::Any Catalog::GetPreviousRevision() const {
 }
 
 
+string Catalog::PrintMemStatistics() const {
+  sqlite::MemStatistics stats;
+  pthread_mutex_lock(lock_);
+  database().GetMemStatistics(&stats);
+  pthread_mutex_unlock(lock_);
+  return string(path().GetChars(), path().GetLength()) + ": " +
+    StringifyInt(stats.lookaside_slots_used) + " / " +
+      StringifyInt(stats.lookaside_slots_max) + " slots -- " +
+      StringifyInt(stats.lookaside_hit) + " hits, " +
+      StringifyInt(stats.lookaside_miss_size) + " misses-size, " +
+      StringifyInt(stats.lookaside_miss_full) + " misses-full -- " +
+    StringifyInt(stats.page_cache_used / 1024) + " kB pages -- " +
+      StringifyInt(stats.page_cache_hit) + " hits, " +
+      StringifyInt(stats.page_cache_miss) + " misses -- " +
+    StringifyInt(stats.schema_used / 1024) + " kB schema -- " +
+    StringifyInt(stats.stmt_used / 1024) + " kB statements";
+}
+
+
 /**
  * Determine the actual inode of a DirectoryEntry.
  * The first used entry from a hardlink group deterimines the inode of the

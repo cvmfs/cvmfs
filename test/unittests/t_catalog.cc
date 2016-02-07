@@ -302,4 +302,13 @@ TEST_F(T_Catalog, Chunks) {
   EXPECT_EQ(4u, counter);  // number of files with content + empty hash
 }
 
+TEST_F(T_Catalog, Statistics) {
+  catalog = catalog::Catalog::AttachFreely("",
+                                           catalog_db_root,
+                                           shash::Any(),
+                                           NULL,
+                                           false);
+  EXPECT_NE("", catalog->PrintMemStatistics());
+}
+
 }  // namespace catalog

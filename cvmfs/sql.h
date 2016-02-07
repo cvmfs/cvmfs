@@ -12,6 +12,31 @@
 
 namespace sqlite {
 
+struct MemStatistics {
+  MemStatistics()
+    : lookaside_slots_used(-1)
+    , lookaside_slots_max(-1)
+    , lookaside_hit(-1)
+    , lookaside_miss_size(-1)
+    , lookaside_miss_full(-1)
+    , page_cache_used(-1)
+    , page_cache_hit(-1)
+    , page_cache_miss(-1)
+    , schema_used(-1)
+    , stmt_used(-1)
+  { }
+  int lookaside_slots_used;
+  int lookaside_slots_max;
+  int lookaside_hit;
+  int lookaside_miss_size;
+  int lookaside_miss_full;
+  int page_cache_used;   ///< Bytes used for caching pages
+  int page_cache_hit;
+  int page_cache_miss;
+  int schema_used;  ///< Bytes used to store db schema
+  int stmt_used;  ///< Bytes used for prepared statmements (lookaside + heap)
+};
+
 class Sql;
 
 /**
@@ -149,6 +174,11 @@ class Database : SingleCopy {
    * @return  the free-page ratio in the opened database file (free pages/pages)
    */
   double GetFreePageRatio() const;
+
+  /**
+   * Retrieves the per-connection memory statistics from SQlite
+   */
+  void GetMemStatistics(MemStatistics *stats) const;
 
   /**
    * Performs a VACUUM call on the opened database file to compacts the database.
