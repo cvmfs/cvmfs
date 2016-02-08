@@ -11,7 +11,7 @@
 
 ## Example
 
-    valgrind /usr/bin/cvmfs2 -f -o \
+    valgrind /usr/bin/cvmfs2 --tool=massif --stacks=yes --peak-inaccuracy=0.1 -f -o \
       disable_watchdog,simple_options_parsing,fsname=cvmfs2,allow_other,grab_mountpoint,uid=0,gid=0 \
       sft.cern.ch /cvmfs/sft.cern.ch
 
