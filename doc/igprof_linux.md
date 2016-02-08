@@ -10,9 +10,11 @@ These are the steps to solve it:
     * simple\_options\_parsing
 4. Also, include the -f flag to avoid a fork.
 
-Install igprof and libunwind from latest git code
-Make sure libunwind and libigprof are also in /usr/lib64
-Memory profiling needs to use the debug library for proper stack traces
+Some more notes:
+
+  - Install igprof and libunwind from latest git code
+  - Make sure libunwind and libigprof are also in /usr/lib64
+  - Memory profiling needs to use the debug library for proper stack traces
 
 The following code runned as superuser would sum up what was explained before:
 
