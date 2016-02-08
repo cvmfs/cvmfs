@@ -960,6 +960,8 @@ int main(int argc, char *argv[]) {
   mount_options = NULL;
 
 #ifdef HAS_VALGRIND_HEADERS
+  // If the libcvmfs_fuse library is unloaded, valgrind can't resolve the 
+  // symbols anymore.  We skip under valgrind.
   if (!RUNNING_ON_VALGRIND) {
 #endif
     dlclose(library_handle_);
