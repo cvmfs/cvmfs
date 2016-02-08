@@ -959,8 +959,14 @@ int main(int argc, char *argv[]) {
   session = NULL;
   mount_options = NULL;
 
-  dlclose(library_handle_);
-  library_handle_ = NULL;
+#ifdef HAS_VALGRIND_HEADERS
+  if (!RUNNING_ON_VALGRIND) {
+#endif
+    dlclose(library_handle_);
+    library_handle_ = NULL;
+#ifdef HAS_VALGRIND_HEADERS
+  }
+#endif
 
   LogCvmfs(kLogCvmfs, kLogSyslog, "CernVM-FS: unmounted %s (%s)",
            mount_point_->c_str(), repository_name_->c_str());
