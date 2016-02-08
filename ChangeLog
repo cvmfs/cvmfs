@@ -1,5 +1,10 @@
 2.3.0:
 
+2.2.1:
+  * Fix reading of chunked files in libcvmfs
+  * Disable access to VOMS protected repositories until certificate handling
+    is resolved
+
 2.2.0:
   * Add VOMS as a build dependency on platforms where it is available.
   * Detect missing 'http:// proxy prefix in chksetup (CVM-979)
