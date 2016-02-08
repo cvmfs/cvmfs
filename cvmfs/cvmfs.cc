@@ -505,13 +505,13 @@ static bool CheckVoms(const fuse_ctx &fctx) {
   // Get VOMS information, if any.  If VOMS authz is present and VOMS is
   // not compiled in, then deny authorization.
   if ((fctx.uid != 0) && voms_authz_->size()) {
-#ifdef VOMS_AUTHZ
-    return CheckVOMSAuthz(&fctx, *voms_authz_);
-#else
+//  #ifdef VOMS_AUTHZ
+//      return CheckVOMSAuthz(&fctx, *voms_authz_);
+//  #else
     LogCvmfs(kLogCvmfs, kLogSyslogWarn | kLogDebug,  "VOMS requirements found "
               "in catalog but client compiled without VOMS support");
     return false;
-#endif
+//  #endif
   }
   return true;
 }
