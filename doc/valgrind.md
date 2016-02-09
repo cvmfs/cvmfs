@@ -11,7 +11,11 @@
 
 ## Example
 
-    valgrind /usr/bin/cvmfs2 --tool=massif --stacks=yes --peak-inaccuracy=0.1 -f -o \
+    ulimit -n 66000
+    valgrind /usr/bin/cvmfs2 --tool=massif --alloc-fn=smalloc --stacks=yes --threshold=0.01 \
+      /usr/bin/cvmfs2 -f -o \
       disable_watchdog,simple_options_parsing,fsname=cvmfs2,allow_other,grab_mountpoint,uid=0,gid=0 \
       sft.cern.ch /cvmfs/sft.cern.ch
+
+(or with option --pages-as-heap=yes instead of --stacks=yes)
 
