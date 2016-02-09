@@ -25,7 +25,9 @@ RUN         yum -y update && yum -y install                     \
                                         valgrind-devel          \
                                         voms-devel              \
                                         which                   \
-                                        zlib-devel
+                                        zlib-devel              \
+                                        python-pip              \
+            && pip install --upgrade pip gcovr
 
 RUN         useradd sftnight
 USER        sftnight
