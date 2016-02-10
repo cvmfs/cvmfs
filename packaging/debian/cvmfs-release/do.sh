@@ -37,8 +37,8 @@ echo -n "initializing build environment... "
 mkdir ${workdir}/src/cvmfs
 cp -R $srctree/* ${workdir}/src/cvmfs
 mkdir ${workdir}/src/cvmfs/debian
-cp -R ${workdir}/tmp/packaging/debian/config-release/* ${workdir}/src/cvmfs/debian
-cp ${workdir}/tmp/packaging/debian/config-release/Makefile ${workdir}/src/cvmfs
+cp -R ${workdir}/tmp/packaging/debian/cvmfs-release/* ${workdir}/src/cvmfs/debian
+cp ${workdir}/tmp/packaging/debian/cvmfs-release/Makefile ${workdir}/src/cvmfs
 echo "done"
 
 echo "building..."
