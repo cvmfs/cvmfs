@@ -47,7 +47,7 @@ int CommandListCatalogs::Main(const ArgumentList &args) {
   if (IsHttpUrl(repo_url)) {
     const bool follow_redirects = false;
     if (!this->InitDownloadManager(follow_redirects) ||
-        !this->InitSignatureManager(repo_keys)) {
+        !this->InitVerifyingSignatureManager(repo_keys)) {
       LogCvmfs(kLogCatalog, kLogStderr, "Failed to init remote connection");
       return 1;
     }

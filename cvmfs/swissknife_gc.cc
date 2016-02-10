@@ -82,7 +82,7 @@ int CommandGc::Main(const ArgumentList &args) {
 
   const bool follow_redirects = false;
   if (!this->InitDownloadManager(follow_redirects) ||
-      !this->InitSignatureManager(repo_keys)) {
+      !this->InitVerifyingSignatureManager(repo_keys)) {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to init repo connection");
     return 1;
   }

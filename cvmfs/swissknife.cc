@@ -51,8 +51,8 @@ bool Command::InitDownloadManager(const bool     follow_redirects,
   return true;
 }
 
-bool Command::InitSignatureManager(const std::string pubkey_path,
-                                   const std::string trusted_certs) {
+bool Command::InitVerifyingSignatureManager(const std::string &pubkey_path,
+                                            const std::string &trusted_certs) {
   if (signature_manager_.IsValid()) {
     return true;
   }

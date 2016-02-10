@@ -85,8 +85,8 @@ class Command {
   bool InitDownloadManager(const bool     follow_redirects,
                            const unsigned max_pool_handles = 1,
                            const bool     use_system_proxy = true);
-  bool InitSignatureManager(const std::string pubkey_path,
-                            const std::string trusted_certs = "");
+  bool InitVerifyingSignatureManager(const std::string &pubkey_path,
+                                     const std::string &trusted_certs = "");
 
   manifest::Manifest* OpenLocalManifest(const std::string path) const;
   manifest::Failures  FetchRemoteManifestEnsemble(
