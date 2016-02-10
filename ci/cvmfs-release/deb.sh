@@ -33,7 +33,7 @@ cd ${CVMFS_SOURCE_LOCATION}/debian
 
 echo "running the debian package build..."
 debuild --no-tgz-check -us -uc # -us -uc == skip signing
-mv ../cvmfs-release_* ${CVMFS_RESULT_LOCATION}/
+mv ${CVMFS_SOURCE_LOCATION}/../cvmfs-release_* ${CVMFS_RESULT_LOCATION}/
 
 echo "switching back to the source directory..."
 cd ${CVMFS_SOURCE_LOCATION}
