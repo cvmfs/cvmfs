@@ -97,7 +97,6 @@ bool Command::InitSigningSignatureManager(
   }
 
   // Load private key
-  // TODO(rmeusel): eliminiate code duplication with swissknife_letter.cc
   if (!signature_manager_->LoadPrivateKeyPath(private_key_path,
                                               private_key_password)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to load private key '%s' (%s)",
