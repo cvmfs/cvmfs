@@ -77,6 +77,49 @@ bool Command::InitVerifyingSignatureManager(const std::string &pubkey_path,
 }
 
 
+bool Command::InitSigningSignatureManager(
+                                      const std::string &certificate_path,
+                                      const std::string &private_key_path,
+                                      const std::string &private_key_password) {
+  if (signature_manager_.IsValid()) {
+    return true;
+  }
+
+  signature_manager_ = new signature::SignatureManager();
+  assert(signature_manager_);
+  signature_manager_->Init();
+
+  // Load certificate
+  if (!signature_manager_->LoadCertificatePath(certificate_path)) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load certificate '%s'",
+                                    certificate_path.c_str());
+    return false;
+  }
+
+  // Load private key
+  // TODO(rmeusel): eliminiate code duplication with swissknife_letter.cc
+  if (!signature_manager_->LoadPrivateKeyPath(private_key_path,
+                                              private_key_password)) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load private key '%s' (%s)",
+             private_key_path.c_str(),
+             signature_manager_->GetCryptoError().c_str());
+    return false;
+  }
+
+  if (!signature_manager_->KeysMatch()) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "the private key '%s' doesn't seem to match certificate '%s' (%s)",
+             private_key_path.c_str(),
+             certificate_path.c_str(),
+             signature_manager_->GetCryptoError().c_str());
+    signature_manager_->UnloadPrivateKey();
+    return false;
+  }
+
+  return true;
+}
+
+
 download::DownloadManager* Command::download_manager()  const {
   assert(download_manager_.IsValid());
   return download_manager_.weak_ref();
