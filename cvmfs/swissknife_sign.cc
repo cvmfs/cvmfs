@@ -24,6 +24,7 @@
 #include "hash.h"
 #include "logging.h"
 #include "manifest.h"
+#include "object_fetcher.h"
 #include "signature.h"
 #include "smalloc.h"
 #include "upload.h"
@@ -31,9 +32,11 @@
 
 using namespace std;  // NOLINT
 
+typedef HttpObjectFetcher<> ObjectFetcher;
 
 int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   string manifest_path = *args.find('m')->second;
+  string repo_url = *args.find('u')->second;
   string spooler_definition = *args.find('r')->second;
   string temp_dir = *args.find('t')->second;
 
@@ -58,9 +61,20 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     return 1;
   }
 
-  if (!InitSigningSignatureManager(certificate, priv_key, pwd)) {
+  // prepare global manager modules
+  const bool follow_redirects = false;
+  if (!this->InitDownloadManager(follow_redirects) ||
+      !this->InitSigningSignatureManager(certificate, priv_key, pwd)) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to init repo connection");
     return 2;
   }
+
+  // init the download helper
+  ObjectFetcher object_fetcher(repo_name,
+                               repo_url,
+                               temp_dir,
+                               download_manager(),
+                               signature_manager());
 
   LogCvmfs(kLogCvmfs, kLogStdout, "Signing %s", manifest_path.c_str());
   {

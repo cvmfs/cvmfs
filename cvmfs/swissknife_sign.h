@@ -27,6 +27,7 @@ class CommandSign : public Command {
   ParameterList GetParams() {
     ParameterList r;
     r.push_back(Parameter::Mandatory('m', "manifest file"));
+    r.push_back(Parameter::Mandatory('u', "repository URL"));
     r.push_back(Parameter::Mandatory('r', "spooler definition"));
     r.push_back(Parameter::Mandatory('t', "directory for temporary files"));
     r.push_back(Parameter::Optional('c', "x509 certificate"));
