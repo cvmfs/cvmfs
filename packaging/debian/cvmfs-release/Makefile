@@ -6,5 +6,5 @@
 all: # nothing to build
 
 install:
-	cp packaging/debian/cernvm.list /etc/apt/sources.list.d/cernvm.list
-	cp packagin/debian/cernvm.gpg /etc/apt/trusted.gpg.d/cernvm.gpg
+	cp packaging/debian/cernvm.list ${DESTDIR}/etc/apt/sources.list.d/cernvm.list
+	cp packagin/debian/cernvm.gpg ${DESTDIR}/etc/apt/trusted.gpg.d/cernvm.gpg
