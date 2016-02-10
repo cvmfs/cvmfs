@@ -34,13 +34,15 @@ cp -R $srctree/* ${workdir}/tmp
 echo "done"
 
 echo -n "initializing build environment... "
-mkdir ${workdir}/src/cvmfs
-cp -R $srctree/* ${workdir}/src/cvmfs
-mkdir ${workdir}/src/cvmfs/debian
-cp -R ${workdir}/tmp/packaging/debian/cvmfs-release/* ${workdir}/src/cvmfs/debian
-cp ${workdir}/tmp/packaging/debian/cvmfs-release/Makefile ${workdir}/src/cvmfs
+mkdir ${workdir}/src/cvmfs-release
+cp -R $srctree/* ${workdir}/src/cvmfs-release
+mkdir ${workdir}/src/cvmfs-release/debian
+cp -R ${workdir}/tmp/packaging/debian/cvmfs-release/* ${workdir}/src/cvmfs-release/debian
+cp ${workdir}/tmp/packaging/debian/cvmfs-release/Makefile ${workdir}/src/cvmfs-release
 echo "done"
 
 echo "building..."
-cd ${workdir}/src/cvmfs/debian
-pdebuild --buildresult ${workdir}/result
+cd ${workdir}/src/cvmfs-release/debian
+debuild --no-tgz-check -us -uc # -us -uc == skip signing
+mv ${workdir}/src/cvmfs-release_* $workdir/result
+
