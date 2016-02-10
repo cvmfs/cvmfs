@@ -31,8 +31,9 @@ cp -v ${CVMFS_SOURCE_LOCATION}/packaging/debian/cvmfs-release/Makefile \
 echo "switching to the debian source directory..."
 cd ${CVMFS_SOURCE_LOCATION}/debian
 
-echo "running the debian package build ($config_package)..."
-pdebuild --buildresult ${CVMFS_RESULT_LOCATION}
+echo "running the debian package build..."
+debuild --no-tgz-check -us -uc # -us -uc == skip signing
+mv ../cvmfs-release_* ${CVMFS_RESULT_LOCATION}/
 
 echo "switching back to the source directory..."
 cd ${CVMFS_SOURCE_LOCATION}
