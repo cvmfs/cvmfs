@@ -47,9 +47,11 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   if (args.find('s') != args.end()) pwd = *args.find('s')->second;
   string meta_info = "";
   if (args.find('M') != args.end()) meta_info = *args.find('M')->second;
-  upload::Spooler *spooler = NULL;
   const bool garbage_collectable = (args.count('g') > 0);
   const bool bootstrap_shortcuts = (args.count('A') > 0);
+
+  UniquePtr<upload::Spooler>    spooler;
+  UniquePtr<manifest::Manifest> manifest;
 
   if (!DirectoryExists(temp_dir)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "%s does not exist", temp_dir.c_str());
@@ -63,17 +65,20 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   LogCvmfs(kLogCvmfs, kLogStdout, "Signing %s", manifest_path.c_str());
   {
     // Load Manifest
-    // TODO(rmeusel): UniquePtr
-    manifest::Manifest *manifest = manifest::Manifest::LoadFile(manifest_path);
-    if (!manifest) {
+    manifest = manifest::Manifest::LoadFile(manifest_path);
+    if (!manifest.IsValid()) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to parse manifest");
-      goto sign_fail;
+      return 1;
     }
 
     // Connect to the spooler
     const upload::SpoolerDefinition sd(spooler_definition,
                                        manifest->GetHashAlgorithm());
     spooler = upload::Spooler::Construct(sd);
+    if (!spooler.IsValid()) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to setup upload spooler");
+      return 1;
+    }
 
     // Register callback for retrieving the certificate hash
     upload::Spooler::CallbackPtr callback =
@@ -86,7 +91,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
 
     if (certificate_hash.IsNull()) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to upload certificate");
-      goto sign_fail;
+      return 1;
     }
 
     // Safe repository meta info file
@@ -100,7 +105,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
 
       if (metainfo_hash.IsNull()) {
         LogCvmfs(kLogCvmfs, kLogStderr, "Failed to upload meta info");
-        goto sign_fail;
+        return 1;
       }
     }
 
@@ -134,8 +139,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
       if (!success) {
         LogCvmfs(kLogCvmfs, kLogStderr, "failed to place VOMS bootstrapping "
                                         "symlinks");
-        delete manifest;
-        goto sign_fail;
+        return 1;
       }
     }
 
@@ -148,8 +152,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
                                    &sig, &sig_size))
     {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to sign manifest");
-      delete manifest;
-      goto sign_fail;
+      return 1;
     }
 
     // Write new manifest
@@ -157,8 +160,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     if (!fmanifest) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to open manifest (errno: %d)",
                errno);
-      delete manifest;
-      goto sign_fail;
+      return 1;
     }
     if ((fwrite(signed_manifest.data(), 1, signed_manifest.length(), fmanifest)
          != signed_manifest.length()) ||
@@ -167,8 +169,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to write manifest (errno: %d)",
                errno);
       fclose(fmanifest);
-      delete manifest;
-      goto sign_fail;
+      return 1;
     }
     free(sig);
     fclose(fmanifest);
@@ -181,19 +182,11 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     if (spooler->GetNumberOfErrors()) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to commit manifest (errors: %d)",
                spooler->GetNumberOfErrors());
-      delete manifest;
-      goto sign_fail;
+      return 1;
     }
-
-    delete manifest;
   }
 
-  delete spooler;
   return 0;
-
- sign_fail:
-  delete spooler;
-  return 1;
 }
 
 
