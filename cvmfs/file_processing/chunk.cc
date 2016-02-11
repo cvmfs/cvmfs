@@ -108,7 +108,8 @@ Chunk::Chunk(const Chunk &other) :
   content_hash_initialized_(other.content_hash_initialized_),
   upload_stream_handle_(NULL),
   bytes_written_(other.bytes_written_),
-  compressed_size_(other.compressed_size_)
+  compressed_size_(other.compressed_size_),
+  compression_algorithm_(kZlibDefault)
 {
   assert(!other.done_);
   assert(!other.HasUploadStreamHandle());
