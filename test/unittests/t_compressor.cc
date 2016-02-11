@@ -153,7 +153,7 @@ TEST_F(T_Compressor, EchoCompressionLong) {
   EXPECT_EQ(compress_pos, long_size);
   EXPECT_EQ(0, memcmp(compress_buf, long_string, long_size));
 
-  delete compress_buf;
+  delete[] compress_buf;
 }
 
 }  // end namespace zlib
