@@ -401,7 +401,7 @@ class T_Uploaders : public FileSandbox {
     serv_addr.sin_port = htons(CVMFS_S3_TEST_MOCKUP_SERVER_PORT);
     int on = 1;
     retval = setsockopt(listen_sockfd, SOL_SOCKET,
-                        O_REUSEADDR, &on, sizeof(on));
+                        SO_REUSEADDR, &on, sizeof(on));
     ASSERT_EQ(retval, 0);
     retval = bind(listen_sockfd,
                   (struct sockaddr *) &serv_addr,
