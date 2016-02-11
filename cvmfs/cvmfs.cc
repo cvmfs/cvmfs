@@ -573,7 +573,7 @@ static bool GetDirentForInode(const fuse_ino_t ino,
 
   // Non-NFS mode
   PathString path;
-  if (ino == catalog_manager_->GetRootInode() && ) {
+  if (ino == catalog_manager_->GetRootInode()) {
     bool retval = catalog_manager_->LookupPath(PathString(),
                                                 catalog::kLookupSole, dirent);
     if (retval) {
