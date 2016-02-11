@@ -61,7 +61,8 @@ ReportChildDeath(pid_t pid, int flags) {
 struct ProxyHelper {
   // TODO(jblomer): remove magic number
   ProxyHelper() : m_subprocess(-1), m_max_files(1024) {
-    pthread_mutex_init(&m_helper_mutex, NULL);
+    int retval = pthread_mutex_init(&m_helper_mutex, NULL);
+    assert(retval == 0);
 
     // TODO(jblomer): make a utility function, this code is also used in the
     // monitor
