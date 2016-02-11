@@ -105,7 +105,7 @@ TEST_F(T_Compressor, CompressionLong) {
   EXPECT_EQ(decompress_size, static_cast<uint64_t>(long_size));
   EXPECT_EQ(0, memcmp(decompress_buf, long_string, long_size));
 
-  delete compress_buf;
+  delete[] compress_buf;
   free(decompress_buf);
 }
 
