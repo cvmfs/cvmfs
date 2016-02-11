@@ -47,99 +47,38 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   if (args.find('s') != args.end()) pwd = *args.find('s')->second;
   string meta_info = "";
   if (args.find('M') != args.end()) meta_info = *args.find('M')->second;
-  upload::Spooler *spooler = NULL;
   const bool garbage_collectable = (args.count('g') > 0);
   const bool bootstrap_shortcuts = (args.count('A') > 0);
+
+  UniquePtr<upload::Spooler>    spooler;
+  UniquePtr<manifest::Manifest> manifest;
 
   if (!DirectoryExists(temp_dir)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "%s does not exist", temp_dir.c_str());
     return 1;
   }
 
-  signature::SignatureManager signature_manager;
-  signature_manager.Init();
-
-  // Load certificate
-  unsigned char *cert_buf = NULL;
-  unsigned cert_buf_size;
-  if (certificate == "") {
-    LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
-             "Enter file name of X509 certificate []: ");
-    getline(cin, certificate);
-  }
-  if (!signature_manager.LoadCertificatePath(certificate) ||
-      !signature_manager.WriteCertificateMem(&cert_buf, &cert_buf_size))
-  {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load certificate");
+  if (!InitSigningSignatureManager(certificate, priv_key, pwd)) {
     return 2;
   }
-
-  // Load private key
-  // TODO(rmeusel): eliminiate code duplication with swissknife_letter.cc
-  if (priv_key == "") {
-    LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
-             "Enter file name of private key file to your certificate []: ");
-    getline(cin, priv_key);
-  }
-  if (!signature_manager.LoadPrivateKeyPath(priv_key, pwd)) {
-    int retry = 0;
-    bool success;
-    do {
-      struct termios defrsett, newrsett;
-      char c;
-      tcgetattr(fileno(stdin), &defrsett);
-      newrsett = defrsett;
-      newrsett.c_lflag &= ~ECHO;
-      if (tcsetattr(fileno(stdin), TCSAFLUSH, &newrsett) != 0) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "terminal failure");
-        free(cert_buf);
-        return 2;
-      }
-
-      LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
-               "Enter password for private key: ");
-      pwd = "";
-      while (cin.get(c) && (c != '\n'))
-        pwd += c;
-      tcsetattr(fileno(stdin), TCSANOW, &defrsett);
-      LogCvmfs(kLogCvmfs, kLogStdout, "");
-
-      success = signature_manager.LoadPrivateKeyPath(priv_key, pwd);
-      if (!success) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "failed to load private key (%s)",
-                 signature_manager.GetCryptoError().c_str());
-      }
-      retry++;
-    } while (!success && (retry < 3));
-    if (!success) {
-      free(cert_buf);
-      return 2;
-    }
-  }
-  if (!signature_manager.KeysMatch()) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-             "the private key doesn't seem to match your certificate (%s)",
-             signature_manager.GetCryptoError().c_str());
-    signature_manager.UnloadPrivateKey();
-    free(cert_buf);
-    return 2;
-  }
-
 
   LogCvmfs(kLogCvmfs, kLogStdout, "Signing %s", manifest_path.c_str());
   {
     // Load Manifest
-    // TODO(rmeusel): UniquePtr
-    manifest::Manifest *manifest = manifest::Manifest::LoadFile(manifest_path);
-    if (!manifest) {
+    manifest = manifest::Manifest::LoadFile(manifest_path);
+    if (!manifest.IsValid()) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to parse manifest");
-      goto sign_fail;
+      return 1;
     }
 
     // Connect to the spooler
     const upload::SpoolerDefinition sd(spooler_definition,
                                        manifest->GetHashAlgorithm());
     spooler = upload::Spooler::Construct(sd);
+    if (!spooler.IsValid()) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to setup upload spooler");
+      return 1;
+    }
 
     // Register callback for retrieving the certificate hash
     upload::Spooler::CallbackPtr callback =
@@ -152,7 +91,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
 
     if (certificate_hash.IsNull()) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to upload certificate");
-      goto sign_fail;
+      return 1;
     }
 
     // Safe repository meta info file
@@ -166,7 +105,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
 
       if (metainfo_hash.IsNull()) {
         LogCvmfs(kLogCvmfs, kLogStderr, "Failed to upload meta info");
-        goto sign_fail;
+        return 1;
       }
     }
 
@@ -200,22 +139,20 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
       if (!success) {
         LogCvmfs(kLogCvmfs, kLogStderr, "failed to place VOMS bootstrapping "
                                         "symlinks");
-        delete manifest;
-        goto sign_fail;
+        return 1;
       }
     }
 
     // Sign manifest
     unsigned char *sig;
     unsigned sig_size;
-    if (!signature_manager.Sign(reinterpret_cast<const unsigned char *>(
-                                published_hash.ToString().data()),
-                                published_hash.GetHexSize(),
-                                &sig, &sig_size))
+    if (!signature_manager()->Sign(reinterpret_cast<const unsigned char *>(
+                                   published_hash.ToString().data()),
+                                   published_hash.GetHexSize(),
+                                   &sig, &sig_size))
     {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to sign manifest");
-      delete manifest;
-      goto sign_fail;
+      return 1;
     }
 
     // Write new manifest
@@ -223,8 +160,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     if (!fmanifest) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to open manifest (errno: %d)",
                errno);
-      delete manifest;
-      goto sign_fail;
+      return 1;
     }
     if ((fwrite(signed_manifest.data(), 1, signed_manifest.length(), fmanifest)
          != signed_manifest.length()) ||
@@ -233,8 +169,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to write manifest (errno: %d)",
                errno);
       fclose(fmanifest);
-      delete manifest;
-      goto sign_fail;
+      return 1;
     }
     free(sig);
     fclose(fmanifest);
@@ -247,22 +182,11 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     if (spooler->GetNumberOfErrors()) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to commit manifest (errors: %d)",
                spooler->GetNumberOfErrors());
-      delete manifest;
-      goto sign_fail;
+      return 1;
     }
-
-    delete manifest;
   }
 
-  delete spooler;
-  signature_manager.Fini();
   return 0;
-
- sign_fail:
-  delete spooler;
-  signature_manager.Fini();
-  if (cert_buf) free(cert_buf);
-  return 1;
 }
 
 

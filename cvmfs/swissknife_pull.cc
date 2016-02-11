@@ -534,7 +534,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     return 1;
   }
 
-  if (!this->InitSignatureManager(master_keys, trusted_certs)) {
+  if (!this->InitVerifyingSignatureManager(master_keys, trusted_certs)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to initalize CVMFS signatures");
     return 1;
   } else {

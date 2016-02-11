@@ -116,26 +116,13 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
   if (args.find('t') != args.end()) text = *args.find('t')->second;
   if (args.find('z') != args.end()) cacrl_path = *args.find('z')->second;
 
-  bool retval_b;
   whitelist::Failures retval_wl;
   letter::Failures retval_ltr;
-  signature::SignatureManager signature_manager;
-  signature_manager.Init();
 
   if (verify) {
-    if (cacrl_path != "") {
-      retval_b = signature_manager.LoadTrustedCaCrl(cacrl_path);
-      if (!retval_b) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "failed to load CA/CRLs");
-        return 2;
-      }
-    }
-    retval_b = signature_manager.LoadPublicRsaKeys(key_path);
-    if (!retval_b && (cacrl_path == "")) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "failed to load public keys");
+    if (!InitVerifyingSignatureManager(key_path, cacrl_path)) {
       return 2;
     }
-
 
     const bool     follow_redirects = false;
     const unsigned max_pool_handles = 2;
@@ -145,7 +132,7 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
     }
 
     whitelist::Whitelist whitelist(fqrn, download_manager(),
-                                   &signature_manager);
+                                   signature_manager());
     retval_wl = whitelist.Load(repository_url);
     if (retval_wl != whitelist::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to load whitelist (%d): %s",
@@ -180,7 +167,7 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
       if ((time(NULL) + 3600*24*3) > whitelist.expires()) {
         LogCvmfs(kLogCvmfs, kLogStderr, "reloading whitelist");
         whitelist::Whitelist refresh(fqrn, download_manager(),
-                                     &signature_manager);
+                                     signature_manager());
         retval_wl = refresh.Load(repository_url);
         if (retval_wl == whitelist::kFailOk)
           whitelist = refresh;
@@ -188,7 +175,7 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
 
       string message;
       string cert;
-      letter::Letter letter(fqrn, text, &signature_manager);
+      letter::Letter letter(fqrn, text, signature_manager());
       retval_ltr = letter.Verify(max_age, &message, &cert);
       if (retval_ltr != letter::kFailOk) {
         exit_code = 3;
@@ -223,54 +210,16 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
       }
       text = "";
     } while (erlang);
-    signature_manager.Fini();
+
     return exit_code;
   }
 
-  // Load certificate
-  if (!signature_manager.LoadCertificatePath(certificate_path)) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load certificate");
+  if (!InitSigningSignatureManager(certificate_path,
+                                   key_path,
+                                   certificate_password)) {
     return 2;
   }
 
-  // Load private key
-  if (!signature_manager.LoadPrivateKeyPath(key_path, certificate_password)) {
-    int retry = 0;
-    bool success;
-    do {
-      struct termios defrsett, newrsett;
-      tcgetattr(fileno(stdin), &defrsett);
-      newrsett = defrsett;
-      newrsett.c_lflag &= ~ECHO;
-      if (tcsetattr(fileno(stdin), TCSAFLUSH, &newrsett) != 0) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "terminal failure");
-        return 2;
-      }
-
-      LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
-               "Enter password for private key: ");
-      certificate_password = "";
-      GetLineFd(0, &certificate_password);
-      tcsetattr(fileno(stdin), TCSANOW, &defrsett);
-      LogCvmfs(kLogCvmfs, kLogStdout, "");
-
-      success =
-        signature_manager.LoadPrivateKeyPath(key_path, certificate_password);
-      if (!success) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "failed to load private key (%s)",
-                 signature_manager.GetCryptoError().c_str());
-      }
-      retry++;
-    } while (!success && (retry < 3));
-    if (!success)
-      return 2;
-  }
-  if (!signature_manager.KeysMatch()) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-             "the private key doesn't seem to match your certificate (%s)",
-             signature_manager.GetCryptoError().c_str());
-    return 2;
-  }
   if (text == "") {
     char c;
     while (read(0, &c, 1) == 1) {
@@ -280,10 +229,9 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
     }
   }
 
-  letter::Letter text_letter(fqrn, text, &signature_manager);
+  letter::Letter text_letter(fqrn, text, signature_manager());
   LogCvmfs(kLogCvmfs, kLogStdout, "%s",
            text_letter.Sign(hash_algorithm).c_str());
 
-  signature_manager.Fini();
   return 0;
 }
