@@ -73,6 +73,26 @@ static inline void __attribute__((used)) smunmap(void *mem) {
   assert((retval == 0) && "Invalid umnmap");
 }
 
+
+/**
+ * Used when the caller remembers the size, so that it can call sxunmap later.
+ */
+static inline void * __attribute__((used)) sxmmap(size_t size) {
+  void *mem = mmap(NULL, size, PROT_READ | PROT_WRITE,
+                   MAP_PRIVATE | PLATFORM_MAP_ANONYMOUS, -1, 0);
+  assert((mem != MAP_FAILED) && "Out Of Memory");
+  return mem;
+}
+
+/**
+ * Free memory acquired by sxmmap.
+ */
+static inline void __attribute__((used)) sxunmap(void *mem, size_t size) {
+  int retval = munmap(mem, size);
+  assert((retval == 0) && "Invalid umnmap");
+}
+
+
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD
 #endif

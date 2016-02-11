@@ -13,6 +13,7 @@
 
 #include "logging.h"
 #include "platform.h"
+#include "sqlitemem.h"
 
 namespace sqlite {
 
@@ -93,8 +94,7 @@ bool Database<DerivedT>::Initialize() {
   const int flags = (read_write_) ? SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READWRITE
                                   : SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READONLY;
 
-  const bool successful =
-    OpenDatabase(flags) &&
+  bool successful = OpenDatabase(flags) &&
     Configure()         &&
     FileReadAhead()     &&
     PrepareCommonQueries();
@@ -135,6 +135,11 @@ bool Database<DerivedT>::OpenDatabase(const int flags) {
     LogCvmfs(kLogSql, kLogDebug, "cannot open database file %s",
              filename().c_str());
     return false;
+  }
+
+  if (!read_write_ && MemoryManager::HasInstance()) {
+    database_.lookaside_buffer =
+      MemoryManager::GetInstance()->AssignLookasideBuffer(sqlite_db());
   }
 
   const int retval = sqlite3_extended_result_codes(sqlite_db(), 1);
@@ -179,6 +184,10 @@ bool Database<DerivedT>::DatabaseRaiiWrapper::Close() {
   }
 
   sqlite_db = NULL;
+  if (lookaside_buffer != NULL) {
+    MemoryManager::GetInstance()->ReleaseLookasideBuffer(lookaside_buffer);
+    lookaside_buffer = NULL;
+  }
   return true;
 }
 

@@ -98,6 +98,7 @@
 #include "shortstring.h"
 #include "signature.h"
 #include "smalloc.h"
+#include "sqlitemem.h"
 #include "sqlitevfs.h"
 #include "statistics.h"
 #include "talk.h"
@@ -1992,8 +1993,6 @@ bool g_talk_ready = false;
 bool g_running_created = false;
 
 int g_fd_lockfile = -1;
-void *g_sqlite_scratch = NULL;
-void *g_sqlite_page_cache = NULL;
 string *g_boot_error = NULL;
 
 __attribute__((visibility("default")))
@@ -2353,17 +2352,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   assert(retval == SQLITE_OK);
   retval = sqlite3_config(SQLITE_CONFIG_MULTITHREAD);
   assert(retval == SQLITE_OK);
-  // 8 KB for 8 threads (2 slots per thread)
-  g_sqlite_scratch = smalloc(8192*16);
-  g_sqlite_page_cache = smalloc(1280*3275);  // 4MB
-  retval = sqlite3_config(SQLITE_CONFIG_SCRATCH, g_sqlite_scratch, 8192, 16);
-  assert(retval == SQLITE_OK);
-  retval = sqlite3_config(SQLITE_CONFIG_PAGECACHE, g_sqlite_page_cache,
-                          1280, 3275);
-  assert(retval == SQLITE_OK);
-  // 4 KB
-  retval = sqlite3_config(SQLITE_CONFIG_LOOKASIDE, 32, 128);
-  assert(retval == SQLITE_OK);
+  sqlite::MemoryManager::GetInstance();
 
   // Disable SQlite3 locks
   retval = sqlite3_vfs_register(sqlite3_vfs_find("unix-none"), 1);
@@ -3071,10 +3060,7 @@ static void Fini() {
     sqlite3_temp_directory = NULL;
   }
   sqlite3_shutdown();
-  if (g_sqlite_page_cache) free(g_sqlite_page_cache);
-  if (g_sqlite_scratch) free(g_sqlite_scratch);
-  g_sqlite_page_cache = NULL;
-  g_sqlite_scratch = NULL;
+  sqlite::MemoryManager::CleanupInstance();
 
   if (g_monitor_ready) monitor::Fini();
 

@@ -70,3 +70,21 @@ TEST(T_Smalloc, BigMmap) {
   ASSERT_DEATH(mem = smmap(kBigAllocation - 8192), ".*Out Of Memory.*");
   ASSERT_DEATH(smunmap(mem), ".*");
 }
+
+
+TEST(T_Smalloc, Xmmap) {
+  void *mem = NULL;
+  mem = sxmmap(1);
+  EXPECT_TRUE(mem != NULL);
+  sxunmap(mem, 1);
+  mem = NULL;
+
+  mem = sxmmap(8192);
+  EXPECT_TRUE(mem != NULL);
+  sxunmap(mem, 8192);
+  mem = NULL;
+
+  mem = sxmmap(1);
+  ASSERT_DEATH(sxunmap(mem, 8192), ".*");
+  sxunmap(mem, 1);
+}
