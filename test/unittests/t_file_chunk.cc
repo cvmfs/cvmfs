@@ -21,6 +21,8 @@ class T_FileChunk : public ::testing::Test {
     FileChunkReflist result;
     result.list = new FileChunkList();
     result.path.Assign("/42", 3);
+    result.compression_alg = kZlibDefault;
+    result.external_data = false;
     return result;
   }
 
