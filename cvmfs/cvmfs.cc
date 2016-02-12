@@ -2999,6 +2999,10 @@ static void Fini() {
     delete cvmfs::fetcher_;
     cvmfs::fetcher_ = NULL;
   }
+  if (cvmfs::external_fetcher_) {
+    delete cvmfs::external_fetcher_;
+    cvmfs::external_fetcher_ = NULL;
+  }
 
   tracer::Fini();
   if (g_signature_ready) cvmfs::signature_manager_->Fini();
