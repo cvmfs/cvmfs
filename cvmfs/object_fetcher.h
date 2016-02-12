@@ -468,12 +468,37 @@ class HttpObjectFetcher :
     assert(object_file != NULL);
     assert(!object_hash.IsNull());
 
-    object_file->clear();
+    const bool decompress = true;
+    const std::string url = BuildRelativeUrl(object_hash);
+    return Download(url, decompress, &object_hash, object_file);
+  }
+
+  Failures Fetch(const std::string &relative_path,
+                 const bool         decompress,
+                       std::string *file_path) {
+    const shash::Any *expected_hash = NULL;
+    return Download(relative_path, decompress, expected_hash, file_path);
+  }
+
+ protected:
+  std::string BuildUrl(const std::string &relative_path) const {
+    return repo_url_ + "/" + relative_path;
+  }
+
+  std::string BuildRelativeUrl(const shash::Any &hash) const {
+    return "data/" + hash.MakePath();
+  }
+
+  Failures Download(const std::string &relative_path,
+                    const bool         decompress,
+                    const shash::Any  *expected_hash,
+                          std::string *file_path) {
+    file_path->clear();
 
     // create temporary file to host the fetching result
     const std::string tmp_path = temporary_directory_ + "/" +
-                                 object_hash.ToStringWithSuffix();
-    FILE *f = CreateTempFile(tmp_path, 0600, "w", object_file);
+                                 GetFileName(relative_path);
+    FILE *f = CreateTempFile(tmp_path, 0600, "w", file_path);
     if (NULL == f) {
       LogCvmfs(kLogDownload, kLogStderr,
                "failed to create temp file (errno: %d)", errno);
@@ -481,20 +506,25 @@ class HttpObjectFetcher :
     }
 
     // fetch and decompress the requested object
-    const std::string url = BuildUrl(object_hash);
-    download::JobInfo download_catalog(&url, true, false, f, &object_hash);
-    download::Failures retval = download_manager_->Fetch(&download_catalog);
+    const std::string url = BuildUrl(relative_path);
+    const bool probe_hosts = false;
+    download::JobInfo download_job(&url,
+                                        decompress,
+                                        probe_hosts,
+                                        f,
+                                        expected_hash);
+    download::Failures retval = download_manager_->Fetch(&download_job);
     const bool success = (retval == download::kFailOk);
     fclose(f);
 
     // check if download worked and remove temporary file if not
     if (!success) {
-      LogCvmfs(kLogDownload, kLogDebug, "failed to download object "
+      LogCvmfs(kLogDownload, kLogDebug, "failed to download file "
                                         "%s to '%s' (%d - %s)",
-               object_hash.ToString().c_str(), object_file->c_str(),
+               relative_path.c_str(), file_path->c_str(),
                retval, Code2Ascii(retval));
-      unlink(object_file->c_str());
-      object_file->clear();
+      unlink(file_path->c_str());
+      file_path->clear();
 
       // hand out the error status
       switch (retval) {
@@ -503,7 +533,7 @@ class HttpObjectFetcher :
 
         case download::kFailProxyHttp:
         case download::kFailHostHttp:
-          return (download_catalog.http_code == 404)
+          return (download_job.http_code == 404)
             ? BaseTN::kFailNotFound
             : BaseTN::kFailNetwork;
 
@@ -518,15 +548,6 @@ class HttpObjectFetcher :
 
     assert(success);
     return BaseTN::kFailOk;
-  }
-
- protected:
-  std::string BuildUrl(const std::string &relative_path) const {
-    return repo_url_ + "/" + relative_path;
-  }
-
-  std::string BuildUrl(const shash::Any &hash) const {
-    return BuildUrl("data/" + hash.MakePath());
   }
 
  private:
