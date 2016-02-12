@@ -62,6 +62,7 @@ class MemoryManager {
   static bool HasInstance() { return instance_ != NULL; }
   ~MemoryManager();
 
+  void AssignGlobalArenas();
   void *AssignLookasideBuffer(void *db);
   void ReleaseLookasideBuffer(void *buffer);
 

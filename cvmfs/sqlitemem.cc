@@ -76,6 +76,19 @@ void MemoryManager::LookasideBufferArena::PutBuffer(void *buffer) {
 
 MemoryManager *MemoryManager::instance_ = NULL;
 
+
+void MemoryManager::AssignGlobalArenas() {
+  int retval;
+
+  retval = sqlite3_config(SQLITE_CONFIG_SCRATCH, scratch_memory_, 8192, 16);
+  assert(retval == SQLITE_OK);
+
+  retval = sqlite3_config(SQLITE_CONFIG_PAGECACHE, page_cache_memory_,
+                          1280, 3275);
+  assert(retval == SQLITE_OK);
+}
+
+
 /**
  * Needs to be the first operation on an opened sqlite database.  Returns the
  * location of the buffer.
@@ -124,15 +137,10 @@ MemoryManager::MemoryManager()
   : scratch_memory_(smalloc(kScratchSize))
   , page_cache_memory_(smalloc(kPageCacheSize))
 {
-  int retval;
-
   lock_ =
     reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
-  retval = pthread_mutex_init(lock_, NULL);
+  int retval = pthread_mutex_init(lock_, NULL);
   assert(retval == 0);
-
-  retval = sqlite3_config(SQLITE_CONFIG_SCRATCH, scratch_memory_, 8192, 16);
-  assert(retval == SQLITE_OK);
 
   lookaside_buffer_arenas_.push_back(new LookasideBufferArena());
 }
