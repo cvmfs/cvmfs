@@ -282,10 +282,10 @@ void *S3FanoutManager::MainUpload(void *data) {
         if (s3fanout_mgr->VerifyAndFinalize(curl_error, info)) {
           curl_multi_add_handle(s3fanout_mgr->curl_multi_, easy_handle);
           int still_running = 0;
-          retval = curl_multi_socket_action(s3fanout_mgr->curl_multi_,
-                                            CURL_SOCKET_TIMEOUT,
-                                            0,
-                                            &still_running);
+          curl_multi_socket_action(s3fanout_mgr->curl_multi_,
+                                   CURL_SOCKET_TIMEOUT,
+                                   0,
+                                   &still_running);
         } else {
           // Return easy handle into pool and write result back
           s3fanout_mgr->ReleaseCurlHandle(info, easy_handle);
