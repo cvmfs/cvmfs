@@ -2642,6 +2642,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
                                               cvmfs::download_manager_);
   if (proxies == "") {
     *g_boot_error = "failed to discover HTTP proxy servers";
+    delete uuid;
     return loader::kFailWpad;
   }
   cvmfs::download_manager_->SetProxyChain(
