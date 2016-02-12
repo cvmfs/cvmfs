@@ -191,6 +191,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   letter.h letter.cc
   xattr.h xattr.cc
   reflog.h reflog.cc
+  reflog_sql.h reflog_sql.cc
 
   swissknife_zpipe.h swissknife_zpipe.cc
   swissknife_hash.h swissknife_hash.cc
