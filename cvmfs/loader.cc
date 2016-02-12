@@ -494,6 +494,19 @@ static CvmfsExports *LoadLibrary(const bool debug_mode,
   return *exports_ptr;
 }
 
+static void CloseLibrary() {
+#ifdef HAS_VALGRIND_HEADERS
+  // If the libcvmfs_fuse library is unloaded, valgrind can't resolve the
+  // symbols anymore.  We skip under valgrind.
+  if (!RUNNING_ON_VALGRIND) {
+#endif
+    dlclose(library_handle_);
+    library_handle_ = NULL;
+#ifdef HAS_VALGRIND_HEADERS
+  }
+#endif
+}
+
 
 Failures Reload(const int fd_progress, const bool stop_and_go) {
   int retval;
@@ -517,8 +530,7 @@ Failures Reload(const int fd_progress, const bool stop_and_go) {
 
   SendMsg2Socket(fd_progress, "Unloading Fuse module\n");
   cvmfs_exports_->fnFini();
-  dlclose(library_handle_);
-  library_handle_ = NULL;
+  CloseLibrary();
 
   if (stop_and_go) {
     CreateFile(*socket_path_ + ".paused", 0600);
@@ -959,16 +971,7 @@ int main(int argc, char *argv[]) {
   session = NULL;
   mount_options = NULL;
 
-#ifdef HAS_VALGRIND_HEADERS
-  // If the libcvmfs_fuse library is unloaded, valgrind can't resolve the 
-  // symbols anymore.  We skip under valgrind.
-  if (!RUNNING_ON_VALGRIND) {
-#endif
-    dlclose(library_handle_);
-    library_handle_ = NULL;
-#ifdef HAS_VALGRIND_HEADERS
-  }
-#endif
+  CloseLibrary();
 
   LogCvmfs(kLogCvmfs, kLogSyslog, "CernVM-FS: unmounted %s (%s)",
            mount_point_->c_str(), repository_name_->c_str());
