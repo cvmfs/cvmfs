@@ -20,11 +20,14 @@ class Reflog {
   static Reflog* Create(const std::string &database_path,
                         const std::string &repo_name);
 
-  void TakeDatabaseFileOwnership() {}
-  void DropDatabaseFileOwnership() {}
-  bool OwnsDatabaseFile() const    { return false; }
+  void TakeDatabaseFileOwnership();
+  void DropDatabaseFileOwnership();
+  bool OwnsDatabaseFile() const {
+    return database_.IsValid() && database_->OwnsFile();
+  }
 
   std::string fqrn() const;
+  std::string database_file() const;
 
  private:
   bool CreateDatabase(const std::string &database_path,

@@ -66,7 +66,25 @@ bool Reflog::OpenDatabase(const std::string &database_path) {
 }
 
 
+void Reflog::TakeDatabaseFileOwnership() {
+  assert(database_);
+  database_->TakeFileOwnership();
+}
+
+
+void Reflog::DropDatabaseFileOwnership() {
+  assert(database_);
+  database_->DropFileOwnership();
+}
+
+
 std::string Reflog::fqrn() const {
   assert(database_);
   return database_->GetProperty<std::string>(ReflogDatabase::kFqrnKey);
+}
+
+
+std::string Reflog::database_file() const {
+  assert(database_);
+  return database_->filename();
 }
