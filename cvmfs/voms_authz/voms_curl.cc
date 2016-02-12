@@ -200,6 +200,7 @@ ConfigureCurlHandle(CURL *curl_handle, pid_t pid, uid_t uid, gid_t gid,
         fclose(fp);
         LogCvmfs(kLogVoms, kLogStderr, "Credential file did not contain any "
                  "actual credentials.");
+        delete parm;
         return false;
       } else {
         LogCvmfs(kLogVoms, kLogDebug, "Certificate stack contains %d entries.",
