@@ -68,49 +68,23 @@ Catalog::Catalog(const PathString &path,
   database_ = NULL;
   uid_map_ = NULL;
   gid_map_ = NULL;
-  sql_listing_ = NULL;
-  sql_lookup_md5path_ = NULL;
-  sql_lookup_nested_ = NULL;
-  sql_list_nested_ = NULL;
-  sql_all_chunks_ = NULL;
-  sql_chunks_listing_ = NULL;
-  sql_lookup_xattrs_ = NULL;
 }
 
 
 Catalog::~Catalog() {
   pthread_mutex_destroy(lock_);
   free(lock_);
-  FinalizePreparedStatements();
   delete database_;
 }
 
 
 /**
  * InitPreparedStatement uses polymorphism in case of a r/w catalog.
- * FinalizePreparedStatements is called in the destructor where
- * polymorphism does not work any more and has to be called both in
- * the WritableCatalog and the Catalog destructor
+ * FinalizePreparedStatements is called in the r/w destructor where
+ * polymorphism does not work any more.
  */
 void Catalog::InitPreparedStatements() {
-  sql_listing_         = new SqlListing(database());
-  sql_lookup_md5path_  = new SqlLookupPathHash(database());
-  sql_lookup_nested_   = new SqlNestedCatalogLookup(database());
-  sql_list_nested_     = new SqlNestedCatalogListing(database());
-  sql_all_chunks_      = new SqlAllChunks(database());
-  sql_chunks_listing_  = new SqlChunksListing(database());
-  sql_lookup_xattrs_   = new SqlLookupXattrs(database());
-}
-
-
-void Catalog::FinalizePreparedStatements() {
-  delete sql_lookup_xattrs_;
-  delete sql_chunks_listing_;
-  delete sql_all_chunks_;
-  delete sql_listing_;
-  delete sql_lookup_md5path_;
-  delete sql_lookup_nested_;
-  delete sql_list_nested_;
+  // r/o statements are lazily initialized
 }
 
 
@@ -226,13 +200,14 @@ bool Catalog::LookupEntry(const shash::Md5 &md5path, const bool expand_symlink,
   assert(IsInitialized());
 
   pthread_mutex_lock(lock_);
-  sql_lookup_md5path_->BindPathHash(md5path);
-  bool found = sql_lookup_md5path_->FetchRow();
+  SqlLookupPathHash *sql = sql_lookup_md5path_.GetPtr(database());
+  sql->BindPathHash(md5path);
+  bool found = sql->FetchRow();
   if (found && (dirent != NULL)) {
-    *dirent = sql_lookup_md5path_->GetDirent(this, expand_symlink);
+    *dirent = sql->GetDirent(this, expand_symlink);
     FixTransitionPoint(md5path, dirent);
   }
-  sql_lookup_md5path_->Reset();
+  sql->Reset();
   pthread_mutex_unlock(lock_);
 
   return found;
@@ -271,12 +246,13 @@ bool Catalog::LookupXattrsMd5Path(
   assert(IsInitialized());
 
   pthread_mutex_lock(lock_);
-  sql_lookup_xattrs_->BindPathHash(md5path);
-  bool found = sql_lookup_xattrs_->FetchRow();
+  SqlLookupXattrs *sql = sql_lookup_xattrs_.GetPtr(database());
+  sql->BindPathHash(md5path);
+  bool found = sql->FetchRow();
   if (found && (xattrs != NULL)) {
-    *xattrs = sql_lookup_xattrs_->GetXattrs();
+    *xattrs = sql->GetXattrs();
   }
-  sql_lookup_xattrs_->Reset();
+  sql->Reset();
   pthread_mutex_unlock(lock_);
 
   return found;
@@ -298,15 +274,16 @@ bool Catalog::ListingMd5PathStat(const shash::Md5 &md5path,
   StatEntry entry;
 
   pthread_mutex_lock(lock_);
-  sql_listing_->BindPathHash(md5path);
-  while (sql_listing_->FetchRow()) {
-    dirent = sql_listing_->GetDirent(this);
+  SqlListing *sql = sql_listing_.GetPtr(database());
+  sql->BindPathHash(md5path);
+  while (sql->FetchRow()) {
+    dirent = sql->GetDirent(this);
     FixTransitionPoint(md5path, &dirent);
     entry.name = dirent.name();
     entry.info = dirent.GetStatStructure();
     listing->PushBack(entry);
   }
-  sql_listing_->Reset();
+  sql->Reset();
   pthread_mutex_unlock(lock_);
 
   return true;
@@ -328,13 +305,14 @@ bool Catalog::ListingMd5Path(const shash::Md5 &md5path,
   assert(IsInitialized());
 
   pthread_mutex_lock(lock_);
-  sql_listing_->BindPathHash(md5path);
-  while (sql_listing_->FetchRow()) {
-    DirectoryEntry dirent = sql_listing_->GetDirent(this, expand_symlink);
+  SqlListing *sql = sql_listing_.GetPtr(database());
+  sql->BindPathHash(md5path);
+  while (sql->FetchRow()) {
+    DirectoryEntry dirent = sql->GetDirent(this, expand_symlink);
     FixTransitionPoint(md5path, &dirent);
     listing->push_back(dirent);
   }
-  sql_listing_->Reset();
+  sql->Reset();
   pthread_mutex_unlock(lock_);
 
   return true;
@@ -342,18 +320,18 @@ bool Catalog::ListingMd5Path(const shash::Md5 &md5path,
 
 
 bool Catalog::AllChunksBegin() {
-  return sql_all_chunks_->Open();
+  return sql_all_chunks_.GetPtr(database())->Open();
 }
 
 
 bool Catalog::AllChunksNext(shash::Any *hash, zlib::Algorithms *compression_alg)
 {
-  return sql_all_chunks_->Next(hash, compression_alg);
+  return sql_all_chunks_.GetPtr(database())->Next(hash, compression_alg);
 }
 
 
 bool Catalog::AllChunksEnd() {
-  return sql_all_chunks_->Close();
+  return sql_all_chunks_.GetPtr(database())->Close();
 }
 
 
@@ -369,11 +347,12 @@ bool Catalog::ListMd5PathChunks(const shash::Md5  &md5path,
   assert(IsInitialized() && chunks->IsEmpty());
 
   pthread_mutex_lock(lock_);
-  sql_chunks_listing_->BindPathHash(md5path);
-  while (sql_chunks_listing_->FetchRow()) {
-    chunks->PushBack(sql_chunks_listing_->GetFileChunk(interpret_hashes_as));
+  SqlChunksListing *sql = sql_chunks_listing_.GetPtr(database());
+  sql->BindPathHash(md5path);
+  while (sql->FetchRow()) {
+    chunks->PushBack(sql->GetFileChunk(interpret_hashes_as));
   }
-  sql_chunks_listing_->Reset();
+  sql->Reset();
   pthread_mutex_unlock(lock_);
 
   return true;
@@ -567,14 +546,15 @@ const Catalog::NestedCatalogList& Catalog::ListNestedCatalogs() const {
   if (nested_catalog_cache_dirty_) {
     LogCvmfs(kLogCatalog, kLogDebug, "refreshing nested catalog cache of '%s'",
              path().c_str());
-    while (sql_list_nested_->FetchRow()) {
+    SqlNestedCatalogListing *sql = sql_list_nested_.GetPtr(database());
+    while (sql->FetchRow()) {
       NestedCatalog nested;
-      nested.path = sql_list_nested_->GetMountpoint();
-      nested.hash = sql_list_nested_->GetContentHash();
-      nested.size = sql_list_nested_->GetSize();
+      nested.path = sql->GetMountpoint();
+      nested.hash = sql->GetContentHash();
+      nested.size = sql->GetSize();
       nested_catalog_cache_.push_back(nested);
     }
-    sql_list_nested_->Reset();
+    sql->Reset();
     nested_catalog_cache_dirty_ = false;
   }
 
@@ -602,13 +582,14 @@ bool Catalog::FindNested(const PathString &mountpoint,
                          shash::Any *hash, uint64_t *size) const
 {
   pthread_mutex_lock(lock_);
-  sql_lookup_nested_->BindSearchPath(mountpoint);
-  bool found = sql_lookup_nested_->FetchRow();
+  SqlNestedCatalogLookup *sql = sql_lookup_nested_.GetPtr(database());
+  sql->BindSearchPath(mountpoint);
+  bool found = sql->FetchRow();
   if (found && (hash != NULL)) {
-    *hash = sql_lookup_nested_->GetContentHash();
-    *size = sql_lookup_nested_->GetSize();
+    *hash = sql->GetContentHash();
+    *size = sql->GetSize();
   }
-  sql_lookup_nested_->Reset();
+  sql->Reset();
   pthread_mutex_unlock(lock_);
 
   return found;

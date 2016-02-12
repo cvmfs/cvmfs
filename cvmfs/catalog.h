@@ -231,7 +231,6 @@ class Catalog : public SingleCopy {
   }
 
   virtual void InitPreparedStatements();
-  void FinalizePreparedStatements();
 
   void AddChild(Catalog *child);
   void RemoveChild(Catalog *child);
@@ -264,6 +263,26 @@ class Catalog : public SingleCopy {
     kVomsPresent,  // voms_authz property available
   };
 
+  /**
+   * Only allocate the object if it is actually used.  Not all SQlite statements
+   * are required in all use cases, and they consume a few kB per database.
+   */
+  template <class TSql>
+  class LazySqlPtr : SingleCopy {
+   public:
+    inline LazySqlPtr() : ref_(NULL) {}
+    inline ~LazySqlPtr() { delete ref_; }
+    inline bool IsAlive() const { return ref_ != NULL; }
+    inline TSql *GetPtr(const CatalogDatabase &database) const {
+      if (ref_ == NULL)
+        ref_ = new TSql(database);
+      return ref_;
+    }
+
+   private:
+    mutable TSql *ref_;
+  };
+
   bool LookupEntry(const shash::Md5 &md5path, const bool expand_symlink,
                    DirectoryEntry *dirent) const;
   CatalogDatabase *database_;
@@ -293,13 +312,13 @@ class Catalog : public SingleCopy {
   const OwnerMap *uid_map_;
   const OwnerMap *gid_map_;
 
-  SqlListing               *sql_listing_;
-  SqlLookupPathHash        *sql_lookup_md5path_;
-  SqlNestedCatalogLookup   *sql_lookup_nested_;
-  SqlNestedCatalogListing  *sql_list_nested_;
-  SqlAllChunks             *sql_all_chunks_;
-  SqlChunksListing         *sql_chunks_listing_;
-  SqlLookupXattrs          *sql_lookup_xattrs_;
+  LazySqlPtr<SqlListing>               sql_listing_;
+  LazySqlPtr<SqlLookupPathHash>        sql_lookup_md5path_;
+  LazySqlPtr<SqlNestedCatalogLookup>   sql_lookup_nested_;
+  LazySqlPtr<SqlNestedCatalogListing>  sql_list_nested_;
+  LazySqlPtr<SqlAllChunks>             sql_all_chunks_;
+  LazySqlPtr<SqlChunksListing>         sql_chunks_listing_;
+  LazySqlPtr<SqlLookupXattrs>          sql_lookup_xattrs_;
 
   mutable HashVector        referenced_hashes_;
 };  // class Catalog
