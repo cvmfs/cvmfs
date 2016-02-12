@@ -425,8 +425,8 @@ TEST_F(T_Util, MakePipe) {
   void *buffer_output = scalloc(100, sizeof(char));
   MakePipe(fd);
   write(fd[1], to_write.c_str(), to_write.length());
-  int bytes_read = read(fd[0], buffer_output, to_write.length());
-  EXPECT_EQ(bytes_read, to_write.length());
+  ssize_t bytes_read = read(fd[0], buffer_output, to_write.length());
+  EXPECT_EQ(static_cast<size_t>(bytes_read), to_write.length());
 
   EXPECT_STREQ(to_write.c_str(), static_cast<const char*>(buffer_output));
   ASSERT_DEATH(MakePipe(static_cast<int*>(NULL)), ".*");
@@ -439,8 +439,8 @@ TEST_F(T_Util, WritePipe) {
   void *buffer_output = scalloc(20, sizeof(char));
   MakePipe(fd);
   WritePipe(fd[1], to_write.c_str(), to_write.length());
-  int bytes_read = read(fd[0], buffer_output, to_write.length());
-  EXPECT_EQ(bytes_read, to_write.length());
+  ssize_t bytes_read = read(fd[0], buffer_output, to_write.length());
+  EXPECT_EQ(static_cast<size_t>(bytes_read), to_write.length());
 
   EXPECT_STREQ(to_write.c_str(), static_cast<const char*>(buffer_output));
   ASSERT_DEATH(WritePipe(-1, to_write.c_str(), to_write.length()),
@@ -501,8 +501,8 @@ TEST_F(T_Util, SafeWrite) {
   void *buffer_output = scalloc(20, sizeof(char));
   MakePipe(fd);
   SafeWrite(fd[1], to_write.c_str(), to_write.length());
-  int bytes_read = read(fd[0], buffer_output, to_write.length());
-  EXPECT_EQ(bytes_read, to_write.length());
+  ssize_t bytes_read = read(fd[0], buffer_output, to_write.length());
+  EXPECT_EQ(static_cast<size_t>(bytes_read), to_write.length());
   EXPECT_STREQ(to_write.c_str(), static_cast<const char*>(buffer_output));
   free(buffer_output);
 
@@ -622,8 +622,8 @@ TEST_F(T_Util, SendMes2Socket) {
   int new_connection = accept(server_fd, (struct sockaddr *) &client_addr,
       &client_length);
   ASSERT_LE(0, new_connection);
-  int bytes_read = read(new_connection, buffer, to_write.length());
-  EXPECT_EQ(bytes_read, to_write.length());
+  ssize_t bytes_read = read(new_connection, buffer, to_write.length());
+  EXPECT_EQ(static_cast<size_t>(bytes_read), to_write.length());
 
   EXPECT_STREQ(to_write.c_str(), static_cast<const char*>(buffer));
   close(new_connection);
@@ -1225,8 +1225,8 @@ TEST_F(T_Util, ExecuteBinary) {
       false,
       &gdb_pid);
   EXPECT_TRUE(result);
-  int bytes_read = read(fd_stdout, buffer, message.length());
-  EXPECT_EQ(bytes_read, message.length());
+  ssize_t bytes_read = read(fd_stdout, buffer, message.length());
+  EXPECT_EQ(static_cast<size_t>(bytes_read), message.length());
   string response(buffer, message.length());
   EXPECT_EQ(message, response);
 }
@@ -1275,8 +1275,8 @@ TEST_F(T_Util, ManagedExecCommandLine) {
       &pid);
   ASSERT_TRUE(success);
   close(fd_stdout[1]);
-  int bytes_read = read(fd_stdout[0], buffer, message.length());
-  EXPECT_EQ(bytes_read, message.length());
+  ssize_t bytes_read = read(fd_stdout[0], buffer, message.length());
+  EXPECT_EQ(static_cast<size_t>(bytes_read), message.length());
   string result(buffer);
   ASSERT_EQ(message, result);
   close(fd_stdout[0]);
