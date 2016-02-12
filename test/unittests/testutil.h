@@ -760,12 +760,19 @@ class MockHistory : public history::History,
 //------------------------------------------------------------------------------
 
 
+class MockReflog {};
+
+
+//------------------------------------------------------------------------------
+
+
 class MockObjectFetcher;
 
 template <>
 struct object_fetcher_traits<MockObjectFetcher> {
   typedef MockCatalog CatalogTN;
   typedef MockHistory HistoryTN;
+  typedef MockReflog  ReflogTN;
 };
 
 /**

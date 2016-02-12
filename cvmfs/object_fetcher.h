@@ -12,6 +12,7 @@
 #include "history_sqlite.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
+#include "reflog.h"
 #include "signature.h"
 
 /**
@@ -78,6 +79,7 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
  public:
   typedef typename object_fetcher_traits<DerivedT>::CatalogTN CatalogTN;
   typedef typename object_fetcher_traits<DerivedT>::HistoryTN HistoryTN;
+  typedef typename object_fetcher_traits<DerivedT>::ReflogTN  ReflogTN;
 
   typedef ObjectFetcherFailures::Failures Failures;
 
@@ -173,6 +175,10 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
     return kFailOk;
   }
 
+  Failures FetchReflog(ReflogTN **reflog) {
+    return kFailOk;
+  }
+
   Failures FetchManifest(UniquePtr<manifest::Manifest> *manifest) {
     manifest::Manifest *raw_manifest_ptr = NULL;
     Failures failure = FetchManifest(&raw_manifest_ptr);
@@ -254,7 +260,8 @@ const std::string AbstractObjectFetcher<DerivedT>::kManifestFilename =
  * verification.
  */
 template <class CatalogT = catalog::Catalog,
-          class HistoryT = history::SqliteHistory>
+          class HistoryT = history::SqliteHistory,
+          class ReflogT  = manifest::Reflog>
 class LocalObjectFetcher :
   public AbstractObjectFetcher<LocalObjectFetcher<CatalogT, HistoryT> >
 {
@@ -344,10 +351,11 @@ class LocalObjectFetcher :
   const std::string temporary_directory_;
 };
 
-template <class CatalogT, class HistoryT>
-struct object_fetcher_traits<LocalObjectFetcher<CatalogT, HistoryT> > {
+template <class CatalogT, class HistoryT, class ReflogT>
+struct object_fetcher_traits<LocalObjectFetcher<CatalogT, HistoryT, ReflogT> > {
     typedef CatalogT CatalogTN;
     typedef HistoryT HistoryTN;
+    typedef ReflogT  ReflogTN;
 };
 
 
@@ -357,7 +365,8 @@ struct object_fetcher_traits<LocalObjectFetcher<CatalogT, HistoryT> > {
  * and the downloaded data integrity.
  */
 template <class CatalogT = catalog::Catalog,
-          class HistoryT = history::SqliteHistory>
+          class HistoryT = history::SqliteHistory,
+          class ReflogT  = manifest::Reflog>
 class HttpObjectFetcher :
   public AbstractObjectFetcher<HttpObjectFetcher<CatalogT, HistoryT> >
 {
@@ -508,10 +517,11 @@ class HttpObjectFetcher :
   signature::SignatureManager *signature_manager_;
 };
 
-template <class CatalogT, class HistoryT>
-struct object_fetcher_traits<HttpObjectFetcher<CatalogT, HistoryT> > {
+template <class CatalogT, class HistoryT, class ReflogT>
+struct object_fetcher_traits<HttpObjectFetcher<CatalogT, HistoryT, ReflogT> > {
     typedef CatalogT CatalogTN;
     typedef HistoryT HistoryTN;
+    typedef ReflogT  ReflogTN;
 };
 
 #endif  // CVMFS_OBJECT_FETCHER_H_
