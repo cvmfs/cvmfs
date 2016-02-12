@@ -309,18 +309,17 @@ class UniquePtrBase : SingleCopy {
 
 template <class T>
 class UniquePtr : public UniquePtrBase<T, UniquePtr<T> > {
+  friend class UniquePtrBase<T, UniquePtr<T> >;
+
  private:
   typedef UniquePtrBase<T, UniquePtr<T> > BaseT;
  public:
-  friend class UniquePtrBase<T, UniquePtr<T> >;
   using BaseT::operator=;
   inline UniquePtr() : BaseT(NULL) { }
   inline explicit UniquePtr(T *ref) : BaseT(ref) { }
   inline T& operator*() const { return *BaseT::ref_; }
  protected:
-  void Free() {
-    delete BaseT::ref_;
-  }
+  void Free() { delete BaseT::ref_; }
 };
 
 template <>
