@@ -6,26 +6,38 @@
 
 #include <cassert>
 
+#include "smalloc.h"
+#include "util_concurrency.h"
+
+using namespace std;  // NOLINT
+
 ClientCtx *ClientCtx::instance_ = NULL;
 
-namespace {
-
-void TLSDestructor(void *data) {
-  ClientCtx::ThreadLocalStorage *tls =
-    static_cast<ClientCtx::ThreadLocalStorage *>(data);
-  delete tls;
-}
-
-}
 
 void ClientCtx::CleanupInstance() {
-  if (instance_ == NULL)
-    return;
-
-  int retval = pthread_key_delete(instance_->thread_local_storage_);
-  assert(retval == 0);
   delete instance_;
   instance_ = NULL;
+}
+
+
+ClientCtx::ClientCtx() {
+  lock_tls_blocks_ = reinterpret_cast<pthread_mutex_t *>(
+    smalloc(sizeof(pthread_mutex_t)));
+  int retval = pthread_mutex_init(lock_tls_blocks_, NULL);
+  assert(retval == 0);
+}
+
+
+ClientCtx::~ClientCtx() {
+  pthread_mutex_destroy(lock_tls_blocks_);
+  free(lock_tls_blocks_);
+
+  for (unsigned i = 0; i < tls_blocks_.size(); ++i) {
+    delete tls_blocks_[i];
+  }
+
+  int retval = pthread_key_delete(thread_local_storage_);
+  assert(retval == 0);
 }
 
 
@@ -33,7 +45,7 @@ ClientCtx *ClientCtx::GetInstance() {
   if (instance_ == NULL) {
     instance_ = new ClientCtx();
     int retval =
-      pthread_key_create(&instance_->thread_local_storage_, TLSDestructor);
+      pthread_key_create(&instance_->thread_local_storage_, TlsDestructor);
     assert(retval == 0);
   }
 
@@ -74,6 +86,8 @@ void ClientCtx::Set(uid_t uid, gid_t gid, pid_t pid) {
     tls = new ThreadLocalStorage(uid, gid, pid);
     int retval = pthread_setspecific(thread_local_storage_, tls);
     assert(retval == 0);
+    MutexLockGuard lock_guard(lock_tls_blocks_);
+    tls_blocks_.push_back(tls);
   } else {
     tls->uid = uid;
     tls->gid = gid;
@@ -81,6 +95,25 @@ void ClientCtx::Set(uid_t uid, gid_t gid, pid_t pid) {
     tls->is_set = true;
   }
 }
+
+
+void ClientCtx::TlsDestructor(void *data) {
+  ThreadLocalStorage *tls = static_cast<ClientCtx::ThreadLocalStorage *>(data);
+  delete tls;
+
+  assert(instance_);
+  MutexLockGuard lock_guard(instance_->lock_tls_blocks_);
+  for (vector<ThreadLocalStorage *>::iterator i =
+       instance_->tls_blocks_.begin(), iEnd = instance_->tls_blocks_.end();
+       i != iEnd; ++i)
+  {
+    if ((*i) == tls) {
+      instance_->tls_blocks_.erase(i);
+      break;
+    }
+  }
+}
+
 
 void ClientCtx::Unset() {
   ThreadLocalStorage *tls = static_cast<ThreadLocalStorage *>(
