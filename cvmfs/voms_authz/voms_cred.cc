@@ -319,6 +319,7 @@ struct ProxyHelper {
                "%s (errno=%d)", strerror(result), result);
       return NULL;
     }
+    assert(fd >= 0);
     return fdopen(fd, "r");
   }
 
