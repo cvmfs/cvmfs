@@ -20,10 +20,18 @@ class Statistics;
 namespace sqlite {
 
 /**
- * Singleton.  GetInstance / CleanupInstance not thread-safe,
- * rest is thread-safe
- * has to be first instantiated before sqlite stuff runs
- * needs to be cleaned up after sqlite3_shutdown
+ * The MemoryManager uses the sqlite hooks to optimize memory allocations.  It
+ * is tuned for reading the cvmfs file catalogs.  It provides a page cache of
+ * a few MB, a small scratch space and per-database lookaside buffers.
+ *
+ * It is implemented as a singleton.  GetInstance() will reserve memory blocks,
+ * AssignGlobalArenas will set the global sqlite configuration and
+ * CleanupInstance frees the memory blocks.  These three routines are not
+ * thread-safe.  AssignGlobalArenas has to be called as first sqlite operation,
+ * CleanupInstance has to be called after sqlite3_shutdown.  If the singleton
+ * is alive, read-only sqlite databases will automatically use it for their
+ * lookaside buffers (see sql.h).  Assignment of lookaside buffers is
+ * thread-safe.
  */
 class MemoryManager {
   FRIEND_TEST(T_Sqlitemem, LookasideBufferArena);
@@ -31,16 +39,32 @@ class MemoryManager {
 
  public:
   /**
-   * In practice, we hardly ever see scratch memory used.  Reserve 8kB for 16
-   * slots.
+   * In practice, we hardly ever see scratch memory used.  If it is used,
+   * the allocation size is <8kB
    */
-  const static unsigned kScratchSize = 8192 * 16;
+  const static unsigned kScratchSlotSize = 8192;
+  /**
+   * Sqlite ensures that never more slots than 2 times the number of threads are
+   * used.  In practice, it's much lower.
+   */
+  const static unsigned kScratchNoSlots = 8;
+  /**
+   * In total: 64kB scratch memory
+   */
+  const static unsigned kScratchSize = kScratchSlotSize * kScratchNoSlots;
 
   /**
-   * Empricially, the largest page cache allocation is 1272B.  Reserve 4MB in
-   * total.
+   * Empricially, the largest page cache allocation is 1296B.
    */
-  const static unsigned kPageCacheSize = 1280 * 3275;
+  const static unsigned kPageCacheSlotSize = 1300;
+  /**
+   * Number of pages that can be cached.
+   */
+  const static unsigned kPageCacheNoSlots = 4000;
+  /**
+   * In total: ~5MB
+   */
+  const static unsigned kPageCacheSize = kPageCacheSlotSize * kPageCacheNoSlots;
 
   /**
    * 32 bytes per slot is an empirically good value so that memory is not wasted

@@ -80,11 +80,12 @@ MemoryManager *MemoryManager::instance_ = NULL;
 void MemoryManager::AssignGlobalArenas() {
   int retval;
 
-  retval = sqlite3_config(SQLITE_CONFIG_SCRATCH, scratch_memory_, 8192, 16);
+  retval = sqlite3_config(SQLITE_CONFIG_SCRATCH, scratch_memory_,
+                          kScratchSlotSize, kScratchNoSlots);
   assert(retval == SQLITE_OK);
 
   retval = sqlite3_config(SQLITE_CONFIG_PAGECACHE, page_cache_memory_,
-                          1280, 3275);
+                          kPageCacheSlotSize, kPageCacheNoSlots);
   assert(retval == SQLITE_OK);
 }
 
@@ -134,8 +135,8 @@ void *MemoryManager::GetLookasideBuffer() {
 
 
 MemoryManager::MemoryManager()
-  : scratch_memory_(smalloc(kScratchSize))
-  , page_cache_memory_(smalloc(kPageCacheSize))
+  : scratch_memory_(sxmmap(kScratchSize))
+  , page_cache_memory_(sxmmap(kPageCacheSize))
 {
   lock_ =
     reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
@@ -150,8 +151,8 @@ MemoryManager::MemoryManager()
  * Must be executed only after sqlite3_shutdown.
  */
 MemoryManager::~MemoryManager() {
-  free(scratch_memory_);
-  free(page_cache_memory_);
+  sxunmap(scratch_memory_, kScratchSize);
+  sxunmap(page_cache_memory_, kPageCacheSize);
   for (unsigned i = 0; i < lookaside_buffer_arenas_.size(); ++i)
     delete lookaside_buffer_arenas_[i];
   pthread_mutex_destroy(lock_);
