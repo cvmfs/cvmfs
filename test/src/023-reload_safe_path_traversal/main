@@ -26,7 +26,11 @@ cvmfs_run_test() {
 
   # decrease the kernel cache timeout to safe some time
   sudo cvmfs_config umount || return 4
-  sudo cvmfs_config probe  || return 5
+  if running_on_osx; then
+    cvmfs_mount_direct sft.cern.ch || return 5
+  else
+    sudo cvmfs_config probe  || return 5
+  fi
 
   # do a detached find call
   # (sudo because sometimes the permissions in the repo are scrambled)

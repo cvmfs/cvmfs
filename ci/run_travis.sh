@@ -1,5 +1,6 @@
 #!/bin/bash
 
+
 report_error() {
   local log_file="$1"
 
@@ -36,7 +37,7 @@ echo ""
 echo ""
 # run the cpplint first
 echo -n "RUNNING CPPLINT ......................................................................................... "
-ci/run_cpplint.sh > cpplint.log 2>&1                                      || CPPLINT_FAILED=true report_error "$(pwd)/cpplint.log"
+ci/run_cpplint.sh > cpplint.log 2>&1                                      || { CPPLINT_FAILED=true; report_error "$(pwd)/cpplint.log"; }
 if ! $CPPLINT_FAILED ; then
   echo "Done"
 fi
@@ -45,7 +46,7 @@ fi
 echo -n "BUILDING CernVM-FS ...................................................................................... "
 mkdir -p build && cd build
 cmake -DBUILD_UNITTESTS=yes -DBUILD_PRELOADER=yes .. > build.log 2>&1  && \
-make >> "$(pwd)/build.log" 2>&1                                           || BUILD_FAILED=true report_error "$(pwd)/build.log"
+make >> "$(pwd)/build.log" 2>&1                                           || { BUILD_FAILED=true; report_error "$(pwd)/build.log"; }
 if ! $BUILD_FAILED ; then
   echo "Done"
 fi
@@ -53,7 +54,7 @@ fi
 #running the unit tests on mac fails because travis osx machines have limited resources
 echo -n "RUNNING UNIT TESTS ...................................................................................... "
 if running_on_linux; then
-  test/unittests/cvmfs_unittests --gtest_shuffle --gtest_filter="-*Slow:T_Dns.CaresResolverLocalhost:T_Dns.NormalResolverCombined:T_Dns.CaresResolverMany" > unittests.log 2>&1  || UNITTESTS_FAILED=true report_error "$(pwd)/unittests.log"
+  test/unittests/cvmfs_unittests --gtest_shuffle --gtest_filter="-*Slow:T_Dns.CaresResolverLocalhost:T_Dns.NormalResolverCombined:T_Dns.CaresResolverMany" > unittests.log 2>&1  || { UNITTESTS_FAILED=true; report_error "$(pwd)/unittests.log"; }
   if ! $UNITTESTS_FAILED ; then
     echo "Done"
   fi

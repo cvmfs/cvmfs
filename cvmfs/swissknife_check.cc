@@ -687,7 +687,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
       return 1;
     }
 
-    if (!this->InitSignatureManager(pubkey_path, trusted_certs)) {
+    if (!this->InitVerifyingSignatureManager(pubkey_path, trusted_certs)) {
       return 1;
     }
   }

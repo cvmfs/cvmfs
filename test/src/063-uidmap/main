@@ -4,8 +4,8 @@ cvmfs_test_name="Uid/Gid Mapping of files and directories"
 cvmfs_run_test() {
   logfile=$1
 
-  local uid_map=$(mktemp)
-  local gid_map=$(mktemp)
+  local uid_map=$(pwd)/uid.map
+  local gid_map=$(pwd)/gid.map
 
   echo "* 1337" > "$uid_map"
   echo "* 1338" > "$gid_map"
@@ -21,8 +21,8 @@ cvmfs_run_test() {
     return 1
   fi
 
-  local discovered_uid=$(stat -c %u /cvmfs/grid.cern.ch)
-  local discovered_gid=$(stat -c %g /cvmfs/grid.cern.ch)
+  local discovered_uid=$(stat_wrapper %u /cvmfs/grid.cern.ch)
+  local discovered_gid=$(stat_wrapper %g /cvmfs/grid.cern.ch)
 
   echo "$discovered_uid $discovered_gid"
   if [ "x1337" != "x$discovered_uid" ]; then
