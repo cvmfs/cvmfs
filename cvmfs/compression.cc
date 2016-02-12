@@ -42,6 +42,23 @@ static bool CopyFile2File(FILE *fsrc, FILE *fdest) {
   return true;
 }
 
+bool CopyPath2File(const std::string &src, FILE *fdest) {
+  int retval = -1;
+  struct stat info;
+
+  FILE *fsrc = fopen(src.c_str(), "r");
+  if (!fsrc) goto file_copy_final;
+
+  if (!CopyFile2File(fsrc, fdest)) goto file_copy_final;
+  retval = fstat(fileno(fsrc), &info);
+  retval |= fchmod(fileno(fdest), info.st_mode);
+
+ file_copy_final:
+  if (fsrc) fclose(fsrc);
+  if (fdest) fclose(fdest);
+  return retval == 0;
+}
+
 
 bool CopyPath2Path(const string &src, const string &dest) {
   FILE *fsrc = NULL;
