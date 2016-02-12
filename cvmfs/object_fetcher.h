@@ -84,6 +84,7 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
   typedef ObjectFetcherFailures::Failures Failures;
 
   static const std::string kManifestFilename;
+  static const std::string kReflogFilename;
 
  public:
   /**
@@ -176,6 +177,19 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
   }
 
   Failures FetchReflog(ReflogTN **reflog) {
+    std::string tmp_path;
+    const bool decompress = false;
+    Failures failure = Fetch(kReflogFilename, decompress, &tmp_path);
+    if (failure != kFailOk) {
+      return failure;
+    }
+
+    *reflog = ReflogTN::Open(tmp_path);
+    if (NULL == *reflog) {
+      return kFailLocalIO;
+    }
+
+    (*reflog)->TakeDatabaseFileOwnership();
     return kFailOk;
   }
 
@@ -206,6 +220,13 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
                                     is_nested,
                                     parent);
     if (failure == kFailOk) *catalog = raw_catalog_ptr;
+    return failure;
+  }
+
+  Failures FetchReflog(UniquePtr<ReflogTN>  *reflog) {
+    ReflogTN *raw_reflog_ptr = NULL;
+    Failures failure = FetchReflog(&raw_reflog_ptr);
+    if (failure == kFailOk) *reflog = raw_reflog_ptr;
     return failure;
   }
 
@@ -260,6 +281,9 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
 template <class DerivedT>
 const std::string AbstractObjectFetcher<DerivedT>::kManifestFilename =
                                                               ".cvmfspublished";
+template <class DerivedT>
+const std::string AbstractObjectFetcher<DerivedT>::kReflogFilename =
+                                                                 ".cvmfsreflog";
 
 
 /**
