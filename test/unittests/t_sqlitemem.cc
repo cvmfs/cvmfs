@@ -24,6 +24,7 @@ class T_Sqlitemem : public ::testing::Test {
 
   virtual void TearDown() {
     MemoryManager::CleanupInstance();
+    EXPECT_FALSE(MemoryManager::HasInstance());
   }
 
   MemoryManager *mem_mgr_;
