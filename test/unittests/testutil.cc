@@ -656,3 +656,10 @@ bool MockHistory::GetHashes(std::vector<shash::Any> *hashes) const {
                  hashes->begin(), MockHistory::get_hash);
   return true;
 }
+
+
+//------------------------------------------------------------------------------
+
+
+MockReflog::MockReflog()
+  : owns_database_file_(false) {}

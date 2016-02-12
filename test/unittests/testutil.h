@@ -760,7 +760,20 @@ class MockHistory : public history::History,
 //------------------------------------------------------------------------------
 
 
-class MockReflog {};
+class MockReflog {
+ public:
+  static MockReflog* Open(const std::string &path) { return new MockReflog(); }
+
+  void TakeDatabaseFileOwnership() { owns_database_file_ = true;  }
+  void DropDatabaseFileOwnership() { owns_database_file_ = false; }
+  bool OwnsDatabaseFile() const    { return owns_database_file_;  }
+
+ protected:
+  MockReflog();
+
+ private:
+  bool owns_database_file_;
+};
 
 
 //------------------------------------------------------------------------------
