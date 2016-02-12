@@ -800,6 +800,37 @@ TYPED_TEST(T_ObjectFetcher, FetchCatalogSlow) {
 }
 
 
+TYPED_TEST(T_ObjectFetcher, FetchReflogSlow) {
+  UniquePtr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
+  ASSERT_TRUE(object_fetcher.IsValid());
+
+  typename TypeParam::ReflogTN *reflog = NULL;
+  typename TypeParam::Failures retval =
+    object_fetcher->FetchReflog(&reflog);
+  EXPECT_EQ(TypeParam::kFailOk, retval);
+  ASSERT_NE(static_cast<typename TypeParam::ReflogTN*>(NULL), reflog);
+
+  if (TestFixture::NeedsFilesystemSandbox()) {
+    EXPECT_LE(1u, TestFixture::CountTemporaryFiles());
+  }
+  delete reflog;
+  if (TestFixture::NeedsFilesystemSandbox()) {
+    EXPECT_EQ(0u, TestFixture::CountTemporaryFiles());
+  }
+
+  UniquePtr<typename TypeParam::ReflogTN> reflog_ptr;
+  EXPECT_FALSE(reflog_ptr.IsValid());
+  typename TypeParam::Failures retval2 =
+    object_fetcher->FetchReflog(&reflog_ptr);
+  EXPECT_EQ(TypeParam::kFailOk, retval2);
+  ASSERT_TRUE(reflog_ptr.IsValid());
+
+  if (TestFixture::NeedsFilesystemSandbox()) {
+    EXPECT_LE(0u, TestFixture::CountTemporaryFiles());
+  }
+}
+
+
 TYPED_TEST(T_ObjectFetcher, FetchInvalidCatalogSlow) {
   UniquePtr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
   ASSERT_TRUE(object_fetcher.IsValid());
