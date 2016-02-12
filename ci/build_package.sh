@@ -52,8 +52,4 @@ echo "++ $command_tmpl"
 # run the build script
 echo "switching to $CVMFS_BUILD_LOCATION..."
 cd "$CVMFS_BUILD_LOCATION"
-
-std_out="$(pwd)/build_stdout"
-std_err="$(pwd)/build_stderr"
-echo "running build script (logging to $std_out / $std_err)"
-$command_tmpl > $std_out 2> $std_err
+$command_tmpl
