@@ -49,9 +49,9 @@ class MemoryManager {
   const static unsigned kLookasideSlotSize = 32;
 
   /**
-   * 160 slots with 32bytes accumulate to 5kB.  See LookasideBufferArena below.
+   * 128 slots with 32bytes accumulate to 4kB.  See LookasideBufferArena below.
    */
-  const static unsigned kLookasideSlotsPerDb = 160;
+  const static unsigned kLookasideSlotsPerDb = 128;
 
   static MemoryManager *GetInstance() {
     if (instance_ == NULL)
@@ -78,7 +78,7 @@ class MemoryManager {
   class LookasideBufferArena {
    public:
     /**
-     * Accumulates to 5kB.
+     * Accumulates to 4kB.
      */
     const static unsigned kBufferSize =
       kLookasideSlotSize * kLookasideSlotsPerDb;
@@ -89,7 +89,7 @@ class MemoryManager {
      */
     const static unsigned kBuffersPerArena = 128;
     /**
-     * 640kB = 128 5kB buffers.
+     * 512kB = 128 4kB buffers.
      */
     const static unsigned kArenaSize = kBuffersPerArena * kBufferSize;
     /**

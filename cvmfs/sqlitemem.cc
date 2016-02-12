@@ -8,7 +8,6 @@
 #include "sqlitemem.h"
 
 #include <cstddef>
-#include <cstdio>
 #include <cstring>
 
 #include "duplex_sqlite3.h"
