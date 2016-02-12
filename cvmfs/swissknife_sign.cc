@@ -76,6 +76,13 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
                                download_manager(),
                                signature_manager());
 
+  UniquePtr<manifest::Reflog> reflog;
+  reflog = GetOrCreateReflog(object_fetcher, repo_name);
+  if (!reflog) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch or create Reflog");
+    return 1;
+  }
+
   LogCvmfs(kLogCvmfs, kLogStdout, "Signing %s", manifest_path.c_str());
   {
     // Load Manifest
@@ -188,10 +195,22 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     free(sig);
     fclose(fmanifest);
 
-    // Upload manifest
-    spooler->Upload(manifest_path, ".cvmfspublished");
+    // Commit and upload Reflog database
+    const std::string reflog_db_file = reflog->database_file();
+    reflog->DropDatabaseFileOwnership();
+    delete reflog.Release();
+    spooler->UploadReflog(reflog_db_file);
     spooler->WaitForUpload();
+    unlink(reflog_db_file.c_str());
+    if (spooler->GetNumberOfErrors()) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to upload Reflog (errors: %d)",
+               spooler->GetNumberOfErrors());
+      return 1;
+    }
 
+    // Upload manifest
+    spooler->UploadManifest(manifest_path);
+    spooler->WaitForUpload();
     unlink(manifest_path.c_str());
     if (spooler->GetNumberOfErrors()) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to commit manifest (errors: %d)",
@@ -228,4 +247,31 @@ void swissknife::CommandSign::MetainfoUploadCallback(
              result.return_code);
   }
   metainfo_hash_.Set(metainfo_hash);
+}
+
+
+template <class ObjectFetcherT>
+manifest::Reflog* swissknife::CommandSign::GetOrCreateReflog(
+                                              ObjectFetcherT    &object_fetcher,
+                                              const std::string &repo_name) {
+  // try to fetch the Reflog from the backend storage first
+  manifest::Reflog *reflog = NULL;
+  typename ObjectFetcherT::Failures f = object_fetcher.FetchReflog(&reflog);
+
+  if (f == ObjectFetcherT::kFailOk) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "fetched reflog '%s' from backend storage",
+                                   reflog->database_file().c_str());
+    return reflog;
+  } else if (f != ObjectFetcherT::kFailNotFound) {
+    return NULL;
+  }
+
+  // create a new Reflog if there was none found yet
+  const std::string tmp_path_prefix = object_fetcher.temporary_directory() +
+                                      "/new_reflog";
+  const std::string tmp_path = CreateTempPath(tmp_path_prefix, 0600);
+
+  LogCvmfs(kLogCvmfs, kLogDebug, "creating new reflog '%s' for %s",
+                                 tmp_path.c_str(), repo_name.c_str());
+  return manifest::Reflog::Create(tmp_path, repo_name);
 }

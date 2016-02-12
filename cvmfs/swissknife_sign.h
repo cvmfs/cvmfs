@@ -8,6 +8,7 @@
 #include <string>
 
 #include "hash.h"
+#include "reflog.h"
 #include "swissknife.h"
 #include "util_concurrency.h"
 
@@ -46,6 +47,10 @@ class CommandSign : public Command {
  protected:
   void CertificateUploadCallback(const upload::SpoolerResult &result);
   void MetainfoUploadCallback(const upload::SpoolerResult &result);
+
+  template <class ObjectFetcherT>
+  manifest::Reflog* GetOrCreateReflog(ObjectFetcherT    &object_fetcher,
+                                      const std::string &repo_name);
 
  private:
   Future<shash::Any> certificate_hash_;
