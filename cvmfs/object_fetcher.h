@@ -230,13 +230,19 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
     return failure;
   }
 
- public:
   bool HasHistory() {
     shash::Any history_hash = GetHistoryHash();
     return !history_hash.IsNull();
   }
 
+  const std::string& temporary_directory() const {
+    return temporary_directory_;
+  }
+
  protected:
+  AbstractObjectFetcher(const std::string &temp_dir)
+    : temporary_directory_(temp_dir) {}
+
   /**
    * Internal function used to download objects defined by the given content
    * hash. This needs to be implemented depending on the concrete implementation
@@ -276,6 +282,9 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
 
     return manifest->history();
   }
+
+ private:
+  const std::string temporary_directory_;
 };
 
 template <class DerivedT>
@@ -295,14 +304,14 @@ template <class CatalogT = catalog::Catalog,
           class HistoryT = history::SqliteHistory,
           class ReflogT  = manifest::Reflog>
 class LocalObjectFetcher :
-  public AbstractObjectFetcher<LocalObjectFetcher<CatalogT, HistoryT> >
+  public AbstractObjectFetcher<LocalObjectFetcher<CatalogT, HistoryT, ReflogT> >
 {
  protected:
-  typedef LocalObjectFetcher<CatalogT, HistoryT> ThisTN;
-  typedef AbstractObjectFetcher<ThisTN>          BaseTN;
+  typedef LocalObjectFetcher<CatalogT, HistoryT, ReflogT> ThisTN;
+  typedef AbstractObjectFetcher<ThisTN>                   BaseTN;
 
  public:
-  typedef typename BaseTN::Failures              Failures;
+  typedef typename BaseTN::Failures Failures;
 
  public:
   /**
@@ -313,8 +322,8 @@ class LocalObjectFetcher :
    */
   LocalObjectFetcher(const std::string &base_path,
                      const std::string &temp_dir)
-    : base_path_(base_path)
-    , temporary_directory_(temp_dir) {}
+    : BaseTN(temp_dir)
+    , base_path_(base_path) {}
 
   using BaseTN::FetchManifest;  // un-hiding convenience overload
   Failures FetchManifest(manifest::Manifest** manifest) {
@@ -353,7 +362,7 @@ class LocalObjectFetcher :
     }
 
     // create a temporary file to store the (decompressed) object file
-    const std::string tmp_path = temporary_directory_ + "/" +
+    const std::string tmp_path = BaseTN::temporary_directory() + "/" +
                                  GetFileName(relative_path);
     FILE *f = CreateTempFile(tmp_path, 0600, "w", file_path);
     if (NULL == f) {
@@ -392,7 +401,6 @@ class LocalObjectFetcher :
 
  private:
   const std::string base_path_;
-  const std::string temporary_directory_;
 };
 
 template <class CatalogT, class HistoryT, class ReflogT>
@@ -412,14 +420,14 @@ template <class CatalogT = catalog::Catalog,
           class HistoryT = history::SqliteHistory,
           class ReflogT  = manifest::Reflog>
 class HttpObjectFetcher :
-  public AbstractObjectFetcher<HttpObjectFetcher<CatalogT, HistoryT> >
+  public AbstractObjectFetcher<HttpObjectFetcher<CatalogT, HistoryT, ReflogT> >
 {
  protected:
-  typedef HttpObjectFetcher<CatalogT, HistoryT>  ThisTN;
-  typedef AbstractObjectFetcher<ThisTN>          BaseTN;
+  typedef HttpObjectFetcher<CatalogT, HistoryT, ReflogT>  ThisTN;
+  typedef AbstractObjectFetcher<ThisTN>                   BaseTN;
 
  public:
-  typedef typename BaseTN::Failures              Failures;
+  typedef typename BaseTN::Failures Failures;
 
  public:
   /**
@@ -438,9 +446,12 @@ class HttpObjectFetcher :
                     const std::string           &repo_url,
                     const std::string           &temp_dir,
                     download::DownloadManager   *download_mgr,
-                    signature::SignatureManager *signature_mgr) :
-    repo_url_(repo_url), repo_name_(repo_name), temporary_directory_(temp_dir),
-    download_manager_(download_mgr), signature_manager_(signature_mgr) {}
+                    signature::SignatureManager *signature_mgr)
+    : BaseTN(temp_dir)
+    , repo_url_(repo_url)
+    , repo_name_(repo_name)
+    , download_manager_(download_mgr)
+    , signature_manager_(signature_mgr) {}
 
  public:
   using BaseTN::FetchManifest;  // un-hiding convenience overload
@@ -520,7 +531,7 @@ class HttpObjectFetcher :
     file_path->clear();
 
     // create temporary file to host the fetching result
-    const std::string tmp_path = temporary_directory_ + "/" +
+    const std::string tmp_path = BaseTN::temporary_directory() + "/" +
                                  GetFileName(relative_path);
     FILE *f = CreateTempFile(tmp_path, 0600, "w", file_path);
     if (NULL == f) {
@@ -577,7 +588,6 @@ class HttpObjectFetcher :
  private:
   const std::string            repo_url_;
   const std::string            repo_name_;
-  const std::string            temporary_directory_;
   download::DownloadManager   *download_manager_;
   signature::SignatureManager *signature_manager_;
 };
