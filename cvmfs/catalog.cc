@@ -74,6 +74,7 @@ Catalog::Catalog(const PathString &path,
 Catalog::~Catalog() {
   pthread_mutex_destroy(lock_);
   free(lock_);
+  FinalizePreparedStatements();
   delete database_;
 }
 
@@ -85,6 +86,17 @@ Catalog::~Catalog() {
  */
 void Catalog::InitPreparedStatements() {
   // r/o statements are lazily initialized
+}
+
+
+void Catalog::FinalizePreparedStatements() {
+  sql_listing_.Free();
+  sql_lookup_md5path_.Free();
+  sql_lookup_nested_.Free();
+  sql_list_nested_.Free();
+  sql_all_chunks_.Free();
+  sql_chunks_listing_.Free();
+  sql_lookup_xattrs_.Free();
 }
 
 
