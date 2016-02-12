@@ -448,6 +448,13 @@ MockObjectFetcher::Fetch(const shash::Any   &object_hash,
   return MockObjectFetcher::kFailOk;
 }
 
+MockObjectFetcher::Failures
+MockObjectFetcher::Fetch(const std::string &relative_path,
+                         const bool         decompress,
+                         std::string *file_path) {
+  return MockObjectFetcher::kFailOk;
+}
+
 bool MockObjectFetcher::ObjectExists(const shash::Any &object_hash) const {
   return MockCatalog::Exists(object_hash) ||
          MockHistory::Exists(object_hash);

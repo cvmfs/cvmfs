@@ -229,6 +229,14 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
     return static_cast<DerivedT*>(this)->Fetch(object_hash, file_path);
   }
 
+  Failures Fetch(const std::string &relative_path,
+                 const bool         decompress,
+                       std::string *file_path) {
+    return static_cast<DerivedT*>(this)->Fetch(relative_path,
+                                               decompress,
+                                               file_path);
+  }
+
   /**
    * Retrieves the history content hash of the HEAD history database from the
    * repository's manifest
@@ -300,17 +308,29 @@ class LocalObjectFetcher :
     assert(file_path != NULL);
     file_path->clear();
 
+    const std::string relative_path = BuildRelativePath(object_hash);
+    const bool        decompress    = true;
+    return Fetch(relative_path, decompress, file_path);
+  }
+
+
+  Failures Fetch(const std::string &relative_path,
+                 const bool         decompress,
+                       std::string *file_path) {
+    assert(file_path != NULL);
+    file_path->clear();
+
     // check if the requested file object is available locally
-    const std::string source = BuildPath(object_hash);
+    const std::string source = BuildPath(relative_path);
     if (!FileExists(source)) {
-      LogCvmfs(kLogDownload, kLogDebug, "failed to locate object %s",
-               object_hash.ToStringWithSuffix().c_str());
+      LogCvmfs(kLogDownload, kLogDebug, "failed to locate file '%s'",
+               relative_path.c_str());
       return BaseTN::kFailNotFound;
     }
 
-    // create a temporary file to store the decompressed object file
+    // create a temporary file to store the (decompressed) object file
     const std::string tmp_path = temporary_directory_ + "/" +
-                                 object_hash.ToStringWithSuffix();
+                                 GetFileName(relative_path);
     FILE *f = CreateTempFile(tmp_path, 0600, "w", file_path);
     if (NULL == f) {
       LogCvmfs(kLogDownload, kLogStderr,
@@ -318,16 +338,17 @@ class LocalObjectFetcher :
       return BaseTN::kFailLocalIO;
     }
 
-    // decompress the requested object file
-    const bool success = zlib::DecompressPath2File(source, f);
+    // decompress or copy the requested object file
+    const bool success = (decompress)
+      ? zlib::DecompressPath2File(source, f)
+      : CopyPath2File(source, f);
     fclose(f);
 
     // check the decompression success and remove the temporary file otherwise
     if (!success) {
-      LogCvmfs(kLogDownload, kLogDebug, "failed to extract object %s from '%s' "
+      LogCvmfs(kLogDownload, kLogDebug, "failed to fetch file from '%s' "
                                         "to '%s' (errno: %d)",
-               object_hash.ToString().c_str(), source.c_str(),
-               file_path->c_str(), errno);
+               source.c_str(), file_path->c_str(), errno);
       unlink(file_path->c_str());
       file_path->clear();
       return BaseTN::kFailDecompression;
@@ -336,14 +357,13 @@ class LocalObjectFetcher :
     return BaseTN::kFailOk;
   }
 
-
  protected:
   std::string BuildPath(const std::string &relative_path) const {
     return base_path_ + "/" + relative_path;
   }
 
-  std::string BuildPath(const shash::Any &hash) const {
-    return BuildPath("data/" + hash.MakePath());
+  std::string BuildRelativePath(const shash::Any &hash) const {
+    return "data/" + hash.MakePath();
   }
 
  private:
