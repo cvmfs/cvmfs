@@ -70,7 +70,6 @@ Catalog::Catalog(const PathString &path,
   gid_map_ = NULL;
   sql_listing_ = NULL;
   sql_lookup_md5path_ = NULL;
-  sql_lookup_inode_ = NULL;
   sql_lookup_nested_ = NULL;
   sql_list_nested_ = NULL;
   sql_all_chunks_ = NULL;
@@ -96,7 +95,6 @@ Catalog::~Catalog() {
 void Catalog::InitPreparedStatements() {
   sql_listing_         = new SqlListing(database());
   sql_lookup_md5path_  = new SqlLookupPathHash(database());
-  sql_lookup_inode_    = new SqlLookupInode(database());
   sql_lookup_nested_   = new SqlNestedCatalogLookup(database());
   sql_list_nested_     = new SqlNestedCatalogListing(database());
   sql_all_chunks_      = new SqlAllChunks(database());
@@ -111,7 +109,6 @@ void Catalog::FinalizePreparedStatements() {
   delete sql_all_chunks_;
   delete sql_listing_;
   delete sql_lookup_md5path_;
-  delete sql_lookup_inode_;
   delete sql_lookup_nested_;
   delete sql_list_nested_;
 }
