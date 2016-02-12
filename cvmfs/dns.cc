@@ -719,7 +719,7 @@ CaresResolver *CaresResolver::Create(
   memset(&options, 0, sizeof(options));
   options.timeout = timeout_ms;
   options.tries = 1 + retries;
-  options.lookups = strdup("b");
+  options.lookups = const_cast<char *>("b");
   optmask = ARES_OPT_TIMEOUTMS | ARES_OPT_TRIES | ARES_OPT_LOOKUPS;
   retval = ares_init_options(resolver->channel_, &options, optmask);
   if (retval != ARES_SUCCESS)
