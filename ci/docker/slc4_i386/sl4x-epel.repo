@@ -1,5 +1,0 @@
-[sl-epel]
-name=SL 4 EPEL
-baseurl=http://cvm-storage00.cern.ch/yum/sl4/epel/i386/
-enabled=1
-gpgcheck=0
