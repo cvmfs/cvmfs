@@ -14,6 +14,7 @@ class T_Reflog : public ::testing::Test {
   static const std::string fqrn;
 
   typedef ReflogT Reflog;
+  typedef std::map<std::string, MockReflog*> MockReflogMap;
 
  protected:
   virtual void SetUp() {
@@ -30,6 +31,13 @@ class T_Reflog : public ::testing::Test {
       const bool retval = RemoveTree(string(sandbox));
       ASSERT_TRUE(retval) << "failed to remove sandbox";
     }
+
+          MockReflogMap::const_iterator i    = mock_reflogs_.begin();
+    const MockReflogMap::const_iterator iend = mock_reflogs_.end();
+    for (; i != iend; ++i) {
+      delete i->second;
+    }
+    mock_reflogs_.clear();
   }
 
   std::string GetReflogFilename() const {
@@ -37,9 +45,9 @@ class T_Reflog : public ::testing::Test {
     if (NeedsSandbox()) {
       path = CreateTempPath(string(sandbox) + "/reflog", 0600);
     } else {
-      // do {
-      //   path = StringifyInt(prng_.Next(123652348));
-      // } while (mock_history_map_.find(path) != mock_history_map_.end());
+      do {
+        path = StringifyInt(prng_.Next(1234567));
+      } while (mock_reflogs_.count(path) > 0);
     }
     CheckEmpty(path);
     return path;
@@ -83,8 +91,9 @@ class T_Reflog : public ::testing::Test {
 
   ReflogT* CreateReflog(const type<MockReflog>  type_specifier,
                         const std::string      &path) {
-    // return Reflog::Create(path);
-    return NULL;
+    MockReflog* reflog = MockReflog::Create(path, fqrn);
+    mock_reflogs_[path] = reflog;
+    return reflog;
   }
 
   ReflogT* OpenReflog(const type<manifest::Reflog>  type_specifier,
@@ -94,17 +103,19 @@ class T_Reflog : public ::testing::Test {
 
   ReflogT* OpenReflog(const type<MockReflog>  type_specifier,
                       const std::string      &path) {
-    return NULL;
+    return (mock_reflogs_.count(path) > 0)
+      ? mock_reflogs_[path]
+      : NULL;
   }
 
   void CloseReflog(const type<manifest::Reflog>  type_specifier,
                    ReflogT                      *reflog) {
-
+    delete reflog;
   }
 
   void CloseReflog(const type<MockReflog>  type_specifier,
                    ReflogT                *reflog) {
-
+    // NOOP
   }
 
   void CheckEmpty(const std::string &str) const {
@@ -113,6 +124,8 @@ class T_Reflog : public ::testing::Test {
 
  protected:
   mutable Prng prng_;
+
+  MockReflogMap mock_reflogs_;
 };
 
 template <class ReflogT>

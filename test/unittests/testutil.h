@@ -762,23 +762,30 @@ class MockHistory : public history::History,
 
 class MockReflog {
  public:
-  static MockReflog* Open(const std::string &path) { return new MockReflog(); }
+  static MockReflog* Open(const std::string &path);
   static MockReflog* Create(const std::string &path,
-                            const std::string &repo_name) {
-    return new MockReflog();
-  }
+                            const std::string &repo_name);
+
+  bool AddCertificate(const shash::Any &certificate);
+  bool AddCatalog(const shash::Any &catalog);
+  bool AddHistory(const shash::Any &history);
+  bool AddMetainfo(const shash::Any &metainfo);
+
+  uint64_t CountEntries() { return references_.size(); }
 
   void TakeDatabaseFileOwnership() { owns_database_file_ = true;  }
   void DropDatabaseFileOwnership() { owns_database_file_ = false; }
   bool OwnsDatabaseFile() const    { return owns_database_file_;  }
 
-  std::string fqrn() const { return ""; }
+  std::string fqrn() const { return fqrn_; }
 
  protected:
-  MockReflog();
+  MockReflog(const std::string fqrn);
 
  private:
-  bool owns_database_file_;
+  bool                  owns_database_file_;
+  const std::string     fqrn_;
+  std::set<shash::Any>  references_;
 };
 
 

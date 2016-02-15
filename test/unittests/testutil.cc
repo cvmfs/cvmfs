@@ -661,5 +661,35 @@ bool MockHistory::GetHashes(std::vector<shash::Any> *hashes) const {
 //------------------------------------------------------------------------------
 
 
-MockReflog::MockReflog()
-  : owns_database_file_(false) {}
+MockReflog* MockReflog::Open(const std::string &path) {
+  return NULL; // don't call that...
+}
+
+MockReflog* MockReflog::Create(const std::string &path,
+                               const std::string &repo_name) {
+  return new MockReflog(repo_name);
+}
+
+MockReflog::MockReflog(const std::string fqrn)
+  : owns_database_file_(false)
+  , fqrn_(fqrn) {}
+
+bool MockReflog::AddCertificate(const shash::Any &certificate) {
+  references_.insert(certificate);
+  return true;
+}
+
+bool MockReflog::AddCatalog(const shash::Any &catalog) {
+  references_.insert(catalog);
+  return true;
+}
+
+bool MockReflog::AddHistory(const shash::Any &history) {
+  references_.insert(history);
+  return true;
+}
+
+bool MockReflog::AddMetainfo(const shash::Any &metainfo) {
+  references_.insert(metainfo);
+  return true;
+}
