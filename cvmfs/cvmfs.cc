@@ -576,10 +576,9 @@ static bool GetDirentForInode(const fuse_ino_t ino,
   if (ino == catalog_manager_->GetRootInode()) {
     bool retval = catalog_manager_->LookupPath(PathString(),
                                                 catalog::kLookupSole, dirent);
-    if (retval) {
-      dirent->set_inode(ino);
-      inode_cache_->Insert(ino, *dirent);
-    }
+    assert(retval);
+    dirent->set_inode(ino);
+    inode_cache_->Insert(ino, *dirent);
     return true;
   }
 
