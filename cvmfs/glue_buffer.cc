@@ -42,9 +42,9 @@ void PathStore::CopyFrom(const PathStore &other) {
   map_ = other.map_;
 
   string_heap_ = new StringHeap(other.string_heap_->used());
-  uint64_t empty_key = map_.empty_key();
+  shash::Md5 empty_path = map_.empty_key();
   for (unsigned i = 0; i < map_.capacity(); ++i) {
-    if (map_.keys()[i] != empty_key) {
+    if (map_.keys()[i] != empty_path) {
       (map_.values() + i)->name =
       string_heap_->AddString(map_.values()[i].name.length(),
                               map_.values()[i].name.data());
