@@ -2869,6 +2869,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
     cvmfs::inode_annotation_->GetGeneration();
   LogCvmfs(kLogCvmfs, kLogDebug, "root inode is %"PRIu64,
            uint64_t(cvmfs::catalog_manager_->GetRootInode()));
+  cvmfs::inode_tracker_->VfsGet(
+    cvmfs::catalog_manager_->GetRootInode(), PathString(""));           
 
   if (cvmfs::catalog_manager_->GetVolatileFlag()) {
     LogCvmfs(kLogCvmfs, kLogDebug, "content of repository flagged as VOLATILE");
