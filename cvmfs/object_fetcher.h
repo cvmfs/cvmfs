@@ -240,7 +240,7 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
   }
 
  protected:
-  AbstractObjectFetcher(const std::string &temp_dir)
+  explicit AbstractObjectFetcher(const std::string &temp_dir)
     : temporary_directory_(temp_dir) {}
 
   /**

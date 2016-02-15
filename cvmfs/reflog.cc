@@ -4,7 +4,7 @@
 
 #include "reflog.h"
 
-using namespace manifest;
+using namespace manifest;  // NOLINT
 
 Reflog* Reflog::Open(const std::string &database_path) {
   Reflog *reflog = new Reflog();

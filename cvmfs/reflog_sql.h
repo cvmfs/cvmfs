@@ -5,6 +5,8 @@
 #ifndef CVMFS_REFLOG_SQL_H_
 #define CVMFS_REFLOG_SQL_H_
 
+#include <string>
+
 #include "sql.h"
 
 class ReflogDatabase : public sqlite::Database<ReflogDatabase> {
@@ -65,4 +67,4 @@ class SqlCountReferences : public SqlReflog {
   uint64_t RetrieveCount();
 };
 
-#endif /* CVMFS_REFLOG_SQL_H_ */
+#endif  // CVMFS_REFLOG_SQL_H_

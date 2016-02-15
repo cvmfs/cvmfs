@@ -62,6 +62,6 @@ class Reflog {
   UniquePtr<SqlCountReferences>  count_references_;
 };
 
-} // namespace manifest
+}  // namespace manifest
 
-#endif /* CVMFS_REFLOG_H_ */
+#endif  // CVMFS_REFLOG_H_

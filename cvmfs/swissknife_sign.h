@@ -49,7 +49,7 @@ class CommandSign : public Command {
   void MetainfoUploadCallback(const upload::SpoolerResult &result);
 
   template <class ObjectFetcherT>
-  manifest::Reflog* GetOrCreateReflog(ObjectFetcherT    &object_fetcher,
+  manifest::Reflog* GetOrCreateReflog(ObjectFetcherT    *object_fetcher,
                                       const std::string &repo_name);
 
  private:

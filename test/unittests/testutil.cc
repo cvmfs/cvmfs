@@ -662,7 +662,7 @@ bool MockHistory::GetHashes(std::vector<shash::Any> *hashes) const {
 
 
 MockReflog* MockReflog::Open(const std::string &path) {
-  return NULL; // don't call that...
+  return NULL;  // don't call that...
 }
 
 MockReflog* MockReflog::Create(const std::string &path,

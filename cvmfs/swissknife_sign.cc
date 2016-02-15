@@ -93,7 +93,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   }
 
   UniquePtr<manifest::Reflog> reflog;
-  reflog = GetOrCreateReflog(object_fetcher, repo_name);
+  reflog = GetOrCreateReflog(&object_fetcher, repo_name);
   if (!reflog) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch or create Reflog");
     return 1;
@@ -279,11 +279,11 @@ void swissknife::CommandSign::MetainfoUploadCallback(
 
 template <class ObjectFetcherT>
 manifest::Reflog* swissknife::CommandSign::GetOrCreateReflog(
-                                              ObjectFetcherT    &object_fetcher,
+                                              ObjectFetcherT    *object_fetcher,
                                               const std::string &repo_name) {
   // try to fetch the Reflog from the backend storage first
   manifest::Reflog *reflog = NULL;
-  typename ObjectFetcherT::Failures f = object_fetcher.FetchReflog(&reflog);
+  typename ObjectFetcherT::Failures f = object_fetcher->FetchReflog(&reflog);
 
   if (f == ObjectFetcherT::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogDebug, "fetched reflog '%s' from backend storage",
@@ -294,7 +294,7 @@ manifest::Reflog* swissknife::CommandSign::GetOrCreateReflog(
   }
 
   // create a new Reflog if there was none found yet
-  const std::string tmp_path_prefix = object_fetcher.temporary_directory() +
+  const std::string tmp_path_prefix = object_fetcher->temporary_directory() +
                                       "/new_reflog";
   const std::string tmp_path = CreateTempPath(tmp_path_prefix, 0600);
 

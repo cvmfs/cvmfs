@@ -780,7 +780,7 @@ class MockReflog {
   std::string fqrn() const { return fqrn_; }
 
  protected:
-  MockReflog(const std::string fqrn);
+  explicit MockReflog(const std::string fqrn);
 
  private:
   bool                  owns_database_file_;
