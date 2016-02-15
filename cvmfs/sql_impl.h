@@ -145,20 +145,41 @@ bool Database<DerivedT>::OpenDatabase(const int flags) {
 
 
 template <class DerivedT>
+std::string Database<DerivedT>::CloseAndReturnDatabaseFile() {
+  database_.DropFileOwnership();
+  database_.Close();
+  return database_.filename();
+}
+
+
+template <class DerivedT>
 Database<DerivedT>::DatabaseRaiiWrapper::~DatabaseRaiiWrapper() {
   if (NULL != sqlite_db) {
-    LogCvmfs(kLogSql, kLogDebug, "closing SQLite database '%s' (unlink: %s)",
-             filename().c_str(),
-             (db_file_guard.IsEnabled() ? "yes" : "no"));
-    const int result = sqlite3_close(sqlite_db);
-    if (result != SQLITE_OK) {
-      LogCvmfs(kLogSql, kLogDebug,
-               "failed to close SQLite database '%s' (%d - %s)",
-               filename().c_str(), result,
-               delegate_->GetLastErrorMsg().c_str());
-    }
-    sqlite_db = NULL;
+    const bool close_successful = Close();
+    assert(close_successful);
   }
+}
+
+
+template <class DerivedT>
+bool Database<DerivedT>::DatabaseRaiiWrapper::Close() {
+  assert(NULL != sqlite_db);
+
+  LogCvmfs(kLogSql, kLogDebug, "closing SQLite database '%s' (unlink: %s)",
+           filename().c_str(),
+           (db_file_guard.IsEnabled() ? "yes" : "no"));
+  const int result = sqlite3_close(sqlite_db);
+
+  if (result != SQLITE_OK) {
+    LogCvmfs(kLogSql, kLogDebug,
+             "failed to close SQLite database '%s' (%d - %s)",
+             filename().c_str(), result,
+             delegate_->GetLastErrorMsg().c_str());
+    return false;
+  }
+
+  sqlite_db = NULL;
+  return true;
 }
 
 
