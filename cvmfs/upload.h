@@ -79,6 +79,30 @@
  *                 *  Backend Storage  *
  *                 *********************
  *
+ *
+ * TODO(rmeusel): special purpose ::Process...() methods should (opionally?)
+ *                return Future<> instead of relying on the callbacks. Those are
+ *                somewhat one-shot calls and require a rather fishy idiom when
+ *                using callbacks, like:
+ *
+ *                   cb = spooler->RegisterListener(...certificate_callback...);
+ *                   spooler->ProcessCertificate(...);
+ *                   spooler->WaitForUpload();
+ *                   spooler->UnregisterListener(cb);
+ *                   cert_hash = global_cert_hash;
+ *
+ *                   void certificate_callback(shash::Any &hash) {
+ *                     global_cert_hash = hash;
+ *                   }
+ *
+ *                If ProcessCertificate(), ProcessHistory(), ProcessMetainfo(),
+ *                UploadManifest() and UploaderReflog() would return Future<>,
+ *                the code would be much more comprehensible and free of user-
+ *                managed global state:
+ *
+ *                   Future<shash::Any> fc = spooler->ProcessCertificate(...);
+ *                   cert_hash = fc.get();
+ *
  */
 
 #ifndef CVMFS_UPLOAD_H_
