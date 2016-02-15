@@ -59,4 +59,10 @@ class SqlInsertReference : public SqlReflog {
 };
 
 
+class SqlCountReferences : public SqlReflog {
+ public:
+  explicit SqlCountReferences(const ReflogDatabase *database);
+  uint64_t RetrieveCount();
+};
+
 #endif /* CVMFS_REFLOG_SQL_H_ */

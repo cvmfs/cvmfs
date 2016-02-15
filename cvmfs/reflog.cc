@@ -69,6 +69,7 @@ bool Reflog::OpenDatabase(const std::string &database_path) {
 void Reflog::PrepareQueries() {
   assert(database_);
   insert_reference_ = new SqlInsertReference(database_.weak_ref());
+  count_references_ = new SqlCountReferences(database_.weak_ref());
 }
 
 
@@ -94,6 +95,17 @@ bool Reflog::AddHistory(const shash::Any &history) {
 bool Reflog::AddMetainfo(const shash::Any &metainfo) {
   assert(metainfo.HasSuffix() && metainfo.suffix == shash::kSuffixMetainfo);
   return AddReference(metainfo, SqlReflog::kRefMetainfo);
+}
+
+
+uint64_t Reflog::CountEntries() {
+  assert(database_);
+  const bool success_exec = count_references_->Execute();
+  assert(success_exec);
+  const uint64_t count = count_references_->RetrieveCount();
+  const bool success_reset = count_references_->Reset();
+  assert(success_reset);
+  return count;
 }
 
 

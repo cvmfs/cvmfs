@@ -30,6 +30,8 @@ class Reflog {
   bool AddHistory(const shash::Any &history);
   bool AddMetainfo(const shash::Any &metainfo);
 
+  uint64_t CountEntries();
+
   void BeginTransaction();
   void CommitTransaction();
 
@@ -57,6 +59,7 @@ class Reflog {
   UniquePtr<ReflogDatabase>      database_;
 
   UniquePtr<SqlInsertReference>  insert_reference_;
+  UniquePtr<SqlCountReferences>  count_references_;
 };
 
 } // namespace manifest

@@ -69,3 +69,17 @@ bool SqlInsertReference::BindReference(const shash::Any    &reference_hash,
     BindInt64(2, static_cast<uint64_t>(type))       &&
     BindInt64(3, static_cast<uint64_t>(time(NULL)));
 }
+
+
+//------------------------------------------------------------------------------
+
+
+SqlCountReferences::SqlCountReferences(const ReflogDatabase *database) {
+  const std::string stmt = "SELECT count(*) as count FROM refs;";
+  const bool success = Init(database->sqlite_db(), stmt);
+  assert(success);
+}
+
+uint64_t SqlCountReferences::RetrieveCount() {
+  return static_cast<uint64_t>(RetrieveInt64(0));
+}
