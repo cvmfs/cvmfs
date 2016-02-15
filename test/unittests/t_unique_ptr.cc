@@ -262,3 +262,13 @@ TEST_F(T_UniquePtr, SelfAssignment) {
   EXPECT_EQ(1u, Foo::global_constructor_calls);
   EXPECT_EQ(1u, Foo::global_destructor_calls);
 }
+
+TEST_F(T_UniquePtr, VoidPtr) {
+  UniquePtr<void> p(malloc(1024));
+  EXPECT_TRUE(p.IsValid());
+  EXPECT_NE(static_cast<void*>(NULL), p.weak_ref());
+
+  UniquePtr<void> p2;
+  EXPECT_FALSE(p2.IsValid());
+  EXPECT_EQ(static_cast<void*>(NULL), p2.weak_ref());
+}

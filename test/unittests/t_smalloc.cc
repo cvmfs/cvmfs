@@ -7,6 +7,7 @@
 #include <limits>
 
 #include "../../cvmfs/smalloc.h"
+#include "../../cvmfs/util.h"
 
 
 const size_t kSmallAllocation = 1024UL;
@@ -34,10 +35,9 @@ TEST(T_Smalloc, SmallRealloc) {
 }
 
 TEST(T_Smalloc, BigRealloc) {
-  void *mem = smalloc(kSmallAllocation);
+  UniquePtr<void> mem(smalloc(kSmallAllocation));
   ASSERT_DEATH(mem = srealloc(mem, kBigAllocation), ".*");
-  EXPECT_NE(static_cast<void*>(NULL), mem);
-  free(mem);
+  EXPECT_NE(static_cast<void*>(NULL), mem.weak_ref());
 }
 
 TEST(T_Smalloc, SmallCalloc) {
