@@ -33,4 +33,30 @@ class ReflogDatabase : public sqlite::Database<ReflogDatabase> {
     sqlite::Database<ReflogDatabase>(filename, open_mode) {}
 };
 
+
+//------------------------------------------------------------------------------
+
+
+class SqlReflog : public sqlite::Sql {
+ public:
+  enum ReferenceType {
+    kRefCatalog,
+    kRefCertificate,
+    kRefHistory,
+    kRefMetainfo
+  };
+
+ protected:
+  std::string db_fields(const ReflogDatabase *database) const;
+};
+
+
+class SqlInsertReference : public SqlReflog {
+ public:
+  explicit SqlInsertReference(const ReflogDatabase *database);
+  bool BindReference(const shash::Any    &reference_hash,
+                     const ReferenceType  type);
+};
+
+
 #endif /* CVMFS_REFLOG_SQL_H_ */
