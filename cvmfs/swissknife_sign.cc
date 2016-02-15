@@ -84,139 +84,138 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   }
 
   LogCvmfs(kLogCvmfs, kLogStdout, "Signing %s", manifest_path.c_str());
-  {
-    // Load Manifest
-    manifest = manifest::Manifest::LoadFile(manifest_path);
-    if (!manifest.IsValid()) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to parse manifest");
-      return 1;
-    }
 
-    // Connect to the spooler
-    const upload::SpoolerDefinition sd(spooler_definition,
-                                       manifest->GetHashAlgorithm());
-    spooler = upload::Spooler::Construct(sd);
-    if (!spooler.IsValid()) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to setup upload spooler");
-      return 1;
-    }
+  // Load Manifest
+  manifest = manifest::Manifest::LoadFile(manifest_path);
+  if (!manifest.IsValid()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to parse manifest");
+    return 1;
+  }
 
-    // Register callback for retrieving the certificate hash
+  // Connect to the spooler
+  const upload::SpoolerDefinition sd(spooler_definition,
+                                     manifest->GetHashAlgorithm());
+  spooler = upload::Spooler::Construct(sd);
+  if (!spooler.IsValid()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to setup upload spooler");
+    return 1;
+  }
+
+  // Register callback for retrieving the certificate hash
+  upload::Spooler::CallbackPtr callback =
+    spooler->RegisterListener(&CommandSign::CertificateUploadCallback, this);
+
+  // Safe certificate (and wait for the upload through a Future)
+  spooler->ProcessCertificate(certificate);
+  const shash::Any certificate_hash = certificate_hash_.Get();
+  spooler->UnregisterListener(callback);
+
+  if (certificate_hash.IsNull()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to upload certificate");
+    return 1;
+  }
+
+  // Safe repository meta info file
+  shash::Any metainfo_hash;
+  if (!meta_info.empty()) {
     upload::Spooler::CallbackPtr callback =
-      spooler->RegisterListener(&CommandSign::CertificateUploadCallback, this);
-
-    // Safe certificate (and wait for the upload through a Future)
-    spooler->ProcessCertificate(certificate);
-    const shash::Any certificate_hash = certificate_hash_.Get();
+      spooler->RegisterListener(&CommandSign::MetainfoUploadCallback, this);
+    spooler->ProcessMetainfo(meta_info);
+    metainfo_hash = metainfo_hash_.Get();
     spooler->UnregisterListener(callback);
 
-    if (certificate_hash.IsNull()) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to upload certificate");
+    if (metainfo_hash.IsNull()) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to upload meta info");
       return 1;
     }
+  }
 
-    // Safe repository meta info file
-    shash::Any metainfo_hash;
-    if (!meta_info.empty()) {
-      upload::Spooler::CallbackPtr callback =
-        spooler->RegisterListener(&CommandSign::MetainfoUploadCallback, this);
-      spooler->ProcessMetainfo(meta_info);
-      metainfo_hash = metainfo_hash_.Get();
-      spooler->UnregisterListener(callback);
+  // Update manifest
+  manifest->set_certificate(certificate_hash);
+  manifest->set_repository_name(repo_name);
+  manifest->set_publish_timestamp(time(NULL));
+  manifest->set_garbage_collectability(garbage_collectable);
+  manifest->set_has_alt_catalog_path(bootstrap_shortcuts);
+  if (!metainfo_hash.IsNull()) {
+    manifest->set_meta_info(metainfo_hash);
+  }
 
-      if (metainfo_hash.IsNull()) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "Failed to upload meta info");
-        return 1;
-      }
-    }
+  string signed_manifest = manifest->ExportString();
+  shash::Any published_hash(manifest->GetHashAlgorithm());
+  shash::HashMem(
+    reinterpret_cast<const unsigned char *>(signed_manifest.data()),
+    signed_manifest.length(), &published_hash);
+  signed_manifest += "--\n" + published_hash.ToString() + "\n";
 
-    // Update manifest
-    manifest->set_certificate(certificate_hash);
-    manifest->set_repository_name(repo_name);
-    manifest->set_publish_timestamp(time(NULL));
-    manifest->set_garbage_collectability(garbage_collectable);
-    manifest->set_has_alt_catalog_path(bootstrap_shortcuts);
-    if (!metainfo_hash.IsNull()) {
-      manifest->set_meta_info(metainfo_hash);
-    }
+  // Create alternative bootstrapping symlinks for VOMS secured repos
+  if (manifest->has_alt_catalog_path()) {
+    const bool success =
+      spooler->PlaceBootstrappingShortcut(manifest->certificate())  &&
+      spooler->PlaceBootstrappingShortcut(manifest->catalog_hash()) &&
+      (manifest->history().IsNull() ||
+       spooler->PlaceBootstrappingShortcut(manifest->history())) &&
+      (metainfo_hash.IsNull() ||
+       spooler->PlaceBootstrappingShortcut(metainfo_hash));
 
-    string signed_manifest = manifest->ExportString();
-    shash::Any published_hash(manifest->GetHashAlgorithm());
-    shash::HashMem(
-      reinterpret_cast<const unsigned char *>(signed_manifest.data()),
-      signed_manifest.length(), &published_hash);
-    signed_manifest += "--\n" + published_hash.ToString() + "\n";
-
-    // Create alternative bootstrapping symlinks for VOMS secured repos
-    if (manifest->has_alt_catalog_path()) {
-      const bool success =
-        spooler->PlaceBootstrappingShortcut(manifest->certificate())  &&
-        spooler->PlaceBootstrappingShortcut(manifest->catalog_hash()) &&
-        (manifest->history().IsNull() ||
-         spooler->PlaceBootstrappingShortcut(manifest->history())) &&
-        (metainfo_hash.IsNull() ||
-         spooler->PlaceBootstrappingShortcut(metainfo_hash));
-
-      if (!success) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "failed to place VOMS bootstrapping "
-                                        "symlinks");
-        return 1;
-      }
-    }
-
-    // Sign manifest
-    unsigned char *sig;
-    unsigned sig_size;
-    if (!signature_manager()->Sign(reinterpret_cast<const unsigned char *>(
-                                   published_hash.ToString().data()),
-                                   published_hash.GetHexSize(),
-                                   &sig, &sig_size))
-    {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to sign manifest");
+    if (!success) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to place VOMS bootstrapping "
+                                      "symlinks");
       return 1;
     }
+  }
 
-    // Write new manifest
-    FILE *fmanifest = fopen(manifest_path.c_str(), "w");
-    if (!fmanifest) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to open manifest (errno: %d)",
-               errno);
-      return 1;
-    }
-    if ((fwrite(signed_manifest.data(), 1, signed_manifest.length(), fmanifest)
-         != signed_manifest.length()) ||
-        (fwrite(sig, 1, sig_size, fmanifest) != sig_size))
-    {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to write manifest (errno: %d)",
-               errno);
-      fclose(fmanifest);
-      return 1;
-    }
-    free(sig);
+  // Sign manifest
+  unsigned char *sig;
+  unsigned sig_size;
+  if (!signature_manager()->Sign(reinterpret_cast<const unsigned char *>(
+                                 published_hash.ToString().data()),
+                                 published_hash.GetHexSize(),
+                                 &sig, &sig_size))
+  {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to sign manifest");
+    return 1;
+  }
+
+  // Write new manifest
+  FILE *fmanifest = fopen(manifest_path.c_str(), "w");
+  if (!fmanifest) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to open manifest (errno: %d)",
+             errno);
+    return 1;
+  }
+  if ((fwrite(signed_manifest.data(), 1, signed_manifest.length(), fmanifest)
+       != signed_manifest.length()) ||
+      (fwrite(sig, 1, sig_size, fmanifest) != sig_size))
+  {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to write manifest (errno: %d)",
+             errno);
     fclose(fmanifest);
+    return 1;
+  }
+  free(sig);
+  fclose(fmanifest);
 
-    // Commit and upload Reflog database
-    const std::string reflog_db_file = reflog->database_file();
-    reflog->DropDatabaseFileOwnership();
-    delete reflog.Release();
-    spooler->UploadReflog(reflog_db_file);
-    spooler->WaitForUpload();
-    unlink(reflog_db_file.c_str());
-    if (spooler->GetNumberOfErrors()) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to upload Reflog (errors: %d)",
-               spooler->GetNumberOfErrors());
-      return 1;
-    }
+  // Commit and upload Reflog database
+  const std::string reflog_db_file = reflog->database_file();
+  reflog->DropDatabaseFileOwnership();
+  delete reflog.Release();
+  spooler->UploadReflog(reflog_db_file);
+  spooler->WaitForUpload();
+  unlink(reflog_db_file.c_str());
+  if (spooler->GetNumberOfErrors()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to upload Reflog (errors: %d)",
+             spooler->GetNumberOfErrors());
+    return 1;
+  }
 
-    // Upload manifest
-    spooler->UploadManifest(manifest_path);
-    spooler->WaitForUpload();
-    unlink(manifest_path.c_str());
-    if (spooler->GetNumberOfErrors()) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to commit manifest (errors: %d)",
-               spooler->GetNumberOfErrors());
-      return 1;
-    }
+  // Upload manifest
+  spooler->UploadManifest(manifest_path);
+  spooler->WaitForUpload();
+  unlink(manifest_path.c_str());
+  if (spooler->GetNumberOfErrors()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to commit manifest (errors: %d)",
+             spooler->GetNumberOfErrors());
+    return 1;
   }
 
   return 0;
