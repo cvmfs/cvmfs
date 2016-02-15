@@ -76,15 +76,6 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
                                download_manager(),
                                signature_manager());
 
-  UniquePtr<manifest::Reflog> reflog;
-  reflog = GetOrCreateReflog(object_fetcher, repo_name);
-  if (!reflog) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch or create Reflog");
-    return 1;
-  }
-
-  LogCvmfs(kLogCvmfs, kLogStdout, "Signing %s", manifest_path.c_str());
-
   // Load Manifest
   manifest = manifest::Manifest::LoadFile(manifest_path);
   if (!manifest.IsValid()) {
@@ -100,6 +91,16 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed to setup upload spooler");
     return 1;
   }
+
+  UniquePtr<manifest::Reflog> reflog;
+  reflog = GetOrCreateReflog(object_fetcher, repo_name);
+  if (!reflog) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch or create Reflog");
+    return 1;
+  }
+
+  // Fron here on things are potentially put in backend storage
+  LogCvmfs(kLogCvmfs, kLogStdout, "Signing %s", manifest_path.c_str());
 
   // Register callback for retrieving the certificate hash
   upload::Spooler::CallbackPtr callback =
@@ -128,6 +129,46 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to upload meta info");
       return 1;
     }
+  }
+
+  // Update Reflog database
+  reflog->BeginTransaction();
+
+  if (!reflog->AddCatalog(manifest->catalog_hash())) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to add catalog to Reflog");
+    return 1;
+  }
+
+  if (!reflog->AddCertificate(certificate_hash)) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to add certificate to Reflog");
+    return 1;
+  }
+
+  if (!manifest->history().IsNull()) {
+    if (!reflog->AddHistory(manifest->history())) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to add history to Reflog");
+      return 1;
+    }
+  }
+
+  if (!metainfo_hash.IsNull()) {
+    if (!reflog->AddMetainfo(metainfo_hash)) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to add meta info to Reflog");
+      return 1;
+    }
+  }
+
+  reflog->CommitTransaction();
+
+  // upload Reflog database
+  const std::string reflog_db_file = reflog->CloseAndReturnDatabaseFile();
+  spooler->UploadReflog(reflog_db_file);
+  spooler->WaitForUpload();
+  unlink(reflog_db_file.c_str());
+  if (spooler->GetNumberOfErrors()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to upload Reflog (errors: %d)",
+             spooler->GetNumberOfErrors());
+    return 1;
   }
 
   // Update manifest
@@ -194,19 +235,6 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   }
   free(sig);
   fclose(fmanifest);
-
-  // Commit and upload Reflog database
-  const std::string reflog_db_file = reflog->database_file();
-  reflog->DropDatabaseFileOwnership();
-  delete reflog.Release();
-  spooler->UploadReflog(reflog_db_file);
-  spooler->WaitForUpload();
-  unlink(reflog_db_file.c_str());
-  if (spooler->GetNumberOfErrors()) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to upload Reflog (errors: %d)",
-             spooler->GetNumberOfErrors());
-    return 1;
-  }
 
   // Upload manifest
   spooler->UploadManifest(manifest_path);
