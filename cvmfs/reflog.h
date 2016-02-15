@@ -20,6 +20,19 @@ class Reflog {
   static Reflog* Create(const std::string &database_path,
                         const std::string &repo_name);
 
+  std::string CloseAndReturnDatabaseFile() {
+    return database_->CloseAndReturnDatabaseFile();
+  }
+
+ public:
+  bool AddCertificate(const shash::Any &certificate);
+  bool AddCatalog(const shash::Any &catalog);
+  bool AddHistory(const shash::Any &history);
+  bool AddMetainfo(const shash::Any &metainfo);
+
+  void BeginTransaction();
+  void CommitTransaction();
+
   void TakeDatabaseFileOwnership();
   void DropDatabaseFileOwnership();
   bool OwnsDatabaseFile() const {
@@ -29,13 +42,21 @@ class Reflog {
   std::string fqrn() const;
   std::string database_file() const;
 
+ protected:
+  bool AddReference(const shash::Any               &hash,
+                    const SqlReflog::ReferenceType  type);
+
  private:
   bool CreateDatabase(const std::string &database_path,
                       const std::string &repo_name);
   bool OpenDatabase(const std::string &database_path);
 
+  void PrepareQueries();
+
  private:
-  UniquePtr<ReflogDatabase> database_;
+  UniquePtr<ReflogDatabase>      database_;
+
+  UniquePtr<SqlInsertReference>  insert_reference_;
 };
 
 } // namespace manifest

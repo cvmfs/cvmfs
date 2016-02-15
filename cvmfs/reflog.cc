@@ -47,7 +47,7 @@ bool Reflog::CreateDatabase(const std::string &database_path,
     return false;
   }
 
-  // PrepareQueries();
+  PrepareQueries();
   return true;
 }
 
@@ -61,8 +61,60 @@ bool Reflog::OpenDatabase(const std::string &database_path) {
     return false;
   }
 
-  // PrepareQueries();
+  PrepareQueries();
   return true;
+}
+
+
+void Reflog::PrepareQueries() {
+  assert(database_);
+  insert_reference_ = new SqlInsertReference(database_.weak_ref());
+}
+
+
+bool Reflog::AddCertificate(const shash::Any &certificate) {
+  assert(certificate.HasSuffix() &&
+         certificate.suffix == shash::kSuffixCertificate);
+  return AddReference(certificate, SqlReflog::kRefCertificate);
+}
+
+
+bool Reflog::AddCatalog(const shash::Any &catalog) {
+  assert(catalog.HasSuffix() && catalog.suffix == shash::kSuffixCatalog);
+  return AddReference(catalog, SqlReflog::kRefCatalog);
+}
+
+
+bool Reflog::AddHistory(const shash::Any &history) {
+  assert(history.HasSuffix() && history.suffix == shash::kSuffixHistory);
+  return AddReference(history, SqlReflog::kRefHistory);
+}
+
+
+bool Reflog::AddMetainfo(const shash::Any &metainfo) {
+  assert(metainfo.HasSuffix() && metainfo.suffix == shash::kSuffixMetainfo);
+  return AddReference(metainfo, SqlReflog::kRefMetainfo);
+}
+
+
+bool Reflog::AddReference(const shash::Any               &hash,
+                          const SqlReflog::ReferenceType  type) {
+  return
+    insert_reference_->BindReference(hash, type) &&
+    insert_reference_->Execute()                 &&
+    insert_reference_->Reset();
+}
+
+
+void Reflog::BeginTransaction() {
+  assert(database_);
+  database_->BeginTransaction();
+}
+
+
+void Reflog::CommitTransaction() {
+  assert(database_);
+  database_->CommitTransaction();
 }
 
 
