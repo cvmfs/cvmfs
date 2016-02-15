@@ -55,7 +55,7 @@ bool CredentialsFetcher::GetProxyFileFromEnv(
   }
 
   // Look for X509_USER_PROXY in the environment and store the value in path
-  char c = '\0';
+  int c = '\0';
   size_t idx = 0, key_idx = 0;
   bool set_env = false;
   while (1) {

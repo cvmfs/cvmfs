@@ -50,7 +50,8 @@ class VOMSSessionCache {
     : m_zombie(true),
       m_last_clean(platform_monotonic_time())
   {
-    pthread_mutex_init(&m_mutex, NULL);
+    int retval = pthread_mutex_init(&m_mutex, NULL);
+    assert(retval == 0);
     load_voms_library();
   }
 

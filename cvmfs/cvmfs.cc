@@ -574,7 +574,9 @@ static bool GetDirentForInode(const fuse_ino_t ino,
   // Non-NFS mode
   PathString path;
   if (ino == catalog_manager_->GetRootInode()) {
-    catalog_manager_->LookupPath(PathString(), catalog::kLookupSole, dirent);
+    bool retval = catalog_manager_->LookupPath(PathString(),
+                                                catalog::kLookupSole, dirent);
+    assert(retval);
     dirent->set_inode(ino);
     inode_cache_->Insert(ino, *dirent);
     return true;
@@ -2639,6 +2641,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
                                               cvmfs::download_manager_);
   if (proxies == "") {
     *g_boot_error = "failed to discover HTTP proxy servers";
+    delete uuid;
     return loader::kFailWpad;
   }
   cvmfs::download_manager_->SetProxyChain(

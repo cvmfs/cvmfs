@@ -630,6 +630,7 @@ int cvmfs_context::Open(const char *c_path) {
       LogCvmfs(kLogCvmfs, kLogDebug| kLogSyslogErr, "file %s is marked as "
                "'chunked', but no chunks found.", path.c_str());
       atomic_inc32(&num_io_error_);
+      delete chunks;
       return -EIO;
     }
 
