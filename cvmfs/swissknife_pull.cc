@@ -569,7 +569,6 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   download_manager()->SetRetryParameters(retries, timeout, 3*timeout);
   download_manager()->Spawn();
 
-  // initializing the threads now in case of cleanup
   pthread_t *workers =
     reinterpret_cast<pthread_t *>(smalloc(sizeof(pthread_t) * num_parallel));
 
