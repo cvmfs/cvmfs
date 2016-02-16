@@ -49,7 +49,7 @@ bool MemoryManager::LookasideBufferArena::Contains(void *buffer) {
 
 
 MemoryManager::LookasideBufferArena::LookasideBufferArena()
-  : arena_(sxmmap(kArenaSize))
+  : arena_(smmap(kArenaSize))
 {
   // All buffers unused, i.e. all bits set
   memset(freemap_, 0xFF, kNoBitmaps * sizeof(int));
@@ -57,7 +57,7 @@ MemoryManager::LookasideBufferArena::LookasideBufferArena()
 
 
 MemoryManager::LookasideBufferArena::~LookasideBufferArena() {
-  sxunmap(arena_, kArenaSize);
+  smunmap(arena_);
 }
 
 
@@ -135,8 +135,8 @@ void *MemoryManager::GetLookasideBuffer() {
 
 
 MemoryManager::MemoryManager()
-  : scratch_memory_(sxmmap(kScratchSize))
-  , page_cache_memory_(sxmmap(kPageCacheSize))
+  : scratch_memory_(smmap(kScratchSize))
+  , page_cache_memory_(smmap(kPageCacheSize))
 {
   lock_ =
     reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
@@ -151,8 +151,8 @@ MemoryManager::MemoryManager()
  * Must be executed only after sqlite3_shutdown.
  */
 MemoryManager::~MemoryManager() {
-  sxunmap(scratch_memory_, kScratchSize);
-  sxunmap(page_cache_memory_, kPageCacheSize);
+  smunmap(scratch_memory_);
+  smunmap(page_cache_memory_);
   for (unsigned i = 0; i < lookaside_buffer_arenas_.size(); ++i)
     delete lookaside_buffer_arenas_[i];
   pthread_mutex_destroy(lock_);
