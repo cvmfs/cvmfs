@@ -1132,15 +1132,32 @@ close_transaction() {
   load_repo_config $name
   local tx_lock="${CVMFS_SPOOL_DIR}/in_transaction"
   local tmp_dir="${CVMFS_SPOOL_DIR}/tmp"
+  local force_grace_time=60
 
+  # if not explicitly asked, try if umounting works without force
+  if [ $use_fd_fallback -eq 0 ]; then
+    if ! cvmfs_suid_helper rw_umount     $name || \
+       ! cvmfs_suid_helper rdonly_umount $name; then
+      use_fd_fallback=1
+    fi
+  fi
+
+  # if explicitly asked for or the normal umount failed we apply more force
   if [ $use_fd_fallback -ne 0 ]; then
+    if [ x"$CVMFS_FORCE_REMOUNT_WARNING" != x"false" ]; then
+      (
+        echo "$name is forcefully remounted in $force_grace_time seconds."
+        echo "Please close files on /cvmfs/$name"
+      ) | wall 2>/dev/null
+      sleep $force_grace_time
+      echo "$name is forcefully remounted NOW." | wall 2>/dev/null
+    fi
     cvmfs_suid_helper rw_lazy_umount     $name
     cvmfs_suid_helper kill_cvmfs         $name
     cvmfs_suid_helper rdonly_lazy_umount $name
-  else
-    cvmfs_suid_helper rw_umount $name
-    cvmfs_suid_helper rdonly_umount $name
   fi
+
+  # continue with the remounting
   cvmfs_suid_helper clear_scratch $name
   [ ! -z "$tmp_dir" ] && rm -fR "${tmp_dir}"/*
   cvmfs_suid_helper rdonly_mount $name > /dev/null
