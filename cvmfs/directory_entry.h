@@ -92,7 +92,6 @@ class DirectoryEntryBase {
    */
   inline DirectoryEntryBase()
     : inode_(kInvalidInode)
-    , parent_inode_(kInvalidInode)
     , mode_(0)
     , uid_(0)
     , gid_(0)
@@ -111,7 +110,6 @@ class DirectoryEntryBase {
   inline bool HasXattrs() const                 { return has_xattrs_;    }
 
   inline inode_t inode() const                  { return inode_; }
-  inline inode_t parent_inode() const           { return parent_inode_; }
   inline uint32_t linkcount() const             { return linkcount_; }
   inline NameString name() const                { return name_; }
   inline LinkString symlink() const             { return symlink_; }
@@ -134,9 +132,6 @@ class DirectoryEntryBase {
   }
 
   inline void set_inode(const inode_t inode) { inode_ = inode; }
-  inline void set_parent_inode(const inode_t parent_inode) {
-    parent_inode_ = parent_inode;
-  }
   inline void set_linkcount(const uint32_t linkcount) {
     assert(linkcount > 0);
     linkcount_ = linkcount;
@@ -186,8 +181,6 @@ class DirectoryEntryBase {
  protected:
   // Inodes are generated based on the rowid of the entry in the file catalog.
   inode_t inode_;
-  // Parent inode is dynamically created and not stored in the file catalog.
-  inode_t parent_inode_;
 
   // Data from struct stat
   NameString name_;

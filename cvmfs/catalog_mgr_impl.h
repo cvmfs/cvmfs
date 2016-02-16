@@ -217,7 +217,7 @@ bool AbstractCatalogManager<CatalogT>::LookupPath(const PathString &path,
 
       CatalogT *nested_catalog;
       found = MountSubtree(path, best_fit, &nested_catalog);
-      // DowngradeLock(); TODO
+
 
       if (!found) {
         LogCvmfs(kLogCatalog, kLogDebug,
@@ -254,29 +254,6 @@ bool AbstractCatalogManager<CatalogT>::LookupPath(const PathString &path,
 
   LogCvmfs(kLogCatalog, kLogDebug, "found entry '%s' in catalog '%s'",
            path.c_str(), best_fit->path().c_str());
-
-  // Look for parent entry
-  if ((options & kLookupFull) == kLookupFull) {
-    assert(dirent != NULL);
-
-    DirectoryEntry parent;
-    PathString parent_path = GetParentPath(path);
-    if (dirent->IsNestedCatalogRoot()) {
-      if (best_fit->parent())
-        found = best_fit->parent()->LookupPath(parent_path, &parent);
-      else
-        found = false;
-    } else {
-      found = best_fit->LookupPath(parent_path, &parent);
-    }
-    if (!found) {
-      LogCvmfs(kLogCatalog, kLogDebug | kLogSyslogErr,
-               "cannot find parent '%s' for entry '%s' --> data corrupt?",
-               parent_path.c_str(), path.c_str());
-      goto lookup_path_notfound;
-    }
-    dirent->set_parent_inode(parent.inode());
-  }
 
   if ((options & kLookupRawSymlink) == kLookupRawSymlink) {
     LinkString raw_symlink;
