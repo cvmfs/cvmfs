@@ -7,10 +7,11 @@
 #include "cvmfs_config.h"
 #include "sqlitemem.h"
 
+#include <malloc.h>
+
 #include <cstddef>
 #include <cstring>
 
-#include "duplex_sqlite3.h"
 #include "smalloc.h"
 #include "util_concurrency.h"
 
@@ -77,6 +78,53 @@ void MemoryManager::LookasideBufferArena::PutBuffer(void *buffer) {
 MemoryManager *MemoryManager::instance_ = NULL;
 
 
+/**
+ * Sqlite ensures that size > 0.
+ */
+void *MemoryManager::xMalloc(int size) {
+  return smalloc(size);
+}
+
+
+/**
+ * Sqlite ensures that ptr != NULL.
+ */
+void MemoryManager::xFree(void *ptr) {
+  free(ptr);
+}
+
+
+/**
+ * Sqlite ensures that ptr != NULL and new_size > 0.
+ */
+void *MemoryManager::xRealloc(void *ptr, int new_size) {
+  return srealloc(ptr, new_size);
+}
+
+
+/**
+ * Sqlite ensures that ptr != NULL.
+ */
+int MemoryManager::xSize(void *ptr) {
+  return malloc_usable_size(ptr);
+}
+
+
+int MemoryManager::xRoundup(int size) {
+  // From sqlite: round up a number to the next larger multiple of 8.
+  return (((size)+7)&~7);
+}
+
+
+int MemoryManager::xInit(void *app_data __attribute__((unused))) {
+  return SQLITE_OK;
+}
+
+
+void MemoryManager::xShutdown(void *app_data __attribute__((unused))) {
+}
+
+
 void MemoryManager::AssignGlobalArenas() {
   int retval;
 
@@ -86,6 +134,9 @@ void MemoryManager::AssignGlobalArenas() {
 
   retval = sqlite3_config(SQLITE_CONFIG_PAGECACHE, page_cache_memory_,
                           kPageCacheSlotSize, kPageCacheNoSlots);
+  assert(retval == SQLITE_OK);
+
+  retval = sqlite3_config(SQLITE_CONFIG_MALLOC, &mem_methods_);
   assert(retval == SQLITE_OK);
 }
 
@@ -144,6 +195,16 @@ MemoryManager::MemoryManager()
   assert(retval == 0);
 
   lookaside_buffer_arenas_.push_back(new LookasideBufferArena());
+
+  memset(&mem_methods_, 0, sizeof(mem_methods_));
+  mem_methods_.xMalloc = xMalloc;
+  mem_methods_.xFree = xFree;
+  mem_methods_.xRealloc = xRealloc;
+  mem_methods_.xSize = xSize;
+  mem_methods_.xRoundup = xRoundup;
+  mem_methods_.xInit = xInit;
+  mem_methods_.xShutdown = xShutdown;
+  mem_methods_.pAppData = NULL;
 }
 
 

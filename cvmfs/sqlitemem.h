@@ -11,6 +11,7 @@
 #include <cstdlib>
 #include <vector>
 
+#include "duplex_sqlite3.h"
 #include "gtest/gtest_prod.h"
 
 namespace perf {
@@ -94,6 +95,18 @@ class MemoryManager {
   static MemoryManager *instance_;
 
   /**
+   * SQlite memory callbacks need to be static because they are referenced by
+   * C function pointers.  See https://www.sqlite.org/c3ref/mem_methods.html
+   */
+  static void *xMalloc(int size);
+  static void xFree(void *ptr);
+  static void *xRealloc(void *ptr, int new_size);
+  static int xSize(void *ptr);
+  static int xRoundup(int size);
+  static int xInit(void *app_data);
+  static void xShutdown(void *app_data);
+
+  /**
    * A continues chunk of memory from which fixed-sized chunks are given as
    * lookaside buffers to SQlite database connections.  A bitmap indicates used
    * and free buffers.
@@ -150,6 +163,7 @@ class MemoryManager {
 
   pthread_mutex_t *lock_;
 
+  struct sqlite3_mem_methods mem_methods_;
   void *scratch_memory_;
   void *page_cache_memory_;
   std::vector<LookasideBufferArena *> lookaside_buffer_arenas_;
