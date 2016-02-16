@@ -42,6 +42,9 @@ cvmfs_run_test() {
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
+  echo "disable force remount wall-warnings"
+  echo "CVMFS_FORCE_REMOUNT_WARNING=false" | sudo tee -a /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf
+
   # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
   echo "starting transaction (1)"
