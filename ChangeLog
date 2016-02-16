@@ -1,4 +1,6 @@
 2.3.0:
+  * Warn when forcfully remounting the file system stack on the server, new
+    parameter CVMFS_FORCE_REMOUNT_WARNING
 
 2.2.1:
   * Fix reading of chunked files in libcvmfs
