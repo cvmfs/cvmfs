@@ -48,10 +48,6 @@ class CommandSign : public Command {
   void CertificateUploadCallback(const upload::SpoolerResult &result);
   void MetainfoUploadCallback(const upload::SpoolerResult &result);
 
-  template <class ObjectFetcherT>
-  manifest::Reflog* GetOrCreateReflog(ObjectFetcherT    *object_fetcher,
-                                      const std::string &repo_name);
-
  private:
   Future<shash::Any> certificate_hash_;
   Future<shash::Any> metainfo_hash_;

@@ -12,6 +12,7 @@
 
 #include "download.h"
 #include "manifest_fetch.h"
+#include "reflog.h"
 #include "signature.h"
 #include "statistics.h"
 #include "util.h"
@@ -101,6 +102,10 @@ class Command {
                              const std::string &repository_name,
                              const shash::Any  &base_hash = shash::Any()) const;
 
+  template <class ObjectFetcherT>
+  manifest::Reflog* GetOrCreateReflog(ObjectFetcherT    *object_fetcher,
+                                      const std::string &repo_name);
+
   download::DownloadManager*   download_manager()  const;
   signature::SignatureManager* signature_manager() const;
   perf::Statistics*            statistics() { return &statistics_; }
@@ -112,5 +117,7 @@ class Command {
 };
 
 }  // namespace swissknife
+
+#include "swissknife_impl.h"
 
 #endif  // CVMFS_SWISSKNIFE_H_
