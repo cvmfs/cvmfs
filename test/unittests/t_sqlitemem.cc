@@ -10,7 +10,7 @@
 #include "../../cvmfs/sqlitemem.h"
 #include "../../cvmfs/util.h"
 
-using namespace std;
+using namespace std;  // NOLINT
 
 namespace sqlite {
 

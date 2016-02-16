@@ -42,40 +42,40 @@ class MemoryManager {
    * In practice, we hardly ever see scratch memory used.  If it is used,
    * the allocation size is <8kB
    */
-  const static unsigned kScratchSlotSize = 8192;
+  static const unsigned kScratchSlotSize = 8192;
   /**
    * Sqlite ensures that never more slots than 2 times the number of threads are
    * used.  In practice, it's much lower.
    */
-  const static unsigned kScratchNoSlots = 8;
+  static const unsigned kScratchNoSlots = 8;
   /**
    * In total: 64kB scratch memory
    */
-  const static unsigned kScratchSize = kScratchSlotSize * kScratchNoSlots;
+  static const unsigned kScratchSize = kScratchSlotSize * kScratchNoSlots;
 
   /**
    * Empricially, the largest page cache allocation is 1296B.
    */
-  const static unsigned kPageCacheSlotSize = 1300;
+  static const unsigned kPageCacheSlotSize = 1300;
   /**
    * Number of pages that can be cached.
    */
-  const static unsigned kPageCacheNoSlots = 4000;
+  static const unsigned kPageCacheNoSlots = 4000;
   /**
    * In total: ~5MB
    */
-  const static unsigned kPageCacheSize = kPageCacheSlotSize * kPageCacheNoSlots;
+  static const unsigned kPageCacheSize = kPageCacheSlotSize * kPageCacheNoSlots;
 
   /**
    * 32 bytes per slot is an empirically good value so that memory is not wasted
    * (too much) and many allocation fit within the boundary.
    */
-  const static unsigned kLookasideSlotSize = 32;
+  static const unsigned kLookasideSlotSize = 32;
 
   /**
    * 128 slots with 32bytes accumulate to 4kB.  See LookasideBufferArena below.
    */
-  const static unsigned kLookasideSlotsPerDb = 128;
+  static const unsigned kLookasideSlotsPerDb = 128;
 
   static MemoryManager *GetInstance() {
     if (instance_ == NULL)
@@ -105,22 +105,22 @@ class MemoryManager {
     /**
      * Accumulates to 4kB.
      */
-    const static unsigned kBufferSize =
+    static const unsigned kBufferSize =
       kLookasideSlotSize * kLookasideSlotsPerDb;
 
     /**
      * Has to be a multiple of the number of bits in the int type.  One arena
      * can serve 128 concurrent sqlite database connections.
      */
-    const static unsigned kBuffersPerArena = 128;
+    static const unsigned kBuffersPerArena = 128;
     /**
      * 512kB = 128 4kB buffers.
      */
-    const static unsigned kArenaSize = kBuffersPerArena * kBufferSize;
+    static const unsigned kArenaSize = kBuffersPerArena * kBufferSize;
     /**
      * Number of bitmap ints for 128 buffers.
      */
-    const static unsigned kNoBitmaps = kBuffersPerArena / (sizeof(int) * 8);
+    static const unsigned kNoBitmaps = kBuffersPerArena / (sizeof(int) * 8);
 
     LookasideBufferArena();
     ~LookasideBufferArena();
