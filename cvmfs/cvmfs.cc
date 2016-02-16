@@ -1207,6 +1207,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
              "linking chunk handle %d to inode: %"PRIu64,
              chunk_tables_->next_handle, uint64_t(ino));
     chunk_tables_->handle2fd.Insert(chunk_tables_->next_handle, ChunkFd());
+    // On NFS, inodes are not unique.  Don't cache there.
+    fi->keep_cache = !nfs_maps_;
     fi->fh = static_cast<uint64_t>(-chunk_tables_->next_handle);
     ++chunk_tables_->next_handle;
     chunk_tables_->Unlock();
