@@ -240,7 +240,6 @@ class DirectoryEntry : public DirectoryEntryBase {
    */
   inline explicit DirectoryEntry(const DirectoryEntryBase& base)
     : DirectoryEntryBase(base)
-    , cached_mtime_(0)
     , hardlink_group_(0)
     , is_nested_catalog_root_(false)
     , is_nested_catalog_mountpoint_(false)
@@ -248,16 +247,14 @@ class DirectoryEntry : public DirectoryEntryBase {
     , is_negative_(false) { }
 
   inline DirectoryEntry()
-    : cached_mtime_(0)
-    , hardlink_group_(0)
+    : hardlink_group_(0)
     , is_nested_catalog_root_(false)
     , is_nested_catalog_mountpoint_(false)
     , is_chunked_file_(false)
     , is_negative_(false) { }
 
   inline explicit DirectoryEntry(SpecialDirents special_type)
-    : cached_mtime_(0)
-    , hardlink_group_(0)
+    : hardlink_group_(0)
     , is_nested_catalog_root_(false)
     , is_nested_catalog_mountpoint_(false)
     , is_chunked_file_(false)
@@ -282,9 +279,7 @@ class DirectoryEntry : public DirectoryEntryBase {
   }
   inline bool IsChunkedFile() const { return is_chunked_file_; }
   inline uint32_t hardlink_group() const { return hardlink_group_; }
-  inline time_t cached_mtime() const     { return cached_mtime_; }
 
-  inline void set_cached_mtime(const time_t value) { cached_mtime_ = value; }
   inline void set_hardlink_group(const uint32_t group) {
     hardlink_group_ = group;
   }
@@ -299,11 +294,6 @@ class DirectoryEntry : public DirectoryEntryBase {
   }
 
  private:
-   /**
-    * Can be compared to mtime to figure out if caches need to be invalidated
-    * (file has changed).
-    */
-  time_t cached_mtime_;
   /**
    * Hardlink handling is emulated in CVMFS. Since inodes are allocated on
    * demand we save hardlink relationships using the same hardlink_group.
