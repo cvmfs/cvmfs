@@ -1228,8 +1228,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
         (static_cast<int>(max_open_files_))-kNumReservedFd) {
       LogCvmfs(kLogCvmfs, kLogDebug, "file %s opened (fd %d)",
                path.c_str(), fd);
-      // TODO(jblomer): can we set it to 1 for non-NFS case?
-      fi->keep_cache = 0;
+      // On NFS, inodes are not unique.  Don't cache there.
+      fi->keep_cache = !nfs_maps_;
       fi->fh = fd;
       fuse_reply_open(req, fi);
       return;
