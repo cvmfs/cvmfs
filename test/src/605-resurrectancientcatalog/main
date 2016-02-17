@@ -42,7 +42,7 @@ cvmfs_run_test() {
   echo "done"
 
   echo -n "get root hash of top-most legacy revision... "
-  local legacy_root_catalog="$(cat ${legacy_repo_storage}/pub/catalogs/.cvmfspublished | get_root_hash_from_manifest)"
+  local legacy_root_catalog="$(cat ${legacy_repo_storage}/pub/catalogs/.cvmfspublished | get_manifest_field_from_manifest 'C')"
   echo "done ($legacy_root_catalog)"
 
   echo "run the repository migration"
