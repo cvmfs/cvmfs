@@ -14,10 +14,6 @@
 #include "duplex_sqlite3.h"
 #include "gtest/gtest_prod.h"
 
-namespace perf {
-class Statistics;
-}
-
 namespace sqlite {
 
 /**
@@ -69,10 +65,9 @@ class MemoryManager {
 
   /**
    * 32 bytes per slot is an empirically good value so that memory is not wasted
-   * (too much) and many allocation fit within the boundary.
+   * (too much) and many allocations fit within the boundary.
    */
   static const unsigned kLookasideSlotSize = 32;
-
   /**
    * 128 slots with 32bytes accumulate to 4kB.  See LookasideBufferArena below.
    */
@@ -150,8 +145,8 @@ class MemoryManager {
     void *arena_;
 
     /**
-     * Indicates free/used slots.  A used slot as its bit set to zero, an unused
-     * slot has its bit set to 1.
+     * Indicates free/used slots.  A used slot has its bit set to zero, an
+     * unused slot has its bit set to 1.
      */
     int freemap_[kNoBitmaps];
   };
