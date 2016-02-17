@@ -761,6 +761,19 @@ class MockHistory : public history::History,
 
 
 class MockReflog {
+ protected:
+  struct ReferenceTypeFilter {
+    explicit ReferenceTypeFilter(const shash::Suffix suffix,
+                                 const bool          inverse)
+      : suffix_(suffix)
+      , inverse_(inverse) { }
+    bool operator()(const shash::Any &hash) const {
+      return (hash.suffix == suffix_) ^ inverse_;
+    }
+    const shash::Suffix suffix_;
+    const bool          inverse_;
+  };
+
  public:
   static MockReflog* Open(const std::string &path);
   static MockReflog* Create(const std::string &path,
@@ -772,6 +785,7 @@ class MockReflog {
   bool AddMetainfo(const shash::Any &metainfo);
 
   uint64_t CountEntries() { return references_.size(); }
+  bool ListCatalogs(std::vector<shash::Any> *hashes) const;
 
   void TakeDatabaseFileOwnership() { owns_database_file_ = true;  }
   void DropDatabaseFileOwnership() { owns_database_file_ = false; }

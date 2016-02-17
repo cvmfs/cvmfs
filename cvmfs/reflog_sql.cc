@@ -54,6 +54,26 @@ std::string SqlReflog::db_fields(const ReflogDatabase *database) const {
   return "hash, type, timestamp";
 }
 
+
+shash::Suffix SqlReflog::ToSuffix(const ReferenceType type) const {
+  switch (type) {
+    case kRefCatalog:
+      return shash::kSuffixCatalog;
+    case kRefCertificate:
+      return shash::kSuffixCertificate;
+    case kRefHistory:
+      return shash::kSuffixHistory;
+    case kRefMetainfo:
+      return shash::kSuffixMetainfo;
+    default:
+      assert(false && "unknown reference type");
+  }
+}
+
+
+//------------------------------------------------------------------------------
+
+
 SqlInsertReference::SqlInsertReference(const ReflogDatabase *database) {
   const std::string stmt =
     "INSERT OR IGNORE INTO refs (" + db_fields(database) + ") "
@@ -82,4 +102,26 @@ SqlCountReferences::SqlCountReferences(const ReflogDatabase *database) {
 
 uint64_t SqlCountReferences::RetrieveCount() {
   return static_cast<uint64_t>(RetrieveInt64(0));
+}
+
+
+//------------------------------------------------------------------------------
+
+
+SqlListReferences::SqlListReferences(const ReflogDatabase *database) {
+  const std::string stmt = "SELECT hash, type FROM refs WHERE type = :type;";
+  const bool success = Init(database->sqlite_db(), stmt);
+  assert(success);
+}
+
+
+bool SqlListReferences::BindType(const ReferenceType type) {
+  return BindInt64(1, static_cast<uint64_t>(type));
+}
+
+
+shash::Any SqlListReferences::RetrieveHash() const {
+  const ReferenceType type   = static_cast<ReferenceType>(RetrieveInt64(1));
+  const shash::Suffix suffix = ToSuffix(type);
+  return shash::MkFromHexPtr(shash::HexPtr(RetrieveString(0)), suffix);
 }

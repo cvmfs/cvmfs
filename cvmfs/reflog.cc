@@ -70,6 +70,7 @@ void Reflog::PrepareQueries() {
   assert(database_);
   insert_reference_ = new SqlInsertReference(database_.weak_ref());
   count_references_ = new SqlCountReferences(database_.weak_ref());
+  list_references_  = new SqlListReferences(database_.weak_ref());
 }
 
 
@@ -106,6 +107,22 @@ uint64_t Reflog::CountEntries() {
   const bool success_reset = count_references_->Reset();
   assert(success_reset);
   return count;
+}
+
+
+bool Reflog::ListCatalogs(std::vector<shash::Any> *hashes) const {
+  assert(database_);
+  assert(NULL != hashes);
+
+  hashes->clear();
+
+  const bool success_bind = list_references_->BindType(SqlReflog::kRefCatalog);
+  assert(success_bind);
+  while (list_references_->FetchRow()) {
+    hashes->push_back(list_references_->RetrieveHash());
+  }
+
+  return list_references_->Reset();
 }
 
 

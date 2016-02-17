@@ -693,3 +693,14 @@ bool MockReflog::AddMetainfo(const shash::Any &metainfo) {
   references_.insert(metainfo);
   return true;
 }
+
+bool MockReflog::ListCatalogs(std::vector<shash::Any> *hashes) const {
+  // TODO(rmeusel): C++11 use std::copy_if
+  hashes->clear();
+  ReferenceTypeFilter predicate(shash::kSuffixCatalog, true /* inverse */);
+  std::remove_copy_if(references_.begin(),
+                      references_.end(),
+                      std::back_inserter(*hashes),
+                      predicate);
+  return true;
+}

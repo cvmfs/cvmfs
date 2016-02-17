@@ -50,6 +50,7 @@ class SqlReflog : public sqlite::Sql {
 
  protected:
   std::string db_fields(const ReflogDatabase *database) const;
+  shash::Suffix ToSuffix(const ReferenceType type) const;
 };
 
 
@@ -65,6 +66,14 @@ class SqlCountReferences : public SqlReflog {
  public:
   explicit SqlCountReferences(const ReflogDatabase *database);
   uint64_t RetrieveCount();
+};
+
+
+class SqlListReferences : public SqlReflog {
+ public:
+  explicit SqlListReferences(const ReflogDatabase *database);
+  bool BindType(const ReferenceType type);
+  shash::Any RetrieveHash() const;
 };
 
 #endif  // CVMFS_REFLOG_SQL_H_

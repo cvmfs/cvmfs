@@ -31,6 +31,7 @@ class Reflog {
   bool AddMetainfo(const shash::Any &metainfo);
 
   uint64_t CountEntries();
+  bool ListCatalogs(std::vector<shash::Any> *hashes) const;
 
   void BeginTransaction();
   void CommitTransaction();
@@ -60,6 +61,7 @@ class Reflog {
 
   UniquePtr<SqlInsertReference>  insert_reference_;
   UniquePtr<SqlCountReferences>  count_references_;
+  UniquePtr<SqlListReferences>   list_references_;
 };
 
 }  // namespace manifest
