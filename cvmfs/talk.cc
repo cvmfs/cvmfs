@@ -248,6 +248,9 @@ static void *MainTalk(void *data __attribute__((unused))) {
           default:
             Answer(con_fd, "internal error\n");
         }
+      } else if (line == "detach nested catalogs") {
+        cvmfs::catalog_manager_->DetachNested();
+        Answer(con_fd, "OK\n");
       } else if (line == "revision") {
         Answer(con_fd, StringifyInt(cvmfs::GetRevision()) + "\n");
       } else if (line == "max ttl info") {
