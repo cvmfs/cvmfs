@@ -55,7 +55,6 @@ bool CopyPath2File(const std::string &src, FILE *fdest) {
 
  file_copy_final:
   if (fsrc) fclose(fsrc);
-  if (fdest) fclose(fdest);
   return retval == 0;
 }
 
