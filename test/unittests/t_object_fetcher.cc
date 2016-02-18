@@ -29,6 +29,7 @@ class T_ObjectFetcher : public ::testing::Test {
     backend_storage_dir(sandbox + "/backend/data"),
     manifest_path(backend_storage + "/.cvmfspublished"),
     whitelist_path(backend_storage + "/.cvmfswhitelist"),
+    reflog_path(backend_storage + "/.cvmfsreflog"),
     temp_directory(sandbox + "/tmp"),
     public_key_path(sandbox + "/" + fqrn + ".pub"),
     private_key_path(sandbox + "/" + fqrn + ".key"),
@@ -42,6 +43,7 @@ class T_ObjectFetcher : public ::testing::Test {
   const std::string  backend_storage_dir;
   const std::string  manifest_path;
   const std::string  whitelist_path;
+  const std::string  reflog_path;
   const std::string  temp_directory;
   const std::string  public_key_path;
   const std::string  private_key_path;
@@ -450,15 +452,17 @@ class T_ObjectFetcher : public ::testing::Test {
   }
 
   void CreateReflog(const type<MockObjectFetcher> type_spec) {
-    MockReflog::Create(".cvmfsreflog", fqrn);
+    MockReflog::Create(GetFileName(reflog_path), fqrn);
   }
 
   void CreateReflog(const type<LocalObjectFetcher<> > type_spec) {
-
+    UniquePtr<manifest::Reflog> reflog(manifest::Reflog::Create(reflog_path,
+                                                                fqrn));
   }
 
   void CreateReflog(const type<HttpObjectFetcher<> > type_spec) {
-
+    UniquePtr<manifest::Reflog> reflog(manifest::Reflog::Create(reflog_path,
+                                                                fqrn));
   }
 
   void CreateHistory(const type<LocalObjectFetcher<> >  type_spec,
