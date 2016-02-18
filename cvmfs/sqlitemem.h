@@ -7,6 +7,7 @@
 
 #include <inttypes.h>
 #include <pthread.h>
+#include <stdint.h>
 
 #include <cstdlib>
 #include <vector>
@@ -79,6 +80,7 @@ class MemoryManager {
   /**
    * An mmap'd block of general purpose memory for malloc/free in sqlite.  Uses
    * the "boundary-tag system" as described in TAOCP.
+   * Not thread-safe.  Pointers are not aligned.
    */
   class MallocArena {
    public:
@@ -87,6 +89,7 @@ class MemoryManager {
      * sqlite file catalogs is 64kB.  An arena size of 8MB limits the total
      * number of arenas (mapped blocks) to <40, given typical storage needs for
      * 10,000 open catalogs.
+     * Has to be a power of 2MB.
      */
     static const unsigned kArenaSize = 8 * 1024 * 1024;
 
@@ -96,12 +99,23 @@ class MemoryManager {
      */
     static const int kMinBlockSize = 20;
 
+    /**
+     * Returns the MallocArena that houses the destination of ptr.
+     */
+    static inline MallocArena *GetMallocArena(void *ptr) {
+      void *arena = reinterpret_cast<void *>(
+        uintptr_t(ptr) & ~(uintptr_t(kArenaSize) - uintptr_t(1)));
+      return *reinterpret_cast<MallocArena **>(arena);
+    }
+
     MallocArena();
     ~MallocArena();
 
     void *Malloc(const uint32_t size);
     void Free(void *ptr);
-    bool Contains(void *ptr) const;
+    inline bool Contains(void *ptr) const {
+      return GetMallocArena(ptr) == this;
+    }
     uint32_t GetSize(void *ptr) const;
     bool IsEmpty() const { return no_reserved_ == 0; }
 
@@ -132,7 +146,7 @@ class MemoryManager {
      * 8 bytes upper boundary of a free block.
      */
     struct AvailBlockTag {
-      AvailBlockTag(int32_t s) : size(s), tag(kTagAvail) { }
+      explicit AvailBlockTag(int32_t s) : size(s), tag(kTagAvail) { }
       int32_t size;
       char padding[3];
       char tag;
@@ -151,8 +165,11 @@ class MemoryManager {
     };
 
     /**
-     * Starts with the head_avail_ block and ends with a -1 guard integer to
-     * mimic a reserved end block.
+     * Starts with the address of the MallocArena object followed by a
+     * head_avail_ block and ends with a -1 guard integer to mimic a reserved
+     * end block.  The arena is aligned at a multiple of kArenaSize.  Therefore,
+     * a pointer pointing into it can get the corresponding MallocArena object
+     * in O(1).
      */
     char *arena_;  ///< The memory block
     /**
@@ -263,6 +280,10 @@ class MemoryManager {
   void *page_cache_memory_;
   std::vector<LookasideBufferArena *> lookaside_buffer_arenas_;
   std::vector<MallocArena *> malloc_arenas_;
+  /**
+   * Where the last successful allocation took place.
+   */
+  unsigned idx_last_arena_;
 };
 
 }  // namespace sqlite

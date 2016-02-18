@@ -8,8 +8,8 @@
 
 #include <cstdlib>
 #include <cstring>
-#include <vector>
 #include <map>
+#include <vector>
 
 #include "../../cvmfs/murmur.h"
 #include "../../cvmfs/prng.h"

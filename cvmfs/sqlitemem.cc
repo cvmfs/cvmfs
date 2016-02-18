@@ -7,8 +7,6 @@
 #include "cvmfs_config.h"
 #include "sqlitemem.h"
 
-#include <malloc.h>
-
 #include <cassert>
 #include <cstddef>
 #include <cstring>
@@ -20,15 +18,6 @@
 using namespace std;  // NOLINT
 
 namespace sqlite {
-
-bool MemoryManager::MallocArena::Contains(void *ptr) const {
-  char *cptr = reinterpret_cast<char *>(ptr);
-  return
-    (cptr >= (arena_ + sizeof(AvailBlockCtl) + 1 + sizeof(ReservedBlockCtl)))
-    &&
-    (cptr < (arena_ + kArenaSize - sizeof(int32_t) - 1));
-}
-
 
 uint32_t MemoryManager::MallocArena::GetSize(void *ptr) const {
   assert(Contains(ptr));
@@ -171,29 +160,32 @@ void *MemoryManager::MallocArena::Malloc(const uint32_t size) {
 
 
 /**
- * The arena starts with the AvailBlockCtl of head_avail_, followed by a
- * reserved tag to prevent it from being merged, followed by a free block
- * spanning the arena until the end tag.  The end tag is a single negative int,
- * which mimics another reserved block.
+ * The arena starts with a pointer to this followed by the AvailBlockCtl of
+ * head_avail_, followed by a reserved tag to prevent it from being merged,
+ * followed by a free block spanning the arena until the end tag.  The end tag
+ * is a single negative int, which mimics another reserved block.
  */
 MemoryManager::MallocArena::MallocArena()
-  : arena_(reinterpret_cast<char *>(sxmmap(kArenaSize)))
-  , head_avail_(reinterpret_cast<AvailBlockCtl *>(arena_))
+  : arena_(reinterpret_cast<char *>(sxmmap_align(kArenaSize)))
+  , head_avail_(reinterpret_cast<AvailBlockCtl *>(arena_ + sizeof(void *)))
   , rover_(head_avail_)
   , no_reserved_(0)
 {
-  int32_t usable_size =
-    kArenaSize - (sizeof(AvailBlockCtl) + 1 + sizeof(int32_t));
+  int32_t usable_size = kArenaSize -
+    (sizeof(void *) + sizeof(AvailBlockCtl) + 1 + sizeof(int32_t));
+  *reinterpret_cast<MallocArena **>(arena_) = this;
   AvailBlockCtl *free_block =
-    new (arena_ + sizeof(AvailBlockCtl) + 1) AvailBlockCtl();
+    new (arena_ + sizeof(void *) + sizeof(AvailBlockCtl) + 1) AvailBlockCtl();
   free_block->size = usable_size;
-  free_block->link_next = free_block->link_prev = 0;
+  free_block->link_next = free_block->link_prev =
+    head_avail_->ConvertToLink(arena_);
 
   head_avail_->size = 0;
-  head_avail_->link_next = head_avail_->link_prev = sizeof(AvailBlockCtl) + 1;
+  head_avail_->link_next = head_avail_->link_prev =
+    free_block->ConvertToLink(arena_);
 
   // Prevent succeeding blocks from merging
-  *(arena_ + sizeof(AvailBlockCtl)) = kTagReserved;
+  *(reinterpret_cast<char *>(free_block) - 1) = kTagReserved;
   // Final tag: reserved block marker
   *reinterpret_cast<int32_t *>(arena_ + kArenaSize - sizeof(int32_t)) = -1;
 }
@@ -376,12 +368,7 @@ void *MemoryManager::GetLookasideBuffer() {
 
 
 int MemoryManager::GetMemorySize(void *ptr) {
-  unsigned N = malloc_arenas_.size();
-  for (unsigned i = 0; i < N; ++i) {
-    if (malloc_arenas_[i]->Contains(ptr))
-      return malloc_arenas_[i]->GetSize(ptr);
-  }
-  assert(false);
+  return MallocArena::GetMallocArena(ptr)->GetSize(ptr);
 }
 
 
@@ -389,13 +376,18 @@ int MemoryManager::GetMemorySize(void *ptr) {
  * Opens new arenas as necessary.
  */
 void *MemoryManager::GetMemory(int size) {
+  void *p = malloc_arenas_[idx_last_arena_]->Malloc(size);
+  if (p != NULL)
+    return p;
   unsigned N = malloc_arenas_.size();
-  void *p = NULL;
   for (unsigned i = 0; i < N; ++i) {
     p = malloc_arenas_[i]->Malloc(size);
-    if (p != NULL)
+    if (p != NULL) {
+      idx_last_arena_ = i;
       return p;
+    }
   }
+  idx_last_arena_ = N;
   MallocArena *M = new MallocArena();
   malloc_arenas_.push_back(M);
   p = M->Malloc(size);
@@ -407,6 +399,7 @@ void *MemoryManager::GetMemory(int size) {
 MemoryManager::MemoryManager()
   : scratch_memory_(sxmmap(kScratchSize))
   , page_cache_memory_(sxmmap(kPageCacheSize))
+  , idx_last_arena_(0)
 {
   lock_ =
     reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
@@ -465,21 +458,22 @@ void MemoryManager::PutLookasideBuffer(void *buffer) {
 
 
 /**
- * Closes empty areas
+ * Closes empty areas.
  */
 void MemoryManager::PutMemory(void *ptr) {
+  MallocArena *M = MallocArena::GetMallocArena(ptr);
+  M->Free(ptr);
   unsigned N = malloc_arenas_.size();
-  for (unsigned i = 0; i < N; ++i) {
-    if (malloc_arenas_[i]->Contains(ptr)) {
-      malloc_arenas_[i]->Free(ptr);
-      if ((N > 1) && malloc_arenas_[i]->IsEmpty()) {
+  if ((N > 1) && M->IsEmpty()) {
+    for (unsigned i = 0; i < N; ++i) {
+      if (malloc_arenas_[i] == M) {
         delete malloc_arenas_[i];
         malloc_arenas_.erase(malloc_arenas_.begin() + i);
+        return;
       }
-      return;
     }
+    assert(false);
   }
-  assert(false);
 }
 
 
