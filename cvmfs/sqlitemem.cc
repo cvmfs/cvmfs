@@ -9,8 +9,10 @@
 
 #include <malloc.h>
 
+#include <cassert>
 #include <cstddef>
 #include <cstring>
+#include <new>
 
 #include "smalloc.h"
 #include "util_concurrency.h"
@@ -18,6 +20,192 @@
 using namespace std;  // NOLINT
 
 namespace sqlite {
+
+bool MemoryManager::MallocArena::Contains(void *ptr) const {
+  char *cptr = reinterpret_cast<char *>(ptr);
+  return
+    (cptr >= (arena_ + sizeof(AvailBlockCtl) + 1 + sizeof(ReservedBlockCtl)))
+    &&
+    (cptr < (arena_ + kArenaSize - sizeof(int32_t) - 1));
+}
+
+
+uint32_t MemoryManager::MallocArena::GetSize(void *ptr) const {
+  assert(Contains(ptr));
+
+  ReservedBlockCtl *block_ctl = reinterpret_cast<ReservedBlockCtl *>(
+    reinterpret_cast<char *>(ptr) - sizeof(ReservedBlockCtl));
+  int32_t size = -(block_ctl->size);
+  assert(size > 1);
+  return size - sizeof(ReservedBlockCtl) - 1;
+}
+
+/**
+ * Creates a free block at the place of the reserved block ptr points into.
+ * The free block might need to be merged with adjacent lower and/or upper
+ * blocks.  In these cases, the corresponding blocks are removed from the list
+ * of available blocks.  Every allocated block has a predecessor and a
+ * successor in the arena.  The newly created free block is added to the end of
+ * the list of available blocks.
+ */
+void MemoryManager::MallocArena::Free(void *ptr) {
+  assert(Contains(ptr));
+
+  no_reserved_--;
+
+  ReservedBlockCtl *block_ctl = reinterpret_cast<ReservedBlockCtl *>(
+    reinterpret_cast<char *>(ptr) - sizeof(ReservedBlockCtl));
+  char prior_tag = *(reinterpret_cast<char *>(block_ctl) - 1);
+  assert((prior_tag == kTagAvail) || (prior_tag == kTagReserved));
+  assert(block_ctl->size <= 0);
+
+  int32_t new_size = -(block_ctl->size);
+  assert(new_size > 0);
+  AvailBlockCtl *new_avail = reinterpret_cast<AvailBlockCtl *>(block_ctl);
+
+  if (prior_tag == kTagAvail) {
+    // Merge with block before and remove the block from the list
+    int32_t prior_size = reinterpret_cast<AvailBlockTag *>(
+      reinterpret_cast<char *>(block_ctl) - sizeof(AvailBlockTag))->size;
+    assert(prior_size > 0);
+    new_size += prior_size;
+    new_avail = reinterpret_cast<AvailBlockCtl *>(
+      reinterpret_cast<char *>(block_ctl) - prior_size);
+    AvailBlockCtl *next = new_avail->GetNextPtr(arena_);
+    AvailBlockCtl *prev = new_avail->GetPrevPtr(arena_);
+    prev->link_next = new_avail->link_next;
+    next->link_prev = new_avail->link_prev;
+    if (rover_ == new_avail)
+      rover_ = head_avail_;
+  }
+
+  int32_t succ_size = *reinterpret_cast<int32_t *>(
+    reinterpret_cast<char *>(new_avail) + new_size);
+  if (succ_size >= 0) {
+    // Merge with succeeding block and remove the block from the list
+    AvailBlockCtl *succ_avail = reinterpret_cast<AvailBlockCtl *>(
+      reinterpret_cast<char *>(new_avail) + new_size);
+    AvailBlockCtl *next = succ_avail->GetNextPtr(arena_);
+    AvailBlockCtl *prev = succ_avail->GetPrevPtr(arena_);
+    prev->link_next = succ_avail->link_next;
+    next->link_prev = succ_avail->link_prev;
+    new_size += succ_size;
+    if (rover_ == succ_avail)
+      rover_ = head_avail_;
+  }
+
+  // Insert new free block at the end of the list
+  AvailBlockCtl *next = head_avail_;
+  AvailBlockCtl *prev = head_avail_->GetPrevPtr(arena_);
+  next->link_prev = new_avail->ConvertToLink(arena_);
+  prev->link_next = new_avail->ConvertToLink(arena_);
+  new_avail->link_next = head_avail_->ConvertToLink(arena_);
+  new_avail->link_prev = prev->ConvertToLink(arena_);
+
+  // Set new free block's boundaries
+  new_avail->size = new_size;
+  void *upper_tag =
+    reinterpret_cast<char *>(new_avail) + new_size - sizeof(AvailBlockTag);
+  new (upper_tag) AvailBlockTag(new_size);
+}
+
+
+/**
+ * Walks the list of available blocks starting from rover and allocates the
+ * first available spot that's large enough.  Puts the reserved block at the end
+ * of the available one and, if necessary, removes the available one from the
+ * list of free blocks.
+ */
+void *MemoryManager::MallocArena::Malloc(const uint32_t size) {
+  assert(size > 0);
+
+  // Control word first, block type tag last
+  int32_t total_size = sizeof(ReservedBlockCtl) + size + 1;
+  if (total_size < kMinBlockSize)
+    total_size = kMinBlockSize;
+
+  bool wrapped = false;
+  // Generally: p = LINK(q)
+  AvailBlockCtl *q = rover_;
+  AvailBlockCtl *p;
+  do {
+    p = q->GetNextPtr(arena_);
+    if (p->size >= total_size)
+      break;
+    if (p == head_avail_) {
+      if (wrapped)
+        return NULL;
+      wrapped = true;
+    }
+    q = p;
+  } while (true);
+
+  // As of here: we found a sufficiently large free block at p following q
+  no_reserved_++;
+
+  int32_t remaining_size = p->size - total_size;
+  // Avoid creation of very small blocks
+  if (remaining_size < kMinBlockSize) {
+    total_size += remaining_size;
+    remaining_size = 0;
+  }
+
+  // Update the list of available blocks
+  if (remaining_size == 0) {
+    // Remove free block p from the list of available blocks
+    q->link_next = p->link_next;
+    q->GetNextPtr(arena_)->link_prev = q->ConvertToLink(arena_);
+  } else {
+    p->size = remaining_size;
+    void *upper_tag =
+      reinterpret_cast<char *>(p) + remaining_size - sizeof(AvailBlockTag);
+    new (upper_tag) AvailBlockTag(remaining_size);
+  }
+  rover_ = q->GetNextPtr(arena_);
+
+  // Place the new allocation, which also sets the block type tag at the end
+  char *new_block = reinterpret_cast<char *>(p) + remaining_size;
+  new (new_block) ReservedBlockCtl(total_size);
+  return new_block + sizeof(ReservedBlockCtl);
+}
+
+
+/**
+ * The arena starts with the AvailBlockCtl of head_avail_, followed by a
+ * reserved tag to prevent it from being merged, followed by a free block
+ * spanning the arena until the end tag.  The end tag is a single negative int,
+ * which mimics another reserved block.
+ */
+MemoryManager::MallocArena::MallocArena()
+  : arena_(reinterpret_cast<char *>(sxmmap(kArenaSize)))
+  , head_avail_(reinterpret_cast<AvailBlockCtl *>(arena_))
+  , rover_(head_avail_)
+  , no_reserved_(0)
+{
+  int32_t usable_size =
+    kArenaSize - (sizeof(AvailBlockCtl) + 1 + sizeof(int32_t));
+  AvailBlockCtl *free_block =
+    new (arena_ + sizeof(AvailBlockCtl) + 1) AvailBlockCtl();
+  free_block->size = usable_size;
+  free_block->link_next = free_block->link_prev = 0;
+
+  head_avail_->size = 0;
+  head_avail_->link_next = head_avail_->link_prev = sizeof(AvailBlockCtl) + 1;
+
+  // Prevent succeeding blocks from merging
+  *(arena_ + sizeof(AvailBlockCtl)) = kTagReserved;
+  // Final tag: reserved block marker
+  *reinterpret_cast<int32_t *>(arena_ + kArenaSize - sizeof(int32_t)) = -1;
+}
+
+
+MemoryManager::MallocArena::~MallocArena() {
+  sxunmap(arena_, kArenaSize);
+}
+
+
+//------------------------------------------------------------------------------
+
 
 void *MemoryManager::LookasideBufferArena::GetBuffer() {
   for (unsigned i = 0; i < kNoBitmaps; ++i) {
@@ -82,7 +270,7 @@ MemoryManager *MemoryManager::instance_ = NULL;
  * Sqlite ensures that size > 0.
  */
 void *MemoryManager::xMalloc(int size) {
-  return smalloc(size);
+  return instance_->GetMemory(size);
 }
 
 
@@ -90,7 +278,7 @@ void *MemoryManager::xMalloc(int size) {
  * Sqlite ensures that ptr != NULL.
  */
 void MemoryManager::xFree(void *ptr) {
-  free(ptr);
+  instance_->PutMemory(ptr);
 }
 
 
@@ -98,7 +286,10 @@ void MemoryManager::xFree(void *ptr) {
  * Sqlite ensures that ptr != NULL and new_size > 0.
  */
 void *MemoryManager::xRealloc(void *ptr, int new_size) {
-  return srealloc(ptr, new_size);
+  void *new_ptr = xMalloc(new_size);
+  memcpy(new_ptr, ptr, new_size);
+  xFree(ptr);
+  return new_ptr;
 }
 
 
@@ -106,13 +297,12 @@ void *MemoryManager::xRealloc(void *ptr, int new_size) {
  * Sqlite ensures that ptr != NULL.
  */
 int MemoryManager::xSize(void *ptr) {
-  return malloc_usable_size(ptr);
+  return instance_->GetMemorySize(ptr);
 }
 
 
 int MemoryManager::xRoundup(int size) {
-  // From sqlite: round up a number to the next larger multiple of 8.
-  return (((size)+7)&~7);
+  return size;
 }
 
 
@@ -185,6 +375,35 @@ void *MemoryManager::GetLookasideBuffer() {
 }
 
 
+int MemoryManager::GetMemorySize(void *ptr) {
+  unsigned N = malloc_arenas_.size();
+  for (unsigned i = 0; i < N; ++i) {
+    if (malloc_arenas_[i]->Contains(ptr))
+      return malloc_arenas_[i]->GetSize(ptr);
+  }
+  assert(false);
+}
+
+
+/**
+ * Opens new arenas as necessary.
+ */
+void *MemoryManager::GetMemory(int size) {
+  unsigned N = malloc_arenas_.size();
+  void *p = NULL;
+  for (unsigned i = 0; i < N; ++i) {
+    p = malloc_arenas_[i]->Malloc(size);
+    if (p != NULL)
+      return p;
+  }
+  MallocArena *M = new MallocArena();
+  malloc_arenas_.push_back(M);
+  p = M->Malloc(size);
+  assert(p != NULL);
+  return p;
+}
+
+
 MemoryManager::MemoryManager()
   : scratch_memory_(sxmmap(kScratchSize))
   , page_cache_memory_(sxmmap(kPageCacheSize))
@@ -195,6 +414,7 @@ MemoryManager::MemoryManager()
   assert(retval == 0);
 
   lookaside_buffer_arenas_.push_back(new LookasideBufferArena());
+  malloc_arenas_.push_back(new MallocArena());
 
   memset(&mem_methods_, 0, sizeof(mem_methods_));
   mem_methods_.xMalloc = xMalloc;
@@ -216,6 +436,8 @@ MemoryManager::~MemoryManager() {
   sxunmap(page_cache_memory_, kPageCacheSize);
   for (unsigned i = 0; i < lookaside_buffer_arenas_.size(); ++i)
     delete lookaside_buffer_arenas_[i];
+  for (unsigned i = 0; i < malloc_arenas_.size(); ++i)
+    delete malloc_arenas_[i];
   pthread_mutex_destroy(lock_);
   free(lock_);
 }
@@ -238,6 +460,26 @@ void MemoryManager::PutLookasideBuffer(void *buffer) {
       return;
     }
   }
+  assert(false);
+}
+
+
+/**
+ * Closes empty areas
+ */
+void MemoryManager::PutMemory(void *ptr) {
+  unsigned N = malloc_arenas_.size();
+  for (unsigned i = 0; i < N; ++i) {
+    if (malloc_arenas_[i]->Contains(ptr)) {
+      malloc_arenas_[i]->Free(ptr);
+      if ((N > 1) && malloc_arenas_[i]->IsEmpty()) {
+        delete malloc_arenas_[i];
+        malloc_arenas_.erase(malloc_arenas_.begin() + i);
+      }
+      return;
+    }
+  }
+  assert(false);
 }
 
 

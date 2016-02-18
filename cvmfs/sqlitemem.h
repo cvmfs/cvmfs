@@ -19,7 +19,9 @@ namespace sqlite {
 /**
  * The MemoryManager uses the sqlite hooks to optimize memory allocations.  It
  * is tuned for reading the cvmfs file catalogs.  It provides a page cache of
- * a few MB, a small scratch space and per-database lookaside buffers.
+ * a few MB, a small scratch space and per-database lookaside buffers.  It also
+ * contains a "general purpose" malloc/free implementation tailored to the
+ * behavior of sqlite memory allocation.
  *
  * It is implemented as a singleton.  GetInstance() will reserve memory blocks,
  * AssignGlobalArenas will set the global sqlite configuration and
@@ -31,8 +33,8 @@ namespace sqlite {
  * thread-safe.
  */
 class MemoryManager {
-  FRIEND_TEST(T_Sqlitemem, LookasideBufferArena);
   FRIEND_TEST(T_Sqlitemem, LookasideBuffer);
+  FRIEND_TEST(T_Sqlitemem, Malloc);
 
  public:
   /**
@@ -73,33 +75,97 @@ class MemoryManager {
    */
   static const unsigned kLookasideSlotsPerDb = 128;
 
-  static MemoryManager *GetInstance() {
-    if (instance_ == NULL)
-      instance_ = new MemoryManager();
-    return instance_;
-  }
-  static void CleanupInstance();
-  static bool HasInstance() { return instance_ != NULL; }
-  ~MemoryManager();
-
-  void AssignGlobalArenas();
-  void *AssignLookasideBuffer(void *db);
-  void ReleaseLookasideBuffer(void *buffer);
-
- private:
-  static MemoryManager *instance_;
 
   /**
-   * SQlite memory callbacks need to be static because they are referenced by
-   * C function pointers.  See https://www.sqlite.org/c3ref/mem_methods.html
+   * An mmap'd block of general purpose memory for malloc/free in sqlite.  Uses
+   * the "boundary-tag system" as described in TAOCP.
    */
-  static void *xMalloc(int size);
-  static void xFree(void *ptr);
-  static void *xRealloc(void *ptr, int new_size);
-  static int xSize(void *ptr);
-  static int xRoundup(int size);
-  static int xInit(void *app_data);
-  static void xShutdown(void *app_data);
+  class MallocArena {
+   public:
+    /**
+     * Should be larger than 10 times the largest allocation, which for reading
+     * sqlite file catalogs is 64kB.  An arena size of 8MB limits the total
+     * number of arenas (mapped blocks) to <40, given typical storage needs for
+     * 10,000 open catalogs.
+     */
+    static const unsigned kArenaSize = 8 * 1024 * 1024;
+
+    /**
+     * Avoid very small free blocks.  This must be anyway larger than
+     * sizeof(AvailBlockCtl) + sizeof(AvailBlockTag).
+     */
+    static const int kMinBlockSize = 20;
+
+    MallocArena();
+    ~MallocArena();
+
+    void *Malloc(const uint32_t size);
+    void Free(void *ptr);
+    bool Contains(void *ptr) const;
+    uint32_t GetSize(void *ptr) const;
+    bool IsEmpty() const { return no_reserved_ == 0; }
+
+   private:
+    static const char kTagAvail = 0;
+    static const char kTagReserved = 1;
+
+    /**
+     * Lower boundary of a free block.  Note that the linking of blocks is not
+     * necessarily in ascending order but random.
+     */
+    struct AvailBlockCtl {
+      AvailBlockCtl *GetNextPtr(char *base) {
+        return reinterpret_cast<AvailBlockCtl *>(base + link_next);
+      }
+      AvailBlockCtl *GetPrevPtr(char *base) {
+        return reinterpret_cast<AvailBlockCtl *>(base + link_prev);
+      }
+      int32_t ConvertToLink(char *base) {
+        return reinterpret_cast<char *>(this) - base;
+      }
+      int32_t size;  // always positive
+      int32_t link_next;
+      int32_t link_prev;
+    };
+
+    /**
+     * 8 bytes upper boundary of a free block.
+     */
+    struct AvailBlockTag {
+      AvailBlockTag(int32_t s) : size(s), tag(kTagAvail) { }
+      int32_t size;
+      char padding[3];
+      char tag;
+    };
+
+    /**
+     * Lower boundary of a reserved block: a negative size to distinguish from
+     * the lower boundary of a free block.
+     */
+    struct ReservedBlockCtl {
+      explicit ReservedBlockCtl(int32_t s) : size(-s) {
+        char *base = reinterpret_cast<char *>(this);
+        *(base + s - 1) = kTagReserved;
+      }
+      int32_t size;  // always negative
+    };
+
+    /**
+     * Starts with the head_avail_ block and ends with a -1 guard integer to
+     * mimic a reserved end block.
+     */
+    char *arena_;  ///< The memory block
+    /**
+     * Head of the list of available blocks.  Located at the beginning of the
+     * arena_.  The only "available" block with size 0 and with the upper tag
+     * field set to "reserved", so that it is not merged with another free'd
+     * block.
+     */
+    AvailBlockCtl *head_avail_;
+    AvailBlockCtl *rover_;  ///< The free block where the next search starts.
+    uint32_t no_reserved_;
+  };
+
 
   /**
    * A continues chunk of memory from which fixed-sized chunks are given as
@@ -151,10 +217,44 @@ class MemoryManager {
     int freemap_[kNoBitmaps];
   };
 
+
+  static MemoryManager *GetInstance() {
+    if (instance_ == NULL)
+      instance_ = new MemoryManager();
+    return instance_;
+  }
+  static void CleanupInstance();
+  static bool HasInstance() { return instance_ != NULL; }
+  ~MemoryManager();
+
+  void AssignGlobalArenas();
+  void *AssignLookasideBuffer(void *db);
+  void ReleaseLookasideBuffer(void *buffer);
+
+ private:
+  static MemoryManager *instance_;
+
+  /**
+   * SQlite memory callbacks need to be static because they are referenced by
+   * C function pointers.  See https://www.sqlite.org/c3ref/mem_methods.html
+   */
+  static void *xMalloc(int size);
+  static void xFree(void *ptr);
+  static void *xRealloc(void *ptr, int new_size);
+  static int xSize(void *ptr);
+  static int xRoundup(int size);
+  static int xInit(void *app_data);
+  static void xShutdown(void *app_data);
+
+
   MemoryManager();
 
   void *GetLookasideBuffer();
   void PutLookasideBuffer(void *buffer);
+
+  void *GetMemory(int size);
+  void PutMemory(void *ptr);
+  int GetMemorySize(void *ptr);
 
   pthread_mutex_t *lock_;
 
@@ -162,6 +262,7 @@ class MemoryManager {
   void *scratch_memory_;
   void *page_cache_memory_;
   std::vector<LookasideBufferArena *> lookaside_buffer_arenas_;
+  std::vector<MallocArena *> malloc_arenas_;
 };
 
 }  // namespace sqlite
