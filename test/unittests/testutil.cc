@@ -460,6 +460,10 @@ bool MockObjectFetcher::ObjectExists(const shash::Any &object_hash) const {
          MockHistory::Exists(object_hash);
 }
 
+bool MockObjectFetcher::PathExists(const std::string &path) const {
+  return MockReflog::Exists(path);
+}
+
 
 //------------------------------------------------------------------------------
 
