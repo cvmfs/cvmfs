@@ -1368,15 +1368,15 @@ TEST_F(T_GarbageCollector, FindAndSweepOrphanedNamedSnapshot) {
   history->Remove("Revision2");
   history->EmptyRecycleBin();
 
-  shash::Any old_history_hash     = h("cb431d5bd49df9ba5f1be54642bb8790477ee7f7",
-                                      shash::kSuffixHistory);
-  shash::Any initial_history_hash = h("963f943b84c478731329709ff90d64978f7feeb4",
-                                      shash::kSuffixHistory);
+  shash::Any old_hist_hash     = h("cb431d5bd49df9ba5f1be54642bb8790477ee7f7",
+                                   shash::kSuffixHistory);
+  shash::Any initial_hist_hash = h("963f943b84c478731329709ff90d64978f7feeb4",
+                                   shash::kSuffixHistory);
 
-  history->SetPreviousRevision(old_history_hash);
-  old_history->SetPreviousRevision(initial_history_hash);
-  MockHistory::RegisterObject(old_history_hash, old_history);
-  MockHistory::RegisterObject(initial_history_hash, initial_history);
+  history->SetPreviousRevision(old_hist_hash);
+  old_history->SetPreviousRevision(initial_hist_hash);
+  MockHistory::RegisterObject(old_hist_hash, old_history);
+  MockHistory::RegisterObject(initial_hist_hash, initial_history);
 
   // + - + - + - + - + - + - + - + - + - + - + - + - + - + - + - + - + - + - + -
 
