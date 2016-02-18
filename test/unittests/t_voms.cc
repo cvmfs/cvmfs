@@ -36,13 +36,13 @@ TEST(T_VOMS, VomsAuthz) {
   voms_entry.user = &user_dn[0];
   char voname[] = "cms";
   voms_entry.voname = voname;
-  const char group1[50];
+  char group1[50];
   strncpy(&group1[0], "/cms", 49);
-  const char group2[50];
+  char group2[50];
   strncpy(&group2[0], "/cms/uscms", 49);
-  const char group3[50];
+  char group3[50];
   strncpy(&group3[0], "/cms/escms", 49);
-  const char role1[50];
+  char role1[50];
   strncpy(&role1[0], "pilot", 49);
 
   voms_data[0].group = &group1[0];
