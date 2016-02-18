@@ -1323,9 +1323,6 @@ TEST_F(T_GarbageCollector, LogDeletionToFile) {
 }
 
 
-/* TODO(rmeusel): re-enable once the 'orphaned named snapshots' problem is
-  solved
-
 TEST_F(T_GarbageCollector, FindAndSweepOrphanedNamedSnapshot) {
  GcConfiguration config = GetStandardGarbageCollectorConfiguration();
  MyGarbageCollector gc(config);
@@ -1360,8 +1357,7 @@ TEST_F(T_GarbageCollector, FindAndSweepOrphanedNamedSnapshot) {
 
  EXPECT_EQ(11u, gc.preserved_catalog_count());
 
- // mock a history database chain that contains the information of the
-deleted
+ // mock a history database chain that contains the information of the deleted
  // snapshot "Revision2" in its recycle bin and remove it entirely from the
  // latest history database
  MockHistory *history         = MockHistory::Get(MockHistory::root_hash);
@@ -1408,4 +1404,3 @@ deleted
 
  EXPECT_EQ(8u, new_gc.preserved_catalog_count());
 }
-*/
