@@ -13,9 +13,6 @@ class T_Reflog : public ::testing::Test {
   static const char        sandbox[];
   static const std::string fqrn;
 
-  typedef ReflogT Reflog;
-  typedef std::map<std::string, MockReflog*> MockReflogMap;
-
  protected:
   virtual void SetUp() {
     if (NeedsSandbox()) {
@@ -32,23 +29,13 @@ class T_Reflog : public ::testing::Test {
       ASSERT_TRUE(retval) << "failed to remove sandbox";
     }
 
-          MockReflogMap::const_iterator i    = mock_reflogs_.begin();
-    const MockReflogMap::const_iterator iend = mock_reflogs_.end();
-    for (; i != iend; ++i) {
-      delete i->second;
-    }
-    mock_reflogs_.clear();
+    MockReflog::Reset();
   }
 
   std::string GetReflogFilename() const {
-    std::string path;
-    if (NeedsSandbox()) {
-      path = CreateTempPath(string(sandbox) + "/reflog", 0600);
-    } else {
-      do {
-        path = StringifyInt(prng_.Next(1234567));
-      } while (mock_reflogs_.count(path) > 0);
-    }
+    const std::string path = (NeedsSandbox())
+      ? CreateTempPath(string(sandbox) + "/reflog", 0600)
+      : ".cvmfsreflog";
     CheckEmpty(path);
     return path;
   }
@@ -86,26 +73,23 @@ class T_Reflog : public ::testing::Test {
 
   ReflogT* CreateReflog(const type<manifest::Reflog>  type_specifier,
                         const std::string            &path) {
-    return Reflog::Create(path, fqrn);
+    return manifest::Reflog::Create(path, fqrn);
   }
 
   ReflogT* CreateReflog(const type<MockReflog>  type_specifier,
                         const std::string      &path) {
     MockReflog* reflog = MockReflog::Create(path, fqrn);
-    mock_reflogs_[path] = reflog;
     return reflog;
   }
 
   ReflogT* OpenReflog(const type<manifest::Reflog>  type_specifier,
                       const std::string            &path) {
-    return Reflog::Open(path);
+    return manifest::Reflog::Open(path);
   }
 
   ReflogT* OpenReflog(const type<MockReflog>  type_specifier,
                       const std::string      &path) {
-    return (mock_reflogs_.count(path) > 0)
-      ? mock_reflogs_[path]
-      : NULL;
+    return MockReflog::Open(path);
   }
 
   void CloseReflog(const type<manifest::Reflog>  type_specifier,
@@ -124,8 +108,6 @@ class T_Reflog : public ::testing::Test {
 
  protected:
   mutable Prng prng_;
-
-  MockReflogMap mock_reflogs_;
 };
 
 template <class ReflogT>
@@ -143,7 +125,7 @@ TYPED_TEST(T_Reflog, Initalize) {}
 
 TYPED_TEST(T_Reflog, CreateReflog) {
   const std::string rp = TestFixture::GetReflogFilename();
-  typedef typename TestFixture::Reflog Reflog;
+  typedef TypeParam Reflog;
 
   Reflog *reflog = TestFixture::CreateReflog(rp);
   ASSERT_NE(static_cast<Reflog*>(NULL), reflog);
@@ -154,7 +136,7 @@ TYPED_TEST(T_Reflog, CreateReflog) {
 
 TYPED_TEST(T_Reflog, OpenReflog) {
   const std::string rp = TestFixture::GetReflogFilename();
-  typedef typename TestFixture::Reflog Reflog;
+  typedef TypeParam Reflog;
 
   Reflog *rl1 = TestFixture::CreateReflog(rp);
   ASSERT_NE(static_cast<Reflog*>(NULL), rl1);
@@ -170,7 +152,7 @@ TYPED_TEST(T_Reflog, OpenReflog) {
 
 TYPED_TEST(T_Reflog, InsertAndCountReferences) {
   const std::string rp = TestFixture::GetReflogFilename();
-  typedef typename TestFixture::Reflog Reflog;
+  typedef TypeParam Reflog;
 
   Reflog *rl1 = TestFixture::CreateReflog(rp);
   ASSERT_NE(static_cast<Reflog*>(NULL), rl1);
@@ -196,7 +178,7 @@ TYPED_TEST(T_Reflog, InsertAndCountReferences) {
 
 TYPED_TEST(T_Reflog, ListCatalogs) {
   const std::string rp = TestFixture::GetReflogFilename();
-  typedef typename TestFixture::Reflog Reflog;
+  typedef TypeParam Reflog;
 
   Reflog *rl1 = TestFixture::CreateReflog(rp);
   ASSERT_NE(static_cast<Reflog*>(NULL), rl1);
@@ -229,7 +211,7 @@ TYPED_TEST(T_Reflog, ListCatalogs) {
 
 TYPED_TEST(T_Reflog, RemoveCatalog) {
   const std::string rp = TestFixture::GetReflogFilename();
-  typedef typename TestFixture::Reflog Reflog;
+  typedef TypeParam Reflog;
 
   Reflog *rl1 = TestFixture::CreateReflog(rp);
   ASSERT_NE(static_cast<Reflog*>(NULL), rl1);
