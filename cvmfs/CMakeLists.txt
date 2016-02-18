@@ -272,6 +272,8 @@ set (CVMFS_PRELOADER_SOURCES
   path_filters/dirtab.h path_filters/dirtab.cc
   path_filters/relaxed_path_filter.h path_filters/relaxed_path_filter.cc
   catalog.cc catalog.h
+  reflog.h reflog.cc
+  reflog_sql.h reflog_sql.cc
   preload.cc
 )
 
