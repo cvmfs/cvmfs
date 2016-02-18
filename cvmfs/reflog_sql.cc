@@ -109,7 +109,8 @@ uint64_t SqlCountReferences::RetrieveCount() {
 
 
 SqlListReferences::SqlListReferences(const ReflogDatabase *database) {
-  const std::string stmt = "SELECT hash, type FROM refs WHERE type = :type;";
+  const std::string stmt = "SELECT hash, type FROM refs WHERE type = :type "
+                           "ORDER BY timestamp ASC;";
   const bool success = Init(database->sqlite_db(), stmt);
   assert(success);
 }
