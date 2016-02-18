@@ -5,6 +5,8 @@
 #ifndef CVMFS_SWISSKNIFE_IMPL_H_
 #define CVMFS_SWISSKNIFE_IMPL_H_
 
+#include <string>
+
 template <class ObjectFetcherT>
 manifest::Reflog* swissknife::Command::GetOrCreateReflog(
                                               ObjectFetcherT    *object_fetcher,

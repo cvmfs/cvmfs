@@ -133,7 +133,7 @@ SqlRemoveReference::SqlRemoveReference(const ReflogDatabase *database) {
   const std::string stmt = "DELETE FROM refs WHERE hash = :hash "
                                               "AND type = :type;";
   const bool success = Init(database->sqlite_db(), stmt);
-  assert (success);
+  assert(success);
 }
 
 bool SqlRemoveReference::BindReference(const shash::Any    &reference_hash,

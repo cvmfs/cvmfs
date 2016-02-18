@@ -6,6 +6,7 @@
 #define CVMFS_REFLOG_H_
 
 #include <string>
+#include <vector>
 
 #include "reflog_sql.h"
 
