@@ -33,6 +33,8 @@ class Reflog {
   uint64_t CountEntries();
   bool ListCatalogs(std::vector<shash::Any> *hashes) const;
 
+  bool RemoveCatalog(const shash::Any &hash);
+
   void BeginTransaction();
   void CommitTransaction();
 
@@ -62,6 +64,7 @@ class Reflog {
   UniquePtr<SqlInsertReference>  insert_reference_;
   UniquePtr<SqlCountReferences>  count_references_;
   UniquePtr<SqlListReferences>   list_references_;
+  UniquePtr<SqlRemoveReference>  remove_reference_;
 };
 
 }  // namespace manifest

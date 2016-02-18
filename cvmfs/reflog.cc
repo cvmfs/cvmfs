@@ -71,6 +71,7 @@ void Reflog::PrepareQueries() {
   insert_reference_ = new SqlInsertReference(database_.weak_ref());
   count_references_ = new SqlCountReferences(database_.weak_ref());
   list_references_  = new SqlListReferences(database_.weak_ref());
+  remove_reference_ = new SqlRemoveReference(database_.weak_ref());
 }
 
 
@@ -123,6 +124,16 @@ bool Reflog::ListCatalogs(std::vector<shash::Any> *hashes) const {
   }
 
   return list_references_->Reset();
+}
+
+
+bool Reflog::RemoveCatalog(const shash::Any &hash) {
+  assert(database_);
+
+  return
+    remove_reference_->BindReference(hash, SqlReflog::kRefCatalog) &&
+    remove_reference_->Execute()                                   &&
+    remove_reference_->Reset();
 }
 
 

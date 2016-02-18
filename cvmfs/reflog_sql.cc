@@ -114,14 +114,30 @@ SqlListReferences::SqlListReferences(const ReflogDatabase *database) {
   assert(success);
 }
 
-
 bool SqlListReferences::BindType(const ReferenceType type) {
   return BindInt64(1, static_cast<uint64_t>(type));
 }
-
 
 shash::Any SqlListReferences::RetrieveHash() const {
   const ReferenceType type   = static_cast<ReferenceType>(RetrieveInt64(1));
   const shash::Suffix suffix = ToSuffix(type);
   return shash::MkFromHexPtr(shash::HexPtr(RetrieveString(0)), suffix);
+}
+
+
+//------------------------------------------------------------------------------
+
+
+SqlRemoveReference::SqlRemoveReference(const ReflogDatabase *database) {
+  const std::string stmt = "DELETE FROM refs WHERE hash = :hash "
+                                              "AND type = :type;";
+  const bool success = Init(database->sqlite_db(), stmt);
+  assert (success);
+}
+
+bool SqlRemoveReference::BindReference(const shash::Any    &reference_hash,
+                                       const ReferenceType  type) {
+  return
+    BindTextTransient(1, reference_hash.ToString()) &&
+    BindInt64(2, static_cast<uint64_t>(type));
 }

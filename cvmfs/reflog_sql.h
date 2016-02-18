@@ -76,4 +76,12 @@ class SqlListReferences : public SqlReflog {
   shash::Any RetrieveHash() const;
 };
 
+
+class SqlRemoveReference : public SqlReflog {
+ public:
+  explicit SqlRemoveReference(const ReflogDatabase *database);
+  bool BindReference(const shash::Any    &reference_hash,
+                     const ReferenceType  type);
+};
+
 #endif  // CVMFS_REFLOG_SQL_H_
