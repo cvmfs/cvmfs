@@ -76,9 +76,9 @@ class T_GarbageCollector : public ::testing::Test {
  protected:
   void SetUp() {
     dice_.InitLocaltime();
+    reflog_ = MockReflog::Create("", "test.cern.ch");
     SetupDummyCatalogs();
     uploader_ = GC_MockUploader::MockConstruct();
-    reflog_   = MockReflog::Create("", "test.cern.ch");
   }
 
   void TearDown() {
@@ -422,7 +422,7 @@ class T_GarbageCollector : public ::testing::Test {
                   const shash::Any   &catalog_hash = shash::Any(shash::kSha1)) {
     // produce a random hash if no catalog has was given
     shash::Any effective_clg_hash = catalog_hash;
-    effective_clg_hash.suffix = 'C';
+    effective_clg_hash.suffix = shash::kSuffixCatalog;
     if (effective_clg_hash.IsNull()) {
       effective_clg_hash.Randomize(&dice_);
     }
@@ -437,6 +437,11 @@ class T_GarbageCollector : public ::testing::Test {
                                            is_root,
                                            parent,
                                            previous);
+
+    // populate Reflog with root catalogs
+    if (is_root) {
+      reflog_->AddCatalog(effective_clg_hash);
+    }
 
     // register the new catalog in the data structures
     MockCatalog::RegisterObject(catalog->hash(), catalog);
