@@ -143,9 +143,10 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::Sweep(
 
 template <class CatalogTraversalT, class HashFilterT>
 bool GarbageCollector<CatalogTraversalT, HashFilterT>::Collect() {
-  return AnalyzePreservedCatalogTree()   &&
-         CheckPreservedRevisions()       &&
-         SweepCondemnedCatalogTree()     &&
+  return AnalyzePreservedCatalogTree() &&
+         CheckPreservedRevisions()     &&
+         SweepCondemnedCatalogTree()   &&
+         SweepReflog()                 &&
          SweepHistoricRevisions();
 }
 
@@ -208,6 +209,42 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::
   const bool success = traversal_.TraversePruned(
                                        CatalogTraversalT::kDepthFirstTraversal);
   traversal_.UnregisterListener(callback);
+
+  return success;
+}
+
+
+template <class CatalogTraversalT, class HashFilterT>
+bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepReflog() {
+  if (configuration_.verbose) {
+    LogCvmfs(kLogGc, kLogStdout, "Sweeping Reference Logs");
+  }
+
+  ReflogTN *reflog = configuration_.reflog;
+  std::vector<shash::Any> catalogs;
+  if (NULL == reflog || !reflog->ListCatalogs(&catalogs)) {
+    LogCvmfs(kLogGc, kLogStderr, "Failed to list catalog reference log");
+    return false;
+  }
+
+  typename CatalogTraversalT::CallbackTN *callback =
+    traversal_.RegisterListener(
+       &GarbageCollector<CatalogTraversalT, HashFilterT>::SweepDataObjects,
+        this);
+
+  bool success = true;
+        std::vector<shash::Any>::const_iterator i    = catalogs.begin();
+  const std::vector<shash::Any>::const_iterator iend = catalogs.end();
+  for (; i != iend && success; ++i) {
+    if (!hash_filter_.Contains(*i)) {
+      success =
+        success &&
+        traversal_.Traverse(*i, CatalogTraversalT::kDepthFirstTraversal);
+    }
+  }
+
+  traversal_.UnregisterListener(callback);
+
   return success;
 }
 

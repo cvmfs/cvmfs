@@ -78,6 +78,7 @@ class T_GarbageCollector : public ::testing::Test {
     dice_.InitLocaltime();
     SetupDummyCatalogs();
     uploader_ = GC_MockUploader::MockConstruct();
+    reflog_   = MockReflog::Create("", "test.cern.ch");
   }
 
   void TearDown() {
@@ -100,6 +101,7 @@ class T_GarbageCollector : public ::testing::Test {
     config.dry_run            = false;
     config.uploader           = uploader_;
     config.object_fetcher     = &object_fetcher_;
+    config.reflog             = reflog_.weak_ref();
     return config;
   }
 
@@ -468,9 +470,10 @@ class T_GarbageCollector : public ::testing::Test {
   RevisionMap                  catalogs_;
 
  private:
-  Prng               dice_;
-  MockObjectFetcher  object_fetcher_;
-  GC_MockUploader   *uploader_;
+  Prng                    dice_;
+  MockObjectFetcher       object_fetcher_;
+  GC_MockUploader        *uploader_;
+  UniquePtr<MockReflog>   reflog_;
 };
 
 const std::string T_GarbageCollector::fqrn = "test.cern.ch";

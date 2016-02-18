@@ -42,6 +42,7 @@ class GarbageCollector {
  protected:
   typedef typename CatalogTraversalT::ObjectFetcherTN ObjectFetcherTN;
   typedef typename ObjectFetcherTN::HistoryTN         HistoryTN;
+  typedef typename ObjectFetcherTN::ReflogTN          ReflogTN;
   typedef typename CatalogTraversalT::CatalogTN       CatalogTN;
   typedef typename CatalogTraversalT::CallbackDataTN  TraversalCallbackDataTN;
   typedef typename CatalogTraversalT::Parameters      TraversalParameters;
@@ -57,6 +58,7 @@ class GarbageCollector {
     Configuration()
       : uploader(NULL)
       , object_fetcher(NULL)
+      , reflog(NULL)
       , keep_history_depth(kFullHistory)
       , keep_history_timestamp(kNoTimestamp)
       , dry_run(false)
@@ -67,6 +69,7 @@ class GarbageCollector {
 
     upload::AbstractUploader  *uploader;
     ObjectFetcherTN           *object_fetcher;
+    ReflogTN                  *reflog;
     unsigned int               keep_history_depth;
     time_t                     keep_history_timestamp;
     bool                       dry_run;
@@ -93,6 +96,7 @@ class GarbageCollector {
   bool AnalyzePreservedCatalogTree();
   bool CheckPreservedRevisions();
   bool SweepCondemnedCatalogTree();
+  bool SweepReflog();
   bool SweepHistoricRevisions();
 
   void CheckAndSweep(const shash::Any &hash);
