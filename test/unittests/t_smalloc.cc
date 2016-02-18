@@ -2,13 +2,15 @@
  * This file is part of the CernVM File System.
  */
 
-
 #include <gtest/gtest.h>
+
 #include <limits>
+#include <vector>
 
 #include "../../cvmfs/smalloc.h"
 #include "../../cvmfs/util.h"
 
+using namespace std;  // NOLINT
 
 const size_t kSmallAllocation = 1024UL;
 const size_t kBigAllocation = std::numeric_limits<size_t>::max();
@@ -87,4 +89,26 @@ TEST(T_Smalloc, Xmmap) {
   mem = sxmmap(1);
   ASSERT_DEATH(sxunmap(mem, 8192), ".*");
   sxunmap(mem, 1);
+}
+
+
+TEST(T_Smalloc, XmmapAlign) {
+  vector<size_t> sizes;
+  sizes.push_back(2*1024*1024);
+  sizes.push_back(4*1024*1024);
+  sizes.push_back(6*1024*1024);
+  sizes.push_back(8*1024*1024);
+  sizes.push_back(10*1024*1024);
+  sizes.push_back(12*1024*1024);
+  sizes.push_back(14*1024*1024);
+  sizes.push_back(16*1024*1024);
+
+  for (unsigned i = 0; i < 25; ++i) {
+    for (unsigned j = 0; j < sizes.size(); ++j) {
+      void *p = sxmmap_align(sizes[j]);
+      EXPECT_EQ(0U, uintptr_t(p) % sizes[j]);
+      memset(p, 0, sizes[j]);
+      sxunmap(p, sizes[j]);
+    }
+  }
 }

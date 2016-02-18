@@ -84,12 +84,30 @@ static inline void * __attribute__((used)) sxmmap(size_t size) {
   return mem;
 }
 
+
 /**
  * Free memory acquired by sxmmap.
  */
 static inline void __attribute__((used)) sxunmap(void *mem, size_t size) {
   int retval = munmap(mem, size);
   assert((retval == 0) && "Invalid umnmap");
+}
+
+
+/**
+ * Pointer is aligned at a multiple of the size.  The size has to be a multiple
+ * of 2MB.
+ */
+static inline void * __attribute__((used)) sxmmap_align(size_t size) {
+  assert((size % (2 * 1024 * 1024)) == 0);
+  char *mem = reinterpret_cast<char *>(sxmmap(2 * size));
+  uintptr_t head = size - (uintptr_t(mem) % size);
+  sxunmap(mem, head);
+  mem += head;
+  uintptr_t tail = size - head;
+  if (tail > 0)
+    sxunmap(mem + size, tail);
+  return mem;
 }
 
 
