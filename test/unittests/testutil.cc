@@ -452,6 +452,10 @@ MockObjectFetcher::Failures
 MockObjectFetcher::Fetch(const std::string &relative_path,
                          const bool         decompress,
                          std::string *file_path) {
+  *file_path = relative_path;
+  if (!PathExists(relative_path)) {
+    return MockObjectFetcher::kFailNotFound;
+  }
   return MockObjectFetcher::kFailOk;
 }
 
@@ -666,12 +670,24 @@ bool MockHistory::GetHashes(std::vector<shash::Any> *hashes) const {
 
 
 MockReflog* MockReflog::Open(const std::string &path) {
-  return NULL;  // don't call that...
+  MockReflog* reflog = MockReflog::Get(path);
+  if (NULL == reflog) {
+    return NULL;
+  }
+  return reflog->Clone();
 }
 
 MockReflog* MockReflog::Create(const std::string &path,
                                const std::string &repo_name) {
-  return new MockReflog(repo_name);
+  MockReflog *reflog = new MockReflog(repo_name);
+  MockReflog::RegisterPath(path, reflog);
+  return reflog;
+}
+
+
+MockReflog* MockReflog::Clone() const {
+  MockReflog *new_reflog = new MockReflog(*this);
+  return new_reflog;
 }
 
 MockReflog::MockReflog(const std::string fqrn)

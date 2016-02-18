@@ -792,7 +792,7 @@ class MockHistory : public history::History,
 //------------------------------------------------------------------------------
 
 
-class MockReflog {
+class MockReflog : public MockObjectStorage<MockReflog> {
  protected:
   struct ReferenceTypeFilter {
     explicit ReferenceTypeFilter(const shash::Suffix suffix,
@@ -806,10 +806,13 @@ class MockReflog {
     const bool          inverse_;
   };
 
+  MockReflog* Clone() const;
+
  public:
   static MockReflog* Open(const std::string &path);
   static MockReflog* Create(const std::string &path,
                             const std::string &repo_name);
+  static void ResetGlobalState() {}
 
   bool AddCertificate(const shash::Any &certificate);
   bool AddCatalog(const shash::Any &catalog);
