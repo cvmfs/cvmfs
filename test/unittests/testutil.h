@@ -787,6 +787,8 @@ class MockReflog {
   uint64_t CountEntries() { return references_.size(); }
   bool ListCatalogs(std::vector<shash::Any> *hashes) const;
 
+  bool RemoveCatalog(const shash::Any &catalog);
+
   void TakeDatabaseFileOwnership() { owns_database_file_ = true;  }
   void DropDatabaseFileOwnership() { owns_database_file_ = false; }
   bool OwnsDatabaseFile() const    { return owns_database_file_;  }

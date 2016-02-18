@@ -225,3 +225,36 @@ TYPED_TEST(T_Reflog, ListCatalogs) {
 
   TestFixture::CloseReflog(rl2);
 }
+
+
+TYPED_TEST(T_Reflog, RemoveCatalog) {
+  const std::string rp = TestFixture::GetReflogFilename();
+  typedef typename TestFixture::Reflog Reflog;
+
+  Reflog *rl1 = TestFixture::CreateReflog(rp);
+  ASSERT_NE(static_cast<Reflog*>(NULL), rl1);
+  EXPECT_EQ(TestFixture::fqrn, rl1->fqrn());
+
+  rl1->AddCatalog(h("b99a789dcdffff8f95b977cc8e2037fcd3960b5b",
+                    shash::kSuffixCatalog));
+  rl1->AddCatalog(h("c5501bd0142cad45c4f0957cbf307e184ac1f661",
+                    shash::kSuffixCatalog));
+  rl1->AddCertificate(h("b778b910390254b37ec66366aeef04f034c51941",
+                        shash::kSuffixCertificate));
+  rl1->AddMetainfo(h("8de3e8cbd611ce225d62341698b9408a47edf76b",
+                     shash::kSuffixMetainfo));
+  rl1->AddHistory(h("cab790100c3b10afd7e755b3c93eaeda6a0db9ab",
+                     shash::kSuffixHistory));
+  TestFixture::CloseReflog(rl1);
+
+  Reflog *rl2 = TestFixture::OpenReflog(rp);
+  ASSERT_NE(static_cast<Reflog*>(NULL), rl2);
+  EXPECT_EQ(TestFixture::fqrn, rl2->fqrn());
+  EXPECT_EQ(5u, rl2->CountEntries());
+
+  ASSERT_TRUE(rl2->RemoveCatalog(h("c5501bd0142cad45c4f0957cbf307e184ac1f661",
+                                 shash::kSuffixCatalog)));
+  EXPECT_EQ(4u, rl2->CountEntries());
+
+  TestFixture::CloseReflog(rl2);
+}

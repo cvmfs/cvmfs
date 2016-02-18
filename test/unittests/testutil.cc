@@ -704,3 +704,8 @@ bool MockReflog::ListCatalogs(std::vector<shash::Any> *hashes) const {
                       predicate);
   return true;
 }
+
+bool MockReflog::RemoveCatalog(const shash::Any &catalog) {
+  references_.erase(catalog);
+  return true;
+}
