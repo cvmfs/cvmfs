@@ -469,6 +469,7 @@ void MemoryManager::PutMemory(void *ptr) {
       if (malloc_arenas_[i] == M) {
         delete malloc_arenas_[i];
         malloc_arenas_.erase(malloc_arenas_.begin() + i);
+        idx_last_arena_ = 0;
         return;
       }
     }
