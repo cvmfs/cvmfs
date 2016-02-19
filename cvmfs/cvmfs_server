@@ -681,6 +681,23 @@ get_apache_conf_filename() {
   echo "cvmfs.${name}.conf"
 }
 
+dump_http2_configuration() {
+  local cmd="httpd -M"
+  if which apache2ctl >/dev/null 2>&1; then
+    cmd="apache2ctl -M"
+  fi
+  if $cmd 2>&1 | grep "http2_module" >/dev/null 2>&1; then
+    echo "
+# Load the http2 module
+LoadModule http2_module modules/mod_http2.so
+<IfModule http2_module>
+  Protocols h2c http/1.1
+  LogLevel http2:info
+</IfModule>
+"
+  fi
+}
+
 # figure out apache config file mode
 #
 # @return   apache config mode (stdout) (see globals below)
@@ -2055,13 +2072,7 @@ Alias /cvmfs/${name} ${storage_dir}
     ExpiresByType application/x-cvmfs "access plus 2 minutes"
     ExpiresByType application/json    "access plus 2 minutes"
 </Directory>
-
-# Load http2 module
-LoadModule http2_module modules/mod_http2.so
-<IfModule http2_module>
-    Protocols h2c http/1.1
-    LogLevel http2:info
-</IfModule>
+$(dump_http2_configuration)
 EOF
 }
 
