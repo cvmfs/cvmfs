@@ -804,6 +804,9 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
     curl_easy_setopt(handle, CURLOPT_RANGE, NULL);
   }
 
+  // Set http2 mode
+  curl_easy_setopt(handle, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2_0);
+
   // Set curl parameters
   curl_easy_setopt(handle, CURLOPT_PRIVATE, static_cast<void *>(info));
   curl_easy_setopt(handle, CURLOPT_WRITEHEADER,
