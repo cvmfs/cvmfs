@@ -755,12 +755,13 @@ bool GetUidOf(const std::string &username, uid_t *uid, gid_t *main_gid) {
 bool GetGidOf(const std::string &groupname, gid_t *gid) {
   char buf[16*1024];
   struct group grp;
-  struct group *result;
+  struct group *result = NULL;
   getgrnam_r(groupname.c_str(), &grp, buf, sizeof(buf), &result);
-  if (result == NULL)
-    return false;
-  *gid = result->gr_gid;
-  return true;
+  if (result != NULL) {
+    *gid = result->gr_gid;
+    return true;
+  }
+  return false;
 }
 
 /**

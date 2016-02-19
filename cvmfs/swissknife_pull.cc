@@ -512,8 +512,6 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     pull_history = true;
   if (args.find('z') != args.end())
     inspect_existing_catalogs = true;
-  pthread_t *workers =
-    reinterpret_cast<pthread_t *>(smalloc(sizeof(pthread_t) * num_parallel));
   typedef std::vector<history::History::Tag> TagVector;
   TagVector historic_tags;
 
@@ -570,6 +568,9 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   download_manager()->SetTimeout(timeout, timeout);
   download_manager()->SetRetryParameters(retries, timeout, 3*timeout);
   download_manager()->Spawn();
+
+  pthread_t *workers =
+    reinterpret_cast<pthread_t *>(smalloc(sizeof(pthread_t) * num_parallel));
 
   // Check if we have a replica-ready server
   const string url_sentinel = *stratum0_url + "/.cvmfs_master_replica";
