@@ -11,6 +11,7 @@
 #include <cstdio>
 
 // TODO(jblomer): unit test this class
+struct authz_data;
 
 /**
  * This implements the credential fetcher server. Communicating over a dedicated
@@ -38,6 +39,7 @@ class CredentialsFetcher {
   static bool GetProxyFileFromEnv(const pid_t pid, const size_t path_len,
                                   char *path);
   static FILE *GetProxyFileInternal(pid_t pid, uid_t uid, gid_t gid);
+  static authz_data *GenerateVOMSData(uid_t, gid_t, pid_t);
 };
 
 #endif  // CVMFS_VOMS_AUTHZ_VOMS_CRED_H_

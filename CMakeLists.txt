@@ -199,6 +199,7 @@ option (GOOGLETEST_BUILTIN      "Don't use system installation of google test"  
 option (GEOIP_BUILTIN           "Don't use system GeoIP library and python-GeoIP"                  ON)
 option (TBB_PRIVATE_LIB         "Compile our own TBB shared libraries"                             ON)
 option (BUILD_COVERAGE          "Compile to collect code coverage reports"                         OFF)
+option (AUTHZ                   "Enable GSI/VOMS authorization"                                    OFF)
 
 #
 # define where to find the external dependencies
@@ -385,18 +386,20 @@ else (SQLITE3_BUILTIN)
 endif (SQLITE3_BUILTIN)
 
 # VOMS / globus libraries for secure CVMFS
-find_package (VOMS)
-if (VOMS_FOUND)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${VOMS_INCLUDE_DIR})
-  add_definitions(-DVOMS_AUTHZ)
-endif (VOMS_FOUND)
+if (AUTHZ)
+  find_package (VOMS)
+  if (VOMS_FOUND)
+    set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${VOMS_INCLUDE_DIR})
+    add_definitions(-DVOMS_AUTHZ)
+  endif (VOMS_FOUND)
 
-include (FindPkgConfig)
-pkg_check_modules(GLOBUS globus-gsi-credential globus-gsi-cert-utils globus-common globus-gsi-sysconfig globus-gsi-callback)
-if (GLOBUS_FOUND)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GLOBUS_INCLUDE_DIRS})
-  add_definitions(-DGLOBUS_AUTHZ)
-endif (GLOBUS_FOUND)
+  include (FindPkgConfig)
+  pkg_check_modules(GLOBUS globus-gsi-credential globus-gsi-cert-utils globus-common globus-gsi-sysconfig globus-gsi-callback)
+  if (GLOBUS_FOUND)
+    set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GLOBUS_INCLUDE_DIRS})
+    add_definitions(-DGLOBUS_AUTHZ)
+  endif (GLOBUS_FOUND)
+endif (AUTHZ)
 
 find_package (Valgrind)
 if (VALGRIND_FOUND)

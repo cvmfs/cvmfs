@@ -25,6 +25,7 @@
 #include "../logging.h"
 #include "../util_concurrency.h"
 #include "voms_cred.h"
+#include "voms_lib.h"
 
 static void
 ReportChildDeath(pid_t pid, int flags) {
@@ -337,4 +338,10 @@ static ProxyHelper g_instance;
 FILE *
 GetProxyFile(pid_t pid, uid_t uid, gid_t gid) {
   return g_instance.GetProxyFile(pid, uid, gid);
+}
+
+
+authz_data*
+GetAuthzData(pid_t pid, uid_t uid, gid_t gid) {
+  return NULL;  // TODO(bbockelm): Finish stub of authz fetcher.
 }

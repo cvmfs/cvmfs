@@ -15,7 +15,193 @@
 #include <cstring>
 
 #include "../logging.h"
+#include "globus_lib.h"
 #include "voms_cred.h"
+#include "voms_lib.h"
+
+/**
+ * Create the VOMS data structure to the best of our abilities.
+ *
+ * Resulting memory is owned by caller and must be destroyed with VOMS_Destroy.
+ */
+struct authz_state {
+  FILE *m_fp;
+  struct vomsdata *m_voms;
+  globus_gsi_cred_handle_t m_cred;
+  BIO *m_bio;
+  X509 *m_cert;
+  EVP_PKEY *m_pkey;
+  STACK_OF(X509) *m_chain;
+  char *m_subject;
+  globus_gsi_callback_data_t m_callback;
+
+  authz_state() :
+    m_fp(NULL),
+    m_voms(NULL),
+    m_cred(NULL),
+    m_bio(NULL),
+    m_cert(NULL),
+    m_pkey(NULL),
+    m_chain(NULL),
+    m_subject(NULL),
+    m_callback(NULL)
+  {}
+
+  ~authz_state() {
+    if (m_fp) {fclose(m_fp);}
+    if (m_voms) {(*g_VOMS_Destroy)(m_voms);}
+    if (m_cred) {(*g_globus_gsi_cred_handle_destroy)(m_cred);}
+    if (m_bio) {BIO_free(m_bio);}
+    if (m_cert) {X509_free(m_cert);}
+    if (m_pkey) {EVP_PKEY_free(m_pkey);}
+    if (m_chain) {sk_X509_pop_free(m_chain, X509_free);}
+    if (m_subject) {OPENSSL_free(m_subject);}
+    if (m_callback) {(*g_globus_gsi_callback_data_destroy)(m_callback);}
+  }
+};
+
+
+authz_data*
+CredentialsFetcher::GenerateVOMSData(uid_t uid, gid_t gid, pid_t pid)
+{
+  authz_state state;
+
+  state.m_fp = GetProxyFileInternal(pid, uid, gid);
+  if (!state.m_fp) {
+    LogCvmfs(kLogVoms, kLogDebug, "Could not find process's proxy file.");
+    return NULL;
+  }
+
+  // Start of Globus proxy parsing and verification...
+  globus_result_t result =
+      (*g_globus_gsi_cred_handle_init)(&state.m_cred, NULL);
+  if (GLOBUS_SUCCESS != result) {
+    GlobusLib::GetInstance().PrintError(result);
+    return NULL;
+  }
+
+  state.m_bio = BIO_new_fp(state.m_fp, 0);
+  if (!state.m_bio) {
+    LogCvmfs(kLogVoms, kLogDebug, "Unable to allocate new BIO object");
+    return NULL;
+  }
+
+  result = (*g_globus_gsi_cred_read_proxy_bio)(state.m_cred, state.m_bio);
+  if (GLOBUS_SUCCESS != result) {
+    LogCvmfs(kLogVoms, kLogDebug, "Failed to parse credentials");
+    GlobusLib::GetInstance().PrintError(result);
+    return NULL;
+  }
+
+  // Setup Globus callback object.
+  result = (*g_globus_gsi_callback_data_init)(&state.m_callback);
+  if (GLOBUS_SUCCESS != result) {
+    GlobusLib::GetInstance().PrintError(result);
+    return NULL;
+  }
+  char *cert_dir;
+  result = (*g_globus_gsi_sysconfig_get_cert_dir_unix)(&cert_dir);
+  if (GLOBUS_SUCCESS != result) {
+    LogCvmfs(kLogVoms, kLogDebug, "Failed to determine trusted certificates "
+                                  "directory.");
+    GlobusLib::GetInstance().PrintError(result);
+    return NULL;
+  }
+  result = (*g_globus_gsi_callback_set_cert_dir)(state.m_callback, cert_dir);
+  free(cert_dir);
+  if (GLOBUS_SUCCESS != result) {
+    GlobusLib::GetInstance().PrintError(result);
+    return NULL;
+  }
+
+  // Verify credential chain.
+  result = (*g_globus_gsi_cred_verify_cert_chain)(state.m_cred,
+                                                  state.m_callback);
+  if (GLOBUS_SUCCESS != result) {
+    LogCvmfs(kLogVoms, kLogDebug, "Failed to validate credentials");
+    GlobusLib::GetInstance().PrintError(result);
+    return NULL;
+  }
+
+  // Load key and certificate from Globus handle
+  result = (*g_globus_gsi_cred_get_key)(state.m_cred, &state.m_pkey);
+  if (GLOBUS_SUCCESS != result) {
+    LogCvmfs(kLogVoms, kLogDebug, "Failed to get process private key.");
+    GlobusLib::GetInstance().PrintError(result);
+    return NULL;
+  }
+  result = (*g_globus_gsi_cred_get_cert)(state.m_cred, &state.m_cert);
+  if (GLOBUS_SUCCESS != result) {
+    LogCvmfs(kLogVoms, kLogDebug, "Failed to get process certificate.");
+    GlobusLib::GetInstance().PrintError(result);
+    return NULL;
+  }
+
+  // Check proxy public key and private key match.
+  if (!X509_check_private_key(state.m_cert, state.m_pkey)) {
+    LogCvmfs(kLogVoms, kLogDebug, "Process certificate and key do not match");
+    return NULL;
+  }
+
+  // Load certificate chain
+  result = (*g_globus_gsi_cred_get_cert_chain)(state.m_cred, &state.m_chain);
+  if (GLOBUS_SUCCESS != result) {
+    LogCvmfs(kLogVoms, kLogDebug, "Process does not have cert chain.");
+    GlobusLib::GetInstance().PrintError(result);
+    return NULL;
+  }
+
+  // Look through certificates to find an EEC (which has the subject)
+  globus_gsi_cert_utils_cert_type_t cert_type;
+  X509 *eec_cert = state.m_cert;
+  result = (*g_globus_gsi_cert_utils_get_cert_type)(state.m_cert, &cert_type);
+  if (GLOBUS_SUCCESS != result) {
+    GlobusLib::GetInstance().PrintError(result);
+    return NULL;
+  }
+  if (!(cert_type & GLOBUS_GSI_CERT_UTILS_TYPE_EEC)) {
+    result = (*g_globus_gsi_cert_utils_get_identity_cert)(state.m_chain,
+                                                          &eec_cert);
+    if (GLOBUS_SUCCESS != result) {
+      GlobusLib::GetInstance().PrintError(result);
+      return NULL;
+    }
+  }
+  // From the EEC, use OpenSSL to determine the subject
+  state.m_subject = X509_NAME_oneline(X509_get_subject_name(eec_cert), NULL, 0);
+  if (!state.m_subject) {
+    LogCvmfs(kLogVoms, kLogDebug, "Unable to determine certificate DN.");
+    return NULL;
+  }
+
+  state.m_voms = (*g_VOMS_Init)(NULL, NULL);
+  if (!state.m_voms) {
+    return NULL;
+  }
+
+  int voms_error = 0;
+  const int retval = (*g_VOMS_Retrieve)(state.m_cert, state.m_chain,
+                                        RECURSE_CHAIN,
+                                        state.m_voms, &voms_error);
+  // If there is no VOMS extension (VERR_NOEXT), this shouldn't be fatal.
+  if (!retval && (voms_error != VERR_NOEXT)) {
+    char *err_str = (*g_VOMS_ErrorMessage)(state.m_voms, voms_error, NULL, 0);
+    LogCvmfs(kLogVoms, kLogDebug, "Unable to parse VOMS file: %s\n",
+             err_str);
+    free(err_str);
+    return NULL;
+  }
+
+  // Move pointers to returned authz_data structure
+  authz_data *authz = new authz_data();
+  authz->dn_ = state.m_subject;
+  state.m_subject = NULL;
+  if (voms_error != VERR_NOEXT) {
+    authz->voms_ = state.m_voms;
+    state.m_voms = NULL;
+  }
+  return authz;
+}
 
 
 /**

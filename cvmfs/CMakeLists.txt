@@ -65,7 +65,10 @@ set (CVMFS_CLIENT_SOURCES
 if (VOMS_FOUND AND GLOBUS_FOUND)
   set (CVMFS_CLIENT_SOURCES ${CVMFS_CLIENT_SOURCES}
   voms_authz/voms_cred.h voms_authz/voms_cred.cc
-  voms_authz/voms_authz.cc voms_authz/voms_authz.h voms_authz/voms_curl.cc)
+  voms_authz/voms_authz.cc voms_authz/voms_authz.h voms_authz/voms_curl.cc
+  voms_authz/voms_lib.cc voms_authz/voms_lib.h voms_authz/loader_helper.cc
+  voms_authz/loader_helper.h)
+
 endif (VOMS_FOUND AND GLOBUS_FOUND)
 
 
@@ -88,7 +91,9 @@ set (CVMFS2_DEBUG_SOURCES
 )
 if (VOMS_FOUND)
   set (CVMFS2_DEBUG_SOURCES ${CVMFS2_DEBUG_SOURCES}
-  voms_authz/cred_fetcher.cc)
+  voms_authz/cred_fetcher.cc voms_authz/globus_lib.cc voms_authz/globus_lib.h
+  voms_authz/voms_lib.cc voms_authz/voms_lib.h voms_authz/loader_helper.cc
+  voms_authz/loader_helper.h)
 endif (VOMS_FOUND)
 
 set (CVMFS2_SOURCES
@@ -275,7 +280,9 @@ set (CVMFS_PRELOADER_SOURCES
 
 if (VOMS_FOUND)
   set (CVMFS_PRELOADER_SOURCES ${CVMFS_PRELOADER_SOURCES}
-       voms_authz/voms_cred.cc voms_authz/voms_authz.h voms_authz/voms_curl.cc)
+       voms_authz/voms_cred.cc voms_authz/voms_authz.h voms_authz/voms_curl.cc
+       voms_authz/voms_lib.cc voms_authz/voms_lib.h voms_authz/loader_helper.cc
+       voms_authz/loader_helper.h)
 endif (VOMS_FOUND)
 
 #
