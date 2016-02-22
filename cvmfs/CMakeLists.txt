@@ -370,7 +370,7 @@ if (BUILD_CVMFS)
          ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${ZLIB_LIBRARIES}
          ${PACPARSER_ARCHIVE} ${LEVELDB_ARCHIVE} ${CARES_ARCHIVE}
          ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${UUID_LIBRARIES}
-         ${SHA3_ARCHIVE} pthread dl)
+         ${SHA3_ARCHIVE} ${NGHTTP2_ARCHIVE} pthread dl)
 
   target_link_libraries (cvmfs2 ${CVMFS_LOADER_LIBS} ${OPENSSL_LIBRARIES}
                                 ${LIBFUSE} ${RT_LIBRARY} ${UUID_LIBRARIES}
