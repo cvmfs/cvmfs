@@ -5,4 +5,4 @@ SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
 autoreconf -i
 automake
 autoconf
-./configure --prefix=${SCRIPT_LOCATION}
+CFLAGS="-fPIC" CXXFLAGS="-fPIC" ./configure --prefix=${SCRIPT_LOCATION}
