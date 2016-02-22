@@ -6,7 +6,6 @@ nghttp2_location="../build_nghttp2"
 cd $cares_location
 sh makeHook.sh
 cd $nghttp2_location
-sh configureHook.sh
 sh makeHook.sh
 cd $cdir
 
