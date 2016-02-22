@@ -10,7 +10,7 @@ sh configureHook.sh
 sh makeHook.sh
 cd $cdir
 
-sh configure CPPFLAGS="$CPPFLAGS -I${PWD}/${cares_location} -I${PWD}/${nghttp2_location} -D_FILE_OFFSET_BITS=64" LDFLAGS="$LDFLAGS -L${PWD}/${cares_location}/.libs -L${PWD}/${nghttp2_location}/lib/.libs -rdynamic" CFLAGS="$CFLAGS -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fno-optimize-sibling-calls -fvisibility=hidden -fPIC" \
+sh configure CPPFLAGS="$CPPFLAGS -I${PWD}/${cares_location} -D_FILE_OFFSET_BITS=64" LDFLAGS="$LDFLAGS -L${PWD}/${cares_location}/.libs -rdynamic" CFLAGS="$CFLAGS -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fno-optimize-sibling-calls -fvisibility=hidden -fPIC" \
   $CVMFS_ZLIB --enable-warnings \
   --enable-ares \
   --disable-shared \
@@ -53,5 +53,5 @@ sh configure CPPFLAGS="$CPPFLAGS -I${PWD}/${cares_location} -I${PWD}/${nghttp2_l
   --without-libidn \
   --without-winidn \
   --without-librtmp \
-  --with-nghttp2 \
+  --with-nghttp2="${PWD}/${nghttp2_location}" \
   --disable-verbose
