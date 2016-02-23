@@ -318,8 +318,8 @@ if (BUILD_CVMFS)
   endif (LIBFUSE_BUILTIN)
 
   if (LIBCURL_BUILTIN)
-    add_dependencies (cvmfs_fuse_debug libcares libcurl)
-    add_dependencies (cvmfs_fuse libcares libcurl)
+    add_dependencies (cvmfs_fuse_debug libcares libnghttp2 libcurl)
+    add_dependencies (cvmfs_fuse libcares libnghttp2 libcurl)
   endif (LIBCURL_BUILTIN)
 
   if (PACPARSER_BUILTIN)
@@ -365,12 +365,12 @@ if (BUILD_CVMFS)
 
   # link the stuff (*_LIBRARIES are dynamic link libraries *_archive are static link libraries ... one of them will be empty for each dependency)
   set (CVMFS_FUSE_LINK_LIBRARIES ${SQLITE3_LIBRARY} ${CARES_LIBRARIES}
-         ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE} ${PACPARSER_LIBRARIES}
+         ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE} ${NGHTTP2_ARCHIVE} ${PACPARSER_LIBRARIES}
          ${LEVELDB_LIBRARIES} ${OPENSSL_LIBRARIES} ${FUSE_LIBRARIES}
          ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${ZLIB_LIBRARIES}
          ${PACPARSER_ARCHIVE} ${LEVELDB_ARCHIVE} ${CARES_ARCHIVE}
          ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${UUID_LIBRARIES}
-         ${SHA3_ARCHIVE} ${NGHTTP2_ARCHIVE} pthread dl)
+         ${SHA3_ARCHIVE} pthread dl)
 
   target_link_libraries (cvmfs2 ${CVMFS_LOADER_LIBS} ${OPENSSL_LIBRARIES}
                                 ${LIBFUSE} ${RT_LIBRARY} ${UUID_LIBRARIES}
@@ -390,10 +390,10 @@ if (BUILD_LIBCVMFS)
   set (LIBCVMFS_LIBS ${LIBCVMFS_LIBS} ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_only.a)
 
   if (LIBCURL_BUILTIN)
-    add_dependencies (cvmfs_only libcares libcurl)
+    add_dependencies (cvmfs_only libcares libnghttp2 libcurl)
     set (LIBCVMFS_LIBS ${CARES_ARCHIVE} ${LIBCVMFS_LIBS} )
-    set (LIBCVMFS_LIBS ${NGHTTP2_ARCHIVE} ${LIBCVMFS_LIBS} )
-    set (LIBCVMFS_LIBS ${LIBCURL_ARCHIVE} ${LIBCVMFS_LIBS} )
+    set (LIBCVMFS_LIBS ${LIBCVMFS_LIBS} )
+    set (LIBCVMFS_LIBS ${NGHTTP2_ARCHIVE} ${LIBCURL_ARCHIVE} ${LIBCVMFS_LIBS} )
   endif (LIBCURL_BUILTIN)
 
   if (PACPARSER_BUILTIN)
@@ -457,7 +457,7 @@ if (BUILD_SERVER)
   add_dependencies (cvmfs_swissknife libvjson)
 
   if (LIBCURL_BUILTIN)
-    add_dependencies (cvmfs_swissknife libcares libcurl)
+    add_dependencies (cvmfs_swissknife libcares libnghttp2 libcurl)
   endif (LIBCURL_BUILTIN)
 
   if (SQLITE3_BUILTIN)
@@ -478,7 +478,7 @@ if (BUILD_SERVER)
 
   # link the stuff (*_LIBRARIES are dynamic link libraries)
   target_link_libraries (cvmfs_swissknife  ${CVMFS_SWISSKNIFE_LIBS}
-                         ${SQLITE3_LIBRARY}  ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE}
+                         ${SQLITE3_LIBRARY}  ${CURL_LIBRARIES} ${NGHTTP2_ARCHIVE} ${LIBCURL_ARCHIVE}
                          ${CARES_LIBRARIES} ${CARES_ARCHIVE} ${NGHTTP2_ARCHIVE}
                          ${TBB_LIBRARIES} ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE}
                          ${OPENSSL_LIBRARIES} ${SQLITE3_ARCHIVE} ${RT_LIBRARY}
@@ -488,7 +488,7 @@ if (BUILD_SERVER)
     add_executable (cvmfs_swissknife_debug ${CVMFS_SWISSKNIFE_DEBUG_SOURCES})
 
     if (LIBCURL_BUILTIN)
-      add_dependencies (cvmfs_swissknife_debug libcares libcurl)
+      add_dependencies (cvmfs_swissknife_debug libcares libnghttp2 libcurl)
     endif (LIBCURL_BUILTIN)
 
     if (SQLITE3_BUILTIN)
@@ -513,7 +513,7 @@ if (BUILD_SERVER)
       set (TBB_DEBUG_LIBRARIES ${TBB_LIBRARIES})
     endif (NOT TBB_DEBUG_LIBRARIES)
     target_link_libraries (cvmfs_swissknife_debug  ${CVMFS_SWISSKNIFE_LIBS}
-                           ${SQLITE3_LIBRARY}  ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE}
+                           ${SQLITE3_LIBRARY} ${NGHTTP2_ARCHIVE} ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE}
                            ${CARES_LIBRARIES} ${CARES_ARCHIVE} ${NGHTTP2_ARCHIVE}
                            ${TBB_LIBRARIES} ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE}
                            ${OPENSSL_LIBRARIES} ${SQLITE3_ARCHIVE} ${RT_LIBRARY}
@@ -526,7 +526,7 @@ if (BUILD_PRELOADER)
 
   if (LIBCURL_BUILTIN)
     add_dependencies (cvmfs_preload_bin libcares libnghttp2 libcurl)
-    set (PRELOADER_LIBS ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${NGHTTP2_ARCHIVE} ${PRELOADER_LIBS} )
+    set (PRELOADER_LIBS ${LIBCURL_ARCHIVE} ${NGHTTP2_ARCHIVE} ${CARES_ARCHIVE} ${PRELOADER_LIBS} )
   endif (LIBCURL_BUILTIN)
 
   if (PACPARSER_BUILTIN)
@@ -556,11 +556,9 @@ if (BUILD_PRELOADER)
   add_dependencies (cvmfs_preload_bin libvjson)
 
   target_link_libraries(cvmfs_preload_bin ${SQLITE3_LIBRARY} ${CARES_LIBRARIES}
-                        ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE} ${NGHTTP2_ARCHIVE}
-                        ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${CARES_ARCHIVE}
-                        ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE} ${TBB_LIBRARIES}
-                        ${VJSON_ARCHIVE} ${SHA3_ARCHIVE} ${RT_LIBRARY}
-                        pthread dl)
+                        ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES}
+                        ${TBB_LIBRARIES} ${VJSON_ARCHIVE} ${SHA3_ARCHIVE} ${RT_LIBRARY}
+                        ${PRELOADER_LIBS} pthread dl)
 endif (BUILD_PRELOADER)
 
 #
