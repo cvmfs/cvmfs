@@ -79,7 +79,7 @@ bool CatalogDatabase::LiveSchemaUpgradeIfNecessary() {
   if (IsEqualSchema(schema_version(), 2.5) && (schema_revision() == 0)) {
     LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision (0 --> 1)");
 
-    Sql sql_upgrade(*this, "ALTER TABLE nested_catalogs ADD size INTEGER;");
+    SqlCatalog sql_upgrade(*this, "ALTER TABLE nested_catalogs ADD size INTEGER;");
     if (!sql_upgrade.Execute()) {
       LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade nested_catalogs");
       return false;
@@ -95,10 +95,10 @@ bool CatalogDatabase::LiveSchemaUpgradeIfNecessary() {
   if (IsEqualSchema(schema_version(), 2.5) && (schema_revision() == 1)) {
     LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision (1 --> 2)");
 
-    Sql sql_upgrade1(*this, "ALTER TABLE catalog ADD xattr BLOB;");
-    Sql sql_upgrade2(*this,
+    SqlCatalog sql_upgrade1(*this, "ALTER TABLE catalog ADD xattr BLOB;");
+    SqlCatalog sql_upgrade2(*this,
       "INSERT INTO statistics (counter, value) VALUES ('self_xattr', 0);");
-    Sql sql_upgrade3(*this,
+    SqlCatalog sql_upgrade3(*this,
       "INSERT INTO statistics (counter, value) VALUES ('subtree_xattr', 0);");
     if (!sql_upgrade1.Execute() || !sql_upgrade2.Execute() ||
         !sql_upgrade3.Execute())
@@ -117,13 +117,17 @@ bool CatalogDatabase::LiveSchemaUpgradeIfNecessary() {
   if (IsEqualSchema(schema_version(), 2.5) && (schema_revision() == 2)) {
     LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision (2 --> 3)");
 
-    Sql sql_upgrade4(*this,
-      "INSERT INTO statistics (counter, value) VALUES ('self_external', 0);");
-    Sql sql_upgrade5(*this, "INSERT INTO statistics (counter, value) VALUES "
+    SqlCatalog sql_upgrade4(*this,
+                            "INSERT INTO statistics (counter, value) VALUES "
+                            "('self_external', 0);");
+    SqlCatalog sql_upgrade5(*this,
+                            "INSERT INTO statistics (counter, value) VALUES "
                             "('self_external_file_size', 0);");
-    Sql sql_upgrade6(*this, "INSERT INTO statistics (counter, value) VALUES "
+    SqlCatalog sql_upgrade6(*this,
+                            "INSERT INTO statistics (counter, value) VALUES "
                             "('subtree_external', 0);");
-    Sql sql_upgrade7(*this, "INSERT INTO statistics (counter, value) VALUES "
+    SqlCatalog sql_upgrade7(*this,
+                            "INSERT INTO statistics (counter, value) VALUES "
                             "('subtree_external_file_size', 0);");
     if (!sql_upgrade4.Execute() || !sql_upgrade5.Execute() ||
         !sql_upgrade6.Execute() || !sql_upgrade7.Execute())
@@ -148,27 +152,27 @@ bool CatalogDatabase::CreateEmptyDatabase() {
 
   // generate the catalog table and index structure
   const bool retval =
-  Sql(*this,
+  SqlCatalog(*this,
     "CREATE TABLE catalog "
     "(md5path_1 INTEGER, md5path_2 INTEGER, parent_1 INTEGER, parent_2 INTEGER,"
     " hardlinks INTEGER, hash BLOB, size INTEGER, mode INTEGER, mtime INTEGER,"
     " flags INTEGER, name TEXT, symlink TEXT, uid INTEGER, gid INTEGER, "
     " xattr BLOB, "
     " CONSTRAINT pk_catalog PRIMARY KEY (md5path_1, md5path_2));").Execute()  &&
-  Sql(*this,
+  SqlCatalog(*this,
     "CREATE INDEX idx_catalog_parent "
     "ON catalog (parent_1, parent_2);")                           .Execute()  &&
-  Sql(*this,
+  SqlCatalog(*this,
     "CREATE TABLE chunks "
     "(md5path_1 INTEGER, md5path_2 INTEGER, offset INTEGER, size INTEGER, "
     " hash BLOB, "
     " CONSTRAINT pk_chunks PRIMARY KEY (md5path_1, md5path_2, offset, size), "
     " FOREIGN KEY (md5path_1, md5path_2) REFERENCES "
     "   catalog(md5path_1, md5path_2));")                         .Execute()  &&
-  Sql(*this,
+  SqlCatalog(*this,
     "CREATE TABLE nested_catalogs (path TEXT, sha1 TEXT, size INTEGER, "
     "CONSTRAINT pk_nested_catalogs PRIMARY KEY (path));")         .Execute()  &&
-  Sql(*this,
+  SqlCatalog(*this,
     "CREATE TABLE statistics (counter TEXT, value INTEGER, "
     "CONSTRAINT pk_statistics PRIMARY KEY (counter));")           .Execute();
 
@@ -196,7 +200,7 @@ bool CatalogDatabase::InsertInitialValues(
     : shash::Md5(shash::AsciiPtr(GetParentPath(root_path)));
 
   // Start initial filling transaction
-  retval = Sql(*this, "BEGIN;").Execute();
+  retval = BeginTransaction();
   if (!retval) {
     PrintSqlError("failed to enter initial filling transaction");
     return false;
@@ -267,7 +271,7 @@ bool CatalogDatabase::InsertInitialValues(
   }
 
   // Commit initial filling transaction
-  retval = Sql(*this, "COMMIT;").Execute();
+  retval = CommitTransaction();
   if (!retval) {
     PrintSqlError("failed to commit initial filling transaction");
     return false;
@@ -284,7 +288,7 @@ CatalogDatabase::SetVOMSAuthz(const std::string &voms_authz) {
 
 
 double CatalogDatabase::GetRowIdWasteRatio() const {
-  Sql rowid_waste_ratio_query(*this,
+  SqlCatalog rowid_waste_ratio_query(*this,
     "SELECT 1.0 - CAST(COUNT(*) AS DOUBLE) / MAX(rowid) "
     "AS ratio FROM catalog;");
   const bool retval = rowid_waste_ratio_query.FetchRow();
@@ -316,18 +320,18 @@ double CatalogDatabase::GetRowIdWasteRatio() const {
 bool CatalogDatabase::CompactDatabase() const {
   assert(read_write());
 
-  return Sql(*this, "PRAGMA foreign_keys = OFF;").Execute() &&
-         BeginTransaction()                                 &&
-         Sql(*this, "CREATE TEMPORARY TABLE duplicate AS "
-                    "  SELECT * FROM catalog "
-                    "  ORDER BY rowid ASC;").Execute()      &&
-         Sql(*this, "DELETE FROM catalog;").Execute()       &&
-         Sql(*this, "INSERT INTO catalog "
-                    "  SELECT * FROM duplicate "
-                    "  ORDER BY rowid").Execute()           &&
-         Sql(*this, "DROP TABLE duplicate;").Execute()      &&
-         CommitTransaction()                                &&
-         Sql(*this, "PRAGMA foreign_keys = ON;").Execute();
+  return SqlCatalog(*this, "PRAGMA foreign_keys = OFF;").Execute() &&
+         BeginTransaction()                                        &&
+         SqlCatalog(*this, "CREATE TEMPORARY TABLE duplicate AS "
+                           "  SELECT * FROM catalog "
+                           "  ORDER BY rowid ASC;").Execute()      &&
+         SqlCatalog(*this, "DELETE FROM catalog;").Execute()       &&
+         SqlCatalog(*this, "INSERT INTO catalog "
+                           "  SELECT * FROM duplicate "
+                           "  ORDER BY rowid").Execute()           &&
+         SqlCatalog(*this, "DROP TABLE duplicate;").Execute()      &&
+         CommitTransaction()                                       &&
+         SqlCatalog(*this, "PRAGMA foreign_keys = ON;").Execute();
 }
 
 

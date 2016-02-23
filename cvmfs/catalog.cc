@@ -170,7 +170,7 @@ bool Catalog::OpenDatabase(const string &db_path) {
   }
 
   // Find out the maximum row id of this database file
-  Sql sql_max_row_id(database(), "SELECT MAX(rowid) FROM catalog;");
+  SqlCatalog sql_max_row_id(database(), "SELECT MAX(rowid) FROM catalog;");
   if (!sql_max_row_id.FetchRow()) {
     LogCvmfs(kLogCatalog, kLogDebug,
              "Cannot retrieve maximal row id for database file %s "
@@ -470,7 +470,7 @@ uint64_t Catalog::GetNumEntries() const {
   const string sql = "SELECT count(*) FROM catalog;";
 
   pthread_mutex_lock(lock_);
-  Sql stmt(database(), sql);
+  SqlCatalog stmt(database(), sql);
   const uint64_t result = (stmt.FetchRow()) ? stmt.RetrieveInt64(0) : 0;
   pthread_mutex_unlock(lock_);
 
