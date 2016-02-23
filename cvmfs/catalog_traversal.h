@@ -255,14 +255,14 @@ class CatalogTraversal
    * Constructs a new catalog traversal engine based on the construction
    * parameters described in struct ConstructionParams.
    */
-  explicit CatalogTraversal(const Parameters &params) :
-    object_fetcher_(params.object_fetcher),
-    no_close_(params.no_close),
-    ignore_load_failure_(params.ignore_load_failure),
-    no_repeat_history_(params.no_repeat_history),
-    default_history_depth_(params.history),
-    default_timestamp_threshold_(params.timestamp),
-    error_sink_((params.quiet) ? kLogDebug : kLogStderr)
+  explicit CatalogTraversal(const Parameters &params)
+    : object_fetcher_(params.object_fetcher)
+    , no_close_(params.no_close)
+    , ignore_load_failure_(params.ignore_load_failure)
+    , no_repeat_history_(params.no_repeat_history)
+    , default_history_depth_(params.history)
+    , default_timestamp_threshold_(params.timestamp)
+    , error_sink_((params.quiet) ? kLogDebug : kLogStderr)
   {
     assert(object_fetcher_ != NULL);
   }
