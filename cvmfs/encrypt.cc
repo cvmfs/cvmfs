@@ -109,7 +109,7 @@ MemoryKeyDatabase::~MemoryKeyDatabase() {
 bool MemoryKeyDatabase::StoreNew(const Key *key, string *id) {
   MutexLockGuard mutex_guard(lock_);
   // TODO(jblomer): is this good enough for random keys? Salting? KDF2?
-  shash::Any hash(shash::kSha256);
+  shash::Any hash(shash::kShake128);
   HashMem(key->data(), key->size(), &hash);
   *id = "H" + hash.ToString();
   map<string, const Key *>::const_iterator i = database_.find(*id);

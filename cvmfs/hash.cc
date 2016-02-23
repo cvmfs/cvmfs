@@ -123,14 +123,14 @@ Any MkFromSuffixedHexPtr(const HexPtr hex) {
         : kSuffixNone;
     result = Any(kRmd160, hex, suffix);
   }
-  if ((length == 2*kDigestSizes[kSha256] + kAlgorithmIdSizes[kSha256]) ||
-      (length == 2*kDigestSizes[kSha256] + kAlgorithmIdSizes[kSha256] + 1))
+  if ((length == 2*kDigestSizes[kShake128] + kAlgorithmIdSizes[kShake128]) ||
+      (length == 2*kDigestSizes[kShake128] + kAlgorithmIdSizes[kShake128] + 1))
   {
     Suffix suffix =
-      (length == 2*kDigestSizes[kSha256] + kAlgorithmIdSizes[kSha256] + 1)
+      (length == 2*kDigestSizes[kShake128] + kAlgorithmIdSizes[kShake128] + 1)
         ? *(hex.str->rbegin())
         : kSuffixNone;
-    result = Any(kSha256, hex, suffix);
+    result = Any(kShake128, hex, suffix);
   }
 
   return result;

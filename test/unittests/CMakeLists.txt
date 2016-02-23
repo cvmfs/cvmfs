@@ -207,16 +207,12 @@ include_directories (${INCLUDE_DIRECTORIES})
 
 if (BUILD_UNITTESTS)
   add_executable (${PROJECT_TEST_NAME} ${CVMFS_UNITTEST_SOURCES})
-<<<<<<< HEAD
 else (BUILD_UNITTESTS)
   add_executable (${PROJECT_TEST_NAME} EXCLUDE_FROM_ALL ${CVMFS_UNITTEST_SOURCES})
-=======
-  add_dependencies (${PROJECT_TEST_NAME} googletest)
-  add_dependencies (${PROJECT_TEST_NAME} libvjson)
->>>>>>> restructure JsonDocument class a bit, add unit test stub
 endif (BUILD_UNITTESTS)
 
 add_dependencies (${PROJECT_TEST_NAME} googletest)
+add_dependencies (${PROJECT_TEST_NAME} libvjson)
 add_dependencies (${PROJECT_TEST_NAME} sparsehash)
 add_dependencies (${PROJECT_TEST_NAME} libsha3)
 add_test (NAME ${PROJECT_TEST_NAME} COMMAND ${PROJECT_TEST_NAME} --gtest_filter=-*Slow)
