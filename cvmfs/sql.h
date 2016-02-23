@@ -433,7 +433,7 @@ class Sql {
    * @param statement  the query string to be prepared for execution
    * @return           true on successful statement preparation
    */
-  bool Init(const sqlite3 *database, const std::string  &statement);
+  bool Init(const sqlite3 *database, const std::string &statement);
 
   /**
    * Defers the initialization of the prepared statement to the first usage to
