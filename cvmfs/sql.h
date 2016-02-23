@@ -276,6 +276,23 @@ class Database : SingleCopy {
 /**
  * Base class for all SQL statement classes.  It wraps a single SQL statement
  * and all neccessary calls of the sqlite3 API to deal with this statement.
+ *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE  *
+ * NOTE   This base class implements a lazy initialization of the SQLite       *
+ * NOTE   prepared statement. Therefore it is strongly discouraged to use      *
+ * NOTE   any sqlite3_***() functions directly in the subclasses. Instead      *
+ * NOTE   one must wrap them in this base class and implement the lazy         *
+ * NOTE   initialization scheme as seen below.                                 *
+ * NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE  *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ *
+ * Derived classes can decide if their statement should be prepared immediately
+ * or on first use (aka lazily). The derived constructor must call Sql::Init()
+ * or Sql::DeferredInit() accordingly.
+ *
+ * Sql objects created via the public constructor rather than by the constructor
+ * of a derived class are prepared immediately by default.
  */
 class Sql {
  public:
@@ -409,7 +426,23 @@ class Sql {
 
   bool IsInitialized() const { return statement_ != NULL; }
 
+  /**
+   * Initializes the prepared statement immediately.
+   *
+   * @param database   the sqlite database pointer to be query against
+   * @param statement  the query string to be prepared for execution
+   * @return           true on successful statement preparation
+   */
   bool Init(const sqlite3 *database, const std::string  &statement);
+
+  /**
+   * Defers the initialization of the prepared statement to the first usage to
+   * safe memory and CPU cycles for statements that are defined but never used.
+   * Typically this method is used in constructors of derived classes.
+   *
+   * @param database   the sqlite database pointer to be query against
+   * @param statement  the query string to be prepared for execution
+   */
   void DeferredInit(const sqlite3 *database, const char *statement);
 
   /**
