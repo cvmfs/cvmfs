@@ -145,9 +145,7 @@ template <class CatalogTraversalT, class HashFilterT>
 bool GarbageCollector<CatalogTraversalT, HashFilterT>::Collect() {
   return AnalyzePreservedCatalogTree() &&
          CheckPreservedRevisions()     &&
-         SweepCondemnedCatalogTree()   &&
-         SweepReflog()                 &&
-         SweepHistoricRevisions();
+         SweepReflog();
 }
 
 
@@ -184,37 +182,6 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::CheckPreservedRevisions()
 
 
 template <class CatalogTraversalT, class HashFilterT>
-bool GarbageCollector<CatalogTraversalT, HashFilterT>::
-  SweepCondemnedCatalogTree()
-{
-  if (configuration_.verbose) {
-    LogCvmfs(kLogGc, kLogStdout, "Sweeping Condemned Catalog Graphs");
-  }
-
-  // check if we have anything to sweep in this stage
-  const bool no_condemned_revisions = (traversal_.pruned_revision_count() == 0);
-  if (no_condemned_revisions) {
-    if (configuration_.verbose) {
-      LogCvmfs(kLogGc, kLogStdout, "Nothing to be swept.");
-    }
-    return true;
-  }
-
-  // sweep all previously pruned revisions including their history
-  typename CatalogTraversalT::CallbackTN *callback =
-    traversal_.RegisterListener(
-       &GarbageCollector<CatalogTraversalT, HashFilterT>::SweepDataObjects,
-        this);
-
-  const bool success = traversal_.TraversePruned(
-                                       CatalogTraversalT::kDepthFirstTraversal);
-  traversal_.UnregisterListener(callback);
-
-  return success;
-}
-
-
-template <class CatalogTraversalT, class HashFilterT>
 bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepReflog() {
   if (configuration_.verbose) {
     LogCvmfs(kLogGc, kLogStdout, "Sweeping Reference Logs");
@@ -246,58 +213,6 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepReflog() {
   traversal_.UnregisterListener(callback);
 
   return success;
-}
-
-
-template <class CatalogTraversalT, class HashFilterT>
-bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepHistoricRevisions()
-{
-  if (configuration_.verbose) {
-    LogCvmfs(kLogGc, kLogStdout, "Sweeping Historic Snapshots");
-  }
-
-  ObjectFetcherTN *fetcher = configuration_.object_fetcher;
-
-  // find the content hash for the current HEAD history database
-  UniquePtr<HistoryTN> history;
-  const typename ObjectFetcherTN::Failures retval =
-    fetcher->FetchHistory(&history);
-  switch (retval) {
-    case ObjectFetcherTN::kFailOk:
-      break;
-
-    case ObjectFetcherTN::kFailNotFound:
-      if (configuration_.verbose)
-        LogCvmfs(kLogGc, kLogStdout, "No history found");
-      return true;
-
-    default:
-      return false;
-  }
-
-  typename CatalogTraversalT::CallbackTN *callback =
-    traversal_.RegisterListener(
-       &GarbageCollector<CatalogTraversalT, HashFilterT>::SweepDataObjects,
-        this);
-
-  // List the recycle bin of the current HEAD history database for sweeping
-  typedef std::vector<shash::Any> Hashes;
-  Hashes recycled_snapshots;
-  if (!history->ListRecycleBin(&recycled_snapshots)) {
-    return false;
-  }
-
-  // sweep all revisions that were marked as deleted in the recycle bin
-        Hashes::const_iterator i    = recycled_snapshots.begin();
-  const Hashes::const_iterator iend = recycled_snapshots.end();
-  for (; i != iend; ++i) {
-    if (!traversal_.Traverse(*i, CatalogTraversalT::kDepthFirstTraversal)) {
-      return false;
-    }
-  }
-
-  traversal_.UnregisterListener(callback);
-  return true;
 }
 
 

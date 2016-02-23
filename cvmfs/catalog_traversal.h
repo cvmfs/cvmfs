@@ -358,42 +358,6 @@ class CatalogTraversal
     return DoTraverse(&ctx);
   }
 
-  /**
-   * This traverses all catalogs that were left out by previous traversal runs.
-   *
-   * Note: This method asserts that previous traversal runs left out certain
-   *       catalogs due to history_depth or timestamp restrictions.
-   *       CatalogTraversal keeps track of the root catalog hashes of catalog
-   *       revisions that have been pruned before. TraversePruned() will use
-   *       those as entry points.
-   *
-   * Note: TraversaPruned() will neither take the history nor the timestamp
-   *       based thresholds into account but traverse all catalogs in can reach
-   *       from the catalogs previously been pruned by those thresholds.
-   *
-   * @param type  breadths or depth first traversal
-   * @return      true on successful traversal of all necessary catalogs or
-   *              false in case of failure or no_repeat_history == false
-   */
-  bool TraversePruned(const TraversalType type = kBreadthFirstTraversal) {
-    TraversalContext ctx(Parameters::kFullHistory,
-                         Parameters::kNoTimestampThreshold,
-                         type);
-    if (pruned_revisions_.empty()) {
-      return false;
-    }
-
-          HashSet::const_iterator i    = pruned_revisions_.begin();
-    const HashSet::const_iterator iend = pruned_revisions_.end();
-    for (; i != iend; ++i) {
-      Push(*i, &ctx);
-    }
-    pruned_revisions_.clear();
-    return DoTraverse(&ctx);
-  }
-
-  size_t pruned_revision_count() const { return pruned_revisions_.size(); }
-
  protected:
   /**
    * This controls the actual traversal. Using a stack to traverse down the
@@ -617,12 +581,9 @@ class CatalogTraversal
     }
 
     // check if the next deeper history level is actually requested
-    // Note: otherwise it is marked to be 'pruned' for possible later traversal
-    //       (see: TraversePruned())
     // Note: if the current catalog is below the timestamp threshold it will be
     //       traversed and only its ancestor revision will not be pushed anymore
     if (IsBelowPruningThresholds(job, *ctx)) {
-      MarkAsPrunedRevision(previous_revision);
       return 0;
     }
 
@@ -784,10 +745,6 @@ class CatalogTraversal
     return job;
   }
 
-  void MarkAsPrunedRevision(const shash::Any &root_catalog_hash) {
-    pruned_revisions_.insert(root_catalog_hash);
-  }
-
   void MarkAsVisited(const CatalogJob &job) {
     if (no_repeat_history_) {
       visited_catalogs_.insert(job.hash);
@@ -830,7 +787,6 @@ class CatalogTraversal
   const unsigned int      default_history_depth_;
   const time_t            default_timestamp_threshold_;
   HashSet                 visited_catalogs_;
-  HashSet                 pruned_revisions_;
   LogFacilities           error_sink_;
 };
 

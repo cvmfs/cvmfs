@@ -95,9 +95,7 @@ class GarbageCollector {
 
   bool AnalyzePreservedCatalogTree();
   bool CheckPreservedRevisions();
-  bool SweepCondemnedCatalogTree();
   bool SweepReflog();
-  bool SweepHistoricRevisions();
 
   void CheckAndSweep(const shash::Any &hash);
   void Sweep(const shash::Any &hash);
