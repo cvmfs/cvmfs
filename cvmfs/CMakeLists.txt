@@ -556,9 +556,10 @@ if (BUILD_PRELOADER)
   add_dependencies (cvmfs_preload_bin libvjson)
 
   target_link_libraries(cvmfs_preload_bin ${SQLITE3_LIBRARY} ${CARES_LIBRARIES}
-                        ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES}
-                        ${TBB_LIBRARIES} ${VJSON_ARCHIVE} ${SHA3_ARCHIVE} ${RT_LIBRARY}
-                        ${PRELOADER_LIBS} pthread dl)
+                        ${PRELOADER_LIBS} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES}
+                        ${OPENSSL_LIBRARIES} ${TBB_LIBRARIES} ${VJSON_ARCHIVE}
+                        ${SHA3_ARCHIVE} ${RT_LIBRARY}
+                        pthread dl)
 endif (BUILD_PRELOADER)
 
 #

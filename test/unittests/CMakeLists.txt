@@ -306,12 +306,12 @@ endif (BUILD_UNITTESTS_DEBUG)
 #
 # link the stuff (*_LIBRARIES are dynamic link libraries)
 #
-set (UNITTEST_LINK_LIBRARIES ${GTEST_LIBRARIES} ${NGHTTP2_ARCHIVE}
-                             ${GOOGLETEST_ARCHIVE} ${OPENSSL_LIBRARIES} ${CURL_LIBRARIES}
-                             ${LIBCURL_ARCHIVE} ${CARES_LIBRARIES} ${CARES_ARCHIVE} ${OPENSSL_LIBRARIES}
-                             ${SQLITE3_LIBRARY} ${SQLITE3_ARCHIVE} ${TBB_LIBRARIES}
-                             ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${UUID_LIBRARIES}
-                             ${SHA3_ARCHIVE} ${PACPARSER_LIBRARIES} ${PACPARSER_ARCHIVE}
+set (UNITTEST_LINK_LIBRARIES ${GTEST_LIBRARIES} ${GOOGLETEST_ARCHIVE} ${OPENSSL_LIBRARIES}
+                             ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_LIBRARIES} ${CARES_ARCHIVE}
+                             ${NGHTTP2_ARCHIVE} ${OPENSSL_LIBRARIES} ${SQLITE3_LIBRARY} ${SQLITE3_ARCHIVE}
+                             ${TBB_LIBRARIES} ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE}
+                             ${RT_LIBRARY} ${UUID_LIBRARIES} ${SHA3_ARCHIVE} ${PACPARSER_LIBRARIES}
+                             ${PACPARSER_ARCHIVE}
                              pthread dl)
 
 target_link_libraries (${PROJECT_TEST_NAME} ${UNITTEST_LINK_LIBRARIES})
