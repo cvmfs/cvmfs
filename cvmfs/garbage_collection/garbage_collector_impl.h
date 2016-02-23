@@ -206,7 +206,8 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepReflog() {
     if (!hash_filter_.Contains(*i)) {
       success =
         success &&
-        traversal_.Traverse(*i, CatalogTraversalT::kDepthFirstTraversal);
+        traversal_.TraverseRevision(*i,
+                                    CatalogTraversalT::kDepthFirstTraversal);
     }
   }
 
