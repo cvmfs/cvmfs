@@ -8,13 +8,13 @@ VAGRANT_WORKSPACE="/vagrant"
 apt-get update
 
 # install required packages
-apt-get install -y                                                      \
-  apache2 attr autoconf autofs autotools-dev bash bc cmake coreutils    \
-  curl debhelper debianutils debootstrap default-jre-headless docker.io \
-  fuse g++ gawk gcc gdb grep gzip initscripts insserv libapache2-mod-   \
-  wsgi libattr1-dev libc-bin libc6-dev libcap-dev libfuse-dev libfuse2  \
-  libssl-dev libtool make openssl patch perl pkg-config psmisc python-  \
-  dev python-lzma sed sqlite3 sudo sysvinit-utils unzip uuid uuid-dev   \
+apt-get install -y                                                          \
+  apache2 attr autoconf autofs autotools-dev bash bc cmake coreutils        \
+  curl debhelper debianutils debootstrap default-jre-headless docker.io     \
+  fuse g++ gawk gcc gdb grep gzip initscripts insserv libapache2-mod-wsgi   \
+  libattr1-dev libc-bin libc6-dev libcap-dev libfuse-dev libfuse2           \
+  libssl-dev libtool make openssl patch perl pkg-config psmisc python-dev   \
+  python-lzma sed sqlite3 sudo sysvinit-utils unzip uuid uuid-dev           \
   yum zlib1g
 
 
