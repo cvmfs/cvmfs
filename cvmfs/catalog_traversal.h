@@ -309,6 +309,25 @@ class CatalogTraversal
   }
 
   /**
+   * Starts the traversal process at the catalog pointed to by the given hash
+   * but doesn't traverse into predecessor catalog revisions. This overrides the
+   * TraversalParameter settings provided at construction.
+   *
+   * @param root_catalog_hash  the entry point into the catalog traversal
+   * @param type               breadths or depth first traversal
+   * @return                   true when catalogs were successfully traversed
+   */
+  bool TraverseRevision(const shash::Any     &root_catalog_hash,
+                        const TraversalType   type = kBreadthFirstTraversal) {
+    // add the given root catalog as the first element on the job stack
+    TraversalContext ctx(Parameters::kNoHistory,
+                         Parameters::kNoTimestampThreshold,
+                         type);
+    Push(root_catalog_hash, &ctx);
+    return DoTraverse(&ctx);
+  }
+
+  /**
    * Figures out all named tags in a repository and uses all of them as entry
    * points into the traversal process.
    *
