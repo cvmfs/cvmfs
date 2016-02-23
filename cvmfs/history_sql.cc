@@ -158,9 +158,7 @@ bool SqlInsertTag::BindTag(const History::Tag &tag) {
 
 
 SqlRemoveTag::SqlRemoveTag(const HistoryDatabase *database) {
-  const std::string stmt = "DELETE FROM tags WHERE name = :name;";
-  const bool success = Init(database->sqlite_db(), stmt);
-  assert(success);
+  DeferredInit(database->sqlite_db(), "DELETE FROM tags WHERE name = :name;");
 }
 
 bool SqlRemoveTag::BindName(const std::string &name) {
@@ -208,9 +206,7 @@ bool SqlFindTagByDate::BindTimestamp(const time_t timestamp) {
 
 
 SqlCountTags::SqlCountTags(const HistoryDatabase *database) {
-  const bool success = Init(database->sqlite_db(),
-                            "SELECT count(*) FROM tags;");
-  assert(success);
+  DeferredInit(database->sqlite_db(), "SELECT count(*) FROM tags;");
 }
 
 unsigned SqlCountTags::RetrieveCount() const {
@@ -244,10 +240,8 @@ SqlGetChannelTips::SqlGetChannelTips(const HistoryDatabase *database) {
 }
 
 SqlGetHashes::SqlGetHashes(const HistoryDatabase *database) {
-  const bool success = Init(database->sqlite_db(),
-                            "SELECT DISTINCT hash FROM tags "
-                            "ORDER BY revision ASC");
-  assert(success);
+  DeferredInit(database->sqlite_db(), "SELECT DISTINCT hash FROM tags "
+                                      "ORDER BY revision ASC");
 }
 
 shash::Any SqlGetHashes::RetrieveHash() const {
@@ -293,10 +287,9 @@ bool SqlRecycleBin::CheckSchema(const HistoryDatabase *database) const {
 
 SqlRecycleBinInsert::SqlRecycleBinInsert(const HistoryDatabase *database) {
   assert(CheckSchema(database));
-  const bool success = Init(database->sqlite_db(),
-                            "INSERT OR IGNORE INTO recycle_bin (hash, flags) "
-                            "VALUES (:hash, :flags)");
-  assert(success);
+  DeferredInit(database->sqlite_db(),
+               "INSERT OR IGNORE INTO recycle_bin (hash, flags) "
+               "VALUES (:hash, :flags)");
 }
 
 
@@ -313,9 +306,7 @@ bool SqlRecycleBinInsert::BindTag(const History::Tag &condemned_tag) {
 
 SqlRecycleBinList::SqlRecycleBinList(const HistoryDatabase *database) {
   assert(CheckSchema(database));
-  const bool success = Init(database->sqlite_db(), "SELECT hash, flags "
-                                                   "FROM recycle_bin;");
-  assert(success);
+  DeferredInit(database->sqlite_db(), "SELECT hash, flags FROM recycle_bin;");
 }
 
 
@@ -335,8 +326,7 @@ shash::Any SqlRecycleBinList::RetrieveHash() {
 
 SqlRecycleBinFlush::SqlRecycleBinFlush(const HistoryDatabase *database) {
   assert(CheckSchema(database));
-  const bool success = Init(database->sqlite_db(), "DELETE FROM recycle_bin;");
-  assert(success);
+  DeferredInit(database->sqlite_db(), "DELETE FROM recycle_bin;");
 }
 
 
