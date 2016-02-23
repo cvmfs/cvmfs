@@ -100,7 +100,7 @@ class T_Pack : public ::testing::Test {
     //printf("produced %d objects of total size %d MB\n",
     //        pack_.GetNoObjects(), pack_.size()/(1024*1024));
 
-    shash::Any digest(shash::kSha256);
+    shash::Any digest(shash::kShake128);
     ObjectPackProducer producer(&pack_);
     producer.GetDigest(&digest);
     ObjectPackConsumer consumer(digest, producer.GetHeaderSize());
@@ -309,7 +309,7 @@ TEST_F(T_Pack, ProducerFile) {
 
 
 TEST_F(T_Pack, Consumer) {
-  shash::Any digest(shash::kSha256);
+  shash::Any digest(shash::kShake128);
   ObjectPackProducer producer(&pack_of_three_);
   producer.GetDigest(&digest);
   ObjectPackConsumer consumer(digest, producer.GetHeaderSize());
@@ -334,7 +334,7 @@ TEST_F(T_Pack, Consumer) {
 
 
 TEST_F(T_Pack, ConsumerEmpty) {
-  shash::Any digest(shash::kSha256);
+  shash::Any digest(shash::kShake128);
   ObjectPackProducer producer(&pack_);
   producer.GetDigest(&digest);
   ObjectPackConsumer consumer(digest, producer.GetHeaderSize());
