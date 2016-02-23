@@ -304,28 +304,34 @@ class Sql {
   std::string GetLastErrorMsg() const;
 
   bool BindBlob(const int index, const void* value, const int size) {
+    LazyInit();
     last_error_code_ = sqlite3_bind_blob(statement_, index, value, size,
                                          SQLITE_STATIC);
     return Successful();
   }
   bool BindBlobTransient(const int index, const void* value, const int size) {
+    LazyInit();
     last_error_code_ = sqlite3_bind_blob(statement_, index, value, size,
                                          SQLITE_TRANSIENT);
     return Successful();
   }
   bool BindDouble(const int index, const double value) {
+    LazyInit();
     last_error_code_ = sqlite3_bind_double(statement_, index, value);
     return Successful();
   }
   bool BindInt(const int index, const int value) {
+    LazyInit();
     last_error_code_ = sqlite3_bind_int(statement_, index, value);
     return Successful();
   }
   bool BindInt64(const int index, const sqlite3_int64 value) {
+    LazyInit();
     last_error_code_ = sqlite3_bind_int64(statement_, index, value);
     return Successful();
   }
   bool BindNull(const int index) {
+    LazyInit();
     last_error_code_ = sqlite3_bind_null(statement_, index);
     return Successful();
   }
@@ -342,6 +348,7 @@ class Sql {
                 const char* value,
                 const int   size,
                 void(*dtor)(void*) = SQLITE_STATIC) {
+    LazyInit();
     last_error_code_ = sqlite3_bind_text(statement_, index, value, size, dtor);
     return Successful();
   }
@@ -394,8 +401,16 @@ class Sql {
   inline T Retrieve(const int index);
 
  protected:
-  Sql() : statement_(NULL), last_error_code_(0) { }
-  bool Init(const sqlite3 *database, const std::string &statement);
+  Sql()
+    : database_(NULL)
+    , statement_(NULL)
+    , query_string_(NULL)
+    , last_error_code_(0) { }
+
+  bool IsInitialized() const { return statement_ != NULL; }
+
+  bool Init(const sqlite3 *database, const std::string  &statement);
+  void DeferredInit(const sqlite3 *database, const char *statement);
 
   /**
    * Checks the last action for success
@@ -407,8 +422,21 @@ class Sql {
            SQLITE_DONE == last_error_code_;
   }
 
-  sqlite3_stmt *statement_;
-  int last_error_code_;
+ private:
+  bool Init(const char *statement);
+  void LazyInit() {
+    if (!IsInitialized()) {
+      assert(NULL != database_);
+      assert(NULL != query_string_);
+      const bool success = Init(query_string_);
+      assert(success);
+    }
+  }
+
+  sqlite3       *database_;
+  sqlite3_stmt  *statement_;
+  const char    *query_string_;
+  int            last_error_code_;
 };
 
 }  // namespace sqlite
