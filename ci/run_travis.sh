@@ -27,41 +27,68 @@ check_failure() {
   fi
 }
 
+print_dots() {
+  while true; do
+    if [ -f $PRINT_FILE ]; then
+      echo -n "."
+      sleep 30
+    else
+      sleep 1
+    fi
+  done
+}
+
+start_processing() {
+  touch "$PRINT_FILE"
+}
+
+stop_processing() {
+  rm "$PRINT_FILE"
+  echo -n " "
+}
+
+PRINT_FILE="$(pwd)/.print"
 CPPLINT_FAILED=false
 BUILD_FAILED=false
 UNITTESTS_FAILED=false
 FAILURES=0
 
+print_dots &
 
 echo ""
 echo ""
 # run the cpplint first
-echo -n "RUNNING CPPLINT ......................................................................................... "
+echo -n "RUNNING CPPLINT "
+start_processing
 ci/run_cpplint.sh > cpplint.log 2>&1                                      || { CPPLINT_FAILED=true; report_error "$(pwd)/cpplint.log"; }
+stop_processing
 if ! $CPPLINT_FAILED ; then
   echo "Done"
 fi
 
 # Build CVMFS (make -j stresses the memory of travis machines)
-echo -n "BUILDING CernVM-FS ...................................................................................... "
+echo -n "BUILDING CernVM-FS "
+start_processing
 mkdir -p build && cd build
 cmake -DBUILD_UNITTESTS=yes -DBUILD_PRELOADER=yes .. > build.log 2>&1  && \
 make >> "$(pwd)/build.log" 2>&1                                           || { BUILD_FAILED=true; report_error "$(pwd)/build.log"; }
+stop_processing
 if ! $BUILD_FAILED ; then
   echo "Done"
 fi
 
 #running the unit tests on mac fails because travis osx machines have limited resources
-echo -n "RUNNING UNIT TESTS ...................................................................................... "
+echo -n "RUNNING UNIT TESTS "
 if running_on_linux; then
+  start_processing
   test/unittests/cvmfs_unittests --gtest_shuffle --gtest_filter="-*Slow:T_Dns.CaresResolverLocalhost:T_Dns.NormalResolverCombined:T_Dns.CaresResolverMany" > unittests.log 2>&1  || { UNITTESTS_FAILED=true; report_error "$(pwd)/unittests.log"; }
+  stop_processing
   if ! $UNITTESTS_FAILED ; then
     echo "Done"
   fi
 else
   echo "Skipped"
 fi
-
 
 ################################################################################
 
