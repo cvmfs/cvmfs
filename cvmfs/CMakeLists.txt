@@ -512,7 +512,7 @@ if (BUILD_OCTOPUS)
 
   add_executable (cvmfs_octopus.fcgi ${CVMFS_OCTOPUS_SOURCES})
   add_dependencies (cvmfs_octopus.fcgi libsha2)
-  target_link_libraries(cvmfs_octopus.fcgi ${SHA2_ARCHIVE} ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${UUID_LIBRARIES} pthread)
+  target_link_libraries(cvmfs_octopus.fcgi ${SHA3_ARCHIVE} ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${UUID_LIBRARIES} pthread)
 endif (BUILD_OCTOPUS)
 
 
