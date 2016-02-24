@@ -6,4 +6,5 @@ autoreconf -i
 automake
 autoconf
 ./configure --prefix=${SCRIPT_LOCATION} \
-            --with-pic=yes
+            --with-pic=yes              \
+            --enable-lib-only
