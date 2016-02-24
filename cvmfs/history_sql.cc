@@ -123,18 +123,21 @@ bool HistoryDatabase::UpgradeSchemaRevision_10_2() {
 //------------------------------------------------------------------------------
 
 #define DB_FIELDS_V1R0  "name, hash, revision, timestamp, channel, description"
-#define DB_FIELDS_V1R1  "name, hash, revision, timestamp, channel, description, size"
-#define DB_PLACEHOLDERS ":name, :hash, :revision, :timestamp, :channel, :description, :size"
+#define DB_FIELDS_V1R1  "name, hash, revision, timestamp, channel, " \
+                        "description,  size"
+#define DB_PLACEHOLDERS ":name, :hash, :revision, :timestamp, :channel, " \
+                        ":description, :size"
 #define ROLLBACK_COND   "(revision > :target_rev  OR " \
                         " name     = :target_name)   " \
                         "AND channel  = :target_chan "
 
-#define MAKE_STATEMENT(STMT_TMPL, REV)                         \
-static const std::string REV =                                 \
-  ReplaceAll(                                                  \
-    ReplaceAll(                                                \
-      ReplaceAll(STMT_TMPL, "@DB_FIELDS@", DB_FIELDS_ ## REV), \
-      "@DB_PLACEHOLDERS@", DB_PLACEHOLDERS),                   \
+#define MAKE_STATEMENT(STMT_TMPL, REV)       \
+static const std::string REV =               \
+  ReplaceAll(                                \
+    ReplaceAll(                              \
+      ReplaceAll(STMT_TMPL,                  \
+        "@DB_FIELDS@", DB_FIELDS_ ## REV),   \
+      "@DB_PLACEHOLDERS@", DB_PLACEHOLDERS), \
     "@ROLLBACK_COND@", ROLLBACK_COND)
 
 #define MAKE_STATEMENTS(STMT_TMPL) \
