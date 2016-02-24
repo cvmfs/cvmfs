@@ -8,7 +8,6 @@
 #include <string>
 
 #include "hash.h"
-#include "reflog.h"
 #include "swissknife.h"
 #include "util_concurrency.h"
 

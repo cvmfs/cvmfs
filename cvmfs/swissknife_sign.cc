@@ -25,6 +25,7 @@
 #include "logging.h"
 #include "manifest.h"
 #include "object_fetcher.h"
+#include "reflog.h"
 #include "signature.h"
 #include "smalloc.h"
 #include "upload.h"

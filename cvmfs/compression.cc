@@ -44,13 +44,13 @@ static bool CopyFile2File(FILE *fsrc, FILE *fdest) {
 
 bool CopyPath2File(const std::string &src, FILE *fdest) {
   int retval = -1;
-  struct stat info;
+  platform_stat64 info;
 
   FILE *fsrc = fopen(src.c_str(), "r");
   if (!fsrc) goto file_copy_final;
 
   if (!CopyFile2File(fsrc, fdest)) goto file_copy_final;
-  retval = fstat(fileno(fsrc), &info);
+  retval = platform_fstat(fileno(fsrc), &info);
   retval |= fchmod(fileno(fdest), info.st_mode);
 
  file_copy_final:
@@ -63,7 +63,7 @@ bool CopyPath2Path(const string &src, const string &dest) {
   FILE *fsrc = NULL;
   FILE *fdest = NULL;
   int retval = -1;
-  struct stat info;
+  platform_stat64 info;
 
   fsrc = fopen(src.c_str(), "r");
   if (!fsrc) goto file_copy_final;
@@ -72,7 +72,7 @@ bool CopyPath2Path(const string &src, const string &dest) {
   if (!fdest) goto file_copy_final;
 
   if (!CopyFile2File(fsrc, fdest)) goto file_copy_final;
-  retval = fstat(fileno(fsrc), &info);
+  retval = platform_fstat(fileno(fsrc), &info);
   retval |= fchmod(fileno(fdest), info.st_mode);
 
  file_copy_final:
@@ -364,8 +364,8 @@ bool CompressPath2Path(const string &src, const string &dest,
   bool result = false;
   if (!CompressFile2File(fsrc, fdest, compressed_hash))
     goto compress_path2path_final;
-  struct stat info;
-  if (fstat(fileno(fsrc), &info) != 0) goto compress_path2path_final;
+  platform_stat64 info;
+  if (platform_fstat(fileno(fsrc), &info) != 0) goto compress_path2path_final;
   // TODO(jakob): open in the right mode from the beginning
   if (fchmod(fileno(fdest), info.st_mode) != 0) goto compress_path2path_final;
 

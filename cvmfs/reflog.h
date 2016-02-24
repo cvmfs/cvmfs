@@ -25,7 +25,6 @@ class Reflog {
     return database_->CloseAndReturnDatabaseFile();
   }
 
- public:
   bool AddCertificate(const shash::Any &certificate);
   bool AddCatalog(const shash::Any &catalog);
   bool AddHistory(const shash::Any &history);

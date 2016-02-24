@@ -759,13 +759,15 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     }
 
     // upload Reflog database
-    reflog->CommitTransaction();
-    spooler->UploadReflog(reflog->CloseAndReturnDatabaseFile());
-    spooler->WaitForUpload();
-    if (spooler->GetNumberOfErrors()) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to upload Reflog (errors: %d)",
-               spooler->GetNumberOfErrors());
-      goto fini;
+    if (!preload_cache) {
+      reflog->CommitTransaction();
+      spooler->UploadReflog(reflog->CloseAndReturnDatabaseFile());
+      spooler->WaitForUpload();
+      if (spooler->GetNumberOfErrors()) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "Failed to upload Reflog (errors: %d)",
+                 spooler->GetNumberOfErrors());
+        goto fini;
+      }
     }
 
     if (preload_cache) {
