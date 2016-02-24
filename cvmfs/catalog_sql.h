@@ -273,15 +273,6 @@ class SqlListContentHashes : public SqlDirent {
 
 
 class SqlLookup : public SqlDirent {
- protected:
-  /**
-   * There are several lookup statements which all share a list of elements to
-   * load.
-   * @return a list of sql fields to query for DirectoryEntry
-   */
-  std::string GetFieldsToSelect(const float schema_version,
-                                const unsigned schema_revision) const;
-
  public:
   /**
    * Retrieves a DirectoryEntry from a freshly performed SqlLookup statement.
@@ -334,6 +325,30 @@ class SqlLookupInode : public SqlLookup {
  public:
   explicit SqlLookupInode(const CatalogDatabase &database);
   bool BindRowId(const uint64_t inode);
+};
+
+
+//------------------------------------------------------------------------------
+
+
+/**
+ * This SQL statement is only used for legacy catalog migrations and has been
+ * moved here as it needs to use a locally defined macro inside catalog_sql.cc
+ *
+ * Queries a single catalog and looks for DirectoryEntrys that have direct
+ * children in the same catalog but are marked as 'nested catalog mountpoints'.
+ * This is an inconsistent situation, since a mountpoint is supposed to be empty
+ * and it's children are stored in the corresponding referenced nested catalog.
+ *
+ * Note: the user code needs to check if there is a corresponding nested catalog
+ *       reference for the found dangling mountpoints. If so, we also have a
+ *       bogus state, but it is not reliably fixable automatically. The child-
+ *       DirectoryEntrys would be masked by the mounting nested catalog but it
+ *       is not clear if we can simply delete them or if this would destroy data.
+ */
+class SqlLookupDanglingMountpoints : public catalog::SqlLookup {
+ public:
+  explicit SqlLookupDanglingMountpoints(const CatalogDatabase &database);
 };
 
 

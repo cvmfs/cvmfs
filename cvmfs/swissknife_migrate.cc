@@ -1301,36 +1301,6 @@ void CommandMigrate::FixNestedCatalogTransitionPoint(
 }
 
 
-/**
- * Queries a single catalog and looks for DirectoryEntrys that have direct
- * children in the same catalog but are marked as 'nested catalog mountpoints'.
- * This is an inconsistent situation, since a mountpoint is supposed to be empty
- * and it's children are stored in the corresponding referenced nested catalog.
- *
- * Note: the user code needs to check if there is a corresponding nested catalog
- *       reference for the found dangling mountpoints. If so, we also have a
- *       bogus state, but it is not reliably fixable automatically. The child-
- *       DirectoryEntrys would be masked by the mounting nested catalog but it
- *       is not clear if we can simply delete them or if this would destroy data.
- */
-class SqlLookupDanglingMountpoints : public catalog::SqlLookup {
- public:
-  explicit SqlLookupDanglingMountpoints(
-    const catalog::CatalogDatabase &database)
-  {
-    const string statement =
-      "SELECT DISTINCT " +
-      GetFieldsToSelect(database.schema_version(), database.schema_revision()) +
-      " FROM catalog "
-      "JOIN catalog AS c2 "
-      "ON catalog.md5path_1 = c2.parent_1 AND catalog.md5path_2 = c2.parent_2 "
-      "WHERE catalog.flags & "
-      + StringifyInt(catalog::SqlDirent::kFlagDirNestedMountpoint) + ";";
-    const bool init_successful = Init(database.sqlite_db(), statement);
-    assert(init_successful);
-  }
-};
-
 bool CommandMigrate::MigrationWorker_20x::RemoveDanglingNestedMountpoints(
   PendingCatalog *data) const
 {
@@ -1355,7 +1325,7 @@ bool CommandMigrate::MigrationWorker_20x::RemoveDanglingNestedMountpoints(
 
   // Retrieve nested catalog mountpoints that have child entries directly inside
   // the current catalog (which is a malformed state)
-  SqlLookupDanglingMountpoints sql_dangling_mountpoints(writable);
+  catalog::SqlLookupDanglingMountpoints sql_dangling_mountpoints(writable);
   catalog::SqlDirentUpdate save_updated_mountpoint(writable);
 
   // go through the list of dangling nested catalog mountpoints and fix them
