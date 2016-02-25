@@ -178,14 +178,13 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
 
   // Check http status codes
   if (HasPrefix(header_line, "HTTP/", false)) {
-    if (header_line.length() < 12) {
+    if (header_line.length() < 10) {
       return 0;
     }
 
     unsigned i;
     for (i = 8; (i < header_line.length()) && (header_line[i] == ' '); ++i) {}
 
-    // TODO(jblomer): consolidate the code
     assert(header_line.length() > i+2);
     info->http_code = DownloadManager::ParseHttpCode(&header_line[i]);
 
