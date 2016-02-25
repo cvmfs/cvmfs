@@ -31,7 +31,7 @@ print_dots() {
   while true; do
     if [ -f $PRINT_FILE ]; then
       echo -n "."
-      sleep 30
+      sleep 10
     else
       sleep 1
     fi
