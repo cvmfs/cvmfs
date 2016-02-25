@@ -12,6 +12,7 @@ GOOGLETEST_VERSION=1.7.0
 TBB_VERSION=4.3-1
 LIBGEOIP_VERSION=1.6.0
 PYTHON_GEOIP_VERSION=1.3.1
+NGHTTP2_VERSION=1.7.1
 
 if [ $# -ne 1 ]; then
   echo "Usage: $0 <decompress location>"
@@ -101,6 +102,7 @@ replace_in_external() {
 mkdir -p $externals_build_dir
 
 do_extract  "c-ares"      "c-ares-${CARES_VERSION}.tar.gz"
+do_extract  "nghttp2"     "nghttp2-${NGHTTP2_VERSION}.tar.gz"
 do_extract  "libcurl"     "curl-${CURL_VERSION}.tar.gz"
 do_extract  "pacparser"   "pacparser-${PACPARSER_VERSION}.tar.gz"
 do_extract  "zlib"        "zlib-${ZLIB_VERSION}.tar.gz"
