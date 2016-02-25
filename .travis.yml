@@ -15,7 +15,6 @@ addons:
   apt:
     packages:
       - autotools-dev
-      - autoconf
       - libcap-dev
       - libssl-dev
       - g++

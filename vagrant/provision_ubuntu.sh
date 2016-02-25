@@ -9,7 +9,7 @@ apt-get update
 
 # install required packages
 apt-get install -y                                                          \
-  apache2 attr autoconf autofs autotools-dev bash bc cmake coreutils        \
+  apache2 attr autofs autotools-dev bash bc cmake coreutils        \
   curl debhelper debianutils debootstrap default-jre-headless docker.io     \
   fuse g++ gawk gcc gdb grep gzip initscripts insserv libapache2-mod-wsgi   \
   libattr1-dev libc-bin libc6-dev libcap-dev libfuse-dev libfuse2           \
