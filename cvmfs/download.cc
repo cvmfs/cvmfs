@@ -178,7 +178,7 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
 
   // Check http status codes
   if (HasPrefix(header_line, "HTTP/", false)) {
-    if (header_line.length() < 10) {
+    if (header_line.length() < 12) {
       return 0;
     }
 
