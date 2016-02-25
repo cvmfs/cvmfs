@@ -391,9 +391,7 @@ if (BUILD_LIBCVMFS)
 
   if (LIBCURL_BUILTIN)
     add_dependencies (cvmfs_only libcares libnghttp2 libcurl)
-    set (LIBCVMFS_LIBS ${CARES_ARCHIVE} ${LIBCVMFS_LIBS} )
-    set (LIBCVMFS_LIBS ${LIBCVMFS_LIBS} )
-    set (LIBCVMFS_LIBS ${NGHTTP2_ARCHIVE} ${LIBCURL_ARCHIVE} ${LIBCVMFS_LIBS} )
+    set (LIBCVMFS_LIBS ${NGHTTP2_ARCHIVE} ${CARES_ARCHIVE} ${LIBCURL_ARCHIVE} ${LIBCVMFS_LIBS} )
   endif (LIBCURL_BUILTIN)
 
   if (PACPARSER_BUILTIN)
@@ -438,7 +436,7 @@ if (BUILD_LIBCVMFS)
   add_dependencies (libcvmfs cvmfs_only)
 
   add_executable( test_libcvmfs ${TEST_LIBCVMFS_SOURCES} )
-  target_link_libraries( test_libcvmfs ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a ${SQLITE3_LIBRARY} ${CARES_LIBRARIES} ${NGHTTP2_ARCHIVE} ${CURL_LIBRARIES} ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl )
+  target_link_libraries( test_libcvmfs ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${CARES_LIBRARIES} ${NGHTTP2_ARCHIVE} ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl )
   add_dependencies (test_libcvmfs libcvmfs)
 
 endif (BUILD_LIBCVMFS)
@@ -478,7 +476,7 @@ if (BUILD_SERVER)
 
   # link the stuff (*_LIBRARIES are dynamic link libraries)
   target_link_libraries (cvmfs_swissknife  ${CVMFS_SWISSKNIFE_LIBS}
-                         ${SQLITE3_LIBRARY}  ${CURL_LIBRARIES} ${NGHTTP2_ARCHIVE} ${LIBCURL_ARCHIVE}
+                         ${SQLITE3_LIBRARY}  ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE}
                          ${CARES_LIBRARIES} ${CARES_ARCHIVE} ${NGHTTP2_ARCHIVE}
                          ${TBB_LIBRARIES} ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE}
                          ${OPENSSL_LIBRARIES} ${SQLITE3_ARCHIVE} ${RT_LIBRARY}
@@ -513,7 +511,7 @@ if (BUILD_SERVER)
       set (TBB_DEBUG_LIBRARIES ${TBB_LIBRARIES})
     endif (NOT TBB_DEBUG_LIBRARIES)
     target_link_libraries (cvmfs_swissknife_debug  ${CVMFS_SWISSKNIFE_LIBS}
-                           ${SQLITE3_LIBRARY} ${NGHTTP2_ARCHIVE} ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE}
+                           ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE}
                            ${CARES_LIBRARIES} ${CARES_ARCHIVE} ${NGHTTP2_ARCHIVE}
                            ${TBB_LIBRARIES} ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE}
                            ${OPENSSL_LIBRARIES} ${SQLITE3_ARCHIVE} ${RT_LIBRARY}
