@@ -301,6 +301,82 @@ FILE *CredentialsFetcher::GetProxyFileInternal(pid_t pid, uid_t uid, gid_t gid)
 
 
 /**
+ * Send a the serialized form of the DN and VOMS credential
+ */
+int SendAuthzData(pid_t pid, uid_t uid, gid_t gid)
+{
+  authz_data* myauthz = CredentialsFetcher::GenerateVOMSData(uid, gid, pid);
+  int command = 4;
+
+  struct msghdr msg_send;
+  memset(&msg_send, '\0', sizeof(msg_send));
+  command = 0;
+  int result = 0;
+  size_t dn_len = 0;
+  size_t voms_len = 0;
+  iovec iov[4];
+  iov[0].iov_base = &command;
+  iov[0].iov_len = sizeof(command);
+  iov[1].iov_base = &result;
+  iov[1].iov_len = sizeof(result);
+  iov[2].iov_base = &dn_len;
+  iov[2].iov_len = sizeof(dn_len);
+  iov[3].iov_base = &voms_len;
+  iov[3].iov_len = sizeof(voms_len);
+  msg_send.msg_iov = iov;
+  msg_send.msg_iovlen = 4;
+
+  std::string mydn;
+  char *buf = NULL;
+  int buflen = 0;
+  if (!myauthz || !myauthz->dn_) {
+    result = 1;
+  } else {
+    mydn = myauthz->dn_;
+    dn_len = mydn.size();
+
+    if (myauthz->voms_) {
+      int voms_error = 0;
+      if (!(*g_VOMS_Export)(&buf, &buflen, myauthz->voms_, &voms_error)) {
+        char *err_str = (*g_VOMS_ErrorMessage)(myauthz->voms_, voms_error,
+                                               NULL, 0);
+        LogCvmfs(kLogVoms, kLogDebug, "Unable to export VOMS credential: %s\n",
+                 err_str);
+        free(err_str);
+        result = 2;
+      }
+    }
+    voms_len = buflen;
+  }
+  delete myauthz;
+
+  errno = 0;
+  while (-1 == sendmsg(3, &msg_send, 0) && errno == EINTR) {}
+  if (errno) {
+    LogCvmfs(kLogVoms, kLogSyslogErr | kLogDebug,
+             "failed to send authz messaage to parent: %s (errno=%d)",
+             strerror(errno), errno);
+    return 1;
+  }
+
+  iov[0].iov_base = &mydn[0];
+  iov[0].iov_len = dn_len;
+  iov[1].iov_base = buf;
+  iov[1].iov_len = buflen;
+  msg_send.msg_iovlen = 2;
+  errno = 0;
+  while (-1 == sendmsg(3, &msg_send, 0) && errno == EINTR) {}
+  if (errno) {
+    LogCvmfs(kLogVoms, kLogSyslogErr | kLogDebug,
+             "failed to send authz messaage to parent: %s (errno=%d)",
+             strerror(errno), errno);
+    return 1;
+  }
+
+  return 0;
+}
+
+/**
  * A command-response server.  It reveices the triplet pid, uid, gid and returns
  * a read-only file descriptor for the user's proxy certificate, taking into
  * account the environment of the pid.
@@ -356,6 +432,10 @@ int CredentialsFetcher::MainCredentialsFetcher(int argc, char *argv[]) {
       LogCvmfs(kLogVoms, kLogDebug,
                "got exit message from parent; exiting %d.", value);
       return value;
+    } else if (command == kCmdAuthzReq) {
+        int result = SendAuthzData(value, uid, gid);
+        if (result) {return 1;}
+        continue;
     } else if (command != kCmdCredReq) {
       LogCvmfs(kLogVoms, kLogSyslogErr | kLogDebug, "got unknown command %d",
                command);

@@ -32,7 +32,8 @@ class CredentialsFetcher {
     kCmdExecErr = 1,
     kCmdCredReq,
     kCmdChildExit,
-    kCmdCredHandle
+    kCmdCredHandle,
+    kCmdAuthzReq
   };
 
   static int MainCredentialsFetcher(int argc, char *argv[]);

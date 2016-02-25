@@ -58,4 +58,7 @@ template bool LoadSymbol<int (*)(x509_st*, stack_st_X509*, int, vomsdata*,
                          char const*);
 template bool LoadSymbol<char* (*)(vomsdata*, int, char*, int)>(void*,
                         char* (**)(vomsdata*, int, char*, int), char const*);
-
+template bool LoadSymbol<int (*)(char**, int*, vomsdata*, int*)>(void*,
+                        int (**)(char**, int*, vomsdata*, int*), char const*);
+template bool LoadSymbol<int (*)(char*, int, vomsdata*, int*)>(void*,
+                        int (**)(char*, int, vomsdata*, int*), char const*);

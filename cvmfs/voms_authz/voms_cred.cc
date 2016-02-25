@@ -221,6 +221,91 @@ struct ProxyHelper {
   }
 
 
+  /**
+   * Get the proxy's DN and VOMS credential here.
+   */
+  authz_data *GetAuthzData(pid_t pid, uid_t uid, gid_t gid) {
+    if (!CheckHelperLaunched()) {return NULL;}
+
+    MutexLockGuard guard(m_helper_mutex);
+    LogCvmfs(kLogVoms, kLogDebug, "Sending authz data request to child for "
+             "PID=%d, UID=%d, GID=%d", pid, uid, gid);
+
+    // Send an authz data request to child.
+    struct msghdr msg_send;
+    memset(&msg_send, '\0', sizeof(msg_send));
+    struct iovec iov[4];
+    int command = CredentialsFetcher::kCmdAuthzReq;
+    iov[0].iov_base = &command;
+    iov[0].iov_len = sizeof(command);
+    iov[1].iov_base = &pid;
+    iov[1].iov_len = sizeof(pid);
+    iov[2].iov_base = &uid;
+    iov[2].iov_len = sizeof(uid);
+    iov[3].iov_base = &gid;
+    iov[3].iov_len = sizeof(gid);
+    msg_send.msg_iov = iov;
+    msg_send.msg_iovlen = 4;
+    errno = 0;
+    while (-1 == sendmsg(m_sock, &msg_send, MSG_NOSIGNAL) && errno == EINTR) {}
+    if (errno) {
+      int result = errno;
+      // Socket is disconnected; child has died.
+      if (errno == ENOTCONN || errno == EPIPE) {
+        ReportChildDeath(m_subprocess, WNOHANG);
+        m_subprocess = -1;
+      }
+      LogCvmfs(kLogVoms, kLogWarning, "Failed to send authz request messaage "
+               "to child: %s (errno=%d)", strerror(result), result);
+      return NULL;
+    }
+
+    // Hang around waiting for a response - first we get the lengths of the
+    // responses.
+    struct msghdr msg_recv;
+    memset(&msg_recv, '\0', sizeof(msg_recv));
+    command = 0;
+    int result = 0;
+    size_t dn = 0;
+    size_t voms = 0;
+    iov[0].iov_base = &command;
+    iov[0].iov_len = sizeof(command);
+    iov[1].iov_base = &result;
+    iov[1].iov_len = sizeof(result);
+    iov[2].iov_base = &dn;
+    iov[2].iov_len = sizeof(dn);
+    iov[3].iov_base = &voms;
+    iov[3].iov_len = sizeof(voms);
+    msg_recv.msg_iov = iov;
+    msg_recv.msg_iovlen = 4;
+
+    errno = 0;
+    // TODO(bbockelm): Implement timeouts.
+    while (-1 == recvmsg(m_sock, &msg_recv, 0) && errno == EINTR) {}
+    if (errno) {
+      int result = errno;
+      // Socket is disconnected; child has died.
+      if (errno == ENOTCONN || errno == EPIPE) {
+        MutexLockGuard guard(m_helper_mutex);
+        ReportChildDeath(m_subprocess, WNOHANG);
+        m_subprocess = -1;
+      }
+      LogCvmfs(kLogVoms, kLogWarning, "Failed to receive authz messaage from "
+               "child: %s (errno=%d)", strerror(result), result);
+    }
+    if (command != 4) {
+      if (command == 1) {  // Child was unable to exec.
+        LogCvmfs(kLogVoms, kLogWarning, "Child process was unable to execute "
+                 "cvmfs_cred_fetcher: %s (errno=%d)", strerror(result), result);
+        MutexLockGuard guard(m_helper_mutex);
+        ReportChildDeath(m_subprocess, 0);
+        m_subprocess = -1;
+      }
+      return NULL;
+    }
+  }
+
+
   // TODO(jblomer): more error handling here: if the user proxy certificate
   // does not exist, it is hard to figure out.
   FILE *GetProxyFile(pid_t pid, uid_t uid, gid_t gid) {

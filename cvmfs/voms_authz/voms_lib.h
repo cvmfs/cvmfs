@@ -19,6 +19,10 @@ extern int (*g_VOMS_Retrieve)(X509 *cert, STACK_OF(X509) *chain, int how,
                          struct vomsdata *vd, int *error);
 extern char * (*g_VOMS_ErrorMessage)(struct vomsdata *vd, int error,
                          char *buffer, int len);
+extern int (*g_VOMS_Export)(char **buffer, int *buflen, struct vomsdata *vd,
+                            int *error);
+extern int (*g_VOMS_Import)(char *buffer, int buflen, struct vomsdata *vd,
+                            int *error);
 }
 
 
@@ -32,7 +36,7 @@ struct authz_data {
   {}
 
   ~authz_data() {
-    if (voms_) {(*g_VOMS_Destroy)(voms_);}
+    if (voms_ && g_VOMS_Destroy) {(*g_VOMS_Destroy)(voms_);}
     if (dn_) {OPENSSL_free(dn_);}
   }
 };
