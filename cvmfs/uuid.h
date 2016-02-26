@@ -15,11 +15,12 @@ namespace cvmfs {
  * identify a cvmfs cache directory.
  *
  * In order to create many UUIDs for short-lived objects (see webapi/macaroon),
- * use the Create factory method with an empty path.
+ * use the CreateOneTime factory method.
  */
 class Uuid {
  public:
   static Uuid *Create(const std::string &store_path);
+  static std::string CreateOneTime();
   std::string uuid() { return uuid_; }
  private:
   void MkUuid();

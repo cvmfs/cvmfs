@@ -52,6 +52,13 @@ Uuid *Uuid::Create(const string &store_path) {
 }
 
 
+string Uuid::CreateOneTime() {
+  Uuid uuid;
+  uuid.MkUuid();
+  return uuid.uuid_;
+}
+
+
 /**
  * Creates a new UUID in canonical string representation and overwrites uuid_
  * with the result.
