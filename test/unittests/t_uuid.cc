@@ -45,6 +45,12 @@ TEST(T_Uuid, Create) {
   EXPECT_EQ(line, uuid->uuid());
 }
 
+
+TEST(T_Uuid, CreateOneTime) {
+  EXPECT_NE(Uuid::CreateOneTime(), Uuid::CreateOneTime());
+}
+
+
 TEST(T_Uuid, FromCache) {
   string path;
   FILE *f = CreateTempFile("./cvmfs_ut_uuid", 0600, "w", &path);
