@@ -490,6 +490,14 @@ void HashString(const std::string &content, Any *any_digest);
 void Hmac(const std::string &key,
           const unsigned char *buffer, const unsigned buffer_size,
           Any *any_digest);
+inline void HmacString(const std::string &key, const std::string &content,
+                Any *any_digest)
+{
+  Hmac(key,
+       reinterpret_cast<const unsigned char *>(content.data()),
+       content.size(),
+       any_digest);
+}
 
 
 Algorithms ParseHashAlgorithm(const std::string &algorithm_option);
