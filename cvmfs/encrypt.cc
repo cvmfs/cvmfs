@@ -89,6 +89,11 @@ bool Key::SaveToFile(const std::string &path) {
 }
 
 
+string Key::ToBase64() const {
+  return Base64(string(reinterpret_cast<const char *>(data_), size_));
+}
+
+
 //------------------------------------------------------------------------------
 
 
