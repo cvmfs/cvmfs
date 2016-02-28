@@ -45,6 +45,7 @@ class Key : SingleCopy {
 
   unsigned size() const { return size_; }
   const unsigned char *data() const { return data_; }
+  std::string ToBase64() const;
 
  private:
   Key() : data_(NULL), size_(0)  { }
