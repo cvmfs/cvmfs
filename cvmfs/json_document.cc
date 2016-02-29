@@ -25,7 +25,7 @@ JsonDocument *JsonDocument::Create(const string &text) {
 string JsonDocument::EscapeString(const string &input) {
   string escaped;
   escaped.reserve(input.length());
-  
+
   for (unsigned i = 0, s = input.length(); i < s; ++i) {
     if (input[i] == '\\') {
       escaped.push_back('\\');
@@ -80,8 +80,8 @@ bool JsonDocument::Parse(const string &text) {
   // check if the json string was parsed successfully
   if (!root) {
     LogCvmfs(kLogUtility, kLogDebug,
-             "Failed to parse Riak configuration json string. "
-             "Error at line %d: %s (%s)", error_line, error_desc, error_pos);
+             "Failed to parse json string. Error at line %d: %s (%s)",
+             error_line, error_desc, error_pos);
     return false;
   }
 
