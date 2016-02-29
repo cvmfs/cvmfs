@@ -453,6 +453,8 @@ struct Any : public Digest<kMaxDigestSize, kAny> {
                const HexPtr      hex,
                const char        suffix = kSuffixNone) :
     Digest<kMaxDigestSize, kAny>(a, hex, suffix) { }
+
+  Md5 CastToMd5();
 };
 
 
@@ -491,7 +493,7 @@ void Hmac(const std::string &key,
           const unsigned char *buffer, const unsigned buffer_size,
           Any *any_digest);
 inline void HmacString(const std::string &key, const std::string &content,
-                Any *any_digest)
+                       Any *any_digest)
 {
   Hmac(key,
        reinterpret_cast<const unsigned char *>(content.data()),

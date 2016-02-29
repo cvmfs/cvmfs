@@ -382,6 +382,14 @@ void Md5::ToIntPair(uint64_t *lo, uint64_t *hi) const {
   memcpy(hi, digest+8, 8);
 }
 
+
+Md5 Any::CastToMd5() {
+  assert(algorithm == kMd5);
+  Md5 result;
+  memcpy(result.digest, digest, kDigestSizes[kMd5]);
+  return result;
+}
+
 }  // namespace shash
 
 #ifdef CVMFS_NAMESPACE_GUARD
