@@ -180,10 +180,12 @@ TEST(T_Encrypt, Aes_256_Cbc) {
 
 TEST(T_Encrypt, Aes_256_Cbc_Iv) {
   CipherAes256Cbc cipher;
+  UniquePtr<cipher::Key> key(cipher::Key::CreateRandomly(cipher.key_size()));
+  ASSERT_TRUE(key.IsValid());
   // Many Iv requests in a short time should still return unique IVs
   shash::Md5 md5;
   for (unsigned i = 0; i < 100000; ++i) {
-    shash::Md5 next_iv = cipher.GenerateIv();
+    shash::Md5 next_iv = cipher.GenerateIv(*key);
     ASSERT_NE(md5, next_iv);
     md5 = next_iv;
   }

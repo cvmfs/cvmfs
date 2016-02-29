@@ -208,6 +208,8 @@ bool Cipher::Decrypt(
 //------------------------------------------------------------------------------
 
 
+atomic_int64 CipherAes256Cbc::sequence_ = 0;
+
 string CipherAes256Cbc::DoDecrypt(const string &ciphertext, const Key &key) {
   assert(key.size() == kKeySize);
   int retval, retval_2;
@@ -258,7 +260,7 @@ string CipherAes256Cbc::DoEncrypt(const string &plaintext, const Key &key) {
   assert(key.size() == kKeySize);
   int retval;
 
-  shash::Md5 md5(GenerateIv());
+  shash::Md5 md5(GenerateIv(key));
   // iv size happens to be md5 digest size
   unsigned char *iv = md5.digest;
 
@@ -292,17 +294,18 @@ string CipherAes256Cbc::DoEncrypt(const string &plaintext, const Key &key) {
 
 /**
  * The block size of AES-256-CBC happens to be the same of the MD5 digest
- * (128 bits)
+ * (128 bits).  Use the HMAC of the key and time + seqno to make it random and
+ * unpredictable.
  */
-shash::Md5 CipherAes256Cbc::GenerateIv() {
-  // use hash over real time and monotonic time
-  struct timespec time_stamp[2];
-  int retval = clock_gettime(CLOCK_REALTIME, &(time_stamp[0]));
-  assert(retval == 0);
-  retval = clock_gettime(CLOCK_MONOTONIC, &(time_stamp[1]));
-  assert(retval == 0);
-  return shash::Md5(reinterpret_cast<const char *>(&time_stamp),
-                    2 * sizeof(struct timespec));
+shash::Md5 CipherAes256Cbc::GenerateIv(const Key &key) {
+  uint64_t timestamp = time(NULL);
+  uint64_t nonce = timestamp + atomic_xadd64(&sequence_, 1);
+
+  shash::Any hmac(shash::kMd5);
+  shash::Hmac(string(reinterpret_cast<const char *>(key.data()), key.size()),
+              reinterpret_cast<const unsigned char *>(&nonce), sizeof(nonce),
+              &hmac);
+  return hmac.CastToMd5();
 }
 
 
