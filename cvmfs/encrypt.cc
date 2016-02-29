@@ -69,6 +69,18 @@ Key *Key::CreateFromFile(const string &path) {
 }
 
 
+Key *Key::CreateFromString(const string &key) {
+  unsigned size = key.size();
+  if ((size == 0) || (size > kMaxSize))
+    return NULL;
+  UniquePtr<Key> result(new Key());
+  result->size_ = size;
+  result->data_ = reinterpret_cast<unsigned char *>(smalloc(size));
+  memcpy(result->data_, key.data(), size);
+  return result.Release();
+}
+
+
 Key::~Key() {
   if (data_) {
     memset(data_, 0, size_);

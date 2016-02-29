@@ -57,6 +57,23 @@ TEST(T_Encrypt, KeyFiles) {
 }
 
 
+TEST(T_Encrypt, KeyStrings) {
+  UniquePtr<Key> k_invalid_small(Key::CreateFromString(""));
+  EXPECT_FALSE(k_invalid_small.IsValid());
+  UniquePtr<Key> k_invalid_big(
+    Key::CreateFromString(string(Key::kMaxSize + 1, 'X')));
+  EXPECT_FALSE(k_invalid_big.IsValid());
+  UniquePtr<Key> k_max_size(
+    Key::CreateFromString(string(Key::kMaxSize, 'X')));
+  EXPECT_TRUE(k_max_size.IsValid());
+
+  string secret = "This is a secret";
+  UniquePtr<Key> k(Key::CreateFromString(secret));
+  ASSERT_TRUE(k.IsValid());
+  EXPECT_EQ(k->ToBase64(), Base64(secret));
+}
+
+
 TEST(T_Encrypt, MemoryKeyDatabase) {
   MemoryKeyDatabase database;
   UniquePtr<Key> k(Key::CreateRandomly(32));

@@ -40,6 +40,7 @@ class Key : SingleCopy {
 
   static Key *CreateRandomly(const unsigned size);
   static Key *CreateFromFile(const std::string &path);
+  static Key *CreateFromString(const std::string &key);
   bool SaveToFile(const std::string &path);
   ~Key();
 
