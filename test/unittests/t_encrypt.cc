@@ -175,6 +175,11 @@ TEST(T_Encrypt, Aes_256_Cbc) {
   retval = Cipher::Decrypt(ciphertext.substr(0, ciphertext.length()-1),
                            *k, &plaintext);
   EXPECT_EQ("", plaintext);
+
+  UniquePtr<Key> k2(Key::CreateRandomly(cipher.key_size()));
+  ASSERT_TRUE(k2.IsValid());
+  Cipher::Decrypt(ciphertext, *k2, &plaintext);
+  EXPECT_EQ("", plaintext);
 }
 
 
