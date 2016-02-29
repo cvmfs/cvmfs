@@ -7,7 +7,7 @@
  * that is itself protected by a digital signature, HMAC, or similar.
  *
  * The initialization vector is transferred together with the cipher text.  It
- * is constructed from a hash over the real time and the monotonic clock.
+ * is constructed from the HMAC of the key and nonce.
  */
 
 #ifndef CVMFS_ENCRYPT_H_
@@ -18,6 +18,7 @@
 #include <map>
 #include <string>
 
+#include "atomic.h"
 #include "gtest/gtest_prod.h"
 #include "hash.h"
 #include "util.h"
@@ -126,10 +127,12 @@ class CipherAes256Cbc : public Cipher {
   virtual std::string DoDecrypt(const std::string &ciphertext, const Key &key);
 
  private:
-  shash::Md5 GenerateIv();
+  shash::Md5 GenerateIv(const Key &key);
   static const unsigned kKeySize = 256/8;
   static const unsigned kIvSize = 128/8;
   static const unsigned kBlockSize = 128/8;
+
+  static atomic_int64 sequence_;  ///< Used together with time as a nonce
 };
 
 
