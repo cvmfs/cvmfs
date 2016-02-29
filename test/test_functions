@@ -993,16 +993,25 @@ get_catalog_count() {
   echo $(cvmfs_server list-catalogs -x $repo_name | wc -l)
 }
 
-# read the manifest piped in through stdin and figure out the root catalog hash
-# @param (stdin)  a manifest file content
-# return          the catalog root hash referenced in the manifest
-get_root_hash_from_manifest() {
-  grep --text '^C[a-f0-9]*\(-[a-z0-9]*\)\?$' | sed -e 's/^C\(.*\)$/\1/'
-              # ^^~~~~~~~^ ^~~~~~~~~~~~^
-              # ||       | |           |
-              # ||       | +-----------+-- (optional) Hash Suffix
-              # |+-------+---------------- Hash String
-              # +------------------------- Manifest Field Identifier
+# read one specific manifest field of the specified repository
+# @param field_tag  the manifest field to be retrieved (one character)
+# @param (stdin)    the manifest to be investigated
+# return            the content of the specified manifest field
+get_manifest_field_from_manifest() {
+  local field_tag="$1"
+  grep --text -e "^$field_tag" | head -n1 | sed "s/^$field_tag\(.*\)$/\1/"
+}
+
+# read one specific manifest field of the specified repository
+# @param repo_name  the repository to be investigated
+# @param field_tag  the manifest field to be retrieved (one character)
+# return            the content of the specified manifest field
+get_manifest_field() {
+  local repo_name=$1
+  local field_tag=$2
+  load_repo_config $repo_name
+  local manifest_url="$(get_repo_url $repo_name)/.cvmfspublished"
+  curl -s "$manifest_url" | get_manifest_field_from_manifest "$field_tag"
 }
 
 # retrieves the hash of the current root catalog of the given
@@ -1012,7 +1021,7 @@ get_root_hash_from_manifest() {
 get_current_root_catalog() {
   local repo_name=$1
   local manifest_url="$(get_repo_url $repo_name)/.cvmfspublished"
-  curl "$manifest_url" 2>/dev/null | get_root_hash_from_manifest
+  get_manifest_field $repo_name "C"
 }
 
 # uses `cvmfs_server check` to check the integrity of the catalog structure

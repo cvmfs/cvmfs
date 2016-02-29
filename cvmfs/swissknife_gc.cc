@@ -108,6 +108,13 @@ int CommandGc::Main(const ArgumentList &args) {
     return 1;
   }
 
+  UniquePtr<manifest::Reflog> reflog;
+  reflog = GetOrCreateReflog(&object_fetcher, repo_name);
+  if (!reflog.IsValid()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load or create Reflog");
+    return 1;
+  }
+
   GcConfig config;
   const upload::SpoolerDefinition spooler_definition(spooler, shash::kAny);
   config.uploader = upload::AbstractUploader::Construct(spooler_definition);
@@ -116,6 +123,7 @@ int CommandGc::Main(const ArgumentList &args) {
   config.dry_run = dry_run;
   config.verbose = list_condemned_objects;
   config.object_fetcher = &object_fetcher;
+  config.reflog = reflog.weak_ref();
   config.deleted_objects_logfile = deletion_log_file;
 
   if (config.uploader == NULL) {

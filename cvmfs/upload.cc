@@ -84,6 +84,16 @@ void Spooler::Upload(const std::string &local_path,
 }
 
 
+void Spooler::UploadManifest(const std::string &local_path) {
+  Upload(local_path, ".cvmfspublished");
+}
+
+
+void Spooler::UploadReflog(const std::string &local_path) {
+  Upload(local_path, ".cvmfsreflog");
+}
+
+
 bool Spooler::Remove(const std::string &file_to_delete) {
   return uploader_->Remove(file_to_delete);
 }

@@ -30,6 +30,7 @@
 #include "logging.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
+#include "object_fetcher.h"
 #include "path_filters/relaxed_path_filter.h"
 #include "signature.h"
 #include "smalloc.h"
@@ -41,6 +42,8 @@ using namespace std;  // NOLINT
 namespace swissknife {
 
 namespace {
+
+typedef HttpObjectFetcher<> ObjectFetcher;
 
 /**
  * This just stores an shash::Any in a predictable way to send it through a
@@ -571,6 +574,15 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   download_manager()->SetRetryParameters(retries, timeout, 3*timeout);
   download_manager()->Spawn();
 
+  // init the download helper
+  ObjectFetcher object_fetcher(repository_name,
+                               *stratum0_url,
+                               *temp_dir,
+                               download_manager(),
+                               signature_manager());
+
+  UniquePtr<manifest::Reflog> reflog;
+
   // Check if we have a replica-ready server
   const string url_sentinel = *stratum0_url + "/.cvmfs_master_replica";
   download::JobInfo download_sentinel(&url_sentinel, false);
@@ -588,6 +600,15 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch manifest (%d - %s)",
              m_retval, manifest::Code2Ascii(m_retval));
     goto fini;
+  }
+
+  if (!preload_cache) {
+    reflog = GetOrCreateReflog(&object_fetcher, repository_name);
+    if (!reflog.IsValid()) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to get or construct a Reflog");
+      goto fini;
+    }
+    reflog->BeginTransaction();
   }
 
   // Get meta info
@@ -661,6 +682,10 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     Store(history_path, history_hash);
     WaitForStorage();
     unlink(history_path.c_str());
+    if (reflog && !reflog->AddHistory(history_hash)) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to add history to Reflog.");
+      goto fini;
+    }
   }
 
   // Starting threads
@@ -677,12 +702,20 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from trunk catalog at /");
   retval = Pull(ensemble.manifest->catalog_hash(), "");
   pull_history = false;
+  if (reflog && !reflog->AddCatalog(ensemble.manifest->catalog_hash())) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to add root catalog to Reflog.");
+    retval = false;
+  }
   for (TagVector::const_iterator i    = historic_tags.begin(),
                                  iend = historic_tags.end();
        i != iend; ++i) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from %s repository tag",
              i->name.c_str());
     bool retval2 = Pull(i->root_hash, "");
+    if (reflog && !reflog->AddCatalog(i->root_hash)) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to add tag catalog to Reflog.");
+      retval = false;
+    }
     retval = retval && retval2;
   }
 
@@ -710,12 +743,33 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
       StoreBuffer(ensemble.cert_buf,
                   ensemble.cert_size,
                   ensemble.manifest->certificate(), true);
+      if (reflog && !reflog->AddCertificate(ensemble.manifest->certificate())) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "Failed to add certificate to Reflog.");
+        goto fini;
+      }
     }
     if (!meta_info_hash.IsNull()) {
       const unsigned char *info = reinterpret_cast<const unsigned char *>(
         meta_info.data());
       StoreBuffer(info, meta_info.size(), meta_info_hash, true);
+      if (reflog && !reflog->AddMetainfo(meta_info_hash)) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "Failed to add metainfo to Reflog.");
+        goto fini;
+      }
     }
+
+    // upload Reflog database
+    if (!preload_cache) {
+      reflog->CommitTransaction();
+      spooler->UploadReflog(reflog->CloseAndReturnDatabaseFile());
+      spooler->WaitForUpload();
+      if (spooler->GetNumberOfErrors()) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "Failed to upload Reflog (errors: %d)",
+                 spooler->GetNumberOfErrors());
+        goto fini;
+      }
+    }
+
     if (preload_cache) {
       bool retval = ensemble.manifest->ExportChecksum(*preload_cachedir, 0660);
       assert(retval);
