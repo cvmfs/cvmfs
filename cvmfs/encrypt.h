@@ -116,6 +116,10 @@ class CipherAes256Cbc : public Cipher {
   FRIEND_TEST(T_Encrypt, Aes_256_Cbc_Iv);
 
  public:
+  static const unsigned kKeySize = 256/8;
+  static const unsigned kIvSize = 128/8;
+  static const unsigned kBlockSize = 128/8;
+    
   virtual std::string const name() { return "AES-256-CBC"; }
   virtual Algorithms const algorithm() { return kAes256Cbc; }
   virtual unsigned const key_size() { return kKeySize; }
@@ -128,9 +132,6 @@ class CipherAes256Cbc : public Cipher {
 
  private:
   shash::Md5 GenerateIv(const Key &key);
-  static const unsigned kKeySize = 256/8;
-  static const unsigned kIvSize = 128/8;
-  static const unsigned kBlockSize = 128/8;
 
   static atomic_int64 sequence_;  ///< Used together with time as a nonce
 };

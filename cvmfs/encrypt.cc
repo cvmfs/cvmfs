@@ -223,6 +223,7 @@ string CipherAes256Cbc::DoDecrypt(const string &ciphertext, const Key &key) {
   unsigned char *plaintext = reinterpret_cast<unsigned char *>(
     smalloc(kBlockSize + ciphertext.size() - kIvSize));
   int plaintext_len;
+  int tail_len;
   EVP_CIPHER_CTX ctx;
   EVP_CIPHER_CTX_init(&ctx);
   retval = EVP_DecryptInit_ex(&ctx, EVP_aes_256_cbc(), NULL, key.data(), iv);
@@ -238,7 +239,7 @@ string CipherAes256Cbc::DoDecrypt(const string &ciphertext, const Key &key) {
     assert(retval == 1);
     return "";
   }
-  retval = EVP_DecryptFinal_ex(&ctx, plaintext + plaintext_len, &plaintext_len);
+  retval = EVP_DecryptFinal_ex(&ctx, plaintext + plaintext_len, &tail_len);
   retval_2 = EVP_CIPHER_CTX_cleanup(&ctx);
   assert(retval_2 == 1);
   if (retval != 1) {
@@ -246,6 +247,7 @@ string CipherAes256Cbc::DoDecrypt(const string &ciphertext, const Key &key) {
     return "";
   }
 
+  plaintext_len += tail_len;
   if (plaintext_len == 0) {
     free(plaintext);
     return "";
@@ -270,6 +272,7 @@ string CipherAes256Cbc::DoEncrypt(const string &plaintext, const Key &key) {
     smalloc(kIvSize + 2 * kBlockSize + plaintext.size()));
   memcpy(ciphertext, iv, kIvSize);
   int cipher_len;
+  int tail_len;
   EVP_CIPHER_CTX ctx;
   EVP_CIPHER_CTX_init(&ctx);
   retval = EVP_EncryptInit_ex(&ctx, EVP_aes_256_cbc(), NULL, key.data(), iv);
@@ -280,11 +283,12 @@ string CipherAes256Cbc::DoEncrypt(const string &plaintext, const Key &key) {
              plaintext.length());
   assert(retval == 1);
   retval = EVP_EncryptFinal_ex(&ctx, ciphertext + kIvSize + cipher_len,
-                               &cipher_len);
+                               &tail_len);
   assert(retval == 1);
   retval = EVP_CIPHER_CTX_cleanup(&ctx);
   assert(retval == 1);
 
+  cipher_len += tail_len;
   assert(cipher_len > 0);
   string result(reinterpret_cast<char *>(ciphertext), kIvSize + cipher_len);
   free(ciphertext);
