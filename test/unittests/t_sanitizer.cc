@@ -82,6 +82,7 @@ TEST_F(T_Sanitizer, Base64) {
 
   EXPECT_TRUE(test_sanitizer.IsValid("abcABC012"));
   EXPECT_TRUE(test_sanitizer.IsValid("abcABC-012/+_"));
+  EXPECT_TRUE(test_sanitizer.IsValid("abcABC-012/+_="));
   EXPECT_FALSE(test_sanitizer.IsValid("abcABC-012 /+_"));
 }
 
