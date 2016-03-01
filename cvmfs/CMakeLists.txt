@@ -500,11 +500,13 @@ if (BUILD_OCTOPUS)
     platform.h platform_linux.h platform_osx.h
     smalloc.h
     encrypt.h encrypt.cc
+    json_document.h json_document.cc
     util.h util.cc
     uuid.h uuid.cc
     logging.h logging_internal.h logging.cc
     pathspec/pathspec.h pathspec/pathspec.cc
     pathspec/pathspec_pattern.h pathspec/pathspec_pattern.cc
+    sanitizer.h sanitizer.cc
     webapi/uri_map.h webapi/uri_map.cc
 		webapi/fcgi.h webapi/fcgi.cc
     webapi/macaroon.h webapi/macaroon.cc
@@ -512,7 +514,10 @@ if (BUILD_OCTOPUS)
 
   add_executable (cvmfs_octopus.fcgi ${CVMFS_OCTOPUS_SOURCES})
   add_dependencies (cvmfs_octopus.fcgi libsha2)
-  target_link_libraries(cvmfs_octopus.fcgi ${SHA3_ARCHIVE} ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${UUID_LIBRARIES} pthread)
+  add_dependencies (cvmfs_octopus.fcgi libvjson)
+  target_link_libraries(cvmfs_octopus.fcgi
+                        ${SHA3_ARCHIVE} ${VJSON_ARCHIVE} ${OPENSSL_LIBRARIES}
+                        ${RT_LIBRARY} ${UUID_LIBRARIES} pthread)
 endif (BUILD_OCTOPUS)
 
 
