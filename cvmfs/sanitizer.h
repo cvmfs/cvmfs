@@ -100,7 +100,7 @@ class PositiveIntegerSanitizer : public IntegerSanitizer {
  */
 class Base64Sanitizer : public InputSanitizer {
  public:
-  Base64Sanitizer() : InputSanitizer("az AZ 09 + / - _") { }
+  Base64Sanitizer() : InputSanitizer("az AZ 09 + / - _ =") { }
 };
 
 /**
