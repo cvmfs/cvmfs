@@ -19,6 +19,7 @@
 #include "smalloc.h"
 #include "util.h"
 #include "util_concurrency.h"
+#include "uuid.h"
 
 using namespace std;  // NOLINT
 
@@ -208,8 +209,6 @@ bool Cipher::Decrypt(
 //------------------------------------------------------------------------------
 
 
-atomic_int64 CipherAes256Cbc::sequence_ = 0;
-
 string CipherAes256Cbc::DoDecrypt(const string &ciphertext, const Key &key) {
   assert(key.size() == kKeySize);
   int retval, retval_2;
@@ -298,22 +297,18 @@ string CipherAes256Cbc::DoEncrypt(const string &plaintext, const Key &key) {
 
 /**
  * The block size of AES-256-CBC happens to be the same of the MD5 digest
- * (128 bits).  Use the HMAC of the key and time + seqno to make it random and
- * unpredictable.
+ * (128 bits).  Use the HMAC of a UUID to make it random and unpredictable.
  */
 shash::Md5 CipherAes256Cbc::GenerateIv(const Key &key) {
-  uint64_t now = time(NULL);
-  struct {
-    uint64_t timestamp;
-    uint64_t seq;
-  } nonce;
-  nonce.timestamp = now;
-  nonce.seq = atomic_xadd64(&sequence_, 1);
+  // The UUID is random but not necessarily cryptographically random.  That
+  // saves the entropy pool.
+  UniquePtr<cvmfs::Uuid> uuid(cvmfs::Uuid::Create(""));
+  assert(uuid.IsValid());
 
+  // Now make it unpredictable, using an HMAC with the encryption key.
   shash::Any hmac(shash::kMd5);
   shash::Hmac(string(reinterpret_cast<const char *>(key.data()), key.size()),
-              reinterpret_cast<const unsigned char *>(&nonce), sizeof(nonce),
-              &hmac);
+              uuid->data(), uuid->size(), &hmac);
   return hmac.CastToMd5();
 }
 
