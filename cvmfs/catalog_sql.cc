@@ -79,7 +79,8 @@ bool CatalogDatabase::LiveSchemaUpgradeIfNecessary() {
   if (IsEqualSchema(schema_version(), 2.5) && (schema_revision() == 0)) {
     LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision (0 --> 1)");
 
-    SqlCatalog sql_upgrade(*this, "ALTER TABLE nested_catalogs ADD size INTEGER;");
+    SqlCatalog sql_upgrade(*this, "ALTER TABLE nested_catalogs "
+                                  "ADD size INTEGER;");
     if (!sql_upgrade.Execute()) {
       LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade nested_catalogs");
       return false;
