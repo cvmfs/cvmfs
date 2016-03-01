@@ -302,8 +302,13 @@ string CipherAes256Cbc::DoEncrypt(const string &plaintext, const Key &key) {
  * unpredictable.
  */
 shash::Md5 CipherAes256Cbc::GenerateIv(const Key &key) {
-  uint64_t timestamp = time(NULL);
-  uint64_t nonce = timestamp + atomic_xadd64(&sequence_, 1);
+  uint64_t now = time(NULL);
+  struct {
+    uint64_t timestamp;
+    uint64_t seq;
+  } nonce;
+  nonce.timestamp = now;
+  nonce.seq = atomic_xadd64(&sequence_, 1);
 
   shash::Any hmac(shash::kMd5);
   shash::Hmac(string(reinterpret_cast<const char *>(key.data()), key.size()),
