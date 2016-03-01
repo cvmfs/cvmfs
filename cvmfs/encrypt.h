@@ -18,7 +18,6 @@
 #include <map>
 #include <string>
 
-#include "atomic.h"
 #include "gtest/gtest_prod.h"
 #include "hash.h"
 #include "util.h"
@@ -132,8 +131,6 @@ class CipherAes256Cbc : public Cipher {
 
  private:
   shash::Md5 GenerateIv(const Key &key);
-
-  static atomic_int64 sequence_;  ///< Used together with time as a nonce
 };
 
 
