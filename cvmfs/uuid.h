@@ -5,6 +5,9 @@
 #ifndef CVMFS_UUID_H_
 #define CVMFS_UUID_H_
 
+#include <inttypes.h>
+#include <uuid/uuid.h>
+
 #include <string>
 
 namespace cvmfs {
@@ -21,12 +24,26 @@ class Uuid {
  public:
   static Uuid *Create(const std::string &store_path);
   static std::string CreateOneTime();
-  std::string uuid() { return uuid_; }
+  std::string uuid() const { return uuid_; }
+  const void *data() const { return &uuid_presentation_.uuid; }
+  unsigned size() const { return sizeof(uuid_presentation_.uuid); }
+
  private:
   void MkUuid();
-  Uuid() : uuid_("") { }
+  Uuid();
 
   std::string uuid_;
+  union {
+    uuid_t uuid;
+    struct __attribute__((__packed__)) {
+      uint32_t a;
+      uint16_t b;
+      uint16_t c;
+      uint16_t d;
+      uint32_t e1;
+      uint16_t e2;
+    } split;
+  } uuid_presentation_;
 };
 
 }  // namespace cvmfs
