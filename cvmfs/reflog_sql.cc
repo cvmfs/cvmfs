@@ -48,11 +48,24 @@ bool ReflogDatabase::InsertInitialValues(const std::string &repo_name) {
 
 //------------------------------------------------------------------------------
 
+#define DB_FIELDS_V1R0  "hash, type, timestamp"
+#define DB_PLACEHOLDERS ":hash, :type, :timestamp"
 
-std::string SqlReflog::db_fields(const ReflogDatabase *database) const {
-  // only one schema revision/version currently... this might change
-  return "hash, type, timestamp";
-}
+#define MAKE_STATEMENT(STMT_TMPL, REV)       \
+static const std::string REV =               \
+    ReplaceAll(                              \
+      ReplaceAll(STMT_TMPL,                  \
+        "@DB_FIELDS@", DB_FIELDS_ ## REV),   \
+      "@DB_PLACEHOLDERS@", DB_PLACEHOLDERS)
+
+#define MAKE_STATEMENTS(STMT_TMPL) \
+  MAKE_STATEMENT(STMT_TMPL, V1R0)
+
+#define DEFERRED_INIT(DB, REV) \
+  DeferredInit((DB)->sqlite_db(), (REV).c_str())
+
+#define DEFERRED_INITS(DB) \
+  DEFERRED_INIT((DB), V1R0)
 
 
 shash::Suffix SqlReflog::ToSuffix(const ReferenceType type) const {
@@ -75,11 +88,9 @@ shash::Suffix SqlReflog::ToSuffix(const ReferenceType type) const {
 
 
 SqlInsertReference::SqlInsertReference(const ReflogDatabase *database) {
-  const std::string stmt =
-    "INSERT OR IGNORE INTO refs (" + db_fields(database) + ") "
-    "VALUES (:hash, :type, :timestamp);";
-  const bool success = Init(database->sqlite_db(), stmt);
-  assert(success);
+  MAKE_STATEMENTS("INSERT OR IGNORE INTO refs (@DB_FIELDS@) "
+                  "VALUES (@DB_PLACEHOLDERS@);");
+  DEFERRED_INITS(database);
 }
 
 bool SqlInsertReference::BindReference(const shash::Any    &reference_hash,
@@ -95,9 +106,7 @@ bool SqlInsertReference::BindReference(const shash::Any    &reference_hash,
 
 
 SqlCountReferences::SqlCountReferences(const ReflogDatabase *database) {
-  const std::string stmt = "SELECT count(*) as count FROM refs;";
-  const bool success = Init(database->sqlite_db(), stmt);
-  assert(success);
+  DeferredInit(database->sqlite_db(), "SELECT count(*) as count FROM refs;");
 }
 
 uint64_t SqlCountReferences::RetrieveCount() {
@@ -109,10 +118,9 @@ uint64_t SqlCountReferences::RetrieveCount() {
 
 
 SqlListReferences::SqlListReferences(const ReflogDatabase *database) {
-  const std::string stmt = "SELECT hash, type FROM refs WHERE type = :type "
-                           "ORDER BY timestamp ASC;";
-  const bool success = Init(database->sqlite_db(), stmt);
-  assert(success);
+  DeferredInit(database->sqlite_db(), "SELECT hash, type FROM refs "
+                                      "WHERE type = :type "
+                                      "ORDER BY timestamp ASC;");
 }
 
 bool SqlListReferences::BindType(const ReferenceType type) {
@@ -130,10 +138,8 @@ shash::Any SqlListReferences::RetrieveHash() const {
 
 
 SqlRemoveReference::SqlRemoveReference(const ReflogDatabase *database) {
-  const std::string stmt = "DELETE FROM refs WHERE hash = :hash "
-                                              "AND type = :type;";
-  const bool success = Init(database->sqlite_db(), stmt);
-  assert(success);
+  DeferredInit(database->sqlite_db(), "DELETE FROM refs WHERE hash = :hash "
+                                      "AND type = :type;");
 }
 
 bool SqlRemoveReference::BindReference(const shash::Any    &reference_hash,
