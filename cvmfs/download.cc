@@ -178,6 +178,7 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
 
   // Check http status codes
   if (HasPrefix(header_line, "HTTP/", false)) {
+    // example: "HTTP/2.0 200", with 12 characters
     if (header_line.length() < 12) {
       return 0;
     }
@@ -1521,7 +1522,11 @@ void DownloadManager::Init(const unsigned max_pool_handles,
   curl_multi_setopt(curl_multi_, CURLMOPT_MAXCONNECTS, watch_fds_max_);
   curl_multi_setopt(curl_multi_, CURLMOPT_MAX_TOTAL_CONNECTIONS,
                     pool_max_handles_);
+
+#ifdef CURL_VERSION_HTTP2
   curl_multi_setopt(curl_multi_, CURLMOPT_PIPELINING, CURLPIPE_MULTIPLEX);
+  curl_multi_setopt(curl_multi_, CURLMOPT_MAX_HOST_CONNECTIONS, 1);
+#endif
 
   prng_.InitLocaltime();
 
