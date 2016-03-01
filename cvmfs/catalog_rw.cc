@@ -62,19 +62,17 @@ WritableCatalog::~WritableCatalog() {
 
 
 void WritableCatalog::Transaction() {
-  Sql transaction(database(), "BEGIN;");
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "opening SQLite transaction for '%s'",
                                         path().c_str());
-  bool retval = transaction.Execute();
+  const bool retval = database().BeginTransaction();
   assert(retval == true);
 }
 
 
 void WritableCatalog::Commit() {
-  Sql commit(database(), "COMMIT;");
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "closing SQLite transaction for '%s'",
                                         path().c_str());
-  bool retval = commit.Execute();
+  const bool retval = database().CommitTransaction();
   assert(retval == true);
   dirty_ = false;
 }
@@ -83,7 +81,7 @@ void WritableCatalog::Commit() {
 void WritableCatalog::InitPreparedStatements() {
   Catalog::InitPreparedStatements();  // polymorphism: up call
 
-  bool retval = Sql(database(), "PRAGMA foreign_keys = ON;").Execute();
+  bool retval = SqlCatalog(database(), "PRAGMA foreign_keys = ON;").Execute();
   assert(retval);
   sql_insert_        = new SqlDirentInsert     (database());
   sql_unlink_        = new SqlDirentUnlink     (database());
@@ -482,8 +480,8 @@ void WritableCatalog::InsertNestedCatalog(const string &mountpoint,
   const string hash_string = (!content_hash.IsNull()) ?
                              content_hash.ToString() : "";
 
-  Sql stmt(database(), "INSERT INTO nested_catalogs (path, sha1, size) "
-                       "VALUES (:p, :sha1, :size);");
+  SqlCatalog stmt(database(), "INSERT INTO nested_catalogs (path, sha1, size) "
+                              "VALUES (:p, :sha1, :size);");
   bool retval =
     stmt.BindText(1, mountpoint) &&
     stmt.BindText(2, hash_string) &&
@@ -520,8 +518,8 @@ void WritableCatalog::RemoveNestedCatalog(const string &mountpoint,
                            &dummy, &dummy_size);
   assert(retval);
 
-  Sql stmt(database(),
-           "DELETE FROM nested_catalogs WHERE path = :p;");
+  SqlCatalog stmt(database(),
+                  "DELETE FROM nested_catalogs WHERE path = :p;");
   retval =
     stmt.BindText(1, mountpoint) &&
     stmt.Execute();
@@ -553,8 +551,8 @@ void WritableCatalog::UpdateNestedCatalog(const string &path,
 {
   const string hash_str = hash.ToString();
   const string sql = "UPDATE nested_catalogs SET sha1 = :sha1, size = :size  "
-    "WHERE path = :path;";
-  Sql stmt(database(), sql);
+                     "WHERE path = :path;";
+  SqlCatalog stmt(database(), sql);
 
   bool retval =
     stmt.BindText(1, hash_str) &&
@@ -627,7 +625,7 @@ void WritableCatalog::CopyToParent() {
     "UPDATE catalog SET hardlinks = hardlinks + " + StringifyInt(offset) +
     " WHERE hardlinks > (1 << 32);";
 
-  Sql sql_update_link_ids(database(), update_link_ids);
+  SqlCatalog sql_update_link_ids(database(), update_link_ids);
   bool retval = sql_update_link_ids.Execute();
   assert(retval);
 
@@ -641,17 +639,17 @@ void WritableCatalog::CopyToParent() {
     Commit();
   if (parent->dirty_)
     parent->Commit();
-  Sql sql_attach(database(), "ATTACH '" + parent->database_path() +
-                             "' AS other;");
+  SqlCatalog sql_attach(database(), "ATTACH '" + parent->database_path() + "' "
+                                    "AS other;");
   retval = sql_attach.Execute();
   assert(retval);
-  retval = Sql(database(), "INSERT INTO other.catalog "
-                           "SELECT * FROM main.catalog;").Execute();
+  retval = SqlCatalog(database(), "INSERT INTO other.catalog "
+                                  "SELECT * FROM main.catalog;").Execute();
   assert(retval);
-  retval = Sql(database(), "INSERT INTO other.chunks "
-                           "SELECT * FROM main.chunks;").Execute();
+  retval = SqlCatalog(database(), "INSERT INTO other.chunks "
+                                  "SELECT * FROM main.chunks;").Execute();
   assert(retval);
-  retval = Sql(database(), "DETACH other;").Execute();
+  retval = SqlCatalog(database(), "DETACH other;").Execute();
   assert(retval);
   parent->SetDirty();
 
