@@ -1,4 +1,5 @@
 2.3.0:
+  * Add .cvmfsreflog for garbage collection
   * Omit S3 bucket number if only a single bucket is used
   * Warn when forcfully remounting the file system stack on the server, new
     parameter CVMFS_FORCE_REMOUNT_WARNING
