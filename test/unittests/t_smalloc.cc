@@ -85,10 +85,6 @@ TEST(T_Smalloc, Xmmap) {
   EXPECT_TRUE(mem != NULL);
   sxunmap(mem, 8192);
   mem = NULL;
-
-  mem = sxmmap(1);
-  ASSERT_DEATH(sxunmap(mem, 8192), ".*");
-  sxunmap(mem, 1);
 }
 
 
