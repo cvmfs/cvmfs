@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-#include <malloc.h>
+// #include <malloc.h> for malloc_usable_size
 
 #include <cstdlib>
 #include <cstring>
