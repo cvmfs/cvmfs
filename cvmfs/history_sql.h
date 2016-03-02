@@ -54,21 +54,7 @@ class HistoryDatabase : public sqlite::Database<HistoryDatabase> {
 //------------------------------------------------------------------------------
 
 
-class SqlHistory : public sqlite::Sql {
- protected:
-  const std::string& db_fields(const HistoryDatabase *database) const {
-    if (database->IsEqualSchema(database->schema_version(), 1.0f) &&
-        database->schema_revision() == 0) {
-      return db_fields_v1r0;
-    } else {
-      return db_fields_v1r1;
-    }
-  }
-
- private:
-  static const std::string db_fields_v1r0;
-  static const std::string db_fields_v1r1;
-};
+class SqlHistory : public sqlite::Sql {};
 
 
 /**

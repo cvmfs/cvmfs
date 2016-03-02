@@ -49,7 +49,6 @@ class SqlReflog : public sqlite::Sql {
   };
 
  protected:
-  std::string db_fields(const ReflogDatabase *database) const;
   shash::Suffix ToSuffix(const ReferenceType type) const;
 };
 
