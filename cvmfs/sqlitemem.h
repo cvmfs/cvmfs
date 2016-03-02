@@ -275,6 +275,18 @@ class MemoryManager {
 
   pthread_mutex_t *lock_;
 
+  /**
+   * True if AssignGlobalArenas was called and the memory manager is used by
+   * sqlite.
+   */
+  bool assigned_;
+
+  /**
+   * The standard memory allocator used by sqlite3.  Saved in order to reset on
+   * destruction.
+   */
+  struct sqlite3_mem_methods sqlite3_mem_vanilla_;
+
   struct sqlite3_mem_methods mem_methods_;
   void *scratch_memory_;
   void *page_cache_memory_;

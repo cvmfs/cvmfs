@@ -308,6 +308,7 @@ void MemoryManager::xShutdown(void *app_data __attribute__((unused))) {
 
 
 void MemoryManager::AssignGlobalArenas() {
+  if (assigned_) return;
   int retval;
 
   retval = sqlite3_config(SQLITE_CONFIG_SCRATCH, scratch_memory_,
@@ -318,8 +319,12 @@ void MemoryManager::AssignGlobalArenas() {
                           kPageCacheSlotSize, kPageCacheNoSlots);
   assert(retval == SQLITE_OK);
 
+  retval = sqlite3_config(SQLITE_CONFIG_GETMALLOC, &sqlite3_mem_vanilla_);
+  assert(retval == SQLITE_OK);
   retval = sqlite3_config(SQLITE_CONFIG_MALLOC, &mem_methods_);
   assert(retval == SQLITE_OK);
+
+  assigned_ = true;
 }
 
 
@@ -397,10 +402,13 @@ void *MemoryManager::GetMemory(int size) {
 
 
 MemoryManager::MemoryManager()
-  : scratch_memory_(sxmmap(kScratchSize))
+  : assigned_(false)
+  , scratch_memory_(sxmmap(kScratchSize))
   , page_cache_memory_(sxmmap(kPageCacheSize))
   , idx_last_arena_(0)
 {
+  memset(&sqlite3_mem_vanilla_, 0, sizeof(sqlite3_mem_vanilla_));
+
   lock_ =
     reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   int retval = pthread_mutex_init(lock_, NULL);
@@ -425,6 +433,17 @@ MemoryManager::MemoryManager()
  * Must be executed only after sqlite3_shutdown.
  */
 MemoryManager::~MemoryManager() {
+  if (assigned_) {
+    // Reset sqlite to default values
+    int retval;
+    retval = sqlite3_config(SQLITE_CONFIG_SCRATCH, NULL, 0, 0);
+    assert(retval == SQLITE_OK);
+    retval = sqlite3_config(SQLITE_CONFIG_PAGECACHE, NULL, 0, 0);
+    assert(retval == SQLITE_OK);
+    retval = sqlite3_config(SQLITE_CONFIG_MALLOC, &sqlite3_mem_vanilla_);
+    assert(retval == SQLITE_OK);
+  }
+
   sxunmap(scratch_memory_, kScratchSize);
   sxunmap(page_cache_memory_, kPageCacheSize);
   for (unsigned i = 0; i < lookaside_buffer_arenas_.size(); ++i)
