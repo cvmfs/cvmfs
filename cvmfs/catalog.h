@@ -231,7 +231,6 @@ class Catalog : public SingleCopy {
   }
 
   virtual void InitPreparedStatements();
-  void FinalizePreparedStatements();
 
   void AddChild(Catalog *child);
   void RemoveChild(Catalog *child);
@@ -278,10 +277,6 @@ class Catalog : public SingleCopy {
       if (ref_ == NULL)
         ref_ = new SqlT(database);
       return ref_;
-    }
-    inline void Free() {
-      delete ref_;
-      ref_ = NULL;
     }
 
    private:
