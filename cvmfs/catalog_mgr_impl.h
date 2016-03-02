@@ -11,8 +11,6 @@
 
 #include "cvmfs_config.h"
 
-#include "catalog_mgr.h"
-
 #include <cassert>
 #include <string>
 

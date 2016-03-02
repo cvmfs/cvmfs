@@ -51,12 +51,13 @@ class FileChunk {
 typedef BigVector<FileChunk> FileChunkList;
 
 struct FileChunkReflist {
-  FileChunkReflist() : list(NULL) { }
-  FileChunkReflist(
-    FileChunkList *l,
-    const PathString &p,
-    zlib::Algorithms alg,
-    bool external)
+  FileChunkReflist() : list(NULL)
+                     , compression_alg(zlib::kZlibDefault)
+                     , external_data(false) { }
+  FileChunkReflist(FileChunkList     *l,
+                   const PathString  &p,
+                   zlib::Algorithms   alg,
+                   bool               external)
     : list(l)
     , path(p)
     , compression_alg(alg)
@@ -64,10 +65,10 @@ struct FileChunkReflist {
 
   unsigned FindChunkIdx(const uint64_t offset);
 
-  FileChunkList *list;
-  PathString path;
-  zlib::Algorithms compression_alg;
-  bool external_data;
+  FileChunkList     *list;
+  PathString         path;
+  zlib::Algorithms   compression_alg;
+  bool               external_data;
 };
 
 
