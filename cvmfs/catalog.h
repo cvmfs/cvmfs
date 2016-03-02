@@ -267,20 +267,20 @@ class Catalog : public SingleCopy {
    * Only allocate the object if it is actually used.  Not all SQlite statements
    * are required in all use cases, and they consume a few kB per database.
    */
-  template <class SqlT>
+  template <class TSql>
   class LazySqlPtr : SingleCopy {
    public:
     inline LazySqlPtr() : ref_(NULL) {}
     inline ~LazySqlPtr() { delete ref_; }
     inline bool IsAlive() const { return ref_ != NULL; }
-    inline SqlT *GetPtr(const CatalogDatabase &database) const {
+    inline TSql *GetPtr(const CatalogDatabase &database) const {
       if (ref_ == NULL)
-        ref_ = new SqlT(database);
+        ref_ = new TSql(database);
       return ref_;
     }
 
    private:
-    mutable SqlT *ref_;
+    mutable TSql *ref_;
   };
 
   bool LookupEntry(const shash::Md5 &md5path, const bool expand_symlink,
