@@ -37,7 +37,8 @@ const unsigned kSqliteMemPerThread = 1*1024*1024;
  */
 enum LookupOptions {
   kLookupSole        = 0x01,
-  kLookupRawSymlink  = 0x02,
+  // kLookupFull        = 0x02  not used anymore
+  kLookupRawSymlink  = 0x10,
 };
 
 
