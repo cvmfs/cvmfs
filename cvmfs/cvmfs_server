@@ -1649,9 +1649,9 @@ create_whitelist() {
 
 
 get_expiry_from_string() {
-  local whitelist_string="$1"
+  local whitelist="$1"
 
-  local expires=$(echo "$whitelist_string" | grep -e '^E[0-9]\{14\}$' | tr -d E)
+  local expires=$(echo "$whitelist" | grep --text -e '^E[0-9]\{14\}$' | tr -d E)
   if echo "$expires" | grep -q -E --invert-match '^[0-9]{14}$'; then
     echo -1
     return 1
