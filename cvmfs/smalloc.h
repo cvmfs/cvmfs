@@ -53,10 +53,16 @@ static inline void * __attribute__((used)) smmap(size_t size) {
   assert(size > 0);
   assert(size < std::numeric_limits<size_t>::max() - 4096);
 
+  const int anonymous_fd = -1;
+  const off_t offset = 0;
   size_t pages = ((size + 2*sizeof(size_t))+4095)/4096;  // round to full page
-  unsigned char *mem =
-    static_cast<unsigned char *>(mmap(NULL, pages*4096, PROT_READ | PROT_WRITE,
-                                 MAP_PRIVATE | PLATFORM_MAP_ANONYMOUS, -1, 0));
+  unsigned char *mem = static_cast<unsigned char *>(
+    mmap(NULL,
+         pages*4096,
+         PROT_READ | PROT_WRITE,
+         MAP_PRIVATE | PLATFORM_MAP_ANONYMOUS,
+         anonymous_fd,
+         offset));
   // printf("SMMAP %d bytes at %p\n", pages*4096, mem);
   assert((mem != MAP_FAILED) && "Out Of Memory");
   *(reinterpret_cast<size_t *>(mem)) = kMemMarker;
@@ -78,8 +84,14 @@ static inline void __attribute__((used)) smunmap(void *mem) {
  * Used when the caller remembers the size, so that it can call sxunmap later.
  */
 static inline void * __attribute__((used)) sxmmap(size_t size) {
-  void *mem = mmap(NULL, size, PROT_READ | PROT_WRITE,
-                   MAP_PRIVATE | PLATFORM_MAP_ANONYMOUS, -1, 0);
+  const int anonymous_fd = -1;
+  const off_t offset = 0;
+  void *mem = mmap(NULL,
+                   size,
+                   PROT_READ | PROT_WRITE,
+                   MAP_PRIVATE | PLATFORM_MAP_ANONYMOUS,
+                   anonymous_fd,
+                   offset);
   assert((mem != MAP_FAILED) && "Out Of Memory");
   return mem;
 }
