@@ -138,8 +138,8 @@ class MemoryManager {
         return reinterpret_cast<char *>(this) - base;
       }
       int32_t size;  // always positive
-      int32_t link_next;
-      int32_t link_prev;
+      int32_t link_next;  // offset in the arena; saves 4 bytes on 64bit archs
+      int32_t link_prev;  // offset in the arena; saves 4 bytes on 64bit archs
     };
 
     /**
@@ -185,7 +185,7 @@ class MemoryManager {
 
 
   /**
-   * A continues chunk of memory from which fixed-sized chunks are given as
+   * A continuous chunk of memory from which fixed-sized chunks are given as
    * lookaside buffers to SQlite database connections.  A bitmap indicates used
    * and free buffers.
    * One arena serves 128 database connections and assuming less than 10000
