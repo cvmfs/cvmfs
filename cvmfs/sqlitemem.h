@@ -245,7 +245,7 @@ class MemoryManager {
   ~MemoryManager();
 
   void AssignGlobalArenas();
-  void *AssignLookasideBuffer(void *db);
+  void *AssignLookasideBuffer(sqlite3 *db);
   void ReleaseLookasideBuffer(void *buffer);
 
  private:

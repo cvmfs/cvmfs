@@ -332,13 +332,12 @@ void MemoryManager::AssignGlobalArenas() {
  * Needs to be the first operation on an opened sqlite database.  Returns the
  * location of the buffer.
  */
-void *MemoryManager::AssignLookasideBuffer(void *db) {
+void *MemoryManager::AssignLookasideBuffer(sqlite3 *db) {
   MutexLockGuard lock_guard(lock_);
 
-  sqlite3 *sqlite_db = reinterpret_cast<sqlite3 *>(db);
   void *buffer = GetLookasideBuffer();
   assert(buffer != NULL);
-  int retval = sqlite3_db_config(sqlite_db, SQLITE_DBCONFIG_LOOKASIDE,
+  int retval = sqlite3_db_config(db, SQLITE_DBCONFIG_LOOKASIDE,
     buffer, kLookasideSlotSize, kLookasideSlotsPerDb);
   assert(retval == SQLITE_OK);
   return buffer;
