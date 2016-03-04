@@ -1,4 +1,5 @@
 2.3.0:
+  * Call cvmfs_suid_helper with a clean environment from cvmfs_server
   * Add .cvmfsreflog for garbage collection
   * Omit S3 bucket number if only a single bucket is used
   * Warn when forcfully remounting the file system stack on the server, new
