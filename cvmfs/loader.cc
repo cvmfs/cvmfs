@@ -442,6 +442,25 @@ static void SetFuseOperations(struct fuse_lowlevel_ops *loader_operations) {
 }
 
 
+static void *OpenLibrary(const string &path) {
+  return dlopen(path.c_str(), RTLD_NOW | RTLD_LOCAL);
+}
+
+
+static void CloseLibrary() {
+#ifdef HAS_VALGRIND_HEADERS
+  // If the libcvmfs_fuse library is unloaded, valgrind can't resolve the
+  // symbols anymore.  We skip under valgrind.
+  if (!RUNNING_ON_VALGRIND) {
+#endif
+    dlclose(library_handle_);
+    library_handle_ = NULL;
+#ifdef HAS_VALGRIND_HEADERS
+  }
+#endif
+}
+
+
 static CvmfsExports *LoadLibrary(const bool debug_mode,
                                  LoaderExports *loader_exports)
 {
@@ -464,7 +483,7 @@ static CvmfsExports *LoadLibrary(const bool debug_mode,
   vector<string>::const_iterator i    = library_paths.begin();
   vector<string>::const_iterator iend = library_paths.end();
   for (; i != iend; ++i) {  // TODO(rmeusel): C++11 range based for
-    library_handle_ = dlopen((*i).c_str(), RTLD_NOW | RTLD_LOCAL);
+    library_handle_ = OpenLibrary(*i);
     if (library_handle_ != NULL) {
       break;
     }
@@ -492,19 +511,6 @@ static CvmfsExports *LoadLibrary(const bool debug_mode,
   }
 
   return *exports_ptr;
-}
-
-static void CloseLibrary() {
-#ifdef HAS_VALGRIND_HEADERS
-  // If the libcvmfs_fuse library is unloaded, valgrind can't resolve the
-  // symbols anymore.  We skip under valgrind.
-  if (!RUNNING_ON_VALGRIND) {
-#endif
-    dlclose(library_handle_);
-    library_handle_ = NULL;
-#ifdef HAS_VALGRIND_HEADERS
-  }
-#endif
 }
 
 
