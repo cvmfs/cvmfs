@@ -4,8 +4,6 @@
 
 #include <gtest/gtest.h>
 
-// #include <malloc.h> for malloc_usable_size
-
 #include <cstdlib>
 #include <cstring>
 #include <map>
@@ -25,7 +23,7 @@ class T_Sqlitemem : public ::testing::Test {
   virtual void SetUp() {
     EXPECT_FALSE(MemoryManager::HasInstance());
     mem_mgr_ = MemoryManager::GetInstance();
-    EXPECT_TRUE(MemoryManager::HasInstance());
+    ASSERT_TRUE(MemoryManager::HasInstance());
   }
 
   virtual void TearDown() {
