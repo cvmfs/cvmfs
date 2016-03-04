@@ -137,11 +137,6 @@ bool Database<DerivedT>::OpenDatabase(const int flags) {
     return false;
   }
 
-  if (!read_write_ && MemoryManager::HasInstance()) {
-    database_.lookaside_buffer =
-      MemoryManager::GetInstance()->AssignLookasideBuffer(sqlite_db());
-  }
-
   const int retval = sqlite3_extended_result_codes(sqlite_db(), 1);
   assert(SQLITE_OK == retval);
 
@@ -196,8 +191,14 @@ template <class DerivedT>
 bool Database<DerivedT>::Configure() {
   // Read-only databases should store temporary files in memory.  This avoids
   // unexpected open read-write file descriptors in the cache directory like
-  // etilqs_<number>.
+  // etilqs_<number>.  They also use the optimized memory manager, if it is
+  // available.
   if (!read_write_) {
+    if (MemoryManager::HasInstance()) {
+      database_.lookaside_buffer =
+        MemoryManager::GetInstance()->AssignLookasideBuffer(sqlite_db());
+    }
+    
     return Sql(sqlite_db() , "PRAGMA temp_store=2;").Execute() &&
            Sql(sqlite_db() , "PRAGMA locking_mode=EXCLUSIVE;").Execute();
   }
