@@ -408,10 +408,7 @@ MemoryManager::MemoryManager()
   , idx_last_arena_(0)
 {
   memset(&sqlite3_mem_vanilla_, 0, sizeof(sqlite3_mem_vanilla_));
-
-  lock_ =
-    reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
-  int retval = pthread_mutex_init(lock_, NULL);
+  int retval = pthread_mutex_init(&lock_, NULL);
   assert(retval == 0);
 
   lookaside_buffer_arenas_.push_back(new LookasideBufferArena());
@@ -450,8 +447,7 @@ MemoryManager::~MemoryManager() {
     delete lookaside_buffer_arenas_[i];
   for (unsigned i = 0; i < malloc_arenas_.size(); ++i)
     delete malloc_arenas_[i];
-  pthread_mutex_destroy(lock_);
-  free(lock_);
+  pthread_mutex_destroy(&lock_);
 }
 
 

@@ -273,7 +273,7 @@ class MemoryManager {
   void PutMemory(void *ptr);
   int GetMemorySize(void *ptr);
 
-  pthread_mutex_t *lock_;
+  pthread_mutex_t lock_;
 
   /**
    * True if AssignGlobalArenas was called and the memory manager is used by
