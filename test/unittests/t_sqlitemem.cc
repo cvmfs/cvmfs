@@ -16,19 +16,17 @@
 
 using namespace std;  // NOLINT
 
-namespace sqlite {
-
 class T_Sqlitemem : public ::testing::Test {
  protected:
   virtual void SetUp() {
-    EXPECT_FALSE(MemoryManager::HasInstance());
-    mem_mgr_ = MemoryManager::GetInstance();
-    ASSERT_TRUE(MemoryManager::HasInstance());
+    EXPECT_FALSE(SqliteMemoryManager::HasInstance());
+    mem_mgr_ = SqliteMemoryManager::GetInstance();
+    ASSERT_TRUE(SqliteMemoryManager::HasInstance());
   }
 
   virtual void TearDown() {
-    MemoryManager::CleanupInstance();
-    EXPECT_FALSE(MemoryManager::HasInstance());
+    SqliteMemoryManager::CleanupInstance();
+    EXPECT_FALSE(SqliteMemoryManager::HasInstance());
   }
 
   uint32_t MemChecksum(void *p, uint32_t size) {
@@ -43,7 +41,7 @@ class T_Sqlitemem : public ::testing::Test {
   }
 
   uint32_t SimulateMalloc(unsigned N, unsigned S_max, unsigned T_max) {
-    MemoryManager::MallocArena M;
+    SqliteMemoryManager::MallocArena M;
     Prng prng;
     prng.InitLocaltime();
     // prng.InitSeed(42);
@@ -102,12 +100,12 @@ class T_Sqlitemem : public ::testing::Test {
     return total_alloc;
   }
 
-  MemoryManager *mem_mgr_;
+  SqliteMemoryManager *mem_mgr_;
 };
 
 
 TEST_F(T_Sqlitemem, LookasideBufferArena) {
-  MemoryManager::LookasideBufferArena la_arena;
+  SqliteMemoryManager::LookasideBufferArena la_arena;
   EXPECT_TRUE(la_arena.IsEmpty());
 
   void *buffer = la_arena.GetBuffer();
@@ -116,16 +114,16 @@ TEST_F(T_Sqlitemem, LookasideBufferArena) {
   EXPECT_FALSE(la_arena.Contains(reinterpret_cast<char *>(buffer) - 1));
   EXPECT_FALSE(la_arena.Contains(
     reinterpret_cast<char *>(buffer) +
-    MemoryManager::LookasideBufferArena::kArenaSize));
+    SqliteMemoryManager::LookasideBufferArena::kArenaSize));
   EXPECT_TRUE(la_arena.Contains(
     reinterpret_cast<char *>(buffer) +
-    MemoryManager::LookasideBufferArena::kArenaSize) - 1);
+    SqliteMemoryManager::LookasideBufferArena::kArenaSize) - 1);
   EXPECT_FALSE(la_arena.IsEmpty());
   la_arena.PutBuffer(buffer);
   EXPECT_TRUE(la_arena.IsEmpty());
 
   // Allocate everything sequentially
-  unsigned N = MemoryManager::LookasideBufferArena::kBuffersPerArena;
+  unsigned N = SqliteMemoryManager::LookasideBufferArena::kBuffersPerArena;
   void *buffer_multi[N];
   for (unsigned i = 0; i < N; ++i) {
     buffer_multi[i] = la_arena.GetBuffer();
@@ -163,7 +161,7 @@ TEST_F(T_Sqlitemem, LookasideBufferArena) {
 
 
 TEST_F(T_Sqlitemem, LookasideBuffer) {
-  unsigned N = MemoryManager::LookasideBufferArena::kBuffersPerArena;
+  unsigned N = SqliteMemoryManager::LookasideBufferArena::kBuffersPerArena;
   void *buffer_multi[N + 1];
   for (unsigned i = 0; i < N; ++i) {
     buffer_multi[i] = mem_mgr_->GetLookasideBuffer();
@@ -186,7 +184,7 @@ TEST_F(T_Sqlitemem, LookasideBuffer) {
 
 
 TEST_F(T_Sqlitemem, MallocArena) {
-  MemoryManager::MallocArena M;
+  SqliteMemoryManager::MallocArena M;
 
   EXPECT_TRUE(M.IsEmpty());
 
@@ -237,7 +235,8 @@ TEST_F(T_Sqlitemem, Malloc) {
   EXPECT_EQ(1U, mem_mgr_->malloc_arenas_.size());
   void *p[4];
   for (unsigned i = 0; i < 4; ++i) {
-    p[i] = mem_mgr_->GetMemory(MemoryManager::MallocArena::kArenaSize / 4);
+    p[i] = mem_mgr_->GetMemory(
+      SqliteMemoryManager::MallocArena::kArenaSize / 4);
   }
   EXPECT_EQ(2U, mem_mgr_->malloc_arenas_.size());
   mem_mgr_->PutMemory(p[3]);
@@ -247,6 +246,3 @@ TEST_F(T_Sqlitemem, Malloc) {
   mem_mgr_->PutMemory(p[0]);
   EXPECT_EQ(1U, mem_mgr_->malloc_arenas_.size());
 }
-
-
-}  // namespace sqlite

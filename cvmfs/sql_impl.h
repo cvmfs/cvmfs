@@ -180,7 +180,8 @@ bool Database<DerivedT>::DatabaseRaiiWrapper::Close() {
 
   sqlite_db = NULL;
   if (lookaside_buffer != NULL) {
-    MemoryManager::GetInstance()->ReleaseLookasideBuffer(lookaside_buffer);
+    SqliteMemoryManager::GetInstance()->ReleaseLookasideBuffer(
+      lookaside_buffer);
     lookaside_buffer = NULL;
   }
   return true;
@@ -194,11 +195,11 @@ bool Database<DerivedT>::Configure() {
   // etilqs_<number>.  They also use the optimized memory manager, if it is
   // available.
   if (!read_write_) {
-    if (MemoryManager::HasInstance()) {
+    if (SqliteMemoryManager::HasInstance()) {
       database_.lookaside_buffer =
-        MemoryManager::GetInstance()->AssignLookasideBuffer(sqlite_db());
+        SqliteMemoryManager::GetInstance()->AssignLookasideBuffer(sqlite_db());
     }
-    
+
     return Sql(sqlite_db() , "PRAGMA temp_store=2;").Execute() &&
            Sql(sqlite_db() , "PRAGMA locking_mode=EXCLUSIVE;").Execute();
   }

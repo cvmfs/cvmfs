@@ -2346,7 +2346,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   assert(retval == SQLITE_OK);
   retval = sqlite3_config(SQLITE_CONFIG_MULTITHREAD);
   assert(retval == SQLITE_OK);
-  sqlite::MemoryManager::GetInstance()->AssignGlobalArenas();
+  SqliteMemoryManager::GetInstance()->AssignGlobalArenas();
 
   // Disable SQlite3 locks
   retval = sqlite3_vfs_register(sqlite3_vfs_find("unix-none"), 1);
@@ -3058,7 +3058,7 @@ static void Fini() {
     sqlite3_temp_directory = NULL;
   }
   sqlite3_shutdown();
-  sqlite::MemoryManager::CleanupInstance();
+  SqliteMemoryManager::CleanupInstance();
 
   if (g_monitor_ready) monitor::Fini();
 

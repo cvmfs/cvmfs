@@ -15,8 +15,6 @@
 #include "duplex_sqlite3.h"
 #include "gtest/gtest_prod.h"
 
-namespace sqlite {
-
 /**
  * The MemoryManager uses the sqlite hooks to optimize memory allocations.  It
  * is tuned for reading the cvmfs file catalogs.  It provides a page cache of
@@ -33,7 +31,7 @@ namespace sqlite {
  * lookaside buffers (see sql.h).  Assignment of lookaside buffers is
  * thread-safe.
  */
-class MemoryManager {
+class SqliteMemoryManager {
   FRIEND_TEST(T_Sqlitemem, LookasideBuffer);
   FRIEND_TEST(T_Sqlitemem, Malloc);
 
@@ -235,21 +233,21 @@ class MemoryManager {
   };
 
 
-  static MemoryManager *GetInstance() {
+  static SqliteMemoryManager *GetInstance() {
     if (instance_ == NULL)
-      instance_ = new MemoryManager();
+      instance_ = new SqliteMemoryManager();
     return instance_;
   }
   static void CleanupInstance();
   static bool HasInstance() { return instance_ != NULL; }
-  ~MemoryManager();
+  ~SqliteMemoryManager();
 
   void AssignGlobalArenas();
   void *AssignLookasideBuffer(sqlite3 *db);
   void ReleaseLookasideBuffer(void *buffer);
 
  private:
-  static MemoryManager *instance_;
+  static SqliteMemoryManager *instance_;
 
   /**
    * SQlite memory callbacks need to be static because they are referenced by
@@ -264,7 +262,7 @@ class MemoryManager {
   static void xShutdown(void *app_data);
 
 
-  MemoryManager();
+  SqliteMemoryManager();
 
   void *GetLookasideBuffer();
   void PutLookasideBuffer(void *buffer);
@@ -296,8 +294,6 @@ class MemoryManager {
    * Where the last successful allocation took place.
    */
   unsigned idx_last_arena_;
-};
-
-}  // namespace sqlite
+};  // class SqliteMemoryManager
 
 #endif  // CVMFS_SQLITEMEM_H_

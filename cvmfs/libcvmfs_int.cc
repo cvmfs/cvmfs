@@ -144,7 +144,7 @@ cvmfs_globals::~cvmfs_globals() {
   }
 
   sqlite3_shutdown();
-  sqlite::MemoryManager::CleanupInstance();
+  SqliteMemoryManager::CleanupInstance();
   delete statistics_;
 
   ClientCtx::CleanupInstance();
@@ -165,7 +165,7 @@ int cvmfs_globals::Setup(const options &opts) {
   // Tune SQlite3
   retval = sqlite3_config(SQLITE_CONFIG_MULTITHREAD);
   assert(retval == SQLITE_OK);
-  sqlite::MemoryManager::GetInstance()->AssignGlobalArenas();
+  SqliteMemoryManager::GetInstance()->AssignGlobalArenas();
 
   // Libcrypto
   libcrypto_locks_ = static_cast<pthread_mutex_t *>(OPENSSL_malloc(
