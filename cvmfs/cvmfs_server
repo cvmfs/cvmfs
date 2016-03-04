@@ -2330,7 +2330,7 @@ If you go for production, backup you software signing keys in /etc/cvmfs/keys/!"
 
 generate_lsof_report_for_mountpoint() {
   local mountpoint="$1"
-  lsof | grep $mountpoint | awk '{print $1,$2,$3,$NF}' | column -t || true
+  lsof "$mountpoint" | awk '{print $1,$2,$3,$NF}' | column -t || true
 }
 
 
