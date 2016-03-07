@@ -216,9 +216,12 @@ set (CVMFS_SWISSKNIFE_SOURCES
 
 if (VOMS_FOUND)
   set (CVMFS_SWISSKNIFE_SOURCES ${CVMFS_SWISSKNIFE_SOURCES}
+       voms_authz/loader_helper.cc
+       voms_authz/voms_lib.cc
        voms_authz/voms_cred.cc
        voms_authz/voms_authz.h
-       voms_authz/voms_curl.cc)
+       voms_authz/voms_curl.cc
+      )
 endif (VOMS_FOUND)
 
 

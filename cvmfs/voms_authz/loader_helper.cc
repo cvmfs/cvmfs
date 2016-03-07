@@ -31,34 +31,3 @@ CloseDynLib(void **handle, const char *name) {
   }
   *handle = NULL;
 }
-
-
-template<typename T>
-bool LoadSymbol(void *lib_handle, T *sym, const char *name) {
-  if (!sym) {return false;}
-  *sym = reinterpret_cast<typeof(T)>(dlsym(lib_handle, name));
-  if (!(*sym)) {
-    LogCvmfs(kLogVoms, kLogDebug, "Failed to load %s: %s", name, dlerror());
-  }
-  return *sym;
-}
-
-struct vomsdata;
-struct x509_st;
-struct stack_st_X509;
-template bool LoadSymbol<vomsdata* (*)(char*, char*)>(
-                        void*, vomsdata* (**)(char*, char*), char const*);
-template bool LoadSymbol<void (*)(vomsdata*)>(void*, void (**)(vomsdata*),
-                        char const*);
-template bool LoadSymbol<int (*)(x509_st*, stack_st_X509*, int, vomsdata*,
-                         int*)>
-                        (void*,
-                         int (**)(x509_st*, stack_st_X509*, int, vomsdata*,
-                                 int*),
-                         char const*);
-template bool LoadSymbol<char* (*)(vomsdata*, int, char*, int)>(void*,
-                        char* (**)(vomsdata*, int, char*, int), char const*);
-template bool LoadSymbol<int (*)(char**, int*, vomsdata*, int*)>(void*,
-                        int (**)(char**, int*, vomsdata*, int*), char const*);
-template bool LoadSymbol<int (*)(char*, int, vomsdata*, int*)>(void*,
-                        int (**)(char*, int, vomsdata*, int*), char const*);

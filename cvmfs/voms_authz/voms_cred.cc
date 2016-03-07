@@ -266,16 +266,16 @@ struct ProxyHelper {
     memset(&msg_recv, '\0', sizeof(msg_recv));
     command = 0;
     int result = 0;
-    size_t dn = 0;
-    size_t voms = 0;
+    size_t dn_len = 0;
+    size_t voms_len = 0;
     iov[0].iov_base = &command;
     iov[0].iov_len = sizeof(command);
     iov[1].iov_base = &result;
     iov[1].iov_len = sizeof(result);
-    iov[2].iov_base = &dn;
-    iov[2].iov_len = sizeof(dn);
-    iov[3].iov_base = &voms;
-    iov[3].iov_len = sizeof(voms);
+    iov[2].iov_base = &dn_len;
+    iov[2].iov_len = sizeof(dn_len);
+    iov[3].iov_base = &voms_len;
+    iov[3].iov_len = sizeof(voms_len);
     msg_recv.msg_iov = iov;
     msg_recv.msg_iovlen = 4;
 
@@ -303,6 +303,47 @@ struct ProxyHelper {
       }
       return NULL;
     }
+    if (result) {
+      LogCvmfs(kLogVoms, kLogDebug, "Child was unable to get a credential: %d",
+                                    result);
+      return NULL;
+    }
+
+    std::vector<char> dn; dn.reserve(dn_len + 1); dn[dn_len] = '\0';
+    std::vector<char> voms; voms.reserve(voms_len + 1); voms[voms_len] = '\0';
+    iov[0].iov_base = &dn[0];
+    iov[0].iov_len = dn_len;
+    iov[1].iov_base = &voms[0];
+    iov[1].iov_len = voms_len;
+    msg_recv.msg_iovlen = 2;
+
+    errno = 0;
+    while (-1 == recvmsg(m_sock, &msg_recv, 0) && errno == EINTR) {}
+    if (errno) {
+      int result = errno;
+      if (errno == ENOTCONN || errno == EPIPE) {
+        MutexLockGuard guard(m_helper_mutex);
+        ReportChildDeath(m_subprocess, WNOHANG);
+        m_subprocess = -1;
+      }
+      LogCvmfs(kLogVoms, kLogWarning, "Failed to receive authz info from "
+               "child: %s (errno=%d)", strerror(result), result);
+      return NULL;
+    }
+
+    authz_data *mydata = new authz_data();
+    mydata->dn_ = strdup(&dn[0]);
+    mydata->voms_ = (*g_VOMS_Init)(NULL, NULL);
+    int voms_error;
+    if (!(*g_VOMS_Import)(&voms[0], voms_len, mydata->voms_, &voms_error)) {
+      char *err_str = \
+        (*g_VOMS_ErrorMessage)(mydata->voms_, voms_error, NULL, 0);
+      LogCvmfs(kLogVoms, kLogDebug, "Unable to parse VOMS data: %s\n",
+             err_str);
+      free(err_str);
+      return NULL;
+    }
+    return mydata;
   }
 
 
@@ -428,5 +469,5 @@ GetProxyFile(pid_t pid, uid_t uid, gid_t gid) {
 
 authz_data*
 GetAuthzData(pid_t pid, uid_t uid, gid_t gid) {
-  return NULL;  // TODO(bbockelm): Finish stub of authz fetcher.
+  return g_instance.GetAuthzData(pid, uid, gid);
 }

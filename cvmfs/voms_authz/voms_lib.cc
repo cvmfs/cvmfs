@@ -35,7 +35,8 @@ void VomsLib::Load() {
       !LoadSymbol(m_libvoms_handle, &g_VOMS_Destroy, "VOMS_Destroy") ||
       !LoadSymbol(m_libvoms_handle, &g_VOMS_Retrieve, "VOMS_Retrieve") ||
       !LoadSymbol(m_libvoms_handle, &g_VOMS_Destroy, "VOMS_Destroy") ||
-      !LoadSymbol(m_libvoms_handle, &g_VOMS_ErrorMessage, "VOMS_ErrorMessage") ||
+      !LoadSymbol(m_libvoms_handle, &g_VOMS_ErrorMessage,
+                                                    "VOMS_ErrorMessage") ||
       !LoadSymbol(m_libvoms_handle, &g_VOMS_Export, "VOMS_Export") ||
       !LoadSymbol(m_libvoms_handle, &g_VOMS_Import, "VOMS_Import")
      ) {

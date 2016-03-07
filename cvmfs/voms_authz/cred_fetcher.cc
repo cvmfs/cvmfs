@@ -168,11 +168,13 @@ CredentialsFetcher::GenerateVOMSData(uid_t uid, gid_t gid, pid_t pid)
     }
   }
   // From the EEC, use OpenSSL to determine the subject
-  state.m_subject = X509_NAME_oneline(X509_get_subject_name(eec_cert), NULL, 0);
-  if (!state.m_subject) {
+  char *dn = X509_NAME_oneline(X509_get_subject_name(eec_cert), NULL, 0);
+  if (!dn) {
     LogCvmfs(kLogVoms, kLogDebug, "Unable to determine certificate DN.");
     return NULL;
   }
+  state.m_subject = strdup(dn);
+  OPENSSL_free(dn);
 
   state.m_voms = (*g_VOMS_Init)(NULL, NULL);
   if (!state.m_voms) {
@@ -306,11 +308,10 @@ FILE *CredentialsFetcher::GetProxyFileInternal(pid_t pid, uid_t uid, gid_t gid)
 int SendAuthzData(pid_t pid, uid_t uid, gid_t gid)
 {
   authz_data* myauthz = CredentialsFetcher::GenerateVOMSData(uid, gid, pid);
-  int command = 4;
 
   struct msghdr msg_send;
   memset(&msg_send, '\0', sizeof(msg_send));
-  command = 0;
+  int command = 4;
   int result = 0;
   size_t dn_len = 0;
   size_t voms_len = 0;
@@ -356,7 +357,12 @@ int SendAuthzData(pid_t pid, uid_t uid, gid_t gid)
     LogCvmfs(kLogVoms, kLogSyslogErr | kLogDebug,
              "failed to send authz messaage to parent: %s (errno=%d)",
              strerror(errno), errno);
+    delete buf;
     return 1;
+  }
+  // No credential available - but sending to parent worked.
+  if (result) {
+    return 0;
   }
 
   iov[0].iov_base = &mydn[0];
@@ -366,6 +372,7 @@ int SendAuthzData(pid_t pid, uid_t uid, gid_t gid)
   msg_send.msg_iovlen = 2;
   errno = 0;
   while (-1 == sendmsg(3, &msg_send, 0) && errno == EINTR) {}
+  delete buf;
   if (errno) {
     LogCvmfs(kLogVoms, kLogSyslogErr | kLogDebug,
              "failed to send authz messaage to parent: %s (errno=%d)",

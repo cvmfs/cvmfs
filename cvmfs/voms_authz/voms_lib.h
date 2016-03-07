@@ -37,7 +37,7 @@ struct authz_data {
 
   ~authz_data() {
     if (voms_ && g_VOMS_Destroy) {(*g_VOMS_Destroy)(voms_);}
-    if (dn_) {OPENSSL_free(dn_);}
+    if (dn_) {free(dn_);}
   }
 };
 
