@@ -15,10 +15,10 @@ message ("Running CMake version ${CMAKE_VERSION}")
 # The version numbers
 #
 # DON'T DELETE
-## CVMFS_VERSION 2.2.0
+## CVMFS_VERSION 2.3.0
 #---------------------
 set (CernVM-FS_VERSION_MAJOR 2)
-set (CernVM-FS_VERSION_MINOR 2)
+set (CernVM-FS_VERSION_MINOR 3)
 set (CernVM-FS_VERSION_PATCH 0)
 set (CernVM-FS_VERSION_STRING "${CernVM-FS_VERSION_MAJOR}.${CernVM-FS_VERSION_MINOR}.${CernVM-FS_VERSION_PATCH}")
 
@@ -223,15 +223,6 @@ set (GOOGLETEST_BUILTIN_LOCATION  "${EXTERNALS_BUILD_LOCATION}/build_googletest"
 set (LIBGEOIP_BUILTIN_LOCATION    "${EXTERNALS_BUILD_LOCATION}/build_libgeoip")
 set (PYTHON_GEOIP_BUILTIN_LOCATION "${EXTERNALS_BUILD_LOCATION}/build_python-geoip")
 set (TBB_BUILD_LOCATION           "${EXTERNALS_BUILD_LOCATION}/build_tbb")
-
-#
-# Until the bugfix https://sourceware.org/ml/binutils/2015-04/msg00302.html
-# is released in binutils, we disable libcvmfs on AArch64
-#
-if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "aarch64")
-  message("Warning: not building libcvmfs on AArch64")
-  set (BUILD_LIBCVMFS OFF)
-endif (${CMAKE_SYSTEM_PROCESSOR} MATCHES "aarch64")
 
 # create the directory for controlled out of source building of external stuff
 file (MAKE_DIRECTORY ${EXTERNALS_BUILD_LOCATION})

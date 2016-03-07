@@ -12,6 +12,7 @@
 
 #include "download.h"
 #include "manifest_fetch.h"
+#include "reflog.h"
 #include "signature.h"
 #include "statistics.h"
 #include "util.h"
@@ -85,8 +86,11 @@ class Command {
   bool InitDownloadManager(const bool     follow_redirects,
                            const unsigned max_pool_handles = 1,
                            const bool     use_system_proxy = true);
-  bool InitSignatureManager(const std::string pubkey_path,
-                            const std::string trusted_certs = "");
+  bool InitVerifyingSignatureManager(const std::string &pubkey_path,
+                                     const std::string &trusted_certs = "");
+  bool InitSigningSignatureManager(const std::string &certificate_path,
+                                   const std::string &private_key_path,
+                                   const std::string &private_key_password);
 
   manifest::Manifest* OpenLocalManifest(const std::string path) const;
   manifest::Failures  FetchRemoteManifestEnsemble(
@@ -97,6 +101,10 @@ class Command {
                              const std::string &repository_url,
                              const std::string &repository_name,
                              const shash::Any  &base_hash = shash::Any()) const;
+
+  template <class ObjectFetcherT>
+  manifest::Reflog* GetOrCreateReflog(ObjectFetcherT    *object_fetcher,
+                                      const std::string &repo_name);
 
   download::DownloadManager*   download_manager()  const;
   signature::SignatureManager* signature_manager() const;
@@ -109,5 +117,7 @@ class Command {
 };
 
 }  // namespace swissknife
+
+#include "swissknife_impl.h"
 
 #endif  // CVMFS_SWISSKNIFE_H_

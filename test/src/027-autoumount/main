@@ -16,7 +16,11 @@ cvmfs_run_test() {
     return 4
   fi
   cd $OLDPWD
-  ls /cvmfs/atlas.cern.ch || return 5
+  if ! running_on_osx; then
+    cvmfs_mount_direct atlas.cern.ch || return 5
+  fi
+
+  ls /cvmfs/atlas.cern.ch || return 6
 
   return 0
 }

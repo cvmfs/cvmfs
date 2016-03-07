@@ -37,7 +37,8 @@ class AuthzSessionCache {
   AuthzSessionCache()
     : m_last_clean(platform_monotonic_time())
   {
-    pthread_mutex_init(&m_mutex, NULL);
+    int retval = pthread_mutex_init(&m_mutex, NULL);
+    assert(retval == 0);
   }
 
   ~AuthzSessionCache() {

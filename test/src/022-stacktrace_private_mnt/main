@@ -2,8 +2,10 @@
 cvmfs_test_name="Stacktrace from Private Mount Point"
 
 final_cleanup() {
-  sudo fusermount -u $(pwd)/mnt
-  sudo umount $(pwd)/mnt
+  if ! running_on_osx; then
+    sudo fusermount -u $(pwd)/mnt
+  fi
+  sudo umount -f $(pwd)/mnt
 }
 
 cvmfs_run_test() {
@@ -39,7 +41,8 @@ EOF
   local stacktrace_path="cache/${fqrn}/stacktrace.${fqrn}"
   [ -f $stacktrace_path ] || { final_cleanup; return 7; }
   [ $(sudo cat $stacktrace_path | wc -l) -gt 20 ] || { final_cleanup; return 8; }
-  if ! sudo cat $stacktrace_path | grep '(gdb)' >> /dev/null 2>&1; then
+  if ! sudo cat $stacktrace_path | grep '(gdb)'  >> /dev/null 2>&1 && \
+     ! sudo cat $stacktrace_path | grep '(lldb)' >> /dev/null 2>&1; then
      final_cleanup
      return 9
   fi

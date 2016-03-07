@@ -1,34 +1,36 @@
 #!/bin/sh
-set -x
+
 retval=0
 
 #cvmfs_unittests --gtest_shuffle \
 #                --gtest_death_test_use_fork || retval=1
 
-logfile="/var/log/cvmfs-test"
-workdir="$HOME/cvmfs/test"
+logfile="$cvmfs_log_directory/integration_tests.log"
 
-cd "$workdir"
+cd "$cvmfs_workspace"
 
 
 # everything will be placed in the home folder
 echo "running CernVM-FS client test cases..."
 CVMFS_TEST_CLASS_NAME=ClientIntegrationTests
-sudo ./run.sh "$logfile"  src/000-dummy                 \
-                          src/001-chksetup              \
-                          src/002-probe                 \
-                          src/003-nested                \
-                          src/009-tar                   \
-                          src/010-du                    \
-                          src/012-ls-s                  \
-                          src/013-certificate_cache     \
-                          src/014-corrupt_lru           \
-                          src/015-rebuild_on_crash      \
-                          src/017-dnstimeout            \
-                          src/018-httpunreachable       \
-                          src/019-httptimeout           \
-                          src/020-emptyrepofailover     \
-                          src/021-stacktrace
+./run.sh "$logfile" -x        src/004-davinci                      \
+                              src/005-asetup                       \
+                              src/006-buildkernel                  \
+                              src/007-testjobs                     \
+                              src/008-default_domain               \
+                              src/016-dnsunreachable               \
+                              src/017-dnstimeout                   \
+                              src/024-reload-during-asetup         \
+                              src/039-reloadalarm                  \
+                              src/040-aliencache                   \
+                              src/045-oasis                        \
+                              src/052-roundrobindns                \
+                              src/055-ownership                    \
+                              src/056-lowspeedlimit                \
+                              src/057-parallelmakecache            \
+                              src/061-systemdnokill                \
+                              --                                   \
+                              src/0*
 
-
+retval=$?
 exit $retval

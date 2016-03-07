@@ -64,11 +64,54 @@ die() {
   exit 1
 }
 
+
+running_on_osx() {
+  [ "x$(uname)" == "xDarwin" ]
+}
+
+get_xattr() {
+  local extended_attr="$1"
+  local repo="$2"
+  if running_on_osx; then
+    xattr -p user.$extended_attr "$repo"
+  else
+    attr -qg $extended_attr "$repo"
+  fi
+}
+
+list_xattrs() {
+  local repo="$1"
+  if running_on_osx; then
+    xattr "$repo"
+  else
+    attr -ql "$repo"
+  fi
+}
+
 show_mounted() {
   if running_on_osx; then
     mount
   else
     cat /proc/mounts
+  fi
+}
+
+get_user_data() {
+  local user=$1
+  if running_on_osx; then
+    id -P "$user"
+  else
+    getent passwd "$user"
+  fi
+}
+
+stat_wrapper() {
+  local format=$1
+  local repo=$2
+  if running_on_osx; then
+    stat -f $format $repo
+  else
+    stat -c $format $repo
   fi
 }
 
@@ -229,7 +272,11 @@ service_should_switch() {
 # checks if autofs is running on /cvmfs
 # @return   0 when autofs is mounted on /cvmfs
 autofs_check() {
-  cat /proc/mounts | grep -q "^/etc/auto.cvmfs /cvmfs "
+  if running_on_osx; then
+    return 0
+  else
+    cat /proc/mounts | grep -q "^/etc/auto.cvmfs /cvmfs "
+  fi
 }
 
 
@@ -315,6 +362,16 @@ cvmfs_clean() {
   return 0
 }
 
+cvmfs_mount_direct() {
+  repositories=$1
+  eval $(cvmfs_config showconfig | grep -e ^CVMFS_CONFIG_REPOSITORY=)
+  if [ "x$CVMFS_CONFIG_REPOSITORY" != "x" ]; then
+    _cvmfs_mount_manually "$CVMFS_CONFIG_REPOSITORY"
+  fi
+  for i in $(echo "$repositories" | tr "," " "); do
+    _cvmfs_mount_manually "$i" || return 102
+  done
+}
 
 cvmfs_mount() {
   repositories=$1
@@ -339,13 +396,7 @@ cvmfs_mount() {
   fi
 
   if running_on_osx; then
-      eval $(cvmfs_config showconfig | grep -e ^CVMFS_CONFIG_REPOSITORY=)
-      if [ "x$CVMFS_CONFIG_REPOSITORY" != "x" ]; then
-        _cvmfs_mount_manually "$CVMFS_CONFIG_REPOSITORY"
-      fi
-      for i in $(echo "$repositories" | tr "," " "); do
-        _cvmfs_mount_manually "$i" || return 102
-      done
+    cvmfs_mount_direct $repositories
   fi
 
   cvmfs_config probe > /dev/null 2>&1 || return 101
@@ -358,7 +409,7 @@ _cvmfs_mount_manually() {
   local repository=$1
   cvmfs_config status | grep -q "/cvmfs/$repository" && return 0
   mkdir -p "/cvmfs/$repository"
-  mount -t cvmfs "$repository" "/cvmfs/$repository" >/dev/null 2>&1
+  sudo mount -t cvmfs "$repository" "/cvmfs/$repository" >/dev/null 2>&1
 }
 
 
@@ -942,16 +993,25 @@ get_catalog_count() {
   echo $(cvmfs_server list-catalogs -x $repo_name | wc -l)
 }
 
-# read the manifest piped in through stdin and figure out the root catalog hash
-# @param (stdin)  a manifest file content
-# return          the catalog root hash referenced in the manifest
-get_root_hash_from_manifest() {
-  grep --text '^C[a-f0-9]*\(-[a-z0-9]*\)\?$' | sed -e 's/^C\(.*\)$/\1/'
-              # ^^~~~~~~~^ ^~~~~~~~~~~~^
-              # ||       | |           |
-              # ||       | +-----------+-- (optional) Hash Suffix
-              # |+-------+---------------- Hash String
-              # +------------------------- Manifest Field Identifier
+# read one specific manifest field of the specified repository
+# @param field_tag  the manifest field to be retrieved (one character)
+# @param (stdin)    the manifest to be investigated
+# return            the content of the specified manifest field
+get_manifest_field_from_manifest() {
+  local field_tag="$1"
+  grep --text -e "^$field_tag" | head -n1 | sed "s/^$field_tag\(.*\)$/\1/"
+}
+
+# read one specific manifest field of the specified repository
+# @param repo_name  the repository to be investigated
+# @param field_tag  the manifest field to be retrieved (one character)
+# return            the content of the specified manifest field
+get_manifest_field() {
+  local repo_name=$1
+  local field_tag=$2
+  load_repo_config $repo_name
+  local manifest_url="$(get_repo_url $repo_name)/.cvmfspublished"
+  curl -s "$manifest_url" | get_manifest_field_from_manifest "$field_tag"
 }
 
 # retrieves the hash of the current root catalog of the given
@@ -961,7 +1021,7 @@ get_root_hash_from_manifest() {
 get_current_root_catalog() {
   local repo_name=$1
   local manifest_url="$(get_repo_url $repo_name)/.cvmfspublished"
-  curl "$manifest_url" 2>/dev/null | get_root_hash_from_manifest
+  get_manifest_field $repo_name "C"
 }
 
 # uses `cvmfs_server check` to check the integrity of the catalog structure
@@ -2083,10 +2143,6 @@ get_internal_value() {
   echo $(sudo cvmfs_talk -i $repo internal affairs | grep "^$key" | cut -d\| -f2)
 }
 
-running_on_osx() {
-  [ "x$(uname)" == "xDarwin" ]
-}
-
 purge_disk_cache() {
   if running_on_osx; then
     sudo purge
@@ -2098,7 +2154,7 @@ purge_disk_cache() {
 try_automount() {
   local repo=$1
   if running_on_osx; then
-    mount -t cvmfs "$repo" "/cvmfs/$repo"
+    mount | grep "$repo" || sudo mount -t cvmfs $repo /cvmfs/$repo >/dev/null 2>&1
   else
     ls /cvmfs/${repo}
   fi
@@ -2117,6 +2173,8 @@ cat_syslog() {
     syslog_file="/var/log/syslog"
   elif [ -f "/var/log/messages" ]; then
     syslog_file="/var/log/messages"
+  elif [ -f "/var/log/system.log" ]; then
+    syslog_file="/var/log/system.log"
   fi
 
   local cat_retval=0

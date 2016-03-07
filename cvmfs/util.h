@@ -279,32 +279,65 @@ struct hash_murmur {
 std::string Base64(const std::string &data);
 bool Debase64(const std::string &data, std::string *decoded);
 
-template <class T>
-class UniquePtr : SingleCopy {
+template <class T, class DerivedT>
+class UniquePtrBase : SingleCopy {
  public:
-  inline UniquePtr() : ref_(NULL) {}
-  inline explicit UniquePtr(T *ref) : ref_(ref) { }
-  inline ~UniquePtr()                 { delete ref_; }
+  inline UniquePtrBase() : ref_(NULL) {}
+  inline explicit UniquePtrBase(T *ref) : ref_(ref) { }
+  inline ~UniquePtrBase()                 { Free(); }
 
   inline operator bool() const        { return IsValid(); }
-  inline T& operator*() const         { return *ref_; }
   inline T* operator->() const        { return ref_; }
-  inline UniquePtr& operator=(T* ref) {
+  inline operator T*()                { return ref_; }
+  inline DerivedT& operator=(T *ref) {
     if (ref_ != ref) {
-      delete ref_;
+      Free();
       ref_ = ref;
     }
-    return *this;
+    return *(static_cast<DerivedT*>(this));
   }
-
   inline T* weak_ref() const          { return ref_; }
   inline bool IsValid() const         { return (ref_ != NULL); }
   inline T*   Release()               { T* r = ref_; ref_ = NULL; return r; }
 
- private:
+ protected:
+  void Free() {
+    static_cast<DerivedT*>(this)->Free();
+  }
   T *ref_;
 };
 
+template <class T>
+class UniquePtr : public UniquePtrBase<T, UniquePtr<T> > {
+  friend class UniquePtrBase<T, UniquePtr<T> >;
+
+ private:
+  typedef UniquePtrBase<T, UniquePtr<T> > BaseT;
+ public:
+  using BaseT::operator=;
+  inline UniquePtr() : BaseT(NULL) { }
+  inline explicit UniquePtr(T *ref) : BaseT(ref) { }
+  inline T& operator*() const { return *BaseT::ref_; }
+ protected:
+  void Free() { delete BaseT::ref_; }
+};
+
+template <>
+class UniquePtr<void> : public UniquePtrBase<void, UniquePtr<void> > {
+ private:
+  typedef UniquePtrBase<void, UniquePtr<void> > BaseT;
+ public:
+  friend class UniquePtrBase<void, UniquePtr<void> >;
+  using BaseT::operator=;
+  inline UniquePtr() : BaseT(NULL) { }
+  inline explicit UniquePtr(void *ref) : BaseT(ref) { }
+ protected:
+  void Free() {
+    if (IsValid()) {
+      free(BaseT::ref_);
+    }
+  }
+};
 
 /**
  * RAII object to call `unlink()` on a containing file when it gets out of scope

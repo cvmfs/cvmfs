@@ -79,6 +79,30 @@
  *                 *  Backend Storage  *
  *                 *********************
  *
+ *
+ * TODO(rmeusel): special purpose ::Process...() methods should (opionally?)
+ *                return Future<> instead of relying on the callbacks. Those are
+ *                somewhat one-shot calls and require a rather fishy idiom when
+ *                using callbacks, like:
+ *
+ *                   cb = spooler->RegisterListener(...certificate_callback...);
+ *                   spooler->ProcessCertificate(...);
+ *                   spooler->WaitForUpload();
+ *                   spooler->UnregisterListener(cb);
+ *                   cert_hash = global_cert_hash;
+ *
+ *                   void certificate_callback(shash::Any &hash) {
+ *                     global_cert_hash = hash;
+ *                   }
+ *
+ *                If ProcessCertificate(), ProcessHistory(), ProcessMetainfo(),
+ *                UploadManifest() and UploaderReflog() would return Future<>,
+ *                the code would be much more comprehensible and free of user-
+ *                managed global state:
+ *
+ *                   Future<shash::Any> fc = spooler->ProcessCertificate(...);
+ *                   cert_hash = fc.get();
+ *
  */
 
 #ifndef CVMFS_UPLOAD_H_
@@ -138,6 +162,21 @@ class Spooler : public Observable<SpoolerResult> {
    */
   void Upload(const std::string &local_path,
               const std::string &remote_path);
+
+  /**
+   * Convenience wrapper to upload the Manifest file into the backend storage
+   *
+   * @param local_path  the location of the (signed) manifest to be uploaded
+   */
+  void UploadManifest(const std::string &local_path);
+
+
+  /**
+   * Convenience wrapper to upload a Reflog database into the backend storage
+   *
+   * @param local_path  the SQLite file location of the Reflog to be uploaded
+   */
+  void UploadReflog(const std::string &local_path);
 
   /**
    * Schedules a process job that compresses and hashes the provided file in

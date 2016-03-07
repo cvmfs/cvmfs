@@ -41,13 +41,13 @@ TEST(T_VOMS, VomsAuthz) {
   authz_info.dn_ = strdup(&user_dn[0]);
   char voname[] = "cms";
   voms_entry.voname = voname;
-  std::vector<char> group1; group1.reserve(50);
+  char group1[50];
   strncpy(&group1[0], "/cms", 49);
-  std::vector<char> group2; group2.reserve(50);
+  char group2[50];
   strncpy(&group2[0], "/cms/uscms", 49);
-  std::vector<char> group3; group3.reserve(50);
+  char group3[50];
   strncpy(&group3[0], "/cms/escms", 49);
-  std::vector<char> role1; role1.reserve(50);
+  char role1[50];
   strncpy(&role1[0], "pilot", 49);
 
   voms_data[0].group = &group1[0];

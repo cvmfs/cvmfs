@@ -23,7 +23,7 @@ EOF
 
   cvmfs_mount grid.cern.ch "CVMFS_HTTP_PROXY=auto" \
     "CVMFS_PAC_URLS=file://$wpad_file" || return 20
-  proxy="$(attr -qg proxy /cvmfs/grid.cern.ch)"
+  proxy="$(get_xattr proxy /cvmfs/grid.cern.ch)"
   echo "Proxy is $proxy"
   if [ x"$proxy" != x"http://no-such-proxy.cern.ch:3128" ]; then
     return 30
@@ -33,7 +33,7 @@ EOF
   # Microsoft extensions
   cvmfs_mount grid.cern.ch "CVMFS_HTTP_PROXY=auto" \
     "CVMFS_PAC_URLS=file://$wpadex_file" || return 21
-  proxy="$(attr -qg proxy /cvmfs/grid.cern.ch)"
+  proxy="$(get_xattr proxy /cvmfs/grid.cern.ch)"
   echo "Proxy is $proxy"
   if [ x"$proxy" != x"http://no-such-proxy-ex.cern.ch:3128" ]; then
     return 31

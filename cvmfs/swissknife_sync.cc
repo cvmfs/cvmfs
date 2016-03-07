@@ -592,7 +592,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     return 3;
   }
 
-  if (!this->InitSignatureManager(params.public_keys, params.trusted_certs)) {
+  if (!this->InitVerifyingSignatureManager(params.public_keys,
+                                           params.trusted_certs)) {
     return 3;
   }
 
@@ -659,14 +660,16 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     }
 
     std::string new_authz;
-    if (!SafeReadToString(fd, &new_authz)) {
+    const bool read_successful = SafeReadToString(fd, &new_authz);
+    close(fd);
+
+    if (!read_successful) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to read authz file (%s): %s",
                params.authz_file.c_str(),
                strerror(errno));
       return 8;
     }
 
-    close(fd);
     catalog_manager.SetVOMSAuthz(new_authz);
   }
 

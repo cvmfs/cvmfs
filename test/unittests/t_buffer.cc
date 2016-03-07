@@ -183,4 +183,5 @@ TEST(T_Buffer, CloneCharBuffer) {
   EXPECT_EQ(str_length,    other->size());
   EXPECT_EQ(str_length,    other->used_bytes());
   EXPECT_EQ(test_base_off, other->base_offset());
+  delete other;
 }

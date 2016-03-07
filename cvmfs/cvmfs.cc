@@ -506,13 +506,13 @@ static bool CheckVoms(const fuse_ctx &fctx) {
   // Get VOMS information, if any.  If VOMS authz is present and VOMS is
   // not compiled in, then deny authorization.
   if ((fctx.uid != 0) && voms_authz_->size()) {
-#ifdef VOMS_AUTHZ
-    return CheckVOMSAuthz(&fctx, *voms_authz_);
-#else
+//  #ifdef VOMS_AUTHZ
+//      return CheckVOMSAuthz(&fctx, *voms_authz_);
+//  #else
     LogCvmfs(kLogCvmfs, kLogSyslogWarn | kLogDebug,  "VOMS requirements found "
               "in catalog but client compiled without VOMS support");
     return false;
-#endif
+//  #endif
   }
   return true;
 }
@@ -575,7 +575,9 @@ static bool GetDirentForInode(const fuse_ino_t ino,
   // Non-NFS mode
   PathString path;
   if (ino == catalog_manager_->GetRootInode()) {
-    catalog_manager_->LookupPath(PathString(), catalog::kLookupSole, dirent);
+    bool retval = catalog_manager_->LookupPath(PathString(),
+                                                catalog::kLookupSole, dirent);
+    assert(retval);
     dirent->set_inode(ino);
     inode_cache_->Insert(ino, *dirent);
     return true;
@@ -1165,9 +1167,9 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       chunk_tables_->Unlock();
 
       // Retrieve File chunks from the catalog
-      FileChunkList *chunks = new FileChunkList();
+      UniquePtr<FileChunkList> chunks(new FileChunkList());
       if (!catalog_manager_->ListFileChunks(path, dirent.hash_algorithm(),
-                                           chunks) ||
+                                            chunks.weak_ref()) ||
           chunks->IsEmpty())
       {
         remount_fence_->Leave();
@@ -1182,7 +1184,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       // Check again to avoid race
       if (!chunk_tables_->inode2chunks.Contains(ino)) {
         chunk_tables_->inode2chunks.Insert(
-          ino, FileChunkReflist(chunks, path, dirent.compression_algorithm(),
+          ino, FileChunkReflist(chunks.Release(), path,
+                                dirent.compression_algorithm(),
                                 dirent.IsExternalFile()));
         chunk_tables_->inode2references.Insert(ino, 1);
       } else {
@@ -2643,6 +2646,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
                                               cvmfs::download_manager_);
   if (proxies == "") {
     *g_boot_error = "failed to discover HTTP proxy servers";
+    delete uuid;
     return loader::kFailWpad;
   }
   cvmfs::download_manager_->SetProxyChain(

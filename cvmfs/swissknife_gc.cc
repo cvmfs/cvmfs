@@ -70,19 +70,9 @@ int CommandGc::Main(const ArgumentList &args) {
     return 1;
   }
 
-  FILE *deletion_log_file = NULL;
-  if (!deletion_log_path.empty()) {
-    deletion_log_file = fopen(deletion_log_path.c_str(), "a+");
-    if (NULL == deletion_log_file) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "failed to open deletion log file "
-                                      "(errno: %d)", errno);
-      return 1;
-    }
-  }
-
   const bool follow_redirects = false;
   if (!this->InitDownloadManager(follow_redirects) ||
-      !this->InitSignatureManager(repo_keys)) {
+      !this->InitVerifyingSignatureManager(repo_keys)) {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to init repo connection");
     return 1;
   }
@@ -108,21 +98,43 @@ int CommandGc::Main(const ArgumentList &args) {
     return 1;
   }
 
-  GcConfig config;
-  const upload::SpoolerDefinition spooler_definition(spooler, shash::kAny);
-  config.uploader = upload::AbstractUploader::Construct(spooler_definition);
-  config.keep_history_depth = revisions;
-  config.keep_history_timestamp = timestamp;
-  config.dry_run = dry_run;
-  config.verbose = list_condemned_objects;
-  config.object_fetcher = &object_fetcher;
-  config.deleted_objects_logfile = deletion_log_file;
+  UniquePtr<manifest::Reflog> reflog;
+  reflog = GetOrCreateReflog(&object_fetcher, repo_name);
+  if (!reflog.IsValid()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load or create Reflog");
+    return 1;
+  }
 
-  if (config.uploader == NULL) {
+  const upload::SpoolerDefinition spooler_definition(spooler, shash::kAny);
+  UniquePtr<upload::AbstractUploader> uploader(
+                       upload::AbstractUploader::Construct(spooler_definition));
+
+  if (!uploader.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to initialize spooler for '%s'",
              spooler.c_str());
     return 1;
   }
+
+  FILE *deletion_log_file = NULL;
+  if (!deletion_log_path.empty()) {
+    deletion_log_file = fopen(deletion_log_path.c_str(), "a+");
+    if (NULL == deletion_log_file) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to open deletion log file "
+                                      "(errno: %d)", errno);
+      return 1;
+    }
+  }
+
+  GcConfig config;
+  config.uploader                = uploader.weak_ref();
+  config.keep_history_depth      = revisions;
+  config.keep_history_timestamp  = timestamp;
+  config.dry_run                 = dry_run;
+  config.verbose                 = list_condemned_objects;
+  config.object_fetcher          = &object_fetcher;
+  config.reflog                  = reflog.weak_ref();
+  config.deleted_objects_logfile = deletion_log_file;
+
 
   if (deletion_log_file != NULL) {
     const int bytes_written = fprintf(deletion_log_file,

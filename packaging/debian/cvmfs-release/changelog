@@ -1,0 +1,5 @@
+cvmfs-release (1.0-1) lucid; urgency=low
+
+  * Initial packaging
+  
+ -- Jakob Blomer <jblomer@cern.ch>  Wed, 10 Feb 2016 12:00:00 +0000

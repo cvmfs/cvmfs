@@ -1,3 +1,16 @@
+2.3.0:
+  * Fix a rare crash when parsing the whitelist in cvmfs_server
+  * Call cvmfs_suid_helper with a clean environment from cvmfs_server
+  * Add .cvmfsreflog for garbage collection
+  * Omit S3 bucket number if only a single bucket is used
+  * Warn when forcfully remounting the file system stack on the server, new
+    parameter CVMFS_FORCE_REMOUNT_WARNING
+
+2.2.1:
+  * Fix reading of chunked files in libcvmfs
+  * Disable access to VOMS protected repositories until certificate handling
+    is resolved
+
 2.2.0:
   * Add VOMS as a build dependency on platforms where it is available.
   * Detect missing 'http:// proxy prefix in chksetup (CVM-979)

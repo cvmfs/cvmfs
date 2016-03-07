@@ -231,6 +231,7 @@ class T_FsTraversal : public ::testing::Test {
     const int retval = MakeSocket(path, 0755);
     ASSERT_NE(-1, retval) << "errno: " << errno;
     reference_[relative_path] = Checklist(relative_path, Checklist::Socket);
+    close(retval);
   }
 
   void MakeFifo(const std::string &relative_path) {

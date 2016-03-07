@@ -1092,6 +1092,10 @@ check_lock() {
   __is_valid_lock "${path}" "$ignore_stale"
 }
 
+run_suid_helper() {
+  env -i /usr/bin/cvmfs_suid_helper $@
+}
+
 
 # checks if a repository is currently in a transaction
 #
@@ -1110,7 +1114,7 @@ open_transaction() {
 
   is_stratum0 $name                    || die "Cannot open transaction on Stratum1"
   acquire_lock "$tx_lock" ignore_stale || die "Failed to create transaction lock"
-  cvmfs_suid_helper open  $name        || die "Failed to make /cvmfs/$name writable"
+  run_suid_helper open $name           || die "Failed to make /cvmfs/$name writable"
 
   to_syslog_for_repo $name "opened transaction"
 }
@@ -1132,19 +1136,36 @@ close_transaction() {
   load_repo_config $name
   local tx_lock="${CVMFS_SPOOL_DIR}/in_transaction"
   local tmp_dir="${CVMFS_SPOOL_DIR}/tmp"
+  local force_grace_time=60
 
-  if [ $use_fd_fallback -ne 0 ]; then
-    cvmfs_suid_helper rw_lazy_umount     $name
-    cvmfs_suid_helper kill_cvmfs         $name
-    cvmfs_suid_helper rdonly_lazy_umount $name
-  else
-    cvmfs_suid_helper rw_umount $name
-    cvmfs_suid_helper rdonly_umount $name
+  # if not explicitly asked, try if umounting works without force
+  if [ $use_fd_fallback -eq 0 ]; then
+    if ! run_suid_helper rw_umount     $name || \
+       ! run_suid_helper rdonly_umount $name; then
+      use_fd_fallback=1
+    fi
   fi
-  cvmfs_suid_helper clear_scratch $name
+
+  # if explicitly asked for or the normal umount failed we apply more force
+  if [ $use_fd_fallback -ne 0 ]; then
+    if [ x"$CVMFS_FORCE_REMOUNT_WARNING" != x"false" ]; then
+      (
+        echo "$name is forcefully remounted in $force_grace_time seconds."
+        echo "Please close files on /cvmfs/$name"
+      ) | wall 2>/dev/null
+      sleep $force_grace_time
+      echo "$name is forcefully remounted NOW." | wall 2>/dev/null
+    fi
+    run_suid_helper rw_lazy_umount     $name
+    run_suid_helper kill_cvmfs         $name
+    run_suid_helper rdonly_lazy_umount $name
+  fi
+
+  # continue with the remounting
+  run_suid_helper clear_scratch $name
   [ ! -z "$tmp_dir" ] && rm -fR "${tmp_dir}"/*
-  cvmfs_suid_helper rdonly_mount $name > /dev/null
-  cvmfs_suid_helper rw_mount $name
+  run_suid_helper rdonly_mount $name > /dev/null
+  run_suid_helper rw_mount $name
   release_lock "$tx_lock"
 
   local fallback_msg=""
@@ -1168,7 +1189,7 @@ publish_starting() {
   local pub_lock="${CVMFS_SPOOL_DIR}/is_publishing"
   acquire_lock "$pub_lock" ignore_stale || die "Failed to acquire publishing lock"
   trap "publish_failed $name" EXIT HUP INT TERM
-  cvmfs_suid_helper lock $name
+  run_suid_helper lock $name
   to_syslog_for_repo $name "started publishing"
 }
 
@@ -1178,7 +1199,7 @@ publish_failed() {
   local pub_lock="${CVMFS_SPOOL_DIR}/is_publishing"
   trap - EXIT HUP INT TERM
   release_lock $pub_lock
-  cvmfs_suid_helper open $name
+  run_suid_helper open $name
   to_syslog_for_repo $name "failed to publish"
 }
 
@@ -1504,19 +1525,19 @@ health_check() {
     if [ $rw_broken -eq 0 ]; then
       echo "Only the lower union file system branch is broken" >&2
       echo -n "Note: Trying to umount /cvmfs/${name}... "
-      cvmfs_suid_helper rw_umount $name && echo "success" || { echo "fail"; exit 1; }
+      run_suid_helper rw_umount $name && echo "success" || { echo "fail"; exit 1; }
       rw_broken=1 # will be fixed downstream
     fi
 
     echo -n "Note: Trying to mount ${CVMFS_SPOOL_DIR}/rdonly... "
-    cvmfs_suid_helper rdonly_mount $name > /dev/null && success=true || success=false
+    run_suid_helper rdonly_mount $name > /dev/null && success=true || success=false
     __health_check_syslog_repair_info $name ".../rdonly" $success
     $success && echo "success" || { echo "fail"; exit 1; }
   fi
 
   if [ $rw_broken -eq 1 ]; then
     echo -n "Note: Trying to mount /cvmfs/${name}... "
-    cvmfs_suid_helper rw_mount $name && success=true || success=false
+    run_suid_helper rw_mount $name && success=true || success=false
     __health_check_syslog_repair_info $name "/cvmfs/${name}" $success
     $success && echo "success" || { echo "fail"; exit 1; }
   fi
@@ -1529,11 +1550,11 @@ health_check() {
     __health_check_print_repair_info $name $repair_in_txn
     local published_hash="$(get_published_root_hash $name)"
     echo -n "Note: Trying to remount repository mountpoints to $published_hash... "
-    cvmfs_suid_helper rw_umount     $name                   && \
-    cvmfs_suid_helper rdonly_umount $name                   && \
+    run_suid_helper rw_umount     $name                     && \
+    run_suid_helper rdonly_umount $name                     && \
     set_ro_root_hash                $name "$published_hash" && \
-    cvmfs_suid_helper rdonly_mount  $name > /dev/null       && \
-    cvmfs_suid_helper rw_mount      $name && success=true || success=false
+    run_suid_helper rdonly_mount  $name > /dev/null         && \
+    run_suid_helper rw_mount      $name && success=true || success=false
     __health_check_syslog_repair_info $name "outdated revision" $success
     $success && echo "success" || { echo "fail"; exit 1; }
   fi
@@ -1544,7 +1565,7 @@ health_check() {
       echo "$name is in a transaction but /cvmfs/$name is not mounted read/write" >&2
       __health_check_print_repair_info $name $repair_in_txn
       echo -n "Note: Trying to remount /cvmfs/${name} read/write... "
-      cvmfs_suid_helper open $name && success=true || success=false
+      run_suid_helper open $name && success=true || success=false
       __health_check_syslog_repair_info $name "non-writable transaction" $success
       $success && echo "success" || { echo "fail"; exit 1; }
     fi
@@ -1553,7 +1574,7 @@ health_check() {
       echo "$name is not in a transaction but /cvmfs/$name is mounted read/write" >&2
       __health_check_print_repair_info $name $repair_in_txn
       echo -n "Note: Trying to remount /cvmfs/${name} read-only... "
-      cvmfs_suid_helper lock $name && success=true || success=false
+      run_suid_helper lock $name && success=true || success=false
       __health_check_syslog_repair_info $name "writable mount point" $success
       $success && echo "success" || { echo "fail"; exit 1; }
     fi
@@ -1628,9 +1649,9 @@ create_whitelist() {
 
 
 get_expiry_from_string() {
-  local whitelist_string="$1"
+  local whitelist="$1"
 
-  local expires=$(echo "$whitelist_string" | grep -e '^E[0-9]\{14\}$' | tr -d E)
+  local expires=$(echo "$whitelist" | grep --text -e '^E[0-9]\{14\}$' | tr -d E)
   if echo "$expires" | grep -q -E --invert-match '^[0-9]{14}$'; then
     echo -1
     return 1
@@ -1692,6 +1713,7 @@ sign_manifest() {
           -c /etc/cvmfs/keys/${name}.crt       \
           -k /etc/cvmfs/keys/${name}.key       \
           -n $name                             \
+          -u $CVMFS_STRATUM0                   \
           -m $unsigned_manifest                \
           -t ${CVMFS_SPOOL_DIR}/tmp            \
           -r $CVMFS_UPSTREAM_STORAGE"
@@ -2312,7 +2334,7 @@ If you go for production, backup you software signing keys in /etc/cvmfs/keys/!"
 
 generate_lsof_report_for_mountpoint() {
   local mountpoint="$1"
-  lsof | grep $mountpoint | awk '{print $1,$2,$3,$NF}' | column -t || true
+  lsof "$mountpoint" | awk '{print $1,$2,$3,$NF}' | column -t || true
 }
 
 
@@ -5442,11 +5464,11 @@ migrate_2_1_7() {
   local remote_hash
   remote_hash=$(get_published_root_hash $name)
 
-  cvmfs_suid_helper rw_umount $name     > /dev/null 2>&1 || die "fail! (unmounting /cvmfs/$name)"
-  cvmfs_suid_helper rdonly_umount $name > /dev/null 2>&1 || die "fail! (unmounting ${CVMFS_SPOOL_DIR}/rdonly)"
+  run_suid_helper rw_umount $name     > /dev/null 2>&1 || die "fail! (unmounting /cvmfs/$name)"
+  run_suid_helper rdonly_umount $name > /dev/null 2>&1 || die "fail! (unmounting ${CVMFS_SPOOL_DIR}/rdonly)"
   set_ro_root_hash $name $remote_hash
-  cvmfs_suid_helper rdonly_mount $name  > /dev/null 2>&1 || die "fail! (mounting ${CVMFS_SPOOL_DIR}/$name)"
-  cvmfs_suid_helper rw_mount $name      > /dev/null 2>&1 || die "fail! (mounting /cvmfs/$name)"
+  run_suid_helper rdonly_mount $name  > /dev/null 2>&1 || die "fail! (mounting ${CVMFS_SPOOL_DIR}/$name)"
+  run_suid_helper rw_mount $name      > /dev/null 2>&1 || die "fail! (mounting /cvmfs/$name)"
 }
 
 # note that this is only run on stratum1s that have local upstream storage

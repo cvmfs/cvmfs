@@ -1,37 +1,65 @@
 
 cvmfs_test_name="Read-only cache"
 
+ro_mount() {
+  local mountpoint=$1
+  local dir=$2
+  if running_on_osx; then
+    sudo mount -u -r -t hfs $mountpoint $dir
+  else
+    sudo mount -o remount,ro $dir
+  fi
+}
+
+cleanup() {
+  local tempdir=$1
+  # releasing the space in OSX
+  if running_on_osx; then
+    # we have to force umount
+    cvmfs_umount atlas.cern.ch
+    sudo umount $tmpdir
+    sudo hdiutil detach $mountpoint
+    sudo rmdir "$tmpdir"
+  else
+    sudo umount -l $tmpdir
+    sudo rmdir $tmpdir
+  fi
+}
+
 cvmfs_run_test() {
   logfile=$1
 
   local tmpdir=$(sudo mktemp -d /var/lib/cvmfs/tmp.XXXXXXXX)
-  [ x"$tmpdir" = x"" ] && return 9
+  [ -d "$tmpdir" ] || return 9
   echo "tmpdir is $tmpdir"
-  sudo mount -t tmpfs tmpfs $tmpdir || return 1
 
+  if running_on_osx; then
+    # on OSX we firstly have to reserve the space
+    local mountpoint=$(sudo hdid -nomount ram://256000)
+    sudo newfs_hfs $mountpoint || return 10
+    sudo mount -t hfs $mountpoint "$tmpdir" || return 11
+  else
+    sudo mount -t tmpfs tmpfs $tmpdir || return 1
+  fi
   cvmfs_mount atlas.cern.ch \
     "CVMFS_CACHE_BASE=$tmpdir" \
     "CVMFS_SHARED_CACHE=no" \
     "CVMFS_CONFIG_REPOSITORY="
   if [ $? -ne 0 ]; then
-    sudo umount -l $tmpdir
-    sudo rmdir $tmpdir
+    cleanup $tmpdir
     return 2
   fi
-  sudo mount -o remount,ro $tmpdir
+  ro_mount $mountpoint $tmpdir
   if [ $? -eq 0 ]; then
     echo "r/o remount is not supposed to work at this stage"
     cvmfs_umount atlas.cern.ch
-    sudo umount -l $tmpdir
-    sudo rmdir $tmpdir
+    cleanup $tmpdir
     return 4
   fi
   sudo cvmfs_talk -i atlas.cern.ch tear down to read-only || return 3
-  sudo mount -o remount,ro $tmpdir
+  ro_mount $mountpoint $tmpdir
   retval=$?
-  cvmfs_umount atlas.cern.ch
-  sudo umount -l $tmpdir
-  sudo rmdir $tmpdir
+  cleanup $tmpdir
 
   return $retval
 }
