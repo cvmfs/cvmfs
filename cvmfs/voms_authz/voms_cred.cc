@@ -61,7 +61,7 @@ ReportChildDeath(pid_t pid, int flags) {
  */
 struct ProxyHelper {
   // TODO(jblomer): remove magic number
-  ProxyHelper() : m_subprocess(-1), m_max_files(1024) {
+  ProxyHelper() : m_subprocess(-1), m_max_files(1024), m_exec_path("cvmfs2") {
     pthread_mutex_init(&m_helper_mutex, NULL);
 
     // TODO(jblomer): make a utility function, this code is also used in the
@@ -114,6 +114,11 @@ struct ProxyHelper {
   }
 
 
+  void SetCvmfsPath(const std::string &new_path) {
+    m_exec_path = new_path;
+  }
+
+
   bool CheckHelperLaunched() {
     MutexLockGuard guard(m_helper_mutex);
     if (m_subprocess != -1) {
@@ -159,9 +164,8 @@ struct ProxyHelper {
       close(idx);
     }
     char *args[3];
-    char executable_name[] = "cvmfs2";
     char process_flavor[] = "__cred_fetcher__";
-    args[0] = executable_name;
+    args[0] = const_cast<char*>(m_exec_path.c_str());
     args[1] = process_flavor;
     args[2] = NULL;
     // NOTE: We have forked from a threaded process.  We do
@@ -169,15 +173,19 @@ struct ProxyHelper {
     // those related to formatting strings or logging.  Hence, we CANNOT
     // call LogCvmfs from here (or allocate any memory on the heap).
     char full_path[PATH_MAX];
-    for (std::vector<std::string>::const_iterator it = m_paths.begin();
-         it != m_paths.end();
-         it++)
-    {
-      if (it->size() + 20 > PATH_MAX) {continue;}
-      memcpy(full_path, it->c_str(), it->size());
-      full_path[it->size()] = '/';
-      strcpy(full_path+it->size()+1, executable_name); // NOLINT
-      execv(full_path, args);
+    if (m_exec_path[0] == '/') {
+      execv(m_exec_path.c_str(), args);
+    } else {
+      for (std::vector<std::string>::const_iterator it = m_paths.begin();
+           it != m_paths.end();
+           it++)
+      {
+        if (it->size() + 20 > PATH_MAX) {continue;}
+        memcpy(full_path, it->c_str(), it->size());
+        full_path[it->size()] = '/';
+        strcpy(full_path+it->size()+1, m_exec_path.c_str()); // NOLINT
+        execv(full_path, args);
+      }
     }
     struct msghdr msg;
     memset(&msg, '\0', sizeof(msg));
@@ -286,7 +294,6 @@ struct ProxyHelper {
       int result = errno;
       // Socket is disconnected; child has died.
       if (errno == ENOTCONN || errno == EPIPE) {
-        MutexLockGuard guard(m_helper_mutex);
         ReportChildDeath(m_subprocess, WNOHANG);
         m_subprocess = -1;
       }
@@ -297,7 +304,6 @@ struct ProxyHelper {
       if (command == 1) {  // Child was unable to exec.
         LogCvmfs(kLogVoms, kLogWarning, "Child process was unable to execute "
                  "cvmfs_cred_fetcher: %s (errno=%d)", strerror(result), result);
-        MutexLockGuard guard(m_helper_mutex);
         ReportChildDeath(m_subprocess, 0);
         m_subprocess = -1;
       }
@@ -322,7 +328,6 @@ struct ProxyHelper {
     if (errno) {
       int result = errno;
       if (errno == ENOTCONN || errno == EPIPE) {
-        MutexLockGuard guard(m_helper_mutex);
         ReportChildDeath(m_subprocess, WNOHANG);
         m_subprocess = -1;
       }
@@ -408,7 +413,6 @@ struct ProxyHelper {
       int result = errno;
       // Socket is disconnected; child has died.
       if (errno == ENOTCONN || errno == EPIPE) {
-        MutexLockGuard guard(m_helper_mutex);
         ReportChildDeath(m_subprocess, WNOHANG);
         m_subprocess = -1;
       }
@@ -419,7 +423,6 @@ struct ProxyHelper {
       if (command == 1) {  // Child was unable to exec.
         LogCvmfs(kLogVoms, kLogWarning, "Child process was unable to execute "
                  "cvmfs_cred_fetcher: %s (errno=%d)", strerror(result), result);
-        MutexLockGuard guard(m_helper_mutex);
         ReportChildDeath(m_subprocess, 0);
         m_subprocess = -1;
       }
@@ -456,6 +459,7 @@ struct ProxyHelper {
   int m_sock;
   pthread_mutex_t m_helper_mutex;
   std::vector<std::string> m_paths;
+  std::string m_exec_path;
 };
 
 // TODO(jblomer): make it a singleton (well-defined initialization time)
@@ -470,4 +474,9 @@ GetProxyFile(pid_t pid, uid_t uid, gid_t gid) {
 authz_data*
 GetAuthzData(pid_t pid, uid_t uid, gid_t gid) {
   return g_instance.GetAuthzData(pid, uid, gid);
+}
+
+
+void SetCvmfsPath(const std::string &new_path) {
+  g_instance.SetCvmfsPath(new_path);
 }

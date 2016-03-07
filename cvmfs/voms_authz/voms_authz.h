@@ -24,5 +24,6 @@ void ReleaseCurlHandle(void *curl_handle, void *data);
 FILE *GetProxyFile(pid_t pid, uid_t uid, gid_t gid);
 authz_data* GetAuthzData(pid_t pid, uid_t uid, gid_t gid);
 
+void SetCvmfsPath(const std::string &);
 #endif  // CVMFS_VOMS_AUTHZ_VOMS_AUTHZ_H_
 
