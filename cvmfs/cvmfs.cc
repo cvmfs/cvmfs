@@ -106,7 +106,6 @@
 #include "util_concurrency.h"
 #include "uuid.h"
 #include "voms_authz/voms_cred.h"
-#include "voms_authz/voms_authz.h"
 #include "wpad.h"
 #include "xattr.h"
 
