@@ -1,0 +1,35 @@
+cvmfs_test_name="Python-wrapped cvmfs_server"
+cvmfs_test_autofs_on_startup=false
+
+cvmfs_run_test() {
+  logfile=$1
+  script_location=$2
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  local scratch_dir=$(pwd)
+
+  echo -n "checking for installed python interpreter... "
+  which "python" > /dev/null 2>&1 && echo "done" || die "fail"
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  local python_interpreter=$(which python)
+  echo "copying python interpreter in ${python_interpreter}"
+  cp $python_interpreter $repo_dir
+  python_interpreter="${repo_dir}/$(basename $python_interpreter)"
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "running python wrapper with ${python_interpreter} as interpreter"
+  yes "n" | CVMFS_TEST_REPO=${CVMFS_TEST_REPO} $python_interpreter ${script_location}/do_install.py || return 1
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+  return 0
+}
