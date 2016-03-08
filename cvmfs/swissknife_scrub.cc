@@ -18,6 +18,28 @@ namespace swissknife {
 const size_t      kHashSubtreeLength = 2;
 const std::string kTxnDirectoryName  = "txn";
 
+
+CommandScrub::CommandScrub()
+  : machine_readable_output_(false)
+  , reader_(NULL)
+  , alerts_(0)
+{
+  // initialize alert printer mutex
+  const bool mutex_init = (pthread_mutex_init(&alerts_mutex_, NULL) == 0);
+  assert(mutex_init);
+}
+
+
+CommandScrub::~CommandScrub() {
+  if (reader_ != NULL) {
+    delete reader_;
+    reader_ = NULL;
+  }
+
+  pthread_mutex_destroy(&alerts_mutex_);
+}
+
+
 CommandScrub::StoredFile::StoredFile(const std::string &path,
                                      const std::string &expected_hash) :
   AbstractFile(path, GetFileSize(path)),
@@ -196,10 +218,6 @@ int CommandScrub::Main(const swissknife::ArgumentList &args) {
   repo_path_               = MakeCanonicalPath(*args.find('r')->second);
   machine_readable_output_ = (args.find('m') != args.end());
 
-  // initialize alert printer mutex
-  const bool mutex_init = (pthread_mutex_init(&alerts_mutex_, NULL) == 0);
-  assert(mutex_init);
-
   // initialize asynchronous reader
   const size_t       max_buffer_size     = 512 * 1024;
   const unsigned int max_files_in_flight = 100;
@@ -252,16 +270,6 @@ std::string CommandScrub::MakeFullPath(const std::string &relative_path,
 
 void CommandScrub::ShowAlertsHelpMessage() const {
   LogCvmfs(kLogUtility, kLogStdout, "to come...");
-}
-
-
-CommandScrub::~CommandScrub() {
-  if (reader_ != NULL) {
-    delete reader_;
-    reader_ = NULL;
-  }
-
-  pthread_mutex_destroy(&alerts_mutex_);
 }
 
 }  // namespace swissknife
