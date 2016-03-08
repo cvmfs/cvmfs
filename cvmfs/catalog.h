@@ -176,6 +176,7 @@ class Catalog : public SingleCopy {
   uint64_t GetNumChunks() const;
   shash::Any GetPreviousRevision() const;
   const Counters& GetCounters() const { return counters_; }
+  std::string PrintMemStatistics() const;
 
   inline float schema() const { return database().schema_version(); }
   inline PathString path() const { return path_; }
@@ -294,7 +295,6 @@ class Catalog : public SingleCopy {
 
   SqlListing               *sql_listing_;
   SqlLookupPathHash        *sql_lookup_md5path_;
-  SqlLookupInode           *sql_lookup_inode_;
   SqlNestedCatalogLookup   *sql_lookup_nested_;
   SqlNestedCatalogListing  *sql_list_nested_;
   SqlAllChunks             *sql_all_chunks_;

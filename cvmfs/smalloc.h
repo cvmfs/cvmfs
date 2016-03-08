@@ -53,10 +53,16 @@ static inline void * __attribute__((used)) smmap(size_t size) {
   assert(size > 0);
   assert(size < std::numeric_limits<size_t>::max() - 4096);
 
+  const int anonymous_fd = -1;
+  const off_t offset = 0;
   size_t pages = ((size + 2*sizeof(size_t))+4095)/4096;  // round to full page
-  unsigned char *mem =
-    static_cast<unsigned char *>(mmap(NULL, pages*4096, PROT_READ | PROT_WRITE,
-                                 MAP_PRIVATE | PLATFORM_MAP_ANONYMOUS, -1, 0));
+  unsigned char *mem = static_cast<unsigned char *>(
+    mmap(NULL,
+         pages*4096,
+         PROT_READ | PROT_WRITE,
+         MAP_PRIVATE | PLATFORM_MAP_ANONYMOUS,
+         anonymous_fd,
+         offset));
   // printf("SMMAP %d bytes at %p\n", pages*4096, mem);
   assert((mem != MAP_FAILED) && "Out Of Memory");
   *(reinterpret_cast<size_t *>(mem)) = kMemMarker;
@@ -72,6 +78,50 @@ static inline void __attribute__((used)) smunmap(void *mem) {
   // printf("SUNMMAP %d bytes at %p\n", pages*4096, area);
   assert((retval == 0) && "Invalid umnmap");
 }
+
+
+/**
+ * Used when the caller remembers the size, so that it can call sxunmap later.
+ */
+static inline void * __attribute__((used)) sxmmap(size_t size) {
+  const int anonymous_fd = -1;
+  const off_t offset = 0;
+  void *mem = mmap(NULL,
+                   size,
+                   PROT_READ | PROT_WRITE,
+                   MAP_PRIVATE | PLATFORM_MAP_ANONYMOUS,
+                   anonymous_fd,
+                   offset);
+  assert((mem != MAP_FAILED) && "Out Of Memory");
+  return mem;
+}
+
+
+/**
+ * Free memory acquired by sxmmap.
+ */
+static inline void __attribute__((used)) sxunmap(void *mem, size_t size) {
+  int retval = munmap(mem, size);
+  assert((retval == 0) && "Invalid umnmap");
+}
+
+
+/**
+ * Pointer is aligned at a multiple of the size.  The size has to be a multiple
+ * of 2MB.
+ */
+static inline void * __attribute__((used)) sxmmap_align(size_t size) {
+  assert((size % (2 * 1024 * 1024)) == 0);
+  char *mem = reinterpret_cast<char *>(sxmmap(2 * size));
+  uintptr_t head = size - (uintptr_t(mem) % size);
+  sxunmap(mem, head);
+  mem += head;
+  uintptr_t tail = size - head;
+  if (tail > 0)
+    sxunmap(mem + size, tail);
+  return mem;
+}
+
 
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD

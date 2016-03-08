@@ -98,6 +98,7 @@
 #include "shortstring.h"
 #include "signature.h"
 #include "smalloc.h"
+#include "sqlitemem.h"
 #include "sqlitevfs.h"
 #include "statistics.h"
 #include "talk.h"
@@ -1206,6 +1207,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
              "linking chunk handle %d to inode: %"PRIu64,
              chunk_tables_->next_handle, uint64_t(ino));
     chunk_tables_->handle2fd.Insert(chunk_tables_->next_handle, ChunkFd());
+    // On NFS, inodes are not unique.  Don't cache there.
+    fi->keep_cache = !nfs_maps_;
     fi->fh = static_cast<uint64_t>(-chunk_tables_->next_handle);
     ++chunk_tables_->next_handle;
     chunk_tables_->Unlock();
@@ -1227,16 +1230,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
         (static_cast<int>(max_open_files_))-kNumReservedFd) {
       LogCvmfs(kLogCvmfs, kLogDebug, "file %s opened (fd %d)",
                path.c_str(), fd);
-      /*fi->keep_cache = kcache_timeout_ == 0.0 ? 0 : 1;
-      if (dirent.cached_mtime() != dirent.mtime()) {
-        LogCvmfs(kLogCvmfs, kLogDebug,
-                 "file might be new or changed, invalidating cache (%d %d "
-                 "%"PRIu64")", dirent.mtime(), dirent.cached_mtime(), uint64_t(ino));
-        fi->keep_cache = 0;
-        dirent.set_cached_mtime(dirent.mtime());
-        inode_cache_->Insert(ino, dirent);
-      }*/
-      fi->keep_cache = 0;
+      // On NFS, inodes are not unique.  Don't cache there.
+      fi->keep_cache = !nfs_maps_;
       fi->fh = fd;
       fuse_reply_open(req, fi);
       return;
@@ -1992,8 +1987,6 @@ bool g_talk_ready = false;
 bool g_running_created = false;
 
 int g_fd_lockfile = -1;
-void *g_sqlite_scratch = NULL;
-void *g_sqlite_page_cache = NULL;
 string *g_boot_error = NULL;
 
 __attribute__((visibility("default")))
@@ -2353,17 +2346,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   assert(retval == SQLITE_OK);
   retval = sqlite3_config(SQLITE_CONFIG_MULTITHREAD);
   assert(retval == SQLITE_OK);
-  // 8 KB for 8 threads (2 slots per thread)
-  g_sqlite_scratch = smalloc(8192*16);
-  g_sqlite_page_cache = smalloc(1280*3275);  // 4MB
-  retval = sqlite3_config(SQLITE_CONFIG_SCRATCH, g_sqlite_scratch, 8192, 16);
-  assert(retval == SQLITE_OK);
-  retval = sqlite3_config(SQLITE_CONFIG_PAGECACHE, g_sqlite_page_cache,
-                          1280, 3275);
-  assert(retval == SQLITE_OK);
-  // 4 KB
-  retval = sqlite3_config(SQLITE_CONFIG_LOOKASIDE, 32, 128);
-  assert(retval == SQLITE_OK);
+  SqliteMemoryManager::GetInstance()->AssignGlobalArenas();
 
   // Disable SQlite3 locks
   retval = sqlite3_vfs_register(sqlite3_vfs_find("unix-none"), 1);
@@ -3010,6 +2993,10 @@ static void Fini() {
     delete cvmfs::fetcher_;
     cvmfs::fetcher_ = NULL;
   }
+  if (cvmfs::external_fetcher_) {
+    delete cvmfs::external_fetcher_;
+    cvmfs::external_fetcher_ = NULL;
+  }
 
   tracer::Fini();
   if (g_signature_ready) cvmfs::signature_manager_->Fini();
@@ -3071,10 +3058,7 @@ static void Fini() {
     sqlite3_temp_directory = NULL;
   }
   sqlite3_shutdown();
-  if (g_sqlite_page_cache) free(g_sqlite_page_cache);
-  if (g_sqlite_scratch) free(g_sqlite_scratch);
-  g_sqlite_page_cache = NULL;
-  g_sqlite_scratch = NULL;
+  SqliteMemoryManager::CleanupInstance();
 
   if (g_monitor_ready) monitor::Fini();
 

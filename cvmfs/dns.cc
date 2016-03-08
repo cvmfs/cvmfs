@@ -681,6 +681,7 @@ CaresResolver::CaresResolver(
   const unsigned timeout_ms)
   : Resolver(ipv4_only, retries, timeout_ms)
   , channel_(NULL)
+  , lookup_options_(strdup("b"))
 {
 }
 
@@ -690,6 +691,7 @@ CaresResolver::~CaresResolver() {
     ares_destroy(*channel_);
     free(channel_);
   }
+  free(lookup_options_);
 }
 
 
@@ -719,7 +721,7 @@ CaresResolver *CaresResolver::Create(
   memset(&options, 0, sizeof(options));
   options.timeout = timeout_ms;
   options.tries = 1 + retries;
-  options.lookups = strdup("b");
+  options.lookups = resolver->lookup_options_;
   optmask = ARES_OPT_TIMEOUTMS | ARES_OPT_TRIES | ARES_OPT_LOOKUPS;
   retval = ares_init_options(resolver->channel_, &options, optmask);
   if (retval != ARES_SUCCESS)

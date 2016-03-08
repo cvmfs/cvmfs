@@ -57,6 +57,7 @@ set (CVMFS_CLIENT_SOURCES
   fs_traversal.h
   xattr.h xattr.cc
   statistics.h statistics.cc
+  sqlitemem.cc sqlitemem.h
   sqlitevfs.cc sqlitevfs.h
   fetch.cc fetch.h
   sink.h
@@ -175,6 +176,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   directory_entry.h directory_entry.cc
   shortstring.h
   catalog_traversal.h
+  sqlitemem.h sqlitemem.cc
   sql.h sql_impl.h sql.cc
   catalog_sql.h catalog_sql.cc
   uid_map.h
@@ -238,7 +240,8 @@ set (CVMFS_PRELOADER_SOURCES
   statistics.cc statistics.h
   duplex_curl.h duplex_cares.h
   catalog_sql.cc catalog_sql.h
-  sql.cc sql.h
+  sqlitemem.h sqlitemem.cc
+  sql.cc sql.h sql_impl.h
   util.cc util.h
   hash.cc hash.h
   upload_facility.cc upload_facility.h
