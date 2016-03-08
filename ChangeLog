@@ -1,5 +1,5 @@
 2.2.2:
-  * Add support for default.conf file in config repository 
+  * Add support for default.conf file in config repository (CVM-993)
 
 2.2.1:
   * Fix reading of chunked files in libcvmfs
