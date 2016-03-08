@@ -54,6 +54,16 @@ publish_after_hook() { :; }
 
 [ -f /etc/cvmfs/cvmfs_server_hooks.sh ] && . /etc/cvmfs/cvmfs_server_hooks.sh
 
+# Path to some useful sbin utilities
+LSOF_BIN="/usr/sbin/lsof"
+GETENFORCE_BIN="/usr/sbin/getenforce"
+SESTATUS_BIN="/usr/sbin/sestatus"
+GETCAP_BIN="/usr/sbin/getcap"
+SETCAP_BIN="/usr/sbin/setcap"
+MODPROBE_BIN="/sbin/modprobe"
+PIDOF_BIN="/sbin/pidof"
+RUNUSER_BIN="/sbin/runuser"
+
 # Find out how to deal with Apache
 # (binary name, configuration directory, CLI, WSGI module name, ...)
 if which httpd2 > /dev/null 2>&1; then # SLES/OpenSuSE
@@ -80,10 +90,10 @@ fi
 
 # Find the service binary (or detect systemd)
 minpidof() {
-  pidof $1 | tr " " "\n" | sort --numeric-sort | head -n1
+  $PIDOF_BIN $1 | tr " " "\n" | sort --numeric-sort | head -n1
 }
 SERVICE_BIN="false"
-if ! pidof systemd > /dev/null 2>&1 || [ $(minpidof systemd) -ne 1 ]; then
+if ! $PIDOF_BIN systemd > /dev/null 2>&1 || [ $(minpidof systemd) -ne 1 ]; then
   if [ -x /sbin/service ]; then
     SERVICE_BIN="/sbin/service"
   elif [ -x /usr/sbin/service ]; then
@@ -98,7 +108,7 @@ fi
 # Check if `runuser` is available on this system
 # Note: at least Ubuntu in older versions doesn't provide this command
 HAS_RUNUSER=0
-if which runuser > /dev/null 2>&1; then
+if [ -x $RUNUSER_BIN ]; then
   HAS_RUNUSER=1
 fi
 
@@ -569,7 +579,7 @@ check_multiple_repository_existence() {
 # or if aufs is compiled in
 # @return   0 if the aufs kernel module is loaded
 check_aufs() {
-  /sbin/modprobe -q aufs || test -d /sys/fs/aufs
+  $MODPROBE_BIN -q aufs || test -d /sys/fs/aufs
 }
 
 
@@ -577,7 +587,7 @@ check_aufs() {
 # or if overlayfs is compiled in
 # @return   0 if the overlayfs kernel module is loaded
 check_overlayfs() {
-  /sbin/modprobe -q overlay || test -d /sys/module/overlay
+  $MODPROBE_BIN -q overlay || test -d /sys/module/overlay
 }
 
 
@@ -787,7 +797,7 @@ has_apache_config_file() {
 
 get_fd_modes() {
   local path=$1
-  lsof -Fan 2>/dev/null | grep -B1 -e "^n$path" | grep -e '^a.*'
+  $LSOF_BIN -Fan 2>/dev/null | grep -B1 -e "^n$path" | grep -e '^a.*'
 }
 
 # gets the number of open read-only file descriptors beneath a given path
@@ -886,7 +896,7 @@ get_user_shell() {
     shell_cmd="sh -c"
   elif is_root; then
     if [ $HAS_RUNUSER -ne 0 ]; then
-      shell_cmd="runuser -m $CVMFS_USER -c"
+      shell_cmd="$RUNUSER_BIN -m $CVMFS_USER -c"
     else
       shell_cmd="su -m $CVMFS_USER -c"
     fi
@@ -1224,9 +1234,9 @@ check_user() {
 
 
 has_selinux() {
-  which sestatus   > /dev/null 2>&1 && \
-  which getenforce > /dev/null 2>&1 && \
-  getenforce | grep -qi "enforc" || return 1
+  [ -x $SESTATUS_BIN   ] && \
+  [ -x $GETENFORCE_BIN ] && \
+  $GETENFORCE_BIN | grep -qi "enforc" || return 1
 }
 
 
@@ -1843,9 +1853,9 @@ EOF
 _setcap_if_needed() {
   local binary_path="$1"
   local capability="$2"
-  [ -x $binary_path ]                           || return 0
-  getcap "$binary_path" | grep -q "$capability" && return 0
-  setcap "${capability}+p" "$binary_path"
+  [ -x $binary_path ]                                || return 0
+  $GETCAP_BIN "$binary_path" | grep -q "$capability" && return 0
+  $SETCAP_BIN "${capability}+p" "$binary_path"
 }
 
 # grants CAP_SYS_ADMIN to cvmfs_swissknife if it is necessary
@@ -2334,7 +2344,7 @@ If you go for production, backup you software signing keys in /etc/cvmfs/keys/!"
 
 generate_lsof_report_for_mountpoint() {
   local mountpoint="$1"
-  lsof "$mountpoint" | awk '{print $1,$2,$3,$NF}' | column -t || true
+  $LSOF_BIN "$mountpoint" | awk '{print $1,$2,$3,$NF}' | column -t || true
 }
 
 
