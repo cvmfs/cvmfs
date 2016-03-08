@@ -240,6 +240,9 @@ void OptionsManager::ParseDefault(const string &fqrn) {
   for (unsigned i = 0; i < dist_defaults.size(); ++i) {
     ParsePath(dist_defaults[i], false);
   }
+  string external_config_path;
+  if ((fqrn != "") && HasConfigRepository(fqrn, &external_config_path))
+    ParsePath(external_config_path + "default.conf", true);
   ParsePath("/etc/cvmfs/default.local", false);
 
   if (fqrn != "") {
@@ -249,7 +252,6 @@ void OptionsManager::ParseDefault(const string &fqrn) {
     tokens.erase(tokens.begin());
     domain = JoinStrings(tokens, ".");
 
-    string external_config_path;
     if (HasConfigRepository(fqrn, &external_config_path))
       ParsePath(external_config_path + "domain.d/" + domain + ".conf", true);
     ParsePath("/etc/cvmfs/domain.d/" + domain + ".conf", false);
