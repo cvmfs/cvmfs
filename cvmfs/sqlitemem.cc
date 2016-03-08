@@ -22,7 +22,7 @@ uint32_t SqliteMemoryManager::MallocArena::GetSize(void *ptr) const {
 
   ReservedBlockCtl *block_ctl = reinterpret_cast<ReservedBlockCtl *>(
     reinterpret_cast<char *>(ptr) - sizeof(ReservedBlockCtl));
-  int32_t size = -(block_ctl->size);
+  int32_t size = block_ctl->size();
   assert(size > 1);
   return size - sizeof(ReservedBlockCtl) - 1;
 }
@@ -44,9 +44,8 @@ void SqliteMemoryManager::MallocArena::Free(void *ptr) {
     reinterpret_cast<char *>(ptr) - sizeof(ReservedBlockCtl));
   char prior_tag = *(reinterpret_cast<char *>(block_ctl) - 1);
   assert((prior_tag == kTagAvail) || (prior_tag == kTagReserved));
-  assert(block_ctl->size <= 0);
 
-  int32_t new_size = -(block_ctl->size);
+  int32_t new_size = block_ctl->size();
   assert(new_size > 0);
   AvailBlockCtl *new_avail = reinterpret_cast<AvailBlockCtl *>(block_ctl);
 

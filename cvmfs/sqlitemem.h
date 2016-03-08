@@ -9,6 +9,7 @@
 #include <pthread.h>
 #include <stdint.h>
 
+#include <cassert>
 #include <cstdlib>
 #include <vector>
 
@@ -185,11 +186,15 @@ class SqliteMemoryManager {
      * the lower boundary of a free block.
      */
     struct ReservedBlockCtl {
-      explicit ReservedBlockCtl(int32_t s) : size(-s) {
+     public:
+      explicit ReservedBlockCtl(int32_t s) : size_(-s) {
         char *base = reinterpret_cast<char *>(this);
         *(base + s - 1) = kTagReserved;
       }
-      int32_t size;  // always negative
+      int32_t size() const { assert(size_ <= 0);  return -size_; }
+
+     private:
+      int32_t size_;  // always negative
     };
 
     /**
