@@ -27,6 +27,7 @@ uint32_t SqliteMemoryManager::MallocArena::GetSize(void *ptr) const {
   return size - sizeof(ReservedBlockCtl) - 1;
 }
 
+
 /**
  * Creates a free block at the place of the reserved block ptr points into.
  * The free block might need to be merged with adjacent lower and/or upper
@@ -57,13 +58,11 @@ void SqliteMemoryManager::MallocArena::Free(void *ptr) {
     new_size += prior_size;
     new_avail = reinterpret_cast<AvailBlockCtl *>(
       reinterpret_cast<char *>(block_ctl) - prior_size);
-    AvailBlockCtl *next = new_avail->GetNextPtr(arena_);
-    AvailBlockCtl *prev = new_avail->GetPrevPtr(arena_);
-    prev->link_next = new_avail->link_next;
-    next->link_prev = new_avail->link_prev;
-    if (rover_ == new_avail)
-      rover_ = head_avail_;
+    // new_avail points now to the prior block
+    UnlinkAvailBlock(new_avail);
   }
+  if (rover_ == new_avail)
+    rover_ = head_avail_;
 
   int32_t succ_size = *reinterpret_cast<int32_t *>(
     reinterpret_cast<char *>(new_avail) + new_size);
@@ -71,10 +70,7 @@ void SqliteMemoryManager::MallocArena::Free(void *ptr) {
     // Merge with succeeding block and remove the block from the list
     AvailBlockCtl *succ_avail = reinterpret_cast<AvailBlockCtl *>(
       reinterpret_cast<char *>(new_avail) + new_size);
-    AvailBlockCtl *next = succ_avail->GetNextPtr(arena_);
-    AvailBlockCtl *prev = succ_avail->GetPrevPtr(arena_);
-    prev->link_next = succ_avail->link_next;
-    next->link_prev = succ_avail->link_prev;
+    UnlinkAvailBlock(succ_avail);
     new_size += succ_size;
     if (rover_ == succ_avail)
       rover_ = head_avail_;
@@ -110,6 +106,7 @@ void *SqliteMemoryManager::MallocArena::Malloc(const uint32_t size) {
   if (total_size < kMinBlockSize)
     total_size = kMinBlockSize;
 
+  // Tries to find a free block to host the given size
   bool wrapped = false;
   // Generally: p = LINK(q)
   AvailBlockCtl *q = rover_;
@@ -139,13 +136,9 @@ void *SqliteMemoryManager::MallocArena::Malloc(const uint32_t size) {
   // Update the list of available blocks
   if (remaining_size == 0) {
     // Remove free block p from the list of available blocks
-    q->link_next = p->link_next;
-    q->GetNextPtr(arena_)->link_prev = q->ConvertToLink(arena_);
+    UnlinkAvailBlock(p);
   } else {
-    p->size = remaining_size;
-    void *upper_tag =
-      reinterpret_cast<char *>(p) + remaining_size - sizeof(AvailBlockTag);
-    new (upper_tag) AvailBlockTag(remaining_size);
+    p->ShrinkTo(remaining_size);
   }
   rover_ = q->GetNextPtr(arena_);
 
@@ -190,6 +183,19 @@ SqliteMemoryManager::MallocArena::MallocArena()
 
 SqliteMemoryManager::MallocArena::~MallocArena() {
   sxunmap(arena_, kArenaSize);
+}
+
+
+/**
+ * Removes the given block from the doubly linked free block list.  This happens
+ * when two adjacent free blocks are created in Free() and then merged.  Or if
+ * a block gets fully used in Malloc().
+ */
+void SqliteMemoryManager::MallocArena::UnlinkAvailBlock(AvailBlockCtl *block) {
+  AvailBlockCtl *next = block->GetNextPtr(arena_);
+  AvailBlockCtl *prev = block->GetPrevPtr(arena_);
+  prev->link_next = block->link_next;
+  next->link_prev = block->link_prev;
 }
 
 
