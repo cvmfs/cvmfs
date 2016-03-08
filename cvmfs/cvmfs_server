@@ -5299,7 +5299,14 @@ EOF
     (
     echo
     echo "Starting $repo at `date`"
-    if ! __do_snapshot $repo 1; then
+    # Work around the errexit (that is, set -e) misfeature of being
+    #  disabled whenever the exit code is to be checked.
+    # See https://lists.gnu.org/archive/html/bug-bash/2012-12/msg00093.html
+    set +e
+    (set -e
+    __do_snapshot $repo 1
+    )
+    if [ $? != 0 ]; then
       echo "ERROR from cvmfs_server snapshot!" >&2
     fi
     echo "Finished $repo at `date`"
