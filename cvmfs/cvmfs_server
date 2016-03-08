@@ -68,14 +68,14 @@ find_sbin() {
 }
 
 # Path to some useful sbin utilities
-LSOF_BIN="$(find_sbin       lsof)"
-GETENFORCE_BIN="$(find_sbin getenforce)"
-SESTATUS_BIN="$(find_sbin   sestatus)"
-GETCAP_BIN="$(find_sbin     getcap)"
-SETCAP_BIN="$(find_sbin     setcap)"
-MODPROBE_BIN="$(find_sbin   modprobe)"
-PIDOF_BIN="$(find_sbin      pidof)"
-RUNUSER_BIN="$(find_sbin    runuser)"
+LSOF_BIN="$(find_sbin       lsof)"       || true
+GETENFORCE_BIN="$(find_sbin getenforce)" || true
+SESTATUS_BIN="$(find_sbin   sestatus)"   || true
+GETCAP_BIN="$(find_sbin     getcap)"     || true
+SETCAP_BIN="$(find_sbin     setcap)"     || true
+MODPROBE_BIN="$(find_sbin   modprobe)"   || true
+PIDOF_BIN="$(find_sbin      pidof)"      || true
+RUNUSER_BIN="$(find_sbin    runuser)"    || true
 
 # Find out how to deal with Apache
 # (binary name, configuration directory, CLI, WSGI module name, ...)
@@ -1894,10 +1894,10 @@ ensure_swissknife_suid() {
 # an ubuntu machine. This enables these modules on an ubuntu installation
 # Note: this function requires a privileged user
 ensure_enabled_apache_modules() {
-  find_sbin a2enmod    > /dev/null 2>&1 || return 0
-  find_sbin apache2ctl > /dev/null 2>&1 || return 0
-  local a2enmod_bin=$(find_sbin a2enmod)
-  local apache2ctl_bin=$(find_sbin apache2ctl)
+  local a2enmod_bin=
+  local apache2ctl_bin=
+  a2enmod_bin="$(find_sbin    a2enmod)"    || return 0
+  apache2ctl_bin="$(find_sbin apache2ctl)" || return 0
 
   local restart=0
   local retcode=0
