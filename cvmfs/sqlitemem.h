@@ -204,6 +204,9 @@ class SqliteMemoryManager {
     };
 
     void UnlinkAvailBlock(AvailBlockCtl *block);
+    void EnqueueAvailBlock(AvailBlockCtl *block);
+    AvailBlockCtl *FindAvailBlock(const int32_t block_size);
+    void *ReserveBlock(AvailBlockCtl *block, int32_t block_size);
 
     /**
      * Starts with the address of the MallocArena object followed by a

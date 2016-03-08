@@ -17,14 +17,30 @@
 
 using namespace std;  // NOLINT
 
-uint32_t SqliteMemoryManager::MallocArena::GetSize(void *ptr) const {
-  assert(Contains(ptr));
 
-  ReservedBlockCtl *block_ctl = reinterpret_cast<ReservedBlockCtl *>(
-    reinterpret_cast<char *>(ptr) - sizeof(ReservedBlockCtl));
-  int32_t size = block_ctl->size();
-  assert(size > 1);
-  return size - sizeof(ReservedBlockCtl) - 1;
+/**
+ * Walks through the free list starting at rover_ and looks for the first block
+ * larger than block_size.  Returns NULL if no such block exists.
+ */
+SqliteMemoryManager::MallocArena::AvailBlockCtl *
+SqliteMemoryManager::MallocArena::FindAvailBlock(const int32_t block_size) {
+  bool wrapped = false;
+  // Generally: p = LINK(q)
+  AvailBlockCtl *q = rover_;
+  AvailBlockCtl *p;
+  do {
+    p = q->GetNextPtr(arena_);
+    if (p->size >= block_size) {
+      rover_ = p->GetNextPtr(arena_);
+      return p;
+    }
+    if (p == head_avail_) {
+      if (wrapped)
+        return NULL;
+      wrapped = true;
+    }
+    q = p;
+  } while (true);
 }
 
 
@@ -76,19 +92,40 @@ void SqliteMemoryManager::MallocArena::Free(void *ptr) {
       rover_ = head_avail_;
   }
 
-  // Insert new free block at the end of the list
-  AvailBlockCtl *next = head_avail_;
-  AvailBlockCtl *prev = head_avail_->GetPrevPtr(arena_);
-  next->link_prev = new_avail->ConvertToLink(arena_);
-  prev->link_next = new_avail->ConvertToLink(arena_);
-  new_avail->link_next = head_avail_->ConvertToLink(arena_);
-  new_avail->link_prev = prev->ConvertToLink(arena_);
-
   // Set new free block's boundaries
   new_avail->size = new_size;
   void *upper_tag =
     reinterpret_cast<char *>(new_avail) + new_size - sizeof(AvailBlockTag);
   new (upper_tag) AvailBlockTag(new_size);
+
+  EnqueueAvailBlock(new_avail);
+}
+
+/**
+ * Inserts an avilable block at the end of the free list.
+ */
+void SqliteMemoryManager::MallocArena::EnqueueAvailBlock(AvailBlockCtl *block) {
+  AvailBlockCtl *next = head_avail_;
+  AvailBlockCtl *prev = head_avail_->GetPrevPtr(arena_);
+  next->link_prev = block->ConvertToLink(arena_);
+  prev->link_next = block->ConvertToLink(arena_);
+  block->link_next = head_avail_->ConvertToLink(arena_);
+  block->link_prev = prev->ConvertToLink(arena_);
+}
+
+
+/**
+ * The ptr points to the result of Malloc().  The size of the area is stored
+ * a few bytes before ptr.
+ */
+uint32_t SqliteMemoryManager::MallocArena::GetSize(void *ptr) const {
+  assert(Contains(ptr));
+
+  ReservedBlockCtl *block_ctl = reinterpret_cast<ReservedBlockCtl *>(
+    reinterpret_cast<char *>(ptr) - sizeof(ReservedBlockCtl));
+  int32_t size = block_ctl->size();
+  assert(size > 1);
+  return size - sizeof(ReservedBlockCtl) - 1;
 }
 
 
@@ -106,46 +143,12 @@ void *SqliteMemoryManager::MallocArena::Malloc(const uint32_t size) {
   if (total_size < kMinBlockSize)
     total_size = kMinBlockSize;
 
-  // Tries to find a free block to host the given size
-  bool wrapped = false;
-  // Generally: p = LINK(q)
-  AvailBlockCtl *q = rover_;
-  AvailBlockCtl *p;
-  do {
-    p = q->GetNextPtr(arena_);
-    if (p->size >= total_size)
-      break;
-    if (p == head_avail_) {
-      if (wrapped)
-        return NULL;
-      wrapped = true;
-    }
-    q = p;
-  } while (true);
+  AvailBlockCtl *p = FindAvailBlock(total_size);
+  if (p == NULL)
+    return NULL;
 
-  // As of here: we found a sufficiently large free block at p following q
   no_reserved_++;
-
-  int32_t remaining_size = p->size - total_size;
-  // Avoid creation of very small blocks
-  if (remaining_size < kMinBlockSize) {
-    total_size += remaining_size;
-    remaining_size = 0;
-  }
-
-  // Update the list of available blocks
-  if (remaining_size == 0) {
-    // Remove free block p from the list of available blocks
-    UnlinkAvailBlock(p);
-  } else {
-    p->ShrinkTo(remaining_size);
-  }
-  rover_ = q->GetNextPtr(arena_);
-
-  // Place the new allocation, which also sets the block type tag at the end
-  char *new_block = reinterpret_cast<char *>(p) + remaining_size;
-  new (new_block) ReservedBlockCtl(total_size);
-  return new_block + sizeof(ReservedBlockCtl);
+  return ReserveBlock(p, total_size);
 }
 
 
@@ -183,6 +186,39 @@ SqliteMemoryManager::MallocArena::MallocArena()
 
 SqliteMemoryManager::MallocArena::~MallocArena() {
   sxunmap(arena_, kArenaSize);
+}
+
+
+/**
+ * Given the free block "block", cuts out a new reserved block of size
+ * block_size at the end of the free block.  Returns a pointer usable by the
+ * application.
+ */
+void *SqliteMemoryManager::MallocArena::ReserveBlock(
+  AvailBlockCtl *block,
+  int32_t block_size)
+{
+  assert(block->size >= block_size);
+
+  int32_t remaining_size = block->size - block_size;
+  // Avoid creation of very small blocks
+  if (remaining_size < kMinBlockSize) {
+    block_size += remaining_size;
+    remaining_size = 0;
+  }
+
+  // Update the list of available blocks
+  if (remaining_size == 0) {
+    // Remove free block p from the list of available blocks
+    UnlinkAvailBlock(block);
+  } else {
+    block->ShrinkTo(remaining_size);
+  }
+
+  // Place the new allocation, which also sets the block type tag at the end
+  char *new_block = reinterpret_cast<char *>(block) + remaining_size;
+  new (new_block) ReservedBlockCtl(block_size);
+  return new_block + sizeof(ReservedBlockCtl);
 }
 
 
