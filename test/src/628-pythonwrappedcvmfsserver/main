@@ -1,4 +1,4 @@
-cvmfs_test_name="Python-wrapped cvmfs_server"
+cvmfs_test_name="Python-wrapped cvmfs_server Invoked Through Crontab"
 cvmfs_test_autofs_on_startup=false
 
 CVMFS_TEST_628_PREVIOUS_CRONTAB=
