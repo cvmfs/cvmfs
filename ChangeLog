@@ -6,6 +6,9 @@
   * Warn when forcfully remounting the file system stack on the server, new
     parameter CVMFS_FORCE_REMOUNT_WARNING
 
+2.2.2:
+  * Add support for default.conf in config repository
+
 2.2.1:
   * Fix reading of chunked files in libcvmfs
   * Disable access to VOMS protected repositories until certificate handling
