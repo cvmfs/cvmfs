@@ -20,55 +20,39 @@
 #include <vector>
 
 #include "fuse/fuse_lowlevel.h"
-#include "voms/voms_apic.h"
 
 #include "../logging.h"
 #include "../platform.h"
+#include "../util.h"
+#include "voms_lib.h"
 
 // TODO(jblomer): add unit tests for static functions
-
-// VOMS API declarations
-extern "C" {
-void (*g_VOMS_Destroy)(struct vomsdata *vd) = NULL;
-struct vomsdata * (*g_VOMS_Init)(char *voms, char *cert) = NULL;
-int (*g_VOMS_RetrieveFromFile)(FILE *file, int how, struct vomsdata *vd,
-                               int *error) = NULL;
-char * (*g_VOMS_ErrorMessage)(struct vomsdata *vd, int error, char *buffer,
-                              int len) = NULL;
-}
-
 // TODO(jblomer): add comment
 // TODO(jblomer): unit test the class
 // TODO(jblomer): Member functions should start with a capital letter
 // TODO(jblomer): put into anonymous namespace
 // TODO(jblomer): replace pthread_mutex_lock by MutexGuard
 // TODO(jblomer): member naming: trailing underscore, no m_ prefix
-// TODO(jblomer): naming VOMS --> Voms
-class VOMSSessionCache {
- public:
-  VOMSSessionCache()
-    : m_zombie(true),
-      m_last_clean(platform_monotonic_time())
+class AuthzSessionCache {
+  AuthzSessionCache()
+    : m_last_clean(platform_monotonic_time())
   {
     int retval = pthread_mutex_init(&m_mutex, NULL);
     assert(retval == 0);
-    load_voms_library();
   }
 
-  ~VOMSSessionCache() {
+  ~AuthzSessionCache() {
     for (KeyToVOMS::const_iterator it = m_map.begin();
          it != m_map.end();
          it++)
     {
-      (*g_VOMS_Destroy)(it->second.first);
+      delete (it->second.first);
     }
-    close_voms_library();
     pthread_mutex_destroy(&m_mutex);
   }
 
-  // TODO(jblomer): change type of vomsdata
-  bool get(pid_t pid, struct vomsdata *&vomsinfo) {  // NOLINT
-    if (m_zombie) {return false;}
+ public:
+  bool get(pid_t pid, authz_data **authz) {  // NOLINT
     time_t now = platform_monotonic_time();
     KeyType mykey;
     if (!lookup(pid, mykey)) {return false;}
@@ -86,7 +70,7 @@ class VOMSSessionCache {
     LogCvmfs(kLogVoms, kLogDebug, "Session %d, UID %d, GID %d, bday %llu "
              "has cached VOMS data", mykey.pid, mykey.uid, mykey.gid,
              mykey.bday);
-    vomsinfo = iter->second.first;
+    *authz = iter->second.first;
     return true;
   }
 
@@ -95,13 +79,12 @@ class VOMSSessionCache {
    * This function is thread safe.
    *
    * The returned pointer is the data in the map which is possibly not the
-   * input vomsdata.
+   * input authz data.
    *
    * If result is NULL, then the operation failed and errno is set.
    */
-  struct vomsdata *try_put(pid_t pid, struct vomsdata *voms_ptr)
+  authz_data *try_put(pid_t pid, authz_data *authz_ptr)
   {
-    if (m_zombie) {return NULL;}
     KeyType mykey;
     if (!lookup(pid, mykey)) {
       LogCvmfs(kLogVoms, kLogDebug, "Failed to determine session key "
@@ -112,16 +95,21 @@ class VOMSSessionCache {
 
     pthread_mutex_lock(&m_mutex);
     std::pair<KeyToVOMS::iterator, bool> result =
-      m_map.insert(std::make_pair(mykey, std::make_pair(voms_ptr, now)));
+      m_map.insert(std::make_pair(mykey, std::make_pair(authz_ptr, now)));
     pthread_mutex_unlock(&m_mutex);
     if (!result.second)
     {
-      (*g_VOMS_Destroy)(voms_ptr);
+      delete authz_ptr;
     }
     LogCvmfs(kLogVoms, kLogDebug, "Cached VOMS data for session %d, "
              "UID %d, GID %d, bday %llu.", mykey.pid, mykey.uid,
              mykey.gid, mykey.bday);
     return result.first->second.first;
+  }
+
+  static AuthzSessionCache &GetInstance()
+  {
+    return g_cache;
   }
 
  private:
@@ -143,11 +131,13 @@ class VOMSSessionCache {
     gid_t gid;
     unsigned long long bday;  // NOLINT
   };
-  typedef std::pair<struct vomsdata*, time_t> ValueType;
+  typedef std::pair<authz_data*, time_t> ValueType;
   typedef std::map<KeyType, ValueType> KeyToVOMS;
 
   typedef std::map<KeyType, KeyType> PidToSid;
   PidToSid m_pid_map;
+
+  AuthzSessionCache(const AuthzSessionCache&);
 
   // Lookup pid's sid and birthdy.
   // Returns false on failure and sets errno.
@@ -246,7 +236,7 @@ class VOMSSessionCache {
     KeyToVOMS::iterator it = m_map.begin();
     while (it != m_map.end()) {
       if (it->second.second < expiry) {
-        (*g_VOMS_Destroy)(it->second.first);
+        delete (it->second.first);
         m_map.erase(it++);
       } else {
         ++it;
@@ -254,116 +244,17 @@ class VOMSSessionCache {
     }
   }
 
-  void load_voms_library() {
-    m_libvoms_handle = dlopen("libvomsapi.so.1", RTLD_LAZY);
-    if (!m_libvoms_handle) {
-      LogCvmfs(kLogVoms, kLogDebug, "Failed to load VOMS library; VOMS "
-               "authz will not be available.  %s", dlerror());
-      return;
-    }
-    // TODO(jblomer): the following if blocks can be factored out in a function
-    if (!(g_VOMS_Init =
-          reinterpret_cast<struct vomsdata*(*)(char *, char *)>
-            (dlsym(m_libvoms_handle, "VOMS_Init"))))
-    {
-      LogCvmfs(kLogVoms, kLogDebug, "Failed to load VOMS_Init from VOMS "
-               "library: %s", dlerror());
-      return;
-    }
-    if (!(g_VOMS_Destroy =
-          reinterpret_cast<void (*)(struct vomsdata *vd)>
-          (dlsym(m_libvoms_handle, "VOMS_Destroy"))))
-    {
-      LogCvmfs(kLogVoms, kLogDebug, "Failed to load VOMS_Destroy from "
-               "VOMS library: %s", dlerror());
-      return;
-    }
-    if (!(g_VOMS_RetrieveFromFile =
-          reinterpret_cast<int (*)(FILE *file, int how, struct vomsdata *vd,
-                                   int *error)>
-        (dlsym(m_libvoms_handle, "VOMS_RetrieveFromFile"))))
-    {
-      LogCvmfs(kLogVoms, kLogDebug, "Failed to load VOMS_RetrieveFromFile"
-               " from VOMS library: %s", dlerror());
-      return;
-    }
-    if (!(g_VOMS_ErrorMessage =
-        reinterpret_cast<char * (*)(struct vomsdata *vd, int error,
-                                    char *buffer, int len)>
-        (dlsym(m_libvoms_handle, "VOMS_ErrorMessage"))))
-    {
-      LogCvmfs(kLogVoms, kLogDebug, "Failed to load VOMS_ErrorMessage "
-               "from VOMS library: %s", dlerror());
-      return;
-    }
-    LogCvmfs(kLogVoms, kLogDebug, "Successfully loaded VOMS library; VOMS "
-            "authz will be available.");
-    m_zombie = false;
-  }
 
-  void close_voms_library() {
-    if (m_libvoms_handle && dlclose(m_libvoms_handle)) {
-      LogCvmfs(kLogVoms, kLogDebug, "Failed to unload VOMS library: %s",
-               dlerror());
-    }
-    m_libvoms_handle = NULL;
-    g_VOMS_Init = NULL;
-    g_VOMS_Destroy = NULL;
-    g_VOMS_RetrieveFromFile = NULL;
-    g_VOMS_ErrorMessage = NULL;
-  }
-
-  bool m_zombie;
   time_t m_last_clean;
   pthread_mutex_t m_mutex;
 
   KeyToVOMS m_map;
 
-  void *m_libvoms_handle;
+  static AuthzSessionCache g_cache;
 };
 
-// TODO(jblomer): why static?
-// TODO(jblomer): use a singleton instead (well-defined initialization time)
-static VOMSSessionCache g_cache;
 
-static FILE *
-GetProxyFile(const struct fuse_ctx *ctx) {
-  return GetProxyFile(ctx->pid, ctx->uid, ctx->gid);
-}
-
-
-/**
- * Create the VOMS data structure to the best of our abilities.
- *
- * Resulting memory is owned by caller and must be destroyed with VOMS_Destroy.
- */
-static struct vomsdata*
-GenerateVOMSData(const struct fuse_ctx *ctx)
-{
-  FILE *fp = GetProxyFile(ctx);
-  if (!fp) {
-    LogCvmfs(kLogVoms, kLogDebug, "Could not find process's proxy file.");
-    return NULL;
-  }
-
-  struct vomsdata *voms_ptr = (*g_VOMS_Init)(NULL, NULL);
-  int error = 0;
-
-  const int retval = (*g_VOMS_RetrieveFromFile)(fp, RECURSE_CHAIN,
-                                                voms_ptr, &error);
-  fclose(fp);
-
-  if (!retval) {
-    char *err_str = (*g_VOMS_ErrorMessage)(voms_ptr, error, NULL, 0);
-    LogCvmfs(kLogVoms, kLogDebug, "Unable to parse VOMS file: %s\n",
-             err_str);
-    free(err_str);
-    (*g_VOMS_Destroy)(voms_ptr);
-    voms_ptr = NULL;
-  }
-
-  return voms_ptr;
-}
+AuthzSessionCache AuthzSessionCache::g_cache;
 
 
 // TODO(jblomer): can probably be replaced by SplitString from util
@@ -414,16 +305,16 @@ IsRoleMatching(const char *role1, const char *role2) {
 }
 
 
-static bool CheckSingleAuthz(const struct vomsdata *voms_ptr,
+static bool CheckSingleAuthz(const authz_data *authz_ptr,
                              const std::string & authz);
 
 
-static bool CheckMultipleAuthz(const struct vomsdata *voms_ptr,
+static bool CheckMultipleAuthz(const authz_data *authz_ptr,
                                const std::string  &authz_list);
 
 
 bool CheckVOMSAuthz(const struct fuse_ctx *ctx, const std::string & authz) {
-  if (g_VOMS_Init == NULL) {
+  if (!VomsLib::GetInstance().IsValid()) {
     LogCvmfs(kLogVoms, kLogSyslog | kLogDebug,
              "VOMS library not present; failing VOMS authz.");
     return false;
@@ -433,13 +324,13 @@ bool CheckVOMSAuthz(const struct fuse_ctx *ctx, const std::string & authz) {
            ctx->uid, authz.c_str());
 
   // Get VOMS information from cache; if not present, store it.
-  struct vomsdata *voms_ptr;
-  if (!g_cache.get(ctx->pid, voms_ptr)) {
-    voms_ptr = GenerateVOMSData(ctx);
-    if (voms_ptr) {
-      voms_ptr = g_cache.try_put(ctx->pid, voms_ptr);
+  authz_data *authz_ptr;
+  if (!AuthzSessionCache::GetInstance().get(ctx->pid, &authz_ptr)) {
+    authz_ptr = GetAuthzData(ctx->pid, ctx->uid, ctx->gid);
+    if (authz_ptr) {
+      authz_ptr = AuthzSessionCache::GetInstance().try_put(ctx->pid, authz_ptr);
       LogCvmfs(kLogVoms, kLogDebug,
-               "Caching user's VOMS credentials at address %p.", voms_ptr);
+               "Caching user's VOMS credentials");
     } else {
       LogCvmfs(kLogVoms, kLogSyslog | kLogDebug,
                "User has no VOMS credentials.");
@@ -448,17 +339,17 @@ bool CheckVOMSAuthz(const struct fuse_ctx *ctx, const std::string & authz) {
   } else {
     LogCvmfs(kLogVoms, kLogDebug, "Using cached VOMS credentials.");
   }
-  if (!voms_ptr) {
+  if (!authz_ptr) {
     LogCvmfs(kLogVoms, kLogSyslog | kLogDebug,
              "ERROR: Failed to generate VOMS data.");
     return false;
   }
-  return CheckMultipleAuthz(voms_ptr, authz);
+  return CheckMultipleAuthz(authz_ptr, authz);
 }
 
 
 static bool
-CheckMultipleAuthz(const struct vomsdata *voms_ptr,
+CheckMultipleAuthz(const authz_data *authz_ptr,
                    const std::string &authz_list)
 {
   // Check all authorizations against our information
@@ -469,15 +360,15 @@ CheckMultipleAuthz(const struct vomsdata *voms_ptr,
     last_delim = delim + 1;
     delim = authz_list.find('\n', last_delim);
 
-    if (CheckSingleAuthz(voms_ptr, next_authz)) {return true;}
+    if (CheckSingleAuthz(authz_ptr, next_authz)) {return true;}
   }
   std::string next_authz = authz_list.substr(last_delim);
-  return CheckSingleAuthz(voms_ptr, next_authz);
+  return CheckSingleAuthz(authz_ptr, next_authz);
 }
 
 
 static bool
-CheckSingleAuthz(const struct vomsdata *voms_ptr, const std::string & authz)
+CheckSingleAuthz(const authz_data *authz_ptr, const std::string & authz)
 {
   // An empty entry should authorize nobody.
   if (authz.empty()) {return false;}
@@ -511,18 +402,16 @@ CheckSingleAuthz(const struct vomsdata *voms_ptr, const std::string & authz)
   std::vector<std::string> group_hierarchy;
   SplitGroupToPaths(group, group_hierarchy);
 
-  // Now we have valid VOMS data, check authz.
+  // Now we have valid data, check authz.
+  // First, check if it is a valid DN.
+  if (is_dn) {
+    return !strcmp(authz.c_str(), authz_ptr->dn_);
+  }
+  // If there is no VOMS info, return immediately..
+  if (!authz_ptr->voms_) {return false;}
   // Iterator through the VOs
-  for (int idx=0; voms_ptr->data[idx] != NULL; idx++) {
-    struct voms *it = voms_ptr->data[idx];
-    // Check first against the full DN.
-    if (is_dn) {
-      if (it->user && !strcmp(it->user, authz.c_str())) {
-        return true;
-      } else {
-        break;
-      }
-    }
+  for (int idx=0; authz_ptr->voms_->data[idx] != NULL; idx++) {
+    struct voms *it = authz_ptr->voms_->data[idx];
     if (!it->voname) {continue;}
     if (strcmp(vo.c_str(), it->voname)) {continue;}
 

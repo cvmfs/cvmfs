@@ -187,11 +187,19 @@ ConfigureCurlHandle(CURL *curl_handle, pid_t pid, uid_t uid, gid_t gid,
       sk_X509_INFO_free(sk);
 
       if (parm->pkey == NULL) {
-        sk_X509_free(certstack);
-        fclose(fp);
-        LogCvmfs(kLogVoms, kLogStderr, "Credential did not contain a decrypted"
-                 " private key.");
-        return false;
+        // Sigh - PEM_X509_INFO_read doesn't understand old key encodings.
+        // Try a more general-purpose funciton.
+        fseek(fp, SEEK_SET, 0);
+        EVP_PKEY *old_pkey = PEM_read_PrivateKey(fp, NULL, NULL, NULL);
+        if (old_pkey) {
+          parm->pkey = old_pkey;
+        } else {
+          sk_X509_free(certstack);
+          fclose(fp);
+          LogCvmfs(kLogVoms, kLogStderr, "Credential did not contain a "
+                   "decrypted private key.");
+          return false;
+        }
       }
 
       if (!sk_X509_num(certstack)) {
