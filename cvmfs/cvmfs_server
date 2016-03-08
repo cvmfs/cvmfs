@@ -300,7 +300,7 @@ Supported Commands:
   publish         [-p pause for tweaks] [-n manual revision number] [-v verbose]
                   [-a tag name] [-c tag channel] [-m tag description]
                   [-X (force external data) | -N (force native data)]
-                  [-Z compression algorithm]
+                  [-Z compression algorithm] [-f use force remount if necessary]
                   <fully qualified name>
                   Make a new repository snapshot
   rmfs            [-p(reserve) repo data and keys] [-f don't ask again]
@@ -2380,13 +2380,19 @@ file_descriptor_warning() {
 
 handle_read_only_file_descriptors_on_mount_point() {
   local name=$1
+  local open_fd_dialog=${2:-1}
 
   if [ $(count_rd_only_fds /cvmfs/$name) -eq 0 ]; then
     return 0
-  else
-    file_descriptor_warning_and_question $name # might abort...
-    return 1
   fi
+
+  if [ $open_fd_dialog -eq 1 ]; then
+    file_descriptor_warning_and_question $name # might abort...
+  else
+    file_descriptor_warning $name
+  fi
+
+  return 1
 }
 
 
@@ -4279,6 +4285,7 @@ abort() {
   local user
   local spool_dir
   local force=0
+  local open_fd_dialog=1
   local retcode=0
 
   # optional parameter handling
@@ -4288,6 +4295,7 @@ abort() {
     case $option in
       f)
         force=1
+        open_fd_dialog=0
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -4336,7 +4344,7 @@ abort() {
 
     # check if we have open file descriptors on /cvmfs/<name>
     local use_fd_fallback=0
-    handle_read_only_file_descriptors_on_mount_point $name || use_fd_fallback=1
+    handle_read_only_file_descriptors_on_mount_point $name $open_fd_dialog || use_fd_fallback=1
     sync
 
     to_syslog_for_repo $name "aborting transaction"
@@ -4374,10 +4382,11 @@ publish() {
   local force_native=0
   local force_compression_algorithm=""
   local external_option=""
+  local open_fd_dialog=1
 
   # optional parameter handling
   OPTIND=1
-  while getopts "F:NXZ:pa:c:m:vn:" option
+  while getopts "F:NXZ:pa:c:m:vn:f" option
   do
     case $option in
       p)
@@ -4409,6 +4418,9 @@ publish() {
       ;;
       F)
         authz_file="-F $OPTARG"
+      ;;
+      f)
+        open_fd_dialog=0
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -4585,7 +4597,7 @@ publish() {
 
     # check if we have open file descriptors on /cvmfs/<name>
     local use_fd_fallback=0
-    handle_read_only_file_descriptors_on_mount_point $name || use_fd_fallback=1
+    handle_read_only_file_descriptors_on_mount_point $name $open_fd_dialog || use_fd_fallback=1
 
     # synchronize the repository
     publish_starting $name
