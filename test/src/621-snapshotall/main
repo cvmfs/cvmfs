@@ -25,14 +25,14 @@ cvmfs_run_test() {
 
   local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
 
-  CVMFS_TEST_621_REPLICA_NAMES="${replica_name}-1 ${replica_name}-2 ${replica_name}-3"
+  CVMFS_TEST_621_REPLICA_NAMES="${replica_name}-1 ${replica_name}-2 ${replica_name}-3 ${replica_name}-4"
   echo "install a cleanup function"
   trap cleanup EXIT HUP INT TERM || return $?
 
-  echo "create 3 Stratum1 repositories on the same machine"
+  echo "create 4 Stratum1 repositories on the same machine"
   load_repo_config $CVMFS_TEST_REPO
 
-  for num in 1 2 3; do
+  for num in 1 2 3 4; do
     create_stratum1 ${replica_name}-$num                   \
                     $CVMFS_TEST_USER                       \
                     $CVMFS_STRATUM0                        \
@@ -42,21 +42,25 @@ cvmfs_run_test() {
 
   echo "disabling snapshots to second replica"
   sudo $SHELL -c "echo "CVMFS_REPLICA_ACTIVE=no" >> /etc/cvmfs/repositories.d/${replica_name}-2/replica.conf"
+  echo "corrupting third replica's download URL"
+  sudo $SHELL -c "sed -i 's,^\(CVMFS_STRATUM0=.*\),\1Bogus,' /etc/cvmfs/repositories.d/${replica_name}-3/server.conf"
 
   echo "running cvmfs_server snapshot -a"
   sudo cvmfs_server snapshot -an || return 5
 
-  echo "download manifests of stratum 0 and replica 1 and 3"
+  echo "download manifests of stratum 0 and replica 1 and 4"
   curl -so mr1 "$(get_repo_url ${replica_name}-1)/.cvmfspublished" || return 6
-  curl -so mr3 "$(get_repo_url ${replica_name}-3)/.cvmfspublished" || return 7
+  curl -so mr4 "$(get_repo_url ${replica_name}-4)/.cvmfspublished" || return 7
   curl -so ms0 "$(get_repo_url $CVMFS_TEST_REPO)/.cvmfspublished"  || return 8
 
-  echo "checking if snapshot worked on replicas 1 and 3"
+  echo "checking if snapshot worked on replicas 1 and 4"
   cmp ms0 mr1 || return  9
-  cmp ms0 mr3 || return 10
+  cmp ms0 mr4 || return 10
 
   echo "checking if replica 2 was skipped"
   curl -f -sI "$(get_repo_url ${replica_name}-2)/.cvmfspublished" && return 11
+  echo "checking if replica 3 detected an error"
+  curl -f -sI "$(get_repo_url ${replica_name}-3)/.cvmfs_last_snapshot" && return 12
 
   return 0
 }
