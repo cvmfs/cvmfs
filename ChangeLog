@@ -1,3 +1,6 @@
+2.2.2:
+  * Add support for default.conf file in config repository 
+
 2.2.1:
   * Fix reading of chunked files in libcvmfs
   * Disable access to VOMS protected repositories until certificate handling
