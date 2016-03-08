@@ -6,9 +6,5 @@ def print_wrapper(msg):
     print "WRAPPER:" , msg
 
 if __name__ == "__main__":
-    print_wrapper("opening transaction")
-
     with Tools.cvmfsTransaction():
         print_wrapper("not installing anything")
-
-    print_wrapper("closed transaction")
