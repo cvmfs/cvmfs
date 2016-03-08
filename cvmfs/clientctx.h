@@ -56,9 +56,13 @@ class ClientCtx {
  */
 class ClientCtxGuard {
  public:
-  ClientCtxGuard(uid_t uid, gid_t gid, pid_t pid) :
-      set_on_construction_(false) {
-      // Implementation guarantees old_ctx is not null.
+  ClientCtxGuard(uid_t uid, gid_t gid, pid_t pid)
+    : set_on_construction_(false)
+    , old_uid_(-1)
+    , old_gid_(-1)
+    , old_pid_(-1)
+  {
+    // Implementation guarantees old_ctx is not null.
     ClientCtx *old_ctx = ClientCtx::GetInstance();
     assert(old_ctx);
     if (old_ctx->IsSet()) {

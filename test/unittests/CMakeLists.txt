@@ -77,6 +77,7 @@ set(CVMFS_UNITTEST_FILES
   t_compressor.cc
   t_compression.cc
   t_clientctx.cc
+  t_reflog.cc
 )
 
 if (VOMS_FOUND)
@@ -203,6 +204,11 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/sqlitevfs.h
   ${CVMFS_SOURCE_DIR}/clientctx.h
   ${CVMFS_SOURCE_DIR}/clientctx.cc
+
+  ${CVMFS_SOURCE_DIR}/reflog.h
+  ${CVMFS_SOURCE_DIR}/reflog.cc
+  ${CVMFS_SOURCE_DIR}/reflog_sql.h
+  ${CVMFS_SOURCE_DIR}/reflog_sql.cc
 )
 
 if (VOMS_FOUND)

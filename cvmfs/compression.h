@@ -21,6 +21,7 @@ class ContextPtr;
 }
 
 bool CopyPath2Path(const std::string &src, const std::string &dest);
+bool CopyPath2File(const std::string &src, FILE *fdest);
 bool CopyMem2Path(const unsigned char *buffer, const unsigned buffer_size,
                   const std::string &path);
 bool CopyMem2File(const unsigned char *buffer, const unsigned buffer_size,

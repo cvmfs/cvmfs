@@ -122,23 +122,42 @@ bool HistoryDatabase::UpgradeSchemaRevision_10_2() {
 
 //------------------------------------------------------------------------------
 
+#define DB_FIELDS_V1R0  "name, hash, revision, timestamp, channel, description"
+#define DB_FIELDS_V1R1  "name, hash, revision, timestamp, channel, " \
+                        "description,  size"
+#define DB_PLACEHOLDERS ":name, :hash, :revision, :timestamp, :channel, " \
+                        ":description, :size"
+#define ROLLBACK_COND   "(revision > :target_rev  OR " \
+                        " name     = :target_name)   " \
+                        "AND channel  = :target_chan "
 
+#define MAKE_STATEMENT(STMT_TMPL, REV)       \
+static const std::string REV =               \
+  ReplaceAll(                                \
+    ReplaceAll(                              \
+      ReplaceAll(STMT_TMPL,                  \
+        "@DB_FIELDS@", DB_FIELDS_ ## REV),   \
+      "@DB_PLACEHOLDERS@", DB_PLACEHOLDERS), \
+    "@ROLLBACK_COND@", ROLLBACK_COND)
 
-const std::string SqlHistory::db_fields_v1r0 =
-  "name, hash, revision, timestamp, channel, description";
+#define MAKE_STATEMENTS(STMT_TMPL) \
+  MAKE_STATEMENT(STMT_TMPL, V1R0); \
+  MAKE_STATEMENT(STMT_TMPL, V1R1)
 
-const std::string SqlHistory::db_fields_v1r1 =
-  "name, hash, revision, timestamp, channel, description, size";
+#define DEFERRED_INIT(DB, REV) \
+  DeferredInit((DB)->sqlite_db(), (REV).c_str())
 
-const std::string SqlInsertTag::db_placeholders =
-  ":name, :hash, :revision, :timestamp, :channel, :description, :size";
+#define DEFERRED_INITS(DB) \
+  if ((DB)->IsEqualSchema((DB)->schema_version(), 1.0f) && \
+      (DB)->schema_revision() == 0) {                      \
+    DEFERRED_INIT((DB), V1R0);                             \
+  } else {                                                 \
+    DEFERRED_INIT((DB), V1R1);                             \
+  }
 
 SqlInsertTag::SqlInsertTag(const HistoryDatabase *database) {
-  const std::string stmt =
-    "INSERT INTO tags (" + db_fields(database) + ")"
-    "VALUES (" + db_placeholders + ");";
-  const bool success = Init(database->sqlite_db(), stmt);
-  assert(success);
+  MAKE_STATEMENTS("INSERT INTO tags (@DB_FIELDS@) VALUES (@DB_PLACEHOLDERS@);");
+  DEFERRED_INITS(database);
 }
 
 
@@ -158,9 +177,7 @@ bool SqlInsertTag::BindTag(const History::Tag &tag) {
 
 
 SqlRemoveTag::SqlRemoveTag(const HistoryDatabase *database) {
-  const std::string stmt = "DELETE FROM tags WHERE name = :name;";
-  const bool success = Init(database->sqlite_db(), stmt);
-  assert(success);
+  DeferredInit(database->sqlite_db(), "DELETE FROM tags WHERE name = :name;");
 }
 
 bool SqlRemoveTag::BindName(const std::string &name) {
@@ -172,10 +189,8 @@ bool SqlRemoveTag::BindName(const std::string &name) {
 
 
 SqlFindTag::SqlFindTag(const HistoryDatabase *database) {
-  const std::string stmt =
-    "SELECT " + db_fields(database) + " FROM tags WHERE name = :name LIMIT 1;";
-  const bool success = Init(database->sqlite_db(), stmt);
-  assert(success);
+  MAKE_STATEMENTS("SELECT @DB_FIELDS@ FROM tags WHERE name = :name LIMIT 1;");
+  DEFERRED_INITS(database);
 }
 
 bool SqlFindTag::BindName(const std::string &name) {
@@ -192,11 +207,10 @@ SqlFindTagByDate::SqlFindTagByDate(const HistoryDatabase *database) {
   // conceptually goes back in the revision history  |  ORDER BY revision DESC
   // and picks the first tag                         |  LIMIT 1
   // that is older than the given timestamp          |  WHICH timestamp <= :ts
-  const bool success = Init(database->sqlite_db(),
-                            "SELECT " + db_fields(database) + " FROM tags "
-                            "WHERE timestamp <= :timestamp "
-                            "ORDER BY revision DESC LIMIT 1;");
-  assert(success);
+  MAKE_STATEMENTS("SELECT @DB_FIELDS@ FROM tags "
+                  "WHERE timestamp <= :timestamp "
+                  "ORDER BY revision DESC LIMIT 1;");
+  DEFERRED_INITS(database);
 }
 
 bool SqlFindTagByDate::BindTimestamp(const time_t timestamp) {
@@ -208,9 +222,7 @@ bool SqlFindTagByDate::BindTimestamp(const time_t timestamp) {
 
 
 SqlCountTags::SqlCountTags(const HistoryDatabase *database) {
-  const bool success = Init(database->sqlite_db(),
-                            "SELECT count(*) FROM tags;");
-  assert(success);
+  DeferredInit(database->sqlite_db(), "SELECT count(*) FROM tags;");
 }
 
 unsigned SqlCountTags::RetrieveCount() const {
@@ -224,10 +236,8 @@ unsigned SqlCountTags::RetrieveCount() const {
 
 
 SqlListTags::SqlListTags(const HistoryDatabase *database) {
-  const bool success = Init(database->sqlite_db(),
-                            "SELECT " + db_fields(database) + " FROM tags "
-                            "ORDER BY revision DESC;");
-  assert(success);
+  MAKE_STATEMENTS("SELECT @DB_FIELDS@ FROM tags ORDER BY revision DESC;");
+  DEFERRED_INITS(database);
 }
 
 
@@ -235,19 +245,15 @@ SqlListTags::SqlListTags(const HistoryDatabase *database) {
 
 
 SqlGetChannelTips::SqlGetChannelTips(const HistoryDatabase *database) {
-  const bool success = Init(database->sqlite_db(),
-                            "SELECT " + db_fields(database) + ", "
-                            "  MAX(revision) AS max_rev "
-                            "FROM tags "
-                            "GROUP BY channel;");
-  assert(success);
+  MAKE_STATEMENTS("SELECT @DB_FIELDS@, MAX(revision) AS max_rev "
+                  "FROM tags "
+                  "GROUP BY channel;");
+  DEFERRED_INITS(database);
 }
 
 SqlGetHashes::SqlGetHashes(const HistoryDatabase *database) {
-  const bool success = Init(database->sqlite_db(),
-                            "SELECT DISTINCT hash FROM tags "
-                            "ORDER BY revision ASC");
-  assert(success);
+  DeferredInit(database->sqlite_db(), "SELECT DISTINCT hash FROM tags "
+                                      "ORDER BY revision ASC");
 }
 
 shash::Any SqlGetHashes::RetrieveHash() const {
@@ -260,10 +266,8 @@ shash::Any SqlGetHashes::RetrieveHash() const {
 
 
 SqlRollbackTag::SqlRollbackTag(const HistoryDatabase *database) {
-  const bool success = Init(database->sqlite_db(),
-                            "DELETE FROM tags WHERE "
-                             + rollback_condition + ";");
-  assert(success);
+  MAKE_STATEMENTS("DELETE FROM tags WHERE @ROLLBACK_COND@;");
+  DEFERRED_INITS(database);
 }
 
 
@@ -271,11 +275,10 @@ SqlRollbackTag::SqlRollbackTag(const HistoryDatabase *database) {
 
 
 SqlListRollbackTags::SqlListRollbackTags(const HistoryDatabase *database) {
-  const bool success = Init(database->sqlite_db(),
-                            "SELECT " + db_fields(database) + " FROM tags "
-                            "WHERE " + rollback_condition + " "
-                            "ORDER BY revision DESC;");
-  assert(success);
+  MAKE_STATEMENTS("SELECT @DB_FIELDS@ FROM tags "
+                  "WHERE @ROLLBACK_COND@ "
+                  "ORDER BY revision DESC;");
+  DEFERRED_INITS(database);
 }
 
 
@@ -293,10 +296,9 @@ bool SqlRecycleBin::CheckSchema(const HistoryDatabase *database) const {
 
 SqlRecycleBinInsert::SqlRecycleBinInsert(const HistoryDatabase *database) {
   assert(CheckSchema(database));
-  const bool success = Init(database->sqlite_db(),
-                            "INSERT OR IGNORE INTO recycle_bin (hash, flags) "
-                            "VALUES (:hash, :flags)");
-  assert(success);
+  DeferredInit(database->sqlite_db(),
+               "INSERT OR IGNORE INTO recycle_bin (hash, flags) "
+               "VALUES (:hash, :flags)");
 }
 
 
@@ -313,9 +315,7 @@ bool SqlRecycleBinInsert::BindTag(const History::Tag &condemned_tag) {
 
 SqlRecycleBinList::SqlRecycleBinList(const HistoryDatabase *database) {
   assert(CheckSchema(database));
-  const bool success = Init(database->sqlite_db(), "SELECT hash, flags "
-                                                   "FROM recycle_bin;");
-  assert(success);
+  DeferredInit(database->sqlite_db(), "SELECT hash, flags FROM recycle_bin;");
 }
 
 
@@ -335,8 +335,7 @@ shash::Any SqlRecycleBinList::RetrieveHash() {
 
 SqlRecycleBinFlush::SqlRecycleBinFlush(const HistoryDatabase *database) {
   assert(CheckSchema(database));
-  const bool success = Init(database->sqlite_db(), "DELETE FROM recycle_bin;");
-  assert(success);
+  DeferredInit(database->sqlite_db(), "DELETE FROM recycle_bin;");
 }
 
 

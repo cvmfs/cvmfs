@@ -79,7 +79,8 @@ bool CatalogDatabase::LiveSchemaUpgradeIfNecessary() {
   if (IsEqualSchema(schema_version(), 2.5) && (schema_revision() == 0)) {
     LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision (0 --> 1)");
 
-    Sql sql_upgrade(*this, "ALTER TABLE nested_catalogs ADD size INTEGER;");
+    SqlCatalog sql_upgrade(*this, "ALTER TABLE nested_catalogs "
+                                  "ADD size INTEGER;");
     if (!sql_upgrade.Execute()) {
       LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade nested_catalogs");
       return false;
@@ -95,10 +96,10 @@ bool CatalogDatabase::LiveSchemaUpgradeIfNecessary() {
   if (IsEqualSchema(schema_version(), 2.5) && (schema_revision() == 1)) {
     LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision (1 --> 2)");
 
-    Sql sql_upgrade1(*this, "ALTER TABLE catalog ADD xattr BLOB;");
-    Sql sql_upgrade2(*this,
+    SqlCatalog sql_upgrade1(*this, "ALTER TABLE catalog ADD xattr BLOB;");
+    SqlCatalog sql_upgrade2(*this,
       "INSERT INTO statistics (counter, value) VALUES ('self_xattr', 0);");
-    Sql sql_upgrade3(*this,
+    SqlCatalog sql_upgrade3(*this,
       "INSERT INTO statistics (counter, value) VALUES ('subtree_xattr', 0);");
     if (!sql_upgrade1.Execute() || !sql_upgrade2.Execute() ||
         !sql_upgrade3.Execute())
@@ -117,13 +118,17 @@ bool CatalogDatabase::LiveSchemaUpgradeIfNecessary() {
   if (IsEqualSchema(schema_version(), 2.5) && (schema_revision() == 2)) {
     LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision (2 --> 3)");
 
-    Sql sql_upgrade4(*this,
-      "INSERT INTO statistics (counter, value) VALUES ('self_external', 0);");
-    Sql sql_upgrade5(*this, "INSERT INTO statistics (counter, value) VALUES "
+    SqlCatalog sql_upgrade4(*this,
+                            "INSERT INTO statistics (counter, value) VALUES "
+                            "('self_external', 0);");
+    SqlCatalog sql_upgrade5(*this,
+                            "INSERT INTO statistics (counter, value) VALUES "
                             "('self_external_file_size', 0);");
-    Sql sql_upgrade6(*this, "INSERT INTO statistics (counter, value) VALUES "
+    SqlCatalog sql_upgrade6(*this,
+                            "INSERT INTO statistics (counter, value) VALUES "
                             "('subtree_external', 0);");
-    Sql sql_upgrade7(*this, "INSERT INTO statistics (counter, value) VALUES "
+    SqlCatalog sql_upgrade7(*this,
+                            "INSERT INTO statistics (counter, value) VALUES "
                             "('subtree_external_file_size', 0);");
     if (!sql_upgrade4.Execute() || !sql_upgrade5.Execute() ||
         !sql_upgrade6.Execute() || !sql_upgrade7.Execute())
@@ -148,27 +153,27 @@ bool CatalogDatabase::CreateEmptyDatabase() {
 
   // generate the catalog table and index structure
   const bool retval =
-  Sql(*this,
+  SqlCatalog(*this,
     "CREATE TABLE catalog "
     "(md5path_1 INTEGER, md5path_2 INTEGER, parent_1 INTEGER, parent_2 INTEGER,"
     " hardlinks INTEGER, hash BLOB, size INTEGER, mode INTEGER, mtime INTEGER,"
     " flags INTEGER, name TEXT, symlink TEXT, uid INTEGER, gid INTEGER, "
     " xattr BLOB, "
     " CONSTRAINT pk_catalog PRIMARY KEY (md5path_1, md5path_2));").Execute()  &&
-  Sql(*this,
+  SqlCatalog(*this,
     "CREATE INDEX idx_catalog_parent "
     "ON catalog (parent_1, parent_2);")                           .Execute()  &&
-  Sql(*this,
+  SqlCatalog(*this,
     "CREATE TABLE chunks "
     "(md5path_1 INTEGER, md5path_2 INTEGER, offset INTEGER, size INTEGER, "
     " hash BLOB, "
     " CONSTRAINT pk_chunks PRIMARY KEY (md5path_1, md5path_2, offset, size), "
     " FOREIGN KEY (md5path_1, md5path_2) REFERENCES "
     "   catalog(md5path_1, md5path_2));")                         .Execute()  &&
-  Sql(*this,
+  SqlCatalog(*this,
     "CREATE TABLE nested_catalogs (path TEXT, sha1 TEXT, size INTEGER, "
     "CONSTRAINT pk_nested_catalogs PRIMARY KEY (path));")         .Execute()  &&
-  Sql(*this,
+  SqlCatalog(*this,
     "CREATE TABLE statistics (counter TEXT, value INTEGER, "
     "CONSTRAINT pk_statistics PRIMARY KEY (counter));")           .Execute();
 
@@ -196,7 +201,7 @@ bool CatalogDatabase::InsertInitialValues(
     : shash::Md5(shash::AsciiPtr(GetParentPath(root_path)));
 
   // Start initial filling transaction
-  retval = Sql(*this, "BEGIN;").Execute();
+  retval = BeginTransaction();
   if (!retval) {
     PrintSqlError("failed to enter initial filling transaction");
     return false;
@@ -267,7 +272,7 @@ bool CatalogDatabase::InsertInitialValues(
   }
 
   // Commit initial filling transaction
-  retval = Sql(*this, "COMMIT;").Execute();
+  retval = CommitTransaction();
   if (!retval) {
     PrintSqlError("failed to commit initial filling transaction");
     return false;
@@ -284,7 +289,7 @@ CatalogDatabase::SetVOMSAuthz(const std::string &voms_authz) {
 
 
 double CatalogDatabase::GetRowIdWasteRatio() const {
-  Sql rowid_waste_ratio_query(*this,
+  SqlCatalog rowid_waste_ratio_query(*this,
     "SELECT 1.0 - CAST(COUNT(*) AS DOUBLE) / MAX(rowid) "
     "AS ratio FROM catalog;");
   const bool retval = rowid_waste_ratio_query.FetchRow();
@@ -316,18 +321,18 @@ double CatalogDatabase::GetRowIdWasteRatio() const {
 bool CatalogDatabase::CompactDatabase() const {
   assert(read_write());
 
-  return Sql(*this, "PRAGMA foreign_keys = OFF;").Execute() &&
-         BeginTransaction()                                 &&
-         Sql(*this, "CREATE TEMPORARY TABLE duplicate AS "
-                    "  SELECT * FROM catalog "
-                    "  ORDER BY rowid ASC;").Execute()      &&
-         Sql(*this, "DELETE FROM catalog;").Execute()       &&
-         Sql(*this, "INSERT INTO catalog "
-                    "  SELECT * FROM duplicate "
-                    "  ORDER BY rowid").Execute()           &&
-         Sql(*this, "DROP TABLE duplicate;").Execute()      &&
-         CommitTransaction()                                &&
-         Sql(*this, "PRAGMA foreign_keys = ON;").Execute();
+  return SqlCatalog(*this, "PRAGMA foreign_keys = OFF;").Execute() &&
+         BeginTransaction()                                        &&
+         SqlCatalog(*this, "CREATE TEMPORARY TABLE duplicate AS "
+                           "  SELECT * FROM catalog "
+                           "  ORDER BY rowid ASC;").Execute()      &&
+         SqlCatalog(*this, "DELETE FROM catalog;").Execute()       &&
+         SqlCatalog(*this, "INSERT INTO catalog "
+                           "  SELECT * FROM duplicate "
+                           "  ORDER BY rowid").Execute()           &&
+         SqlCatalog(*this, "DROP TABLE duplicate;").Execute()      &&
+         CommitTransaction()                                       &&
+         SqlCatalog(*this, "PRAGMA foreign_keys = ON;").Execute();
 }
 
 
@@ -506,13 +511,13 @@ bool SqlDirentWrite::BindDirentFields(const int hash_idx,
 
 
 SqlListContentHashes::SqlListContentHashes(const CatalogDatabase &database) {
-  const string statement =
-    (database.schema_version() < 2.4-CatalogDatabase::kSchemaEpsilon)
-    ? "SELECT hash, flags, 0 "
+  static const char *stmt_lt_2_4 =
+      "SELECT hash, flags, 0 "
       "  FROM catalog "
-      "  WHERE length(hash) > 0;"
+      "  WHERE length(hash) > 0;";
 
-    : "SELECT hash, flags, 0 "
+  static const char *stmt_ge_2_4 =
+      "SELECT hash, flags, 0 "
       "  FROM catalog "
       "  WHERE length(catalog.hash) > 0 "
       "UNION "
@@ -523,8 +528,11 @@ SqlListContentHashes::SqlListContentHashes(const CatalogDatabase &database) {
       "     catalog.md5path_2 = chunks.md5path_2 "
       "  WHERE length(catalog.hash) > 0;";
 
-  const bool successful_init = Init(database.sqlite_db(), statement);
-  assert(successful_init);
+  if (database.schema_version() < 2.4-CatalogDatabase::kSchemaEpsilon) {
+    DeferredInit(database.sqlite_db(), stmt_lt_2_4);
+  } else {
+    DeferredInit(database.sqlite_db(), stmt_ge_2_4);
+  }
 }
 
 
@@ -542,40 +550,47 @@ shash::Any SqlListContentHashes::GetHash() const {
 
 //------------------------------------------------------------------------------
 
+#define DB_FIELDS_LT_V2_1                                                 \
+           "catalog.hash,       catalog.inode,      catalog.size, "       \
+           "catalog.mode,       catalog.mtime,      catalog.flags, "      \
+           "catalog.name,       catalog.symlink,    catalog.md5path_1, "  \
+           "catalog.md5path_2,  catalog.parent_1,   catalog.parent_2, "   \
+           "catalog.rowid"
+#define DB_FIELDS_GE_V2_1_LT_R2                                           \
+           "catalog.hash,       catalog.hardlinks,  catalog.size, "       \
+           "catalog.mode,       catalog.mtime,      catalog.flags, "      \
+           "catalog.name,       catalog.symlink,    catalog.md5path_1, "  \
+           "catalog.md5path_2,  catalog.parent_1,   catalog.parent_2, "   \
+           "catalog.rowid,      catalog.uid,        catalog.gid, "        \
+           "0"
+#define DB_FIELDS_GE_V2_1_GE_R2                                           \
+           "catalog.hash,       catalog.hardlinks,  catalog.size, "       \
+           "catalog.mode,       catalog.mtime,      catalog.flags, "      \
+           "catalog.name,       catalog.symlink,    catalog.md5path_1, "  \
+           "catalog.md5path_2,  catalog.parent_1,   catalog.parent_2, "   \
+           "catalog.rowid,      catalog.uid,        catalog.gid, "        \
+           "catalog.xattr IS NOT NULL"
 
-string SqlLookup::GetFieldsToSelect(
-  const float schema_version,
-  const unsigned schema_revision) const
-{
-  if (schema_version < 2.1 - CatalogDatabase::kSchemaEpsilon) {
-    return "catalog.hash, catalog.inode, catalog.size, catalog.mode, "
-        //           0              1             2             3
-           "catalog.mtime, catalog.flags, catalog.name, catalog.symlink, "
-        //            4              5             6               7
-           "catalog.md5path_1, catalog.md5path_2, catalog.parent_1, "
-        //              8                  9                 10
-           "catalog.parent_2, catalog.rowid";
-        //             11              12
+#define MAKE_STATEMENT(STMT_TMPL, REV)                        \
+  static const std::string REV =                              \
+      ReplaceAll(STMT_TMPL, "@DB_FIELDS@", DB_FIELDS_ ## REV)
+
+#define MAKE_STATEMENTS(STMT_TMPL)          \
+  MAKE_STATEMENT(STMT_TMPL, LT_V2_1);       \
+  MAKE_STATEMENT(STMT_TMPL, GE_V2_1_LT_R2); \
+  MAKE_STATEMENT(STMT_TMPL, GE_V2_1_GE_R2)
+
+#define DEFERRED_INIT(DB, REV) \
+  DeferredInit((DB).sqlite_db(), (REV).c_str())
+
+#define DEFERRED_INITS(DB)                                               \
+  if ((DB).schema_version() < 2.1 - CatalogDatabase::kSchemaEpsilon) {   \
+    DEFERRED_INIT((DB), LT_V2_1);                                        \
+  } else if ((DB).schema_revision() < 2) {                               \
+    DEFERRED_INIT((DB), GE_V2_1_LT_R2);                                  \
+  } else {                                                               \
+    DEFERRED_INIT((DB), GE_V2_1_GE_R2);                                  \
   }
-
-  string fields =
-    "catalog.hash, catalog.hardlinks, catalog.size, catalog.mode, "
-    //          0                1               2             3
-    "catalog.mtime, catalog.flags, catalog.name, catalog.symlink, "
-    //           4              5             6               7
-    "catalog.md5path_1, catalog.md5path_2, catalog.parent_1, "
-    //              8                  9                 10
-    "catalog.parent_2, catalog.rowid, catalog.uid, catalog.gid, ";
-    //            11              12           13           14
-
-  // Field 15: has extended attributes?
-  if (schema_revision < 2) {
-    fields += "0";  // Generally no xattrs
-  } else {
-    fields += "catalog.xattr IS NOT NULL";
-  }
-  return fields;
-}
 
 
 shash::Md5 SqlLookup::GetPathHash() const {
@@ -659,11 +674,9 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
 
 
 SqlListing::SqlListing(const CatalogDatabase &database) {
-  const string statement =
-    "SELECT " +
-    GetFieldsToSelect(database.schema_version(), database.schema_revision()) +
-    " FROM catalog WHERE (parent_1 = :p_1) AND (parent_2 = :p_2);";
-  Init(database.sqlite_db(), statement);
+  MAKE_STATEMENTS("SELECT @DB_FIELDS@ FROM catalog "
+                  "WHERE (parent_1 = :p_1) AND (parent_2 = :p_2);");
+  DEFERRED_INITS(database);
 }
 
 
@@ -676,11 +689,9 @@ bool SqlListing::BindPathHash(const struct shash::Md5 &hash) {
 
 
 SqlLookupPathHash::SqlLookupPathHash(const CatalogDatabase &database) {
-  const string statement =
-    "SELECT " +
-    GetFieldsToSelect(database.schema_version(), database.schema_revision()) +
-    " FROM catalog WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);";
-  Init(database.sqlite_db(), statement);
+  MAKE_STATEMENTS("SELECT @DB_FIELDS@ FROM catalog "
+                  "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);");
+  DEFERRED_INITS(database);
 }
 
 bool SqlLookupPathHash::BindPathHash(const struct shash::Md5 &hash) {
@@ -692,11 +703,8 @@ bool SqlLookupPathHash::BindPathHash(const struct shash::Md5 &hash) {
 
 
 SqlLookupInode::SqlLookupInode(const CatalogDatabase &database) {
-  const string statement =
-    "SELECT " +
-    GetFieldsToSelect(database.schema_version(), database.schema_revision()) +
-    " FROM catalog WHERE rowid = :rowid;";
-  Init(database.sqlite_db(), statement);
+  MAKE_STATEMENTS("SELECT @DB_FIELDS@ FROM catalog WHERE rowid = :rowid;");
+  DEFERRED_INITS(database);
 }
 
 
@@ -708,16 +716,34 @@ bool SqlLookupInode::BindRowId(const uint64_t inode) {
 //------------------------------------------------------------------------------
 
 
+SqlLookupDanglingMountpoints::SqlLookupDanglingMountpoints(
+                                     const catalog::CatalogDatabase &database) {
+  MAKE_STATEMENTS("SELECT DISTINCT @DB_FIELDS@ FROM catalog "
+                  "JOIN catalog AS c2 "
+                  "ON catalog.md5path_1 = c2.parent_1 AND "
+                  "   catalog.md5path_2 = c2.parent_2 "
+                  "WHERE catalog.flags & :nested_mountpoint_flag");
+  DEFERRED_INITS(database);
+
+  // this pretty much removes the advantage of a deferred init but the statement
+  // is anyway only used directly.
+  const bool success = BindInt64(1, SqlDirent::kFlagDirNestedMountpoint);
+  assert(success);
+}
+
+
+//------------------------------------------------------------------------------
+
+
 SqlDirentTouch::SqlDirentTouch(const CatalogDatabase &database) {
-  const string statement =
+  DeferredInit(database.sqlite_db(),
     "UPDATE catalog "
     "SET hash = :hash, size = :size, mode = :mode, mtime = :mtime, "
 //            1             2             3               4
     "name = :name, symlink = :symlink, uid = :uid, gid = :gid "
 //        5                6               7           8
-    "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);";
+    "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);");
 //                    9                       10
-  Init(database.sqlite_db(), statement);
 }
 
 
@@ -744,15 +770,18 @@ bool SqlDirentTouch::BindPathHash(const shash::Md5 &hash) {
 
 SqlNestedCatalogLookup::SqlNestedCatalogLookup(const CatalogDatabase &database)
 {
+  static const char *stmt_2_5_ge_1 =
+    "SELECT sha1, size FROM nested_catalogs WHERE path=:path;";
+
+  // Internally converts NULL to 0 for size
+  static const char *stmt_2_5_lt_1 =
+    "SELECT sha1, 0 FROM nested_catalogs WHERE path=:path;";
+
   if (database.IsEqualSchema(database.schema_version(), 2.5) &&
-      (database.schema_revision() >= 1))
-  {
-    // Internally converts NULL to 0 for size
-    Init(database.sqlite_db(),
-         "SELECT sha1, size FROM nested_catalogs WHERE path=:path;");
+      (database.schema_revision() >= 1)) {
+    DeferredInit(database.sqlite_db(), stmt_2_5_ge_1);
   } else {
-    Init(database.sqlite_db(),
-         "SELECT sha1, 0 FROM nested_catalogs WHERE path=:path;");
+    DeferredInit(database.sqlite_db(), stmt_2_5_lt_1);
   }
 }
 
@@ -781,13 +810,18 @@ uint64_t SqlNestedCatalogLookup::GetSize() const {
 SqlNestedCatalogListing::SqlNestedCatalogListing(
   const CatalogDatabase &database)
 {
+  static const char *stmt_2_5_ge_1 =
+    "SELECT path, sha1, size FROM nested_catalogs;";
+
+  // Internally converts NULL to 0 for size
+  static const char *stmt_2_5_lt_1 =
+    "SELECT path, sha1, 0 FROM nested_catalogs;";
+
   if (database.IsEqualSchema(database.schema_version(), 2.5) &&
-      (database.schema_revision() >= 1))
-  {
-    // Internally converts NULL to 0 for size
-    Init(database.sqlite_db(), "SELECT path, sha1, size FROM nested_catalogs;");
+      (database.schema_revision() >= 1)) {
+    DeferredInit(database.sqlite_db(), stmt_2_5_ge_1);
   } else {
-    Init(database.sqlite_db(), "SELECT path, sha1, 0 FROM nested_catalogs;");
+    DeferredInit(database.sqlite_db(), stmt_2_5_lt_1);
   }
 }
 
@@ -815,14 +849,14 @@ uint64_t SqlNestedCatalogListing::GetSize() const {
 
 
 SqlDirentInsert::SqlDirentInsert(const CatalogDatabase &database) {
-  const string statement = "INSERT INTO catalog "
+  DeferredInit(database.sqlite_db(),
+    "INSERT INTO catalog "
     "(md5path_1, md5path_2, parent_1, parent_2, hash, hardlinks, size, mode,"
     //    1           2         3         4       5       6        7     8
     "mtime, flags, name, symlink, uid, gid, xattr) "
     // 9,     10    11     12     13   14   15
     "VALUES (:md5_1, :md5_2, :p_1, :p_2, :hash, :links, :size, :mode, :mtime,"
-    " :flags, :name, :symlink, :uid, :gid, :xattr);";
-  Init(database.sqlite_db(), statement);
+    " :flags, :name, :symlink, :uid, :gid, :xattr);");
 }
 
 
@@ -860,7 +894,7 @@ bool SqlDirentInsert::BindXattrEmpty() {
 
 
 SqlDirentUpdate::SqlDirentUpdate(const CatalogDatabase &database) {
-  const string statement =
+  DeferredInit(database.sqlite_db(),
     "UPDATE catalog "
     "SET hash = :hash, size = :size, mode = :mode, mtime = :mtime, "
 //            1             2             3               4
@@ -868,9 +902,8 @@ SqlDirentUpdate::SqlDirentUpdate(const CatalogDatabase &database) {
 //          5             6                  7                8
     "uid = :uid, gid = :gid "
 //          9           10
-    "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);";
+    "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);");
 //                     11                       12
-  Init(database.sqlite_db(), statement);
 }
 
 
@@ -888,7 +921,7 @@ bool SqlDirentUpdate::BindDirent(const DirectoryEntry &entry) {
 
 
 SqlDirentUnlink::SqlDirentUnlink(const CatalogDatabase &database) {
-  Init(database.sqlite_db(),
+  DeferredInit(database.sqlite_db(),
        "DELETE FROM catalog "
        "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);");
 }
@@ -909,11 +942,10 @@ SqlIncLinkcount::SqlIncLinkcount(const CatalogDatabase &database) {
   // group while adding/subtracting small values from it will only effect the
   // linkcount in the lower 32bit.
   // Take a deep breath!
-  const string statememt =
+  DeferredInit(database.sqlite_db(),
     "UPDATE catalog SET hardlinks = hardlinks + :delta "
     "WHERE hardlinks = (SELECT hardlinks from catalog "
-    "WHERE md5path_1 = :md5_1 AND md5path_2 = :md5_2);";
-  Init(database.sqlite_db(), statememt);
+    "WHERE md5path_1 = :md5_1 AND md5path_2 = :md5_2);");
 }
 
 
@@ -931,11 +963,10 @@ bool SqlIncLinkcount::BindDelta(const int delta) {
 
 
 SqlChunkInsert::SqlChunkInsert(const CatalogDatabase &database) {
-  const string statememt =
+  DeferredInit(database.sqlite_db(),
     "INSERT INTO chunks (md5path_1, md5path_2, offset, size, hash) "
     //                       1          2        3      4     5
-    "VALUES (:md5_1, :md5_2, :offset, :size, :hash);";
-  Init(database.sqlite_db(), statememt);
+    "VALUES (:md5_1, :md5_2, :offset, :size, :hash);");
 }
 
 
@@ -956,10 +987,9 @@ bool SqlChunkInsert::BindFileChunk(const FileChunk &chunk) {
 
 
 SqlChunksRemove::SqlChunksRemove(const CatalogDatabase &database) {
-  const string statement =
+  DeferredInit(database.sqlite_db(),
     "DELETE FROM chunks "
-    "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);";
-  Init(database.sqlite_db(), statement);
+    "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);");
 }
 
 
@@ -972,13 +1002,12 @@ bool SqlChunksRemove::BindPathHash(const shash::Md5 &hash) {
 
 
 SqlChunksListing::SqlChunksListing(const CatalogDatabase &database) {
-  const string statement =
+  DeferredInit(database.sqlite_db(),
     "SELECT offset, size, hash FROM chunks "
     //         0      1     2
     "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2) "
     //                    1                          2
-    "ORDER BY offset ASC;";
-  Init(database.sqlite_db(), statement);
+    "ORDER BY offset ASC;");
 }
 
 
@@ -1001,12 +1030,11 @@ FileChunk SqlChunksListing::GetFileChunk(
 
 
 SqlChunksCount::SqlChunksCount(const CatalogDatabase &database) {
-  const string statement =
+  DeferredInit(database.sqlite_db(),
     "SELECT count(*) FROM chunks "
     //         0
-    "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2)";
+    "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2)");
     //                    1                          2
-  Init(database.sqlite_db(), statement);
 }
 
 
@@ -1024,7 +1052,7 @@ int SqlChunksCount::GetChunkCount() const {
 
 
 SqlMaxHardlinkGroup::SqlMaxHardlinkGroup(const CatalogDatabase &database) {
-  Init(database.sqlite_db(), "SELECT max(hardlinks) FROM catalog;");
+  DeferredInit(database.sqlite_db(), "SELECT max(hardlinks) FROM catalog;");
 }
 
 
@@ -1037,13 +1065,17 @@ uint32_t SqlMaxHardlinkGroup::GetMaxGroupId() const {
 
 
 SqlGetCounter::SqlGetCounter(const CatalogDatabase &database) {
+  static const char *stmt_ge_2_4 =
+    "SELECT value from statistics WHERE counter = :counter;";
+  static const char *stmt_lt_2_4 =
+    "SELECT 0;";
+
   if (database.schema_version() >= 2.4 - CatalogDatabase::kSchemaEpsilon) {
     compat_ = false;
-    Init(database.sqlite_db(),
-         "SELECT value from statistics WHERE counter = :counter;");
+    DeferredInit(database.sqlite_db(), stmt_ge_2_4);
   } else {
-    Init(database.sqlite_db(), "SELECT 0;");
     compat_ = true;
+    DeferredInit(database.sqlite_db(), stmt_lt_2_4);
   }
 }
 
@@ -1064,7 +1096,7 @@ uint64_t SqlGetCounter::GetCounter() const {
 
 
 SqlUpdateCounter::SqlUpdateCounter(const CatalogDatabase &database) {
-  Init(database.sqlite_db(),
+  DeferredInit(database.sqlite_db(),
        "UPDATE statistics SET value=value+:val WHERE counter=:counter;");
 }
 
@@ -1083,7 +1115,7 @@ bool SqlUpdateCounter::BindDelta(const int64_t delta) {
 
 
 SqlCreateCounter::SqlCreateCounter(const CatalogDatabase &database) {
-  Init(database.sqlite_db(),
+  DeferredInit(database.sqlite_db(),
        "INSERT OR REPLACE INTO statistics (counter, value) "
        "VALUES (:counter, :value);");
 }
@@ -1168,10 +1200,9 @@ bool SqlAllChunks::Close() {
 
 
 SqlLookupXattrs::SqlLookupXattrs(const CatalogDatabase &database) {
-  const string statement =
+  DeferredInit(database.sqlite_db(),
     "SELECT xattr FROM catalog "
-    "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);";
-  Init(database.sqlite_db(), statement);
+    "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);");
 }
 
 

@@ -400,9 +400,9 @@ TEST_F(T_Util, MakeSocket) {
   int socket_fd2;
 
   ASSERT_DEATH(MakeSocket(long_path, 0600), ".*");
-  EXPECT_NE(-1, socket_fd1 = MakeSocket(socket_address, 0777));
-  // the second time it should work as well (non socket-alrady-in-use error)
-  EXPECT_NE(-1, socket_fd2 = MakeSocket(socket_address, 0777));
+  ASSERT_NE(-1, socket_fd1 = MakeSocket(socket_address, 0777));
+  // the second time it should work as well (no socket-already-in-use error)
+  ASSERT_NE(-1, socket_fd2 = MakeSocket(socket_address, 0777));
   close(socket_fd1);
   close(socket_fd2);
 }
@@ -617,7 +617,7 @@ TEST_F(T_Util, SendMes2Socket) {
   ASSERT_LT(0, server_fd);
   listen(server_fd, 1);
   int client_fd = ConnectSocket(socket_address);
-  ASSERT_LT(0, client_fd);
+  ASSERT_LE(0, client_fd);
   SendMsg2Socket(client_fd, to_write);
   int new_connection = accept(server_fd, (struct sockaddr *) &client_addr,
       &client_length);
@@ -757,8 +757,11 @@ TEST_F(T_Util, UnlockFile) {
   EXPECT_EQ(-2, TryLockFile(filename));
   UnlockFile(fd1);
   EXPECT_LE(0, fd2 = TryLockFile(filename));  // can be locked again
+
   // no need to close fd1
-  close(fd2);
+  if (fd2 >= 0) {
+    close(fd2);
+  }
 }
 
 TEST_F(T_Util, CreateTempFile) {
@@ -1127,6 +1130,11 @@ TEST_F(T_Util, GetLineFd) {
   int fd2 = open(file2.c_str(), O_RDONLY);
   int fd3 = open(file3.c_str(), O_RDONLY);
   int fd4 = open(file4.c_str(), O_RDONLY);
+
+  ASSERT_LE(0, fd1);
+  ASSERT_LE(0, fd2);
+  ASSERT_LE(0, fd3);
+  ASSERT_LE(0, fd4);
 
   EXPECT_TRUE(GetLineFd(fd1, &result));
   EXPECT_EQ("first", result);

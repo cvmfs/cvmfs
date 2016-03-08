@@ -61,10 +61,11 @@ class CommandMigrate : public Command {
   struct PendingCatalog;
   typedef std::vector<PendingCatalog *> PendingCatalogList;
   struct PendingCatalog {
-    explicit PendingCatalog(const catalog::Catalog *old_catalog = NULL) :
-      success(false),
-      old_catalog(old_catalog),
-      new_catalog(NULL) { }
+    explicit PendingCatalog(const catalog::Catalog *old_catalog = NULL)
+      : success(false)
+      , old_catalog(old_catalog)
+      , new_catalog(NULL)
+      , new_catalog_size(0) { }
     virtual ~PendingCatalog();
 
     inline const std::string root_path() const {

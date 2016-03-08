@@ -1,3 +1,6 @@
+__x86.get_pc_thunk.ax
+__x86.get_pc_thunk.bx
+__x86.get_pc_thunk.dx
 __i686.get_pc_thunk.bx
 __i686.get_pc_thunk.cx
 cvmfs_init

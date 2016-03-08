@@ -164,6 +164,21 @@ class Spooler : public Observable<SpoolerResult> {
               const std::string &remote_path);
 
   /**
+   * Convenience wrapper to upload the Manifest file into the backend storage
+   *
+   * @param local_path  the location of the (signed) manifest to be uploaded
+   */
+  void UploadManifest(const std::string &local_path);
+
+
+  /**
+   * Convenience wrapper to upload a Reflog database into the backend storage
+   *
+   * @param local_path  the SQLite file location of the Reflog to be uploaded
+   */
+  void UploadReflog(const std::string &local_path);
+
+  /**
    * Schedules a process job that compresses and hashes the provided file in
    * local_path and uploads it into the CAS backend. The remote path to the
    * file is determined by the content hash of the compressed file appended by

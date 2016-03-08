@@ -1166,9 +1166,9 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       chunk_tables_->Unlock();
 
       // Retrieve File chunks from the catalog
-      FileChunkList *chunks = new FileChunkList();
+      UniquePtr<FileChunkList> chunks(new FileChunkList());
       if (!catalog_manager_->ListFileChunks(path, dirent.hash_algorithm(),
-                                           chunks) ||
+                                            chunks.weak_ref()) ||
           chunks->IsEmpty())
       {
         remount_fence_->Leave();
@@ -1183,7 +1183,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       // Check again to avoid race
       if (!chunk_tables_->inode2chunks.Contains(ino)) {
         chunk_tables_->inode2chunks.Insert(
-          ino, FileChunkReflist(chunks, path, dirent.compression_algorithm(),
+          ino, FileChunkReflist(chunks.Release(), path,
+                                dirent.compression_algorithm(),
                                 dirent.IsExternalFile()));
         chunk_tables_->inode2references.Insert(ino, 1);
       } else {

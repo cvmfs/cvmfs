@@ -93,7 +93,7 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
   //       currently this is not possible, since Manifest::Fetch asks for the
   //       repository name... Which we want to figure out with the tool at hand.
   //       Possible Fix: Allow for a Manifest::Fetch with an empty name.
-  manifest::Manifest *manifest = NULL;
+  UniquePtr<manifest::Manifest> manifest;
   if (IsRemote(repository)) {
     const bool follow_redirects = args.count('L') > 0;
     if (!this->InitDownloadManager(follow_redirects)) {
@@ -122,7 +122,7 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
     manifest = manifest::Manifest::LoadFile(".cvmfspublished");
   }
 
-  if (!manifest) {
+  if (!manifest.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to load repository manifest");
     return 1;
   }
@@ -132,7 +132,6 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
   if (!Exists(repository, certificate_path)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to find certificate (%s)",
              certificate_path.c_str());
-    delete manifest;
     return 1;
   }
 
@@ -245,7 +244,6 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
              manifest->ExportString().c_str());
   }
 
-  delete manifest;
   return 0;
 }
 

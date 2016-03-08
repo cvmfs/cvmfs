@@ -448,9 +448,24 @@ MockObjectFetcher::Fetch(const shash::Any   &object_hash,
   return MockObjectFetcher::kFailOk;
 }
 
+MockObjectFetcher::Failures
+MockObjectFetcher::Fetch(const std::string &relative_path,
+                         const bool         decompress,
+                         std::string *file_path) {
+  *file_path = relative_path;
+  if (!PathExists(relative_path)) {
+    return MockObjectFetcher::kFailNotFound;
+  }
+  return MockObjectFetcher::kFailOk;
+}
+
 bool MockObjectFetcher::ObjectExists(const shash::Any &object_hash) const {
   return MockCatalog::Exists(object_hash) ||
          MockHistory::Exists(object_hash);
+}
+
+bool MockObjectFetcher::PathExists(const std::string &path) const {
+  return MockReflog::Exists(path);
 }
 
 
@@ -647,5 +662,70 @@ bool MockHistory::GetHashes(std::vector<shash::Any> *hashes) const {
   hashes->resize(tags.size());
   std::transform(tags.rbegin(), tags.rend(),
                  hashes->begin(), MockHistory::get_hash);
+  return true;
+}
+
+
+//------------------------------------------------------------------------------
+
+
+MockReflog* MockReflog::Open(const std::string &path) {
+  MockReflog* reflog = MockReflog::Get(path);
+  if (NULL == reflog) {
+    return NULL;
+  }
+  return reflog->Clone();
+}
+
+MockReflog* MockReflog::Create(const std::string &path,
+                               const std::string &repo_name) {
+  MockReflog *reflog = new MockReflog(repo_name);
+  MockReflog::RegisterPath(path, reflog);
+  return reflog;
+}
+
+
+MockReflog* MockReflog::Clone() const {
+  MockReflog *new_reflog = new MockReflog(*this);
+  return new_reflog;
+}
+
+MockReflog::MockReflog(const std::string fqrn)
+  : owns_database_file_(false)
+  , fqrn_(fqrn) {}
+
+bool MockReflog::AddCertificate(const shash::Any &certificate) {
+  references_.insert(certificate);
+  return true;
+}
+
+bool MockReflog::AddCatalog(const shash::Any &catalog) {
+  references_.insert(catalog);
+  return true;
+}
+
+bool MockReflog::AddHistory(const shash::Any &history) {
+  references_.insert(history);
+  return true;
+}
+
+bool MockReflog::AddMetainfo(const shash::Any &metainfo) {
+  references_.insert(metainfo);
+  return true;
+}
+
+bool MockReflog::ListCatalogs(std::vector<shash::Any> *hashes) const {
+  // TODO(rmeusel): C++11 use std::copy_if
+  hashes->clear();
+  ReferenceTypeFilter predicate(shash::kSuffixCatalog, true /* inverse */);
+  std::remove_copy_if(references_.begin(),
+                      references_.end(),
+                      std::back_inserter(*hashes),
+                      predicate);
+  return true;
+}
+
+bool MockReflog::RemoveCatalog(const shash::Any &catalog) {
+  references_.erase(catalog);
   return true;
 }
