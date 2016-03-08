@@ -54,6 +54,19 @@ publish_after_hook() { :; }
 
 [ -f /etc/cvmfs/cvmfs_server_hooks.sh ] && . /etc/cvmfs/cvmfs_server_hooks.sh
 
+find_sbin() {
+  local bin_name="$1"
+  local bin_path=""
+  for d in /sbin /usr/sbin /usr/local/sbin /bin /usr/bin /usr/local/bin; do
+    bin_path="${d}/${bin_name}"
+    if [ -x "$bin_path" ]; then
+      echo "$bin_path"
+      return 0
+    fi
+  done
+  return 1
+}
+
 # Path to some useful sbin utilities
 LSOF_BIN="/usr/sbin/lsof"
 GETENFORCE_BIN="/usr/sbin/getenforce"
