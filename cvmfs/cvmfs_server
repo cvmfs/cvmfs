@@ -68,14 +68,14 @@ find_sbin() {
 }
 
 # Path to some useful sbin utilities
-LSOF_BIN="/usr/sbin/lsof"
-GETENFORCE_BIN="/usr/sbin/getenforce"
-SESTATUS_BIN="/usr/sbin/sestatus"
-GETCAP_BIN="/usr/sbin/getcap"
-SETCAP_BIN="/usr/sbin/setcap"
-MODPROBE_BIN="/sbin/modprobe"
-PIDOF_BIN="/sbin/pidof"
-RUNUSER_BIN="/sbin/runuser"
+LSOF_BIN="$(find_sbin       lsof)"
+GETENFORCE_BIN="$(find_sbin getenforce)"
+SESTATUS_BIN="$(find_sbin   sestatus)"
+GETCAP_BIN="$(find_sbin     getcap)"
+SETCAP_BIN="$(find_sbin     setcap)"
+MODPROBE_BIN="$(find_sbin   modprobe)"
+PIDOF_BIN="$(find_sbin      pidof)"
+RUNUSER_BIN="$(find_sbin    runuser)"
 
 # Find out how to deal with Apache
 # (binary name, configuration directory, CLI, WSGI module name, ...)
