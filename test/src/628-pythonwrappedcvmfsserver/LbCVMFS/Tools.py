@@ -32,7 +32,7 @@ def cvmfsPublish(reponame = None):
     if reponame == None:
         reponame = _getRepoName()
 
-    rc = subprocess.call(["cvmfs_server", "publish", reponame])
+    rc = subprocess.call(["cvmfs_server", "publish", "-f", reponame])
     if rc != 0:
         raise RuntimeError("Could not publish CVMFS transaction")
 
