@@ -77,8 +77,38 @@ class SqliteMemoryManager {
 
   /**
    * An mmap'd block of general purpose memory for malloc/free in sqlite.  Uses
-   * the "boundary-tag system" as described in TAOCP.
+   * the "boundary-tag system" as described in TAOCP vol 1 section 2.5.
    * Not thread-safe.  Pointers are not aligned.
+   *
+   * The tag layouts are as follows.  Size is a signed 4 byte integer, previous
+   * and next are 4 byte offsets into the arena, linking to the previous and
+   * next free blocks in the list of free blocks.
+   *
+   * Available (free) block:                         Reserved (used) block:
+   *
+   *       +--------+--------+                             +--------+--------+
+   * upper |  size  |      00|                       upper |        |      01|
+   *       +--------+--------+                             +--------+--------+
+   *       |       ...       |                             |       ...       |
+   *       +-----------------+                             +-----------------+
+   *       |previous|        |                             |       ...       |
+   *       +-----------------+                             +-----------------+
+   * lower |  size  |  next  |                       lower |  -size |        |
+   *       +--------+--------+                             +--------+--------+
+   *        B0             B7                               B0             B7
+   *
+   *
+   * First block of arena_:                          Last "block" of arena_:
+   * in the free list but blocked for merging
+   *
+   *       +--------+--+-----+
+   * upper |previous|01| ... |
+   *       +-----------+-----+
+   *       | int(0) | next   | <- head_avail_
+   *       +-----------------+                             +--------+########
+   * lower |  this (@ 64bit) |                       lower |int(-1) |outside#
+   *       +--------+--------+                             +--------+########
+   *        B0             B7                               B0    B4
    */
   class MallocArena {
    public:
