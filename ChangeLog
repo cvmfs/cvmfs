@@ -1,4 +1,5 @@
 2.3.0:
+  * Reduce number of system calls during publish
   * Fix compilation of libcvmfs on Fedora 23 i686
   * Add support for cvmfs_swissknife publish -f to force publishing in the
     presence of open file descriptors
