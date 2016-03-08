@@ -1,4 +1,6 @@
 2.3.0:
+  * Add support for cvmfs_swissknife publish -f to force publishing in the
+    presence of open file descriptors
   * Fix a rare crash when parsing the whitelist in cvmfs_server
   * Call cvmfs_suid_helper with a clean environment from cvmfs_server
   * Add .cvmfsreflog for garbage collection
