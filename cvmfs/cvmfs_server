@@ -79,19 +79,19 @@ RUNUSER_BIN="$(find_sbin    runuser)"
 
 # Find out how to deal with Apache
 # (binary name, configuration directory, CLI, WSGI module name, ...)
-if which httpd2 > /dev/null 2>&1; then # SLES/OpenSuSE
+if find_sbin httpd2 > /dev/null 2>&1; then # SLES/OpenSuSE
   APACHE_CONF="apache2"
-  APACHE_BIN="$(which httpd2)"
+  APACHE_BIN="$(find_sbin httpd2)"
   APACHE_CTL="$APACHE_BIN"
   APACHE_WSGI_MODPKG="apache2-mod_wsgi"
-elif which apache2 > /dev/null 2>&1; then
+elif find_sbin apache2 > /dev/null 2>&1; then
   APACHE_CONF="apache2"
-  APACHE_BIN="$(which apache2)"
-  if which apachectl > /dev/null 2>&1; then # Debian
-    APACHE_CTL="$(which apachectl)"
+  APACHE_BIN="$(find_sbin apache2)"
+  if find_sbin apachectl > /dev/null 2>&1; then # Debian
+    APACHE_CTL="$(find_sbin apachectl)"
     APACHE_WSGI_MODPKG="libapache2-mod-wsgi"
-  elif which apache2ctl > /dev/null 2>&1; then # Gentoo
-    APACHE_CTL="$(which apache2ctl)"
+  elif find_sbin apache2ctl > /dev/null 2>&1; then # Gentoo
+    APACHE_CTL="$(find_sbin apache2ctl)"
     APACHE_WSGI_MODPKG="www-apache/mod_wsgi"
   fi
 else # RedHat based
@@ -1894,16 +1894,18 @@ ensure_swissknife_suid() {
 # an ubuntu machine. This enables these modules on an ubuntu installation
 # Note: this function requires a privileged user
 ensure_enabled_apache_modules() {
-  which a2enmod > /dev/null 2>&1    || return 0
-  which apache2ctl > /dev/null 2>&1 || return 0
+  find_sbin a2enmod    > /dev/null 2>&1 || return 0
+  find_sbin apache2ctl > /dev/null 2>&1 || return 0
+  local a2enmod_bin=$(find_sbin a2enmod)
+  local apache2ctl_bin=$(find_sbin apache2ctl)
 
   local restart=0
   local retcode=0
   local modules="headers expires"
 
   for module in $modules; do
-    apache2ctl -M 2>/dev/null | grep -q "$module" && continue
-    a2enmod $module > /dev/null 2>&1 || { echo "Warning: failed to enable apache2 module $module"; retcode=1; }
+    $apache2ctl_bin -M 2>/dev/null | grep -q "$module" && continue
+    $a2enmod_bin $module > /dev/null 2>&1 || { echo "Warning: failed to enable apache2 module $module"; retcode=1; }
     restart=1
   done
 
