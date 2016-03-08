@@ -23,6 +23,28 @@ wait_for_file() {
   return 1
 }
 
+# Regression Test: This issue was seen on the lhcbdev.cern.ch release manager
+#                  machine where a misconfigured environment caused a python
+#                  script to be interpreted with a python interpreter hosted on
+#                  lhcbdev.cern.ch.
+#                  The script was a wrapper around `cvmfs_server` and therefore
+#                  called `cvmfs_server publish` that remounts lhcbdev.cern.ch.
+#                  Since an interpreter from within the repository was used,
+#                  this should have resulted in `cvmfs_server` detecting open
+#                  file descriptors on the mount point and aborting the publish.
+#                  However, it resulted in a failed repository remount and left
+#                  the release manager machine in an undefined state.
+#
+# The issue has been quick-fixed by using a python interpreter outside of the
+# repository. However, it remained unclear why `cvmfs_server` failed to detect
+# the open file descriptor before remounting.
+#
+# It turns out that using `crontab` to invoke the python script was the actual
+# root cause. `crontab` uses a limited $PATH - not including /usr/sbin - so that
+# `cvmfs_server` doesn't find the `lsof` command. Hence, `cvmfs_server` falsely
+# concluded that there are no open files and proceeds to umount the busy
+# mountpoint.
+
 cvmfs_run_test() {
   logfile=$1
   script_location=$2
