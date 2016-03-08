@@ -1,6 +1,28 @@
 cvmfs_test_name="Python-wrapped cvmfs_server"
 cvmfs_test_autofs_on_startup=false
 
+CVMFS_TEST_628_PREVIOUS_CRONTAB=
+cleanup() {
+  echo "running cleanup..."
+  [ -z $CVMFS_TEST_628_PREVIOUS_CRONTAB ] || crontab $CVMFS_TEST_628_PREVIOUS_CRONTAB
+}
+
+wait_for_file() {
+  local path=$1
+  local timeout=$2
+
+  while [ $timeout -gt 0 ]; do
+    if [ -f $publish_2 ]; then
+      sleep 10
+      return 0
+    fi
+    sleep 1
+    timeout=$(( $timeout - 1 ))
+  done
+
+  return 1
+}
+
 cvmfs_run_test() {
   logfile=$1
   script_location=$2
@@ -14,6 +36,10 @@ cvmfs_run_test() {
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
+  local server_conf=/etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/server.conf
+  echo "disabling wall message"
+  echo "CVMFS_FORCE_REMOUNT_WARNING=false" | sudo tee --append $server_conf
+
   echo "starting transaction to edit repository"
   start_transaction $CVMFS_TEST_REPO || return $?
 
@@ -25,8 +51,57 @@ cvmfs_run_test() {
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO || return $?
 
-  echo "running python wrapper with ${python_interpreter} as interpreter"
-  yes "n" | CVMFS_TEST_REPO=${CVMFS_TEST_REPO} $python_interpreter ${script_location}/do_install.py || return 1
+  local install_wrapper="${scratch_dir}/do_install.sh"
+  echo "dropping $install_wrapper"
+  echo "#!/bin/sh"                                                                               >  $install_wrapper
+  echo "CVMFS_TEST_REPO=${CVMFS_TEST_REPO} $python_interpreter ${script_location}/do_install.py" >> $install_wrapper
+  chmod +x $install_wrapper
+
+  local publish_1="publish_1.log"
+  echo "running python wrapper with ${python_interpreter} as interpreter (logging to $publish_1)"
+  echo "Note: the wrapper uses \`cvmfs_server publish -f\`"
+  $install_wrapper > $publish_1 2>&1 || return 1
+
+  echo "check for error messages"
+  cat $publish_1 | grep -e 'Open file descriptors'    || return 2
+  cat $publish_1 | grep -e 'lsof report'              || return 3
+  cat $publish_1 | grep -e "python.*$CVMFS_TEST_USER" || return 4
+
+  echo "set a trap for system directory cleanup"
+  trap cleanup EXIT HUP INT TERM
+
+  echo "stash the current crontab"
+  local stash_crontab="previous_crontab"
+  local crontab_l_stderr="crontab_stderr"
+  crontab -l > $stash_crontab 2> $crontab_l_stderr || true
+  if [ $(cat $crontab_l_stderr | wc -l) -gt 0 ] && \
+         cat $crontab_l_stderr | grep -qv 'no crontab for'; then
+    return 5
+  fi
+
+  echo "----"
+  cat $stash_crontab
+  echo "----"
+
+  local publish_2="${scratch_dir}/publish_2.log"
+  echo "install a crontab to start the publishing process (logging into $publish_2)"
+  local new_crontab="new_crontab"
+  local in_two_minutes=$(date --date '2 minutes' +%M)
+  cp $stash_crontab $new_crontab || return 6
+  echo "$in_two_minutes * * * * $install_wrapper > $publish_2 2>&1" >> $new_crontab
+  CVMFS_TEST_628_PREVIOUS_CRONTAB=$stash_crontab
+  crontab $new_crontab || return 7
+
+  echo "----"
+  cat $new_crontab
+  echo "----"
+
+  echo "waiting until crontab has executed the publish command ($in_two_minutes)"
+  wait_for_file $publish_2 300 || return 8  # wait 5 minutes for publish log to appear
+
+  cat $publish_2 | grep -e 'Open file descriptors'    || return  9
+  cat $publish_2 | grep -e 'lsof report'              || return 10
+  cat $publish_2 | grep -e "python.*$CVMFS_TEST_USER" || return 11
 
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i  || return $?
