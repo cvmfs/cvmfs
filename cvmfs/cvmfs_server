@@ -54,21 +54,44 @@ publish_after_hook() { :; }
 
 [ -f /etc/cvmfs/cvmfs_server_hooks.sh ] && . /etc/cvmfs/cvmfs_server_hooks.sh
 
+find_sbin() {
+  local bin_name="$1"
+  local bin_path=""
+  for d in /sbin /usr/sbin /usr/local/sbin /bin /usr/bin /usr/local/bin; do
+    bin_path="${d}/${bin_name}"
+    if [ -x "$bin_path" ]; then
+      echo "$bin_path"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Path to some useful sbin utilities
+LSOF_BIN="$(find_sbin       lsof)"       || true
+GETENFORCE_BIN="$(find_sbin getenforce)" || true
+SESTATUS_BIN="$(find_sbin   sestatus)"   || true
+GETCAP_BIN="$(find_sbin     getcap)"     || true
+SETCAP_BIN="$(find_sbin     setcap)"     || true
+MODPROBE_BIN="$(find_sbin   modprobe)"   || true
+PIDOF_BIN="$(find_sbin      pidof)"      || true
+RUNUSER_BIN="$(find_sbin    runuser)"    || true
+
 # Find out how to deal with Apache
 # (binary name, configuration directory, CLI, WSGI module name, ...)
-if which httpd2 > /dev/null 2>&1; then # SLES/OpenSuSE
+if find_sbin httpd2 > /dev/null 2>&1; then # SLES/OpenSuSE
   APACHE_CONF="apache2"
-  APACHE_BIN="$(which httpd2)"
+  APACHE_BIN="$(find_sbin httpd2)"
   APACHE_CTL="$APACHE_BIN"
   APACHE_WSGI_MODPKG="apache2-mod_wsgi"
-elif which apache2 > /dev/null 2>&1; then
+elif find_sbin apache2 > /dev/null 2>&1; then
   APACHE_CONF="apache2"
-  APACHE_BIN="$(which apache2)"
-  if which apachectl > /dev/null 2>&1; then # Debian
-    APACHE_CTL="$(which apachectl)"
+  APACHE_BIN="$(find_sbin apache2)"
+  if find_sbin apachectl > /dev/null 2>&1; then # Debian
+    APACHE_CTL="$(find_sbin apachectl)"
     APACHE_WSGI_MODPKG="libapache2-mod-wsgi"
-  elif which apache2ctl > /dev/null 2>&1; then # Gentoo
-    APACHE_CTL="$(which apache2ctl)"
+  elif find_sbin apache2ctl > /dev/null 2>&1; then # Gentoo
+    APACHE_CTL="$(find_sbin apache2ctl)"
     APACHE_WSGI_MODPKG="www-apache/mod_wsgi"
   fi
 else # RedHat based
@@ -80,10 +103,10 @@ fi
 
 # Find the service binary (or detect systemd)
 minpidof() {
-  pidof $1 | tr " " "\n" | sort --numeric-sort | head -n1
+  $PIDOF_BIN $1 | tr " " "\n" | sort --numeric-sort | head -n1
 }
 SERVICE_BIN="false"
-if ! pidof systemd > /dev/null 2>&1 || [ $(minpidof systemd) -ne 1 ]; then
+if ! $PIDOF_BIN systemd > /dev/null 2>&1 || [ $(minpidof systemd) -ne 1 ]; then
   if [ -x /sbin/service ]; then
     SERVICE_BIN="/sbin/service"
   elif [ -x /usr/sbin/service ]; then
@@ -98,7 +121,7 @@ fi
 # Check if `runuser` is available on this system
 # Note: at least Ubuntu in older versions doesn't provide this command
 HAS_RUNUSER=0
-if which runuser > /dev/null 2>&1; then
+if [ -x $RUNUSER_BIN ]; then
   HAS_RUNUSER=1
 fi
 
@@ -569,7 +592,7 @@ check_multiple_repository_existence() {
 # or if aufs is compiled in
 # @return   0 if the aufs kernel module is loaded
 check_aufs() {
-  /sbin/modprobe -q aufs || test -d /sys/fs/aufs
+  $MODPROBE_BIN -q aufs || test -d /sys/fs/aufs
 }
 
 
@@ -577,7 +600,7 @@ check_aufs() {
 # or if overlayfs is compiled in
 # @return   0 if the overlayfs kernel module is loaded
 check_overlayfs() {
-  /sbin/modprobe -q overlay || test -d /sys/module/overlay
+  $MODPROBE_BIN -q overlay || test -d /sys/module/overlay
 }
 
 
@@ -787,7 +810,7 @@ has_apache_config_file() {
 
 get_fd_modes() {
   local path=$1
-  lsof -Fan 2>/dev/null | grep -B1 -e "^n$path" | grep -e '^a.*'
+  $LSOF_BIN -Fan 2>/dev/null | grep -B1 -e "^n$path" | grep -e '^a.*'
 }
 
 # gets the number of open read-only file descriptors beneath a given path
@@ -886,7 +909,7 @@ get_user_shell() {
     shell_cmd="sh -c"
   elif is_root; then
     if [ $HAS_RUNUSER -ne 0 ]; then
-      shell_cmd="runuser -m $CVMFS_USER -c"
+      shell_cmd="$RUNUSER_BIN -m $CVMFS_USER -c"
     else
       shell_cmd="su -m $CVMFS_USER -c"
     fi
@@ -1224,9 +1247,9 @@ check_user() {
 
 
 has_selinux() {
-  which sestatus   > /dev/null 2>&1 && \
-  which getenforce > /dev/null 2>&1 && \
-  getenforce | grep -qi "enforc" || return 1
+  [ -x $SESTATUS_BIN   ] && \
+  [ -x $GETENFORCE_BIN ] && \
+  $GETENFORCE_BIN | grep -qi "enforc" || return 1
 }
 
 
@@ -1843,9 +1866,9 @@ EOF
 _setcap_if_needed() {
   local binary_path="$1"
   local capability="$2"
-  [ -x $binary_path ]                           || return 0
-  getcap "$binary_path" | grep -q "$capability" && return 0
-  setcap "${capability}+p" "$binary_path"
+  [ -x $binary_path ]                                || return 0
+  $GETCAP_BIN "$binary_path" | grep -q "$capability" && return 0
+  $SETCAP_BIN "${capability}+p" "$binary_path"
 }
 
 # grants CAP_SYS_ADMIN to cvmfs_swissknife if it is necessary
@@ -1871,16 +1894,18 @@ ensure_swissknife_suid() {
 # an ubuntu machine. This enables these modules on an ubuntu installation
 # Note: this function requires a privileged user
 ensure_enabled_apache_modules() {
-  which a2enmod > /dev/null 2>&1    || return 0
-  which apache2ctl > /dev/null 2>&1 || return 0
+  local a2enmod_bin=
+  local apache2ctl_bin=
+  a2enmod_bin="$(find_sbin    a2enmod)"    || return 0
+  apache2ctl_bin="$(find_sbin apache2ctl)" || return 0
 
   local restart=0
   local retcode=0
   local modules="headers expires"
 
   for module in $modules; do
-    apache2ctl -M 2>/dev/null | grep -q "$module" && continue
-    a2enmod $module > /dev/null 2>&1 || { echo "Warning: failed to enable apache2 module $module"; retcode=1; }
+    $apache2ctl_bin -M 2>/dev/null | grep -q "$module" && continue
+    $a2enmod_bin $module > /dev/null 2>&1 || { echo "Warning: failed to enable apache2 module $module"; retcode=1; }
     restart=1
   done
 
@@ -2334,7 +2359,7 @@ If you go for production, backup you software signing keys in /etc/cvmfs/keys/!"
 
 generate_lsof_report_for_mountpoint() {
   local mountpoint="$1"
-  lsof "$mountpoint" | awk '{print $1,$2,$3,$NF}' | column -t || true
+  $LSOF_BIN "$mountpoint" | awk '{print $1,$2,$3,$NF}' | column -t || true
 }
 
 
