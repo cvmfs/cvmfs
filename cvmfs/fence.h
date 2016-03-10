@@ -5,9 +5,8 @@
 #ifndef CVMFS_FENCE_H_
 #define CVMFS_FENCE_H_
 
-#include <gtest/gtest_prod.h>
-
 #include "atomic.h"
+#include "gtest/gtest_prod.h"
 #include "util.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
@@ -26,39 +25,39 @@ class Fence : public SingleCopy {
   FRIEND_TEST(T_Fence, Basics);
 
  public:
-   Fence() {
-     atomic_init64(&counter_);
-     atomic_init32(&blocking_);
-   }
+  Fence() {
+    atomic_init64(&counter_);
+    atomic_init32(&blocking_);
+  }
 
-   void Enter() {
-     while (atomic_read32(&blocking_)) {
-       SafeSleepMs(kBusyWaitBackoffMs);
-     }
-     atomic_inc64(&counter_);
-   }
+  void Enter() {
+    while (atomic_read32(&blocking_)) {
+      SafeSleepMs(kBusyWaitBackoffMs);
+    }
+    atomic_inc64(&counter_);
+  }
 
-   void Leave() {
-     atomic_dec64(&counter_);
-   }
+  void Leave() {
+    atomic_dec64(&counter_);
+  }
 
-   void Close() {
-     atomic_cas32(&blocking_, 0, 1);
-   }
+  void Close() {
+    atomic_cas32(&blocking_, 0, 1);
+  }
 
-   /**
-    * Close and let live critical regions exit
-    */
-   void Drain() {
-     Close();
-     while (atomic_read64(&counter_) > 0) {
-       SafeSleepMs(kBusyWaitBackoffMs);
-     }
-   }
+  /**
+   * Close and let live critical regions exit
+   */
+  void Drain() {
+    Close();
+    while (atomic_read64(&counter_) > 0) {
+      SafeSleepMs(kBusyWaitBackoffMs);
+    }
+  }
 
-   void Open() {
-     atomic_cas32(&blocking_, 1, 0);
-   }
+  void Open() {
+    atomic_cas32(&blocking_, 1, 0);
+  }
 
  private:
   static const unsigned kBusyWaitBackoffMs = 100;
