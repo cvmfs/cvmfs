@@ -134,6 +134,17 @@ void Reader<FileScrubbingTaskT, FileT>::OpenNewFile(FileT *file) {
 
 template <class FileScrubbingTaskT, class FileT>
 void Reader<FileScrubbingTaskT, FileT>::CloseFile(OpenFile *file) {
+  // tell kernel to evict the file from the caches prior to closing it
+  const off_t offset = 0;
+  const off_t length = 0;  // advice refers to entire file
+  const int advice = POSIX_FADV_DONTNEED;
+  const int error_code = posix_fadvise(file->file_descriptor,
+                                       offset, length, advice);
+  if (error_code != 0) {
+    LogCvmfs(kLogSpooler, kLogVerboseMsg, "fd advice failed for %d (%d - %s)",
+             file->file_descriptor, error_code, strerror(error_code));
+  }
+
   const int retval = close(file->file_descriptor);
   assert(retval == 0);
 }
