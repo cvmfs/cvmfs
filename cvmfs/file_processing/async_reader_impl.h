@@ -116,6 +116,15 @@ void Reader<FileScrubbingTaskT, FileT>::OpenNewFile(FileT *file) {
   }
   assert(fd > 0);
 
+  const off_t offset = 0;
+  const off_t length = 0;  // advice refers to entire file
+  const int advice = POSIX_FADV_WILLNEED;
+  const int error_code = posix_fadvise(fd, offset, length, advice);
+  if (error_code != 0) {
+    LogCvmfs(kLogSpooler, kLogVerboseMsg, "fd advice failed for %s (%d - %s)",
+             file->path().c_str(), error_code, strerror(error_code));
+  }
+
   OpenFile open_file;
   open_file.file            = file;
   open_file.file_descriptor = fd;
