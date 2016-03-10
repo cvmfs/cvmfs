@@ -79,6 +79,7 @@ set(CVMFS_UNITTEST_FILES
   t_clientctx.cc
   t_reflog.cc
   t_sqlitemem.cc
+  t_fence.cc
 )
 
 if (VOMS_FOUND)
@@ -211,6 +212,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/reflog_sql.cc
   ${CVMFS_SOURCE_DIR}/sqlitemem.h
   ${CVMFS_SOURCE_DIR}/sqlitemem.cc
+  ${CVMFS_SOURCE_DIR}/fence.h
 )
 
 if (VOMS_FOUND)
