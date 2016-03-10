@@ -137,6 +137,15 @@ int LocalUploader::CreateAndOpenTemporaryChunkFile(std::string *path) const {
     return tmp_fd;
   }
 
+  const off_t offset = 0;
+  const off_t length = 0;  // advice refers to entire file
+  const int advice = POSIX_FADV_DONTNEED;
+  const int error_code = posix_fadvise(tmp_fd, offset, length, advice);
+  if (error_code != 0) {
+    LogCvmfs(kLogSpooler, kLogVerboseMsg, "fd advice failed for %s (%d - %s)",
+             tmp_path.c_str(), error_code, strerror(error_code));
+  }
+
   *path = tmp_path;
   return tmp_fd;
 }
