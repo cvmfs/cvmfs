@@ -541,6 +541,28 @@ void UnlockFile(const int filedes) {
 }
 
 
+void InvalidatePagecache(const int    fd,
+                         const off_t  offset,
+                         const size_t length) {
+  const off_t  aligned_offset = offset - (offset % kPageSize);
+  const size_t aligned_length = length - ((offset + length) % kPageSize)
+                                       + (offset % kPageSize);
+
+  if (aligned_length == 0) {
+    return;
+  }
+
+  const int advice = POSIX_FADV_DONTNEED;
+  const int retcode = posix_fadvise(fd, aligned_offset, aligned_length, advice);
+
+  if (retcode != 0) {
+    LogCvmfs(kLogUtility, kLogVerboseMsg, "page cache eviction advice failed "
+                                          "for %d (%d - %s)",
+             fd, retcode, strerror(retcode));
+  }
+}
+
+
 /**
  * Wrapper around mkstemp.
  */
