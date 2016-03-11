@@ -9,6 +9,7 @@
 #include "cvmfs_config.h"
 #include "mmap_file.h"
 
+#include <errno.h>
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
