@@ -160,6 +160,7 @@ void LocalUploader::Upload(UploadStreamHandle  *handle,
   assert(buffer->IsInitialized());
   LocalStreamHandle *local_handle = static_cast<LocalStreamHandle*>(handle);
 
+  const off_t offset = lseek(local_handle->file_descriptor, 0, SEEK_CUR);
   const size_t bytes_written = write(local_handle->file_descriptor,
                                      buffer->ptr(),
                                      buffer->used_bytes());
@@ -175,18 +176,8 @@ void LocalUploader::Upload(UploadStreamHandle  *handle,
     return;
   }
 
-  // TODO(rmeusel): aligning calls to fadvice() to page boundaries would perhaps
-  //                save a few system calls
-  const off_t start_offset = lseek(local_handle->file_descriptor,
-                                   0, SEEK_CUR) - bytes_written;
-  const int advice = POSIX_FADV_DONTNEED;
-  const int error_code = posix_fadvise(local_handle->file_descriptor,
-                                       start_offset, bytes_written, advice);
-  if (error_code != 0) {
-    LogCvmfs(kLogSpooler, kLogVerboseMsg, "fd advice failed for %s (%d - %s)",
-             local_handle->temporary_path.c_str(), error_code,
-             strerror(error_code));
-  }
+  // tell kernel to evict written pages from the page cache
+  InvalidatePagecache(local_handle->file_descriptor, offset, bytes_written);
 
   Respond(callback, UploaderResults(0, buffer));
 }

@@ -219,15 +219,7 @@ bool Reader<FileScrubbingTaskT, FileT>::
   open_file->file_marker += bytes_read;
 
   // tell kernel to evict read pages from the page cache
-  // TODO(rmeusel): aligning this to page boundaries might save a couple of
-  //                system calls
-  const int advice = POSIX_FADV_DONTNEED;
-  const int error_code = posix_fadvise(open_file->file_descriptor,
-                                       file_offset, bytes_read, advice);
-  if (error_code != 0) {
-    LogCvmfs(kLogSpooler, kLogVerboseMsg, "fd advice failed for %d (%d - %s)",
-             open_file->file_descriptor, error_code, strerror(error_code));
-  }
+  InvalidatePagecache(open_file->file_descriptor, file_offset, bytes_read);
 
   // check if the file has been fully read
   const bool finished_reading =
