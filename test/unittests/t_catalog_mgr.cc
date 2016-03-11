@@ -12,7 +12,6 @@
 #include "../../cvmfs/catalog_mgr.h"
 #include "../../cvmfs/hash.h"
 #include "../../cvmfs/shortstring.h"
-#include "../../cvmfs/util.h"
 #include "testutil.h"
 
 using namespace std;  // NOLINT

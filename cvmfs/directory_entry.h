@@ -20,7 +20,6 @@
 #include "hash.h"
 #include "platform.h"
 #include "shortstring.h"
-#include "util.h"
 
 namespace publish {
 class SyncItem;

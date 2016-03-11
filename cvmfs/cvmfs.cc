@@ -104,7 +104,6 @@
 #include "statistics.h"
 #include "talk.h"
 #include "tracer.h"
-#include "util.h"
 #include "util_concurrency.h"
 #include "uuid.h"
 #include "voms_authz/voms_cred.h"

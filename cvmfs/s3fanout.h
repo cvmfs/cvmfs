@@ -18,7 +18,7 @@
 #include "dns.h"
 #include "duplex_curl.h"
 #include "prng.h"
-#include "util.h"
+#include "util/mmap_file.h"
 #include "util_concurrency.h"
 
 namespace s3fanout {

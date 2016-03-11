@@ -12,6 +12,7 @@
 #include "quota.h"
 #include "signature.h"
 #include "statistics.h"
+#include "util/posix.h"
 
 using namespace std;  // NOLINT
 

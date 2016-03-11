@@ -8,7 +8,7 @@
 
 #include <string>
 
-#include "../../cvmfs/util.h"
+#include "../../cvmfs/util/string.h"
 
 class T_Base64 : public ::testing::Test {
  protected:

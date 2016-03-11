@@ -13,7 +13,6 @@
 #include "../../cvmfs/file_processing/char_buffer.h"
 #include "../../cvmfs/file_processing/file_processor.h"
 #include "../../cvmfs/upload_spooler_result.h"
-#include "../../cvmfs/util.h"
 #include "c_file_sandbox.h"
 #include "testutil.h"
 

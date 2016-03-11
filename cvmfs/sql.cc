@@ -6,7 +6,7 @@
 #include "sql.h"
 
 #include "logging.h"
-#include "util.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 

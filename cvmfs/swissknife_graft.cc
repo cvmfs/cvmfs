@@ -16,6 +16,7 @@
 #include "fs_traversal.h"
 #include "hash.h"
 #include "platform.h"
+#include "util/string.h"
 
 
 bool

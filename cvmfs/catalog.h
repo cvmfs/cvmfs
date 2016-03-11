@@ -21,7 +21,6 @@
 #include "shortstring.h"
 #include "sql.h"
 #include "uid_map.h"
-#include "util.h"
 #include "xattr.h"
 
 namespace swissknife {

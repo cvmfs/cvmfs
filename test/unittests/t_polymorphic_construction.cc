@@ -8,7 +8,7 @@
 #include <string>
 
 #include "../../cvmfs/prng.h"
-#include "../../cvmfs/util.h"
+#include "../../cvmfs/util/plugin.h"
 #include "testutil.h"
 
 struct DecisionType {

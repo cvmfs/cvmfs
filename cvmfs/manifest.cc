@@ -8,7 +8,7 @@
 #include <map>
 
 #include "catalog.h"
-#include "util.h"
+#include "util/posix.h"
 
 using namespace std;  // NOLINT
 

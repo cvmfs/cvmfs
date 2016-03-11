@@ -39,8 +39,9 @@
 #include "loader_talk.h"
 #include "logging.h"
 #include "options.h"
+#include "platform.h"
 #include "sanitizer.h"
-#include "util.h"
+#include "util/string.h"
 
 // If valgrind headers are present on the build system,
 // then we can detect valgrind at runtime.

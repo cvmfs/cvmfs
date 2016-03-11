@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-#include "../../cvmfs/util.h"
+#include "../../cvmfs/util/async.h"
 
 
 void CallbackFn(bool* const &param) { *param = true; }

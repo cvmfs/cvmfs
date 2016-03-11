@@ -7,7 +7,6 @@
 #include <tbb/scalable_allocator.h>
 
 #include "../../cvmfs/file_processing/char_buffer.h"
-#include "../../cvmfs/util.h"
 
 
 TEST(T_Buffer, Initialize) {

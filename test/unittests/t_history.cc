@@ -10,7 +10,6 @@
 #include "../../cvmfs/compression.h"
 #include "../../cvmfs/history_sqlite.h"
 #include "../../cvmfs/prng.h"
-#include "../../cvmfs/util.h"
 #include "testutil.h"
 
 using history::History;

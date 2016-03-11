@@ -10,7 +10,8 @@
 #include <cstdio>
 
 #include "../../cvmfs/tracer.h"
-#include "../../cvmfs/util.h"
+#include "../../cvmfs/util/posix.h"
+#include "../../cvmfs/util/string.h"
 
 using namespace std;  // NOLINT
 

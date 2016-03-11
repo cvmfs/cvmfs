@@ -14,7 +14,6 @@
 #include "../../cvmfs/history_sqlite.h"
 #include "../../cvmfs/shortstring.h"
 #include "../../cvmfs/statistics.h"
-#include "../../cvmfs/util.h"
 #include "testutil.h"
 
 using namespace std;  // NOLINT

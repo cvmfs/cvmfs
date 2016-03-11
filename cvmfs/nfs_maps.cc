@@ -32,7 +32,8 @@
 #include "leveldb/filter_policy.h"
 #include "logging.h"
 #include "nfs_shared_maps.h"
-#include "util.h"
+#include "util/posix.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 

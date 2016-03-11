@@ -14,7 +14,6 @@
 #include "../../cvmfs/fetch.h"
 #include "../../cvmfs/hash.h"
 #include "../../cvmfs/statistics.h"
-#include "../../cvmfs/util.h"
 #include "testutil.h"
 
 using namespace std;  // NOLINT

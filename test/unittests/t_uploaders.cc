@@ -17,7 +17,6 @@
 #include "../../cvmfs/upload_local.h"
 #include "../../cvmfs/upload_s3.h"
 #include "../../cvmfs/upload_spooler_definition.h"
-#include "../../cvmfs/util.h"
 #include "c_file_sandbox.h"
 #include "testutil.h"
 

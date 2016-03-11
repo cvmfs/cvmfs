@@ -13,7 +13,6 @@
 #include "file_chunk.h"
 #include "hash.h"
 #include "platform.h"
-#include "util.h"
 
 namespace publish {
 

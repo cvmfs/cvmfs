@@ -7,6 +7,8 @@
 
 #include <string>
 
+#include "util/posix.h"
+
 template <class ObjectFetcherT>
 manifest::Reflog* swissknife::Command::GetOrCreateReflog(
                                               ObjectFetcherT    *object_fetcher,

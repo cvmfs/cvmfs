@@ -6,6 +6,7 @@
 
 #include "../../cvmfs/lru.h"
 #include "../../cvmfs/statistics.h"
+#include "../../cvmfs/util/string.h"
 
 using lru::LruCache;
 

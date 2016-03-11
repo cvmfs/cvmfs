@@ -70,7 +70,7 @@
 #include "sqlitemem.h"
 #include "sqlitevfs.h"
 #include "statistics.h"
-#include "util.h"
+#include "util/posix.h"
 #include "wpad.h"
 
 using namespace std;  // NOLINT

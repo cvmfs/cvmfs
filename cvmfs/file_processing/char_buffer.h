@@ -9,9 +9,10 @@
 #include <tbb/scalable_allocator.h>
 
 #include <cassert>
+#include <cstring>
 #include <vector>
 
-#include "../util.h"
+#include "../util/buffer.h"
 
 namespace upload {
 

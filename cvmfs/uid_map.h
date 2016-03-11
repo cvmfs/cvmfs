@@ -14,7 +14,7 @@
 
 #include "logging.h"
 #include "sanitizer.h"
-#include "util.h"
+#include "util/string.h"
 
 /**
  * This reads a mapping file of (roughly) the following format:

@@ -15,9 +15,10 @@
 #include <vector>
 
 #include "duplex_sqlite3.h"
+#include "gtest/gtest_prod.h"
 #include "hash.h"
 #include "statistics.h"
-#include "util.h"
+#include "util/single_copy.h"
 
 namespace perf {
 class Recorder;

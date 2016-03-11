@@ -15,7 +15,6 @@
 #include "catalog_mgr.h"
 #include "loader.h"
 #include "lru.h"
-#include "util.h"
 
 namespace cache {
 class CacheManager;

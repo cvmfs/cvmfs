@@ -6,7 +6,7 @@
 
 
 #include "../../cvmfs/compression.h"
-#include "../../cvmfs/util.h"
+#include "../../cvmfs/util/pointer.h"
 
 // TODO(jblomer): typed tests
 

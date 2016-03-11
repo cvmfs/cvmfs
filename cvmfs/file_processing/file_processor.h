@@ -9,7 +9,6 @@
 
 #include "../hash.h"
 #include "../upload_spooler_result.h"
-#include "../util.h"
 #include "../util_concurrency.h"
 
 namespace upload {

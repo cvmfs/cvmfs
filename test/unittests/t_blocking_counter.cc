@@ -4,6 +4,7 @@
 
 #include <gtest/gtest.h>
 
+#include <errno.h>
 #include <pthread.h>
 #include <unistd.h>
 

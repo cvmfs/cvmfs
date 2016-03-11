@@ -6,7 +6,7 @@
 #define CVMFS_JSON_DOCUMENT_H_
 
 #include "json.h"
-#include "util.h"
+#include "util/single_copy.h"
 
 typedef struct json_value JSON;
 

@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "catalog.h"
+#include "util/posix.h"
 
 class XattrList;
 

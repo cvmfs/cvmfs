@@ -24,7 +24,6 @@
 #include "hash.h"
 #include "logging.h"
 #include "statistics.h"
-#include "util.h"
 
 class XattrList;
 

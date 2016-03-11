@@ -11,7 +11,7 @@
 #include <map>
 
 #include "signature.h"
-#include "util.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 

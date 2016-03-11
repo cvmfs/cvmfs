@@ -6,6 +6,8 @@
 
 #include <cassert>
 
+#include "util/string.h"
+
 const float    ReflogDatabase::kLatestSchema          = 1.0;
 const float    ReflogDatabase::kLatestSupportedSchema = 1.0;
 const unsigned ReflogDatabase::kLatestSchemaRevision  = 0;

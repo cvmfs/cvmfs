@@ -8,7 +8,6 @@
 
 #include "../../cvmfs/file_processing/char_buffer.h"
 #include "../../cvmfs/hash.h"
-#include "../../cvmfs/util.h"
 #include "testutil.h"
 
 

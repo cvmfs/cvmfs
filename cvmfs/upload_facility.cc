@@ -4,9 +4,10 @@
 
 #include "upload_facility.h"
 
+#include <cassert>
+
 #include "upload_local.h"
 #include "upload_s3.h"
-#include "util.h"
 
 namespace upload {
 
