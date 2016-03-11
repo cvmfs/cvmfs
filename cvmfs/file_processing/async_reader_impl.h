@@ -134,17 +134,6 @@ void Reader<FileScrubbingTaskT, FileT>::OpenNewFile(FileT *file) {
 
 template <class FileScrubbingTaskT, class FileT>
 void Reader<FileScrubbingTaskT, FileT>::CloseFile(OpenFile *file) {
-  // tell kernel to evict the file from the caches prior to closing it
-  const off_t offset = 0;
-  const off_t length = 0;  // advice refers to entire file
-  const int advice = POSIX_FADV_DONTNEED;
-  const int error_code = posix_fadvise(file->file_descriptor,
-                                       offset, length, advice);
-  if (error_code != 0) {
-    LogCvmfs(kLogSpooler, kLogVerboseMsg, "fd advice failed for %d (%d - %s)",
-             file->file_descriptor, error_code, strerror(error_code));
-  }
-
   const int retval = close(file->file_descriptor);
   assert(retval == 0);
 }
@@ -215,6 +204,7 @@ bool Reader<FileScrubbingTaskT, FileT>::
   // figure out how many bytes need to be read in this step and create a
   // CharBuffer to accomodate these bytes
   const size_t file_size     = open_file->file->size();
+  const off_t  file_offset   = lseek(open_file->file_descriptor, 0, SEEK_CUR);
   const size_t bytes_to_read =
     std::min(file_size - static_cast<size_t>(open_file->file_marker),
              max_buffer_size_);
@@ -229,6 +219,17 @@ bool Reader<FileScrubbingTaskT, FileT>::
   assert(bytes_to_read == bytes_read);
   buffer->SetUsedBytes(bytes_read);
   open_file->file_marker += bytes_read;
+
+  // tell kernel to evict read pages from the page cache
+  // TODO(rmeusel): aligning this to page boundaries might save a couple of
+  //                system calls
+  const int advice = POSIX_FADV_DONTNEED;
+  const int error_code = posix_fadvise(open_file->file_descriptor,
+                                       file_offset, bytes_read, advice);
+  if (error_code != 0) {
+    LogCvmfs(kLogSpooler, kLogVerboseMsg, "fd advice failed for %d (%d - %s)",
+             open_file->file_descriptor, error_code, strerror(error_code));
+  }
 
   // check if the file has been fully read
   const bool finished_reading =
