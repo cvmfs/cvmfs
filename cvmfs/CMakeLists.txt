@@ -16,6 +16,7 @@ set (CVMFS_LOADER_SOURCES
   loader_talk.h loader_talk.cc
   loader.h loader.cc
   statistics.h statistics.cc
+  fence.h
 )
 
 set (CVMFS_CLIENT_SOURCES
@@ -73,6 +74,7 @@ endif (VOMS_FOUND)
 set (CVMFS2_DEBUG_SOURCES
   ${CVMFS_CLIENT_SOURCES}
 
+  fence.h
   tracer.h tracer.cc
   options.cc options.h
   talk.h talk.cc
