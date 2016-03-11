@@ -72,9 +72,7 @@ class CommandScrub : public Command {
   typedef upload::Reader<StoredFileScrubbingTask, StoredFile> ScrubbingReader;
 
  public:
-  CommandScrub() : machine_readable_output_(false),
-                   reader_(NULL),
-                   alerts_(0) { }
+  CommandScrub();
   ~CommandScrub();
   std::string GetName() { return "scrub"; }
   std::string GetDescription() {

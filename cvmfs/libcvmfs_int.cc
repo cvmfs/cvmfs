@@ -67,6 +67,7 @@
 #include "shortstring.h"
 #include "signature.h"
 #include "smalloc.h"
+#include "sqlitemem.h"
 #include "sqlitevfs.h"
 #include "statistics.h"
 #include "util.h"
@@ -143,6 +144,7 @@ cvmfs_globals::~cvmfs_globals() {
   }
 
   sqlite3_shutdown();
+  SqliteMemoryManager::CleanupInstance();
   delete statistics_;
 
   ClientCtx::CleanupInstance();
@@ -161,13 +163,9 @@ int cvmfs_globals::Setup(const options &opts) {
   int retval;
 
   // Tune SQlite3
-  sqlite_page_cache = smalloc(1280*3275);  // 4MB
-  retval = sqlite3_config(SQLITE_CONFIG_PAGECACHE, sqlite_page_cache,
-                          1280, 3275);
+  retval = sqlite3_config(SQLITE_CONFIG_MULTITHREAD);
   assert(retval == SQLITE_OK);
-  // 4 KB
-  retval = sqlite3_config(SQLITE_CONFIG_LOOKASIDE, 32, 128);
-  assert(retval == SQLITE_OK);
+  SqliteMemoryManager::GetInstance()->AssignGlobalArenas();
 
   // Libcrypto
   libcrypto_locks_ = static_cast<pthread_mutex_t *>(OPENSSL_malloc(

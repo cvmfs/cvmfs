@@ -59,7 +59,7 @@ void SyncUnion::PreprocessSyncItem(SyncItem *entry) const {
     entry->MarkAsWhiteout(UnwindWhiteoutFilename(*entry));
   }
 
-  if (IsOpaqueDirectory(*entry)) {
+  if (entry->IsDirectory() && IsOpaqueDirectory(*entry)) {
     entry->MarkAsOpaqueDirectory();
   }
 }

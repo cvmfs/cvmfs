@@ -618,9 +618,6 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
   const char *name = reinterpret_cast<const char *>(RetrieveText(6));
   const char *symlink = reinterpret_cast<const char *>(RetrieveText(7));
 
-  // Must be set later by a second catalog lookup
-  result.parent_inode_ = DirectoryEntry::kInvalidInode;
-
   // Retrieve the hardlink information from the hardlinks database field
   if (catalog->schema() < 2.1 - CatalogDatabase::kSchemaEpsilon) {
     result.linkcount_       = 1;

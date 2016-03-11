@@ -106,7 +106,6 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   // we create and configure this here
   DirectoryEntry root_entry;
   root_entry.inode_             = DirectoryEntry::kInvalidInode;
-  root_entry.parent_inode_      = DirectoryEntry::kInvalidInode;
   root_entry.mode_              = 16877;
   root_entry.size_              = 4096;
   root_entry.mtime_             = time(NULL);

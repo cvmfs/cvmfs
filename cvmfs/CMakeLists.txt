@@ -4,87 +4,100 @@
 #
 
 set (CVMFS_LOADER_SOURCES
-  smalloc.h atomic.h shortstring.h fs_traversal.h
+  atomic.h
+  fence.h
+  fs_traversal.h
+  globals.cc globals.h
+  hash.cc hash.h
+  loader.cc loader.h
+  loader_talk.cc loader_talk.h
+  logging.cc logging.h logging_internal.h
+  options.cc options.h
   platform.h platform_linux.h platform_osx.h
-  logging_internal.h logging.h logging.cc
   prng.h
-  hash.h hash.cc
-  util.h util.cc
-  sanitizer.h sanitizer.cc
-  options.h options.cc
-  globals.h globals.cc
-  loader_talk.h loader_talk.cc
-  loader.h loader.cc
-  statistics.h statistics.cc
+  sanitizer.cc sanitizer.h
+  shortstring.h
+  smalloc.h
+  statistics.cc statistics.h
+  util.cc util.h
 )
 
 set (CVMFS_CLIENT_SOURCES
-  smalloc.h
-  logging.cc logging.h logging_internal.h
   atomic.h
-  duplex_sqlite3.h duplex_curl.h duplex_cares.h
-  signature.h signature.cc
-  quota.h quota.cc
-  hash.h hash.cc
-  cache.h cache.cc
-  platform.h platform_osx.h platform_linux.h
-  monitor.h monitor.cc
-  prng.h util.cc util.h
-  uuid.h uuid.cc
-  backoff.h backoff.cc
-  duplex_zlib.h compression.h compression.cc
-  sanitizer.cc sanitizer.h
-  dns.h dns.cc
-  download.cc download.h
-  wpad.cc wpad.h
-  manifest.h manifest.cc
-  whitelist.h whitelist.cc
-  manifest_fetch.h manifest_fetch.cc
-  murmur.h smallhash.h
+  backoff.cc backoff.h
   bigvector.h
-  lru.h
-  globals.h globals.cc
-  sql.h sql_impl.h sql.cc
-  catalog_sql.h catalog_sql.cc
-  uid_map.h
-  catalog.h catalog.cc
+  cache.cc cache.h
+  catalog.cc catalog.h
+  catalog_counters.cc catalog_counters.h catalog_counters_impl.h
   catalog_mgr.h catalog_mgr_impl.h
-  catalog_mgr_client.h catalog_mgr_client.cc
-  catalog_counters.h catalog_counters_impl.h catalog_counters.cc
-  directory_entry.h directory_entry.cc
-  shortstring.h
-  file_chunk.h file_chunk.cc
-  fs_traversal.h
-  xattr.h xattr.cc
-  statistics.h statistics.cc
-  sqlitevfs.cc sqlitevfs.h
-  fetch.cc fetch.h
-  sink.h
+  catalog_mgr_client.cc catalog_mgr_client.h
+  catalog_sql.cc catalog_sql.h
   clientctx.cc clientctx.h
+  compression.cc compression.h
+  directory_entry.cc directory_entry.h
+  dns.cc dns.h
+  download.cc download.h
+  duplex_cares.h
+  duplex_curl.h
+  duplex_sqlite3.h
+  duplex_zlib.h
+  fetch.cc fetch.h
+  file_chunk.cc file_chunk.h
+  fs_traversal.h
+  globals.cc globals.h
+  hash.cc hash.h
+  logging.cc logging.h logging_internal.h
+  lru.h
+  manifest.cc manifest.h
+  manifest_fetch.cc manifest_fetch.h
+  monitor.cc monitor.h
+  murmur.h
+  platform.h platform_linux.h platform_osx.h
+  prng.h
+  quota.cc quota.h
+  sanitizer.cc sanitizer.h
+  shortstring.h
+  signature.cc signature.h
+  sink.h
+  smallhash.h
+  smalloc.h
+  sql.cc sql.h sql_impl.h
+  sqlitemem.cc sqlitemem.h
+  sqlitevfs.cc sqlitevfs.h
+  statistics.cc statistics.h
+  uid_map.h
+  util.cc util.h
+  uuid.cc uuid.h
+  whitelist.cc whitelist.h
+  wpad.cc wpad.h
+  xattr.cc xattr.h
 )
 if (VOMS_FOUND)
   set (CVMFS_CLIENT_SOURCES ${CVMFS_CLIENT_SOURCES}
-  voms_authz/voms_cred.h voms_authz/voms_cred.cc
-  voms_authz/voms_authz.cc voms_authz/voms_authz.h voms_authz/voms_curl.cc)
+  voms_authz/voms_authz.cc voms_authz/voms_authz.h
+  voms_authz/voms_cred.cc voms_authz/voms_cred.h
+  voms_authz/voms_curl.cc)
 endif (VOMS_FOUND)
 
 
 set (CVMFS2_DEBUG_SOURCES
   ${CVMFS_CLIENT_SOURCES}
 
-  tracer.h tracer.cc
-  options.cc options.h
-  talk.h talk.cc
-  nfs_maps.h nfs_maps.cc
-  nfs_shared_maps.h nfs_shared_maps.cc
-  glue_buffer.h glue_buffer.cc
-  loader.h compat.cc compat.h
+  auto_umount.cc auto_umount.h
+  compat.cc compat.h
+  cvmfs.cc cvmfs.h
+  fence.h
+  glue_buffer.cc glue_buffer.h
   history.h
-  history_sql.h history_sql.cc
-  history_sqlite.h history_sqlite.cc
-  quota_listener.h quota_listener.cc
-  auto_umount.h auto_umount.cc
-  cvmfs.h cvmfs.cc
+  history_sql.cc history_sql.h
+  history_sqlite.cc history_sqlite.h
+  loader.h
+  nfs_maps.cc nfs_maps.h
+  nfs_shared_maps.cc nfs_shared_maps.h
+  options.cc options.h
+  quota_listener.cc quota_listener.h
+  talk.cc talk.h
+  tracer.cc tracer.h
 )
 if (VOMS_FOUND)
   set (CVMFS2_DEBUG_SOURCES ${CVMFS2_DEBUG_SOURCES}
@@ -97,8 +110,9 @@ set (CVMFS2_SOURCES
 
 set (LIBCVMFS_SOURCES
   ${CVMFS_CLIENT_SOURCES}
-  libcvmfs_int.h libcvmfs_int.cc
-  libcvmfs.h libcvmfs.cc
+
+  libcvmfs.cc libcvmfs.h
+  libcvmfs_int.cc libcvmfs_int.h
 )
 
 set (TEST_LIBCVMFS_SOURCES
@@ -107,114 +121,113 @@ set (TEST_LIBCVMFS_SOURCES
 )
 
 set (CVMFS_FSCK_SOURCES
-  platform.h platform_linux.h platform_osx.h
-  logging_internal.h logging.h logging.cc
-  smalloc.h
   atomic.h
-  duplex_zlib.h compression.cc compression.h
-  prng.h
+  compression.cc compression.h
+  cvmfs_fsck.cc
+  duplex_zlib.h
   hash.cc hash.h
+  logging.cc logging.h logging_internal.h
+  platform.h platform_linux.h platform_osx.h
+  prng.h
+  smalloc.h
+  statistics.cc statistics.h
   util.cc util.h
-  statistics.h statistics.cc
-  cvmfs_fsck.cc)
+)
 
 set (CVMFS_SWISSKNIFE_SOURCES
-  options.cc options.h
-  smalloc.h atomic.h
-  platform.h platform_linux.h platform_osx.h
-  duplex_zlib.h duplex_sqlite3.h
-  logging.cc logging.h logging_internal.h
-  globals.cc globals.h
-  manifest.h manifest.cc
-  whitelist.h whitelist.cc
-  manifest_fetch.h manifest_fetch.cc
-  prng.h
-  hash.h hash.cc
-  compression.h compression.cc
-  clientctx.cc clientctx.h
-  util.h util.cc
-  util_concurrency.h util_concurrency_impl.h util_concurrency.cc
-  object_fetcher.h
-  statistics.cc statistics.h
-
-  file_processing/async_reader.h file_processing/async_reader_impl.h file_processing/async_reader.cc
-  file_processing/char_buffer.h
-  file_processing/chunk.h file_processing/chunk.cc
-  file_processing/chunk_detector.h file_processing/chunk_detector.cc
-  file_processing/file.h file_processing/file.cc
-  file_processing/io_dispatcher.h file_processing/io_dispatcher.cc
-  file_processing/processor.h file_processing/processor.cc
-  file_processing/file_processor.h file_processing/file_processor.cc
-
-  pathspec/pathspec.h pathspec/pathspec.cc
-  pathspec/pathspec_pattern.h pathspec/pathspec_pattern.cc
-
-  path_filters/dirtab.h path_filters/dirtab.cc
-  path_filters/relaxed_path_filter.h path_filters/relaxed_path_filter.cc
-
-  upload.h upload.cc
-  upload_spooler_definition.h upload_spooler_definition.cc
-  upload_facility.h upload_facility.cc
-  upload_local.h upload_local.cc
-  s3fanout.h s3fanout.cc
-  upload_s3.h upload_s3.cc
-  upload_spooler_result.h
-  json_document.h json_document.cc
-
-  sanitizer.cc sanitizer.h
-  dns.h dns.cc
-  duplex_curl.h duplex_cares.h download.h download.cc
-  signature.cc signature.h
-
-  fs_traversal.h
-  sync_item.h sync_item.cc
-  sync_union.h sync_union.cc
-  sync_mediator.h sync_mediator.cc
-
-  file_chunk.h file_chunk.cc
-  directory_entry.h directory_entry.cc
-  shortstring.h
-  catalog_traversal.h
-  sql.h sql_impl.h sql.cc
-  catalog_sql.h catalog_sql.cc
-  uid_map.h
-  catalog.h catalog.cc
-  catalog_rw.h catalog_rw.cc
-  catalog_mgr.h catalog_mgr_impl.h
-  catalog_mgr_ro.h catalog_mgr_ro.cc
-  catalog_mgr_rw.h catalog_mgr_rw.cc
+  atomic.h
+  catalog.cc catalog.h
   catalog_balancer.h catalog_balancer_impl.h
-  catalog_counters.h catalog_counters_impl.h catalog_counters.cc
+  catalog_counters.cc catalog_counters.h catalog_counters_impl.h
+  catalog_mgr.h catalog_mgr_impl.h
+  catalog_mgr_ro.cc catalog_mgr_ro.h
+  catalog_mgr_rw.cc catalog_mgr_rw.h
+  catalog_sql.cc catalog_sql.h
+  catalog_traversal.h
+  catalog_rw.cc catalog_rw.h
+  clientctx.cc clientctx.h
+  compression.cc compression.h
+  directory_entry.cc directory_entry.h
+  dns.cc dns.h
+  download.cc download.h
+  duplex_cares.h
+  duplex_curl.h
+  duplex_sqlite3.h
+  duplex_zlib.h
+  file_chunk.cc file_chunk.h
+  file_processing/async_reader.cc file_processing/async_reader.h file_processing/async_reader_impl.h
+  file_processing/char_buffer.h
+  file_processing/chunk.cc file_processing/chunk.h
+  file_processing/chunk_detector.cc file_processing/chunk_detector.h
+  file_processing/file.cc file_processing/file.h
+  file_processing/file_processor.cc file_processing/file_processor.h
+  file_processing/io_dispatcher.cc file_processing/io_dispatcher.h
+  file_processing/processor.cc file_processing/processor.h
+  fs_traversal.h
+  globals.cc globals.h
+  hash.cc hash.h
   history.h
-  history_sql.h history_sql.cc
-  history_sqlite.h history_sqlite.cc
-  letter.h letter.cc
-  xattr.h xattr.cc
-  reflog.h reflog.cc
-  reflog_sql.h reflog_sql.cc
-
-  swissknife_zpipe.h swissknife_zpipe.cc
-  swissknife_hash.h swissknife_hash.cc
-  swissknife_check.h swissknife_check.cc
-  swissknife_lsrepo.h swissknife_lsrepo.cc
-  swissknife_pull.h swissknife_pull.cc
-  swissknife_sign.h swissknife_sign.cc
-  swissknife_letter.h swissknife_letter.cc
-  swissknife_sync.h swissknife_sync.cc
-  swissknife_info.h swissknife_info.cc
-  swissknife_history.h swissknife_history.cc
-  swissknife_migrate.h swissknife_migrate.cc
-  swissknife_scrub.h swissknife_scrub.cc
-  swissknife_gc.h swissknife_gc.cc
-  swissknife_graft.h swissknife_graft.cc
-  swissknife.h swissknife.cc
+  history_sql.cc history_sql.h
+  history_sqlite.cc history_sqlite.h
+  json_document.cc json_document.h
+  letter.cc letter.h
+  logging.cc logging.h logging_internal.h
+  manifest.cc manifest.h
+  manifest_fetch.cc manifest_fetch.h
+  object_fetcher.h
+  options.cc options.h
+  path_filters/dirtab.cc path_filters/dirtab.h
+  path_filters/relaxed_path_filter.cc path_filters/relaxed_path_filter.h
+  pathspec/pathspec.cc pathspec/pathspec.h
+  pathspec/pathspec_pattern.cc pathspec/pathspec_pattern.h
+  platform.h platform_linux.h platform_osx.h
+  prng.h
+  reflog.cc reflog.h
+  reflog_sql.cc reflog_sql.h
+  s3fanout.cc s3fanout.h
+  sanitizer.cc sanitizer.h
+  shortstring.h
+  signature.cc signature.h
+  smalloc.h
+  sql.cc sql.h sql_impl.h
+  sqlitemem.cc sqlitemem.h
+  statistics.cc statistics.h
+  swissknife.cc swissknife.h
+  swissknife_check.cc swissknife_check.h
+  swissknife_gc.cc swissknife_gc.h
+  swissknife_graft.cc swissknife_graft.h
+  swissknife_hash.cc swissknife_hash.h
+  swissknife_history.cc swissknife_history.h
+  swissknife_info.cc swissknife_info.h
+  swissknife_letter.cc swissknife_letter.h
+  swissknife_lsrepo.cc swissknife_lsrepo.h
   swissknife_main.cc
-  )
+  swissknife_migrate.cc swissknife_migrate.h
+  swissknife_pull.cc swissknife_pull.h
+  swissknife_scrub.cc swissknife_scrub.h
+  swissknife_sign.cc swissknife_sign.h
+  swissknife_sync.cc swissknife_sync.h
+  swissknife_zpipe.cc swissknife_zpipe.h
+  sync_item.cc sync_item.h
+  sync_mediator.cc sync_mediator.h
+  sync_union.cc sync_union.h
+  upload.cc upload.h
+  upload_facility.cc upload_facility.h
+  upload_local.cc upload_local.h
+  upload_s3.cc upload_s3.h
+  upload_spooler_definition.cc upload_spooler_definition.h
+  upload_spooler_result.h
+  uid_map.h
+  util.cc util.h
+  util_concurrency.cc util_concurrency.h util_concurrency_impl.h
+  whitelist.cc whitelist.h
+  xattr.cc xattr.h
+)
 
 if (VOMS_FOUND)
   set (CVMFS_SWISSKNIFE_SOURCES ${CVMFS_SWISSKNIFE_SOURCES}
-       voms_authz/voms_cred.cc
        voms_authz/voms_authz.h
+       voms_authz/voms_cred.cc
        voms_authz/voms_curl.cc)
 endif (VOMS_FOUND)
 
@@ -224,62 +237,69 @@ set (CVMFS_SWISSKNIFE_DEBUG_SOURCES
 )
 
 set (CVMFS_SUID_HELPER_SOURCES
-  platform.h platform_osx.h platform_linux.h
-  sanitizer.h sanitizer.cc
   cvmfs_suid_helper.cc
+  platform.h platform_linux.h platform_osx.h
+  sanitizer.cc sanitizer.h
 )
 
 set (CVMFS_PRELOADER_SOURCES
-  download.cc download.h
-  logging.cc logging.h
-  swissknife.h swissknife.cc
-  swissknife_pull.cc swissknife_pull.h
-  signature.cc signature.h
-  statistics.cc statistics.h
-  duplex_curl.h duplex_cares.h
+  atomic.h
+  catalog.cc catalog.h
   catalog_sql.cc catalog_sql.h
-  sql.cc sql.h
-  util.cc util.h
-  hash.cc hash.h
-  upload_facility.cc upload_facility.h
-  pathspec/pathspec_pattern.cc pathspec/pathspec_pattern.h
-  pathspec/pathspec.cc pathspec/pathspec.h
-  util_concurrency.cc util_concurrency.h
-  file_processing/async_reader.h file_processing/async_reader_impl.h file_processing/async_reader.cc
-  file_processing/char_buffer.h
-  file_processing/chunk.h file_processing/chunk.cc
-  file_processing/chunk_detector.h file_processing/chunk_detector.cc
-  file_processing/file.h file_processing/file.cc
-  file_processing/io_dispatcher.h file_processing/io_dispatcher.cc
-  file_processing/processor.h file_processing/processor.cc
-  file_processing/file_processor.h file_processing/file_processor.cc
-  upload_s3.cc upload_s3.h
-  s3fanout.cc s3fanout.h
-  options.cc options.h
   compression.cc compression.h
-  upload_spooler_definition.cc upload_spooler_definition.h
+  dns.cc dns.h
+  download.cc download.h
+  duplex_cares.h
+  duplex_curl.h
+  duplex_sqlite3.h
+  file_processing/async_reader.cc file_processing/async_reader.h file_processing/async_reader_impl.h
+  file_processing/char_buffer.h
+  file_processing/chunk.cc file_processing/chunk.h
+  file_processing/chunk_detector.cc file_processing/chunk_detector.h
+  file_processing/file.cc file_processing/file.h
+  file_processing/file_processor.cc file_processing/file_processor.h
+  file_processing/io_dispatcher.cc file_processing/io_dispatcher.h
+  file_processing/processor.cc file_processing/processor.h
+  globals.cc globals.h
+  hash.cc hash.h
   history_sql.cc history_sql.h
   history_sqlite.cc history_sqlite.h
-  xattr.cc xattr.h
-  globals.cc globals.h
+  logging.cc logging.h logging_internal.h
   manifest.cc manifest.h
   manifest_fetch.cc manifest_fetch.h
-  upload.cc upload.h
-  upload_local.cc upload_local.h
-  whitelist.cc whitelist.h
-  sanitizer.cc sanitizer.h
-  dns.cc dns.h
-  path_filters/dirtab.h path_filters/dirtab.cc
-  path_filters/relaxed_path_filter.h path_filters/relaxed_path_filter.cc
-  catalog.cc catalog.h
-  reflog.h reflog.cc
-  reflog_sql.h reflog_sql.cc
+  options.cc options.h
+  path_filters/dirtab.cc path_filters/dirtab.h
+  path_filters/relaxed_path_filter.cc path_filters/relaxed_path_filter.h
+  pathspec/pathspec.cc pathspec/pathspec.h
+  pathspec/pathspec_pattern.cc pathspec/pathspec_pattern.h
   preload.cc
+  reflog.cc reflog.h
+  reflog_sql.cc reflog_sql.h
+  s3fanout.cc s3fanout.h
+  sanitizer.cc sanitizer.h
+  signature.cc signature.h
+  smalloc.h
+  sql.cc sql.h sql_impl.h
+  sqlitemem.cc sqlitemem.h
+  statistics.cc statistics.h
+  swissknife.cc swissknife.h
+  swissknife_pull.cc swissknife_pull.h
+  upload.cc upload.h
+  upload_facility.cc upload_facility.h
+  upload_local.cc upload_local.h
+  upload_s3.cc upload_s3.h
+  upload_spooler_definition.cc upload_spooler_definition.h
+  util.cc util.h
+  util_concurrency.cc util_concurrency.h
+  whitelist.cc whitelist.h
+  xattr.cc xattr.h
 )
 
 if (VOMS_FOUND)
   set (CVMFS_PRELOADER_SOURCES ${CVMFS_PRELOADER_SOURCES}
-       voms_authz/voms_cred.cc voms_authz/voms_authz.h voms_authz/voms_curl.cc)
+       voms_authz/voms_authz.h
+       voms_authz/voms_cred.cc
+       voms_authz/voms_curl.cc)
 endif (VOMS_FOUND)
 
 #

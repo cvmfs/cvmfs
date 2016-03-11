@@ -13,6 +13,7 @@
 
 #include "logging.h"
 #include "platform.h"
+#include "sqlitemem.h"
 
 namespace sqlite {
 
@@ -93,8 +94,7 @@ bool Database<DerivedT>::Initialize() {
   const int flags = (read_write_) ? SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READWRITE
                                   : SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READONLY;
 
-  const bool successful =
-    OpenDatabase(flags) &&
+  bool successful = OpenDatabase(flags) &&
     Configure()         &&
     FileReadAhead()     &&
     PrepareCommonQueries();
@@ -179,6 +179,11 @@ bool Database<DerivedT>::DatabaseRaiiWrapper::Close() {
   }
 
   sqlite_db = NULL;
+  if (lookaside_buffer != NULL) {
+    SqliteMemoryManager::GetInstance()->ReleaseLookasideBuffer(
+      lookaside_buffer);
+    lookaside_buffer = NULL;
+  }
   return true;
 }
 
@@ -187,8 +192,14 @@ template <class DerivedT>
 bool Database<DerivedT>::Configure() {
   // Read-only databases should store temporary files in memory.  This avoids
   // unexpected open read-write file descriptors in the cache directory like
-  // etilqs_<number>.
+  // etilqs_<number>.  They also use the optimized memory manager, if it is
+  // available.
   if (!read_write_) {
+    if (SqliteMemoryManager::HasInstance()) {
+      database_.lookaside_buffer =
+        SqliteMemoryManager::GetInstance()->AssignLookasideBuffer(sqlite_db());
+    }
+
     return Sql(sqlite_db() , "PRAGMA temp_store=2;").Execute() &&
            Sql(sqlite_db() , "PRAGMA locking_mode=EXCLUSIVE;").Execute();
   }
@@ -353,8 +364,46 @@ unsigned Database<DerivedT>::GetModifiedRowCount() const {
 }
 
 /**
- * Used to check if the database needs cleanup
+ * Ask SQlite for per-connection memory statistics
  */
+template <class DerivedT>
+void Database<DerivedT>::GetMemStatistics(MemStatistics *stats) const {
+  const int reset = 0;
+  int current;
+  int highwater;
+  int retval = SQLITE_OK;
+  retval |= sqlite3_db_status(sqlite_db(), SQLITE_DBSTATUS_LOOKASIDE_USED,
+                              &current, &highwater, reset);
+  stats->lookaside_slots_used = current;
+  stats->lookaside_slots_max = highwater;
+  retval |= sqlite3_db_status(sqlite_db(), SQLITE_DBSTATUS_LOOKASIDE_HIT,
+                              &current, &highwater, reset);
+  stats->lookaside_hit = highwater;
+  retval |= sqlite3_db_status(sqlite_db(), SQLITE_DBSTATUS_LOOKASIDE_MISS_SIZE,
+                              &current, &highwater, reset);
+  stats->lookaside_miss_size = highwater;
+  retval |= sqlite3_db_status(sqlite_db(), SQLITE_DBSTATUS_LOOKASIDE_MISS_FULL,
+                              &current, &highwater, reset);
+  stats->lookaside_miss_full = highwater;
+  retval |= sqlite3_db_status(sqlite_db(), SQLITE_DBSTATUS_CACHE_USED,
+                              &current, &highwater, reset);
+  stats->page_cache_used = current;
+  retval |= sqlite3_db_status(sqlite_db(), SQLITE_DBSTATUS_CACHE_HIT,
+                              &current, &highwater, reset);
+  stats->page_cache_hit = current;
+  retval |= sqlite3_db_status(sqlite_db(), SQLITE_DBSTATUS_CACHE_MISS,
+                              &current, &highwater, reset);
+  stats->page_cache_miss = current;
+  retval |= sqlite3_db_status(sqlite_db(), SQLITE_DBSTATUS_SCHEMA_USED,
+                              &current, &highwater, reset);
+  stats->schema_used = current;
+  retval |= sqlite3_db_status(sqlite_db(), SQLITE_DBSTATUS_STMT_USED,
+                              &current, &highwater, reset);
+  stats->stmt_used = current;
+  assert(retval == SQLITE_OK);
+}
+
+
 template <class DerivedT>
 double Database<DerivedT>::GetFreePageRatio() const {
   Sql free_page_count_query(this->sqlite_db(), "PRAGMA freelist_count;");

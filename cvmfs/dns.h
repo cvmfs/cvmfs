@@ -299,6 +299,7 @@ class CaresResolver : public Resolver {
  private:
   void WaitOnCares();
   ares_channel *channel_;
+  char *lookup_options_;
   std::vector<std::string> system_resolvers_;
   std::vector<std::string> system_domains_;
 };

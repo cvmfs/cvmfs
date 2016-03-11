@@ -9,6 +9,7 @@
 #include <unistd.h>
 
 #include <cassert>
+#include <vector>
 
 /**
  * A client context associates a file system call with the uid, gid, and pid
@@ -34,6 +35,7 @@ class ClientCtx {
 
   static ClientCtx *GetInstance();
   static void CleanupInstance();
+  ~ClientCtx();
 
   void Set(uid_t uid, gid_t gid, pid_t pid);
   void Unset();
@@ -42,10 +44,13 @@ class ClientCtx {
 
  private:
   static ClientCtx *instance_;
+  static void TlsDestructor(void *data);
 
-  ClientCtx() { }
+  ClientCtx();
 
   pthread_key_t thread_local_storage_;
+  pthread_mutex_t *lock_tls_blocks_;
+  std::vector<ThreadLocalStorage *> tls_blocks_;
 };
 
 /**

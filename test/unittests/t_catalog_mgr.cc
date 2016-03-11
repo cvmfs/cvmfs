@@ -173,28 +173,19 @@ TEST_F(T_CatalogManager, Lookup) {
   EXPECT_TRUE(dirent.IsDirectory());
   EXPECT_TRUE(catalog_mgr_.LookupPath("/file1", kLookupSole, &dirent));
   EXPECT_TRUE(dirent.IsRegular());
-  EXPECT_TRUE(catalog_mgr_.LookupPath("/file1", kLookupFull, &dirent));
-  EXPECT_TRUE(dirent.IsRegular());
-  // the father directory belongs to the catalog, so there is no problem
-  EXPECT_TRUE(
-    catalog_mgr_.LookupPath("/dir/dir/file2", kLookupFull, &dirent));
-  EXPECT_TRUE(dirent.IsRegular());
   // /dir/dir/dir/file4 belongs to a catalog that is not mounted yet
   EXPECT_TRUE(catalog_mgr_.LookupPath("/dir/dir/dir/file4", kLookupSole,
                                       &dirent));
   // the new catalog should be mounted now
   EXPECT_EQ(2, catalog_mgr_.GetNumCatalogs());
 
-  // the father directory should also belong to the nested catalog
-  EXPECT_TRUE(catalog_mgr_.LookupPath("/dir/dir/dir/file4", kLookupFull,
-                                      &dirent));
   // it is not a symplink, so it should crash
   EXPECT_DEATH(catalog_mgr_.LookupPath("/dir/dir/dir/file4", kLookupRawSymlink,
                                       &dirent), ".*");
 
   // load the next catalog
   EXPECT_TRUE(catalog_mgr_.LookupPath("/dir/dir/dir/dir/dir/file5",
-                                      kLookupFull, &dirent));
+                                      kLookupSole, &dirent));
   // the new catalog should be mounted now
   EXPECT_EQ(3, catalog_mgr_.GetNumCatalogs());
 }
@@ -204,7 +195,7 @@ TEST_F(T_CatalogManager, LongLookup) {
   ASSERT_TRUE(catalog_mgr_.Init());
   AddTree();
   EXPECT_TRUE(catalog_mgr_.LookupPath("/dir/dir/dir/dir/dir/file5",
-                                      kLookupFull, &dirent));
+                                      kLookupSole, &dirent));
   EXPECT_TRUE(dirent.IsRegular());
   // we should have mounted two catalogs
   EXPECT_EQ(3, catalog_mgr_.GetNumCatalogs());
@@ -285,7 +276,7 @@ TEST_F(T_CatalogManager, Balance) {
 
   // load the other catalogs so that they can be removed
   EXPECT_TRUE(catalog_mgr_.LookupPath("/dir/dir/dir/dir/dir/file5",
-                                      kLookupFull, &dirent));
+                                      kLookupSole, &dirent));
 }
 
 TEST_F(T_CatalogManager, Remount) {
