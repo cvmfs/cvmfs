@@ -541,6 +541,25 @@ void UnlockFile(const int filedes) {
 }
 
 
+/**
+ * Advises the kernel to evict the given file region from the page cache.
+ *
+ * Note: The provided `offset` and `length` will be page-aligned. I.e. the page
+ *       containing data at `offset` is evicted but a partial page containing
+ *       data up to `length` is retained. See below:
+ *
+ *                offset                                  length
+ *                  |                                        |
+ *   +---------+----|----+---------+---------+---------+-----|---+---------+
+ *   |         | xx | xx | xxxxxxx | xxxxxxx | xxxxxxx |     |   |         |
+ *   |         | xx | xx | xxxxxxx | xxxxxxx | xxxxxxx |     |   |         |
+ *   +---------+----|----+---------+---------+---------+-----|---+---------+
+ *   0       4096   |  8192      12288     16384     20480   | 24576     28672
+ *
+ * @param fd      file descriptor whose page cache should be (partially) evicted
+ * @param offset  start offset of the pages to be evicted
+ * @param length  number of bytes to be evicted
+ */
 void InvalidatePagecache(const int    fd,
                          const off_t  offset,
                          const size_t length) {
