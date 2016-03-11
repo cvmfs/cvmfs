@@ -137,15 +137,6 @@ int LocalUploader::CreateAndOpenTemporaryChunkFile(std::string *path) const {
     return tmp_fd;
   }
 
-  const off_t offset = 0;
-  const off_t length = 0;  // advice refers to entire file
-  const int advice = POSIX_FADV_DONTNEED;
-  const int error_code = posix_fadvise(tmp_fd, offset, length, advice);
-  if (error_code != 0) {
-    LogCvmfs(kLogSpooler, kLogVerboseMsg, "fd advice failed for %s (%d - %s)",
-             tmp_path.c_str(), error_code, strerror(error_code));
-  }
-
   *path = tmp_path;
   return tmp_fd;
 }
@@ -182,6 +173,19 @@ void LocalUploader::Upload(UploadStreamHandle  *handle,
     atomic_inc32(&copy_errors_);
     Respond(callback, UploaderResults(cpy_errno, buffer));
     return;
+  }
+
+  // TODO(rmeusel): aligning calls to fadvice() to page boundaries would perhaps
+  //                save a few system calls
+  const off_t start_offset = lseek(local_handle->file_descriptor,
+                                   0, SEEK_CUR) - bytes_written;
+  const int advice = POSIX_FADV_DONTNEED;
+  const int error_code = posix_fadvise(local_handle->file_descriptor,
+                                       start_offset, bytes_written, advice);
+  if (error_code != 0) {
+    LogCvmfs(kLogSpooler, kLogVerboseMsg, "fd advice failed for %s (%d - %s)",
+             local_handle->temporary_path.c_str(), error_code,
+             strerror(error_code));
   }
 
   Respond(callback, UploaderResults(0, buffer));
