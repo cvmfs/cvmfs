@@ -579,25 +579,6 @@ void InvalidatePagecache(const int    fd,
 
 
 /**
- * Advises the kernel to load the given file region into the page cache.
- *
- * @param fd      file descriptor whose page cache should be populated
- * @param offset  start offset of pages to be loaded
- * @param length  number of bytes to be loaded
- */
-void PopulatePagecache(const int fd, const off_t offset, const size_t length) {
-  const int advice = POSIX_FADV_WILLNEED;
-  const int retcode = posix_fadvise(fd, offset, length, advice);
-
-  if (retcode != 0) {
-    LogCvmfs(kLogUtility, kLogVerboseMsg, "page cache population advice failed "
-                                          "for %d (%d - %s)",
-             fd, retcode, strerror(retcode));
-  }
-}
-
-
-/**
  * Wrapper around mkstemp.
  */
 FILE *CreateTempFile(const string &path_prefix, const int mode,

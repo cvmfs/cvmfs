@@ -116,8 +116,6 @@ void Reader<FileScrubbingTaskT, FileT>::OpenNewFile(FileT *file) {
   }
   assert(fd > 0);
 
-  PopulatePagecache(fd, 0, file->size());
-
   OpenFile open_file;
   open_file.file            = file;
   open_file.file_descriptor = fd;
