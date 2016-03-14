@@ -12,6 +12,7 @@
 #include <cerrno>
 
 #include "../logging.h"
+#include "../platform.h"
 
 // TODO(remeusel): remove this... wrong namespace (for testing)
 namespace upload {
@@ -195,6 +196,7 @@ bool Reader<FileScrubbingTaskT, FileT>::
   // figure out how many bytes need to be read in this step and create a
   // CharBuffer to accomodate these bytes
   const size_t file_size     = open_file->file->size();
+  const off_t  file_offset   = lseek(open_file->file_descriptor, 0, SEEK_CUR);
   const size_t bytes_to_read =
     std::min(file_size - static_cast<size_t>(open_file->file_marker),
              max_buffer_size_);
@@ -209,6 +211,10 @@ bool Reader<FileScrubbingTaskT, FileT>::
   assert(bytes_to_read == bytes_read);
   buffer->SetUsedBytes(bytes_read);
   open_file->file_marker += bytes_read;
+
+  // tell kernel to evict read pages from the page cache
+  platform_invalidate_kcache(open_file->file_descriptor,
+                             file_offset, bytes_read);
 
   // check if the file has been fully read
   const bool finished_reading =
