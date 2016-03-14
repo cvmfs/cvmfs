@@ -1,4 +1,5 @@
 2.3.0:
+  * Reduce page cache utilization during publish
   * Fix lookup of sbin binaries in cvmfs_server
   * Add 'cvmfs_talk detach nested' debug and testing interface
   * Add per-database memory statistics to 'cvmfs_talk internal affairs'
