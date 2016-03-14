@@ -6,8 +6,8 @@
 
 #include <string>
 
-#include "../../cvmfs/util/posix.h"
-#include "../../cvmfs/util/unlink_guard.h"
+#include "util/posix.h"
+#include "util/unlink_guard.h"
 
 class T_UnlinkGuard : public ::testing::Test {
  protected:

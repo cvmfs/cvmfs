@@ -7,7 +7,7 @@
 #define __STDC_FORMAT_MACROS
 
 #include "cvmfs_config.h"
-#include "algorithm.h"
+#include "util/algorithm.h"
 
 using namespace std;  // NOLINT
 

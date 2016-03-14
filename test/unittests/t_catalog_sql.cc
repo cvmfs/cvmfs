@@ -4,10 +4,10 @@
 
 #include <gtest/gtest.h>
 
-#include "../../cvmfs/catalog_counters.h"
-#include "../../cvmfs/catalog_sql.h"
-#include "../../cvmfs/util/posix.h"
-#include "../../cvmfs/util/string.h"
+#include "catalog_counters.h"
+#include "catalog_sql.h"
+#include "util/posix.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 

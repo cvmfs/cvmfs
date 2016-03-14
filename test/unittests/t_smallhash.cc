@@ -9,9 +9,9 @@
 
 #include <limits>
 
-#include "../../cvmfs/hash.h"
-#include "../../cvmfs/murmur.h"
-#include "../../cvmfs/smallhash.h"
+#include "hash.h"
+#include "murmur.h"
+#include "smallhash.h"
 
 static uint32_t hasher_int(const int &key) {
   return MurmurHash2(&key, sizeof(key), 0x07387a4f);

@@ -9,11 +9,11 @@
 #include <ctime>
 #include <string>
 
-#include "../../cvmfs/catalog_sql.h"
-#include "../../cvmfs/compression.h"
-#include "../../cvmfs/history_sqlite.h"
-#include "../../cvmfs/shortstring.h"
-#include "../../cvmfs/statistics.h"
+#include "catalog_sql.h"
+#include "compression.h"
+#include "history_sqlite.h"
+#include "shortstring.h"
+#include "statistics.h"
 #include "testutil.h"
 
 using namespace std;  // NOLINT

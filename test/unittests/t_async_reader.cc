@@ -10,11 +10,11 @@
 
 #include <cassert>
 
-#include "../../cvmfs/file_processing/async_reader.h"
-#include "../../cvmfs/file_processing/char_buffer.h"
-#include "../../cvmfs/file_processing/file_scrubbing_task.h"
-#include "../../cvmfs/util/posix.h"
 #include "c_file_sandbox.h"
+#include "file_processing/async_reader.h"
+#include "file_processing/char_buffer.h"
+#include "file_processing/file_scrubbing_task.h"
+#include "util/posix.h"
 
 namespace upload {
 

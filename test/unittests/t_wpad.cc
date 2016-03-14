@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-#include "../../cvmfs/wpad.h"
+#include "wpad.h"
 
 using namespace std;  // NOLINT
 

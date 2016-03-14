@@ -8,9 +8,9 @@
 
 #include <string>
 
-#include "../../cvmfs/hash.h"
-#include "../../cvmfs/prng.h"
 #include "c_file_sandbox.h"
+#include "hash.h"
+#include "prng.h"
 
 
 class T_FileSandbox : public FileSandbox {

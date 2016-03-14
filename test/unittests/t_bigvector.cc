@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-#include "../../cvmfs/bigvector.h"
+#include "bigvector.h"
 
 class T_Bigvector : public ::testing::Test {
  protected:

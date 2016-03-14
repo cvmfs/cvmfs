@@ -8,10 +8,10 @@
 #include <map>
 #include <string>
 
-#include "../../cvmfs/catalog_traversal.h"
-#include "../../cvmfs/hash.h"
-#include "../../cvmfs/manifest.h"
-#include "../../cvmfs/prng.h"
+#include "catalog_traversal.h"
+#include "hash.h"
+#include "manifest.h"
+#include "prng.h"
 #include "testutil.h"
 
 using swissknife::CatalogTraversal;

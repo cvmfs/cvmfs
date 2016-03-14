@@ -6,7 +6,7 @@
 
 #include <string>
 
-#include "../../cvmfs/path_filters/relaxed_path_filter.h"
+#include "path_filters/relaxed_path_filter.h"
 
 class T_RelaxedPathFilter : public ::testing::Test {
  protected:

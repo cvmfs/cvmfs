@@ -10,7 +10,7 @@
 #include <cassert>
 #include <vector>
 
-#include "../atomic.h"
+#include "atomic.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {

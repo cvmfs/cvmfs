@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-#include "../../cvmfs/platform.h"
+#include "platform.h"
 
 TEST(T_Platforms, OsVersion) {
   int major = -1;

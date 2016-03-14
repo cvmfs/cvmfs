@@ -5,10 +5,10 @@
 #include "cvmfs_config.h"
 #include "chunk.h"
 
-#include "../file_chunk.h"
-#include "../smalloc.h"
-#include "file.h"
-#include "io_dispatcher.h"
+#include "file_chunk.h"
+#include "file_processing/file.h"
+#include "file_processing/io_dispatcher.h"
+#include "smalloc.h"
 
 namespace upload {
 
@@ -103,13 +103,13 @@ Chunk::Chunk(const Chunk &other) :
   deferred_write_(other.deferred_write_),
   deferred_buffers_(other.deferred_buffers_),
   zlib_initialized_(false),
+  compression_algorithm_(zlib::kZlibDefault),
   content_hash_context_(other.content_hash_context_),
   content_hash_(other.content_hash_),
   content_hash_initialized_(other.content_hash_initialized_),
   upload_stream_handle_(NULL),
   bytes_written_(other.bytes_written_),
-  compressed_size_(other.compressed_size_),
-  compression_algorithm_(zlib::kZlibDefault)
+  compressed_size_(other.compressed_size_)
 {
   assert(!other.done_);
   assert(!other.HasUploadStreamHandle());

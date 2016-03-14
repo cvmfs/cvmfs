@@ -11,8 +11,8 @@
 
 #include <set>
 
-#include "../hash.h"
-#include "../smallhash.h"
+#include "hash.h"
+#include "smallhash.h"
 
 /**
  * Abstract base class of a HashFilter to define the common interface.

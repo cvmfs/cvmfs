@@ -9,9 +9,9 @@
 #include <cassert>
 #include <cstdio>
 
-#include "../../cvmfs/tracer.h"
-#include "../../cvmfs/util/posix.h"
-#include "../../cvmfs/util/string.h"
+#include "tracer.h"
+#include "util/posix.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 

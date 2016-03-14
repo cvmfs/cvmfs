@@ -9,7 +9,7 @@
 
 #include <cassert>
 
-#include "../../cvmfs/util_concurrency.h"
+#include "util_concurrency.h"
 
 
 struct thread_args {

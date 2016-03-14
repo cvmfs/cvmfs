@@ -8,11 +8,11 @@
 #include <cassert>
 #include <string>
 
-#include "../logging.h"
-#include "chunk.h"
-#include "chunk_detector.h"
-#include "file.h"
-#include "io_dispatcher.h"
+#include "file_processing/chunk.h"
+#include "file_processing/chunk_detector.h"
+#include "file_processing/file.h"
+#include "file_processing/io_dispatcher.h"
+#include "logging.h"
 
 namespace upload {
 
