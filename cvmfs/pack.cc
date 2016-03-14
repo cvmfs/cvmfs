@@ -11,7 +11,7 @@
 
 #include "platform.h"
 #include "smalloc.h"
-#include "util.h"
+#include "util/string.h"
 #include "util_concurrency.h"
 
 using namespace std;  // NOLINT

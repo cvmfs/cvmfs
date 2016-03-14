@@ -25,8 +25,8 @@ class Uuid {
   static Uuid *Create(const std::string &store_path);
   static std::string CreateOneTime();
   std::string uuid() const { return uuid_; }
-  const unsigned char *data() const { 
-    return reinterpret_cast<const unsigned char *>(&uuid_presentation_.uuid); 
+  const unsigned char *data() const {
+    return reinterpret_cast<const unsigned char *>(&uuid_presentation_.uuid);
   }
   unsigned size() const { return sizeof(uuid_presentation_.uuid); }
 

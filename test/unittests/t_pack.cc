@@ -11,7 +11,8 @@
 #include "../../cvmfs/pack.h"
 #include "../../cvmfs/prng.h"
 #include "../../cvmfs/smalloc.h"
-#include "../../cvmfs/util.h"
+#include "../../cvmfs/util/posix.h"
+#include "../../cvmfs/util/string.h"
 
 using namespace std;  // NOLINT
 
@@ -35,7 +36,7 @@ class ConsumerCallbacks {
     verify_errors = 0;
   }
 
-  
+
   uint64_t total_size;
   uint64_t total_objects;
   uint64_t this_size;
@@ -97,15 +98,15 @@ class T_Pack : public ::testing::Test {
     } while (has_space);
     free(obj_buf);
 
-    //printf("produced %d objects of total size %d MB\n",
-    //        pack_.GetNoObjects(), pack_.size()/(1024*1024));
+    // printf("produced %d objects of total size %d MB\n",
+    //         pack_.GetNoObjects(), pack_.size()/(1024*1024));
 
     shash::Any digest(shash::kShake128);
     ObjectPackProducer producer(&pack_);
     producer.GetDigest(&digest);
     ObjectPackConsumer consumer(digest, producer.GetHeaderSize());
     ConsumerCallbacks callbacks;
-    // TODO Verify objects
+    // TODO(jblomer) Verify objects
     consumer.RegisterListener(&ConsumerCallbacks::OnEvent, &callbacks);
     unsigned char *transfer_buf =
       reinterpret_cast<unsigned char *>(smalloc(kBufSize));

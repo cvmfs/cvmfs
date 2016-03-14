@@ -14,12 +14,10 @@
 #include <vector>
 
 #include "gtest/gtest_prod.h"
-#include "util.h"
+#include "hash.h"
+#include "util/single_copy.h"
 #include "util_concurrency.h"
 
-namespace shash {
-class Any;
-}
 
 /**
  * Multiple content-addressable objects in a single BLOB.  A (serialized)

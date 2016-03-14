@@ -13,14 +13,14 @@
 #ifndef CVMFS_ENCRYPT_H_
 #define CVMFS_ENCRYPT_H_
 
-#include "pthread.h"
+#include <pthread.h>
 
 #include <map>
 #include <string>
 
 #include "gtest/gtest_prod.h"
 #include "hash.h"
-#include "util.h"
+#include "util/single_copy.h"
 
 namespace cipher {
 
@@ -118,7 +118,7 @@ class CipherAes256Cbc : public Cipher {
   static const unsigned kKeySize = 256/8;
   static const unsigned kIvSize = 128/8;
   static const unsigned kBlockSize = 128/8;
-    
+
   virtual std::string const name() { return "AES-256-CBC"; }
   virtual Algorithms const algorithm() { return kAes256Cbc; }
   virtual unsigned const key_size() { return kKeySize; }

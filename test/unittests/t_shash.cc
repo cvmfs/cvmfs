@@ -1051,7 +1051,7 @@ TEST(T_Shash, Hmac) {
     "50278a77d4d7670561ab72e867383aef6ce50b3e-rmd160", rmd160.ToString());
 
   shash::Any sha1_hmacstring(shash::kSha1);
-  shash::HmacString("key", string(reinterpret_cast<const char *>(fox)), 
+  shash::HmacString("key", string(reinterpret_cast<const char *>(fox)),
                     &sha1_hmacstring);
   EXPECT_EQ(sha1_hmacstring, sha1);
 }
