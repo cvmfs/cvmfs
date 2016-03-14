@@ -25,7 +25,6 @@
 #include "logging.h"
 #include "manifest.h"
 #include "shortstring.h"
-#include "util.h"
 
 using namespace std;  // NOLINT
 

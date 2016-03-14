@@ -14,7 +14,8 @@
 #include "../../cvmfs/prng.h"
 #include "../../cvmfs/sink.h"
 #include "../../cvmfs/statistics.h"
-#include "../../cvmfs/util.h"
+#include "../../cvmfs/util/posix.h"
+#include "../../cvmfs/util/unlink_guard.h"
 
 using namespace std;  // NOLINT
 

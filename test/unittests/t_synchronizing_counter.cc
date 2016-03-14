@@ -4,11 +4,11 @@
 
 #include <gtest/gtest.h>
 
+#include <errno.h>
 #include <unistd.h>
 
 #include <cassert>
 
-#include "../../cvmfs/util.h"
 #include "../../cvmfs/util_concurrency.h"
 
 

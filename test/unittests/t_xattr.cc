@@ -8,7 +8,10 @@
 #include <gtest/gtest.h>
 
 #include "../../cvmfs/platform.h"
-#include "../../cvmfs/util.h"
+#include "../../cvmfs/util/pointer.h"
+#include "../../cvmfs/util/posix.h"
+#include "../../cvmfs/util/string.h"
+#include "../../cvmfs/util/unlink_guard.h"
 #include "../../cvmfs/xattr.h"
 
 using namespace std;  // NOLINT

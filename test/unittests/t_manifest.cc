@@ -11,7 +11,7 @@
 
 #include "../../cvmfs/hash.h"
 #include "../../cvmfs/manifest.h"
-#include "../../cvmfs/util.h"
+#include "../../cvmfs/util/posix.h"
 
 using namespace std;  // NOLINT
 

@@ -14,7 +14,6 @@
 #include "../../cvmfs/hash.h"
 #include "../../cvmfs/manifest.h"
 #include "../../cvmfs/prng.h"
-#include "../../cvmfs/util.h"
 #include "testutil.h"
 
 using swissknife::CatalogTraversal;

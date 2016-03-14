@@ -8,7 +8,7 @@
 #include <vector>
 
 #include "../../cvmfs/smalloc.h"
-#include "../../cvmfs/util.h"
+#include "../../cvmfs/util/pointer.h"
 
 using namespace std;  // NOLINT
 

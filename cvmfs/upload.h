@@ -118,6 +118,7 @@
 #include "upload_facility.h"
 #include "upload_spooler_definition.h"
 #include "upload_spooler_result.h"
+#include "util/pointer.h"
 
 namespace upload {
 

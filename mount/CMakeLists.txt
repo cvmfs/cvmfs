@@ -1,10 +1,13 @@
 set (CVMFS_MOUNT_SOURCES
-  ../cvmfs/smalloc.h
+  ../cvmfs/logging.cc ../cvmfs/logging.h ../cvmfs/logging_internal.h
+  ../cvmfs/options.cc ../cvmfs/options.h
   ../cvmfs/platform.h ../cvmfs/platform_linux.h ../cvmfs/platform_osx.h
-  ../cvmfs/util.h ../cvmfs/util.cc
-  ../cvmfs/logging.h ../cvmfs/logging_internal.h ../cvmfs/logging.cc
-  ../cvmfs/options.h ../cvmfs/options.cc
-  ../cvmfs/sanitizer.h ../cvmfs/sanitizer.cc
+  ../cvmfs/sanitizer.cc ../cvmfs/sanitizer.h
+  ../cvmfs/smalloc.h
+  ../cvmfs/util/pointer.h
+  ../cvmfs/util/posix.cc ../cvmfs/util/posix.h
+  ../cvmfs/util/single_copy.h
+  ../cvmfs/util/string.cc ../cvmfs/util/string.h
   mount.cvmfs.cc
 )
 
@@ -60,7 +63,7 @@ if (MACOSX)
     DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/domain.d"
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
-  
+
   install (
     FILES         domain.d/egi.eu.conf
     DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/domain.d"

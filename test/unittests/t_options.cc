@@ -5,7 +5,8 @@
 #include "gtest/gtest.h"
 
 #include "../../cvmfs/options.h"
-#include "../../cvmfs/util.h"
+#include "../../cvmfs/util/posix.h"
+#include "../../cvmfs/util/unlink_guard.h"
 
 using namespace std;  // NOLINT
 

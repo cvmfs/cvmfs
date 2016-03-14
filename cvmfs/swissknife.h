@@ -15,7 +15,6 @@
 #include "reflog.h"
 #include "signature.h"
 #include "statistics.h"
-#include "util.h"
 
 namespace download {
 class DownloadManager;

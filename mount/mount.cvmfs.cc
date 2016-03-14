@@ -20,10 +20,12 @@
 #include <string>
 #include <vector>
 
+#include "logging.h"
 #include "options.h"
 #include "platform.h"
 #include "sanitizer.h"
-#include "util.h"
+#include "util/posix.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 

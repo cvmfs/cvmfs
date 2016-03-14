@@ -22,7 +22,6 @@
 #include "../../cvmfs/history.h"
 #include "../../cvmfs/object_fetcher.h"
 #include "../../cvmfs/upload_facility.h"
-#include "../../cvmfs/util.h"
 
 pid_t GetParentPid(const pid_t pid);
 std::string GetExecutablePath(const std::string &exe_name);

@@ -5,10 +5,9 @@
 #include "cvmfs_config.h"
 #include "file.h"
 
+#include "../util/posix.h"
 #include "chunk.h"
 #include "io_dispatcher.h"
-
-#include "../util.h"
 
 namespace upload {
 

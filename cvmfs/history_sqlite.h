@@ -14,7 +14,6 @@
 #include "hash.h"
 #include "history.h"
 #include "history_sql.h"
-#include "util.h"
 
 namespace history {
 

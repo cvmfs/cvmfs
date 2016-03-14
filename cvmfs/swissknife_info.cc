@@ -16,7 +16,7 @@
 #include "hash.h"
 #include "logging.h"
 #include "manifest.h"
-#include "util.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 

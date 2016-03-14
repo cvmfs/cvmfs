@@ -8,7 +8,7 @@
 #include <vector>
 
 #include "logging.h"
-#include "util.h"
+#include "util/string.h"
 
 namespace upload {
 

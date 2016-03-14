@@ -12,7 +12,7 @@
 #include "../../cvmfs/murmur.h"
 #include "../../cvmfs/prng.h"
 #include "../../cvmfs/sqlitemem.h"
-#include "../../cvmfs/util.h"
+#include "../../cvmfs/util/algorithm.h"
 
 using namespace std;  // NOLINT
 

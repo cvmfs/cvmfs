@@ -14,6 +14,7 @@
 #include "manifest_fetch.h"
 #include "reflog.h"
 #include "signature.h"
+#include "util/posix.h"
 
 /**
  * Trait class to define the concrete object types produced by the methods of

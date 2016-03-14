@@ -5,6 +5,7 @@
 #include "upload_s3.h"
 
 #include <errno.h>
+#include <fcntl.h>
 #include <inttypes.h>
 #ifdef _POSIX_PRIORITY_SCHEDULING
 #include <sched.h>
@@ -20,7 +21,8 @@
 #include "logging.h"
 #include "options.h"
 #include "s3fanout.h"
-#include "util.h"
+#include "util/posix.h"
+#include "util/string.h"
 
 namespace upload {
 

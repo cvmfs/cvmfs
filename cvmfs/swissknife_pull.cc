@@ -35,7 +35,6 @@
 #include "signature.h"
 #include "smalloc.h"
 #include "upload.h"
-#include "util.h"
 
 using namespace std;  // NOLINT
 

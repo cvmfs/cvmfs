@@ -21,7 +21,7 @@
 #include "smalloc.h"
 #include "statistics.h"
 #include "upload.h"
-#include "util.h"
+#include "util/posix.h"
 
 using namespace std;  // NOLINT
 

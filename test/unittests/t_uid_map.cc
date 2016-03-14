@@ -5,7 +5,7 @@
 #include <gtest/gtest.h>
 
 #include "../../cvmfs/uid_map.h"
-#include "../../cvmfs/util.h"
+#include "../../cvmfs/util/posix.h"
 
 template <typename MapT>
 class T_UidMap : public ::testing::Test {

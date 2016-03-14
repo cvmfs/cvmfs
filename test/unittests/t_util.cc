@@ -18,7 +18,10 @@
 
 #include "../../cvmfs/shortstring.h"
 #include "../../cvmfs/smalloc.h"
-#include "../../cvmfs/util.h"
+#include "../../cvmfs/util/algorithm.h"
+#include "../../cvmfs/util/mmap_file.h"
+#include "../../cvmfs/util/posix.h"
+#include "../../cvmfs/util/string.h"
 #include "testutil.h"
 
 using namespace std;  // NOLINT

@@ -17,7 +17,7 @@
 #include "hash.h"
 #include "uid_map.h"
 #include "upload.h"
-#include "util.h"
+#include "util/algorithm.h"
 #include "util_concurrency.h"
 
 namespace catalog {

@@ -17,7 +17,6 @@
 #include "logging.h"
 #include "platform.h"
 #include "sync_mediator.h"
-#include "util.h"
 
 using namespace std;  // NOLINT
 

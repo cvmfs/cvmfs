@@ -11,7 +11,7 @@
 
 #include "../../cvmfs/duplex_sqlite3.h"
 #include "../../cvmfs/libcvmfs.h"
-#include "../../cvmfs/util.h"
+#include "../../cvmfs/util/posix.h"
 
 using namespace std;  // NOLINT
 

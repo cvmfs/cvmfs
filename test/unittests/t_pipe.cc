@@ -4,7 +4,9 @@
 
 #include <gtest/gtest.h>
 
-#include "../../cvmfs/util.h"
+#include <fcntl.h>
+
+#include "../../cvmfs/util/posix.h"
 
 class T_Pipe : public ::testing::Test {
  protected:

@@ -35,6 +35,7 @@
 #include <inttypes.h>
 #include <poll.h>
 #include <pthread.h>
+#include <signal.h>
 #include <stdint.h>
 #include <sys/time.h>
 #include <unistd.h>
@@ -54,7 +55,9 @@
 #include "prng.h"
 #include "sanitizer.h"
 #include "smalloc.h"
-#include "util.h"
+#include "util/algorithm.h"
+#include "util/posix.h"
+#include "util/string.h"
 #include "voms_authz/voms_authz.h"
 
 using namespace std;  // NOLINT

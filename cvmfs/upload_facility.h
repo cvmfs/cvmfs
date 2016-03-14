@@ -11,7 +11,6 @@
 #include <string>
 
 #include "upload_spooler_definition.h"
-#include "util.h"
 #include "util_concurrency.h"
 
 namespace upload {

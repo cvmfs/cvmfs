@@ -12,6 +12,8 @@
 #include "cvmfs_config.h"
 #include "s3fanout.h"
 #include "upload_facility.h"
+#include "util/posix.h"
+#include "util/string.h"
 #include "util_concurrency.h"
 
 using namespace std;  // NOLINT

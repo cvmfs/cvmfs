@@ -15,7 +15,7 @@
 #include "../compression.h"
 #include "../duplex_zlib.h"
 #include "../hash.h"
-#include "../util.h"
+#include "../util/pointer.h"
 #include "char_buffer.h"
 
 namespace upload {

@@ -36,7 +36,7 @@
 #include "logging.h"
 #include "sanitizer.h"
 #include "smalloc.h"
-#include "util.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 

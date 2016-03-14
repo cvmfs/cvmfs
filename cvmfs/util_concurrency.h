@@ -13,7 +13,8 @@
 #include <vector>
 
 #include "atomic.h"
-#include "util.h"
+#include "util/async.h"
+#include "util/single_copy.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {

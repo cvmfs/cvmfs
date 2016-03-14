@@ -10,7 +10,7 @@
 
 #include "../../cvmfs/hash.h"
 #include "../../cvmfs/prng.h"
-#include "../../cvmfs/util.h"
+#include "../../cvmfs/util/posix.h"
 
 class FileSandbox : public ::testing::Test {
  public:

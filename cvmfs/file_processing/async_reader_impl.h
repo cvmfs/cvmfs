@@ -5,6 +5,9 @@
 #ifndef CVMFS_FILE_PROCESSING_ASYNC_READER_IMPL_H_
 #define CVMFS_FILE_PROCESSING_ASYNC_READER_IMPL_H_
 
+#include <fcntl.h>
+#include <unistd.h>
+
 #include <algorithm>
 #include <cerrno>
 

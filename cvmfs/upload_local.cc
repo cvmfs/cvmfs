@@ -6,13 +6,14 @@
 #include "upload_local.h"
 
 #include <errno.h>
+#include <fcntl.h>
 
 #include <string>
 
 #include "compression.h"
 #include "file_processing/char_buffer.h"
 #include "logging.h"
-#include "util.h"
+#include "util/posix.h"
 
 
 namespace upload {

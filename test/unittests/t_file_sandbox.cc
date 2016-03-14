@@ -4,11 +4,12 @@
 
 #include <gtest/gtest.h>
 
+#include <errno.h>
+
 #include <string>
 
 #include "../../cvmfs/hash.h"
 #include "../../cvmfs/prng.h"
-#include "../../cvmfs/util.h"
 #include "c_file_sandbox.h"
 
 

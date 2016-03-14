@@ -16,7 +16,7 @@
 #include "../../cvmfs/fs_traversal.h"
 #include "../../cvmfs/hash.h"
 #include "../../cvmfs/quota.h"
-#include "../../cvmfs/util.h"
+#include "../../cvmfs/util/algorithm.h"
 #include "testutil.h"
 
 using namespace std;  // NOLINT

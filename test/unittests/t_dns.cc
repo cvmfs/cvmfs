@@ -13,7 +13,9 @@
 #include <string>
 
 #include "../../cvmfs/dns.h"
-#include "../../cvmfs/util.h"
+#include "../../cvmfs/util/pointer.h"
+#include "../../cvmfs/util/posix.h"
+#include "../../cvmfs/util/string.h"
 
 using namespace std;  // NOLINT
 

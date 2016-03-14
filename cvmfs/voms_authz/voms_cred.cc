@@ -18,6 +18,7 @@
 #include <sys/syscall.h>
 #endif
 
+#include <cstdlib>
 #include <cstring>
 #include <string>
 #include <vector>

@@ -13,7 +13,7 @@
 #include "../../cvmfs/file_processing/async_reader.h"
 #include "../../cvmfs/file_processing/char_buffer.h"
 #include "../../cvmfs/file_processing/file_scrubbing_task.h"
-#include "../../cvmfs/util.h"
+#include "../../cvmfs/util/posix.h"
 #include "c_file_sandbox.h"
 
 namespace upload {
