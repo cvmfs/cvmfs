@@ -14,6 +14,7 @@
 #include "file_processing/char_buffer.h"
 #include "logging.h"
 #include "util/posix.h"
+#include "platform.h"
 
 
 namespace upload {
@@ -177,7 +178,8 @@ void LocalUploader::Upload(UploadStreamHandle  *handle,
   }
 
   // tell kernel to evict written pages from the page cache
-  InvalidatePagecache(local_handle->file_descriptor, offset, bytes_written);
+  platform_invalidate_kcache(local_handle->file_descriptor,
+                             offset, bytes_written);
 
   Respond(callback, UploaderResults(0, buffer));
 }

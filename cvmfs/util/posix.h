@@ -76,7 +76,6 @@ std::string GetCurrentWorkingDirectory();
 int TryLockFile(const std::string &path);
 int LockFile(const std::string &path);
 void UnlockFile(const int filedes);
-void InvalidatePagecache(const int fd, const off_t offset, const size_t length);
 bool RemoveTree(const std::string &path);
 std::vector<std::string> FindFiles(const std::string &dir,
                                    const std::string &suffix);

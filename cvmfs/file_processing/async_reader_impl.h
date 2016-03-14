@@ -12,7 +12,7 @@
 #include <cerrno>
 
 #include "../logging.h"
-#include "../util/posix.h"
+#include "../platform.h"
 
 // TODO(remeusel): remove this... wrong namespace (for testing)
 namespace upload {
@@ -213,7 +213,8 @@ bool Reader<FileScrubbingTaskT, FileT>::
   open_file->file_marker += bytes_read;
 
   // tell kernel to evict read pages from the page cache
-  InvalidatePagecache(open_file->file_descriptor, file_offset, bytes_read);
+  platform_invalidate_kcache(open_file->file_descriptor,
+                             file_offset, bytes_read);
 
   // check if the file has been fully read
   const bool finished_reading =

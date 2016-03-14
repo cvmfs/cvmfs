@@ -542,43 +542,6 @@ void UnlockFile(const int filedes) {
 
 
 /**
- * Advises the kernel to evict the given file region from the page cache.
- *
- * Note: Pages containing the data at `offset` and `offset + length` are NOT
- *       evicted by the kernel. This means that a few pages are not purged when
- *       offset and length are not exactly on page boundaries. See below:
- *
- *                offset                                  length
- *                  |                                        |
- *   +---------+----|----+---------+---------+---------+-----|---+---------+
- *   |         |    |    | xxxxxxx | xxxxxxx | xxxxxxx |     |   |         |
- *   |         |    |    | xxxxxxx | xxxxxxx | xxxxxxx |     |   |         |
- *   +---------+----|----+---------+---------+---------+-----|---+---------+
- *   0       4096   |  8192      12288     16384     20480   | 24576     28672
- *
- * git.kernel.org/cgit/linux/kernel/git/stable/linux-stable.git/tree/mm/fadvise.c#n115
- *
- * TODO(rmeusel): figure out a clever way how to align `offset` and `length`
- *
- * @param fd      file descriptor whose page cache should be (partially) evicted
- * @param offset  start offset of the pages to be evicted
- * @param length  number of bytes to be evicted
- */
-void InvalidatePagecache(const int    fd,
-                         const off_t  offset,
-                         const size_t length) {
-  const int advice = POSIX_FADV_DONTNEED;
-  const int retcode = posix_fadvise(fd, offset, length, advice);
-
-  if (retcode != 0) {
-    LogCvmfs(kLogUtility, kLogVerboseMsg, "page cache eviction advice failed "
-                                          "for %d (%d - %s)",
-             fd, retcode, strerror(retcode));
-  }
-}
-
-
-/**
  * Wrapper around mkstemp.
  */
 FILE *CreateTempFile(const string &path_prefix, const int mode,
