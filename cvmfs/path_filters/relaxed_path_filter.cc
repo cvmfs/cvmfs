@@ -4,7 +4,7 @@
 
 #include <string>
 
-#include "relaxed_path_filter.h"
+#include "path_filters/relaxed_path_filter.h"
 
 using namespace catalog;  // NOLINT
 

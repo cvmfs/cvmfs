@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-#include "../../cvmfs/fence.h"
+#include "fence.h"
 
 class T_Fence : public ::testing::Test {
  protected:

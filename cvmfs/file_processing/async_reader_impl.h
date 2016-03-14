@@ -11,7 +11,7 @@
 #include <algorithm>
 #include <cerrno>
 
-#include "../logging.h"
+#include "logging.h"
 
 // TODO(remeusel): remove this... wrong namespace (for testing)
 namespace upload {

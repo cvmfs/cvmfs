@@ -7,10 +7,10 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "../../cvmfs/catalog.h"
-#include "../../cvmfs/catalog_rw.h"
-#include "../../cvmfs/hash.h"
-#include "../../cvmfs/shortstring.h"
+#include "catalog.h"
+#include "catalog_rw.h"
+#include "hash.h"
+#include "shortstring.h"
 #include "testutil.h"
 
 using namespace std;  // NOLINT

@@ -6,8 +6,8 @@
 
 #include <fcntl.h>
 
-#include "../../cvmfs/compression.h"
-#include "../../cvmfs/hash.h"
+#include "compression.h"
+#include "hash.h"
 
 TEST(T_Compression, CompressFd2Null) {
   shash::Any hash(shash::kSha1);

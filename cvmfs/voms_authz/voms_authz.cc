@@ -22,8 +22,8 @@
 #include "fuse/fuse_lowlevel.h"
 #include "voms/voms_apic.h"
 
-#include "../logging.h"
-#include "../platform.h"
+#include "logging.h"
+#include "platform.h"
 
 // TODO(jblomer): add unit tests for static functions
 

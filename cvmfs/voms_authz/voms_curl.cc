@@ -17,9 +17,9 @@
 
 #include <cstring>
 
-#include "../duplex_curl.h"
-#include "../logging_internal.h"
-#include "../util_concurrency.h"
+#include "duplex_curl.h"
+#include "logging_internal.h"
+#include "util_concurrency.h"
 
 // TODO(jblomer): more documentation
 

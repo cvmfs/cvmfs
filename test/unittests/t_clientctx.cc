@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-#include "../../cvmfs/clientctx.h"
+#include "clientctx.h"
 
 TEST(T_ClientCtx, GetInstance) {
   // Noop, don't crash

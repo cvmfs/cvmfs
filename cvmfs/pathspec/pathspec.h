@@ -10,7 +10,7 @@
 #include <string>
 #include <vector>
 
-#include "pathspec_pattern.h"
+#include "pathspec/pathspec_pattern.h"
 
 /**
  * A Pathspec is an abstract description of a file path pattern.

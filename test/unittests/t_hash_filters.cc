@@ -6,7 +6,7 @@
 
 #include <algorithm>
 
-#include "../../cvmfs/garbage_collection/hash_filter.h"
+#include "garbage_collection/hash_filter.h"
 
 static shash::Any sha(const std::string &hash,
                       const char suffix = shash::kSuffixNone) {

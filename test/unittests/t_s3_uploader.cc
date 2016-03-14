@@ -16,14 +16,14 @@
 #include <sstream>  // TODO(jblomer): remove me
 #include <string>
 
-#include "../../cvmfs/atomic.h"
-#include "../../cvmfs/file_processing/char_buffer.h"
-#include "../../cvmfs/hash.h"
-#include "../../cvmfs/upload_s3.h"
-#include "../../cvmfs/upload_spooler_definition.h"
-#include "../../cvmfs/util.h"
+#include "atomic.h"
 #include "c_file_sandbox.h"
+#include "file_processing/char_buffer.h"
+#include "hash.h"
 #include "testutil.h"
+#include "upload_s3.h"
+#include "upload_spooler_definition.h"
+#include "util.h"
 
 namespace upload {
 
