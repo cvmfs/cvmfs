@@ -30,9 +30,9 @@
 #include <cstring>
 #include <string>
 
-#include "../fs_traversal.h"
-#include "../logging.h"
-#include "../platform.h"
+#include "fs_traversal.h"
+#include "logging.h"
+#include "platform.h"
 
 using namespace std;  // NOLINT
 

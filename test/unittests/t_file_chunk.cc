@@ -6,7 +6,7 @@
 
 #include <vector>
 
-#include "../../cvmfs/file_chunk.h"
+#include "file_chunk.h"
 
 using namespace std;  // NOLINT
 

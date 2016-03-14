@@ -7,12 +7,12 @@
 #include <cerrno>
 #include <gtest/gtest.h>
 
-#include "../../cvmfs/platform.h"
-#include "../../cvmfs/util/pointer.h"
-#include "../../cvmfs/util/posix.h"
-#include "../../cvmfs/util/string.h"
-#include "../../cvmfs/util/unlink_guard.h"
-#include "../../cvmfs/xattr.h"
+#include "platform.h"
+#include "util/pointer.h"
+#include "util/posix.h"
+#include "util/string.h"
+#include "util/unlink_guard.h"
+#include "xattr.h"
 
 using namespace std;  // NOLINT
 

@@ -6,7 +6,7 @@
 
 #include "testutil.h"
 
-#include "../../cvmfs/catalog_counters.h"
+#include "catalog_counters.h"
 
 namespace catalog {
 

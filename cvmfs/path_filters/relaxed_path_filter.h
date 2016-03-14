@@ -7,7 +7,7 @@
 
 #include <string>
 
-#include "dirtab.h"
+#include "path_filters/dirtab.h"
 
 namespace catalog {
 

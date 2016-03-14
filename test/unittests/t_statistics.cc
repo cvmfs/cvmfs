@@ -4,8 +4,8 @@
 
 #include "gtest/gtest.h"
 
-#include "../../cvmfs/platform.h"
-#include "../../cvmfs/statistics.h"
+#include "platform.h"
+#include "statistics.h"
 
 using namespace std;  // NOLINT
 

@@ -10,12 +10,12 @@
 #include <string>
 #include <vector>
 
-#include "../compression.h"
-#include "../hash.h"
-#include "../platform.h"
-#include "char_buffer.h"
-#include "chunk_detector.h"
-#include "file_scrubbing_task.h"
+#include "compression.h"
+#include "file_processing/char_buffer.h"
+#include "file_processing/chunk_detector.h"
+#include "file_processing/file_scrubbing_task.h"
+#include "hash.h"
+#include "platform.h"
 
 namespace upload {
 

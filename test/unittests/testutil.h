@@ -16,12 +16,12 @@
 #include <string>
 #include <vector>
 
-#include "../../cvmfs/catalog_mgr.h"
-#include "../../cvmfs/directory_entry.h"
-#include "../../cvmfs/hash.h"
-#include "../../cvmfs/history.h"
-#include "../../cvmfs/object_fetcher.h"
-#include "../../cvmfs/upload_facility.h"
+#include "catalog_mgr.h"
+#include "directory_entry.h"
+#include "hash.h"
+#include "history.h"
+#include "object_fetcher.h"
+#include "upload_facility.h"
 
 pid_t GetParentPid(const pid_t pid);
 std::string GetExecutablePath(const std::string &exe_name);

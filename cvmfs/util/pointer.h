@@ -7,7 +7,7 @@
 
 #include <cstdlib>
 
-#include "single_copy.h"
+#include "util/single_copy.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {

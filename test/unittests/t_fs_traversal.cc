@@ -15,9 +15,9 @@
 #include <map>
 #include <string>
 
-#include "../../cvmfs/fs_traversal.h"
-#include "../../cvmfs/platform.h"
-#include "../../cvmfs/util/posix.h"
+#include "fs_traversal.h"
+#include "platform.h"
+#include "util/posix.h"
 
 class T_FsTraversal : public ::testing::Test {
  public:

@@ -14,8 +14,8 @@
 #include <map>
 #include <sstream>  // TODO(jblomer): remove me
 
-#include "../../cvmfs/hash.h"
-#include "../../cvmfs/manifest.h"
+#include "hash.h"
+#include "manifest.h"
 #include "testutil.h"
 
 

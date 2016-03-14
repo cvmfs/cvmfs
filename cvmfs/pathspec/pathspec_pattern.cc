@@ -7,7 +7,7 @@
 
 #include <cassert>
 
-#include "pathspec.h"
+#include "pathspec/pathspec.h"
 
 PathspecElementPattern::PathspecElementPattern(
   const std::string::const_iterator begin,

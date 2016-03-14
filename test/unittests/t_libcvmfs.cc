@@ -9,9 +9,9 @@
 #include <cstdio>
 #include <string>
 
-#include "../../cvmfs/duplex_sqlite3.h"
-#include "../../cvmfs/libcvmfs.h"
-#include "../../cvmfs/util/posix.h"
+#include "duplex_sqlite3.h"
+#include "libcvmfs.h"
+#include "util/posix.h"
 
 using namespace std;  // NOLINT
 

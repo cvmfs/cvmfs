@@ -9,9 +9,9 @@
 #include <cstdio>
 #include <cstdlib>
 
-#include "../logging.h"
-#include "../util/posix.h"
-#include "../util/string.h"
+#include "logging.h"
+#include "util/posix.h"
+#include "util/string.h"
 
 namespace catalog {
 
