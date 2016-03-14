@@ -495,22 +495,25 @@ endif (BUILD_LIBCVMFS)
 
 if (BUILD_OCTOPUS)
   set (CVMFS_OCTOPUS_SOURCES
-	  sanitizer.h sanitizer.cc
-    hash.h hash.cc
+    encrypt.cc encrypt.h
+    hash.cc hash.h
+    json_document.cc json_document.h
+    logging.cc logging.h logging_internal.h
+    pathspec/pathspec.cc pathspec/pathspec.h
+    pathspec/pathspec_pattern.cc pathspec/pathspec_pattern.h
     platform.h platform_linux.h platform_osx.h
+	  sanitizer.cc sanitizer.h
     smalloc.h
-    encrypt.h encrypt.cc
-    json_document.h json_document.cc
-    util.h util.cc
-    uuid.h uuid.cc
-    logging.h logging_internal.h logging.cc
-    pathspec/pathspec.h pathspec/pathspec.cc
-    pathspec/pathspec_pattern.h pathspec/pathspec_pattern.cc
-    sanitizer.h sanitizer.cc
-    webapi/uri_map.h webapi/uri_map.cc
-		webapi/fcgi.h webapi/fcgi.cc
-    webapi/macaroon.h webapi/macaroon.cc
-    webapi/octopus.cc)
+    util/pointer.h
+    util/posix.cc util/posix.h
+    util/single_copy.h
+    util/string.cc util/string.h
+    uuid.cc uuid.h
+		webapi/fcgi.cc webapi/fcgi.h
+    webapi/macaroon.cc webapi/macaroon.h
+    webapi/octopus.cc
+    webapi/uri_map.cc webapi/uri_map.h
+  )
 
   add_executable (cvmfs_octopus.fcgi ${CVMFS_OCTOPUS_SOURCES})
   add_dependencies (cvmfs_octopus.fcgi libsha2)

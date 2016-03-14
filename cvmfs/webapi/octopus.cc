@@ -2,19 +2,18 @@
  * This file is part of the CernVM File System
  */
 
-#include "fcgi.h"
-
 #include <cstdio>
 #include <cstdlib>
 #include <string>
 
 #include "../sanitizer.h"
+#include "fcgi.h"
 #include "uri_map.h"
 
 using namespace std;  // NOLINT
 
 int main(int argc, char **argv) {
-  //FILE *f = fopen("/tmp/mycgi.log", "w");
+  // FILE *f = fopen("/tmp/mycgi.log", "w");
   FastCgi fcgi;
   if (!fcgi.IsFcgi()) {
     printf("not in FastCGI context, starting localhost:9000\n");

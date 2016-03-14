@@ -8,7 +8,7 @@
 
 #include "../../cvmfs/encrypt.h"
 #include "../../cvmfs/json_document.h"
-#include "../../cvmfs/util.h"
+#include "../../cvmfs/util/pointer.h"
 #include "../../cvmfs/webapi/macaroon.h"
 
 using namespace std;  // NOLINT

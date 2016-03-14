@@ -10,7 +10,7 @@
 
 #include "../hash.h"
 #include "../json_document.h"
-#include "../util.h"
+#include "../util/single_copy.h"
 
 namespace cipher {
 class AbstractKeyDatabase;

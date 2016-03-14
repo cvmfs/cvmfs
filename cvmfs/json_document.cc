@@ -9,6 +9,8 @@
 #include <cstring>
 
 #include "logging.h"
+#include "util/pointer.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 
@@ -30,8 +32,7 @@ string JsonDocument::EscapeString(const string &input) {
     if (input[i] == '\\') {
       escaped.push_back('\\');
       escaped.push_back('\\');
-    }
-    else if (input[i] == '"') {
+    } else if (input[i] == '"') {
       escaped.push_back('\\');
       escaped.push_back('"');
     } else {

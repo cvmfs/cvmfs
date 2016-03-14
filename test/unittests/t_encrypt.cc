@@ -13,7 +13,6 @@
 
 #include "../../cvmfs/encrypt.h"
 #include "../../cvmfs/hash.h"
-#include "../../cvmfs/util.h"
 #include "testutil.h"
 
 using namespace std;  // NOLINT
@@ -44,8 +43,8 @@ TEST(T_Encrypt, KeyFiles) {
   UniquePtr<Key> k_restore1(Key::CreateFromFile(tmp_path));
   ASSERT_TRUE(k_restore1.IsValid());
   EXPECT_EQ(k->size(), k_restore1->size());
-  EXPECT_EQ( 0, memcmp(k->data(), k_restore1->data(),
-                       std::min(k->size(), k_restore1->size())) );
+  EXPECT_EQ(0, memcmp(k->data(), k_restore1->data(),
+                      std::min(k->size(), k_restore1->size())));
 
   EXPECT_EQ(0, truncate(tmp_path.c_str(), 0));
   UniquePtr<Key> k_restore2(Key::CreateFromFile(tmp_path));
@@ -167,7 +166,7 @@ TEST(T_Encrypt, Aes_256_Cbc) {
   retval = Cipher::Decrypt(ciphertext, *k, &plaintext);
   EXPECT_TRUE(retval);
   EXPECT_EQ(dummy, plaintext);
-  
+
   retval = cipher.Encrypt(dummy2, *k, &ciphertext);
   EXPECT_TRUE(retval);
   retval = Cipher::Decrypt(ciphertext, *k, &plaintext);

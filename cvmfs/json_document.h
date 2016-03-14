@@ -22,7 +22,7 @@ class JsonDocument : SingleCopy {
 
   inline const JSON* root() const { return root_; }
   inline bool IsValid() const { return root_ != NULL; }
-  
+
   static std::string EscapeString(const std::string &input);
 
  private:
