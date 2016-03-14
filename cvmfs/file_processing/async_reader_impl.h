@@ -12,6 +12,7 @@
 #include <cerrno>
 
 #include "../logging.h"
+#include "../util/posix.h"
 
 // TODO(remeusel): remove this... wrong namespace (for testing)
 namespace upload {
