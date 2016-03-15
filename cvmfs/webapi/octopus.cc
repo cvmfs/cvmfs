@@ -6,9 +6,9 @@
 #include <cstdlib>
 #include <string>
 
-#include "../sanitizer.h"
-#include "fcgi.h"
-#include "uri_map.h"
+#include "sanitizer.h"
+#include "webapi/fcgi.h"
+#include "webapi/uri_map.h"
 
 using namespace std;  // NOLINT
 

@@ -7,12 +7,12 @@
 
 #include <ctime>
 
-#include "../encrypt.h"
-#include "../hash.h"
-#include "../sanitizer.h"
-#include "../util/pointer.h"
-#include "../util/string.h"
-#include "../uuid.h"
+#include "encrypt.h"
+#include "hash.h"
+#include "sanitizer.h"
+#include "util/pointer.h"
+#include "util/string.h"
+#include "uuid.h"
 
 using namespace std;  // NOLINT
 

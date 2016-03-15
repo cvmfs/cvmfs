@@ -8,9 +8,9 @@
 #include <ctime>
 #include <string>
 
-#include "../hash.h"
-#include "../json_document.h"
-#include "../util/single_copy.h"
+#include "hash.h"
+#include "json_document.h"
+#include "util/single_copy.h"
 
 namespace cipher {
 class AbstractKeyDatabase;
