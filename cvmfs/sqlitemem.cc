@@ -76,9 +76,9 @@ void SqliteMemoryManager::MallocArena::Free(void *ptr) {
       reinterpret_cast<char *>(block_ctl) - prior_size);
     // new_avail points now to the prior block
     UnlinkAvailBlock(new_avail);
+    if (rover_ == new_avail)
+      rover_ = head_avail_;
   }
-  if (rover_ == new_avail)
-    rover_ = head_avail_;
 
   int32_t succ_size = *reinterpret_cast<int32_t *>(
     reinterpret_cast<char *>(new_avail) + new_size);
