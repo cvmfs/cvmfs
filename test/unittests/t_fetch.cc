@@ -7,13 +7,13 @@
 #include <fcntl.h>
 #include <pthread.h>
 
-#include "../../cvmfs/atomic.h"
-#include "../../cvmfs/backoff.h"
-#include "../../cvmfs/cache.h"
-#include "../../cvmfs/download.h"
-#include "../../cvmfs/fetch.h"
-#include "../../cvmfs/hash.h"
-#include "../../cvmfs/statistics.h"
+#include "atomic.h"
+#include "backoff.h"
+#include "cache.h"
+#include "download.h"
+#include "fetch.h"
+#include "hash.h"
+#include "statistics.h"
 #include "testutil.h"
 
 using namespace std;  // NOLINT

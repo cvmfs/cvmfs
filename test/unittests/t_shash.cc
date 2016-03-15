@@ -11,9 +11,9 @@
 #include <cstring>
 #include <string>
 
-#include "../../cvmfs/hash.h"
-#include "../../cvmfs/prng.h"
-#include "../../cvmfs/smalloc.h"
+#include "hash.h"
+#include "prng.h"
+#include "smalloc.h"
 
 using namespace std;  // NOLINT
 

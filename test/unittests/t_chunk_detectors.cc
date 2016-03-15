@@ -6,9 +6,9 @@
 
 #include <vector>
 
-#include "../../cvmfs/file_processing/char_buffer.h"
-#include "../../cvmfs/file_processing/chunk_detector.h"
-#include "../../cvmfs/prng.h"
+#include "file_processing/char_buffer.h"
+#include "file_processing/chunk_detector.h"
+#include "prng.h"
 
 namespace upload {
 

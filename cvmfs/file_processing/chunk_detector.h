@@ -13,7 +13,7 @@
 #include <utility>
 #include <vector>
 
-#include "char_buffer.h"
+#include "file_processing/char_buffer.h"
 
 namespace upload {
 

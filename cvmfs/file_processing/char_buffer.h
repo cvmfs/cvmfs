@@ -12,7 +12,7 @@
 #include <cstring>
 #include <vector>
 
-#include "../util/buffer.h"
+#include "util/buffer.h"
 
 namespace upload {
 

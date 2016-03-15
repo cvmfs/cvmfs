@@ -17,9 +17,9 @@
 #include <string>
 #include <vector>
 
-#include "../shortstring.h"
-#include "pointer.h"
-#include "single_copy.h"
+#include "shortstring.h"
+#include "util/pointer.h"
+#include "util/single_copy.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {

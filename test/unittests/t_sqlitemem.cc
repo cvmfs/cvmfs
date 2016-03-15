@@ -9,10 +9,10 @@
 #include <map>
 #include <vector>
 
-#include "../../cvmfs/murmur.h"
-#include "../../cvmfs/prng.h"
-#include "../../cvmfs/sqlitemem.h"
-#include "../../cvmfs/util/algorithm.h"
+#include "murmur.h"
+#include "prng.h"
+#include "sqlitemem.h"
+#include "util/algorithm.h"
 
 using namespace std;  // NOLINT
 

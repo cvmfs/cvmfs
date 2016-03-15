@@ -271,7 +271,7 @@ if (BUILD_COVERAGE AND NOT USING_CLANG)
   set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fprofile-arcs -ftest-coverage")
 endif (BUILD_COVERAGE AND NOT USING_CLANG)
 
-set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES})
+set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} cvmfs)
 
 #
 # check existence of include files

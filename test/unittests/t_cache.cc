@@ -14,12 +14,12 @@
 #include <cstring>
 #include <string>
 
-#include "../../cvmfs/cache.h"
-#include "../../cvmfs/compression.h"
-#include "../../cvmfs/hash.h"
-#include "../../cvmfs/platform.h"
-#include "../../cvmfs/quota.h"
-#include "../../cvmfs/smalloc.h"
+#include "cache.h"
+#include "compression.h"
+#include "hash.h"
+#include "platform.h"
+#include "quota.h"
+#include "smalloc.h"
 #include "testutil.h"
 
 using namespace std;  // NOLINT

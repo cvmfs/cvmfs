@@ -12,10 +12,10 @@
 #include <ctime>
 #include <string>
 
-#include "../../cvmfs/dns.h"
-#include "../../cvmfs/util/pointer.h"
-#include "../../cvmfs/util/posix.h"
-#include "../../cvmfs/util/string.h"
+#include "dns.h"
+#include "util/pointer.h"
+#include "util/posix.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 

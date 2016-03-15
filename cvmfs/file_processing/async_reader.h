@@ -12,8 +12,8 @@
 #include <list>
 #include <string>
 
-#include "../util_concurrency.h"
-#include "char_buffer.h"
+#include "file_processing/char_buffer.h"
+#include "util_concurrency.h"
 
 // TODO(rmeusel): remove this... wrong namespace (for testing)
 namespace upload {

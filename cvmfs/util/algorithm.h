@@ -12,10 +12,10 @@
 #include <string>
 #include <vector>
 
-#include "../murmur.h"
+#include "murmur.h"
 // TODO(jblomer): should be also part of algorithm
-#include "../prng.h"
-#include "single_copy.h"
+#include "prng.h"
+#include "util/single_copy.h"
 
 
 #ifdef CVMFS_NAMESPACE_GUARD

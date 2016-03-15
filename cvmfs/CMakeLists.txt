@@ -347,7 +347,7 @@ set (LIBCVMFS_CFLAGS "${LIBCVMFS_CFLAGS} -D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -
 # set some include and linking stuff
 #
 set (CVMFS2_LD_FLAGS "${CVMFS2_LD_FLAGS} -ldl -lm")
-include_directories (${INCLUDE_DIRECTORIES})
+include_directories (cvmfs ${INCLUDE_DIRECTORIES})
 
 #
 # do the job!

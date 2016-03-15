@@ -9,9 +9,9 @@
 #include <cstdio>
 #include <string>
 
-#include "../../cvmfs/hash.h"
-#include "../../cvmfs/manifest.h"
-#include "../../cvmfs/util/posix.h"
+#include "hash.h"
+#include "manifest.h"
+#include "util/posix.h"
 
 using namespace std;  // NOLINT
 

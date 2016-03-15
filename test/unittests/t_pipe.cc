@@ -6,7 +6,7 @@
 
 #include <fcntl.h>
 
-#include "../../cvmfs/util/posix.h"
+#include "util/posix.h"
 
 class T_Pipe : public ::testing::Test {
  protected:

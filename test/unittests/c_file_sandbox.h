@@ -5,12 +5,14 @@
 #ifndef TEST_UNITTESTS_C_FILE_SANDBOX_H_
 #define TEST_UNITTESTS_C_FILE_SANDBOX_H_
 
+#include <errno.h>
+
 #include <string>
 #include <utility>
 
-#include "../../cvmfs/hash.h"
-#include "../../cvmfs/prng.h"
-#include "../../cvmfs/util/posix.h"
+#include "hash.h"
+#include "prng.h"
+#include "util/posix.h"
 
 class FileSandbox : public ::testing::Test {
  public:

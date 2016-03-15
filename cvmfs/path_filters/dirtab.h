@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-#include "../pathspec/pathspec.h"
+#include "pathspec/pathspec.h"
 
 namespace catalog {
 
