@@ -16,8 +16,8 @@
 #include <cassert>
 #include <cstdlib>
 
-#include "../logging.h"
-#include "../platform.h"
+#include "logging.h"
+#include "platform.h"
 
 using namespace std;  // NOLINT
 

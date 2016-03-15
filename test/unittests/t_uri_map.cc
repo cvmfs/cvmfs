@@ -6,7 +6,7 @@
 
 #include <string>
 
-#include "../../cvmfs/webapi/uri_map.h"
+#include "webapi/uri_map.h"
 
 using namespace std;  // NOLINT
 

@@ -8,11 +8,11 @@
 #include <cstring>
 #include <string>
 
-#include "../../cvmfs/pack.h"
-#include "../../cvmfs/prng.h"
-#include "../../cvmfs/smalloc.h"
-#include "../../cvmfs/util/posix.h"
-#include "../../cvmfs/util/string.h"
+#include "pack.h"
+#include "prng.h"
+#include "smalloc.h"
+#include "util/posix.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 

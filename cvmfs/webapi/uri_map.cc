@@ -7,7 +7,7 @@
 
 #include <cassert>
 
-#include "fcgi.h"
+#include "webapi/fcgi.h"
 
 using namespace std;  // NOLINT
 

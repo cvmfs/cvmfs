@@ -4,8 +4,8 @@
 
 #include <gtest/gtest.h>
 
-#include "../../cvmfs/json_document.h"
-#include "../../cvmfs/util/pointer.h"
+#include "json_document.h"
+#include "util/pointer.h"
 
 TEST(T_Json, Empty) {
   UniquePtr<JsonDocument> json(JsonDocument::Create("{}"));

@@ -11,8 +11,8 @@
 #include <cstring>
 #include <string>
 
-#include "../../cvmfs/encrypt.h"
-#include "../../cvmfs/hash.h"
+#include "encrypt.h"
+#include "hash.h"
 #include "testutil.h"
 
 using namespace std;  // NOLINT
