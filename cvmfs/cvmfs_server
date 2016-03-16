@@ -1159,6 +1159,8 @@ close_transaction() {
   load_repo_config $name
   local tx_lock="${CVMFS_SPOOL_DIR}/in_transaction"
   local tmp_dir="${CVMFS_SPOOL_DIR}/tmp"
+  local current_scratch_dir="${CVMFS_SPOOL_DIR}/scratch/current"
+  local wastebin_scratch_dir="${CVMFS_SPOOL_DIR}/scratch/wastebin"
   local force_grace_time=60
 
   # if not explicitly asked, try if umounting works without force
@@ -1185,7 +1187,16 @@ close_transaction() {
   fi
 
   # continue with the remounting
-  run_suid_helper clear_scratch $name
+  local async_msg=""
+  if [ x"$CVMFS_ASYNC_SCRATCH_CLEANUP" != x"false" ]; then
+    tmpdir=$(mktemp -d "${wastebin_scratch_dir}/waste.XXXXXX")
+    mv $current_scratch_dir $tmpdir
+    mkdir -p $current_scratch_dir && chown $CVMFS_USER $current_scratch_dir
+    async_msg="(asynchronous scratch cleanup)"
+    run_suid_helper clear_scratch_async $name
+  else
+    run_suid_helper clear_scratch $name
+  fi
   [ ! -z "$tmp_dir" ] && rm -fR "${tmp_dir}"/*
   run_suid_helper rdonly_mount $name > /dev/null
   run_suid_helper rw_mount $name
@@ -1193,7 +1204,7 @@ close_transaction() {
 
   local fallback_msg=""
   [ $use_fd_fallback -eq 0 ] || fallback_msg="(using force)"
-  to_syslog_for_repo $name "closed transaction $fallback_msg"
+  to_syslog_for_repo $name "closed transaction $fallback_msg $async_msg"
 }
 
 # checks if a repository is currently runing a publish procedure
@@ -2152,6 +2163,7 @@ CVMFS_AUTO_TAG=$autotagging
 CVMFS_GARBAGE_COLLECTION=$garbage_collectable
 CVMFS_AUTO_REPAIR_MOUNTPOINT=true
 CVMFS_AUTOCATALOGS=false
+CVMFS_ASYNC_SCRATCH_CLEANUP=true
 EOF
 
   if [ x"$voms_authz" != x"" ]; then
