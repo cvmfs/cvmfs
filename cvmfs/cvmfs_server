@@ -2120,7 +2120,7 @@ create_config_files_for_new_repository() {
 
   # other configurations
   local spool_dir="/var/spool/cvmfs/${name}"
-  local scratch_dir="${spool_dir}/scratch"
+  local scratch_dir="${spool_dir}/scratch/current"
   local rdonly_dir="${spool_dir}/rdonly"
   local temp_dir="${spool_dir}/tmp"
   local cache_dir="${spool_dir}/cache"
@@ -2215,13 +2215,19 @@ create_spool_area_for_new_repository() {
   # gather repository information from configuration file
   load_repo_config $name
   local spool_dir=$CVMFS_SPOOL_DIR
-  local scratch_dir="${spool_dir}/scratch"
+  local current_scratch_dir="${spool_dir}/scratch/current"
+  local wastebin_scratch_dir="${spool_dir}/scratch/wastebin"
   local rdonly_dir="${spool_dir}/rdonly"
   local temp_dir="${spool_dir}/tmp"
   local cache_dir="${spool_dir}/cache"
   local ofs_workdir="${spool_dir}/ofs_workdir"
 
-  mkdir -p /cvmfs/$name $scratch_dir $rdonly_dir $temp_dir $cache_dir || return 1
+  mkdir -p /cvmfs/$name          \
+           $current_scratch_dir  \
+           $wastebin_scratch_dir \
+           $rdonly_dir           \
+           $temp_dir             \
+           $cache_dir || return 1
   if [ x"$CVMFS_UNION_FS_TYPE" = x"overlayfs" ]; then
     mkdir -p $ofs_workdir || return 2
   fi
@@ -2289,7 +2295,7 @@ setup_and_mount_new_repository() {
   # get repository information
   load_repo_config $name
   local rdonly_dir="${CVMFS_SPOOL_DIR}/rdonly"
-  local scratch_dir="${CVMFS_SPOOL_DIR}/scratch"
+  local scratch_dir="${CVMFS_SPOOL_DIR}/scratch/current"
   local ofs_workdir="${CVMFS_SPOOL_DIR}/ofs_workdir"
 
   local selinux_context=""
@@ -3058,7 +3064,7 @@ mkfs() {
   load_repo_config $name
   local temp_dir="${CVMFS_SPOOL_DIR}/tmp"
   local rdonly_dir="${CVMFS_SPOOL_DIR}/rdonly"
-  local scratch_dir="${CVMFS_SPOOL_DIR}/scratch"
+  local scratch_dir="${CVMFS_SPOOL_DIR}/scratch/current"
 
   echo -n "Creating Initial Repository... "
   create_whitelist $name $cvmfs_user $upstream $temp_dir > /dev/null
@@ -4481,6 +4487,7 @@ publish() {
     load_repo_config $name
     user=$CVMFS_USER
     spool_dir=$CVMFS_SPOOL_DIR
+    scratch_dir="${spool_dir}/scratch/current"
     stratum0=$CVMFS_STRATUM0
     upstream=$CVMFS_UPSTREAM_STORAGE
     hash_algorithm="${CVMFS_HASH_ALGORITHM-sha1}"
@@ -4532,7 +4539,7 @@ publish() {
       -w $stratum0                                       \
       -t ${spool_dir}/tmp                                \
       -u /cvmfs/${name}                                  \
-      -s ${spool_dir}/scratch                            \
+      -s ${scratch_dir}                                  \
       $verbosity"
 
     local log_level=
@@ -4541,7 +4548,7 @@ publish() {
     local trusted_certs="/etc/cvmfs/repositories.d/${name}/trusted_certs"
     local sync_command="$(__swissknife_cmd dbg) sync \
       -u /cvmfs/$name                                \
-      -s ${spool_dir}/scratch                        \
+      -s ${scratch_dir}                              \
       -c ${spool_dir}/rdonly                         \
       -t ${spool_dir}/tmp                            \
       -b $base_hash                                  \
