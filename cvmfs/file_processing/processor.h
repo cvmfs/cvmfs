@@ -9,8 +9,8 @@
 
 #include <vector>
 
-#include "char_buffer.h"
-#include "file_scrubbing_task.h"
+#include "file_processing/char_buffer.h"
+#include "file_processing/file_scrubbing_task.h"
 
 namespace upload {
 

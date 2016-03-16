@@ -6,9 +6,9 @@
 
 #include <string>
 
-#include "../../cvmfs/sql.h"
-#include "../../cvmfs/util/posix.h"
-#include "../../cvmfs/util/string.h"
+#include "sql.h"
+#include "util/posix.h"
+#include "util/string.h"
 
 struct RevisionFlags {
   enum T {
