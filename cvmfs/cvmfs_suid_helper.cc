@@ -104,58 +104,99 @@ static void KillCvmfs(const string &fqrn) {
   ExecAsRoot("/bin/kill", "-9", pid.c_str(), NULL);
 }
 
-static bool ClearWorkingDir() {
-  int retval;
-  DIR *dirp = opendir(".");
-  if (dirp == NULL)
-    return false;
-  platform_dirent64 *dirent;
-  while ((dirent = platform_readdir(dirp)) != NULL) {
-    if ((strcmp(dirent->d_name, ".") == 0) ||
-        (strcmp(dirent->d_name, "..") == 0))
-    {
-      continue;
-    }
+class ScopedWorkingDirectory {
+ public:
+  ScopedWorkingDirectory(const string &path)
+    : previous_path_(GetCurrentWorkingDirectory())
+    , directory_handle_(NULL)
+  {
+    ChangeDirectory(path);
+    directory_handle_ = opendir(".");
+  }
 
-    platform_stat64 info;
-    retval = platform_lstat(dirent->d_name, &info);
-    if (retval != 0) {
-      closedir(dirp);
+  ~ScopedWorkingDirectory() {
+    if (directory_handle_ != NULL) {
+      closedir(directory_handle_);
+    }
+    ChangeDirectory(previous_path_);
+  }
+
+  operator bool() const { return directory_handle_ != NULL; }
+
+  struct DirectoryEntry {
+    bool   is_directory;
+    string name;
+  };
+
+  bool NextDirectoryEntry(DirectoryEntry *entry) {
+    platform_dirent64 *dirent;
+    while ((dirent = platform_readdir(directory_handle_)) != NULL &&
+           IsMetaEntry(dirent));
+    if (dirent == NULL) {
       return false;
     }
 
-    if (S_ISDIR(info.st_mode)) {
-      // Recursion
-      retval = chdir(dirent->d_name);
-      if (retval != 0) {
-        closedir(dirp);
-        return false;
-      }
-      retval = ClearWorkingDir();
-      if (!retval) {
-        closedir(dirp);
-        return false;
-      }
-      retval = chdir("..");
-      if (retval != 0) {
-        closedir(dirp);
-        return false;
-      }
-      retval = rmdir(dirent->d_name);
-      if (retval != 0) {
-        closedir(dirp);
-        return false;
-      }
-    } else {
-      retval = unlink(dirent->d_name);
-      if (retval != 0) {
-        closedir(dirp);
-        return false;
-      }
+    platform_stat64 info;
+    if (platform_lstat(dirent->d_name, &info) != 0) {
+      return false;
     }
+
+    entry->is_directory = S_ISDIR(info.st_mode);
+    entry->name         = dirent->d_name;
+    return true;
   }
-  closedir(dirp);
-  return true;
+
+ protected:
+  string GetCurrentWorkingDirectory() {
+    char path[PATH_MAX];
+    const char* cwd = getcwd(path, PATH_MAX);
+    assert(cwd == path);
+    return string(cwd);
+  }
+
+  void ChangeDirectory(const string &path) {
+    const int retval = chdir(path.c_str());
+    assert(retval == 0);
+  }
+
+  bool IsMetaEntry(const platform_dirent64 *dirent) {
+    return (strcmp(dirent->d_name, ".")  == 0) ||
+           (strcmp(dirent->d_name, "..") == 0);
+  }
+
+ private:
+  const string  previous_path_;
+        DIR    *directory_handle_;
+};
+
+static bool ClearDirectory(const string &path) {
+  ScopedWorkingDirectory swd(path);
+  if (!swd) {
+    return false;
+  }
+
+  bool success = true;
+  ScopedWorkingDirectory::DirectoryEntry dirent;
+  while (success && swd.NextDirectoryEntry(&dirent)) {
+    success = (dirent.is_directory)
+      ? ClearDirectory(dirent.name) && (rmdir(dirent.name.c_str()) == 0)
+      : (unlink(dirent.name.c_str()) == 0);
+  }
+
+  return success;
+}
+
+static int CleanupDirectory(const string &path) {
+  if (!ClearDirectory(path)) {
+    fprintf(stderr, "failed to clear %s\n", path.c_str());
+    return 1;
+  }
+  return 0;
+}
+
+static int DoSynchronousScratchCleanup(const string &fqrn) {
+  const string scratch = string(kSpoolArea) + "/" + fqrn + "/scratch/current";
+  return CleanupDirectory(scratch);
 }
 
 static void Usage(const string &exe, FILE *output) {
@@ -223,17 +264,7 @@ int main(int argc, char *argv[]) {
   } else if (command == "rdonly_lazy_umount") {
     LazyUmount(string(kSpoolArea) + "/" + fqrn + "/rdonly");
   } else if (command == "clear_scratch") {
-    const string scratch_area = string(kSpoolArea) + "/" + fqrn + "/scratch";
-    retval = chdir(scratch_area.c_str());
-    if (retval != 0) {
-      fprintf(stderr, "failed to chdir to %s\n", scratch_area.c_str());
-      return 1;
-    }
-    retval = ClearWorkingDir();
-    if (!retval) {
-      fprintf(stderr, "failed to clear %s\n", scratch_area.c_str());
-      return 1;
-    }
+    return DoSynchronousScratchCleanup(fqrn);
   } else {
     Usage(argv[0], stderr);
     return 1;
