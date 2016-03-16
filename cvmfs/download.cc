@@ -455,6 +455,15 @@ int DownloadManager::CallbackCurlSocket(CURL *easy,
   return 0;
 }
 
+void DownloadManager::AddDownload(DownloadManager *download_mgr,
+                                  JobInfo         *info)
+{
+  CURL *handle = download_mgr->AcquireCurlHandle();
+  download_mgr->InitializeRequest(info, handle);
+  download_mgr->SetUrlOptions(info);
+  curl_multi_add_handle(download_mgr->curl_multi_, handle);
+}
+
 
 /**
  * Worker thread event loop.  Waits on new JobInfo structs on a pipe.
@@ -462,128 +471,136 @@ int DownloadManager::CallbackCurlSocket(CURL *easy,
 void *DownloadManager::MainDownload(void *data) {
   LogCvmfs(kLogDownload, kLogDebug, "download I/O thread started");
   DownloadManager *download_mgr = static_cast<DownloadManager *>(data);
+  bool finished = false;
 
-  download_mgr->watch_fds_ =
-    static_cast<struct pollfd *>(smalloc(2 * sizeof(struct pollfd)));
-  download_mgr->watch_fds_size_ = 2;
-  download_mgr->watch_fds_[0].fd = download_mgr->pipe_terminate_[0];
-  download_mgr->watch_fds_[0].events = POLLIN | POLLPRI;
-  download_mgr->watch_fds_[0].revents = 0;
-  download_mgr->watch_fds_[1].fd = download_mgr->pipe_jobs_[0];
-  download_mgr->watch_fds_[1].events = POLLIN | POLLPRI;
-  download_mgr->watch_fds_[1].revents = 0;
-  download_mgr->watch_fds_inuse_ = 2;
-
-  int still_running = 0;
-  struct timeval timeval_start, timeval_stop;
-  gettimeofday(&timeval_start, NULL);
-  while (true) {
-    int timeout;
-    if (still_running) {
-      /* NOTE: The following might degrade the performance for many small files
-       * use case. TODO(jblomer): look into it.
-      // Specify a timeout for polling in ms; this allows us to return
-      // to libcurl once a second so it can look for internal operations
-      // which timed out.  libcurl has a more elaborate mechanism
-      // (CURLMOPT_TIMERFUNCTION) that would inform us of the next potential
-      // timeout.  TODO(bbockelm) we should switch to that in the future.
-      timeout = 100;
-      */
-      timeout = 1;
-    } else {
-      timeout = -1;
-      gettimeofday(&timeval_stop, NULL);
-      int64_t delta = static_cast<int64_t>(
-        1000 * DiffTimeSeconds(timeval_start, timeval_stop));
-      perf::Xadd(download_mgr->counters_->sz_transfer_time, delta);
-    }
-    int retval = poll(download_mgr->watch_fds_, download_mgr->watch_fds_inuse_,
-                      timeout);
-    if (retval < 0) {
-      continue;
+  do {
+    // Pick up as many JobInfos as we can
+    int new_jobs = min(download_mgr->pending_jobs_.GetItemCount(),
+                       static_cast<size_t>(download_mgr->pool_max_handles_));
+    for (int i = 0; i < max(new_jobs, 1); ++i) {
+      JobInfo *new_job = download_mgr->pending_jobs_.Dequeue();
+      if (new_job->code == JobInfo::kJobFinish ||
+          new_job->code == JobInfo::kJobAbort) {
+        finished = true;
+        break;
+      } else {
+        AddDownload(download_mgr, new_job);
+      }
     }
 
-    // Handle timeout
-    if (retval == 0) {
-      retval = curl_multi_socket_action(download_mgr->curl_multi_,
-                                        CURL_SOCKET_TIMEOUT,
-                                        0,
-                                        &still_running);
-    }
-
-    // Terminate I/O thread
-    if (download_mgr->watch_fds_[0].revents)
+    if (finished)
       break;
 
-    // New job arrives
-    if (download_mgr->watch_fds_[1].revents) {
-      download_mgr->watch_fds_[1].revents = 0;
-      JobInfo *info;
-      ReadPipe(download_mgr->pipe_jobs_[0], &info, sizeof(info));
-      if (!still_running)
-        gettimeofday(&timeval_start, NULL);
-      CURL *handle = download_mgr->AcquireCurlHandle();
-      download_mgr->InitializeRequest(info, handle);
-      download_mgr->SetUrlOptions(info);
-      curl_multi_add_handle(download_mgr->curl_multi_, handle);
-      retval = curl_multi_socket_action(download_mgr->curl_multi_,
-                                        CURL_SOCKET_TIMEOUT,
-                                        0,
-                                        &still_running);
-    }
+    int still_running = 0;
+    struct timeval timeval_start, timeval_stop;
+    gettimeofday(&timeval_start, NULL);
 
-    // Activity on curl sockets
-    for (unsigned i = 2; i < download_mgr->watch_fds_inuse_; ++i) {
-      if (download_mgr->watch_fds_[i].revents) {
-        int ev_bitmask = 0;
-        if (download_mgr->watch_fds_[i].revents & (POLLIN | POLLPRI))
-          ev_bitmask |= CURL_CSELECT_IN;
-        if (download_mgr->watch_fds_[i].revents & (POLLOUT | POLLWRBAND))
-          ev_bitmask |= CURL_CSELECT_OUT;
-        if (download_mgr->watch_fds_[i].revents &
-            (POLLERR | POLLHUP | POLLNVAL))
-        {
-          ev_bitmask |= CURL_CSELECT_ERR;
-        }
-        download_mgr->watch_fds_[i].revents = 0;
+    // we can now start the actual download loop
+    curl_multi_perform(download_mgr->curl_multi_, &still_running);
 
-        retval = curl_multi_socket_action(download_mgr->curl_multi_,
-                                          download_mgr->watch_fds_[i].fd,
-                                          ev_bitmask,
-                                          &still_running);
+    do {
+      struct timeval timeout;
+      int rc;
+      CURLMcode mc;
+
+      fd_set fdread;
+      fd_set fdwrite;
+      fd_set fdexcep;
+      int maxfd = -1;
+      long curl_timeo = -1;
+
+      FD_ZERO(&fdread);
+      FD_ZERO(&fdwrite);
+      FD_ZERO(&fdexcep);
+
+      // set a suitable timeout to play around with
+      timeout.tv_sec = 1;
+      timeout.tv_usec = 0;
+
+      curl_multi_timeout(download_mgr->curl_multi_, &curl_timeo);
+      if (curl_timeo >= 0) {
+        timeout.tv_sec = curl_timeo / 1000;
+        if(timeout.tv_sec > 1)
+          timeout.tv_sec = 5;
+        else
+          timeout.tv_usec = (curl_timeo % 1000) * 1000;
       }
-    }
 
-    // Check if transfers are completed
-    CURLMsg *curl_msg;
-    int msgs_in_queue;
-    while ((curl_msg = curl_multi_info_read(download_mgr->curl_multi_,
-                                            &msgs_in_queue)))
-    {
-      if (curl_msg->msg == CURLMSG_DONE) {
-        perf::Inc(download_mgr->counters_->n_requests);
-        JobInfo *info;
-        CURL *easy_handle = curl_msg->easy_handle;
-        int curl_error = curl_msg->data.result;
-        curl_easy_getinfo(easy_handle, CURLINFO_PRIVATE, &info);
+      // get file descriptors from the transfers
+      mc = curl_multi_fdset(download_mgr->curl_multi_, &fdread,
+                            &fdwrite, &fdexcep, &maxfd);
 
-        curl_multi_remove_handle(download_mgr->curl_multi_, easy_handle);
-        if (download_mgr->VerifyAndFinalize(curl_error, info)) {
-          curl_multi_add_handle(download_mgr->curl_multi_, easy_handle);
-          retval = curl_multi_socket_action(download_mgr->curl_multi_,
-                                            CURL_SOCKET_TIMEOUT,
-                                            0,
-                                            &still_running);
+      if (mc != CURLM_OK) {
+        LogCvmfs(kLogDownload, kLogDebug,
+          "curl_multi_fdset() failed, code %d.\n", mc);
+        finished = true;
+        break;
+      }
+
+      if (maxfd == -1) {
+        struct timeval wait = { 0, 100 * 1000 };  // 100ms
+        rc = select(0, NULL, NULL, NULL, &wait);
+      } else {
+        rc = select(maxfd+1, &fdread, &fdwrite, &fdexcep, &timeout);
+      }
+
+      assert(rc == 0);
+
+      curl_multi_perform(download_mgr->curl_multi_, &still_running);
+
+      size_t available_handles =
+               download_mgr->pool_max_handles_ - still_running;
+      new_jobs = min(download_mgr->pending_jobs_.GetItemCount(),
+                          available_handles);
+      for (int i = 0; i < new_jobs; ++i) {
+        JobInfo *new_job = download_mgr->pending_jobs_.Dequeue();
+        if (new_job->code == JobInfo::kJobFinish) {
+          finished = true;
+        } else if(new_job->code == JobInfo::kJobAbort) {
+          finished = true;
+          still_running = 0;
+          break;
         } else {
-          // Return easy handle into pool and write result back
-          download_mgr->ReleaseCurlHandle(easy_handle);
-
-          WritePipe(info->wait_at[1], &info->error_code,
-                    sizeof(info->error_code));
+          AddDownload(download_mgr, new_job);
         }
       }
-    }
-  }
+
+      // Check if transfers are completed
+      CURLMsg *curl_msg;
+      int msgs_in_queue;
+      while ((curl_msg = curl_multi_info_read(download_mgr->curl_multi_,
+                                              &msgs_in_queue)))
+      {
+        if (curl_msg->msg == CURLMSG_DONE) {
+          perf::Inc(download_mgr->counters_->n_requests);
+          JobInfo *info;
+          CURL *easy_handle = curl_msg->easy_handle;
+          int curl_error = curl_msg->data.result;
+          curl_easy_getinfo(easy_handle, CURLINFO_PRIVATE, &info);
+
+          curl_multi_remove_handle(download_mgr->curl_multi_, easy_handle);
+          if (download_mgr->VerifyAndFinalize(curl_error, info)) {
+            curl_multi_add_handle(download_mgr->curl_multi_, easy_handle);
+            curl_multi_perform(download_mgr->curl_multi_, &still_running);
+          } else {
+      			// Return easy handle into pool and write result back
+      			download_mgr->ReleaseCurlHandle(easy_handle);
+          }
+          if (info->callback) {
+            (*info->callback)(info);
+          }
+        }
+      }
+
+    } while(still_running);
+
+    gettimeofday(&timeval_stop, NULL);
+    int64_t delta = static_cast<int64_t>(
+      1000 * DiffTimeSeconds(timeval_start, timeval_stop));
+    perf::Xadd(download_mgr->counters_->sz_transfer_time, delta);
+
+  } while (!finished);
+
 
   for (set<CURL *>::iterator i = download_mgr->pool_handles_inuse_->begin(),
        iEnd = download_mgr->pool_handles_inuse_->end(); i != iEnd; ++i)
@@ -591,6 +608,7 @@ void *DownloadManager::MainDownload(void *data) {
     curl_multi_remove_handle(download_mgr->curl_multi_, *i);
     curl_easy_cleanup(*i);
   }
+  curl_multi_cleanup(download_mgr->curl_multi_);
   download_mgr->pool_handles_inuse_->clear();
   free(download_mgr->watch_fds_);
 
@@ -1387,22 +1405,44 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
 }
 
 
-DownloadManager::DownloadManager() {
-  pool_handles_idle_ = NULL;
-  pool_handles_inuse_ = NULL;
-  pool_max_handles_ = 0;
-  curl_multi_ = NULL;
-  default_headers_ = NULL;
-
+DownloadManager::DownloadManager() :
+    pool_handles_idle_(NULL),
+    pool_handles_inuse_(NULL),
+    pool_max_handles_(0),
+    curl_multi_(NULL),
+    default_headers_(NULL),
+    watch_fds_(NULL),
+    watch_fds_size_(0),
+    watch_fds_inuse_(0),
+    watch_fds_max_(0),
+    opt_dns_server_(NULL),
+    opt_timeout_proxy_(0),
+    opt_timeout_direct_(0),
+    opt_low_speed_limit_(0),
+    opt_max_retries_(0),
+    opt_backoff_init_ms_(0),
+    opt_backoff_max_ms_(0),
+    enable_info_header_(false),
+    opt_ipv4_only_(false),
+    follow_redirects_(false),
+    opt_host_chain_(NULL),
+    opt_host_chain_rtt_(NULL),
+    opt_host_chain_current_(0),
+    opt_proxy_groups_(NULL),
+    opt_proxy_groups_current_(0),
+    opt_proxy_groups_current_burned_(0),
+    opt_num_proxies_(0),
+    resolver_(NULL),
+    opt_ip_preference_(dns::kIpPreferSystem),
+    opt_timestamp_backup_proxies_(0),
+    opt_timestamp_failover_proxies_(0),
+    opt_proxy_groups_reset_after_(0),
+    opt_timestamp_backup_host_(0),
+    opt_host_reset_after_(0),
+    pending_jobs_(100*pool_max_handles_, 100*pool_max_handles_),
+    counters_(NULL)
+{
   atomic_init32(&multi_threaded_);
-  pipe_terminate_[0] = pipe_terminate_[1] = -1;
-
-  pipe_jobs_[0] = pipe_jobs_[1] = -1;
-  watch_fds_ = NULL;
-  watch_fds_size_ = 0;
-  watch_fds_inuse_ = 0;
-  watch_fds_max_ = 0;
-
   lock_options_ =
   reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   int retval = pthread_mutex_init(lock_options_, NULL);
@@ -1411,35 +1451,6 @@ DownloadManager::DownloadManager() {
   reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   retval = pthread_mutex_init(lock_synchronous_mode_, NULL);
   assert(retval == 0);
-
-  opt_dns_server_ = NULL;
-  opt_ip_preference_ = dns::kIpPreferSystem;
-  opt_timeout_proxy_ = 0;
-  opt_timeout_direct_ = 0;
-  opt_low_speed_limit_ = 0;
-  opt_host_chain_ = NULL;
-  opt_host_chain_rtt_ = NULL;
-  opt_host_chain_current_ = 0;
-  opt_proxy_groups_ = NULL;
-  opt_proxy_groups_current_ = 0;
-  opt_proxy_groups_current_burned_ = 0;
-  opt_num_proxies_ = 0;
-  opt_max_retries_ = 0;
-  opt_backoff_init_ms_ = 0;
-  opt_backoff_max_ms_ = 0;
-  enable_info_header_ = false;
-  opt_ipv4_only_ = false;
-  follow_redirects_ = false;
-
-  resolver_ = NULL;
-
-  opt_timestamp_backup_proxies_ = 0;
-  opt_timestamp_failover_proxies_ = 0;
-  opt_proxy_groups_reset_after_ = 0;
-  opt_timestamp_backup_host_ = 0;
-  opt_host_reset_after_ = 0;
-
-  counters_ = NULL;
 }
 
 
@@ -1541,16 +1552,11 @@ void DownloadManager::Init(const unsigned max_pool_handles,
 
 
 void DownloadManager::Fini() {
+  JobInfo terminate;
+  terminate.code = JobInfo::kJobFinish;
+  AddDownload(this, &terminate);
   if (atomic_xadd32(&multi_threaded_, 0) == 1) {
-    // Shutdown I/O thread
-    char buf = 'T';
-    WritePipe(pipe_terminate_[1], &buf, 1);
     pthread_join(thread_download_, NULL);
-    // All handles are removed from the multi stack
-    close(pipe_terminate_[1]);
-    close(pipe_terminate_[0]);
-    close(pipe_jobs_[1]);
-    close(pipe_jobs_[0]);
   }
 
   for (set<CURL *>::iterator i = pool_handles_idle_->begin(),
@@ -1592,9 +1598,6 @@ void DownloadManager::Fini() {
  * No way back except Fini(); Init();
  */
 void DownloadManager::Spawn() {
-  MakePipe(pipe_terminate_);
-  MakePipe(pipe_jobs_);
-
   int retval = pthread_create(&thread_download_, NULL, MainDownload,
                               static_cast<void *>(this));
   assert(retval == 0);
@@ -1602,6 +1605,13 @@ void DownloadManager::Spawn() {
   atomic_inc32(&multi_threaded_);
 }
 
+void DownloadManager::FetchAsync(JobInfo *info, void (*Callback)(JobInfo*)) {
+  // It is necessary to call Spawn in advance
+  assert(atomic_xadd32(&multi_threaded_, 0) != 0);
+  assert(info != NULL);
+  info->callback = Callback;
+  pending_jobs_.Enqueue(info);
+}
 
 /**
  * Downloads data from an unsecure outside channel (currently HTTP or file).
@@ -1636,34 +1646,23 @@ Failures DownloadManager::Fetch(JobInfo *info) {
     info->info_header[header_size-1] = '\0';
   }
 
-  if (atomic_xadd32(&multi_threaded_, 0) == 1) {
-    if (info->wait_at[0] == -1) {
-      MakePipe(info->wait_at);
-    }
+  pthread_mutex_lock(lock_synchronous_mode_);
+  CURL *handle = AcquireCurlHandle();
+  InitializeRequest(info, handle);
+  SetUrlOptions(info);
+  // curl_easy_setopt(handle, CURLOPT_VERBOSE, 1);
+  int retval;
+  do {
+    retval = curl_easy_perform(handle);
+    perf::Inc(counters_->n_requests);
+    double elapsed;
+    if (curl_easy_getinfo(handle, CURLINFO_TOTAL_TIME, &elapsed) == CURLE_OK)
+      perf::Xadd(counters_->sz_transfer_time, (int64_t)(elapsed * 1000));
+  } while (VerifyAndFinalize(retval, info));
+  result = info->error_code;
+  ReleaseCurlHandle(info->curl_handle);
+  pthread_mutex_unlock(lock_synchronous_mode_);
 
-    // LogCvmfs(kLogDownload, kLogDebug, "send job to thread, pipe %d %d",
-    //          info->wait_at[0], info->wait_at[1]);
-    WritePipe(pipe_jobs_[1], &info, sizeof(info));
-    ReadPipe(info->wait_at[0], &result, sizeof(result));
-    // LogCvmfs(kLogDownload, kLogDebug, "got result %d", result);
-  } else {
-    pthread_mutex_lock(lock_synchronous_mode_);
-    CURL *handle = AcquireCurlHandle();
-    InitializeRequest(info, handle);
-    SetUrlOptions(info);
-    // curl_easy_setopt(handle, CURLOPT_VERBOSE, 1);
-    int retval;
-    do {
-      retval = curl_easy_perform(handle);
-      perf::Inc(counters_->n_requests);
-      double elapsed;
-      if (curl_easy_getinfo(handle, CURLINFO_TOTAL_TIME, &elapsed) == CURLE_OK)
-        perf::Xadd(counters_->sz_transfer_time, (int64_t)(elapsed * 1000));
-    } while (VerifyAndFinalize(retval, info));
-    result = info->error_code;
-    ReleaseCurlHandle(info->curl_handle);
-    pthread_mutex_unlock(lock_synchronous_mode_);
-  }
 
   if (result != kFailOk) {
     LogCvmfs(kLogDownload, kLogDebug, "download failed (error %d - %s)", result,

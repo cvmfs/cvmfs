@@ -25,6 +25,7 @@
 #include "prng.h"
 #include "sink.h"
 #include "statistics.h"
+#include "util_concurrency.h"
 
 
 namespace download {
@@ -120,6 +121,11 @@ struct JobInfo {
   bool probe_hosts;
   bool head_request;
   bool follow_redirects;
+  enum {
+    kJobDownload,
+    kJobFinish,
+    kJobAbort
+  } code;
   pid_t pid;
   uid_t uid;
   gid_t gid;
@@ -149,6 +155,7 @@ struct JobInfo {
     probe_hosts = false;
     head_request = false;
     follow_redirects = false;
+    code = kJobDownload;
     pid = -1;
     uid = -1;
     gid = -1;
@@ -167,7 +174,6 @@ struct JobInfo {
     headers = NULL;
     memset(&zstream, 0, sizeof(zstream));
     info_header = NULL;
-    wait_at[0] = wait_at[1] = -1;
     nocache = false;
     error_code = kFailOther;
     num_used_proxies = num_used_hosts = num_retries = 0;
@@ -232,10 +238,6 @@ struct JobInfo {
 
   ~JobInfo() {
     delete cred_fname;
-    if (wait_at[0] >= 0) {
-      close(wait_at[0]);
-      close(wait_at[1]);
-    }
   }
 
   // Internal state, don't touch
@@ -244,7 +246,6 @@ struct JobInfo {
   char *info_header;
   z_stream zstream;
   shash::ContextPtr hash_context;
-  int wait_at[2];  /**< Pipe used for the return value */
   std::string proxy;
   bool nocache;
   Failures error_code;
@@ -253,6 +254,7 @@ struct JobInfo {
   unsigned char num_used_hosts;
   unsigned char num_retries;
   unsigned backoff_ms;
+  void (*callback)(JobInfo*);
 };  // JobInfo
 
 
@@ -342,6 +344,7 @@ class DownloadManager {
   void Fini();
   void Spawn();
   Failures Fetch(JobInfo *info);
+  void FetchAsync(JobInfo *info, void (*Callback)(JobInfo*));
 
   void SetDnsServer(const std::string &address);
   void SetDnsParameters(const unsigned retries, const unsigned timeout_ms);
@@ -387,6 +390,7 @@ class DownloadManager {
   static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
                                 void *userp, void *socketp);
   static void *MainDownload(void *data);
+  static void AddDownload(DownloadManager *download_mgr, JobInfo *info);
 
   bool StripDirect(const std::string &proxy_list, std::string *cleaned_list);
   bool ValidateGeoReply(const std::string &reply_order,
@@ -418,9 +422,7 @@ class DownloadManager {
 
   pthread_t thread_download_;
   atomic_int32 multi_threaded_;
-  int pipe_terminate_[2];
 
-  int pipe_jobs_[2];
   struct pollfd *watch_fds_;
   uint32_t watch_fds_size_;
   uint32_t watch_fds_inuse_;
@@ -517,6 +519,8 @@ class DownloadManager {
    */
   time_t opt_timestamp_backup_host_;
   unsigned opt_host_reset_after_;
+
+  FifoChannel<JobInfo*> pending_jobs_;
 
   // Writes and reads should be atomic because reading happens in a different
   // thread than writing.
