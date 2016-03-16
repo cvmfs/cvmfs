@@ -107,7 +107,7 @@ static void KillCvmfs(const string &fqrn) {
 
 class ScopedWorkingDirectory {
  public:
-  ScopedWorkingDirectory(const string &path)
+  explicit ScopedWorkingDirectory(const string &path)
     : previous_path_(GetCurrentWorkingDirectory())
     , directory_handle_(NULL)
   {
@@ -132,7 +132,7 @@ class ScopedWorkingDirectory {
   bool NextDirectoryEntry(DirectoryEntry *entry) {
     platform_dirent64 *dirent;
     while ((dirent = platform_readdir(directory_handle_)) != NULL &&
-           IsMetaEntry(dirent));
+           IsMetaEntry(dirent)) {}
     if (dirent == NULL) {
       return false;
     }
