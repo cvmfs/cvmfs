@@ -12,6 +12,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include <cstdio>
@@ -199,10 +200,32 @@ static int DoSynchronousScratchCleanup(const string &fqrn) {
   return CleanupDirectory(scratch);
 }
 
+static int DoAsynchronousScratchCleanup(const string &fqrn) {
+  const string wastebin = string(kSpoolArea) + "/" + fqrn + "/scratch/wastebin";
+
+  // double-fork to daemonize the process
+  pid_t pid;
+  int statloc;
+  if ((pid = fork()) == 0) {
+    if ((pid = fork()) == 0) {
+      close(0); close(1); close(2);
+    } else {
+      assert(pid > 0);
+      _exit(0);
+    }
+  } else {
+    assert(pid > 0);
+    waitpid(pid, &statloc, 0);
+    _exit(0);
+  }
+
+  return CleanupDirectory(wastebin);
+}
+
 static void Usage(const string &exe, FILE *output) {
   fprintf(output,
     "Usage: %s lock|open|rw_mount|rw_umount|rdonly_mount|rdonly_umount|"
-      "clear_scratch|kill_cvmfs <fqrn>\n"
+      "clear_scratch|clear_scratch_async|kill_cvmfs <fqrn>\n"
     "Example: %s rw_umount atlas.cern.ch\n"
     "This binary is typically called by cvmfs_server.\n",
     exe.c_str(), exe.c_str());
@@ -265,6 +288,8 @@ int main(int argc, char *argv[]) {
     LazyUmount(string(kSpoolArea) + "/" + fqrn + "/rdonly");
   } else if (command == "clear_scratch") {
     return DoSynchronousScratchCleanup(fqrn);
+  } else if (command == "clear_scratch_async") {
+    return DoAsynchronousScratchCleanup(fqrn);
   } else {
     Usage(argv[0], stderr);
     return 1;
