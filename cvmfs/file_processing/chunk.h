@@ -12,11 +12,11 @@
 #include <string>
 #include <vector>
 
-#include "../compression.h"
-#include "../duplex_zlib.h"
-#include "../hash.h"
-#include "../util.h"
-#include "char_buffer.h"
+#include "compression.h"
+#include "duplex_zlib.h"
+#include "file_processing/char_buffer.h"
+#include "hash.h"
+#include "util/pointer.h"
 
 namespace upload {
 

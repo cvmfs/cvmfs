@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-#include "../../cvmfs/util.h"
+#include "util/pointer.h"
 
 
 class Foo {

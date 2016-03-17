@@ -13,7 +13,7 @@
 
 #include "duplex_zlib.h"
 #include "sink.h"
-#include "util.h"
+#include "util/plugin.h"
 
 namespace shash {
 struct Any;

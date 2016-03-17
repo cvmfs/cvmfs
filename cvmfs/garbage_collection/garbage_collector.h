@@ -34,8 +34,8 @@
 
 #include <vector>
 
-#include "../upload_facility.h"
-#include "hash_filter.h"
+#include "garbage_collection/hash_filter.h"
+#include "upload_facility.h"
 
 template<class CatalogTraversalT, class HashFilterT>
 class GarbageCollector {

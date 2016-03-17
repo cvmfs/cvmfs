@@ -11,13 +11,13 @@
 #include <string>
 #include <vector>
 
-#include "../../cvmfs/cache.h"
-#include "../../cvmfs/compression.h"
-#include "../../cvmfs/fs_traversal.h"
-#include "../../cvmfs/hash.h"
-#include "../../cvmfs/quota.h"
-#include "../../cvmfs/util.h"
+#include "cache.h"
+#include "compression.h"
+#include "fs_traversal.h"
+#include "hash.h"
+#include "quota.h"
 #include "testutil.h"
+#include "util/algorithm.h"
 
 using namespace std;  // NOLINT
 

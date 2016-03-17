@@ -22,7 +22,7 @@
 #include "hash.h"
 #include "shortstring.h"
 #include "smallhash.h"
-#include "util.h"
+#include "util/single_copy.h"
 
 /**
  * Describes a FileChunk as generated from the FileProcessor in collaboration

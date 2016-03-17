@@ -15,11 +15,11 @@
 
 #include <list>
 
-#include "../upload_facility.h"
-#include "async_reader.h"
-#include "char_buffer.h"
-#include "file.h"
-#include "processor.h"
+#include "file_processing/async_reader.h"
+#include "file_processing/char_buffer.h"
+#include "file_processing/file.h"
+#include "file_processing/processor.h"
+#include "upload_facility.h"
 
 namespace upload {
 

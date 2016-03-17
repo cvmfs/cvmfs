@@ -5,8 +5,8 @@
 #include "gtest/gtest.h"
 
 
-#include "../../cvmfs/compression.h"
-#include "../../cvmfs/util.h"
+#include "compression.h"
+#include "util/pointer.h"
 
 // TODO(jblomer): typed tests
 

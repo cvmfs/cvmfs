@@ -13,7 +13,6 @@
 #include "hash.h"
 #include "manifest.h"
 #include "signature.h"
-#include "util.h"
 #include "whitelist.h"
 
 using namespace std;  // NOLINT

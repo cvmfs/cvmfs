@@ -41,7 +41,6 @@
 #include "platform.h"
 #include "sync_mediator.h"
 #include "sync_union.h"
-#include "util.h"
 
 using namespace std;  // NOLINT
 

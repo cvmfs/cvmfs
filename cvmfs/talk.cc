@@ -46,7 +46,6 @@
 #include "shortstring.h"
 #include "statistics.h"
 #include "tracer.h"
-#include "util.h"
 #include "wpad.h"
 
 using namespace std;  // NOLINT

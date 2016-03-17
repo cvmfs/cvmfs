@@ -9,7 +9,7 @@
 
 #include <string>
 
-#include "async_reader.h"
+#include "file_processing/async_reader.h"
 
 namespace upload {  // TODO(rmeusel): remove or replace
 

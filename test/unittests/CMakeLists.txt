@@ -162,7 +162,15 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/upload_local.cc
   ${CVMFS_SOURCE_DIR}/upload_s3.cc
   ${CVMFS_SOURCE_DIR}/upload_spooler_definition.cc
-  ${CVMFS_SOURCE_DIR}/util.cc ${CVMFS_SOURCE_DIR}/util.h
+  ${CVMFS_SOURCE_DIR}/util/algorithm.cc ${CVMFS_SOURCE_DIR}/util/algorithm.h
+  ${CVMFS_SOURCE_DIR}/util/async.h
+  ${CVMFS_SOURCE_DIR}/util/buffer.h
+  ${CVMFS_SOURCE_DIR}/util/mmap_file.cc ${CVMFS_SOURCE_DIR}/util/mmap_file.h
+  ${CVMFS_SOURCE_DIR}/util/pointer.h
+  ${CVMFS_SOURCE_DIR}/util/posix.cc ${CVMFS_SOURCE_DIR}/util/posix.h
+  ${CVMFS_SOURCE_DIR}/util/single_copy.h
+  ${CVMFS_SOURCE_DIR}/util/string.cc ${CVMFS_SOURCE_DIR}/util/string.h
+  ${CVMFS_SOURCE_DIR}/util/unlink_guard.h
   ${CVMFS_SOURCE_DIR}/util_concurrency.cc ${CVMFS_SOURCE_DIR}/util_concurrency.h ${CVMFS_SOURCE_DIR}/util_concurrency_impl.h
   ${CVMFS_SOURCE_DIR}/uuid.cc ${CVMFS_SOURCE_DIR}/uuid.h
   ${CVMFS_SOURCE_DIR}/whitelist.cc

@@ -16,7 +16,7 @@
 #include "hash.h"
 #include "letter.h"
 #include "signature.h"
-#include "util.h"
+#include "util/string.h"
 #include "whitelist.h"
 
 using namespace std;  // NOLINT

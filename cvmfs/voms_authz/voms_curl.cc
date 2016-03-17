@@ -12,14 +12,16 @@
 #include <openssl/ssl.h>
 
 #include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include <cstring>
 
-#include "../duplex_curl.h"
-#include "../logging_internal.h"
-#include "../util_concurrency.h"
+#include "duplex_curl.h"
+#include "logging_internal.h"
+#include "util_concurrency.h"
 
 // TODO(jblomer): more documentation
 

@@ -11,7 +11,6 @@
 #include <cstdlib>
 
 #include "logging.h"
-#include "util.h"
 #include "xattr.h"
 
 using namespace std;  // NOLINT

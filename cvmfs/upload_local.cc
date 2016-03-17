@@ -6,13 +6,15 @@
 #include "upload_local.h"
 
 #include <errno.h>
+#include <fcntl.h>
 
 #include <string>
 
 #include "compression.h"
 #include "file_processing/char_buffer.h"
 #include "logging.h"
-#include "util.h"
+#include "platform.h"
+#include "util/posix.h"
 
 
 namespace upload {
@@ -159,6 +161,7 @@ void LocalUploader::Upload(UploadStreamHandle  *handle,
   assert(buffer->IsInitialized());
   LocalStreamHandle *local_handle = static_cast<LocalStreamHandle*>(handle);
 
+  const off_t offset = lseek(local_handle->file_descriptor, 0, SEEK_CUR);
   const size_t bytes_written = write(local_handle->file_descriptor,
                                      buffer->ptr(),
                                      buffer->used_bytes());
@@ -173,6 +176,10 @@ void LocalUploader::Upload(UploadStreamHandle  *handle,
     Respond(callback, UploaderResults(cpy_errno, buffer));
     return;
   }
+
+  // tell kernel to evict written pages from the page cache
+  platform_invalidate_kcache(local_handle->file_descriptor,
+                             offset, bytes_written);
 
   Respond(callback, UploaderResults(0, buffer));
 }

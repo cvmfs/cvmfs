@@ -18,7 +18,7 @@
 
 #include "logging.h"
 #include "platform.h"
-#include "util.h"
+#include "util/async.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {

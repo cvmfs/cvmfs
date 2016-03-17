@@ -19,7 +19,10 @@ set (CVMFS_LOADER_SOURCES
   shortstring.h
   smalloc.h
   statistics.cc statistics.h
-  util.cc util.h
+  util/pointer.h
+  util/posix.cc util/posix.h
+  util/single_copy.h
+  util/string.cc util/string.h
 )
 
 set (CVMFS_CLIENT_SOURCES
@@ -66,8 +69,14 @@ set (CVMFS_CLIENT_SOURCES
   sqlitevfs.cc sqlitevfs.h
   statistics.cc statistics.h
   uid_map.h
-  util.cc util.h
   uuid.cc uuid.h
+  util/algorithm.cc util/algorithm.h
+  util/plugin.h
+  util/pointer.h
+  util/posix.cc util/posix.h
+  util/single_copy.h
+  util/string.cc util/string.h
+  util/unlink_guard.h
   whitelist.cc whitelist.h
   wpad.cc wpad.h
   xattr.cc xattr.h
@@ -131,7 +140,11 @@ set (CVMFS_FSCK_SOURCES
   prng.h
   smalloc.h
   statistics.cc statistics.h
-  util.cc util.h
+  util/plugin.h
+  util/pointer.h
+  util/posix.cc util/posix.h
+  util/single_copy.h
+  util/string.cc util/string.h
 )
 
 set (CVMFS_SWISSKNIFE_SOURCES
@@ -211,14 +224,21 @@ set (CVMFS_SWISSKNIFE_SOURCES
   sync_item.cc sync_item.h
   sync_mediator.cc sync_mediator.h
   sync_union.cc sync_union.h
+  uid_map.h
   upload.cc upload.h
   upload_facility.cc upload_facility.h
   upload_local.cc upload_local.h
   upload_s3.cc upload_s3.h
   upload_spooler_definition.cc upload_spooler_definition.h
   upload_spooler_result.h
-  uid_map.h
-  util.cc util.h
+  util/algorithm.cc util/algorithm.h
+  util/async.h
+  util/mmap_file.cc util/mmap_file.h
+  util/plugin.h
+  util/pointer.h
+  util/posix.cc util/posix.h
+  util/single_copy.h
+  util/string.cc util/string.h
   util_concurrency.cc util_concurrency.h util_concurrency_impl.h
   whitelist.cc whitelist.h
   xattr.cc xattr.h
@@ -289,7 +309,13 @@ set (CVMFS_PRELOADER_SOURCES
   upload_local.cc upload_local.h
   upload_s3.cc upload_s3.h
   upload_spooler_definition.cc upload_spooler_definition.h
-  util.cc util.h
+  util/algorithm.cc util/algorithm.h
+  util/buffer.h
+  util/mmap_file.cc util/mmap_file.h
+  util/pointer.h
+  util/posix.cc util/posix.h
+  util/single_copy.h
+  util/string.cc util/string.h
   util_concurrency.cc util_concurrency.h
   whitelist.cc whitelist.h
   xattr.cc xattr.h
@@ -321,7 +347,7 @@ set (LIBCVMFS_CFLAGS "${LIBCVMFS_CFLAGS} -D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -
 # set some include and linking stuff
 #
 set (CVMFS2_LD_FLAGS "${CVMFS2_LD_FLAGS} -ldl -lm")
-include_directories (${INCLUDE_DIRECTORIES})
+include_directories (cvmfs ${INCLUDE_DIRECTORIES})
 
 #
 # do the job!

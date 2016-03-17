@@ -8,13 +8,14 @@
 
 #include <cstdio>
 
-#include "../../cvmfs/compression.h"
-#include "../../cvmfs/download.h"
-#include "../../cvmfs/hash.h"
-#include "../../cvmfs/prng.h"
-#include "../../cvmfs/sink.h"
-#include "../../cvmfs/statistics.h"
-#include "../../cvmfs/util.h"
+#include "compression.h"
+#include "download.h"
+#include "hash.h"
+#include "prng.h"
+#include "sink.h"
+#include "statistics.h"
+#include "util/posix.h"
+#include "util/unlink_guard.h"
 
 using namespace std;  // NOLINT
 

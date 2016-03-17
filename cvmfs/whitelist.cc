@@ -14,7 +14,7 @@
 #include "logging.h"
 #include "signature.h"
 #include "smalloc.h"
-#include "util.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 

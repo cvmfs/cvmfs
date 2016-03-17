@@ -30,7 +30,7 @@
 #include "logging.h"
 #include "platform.h"
 #include "smalloc.h"
-#include "util.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 

@@ -13,7 +13,7 @@
 
 #include "hash.h"
 #include "logging.h"
-#include "util.h"
+#include "smalloc.h"
 
 // Hash stdin and print the digest to stdout
 int swissknife::CommandHash::Main(const swissknife::ArgumentList &args) {

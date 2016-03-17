@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-#include "../../cvmfs/reflog.h"
+#include "reflog.h"
 #include "testutil.h"
 
 template <class ReflogT>

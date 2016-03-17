@@ -16,7 +16,7 @@
 #include "logging.h"
 #include "pacparser.h"
 #include "statistics.h"
-#include "util.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 

@@ -18,13 +18,14 @@
 #include <sys/syscall.h>
 #endif
 
+#include <cstdlib>
 #include <cstring>
 #include <string>
 #include <vector>
 
-#include "../logging.h"
-#include "../util_concurrency.h"
-#include "voms_cred.h"
+#include "logging.h"
+#include "util_concurrency.h"
+#include "voms_authz/voms_cred.h"
 
 static void
 ReportChildDeath(pid_t pid, int flags) {

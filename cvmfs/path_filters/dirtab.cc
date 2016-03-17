@@ -4,11 +4,14 @@
 
 #include "dirtab.h"
 
+#include <cassert>
 #include <cerrno>
 #include <cstdio>
 #include <cstdlib>
 
-#include "../util.h"
+#include "logging.h"
+#include "util/posix.h"
+#include "util/string.h"
 
 namespace catalog {
 

@@ -7,10 +7,9 @@
 #include <map>
 #include <string>
 
-#include "../../cvmfs/compression.h"
-#include "../../cvmfs/history_sqlite.h"
-#include "../../cvmfs/prng.h"
-#include "../../cvmfs/util.h"
+#include "compression.h"
+#include "history_sqlite.h"
+#include "prng.h"
 #include "testutil.h"
 
 using history::History;

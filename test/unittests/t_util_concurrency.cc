@@ -7,7 +7,7 @@
 #include <errno.h>
 #include <unistd.h>
 
-#include "../../cvmfs/util_concurrency.h"
+#include "util_concurrency.h"
 
 
 class DummyLocker {

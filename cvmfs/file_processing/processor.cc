@@ -10,10 +10,10 @@
 #include <algorithm>
 #include <vector>
 
-#include "../hash.h"
-#include "chunk.h"
-#include "file.h"
-#include "io_dispatcher.h"
+#include "file_processing/chunk.h"
+#include "file_processing/file.h"
+#include "file_processing/io_dispatcher.h"
+#include "hash.h"
 
 namespace upload {
 

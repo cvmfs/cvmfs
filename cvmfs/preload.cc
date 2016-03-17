@@ -17,7 +17,7 @@
 #include "statistics.h"
 #include "swissknife.h"
 #include "swissknife_pull.h"
-#include "util.h"
+#include "util/posix.h"
 
 
 using namespace std;  // NOLINT

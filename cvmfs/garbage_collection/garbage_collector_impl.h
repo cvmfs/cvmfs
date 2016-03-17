@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-#include "../logging.h"
+#include "logging.h"
 
 template<class CatalogTraversalT, class HashFilterT>
 const unsigned int GarbageCollector<CatalogTraversalT,

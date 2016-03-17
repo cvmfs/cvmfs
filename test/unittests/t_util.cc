@@ -16,10 +16,13 @@
 #include <limits>
 #include <vector>
 
-#include "../../cvmfs/shortstring.h"
-#include "../../cvmfs/smalloc.h"
-#include "../../cvmfs/util.h"
+#include "shortstring.h"
+#include "smalloc.h"
 #include "testutil.h"
+#include "util/algorithm.h"
+#include "util/mmap_file.h"
+#include "util/posix.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 

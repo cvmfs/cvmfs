@@ -4,7 +4,7 @@
 
 #include "gtest/gtest.h"
 
-#include "../../cvmfs/download.h"
+#include "download.h"
 
 namespace download {
 

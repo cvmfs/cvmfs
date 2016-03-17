@@ -21,7 +21,6 @@
 #include "shortstring.h"
 #include "signature.h"
 #include "statistics.h"
-#include "util.h"
 
 namespace catalog {
 class DirectoryEntry;

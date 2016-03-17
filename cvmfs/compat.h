@@ -22,7 +22,7 @@
 #include "glue_buffer.h"
 #include "hash.h"
 #include "shortstring.h"
-#include "util.h"
+#include "util/algorithm.h"
 
 namespace compat {
 

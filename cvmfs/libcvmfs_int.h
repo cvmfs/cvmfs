@@ -19,7 +19,6 @@
 #include "catalog_mgr.h"
 #include "file_chunk.h"
 #include "lru.h"
-#include "util.h"
 
 namespace cache {
 class CacheManager;

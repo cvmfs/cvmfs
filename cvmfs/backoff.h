@@ -8,7 +8,7 @@
 #include <pthread.h>
 
 #include "prng.h"
-#include "util.h"
+#include "util/single_copy.h"
 
 /**
  * When Throttle() is called in quick succession, the exponential backoff will

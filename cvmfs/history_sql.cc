@@ -6,6 +6,8 @@
 
 #include <cassert>
 
+#include "util/string.h"
+
 namespace history {
 
 const float    HistoryDatabase::kLatestSchema          = 1.0;

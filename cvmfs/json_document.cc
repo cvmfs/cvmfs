@@ -6,6 +6,10 @@
 
 #include "json_document.h"
 
+#include <cassert>
+
+#include "logging.h"
+
 JsonDocument::JsonDocument() :
   allocator_(1 << 10),
   root_(NULL) {}

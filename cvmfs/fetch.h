@@ -16,7 +16,6 @@
 #include "gtest/gtest_prod.h"
 #include "hash.h"
 #include "sink.h"
-#include "util.h"
 
 class BackoffThrottle;
 

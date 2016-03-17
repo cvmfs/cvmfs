@@ -15,7 +15,6 @@
 #include "manifest_fetch.h"
 #include "signature.h"
 #include "upload.h"
-#include "util.h"
 
 using namespace std;  // NOLINT
 using namespace swissknife;  // NOLINT

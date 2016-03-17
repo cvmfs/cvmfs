@@ -49,7 +49,7 @@
 #include "platform.h"
 #include "smalloc.h"
 #include "statistics.h"
-#include "util.h"
+#include "util/posix.h"
 #include "util_concurrency.h"
 
 using namespace std;  // NOLINT

@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-#include "../../cvmfs/sanitizer.h"
+#include "sanitizer.h"
 
 class T_Sanitizer : public ::testing::Test {
  protected:

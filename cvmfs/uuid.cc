@@ -13,7 +13,8 @@
 #include <cstdio>
 #include <cstring>
 
-#include "util.h"
+#include "util/pointer.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 

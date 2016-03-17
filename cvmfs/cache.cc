@@ -64,7 +64,7 @@
 #include "signature.h"
 #include "smalloc.h"
 #include "statistics.h"
-#include "util.h"
+#include "util/posix.h"
 
 #ifndef NFS_SUPER_MAGIC
 #define NFS_SUPER_MAGIC 0x6969

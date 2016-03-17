@@ -6,7 +6,7 @@
 
 #include <string>
 
-#include "../../cvmfs/pathspec/pathspec.h"
+#include "pathspec/pathspec.h"
 
 
 TEST(T_Pathspec, ParseSimpleRelative) {

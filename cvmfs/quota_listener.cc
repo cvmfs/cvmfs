@@ -14,6 +14,7 @@
 #include "logging.h"
 #include "quota.h"
 #include "smalloc.h"
+#include "util/posix.h"
 
 using namespace std;  // NOLINT
 
