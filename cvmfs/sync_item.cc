@@ -49,8 +49,7 @@ SyncItem::SyncItem(const string       &relative_parent_path,
   compression_algorithm_(zlib::kZlibDefault)
 {
   content_hash_.algorithm = shash::kAny;
-  // Note: graft marker for non-regular files are silently ignored
-  if (IsRegularFile()) {CheckGraft();}
+  CheckMarkerFiles();
 }
 
 
@@ -214,6 +213,12 @@ std::string SyncItem::GetScratchPath() const {
   const string relative_path = GetRelativePath().empty() ?
                                "" : "/" + GetRelativePath();
   return union_engine_->scratch_path() + relative_path;
+}
+
+void SyncItem::CheckMarkerFiles() {
+  if (IsRegularFile()) {
+    CheckGraft();
+  }
 }
 
 

@@ -207,6 +207,8 @@ class SyncItem {
 
   SyncItemType GetGenericFiletype(const EntryStat &stat) const;
 
+  void CheckMarkerFiles();
+
   std::string GetGraftMarkerPath() const;
   void CheckGraft();
 
