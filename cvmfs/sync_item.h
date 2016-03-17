@@ -58,7 +58,7 @@ class SyncItem {
   inline bool IsNew()             const { return WasType(kItemNew);            }
   inline bool IsCharacterDevice() const { return IsType(kItemCharacterDevice); }
   inline bool IsGraftMarker()     const { return IsType(kItemMarker);          }
-  inline bool IsExternalData()    const { return external_data_;              }
+  inline bool IsExternalData()    const { return external_data_;               }
 
   inline bool IsWhiteout()        const { return whiteout_;                    }
   inline bool IsCatalogMarker()   const { return filename_ == ".cvmfscatalog"; }
