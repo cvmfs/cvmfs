@@ -73,5 +73,28 @@ cvmfs_run_test() {
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i  || return $?
 
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+  echo "starting transaction to remove several nested catalogs recursively"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "remove directory $dir_2 and the contained nested catalogs"
+  rm -fR ${repo_dir}/$dir_2 || return 20
+
+  local log_3="publish_3.log"
+  echo "creating CVMFS snapshot (logging into $log_3)"
+  publish_repo $CVMFS_TEST_REPO -v > $log_3 2>&1 || return $?
+
+  echo "check if the catalogs have been removed properly"
+  for d in $(seq 1 5); do
+    cat $log_3 | grep -A1 -e "^\[rem\] Nested catalog.*/${dir_2}/${d}\$" \
+               | tail -n1                                                \
+               | grep -e "^\[rem\] /.*${dir_2}/${d}\$"       || return 21
+    check_catalog_presence "/${dir_2}/${d}" $CVMFS_TEST_REPO && return 22
+  done
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
   return 0
 }
