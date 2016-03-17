@@ -64,6 +64,7 @@ class SyncItem {
   inline bool IsCatalogMarker()   const { return filename_ == ".cvmfscatalog"; }
   inline bool IsOpaqueDirectory() const { return IsDirectory() && opaque_;     }
 
+  bool HasCatalogMarker()         const { return has_catalog_marker_;          }
   bool HasGraftMarker()           const { return graft_marker_present_;        }
   bool IsValidGraft()             const { return valid_graft_;                 }
   bool IsChunkedGraft()           const { return graft_chunklist_;             }
@@ -209,6 +210,8 @@ class SyncItem {
 
   void CheckMarkerFiles();
 
+  void CheckCatalogMarker();
+
   std::string GetGraftMarkerPath() const;
   void CheckGraft();
 
@@ -221,6 +224,7 @@ class SyncItem {
   bool whiteout_;                     /**< SyncUnion marked this as whiteout  */
   bool opaque_;                       /**< SyncUnion marked this as opaque dir*/
   bool masked_hardlink_;              /**< SyncUnion masked out the linkcount */
+  bool has_catalog_marker_;           /**< directory containing .cvmfscatalog */
   bool valid_graft_;                  /**< checksum and size in graft marker */
   bool graft_marker_present_;         /**< .cvmfsgraft-$filename exists */
 

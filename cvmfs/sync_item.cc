@@ -20,6 +20,7 @@ SyncItem::SyncItem() :
   whiteout_(false),
   opaque_(false),
   masked_hardlink_(false),
+  has_catalog_marker_(false),
   valid_graft_(false),
   graft_marker_present_(false),
   external_data_(false),
@@ -37,6 +38,7 @@ SyncItem::SyncItem(const string       &relative_parent_path,
   whiteout_(false),
   opaque_(false),
   masked_hardlink_(false),
+  has_catalog_marker_(false),
   valid_graft_(false),
   graft_marker_present_(false),
   external_data_(false),
@@ -218,7 +220,13 @@ std::string SyncItem::GetScratchPath() const {
 void SyncItem::CheckMarkerFiles() {
   if (IsRegularFile()) {
     CheckGraft();
+  } else if (IsDirectory()) {
+    CheckCatalogMarker();
   }
+}
+
+void SyncItem::CheckCatalogMarker() {
+  has_catalog_marker_ = FileExists(GetUnionPath() + "/.cvmfscatalog");
 }
 
 
