@@ -88,10 +88,6 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
     goto cleanup;
   }
 
-  // Quick way out: hash matches base catalog
-  if (base_catalog && (ensemble->manifest->catalog_hash() == *base_catalog))
-    return kFailOk;
-
   // Load certificate
   certificate_hash = ensemble->manifest->certificate();
   ensemble->FetchCertificate(certificate_hash);
@@ -112,6 +108,15 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
     result = kFailBadCertificate;
     goto cleanup;
   }
+
+  if (signature_manager->CertificateBlacklisted()) {
+    result = kFailBlacklisted;
+    goto cleanup;
+  }
+  
+  // Quick way out: hash matches base catalog
+  if (base_catalog && (ensemble->manifest->catalog_hash() == *base_catalog))
+    return kFailOk;
 
   // Verify manifest
   retval_b = signature_manager->VerifyLetter(ensemble->raw_manifest_buf,
