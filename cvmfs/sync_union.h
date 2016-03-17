@@ -121,12 +121,13 @@ class SyncUnion {
   /**
    * Union file systems may use some special files for bookkeeping.
    * They must not show up in to repository and are ignored by the recursion.
+   * Note: This needs to be up-called!
    * @param parent directory in which file resides
    * @param filename to decide whether to ignore or not
    * @return true if file should be ignored, othewise false
    */
   virtual bool IgnoreFilePredicate(const std::string &parent_dir,
-                                   const std::string &filename) = 0;
+                                   const std::string &filename);
 
   bool IsInitialized() const { return initialized_; }
   virtual bool SupportsHardlinks() const { return false; }
@@ -254,8 +255,6 @@ class SyncUnionOverlayfs : public SyncUnion {
   bool IsOpaqueDirectory(const SyncItem &directory) const;
   bool IsWhiteoutSymlinkPath(const std::string &path) const;
 
-  bool IgnoreFilePredicate(const std::string &parent_dir,
-                           const std::string &filename);
   void ProcessCharacterDevice(const std::string &parent_dir,
                               const std::string &filename);
   std::string UnwindWhiteoutFilename(const SyncItem &entry) const;
