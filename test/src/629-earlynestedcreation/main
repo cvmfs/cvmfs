@@ -40,5 +40,38 @@ cvmfs_run_test() {
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i  || return $?
 
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+  echo "starting transaction to create several nested catalogs recursively"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  local dir_2="nested_2"
+  echo "setting up a new nested catalog ($dir_2)"
+  mkdir ${repo_dir}/${dir_2}               || return 10
+  for d in $(seq 1 5); do
+    mkdir ${repo_dir}/${dir_2}/${d}
+    touch ${repo_dir}/${dir_2}/${d}/.cvmfscatalog
+    local j=1024
+    while [ $j -gt 0 ]; do
+      local f=$(head -c10 /dev/urandom | md5sum | cut -d' ' -f1)
+      head -c1024 /dev/urandom > ${repo_dir}/${dir_2}/${d}/${f} || return 11
+      j=$(( $j - 1 ))
+    done
+  done
+
+  local log_2="publish_2.log"
+  echo "creating CVMFS snapshot (logging into $log_2)"
+  publish_repo $CVMFS_TEST_REPO -v > $log_2 2>&1 || return $?
+
+  echo "check if the catalogs have been created properly"
+  for d in $(seq 1 5); do
+    cat $log_2 | grep -A1 -e "^\[add\] /.*${dir_2}/${d}\$" | tail -n1 | grep -e "^\[add\] Nested catalog" || return 12
+    cat $log_2 | grep -A2 -e "^\[add\] /.*${dir_2}/${d}\$" | tail -n1 | grep -e "\.cvmfscatalog$"         || return 13
+    check_catalog_presence "/${dir_2}/${d}" $CVMFS_TEST_REPO                                              || return 14
+  done
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
   return 0
 }
