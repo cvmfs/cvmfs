@@ -535,18 +535,11 @@ void SyncMediator::PublishHardlinksCallback(
 
 
 void SyncMediator::CreateNestedCatalog(const SyncItem &directory) {
-  const std::string directory_path = directory.GetRelativePath();
-  if (directory_path == "") {
-    LogCvmfs(kLogPublish, kLogStderr,
-             "Error: nested catalog marker in root directory");
-    abort();
-  }
-
   const std::string notice = "Nested catalog at " + directory.GetUnionPath();
   PrintChangesetNotice(kAddCatalog, notice);
 
   if (!params_->dry_run) {
-    catalog_manager_->CreateNestedCatalog(directory_path);
+    catalog_manager_->CreateNestedCatalog(directory.GetRelativePath());
   }
 }
 
@@ -629,6 +622,10 @@ void SyncMediator::AddFile(const SyncItem &entry) {
                entry.GetRelativePath().c_str());
       abort();
     }
+  } else if (entry.relative_parent_path().empty() && entry.IsCatalogMarker()) {
+    LogCvmfs(kLogPublish, kLogStderr,
+             "Error: nested catalog marker in root directory");
+    abort();
   } else {
     // Push the file to the spooler, remember the entry for the path
     pthread_mutex_lock(&lock_file_queue_);
