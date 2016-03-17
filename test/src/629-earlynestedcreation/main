@@ -66,8 +66,7 @@ cvmfs_run_test() {
   echo "check if the catalogs have been created properly"
   for d in $(seq 1 5); do
     cat $log_2 | grep -A1 -e "^\[add\] /.*${dir_2}/${d}\$" | tail -n1 | grep -e "^\[add\] Nested catalog" || return 12
-    cat $log_2 | grep -A2 -e "^\[add\] /.*${dir_2}/${d}\$" | tail -n1 | grep -e "\.cvmfscatalog$"         || return 13
-    check_catalog_presence "/${dir_2}/${d}" $CVMFS_TEST_REPO                                              || return 14
+    check_catalog_presence "/${dir_2}/${d}" $CVMFS_TEST_REPO                                              || return 13
   done
 
   echo "check catalog and data integrity"
@@ -147,8 +146,7 @@ cvmfs_run_test() {
   echo "check if the catalogs have been created properly"
   for d in $(seq 1 5); do
     cat $log_5 | grep -A1 -e "^\[tou\] /.*${dir_3}/${d}\$" | tail -n1 | grep -e "^\[add\] Nested catalog" || return 35
-    cat $log_5 | grep -A2 -e "^\[tou\] /.*${dir_3}/${d}\$" | tail -n1 | grep -e "\.cvmfscatalog$"         || return 36
-    check_catalog_presence "/${dir_3}/${d}" $CVMFS_TEST_REPO                                              || return 37
+    check_catalog_presence "/${dir_3}/${d}" $CVMFS_TEST_REPO                                              || return 36
   done
 
   # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
