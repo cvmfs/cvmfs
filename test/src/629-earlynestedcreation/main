@@ -1,0 +1,44 @@
+cvmfs_test_name="Early Creation of Nested Catalogs"
+cvmfs_test_autofs_on_startup=false
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  local scratch_dir=$(pwd)
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "starting transaction to create a single nested catalog"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  local dir_1="nested_1"
+  echo "setting up a new nested catalog ($dir_1)"
+  mkdir ${repo_dir}/${dir_1}               || return 1
+  touch ${repo_dir}/${dir_1}/.cvmfscatalog || return 2
+  local i=1024
+  while [ $i -gt 0 ]; do
+    local f=$(head -c10 /dev/urandom | md5sum | cut -d' ' -f1)
+    head -c1024 /dev/urandom > ${repo_dir}/${dir_1}/${f} || return 3
+    i=$(( $i - 1 ))
+  done
+
+  local log_1="publish_1.log"
+  echo "creating CVMFS snapshot (logging into $log_1)"
+  publish_repo $CVMFS_TEST_REPO -v > $log_1 2>&1 || return $?
+
+  echo "check if the nested catalog was created first"
+  # 1st: the containing directory is added
+  # 2nd: the nested catalog is created in this directory
+  cat $log_1 | grep -e '^\[add\] ' | head -n1 | grep -e "$dir_1\$"                           || return 4
+  cat $log_1 | grep -e '^\[add\] ' | head -n2 | tail -n1 | grep -e "^\[add\] Nested catalog" || return 5
+
+  echo "check if all catalogs are there"
+  check_catalog_presence "/${dir_1}" $CVMFS_TEST_REPO || return 6
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+  return 0
+}
