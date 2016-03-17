@@ -63,24 +63,6 @@ void SyncMediator::Add(const SyncItem &entry) {
   }
 
   if (entry.IsRegularFile() || entry.IsSymlink()) {
-    // Create a nested catalog if we find a new catalog marker
-    // The IsNew() condition can fail if the catalog has just been deleted
-    // if (entry.IsCatalogMarker() && entry.IsNew())
-    if (entry.IsCatalogMarker())
-    {
-      if (entry.relative_parent_path() == "") {
-        LogCvmfs(kLogPublish, kLogStderr,
-                 "Error: nested catalog marker in root directory");
-        abort();
-      } else {
-        if (!catalog_manager_->IsTransitionPoint(
-               "/" + entry.relative_parent_path()))
-        {
-          CreateNestedCatalog(entry);
-        }
-      }
-    }
-
     // A file is a hard link if the link count is greater than 1
     if (entry.HasHardlinks())
       InsertHardlink(entry);
@@ -107,13 +89,6 @@ void SyncMediator::Touch(const SyncItem &entry) {
     return;
   }
 
-  // Avoid removing and recreating nested catalog
-  if (entry.IsCatalogMarker()) {
-    RemoveFile(entry);
-    AddFile(entry);
-    return;
-  }
-
   if (entry.IsRegularFile() || entry.IsSymlink()) {
     Replace(entry);  // This way, hardlink processing is correct
     return;
@@ -134,14 +109,7 @@ void SyncMediator::Remove(const SyncItem &entry) {
   }
 
   if (entry.WasRegularFile() || entry.WasSymlink()) {
-    // First remove the file...
     RemoveFile(entry);
-
-    // ... then the nested catalog (if needed)
-    if (entry.IsCatalogMarker() && !entry.IsNew()) {
-      RemoveNestedCatalog(entry);
-    }
-
     return;
   }
 
@@ -566,20 +534,29 @@ void SyncMediator::PublishHardlinksCallback(
 }
 
 
-void SyncMediator::CreateNestedCatalog(const SyncItem &requestFile) {
-  const std::string notice = "Nested catalog at ";
-  PrintChangesetNotice(kAddCatalog, notice + requestFile.GetUnionPath());
+void SyncMediator::CreateNestedCatalog(const SyncItem &directory) {
+  const std::string directory_path = directory.GetRelativePath();
+  if (directory_path == "") {
+    LogCvmfs(kLogPublish, kLogStderr,
+             "Error: nested catalog marker in root directory");
+    abort();
+  }
+
+  const std::string notice = "Nested catalog at " + directory.GetUnionPath();
+  PrintChangesetNotice(kAddCatalog, notice);
+
   if (!params_->dry_run) {
-    catalog_manager_->CreateNestedCatalog(requestFile.relative_parent_path());
+    catalog_manager_->CreateNestedCatalog(directory_path);
   }
 }
 
 
-void SyncMediator::RemoveNestedCatalog(const SyncItem &requestFile) {
-  const std::string notice = "Nested catalog at ";
-  PrintChangesetNotice(kRemoveCatalog, notice + requestFile.GetUnionPath());
+void SyncMediator::RemoveNestedCatalog(const SyncItem &directory) {
+  const std::string notice =  "Nested catalog at " + directory.GetUnionPath();
+  PrintChangesetNotice(kRemoveCatalog, notice);
+
   if (!params_->dry_run) {
-    catalog_manager_->RemoveNestedCatalog(requestFile.relative_parent_path());
+    catalog_manager_->RemoveNestedCatalog(directory.GetRelativePath());
   }
 }
 
@@ -680,13 +657,18 @@ void SyncMediator::RemoveFile(const SyncItem &entry) {
 void SyncMediator::AddDirectory(const SyncItem &entry) {
   PrintChangesetNotice(kAdd, entry.GetUnionPath());
 
+  assert(!entry.HasGraftMarker());
   if (!params_->dry_run) {
-    assert(!entry.HasGraftMarker());
-
     catalog_manager_->AddDirectory(entry.CreateBasicCatalogDirent(),
                                    entry.relative_parent_path());
   }
+
+  if (entry.HasCatalogMarker() &&
+      !catalog_manager_->IsTransitionPoint("/" + entry.GetRelativePath())) {
+    CreateNestedCatalog(entry);
+  }
 }
+
 
 /**
  * this method deletes a single directory entry! Make sure to empty it
@@ -694,19 +676,37 @@ void SyncMediator::AddDirectory(const SyncItem &entry) {
  * SyncMediator::RemoveDirectoryRecursively instead.
  */
 void SyncMediator::RemoveDirectory(const SyncItem &entry) {
-  PrintChangesetNotice(kRemove, entry.GetUnionPath());
+  const std::string directory_path = entry.GetRelativePath();
 
-  if (!params_->dry_run)
-    catalog_manager_->RemoveDirectory(entry.GetRelativePath());
+  if (catalog_manager_->IsTransitionPoint("/" + directory_path)) {
+    RemoveNestedCatalog(entry);
+  }
+
+  PrintChangesetNotice(kRemove, entry.GetUnionPath());
+  if (!params_->dry_run) {
+    catalog_manager_->RemoveDirectory(directory_path);
+  }
 }
 
 
 void SyncMediator::TouchDirectory(const SyncItem &entry) {
   PrintChangesetNotice(kTouch, entry.GetUnionPath());
+  const std::string directory_path = entry.GetRelativePath();
 
-  if (!params_->dry_run)
+  if (!params_->dry_run) {
     catalog_manager_->TouchDirectory(entry.CreateBasicCatalogDirent(),
-                                     entry.GetRelativePath());
+                                     directory_path);
+  }
+
+  if (entry.HasCatalogMarker() &&
+      !catalog_manager_->IsTransitionPoint("/" + directory_path))
+  {
+    CreateNestedCatalog(entry);
+  } else if (!entry.HasCatalogMarker() &&
+             catalog_manager_->IsTransitionPoint("/" + directory_path))
+  {
+    RemoveNestedCatalog(entry);
+  }
 }
 
 
