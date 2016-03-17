@@ -664,7 +664,7 @@ void SyncMediator::AddDirectory(const SyncItem &entry) {
   }
 
   if (entry.HasCatalogMarker() &&
-      !catalog_manager_->IsTransitionPoint("/" + entry.GetRelativePath())) {
+      !catalog_manager_->IsTransitionPoint(entry.GetRelativePath())) {
     CreateNestedCatalog(entry);
   }
 }
@@ -678,7 +678,7 @@ void SyncMediator::AddDirectory(const SyncItem &entry) {
 void SyncMediator::RemoveDirectory(const SyncItem &entry) {
   const std::string directory_path = entry.GetRelativePath();
 
-  if (catalog_manager_->IsTransitionPoint("/" + directory_path)) {
+  if (catalog_manager_->IsTransitionPoint(directory_path)) {
     RemoveNestedCatalog(entry);
   }
 
@@ -699,11 +699,11 @@ void SyncMediator::TouchDirectory(const SyncItem &entry) {
   }
 
   if (entry.HasCatalogMarker() &&
-      !catalog_manager_->IsTransitionPoint("/" + directory_path))
+      !catalog_manager_->IsTransitionPoint(directory_path))
   {
     CreateNestedCatalog(entry);
   } else if (!entry.HasCatalogMarker() &&
-             catalog_manager_->IsTransitionPoint("/" + directory_path))
+             catalog_manager_->IsTransitionPoint(directory_path))
   {
     RemoveNestedCatalog(entry);
   }
