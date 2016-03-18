@@ -207,6 +207,8 @@ static int DoAsynchronousScratchCleanup(const string &fqrn) {
   pid_t pid;
   int statloc;
   if ((pid = fork()) == 0) {
+    int retval = setsid();
+    assert(retval != -1);
     if ((pid = fork()) == 0) {
       close(0); close(1); close(2);
     } else {
