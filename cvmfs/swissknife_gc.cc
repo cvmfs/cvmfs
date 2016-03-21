@@ -121,6 +121,7 @@ int CommandGc::Main(const ArgumentList &args) {
     if (NULL == deletion_log_file) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to open deletion log file "
                                       "(errno: %d)", errno);
+      uploader->TearDown();
       return 1;
     }
   }
@@ -144,12 +145,14 @@ int CommandGc::Main(const ArgumentList &args) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to write to deletion log '%s' "
                                       "(errno: %d)",
                                       deletion_log_path.c_str(), errno);
+      uploader->TearDown();
       return 1;
     }
   }
 
   GC collector(config);
   const bool success = collector.Collect();
+  uploader->TearDown();
 
   if (deletion_log_file != NULL) {
     const int bytes_written = fprintf(deletion_log_file,
