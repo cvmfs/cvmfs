@@ -92,6 +92,7 @@ static void SpoolerOnUpload(const upload::SpoolerResult &result) {
 }
 
 string              *stratum0_url = NULL;
+string              *stratum1_url = NULL;
 string              *temp_dir = NULL;
 unsigned             num_parallel = 1;
 bool                 pull_history = false;
@@ -521,6 +522,14 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     pull_history = true;
   if (args.find('z') != args.end())
     inspect_existing_catalogs = true;
+  if (args.find('w') != args.end())
+    stratum1_url = args.find('w')->second;
+
+  if (!preload_cache && stratum1_url == NULL) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "need -w <stratum 1 URL>");
+    return 1;
+  }
+
   pthread_t *workers =
     reinterpret_cast<pthread_t *>(smalloc(sizeof(pthread_t) * num_parallel));
   typedef std::vector<history::History::Tag> TagVector;
@@ -607,7 +616,13 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   }
 
   if (!preload_cache) {
-    reflog = GetOrCreateReflog(&object_fetcher, repository_name);
+    ObjectFetcher object_fetcher_stratum1(repository_name,
+                                          *stratum1_url,
+                                          *temp_dir,
+                                          download_manager(),
+                                          signature_manager());
+
+    reflog = GetOrCreateReflog(&object_fetcher_stratum1, repository_name);
     if (reflog == NULL) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to get or construct a Reflog");
       goto fini;

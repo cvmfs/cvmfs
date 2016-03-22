@@ -5161,6 +5161,7 @@ __do_snapshot() {
     [ $initial_snapshot -ne 1 ] && with_history="-p"
     $user_shell "$(__swissknife_cmd dbg) pull -m $name \
         -u $stratum0                                   \
+        -w $stratum1                                   \
         -r ${upstream}                                 \
         -x ${spool_dir}/tmp                            \
         -k $public_key                                 \
