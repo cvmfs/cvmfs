@@ -224,7 +224,7 @@ EOF
   cvmfs_server snapshot $replica_name || return 37
 
   echo "check Reflog from Stratum1"
-  check_reflog_contains $replica_name "$root_hash_5 $root_hash_4 $root_hash_1 $history_5 $history_4 $history_2 $history_1 $meta_info_3 $meta_info_1 $certificate_1" || return 38
+  check_reflog_contains $replica_name "$root_hash_5 $root_hash_4 $root_hash_1 $history_5 $history_1 $meta_info_3 $meta_info_1 $certificate_1" || return 38
 
   return 0
 }
