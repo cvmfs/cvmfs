@@ -99,6 +99,7 @@ class CommandCreate : public Command {
     r.push_back(Parameter::Mandatory('o', "manifest output file"));
     r.push_back(Parameter::Mandatory('t', "directory for temporary storage"));
     r.push_back(Parameter::Mandatory('r', "spooler definition"));
+    r.push_back(Parameter::Mandatory('n', "repository name"));
     r.push_back(Parameter::Optional('l', "log level (0-4, default: 2)"));
     r.push_back(Parameter::Optional('a', "hash algorithm (default: SHA-1)"));
     r.push_back(Parameter::Optional('V', "VOMS authz requirement "

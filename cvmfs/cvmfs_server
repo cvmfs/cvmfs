@@ -3074,6 +3074,7 @@ mkfs() {
   local create_cmd="$(__swissknife_cmd) create  \
     -t $temp_dir                                \
     -r $upstream                                \
+    -n $name                                    \
     -a $hash_algo $volatile_opt                 \
     -o ${temp_dir}/new_manifest"
   if $garbage_collectable; then
