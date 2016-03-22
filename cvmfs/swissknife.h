@@ -105,6 +105,10 @@ class Command {
   manifest::Reflog* GetOrCreateReflog(ObjectFetcherT    *object_fetcher,
                                       const std::string &repo_name);
 
+  template <class ObjectFetcherT>
+  manifest::Reflog* GetOrIgnoreReflog(ObjectFetcherT    *object_fetcher,
+                                      const std::string &repo_name);
+
   download::DownloadManager*   download_manager()  const;
   signature::SignatureManager* signature_manager() const;
   perf::Statistics*            statistics() { return &statistics_; }

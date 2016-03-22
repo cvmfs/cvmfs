@@ -10,7 +10,7 @@
 #include "util/posix.h"
 
 template <class ObjectFetcherT>
-manifest::Reflog* swissknife::Command::GetOrCreateReflog(
+manifest::Reflog* swissknife::Command::GetOrIgnoreReflog(
                                               ObjectFetcherT    *object_fetcher,
                                               const std::string &repo_name) {
   // try to fetch the Reflog from the backend storage first
@@ -20,9 +20,28 @@ manifest::Reflog* swissknife::Command::GetOrCreateReflog(
   if (f == ObjectFetcherT::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogDebug, "fetched reflog '%s' from backend storage",
                                    reflog->database_file().c_str());
+  } else if (f == ObjectFetcherT::kFailNotFound) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "reflog for '%s' not found",
+                                   repo_name.c_str());
+    reflog = NULL;
+  } else {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load reflog for '%s' (%d - %s)",
+                                    repo_name.c_str(),
+                                    f, Code2Ascii(f));
+    abort();
+  }
+
+  return reflog;
+}
+
+
+template <class ObjectFetcherT>
+manifest::Reflog* swissknife::Command::GetOrCreateReflog(
+                                              ObjectFetcherT    *object_fetcher,
+                                              const std::string &repo_name) {
+  manifest::Reflog *reflog = GetOrIgnoreReflog(object_fetcher, repo_name);
+  if (reflog != NULL) {
     return reflog;
-  } else if (f != ObjectFetcherT::kFailNotFound) {
-    return NULL;
   }
 
   // create a new Reflog if there was none found yet
@@ -34,6 +53,5 @@ manifest::Reflog* swissknife::Command::GetOrCreateReflog(
                                  tmp_path.c_str(), repo_name.c_str());
   return manifest::Reflog::Create(tmp_path, repo_name);
 }
-
 
 #endif  // CVMFS_SWISSKNIFE_IMPL_H_
