@@ -1486,6 +1486,15 @@ make_path() {
 }
 
 
+peek_backend_raw() {
+  local repo_name="$1"
+  local remote_path="$2"
+
+  load_repo_config $repo_name
+  cvmfs_swissknife peek -d $remote_path -r $CVMFS_UPSTREAM_STORAGE
+}
+
+
 # peeks in the upstream storage to find a given content hash
 #
 # @param repository     the repository name to be queried
@@ -1494,10 +1503,8 @@ make_path() {
 peek_backend() {
   local repo_name="$1"
   local content_hash="$2"
-  local remote_path=$(make_path $content_hash)
 
-  load_repo_config $repo_name
-  cvmfs_swissknife peek -d $remote_path -r $CVMFS_UPSTREAM_STORAGE
+  peek_backend_raw $repo_name $(make_path $content_hash)
 }
 
 
