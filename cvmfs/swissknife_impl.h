@@ -17,18 +17,22 @@ manifest::Reflog* swissknife::Command::GetOrIgnoreReflog(
   manifest::Reflog *reflog = NULL;
   typename ObjectFetcherT::Failures f = object_fetcher->FetchReflog(&reflog);
 
-  if (f == ObjectFetcherT::kFailOk) {
-    LogCvmfs(kLogCvmfs, kLogDebug, "fetched reflog '%s' from backend storage",
+  switch (f) {
+    case ObjectFetcherT::kFailOk:
+      LogCvmfs(kLogCvmfs, kLogDebug, "fetched reflog '%s' from backend storage",
                                    reflog->database_file().c_str());
-  } else if (f == ObjectFetcherT::kFailNotFound) {
-    LogCvmfs(kLogCvmfs, kLogDebug, "reflog for '%s' not found",
-                                   repo_name.c_str());
-    reflog = NULL;
-  } else {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load reflog for '%s' (%d - %s)",
-                                    repo_name.c_str(),
-                                    f, Code2Ascii(f));
-    abort();
+      break;
+
+    case ObjectFetcherT::kFailNotFound:
+      LogCvmfs(kLogCvmfs, kLogDebug, "reflog for '%s' not found",
+                                     repo_name.c_str());
+      reflog = NULL;
+      break;
+
+    default:
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed loading reflog in '%s' (%d - %s)",
+                                          repo_name.c_str(), f, Code2Ascii(f));
+      abort();
   }
 
   return reflog;
