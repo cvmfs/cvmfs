@@ -109,6 +109,9 @@ class Command {
   manifest::Reflog* GetOrIgnoreReflog(ObjectFetcherT    *object_fetcher,
                                       const std::string &repo_name);
 
+  manifest::Reflog* CreateEmptyReflog(const std::string &temp_directory,
+                                      const std::string &repo_name);
+
   download::DownloadManager*   download_manager()  const;
   signature::SignatureManager* signature_manager() const;
   perf::Statistics*            statistics() { return &statistics_; }

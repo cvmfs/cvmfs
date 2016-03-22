@@ -44,18 +44,13 @@ manifest::Reflog* swissknife::Command::GetOrCreateReflog(
                                               ObjectFetcherT    *object_fetcher,
                                               const std::string &repo_name) {
   manifest::Reflog *reflog = GetOrIgnoreReflog(object_fetcher, repo_name);
-  if (reflog != NULL) {
-    return reflog;
+
+  if (reflog == NULL) {
+    const std::string tmp_dir = object_fetcher->temporary_directory();
+    reflog = CreateEmptyReflog(tmp_dir, repo_name);
   }
 
-  // create a new Reflog if there was none found yet
-  const std::string tmp_path_prefix = object_fetcher->temporary_directory() +
-                                      "/new_reflog";
-  const std::string tmp_path = CreateTempPath(tmp_path_prefix, 0600);
-
-  LogCvmfs(kLogCvmfs, kLogDebug, "creating new reflog '%s' for %s",
-                                 tmp_path.c_str(), repo_name.c_str());
-  return manifest::Reflog::Create(tmp_path, repo_name);
+  return reflog;
 }
 
 #endif  // CVMFS_SWISSKNIFE_IMPL_H_
