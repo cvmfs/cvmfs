@@ -622,12 +622,12 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
                                           download_manager(),
                                           signature_manager());
 
-    reflog = GetOrCreateReflog(&object_fetcher_stratum1, repository_name);
+    reflog = GetOrIgnoreReflog(&object_fetcher_stratum1, repository_name);
     if (reflog == NULL) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "failed to get or construct a Reflog");
-      goto fini;
+      LogCvmfs(kLogCvmfs, kLogVerboseMsg, "failed to get a Reflog (ignoring)");
+    } else {
+      reflog->BeginTransaction();
     }
-    reflog->BeginTransaction();
   }
 
   // Get meta info
@@ -771,7 +771,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     }
 
     // upload Reflog database
-    if (!preload_cache) {
+    if (!preload_cache && reflog != NULL) {
       reflog->CommitTransaction();
       spooler->UploadReflog(reflog->CloseAndReturnDatabaseFile());
       spooler->WaitForUpload();
