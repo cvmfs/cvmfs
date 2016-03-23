@@ -7,11 +7,11 @@ cleanup() {
   [ -z $CVMFS_TEST_627_REPLICA_NAME ] || sudo cvmfs_server rmfs -f $CVMFS_TEST_627_REPLICA_NAME
 }
 
-check_stratum1_tmp_dir_emptiness() {
+check_tmp_dir_emptiness() {
   local tmp_dir="$1"
   local tmp_dir_entries
   echo "check stratum1 tmp directory"
-  tmp_dir_entries=$(ls $tmp_dir | wc -l)
+  tmp_dir_entries=$(ls -a $tmp_dir | grep -v '^\.\+$' | wc -l)
   echo "$tmp_dir contains: $tmp_dir_entries"
   [ $tmp_dir_entries -eq 0 ]
 }
@@ -52,6 +52,11 @@ cvmfs_run_test() {
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -g || return $?
 
+  echo -n "get Stratum 0 spool directory: "
+  load_repo_config $CVMFS_TEST_REPO
+  local s0_spool_tmp_dir="${CVMFS_SPOOL_DIR}/tmp"
+  echo "$s0_spool_tmp_dir"
+
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
   echo "install a cleanup function"
@@ -75,7 +80,7 @@ cvmfs_run_test() {
   sudo cvmfs_server snapshot $replica_name || return 2
 
   echo "check that Stratum1 spooler tmp dir is empty"
-  check_stratum1_tmp_dir_emptiness $s1_spool_tmp_dir || return 3
+  check_tmp_dir_emptiness $s1_spool_tmp_dir || return 3
 
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -107,6 +112,9 @@ cvmfs_run_test() {
   cvmfs_server tag -a "foobar"                          \
                    -m "new tag to create a new history" \
                    -h "$root_hash_1" $CVMFS_TEST_REPO || return 6
+
+  echo "check that Stratum0 spooler tmp dir is empty"
+  check_tmp_dir_emptiness $s0_spool_tmp_dir || return 120
 
   echo "extracting root hashes from Stratum0"
   local root_hash_2=$(get_manifest_field $CVMFS_TEST_REPO 'C')
@@ -145,6 +153,9 @@ EOF
 
   cvmfs_server update-repoinfo -f $json_file $CVMFS_TEST_REPO || return 13
 
+  echo "check that Stratum0 spooler tmp dir is empty"
+  check_tmp_dir_emptiness $s0_spool_tmp_dir || return 121
+
   echo "extracting root hashes from Stratum0"
   local root_hash_3=$(get_manifest_field $CVMFS_TEST_REPO 'C')
   local history_3=$(get_manifest_field $CVMFS_TEST_REPO 'H')
@@ -174,6 +185,9 @@ EOF
   start_transaction $CVMFS_TEST_REPO || return 20
   publish_repo $CVMFS_TEST_REPO      || return 21
 
+  echo "check that Stratum0 spooler tmp dir is empty"
+  check_tmp_dir_emptiness $s0_spool_tmp_dir || return 122
+
   echo "extracting root hashes from Stratum0"
   local root_hash_4=$(get_manifest_field $CVMFS_TEST_REPO 'C')
   local history_4=$(get_manifest_field $CVMFS_TEST_REPO 'H')
@@ -201,6 +215,9 @@ EOF
   echo "Update revision in Stratum0"
   start_transaction $CVMFS_TEST_REPO || return 28
   publish_repo $CVMFS_TEST_REPO      || return 29
+
+  echo "check that Stratum0 spooler tmp dir is empty"
+  check_tmp_dir_emptiness $s0_spool_tmp_dir || return 123
 
   echo "extracting root hashes from Stratum0"
   local root_hash_5=$(get_manifest_field $CVMFS_TEST_REPO 'C')
@@ -238,6 +255,9 @@ EOF
   toggle_gc         $CVMFS_TEST_REPO || return 38
   start_transaction $CVMFS_TEST_REPO || return 39
   publish_repo      $CVMFS_TEST_REPO || return 40
+
+  echo "check that Stratum0 spooler tmp dir is empty"
+  check_tmp_dir_emptiness $s0_spool_tmp_dir || return 124
 
   echo "extracting root hashes from Stratum0"
   local root_hash_6=$(get_manifest_field $CVMFS_TEST_REPO 'C')
