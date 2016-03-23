@@ -4960,7 +4960,9 @@ gc() {
     to_syslog_for_repo $name "started manual garbage collection"
 
     # run the garbage collection
-    echo "Running Garbage Collection"
+    local reflog_reconstruct_msg=""
+    [ $reconstruct_reflog -ne 0 ] && reflog_reconstruct_msg="(reconstructing reference logs)"
+    echo "Running Garbage Collection $reflog_reconstruct_msg"
     __run_gc "$name"               \
              "$repository_url"     \
              "$dry_run"            \
