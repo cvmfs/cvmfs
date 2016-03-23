@@ -130,6 +130,7 @@ class CommandMigrate : public Command {
     bool RunMigration(PendingCatalog *data) const { return false; }
 
     bool UpdateNestedCatalogReferences(PendingCatalog *data) const;
+    bool UpdateCatalogMetadata(PendingCatalog *data) const;
     bool CleanupNestedCatalogs(PendingCatalog *data) const;
     bool CollectAndAggregateStatistics(PendingCatalog *data) const;
 
