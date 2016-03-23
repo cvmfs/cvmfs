@@ -121,8 +121,11 @@ int CommandReconstructReflog::Main(const ArgumentList &args) {
 
   LogCvmfs(kLogCvmfs, kLogStdout, "found %d entries", reflog->CountEntries());
 
-  uploader->Upload(reflog->CloseAndReturnDatabaseFile(), ".cvmfsreflog");
+  const std::string reflog_db = reflog->CloseAndReturnDatabaseFile();
+  uploader->Upload(reflog_db, ".cvmfsreflog");
   uploader->WaitForUpload();
+  unlink(reflog_db.c_str());
+
   const int errors = uploader->GetNumberOfErrors();
   if (errors > 0) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to upload generated Reflog");
