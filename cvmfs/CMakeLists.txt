@@ -217,6 +217,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   swissknife_main.cc
   swissknife_migrate.cc swissknife_migrate.h
   swissknife_pull.cc swissknife_pull.h
+  swissknife_reflog.cc swissknife_reflog.h
   swissknife_scrub.cc swissknife_scrub.h
   swissknife_sign.cc swissknife_sign.h
   swissknife_sync.cc swissknife_sync.h
