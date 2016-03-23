@@ -4816,6 +4816,7 @@ gc() {
   local timestamp_threshold=""
   local force=0
   local deletion_log=""
+  local reconstruct_reflog="0"
 
   # optional parameter handling
   OPTIND=1
@@ -4870,6 +4871,18 @@ gc() {
   echo '         in future versions of CernVM-FS. Please do not use it manually!'
   echo
 
+  for name in $names; do
+    if ! has_reference_log $name; then
+      reconstruct_reflog=1
+    fi
+  done
+
+  # sanity checks
+  if [ $dry_run -ne 0 ] && [ $reconstruct_reflog -ne 0 ]; then
+    die "Reflog reconstruction needed. Cannot do a dry-run."
+  fi
+
+  # safety user confirmation
   if [ $force -eq 0 ] && [ $dry_run -eq 0 ]; then
     echo "YOU ARE ABOUT TO DELETE DATA! Are you sure you want to do the following:"
   fi
@@ -4877,8 +4890,12 @@ gc() {
   local dry_run_msg="no"
   if [ $dry_run -eq 1 ]; then dry_run_msg="yes"; fi
 
+  local reflog_reconstruct_msg="no"
+  if [ $reconstruct_reflog -eq 1 ]; then reflog_reconstruct_msg="yes"; fi
+
   echo "Affected Repositories:         $names"
   echo "Dry Run (no actual deletion):  $dry_run_msg"
+  echo "Needs Reflog reconstruction:   $reflog_reconstruct_msg"
   if [ $preserve_revisions -ge 0 ]; then
     echo "Preserved Legacy Revisions:    $preserve_revisions"
   fi
