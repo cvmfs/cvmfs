@@ -7,6 +7,7 @@
 #include <cassert>
 
 #include <string>
+#include <vector>
 
 #include "object_fetcher.h"
 #include "manifest.h"
@@ -23,17 +24,27 @@ class RootChainWalker {
   typedef typename ObjectFetcher::HistoryTN HistoryTN;
 
  public:
-  RootChainWalker(ObjectFetcher    *object_fetcher,
-                  manifest::Reflog *reflog)
+  RootChainWalker(const manifest::Manifest *manifest,
+                  ObjectFetcher            *object_fetcher,
+                  manifest::Reflog         *reflog)
     : object_fetcher_(object_fetcher)
-    , reflog_(reflog) {}
+    , reflog_(reflog)
+    , manifest_(manifest) {}
 
-  void WalkRootCatalogs(const shash::Any &root_catalog_hash);
-  void WalkHistories(const shash::Any &history_hash);
+  void FindObjectsAndPopulateReflog();
+
+ protected:
+  typedef std::vector<shash::Any> CatalogList;
 
  protected:
   CatalogTN* FetchCatalog(const shash::Any catalog_hash);
   HistoryTN* FetchHistory(const shash::Any history_hash);
+
+  void WalkRootCatalogs(const shash::Any &root_catalog_hash);
+  void WalkHistories(const shash::Any &history_hash);
+
+  void WalkCatalogsInHistory(const HistoryTN *history);
+  void WalkListedCatalogs(const CatalogList &catalog_list);
 
   template <class DatabaseT>
   DatabaseT* ReturnOrAbort(const ObjectFetcherFailures::Failures  failure,
@@ -41,19 +52,10 @@ class RootChainWalker {
                            DatabaseT                             *database);
 
  private:
-  ObjectFetcher     *object_fetcher_;
-  manifest::Reflog  *reflog_;
+  ObjectFetcher            *object_fetcher_;
+  manifest::Reflog         *reflog_;
+  const manifest::Manifest *manifest_;
 };
-
-
-CommandBootstrapReflog::CommandBootstrapReflog() {
-
-}
-
-
-CommandBootstrapReflog::~CommandBootstrapReflog() {
-
-}
 
 
 ParameterList CommandBootstrapReflog::GetParams() {
@@ -107,25 +109,28 @@ int CommandBootstrapReflog::Main(const ArgumentList &args) {
   }
 
   UniquePtr<manifest::Reflog> reflog(CreateEmptyReflog(tmp_dir, repo_name));
+  reflog->TakeDatabaseFileOwnership();
 
+  reflog->BeginTransaction();
   AddStaticManifestObjects(reflog.weak_ref(), manifest.weak_ref());
+  RootChainWalker walker(manifest.weak_ref(),
+                         &object_fetcher,
+                         reflog.weak_ref());
+  walker.FindObjectsAndPopulateReflog();
+  reflog->CommitTransaction();
 
-  const shash::Any root_catalog = manifest->catalog_hash();
-  const shash::Any history      = manifest->history();
+  LogCvmfs(kLogCvmfs, kLogStdout, "found %d entries", reflog->CountEntries());
 
-  assert(!root_catalog.IsNull());
-
-  RootChainWalker walker(&object_fetcher, reflog.weak_ref());
-  walker.WalkRootCatalogs(root_catalog);
-  if (!history.IsNull()) {
-    walker.WalkHistories(history);
+  uploader->Upload(reflog->CloseAndReturnDatabaseFile(), ".cvmfsreflog");
+  uploader->WaitForUpload();
+  const int errors = uploader->GetNumberOfErrors();
+  if (errors > 0) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to upload generated Reflog");
   }
-
-  LogCvmfs(kLogCvmfs, kLogStderr, "found %d entries", reflog->CountEntries());
 
   uploader->TearDown();
 
-  return 0;
+  return (errors == 0) ? 0 : 1;
 }
 
 
@@ -150,11 +155,25 @@ void CommandBootstrapReflog::AddStaticManifestObjects(
 }
 
 
+void RootChainWalker::FindObjectsAndPopulateReflog() {
+  const shash::Any root_catalog = manifest_->catalog_hash();
+  const shash::Any history      = manifest_->history();
+
+  assert(!root_catalog.IsNull());
+  WalkRootCatalogs(root_catalog);
+
+  if (!history.IsNull()) {
+    WalkHistories(history);
+  }
+}
+
+
 void RootChainWalker::WalkRootCatalogs(const shash::Any &root_catalog_hash) {
   shash::Any           current_hash = root_catalog_hash;
   UniquePtr<CatalogTN> current_catalog;
 
-  while (!current_hash.IsNull() &&
+  while (!current_hash.IsNull()                  &&
+         !reflog_->ContainsCatalog(current_hash) &&
          (current_catalog = FetchCatalog(current_hash)).IsValid()) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Catalog: %s Revision: %d",
              current_hash.ToString().c_str(), current_catalog->GetRevision());
@@ -171,15 +190,42 @@ void RootChainWalker::WalkHistories(const shash::Any &history_hash) {
   shash::Any           current_hash = history_hash;
   UniquePtr<HistoryTN> current_history;
 
-  while (!current_hash.IsNull() &&
+  while (!current_hash.IsNull()                  &&
+         !reflog_->ContainsHistory(current_hash) &&
          (current_history = FetchHistory(current_hash)).IsValid()) {
     LogCvmfs(kLogCvmfs, kLogStdout, "History: %s",
              current_hash.ToString().c_str());
 
+    WalkCatalogsInHistory(current_history);
     const bool success = reflog_->AddHistory(current_hash);
     assert(success);
 
     current_hash = current_history->previous_revision();
+  }
+}
+
+
+void RootChainWalker::WalkCatalogsInHistory(const HistoryTN *history) {
+
+  CatalogList tag_hashes;
+  const bool list_success = history->GetHashes(&tag_hashes);
+  assert(list_success);
+
+  CatalogList bin_hashes;
+  const bool bin_success = history->ListRecycleBin(&bin_hashes);
+  assert(bin_success);
+
+  WalkListedCatalogs(tag_hashes);
+  WalkListedCatalogs(bin_hashes);
+}
+
+
+void RootChainWalker::WalkListedCatalogs(
+                             const RootChainWalker::CatalogList &catalog_list) {
+  CatalogList::const_iterator i    = catalog_list.begin();
+  CatalogList::const_iterator iend = catalog_list.end();
+  for (; i != iend; ++i) {
+    WalkRootCatalogs(*i);
   }
 }
 

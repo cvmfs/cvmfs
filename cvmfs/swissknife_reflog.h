@@ -16,8 +16,6 @@ namespace swissknife {
 
 class CommandBootstrapReflog : public Command {
  public:
-  CommandBootstrapReflog();
-  ~CommandBootstrapReflog();
   std::string GetName() { return "bootstrap_reflog"; }
   std::string GetDescription() {
     return "Bootstraps a Reference Log from Catalog and History chains. This "
