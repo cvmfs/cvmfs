@@ -38,19 +38,4 @@ manifest::Reflog* swissknife::Command::FetchReflog(
   return reflog;
 }
 
-
-template <class ObjectFetcherT>
-manifest::Reflog* swissknife::Command::GetOrCreateReflog(
-                                              ObjectFetcherT    *object_fetcher,
-                                              const std::string &repo_name) {
-  manifest::Reflog *reflog = GetOrIgnoreReflog(object_fetcher, repo_name);
-
-  if (reflog == NULL) {
-    const std::string tmp_dir = object_fetcher->temporary_directory();
-    reflog = CreateEmptyReflog(tmp_dir, repo_name);
-  }
-
-  return reflog;
-}
-
 #endif  // CVMFS_SWISSKNIFE_IMPL_H_
