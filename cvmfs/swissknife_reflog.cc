@@ -4,6 +4,8 @@
 
 #include "swissknife_reflog.h"
 
+#include <cassert>
+
 #include <string>
 
 #include "object_fetcher.h"
@@ -14,6 +16,35 @@
 namespace swissknife {
 
 typedef HttpObjectFetcher<> ObjectFetcher;
+
+class RootChainWalker {
+ public:
+  typedef typename ObjectFetcher::CatalogTN CatalogTN;
+  typedef typename ObjectFetcher::HistoryTN HistoryTN;
+
+ public:
+  RootChainWalker(ObjectFetcher    *object_fetcher,
+                  manifest::Reflog *reflog)
+    : object_fetcher_(object_fetcher)
+    , reflog_(reflog) {}
+
+  void WalkRootCatalogs(const shash::Any &root_catalog_hash);
+  void WalkHistories(const shash::Any &history_hash);
+
+ protected:
+  CatalogTN* FetchCatalog(const shash::Any catalog_hash);
+  HistoryTN* FetchHistory(const shash::Any history_hash);
+
+  template <class DatabaseT>
+  DatabaseT* ReturnOrAbort(const ObjectFetcherFailures::Failures  failure,
+                           const shash::Any                      &content_hash,
+                           DatabaseT                             *database);
+
+ private:
+  ObjectFetcher     *object_fetcher_;
+  manifest::Reflog  *reflog_;
+};
+
 
 CommandBootstrapReflog::CommandBootstrapReflog() {
 
@@ -75,7 +106,121 @@ int CommandBootstrapReflog::Main(const ArgumentList &args) {
     return 1;
   }
 
+  UniquePtr<manifest::Reflog> reflog(CreateEmptyReflog(tmp_dir, repo_name));
+
+  AddStaticManifestObjects(reflog.weak_ref(), manifest.weak_ref());
+
+  const shash::Any root_catalog = manifest->catalog_hash();
+  const shash::Any history      = manifest->history();
+
+  assert(!root_catalog.IsNull());
+
+  RootChainWalker walker(&object_fetcher, reflog.weak_ref());
+  walker.WalkRootCatalogs(root_catalog);
+  if (!history.IsNull()) {
+    walker.WalkHistories(history);
+  }
+
+  LogCvmfs(kLogCvmfs, kLogStderr, "found %d entries", reflog->CountEntries());
+
+  uploader->TearDown();
+
   return 0;
+}
+
+
+void CommandBootstrapReflog::AddStaticManifestObjects(
+                                          manifest::Reflog    *reflog,
+                                          manifest::Manifest  *manifest) const {
+  const shash::Any certificate = manifest->certificate();
+  const shash::Any meta_info   = manifest->meta_info();
+  assert(!certificate.IsNull());
+
+  bool success = reflog->AddCertificate(certificate);
+  assert(success);
+  LogCvmfs(kLogCvmfs, kLogStdout, "Certificate: %s",
+           certificate.ToString().c_str());
+
+  if (!meta_info.IsNull()) {
+    success = reflog->AddMetainfo(meta_info);
+    assert(success);
+    LogCvmfs(kLogCvmfs, kLogStdout, "Metainfo: %s",
+             meta_info.ToString().c_str());
+  }
+}
+
+
+void RootChainWalker::WalkRootCatalogs(const shash::Any &root_catalog_hash) {
+  shash::Any           current_hash = root_catalog_hash;
+  UniquePtr<CatalogTN> current_catalog;
+
+  while (!current_hash.IsNull() &&
+         (current_catalog = FetchCatalog(current_hash)).IsValid()) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "Catalog: %s Revision: %d",
+             current_hash.ToString().c_str(), current_catalog->GetRevision());
+
+    const bool success = reflog_->AddCatalog(current_hash);
+    assert(success);
+
+    current_hash = current_catalog->GetPreviousRevision();
+  }
+}
+
+
+void RootChainWalker::WalkHistories(const shash::Any &history_hash) {
+  shash::Any           current_hash = history_hash;
+  UniquePtr<HistoryTN> current_history;
+
+  while (!current_hash.IsNull() &&
+         (current_history = FetchHistory(current_hash)).IsValid()) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "History: %s",
+             current_hash.ToString().c_str());
+
+    const bool success = reflog_->AddHistory(current_hash);
+    assert(success);
+
+    current_hash = current_history->previous_revision();
+  }
+}
+
+
+RootChainWalker::CatalogTN* RootChainWalker::FetchCatalog(
+                                                const shash::Any catalog_hash) {
+  CatalogTN *catalog;
+  const char *root_path = "";
+  ObjectFetcherFailures::Failures failure =
+    object_fetcher_->FetchCatalog(catalog_hash, root_path, &catalog);
+
+  return ReturnOrAbort(failure, catalog_hash, catalog);
+}
+
+
+RootChainWalker::HistoryTN* RootChainWalker::FetchHistory(
+                                                const shash::Any history_hash) {
+  HistoryTN *history;
+  ObjectFetcherFailures::Failures failure =
+    object_fetcher_->FetchHistory(&history, history_hash);
+
+  return ReturnOrAbort(failure, history_hash, history);
+}
+
+
+template <class DatabaseT>
+DatabaseT* RootChainWalker::ReturnOrAbort(
+                            const ObjectFetcherFailures::Failures  failure,
+                            const shash::Any                      &content_hash,
+                            DatabaseT                             *database) {
+  switch (failure) {
+    case ObjectFetcherFailures::kFailOk:
+      return database;
+    case ObjectFetcherFailures::kFailNotFound:
+      return NULL;
+    default:
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to load object '%s' (%d - %s)",
+                                      content_hash.ToStringWithSuffix().c_str(),
+                                      failure, Code2Ascii(failure));
+      abort();
+  }
 }
 
 }  // namespace swissknife

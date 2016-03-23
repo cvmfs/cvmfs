@@ -7,6 +7,11 @@
 
 #include "swissknife.h"
 
+namespace manifest {
+  class Reflog;
+  class Manifest;
+}
+
 namespace swissknife {
 
 class CommandBootstrapReflog : public Command {
@@ -20,6 +25,10 @@ class CommandBootstrapReflog : public Command {
   }
   ParameterList GetParams();
   int Main(const ArgumentList &args);
+
+ protected:
+  void AddStaticManifestObjects(manifest::Reflog    *reflog,
+                                manifest::Manifest  *manifest) const;
 };
 
 };  // namespace swissknife
