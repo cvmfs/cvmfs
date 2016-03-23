@@ -95,13 +95,15 @@ cvmfs_run_test() {
   echo "run a first garbage collection to delete all revision except the last 4"
   cvmfs_server gc -r 3 -f $legacy_repo_name || return 11
 
-  echo "check if some 2.0 catalogs are gone (5 expected)"
+  local expected_1=5
+  uses_overlayfs $legacy_repo_name && expected_1=$(( $expected_1 + 1 ))
+  echo "check if some 2.0 catalogs are gone ($expected_1 expected)"
   local not_available_catalogs=0
   for hash in $last_legacy_catalogs; do
     peek_backend $legacy_repo_name "${hash}C" || not_available_catalogs=$(( $not_available_catalogs + 1 ))
   done
   echo "$not_available_catalogs are not available"
-  [ $not_available_catalogs -eq 5 ] || return 12
+  [ $not_available_catalogs -eq $expected_1 ] || return 12
 
   echo "check if the right 2.0 catalogs are gone"
   local condemned_catalogs="713ca8a74dd20682338da781e314ac2b8ce883e4
