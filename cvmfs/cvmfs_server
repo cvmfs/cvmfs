@@ -5027,9 +5027,24 @@ __run_gc() {
   fi
 
   # do it!
-  [ $dry_run -ne 0 ] || to_syslog_for_repo $name "started garbage collection"
-
   local user_shell="$(get_user_shell $name)"
+
+  if [ $reconstruct_reflog -ne 0 ]; then
+    to_syslog_for_repo $name "reference log reconstruction started"
+    local reflog_reconstruct_command="$(__swissknife_cmd dbg) reconstruct_reflog \
+                                                  -r $repository_url             \
+                                                  -u $CVMFS_UPSTREAM_STORAGE     \
+                                                  -n $CVMFS_REPOSITORY_NAME      \
+                                                  -t ${CVMFS_SPOOL_DIR}/tmp/     \
+                                                  -k $CVMFS_PUBLIC_KEY"
+    if ! $user_shell "$reflog_reconstruct_command"; then
+      to_syslog_for_repo $name "failed to reconstruction reference log"
+    else
+      to_syslog_for_repo $name "successfully reconstructed reference log"
+    fi
+  fi
+
+  [ $dry_run -ne 0 ] || to_syslog_for_repo $name "started garbage collection"
   local gc_command="$(__swissknife_cmd dbg) gc                         \
                                             -r $repository_url         \
                                             -u $CVMFS_UPSTREAM_STORAGE \
