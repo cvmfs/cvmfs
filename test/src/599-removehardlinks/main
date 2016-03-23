@@ -76,6 +76,9 @@ cvmfs_run_test() {
   local root_clg_imported="$(get_current_root_catalog $legacy_repo_name)"
   echo "$root_clg_imported"
 
+  local root_clg_imported_db=$(get_and_decompress_root_catalog $legacy_repo_name)
+  local rev_no_imported="$(sqlite3 $root_clg_imported_db "SELECT value FROM properties WHERE key = 'revision';")"
+
   local uid_map=uid.map
   local gid_map=gid.map
   echo "* $(id -u $CVMFS_TEST_USER)" > $uid_map
@@ -86,6 +89,9 @@ cvmfs_run_test() {
   echo -n "get root catalog hash after catalog-chown... "
   local root_clg_chowned="$(get_current_root_catalog $legacy_repo_name)"
   echo "$root_clg_chowned"
+
+  local root_clg_chowned_db=$(get_and_decompress_root_catalog $legacy_repo_name)
+  local rev_no_chowned="$(sqlite3 $root_clg_chowned_db "SELECT value FROM properties WHERE key = 'revision';")"
 
   echo "check if repostory is sane"
   check_repository $legacy_repo_name -i || return 3
@@ -114,11 +120,13 @@ cvmfs_run_test() {
   echo "download catalog $root_clg_after and check its previous pointer"
   local root_clg_after_db=$(get_and_decompress_root_catalog $legacy_repo_name)
   local prev_ptr="$(sqlite3 $root_clg_after_db "SELECT value FROM properties WHERE key = 'previous_revision';")"
-  echo "  imported: $root_clg_imported"
-  echo "  chowned:  $root_clg_chowned"
-  echo "  after:    $root_clg_after"
+  local rev_no_after="$(sqlite3 $root_clg_after_db "SELECT value FROM properties WHERE key = 'revision';")"
+  echo "  imported: $root_clg_imported | $rev_no_imported"
+  echo "  chowned:  $root_clg_chowned | $rev_no_chowned"
+  echo "  after:    $root_clg_after | $rev_no_after"
   echo "  prev_ptr: $prev_ptr"
-  [ x"$prev_ptr" = x"$root_clg_chowned" ] || return 101
+  [ x"$prev_ptr" = x"$root_clg_chowned"        ] || return 101
+  [ $(( $rev_no_after - 1 )) = $rev_no_chowned ] || return 102
 
   echo "check if repostory is still sane"
   check_repository $legacy_repo_name -i || return 6
