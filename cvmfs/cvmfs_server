@@ -1017,6 +1017,19 @@ is_garbage_collectable() {
   fi
 }
 
+# checks if a repository contains a reference log that is necessary to run
+# garbage collections
+#
+# @param name  the name of the repository to be checked
+# @return      0 if it contains a reference log
+has_reference_log() {
+  local name=$1
+  local url=""
+  load_repo_config $name
+  is_stratum0 $name && url="$CVMFS_STRATUM0" || url="$CVMFS_STRATUM1"
+  [ x"$(get_repo_info_from_url "$url" -o)" = x"true" ]
+}
+
 # checks if a repository has automatic garbage collection enabled
 #
 # @param name  the name of the repository to be checked
