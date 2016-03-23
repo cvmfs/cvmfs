@@ -825,6 +825,11 @@ class MockReflog : public MockObjectStorage<MockReflog> {
 
   bool RemoveCatalog(const shash::Any &catalog);
 
+  bool ContainsCertificate(const shash::Any &certificate) const;
+  bool ContainsCatalog(const shash::Any &catalog) const;
+  bool ContainsHistory(const shash::Any &history) const;
+  bool ContainsMetainfo(const shash::Any &metainfo) const;
+
   void TakeDatabaseFileOwnership() { owns_database_file_ = true;  }
   void DropDatabaseFileOwnership() { owns_database_file_ = false; }
   bool OwnsDatabaseFile() const    { return owns_database_file_;  }
