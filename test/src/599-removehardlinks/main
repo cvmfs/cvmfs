@@ -72,12 +72,20 @@ cvmfs_run_test() {
   TEST599_NEW_REPO_NAME="$legacy_repo_name"
   import_repo $legacy_repo_name $CVMFS_TEST_USER -g > $import_log 2>&1 || return 2
 
+  echo -n "get root catalog hash after import... "
+  local root_clg_imported="$(get_current_root_catalog $legacy_repo_name)"
+  echo "$root_clg_imported"
+
   local uid_map=uid.map
   local gid_map=gid.map
   echo "* $(id -u $CVMFS_TEST_USER)" > $uid_map
   echo "* $(id -g $CVMFS_TEST_USER)" > $gid_map
   echo "chown the repository contents on catalog level ($uid_map | $gid_map)"
   sudo cvmfs_server catalog-chown -u $uid_map -g $gid_map $legacy_repo_name || return 100
+
+  echo -n "get root catalog hash after catalog-chown... "
+  local root_clg_chowned="$(get_current_root_catalog $legacy_repo_name)"
+  echo "$root_clg_chowned"
 
   echo "check if repostory is sane"
   check_repository $legacy_repo_name -i || return 3
@@ -98,6 +106,19 @@ cvmfs_run_test() {
   local migration_log_1="migration_1.log"
   echo "run the repository migration (logging into ${migration_log_1})"
   sudo cvmfs_server eliminate-hardlinks -f $legacy_repo_name > $migration_log_1 2>&1 || return 5
+
+  echo -n "get root catalog hash after migration... "
+  local root_clg_after="$(get_current_root_catalog $legacy_repo_name)"
+  echo "$root_clg_after"
+
+  echo "download catalog $root_clg_after and check its previous pointer"
+  local root_clg_after_db=$(get_and_decompress_root_catalog $legacy_repo_name)
+  local prev_ptr="$(sqlite3 $root_clg_after_db "SELECT value FROM properties WHERE key = 'previous_revision';")"
+  echo "  imported: $root_clg_imported"
+  echo "  chowned:  $root_clg_chowned"
+  echo "  after:    $root_clg_after"
+  echo "  prev_ptr: $prev_ptr"
+  [ x"$prev_ptr" = x"$root_clg_chowned" ] || return 101
 
   echo "check if repostory is still sane"
   check_repository $legacy_repo_name -i || return 6
