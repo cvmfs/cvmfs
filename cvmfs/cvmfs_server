@@ -4667,6 +4667,7 @@ publish() {
                $manifest   \
                $trunk_hash \
                ""          \
+               "0"         \
                -z $gc_timespan      || { local err=$?; publish_failed $name; die "Garbage collection failed ($err)"; }
       sign_manifest $name $manifest || { publish_failed $name; die "Signing failed"; }
     fi
@@ -4960,12 +4961,13 @@ gc() {
 
     # run the garbage collection
     echo "Running Garbage Collection"
-    __run_gc "$name"           \
-             "$repository_url" \
-             "$dry_run"        \
-             "$manifest"       \
-             "$base_hash"      \
-             "$deletion_log"   \
+    __run_gc "$name"               \
+             "$repository_url"     \
+             "$dry_run"            \
+             "$manifest"           \
+             "$base_hash"          \
+             "$deletion_log"       \
+             "$reconstruct_reflog" \
              $additional_switches || die "Fail ($?)!"
 
     # sign the result
@@ -4993,7 +4995,8 @@ __run_gc() {
   local manifest="$4"
   local base_hash="$5"
   local deletion_log="$6"
-  shift 6
+  local reconstruct_reflog="$7"
+  shift 7
   local additional_switches="$*"
 
   load_repo_config $name
@@ -5003,11 +5006,17 @@ __run_gc() {
   [ x"$repository_url" != x"" ] || return 2
   if [ $dry_run -eq 0 ]; then
     is_in_transaction $name || is_stratum1 $name || return 3
+  else
+    [ $reconstruct_reflog -eq 0 ] || return 8
   fi
 
   if is_stratum0 $name; then
     [ x"$manifest"  != x"" ] || return 4
     [ x"$base_hash" != x"" ] || return 5
+  fi
+
+  if ! has_reference_log $name && [ $reconstruct_reflog -eq 0 ]; then
+    return 9
   fi
 
   # handle a configured deletion log (manually passed log has precedence)
@@ -5219,6 +5228,7 @@ __do_snapshot() {
                ""            \
                ""            \
                ""            \
+               "0"           \
                -z $gc_timespan || die "Garbage collection failed ($?)"
     fi
 
