@@ -9,8 +9,8 @@
 #include <string>
 #include <vector>
 
-#include "object_fetcher.h"
 #include "manifest.h"
+#include "object_fetcher.h"
 #include "upload_facility.h"
 
 
@@ -209,7 +209,6 @@ void RootChainWalker::WalkHistories(const shash::Any &history_hash) {
 
 
 void RootChainWalker::WalkCatalogsInHistory(const HistoryTN *history) {
-
   CatalogList tag_hashes;
   const bool list_success = history->GetHashes(&tag_hashes);
   assert(list_success);

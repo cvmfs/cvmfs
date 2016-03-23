@@ -7,9 +7,11 @@
 
 #include "swissknife.h"
 
+#include <string>
+
 namespace manifest {
-  class Reflog;
-  class Manifest;
+class Reflog;
+class Manifest;
 }
 
 namespace swissknife {
