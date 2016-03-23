@@ -40,7 +40,7 @@ int CommandBootstrapReflog::Main(const ArgumentList &args) {
   const std::string &repo_url  = *args.find('r')->second;
   const std::string &spooler   = *args.find('u')->second;
   const std::string &repo_name = *args.find('n')->second;
-  const std::string &tmp_dir   = *args.find('n')->second;
+  const std::string &tmp_dir   = *args.find('t')->second;
   const std::string &repo_keys = *args.find('k')->second;
 
   const bool follow_redirects = false;
