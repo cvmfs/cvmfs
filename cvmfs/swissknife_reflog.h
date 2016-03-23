@@ -14,9 +14,9 @@ namespace manifest {
 
 namespace swissknife {
 
-class CommandBootstrapReflog : public Command {
+class CommandReconstructReflog : public Command {
  public:
-  std::string GetName() { return "bootstrap_reflog"; }
+  std::string GetName() { return "reconstruct_reflog"; }
   std::string GetDescription() {
     return "Bootstraps a Reference Log from Catalog and History chains. This "
            "is used for both legacy repository migration and repairs.";

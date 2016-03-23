@@ -58,7 +58,7 @@ class RootChainWalker {
 };
 
 
-ParameterList CommandBootstrapReflog::GetParams() {
+ParameterList CommandReconstructReflog::GetParams() {
   ParameterList r;
   r.push_back(Parameter::Mandatory('r', "repository url"));
   r.push_back(Parameter::Mandatory('u', "spooler definition string"));
@@ -69,7 +69,7 @@ ParameterList CommandBootstrapReflog::GetParams() {
 }
 
 
-int CommandBootstrapReflog::Main(const ArgumentList &args) {
+int CommandReconstructReflog::Main(const ArgumentList &args) {
   const std::string &repo_url  = *args.find('r')->second;
   const std::string &spooler   = *args.find('u')->second;
   const std::string &repo_name = *args.find('n')->second;
@@ -134,7 +134,7 @@ int CommandBootstrapReflog::Main(const ArgumentList &args) {
 }
 
 
-void CommandBootstrapReflog::AddStaticManifestObjects(
+void CommandReconstructReflog::AddStaticManifestObjects(
                                           manifest::Reflog    *reflog,
                                           manifest::Manifest  *manifest) const {
   const shash::Any certificate = manifest->certificate();
