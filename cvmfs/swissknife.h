@@ -106,8 +106,8 @@ class Command {
                                       const std::string &repo_name);
 
   template <class ObjectFetcherT>
-  manifest::Reflog* GetOrIgnoreReflog(ObjectFetcherT    *object_fetcher,
-                                      const std::string &repo_name);
+  manifest::Reflog* FetchReflog(ObjectFetcherT    *object_fetcher,
+                                const std::string &repo_name);
 
   manifest::Reflog* CreateEmptyReflog(const std::string &temp_directory,
                                       const std::string &repo_name);

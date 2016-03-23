@@ -10,7 +10,7 @@
 #include "util/posix.h"
 
 template <class ObjectFetcherT>
-manifest::Reflog* swissknife::Command::GetOrIgnoreReflog(
+manifest::Reflog* swissknife::Command::FetchReflog(
                                               ObjectFetcherT    *object_fetcher,
                                               const std::string &repo_name) {
   // try to fetch the Reflog from the backend storage first

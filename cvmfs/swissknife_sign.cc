@@ -93,7 +93,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   }
 
   UniquePtr<manifest::Reflog> reflog;
-  reflog = GetOrIgnoreReflog(&object_fetcher, repo_name);
+  reflog = FetchReflog(&object_fetcher, repo_name);
   if (!reflog) {
     LogCvmfs(kLogCvmfs, kLogVerboseMsg, "failed to fetch Reflog (ignoring)");
   }

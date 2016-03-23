@@ -634,7 +634,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
                                             download_manager(),
                                             signature_manager());
 
-      reflog = GetOrIgnoreReflog(&object_fetcher_stratum1, repository_name);
+      reflog = FetchReflog(&object_fetcher_stratum1, repository_name);
       if (reflog == NULL) {
         LogCvmfs(kLogCvmfs, kLogVerboseMsg, "failed to get Reflog (ignoring)");
       }
