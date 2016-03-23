@@ -5000,7 +5000,7 @@ __run_gc() {
                                             $additional_switches"
 
   if ! $user_shell "$gc_command"; then
-    to_syslog_for_repo $name "failed to garbage collect"
+    [ $dry_run -ne 0 ] || to_syslog_for_repo $name "failed to garbage collect"
     return 6
   fi
 
@@ -5021,7 +5021,7 @@ __run_gc() {
     fi
   fi
 
-  to_syslog_for_repo $name "successfully finished garbage collection"
+  [ $dry_run -ne 0 ] || to_syslog_for_repo $name "successfully finished garbage collection"
 
   return 0
 }
