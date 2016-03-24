@@ -2048,9 +2048,9 @@ migrate_legacy_dirtab() {
   local tmp_dirtab=$(mktemp)
 
   cp -f "$dirtab_path" "$tmp_dirtab"                           || return 1
-  transaction $name > /dev/null                                || return 2
+  cvmfs_server_transaction $name > /dev/null                   || return 2
   cat "$tmp_dirtab" | sed -e 's/\(.*\)/\1\/\*/' > $dirtab_path || return 3
-  publish $name > /dev/null                                    || return 4
+  cvmfs_server_publish $name > /dev/null                       || return 4
   rm -f "$tmp_dirtab"                                          || return 5
 }
 
@@ -2822,14 +2822,14 @@ _update_geodb() {
   _update_geodb_install && echo "done" || { echo "fail"; return 3; }
 }
 
-update_geodb() {
+cvmfs_server_update_geodb() {
   _update_geodb $@
 }
 
 ################################################################################
 
 
-alterfs() {
+cvmfs_server_alterfs() {
   local master_replica=-1
   local name
 
@@ -2897,7 +2897,7 @@ alterfs() {
 ################################################################################
 
 
-mkfs() {
+cvmfs_server_mkfs() {
   local name
   local stratum0
   local upstream
@@ -3131,16 +3131,16 @@ mkfs() {
   echo "done"
 
   if [ $replicable -eq 1 ]; then
-    alterfs -m on $name
+    cvmfs_server_alterfs -m on $name
   fi
 
   health_check $name
 
   echo -n "Initial commit... "
-  transaction $name > /dev/null  || die "fail (transaction)"
+  cvmfs_server_transaction $name > /dev/null || die "fail (transaction)"
   echo "New CernVM-FS repository for $name" > /cvmfs/${name}/new_repository
   chown $cvmfs_user /cvmfs/${name}/new_repository
-  publish $name > /dev/null      || die "fail (publish)"
+  cvmfs_server_publish $name > /dev/null || die "fail (publish)"
   # When publishing an external repository, it is the user's responsibility to
   # stage the actual data files to the web server - not the publication function.
   # Hence, the following is guaranteed to not work.
@@ -3158,7 +3158,7 @@ mkfs() {
 ################################################################################
 
 
-add_replica() {
+cvmfs_server_add_replica() {
   local name
   local alias_name
   local stratum0
@@ -3370,7 +3370,7 @@ _import_desaster_cleanup() {
 }
 
 
-import() {
+cvmfs_server_import() {
   local name
   local stratum0
   local keys_location="/etc/cvmfs/keys"
@@ -3633,7 +3633,7 @@ import() {
 
   # make stratum0 repository replicable if requested
   if [ $replicable -eq 1 ]; then
-    alterfs -m on $name
+    cvmfs_server_alterfs -m on $name
   fi
 
   echo -n "Updating global JSON information... "
@@ -3660,7 +3660,7 @@ import() {
 ################################################################################
 
 
-rmfs() {
+cvmfs_server_rmfs() {
   local names
   local force=0
   local preserve_data=0
@@ -3770,7 +3770,7 @@ rmfs() {
 ################################################################################
 
 
-resign() {
+cvmfs_server_resign() {
   local names
   local retcode=0
 
@@ -3808,7 +3808,7 @@ resign() {
 ################################################################################
 
 
-list_catalogs() {
+cvmfs_server_list_catalogs() {
   local name
   local param_list="-t"
   local silence_warnings=0
@@ -3872,7 +3872,7 @@ list_catalogs() {
 ################################################################################
 
 
-info() {
+cvmfs_server_info() {
   local name
   local stratum0
 
@@ -3916,7 +3916,7 @@ Copy /etc/cvmfs/keys/${name}.pub to the client"
 ################################################################################
 
 
-tag() {
+cvmfs_server_tag() {
   local name
   local tag_name=""
   local action_add=0
@@ -4101,13 +4101,13 @@ tag() {
 ################################################################################
 
 
-lstags() {
-  tag -l "$@" # backward compatibility alias
+cvmfs_server_lstags() {
+  cvmfs_server_tag -l "$@" # backward compatibility alias
   echo "NOTE: cvmfs_server lstags is deprecated! Use cvmfs_server tag instead" 1>&2
 }
 
-list_tags() {
-  tag -l "$@" # backward compatibility alias
+cvmfs_server_list_tags() {
+  cvmfs_server_tag -l "$@" # backward compatibility alias
   echo "NOTE: cvmfs_server list-tags is deprecated! Use cvmfs_server tag instead" 1>&2
 }
 
@@ -4115,7 +4115,7 @@ list_tags() {
 ################################################################################
 
 
-check() {
+cvmfs_server_check() {
   local name
   local upstream
   local storage_dir
@@ -4212,7 +4212,7 @@ check() {
 ################################################################################
 
 
-list() {
+cvmfs_server_list() {
   for repository in /etc/cvmfs/repositories.d/*; do
     if [ "x$repository" = "x/etc/cvmfs/repositories.d/*" ]; then
       return 0
@@ -4277,7 +4277,7 @@ list() {
 ################################################################################
 
 
-transaction() {
+cvmfs_server_transaction() {
   local names
   local spool_dir
   local stratum0
@@ -4344,7 +4344,7 @@ transaction() {
 ################################################################################
 
 
-abort() {
+cvmfs_server_abort() {
   local names
   local user
   local spool_dir
@@ -4426,7 +4426,7 @@ abort() {
 ################################################################################
 
 
-publish() {
+cvmfs_server_publish() {
   local names
   local user
   local spool_dir
@@ -4722,7 +4722,7 @@ publish() {
 ################################################################################
 
 
-rollback() {
+cvmfs_server_rollback() {
   local name
   local user
   local spool_dir
@@ -4834,7 +4834,7 @@ rollback() {
 ################################################################################
 
 
-gc() {
+cvmfs_server_gc() {
   local names
   local list_deleted_objects=0
   local dry_run=0
@@ -5407,7 +5407,7 @@ EOF
   done
 }
 
-snapshot() {
+cvmfs_server_snapshot() {
   local alias_names
   local retcode=0
   local abort_on_conflict=0
@@ -5749,7 +5749,7 @@ migrate_2_2_0() {
   load_repo_config $name
 }
 
-migrate() {
+cvmfs_server_migrate() {
   local names
   local retcode=0
 
@@ -5877,7 +5877,7 @@ _run_catalog_migration() {
 ################################################################################
 
 
-catalog_chown() {
+cvmfs_server_catalog_chown() {
   local uid_map
   local gid_map
 
@@ -5926,7 +5926,7 @@ catalog_chown() {
 ################################################################################
 
 
-eliminate_hardlinks() {
+cvmfs_server_eliminate_hardlinks() {
   local name=
   local force=0
 
@@ -5994,7 +5994,7 @@ _update_repoinfo_cleanup() {
   close_transaction $repo_name 0
 }
 
-update_repoinfo() {
+cvmfs_server_update_repoinfo() {
   local name
   local json_file
 
@@ -6064,7 +6064,7 @@ _update_info_cleanup() {
   rm -f $tmp_file > /dev/null 2>&1
 }
 
-update_info() {
+cvmfs_server_update_info() {
   local configure_apache=1
   local edit_meta_info=1
 
@@ -6127,7 +6127,7 @@ update_info() {
 ################################################################################
 
 
-skeleton() {
+cvmfs_server_skeleton() {
   local skeleton_dir
   local skeleton_user
 
@@ -6203,7 +6203,7 @@ if is_subcommand $subcommand; then
   done
 
   # replace a dash (-) by an underscore (_) and call the requested sub-command
-  eval "$(echo $subcommand | sed 's/-/_/g') $args"
+  eval "cvmfs_server_$(echo $subcommand | sed 's/-/_/g') $args"
 else
   usage "Unrecognized command: $subcommand"
 fi
