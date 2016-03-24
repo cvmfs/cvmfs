@@ -1500,47 +1500,62 @@ foreclose_legacy_cvmfs() {
 }
 
 
-__health_check_print_repair_info() {
-  local name=$1
-  local repair_in_txn=$2
+__hc_print_repair_info() {
+  local name="$1"
+  local rdonly_broken=$2
+  local rdonly_outdated=$3
+  local rw_broken=$4
+  local rw_should_be_rdonly=$5
+  local rw_should_be_rw=$6
 
-  load_repo_config $name
+  [ $rdonly_broken       -eq 0 ] || echo "${CVMFS_SPOOL_DIR}/rdonly is not mounted properly."                   >&2
+  [ $rdonly_outdated     -eq 0 ] || echo "$name is not based on the newest published revision"                  >&2
+  [ $rw_broken           -eq 0 ] || echo "/cvmfs/$name is not mounted properly."                                >&2
+  [ $rw_should_be_rdonly -eq 0 ] || echo "$name is not in a transaction but /cvmfs/$name is mounted read/write" >&2
+  [ $rw_should_be_rw     -eq 0 ] || echo "$name is in a transaction but /cvmfs/$name is not mounted read/write" >&2
 
-  if [ x"$CVMFS_AUTO_REPAIR_MOUNTPOINT" = x"false" ]; then
-    echo "Auto-Repair is disabled (CVMFS_AUTO_REPAIR_MOUNTPOINT = false)" >&2
-    exit 1
-  fi
-
-  if is_in_transaction $name && [ $repair_in_txn = 0 ]; then
-    echo "Repository $name is in a transaction and cannot be repaired." >&2
-    echo "--> Run \`cvmfs_server abort $name\` to revert and repair."   >&2
-    exit 1
-  fi
+  to_syslog_for_repo $name "attempting mountpoint repair ($rdonly_broken $rdonly_outdated $rw_broken $rw_should_be_rdonly $rw_should_be_rw)"
 }
 
-__health_check_syslog_repair_info() {
+__hc_transition() {
   local name="$1"
-  local reason="$2"
-  local success="$3"
-  if $success; then
-    to_syslog_for_repo $name "repaired mounts ($reason)"
+  local transition="$2"
+  local msg=""
+
+  case $transition in
+    rw_umount)     msg="Trying to umount /cvmfs/${name}"             ;;
+    rdonly_umount) msg="Trying to umount ${CVMFS_SPOOL_DIR}/rdonly"  ;;
+    rw_mount)      msg="Trying to mount /cvmfs/${name}"              ;;
+    rdonly_mount)  msg="Trying to mount ${CVMFS_SPOOL_DIR}/rdonly"   ;;
+    open)          msg="Trying to remount /cvmfs/${name} read/write" ;;
+    lock)          msg="Trying to remount /cvmfs/${name} read-only"  ;;
+    *)             exit 2                                            ;;
+  esac
+
+  echo -n "Note: ${msg}... "
+  if run_suid_helper $transition $name; then
+    echo "success"
   else
-    to_syslog_for_repo $name "failed to repair mounts ($reason)"
+    echo "fail"
+    exit 1
   fi
 }
 
 # checks and warns in inconsistent repository states or unfavorable configs.
 #
 # @param name           the FQRN of the repository to be checked
-# @param quiet          disable printing of warnings
-# @param repair_in_txn  repair even if currently in a transaction
+# @param quiet          disable printing of warnings (default: no)
+# @param repair_in_txn  repair even if currently in a transaction (default: no)
 health_check() {
   local name=$1
   local quiet=${2-0}
   local repair_in_txn=${3-0}
+
   local rdonly_broken=0
   local rw_broken=0
-  local success=false
+  local rw_should_be_rdonly=0
+  local rw_should_be_rw=0
+  local rdonly_outdated=0
 
   load_repo_config $name
 
@@ -1562,76 +1577,99 @@ health_check() {
 
   # check mounted read-only cvmfs client
   if ! is_mounted "${CVMFS_SPOOL_DIR}/rdonly"; then
-    echo "${CVMFS_SPOOL_DIR}/rdonly is not mounted properly." >&2
-    __health_check_print_repair_info $name $repair_in_txn
     rdonly_broken=1
+  elif [ x"$(get_mounted_root_hash $name)"      != \
+         x"$(get_published_root_hash $name)" ]; then
+    rdonly_outdated=1
   fi
 
   # check mounted union file system
   if ! is_mounted "/cvmfs/$name"; then
-    echo "/cvmfs/$name is not mounted properly." >&2
-    __health_check_print_repair_info $name $repair_in_txn
     rw_broken=1
+  else
+    if ! is_in_transaction $name && \
+         is_mounted "/cvmfs/$name" "^.* rw[, ].*$"; then
+      rw_should_be_rdonly=1
+    elif is_in_transaction $name && \
+         is_mounted "/cvmfs/$name" "^.* ro[, ].*$"; then
+      rw_should_be_rw=1
+    fi
   fi
 
-  # try to repair the mountpoints
-  if [ $rdonly_broken -eq 1 ]; then
+  # did we detect any kind of problem?
+  if [ $((   $rdonly_broken       \
+           + $rdonly_outdated     \
+           + $rw_broken           \
+           + $rw_should_be_rdonly \
+           + $rw_should_be_rw )) -eq 0 ]; then
+    return 0
+  fi
+
+  # check if we are allowed to attempt a repair
+  if [ x"$CVMFS_AUTO_REPAIR_MOUNTPOINT" = x"false" ]; then
+    echo "Auto-Repair is disabled (CVMFS_AUTO_REPAIR_MOUNTPOINT = false)" >&2
+    exit 1
+  fi
+
+  if is_in_transaction $name && [ $repair_in_txn = 0 ]; then
+    echo "Repository $name is in a transaction and cannot be repaired." >&2
+    echo "--> Run \`cvmfs_server abort $name\` to revert and repair."   >&2
+    exit 1
+  fi
+
+  __hc_print_repair_info $name $rdonly_broken       \
+                               $rdonly_outdated     \
+                               $rw_broken           \
+                               $rw_should_be_rdonly \
+                               $rw_should_be_rw
+
+  # consecutively bring the mountpoints into a sane state by working bottom up:
+  #   1. solve problems with the rdonly mountpoint
+  #      Note: this might require to 'break' the rw mountpoint (rw_broken --> 1)
+  #      1.1. solve outdated rdonly mountpoint (rdonly_outdated --> 0)
+  #      1.2. remount rdonly mountpoint        (rdonly_broken   --> 0)
+  #   2. solve problems with the rw mountpoint
+  #      2.1. mount the rw mountpoint as read-only    (rw_broken       --> 0)
+  #      2.2. remount the rw mountpoint as read-only  (rw_should_be_ro --> 0)
+  #      2.2. remount the rw mountpoint as read-write (rw_should_be_rw --> 0)
+  if [ $rdonly_outdated -eq 1 ]; then
     if [ $rw_broken -eq 0 ]; then
-      echo "Only the lower union file system branch is broken" >&2
-      echo -n "Note: Trying to umount /cvmfs/${name}... "
-      run_suid_helper rw_umount $name && echo "success" || { echo "fail"; exit 1; }
-      rw_broken=1 # will be fixed downstream
+      __hc_transition $name rw_umount
+      rw_broken=1 # ... remount happens downstream
     fi
 
-    echo -n "Note: Trying to mount ${CVMFS_SPOOL_DIR}/rdonly... "
-    run_suid_helper rdonly_mount $name > /dev/null && success=true || success=false
-    __health_check_syslog_repair_info $name ".../rdonly" $success
-    $success && echo "success" || { echo "fail"; exit 1; }
+    if [ $rdonly_broken -eq 0 ]; then
+      __hc_transition $name rdonly_umount
+      rdonly_broken=1 # ... remount happens downstream
+    fi
+
+    rdonly_outdated=0 # ... remount will mount the latest revision
+  fi
+
+  if [ $rdonly_broken -eq 1 ]; then
+    if [ $rw_broken -eq 0 ]; then
+      __hc_transition $name rw_umount
+      rw_broken=1 # ... remount happens downstream
+    fi
+
+    __hc_transition $name rdonly_mount > /dev/null
+    rdonly_broken=0 # ... rdonly is repaired
   fi
 
   if [ $rw_broken -eq 1 ]; then
-    echo -n "Note: Trying to mount /cvmfs/${name}... "
-    run_suid_helper rw_mount $name && success=true || success=false
-    __health_check_syslog_repair_info $name "/cvmfs/${name}" $success
-    $success && echo "success" || { echo "fail"; exit 1; }
+    __hc_transition $name rw_mount
+    rw_broken=0           # ... rw is repaired
+    rw_should_be_rdonly=0 # ... and already mounted read-only by default
   fi
 
-  # check mounted CVMFS revision against published one
-  # Note: this needs to repaired first, so that the consecutive checks can put
-  #       the union mountpoint in the right state afterwards
-  if [ x"$(get_mounted_root_hash $name)" != x"$(get_published_root_hash $name)" ]; then
-    echo "$name is not based on the newest published revision" >&2
-    __health_check_print_repair_info $name $repair_in_txn
-    local published_hash="$(get_published_root_hash $name)"
-    echo -n "Note: Trying to remount repository mountpoints to $published_hash... "
-    run_suid_helper rw_umount     $name                     && \
-    run_suid_helper rdonly_umount $name                     && \
-    set_ro_root_hash              $name   "$published_hash" && \
-    run_suid_helper rdonly_mount  $name > /dev/null         && \
-    run_suid_helper rw_mount      $name && success=true || success=false
-    __health_check_syslog_repair_info $name "outdated revision" $success
-    $success && echo "success" || { echo "fail"; exit 1; }
+  if [ $rw_should_be_rw -eq 1 ]; then
+    __hc_transition $name open
+    rw_should_be_rw=0 # ... rw is repaired
   fi
 
-  # check transaction status
-  if is_in_transaction $name; then
-    if ! is_mounted "/cvmfs/$name" "^.* rw[, ].*$"; then
-      echo "$name is in a transaction but /cvmfs/$name is not mounted read/write" >&2
-      __health_check_print_repair_info $name $repair_in_txn
-      echo -n "Note: Trying to remount /cvmfs/${name} read/write... "
-      run_suid_helper open $name && success=true || success=false
-      __health_check_syslog_repair_info $name "non-writable transaction" $success
-      $success && echo "success" || { echo "fail"; exit 1; }
-    fi
-  else
-    if ! is_mounted "/cvmfs/$name" "^.* ro[, ].*$"; then
-      echo "$name is not in a transaction but /cvmfs/$name is mounted read/write" >&2
-      __health_check_print_repair_info $name $repair_in_txn
-      echo -n "Note: Trying to remount /cvmfs/${name} read-only... "
-      run_suid_helper lock $name && success=true || success=false
-      __health_check_syslog_repair_info $name "writable mount point" $success
-      $success && echo "success" || { echo "fail"; exit 1; }
-    fi
+  if [ $rw_should_be_rdonly -eq 1 ]; then
+    __hc_transition $name lock
+    rw_should_be_rdonly=0 # ... rw is repaired
   fi
 }
 
