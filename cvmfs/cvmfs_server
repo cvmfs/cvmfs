@@ -1606,7 +1606,7 @@ health_check() {
     echo -n "Note: Trying to remount repository mountpoints to $published_hash... "
     run_suid_helper rw_umount     $name                     && \
     run_suid_helper rdonly_umount $name                     && \
-    set_ro_root_hash                $name "$published_hash" && \
+    set_ro_root_hash              $name   "$published_hash" && \
     run_suid_helper rdonly_mount  $name > /dev/null         && \
     run_suid_helper rw_mount      $name && success=true || success=false
     __health_check_syslog_repair_info $name "outdated revision" $success
