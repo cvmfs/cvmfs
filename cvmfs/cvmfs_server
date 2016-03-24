@@ -5465,7 +5465,7 @@ cvmfs_server_snapshot() {
 ################################################################################
 
 
-migrate_2_1_6() {
+_migrate_2_1_6() {
   local name=$1
   local destination_version="2.1.7"
 
@@ -5533,7 +5533,7 @@ EOF
 }
 
 
-migrate_2_1_7() {
+_migrate_2_1_7() {
   local name=$1
   local destination_version="2.1.15"
 
@@ -5603,7 +5603,7 @@ migrate_2_1_7() {
 }
 
 # note that this is only run on stratum1s that have local upstream storage
-migrate_2_1_15() {
+_migrate_2_1_15() {
   local name=$1
   local destination_version="2.1.20"
   local conf_file
@@ -5654,7 +5654,7 @@ migrate_2_1_15() {
   load_repo_config $name
 }
 
-migrate_2_1_20() {
+_migrate_2_1_20() {
   local name=$1
   local destination_version="2.2.0-1"
   local creator=$(repository_creator_version $name)
@@ -5777,7 +5777,7 @@ cvmfs_server_migrate() {
 
     # do the migrations...
     if [ x"$creator" = x"2.1.6" ]; then
-      migrate_2_1_6 $name
+      _migrate_2_1_6 $name
     fi
 
     if [ x"$creator" = x"2.1.7" -o  \
@@ -5789,7 +5789,7 @@ cvmfs_server_migrate() {
          x"$creator" = x"2.1.13" -o \
          x"$creator" = x"2.1.14" ];
     then
-      migrate_2_1_7 $name
+      _migrate_2_1_7 $name
     fi
 
     if [ x"$creator" = x"2.1.15" -o   \
@@ -5800,7 +5800,7 @@ cvmfs_server_migrate() {
          is_stratum1 $name         && \
          is_local_upstream $CVMFS_UPSTREAM_STORAGE;
     then
-      migrate_2_1_15 $name
+      _migrate_2_1_15 $name
     fi
 
     if [ x"$creator" = x"2.1.15" -o \
@@ -5811,7 +5811,7 @@ cvmfs_server_migrate() {
          x"$creator" = x"2.1.20" -o \
          x"$creator" = x"2.2.0-0" ];
     then
-      migrate_2_1_20 $name
+      _migrate_2_1_20 $name
     fi
 
     if [ x"$creator" = x"2.2.0-1" -o   \
