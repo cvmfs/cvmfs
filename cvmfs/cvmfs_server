@@ -1584,6 +1584,13 @@ health_check() {
   # check mounted union file system
   if ! is_mounted "/cvmfs/$name"; then
     rw_broken=1
+    if is_in_transaction $name; then
+      rw_should_be_rw=1
+      rw_should_be_ro=0
+    else
+      rw_should_be_rw=0
+      rw_should_be_ro=1
+    fi
   else
     if ! is_in_transaction $name && \
          is_mounted "/cvmfs/$name" "^.* rw[, ].*$"; then
