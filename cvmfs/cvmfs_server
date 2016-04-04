@@ -1500,7 +1500,7 @@ foreclose_legacy_cvmfs() {
 }
 
 
-__hc_print_repair_info() {
+__hc_print_status_report() {
   local name="$1"
   local rdonly_broken=$2
   local rdonly_outdated=$3
@@ -1513,8 +1513,6 @@ __hc_print_repair_info() {
   [ $rw_broken           -eq 0 ] || echo "/cvmfs/$name is not mounted properly."                                >&2
   [ $rw_should_be_rdonly -eq 0 ] || echo "$name is not in a transaction but /cvmfs/$name is mounted read/write" >&2
   [ $rw_should_be_rw     -eq 0 ] || echo "$name is in a transaction but /cvmfs/$name is not mounted read/write" >&2
-
-  to_syslog_for_repo $name "attempting mountpoint repair ($rdonly_broken $rdonly_outdated $rw_broken $rw_should_be_rdonly $rw_should_be_rw)"
 }
 
 __hc_transition() {
@@ -1605,6 +1603,12 @@ health_check() {
     return 0
   fi
 
+  __hc_print_status_report $name $rdonly_broken       \
+                                 $rdonly_outdated     \
+                                 $rw_broken           \
+                                 $rw_should_be_rdonly \
+                                 $rw_should_be_rw
+
   # check if we are allowed to attempt a repair
   if [ x"$CVMFS_AUTO_REPAIR_MOUNTPOINT" = x"false" ]; then
     echo "Auto-Repair is disabled (CVMFS_AUTO_REPAIR_MOUNTPOINT = false)" >&2
@@ -1617,11 +1621,7 @@ health_check() {
     exit 1
   fi
 
-  __hc_print_repair_info $name $rdonly_broken       \
-                               $rdonly_outdated     \
-                               $rw_broken           \
-                               $rw_should_be_rdonly \
-                               $rw_should_be_rw
+  to_syslog_for_repo $name "attempting mountpoint repair ($rdonly_broken $rdonly_outdated $rw_broken $rw_should_be_rdonly $rw_should_be_rw)"
 
   # consecutively bring the mountpoints into a sane state by working bottom up:
   #   1. solve problems with the rdonly mountpoint
