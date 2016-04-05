@@ -1553,6 +1553,7 @@ __hc_transition() {
 #   -q    silence notifications to stdout/stderr (syslog messages stay in place)
 #   -r    try to repair detected inconsistencies (non-zero exit on failure)
 #   -t    repair even if the repository is in a transaction
+#   -f    force repair (even if CVMFS_AUTO_REPAIR_MOUNTPOINT=false)
 #
 # @param name   the FQRN of the repository to be checked
 # @return       0 if repository is healthy (or has been successfully repaired)
@@ -1562,8 +1563,9 @@ health_check() {
   local quiet=0
   local repair=0
   local repair_in_txn=0
+  local force_repair=0
 
-  while getopts "qrt" option; do
+  while getopts "qrtf" option; do
     case $option in
       q)
         quiet=1
@@ -1574,6 +1576,10 @@ health_check() {
       t)
         repair=1
         repair_in_txn=1
+      ;;
+      f)
+        repair=1
+        force_repair=1
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -1651,7 +1657,8 @@ health_check() {
   fi
 
   # check if we are allowed to attempt a repair
-  if [ x"$CVMFS_AUTO_REPAIR_MOUNTPOINT" = x"false" ]; then
+  if [ x"$CVMFS_AUTO_REPAIR_MOUNTPOINT" = x"false" ] && \
+     [ $force_repair = 0 ]; then
     echo "Auto-Repair is disabled (CVMFS_AUTO_REPAIR_MOUNTPOINT = false)" >&2
     exit 1
   fi
