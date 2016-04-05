@@ -215,7 +215,7 @@ is_subcommand() {
   local supported_commands="mkfs add-replica import publish rollback rmfs alterfs    \
     resign list info tag list-tags lstags check transaction abort snapshot           \
     skeleton migrate list-catalogs update-geodb gc catalog-chown eliminate-hardlinks \
-    update-info update-repoinfo"
+    update-info update-repoinfo mount"
 
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
@@ -6222,6 +6222,44 @@ cvmfs_server_update_info() {
     update_global_meta_info "$tmp_file" || die "fail (update meta info)"
   fi
   echo "done"
+}
+
+
+################################################################################
+
+
+cvmfs_server_mount() {
+  local names=""
+  local mount_all=0
+
+  OPTIND=1
+  while getopts "a" option; do
+    case $option in
+      a)
+        mount_all=1
+      ;;
+      ?)
+        shift $(($OPTIND-2))
+        usage "Command mount: Unrecognized option: $1"
+      ;;
+    esac
+  done
+  shift $(($OPTIND-1))
+
+  # sanity checks
+  if [ $mount_all -eq 1 ]; then
+    is_root || die "Permission Denied: need root to mount all repositories"
+    names="$(ls /etc/cvmfs/repositories.d)"
+  else
+    # get repository name
+    check_parameter_count_with_guessing $#
+    names=$(get_or_guess_repository_name $@)
+  fi
+
+  for name in $names; do
+    is_stratum0 $name        || continue
+    health_check -rftq $name || return 1
+  done
 }
 
 
