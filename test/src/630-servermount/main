@@ -250,6 +250,37 @@ cvmfs_run_test() {
   echo "publish $repo2"
   publish_repo $repo2 || return 67
 
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+  # Provoke a mount failure for a multi-repo `cvmfs_server mount`
+
+  echo "break union fs mount point of ${CVMFS_TEST_REPO} and ${repo2}"
+  cvmfs_suid_helper rw_umount $CVMFS_TEST_REPO || return 68
+  cvmfs_suid_helper rw_umount $repo2           || return 69
+
+  echo "remove ${repo_dir} to provoke failed mount call"
+  sudo rm -fR $repo_dir || return 70
+
+  echo "check that both $repo_dir and $repo2_repo_dir are not mounted"
+  cat /proc/mounts | grep -e " $repo_dir "         && return 71
+  cat /proc/mounts | grep -e " $repo2_repo_dir "   && return 72
+
+  local mount_log_2="$(pwd)/mount_2.log"
+  echo "try to mount ${CVMFS_TEST_REPO} and $repo2 (should fail | log: ${mount_log_2})"
+  cvmfs_server mount $CVMFS_TEST_REPO $repo2 > $mount_log_2 2>&1 && return 73
+
+  echo "check that an error message was printed"
+  cat $mount_log_2 | grep 'fail' || return 74
+
+  echo "check that $repo_dir is still not mounted but $repo2_repo_dir is"
+  cat /proc/mounts | grep -e " $repo_dir "         && return 75
+  cat /proc/mounts | grep -e " $repo2_repo_dir "   || return 76
+
+  echo "repair the mount point"
+  sudo mkdir -p $repo_dir || return 77
+
+  echo "try to mount again (should work now)"
+  cvmfs_server mount $CVMFS_TEST_REPO || return 78
+
   return 0
 }
 
