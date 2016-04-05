@@ -1650,12 +1650,12 @@ health_check() {
   fi
 
   if is_publishing $name; then
-    echo "WARNING: The repository $name is currently publishing and should not"
-    echo "be touched. If you are absolutely sure, that this is _not_ the case,"
-    echo "please run the following command and retry:"
-    echo
-    echo "   rm -fR ${CVMFS_SPOOL_DIR}/is_publishing.lock"
-    echo
+    echo "WARNING: The repository $name is currently publishing and should not" >&2
+    echo "be touched. If you are absolutely sure, that this is _not_ the case," >&2
+    echo "please run the following command and retry:"                          >&2
+    echo                                                                        >&2
+    echo "   rm -fR ${CVMFS_SPOOL_DIR}/is_publishing.lock"                      >&2
+    echo                                                                        >&2
     exit 1
   fi
 
