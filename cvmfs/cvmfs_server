@@ -4353,12 +4353,18 @@ cvmfs_server_list() {
       fi
     fi
 
+    # check if the repository is healthy
+    local health_info=""
+    if ! health_check -q $name; then
+      health_info=" - unhealthy"
+    fi
+
     # get the storage type of the repository
     local storage_type=""
     storage_type=$(get_upstream_type $CVMFS_UPSTREAM_STORAGE)
 
     # print out repository information list
-    echo "$name ($CVMFS_REPOSITORY_TYPE / $storage_type$transaction_info$whitelist_info) $stratum1_info $version_info"
+    echo "$name ($CVMFS_REPOSITORY_TYPE / $storage_type$transaction_info$whitelist_info$health_info) $stratum1_info $version_info"
     CVMFS_CREATOR_VERSION=""
   done
 }
