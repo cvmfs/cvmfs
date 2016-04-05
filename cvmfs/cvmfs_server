@@ -1638,6 +1638,10 @@ health_check() {
                                    $rw_should_be_rw
   fi
 
+  # should we try a repair?
+  if [ $repair = 0 ]; then
+    return 1
+  fi
 
   # check if we are allowed to attempt a repair
   if [ x"$CVMFS_AUTO_REPAIR_MOUNTPOINT" = x"false" ]; then
