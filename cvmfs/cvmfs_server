@@ -6247,8 +6247,8 @@ cvmfs_server_mount() {
   done
   shift $(($OPTIND-1))
 
-  # sanity checks
   if [ $mount_all -eq 1 ]; then
+    # sanity checks
     is_root || die "Permission Denied: need root to mount all repositories"
     names="$(ls /etc/cvmfs/repositories.d)"
   else
@@ -6260,7 +6260,7 @@ cvmfs_server_mount() {
   for name in $names; do
     is_stratum0        $name || continue
     is_owner_or_root   $name || { echo "Permission Denied: $name is owned by $CVMFS_USER" >&2; retval=1; continue; }
-    health_check -rftq $name || { echo "Failed to mount $name" >&2;                            retval=1; continue; }
+    health_check -rftq $name || { echo "Failed to mount $name"                            >&2; retval=1; continue; }
   done
 
   return $retval
