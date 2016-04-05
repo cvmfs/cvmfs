@@ -269,7 +269,7 @@ cvmfs_run_test() {
   cvmfs_server mount $CVMFS_TEST_REPO $repo2 > $mount_log_2 2>&1 && return 73
 
   echo "check that an error message was printed"
-  cat $mount_log_2 | grep 'fail' || return 74
+  cat $mount_log_2 | grep 'Trying to mount.*fail' || return 74
 
   echo "check that $repo_dir is still not mounted but $repo2_repo_dir is"
   cat /proc/mounts | grep -e " $repo_dir "         && return 75
