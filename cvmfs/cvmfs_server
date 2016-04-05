@@ -6231,6 +6231,7 @@ cvmfs_server_update_info() {
 cvmfs_server_mount() {
   local names=""
   local mount_all=0
+  local retval=0
 
   OPTIND=1
   while getopts "a" option; do
@@ -6257,9 +6258,12 @@ cvmfs_server_mount() {
   fi
 
   for name in $names; do
-    is_stratum0 $name        || continue
-    health_check -rftq $name || return 1
+    is_stratum0        $name || continue
+    is_owner_or_root   $name || { echo "Permission Denied: $name is owned by $CVMFS_USER" >&2; retval=1; continue; }
+    health_check -rftq $name || { echo "Failed to mount $name" >&2;                            retval=1; continue; }
   done
+
+  return $retval
 }
 
 
