@@ -1517,8 +1517,10 @@ __hc_print_status_report() {
 
 __hc_transition() {
   local name="$1"
-  local transition="$2"
+  local quiet="$2"
+  local transition="$3"
   local msg=""
+  local stdout_msg=""
   local retcode=0
 
   case $transition in
@@ -1531,12 +1533,15 @@ __hc_transition() {
     *)             exit 2                                            ;;
   esac
 
-  echo -n "Note: ${msg}... " >&2
-  if run_suid_helper $transition $name; then
-    echo "success" >&2
+  stdout_msg="Note: ${msg}... "
+  [ $quiet = 0 ] && echo -n "$stdout_msg" >&2
+
+  if run_suid_helper $transition $name > /dev/null; then
+    [ $quiet = 0 ] && echo "success" >&2
     to_syslog_for_repo $name "${msg}... success"
   else
-    echo "fail" >&2
+    [ $quiet = 0 ] || echo -n "${stdout_msg}" >&2 # error messages are not quiet
+    echo "fail"                               >&2
     to_syslog_for_repo $name "${msg}... fail"
     exit 1
   fi
@@ -1624,11 +1629,15 @@ health_check() {
     return 0
   fi
 
-  __hc_print_status_report $name $rdonly_broken       \
-                                 $rdonly_outdated     \
-                                 $rw_broken           \
-                                 $rw_should_be_rdonly \
-                                 $rw_should_be_rw
+  # should we print the found status?
+  if [ $quiet = 0 ]; then
+    __hc_print_status_report $name $rdonly_broken       \
+                                   $rdonly_outdated     \
+                                   $rw_broken           \
+                                   $rw_should_be_rdonly \
+                                   $rw_should_be_rw
+  fi
+
 
   # check if we are allowed to attempt a repair
   if [ x"$CVMFS_AUTO_REPAIR_MOUNTPOINT" = x"false" ]; then
@@ -1665,12 +1674,12 @@ health_check() {
   #      2.2. remount the rw mountpoint as read-write (rw_should_be_rw --> 0)
   if [ $rdonly_outdated -eq 1 ]; then
     if [ $rw_broken -eq 0 ]; then
-      __hc_transition $name rw_umount
+      __hc_transition $name $quiet "rw_umount"
       rw_broken=1 # ... remount happens downstream
     fi
 
     if [ $rdonly_broken -eq 0 ]; then
-      __hc_transition $name rdonly_umount
+      __hc_transition $name $quiet "rdonly_umount"
       rdonly_broken=1 # ... remount happens downstream
     fi
 
@@ -1680,27 +1689,27 @@ health_check() {
 
   if [ $rdonly_broken -eq 1 ]; then
     if [ $rw_broken -eq 0 ]; then
-      __hc_transition $name rw_umount
+      __hc_transition $name $quiet "rw_umount"
       rw_broken=1 # ... remount happens downstream
     fi
 
-    __hc_transition $name rdonly_mount > /dev/null
+    __hc_transition $name $quiet "rdonly_mount" > /dev/null
     rdonly_broken=0 # ... rdonly is repaired
   fi
 
   if [ $rw_broken -eq 1 ]; then
-    __hc_transition $name rw_mount
+    __hc_transition $name $quiet "rw_mount"
     rw_broken=0           # ... rw is repaired
     rw_should_be_rdonly=0 # ... and already mounted read-only by default
   fi
 
   if [ $rw_should_be_rw -eq 1 ]; then
-    __hc_transition $name open
+    __hc_transition $name $quiet "open"
     rw_should_be_rw=0 # ... rw is repaired
   fi
 
   if [ $rw_should_be_rdonly -eq 1 ]; then
-    __hc_transition $name lock
+    __hc_transition $name $quiet "lock"
     rw_should_be_rdonly=0 # ... rw is repaired
   fi
 
