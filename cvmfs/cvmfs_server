@@ -1704,7 +1704,7 @@ health_check() {
       rw_broken=1 # ... remount happens downstream
     fi
 
-    __hc_transition $name $quiet "rdonly_mount" > /dev/null
+    __hc_transition $name $quiet "rdonly_mount"
     rdonly_broken=0 # ... rdonly is repaired
   fi
 
