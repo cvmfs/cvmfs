@@ -1545,12 +1545,34 @@ __hc_transition() {
 # checks and warns in inconsistent repository states or unfavorable configs.
 #
 # @param name           the FQRN of the repository to be checked
-# @param quiet          disable printing of warnings (default: no)
-# @param repair_in_txn  repair even if currently in a transaction (default: no)
 health_check() {
-  local name=$1
-  local quiet=${2-0}
-  local repair_in_txn=${3-0}
+  local name=""
+  local quiet=0
+  local repair=0
+  local repair_in_txn=0
+
+  while getopts "qrt" option; do
+    case $option in
+      q)
+        quiet=1
+      ;;
+      r)
+        repair=1
+      ;;
+      t)
+        repair=1
+        repair_in_txn=1
+      ;;
+      ?)
+        shift $(($OPTIND-2))
+        die "health_check: Unrecognized option: $1"
+      ;;
+    esac
+  done
+  shift $(($OPTIND-1))
+
+  [ $# -eq 1 ] || die "health_check: No repository name provided"
+  name="$1"
 
   local rdonly_broken=0
   local rw_broken=0
@@ -3184,7 +3206,7 @@ cvmfs_server_mkfs() {
     cvmfs_server_alterfs -m on $name
   fi
 
-  health_check $name
+  health_check $name || die "fail! (health check after mount)"
 
   echo -n "Initial commit... "
   cvmfs_server_transaction $name > /dev/null || die "fail (transaction)"
@@ -3835,8 +3857,8 @@ cvmfs_server_resign() {
   for name in $names; do
 
     # sanity checks
-    is_stratum0 $name || { echo "Repository $name is not a stratum 0 repository"; retcode=1; continue; }
-    health_check $name
+    is_stratum0 $name  || { echo "Repository $name is not a stratum 0 repository"; retcode=1; continue; }
+    health_check $name || { echo "Repository $name is not healthy"; retcode=1; continue; }
 
     # get repository information
     load_repo_config $name
@@ -3861,7 +3883,6 @@ cvmfs_server_resign() {
 cvmfs_server_list_catalogs() {
   local name
   local param_list="-t"
-  local silence_warnings=0
 
   # optional parameter handling
   OPTIND=1
@@ -3879,7 +3900,6 @@ cvmfs_server_list_catalogs() {
       ;;
       x)
         param_list=$(echo "$param_list" | sed 's/-t\s\?//')
-        silence_warnings=1
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -3901,7 +3921,7 @@ cvmfs_server_list_catalogs() {
 
   # more sanity checks
   is_owner_or_root $name || die "Permission denied: Repository $name is owned by $CVMFS_USER"
-  health_check $name $silence_warnings
+  health_check     $name || die "Repository $name is not healthy"
 
   # check if repository is compatible to the installed CernVM-FS version
   check_repository_compatibility $name
@@ -4042,7 +4062,7 @@ cvmfs_server_tag() {
   is_owner_or_root $name           || die "Permission denied: Repository $name is owned by $CVMFS_USER"
   is_stratum0 $name                || die "This is not a stratum 0 repository"
   ! is_publishing $name            || die "Repository is currently publishing"
-  health_check $name $silence_warnings
+  health_check -r $name
 
   local base_hash="$(get_mounted_root_hash $name)"
   local user_shell="$(get_user_shell $name)"
@@ -4212,7 +4232,7 @@ cvmfs_server_check() {
 
   # more sanity checks
   is_owner_or_root $name || die "Permission denied: Repository $name is owned by $CVMFS_USER"
-  health_check $name
+  health_check -r $name
 
   # check if repository is compatible to the installed CernVM-FS version
   check_repository_compatibility $name
@@ -4363,7 +4383,7 @@ cvmfs_server_transaction() {
 
     # sanity checks
     is_stratum0 $name || { echo "Repository $name is not a stratum 0 repository"; retcode=1; continue; }
-    health_check $name
+    health_check -r $name
 
     # get repository information
     load_repo_config $name
@@ -4452,9 +4472,7 @@ cvmfs_server_abort() {
     fi
 
     # do a health check (might also repair out-of-sync in_transaction repos)
-    local silence_warnings=0
-    local repair_in_txn=1
-    health_check $name $silence_warnings $repair_in_txn
+    health_check -rt $name
 
     # check if we have open file descriptors on /cvmfs/<name>
     local use_fd_fallback=0
@@ -4564,7 +4582,7 @@ cvmfs_server_publish() {
     # sanity checks
     is_stratum0 $name   || die "This is not a stratum 0 repository"
     is_publishing $name && die "Another publish process is active for $name"
-    health_check $name
+    health_check -r $name
 
     # get repository information
     load_repo_config $name
@@ -4810,7 +4828,7 @@ cvmfs_server_rollback() {
   check_repository_existence $name || die "The repository $name does not exist"
   is_stratum0 $name                || die "This is not a stratum 0 repository"
   is_publishing $name              && die "Repository $name is currently being published"
-  health_check $name
+  health_check -r $name
 
   # get repository information
   load_repo_config $name
@@ -5821,7 +5839,7 @@ cvmfs_server_migrate() {
     # more sanity checks
     is_owner_or_root $name || { echo "Permission denied: Repository $name is owned by $user"; retcode=1; continue; }
     check_repository_compatibility $name "nokill" && { echo "Repository '$name' is already up-to-date."; continue; }
-    health_check $name
+    health_check -r $name
 
     creator="$(repository_creator_version $name)"
 
@@ -5890,7 +5908,7 @@ _run_catalog_migration() {
   is_stratum0 $name       || die "This is not a stratum 0 repository"
   is_root                 || die "Permission denied: Only root can do that"
   is_in_transaction $name && die "Repository is already in a transaction"
-  health_check $name
+  health_check -r $name
 
   # all following commands need an open repository transaction and are supposed
   # to commit or abort it after performing the catalog migration.
@@ -6072,7 +6090,7 @@ cvmfs_server_update_repoinfo() {
   is_owner_or_root $name           || die "Permission denied: Repository $name is owned by $CVMFS_USER"
   is_stratum0 $name                || die "This is not a stratum 0 repository"
   ! is_publishing $name            || die "Repository is currently publishing"
-  health_check $name $silence_warnings
+  health_check -r $name
   is_in_transaction $name && die "Cannot edit repository meta info while in a transaction"
   [ x"$json_file" = x"" ] || [ -f "$json_file" ] || die "Provided file '$json_file' doesn't exist"
 
