@@ -1682,6 +1682,8 @@ health_check() {
     __hc_transition $name lock
     rw_should_be_rdonly=0 # ... rw is repaired
   fi
+
+  to_syslog_for_repo $name "finished mountpoint repair ($rdonly_broken $rdonly_outdated $rw_broken $rw_should_be_rdonly $rw_should_be_rw)"
 }
 
 
