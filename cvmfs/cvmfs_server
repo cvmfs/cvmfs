@@ -1547,9 +1547,16 @@ __hc_transition() {
   fi
 }
 
-# checks and warns in inconsistent repository states or unfavorable configs.
+# Checks for inconsistent repository states or unfavorable configs. Can repair
+# inconsistent repository mount states (-r)
+# Parameters:
+#   -q    silence notifications to stdout/stderr (syslog messages stay in place)
+#   -r    try to repair detected inconsistencies (non-zero exit on failure)
+#   -t    repair even if the repository is in a transaction
 #
-# @param name           the FQRN of the repository to be checked
+# @param name   the FQRN of the repository to be checked
+# @return       0 if repository is healthy (or has been successfully repaired)
+#               otherwise 1 (or abort when -r is given and repair fails)
 health_check() {
   local name=""
   local quiet=0
