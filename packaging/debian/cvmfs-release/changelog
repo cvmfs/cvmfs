@@ -1,3 +1,9 @@
+cvmfs-release (1.0-2) lucid; urgency=low
+
+  * Update GPG key
+
+ -- Jakob Blomer <jblomer@cern.ch>  Tue, 05 Apr 2016 12:56:00 +0000
+
 cvmfs-release (1.0-1) lucid; urgency=low
 
   * Initial packaging
