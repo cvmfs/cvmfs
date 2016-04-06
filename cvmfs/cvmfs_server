@@ -541,6 +541,13 @@ least CernVM-FS $creator to manipulate this repository."
     fi
   fi
 
+  if [ "$creator" = "2.2.0-1" ] || [ "$creator" = "2.2.1-1" ]; then
+    if version_greater_or_equal "2.3.0"; then
+      _repo_is_incompatible "$creator" $nokill
+      return $?
+    fi
+  fi
+
   return 0
 }
 
@@ -1159,6 +1166,8 @@ close_transaction() {
   load_repo_config $name
   local tx_lock="${CVMFS_SPOOL_DIR}/in_transaction"
   local tmp_dir="${CVMFS_SPOOL_DIR}/tmp"
+  local current_scratch_dir="${CVMFS_SPOOL_DIR}/scratch/current"
+  local wastebin_scratch_dir="${CVMFS_SPOOL_DIR}/scratch/wastebin"
   local force_grace_time=60
 
   # if not explicitly asked, try if umounting works without force
@@ -1185,7 +1194,16 @@ close_transaction() {
   fi
 
   # continue with the remounting
-  run_suid_helper clear_scratch $name
+  local async_msg=""
+  if [ x"$CVMFS_ASYNC_SCRATCH_CLEANUP" != x"false" ]; then
+    tmpdir=$(mktemp -d "${wastebin_scratch_dir}/waste.XXXXXX")
+    mv $current_scratch_dir $tmpdir
+    mkdir -p $current_scratch_dir && chown $CVMFS_USER $current_scratch_dir
+    async_msg="(asynchronous scratch cleanup)"
+    run_suid_helper clear_scratch_async $name
+  else
+    run_suid_helper clear_scratch $name
+  fi
   [ ! -z "$tmp_dir" ] && rm -fR "${tmp_dir}"/*
   run_suid_helper rdonly_mount $name > /dev/null
   run_suid_helper rw_mount $name
@@ -1193,7 +1211,7 @@ close_transaction() {
 
   local fallback_msg=""
   [ $use_fd_fallback -eq 0 ] || fallback_msg="(using force)"
-  to_syslog_for_repo $name "closed transaction $fallback_msg"
+  to_syslog_for_repo $name "closed transaction $fallback_msg $async_msg"
 }
 
 # checks if a repository is currently runing a publish procedure
@@ -2120,7 +2138,7 @@ create_config_files_for_new_repository() {
 
   # other configurations
   local spool_dir="/var/spool/cvmfs/${name}"
-  local scratch_dir="${spool_dir}/scratch"
+  local scratch_dir="${spool_dir}/scratch/current"
   local rdonly_dir="${spool_dir}/rdonly"
   local temp_dir="${spool_dir}/tmp"
   local cache_dir="${spool_dir}/cache"
@@ -2152,6 +2170,7 @@ CVMFS_AUTO_TAG=$autotagging
 CVMFS_GARBAGE_COLLECTION=$garbage_collectable
 CVMFS_AUTO_REPAIR_MOUNTPOINT=true
 CVMFS_AUTOCATALOGS=false
+CVMFS_ASYNC_SCRATCH_CLEANUP=true
 EOF
 
   if [ x"$voms_authz" != x"" ]; then
@@ -2215,13 +2234,19 @@ create_spool_area_for_new_repository() {
   # gather repository information from configuration file
   load_repo_config $name
   local spool_dir=$CVMFS_SPOOL_DIR
-  local scratch_dir="${spool_dir}/scratch"
+  local current_scratch_dir="${spool_dir}/scratch/current"
+  local wastebin_scratch_dir="${spool_dir}/scratch/wastebin"
   local rdonly_dir="${spool_dir}/rdonly"
   local temp_dir="${spool_dir}/tmp"
   local cache_dir="${spool_dir}/cache"
   local ofs_workdir="${spool_dir}/ofs_workdir"
 
-  mkdir -p /cvmfs/$name $scratch_dir $rdonly_dir $temp_dir $cache_dir || return 1
+  mkdir -p /cvmfs/$name          \
+           $current_scratch_dir  \
+           $wastebin_scratch_dir \
+           $rdonly_dir           \
+           $temp_dir             \
+           $cache_dir || return 1
   if [ x"$CVMFS_UNION_FS_TYPE" = x"overlayfs" ]; then
     mkdir -p $ofs_workdir || return 2
   fi
@@ -2289,7 +2314,7 @@ setup_and_mount_new_repository() {
   # get repository information
   load_repo_config $name
   local rdonly_dir="${CVMFS_SPOOL_DIR}/rdonly"
-  local scratch_dir="${CVMFS_SPOOL_DIR}/scratch"
+  local scratch_dir="${CVMFS_SPOOL_DIR}/scratch/current"
   local ofs_workdir="${CVMFS_SPOOL_DIR}/ofs_workdir"
 
   local selinux_context=""
@@ -3058,7 +3083,7 @@ mkfs() {
   load_repo_config $name
   local temp_dir="${CVMFS_SPOOL_DIR}/tmp"
   local rdonly_dir="${CVMFS_SPOOL_DIR}/rdonly"
-  local scratch_dir="${CVMFS_SPOOL_DIR}/scratch"
+  local scratch_dir="${CVMFS_SPOOL_DIR}/scratch/current"
 
   echo -n "Creating Initial Repository... "
   create_whitelist $name $cvmfs_user $upstream $temp_dir > /dev/null
@@ -4482,6 +4507,7 @@ publish() {
     load_repo_config $name
     user=$CVMFS_USER
     spool_dir=$CVMFS_SPOOL_DIR
+    scratch_dir="${spool_dir}/scratch/current"
     stratum0=$CVMFS_STRATUM0
     upstream=$CVMFS_UPSTREAM_STORAGE
     hash_algorithm="${CVMFS_HASH_ALGORITHM-sha1}"
@@ -4533,7 +4559,7 @@ publish() {
       -w $stratum0                                       \
       -t ${spool_dir}/tmp                                \
       -u /cvmfs/${name}                                  \
-      -s ${spool_dir}/scratch                            \
+      -s ${scratch_dir}                                  \
       $verbosity"
 
     local log_level=
@@ -4542,7 +4568,7 @@ publish() {
     local trusted_certs="/etc/cvmfs/repositories.d/${name}/trusted_certs"
     local sync_command="$(__swissknife_cmd dbg) sync \
       -u /cvmfs/$name                                \
-      -s ${spool_dir}/scratch                        \
+      -s ${scratch_dir}                              \
       -c ${spool_dir}/rdonly                         \
       -t ${spool_dir}/tmp                            \
       -b $base_hash                                  \
@@ -5628,6 +5654,44 @@ migrate_2_1_20() {
   load_repo_config $name
 }
 
+migrate_2_2_0() {
+  local name=$1
+  local destination_version="2.3.0-1"
+  local server_conf="/etc/cvmfs/repositories.d/${name}/server.conf"
+
+  # get repository information
+  load_repo_config $name
+  [ ! -z $CVMFS_SPOOL_DIR     ] || die "\$CVMFS_SPOOL_DIR is not set"
+  [ ! -z $CVMFS_USER          ] || die "\$CVMFS_USER is not set"
+  [ ! -z $CVMFS_UNION_FS_TYPE ] || die "\$CVMFS_UNION_FS_TYPE is not set"
+
+  echo "--> umount repository"
+  run_suid_helper rw_umount $name
+
+  echo "--> updating scratch directory layout"
+  local scratch_dir="${CVMFS_SPOOL_DIR}/scratch"
+  rm -fR   ${scratch_dir}
+  mkdir -p ${scratch_dir}/current
+  mkdir -p ${scratch_dir}/wastebin
+  chown -R $CVMFS_USER ${scratch_dir}
+
+  echo "--> updating /etc/fstab"
+  local comment="added by CernVM-FS for ${name}"
+  sed -i -e "s~^\(.*\)\(${scratch_dir}\)\(.*${comment}\)$~\1\2/current\3~" /etc/fstab
+
+  echo "--> remount repository"
+  run_suid_helper rw_mount $name
+
+  echo "--> updating server.conf"
+  sed -i -e "s/^\(CVMFS_CREATOR_VERSION\)=.*/\1=$destination_version/" $server_conf
+
+  echo "--> ensure binary permission settings"
+  ensure_swissknife_suid $CVMFS_UNION_FS_TYPE
+
+  # update repository information
+  load_repo_config $name
+}
+
 migrate() {
   local names
   local retcode=0
@@ -5691,6 +5755,13 @@ migrate() {
          x"$creator" = x"2.2.0-0" ];
     then
       migrate_2_1_20 $name
+    fi
+
+    if [ x"$creator" = x"2.2.0-1" -o   \
+         x"$creator" = x"2.2.1-1" ] && \
+         is_stratum0 $name;
+    then
+      migrate_2_2_0 $name
     fi
 
   done
