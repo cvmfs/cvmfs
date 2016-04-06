@@ -230,6 +230,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   upload_facility.cc upload_facility.h
   upload_local.cc upload_local.h
   upload_s3.cc upload_s3.h
+  upload_leveldb.cc upload_leveldb.h
   upload_spooler_definition.cc upload_spooler_definition.h
   upload_spooler_result.h
   util/algorithm.cc util/algorithm.h

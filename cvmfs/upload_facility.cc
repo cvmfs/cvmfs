@@ -6,12 +6,14 @@
 
 #include <cassert>
 
+#include "upload_leveldb.h"
 #include "upload_local.h"
 #include "upload_s3.h"
 
 namespace upload {
 
 void AbstractUploader::RegisterPlugins() {
+  RegisterPlugin<LevelDbUploader>();
   RegisterPlugin<LocalUploader>();
   RegisterPlugin<S3Uploader>();
 }
