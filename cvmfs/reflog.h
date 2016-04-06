@@ -35,6 +35,11 @@ class Reflog {
 
   bool RemoveCatalog(const shash::Any &hash);
 
+  bool ContainsCertificate(const shash::Any &certificate) const;
+  bool ContainsCatalog(const shash::Any &catalog) const;
+  bool ContainsHistory(const shash::Any &history) const;
+  bool ContainsMetainfo(const shash::Any &metainfo) const;
+
   void BeginTransaction();
   void CommitTransaction();
 
@@ -50,6 +55,8 @@ class Reflog {
  protected:
   bool AddReference(const shash::Any               &hash,
                     const SqlReflog::ReferenceType  type);
+  bool ContainsReference(const shash::Any               &hash,
+                         const SqlReflog::ReferenceType  type) const;
 
  private:
   bool CreateDatabase(const std::string &database_path,
@@ -59,12 +66,13 @@ class Reflog {
   void PrepareQueries();
 
  private:
-  UniquePtr<ReflogDatabase>      database_;
+  UniquePtr<ReflogDatabase>       database_;
 
-  UniquePtr<SqlInsertReference>  insert_reference_;
-  UniquePtr<SqlCountReferences>  count_references_;
-  UniquePtr<SqlListReferences>   list_references_;
-  UniquePtr<SqlRemoveReference>  remove_reference_;
+  UniquePtr<SqlInsertReference>   insert_reference_;
+  UniquePtr<SqlCountReferences>   count_references_;
+  UniquePtr<SqlListReferences>    list_references_;
+  UniquePtr<SqlRemoveReference>   remove_reference_;
+  UniquePtr<SqlContainsReference> contains_reference_;
 };
 
 }  // namespace manifest

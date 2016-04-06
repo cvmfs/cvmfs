@@ -1024,6 +1024,19 @@ is_garbage_collectable() {
   fi
 }
 
+# checks if a repository contains a reference log that is necessary to run
+# garbage collections
+#
+# @param name  the name of the repository to be checked
+# @return      0 if it contains a reference log
+has_reference_log() {
+  local name=$1
+  local url=""
+  load_repo_config $name
+  is_stratum0 $name && url="$CVMFS_STRATUM0" || url="$CVMFS_STRATUM1"
+  [ x"$(get_repo_info_from_url "$url" -o)" = x"true" ]
+}
+
 # checks if a repository has automatic garbage collection enabled
 #
 # @param name  the name of the repository to be checked
@@ -4680,6 +4693,7 @@ publish() {
                $manifest   \
                $trunk_hash \
                ""          \
+               "0"         \
                -z $gc_timespan      || { local err=$?; publish_failed $name; die "Garbage collection failed ($err)"; }
       sign_manifest $name $manifest || { publish_failed $name; die "Signing failed"; }
     fi
@@ -4829,6 +4843,7 @@ gc() {
   local timestamp_threshold=""
   local force=0
   local deletion_log=""
+  local reconstruct_reflog="0"
 
   # optional parameter handling
   OPTIND=1
@@ -4883,6 +4898,18 @@ gc() {
   echo '         in future versions of CernVM-FS. Please do not use it manually!'
   echo
 
+  for name in $names; do
+    if ! has_reference_log $name; then
+      reconstruct_reflog=1
+    fi
+  done
+
+  # sanity checks
+  if [ $dry_run -ne 0 ] && [ $reconstruct_reflog -ne 0 ]; then
+    die "Reflog reconstruction needed. Cannot do a dry-run."
+  fi
+
+  # safety user confirmation
   if [ $force -eq 0 ] && [ $dry_run -eq 0 ]; then
     echo "YOU ARE ABOUT TO DELETE DATA! Are you sure you want to do the following:"
   fi
@@ -4890,8 +4917,12 @@ gc() {
   local dry_run_msg="no"
   if [ $dry_run -eq 1 ]; then dry_run_msg="yes"; fi
 
+  local reflog_reconstruct_msg="no"
+  if [ $reconstruct_reflog -eq 1 ]; then reflog_reconstruct_msg="yes"; fi
+
   echo "Affected Repositories:         $names"
   echo "Dry Run (no actual deletion):  $dry_run_msg"
+  echo "Needs Reflog reconstruction:   $reflog_reconstruct_msg"
   if [ $preserve_revisions -ge 0 ]; then
     echo "Preserved Legacy Revisions:    $preserve_revisions"
   fi
@@ -4955,13 +4986,16 @@ gc() {
     to_syslog_for_repo $name "started manual garbage collection"
 
     # run the garbage collection
-    echo "Running Garbage Collection"
-    __run_gc "$name"           \
-             "$repository_url" \
-             "$dry_run"        \
-             "$manifest"       \
-             "$base_hash"      \
-             "$deletion_log"   \
+    local reflog_reconstruct_msg=""
+    [ $reconstruct_reflog -ne 0 ] && reflog_reconstruct_msg="(reconstructing reference logs)"
+    echo "Running Garbage Collection $reflog_reconstruct_msg"
+    __run_gc "$name"               \
+             "$repository_url"     \
+             "$dry_run"            \
+             "$manifest"           \
+             "$base_hash"          \
+             "$deletion_log"       \
+             "$reconstruct_reflog" \
              $additional_switches || die "Fail ($?)!"
 
     # sign the result
@@ -4989,7 +5023,8 @@ __run_gc() {
   local manifest="$4"
   local base_hash="$5"
   local deletion_log="$6"
-  shift 6
+  local reconstruct_reflog="$7"
+  shift 7
   local additional_switches="$*"
 
   load_repo_config $name
@@ -4999,11 +5034,17 @@ __run_gc() {
   [ x"$repository_url" != x"" ] || return 2
   if [ $dry_run -eq 0 ]; then
     is_in_transaction $name || is_stratum1 $name || return 3
+  else
+    [ $reconstruct_reflog -eq 0 ] || return 8
   fi
 
   if is_stratum0 $name; then
     [ x"$manifest"  != x"" ] || return 4
     [ x"$base_hash" != x"" ] || return 5
+  fi
+
+  if ! has_reference_log $name && [ $reconstruct_reflog -eq 0 ]; then
+    return 9
   fi
 
   # handle a configured deletion log (manually passed log has precedence)
@@ -5014,9 +5055,24 @@ __run_gc() {
   fi
 
   # do it!
-  [ $dry_run -ne 0 ] || to_syslog_for_repo $name "started garbage collection"
-
   local user_shell="$(get_user_shell $name)"
+
+  if [ $reconstruct_reflog -ne 0 ]; then
+    to_syslog_for_repo $name "reference log reconstruction started"
+    local reflog_reconstruct_command="$(__swissknife_cmd dbg) reconstruct_reflog \
+                                                  -r $repository_url             \
+                                                  -u $CVMFS_UPSTREAM_STORAGE     \
+                                                  -n $CVMFS_REPOSITORY_NAME      \
+                                                  -t ${CVMFS_SPOOL_DIR}/tmp/     \
+                                                  -k $CVMFS_PUBLIC_KEY"
+    if ! $user_shell "$reflog_reconstruct_command"; then
+      to_syslog_for_repo $name "failed to reconstruction reference log"
+    else
+      to_syslog_for_repo $name "successfully reconstructed reference log"
+    fi
+  fi
+
+  [ $dry_run -ne 0 ] || to_syslog_for_repo $name "started garbage collection"
   local gc_command="$(__swissknife_cmd dbg) gc                         \
                                             -r $repository_url         \
                                             -u $CVMFS_UPSTREAM_STORAGE \
@@ -5026,7 +5082,7 @@ __run_gc() {
                                             $additional_switches"
 
   if ! $user_shell "$gc_command"; then
-    to_syslog_for_repo $name "failed to garbage collect"
+    [ $dry_run -ne 0 ] || to_syslog_for_repo $name "failed to garbage collect"
     return 6
   fi
 
@@ -5047,7 +5103,7 @@ __run_gc() {
     fi
   fi
 
-  to_syslog_for_repo $name "successfully finished garbage collection"
+  [ $dry_run -ne 0 ] || to_syslog_for_repo $name "successfully finished garbage collection"
 
   return 0
 }
@@ -5215,6 +5271,7 @@ __do_snapshot() {
                ""            \
                ""            \
                ""            \
+               "0"           \
                -z $gc_timespan || die "Garbage collection failed ($?)"
     fi
 
