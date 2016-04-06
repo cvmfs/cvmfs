@@ -47,6 +47,19 @@ cvmfs_run_test() {
     -s                                               \
     -g || return 4
 
+  echo -n "get root catalog hash after migration... "
+  local root_clg_after="$(get_current_root_catalog $legacy_repo_name)"
+  echo "$root_clg_after"
+
+  echo "download catalog $root_clg_after and check its previous pointer"
+  local root_clg_after_db=$(get_and_decompress_root_catalog $legacy_repo_name)
+  local prev_ptr="$(sqlite3 $root_clg_after_db "SELECT value FROM properties WHERE key = 'previous_revision';")"
+  local root_clg_legacy="07df6f3a10a70ca17df82370ca3845e82ca6a9af"
+  echo "  legacy:   $root_clg_legacy"
+  echo "  after:    $root_clg_after"
+  echo "  prev_ptr: $prev_ptr"
+  [ x"$prev_ptr" = x"$root_clg_legacy" ] || return 101
+
   echo "list newly generated repository under /cvmfs/${legacy_repo_name}"
   ls -lisa /cvmfs/${legacy_repo_name} || return 5
 

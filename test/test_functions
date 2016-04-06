@@ -1024,6 +1024,19 @@ get_current_root_catalog() {
   get_manifest_field $repo_name "C"
 }
 
+# downloads and decompresses the root catalog of a given repository for deeper
+# inspection
+# @param repo_name   the repository to download the root catalog from
+# @param object_hash the object to be downloaded and decompressed
+# @return            prints the file name of the extracted catalog to stdout
+get_and_decompress_root_catalog() {
+  local repo_name=$1
+  local catalog_hash="$(get_current_root_catalog $repo_name)C"
+  download_and_decompress_object $repo_name $catalog_hash
+}
+
+
+
 # uses `cvmfs_server check` to check the integrity of the catalog structure
 # additionally it might check the backend storage integrity as well when
 # provided with -i
@@ -1555,6 +1568,24 @@ upload_into_backend() {
                           -o $remote_path            \
                           -r $CVMFS_UPSTREAM_STORAGE \
                           -a $CVMFS_HASH_ALGORITHM
+}
+
+
+# downloads and decompresses a backend object from a given repository
+# @param repo_name   the repository to download the root catalog from
+# @param object_hash the object to be downloaded and decompressed
+# @return            prints the file name of the extracted catalog to stdout
+download_and_decompress_object() {
+  local repo_name="$1"
+  local object_hash="$2"
+  local object_url="$(get_object_url $repo_name $object_hash)"
+  local destination="${object_hash}.uncompressed"
+
+  curl --silent                 \
+       --show-error $object_url \
+    | cvmfs_swissknife zpipe -d > $destination || return 1
+
+  echo $destination
 }
 
 

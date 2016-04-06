@@ -380,6 +380,12 @@ cvmfs_run_test() {
   mkdir reference_dir
   local reference_dir=$scratch_dir/reference_dir
 
+  echo -n "checking for sqlite3... "
+  which sqlite3 > /dev/null 2>&1 && echo "done" || die "not found"
+
+  echo -n "checking for curl... "
+  which curl > /dev/null 2>&1 && echo "done" || die "not found"
+
   echo "creating some dummy UIDs and GIDs"
   local uid_1=$(find_next_free_uid 300)
   local uid_2=$(find_next_free_uid $uid_1)
@@ -485,6 +491,10 @@ EOF
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
+  echo -n "get root catalog hash of newly created repository... "
+  local root_clg_new="$(get_current_root_catalog $CVMFS_TEST_REPO)"
+  echo $root_clg_new
+
   echo "get spool and rdonly directory"
   load_repo_config $CVMFS_TEST_REPO
   local rdonly_dir="${CVMFS_SPOOL_DIR}/rdonly"
@@ -515,8 +525,25 @@ EOF
 
   # ============================================================================
 
+  echo -n "get root catalog hash before catalog-chown... "
+  local root_clg_before="$(get_current_root_catalog $CVMFS_TEST_REPO)"
+  echo $root_clg_before
+
   echo "run the chown on catalog level"
   sudo cvmfs_server catalog-chown -u $uid_map_1 -g $gid_map_1 $CVMFS_TEST_REPO || return 3
+
+  echo -n "get root catalog hash after catalog-chown... "
+  local root_clg_after="$(get_current_root_catalog $CVMFS_TEST_REPO)"
+  echo "$root_clg_after"
+
+  echo "download catalog $root_clg_after and check its previous pointer"
+  local root_clg_after_db=$(get_and_decompress_root_catalog $CVMFS_TEST_REPO)
+  local prev_ptr="$(sqlite3 $root_clg_after_db "SELECT value FROM properties WHERE key = 'previous_revision';")"
+  echo "  new:      $root_clg_new"
+  echo "  before:   $root_clg_before"
+  echo "  after:    $root_clg_after"
+  echo "  prev_ptr: $prev_ptr"
+  [ x"$prev_ptr" = x"$root_clg_before" ] || return 101
 
   echo "apply the same UID and GID changes to the reference directory"
   apply_uid_gid_map_1_to $reference_dir $uid_1 $uid_2 $uid_3 $gid_1 $gid_2 $gid_3 || return 4
