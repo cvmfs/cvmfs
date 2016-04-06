@@ -176,8 +176,8 @@ int CommandGc::Main(const ArgumentList &args) {
   unlink(reflog_db.c_str());
 
   if (uploader->GetNumberOfErrors() > 0) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to upload updated Reflog "
-                                    "(not critical)");
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to upload updated Reflog");
+    success = false;
   }
 
   uploader->TearDown();
