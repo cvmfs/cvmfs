@@ -132,7 +132,7 @@ class ScopedWorkingDirectory {
   bool NextDirectoryEntry(DirectoryEntry *entry) {
     platform_dirent64 *dirent;
     while ((dirent = platform_readdir(directory_handle_)) != NULL &&
-           IsMetaEntry(dirent)) {}
+           IsDotEntry(dirent)) {}
     if (dirent == NULL) {
       return false;
     }
@@ -160,7 +160,7 @@ class ScopedWorkingDirectory {
     assert(retval == 0);
   }
 
-  bool IsMetaEntry(const platform_dirent64 *dirent) {
+  bool IsDotEntry(const platform_dirent64 *dirent) {
     return (strcmp(dirent->d_name, ".")  == 0) ||
            (strcmp(dirent->d_name, "..") == 0);
   }
