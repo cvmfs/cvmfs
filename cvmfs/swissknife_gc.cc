@@ -126,6 +126,8 @@ int CommandGc::Main(const ArgumentList &args) {
     }
   }
 
+  reflog->BeginTransaction();
+
   GcConfig config;
   config.uploader                = uploader.weak_ref();
   config.keep_history_depth      = revisions;
@@ -152,7 +154,12 @@ int CommandGc::Main(const ArgumentList &args) {
 
   GC collector(config);
   const bool success = collector.Collect();
-  uploader->TearDown();
+
+  if (!success) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "garbage collection failed");
+    uploader->TearDown();
+    return 1;
+  }
 
   if (deletion_log_file != NULL) {
     const int bytes_written = fprintf(deletion_log_file,
@@ -161,6 +168,11 @@ int CommandGc::Main(const ArgumentList &args) {
     assert(bytes_written >= 0);
     fclose(deletion_log_file);
   }
+
+  reflog->CommitTransaction();
+  uploader->Upload(reflog->CloseAndReturnDatabaseFile(), ".cvmfsreflog");
+  uploader->WaitForUpload();
+  uploader->TearDown();
 
   return success ? 0 : 1;
 }
