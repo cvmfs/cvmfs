@@ -5672,11 +5672,8 @@ migrate_2_2_0() {
   chown -R $CVMFS_USER ${scratch_dir}
 
   echo "--> updating /etc/fstab"
-  local tmp_fstab=$(mktemp)
   local comment="added by CernVM-FS for ${name}"
-  sed -e "s~^\(.*\)\(${scratch_dir}\)\(.*${comment}\)$~\1\2/current\3~" /etc/fstab > $tmp_fstab
-  cat $tmp_fstab > /etc/fstab
-  rm -f $tmp_fstab
+  sed -i -e "s~^\(.*\)\(${scratch_dir}\)\(.*${comment}\)$~\1\2/current\3~" /etc/fstab
 
   echo "--> remount repository"
   run_suid_helper rw_mount $name
