@@ -16,6 +16,7 @@
 #include "hash.h"
 #include "testutil.h"
 #include "upload_facility.h"
+#include "upload_leveldb.h"
 #include "upload_local.h"
 #include "upload_s3.h"
 #include "upload_spooler_definition.h"
@@ -120,6 +121,11 @@ class T_Uploaders : public FileSandbox {
   }
 
 
+  virtual void SetUp(const type<upload::LevelDbUploader> type_specifier) {
+    // Empty, no specific needs
+  }
+
+
   virtual void SetUp(const type<upload::S3Uploader> type_specifier) {
     repo_alias = "testdata";
     CreateTempS3ConfigFile(10, 10);
@@ -140,6 +146,11 @@ class T_Uploaders : public FileSandbox {
 
 
   virtual void TearDown(const type<upload::LocalUploader> type_specifier) {
+    // Empty, no specific needs
+  }
+
+
+  virtual void TearDown(const type<upload::LevelDbUploader> type_specifier) {
     // Empty, no specific needs
   }
 
@@ -190,6 +201,16 @@ class T_Uploaders : public FileSandbox {
   std::string GetSpoolerDefinition(
       const type<upload::LocalUploader> type_specifier) const {
     const std::string spl_type   = "local";
+    const std::string spl_tmp    = T_Uploaders::tmp_dir;
+    const std::string spl_cfg    = T_Uploaders::dest_dir;
+    const std::string definition = spl_type + "," + spl_tmp + "," + spl_cfg;
+    return definition;
+  }
+
+
+  std::string GetSpoolerDefinition(
+      const type<upload::LevelDbUploader> type_specifier) const {
+    const std::string spl_type   = "leveldb";
     const std::string spl_tmp    = T_Uploaders::tmp_dir;
     const std::string spl_cfg    = T_Uploaders::dest_dir;
     const std::string definition = spl_type + "," + spl_tmp + "," + spl_cfg;
@@ -627,7 +648,7 @@ template <class UploadersT>
 const std::string T_Uploaders<UploadersT>::dest_dir =
     string(T_Uploaders::sandbox_path) + "/dest";
 
-typedef testing::Types<S3Uploader, LocalUploader> UploadTypes;
+typedef testing::Types<S3Uploader, LocalUploader, LevelDbUploader> UploadTypes;
 TYPED_TEST_CASE(T_Uploaders, UploadTypes);
 
 
