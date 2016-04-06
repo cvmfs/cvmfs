@@ -203,14 +203,24 @@ static int DoSynchronousScratchCleanup(const string &fqrn) {
 static int DoAsynchronousScratchCleanup(const string &fqrn) {
   const string wastebin = string(kSpoolArea) + "/" + fqrn + "/scratch/wastebin";
 
-  // double-fork to daemonize the process
+  // double-fork to daemonize the process and redirect I/O to /dev/null
   pid_t pid;
   int statloc;
   if ((pid = fork()) == 0) {
     int retval = setsid();
     assert(retval != -1);
     if ((pid = fork()) == 0) {
-      close(0); close(1); close(2);
+      int null_read = open("/dev/null", O_RDONLY);
+      int null_write = open("/dev/null", O_WRONLY);
+      assert((null_read >= 0) && (null_write >= 0));
+      retval = dup2(null_read, 0);
+      assert(retval == 0);
+      retval = dup2(null_write, 1);
+      assert(retval == 1);
+      retval = dup2(null_write, 2);
+      assert(retval == 2);
+      close(null_read);
+      close(null_write);
     } else {
       assert(pid > 0);
       _exit(0);
