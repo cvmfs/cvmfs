@@ -3074,6 +3074,7 @@ mkfs() {
   local create_cmd="$(__swissknife_cmd) create  \
     -t $temp_dir                                \
     -r $upstream                                \
+    -n $name                                    \
     -a $hash_algo $volatile_opt                 \
     -o ${temp_dir}/new_manifest"
   if $garbage_collectable; then
@@ -5109,8 +5110,10 @@ __do_snapshot() {
     fi
 
     local initial_snapshot=0
+    local initial_snapshot_flag=""
     if $user_shell "$(__swissknife_cmd) peek -d .cvmfs_last_snapshot -r ${upstream}" | grep -v -q "available"; then
       initial_snapshot=1
+      initial_snapshot_flag="-i"
     fi
 
     # check for other snapshots in progress
@@ -5167,7 +5170,7 @@ __do_snapshot() {
         -k $public_key                                 \
         -n $num_workers                                \
         -t $timeout                                    \
-        -a $retries $with_history $log_level"
+        -a $retries $with_history $initial_snapshot_flag $log_level"
 
     local last_snapshot_tmp="${spool_dir}/tmp/last_snapshot"
     $user_shell "date --utc > $last_snapshot_tmp"

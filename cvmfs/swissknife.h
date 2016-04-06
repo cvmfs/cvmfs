@@ -102,7 +102,10 @@ class Command {
                              const shash::Any  &base_hash = shash::Any()) const;
 
   template <class ObjectFetcherT>
-  manifest::Reflog* GetOrCreateReflog(ObjectFetcherT    *object_fetcher,
+  manifest::Reflog* FetchReflog(ObjectFetcherT    *object_fetcher,
+                                const std::string &repo_name);
+
+  manifest::Reflog* CreateEmptyReflog(const std::string &temp_directory,
                                       const std::string &repo_name);
 
   download::DownloadManager*   download_manager()  const;

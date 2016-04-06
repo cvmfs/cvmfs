@@ -97,6 +97,7 @@ string              *temp_dir = NULL;
 unsigned             num_parallel = 1;
 bool                 pull_history = false;
 bool                 is_garbage_collectable = false;
+bool                 initial_snapshot = false;
 upload::Spooler     *spooler = NULL;
 int                  pipe_chunks[2];
 // required for concurrent reading
@@ -524,6 +525,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     inspect_existing_catalogs = true;
   if (args.find('w') != args.end())
     stratum1_url = args.find('w')->second;
+  if (args.find('i') != args.end())
+    initial_snapshot = true;
 
   if (!preload_cache && stratum1_url == NULL) {
     LogCvmfs(kLogCvmfs, kLogStderr, "need -w <stratum 1 URL>");
@@ -616,18 +619,30 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   }
 
   if (!preload_cache) {
-    ObjectFetcher object_fetcher_stratum1(repository_name,
-                                          *stratum1_url,
-                                          *temp_dir,
-                                          download_manager(),
-                                          signature_manager());
+    if (initial_snapshot) {
+      LogCvmfs(kLogCvmfs, kLogStdout, "Creating an empty Reflog for '%s'",
+                                      repository_name.c_str());
+      reflog = CreateEmptyReflog(*temp_dir, repository_name);
+      if (reflog == NULL) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "failed to create initial Reflog");
+        goto fini;
+      }
+    } else {
+      ObjectFetcher object_fetcher_stratum1(repository_name,
+                                            *stratum1_url,
+                                            *temp_dir,
+                                            download_manager(),
+                                            signature_manager());
 
-    reflog = GetOrCreateReflog(&object_fetcher_stratum1, repository_name);
-    if (reflog == NULL) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "failed to get or construct a Reflog");
-      goto fini;
+      reflog = FetchReflog(&object_fetcher_stratum1, repository_name);
+      if (reflog == NULL) {
+        LogCvmfs(kLogCvmfs, kLogVerboseMsg, "failed to get Reflog (ignoring)");
+      }
     }
-    reflog->BeginTransaction();
+
+    if (reflog != NULL) {
+      reflog->BeginTransaction();
+    }
   }
 
   // Get meta info
@@ -771,7 +786,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     }
 
     // upload Reflog database
-    if (!preload_cache) {
+    if (!preload_cache && reflog != NULL) {
       reflog->CommitTransaction();
       spooler->UploadReflog(reflog->CloseAndReturnDatabaseFile());
       spooler->WaitForUpload();
