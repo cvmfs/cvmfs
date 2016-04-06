@@ -177,7 +177,8 @@ int CommandGc::Main(const ArgumentList &args) {
 
   if (uploader->GetNumberOfErrors() > 0) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to upload updated Reflog");
-    success = false;
+    uploader->TearDown();
+    return 1;
   }
 
   uploader->TearDown();
