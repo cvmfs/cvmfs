@@ -192,7 +192,7 @@ is_subcommand() {
   local supported_commands="mkfs add-replica import publish rollback rmfs alterfs \
     resign list info tag list-tags lstags check transaction abort snapshot \
     skeleton migrate list-catalogs update-geodb gc catalog-chown eliminate-hardlinks \
-    update-info update-repoinfo"
+    update-info update-repoinfo mount"
 
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
@@ -1428,10 +1428,12 @@ foreclose_legacy_cvmfs() {
 __health_check_print_repair_info() {
   local name=$1
   local repair_in_txn=$2
+  local force_repair=$3
 
   load_repo_config $name
 
-  if [ x"$CVMFS_AUTO_REPAIR_MOUNTPOINT" = x"false" ]; then
+  if [ x"$CVMFS_AUTO_REPAIR_MOUNTPOINT" = x"false" ] && \
+     [ $force_repair -eq 0 ]; then
     echo "Auto-Repair is disabled (CVMFS_AUTO_REPAIR_MOUNTPOINT = false)" >&2
     exit 1
   fi
@@ -1456,13 +1458,18 @@ __health_check_syslog_repair_info() {
 
 # checks and warns in inconsistent repository states or unfavorable configs.
 #
+# Note: the 'force_repair' parameter is a retrofit for the CernVM-FS 2.2.2 bug
+#       fix release of refactorings done to `health_check()` in CernVM-FS 2.3.0
+#
 # @param name           the FQRN of the repository to be checked
 # @param quiet          disable printing of warnings
 # @param repair_in_txn  repair even if currently in a transaction
+# @param force_repair   override CVMFS_AUTO_REPAIR_MOUNTPOINT=false
 health_check() {
   local name=$1
   local quiet=${2-0}
   local repair_in_txn=${3-0}
+  local force_repair=${4-0}
   local rdonly_broken=0
   local rw_broken=0
   local success=false
@@ -1488,14 +1495,14 @@ health_check() {
   # check mounted read-only cvmfs client
   if ! is_mounted "${CVMFS_SPOOL_DIR}/rdonly"; then
     echo "${CVMFS_SPOOL_DIR}/rdonly is not mounted properly." >&2
-    __health_check_print_repair_info $name $repair_in_txn
+    __health_check_print_repair_info $name $repair_in_txn $force_repair
     rdonly_broken=1
   fi
 
   # check mounted union file system
   if ! is_mounted "/cvmfs/$name"; then
     echo "/cvmfs/$name is not mounted properly." >&2
-    __health_check_print_repair_info $name $repair_in_txn
+    __health_check_print_repair_info $name $repair_in_txn $force_repair
     rw_broken=1
   fi
 
@@ -1526,7 +1533,7 @@ health_check() {
   #       the union mountpoint in the right state afterwards
   if [ x"$(get_mounted_root_hash $name)" != x"$(get_published_root_hash $name)" ]; then
     echo "$name is not based on the newest published revision" >&2
-    __health_check_print_repair_info $name $repair_in_txn
+    __health_check_print_repair_info $name $repair_in_txn $force_repair
     local published_hash="$(get_published_root_hash $name)"
     echo -n "Note: Trying to remount repository mountpoints to $published_hash... "
     cvmfs_suid_helper rw_umount     $name                   && \
@@ -1542,7 +1549,7 @@ health_check() {
   if is_in_transaction $name; then
     if ! is_mounted "/cvmfs/$name" "^.* rw[, ].*$"; then
       echo "$name is in a transaction but /cvmfs/$name is not mounted read/write" >&2
-      __health_check_print_repair_info $name $repair_in_txn
+      __health_check_print_repair_info $name $repair_in_txn $force_repair
       echo -n "Note: Trying to remount /cvmfs/${name} read/write... "
       cvmfs_suid_helper open $name && success=true || success=false
       __health_check_syslog_repair_info $name "non-writable transaction" $success
@@ -1551,7 +1558,7 @@ health_check() {
   else
     if ! is_mounted "/cvmfs/$name" "^.* ro[, ].*$"; then
       echo "$name is not in a transaction but /cvmfs/$name is mounted read/write" >&2
-      __health_check_print_repair_info $name $repair_in_txn
+      __health_check_print_repair_info $name $repair_in_txn $force_repair
       echo -n "Note: Trying to remount /cvmfs/${name} read-only... "
       cvmfs_suid_helper lock $name && success=true || success=false
       __health_check_syslog_repair_info $name "writable mount point" $success
@@ -5936,6 +5943,53 @@ update_info() {
 ################################################################################
 
 
+cvmfs_server_mount() {
+  local names=""
+  local mount_all=0
+  local retval=0
+
+  OPTIND=1
+  while getopts "a" option; do
+    case $option in
+      a)
+        mount_all=1
+      ;;
+      ?)
+        shift $(($OPTIND-2))
+        usage "Command mount: Unrecognized option: $1"
+      ;;
+    esac
+  done
+  shift $(($OPTIND-1))
+
+  if [ $mount_all -eq 1 ]; then
+    # sanity checks
+    is_root || die "Permission Denied: need root to mount all repositories"
+    names="$(ls /etc/cvmfs/repositories.d)"
+  else
+    # get repository name
+    check_parameter_count_for_multiple_repositories $#
+    names=$(get_or_guess_multiple_repository_names $@)
+    check_multiple_repository_existence "$names"
+  fi
+
+  for name in $names; do
+    is_stratum0        $name || continue
+    is_owner_or_root   $name || { echo "Permission Denied: $name is owned by $CVMFS_USER" >&2; retval=1; continue; }
+
+    local quiet=0
+    local repair_in_txn=1
+    local force_repair=1
+    health_check $name $quiet $repair_in_txn $force_repair || { echo "Failed to mount $name" >&2; retval=1; continue; }
+  done
+
+  return $retval
+}
+
+
+################################################################################
+
+
 skeleton() {
   local skeleton_dir
   local skeleton_user
@@ -6010,6 +6064,11 @@ if is_subcommand $subcommand; then
     fi
     shift 1
   done
+
+  # CernVM-FS 2.3.0 cherry-picking workaround: "mount" --> "cvmfs_server_mount"
+  #  --> The next release will prefix all "$subcommand"s with 'cvmfs_server_'
+  #      but we didn't want to pull this refactoring into a bugfix release
+  subcommand=$(echo "$subcommand" | sed 's/^mount$/cvmfs_server_mount/')
 
   # replace a dash (-) by an underscore (_) and call the requested sub-command
   eval "$(echo $subcommand | sed 's/-/_/g') $args"
