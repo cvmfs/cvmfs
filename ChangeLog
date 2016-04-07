@@ -1,4 +1,5 @@
 2.3.0:
+  * Add `cvmfs_server mount` command (CVM-996)
   * Remove scratch directory asynchronously on publish
   * Fix maintaining "previous revision" pointer during catalog migrations
   * Optimize sequence of creation/removal of nested catalogs during publish
