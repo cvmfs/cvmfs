@@ -222,6 +222,24 @@ done
 popd
 %endif
 
+%pretrans server
+[ -d "/var/spool/cvmfs"  ]          || exit 0
+[ -d "/etc/cvmfs/repositories.d/" ] || exit 0
+
+for repo in /var/spool/cvmfs/*; do
+  [ -d $repo ] && [ ! -f /etc/cvmfs/repositories.d/$(basename $repo)/replica.conf ] || continue
+
+  if [ -f ${repo}/in_transaction.lock ] || \
+     [ -d ${repo}/in_transaction      ] || \
+     [ -f ${repo}/in_transaction      ]; then
+    echo "     Found open CernVM-FS repository transactions."           >&2
+    echo "     Please abort or publish them before updating CernVM-FS." >&2
+    exit 1
+  fi
+done
+
+exit 0
+
 %pre
 %if 0%{?suse_version}
   /usr/bin/getent group cvmfs >/dev/null
@@ -404,6 +422,8 @@ fi
 %doc COPYING AUTHORS README ChangeLog
 
 %changelog
+* Thu Apr 07 2016 Rene Meusel <rene.meusel@cern.ch> - 2.3.0
+- Check for open repo transactions before updating server package
 * Sat Jan 23 2016 Brian Bockelman <bbockelm@cse.unl.edu> - 2.2.0
 - Build with VOMS support
 * Thu Jan 21 2016 Jakob Blomer <jblomer@cern.ch> - 2.2.0
