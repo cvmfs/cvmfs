@@ -215,7 +215,7 @@ is_subcommand() {
   local supported_commands="mkfs add-replica import publish rollback rmfs alterfs    \
     resign list info tag list-tags lstags check transaction abort snapshot           \
     skeleton migrate list-catalogs update-geodb gc catalog-chown eliminate-hardlinks \
-    update-info update-repoinfo"
+    update-info update-repoinfo mount"
 
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
@@ -1553,6 +1553,7 @@ __hc_transition() {
 #   -q    silence notifications to stdout/stderr (syslog messages stay in place)
 #   -r    try to repair detected inconsistencies (non-zero exit on failure)
 #   -t    repair even if the repository is in a transaction
+#   -f    force repair (even if CVMFS_AUTO_REPAIR_MOUNTPOINT=false)
 #
 # @param name   the FQRN of the repository to be checked
 # @return       0 if repository is healthy (or has been successfully repaired)
@@ -1562,8 +1563,9 @@ health_check() {
   local quiet=0
   local repair=0
   local repair_in_txn=0
+  local force_repair=0
 
-  while getopts "qrt" option; do
+  while getopts "qrtf" option; do
     case $option in
       q)
         quiet=1
@@ -1574,6 +1576,10 @@ health_check() {
       t)
         repair=1
         repair_in_txn=1
+      ;;
+      f)
+        repair=1
+        force_repair=1
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -1651,7 +1657,8 @@ health_check() {
   fi
 
   # check if we are allowed to attempt a repair
-  if [ x"$CVMFS_AUTO_REPAIR_MOUNTPOINT" = x"false" ]; then
+  if [ x"$CVMFS_AUTO_REPAIR_MOUNTPOINT" = x"false" ] && \
+     [ $force_repair = 0 ]; then
     echo "Auto-Repair is disabled (CVMFS_AUTO_REPAIR_MOUNTPOINT = false)" >&2
     exit 1
   fi
@@ -6215,6 +6222,49 @@ cvmfs_server_update_info() {
     update_global_meta_info "$tmp_file" || die "fail (update meta info)"
   fi
   echo "done"
+}
+
+
+################################################################################
+
+
+cvmfs_server_mount() {
+  local names=""
+  local mount_all=0
+  local retval=0
+
+  OPTIND=1
+  while getopts "a" option; do
+    case $option in
+      a)
+        mount_all=1
+      ;;
+      ?)
+        shift $(($OPTIND-2))
+        usage "Command mount: Unrecognized option: $1"
+      ;;
+    esac
+  done
+  shift $(($OPTIND-1))
+
+  if [ $mount_all -eq 1 ]; then
+    # sanity checks
+    is_root || die "Permission Denied: need root to mount all repositories"
+    names="$(ls /etc/cvmfs/repositories.d)"
+  else
+    # get repository name
+    check_parameter_count_for_multiple_repositories $#
+    names=$(get_or_guess_multiple_repository_names $@)
+    check_multiple_repository_existence "$names"
+  fi
+
+  for name in $names; do
+    is_stratum0        $name || continue
+    is_owner_or_root   $name || { echo "Permission Denied: $name is owned by $CVMFS_USER" >&2; retval=1; continue; }
+    health_check -rftq $name || { echo "Failed to mount $name"                            >&2; retval=1; continue; }
+  done
+
+  return $retval
 }
 
 
