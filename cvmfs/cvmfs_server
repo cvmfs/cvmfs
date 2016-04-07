@@ -5868,13 +5868,20 @@ cvmfs_server_migrate() {
 
     # get repository information
     load_repo_config $name
+    creator="$(repository_creator_version $name)"
 
     # more sanity checks
     is_owner_or_root $name || { echo "Permission denied: Repository $name is owned by $user"; retcode=1; continue; }
     check_repository_compatibility $name "nokill" && { echo "Repository '$name' is already up-to-date."; continue; }
     health_check -r $name
 
-    creator="$(repository_creator_version $name)"
+    if is_stratum0 $name && is_in_transaction $name; then
+      echo "Repository '$name' is currently in a transaction - migrating might"
+      echo "result in data loss. Please abort or publish this transaction with"
+      echo "the CernVM-FS version ($creator) that opened it."
+      retcode=1
+      continue
+    fi
 
     # do the migrations...
     if [ x"$creator" = x"2.1.6" ]; then
