@@ -73,8 +73,6 @@ CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
                               -x src/518-hardlinkstresstest                   \
                                  src/523-corruptchunkfailover                 \
                                  src/524-corruptmanifestfailover              \
-                                 src/577-garbagecollecthiddenstratum1revision \
-                                 src/579-garbagecollectstratum1legacytag      \
                                  src/585-xattrs                               \
                                  --                                           \
                                  src/5*                                       \
@@ -111,8 +109,6 @@ if [ $s3_retval -eq 0 ]; then
                                src/568-migratecorruptrepo                   \
                                src/571-localbackendumask                    \
                                src/572-proxyfailover                        \
-                               src/577-garbagecollecthiddenstratum1revision \
-                               src/579-garbagecollectstratum1legacytag      \
                                src/583-httpredirects                        \
                                src/585-xattrs                               \
                                src/591-importrepo                           \
