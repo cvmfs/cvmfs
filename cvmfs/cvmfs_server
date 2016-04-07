@@ -6054,6 +6054,11 @@ if is_subcommand $subcommand; then
     shift 1
   done
 
+  # CernVM-FS 2.3.0 cherry-picking workaround: "mount" --> "cvmfs_server_mount"
+  #  --> The next release will prefix all "$subcommand"s with 'cvmfs_server_'
+  #      but we didn't want to pull this refactoring into a bugfix release
+  subcommand=$(echo "$subcommand" | sed 's/^mount$/cvmfs_server_mount/')
+
   # replace a dash (-) by an underscore (_) and call the requested sub-command
   eval "$(echo $subcommand | sed 's/-/_/g') $args"
 else
