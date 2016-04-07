@@ -269,7 +269,14 @@ cvmfs_run_test() {
   cvmfs_server mount $CVMFS_TEST_REPO $repo2 > $mount_log_2 2>&1 && return 73
 
   echo "check that an error message was printed"
-  cat $mount_log_2 | grep 'Trying to mount.*fail' || return 74
+  # retrofit for CernVM-FS 2.2.2 bugfix release:
+  #  --> we didn't pull in a refactoring of `cvmfs_server health_check()` at the
+  #      expense of less concise status/error logging
+  #
+  # '... does not exist' --> OverlayFS
+  # '... No such file'   --> AUFS
+  cat $mount_log_2 | grep 'Trying to mount.*does not exist' || \
+  cat $mount_log_2 | grep 'Trying to mount.*No such file'   || return 74
 
   echo "check that $repo_dir is still not mounted but $repo2_repo_dir is"
   cat /proc/mounts | grep -e " $repo_dir "         && return 75
