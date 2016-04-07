@@ -5805,7 +5805,7 @@ _migrate_2_1_20() {
   load_repo_config $name
 }
 
-migrate_2_2_0() {
+_migrate_2_2_0() {
   local name=$1
   local destination_version="2.3.0-1"
   local server_conf="/etc/cvmfs/repositories.d/${name}/server.conf"
@@ -5912,7 +5912,7 @@ cvmfs_server_migrate() {
          x"$creator" = x"2.2.1-1" ] && \
          is_stratum0 $name;
     then
-      migrate_2_2_0 $name
+      _migrate_2_2_0 $name
     fi
 
   done
