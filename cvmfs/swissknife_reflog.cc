@@ -20,8 +20,8 @@ typedef HttpObjectFetcher<> ObjectFetcher;
 
 class RootChainWalker {
  public:
-  typedef typename ObjectFetcher::CatalogTN CatalogTN;
-  typedef typename ObjectFetcher::HistoryTN HistoryTN;
+  typedef ObjectFetcher::CatalogTN CatalogTN;
+  typedef ObjectFetcher::HistoryTN HistoryTN;
 
  public:
   RootChainWalker(const manifest::Manifest *manifest,
