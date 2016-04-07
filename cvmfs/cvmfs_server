@@ -541,7 +541,8 @@ least CernVM-FS $creator to manipulate this repository."
     fi
   fi
 
-  if [ "$creator" = "2.2.0-1" ] || [ "$creator" = "2.2.1-1" ]; then
+  if [ "$creator" = "2.2.0-1" ] || [ "$creator" = "2.2.1-1" ] || \
+     [ "$creator" = "2.2.2-1" ]; then
     if version_greater_or_equal "2.3.0"; then
       _repo_is_incompatible "$creator" $nokill
       return $?
@@ -5923,7 +5924,8 @@ cvmfs_server_migrate() {
     fi
 
     if [ x"$creator" = x"2.2.0-1" -o   \
-         x"$creator" = x"2.2.1-1" ] && \
+         x"$creator" = x"2.2.1-1" -o   \
+         x"$creator" = x"2.2.2-1" ] && \
          is_stratum0 $name;
     then
       _migrate_2_2_0 $name
