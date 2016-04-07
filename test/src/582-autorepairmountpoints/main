@@ -92,8 +92,8 @@ cvmfs_run_test() {
   echo "unmount union file system mountpoint"
   sudo umount $repo_dir || return 3
 
-  echo "check the repository"
-  local check_log_1="check_1.log"
+  local check_log_1="${scratch_dir}/check_1.log"
+  echo "check the repository (log: ${check_log_1})"
   cvmfs_server check $CVMFS_TEST_REPO > $check_log_1 2>&1 || return 4
 
   echo "check the error and warning messages"
@@ -111,8 +111,8 @@ cvmfs_run_test() {
   echo "unmount read-only cvmfs branch"
   sudo umount $rd_only || return 8
 
-  echo "check the repository"
-  local check_log_2="check_2.log"
+  local check_log_2="${scratch_dir}/check_2.log"
+  echo "check the repository (log: ${check_log_2})"
   cvmfs_server check $CVMFS_TEST_REPO > $check_log_2 2>&1 || return 9
 
   echo "check the error and warning messages"
@@ -135,13 +135,12 @@ cvmfs_run_test() {
   echo "mount the union file system again (without CVMFS mounted underneath)"
   sudo mount $repo_dir || return 108
 
-  echo "check the repository"
-  local check_log_2_1="check_2.1.log"
+  local check_log_2_1="${scratch_dir}/check_2.1.log"
+  echo "check the repository (log: ${check_log_2_1})"
   cvmfs_server check $CVMFS_TEST_REPO > $check_log_2_1 2>&1 || return 109
 
   echo "check the error and warning messages"
   cat $check_log_2_1 | grep -e "${CVMFS_TEST_REPO}/rdonly is not mounted"    || return 110
-  cat $check_log_2_1 | grep -e "Only.*lower.*branch is broken"               || return 111
   cat $check_log_2_1 | grep -e "Trying.*umount.* /cvmfs/${CVMFS_TEST_REPO}"  || return 112
   cat $check_log_2_1 | grep -e "Trying to mount .*${CVMFS_TEST_REPO}/rdonly" || return 113
   cat $check_log_2_1 | grep -e "Trying to mount /cvmfs/${CVMFS_TEST_REPO}"   || return 114
@@ -154,8 +153,8 @@ cvmfs_run_test() {
   echo "remount union file system read/write"
   sudo mount -o remount,rw $repo_dir || return 14
 
-  echo "open transaction"
-  local check_log_3="check_3.log"
+  local check_log_3="${scratch_dir}/check_3.log"
+  echo "open transaction (log: ${check_log_3})"
   start_transaction $CVMFS_TEST_REPO > $check_log_3 2>&1 || return 15
 
   echo "check the error and warning messages"
@@ -170,8 +169,8 @@ cvmfs_run_test() {
   echo "remount union file system read-only"
   sudo mount -o remount,ro $repo_dir || return 19
 
-  echo "publish transaction (should fail)"
-  local check_log_4="check_4.log"
+  local check_log_4="${scratch_dir}/check_4.log"
+  echo "publish transaction (should fail | log: ${check_log_4})"
   publish_repo $CVMFS_TEST_REPO > $check_log_4 2>&1 && return 20
 
   echo "check the error and warning messages"
@@ -183,8 +182,8 @@ cvmfs_run_test() {
 
   # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-  echo "run abort to bring the repository back in shape"
-  local check_log_5="check_5.log"
+  local check_log_5="${scratch_dir}/check_5.log"
+  echo "run abort to bring the repository back in shape (log: ${check_log_5})"
   abort_transaction $CVMFS_TEST_REPO > $check_log_5 2>&1 || return 24
 
   echo "check the error and warning messages"
@@ -220,8 +219,8 @@ cvmfs_run_test() {
   sudo umount $repo_dir || return 30
   sudo umount $rd_only  || return 31
 
-  echo "publish transaction (should fail)"
-  local check_log_6="check_6.log"
+  local check_log_6="${scratch_dir}/check_6.log"
+  echo "publish transaction (should fail | log: ${check_log_6})"
   publish_repo $CVMFS_TEST_REPO > $check_log_6 2>&1 && return 32
 
   echo "check the error and warning messages"
@@ -230,8 +229,8 @@ cvmfs_run_test() {
 
   # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-  echo "run abort to bring the repository back in shape"
-  local check_log_7="check_7.log"
+  local check_log_7="${scratch_dir}/check_7.log"
+  echo "run abort to bring the repository back in shape (log: ${check_log_7})"
   abort_transaction $CVMFS_TEST_REPO > $check_log_7 2>&1 || return 35
 
   echo "check the error and warning messages"
@@ -260,8 +259,8 @@ cvmfs_run_test() {
   echo "open transaction"
   start_transaction $CVMFS_TEST_REPO || return 44
 
-  echo "publish transaction"
-  local check_log_8="check_8.log"
+  local check_log_8="${scratch_dir}/check_8.log"
+  echo "publish transaction (log: ${check_log_8})"
   publish_repo $CVMFS_TEST_REPO > $check_log_8 2>&1 || return 45
 
   # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -277,13 +276,16 @@ cvmfs_run_test() {
   local tampered_root_hash="$(attr -qg root_hash $rd_only)"
   [ x"$tampered_root_hash" = x"$old_root_hash" ] || return 46
 
-  echo "open a transaction (should remount the repository)"
-  local check_log_9="check_9.log"
+  local check_log_9="${scratch_dir}/check_9.log"
+  echo "open a transaction (should remount the repository | log: ${check_log_9})"
   start_transaction $CVMFS_TEST_REPO > $check_log_9 2>&1 || return 47
 
   echo "check the error and warning messages"
   cat $check_log_9 | grep -e "${CVMFS_TEST_REPO} .* not based on .* published revision" || return 48
-  cat $check_log_9 | grep -e "Trying to remount .* to $current_root_hash"               || return 49
+  cat $check_log_9 | grep -e "Trying to umount /cvmfs/${CVMFS_TEST_REPO}"               || return 49
+  cat $check_log_9 | grep -e "Trying to umount .*${CVMFS_TEST_REPO}/rdonly"             || return 150
+  cat $check_log_9 | grep -e "Trying to mount .*${CVMFS_TEST_REPO}/rdonly"              || return 151
+  cat $check_log_9 | grep -e "Trying to mount /cvmfs/${CVMFS_TEST_REPO}"                || return 152
 
   echo "add a couple of files"
   do_some_changes_to $repo_dir || return 50
@@ -316,8 +318,8 @@ cvmfs_run_test() {
   echo "create a manipulated client.local file with '$old_root_hash' and remount"
   mount_old_root_hash $CVMFS_TEST_REPO $old_root_hash || return $?
 
-  echo "publish repository (should fail)"
-  local check_log_10="check_10.log"
+  local check_log_10="${scratch_dir}/check_10.log"
+  echo "publish repository (should fail | log: ${check_log_10})"
   publish_repo $CVMFS_TEST_REPO > $check_log_10 2>&1 && return 56
 
   echo "check error and warning messages"
@@ -327,13 +329,16 @@ cvmfs_run_test() {
   echo "check if transaction is still open"
   [ -e ${CVMFS_SPOOL_DIR}/in_transaction.lock ] || return 59
 
-  echo "run abort to bring the repository back in shape"
-  local check_log_11="check_11.log"
+  local check_log_11="${scratch_dir}/check_11.log"
+  echo "run abort to bring the repository back in shape (log: ${check_log_11})"
   abort_transaction $CVMFS_TEST_REPO > $check_log_11 2>&1 || return 60
 
   echo "check error and warning messages"
   cat $check_log_11 | grep -e "${CVMFS_TEST_REPO} .* not based on .* published revision"         || return 61
-  cat $check_log_11 | grep -e "Trying to remount .* to $current_root_hash"                       || return 62
+  cat $check_log_11 | grep -e "Trying to umount /cvmfs/${CVMFS_TEST_REPO}"                       || return 62
+  cat $check_log_11 | grep -e "Trying to umount .*${CVMFS_TEST_REPO}/rdonly"                     || return 163
+  cat $check_log_11 | grep -e "Trying to mount .*${CVMFS_TEST_REPO}/rdonly"                      || return 164
+  cat $check_log_11 | grep -e "Trying to mount /cvmfs/${CVMFS_TEST_REPO}"                        || return 165
   cat $check_log_11 | grep -e "${CVMFS_TEST_REPO} .* in a transaction .* not mounted read/write" || return 63
   cat $check_log_11 | grep -e "Trying to remount .* read/write"                                  || return 64
 

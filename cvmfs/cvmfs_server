@@ -212,8 +212,8 @@ cvmfs_mkfqrn() {
 # @return   0 if the command was recognized
 is_subcommand() {
   local subcommand="$1"
-  local supported_commands="mkfs add-replica import publish rollback rmfs alterfs \
-    resign list info tag list-tags lstags check transaction abort snapshot \
+  local supported_commands="mkfs add-replica import publish rollback rmfs alterfs    \
+    resign list info tag list-tags lstags check transaction abort snapshot           \
     skeleton migrate list-catalogs update-geodb gc catalog-chown eliminate-hardlinks \
     update-info update-repoinfo"
 
@@ -1500,47 +1500,97 @@ foreclose_legacy_cvmfs() {
 }
 
 
-__health_check_print_repair_info() {
-  local name=$1
-  local repair_in_txn=$2
-
-  load_repo_config $name
-
-  if [ x"$CVMFS_AUTO_REPAIR_MOUNTPOINT" = x"false" ]; then
-    echo "Auto-Repair is disabled (CVMFS_AUTO_REPAIR_MOUNTPOINT = false)" >&2
-    exit 1
-  fi
-
-  if is_in_transaction $name && [ $repair_in_txn = 0 ]; then
-    echo "Repository $name is in a transaction and cannot be repaired." >&2
-    echo "--> Run \`cvmfs_server abort $name\` to revert and repair."   >&2
-    exit 1
-  fi
-}
-
-__health_check_syslog_repair_info() {
+__hc_print_status_report() {
   local name="$1"
-  local reason="$2"
-  local success="$3"
-  if $success; then
-    to_syslog_for_repo $name "repaired mounts ($reason)"
+  local rdonly_broken=$2
+  local rdonly_outdated=$3
+  local rw_broken=$4
+  local rw_should_be_rdonly=$5
+  local rw_should_be_rw=$6
+
+  [ $rdonly_broken       -eq 0 ] || echo "${CVMFS_SPOOL_DIR}/rdonly is not mounted properly."                   >&2
+  [ $rdonly_outdated     -eq 0 ] || echo "$name is not based on the newest published revision"                  >&2
+  [ $rw_broken           -eq 0 ] || echo "/cvmfs/$name is not mounted properly."                                >&2
+  [ $rw_should_be_rdonly -eq 0 ] || echo "$name is not in a transaction but /cvmfs/$name is mounted read/write" >&2
+  [ $rw_should_be_rw     -eq 0 ] || echo "$name is in a transaction but /cvmfs/$name is not mounted read/write" >&2
+}
+
+__hc_transition() {
+  local name="$1"
+  local quiet="$2"
+  local transition="$3"
+  local msg=""
+  local stdout_msg=""
+  local retcode=0
+
+  case $transition in
+    rw_umount)     msg="Trying to umount /cvmfs/${name}"             ;;
+    rdonly_umount) msg="Trying to umount ${CVMFS_SPOOL_DIR}/rdonly"  ;;
+    rw_mount)      msg="Trying to mount /cvmfs/${name}"              ;;
+    rdonly_mount)  msg="Trying to mount ${CVMFS_SPOOL_DIR}/rdonly"   ;;
+    open)          msg="Trying to remount /cvmfs/${name} read/write" ;;
+    lock)          msg="Trying to remount /cvmfs/${name} read-only"  ;;
+    *)             exit 2                                            ;;
+  esac
+
+  stdout_msg="Note: ${msg}... "
+  [ $quiet = 0 ] && echo -n "$stdout_msg" >&2
+
+  if run_suid_helper $transition $name > /dev/null; then
+    [ $quiet = 0 ] && echo "success" >&2
+    to_syslog_for_repo $name "${msg}... success"
   else
-    to_syslog_for_repo $name "failed to repair mounts ($reason)"
+    [ $quiet = 0 ] || echo -n "${stdout_msg}" >&2 # error messages are not quiet
+    echo "fail"                               >&2
+    to_syslog_for_repo $name "${msg}... fail"
+    exit 1
   fi
 }
 
-# checks and warns in inconsistent repository states or unfavorable configs.
+# Checks for inconsistent repository states or unfavorable configs. Can repair
+# inconsistent repository mount states (-r)
+# Parameters:
+#   -q    silence notifications to stdout/stderr (syslog messages stay in place)
+#   -r    try to repair detected inconsistencies (non-zero exit on failure)
+#   -t    repair even if the repository is in a transaction
 #
-# @param name           the FQRN of the repository to be checked
-# @param quiet          disable printing of warnings
-# @param repair_in_txn  repair even if currently in a transaction
+# @param name   the FQRN of the repository to be checked
+# @return       0 if repository is healthy (or has been successfully repaired)
+#               otherwise 1 (or abort when -r is given and repair fails)
 health_check() {
-  local name=$1
-  local quiet=${2-0}
-  local repair_in_txn=${3-0}
+  local name=""
+  local quiet=0
+  local repair=0
+  local repair_in_txn=0
+
+  while getopts "qrt" option; do
+    case $option in
+      q)
+        quiet=1
+      ;;
+      r)
+        repair=1
+      ;;
+      t)
+        repair=1
+        repair_in_txn=1
+      ;;
+      ?)
+        shift $(($OPTIND-2))
+        die "health_check: Unrecognized option: $1"
+      ;;
+    esac
+  done
+  shift $(($OPTIND-1))
+
+  [ $# -eq 1 ] || die "health_check: No repository name provided"
+  name="$1"
+
   local rdonly_broken=0
   local rw_broken=0
-  local success=false
+  local rw_should_be_rdonly=0
+  local rw_should_be_rw=0
+  local rdonly_outdated=0
 
   load_repo_config $name
 
@@ -1549,90 +1599,132 @@ health_check() {
     return 0
   fi
 
-  # health check cannot deal with repositories currently being published
-  if [ $quiet -eq 0 ] && is_publishing $name; then
-    echo "WARNING: The repository $name is currently publishing and should not"
-    echo "be touched. If you are absolutely sure, that this is _not_ the case,"
-    echo "please run the following command and retry:"
-    echo
-    echo "   rm -fR ${CVMFS_SPOOL_DIR}/is_publishing.lock"
-    echo
-    exit 1
-  fi
-
   # check mounted read-only cvmfs client
   if ! is_mounted "${CVMFS_SPOOL_DIR}/rdonly"; then
-    echo "${CVMFS_SPOOL_DIR}/rdonly is not mounted properly." >&2
-    __health_check_print_repair_info $name $repair_in_txn
     rdonly_broken=1
+  elif [ x"$(get_mounted_root_hash $name)"      != \
+         x"$(get_published_root_hash $name)" ]; then
+    rdonly_outdated=1
   fi
 
   # check mounted union file system
   if ! is_mounted "/cvmfs/$name"; then
-    echo "/cvmfs/$name is not mounted properly." >&2
-    __health_check_print_repair_info $name $repair_in_txn
     rw_broken=1
+    if is_in_transaction $name; then
+      rw_should_be_rw=1
+      rw_should_be_ro=0
+    else
+      rw_should_be_rw=0
+      rw_should_be_ro=1
+    fi
+  else
+    if ! is_in_transaction $name && \
+         is_mounted "/cvmfs/$name" "^.* rw[, ].*$"; then
+      rw_should_be_rdonly=1
+    elif is_in_transaction $name && \
+         is_mounted "/cvmfs/$name" "^.* ro[, ].*$"; then
+      rw_should_be_rw=1
+    fi
   fi
 
-  # try to repair the mountpoints
-  if [ $rdonly_broken -eq 1 ]; then
+  # did we detect any kind of problem?
+  if [ $((   $rdonly_broken       \
+           + $rdonly_outdated     \
+           + $rw_broken           \
+           + $rw_should_be_rdonly \
+           + $rw_should_be_rw )) -eq 0 ]; then
+    return 0
+  fi
+
+  # should we print the found status?
+  if [ $quiet = 0 ]; then
+    __hc_print_status_report $name $rdonly_broken       \
+                                   $rdonly_outdated     \
+                                   $rw_broken           \
+                                   $rw_should_be_rdonly \
+                                   $rw_should_be_rw
+  fi
+
+  # should we try a repair?
+  if [ $repair = 0 ]; then
+    return 1
+  fi
+
+  # check if we are allowed to attempt a repair
+  if [ x"$CVMFS_AUTO_REPAIR_MOUNTPOINT" = x"false" ]; then
+    echo "Auto-Repair is disabled (CVMFS_AUTO_REPAIR_MOUNTPOINT = false)" >&2
+    exit 1
+  fi
+
+  if is_publishing $name; then
+    echo "WARNING: The repository $name is currently publishing and should not" >&2
+    echo "be touched. If you are absolutely sure, that this is _not_ the case," >&2
+    echo "please run the following command and retry:"                          >&2
+    echo                                                                        >&2
+    echo "   rm -fR ${CVMFS_SPOOL_DIR}/is_publishing.lock"                      >&2
+    echo                                                                        >&2
+    exit 1
+  fi
+
+  if is_in_transaction $name && [ $repair_in_txn = 0 ]; then
+    echo "Repository $name is in a transaction and cannot be repaired." >&2
+    echo "--> Run \`cvmfs_server abort $name\` to revert and repair."   >&2
+    exit 1
+  fi
+
+  to_syslog_for_repo $name "attempting mountpoint repair ($rdonly_broken $rdonly_outdated $rw_broken $rw_should_be_rdonly $rw_should_be_rw)"
+
+  # consecutively bring the mountpoints into a sane state by working bottom up:
+  #   1. solve problems with the rdonly mountpoint
+  #      Note: this might require to 'break' the rw mountpoint (rw_broken --> 1)
+  #      1.1. solve outdated rdonly mountpoint (rdonly_outdated --> 0)
+  #      1.2. remount rdonly mountpoint        (rdonly_broken   --> 0)
+  #   2. solve problems with the rw mountpoint
+  #      2.1. mount the rw mountpoint as read-only    (rw_broken       --> 0)
+  #      2.2. remount the rw mountpoint as read-only  (rw_should_be_ro --> 0)
+  #      2.2. remount the rw mountpoint as read-write (rw_should_be_rw --> 0)
+  if [ $rdonly_outdated -eq 1 ]; then
     if [ $rw_broken -eq 0 ]; then
-      echo "Only the lower union file system branch is broken" >&2
-      echo -n "Note: Trying to umount /cvmfs/${name}... "
-      run_suid_helper rw_umount $name && echo "success" || { echo "fail"; exit 1; }
-      rw_broken=1 # will be fixed downstream
+      __hc_transition $name $quiet "rw_umount"
+      rw_broken=1 # ... remount happens downstream
     fi
 
-    echo -n "Note: Trying to mount ${CVMFS_SPOOL_DIR}/rdonly... "
-    run_suid_helper rdonly_mount $name > /dev/null && success=true || success=false
-    __health_check_syslog_repair_info $name ".../rdonly" $success
-    $success && echo "success" || { echo "fail"; exit 1; }
+    if [ $rdonly_broken -eq 0 ]; then
+      __hc_transition $name $quiet "rdonly_umount"
+      rdonly_broken=1 # ... remount happens downstream
+    fi
+
+    set_ro_root_hash $name "$(get_published_root_hash $name)" || die "failed to update root hash"
+    rdonly_outdated=0 # ... remount will mount the latest revision
+  fi
+
+  if [ $rdonly_broken -eq 1 ]; then
+    if [ $rw_broken -eq 0 ]; then
+      __hc_transition $name $quiet "rw_umount"
+      rw_broken=1 # ... remount happens downstream
+    fi
+
+    __hc_transition $name $quiet "rdonly_mount"
+    rdonly_broken=0 # ... rdonly is repaired
   fi
 
   if [ $rw_broken -eq 1 ]; then
-    echo -n "Note: Trying to mount /cvmfs/${name}... "
-    run_suid_helper rw_mount $name && success=true || success=false
-    __health_check_syslog_repair_info $name "/cvmfs/${name}" $success
-    $success && echo "success" || { echo "fail"; exit 1; }
+    __hc_transition $name $quiet "rw_mount"
+    rw_broken=0           # ... rw is repaired
+    rw_should_be_rdonly=0 # ... and already mounted read-only by default
   fi
 
-  # check mounted CVMFS revision against published one
-  # Note: this needs to repaired first, so that the consecutive checks can put
-  #       the union mountpoint in the right state afterwards
-  if [ x"$(get_mounted_root_hash $name)" != x"$(get_published_root_hash $name)" ]; then
-    echo "$name is not based on the newest published revision" >&2
-    __health_check_print_repair_info $name $repair_in_txn
-    local published_hash="$(get_published_root_hash $name)"
-    echo -n "Note: Trying to remount repository mountpoints to $published_hash... "
-    run_suid_helper rw_umount     $name                     && \
-    run_suid_helper rdonly_umount $name                     && \
-    set_ro_root_hash                $name "$published_hash" && \
-    run_suid_helper rdonly_mount  $name > /dev/null         && \
-    run_suid_helper rw_mount      $name && success=true || success=false
-    __health_check_syslog_repair_info $name "outdated revision" $success
-    $success && echo "success" || { echo "fail"; exit 1; }
+  if [ $rw_should_be_rw -eq 1 ]; then
+    __hc_transition $name $quiet "open"
+    rw_should_be_rw=0 # ... rw is repaired
   fi
 
-  # check transaction status
-  if is_in_transaction $name; then
-    if ! is_mounted "/cvmfs/$name" "^.* rw[, ].*$"; then
-      echo "$name is in a transaction but /cvmfs/$name is not mounted read/write" >&2
-      __health_check_print_repair_info $name $repair_in_txn
-      echo -n "Note: Trying to remount /cvmfs/${name} read/write... "
-      run_suid_helper open $name && success=true || success=false
-      __health_check_syslog_repair_info $name "non-writable transaction" $success
-      $success && echo "success" || { echo "fail"; exit 1; }
-    fi
-  else
-    if ! is_mounted "/cvmfs/$name" "^.* ro[, ].*$"; then
-      echo "$name is not in a transaction but /cvmfs/$name is mounted read/write" >&2
-      __health_check_print_repair_info $name $repair_in_txn
-      echo -n "Note: Trying to remount /cvmfs/${name} read-only... "
-      run_suid_helper lock $name && success=true || success=false
-      __health_check_syslog_repair_info $name "writable mount point" $success
-      $success && echo "success" || { echo "fail"; exit 1; }
-    fi
+  if [ $rw_should_be_rdonly -eq 1 ]; then
+    __hc_transition $name $quiet "lock"
+    rw_should_be_rdonly=0 # ... rw is repaired
   fi
+
+  to_syslog_for_repo $name "finished mountpoint repair ($rdonly_broken $rdonly_outdated $rw_broken $rw_should_be_rdonly $rw_should_be_rw)"
 }
 
 
@@ -2048,9 +2140,9 @@ migrate_legacy_dirtab() {
   local tmp_dirtab=$(mktemp)
 
   cp -f "$dirtab_path" "$tmp_dirtab"                           || return 1
-  transaction $name > /dev/null                                || return 2
+  cvmfs_server_transaction $name > /dev/null                   || return 2
   cat "$tmp_dirtab" | sed -e 's/\(.*\)/\1\/\*/' > $dirtab_path || return 3
-  publish $name > /dev/null                                    || return 4
+  cvmfs_server_publish $name > /dev/null                       || return 4
   rm -f "$tmp_dirtab"                                          || return 5
 }
 
@@ -2822,14 +2914,14 @@ _update_geodb() {
   _update_geodb_install && echo "done" || { echo "fail"; return 3; }
 }
 
-update_geodb() {
+cvmfs_server_update_geodb() {
   _update_geodb $@
 }
 
 ################################################################################
 
 
-alterfs() {
+cvmfs_server_alterfs() {
   local master_replica=-1
   local name
 
@@ -2897,7 +2989,7 @@ alterfs() {
 ################################################################################
 
 
-mkfs() {
+cvmfs_server_mkfs() {
   local name
   local stratum0
   local upstream
@@ -3131,16 +3223,16 @@ mkfs() {
   echo "done"
 
   if [ $replicable -eq 1 ]; then
-    alterfs -m on $name
+    cvmfs_server_alterfs -m on $name
   fi
 
-  health_check $name
+  health_check $name || die "fail! (health check after mount)"
 
   echo -n "Initial commit... "
-  transaction $name > /dev/null  || die "fail (transaction)"
+  cvmfs_server_transaction $name > /dev/null || die "fail (transaction)"
   echo "New CernVM-FS repository for $name" > /cvmfs/${name}/new_repository
   chown $cvmfs_user /cvmfs/${name}/new_repository
-  publish $name > /dev/null      || die "fail (publish)"
+  cvmfs_server_publish $name > /dev/null || die "fail (publish)"
   # When publishing an external repository, it is the user's responsibility to
   # stage the actual data files to the web server - not the publication function.
   # Hence, the following is guaranteed to not work.
@@ -3158,7 +3250,7 @@ mkfs() {
 ################################################################################
 
 
-add_replica() {
+cvmfs_server_add_replica() {
   local name
   local alias_name
   local stratum0
@@ -3370,7 +3462,7 @@ _import_desaster_cleanup() {
 }
 
 
-import() {
+cvmfs_server_import() {
   local name
   local stratum0
   local keys_location="/etc/cvmfs/keys"
@@ -3633,7 +3725,7 @@ import() {
 
   # make stratum0 repository replicable if requested
   if [ $replicable -eq 1 ]; then
-    alterfs -m on $name
+    cvmfs_server_alterfs -m on $name
   fi
 
   echo -n "Updating global JSON information... "
@@ -3660,7 +3752,7 @@ import() {
 ################################################################################
 
 
-rmfs() {
+cvmfs_server_rmfs() {
   local names
   local force=0
   local preserve_data=0
@@ -3770,7 +3862,7 @@ rmfs() {
 ################################################################################
 
 
-resign() {
+cvmfs_server_resign() {
   local names
   local retcode=0
 
@@ -3785,8 +3877,8 @@ resign() {
   for name in $names; do
 
     # sanity checks
-    is_stratum0 $name || { echo "Repository $name is not a stratum 0 repository"; retcode=1; continue; }
-    health_check $name
+    is_stratum0 $name  || { echo "Repository $name is not a stratum 0 repository"; retcode=1; continue; }
+    health_check $name || { echo "Repository $name is not healthy"; retcode=1; continue; }
 
     # get repository information
     load_repo_config $name
@@ -3808,10 +3900,9 @@ resign() {
 ################################################################################
 
 
-list_catalogs() {
+cvmfs_server_list_catalogs() {
   local name
   local param_list="-t"
-  local silence_warnings=0
 
   # optional parameter handling
   OPTIND=1
@@ -3829,7 +3920,6 @@ list_catalogs() {
       ;;
       x)
         param_list=$(echo "$param_list" | sed 's/-t\s\?//')
-        silence_warnings=1
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -3851,7 +3941,7 @@ list_catalogs() {
 
   # more sanity checks
   is_owner_or_root $name || die "Permission denied: Repository $name is owned by $CVMFS_USER"
-  health_check $name $silence_warnings
+  health_check     $name || die "Repository $name is not healthy"
 
   # check if repository is compatible to the installed CernVM-FS version
   check_repository_compatibility $name
@@ -3872,7 +3962,7 @@ list_catalogs() {
 ################################################################################
 
 
-info() {
+cvmfs_server_info() {
   local name
   local stratum0
 
@@ -3916,7 +4006,7 @@ Copy /etc/cvmfs/keys/${name}.pub to the client"
 ################################################################################
 
 
-tag() {
+cvmfs_server_tag() {
   local name
   local tag_name=""
   local action_add=0
@@ -3992,7 +4082,7 @@ tag() {
   is_owner_or_root $name           || die "Permission denied: Repository $name is owned by $CVMFS_USER"
   is_stratum0 $name                || die "This is not a stratum 0 repository"
   ! is_publishing $name            || die "Repository is currently publishing"
-  health_check $name $silence_warnings
+  health_check -r $name
 
   local base_hash="$(get_mounted_root_hash $name)"
   local user_shell="$(get_user_shell $name)"
@@ -4101,13 +4191,13 @@ tag() {
 ################################################################################
 
 
-lstags() {
-  tag -l "$@" # backward compatibility alias
+cvmfs_server_lstags() {
+  cvmfs_server_tag -l "$@" # backward compatibility alias
   echo "NOTE: cvmfs_server lstags is deprecated! Use cvmfs_server tag instead" 1>&2
 }
 
-list_tags() {
-  tag -l "$@" # backward compatibility alias
+cvmfs_server_list_tags() {
+  cvmfs_server_tag -l "$@" # backward compatibility alias
   echo "NOTE: cvmfs_server list-tags is deprecated! Use cvmfs_server tag instead" 1>&2
 }
 
@@ -4115,7 +4205,7 @@ list_tags() {
 ################################################################################
 
 
-check() {
+cvmfs_server_check() {
   local name
   local upstream
   local storage_dir
@@ -4162,7 +4252,7 @@ check() {
 
   # more sanity checks
   is_owner_or_root $name || die "Permission denied: Repository $name is owned by $CVMFS_USER"
-  health_check $name
+  health_check -r $name
 
   # check if repository is compatible to the installed CernVM-FS version
   check_repository_compatibility $name
@@ -4212,7 +4302,7 @@ check() {
 ################################################################################
 
 
-list() {
+cvmfs_server_list() {
   for repository in /etc/cvmfs/repositories.d/*; do
     if [ "x$repository" = "x/etc/cvmfs/repositories.d/*" ]; then
       return 0
@@ -4263,12 +4353,18 @@ list() {
       fi
     fi
 
+    # check if the repository is healthy
+    local health_info=""
+    if ! health_check -q $name; then
+      health_info=" - unhealthy"
+    fi
+
     # get the storage type of the repository
     local storage_type=""
     storage_type=$(get_upstream_type $CVMFS_UPSTREAM_STORAGE)
 
     # print out repository information list
-    echo "$name ($CVMFS_REPOSITORY_TYPE / $storage_type$transaction_info$whitelist_info) $stratum1_info $version_info"
+    echo "$name ($CVMFS_REPOSITORY_TYPE / $storage_type$transaction_info$whitelist_info$health_info) $stratum1_info $version_info"
     CVMFS_CREATOR_VERSION=""
   done
 }
@@ -4277,7 +4373,7 @@ list() {
 ################################################################################
 
 
-transaction() {
+cvmfs_server_transaction() {
   local names
   local spool_dir
   local stratum0
@@ -4313,7 +4409,7 @@ transaction() {
 
     # sanity checks
     is_stratum0 $name || { echo "Repository $name is not a stratum 0 repository"; retcode=1; continue; }
-    health_check $name
+    health_check -r $name
 
     # get repository information
     load_repo_config $name
@@ -4344,7 +4440,7 @@ transaction() {
 ################################################################################
 
 
-abort() {
+cvmfs_server_abort() {
   local names
   local user
   local spool_dir
@@ -4402,9 +4498,7 @@ abort() {
     fi
 
     # do a health check (might also repair out-of-sync in_transaction repos)
-    local silence_warnings=0
-    local repair_in_txn=1
-    health_check $name $silence_warnings $repair_in_txn
+    health_check -rt $name
 
     # check if we have open file descriptors on /cvmfs/<name>
     local use_fd_fallback=0
@@ -4426,7 +4520,7 @@ abort() {
 ################################################################################
 
 
-publish() {
+cvmfs_server_publish() {
   local names
   local user
   local spool_dir
@@ -4514,7 +4608,7 @@ publish() {
     # sanity checks
     is_stratum0 $name   || die "This is not a stratum 0 repository"
     is_publishing $name && die "Another publish process is active for $name"
-    health_check $name
+    health_check -r $name
 
     # get repository information
     load_repo_config $name
@@ -4722,7 +4816,7 @@ publish() {
 ################################################################################
 
 
-rollback() {
+cvmfs_server_rollback() {
   local name
   local user
   local spool_dir
@@ -4760,7 +4854,7 @@ rollback() {
   check_repository_existence $name || die "The repository $name does not exist"
   is_stratum0 $name                || die "This is not a stratum 0 repository"
   is_publishing $name              && die "Repository $name is currently being published"
-  health_check $name
+  health_check -r $name
 
   # get repository information
   load_repo_config $name
@@ -4834,7 +4928,7 @@ rollback() {
 ################################################################################
 
 
-gc() {
+cvmfs_server_gc() {
   local names
   local list_deleted_objects=0
   local dry_run=0
@@ -5407,7 +5501,7 @@ EOF
   done
 }
 
-snapshot() {
+cvmfs_server_snapshot() {
   local alias_names
   local retcode=0
   local abort_on_conflict=0
@@ -5465,7 +5559,7 @@ snapshot() {
 ################################################################################
 
 
-migrate_2_1_6() {
+_migrate_2_1_6() {
   local name=$1
   local destination_version="2.1.7"
 
@@ -5533,7 +5627,7 @@ EOF
 }
 
 
-migrate_2_1_7() {
+_migrate_2_1_7() {
   local name=$1
   local destination_version="2.1.15"
 
@@ -5603,7 +5697,7 @@ migrate_2_1_7() {
 }
 
 # note that this is only run on stratum1s that have local upstream storage
-migrate_2_1_15() {
+_migrate_2_1_15() {
   local name=$1
   local destination_version="2.1.20"
   local conf_file
@@ -5654,7 +5748,7 @@ migrate_2_1_15() {
   load_repo_config $name
 }
 
-migrate_2_1_20() {
+_migrate_2_1_20() {
   local name=$1
   local destination_version="2.2.0-1"
   local creator=$(repository_creator_version $name)
@@ -5711,7 +5805,7 @@ migrate_2_1_20() {
   load_repo_config $name
 }
 
-migrate_2_2_0() {
+_migrate_2_2_0() {
   local name=$1
   local destination_version="2.3.0-1"
   local server_conf="/etc/cvmfs/repositories.d/${name}/server.conf"
@@ -5749,7 +5843,7 @@ migrate_2_2_0() {
   load_repo_config $name
 }
 
-migrate() {
+cvmfs_server_migrate() {
   local names
   local retcode=0
 
@@ -5771,13 +5865,13 @@ migrate() {
     # more sanity checks
     is_owner_or_root $name || { echo "Permission denied: Repository $name is owned by $user"; retcode=1; continue; }
     check_repository_compatibility $name "nokill" && { echo "Repository '$name' is already up-to-date."; continue; }
-    health_check $name
+    health_check -r $name
 
     creator="$(repository_creator_version $name)"
 
     # do the migrations...
     if [ x"$creator" = x"2.1.6" ]; then
-      migrate_2_1_6 $name
+      _migrate_2_1_6 $name
     fi
 
     if [ x"$creator" = x"2.1.7" -o  \
@@ -5789,7 +5883,7 @@ migrate() {
          x"$creator" = x"2.1.13" -o \
          x"$creator" = x"2.1.14" ];
     then
-      migrate_2_1_7 $name
+      _migrate_2_1_7 $name
     fi
 
     if [ x"$creator" = x"2.1.15" -o   \
@@ -5800,7 +5894,7 @@ migrate() {
          is_stratum1 $name         && \
          is_local_upstream $CVMFS_UPSTREAM_STORAGE;
     then
-      migrate_2_1_15 $name
+      _migrate_2_1_15 $name
     fi
 
     if [ x"$creator" = x"2.1.15" -o \
@@ -5811,14 +5905,14 @@ migrate() {
          x"$creator" = x"2.1.20" -o \
          x"$creator" = x"2.2.0-0" ];
     then
-      migrate_2_1_20 $name
+      _migrate_2_1_20 $name
     fi
 
     if [ x"$creator" = x"2.2.0-1" -o   \
          x"$creator" = x"2.2.1-1" ] && \
          is_stratum0 $name;
     then
-      migrate_2_2_0 $name
+      _migrate_2_2_0 $name
     fi
 
   done
@@ -5840,7 +5934,7 @@ _run_catalog_migration() {
   is_stratum0 $name       || die "This is not a stratum 0 repository"
   is_root                 || die "Permission denied: Only root can do that"
   is_in_transaction $name && die "Repository is already in a transaction"
-  health_check $name
+  health_check -r $name
 
   # all following commands need an open repository transaction and are supposed
   # to commit or abort it after performing the catalog migration.
@@ -5877,7 +5971,7 @@ _run_catalog_migration() {
 ################################################################################
 
 
-catalog_chown() {
+cvmfs_server_catalog_chown() {
   local uid_map
   local gid_map
 
@@ -5926,7 +6020,7 @@ catalog_chown() {
 ################################################################################
 
 
-eliminate_hardlinks() {
+cvmfs_server_eliminate_hardlinks() {
   local name=
   local force=0
 
@@ -5994,7 +6088,7 @@ _update_repoinfo_cleanup() {
   close_transaction $repo_name 0
 }
 
-update_repoinfo() {
+cvmfs_server_update_repoinfo() {
   local name
   local json_file
 
@@ -6022,7 +6116,7 @@ update_repoinfo() {
   is_owner_or_root $name           || die "Permission denied: Repository $name is owned by $CVMFS_USER"
   is_stratum0 $name                || die "This is not a stratum 0 repository"
   ! is_publishing $name            || die "Repository is currently publishing"
-  health_check $name $silence_warnings
+  health_check -r $name
   is_in_transaction $name && die "Cannot edit repository meta info while in a transaction"
   [ x"$json_file" = x"" ] || [ -f "$json_file" ] || die "Provided file '$json_file' doesn't exist"
 
@@ -6064,7 +6158,7 @@ _update_info_cleanup() {
   rm -f $tmp_file > /dev/null 2>&1
 }
 
-update_info() {
+cvmfs_server_update_info() {
   local configure_apache=1
   local edit_meta_info=1
 
@@ -6127,7 +6221,7 @@ update_info() {
 ################################################################################
 
 
-skeleton() {
+cvmfs_server_skeleton() {
   local skeleton_dir
   local skeleton_user
 
@@ -6203,7 +6297,7 @@ if is_subcommand $subcommand; then
   done
 
   # replace a dash (-) by an underscore (_) and call the requested sub-command
-  eval "$(echo $subcommand | sed 's/-/_/g') $args"
+  eval "cvmfs_server_$(echo $subcommand | sed 's/-/_/g') $args"
 else
   usage "Unrecognized command: $subcommand"
 fi
