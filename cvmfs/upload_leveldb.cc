@@ -8,6 +8,7 @@
 #include "options.h"
 #include "util/posix.h"
 #include "util/string.h"
+#include "util/mmap_file.h"
 
 namespace upload {
 
@@ -181,7 +182,30 @@ void LevelDbUploader::FileUpload(
   const std::string &remote_path,
   const CallbackTN   *callback
 ) {
-  Respond(callback, UploaderResults(1, local_path));
+  LevelDbHandle& handle = GetDatabaseForPath(remote_path);
+
+  MemoryMappedFile file(local_path);
+  if (!file.Map()) {
+    LogCvmfs(kLogUploadLevelDb, kLogStderr, "failed to read '%s'",
+             local_path.c_str());
+    Respond(callback, UploaderResults(1, local_path));
+    return;
+  }
+
+  leveldb::WriteOptions options;
+  const leveldb::Status status =
+    handle->Put(options,
+                remote_path,
+                leveldb::Slice(reinterpret_cast<const char*>(file.buffer()),
+                               file.size()));
+  if (!status.ok()) {
+    LogCvmfs(kLogUploadLevelDb, kLogStderr, "failed to write '%s' to LevelDB",
+             local_path.c_str());
+    Respond(callback, UploaderResults(2, local_path));
+    return;
+  }
+
+  Respond(callback, UploaderResults(0, local_path));
 }
 
 
