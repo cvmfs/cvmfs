@@ -216,14 +216,14 @@ UploadStreamHandle* LevelDbUploader::InitStreamedUpload(
 
 
 void LevelDbUploader::Upload(UploadStreamHandle  *handle,
-                           CharBuffer          *buffer,
-                           const CallbackTN    *callback) {
+                             CharBuffer          *buffer,
+                             const CallbackTN    *callback) {
   Respond(callback, UploaderResults(1, buffer));
 }
 
 
 void LevelDbUploader::FinalizeStreamedUpload(UploadStreamHandle  *handle,
-                                           const shash::Any    &content_hash) {
+                                             const shash::Any    &content_hash) {
   LevelDbStreamHandle *leveldb_handle =
                                       static_cast<LevelDbStreamHandle*>(handle);
   const CallbackTN *callback = handle->commit_callback;
