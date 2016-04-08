@@ -241,6 +241,10 @@ if (BUILD_UNITTESTS)
   if (TBB_PRIVATE_LIB)
     add_dependencies (${PROJECT_TEST_NAME} libtbb)
   endif (TBB_PRIVATE_LIB)
+
+  if (LEVELDB_BUILTIN)
+    add_dependencies (${PROJECT_TEST_NAME} libleveldb)
+  endif (LEVELDB_BUILTIN)
 endif (BUILD_UNITTESTS)
 
 if (BUILD_UNITTESTS_DEBUG)
@@ -264,6 +268,10 @@ if (BUILD_UNITTESTS_DEBUG)
     add_dependencies (${PROJECT_TEST_DEBUG_NAME} libtbb)
   endif (TBB_PRIVATE_LIB)
 
+  if (LEVELDB_BUILTIN)
+    add_dependencies (${PROJECT_TEST_DEBUG_NAME} libleveldb)
+  endif (LEVELDB_BUILTIN)
+
   add_dependencies (${PROJECT_TEST_DEBUG_NAME} libsha3)
 endif (BUILD_UNITTESTS_DEBUG)
 
@@ -283,8 +291,8 @@ set (UNITTEST_LINK_LIBRARIES ${GTEST_LIBRARIES} ${GOOGLETEST_ARCHIVE} ${OPENSSL_
                              ${LIBCURL_ARCHIVE} ${CARES_LIBRARIES} ${CARES_ARCHIVE} ${OPENSSL_LIBRARIES}
                              ${SQLITE3_LIBRARY} ${SQLITE3_ARCHIVE} ${TBB_LIBRARIES}
                              ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${UUID_LIBRARIES}
-                             ${SHA3_ARCHIVE} ${PACPARSER_LIBRARIES} ${PACPARSER_ARCHIVE}
-                             pthread dl)
+                             ${SHA3_ARCHIVE} ${PACPARSER_LIBRARIES} ${PACPARSER_ARCHIVE} ${LEVELDB_LIBRARIES}
+                             ${LEVELDB_ARCHIVE} pthread dl)
 
 target_link_libraries (${PROJECT_TEST_NAME} ${UNITTEST_LINK_LIBRARIES})
 
