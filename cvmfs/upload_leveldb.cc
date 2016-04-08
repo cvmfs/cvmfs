@@ -4,6 +4,10 @@
 
 #include "upload_leveldb.h"
 
+#include "options.h"
+#include "util/posix.h"
+#include "util/string.h"
+
 namespace upload {
 
 LevelDbUploader::LevelDbUploader(const SpoolerDefinition &spooler_definition) :
@@ -15,6 +19,54 @@ LevelDbUploader::LevelDbUploader(const SpoolerDefinition &spooler_definition) :
 
 bool LevelDbUploader::WillHandle(const SpoolerDefinition &spooler_definition) {
   return spooler_definition.driver_type == SpoolerDefinition::LevelDb;
+}
+
+
+bool LevelDbUploader::Initialize() {
+  const SpoolerDefinition  &sd          = spooler_definition();
+  const std::string         config_path = sd.spooler_configuration;
+
+  return ParseConfiguration(config_path) && AbstractUploader::Initialize();
+}
+
+
+bool LevelDbUploader::ParseConfiguration(const std::string &config_path) {
+  if (!FileExists(config_path)) {
+    LogCvmfs(kLogUploadLevelDb, kLogStderr,
+             "LevelDB uploader config file not found at '%s'",
+             config_path.c_str());
+    return false;
+  }
+
+  BashOptionsManager options_manager;
+  options_manager.ParsePath(config_path, false);
+
+  if (!options_manager.GetValue("CVMFS_LEVELDB_STORAGE", &base_path_)) {
+    LogCvmfs(kLogUploadLevelDb, kLogStderr,
+             "Failed to parse CVMFS_LEVELDB_STORAGE from '%s'",
+             config_path.c_str());
+    return false;
+  }
+
+  std::string leveldb_count_str;
+  if (!options_manager.GetValue("CVMFS_LEVELDB_COUNT", &leveldb_count_str)) {
+    LogCvmfs(kLogUploadLevelDb, kLogStderr,
+             "Failed to parse CVMFS_LEVELDB_COUNT from '%s'",
+             config_path.c_str());
+    return false;
+  }
+
+  database_count_ = String2Uint64(leveldb_count_str);
+  if (database_count_ < 1 || database_count_ > 255) {
+    LogCvmfs(kLogUploadLevelDb, kLogStderr,
+             "Fail, invalid CVMFS_LEVELDB_COUNT given: '%s'.",
+             leveldb_count_str.c_str());
+    LogCvmfs(kLogUploadLevelDb, kLogStderr,
+             "CVMFS_LEVELDB_COUNT should be in range 1-255.");
+    return false;
+  }
+
+  return true;
 }
 
 

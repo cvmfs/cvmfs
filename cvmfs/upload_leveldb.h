@@ -31,6 +31,8 @@ class LevelDbUploader : public AbstractUploader {
   explicit LevelDbUploader(const SpoolerDefinition &spooler_definition);
   static bool WillHandle(const SpoolerDefinition &spooler_definition);
 
+  bool Initialize();
+
   inline std::string name() const { return "LevelDB"; }
 
   void FileUpload(const std::string  &local_path,
@@ -58,6 +60,13 @@ class LevelDbUploader : public AbstractUploader {
 
  protected:
   void WorkerThread();
+
+ private:
+  bool ParseConfiguration(const std::string &config_path);
+
+ private:
+  std::string base_path_;
+  unsigned    database_count_;
 };
 
 }  // namespace upload
