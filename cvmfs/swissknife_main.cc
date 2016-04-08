@@ -19,6 +19,7 @@
 #include "swissknife_lsrepo.h"
 #include "swissknife_migrate.h"
 #include "swissknife_pull.h"
+#include "swissknife_reflog.h"
 #include "swissknife_scrub.h"
 #include "swissknife_sign.h"
 #include "swissknife_sync.h"
@@ -91,6 +92,7 @@ int main(int argc, char **argv) {
   command_list.push_back(new swissknife::CommandMigrate());
   command_list.push_back(new swissknife::CommandScrub());
   command_list.push_back(new swissknife::CommandGc());
+  command_list.push_back(new swissknife::CommandReconstructReflog());
 
   if (argc < 2) {
     Usage();

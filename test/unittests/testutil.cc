@@ -729,3 +729,19 @@ bool MockReflog::RemoveCatalog(const shash::Any &catalog) {
   references_.erase(catalog);
   return true;
 }
+
+bool MockReflog::ContainsCertificate(const shash::Any &certificate) const {
+  return references_.count(certificate) == 1;
+}
+
+bool MockReflog::ContainsCatalog(const shash::Any &catalog) const {
+  return references_.count(catalog) == 1;
+}
+
+bool MockReflog::ContainsHistory(const shash::Any &history) const {
+  return references_.count(history) == 1;
+}
+
+bool MockReflog::ContainsMetainfo(const shash::Any &metainfo) const {
+  return references_.count(metainfo) == 1;
+}

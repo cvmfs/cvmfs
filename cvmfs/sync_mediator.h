@@ -132,8 +132,8 @@ class SyncMediator {
   void RemoveDirectory(const SyncItem &entry);
   void TouchDirectory(const SyncItem &entry);
 
-  void CreateNestedCatalog(const SyncItem &requestFile);
-  void RemoveNestedCatalog(const SyncItem &requestFile);
+  void CreateNestedCatalog(const SyncItem &directory);
+  void RemoveNestedCatalog(const SyncItem &directory);
 
   // Called by file system traversal
   void EnterAddedDirectoryCallback(const std::string &parent_dir,

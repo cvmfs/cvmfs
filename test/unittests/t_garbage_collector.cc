@@ -959,7 +959,8 @@ TEST_F(T_GarbageCollector, KeepRevisionsBasedOnTimestamp) {
 
   EXPECT_EQ(5u, upl->deleted_hashes.size());
   EXPECT_EQ(14u, gc2.preserved_catalog_count());
-  EXPECT_EQ(2u, gc2.condemned_catalog_count());
+  EXPECT_EQ(0u, gc2.condemned_catalog_count());  // Reflog doesn't contain
+                                                 // deleted catalogs anymore
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -968,7 +969,7 @@ TEST_F(T_GarbageCollector, KeepRevisionsBasedOnTimestamp) {
   EXPECT_TRUE(gc3.Collect());
 
   EXPECT_EQ(14u, gc3.preserved_catalog_count());
-  EXPECT_EQ(2u, gc3.condemned_catalog_count());
+  EXPECT_EQ(0u, gc3.condemned_catalog_count());
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -977,7 +978,7 @@ TEST_F(T_GarbageCollector, KeepRevisionsBasedOnTimestamp) {
   EXPECT_TRUE(gc4.Collect());
 
   EXPECT_EQ(11u, gc4.preserved_catalog_count());
-  EXPECT_EQ(5u, gc4.condemned_catalog_count());
+  EXPECT_EQ(3u, gc4.condemned_catalog_count());
   EXPECT_EQ(11u, upl->deleted_hashes.size());
 
   EXPECT_TRUE(upl->HasDeleted(c[mp(1, "00")]->hash()));
@@ -1066,7 +1067,7 @@ TEST_F(T_GarbageCollector, KeepRevisionsBasedOnTimestamp) {
   EXPECT_TRUE(gc5.Collect());
 
   EXPECT_EQ(11u, gc5.preserved_catalog_count());
-  EXPECT_EQ(5u, gc5.condemned_catalog_count());
+  EXPECT_EQ(0u, gc5.condemned_catalog_count());
   EXPECT_EQ(11u, upl->deleted_hashes.size());
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -1076,7 +1077,7 @@ TEST_F(T_GarbageCollector, KeepRevisionsBasedOnTimestamp) {
   EXPECT_TRUE(gc6.Collect());
 
   EXPECT_EQ(11u, gc6.preserved_catalog_count());
-  EXPECT_EQ(5u, gc6.condemned_catalog_count());
+  EXPECT_EQ(0u, gc6.condemned_catalog_count());
   EXPECT_EQ(11u, upl->deleted_hashes.size());
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -1086,7 +1087,7 @@ TEST_F(T_GarbageCollector, KeepRevisionsBasedOnTimestamp) {
   EXPECT_TRUE(gc7.Collect());
 
   EXPECT_EQ(7u, gc7.preserved_catalog_count());
-  EXPECT_EQ(9u, gc7.condemned_catalog_count());
+  EXPECT_EQ(4u, gc7.condemned_catalog_count());
   EXPECT_EQ(29u, upl->deleted_hashes.size());
 
   EXPECT_TRUE(upl->HasDeleted(c[mp(4, "00")]->hash()));

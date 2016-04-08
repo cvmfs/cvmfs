@@ -194,4 +194,17 @@ manifest::Manifest* Command::FetchRemoteManifest(
   return manifest.Release();
 }
 
+
+manifest::Reflog* swissknife::Command::CreateEmptyReflog(
+                                              const std::string &temp_directory,
+                                              const std::string &repo_name) {
+  // create a new Reflog if there was none found yet
+  const std::string tmp_path_prefix = temp_directory + "/new_reflog";
+  const std::string tmp_path = CreateTempPath(tmp_path_prefix, 0600);
+
+  LogCvmfs(kLogCvmfs, kLogDebug, "creating new reflog '%s' for %s",
+                                 tmp_path.c_str(), repo_name.c_str());
+  return manifest::Reflog::Create(tmp_path, repo_name);
+}
+
 }  // namespace swissknife

@@ -98,35 +98,15 @@ change_files_in() {
   popdir
 }
 
-make_clg_path() {
-  local catalog_hash=$1
-  local cas_path="$(echo $catalog_hash | cut --bytes=1,2)"
-  local clg_path="$(echo $catalog_hash | cut --bytes=3-)C"
-  echo "${cas_path}/${clg_path}"
-}
-
-download_catalog() {
-  local base_url=$1
-  local catalog_hash=$2
-  local dest_path=$3
-  local catalog_url
-  catalog_url="${base_url}/data/$(make_clg_path $catalog_hash)"
-  echo "Downloading and Decompressing: $catalog_url into $dest_path"
-  curl --silent --show-error $catalog_url | cvmfs_swissknife zpipe -d > $dest_path
-}
-
 check_chunk_alignment() {
   local repo_name=$1
   local old_clg_hash=$2
   local new_clg_hash=$3
 
-  local old_catalog="old.db"
-  local new_catalog="new.db"
+  local old_catalog="$(download_and_decompress_object $repo_name ${old_clg_hash}C)"
+  local new_catalog="$(download_and_decompress_object $repo_name ${new_clg_hash}C)"
 
   load_repo_config $repo_name
-
-  download_catalog $CVMFS_STRATUM0 $old_clg_hash $old_catalog || return 1
-  download_catalog $CVMFS_STRATUM0 $new_clg_hash $new_catalog || return 2
 
   local big_file="50megabyte" # see change_files_in()
 
@@ -178,9 +158,10 @@ cvmfs_run_test() {
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
 
-  echo "retrieving name of root catalog for later comparison"
+  echo -n "retrieving name of root catalog for later comparison... "
   load_repo_config $CVMFS_TEST_REPO
-  local old_root_catalog=$(cvmfs_swissknife info -r $CVMFS_STRATUM0 -c)
+  local old_root_catalog="$(get_current_root_catalog $CVMFS_TEST_REPO)"
+  echo $old_root_catalog
 
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -202,8 +183,9 @@ cvmfs_run_test() {
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
 
-  echo "retrieving name of new root catalog"
-  local new_root_catalog=$(cvmfs_swissknife info -r $CVMFS_STRATUM0 -c)
+  echo -n "retrieving name of new root catalog... "
+  local new_root_catalog="$(get_current_root_catalog $CVMFS_TEST_REPO)"
+  echo $new_root_catalog
 
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 

@@ -64,6 +64,12 @@ void SyncUnion::PreprocessSyncItem(SyncItem *entry) const {
 }
 
 
+bool SyncUnion::IgnoreFilePredicate(const std::string &parent_dir,
+                                    const std::string &filename) {
+  return false;
+}
+
+
 bool SyncUnion::ProcessDirectory(const string &parent_dir,
                                  const string &dir_name)
 {
@@ -205,7 +211,8 @@ string SyncUnionAufs::UnwindWhiteoutFilename(const SyncItem &entry) const {
 bool SyncUnionAufs::IgnoreFilePredicate(const string &parent_dir,
                                         const string &filename)
 {
-  return (ignore_filenames_.find(filename) != ignore_filenames_.end());
+  return SyncUnion::IgnoreFilePredicate(parent_dir, filename) ||
+         (ignore_filenames_.find(filename) != ignore_filenames_.end());
 }
 
 
@@ -470,14 +477,6 @@ bool SyncUnionOverlayfs::IsOpaqueDirPath(const string &path) const {
 
 string SyncUnionOverlayfs::UnwindWhiteoutFilename(const SyncItem &entry) const {
   return entry.filename();
-}
-
-
-bool SyncUnionOverlayfs::IgnoreFilePredicate(const string &parent_dir,
-                                             const string &filename)
-{
-  // no files need to be ignored for OverlayFS
-  return false;
 }
 
 void SyncUnionOverlayfs::ProcessCharacterDevice(const std::string &parent_dir,

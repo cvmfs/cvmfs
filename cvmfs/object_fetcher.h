@@ -368,7 +368,8 @@ class LocalObjectFetcher :
     FILE *f = CreateTempFile(tmp_path, 0600, "w", file_path);
     if (NULL == f) {
       LogCvmfs(kLogDownload, kLogStderr,
-               "failed to create temp file (errno: %d)", errno);
+               "failed to create temp file '%s' (errno: %d)",
+               tmp_path.c_str(), errno);
       return BaseTN::kFailLocalIO;
     }
 
@@ -537,7 +538,8 @@ class HttpObjectFetcher :
     FILE *f = CreateTempFile(tmp_path, 0600, "w", file_path);
     if (NULL == f) {
       LogCvmfs(kLogDownload, kLogStderr,
-               "failed to create temp file (errno: %d)", errno);
+               "failed to create temp file '%s' (errno: %d)",
+               tmp_path.c_str(), errno);
       return BaseTN::kFailLocalIO;
     }
 

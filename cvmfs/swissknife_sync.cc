@@ -92,6 +92,7 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
   const string manifest_path = *args.find('o')->second;
   const string dir_temp = *args.find('t')->second;
   const string spooler_definition = *args.find('r')->second;
+  const string repo_name = *args.find('n')->second;
   if (args.find('l') != args.end()) {
     unsigned log_level =
       1 << (kLogLevel0 + String2Uint64(*args.find('l')->second));
@@ -133,6 +134,13 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
     return 1;
   }
 
+  UniquePtr<manifest::Reflog> reflog(CreateEmptyReflog(dir_temp, repo_name));
+  if (!reflog.IsValid()) {
+    PrintError("Failed to create fresh Reflog");
+    return 1;
+  }
+
+  spooler->UploadReflog(reflog->CloseAndReturnDatabaseFile());
   spooler->WaitForUpload();
   delete spooler;
 

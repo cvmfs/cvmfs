@@ -602,6 +602,7 @@ void CommandMigrate::AbstractMigrationWorker<DerivedT>::operator()(
   migration_stopwatch_.Start();
   const bool success = static_cast<DerivedT*>(this)->RunMigration(data) &&
                        UpdateNestedCatalogReferences(data) &&
+                       UpdateCatalogMetadata(data)         &&
                        CollectAndAggregateStatistics(data) &&
                        CleanupNestedCatalogs(data);
   data->success = success;
@@ -659,6 +660,28 @@ bool CommandMigrate::AbstractMigrationWorker<DerivedT>::
     }
     add_nested_catalog.Reset();
   }
+
+  return true;
+}
+
+
+template<class DerivedT>
+bool CommandMigrate::AbstractMigrationWorker<DerivedT>::
+     UpdateCatalogMetadata(PendingCatalog *data) const
+{
+  if (!data->HasChanges()) {
+    return true;
+  }
+
+  catalog::WritableCatalog *catalog =
+    (data->HasNew()) ? data->new_catalog : GetWritable(data->old_catalog);
+
+  // Set the previous revision hash in the new catalog to the old catalog
+  // we are doing the whole migration as a new snapshot that does not change
+  // any files, but just applies the necessary data schema migrations
+  catalog->SetPreviousRevision(data->old_catalog->hash());
+  catalog->IncrementRevision();
+  catalog->UpdateLastModified();
 
   return true;
 }
@@ -1025,13 +1048,6 @@ bool CommandMigrate::MigrationWorker_20x::MigrateFileMetadata(
     Error("Failed to migrate the properties table.", copy_properties, data);
     return false;
   }
-
-  // Set the previous revision hash in the new catalog to the old catalog
-  //   we are doing the whole migration as a new snapshot that does not change
-  //   any files, but just bumpes the catalog schema to the latest version
-  data->new_catalog->SetPreviousRevision(data->old_catalog->hash());
-  data->new_catalog->IncrementRevision();
-  data->new_catalog->UpdateLastModified();
 
   return true;
 }

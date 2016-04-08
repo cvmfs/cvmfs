@@ -10,18 +10,6 @@ get_catalog_file_size() {
 }
 
 
-get_and_decompress_root_catalog() {
-  local repo_name="$1"
-  local root_catalog="$(get_current_root_catalog $repo_name)C"
-  local object_url="$(get_object_url $repo_name $root_catalog)"
-  local sqlite_db="${root_catalog}.uncompressed"
-
-  wget --quiet $object_url                                             || return 1
-  cat $(basename $object_url) | cvmfs_swissknife zpipe -d > $sqlite_db || return 2
-  echo $sqlite_db
-}
-
-
 get_wasted_row_ids_in_root_catalog() {
   local repo_name="$1"
   local root_clg="$(get_and_decompress_root_catalog $repo_name)"
@@ -35,8 +23,8 @@ cvmfs_run_test() {
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
   local scratch_dir=$(pwd)
 
-  echo -n "checking for wget... "
-  which wget > /dev/null 2>&1 && echo "done" || { echo "not found"; return 1; }
+  echo -n "checking for curl... "
+  which curl > /dev/null 2>&1 && echo "done" || { echo "not found"; return 1; }
 
   echo -n "checking for sqlite3 utility... "
   which sqlite3 > /dev/null 2>&1 && echo "done" || { echo "not found"; return 1; }

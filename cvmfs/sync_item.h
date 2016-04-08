@@ -58,12 +58,13 @@ class SyncItem {
   inline bool IsNew()             const { return WasType(kItemNew);            }
   inline bool IsCharacterDevice() const { return IsType(kItemCharacterDevice); }
   inline bool IsGraftMarker()     const { return IsType(kItemMarker);          }
-  inline bool IsExternalData()    const { return external_data_;              }
+  inline bool IsExternalData()    const { return external_data_;               }
 
   inline bool IsWhiteout()        const { return whiteout_;                    }
   inline bool IsCatalogMarker()   const { return filename_ == ".cvmfscatalog"; }
   inline bool IsOpaqueDirectory() const { return IsDirectory() && opaque_;     }
 
+  bool HasCatalogMarker()         const { return has_catalog_marker_;          }
   bool HasGraftMarker()           const { return graft_marker_present_;        }
   bool IsValidGraft()             const { return valid_graft_;                 }
   bool IsChunkedGraft()           const { return graft_chunklist_;             }
@@ -207,6 +208,10 @@ class SyncItem {
 
   SyncItemType GetGenericFiletype(const EntryStat &stat) const;
 
+  void CheckMarkerFiles();
+
+  void CheckCatalogMarker();
+
   std::string GetGraftMarkerPath() const;
   void CheckGraft();
 
@@ -219,6 +224,7 @@ class SyncItem {
   bool whiteout_;                     /**< SyncUnion marked this as whiteout  */
   bool opaque_;                       /**< SyncUnion marked this as opaque dir*/
   bool masked_hardlink_;              /**< SyncUnion masked out the linkcount */
+  bool has_catalog_marker_;           /**< directory containing .cvmfscatalog */
   bool valid_graft_;                  /**< checksum and size in graft marker */
   bool graft_marker_present_;         /**< .cvmfsgraft-$filename exists */
 

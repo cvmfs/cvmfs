@@ -1,4 +1,4 @@
-cvmfs_test_name="Reference Log Handling"
+cvmfs_test_name="Missing Reference Log Ignore and On-Demand Recreation"
 cvmfs_test_autofs_on_startup=false
 
 
@@ -7,11 +7,11 @@ cleanup() {
   [ -z $CVMFS_TEST_627_REPLICA_NAME ] || sudo cvmfs_server rmfs -f $CVMFS_TEST_627_REPLICA_NAME
 }
 
-check_stratum1_tmp_dir_emptiness() {
+check_tmp_dir_emptiness() {
   local tmp_dir="$1"
   local tmp_dir_entries
   echo "check stratum1 tmp directory"
-  tmp_dir_entries=$(ls $tmp_dir | wc -l)
+  tmp_dir_entries=$(ls -a $tmp_dir | grep -v '^\.\+$' | wc -l)
   echo "$tmp_dir contains: $tmp_dir_entries"
   [ $tmp_dir_entries -eq 0 ]
 }
@@ -50,7 +50,12 @@ cvmfs_run_test() {
   which sqlite3 > /dev/null 2>&1 && echo "done" || { echo "fail"; return 1; }
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
-  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -g || return $?
+
+  echo -n "get Stratum 0 spool directory: "
+  load_repo_config $CVMFS_TEST_REPO
+  local s0_spool_tmp_dir="${CVMFS_SPOOL_DIR}/tmp"
+  echo "$s0_spool_tmp_dir"
 
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -75,7 +80,7 @@ cvmfs_run_test() {
   sudo cvmfs_server snapshot $replica_name || return 2
 
   echo "check that Stratum1 spooler tmp dir is empty"
-  check_stratum1_tmp_dir_emptiness $s1_spool_tmp_dir || return 3
+  check_tmp_dir_emptiness $s1_spool_tmp_dir || return 3
 
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -97,10 +102,19 @@ cvmfs_run_test() {
 
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
+  echo "check that Reflog is available on Stratum0"
+  peek_backend_raw $CVMFS_TEST_REPO ".cvmfsreflog" || return 71
+
+  echo "removing Reflog from Stratum0"
+  delete_from_backend $CVMFS_TEST_REPO ".cvmfsreflog" || return 72
+
   echo "creating a tag in Stratum0"
   cvmfs_server tag -a "foobar"                          \
                    -m "new tag to create a new history" \
                    -h "$root_hash_1" $CVMFS_TEST_REPO || return 6
+
+  echo "check that Stratum0 spooler tmp dir is empty"
+  check_tmp_dir_emptiness $s0_spool_tmp_dir || return 120
 
   echo "extracting root hashes from Stratum0"
   local root_hash_2=$(get_manifest_field $CVMFS_TEST_REPO 'C')
@@ -118,8 +132,8 @@ cvmfs_run_test() {
   [ x"$meta_info_2"    = x"$meta_info_1"   ] || return  9
   [ x"$certificate_2"  = x"$certificate_1" ] || return 10
 
-  echo "check Reflog from Stratum0"
-  check_reflog_contains $CVMFS_TEST_REPO "$history_1 $history_2" || return 11
+  echo "check that Reflog is gone on Stratum0"
+  peek_backend_raw $CVMFS_TEST_REPO ".cvmfsreflog" && return 11
 
   echo "check that Reflog from Stratum1 doesn't contain new history"
   check_reflog_contains $replica_name "$history_2" && return 12
@@ -139,6 +153,9 @@ EOF
 
   cvmfs_server update-repoinfo -f $json_file $CVMFS_TEST_REPO || return 13
 
+  echo "check that Stratum0 spooler tmp dir is empty"
+  check_tmp_dir_emptiness $s0_spool_tmp_dir || return 121
+
   echo "extracting root hashes from Stratum0"
   local root_hash_3=$(get_manifest_field $CVMFS_TEST_REPO 'C')
   local history_3=$(get_manifest_field $CVMFS_TEST_REPO 'H')
@@ -156,8 +173,8 @@ EOF
   [ x"$meta_info_3"   != x"$meta_info_1"   ] || return 16
   [ x"$certificate_3"  = x"$certificate_1" ] || return 17
 
-  echo "check Reflog from Stratum0"
-  check_reflog_contains $CVMFS_TEST_REPO "$history_1 $history_2 $meta_info_3 $meta_info_1" || return 18
+  echo "check that Reflog is still gone on Stratum0"
+  peek_backend_raw $CVMFS_TEST_REPO ".cvmfsreflog" && return 18
 
   echo "check that Reflog from Stratum1 doesn't contain new meta info"
   check_reflog_contains $replica_name "$meta_info_3" && return 19
@@ -167,6 +184,9 @@ EOF
   echo "Update revision in Stratum0"
   start_transaction $CVMFS_TEST_REPO || return 20
   publish_repo $CVMFS_TEST_REPO      || return 21
+
+  echo "check that Stratum0 spooler tmp dir is empty"
+  check_tmp_dir_emptiness $s0_spool_tmp_dir || return 122
 
   echo "extracting root hashes from Stratum0"
   local root_hash_4=$(get_manifest_field $CVMFS_TEST_REPO 'C')
@@ -184,8 +204,8 @@ EOF
   [ x"$meta_info_3"    = x"$meta_info_3"   ] || return 24
   [ x"$certificate_4"  = x"$certificate_1" ] || return 25
 
-  echo "check Reflog from Stratum0"
-  check_reflog_contains $CVMFS_TEST_REPO "$root_hash_4 $root_hash_1 $history_4 $history_2 $history_1" || return 26
+  echo "check that Reflog is still gone on Stratum0"
+  peek_backend_raw $CVMFS_TEST_REPO ".cvmfsreflog" && return 26
 
   echo "check that Reflog from Stratum1 doesn't contain new root catalog"
   check_reflog_contains $replica_name "$root_hash_4" && return 27
@@ -195,6 +215,9 @@ EOF
   echo "Update revision in Stratum0"
   start_transaction $CVMFS_TEST_REPO || return 28
   publish_repo $CVMFS_TEST_REPO      || return 29
+
+  echo "check that Stratum0 spooler tmp dir is empty"
+  check_tmp_dir_emptiness $s0_spool_tmp_dir || return 123
 
   echo "extracting root hashes from Stratum0"
   local root_hash_5=$(get_manifest_field $CVMFS_TEST_REPO 'C')
@@ -212,19 +235,138 @@ EOF
   [ x"$meta_info_5"    = x"$meta_info_3"   ] || return 32
   [ x"$certificate_5"  = x"$certificate_1" ] || return 33
 
-  echo "check Reflog from Stratum0"
-  check_reflog_contains $CVMFS_TEST_REPO "$root_hash_5 $root_hash_4 $root_hash_1 $history_5 $history_4 $history_2 $history_1 $meta_info_3 $meta_info_1 $certificate_1" || return 34
+  echo "check that Reflog is still gone on Stratum0"
+  peek_backend_raw $CVMFS_TEST_REPO ".cvmfsreflog" && return 34
 
   echo "check that Reflog from Stratum1 doesn't contain new root catalog"
   check_reflog_contains $replica_name "$root_hash_5" && return 35
 
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-  echo "create a snapshot in Stratum1"
-  cvmfs_server snapshot $replica_name || return 37
+  echo "enable garbage collection for Stratum0"
+  toggle_gc         $CVMFS_TEST_REPO || return 38
+  start_transaction $CVMFS_TEST_REPO || return 39
+  publish_repo      $CVMFS_TEST_REPO || return 40
+
+  echo "check that Stratum0 spooler tmp dir is empty"
+  check_tmp_dir_emptiness $s0_spool_tmp_dir || return 124
+
+  echo "extracting root hashes from Stratum0"
+  local root_hash_6=$(get_manifest_field $CVMFS_TEST_REPO 'C')
+  local history_6=$(get_manifest_field $CVMFS_TEST_REPO 'H')
+  local meta_info_6=$(get_manifest_field $CVMFS_TEST_REPO 'M')
+  local certificate_6=$(get_manifest_field $CVMFS_TEST_REPO 'X')
+  echo "C: $root_hash_6"
+  echo "H: $history_6"
+  echo "M: $meta_info_6"
+  echo "X: $certificate_6"
+
+  echo "check hash sanity"
+  [ x"$root_hash_6"   != x"$root_hash_5"   ] || return 41
+  [ x"$history_6"     != x"$history_5"     ] || return 42
+  [ x"$meta_info_6"    = x"$meta_info_3"   ] || return 43
+  [ x"$certificate_6"  = x"$certificate_1" ] || return 44
+
+  echo "remove repo tag 'foobar' (creating a new history db)"
+  cvmfs_server tag -fr "foobar" $CVMFS_TEST_REPO || return 80
+
+  echo "check that Stratum0 spooler tmp dir is empty"
+  check_tmp_dir_emptiness $s0_spool_tmp_dir || return 125
+
+  echo "extracting root hashes from Stratum0"
+  local root_hash_7=$(get_manifest_field $CVMFS_TEST_REPO 'C')
+  local history_7=$(get_manifest_field $CVMFS_TEST_REPO 'H')
+  local meta_info_7=$(get_manifest_field $CVMFS_TEST_REPO 'M')
+  local certificate_7=$(get_manifest_field $CVMFS_TEST_REPO 'X')
+  echo "C: $root_hash_7"
+  echo "H: $history_7"
+  echo "M: $meta_info_7"
+  echo "X: $certificate_7"
+
+  echo "check hash sanity"
+  [ x"$root_hash_7"    = x"$root_hash_6"   ] || return 81
+  [ x"$history_7"     != x"$history_6"     ] || return 82
+  [ x"$meta_info_7"    = x"$meta_info_3"   ] || return 83
+  [ x"$certificate_7"  = x"$certificate_1" ] || return 84
+
+  local gc_log_1="${scratch_dir}/gc_s0_1.log"
+  local gc_stdout_log_1="${scratch_dir}/gc_s0_stdout_1.log"
+  echo "run garbage collection on Stratum0 (deleting as much as possible | logging to: $gc_log_1 and $gc_stdout_log_1)"
+  cvmfs_server gc -fL "$gc_log_1" $CVMFS_TEST_REPO > $gc_stdout_log_1 2>&1 || return 45
+
+  echo "check that Stratum0 spooler tmp dir is empty"
+  check_tmp_dir_emptiness $s0_spool_tmp_dir || return 126
+
+  echo "extracting root hashes from Stratum0"
+  local root_hash_8=$(get_manifest_field $CVMFS_TEST_REPO 'C')
+  local history_8=$(get_manifest_field $CVMFS_TEST_REPO 'H')
+  local meta_info_8=$(get_manifest_field $CVMFS_TEST_REPO 'M')
+  local certificate_8=$(get_manifest_field $CVMFS_TEST_REPO 'X')
+  echo "C: $root_hash_8"
+  echo "H: $history_8"
+  echo "M: $meta_info_8"
+  echo "X: $certificate_8"
+
+  echo "check hash sanity"
+  [ x"$root_hash_8"    = x"$root_hash_6"   ] || return 46
+  [ x"$history_8"     != x"$history_7"     ] || return 47
+  [ x"$meta_info_8"    = x"$meta_info_7"   ] || return 48
+  [ x"$certificate_8"  = x"$certificate_7" ] || return 49
+
+  echo "check that Reflog is recreated on Stratum0"
+  peek_backend_raw $CVMFS_TEST_REPO ".cvmfsreflog" || return 50
+
+  echo "check garbage collection log output"
+  cat $gc_stdout_log_1 | grep 'Needs Reflog reconstruct.*yes' || return 51
+  cat $gc_stdout_log_1 | grep 'reconstructing reference log'  || return 52
+
+  echo "check that the reflog contains sane entries"
+  check_reflog_contains $CVMFS_TEST_REPO "$root_hash_6 $root_hash_5 $history_8 $history_7 $history_6 $history_5 $history_4 $history_3 $history_2 $history_1 $meta_info_3 $certificate_1" || return 53
+
+  echo "check that the deletion log contains sane entries"
+  cat $gc_log_1 | grep "$root_hash_4" || return 54
+  cat $gc_log_1 | grep "$root_hash_1" || return 55
+
+  echo "check that the right root catalogs are in Stratum0"
+  peek_backend $CVMFS_TEST_REPO ${root_hash_1}C && return 90
+  peek_backend $CVMFS_TEST_REPO ${root_hash_4}C && return 91
+  peek_backend $CVMFS_TEST_REPO ${root_hash_5}C || return 92
+  peek_backend $CVMFS_TEST_REPO ${root_hash_6}C || return 93
+
+  # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  echo "create a Stratum1 snapshot"
+  cvmfs_server snapshot $replica_name || return 56
+
+  echo "check that Stratum1 spooler tmp dir is empty"
+  check_tmp_dir_emptiness $s1_spool_tmp_dir || return 127
 
   echo "check Reflog from Stratum1"
-  check_reflog_contains $replica_name "$root_hash_5 $root_hash_4 $root_hash_1 $history_5 $history_1 $meta_info_3 $meta_info_1 $certificate_1" || return 38
+  check_reflog_contains $replica_name "$root_hash_6 $root_hash_5 $root_hash_1 $history_8 $history_1 $meta_info_3 $meta_info_1 $certificate_1" || return 52
+
+  echo "enable garbage collection on Stratum1"
+  toggle_gc $replica_name || return 57
+
+  local gc_log_2="${scratch_dir}/gc_s1_2.log"
+  local gc_stdout_log_2="${scratch_dir}/gc_s1_stdout_2.log"
+  echo "run garbage collection on Stratum1 (deleting as much as possible | logging to: $gc_log_2 and $gc_stdout_log_2)"
+  cvmfs_server gc -fL "$gc_log_2" $replica_name > $gc_stdout_log_2 2>&1 || return 58
+
+  echo "check that Stratum1 spooler tmp dir is empty"
+  check_tmp_dir_emptiness $s1_spool_tmp_dir || return 128
+
+  echo "check that the reflog was not recreated"
+  cat $gc_stdout_log_2 | grep    'Needs Reflog reconstruct.*no' || return 59
+  cat $gc_stdout_log_2 | grep -v 'reconstructing reference log' || return 60
+
+  echo "check that the right root catalogs are in Stratum1"
+  peek_backend $replica_name ${root_hash_1}C && return 100
+  peek_backend $replica_name ${root_hash_4}C && return 101
+  peek_backend $replica_name ${root_hash_5}C || return 102
+  peek_backend $replica_name ${root_hash_6}C || return 103
+
+  echo "check Reflog from Stratum1"
+  check_reflog_contains $replica_name "$root_hash_6 $root_hash_5 $history_8 $history_1 $meta_info_3 $meta_info_1 $certificate_1" || return 52
 
   return 0
 }
