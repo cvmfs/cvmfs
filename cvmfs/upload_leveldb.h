@@ -87,12 +87,27 @@ class LevelDbUploader : public AbstractUploader {
 
   LevelDbHandle& GetDatabaseForPath(const std::string &path);
 
+  friend class LevelDbUploaderTestWrapper;
+
  private:
   std::string               base_path_;
   unsigned                  database_count_;
   leveldb::CompressionType  compression_;
 
   LevelDbHandles            databases_;
+};
+
+
+/**
+ * For unit-testing purposes only!
+ */
+class LevelDbUploaderTestWrapper {
+ public:
+  static LevelDbHandle& GetLevelDbHandleForPath(LevelDbUploader    *uploader,
+                                                const std::string  &remote_path)
+  {
+    return uploader->GetDatabaseForPath(remote_path);
+  }
 };
 
 }  // namespace upload
