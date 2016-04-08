@@ -79,6 +79,7 @@ class T_Uploaders : public FileSandbox {
   static const std::string tmp_dir;
   std::string repo_alias;
   std::string s3_conf_path;
+  std::string leveldb_conf_path;
   template<typename> struct type {};
 
  public:
@@ -122,7 +123,7 @@ class T_Uploaders : public FileSandbox {
 
 
   virtual void SetUp(const type<upload::LevelDbUploader> type_specifier) {
-    // Empty, no specific needs
+    CreateTempLevelDbConfigFile(5);
   }
 
 
@@ -212,7 +213,7 @@ class T_Uploaders : public FileSandbox {
       const type<upload::LevelDbUploader> type_specifier) const {
     const std::string spl_type   = "leveldb";
     const std::string spl_tmp    = T_Uploaders::tmp_dir;
-    const std::string spl_cfg    = T_Uploaders::dest_dir;
+    const std::string spl_cfg    = T_Uploaders::leveldb_conf_path;
     const std::string definition = spl_type + "," + spl_tmp + "," + spl_cfg;
     return definition;
   }
@@ -574,6 +575,21 @@ class T_Uploaders : public FileSandbox {
 
     fprintf(s3_conf, "%s\n", conf_str.c_str());
     fclose(s3_conf);
+  }
+
+
+  void CreateTempLevelDbConfigFile(int database_count) {
+    ASSERT_GE(database_count, 1);
+    ASSERT_LE(database_count, 255);
+    FILE *leveldb_conf = CreateTempFile(T_Uploaders::tmp_dir + "/leveldb.conf",
+                                        0660, "w", &leveldb_conf_path);
+    ASSERT_TRUE(leveldb_conf != NULL);
+    std::string conf_str =
+        "CVMFS_LEVELDB_STORAGE=" + T_Uploaders::dest_dir + "\n" +
+        "CVMFS_LEVELDB_COUNT=" + StringifyInt(database_count);
+
+    fprintf(leveldb_conf, "%s\n", conf_str.c_str());
+    fclose(leveldb_conf);
   }
 
 
