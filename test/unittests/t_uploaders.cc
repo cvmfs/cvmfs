@@ -282,6 +282,24 @@ class T_Uploaders : public FileSandbox {
     return streams;
   }
 
+  void GetFileFromLevelDb(const std::string &remote_path,
+                                std::string *buffer,
+                                bool        *found = NULL) const {
+    upload::LevelDbUploader *upl =
+      dynamic_cast<LevelDbUploader*>(this->uploader_);
+    upload::LevelDbHandle& handle =
+      LevelDbUploaderTestWrapper::GetLevelDbHandleForPath(upl, remote_path);
+
+    const leveldb::ReadOptions options;
+    const leveldb::Status status = handle->Get(options, remote_path, buffer);
+
+    ASSERT_TRUE(status.ok() || status.IsNotFound()) << status.ToString();
+
+    if (NULL != found) {
+      *found = status.ok();
+    }
+  }
+
 
   void FreeBufferStreams(BufferStreams *streams) const {
     typename BufferStreams::iterator       i    = streams->begin();
@@ -304,6 +322,14 @@ class T_Uploaders : public FileSandbox {
     return FileExists(absolute_path);
   }
 
+  bool CheckFile(const std::string &remote_path,
+                 const type<upload::LevelDbUploader> type_specifier) const {
+    std::string buffer;
+    bool        found = false;
+    GetFileFromLevelDb(remote_path, &buffer, &found);
+    return found;
+  }
+
   size_t GetBackendFileSize(const std::string &remote_path) const {
     return GetBackendFileSize(remote_path, type<UploadersT>());
   }
@@ -314,6 +340,14 @@ class T_Uploaders : public FileSandbox {
     const std::string absolute_path = AbsoluteDestinationPath(remote_path);
     return GetFileSize(absolute_path);
   }
+
+  size_t GetBackendFileSize(const std::string     &remote_path,
+                            type<LevelDbUploader>  type_specifier) const {
+    std::string buffer;
+    GetFileFromLevelDb(remote_path, &buffer);
+    return buffer.size();
+  }
+
 
   void CompareFileContents(const std::string &reference_path,
                            const std::string &testee_path) const {
@@ -614,6 +648,16 @@ class T_Uploaders : public FileSandbox {
     const std::string absolute_path = AbsoluteDestinationPath(remote_path);
     const bool successful = shash::HashFile(absolute_path, hash);
     ASSERT_TRUE(successful);
+  }
+
+  void HashBackendFileInternal(const std::string &remote_path, shash::Any *hash,
+                               type<LevelDbUploader> type_specifier) const {
+    std::string buffer;
+    bool        found = false;
+    GetFileFromLevelDb(remote_path, &buffer, &found);
+    ASSERT_TRUE(found);
+
+    shash::HashString(buffer, hash);
   }
 
 
