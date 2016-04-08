@@ -9,6 +9,8 @@
 
 #include <string>
 
+#include <leveldb/options.h>
+
 #include "atomic.h"
 #include "upload_facility.h"
 #include "util_concurrency.h"
@@ -65,8 +67,9 @@ class LevelDbUploader : public AbstractUploader {
   bool ParseConfiguration(const std::string &config_path);
 
  private:
-  std::string base_path_;
-  unsigned    database_count_;
+  std::string               base_path_;
+  unsigned                  database_count_;
+  leveldb::CompressionType  compression_;
 };
 
 }  // namespace upload

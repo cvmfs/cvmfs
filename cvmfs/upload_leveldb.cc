@@ -66,6 +66,22 @@ bool LevelDbUploader::ParseConfiguration(const std::string &config_path) {
     return false;
   }
 
+  std::string compression;
+  if (!options_manager.GetValue("CVMFS_LEVELDB_COMPRESSION", &compression)) {
+    compression = "none";  // default
+  }
+
+  if (compression == "none") {
+    compression_ = leveldb::kNoCompression;
+  } else if (compression == "snappy") {
+    compression_ = leveldb::kSnappyCompression;
+  } else {
+    LogCvmfs(kLogUploadLevelDb, kLogStderr,
+             "unknown compression method '%s' in CVMFS_LEVELDB_COMPRESSION",
+             compression.c_str());
+    return false;
+  }
+
   return true;
 }
 
