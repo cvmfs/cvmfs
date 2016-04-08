@@ -9,6 +9,7 @@
 
 #include <string>
 
+#include <leveldb/db.h>
 #include <leveldb/options.h>
 
 #include "atomic.h"
@@ -22,6 +23,17 @@ struct LevelDbStreamHandle : public UploadStreamHandle {
     UploadStreamHandle(commit_callback) {}
 };
 
+class LevelDbHandle {
+ public:
+  LevelDbHandle(leveldb::DB *database) : database_(database) { }
+
+  void Close() { delete database_; database_ = NULL; }
+  leveldb::DB* operator->() const { return database_; }
+
+ private:
+  leveldb::DB *database_;
+};
+
 /**
  * The LevelDbUploader implements the AbstractUploader interface to push files
  * into one or multiple LevelDB.
@@ -29,8 +41,13 @@ struct LevelDbStreamHandle : public UploadStreamHandle {
  * the AbstractUploader base class.
  */
 class LevelDbUploader : public AbstractUploader {
+ protected:
+  typedef std::vector<LevelDbHandle> LevelDbHandles;
+
  public:
   explicit LevelDbUploader(const SpoolerDefinition &spooler_definition);
+  ~LevelDbUploader();
+
   static bool WillHandle(const SpoolerDefinition &spooler_definition);
 
   bool Initialize();
@@ -65,11 +82,17 @@ class LevelDbUploader : public AbstractUploader {
 
  private:
   bool ParseConfiguration(const std::string &config_path);
+  bool OpenDatabases();
+  void CloseDatabases();
+
+  LevelDbHandle& GetDatabaseForPath(const std::string &path);
 
  private:
   std::string               base_path_;
   unsigned                  database_count_;
   leveldb::CompressionType  compression_;
+
+  LevelDbHandles            databases_;
 };
 
 }  // namespace upload

@@ -4,6 +4,7 @@
 
 #include "upload_leveldb.h"
 
+#include "hash.h"
 #include "options.h"
 #include "util/posix.h"
 #include "util/string.h"
@@ -17,6 +18,10 @@ LevelDbUploader::LevelDbUploader(const SpoolerDefinition &spooler_definition) :
          spooler_definition.driver_type == SpoolerDefinition::LevelDb);
 }
 
+LevelDbUploader::~LevelDbUploader() {
+  CloseDatabases();
+}
+
 bool LevelDbUploader::WillHandle(const SpoolerDefinition &spooler_definition) {
   return spooler_definition.driver_type == SpoolerDefinition::LevelDb;
 }
@@ -26,7 +31,9 @@ bool LevelDbUploader::Initialize() {
   const SpoolerDefinition  &sd          = spooler_definition();
   const std::string         config_path = sd.spooler_configuration;
 
-  return ParseConfiguration(config_path) && AbstractUploader::Initialize();
+  return ParseConfiguration(config_path) &&
+         OpenDatabases()                 &&
+         AbstractUploader::Initialize();
 }
 
 
@@ -83,6 +90,54 @@ bool LevelDbUploader::ParseConfiguration(const std::string &config_path) {
   }
 
   return true;
+}
+
+
+bool LevelDbUploader::OpenDatabases() {
+  assert(database_count_ > 0 && database_count_ < 1000);
+
+  for (unsigned i = 0; i < database_count_; ++i) {
+    const std::string db_name = "lvldb" + PaddingLeft(StringifyInt(i), 3, '0');
+    const std::string db_path = base_path_ + "/" + db_name;
+
+    leveldb::DB      *database;
+    leveldb::Options  options;
+    options.create_if_missing = true;
+    options.error_if_exists   = false;
+    options.paranoid_checks   = false;
+    options.compression       = compression_;
+    const leveldb::Status status = leveldb::DB::Open(options,
+                                                     db_path,
+                                                     &database);
+    if (!status.ok()) {
+      LogCvmfs(kLogUploadLevelDb, kLogStderr,
+               "failed to open LevelDB '%s' - %s",
+               db_path.c_str(), status.ToString().c_str());
+      return false;
+    }
+
+    databases_.push_back(LevelDbHandle(database));
+  }
+
+  return true;
+}
+
+
+void LevelDbUploader::CloseDatabases() {
+  LevelDbHandles::iterator       i    = databases_.begin();
+  LevelDbHandles::const_iterator iend = databases_.end();
+  for (; i != iend; ++i) {
+    i->Close();
+  }
+  databases_.clear();
+}
+
+
+LevelDbHandle& LevelDbUploader::GetDatabaseForPath(const std::string &path) {
+  shash::Any h(shash::kMd5);
+  HashString(path, &h);
+  const uint32_t shorthash = *reinterpret_cast<uint32_t*>(h.digest);
+  return databases_[shorthash % database_count_];
 }
 
 
