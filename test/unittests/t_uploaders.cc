@@ -272,36 +272,56 @@ class T_Uploaders : public FileSandbox {
 
 
   bool CheckFile(const std::string &remote_path) const {
+    return CheckFile(remote_path, type<UploadersT>());
+  }
+
+  template <typename T>  // LocalUploader, S3Uploader
+  bool CheckFile(const std::string  &remote_path,
+                 const type<T>       type_specifier) const {
     const std::string absolute_path = AbsoluteDestinationPath(remote_path);
     return FileExists(absolute_path);
   }
 
+  size_t GetBackendFileSize(const std::string &remote_path) const {
+    return GetBackendFileSize(remote_path, type<UploadersT>());
+  }
 
-  void CompareFileContents(const std::string &testee_path,
-                           const std::string &reference_path) const {
-    const size_t testee_size    = GetFileSize(testee_path);
+  template <typename T>  // LocalUploader, S3Uploader
+  size_t GetBackendFileSize(const std::string  &remote_path,
+                            type<T>             type_specifier) const {
+    const std::string absolute_path = AbsoluteDestinationPath(remote_path);
+    return GetFileSize(absolute_path);
+  }
+
+  void CompareFileContents(const std::string &reference_path,
+                           const std::string &testee_path) const {
+    const size_t testee_size    = GetBackendFileSize(testee_path);
     const size_t reference_size = GetFileSize(reference_path);
     EXPECT_EQ(reference_size, testee_size);
 
-    shash::Any testee_hash    = HashFile(testee_path);
-    shash::Any reference_hash = HashFile(reference_path);
+    shash::Any testee_hash = HashBackendFile(testee_path);
+
+    shash::Any reference_hash(shash::kMd5);
+    const bool successful = shash::HashFile(reference_path, &reference_hash);
+    ASSERT_TRUE(successful);
+
     EXPECT_EQ(reference_hash, testee_hash);
   }
 
 
   void CompareBuffersAndFileContents(const Buffers     &buffers,
-                                     const std::string &file_path) const {
+                                     const std::string &remote_path) const {
     size_t buffers_size = 0;
     Buffers::const_iterator i    = buffers.begin();
     Buffers::const_iterator iend = buffers.end();
     for (; i != iend; ++i) {
       buffers_size += (*i)->used_bytes();
     }
-    const size_t file_size = GetFileSize(file_path);
+    const size_t file_size = GetBackendFileSize(remote_path);
     EXPECT_EQ(file_size, buffers_size);
 
     shash::Any buffers_hash = HashBuffers(buffers);
-    shash::Any file_hash    = HashFile(file_path);
+    shash::Any file_hash    = HashBackendFile(remote_path);
     EXPECT_EQ(file_hash, buffers_hash);
   }
 
@@ -544,16 +564,18 @@ class T_Uploaders : public FileSandbox {
   }
 
 
-  shash::Any HashFile(const std::string &path) const {
+  shash::Any HashBackendFile(const std::string &remote_path) const {
     shash::Any result(shash::kMd5);
     // googletest requires method that use EXPECT_* or ASSERT_* to return void
-    HashFileInternal(path, &result);
+    HashBackendFileInternal(remote_path, &result, type<UploadersT>());
     return result;
   }
 
-
-  void HashFileInternal(const std::string &path, shash::Any *hash) const {
-    const bool successful = shash::HashFile(path, hash);
+  template <typename T>  // LocalUploader, S3Uploader
+  void HashBackendFileInternal(const std::string &remote_path, shash::Any *hash,
+                               type<T> type_specifier) const {
+    const std::string absolute_path = AbsoluteDestinationPath(remote_path);
+    const bool successful = shash::HashFile(absolute_path, hash);
     ASSERT_TRUE(successful);
   }
 
@@ -634,9 +656,7 @@ TYPED_TEST(T_Uploaders, SimpleFileUpload) {
   this->uploader_->WaitForUpload();
   EXPECT_TRUE(TestFixture::CheckFile(dest_name));
   EXPECT_EQ(1u, this->delegate_.simple_upload_invocations);
-  TestFixture::CompareFileContents(big_file_path,
-                                   TestFixture::AbsoluteDestinationPath(
-                                       dest_name));
+  TestFixture::CompareFileContents(big_file_path, dest_name);
 }
 
 
@@ -656,9 +676,7 @@ TYPED_TEST(T_Uploaders, PeekIntoStorage) {
 
   EXPECT_TRUE(TestFixture::CheckFile(dest_name));
   EXPECT_EQ(1u, this->delegate_.simple_upload_invocations);
-  TestFixture::CompareFileContents(small_file_path,
-                                   TestFixture::AbsoluteDestinationPath(
-                                       dest_name));
+  TestFixture::CompareFileContents(small_file_path, dest_name);
 
   const bool file_exists = this->uploader_->Peek(dest_name);
   EXPECT_TRUE(file_exists);
@@ -684,9 +702,7 @@ TYPED_TEST(T_Uploaders, RemoveFromStorage) {
 
   EXPECT_TRUE(TestFixture::CheckFile(dest_name));
   EXPECT_EQ(1u, this->delegate_.simple_upload_invocations);
-  TestFixture::CompareFileContents(small_file_path,
-                                   TestFixture::AbsoluteDestinationPath(
-                                       dest_name));
+  TestFixture::CompareFileContents(small_file_path, dest_name);
 
   const bool file_exists = this->uploader_->Peek(dest_name);
   EXPECT_TRUE(file_exists);
@@ -718,9 +734,7 @@ TYPED_TEST(T_Uploaders, UploadEmptyFile) {
 
   EXPECT_TRUE(TestFixture::CheckFile(dest_name));
   EXPECT_EQ(1u, this->delegate_.simple_upload_invocations);
-  TestFixture::CompareFileContents(empty_file_path,
-                                   TestFixture::AbsoluteDestinationPath(
-                                       dest_name));
+  TestFixture::CompareFileContents(empty_file_path, dest_name);
   EXPECT_EQ(0, GetFileSize(TestFixture::AbsoluteDestinationPath(dest_name)));
 }
 
@@ -741,9 +755,7 @@ TYPED_TEST(T_Uploaders, UploadHugeFileSlow) {
 
   EXPECT_TRUE(TestFixture::CheckFile(dest_name));
   EXPECT_EQ(1u, this->delegate_.simple_upload_invocations);
-  TestFixture::CompareFileContents(huge_file_path,
-                                   TestFixture::AbsoluteDestinationPath(
-                                       dest_name));
+  TestFixture::CompareFileContents(huge_file_path, dest_name);
 }
 
 
@@ -791,9 +803,7 @@ TYPED_TEST(T_Uploaders, UploadManyFilesSlow) {
   EXPECT_EQ(number_of_files, this->delegate_.simple_upload_invocations);
   for (i = files.begin(); i != iend; ++i) {
     EXPECT_TRUE(TestFixture::CheckFile(i->second));
-    TestFixture::CompareFileContents(i->first,
-                                     TestFixture::AbsoluteDestinationPath(
-                                         i->second));
+    TestFixture::CompareFileContents(i->first, i->second);
   }
 }
 
@@ -846,9 +856,7 @@ TYPED_TEST(T_Uploaders, SingleStreamedUpload) {
 
   const std::string dest = "data/" + content_hash.MakePath();
   EXPECT_TRUE(TestFixture::CheckFile(dest));
-  TestFixture::CompareBuffersAndFileContents(
-      buffers,
-      TestFixture::AbsoluteDestinationPath(dest));
+  TestFixture::CompareBuffersAndFileContents(buffers, dest);
 
   TestFixture::FreeBuffers(&buffers);
 }
@@ -921,9 +929,7 @@ TYPED_TEST(T_Uploaders, MultipleStreamedUploadSlow) {
     const shash::Any &content_hash = k->second.content_hash;
     const std::string dest = "data/" + content_hash.MakePath();
     EXPECT_TRUE(TestFixture::CheckFile(dest));
-    TestFixture::CompareBuffersAndFileContents(
-        k->first,
-        TestFixture::AbsoluteDestinationPath(dest));
+    TestFixture::CompareBuffersAndFileContents(k->first, dest);
   }
 
   TestFixture::FreeBufferStreams(&streams);
@@ -957,14 +963,10 @@ TYPED_TEST(T_Uploaders, PlaceBootstrappingShortcut) {
   EXPECT_TRUE(TestFixture::CheckFile(dest_name));
 
   EXPECT_EQ(1u, this->delegate_.simple_upload_invocations);
-  TestFixture::CompareFileContents(big_file_path,
-                                   TestFixture::AbsoluteDestinationPath(
-                                       dest_name));
+  TestFixture::CompareFileContents(big_file_path, dest_name);
 
   ASSERT_TRUE(this->uploader_->PlaceBootstrappingShortcut(digest));
-  TestFixture::CompareFileContents(big_file_path,
-                                   TestFixture::AbsoluteDestinationPath(
-                                       digest.MakeAlternativePath()));
+  TestFixture::CompareFileContents(big_file_path, digest.MakeAlternativePath());
 }
 
 }  // namespace upload
