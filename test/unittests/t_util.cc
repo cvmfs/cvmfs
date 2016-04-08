@@ -1468,3 +1468,14 @@ TEST_F(T_Util, MemoryMappedFile) {
   EXPECT_TRUE(mf.IsMapped());
   mf.Unmap();
 }
+
+TEST_F(T_Util, PaddingLeft) {
+  string foobar = "foobar";
+  string padded_foobar = PaddingLeft(foobar, 10, 'A');
+  EXPECT_EQ("AAAAfoobar", padded_foobar);
+  string same_foobar = PaddingLeft(foobar, 6, 'B');
+  EXPECT_EQ("foobar", same_foobar);
+  int leet = 1337;
+  string padded_leet = PaddingLeft(StringifyInt(leet), 6, '0');
+  EXPECT_EQ("001337", padded_leet);
+}
