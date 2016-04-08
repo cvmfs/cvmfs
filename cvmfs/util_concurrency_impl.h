@@ -119,57 +119,6 @@ void SynchronizingCounter<T>::Destroy() {
 
 //
 // +----------------------------------------------------------------------------
-// |  CircularQueue
-//
-
-template <typename T>
-CircularQueue<T>::CircularQueue(size_t size) :
-  max_size_(size), current_size_(0) {
-  pthread_mutex_init(&mutex_, NULL);
-  pthread_cond_init(&queue_full_, NULL);
-  queue_ = new T*(max_size_);
-}
-
-template <typename T>
-CircularQueue<T>::~CircularQueue() {
-  pthread_mutex_destroy(&mutex_);
-  pthread_cond_destroy(&queue_full_);
-  delete[] queue_;
-}
-
-template <typename T>
-void CircularQueue<T>::Push_back(const T *element) {
-  pthread_mutex_lock(&mutex_);
-  if (current_size_ == max_size_) {
-    pthread_cond_wait(&queue_full_, &mutex_);
-  }
-  queue_[current_size_-1] = element;
-  ++current_size_;
-  pthread_mutex_unlock(&mutex_);
-}
-
-template <typename T>
-T* CircularQueue<T>::Pop_front() {
-  pthread_mutex_lock(&mutex_);
-  assert(current_size_ > 0);
-  T* object = queue_[current_size_-1];
-  --current_size_;
-  pthread_cond_signal(&queue_full_);
-  pthread_mutex_unlock(&mutex_);
-  return object;
-}
-
-template <typename T>
-size_t CircularQueue<T>::CircularQueue::Size() const {
-  pthread_mutex_lock(&mutex_);
-  size_t size = current_size_;
-  pthread_mutex_unlock(&mutex_);
-  return size;
-}
-
-
-//
-// +----------------------------------------------------------------------------
 // |  Observable
 //
 

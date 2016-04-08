@@ -285,28 +285,6 @@ class SynchronizingCounter : SingleCopy {
 // -----------------------------------------------------------------------------
 //
 
-template <typename T>
-class CircularQueue : SingleCopy {
- public:
-  CircularQueue(size_t size);
-  ~CircularQueue();
-  void Push_back(const T *element);
-  T* Pop_front();
-  size_t Size() const;
-
- private:
-  T **queue_;
-  size_t max_size_;
-  size_t current_size_;
-  mutable pthread_mutex_t mutex_;
-  mutable pthread_cond_t queue_full_;
-};
-
-
-//
-// -----------------------------------------------------------------------------
-//
-
 
 template <typename ParamT>
 class Observable;
