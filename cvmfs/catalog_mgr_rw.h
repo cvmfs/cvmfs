@@ -111,7 +111,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
   // Nested catalog handling
   void CreateNestedCatalog(const std::string &mountpoint);
   void RemoveNestedCatalog(const std::string &mountpoint);
-  bool IsTransitionPoint(const std::string &path);
+  bool IsTransitionPoint(const std::string &mountpoint);
 
   inline bool IsBalanceable() const { return is_balanceable_; }
   /**

@@ -240,3 +240,83 @@ TYPED_TEST(T_Reflog, RemoveCatalog) {
 
   TestFixture::CloseReflog(rl2);
 }
+
+
+TYPED_TEST(T_Reflog, ContainsObject) {
+  const std::string rp = TestFixture::GetReflogFilename();
+  typedef TypeParam Reflog;
+
+  Reflog *rl1 = TestFixture::CreateReflog(rp);
+  ASSERT_NE(static_cast<Reflog*>(NULL), rl1);
+  EXPECT_EQ(TestFixture::fqrn, rl1->fqrn());
+
+  rl1->AddCatalog(h("b99a789dcdffff8f95b977cc8e2037fcd3960b5b",
+                    shash::kSuffixCatalog));
+  rl1->AddCatalog(h("c5501bd0142cad45c4f0957cbf307e184ac1f661",
+                    shash::kSuffixCatalog));
+  rl1->AddCertificate(h("b778b910390254b37ec66366aeef04f034c51941",
+                        shash::kSuffixCertificate));
+  rl1->AddMetainfo(h("8de3e8cbd611ce225d62341698b9408a47edf76b",
+                     shash::kSuffixMetainfo));
+  rl1->AddHistory(h("cab790100c3b10afd7e755b3c93eaeda6a0db9ab",
+                     shash::kSuffixHistory));
+
+  EXPECT_TRUE(
+    rl1->ContainsCatalog(h("b99a789dcdffff8f95b977cc8e2037fcd3960b5b",
+                           shash::kSuffixCatalog)));
+  EXPECT_FALSE(
+    rl1->ContainsCatalog(h("abcde89dcdffff8f95b977cc8e2037fcd3960b5b",
+                           shash::kSuffixCatalog)));
+  EXPECT_TRUE(
+    rl1->ContainsCertificate(h("b778b910390254b37ec66366aeef04f034c51941",
+                               shash::kSuffixCertificate)));
+  EXPECT_FALSE(
+    rl1->ContainsCertificate(h("abcde910390254b37ec66366aeef04f034c51941",
+                               shash::kSuffixCertificate)));
+  EXPECT_TRUE(
+    rl1->ContainsMetainfo(h("8de3e8cbd611ce225d62341698b9408a47edf76b",
+                            shash::kSuffixMetainfo)));
+  EXPECT_FALSE(
+    rl1->ContainsMetainfo(h("abcde8cbd611ce225d62341698b9408a47edf76b",
+                            shash::kSuffixMetainfo)));
+  EXPECT_TRUE(
+    rl1->ContainsHistory(h("cab790100c3b10afd7e755b3c93eaeda6a0db9ab",
+                           shash::kSuffixHistory)));
+  EXPECT_FALSE(
+    rl1->ContainsHistory(h("abcde0100c3b10afd7e755b3c93eaeda6a0db9ab",
+                           shash::kSuffixHistory)));
+
+  TestFixture::CloseReflog(rl1);
+
+  Reflog *rl2 = TestFixture::OpenReflog(rp);
+  ASSERT_NE(static_cast<Reflog*>(NULL), rl2);
+  EXPECT_EQ(TestFixture::fqrn, rl2->fqrn());
+  EXPECT_EQ(5u, rl2->CountEntries());
+
+  EXPECT_TRUE(
+    rl1->ContainsCatalog(h("c5501bd0142cad45c4f0957cbf307e184ac1f661",
+                           shash::kSuffixCatalog)));
+  EXPECT_FALSE(
+    rl1->ContainsCatalog(h("abcdef01422cad45c4f0957cbf307e184ac1f661",
+                           shash::kSuffixCatalog)));
+  EXPECT_TRUE(
+    rl1->ContainsCertificate(h("b778b910390254b37ec66366aeef04f034c51941",
+                               shash::kSuffixCertificate)));
+  EXPECT_FALSE(
+    rl1->ContainsCertificate(h("abcde910390254b37ec66366aeef04f034c51941",
+                               shash::kSuffixCertificate)));
+  EXPECT_TRUE(
+    rl1->ContainsMetainfo(h("8de3e8cbd611ce225d62341698b9408a47edf76b",
+                            shash::kSuffixMetainfo)));
+  EXPECT_FALSE(
+    rl1->ContainsMetainfo(h("abcde8cbd611ce225d62341698b9408a47edf76b",
+                            shash::kSuffixMetainfo)));
+  EXPECT_TRUE(
+    rl1->ContainsHistory(h("cab790100c3b10afd7e755b3c93eaeda6a0db9ab",
+                           shash::kSuffixHistory)));
+  EXPECT_FALSE(
+    rl1->ContainsHistory(h("abcde0100c3b10afd7e755b3c93eaeda6a0db9ab",
+                           shash::kSuffixHistory)));
+
+  TestFixture::CloseReflog(rl2);
+}

@@ -92,10 +92,12 @@ static void SpoolerOnUpload(const upload::SpoolerResult &result) {
 }
 
 string              *stratum0_url = NULL;
+string              *stratum1_url = NULL;
 string              *temp_dir = NULL;
 unsigned             num_parallel = 1;
 bool                 pull_history = false;
 bool                 is_garbage_collectable = false;
+bool                 initial_snapshot = false;
 upload::Spooler     *spooler = NULL;
 int                  pipe_chunks[2];
 // required for concurrent reading
@@ -108,6 +110,7 @@ atomic_int64         chunk_queue;
 bool                 preload_cache = false;
 string              *preload_cachedir = NULL;
 bool                 inspect_existing_catalogs = false;
+manifest::Reflog    *reflog = NULL;
 
 }  // anonymous namespace
 
@@ -413,6 +416,12 @@ bool CommandPull::Pull(const shash::Any   &catalog_hash,
              file_catalog_vanilla.c_str(), catalog_hash.ToString().c_str());
     goto pull_cleanup;
   }
+  if (path.empty() && reflog != NULL) {
+    if (!reflog->AddCatalog(catalog_hash)) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to add catalog to Reflog.");
+      goto pull_cleanup;
+    }
+  }
 
   catalog = catalog::Catalog::AttachFreely(path, file_catalog, catalog_hash);
   if (catalog == NULL) {
@@ -514,6 +523,16 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     pull_history = true;
   if (args.find('z') != args.end())
     inspect_existing_catalogs = true;
+  if (args.find('w') != args.end())
+    stratum1_url = args.find('w')->second;
+  if (args.find('i') != args.end())
+    initial_snapshot = true;
+
+  if (!preload_cache && stratum1_url == NULL) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "need -w <stratum 1 URL>");
+    return 1;
+  }
+
   pthread_t *workers =
     reinterpret_cast<pthread_t *>(smalloc(sizeof(pthread_t) * num_parallel));
   typedef std::vector<history::History::Tag> TagVector;
@@ -580,8 +599,6 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
                                download_manager(),
                                signature_manager());
 
-  UniquePtr<manifest::Reflog> reflog;
-
   // Check if we have a replica-ready server
   const string url_sentinel = *stratum0_url + "/.cvmfs_master_replica";
   download::JobInfo download_sentinel(&url_sentinel, false);
@@ -602,12 +619,30 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   }
 
   if (!preload_cache) {
-    reflog = GetOrCreateReflog(&object_fetcher, repository_name);
-    if (!reflog.IsValid()) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "failed to get or construct a Reflog");
-      goto fini;
+    if (initial_snapshot) {
+      LogCvmfs(kLogCvmfs, kLogStdout, "Creating an empty Reflog for '%s'",
+                                      repository_name.c_str());
+      reflog = CreateEmptyReflog(*temp_dir, repository_name);
+      if (reflog == NULL) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "failed to create initial Reflog");
+        goto fini;
+      }
+    } else {
+      ObjectFetcher object_fetcher_stratum1(repository_name,
+                                            *stratum1_url,
+                                            *temp_dir,
+                                            download_manager(),
+                                            signature_manager());
+
+      reflog = FetchReflog(&object_fetcher_stratum1, repository_name);
+      if (reflog == NULL) {
+        LogCvmfs(kLogCvmfs, kLogVerboseMsg, "failed to get Reflog (ignoring)");
+      }
     }
-    reflog->BeginTransaction();
+
+    if (reflog != NULL) {
+      reflog->BeginTransaction();
+    }
   }
 
   // Get meta info
@@ -681,7 +716,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     Store(history_path, history_hash);
     WaitForStorage();
     unlink(history_path.c_str());
-    if (reflog && !reflog->AddHistory(history_hash)) {
+    if (reflog != NULL && !reflog->AddHistory(history_hash)) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to add history to Reflog.");
       goto fini;
     }
@@ -701,20 +736,12 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from trunk catalog at /");
   retval = Pull(ensemble.manifest->catalog_hash(), "");
   pull_history = false;
-  if (reflog && !reflog->AddCatalog(ensemble.manifest->catalog_hash())) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to add root catalog to Reflog.");
-    retval = false;
-  }
   for (TagVector::const_iterator i    = historic_tags.begin(),
                                  iend = historic_tags.end();
        i != iend; ++i) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from %s repository tag",
              i->name.c_str());
     bool retval2 = Pull(i->root_hash, "");
-    if (reflog && !reflog->AddCatalog(i->root_hash)) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to add tag catalog to Reflog.");
-      retval = false;
-    }
     retval = retval && retval2;
   }
 
@@ -742,7 +769,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
       StoreBuffer(ensemble.cert_buf,
                   ensemble.cert_size,
                   ensemble.manifest->certificate(), true);
-      if (reflog && !reflog->AddCertificate(ensemble.manifest->certificate())) {
+      if (reflog != NULL &&
+          !reflog->AddCertificate(ensemble.manifest->certificate())) {
         LogCvmfs(kLogCvmfs, kLogStderr, "Failed to add certificate to Reflog.");
         goto fini;
       }
@@ -751,14 +779,14 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
       const unsigned char *info = reinterpret_cast<const unsigned char *>(
         meta_info.data());
       StoreBuffer(info, meta_info.size(), meta_info_hash, true);
-      if (reflog && !reflog->AddMetainfo(meta_info_hash)) {
+      if (reflog != NULL && !reflog->AddMetainfo(meta_info_hash)) {
         LogCvmfs(kLogCvmfs, kLogStderr, "Failed to add metainfo to Reflog.");
         goto fini;
       }
     }
 
     // upload Reflog database
-    if (!preload_cache) {
+    if (!preload_cache && reflog != NULL) {
       reflog->CommitTransaction();
       spooler->UploadReflog(reflog->CloseAndReturnDatabaseFile());
       spooler->WaitForUpload();

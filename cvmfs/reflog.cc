@@ -68,10 +68,11 @@ bool Reflog::OpenDatabase(const std::string &database_path) {
 
 void Reflog::PrepareQueries() {
   assert(database_);
-  insert_reference_ = new SqlInsertReference(database_.weak_ref());
-  count_references_ = new SqlCountReferences(database_.weak_ref());
-  list_references_  = new SqlListReferences(database_.weak_ref());
-  remove_reference_ = new SqlRemoveReference(database_.weak_ref());
+  insert_reference_   = new SqlInsertReference(database_.weak_ref());
+  count_references_   = new SqlCountReferences(database_.weak_ref());
+  list_references_    = new SqlListReferences(database_.weak_ref());
+  remove_reference_   = new SqlRemoveReference(database_.weak_ref());
+  contains_reference_ = new SqlContainsReference(database_.weak_ref());
 }
 
 
@@ -137,12 +138,52 @@ bool Reflog::RemoveCatalog(const shash::Any &hash) {
 }
 
 
+bool Reflog::ContainsCertificate(const shash::Any &certificate) const {
+  assert(certificate.HasSuffix() &&
+         certificate.suffix == shash::kSuffixCertificate);
+  return ContainsReference(certificate, SqlReflog::kRefCertificate);
+}
+
+
+bool Reflog::ContainsCatalog(const shash::Any &catalog) const {
+  assert(catalog.HasSuffix() && catalog.suffix == shash::kSuffixCatalog);
+  return ContainsReference(catalog, SqlReflog::kRefCatalog);
+}
+
+
+bool Reflog::ContainsHistory(const shash::Any &history) const {
+  assert(history.HasSuffix() && history.suffix == shash::kSuffixHistory);
+  return ContainsReference(history, SqlReflog::kRefHistory);
+}
+
+
+bool Reflog::ContainsMetainfo(const shash::Any &metainfo) const {
+  assert(metainfo.HasSuffix() && metainfo.suffix == shash::kSuffixMetainfo);
+  return ContainsReference(metainfo, SqlReflog::kRefMetainfo);
+}
+
+
 bool Reflog::AddReference(const shash::Any               &hash,
                           const SqlReflog::ReferenceType  type) {
   return
     insert_reference_->BindReference(hash, type) &&
     insert_reference_->Execute()                 &&
     insert_reference_->Reset();
+}
+
+
+bool Reflog::ContainsReference(const shash::Any               &hash,
+                               const SqlReflog::ReferenceType  type) const {
+  const bool fetching =
+    contains_reference_->BindReference(hash, type) &&
+    contains_reference_->FetchRow();
+  assert(fetching);
+
+  const bool answer = contains_reference_->RetrieveAnswer();
+  const bool reset = contains_reference_->Reset();
+  assert(reset);
+
+  return answer;
 }
 
 

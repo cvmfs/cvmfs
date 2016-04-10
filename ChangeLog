@@ -1,4 +1,9 @@
 2.3.0:
+  * Prevent a cvmfs_server migrate on a repository that is in a transaction
+  * Add `cvmfs_server mount` command (CVM-996)
+  * Remove scratch directory asynchronously on publish
+  * Fix maintaining "previous revision" pointer during catalog migrations
+  * Optimize sequence of creation/removal of nested catalogs during publish
   * Reduce page cache utilization during publish
   * Fix lookup of sbin binaries in cvmfs_server
   * Add 'cvmfs_talk detach nested' debug and testing interface
@@ -19,6 +24,8 @@
     parameter CVMFS_FORCE_REMOUNT_WARNING
 
 2.2.2:
+  * Backport `cvmfs_server mount -a`
+  * Remove use of SSLv3_client_method() in libcurl
   * Fix 'cvmfs_server snapshot -a' not noticing failed snapshots (CVM-997)
   * Add support for default.conf in config repository (CVM-993)
 

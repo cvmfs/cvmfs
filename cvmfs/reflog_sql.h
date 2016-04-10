@@ -84,4 +84,13 @@ class SqlRemoveReference : public SqlReflog {
                      const ReferenceType  type);
 };
 
+
+class SqlContainsReference : public SqlReflog {
+ public:
+  explicit SqlContainsReference(const ReflogDatabase *database);
+  bool BindReference(const shash::Any    &reference_hash,
+                     const ReferenceType  type);
+  bool RetrieveAnswer();
+};
+
 #endif  // CVMFS_REFLOG_SQL_H_

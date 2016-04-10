@@ -614,7 +614,7 @@ TEST_F(T_Dns, CaresResolverMany) {
   ExpectResolvedName(hosts[10], "k.root-servers.net",
                      "193.0.14.129", "[2001:7fd::1]");
   ExpectResolvedName(hosts[11], "l.root-servers.net",
-                     "199.7.83.42", "[2001:500:3::42]");
+                     "199.7.83.42", "[2001:500:9f::42]");
   ExpectResolvedName(hosts[12], "m.root-servers.net",
                      "202.12.27.33", "[2001:dc3::35]");
   ExpectResolvedName(hosts[13], "127.0.0.1", "127.0.0.1", "");

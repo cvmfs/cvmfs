@@ -200,14 +200,16 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepReflog() {
         this);
 
   bool success = true;
+  const typename CatalogTraversalT::TraversalType traversal_type =
+                                        CatalogTraversalT::kDepthFirstTraversal;
         std::vector<shash::Any>::const_iterator i    = catalogs.begin();
   const std::vector<shash::Any>::const_iterator iend = catalogs.end();
   for (; i != iend && success; ++i) {
     if (!hash_filter_.Contains(*i)) {
       success =
-        success &&
-        traversal_.TraverseRevision(*i,
-                                    CatalogTraversalT::kDepthFirstTraversal);
+        success                                         &&
+        traversal_.TraverseRevision(*i, traversal_type) &&
+        reflog->RemoveCatalog(*i);
     }
   }
 

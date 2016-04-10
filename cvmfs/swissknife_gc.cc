@@ -99,9 +99,9 @@ int CommandGc::Main(const ArgumentList &args) {
   }
 
   UniquePtr<manifest::Reflog> reflog;
-  reflog = GetOrCreateReflog(&object_fetcher, repo_name);
+  reflog = FetchReflog(&object_fetcher, repo_name);
   if (!reflog.IsValid()) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load or create Reflog");
+    LogCvmfs(kLogCvmfs, kLogStderr, "no Reflog found, cannot garbage collect");
     return 1;
   }
 
@@ -121,9 +121,12 @@ int CommandGc::Main(const ArgumentList &args) {
     if (NULL == deletion_log_file) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to open deletion log file "
                                       "(errno: %d)", errno);
+      uploader->TearDown();
       return 1;
     }
   }
+
+  reflog->BeginTransaction();
 
   GcConfig config;
   config.uploader                = uploader.weak_ref();
@@ -144,12 +147,19 @@ int CommandGc::Main(const ArgumentList &args) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to write to deletion log '%s' "
                                       "(errno: %d)",
                                       deletion_log_path.c_str(), errno);
+      uploader->TearDown();
       return 1;
     }
   }
 
   GC collector(config);
   const bool success = collector.Collect();
+
+  if (!success) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "garbage collection failed");
+    uploader->TearDown();
+    return 1;
+  }
 
   if (deletion_log_file != NULL) {
     const int bytes_written = fprintf(deletion_log_file,
@@ -158,6 +168,20 @@ int CommandGc::Main(const ArgumentList &args) {
     assert(bytes_written >= 0);
     fclose(deletion_log_file);
   }
+
+  reflog->CommitTransaction();
+  const std::string reflog_db = reflog->CloseAndReturnDatabaseFile();
+  uploader->Upload(reflog_db, ".cvmfsreflog");
+  uploader->WaitForUpload();
+  unlink(reflog_db.c_str());
+
+  if (uploader->GetNumberOfErrors() > 0) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to upload updated Reflog");
+    uploader->TearDown();
+    return 1;
+  }
+
+  uploader->TearDown();
 
   return success ? 0 : 1;
 }

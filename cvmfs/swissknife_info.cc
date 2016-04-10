@@ -56,6 +56,8 @@ ParameterList CommandInfo::GetParams() {
   r.push_back(Parameter::Switch('v', "repository revision number"));
   r.push_back(Parameter::Switch('g', "check if repository is garbage "
                                         "collectable"));
+  r.push_back(Parameter::Switch('o', "check if the repository maintains a "
+                                     "reference log file"));
   r.push_back(Parameter::Switch('h', "print results in human readable form"));
   r.push_back(Parameter::Switch('L', "follow HTTP redirects"));
   r.push_back(Parameter::Switch('X', "show whether external data is supported "
@@ -215,6 +217,12 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
     LogCvmfs(kLogCvmfs, kLogStdout, "%s%s",
              (human_readable) ? "Garbage Collectable:             " : "",
              (StringifyBool(manifest->garbage_collectable())).c_str());
+  }
+
+  if (args.count('o') > 0) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "%s%s",
+             (human_readable) ? "Maintains Reference Log:         " : "",
+             (Exists(repository, ".cvmfsreflog")) ? "true" : "false");
   }
 
   if (args.count('M') > 0) {

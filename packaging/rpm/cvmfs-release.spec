@@ -1,6 +1,6 @@
 Name:           cvmfs-release       
 Version:        2
-Release:        5
+Release:        6
 Summary:        Packages for the CernVM File System
 
 Group:          Applications/System
@@ -54,6 +54,8 @@ rm -rf $RPM_BUILD_ROOT
 
 
 %changelog
+* Tue Apr 05 2016 Jakob Blomer <jblomer@cern.ch> - 2-6
+- Update GPG key
 * Tue Mar 31 2015 Jakob Blomer <jblomer@cern.ch> - 2-5
 - Added cernvm-config repository
 - Remove dist tag from release

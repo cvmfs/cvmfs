@@ -150,3 +150,26 @@ bool SqlRemoveReference::BindReference(const shash::Any    &reference_hash,
     BindTextTransient(1, reference_hash.ToString()) &&
     BindInt64(2, static_cast<uint64_t>(type));
 }
+
+
+//------------------------------------------------------------------------------
+
+
+SqlContainsReference::SqlContainsReference(const ReflogDatabase *database) {
+  DeferredInit(database->sqlite_db(), "SELECT count(*) as answer FROM refs "
+                                      "WHERE type = :type "
+                                      "  AND hash = :hash");
+}
+
+bool SqlContainsReference::BindReference(const shash::Any    &reference_hash,
+                                         const ReferenceType  type) {
+  return
+    BindInt64(1, static_cast<uint64_t>(type)) &&
+    BindTextTransient(2, reference_hash.ToString());
+}
+
+bool SqlContainsReference::RetrieveAnswer() {
+  const int64_t count = RetrieveInt64(0);
+  assert(count == 0 || count == 1);
+  return count > 0;
+}

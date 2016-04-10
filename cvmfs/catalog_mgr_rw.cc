@@ -656,7 +656,9 @@ void WritableCatalogManager::RemoveNestedCatalog(const string &mountpoint) {
 /**
  * Checks if a nested catalog starts at this path.  The path must be valid.
  */
-bool WritableCatalogManager::IsTransitionPoint(const string &path) {
+bool WritableCatalogManager::IsTransitionPoint(const string &mountpoint) {
+  const string path = MakeRelativePath(mountpoint);
+
   SyncLock();
   WritableCatalog *catalog;
   if (!FindCatalog(path, &catalog)) {
