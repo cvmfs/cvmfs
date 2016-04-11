@@ -167,9 +167,11 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
   /**
    * This method schedules a CharBuffer to be uploaded in the context of the
    * given UploadStreamHandle. The actual upload will happen asynchronously by
-   * a concrete implementation of AbstractUploader. As soon has the scheduled
-   * upload job is complete (either successful or not) the optionally passed
-   * callback is supposed to be invoked using AbstractUploader::Respond().
+   * a concrete implementation of AbstractUploader
+   * (see AbstractUploader::StreamedUpload()).
+   * As soon has the scheduled upload job is complete (either successful or not)
+   * the optionally passed callback is supposed to be invoked using
+   * AbstractUploader::Respond().
    *
    * Note: This method is called in the context of a TBB worker thread it is
    *       supposed to be non-blocking!
@@ -189,8 +191,8 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
 
   /**
    * This method schedules a commit job as soon as all data Blocks of a streamed
-   * upload are (successfully) uploaded. The concrete implementation of Abstract
-   * Uploader is supposed to clean up the streamed upload.
+   * upload are (successfully) uploaded. Derived classes must override
+   * AbstractUploader::FinalizeStreamedUpload() for this to happen.
    *
    * Note: This method is called in the context of a TBB worker thread it is
    *       supposed to be non-blocking!
@@ -270,14 +272,37 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
  protected:
   explicit AbstractUploader(const SpoolerDefinition& spooler_definition);
 
+  /**
+   * Implementation of plain file upload
+   * Public interface: AbstractUploader::Upload()
+   *
+   * @param local_path   file to be uploaded
+   * @param remote_path  destination to be written in the backend
+   * @param callback     callback to be called on completion
+   */
   virtual void FileUpload(const std::string  &local_path,
                           const std::string  &remote_path,
                           const CallbackTN   *callback = NULL) = 0;
 
+  /**
+   * Implementation of a streamed upload step. See public interface for details.
+   * Public interface: AbstractUploader::ScheduleUpload()
+   *
+   * @param handle     decendant of UploadStreamHandle specifying the stream
+   * @param buffer     the CharBuffer to be uploaded to the stream
+   * @param callback   callback to be called on completion
+   */
   virtual void StreamedUpload(UploadStreamHandle  *handle,
                               CharBuffer          *buffer,
                               const CallbackTN    *callback) = 0;
 
+  /**
+   * Implemetation of streamed upload commit
+   * Public interface: AbstractUploader::ScheduleUpload()
+   *
+   * @param handle        decendant of UploadStreamHandle specifying the stream
+   * @param content_hash  the computed content hash of the streamed object
+   */
   virtual void FinalizeStreamedUpload(UploadStreamHandle  *handle,
                                       const shash::Any    &content_hash) = 0;
 
@@ -302,14 +327,14 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
 
 
   /**
-   * Acquires a job from the job queue.
+   * Performs a job from the job queue.
    *
    * Note: if there are no jobs in the queue, it will block the calling thread
    *       until new work is available in the job queue.
-   *       Consider to use TryToAcquireNewJob() if you do not want to block!
+   *       Consider to use TryToPerformJob() if you do not want to block!
    *
-   * @return   an UploadJob to be processed by the concrete implementation of
-   *           AbstractUploader
+   * @return  a JobStatus either being ::kOk or ::kTerminate. In the latter case
+   *          custom worker thread implementations should terminate
    */
   JobStatus::State PerformJob() {
     UploadJob job;
@@ -319,13 +344,13 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
 
 
   /**
-   * Tries to acquires a job from the job queue. If there is no work in the job
-   * queue, it will _not_ wait but immediately return with 'false'.
+   * Tries to perform a job from the job queue. If there is no work in the job
+   * queue, it will _not_ wait but immediately return with '::kNoJobs'.
    *
    * Note: This method will not block on an empty queue (see AcquireNewJob())!
    *
-   * @param job_slot   a reference for an UploadJob slot to be pulled
-   * @return           true if a job was successfully popped
+   * @return  a JobStatus either being ::kOk, ::kNoJobs or ::kTerminate. In the
+   *          last case custom worker thread implementations should terminate
    */
   JobStatus::State TryToPerformJob() {
     UploadJob job;
