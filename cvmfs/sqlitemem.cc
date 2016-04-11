@@ -94,9 +94,7 @@ void SqliteMemoryManager::MallocArena::Free(void *ptr) {
 
   // Set new free block's boundaries
   new_avail->size = new_size;
-  void *upper_tag =
-    reinterpret_cast<char *>(new_avail) + new_size - sizeof(AvailBlockTag);
-  new (upper_tag) AvailBlockTag(new_size);
+  new (AvailBlockTag::GetTagLocation(new_avail)) AvailBlockTag(new_size);
 
   EnqueueAvailBlock(new_avail);
 }
@@ -172,6 +170,7 @@ SqliteMemoryManager::MallocArena::MallocArena()
   free_block->size = usable_size;
   free_block->link_next = free_block->link_prev =
     head_avail_->ConvertToLink(arena_);
+  new (AvailBlockTag::GetTagLocation(free_block)) AvailBlockTag(usable_size);
 
   head_avail_->size = 0;
   head_avail_->link_next = head_avail_->link_prev =
@@ -181,6 +180,28 @@ SqliteMemoryManager::MallocArena::MallocArena()
   *(reinterpret_cast<char *>(free_block) - 1) = kTagReserved;
   // Final tag: reserved block marker
   *reinterpret_cast<int32_t *>(arena_ + kArenaSize - sizeof(int32_t)) = -1;
+}
+
+
+/**
+ * Initializes the arena with repeated copies of the given pattern.  Used for
+ * testing.
+ */
+SqliteMemoryManager::MallocArena *
+SqliteMemoryManager::MallocArena::CreateInitialized(
+  unsigned char pattern)
+{
+  MallocArena *result = new MallocArena();
+  // At this point, there is one big free block linked to by head_avail_
+  AvailBlockCtl *free_block = result->head_avail_->GetNextPtr(result->arena_);
+  assert(free_block != result->head_avail_);
+  assert(free_block->size > 0);
+  // Strip control information at both ends of the block
+  int usable_size = free_block->size -
+                    (sizeof(AvailBlockCtl) + sizeof(AvailBlockTag));
+  assert(usable_size > 0);
+  memset(free_block + 1, pattern, usable_size);
+  return result;
 }
 
 
