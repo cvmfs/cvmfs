@@ -240,7 +240,20 @@ bool LevelDbUploader::Remove(const std::string& file_to_delete) {
 
 
 bool LevelDbUploader::Peek(const std::string& path) const {
-  return false;
+  LevelDbHandle& handle = GetDatabaseForPath(path);
+
+  leveldb::ReadOptions read_options;
+  read_options.fill_cache = false;
+  std::string buffer;
+  leveldb::Status status = handle->Get(read_options, path, &buffer);
+
+  if (!status.ok() && !status.IsNotFound()) {
+    LogCvmfs(kLogUploadLevelDb, kLogStderr, "failed to peek '%s' in LevelDB",
+             path.c_str());
+    return false;
+  }
+
+  return status.ok();
 }
 
 
