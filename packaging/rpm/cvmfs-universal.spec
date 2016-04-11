@@ -222,6 +222,8 @@ done
 popd
 %endif
 
+%if 0%{?el4}
+%else
 %pretrans server
 [ -d "/var/spool/cvmfs"  ]          || exit 0
 [ -d "/etc/cvmfs/repositories.d/" ] || exit 0
@@ -239,6 +241,7 @@ for repo in /var/spool/cvmfs/*; do
 done
 
 exit 0
+%endif
 
 %pre
 %if 0%{?suse_version}
@@ -422,6 +425,8 @@ fi
 %doc COPYING AUTHORS README ChangeLog
 
 %changelog
+* Mon Apr 11 2016 Rene Meusel <rene.meusel@cern.ch> - 2.3.0
+- Disable open repo transaction check in EL4
 * Thu Apr 07 2016 Rene Meusel <rene.meusel@cern.ch> - 2.3.0
 - Check for open repo transactions before updating server package
 * Sat Jan 23 2016 Brian Bockelman <bbockelm@cse.unl.edu> - 2.2.0
