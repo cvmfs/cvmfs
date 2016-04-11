@@ -148,19 +148,15 @@ unsigned int LevelDbUploader::GetNumberOfErrors() const {
 }
 
 
-void LevelDbUploader::FileUpload(
-  const std::string &local_path,
-  const std::string &remote_path,
-  const CallbackTN   *callback
-) {
+int LevelDbUploader::PutFile(const std::string &local_path,
+                              const std::string &remote_path) {
   LevelDbHandle& handle = GetDatabaseForPath(remote_path);
 
   MemoryMappedFile file(local_path);
   if (!file.Map()) {
     LogCvmfs(kLogUploadLevelDb, kLogStderr, "failed to read '%s'",
              local_path.c_str());
-    Respond(callback, UploaderResults(1, local_path));
-    return;
+    return errno;
   }
 
   leveldb::WriteOptions options;
@@ -172,11 +168,20 @@ void LevelDbUploader::FileUpload(
   if (!status.ok()) {
     LogCvmfs(kLogUploadLevelDb, kLogStderr, "failed to write '%s' to LevelDB",
              local_path.c_str());
-    Respond(callback, UploaderResults(2, local_path));
-    return;
+    return 2;
   }
 
-  Respond(callback, UploaderResults(0, local_path));
+  return 0;
+}
+
+
+void LevelDbUploader::FileUpload(
+  const std::string &local_path,
+  const std::string &remote_path,
+  const CallbackTN   *callback
+) {
+  const int retcode = PutFile(local_path, remote_path);
+  Respond(callback, UploaderResults(retcode, local_path));
 }
 
 

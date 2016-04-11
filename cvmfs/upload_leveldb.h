@@ -83,6 +83,7 @@ class LevelDbUploader : public AbstractUploader {
   void CloseDatabases();
 
   LevelDbHandle& GetDatabaseForPath(const std::string &path) const;
+  int PutFile(const std::string &local_path, const std::string &remote_path);
 
   friend class LevelDbUploaderTestWrapper;
 
