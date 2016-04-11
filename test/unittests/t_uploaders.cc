@@ -392,6 +392,7 @@ class T_Uploaders : public FileSandbox {
 
 
   bool IsS3() const;
+  bool IsLevelDB() const;
 
  private:
   void CreateS3Mockup() {
@@ -691,6 +692,16 @@ bool T_Uploaders<T>::IsS3() const {
 
 template <>
 bool T_Uploaders<S3Uploader>::IsS3() const {
+  return true;
+}
+
+template <typename T>
+bool T_Uploaders<T>::IsLevelDB() const {
+  return false;
+}
+
+template <>
+bool T_Uploaders<LevelDbUploader>::IsLevelDB() const {
   return true;
 }
 
@@ -1021,9 +1032,9 @@ TYPED_TEST(T_Uploaders, MultipleStreamedUploadSlow) {
 
 
 TYPED_TEST(T_Uploaders, PlaceBootstrappingShortcut) {
-  if (TestFixture::IsS3()) {
+  if (TestFixture::IsS3() || TestFixture::IsLevelDB()) {
     SUCCEED();  // TODO(rmeusel): enable this as soon as the feature is
-    return;     //                implemented for the S3Uploader
+    return;     //                implemented for the LevelDB and S3Uploaders
   }
 
   const std::string big_file_path = TestFixture::GetBigFile();
