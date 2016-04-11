@@ -816,7 +816,7 @@ TYPED_TEST(T_Uploaders, UploadEmptyFile) {
   EXPECT_TRUE(TestFixture::CheckFile(dest_name));
   EXPECT_EQ(1u, this->delegate_.simple_upload_invocations);
   TestFixture::CompareFileContents(empty_file_path, dest_name);
-  EXPECT_EQ(0, GetFileSize(TestFixture::AbsoluteDestinationPath(dest_name)));
+  EXPECT_EQ(0u, TestFixture::GetBackendFileSize(dest_name));
 }
 
 
