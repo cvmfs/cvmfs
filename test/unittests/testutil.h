@@ -144,7 +144,7 @@ class AbstractMockUploader : public upload::AbstractUploader {
   void WorkerThread() {
     worker_thread_running = true;
 
-    while (PerformJob() != JobStatus::kTerminate);
+    AbstractUploader::WorkerThread();
 
     worker_thread_running = false;
   }

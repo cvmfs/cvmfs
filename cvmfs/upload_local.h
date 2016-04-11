@@ -75,8 +75,6 @@ class LocalUploader : public AbstractUploader {
   unsigned int GetNumberOfErrors() const;
 
  protected:
-  void WorkerThread();
-
   int Move(const std::string &local_path,
            const std::string &remote_path) const;
 

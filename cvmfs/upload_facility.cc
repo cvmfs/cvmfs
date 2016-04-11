@@ -44,6 +44,13 @@ bool AbstractUploader::Initialize() {
 }
 
 
+void AbstractUploader::WorkerThread() {
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "Uploader WorkerThread started.");
+  while (PerformJob() != JobStatus::kTerminate);
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "Uploader WorkerThread exited.");
+}
+
+
 AbstractUploader::JobStatus::State AbstractUploader::DispatchJob(
                                                          const UploadJob &job) {
   switch (job.type) {

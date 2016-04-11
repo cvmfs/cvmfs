@@ -371,7 +371,7 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    * make sure to exit that method if and only if you receive an UploadJob like:
    *   UploadJob.type == UploadJob::Terminate
    */
-  virtual void WorkerThread() = 0;
+  virtual void WorkerThread();
 
 
   /**

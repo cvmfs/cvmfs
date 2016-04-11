@@ -42,15 +42,6 @@ unsigned int LocalUploader::GetNumberOfErrors() const {
 }
 
 
-void LocalUploader::WorkerThread() {
-  LogCvmfs(kLogSpooler, kLogVerboseMsg, "Local WorkerThread started.");
-
-  while (PerformJob() != JobStatus::kTerminate);
-
-  LogCvmfs(kLogSpooler, kLogVerboseMsg, "Local WorkerThread exited.");
-}
-
-
 void LocalUploader::FileUpload(
   const std::string &local_path,
   const std::string &remote_path,
