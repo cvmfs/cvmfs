@@ -234,8 +234,19 @@ void LevelDbUploader::FinalizeStreamedUpload(UploadStreamHandle  *handle,
 }
 
 
-bool LevelDbUploader::Remove(const std::string& file_to_delete) {
-  return false;
+bool LevelDbUploader::Remove(const std::string& path) {
+  LevelDbHandle& handle = GetDatabaseForPath(path);
+
+  leveldb::WriteOptions write_options;
+  leveldb::Status status = handle->Delete(write_options, path);
+
+  if (!status.ok()) {
+    LogCvmfs(kLogUploadLevelDb, kLogStderr, "failed to delete '%s' in LevelDB",
+             path.c_str());
+    return false;
+  }
+
+  return true;
 }
 
 

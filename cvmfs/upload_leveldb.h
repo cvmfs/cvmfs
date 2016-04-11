@@ -65,7 +65,7 @@ class LevelDbUploader : public AbstractUploader {
   void FinalizeStreamedUpload(UploadStreamHandle  *handle,
                               const shash::Any    &content_hash);
 
-  bool Remove(const std::string &file_to_delete);
+  bool Remove(const std::string &path);
 
   bool Peek(const std::string& path) const;
 
