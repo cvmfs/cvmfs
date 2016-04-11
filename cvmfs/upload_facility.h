@@ -362,14 +362,11 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
 
 
   /**
-   * This purely virtual function is called once the AbstractUploader has started
-   * its dedicated writer thread. Overwrite this method to implement your event
-   * loop that is supposed to run in its own thread. In this event loop you are
-   * supposed to pull upload jobs using AbstractUploader::AcquireNewJob().
-   *
-   * If this method returns, AbstractUploader's write thread is terminated, so
-   * make sure to exit that method if and only if you receive an UploadJob like:
-   *   UploadJob.type == UploadJob::Terminate
+   * This virtual function is called once the AbstractUploader has started its
+   * dedicated writer thread. Overwrite this method to implement your own event
+   * loop. You must call AbstractUploader::PerformJob() or ::TryToPerformJob()
+   * in an endless loop until either of those returns JobState::kTerminate.
+   * AbstractUploader's write thread is terminated when this method returns.
    */
   virtual void WorkerThread();
 
