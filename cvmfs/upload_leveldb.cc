@@ -134,7 +134,8 @@ void LevelDbUploader::CloseDatabases() {
 }
 
 
-LevelDbHandle& LevelDbUploader::GetDatabaseForPath(const std::string &path) {
+LevelDbHandle& LevelDbUploader::GetDatabaseForPath(
+                                                const std::string &path) const {
   shash::Any h(shash::kMd5);
   HashString(path, &h);
   const uint32_t shorthash = *reinterpret_cast<uint32_t*>(h.digest);

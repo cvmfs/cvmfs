@@ -85,7 +85,7 @@ class LevelDbUploader : public AbstractUploader {
   bool OpenDatabases();
   void CloseDatabases();
 
-  LevelDbHandle& GetDatabaseForPath(const std::string &path);
+  LevelDbHandle& GetDatabaseForPath(const std::string &path) const;
 
   friend class LevelDbUploaderTestWrapper;
 
@@ -94,7 +94,7 @@ class LevelDbUploader : public AbstractUploader {
   unsigned                  database_count_;
   leveldb::CompressionType  compression_;
 
-  LevelDbHandles            databases_;
+  mutable LevelDbHandles    databases_;
 };
 
 
