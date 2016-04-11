@@ -523,6 +523,10 @@ if (BUILD_SERVER)
     add_dependencies (cvmfs_swissknife libtbb)
   endif (TBB_PRIVATE_LIB)
 
+  if (LEVELDB_BUILTIN)
+    add_dependencies (cvmfs_swissknife libleveldb)
+  endif (LEVELDB_BUILTIN)
+
   add_dependencies (cvmfs_swissknife libsha3)
 
   set_target_properties (cvmfs_swissknife PROPERTIES COMPILE_FLAGS "${CVMFS_SWISSKNIFE_CFLAGS}" LINK_FLAGS "${CVMFS_SWISSKNIFE_LD_FLAGS}")
@@ -533,7 +537,8 @@ if (BUILD_SERVER)
                          ${CARES_LIBRARIES} ${CARES_ARCHIVE} ${TBB_LIBRARIES}
                          ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} ${OPENSSL_LIBRARIES}
                          ${SQLITE3_ARCHIVE} ${RT_LIBRARY} ${VJSON_ARCHIVE}
-                         ${SHA3_ARCHIVE} ${CAP_LIBRARIES} pthread dl)
+                         ${SHA3_ARCHIVE} ${CAP_LIBRARIES} ${LEVELDB_LIBRARIES}
+                         ${LEVELDB_ARCHIVE} pthread dl)
 
   if (BUILD_SERVER_DEBUG)
     add_executable (cvmfs_swissknife_debug ${CVMFS_SWISSKNIFE_DEBUG_SOURCES})
@@ -554,6 +559,10 @@ if (BUILD_SERVER)
       add_dependencies (cvmfs_swissknife_debug libtbb)
     endif (TBB_PRIVATE_LIB)
 
+    if (LEVELDB_BUILTIN)
+      add_dependencies (cvmfs_swissknife_debug libleveldb)
+    endif (LEVELDB_BUILTIN)
+
     add_dependencies (cvmfs_swissknife_debug libsha3)
 
     set_target_properties (cvmfs_swissknife_debug PROPERTIES COMPILE_FLAGS "${CVMFS_SWISSKNIFE_DEBUG_CFLAGS}" LINK_FLAGS "${CVMFS_SWISSKNIFE_DEBUG_LD_FLAGS}")
@@ -568,7 +577,8 @@ if (BUILD_SERVER)
                            ${CARES_LIBRARIES} ${CARES_ARCHIVE} ${TBB_DEBUG_LIBRARIES}
                            ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} ${OPENSSL_LIBRARIES}
                            ${SQLITE3_ARCHIVE} ${RT_LIBRARY} ${VJSON_ARCHIVE}
-                           ${SHA3_ARCHIVE} ${CAP_LIBRARIES} pthread dl)
+                           ${SHA3_ARCHIVE} ${CAP_LIBRARIES} ${LEVELDB_LIBRARIES}
+                           ${LEVELDB_ARCHIVE} pthread dl)
   endif (BUILD_SERVER_DEBUG)
 endif (BUILD_SERVER)
 
