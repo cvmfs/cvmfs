@@ -144,27 +144,7 @@ class AbstractMockUploader : public upload::AbstractUploader {
   void WorkerThread() {
     worker_thread_running = true;
 
-    bool running = true;
-    while (running) {
-      UploadJob job = AcquireNewJob();
-      switch (job.type) {
-        case UploadJob::Upload:
-          Upload(job.stream_handle,
-                 job.buffer,
-                 job.callback);
-          break;
-        case UploadJob::Commit:
-          FinalizeStreamedUpload(job.stream_handle,
-                                 job.content_hash);
-          break;
-        case UploadJob::Terminate:
-          running = false;
-          break;
-        default:
-          assert(AbstractMockUploader::not_implemented);
-          break;
-      }
-    }
+    while (PerformJob() != JobStatus::kTerminate);
 
     worker_thread_running = false;
   }
@@ -181,14 +161,14 @@ class AbstractMockUploader : public upload::AbstractUploader {
     return NULL;
   }
 
-  virtual void Upload(upload::UploadStreamHandle  *handle,
-                      upload::CharBuffer          *buffer,
-                      const CallbackTN            *callback = NULL) {
+  virtual void StreamedUpload(upload::UploadStreamHandle  *handle,
+                              upload::CharBuffer          *buffer,
+                              const CallbackTN            *callback = NULL) {
     assert(AbstractMockUploader::not_implemented);
   }
 
   virtual void FinalizeStreamedUpload(upload::UploadStreamHandle *handle,
-                                      const shash::Any            content_hash)
+                                      const shash::Any           &content_hash)
   {
     assert(AbstractMockUploader::not_implemented);
   }

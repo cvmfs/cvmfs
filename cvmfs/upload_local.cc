@@ -43,30 +43,9 @@ unsigned int LocalUploader::GetNumberOfErrors() const {
 
 
 void LocalUploader::WorkerThread() {
-  bool running = true;
-
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "Local WorkerThread started.");
 
-  while (running) {
-    UploadJob job = AcquireNewJob();
-    switch (job.type) {
-      case UploadJob::Upload:
-        Upload(job.stream_handle,
-               job.buffer,
-               job.callback);
-        break;
-      case UploadJob::Commit:
-        FinalizeStreamedUpload(job.stream_handle, job.content_hash);
-        break;
-      case UploadJob::Terminate:
-        running = false;
-        break;
-      default:
-        const bool unknown_job_type = false;
-        assert(unknown_job_type);
-        break;
-    }
-  }
+  while (PerformJob() != JobStatus::kTerminate);
 
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "Local WorkerThread exited.");
 }
@@ -155,9 +134,9 @@ UploadStreamHandle* LocalUploader::InitStreamedUpload(
 }
 
 
-void LocalUploader::Upload(UploadStreamHandle  *handle,
-                           CharBuffer          *buffer,
-                           const CallbackTN    *callback) {
+void LocalUploader::StreamedUpload(UploadStreamHandle  *handle,
+                                   CharBuffer          *buffer,
+                                   const CallbackTN    *callback) {
   assert(buffer->IsInitialized());
   LocalStreamHandle *local_handle = static_cast<LocalStreamHandle*>(handle);
 

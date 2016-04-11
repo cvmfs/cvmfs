@@ -173,28 +173,8 @@ void S3Uploader::WorkerThread() {
   while (running) {
     UploadJob job;
 
-    // Try to get new job
-    bool newjob = TryToAcquireNewJob(&job);
-    if (newjob) {
-      switch (job.type) {
-        case UploadJob::Upload:
-          Upload(job.stream_handle,
-                 job.buffer,
-                 job.callback);
-          break;
-        case UploadJob::Commit:
-          // Note, this block until upload is possible
-          FinalizeStreamedUpload(job.stream_handle, job.content_hash);
-          break;
-        case UploadJob::Terminate:
-          running = false;
-          break;
-        default:
-          const bool unknown_job_type = false;
-          assert(unknown_job_type);
-          break;
-      }
-    }
+    // Try to perform a new job
+    running = TryToPerformJob() != JobStatus::kTerminate;
 
     // Get and report completed jobs
     std::vector<s3fanout::JobInfo *> jobs;
@@ -457,9 +437,9 @@ UploadStreamHandle *S3Uploader::InitStreamedUpload(const CallbackTN *callback) {
 }
 
 
-void S3Uploader::Upload(UploadStreamHandle  *handle,
-                        CharBuffer          *buffer,
-                        const CallbackTN    *callback) {
+void S3Uploader::StreamedUpload(UploadStreamHandle  *handle,
+                                CharBuffer          *buffer,
+                                const CallbackTN    *callback) {
   assert(buffer->IsInitialized());
   S3StreamHandle *local_handle = static_cast<S3StreamHandle*>(handle);
 

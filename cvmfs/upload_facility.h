@@ -102,6 +102,15 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
   };
 
  public:
+  struct JobStatus {
+    enum State {
+      kOk,
+      kTerminate,
+      kNoJobs
+    };
+  };
+
+ public:
   virtual ~AbstractUploader() {
     assert(torn_down_ && "Call AbstractUploader::TearDown() before dtor!");
   }
@@ -265,6 +274,13 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
                           const std::string  &remote_path,
                           const CallbackTN   *callback = NULL) = 0;
 
+  virtual void StreamedUpload(UploadStreamHandle  *handle,
+                              CharBuffer          *buffer,
+                              const CallbackTN    *callback) = 0;
+
+  virtual void FinalizeStreamedUpload(UploadStreamHandle  *handle,
+                                      const shash::Any    &content_hash) = 0;
+
   /**
    * This notifies the callback that is associated to a finishing job. Please
    * do not call the handed callback yourself in concrete Uploaders!
@@ -295,10 +311,10 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    * @return   an UploadJob to be processed by the concrete implementation of
    *           AbstractUploader
    */
-  UploadJob AcquireNewJob() {
+  JobStatus::State PerformJob() {
     UploadJob job;
     upload_queue_.pop(job);
-    return job;
+    return DispatchJob(job);
   }
 
 
@@ -311,8 +327,12 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    * @param job_slot   a reference for an UploadJob slot to be pulled
    * @return           true if a job was successfully popped
    */
-  bool TryToAcquireNewJob(UploadJob *job_slot) {
-    return upload_queue_.try_pop(*job_slot);
+  JobStatus::State TryToPerformJob() {
+    UploadJob job;
+    const bool got_job = upload_queue_.try_pop(job);
+    return (got_job)
+      ? DispatchJob(job)
+      : JobStatus::kNoJobs;
   }
 
 
@@ -344,6 +364,10 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
   const SynchronizingCounter<int32_t>& jobs_in_flight() const {
     return jobs_in_flight_;
   }
+
+
+ private:
+  JobStatus::State DispatchJob(const UploadJob &job);
 
  private:
   const SpoolerDefinition                   spooler_definition_;

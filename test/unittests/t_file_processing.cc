@@ -113,9 +113,9 @@ class FP_MockUploader : public AbstractMockUploader<FP_MockUploader> {
     return new MockStreamHandle(callback);
   }
 
-  void Upload(upload::UploadStreamHandle  *handle,
-              upload::CharBuffer          *buffer,
-              const CallbackTN            *callback = NULL) {
+  void StreamedUpload(upload::UploadStreamHandle  *handle,
+                      upload::CharBuffer          *buffer,
+                      const CallbackTN            *callback = NULL) {
     MockStreamHandle *local_handle = dynamic_cast<MockStreamHandle*>(handle);
     assert(local_handle != NULL);
     local_handle->Append(buffer);
@@ -124,7 +124,7 @@ class FP_MockUploader : public AbstractMockUploader<FP_MockUploader> {
   }
 
   void FinalizeStreamedUpload(upload::UploadStreamHandle *handle,
-                              const shash::Any            content_hash) {
+                              const shash::Any           &content_hash) {
     MockStreamHandle *local_handle = dynamic_cast<MockStreamHandle*>(handle);
     assert(local_handle != NULL);
 

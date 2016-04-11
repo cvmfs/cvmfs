@@ -55,9 +55,9 @@ class UF_MockUploader : public AbstractMockUploader<UF_MockUploader> {
     return true;
   }
 
-  void Upload(upload::UploadStreamHandle  *abstract_handle,
-              upload::CharBuffer          *buffer,
-              const CallbackTN            *callback = NULL) {
+  void StreamedUpload(upload::UploadStreamHandle  *abstract_handle,
+                      upload::CharBuffer          *buffer,
+                      const CallbackTN            *callback = NULL) {
     UF_MockStreamHandle* handle =
                              static_cast<UF_MockStreamHandle*>(abstract_handle);
     handle->uploads++;
@@ -65,7 +65,7 @@ class UF_MockUploader : public AbstractMockUploader<UF_MockUploader> {
   }
 
   void FinalizeStreamedUpload(upload::UploadStreamHandle *abstract_handle,
-                              const shash::Any            content_hash) {
+                              const shash::Any           &content_hash) {
     UF_MockStreamHandle* handle =
                              static_cast<UF_MockStreamHandle*>(abstract_handle);
     handle->commits++;

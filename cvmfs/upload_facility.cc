@@ -44,6 +44,30 @@ bool AbstractUploader::Initialize() {
 }
 
 
+AbstractUploader::JobStatus::State AbstractUploader::DispatchJob(
+                                                         const UploadJob &job) {
+  switch (job.type) {
+    case UploadJob::Upload:
+      StreamedUpload(job.stream_handle,
+                     job.buffer,
+                     job.callback);
+      return JobStatus::kOk;
+
+    case UploadJob::Commit:
+      FinalizeStreamedUpload(job.stream_handle, job.content_hash);
+      return JobStatus::kOk;
+
+    case UploadJob::Terminate:
+      return JobStatus::kTerminate;
+
+    default:
+      const bool unknown_job_type = false;
+      assert(unknown_job_type);
+      return JobStatus::kTerminate;
+  }
+}
+
+
 void AbstractUploader::TearDown() {
   assert(!torn_down_);
   upload_queue_.push(UploadJob());  // Termination signal
