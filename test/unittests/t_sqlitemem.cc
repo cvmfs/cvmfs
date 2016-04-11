@@ -13,6 +13,7 @@
 #include "prng.h"
 #include "sqlitemem.h"
 #include "util/algorithm.h"
+#include "util/pointer.h"
 
 using namespace std;  // NOLINT
 
@@ -245,4 +246,37 @@ TEST_F(T_Sqlitemem, Malloc) {
   mem_mgr_->PutMemory(p[1]);
   mem_mgr_->PutMemory(p[0]);
   EXPECT_EQ(1U, mem_mgr_->malloc_arenas_.size());
+}
+
+
+TEST_F(T_Sqlitemem, Realloc) {
+  unsigned char pattern_one = 0xFF;
+  // At the end of the newly allocated blocks we have left-over tags from the
+  // allocation procedure;  Don't compare the last 8 bytes for the pattern.
+  unsigned char pattern_one_1kb[1016];
+  memset(pattern_one_1kb, pattern_one, 1016);
+
+  // Switch default memory arena against initialized one
+  delete mem_mgr_->malloc_arenas_[0];
+  mem_mgr_->malloc_arenas_[0] =
+    SqliteMemoryManager::MallocArena::CreateInitialized(pattern_one);
+
+  // Allocate 2 times 1kB from the end of the arena and set both areas to zero
+  void *p1 = mem_mgr_->GetMemory(1024);
+  ASSERT_TRUE(p1 != NULL);
+  EXPECT_EQ(1024, mem_mgr_->GetMemorySize(p1));
+  EXPECT_EQ(0, memcmp(p1, pattern_one_1kb, 1016));
+  void *p2 = mem_mgr_->GetMemory(1024);
+  ASSERT_TRUE(p2 != NULL);
+  EXPECT_EQ(1024, mem_mgr_->GetMemorySize(p2));
+  EXPECT_EQ(0, memcmp(p2, pattern_one_1kb, 1016));
+  memset(p1, 0, 1024);
+  memset(p2, 0, 1024);
+  EXPECT_EQ(0, memcmp(p2, p1, 1024));
+
+  // Double space of p2 into new area
+  p2 = mem_mgr_->xRealloc(p2, 2048);
+  EXPECT_EQ(0, memcmp(p2, p1, 1024));
+  EXPECT_EQ(0,
+            memcmp(reinterpret_cast<char *>(p2) + 1024, pattern_one_1kb, 1016));
 }
