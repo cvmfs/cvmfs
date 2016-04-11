@@ -72,8 +72,6 @@ class S3Uploader : public AbstractUploader {
  protected:
   void WorkerThread();
 
-  int CreateAndOpenTemporaryChunkFile(std::string *path) const;
-
  private:
   bool ParseSpoolerDefinition(const SpoolerDefinition &spooler_definition);
   bool UploadJobInfo(s3fanout::JobInfo *info);

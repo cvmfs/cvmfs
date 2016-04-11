@@ -44,6 +44,30 @@ bool AbstractUploader::Initialize() {
 }
 
 
+int AbstractUploader::CreateAndOpenTemporaryChunkFile(std::string *path) const {
+  const std::string tmp_path = CreateTempPath(
+    spooler_definition_.temporary_path + "/" + "chunk", 0644);
+  if (tmp_path.empty()) {
+    LogCvmfs(kLogSpooler, kLogStderr,
+             "Failed to create temp file for upload of file chunk (errno: %d).",
+             errno);
+    return -1;
+  }
+
+  const int tmp_fd = open(tmp_path.c_str(), O_WRONLY);
+  if (tmp_fd < 0) {
+    LogCvmfs(kLogSpooler, kLogStderr,
+             "Failed to open temp file '%s' for upload of file chunk "
+             "(errno: %d)", tmp_path.c_str(), errno);
+    unlink(tmp_path.c_str());
+  } else {
+    *path = tmp_path;
+  }
+
+  return tmp_fd;
+}
+
+
 void AbstractUploader::WorkerThread() {
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "Uploader WorkerThread started.");
   while (PerformJob() != JobStatus::kTerminate);

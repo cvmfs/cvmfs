@@ -385,39 +385,6 @@ bool S3Uploader::UploadJobInfo(s3fanout::JobInfo *info) {
 }
 
 
-/**
- * Creates and opens a temporary file.
- *
- * @param path The created file path will be saved here
- * return file id, -1 if failure
- */
-int S3Uploader::CreateAndOpenTemporaryChunkFile(std::string *path) const {
-  const std::string tmp_path = CreateTempPath(temporary_path_ + "/chunk",
-                                              kDefaultFileMode);
-  if (tmp_path.empty()) {
-    LogCvmfs(kLogUploadS3, kLogStderr,
-             "Failed to create temp file for "
-             "upload of file chunk.");
-    atomic_inc32(&copy_errors_);
-    return -1;
-  }
-
-  const int tmp_fd = open(tmp_path.c_str(), O_WRONLY);
-  if (tmp_fd < 0) {
-    LogCvmfs(kLogUploadS3, kLogStderr,
-             "Failed to open temp file '%s' for "
-             "upload of file chunk (errno: %d)",
-             tmp_path.c_str(), errno);
-    unlink(tmp_path.c_str());
-    atomic_inc32(&copy_errors_);
-    return tmp_fd;
-  }
-
-  *path = tmp_path;
-  return tmp_fd;
-}
-
-
 UploadStreamHandle *S3Uploader::InitStreamedUpload(const CallbackTN *callback) {
   std::string tmp_path;
   const int tmp_fd = CreateAndOpenTemporaryChunkFile(&tmp_path);
@@ -429,6 +396,7 @@ UploadStreamHandle *S3Uploader::InitStreamedUpload(const CallbackTN *callback) {
     LogCvmfs(kLogUploadS3, kLogStderr,
              "Failed to open file (%d), %s",
              errno, strerror(errno));
+    atomic_inc32(&copy_errors_);
 
     return NULL;
   }

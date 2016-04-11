@@ -6,7 +6,6 @@
 #include "upload_local.h"
 
 #include <errno.h>
-#include <fcntl.h>
 
 #include <string>
 
@@ -87,37 +86,12 @@ void LocalUploader::FileUpload(
 }
 
 
-int LocalUploader::CreateAndOpenTemporaryChunkFile(std::string *path) const {
-  const std::string tmp_path = CreateTempPath(temporary_path_ + "/" + "chunk",
-                                              0644);
-  if (tmp_path.empty()) {
-    LogCvmfs(kLogSpooler, kLogStderr,
-             "Failed to create temp file for upload of file chunk (errno: %d).",
-             errno);
-    atomic_inc32(&copy_errors_);
-    return -1;
-  }
-
-  const int tmp_fd = open(tmp_path.c_str(), O_WRONLY);
-  if (tmp_fd < 0) {
-    LogCvmfs(kLogSpooler, kLogStderr,
-             "Failed to open temp file '%s' for upload of file chunk "
-             "(errno: %d)", tmp_path.c_str(), errno);
-    unlink(tmp_path.c_str());
-    atomic_inc32(&copy_errors_);
-    return tmp_fd;
-  }
-
-  *path = tmp_path;
-  return tmp_fd;
-}
-
-
 UploadStreamHandle* LocalUploader::InitStreamedUpload(
                                                    const CallbackTN *callback) {
   std::string tmp_path;
   const int tmp_fd = CreateAndOpenTemporaryChunkFile(&tmp_path);
   if (tmp_fd < 0) {
+    atomic_inc32(&copy_errors_);
     return NULL;
   }
 

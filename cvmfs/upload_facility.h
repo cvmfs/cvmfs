@@ -8,10 +8,13 @@
 #include <tbb/concurrent_queue.h>
 #include <tbb/tbb_thread.h>
 
+#include <fcntl.h>
+
 #include <string>
 
 #include "upload_spooler_definition.h"
 #include "util_concurrency.h"
+#include "util/posix.h"
 
 namespace upload {
 
@@ -359,6 +362,17 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
       ? DispatchJob(job)
       : JobStatus::kNoJobs;
   }
+
+
+  /**
+   * Creates a temporary file in the backend storage's temporary location
+   * For the LocalUploader this usually is the 'txn' directory of the backend
+   * storage. Otherwise it is some scratch area.
+   *
+   * @param path   pointer to a string that will contain the created file path
+   * @return       a file descriptor to the opened file
+   */
+  int CreateAndOpenTemporaryChunkFile(std::string *path) const;
 
 
   /**
