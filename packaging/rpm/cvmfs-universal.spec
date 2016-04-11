@@ -222,7 +222,8 @@ done
 popd
 %endif
 
-%if 0%{?redhat_major} > 4
+%if 0%{?el4}
+%else
 %pretrans server
 [ -d "/var/spool/cvmfs"  ]          || exit 0
 [ -d "/etc/cvmfs/repositories.d/" ] || exit 0
