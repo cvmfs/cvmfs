@@ -148,36 +148,6 @@ unsigned int LevelDbUploader::GetNumberOfErrors() const {
 }
 
 
-void LevelDbUploader::WorkerThread() {
-  bool running = true;
-
-  LogCvmfs(kLogSpooler, kLogVerboseMsg, "LevelDb WorkerThread started.");
-
-  while (running) {
-    UploadJob job = AcquireNewJob();
-    switch (job.type) {
-      case UploadJob::Upload:
-        Upload(job.stream_handle,
-               job.buffer,
-               job.callback);
-        break;
-      case UploadJob::Commit:
-        FinalizeStreamedUpload(job.stream_handle, job.content_hash);
-        break;
-      case UploadJob::Terminate:
-        running = false;
-        break;
-      default:
-        const bool unknown_job_type = false;
-        assert(unknown_job_type);
-        break;
-    }
-  }
-
-  LogCvmfs(kLogSpooler, kLogVerboseMsg, "LevelDb WorkerThread exited.");
-}
-
-
 void LevelDbUploader::FileUpload(
   const std::string &local_path,
   const std::string &remote_path,
@@ -216,9 +186,9 @@ UploadStreamHandle* LevelDbUploader::InitStreamedUpload(
 }
 
 
-void LevelDbUploader::Upload(UploadStreamHandle  *handle,
-                             CharBuffer          *buffer,
-                             const CallbackTN    *callback) {
+void LevelDbUploader::StreamedUpload(UploadStreamHandle  *handle,
+                                     CharBuffer          *buffer,
+                                     const CallbackTN    *callback) {
   Respond(callback, UploaderResults(1, buffer));
 }
 

@@ -59,9 +59,9 @@ class LevelDbUploader : public AbstractUploader {
                   const CallbackTN   *callback = NULL);
 
   UploadStreamHandle* InitStreamedUpload(const CallbackTN *callback = NULL);
-  void Upload(UploadStreamHandle  *handle,
-              CharBuffer          *buffer,
-              const CallbackTN    *callback = NULL);
+  void StreamedUpload(UploadStreamHandle  *handle,
+                      CharBuffer          *buffer,
+                      const CallbackTN    *callback = NULL);
   void FinalizeStreamedUpload(UploadStreamHandle  *handle,
                               const shash::Any    &content_hash);
 
@@ -76,9 +76,6 @@ class LevelDbUploader : public AbstractUploader {
    * well as in the Upload() command.
    */
   unsigned int GetNumberOfErrors() const;
-
- protected:
-  void WorkerThread();
 
  private:
   bool ParseConfiguration(const std::string &config_path);
