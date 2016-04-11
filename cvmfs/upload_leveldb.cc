@@ -4,6 +4,7 @@
 
 #include "upload_leveldb.h"
 
+#include "file_processing/char_buffer.h"
 #include "hash.h"
 #include "options.h"
 #include "util/posix.h"
@@ -187,25 +188,65 @@ void LevelDbUploader::FileUpload(
 
 UploadStreamHandle* LevelDbUploader::InitStreamedUpload(
                                                    const CallbackTN *callback) {
-  return new LevelDbStreamHandle(callback);
+  std::string tmp_path;
+  const int tmp_fd = CreateAndOpenTemporaryChunkFile(&tmp_path);
+
+  if (tmp_fd < 0) {
+    LogCvmfs(kLogUploadS3, kLogStderr, "Failed to open file (%d), %s",
+             errno, strerror(errno));
+    return NULL;
+  }
+
+  return new LevelDbStreamHandle(callback, tmp_fd, tmp_path);
 }
 
 
 void LevelDbUploader::StreamedUpload(UploadStreamHandle  *handle,
                                      CharBuffer          *buffer,
                                      const CallbackTN    *callback) {
-  Respond(callback, UploaderResults(1, buffer));
+  assert(buffer->IsInitialized());
+  LevelDbStreamHandle *lvldb_handle = static_cast<LevelDbStreamHandle*>(handle);
+
+  const size_t bytes_written = write(lvldb_handle->file_descriptor,
+                                     buffer->ptr(),
+                                     buffer->used_bytes());
+  if (bytes_written != buffer->used_bytes()) {
+    const int write_errno = errno;
+    LogCvmfs(kLogUploadS3, kLogStderr, "failed to write %d bytes to '%s' "
+                                       "(errno: %d)",
+             buffer->used_bytes(), lvldb_handle->temporary_path.c_str(),
+             write_errno);
+    Respond(callback, UploaderResults(write_errno, buffer));
+    return;
+  }
+
+  Respond(callback, UploaderResults(0, buffer));
 }
 
 
-void LevelDbUploader::FinalizeStreamedUpload(UploadStreamHandle  *handle,
-                                             const shash::Any    &content_hash) {
-  LevelDbStreamHandle *leveldb_handle =
-                                      static_cast<LevelDbStreamHandle*>(handle);
-  const CallbackTN *callback = handle->commit_callback;
-  delete leveldb_handle;
+void LevelDbUploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
+                                             const shash::Any   &content_hash) {
+  LevelDbStreamHandle *lvldb_handle = static_cast<LevelDbStreamHandle*>(handle);
+  const CallbackTN    *callback     = handle->commit_callback;
 
-  Respond(callback, UploaderResults(1));
+  int retval = close(lvldb_handle->file_descriptor);
+  if (retval != 0) {
+    const int cpy_errno = errno;
+    LogCvmfs(kLogUploadLevelDb, kLogStderr, "failed to close temp file '%s' "
+                                            "(errno: %d)",
+             lvldb_handle->temporary_path.c_str(), cpy_errno);
+    Respond(handle->commit_callback, UploaderResults(cpy_errno));
+    return;
+  }
+
+  const std::string final_path("data/" + content_hash.MakePath());
+  const int retcode = PutFile(lvldb_handle->temporary_path, final_path);
+
+  retval = unlink(lvldb_handle->temporary_path.c_str());
+  assert(retval == 0);
+  delete lvldb_handle;
+
+  Respond(callback, UploaderResults(retcode));
 }
 
 
