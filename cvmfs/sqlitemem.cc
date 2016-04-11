@@ -317,8 +317,9 @@ void SqliteMemoryManager::xFree(void *ptr) {
  * Sqlite ensures that ptr != NULL and new_size > 0.
  */
 void *SqliteMemoryManager::xRealloc(void *ptr, int new_size) {
+  int old_size = xSize(ptr);
   void *new_ptr = xMalloc(new_size);
-  memcpy(new_ptr, ptr, new_size);
+  memcpy(new_ptr, ptr, old_size);
   xFree(ptr);
   return new_ptr;
 }
