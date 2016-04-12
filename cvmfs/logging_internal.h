@@ -70,7 +70,8 @@ enum LogSource {
   kLogGc,
   kLogDns,
   kLogVoms,
-  kLogReflog
+  kLogAuthz,
+  kLogReflog,
 };
 
 const int kLogVerboseMsg = kLogStdout | kLogShowSource | kLogVerbose;

@@ -77,6 +77,9 @@ set (CVMFS_CLIENT_SOURCES
   util/single_copy.h
   util/string.cc util/string.h
   util/unlink_guard.h
+  voms_authz/authz.h voms_authz/authz.cc
+  voms_authz/authz_fetch.h voms_authz/authz_fetch.cc
+  voms_authz/authz_session.h voms_authz/authz_session.cc
   whitelist.cc whitelist.h
   wpad.cc wpad.h
   xattr.cc xattr.h

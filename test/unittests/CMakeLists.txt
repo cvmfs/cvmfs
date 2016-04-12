@@ -18,6 +18,7 @@ set(CVMFS_UNITTEST_FILES
 
   t_async_reader.cc
   t_atomic.cc
+  t_authz.cc
   t_backoff.cc
   t_base64.cc
   t_bigvector.cc
@@ -96,6 +97,9 @@ set (CVMFS_UNITTEST_SOURCES
 
   # test dependencies
   ${CVMFS_SOURCE_DIR}/atomic.h
+  ${CVMFS_SOURCE_DIR}/voms_authz/authz.h ${CVMFS_SOURCE_DIR}/voms_authz/authz.cc
+  ${CVMFS_SOURCE_DIR}/voms_authz/authz_fetch.h ${CVMFS_SOURCE_DIR}/voms_authz/authz_fetch.cc
+  ${CVMFS_SOURCE_DIR}/voms_authz/authz_session.h ${CVMFS_SOURCE_DIR}/voms_authz/authz_session.cc
   ${CVMFS_SOURCE_DIR}/backoff.cc ${CVMFS_SOURCE_DIR}/backoff.h
   ${CVMFS_SOURCE_DIR}/bigvector.h
   ${CVMFS_SOURCE_DIR}/cache.cc ${CVMFS_SOURCE_DIR}/cache.h
