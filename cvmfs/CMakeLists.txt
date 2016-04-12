@@ -310,6 +310,7 @@ set (CVMFS_PRELOADER_SOURCES
   upload_facility.cc upload_facility.h
   upload_local.cc upload_local.h
   upload_s3.cc upload_s3.h
+  upload_leveldb.cc upload_leveldb.h
   upload_spooler_definition.cc upload_spooler_definition.h
   util/algorithm.cc util/algorithm.h
   util/buffer.h
@@ -614,6 +615,10 @@ if (BUILD_PRELOADER)
     add_dependencies (cvmfs_preload_bin libtbb)
   endif (TBB_PRIVATE_LIB)
 
+  if (LEVELDB_BUILTIN)
+    add_dependencies (cvmfs_preload_bin libleveldb)
+  endif (LEVELDB_BUILTIN)
+
   add_dependencies (cvmfs_preload_bin libsha3)
   add_dependencies (cvmfs_preload_bin libvjson)
 
@@ -621,8 +626,8 @@ if (BUILD_PRELOADER)
                         ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE} ${ZLIB_LIBRARIES}
                         ${OPENSSL_LIBRARIES} ${CARES_ARCHIVE} ${SQLITE3_ARCHIVE}
                         ${ZLIB_ARCHIVE} ${TBB_LIBRARIES} ${RT_LIBRARY}
-                        ${VJSON_ARCHIVE} ${SHA3_ARCHIVE}
-                        pthread dl)
+                        ${VJSON_ARCHIVE} ${SHA3_ARCHIVE} ${LEVELDB_LIBRARIES}
+                        ${LEVELDB_ARCHIVE} pthread dl)
 endif (BUILD_PRELOADER)
 
 #
