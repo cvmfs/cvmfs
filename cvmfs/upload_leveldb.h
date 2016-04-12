@@ -8,11 +8,11 @@
 #include <sys/stat.h>
 
 #include <string>
-
-#include <leveldb/db.h>
-#include <leveldb/options.h>
+#include <vector>
 
 #include "atomic.h"
+#include "leveldb/db.h"
+#include "leveldb/options.h"
 #include "upload_facility.h"
 #include "util_concurrency.h"
 

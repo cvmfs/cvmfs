@@ -5,16 +5,16 @@
 #ifndef CVMFS_UPLOAD_FACILITY_H_
 #define CVMFS_UPLOAD_FACILITY_H_
 
+#include <fcntl.h>
+
 #include <tbb/concurrent_queue.h>
 #include <tbb/tbb_thread.h>
-
-#include <fcntl.h>
 
 #include <string>
 
 #include "upload_spooler_definition.h"
-#include "util_concurrency.h"
 #include "util/posix.h"
+#include "util_concurrency.h"
 
 namespace upload {
 

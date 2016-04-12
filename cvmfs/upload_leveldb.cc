@@ -7,9 +7,9 @@
 #include "file_processing/char_buffer.h"
 #include "hash.h"
 #include "options.h"
+#include "util/mmap_file.h"
 #include "util/posix.h"
 #include "util/string.h"
-#include "util/mmap_file.h"
 
 namespace upload {
 
