@@ -72,7 +72,7 @@ int AbstractUploader::CreateAndOpenTemporaryChunkFile(std::string *path) const {
 
 void AbstractUploader::WorkerThread() {
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "Uploader WorkerThread started.");
-  while (PerformJob() != JobStatus::kTerminate);
+  while (PerformJob() != JobStatus::kTerminate) {}
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "Uploader WorkerThread exited.");
 }
 

@@ -32,7 +32,7 @@ struct LevelDbStreamHandle : public UploadStreamHandle {
 
 class LevelDbHandle {
  public:
-  LevelDbHandle(leveldb::DB *database) : database_(database) { }
+  explicit LevelDbHandle(leveldb::DB *database) : database_(database) { }
 
   void Close() { delete database_; database_ = NULL; }
   leveldb::DB* operator->() const { return database_; }

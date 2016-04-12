@@ -284,7 +284,8 @@ bool LevelDbUploader::Peek(const std::string& path) const {
 }
 
 
-bool LevelDbUploader::PlaceBootstrappingShortcut(const shash::Any &object) const {
+bool LevelDbUploader::PlaceBootstrappingShortcut(const shash::Any &object) const
+{
   return false;
 }
 
