@@ -111,14 +111,13 @@ class T_Uploaders : public FileSandbox {
 
     SetUp(type<UploadersT>());
 
-    InitializeStorageBackend();
     uploader_ = AbstractUploader::Construct(GetSpoolerDefinition());
     ASSERT_NE(static_cast<AbstractUploader*>(NULL), uploader_);
   }
 
 
   virtual void SetUp(const type<upload::LocalUploader> type_specifier) {
-    // Empty, no specific needs
+    InitializeStorageBackend();
   }
 
 
@@ -131,6 +130,7 @@ class T_Uploaders : public FileSandbox {
     repo_alias = "testdata";
     CreateTempS3ConfigFile(10, 10);
     CreateS3Mockup();
+    InitializeStorageBackend();
   }
 
 
