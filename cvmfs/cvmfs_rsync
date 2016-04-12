@@ -46,22 +46,31 @@ if [ "${SRC%/}" = "$SRC" ]; then
     DESTDIR="$DEST/${SRC##*/}"
 fi
 # Look for catalogs under $DESTDIR, and if any of the corresponding source 
-# directories have gone away, remove any .cvmfscatalog or .cvmfsautocatalog
-# in the destination.  Note: $DESTSUBDIR may be empty, and $SRC may or
-# may not have a trailing slash.
+# directories have gone away or been replaced by a symbolic link, remove any
+# .cvmfscatalog or .cvmfsautocatalog in the destination.
+# Note: $DESTSUBDIR may be empty, and $SRC may or may not have a trailing slash.
 DESTSUBDIR="${DESTDIR#/cvmfs/$REPO}"
 cvmfs_server list-catalogs -x $REPO|grep -E "^$DESTSUBDIR(/|$)"|while read DIR; do
     # SRCSUBD will always either start with a slash or be empty
     SRCSUBD="${DIR#$DESTSUBDIR}"
-    if [ ! -d "$SRC$SRCSUBD" ]; then
-        for F in .cvmfscatalog .cvmfsautocatalog; do
-            CATFILE="/cvmfs/$REPO$DIR/$F"
-            if [ -f "$CATFILE" ] ; then
-                echo "removing $F from deleted dir $DIR"
-                rm -f "$CATFILE"
-            fi
+    if [ -d "$SRC$SRCSUBD" ]; then
+        # The source subdirectory is there, but look for symbolic
+        # links in the $SRCSUBD path.  If there are any they must be
+        # new because otherwise they wouldn't have a catalog.
+        while [ -n "$SRCSUBD" ] && [ ! -L "$SRC$SRCSUBD" ]; do
+             SRCSUBD="${SRCSUBD%/*}"
         done
+        if [ -z "$SRCSUBD" ]; then
+            continue
+        fi
     fi
+    for F in .cvmfscatalog .cvmfsautocatalog; do
+        CATFILE="/cvmfs/$REPO$DIR/$F"
+        if [ -f "$CATFILE" ] ; then
+            echo "removing $F from deleted dir $DIR"
+            rm -f "$CATFILE"
+        fi
+    done
 done
 
 exec rsync $RSYNC_OPTIONS $SRC $DEST
