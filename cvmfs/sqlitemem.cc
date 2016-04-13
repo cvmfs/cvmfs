@@ -339,6 +339,9 @@ void SqliteMemoryManager::xFree(void *ptr) {
  */
 void *SqliteMemoryManager::xRealloc(void *ptr, int new_size) {
   int old_size = xSize(ptr);
+  if (old_size >= new_size)
+    return ptr;
+
   void *new_ptr = xMalloc(new_size);
   memcpy(new_ptr, ptr, old_size);
   xFree(ptr);
