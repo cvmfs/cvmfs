@@ -33,6 +33,7 @@ cvmfs_run_test() {
   # create some directories that will have catalogs including one with a dot
   mkdir People
   mkdir People/Germans People/Americans People/Russians People/.French
+  mkdir People/Ukranians
   mkdir -p Continents/NorthAmerica/UnitedStates
   mkdir -p Continents/Europe/Germany Continents/Europe/.Switzerland
 
@@ -70,7 +71,7 @@ cvmfs_run_test() {
   check_repository $CVMFS_TEST_REPO -i || return $?
 
   echo "check if the right number of catalogs are present in the repository (1)"
-  [ $(get_catalog_count $CVMFS_TEST_REPO) -eq 8 ] || return 101
+  [ $(get_catalog_count $CVMFS_TEST_REPO) -eq 9 ] || return 101
 
   # no catalogs should be created after this point
   touch $pubtime_file
@@ -95,7 +96,7 @@ cvmfs_run_test() {
   publish_repo $CVMFS_TEST_REPO > $publish_log_2 2>&1 || return $?
 
   echo "check if the right number of catalogs are present in the repository (2)"
-  [ $(get_catalog_count $CVMFS_TEST_REPO) -eq 6 ] || return 102
+  [ $(get_catalog_count $CVMFS_TEST_REPO) -eq 7 ] || return 102
 
   echo "making sure no catalog files were recreated"
   [ -z "`find $repo_dir -name .cvmfscatalog -newer $pubtime_file`" ] || return 112
@@ -112,6 +113,9 @@ cvmfs_run_test() {
   pushdir $src_dir
   rm -rf People/Americans
   rm -rf Continents/Europe/Germany
+  rmdir People/Ukranians
+  echo "linking one old source dir that had a catalog to another one"
+  ln -s Russians People/Ukranians
   popdir
 
   local rsync_log_3="rsync_3.log"
