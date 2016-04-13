@@ -6,7 +6,7 @@ script_location=$(dirname $(readlink --canonicalize $0))
 
 # update packages installed on the system
 echo "updating installed RPM packages..."
-sudo dnf -y update || die "fail (dnf update)"
+sudo dnf -y update || echo "---- WARNING: dnf reported non-zero status code"
 
 # install CernVM-FS RPM packages
 echo "installing RPM packages... "

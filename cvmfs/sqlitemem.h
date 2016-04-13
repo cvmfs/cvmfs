@@ -35,6 +35,8 @@
 class SqliteMemoryManager {
   FRIEND_TEST(T_Sqlitemem, LookasideBuffer);
   FRIEND_TEST(T_Sqlitemem, Malloc);
+  FRIEND_TEST(T_Sqlitemem, Realloc);
+  FRIEND_TEST(T_Sqlitemem, ReallocStress);
 
  public:
   /**
@@ -138,6 +140,7 @@ class SqliteMemoryManager {
     }
 
     MallocArena();
+    static MallocArena *CreateInitialized(unsigned char pattern);
     ~MallocArena();
 
     void *Malloc(const uint32_t size);
@@ -168,9 +171,7 @@ class SqliteMemoryManager {
       }
       void ShrinkTo(int32_t smaller_size) {
         size = smaller_size;
-        void *upper_tag =
-          reinterpret_cast<char *>(this) + smaller_size - sizeof(AvailBlockTag);
-        new (upper_tag) AvailBlockTag(smaller_size);
+        new (AvailBlockTag::GetTagLocation(this)) AvailBlockTag(smaller_size);
       }
       int32_t size;  // always positive
       int32_t link_next;  // offset in the arena; saves 4 bytes on 64bit archs
@@ -182,6 +183,10 @@ class SqliteMemoryManager {
      */
     struct AvailBlockTag {
       explicit AvailBlockTag(int32_t s) : size(s), tag(kTagAvail) { }
+      static void *GetTagLocation(AvailBlockCtl *block) {
+        return
+          reinterpret_cast<char *>(block) + block->size - sizeof(AvailBlockTag);
+      }
       int32_t size;
       char padding[3];
       char tag;
