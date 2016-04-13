@@ -280,3 +280,20 @@ TEST_F(T_Sqlitemem, Realloc) {
   EXPECT_EQ(0,
             memcmp(reinterpret_cast<char *>(p2) + 1024, pattern_one_1kb, 1016));
 }
+
+
+TEST_F(T_Sqlitemem, ReallocStress) {
+  Prng prng;
+  prng.InitSeed(42);
+  vector<void *> ptrs;
+  for (unsigned i = 0; i < 20000; ++i) {
+    void *p = mem_mgr_->GetMemory(100 + prng.Next(50));
+    ASSERT_TRUE(p != NULL);
+    ptrs.push_back(p);
+  }
+  vector<void *> shuffled_ptrs = Shuffle(ptrs, &prng);
+  for (unsigned i = 0; i < shuffled_ptrs.size(); ++i) {
+    void *p = mem_mgr_->xRealloc(shuffled_ptrs[i], 150 + prng.Next(10));
+    ASSERT_TRUE(p != NULL);
+  }
+}

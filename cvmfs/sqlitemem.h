@@ -36,6 +36,7 @@ class SqliteMemoryManager {
   FRIEND_TEST(T_Sqlitemem, LookasideBuffer);
   FRIEND_TEST(T_Sqlitemem, Malloc);
   FRIEND_TEST(T_Sqlitemem, Realloc);
+  FRIEND_TEST(T_Sqlitemem, ReallocStress);
 
  public:
   /**
