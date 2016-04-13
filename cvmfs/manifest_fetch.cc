@@ -113,7 +113,7 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
     result = kFailBlacklisted;
     goto cleanup;
   }
-  
+
   // Quick way out: hash matches base catalog
   if (base_catalog && (ensemble->manifest->catalog_hash() == *base_catalog))
     return kFailOk;
