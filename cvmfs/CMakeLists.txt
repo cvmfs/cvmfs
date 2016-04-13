@@ -49,6 +49,7 @@ set (CVMFS_CLIENT_SOURCES
   fs_traversal.h
   globals.cc globals.h
   hash.cc hash.h
+  json_document.cc json_document.h
   logging.cc logging.h logging_internal.h
   lru.h
   manifest.cc manifest.h
@@ -407,6 +408,9 @@ if (BUILD_CVMFS)
   add_dependencies (cvmfs2 libsha3)
   add_dependencies (cvmfs_fsck libsha3)
 
+  add_dependencies (cvmfs_fuse_debug libvjson)
+  add_dependencies (cvmfs_fuse libvjson)
+
   # set some properties
   set (CVMFS_LOADER_LD_FLAGS "${CVMFS_LOADER_LD_FLAGS} -ldl -lm")
   set_target_properties (cvmfs2 PROPERTIES COMPILE_FLAGS "${CVMFS_LOADER_CFLAGS}" LINK_FLAGS "${CVMFS_LOADER_LD_FLAGS}")
@@ -424,7 +428,7 @@ if (BUILD_CVMFS)
          ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${ZLIB_LIBRARIES}
          ${PACPARSER_ARCHIVE} ${LEVELDB_ARCHIVE} ${CARES_ARCHIVE}
          ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${UUID_LIBRARIES}
-         ${SHA3_ARCHIVE} pthread dl)
+         ${SHA3_ARCHIVE} ${VJSON_ARCHIVE} pthread dl)
 
   target_link_libraries (cvmfs2 ${CVMFS_LOADER_LIBS} ${OPENSSL_LIBRARIES}
                                 ${LIBFUSE} ${RT_LIBRARY} ${UUID_LIBRARIES}
@@ -469,7 +473,8 @@ if (BUILD_LIBCVMFS)
   endif (SPARSEHASH_BUILTIN)
 
   add_dependencies (cvmfs_only libsha3)
-  set (LIBCVMFS_LIBS ${SHA3_ARCHIVE} ${LIBCVMFS_LIBS})
+  add_dependencies (cvmfs_only libvjson)
+  set (LIBCVMFS_LIBS ${SHA3_ARCHIVE} ${VJSON_ARCHIVE} ${LIBCVMFS_LIBS})
 
   set_target_properties (cvmfs_only PROPERTIES COMPILE_FLAGS "${LIBCVMFS_CFLAGS}")
 

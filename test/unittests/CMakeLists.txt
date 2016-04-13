@@ -49,6 +49,7 @@ set(CVMFS_UNITTEST_FILES
   t_hash_filters.cc
   t_header_lists.cc
   t_history.cc
+  t_json.cc
   t_libcvmfs.cc
   t_lru.cc
   t_manifest.cc
@@ -98,9 +99,9 @@ set (CVMFS_UNITTEST_SOURCES
 
   # test dependencies
   ${CVMFS_SOURCE_DIR}/atomic.h
-  ${CVMFS_SOURCE_DIR}/voms_authz/authz.h ${CVMFS_SOURCE_DIR}/voms_authz/authz.cc
-  ${CVMFS_SOURCE_DIR}/voms_authz/authz_fetch.h ${CVMFS_SOURCE_DIR}/voms_authz/authz_fetch.cc
-  ${CVMFS_SOURCE_DIR}/voms_authz/authz_session.h ${CVMFS_SOURCE_DIR}/voms_authz/authz_session.cc
+  ${CVMFS_SOURCE_DIR}/voms_authz/authz.cc ${CVMFS_SOURCE_DIR}/voms_authz/authz.h
+  ${CVMFS_SOURCE_DIR}/voms_authz/authz_fetch.cc ${CVMFS_SOURCE_DIR}/voms_authz/authz_fetch.h
+  ${CVMFS_SOURCE_DIR}/voms_authz/authz_session.cc ${CVMFS_SOURCE_DIR}/voms_authz/authz_session.h
   ${CVMFS_SOURCE_DIR}/backoff.cc ${CVMFS_SOURCE_DIR}/backoff.h
   ${CVMFS_SOURCE_DIR}/bigvector.h
   ${CVMFS_SOURCE_DIR}/cache.cc ${CVMFS_SOURCE_DIR}/cache.h
@@ -133,6 +134,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/hash.cc ${CVMFS_SOURCE_DIR}/hash.h
   ${CVMFS_SOURCE_DIR}/history_sql.cc
   ${CVMFS_SOURCE_DIR}/history_sqlite.cc
+  ${CVMFS_SOURCE_DIR}/json_document.cc ${CVMFS_SOURCE_DIR}/json_document.h
   ${CVMFS_SOURCE_DIR}/libcvmfs.cc ${CVMFS_SOURCE_DIR}/libcvmfs.h
   ${CVMFS_SOURCE_DIR}/libcvmfs_int.cc ${CVMFS_SOURCE_DIR}/libcvmfs_int.h
   ${CVMFS_SOURCE_DIR}/logging.cc ${CVMFS_SOURCE_DIR}/logging.h ${CVMFS_SOURCE_DIR}/logging_internal.h
@@ -246,6 +248,9 @@ if (BUILD_UNITTESTS)
   if (TBB_PRIVATE_LIB)
     add_dependencies (${PROJECT_TEST_NAME} libtbb)
   endif (TBB_PRIVATE_LIB)
+  
+  add_dependencies (${PROJECT_TEST_NAME} libsha3)
+  add_dependencies (${PROJECT_TEST_NAME} libvjson)
 endif (BUILD_UNITTESTS)
 
 if (BUILD_UNITTESTS_DEBUG)
@@ -270,6 +275,7 @@ if (BUILD_UNITTESTS_DEBUG)
   endif (TBB_PRIVATE_LIB)
 
   add_dependencies (${PROJECT_TEST_DEBUG_NAME} libsha3)
+  add_dependencies (${PROJECT_TEST_DEBUG_NAME} libvjson)
 endif (BUILD_UNITTESTS_DEBUG)
 
 #
@@ -289,7 +295,7 @@ set (UNITTEST_LINK_LIBRARIES ${GTEST_LIBRARIES} ${GOOGLETEST_ARCHIVE} ${OPENSSL_
                              ${SQLITE3_LIBRARY} ${SQLITE3_ARCHIVE} ${TBB_LIBRARIES}
                              ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${UUID_LIBRARIES}
                              ${SHA3_ARCHIVE} ${PACPARSER_LIBRARIES} ${PACPARSER_ARCHIVE}
-                             pthread dl)
+                             ${VJSON_ARCHIVE} pthread dl)
 
 target_link_libraries (${PROJECT_TEST_NAME} ${UNITTEST_LINK_LIBRARIES})
 
