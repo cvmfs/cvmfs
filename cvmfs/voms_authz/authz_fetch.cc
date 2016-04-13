@@ -18,7 +18,6 @@
 #include "platform.h"
 #include "util_concurrency.h"
 #include "util/posix.h"
-#include "util/string.h"
 
 using namespace std;  // NOLINT
 
@@ -86,11 +85,10 @@ void AuthzExternalFetcher::ExecHelper() {
   int pipe_recv[2];
   MakePipe(pipe_send);
   MakePipe(pipe_recv);
-  char *env_pid = strdupa(("CVMFS_PID=" + StringifyInt(getpid())).c_str());
   char *env_fqrn = strdupa(("CVMFS_FQRN=" + fqrn_).c_str());
   char *argv0 = strdupa(progname_.c_str());
   char *argv[] = {argv0, NULL};
-  char *envp[] = {env_pid, env_fqrn, NULL};
+  char *envp[] = {env_fqrn, NULL};
   int max_fd = sysconf(_SC_OPEN_MAX);
   assert(max_fd > 0);
   LogCvmfs(kLogAuthz, kLogDebug | kLogSyslog, "starting authz helper %s",
