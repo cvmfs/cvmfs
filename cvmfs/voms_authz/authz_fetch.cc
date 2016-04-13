@@ -21,6 +21,7 @@
 
 using namespace std;  // NOLINT
 
+
 AuthzExternalFetcher::AuthzExternalFetcher(
   const string &fqrn,
   const string &progname)
@@ -29,6 +30,7 @@ AuthzExternalFetcher::AuthzExternalFetcher(
   , fd_send_(-1)
   , fd_recv_(-1)
   , pid_(-1)
+  , fail_state_(false)
 {
   InitLock();
 }
@@ -41,6 +43,7 @@ AuthzExternalFetcher::AuthzExternalFetcher(
   , fd_send_(fd_send)
   , fd_recv_(fd_recv)
   , pid_(-1)
+  , fail_state_(false)
 {
   InitLock();
 }
@@ -71,6 +74,14 @@ AuthzExternalFetcher::~AuthzExternalFetcher() {
 }
 
 
+void AuthzExternalFetcher::EnterFailState() {
+  LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug,
+           "authz helper %s enters fail state, no more authentication",
+           progname_.c_str());
+  fail_state_ = true;
+}
+
+
 /**
  * Uses execve to start progname_.  The started program has stdin and stdout
  * connected to fd_send_ and fd_recv_ and the CVMFS_... environment variables
@@ -85,10 +96,9 @@ void AuthzExternalFetcher::ExecHelper() {
   int pipe_recv[2];
   MakePipe(pipe_send);
   MakePipe(pipe_recv);
-  char *env_fqrn = strdupa(("CVMFS_FQRN=" + fqrn_).c_str());
   char *argv0 = strdupa(progname_.c_str());
   char *argv[] = {argv0, NULL};
-  char *envp[] = {env_fqrn, NULL};
+  char *envp[] = {NULL};
   int max_fd = sysconf(_SC_OPEN_MAX);
   assert(max_fd > 0);
   LogCvmfs(kLogAuthz, kLogDebug | kLogSyslog, "starting authz helper %s",
@@ -113,6 +123,8 @@ void AuthzExternalFetcher::ExecHelper() {
   close(pipe_send[0]);
   close(pipe_recv[1]);
 
+  // Don't receive a signal if the helper terminates
+  signal(SIGPIPE, SIG_IGN);
   pid_ = pid;
   fd_send_ = pipe_send[1];
   fd_recv_ = pipe_recv[0];
@@ -131,6 +143,9 @@ AuthzStatus AuthzExternalFetcher::FetchWithinClientCtx(
   ClientCtx::GetInstance()->Get(&uid, &gid, &pid);
 
   MutexLockGuard lock_guard(lock_);
+  if (fail_state_)
+    return kAuthzNoHelper;
+
 
   if (fd_send_ < 0)
     ExecHelper();
@@ -141,7 +156,92 @@ AuthzStatus AuthzExternalFetcher::FetchWithinClientCtx(
 }
 
 
+/**
+ * Establish communication link with a forked authz helper.
+ */
+bool AuthzExternalFetcher::Handshake() {
+  string json_msg = string("{") +
+    "\"cvmfs_authz_v1\": {" +
+    "\"revision\": 1, " +
+    "\"fqrn\": \"" + fqrn_ + "\", " +
+    "}}";
+  bool retval = Send(json_msg);
+  if (!retval)
+    return false;
+  return false;
+}
+
+
 void AuthzExternalFetcher::InitLock() {
   int retval = pthread_mutex_init(&lock_, NULL);
   assert(retval == 0);
+}
+
+
+bool AuthzExternalFetcher::Send(const string &msg) {
+  // Line format: 4 byte protocol version, 4 byte length, message
+  struct {
+    uint32_t version;
+    uint32_t length;
+  } header;
+  header.version = kProtocolVersion;
+  header.length = msg.length();
+  unsigned raw_length = sizeof(header) + msg.length();
+  unsigned char *raw_msg = reinterpret_cast<unsigned char *>(
+    alloca(raw_length));
+  memcpy(raw_msg, &header, sizeof(header));
+  memcpy(raw_msg + sizeof(header), msg.data(), header.length);
+
+  bool retval = SafeWrite(fd_send_, raw_msg, raw_length);
+  if (!retval)
+    EnterFailState();
+  return retval;
+}
+
+
+bool AuthzExternalFetcher::Recv(string *msg) {
+  uint32_t version;
+  ssize_t retval = SafeRead(fd_recv_, &version, sizeof(version));
+  if (retval != int(sizeof(version))) {
+    EnterFailState();
+    return false;
+  }
+  if (version != kProtocolVersion) {
+    LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug,
+             "authz helper uses unknown protocol version %u", version);
+    EnterFailState();
+    return false;
+  }
+
+  uint32_t length;
+  retval = SafeRead(fd_recv_, &length, sizeof(length));
+  if (retval != int(sizeof(length))) {
+    EnterFailState();
+    return false;
+  }
+
+  msg->clear();
+  char buf[kPageSize];
+  unsigned nbytes = 0;
+  while (nbytes < length) {
+    retval = SafeRead(fd_recv_, buf, kPageSize);
+    if (retval < 0) {
+      LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug,
+               "read failure from authz helper %s", progname_.c_str());
+      EnterFailState();
+      return false;
+    }
+    nbytes += retval;
+    msg->append(buf, retval);
+    if (nbytes < kPageSize)
+      break;
+  }
+  if (nbytes < length) {
+    LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug,
+             "short read from authz helper %s", progname_.c_str());
+    EnterFailState();
+    return false;
+  }
+
+  return true;
 }

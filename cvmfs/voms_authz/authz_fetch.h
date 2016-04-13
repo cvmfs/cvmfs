@@ -5,6 +5,7 @@
 #ifndef CVMFS_VOMS_AUTHZ_AUTHZ_FETCH_H_
 #define CVMFS_VOMS_AUTHZ_AUTHZ_FETCH_H_
 
+#include <inttypes.h>
 #include <pthread.h>
 
 #include <string>
@@ -58,6 +59,8 @@ class AuthzExternalFetcher : public AuthzFetcher, SingleCopy {
   FRIEND_TEST(T_AuthzFetch, ExecHelperSlow);
 
  public:
+  static const uint32_t kProtocolVersion = 1;
+
   AuthzExternalFetcher(const std::string &fqrn, const std::string &progname);
   AuthzExternalFetcher(const std::string &fqrn, int fd_send, int fd_recv);
   ~AuthzExternalFetcher();
@@ -74,6 +77,11 @@ class AuthzExternalFetcher : public AuthzFetcher, SingleCopy {
 
   void InitLock();
   void ExecHelper();
+  bool Handshake();
+
+  bool Send(const std::string &msg);
+  bool Recv(std::string *msg);
+  void EnterFailState();
 
   /**
    * The fully qualified repository name, e.g. atlas.cern.ch
@@ -99,6 +107,12 @@ class AuthzExternalFetcher : public AuthzFetcher, SingleCopy {
    * If a helper was started, the pid must be collected to avoid a zombie.
    */
   pid_t pid_;
+
+  /**
+   * If the external helper behaves unexectely, enter fail state and stop
+   * authenticating
+   */
+  bool fail_state_;
 
   /**
    * The send-receive cycle is atomic.

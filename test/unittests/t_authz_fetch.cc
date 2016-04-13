@@ -4,10 +4,16 @@
 
 #include <gtest/gtest.h>
 
+#include <signal.h>
+#include <sys/wait.h>
 #include <unistd.h>
+
+#include <string>
 
 #include "voms_authz/authz.h"
 #include "voms_authz/authz_fetch.h"
+
+using namespace std;  // NOLINT
 
 
 class T_AuthzFetch : public ::testing::Test {
@@ -17,21 +23,36 @@ class T_AuthzFetch : public ::testing::Test {
 
   virtual void TearDown() {
   }
-
 };
 
 
 TEST_F(T_AuthzFetch, ExecHelper) {
-  // Run the code and don't segfault
-
   AuthzExternalFetcher *authz_fetcher =
     new AuthzExternalFetcher("X", "/bin/sh");
   authz_fetcher->ExecHelper();
+  EXPECT_TRUE(authz_fetcher->Send("\n/bin/echo hello\n"));
+  string dummy;
+  EXPECT_FALSE(authz_fetcher->Recv(&dummy));
+  EXPECT_TRUE(authz_fetcher->fail_state_);
+  delete authz_fetcher;
+
+  authz_fetcher = new AuthzExternalFetcher("X", "/bin/sh");
+  authz_fetcher->ExecHelper();
+  kill(authz_fetcher->pid_, SIGKILL);
+  int statloc;
+  waitpid(authz_fetcher->pid_, &statloc, 0);
+  authz_fetcher->pid_ = -1;
+  EXPECT_FALSE(authz_fetcher->Send("\n/bin/echo hello\n"));
+  EXPECT_TRUE(authz_fetcher->fail_state_);
   delete authz_fetcher;
 
   authz_fetcher = new AuthzExternalFetcher("X", "/no/such/file");
   // Execve will fail but that's noted on first communication
   authz_fetcher->ExecHelper();
+  // Might fail or not, depending on how fast fork is
+  authz_fetcher->Send("\n/bin/echo hello\n");
+  EXPECT_FALSE(authz_fetcher->Recv(&dummy));
+  EXPECT_TRUE(authz_fetcher->fail_state_);
   delete authz_fetcher;
 }
 
