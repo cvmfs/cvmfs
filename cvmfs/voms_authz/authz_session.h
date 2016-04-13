@@ -20,7 +20,6 @@
 
 class AuthzFetcher;
 
-// TODO(jblomer): add statistics
 // TODO(jblomer): add audit log
 
 /**
@@ -35,9 +34,9 @@ class AuthzFetcher;
  * An AuthzFetcher is used to gather credentials that are not cached.
  */
 class AuthzSessionManager : SingleCopy {
-  FRIEND_TEST(T_Authz, GetPidInfo);
-  FRIEND_TEST(T_Authz, LookupAuthzData);
-  FRIEND_TEST(T_Authz, LookupSessionKey);
+  FRIEND_TEST(T_AuthzSession, GetPidInfo);
+  FRIEND_TEST(T_AuthzSession, LookupAuthzData);
+  FRIEND_TEST(T_AuthzSession, LookupSessionKey);
 
  public:
   static AuthzSessionManager *Create(AuthzFetcher *authz_fetcher,

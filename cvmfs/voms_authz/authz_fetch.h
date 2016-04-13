@@ -5,8 +5,12 @@
 #ifndef CVMFS_VOMS_AUTHZ_AUTHZ_FETCH_H_
 #define CVMFS_VOMS_AUTHZ_AUTHZ_FETCH_H_
 
+#include <pthread.h>
+
 #include <string>
 
+#include "gtest/gtest_prod.h"
+#include "util/single_copy.h"
 #include "voms_authz/authz.h"
 
 class AuthzFetcher {
@@ -40,6 +44,66 @@ class AuthzStaticFetcher : public AuthzFetcher {
  private:
   AuthzStatus status_;
   unsigned ttl_;
+};
+
+
+/**
+ * Connects to an external process that fetches the tokens.  The external helper
+ * is spawned on demand through execve.  It has to receive commands on stdin
+ * and write replies to stdout.  It can expect the following environment
+ * variables to be set: CVMFS_FQRN, CVMFS_PID.
+ */
+class AuthzExternalFetcher : public AuthzFetcher, SingleCopy {
+  FRIEND_TEST(T_AuthzFetch, ExecHelper);
+  FRIEND_TEST(T_AuthzFetch, ExecHelperSlow);
+
+ public:
+  AuthzExternalFetcher(const std::string &fqrn, const std::string &progname);
+  AuthzExternalFetcher(const std::string &fqrn, int fd_send, int fd_recv);
+  ~AuthzExternalFetcher();
+
+  virtual AuthzStatus FetchWithinClientCtx(const std::string &membership,
+                                           AuthzToken *authz_token,
+                                           unsigned *ttl);
+
+ private:
+  /**
+   * After 5 seconds of unresponsiveness, helper prcesses may be killed.
+   */
+  static const unsigned kChildTimeout = 5;
+
+  void InitLock();
+  void ExecHelper();
+
+  /**
+   * The fully qualified repository name, e.g. atlas.cern.ch
+   */
+  std::string fqrn_;
+
+  /**
+   * Full path of external helper.
+   */
+  std::string progname_;
+
+  /**
+   * Send requests to the external helper.
+   */
+  int fd_send_;
+
+  /**
+   * Receive authz status, ttl, and token from the external helper.
+   */
+  int fd_recv_;
+
+  /**
+   * If a helper was started, the pid must be collected to avoid a zombie.
+   */
+  pid_t pid_;
+
+  /**
+   * The send-receive cycle is atomic.
+   */
+  pthread_mutex_t lock_;
 };
 
 #endif  // CVMFS_VOMS_AUTHZ_AUTHZ_FETCH_H_

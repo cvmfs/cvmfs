@@ -27,7 +27,7 @@ enum AuthzTokenType {
 struct AuthzToken {
   AuthzToken() : type(kTokenUnknown), data(NULL), size(0) { }
   AuthzToken *DeepCopy();
-  
+
   AuthzTokenType type;
   void *data;
   unsigned size;
@@ -39,6 +39,7 @@ enum AuthzStatus {
   kAuthzNotFound,
   kAuthzInvalid,
   kAuthzNotMember,
+  kAuthzNoHelper,
   kAuthzUnknown,
 };
 

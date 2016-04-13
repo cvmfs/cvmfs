@@ -18,7 +18,8 @@ set(CVMFS_UNITTEST_FILES
 
   t_async_reader.cc
   t_atomic.cc
-  t_authz.cc
+  t_authz_fetch.cc
+  t_authz_session.cc
   t_backoff.cc
   t_base64.cc
   t_bigvector.cc
