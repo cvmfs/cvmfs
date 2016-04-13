@@ -11,6 +11,7 @@
 #include <syslog.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <cassert>
 
 #include "clientctx.h"
@@ -167,7 +168,7 @@ bool AuthzExternalFetcher::Handshake() {
   string json_msg = string("{") +
     "\"cvmfs_authz_v1\": {" +
     "\"msgid\": " + StringifyInt(0) + "," +
-    "\"revision\": 1, " +
+    "\"revision\": 0, " +
     "\"fqrn\": \"" + fqrn_ + "\"" +
     "}}";
   bool retval = Send(json_msg);
@@ -248,10 +249,14 @@ bool AuthzExternalFetcher::ParseMsg(
     return false;
   }
 
-  if (!ParseMsgId(json_authz, binary_msg))
+  if (!ParseMsgId(json_authz, binary_msg)) {
+    EnterFailState();
     return false;
-  if (!ParseRevision(json_authz, binary_msg))
+  }
+  if (!ParseRevision(json_authz, binary_msg)) {
+    EnterFailState();
     return false;
+  }
   return true;
 }
 
@@ -337,7 +342,8 @@ bool AuthzExternalFetcher::Recv(string *msg) {
   char buf[kPageSize];
   unsigned nbytes = 0;
   while (nbytes < length) {
-    retval = SafeRead(fd_recv_, buf, kPageSize);
+    const unsigned remaining = length - nbytes;
+    retval = SafeRead(fd_recv_, buf, std::min(kPageSize, remaining));
     if (retval < 0) {
       LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug,
                "read failure from authz helper %s", progname_.c_str());
@@ -346,14 +352,6 @@ bool AuthzExternalFetcher::Recv(string *msg) {
     }
     nbytes += retval;
     msg->append(buf, retval);
-    if (nbytes < kPageSize)
-      break;
-  }
-  if (nbytes < length) {
-    LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug,
-             "short read from authz helper %s", progname_.c_str());
-    EnterFailState();
-    return false;
   }
 
   return true;

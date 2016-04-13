@@ -4,6 +4,8 @@
 
 #include <gtest/gtest.h>
 
+#include <inttypes.h>
+#include <pthread.h>
 #include <signal.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -29,6 +31,17 @@ class T_AuthzFetch : public ::testing::Test {
     delete fetcher_;
     close(pipe_send_[0]);
     close(pipe_recv_[1]);
+  }
+
+  static void *MainSendHandshake(void *data) {
+    int fd = *reinterpret_cast<int *>(data);
+    string ready_msg = "{\"cvmfs_authz_v1\": {\"msgid\": 1, \"revision\": 0}}";
+    uint32_t version = AuthzExternalFetcher::kProtocolVersion;
+    uint32_t length = ready_msg.length();
+    SafeWrite(fd, &version, sizeof(version));
+    SafeWrite(fd, &length, sizeof(length));
+    SafeWrite(fd, ready_msg.data(), length);
+    return NULL;
   }
 
   AuthzExternalFetcher *fetcher_;
@@ -104,4 +117,18 @@ TEST_F(T_AuthzFetch, ParseMsg) {
     "{\"cvmfs_authz_v1\": {\"msgid\": 0, \"revision\": -1}}", &binary_msg));
   EXPECT_FALSE(fetcher_->ParseMsg(
     "{\"cvmfs_authz_v1\": {\"msgid\": \"0\", \"revision\": 0}}", &binary_msg));
+}
+
+
+TEST_F(T_AuthzFetch, Handshake) {
+  pthread_t thread_handshake;
+  ASSERT_EQ(0,
+    pthread_create(&thread_handshake, NULL, MainSendHandshake, &pipe_recv_[1]));
+  EXPECT_TRUE(fetcher_->Handshake());
+  pthread_join(thread_handshake, NULL);
+
+  AuthzExternalFetcher *authz_fetcher =
+    new AuthzExternalFetcher("X", "/no/such/file");
+  EXPECT_FALSE(authz_fetcher->Handshake());
+  delete authz_fetcher;
 }

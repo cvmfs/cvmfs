@@ -81,6 +81,7 @@ class AuthzExternalFetcher : public AuthzFetcher, SingleCopy {
   FRIEND_TEST(T_AuthzFetch, ExecHelper);
   FRIEND_TEST(T_AuthzFetch, ExecHelperSlow);
   FRIEND_TEST(T_AuthzFetch, ParseMsg);
+  FRIEND_TEST(T_AuthzFetch, Handshake);
 
  public:
   static const uint32_t kProtocolVersion = 1;
