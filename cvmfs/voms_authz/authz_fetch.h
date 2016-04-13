@@ -10,6 +10,7 @@
 
 #include <string>
 
+#include "json_document.h"
 #include "gtest/gtest_prod.h"
 #include "util/single_copy.h"
 #include "voms_authz/authz.h"
@@ -49,6 +50,28 @@ class AuthzStaticFetcher : public AuthzFetcher {
 
 
 /**
+ * Types of messages that can be sent between cvmfs client and authz helper.
+ */
+enum AuthzExternalMsgIds {
+  kAuthzMsgHandshake = 0,  ///< Cvmfs: "Hello, helper, are you there?"
+  kAuthzMsgReady,          ///< Helper: "Yes, cvmfs, I'm here"
+  kAuthzMsgVerify,         ///< Cvmfs: "Please verify, helper"
+  kAuthzMsgPermit,         ///< Helper: "I verified, cvmfs, here's the result"
+  kAuthzMsgInvalid         ///< First invalid message id
+};
+
+
+/**
+ * A binary representation of JSON messages that can be received from an authz
+ * helper.
+ */
+struct AuthzExternalMsg {
+  AuthzExternalMsgIds msg_id;
+  int protocol_revision;
+};
+
+
+/**
  * Connects to an external process that fetches the tokens.  The external helper
  * is spawned on demand through execve.  It has to receive commands on stdin
  * and write replies to stdout.  It can expect the following environment
@@ -57,6 +80,7 @@ class AuthzStaticFetcher : public AuthzFetcher {
 class AuthzExternalFetcher : public AuthzFetcher, SingleCopy {
   FRIEND_TEST(T_AuthzFetch, ExecHelper);
   FRIEND_TEST(T_AuthzFetch, ExecHelperSlow);
+  FRIEND_TEST(T_AuthzFetch, ParseMsg);
 
  public:
   static const uint32_t kProtocolVersion = 1;
@@ -82,6 +106,10 @@ class AuthzExternalFetcher : public AuthzFetcher, SingleCopy {
   bool Send(const std::string &msg);
   bool Recv(std::string *msg);
   void EnterFailState();
+
+  bool ParseMsg(const std::string &json_msg, AuthzExternalMsg *binary_msg);
+  bool ParseMsgId(JSON *json_authz, AuthzExternalMsg *binary_msg);
+  bool ParseRevision(JSON *json_authz, AuthzExternalMsg *binary_msg);
 
   /**
    * The fully qualified repository name, e.g. atlas.cern.ch

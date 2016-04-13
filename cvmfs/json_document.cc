@@ -207,3 +207,22 @@ std::string JsonDocument::PrintValue(JSON *value, PrintOptions print_options) {
   }
   return result;
 }
+
+
+JSON *JsonDocument::SearchInObject(
+  const JSON *json_object,
+  const string &name,
+  const json_type type)
+{
+  if (!json_object || (json_object->type != JSON_OBJECT))
+    return NULL;
+
+  JSON *walker = json_object->first_child;
+  while (walker != NULL) {
+    if (string(walker->name) == name) {
+      return (walker->type == type) ? walker : NULL;
+    }
+    walker = walker->next_sibling;
+  }
+  return NULL;
+}

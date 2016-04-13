@@ -10,6 +10,7 @@
 
 #include <string>
 
+#include "util/posix.h"
 #include "voms_authz/authz.h"
 #include "voms_authz/authz_fetch.h"
 
@@ -19,10 +20,20 @@ using namespace std;  // NOLINT
 class T_AuthzFetch : public ::testing::Test {
  protected:
   virtual void SetUp() {
+    MakePipe(pipe_send_);
+    MakePipe(pipe_recv_);
+    fetcher_ = new AuthzExternalFetcher("X", pipe_send_[1], pipe_recv_[0]);
   }
 
   virtual void TearDown() {
+    delete fetcher_;
+    close(pipe_send_[0]);
+    close(pipe_recv_[1]);
   }
+
+  AuthzExternalFetcher *fetcher_;
+  int pipe_send_[2];
+  int pipe_recv_[2];
 };
 
 
@@ -69,4 +80,28 @@ TEST_F(T_AuthzFetch, ExecHelperSlow) {
   delete authz_fetcher;
   close(fd_send);
   close(fd_recv);
+}
+
+
+TEST_F(T_AuthzFetch, ParseMsg) {
+  AuthzExternalMsg binary_msg;
+  EXPECT_FALSE(fetcher_->ParseMsg("", &binary_msg));
+  EXPECT_FALSE(fetcher_->ParseMsg("{{{", &binary_msg));
+  EXPECT_FALSE(fetcher_->ParseMsg("{\"cvmfs_authz_v2\": {}}", &binary_msg));
+  EXPECT_FALSE(fetcher_->ParseMsg("{\"cvmfs_authz_v1\": {}}", &binary_msg));
+  EXPECT_FALSE(fetcher_->ParseMsg(
+    "{\"cvmfs_authz_v1\": {\"msgid\": 0}}", &binary_msg));
+  EXPECT_TRUE(fetcher_->ParseMsg(
+    "{\"cvmfs_authz_v1\": {\"msgid\": 0, \"revision\": 0}}", &binary_msg));
+  EXPECT_TRUE(fetcher_->ParseMsg(
+    "{\"cvmfs_authz_v1\": {\"msgid\": 0, \"revision\": 0, null}}",
+    &binary_msg));
+  EXPECT_FALSE(fetcher_->ParseMsg(
+    "{\"cvmfs_authz_v1\": {\"msgid\": 1000, \"revision\": 0}}", &binary_msg));
+  EXPECT_FALSE(fetcher_->ParseMsg(
+    "{\"cvmfs_authz_v1\": {\"msgid\": -1, \"revision\": 0}}", &binary_msg));
+  EXPECT_FALSE(fetcher_->ParseMsg(
+    "{\"cvmfs_authz_v1\": {\"msgid\": 0, \"revision\": -1}}", &binary_msg));
+  EXPECT_FALSE(fetcher_->ParseMsg(
+    "{\"cvmfs_authz_v1\": {\"msgid\": \"0\", \"revision\": 0}}", &binary_msg));
 }

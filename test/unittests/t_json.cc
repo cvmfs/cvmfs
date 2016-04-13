@@ -44,3 +44,21 @@ TEST(T_Json, StringEscape) {
     "{\"string\":\"a \\\"string\\\" with special chars\"}",
     json->PrintCanonical());
 }
+
+
+TEST(T_Json, SearchInObject) {
+  UniquePtr<JsonDocument> json(JsonDocument::Create(
+    "{\"string\": \"a \\\"string\\\" with special chars\"}"));
+  ASSERT_TRUE(json.IsValid());
+  JSON *result = json->SearchInObject(json->root(), "string", JSON_STRING);
+  EXPECT_TRUE(result != NULL);
+  result = json->SearchInObject(json->root(), "string", JSON_INT);
+  EXPECT_EQ(NULL, result);
+  result = json->SearchInObject(json->root(), "xyz", JSON_INT);
+  EXPECT_EQ(NULL, result);
+  result = json->SearchInObject(NULL, "string", JSON_STRING);
+  EXPECT_EQ(NULL, result);
+  result = 
+    json->SearchInObject(json->root()->first_child, "string", JSON_STRING);
+  EXPECT_EQ(NULL, result);
+}
