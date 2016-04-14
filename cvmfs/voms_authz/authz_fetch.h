@@ -63,11 +63,16 @@ enum AuthzExternalMsgIds {
 
 /**
  * A binary representation of JSON messages that can be received from an authz
- * helper.
+ * helper.  Holds either a kAuthzMsgReady or a kAuthzMsgPermit message.
  */
 struct AuthzExternalMsg {
-  AuthzExternalMsgIds msg_id;
+  AuthzExternalMsgIds msgid;
   int protocol_revision;
+  struct {
+    AuthzStatus status;
+    AuthzToken token;
+    uint32_t ttl;
+  } permit;
 };
 
 
@@ -84,7 +89,11 @@ class AuthzExternalFetcher : public AuthzFetcher, SingleCopy {
   FRIEND_TEST(T_AuthzFetch, Handshake);
 
  public:
-  static const uint32_t kProtocolVersion = 1;
+  /**
+   * The "wire" protocol: 4 byte version, 4 byte length, JSON message.  Must
+   * be the same for cvmfs and helper.
+   */
+  static const uint32_t kProtocolVersion;  // = 1;
 
   AuthzExternalFetcher(const std::string &fqrn, const std::string &progname);
   AuthzExternalFetcher(const std::string &fqrn, int fd_send, int fd_recv);
@@ -100,6 +109,16 @@ class AuthzExternalFetcher : public AuthzFetcher, SingleCopy {
    */
   static const unsigned kChildTimeout = 5;
 
+  /**
+   * For now we allow "no caching".
+   */
+  static const int kMinTtl;  // = 0
+
+  /**
+   * If permits come without TTL, use 2 minutes.
+   */
+  static const unsigned kDefaultTtl = 120;
+
   void InitLock();
   void ExecHelper();
   bool Handshake();
@@ -108,9 +127,12 @@ class AuthzExternalFetcher : public AuthzFetcher, SingleCopy {
   bool Recv(std::string *msg);
   void EnterFailState();
 
-  bool ParseMsg(const std::string &json_msg, AuthzExternalMsg *binary_msg);
+  bool ParseMsg(const std::string &json_msg,
+                const AuthzExternalMsgIds expected_msgid,
+                AuthzExternalMsg *binary_msg);
   bool ParseMsgId(JSON *json_authz, AuthzExternalMsg *binary_msg);
   bool ParseRevision(JSON *json_authz, AuthzExternalMsg *binary_msg);
+  bool ParsePermit(JSON *json_authz, AuthzExternalMsg *binary_msg);
 
   /**
    * The fully qualified repository name, e.g. atlas.cern.ch

@@ -13,16 +13,22 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cstring>
 
 #include "clientctx.h"
 #include "logging.h"
 #include "platform.h"
+#include "smalloc.h"
 #include "util_concurrency.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
 
 using namespace std;  // NOLINT
+
+
+const int AuthzExternalFetcher::kMinTtl = 0;
+const uint32_t AuthzExternalFetcher::kProtocolVersion = 1;
 
 
 AuthzExternalFetcher::AuthzExternalFetcher(
@@ -144,6 +150,7 @@ AuthzStatus AuthzExternalFetcher::FetchWithinClientCtx(
   gid_t gid;
   pid_t pid;
   ClientCtx::GetInstance()->Get(&uid, &gid, &pid);
+  bool retval;
 
   MutexLockGuard lock_guard(lock_);
   if (fail_state_)
@@ -151,13 +158,34 @@ AuthzStatus AuthzExternalFetcher::FetchWithinClientCtx(
 
   if (fd_send_ < 0) {
     ExecHelper();
-    if (!Handshake())
+    retval = Handshake();
+    if (!retval)
       return kAuthzNoHelper;
   }
   assert((fd_send_ >= 0) && (fd_recv_ >= 0));
 
+  string json_msg = string("{\"cvmfs_authz_v1\":{") +
+    "\"msgid\":" + StringifyInt(kAuthzMsgVerify) + "," +
+    "\"revision\":0," +
+    "\"uid\":" +  StringifyInt(uid) + "," +
+    "\"gid\":" +  StringifyInt(gid) + "," +
+    "\"pid\":" +  StringifyInt(pid) + "," +
+    "\"membership\":\"" +  JsonDocument::EscapeString(membership) +
+    "}}";
+  retval = Send(json_msg) && Recv(&json_msg);
+  if (!retval)
+    return kAuthzNoHelper;
+  AuthzExternalMsg binary_msg;
+  retval = ParseMsg(json_msg, kAuthzMsgPermit, &binary_msg);
+  if (!retval)
+    return kAuthzNoHelper;
 
-  return kAuthzUnknown;
+  if (binary_msg.permit.status == kAuthzOk) {
+    *authz_token = binary_msg.permit.token;
+    *ttl = binary_msg.permit.ttl;
+  }
+
+  return binary_msg.permit.status;
 }
 
 
@@ -166,10 +194,10 @@ AuthzStatus AuthzExternalFetcher::FetchWithinClientCtx(
  */
 bool AuthzExternalFetcher::Handshake() {
   string json_msg = string("{") +
-    "\"cvmfs_authz_v1\": {" +
-    "\"msgid\": " + StringifyInt(0) + "," +
-    "\"revision\": 0, " +
-    "\"fqrn\": \"" + fqrn_ + "\"" +
+    "\"cvmfs_authz_v1\":{" +
+    "\"msgid\":" + StringifyInt(0) + "," +
+    "\"revision\":0," +
+    "\"fqrn\":\"" + fqrn_ + "\"" +
     "}}";
   bool retval = Send(json_msg);
   if (!retval)
@@ -179,8 +207,11 @@ bool AuthzExternalFetcher::Handshake() {
   if (!retval)
     return false;
   AuthzExternalMsg binary_msg;
-  retval = ParseMsg(json_msg, &binary_msg);
-  return (retval == true) && (binary_msg.msg_id == kAuthzMsgReady);
+  retval = ParseMsg(json_msg, kAuthzMsgReady, &binary_msg);
+  if (!retval)
+    return false;
+
+  return true;
 }
 
 
@@ -226,6 +257,7 @@ bool AuthzExternalFetcher::Send(const string &msg) {
  */
 bool AuthzExternalFetcher::ParseMsg(
   const std::string &json_msg,
+  const AuthzExternalMsgIds expected_msgid,
   AuthzExternalMsg *binary_msg)
 {
   assert(binary_msg != NULL);
@@ -249,13 +281,21 @@ bool AuthzExternalFetcher::ParseMsg(
     return false;
   }
 
-  if (!ParseMsgId(json_authz, binary_msg)) {
+  if (!ParseMsgId(json_authz, binary_msg) ||
+      (binary_msg->msgid != expected_msgid))
+  {
     EnterFailState();
     return false;
   }
   if (!ParseRevision(json_authz, binary_msg)) {
     EnterFailState();
     return false;
+  }
+  if (binary_msg->msgid == kAuthzMsgPermit) {
+    if (!ParsePermit(json_authz, binary_msg)) {
+      EnterFailState();
+      return false;
+    }
   }
   return true;
 }
@@ -285,7 +325,58 @@ bool AuthzExternalFetcher::ParseMsgId(
     return false;
   }
 
-  binary_msg->msg_id = static_cast<AuthzExternalMsgIds>(json_msgid->int_value);
+  binary_msg->msgid = static_cast<AuthzExternalMsgIds>(json_msgid->int_value);
+  return true;
+}
+
+
+/**
+ * A permit must contain the authorization status.  Optionally it can come with
+ * a "time to live" of the answer and a token (e.g. X.509 proxy certificate).
+ */
+bool AuthzExternalFetcher::ParsePermit(
+  JSON *json_authz,
+  AuthzExternalMsg *binary_msg)
+{
+  JSON *json_status =
+    JsonDocument::SearchInObject(json_authz, "status", JSON_INT);
+  if (json_status == NULL) {
+    LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug,
+             "\"status\" not found in json from authz helper %s",
+             progname_.c_str());
+    EnterFailState();
+    return false;
+  }
+  if ((json_status->int_value < 0) || (json_status->int_value > kAuthzUnknown))
+  {
+    binary_msg->permit.status = kAuthzUnknown;
+  } else {
+    binary_msg->permit.status = static_cast<AuthzStatus>(
+      json_status->int_value);
+  }
+
+  JSON *json_ttl = JsonDocument::SearchInObject(json_authz, "ttl", JSON_INT);
+  if (json_ttl == NULL) {
+    LogCvmfs(kLogAuthz, kLogDebug, "no ttl, using default");
+    binary_msg->permit.ttl = kDefaultTtl;
+  } else {
+    binary_msg->permit.ttl = std::max(kMinTtl, json_ttl->int_value);
+  }
+
+  JSON *json_token =
+    JsonDocument::SearchInObject(json_authz, "x509_proxy", JSON_STRING);
+  if (json_token != NULL) {
+    binary_msg->permit.token.type = kTokenX509;
+    unsigned size = strlen(json_token->string_value);
+    binary_msg->permit.token.size = size;
+    if (size > 0) {
+      // The token is passed to the AuthzSessionManager, which takes care of
+      // freeing the memory
+      binary_msg->permit.token.data = smalloc(size);
+      memcpy(binary_msg->permit.token.data, json_token->string_value, size);
+    }
+  }
+
   return true;
 }
 
