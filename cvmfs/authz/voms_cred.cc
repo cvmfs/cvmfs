@@ -23,9 +23,9 @@
 #include <string>
 #include <vector>
 
+#include "authz/voms_cred.h"
 #include "logging.h"
 #include "util_concurrency.h"
-#include "voms_authz/voms_cred.h"
 
 static void
 ReportChildDeath(pid_t pid, int flags) {

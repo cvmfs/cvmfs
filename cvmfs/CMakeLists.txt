@@ -27,6 +27,9 @@ set (CVMFS_LOADER_SOURCES
 
 set (CVMFS_CLIENT_SOURCES
   atomic.h
+  authz/authz.h authz/authz.cc
+  authz/authz_fetch.h authz/authz_fetch.cc
+  authz/authz_session.h authz/authz_session.cc
   backoff.cc backoff.h
   bigvector.h
   cache.cc cache.h
@@ -78,18 +81,15 @@ set (CVMFS_CLIENT_SOURCES
   util/single_copy.h
   util/string.cc util/string.h
   util/unlink_guard.h
-  voms_authz/authz.h voms_authz/authz.cc
-  voms_authz/authz_fetch.h voms_authz/authz_fetch.cc
-  voms_authz/authz_session.h voms_authz/authz_session.cc
   whitelist.cc whitelist.h
   wpad.cc wpad.h
   xattr.cc xattr.h
 )
 if (VOMS_FOUND)
   set (CVMFS_CLIENT_SOURCES ${CVMFS_CLIENT_SOURCES}
-  voms_authz/voms_authz.cc voms_authz/voms_authz.h
-  voms_authz/voms_cred.cc voms_authz/voms_cred.h
-  voms_authz/voms_curl.cc)
+  authz/voms_authz.cc authz/voms_authz.h
+  authz/voms_cred.cc authz/voms_cred.h
+  authz/voms_curl.cc)
 endif (VOMS_FOUND)
 
 
@@ -114,7 +114,7 @@ set (CVMFS2_DEBUG_SOURCES
 )
 if (VOMS_FOUND)
   set (CVMFS2_DEBUG_SOURCES ${CVMFS2_DEBUG_SOURCES}
-  voms_authz/cred_fetcher.cc)
+  authz/cred_fetcher.cc)
 endif (VOMS_FOUND)
 
 set (CVMFS2_SOURCES
@@ -251,9 +251,9 @@ set (CVMFS_SWISSKNIFE_SOURCES
 
 if (VOMS_FOUND)
   set (CVMFS_SWISSKNIFE_SOURCES ${CVMFS_SWISSKNIFE_SOURCES}
-       voms_authz/voms_authz.h
-       voms_authz/voms_cred.cc
-       voms_authz/voms_curl.cc)
+       authz/voms_authz.h
+       authz/voms_cred.cc
+       authz/voms_curl.cc)
 endif (VOMS_FOUND)
 
 
@@ -328,9 +328,9 @@ set (CVMFS_PRELOADER_SOURCES
 
 if (VOMS_FOUND)
   set (CVMFS_PRELOADER_SOURCES ${CVMFS_PRELOADER_SOURCES}
-       voms_authz/voms_authz.h
-       voms_authz/voms_cred.cc
-       voms_authz/voms_curl.cc)
+       authz/voms_authz.h
+       authz/voms_cred.cc
+       authz/voms_curl.cc)
 endif (VOMS_FOUND)
 
 #

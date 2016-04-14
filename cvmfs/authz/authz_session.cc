@@ -12,11 +12,11 @@
 #include <cstdio>
 #include <vector>
 
+#include "authz/authz_fetch.h"
 #include "logging.h"
 #include "platform.h"
 #include "statistics.h"
 #include "util/posix.h"
-#include "voms_authz/authz_fetch.h"
 
 using namespace std;  // NOLINT
 

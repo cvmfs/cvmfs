@@ -48,6 +48,7 @@
 #include <set>
 
 #include "atomic.h"
+#include "authz/voms_authz.h"
 #include "compression.h"
 #include "duplex_curl.h"
 #include "hash.h"
@@ -58,7 +59,6 @@
 #include "util/algorithm.h"
 #include "util/posix.h"
 #include "util/string.h"
-#include "voms_authz/voms_authz.h"
 
 using namespace std;  // NOLINT
 

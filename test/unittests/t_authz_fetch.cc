@@ -12,11 +12,11 @@
 
 #include <string>
 
+#include "authz/authz.h"
+#include "authz/authz_fetch.h"
 #include "clientctx.h"
 #include "util/posix.h"
 #include "util/string.h"
-#include "voms_authz/authz.h"
-#include "voms_authz/authz_fetch.h"
 
 using namespace std;  // NOLINT
 

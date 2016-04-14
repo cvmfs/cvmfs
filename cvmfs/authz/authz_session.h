@@ -11,12 +11,12 @@
 
 #include <string>
 
+#include "authz/authz.h"
 #include "gtest/gtest_prod.h"
 #include "murmur.h"
 #include "smallhash.h"
 #include "statistics.h"
 #include "util/single_copy.h"
-#include "voms_authz/authz.h"
 
 class AuthzFetcher;
 

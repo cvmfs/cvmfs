@@ -6,11 +6,11 @@
 
 #include <unistd.h>
 
+#include "authz/authz.h"
+#include "authz/authz_fetch.h"
+#include "authz/authz_session.h"
 #include "platform.h"
 #include "statistics.h"
-#include "voms_authz/authz.h"
-#include "voms_authz/authz_fetch.h"
-#include "voms_authz/authz_session.h"
 
 
 class TestAuthzFetcher : public AuthzFetcher {

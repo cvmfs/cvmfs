@@ -10,10 +10,10 @@
 
 #include <string>
 
+#include "authz/authz.h"
 #include "json_document.h"
 #include "gtest/gtest_prod.h"
 #include "util/single_copy.h"
-#include "voms_authz/authz.h"
 
 class AuthzFetcher {
  public:

@@ -99,9 +99,9 @@ set (CVMFS_UNITTEST_SOURCES
 
   # test dependencies
   ${CVMFS_SOURCE_DIR}/atomic.h
-  ${CVMFS_SOURCE_DIR}/voms_authz/authz.cc ${CVMFS_SOURCE_DIR}/voms_authz/authz.h
-  ${CVMFS_SOURCE_DIR}/voms_authz/authz_fetch.cc ${CVMFS_SOURCE_DIR}/voms_authz/authz_fetch.h
-  ${CVMFS_SOURCE_DIR}/voms_authz/authz_session.cc ${CVMFS_SOURCE_DIR}/voms_authz/authz_session.h
+  ${CVMFS_SOURCE_DIR}/authz/authz.cc ${CVMFS_SOURCE_DIR}/authz/authz.h
+  ${CVMFS_SOURCE_DIR}/authz/authz_fetch.cc ${CVMFS_SOURCE_DIR}/authz/authz_fetch.h
+  ${CVMFS_SOURCE_DIR}/authz/authz_session.cc ${CVMFS_SOURCE_DIR}/authz/authz_session.h
   ${CVMFS_SOURCE_DIR}/backoff.cc ${CVMFS_SOURCE_DIR}/backoff.h
   ${CVMFS_SOURCE_DIR}/bigvector.h
   ${CVMFS_SOURCE_DIR}/cache.cc ${CVMFS_SOURCE_DIR}/cache.h
@@ -187,9 +187,9 @@ set (CVMFS_UNITTEST_SOURCES
 
 if (VOMS_FOUND)
   set (CVMFS_UNITTEST_SOURCES ${CVMFS_UNITTEST_SOURCES}
-       ${CVMFS_SOURCE_DIR}/voms_authz/voms_authz.h
-       ${CVMFS_SOURCE_DIR}/voms_authz/voms_cred.cc
-       ${CVMFS_SOURCE_DIR}/voms_authz/voms_curl.cc)
+       ${CVMFS_SOURCE_DIR}/authz/voms_authz.h
+       ${CVMFS_SOURCE_DIR}/authz/voms_cred.cc
+       ${CVMFS_SOURCE_DIR}/authz/voms_curl.cc)
 endif (VOMS_FOUND)
 
 set (CVMFS_UNITTEST_DEBUG_SOURCES ${CVMFS_UNITTEST_SOURCES})

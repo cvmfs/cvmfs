@@ -70,6 +70,8 @@
 
 #include "atomic.h"
 #include "auto_umount.h"
+#include "authz/voms_authz.h"
+#include "authz/voms_cred.h"
 #include "backoff.h"
 #include "cache.h"
 #include "catalog_mgr_client.h"
@@ -106,11 +108,8 @@
 #include "tracer.h"
 #include "util_concurrency.h"
 #include "uuid.h"
-#include "voms_authz/voms_cred.h"
 #include "wpad.h"
 #include "xattr.h"
-
-#include "voms_authz/voms_authz.h"
 
 #ifdef FUSE_CAP_EXPORT_SUPPORT
 #define CVMFS_NFS_SUPPORT

@@ -14,8 +14,8 @@
 #include <cassert>
 #include <cstring>
 
+#include "authz/voms_cred.h"
 #include "logging.h"
-#include "voms_authz/voms_cred.h"
 
 
 /**

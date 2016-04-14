@@ -6,7 +6,7 @@
 
 // Single Authz test is static
 // TODO(jblomer): find a better solution than pulling in the .cc file
-#include "voms_authz/voms_authz.cc"  // NOLINT
+#include "authz/voms_authz.cc"  // NOLINT
 
 #define TEST_DN "/DC=ch/DC=cern/OU=Organic Units/OU=Users" \
                 "/CN=bbockelm/CN=659869/CN=Brian Paul Bockelman"
