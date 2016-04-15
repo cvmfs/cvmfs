@@ -146,7 +146,9 @@ class WritableCatalogManager : public SimpleCatalogManager {
                const std::string     &parent_directory);
 
  private:
-  bool FindCatalog(const std::string &path, WritableCatalog **result);
+  bool FindCatalog(const std::string  &path,
+                   WritableCatalog   **result,
+                   DirectoryEntry     *dirent = NULL);
   void DoBalance();
   void FixWeight(WritableCatalog *catalog);
 

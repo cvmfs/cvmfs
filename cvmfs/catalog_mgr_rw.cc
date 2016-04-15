@@ -180,21 +180,24 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
  * @param result the retrieved catalog (as a pointer)
  * @return true if catalog was found, false otherwise
  */
-bool WritableCatalogManager::FindCatalog(const string &path,
-                                         WritableCatalog **result)
-{
+bool WritableCatalogManager::FindCatalog(const string     &path,
+                                         WritableCatalog **result,
+                                         DirectoryEntry   *dirent) {
+  const PathString ps_path(path);
+
   Catalog *best_fit =
-    AbstractCatalogManager<Catalog>::FindCatalog(PathString(path.data(),
-                                                            path.length()));
+    AbstractCatalogManager<Catalog>::FindCatalog(ps_path);
   assert(best_fit != NULL);
   Catalog *catalog = NULL;
-  bool retval = MountSubtree(PathString(path.data(), path.length()),
-                             best_fit, &catalog);
+  bool retval = MountSubtree(ps_path, best_fit, &catalog);
   if (!retval)
     return false;
 
   catalog::DirectoryEntry dummy;
-  bool found = LookupPath(path, kLookupSole, &dummy);
+  if (NULL == dirent) {
+    dirent = &dummy;
+  }
+  bool found = LookupPath(ps_path, kLookupSole, dirent);
   if (!found || !catalog->IsWritable())
     return false;
 
@@ -236,19 +239,10 @@ void WritableCatalogManager::RemoveDirectory(const std::string &path) {
 
   SyncLock();
   WritableCatalog *catalog;
-  if (!FindCatalog(parent_path, &catalog)) {
+  DirectoryEntry parent_entry;
+  if (!FindCatalog(parent_path, &catalog, &parent_entry)) {
     LogCvmfs(kLogCatalog, kLogStderr,
              "catalog for directory '%s' cannot be found",
-             directory_path.c_str());
-    assert(false);
-  }
-
-  DirectoryEntry parent_entry;
-  if (!catalog->LookupPath(PathString(parent_path.data(), parent_path.length()),
-                           &parent_entry))
-  {
-    LogCvmfs(kLogCatalog, kLogStderr,
-             "parent directory of directory '%s' not found",
              directory_path.c_str());
     assert(false);
   }
@@ -286,18 +280,10 @@ void WritableCatalogManager::AddDirectory(const DirectoryEntryBase &entry,
 
   SyncLock();
   WritableCatalog *catalog;
-  if (!FindCatalog(parent_path, &catalog)) {
+  DirectoryEntry parent_entry;
+  if (!FindCatalog(parent_path, &catalog, &parent_entry)) {
     LogCvmfs(kLogCatalog, kLogStderr,
              "catalog for directory '%s' cannot be found",
-             directory_path.c_str());
-    assert(false);
-  }
-  DirectoryEntry parent_entry;
-  if (!catalog->LookupPath(PathString(parent_path.data(), parent_path.length()),
-                           &parent_entry))
-  {
-    LogCvmfs(kLogCatalog, kLogStderr,
-             "parent directory for directory '%s' cannot be found",
              directory_path.c_str());
     assert(false);
   }
@@ -531,24 +517,20 @@ void WritableCatalogManager::TouchDirectory(const DirectoryEntryBase &entry,
 void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
 {
   const string nested_root_path = MakeRelativePath(mountpoint);
+  const PathString ps_nested_root_path(nested_root_path);
 
   SyncLock();
   // Find the catalog currently containing the directory structure, which
-  // will be represented as a new nested catalog from now on
+  // will be represented as a new nested catalog and its root-entry/mountpoint
+  // along the way
   WritableCatalog *old_catalog = NULL;
-  if (!FindCatalog(nested_root_path, &old_catalog)) {
+  DirectoryEntry new_root_entry;
+  if (!FindCatalog(nested_root_path, &old_catalog, &new_root_entry)) {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to create nested catalog '%s': "
              "mountpoint was not found in current catalog structure",
              nested_root_path.c_str());
     assert(false);
   }
-
-  // Get the DirectoryEntry for the given path, this will serve as root
-  // entry for the nested catalog we are about to create
-  DirectoryEntry new_root_entry;
-  bool retval = old_catalog->LookupPath(PathString(nested_root_path),
-                                        &new_root_entry);
-  assert(retval);
 
   // Create the database schema and the inital root entry
   // for the new nested catalog
@@ -558,7 +540,8 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
   CatalogDatabase *new_catalog_db = CatalogDatabase::Create(database_file_path);
   assert(NULL != new_catalog_db);
   // Note we do not set the external_data bit for nested catalogs
-  retval = new_catalog_db->InsertInitialValues(nested_root_path,
+  bool retval =
+           new_catalog_db->InsertInitialValues(nested_root_path,
                                                volatile_content,
                                                "",  // At this point, only root
                                                     // catalog gets VOMS authz
@@ -571,7 +554,7 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
 
   // Attach the just created nested catalog
   Catalog *new_catalog =
-    CreateCatalog(PathString(nested_root_path), shash::Any(), old_catalog);
+    CreateCatalog(ps_nested_root_path, shash::Any(), old_catalog);
   retval = AttachCatalog(database_file_path, new_catalog);
   assert(retval);
 
@@ -661,15 +644,10 @@ bool WritableCatalogManager::IsTransitionPoint(const string &mountpoint) {
 
   SyncLock();
   WritableCatalog *catalog;
-  if (!FindCatalog(path, &catalog)) {
+  DirectoryEntry entry;
+  if (!FindCatalog(path, &catalog, &entry)) {
     LogCvmfs(kLogCatalog, kLogStderr,
              "catalog for directory '%s' cannot be found", path.c_str());
-    assert(false);
-  }
-  DirectoryEntry entry;
-  if (!catalog->LookupPath(PathString(path.data(), path.length()), &entry)) {
-    LogCvmfs(kLogCatalog, kLogStderr, "directory '%s' cannot be found",
-             path.c_str());
     assert(false);
   }
   const bool result = entry.IsNestedCatalogRoot();
