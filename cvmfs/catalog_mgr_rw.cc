@@ -199,7 +199,7 @@ bool WritableCatalogManager::FindCatalog(const string     &path,
   if (NULL == dirent) {
     dirent = &dummy;
   }
-  bool found = LookupPath(ps_path, kLookupSole, dirent);
+  bool found = catalog->LookupPath(ps_path, dirent);
   if (!found || !catalog->IsWritable())
     return false;
 
