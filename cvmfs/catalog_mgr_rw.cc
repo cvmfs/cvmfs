@@ -172,13 +172,15 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
 
 
 /**
- * Tries to retrieve the catalog containing the given path
- * This method is just a wrapper around the FindCatalog method of
- * AbstractCatalogManager to provide a direct interface returning
- * WritableCatalog classes.
- * @param path the path to look for
- * @param result the retrieved catalog (as a pointer)
- * @return true if catalog was found, false otherwise
+ * Retrieve the catalog containing the given path.
+ * Other than AbstractCatalogManager::FindCatalog() this mounts nested
+ * catalogs if necessary and returns  WritableCatalog objects.
+ * Furthermore it optionally returns the looked-up DirectoryEntry.
+ *
+ * @param path    the path to look for
+ * @param result  the retrieved catalog (as a pointer)
+ * @param dirent  is set to looked up DirectoryEntry for 'path' if non-NULL
+ * @return        true if catalog was found
  */
 bool WritableCatalogManager::FindCatalog(const string     &path,
                                          WritableCatalog **result,
