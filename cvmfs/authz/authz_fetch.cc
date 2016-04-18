@@ -150,11 +150,13 @@ AuthzStatus AuthzExternalFetcher::FetchWithinClientCtx(
   gid_t gid;
   pid_t pid;
   ClientCtx::GetInstance()->Get(&uid, &gid, &pid);
-  bool retval;
+  *ttl = kDefaultTtl;
 
   MutexLockGuard lock_guard(lock_);
   if (fail_state_)
     return kAuthzNoHelper;
+
+  bool retval;
 
   if (fd_send_ < 0) {
     ExecHelper();
@@ -170,7 +172,7 @@ AuthzStatus AuthzExternalFetcher::FetchWithinClientCtx(
     "\"uid\":" +  StringifyInt(uid) + "," +
     "\"gid\":" +  StringifyInt(gid) + "," +
     "\"pid\":" +  StringifyInt(pid) + "," +
-    "\"membership\":\"" +  JsonDocument::EscapeString(membership) +
+    "\"membership\":\"" +  JsonDocument::EscapeString(membership) + "\"" +
     "}}";
   retval = Send(json_msg) && Recv(&json_msg);
   if (!retval)
@@ -193,11 +195,16 @@ AuthzStatus AuthzExternalFetcher::FetchWithinClientCtx(
  * Establish communication link with a forked authz helper.
  */
 bool AuthzExternalFetcher::Handshake() {
+  string debug_log = GetLogDebugFile();
+  string json_debug_log;
+  if (debug_log != "")
+    json_debug_log = ",\"debug_log\":\"" + debug_log + "\"";
   string json_msg = string("{") +
     "\"cvmfs_authz_v1\":{" +
     "\"msgid\":" + StringifyInt(0) + "," +
     "\"revision\":0," +
     "\"fqrn\":\"" + fqrn_ + "\"" +
+    json_debug_log +
     "}}";
   bool retval = Send(json_msg);
   if (!retval)

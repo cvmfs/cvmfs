@@ -199,6 +199,7 @@ option (GOOGLETEST_BUILTIN      "Don't use system installation of google test"  
 option (GEOIP_BUILTIN           "Don't use system GeoIP library and python-GeoIP"                  ON)
 option (TBB_PRIVATE_LIB         "Compile our own TBB shared libraries"                             ON)
 option (BUILD_COVERAGE          "Compile to collect code coverage reports"                         OFF)
+option (BUILD_X509_HELPER       "Compile the X.509 authz helper (requires voms, globus)"           OFF)
 
 #
 # define where to find the external dependencies

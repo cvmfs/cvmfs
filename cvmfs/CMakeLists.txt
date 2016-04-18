@@ -151,6 +151,23 @@ set (CVMFS_FSCK_SOURCES
   util/string.cc util/string.h
 )
 
+
+if (BUILD_X509_HELPER)
+  set (CVMFS_X509_HELPER_SOURCES
+    authz/x509_helper.cc)
+
+  add_executable (cvmfs_x509_helper ${CVMFS_X509_HELPER_SOURCES})
+  add_dependencies (cvmfs_x509_helper libvjson)
+  target_link_libraries (cvmfs_x509_helper ${VJSON_ARCHIVE})
+  
+  install (
+    TARGETS      cvmfs_x509_helper
+    RUNTIME
+    DESTINATION    bin
+  )
+endif (BUILD_X509_HELPER)
+
+
 set (CVMFS_SWISSKNIFE_SOURCES
   atomic.h
   catalog.cc catalog.h
