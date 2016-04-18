@@ -854,43 +854,38 @@ void WritableCatalogManager::CatalogUploadCallback(
   uint64_t catalog_size = GetFileSize(result.local_path);
   assert(catalog_size > 0);
 
-  if (!catalog->HasParent()) {
+  if (catalog->HasParent()) {
+    LogCvmfs(kLogCatalog, kLogVerboseMsg, "updating nested catalog link");
+    WritableCatalog *parent = catalog->GetWritableParent();
+
+    parent->UpdateNestedCatalog(catalog->path().ToString(), result.content_hash,
+                                catalog_size, catalog->delta_counters_);
+    catalog->delta_counters_.SetZero();
+
+    const int remaining_dirty_children =
+      catalog->GetWritableParent()->DecrementDirtyChildren();
+
+    if (remaining_dirty_children == 0) {
+      FinalizeCatalog(parent, catalog_upload_context.stop_for_tweaks);
+      ScheduleCatalogProcessing(parent);
+    }
+
+  } else if (catalog->IsRoot()) {
     CatalogInfo root_catalog_info;
     root_catalog_info.size         = catalog_size;
     root_catalog_info.ttl          = catalog->GetTTL();
     root_catalog_info.content_hash = result.content_hash;
     root_catalog_info.revision     = catalog->GetRevision();
     catalog_upload_context.root_catalog_info->Set(root_catalog_info);
-    return;
-  }
-
-  LogCvmfs(kLogCatalog, kLogVerboseMsg, "updating nested catalog link");
-  WritableCatalog *parent = catalog->GetWritableParent();
-
-  parent->UpdateNestedCatalog(catalog->path().ToString(), result.content_hash,
-                              catalog_size, catalog->delta_counters_);
-  catalog->delta_counters_.SetZero();
-
-  const int remaining_dirty_children =
-    catalog->GetWritableParent()->DecrementDirtyChildren();
-
-  // continuation of the dirty catalog tree traversal
-  // see WritableCatalogManager::Commit()
-  if (remaining_dirty_children == 0) {
-    FinalizeCatalog(parent, catalog_upload_context.stop_for_tweaks);
-    ScheduleCatalogProcessing(parent);
+  } else {
+    assert(false && "inconsistent state detected");
   }
 }
 
 
 bool WritableCatalogManager::GetModifiedCatalogLeafsRecursively(
-  Catalog             *catalog,
-  WritableCatalogList *result) const
-{
-  // A catalog must be snapshot, if itself or one of it's descendants is dirty.
-  // So we traverse the catalog tree recursively and look for dirty catalogs
-  // on the way.
-
+                                            Catalog             *catalog,
+                                            WritableCatalogList *result) const {
   WritableCatalog *wr_catalog = static_cast<WritableCatalog *>(catalog);
 
   // Look for dirty catalogs in the descendants of *catalog
@@ -915,6 +910,7 @@ bool WritableCatalogManager::GetModifiedCatalogLeafsRecursively(
 
   return is_dirty;
 }
+
 
 void WritableCatalogManager::DoBalance() {
   CatalogList catalog_list = GetCatalogs();
