@@ -748,8 +748,35 @@ bool WritableCatalogManager::Commit(const bool           stop_for_tweaks,
 }
 
 
+/**
+ * Handles the snapshotting of dirty (i.e. modified) catalogs while trying to
+ * parallize the compression and upload as much as possible. We use a parallel
+ * depth first post order tree traversal based on 'continuations'.
+ *
+ * The idea is as follows:
+ *  1. find all leaf-catalogs (i.e. dirty catalogs with no dirty children)
+ *     --> these can be processed and uploaded immedately and independently
+ *         see WritableCatalogManager::GetModifiedCatalogLeafs()
+ *  2. annotate non-leaf catalogs with their number of dirty children
+ *     --> a finished child will notify it's parent and decrement this number
+ *         see WritableCatalogManager::CatalogUploadCallback()
+ *  3. if a non-leaf catalog's dirty children number reaches 0, it is scheduled
+ *     for processing as well (continuation)
+ *     --> the parallel processing walks bottom-up through the catalog tree
+ *         see WritableCatalogManager::CatalogUploadCallback()
+ *  4. when the root catalog is reached, we notify the main thread and return
+ *     --> done through a Future<> in WritableCatalogManager::SnapshotCatalogs
+ *
+ * Note: The catalog finalisation (see WritableCatalogManager::FinalizeCatalog)
+ *       happens in a worker thread (i.e. the callback method) for non-leaf
+ *       catalogs.
+ *
+ * TODO(rmeusel): since all leaf catalogs are finalized in the main thread, we
+ *                sacrafice some potential concurrency for simplicity.
+ */
 WritableCatalogManager::CatalogInfo WritableCatalogManager::SnapshotCatalogs(
                                                    const bool stop_for_tweaks) {
+  // prepare environment for parallel processing
   Future<CatalogInfo>  root_catalog_info_future;
   CatalogUploadContext upload_context;
   upload_context.root_catalog_info = &root_catalog_info_future;
@@ -758,9 +785,12 @@ WritableCatalogManager::CatalogInfo WritableCatalogManager::SnapshotCatalogs(
   spooler_->RegisterListener(
     &WritableCatalogManager::CatalogUploadCallback, this, upload_context);
 
+  // find dirty leaf catalogs and annotate non-leaf catalogs (dirty child count)
+  // post-condition: the entire catalog tree is ready for concurrent processing
   WritableCatalogList leafs_to_snapshot;
   GetModifiedCatalogLeafs(&leafs_to_snapshot);
 
+  // finalize and schedule the catalog processing
         WritableCatalogList::const_iterator i    = leafs_to_snapshot.begin();
   const WritableCatalogList::const_iterator iend = leafs_to_snapshot.end();
   for (; i != iend; ++i) {
@@ -828,6 +858,8 @@ void WritableCatalogManager::FinalizeCatalog(WritableCatalog *catalog,
 void WritableCatalogManager::ScheduleCatalogProcessing(
                                                      WritableCatalog *catalog) {
   MutexLockGuard guard(catalog_processing_lock_);
+
+  // register catalog object for WritableCatalogManager::CatalogUploadCallback
   catalog_processing_map_[catalog->database_path()] = catalog;
   spooler_->ProcessCatalog(catalog->database_path());
 }
@@ -842,6 +874,8 @@ void WritableCatalogManager::CatalogUploadCallback(
     assert(false);
   }
 
+  // retrieve the catalog object based on the callback information
+  // see WritableCatalogManager::ScheduleCatalogProcessing()
   WritableCatalog *catalog = NULL;
   {
     MutexLockGuard guard(catalog_processing_lock_);
@@ -855,6 +889,8 @@ void WritableCatalogManager::CatalogUploadCallback(
   assert(catalog_size > 0);
 
   if (catalog->HasParent()) {
+    // finalized nested catalogs will update their parent's pointer and schedule
+    // them for processing (continuation) if the 'dirty children count' == 0
     LogCvmfs(kLogCatalog, kLogVerboseMsg, "updating nested catalog link");
     WritableCatalog *parent = catalog->GetWritableParent();
 
@@ -865,12 +901,16 @@ void WritableCatalogManager::CatalogUploadCallback(
     const int remaining_dirty_children =
       catalog->GetWritableParent()->DecrementDirtyChildren();
 
+    // continuation of the dirty catalog tree traversal
+    // see WritableCatalogManager::SnapshotCatalogs()
     if (remaining_dirty_children == 0) {
       FinalizeCatalog(parent, catalog_upload_context.stop_for_tweaks);
       ScheduleCatalogProcessing(parent);
     }
 
   } else if (catalog->IsRoot()) {
+    // once the root catalog is reached, we are done with processing and report
+    // back to the main via a Future<> and provide the necessary information
     CatalogInfo root_catalog_info;
     root_catalog_info.size         = catalog_size;
     root_catalog_info.ttl          = catalog->GetTTL();
@@ -883,6 +923,16 @@ void WritableCatalogManager::CatalogUploadCallback(
 }
 
 
+/**
+ * Finds dirty catalogs that can be snapshot right away and annotates all the
+ * other catalogs with their number of dirty decendants.
+ * Note that there is a convenience wrapper to start the recursion:
+ *   WritableCatalogManager::GetModifiedCatalogLeafs()
+ *
+ * @param catalog  the catalog for this recursion step
+ * @param result   the result list to be appended to
+ * @return         true if 'catalog' is dirty
+ */
 bool WritableCatalogManager::GetModifiedCatalogLeafsRecursively(
                                             Catalog             *catalog,
                                             WritableCatalogList *result) const {

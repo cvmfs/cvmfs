@@ -169,13 +169,6 @@ class WritableCatalogManager : public SimpleCatalogManager {
                        const bool stop_for_tweaks);
   void ScheduleCatalogProcessing(WritableCatalog *catalog);
 
-  /**
-   * Traverses all open catalogs and determines which catalogs need updated
-   * snapshots. Only the leafs (i.e. the catalogs without dirty decendants) are
-   * returned.
-   *
-   * @param[out] result  the list of leaf catalogs to snapshot
-   */
   void GetModifiedCatalogLeafs(WritableCatalogList *result) const {
     const bool dirty = GetModifiedCatalogLeafsRecursively(GetRootCatalog(),
                                                           result);
