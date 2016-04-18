@@ -82,8 +82,10 @@ class WritableCatalog : public Catalog {
                            Catalog *attached_reference,
                            const shash::Any content_hash,
                            const uint64_t size);
-  void UpdateNestedCatalog(const std::string &path,
-                           const shash::Any &hash, const uint64_t size);
+  void UpdateNestedCatalog(const std::string   &path,
+                           const shash::Any    &hash,
+                           const uint64_t       size,
+                           const DeltaCounters &child_counters);
   void RemoveNestedCatalog(const std::string &mountpoint,
                            Catalog **attached_reference);
 
@@ -127,6 +129,14 @@ class WritableCatalog : public Catalog {
     return static_cast<WritableCatalog *>(parent);
   }
 
+  int dirty_children() const { return atomic_read32(&dirty_children_); }
+  void set_dirty_children(const int count) {
+    atomic_write32(&dirty_children_, count);
+  }
+  int DecrementDirtyChildren() {
+    return atomic_xadd32(&dirty_children_, -1) - 1;
+  }
+
  private:
   SqlDirentInsert     *sql_insert_;
   SqlDirentUnlink     *sql_unlink_;
@@ -141,6 +151,10 @@ class WritableCatalog : public Catalog {
   bool dirty_;  /**< Indicates if the catalog has been changed */
 
   DeltaCounters delta_counters_;
+
+  // parallel commit state
+  pthread_mutex_t *writable_lock_;
+  mutable atomic_int32 dirty_children_;
 
   inline void SetDirty() {
     if (!dirty_)
