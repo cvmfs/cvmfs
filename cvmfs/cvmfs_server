@@ -1566,6 +1566,7 @@ health_check() {
   local repair_in_txn=0
   local force_repair=0
 
+  OPTIND=0
   while getopts "qrtf" option; do
     case $option in
       q)
@@ -1591,7 +1592,7 @@ health_check() {
   shift $(($OPTIND-1))
 
   [ $# -eq 1 ] || die "health_check: No repository name provided"
-  name="$1"
+  name=$(get_repository_name $1)
 
   local rdonly_broken=0
   local rw_broken=0
