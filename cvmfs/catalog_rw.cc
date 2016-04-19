@@ -503,7 +503,7 @@ void WritableCatalog::InsertNestedCatalog(const string &mountpoint,
   if (attached_reference != NULL)
     AddChild(attached_reference);
 
-  ResetNestedCatalogCache();
+  ResetNestedCatalogCacheUnprotected();
 
   delta_counters_.self.nested_catalogs++;
 }
@@ -543,7 +543,7 @@ void WritableCatalog::RemoveNestedCatalog(const string &mountpoint,
   if (attached_reference != NULL)
     *attached_reference = child;
 
-  ResetNestedCatalogCache();
+  ResetNestedCatalogCacheUnprotected();
 
   delta_counters_.self.nested_catalogs--;
 }
@@ -560,7 +560,7 @@ void WritableCatalog::UpdateNestedCatalog(const std::string   &path,
                                           const shash::Any    &hash,
                                           const uint64_t       size,
                                           const DeltaCounters &child_counters) {
-  MutexLockGuard guard(writable_lock_);
+  MutexLockGuard guard(lock_);
 
   child_counters.PopulateToParent(&delta_counters_);
 
@@ -575,7 +575,7 @@ void WritableCatalog::UpdateNestedCatalog(const std::string   &path,
     stmt.BindText(3, path) &&
     stmt.Execute();
 
-  ResetNestedCatalogCache();
+  ResetNestedCatalogCacheUnprotected();
 
   assert(retval);
 }

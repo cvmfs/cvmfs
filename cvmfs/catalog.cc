@@ -585,12 +585,13 @@ const Catalog::NestedCatalogList& Catalog::ListNestedCatalogs() const {
 /**
  * Drops the nested catalog cache. Usually this is only useful in subclasses
  * that implement writable catalogs.
+ *
+ * Note: this action is _not_ secured by the catalog's mutex. If serialisation
+ *       is required the subclass needs to ensure that.
  */
-void Catalog::ResetNestedCatalogCache() {
-  pthread_mutex_lock(lock_);
+void Catalog::ResetNestedCatalogCacheUnprotected() {
   nested_catalog_cache_.clear();
   nested_catalog_cache_dirty_ = true;
-  pthread_mutex_unlock(lock_);
 }
 
 
