@@ -139,4 +139,3 @@ void LogAuthz(const int flags, const char *format, ...) {
 
   free(msg);
 }
-

@@ -156,13 +156,16 @@ if (BUILD_X509_HELPER)
   set (CVMFS_X509_HELPER_SOURCES
     authz/x509_helper.cc
     authz/x509_helper_base64.cc authz/x509_helper_base64.h
+    authz/x509_helper_dynlib.cc authz/x509_helper_dynlib.h
     authz/x509_helper_fetch.cc authz/x509_helper_fetch.h
+    authz/x509_helper_globus.cc authz/x509_helper_globus.h
     authz/x509_helper_log.cc authz/x509_helper_log.h
-    authz/x509_helper_req.cc authz/x509_helper_req.h)
+    authz/x509_helper_req.cc authz/x509_helper_req.h
+    authz/x509_helper_voms.cc authz/x509_helper_voms.h)
 
   add_executable (cvmfs_x509_helper ${CVMFS_X509_HELPER_SOURCES})
   add_dependencies (cvmfs_x509_helper libvjson)
-  target_link_libraries (cvmfs_x509_helper ${VJSON_ARCHIVE})
+  target_link_libraries (cvmfs_x509_helper ${VJSON_ARCHIVE} dl)
 
   install (
     TARGETS      cvmfs_x509_helper
