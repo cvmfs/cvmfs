@@ -475,8 +475,8 @@ static bool CheckVoms(const fuse_ctx &fctx) {
   LogCvmfs(kLogCvmfs, kLogDebug, "Got VOMS authz %s from filesystem "
            "properties", voms_authz_->c_str());
 
-  if (fctx.uid == 0)
-    return true;
+  //if (fctx.uid == 0)
+  //  return true;
 
   return authz_session_manager_->IsMemberOf(fctx.pid, *voms_authz_);
 }

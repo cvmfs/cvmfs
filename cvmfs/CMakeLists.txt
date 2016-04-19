@@ -154,7 +154,8 @@ set (CVMFS_FSCK_SOURCES
 
 if (BUILD_X509_HELPER)
   set (CVMFS_X509_HELPER_SOURCES
-    authz/x509_helper.cc)
+    authz/x509_helper.cc
+    authz/x509_helper_log.cc authz/x509_helper_log.h)
 
   add_executable (cvmfs_x509_helper ${CVMFS_X509_HELPER_SOURCES})
   add_dependencies (cvmfs_x509_helper libvjson)

@@ -203,7 +203,9 @@ bool AuthzExternalFetcher::Handshake() {
     "\"cvmfs_authz_v1\":{" +
     "\"msgid\":" + StringifyInt(0) + "," +
     "\"revision\":0," +
-    "\"fqrn\":\"" + fqrn_ + "\"" +
+    "\"fqrn\":\"" + fqrn_ + "\"," +
+    "\"syslog_facility\":" + StringifyInt(GetLogSyslogFacility()) + "," +
+    "\"syslog_level\":" + StringifyInt(GetLogSyslogLevel()) +
     json_debug_log +
     "}}";
   bool retval = Send(json_msg);
