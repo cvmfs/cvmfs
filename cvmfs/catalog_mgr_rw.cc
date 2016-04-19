@@ -951,7 +951,7 @@ bool WritableCatalogManager::GetModifiedCatalogLeafsRecursively(
         CatalogList::const_iterator i    = children.begin();
   const CatalogList::const_iterator iend = children.end();
   for (; i != iend; ++i) {
-    if(GetModifiedCatalogLeafsRecursively(*i, result)) {
+    if (GetModifiedCatalogLeafsRecursively(*i, result)) {
       ++dirty_children;
     }
   }

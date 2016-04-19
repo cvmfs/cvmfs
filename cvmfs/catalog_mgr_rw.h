@@ -32,6 +32,7 @@
 #include <pthread.h>
 #include <stdint.h>
 
+#include <map>
 #include <set>
 #include <string>
 
