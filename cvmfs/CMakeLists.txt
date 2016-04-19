@@ -155,12 +155,14 @@ set (CVMFS_FSCK_SOURCES
 if (BUILD_X509_HELPER)
   set (CVMFS_X509_HELPER_SOURCES
     authz/x509_helper.cc
-    authz/x509_helper_log.cc authz/x509_helper_log.h)
+    authz/x509_helper_fetch.cc authz/x509_helper_fetch.h
+    authz/x509_helper_log.cc authz/x509_helper_log.h
+    authz/x509_helper_req.cc authz/x509_helper_req.h)
 
   add_executable (cvmfs_x509_helper ${CVMFS_X509_HELPER_SOURCES})
   add_dependencies (cvmfs_x509_helper libvjson)
   target_link_libraries (cvmfs_x509_helper ${VJSON_ARCHIVE})
-  
+
   install (
     TARGETS      cvmfs_x509_helper
     RUNTIME
