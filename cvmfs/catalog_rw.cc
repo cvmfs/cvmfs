@@ -38,10 +38,6 @@ WritableCatalog::WritableCatalog(const string      &path,
   dirty_(false)
 {
   atomic_init32(&dirty_children_);
-  writable_lock_ =
-    reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
-  int retval = pthread_mutex_init(writable_lock_, NULL);
-  assert(retval == 0);
 }
 
 
@@ -64,8 +60,6 @@ WritableCatalog *WritableCatalog::AttachFreely(const string      &root_path,
 WritableCatalog::~WritableCatalog() {
   // CAUTION HOT!
   // (see Catalog.h - near the definition of FinalizePreparedStatements)
-  pthread_mutex_destroy(writable_lock_);
-  free(writable_lock_);
   FinalizePreparedStatements();
 }
 

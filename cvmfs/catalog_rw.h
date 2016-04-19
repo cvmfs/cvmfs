@@ -153,7 +153,6 @@ class WritableCatalog : public Catalog {
   DeltaCounters delta_counters_;
 
   // parallel commit state
-  pthread_mutex_t *writable_lock_;
   mutable atomic_int32 dirty_children_;
 
   inline void SetDirty() {
