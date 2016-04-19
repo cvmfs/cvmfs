@@ -819,6 +819,9 @@ void WritableCatalogManager::FinalizeCatalog(WritableCatalog *catalog,
 
   // update the previous catalog revision pointer
   if (catalog->IsRoot()) {
+    LogCvmfs(kLogCatalog, kLogVerboseMsg, "setting '%s' as previous revision "
+                                          "for root catalog",
+             base_hash().ToStringWithSuffix().c_str());
     catalog->SetPreviousRevision(base_hash());
   } else {
     shash::Any hash_previous;
@@ -827,6 +830,10 @@ void WritableCatalogManager::FinalizeCatalog(WritableCatalog *catalog,
       catalog->parent()->FindNested(catalog->path(),
                                     &hash_previous, &size_previous);
     assert(retval);
+    LogCvmfs(kLogCatalog, kLogVerboseMsg, "found '%s' as previous revision "
+                                          "for nested catalog '%s'",
+             hash_previous.ToStringWithSuffix().c_str(),
+             catalog->path().c_str());
     catalog->SetPreviousRevision(hash_previous);
   }
   catalog->Commit();
