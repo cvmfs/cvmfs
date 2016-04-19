@@ -185,6 +185,8 @@ AuthzStatus AuthzExternalFetcher::FetchWithinClientCtx(
   if (binary_msg.permit.status == kAuthzOk) {
     *authz_token = binary_msg.permit.token;
     *ttl = binary_msg.permit.ttl;
+    LogCvmfs(kLogAuthz, kLogDebug, "got token of type %d and size %u",
+             binary_msg.permit.token.type, binary_msg.permit.token.size);
   }
 
   return binary_msg.permit.status;
@@ -376,13 +378,22 @@ bool AuthzExternalFetcher::ParsePermit(
     JsonDocument::SearchInObject(json_authz, "x509_proxy", JSON_STRING);
   if (json_token != NULL) {
     binary_msg->permit.token.type = kTokenX509;
-    unsigned size = strlen(json_token->string_value);
+    string token_binary;
+    bool valid_base64 = Debase64(json_token->string_value, &token_binary);
+    if (!valid_base64) {
+      LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug,
+               "invalid Base64 in 'x509_proxy' from authz helper %s",
+               progname_.c_str());
+      EnterFailState();
+      return false;
+    }
+    unsigned size = token_binary.size();
     binary_msg->permit.token.size = size;
     if (size > 0) {
       // The token is passed to the AuthzSessionManager, which takes care of
       // freeing the memory
       binary_msg->permit.token.data = smalloc(size);
-      memcpy(binary_msg->permit.token.data, json_token->string_value, size);
+      memcpy(binary_msg->permit.token.data, token_binary.data(), size);
     }
   }
 

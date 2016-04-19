@@ -155,6 +155,7 @@ set (CVMFS_FSCK_SOURCES
 if (BUILD_X509_HELPER)
   set (CVMFS_X509_HELPER_SOURCES
     authz/x509_helper.cc
+    authz/x509_helper_base64.cc authz/x509_helper_base64.h
     authz/x509_helper_fetch.cc authz/x509_helper_fetch.h
     authz/x509_helper_log.cc authz/x509_helper_log.h
     authz/x509_helper_req.cc authz/x509_helper_req.h)
