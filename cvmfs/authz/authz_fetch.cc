@@ -182,9 +182,9 @@ AuthzStatus AuthzExternalFetcher::FetchWithinClientCtx(
   if (!retval)
     return kAuthzNoHelper;
 
+  *ttl = binary_msg.permit.ttl;
   if (binary_msg.permit.status == kAuthzOk) {
     *authz_token = binary_msg.permit.token;
-    *ttl = binary_msg.permit.ttl;
     LogCvmfs(kLogAuthz, kLogDebug, "got token of type %d and size %u",
              binary_msg.permit.token.type, binary_msg.permit.token.size);
   }
