@@ -28,6 +28,7 @@ set (CVMFS_LOADER_SOURCES
 set (CVMFS_CLIENT_SOURCES
   atomic.h
   authz/authz.h authz/authz.cc
+  authz/authz_curl.h authz/authz_curl.cc
   authz/authz_fetch.h authz/authz_fetch.cc
   authz/authz_session.h authz/authz_session.cc
   backoff.cc backoff.h
@@ -85,12 +86,6 @@ set (CVMFS_CLIENT_SOURCES
   wpad.cc wpad.h
   xattr.cc xattr.h
 )
-if (VOMS_FOUND)
-  set (CVMFS_CLIENT_SOURCES ${CVMFS_CLIENT_SOURCES}
-  authz/voms_authz.cc authz/voms_authz.h
-  authz/voms_cred.cc authz/voms_cred.h
-  authz/voms_curl.cc)
-endif (VOMS_FOUND)
 
 
 set (CVMFS2_DEBUG_SOURCES
@@ -271,14 +266,6 @@ set (CVMFS_SWISSKNIFE_SOURCES
   xattr.cc xattr.h
 )
 
-if (VOMS_FOUND)
-  set (CVMFS_SWISSKNIFE_SOURCES ${CVMFS_SWISSKNIFE_SOURCES}
-       authz/voms_authz.h
-       authz/voms_cred.cc
-       authz/voms_curl.cc)
-endif (VOMS_FOUND)
-
-
 set (CVMFS_SWISSKNIFE_DEBUG_SOURCES
   ${CVMFS_SWISSKNIFE_SOURCES}
 )
@@ -348,12 +335,6 @@ set (CVMFS_PRELOADER_SOURCES
   xattr.cc xattr.h
 )
 
-if (VOMS_FOUND)
-  set (CVMFS_PRELOADER_SOURCES ${CVMFS_PRELOADER_SOURCES}
-       authz/voms_authz.h
-       authz/voms_cred.cc
-       authz/voms_curl.cc)
-endif (VOMS_FOUND)
 
 #
 # configure some compiler flags for proper build

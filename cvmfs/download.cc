@@ -48,7 +48,6 @@
 #include <set>
 
 #include "atomic.h"
-#include "authz/voms_authz.h"
 #include "compression.h"
 #include "duplex_curl.h"
 #include "hash.h"
@@ -930,12 +929,18 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     const char *cadir = getenv("X509_CERT_DIR");
     if (!cadir) {cadir = "/etc/grid-security/certificates";}
     curl_easy_setopt(curl_handle, CURLOPT_CAPATH, cadir);
-#ifdef VOMS_AUTHZ
-/*    if (info->pid != -1) {
-      ConfigureCurlHandle(curl_handle, info->pid, info->uid, info->gid,
-                          &info->cred_fname, &info->cred_data);
-    }*/
-#endif
+    if (info->pid != -1) {
+      if (credentials_attachment_ == NULL) {
+        LogCvmfs(kLogDownload, kLogDebug,
+                 "uses secure downloads but no credentials attachment set");
+      } else {
+        bool retval = credentials_attachment_->ConfigureCurlHandle(
+          curl_handle, info->pid, &info->cred_data);
+        if (!retval) {
+          LogCvmfs(kLogDownload, kLogDebug, "failed attaching credentials");
+        }
+      }
+    }
     // The download manager disables signal handling in the curl library;
     // as OpenSSL's implementation of TLS will generate a sigpipe in some
     // error paths, we must explicitly disable SIGPIPE here.
@@ -1113,17 +1118,10 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
            info->url->c_str(), info->proxy.c_str(), curl_error);
   UpdateStatistics(info->curl_handle);
 
-  if (info->cred_fname) {
-    unlink(info->cred_fname);
-    free(info->cred_fname);
-    info->cred_fname = NULL;
-    curl_easy_setopt(info->curl_handle, CURLOPT_SSLCERT, NULL);
-    curl_easy_setopt(info->curl_handle, CURLOPT_SSLKEY, NULL);
-  }
   if (info->cred_data) {
-#ifdef VOMS_AUTHZ
-    ::ReleaseCurlHandle(info->curl_handle, info->cred_data);
-#endif
+    assert(credentials_attachment_ != NULL);  // Someone must have set it
+    credentials_attachment_->ReleaseCurlHandle(info->curl_handle,
+                                               info->cred_data);
     info->cred_data = NULL;
   }
 
@@ -1206,11 +1204,11 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       info->error_code = kFailHostConnection;
       break;
     case CURLE_PEER_FAILED_VERIFICATION:
-      LogCvmfs(kLogDownload, kLogDebug | kLogSyslogErr, 
+      LogCvmfs(kLogDownload, kLogDebug | kLogSyslogErr,
                "invalid SSL certificate of remote host. "
                "X509_CERT_DIR might point to the wrong directory.");
       info->error_code = kFailHostConnection;
-      break;  
+      break;
     case CURLE_ABORTED_BY_CALLBACK:
     case CURLE_WRITE_ERROR:
       // Error set by callback
@@ -1444,6 +1442,8 @@ DownloadManager::DownloadManager() {
   opt_proxy_groups_reset_after_ = 0;
   opt_timestamp_backup_host_ = 0;
   opt_host_reset_after_ = 0;
+
+  credentials_attachment_ = NULL;
 
   counters_ = NULL;
 }
@@ -1686,6 +1686,17 @@ Failures DownloadManager::Fetch(JobInfo *info) {
   }
 
   return result;
+}
+
+
+/**
+ * Used by the client to connect the authz session manager to the download
+ * manager.
+ */
+void DownloadManager::SetCredentialsAttachment(CredentialsAttachment *ca) {
+  pthread_mutex_lock(lock_options_);
+  credentials_attachment_ = ca;
+  pthread_mutex_unlock(lock_options_);
 }
 
 

@@ -2,8 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef CVMFS_VOMS_AUTHZ_AUTHZ_SESSION_H_
-#define CVMFS_VOMS_AUTHZ_AUTHZ_SESSION_H_
+#ifndef CVMFS_AUTHZ_AUTHZ_SESSION_H_
+#define CVMFS_AUTHZ_AUTHZ_SESSION_H_
 
 #include <inttypes.h>
 #include <pthread.h>
