@@ -25,6 +25,7 @@ USER_SERIAL_NUMBER=A1B2C3D4E5F7
 DAYS=10
 CRL_NUMBER_FILE=crlnumber
 CRL_FILE=OSG-Test-CA.r0
+SIGNING_POLICY_FILE=OSG-Test-CA.signing_policy
 
 # Clean up from previous run
 rm -f *.pem *.r0
@@ -81,3 +82,10 @@ openssl ca -gencrl -config $OPENSSL_CONFIG -cert $CA_FILE -keyfile $PRIVATE_KEY_
 if [ $? -eq 0 ]; then
     rm -f index.*
 fi
+
+cat > $SIGNING_POLICY_FILE << EOF
+# OSG-Test-CA Signing Policy file
+access_id_CA		X509	'/DC=org/DC=Open Science Grid/O=OSG Test/CN=OSG Test CA'
+pos_rights		globus	CA:sign
+cond_subjects		globus	'"/DC=org/DC=Open Science Grid/O=OSG Test/*"'
+EOF
