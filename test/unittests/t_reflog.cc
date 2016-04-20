@@ -294,28 +294,28 @@ TYPED_TEST(T_Reflog, ContainsObject) {
   EXPECT_EQ(5u, rl2->CountEntries());
 
   EXPECT_TRUE(
-    rl1->ContainsCatalog(h("c5501bd0142cad45c4f0957cbf307e184ac1f661",
+    rl2->ContainsCatalog(h("c5501bd0142cad45c4f0957cbf307e184ac1f661",
                            shash::kSuffixCatalog)));
   EXPECT_FALSE(
-    rl1->ContainsCatalog(h("abcdef01422cad45c4f0957cbf307e184ac1f661",
+    rl2->ContainsCatalog(h("abcdef01422cad45c4f0957cbf307e184ac1f661",
                            shash::kSuffixCatalog)));
   EXPECT_TRUE(
-    rl1->ContainsCertificate(h("b778b910390254b37ec66366aeef04f034c51941",
+    rl2->ContainsCertificate(h("b778b910390254b37ec66366aeef04f034c51941",
                                shash::kSuffixCertificate)));
   EXPECT_FALSE(
-    rl1->ContainsCertificate(h("abcde910390254b37ec66366aeef04f034c51941",
+    rl2->ContainsCertificate(h("abcde910390254b37ec66366aeef04f034c51941",
                                shash::kSuffixCertificate)));
   EXPECT_TRUE(
-    rl1->ContainsMetainfo(h("8de3e8cbd611ce225d62341698b9408a47edf76b",
+    rl2->ContainsMetainfo(h("8de3e8cbd611ce225d62341698b9408a47edf76b",
                             shash::kSuffixMetainfo)));
   EXPECT_FALSE(
-    rl1->ContainsMetainfo(h("abcde8cbd611ce225d62341698b9408a47edf76b",
+    rl2->ContainsMetainfo(h("abcde8cbd611ce225d62341698b9408a47edf76b",
                             shash::kSuffixMetainfo)));
   EXPECT_TRUE(
-    rl1->ContainsHistory(h("cab790100c3b10afd7e755b3c93eaeda6a0db9ab",
+    rl2->ContainsHistory(h("cab790100c3b10afd7e755b3c93eaeda6a0db9ab",
                            shash::kSuffixHistory)));
   EXPECT_FALSE(
-    rl1->ContainsHistory(h("abcde0100c3b10afd7e755b3c93eaeda6a0db9ab",
+    rl2->ContainsHistory(h("abcde0100c3b10afd7e755b3c93eaeda6a0db9ab",
                            shash::kSuffixHistory)));
 
   TestFixture::CloseReflog(rl2);
