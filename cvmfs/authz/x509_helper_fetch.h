@@ -7,10 +7,11 @@
 
 #include <unistd.h>
 
+#include <cstdio>
 #include <string>
 
 #include "authz/x509_helper_req.h"
 
-bool GetX509Proxy(const AuthzRequest &authz_req, std::string *proxy);
+FILE *GetX509Proxy(const AuthzRequest &authz_req, std::string *proxy);
 
 #endif  // CVMFS_AUTHZ_X509_HELPER_FETCH_H_

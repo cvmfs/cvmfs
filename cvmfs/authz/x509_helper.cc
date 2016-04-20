@@ -177,15 +177,16 @@ int main() {
     LogAuthz(kLogAuthzDebug, "got authz request %s", msg.c_str());
     AuthzRequest request = ParseRequest(msg);
     string proxy;
-    bool found_proxy = GetX509Proxy(request, &proxy);
-    if (!found_proxy) {
+    FILE *fp_proxy = GetX509Proxy(request, &proxy);
+    if (fp_proxy == NULL) {
       // kAuthzNotFound, 5 seconds TTL
       WriteMsg("{\"cvmfs_authz_v1\":{\"msgid\":3,\"revision\":0,"
                "\"status\":1,\"ttl\":5}}");
       continue;
     }
 
-    bool verify_proxy = CheckX509Proxy(proxy, request.membership);
+    // This will close fp_proxy along the way.
+    bool verify_proxy = CheckX509Proxy(request.membership, fp_proxy);
     if (!verify_proxy) {
       // kAuthzInvalid or kAuthzNotMember, 5 seconds TTL
       WriteMsg("{\"cvmfs_authz_v1\":{\"msgid\":3,\"revision\":0,"

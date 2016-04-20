@@ -3,8 +3,10 @@
  */
 #include "x509_helper_check.h"
 
+#include <alloca.h>
 #include <sys/types.h>
 
+#include <cassert>
 #include <cstdio>
 #include <cstring>
 #include <vector>
@@ -24,7 +26,7 @@ namespace {
  * Resulting memory is owned by caller and must be destroyed with VOMS_Destroy.
  */
 struct authz_state {
-  string m_proxy;
+  FILE *m_fp;
   struct vomsdata *m_voms;
   globus_gsi_cred_handle_t m_cred;
   BIO *m_bio;
@@ -35,6 +37,7 @@ struct authz_state {
   globus_gsi_callback_data_t m_callback;
 
   authz_state() :
+    m_fp(NULL),
     m_voms(NULL),
     m_cred(NULL),
     m_bio(NULL),
@@ -46,6 +49,7 @@ struct authz_state {
   {}
 
   ~authz_state() {
+    if (m_fp) {fclose(m_fp);}
     if (m_voms) {(*g_VOMS_Destroy)(m_voms);}
     if (m_cred) {(*g_globus_gsi_cred_handle_destroy)(m_cred);}
     if (m_bio) {BIO_free(m_bio);}
@@ -60,9 +64,9 @@ struct authz_state {
 }  // anonymous namespace
 
 
-static authz_data *GenerateVOMSData(const string &x509_proxy) {
+static authz_data *GenerateVOMSData(FILE *fp_proxy) {
   authz_state state;
-  state.m_proxy = x509_proxy;
+  state.m_fp = fp_proxy;
 
   // Start of Globus proxy parsing and verification...
   globus_result_t result =
@@ -72,8 +76,7 @@ static authz_data *GenerateVOMSData(const string &x509_proxy) {
     return NULL;
   }
 
-  state.m_bio = BIO_new_mem_buf(const_cast<char *>(state.m_proxy.data()),
-                                state.m_proxy.length());
+  state.m_bio = BIO_new_fp(state.m_fp, 0);
   if (!state.m_bio) {
     LogAuthz(kLogAuthzDebug, "Unable to allocate new BIO object");
     return NULL;
@@ -326,8 +329,8 @@ CheckMultipleAuthz(const authz_data *authz_ptr,
 }
 
 
-bool CheckX509Proxy(const string &x509_proxy, const string &membership) {
-  authz_data *voms_data = GenerateVOMSData(x509_proxy);
+bool CheckX509Proxy(const string &membership, FILE *fp_proxy) {
+  authz_data *voms_data = GenerateVOMSData(fp_proxy);
   if (voms_data == NULL)
     return false;
   const bool result = CheckMultipleAuthz(voms_data, membership);

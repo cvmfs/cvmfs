@@ -114,14 +114,14 @@ generate_certs() {
   ./ca-generate-certs ${TEST600_HOSTNAME}
   result=$?
   LD_LIBRARY_PATH=${voms_path}/usr/lib64 \
-  PATH=$PATH:${voms_path}/usr/bin/
+    PATH=$PATH:${voms_path}/usr/bin/ \
      voms-proxy-fake -certdir ${TEST600_GRID_SECURITY_DIR}/certificates \
       -cert usercert.pem -key userkey.pem -out vomsproxy.pem -rfc \
       -hostcert hostcert.pem -hostkey hostkey.pem -fqan /cvmfs/Role=NULL \
       -voms cvmfs -uri ${TEST600_HOSTNAME}:15000 || return 1
 
   LD_LIBRARY_PATH=${voms_path}/usr/lib64 \
-  PATH=$PATH:${voms_path}/usr/bin/
+    PATH=$PATH:${voms_path}/usr/bin/ \
      voms-proxy-fake -certdir ${TEST600_GRID_SECURITY_DIR}/certificates \
       -cert usercert.pem -key userkey.pem -out vomsproxy2.pem -rfc \
       -hostcert hostcert.pem -hostkey hostkey.pem -fqan /cvmfs/Role=NULL \
@@ -136,7 +136,7 @@ generate_certs() {
   echo "/DC=org/DC=Open Science Grid/O=OSG Test/CN=OSG Test CA" >> ${TEST600_GRID_SECURITY_DIR}/vomsdir/cvmfs/${TEST600_HOSTNAME}.lsc
 
   LD_LIBRARY_PATH=${voms_path}/usr/lib64 X509_CERT_DIR=${TEST600_GRID_SECURITY_DIR}/certificates \
-  PATH=$PATH:${voms_path}/usr/bin/
+    PATH=$PATH:${voms_path}/usr/bin/ \
     voms-proxy-info -file $TEST600_CERTS_DIR/vomsproxy.pem -all
 
   sudo cp $TEST600_CERTS_DIR/hostcert.pem $TEST600_HOSTCERT || return 1
@@ -266,7 +266,9 @@ cvmfs_run_test() {
   disable_resolv_conf
   do_local_mount_as_root "$mntpnt"          \
                          "$CVMFS_TEST_REPO" \
-                         "https://${TEST600_HOSTNAME}:8443/cvmfs/$CVMFS_TEST_REPO" || return 19
+                         "https://${TEST600_HOSTNAME}:8443/cvmfs/$CVMFS_TEST_REPO" \
+                         "" \
+                         "CVMFS_AUTHZ_HELPER=/usr/bin/cvmfs_x509_helper" || return 19
   enable_resolv_conf
 
   echo "copy vomsproxy for 'nobody'"
