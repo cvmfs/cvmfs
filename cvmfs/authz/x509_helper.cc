@@ -139,6 +139,12 @@ static AuthzRequest ParseRequest(const string &msg) {
       result.pid = json->int_value;
     } else if (name == "membership") {
       result.membership = string(json->string_value);
+    } else if (name == "msgid") {
+      if (json->int_value == 4) {  /* kAuthzMsgQuit */
+        LogAuthz(kLogAuthzDebug, "shut down");
+        // TODO(jblomer): we might want to properly cleanup
+        exit(0);
+      }
     }
     json = json->next_sibling;
   }
@@ -186,18 +192,24 @@ int main() {
     }
 
     // This will close fp_proxy along the way.
-    bool verify_proxy = CheckX509Proxy(request.membership, fp_proxy);
-    if (!verify_proxy) {
-      // kAuthzInvalid or kAuthzNotMember, 5 seconds TTL
-      WriteMsg("{\"cvmfs_authz_v1\":{\"msgid\":3,\"revision\":0,"
+    StatusX509Validation validation_status = 
+      CheckX509Proxy(request.membership, fp_proxy);
+    switch (validation_status) {
+      case kCheckX509Invalid:
+        WriteMsg("{\"cvmfs_authz_v1\":{\"msgid\":3,\"revision\":0,"
                "\"status\":2,\"ttl\":5}}");
-      continue;
+        break;
+      case kCheckX509NotMember:
+        WriteMsg("{\"cvmfs_authz_v1\":{\"msgid\":3,\"revision\":0,"
+                 "\"status\":3,\"ttl\":5}}");
+        break;
+      case kCheckX509Good:
+        WriteMsg("{\"cvmfs_authz_v1\":{\"msgid\":3,\"revision\":0,"
+                 "\"status\":0,\"x509_proxy\":\"" + Base64(proxy) + "\"}}");
+        break;
+      default:
+        abort();
     }
-
-    string reply = "{\"cvmfs_authz_v1\":{\"msgid\":3,\"revision\":0,"
-                   "\"status\":0,\"x509_proxy\":\"" + Base64(proxy) + "\"}}";
-    LogAuthz(kLogAuthzDebug, "reply %s", reply.c_str());
-    WriteMsg(reply);
   }
 
   return 0;

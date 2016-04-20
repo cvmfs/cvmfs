@@ -62,6 +62,14 @@ AuthzExternalFetcher::~AuthzExternalFetcher() {
   int retval = pthread_mutex_destroy(&lock_);
   assert(retval == 0);
 
+  // Allow helper to gracefully terminate
+  if (fd_send_ && !fail_state_) {
+    LogCvmfs(kLogAuthz, kLogDebug, "shutting down authz helper");
+    Send(string("{\"cvmfs_authz_v1\":{") +
+      "\"msgid\":" + StringifyInt(kAuthzMsgQuit) + "," +
+      "\"revision\":0}}");
+  }
+
   if (fd_send_ >= 0)
     close(fd_send_);
   if (fd_recv_ >= 0)

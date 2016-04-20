@@ -57,6 +57,7 @@ enum AuthzExternalMsgIds {
   kAuthzMsgReady,          ///< Helper: "Yes, cvmfs, I'm here"
   kAuthzMsgVerify,         ///< Cvmfs: "Please verify, helper"
   kAuthzMsgPermit,         ///< Helper: "I verified, cvmfs, here's the result"
+  kAuthzMsgQuit,           ///< Cvmfs: "Please shutdown, helper"
   kAuthzMsgInvalid         ///< First invalid message id
 };
 

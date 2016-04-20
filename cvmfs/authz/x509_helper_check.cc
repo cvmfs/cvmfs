@@ -329,11 +329,11 @@ CheckMultipleAuthz(const authz_data *authz_ptr,
 }
 
 
-bool CheckX509Proxy(const string &membership, FILE *fp_proxy) {
+StatusX509Validation CheckX509Proxy(const string &membership, FILE *fp_proxy) {
   authz_data *voms_data = GenerateVOMSData(fp_proxy);
   if (voms_data == NULL)
-    return false;
+    return kCheckX509Invalid;
   const bool result = CheckMultipleAuthz(voms_data, membership);
   delete voms_data;
-  return result;
+  return result ? kCheckX509Good : kCheckX509NotMember;
 }
