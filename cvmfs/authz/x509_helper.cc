@@ -187,6 +187,7 @@ int main() {
     FILE *fp_proxy = GetX509Proxy(request, &proxy);
     if (fp_proxy == NULL) {
       // kAuthzNotFound, 5 seconds TTL
+      LogAuthz(kLogAuthzDebug, "reply 'proxy not found'");
       WriteMsg("{\"cvmfs_authz_v1\":{\"msgid\":3,\"revision\":0,"
                "\"status\":1,\"ttl\":5}}");
       continue;

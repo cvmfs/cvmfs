@@ -14,7 +14,6 @@
 
 #include "authz/authz.h"
 #include "authz/authz_fetch.h"
-#include "clientctx.h"
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -72,7 +71,7 @@ class T_AuthzFetch : public ::testing::Test {
 
   static void *MainOneAuth(void *data) {
     HelperFds helper_fds = *reinterpret_cast<HelperFds *>(data);
-    RecvAndFind(helper_fds.fd_stdin, "\"uid\":1");
+    RecvAndFind(helper_fds.fd_stdin, "\"uid\":2");
     string auth_msg = string("{\"cvmfs_authz_v1\":") +
        "{\"msgid\": 3, \"revision\": 0, \"status\": 0, \"ttl\": 60," +
         "\"x509_proxy\": \"" + Base64(string(8192, 'X')) + "\"}}";
@@ -215,7 +214,6 @@ TEST_F(T_AuthzFetch, Handshake) {
 
 
 TEST_F(T_AuthzFetch, Fetch) {
-  ClientCtx::GetInstance()->Set(1, 2, 3);
   HelperFds helper_fds;
   helper_fds.fd_stdin = pipe_send_[0];
   helper_fds.fd_stdout = pipe_recv_[1];
@@ -223,12 +221,12 @@ TEST_F(T_AuthzFetch, Fetch) {
   ASSERT_EQ(0, pthread_create(&thread_auth, NULL, MainOneAuth, &helper_fds));
   AuthzToken token;
   unsigned ttl;
-  EXPECT_EQ(kAuthzOk, fetcher_->FetchWithinClientCtx("X", &token, &ttl));
+  EXPECT_EQ(kAuthzOk, fetcher_->Fetch(AuthzFetcher::QueryInfo(1, 2, 3, "X"),
+                                      &token, &ttl));
   pthread_join(thread_auth, NULL);
   EXPECT_EQ(60U, ttl);
   EXPECT_EQ(kTokenX509, token.type);
   EXPECT_EQ(8192U, token.size);
   EXPECT_TRUE(token.data != NULL);
   free(token.data);
-  ClientCtx::CleanupInstance();
 }

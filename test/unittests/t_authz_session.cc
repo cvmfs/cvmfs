@@ -15,8 +15,8 @@
 
 class TestAuthzFetcher : public AuthzFetcher {
  public:
-  virtual AuthzStatus FetchWithinClientCtx(
-    const std::string &membership,
+  virtual AuthzStatus Fetch(
+    const QueryInfo &query_info,
     AuthzToken *authz_token,
     unsigned *ttl)
   {
@@ -75,12 +75,17 @@ TEST_F(T_AuthzSession, LookupSessionKey) {
   uint64_t now = platform_monotonic_time();
   EXPECT_EQ(0U, authz_session_mgr_->pid2session_.size());
   AuthzSessionManager::SessionKey session_key;
-  EXPECT_FALSE(authz_session_mgr_->LookupSessionKey(-1, &session_key));
+  AuthzSessionManager::PidKey pid_key;
+  EXPECT_FALSE(
+    authz_session_mgr_->LookupSessionKey(-1, &pid_key, &session_key));
 
-  EXPECT_TRUE(authz_session_mgr_->LookupSessionKey(getpid(), &session_key));
+  EXPECT_TRUE(authz_session_mgr_->LookupSessionKey(
+    getpid(), &pid_key, &session_key));
+  EXPECT_EQ(getpid(), pid_key.pid);
+  EXPECT_EQ(getsid(0), pid_key.sid);
+  EXPECT_EQ(getuid(), pid_key.uid);
+  EXPECT_EQ(getgid(), pid_key.gid);
   EXPECT_EQ(getsid(0), session_key.sid);
-  EXPECT_EQ(getuid(), session_key.uid);
-  EXPECT_EQ(getgid(), session_key.gid);
   EXPECT_EQ(1U, authz_session_mgr_->pid2session_.size());
 
   authz_session_mgr_->SweepPids(now);
@@ -91,13 +96,16 @@ TEST_F(T_AuthzSession, LookupSessionKey) {
 
 
 TEST_F(T_AuthzSession, LookupAuthzData) {
-  AuthzSessionManager::SessionKey key;
+  AuthzSessionManager::SessionKey session_key;
+  AuthzSessionManager::PidKey pid_key;
   AuthzData authz_data;
 
-  key.sid = 0;
+  session_key.sid = 0;
+  pid_key.pid = 0;
   authz_fetcher_.next_status = kAuthzOk;
   authz_fetcher_.next_ttl = 1000;
-  EXPECT_TRUE(authz_session_mgr_->LookupAuthzData(key, "A", &authz_data));
+  EXPECT_TRUE(authz_session_mgr_->LookupAuthzData(
+    pid_key, session_key, "A", &authz_data));
   EXPECT_EQ("A", authz_data.membership);
   EXPECT_EQ(kAuthzOk, authz_data.status);
   EXPECT_LE(platform_monotonic_time() + authz_fetcher_.next_ttl,
@@ -105,18 +113,24 @@ TEST_F(T_AuthzSession, LookupAuthzData) {
 
   authz_fetcher_.next_status = kAuthzNotFound;
   // Cached
-  EXPECT_TRUE(authz_session_mgr_->LookupAuthzData(key, "A", &authz_data));
+  EXPECT_TRUE(authz_session_mgr_->LookupAuthzData(
+    pid_key, session_key, "A", &authz_data));
   // Membership changed
-  EXPECT_FALSE(authz_session_mgr_->LookupAuthzData(key, "B", &authz_data));
-  key.sid = 1;
-  EXPECT_FALSE(authz_session_mgr_->LookupAuthzData(key, "A", &authz_data));
+  EXPECT_FALSE(authz_session_mgr_->LookupAuthzData(
+    pid_key, session_key, "B", &authz_data));
+  session_key.sid = 1;
+  pid_key.pid = 1;
+  EXPECT_FALSE(authz_session_mgr_->LookupAuthzData(
+    pid_key, session_key, "A", &authz_data));
 
   authz_fetcher_.next_status = kAuthzOk;
   // Negative cache
-  EXPECT_FALSE(authz_session_mgr_->LookupAuthzData(key, "A", &authz_data));
+  EXPECT_FALSE(authz_session_mgr_->LookupAuthzData(
+    pid_key, session_key, "A", &authz_data));
   authz_session_mgr_->SweepCreds(platform_monotonic_time() +
                                  authz_fetcher_.next_ttl);
-  EXPECT_TRUE(authz_session_mgr_->LookupAuthzData(key, "A", &authz_data));
+  EXPECT_TRUE(authz_session_mgr_->LookupAuthzData(
+    pid_key, session_key, "A", &authz_data));
 }
 
 

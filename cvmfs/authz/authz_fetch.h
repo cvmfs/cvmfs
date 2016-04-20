@@ -17,14 +17,22 @@
 
 class AuthzFetcher {
  public:
+  struct QueryInfo {
+    QueryInfo(pid_t p, uid_t u, gid_t g, const std::string &m)
+      : pid(p), uid(u), gid(g), membership(m) { }
+    pid_t pid;
+    uid_t uid;
+    gid_t gid;
+    std::string membership;
+  };
+
   /**
-   * Based on the current client context (pid, uid, gid) and the given
-   * membership requirement, gather credentials.  Positive and negative replies
-   * have a time to live.
+   * Based on the given pid, uid, gid and the given membership requirement,
+   * gather credentials.  Positive and negative replies have a time to live.
    */
-  virtual AuthzStatus FetchWithinClientCtx(const std::string &membership,
-                                           AuthzToken *authz_token,
-                                           unsigned *ttl) = 0;
+  virtual AuthzStatus Fetch(const QueryInfo &query_info,
+                            AuthzToken *authz_token,
+                            unsigned *ttl) = 0;
 };
 
 
@@ -34,9 +42,9 @@ class AuthzFetcher {
 class AuthzStaticFetcher : public AuthzFetcher {
  public:
   AuthzStaticFetcher(AuthzStatus s, unsigned ttl) : status_(s), ttl_(ttl) { }
-  virtual AuthzStatus FetchWithinClientCtx(const std::string &membership,
-                                           AuthzToken *authz_token,
-                                           unsigned *ttl)
+  virtual AuthzStatus Fetch(const QueryInfo &query_info,
+                            AuthzToken *authz_token,
+                            unsigned *ttl)
   {
     *authz_token = AuthzToken();
     *ttl = ttl_;
@@ -100,9 +108,9 @@ class AuthzExternalFetcher : public AuthzFetcher, SingleCopy {
   AuthzExternalFetcher(const std::string &fqrn, int fd_send, int fd_recv);
   ~AuthzExternalFetcher();
 
-  virtual AuthzStatus FetchWithinClientCtx(const std::string &membership,
-                                           AuthzToken *authz_token,
-                                           unsigned *ttl);
+  virtual AuthzStatus Fetch(const QueryInfo &query_info,
+                            AuthzToken *authz_token,
+                            unsigned *ttl);
 
  private:
   /**

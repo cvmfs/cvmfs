@@ -15,7 +15,6 @@
 #include <cassert>
 #include <cstring>
 
-#include "clientctx.h"
 #include "logging.h"
 #include "platform.h"
 #include "smalloc.h"
@@ -148,16 +147,11 @@ void AuthzExternalFetcher::ExecHelper() {
 }
 
 
-AuthzStatus AuthzExternalFetcher::FetchWithinClientCtx(
-  const std::string &membership,
+AuthzStatus AuthzExternalFetcher::Fetch(
+  const QueryInfo &query_info,
   AuthzToken *authz_token,
   unsigned *ttl)
 {
-  assert(ClientCtx::GetInstance()->IsSet());
-  uid_t uid;
-  gid_t gid;
-  pid_t pid;
-  ClientCtx::GetInstance()->Get(&uid, &gid, &pid);
   *ttl = kDefaultTtl;
 
   MutexLockGuard lock_guard(lock_);
@@ -177,11 +171,11 @@ AuthzStatus AuthzExternalFetcher::FetchWithinClientCtx(
   string json_msg = string("{\"cvmfs_authz_v1\":{") +
     "\"msgid\":" + StringifyInt(kAuthzMsgVerify) + "," +
     "\"revision\":0," +
-    "\"uid\":" +  StringifyInt(uid) + "," +
-    "\"gid\":" +  StringifyInt(gid) + "," +
-    "\"pid\":" +  StringifyInt(pid) + "," +
-    "\"membership\":\"" +  JsonDocument::EscapeString(membership) + "\"" +
-    "}}";
+    "\"uid\":" +  StringifyInt(query_info.uid) + "," +
+    "\"gid\":" +  StringifyInt(query_info.gid) + "," +
+    "\"pid\":" +  StringifyInt(query_info.pid) + "," +
+    "\"membership\":\"" +  JsonDocument::EscapeString(query_info.membership) + 
+      "\"}}";
   retval = Send(json_msg) && Recv(&json_msg);
   if (!retval)
     return kAuthzNoHelper;

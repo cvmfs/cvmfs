@@ -31,7 +31,9 @@ class AuthzFetcher;
  * be anything, for instance a role in a certificate.  It is stored in the cvmfs
  * root file catalog.
  *
- * An AuthzFetcher is used to gather credentials that are not cached.
+ * An AuthzFetcher is used to gather credentials that are not cached.  Note that
+ * the credentials are fetched using original pid/uid/gid but cached under the
+ * session.
  */
 class AuthzSessionManager : SingleCopy {
   FRIEND_TEST(T_AuthzSession, GetPidInfo);
@@ -83,10 +85,8 @@ class AuthzSessionManager : SingleCopy {
    * Extended information on an SID.
    */
   struct SessionKey {
-    SessionKey() : sid(-1), uid(-1), gid(-1), sid_bday(0) { }
+    SessionKey() : sid(-1), sid_bday(0) { }
     pid_t sid;
-    uid_t uid;
-    gid_t gid;
     uint64_t sid_bday;
 
     bool operator ==(const SessionKey &other) const {
@@ -122,11 +122,12 @@ class AuthzSessionManager : SingleCopy {
   AuthzSessionManager();
 
   bool GetPidInfo(pid_t pid, PidKey *pid_key);
-  bool LookupSessionKey(pid_t pid, SessionKey *session_key);
+  bool LookupSessionKey(pid_t pid, PidKey *pid_key, SessionKey *session_key);
   void MaySweepPids();
   void SweepPids(uint64_t now);
 
-  bool LookupAuthzData(const SessionKey &session_key,
+  bool LookupAuthzData(const PidKey &pid_key,
+                       const SessionKey &session_key,
                        const std::string &membership,
                        AuthzData *authz_data);
   void MaySweepCreds();

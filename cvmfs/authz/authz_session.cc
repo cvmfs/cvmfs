@@ -136,12 +136,14 @@ AuthzToken *AuthzSessionManager::GetTokenCopy(
   const std::string &membership)
 {
   SessionKey session_key;
-  bool retval = LookupSessionKey(pid, &session_key);
+  PidKey pid_key;
+  bool retval = LookupSessionKey(pid, &pid_key, &session_key);
   if (!retval)
     return NULL;
 
   AuthzData authz_data;
-  const bool granted = LookupAuthzData(session_key, membership, &authz_data);
+  const bool granted =
+    LookupAuthzData(pid_key, session_key, membership, &authz_data);
   if (!granted)
     return NULL;
   return authz_data.token.DeepCopy();
@@ -153,12 +155,13 @@ bool AuthzSessionManager::IsMemberOf(
   const std::string &membership)
 {
   SessionKey session_key;
-  bool retval = LookupSessionKey(pid, &session_key);
+  PidKey pid_key;
+  bool retval = LookupSessionKey(pid, &pid_key, &session_key);
   if (!retval)
     return false;
 
   AuthzData authz_data;
-  return LookupAuthzData(session_key, membership, &authz_data);
+  return LookupAuthzData(pid_key, session_key, membership, &authz_data);
 }
 
 
@@ -167,6 +170,7 @@ bool AuthzSessionManager::IsMemberOf(
  * membership.
  */
 bool AuthzSessionManager::LookupAuthzData(
+  const PidKey &pid_key,
   const SessionKey &session_key,
   const std::string &membership,
   AuthzData *authz_data)
@@ -191,15 +195,16 @@ bool AuthzSessionManager::LookupAuthzData(
   // Not found in cache, ask for help
   perf::Inc(n_fetch_);
   unsigned ttl;
-  authz_data->status = authz_fetcher_->FetchWithinClientCtx(
-    membership, &(authz_data->token), &ttl);
+  authz_data->status = authz_fetcher_->Fetch(
+    AuthzFetcher::QueryInfo(pid_key.pid, pid_key.uid, pid_key.gid, membership),
+    &(authz_data->token), &ttl);
   authz_data->deadline = platform_monotonic_time() + ttl;
   if (authz_data->status == kAuthzOk)
     authz_data->membership = membership;
   LogCvmfs(kLogAuthz, kLogDebug,
-           "fetched authz data for sid %d, membership %s, status %d, ttl %u",
-           session_key.sid, authz_data->membership.c_str(),
-           authz_data->status, ttl);
+           "fetched authz data for sid %d (pid %d), membership %s, status %d, "
+           "ttl %u", session_key.sid, pid_key.pid,
+           authz_data->membership.c_str(), authz_data->status, ttl);
 
   LockMutex(&lock_session2cred_);
   if (!session2cred_.Contains(session_key))
@@ -219,42 +224,44 @@ bool AuthzSessionManager::LookupAuthzData(
  * ID and its birthday together with UID and GID make the Session Key.  The
  * translation result is cached in pid2session_.
  */
-bool AuthzSessionManager::LookupSessionKey(pid_t pid, SessionKey *session_key) {
+bool AuthzSessionManager::LookupSessionKey(
+  pid_t pid,
+  PidKey *pid_key,
+  SessionKey *session_key)
+{
+  assert(pid_key != NULL);
   assert(session_key != NULL);
-  PidKey pid_key;
-  if (!GetPidInfo(pid, &pid_key))
+  if (!GetPidInfo(pid, pid_key))
     return false;
 
   LockMutex(&lock_pid2session_);
-  bool found = pid2session_.Lookup(pid_key, session_key);
+  bool found = pid2session_.Lookup(*pid_key, session_key);
   MaySweepPids();
   UnlockMutex(&lock_pid2session_);
   if (found) {
     LogCvmfs(kLogAuthz, kLogDebug,
              "Session key %d/%" PRIu64 " in cache; sid=%d, bday=%" PRIu64,
-             pid_key.pid, pid_key.pid_bday,
+             pid_key->pid, pid_key->pid_bday,
              session_key->sid, session_key->sid_bday);
     return true;
   }
 
   // Not found in cache, get session information from OS
   PidKey sid_key;
-  if (!GetPidInfo(pid_key.sid, &sid_key))
+  if (!GetPidInfo(pid_key->sid, &sid_key))
     return false;
 
   session_key->sid = sid_key.pid;
-  session_key->uid = sid_key.uid;
-  session_key->gid = sid_key.gid;
   session_key->sid_bday = sid_key.pid_bday;
   LockMutex(&lock_pid2session_);
-  pid_key.deadline = platform_monotonic_time() + kPidLifetime;
-  if (!pid2session_.Contains(pid_key))
+  pid_key->deadline = platform_monotonic_time() + kPidLifetime;
+  if (!pid2session_.Contains(*pid_key))
     perf::Inc(no_pid_);
-  pid2session_.Insert(pid_key, *session_key);
+  pid2session_.Insert(*pid_key, *session_key);
   UnlockMutex(&lock_pid2session_);
 
   LogCvmfs(kLogAuthz, kLogDebug, "Lookup key %d/%" PRIu64 "; sid=%d, bday=%llu",
-           pid_key.pid, pid_key.pid_bday,
+           pid_key->pid, pid_key->pid_bday,
            session_key->sid, session_key->sid_bday);
   return true;
 }
