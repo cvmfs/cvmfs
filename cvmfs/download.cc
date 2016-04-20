@@ -931,10 +931,10 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     if (!cadir) {cadir = "/etc/grid-security/certificates";}
     curl_easy_setopt(curl_handle, CURLOPT_CAPATH, cadir);
 #ifdef VOMS_AUTHZ
-    if (info->pid != -1) {
+/*    if (info->pid != -1) {
       ConfigureCurlHandle(curl_handle, info->pid, info->uid, info->gid,
                           &info->cred_fname, &info->cred_data);
-    }
+    }*/
 #endif
     // The download manager disables signal handling in the curl library;
     // as OpenSSL's implementation of TLS will generate a sigpipe in some
@@ -1205,6 +1205,12 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
                "X509_CERT_DIR might point to the wrong directory.");
       info->error_code = kFailHostConnection;
       break;
+    case CURLE_PEER_FAILED_VERIFICATION:
+      LogCvmfs(kLogDownload, kLogDebug | kLogSyslogErr, 
+               "invalid SSL certificate of remote host. "
+               "X509_CERT_DIR might point to the wrong directory.");
+      info->error_code = kFailHostConnection;
+      break;  
     case CURLE_ABORTED_BY_CALLBACK:
     case CURLE_WRITE_ERROR:
       // Error set by callback

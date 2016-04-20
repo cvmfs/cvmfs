@@ -182,6 +182,8 @@ cvmfs_run_test() {
   echo "setting a dummy host name"
   TEST600_HOSTNAME='test-600-dummyhost'
   echo "127.0.0.1 $TEST600_HOSTNAME" | sudo tee --append /etc/hosts
+  echo "==== new /etc/hosts: ===="
+  cat /etc/hosts
 
   if has_selinux; then
     echo "make sure that SELinux does not interfere"
@@ -262,7 +264,7 @@ cvmfs_run_test() {
   echo "This should not work"
   sudo -u nobody setsid /bin/sh -c "env && cat ${mntpnt}/hello_world" && return 32
 
-  # Put in incorrect key into proxy file. 
+  # Put in incorrect key into proxy file.
   echo "make invalid vomsproxy for 'nobody'"
   nobody_vomsproxy="$(pwd)/certs/vomsproxy2.pem.nobody"
   openssl x509 -in "$(pwd)/certs/vomsproxy2.pem" > $nobody_vomsproxy
