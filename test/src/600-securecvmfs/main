@@ -29,9 +29,25 @@ TEST600_GRID_SECURITY_TAINTED=
 TEST600_PRIVATE_MOUNT=
 TEST600_HOSTNAME=
 TEST600_SELINUX_DISABLED=
+TEST600_RESOLV_CONF_DISABLED=
+
+disable_resolv_conf() {
+  if [ -f /etc/resolv.conf ]; then
+    TEST600_RESOLV_CONF_DISABLED="/etc/resolv.conf.disabled.cvmfstest600"
+    sudo mv /etc/resolv.conf ${TEST600_RESOLV_CONF_DISABLED}
+  fi
+}
+
+enable_resolv_conf() {
+  if [ -f "$TEST600_RESOLV_CONF_DISABLED" ]; then
+    sudo mv ${TEST600_RESOLV_CONF_DISABLED} /etc/resolv.conf
+    TEST600_RESOLV_CONF_DISABLED=
+  fi
+}
 
 cleanup() {
   echo "running cleanup()..."
+  enable_resolv_conf
   sudo umount ${TEST600_GRID_MOUNTPOINT}
   [ "x$TEST600_GRID_SECURITY_TAINTED" = "xyes" ] && sudo umount /etc/grid-security
   [ -z "$TEST600_HTTPS_CONFIG"                 ] || sudo rm -f $TEST600_HTTPS_CONFIG
@@ -246,9 +262,12 @@ cvmfs_run_test() {
 
   local mntpnt="${scratch_dir}/secure_mnt"
   TEST600_PRIVATE_MOUNT="$mntpnt"
+  # VMware Fusion's DNS server times out on ${TEST600_HOSTNAME}
+  disable_resolv_conf
   do_local_mount_as_root "$mntpnt"          \
                          "$CVMFS_TEST_REPO" \
                          "https://${TEST600_HOSTNAME}:8443/cvmfs/$CVMFS_TEST_REPO" || return 19
+  enable_resolv_conf
 
   echo "copy vomsproxy for 'nobody'"
   local nobody_vomsproxy="$(pwd)/certs/vomsproxy.pem.nobody"
