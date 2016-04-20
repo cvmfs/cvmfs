@@ -231,7 +231,8 @@ bool AuthzSessionManager::LookupSessionKey(pid_t pid, SessionKey *session_key) {
   UnlockMutex(&lock_pid2session_);
   if (found) {
     LogCvmfs(kLogAuthz, kLogDebug,
-             "Session key in cache; sid=%d, bday=%" PRIu64,
+             "Session key %d/%" PRIu64 " in cache; sid=%d, bday=%" PRIu64,
+             pid_key.pid, pid_key.pid_bday,
              session_key->sid, session_key->sid_bday);
     return true;
   }
@@ -252,7 +253,8 @@ bool AuthzSessionManager::LookupSessionKey(pid_t pid, SessionKey *session_key) {
   pid2session_.Insert(pid_key, *session_key);
   UnlockMutex(&lock_pid2session_);
 
-  LogCvmfs(kLogAuthz, kLogDebug, "Lookup key; sid=%d, bday=%llu",
+  LogCvmfs(kLogAuthz, kLogDebug, "Lookup key %d/%" PRIu64 "; sid=%d, bday=%llu",
+           pid_key.pid, pid_key.pid_bday,
            session_key->sid, session_key->sid_bday);
   return true;
 }

@@ -70,6 +70,7 @@
 
 #include "atomic.h"
 #include "auto_umount.h"
+#include "authz/authz_curl.h"
 #include "authz/authz_fetch.h"
 #include "authz/authz_session.h"
 #include "backoff.h"
@@ -197,6 +198,7 @@ download::DownloadManager *download_manager_ = NULL;
 download::DownloadManager *external_download_manager_ = NULL;
 AuthzExternalFetcher *authz_fetcher_ = NULL;
 AuthzSessionManager *authz_session_manager_ = NULL;
+AuthzAttachment *authz_attachment_ = NULL;
 cache::CacheManager *cache_manager_ = NULL;
 Fetcher *fetcher_ = NULL;
 Fetcher *external_fetcher_ = NULL;
@@ -415,6 +417,7 @@ static void RemountFinish() {
     }
     volatile_repository_ = catalog_manager_->GetVolatileFlag();
     has_voms_authz_ = catalog_manager_->GetVOMSAuthz(voms_authz_);
+    authz_attachment_->set_membership(*voms_authz_);
     fence_remount_->Open();
 
     inode_cache_->Resume();
@@ -2559,11 +2562,13 @@ static int Init(const loader::LoaderExports *loader_exports) {
     cvmfs::authz_fetcher_,
     cvmfs::statistics_);
   assert(cvmfs::authz_session_manager_ != NULL);
+  cvmfs::authz_attachment_ = new AuthzAttachment(cvmfs::authz_session_manager_);
 
   // Network initialization
   cvmfs::download_manager_ = new download::DownloadManager();
   cvmfs::download_manager_->Init(cvmfs::kDefaultNumConnections, false,
       cvmfs::statistics_);
+  cvmfs::download_manager_->SetCredentialsAttachment(cvmfs::authz_attachment_);
   cvmfs::download_manager_->SetHostChain(hostname);
   if ((dns_timeout_ms != download::DownloadManager::kDnsDefaultTimeoutMs) ||
       (dns_retries != download::DownloadManager::kDnsDefaultRetries))
@@ -2616,7 +2621,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::external_download_manager_ = new download::DownloadManager();
   cvmfs::external_download_manager_->Init(cvmfs::kDefaultNumConnections, false,
       cvmfs::statistics_, "download-external");
-
+  cvmfs::external_download_manager_->SetCredentialsAttachment(
+    cvmfs::authz_attachment_);
   cvmfs::external_download_manager_->SetHostChain(!external_host.empty() ?
                                                   external_host : hostname);
   if ((dns_timeout_ms != download::DownloadManager::kDnsDefaultTimeoutMs) ||
@@ -2852,6 +2858,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
     LogCvmfs(kLogCvmfs, kLogSyslogWarn | kLogDebug,
              "authz requirement present but CVMFS_AUTHZ_HELPER missing");
   }
+  cvmfs::authz_attachment_->set_membership(*cvmfs::voms_authz_);
 
   // Make sure client context TLS has been initialized
   // (first initialization is not thread safe).
@@ -2999,6 +3006,7 @@ static void Fini() {
   delete cvmfs::signature_manager_;
   delete cvmfs::download_manager_;
   delete cvmfs::external_download_manager_;
+  delete cvmfs::authz_attachment_;
   delete cvmfs::authz_session_manager_;
   delete cvmfs::authz_fetcher_;
   delete cvmfs::inode_annotation_;
@@ -3019,6 +3027,7 @@ static void Fini() {
   cvmfs::signature_manager_ = NULL;
   cvmfs::download_manager_ = NULL;
   cvmfs::external_download_manager_ = NULL;
+  cvmfs::authz_attachment_ = NULL;
   cvmfs::authz_session_manager_ = NULL;
   cvmfs::authz_fetcher_ = NULL;
   cvmfs::inode_annotation_ = NULL;

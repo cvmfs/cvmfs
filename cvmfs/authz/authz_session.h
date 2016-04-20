@@ -71,9 +71,6 @@ class AuthzSessionManager : SingleCopy {
 
     bool operator ==(const PidKey &other) const {
       return (pid == other.pid) &&
-             (uid == other.uid) &&
-             (gid == other.gid) &&
-             (sid == other.sid) &&
              (pid_bday == other.pid_bday);
     }
 
@@ -94,8 +91,6 @@ class AuthzSessionManager : SingleCopy {
 
     bool operator ==(const SessionKey &other) const {
       return (sid == other.sid) &&
-             (uid == other.uid) &&
-             (gid == other.gid) &&
              (sid_bday == other.sid_bday);
     }
 
@@ -105,11 +100,23 @@ class AuthzSessionManager : SingleCopy {
   };
 
   static uint32_t HashPidKey(const PidKey &key) {
-    return MurmurHash2(&key, sizeof(key), 0x07387a4f);
+    struct {
+      uint64_t bday;
+      pid_t pid;
+    }  __attribute__((packed)) key_info;
+    key_info.pid = key.pid;
+    key_info.bday = key.pid_bday;
+    return MurmurHash2(&key_info, sizeof(key_info), 0x07387a4f);
   }
 
   static uint32_t HashSessionKey(const SessionKey &key) {
-    return MurmurHash2(&key, sizeof(key), 0x07387a4f);
+    struct {
+      uint64_t bday;
+      pid_t pid;
+    } __attribute__((packed)) key_info;
+    key_info.pid = key.sid;
+    key_info.bday = key.sid_bday;
+    return MurmurHash2(&key_info, sizeof(key_info), 0x07387a4f);
   }
 
   AuthzSessionManager();

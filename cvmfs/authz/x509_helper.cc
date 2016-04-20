@@ -104,6 +104,7 @@ static void ParseHandshakeInit(const string &msg) {
     if (name == "debug_log") {
       SetLogAuthzDebug(string(json->string_value) + ".authz");
     } else if (name == "fqrn") {
+      LogAuthz(kLogAuthzDebug, "fqrn is %s", json->string_value);
       SetLogAuthzSyslogPrefix(string(json->string_value));
     } else if (name == "syslog_level") {
       SetLogAuthzSyslogLevel(json->int_value);
@@ -192,8 +193,9 @@ int main() {
     }
 
     // This will close fp_proxy along the way.
-    StatusX509Validation validation_status = 
+    StatusX509Validation validation_status =
       CheckX509Proxy(request.membership, fp_proxy);
+    LogAuthz(kLogAuthzDebug, "validation status is %d", validation_status);
     switch (validation_status) {
       case kCheckX509Invalid:
         WriteMsg("{\"cvmfs_authz_v1\":{\"msgid\":3,\"revision\":0,"

@@ -289,11 +289,10 @@ class HeaderLists {
  */
 class CredentialsAttachment {
  public:
-  virtual ~CredentialsAttachment() = 0;
   virtual bool ConfigureCurlHandle(CURL *curl_handle,
                                    pid_t pid,
                                    void **info_data) = 0;
-  virtual bool ReleaseCurlHandle(CURL *curl_handle, void *info_data) = 0;
+  virtual void ReleaseCurlHandle(CURL *curl_handle, void *info_data) = 0;
 };
 
 

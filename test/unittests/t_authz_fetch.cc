@@ -75,7 +75,7 @@ class T_AuthzFetch : public ::testing::Test {
     RecvAndFind(helper_fds.fd_stdin, "\"uid\":1");
     string auth_msg = string("{\"cvmfs_authz_v1\":") +
        "{\"msgid\": 3, \"revision\": 0, \"status\": 0, \"ttl\": 60," +
-        "\"x509_proxy\": \"" + string(8192, 'X') + "\"}}";
+        "\"x509_proxy\": \"" + Base64(string(8192, 'X')) + "\"}}";
     uint32_t version = AuthzExternalFetcher::kProtocolVersion;
     uint32_t length = auth_msg.length();
     SafeWrite(helper_fds.fd_stdout, &version, sizeof(version));
@@ -178,7 +178,7 @@ TEST_F(T_AuthzFetch, ParseMsg) {
   EXPECT_EQ(kTokenUnknown, binary_msg.permit.token.type);
   EXPECT_TRUE(fetcher_->ParseMsg(string("{\"cvmfs_authz_v1\":") +
     "{\"msgid\": 3, \"revision\": 0, \"status\": 0, \"ttl\": 240, " +
-      "\"x509_proxy\": \"XYZ\"}}",
+      "\"x509_proxy\": \"" + Base64("XYZ") + "\"}}",
     kAuthzMsgPermit, &binary_msg));
   EXPECT_EQ(kAuthzOk, binary_msg.permit.status);
   EXPECT_EQ(240U, binary_msg.permit.ttl);
