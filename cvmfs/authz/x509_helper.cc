@@ -16,6 +16,7 @@
 #include <string>
 
 #include "authz/x509_helper_base64.h"
+#include "authz/x509_helper_check.h"
 #include "authz/x509_helper_fetch.h"
 #include "authz/x509_helper_globus.h"
 #include "authz/x509_helper_log.h"
@@ -176,15 +177,22 @@ int main() {
     LogAuthz(kLogAuthzDebug, "got authz request %s", msg.c_str());
     AuthzRequest request = ParseRequest(msg);
     string proxy;
-    FILE *fp_proxy = GetX509Proxy(request, &proxy);
-    if (fp_proxy == NULL) {
-      // kAuthzNotFound
+    bool found_proxy = GetX509Proxy(request, &proxy);
+    if (!found_proxy) {
+      // kAuthzNotFound, 5 seconds TTL
       WriteMsg("{\"cvmfs_authz_v1\":{\"msgid\":3,\"revision\":0,"
                "\"status\":1,\"ttl\":5}}");
       continue;
     }
 
-    fclose(fp_proxy);
+    bool verify_proxy = CheckX509Proxy(proxy, request.membership);
+    if (!verify_proxy) {
+      // kAuthzInvalid or kAuthzNotMember, 5 seconds TTL
+      WriteMsg("{\"cvmfs_authz_v1\":{\"msgid\":3,\"revision\":0,"
+               "\"status\":2,\"ttl\":5}}");
+      continue;
+    }
+
     string reply = "{\"cvmfs_authz_v1\":{\"msgid\":3,\"revision\":0,"
                    "\"status\":0,\"x509_proxy\":\"" + Base64(proxy) + "\"}}";
     LogAuthz(kLogAuthzDebug, "reply %s", reply.c_str());

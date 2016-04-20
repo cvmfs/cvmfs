@@ -109,7 +109,7 @@ static FILE *GetProxyFileInternal(pid_t pid, uid_t uid, gid_t gid)
 }
 
 
-FILE *GetX509Proxy(
+bool GetX509Proxy(
 const AuthzRequest &authz_req, string *proxy) {
   assert(proxy != NULL);
 
@@ -118,7 +118,7 @@ const AuthzRequest &authz_req, string *proxy) {
   if (fproxy == NULL) {
     LogAuthz(kLogAuthzDebug, "no proxy found for %s",
              authz_req.Ident().c_str());
-    return NULL;
+    return false;
   }
 
   proxy->clear();
@@ -130,6 +130,7 @@ const AuthzRequest &authz_req, string *proxy) {
     if (nbytes > 0)
       proxy->append(string(buf, nbytes));
   } while (nbytes == kBufSize);
-
-  return fproxy;
+  
+  fclose(fproxy);
+  return true;
 }
