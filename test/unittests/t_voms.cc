@@ -2,6 +2,9 @@
  * This file is part of the CernVM File System.
  */
 
+// TODO(jblomer): this unit test does not compile at the moment.  Re-enable
+// based on updated authz code.
+
 #include <gtest/gtest.h>
 
 // Single Authz test is static

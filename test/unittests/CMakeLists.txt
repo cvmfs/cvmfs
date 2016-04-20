@@ -85,10 +85,6 @@ set(CVMFS_UNITTEST_FILES
   t_xattr.cc
 )
 
-if (VOMS_FOUND)
-  set (CVMFS_UNITTEST_FILES ${CVMFS_UNITTEST_FILES} t_voms.cc)
-endif (VOMS_FOUND)
-
 #
 # unit test source files
 #
@@ -248,7 +244,7 @@ if (BUILD_UNITTESTS)
   if (TBB_PRIVATE_LIB)
     add_dependencies (${PROJECT_TEST_NAME} libtbb)
   endif (TBB_PRIVATE_LIB)
-  
+
   add_dependencies (${PROJECT_TEST_NAME} libsha3)
   add_dependencies (${PROJECT_TEST_NAME} libvjson)
 endif (BUILD_UNITTESTS)

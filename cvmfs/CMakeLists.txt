@@ -112,10 +112,6 @@ set (CVMFS2_DEBUG_SOURCES
   talk.cc talk.h
   tracer.cc tracer.h
 )
-if (VOMS_FOUND)
-  set (CVMFS2_DEBUG_SOURCES ${CVMFS2_DEBUG_SOURCES}
-  authz/cred_fetcher.cc)
-endif (VOMS_FOUND)
 
 set (CVMFS2_SOURCES
   ${CVMFS2_DEBUG_SOURCES}
@@ -166,7 +162,7 @@ if (BUILD_X509_HELPER)
 
   add_executable (cvmfs_x509_helper ${CVMFS_X509_HELPER_SOURCES})
   add_dependencies (cvmfs_x509_helper libvjson)
-  target_link_libraries (cvmfs_x509_helper 
+  target_link_libraries (cvmfs_x509_helper
                          ${VJSON_ARCHIVE} ${OPENSSL_LIBRARIES} dl)
 
   install (
