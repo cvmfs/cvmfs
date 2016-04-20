@@ -181,13 +181,6 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/xattr.cc ${CVMFS_SOURCE_DIR}/xattr.h
 )
 
-if (VOMS_FOUND)
-  set (CVMFS_UNITTEST_SOURCES ${CVMFS_UNITTEST_SOURCES}
-       ${CVMFS_SOURCE_DIR}/authz/voms_authz.h
-       ${CVMFS_SOURCE_DIR}/authz/voms_cred.cc
-       ${CVMFS_SOURCE_DIR}/authz/voms_curl.cc)
-endif (VOMS_FOUND)
-
 set (CVMFS_UNITTEST_DEBUG_SOURCES ${CVMFS_UNITTEST_SOURCES})
 
 #
