@@ -2327,6 +2327,10 @@ CVMFS_HIDE_MAGIC_XATTRS=yes
 CVMFS_FOLLOW_REDIRECTS=yes
 CVMFS_SERVER_CACHE_MODE=yes
 EOF
+
+  if [ x"$voms_authz" != x"" ]; then
+    echo "CVMFS_AUTHZ_HELPER=/usr/bin/cvmfs_x509_helper" >> $client_conf
+  fi
 }
 
 
