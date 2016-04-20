@@ -56,9 +56,9 @@ class LocalUploader : public AbstractUploader {
                   const CallbackTN   *callback = NULL);
 
   UploadStreamHandle* InitStreamedUpload(const CallbackTN *callback = NULL);
-  void Upload(UploadStreamHandle  *handle,
-              CharBuffer          *buffer,
-              const CallbackTN    *callback = NULL);
+  void StreamedUpload(UploadStreamHandle  *handle,
+                      CharBuffer          *buffer,
+                      const CallbackTN    *callback = NULL);
   void FinalizeStreamedUpload(UploadStreamHandle  *handle,
                               const shash::Any    &content_hash);
 
@@ -75,12 +75,8 @@ class LocalUploader : public AbstractUploader {
   unsigned int GetNumberOfErrors() const;
 
  protected:
-  void WorkerThread();
-
   int Move(const std::string &local_path,
            const std::string &remote_path) const;
-
-  int CreateAndOpenTemporaryChunkFile(std::string *path) const;
 
  private:
   // state information

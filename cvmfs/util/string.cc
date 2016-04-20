@@ -15,6 +15,7 @@
 #include <stdint.h>
 #include <unistd.h>
 
+#include <cassert>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -447,6 +448,19 @@ string ReplaceAll(const string &haystack, const string &needle,
 
   while ((pos = result.find(needle, pos)) != string::npos)
     result.replace(pos, needle_size, replace_by);
+  return result;
+}
+
+
+std::string PaddingLeft(const std::string &input, const unsigned length,
+                        char padding_character) {
+  assert(input.size() <= length);
+  if (length == input.size()) {
+    return input;
+  }
+
+  std::string result(length, padding_character);
+  result.replace(length - input.size(), input.size(), input);
   return result;
 }
 

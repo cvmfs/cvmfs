@@ -16,6 +16,7 @@
 #include "hash.h"
 #include "testutil.h"
 #include "upload_facility.h"
+#include "upload_leveldb.h"
 #include "upload_local.h"
 #include "upload_s3.h"
 #include "upload_spooler_definition.h"
@@ -78,6 +79,7 @@ class T_Uploaders : public FileSandbox {
   static const std::string tmp_dir;
   std::string repo_alias;
   std::string s3_conf_path;
+  std::string leveldb_conf_path;
   template<typename> struct type {};
 
  public:
@@ -109,14 +111,18 @@ class T_Uploaders : public FileSandbox {
 
     SetUp(type<UploadersT>());
 
-    InitializeStorageBackend();
     uploader_ = AbstractUploader::Construct(GetSpoolerDefinition());
     ASSERT_NE(static_cast<AbstractUploader*>(NULL), uploader_);
   }
 
 
   virtual void SetUp(const type<upload::LocalUploader> type_specifier) {
-    // Empty, no specific needs
+    InitializeStorageBackend();
+  }
+
+
+  virtual void SetUp(const type<upload::LevelDbUploader> type_specifier) {
+    CreateTempLevelDbConfigFile(5);
   }
 
 
@@ -124,6 +130,7 @@ class T_Uploaders : public FileSandbox {
     repo_alias = "testdata";
     CreateTempS3ConfigFile(10, 10);
     CreateS3Mockup();
+    InitializeStorageBackend();
   }
 
 
@@ -140,6 +147,11 @@ class T_Uploaders : public FileSandbox {
 
 
   virtual void TearDown(const type<upload::LocalUploader> type_specifier) {
+    // Empty, no specific needs
+  }
+
+
+  virtual void TearDown(const type<upload::LevelDbUploader> type_specifier) {
     // Empty, no specific needs
   }
 
@@ -192,6 +204,16 @@ class T_Uploaders : public FileSandbox {
     const std::string spl_type   = "local";
     const std::string spl_tmp    = T_Uploaders::tmp_dir;
     const std::string spl_cfg    = T_Uploaders::dest_dir;
+    const std::string definition = spl_type + "," + spl_tmp + "," + spl_cfg;
+    return definition;
+  }
+
+
+  std::string GetSpoolerDefinition(
+      const type<upload::LevelDbUploader> type_specifier) const {
+    const std::string spl_type   = "leveldb";
+    const std::string spl_tmp    = T_Uploaders::tmp_dir;
+    const std::string spl_cfg    = T_Uploaders::leveldb_conf_path;
     const std::string definition = spl_type + "," + spl_tmp + "," + spl_cfg;
     return definition;
   }
@@ -260,6 +282,24 @@ class T_Uploaders : public FileSandbox {
     return streams;
   }
 
+  void GetFileFromLevelDb(const std::string &remote_path,
+                                std::string *buffer,
+                                bool        *found = NULL) const {
+    upload::LevelDbUploader *upl =
+      dynamic_cast<LevelDbUploader*>(this->uploader_);
+    upload::LevelDbHandle& handle =
+      LevelDbUploaderTestWrapper::GetLevelDbHandleForPath(upl, remote_path);
+
+    const leveldb::ReadOptions options;
+    const leveldb::Status status = handle->Get(options, remote_path, buffer);
+
+    ASSERT_TRUE(status.ok() || status.IsNotFound()) << status.ToString();
+
+    if (NULL != found) {
+      *found = status.ok();
+    }
+  }
+
 
   void FreeBufferStreams(BufferStreams *streams) const {
     typename BufferStreams::iterator       i    = streams->begin();
@@ -272,36 +312,72 @@ class T_Uploaders : public FileSandbox {
 
 
   bool CheckFile(const std::string &remote_path) const {
+    return CheckFile(remote_path, type<UploadersT>());
+  }
+
+  template <typename T>  // LocalUploader, S3Uploader
+  bool CheckFile(const std::string  &remote_path,
+                 const type<T>       type_specifier) const {
     const std::string absolute_path = AbsoluteDestinationPath(remote_path);
     return FileExists(absolute_path);
   }
 
+  bool CheckFile(const std::string &remote_path,
+                 const type<upload::LevelDbUploader> type_specifier) const {
+    std::string buffer;
+    bool        found = false;
+    GetFileFromLevelDb(remote_path, &buffer, &found);
+    return found;
+  }
 
-  void CompareFileContents(const std::string &testee_path,
-                           const std::string &reference_path) const {
-    const size_t testee_size    = GetFileSize(testee_path);
+  size_t GetBackendFileSize(const std::string &remote_path) const {
+    return GetBackendFileSize(remote_path, type<UploadersT>());
+  }
+
+  template <typename T>  // LocalUploader, S3Uploader
+  size_t GetBackendFileSize(const std::string  &remote_path,
+                            type<T>             type_specifier) const {
+    const std::string absolute_path = AbsoluteDestinationPath(remote_path);
+    return GetFileSize(absolute_path);
+  }
+
+  size_t GetBackendFileSize(const std::string     &remote_path,
+                            type<LevelDbUploader>  type_specifier) const {
+    std::string buffer;
+    GetFileFromLevelDb(remote_path, &buffer);
+    return buffer.size();
+  }
+
+
+  void CompareFileContents(const std::string &reference_path,
+                           const std::string &testee_path) const {
+    const size_t testee_size    = GetBackendFileSize(testee_path);
     const size_t reference_size = GetFileSize(reference_path);
     EXPECT_EQ(reference_size, testee_size);
 
-    shash::Any testee_hash    = HashFile(testee_path);
-    shash::Any reference_hash = HashFile(reference_path);
+    shash::Any testee_hash = HashBackendFile(testee_path);
+
+    shash::Any reference_hash(shash::kMd5);
+    const bool successful = shash::HashFile(reference_path, &reference_hash);
+    ASSERT_TRUE(successful);
+
     EXPECT_EQ(reference_hash, testee_hash);
   }
 
 
   void CompareBuffersAndFileContents(const Buffers     &buffers,
-                                     const std::string &file_path) const {
+                                     const std::string &remote_path) const {
     size_t buffers_size = 0;
     Buffers::const_iterator i    = buffers.begin();
     Buffers::const_iterator iend = buffers.end();
     for (; i != iend; ++i) {
       buffers_size += (*i)->used_bytes();
     }
-    const size_t file_size = GetFileSize(file_path);
+    const size_t file_size = GetBackendFileSize(remote_path);
     EXPECT_EQ(file_size, buffers_size);
 
     shash::Any buffers_hash = HashBuffers(buffers);
-    shash::Any file_hash    = HashFile(file_path);
+    shash::Any file_hash    = HashBackendFile(remote_path);
     EXPECT_EQ(file_hash, buffers_hash);
   }
 
@@ -316,6 +392,7 @@ class T_Uploaders : public FileSandbox {
 
 
   bool IsS3() const;
+  bool IsLevelDB() const;
 
  private:
   void CreateS3Mockup() {
@@ -536,6 +613,21 @@ class T_Uploaders : public FileSandbox {
   }
 
 
+  void CreateTempLevelDbConfigFile(int database_count) {
+    ASSERT_GE(database_count, 1);
+    ASSERT_LE(database_count, 255);
+    FILE *leveldb_conf = CreateTempFile(T_Uploaders::tmp_dir + "/leveldb.conf",
+                                        0660, "w", &leveldb_conf_path);
+    ASSERT_TRUE(leveldb_conf != NULL);
+    std::string conf_str =
+        "CVMFS_LEVELDB_STORAGE=" + T_Uploaders::dest_dir + "\n" +
+        "CVMFS_LEVELDB_COUNT=" + StringifyInt(database_count);
+
+    fprintf(leveldb_conf, "%s\n", conf_str.c_str());
+    fclose(leveldb_conf);
+  }
+
+
   std::string ByteToHex(const unsigned char byte) {
     const unsigned int kLen = 3;
     char hex[kLen];
@@ -544,17 +636,29 @@ class T_Uploaders : public FileSandbox {
   }
 
 
-  shash::Any HashFile(const std::string &path) const {
+  shash::Any HashBackendFile(const std::string &remote_path) const {
     shash::Any result(shash::kMd5);
     // googletest requires method that use EXPECT_* or ASSERT_* to return void
-    HashFileInternal(path, &result);
+    HashBackendFileInternal(remote_path, &result, type<UploadersT>());
     return result;
   }
 
-
-  void HashFileInternal(const std::string &path, shash::Any *hash) const {
-    const bool successful = shash::HashFile(path, hash);
+  template <typename T>  // LocalUploader, S3Uploader
+  void HashBackendFileInternal(const std::string &remote_path, shash::Any *hash,
+                               type<T> type_specifier) const {
+    const std::string absolute_path = AbsoluteDestinationPath(remote_path);
+    const bool successful = shash::HashFile(absolute_path, hash);
     ASSERT_TRUE(successful);
+  }
+
+  void HashBackendFileInternal(const std::string &remote_path, shash::Any *hash,
+                               type<LevelDbUploader> type_specifier) const {
+    std::string buffer;
+    bool        found = false;
+    GetFileFromLevelDb(remote_path, &buffer, &found);
+    ASSERT_TRUE(found);
+
+    shash::HashString(buffer, hash);
   }
 
 
@@ -591,6 +695,16 @@ bool T_Uploaders<S3Uploader>::IsS3() const {
   return true;
 }
 
+template <typename T>
+bool T_Uploaders<T>::IsLevelDB() const {
+  return false;
+}
+
+template <>
+bool T_Uploaders<LevelDbUploader>::IsLevelDB() const {
+  return true;
+}
+
 template <class UploadersT>
 atomic_int64 T_Uploaders<UploadersT>::gSeed = 0;
 
@@ -605,7 +719,7 @@ template <class UploadersT>
 const std::string T_Uploaders<UploadersT>::dest_dir =
     string(T_Uploaders::sandbox_path) + "/dest";
 
-typedef testing::Types<S3Uploader, LocalUploader> UploadTypes;
+typedef testing::Types<S3Uploader, LocalUploader, LevelDbUploader> UploadTypes;
 TYPED_TEST_CASE(T_Uploaders, UploadTypes);
 
 
@@ -634,9 +748,7 @@ TYPED_TEST(T_Uploaders, SimpleFileUpload) {
   this->uploader_->WaitForUpload();
   EXPECT_TRUE(TestFixture::CheckFile(dest_name));
   EXPECT_EQ(1u, this->delegate_.simple_upload_invocations);
-  TestFixture::CompareFileContents(big_file_path,
-                                   TestFixture::AbsoluteDestinationPath(
-                                       dest_name));
+  TestFixture::CompareFileContents(big_file_path, dest_name);
 }
 
 
@@ -656,9 +768,7 @@ TYPED_TEST(T_Uploaders, PeekIntoStorage) {
 
   EXPECT_TRUE(TestFixture::CheckFile(dest_name));
   EXPECT_EQ(1u, this->delegate_.simple_upload_invocations);
-  TestFixture::CompareFileContents(small_file_path,
-                                   TestFixture::AbsoluteDestinationPath(
-                                       dest_name));
+  TestFixture::CompareFileContents(small_file_path, dest_name);
 
   const bool file_exists = this->uploader_->Peek(dest_name);
   EXPECT_TRUE(file_exists);
@@ -684,9 +794,7 @@ TYPED_TEST(T_Uploaders, RemoveFromStorage) {
 
   EXPECT_TRUE(TestFixture::CheckFile(dest_name));
   EXPECT_EQ(1u, this->delegate_.simple_upload_invocations);
-  TestFixture::CompareFileContents(small_file_path,
-                                   TestFixture::AbsoluteDestinationPath(
-                                       dest_name));
+  TestFixture::CompareFileContents(small_file_path, dest_name);
 
   const bool file_exists = this->uploader_->Peek(dest_name);
   EXPECT_TRUE(file_exists);
@@ -718,10 +826,8 @@ TYPED_TEST(T_Uploaders, UploadEmptyFile) {
 
   EXPECT_TRUE(TestFixture::CheckFile(dest_name));
   EXPECT_EQ(1u, this->delegate_.simple_upload_invocations);
-  TestFixture::CompareFileContents(empty_file_path,
-                                   TestFixture::AbsoluteDestinationPath(
-                                       dest_name));
-  EXPECT_EQ(0, GetFileSize(TestFixture::AbsoluteDestinationPath(dest_name)));
+  TestFixture::CompareFileContents(empty_file_path, dest_name);
+  EXPECT_EQ(0u, TestFixture::GetBackendFileSize(dest_name));
 }
 
 
@@ -741,9 +847,7 @@ TYPED_TEST(T_Uploaders, UploadHugeFileSlow) {
 
   EXPECT_TRUE(TestFixture::CheckFile(dest_name));
   EXPECT_EQ(1u, this->delegate_.simple_upload_invocations);
-  TestFixture::CompareFileContents(huge_file_path,
-                                   TestFixture::AbsoluteDestinationPath(
-                                       dest_name));
+  TestFixture::CompareFileContents(huge_file_path, dest_name);
 }
 
 
@@ -791,9 +895,7 @@ TYPED_TEST(T_Uploaders, UploadManyFilesSlow) {
   EXPECT_EQ(number_of_files, this->delegate_.simple_upload_invocations);
   for (i = files.begin(); i != iend; ++i) {
     EXPECT_TRUE(TestFixture::CheckFile(i->second));
-    TestFixture::CompareFileContents(i->first,
-                                     TestFixture::AbsoluteDestinationPath(
-                                         i->second));
+    TestFixture::CompareFileContents(i->first, i->second);
   }
 }
 
@@ -846,9 +948,7 @@ TYPED_TEST(T_Uploaders, SingleStreamedUpload) {
 
   const std::string dest = "data/" + content_hash.MakePath();
   EXPECT_TRUE(TestFixture::CheckFile(dest));
-  TestFixture::CompareBuffersAndFileContents(
-      buffers,
-      TestFixture::AbsoluteDestinationPath(dest));
+  TestFixture::CompareBuffersAndFileContents(buffers, dest);
 
   TestFixture::FreeBuffers(&buffers);
 }
@@ -921,9 +1021,7 @@ TYPED_TEST(T_Uploaders, MultipleStreamedUploadSlow) {
     const shash::Any &content_hash = k->second.content_hash;
     const std::string dest = "data/" + content_hash.MakePath();
     EXPECT_TRUE(TestFixture::CheckFile(dest));
-    TestFixture::CompareBuffersAndFileContents(
-        k->first,
-        TestFixture::AbsoluteDestinationPath(dest));
+    TestFixture::CompareBuffersAndFileContents(k->first, dest);
   }
 
   TestFixture::FreeBufferStreams(&streams);
@@ -934,9 +1032,9 @@ TYPED_TEST(T_Uploaders, MultipleStreamedUploadSlow) {
 
 
 TYPED_TEST(T_Uploaders, PlaceBootstrappingShortcut) {
-  if (TestFixture::IsS3()) {
+  if (TestFixture::IsS3() || TestFixture::IsLevelDB()) {
     SUCCEED();  // TODO(rmeusel): enable this as soon as the feature is
-    return;     //                implemented for the S3Uploader
+    return;     //                implemented for the LevelDB and S3Uploaders
   }
 
   const std::string big_file_path = TestFixture::GetBigFile();
@@ -957,14 +1055,10 @@ TYPED_TEST(T_Uploaders, PlaceBootstrappingShortcut) {
   EXPECT_TRUE(TestFixture::CheckFile(dest_name));
 
   EXPECT_EQ(1u, this->delegate_.simple_upload_invocations);
-  TestFixture::CompareFileContents(big_file_path,
-                                   TestFixture::AbsoluteDestinationPath(
-                                       dest_name));
+  TestFixture::CompareFileContents(big_file_path, dest_name);
 
   ASSERT_TRUE(this->uploader_->PlaceBootstrappingShortcut(digest));
-  TestFixture::CompareFileContents(big_file_path,
-                                   TestFixture::AbsoluteDestinationPath(
-                                       digest.MakeAlternativePath()));
+  TestFixture::CompareFileContents(big_file_path, digest.MakeAlternativePath());
 }
 
 }  // namespace upload

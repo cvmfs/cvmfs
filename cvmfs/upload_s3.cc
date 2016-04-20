@@ -173,28 +173,8 @@ void S3Uploader::WorkerThread() {
   while (running) {
     UploadJob job;
 
-    // Try to get new job
-    bool newjob = TryToAcquireNewJob(&job);
-    if (newjob) {
-      switch (job.type) {
-        case UploadJob::Upload:
-          Upload(job.stream_handle,
-                 job.buffer,
-                 job.callback);
-          break;
-        case UploadJob::Commit:
-          // Note, this block until upload is possible
-          FinalizeStreamedUpload(job.stream_handle, job.content_hash);
-          break;
-        case UploadJob::Terminate:
-          running = false;
-          break;
-        default:
-          const bool unknown_job_type = false;
-          assert(unknown_job_type);
-          break;
-      }
-    }
+    // Try to perform a new job
+    running = TryToPerformJob() != JobStatus::kTerminate;
 
     // Get and report completed jobs
     std::vector<s3fanout::JobInfo *> jobs;
@@ -405,39 +385,6 @@ bool S3Uploader::UploadJobInfo(s3fanout::JobInfo *info) {
 }
 
 
-/**
- * Creates and opens a temporary file.
- *
- * @param path The created file path will be saved here
- * return file id, -1 if failure
- */
-int S3Uploader::CreateAndOpenTemporaryChunkFile(std::string *path) const {
-  const std::string tmp_path = CreateTempPath(temporary_path_ + "/chunk",
-                                              kDefaultFileMode);
-  if (tmp_path.empty()) {
-    LogCvmfs(kLogUploadS3, kLogStderr,
-             "Failed to create temp file for "
-             "upload of file chunk.");
-    atomic_inc32(&copy_errors_);
-    return -1;
-  }
-
-  const int tmp_fd = open(tmp_path.c_str(), O_WRONLY);
-  if (tmp_fd < 0) {
-    LogCvmfs(kLogUploadS3, kLogStderr,
-             "Failed to open temp file '%s' for "
-             "upload of file chunk (errno: %d)",
-             tmp_path.c_str(), errno);
-    unlink(tmp_path.c_str());
-    atomic_inc32(&copy_errors_);
-    return tmp_fd;
-  }
-
-  *path = tmp_path;
-  return tmp_fd;
-}
-
-
 UploadStreamHandle *S3Uploader::InitStreamedUpload(const CallbackTN *callback) {
   std::string tmp_path;
   const int tmp_fd = CreateAndOpenTemporaryChunkFile(&tmp_path);
@@ -449,6 +396,7 @@ UploadStreamHandle *S3Uploader::InitStreamedUpload(const CallbackTN *callback) {
     LogCvmfs(kLogUploadS3, kLogStderr,
              "Failed to open file (%d), %s",
              errno, strerror(errno));
+    atomic_inc32(&copy_errors_);
 
     return NULL;
   }
@@ -457,9 +405,9 @@ UploadStreamHandle *S3Uploader::InitStreamedUpload(const CallbackTN *callback) {
 }
 
 
-void S3Uploader::Upload(UploadStreamHandle  *handle,
-                        CharBuffer          *buffer,
-                        const CallbackTN    *callback) {
+void S3Uploader::StreamedUpload(UploadStreamHandle  *handle,
+                                CharBuffer          *buffer,
+                                const CallbackTN    *callback) {
   assert(buffer->IsInitialized());
   S3StreamHandle *local_handle = static_cast<S3StreamHandle*>(handle);
 

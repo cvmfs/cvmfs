@@ -55,6 +55,8 @@ std::string Trim(const std::string &raw);
 std::string ToUpper(const std::string &mixed_case);
 std::string ReplaceAll(const std::string &haystack, const std::string &needle,
                        const std::string &replace_by);
+std::string PaddingLeft(const std::string &input, const unsigned length,
+                        char padding_character);
 
 std::string Base64(const std::string &data);
 bool Debase64(const std::string &data, std::string *decoded);

@@ -5,12 +5,15 @@
 #ifndef CVMFS_UPLOAD_FACILITY_H_
 #define CVMFS_UPLOAD_FACILITY_H_
 
+#include <fcntl.h>
+
 #include <tbb/concurrent_queue.h>
 #include <tbb/tbb_thread.h>
 
 #include <string>
 
 #include "upload_spooler_definition.h"
+#include "util/posix.h"
 #include "util_concurrency.h"
 
 namespace upload {
@@ -102,6 +105,15 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
   };
 
  public:
+  struct JobStatus {
+    enum State {
+      kOk,
+      kTerminate,
+      kNoJobs
+    };
+  };
+
+ public:
   virtual ~AbstractUploader() {
     assert(torn_down_ && "Call AbstractUploader::TearDown() before dtor!");
   }
@@ -158,9 +170,11 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
   /**
    * This method schedules a CharBuffer to be uploaded in the context of the
    * given UploadStreamHandle. The actual upload will happen asynchronously by
-   * a concrete implementation of AbstractUploader. As soon has the scheduled
-   * upload job is complete (either successful or not) the optionally passed
-   * callback is supposed to be invoked using AbstractUploader::Respond().
+   * a concrete implementation of AbstractUploader
+   * (see AbstractUploader::StreamedUpload()).
+   * As soon has the scheduled upload job is complete (either successful or not)
+   * the optionally passed callback is supposed to be invoked using
+   * AbstractUploader::Respond().
    *
    * Note: This method is called in the context of a TBB worker thread it is
    *       supposed to be non-blocking!
@@ -180,8 +194,8 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
 
   /**
    * This method schedules a commit job as soon as all data Blocks of a streamed
-   * upload are (successfully) uploaded. The concrete implementation of Abstract
-   * Uploader is supposed to clean up the streamed upload.
+   * upload are (successfully) uploaded. Derived classes must override
+   * AbstractUploader::FinalizeStreamedUpload() for this to happen.
    *
    * Note: This method is called in the context of a TBB worker thread it is
    *       supposed to be non-blocking!
@@ -261,9 +275,39 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
  protected:
   explicit AbstractUploader(const SpoolerDefinition& spooler_definition);
 
+  /**
+   * Implementation of plain file upload
+   * Public interface: AbstractUploader::Upload()
+   *
+   * @param local_path   file to be uploaded
+   * @param remote_path  destination to be written in the backend
+   * @param callback     callback to be called on completion
+   */
   virtual void FileUpload(const std::string  &local_path,
                           const std::string  &remote_path,
                           const CallbackTN   *callback = NULL) = 0;
+
+  /**
+   * Implementation of a streamed upload step. See public interface for details.
+   * Public interface: AbstractUploader::ScheduleUpload()
+   *
+   * @param handle     decendant of UploadStreamHandle specifying the stream
+   * @param buffer     the CharBuffer to be uploaded to the stream
+   * @param callback   callback to be called on completion
+   */
+  virtual void StreamedUpload(UploadStreamHandle  *handle,
+                              CharBuffer          *buffer,
+                              const CallbackTN    *callback) = 0;
+
+  /**
+   * Implemetation of streamed upload commit
+   * Public interface: AbstractUploader::ScheduleUpload()
+   *
+   * @param handle        decendant of UploadStreamHandle specifying the stream
+   * @param content_hash  the computed content hash of the streamed object
+   */
+  virtual void FinalizeStreamedUpload(UploadStreamHandle  *handle,
+                                      const shash::Any    &content_hash) = 0;
 
   /**
    * This notifies the callback that is associated to a finishing job. Please
@@ -286,47 +330,59 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
 
 
   /**
-   * Acquires a job from the job queue.
+   * Performs a job from the job queue.
    *
    * Note: if there are no jobs in the queue, it will block the calling thread
    *       until new work is available in the job queue.
-   *       Consider to use TryToAcquireNewJob() if you do not want to block!
+   *       Consider to use TryToPerformJob() if you do not want to block!
    *
-   * @return   an UploadJob to be processed by the concrete implementation of
-   *           AbstractUploader
+   * @return  a JobStatus either being ::kOk or ::kTerminate. In the latter case
+   *          custom worker thread implementations should terminate
    */
-  UploadJob AcquireNewJob() {
+  JobStatus::State PerformJob() {
     UploadJob job;
     upload_queue_.pop(job);
-    return job;
+    return DispatchJob(job);
   }
 
 
   /**
-   * Tries to acquires a job from the job queue. If there is no work in the job
-   * queue, it will _not_ wait but immediately return with 'false'.
+   * Tries to perform a job from the job queue. If there is no work in the job
+   * queue, it will _not_ wait but immediately return with '::kNoJobs'.
    *
    * Note: This method will not block on an empty queue (see AcquireNewJob())!
    *
-   * @param job_slot   a reference for an UploadJob slot to be pulled
-   * @return           true if a job was successfully popped
+   * @return  a JobStatus either being ::kOk, ::kNoJobs or ::kTerminate. In the
+   *          last case custom worker thread implementations should terminate
    */
-  bool TryToAcquireNewJob(UploadJob *job_slot) {
-    return upload_queue_.try_pop(*job_slot);
+  JobStatus::State TryToPerformJob() {
+    UploadJob job;
+    const bool got_job = upload_queue_.try_pop(job);
+    return (got_job)
+      ? DispatchJob(job)
+      : JobStatus::kNoJobs;
   }
 
 
   /**
-   * This purely virtual function is called once the AbstractUploader has started
-   * its dedicated writer thread. Overwrite this method to implement your event
-   * loop that is supposed to run in its own thread. In this event loop you are
-   * supposed to pull upload jobs using AbstractUploader::AcquireNewJob().
+   * Creates a temporary file in the backend storage's temporary location
+   * For the LocalUploader this usually is the 'txn' directory of the backend
+   * storage. Otherwise it is some scratch area.
    *
-   * If this method returns, AbstractUploader's write thread is terminated, so
-   * make sure to exit that method if and only if you receive an UploadJob like:
-   *   UploadJob.type == UploadJob::Terminate
+   * @param path   pointer to a string that will contain the created file path
+   * @return       a file descriptor to the opened file
    */
-  virtual void WorkerThread() = 0;
+  int CreateAndOpenTemporaryChunkFile(std::string *path) const;
+
+
+  /**
+   * This virtual function is called once the AbstractUploader has started its
+   * dedicated writer thread. Overwrite this method to implement your own event
+   * loop. You must call AbstractUploader::PerformJob() or ::TryToPerformJob()
+   * in an endless loop until either of those returns JobState::kTerminate.
+   * AbstractUploader's write thread is terminated when this method returns.
+   */
+  virtual void WorkerThread();
 
 
   /**
@@ -344,6 +400,10 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
   const SynchronizingCounter<int32_t>& jobs_in_flight() const {
     return jobs_in_flight_;
   }
+
+
+ private:
+  JobStatus::State DispatchJob(const UploadJob &job);
 
  private:
   const SpoolerDefinition                   spooler_definition_;
