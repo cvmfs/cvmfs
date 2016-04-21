@@ -369,8 +369,8 @@ if (BUILD_CVMFS)
   endif (LIBFUSE_BUILTIN)
 
   if (LIBCURL_BUILTIN)
-    add_dependencies (cvmfs_fuse_debug libcares libcurl)
-    add_dependencies (cvmfs_fuse libcares libcurl)
+    add_dependencies (cvmfs_fuse_debug libcares libnghttp2 libcurl)
+    add_dependencies (cvmfs_fuse libcares libnghttp2 libcurl)
   endif (LIBCURL_BUILTIN)
 
   if (PACPARSER_BUILTIN)
@@ -416,7 +416,7 @@ if (BUILD_CVMFS)
 
   # link the stuff (*_LIBRARIES are dynamic link libraries *_archive are static link libraries ... one of them will be empty for each dependency)
   set (CVMFS_FUSE_LINK_LIBRARIES ${SQLITE3_LIBRARY} ${CARES_LIBRARIES}
-         ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE} ${PACPARSER_LIBRARIES}
+         ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE} ${NGHTTP2_ARCHIVE} ${PACPARSER_LIBRARIES}
          ${LEVELDB_LIBRARIES} ${OPENSSL_LIBRARIES} ${FUSE_LIBRARIES}
          ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${ZLIB_LIBRARIES}
          ${PACPARSER_ARCHIVE} ${LEVELDB_ARCHIVE} ${CARES_ARCHIVE}
@@ -441,9 +441,8 @@ if (BUILD_LIBCVMFS)
   set (LIBCVMFS_LIBS ${LIBCVMFS_LIBS} ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_only.a)
 
   if (LIBCURL_BUILTIN)
-    add_dependencies (cvmfs_only libcares libcurl)
-    set (LIBCVMFS_LIBS ${CARES_ARCHIVE} ${LIBCVMFS_LIBS} )
-    set (LIBCVMFS_LIBS ${LIBCURL_ARCHIVE} ${LIBCVMFS_LIBS} )
+    add_dependencies (cvmfs_only libcares libnghttp2 libcurl)
+    set (LIBCVMFS_LIBS ${NGHTTP2_ARCHIVE} ${CARES_ARCHIVE} ${LIBCURL_ARCHIVE} ${LIBCVMFS_LIBS} )
   endif (LIBCURL_BUILTIN)
 
   if (PACPARSER_BUILTIN)
@@ -488,7 +487,7 @@ if (BUILD_LIBCVMFS)
   add_dependencies (libcvmfs cvmfs_only)
 
   add_executable( test_libcvmfs ${TEST_LIBCVMFS_SOURCES} )
-  target_link_libraries( test_libcvmfs ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a ${SQLITE3_LIBRARY} ${CARES_LIBRARIES} ${CURL_LIBRARIES} ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl )
+  target_link_libraries( test_libcvmfs ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${CARES_LIBRARIES} ${NGHTTP2_ARCHIVE} ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl )
   add_dependencies (test_libcvmfs libcvmfs)
 
 endif (BUILD_LIBCVMFS)
@@ -507,7 +506,7 @@ if (BUILD_SERVER)
   add_dependencies (cvmfs_swissknife libvjson)
 
   if (LIBCURL_BUILTIN)
-    add_dependencies (cvmfs_swissknife libcares libcurl)
+    add_dependencies (cvmfs_swissknife libcares libnghttp2 libcurl)
   endif (LIBCURL_BUILTIN)
 
   if (SQLITE3_BUILTIN)
@@ -529,16 +528,16 @@ if (BUILD_SERVER)
   # link the stuff (*_LIBRARIES are dynamic link libraries)
   target_link_libraries (cvmfs_swissknife  ${CVMFS_SWISSKNIFE_LIBS}
                          ${SQLITE3_LIBRARY}  ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE}
-                         ${CARES_LIBRARIES} ${CARES_ARCHIVE} ${TBB_LIBRARIES}
-                         ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} ${OPENSSL_LIBRARIES}
-                         ${SQLITE3_ARCHIVE} ${RT_LIBRARY} ${VJSON_ARCHIVE}
-                         ${SHA3_ARCHIVE} ${CAP_LIBRARIES} pthread dl)
+                         ${CARES_LIBRARIES} ${CARES_ARCHIVE} ${NGHTTP2_ARCHIVE}
+                         ${TBB_LIBRARIES} ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE}
+                         ${OPENSSL_LIBRARIES} ${SQLITE3_ARCHIVE} ${RT_LIBRARY}
+                         ${VJSON_ARCHIVE} ${SHA3_ARCHIVE} ${CAP_LIBRARIES} pthread dl)
 
   if (BUILD_SERVER_DEBUG)
     add_executable (cvmfs_swissknife_debug ${CVMFS_SWISSKNIFE_DEBUG_SOURCES})
 
     if (LIBCURL_BUILTIN)
-      add_dependencies (cvmfs_swissknife_debug libcares libcurl)
+      add_dependencies (cvmfs_swissknife_debug libcares libnghttp2 libcurl)
     endif (LIBCURL_BUILTIN)
 
     if (SQLITE3_BUILTIN)
@@ -563,11 +562,11 @@ if (BUILD_SERVER)
       set (TBB_DEBUG_LIBRARIES ${TBB_LIBRARIES})
     endif (NOT TBB_DEBUG_LIBRARIES)
     target_link_libraries (cvmfs_swissknife_debug  ${CVMFS_SWISSKNIFE_LIBS}
-                           ${SQLITE3_LIBRARY}  ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE}
-                           ${CARES_LIBRARIES} ${CARES_ARCHIVE} ${TBB_DEBUG_LIBRARIES}
-                           ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} ${OPENSSL_LIBRARIES}
-                           ${SQLITE3_ARCHIVE} ${RT_LIBRARY} ${VJSON_ARCHIVE}
-                           ${SHA3_ARCHIVE} ${CAP_LIBRARIES} pthread dl)
+                           ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE}
+                           ${CARES_LIBRARIES} ${CARES_ARCHIVE} ${NGHTTP2_ARCHIVE}
+                           ${TBB_LIBRARIES} ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE}
+                           ${OPENSSL_LIBRARIES} ${SQLITE3_ARCHIVE} ${RT_LIBRARY}
+                           ${VJSON_ARCHIVE} ${SHA3_ARCHIVE} ${CAP_LIBRARIES} pthread dl)
   endif (BUILD_SERVER_DEBUG)
 endif (BUILD_SERVER)
 
@@ -575,9 +574,8 @@ if (BUILD_PRELOADER)
   add_executable (cvmfs_preload_bin ${CVMFS_PRELOADER_SOURCES})
 
   if (LIBCURL_BUILTIN)
-    add_dependencies (cvmfs_preload_bin libcares libcurl)
-    set (PRELOADER_LIBS ${CARES_ARCHIVE} ${PRELOADER_LIBS} )
-    set (PRELOADER_LIBS ${LIBCURL_ARCHIVE} ${PRELOADER_LIBS} )
+    add_dependencies (cvmfs_preload_bin libcares libnghttp2 libcurl)
+    set (PRELOADER_LIBS ${LIBCURL_ARCHIVE} ${NGHTTP2_ARCHIVE} ${CARES_ARCHIVE} ${PRELOADER_LIBS} )
   endif (LIBCURL_BUILTIN)
 
   if (PACPARSER_BUILTIN)
@@ -607,10 +605,9 @@ if (BUILD_PRELOADER)
   add_dependencies (cvmfs_preload_bin libvjson)
 
   target_link_libraries(cvmfs_preload_bin ${SQLITE3_LIBRARY} ${CARES_LIBRARIES}
-                        ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE} ${ZLIB_LIBRARIES}
-                        ${OPENSSL_LIBRARIES} ${CARES_ARCHIVE} ${SQLITE3_ARCHIVE}
-                        ${ZLIB_ARCHIVE} ${TBB_LIBRARIES} ${RT_LIBRARY}
-                        ${VJSON_ARCHIVE} ${SHA3_ARCHIVE}
+                        ${PRELOADER_LIBS} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES}
+                        ${OPENSSL_LIBRARIES} ${TBB_LIBRARIES} ${VJSON_ARCHIVE}
+                        ${SHA3_ARCHIVE} ${RT_LIBRARY}
                         pthread dl)
 endif (BUILD_PRELOADER)
 

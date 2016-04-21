@@ -222,6 +222,7 @@ set (GOOGLETEST_BUILTIN_LOCATION  "${EXTERNALS_BUILD_LOCATION}/build_googletest"
 set (LIBGEOIP_BUILTIN_LOCATION    "${EXTERNALS_BUILD_LOCATION}/build_libgeoip")
 set (PYTHON_GEOIP_BUILTIN_LOCATION "${EXTERNALS_BUILD_LOCATION}/build_python-geoip")
 set (TBB_BUILD_LOCATION           "${EXTERNALS_BUILD_LOCATION}/build_tbb")
+set (NGHTTP2_BUILTIN_LOCATION     "${EXTERNALS_BUILD_LOCATION}/build_nghttp2")
 
 # create the directory for controlled out of source building of external stuff
 file (MAKE_DIRECTORY ${EXTERNALS_BUILD_LOCATION})
@@ -342,6 +343,7 @@ set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${CMAKE_BINARY_DIR})
 # required libraries for all builds
 if (LIBCURL_BUILTIN)
   include (${CARES_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
+  include (${NGHTTP2_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
   include (${LIBCURL_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
   set (CURL_LIBRARIES "")
   set (CARES_LIBRARIES "")

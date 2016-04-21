@@ -2,11 +2,14 @@
 
 cdir=$(pwd)
 cares_location="../build_c-ares"
+nghttp2_location="../build_nghttp2"
 cd $cares_location
+sh makeHook.sh
+cd $nghttp2_location
 sh makeHook.sh
 cd $cdir
 
-sh configure CPPFLAGS="$CPPFLAGS -I${PWD}/${cares_location} -D_FILE_OFFSET_BITS=64" LDFLAGS="$LDFLAGS -L${PWD}/${cares_location}/.libs -rdynamic" CFLAGS="$CFLAGS -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fno-optimize-sibling-calls -fvisibility=hidden -fPIC" \
+LD_LIBRARY_PATH="${PWD}/${nghttp2_location}/lib" ./configure CPPFLAGS="$CPPFLAGS -I${PWD}/${cares_location} -D_FILE_OFFSET_BITS=64" LDFLAGS="$LDFLAGS -L${PWD}/${cares_location}/.libs -rdynamic" CFLAGS="$CFLAGS -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fno-optimize-sibling-calls -fvisibility=hidden -fPIC" \
   $CVMFS_ZLIB --enable-warnings \
   --enable-ares \
   --disable-shared \
@@ -49,5 +52,5 @@ sh configure CPPFLAGS="$CPPFLAGS -I${PWD}/${cares_location} -D_FILE_OFFSET_BITS=
   --without-libidn \
   --without-winidn \
   --without-librtmp \
-  --without-nghttp2 \
+  --with-nghttp2="${PWD}/${nghttp2_location}" \
   --disable-verbose

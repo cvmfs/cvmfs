@@ -180,25 +180,27 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
   //          header_line.c_str());
 
   // Check http status codes
-  if (HasPrefix(header_line, "HTTP/1.", false)) {
-    if (header_line.length() < 10)
+  if (HasPrefix(header_line, "HTTP/", false)) {
+    // example: "HTTP/2.0 200", with 12 characters
+    if (header_line.length() < 12) {
       return 0;
+    }
 
     unsigned i;
     for (i = 8; (i < header_line.length()) && (header_line[i] == ' '); ++i) {}
 
-    // TODO(jblomer): consolidate the code
-    if (header_line.length() > i+2) {
-      info->http_code = DownloadManager::ParseHttpCode(&header_line[i]);
-    }
+    assert(header_line.length() > i+2);
+    info->http_code = DownloadManager::ParseHttpCode(&header_line[i]);
 
-    if (header_line[i] == '2') {
+    if (info->http_code == 101) {
+      LogCvmfs(kLogDownload, kLogSyslog | kLogDebug, "switching to HTTP/2");
       return num_bytes;
-    } else if ((header_line.length() > i+2) && (header_line[i] == '3') &&
-               (header_line[i+1] == '0') &&
-               ((header_line[i+2] == '1') || (header_line[i+2] == '2') ||
-                (header_line[i+2] == '3') || (header_line[i+2] == '7')))
-    {
+    } else if (info->http_code >= 200 && info->http_code < 300) {
+      return num_bytes;
+    } else if (info->http_code == 301 ||
+               info->http_code == 302 ||
+               info->http_code == 303 ||
+               info->http_code == 307) {
       if (!info->follow_redirects) {
         LogCvmfs(kLogDownload, kLogDebug, "redirect support not enabled: %s",
                  header_line.c_str());
@@ -212,13 +214,11 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
     } else {
       LogCvmfs(kLogDownload, kLogDebug, "http status error code: %s",
                header_line.c_str());
-      if (header_line[i] == '5') {
+      if (info->http_code >= 500 && info->http_code < 600) {
         // 5XX returned by host
         info->error_code = kFailHostHttp;
-      } else if ( (header_line.length() > i+2) && (header_line[i] == '4') &&
-                  (header_line[i+1] == '0') &&
-                  ((header_line[i+2] == '4') || (header_line[i+2] == '0')) )
-      {
+      } else if (info->http_code == 400 ||
+                 info->http_code == 404) {
         // 400: error from the GeoAPI module
         // 404: the stratum 1 does not have the newest files
         info->error_code = kFailHostHttp;
@@ -234,9 +234,13 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
   if ((info->destination == kDestinationMem) &&
       HasPrefix(header_line, "CONTENT-LENGTH:", true))
   {
-    char *tmp = reinterpret_cast<char *>(alloca(num_bytes+1));
     uint64_t length = 0;
-    sscanf(header_line.c_str(), "%s %"PRIu64, tmp, &length);
+    size_t pos = header_line.find(":") + 1;
+    assert(header_line.length() > pos);
+    if (header_line[pos] == ' ') {
+      ++pos;
+    }
+    sscanf(&header_line[pos], "%"PRIu64, &length);
     if (length > 0) {
       if (length > DownloadManager::kMaxMemSize) {
         LogCvmfs(kLogDownload, kLogDebug | kLogSyslogErr,
@@ -806,6 +810,12 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
   } else {
     curl_easy_setopt(handle, CURLOPT_RANGE, NULL);
   }
+
+  // Set http2 mode
+#ifdef CURL_VERSION_HTTP2
+  curl_easy_setopt(handle, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2_0);
+  curl_easy_setopt(handle, CURLOPT_PIPEWAIT, 1);
+#endif
 
   // Set curl parameters
   curl_easy_setopt(handle, CURLOPT_PRIVATE, static_cast<void *>(info));
@@ -1515,7 +1525,11 @@ void DownloadManager::Init(const unsigned max_pool_handles,
   curl_multi_setopt(curl_multi_, CURLMOPT_MAXCONNECTS, watch_fds_max_);
   curl_multi_setopt(curl_multi_, CURLMOPT_MAX_TOTAL_CONNECTIONS,
                     pool_max_handles_);
-  // curl_multi_setopt(curl_multi_, CURLMOPT_PIPELINING, 1);
+
+#ifdef CURL_VERSION_HTTP2
+  curl_multi_setopt(curl_multi_, CURLMOPT_PIPELINING, CURLPIPE_MULTIPLEX);
+  curl_multi_setopt(curl_multi_, CURLMOPT_MAX_HOST_CONNECTIONS, 1);
+#endif
 
   prng_.InitLocaltime();
 
