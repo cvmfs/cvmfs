@@ -4,8 +4,8 @@
  * Shared data structures for client-side authorization.
  */
 
-#ifndef CVMFS_VOMS_AUTHZ_AUTHZ_H_
-#define CVMFS_VOMS_AUTHZ_AUTHZ_H_
+#ifndef CVMFS_AUTHZ_AUTHZ_H_
+#define CVMFS_AUTHZ_AUTHZ_H_
 
 #include <inttypes.h>
 
@@ -63,4 +63,4 @@ struct AuthzData {
   AuthzStatus status;
 };
 
-#endif  // CVMFS_VOMS_AUTHZ_AUTHZ_H_
+#endif  // CVMFS_AUTHZ_AUTHZ_H_

@@ -187,8 +187,10 @@ bool AuthzSessionManager::LookupAuthzData(
              session_key.sid, authz_data->membership.c_str(),
              authz_data->status);
     const bool granted = authz_data->IsGranted(membership);
-    if (granted) perf::Inc(n_grant_);
-    else perf::Inc(n_deny_);
+    if (granted)
+      perf::Inc(n_grant_);
+    else
+      perf::Inc(n_deny_);
     return granted;
   }
 
@@ -213,8 +215,10 @@ bool AuthzSessionManager::LookupAuthzData(
   UnlockMutex(&lock_session2cred_);
 
   const bool granted = authz_data->status == kAuthzOk;
-  if (granted) perf::Inc(n_grant_);
-  else perf::Inc(n_deny_);
+  if (granted)
+    perf::Inc(n_grant_);
+  else
+    perf::Inc(n_deny_);
   return granted;
 }
 

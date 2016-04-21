@@ -6,8 +6,8 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#include <unistd.h>
 #include <syslog.h>
+#include <unistd.h>
 
 #include <cassert>
 #include <cstdarg>

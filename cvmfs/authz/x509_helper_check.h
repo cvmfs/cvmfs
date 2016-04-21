@@ -14,7 +14,7 @@ enum StatusX509Validation {
   kCheckX509NotMember,
 };
 
-StatusX509Validation CheckX509Proxy(const std::string &membership, 
+StatusX509Validation CheckX509Proxy(const std::string &membership,
                                     FILE *fp_proxy);
 
 #endif  // CVMFS_AUTHZ_X509_HELPER_CHECK_H_

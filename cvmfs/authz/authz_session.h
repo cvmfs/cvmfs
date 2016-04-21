@@ -160,4 +160,4 @@ class AuthzSessionManager : SingleCopy {
   perf::Counter *n_deny_;
 };
 
-#endif  // CVMFS_VOMS_AUTHZ_AUTHZ_SESSION_H_
+#endif  // CVMFS_AUTHZ_AUTHZ_SESSION_H_

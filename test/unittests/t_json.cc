@@ -58,7 +58,7 @@ TEST(T_Json, SearchInObject) {
   EXPECT_EQ(NULL, result);
   result = json->SearchInObject(NULL, "string", JSON_STRING);
   EXPECT_EQ(NULL, result);
-  result = 
+  result =
     json->SearchInObject(json->root()->first_child, "string", JSON_STRING);
   EXPECT_EQ(NULL, result);
 }

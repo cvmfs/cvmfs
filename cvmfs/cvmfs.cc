@@ -69,10 +69,10 @@
 #include <vector>
 
 #include "atomic.h"
-#include "auto_umount.h"
 #include "authz/authz_curl.h"
 #include "authz/authz_fetch.h"
 #include "authz/authz_session.h"
+#include "auto_umount.h"
 #include "backoff.h"
 #include "cache.h"
 #include "catalog_mgr_client.h"

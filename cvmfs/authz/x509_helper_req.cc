@@ -6,7 +6,7 @@
 
 #include <cstdio>
 
-using namespace std;
+using namespace std;  // NOLINT
 
 string AuthzRequest::Ident() const {
   char buf_pid[32];
@@ -18,4 +18,4 @@ string AuthzRequest::Ident() const {
   return "{pid " + string(buf_pid) + ", " +
           "uid " + string(buf_uid) + ", " +
           "gid " + string(buf_gid) + "}";
-};
+}

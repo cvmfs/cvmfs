@@ -18,10 +18,10 @@
 #include "logging.h"
 #include "platform.h"
 #include "smalloc.h"
-#include "util_concurrency.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
+#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 
@@ -174,7 +174,7 @@ AuthzStatus AuthzExternalFetcher::Fetch(
     "\"uid\":" +  StringifyInt(query_info.uid) + "," +
     "\"gid\":" +  StringifyInt(query_info.gid) + "," +
     "\"pid\":" +  StringifyInt(query_info.pid) + "," +
-    "\"membership\":\"" +  JsonDocument::EscapeString(query_info.membership) + 
+    "\"membership\":\"" +  JsonDocument::EscapeString(query_info.membership) +
       "\"}}";
   retval = Send(json_msg) && Recv(&json_msg);
   if (!retval)
@@ -433,7 +433,7 @@ bool AuthzExternalFetcher::ParseRevision(
 bool AuthzExternalFetcher::Recv(string *msg) {
   uint32_t version;
   ssize_t retval = SafeRead(fd_recv_, &version, sizeof(version));
-  if (retval != int(sizeof(version))) {
+  if (retval != static_cast<int>(sizeof(version))) {
     EnterFailState();
     return false;
   }
@@ -446,7 +446,7 @@ bool AuthzExternalFetcher::Recv(string *msg) {
 
   uint32_t length;
   retval = SafeRead(fd_recv_, &length, sizeof(length));
-  if (retval != int(sizeof(length))) {
+  if (retval != static_cast<int>(sizeof(length))) {
     EnterFailState();
     return false;
   }

@@ -4,7 +4,7 @@
 
 #include "x509_helper_base64.h"
 
-using namespace std;
+using namespace std;  // NOLINT
 
 namespace {
 const char b64_table[] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',

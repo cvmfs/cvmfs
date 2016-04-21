@@ -13,8 +13,8 @@
 #include "authz/authz_session.h"
 #include "duplex_curl.h"
 #include "logging.h"
-#include "util_concurrency.h"
 #include "util/pointer.h"
+#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 

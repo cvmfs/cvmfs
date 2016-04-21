@@ -11,8 +11,8 @@
 #include <string>
 
 #include "authz/authz.h"
-#include "json_document.h"
 #include "gtest/gtest_prod.h"
+#include "json_document.h"
 #include "util/single_copy.h"
 
 class AuthzFetcher {
