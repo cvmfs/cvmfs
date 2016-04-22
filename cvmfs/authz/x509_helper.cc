@@ -139,7 +139,7 @@ static AuthzRequest ParseRequest(const string &msg) {
     } else if (name == "pid") {
       result.pid = json->int_value;
     } else if (name == "membership") {
-      result.membership = string(json->string_value);
+      result.membership = Debase64(string(json->string_value));
     } else if (name == "msgid") {
       if (json->int_value == 4) {  /* kAuthzMsgQuit */
         LogAuthz(kLogAuthzDebug, "shut down");

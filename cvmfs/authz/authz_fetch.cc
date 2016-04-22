@@ -174,7 +174,7 @@ AuthzStatus AuthzExternalFetcher::Fetch(
     "\"uid\":" +  StringifyInt(query_info.uid) + "," +
     "\"gid\":" +  StringifyInt(query_info.gid) + "," +
     "\"pid\":" +  StringifyInt(query_info.pid) + "," +
-    "\"membership\":\"" +  JsonDocument::EscapeString(query_info.membership) +
+    "\"membership\":\"" + Base64(query_info.membership) +
       "\"}}";
   retval = Send(json_msg) && Recv(&json_msg);
   if (!retval)
