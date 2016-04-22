@@ -2031,6 +2031,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   bool shared_cache = false;
   int64_t quota_limit = cvmfs::kDefaultCacheSizeMb;
   string authz_helper = "";
+  string authz_search_path = "/usr/libexec/cvmfs/authz";
   string hostname = "";
   string proxies = "";
   string fallback_proxies = "";
@@ -2097,6 +2098,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
     mem_cache_size = String2Uint64(parameter) * 1024*1024;
   if (cvmfs::options_manager_->GetValue("CVMFS_AUTHZ_HELPER", &parameter))
     authz_helper = parameter;
+  if (cvmfs::options_manager_->GetValue("CVMFS_AUTHZ_SEARCH_PATH", &parameter))
+    authz_search_path = parameter;
   if (cvmfs::options_manager_->GetValue("CVMFS_TIMEOUT", &parameter))
     timeout = String2Uint64(parameter);
   if (cvmfs::options_manager_->GetValue("CVMFS_TIMEOUT_DIRECT", &parameter))
@@ -2557,7 +2560,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
   // Credentials store
   cvmfs::authz_fetcher_ = new AuthzExternalFetcher(
     *cvmfs::repository_name_,
-    authz_helper);
+    authz_helper,
+    authz_search_path);
   cvmfs::authz_session_manager_ = AuthzSessionManager::Create(
     cvmfs::authz_fetcher_,
     cvmfs::statistics_);
@@ -2854,10 +2858,6 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::voms_authz_ = new string();
   cvmfs::has_voms_authz_ =
     cvmfs::catalog_manager_->GetVOMSAuthz(cvmfs::voms_authz_);
-  if (cvmfs::has_voms_authz_ && (authz_helper == "")) {
-    LogCvmfs(kLogCvmfs, kLogSyslogWarn | kLogDebug,
-             "authz requirement present but CVMFS_AUTHZ_HELPER missing");
-  }
   cvmfs::authz_attachment_->set_membership(*cvmfs::voms_authz_);
 
   // Make sure client context TLS has been initialized

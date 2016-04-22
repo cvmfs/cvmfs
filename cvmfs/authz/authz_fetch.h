@@ -105,7 +105,9 @@ class AuthzExternalFetcher : public AuthzFetcher, SingleCopy {
    */
   static const uint32_t kProtocolVersion;  // = 1;
 
-  AuthzExternalFetcher(const std::string &fqrn, const std::string &progname);
+  AuthzExternalFetcher(const std::string &fqrn,
+                       const std::string &progname,
+                       const std::string &search_path);
   AuthzExternalFetcher(const std::string &fqrn, int fd_send, int fd_recv);
   ~AuthzExternalFetcher();
 
@@ -130,6 +132,7 @@ class AuthzExternalFetcher : public AuthzFetcher, SingleCopy {
   static const unsigned kDefaultTtl = 120;
 
   void InitLock();
+  std::string FindHelper(const std::string &membership);
   void ExecHelper();
   bool Handshake();
 
@@ -137,6 +140,9 @@ class AuthzExternalFetcher : public AuthzFetcher, SingleCopy {
   bool Recv(std::string *msg);
   void EnterFailState();
 
+  void StripAuthzSchema(const std::string &membership, 
+                        std::string *authz_schema,
+                        std::string *pure_membership);
   bool ParseMsg(const std::string &json_msg,
                 const AuthzExternalMsgIds expected_msgid,
                 AuthzExternalMsg *binary_msg);
@@ -153,6 +159,11 @@ class AuthzExternalFetcher : public AuthzFetcher, SingleCopy {
    * Full path of external helper.
    */
   std::string progname_;
+
+  /**
+   * Where to look for authz helpers that are guessed from the membership schema
+   */
+  std::string search_path_;
 
   /**
    * Send requests to the external helper.

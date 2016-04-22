@@ -17,6 +17,7 @@
 
 #include "logging.h"
 #include "platform.h"
+#include "sanitizer.h"
 #include "smalloc.h"
 #include "util/pointer.h"
 #include "util/posix.h"
@@ -32,9 +33,11 @@ const uint32_t AuthzExternalFetcher::kProtocolVersion = 1;
 
 AuthzExternalFetcher::AuthzExternalFetcher(
   const string &fqrn,
-  const string &progname)
+  const string &progname,
+  const string &search_path)
   : fqrn_(fqrn)
   , progname_(progname)
+  , search_path_(search_path)
   , fd_send_(-1)
   , fd_recv_(-1)
   , pid_(-1)
@@ -162,6 +165,8 @@ AuthzStatus AuthzExternalFetcher::Fetch(
   bool retval;
 
   if (fd_send_ < 0) {
+    if (progname_.empty())
+      progname_ = FindHelper(query_info.membership);
     ExecHelper();
     retval = Handshake();
     if (!retval)
@@ -169,13 +174,16 @@ AuthzStatus AuthzExternalFetcher::Fetch(
   }
   assert((fd_send_ >= 0) && (fd_recv_ >= 0));
 
+  string authz_schema;
+  string pure_membership;
+  StripAuthzSchema(query_info.membership, &authz_schema, &pure_membership);
   string json_msg = string("{\"cvmfs_authz_v1\":{") +
     "\"msgid\":" + StringifyInt(kAuthzMsgVerify) + "," +
     "\"revision\":0," +
     "\"uid\":" +  StringifyInt(query_info.uid) + "," +
     "\"gid\":" +  StringifyInt(query_info.gid) + "," +
     "\"pid\":" +  StringifyInt(query_info.pid) + "," +
-    "\"membership\":\"" + Base64(query_info.membership) +
+    "\"membership\":\"" + Base64(pure_membership) +
       "\"}}";
   retval = Send(json_msg) && Recv(&json_msg);
   if (!retval)
@@ -193,6 +201,26 @@ AuthzStatus AuthzExternalFetcher::Fetch(
   }
 
   return binary_msg.permit.status;
+}
+
+
+string AuthzExternalFetcher::FindHelper(const string &membership) {
+  string authz_schema;
+  string pure_membership;
+  StripAuthzSchema(membership, &authz_schema, &pure_membership);
+  sanitizer::AuthzSchemaSanitizer sanitizer;
+  if (!sanitizer.IsValid(authz_schema)) {
+    LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug, "invalid authz schema: %s",
+             authz_schema.c_str());
+    return "";
+  }
+
+  string exe_path = search_path_ + "/cvmfs_" + authz_schema + "_helper";
+  if (!FileExists(exe_path)) {
+    LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug, "authz helper %s missing",
+             exe_path.c_str());
+  }
+  return exe_path;
 }
 
 
@@ -469,4 +497,23 @@ bool AuthzExternalFetcher::Recv(string *msg) {
   }
 
   return true;
+}
+
+
+void AuthzExternalFetcher::StripAuthzSchema(
+  const string &membership,
+  string *authz_schema,
+  string *pure_membership)
+{
+  vector<string> components = SplitString(membership, ':');
+  *authz_schema = components[0];
+  if (components.size() < 2) {
+    LogCvmfs(kLogAuthz, kLogDebug, "invalid membership: %s",
+             membership.c_str());
+    *pure_membership = "";
+    return;
+  }
+
+  components.erase(components.begin());
+  *pure_membership = JoinStrings(components, ":");
 }
