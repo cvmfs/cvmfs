@@ -199,7 +199,6 @@ option (GOOGLETEST_BUILTIN      "Don't use system installation of google test"  
 option (GEOIP_BUILTIN           "Don't use system GeoIP library and python-GeoIP"                  ON)
 option (TBB_PRIVATE_LIB         "Compile our own TBB shared libraries"                             ON)
 option (BUILD_COVERAGE          "Compile to collect code coverage reports"                         OFF)
-option (BUILD_X509_HELPER       "Compile the X.509 authz helper (requires voms, globus)"           OFF)
 
 #
 # define where to find the external dependencies
@@ -494,17 +493,6 @@ if (BUILD_SERVER OR BUILD_SERVER_DEBUG)
   endif (GEOIP_BUILTIN)
 endif (BUILD_SERVER OR BUILD_SERVER_DEBUG)
 
-# VOMS / globus libraries for secure CVMFS
-if (BUILD_X509_HELPER)
-  find_package (VOMS REQUIRED)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${VOMS_INCLUDE_DIR})
-  add_definitions(-DVOMS_AUTHZ)
-
-  include (FindPkgConfig)
-  pkg_check_modules(GLOBUS REQUIRED globus-gsi-credential globus-gsi-cert-utils globus-common globus-gsi-sysconfig globus-gsi-callback)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GLOBUS_INCLUDE_DIRS})
-  add_definitions(-DGLOBUS_AUTHZ)
-endif (BUILD_X509_HELPER)
 
 include_directories (${INCLUDE_DIRECTORIES})
 
