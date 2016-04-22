@@ -142,6 +142,16 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::Sweep(
 
 
 template <class CatalogTraversalT, class HashFilterT>
+bool GarbageCollector<CatalogTraversalT, HashFilterT>::
+  RemoveCatalogFromReflog(const shash::Any &catalog)
+{
+  return (configuration_.dry_run)
+    ? true
+    : configuration_.reflog->RemoveCatalog(catalog);
+}
+
+
+template <class CatalogTraversalT, class HashFilterT>
 bool GarbageCollector<CatalogTraversalT, HashFilterT>::Collect() {
   return AnalyzePreservedCatalogTree() &&
          CheckPreservedRevisions()     &&

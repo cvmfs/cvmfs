@@ -99,6 +99,7 @@ class GarbageCollector {
 
   void CheckAndSweep(const shash::Any &hash);
   void Sweep(const shash::Any &hash);
+  bool RemoveCatalogFromReflog(const shash::Any &catalog);
 
   void PrintCatalogTreeEntry(const unsigned int  tree_level,
                              const CatalogTN    *catalog) const;
