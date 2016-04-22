@@ -1,0 +1,96 @@
+
+cvmfs_test_name="Create a Plethora of Nested Catalogs"
+cvmfs_test_autofs_on_startup=false
+
+create_nested_catalogs() {
+  local subdir="$1"
+  shift 1
+
+  [ $# -gt 0 ] || return 0
+
+  local nested_clgs=$1
+  shift 1
+
+  mkdir -p "$subdir" || return 1
+  local subsubdir
+  while [ $nested_clgs -gt 0 ]; do
+    subsubdir="${subdir}/$(printf "%04x" ${nested_clgs})"
+    mkdir -p "$subsubdir"                  || return 2
+    touch "${subsubdir}/.cvmfscatalog"     || return 3
+    create_nested_catalogs "$subsubdir" $@ || return 4
+    nested_clgs=$(( $nested_clgs - 1 ))
+  done
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  local scratch_dir=$(pwd)
+
+  local needed_ofiles=25000
+  echo -n "check if enough files (${needed_ofiles}) can be opened... "
+  if [ $(ulimit -n) -lt $needed_ofiles ]; then
+    echo "no"
+    return 100
+  else
+    echo "yes"
+  fi
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  # ============================================================================
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  local subdir1="${repo_dir}/test1"
+  echo "generate many nested catalogs in ${subdir1}"
+  create_nested_catalogs $subdir1 10 10 || return 1
+
+  local publish_log_1="${scratch_dir}/publish_1.log"
+  echo "creating CVMFS snapshot (logging to ${publish_log_1})"
+  publish_repo $CVMFS_TEST_REPO > $publish_log_1 2>&1 || return $?
+
+  local inspect_log_1="${scratch_dir}/inspect_1.log"
+  echo "check catalog and data integrity (logging to ${inspect_log_1})"
+  check_repository $CVMFS_TEST_REPO -i > $inspect_log_1 2>&1 || return $?
+
+  # ============================================================================
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  local subdir2="${repo_dir}/test2"
+  echo "generate many nested catalogs in ${subdir2}"
+  create_nested_catalogs $subdir2 10 100 || return 2
+
+  local publish_log_2="${scratch_dir}/publish_2.log"
+  echo "creating CVMFS snapshot (logging to ${publish_log_2})"
+  publish_repo $CVMFS_TEST_REPO > $publish_log_2 2>&1 || return $?
+
+  local inspect_log_2="${scratch_dir}/inspect_2.log"
+  echo "check catalog and data integrity (logging to ${inspect_log_2})"
+  check_repository $CVMFS_TEST_REPO -i > $inspect_log_2 2>&1 || return $?
+
+  # ============================================================================
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  local subdir3="${repo_dir}/test3"
+  echo "generate many nested catalogs in ${subdir3}"
+  create_nested_catalogs $subdir3 10 1000 || return 3
+
+  local publish_log_3="${scratch_dir}/publish_3.log"
+  echo "creating CVMFS snapshot (logging to ${publish_log_3})"
+  publish_repo $CVMFS_TEST_REPO > $publish_log_3 2>&1 || return $?
+
+  local inspect_log_3="${scratch_dir}/inspect_3.log"
+  echo "check catalog and data integrity (logging to ${inspect_log_3})"
+  check_repository $CVMFS_TEST_REPO -i > $inspect_log_3 2>&1 || return $?
+
+  return 0
+}
+
