@@ -171,11 +171,15 @@ int CommandGc::Main(const ArgumentList &args) {
 
   reflog->CommitTransaction();
   const std::string reflog_db = reflog->CloseAndReturnDatabaseFile();
-  uploader->Upload(reflog_db, ".cvmfsreflog");
-  uploader->WaitForUpload();
+
+  if (!dry_run) {
+    uploader->Upload(reflog_db, ".cvmfsreflog");
+    uploader->WaitForUpload();
+  }
+
   unlink(reflog_db.c_str());
 
-  if (uploader->GetNumberOfErrors() > 0) {
+  if (uploader->GetNumberOfErrors() > 0 && !dry_run) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to upload updated Reflog");
     uploader->TearDown();
     return 1;
