@@ -30,6 +30,7 @@
 #include <vector>
 
 #include "cache.h"
+#include "cache_posix.h"
 #include "catalog_mgr_client.h"
 #include "cvmfs.h"
 #include "download.h"

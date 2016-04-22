@@ -14,7 +14,7 @@
 #include <cstring>
 #include <string>
 
-#include "cache.h"
+#include "cache_posix.h"
 #include "compression.h"
 #include "hash.h"
 #include "platform.h"
