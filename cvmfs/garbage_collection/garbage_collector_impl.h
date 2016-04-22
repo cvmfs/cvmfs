@@ -197,7 +197,7 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepReflog() {
     LogCvmfs(kLogGc, kLogStdout, "Sweeping Reference Logs");
   }
 
-  ReflogTN *reflog = configuration_.reflog;
+  const ReflogTN *reflog = configuration_.reflog;
   std::vector<shash::Any> catalogs;
   if (NULL == reflog || !reflog->ListCatalogs(&catalogs)) {
     LogCvmfs(kLogGc, kLogStderr, "Failed to list catalog reference log");
@@ -219,7 +219,7 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepReflog() {
       success =
         success                                         &&
         traversal_.TraverseRevision(*i, traversal_type) &&
-        reflog->RemoveCatalog(*i);
+        RemoveCatalogFromReflog(*i);
     }
   }
 
