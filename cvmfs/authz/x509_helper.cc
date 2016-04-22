@@ -157,8 +157,7 @@ static AuthzRequest ParseRequest(const string &msg) {
  * This binary is supposed to be called from the cvmfs client, not stand-alone.
  */
 static void CheckCallContext() {
-  int retval = fcntl(fileno(stderr), F_GETFD, 0);
-  if (retval != -1) {
+  if (getenv("CVMFS_AUTHZ_HELPER") == NULL) {
     printf("This program is supposed to be called from the CernVM-FS client.");
     printf("\n");
     abort();

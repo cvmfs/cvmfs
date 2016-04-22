@@ -114,7 +114,8 @@ void AuthzExternalFetcher::ExecHelper() {
   MakePipe(pipe_recv);
   char *argv0 = strdupa(progname_.c_str());
   char *argv[] = {argv0, NULL};
-  char *envp[] = {NULL};
+  char *envp0 = strdupa("CVMFS_AUTHZ_HELPER=yes");
+  char *envp[] = {envp0, NULL};
   int max_fd = sysconf(_SC_OPEN_MAX);
   assert(max_fd > 0);
   LogCvmfs(kLogAuthz, kLogDebug | kLogSyslog, "starting authz helper %s",
