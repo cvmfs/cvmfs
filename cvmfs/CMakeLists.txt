@@ -442,6 +442,24 @@ if (BUILD_CVMFS)
                                           ${OPENSSL_LIBRARIES} ${ZLIB_ARCHIVE}
                                           ${SHA3_ARCHIVE} ${RT_LIBRARY} pthread)
 
+
+  set (CVMFS_ALLOW_HELPER_SOURCES
+    authz/helper_allow.cc
+    authz/helper_log.h authz/helper_log.cc
+    authz/helper_util.h authz/helper_util.cc
+  )
+  add_executable (cvmfs_allow_helper ${CVMFS_ALLOW_HELPER_SOURCES})
+  add_dependencies (cvmfs_allow_helper libvjson)
+  target_link_libraries (cvmfs_allow_helper ${VJSON_ARCHIVE})
+
+  set (CVMFS_DENY_HELPER_SOURCES
+    authz/helper_deny.cc
+    authz/helper_log.h authz/helper_log.cc
+    authz/helper_util.h authz/helper_util.cc
+  )
+  add_executable (cvmfs_deny_helper ${CVMFS_DENY_HELPER_SOURCES})
+  add_dependencies (cvmfs_deny_helper libvjson)
+  target_link_libraries (cvmfs_deny_helper ${VJSON_ARCHIVE})
 endif (BUILD_CVMFS)
 
 if (BUILD_LIBCVMFS)
@@ -645,6 +663,12 @@ if (BUILD_CVMFS)
     TARGETS      cvmfs2 cvmfs_fsck
     RUNTIME
     DESTINATION    bin
+  )
+
+  install (
+    TARGETS      cvmfs_allow_helper cvmfs_deny_helper
+    RUNTIME
+    DESTINATION  libexec/cvmfs/authz
   )
 
   install (
