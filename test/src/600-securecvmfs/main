@@ -231,7 +231,7 @@ cvmfs_run_test() {
   # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
-  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER /dev/stdout -V x509:cvmfs:/cvmfs || return $?
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER /dev/stdout -V "x509%cvmfs:/cvmfs" || return $?
 
   echo "gather information about the just created repo"
   load_repo_config $CVMFS_TEST_REPO
@@ -327,7 +327,7 @@ cvmfs_run_test() {
   echo "Check authz attr"
   local authz_attr=
   authz_attr="$(attr -qg authz $mntpnt)" || return 41
-  [ x"$authz_attr" = x"x509:cvmfs:/cvmfs" ]   || return 42
+  [ x"$authz_attr" = x"x509%cvmfs:/cvmfs" ]   || return 42
 
   return 0
 }

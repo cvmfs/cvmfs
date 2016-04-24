@@ -14,6 +14,7 @@ class AuthzSessionManager;
 class AuthzAttachment : public download::CredentialsAttachment {
  public:
   explicit AuthzAttachment(AuthzSessionManager *sm);
+  virtual ~AuthzAttachment() { }
 
   virtual bool ConfigureCurlHandle(CURL *curl_handle,
                                    pid_t pid,

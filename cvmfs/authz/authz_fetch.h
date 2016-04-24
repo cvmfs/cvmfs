@@ -109,7 +109,7 @@ class AuthzExternalFetcher : public AuthzFetcher, SingleCopy {
                        const std::string &progname,
                        const std::string &search_path);
   AuthzExternalFetcher(const std::string &fqrn, int fd_send, int fd_recv);
-  ~AuthzExternalFetcher();
+  virtual ~AuthzExternalFetcher();
 
   virtual AuthzStatus Fetch(const QueryInfo &query_info,
                             AuthzToken *authz_token,
@@ -140,7 +140,7 @@ class AuthzExternalFetcher : public AuthzFetcher, SingleCopy {
   bool Recv(std::string *msg);
   void EnterFailState();
 
-  void StripAuthzSchema(const std::string &membership, 
+  void StripAuthzSchema(const std::string &membership,
                         std::string *authz_schema,
                         std::string *pure_membership);
   bool ParseMsg(const std::string &json_msg,

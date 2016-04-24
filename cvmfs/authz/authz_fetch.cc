@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cstring>
+#include <vector>
 
 #include "logging.h"
 #include "platform.h"
@@ -505,7 +506,7 @@ void AuthzExternalFetcher::StripAuthzSchema(
   string *authz_schema,
   string *pure_membership)
 {
-  vector<string> components = SplitString(membership, ':');
+  vector<string> components = SplitString(membership, '%');
   *authz_schema = components[0];
   if (components.size() < 2) {
     LogCvmfs(kLogAuthz, kLogDebug, "invalid membership: %s",
@@ -515,5 +516,5 @@ void AuthzExternalFetcher::StripAuthzSchema(
   }
 
   components.erase(components.begin());
-  *pure_membership = JoinStrings(components, ":");
+  *pure_membership = JoinStrings(components, "%");
 }
