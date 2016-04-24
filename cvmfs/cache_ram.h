@@ -1,25 +1,38 @@
 /**
  * This file is part of the CernVM File System.
  */
-
 #ifndef CVMFS_CACHE_RAM_H_
 #define CVMFS_CACHE_RAM_H_
 
-#include "cache.h"
+#include <pthread.h>
 
+#include <cassert>
+#include <cstdlib>
 #include <string>
+#include <vector>
+
+#include "cache.h"
+#include "hash.h"
+#include "util/pointer.h"
 
 namespace cache {
 
+class KvStore : SingleCopy {
+ public:
+
+};
+
+
 /**
  * ...
+ * TODO(jblomer): save open file table for hotpatch
  */
 class RamCacheManager : public CacheManager {
  public:
   virtual CacheManagerIds id() { return kRamCacheManager; }
 
   RamCacheManager();
-  virtual ~RamCacheManager() { }
+  virtual ~RamCacheManager();
   virtual bool AcquireQuotaManager(QuotaManager *quota_mgr);
 
   virtual int Open(const shash::Any &id);
@@ -42,8 +55,39 @@ class RamCacheManager : public CacheManager {
   virtual int CommitTxn(void *txn);
 
  private:
-  struct Transaction {
+  struct ReadOnlyFd {
+    ReadOnlyFd() : handle(-1), size(0) { }
+    ReadOnlyFd(int64_t h, uint64_t s) : handle(h), size(s) { }
+    /**
+     * Negative handle: invalid FD
+     */
+    int64_t handle;
+    uint64_t size;
   };
+
+  struct Transaction {
+    Transaction() :
+      buffer(NULL), size(0), expected_size(0), pos(0), handle(-1) { }
+    shash::Any id;
+    void *buffer;
+    uint64_t size;
+    uint64_t expected_size;
+    uint64_t pos;
+    int64_t handle;
+  };
+
+  inline bool IsValid(int fd) {
+    if ((fd < 0) || (static_cast<unsigned>(fd) >= open_fds_.size()))
+      return false;
+    return open_fds_[fd].handle >= 0;
+  }
+
+  int AddFd(const ReadOnlyFd &fd);
+  int64_t CommitToKvStore(Transaction *transaction);
+
+
+  std::vector<ReadOnlyFd> open_fds_;
+  pthread_rwlock_t rwlock_;
 };  // class RamCacheManager
 
 }  // namespace cache
