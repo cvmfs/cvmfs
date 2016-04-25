@@ -1,4 +1,5 @@
 2.3.0:
+  * Add well-defined client-side authz interface and allow/deny helpers
   * Parallel commit of catalog databases after publish
   * Speed-up catalog meta-data updates during publish
   * Prevent a cvmfs_server migrate on a repository that is in a transaction
