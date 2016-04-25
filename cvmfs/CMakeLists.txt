@@ -27,6 +27,10 @@ set (CVMFS_LOADER_SOURCES
 
 set (CVMFS_CLIENT_SOURCES
   atomic.h
+  authz/authz.h authz/authz.cc
+  authz/authz_curl.h authz/authz_curl.cc
+  authz/authz_fetch.h authz/authz_fetch.cc
+  authz/authz_session.h authz/authz_session.cc
   backoff.cc backoff.h
   bigvector.h
   cache.cc cache.h
@@ -49,6 +53,7 @@ set (CVMFS_CLIENT_SOURCES
   fs_traversal.h
   globals.cc globals.h
   hash.cc hash.h
+  json_document.cc json_document.h
   logging.cc logging.h logging_internal.h
   lru.h
   manifest.cc manifest.h
@@ -81,12 +86,6 @@ set (CVMFS_CLIENT_SOURCES
   wpad.cc wpad.h
   xattr.cc xattr.h
 )
-if (VOMS_FOUND)
-  set (CVMFS_CLIENT_SOURCES ${CVMFS_CLIENT_SOURCES}
-  voms_authz/voms_authz.cc voms_authz/voms_authz.h
-  voms_authz/voms_cred.cc voms_authz/voms_cred.h
-  voms_authz/voms_curl.cc)
-endif (VOMS_FOUND)
 
 
 set (CVMFS2_DEBUG_SOURCES
@@ -108,10 +107,6 @@ set (CVMFS2_DEBUG_SOURCES
   talk.cc talk.h
   tracer.cc tracer.h
 )
-if (VOMS_FOUND)
-  set (CVMFS2_DEBUG_SOURCES ${CVMFS2_DEBUG_SOURCES}
-  voms_authz/cred_fetcher.cc)
-endif (VOMS_FOUND)
 
 set (CVMFS2_SOURCES
   ${CVMFS2_DEBUG_SOURCES}
@@ -146,6 +141,7 @@ set (CVMFS_FSCK_SOURCES
   util/single_copy.h
   util/string.cc util/string.h
 )
+
 
 set (CVMFS_SWISSKNIFE_SOURCES
   atomic.h
@@ -245,14 +241,6 @@ set (CVMFS_SWISSKNIFE_SOURCES
   xattr.cc xattr.h
 )
 
-if (VOMS_FOUND)
-  set (CVMFS_SWISSKNIFE_SOURCES ${CVMFS_SWISSKNIFE_SOURCES}
-       voms_authz/voms_authz.h
-       voms_authz/voms_cred.cc
-       voms_authz/voms_curl.cc)
-endif (VOMS_FOUND)
-
-
 set (CVMFS_SWISSKNIFE_DEBUG_SOURCES
   ${CVMFS_SWISSKNIFE_SOURCES}
 )
@@ -322,12 +310,6 @@ set (CVMFS_PRELOADER_SOURCES
   xattr.cc xattr.h
 )
 
-if (VOMS_FOUND)
-  set (CVMFS_PRELOADER_SOURCES ${CVMFS_PRELOADER_SOURCES}
-       voms_authz/voms_authz.h
-       voms_authz/voms_cred.cc
-       voms_authz/voms_curl.cc)
-endif (VOMS_FOUND)
 
 #
 # configure some compiler flags for proper build
@@ -404,6 +386,9 @@ if (BUILD_CVMFS)
   add_dependencies (cvmfs2 libsha3)
   add_dependencies (cvmfs_fsck libsha3)
 
+  add_dependencies (cvmfs_fuse_debug libvjson)
+  add_dependencies (cvmfs_fuse libvjson)
+
   # set some properties
   set (CVMFS_LOADER_LD_FLAGS "${CVMFS_LOADER_LD_FLAGS} -ldl -lm")
   set_target_properties (cvmfs2 PROPERTIES COMPILE_FLAGS "${CVMFS_LOADER_CFLAGS}" LINK_FLAGS "${CVMFS_LOADER_LD_FLAGS}")
@@ -421,7 +406,7 @@ if (BUILD_CVMFS)
          ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${ZLIB_LIBRARIES}
          ${PACPARSER_ARCHIVE} ${LEVELDB_ARCHIVE} ${CARES_ARCHIVE}
          ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${UUID_LIBRARIES}
-         ${SHA3_ARCHIVE} pthread dl)
+         ${SHA3_ARCHIVE} ${VJSON_ARCHIVE} pthread dl)
 
   target_link_libraries (cvmfs2 ${CVMFS_LOADER_LIBS} ${OPENSSL_LIBRARIES}
                                 ${LIBFUSE} ${RT_LIBRARY} ${UUID_LIBRARIES}
@@ -432,6 +417,24 @@ if (BUILD_CVMFS)
                                           ${OPENSSL_LIBRARIES} ${ZLIB_ARCHIVE}
                                           ${SHA3_ARCHIVE} ${RT_LIBRARY} pthread)
 
+
+  set (CVMFS_ALLOW_HELPER_SOURCES
+    authz/helper_allow.cc
+    authz/helper_log.h authz/helper_log.cc
+    authz/helper_util.h authz/helper_util.cc
+  )
+  add_executable (cvmfs_allow_helper ${CVMFS_ALLOW_HELPER_SOURCES})
+  add_dependencies (cvmfs_allow_helper libvjson)
+  target_link_libraries (cvmfs_allow_helper ${VJSON_ARCHIVE})
+
+  set (CVMFS_DENY_HELPER_SOURCES
+    authz/helper_deny.cc
+    authz/helper_log.h authz/helper_log.cc
+    authz/helper_util.h authz/helper_util.cc
+  )
+  add_executable (cvmfs_deny_helper ${CVMFS_DENY_HELPER_SOURCES})
+  add_dependencies (cvmfs_deny_helper libvjson)
+  target_link_libraries (cvmfs_deny_helper ${VJSON_ARCHIVE})
 endif (BUILD_CVMFS)
 
 if (BUILD_LIBCVMFS)
@@ -466,7 +469,8 @@ if (BUILD_LIBCVMFS)
   endif (SPARSEHASH_BUILTIN)
 
   add_dependencies (cvmfs_only libsha3)
-  set (LIBCVMFS_LIBS ${SHA3_ARCHIVE} ${LIBCVMFS_LIBS})
+  add_dependencies (cvmfs_only libvjson)
+  set (LIBCVMFS_LIBS ${SHA3_ARCHIVE} ${VJSON_ARCHIVE} ${LIBCVMFS_LIBS})
 
   set_target_properties (cvmfs_only PROPERTIES COMPILE_FLAGS "${LIBCVMFS_CFLAGS}")
 
@@ -634,6 +638,12 @@ if (BUILD_CVMFS)
     TARGETS      cvmfs2 cvmfs_fsck
     RUNTIME
     DESTINATION    bin
+  )
+
+  install (
+    TARGETS      cvmfs_allow_helper cvmfs_deny_helper
+    RUNTIME
+    DESTINATION  libexec/cvmfs/authz
   )
 
   install (

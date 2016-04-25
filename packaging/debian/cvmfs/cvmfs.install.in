@@ -11,6 +11,8 @@ usr/lib/libcvmfs_fuse_debug.so
 usr/bin/cvmfs_talk
 usr/bin/cvmfs_config
 usr/libexec/cvmfs/auto.cvmfs
+usr/libexec/cvmfs/authz/cvmfs_allow_helper
+usr/libexec/cvmfs/authz/cvmfs_deny_helper
 etc/auto.cvmfs
 sbin/mount.cvmfs
 etc/cvmfs/config.sh

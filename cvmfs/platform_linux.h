@@ -324,6 +324,7 @@ inline const char* platform_getexepath() {
   return buf;
 }
 
+
 inline void platform_get_os_version(int32_t *major,
                                     int32_t *minor,
                                     int32_t *patch) {
