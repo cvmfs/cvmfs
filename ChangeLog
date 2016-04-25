@@ -24,6 +24,7 @@
   * Omit S3 bucket number if only a single bucket is used
   * Warn when forcfully remounting the file system stack on the server, new
     parameter CVMFS_FORCE_REMOUNT_WARNING
+  * Add support for default.conf in config repository (CVM-993)
 
 2.2.2:
   * Fix compilation of libcvmfs on Fedora 23 i686
@@ -31,7 +32,6 @@
   * Backport `cvmfs_server mount -a`
   * Remove use of SSLv3_client_method() in libcurl
   * Fix 'cvmfs_server snapshot -a' not noticing failed snapshots (CVM-997)
-  * Add support for default.conf in config repository (CVM-993)
 
 2.2.1:
   * Fix reading of chunked files in libcvmfs
