@@ -66,7 +66,7 @@ AuthzExternalFetcher::~AuthzExternalFetcher() {
   assert(retval == 0);
 
   // Allow helper to gracefully terminate
-  if (fd_send_ && !fail_state_) {
+  if ((fd_send_ >= 0) && !fail_state_) {
     LogCvmfs(kLogAuthz, kLogDebug, "shutting down authz helper");
     Send(string("{\"cvmfs_authz_v1\":{") +
       "\"msgid\":" + StringifyInt(kAuthzMsgQuit) + "," +

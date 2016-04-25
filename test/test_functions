@@ -363,7 +363,6 @@ cvmfs_clean() {
 }
 
 cvmfs_disable_config_repository() {
-  echo "HERE"
   sudo sh -c "echo 'CVMFS_CONFIG_REPOSITORY=' > /etc/cvmfs/default.d/99_no_config_repo.conf" \
     || return $?
 }
