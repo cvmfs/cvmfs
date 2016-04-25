@@ -323,7 +323,8 @@ Supported Commands:
   publish         [-p pause for tweaks] [-n manual revision number] [-v verbose]
                   [-a tag name] [-c tag channel] [-m tag description]
                   [-X (force external data) | -N (force native data)]
-                  [-Z compression algorithm] [-f use force remount if necessary]
+                  [-Z compression algorithm] [-F authz info file]
+                  [-f use force remount if necessary]
                   <fully qualified name>
                   Make a new repository snapshot
   rmfs            [-p(reserve) repo data and keys] [-f don't ask again]
