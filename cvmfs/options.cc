@@ -241,8 +241,9 @@ void OptionsManager::ParseDefault(const string &fqrn) {
     ParsePath(dist_defaults[i], false);
   }
   string external_config_path;
-  if ((fqrn != "") && HasConfigRepository(fqrn, &external_config_path))
-    ParsePath(external_config_path + "default.conf", true);
+  // This change breaks a number of integration tests.  Move to version 2.3.
+  // if ((fqrn != "") && HasConfigRepository(fqrn, &external_config_path))
+  //  ParsePath(external_config_path + "default.conf", true);
   ParsePath("/etc/cvmfs/default.local", false);
 
   if (fqrn != "") {

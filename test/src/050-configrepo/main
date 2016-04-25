@@ -37,7 +37,7 @@ cvmfs_run_test() {
   mkdir -p "$(pwd)/cvmfs-config.cern.ch/etc/cvmfs/config.d"
   echo "EXTERNAL_DOMAIN_PARAMETER=" > "$(pwd)/cvmfs-config.cern.ch/etc/cvmfs/domain.d/cern.ch.conf"
   echo "EXTERNAL_REPO_PARAMETER=" > "$(pwd)/cvmfs-config.cern.ch/etc/cvmfs/config.d/grid.cern.ch.conf"
-  echo "EXTERNAL_DEFAULT_PARAMETER=" > "$(pwd)/cvmfs-config.cern.ch/etc/cvmfs/default.conf"
+  # echo "EXTERNAL_DEFAULT_PARAMETER=" > "$(pwd)/cvmfs-config.cern.ch/etc/cvmfs/default.conf"
 
   sudo sed -i -e "s,CVMFS_MOUNT_DIR=/cvmfs,CVMFS_MOUNT_DIR=$PWD," /etc/cvmfs/default.conf
   local retval=0
@@ -49,7 +49,7 @@ cvmfs_run_test() {
   ls /cvmfs/grid.cern.ch || retval=21
   sudo cvmfs_talk -i grid.cern.ch parameters | grep EXTERNAL_DOMAIN_PARAMETER || retval=22
   sudo cvmfs_talk -i grid.cern.ch parameters | grep EXTERNAL_REPO_PARAMETER || retval=23
-  sudo cvmfs_talk -i grid.cern.ch parameters | grep EXTERNAL_DEFAULT_PARAMETER || retval=24
+  # sudo cvmfs_talk -i grid.cern.ch parameters | grep EXTERNAL_DEFAULT_PARAMETER || retval=24
   sudo sed -i -e "s,CVMFS_MOUNT_DIR=$PWD,CVMFS_MOUNT_DIR=/cvmfs," /etc/cvmfs/default.conf
   rm -f $defaultconf
 

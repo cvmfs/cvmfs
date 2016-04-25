@@ -4,7 +4,6 @@
   * Backport `cvmfs_server mount -a`
   * Remove use of SSLv3_client_method() in libcurl
   * Fix 'cvmfs_server snapshot -a' not noticing failed snapshots (CVM-997)
-  * Add support for default.conf file in config repository (CVM-993)
 
 2.2.1:
   * Fix reading of chunked files in libcvmfs
