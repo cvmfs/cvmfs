@@ -5001,12 +5001,6 @@ cvmfs_server_gc() {
     preserve_revisions=0
   fi
 
-  # print a warning to scare off people that might not know what they are doing
-  echo
-  echo 'WARNING: `cvmfs_server gc` is an internal command and will be subject to change'
-  echo '         in future versions of CernVM-FS. Please do not use it manually!'
-  echo
-
   for name in $names; do
     if ! has_reference_log $name; then
       reconstruct_reflog=1
