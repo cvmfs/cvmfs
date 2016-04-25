@@ -1,4 +1,5 @@
 2.2.2:
+  * Fix compilation of libcvmfs on Fedora 23 i686
   * Update cvmfs_rsync to handle source dirs changed into symlinks (CVM-1004)
   * Backport `cvmfs_server mount -a`
   * Remove use of SSLv3_client_method() in libcurl
