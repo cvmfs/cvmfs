@@ -5094,17 +5094,22 @@ cvmfs_server_gc() {
 
     to_syslog_for_repo $name "started manual garbage collection"
 
+    local reconstruct_this_reflog=0
+    if ! has_reference_log $name; then
+      reconstruct_this_reflog=1
+    fi
+
     # run the garbage collection
     local reflog_reconstruct_msg=""
-    [ $reconstruct_reflog -ne 0 ] && reflog_reconstruct_msg="(reconstructing reference logs)"
+    [ $reconstruct_this_reflog -ne 0 ] && reflog_reconstruct_msg="(reconstructing reference logs)"
     echo "Running Garbage Collection $reflog_reconstruct_msg"
-    __run_gc "$name"               \
-             "$repository_url"     \
-             "$dry_run"            \
-             "$manifest"           \
-             "$base_hash"          \
-             "$deletion_log"       \
-             "$reconstruct_reflog" \
+    __run_gc "$name"                    \
+             "$repository_url"          \
+             "$dry_run"                 \
+             "$manifest"                \
+             "$base_hash"               \
+             "$deletion_log"            \
+             "$reconstruct_this_reflog" \
              $additional_switches || die "Fail ($?)!"
 
     # sign the result
