@@ -12,9 +12,29 @@
 
 namespace manifest {
 
-// TODO(rmeusel): this shares a lot of database management code with
-//                SqliteHistory and (potentially) ...Catalog. This might be an
-//                architectural weakness and should be cleaned up.
+
+/**
+ * This is an object reference log meant to keep track of all "root" objects in
+ * the backend storage it is situated in. It's main purpose is to keep track of
+ * historic objects for efficient and robust garbage collection.
+ *
+ * "Root objects" in this sense are backend objects containing references to
+ * other backend objects but that are not necessarily referenced by any other
+ * object in the backend. For example historic root catalogs, history databases,
+ * meta-info objects or certificates.
+ *
+ * Every time such an object is newly added to a backend storage of CernVM-FS
+ * its content hash (and object type) will be added to the Reflog. This ensures
+ * an authorative list of "root objects" in a given backend storage.
+ *
+ * Reflogs are associated to a specific backend storage of Stratum0 or Stratum1
+ * and _not_ to a CernVM-FS repository. Thus, the Reflogs of Stratum0 and its
+ * replicas can and probably will be different and are _not_ interchangable.
+ *
+ * TODO(rmeusel): this shares a lot of database management code with
+ *                SqliteHistory and (potentially) ...Catalog. This might be an
+ *                architectural weakness and should be cleaned up.
+ */
 class Reflog {
  public:
   static Reflog* Open(const std::string &database_path);
