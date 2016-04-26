@@ -13,8 +13,8 @@
 #include <string>
 
 #include "upload_spooler_definition.h"
-#include "util_concurrency.h"
 #include "util/posix.h"
+#include "util_concurrency.h"
 
 namespace upload {
 
