@@ -62,8 +62,9 @@ TEST_F(T_AuthzSession, GetPidInfo) {
   AuthzSessionManager::PidKey init_pid_key;
   EXPECT_TRUE(authz_session_mgr_->GetPidInfo(1, &init_pid_key));
   EXPECT_EQ(1, init_pid_key.pid);
-  EXPECT_EQ(0U, init_pid_key.uid);
-  EXPECT_EQ(0U, init_pid_key.gid);
+  // On docker, the following two lines are not necessarily true
+  // EXPECT_EQ(0U, init_pid_key.uid);
+  // EXPECT_EQ(0U, init_pid_key.gid);
   EXPECT_EQ(1, init_pid_key.sid);
   EXPECT_EQ(0U, init_pid_key.deadline);
 
