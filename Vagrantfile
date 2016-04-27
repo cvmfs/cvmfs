@@ -31,8 +31,8 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "cernvm" do |cvm|
-    cvm.vm.box = "cernvm"
-    # cvm.vm.box_url = ... TODO(reneme): maybe add later for convenience
+    cvm.vm.box = "cernvm4"
+    cvm.vm.box_url = "http://cernvm.cern.ch/releases/ucernvm-images.2.6-4.cernvm.x86_64/ucernvm-sl7.2.6-4.cernvm.x86_64.box"
 
     cvm.vm.boot_timeout = 1200 # CernVM might load stuff over a slow network
                                   # and need a lot of time on first boot up
@@ -72,5 +72,12 @@ Vagrant.configure(2) do |config|
     fedora.vm.network "private_network", ip: "192.168.33.13"
     fedora.vm.synced_folder '.', '/vagrant', nfs: true
     fedora.vm.provision "shell", path: "vagrant/provision_fedora.sh"
+  end
+
+  config.vm.define "centos7" do |centos7|
+    centos7.vm.box = "geerlingguy/centos7"
+    centos7.vm.network "private_network", ip: "192.168.33.14"
+    centos7.vm.synced_folder '.', '/vagrant', nfs: true
+    centos7.vm.provision "shell", path: "vagrant/provision_centos7.sh"
   end
 end
