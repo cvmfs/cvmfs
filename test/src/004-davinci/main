@@ -5,12 +5,12 @@ cvmfs_run_test() {
   logfile=$1
 
   cvmfs_mount lhcb || 1
-  
+
   . /cvmfs/lhcb.cern.ch/etc/login.sh || return 1
   ( time SetupProject.sh Davinci ) || return 2
   sync
   sudo sh -c "echo 3 > /proc/sys/vm/drop_caches" || return 3
-  
+
   start_time=$(date -u +%s)
   ( time SetupProject.sh Davinci ) || return 4
   end_time=`date -u +%s`
@@ -28,8 +28,8 @@ cvmfs_run_test() {
   echo "All catalogs: $all_catalogs"
   sudo cvmfs_talk -i lhcb.cern.ch internal affairs || return 9
 
-  check_memory lhcb.cern.ch 65000
- 
+  check_memory lhcb.cern.ch 75000
+
   return 0
 }
 

@@ -5,9 +5,9 @@ do_faulty_mount() {
   local repo=$1
   shift
 
+  cvmfs_disable_config_repository
   cvmfs_mount $repo \
               "CVMFS_HTTP_PROXY=http://no-such-proxy.cern.ch:3128" \
-              "CVMFS_CONFIG_REPOSITORY=" \
               "CVMFS_USE_GEOAPI=no" \
               "CVMFS_DNS_SERVER=127.0.0.1" \
               "CVMFS_TIMEOUT=3" \
@@ -19,6 +19,7 @@ CVMFS_TEST_017_SILENT_PID=""
 cleanup() {
   echo "running cleanup()"
   [ -z $CVMFS_TEST_017_SILENT_PID ] || sudo kill $CVMFS_TEST_017_SILENT_PID
+  cvmfs_enable_config_repository
 }
 
 
