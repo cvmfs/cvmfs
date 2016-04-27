@@ -46,6 +46,13 @@ struct SpoolerDefinition {
     const size_t             max_file_chunk_size = 0);
   bool IsValid() const { return valid_; }
 
+  /**
+   * Creates a new SpoolerDefinition based on an existing one.  The new spooler
+   * has compression set to zlib, which is required for catalogs and other meta-
+   * objects.
+   */
+  SpoolerDefinition Dup2DefaultCompression() const;
+
   DriverType  driver_type;            //!< the type of the spooler driver
   std::string temporary_path;         //!< scratch space for the FileProcessor
   /**

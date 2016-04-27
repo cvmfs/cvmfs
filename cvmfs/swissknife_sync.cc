@@ -590,8 +590,15 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
                                                params.max_concurrent_write_jobs;
   }
 
+  upload::SpoolerDefinition spooler_definition_catalogs(
+    spooler_definition.Dup2DefaultCompression());
+
   params.spooler = upload::Spooler::Construct(spooler_definition);
   if (NULL == params.spooler)
+    return 3;
+  UniquePtr<upload::Spooler> spooler_catalogs(
+    upload::Spooler::Construct(spooler_definition_catalogs));
+  if (!spooler_catalogs.IsValid())
     return 3;
 
   const bool follow_redirects = (args.count('L') > 0);
@@ -614,7 +621,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 
   catalog::WritableCatalogManager
     catalog_manager(params.base_hash, params.stratum0, params.dir_temp,
-                    params.spooler, download_manager(),
+                    spooler_catalogs, download_manager(),
                     params.catalog_entry_warn_threshold,
                     statistics(),
                     params.is_balanced,
@@ -688,6 +695,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   // finalize the spooler
   LogCvmfs(kLogCvmfs, kLogStdout, "Exporting repository manifest");
   params.spooler->WaitForUpload();
+  spooler_catalogs->WaitForUpload();
   delete params.spooler;
 
   if (!manifest->Export(params.manifest_path)) {
