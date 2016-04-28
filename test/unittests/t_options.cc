@@ -17,6 +17,9 @@ class T_Options : public ::testing::Test {
     FILE *temp_file = CreateTempFile("./cvmfs_ut_options", 0600, "w",
         &config_file_);
     ASSERT_TRUE(temp_file != NULL);
+    FILE *temp_file_2 = CreateTempFile("./cvmfs_ut_options2", 0600, "w",
+        &config_file_2_);
+    ASSERT_TRUE(temp_file_2 != NULL);
     unlink_guard_.Set(config_file_);
     fprintf(temp_file,
             "CVMFS_CACHE_BASE=/root/cvmfs_testing/cache\n"
@@ -30,6 +33,9 @@ class T_Options : public ::testing::Test {
             "CVMFS_HTTP_PROXY=DIRECT\n"
             "export A=B\n");
     int result = fclose(temp_file);
+    ASSERT_EQ(0, result);
+    fprintf(temp_file_2, "CVMFS_CACHE_BASE=/overwritten\n");
+    result = fclose(temp_file_2);
     ASSERT_EQ(0, result);
   }
 
@@ -56,6 +62,7 @@ class T_Options : public ::testing::Test {
   OptionsT     options_manager_;
   UnlinkGuard  unlink_guard_;
   string       config_file_;
+  string       config_file_2_;
 };  // class T_Options
 
 typedef ::testing::Types<BashOptionsManager, SimpleOptionsParser>
@@ -107,5 +114,24 @@ TYPED_TEST(T_Options, ParsePathNoFile) {
   string fileName = "somethingThatDoesntExists";
   TestFixture::options_manager_.ParsePath(fileName, false);
   ASSERT_EQ(0u, TestFixture::options_manager_.GetAllKeys().size());
+}
+
+TYPED_TEST(T_Options, ProtectedParameter) {
+  string container;
+  OptionsManager &options_manager = TestFixture::options_manager_;
+  const string &config_file = TestFixture::config_file_;
+  const string &config_file_2 = TestFixture::config_file_2_;
+
+  options_manager.ParsePath(config_file, false);
+  options_manager.ParsePath(config_file_2, false);
+  EXPECT_TRUE(options_manager.GetValue("CVMFS_CACHE_BASE", &container));
+  EXPECT_EQ("/overwritten", container);
+
+  options_manager.ClearConfig();
+  options_manager.ParsePath(config_file, false);
+  options_manager.ProtectParameter("CVMFS_CACHE_BASE");
+  options_manager.ParsePath(config_file_2, false);
+  EXPECT_TRUE(options_manager.GetValue("CVMFS_CACHE_BASE", &container));
+  EXPECT_NE("/overwritten", container);
 }
 
