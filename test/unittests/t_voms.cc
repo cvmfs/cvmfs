@@ -2,11 +2,14 @@
  * This file is part of the CernVM File System.
  */
 
+// TODO(jblomer): this unit test does not compile at the moment.  Re-enable
+// based on updated authz code.
+
 #include <gtest/gtest.h>
 
 // Single Authz test is static
 // TODO(jblomer): find a better solution than pulling in the .cc file
-#include "voms_authz/voms_authz.cc"  // NOLINT
+#include "authz/voms_authz.cc"  // NOLINT
 
 #define TEST_DN "/DC=ch/DC=cern/OU=Organic Units/OU=Users" \
                 "/CN=bbockelm/CN=659869/CN=Brian Paul Bockelman"

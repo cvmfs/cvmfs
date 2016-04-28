@@ -372,6 +372,8 @@ fi
 %{_bindir}/cvmfs_fsck
 %{_bindir}/cvmfs_config
 /usr/libexec/cvmfs/auto.cvmfs
+/usr/libexec/cvmfs/authz/cvmfs_allow_helper
+/usr/libexec/cvmfs/authz/cvmfs_deny_helper
 %{_sysconfdir}/auto.cvmfs
 %{_sysconfdir}/cvmfs/config.sh
 %if 0%{?selinux_cvmfs}

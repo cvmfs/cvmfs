@@ -123,8 +123,6 @@ struct JobInfo {
   pid_t pid;
   uid_t uid;
   gid_t gid;
-  char *cred_fname;  // TODO(bbockelm): This is a fallback method -
-                     // can we eliminate?
   void *cred_data;  // Per-transfer credential data
   Destination destination;
   struct {
@@ -152,7 +150,6 @@ struct JobInfo {
     pid = -1;
     uid = -1;
     gid = -1;
-    cred_fname = NULL;
     cred_data = NULL;
     destination = kDestinationNone;
     destination_mem.size = destination_mem.pos = 0;
@@ -231,7 +228,6 @@ struct JobInfo {
   }
 
   ~JobInfo() {
-    delete cred_fname;
     if (wait_at[0] >= 0) {
       close(wait_at[0]);
       close(wait_at[1]);
@@ -284,6 +280,19 @@ class HeaderLists {
   void AddBlock();
 
   std::vector<curl_slist *> blocks_;  // List of curl_slist blocks
+};
+
+
+/**
+ * Provides hooks to attach per-transfer credentials to curl handles.
+ * Overwritten by the AuthzX509Attachment in authz_curl.cc.
+ */
+class CredentialsAttachment {
+ public:
+  virtual bool ConfigureCurlHandle(CURL *curl_handle,
+                                   pid_t pid,
+                                   void **info_data) = 0;
+  virtual void ReleaseCurlHandle(CURL *curl_handle, void *info_data) = 0;
 };
 
 
@@ -343,6 +352,7 @@ class DownloadManager {
   void Spawn();
   Failures Fetch(JobInfo *info);
 
+  void SetCredentialsAttachment(CredentialsAttachment *ca);
   void SetDnsServer(const std::string &address);
   void SetDnsParameters(const unsigned retries, const unsigned timeout_ms);
   void SetIpPreference(const dns::IpPreference preference);
@@ -518,10 +528,13 @@ class DownloadManager {
   time_t opt_timestamp_backup_host_;
   unsigned opt_host_reset_after_;
 
+  CredentialsAttachment *credentials_attachment_;
+
   // Writes and reads should be atomic because reading happens in a different
   // thread than writing.
   Counters *counters_;
 };  // DownloadManager
+
 
 }  // namespace download
 

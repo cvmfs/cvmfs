@@ -3,7 +3,6 @@ cvmfs_test_name="HTTP Timeout"
 
 do_faulty_mount() {
   cvmfs_mount "atlas.cern.ch"          \
-	            "CVMFS_CONFIG_REPOSITORY=" \
               "CVMFS_TIMEOUT=3"        \
               "CVMFS_TIMEOUT_DIRECT=3" \
               "CVMFS_HTTP_PROXY=DIRECT" \
@@ -14,6 +13,7 @@ CVMFS_TEST_019_SILENT_PID=
 cleanup() {
   echo "running cleanup()"
   [ -z $CVMFS_TEST_019_SILENT_PID ] || sudo kill $CVMFS_TEST_019_SILENT_PID
+  cvmfs_enable_config_repository
 }
 
 cvmfs_run_test() {
@@ -31,6 +31,8 @@ cvmfs_run_test() {
 
   echo "configure cvmfs with an unreachable and an unresponsive host"
   sudo sh -c "echo \"CVMFS_SERVER_URL=\\\"http://127.0.1.2:8080;http://127.0.0.1:${http_port}/@org@;http://cvmfs-stratum-one.cern.ch/opt/@org@\\\"\" > /etc/cvmfs/domain.d/cern.ch.local" || return 1
+
+  cvmfs_disable_config_repository
 
   echo "install a desaster cleanup"
   trap cleanup EXIT HUP INT TERM || return $?

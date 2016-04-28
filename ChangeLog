@@ -1,4 +1,7 @@
 2.3.0:
+  * Add well-defined client-side authz interface and allow/deny helpers
+  * Parallel commit of catalog databases after publish
+  * Speed-up catalog meta-data updates during publish
   * Prevent a cvmfs_server migrate on a repository that is in a transaction
   * Add `cvmfs_server mount` command (CVM-996)
   * Remove scratch directory asynchronously on publish
@@ -13,7 +16,6 @@
   * Use sqlite 3.10.2
   * Fix a few small memory leaks during reload of the library
   * Reduce number of system calls during publish
-  * Fix compilation of libcvmfs on Fedora 23 i686
   * Add support for cvmfs_swissknife publish -f to force publishing in the
     presence of open file descriptors
   * Fix a rare crash when parsing the whitelist in cvmfs_server
@@ -22,13 +24,14 @@
   * Omit S3 bucket number if only a single bucket is used
   * Warn when forcfully remounting the file system stack on the server, new
     parameter CVMFS_FORCE_REMOUNT_WARNING
+  * Add support for default.conf in config repository (CVM-993)
 
 2.2.2:
+  * Fix compilation of libcvmfs on Fedora 23 i686
   * Update cvmfs_rsync to handle source dirs changed into symlinks (CVM-1004)
   * Backport `cvmfs_server mount -a`
   * Remove use of SSLv3_client_method() in libcurl
   * Fix 'cvmfs_server snapshot -a' not noticing failed snapshots (CVM-997)
-  * Add support for default.conf in config repository (CVM-993)
 
 2.2.1:
   * Fix reading of chunked files in libcvmfs

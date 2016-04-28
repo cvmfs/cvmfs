@@ -272,16 +272,12 @@ static void *MainWorker(void *data) {
       download::JobInfo download_chunk(&url_chunk, false, false, fchunk,
                                        &chunk_hash);
 
-      unsigned attempts = 0;
-      download::Failures retval;
-      do {
-        retval = download_manager->Fetch(&download_chunk);
-        if (retval != download::kFailOk) {
-          ReportDownloadError(chunk_hash, retval);
-          abort();
-        }
-        attempts++;
-      } while (attempts < retries);
+      const download::Failures download_result =
+                                       download_manager->Fetch(&download_chunk);
+      if (download_result != download::kFailOk) {
+        ReportDownloadError(chunk_hash, download_result);
+        abort();
+      }
       fclose(fchunk);
       Store(tmp_file, chunk_hash,
             (compression_alg == zlib::kZlibDefault) ? true : false);

@@ -11,6 +11,7 @@
 #include <cstdlib>
 
 #include "logging.h"
+#include "util_concurrency.h"
 #include "xattr.h"
 
 using namespace std;  // NOLINT
@@ -34,7 +35,10 @@ WritableCatalog::WritableCatalog(const string      &path,
   sql_chunks_count_(NULL),
   sql_max_link_id_(NULL),
   sql_inc_linkcount_(NULL),
-  dirty_(false) {}
+  dirty_(false)
+{
+  atomic_init32(&dirty_children_);
+}
 
 
 WritableCatalog *WritableCatalog::AttachFreely(const string      &root_path,
@@ -493,7 +497,7 @@ void WritableCatalog::InsertNestedCatalog(const string &mountpoint,
   if (attached_reference != NULL)
     AddChild(attached_reference);
 
-  ResetNestedCatalogCache();
+  ResetNestedCatalogCacheUnprotected();
 
   delta_counters_.self.nested_catalogs++;
 }
@@ -533,7 +537,7 @@ void WritableCatalog::RemoveNestedCatalog(const string &mountpoint,
   if (attached_reference != NULL)
     *attached_reference = child;
 
-  ResetNestedCatalogCache();
+  ResetNestedCatalogCacheUnprotected();
 
   delta_counters_.self.nested_catalogs--;
 }
@@ -541,13 +545,19 @@ void WritableCatalog::RemoveNestedCatalog(const string &mountpoint,
 
 /**
  * Updates the link to a nested catalog in the database.
- * @param path the path of the nested catalog to update
- * @param hash the hash to set the given nested catalog link to
+ * @param path             the path of the nested catalog to update
+ * @param hash             the hash to set the given nested catalog link to
+ * @param size             the uncompressed catalog database file size
+ * @param child_counters   the statistics counters of the nested catalog
  */
-void WritableCatalog::UpdateNestedCatalog(const string &path,
-                                          const shash::Any &hash,
-                                          const uint64_t size)
-{
+void WritableCatalog::UpdateNestedCatalog(const std::string   &path,
+                                          const shash::Any    &hash,
+                                          const uint64_t       size,
+                                          const DeltaCounters &child_counters) {
+  MutexLockGuard guard(lock_);
+
+  child_counters.PopulateToParent(&delta_counters_);
+
   const string hash_str = hash.ToString();
   const string sql = "UPDATE nested_catalogs SET sha1 = :sha1, size = :size  "
                      "WHERE path = :path;";
@@ -559,7 +569,7 @@ void WritableCatalog::UpdateNestedCatalog(const string &path,
     stmt.BindText(3, path) &&
     stmt.Execute();
 
-  ResetNestedCatalogCache();
+  ResetNestedCatalogCacheUnprotected();
 
   assert(retval);
 }

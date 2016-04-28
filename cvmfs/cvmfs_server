@@ -323,7 +323,8 @@ Supported Commands:
   publish         [-p pause for tweaks] [-n manual revision number] [-v verbose]
                   [-a tag name] [-c tag channel] [-m tag description]
                   [-X (force external data) | -N (force native data)]
-                  [-Z compression algorithm] [-f use force remount if necessary]
+                  [-Z compression algorithm] [-F authz info file]
+                  [-f use force remount if necessary]
                   <fully qualified name>
                   Make a new repository snapshot
   rmfs            [-p(reserve) repo data and keys] [-f don't ask again]
@@ -940,7 +941,9 @@ is_mounted() {
   local regexp="$2"
 
   local absolute_mnt=
-  absolute_mnt="$(readlink --canonicalize $mountpoint)" || return 2
+  # Use canonicalize-missing because the mount point can be broken and
+  # inaccessible
+  absolute_mnt="$(readlink --canonicalize-missing $mountpoint)" || return 2
   local mnt_record="$(cat /proc/mounts 2>/dev/null | grep " $absolute_mnt ")"
   if [ x"$mnt_record" = x"" ]; then
     return 1
@@ -1566,6 +1569,7 @@ health_check() {
   local repair_in_txn=0
   local force_repair=0
 
+  OPTIND=0
   while getopts "qrtf" option; do
     case $option in
       q)
@@ -1591,7 +1595,7 @@ health_check() {
   shift $(($OPTIND-1))
 
   [ $# -eq 1 ] || die "health_check: No repository name provided"
-  name="$1"
+  name=$(get_repository_name $1)
 
   local rdonly_broken=0
   local rw_broken=0
@@ -2324,6 +2328,10 @@ CVMFS_HIDE_MAGIC_XATTRS=yes
 CVMFS_FOLLOW_REDIRECTS=yes
 CVMFS_SERVER_CACHE_MODE=yes
 EOF
+
+  if [ x"$voms_authz" != x"" ]; then
+    echo "CVMFS_AUTHZ_HELPER=/usr/bin/cvmfs_x509_helper" >> $client_conf
+  fi
 }
 
 
@@ -4994,12 +5002,6 @@ cvmfs_server_gc() {
     preserve_revisions=0
   fi
 
-  # print a warning to scare off people that might not know what they are doing
-  echo
-  echo 'WARNING: `cvmfs_server gc` is an internal command and will be subject to change'
-  echo '         in future versions of CernVM-FS. Please do not use it manually!'
-  echo
-
   for name in $names; do
     if ! has_reference_log $name; then
       reconstruct_reflog=1
@@ -5087,17 +5089,22 @@ cvmfs_server_gc() {
 
     to_syslog_for_repo $name "started manual garbage collection"
 
+    local reconstruct_this_reflog=0
+    if ! has_reference_log $name; then
+      reconstruct_this_reflog=1
+    fi
+
     # run the garbage collection
     local reflog_reconstruct_msg=""
-    [ $reconstruct_reflog -ne 0 ] && reflog_reconstruct_msg="(reconstructing reference logs)"
+    [ $reconstruct_this_reflog -ne 0 ] && reflog_reconstruct_msg="(reconstructing reference logs)"
     echo "Running Garbage Collection $reflog_reconstruct_msg"
-    __run_gc "$name"               \
-             "$repository_url"     \
-             "$dry_run"            \
-             "$manifest"           \
-             "$base_hash"          \
-             "$deletion_log"       \
-             "$reconstruct_reflog" \
+    __run_gc "$name"                    \
+             "$repository_url"          \
+             "$dry_run"                 \
+             "$manifest"                \
+             "$base_hash"               \
+             "$deletion_log"            \
+             "$reconstruct_this_reflog" \
              $additional_switches || die "Fail ($?)!"
 
     # sign the result

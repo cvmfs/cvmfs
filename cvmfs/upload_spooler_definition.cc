@@ -65,4 +65,11 @@ SpoolerDefinition::SpoolerDefinition(
   valid_ = true;
 }
 
+
+SpoolerDefinition SpoolerDefinition::Dup2DefaultCompression() const {
+  SpoolerDefinition result(*this);
+  result.compression_alg = zlib::kZlibDefault;
+  return result;
+}
+
 }  // namespace upload

@@ -61,6 +61,12 @@ class RepositorySanitizer : public InputSanitizer {
 };
 
 
+class AuthzSchemaSanitizer : public InputSanitizer {
+ public:
+  AuthzSchemaSanitizer() : InputSanitizer("az AZ 09 - _ .") { }
+};
+
+
 class IntegerSanitizer : public InputSanitizer {
  public:
   IntegerSanitizer() : InputSanitizer("09") { }

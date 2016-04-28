@@ -69,6 +69,9 @@
 #include <vector>
 
 #include "atomic.h"
+#include "authz/authz_curl.h"
+#include "authz/authz_fetch.h"
+#include "authz/authz_session.h"
 #include "auto_umount.h"
 #include "backoff.h"
 #include "cache.h"
@@ -106,11 +109,8 @@
 #include "tracer.h"
 #include "util_concurrency.h"
 #include "uuid.h"
-#include "voms_authz/voms_cred.h"
 #include "wpad.h"
 #include "xattr.h"
-
-#include "voms_authz/voms_authz.h"
 
 #ifdef FUSE_CAP_EXPORT_SUPPORT
 #define CVMFS_NFS_SUPPORT
@@ -196,6 +196,9 @@ quota::ListenerHandle *unpin_listener_ = NULL;
 signature::SignatureManager *signature_manager_ = NULL;
 download::DownloadManager *download_manager_ = NULL;
 download::DownloadManager *external_download_manager_ = NULL;
+AuthzExternalFetcher *authz_fetcher_ = NULL;
+AuthzSessionManager *authz_session_manager_ = NULL;
+AuthzAttachment *authz_attachment_ = NULL;
 cache::CacheManager *cache_manager_ = NULL;
 Fetcher *fetcher_ = NULL;
 Fetcher *external_fetcher_ = NULL;
@@ -414,6 +417,7 @@ static void RemountFinish() {
     }
     volatile_repository_ = catalog_manager_->GetVolatileFlag();
     has_voms_authz_ = catalog_manager_->GetVOMSAuthz(voms_authz_);
+    authz_attachment_->set_membership(*voms_authz_);
     fence_remount_->Open();
 
     inode_cache_->Resume();
@@ -469,23 +473,15 @@ static void RemountCheck() {
 
 
 static bool CheckVoms(const fuse_ctx &fctx) {
-  if (has_voms_authz_) {
-    LogCvmfs(kLogCvmfs, kLogDebug, "Got VOMS authz %s from filesystem "
-             "properties", voms_authz_->c_str());
-  }
+  if (!has_voms_authz_)
+    return true;
+  LogCvmfs(kLogCvmfs, kLogDebug, "Got VOMS authz %s from filesystem "
+           "properties", voms_authz_->c_str());
 
-  // Get VOMS information, if any.  If VOMS authz is present and VOMS is
-  // not compiled in, then deny authorization.
-  if ((fctx.uid != 0) && voms_authz_->size()) {
-//  #ifdef VOMS_AUTHZ
-//      return CheckVOMSAuthz(&fctx, *voms_authz_);
-//  #else
-    LogCvmfs(kLogCvmfs, kLogSyslogWarn | kLogDebug,  "VOMS requirements found "
-              "in catalog but client compiled without VOMS support");
-    return false;
-//  #endif
-  }
-  return true;
+  if (fctx.uid == 0)
+    return true;
+
+  return authz_session_manager_->IsMemberOf(fctx.pid, *voms_authz_);
 }
 
 // TODO(jblomer): the remount functions need to move into a separate entity
@@ -2034,6 +2030,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
   string nfs_shared_dir = string(cvmfs::kDefaultCachedir);
   bool shared_cache = false;
   int64_t quota_limit = cvmfs::kDefaultCacheSizeMb;
+  string authz_helper = "";
+  string authz_search_path = "/usr/libexec/cvmfs/authz";
   string hostname = "";
   string proxies = "";
   string fallback_proxies = "";
@@ -2098,6 +2096,10 @@ static int Init(const loader::LoaderExports *loader_exports) {
   // Overwrite default options
   if (cvmfs::options_manager_->GetValue("CVMFS_MEMCACHE_SIZE", &parameter))
     mem_cache_size = String2Uint64(parameter) * 1024*1024;
+  if (cvmfs::options_manager_->GetValue("CVMFS_AUTHZ_HELPER", &parameter))
+    authz_helper = parameter;
+  if (cvmfs::options_manager_->GetValue("CVMFS_AUTHZ_SEARCH_PATH", &parameter))
+    authz_search_path = parameter;
   if (cvmfs::options_manager_->GetValue("CVMFS_TIMEOUT", &parameter))
     timeout = String2Uint64(parameter);
   if (cvmfs::options_manager_->GetValue("CVMFS_TIMEOUT_DIRECT", &parameter))
@@ -2555,10 +2557,22 @@ static int Init(const loader::LoaderExports *loader_exports) {
     return loader::kFailCacheDir;
   }
 
+  // Credentials store
+  cvmfs::authz_fetcher_ = new AuthzExternalFetcher(
+    *cvmfs::repository_name_,
+    authz_helper,
+    authz_search_path);
+  cvmfs::authz_session_manager_ = AuthzSessionManager::Create(
+    cvmfs::authz_fetcher_,
+    cvmfs::statistics_);
+  assert(cvmfs::authz_session_manager_ != NULL);
+  cvmfs::authz_attachment_ = new AuthzAttachment(cvmfs::authz_session_manager_);
+
   // Network initialization
   cvmfs::download_manager_ = new download::DownloadManager();
   cvmfs::download_manager_->Init(cvmfs::kDefaultNumConnections, false,
       cvmfs::statistics_);
+  cvmfs::download_manager_->SetCredentialsAttachment(cvmfs::authz_attachment_);
   cvmfs::download_manager_->SetHostChain(hostname);
   if ((dns_timeout_ms != download::DownloadManager::kDnsDefaultTimeoutMs) ||
       (dns_retries != download::DownloadManager::kDnsDefaultRetries))
@@ -2611,7 +2625,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::external_download_manager_ = new download::DownloadManager();
   cvmfs::external_download_manager_->Init(cvmfs::kDefaultNumConnections, false,
       cvmfs::statistics_, "download-external");
-
+  cvmfs::external_download_manager_->SetCredentialsAttachment(
+    cvmfs::authz_attachment_);
   cvmfs::external_download_manager_->SetHostChain(!external_host.empty() ?
                                                   external_host : hostname);
   if ((dns_timeout_ms != download::DownloadManager::kDnsDefaultTimeoutMs) ||
@@ -2843,6 +2858,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::voms_authz_ = new string();
   cvmfs::has_voms_authz_ =
     cvmfs::catalog_manager_->GetVOMSAuthz(cvmfs::voms_authz_);
+  cvmfs::authz_attachment_->set_membership(*cvmfs::voms_authz_);
 
   // Make sure client context TLS has been initialized
   // (first initialization is not thread safe).
@@ -2990,6 +3006,9 @@ static void Fini() {
   delete cvmfs::signature_manager_;
   delete cvmfs::download_manager_;
   delete cvmfs::external_download_manager_;
+  delete cvmfs::authz_attachment_;
+  delete cvmfs::authz_session_manager_;
+  delete cvmfs::authz_fetcher_;
   delete cvmfs::inode_annotation_;
   delete cvmfs::directory_handles_;
   delete cvmfs::chunk_tables_;
@@ -3008,6 +3027,9 @@ static void Fini() {
   cvmfs::signature_manager_ = NULL;
   cvmfs::download_manager_ = NULL;
   cvmfs::external_download_manager_ = NULL;
+  cvmfs::authz_attachment_ = NULL;
+  cvmfs::authz_session_manager_ = NULL;
+  cvmfs::authz_fetcher_ = NULL;
   cvmfs::inode_annotation_ = NULL;
   cvmfs::directory_handles_ = NULL;
   cvmfs::chunk_tables_ = NULL;
@@ -3058,11 +3080,6 @@ static int AltProcessFlavor(int argc, char **argv) {
   if (strcmp(argv[1], "__wpad__") == 0) {
     return download::MainResolveProxyDescription(argc, argv);
   }
-#ifdef VOMS_AUTHZ
-  if (strcmp(argv[1], "__cred_fetcher__") == 0) {
-    return CredentialsFetcher::MainCredentialsFetcher(argc, argv);
-  }
-#endif
   return 1;
 }
 

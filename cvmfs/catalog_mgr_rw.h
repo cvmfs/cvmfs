@@ -32,12 +32,14 @@
 #include <pthread.h>
 #include <stdint.h>
 
+#include <map>
 #include <set>
 #include <string>
 
 #include "catalog_mgr_ro.h"
 #include "catalog_rw.h"
 #include "upload_spooler_result.h"
+#include "util_concurrency.h"
 #include "xattr.h"
 
 class XattrList;
@@ -124,6 +126,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
   bool Commit(const bool           stop_for_tweaks,
               const uint64_t       manual_revision,
               manifest::Manifest  *manifest);
+
   void Balance() {
       if (IsBalanceable()) {
           DoBalance();
@@ -146,25 +149,39 @@ class WritableCatalogManager : public SimpleCatalogManager {
                const std::string     &parent_directory);
 
  private:
-  bool FindCatalog(const std::string &path, WritableCatalog **result);
+  bool FindCatalog(const std::string  &path,
+                   WritableCatalog   **result,
+                   DirectoryEntry     *dirent = NULL);
   void DoBalance();
   void FixWeight(WritableCatalog *catalog);
 
-  /**
-   * Traverses all open catalogs and determines which catalogs need updated
-   * snapshots.
-   * @param[out] result the list of catalogs to snapshot
-   */
-  void GetModifiedCatalogs(WritableCatalogList *result) const {
-    const unsigned int number_of_dirty_catalogs =
-      GetModifiedCatalogsRecursively(GetRootCatalog(), result);
-    assert(number_of_dirty_catalogs <= result->size());
-  }
-  int GetModifiedCatalogsRecursively(const Catalog *catalog,
-                                     WritableCatalogList *result) const;
+  struct CatalogInfo {
+    uint64_t     ttl;
+    size_t       size;
+    shash::Any   content_hash;
+    unsigned int revision;
+  };
 
-  shash::Any SnapshotCatalog(WritableCatalog *catalog) const;
-  void CatalogUploadCallback(const upload::SpoolerResult &result);
+  struct CatalogUploadContext {
+    Future<CatalogInfo>* root_catalog_info;
+    bool                 stop_for_tweaks;
+  };
+
+  CatalogInfo SnapshotCatalogs(const bool stop_for_tweaks);
+  void FinalizeCatalog(WritableCatalog *catalog,
+                       const bool stop_for_tweaks);
+  void ScheduleCatalogProcessing(WritableCatalog *catalog);
+
+  void GetModifiedCatalogLeafs(WritableCatalogList *result) const {
+    const bool dirty = GetModifiedCatalogLeafsRecursively(GetRootCatalog(),
+                                                          result);
+    assert(dirty);
+  }
+  bool GetModifiedCatalogLeafsRecursively(Catalog             *catalog,
+                                          WritableCatalogList *result) const;
+
+  void CatalogUploadCallback(const upload::SpoolerResult &result,
+                             const CatalogUploadContext   clg_upload_context);
 
  private:
   inline void SyncLock() { pthread_mutex_lock(sync_lock_); }
@@ -176,6 +193,9 @@ class WritableCatalogManager : public SimpleCatalogManager {
   // private lock of WritableCatalogManager
   pthread_mutex_t *sync_lock_;
   upload::Spooler *spooler_;
+
+  pthread_mutex_t                         *catalog_processing_lock_;
+  std::map<std::string, WritableCatalog*>  catalog_processing_map_;
 
   uint64_t catalog_entry_warn_threshold_;
 

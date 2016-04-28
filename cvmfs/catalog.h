@@ -219,6 +219,8 @@ class Catalog : public SingleCopy {
   typedef std::map<uint64_t, inode_t> HardlinkGroupMap;
   mutable HardlinkGroupMap hardlink_groups_;
 
+  pthread_mutex_t *lock_;
+
   bool InitStandalone(const std::string &database_file);
   bool ReadCatalogCounters();
 
@@ -244,7 +246,7 @@ class Catalog : public SingleCopy {
   inline       CatalogDatabase &database()       { return *database_; }
   inline void set_parent(Catalog *catalog) { parent_ = catalog; }
 
-  void ResetNestedCatalogCache();
+  void ResetNestedCatalogCacheUnprotected();
 
  private:
   typedef std::map<PathString, Catalog*> NestedCatalogMap;
@@ -266,7 +268,6 @@ class Catalog : public SingleCopy {
   bool LookupEntry(const shash::Md5 &md5path, const bool expand_symlink,
                    DirectoryEntry *dirent) const;
   CatalogDatabase *database_;
-  pthread_mutex_t *lock_;
 
   const shash::Any catalog_hash_;
   PathString root_prefix_;

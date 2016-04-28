@@ -59,7 +59,6 @@ void SimpleOptionsParser::ParsePath(const string &config_file,
                                  const bool external __attribute__((unused))) {
   LogCvmfs(kLogCvmfs, kLogDebug, "Fast-parsing config file %s",
       config_file.c_str());
-  int retval;
   string line;
   FILE *fconfig = fopen(config_file.c_str(), "r");
   if (fconfig == NULL)
@@ -78,9 +77,7 @@ void SimpleOptionsParser::ParsePath(const string &config_file,
     value.source = config_file;
     value.value = tokens[1];
     string parameter = tokens[0];
-    config_[parameter] = value;
-    retval = setenv(parameter.c_str(), value.value.c_str(), 1);
-    assert(retval == 0);
+    PopulateParameter(parameter, value);
   }
   fclose(fconfig);
 }
@@ -194,9 +191,7 @@ void BashOptionsManager::ParsePath(const string &config_file,
     const string sh_echo = "echo $" + parameter + "\n";
     WritePipe(fd_stdin, sh_echo.data(), sh_echo.length());
     GetLineFd(fd_stdout, &value.value);
-    config_[parameter] = value;
-    retval = setenv(parameter.c_str(), value.value.c_str(), 1);
-    assert(retval == 0);
+    PopulateParameter(parameter, value);
   }
 
   close(fd_stderr);
@@ -236,11 +231,14 @@ void OptionsManager::ParseDefault(const string &fqrn) {
   int retval = setenv("CVMFS_FQRN", fqrn.c_str(), 1);
   assert(retval == 0);
 
+  protected_parameters_.clear();
+
   ParsePath("/etc/cvmfs/default.conf", false);
   vector<string> dist_defaults = FindFiles("/etc/cvmfs/default.d", ".conf");
   for (unsigned i = 0; i < dist_defaults.size(); ++i) {
     ParsePath(dist_defaults[i], false);
   }
+  ProtectParameter("CVMFS_CONFIG_REPOSITORY");
   string external_config_path;
   if ((fqrn != "") && HasConfigRepository(fqrn, &external_config_path))
     ParsePath(external_config_path + "default.conf", true);
@@ -263,6 +261,32 @@ void OptionsManager::ParseDefault(const string &fqrn) {
     ParsePath("/etc/cvmfs/config.d/" + fqrn + ".conf", false);
     ParsePath("/etc/cvmfs/config.d/" + fqrn + ".local", false);
   }
+}
+
+
+void OptionsManager::PopulateParameter(
+  const string &param,
+  const ConfigValue val)
+{
+  map<string, string>::const_iterator iter = protected_parameters_.find(param);
+  if ((iter != protected_parameters_.end()) && (iter->second != val.value)) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+             "error in cvmfs configuration: attempt to change protected %s "
+             "from %s to %s",
+             param.c_str(), iter->second.c_str(), val.value.c_str());
+    return;
+  }
+
+  config_[param] = val;
+  int retval = setenv(param.c_str(), val.value.c_str(), 1);
+  assert(retval == 0);
+}
+
+
+void OptionsManager::ProtectParameter(const string &param) {
+  string value;
+  GetValue(param, &value);
+  protected_parameters_[param] = value;
 }
 
 

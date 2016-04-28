@@ -14,7 +14,8 @@ cvmfs_run_test() {
   fi
   purge_disk_cache
   sleep 120
-  check_memory sft.cern.ch 100000
+  check_memory sft.cern.ch 150000
+  sudo cvmfs_talk -i sft.cern.ch internal affairs
 
   return 0
 }

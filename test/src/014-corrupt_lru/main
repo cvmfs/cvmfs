@@ -1,17 +1,25 @@
 
 cvmfs_test_name="Recover from corrupted LRU DB"
 
+cleanup() {
+  cvmfs_enable_config_repository
+}
+
 cvmfs_run_test() {
   logfile=$1
 
   local repo="atlas.cern.ch"
 
-  # Make sure that only a single repo uses the shared cache
-  cvmfs_mount ${repo} "CVMFS_CONFIG_REPOSITORY=" || return 1
+  echo "make sure that only a single repo uses the shared cache"
+  cvmfs_disable_config_repository || return $?
+  trap cleanup HUP EXIT TERM INT || return $?
+
+  cvmfs_mount ${repo} || return 1
 
   local cache_dir
   local cache_list
 
+  echo "look for cachedb"
   cache_dir=$(get_cvmfs_cachedir ${repo})
   sudo [ -f ${cache_dir}/cachedb ] || return 2
   ls /cvmfs/${repo} || return 3
@@ -22,9 +30,13 @@ cvmfs_run_test() {
     return 5
   fi
 
+  echo "unmount ${repo}"
   cvmfs_umount ${repo} || 10
+  echo "destroy cache database"
   sudo sh -c "echo bla > ${cache_dir}/cachedb" || return 11
-  cvmfs_mount ${repo} "CVMFS_CONFIG_REPOSITORY=" || return 12
+  
+  echo "remount ${repo}"
+  cvmfs_mount ${repo} || return 12
   cat /cvmfs/${repo}/.cvmfsdirtab || return 13
   cache_list=$(sudo cvmfs_talk -i ${repo} cache list)
   if echo $cache_list | grep -v -q "automatic rebuild"; then

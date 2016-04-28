@@ -1,16 +1,27 @@
 
 cvmfs_test_name="Cleanup left-over pipes"
 
+cleanup() {
+  cvmfs_enable_config_repository
+}
+
 cvmfs_run_test() {
   logfile=$1
 
-  cvmfs_mount "lhcb.cern.ch" "CVMFS_CONFIG_REPOSITORY=" || return 1
+  echo "disable config repository"
+  cvmfs_disable_config_repository || return $?
+  trap cleanup TERM HUP INT EXIT || return $?
+
+  echo "mount lhcb"
+  cvmfs_mount "lhcb.cern.ch" || return 1
   ls /cvmfs/lhcb.cern.ch || return 2
 
+  echo "add artificial pipes"
   local cache_dir="$(get_cvmfs_cachedir)"
   sudo mkfifo "${cache_dir}/pipe000" || return 5
   sudo mkfifo "${cache_dir}/fifo000" || return 7
 
+  echo "remount "
   cvmfs_umount "lhcb.cern.ch" || return 3
   cvmfs_mount "lhcb.cern.ch" || return 4
   sudo stat ${cache_dir}/fifo000 || return 8
