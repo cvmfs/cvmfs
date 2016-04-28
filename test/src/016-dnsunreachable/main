@@ -3,7 +3,6 @@ cvmfs_test_name="DNS Unreachable"
 
 do_faulty_mount() {
   cvmfs_mount $repo \
-              "CVMFS_CONFIG_REPOSITORY=" \
               "CVMFS_DNS_SERVER=127.0.0.2" \
               "CVMFS_TIMEOUT=3" \
               "CVMFS_TIMEOUT_DIRECT=3" \
@@ -27,7 +26,9 @@ cvmfs_run_test() {
 
   echo "trying to mount again with unreachable DNS"
   local milliseconds
+  cvmfs_disable_config_repository
   milliseconds=$(stop_watch do_faulty_mount)
+  cvmfs_enable_config_repository
   echo "timeout was $milliseconds seconds"
 
   # Unreachable name server should fail immediately
