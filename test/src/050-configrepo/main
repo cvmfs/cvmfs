@@ -57,6 +57,13 @@ cvmfs_run_test() {
   cvmfs_umount grid.cern.ch  || return 10
   cvmfs_umount alice.cern.ch || return 11
 
+  echo "prevent hang when config repository gets mistakenly changed"
+  cvmfs_umount grid.cern.ch
+  cvmfs_mount grid.cern.ch "CVMFS_CONFIG_REPOSITORY=lhcb.cern.ch" || return 50
+  mount | grep lhcb.cern.ch && return 51
+  cvmfs_umount grid.cern.ch  || return 52
+  cvmfs_umount alice.cern.ch || return 53
+
   echo "set 'notavail.cern.ch' as the global config repo"
   echo "CVMFS_CONFIG_REPOSITORY=notavail.cern.ch" | sudo tee $defaultconf || return 1
 

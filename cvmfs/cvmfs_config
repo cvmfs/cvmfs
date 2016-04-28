@@ -437,6 +437,20 @@ cvmfs_chksetup() {
     fi
   fi
 
+  # Check CVMFS_CONFIG_REPOSITORY not set in late config files
+  for conf_file in /etc/cvmfs/default.local \
+    $(find /etc/cvmfs/domain.d -name '*.conf') \
+    $(find /etc/cvmfs/domain.d -name '*.local') \
+    $(find /etc/cvmfs/config.d -name '*.conf') \
+    $(find /etc/cvmfs/config.d -name '*.local'); do
+    if [ -f $conf_file ]; then
+      if grep -q ^CVMFS_CONFIG_REPOSITORY= $conf_file; then
+        echo "Error: CVMFS_CONFIG_REPOSITORY can only be set in /etc/cvmfs/default.conf and /etc/cvmfs/default.d/*.conf (not in $conf_file)"
+        num_errors=$(($num_errors+1))
+      fi
+    fi
+  done
+
   # Check repository specfic settings
   local repo_list="$(list_repos)"
   local repo
