@@ -7,6 +7,9 @@
 
 #include <errno.h>
 #include <inttypes.h>
+#ifdef __APPLE__
+#include <sys/sysctl.h>
+#endif
 
 #include <cassert>
 #include <cstdio>
@@ -79,10 +82,38 @@ AuthzSessionManager *AuthzSessionManager::Create(
 
 
 /**
- * Gathers SID, birthday, uid, and gid from given PID.  Works currently on Linux
- * only (TODO(jblomer)).
+ * Gathers SID, birthday, uid, and gid from given PID.
  */
 bool AuthzSessionManager::GetPidInfo(pid_t pid, PidKey *pid_key) {
+  int retval;
+
+  // TODO(jblomer): better in platform.h?  Maybe a bit too bulky for that?
+#ifdef __APPLE__
+  pid_key->sid = getsid(pid);
+  if (pid_key->sid == static_cast<pid_t>(-1)) {
+    LogCvmfs(kLogAuthz, kLogDebug, "failed to get sid (%s)", strerror(errno));
+    return false;
+  }
+
+  int mib[] = { CTL_KERN, KERN_PROC, KERN_PROC_PID, pid };
+  struct kinfo_proc kp;
+  size_t len = sizeof(kp);
+  retval = sysctl(mib, 4, &kp, &len, NULL, 0);
+  if (retval == -1) {
+    LogCvmfs(kLogAuthz, kLogDebug, "failed to get pid info (%s)",
+             strerror(errno));
+    return false;
+  }
+  pid_key->uid = kp.kp_eproc.e_pcred.p_ruid;
+  pid_key->gid = kp.kp_eproc.e_pcred.p_rgid;
+  int64_t usec =
+    static_cast<int64_t>(kp.kp_proc.p_un.__p_starttime.tv_sec) * 1000000;
+  usec += static_cast<int64_t>(kp.kp_proc.p_un.__p_starttime.tv_usec);
+  pid_key->pid_bday = usec;
+  pid_key->pid = pid;
+  return true;
+#endif
+
   const int kMaxProcPath = 64;  // Enough to store /proc/PID/stat
   char pid_path[kMaxProcPath];
   if (snprintf(pid_path, kMaxProcPath, "/proc/%d/stat", pid) >= kMaxProcPath) {
@@ -98,7 +129,7 @@ bool AuthzSessionManager::GetPidInfo(pid_t pid, PidKey *pid_key) {
   // The uid and gid can be gathered from /proc/$PID/stat file ownership
   int fd_stat = fileno(fp_stat);
   platform_stat64 info;
-  int retval = platform_fstat(fd_stat, &info);
+  retval = platform_fstat(fd_stat, &info);
   if (retval != 0) {
     fclose(fp_stat);
     LogCvmfs(kLogAuthz, kLogDebug,
