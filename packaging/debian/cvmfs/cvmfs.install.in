@@ -3,6 +3,7 @@ usr/share/doc/cvmfs-@CVMFS_VERSION@/AUTHORS
 usr/share/doc/cvmfs-@CVMFS_VERSION@/ChangeLog
 usr/share/doc/cvmfs-@CVMFS_VERSION@/COPYING
 usr/bin/cvmfs2
+usr/bin/cvmfs_cp
 usr/bin/cvmfs_fsck
 usr/lib/libcvmfs_fuse.so.@CVMFS_VERSION@
 usr/lib/libcvmfs_fuse.so
