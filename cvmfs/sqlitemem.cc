@@ -284,8 +284,9 @@ bool SqliteMemoryManager::LookasideBufferArena::IsEmpty() {
 bool SqliteMemoryManager::LookasideBufferArena::Contains(void *buffer) {
   if ((buffer == NULL) || (buffer < arena_))
     return false;
-  return (reinterpret_cast<char *>(buffer) - reinterpret_cast<char *>(arena_)) <
-         kArenaSize;
+  return (static_cast<uint64_t>(
+    (reinterpret_cast<char *>(buffer) - reinterpret_cast<char *>(arena_))) <
+    kArenaSize);
 }
 
 
@@ -303,10 +304,11 @@ SqliteMemoryManager::LookasideBufferArena::~LookasideBufferArena() {
 
 
 void SqliteMemoryManager::LookasideBufferArena::PutBuffer(void *buffer) {
+  assert(buffer >= arena_);
   ptrdiff_t nbuffer =
     (reinterpret_cast<char *>(buffer) - reinterpret_cast<char *>(arena_))
     / kBufferSize;
-  assert(nbuffer < kBuffersPerArena);
+  assert(static_cast<uint64_t>(nbuffer) < kBuffersPerArena);
   const int nfreemap = nbuffer / (sizeof(int) * 8);
   freemap_[nfreemap] |= 1 << (nbuffer % (sizeof(int) * 8));
 }

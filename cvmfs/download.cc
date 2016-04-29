@@ -796,9 +796,13 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
 
   if ((info->range_offset != -1) && (info->range_size)) {
     char byte_range_array[100];
-    if (snprintf(byte_range_array, sizeof(byte_range_array), "%ld-%ld",
-                 info->range_offset,
-                 info->range_offset + info->range_size - 1) == 100) {
+    const int64_t range_lower = static_cast<int64_t>(info->range_offset);
+    const int64_t range_upper = static_cast<int64_t>(
+      info->range_offset + info->range_size - 1);
+    if (snprintf(byte_range_array, sizeof(byte_range_array),
+                 "%" PRId64"-%" PRId64,
+                 range_lower, range_upper) == 100)
+    {
       abort();  // Should be impossible given limits on offset size.
     }
     curl_easy_setopt(handle, CURLOPT_RANGE, byte_range_array);
