@@ -28,8 +28,8 @@ if [ $? -ne 0 ]; then
 fi
 PYTHON_MAJOR=$(echo $PYTHON_VERSION_STR | awk '{print $2}' | cut -d. -f1)
 PYTHON_MINOR=$(echo $PYTHON_VERSION_STR | awk '{print $2}' | cut -d. -f2)
-if [ $PYTHON_MAJOR -lt 2 -o $PYTHON_MAJOR -eq 2 -a $PYTHON_MINOR -lt 4 ]; then
-  echo "WARNING: python too old (< 2.4), skipping linter"
+if [ $PYTHON_MAJOR -lt 2 -o $PYTHON_MAJOR -eq 2 -a $PYTHON_MINOR -lt 6 ]; then
+  echo "WARNING: python too old (< 2.6), skipping linter"
   cat /dev/null > ${SCRIPT_OUTPUT}
   exit 0
 fi
