@@ -78,6 +78,7 @@ class T_Sqlitemem : public ::testing::Test {
       char *p = reinterpret_cast<char *>(M.Malloc(S));
       if (p == NULL)
         continue;
+      EXPECT_EQ(0, reinterpret_cast<intptr_t>(p) % 8) << "S is " << S;
       uint32_t p_size = M.GetSize(p);
       // uint32_t p_size = malloc_usable_size(p);
       EXPECT_GE(p_size, S);
@@ -264,11 +265,13 @@ TEST_F(T_Sqlitemem, Realloc) {
   // Allocate 2 times 1kB from the end of the arena and set both areas to zero
   void *p1 = mem_mgr_->GetMemory(1024);
   ASSERT_TRUE(p1 != NULL);
-  EXPECT_EQ(1024, mem_mgr_->GetMemorySize(p1));
+  EXPECT_GE(mem_mgr_->GetMemorySize(p1), 1024);
+  EXPECT_LE(mem_mgr_->GetMemorySize(p1), 1032);
   EXPECT_EQ(0, memcmp(p1, pattern_one_1kb, 1016));
   void *p2 = mem_mgr_->GetMemory(1024);
   ASSERT_TRUE(p2 != NULL);
-  EXPECT_EQ(1024, mem_mgr_->GetMemorySize(p2));
+  EXPECT_GE(mem_mgr_->GetMemorySize(p2), 1024);
+  EXPECT_LE(mem_mgr_->GetMemorySize(p2), 1032);
   EXPECT_EQ(0, memcmp(p2, pattern_one_1kb, 1016));
   memset(p1, 0, 1024);
   memset(p2, 0, 1024);

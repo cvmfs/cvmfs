@@ -81,7 +81,15 @@ class SqliteMemoryManager {
   /**
    * An mmap'd block of general purpose memory for malloc/free in sqlite.  Uses
    * the "boundary-tag system" as described in TAOCP vol 1 section 2.5.
-   * Not thread-safe.  Pointers are not aligned.
+   * Not thread-safe.
+   *
+   * Returned pointers are 8-byte aligned.  Since a reserved block has a 4 bytes
+   * prefix, all reserved blocks must start addresses that end with binary 100.
+   * We round up all allocation requests to a multiple of 8.  Reserved blocks
+   * are always placed at the upper bound of a free block.  The first block of
+   * the arena is appropriately padded and because the upper bound of the
+   * initial large free block is at an address that ends on binary 100, all
+   * reserved blocks will be aligned correctly.
    *
    * The tag layouts are as follows.  Size is a signed 4 byte integer, previous
    * and next are 4 byte offsets into the arena, linking to the previous and
@@ -104,12 +112,14 @@ class SqliteMemoryManager {
    * First block of arena_:                          Last "block" of arena_:
    * in the free list but blocked for merging
    *
-   *       +--------+--+-----+
-   * upper |previous|01| ... |
-   *       +-----------+-----+
-   *       | int(0) | next   | <- head_avail_
+   *       +--------+#########
+   * upper |      01| arena  #
+   *       +--------+--------+
+   *       |previous|        |
+   *       +-----------------+                                multiple of 8
+   *       | int(0) | next   | <- head_avail_                       |
    *       +-----------------+                             +--------+########
-   * lower |  this (@ 64bit) |                       lower |int(-1) |outside#
+   * lower | this [+ pad@32] |                       lower |int(-1) |outside#
    *       +--------+--------+                             +--------+########
    *        B0             B7                               B0    B4
    */
@@ -120,15 +130,15 @@ class SqliteMemoryManager {
      * sqlite file catalogs is 64kB.  An arena size of 8MB limits the total
      * number of arenas (mapped blocks) to <40, given typical storage needs for
      * 10,000 open catalogs.
-     * Has to be a power of 2MB.
+     * Has to be a power of 2MB.  (Has to be a multiple of 8 for alignment.)
      */
     static const unsigned kArenaSize = 8 * 1024 * 1024;
 
     /**
-     * Avoid very small free blocks.  This must be anyway larger than
-     * sizeof(AvailBlockCtl) + sizeof(AvailBlockTag).
+     * Avoid very small free blocks.  This must be a larger than
+     * sizeof(AvailBlockCtl) + sizeof(AvailBlockTag) and a multiple of 8.
      */
-    static const int kMinBlockSize = 20;
+    static const int kMinBlockSize = 24;
 
     /**
      * Returns the MallocArena that houses the destination of ptr.
@@ -207,6 +217,14 @@ class SqliteMemoryManager {
      private:
       int32_t size_;  // always negative
     };
+
+    /**
+     * Round up size to the next larger multiple of 8.  This is used
+     * to force 8-byte alignment.
+     */
+    static inline uint32_t RoundUp8(const uint32_t size) {
+      return (size + 7) & ~7;
+    }
 
     void UnlinkAvailBlock(AvailBlockCtl *block);
     void EnqueueAvailBlock(AvailBlockCtl *block);
