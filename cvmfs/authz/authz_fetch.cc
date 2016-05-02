@@ -118,8 +118,20 @@ void AuthzExternalFetcher::ExecHelper() {
   MakePipe(pipe_recv);
   char *argv0 = strdupa(progname_.c_str());
   char *argv[] = {argv0, NULL};
-  char *envp0 = strdupa("CVMFS_AUTHZ_HELPER=yes");
-  char *envp[] = {envp0, NULL};
+  std::vector<std::string> env_strs;
+  std::vector<char*> env_chars;
+  char **envp = environ;
+  while (*envp) {
+    env_strs.push_back(*envp);
+    envp++;
+  }
+  env_strs.push_back("CVMFS_AUTHZ_HELPER=yes");
+  for (std::vector<std::string>::const_iterator it = env_strs.begin();
+                                                it != env_strs.end();
+                                                it++) {
+    env_chars.push_back(const_cast<char*>(it->c_str()));
+  }
+  env_chars.push_back(NULL);
   int max_fd = sysconf(_SC_OPEN_MAX);
   assert(max_fd > 0);
   LogCvmfs(kLogAuthz, kLogDebug | kLogSyslog, "starting authz helper %s",
@@ -135,7 +147,7 @@ void AuthzExternalFetcher::ExecHelper() {
     for (int fd = 2; fd < max_fd; fd++)
       close(fd);
 
-    execve(argv0, argv, envp);
+    execve(argv0, argv, &env_chars[0]);
     syslog(LOG_USER | LOG_ERR, "failed to start authz helper %s (%d)",
            argv0, errno);
     abort();
