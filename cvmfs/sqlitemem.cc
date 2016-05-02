@@ -370,7 +370,7 @@ int SqliteMemoryManager::xSize(void *ptr) {
 
 
 int SqliteMemoryManager::xRoundup(int size) {
-  return RoundUp8(size);
+  return MallocArena::RoundUp8(size);
 }
 
 

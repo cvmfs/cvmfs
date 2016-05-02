@@ -160,6 +160,14 @@ class SqliteMemoryManager {
     }
     uint32_t GetSize(void *ptr) const;
     bool IsEmpty() const { return no_reserved_ == 0; }
+    
+    /**
+     * Round up size to the next larger multiple of 8.  This is used
+     * to force 8-byte alignment.
+     */
+    static inline uint32_t RoundUp8(const uint32_t size) {
+      return (size + 7) & ~7;
+    }
 
    private:
     static const char kTagAvail = 0;
@@ -217,14 +225,6 @@ class SqliteMemoryManager {
      private:
       int32_t size_;  // always negative
     };
-
-    /**
-     * Round up size to the next larger multiple of 8.  This is used
-     * to force 8-byte alignment.
-     */
-    static inline uint32_t RoundUp8(const uint32_t size) {
-      return (size + 7) & ~7;
-    }
 
     void UnlinkAvailBlock(AvailBlockCtl *block);
     void EnqueueAvailBlock(AvailBlockCtl *block);
