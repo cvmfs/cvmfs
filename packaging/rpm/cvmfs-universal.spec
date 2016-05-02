@@ -32,15 +32,6 @@ Group: Applications/System
 License: BSD
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
-# Build with voms-devel on Fedora / RHEL derivatives.
-# Note that we *load* VOMS at runtime, not link against it; this means that
-# the produced RPM will not depend on VOMS.
-%if 0%{?suse_version}
-# TODO(bbockelm): figure out solution for VOMS on SUSE.
-%else
-BuildRequires: voms-devel
-%endif
-
 %if 0%{?el5}
 BuildRequires: buildsys-macros
 %endif
@@ -427,6 +418,8 @@ fi
 %doc COPYING AUTHORS README ChangeLog
 
 %changelog
+* Fri Apr 29 2016 Jakob Blomer <jblomer@cern.ch> - 2.3.0
+- voms-devel not necessary anymore
 * Mon Apr 11 2016 Rene Meusel <rene.meusel@cern.ch> - 2.3.0
 - Disable open repo transaction check in EL4
 * Thu Apr 07 2016 Rene Meusel <rene.meusel@cern.ch> - 2.3.0

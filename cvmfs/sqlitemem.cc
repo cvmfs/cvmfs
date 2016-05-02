@@ -138,6 +138,7 @@ void *SqliteMemoryManager::MallocArena::Malloc(const uint32_t size) {
 
   // Control word first, block type tag last
   int32_t total_size = sizeof(ReservedBlockCtl) + size + 1;
+  total_size = RoundUp8(total_size);
   if (total_size < kMinBlockSize)
     total_size = kMinBlockSize;
 
@@ -158,15 +159,24 @@ void *SqliteMemoryManager::MallocArena::Malloc(const uint32_t size) {
  */
 SqliteMemoryManager::MallocArena::MallocArena()
   : arena_(reinterpret_cast<char *>(sxmmap_align(kArenaSize)))
-  , head_avail_(reinterpret_cast<AvailBlockCtl *>(arena_ + sizeof(void *)))
+  , head_avail_(reinterpret_cast<AvailBlockCtl *>(arena_ + sizeof(uint64_t)))
   , rover_(head_avail_)
   , no_reserved_(0)
 {
+  const unsigned char padding = 7;
+  // Size of the initial free block: everything minus arena boundaries
   int32_t usable_size = kArenaSize -
-    (sizeof(void *) + sizeof(AvailBlockCtl) + 1 + sizeof(int32_t));
+    (sizeof(uint64_t) + sizeof(AvailBlockCtl) + padding + 1 + sizeof(int32_t));
+  assert((usable_size % 8) == 0);
+
+  // First 8 bytes of arena: this pointer (occupies only 4 bytes on 32bit
+  // architectures, in which case the second 4 bytes are unused.)
   *reinterpret_cast<MallocArena **>(arena_) = this;
+
+  // The initial large free block
   AvailBlockCtl *free_block =
-    new (arena_ + sizeof(void *) + sizeof(AvailBlockCtl) + 1) AvailBlockCtl();
+    new (arena_ + sizeof(uint64_t) + sizeof(AvailBlockCtl) + padding + 1)
+    AvailBlockCtl();
   free_block->size = usable_size;
   free_block->link_next = free_block->link_prev =
     head_avail_->ConvertToLink(arena_);
@@ -284,8 +294,9 @@ bool SqliteMemoryManager::LookasideBufferArena::IsEmpty() {
 bool SqliteMemoryManager::LookasideBufferArena::Contains(void *buffer) {
   if ((buffer == NULL) || (buffer < arena_))
     return false;
-  return (reinterpret_cast<char *>(buffer) - reinterpret_cast<char *>(arena_)) <
-         kArenaSize;
+  return (static_cast<uint64_t>(
+    (reinterpret_cast<char *>(buffer) - reinterpret_cast<char *>(arena_))) <
+    kArenaSize);
 }
 
 
@@ -303,10 +314,11 @@ SqliteMemoryManager::LookasideBufferArena::~LookasideBufferArena() {
 
 
 void SqliteMemoryManager::LookasideBufferArena::PutBuffer(void *buffer) {
+  assert(buffer >= arena_);
   ptrdiff_t nbuffer =
     (reinterpret_cast<char *>(buffer) - reinterpret_cast<char *>(arena_))
     / kBufferSize;
-  assert(nbuffer < kBuffersPerArena);
+  assert(static_cast<uint64_t>(nbuffer) < kBuffersPerArena);
   const int nfreemap = nbuffer / (sizeof(int) * 8);
   freemap_[nfreemap] |= 1 << (nbuffer % (sizeof(int) * 8));
 }
@@ -358,7 +370,7 @@ int SqliteMemoryManager::xSize(void *ptr) {
 
 
 int SqliteMemoryManager::xRoundup(int size) {
-  return size;
+  return MallocArena::RoundUp8(size);
 }
 
 
