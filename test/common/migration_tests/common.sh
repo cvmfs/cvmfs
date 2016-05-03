@@ -140,7 +140,7 @@ installed_package_version() {
   local pkg_name=$1
 
   if has_binary rpm; then
-    echo $(rpm -qa --queryformat '%{version}' yum)
+    echo $(rpm -qa --queryformat '%{version}' $pkg_name)
   elif has_binary dpkg; then
     dpkg --status $pkg_name 2>/dev/null | grep -e "^Version:" | sed 's/^Version: \([0-9]\.[0-9]\.[0-9]*\).*$/\1/'
   else
