@@ -43,7 +43,7 @@ cvmfs_run_test() {
 
   echo "create temporary directory"
   CVMFS_TEST_041_TMPDIR=$(sudo mktemp -d /var/lib/cvmfs/tmp.XXXXXXXX)
-  [ -d "$CVMFS_TEST_041_TMPDIR" ] || return 9
+  sudo [ -d "$CVMFS_TEST_041_TMPDIR" ] || return 9
   echo "tmpdir is $CVMFS_TEST_041_TMPDIR"
 
   cvmfs_disable_config_repository || return $?

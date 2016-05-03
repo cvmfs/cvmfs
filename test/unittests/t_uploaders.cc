@@ -7,7 +7,6 @@
 #include <tbb/atomic.h>
 #include <unistd.h>
 
-#include <sstream>  // TODO(jblomer): remove me
 #include <string>
 
 #include "atomic.h"
@@ -20,6 +19,7 @@
 #include "upload_s3.h"
 #include "upload_spooler_definition.h"
 #include "util/file_guard.h"
+#include "util/string.h"
 
 
 /**
@@ -152,7 +152,8 @@ class T_Uploaders : public FileSandbox {
     // Wait S3 mockup server to finish
     int stat_loc = 0;
     wait(&stat_loc);
-    ASSERT_EQ(stat_loc, 0);
+    EXPECT_TRUE(WIFEXITED(stat_loc));
+    EXPECT_EQ(0, WEXITSTATUS(stat_loc));
   }
 
 
@@ -326,19 +327,6 @@ class T_Uploaders : public FileSandbox {
       S3MockupServerThread();
       exit(0);
     }
-  }
-
-
-  std::vector<std::string> SplitString(const std::string &str, char delim) {
-    std::vector<std::string> elems;
-    std::stringstream ss(str);
-    std::string item;
-
-    while (std::getline(ss, item, delim)) {
-      elems.push_back(item);
-    }
-
-    return elems;
   }
 
 
@@ -755,9 +743,7 @@ TYPED_TEST(T_Uploaders, UploadManyFilesSlow) {
 
   Files files;
   for (unsigned int i = 0; i < number_of_files; ++i) {
-    std::stringstream ss;
-    ss << "file" << i;
-    const std::string dest_name = ss.str();
+    const std::string dest_name = "file" + StringifyInt(i);
     std::string file;
     switch (i % 3) {
       case 0:

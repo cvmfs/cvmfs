@@ -131,9 +131,9 @@ cvmfs_run_test() {
   # download upstream package
   current_version=$(package_version $CVMFS_CLIENT_PACKAGE)
   echo "Version of testee:        $current_version"
-  # FIX ME: Once 2.2.0 is the "previous version" go back to the decrement_version
+  # FIX ME: We want to test upgrading from more than just one base version
   # previous_version=$(decrement_version $current_version)
-  previous_version="2.1.20"
+  previous_version="2.2.1"
   echo "Version to be downloaded: $previous_version"
   upstream_package_url=$(guess_package_url "cvmfs" ${previous_version}-1)
   echo "Download URL:             $upstream_package_url"
@@ -199,8 +199,14 @@ cvmfs_run_test() {
   kill -0 $tar_pid || return 11 # tar finished already >.<
   kill -0 $chksum_pid || return 11 # checksumming finished already >.<
   install_packages "$CVMFS_CLIENT_PACKAGE"
-  kill -0 $tar_pid || return 13 # tar finished already >.<
-  kill -0 $chksum_pid || return 13 # checksumming finished already >.<
+  if ! kill -0 $tar_pid; then
+    echo "WARNING: tar finished before upgrading"
+    CVMFS_GENERAL_WARNING_FLAG=1
+  fi
+  if ! kill -0 $chksum_pid; then
+    echo "WARNING: checksumming finished before upgrading"
+    CVMFS_GENERAL_WARNING_FLAG=1
+  fi
 
   # wait for the file system hammering to finish and collect the pieces
   echo "waiting for tar to be finished... "
