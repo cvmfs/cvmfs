@@ -161,6 +161,8 @@ int CommandGc::Main(const ArgumentList &args) {
     return 1;
   }
 
+  // As of here: garbage collection succeeded, cleanup & commit
+
   if (deletion_log_file != NULL) {
     const int bytes_written = fprintf(deletion_log_file,
                                       "# Garbage Collection finished at %s\n\n",
@@ -186,8 +188,7 @@ int CommandGc::Main(const ArgumentList &args) {
   }
 
   uploader->TearDown();
-
-  return success ? 0 : 1;
+  return 0;
 }
 
 }  // namespace swissknife

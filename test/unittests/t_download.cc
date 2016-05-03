@@ -14,8 +14,8 @@
 #include "prng.h"
 #include "sink.h"
 #include "statistics.h"
+#include "util/file_guard.h"
 #include "util/posix.h"
-#include "util/unlink_guard.h"
 
 using namespace std;  // NOLINT
 

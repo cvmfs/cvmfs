@@ -76,12 +76,12 @@ set (CVMFS_CLIENT_SOURCES
   uid_map.h
   uuid.cc uuid.h
   util/algorithm.cc util/algorithm.h
+  util/file_guard.h
   util/plugin.h
   util/pointer.h
   util/posix.cc util/posix.h
   util/single_copy.h
   util/string.cc util/string.h
-  util/unlink_guard.h
   whitelist.cc whitelist.h
   wpad.cc wpad.h
   xattr.cc xattr.h
@@ -230,6 +230,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   upload_spooler_result.h
   util/algorithm.cc util/algorithm.h
   util/async.h
+  util/file_guard.h
   util/mmap_file.cc util/mmap_file.h
   util/plugin.h
   util/pointer.h

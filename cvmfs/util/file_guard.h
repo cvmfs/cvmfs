@@ -2,11 +2,12 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef CVMFS_UTIL_UNLINK_GUARD_H_
-#define CVMFS_UTIL_UNLINK_GUARD_H_
+#ifndef CVMFS_UTIL_FILE_GUARD_H_
+#define CVMFS_UTIL_FILE_GUARD_H_
 
 #include <unistd.h>
 
+#include <cstdio>
 #include <string>
 
 #include "util/single_copy.h"
@@ -23,7 +24,6 @@ class UnlinkGuard : SingleCopy {
  public:
   enum InitialState { kEnabled, kDisabled };
 
- public:
   inline UnlinkGuard() : enabled_(false) {}
   inline UnlinkGuard(const std::string &path,
                      const InitialState state = kEnabled)
@@ -45,8 +45,38 @@ class UnlinkGuard : SingleCopy {
 };
 
 
+/**
+ * RAII object to close a file descriptor when it gets out of scope
+ */
+class FdGuard : SingleCopy {
+ public:
+  inline FdGuard() : fd_(-1) { }
+  explicit inline FdGuard(const int fd) : fd_(fd) { }
+  inline ~FdGuard() { if (fd_ >= 0) close(fd_); }
+  int fd() const { return fd_; }
+
+ private:
+  int fd_;
+};
+
+
+/**
+ * RAII object to close a FILE stream when it gets out of scope
+ */
+class FileGuard : SingleCopy {
+ public:
+  inline FileGuard() : file_(NULL) { }
+  explicit inline FileGuard(FILE *file) : file_(file) { }
+  inline ~FileGuard() { if (file_ != NULL) fclose(file_); }
+  const FILE *file() const { return file_; }
+
+ private:
+  FILE *file_;
+};
+
+
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD
 #endif
 
-#endif  // CVMFS_UTIL_UNLINK_GUARD_H_
+#endif  // CVMFS_UTIL_FILE_GUARD_H_

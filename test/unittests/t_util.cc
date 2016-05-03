@@ -4,6 +4,7 @@
 
 #include <gtest/gtest.h>
 
+#include <alloca.h>
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <pthread.h>
@@ -20,6 +21,7 @@
 #include "smalloc.h"
 #include "testutil.h"
 #include "util/algorithm.h"
+#include "util/file_guard.h"
 #include "util/mmap_file.h"
 #include "util/posix.h"
 #include "util/string.h"
@@ -403,9 +405,9 @@ TEST_F(T_Util, MakeSocket) {
   int socket_fd2;
 
   ASSERT_DEATH(MakeSocket(long_path, 0600), ".*");
-  ASSERT_NE(-1, socket_fd1 = MakeSocket(socket_address, 0777));
+  EXPECT_NE(-1, socket_fd1 = MakeSocket(socket_address, 0777));
   // the second time it should work as well (no socket-already-in-use error)
-  ASSERT_NE(-1, socket_fd2 = MakeSocket(socket_address, 0777));
+  EXPECT_NE(-1, socket_fd2 = MakeSocket(socket_address, 0777));
   close(socket_fd1);
   close(socket_fd2);
 }
@@ -613,26 +615,27 @@ TEST_F(T_Util, Block2Nonblock) {
 }
 
 TEST_F(T_Util, SendMes2Socket) {
-  void *buffer = scalloc(20, sizeof(char));
+  void *buffer = alloca(20);
   struct sockaddr_in client_addr;
   unsigned int client_length = sizeof(client_addr);
+
   int server_fd = MakeSocket(socket_address, 0777);
   ASSERT_LT(0, server_fd);
+  FdGuard fd_guard_server(server_fd);
   listen(server_fd, 1);
+
   int client_fd = ConnectSocket(socket_address);
   ASSERT_LE(0, client_fd);
+  FdGuard fd_guard_client(client_fd);
   SendMsg2Socket(client_fd, to_write);
   int new_connection = accept(server_fd, (struct sockaddr *) &client_addr,
-      &client_length);
+                              &client_length);
   ASSERT_LE(0, new_connection);
+  FdGuard fd_guard_connection(new_connection);
   ssize_t bytes_read = read(new_connection, buffer, to_write.length());
   EXPECT_EQ(static_cast<size_t>(bytes_read), to_write.length());
 
   EXPECT_STREQ(to_write.c_str(), static_cast<const char*>(buffer));
-  close(new_connection);
-  close(client_fd);
-  close(server_fd);
-  free(buffer);
 }
 
 TEST_F(T_Util, Mutex) {
@@ -1129,10 +1132,15 @@ TEST_F(T_Util, GetLineFd) {
   string file2 = CreateFileWithContent("file2.txt", "\ncontent\ncontent2\n");
   string file3 = CreateFileWithContent("file3.txt", "mycompletestring");
   string file4 = CreateFileWithContent("file4.txt", "");
+
   int fd1 = open(file1.c_str(), O_RDONLY);
   int fd2 = open(file2.c_str(), O_RDONLY);
   int fd3 = open(file3.c_str(), O_RDONLY);
   int fd4 = open(file4.c_str(), O_RDONLY);
+  FdGuard fd_guard_1(fd1);
+  FdGuard fd_guard_2(fd2);
+  FdGuard fd_guard_3(fd3);
+  FdGuard fd_guard_4(fd4);
 
   ASSERT_LE(0, fd1);
   ASSERT_LE(0, fd2);
@@ -1147,10 +1155,6 @@ TEST_F(T_Util, GetLineFd) {
   EXPECT_EQ("mycompletestring", result);
   EXPECT_FALSE(GetLineFd(fd4, &result));  // no content
   EXPECT_EQ("", result);
-  close(fd1);
-  close(fd2);
-  close(fd3);
-  close(fd4);
 }
 
 TEST_F(T_Util, Trim) {

@@ -4,6 +4,7 @@
 
 #include <gtest/gtest.h>
 
+#include <alloca.h>
 #include <unistd.h>
 
 #include "authz/authz.h"
@@ -11,6 +12,7 @@
 #include "authz/authz_session.h"
 #include "platform.h"
 #include "statistics.h"
+#include "util/pointer.h"
 
 
 class TestAuthzFetcher : public AuthzFetcher {
@@ -154,23 +156,20 @@ TEST_F(T_AuthzSession, GetTokenCopy) {
   fetched_token.size = 1;
   authz_fetcher_.next_token = fetched_token;
 
-  AuthzToken *tokenX = authz_session_mgr_->GetTokenCopy(1, "A");
-  reinterpret_cast<char *>(fetched_token.data)[0] = 'Y';
-  AuthzToken *tokenY = authz_session_mgr_->GetTokenCopy(1, "A");
-  ASSERT_TRUE(tokenX != NULL);
-  ASSERT_TRUE(tokenY != NULL);
-
+  UniquePtr<AuthzToken> tokenX(authz_session_mgr_->GetTokenCopy(1, "A"));
+  ASSERT_TRUE(tokenX.IsValid());
   EXPECT_EQ(kTokenX509, tokenX->type);
   EXPECT_EQ(1U, tokenX->size);
   EXPECT_EQ('X', reinterpret_cast<char *>(tokenX->data)[0]);
   free(tokenX->data);
-  free(tokenX);
 
+  reinterpret_cast<char *>(fetched_token.data)[0] = 'Y';
+  UniquePtr<AuthzToken> tokenY(authz_session_mgr_->GetTokenCopy(1, "A"));
+  ASSERT_TRUE(tokenY.IsValid());
   EXPECT_EQ(kTokenX509, tokenY->type);
   EXPECT_EQ(1U, tokenY->size);
   EXPECT_EQ('Y', reinterpret_cast<char *>(tokenY->data)[0]);
   free(tokenY->data);
-  free(tokenY);
 
   EXPECT_EQ(NULL, authz_session_mgr_->GetTokenCopy(-1, "A"));
 }

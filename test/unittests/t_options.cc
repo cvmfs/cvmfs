@@ -5,8 +5,8 @@
 #include "gtest/gtest.h"
 
 #include "options.h"
+#include "util/file_guard.h"
 #include "util/posix.h"
-#include "util/unlink_guard.h"
 
 using namespace std;  // NOLINT
 
@@ -17,10 +17,13 @@ class T_Options : public ::testing::Test {
     FILE *temp_file = CreateTempFile("./cvmfs_ut_options", 0600, "w",
         &config_file_);
     ASSERT_TRUE(temp_file != NULL);
+    unlink_guard_.Set(config_file_);
+
     FILE *temp_file_2 = CreateTempFile("./cvmfs_ut_options2", 0600, "w",
         &config_file_2_);
     ASSERT_TRUE(temp_file_2 != NULL);
-    unlink_guard_.Set(config_file_);
+    unlink_guard_2_.Set(config_file_2_);
+
     fprintf(temp_file,
             "CVMFS_CACHE_BASE=/root/cvmfs_testing/cache\n"
             "CVMFS_RELOAD_SOCKETS=/root/cvmfs_testing/cache\n"
@@ -61,6 +64,7 @@ class T_Options : public ::testing::Test {
  protected:
   OptionsT     options_manager_;
   UnlinkGuard  unlink_guard_;
+  UnlinkGuard  unlink_guard_2_;
   string       config_file_;
   string       config_file_2_;
 };  // class T_Options

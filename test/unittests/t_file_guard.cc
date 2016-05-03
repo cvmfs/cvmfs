@@ -4,12 +4,14 @@
 
 #include <gtest/gtest.h>
 
+#include <fcntl.h>
+
 #include <string>
 
+#include "util/file_guard.h"
 #include "util/posix.h"
-#include "util/unlink_guard.h"
 
-class T_UnlinkGuard : public ::testing::Test {
+class T_FileGuard : public ::testing::Test {
  protected:
   static const std::string sandbox;
 
@@ -43,13 +45,13 @@ class T_UnlinkGuard : public ::testing::Test {
   }
 };
 
-const std::string T_UnlinkGuard::sandbox = "./cvmfs_ut_unlink_guard";
+const std::string T_FileGuard::sandbox = "./cvmfs_ut_unlink_guard";
 
 
-TEST_F(T_UnlinkGuard, Initialize) {}
+TEST_F(T_FileGuard, Initialize) {}
 
 
-TEST_F(T_UnlinkGuard, SimpleUnlink) {
+TEST_F(T_FileGuard, SimpleUnlink) {
   const std::string file_path = GetFilename();
   {
     UnlinkGuard d(file_path);
@@ -61,7 +63,7 @@ TEST_F(T_UnlinkGuard, SimpleUnlink) {
 }
 
 
-TEST_F(T_UnlinkGuard, Disable) {
+TEST_F(T_FileGuard, UnlinkDisable) {
   const std::string file_path = GetFilename();
   {
     UnlinkGuard d(file_path);
@@ -78,7 +80,7 @@ TEST_F(T_UnlinkGuard, Disable) {
 }
 
 
-TEST_F(T_UnlinkGuard, Reenable) {
+TEST_F(T_FileGuard, UnlinkReenable) {
   const std::string file_path = GetFilename();
   {
     UnlinkGuard d(file_path);
@@ -96,7 +98,7 @@ TEST_F(T_UnlinkGuard, Reenable) {
 }
 
 
-TEST_F(T_UnlinkGuard, MultipleGuards) {
+TEST_F(T_FileGuard, MultipleUnlinkGuards) {
   const std::string file_path1 = GetFilename();
   const std::string file_path2 = GetFilename();
   const std::string file_path3 = GetFilename();
@@ -137,7 +139,7 @@ TEST_F(T_UnlinkGuard, MultipleGuards) {
 }
 
 
-TEST_F(T_UnlinkGuard, DeferredInit) {
+TEST_F(T_FileGuard, UnlinkDeferredInit) {
   const std::string file_path = GetFilename();
   {
     ASSERT_TRUE(FileExists(file_path));
@@ -154,7 +156,7 @@ TEST_F(T_UnlinkGuard, DeferredInit) {
 }
 
 
-TEST_F(T_UnlinkGuard, DisabledInit) {
+TEST_F(T_FileGuard, UnlinkDisabledInit) {
   const std::string file_path = GetFilename();
   {
     ASSERT_TRUE(FileExists(file_path));
@@ -181,7 +183,7 @@ TEST_F(T_UnlinkGuard, DisabledInit) {
 }
 
 
-TEST_F(T_UnlinkGuard, ExplicitEnabledInit) {
+TEST_F(T_FileGuard, UnlinkExplicitEnabledInit) {
   const std::string file_path = GetFilename();
   {
     ASSERT_TRUE(FileExists(file_path));
@@ -205,4 +207,18 @@ TEST_F(T_UnlinkGuard, ExplicitEnabledInit) {
     EXPECT_TRUE(FileExists(file_path));
   }
   EXPECT_FALSE(FileExists(file_path));
+}
+
+
+TEST_F(T_FileGuard, FdGuard) {
+  int fd = -1;
+  {
+    fd = open("/dev/null", O_RDONLY);
+    ASSERT_GE(fd, 0);
+    FdGuard fd_guard(fd);
+    int retval = fcntl(fd, F_GETFD, 0);
+    EXPECT_NE(-1, retval);
+  }
+  int retval = fcntl(fd, F_GETFD, 0);
+  EXPECT_EQ(-1, retval);
 }
