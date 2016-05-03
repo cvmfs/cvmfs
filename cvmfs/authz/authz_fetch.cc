@@ -26,7 +26,7 @@
 #include "util_concurrency.h"
 
 using namespace std;  // NOLINT
-
+extern char **environ;
 
 const int AuthzExternalFetcher::kMinTtl = 0;
 const uint32_t AuthzExternalFetcher::kProtocolVersion = 1;
@@ -122,7 +122,9 @@ void AuthzExternalFetcher::ExecHelper() {
   std::vector<char*> env_chars;
   char **envp = environ;
   while (*envp) {
-    env_strs.push_back(*envp);
+    if (strncmp("CVMFS_AUTHZ_", *envp, 12) == 0) {
+      env_strs.push_back(*envp + 12);
+    }
     envp++;
   }
   env_strs.push_back("CVMFS_AUTHZ_HELPER=yes");
