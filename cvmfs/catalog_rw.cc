@@ -18,6 +18,10 @@ using namespace std;  // NOLINT
 
 namespace catalog {
 
+const double WritableCatalog::kMaximalFreePageRatio = 0.20;
+const double WritableCatalog::kMaximalRowIdWasteRatio = 0.25;
+
+
 WritableCatalog::WritableCatalog(const string      &path,
                                  const shash::Any  &catalog_hash,
                                        Catalog     *parent,

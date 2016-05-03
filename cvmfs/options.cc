@@ -285,7 +285,9 @@ void OptionsManager::PopulateParameter(
 
 void OptionsManager::ProtectParameter(const string &param) {
   string value;
-  GetValue(param, &value);
+  // We don't care about the result.  If param does not yet exists, we lock it
+  // to the empty string.
+  (void) GetValue(param, &value);
   protected_parameters_[param] = value;
 }
 

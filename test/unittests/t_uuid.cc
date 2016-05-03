@@ -6,10 +6,10 @@
 
 #include <unistd.h>
 
+#include "util/file_guard.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
-#include "util/unlink_guard.h"
 #include "uuid.h"
 
 using namespace std;  // NOLINT

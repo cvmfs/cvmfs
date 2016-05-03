@@ -212,9 +212,10 @@ bool Reader<FileScrubbingTaskT, FileT>::
   buffer->SetUsedBytes(bytes_read);
   open_file->file_marker += bytes_read;
 
-  // tell kernel to evict read pages from the page cache
-  platform_invalidate_kcache(open_file->file_descriptor,
-                             file_offset, bytes_read);
+  // Tell kernel to evict read pages from the page cache.  We don't care much if
+  // it succeeds or not.
+  (void) platform_invalidate_kcache(open_file->file_descriptor,
+                                    file_offset, bytes_read);
 
   // check if the file has been fully read
   const bool finished_reading =

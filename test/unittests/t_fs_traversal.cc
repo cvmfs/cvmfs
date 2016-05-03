@@ -17,6 +17,7 @@
 
 #include "fs_traversal.h"
 #include "platform.h"
+#include "util/file_guard.h"
 #include "util/posix.h"
 
 class T_FsTraversal : public ::testing::Test {
@@ -230,7 +231,7 @@ class T_FsTraversal : public ::testing::Test {
   void CreateSocket(const std::string &relative_path) {
     const std::string path = testbed_path_ + "/" + relative_path;
     const int retval = MakeSocket(path, 0755);
-    ASSERT_NE(-1, retval) << "errno: " << errno;
+    ASSERT_GE(retval, 0) << "errno: " << errno;
     reference_[relative_path] = Checklist(relative_path, Checklist::Socket);
     close(retval);
   }

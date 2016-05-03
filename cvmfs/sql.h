@@ -9,8 +9,8 @@
 #include <string>
 
 #include "duplex_sqlite3.h"
+#include "util/file_guard.h"
 #include "util/pointer.h"
-#include "util/unlink_guard.h"
 
 namespace sqlite {
 
