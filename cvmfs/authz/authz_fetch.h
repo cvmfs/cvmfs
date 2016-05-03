@@ -27,6 +27,8 @@ class AuthzFetcher {
     std::string membership;
   };
 
+  virtual ~AuthzFetcher() { }
+
   /**
    * Based on the given pid, uid, gid and the given membership requirement,
    * gather credentials.  Positive and negative replies have a time to live.
@@ -43,6 +45,7 @@ class AuthzFetcher {
 class AuthzStaticFetcher : public AuthzFetcher {
  public:
   AuthzStaticFetcher(AuthzStatus s, unsigned ttl) : status_(s), ttl_(ttl) { }
+  virtual ~AuthzStaticFetcher() { }
   virtual AuthzStatus Fetch(const QueryInfo &query_info,
                             AuthzToken *authz_token,
                             unsigned *ttl)
