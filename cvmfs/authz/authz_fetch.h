@@ -16,6 +16,8 @@
 #include "json_document.h"
 #include "util/single_copy.h"
 
+class OptionsManager;
+
 class AuthzFetcher {
  public:
   struct QueryInfo {
@@ -92,8 +94,9 @@ struct AuthzExternalMsg {
 /**
  * Connects to an external process that fetches the tokens.  The external helper
  * is spawned on demand through execve.  It has to receive commands on stdin
- * and write replies to stdout.  It can expect the following environment
- * variables to be set: CVMFS_FQRN, CVMFS_PID.
+ * and write replies to stdout.  Environment variables of the form
+ * CVMFS_AUTHZ_... are forwarded to the helper having the CVMFS_AUTHZ_ prefix
+ * stripped.
  */
 class AuthzExternalFetcher : public AuthzFetcher, SingleCopy {
   FRIEND_TEST(T_AuthzFetch, ExecHelper);
@@ -110,7 +113,8 @@ class AuthzExternalFetcher : public AuthzFetcher, SingleCopy {
 
   AuthzExternalFetcher(const std::string &fqrn,
                        const std::string &progname,
-                       const std::string &search_path);
+                       const std::string &search_path,
+                       OptionsManager *options_manager);
   AuthzExternalFetcher(const std::string &fqrn, int fd_send, int fd_recv);
   virtual ~AuthzExternalFetcher();
 
@@ -188,6 +192,11 @@ class AuthzExternalFetcher : public AuthzFetcher, SingleCopy {
    * authenticating
    */
   bool fail_state_;
+
+  /**
+   * Used to gather CVMFS_AUTHZ_ options
+   */
+  OptionsManager *options_manager_;
 
   /**
    * The send-receive cycle is atomic.

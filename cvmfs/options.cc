@@ -342,14 +342,21 @@ vector<string> OptionsManager::GetAllKeys() {
 }
 
 
-vector<string> OptionsManager::GetEnvironmentSubset(const string &key_prefix) {
+vector<string> OptionsManager::GetEnvironmentSubset(
+  const string &key_prefix,
+  bool strip_prefix)
+{
   vector<string> result;
   for (map<string, ConfigValue>::const_iterator i = config_.begin(),
        iEnd = config_.end(); i != iEnd; ++i)
   {
     const bool ignore_prefix = false;
-    if (HasPrefix(i->first, key_prefix, ignore_prefix))
-      result.push_back(i->first + "=" + i->second.value);
+    if (HasPrefix(i->first, key_prefix, ignore_prefix)) {
+      const string output_key = strip_prefix
+        ? i->first.substr(key_prefix.length())
+        : i->first;
+      result.push_back(output_key + "=" + i->second.value);
+    }
   }
   return result;
 }

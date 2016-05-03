@@ -144,10 +144,15 @@ TYPED_TEST(T_Options, GetEnvironmentSubset) {
   const string &config_file = TestFixture::config_file_;
   options_manager.ParsePath(config_file, false);
 
-  EXPECT_EQ(0U, options_manager.GetEnvironmentSubset("NO_SUCH_PREFIX").size());
-  EXPECT_EQ(5U, options_manager.GetEnvironmentSubset("CVMFS").size());
-  vector<string> env = options_manager.GetEnvironmentSubset("CVMFS_CACHE");
+  EXPECT_EQ(0U,
+    options_manager.GetEnvironmentSubset("NO_SUCH_PREFIX", false).size());
+  EXPECT_EQ(5U, options_manager.GetEnvironmentSubset("CVMFS", false).size());
+  vector<string> env =
+    options_manager.GetEnvironmentSubset("CVMFS_CACHE", false);
   ASSERT_EQ(1U, env.size());
   EXPECT_EQ(env[0], "CVMFS_CACHE_BASE=/root/cvmfs_testing/cache");
+  
+  env = options_manager.GetEnvironmentSubset("CVMFS_CACHE_", true);
+  ASSERT_EQ(1U, env.size());
+  EXPECT_EQ(env[0], "BASE=/root/cvmfs_testing/cache");
 }
-
