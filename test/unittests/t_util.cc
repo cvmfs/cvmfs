@@ -13,6 +13,7 @@
 #include <tbb/tbb_thread.h>
 #include <unistd.h>
 
+#include <cstring>
 #include <ctime>
 #include <limits>
 #include <vector>
@@ -616,6 +617,7 @@ TEST_F(T_Util, Block2Nonblock) {
 
 TEST_F(T_Util, SendMes2Socket) {
   void *buffer = alloca(20);
+  memset(buffer, 0, 20);
   struct sockaddr_in client_addr;
   unsigned int client_length = sizeof(client_addr);
 
