@@ -197,6 +197,10 @@ class AbstractMockUploader : public upload::AbstractUploader {
     assert(AbstractMockUploader::not_implemented);
   }
 
+  virtual bool Remove(const shash::Any &hash_to_delete) {
+    assert(AbstractMockUploader::not_implemented);
+  }
+
   virtual bool Peek(const std::string &path) const {
     assert(AbstractMockUploader::not_implemented);
   }
