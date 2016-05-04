@@ -49,7 +49,7 @@ yum -y install libuuid-devel gcc gcc-c++ glibc-common cmake fuse fuse-devel  \
                curl attr httpd libcap-devel voms-devel rpm-build             \
                globus-common-devel globus-gsi-callback-devel                 \
                globus-gsi-cert-utils-devel globus-gsi-credential-devel       \
-               globus-gsi-sysconfig-devel
+               globus-gsi-sysconfig-devel compat-expat1 openssl098e gridsite
 
 # install convenience packages for development
 yum -y install git tig iftop htop jq rubygems screen nc python-unittest2 \
