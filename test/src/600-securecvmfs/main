@@ -60,8 +60,11 @@ cleanup() {
   [ -z "$TEST600_TESTCA_HASH"                  ] || sudo rm -f $TEST600_TESTCA_HASH
   [ -z "$TEST600_TESTCRL_HASH"                 ] || sudo rm -f $TEST600_TESTCRL_HASH
   [ -z "$TEST600_TESTSIGNING_HASH"             ] || sudo rm -f $TEST600_TESTSIGNING_HASH
-  [ -z "$TEST600_PRIVATE_MOUNT"                ] || sudo umount $TEST600_PRIVATE_MOUNT
   [ -z "$TEST600_HOSTNAME"                     ] || sudo sed -i -e "/$TEST600_HOSTNAME/d" /etc/hosts
+  if [ ! -z "$TEST600_PRIVATE_MOUNT" ]; then
+    sudo umount $TEST600_PRIVATE_MOUNT
+    sudo rmdir $TEST600_PRIVATE_MOUNT
+  fi
   [ -z "$TEST600_SELINUX_DISABLED"             ] || sudo setenforce 1
 }
 
