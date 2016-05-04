@@ -151,7 +151,7 @@ TYPED_TEST(T_Options, GetEnvironmentSubset) {
     options_manager.GetEnvironmentSubset("CVMFS_CACHE", false);
   ASSERT_EQ(1U, env.size());
   EXPECT_EQ(env[0], "CVMFS_CACHE_BASE=/root/cvmfs_testing/cache");
-  
+
   env = options_manager.GetEnvironmentSubset("CVMFS_CACHE_", true);
   ASSERT_EQ(1U, env.size());
   EXPECT_EQ(env[0], "BASE=/root/cvmfs_testing/cache");
