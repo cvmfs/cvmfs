@@ -271,7 +271,7 @@ cvmfs_run_test() {
 
   echo "copy vomsproxy for 'nobody'"
   local nobody_vomsproxy="$(pwd)/certs/vomsproxy.pem.nobody"
-  cp $(pwd)/certs/vomsproxy.pem $nobody_vomsproxy || return 20
+  sudo cp $(pwd)/certs/vomsproxy.pem $nobody_vomsproxy || return 20
   sudo chown nobody:            $nobody_vomsproxy || return 21
 
   echo "This should work"
@@ -309,7 +309,7 @@ cvmfs_run_test() {
   # Make sure our second VOMS proxy was valid.
   echo "This should work"
   nobody_vomsproxy="$(pwd)/certs/vomsproxy3.pem.nobody"
-  cp $(pwd)/certs/vomsproxy2.pem $nobody_vomsproxy || return 20
+  sudo cp $(pwd)/certs/vomsproxy2.pem $nobody_vomsproxy || return 20
   sudo chown nobody:             $nobody_vomsproxy || return 21
   sudo -u nobody /bin/sh -c "export X509_USER_PROXY=$nobody_vomsproxy; cat ${mntpnt}/hello_world" > /dev/null || return 34
 
