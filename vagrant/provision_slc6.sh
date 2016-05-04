@@ -94,3 +94,5 @@ if ! id $CVMFS_TEST_USER > /dev/null 2>&1; then
   usermod -a -G fuse $CVMFS_TEST_USER
   echo "$CVMFS_TEST_USER ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 fi
+
+usermod -a -G fuse vagrant
