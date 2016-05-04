@@ -60,6 +60,7 @@ set (CVMFS_CLIENT_SOURCES
   manifest_fetch.cc manifest_fetch.h
   monitor.cc monitor.h
   murmur.h
+  options.cc options.h
   platform.h platform_linux.h platform_osx.h
   prng.h
   quota.cc quota.h
@@ -102,7 +103,6 @@ set (CVMFS2_DEBUG_SOURCES
   loader.h
   nfs_maps.cc nfs_maps.h
   nfs_shared_maps.cc nfs_shared_maps.h
-  options.cc options.h
   quota_listener.cc quota_listener.h
   talk.cc talk.h
   tracer.cc tracer.h

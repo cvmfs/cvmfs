@@ -2561,7 +2561,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::authz_fetcher_ = new AuthzExternalFetcher(
     *cvmfs::repository_name_,
     authz_helper,
-    authz_search_path);
+    authz_search_path,
+    cvmfs::options_manager_);
   cvmfs::authz_session_manager_ = AuthzSessionManager::Create(
     cvmfs::authz_fetcher_,
     cvmfs::statistics_);
