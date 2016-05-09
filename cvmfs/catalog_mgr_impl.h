@@ -432,7 +432,7 @@ template <class CatalogT>
 bool AbstractCatalogManager<CatalogT>::GetVOMSAuthz(std::string *authz) const {
   ReadLock();
   const bool has_authz = has_authz_cache_;
-  if (has_authz)
+  if (has_authz && authz)
     *authz = authz_cache_;
   Unlock();
   return has_authz;
