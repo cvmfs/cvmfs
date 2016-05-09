@@ -17,12 +17,6 @@
 
 namespace cache {
 
-class KvStore : SingleCopy {
- public:
-
-};
-
-
 /**
  * ...
  * TODO(jblomer): save open file table for hotpatch
