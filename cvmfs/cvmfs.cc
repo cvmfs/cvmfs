@@ -744,6 +744,8 @@ static void cvmfs_forget(
 
   fence_remount_->Enter();
   ino = catalog_manager_->MangleInode(ino);
+  // This has been seen to deadlock on the debug log mutex on SL5.  Problem of
+  // old kernel/fuse?
   LogCvmfs(kLogCvmfs, kLogDebug, "forget on inode %"PRIu64" by %u",
            uint64_t(ino), nlookup);
   if (!nfs_maps_)

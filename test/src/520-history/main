@@ -174,7 +174,7 @@ cvmfs_run_test() {
   local prev_trunk_tag="trunk-previous"
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
-  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER $scratch_dir/debug.log || return $?
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
   # ============================================================================
 
@@ -199,39 +199,39 @@ cvmfs_run_test() {
 
   # ============================================================================
 
-  echo "init a new transaction to change something in repository $CVMFS_TEST_REPO"
+  echo "init a new transaction to change something in repository $CVMFS_TEST_REPO (1/2)"
   start_transaction $CVMFS_TEST_REPO || return $?
 
-  echo "change stuff in the repository"
+  echo "change stuff in the repository (1/2)"
   change_files_1_in $repo_dir || return 7
 
-  echo "change exactly the same stuff in the scratch spaces"
+  echo "change exactly the same stuff in the scratch spaces (1/2)"
   change_files_1_in $reference_dir2 || return 8
   change_files_1_in $reference_dir3 || return 8
   change_files_1_in $reference_dir4 || return 8
   change_files_1_in $reference_dir5 || return 8
 
-  echo "creating CVMFS snapshot"
+  echo "creating CVMFS snapshot (1/2)"
   publish_repo $CVMFS_TEST_REPO -a $second_tag -m "$second_tag_desc" || return $?
 
-  echo "compare the changed directories"
+  echo "compare the changed directories (1/2)"
   compare_directories $repo_dir $reference_dir2 $CVMFS_TEST_REPO || return $?
 
   # ============================================================================
 
-  echo "init a new transaction to change something in repository $CVMFS_TEST_REPO"
+  echo "init a new transaction to change something in repository $CVMFS_TEST_REPO (2/2)"
   start_transaction $CVMFS_TEST_REPO || return $?
 
-  echo "change stuff in the repository"
+  echo "change stuff in the repository (2/2)"
   change_files_2_in $repo_dir || return 7
 
-  echo "change exactly the same stuff in the scratch space"
+  echo "change exactly the same stuff in the scratch space (2/2)"
   change_files_2_in $reference_dir3 || return 8
 
-  echo "creating CVMFS snapshot"
+  echo "creating CVMFS snapshot (2/2)"
   publish_repo $CVMFS_TEST_REPO -a $third_tag -m "$third_tag_desc1" || return $?
 
-  echo "compare the changed directories"
+  echo "compare the changed directories (2/2)"
   compare_directories $repo_dir $reference_dir3 $CVMFS_TEST_REPO || return $?
 
   # ============================================================================
