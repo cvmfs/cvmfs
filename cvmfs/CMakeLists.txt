@@ -51,14 +51,18 @@ set (CVMFS_CLIENT_SOURCES
   fetch.cc fetch.h
   file_chunk.cc file_chunk.h
   fs_traversal.h
+  fuse_listing.cc fuse_listing.h
   globals.cc globals.h
+  glue_buffer.cc glue_buffer.h
   hash.cc hash.h
   json_document.cc json_document.h
+  loader.h
   logging.cc logging.h logging_internal.h
   lru.h
   manifest.cc manifest.h
   manifest_fetch.cc manifest_fetch.h
   monitor.cc monitor.h
+  mountpoint.cc mountpoint.h
   murmur.h
   options.cc options.h
   platform.h platform_linux.h platform_osx.h
@@ -96,11 +100,9 @@ set (CVMFS2_DEBUG_SOURCES
   compat.cc compat.h
   cvmfs.cc cvmfs.h
   fence.h
-  glue_buffer.cc glue_buffer.h
   history.h
   history_sql.cc history_sql.h
   history_sqlite.cc history_sqlite.h
-  loader.h
   nfs_maps.cc nfs_maps.h
   nfs_shared_maps.cc nfs_shared_maps.h
   quota_listener.cc quota_listener.h
