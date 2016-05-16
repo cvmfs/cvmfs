@@ -53,7 +53,9 @@ class MountPointFactory {
 
 /**
  * The FileSystem object initializes cvmfs' global state.  It sets up the cache
- * directory and it can contain mutiple mount points.
+ * directory and it can contain multiple mount points.
+ *
+ * TODO(jblomer): make FileSystem independent from specific repository
  */
 class FileSystem : SingleCopy, public MountPointFactory {
  public:
@@ -70,10 +72,12 @@ class FileSystem : SingleCopy, public MountPointFactory {
   static const unsigned kCacheNfsHa      = 0x20;
   static const unsigned kCacheNoRename   = 0x40;
 
-  static FileSystem *Create(Type type, OptionsManager *options_manager);
+  static FileSystem *Create(const std::string &name,
+                            Type type,
+                            OptionsManager *options_mgr);
   ~FileSystem();
 
-  OptionsManager *options_manager() { return options_manager_; }
+  OptionsManager *options_mgr() { return options_mgr_; }
   Type type() { return type_; }
 
  private:
@@ -84,23 +88,34 @@ class FileSystem : SingleCopy, public MountPointFactory {
                              int sqlite_extended_error,
                              const char *message);
 
-  FileSystem(Type type, OptionsManager *options_manager);
+  FileSystem(const std::string &name, Type type, OptionsManager *options_mgr);
 
   void SetupLogging();
   void SetupSqlite();
-  bool SetupCache();
+  bool SetupWorkspace();
+  bool LockWorkspace();
+  bool SetupCrashGuard();
+
+  bool CheckCacheMode();
   void DetermineCacheMode();
   void DetermineCacheDirs();
-  bool CheckCacheMode();
+  void DetermineMountpoint();
+  void DetermineWorkspace();
 
+  std::string name_;
   Type type_;
-  OptionsManager *options_manager_;
+  OptionsManager *options_mgr_;
 
-  std::string fqrn_;
+  std::string workspace_;
+  int fd_workspace_lock_;
+  std::string path_workspace_lock_;
+  std::string path_crash_guard_;
+  bool found_crash_;
+
+  std::string mountpoint_;
   std::string cache_dir_;
   std::string alien_cache_dir_;
   int cache_mode_;
-  int fd_cache_lock_;
   int64_t quota_limit_;
 };
 

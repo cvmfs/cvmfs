@@ -5,6 +5,8 @@
 #include "cvmfs_config.h"
 #include "mountpoint.h"
 
+#include <errno.h>
+#include <fcntl.h>
 #include <stdint.h>
 #include <unistd.h>
 
@@ -19,6 +21,7 @@
 #include "logging.h"
 #include "lru.h"
 #include "options.h"
+#include "platform.h"
 #include "sqlitemem.h"
 #include "statistics.h"
 #include "util_concurrency.h"
@@ -55,7 +58,7 @@ bool FileSystem::CheckCacheMode() {
   if (type_ == kFsLibrary) {
     if (cache_mode_ & (kCacheShared | kCacheNfs | kCacheManaged)) {
       boot_error_ = "Failure: libcvmfs supports only unmanaged exclusive cache "
-                    "or alien cache."
+                    "or alien cache.";
       boot_status_ = loader::kFailOptions;
       return false;
     }
@@ -66,23 +69,22 @@ bool FileSystem::CheckCacheMode() {
 
 
 FileSystem *FileSystem::Create(
+  const string &name,
   FileSystem::Type type,
-  OptionsManager *options_manager)
+  OptionsManager *options_mgr)
 {
-  UniquePtr<FileSystem> file_system(new FileSystem(type, options_manager));
-  if (file_system->fqrn_.empty()) {
-    file_system->boot_status_ = loader::kFailOptions;
-    file_system->boot_error_ = "CVMFS_FQRN is missing";
-    return file_system.Release();
-  }
+  UniquePtr<FileSystem>
+    file_system(new FileSystem(name, type, options_mgr));
 
   file_system->SetupLogging();
+  LogCvmfs(kLogCvmfs, kLogDebug, "Options:\n%s", options_mgr->Dump().c_str());
   file_system->SetupSqlite();
-  LogCvmfs(kLogCvmfs, kLogDebug, "Options:\n%s",
-           options_manager->Dump().c_str());
 
-  if (!file_system->SetupCache())
+  file_system->DetermineCacheMode();
+  if (!file_system->CheckCacheMode())
     return file_system.Release();
+  file_system->DetermineCacheDirs();
+  file_system->DetermineWorkspace();
 
   file_system->boot_status_ = loader::kFailOk;
   return file_system.Release();
@@ -93,16 +95,16 @@ void FileSystem::DetermineCacheDirs() {
   string optarg;
 
   cache_dir_ = kDefaultCacheBase;
-  if (options_manager_->GetValue("CVMFS_CACHE_BASE", &optarg))
+  if (options_mgr_->GetValue("CVMFS_CACHE_BASE", &optarg))
     cache_dir_ = MakeCanonicalPath(optarg);
 
   if (cache_mode_ & kCacheShared) {
     cache_dir_ += "/shared";
   } else {
-    cache_dir_ += "/" + fqrn_;
+    cache_dir_ += "/" + name_;
   }
 
-  if (options_manager_->GetValue("CVMFS_ALIEN_CACHE", &optarg))
+  if (options_mgr_->GetValue("CVMFS_ALIEN_CACHE", &optarg))
     alien_cache_dir_ = optarg;
 }
 
@@ -110,56 +112,58 @@ void FileSystem::DetermineCacheDirs() {
 void FileSystem::DetermineCacheMode() {
   string optarg;
 
-  if (options_manager_->GetValue("CVMFS_SHARED_CACHE", &optarg) &&
-      options_manager_->IsOn(optarg))
+  if (options_mgr_->GetValue("CVMFS_SHARED_CACHE", &optarg) &&
+      options_mgr_->IsOn(optarg))
   {
     cache_mode_ = kCacheShared;
   } else {
     cache_mode_ = kCacheExclusive;
   }
-  if (options_manager_->GetValue("CVMFS_ALIEN_CACHE", &optarg)) {
+  if (options_mgr_->GetValue("CVMFS_ALIEN_CACHE", &optarg)) {
     cache_mode_ |= kCacheAlien;
   }
-  if (options_manager_->GetValue("CVMFS_NFS_SOURCE", &optarg)) {
+  if (options_mgr_->GetValue("CVMFS_NFS_SOURCE", &optarg)) {
     cache_mode_ |= kCacheNfs;
-    if (options_manager_->GetValue("CVMFS_NFS_SHARED", &optarg)) {
+    if (options_mgr_->GetValue("CVMFS_NFS_SHARED", &optarg)) {
       cache_mode_ |= kCacheNfsHa;
     }
   }
-  if (options_manager_->GetValue("CVMFS_SERVER_CACHE_MODE", &optarg) &&
-      options_manager_->IsOn(optarg))
+  if (options_mgr_->GetValue("CVMFS_SERVER_CACHE_MODE", &optarg) &&
+      options_mgr_->IsOn(optarg))
   {
     cache_mode_ |= kCacheNoRename;
   }
 
-  if (options_manager_->GetValue("CVMFS_QUOTA_LIMIT", &optarg))
+  if (options_mgr_->GetValue("CVMFS_QUOTA_LIMIT", &optarg))
     quota_limit_ = String2Int64(optarg) * 1024 * 1024;
   if (quota_limit_ > 0)
     cache_mode_ |= kCacheManaged;
 }
 
 
+void FileSystem::DetermineWorkspace() {
+  workspace_ = cache_dir_;
+}
+
+
 FileSystem::FileSystem(
+  const string &name,
   FileSystem::Type type,
-  OptionsManager *options_manager)
-  : type_(type)
-  , options_manager_(options_manager)
+  OptionsManager *options_mgr)
+  : name_(name)
+  , type_(type)
+  , options_mgr_(options_mgr)
+  , fd_workspace_lock_(-1)
+  , found_crash_(false)
   , cache_mode_(0)
-  , fd_cache_lock_(-1)
   , quota_limit_(kDefaultQuotaLimit)
 {
   g_uid = geteuid();
   g_gid = getegid();
 
   string optarg;
-  // This is set artifically by the fuse module because we actually get to know
-  // the fqrn only in the mountpoint.
-  if (options_manager_->GetValue("CVMFS_FQRN", &optarg))
-    fqrn_ = optarg;
-
-
-  if (options_manager->GetValue("CVMFS_SERVER_CACHE_MODE", &optarg) &&
-      options_manager->IsOn(optarg))
+  if (options_mgr_->GetValue("CVMFS_SERVER_CACHE_MODE", &optarg) &&
+      options_mgr_->IsOn(optarg))
   {
     g_raw_symlinks = true;
   }
@@ -167,14 +171,56 @@ FileSystem::FileSystem(
 
 
 FileSystem::~FileSystem() {
-  if (fd_cache_lock_ >= 0) {
-    UnlockFile(fd_cache_lock_);
-  }
+  if (!path_crash_guard_.empty())
+    unlink(path_crash_guard_.c_str());
+  if (!path_workspace_lock_.empty())
+    unlink(path_workspace_lock_.c_str());
+  if (fd_workspace_lock_ >= 0)
+    UnlockFile(fd_workspace_lock_);
   sqlite3_shutdown();
   SqliteMemoryManager::CleanupInstance();
   SetLogSyslogPrefix("");
   SetLogMicroSyslog("");
   SetLogDebugFile("");
+}
+
+
+bool FileSystem::LockWorkspace() {
+  path_workspace_lock_ = workspace_ + "/lock." + name_;
+  fd_workspace_lock_ = TryLockFile(path_workspace_lock_);
+  if (fd_workspace_lock_ == -1) {
+    boot_error_ = "could not acquire workspace lock (" +
+                 StringifyInt(errno) + ")";
+    boot_status_ = loader::kFailCacheDir;
+    return false;
+  } else if (fd_workspace_lock_ == -2) {
+    // Prevent double mount
+    // Hack at this point (TODO(jblomer))
+//    string fqrn;
+//    retval = platform_getxattr(*cvmfs::mountpoint_, "user.fqrn", &fqrn);
+//    if (!retval) {
+      fd_workspace_lock_ = LockFile(path_workspace_lock_);
+      if (fd_workspace_lock_ < 0) {
+        boot_error_ = "could not acquire workspace lock (" +
+                     StringifyInt(errno) + ")";
+        boot_status_ = loader::kFailCacheDir;
+        return false;
+      }
+/*    } else {
+      if (fqrn == *cvmfs::repository_name_) {
+        LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+                 "repository already mounted on %s",
+                 cvmfs::mountpoint_->c_str());
+        return loader::kFailDoubleMount;
+      } else {
+        LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+                 "CernVM-FS repository %s already mounted on %s",
+                 fqrn.c_str(), cvmfs::mountpoint_->c_str());
+        return loader::kFailOtherMount;
+      }
+    }*/
+  }
+  return true;
 }
 
 
@@ -208,17 +254,41 @@ void FileSystem::LogSqliteError(
 }
 
 
+bool FileSystem::SetupCrashGuard() {
+  path_crash_guard_ = workspace_ + "/running." + name_;
+  platform_stat64 info;
+  int retval = platform_stat(path_crash_guard_.c_str(), &info);
+  if (retval == 0) {
+    found_crash_ = true;
+    string msg = "looks like cvmfs has been crashed previously";
+    if (cache_mode_ & kCacheManaged) {
+      msg += ", rebuilding cache database";
+    }
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn, "%s", msg.c_str());
+  }
+  retval = open(path_crash_guard_.c_str(), O_RDONLY | O_CREAT, 0600);
+  if (retval < 0) {
+    boot_error_ = "could not open running sentinel (" +
+                  StringifyInt(errno) + ")";
+    boot_status_ = loader::kFailCacheDir;
+    return false;
+  }
+  close(retval);
+  return true;
+}
+
+
 void FileSystem::SetupLogging() {
   string optarg;
-  if (options_manager_->GetValue("CVMFS_SYSLOG_LEVEL", &optarg))
+  if (options_mgr_->GetValue("CVMFS_SYSLOG_LEVEL", &optarg))
     SetLogSyslogLevel(String2Uint64(optarg));
-  if (options_manager_->GetValue("CVMFS_SYSLOG_FACILITY", &optarg))
+  if (options_mgr_->GetValue("CVMFS_SYSLOG_FACILITY", &optarg))
     SetLogSyslogFacility(String2Int64(optarg));
-  if (options_manager_->GetValue("CVMFS_USYSLOG", &optarg))
+  if (options_mgr_->GetValue("CVMFS_USYSLOG", &optarg))
     SetLogMicroSyslog(optarg);
-  if (options_manager_->GetValue("CVMFS_DEBUGLOG", &optarg))
+  if (options_mgr_->GetValue("CVMFS_DEBUGLOG", &optarg))
     SetLogDebugFile(optarg);
-  SetLogSyslogPrefix(fqrn_);
+  SetLogSyslogPrefix(name_);
 }
 
 
@@ -239,27 +309,20 @@ void FileSystem::SetupSqlite() {
 }
 
 
-bool FileSystem::SetupCache() {
-  DetermineCacheMode();
-  if (!CheckCacheMode())
-    return false;
-  DetermineCacheDirs();
-
-  if (!MkdirDeep(cache_dir_, 0700, false)) {
+bool FileSystem::SetupWorkspace() {
+  const int mode = (workspace_ == alien_cache_dir_) ? 0770 : 0700;
+  if (!MkdirDeep(workspace_, mode, false)) {
     boot_error_ = "cannot create cache directory " + cache_dir_;
     boot_status_ = loader::kFailCacheDir;
     return false;
   }
-  
-  // Try to jump to cache directory.  This tests, if it is accassible.
-  // Also, it brings speed later on.
-  if (chdir(cache_dir_->c_str()) != 0) {
-    *boot_error_ = "cache directory " + cache_dir_ + " is unavailable";
-    boot_status_ = loader::kFailCacheDir;
-    return false;
-  }
 
-  return false;
+  if (!LockWorkspace())
+    return false;
+  if (!SetupCrashGuard())
+    return false;
+
+  return true;
 }
 
 
@@ -351,7 +414,7 @@ void MountPoint::CreateTables() {
   chunk_tables_ = new ChunkTables();
 
   string optarg;
-  OptionsManager *options_manager = file_system_->options_manager();
+  OptionsManager *options_manager = file_system_->options_mgr();
   uint64_t mem_cache_size = kDefaultMemcacheSize;
   if (options_manager->GetValue("CVMFS_MEMCACHE_SIZE", &optarg))
     mem_cache_size = String2Uint64(optarg) * 1024 * 1024;
@@ -433,7 +496,7 @@ void MountPoint::SetMaxTtlMn(unsigned value_minutes) {
 
 
 void MountPoint::SetupTtls() {
-  OptionsManager *options_manager = file_system_->options_manager();
+  OptionsManager *options_manager = file_system_->options_mgr();
   string optarg;
 
   if (options_manager->GetValue("CVMFS_MAX_TTL", &optarg))
