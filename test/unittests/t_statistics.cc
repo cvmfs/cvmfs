@@ -57,6 +57,29 @@ TEST(T_Statistics, Statistics) {
 }
 
 
+TEST(T_Statistics, Fork) {
+  Statistics stat_father;
+
+  Counter *cnt_father = stat_father.Register("father", "a test counter");
+  perf::Inc(cnt_father);
+  EXPECT_EQ(1, stat_father.Lookup("father")->Get());
+  Statistics *stat_child = stat_father.Fork();
+  EXPECT_EQ(1, stat_child->Lookup("father")->Get());
+  perf::Inc(cnt_father);
+  EXPECT_EQ(2, stat_father.Lookup("father")->Get());
+  EXPECT_EQ(2, stat_child->Lookup("father")->Get());
+
+  Counter *cnt_fork_father = stat_father.Register("fork", "a test counter");
+  stat_child->Register("fork", "a test counter");
+  perf::Inc(cnt_fork_father);
+  EXPECT_EQ(1, stat_father.Lookup("fork")->Get());
+  EXPECT_EQ(0, stat_child->Lookup("fork")->Get());
+
+  delete stat_child;
+  EXPECT_EQ(2, stat_father.Lookup("father")->Get());
+}
+
+
 TEST(T_Statistics, RecorderConstruct) {
   Recorder recorder(5, 10);
   EXPECT_EQ(10U, recorder.capacity_s());

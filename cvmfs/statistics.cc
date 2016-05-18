@@ -36,6 +36,28 @@ std::string Counter::PrintRatio(Counter divider) {
 //-----------------------------------------------------------------------------
 
 
+/**
+ * Creates a new Statistics binder which maintains the same Counters as the
+ * existing one.  Changes to those counters are visible in both Statistics
+ * objects.  The child can then independently add more counters.  CounterInfo
+ * objects are reference counted and deleted when all the statistics objects
+ * dealing with it are destroyed.
+ */
+Statistics *Statistics::Fork() {
+  Statistics *child = new Statistics();
+
+  MutexLockGuard lock_guard(lock_);
+  for (map<string, CounterInfo *>::iterator i = counters_.begin(),
+       iEnd = counters_.end(); i != iEnd; ++i)
+  {
+    atomic_inc32(&i->second->refcnt);
+  }
+  child->counters_ = counters_;
+
+  return child;
+}
+
+
 Counter *Statistics::Lookup(const std::string &name) {
   MutexLockGuard lock_guard(lock_);
   map<string, CounterInfo *>::const_iterator i = counters_.find(name);
@@ -91,7 +113,9 @@ Statistics::~Statistics() {
   for (map<string, CounterInfo *>::iterator i = counters_.begin(),
        iEnd = counters_.end(); i != iEnd; ++i)
   {
-    delete i->second;
+    int32_t old_value = atomic_xadd32(&i->second->refcnt, -1);
+    if (old_value == 1)
+      delete i->second;
   }
   pthread_mutex_destroy(lock_);
   free(lock_);
