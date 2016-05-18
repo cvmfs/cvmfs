@@ -124,10 +124,11 @@ FileSystem *FileSystem::Create(const FileSystem::FileSystemInfo &fs_info) {
   if (!file_system->CreateCache())
     return file_system.Release();
   bool retval = sqlite::RegisterVfsRdOnly(
-    file_system->cache_mgr_, 
-    file_system->statistics_, 
+    file_system->cache_mgr_,
+    file_system->statistics_,
     sqlite::kVfsOptDefault);
   assert(retval);
+  has_custom_sqlitevfs_ = true;
 
   file_system->boot_status_ = loader::kFailOk;
   return file_system.Release();
@@ -287,6 +288,7 @@ FileSystem::FileSystem(const FileSystem::FileSystemInfo &fs_info)
   , cache_mgr_(NULL)
   , uuid_cache_(NULL)
   , has_nfs_maps_(false)
+  , has_custom_sqlitevfs_(false)
 {
   g_uid = geteuid();
   g_gid = getegid();
@@ -313,13 +315,18 @@ FileSystem::~FileSystem() {
     unlink(path_workspace_lock_.c_str());
   if (fd_workspace_lock_ >= 0)
     UnlockFile(fd_workspace_lock_);
+
+  if (has_custom_sqlitevfs_)
+    sqlite::UnregisterVfsRdOnly();
   if (sqlite3_temp_directory) {
     sqlite3_free(sqlite3_temp_directory);
     sqlite3_temp_directory = NULL;
   }
   sqlite3_shutdown();
   SqliteMemoryManager::CleanupInstance();
+
   delete statistics_;
+
   SetLogSyslogPrefix("");
   SetLogMicroSyslog("");
   SetLogDebugFile("");
@@ -757,6 +764,7 @@ MountPoint::MountPoint(const string &fqrn, FileSystem *file_system)
   , authz_session_mgr_(NULL)
   , authz_attachment_(NULL)
   , download_mgr_(NULL)
+  , external_download_mgr_(NULL)
   , directory_handles_(NULL)
   , chunk_tables_(NULL)
   , inode_cache_(NULL)
@@ -775,7 +783,14 @@ MountPoint::MountPoint(const string &fqrn, FileSystem *file_system)
 MountPoint::~MountPoint() {
   pthread_mutex_destroy(&lock_max_ttl_);
 
-  delete download_mgr_;
+  if (external_download_mgr_ != NULL) {
+    external_download_mgr_->Fini();
+    delete external_download_mgr_;
+  }
+  if (download_mgr_ != NULL) {
+    download_mgr_->Fini();
+    delete download_mgr_;
+  }
   delete authz_attachment_;
   delete authz_session_mgr_;
   delete authz_fetcher_;
@@ -786,8 +801,6 @@ MountPoint::~MountPoint() {
   delete inode_cache_;
   delete chunk_tables_;
   delete directory_handles_;
-  sqlite3_shutdown();
-  SqliteMemoryManager::CleanupInstance();
   delete statistics_;
 }
 

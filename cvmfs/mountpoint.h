@@ -164,6 +164,7 @@ class FileSystem : SingleCopy, public MountPointFactory {
   cache::CacheManager *cache_mgr_;
   cvmfs::Uuid *uuid_cache_;
   bool has_nfs_maps_;
+  bool has_custom_sqlitevfs_;
 };
 
 
@@ -248,6 +249,7 @@ class MountPoint : SingleCopy, public MountPointFactory {
   AuthzSessionManager *authz_session_mgr_;
   AuthzAttachment *authz_attachment_;
   download::DownloadManager *download_mgr_;
+  download::DownloadManager *external_download_mgr_;
   FuseDirectoryHandles *directory_handles_;
   ChunkTables *chunk_tables_;
   lru::InodeCache *inode_cache_;

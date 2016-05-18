@@ -348,9 +348,10 @@ class DownloadManager {
   static int ParseHttpCode(const char digits[3]);
 
   void Init(const unsigned max_pool_handles, const bool use_system_proxy,
-      perf::Statistics * statistics, const std::string &name = "download");
+      perf::Statistics *statistics, const std::string &name = "download");
   void Fini();
   void Spawn();
+  DownloadManager *Clone(perf::Statistics *statistics, const std::string &name);
   Failures Fetch(JobInfo *info);
 
   void SetCredentialsAttachment(CredentialsAttachment *ca);
@@ -449,6 +450,7 @@ class DownloadManager {
   bool enable_info_header_;
   bool opt_ipv4_only_;
   bool follow_redirects_;
+  bool use_system_proxy_;
 
   // Host list
   std::vector<std::string> *opt_host_chain_;

@@ -1438,6 +1438,7 @@ DownloadManager::DownloadManager() {
   enable_info_header_ = false;
   opt_ipv4_only_ = false;
   follow_redirects_ = false;
+  use_system_proxy_ = false;
 
   resolver_ = NULL;
 
@@ -1541,6 +1542,7 @@ void DownloadManager::Init(const unsigned max_pool_handles,
 
   // Parsing environment variables
   if (use_system_proxy) {
+    use_system_proxy_ = true;
     if (getenv("http_proxy") == NULL) {
       SetProxyChain("", "", kSetProxyRegular);
     } else {
@@ -2615,6 +2617,27 @@ void DownloadManager::EnablePipelining() {
 
 void DownloadManager::EnableRedirects() {
   follow_redirects_ = true;
+}
+
+
+DownloadManager *DownloadManager::Clone(
+  perf::Statistics *statistics,
+  const string &name)
+{
+  DownloadManager *clone = new DownloadManager();
+  clone->Init(pool_max_handles_, use_system_proxy_, statistics, name);
+  if (opt_dns_server_)
+    clone->SetDnsServer(opt_dns_server_);
+  clone->opt_timeout_proxy_ = opt_timeout_proxy_;
+  clone->opt_timeout_direct_ = opt_timeout_direct_;
+  clone->opt_low_speed_limit_ = opt_low_speed_limit_;
+  clone->opt_max_retries_ = opt_max_retries_;
+  clone->opt_backoff_init_ms_ = opt_backoff_init_ms_;
+  clone->opt_backoff_max_ms_ = opt_backoff_max_ms_;
+  clone->enable_info_header_ = enable_info_header_;
+  clone->follow_redirects_ = follow_redirects_;
+  
+  return clone;
 }
 
 }  // namespace download
