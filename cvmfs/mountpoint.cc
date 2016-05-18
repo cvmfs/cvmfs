@@ -2,33 +2,59 @@
  * This file is part of the CernVM File System.
  */
 
+#define __STDC_FORMAT_MACROS
 #include "cvmfs_config.h"
 #include "mountpoint.h"
 
 #include <errno.h>
+#ifndef CVMFS_LIBCVMFS
+#include <fuse/fuse_lowlevel.h>
+#endif
+#include <inttypes.h>
 #include <fcntl.h>
 #include <stdint.h>
 #include <unistd.h>
 
 #include <algorithm>
 #include <cassert>
+#include <cstring>
 
+#ifndef CVMFS_LIBCVMFS
+#ifdef FUSE_CAP_EXPORT_SUPPORT
+#define CVMFS_NFS_SUPPORT
+#else
+#warning "No NFS support, Fuse too old"
+#endif
+#endif
+
+#include "authz/authz_curl.h"
+#include "authz/authz_fetch.h"
+#include "authz/authz_session.h"
 #include "backoff.h"
+#include "cache.h"
+#include "catalog_mgr_client.h"
 #include "duplex_sqlite3.h"
+#include "download.h"
 #include "file_chunk.h"
 #include "globals.h"
 #include "glue_buffer.h"
 #include "logging.h"
 #include "lru.h"
+#ifdef CVMFS_NFS_SUPPORT
+#include "nfs_maps.h"
+#endif
 #include "options.h"
 #include "platform.h"
+#include "quota.h"
 #include "sqlitemem.h"
+#include "sqlitevfs.h"
 #include "statistics.h"
 #include "util_concurrency.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
 #include "uuid.h"
+#include "wpad.h"
 
 using namespace std;  // NOLINT
 
@@ -68,16 +94,15 @@ bool FileSystem::CheckCacheMode() {
 }
 
 
-FileSystem *FileSystem::Create(
-  const string &name,
-  FileSystem::Type type,
-  OptionsManager *options_mgr)
-{
+FileSystem *FileSystem::Create(const FileSystem::FileSystemInfo &fs_info) {
   UniquePtr<FileSystem>
-    file_system(new FileSystem(name, type, options_mgr));
+    file_system(new FileSystem(fs_info));
 
   file_system->SetupLogging();
-  LogCvmfs(kLogCvmfs, kLogDebug, "Options:\n%s", options_mgr->Dump().c_str());
+  LogCvmfs(kLogCvmfs, kLogDebug, "Options:\n%s",
+           file_system->options_mgr()->Dump().c_str());
+
+  file_system->CreateStatistics();
   file_system->SetupSqlite();
 
   file_system->DetermineCacheMode();
@@ -85,9 +110,97 @@ FileSystem *FileSystem::Create(
     return file_system.Release();
   file_system->DetermineCacheDirs();
   file_system->DetermineWorkspace();
+  if (!file_system->SetupWorkspace())
+    return file_system.Release();
+
+  // Redirect SQlite temp directory to cache (global variable)
+  unsigned length_tempdir = file_system->workspace_.length() + 1;
+  sqlite3_temp_directory = static_cast<char *>(sqlite3_malloc(length_tempdir));
+  snprintf(sqlite3_temp_directory,
+           length_tempdir,
+           file_system->workspace_.c_str());
+
+
+  if (!file_system->CreateCache())
+    return file_system.Release();
+  bool retval = sqlite::RegisterVfsRdOnly(
+    file_system->cache_mgr_, 
+    file_system->statistics_, 
+    sqlite::kVfsOptDefault);
+  assert(retval);
 
   file_system->boot_status_ = loader::kFailOk;
   return file_system.Release();
+}
+
+
+bool FileSystem::CreateCache() {
+  cache_mgr_ = cache::PosixCacheManager::Create(
+                 cache_dir_,
+                 cache_mode_ & FileSystem::kCacheAlien,
+                 cache_mode_ & FileSystem::kCacheNoRename);
+  if (cache_mgr_ == NULL) {
+    boot_error_ = "Failed to setup cache in " + cache_dir_ + ": " +
+                  strerror(errno);
+    boot_status_ = loader::kFailCacheDir;
+    return false;
+  }
+  // Sentinel file for future use
+  CreateFile(cache_dir_ + "/.cvmfscache", 0600);
+
+  if (cache_mode_ & FileSystem::kCacheManaged) {
+    if (!SetupQuotaMgmt())
+      return false;
+  }
+
+  if (!SetupNfsMaps())
+    return false;
+
+  // Create or load from cache, used as id by the download manager when the
+  // proxy template is replaced
+  uuid_cache_ = cvmfs::Uuid::Create(cache_dir_ + "/uuid");
+  if (uuid_cache_ == NULL) {
+    boot_error_ = "failed to load/store uuid";
+    boot_status_ = loader::kFailCacheDir;
+    return false;
+  }
+
+  return true;
+}
+
+
+void FileSystem::CreateStatistics() {
+  statistics_ = new perf::Statistics();
+
+  // Register the ShortString's static counters
+  statistics_->Register("pathstring.n_instances", "Number of instances");
+  statistics_->Register("pathstring.n_overflows", "Number of overflows");
+  statistics_->Register("namestring.n_instances", "Number of instances");
+  statistics_->Register("namestring.n_overflows", "Number of overflows");
+  statistics_->Register("linkstring.n_instances", "Number of instances");
+  statistics_->Register("linkstring.n_overflows", "Number of overflows");
+
+  // Callback counters
+  n_fs_open_ = statistics_->Register("cvmfs.n_fs_open",
+                                     "Overall number of file open operations");
+  n_fs_dir_open_ = statistics_->Register("cvmfs.n_fs_dir_open",
+                   "Overall number of directory open operations");
+  n_fs_lookup_ = statistics_->Register("cvmfs.n_fs_lookup",
+                                       "Number of lookups");
+  n_fs_lookup_negative_ = statistics_->Register("cvmfs.n_fs_lookup_negative",
+                                                "Number of negative lookups");
+  n_fs_stat_ = statistics_->Register("cvmfs.n_fs_stat", "Number of stats");
+  n_fs_read_ = statistics_->Register("cvmfs.n_fs_read", "Number of files read");
+  n_fs_readlink_ = statistics_->Register("cvmfs.n_fs_readlink",
+                                         "Number of links read");
+  n_fs_forget_ = statistics_->Register("cvmfs.n_fs_forget",
+                                       "Number of inode forgets");
+  n_io_error_ = statistics_->Register("cvmfs.n_io_error",
+                                      "Number of I/O errors");
+  no_open_files_ = statistics_->Register("cvmfs.no_open_files",
+                                         "Number of currently opened files");
+  no_open_dirs_ = statistics_->Register("cvmfs.no_open_dirs",
+                  "Number of currently opened directories");
 }
 
 
@@ -105,7 +218,11 @@ void FileSystem::DetermineCacheDirs() {
   }
 
   if (options_mgr_->GetValue("CVMFS_ALIEN_CACHE", &optarg))
-    alien_cache_dir_ = optarg;
+    cache_dir_ = optarg;
+
+  nfs_maps_dir_ = cache_dir_;
+  if (options_mgr_->GetValue("CVMFS_NFS_SHARED", &optarg))
+    nfs_maps_dir_ = optarg;
 }
 
 
@@ -146,17 +263,30 @@ void FileSystem::DetermineWorkspace() {
 }
 
 
-FileSystem::FileSystem(
-  const string &name,
-  FileSystem::Type type,
-  OptionsManager *options_mgr)
-  : name_(name)
-  , type_(type)
-  , options_mgr_(options_mgr)
+FileSystem::FileSystem(const FileSystem::FileSystemInfo &fs_info)
+  : name_(fs_info.name)
+  , exe_path_(fs_info.exe_path)
+  , type_(fs_info.type)
+  , options_mgr_(fs_info.options_mgr)
+  , n_fs_open_(NULL)
+  , n_fs_dir_open_(NULL)
+  , n_fs_lookup_(NULL)
+  , n_fs_lookup_negative_(NULL)
+  , n_fs_stat_(NULL)
+  , n_fs_read_(NULL)
+  , n_fs_readlink_(NULL)
+  , n_fs_forget_(NULL)
+  , n_io_error_(NULL)
+  , no_open_files_(NULL)
+  , no_open_dirs_(NULL)
+  , statistics_(NULL)
   , fd_workspace_lock_(-1)
-  , found_crash_(false)
+  , found_previous_crash_(false)
   , cache_mode_(0)
   , quota_limit_(kDefaultQuotaLimit)
+  , cache_mgr_(NULL)
+  , uuid_cache_(NULL)
+  , has_nfs_maps_(false)
 {
   g_uid = geteuid();
   g_gid = getegid();
@@ -171,14 +301,25 @@ FileSystem::FileSystem(
 
 
 FileSystem::~FileSystem() {
+  delete uuid_cache_;
+#ifdef CVMFS_NFS_SUPPORT
+  if (has_nfs_maps_)
+    nfs_maps::Fini();
+#endif
+  delete cache_mgr_;
   if (!path_crash_guard_.empty())
     unlink(path_crash_guard_.c_str());
   if (!path_workspace_lock_.empty())
     unlink(path_workspace_lock_.c_str());
   if (fd_workspace_lock_ >= 0)
     UnlockFile(fd_workspace_lock_);
+  if (sqlite3_temp_directory) {
+    sqlite3_free(sqlite3_temp_directory);
+    sqlite3_temp_directory = NULL;
+  }
   sqlite3_shutdown();
   SqliteMemoryManager::CleanupInstance();
+  delete statistics_;
   SetLogSyslogPrefix("");
   SetLogMicroSyslog("");
   SetLogDebugFile("");
@@ -259,7 +400,7 @@ bool FileSystem::SetupCrashGuard() {
   platform_stat64 info;
   int retval = platform_stat(path_crash_guard_.c_str(), &info);
   if (retval == 0) {
-    found_crash_ = true;
+    found_previous_crash_ = true;
     string msg = "looks like cvmfs has been crashed previously";
     if (cache_mode_ & kCacheManaged) {
       msg += ", rebuilding cache database";
@@ -292,6 +433,104 @@ void FileSystem::SetupLogging() {
 }
 
 
+bool FileSystem::SetupNfsMaps() {
+#ifdef CVMFS_NFS_SUPPORT
+  string no_nfs_sentinel = cache_dir_ + "/no_nfs_maps." + name_;
+
+  if (cache_mode_ & FileSystem::kCacheNfs) {
+    CreateFile(no_nfs_sentinel, 0600);
+    return true;
+  }
+
+  // nfs maps need to be protected by workspace lock
+  assert(cache_dir_ == workspace_);
+
+  if (FileExists(no_nfs_sentinel)) {
+    boot_error_ = "Cache was used without NFS maps before. "
+                  "It has to be wiped out.";
+    boot_status_ = loader::kFailNfsMaps;
+    return false;
+  }
+
+  string inode_cache_dir = nfs_maps_dir_ + "/nfs_maps." + name_;
+  if (!MkdirDeep(inode_cache_dir, 0700)) {
+    boot_error_ = "Failed to initialize NFS maps";
+    boot_status_ = loader::kFailNfsMaps;
+    return false;
+  }
+
+  // TODO(jblomer): make this a manager class
+  bool retval =
+    nfs_maps::Init(inode_cache_dir,
+                   catalog::ClientCatalogManager::kInodeOffset + 1,
+                   found_previous_crash_,
+                   cache_mode_ & FileSystem::kCacheNfsHa);
+  if (!retval) {
+    boot_error_ = "Failed to initialize NFS maps";
+    boot_status_ = loader::kFailNfsMaps;
+    return false;
+  }
+
+  return has_nfs_maps_ = true;
+#else
+  return true;
+#endif
+}
+
+
+bool FileSystem::SetupQuotaMgmt() {
+  assert(quota_limit_ >= 0);
+  int64_t quota_threshold = quota_limit_ / 2;
+  PosixQuotaManager *quota_mgr;
+
+  if (cache_mode_ & FileSystem::kCacheShared) {
+    quota_mgr = PosixQuotaManager::CreateShared(
+                  exe_path_,
+                  cache_dir_,
+                  quota_limit_,
+                  quota_threshold);
+    if (quota_mgr == NULL) {
+      boot_error_ = "Failed to initialize shared lru cache";
+      boot_status_ = loader::kFailQuota;
+      return false;
+    }
+  } else {
+    // Cache database should to be protected by workspace lock
+    assert(workspace_ == cache_dir_);
+    quota_mgr = PosixQuotaManager::Create(
+                  cache_dir_,
+                  quota_limit_,
+                  quota_threshold,
+                  found_previous_crash_);
+    if (quota_mgr == NULL) {
+      boot_error_ = "Failed to initialize lru cache";
+      boot_status_ = loader::kFailQuota;
+      return false;
+    }
+  }
+
+  if (quota_mgr->GetSize() > quota_mgr->GetCapacity()) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+             "cache is already beyond quota size "
+             "(size: %" PRId64 ", capacity: %" PRId64 "), cleaning up",
+             quota_mgr->GetSize(), quota_mgr->GetCapacity());
+    if (!quota_mgr->Cleanup(quota_threshold)) {
+      delete quota_mgr;
+      boot_error_ = "Failed to clean up cache";
+      boot_status_ = loader::kFailQuota;
+      return false;
+    }
+  }
+
+  int retval = cache_mgr_->AcquireQuotaManager(quota_mgr);
+  assert(retval);
+  LogCvmfs(kLogCvmfs, kLogDebug,
+           "CernVM-FS: quota initialized, current size %luMB",
+           quota_mgr->GetSize() / (1024 * 1024));
+  return true;
+}
+
+
 void FileSystem::SetupSqlite() {
   // Make sure SQlite starts clean after initialization
   sqlite3_shutdown();
@@ -310,11 +549,28 @@ void FileSystem::SetupSqlite() {
 
 
 bool FileSystem::SetupWorkspace() {
-  const int mode = (workspace_ == alien_cache_dir_) ? 0770 : 0700;
+  // If workspace and alien cache are the same directory, we need to open
+  // permission now to 0770 to avoid a race when fixing it later
+  const int mode = ((cache_mode_ & kCacheAlien) && (workspace_ == cache_dir_)) ?
+                   0770 : 0700;
   if (!MkdirDeep(workspace_, mode, false)) {
     boot_error_ = "cannot create cache directory " + cache_dir_;
     boot_status_ = loader::kFailCacheDir;
     return false;
+  }
+
+  if (type_ == kFsFuse) {
+    // Try to jump to workspace / cache directory.  This tests, if it is
+    // accassible and it brings speed later on.
+    int retval = chdir(workspace_.c_str());
+    if (retval != 0) {
+      boot_error_ = "workspace " + workspace_ + " is unavailable";
+      boot_status_ = loader::kFailCacheDir;
+      return false;
+    }
+    if (workspace_ == cache_dir_)
+      cache_dir_ = ".";
+    workspace_ = ".";
   }
 
   if (!LockWorkspace())
@@ -329,6 +585,8 @@ bool FileSystem::SetupWorkspace() {
 //------------------------------------------------------------------------------
 
 
+const char *MountPoint::kDefaultAuthzSearchPath = "/usr/libexec/cvmfs/authz";
+
 
 MountPoint *MountPoint::Create(
   const string &fqrn,
@@ -337,13 +595,15 @@ MountPoint *MountPoint::Create(
   string optarg;
   UniquePtr<MountPoint> mountpoint(new MountPoint(fqrn, file_system));
 
-  // At this point, we have a repository name, the type (fuse or library),
-  // an options manager from the FileSystem object and a newly generated uuid
-  // for the mount point
+  // At this point, we have a repository name, the type (fuse or library) and
+  // an options manager from the FileSystem object.
 
   mountpoint->CreateStatistics();
-  mountpoint->CreateTables();
+  mountpoint->CreateAuthz();
+  if (!mountpoint->CreateDownloadManagers())
+    return mountpoint.Release();
 
+  mountpoint->CreateTables();
   mountpoint->SetupTtls();
   mountpoint->backoff_throttle_ = new BackoffThrottle();
 
@@ -352,53 +612,101 @@ MountPoint *MountPoint::Create(
 }
 
 
-void MountPoint::CreateStatistics() {
-  statistics_ = new perf::Statistics();
+void MountPoint::CreateAuthz() {
+  OptionsManager *options_mgr = file_system_->options_mgr();
+  string optarg;
+  string authz_helper;
+  if (options_mgr->GetValue("CVMFS_AUTHZ_HELPER", &optarg))
+    authz_helper = optarg;
+  string authz_search_path(kDefaultAuthzSearchPath);
+  if (options_mgr->GetValue("CVMFS_AUTHZ_SEARCH_PATH", &optarg))
+    authz_search_path = optarg;
 
-  // Register the ShortString's static counters
-  statistics_->Register("pathstring.n_instances", "Number of instances");
-  statistics_->Register("pathstring.n_overflows", "Number of overflows");
-  statistics_->Register("namestring.n_instances", "Number of instances");
-  statistics_->Register("namestring.n_overflows", "Number of overflows");
-  statistics_->Register("linkstring.n_instances", "Number of instances");
-  statistics_->Register("linkstring.n_overflows", "Number of overflows");
+  authz_fetcher_ = new AuthzExternalFetcher(
+    fqrn_,
+    authz_helper,
+    authz_search_path,
+    options_mgr);
+  assert(authz_fetcher_ != NULL);
 
-  if (file_system_->type() == FileSystem::kFsFuse) {
-    statistics_->Register("inode_tracker.n_insert",
-                          "overall number of accessed inodes");
-    statistics_->Register("inode_tracker.n_remove",
-                          "overall number of evicted inodes");
-    statistics_->Register("inode_tracker.no_reference",
-                          "currently active inodes");
-    statistics_->Register("inode_tracker.n_hit_inode",
-                          "overall number of inode lookups");
-    statistics_->Register("inode_tracker.n_hit_path",
-                          "overall number of successful path lookups");
-    statistics_->Register("inode_tracker.n_miss_path",
-                          "overall number of unsuccessful path lookups");
+  authz_session_mgr_ = AuthzSessionManager::Create(
+    authz_fetcher_,
+    statistics_);
+  assert(authz_session_mgr_ != NULL);
+
+  authz_attachment_ = new AuthzAttachment(authz_session_mgr_);
+  assert(authz_attachment_ != NULL);
+}
+
+
+bool MountPoint::CreateDownloadManagers() {
+  string optarg;
+  OptionsManager *options_mgr = file_system_->options_mgr();
+
+  download_mgr_ = new download::DownloadManager();
+  const bool use_system_proxy = false;
+  download_mgr_->Init(kDefaultNumConnections, use_system_proxy, statistics_);
+
+  if (options_mgr->GetValue("CVMFS_SERVER_URL", &optarg)) {
+    download_mgr_->SetHostChain(ReplaceHosts(optarg));
+  }
+  if (options_mgr->GetValue("CVMFS_DNS_SERVER", &optarg)) {
+    download_mgr_->SetDnsServer(optarg);
+  }
+  download_mgr_->SetCredentialsAttachment(authz_attachment_);
+
+  SetupDnsTuning();
+  SetupHttpTuning();
+
+  string forced_proxy_template;
+  if (options_mgr->GetValue("CVMFS_PROXY_TEMPLATE", &optarg))
+    forced_proxy_template = optarg;
+  download_mgr_->SetProxyTemplates(file_system_->uuid_cache()->uuid(),
+                                   forced_proxy_template);
+
+  string proxies;
+  if (!options_mgr->GetValue("CVMFS_HTTP_PROXY", &optarg))
+    proxies = optarg;
+  proxies = download::ResolveProxyDescription(proxies, download_mgr_);
+  if (proxies == "") {
+    boot_error_ = "failed to discover HTTP proxy servers";
+    boot_status_ = loader::kFailWpad;
+    return false;
+  }
+  string fallback_proxies;
+  if (options_mgr->GetValue("CVMFS_FALLBACK_PROXY", &optarg))
+    fallback_proxies = optarg;
+  download_mgr_->SetProxyChain(proxies, fallback_proxies,
+                               download::DownloadManager::kSetProxyBoth);
+
+  if (options_mgr->GetValue("CVMFS_USE_GEOAPI", &optarg) &&
+      options_mgr->IsOn(optarg))
+  {
+    download_mgr_->ProbeGeo();
   }
 
-  // Callback counters
-  n_fs_open_ = statistics_->Register("cvmfs.n_fs_open",
-                                     "Overall number of file open operations");
-  n_fs_dir_open_ = statistics_->Register("cvmfs.n_fs_dir_open",
-                   "Overall number of directory open operations");
-  n_fs_lookup_ = statistics_->Register("cvmfs.n_fs_lookup",
-                                       "Number of lookups");
-  n_fs_lookup_negative_ = statistics_->Register("cvmfs.n_fs_lookup_negative",
-                                                "Number of negative lookups");
-  n_fs_stat_ = statistics_->Register("cvmfs.n_fs_stat", "Number of stats");
-  n_fs_read_ = statistics_->Register("cvmfs.n_fs_read", "Number of files read");
-  n_fs_readlink_ = statistics_->Register("cvmfs.n_fs_readlink",
-                                         "Number of links read");
-  n_fs_forget_ = statistics_->Register("cvmfs.n_fs_forget",
-                                       "Number of inode forgets");
-  n_io_error_ = statistics_->Register("cvmfs.n_io_error",
-                                      "Number of I/O errors");
-  no_open_files_ = statistics_->Register("cvmfs.no_open_files",
-                                         "Number of currently opened files");
-  no_open_dirs_ = statistics_->Register("cvmfs.no_open_dirs",
-                  "Number of currently opened directories");
+  return true;
+}
+
+
+void MountPoint::CreateStatistics() {
+  statistics_ = file_system_->statistics()->Fork();
+  if (file_system_->type() != FileSystem::kFsFuse)
+    return;
+
+  // TODO(jblomer): this should be registered by the tracker
+  statistics_->Register("inode_tracker.n_insert",
+                        "overall number of accessed inodes");
+  statistics_->Register("inode_tracker.n_remove",
+                        "overall number of evicted inodes");
+  statistics_->Register("inode_tracker.no_reference",
+                        "currently active inodes");
+  statistics_->Register("inode_tracker.n_hit_inode",
+                        "overall number of inode lookups");
+  statistics_->Register("inode_tracker.n_hit_path",
+                        "overall number of successful path lookups");
+  statistics_->Register("inode_tracker.n_miss_path",
+                        "overall number of unsuccessful path lookups");
 }
 
 
@@ -444,19 +752,11 @@ unsigned MountPoint::GetMaxTtlMn() {
 MountPoint::MountPoint(const string &fqrn, FileSystem *file_system)
   : fqrn_(fqrn)
   , file_system_(file_system)
-  , uuid_mountpoint_(cvmfs::Uuid::Create(""))
-  , n_fs_open_(NULL)
-  , n_fs_dir_open_(NULL)
-  , n_fs_lookup_(NULL)
-  , n_fs_lookup_negative_(NULL)
-  , n_fs_stat_(NULL)
-  , n_fs_read_(NULL)
-  , n_fs_readlink_(NULL)
-  , n_fs_forget_(NULL)
-  , n_io_error_(NULL)
-  , no_open_files_(NULL)
-  , no_open_dirs_(NULL)
   , statistics_(NULL)
+  , authz_fetcher_(NULL)
+  , authz_session_mgr_(NULL)
+  , authz_attachment_(NULL)
+  , download_mgr_(NULL)
   , directory_handles_(NULL)
   , chunk_tables_(NULL)
   , inode_cache_(NULL)
@@ -475,6 +775,10 @@ MountPoint::MountPoint(const string &fqrn, FileSystem *file_system)
 MountPoint::~MountPoint() {
   pthread_mutex_destroy(&lock_max_ttl_);
 
+  delete download_mgr_;
+  delete authz_attachment_;
+  delete authz_session_mgr_;
+  delete authz_fetcher_;
   delete backoff_throttle_;
   delete inode_tracker_;
   delete md5path_cache_;
@@ -485,13 +789,98 @@ MountPoint::~MountPoint() {
   sqlite3_shutdown();
   SqliteMemoryManager::CleanupInstance();
   delete statistics_;
-  delete uuid_mountpoint_;
 }
 
 
 void MountPoint::SetMaxTtlMn(unsigned value_minutes) {
   MutexLockGuard lock_guard(lock_max_ttl_);
   max_ttl_sec_ = value_minutes * 60;
+}
+
+
+string MountPoint::ReplaceHosts(string hosts) {
+  vector<string> tokens = SplitString(fqrn_, '.');
+  const string org = tokens[0];
+  hosts = ReplaceAll(hosts, "@org@", org);
+  hosts = ReplaceAll(hosts, "@fqrn@", fqrn_);
+  return hosts;
+}
+
+
+void MountPoint::SetupDnsTuning() {
+  string optarg;
+  OptionsManager *options_mgr = file_system_->options_mgr();
+
+  unsigned dns_timeout_ms = download::DownloadManager::kDnsDefaultTimeoutMs;
+  unsigned dns_retries = download::DownloadManager::kDnsDefaultRetries;
+  if (options_mgr->GetValue("CVMFS_DNS_TIMEOUT", &optarg))
+    dns_timeout_ms = String2Uint64(optarg) * 1000;
+  if (options_mgr->GetValue("CVMFS_DNS_RETRIES", &optarg))
+    dns_retries = String2Uint64(optarg);
+  if ((dns_timeout_ms != download::DownloadManager::kDnsDefaultTimeoutMs) ||
+      (dns_retries != download::DownloadManager::kDnsDefaultRetries))
+  {
+    // Creates internally a new resolver object, therefore change only if
+    // necessary.
+    download_mgr_->SetDnsParameters(dns_retries, dns_timeout_ms);
+  }
+  if (options_mgr->GetValue("CVMFS_IPFAMILY_PREFER", &optarg)) {
+    switch (String2Int64(optarg)) {
+      case 4:
+        download_mgr_->SetIpPreference(dns::kIpPreferV4);
+        break;
+      case 6:
+        download_mgr_->SetIpPreference(dns::kIpPreferV6);
+        break;
+    }
+  }
+  if (options_mgr->GetValue("CVMFS_MAX_IPADDR_PER_PROXY", &optarg))
+    download_mgr_->SetMaxIpaddrPerProxy(String2Uint64(optarg));
+}
+
+
+void MountPoint::SetupHttpTuning() {
+  string optarg;
+  OptionsManager *options_mgr = file_system_->options_mgr();
+
+  // TODO(jblomer): avoid double default settings
+
+  unsigned timeout = kDefaultTimeoutSec;
+  unsigned timeout_direct = kDefaultTimeoutSec;
+  if (options_mgr->GetValue("CVMFS_TIMEOUT", &optarg))
+    timeout = String2Uint64(optarg);
+  if (options_mgr->GetValue("CVMFS_TIMEOUT_DIRECT", &optarg))
+    timeout_direct = String2Uint64(optarg);
+  download_mgr_->SetTimeout(timeout, timeout_direct);
+
+  unsigned max_retries = kDefaultRetries;
+  unsigned backoff_init = kDefaultBackoffInitMs;
+  unsigned backoff_max = kDefaultBackoffMaxMs;
+  if (options_mgr->GetValue("CVMFS_MAX_RETRIES", &optarg))
+    max_retries = String2Uint64(optarg);
+  if (options_mgr->GetValue("CVMFS_BACKOFF_INIT", &optarg))
+    backoff_init = String2Uint64(optarg) * 1000;
+  if (options_mgr->GetValue("CVMFS_BACKOFF_MAX", &optarg))
+    backoff_max = String2Uint64(optarg) * 1000;
+  download_mgr_->SetRetryParameters(max_retries, backoff_init, backoff_max);
+
+  if (options_mgr->GetValue("CVMFS_LOW_SPEED_LIMIT", &optarg))
+    download_mgr_->SetLowSpeedLimit(String2Uint64(optarg));
+  if (options_mgr->GetValue("CVMFS_PROXY_RESET_AFTER", &optarg))
+    download_mgr_->SetProxyGroupResetDelay(String2Uint64(optarg));
+  if (options_mgr->GetValue("CVMFS_HOST_RESET_AFTER", &optarg))
+    download_mgr_->SetHostResetDelay(String2Uint64(optarg));
+
+  if (options_mgr->GetValue("CVMFS_FOLLOW_REDIRECTS", &optarg) &&
+      options_mgr->IsOn(optarg))
+  {
+    download_mgr_->EnableRedirects();
+  }
+  if (options_mgr->GetValue("CVMFS_SEND_INFO_HEADER", &optarg) &&
+      options_mgr->IsOn(optarg))
+  {
+    download_mgr_->EnableInfoHeader();
+  }
 }
 
 

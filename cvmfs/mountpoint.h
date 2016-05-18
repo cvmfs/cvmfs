@@ -14,10 +14,19 @@
 #include "fuse_listing.h"
 #include "util/pointer.h"
 
+class AuthzAttachment;
+class AuthzFetcher;
+class AuthzSessionManager;
 class BackoffThrottle;
+namespace cache {
+class CacheManager;
+}
 class ChunkTables;
 namespace cvmfs {
 class Uuid;
+}
+namespace download {
+class DownloadManager;
 }
 namespace glue {
 class InodeTracker;
@@ -64,6 +73,14 @@ class FileSystem : SingleCopy, public MountPointFactory {
     kFsLibrary
   };
 
+  struct FileSystemInfo {
+    FileSystemInfo() : type(kFsFuse), options_mgr(NULL) { }
+    std::string name;
+    std::string exe_path;
+    Type type;
+    OptionsManager *options_mgr;
+  };
+
   static const unsigned kCacheExclusive  = 0x01;
   static const unsigned kCacheShared     = 0x02;
   static const unsigned kCacheAlien      = 0x04;
@@ -72,13 +89,21 @@ class FileSystem : SingleCopy, public MountPointFactory {
   static const unsigned kCacheNfsHa      = 0x20;
   static const unsigned kCacheNoRename   = 0x40;
 
-  static FileSystem *Create(const std::string &name,
-                            Type type,
-                            OptionsManager *options_mgr);
+  static FileSystem *Create(const FileSystemInfo &fs_info);
   ~FileSystem();
 
+  std::string cache_dir() { return cache_dir_; }
+  cache::CacheManager *cache_mgr() { return cache_mgr_; }
+  int cache_mode() { return cache_mode_; }
+  std::string exe_path() { return exe_path_; }
+  bool found_previous_crash() { return found_previous_crash_; }
+  std::string nfs_maps_dir() { return nfs_maps_dir_; }
   OptionsManager *options_mgr() { return options_mgr_; }
+  int64_t quota_limit() { return quota_limit_; }
+  perf::Statistics *statistics() { return statistics_; }
   Type type() { return type_; }
+  std::string workspace() { return workspace_; }
+  cvmfs::Uuid *uuid_cache() { return uuid_cache_; }
 
  private:
   static const char *kDefaultCacheBase;  // /var/lib/cvmfs
@@ -88,13 +113,17 @@ class FileSystem : SingleCopy, public MountPointFactory {
                              int sqlite_extended_error,
                              const char *message);
 
-  FileSystem(const std::string &name, Type type, OptionsManager *options_mgr);
+  FileSystem(const FileSystemInfo &fs_info);
 
   void SetupLogging();
+  void CreateStatistics();
   void SetupSqlite();
   bool SetupWorkspace();
   bool LockWorkspace();
   bool SetupCrashGuard();
+  bool CreateCache();
+  bool SetupQuotaMgmt();
+  bool SetupNfsMaps();
 
   bool CheckCacheMode();
   void DetermineCacheMode();
@@ -103,20 +132,38 @@ class FileSystem : SingleCopy, public MountPointFactory {
   void DetermineWorkspace();
 
   std::string name_;
+  std::string exe_path_;
   Type type_;
   OptionsManager *options_mgr_;
+
+  perf::Counter *n_fs_open_;
+  perf::Counter *n_fs_dir_open_;
+  perf::Counter *n_fs_lookup_;
+  perf::Counter *n_fs_lookup_negative_;
+  perf::Counter *n_fs_stat_;
+  perf::Counter *n_fs_read_;
+  perf::Counter *n_fs_readlink_;
+  perf::Counter *n_fs_forget_;
+  perf::Counter *n_io_error_;
+  perf::Counter *no_open_files_;
+  perf::Counter *no_open_dirs_;
+  perf::Statistics *statistics_;
 
   std::string workspace_;
   int fd_workspace_lock_;
   std::string path_workspace_lock_;
   std::string path_crash_guard_;
-  bool found_crash_;
+  bool found_previous_crash_;
 
   std::string mountpoint_;
   std::string cache_dir_;
-  std::string alien_cache_dir_;
+  std::string nfs_maps_dir_;
   int cache_mode_;
   int64_t quota_limit_;
+
+  cache::CacheManager *cache_mgr_;
+  cvmfs::Uuid *uuid_cache_;
+  bool has_nfs_maps_;
 };
 
 
@@ -163,32 +210,44 @@ class MountPoint : SingleCopy, public MountPointFactory {
    * Default to 16M RAM for meta-data caches; does not include the inode tracker
    */
   static const unsigned kDefaultMemcacheSize = 16 * 1024 * 1024;
+  /**
+   * Where to look for external authz helpers.
+   */
+  static const char *kDefaultAuthzSearchPath;  // "/usr/libexec/cvmfs/authz"
+  /**
+   * Maximum number of concurrent HTTP connections.
+   */
+  static const unsigned kDefaultNumConnections = 16;
+  /**
+   * Default network timeout
+   */
+  static const unsigned kDefaultTimeoutSec = 5;
+  static const unsigned kDefaultRetries = 1;
+  static const unsigned kDefaultBackoffInitMs = 2000;
+  static const unsigned kDefaultBackoffMaxMs = 10000;
 
   MountPoint(const std::string &fqrn, FileSystem *file_system);
+
   void CreateStatistics();
+  void CreateAuthz();
+  bool CreateDownloadManagers();
   void CreateTables();
   void SetupTtls();
+  void SetupDnsTuning();
+  void SetupHttpTuning();
+  std::string ReplaceHosts(std::string hosts);
 
   std::string fqrn_;
   /**
    * In contrast to the manager objects, the FileSystem is not owned.
    */
   FileSystem *file_system_;
-  cvmfs::Uuid *uuid_mountpoint_;
 
-  perf::Counter *n_fs_open_;
-  perf::Counter *n_fs_dir_open_;
-  perf::Counter *n_fs_lookup_;
-  perf::Counter *n_fs_lookup_negative_;
-  perf::Counter *n_fs_stat_;
-  perf::Counter *n_fs_read_;
-  perf::Counter *n_fs_readlink_;
-  perf::Counter *n_fs_forget_;
-  perf::Counter *n_io_error_;
-  perf::Counter *no_open_files_;
-  perf::Counter *no_open_dirs_;
   perf::Statistics *statistics_;
-
+  AuthzFetcher *authz_fetcher_;
+  AuthzSessionManager *authz_session_mgr_;
+  AuthzAttachment *authz_attachment_;
+  download::DownloadManager *download_mgr_;
   FuseDirectoryHandles *directory_handles_;
   ChunkTables *chunk_tables_;
   lru::InodeCache *inode_cache_;
