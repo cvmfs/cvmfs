@@ -553,8 +553,8 @@ static bool GetDirentForInode(const fuse_ino_t ino,
   // Non-NFS mode
   PathString path;
   if (ino == catalog_manager_->GetRootInode()) {
-    bool retval = catalog_manager_->LookupPath(PathString(),
-                                                catalog::kLookupSole, dirent);
+    bool retval =
+      catalog_manager_->LookupPath(PathString(), catalog::kLookupSole, dirent);
     assert(retval);
     dirent->set_inode(ino);
     inode_cache_->Insert(ino, *dirent);
@@ -564,7 +564,8 @@ static bool GetDirentForInode(const fuse_ino_t ino,
   bool retval = inode_tracker_->FindPath(ino, &path);
   if (!retval) {
     // Can this ever happen?
-    LogCvmfs(kLogCvmfs, kLogDebug, "GetDirentForInode inode lookup failure");
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+             "GetDirentForInode inode lookup failure %" PRId64, ino);
     *dirent = dirent_negative;
     return false;
   }
@@ -1187,8 +1188,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
              "linking chunk handle %d to inode: %"PRIu64,
              chunk_tables_->next_handle, uint64_t(ino));
     chunk_tables_->handle2fd.Insert(chunk_tables_->next_handle, ChunkFd());
-    // On NFS, inodes are not unique.  Don't cache there.
-    fi->keep_cache = !nfs_maps_;
+    // The same inode can refer to different revisions of a path.  Don't cache.
+    fi->keep_cache = 0;
     fi->fh = static_cast<uint64_t>(-chunk_tables_->next_handle);
     ++chunk_tables_->next_handle;
     chunk_tables_->Unlock();
@@ -1210,8 +1211,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
         (static_cast<int>(max_open_files_))-kNumReservedFd) {
       LogCvmfs(kLogCvmfs, kLogDebug, "file %s opened (fd %d)",
                path.c_str(), fd);
-      // On NFS, inodes are not unique.  Don't cache there.
-      fi->keep_cache = !nfs_maps_;
+      // The same inode can refer to different revisions of a path. Don't cache.
+      fi->keep_cache = 0;
       fi->fh = fd;
       fuse_reply_open(req, fi);
       return;
