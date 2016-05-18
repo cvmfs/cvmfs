@@ -352,6 +352,17 @@ static bool UseWatchdog() {
 }
 
 
+std::string PrintInodeGeneration() {
+  return "init-catalog-revision: " +
+    StringifyInt(inode_generation_info_.initial_revision) + "  " +
+    "current-catalog-revision: " +
+    StringifyInt(catalog_manager_->GetRevision()) + "  " +
+    "incarnation: " + StringifyInt(inode_generation_info_.incarnation) + "  " +
+    "inode generation: " + StringifyInt(inode_generation_info_.inode_generation)
+    + "\n";
+}
+
+
 static void AlarmReload(int signal __attribute__((unused)),
                         siginfo_t *siginfo __attribute__((unused)),
                         void *context __attribute__((unused)))

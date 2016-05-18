@@ -398,6 +398,8 @@ static void *MainTalk(void *data __attribute__((unused))) {
         int highwater;
         string result;
 
+        result += "Inode Generation:\n  " + cvmfs::PrintInodeGeneration();
+
         // Manually setting the values of the ShortString counters
         cvmfs::statistics_->Lookup("pathstring.n_instances")->
             Set(PathString::num_instances());
