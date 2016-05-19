@@ -1170,8 +1170,21 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       return;
     }
 
+    // Figure out unique inode from annotated catalog
+    catalog::DirectoryEntry dirent_origin;
+    if (!catalog_manager_->LookupPath(path, catalog::kLookupSole,
+                                      &dirent_origin))
+    {
+      fence_remount_->Leave();
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+               "chunked file %s vanished unexpectedly", path.c_str());
+      fuse_reply_err(req, ENOENT);
+      return;
+    }
+    const uint64_t unique_inode = dirent_origin.inode();
+
     chunk_tables_->Lock();
-    if (!chunk_tables_->inode2chunks.Contains(ino)) {
+    if (!chunk_tables_->inode2chunks.Contains(unique_inode)) {
       chunk_tables_->Unlock();
 
       // Retrieve File chunks from the catalog
@@ -1190,30 +1203,37 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
 
       chunk_tables_->Lock();
       // Check again to avoid race
-      if (!chunk_tables_->inode2chunks.Contains(ino)) {
+      if (!chunk_tables_->inode2chunks.Contains(unique_inode)) {
         chunk_tables_->inode2chunks.Insert(
-          ino, FileChunkReflist(chunks, path, dirent.compression_algorithm(),
-                                dirent.IsExternalFile()));
-        chunk_tables_->inode2references.Insert(ino, 1);
+          unique_inode, FileChunkReflist(chunks, path, 
+                                         dirent.compression_algorithm(),
+                                         dirent.IsExternalFile()));
+        chunk_tables_->inode2references.Insert(unique_inode, 1);
       } else {
         uint32_t refctr;
-        bool retval = chunk_tables_->inode2references.Lookup(ino, &refctr);
+        bool retval =
+          chunk_tables_->inode2references.Lookup(unique_inode, &refctr);
         assert(retval);
-        chunk_tables_->inode2references.Insert(ino, refctr+1);
+        chunk_tables_->inode2references.Insert(unique_inode, refctr+1);
       }
     } else {
       remount_fence_->Leave();
       uint32_t refctr;
-      bool retval = chunk_tables_->inode2references.Lookup(ino, &refctr);
+      bool retval =
+        chunk_tables_->inode2references.Lookup(unique_inode, &refctr);
       assert(retval);
-      chunk_tables_->inode2references.Insert(ino, refctr+1);
+      chunk_tables_->inode2references.Insert(unique_inode, refctr+1);
     }
 
     // Update the chunk handle list
     LogCvmfs(kLogCvmfs, kLogDebug,
-             "linking chunk handle %d to inode: %"PRIu64,
-             chunk_tables_->next_handle, uint64_t(ino));
+             "linking chunk handle %d to unique inode: %" PRIu64,
+             chunk_tables_->next_handle, uint64_t(unique_inode));
     chunk_tables_->handle2fd.Insert(chunk_tables_->next_handle, ChunkFd());
+    chunk_tables_->handle2uniqino.Insert(chunk_tables_->next_handle,
+                                         unique_inode);
+    // The same inode can refer to different revisions of a path.  Don't cache.
+    fi->keep_cache = 0;
     fi->fh = static_cast<uint64_t>(-chunk_tables_->next_handle);
     ++chunk_tables_->next_handle;
     chunk_tables_->Unlock();
@@ -1295,13 +1315,19 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
 
     const uint64_t chunk_handle =
       static_cast<uint64_t>(-static_cast<int64_t>(fi->fh));
+    uint64_t unique_inode;
     ChunkFd chunk_fd;
     FileChunkReflist chunks;
     bool retval;
 
-    // Fetch chunk list and file descriptor
+    // Fetch unique inode, chunk list and file descriptor
     chunk_tables_->Lock();
-    retval = chunk_tables_->inode2chunks.Lookup(ino, &chunks);
+    retval = chunk_tables_->handle2uniqino.Lookup(chunk_handle, &unique_inode);
+    if (!retval) {
+      LogCvmfs(kLogCvmfs, kLogDebug, "no unique inode, fall back to fuse ino");
+      unique_inode = ino;
+    }
+    retval = chunk_tables_->inode2chunks.Lookup(unique_inode, &chunks);
     assert(retval);
     chunk_tables_->Unlock();
 
@@ -1426,30 +1452,36 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
       static_cast<uint64_t>(-static_cast<int64_t>(fi->fh));
     LogCvmfs(kLogCvmfs, kLogDebug, "releasing chunk handle %"PRIu64,
              chunk_handle);
+    uint64_t unique_inode;
     ChunkFd chunk_fd;
     FileChunkReflist chunks;
     uint32_t refctr;
     bool retval;
 
     chunk_tables_->Lock();
+    retval = chunk_tables_->handle2uniqino.Lookup(chunk_handle, &unique_inode);
+    if (!retval) {
+      LogCvmfs(kLogCvmfs, kLogDebug, "no unique inode, fall back to fuse ino");
+      unique_inode = ino;
+    }
     retval = chunk_tables_->handle2fd.Lookup(chunk_handle, &chunk_fd);
     assert(retval);
     chunk_tables_->handle2fd.Erase(chunk_handle);
 
-    retval = chunk_tables_->inode2references.Lookup(ino, &refctr);
+    retval = chunk_tables_->inode2references.Lookup(unique_inode, &refctr);
     assert(retval);
     refctr--;
     if (refctr == 0) {
       LogCvmfs(kLogCvmfs, kLogDebug, "releasing chunk list for inode %"PRIu64,
-               uint64_t(ino));
+               uint64_t(unique_inode));
       FileChunkReflist to_delete;
-      retval = chunk_tables_->inode2chunks.Lookup(ino, &to_delete);
+      retval = chunk_tables_->inode2chunks.Lookup(unique_inode, &to_delete);
       assert(retval);
-      chunk_tables_->inode2references.Erase(ino);
-      chunk_tables_->inode2chunks.Erase(ino);
+      chunk_tables_->inode2references.Erase(unique_inode);
+      chunk_tables_->inode2chunks.Erase(unique_inode);
       delete to_delete.list;
     } else {
-      chunk_tables_->inode2references.Insert(ino, refctr);
+      chunk_tables_->inode2references.Insert(unique_inode, refctr);
     }
     chunk_tables_->Unlock();
 
@@ -3175,7 +3207,7 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
   SendMsg2Socket(fd_progress, msg_progress);
   ChunkTables *saved_chunk_tables = new ChunkTables(*cvmfs::chunk_tables_);
   loader::SavedState *state_chunk_tables = new loader::SavedState();
-  state_chunk_tables->state_id = loader::kStateOpenFilesV3;
+  state_chunk_tables->state_id = loader::kStateOpenFilesV4;
   state_chunk_tables->state = saved_chunk_tables;
   saved_states->push_back(state_chunk_tables);
 
@@ -3261,7 +3293,7 @@ static bool RestoreState(const int fd_progress,
     }
 
     if (saved_states[i]->state_id == loader::kStateOpenFiles) {
-      SendMsg2Socket(fd_progress, "Migrating chunk tables (v1 to v3)... ");
+      SendMsg2Socket(fd_progress, "Migrating chunk tables (v1 to v4)... ");
       compat::chunk_tables::ChunkTables *saved_chunk_tables =
         (compat::chunk_tables::ChunkTables *)saved_states[i]->state;
       compat::chunk_tables::Migrate(saved_chunk_tables, cvmfs::chunk_tables_);
@@ -3270,7 +3302,7 @@ static bool RestoreState(const int fd_progress,
     }
 
     if (saved_states[i]->state_id == loader::kStateOpenFilesV2) {
-      SendMsg2Socket(fd_progress, "Migrating chunk tables (v2 to v3)... ");
+      SendMsg2Socket(fd_progress, "Migrating chunk tables (v2 to v4)... ");
       compat::chunk_tables_v2::ChunkTables *saved_chunk_tables =
         (compat::chunk_tables_v2::ChunkTables *)saved_states[i]->state;
       compat::chunk_tables_v2::Migrate(saved_chunk_tables,
@@ -3280,6 +3312,16 @@ static bool RestoreState(const int fd_progress,
     }
 
     if (saved_states[i]->state_id == loader::kStateOpenFilesV3) {
+      SendMsg2Socket(fd_progress, "Migrating chunk tables (v3 to v4)... ");
+      compat::chunk_tables_v3::ChunkTables *saved_chunk_tables =
+        (compat::chunk_tables_v3::ChunkTables *)saved_states[i]->state;
+      compat::chunk_tables_v3::Migrate(saved_chunk_tables,
+                                       cvmfs::chunk_tables_);
+      SendMsg2Socket(fd_progress,
+        StringifyInt(cvmfs::chunk_tables_->handle2fd.size()) + " handles\n");
+    }
+
+    if (saved_states[i]->state_id == loader::kStateOpenFilesV4) {
       SendMsg2Socket(fd_progress, "Restoring chunk tables... ");
       delete cvmfs::chunk_tables_;
       ChunkTables *saved_chunk_tables = reinterpret_cast<ChunkTables *>(
@@ -3364,6 +3406,11 @@ static void FreeSavedState(const int fd_progress,
           saved_states[i]->state);
         break;
       case loader::kStateOpenFilesV3:
+        SendMsg2Socket(fd_progress, "Releasing chunk tables (version 3)\n");
+        delete static_cast<compat::chunk_tables_v3::ChunkTables *>(
+          saved_states[i]->state);
+        break;
+      case loader::kStateOpenFilesV4:
         SendMsg2Socket(fd_progress, "Releasing chunk tables\n");
         delete static_cast<ChunkTables *>(saved_states[i]->state);
         break;

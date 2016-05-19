@@ -97,7 +97,7 @@ cvmfs_run_test() {
   [ "x$(tail -n 1 ${mntpnt}/dir/small)" = "xmodified" ] || return 50
   [ "x$(tail -n 1 ${mntpnt}/dir/large)" = "xmodified" ] || return 51
 
-  echo "verify that our open tail processes where acutally running"
+  echo "verify that our open tail processes did acutally run"
   /bin/kill -TERM $TEST633_TAIL_SMALL || return 60
   TEST633_TAIL_SMALL=
   /bin/kill -TERM $TEST633_TAIL_LARGE || return 61
