@@ -1427,6 +1427,8 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
     if (!retval) {
       LogCvmfs(kLogCvmfs, kLogDebug, "no unique inode, fall back to fuse ino");
       unique_inode = ino;
+    } else {
+      chunk_tables_->handle2uniqino.Erase(chunk_handle);
     }
     retval = chunk_tables_->handle2fd.Lookup(chunk_handle, &chunk_fd);
     assert(retval);
