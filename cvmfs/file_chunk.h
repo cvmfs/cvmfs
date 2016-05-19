@@ -107,10 +107,15 @@ struct ChunkTables {
     assert(retval == 0);
   }
 
-  static const unsigned kVersion = 2;
+  // Version 2 --> 4: add handle2uniqino
+  static const unsigned kVersion = 4;
 
   int version;
   static const unsigned kNumHandleLocks = 128;
+  // Versions < 4 of ChunkTables didn't have this map.  Therefore, after a
+  // hot patch a handle can be missing from this map.  In this case, the fuse
+  // module falls back to the inode passed by the kernel.
+  SmallHashDynamic<uint64_t, uint64_t> handle2uniqino;
   SmallHashDynamic<uint64_t, ChunkFd> handle2fd;
   // The file descriptors attached to handles need to be locked.
   // Using a hash map to survive with a small, fixed number of locks

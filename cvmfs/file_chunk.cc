@@ -62,6 +62,7 @@ void ChunkTables::InitLocks() {
 
 
 void ChunkTables::InitHashmaps() {
+  handle2uniqino.Init(16, 0, hasher_uint64t);
   handle2fd.Init(16, 0, hasher_uint64t);
   inode2chunks.Init(16, 0, hasher_uint64t);
   inode2references.Init(16, 0, hasher_uint64t);
@@ -98,6 +99,7 @@ ChunkTables &ChunkTables::operator= (const ChunkTables &other) {
   if (&other == this)
     return *this;
 
+  handle2uniqino.Clear();
   handle2fd.Clear();
   inode2chunks.Clear();
   inode2references.Clear();
@@ -112,6 +114,7 @@ void ChunkTables::CopyFrom(const ChunkTables &other) {
   inode2references = other.inode2references;
   inode2chunks = other.inode2chunks;
   handle2fd = other.handle2fd;
+  handle2uniqino = other.handle2uniqino;
 }
 
 
