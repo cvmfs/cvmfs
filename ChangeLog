@@ -1,3 +1,6 @@
+2.2.3
+  * Fix stale open chunked files that are updated in the repository (CVM-1017)
+
 2.2.2:
   * Fix compilation of libcvmfs on Fedora 23 i686
   * Update cvmfs_rsync to handle source dirs changed into symlinks (CVM-1004)
