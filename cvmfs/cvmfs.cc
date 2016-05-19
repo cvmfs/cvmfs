@@ -1175,7 +1175,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     if (!catalog_manager_->LookupPath(path, catalog::kLookupSole,
                                       &dirent_origin))
     {
-      fence_remount_->Leave();
+      remount_fence_->Leave();
       LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
                "chunked file %s vanished unexpectedly", path.c_str());
       fuse_reply_err(req, ENOENT);
