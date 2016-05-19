@@ -21,8 +21,9 @@
 // 18: add cvmfs_pread and support for chunked files
 // 19: CernVM-FS 2.2.0
 // 20: fix reading of chunked files
-// 21: CernVM-FS 2.3.0
-#define LIBCVMFS_REVISION 21
+// 21: CernVM-FS 2.2.3
+// 22: CernVM-FS 2.3.0
+#define LIBCVMFS_REVISION 22
 
 #include <sys/stat.h>
 #include <unistd.h>
