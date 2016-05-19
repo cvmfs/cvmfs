@@ -66,11 +66,11 @@ cvmfs_run_test() {
   echo "mount private mount point"
   private_mount $mntpnt || return 20
 
-  local revision_old=$(get_xattr revision ${mntpnt}) || return 25
+  local revision_old=$(attr -qg revision ${mntpnt}) || return 25
   echo "revision is $revision_old"
 
   echo "verify that large file is chunked"
-  local no_chunks=$(get_xattr chunks ${mntpnt}/dir/large) || return 21
+  local no_chunks=$(attr -qg chunks ${mntpnt}/dir/large) || return 21
   [ $no_chunks -gt 1 ] || return 22
 
   echo "open file descriptors"
@@ -89,7 +89,7 @@ cvmfs_run_test() {
   sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO remount || return 40
   echo "waiting for kernel caches to drain out"
   sleep 10
-  local revision_new=$(get_xattr revision ${mntpnt}) || return 41
+  local revision_new=$(attr -qg revision ${mntpnt}) || return 41
   echo "revision is now $revision_new"
   [ $revision_new -gt $revision_old ] || return 42
 
