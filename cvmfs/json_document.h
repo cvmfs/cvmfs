@@ -24,8 +24,6 @@ class JsonDocument : SingleCopy {
   inline bool IsValid() const { return root_ != NULL; }
 
   static std::string EscapeString(const std::string &input);
-
-  static std::string EscapeString(const std::string &input);
   static JSON *SearchInObject(const JSON *json_object,
                               const std::string &name,
                               const json_type type);
