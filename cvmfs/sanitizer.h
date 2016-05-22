@@ -55,6 +55,12 @@ class AlphaNumSanitizer : public InputSanitizer {
 };
 
 
+class UuidSanitizer : public InputSanitizer {
+ public:
+  UuidSanitizer() : InputSanitizer("af AF 09 -") { }
+};
+
+
 class RepositorySanitizer : public InputSanitizer {
  public:
   RepositorySanitizer() : InputSanitizer("az AZ 09 - _ .") { }
@@ -86,6 +92,24 @@ class PositiveIntegerSanitizer : public IntegerSanitizer {
   virtual bool Sanitize(std::string::const_iterator   begin,
                         std::string::const_iterator   end,
                         std::string                  *filtered_output) const;
+};
+
+
+/**
+ * Accepts both normal base64 and url conformant base64.
+ */
+class Base64Sanitizer : public InputSanitizer {
+ public:
+  Base64Sanitizer() : InputSanitizer("az AZ 09 + / - _ =") { }
+};
+
+/**
+ * There could be more on the whitelist but this is already sufficient for the
+ * octopus web service.  It includes the whitelist for valid repositories.
+ */
+class UriSanitizer : public InputSanitizer {
+ public:
+  UriSanitizer() : InputSanitizer("az AZ 09 . - _ /") { }
 };
 
 }  // namespace sanitizer

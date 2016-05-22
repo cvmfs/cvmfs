@@ -185,6 +185,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   manifest_fetch.cc manifest_fetch.h
   object_fetcher.h
   options.cc options.h
+  pack.cc pack.h
   path_filters/dirtab.cc path_filters/dirtab.h
   path_filters/relaxed_path_filter.cc path_filters/relaxed_path_filter.h
   pathspec/pathspec.cc pathspec/pathspec.h
@@ -495,8 +496,39 @@ if (BUILD_LIBCVMFS)
   add_executable( test_libcvmfs ${TEST_LIBCVMFS_SOURCES} )
   target_link_libraries( test_libcvmfs ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a ${SQLITE3_LIBRARY} ${CARES_LIBRARIES} ${CURL_LIBRARIES} ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl )
   add_dependencies (test_libcvmfs libcvmfs)
-
 endif (BUILD_LIBCVMFS)
+
+
+if (BUILD_OCTOPUS)
+  set (CVMFS_OCTOPUS_SOURCES
+    encrypt.cc encrypt.h
+    hash.cc hash.h
+    json_document.cc json_document.h
+    logging.cc logging.h logging_internal.h
+    pathspec/pathspec.cc pathspec/pathspec.h
+    pathspec/pathspec_pattern.cc pathspec/pathspec_pattern.h
+    platform.h platform_linux.h platform_osx.h
+	  sanitizer.cc sanitizer.h
+    smalloc.h
+    util/pointer.h
+    util/posix.cc util/posix.h
+    util/single_copy.h
+    util/string.cc util/string.h
+    uuid.cc uuid.h
+		webapi/fcgi.cc webapi/fcgi.h
+    webapi/macaroon.cc webapi/macaroon.h
+    webapi/octopus.cc
+    webapi/uri_map.cc webapi/uri_map.h
+  )
+
+  add_executable (cvmfs_octopus.fcgi ${CVMFS_OCTOPUS_SOURCES})
+  add_dependencies (cvmfs_octopus.fcgi libsha2)
+  add_dependencies (cvmfs_octopus.fcgi libvjson)
+  target_link_libraries(cvmfs_octopus.fcgi
+                        ${SHA3_ARCHIVE} ${VJSON_ARCHIVE} ${OPENSSL_LIBRARIES}
+                        ${RT_LIBRARY} ${UUID_LIBRARIES} pthread)
+endif (BUILD_OCTOPUS)
+
 
 if (BUILD_SERVER)
   # create targets with corresponding sources and static link libraries
@@ -726,6 +758,15 @@ if (BUILD_SERVER)
     DESTINATION    "/var/www/wsgi-scripts"
     PERMISSIONS    OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
   )
+
+  if (BUILD_OCTOPUS)
+    install(
+      TARGETS      cvmfs_octopus.fcgi
+      RUNTIME
+      DESTINATION  "/usr/share/cvmfs-server/webapi"
+      PERMISSIONS  OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+    )
+  endif (BUILD_OCTOPUS)
 
   if (GEOIP_BUILTIN)
     install(

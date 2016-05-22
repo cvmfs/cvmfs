@@ -34,15 +34,15 @@ const char b64_table[] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
   '4', '5', '6', '7', '8', '9', '+', '/'};
 
 /**
- * Decode Base64
+ * Decode Base64 and Base64Url
  */
 const signed char db64_table[] =
   { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 62, -1, -1, -1, 63,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 62, -1, 62, -1, 63,
     52, 53, 54, 55, 56, 57, 58, 59, 60, 61, -1, -1, -1,  0, -1, -1,
     -1,  0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14,
-    15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, -1, -1, -1, -1, -1,
+    15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, -1, -1, -1, -1, 63,
     -1, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40,
     41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, -1, -1, -1, -1, -1,
 
@@ -490,6 +490,21 @@ string Base64(const string &data) {
 }
 
 
+/**
+ * Safe encoding for URIs and path names: replace + by - and / by _
+ */
+string Base64Url(const string &data) {
+  string base64 = Base64(data);
+  for (unsigned i = 0, l = base64.length(); i < l; ++i) {
+    if (base64[i] == '+')
+      base64[i] = '-';
+    else if (base64[i] == '/')
+      base64[i] = '_';
+  }
+  return base64;
+}
+
+
 static bool Debase64Block(const unsigned char input[4],
                           const signed char *d_table,
                           unsigned char output[3])
@@ -507,6 +522,9 @@ static bool Debase64Block(const unsigned char input[4],
 }
 
 
+/**
+ * Can decode both base64 and base64url
+ */
 bool Debase64(const string &data, string *decoded) {
   decoded->clear();
   decoded->reserve((data.length()+4)*3/4);

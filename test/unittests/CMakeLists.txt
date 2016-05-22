@@ -39,6 +39,7 @@ set(CVMFS_UNITTEST_FILES
   t_dirtab.cc
   t_dns.cc
   t_download.cc
+  t_encrypt.cc
   t_fence.cc
   t_fetch.cc
   t_file_chunk.cc
@@ -53,9 +54,11 @@ set(CVMFS_UNITTEST_FILES
   t_json.cc
   t_libcvmfs.cc
   t_lru.cc
+  t_macaroon.cc
   t_manifest.cc
   t_object_fetcher.cc
   t_options.cc
+  t_pack.cc
   t_pathspec.cc
   t_pipe.cc
   t_platforms.cc
@@ -78,6 +81,7 @@ set(CVMFS_UNITTEST_FILES
   t_unique_ptr.cc
   t_upload_facility.cc
   t_uploaders.cc
+  t_uri_map.cc
   t_util.cc
   t_util_concurrency.cc
   t_uuid.cc
@@ -116,6 +120,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/duplex_curl.h
   ${CVMFS_SOURCE_DIR}/duplex_sqlite3.h
   ${CVMFS_SOURCE_DIR}/duplex_zlib.h
+  ${CVMFS_SOURCE_DIR}/encrypt.cc ${CVMFS_SOURCE_DIR}/encrypt.h
   ${CVMFS_SOURCE_DIR}/fence.h
   ${CVMFS_SOURCE_DIR}/fetch.cc ${CVMFS_SOURCE_DIR}/fetch.h
   ${CVMFS_SOURCE_DIR}/file_chunk.cc
@@ -139,6 +144,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/monitor.cc ${CVMFS_SOURCE_DIR}/monitor.h
   ${CVMFS_SOURCE_DIR}/murmur.h
   ${CVMFS_SOURCE_DIR}/options.cc ${CVMFS_SOURCE_DIR}/options.h
+  ${CVMFS_SOURCE_DIR}/pack.cc ${CVMFS_SOURCE_DIR}/pack.h
   ${CVMFS_SOURCE_DIR}/path_filters/dirtab.cc ${CVMFS_SOURCE_DIR}/path_filters/dirtab.h
   ${CVMFS_SOURCE_DIR}/path_filters/relaxed_path_filter.cc ${CVMFS_SOURCE_DIR}/path_filters/relaxed_path_filter.h
   ${CVMFS_SOURCE_DIR}/pathspec/pathspec.cc ${CVMFS_SOURCE_DIR}/pathspec/pathspec.h
@@ -176,6 +182,9 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/util/string.cc ${CVMFS_SOURCE_DIR}/util/string.h
   ${CVMFS_SOURCE_DIR}/util_concurrency.cc ${CVMFS_SOURCE_DIR}/util_concurrency.h ${CVMFS_SOURCE_DIR}/util_concurrency_impl.h
   ${CVMFS_SOURCE_DIR}/uuid.cc ${CVMFS_SOURCE_DIR}/uuid.h
+	${CVMFS_SOURCE_DIR}/webapi/fcgi.cc ${CVMFS_SOURCE_DIR}/webapi/fcgi.h
+  ${CVMFS_SOURCE_DIR}/webapi/macaroon.cc ${CVMFS_SOURCE_DIR}/webapi/macaroon.h
+	${CVMFS_SOURCE_DIR}/webapi/uri_map.cc ${CVMFS_SOURCE_DIR}/webapi/uri_map.h
   ${CVMFS_SOURCE_DIR}/whitelist.cc
   ${CVMFS_SOURCE_DIR}/wpad.cc ${CVMFS_SOURCE_DIR}/wpad.h
   ${CVMFS_SOURCE_DIR}/xattr.cc ${CVMFS_SOURCE_DIR}/xattr.h
@@ -203,6 +212,7 @@ else (BUILD_UNITTESTS)
 endif (BUILD_UNITTESTS)
 
 add_dependencies (${PROJECT_TEST_NAME} googletest)
+add_dependencies (${PROJECT_TEST_NAME} libvjson)
 add_dependencies (${PROJECT_TEST_NAME} sparsehash)
 add_dependencies (${PROJECT_TEST_NAME} libsha3)
 add_test (NAME ${PROJECT_TEST_NAME} COMMAND ${PROJECT_TEST_NAME} --gtest_filter=-*Slow)

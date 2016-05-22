@@ -57,6 +57,7 @@ std::string ReplaceAll(const std::string &haystack, const std::string &needle,
                        const std::string &replace_by);
 
 std::string Base64(const std::string &data);
+std::string Base64Url(const std::string &data);
 bool Debase64(const std::string &data, std::string *decoded);
 
 
