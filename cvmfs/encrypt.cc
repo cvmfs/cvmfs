@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <openssl/evp.h>
 #include <openssl/rand.h>
+#include <unistd.h>
 
 #include <cassert>
 #include <cstdlib>
@@ -55,7 +56,7 @@ Key *Key::CreateFromFile(const string &path) {
   }
   if ((info.st_size == 0) || (info.st_size > kMaxSize)) {
     close(fd);
-    return false;
+    return NULL;
   }
 
   Key *result = new Key();
