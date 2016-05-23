@@ -278,11 +278,14 @@ string CipherAes256Cbc::DoEncrypt(const string &plaintext, const Key &key) {
   EVP_CIPHER_CTX_init(&ctx);
   retval = EVP_EncryptInit_ex(&ctx, EVP_aes_256_cbc(), NULL, key.data(), iv);
   assert(retval == 1);
-  retval = EVP_EncryptUpdate(&ctx,
-             ciphertext + kIvSize, &cipher_len,
-             reinterpret_cast<const unsigned char *>(plaintext.data()),
-             plaintext.length());
-  assert(retval == 1);
+  // Older versions of OpenSSL don't allow empty input buffers
+  if (!plaintext.empty()) {
+    retval = EVP_EncryptUpdate(&ctx,
+               ciphertext + kIvSize, &cipher_len,
+               reinterpret_cast<const unsigned char *>(plaintext.data()),
+               plaintext.length());
+    assert(retval == 1);
+  }
   retval = EVP_EncryptFinal_ex(&ctx, ciphertext + kIvSize + cipher_len,
                                &tail_len);
   assert(retval == 1);
