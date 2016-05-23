@@ -272,8 +272,8 @@ string CipherAes256Cbc::DoEncrypt(const string &plaintext, const Key &key) {
   unsigned char *ciphertext = reinterpret_cast<unsigned char *>(
     smalloc(kIvSize + 2 * kBlockSize + plaintext.size()));
   memcpy(ciphertext, iv, kIvSize);
-  int cipher_len;
-  int tail_len;
+  int cipher_len = 0;
+  int tail_len = 0;
   EVP_CIPHER_CTX ctx;
   EVP_CIPHER_CTX_init(&ctx);
   retval = EVP_EncryptInit_ex(&ctx, EVP_aes_256_cbc(), NULL, key.data(), iv);
