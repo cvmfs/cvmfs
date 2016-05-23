@@ -61,6 +61,7 @@ class Key : SingleCopy {
  */
 class AbstractKeyDatabase {
  public:
+  virtual ~AbstractKeyDatabase() { }
   virtual bool StoreNew(const Key *key, std::string *id) = 0;
   virtual const Key *Find(const std::string &id) = 0;
 };
@@ -69,7 +70,7 @@ class AbstractKeyDatabase {
 class MemoryKeyDatabase : SingleCopy, public AbstractKeyDatabase {
  public:
   MemoryKeyDatabase();
-  ~MemoryKeyDatabase();
+  virtual ~MemoryKeyDatabase();
   virtual bool StoreNew(const Key *key, std::string *id);
   virtual const Key *Find(const std::string &id);
 
@@ -87,6 +88,7 @@ class MemoryKeyDatabase : SingleCopy, public AbstractKeyDatabase {
 class Cipher {
  public:
   static Cipher *Create(const Algorithms a);
+  virtual ~Cipher() { }
 
   bool Encrypt(const std::string &plaintext, const Key &key,
                std::string *ciphertext);
@@ -119,6 +121,8 @@ class CipherAes256Cbc : public Cipher {
   static const unsigned kIvSize = 128/8;
   static const unsigned kBlockSize = 128/8;
 
+  virtual ~CipherAes256Cbc() { }
+
   virtual std::string const name() { return "AES-256-CBC"; }
   virtual Algorithms const algorithm() { return kAes256Cbc; }
   virtual unsigned const key_size() { return kKeySize; }
@@ -139,6 +143,8 @@ class CipherAes256Cbc : public Cipher {
  */
 class CipherNone : public Cipher {
  public:
+  virtual ~CipherNone() { }
+
   virtual std::string const name() { return "FOR TESTING ONLY"; }
   virtual Algorithms const algorithm() { return kNone; }
   virtual unsigned const key_size() { return 256/8; }
