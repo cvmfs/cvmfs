@@ -30,6 +30,20 @@ Vagrant.configure(2) do |config|
     v.customize ["modifyvm", :id, "--cpus", cpus]
   end
 
+  config.vm.define "cernvm2" do |cvm2|
+    cvm2.vm.box = "cernvm2"
+    cvm2.vm.box_url = "http://cernvm.cern.ch/releases/ucernvm-images.2.6-7.cernvm.x86_64/ucernvm-slc5.2.6-7.cernvm.x86_64.box"
+
+    cvm2.vm.boot_timeout = 1200 # CernVM might load stuff over a slow network
+                                  # and need a lot of time on first boot up
+
+    #cvm2.vm.network "private_network", ip: "192.168.33.10"
+    cvm2.vm.network "private_network", type: "dhcp", auto_config: false
+    cvm2.vm.synced_folder '.', '/vagrant', nfs: false
+
+    cvm2.vm.provision "shell", path: "vagrant/provision_cernvm.sh"
+  end
+
   config.vm.define "cernvm" do |cvm|
     cvm.vm.box = "cernvm36"
     cvm.vm.box_url = "http://cernvm.cern.ch/releases/production/cernvm-3.6.5.box"
