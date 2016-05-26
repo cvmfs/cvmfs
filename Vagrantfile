@@ -30,9 +30,23 @@ Vagrant.configure(2) do |config|
     v.customize ["modifyvm", :id, "--cpus", cpus]
   end
 
+  config.vm.define "cernvm2" do |cvm2|
+    cvm2.vm.box = "cernvm2"
+    cvm2.vm.box_url = "http://cernvm.cern.ch/releases/ucernvm-images.2.6-7.cernvm.x86_64/ucernvm-slc5.2.6-7.cernvm.x86_64.box"
+
+    cvm2.vm.boot_timeout = 1200 # CernVM might load stuff over a slow network
+                                  # and need a lot of time on first boot up
+
+    #cvm2.vm.network "private_network", ip: "192.168.33.10"
+    cvm2.vm.network "private_network", type: "dhcp", auto_config: false
+    cvm2.vm.synced_folder '.', '/vagrant', nfs: false
+
+    cvm2.vm.provision "shell", path: "vagrant/provision_cernvm.sh"
+  end
+
   config.vm.define "cernvm" do |cvm|
-    cvm.vm.box = "cernvm3"
-    cvm.vm.box_url = "http://cernvm.cern.ch/releases/ucernvm-images.2.6-4.cernvm.x86_64/ucernvm-testing.2.6-4.cernvm.x86_64.box"
+    cvm.vm.box = "cernvm36"
+    cvm.vm.box_url = "http://cernvm.cern.ch/releases/production/cernvm-3.6.5.box"
 
     cvm.vm.boot_timeout = 1200 # CernVM might load stuff over a slow network
                                   # and need a lot of time on first boot up
@@ -60,9 +74,16 @@ Vagrant.configure(2) do |config|
     slc6.vm.provision :reload
   end
 
-  config.vm.define "ubuntu" do |ub|
-    ub.vm.box = "ubuntu/wily64"
-    ub.vm.network "private_network", ip: "192.168.33.12"
+  config.vm.define "ubuntu1604" do |ub|
+    ub.vm.box = "ubuntu/xenial64"
+    ub.vm.network "private_network", ip: "192.168.33.15"
+    ub.vm.synced_folder '.', '/vagrant', nfs: true
+    ub.vm.provision "shell", path: "vagrant/provision_ubuntu.sh"
+  end
+
+  config.vm.define "ubuntu1204" do |ub|
+    ub.vm.box = "ubuntu/precise64"
+    ub.vm.network "private_network", ip: "192.168.33.16"
     ub.vm.synced_folder '.', '/vagrant', nfs: true
     ub.vm.provision "shell", path: "vagrant/provision_ubuntu.sh"
   end

@@ -19,8 +19,6 @@ using namespace std;  // NOLINT
 
 namespace catalog {
 
-const int kSqliteThreadMem = 4;  /**< TODO SQLite3 heap limit per thread */
-
 
 /**
  * Open a catalog outside the framework of a catalog manager.

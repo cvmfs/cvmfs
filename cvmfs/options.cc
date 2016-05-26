@@ -285,7 +285,9 @@ void OptionsManager::PopulateParameter(
 
 void OptionsManager::ProtectParameter(const string &param) {
   string value;
-  GetValue(param, &value);
+  // We don't care about the result.  If param does not yet exists, we lock it
+  // to the empty string.
+  (void) GetValue(param, &value);
   protected_parameters_[param] = value;
 }
 
@@ -335,6 +337,26 @@ vector<string> OptionsManager::GetAllKeys() {
        iEnd = config_.end(); i != iEnd; ++i)
   {
     result.push_back(i->first);
+  }
+  return result;
+}
+
+
+vector<string> OptionsManager::GetEnvironmentSubset(
+  const string &key_prefix,
+  bool strip_prefix)
+{
+  vector<string> result;
+  for (map<string, ConfigValue>::const_iterator i = config_.begin(),
+       iEnd = config_.end(); i != iEnd; ++i)
+  {
+    const bool ignore_prefix = false;
+    if (HasPrefix(i->first, key_prefix, ignore_prefix)) {
+      const string output_key = strip_prefix
+        ? i->first.substr(key_prefix.length())
+        : i->first;
+      result.push_back(output_key + "=" + i->second.value);
+    }
   }
   return result;
 }

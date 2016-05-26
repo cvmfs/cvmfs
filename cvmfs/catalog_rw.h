@@ -97,8 +97,8 @@ class WritableCatalog : public Catalog {
   bool SetVOMSAuthz(const std::string &voms_authz);
 
  protected:
-  static const double kMaximalFreePageRatio   = 0.20;
-  static const double kMaximalRowIdWasteRatio = 0.25;
+  static const double kMaximalFreePageRatio;  // = 0.2
+  static const double kMaximalRowIdWasteRatio;  // = 0.25;
 
   CatalogDatabase::OpenMode DatabaseOpenMode() const {
     return CatalogDatabase::kOpenReadWrite;

@@ -4,10 +4,9 @@
  * UUID generation and caching.
  */
 
-#include "uuid.h"
+#define __STDC_FORMAT_MACROS
 
-#include <inttypes.h>
-#include <uuid/uuid.h>
+#include "uuid.h"
 
 #include <cassert>
 #include <cstdio>
@@ -47,8 +46,22 @@ Uuid *Uuid::Create(const string &store_path) {
   fclose(f);
   if (!retval)
     return NULL;
+  int nitems = sscanf(uuid->uuid_.c_str(),
+    "%08"SCNx32"-%04"SCNx16"-%04"SCNx16"-%04"SCNx16"-%08"SCNx32"%04"SCNx16,
+    &uuid->uuid_presentation_.split.a, &uuid->uuid_presentation_.split.b,
+    &uuid->uuid_presentation_.split.c, &uuid->uuid_presentation_.split.d,
+    &uuid->uuid_presentation_.split.e1, &uuid->uuid_presentation_.split.e2);
+  if (nitems != 6)
+    return NULL;
 
   return uuid.Release();
+}
+
+
+string Uuid::CreateOneTime() {
+  Uuid uuid;
+  uuid.MkUuid();
+  return uuid.uuid_;
 }
 
 
@@ -57,29 +70,23 @@ Uuid *Uuid::Create(const string &store_path) {
  * with the result.
  */
 void Uuid::MkUuid() {
-  union {
-    uuid_t uuid;
-    struct __attribute__((__packed__)) {
-      uint32_t a;
-      uint16_t b;
-      uint16_t c;
-      uint16_t d;
-      uint32_t e1;
-      uint16_t e2;
-    } split;
-  } uuid_presentation;
   uuid_t new_uuid;
   uuid_generate(new_uuid);
   assert(sizeof(new_uuid) == 16);
-  memcpy(uuid_presentation.uuid, new_uuid, sizeof(uuid_presentation.uuid));
+  memcpy(uuid_presentation_.uuid, new_uuid, sizeof(uuid_presentation_.uuid));
   // Canonical UUID format, including trailing \0
   unsigned uuid_len = 8+1+4+1+4+1+4+1+12+1;
   char uuid_cstr[uuid_len];
   snprintf(uuid_cstr, uuid_len, "%08x-%04x-%04x-%04x-%08x%04x",
-           uuid_presentation.split.a, uuid_presentation.split.b,
-           uuid_presentation.split.c, uuid_presentation.split.d,
-           uuid_presentation.split.e1, uuid_presentation.split.e2);
+           uuid_presentation_.split.a, uuid_presentation_.split.b,
+           uuid_presentation_.split.c, uuid_presentation_.split.d,
+           uuid_presentation_.split.e1, uuid_presentation_.split.e2);
   uuid_ = string(uuid_cstr);
+}
+
+
+Uuid::Uuid() {
+  memset(&uuid_presentation_, 0, sizeof(uuid_presentation_));
 }
 
 }  // namespace cvmfs

@@ -21,7 +21,7 @@
 
 Summary: CernVM File System
 Name: cvmfs
-Version: 2.3.0
+Version: 2.4.0
 Release: 1%{?dist}
 Source0: https://ecsft.cern.ch/dist/cvmfs/%{name}-%{version}.tar.gz
 %if 0%{?selinux_cvmfs}
@@ -185,6 +185,10 @@ cp %{SOURCE1} %{SOURCE2} SELinux
 %ifarch i386 i686
 export CXXFLAGS="`echo %{optflags}|sed 's/march=i386/march=i686/'`"
 export CFLAGS="`echo %{optflags}|sed 's/march=i386/march=i686/'`"
+%if 0%{?el5}
+export CFLAGS="$CFLAGS -O0"
+export CXXFLAGS="$CXXFLAGS -O0"
+%endif
 %endif
 
 %if 0%{?el4}
@@ -418,6 +422,8 @@ fi
 %doc COPYING AUTHORS README ChangeLog
 
 %changelog
+* Tue May 03 2016 Jakob Blomer <jblomer@cern.ch> - 2.3.0
+- No optimiziation on EL5/i686 to prevent faulty atomics
 * Fri Apr 29 2016 Jakob Blomer <jblomer@cern.ch> - 2.3.0
 - voms-devel not necessary anymore
 * Mon Apr 11 2016 Rene Meusel <rene.meusel@cern.ch> - 2.3.0

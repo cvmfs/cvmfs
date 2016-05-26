@@ -289,6 +289,7 @@ class HeaderLists {
  */
 class CredentialsAttachment {
  public:
+  virtual ~CredentialsAttachment() { }
   virtual bool ConfigureCurlHandle(CURL *curl_handle,
                                    pid_t pid,
                                    void **info_data) = 0;

@@ -1,4 +1,7 @@
+2.4.0:
+
 2.3.0:
+  * Fix null pointer dereference for authz extended attribute
   * Add well-defined client-side authz interface and allow/deny helpers
   * Parallel commit of catalog databases after publish
   * Speed-up catalog meta-data updates during publish
@@ -25,6 +28,9 @@
   * Warn when forcfully remounting the file system stack on the server, new
     parameter CVMFS_FORCE_REMOUNT_WARNING
   * Add support for default.conf in config repository (CVM-993)
+
+2.2.3:
+  * Fix stale open chunked files that are updated in the repository (CVM-1017)
 
 2.2.2:
   * Fix compilation of libcvmfs on Fedora 23 i686

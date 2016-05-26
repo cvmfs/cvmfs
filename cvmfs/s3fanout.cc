@@ -883,6 +883,7 @@ S3FanoutManager::S3FanoutManager() {
   thread_upload_ = 0;
   thread_upload_run_ = false;
   resolver_ = NULL;
+  available_jobs_ = NULL;
   statistics_ = NULL;
 }
 

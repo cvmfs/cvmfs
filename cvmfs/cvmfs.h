@@ -62,6 +62,7 @@ std::string GetOpenCatalogs();
 unsigned GetMaxTTL();  // in minutes
 void SetMaxTTL(const unsigned value);  // in minutes
 void ResetErrorCounters();
+std::string PrintInodeGeneration();
 void UnregisterQuotaListener();
 
 }  // namespace cvmfs

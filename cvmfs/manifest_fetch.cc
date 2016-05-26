@@ -19,12 +19,6 @@ using namespace std;  // NOLINT
 
 namespace manifest {
 
-const int kWlInvalid       = 0x00;
-const int kWlVerifyRsa     = 0x01;
-const int kWlVerifyPkcs7   = 0x02;
-const int kWlVerifyCaChain = 0x04;
-
-
 /**
  * Downloads and verifies the manifest, the certificate, and the whitelist.
  * If base_url is empty, uses the probe_hosts feature from download manager.

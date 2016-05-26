@@ -177,9 +177,10 @@ void LocalUploader::Upload(UploadStreamHandle  *handle,
     return;
   }
 
-  // tell kernel to evict written pages from the page cache
-  platform_invalidate_kcache(local_handle->file_descriptor,
-                             offset, bytes_written);
+  // Tell kernel to evict written pages from the page cache.  We don't care if
+  // it succeeds or not.
+  (void) platform_invalidate_kcache(local_handle->file_descriptor,
+                                    offset, bytes_written);
 
   Respond(callback, UploaderResults(0, buffer));
 }

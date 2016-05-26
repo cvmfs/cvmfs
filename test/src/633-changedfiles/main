@@ -1,0 +1,107 @@
+
+cvmfs_test_name="Test pickup of changed files"
+cvmfs_test_autofs_on_startup=false
+
+TEST633_PRIVATE_MOUNT=
+TEST633_TAIL_SMALL=
+TEST633_TAIL_LARGE=
+
+private_mount() {
+  local mntpnt="$1"
+  TEST633_PRIVATE_MOUNT="$mntpnt"
+  do_local_mount "$mntpnt"          \
+                 "$CVMFS_TEST_REPO" \
+                 "http://localhost/cvmfs/$CVMFS_TEST_REPO" \
+                 "" \
+                 "CVMFS_KCACHE_TIMEOUT=5" || return 1
+}
+
+private_unmount() {
+  sudo umount $TEST633_PRIVATE_MOUNT
+  TEST633_PRIVATE_MOUNT=
+}
+
+cleanup() {
+  echo "running cleanup()..."
+  if [ "x$TEST633_TAIL_SMALL" != "x" ]; then
+    /bin/kill -9 $TEST633_TAIL_SMALL
+  fi
+  if [ "x$TEST633_TAIL_LARGE" != "x" ]; then
+    /bin/kill -9 $TEST633_TAIL_LARGE
+  fi
+  if [ "x$TEST633_PRIVATE_MOUNT" != "x" ]; then
+    sudo umount $TEST633_PRIVATE_MOUNT
+    sudo rmdir $TEST633_PRIVATE_MOUNT
+    sudo rm -rf "${TEST633_PRIVATE_MOUNT}c"
+  fi
+}
+
+
+cvmfs_run_test() {
+  local logfile=$1
+  local script_location=$2
+  local scratch_dir=$(pwd)
+
+  echo "set a trap for system directory cleanup"
+  trap cleanup EXIT HUP INT TERM
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  local md5_small_orig
+  local md5_large_orig
+  echo "put a small file and a large file into $CVMFS_TEST_REPO"
+  start_transaction $CVMFS_TEST_REPO                              || return $?
+  mkdir /cvmfs/$CVMFS_TEST_REPO/dir                               || return 3
+  echo "Hello World" > /cvmfs/$CVMFS_TEST_REPO/dir/small          || return 3
+  md5_small_orig=$(md5sum /cvmfs/$CVMFS_TEST_REPO/dir/small \
+    | awk '{print $1}')                                           || return 3
+  yes | head -c $((32*1024*1024)) > \
+    /cvmfs/$CVMFS_TEST_REPO/dir/large                             || return 3
+  md5_large_orig=$(md5sum /cvmfs/$CVMFS_TEST_REPO/dir/large \
+     | awk '{print $1}')                                          || return 3
+  publish_repo $CVMFS_TEST_REPO -v                                || return $?
+
+  local mntpnt="${scratch_dir}/private_mnt"
+  echo "mount private mount point"
+  private_mount $mntpnt || return 20
+
+  local revision_old=$(get_xattr revision ${mntpnt}) || return 25
+  echo "revision is $revision_old"
+
+  echo "verify that large file is chunked"
+  local no_chunks=$(get_xattr chunks ${mntpnt}/dir/large) || return 21
+  [ $no_chunks -gt 1 ] || return 22
+
+  echo "open file descriptors"
+  tail -f ${mntpnt}/dir/small &
+  TEST633_TAIL_SMALL=$!
+  tail -f ${mntpnt}/dir/large &
+  TEST633_TAIL_LARGE=$!
+
+  echo "add contents to files in repository"
+  start_transaction $CVMFS_TEST_REPO                    || return $?
+  echo "modified" >> /cvmfs/$CVMFS_TEST_REPO/dir/small  || return 30
+  echo "modified" >> /cvmfs/$CVMFS_TEST_REPO/dir/large  || return 30
+  publish_repo $CVMFS_TEST_REPO -v                      || return $?
+
+  echo "remount private mount point"
+  sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO remount || return 40
+  echo "waiting for kernel caches to drain out"
+  sleep 10
+  local revision_new=$(get_xattr revision ${mntpnt}) || return 41
+  echo "revision is now $revision_new"
+  [ $revision_new -gt $revision_old ] || return 42
+
+  echo "verify new content"
+  [ "x$(tail -n 1 ${mntpnt}/dir/small)" = "xmodified" ] || return 50
+  [ "x$(tail -n 1 ${mntpnt}/dir/large)" = "xmodified" ] || return 51
+
+  echo "verify that our open tail processes did acutally run"
+  /bin/kill -TERM $TEST633_TAIL_SMALL || return 60
+  TEST633_TAIL_SMALL=
+  /bin/kill -TERM $TEST633_TAIL_LARGE || return 61
+  TEST633_TAIL_LARGE=
+
+  return 0
+}

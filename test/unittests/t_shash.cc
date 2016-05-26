@@ -257,6 +257,80 @@ TEST(T_Shash, VerifyHex) {
 }
 
 
+TEST(T_Shash, MkFromHexPtr) {
+  EXPECT_EQ(shash::Any(), shash::MkFromHexPtr(shash::HexPtr("")));
+
+  shash::Any md5(shash::kMd5);
+  shash::Any sha1(shash::kSha1);
+  shash::Any rmd160(shash::kRmd160);
+  shash::Any shake128(shash::kShake128);
+  md5.Randomize();
+  sha1.Randomize();
+  rmd160.Randomize();
+  shake128.Randomize();
+
+  EXPECT_EQ(md5, shash::MkFromHexPtr(shash::HexPtr(md5.ToString())));
+  EXPECT_EQ(sha1, shash::MkFromHexPtr(shash::HexPtr(sha1.ToString())));
+  EXPECT_EQ(rmd160, shash::MkFromHexPtr(shash::HexPtr(rmd160.ToString())));
+  EXPECT_EQ(shake128, shash::MkFromHexPtr(shash::HexPtr(shake128.ToString())));
+
+  shash::Any constructed = shash::MkFromHexPtr(shash::HexPtr(sha1.ToString()));
+  EXPECT_EQ(shash::kSuffixNone, constructed.suffix);
+  constructed = shash::MkFromHexPtr(shash::HexPtr(sha1.ToString()),
+                                    shash::kSuffixCatalog);
+  EXPECT_EQ(shash::kSuffixCatalog, constructed.suffix);
+}
+
+
+TEST(T_Shash, MkFromSuffixedHexPtr) {
+  EXPECT_EQ(shash::Any(), shash::MkFromSuffixedHexPtr(shash::HexPtr("")));
+
+  shash::Any md5(shash::kMd5);
+  shash::Any sha1(shash::kSha1);
+  shash::Any rmd160(shash::kRmd160);
+  shash::Any shake128(shash::kShake128);
+  shash::Any md5S(shash::kMd5);
+  shash::Any sha1S(shash::kSha1);
+  shash::Any rmd160S(shash::kRmd160);
+  shash::Any shake128S(shash::kShake128);
+  md5.Randomize();  md5S.Randomize();
+  sha1.Randomize();  sha1S.Randomize();
+  rmd160.Randomize();  rmd160S.Randomize();
+  shake128.Randomize();  shake128S.Randomize();
+  md5S.suffix = shash::kSuffixCatalog;
+  sha1S.suffix = shash::kSuffixHistory;
+  rmd160S.suffix = shash::kSuffixPartial;
+  shake128S.suffix = shash::kSuffixCertificate;
+
+  shash::Any constructed;
+  constructed = shash::MkFromSuffixedHexPtr(shash::HexPtr(md5.ToString(true)));
+  EXPECT_EQ(md5, constructed);  EXPECT_EQ(md5.suffix, constructed.suffix);
+  constructed = shash::MkFromSuffixedHexPtr(shash::HexPtr(sha1.ToString(true)));
+  EXPECT_EQ(sha1, constructed);  EXPECT_EQ(sha1.suffix, constructed.suffix);
+  constructed =
+    shash::MkFromSuffixedHexPtr(shash::HexPtr(rmd160.ToString(true)));
+  EXPECT_EQ(rmd160, constructed);  EXPECT_EQ(rmd160.suffix, constructed.suffix);
+  constructed =
+    shash::MkFromSuffixedHexPtr(shash::HexPtr(shake128.ToString(true)));
+  EXPECT_EQ(shake128, constructed);
+  EXPECT_EQ(shake128.suffix, constructed.suffix);
+
+  constructed = shash::MkFromSuffixedHexPtr(shash::HexPtr(md5S.ToString(true)));
+  EXPECT_EQ(md5S, constructed);  EXPECT_EQ(md5S.suffix, constructed.suffix);
+  constructed =
+    shash::MkFromSuffixedHexPtr(shash::HexPtr(sha1S.ToString(true)));
+  EXPECT_EQ(sha1S, constructed);  EXPECT_EQ(sha1S.suffix, constructed.suffix);
+  constructed =
+    shash::MkFromSuffixedHexPtr(shash::HexPtr(rmd160S.ToString(true)));
+  EXPECT_EQ(rmd160S, constructed);
+  EXPECT_EQ(rmd160S.suffix, constructed.suffix);
+  constructed =
+    shash::MkFromSuffixedHexPtr(shash::HexPtr(shake128S.ToString(true)));
+  EXPECT_EQ(shake128S, constructed);
+  EXPECT_EQ(shake128S.suffix, constructed.suffix);
+}
+
+
 TEST(T_Shash, IsNull) {
   const shash::Any hash_md5(shash::kMd5);
   ASSERT_TRUE(hash_md5.IsNull());
@@ -975,4 +1049,9 @@ TEST(T_Shash, Hmac) {
   shash::Hmac("key", fox, len_fox, &rmd160);
   EXPECT_EQ(
     "50278a77d4d7670561ab72e867383aef6ce50b3e-rmd160", rmd160.ToString());
+
+  shash::Any sha1_hmacstring(shash::kSha1);
+  shash::HmacString("key", string(reinterpret_cast<const char *>(fox)),
+                    &sha1_hmacstring);
+  EXPECT_EQ(sha1_hmacstring, sha1);
 }

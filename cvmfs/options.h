@@ -92,6 +92,14 @@ class OptionsManager {
   std::vector<std::string> GetAllKeys();
 
   /**
+   * Returns key=value strings from the options array for all keys that match
+   * key_prefix.  Can be used to construct an environment pointer for execve.
+   */
+  std::vector<std::string> GetEnvironmentSubset(
+    const std::string &key_prefix,
+    bool strip_prefix);
+
+  /**
    * Gets all stored key-values of the map in an string format. This format
    * follows the following pattern:
    *

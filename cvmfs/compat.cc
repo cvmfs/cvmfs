@@ -256,4 +256,28 @@ void Migrate(ChunkTables *old_tables, ::ChunkTables *new_tables) {
 
 }  // namespace chunk_tables_v2
 
+
+//------------------------------------------------------------------------------
+
+
+namespace chunk_tables_v3 {
+
+ChunkTables::~ChunkTables() {
+  pthread_mutex_destroy(lock);
+  free(lock);
+  for (unsigned i = 0; i < kNumHandleLocks; ++i) {
+    pthread_mutex_destroy(handle_locks.At(i));
+    free(handle_locks.At(i));
+  }
+}
+
+void Migrate(ChunkTables *old_tables, ::ChunkTables *new_tables) {
+  new_tables->next_handle = old_tables->next_handle;
+  new_tables->handle2fd = old_tables->handle2fd;
+  new_tables->inode2chunks = old_tables->inode2chunks;
+  new_tables->inode2references = old_tables->inode2references;
+}
+
+}  // namespace chunk_tables_v3
+
 }  // namespace compat

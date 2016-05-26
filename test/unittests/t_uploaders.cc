@@ -7,7 +7,6 @@
 #include <tbb/atomic.h>
 #include <unistd.h>
 
-#include <sstream>  // TODO(jblomer): remove me
 #include <string>
 
 #include "atomic.h"
@@ -19,6 +18,8 @@
 #include "upload_local.h"
 #include "upload_s3.h"
 #include "upload_spooler_definition.h"
+#include "util/file_guard.h"
+#include "util/string.h"
 
 
 /**
@@ -151,7 +152,8 @@ class T_Uploaders : public FileSandbox {
     // Wait S3 mockup server to finish
     int stat_loc = 0;
     wait(&stat_loc);
-    ASSERT_EQ(stat_loc, 0);
+    EXPECT_TRUE(WIFEXITED(stat_loc));
+    EXPECT_EQ(0, WEXITSTATUS(stat_loc));
   }
 
 
@@ -328,19 +330,6 @@ class T_Uploaders : public FileSandbox {
   }
 
 
-  std::vector<std::string> SplitString(const std::string &str, char delim) {
-    std::vector<std::string> elems;
-    std::stringstream ss(str);
-    std::string item;
-
-    while (std::getline(ss, item, delim)) {
-      elems.push_back(item);
-    }
-
-    return elems;
-  }
-
-
   /**
    * Get the field number "idx" (e.g. 2) from a string
    * separated by given delimiter (e.g. ' '). The field numbering
@@ -394,6 +383,7 @@ class T_Uploaders : public FileSandbox {
     // Listen incoming connections
     listen_sockfd = socket(AF_INET, SOCK_STREAM, 0);
     ASSERT_GE(listen_sockfd, 0);
+    FdGuard fd_guard_listen(listen_sockfd);
     bzero(reinterpret_cast<char *>(&serv_addr), sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_addr.s_addr = INADDR_ANY;
@@ -426,6 +416,7 @@ class T_Uploaders : public FileSandbox {
                              (struct sockaddr *) &cli_addr,
                              &clilen);
       ASSERT_GE(accept_sockfd, 0);
+      FdGuard fd_guard_accept(accept_sockfd);
       bzero(buffer, kReadBufferSize);
 
       // Get header
@@ -462,6 +453,7 @@ class T_Uploaders : public FileSandbox {
         std::string path = T_Uploaders::dest_dir + "/" + req_file;
         file = fopen(path.c_str(), "w");
         ASSERT_TRUE(file != NULL);
+        FileGuard file_guard(file);
         int fid = fileno(file);
         ASSERT_GE(fid, 0);
         int left_to_read = content_length;
@@ -471,9 +463,7 @@ class T_Uploaders : public FileSandbox {
           left_to_read -= n;
         }
         retval = fsync(fid);
-        ASSERT_EQ(retval, 0);
-        retval = fclose(file);
-        ASSERT_EQ(retval, 0);
+        EXPECT_EQ(retval, 0);
       }
 
       // Reply to client
@@ -481,7 +471,6 @@ class T_Uploaders : public FileSandbox {
       if (req_type.compare("HEAD") == 0) {
         if (req_file.size() >= 4 &&
             req_file.compare(req_file.size() - 4, 4, "EXIT") == 0) {
-          close(listen_sockfd);
           return;
         }
         if (FileExists(T_Uploaders::dest_dir + "/" + req_file) == false)
@@ -499,9 +488,7 @@ class T_Uploaders : public FileSandbox {
 
       int n = write(accept_sockfd, reply.c_str(), reply.length());
       ASSERT_GE(n, 0);
-      close(accept_sockfd);
     }
-    close(listen_sockfd);
   }
 
 
@@ -756,9 +743,7 @@ TYPED_TEST(T_Uploaders, UploadManyFilesSlow) {
 
   Files files;
   for (unsigned int i = 0; i < number_of_files; ++i) {
-    std::stringstream ss;
-    ss << "file" << i;
-    const std::string dest_name = ss.str();
+    const std::string dest_name = "file" + StringifyInt(i);
     std::string file;
     switch (i % 3) {
       case 0:

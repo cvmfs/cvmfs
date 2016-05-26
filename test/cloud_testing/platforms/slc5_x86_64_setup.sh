@@ -84,6 +84,9 @@ echo -n "increasing ulimit -n ... "
 set_nofile_limit 65536 || die "fail"
 echo "done"
 
+# update kernel, we've seen ptherad mutex deadlocks with the given one
+sudo yum -y update kernel
+
 # rebooting the system (returning 0 value)
 echo "sleep 1 && reboot" > killme.sh
 sudo nohup sh < killme.sh &

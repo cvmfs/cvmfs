@@ -529,8 +529,6 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     return 1;
   }
 
-  pthread_t *workers =
-    reinterpret_cast<pthread_t *>(smalloc(sizeof(pthread_t) * num_parallel));
   typedef std::vector<history::History::Tag> TagVector;
   TagVector historic_tags;
 
@@ -594,6 +592,9 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
                                *temp_dir,
                                download_manager(),
                                signature_manager());
+
+  pthread_t *workers =
+    reinterpret_cast<pthread_t *>(smalloc(sizeof(pthread_t) * num_parallel));
 
   // Check if we have a replica-ready server
   const string url_sentinel = *stratum0_url + "/.cvmfs_master_replica";

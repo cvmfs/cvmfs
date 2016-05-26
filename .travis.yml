@@ -29,7 +29,6 @@ addons:
       - valgrind
       - voms-dev
       - gdb
-      - lldb
 
 before_script:
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update && brew install Caskroom/cask/osxfuse ; fi

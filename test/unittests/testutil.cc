@@ -19,6 +19,7 @@
 #include "testutil.h"
 
 
+#ifndef __APPLE__
 static void SkipWhitespace(std::istringstream *iss) {
   while (iss->good()) {
     const char next = iss->peek();
@@ -28,6 +29,7 @@ static void SkipWhitespace(std::istringstream *iss) {
     iss->get();
   }
 }
+#endif
 
 
 pid_t GetParentPid(const pid_t pid) {

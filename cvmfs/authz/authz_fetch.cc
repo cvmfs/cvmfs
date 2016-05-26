@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "logging.h"
+#include "options.h"
 #include "platform.h"
 #include "sanitizer.h"
 #include "smalloc.h"
@@ -35,7 +36,8 @@ const uint32_t AuthzExternalFetcher::kProtocolVersion = 1;
 AuthzExternalFetcher::AuthzExternalFetcher(
   const string &fqrn,
   const string &progname,
-  const string &search_path)
+  const string &search_path,
+  OptionsManager *options_manager)
   : fqrn_(fqrn)
   , progname_(progname)
   , search_path_(search_path)
@@ -43,6 +45,7 @@ AuthzExternalFetcher::AuthzExternalFetcher(
   , fd_recv_(-1)
   , pid_(-1)
   , fail_state_(false)
+  , options_manager_(options_manager)
 {
   InitLock();
 }
@@ -56,6 +59,7 @@ AuthzExternalFetcher::AuthzExternalFetcher(
   , fd_recv_(fd_recv)
   , pid_(-1)
   , fail_state_(false)
+  , options_manager_(NULL)
 {
   InitLock();
 }
@@ -118,8 +122,16 @@ void AuthzExternalFetcher::ExecHelper() {
   MakePipe(pipe_recv);
   char *argv0 = strdupa(progname_.c_str());
   char *argv[] = {argv0, NULL};
-  char *envp0 = strdupa("CVMFS_AUTHZ_HELPER=yes");
-  char *envp[] = {envp0, NULL};
+
+  const bool strip_prefix = true;
+  vector<string> authz_env =
+    options_manager_->GetEnvironmentSubset("CVMFS_AUTHZ_", strip_prefix);
+  vector<char *> envp;
+  for (unsigned i = 0; i < authz_env.size(); ++i)
+    envp.push_back(strdupa(authz_env[i].c_str()));
+  envp.push_back(strdupa("CVMFS_AUTHZ_HELPER=yes"));
+  envp.push_back(NULL);
+
   int max_fd = sysconf(_SC_OPEN_MAX);
   assert(max_fd > 0);
   LogCvmfs(kLogAuthz, kLogDebug | kLogSyslog, "starting authz helper %s",
@@ -135,7 +147,7 @@ void AuthzExternalFetcher::ExecHelper() {
     for (int fd = 2; fd < max_fd; fd++)
       close(fd);
 
-    execve(argv0, argv, envp);
+    execve(argv0, argv, &envp[0]);
     syslog(LOG_USER | LOG_ERR, "failed to start authz helper %s (%d)",
            argv0, errno);
     abort();
