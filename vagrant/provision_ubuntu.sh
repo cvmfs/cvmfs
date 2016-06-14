@@ -24,6 +24,7 @@ apt-get install -y docker.io
 apt-get install -y git tig iftop htop jq screen python-unittest2
 
 # install FakeS3 from rubygems
+apt-get install -y ruby
 gem install fakes3
 
 # drop a FakeS3 default configuration for CVMFS server

@@ -75,7 +75,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "ubuntu1604" do |ub|
-    ub.vm.box = "ubuntu/xenial64"
+    ub.vm.box = "geerlingguy/ubuntu1604"
     ub.vm.network "private_network", ip: "192.168.33.15"
     ub.vm.synced_folder '.', '/vagrant', nfs: true
     ub.vm.provision "shell", path: "vagrant/provision_ubuntu.sh"
