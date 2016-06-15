@@ -128,7 +128,7 @@ FileSystem *FileSystem::Create(const FileSystem::FileSystemInfo &fs_info) {
     file_system->statistics_,
     sqlite::kVfsOptDefault);
   assert(retval);
-  has_custom_sqlitevfs_ = true;
+  file_system->has_custom_sqlitevfs_ = true;
 
   file_system->boot_status_ = loader::kFailOk;
   return file_system.Release();

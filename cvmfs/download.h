@@ -285,7 +285,8 @@ class HeaderLists {
 
 /**
  * Provides hooks to attach per-transfer credentials to curl handles.
- * Overwritten by the AuthzX509Attachment in authz_curl.cc.
+ * Overwritten by the AuthzX509Attachment in authz_curl.cc.  Needs to be
+ * thread-safe because it can be potentially used by multiple DownloadManagers.
  */
 class CredentialsAttachment {
  public:
@@ -297,6 +298,9 @@ class CredentialsAttachment {
 };
 
 
+/**
+ * Note when adding new fields: Clone() probably needs to be adjusted, too.
+ */
 class DownloadManager {
   FRIEND_TEST(T_Download, ValidateGeoReply);
   FRIEND_TEST(T_Download, StripDirect);
@@ -537,7 +541,6 @@ class DownloadManager {
   // thread than writing.
   Counters *counters_;
 };  // DownloadManager
-
 
 }  // namespace download
 

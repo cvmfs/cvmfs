@@ -170,7 +170,7 @@ class FileSystem : SingleCopy, public MountPointFactory {
 
 /**
  * A MountPoint provides a clip around all the different *Manager objects that
- * in combination represent a mounted cvmfs repository.  It's main purpose is
+ * in combination represent a mounted cvmfs repository.  Its main purpose is
  * the controlled construction and deconstruction of the involved ensemble of
  * classes based on the information passed from an options manager.
  *

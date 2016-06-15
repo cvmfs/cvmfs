@@ -2620,6 +2620,10 @@ void DownloadManager::EnableRedirects() {
 }
 
 
+/**
+ * Creates a copy of the existing download manager.  Must only be called in
+ * single-threaded stage because it calls curl_global_init().
+ */
 DownloadManager *DownloadManager::Clone(
   perf::Statistics *statistics,
   const string &name)
@@ -2636,6 +2640,19 @@ DownloadManager *DownloadManager::Clone(
   clone->opt_backoff_max_ms_ = opt_backoff_max_ms_;
   clone->enable_info_header_ = enable_info_header_;
   clone->follow_redirects_ = follow_redirects_;
+  if (opt_host_chain_) {
+    clone->opt_host_chain_ = new vector<string>(*opt_host_chain_);
+    clone->opt_host_chain_rtt_ = new vector<int>(*opt_host_chain_rtt_);
+    clone->opt_host_chain_current_ = opt_host_chain_current_;
+  }
+  clone->SetProxyChain(opt_proxy_list_, opt_proxy_fallback_list_,
+                       kSetProxyBoth);
+  clone->opt_ip_preference_ = opt_ip_preference_;
+  clone->proxy_template_direct_ = proxy_template_direct_;
+  clone->proxy_template_forced_ = proxy_template_forced_;
+  clone->opt_proxy_groups_reset_after_ = opt_proxy_groups_reset_after_;
+  clone->opt_host_reset_after_ = opt_host_reset_after_;
+  clone->credentials_attachment_ = credentials_attachment_;
   
   return clone;
 }
