@@ -248,7 +248,10 @@ void SyncItem::CheckGraft() {
            graftfile.c_str());
   FILE *fp = fopen(graftfile.c_str(), "r");
   if (fp == NULL) {
-    if (errno != ENOENT) {
+    // This sync item can be a file from a removed directory tree on overlayfs.
+    // In this case, the entire tree is missing on the scratch directory and
+    // the errno is ENOTDIR.
+    if ((errno != ENOENT) && (errno != ENOTDIR)) {
       LogCvmfs(kLogFsTraversal, kLogWarning, "Unable to open graft file "
                "(%s): %s (errno=%d)",
                graftfile.c_str(), strerror(errno), errno);
