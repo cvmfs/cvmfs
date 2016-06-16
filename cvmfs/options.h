@@ -122,6 +122,11 @@ class OptionsManager {
    */
   void SetValue(const std::string &key, const std::string &value);
 
+  /**
+   * Purge a value from the parameter map.  Used in unit tests.
+   */
+  void UnsetValue(const std::string &key);
+
  protected:
   /**
     * The ConfigValue structure contains a concrete value of a variable, as well

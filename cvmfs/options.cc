@@ -388,6 +388,13 @@ void OptionsManager::SetValue(const string &key, const string &value) {
   PopulateParameter(key, config_value);
 }
 
+
+void OptionsManager::UnsetValue(const string &key) {
+  protected_parameters_.erase(key);
+  config_.erase(key);
+  unsetenv(key.c_str());
+}
+
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD
 #endif
