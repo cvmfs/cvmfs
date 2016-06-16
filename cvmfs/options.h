@@ -117,6 +117,11 @@ class OptionsManager {
    */
   void ProtectParameter(const std::string &param);
 
+  /**
+   * Artificially inject values in the option manager.
+   */
+  void SetValue(const std::string &key, const std::string &value);
+
  protected:
   /**
     * The ConfigValue structure contains a concrete value of a variable, as well
