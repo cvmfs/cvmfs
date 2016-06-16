@@ -1,5 +1,7 @@
 /**
  * This file is part of the CernVM File System.
+ *
+ * Steers the booting of CernVM-FS repositories.
  */
 
 #ifndef CVMFS_MOUNTPOINT_H_
@@ -54,11 +56,11 @@ class SignatureManager;
 
 /**
  * Construction of FileSystem and MountPoint can go wrong.  In this case, we'd
- * like to know why.
+ * like to know why.  This is a base class for both FileSystem and MountPoint.
  */
-class MountPointFactory {
+class BootFactory {
  public:
-  MountPointFactory() : boot_status_(loader::kFailUnknown) { }
+  BootFactory() : boot_status_(loader::kFailUnknown) { }
   bool IsValid() { return boot_status_ == loader::kFailOk; }
   loader::Failures boot_status() { return boot_status_; }
   std::string boot_error() { return boot_error_; }
@@ -70,12 +72,12 @@ class MountPointFactory {
 
 
 /**
- * The FileSystem object initializes cvmfs' global state.  It sets up the cache
- * directory and it can contain multiple mount points.
- *
- * TODO(jblomer): make FileSystem independent from specific repository
+ * The FileSystem object initializes cvmfs' global state.  It sets up sqlite and
+ * the cache directory and it can contain multiple mount points.  It currently
+ * does so only for libcvmfs; the cvmfs fuse module has exactly one FileSystem
+ * object and one MountPoint object.
  */
-class FileSystem : SingleCopy, public MountPointFactory {
+class FileSystem : SingleCopy, public BootFactory {
  public:
   enum Type {
     kFsFuse = 0,
@@ -84,18 +86,60 @@ class FileSystem : SingleCopy, public MountPointFactory {
 
   struct FileSystemInfo {
     FileSystemInfo() : type(kFsFuse), options_mgr(NULL) { }
+    /**
+     * Name can is used to identify this particular instance of cvmfs in the
+     * cache (directory).  Normally it is the fully qualified repository name.
+     * For libcvmfs and in other special mount conditions, it can be something
+     * else.  Only file systems with different names can share a cache because
+     * the name is part of a lock file.
+     */
     std::string name;
+
+    /**
+     * Used to fork & execve into different flavors of the binary, e.g. the
+     * quota manager.
+     */
     std::string exe_path;
+
+    /**
+     * Fuse mount point or libcvmfs.
+     */
     Type type;
+
+    /**
+     * All further configuration has to be present in the options manager.
+     */
     OptionsManager *options_mgr;
   };
 
+  /**
+   * Local hard disk cache, no shared quota manager.
+   */
   static const unsigned kCacheExclusive  = 0x01;
+  /**
+   * Connect to the quota manager process for a shared local hard disk cache.
+   */
   static const unsigned kCacheShared     = 0x02;
+  /**
+   * Unmanaged cache (no cleanup), cache directory writable
+   * for owner uid _and_ gid
+   */
   static const unsigned kCacheAlien      = 0x04;
+  /**
+   * Whether to use a quota manager or not.
+   */
   static const unsigned kCacheManaged    = 0x08;
+  /**
+   * Use NFS maps to persistently map paths to inodes.
+   */
   static const unsigned kCacheNfs        = 0x10;
+  /**
+   * Store NFS maps on an NFS volume.
+   */
   static const unsigned kCacheNfsHa      = 0x20;
+  /**
+   * Avoid rename() calls in the cache directory (replaced by link+unlink)
+   */
   static const unsigned kCacheNoRename   = 0x40;
 
   static FileSystem *Create(const FileSystemInfo &fs_info);
@@ -116,7 +160,7 @@ class FileSystem : SingleCopy, public MountPointFactory {
 
  private:
   static const char *kDefaultCacheBase;  // /var/lib/cvmfs
-  static const unsigned kDefaultQuotaLimit = 1024 * 1024 * 1024;
+  static const unsigned kDefaultQuotaLimit = 1024 * 1024 * 1024;  // 1GB
 
   static void LogSqliteError(void *user_data __attribute__((unused)),
                              int sqlite_extended_error,
@@ -140,6 +184,7 @@ class FileSystem : SingleCopy, public MountPointFactory {
   void DetermineMountpoint();
   void DetermineWorkspace();
 
+  // See FileSystemInfo for the following fields
   std::string name_;
   std::string exe_path_;
   Type type_;
@@ -158,21 +203,58 @@ class FileSystem : SingleCopy, public MountPointFactory {
   perf::Counter *no_open_dirs_;
   perf::Statistics *statistics_;
 
+  /**
+   * A writeable local directory.  Only small amounts of data (few bytes) will
+   * be stored here.  Needed because the cache can be read-only.  The workspace
+   * and the cache directory can be identical.  A workspace can be shared among
+   * FileSystem instances if their name is different.
+   */
   std::string workspace_;
   int fd_workspace_lock_;
   std::string path_workspace_lock_;
+
+  /**
+   * An empty file that is removed on proper shutdown.
+   */
   std::string path_crash_guard_;
+
+  /**
+   * A crash guard was found, thus we assume the file system was not shutdown
+   * properly last time.
+   */
   bool found_previous_crash_;
 
+  /**
+   * Only needed for fuse to detect and prevent double mounting at the same
+   * location.
+   */
   std::string mountpoint_;
   std::string cache_dir_;
   std::string nfs_maps_dir_;
+  /**
+   * Combination of kCache... flags
+   */
   int cache_mode_;
+  /**
+   * Soft limit in bytes for the cache.  The quota manager removes half the
+   * cache when the limit is exceeded.
+   */
   int64_t quota_limit_;
-
   cache::CacheManager *cache_mgr_;
+  /**
+   * Persistent for the cache directory + name combination.  It is used in the
+   * Geo-API to allow for per-client responses when no proxy is used.
+   */
   cvmfs::Uuid *uuid_cache_;
+
+  /**
+   * Used internally to remember if NFS maps need to be shut down.
+   */
   bool has_nfs_maps_;
+ /**
+  * Used internally to remember if the Sqlite memory manager need to be shut
+  * down.
+  */
   bool has_custom_sqlitevfs_;
 };
 
@@ -183,10 +265,12 @@ class FileSystem : SingleCopy, public MountPointFactory {
  * the controlled construction and deconstruction of the involved ensemble of
  * classes based on the information passed from an options manager.
  *
+ * A MountPoint is constructed on top of a successfully constructed FileSystem.
+ *
  * We use pointers to manager classes to make the order of construction and
  * destruction explicit and also to keep the include list for this header small.
  */
-class MountPoint : SingleCopy, public MountPointFactory {
+class MountPoint : SingleCopy, public BootFactory {
  public:
   static MountPoint *Create(const std::string &fqrn,
                             FileSystem *file_system);
