@@ -69,6 +69,9 @@ using namespace std;  // NOLINT
 const char *FileSystem::kDefaultCacheBase = "/var/lib/cvmfs";
 
 
+/**
+ * Not all possible combinations of cache flags / modes are valid.
+ */
 bool FileSystem::CheckCacheMode() {
   if ((cache_mode_ & kCacheAlien) && (cache_mode_ & kCacheShared)) {
     boot_error_ = "Failure: shared local disk cache and alien cache mutually "
@@ -101,6 +104,10 @@ bool FileSystem::CheckCacheMode() {
 }
 
 
+/**
+ * Creation of state and manager classes.  The destructor should mirror this
+ * method.
+ */
 FileSystem *FileSystem::Create(const FileSystem::FileSystemInfo &fs_info) {
   UniquePtr<FileSystem>
     file_system(new FileSystem(fs_info));
@@ -143,6 +150,9 @@ FileSystem *FileSystem::Create(const FileSystem::FileSystemInfo &fs_info) {
 }
 
 
+/**
+ * Initialize the cache directory and start the quota manager.
+ */
 bool FileSystem::CreateCache() {
   cache_mgr_ = cache::PosixCacheManager::Create(
                  cache_dir_,
@@ -213,6 +223,10 @@ void FileSystem::CreateStatistics() {
 }
 
 
+/**
+ * Depending on the cache mode and other parameters, figure out the actual
+ * path to the cache directory.
+ */
 void FileSystem::DetermineCacheDirs() {
   string optarg;
 

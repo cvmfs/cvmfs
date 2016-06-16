@@ -56,6 +56,7 @@ set(CVMFS_UNITTEST_FILES
   t_lru.cc
   t_macaroon.cc
   t_manifest.cc
+  t_mountpoint.cc
   t_object_fetcher.cc
   t_options.cc
   t_pack.cc
@@ -100,6 +101,7 @@ set (CVMFS_UNITTEST_SOURCES
   # test dependencies
   ${CVMFS_SOURCE_DIR}/atomic.h
   ${CVMFS_SOURCE_DIR}/authz/authz.cc ${CVMFS_SOURCE_DIR}/authz/authz.h
+  ${CVMFS_SOURCE_DIR}/authz/authz_curl.cc ${CVMFS_SOURCE_DIR}/authz/authz_curl.h
   ${CVMFS_SOURCE_DIR}/authz/authz_fetch.cc ${CVMFS_SOURCE_DIR}/authz/authz_fetch.h
   ${CVMFS_SOURCE_DIR}/authz/authz_session.cc ${CVMFS_SOURCE_DIR}/authz/authz_session.h
   ${CVMFS_SOURCE_DIR}/backoff.cc ${CVMFS_SOURCE_DIR}/backoff.h
@@ -132,6 +134,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/file_processing/io_dispatcher.cc
   ${CVMFS_SOURCE_DIR}/file_processing/processor.cc
   ${CVMFS_SOURCE_DIR}/globals.cc ${CVMFS_SOURCE_DIR}/globals.h
+  ${CVMFS_SOURCE_DIR}/glue_buffer.cc ${CVMFS_SOURCE_DIR}/glue_buffer.h
   ${CVMFS_SOURCE_DIR}/hash.cc ${CVMFS_SOURCE_DIR}/hash.h
   ${CVMFS_SOURCE_DIR}/history_sql.cc
   ${CVMFS_SOURCE_DIR}/history_sqlite.cc
@@ -142,6 +145,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/manifest.cc ${CVMFS_SOURCE_DIR}/manifest.h
   ${CVMFS_SOURCE_DIR}/manifest_fetch.cc ${CVMFS_SOURCE_DIR}/manifest_fetch.h
   ${CVMFS_SOURCE_DIR}/monitor.cc ${CVMFS_SOURCE_DIR}/monitor.h
+  ${CVMFS_SOURCE_DIR}/mountpoint.cc ${CVMFS_SOURCE_DIR}/mountpoint.h
   ${CVMFS_SOURCE_DIR}/murmur.h
   ${CVMFS_SOURCE_DIR}/options.cc ${CVMFS_SOURCE_DIR}/options.h
   ${CVMFS_SOURCE_DIR}/pack.cc ${CVMFS_SOURCE_DIR}/pack.h
