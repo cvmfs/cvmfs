@@ -32,20 +32,27 @@
 #include "authz/authz_session.h"
 #include "backoff.h"
 #include "cache.h"
+#include "catalog.h"
 #include "catalog_mgr_client.h"
 #include "duplex_sqlite3.h"
 #include "download.h"
+#include "fetch.h"
 #include "file_chunk.h"
 #include "globals.h"
 #include "glue_buffer.h"
+#include "history.h"
+#include "history_sqlite.h"
 #include "logging.h"
 #include "lru.h"
+#include "manifest.h"
+#include "manifest_fetch.h"
 #ifdef CVMFS_NFS_SUPPORT
 #include "nfs_maps.h"
 #endif
 #include "options.h"
 #include "platform.h"
 #include "quota.h"
+#include "signature.h"
 #include "sqlitemem.h"
 #include "sqlitevfs.h"
 #include "statistics.h"
@@ -118,6 +125,7 @@ FileSystem *FileSystem::Create(const FileSystem::FileSystemInfo &fs_info) {
   sqlite3_temp_directory = static_cast<char *>(sqlite3_malloc(length_tempdir));
   snprintf(sqlite3_temp_directory,
            length_tempdir,
+           "%s",
            file_system->workspace_.c_str());
 
 
@@ -594,6 +602,34 @@ bool FileSystem::SetupWorkspace() {
 
 const char *MountPoint::kDefaultAuthzSearchPath = "/usr/libexec/cvmfs/authz";
 
+bool MountPoint::CheckBlacklists() {
+  if (FileExists("/etc/cvmfs/blacklist")) {
+    const bool append = false;
+    if (!signature_mgr_->LoadBlacklist("/etc/cvmfs/blacklist", append)) {
+      boot_error_ = "failed to load blacklist";
+      boot_status_ = loader::kFailSignature;
+      return false;
+    }
+  }
+
+  string config_repository_path;
+  OptionsManager *options_mgr = file_system_->options_mgr();
+  if (options_mgr->HasConfigRepository(fqrn_, &config_repository_path)
+      && FileExists(config_repository_path + "blacklist"))
+  {
+    const bool append = true;
+    if (!signature_mgr_->LoadBlacklist(config_repository_path + "blacklist",
+                                       append))
+    {
+      boot_error_ = "failed to load blacklist from config repository";
+      boot_status_ = loader::kFailSignature;
+      return false;
+    }
+  }
+
+  return true;
+}
+
 
 MountPoint *MountPoint::Create(
   const string &fqrn,
@@ -607,12 +643,18 @@ MountPoint *MountPoint::Create(
 
   mountpoint->CreateStatistics();
   mountpoint->CreateAuthz();
+  mountpoint->backoff_throttle_ = new BackoffThrottle();
+
+  if (!mountpoint->CreateSignatureManager() || !mountpoint->CheckBlacklists())
+    return mountpoint.Release();
   if (!mountpoint->CreateDownloadManagers())
+    return mountpoint.Release();
+  mountpoint->CreateFetchers();
+  if (!mountpoint->CreateCatalogManager())
     return mountpoint.Release();
 
   mountpoint->CreateTables();
   mountpoint->SetupTtls();
-  mountpoint->backoff_throttle_ = new BackoffThrottle();
 
   mountpoint->boot_status_ = loader::kFailOk;
   return mountpoint.Release();
@@ -646,6 +688,39 @@ void MountPoint::CreateAuthz() {
 }
 
 
+bool MountPoint::CreateCatalogManager() {
+  string optarg;
+  OptionsManager *options_manager = file_system_->options_mgr();
+
+  catalog_mgr_ = new catalog::ClientCatalogManager(
+    fqrn_, fetcher_, signature_mgr_, statistics_);
+
+  SetupInodeAnnotation();
+  SetupOwnerMaps();
+  shash::Any root_hash;
+  if (!DetermineRootHash(&root_hash))
+    return false;
+
+  bool retval;
+  if (root_hash.IsNull()) {
+    retval = catalog_mgr_->Init();
+  } else {
+    fixed_catalog_ = true;
+    bool alt_root_path =
+      options_manager->GetValue("CVMFS_ALT_ROOT_PATH", &optarg) &&
+      options_manager->IsOn(optarg);
+    retval = catalog_mgr_->InitFixed(root_hash, alt_root_path);
+  }
+  if (!retval) {
+    boot_error_ = "Failed to initialize root file catalog";
+    boot_status_ = loader::kFailCatalog;
+    return false;
+  }
+
+  return true;
+}
+
+
 bool MountPoint::CreateDownloadManagers() {
   string optarg;
   OptionsManager *options_mgr = file_system_->options_mgr();
@@ -653,6 +728,7 @@ bool MountPoint::CreateDownloadManagers() {
   download_mgr_ = new download::DownloadManager();
   const bool use_system_proxy = false;
   download_mgr_->Init(kDefaultNumConnections, use_system_proxy, statistics_);
+  download_mgr_->SetCredentialsAttachment(authz_attachment_);
 
   if (options_mgr->GetValue("CVMFS_SERVER_URL", &optarg)) {
     download_mgr_->SetHostChain(ReplaceHosts(optarg));
@@ -660,7 +736,6 @@ bool MountPoint::CreateDownloadManagers() {
   if (options_mgr->GetValue("CVMFS_DNS_SERVER", &optarg)) {
     download_mgr_->SetDnsServer(optarg);
   }
-  download_mgr_->SetCredentialsAttachment(authz_attachment_);
 
   SetupDnsTuning();
   SetupHttpTuning();
@@ -690,6 +765,62 @@ bool MountPoint::CreateDownloadManagers() {
       options_mgr->IsOn(optarg))
   {
     download_mgr_->ProbeGeo();
+  }
+
+  SetupExternalDownloadMgr();
+
+  return true;
+}
+
+
+void MountPoint::CreateFetchers() {
+  fetcher_ = new cvmfs::Fetcher(
+    file_system_->cache_mgr(),
+    download_mgr_,
+    backoff_throttle_,
+    statistics_);
+
+  const bool is_external_data = true;
+  external_fetcher_ = new cvmfs::Fetcher(
+    file_system_->cache_mgr(),
+    external_download_mgr_,
+    backoff_throttle_,
+    statistics_,
+    "fetch-external",
+    is_external_data);
+}
+
+
+bool MountPoint::CreateSignatureManager() {
+  string optarg;
+  OptionsManager *options_mgr = file_system_->options_mgr();
+  signature_mgr_ = new signature::SignatureManager();
+  signature_mgr_->Init();
+
+  string public_keys;
+  if (options_mgr->GetValue("CVMFS_PUBLIC_KEY", &optarg)) {
+    public_keys = optarg;
+  } else if (options_mgr->GetValue("CVMFS_KEYS_DIR", &optarg)) {
+    // Collect .pub files from CVMFS_KEYS_DIR
+    public_keys = JoinStrings(FindFiles(optarg, ".pub"), ":");
+  } else {
+    public_keys = JoinStrings(FindFiles("/etc/cvmfs/keys", ".pub"), ":");
+  }
+
+  if (!signature_mgr_->LoadPublicRsaKeys(public_keys)) {
+    boot_error_ = "failed to load public key(s)";
+    boot_status_ = loader::kFailSignature;
+    return false;
+  }
+  LogCvmfs(kLogCvmfs, kLogDebug, "CernVM-FS: using public key(s) %s",
+           public_keys.c_str());
+
+  if (options_mgr->GetValue("CVMFS_TRUSTED_CERTS", &optarg)) {
+    if (!signature_mgr_->LoadTrustedCaCrl(optarg)) {
+      boot_error_ = "failed to load trusted certificates";
+      boot_status_ = loader::kFailSignature;
+      return false;
+    }
   }
 
   return true;
@@ -750,6 +881,107 @@ void MountPoint::CreateTables() {
 }
 
 
+bool MountPoint::DetermineRootHash(shash::Any *root_hash) {
+  string optarg;
+  OptionsManager *options_manager = file_system_->options_mgr();
+  if (options_manager->GetValue("CVMFS_ROOT_HASH", &optarg)) {
+    *root_hash = MkFromHexPtr(shash::HexPtr(optarg), shash::kSuffixCatalog);
+    return true;
+  }
+
+  if (!options_manager->IsDefined("CVMFS_REPOSITORY_TAG") &&
+      !options_manager->IsDefined("CVMFS_REPOSITORY_DATE"))
+  {
+    root_hash->SetNull();
+    return true;
+  }
+
+  string history_path;
+  if (!FetchHistory(&history_path))
+    return false;
+  UnlinkGuard history_file(history_path);
+  UniquePtr<history::History> tag_db(
+    history::SqliteHistory::Open(history_path));
+  if (!tag_db) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+             "failed to open history database (%s)", history_path.c_str());
+    boot_error_ = "failed to open history database";
+    boot_status_ = loader::kFailHistory;
+    return false;
+  }
+
+  history::History::Tag tag;
+  bool retval;
+  if (!options_manager->GetValue("CVMFS_REPOSITORY_TAG", &repository_tag_)) {
+    string repository_date;
+    options_manager->GetValue("CVMFS_REPOSITORY_TAG", &repository_date);
+    time_t repository_utctime = IsoTimestamp2UtcTime(repository_date);
+    if (repository_utctime == 0) {
+      boot_error_ = "invalid timestamp in CVMFS_REPOSITORY_DATE: " +
+                    repository_date + ". Use YYYY-MM-DDTHH:MM:SSZ";
+      boot_status_ = loader::kFailHistory;
+      return false;
+    }
+    retval = tag_db->GetByDate(repository_utctime, &tag);
+    if (!retval) {
+      boot_error_ = "no repository state as early as utc timestamp " +
+                     StringifyTime(repository_utctime, true);
+      boot_status_ = loader::kFailHistory;
+      return false;
+    }
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+             "time stamp %s UTC resolved to tag '%s'",
+             StringifyTime(repository_utctime, true).c_str(),
+             tag.name.c_str());
+    repository_tag_ = tag.name;
+  } else {
+    retval = tag_db->GetByName(repository_tag_, &tag);
+    if (!retval) {
+      boot_error_ = "no such tag: " + repository_tag_;
+      boot_status_ = loader::kFailHistory;
+      return false;
+    }
+  }
+
+  *root_hash = tag.root_hash;
+  return true;
+}
+
+
+bool MountPoint::FetchHistory(std::string *history_path) {
+  manifest::Failures retval_mf;
+  manifest::ManifestEnsemble ensemble;
+  retval_mf = manifest::Fetch("", fqrn_, 0, NULL, signature_mgr_, download_mgr_,
+                              &ensemble);
+  if (retval_mf != manifest::kFailOk) {
+    boot_error_ = "Failed to fetch manifest";
+    boot_status_ = loader::kFailHistory;
+    return false;
+  }
+  shash::Any history_hash = ensemble.manifest->history();
+  if (history_hash.IsNull()) {
+    boot_error_ = "No history";
+    boot_status_ = loader::kFailHistory;
+    return false;
+  }
+
+  *history_path =
+    file_system_->workspace() + "/history." + history_hash.ToString();
+  string history_url = "/data/" + history_hash.MakePath();
+  download::JobInfo download_history(&history_url, true, true, history_path,
+                                     &history_hash);
+  download::Failures retval_dl;
+  retval_dl = download_mgr_->Fetch(&download_history);
+  if (retval_dl != download::kFailOk) {
+    boot_error_ = "failed to download history: " + StringifyInt(retval_dl);
+    boot_status_ = loader::kFailHistory;
+    return false;
+  }
+
+  return true;
+}
+
+
 unsigned MountPoint::GetMaxTtlMn() {
   MutexLockGuard lock_guard(lock_max_ttl_);
   return max_ttl_sec_ / 60;
@@ -763,17 +995,23 @@ MountPoint::MountPoint(const string &fqrn, FileSystem *file_system)
   , authz_fetcher_(NULL)
   , authz_session_mgr_(NULL)
   , authz_attachment_(NULL)
+  , backoff_throttle_(NULL)
+  , signature_mgr_(NULL)
   , download_mgr_(NULL)
   , external_download_mgr_(NULL)
+  , fetcher_(NULL)
+  , external_fetcher_(NULL)
+  , inode_annotation_(NULL)
+  , catalog_mgr_(NULL)
   , directory_handles_(NULL)
   , chunk_tables_(NULL)
   , inode_cache_(NULL)
   , path_cache_(NULL)
   , md5path_cache_(NULL)
   , inode_tracker_(NULL)
-  , backoff_throttle_(NULL)
   , max_ttl_sec_(kDefaultMaxTtlSec)
   , kcache_timeout_sec_(static_cast<double>(kDefaultKCacheTtlSec))
+  , fixed_catalog_(false)
 {
   int retval = pthread_mutex_init(&lock_max_ttl_, NULL);
   assert(retval == 0);
@@ -783,6 +1021,17 @@ MountPoint::MountPoint(const string &fqrn, FileSystem *file_system)
 MountPoint::~MountPoint() {
   pthread_mutex_destroy(&lock_max_ttl_);
 
+  delete inode_tracker_;
+  delete md5path_cache_;
+  delete path_cache_;
+  delete inode_cache_;
+  delete chunk_tables_;
+  delete directory_handles_;
+
+  delete catalog_mgr_;
+  delete inode_annotation_;
+  delete external_fetcher_;
+  delete fetcher_;
   if (external_download_mgr_ != NULL) {
     external_download_mgr_->Fini();
     delete external_download_mgr_;
@@ -791,16 +1040,15 @@ MountPoint::~MountPoint() {
     download_mgr_->Fini();
     delete download_mgr_;
   }
+  if (signature_mgr_ != NULL) {
+    signature_mgr_->Fini();
+    delete signature_mgr_;
+  }
+
+  delete backoff_throttle_;
   delete authz_attachment_;
   delete authz_session_mgr_;
   delete authz_fetcher_;
-  delete backoff_throttle_;
-  delete inode_tracker_;
-  delete md5path_cache_;
-  delete path_cache_;
-  delete inode_cache_;
-  delete chunk_tables_;
-  delete directory_handles_;
   delete statistics_;
 }
 
@@ -852,6 +1100,41 @@ void MountPoint::SetupDnsTuning() {
 }
 
 
+void MountPoint::SetupExternalDownloadMgr() {
+  string optarg;
+  OptionsManager *options_mgr = file_system_->options_mgr();
+  external_download_mgr_ =
+    download_mgr_->Clone(statistics_, "download-external");
+
+  unsigned timeout;
+  unsigned timeout_direct;
+  download_mgr_->GetTimeout(&timeout, &timeout_direct);
+  if (options_mgr->GetValue("CVMFS_EXTERNAL_TIMEOUT", &optarg)) {
+    timeout = String2Uint64(optarg);
+  }
+  if (options_mgr->GetValue("CVMFS_EXTERNAL_TIMEOUT_DIRECT", &optarg)) {
+    timeout_direct = String2Uint64(optarg);
+  }
+  external_download_mgr_->SetTimeout(timeout, timeout_direct);
+
+  string proxies = "DIRECT";
+  if (options_mgr->GetValue("CVMFS_EXTERNAL_HTTP_PROXY", &optarg)) {
+    proxies = optarg;
+  }
+  external_download_mgr_->SetProxyChain(
+    proxies, "", download::DownloadManager::kSetProxyRegular);
+  if (options_mgr->GetValue("CVMFS_EXTERNAL_FALLBACK_PROXY", &optarg)) {
+    external_download_mgr_->SetProxyChain(
+      "", optarg, download::DownloadManager::kSetProxyFallback);
+  }
+
+  if (options_mgr->GetValue("CVMFS_EXTERNAL_URL", &optarg)) {
+    external_download_mgr_->SetHostChain(ReplaceHosts(optarg));
+    external_download_mgr_->ProbeGeo();
+  }
+}
+
+
 void MountPoint::SetupHttpTuning() {
   string optarg;
   OptionsManager *options_mgr = file_system_->options_mgr();
@@ -894,6 +1177,56 @@ void MountPoint::SetupHttpTuning() {
   {
     download_mgr_->EnableInfoHeader();
   }
+}
+
+
+void MountPoint::SetupInodeAnnotation() {
+  if (file_system_->type() != FileSystem::kFsFuse)
+    return;
+  if (file_system_->cache_mode() & FileSystem::kCacheNfs)
+    return;
+
+  string optarg;
+  OptionsManager *options_manager = file_system_->options_mgr();
+
+  inode_annotation_ = new catalog::InodeGenerationAnnotation();
+  if (options_manager->GetValue("CVMFS_INITIAL_GENERATION", &optarg)) {
+    inode_annotation_->IncGeneration(String2Uint64(optarg));
+  }
+  catalog_mgr_->SetInodeAnnotation(inode_annotation_);
+}
+
+
+bool MountPoint::SetupOwnerMaps() {
+  string optarg;
+  OptionsManager *options_manager = file_system_->options_mgr();
+  catalog::OwnerMap uid_map;
+  catalog::OwnerMap gid_map;
+
+  if (options_manager->GetValue("CVMFS_UID_MAP", &optarg)) {
+    if (!uid_map.Read(optarg)) {
+      boot_error_ = "failed to parse uid map " + optarg;
+      boot_status_ = loader::kFailOptions;
+      return false;
+    }
+  }
+  if (options_manager->GetValue("CVMFS_GID_MAP", &optarg)) {
+    if (!gid_map.Read(optarg)) {
+      boot_error_ = "failed to parse gid map " + optarg;
+      boot_status_ = loader::kFailOptions;
+      return false;
+    }
+  }
+  catalog_mgr_->SetOwnerMaps(uid_map, gid_map);
+
+  // TODO(jblomer): make local to catalog manager
+  if (options_manager->GetValue("CVMFS_CLAIM_OWNERSHIP", &optarg) &&
+      options_manager->IsOn(optarg))
+  {
+    g_claim_ownership = true;
+  }
+
+  return true;
 }
 
 

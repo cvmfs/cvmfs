@@ -55,6 +55,9 @@ set (CVMFS_CLIENT_SOURCES
   globals.cc globals.h
   glue_buffer.cc glue_buffer.h
   hash.cc hash.h
+  history.h
+  history_sql.cc history_sql.h
+  history_sqlite.cc history_sqlite.h
   json_document.cc json_document.h
   loader.h
   logging.cc logging.h logging_internal.h
@@ -100,9 +103,6 @@ set (CVMFS2_DEBUG_SOURCES
   compat.cc compat.h
   cvmfs.cc cvmfs.h
   fence.h
-  history.h
-  history_sql.cc history_sql.h
-  history_sqlite.cc history_sqlite.h
   nfs_maps.cc nfs_maps.h
   nfs_shared_maps.cc nfs_shared_maps.h
   quota_listener.cc quota_listener.h

@@ -10,6 +10,7 @@
 
 #include <string>
 
+#include "hash.h"
 #include "loader.h"
 #include "fuse_listing.h"
 #include "util/pointer.h"
@@ -21,8 +22,13 @@ class BackoffThrottle;
 namespace cache {
 class CacheManager;
 }
+namespace catalog {
+class ClientCatalogManager;
+class InodeGenerationAnnotation;
+}
 class ChunkTables;
 namespace cvmfs {
+class Fetcher;
 class Uuid;
 }
 namespace download {
@@ -40,6 +46,9 @@ class OptionsManager;
 namespace perf {
 class Counter;
 class Statistics;
+}
+namespace signature {
+class SignatureManager;
 }
 
 
@@ -231,11 +240,20 @@ class MountPoint : SingleCopy, public MountPointFactory {
 
   void CreateStatistics();
   void CreateAuthz();
+  bool CreateSignatureManager();
+  bool CheckBlacklists();
   bool CreateDownloadManagers();
+  void CreateFetchers();
+  bool CreateCatalogManager();
   void CreateTables();
   void SetupTtls();
   void SetupDnsTuning();
   void SetupHttpTuning();
+  void SetupExternalDownloadMgr();
+  void SetupInodeAnnotation();
+  bool SetupOwnerMaps();
+  bool DetermineRootHash(shash::Any *root_hash);
+  bool FetchHistory(std::string *history_path);
   std::string ReplaceHosts(std::string hosts);
 
   std::string fqrn_;
@@ -248,8 +266,14 @@ class MountPoint : SingleCopy, public MountPointFactory {
   AuthzFetcher *authz_fetcher_;
   AuthzSessionManager *authz_session_mgr_;
   AuthzAttachment *authz_attachment_;
+  BackoffThrottle *backoff_throttle_;
+  signature::SignatureManager *signature_mgr_;
   download::DownloadManager *download_mgr_;
   download::DownloadManager *external_download_mgr_;
+  cvmfs::Fetcher *fetcher_;
+  cvmfs::Fetcher *external_fetcher_;
+  catalog::InodeGenerationAnnotation *inode_annotation_;
+  catalog::ClientCatalogManager *catalog_mgr_;
   FuseDirectoryHandles *directory_handles_;
   ChunkTables *chunk_tables_;
   lru::InodeCache *inode_cache_;
@@ -257,11 +281,11 @@ class MountPoint : SingleCopy, public MountPointFactory {
   lru::Md5PathCache *md5path_cache_;
   glue::InodeTracker *inode_tracker_;
 
-  BackoffThrottle *backoff_throttle_;
-
   unsigned max_ttl_sec_;
   pthread_mutex_t lock_max_ttl_;
   double kcache_timeout_sec_;
+  bool fixed_catalog_;
+  std::string repository_tag_;
 };  // class MointPoint
 
 #endif  // CVMFS_MOUNTPOINT_H_

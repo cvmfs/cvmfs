@@ -114,6 +114,7 @@ TEST_F(T_Download, Clone) {
   ASSERT_EQ(info.error_code, kFailOk);
   ASSERT_EQ(info.destination_mem.size, 1U);
   EXPECT_EQ(info.destination_mem.data[0], '1');
+  download_mgr_cloned->Fini();
   delete download_mgr_cloned;
 
   // Don't crash
