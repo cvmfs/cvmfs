@@ -85,7 +85,10 @@ class FileSystem : SingleCopy, public BootFactory {
   };
 
   struct FileSystemInfo {
-    FileSystemInfo() : type(kFsFuse), options_mgr(NULL) { }
+    FileSystemInfo()
+      : type(kFsFuse)
+      , options_mgr(NULL)
+      , wait_workspace(false) { }
     /**
      * Name can is used to identify this particular instance of cvmfs in the
      * cache (directory).  Normally it is the fully qualified repository name.
@@ -110,6 +113,14 @@ class FileSystem : SingleCopy, public BootFactory {
      * All further configuration has to be present in the options manager.
      */
     OptionsManager *options_mgr;
+
+    /**
+     * Decides if FileSystem construction should block if the workspace is
+     * currently taken.  This is used to coordinate fuse mounts where the next
+     * mount happens while the previous fuse module is not yet fully cleaned
+     * up.
+     */
+    bool wait_workspace;
   };
 
   /**
@@ -182,13 +193,13 @@ class FileSystem : SingleCopy, public BootFactory {
   void DetermineCacheMode();
   void DetermineCacheDirs();
   void DetermineMountpoint();
-  void DetermineWorkspace();
 
   // See FileSystemInfo for the following fields
   std::string name_;
   std::string exe_path_;
   Type type_;
   OptionsManager *options_mgr_;
+  bool wait_workspace_;
 
   perf::Counter *n_fs_open_;
   perf::Counter *n_fs_dir_open_;

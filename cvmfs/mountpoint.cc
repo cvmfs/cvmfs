@@ -79,7 +79,7 @@ bool FileSystem::CheckCacheMode() {
     boot_status_ = loader::kFailOptions;
     return false;
   }
-  if ((cache_mode_ & kCacheAlien) && (cache_mode_ & kCacheShared)) {
+  if ((cache_mode_ & kCacheAlien) && (cache_mode_ & kCacheManaged)) {
     boot_error_ = "Failure: quota management and alien cache mutually "
                   "exclusive. Turn off quota limit.";
     boot_status_ = loader::kFailOptions;
@@ -123,7 +123,6 @@ FileSystem *FileSystem::Create(const FileSystem::FileSystemInfo &fs_info) {
   if (!file_system->CheckCacheMode())
     return file_system.Release();
   file_system->DetermineCacheDirs();
-  file_system->DetermineWorkspace();
   if (!file_system->SetupWorkspace())
     return file_system.Release();
 
@@ -134,7 +133,6 @@ FileSystem *FileSystem::Create(const FileSystem::FileSystemInfo &fs_info) {
            length_tempdir,
            "%s",
            file_system->workspace_.c_str());
-
 
   if (!file_system->CreateCache())
     return file_system.Release();
@@ -225,7 +223,7 @@ void FileSystem::CreateStatistics() {
 
 /**
  * Depending on the cache mode and other parameters, figure out the actual
- * path to the cache directory.
+ * path to the cache directory and set the workspace directory along the way.
  */
 void FileSystem::DetermineCacheDirs() {
   string optarg;
@@ -239,6 +237,8 @@ void FileSystem::DetermineCacheDirs() {
   } else {
     cache_dir_ += "/" + name_;
   }
+
+  workspace_ = cache_dir_;
 
   if (options_mgr_->GetValue("CVMFS_ALIEN_CACHE", &optarg))
     cache_dir_ = optarg;
@@ -281,16 +281,12 @@ void FileSystem::DetermineCacheMode() {
 }
 
 
-void FileSystem::DetermineWorkspace() {
-  workspace_ = cache_dir_;
-}
-
-
 FileSystem::FileSystem(const FileSystem::FileSystemInfo &fs_info)
   : name_(fs_info.name)
   , exe_path_(fs_info.exe_path)
   , type_(fs_info.type)
   , options_mgr_(fs_info.options_mgr)
+  , wait_workspace_(fs_info.wait_workspace)
   , n_fs_open_(NULL)
   , n_fs_dir_open_(NULL)
   , n_fs_lookup_(NULL)
@@ -358,37 +354,29 @@ FileSystem::~FileSystem() {
 bool FileSystem::LockWorkspace() {
   path_workspace_lock_ = workspace_ + "/lock." + name_;
   fd_workspace_lock_ = TryLockFile(path_workspace_lock_);
+  if (fd_workspace_lock_ >= 0)
+    return true;
+
   if (fd_workspace_lock_ == -1) {
     boot_error_ = "could not acquire workspace lock (" +
                  StringifyInt(errno) + ")";
     boot_status_ = loader::kFailCacheDir;
     return false;
-  } else if (fd_workspace_lock_ == -2) {
-    // Prevent double mount
-    // Hack at this point (TODO(jblomer))
-//    string fqrn;
-//    retval = platform_getxattr(*cvmfs::mountpoint_, "user.fqrn", &fqrn);
-//    if (!retval) {
-      fd_workspace_lock_ = LockFile(path_workspace_lock_);
-      if (fd_workspace_lock_ < 0) {
-        boot_error_ = "could not acquire workspace lock (" +
-                     StringifyInt(errno) + ")";
-        boot_status_ = loader::kFailCacheDir;
-        return false;
-      }
-/*    } else {
-      if (fqrn == *cvmfs::repository_name_) {
-        LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
-                 "repository already mounted on %s",
-                 cvmfs::mountpoint_->c_str());
-        return loader::kFailDoubleMount;
-      } else {
-        LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
-                 "CernVM-FS repository %s already mounted on %s",
-                 fqrn.c_str(), cvmfs::mountpoint_->c_str());
-        return loader::kFailOtherMount;
-      }
-    }*/
+  }
+
+  assert(fd_workspace_lock_ == -2);
+
+  if (!wait_workspace_) {
+    boot_status_ = loader::kFailLockWorkspace;
+    return false;
+  }
+
+  fd_workspace_lock_ = LockFile(path_workspace_lock_);
+  if (fd_workspace_lock_ < 0) {
+    boot_error_ = "could not acquire workspace lock (" +
+                   StringifyInt(errno) + ")";
+    boot_status_ = loader::kFailCacheDir;
+    return false;
   }
   return true;
 }
@@ -963,6 +951,7 @@ bool MountPoint::DetermineRootHash(shash::Any *root_hash) {
 
 
 bool MountPoint::FetchHistory(std::string *history_path) {
+  // TODO(jblomer): use the fetcher and thereby reuse the cache
   manifest::Failures retval_mf;
   manifest::ManifestEnsemble ensemble;
   retval_mf = manifest::Fetch("", fqrn_, 0, NULL, signature_mgr_, download_mgr_,
