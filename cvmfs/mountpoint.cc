@@ -749,7 +749,7 @@ bool MountPoint::CreateDownloadManagers() {
                                    forced_proxy_template);
 
   string proxies;
-  if (!options_mgr->GetValue("CVMFS_HTTP_PROXY", &optarg))
+  if (options_mgr->GetValue("CVMFS_HTTP_PROXY", &optarg))
     proxies = optarg;
   proxies = download::ResolveProxyDescription(proxies, download_mgr_);
   if (proxies == "") {

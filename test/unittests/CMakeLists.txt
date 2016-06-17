@@ -112,6 +112,8 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/catalog_mgr.h
   ${CVMFS_SOURCE_DIR}/catalog_mgr_client.cc ${CVMFS_SOURCE_DIR}/catalog_mgr_client.h
   ${CVMFS_SOURCE_DIR}/catalog_mgr_impl.h
+  ${CVMFS_SOURCE_DIR}/catalog_mgr_ro.cc ${CVMFS_SOURCE_DIR}/catalog_mgr_ro.h
+  ${CVMFS_SOURCE_DIR}/catalog_mgr_rw.cc ${CVMFS_SOURCE_DIR}/catalog_mgr_rw.h
   ${CVMFS_SOURCE_DIR}/catalog_sql.cc ${CVMFS_SOURCE_DIR}/catalog_sql.h
   ${CVMFS_SOURCE_DIR}/catalog_rw.cc ${CVMFS_SOURCE_DIR}/catalog_rw.h
   ${CVMFS_SOURCE_DIR}/clientctx.cc ${CVMFS_SOURCE_DIR}/clientctx.h
@@ -171,6 +173,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/statistics.cc ${CVMFS_SOURCE_DIR}/statistics.h
   ${CVMFS_SOURCE_DIR}/tracer.cc ${CVMFS_SOURCE_DIR}/tracer.h
   ${CVMFS_SOURCE_DIR}/uid_map.h
+  ${CVMFS_SOURCE_DIR}/upload.cc ${CVMFS_SOURCE_DIR}/upload.h
   ${CVMFS_SOURCE_DIR}/upload_facility.cc
   ${CVMFS_SOURCE_DIR}/upload_local.cc
   ${CVMFS_SOURCE_DIR}/upload_s3.cc

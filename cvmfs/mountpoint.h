@@ -291,6 +291,7 @@ class MountPoint : SingleCopy, public BootFactory {
   void SetMaxTtlMn(unsigned value_minutes);
 
   BackoffThrottle *backoff_throttle() { return backoff_throttle_; }
+  catalog::ClientCatalogManager *catalog_mgr() { return catalog_mgr_; }
   perf::Statistics *statistics() { return statistics_; }
 
  private:

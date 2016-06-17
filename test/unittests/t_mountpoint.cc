@@ -5,14 +5,20 @@
 #include <gtest/gtest.h>
 
 #include <fcntl.h>
+#include <sys/param.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
 #include <string>
 
+#include "catalog_mgr_client.h"
+#include "catalog_mgr_rw.h"
+#include "manifest.h"
 #include "mountpoint.h"
 #include "options.h"
 #include "testutil.h"
+#include "upload.h"
+#include "upload_spooler_definition.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "uuid.h"
@@ -30,6 +36,8 @@ class T_MountPoint : public ::testing::Test {
     options_mgr_.SetValue("CVMFS_SHARED_CACHE", "no");
     fs_info_.name = "unit-test";
     fs_info_.options_mgr = &options_mgr_;
+    // Silence syslog error
+    options_mgr_.SetValue("CVMFS_MOUNT_DIR", "/no/such/dir");
   }
 
   virtual void TearDown() {
@@ -39,6 +47,49 @@ class T_MountPoint : public ::testing::Test {
     if (tmp_path_ != "")
       RemoveTree(tmp_path_);
     EXPECT_EQ(used_fds_, GetNoUsedFds());
+  }
+
+  void CreateMiniRepository() {
+    char abs_path[MAXPATHLEN];
+    getcwd(abs_path, MAXPATHLEN);
+    string repo_path(string(abs_path) + "/repo");
+    MakeCacheDirectories(repo_path + "/data", 0700);
+    upload::SpoolerDefinition sd(
+      "local," + repo_path + "/data/txn," + repo_path,
+      shash::kSha1);
+    ASSERT_TRUE(sd.IsValid());
+    UniquePtr<upload::Spooler> spooler(upload::Spooler::Construct(sd));
+    ASSERT_TRUE(spooler.IsValid());
+
+    const bool volatile_content = false;
+    const string voms_authz;
+    UniquePtr<manifest::Manifest> manifest(
+      catalog::WritableCatalogManager::CreateRepository(
+        repo_path + "/data/txn",
+        volatile_content,
+        voms_authz,
+        spooler.weak_ref()));
+    ASSERT_TRUE(manifest.IsValid());
+    options_mgr_.SetValue("CVMFS_ROOT_HASH",
+                          manifest->catalog_hash().ToString());
+    options_mgr_.SetValue("CVMFS_SERVER_URL", "file://" + repo_path);
+    options_mgr_.SetValue("CVMFS_HTTP_PROXY", "DIRECT");
+
+    string pubkey = "-----BEGIN PUBLIC KEY-----\n"
+      "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAukBusmYyFW8KJxVMmeCj\n"
+      "N7vcU1mERMpDhPTa5PgFROSViiwbUsbtpP9CvfxB/KU1gggdbtWOTZVTQqA3b+p8\n"
+      "g5Vve3/rdnN5ZEquxeEfIG6iEZta9Zei5mZMeuK+DPdyjtvN1wP0982ppbZzKRBu\n"
+      "BbzR4YdrwwWXXNZH65zZuUISDJB4my4XRoVclrN5aGVz4PjmIZFlOJ+ytKsMlegW\n"
+      "SNDwZO9z/YtBFil/Ca8FJhRPFMKdvxK+ezgq+OQWAerVNX7fArMC+4Ya5pF3ASr6\n"
+      "3mlvIsBpejCUBygV4N2pxIcPJu/ZDaikmVvdPTNOTZlIFMf4zIP/YHegQSJmOyVp\n"
+      "HQIDAQAB\n"
+      "-----END PUBLIC KEY-----\n";
+    int fd = open((repo_path + string("/key.pub")).c_str(),
+                  O_RDWR | O_CREAT, 0600);
+    ASSERT_GE(fd, 0);
+    SafeWrite(fd, pubkey.data(), pubkey.size());
+    close(fd);
+    options_mgr_.SetValue("CVMFS_PUBLIC_KEY", repo_path + string("/key.pub"));
   }
 
  protected:
@@ -223,5 +274,43 @@ TEST_F(T_MountPoint, QuotaMgr) {
   {
     UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
     EXPECT_EQ(loader::kFailQuota, fs->boot_status());
+  }
+}
+
+
+TEST_F(T_MountPoint, MountFixed) {
+  CreateMiniRepository();
+  UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+  ASSERT_EQ(loader::kFailOk, fs->boot_status());
+  {
+    UniquePtr<MountPoint> mp(MountPoint::Create("test", fs.weak_ref()));
+    EXPECT_EQ(loader::kFailOk, mp->boot_status());
+    string root_hash;
+    options_mgr_.GetValue("CVMFS_ROOT_HASH", &root_hash);
+    EXPECT_EQ(root_hash, mp->catalog_mgr()->GetRootHash().ToString());
+  }
+
+  // Again to check proper cleanup
+  {
+    UniquePtr<MountPoint> mp(MountPoint::Create("test", fs.weak_ref()));
+    EXPECT_EQ(loader::kFailOk, mp->boot_status());
+  }
+
+  options_mgr_.UnsetValue("CVMFS_ROOT_HASH");
+  {
+    UniquePtr<MountPoint> mp(MountPoint::Create("test", fs.weak_ref()));
+    EXPECT_EQ(loader::kFailCatalog, mp->boot_status());
+  }
+
+  options_mgr_.UnsetValue("CVMFS_HTTP_PROXY");
+  {
+    UniquePtr<MountPoint> mp(MountPoint::Create("test", fs.weak_ref()));
+    EXPECT_EQ(loader::kFailWpad, mp->boot_status());
+  }
+
+  options_mgr_.SetValue("CVMFS_PUBLIC_KEY", "/no/such/key");
+  {
+    UniquePtr<MountPoint> mp(MountPoint::Create("test", fs.weak_ref()));
+    EXPECT_EQ(loader::kFailSignature, mp->boot_status());
   }
 }
