@@ -510,6 +510,16 @@ bool CompressFd2Null(int fd_src, shash::Any *compressed_hash,
 }
 
 
+bool CompressPath2Null(const string &src, shash::Any *compressed_hash) {
+  FILE *fsrc = fopen(src.c_str(), "r");
+  if (fsrc == NULL)
+    return false;
+  bool retval = CompressFile2Null(fsrc, compressed_hash);
+  fclose(fsrc);
+  return retval;
+}
+
+
 bool CompressFile2File(FILE *fsrc, FILE *fdest) {
   int z_ret, flush;
   bool result = false;
