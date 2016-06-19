@@ -29,6 +29,7 @@
 #include "signature.h"
 #include "smalloc.h"
 #include "upload.h"
+#include "util/posix.h"
 
 using namespace std;  // NOLINT
 
@@ -219,23 +220,13 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   }
 
   // Write new manifest
-  FILE *fmanifest = fopen(manifest_path.c_str(), "w");
-  if (!fmanifest) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to open manifest (errno: %d)",
-             errno);
-    return 1;
-  }
-  if ((fwrite(signed_manifest.data(), 1, signed_manifest.length(), fmanifest)
-       != signed_manifest.length()) ||
-      (fwrite(sig, 1, sig_size, fmanifest) != sig_size))
-  {
+  signed_manifest += string(reinterpret_cast<char *>(sig), sig_size);
+  free(sig);
+  if (!SafeWriteToFile(signed_manifest, manifest_path, 0664)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed to write manifest (errno: %d)",
              errno);
-    fclose(fmanifest);
     return 1;
   }
-  free(sig);
-  fclose(fmanifest);
 
   // Upload manifest
   spooler->UploadManifest(manifest_path);
