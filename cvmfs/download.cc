@@ -1157,7 +1157,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
         if (retval) {
           free(info->destination_mem.data);
           info->destination_mem.data = static_cast<char *>(buf);
-          info->destination_mem.pos = size;
+          info->destination_mem.pos = info->destination_mem.size = size;
         } else {
           LogCvmfs(kLogDownload, kLogDebug,
                    "decompression (memory) of url %s failed",
