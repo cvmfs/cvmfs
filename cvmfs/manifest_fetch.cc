@@ -57,7 +57,7 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
   // Load Manifest
   ensemble->raw_manifest_buf =
     reinterpret_cast<unsigned char *>(download_manifest.destination_mem.data);
-  ensemble->raw_manifest_size = download_manifest.destination_mem.size;
+  ensemble->raw_manifest_size = download_manifest.destination_mem.pos;
   ensemble->manifest =
     manifest::Manifest::LoadMem(ensemble->raw_manifest_buf,
                                 ensemble->raw_manifest_size);
@@ -98,7 +98,7 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
     }
     ensemble->cert_buf = reinterpret_cast<unsigned char *>(
       download_certificate.destination_mem.data);
-    ensemble->cert_size = download_certificate.destination_mem.size;
+    ensemble->cert_size = download_certificate.destination_mem.pos;
   }
   retval_b = signature_manager->LoadCertificateMem(ensemble->cert_buf,
                                                    ensemble->cert_size);

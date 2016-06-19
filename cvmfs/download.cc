@@ -787,13 +787,6 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
     shash::Init(info->hash_context);
   }
 
-  if ((info->destination == kDestinationMem) &&
-      (HasPrefix(*(info->url), "file://", false)))
-  {
-    info->destination_mem.size = 64*1024;
-    info->destination_mem.data = static_cast<char *>(smalloc(64*1024));
-  }
-
   if ((info->range_offset != -1) && (info->range_size)) {
     char byte_range_array[100];
     const int64_t range_lower = static_cast<int64_t>(info->range_offset);
@@ -979,6 +972,14 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
   }
   pthread_mutex_unlock(lock_options_);
 
+  if ((info->destination == kDestinationMem) &&
+      (info->destination_mem.size == 0) &&
+      HasPrefix(url, "file://", false))
+  {
+    info->destination_mem.size = 64*1024;
+    info->destination_mem.data = static_cast<char *>(smalloc(64*1024));
+  }
+
   curl_easy_setopt(curl_handle, CURLOPT_URL, EscapeUrl(url).c_str());
 }
 
@@ -1146,24 +1147,17 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
         }
       }
 
-      // Set actual size in case of file:// download into memory
-      if ((info->destination == kDestinationMem) &&
-          (HasPrefix(*(info->url), "file://", false)))
-      {
-        info->destination_mem.size = info->destination_mem.pos;
-      }
-
       // Decompress memory in a single run
       if ((info->destination == kDestinationMem) && info->compressed) {
         void *buf;
         uint64_t size;
         bool retval = zlib::DecompressMem2Mem(info->destination_mem.data,
-                                              info->destination_mem.size,
+                                              info->destination_mem.pos,
                                               &buf, &size);
         if (retval) {
           free(info->destination_mem.data);
           info->destination_mem.data = static_cast<char *>(buf);
-          info->destination_mem.size = size;
+          info->destination_mem.pos = size;
         } else {
           LogCvmfs(kLogDownload, kLogDebug,
                    "decompression (memory) of url %s failed",
@@ -1192,6 +1186,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     case CURLE_PARTIAL_FILE:
     case CURLE_GOT_NOTHING:
     case CURLE_RECV_ERROR:
+    case CURLE_FILE_COULDNT_READ_FILE:
       if (info->proxy != "DIRECT")
         // This is a guess.  Fail-over can still change to switching host
         info->error_code = kFailProxyConnection;
@@ -2653,7 +2648,7 @@ DownloadManager *DownloadManager::Clone(
   clone->opt_proxy_groups_reset_after_ = opt_proxy_groups_reset_after_;
   clone->opt_host_reset_after_ = opt_host_reset_after_;
   clone->credentials_attachment_ = credentials_attachment_;
-  
+
   return clone;
 }
 
