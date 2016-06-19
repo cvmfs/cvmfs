@@ -111,6 +111,8 @@ bool SafeWrite(int fd, const void *buf, size_t nbyte);
 
 // Read the contents of a file descriptor to a string.
 bool SafeReadToString(int fd, std::string *final_result);
+bool SafeWriteToFile(const std::string &content, 
+                     const std::string &path, int mode);
 
 
 struct Pipe : public SingleCopy {

@@ -1110,6 +1110,15 @@ bool SafeReadToString(int fd, std::string *final_result) {
   return true;
 }
 
+bool SafeWriteToFile(const string &content, const string &path, int mode) {
+  int fd = open(path.c_str(), O_WRONLY | O_CREAT, mode);
+  if (fd < 0)
+    return false;
+  int retval = SafeWrite(fd, content.data(), content.size());
+  close(fd);
+  return retval;
+}
+
 
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD

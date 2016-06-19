@@ -526,6 +526,14 @@ TEST_F(T_Util, SafeWrite) {
   ClosePipe(fd);
 
   EXPECT_FALSE(SafeWrite(-1, &stop, 1));
+
+  EXPECT_TRUE(SafeWriteToFile("abc", sandbox + "/new_file", 0600));
+  string result;
+  int fd_file = open((sandbox + "/new_file").c_str(), O_RDONLY);
+  EXPECT_GE(fd_file, 0);
+  EXPECT_TRUE(SafeReadToString(fd_file, &result));
+  close(fd_file);
+  EXPECT_EQ("abc", result);
 }
 
 
