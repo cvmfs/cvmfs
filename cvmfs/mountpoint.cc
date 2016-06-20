@@ -66,6 +66,7 @@
 using namespace std;  // NOLINT
 
 
+bool FileSystem::g_alive = false;
 const char *FileSystem::kDefaultCacheBase = "/var/lib/cvmfs";
 
 
@@ -308,6 +309,8 @@ FileSystem::FileSystem(const FileSystem::FileSystemInfo &fs_info)
   , has_nfs_maps_(false)
   , has_custom_sqlitevfs_(false)
 {
+  assert(!g_alive);
+  g_alive = true;
   g_uid = geteuid();
   g_gid = getegid();
 
@@ -348,6 +351,7 @@ FileSystem::~FileSystem() {
   SetLogSyslogPrefix("");
   SetLogMicroSyslog("");
   SetLogDebugFile("");
+  g_alive = false;
 }
 
 
@@ -698,7 +702,8 @@ bool MountPoint::CreateCatalogManager() {
     fqrn_, fetcher_, signature_mgr_, statistics_);
 
   SetupInodeAnnotation();
-  SetupOwnerMaps();
+  if (!SetupOwnerMaps())
+    return false;
   shash::Any root_hash;
   if (!DetermineRootHash(&root_hash))
     return false;
@@ -739,7 +744,7 @@ bool MountPoint::CreateDownloadManagers() {
     download_mgr_->SetDnsServer(optarg);
   }
 
-  SetupDnsTuning();
+  SetupDnsTuning(download_mgr_);
   SetupHttpTuning();
 
   string forced_proxy_template;
@@ -769,9 +774,7 @@ bool MountPoint::CreateDownloadManagers() {
     download_mgr_->ProbeGeo();
   }
 
-  SetupExternalDownloadMgr();
-
-  return true;
+  return SetupExternalDownloadMgr();
 }
 
 
@@ -916,7 +919,7 @@ bool MountPoint::DetermineRootHash(shash::Any *root_hash) {
   bool retval;
   if (!options_manager->GetValue("CVMFS_REPOSITORY_TAG", &repository_tag_)) {
     string repository_date;
-    options_manager->GetValue("CVMFS_REPOSITORY_TAG", &repository_date);
+    options_manager->GetValue("CVMFS_REPOSITORY_DATE", &repository_date);
     time_t repository_utctime = IsoTimestamp2UtcTime(repository_date);
     if (repository_utctime == 0) {
       boot_error_ = "invalid timestamp in CVMFS_REPOSITORY_DATE: " +
@@ -944,6 +947,7 @@ bool MountPoint::DetermineRootHash(shash::Any *root_hash) {
       return false;
     }
   }
+  LogCvmfs(kLogCvmfs, kLogDebug, "mounting tag %s", tag.name.c_str());
 
   *root_hash = tag.root_hash;
   return true;
@@ -951,7 +955,6 @@ bool MountPoint::DetermineRootHash(shash::Any *root_hash) {
 
 
 bool MountPoint::FetchHistory(std::string *history_path) {
-  // TODO(jblomer): use the fetcher and thereby reuse the cache
   manifest::Failures retval_mf;
   manifest::ManifestEnsemble ensemble;
   retval_mf = manifest::Fetch("", fqrn_, 0, NULL, signature_mgr_, download_mgr_,
@@ -968,19 +971,19 @@ bool MountPoint::FetchHistory(std::string *history_path) {
     return false;
   }
 
-  *history_path =
-    file_system_->workspace() + "/history." + history_hash.ToString();
-  string history_url = "/data/" + history_hash.MakePath();
-  download::JobInfo download_history(&history_url, true, true, history_path,
-                                     &history_hash);
-  download::Failures retval_dl;
-  retval_dl = download_mgr_->Fetch(&download_history);
-  if (retval_dl != download::kFailOk) {
-    boot_error_ = "failed to download history: " + StringifyInt(retval_dl);
+  int fd = fetcher_->Fetch(
+    history_hash,
+    cache::CacheManager::kSizeUnknown,
+    "tag database for " + fqrn_,
+    zlib::kZlibDefault,
+    cache::CacheManager::kTypeRegular);
+  if (fd < 0) {
+    boot_error_ = "failed to download history: " + StringifyInt(-fd);
     boot_status_ = loader::kFailHistory;
     return false;
   }
-
+  // We have the custom sqlite vfs driver installed
+  *history_path = "@" + StringifyInt(fd);
   return true;
 }
 
@@ -1071,7 +1074,13 @@ string MountPoint::ReplaceHosts(string hosts) {
 }
 
 
-void MountPoint::SetupDnsTuning() {
+/**
+ * Called twice once for the regular download manager and once for the external
+ * download manager.
+ * TODO(jblomer): this should not be called twice but DND config should be
+ * done as part of DownloadManager::Clone (or DnsManager::Clone)
+ */
+void MountPoint::SetupDnsTuning(download::DownloadManager *manager) {
   string optarg;
   OptionsManager *options_mgr = file_system_->options_mgr();
 
@@ -1086,24 +1095,24 @@ void MountPoint::SetupDnsTuning() {
   {
     // Creates internally a new resolver object, therefore change only if
     // necessary.
-    download_mgr_->SetDnsParameters(dns_retries, dns_timeout_ms);
+    manager->SetDnsParameters(dns_retries, dns_timeout_ms);
   }
   if (options_mgr->GetValue("CVMFS_IPFAMILY_PREFER", &optarg)) {
     switch (String2Int64(optarg)) {
       case 4:
-        download_mgr_->SetIpPreference(dns::kIpPreferV4);
+        manager->SetIpPreference(dns::kIpPreferV4);
         break;
       case 6:
-        download_mgr_->SetIpPreference(dns::kIpPreferV6);
+        manager->SetIpPreference(dns::kIpPreferV6);
         break;
     }
   }
   if (options_mgr->GetValue("CVMFS_MAX_IPADDR_PER_PROXY", &optarg))
-    download_mgr_->SetMaxIpaddrPerProxy(String2Uint64(optarg));
+    manager->SetMaxIpaddrPerProxy(String2Uint64(optarg));
 }
 
 
-void MountPoint::SetupExternalDownloadMgr() {
+bool MountPoint::SetupExternalDownloadMgr() {
   string optarg;
   OptionsManager *options_mgr = file_system_->options_mgr();
   external_download_mgr_ =
@@ -1120,9 +1129,21 @@ void MountPoint::SetupExternalDownloadMgr() {
   }
   external_download_mgr_->SetTimeout(timeout, timeout_direct);
 
+  if (options_mgr->GetValue("CVMFS_EXTERNAL_URL", &optarg)) {
+    external_download_mgr_->SetHostChain(ReplaceHosts(optarg));
+    external_download_mgr_->ProbeGeo();
+  }
+
+  SetupDnsTuning(external_download_mgr_);
+
   string proxies = "DIRECT";
   if (options_mgr->GetValue("CVMFS_EXTERNAL_HTTP_PROXY", &optarg)) {
-    proxies = optarg;
+    proxies = download::ResolveProxyDescription(optarg, external_download_mgr_);
+    if (proxies == "") {
+      boot_error_ = "failed to discover external HTTP proxy servers";
+      boot_status_ = loader::kFailWpad;
+      return false;
+    }
   }
   external_download_mgr_->SetProxyChain(
     proxies, "", download::DownloadManager::kSetProxyRegular);
@@ -1131,10 +1152,7 @@ void MountPoint::SetupExternalDownloadMgr() {
       "", optarg, download::DownloadManager::kSetProxyFallback);
   }
 
-  if (options_mgr->GetValue("CVMFS_EXTERNAL_URL", &optarg)) {
-    external_download_mgr_->SetHostChain(ReplaceHosts(optarg));
-    external_download_mgr_->ProbeGeo();
-  }
+  return true;
 }
 
 

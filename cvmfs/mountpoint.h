@@ -170,6 +170,10 @@ class FileSystem : SingleCopy, public BootFactory {
   cvmfs::Uuid *uuid_cache() { return uuid_cache_; }
 
  private:
+  /**
+   * Only one instance may be alive at any given time
+   */
+  static bool g_alive;
   static const char *kDefaultCacheBase;  // /var/lib/cvmfs
   static const unsigned kDefaultQuotaLimit = 1024 * 1024 * 1024;  // 1GB
 
@@ -343,9 +347,9 @@ class MountPoint : SingleCopy, public BootFactory {
   bool CreateCatalogManager();
   void CreateTables();
   void SetupTtls();
-  void SetupDnsTuning();
+  void SetupDnsTuning(download::DownloadManager *manager);
   void SetupHttpTuning();
-  void SetupExternalDownloadMgr();
+  bool SetupExternalDownloadMgr();
   void SetupInodeAnnotation();
   bool SetupOwnerMaps();
   bool DetermineRootHash(shash::Any *root_hash);
