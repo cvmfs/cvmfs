@@ -332,6 +332,8 @@ bool SignatureManager::LoadBlacklist(
   const std::string &path_blacklist,
   bool append)
 {
+  LogCvmfs(kLogSignature, kLogDebug, "reading from blacklist %s", 
+           path_blacklist.c_str());
   if (!append)
     blacklisted_certificates_.clear();
 
