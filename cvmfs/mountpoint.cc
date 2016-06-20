@@ -1077,8 +1077,6 @@ string MountPoint::ReplaceHosts(string hosts) {
 /**
  * Called twice once for the regular download manager and once for the external
  * download manager.
- * TODO(jblomer): this should not be called twice but DND config should be
- * done as part of DownloadManager::Clone (or DnsManager::Clone)
  */
 void MountPoint::SetupDnsTuning(download::DownloadManager *manager) {
   string optarg;
@@ -1090,13 +1088,7 @@ void MountPoint::SetupDnsTuning(download::DownloadManager *manager) {
     dns_timeout_ms = String2Uint64(optarg) * 1000;
   if (options_mgr->GetValue("CVMFS_DNS_RETRIES", &optarg))
     dns_retries = String2Uint64(optarg);
-  if ((dns_timeout_ms != download::DownloadManager::kDnsDefaultTimeoutMs) ||
-      (dns_retries != download::DownloadManager::kDnsDefaultRetries))
-  {
-    // Creates internally a new resolver object, therefore change only if
-    // necessary.
-    manager->SetDnsParameters(dns_retries, dns_timeout_ms);
-  }
+  manager->SetDnsParameters(dns_retries, dns_timeout_ms);
   if (options_mgr->GetValue("CVMFS_IPFAMILY_PREFER", &optarg)) {
     switch (String2Int64(optarg)) {
       case 4:
@@ -1133,8 +1125,6 @@ bool MountPoint::SetupExternalDownloadMgr() {
     external_download_mgr_->SetHostChain(ReplaceHosts(optarg));
     external_download_mgr_->ProbeGeo();
   }
-
-  SetupDnsTuning(external_download_mgr_);
 
   string proxies = "DIRECT";
   if (options_mgr->GetValue("CVMFS_EXTERNAL_HTTP_PROXY", &optarg)) {

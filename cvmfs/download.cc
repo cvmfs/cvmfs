@@ -1731,6 +1731,12 @@ void DownloadManager::SetDnsParameters(
   const unsigned timeout_ms)
 {
   pthread_mutex_lock(lock_options_);
+  if ((resolver_->retries() == retries) &&
+      (resolver_->timeout_ms() == timeout_ms))
+  {
+    pthread_mutex_unlock(lock_options_);
+    return;
+  }
   delete resolver_;
   resolver_ = NULL;
   resolver_ =
@@ -2625,6 +2631,10 @@ DownloadManager *DownloadManager::Clone(
 {
   DownloadManager *clone = new DownloadManager();
   clone->Init(pool_max_handles_, use_system_proxy_, statistics, name);
+  if (resolver_) {
+    clone->SetDnsParameters(resolver_->retries(), resolver_->timeout_ms());
+    clone->SetMaxIpaddrPerProxy(resolver_->throttle());
+  }
   if (opt_dns_server_)
     clone->SetDnsServer(opt_dns_server_);
   clone->opt_timeout_proxy_ = opt_timeout_proxy_;

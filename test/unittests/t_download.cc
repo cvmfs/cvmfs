@@ -112,7 +112,7 @@ TEST_F(T_Download, Clone) {
   JobInfo info(&url, false /* compressed */, false /* probe hosts */, NULL);
   download_mgr_cloned->Fetch(&info);
   ASSERT_EQ(info.error_code, kFailOk);
-  ASSERT_EQ(info.destination_mem.size, 1U);
+  ASSERT_EQ(info.destination_mem.pos, 1U);
   EXPECT_EQ(info.destination_mem.data[0], '1');
   download_mgr_cloned->Fini();
   delete download_mgr_cloned;
@@ -160,7 +160,7 @@ TEST_F(T_Download, LocalFile2Mem) {
   JobInfo info(&url, false /* compressed */, false /* probe hosts */, NULL);
   download_mgr.Fetch(&info);
   ASSERT_EQ(info.error_code, kFailOk);
-  ASSERT_EQ(info.destination_mem.size, 1U);
+  ASSERT_EQ(info.destination_mem.pos, 1U);
   EXPECT_EQ(info.destination_mem.data[0], '1');
 }
 
