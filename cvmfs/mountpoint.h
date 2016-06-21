@@ -346,7 +346,7 @@ class MountPoint : SingleCopy, public BootFactory {
   void CreateFetchers();
   bool CreateCatalogManager();
   void CreateTables();
-  void SetupTtls();
+  void SetupBehavior();
   void SetupDnsTuning(download::DownloadManager *manager);
   void SetupHttpTuning();
   bool SetupExternalDownloadMgr();
@@ -385,6 +385,7 @@ class MountPoint : SingleCopy, public BootFactory {
   pthread_mutex_t lock_max_ttl_;
   double kcache_timeout_sec_;
   bool fixed_catalog_;
+  bool hide_magic_xattrs_;
   std::string repository_tag_;
 };  // class MointPoint
 

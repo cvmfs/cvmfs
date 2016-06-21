@@ -6,10 +6,15 @@
 #define CVMFS_FUSE_LISTING_H_
 
 #include <inttypes.h>
+#include <pthread.h>
 #include <sys/types.h>
+
+#include <cassert>
+#include <cstdlib>
 
 #include "google/dense_hash_map"
 #include "util/algorithm.h"
+#include "util/pointer.h"
 
 struct FuseListing {
   char *buffer;  /**< Filled by fuse_add_direntry */
@@ -25,5 +30,21 @@ struct FuseListing {
 typedef google::dense_hash_map<uint64_t, FuseListing,
                                hash_murmur<uint64_t> >
         FuseDirectoryHandles;
+
+
+struct FuseDirectoryMap : SingleCopy {
+  FuseDirectoryMap() : next_directory_handle_(0) {
+    int retval = pthread_mutex_init(&lock_handles, NULL);
+    assert(retval == 0);
+  }
+
+  ~FuseDirectoryMap() {
+    pthread_mutex_destroy(&lock_handles);
+  }
+
+  FuseDirectoryHandles handles;
+  pthread_mutex_t lock_handles;
+  uint64_t next_directory_handle_ = 0;
+};
 
 #endif  // CVMFS_FUSE_LISTING_H_

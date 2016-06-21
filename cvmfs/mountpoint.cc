@@ -660,7 +660,7 @@ MountPoint *MountPoint::Create(
     return mountpoint.Release();
 
   mountpoint->CreateTables();
-  mountpoint->SetupTtls();
+  mountpoint->SetupBehavior();
 
   mountpoint->boot_status_ = loader::kFailOk;
   return mountpoint.Release();
@@ -1059,18 +1059,41 @@ MountPoint::~MountPoint() {
 }
 
 
-void MountPoint::SetMaxTtlMn(unsigned value_minutes) {
-  MutexLockGuard lock_guard(lock_max_ttl_);
-  max_ttl_sec_ = value_minutes * 60;
-}
-
-
 string MountPoint::ReplaceHosts(string hosts) {
   vector<string> tokens = SplitString(fqrn_, '.');
   const string org = tokens[0];
   hosts = ReplaceAll(hosts, "@org@", org);
   hosts = ReplaceAll(hosts, "@fqrn@", fqrn_);
   return hosts;
+}
+
+
+void MountPoint::SetMaxTtlMn(unsigned value_minutes) {
+  MutexLockGuard lock_guard(lock_max_ttl_);
+  max_ttl_sec_ = value_minutes * 60;
+}
+
+
+void MountPoint::SetupBehavior() {
+  OptionsManager *options_manager = file_system_->options_mgr();
+  string optarg;
+
+  if (options_manager->GetValue("CVMFS_MAX_TTL", &optarg))
+    SetMaxTtlMn(String2Uint64(optarg));
+
+  if (options_manager->GetValue("CVMFS_KCACHE_TIMEOUT", &optarg)) {
+    // Can be negative and should then be interpreted as 0.0
+    kcache_timeout_sec_ =
+      std::max(0.0, static_cast<double>(String2Int64(optarg)));
+  }
+  LogCvmfs(kLogCvmfs, kLogDebug, "kernel caches expire after %d seconds",
+           static_cast<int>(kcache_timeout_sec_));
+
+  if (options_manager->GetValue("CVMFS_HIDE_MAGIC_XATTRS", &optarg)
+      && options_manager->IsOn(optarg))
+  {
+    hide_magic_xattrs_ = true;
+  }
 }
 
 
@@ -1238,21 +1261,4 @@ bool MountPoint::SetupOwnerMaps() {
   }
 
   return true;
-}
-
-
-void MountPoint::SetupTtls() {
-  OptionsManager *options_manager = file_system_->options_mgr();
-  string optarg;
-
-  if (options_manager->GetValue("CVMFS_MAX_TTL", &optarg))
-    SetMaxTtlMn(String2Uint64(optarg));
-
-  if (options_manager->GetValue("CVMFS_KCACHE_TIMEOUT", &optarg)) {
-    // Can be negative and should then be interpreted as 0.0
-    kcache_timeout_sec_ =
-      std::max(0.0, static_cast<double>(String2Int64(optarg)));
-  }
-  LogCvmfs(kLogCvmfs, kLogDebug, "kernel caches expire after %d seconds",
-           static_cast<int>(kcache_timeout_sec_));
 }
