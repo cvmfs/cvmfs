@@ -416,6 +416,11 @@ void FileSystem::LogSqliteError(
 }
 
 
+void FileSystem::ResetErrorCounters() {
+  n_io_error_->Set(0);
+}
+
+
 bool FileSystem::SetupCrashGuard() {
   path_crash_guard_ = workspace_ + "/running." + name_;
   platform_stat64 info;

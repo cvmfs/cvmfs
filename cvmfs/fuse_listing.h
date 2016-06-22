@@ -44,7 +44,7 @@ struct FuseDirectoryMap : SingleCopy {
 
   FuseDirectoryHandles handles;
   pthread_mutex_t lock_handles;
-  uint64_t next_directory_handle_ = 0;
+  uint64_t next_directory_handle_;
 };
 
 #endif  // CVMFS_FUSE_LISTING_H_

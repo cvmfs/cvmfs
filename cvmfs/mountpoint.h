@@ -156,6 +156,8 @@ class FileSystem : SingleCopy, public BootFactory {
   static FileSystem *Create(const FileSystemInfo &fs_info);
   ~FileSystem();
 
+  void ResetErrorCounters();
+
   std::string cache_dir() { return cache_dir_; }
   cache::CacheManager *cache_mgr() { return cache_mgr_; }
   int cache_mode() { return cache_mode_; }
@@ -296,6 +298,12 @@ class MountPoint : SingleCopy, public BootFactory {
 
   BackoffThrottle *backoff_throttle() { return backoff_throttle_; }
   catalog::ClientCatalogManager *catalog_mgr() { return catalog_mgr_; }
+  download::DownloadManager *download_mgr() { return download_mgr_; }
+  download::DownloadManager *external_download_mgr() {
+    return external_download_mgr_;
+  }
+  FileSystem *file_system() { return file_system_; }
+  glue::InodeTracker *inode_tracker() { return inode_tracker_; }
   perf::Statistics *statistics() { return statistics_; }
 
  private:
