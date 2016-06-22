@@ -1,0 +1,24 @@
+--- src/google/sparsehash/hashtable-common.h.orig	2016-06-22 13:32:47.000000000 +0200
++++ src/google/sparsehash/hashtable-common.h	2016-06-22 13:33:18.000000000 +0200
+@@ -163,8 +163,8 @@
+   *value = 0;
+   unsigned char byte;
+   // We require IntType to be unsigned or else the shifting gets all screwy.
+-  SPARSEHASH_COMPILE_ASSERT(static_cast<IntType>(-1) > static_cast<IntType>(0),
+-                            serializing_int_requires_an_unsigned_type);
++  //SPARSEHASH_COMPILE_ASSERT(static_cast<IntType>(-1) > static_cast<IntType>(0),
++  //                          serializing_int_requires_an_unsigned_type);
+   for (size_t i = 0; i < length; ++i) {
+     if (!read_data(fp, &byte, sizeof(byte))) return false;
+     *value |= static_cast<IntType>(byte) << ((length - 1 - i) * 8);
+@@ -176,8 +176,8 @@
+ bool write_bigendian_number(OUTPUT* fp, IntType value, size_t length) {
+   unsigned char byte;
+   // We require IntType to be unsigned or else the shifting gets all screwy.
+-  SPARSEHASH_COMPILE_ASSERT(static_cast<IntType>(-1) > static_cast<IntType>(0),
+-                            serializing_int_requires_an_unsigned_type);
++  //SPARSEHASH_COMPILE_ASSERT(static_cast<IntType>(-1) > static_cast<IntType>(0),
++  //                          serializing_int_requires_an_unsigned_type);
+   for (size_t i = 0; i < length; ++i) {
+     byte = (sizeof(value) <= length-1 - i)
+         ? 0 : static_cast<unsigned char>((value >> ((length-1 - i) * 8)) & 255);

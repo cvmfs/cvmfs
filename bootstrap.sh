@@ -124,7 +124,8 @@ patch_external "tbb"         "custom_library_suffix.patch"        \
                              "symlink_to_build_directories.patch" \
                              "32bit_mock.patch"
 patch_external "vjson"       "missing_include.patch"
-patch_external "sparsehash"  "fix_sl4_compilation.patch"
+patch_external "sparsehash"  "fix_sl4_compilation.patch"          \
+                             "fix_warning_gcc48.patch"
 patch_external "libcurl"     "disable_sslv3.patch"
 
 replace_in_external "c-ares"      "config.guess.latest" "config.guess"
