@@ -205,7 +205,7 @@ class FileSystem : SingleCopy, public BootFactory {
                              int sqlite_extended_error,
                              const char *message);
 
-  FileSystem(const FileSystemInfo &fs_info);
+  explicit FileSystem(const FileSystemInfo &fs_info);
 
   void SetupLogging();
   void CreateStatistics();

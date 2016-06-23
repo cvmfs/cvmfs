@@ -76,7 +76,7 @@ class Statistics {
   Statistics(const Statistics &other);
   Statistics& operator=(const Statistics &other);
   struct CounterInfo {
-    explicit CounterInfo(const std::string &desc) : desc(desc) { 
+    explicit CounterInfo(const std::string &desc) : desc(desc) {
       atomic_init32(&refcnt);
       atomic_inc32(&refcnt);
     }

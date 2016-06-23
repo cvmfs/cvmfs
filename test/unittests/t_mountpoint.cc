@@ -485,7 +485,7 @@ TEST_F(T_MountPoint, MountMulti) {
 
   UniquePtr<MountPoint> mp01(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
   EXPECT_EQ(loader::kFailOk, mp01->boot_status());
-    
+
   UniquePtr<MountPoint> mp02(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
   EXPECT_EQ(loader::kFailOk, mp02->boot_status());
 }

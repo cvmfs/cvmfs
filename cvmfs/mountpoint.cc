@@ -7,17 +7,18 @@
 #include "mountpoint.h"
 
 #include <errno.h>
+#include <fcntl.h>
 #ifndef CVMFS_LIBCVMFS
 #include <fuse/fuse_lowlevel.h>
 #endif
 #include <inttypes.h>
-#include <fcntl.h>
 #include <stdint.h>
 #include <unistd.h>
 
 #include <algorithm>
 #include <cassert>
 #include <cstring>
+#include <vector>
 
 #ifndef CVMFS_LIBCVMFS
 #ifdef FUSE_CAP_EXPORT_SUPPORT
@@ -34,8 +35,8 @@
 #include "cache.h"
 #include "catalog.h"
 #include "catalog_mgr_client.h"
-#include "duplex_sqlite3.h"
 #include "download.h"
+#include "duplex_sqlite3.h"
 #include "fetch.h"
 #include "file_chunk.h"
 #include "globals.h"
@@ -57,10 +58,10 @@
 #include "sqlitevfs.h"
 #include "statistics.h"
 #include "tracer.h"
-#include "util_concurrency.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
+#include "util_concurrency.h"
 #include "uuid.h"
 #include "wpad.h"
 
