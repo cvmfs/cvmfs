@@ -7,6 +7,7 @@
 
 #include <inttypes.h>
 #include <pthread.h>
+#include <sys/time.h>
 
 #include <cstdio>
 #include <string>

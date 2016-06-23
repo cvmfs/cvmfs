@@ -6,7 +6,6 @@
 #include "tracer.h"
 
 #include <pthread.h>
-#include <sys/time.h>
 
 #include <cassert>
 #include <cerrno>
