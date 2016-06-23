@@ -19,6 +19,7 @@
 #include "hash.h"
 #include "statistics.h"
 #include "util/single_copy.h"
+#include "util/string.h"
 
 namespace perf {
 class Recorder;

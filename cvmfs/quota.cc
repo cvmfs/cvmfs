@@ -41,7 +41,6 @@
 #include <string>
 #include <vector>
 
-#include "cvmfs.h"
 #include "duplex_sqlite3.h"
 #include "hash.h"
 #include "logging.h"
