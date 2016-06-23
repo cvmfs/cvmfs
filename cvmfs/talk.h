@@ -50,12 +50,4 @@ class TalkManager : SingleCopy {
   bool spawned_;
 };
 
-namespace talk {
-
-bool Init(const std::string &cachedir, OptionsManager *options_manager);
-void Spawn();
-void Fini();
-
-}  // namespace talk
-
 #endif  // CVMFS_TALK_H_

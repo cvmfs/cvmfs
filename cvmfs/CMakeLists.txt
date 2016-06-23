@@ -51,7 +51,6 @@ set (CVMFS_CLIENT_SOURCES
   fetch.cc fetch.h
   file_chunk.cc file_chunk.h
   fs_traversal.h
-  fuse_listing.cc fuse_listing.h
   globals.cc globals.h
   glue_buffer.cc glue_buffer.h
   hash.cc hash.h
@@ -81,6 +80,7 @@ set (CVMFS_CLIENT_SOURCES
   sqlitemem.cc sqlitemem.h
   sqlitevfs.cc sqlitevfs.h
   statistics.cc statistics.h
+  tracer.cc tracer.h
   uid_map.h
   uuid.cc uuid.h
   util/algorithm.cc util/algorithm.h
@@ -107,7 +107,6 @@ set (CVMFS2_DEBUG_SOURCES
   nfs_shared_maps.cc nfs_shared_maps.h
   quota_listener.cc quota_listener.h
   talk.cc talk.h
-  tracer.cc tracer.h
 )
 
 set (CVMFS2_SOURCES

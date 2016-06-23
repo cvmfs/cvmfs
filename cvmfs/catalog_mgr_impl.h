@@ -30,6 +30,7 @@ AbstractCatalogManager<CatalogT>::AbstractCatalogManager(
   inode_watermark_status_ = 0;
   inode_gauge_ = AbstractCatalogManager<CatalogT>::kInodeOffset;
   revision_cache_ = 0;
+  volatile_flag_ = false;
   has_authz_cache_ = false;
   inode_annotation_ = NULL;
   incarnation_ = 0;
@@ -439,14 +440,6 @@ bool AbstractCatalogManager<CatalogT>::GetVOMSAuthz(std::string *authz) const {
 }
 
 template <class CatalogT>
-bool AbstractCatalogManager<CatalogT>::GetVolatileFlag() const {
-  ReadLock();
-  const bool volatile_flag = GetRootCatalog()->volatile_flag();
-  Unlock();
-  return volatile_flag;
-}
-
-template <class CatalogT>
 uint64_t AbstractCatalogManager<CatalogT>::GetTTL() const {
   ReadLock();
   const uint64_t revision = GetRootCatalog()->GetTTL();
@@ -684,6 +677,7 @@ bool AbstractCatalogManager<CatalogT>::AttachCatalog(const string &db_path,
   if (catalogs_.empty()) {
     revision_cache_ = new_catalog->GetRevision();
     has_authz_cache_ = new_catalog->GetVOMSAuthz(&authz_cache_);
+    volatile_flag_ = new_catalog->volatile_flag();
   }
 
   catalogs_.push_back(new_catalog);

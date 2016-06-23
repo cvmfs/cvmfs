@@ -56,6 +56,7 @@
 #include "sqlitemem.h"
 #include "sqlitevfs.h"
 #include "statistics.h"
+#include "tracer.h"
 #include "util_concurrency.h"
 #include "util/pointer.h"
 #include "util/posix.h"
@@ -263,7 +264,9 @@ void FileSystem::DetermineCacheMode() {
   if (options_mgr_->GetValue("CVMFS_ALIEN_CACHE", &optarg)) {
     cache_mode_ |= kCacheAlien;
   }
-  if (options_mgr_->GetValue("CVMFS_NFS_SOURCE", &optarg)) {
+  if (options_mgr_->GetValue("CVMFS_NFS_SOURCE", &optarg) &&
+      options_mgr_->IsOn(optarg))
+  {
     cache_mode_ |= kCacheNfs;
     if (options_mgr_->GetValue("CVMFS_NFS_SHARED", &optarg)) {
       cache_mode_ |= kCacheNfsHa;
@@ -288,6 +291,7 @@ FileSystem::FileSystem(const FileSystem::FileSystemInfo &fs_info)
   , type_(fs_info.type)
   , options_mgr_(fs_info.options_mgr)
   , wait_workspace_(fs_info.wait_workspace)
+  , foreground_(fs_info.foreground)
   , n_fs_open_(NULL)
   , n_fs_dir_open_(NULL)
   , n_fs_lookup_(NULL)
@@ -463,7 +467,7 @@ bool FileSystem::SetupNfsMaps() {
 #ifdef CVMFS_NFS_SUPPORT
   string no_nfs_sentinel = cache_dir_ + "/no_nfs_maps." + name_;
 
-  if (cache_mode_ & FileSystem::kCacheNfs) {
+  if (!IsNfsSource()) {
     CreateFile(no_nfs_sentinel, 0600);
     return true;
   }
@@ -514,7 +518,8 @@ bool FileSystem::SetupQuotaMgmt() {
                   exe_path_,
                   cache_dir_,
                   quota_limit_,
-                  quota_threshold);
+                  quota_threshold,
+                  foreground_);
     if (quota_mgr == NULL) {
       boot_error_ = "Failed to initialize shared lru cache";
       boot_status_ = loader::kFailQuota;
@@ -585,6 +590,9 @@ bool FileSystem::SetupWorkspace() {
     return false;
   }
 
+  if (!LockWorkspace())
+    return false;
+
   if (type_ == kFsFuse) {
     // Try to jump to workspace / cache directory.  This tests, if it is
     // accassible and it brings speed later on.
@@ -599,12 +607,27 @@ bool FileSystem::SetupWorkspace() {
     workspace_ = ".";
   }
 
-  if (!LockWorkspace())
-    return false;
   if (!SetupCrashGuard())
     return false;
 
   return true;
+}
+
+
+/**
+ * Required by CernVM: the fuse module needs to free r/w file descriptor to the
+ * cache in order to properly unravel the file system stack on shutdown.
+ */
+void FileSystem::TearDown2ReadOnly() {
+  if ((cache_mgr_ != NULL) && (cache_mgr_->id() == cache::kPosixCacheManager)) {
+    cache::PosixCacheManager *posix_cache_mgr =
+      reinterpret_cast<cache::PosixCacheManager *>(cache_mgr_);
+    posix_cache_mgr->TearDown2ReadOnly();
+  }
+
+  unlink(path_crash_guard_.c_str());
+  LogCvmfs(kLogCache, kLogSyslog, "switch to read-only cache mode");
+  SetLogMicroSyslog("");
 }
 
 
@@ -664,7 +687,9 @@ MountPoint *MountPoint::Create(
   if (!mountpoint->CreateCatalogManager())
     return mountpoint.Release();
 
+  mountpoint->ReEvaluateAuthz();
   mountpoint->CreateTables();
+  mountpoint->CreateTracer();
   mountpoint->SetupBehavior();
 
   mountpoint->boot_status_ = loader::kFailOk;
@@ -727,6 +752,16 @@ bool MountPoint::CreateCatalogManager() {
     boot_error_ = "Failed to initialize root file catalog";
     boot_status_ = loader::kFailCatalog;
     return false;
+  }
+
+  if (options_manager->GetValue("CVMFS_AUTO_UPDATE", &optarg) &&
+      !options_manager->IsOn(optarg))
+  {
+    fixed_catalog_ = true;
+  }
+
+  if (catalog_mgr_->volatile_flag()) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "content of repository flagged as VOLATILE");
   }
 
   return true;
@@ -864,9 +899,6 @@ void MountPoint::CreateTables() {
     return;
   }
 
-  directory_handles_ = new FuseDirectoryHandles();
-  directory_handles_->set_empty_key((uint64_t)(-1));
-  directory_handles_->set_deleted_key((uint64_t)(-2));
   chunk_tables_ = new ChunkTables();
 
   string optarg;
@@ -888,6 +920,16 @@ void MountPoint::CreateTables() {
                                          statistics_);
 
   inode_tracker_ = new glue::InodeTracker();
+}
+
+
+void MountPoint::CreateTracer() {
+  string optarg;
+  OptionsManager *options_manager = file_system_->options_mgr();
+  tracer_ = new Tracer();
+  if (options_manager->GetValue("CVMFS_TRACEFILE", &optarg)) {
+    tracer_->Activate(8192, 7000, optarg);
+  }
 }
 
 
@@ -993,6 +1035,18 @@ bool MountPoint::FetchHistory(std::string *history_path) {
 }
 
 
+unsigned MountPoint::GetEffectiveTtlSec() {
+  unsigned max_ttl;
+  {
+    MutexLockGuard lock_guard(lock_max_ttl_);
+    max_ttl = max_ttl_sec_;
+  }
+  const unsigned catalog_ttl_sec = catalog_mgr_->GetTTL();
+
+  return max_ttl ? std::min(max_ttl, catalog_ttl_sec) : catalog_ttl_sec;
+}
+
+
 unsigned MountPoint::GetMaxTtlMn() {
   MutexLockGuard lock_guard(lock_max_ttl_);
   return max_ttl_sec_ / 60;
@@ -1001,6 +1055,7 @@ unsigned MountPoint::GetMaxTtlMn() {
 
 MountPoint::MountPoint(const string &fqrn, FileSystem *file_system)
   : fqrn_(fqrn)
+  , uuid_(cvmfs::Uuid::Create(""))
   , file_system_(file_system)
   , statistics_(NULL)
   , authz_fetcher_(NULL)
@@ -1014,15 +1069,17 @@ MountPoint::MountPoint(const string &fqrn, FileSystem *file_system)
   , external_fetcher_(NULL)
   , inode_annotation_(NULL)
   , catalog_mgr_(NULL)
-  , directory_handles_(NULL)
   , chunk_tables_(NULL)
   , inode_cache_(NULL)
   , path_cache_(NULL)
   , md5path_cache_(NULL)
+  , tracer_(NULL)
   , inode_tracker_(NULL)
   , max_ttl_sec_(kDefaultMaxTtlSec)
   , kcache_timeout_sec_(static_cast<double>(kDefaultKCacheTtlSec))
   , fixed_catalog_(false)
+  , hide_magic_xattrs_(false)
+  , has_membership_req_(false)
 {
   int retval = pthread_mutex_init(&lock_max_ttl_, NULL);
   assert(retval == 0);
@@ -1033,11 +1090,11 @@ MountPoint::~MountPoint() {
   pthread_mutex_destroy(&lock_max_ttl_);
 
   delete inode_tracker_;
+  delete tracer_;
   delete md5path_cache_;
   delete path_cache_;
   delete inode_cache_;
   delete chunk_tables_;
-  delete directory_handles_;
 
   delete catalog_mgr_;
   delete inode_annotation_;
@@ -1061,6 +1118,13 @@ MountPoint::~MountPoint() {
   delete authz_session_mgr_;
   delete authz_fetcher_;
   delete statistics_;
+  delete uuid_;
+}
+
+
+void MountPoint::ReEvaluateAuthz() {
+  has_membership_req_ = catalog_mgr_->GetVOMSAuthz(&membership_req_);
+  authz_attachment_->set_membership(membership_req_);
 }
 
 
@@ -1220,11 +1284,6 @@ void MountPoint::SetupHttpTuning() {
 
 
 void MountPoint::SetupInodeAnnotation() {
-  if (file_system_->type() != FileSystem::kFsFuse)
-    return;
-  if (file_system_->cache_mode() & FileSystem::kCacheNfs)
-    return;
-
   string optarg;
   OptionsManager *options_manager = file_system_->options_mgr();
 
@@ -1232,7 +1291,12 @@ void MountPoint::SetupInodeAnnotation() {
   if (options_manager->GetValue("CVMFS_INITIAL_GENERATION", &optarg)) {
     inode_annotation_->IncGeneration(String2Uint64(optarg));
   }
-  catalog_mgr_->SetInodeAnnotation(inode_annotation_);
+
+  if ((file_system_->type() == FileSystem::kFsFuse) &&
+      !file_system_->IsNfsSource())
+  {
+    catalog_mgr_->SetInodeAnnotation(inode_annotation_);
+  }
 }
 
 

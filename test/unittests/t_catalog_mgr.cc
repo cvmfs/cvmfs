@@ -135,7 +135,7 @@ TEST_F(T_CatalogManager, InitialConfiguration) {
   EXPECT_TRUE(catalog_mgr_.Init());
   EXPECT_EQ(1, catalog_mgr_.GetNumCatalogs());
   EXPECT_EQ(1u, catalog_mgr_.GetRevision());
-  EXPECT_FALSE(catalog_mgr_.GetVolatileFlag());
+  EXPECT_FALSE(catalog_mgr_.volatile_flag());
   EXPECT_EQ(0u, catalog_mgr_.GetTTL());
 }
 

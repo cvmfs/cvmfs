@@ -10,11 +10,11 @@
 #include <pthread.h>
 #include <unistd.h>
 
+#include <ctime>
 #include <string>
 
 #include "hash.h"
 #include "loader.h"
-#include "fuse_listing.h"
 #include "util/pointer.h"
 
 class AuthzAttachment;
@@ -52,6 +52,7 @@ class Statistics;
 namespace signature {
 class SignatureManager;
 }
+class Tracer;
 
 
 /**
@@ -64,6 +65,12 @@ class BootFactory {
   bool IsValid() { return boot_status_ == loader::kFailOk; }
   loader::Failures boot_status() { return boot_status_; }
   std::string boot_error() { return boot_error_; }
+
+  /**
+   * Used in the fuse module to artificially set boot errors that are specific
+   * to the fuse boot procedure.
+   */
+  void set_boot_status(loader::Failures code) { boot_status_ = code; }
 
  protected:
   loader::Failures boot_status_;
@@ -88,7 +95,8 @@ class FileSystem : SingleCopy, public BootFactory {
     FileSystemInfo()
       : type(kFsFuse)
       , options_mgr(NULL)
-      , wait_workspace(false) { }
+      , wait_workspace(false)
+      , foreground(false) { }
     /**
      * Name can is used to identify this particular instance of cvmfs in the
      * cache (directory).  Normally it is the fully qualified repository name.
@@ -121,6 +129,7 @@ class FileSystem : SingleCopy, public BootFactory {
      * up.
      */
     bool wait_workspace;
+    bool foreground;
   };
 
   /**
@@ -156,20 +165,33 @@ class FileSystem : SingleCopy, public BootFactory {
   static FileSystem *Create(const FileSystemInfo &fs_info);
   ~FileSystem();
 
+  bool IsNfsSource() { return cache_mode_ & kCacheNfs; }
   void ResetErrorCounters();
+  void TearDown2ReadOnly();
 
   std::string cache_dir() { return cache_dir_; }
   cache::CacheManager *cache_mgr() { return cache_mgr_; }
   int cache_mode() { return cache_mode_; }
   std::string exe_path() { return exe_path_; }
   bool found_previous_crash() { return found_previous_crash_; }
+  perf::Counter *n_fs_dir_open() { return n_fs_dir_open_; }
+  perf::Counter *n_fs_forget() { return n_fs_forget_; }
+  perf::Counter *n_fs_lookup() { return n_fs_lookup_; }
+  perf::Counter *n_fs_lookup_negative() { return n_fs_lookup_negative_; }
+  perf::Counter *n_fs_open() { return n_fs_open_; }
+  perf::Counter *n_fs_read() { return n_fs_read_; }
+  perf::Counter *n_fs_readlink() { return n_fs_readlink_; }
+  perf::Counter *n_fs_stat() { return n_fs_stat_; }
+  perf::Counter *n_io_error() { return n_io_error_; }
   std::string nfs_maps_dir() { return nfs_maps_dir_; }
+  perf::Counter *no_open_dirs() { return no_open_dirs_; }
+  perf::Counter *no_open_files() { return no_open_files_; }
   OptionsManager *options_mgr() { return options_mgr_; }
   int64_t quota_limit() { return quota_limit_; }
   perf::Statistics *statistics() { return statistics_; }
   Type type() { return type_; }
-  std::string workspace() { return workspace_; }
   cvmfs::Uuid *uuid_cache() { return uuid_cache_; }
+  std::string workspace() { return workspace_; }
 
  private:
   /**
@@ -206,6 +228,7 @@ class FileSystem : SingleCopy, public BootFactory {
   Type type_;
   OptionsManager *options_mgr_;
   bool wait_workspace_;
+  bool foreground_;
 
   perf::Counter *n_fs_open_;
   perf::Counter *n_fs_dir_open_;
@@ -268,11 +291,15 @@ class FileSystem : SingleCopy, public BootFactory {
    * Used internally to remember if NFS maps need to be shut down.
    */
   bool has_nfs_maps_;
- /**
-  * Used internally to remember if the Sqlite memory manager need to be shut
-  * down.
-  */
+  /**
+   * Used internally to remember if the Sqlite memory manager need to be shut
+   * down.
+   */
   bool has_custom_sqlitevfs_;
+  /**
+   * The fuse module should not daemonize.  That means the quota manager should
+   * not daemonize, too, but print debug messages to stdout.
+   */
 };
 
 
@@ -289,22 +316,56 @@ class FileSystem : SingleCopy, public BootFactory {
  */
 class MountPoint : SingleCopy, public BootFactory {
  public:
+  /**
+   * If catalog reload fails, try again in 3 minutes
+   */
+  static const unsigned kShortTermTTL = 180;
+  static const time_t kIndefiniteDeadline = time_t(-1);
+
   static MountPoint *Create(const std::string &fqrn,
                             FileSystem *file_system);
   ~MountPoint();
 
   unsigned GetMaxTtlMn();
+  unsigned GetEffectiveTtlSec();
   void SetMaxTtlMn(unsigned value_minutes);
+  void ReEvaluateAuthz();
 
+  AuthzSessionManager *authz_session_mgr() { return authz_session_mgr_; }
   BackoffThrottle *backoff_throttle() { return backoff_throttle_; }
   catalog::ClientCatalogManager *catalog_mgr() { return catalog_mgr_; }
+  ChunkTables *chunk_tables() { return chunk_tables_; }
   download::DownloadManager *download_mgr() { return download_mgr_; }
   download::DownloadManager *external_download_mgr() {
     return external_download_mgr_;
   }
+  cvmfs::Fetcher *fetcher() { return fetcher_; }
+  bool fixed_catalog() { return fixed_catalog_; }
+  std::string fqrn() { return fqrn_; }
+  cvmfs::Fetcher *external_fetcher() { return external_fetcher_; }
   FileSystem *file_system() { return file_system_; }
+  bool has_membership_req() { return has_membership_req_; }
+  bool hide_magic_xattrs() { return hide_magic_xattrs_; }
+  catalog::InodeGenerationAnnotation *inode_annotation() {
+    return inode_annotation_;
+  }
   glue::InodeTracker *inode_tracker() { return inode_tracker_; }
+  lru::InodeCache *inode_cache() { return inode_cache_; }
+  double kcache_timeout_sec() { return kcache_timeout_sec_; }
+  lru::Md5PathCache *md5path_cache() { return md5path_cache_; }
+  std::string membership_req() { return membership_req_; }
+  lru::PathCache *path_cache() { return path_cache_; }
+  std::string repository_tag() { return repository_tag_; }
   perf::Statistics *statistics() { return statistics_; }
+  signature::SignatureManager *signature_mgr() { return signature_mgr_; }
+  Tracer *tracer() { return tracer_; }
+  cvmfs::Uuid *uuid() { return uuid_; }
+
+  /**
+   * Used by hotpatch procedure
+   */
+  void set_inode_tracker(glue::InodeTracker *val) { inode_tracker_ = val; }
+  void set_chunk_tables(ChunkTables *val) { chunk_tables_ = val; }
 
  private:
   /**
@@ -354,6 +415,7 @@ class MountPoint : SingleCopy, public BootFactory {
   void CreateFetchers();
   bool CreateCatalogManager();
   void CreateTables();
+  void CreateTracer();
   void SetupBehavior();
   void SetupDnsTuning(download::DownloadManager *manager);
   void SetupHttpTuning();
@@ -365,6 +427,7 @@ class MountPoint : SingleCopy, public BootFactory {
   std::string ReplaceHosts(std::string hosts);
 
   std::string fqrn_;
+  cvmfs::Uuid *uuid_;
   /**
    * In contrast to the manager objects, the FileSystem is not owned.
    */
@@ -382,11 +445,11 @@ class MountPoint : SingleCopy, public BootFactory {
   cvmfs::Fetcher *external_fetcher_;
   catalog::InodeGenerationAnnotation *inode_annotation_;
   catalog::ClientCatalogManager *catalog_mgr_;
-  FuseDirectoryHandles *directory_handles_;
   ChunkTables *chunk_tables_;
   lru::InodeCache *inode_cache_;
   lru::PathCache *path_cache_;
   lru::Md5PathCache *md5path_cache_;
+  Tracer *tracer_;
   glue::InodeTracker *inode_tracker_;
 
   unsigned max_ttl_sec_;
@@ -395,6 +458,10 @@ class MountPoint : SingleCopy, public BootFactory {
   bool fixed_catalog_;
   bool hide_magic_xattrs_;
   std::string repository_tag_;
+
+  // TODO(jblomer): this should go in the catalog manager
+  std::string membership_req_;
+  bool has_membership_req_;
 };  // class MointPoint
 
 #endif  // CVMFS_MOUNTPOINT_H_
