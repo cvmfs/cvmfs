@@ -2648,7 +2648,6 @@ DownloadManager *DownloadManager::Clone(
   if (opt_host_chain_) {
     clone->opt_host_chain_ = new vector<string>(*opt_host_chain_);
     clone->opt_host_chain_rtt_ = new vector<int>(*opt_host_chain_rtt_);
-    clone->opt_host_chain_current_ = opt_host_chain_current_;
   }
   clone->SetProxyChain(opt_proxy_list_, opt_proxy_fallback_list_,
                        kSetProxyBoth);
