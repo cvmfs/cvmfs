@@ -781,9 +781,6 @@ bool MountPoint::CreateDownloadManagers() {
   if (options_mgr->GetValue("CVMFS_SERVER_URL", &optarg)) {
     download_mgr_->SetHostChain(ReplaceHosts(optarg));
   }
-  if (options_mgr->GetValue("CVMFS_DNS_SERVER", &optarg)) {
-    download_mgr_->SetDnsServer(optarg);
-  }
 
   SetupDnsTuning(download_mgr_);
   SetupHttpTuning();
@@ -1174,6 +1171,10 @@ void MountPoint::SetupBehavior() {
 void MountPoint::SetupDnsTuning(download::DownloadManager *manager) {
   string optarg;
   OptionsManager *options_mgr = file_system_->options_mgr();
+  
+  if (options_mgr->GetValue("CVMFS_DNS_SERVER", &optarg)) {
+    download_mgr_->SetDnsServer(optarg);
+  }
 
   unsigned dns_timeout_ms = download::DownloadManager::kDnsDefaultTimeoutMs;
   unsigned dns_retries = download::DownloadManager::kDnsDefaultRetries;
