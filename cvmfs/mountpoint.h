@@ -129,6 +129,10 @@ class FileSystem : SingleCopy, public BootFactory {
      * up.
      */
     bool wait_workspace;
+    /**
+     * The fuse module should not daemonize.  That means the quota manager 
+     * should not daemonize, too, but print debug messages to stdout.
+     */
     bool foreground;
   };
 
@@ -296,10 +300,6 @@ class FileSystem : SingleCopy, public BootFactory {
    * down.
    */
   bool has_custom_sqlitevfs_;
-  /**
-   * The fuse module should not daemonize.  That means the quota manager should
-   * not daemonize, too, but print debug messages to stdout.
-   */
 };
 
 
