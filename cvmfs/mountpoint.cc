@@ -1171,7 +1171,7 @@ void MountPoint::SetupBehavior() {
 void MountPoint::SetupDnsTuning(download::DownloadManager *manager) {
   string optarg;
   OptionsManager *options_mgr = file_system_->options_mgr();
-  
+
   if (options_mgr->GetValue("CVMFS_DNS_SERVER", &optarg)) {
     download_mgr_->SetDnsServer(optarg);
   }
