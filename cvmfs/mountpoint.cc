@@ -929,7 +929,7 @@ void MountPoint::CreateTracer() {
   OptionsManager *options_manager = file_system_->options_mgr();
   tracer_ = new Tracer();
   if (options_manager->GetValue("CVMFS_TRACEFILE", &optarg)) {
-    tracer_->Activate(8192, 7000, optarg);
+    tracer_->Activate(kTracerBufferSize, kTracerFlushThreshold, optarg);
   }
 }
 

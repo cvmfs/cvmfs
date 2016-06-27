@@ -404,6 +404,11 @@ class MountPoint : SingleCopy, public BootFactory {
   static const unsigned kDefaultRetries = 1;
   static const unsigned kDefaultBackoffInitMs = 2000;
   static const unsigned kDefaultBackoffMaxMs = 10000;
+  /**
+   * Memory buffer sizes for an activated tracer
+   */
+  static const unsigned kTracerBufferSize = 8192;
+  static const unsigned kTracerFlushThreshold = 7000;
 
   MountPoint(const std::string &fqrn, FileSystem *file_system);
 
