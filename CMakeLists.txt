@@ -525,11 +525,6 @@ install (
         )
 
 #
-# configure the packaging stuff
-#
-include (CPackLists.txt)
-
-#
 # Generate the documentation using doxygen
 #
 if (BUILD_DOCUMENTATION)
