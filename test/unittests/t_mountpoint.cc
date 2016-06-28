@@ -52,7 +52,7 @@ class T_MountPoint : public ::testing::Test {
       RemoveTree(tmp_path_);
     if (repo_path_ != "")
       RemoveTree(repo_path_);
-    EXPECT_EQ(used_fds_, GetNoUsedFds());
+    EXPECT_EQ(used_fds_, GetNoUsedFds()) << ShowOpenFiles();
   }
 
   void CreateMiniRepository() {
