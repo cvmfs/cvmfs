@@ -573,7 +573,6 @@ TEST_F(T_MountPoint, History) {
   options_mgr_.SetValue("CVMFS_REPOSITORY_DATE", "2424-01-01T00:00:00Z");
   {
     UniquePtr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
-    printf("%s\n", mp->boot_error().c_str());
     EXPECT_EQ(loader::kFailOk, mp->boot_status());
   }
 
