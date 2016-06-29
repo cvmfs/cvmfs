@@ -349,7 +349,7 @@ static int VfsRdOnlyRandomness(
   memset(zBuf, 0, nBuf);
   pid_t randomnessPid = getpid();
   int fd, got;
-  fd = open("/dev/urandom", O_RDONLY, 0);
+  fd = open("/dev/random", O_RDONLY, 0);
   if (fd < 0) {
     time_t t;
     time(&t);
