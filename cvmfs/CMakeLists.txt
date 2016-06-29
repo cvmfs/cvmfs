@@ -61,6 +61,7 @@ set (CVMFS_CLIENT_SOURCES
   history_sqlite.cc history_sqlite.h
   json_document.cc json_document.h
   loader.h
+  kvstore.h kvstore.cc
   logging.cc logging.h logging_internal.h
   lru.h
   manifest.cc manifest.h
