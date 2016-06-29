@@ -32,6 +32,10 @@ addons:
 
 before_script:
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update && brew install Caskroom/cask/osxfuse ; fi
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then sudo apt-get install --yes rng-tools || true; fi
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then sudo rm -f /dev/random; mknod -m 0666 /dev/random c 1 9; fi
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then echo HRNGDEVICE=/dev/urandom | sudo tee /etc/default/rng-tools; fi
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then sudo /etc/init.d/rng-tools restart; fi
 
 script:
   - ci/run_travis.sh
