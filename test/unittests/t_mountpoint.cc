@@ -31,6 +31,7 @@ using namespace std;  // NOLINT
 class T_MountPoint : public ::testing::Test {
  protected:
   virtual void SetUp() {
+    printf("%s", ShowOpenFiles().c_str());
     used_fds_ = GetNoUsedFds();
     fd_cwd_ = open(".", O_RDONLY);
     ASSERT_GE(fd_cwd_, 0);
