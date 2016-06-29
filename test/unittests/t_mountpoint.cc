@@ -31,9 +31,6 @@ using namespace std;  // NOLINT
 class T_MountPoint : public ::testing::Test {
  protected:
   virtual void SetUp() {
-    used_fds_ = GetNoUsedFds();
-    fd_cwd_ = open(".", O_RDONLY);
-    ASSERT_GE(fd_cwd_, 0);
     tmp_path_ = CreateTempDir("./cvmfs_ut_cache");
     options_mgr_.SetValue("CVMFS_CACHE_BASE", tmp_path_);
     options_mgr_.SetValue("CVMFS_SHARED_CACHE", "no");
@@ -42,6 +39,10 @@ class T_MountPoint : public ::testing::Test {
     fs_info_.options_mgr = &options_mgr_;
     // Silence syslog error
     options_mgr_.SetValue("CVMFS_MOUNT_DIR", "/no/such/dir");
+
+    used_fds_ = GetNoUsedFds();
+    fd_cwd_ = open(".", O_RDONLY);
+    ASSERT_GE(fd_cwd_, 0);
   }
 
   virtual void TearDown() {
