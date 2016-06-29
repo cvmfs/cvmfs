@@ -11,31 +11,16 @@
 using namespace std;  // NOLINT
 
 namespace kvstore {
+
 struct MemoryBuffer {
+  MemoryBuffer() :
+    address(NULL), size(0), refcount(0) {}
   void *address;
   uint64_t size;
   int64_t refcount;
   
 };
-} // namespace kvstore
 
-namespace lru {
-class MemoryCache : public LruCache<shash::Any, kvstore::MemoryBuffer> {
- public:
-  MemoryCache(unsigned int cache_size, perf::Statistics *statistics) :
-    LruCache<shash::Any, kvstore::MemoryBuffer>(cache_size, shash::Any(), hasher_any,
-        statistics, "memory_cache")
-  {
-  }
-
-  bool Insert(const shash::Any &hash, const kvstore::MemoryBuffer &buf);
-  bool Lookup(const shash::Any &hash, kvstore::MemoryBuffer *buf);
-  bool Forget(const shash::Any &hash);
-  void Drop();
-};
-}  // namespace lru
-
-namespace kvstore {
 class KvStore : SingleCopy {
  public:
   KvStore()
@@ -47,15 +32,17 @@ class KvStore : SingleCopy {
   virtual int64_t Read(const shash::Any &id, void *buf, uint64_t size, uint64_t offset) = 0;
   virtual bool Commit(const shash::Any &id, const kvstore::MemoryBuffer &buf) = 0;
   virtual bool Delete(const shash::Any &id) = 0;
-  uint64_t GetUsed() { return used_bytes; }
+  virtual uint64_t GetUsed() { return used_bytes; }
+  virtual bool Shrink(uint64_t size) = 0;
  protected:
   uint64_t used_bytes;
 };
 
-class MemoryKvStore : KvStore {
+class MemoryKvStore : public KvStore {
  public:
-  explicit MemoryKvStore(unsigned int max_entries, perf::Statistics *statistics)
-    : Entries(max_entries, statistics) {}
+  MemoryKvStore(unsigned int cache_entries, perf::Statistics *statistics)
+    : Entries(cache_entries, shash::Any(), lru::hasher_any,
+        statistics, "memory_cache") {}
   virtual int64_t GetSize(const shash::Any &id);
   virtual int64_t GetRefcount(const shash::Any &id);
   virtual bool Ref(const shash::Any &id);
@@ -63,9 +50,10 @@ class MemoryKvStore : KvStore {
   virtual int64_t Read(const shash::Any &id, void *buf, uint64_t size, uint64_t offset);
   virtual bool Commit(const shash::Any &id, const kvstore::MemoryBuffer &buf);
   virtual bool Delete(const shash::Any &id);
+  virtual bool Shrink(uint64_t size);
+  virtual bool GetBuffer(const shash::Any &id, MemoryBuffer *buf);
  protected:
-  virtual bool Lookup(const shash::Any &id, MemoryBuffer *mem);
-  lru::MemoryCache Entries;
+  lru::LruCache<shash::Any, MemoryBuffer> Entries;
 };
 } // namespace kvstore
 #endif // CVMFS_KVSTORE_H_

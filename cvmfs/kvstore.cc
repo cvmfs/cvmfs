@@ -5,15 +5,14 @@
 using namespace std;  // NOLINT
 
 namespace kvstore {
-bool MemoryKvStore::Lookup(const shash::Any &id, MemoryBuffer *mem) {
-  MemoryBuffer m;
-  if (!mem) mem = &m;
-  return Entries.Lookup(id, mem);
+
+bool MemoryKvStore::GetBuffer(const shash::Any &id, MemoryBuffer *buf) {
+  return Entries.Lookup(id, buf);
 }
 
 int64_t MemoryKvStore::GetSize(const shash::Any &id) {
   MemoryBuffer mem;
-  if (Lookup(id, &mem)) {
+  if (Entries.Lookup(id, &mem)) {
     return mem.size;
   } else {
     return -ENOENT;
@@ -22,7 +21,7 @@ int64_t MemoryKvStore::GetSize(const shash::Any &id) {
 
 int64_t MemoryKvStore::GetRefcount(const shash::Any &id) {
   MemoryBuffer mem;
-  if (Lookup(id, &mem)) {
+  if (Entries.Lookup(id, &mem)) {
     return mem.refcount;
   } else {
     return -ENOENT;
@@ -31,7 +30,7 @@ int64_t MemoryKvStore::GetRefcount(const shash::Any &id) {
 
 bool MemoryKvStore::Ref(const shash::Any &id) {
   MemoryBuffer mem;
-  if (Lookup(id, &mem)) {
+  if (Entries.Lookup(id, &mem)) {
     // is an overflow check necessary here?
     ++mem.refcount;
     return true;
@@ -42,7 +41,7 @@ bool MemoryKvStore::Ref(const shash::Any &id) {
 
 bool MemoryKvStore::Unref(const shash::Any &id) {
   MemoryBuffer mem;
-  if (Lookup(id, &mem) && mem.refcount > 0) {
+  if (Entries.Lookup(id, &mem) && mem.refcount > 0) {
     --mem.refcount;
     return true;
   } else {
@@ -52,7 +51,7 @@ bool MemoryKvStore::Unref(const shash::Any &id) {
 
 int64_t MemoryKvStore::Read(const shash::Any &id, void *buf, uint64_t size, uint64_t offset) {
   MemoryBuffer mem;
-  if (Lookup(id, &mem)) {
+  if (Entries.Lookup(id, &mem)) {
     uint64_t copy_size = min(mem.size - offset, size);
     memcpy(buf, static_cast<char *>(mem.address) + offset, copy_size);
     return copy_size;
@@ -63,7 +62,8 @@ int64_t MemoryKvStore::Read(const shash::Any &id, void *buf, uint64_t size, uint
 
 bool MemoryKvStore::Commit(const shash::Any &id, const kvstore::MemoryBuffer &buf) {
   bool existed = false;
-  if (Lookup(id, NULL)) {
+  MemoryBuffer mem;
+  if (Entries.Lookup(id, &mem)) {
     Delete(id);
     existed = true;
   }
@@ -74,8 +74,9 @@ bool MemoryKvStore::Commit(const shash::Any &id, const kvstore::MemoryBuffer &bu
 
 bool MemoryKvStore::Delete(const shash::Any &id) {
   MemoryBuffer buf;
-  if (Lookup(id, &buf)) {
+  if (Entries.Lookup(id, &buf)) {
     used_bytes -= buf.size;
+    free(buf.address);
     Entries.Forget(id);
     return true;
   } else {
@@ -83,32 +84,15 @@ bool MemoryKvStore::Delete(const shash::Any &id) {
   }
 }
 
+bool MemoryKvStore::Shrink(uint64_t size) {
+  shash::Any key;
+  MemoryBuffer buf;
+  while (used_bytes > size) {
+    if (!Entries.PopOldest(&key, &buf)) return false;
+    used_bytes -= buf.size;
+    free(buf.address);
+  }
+  return true;
+}
+
 } // namespace kvstore
-
-namespace lru {
-  bool MemoryCache::Insert(const shash::Any &hash, const kvstore::MemoryBuffer &buf) {
-    LogCvmfs(kLogLru, kLogDebug, "insert hash --> memory %s -> '%p'",
-             hash.ToString().c_str(), buf.address);
-    const bool result = LruCache<shash::Any, kvstore::MemoryBuffer>::Insert(hash, buf);
-    return result;
-  }
-
-  bool MemoryCache::Lookup(const shash::Any &hash, kvstore::MemoryBuffer *buf) {
-    const bool found = LruCache<shash::Any, kvstore::MemoryBuffer>::Lookup(hash, buf);
-    LogCvmfs(kLogLru, kLogDebug, "lookup hash --> memory: %s (%s)",
-             hash.ToString().c_str(), found ? "hit" : "miss");
-    return found;
-  }
-
-  bool MemoryCache::Forget(const shash::Any &hash) {
-    const bool found = LruCache<shash::Any, kvstore::MemoryBuffer>::Forget(hash);
-    LogCvmfs(kLogLru, kLogDebug, "forget hash: %s (%s)",
-             hash.ToString().c_str(), found ? "hit" : "miss");
-    return found;
-  }
-
-  void MemoryCache::Drop() {
-    LogCvmfs(kLogLru, kLogDebug, "dropping memory cache");
-    LruCache<shash::Any, kvstore::MemoryBuffer>::Drop();
-  }
-} // namespace lru
