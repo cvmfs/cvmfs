@@ -659,6 +659,33 @@ class LruCache : SingleCopy {
   }
 
   /**
+   * Removes and returns the least recently used cache entry
+   * @param key (out) address at which to write the removed key
+   * @param value (out) address at which to write the removed value
+   * @return true iff an entry was deleted
+   */
+  virtual bool PopOldest(Key *key, Value *value) {
+    this->Lock();
+    if (pause_) {
+      Unlock();
+      return false;
+    }
+    if (this->IsEmpty()) return false;
+
+    perf::Inc(counters_.n_forget);
+    Key dead_key = lru_list_.PopFront();
+    CacheEntry dead_entry;
+    assert(cache_.Lookup(dead_key, &dead_entry));
+    *key = dead_key;
+    *value = dead_entry.value;
+    cache_.Erase(dead_key);
+  --cache_gauge_;
+
+    this->Unlock();
+    return true;
+  }
+
+  /**
    * Clears all elements from the cache.
    * All memory of internal data structures will be freed but data of
    * cache entries may stay in use, we do not call delete on any user data.
