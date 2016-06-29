@@ -329,12 +329,21 @@ FileSystem::FileSystem(const FileSystem::FileSystemInfo &fs_info)
 
 
 FileSystem::~FileSystem() {
+  if (has_custom_sqlitevfs_)
+    sqlite::UnregisterVfsRdOnly();
+
   delete uuid_cache_;
 #ifdef CVMFS_NFS_SUPPORT
   if (has_nfs_maps_)
     nfs_maps::Fini();
 #endif
   delete cache_mgr_;
+
+  if (sqlite3_temp_directory) {
+    sqlite3_free(sqlite3_temp_directory);
+    sqlite3_temp_directory = NULL;
+  }
+
   if (!path_crash_guard_.empty())
     unlink(path_crash_guard_.c_str());
   if (!path_workspace_lock_.empty())
@@ -342,12 +351,6 @@ FileSystem::~FileSystem() {
   if (fd_workspace_lock_ >= 0)
     UnlockFile(fd_workspace_lock_);
 
-  if (has_custom_sqlitevfs_)
-    sqlite::UnregisterVfsRdOnly();
-  if (sqlite3_temp_directory) {
-    sqlite3_free(sqlite3_temp_directory);
-    sqlite3_temp_directory = NULL;
-  }
   sqlite3_shutdown();
   SqliteMemoryManager::CleanupInstance();
 
