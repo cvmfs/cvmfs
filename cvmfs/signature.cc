@@ -14,6 +14,7 @@
 #include "cvmfs_config.h"
 #include "signature.h"
 
+#include <openssl/evp.h>
 #include <openssl/pkcs7.h>
 #include <openssl/x509v3.h>
 
@@ -332,6 +333,8 @@ bool SignatureManager::LoadBlacklist(
   const std::string &path_blacklist,
   bool append)
 {
+  LogCvmfs(kLogSignature, kLogDebug, "reading from blacklist %s",
+           path_blacklist.c_str());
   if (!append)
     blacklisted_certificates_.clear();
 
@@ -596,20 +599,22 @@ bool SignatureManager::Verify(const unsigned char *buffer,
   EVP_MD_CTX ctx;
 
   EVP_MD_CTX_init(&ctx);
+  EVP_PKEY *pubkey = X509_get_pubkey(certificate_);
   if (EVP_VerifyInit(&ctx, EVP_sha1()) &&
       EVP_VerifyUpdate(&ctx, buffer, buffer_size) &&
 #if OPENSSL_VERSION_NUMBER < 0x00908000L
       EVP_VerifyFinal(&ctx,
                       const_cast<unsigned char *>(signature), signature_size,
-                      X509_get_pubkey(certificate_))
+                      pubkey)
 #else
-      EVP_VerifyFinal(&ctx, signature, signature_size,
-                      X509_get_pubkey(certificate_))
+      EVP_VerifyFinal(&ctx, signature, signature_size, pubkey)
 #endif
     )
   {
     result = true;
   }
+  if (pubkey != NULL)
+    EVP_PKEY_free(pubkey);
   EVP_MD_CTX_cleanup(&ctx);
 
   return result;

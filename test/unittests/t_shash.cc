@@ -352,6 +352,16 @@ TEST(T_Shash, IsNull) {
 }
 
 
+TEST(T_Shash, SetNull) {
+  shash::Any rnd;
+  EXPECT_TRUE(rnd.IsNull());
+  rnd.Randomize();
+  EXPECT_FALSE(rnd.IsNull());
+  rnd.SetNull();
+  EXPECT_TRUE(rnd.IsNull());
+}
+
+
 TEST(T_Shash, ToString) {
   Prng prng;
   prng.InitSeed(1337);

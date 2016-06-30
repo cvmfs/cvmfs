@@ -122,13 +122,13 @@ TEST_F(T_Base64, UrlSafe) {
     if ((enc_normal[i] == '/') || (enc_normal[i] == '+'))
       unsafe_char_found = true;
   }
-  EXPECT_EQ(true, unsafe_char_found);
+  EXPECT_TRUE(unsafe_char_found);
   unsafe_char_found = false;
   for (unsigned i = 0; i < enc_url.length(); ++i) {
     if ((enc_url[i] == '/') || (enc_url[i] == '+'))
       unsafe_char_found = true;
   }
-  EXPECT_EQ(false, unsafe_char_found);
+  EXPECT_FALSE(unsafe_char_found);
 
   bool retval = Debase64(enc_url, &dec);
   EXPECT_EQ(retval, true);

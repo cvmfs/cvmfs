@@ -45,6 +45,7 @@ enum Failures {
   kFailDoubleMount,
   kFailHistory,
   kFailWpad,
+  kFailLockWorkspace,
 
   kFailNumEntries
 };
@@ -75,7 +76,8 @@ inline const char *Code2Ascii(const Failures error) {
   texts[21] = "double mount";
   texts[22] = "history init failure";
   texts[23] = "proxy auto-discovery failed";
-  texts[24] = "no text";
+  texts[24] = "workspace already locked";
+  texts[25] = "no text";
   return texts[error];
 }
 

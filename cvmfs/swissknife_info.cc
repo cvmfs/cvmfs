@@ -111,7 +111,7 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
       return 1;
     }
     char *buffer = download_manifest.destination_mem.data;
-    const unsigned length = download_manifest.destination_mem.size;
+    const unsigned length = download_manifest.destination_mem.pos;
     manifest = manifest::Manifest::LoadMem(
       reinterpret_cast<const unsigned char *>(buffer), length);
     free(download_manifest.destination_mem.data);
@@ -243,7 +243,7 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
       return 1;
     }
     string info(download_metainfo.destination_mem.data,
-                download_metainfo.destination_mem.size);
+                download_metainfo.destination_mem.pos);
     LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "%s", info.c_str());
   }
 

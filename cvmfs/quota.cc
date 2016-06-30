@@ -41,7 +41,6 @@
 #include <string>
 #include <vector>
 
-#include "cvmfs.h"
 #include "duplex_sqlite3.h"
 #include "hash.h"
 #include "logging.h"
@@ -286,7 +285,8 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
   const std::string &exe_path,
   const std::string &cache_dir,
   const uint64_t limit,
-  const uint64_t cleanup_threshold)
+  const uint64_t cleanup_threshold,
+  bool foreground)
 {
   // Create lock file: only one fuse client at a time
   const int fd_lockfile = LockFile(cache_dir + "/lock_cachemgr");
@@ -365,7 +365,7 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
   command_line.push_back(StringifyInt(pipe_handshake[0]));
   command_line.push_back(StringifyInt(limit));
   command_line.push_back(StringifyInt(cleanup_threshold));
-  command_line.push_back(StringifyInt(cvmfs::foreground_));
+  command_line.push_back(StringifyInt(foreground));
   command_line.push_back(StringifyInt(GetLogSyslogLevel()));
   command_line.push_back(StringifyInt(GetLogSyslogFacility()));
   command_line.push_back(GetLogDebugFile() + ":" + GetLogMicroSyslog());

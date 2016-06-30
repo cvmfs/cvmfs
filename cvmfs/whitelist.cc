@@ -100,7 +100,7 @@ Failures Whitelist::Load(const std::string &base_url) {
   retval_dl = download_manager_->Fetch(&download_whitelist);
   if (retval_dl != download::kFailOk)
     return kFailLoad;
-  plain_size_ = download_whitelist.destination_mem.size;
+  plain_size_ = download_whitelist.destination_mem.pos;
   if (plain_size_ == 0)
     return kFailEmpty;
   plain_buf_ =
@@ -127,7 +127,7 @@ Failures Whitelist::Load(const std::string &base_url) {
     retval_dl = download_manager_->Fetch(&download_whitelist_pkcs7);
     if (retval_dl != download::kFailOk)
       return kFailLoadPkcs7;
-    pkcs7_size_ = download_whitelist_pkcs7.destination_mem.size;
+    pkcs7_size_ = download_whitelist_pkcs7.destination_mem.pos;
     if (pkcs7_size_ == 0)
       return kFailEmptyPkcs7;
     pkcs7_buf_ = reinterpret_cast<unsigned char *>

@@ -162,7 +162,7 @@ struct Digest {
   Digest() :
     algorithm(algorithm_), suffix(kSuffixNone)
   {
-    memset(digest, 0, digest_size_);
+    SetNull();
   }
 
   explicit Digest(const Algorithms a, const HexPtr hex, const char s = 0) :
@@ -375,6 +375,12 @@ struct Digest {
         return false;
     return true;
   }
+
+
+  void SetNull() {
+    memset(digest, 0, digest_size_);
+  }
+
 
   bool operator ==(const Digest<digest_size_, algorithm_> &other) const {
     if (this->algorithm != other.algorithm)

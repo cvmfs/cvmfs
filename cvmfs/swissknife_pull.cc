@@ -655,7 +655,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
       goto fini;
     }
     meta_info = string(download_metainfo.destination_mem.data,
-                       download_metainfo.destination_mem.size);
+                       download_metainfo.destination_mem.pos);
   }
 
   is_garbage_collectable = ensemble.manifest->garbage_collectable();

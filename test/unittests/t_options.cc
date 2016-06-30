@@ -156,3 +156,25 @@ TYPED_TEST(T_Options, GetEnvironmentSubset) {
   ASSERT_EQ(1U, env.size());
   EXPECT_EQ(env[0], "BASE=/root/cvmfs_testing/cache");
 }
+
+
+TYPED_TEST(T_Options, SetValue) {
+  OptionsManager &options_manager = TestFixture::options_manager_;
+  const string &config_file = TestFixture::config_file_;
+  options_manager.ParsePath(config_file, false);
+
+  string arg;
+  EXPECT_TRUE(options_manager.GetValue("CVMFS_CACHE_BASE", &arg));
+  EXPECT_EQ("/root/cvmfs_testing/cache", arg);
+  options_manager.SetValue("CVMFS_CACHE_BASE", "new");
+  EXPECT_TRUE(options_manager.GetValue("CVMFS_CACHE_BASE", &arg));
+  EXPECT_EQ("new", arg);
+
+  options_manager.SetValue("UNKNOWN_BEFORE", "information");
+  EXPECT_TRUE(options_manager.GetValue("UNKNOWN_BEFORE", &arg));
+  EXPECT_EQ("information", arg);
+
+  EXPECT_TRUE(options_manager.IsDefined("CVMFS_SERVER_URL"));
+  options_manager.UnsetValue("CVMFS_SERVER_URL");
+  EXPECT_FALSE(options_manager.IsDefined("CVMFS_SERVER_URL"));
+}

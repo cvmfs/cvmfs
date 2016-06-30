@@ -51,7 +51,6 @@
 
 #include "atomic.h"
 #include "compression.h"
-#include "cvmfs.h"
 #include "directory_entry.h"
 #include "download.h"
 #include "hash.h"
@@ -630,11 +629,6 @@ void PosixCacheManager::TearDown2ReadOnly() {
   QuotaManager *old_manager = quota_mgr_;
   quota_mgr_ = new NoopQuotaManager();
   delete old_manager;
-
-  // TODO(jblomer): Hacks, should be handled elsewhere
-  unlink(("running." + *cvmfs::repository_name_).c_str());
-  LogCvmfs(kLogCache, kLogSyslog, "switch to read-only cache mode");
-  SetLogMicroSyslog("");
 }
 
 

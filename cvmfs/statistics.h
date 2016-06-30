@@ -66,15 +66,21 @@ class Statistics {
 
   Statistics();
   ~Statistics();
+  Statistics *Fork();
   Counter *Register(const std::string &name, const std::string &desc);
   Counter *Lookup(const std::string &name);
   std::string LookupDesc(const std::string &name);
   std::string PrintList(const PrintOptions print_options);
+
  private:
   Statistics(const Statistics &other);
   Statistics& operator=(const Statistics &other);
   struct CounterInfo {
-    explicit CounterInfo(const std::string &desc) : desc(desc) { }
+    explicit CounterInfo(const std::string &desc) : desc(desc) {
+      atomic_init32(&refcnt);
+      atomic_inc32(&refcnt);
+    }
+    atomic_int32 refcnt;
     Counter counter;
     std::string desc;
   };
