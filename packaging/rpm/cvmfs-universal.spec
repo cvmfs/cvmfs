@@ -1,5 +1,8 @@
 
 %{?suse_version:%define dist .suse%suse_version}
+%if 0%{?suse_version} == 1315
+%define dist .sle12
+%endif
 %if 0%{?el6} || 0%{?el7} || 0%{?fedora}
 %define selinux_cvmfs 1
 %define selinux_variants mls strict targeted
@@ -422,6 +425,8 @@ fi
 %doc COPYING AUTHORS README ChangeLog
 
 %changelog
+* Thu Jun 30 2016 Jakob Blomer <jblomer@cern.ch> - 2.4.0
+- Fix SLES12 dist tag
 * Mon Jun 13 2016 Jakob Blomer <jblomer@cern.ch> - 2.4.0
 - Update upstream package
 * Tue May 03 2016 Jakob Blomer <jblomer@cern.ch> - 2.3.0
