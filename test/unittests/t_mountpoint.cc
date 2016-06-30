@@ -31,6 +31,7 @@ using namespace std;  // NOLINT
 class T_MountPoint : public ::testing::Test {
  protected:
   virtual void SetUp() {
+    uuid_dummy_ = cvmfs::Uuid::Create("");
     used_fds_ = GetNoUsedFds();
     fd_cwd_ = open(".", O_RDONLY);
     ASSERT_GE(fd_cwd_, 0);
@@ -45,6 +46,7 @@ class T_MountPoint : public ::testing::Test {
   }
 
   virtual void TearDown() {
+    delete uuid_dummy_;
     int retval = fchdir(fd_cwd_);
     ASSERT_EQ(0, retval);
     close(fd_cwd_);
@@ -276,6 +278,10 @@ class T_MountPoint : public ::testing::Test {
   string repo_path_;
   int fd_cwd_;
   unsigned used_fds_;
+  /**
+   * Initialize libuuid / open file descriptor on /dev/urandom
+   */
+  cvmfs::Uuid *uuid_dummy_;
 };
 
 
