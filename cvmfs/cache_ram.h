@@ -11,9 +11,11 @@
 #include <string>
 #include <vector>
 
+#include "statistics.h"
 #include "cache.h"
 #include "hash.h"
 #include "util/pointer.h"
+#include "kvstore.h"
 
 namespace cache {
 
@@ -25,8 +27,18 @@ class RamCacheManager : public CacheManager {
  public:
   virtual CacheManagerIds id() { return kRamCacheManager; }
 
-  RamCacheManager();
-  virtual ~RamCacheManager();
+  RamCacheManager(uint64_t max_size, unsigned max_entries, perf::Statistics *statistics)
+    : max_size(max_size)
+    , invalid_fd_(shash::Any())
+    , pinned_entries_(max_entries/3, statistics)
+    , regular_entries_(max_entries/3, statistics)
+    , volatile_entries_(max_entries/3, statistics) {
+    int retval = pthread_rwlock_init(&rwlock_, NULL);
+    assert(retval == 0);
+  }
+  virtual ~RamCacheManager() {
+    pthread_rwlock_destroy(&rwlock_);
+  }
   virtual bool AcquireQuotaManager(QuotaManager *quota_mgr);
 
   virtual int Open(const shash::Any &id);
@@ -50,38 +62,41 @@ class RamCacheManager : public CacheManager {
 
  private:
   struct ReadOnlyFd {
-    ReadOnlyFd() : handle(-1), size(0) { }
-    ReadOnlyFd(int64_t h, uint64_t s) : handle(h), size(s) { }
-    /**
-     * Negative handle: invalid FD
-     */
-    int64_t handle;
-    uint64_t size;
+    ReadOnlyFd() : handle(shash::Any()), pos(0) { }
+    ReadOnlyFd(const shash::Any &h, uint64_t pos) : handle(h), pos(pos) { }
+    shash::Any handle;
+    uint64_t pos;
   };
 
   struct Transaction {
     Transaction() :
-      buffer(NULL), size(0), expected_size(0), pos(0), handle(-1) { }
+      buffer(NULL), size(0), expected_size(0), pos(0), object_type(kTypeRegular) { }
     shash::Any id;
     void *buffer;
     uint64_t size;
     uint64_t expected_size;
     uint64_t pos;
-    int64_t handle;
+    ObjectType object_type;
+    std::string description;
   };
 
   inline bool IsValid(int fd) {
     if ((fd < 0) || (static_cast<unsigned>(fd) >= open_fds_.size()))
       return false;
-    return open_fds_[fd].handle >= 0;
+    return open_fds_[fd].handle != invalid_fd_;
   }
 
   int AddFd(const ReadOnlyFd &fd);
   int64_t CommitToKvStore(Transaction *transaction);
+  virtual int DoOpen(const shash::Any &id);
 
-
+  uint64_t max_size;
+  shash::Any invalid_fd_;
   std::vector<ReadOnlyFd> open_fds_;
   pthread_rwlock_t rwlock_;
+  kvstore::MemoryKvStore pinned_entries_;
+  kvstore::MemoryKvStore regular_entries_;
+  kvstore::MemoryKvStore volatile_entries_;
 };  // class RamCacheManager
 
 }  // namespace cache
