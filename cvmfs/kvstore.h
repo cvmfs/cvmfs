@@ -6,6 +6,7 @@
 #define CVMFS_KVSTORE_H_
 
 #include <unistd.h>
+#include <pthread.h>
 #include "statistics.h"
 #include "lru.h"
 #include "cache.h"
@@ -26,7 +27,14 @@ class MemoryKvStore :SingleCopy {
   MemoryKvStore(unsigned int cache_entries, perf::Statistics *statistics)
     : used_bytes(0)
     , Entries(cache_entries, shash::Any(), lru::hasher_any,
-        statistics, "memory_cache") {}
+        statistics, "memory_cache") {
+    int retval = pthread_rwlock_init(&rwlock_, NULL);
+    assert(retval == 0);
+  }
+
+  virtual ~MemoryKvStore() {
+    pthread_rwlock_destroy(&rwlock_);
+  }
 
   /**
    * Get the size in bytes of the entry at id
@@ -111,6 +119,8 @@ class MemoryKvStore :SingleCopy {
  protected:
   size_t used_bytes;
   lru::LruCache<shash::Any, MemoryBuffer> Entries;
+  pthread_rwlock_t rwlock_;
+  bool DoDelete(const shash::Any &id);
 };
 } // namespace kvstore
 #endif // CVMFS_KVSTORE_H_

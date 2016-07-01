@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <limits.h>
 #include "kvstore.h"
+#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 
@@ -13,6 +14,7 @@ bool MemoryKvStore::GetBuffer(const shash::Any &id, MemoryBuffer *buf) {
 }
 
 bool MemoryKvStore::PopBuffer(const shash::Any &id, MemoryBuffer *buf) {
+  WriteLockGuard guard(rwlock_);
   if (!Entries.Lookup(id, buf)) return false;
   used_bytes -= (*buf).size;
   Entries.Forget(id);
@@ -38,6 +40,7 @@ int64_t MemoryKvStore::GetRefcount(const shash::Any &id) {
 }
 
 bool MemoryKvStore::Ref(const shash::Any &id) {
+  WriteLockGuard guard(rwlock_);
   MemoryBuffer mem;
   if (Entries.Lookup(id, &mem)) {
     assert(mem.refcount < UINT_MAX);
@@ -50,6 +53,7 @@ bool MemoryKvStore::Ref(const shash::Any &id) {
 }
 
 bool MemoryKvStore::Unref(const shash::Any &id) {
+  WriteLockGuard guard(rwlock_);
   MemoryBuffer mem;
   if (Entries.Lookup(id, &mem) && mem.refcount > 0) {
     --mem.refcount;
@@ -62,6 +66,7 @@ bool MemoryKvStore::Unref(const shash::Any &id) {
 
 int64_t MemoryKvStore::Read(const shash::Any &id, void *buf, size_t size, off_t offset) {
   MemoryBuffer mem;
+  ReadLockGuard guard(rwlock_);
   if (Entries.Lookup(id, &mem)) {
     uint64_t copy_size = min(mem.size - offset, size);
     memcpy(buf, static_cast<char *>(mem.address) + offset, copy_size);
@@ -72,6 +77,7 @@ int64_t MemoryKvStore::Read(const shash::Any &id, void *buf, size_t size, off_t 
 }
 
 bool MemoryKvStore::Commit(const shash::Any &id, const kvstore::MemoryBuffer &buf) {
+  WriteLockGuard guard(rwlock_);
   bool existed = false;
   MemoryBuffer mem;
   if (Entries.Lookup(id, &mem)) {
@@ -84,6 +90,11 @@ bool MemoryKvStore::Commit(const shash::Any &id, const kvstore::MemoryBuffer &bu
 }
 
 bool MemoryKvStore::Delete(const shash::Any &id) {
+  WriteLockGuard guard(rwlock_);
+  return DoDelete(id);
+}
+
+bool MemoryKvStore::DoDelete(const shash::Any &id) {
   MemoryBuffer buf;
   if (Entries.Lookup(id, &buf)) {
     used_bytes -= buf.size;
@@ -96,6 +107,7 @@ bool MemoryKvStore::Delete(const shash::Any &id) {
 }
 
 bool MemoryKvStore::Shrink(size_t size) {
+  WriteLockGuard guard(rwlock_);
   shash::Any key;
   MemoryBuffer buf;
   while (used_bytes > size) {
