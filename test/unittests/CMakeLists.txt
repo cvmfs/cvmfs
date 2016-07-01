@@ -86,6 +86,7 @@ set(CVMFS_UNITTEST_FILES
   t_util.cc
   t_util_concurrency.cc
   t_uuid.cc
+  t_whitelist.cc
   t_wpad.cc
   t_xattr.cc
 )
