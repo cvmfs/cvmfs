@@ -120,7 +120,6 @@ using namespace std;  // NOLINT
 
 namespace cvmfs {
 
-const double kDefaultKCacheTimeout = 60.0;
 const unsigned kReloadSafetyMargin = 500;  // in milliseconds
 
 FileSystem *file_system_ = NULL;

@@ -28,7 +28,7 @@ namespace catalog {
 class ClientCatalogManager;
 class InodeGenerationAnnotation;
 }
-class ChunkTables;
+struct ChunkTables;
 namespace cvmfs {
 class Fetcher;
 class Uuid;
