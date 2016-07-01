@@ -174,8 +174,10 @@ class FileSystem : SingleCopy, public BootFactory {
   void TearDown2ReadOnly();
 
   std::string cache_dir() { return cache_dir_; }
+  std::string second_cache_dir() { return second_cache_dir_; }
   cache::CacheManager *cache_mgr() { return cache_mgr_; }
   int cache_mode() { return cache_mode_; }
+  int second_cache_mode() { return cache_mode_; }
   std::string exe_path() { return exe_path_; }
   bool found_previous_crash() { return found_previous_crash_; }
   perf::Counter *n_fs_dir_open() { return n_fs_dir_open_; }
@@ -274,11 +276,13 @@ class FileSystem : SingleCopy, public BootFactory {
    */
   std::string mountpoint_;
   std::string cache_dir_;
+  std::string second_cache_dir_;
   std::string nfs_maps_dir_;
   /**
    * Combination of kCache... flags
    */
   int cache_mode_;
+  int second_cache_mode_;
   /**
    * Soft limit in bytes for the cache.  The quota manager removes half the
    * cache when the limit is exceeded.

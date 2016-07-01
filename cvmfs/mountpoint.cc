@@ -33,6 +33,7 @@
 #include "authz/authz_session.h"
 #include "backoff.h"
 #include "cache.h"
+#include "tiered_cache.h"
 #include "catalog.h"
 #include "catalog_mgr_client.h"
 #include "download.h"
@@ -95,8 +96,8 @@ bool FileSystem::CheckCacheMode() {
   }
 
   if (type_ == kFsLibrary) {
-    if (cache_mode_ & (kCacheShared | kCacheNfs | kCacheManaged)) {
-      boot_error_ = "Failure: libcvmfs supports only unmanaged exclusive cache "
+    if ((cache_mode_ & (kCacheShared | kCacheNfs | kCacheManaged)) || second_cache_mode_) {
+      boot_error_ = "Failure: libcvmfs supports only a single, unmanaged exclusive cache "
                     "or alien cache.";
       boot_status_ = loader::kFailOptions;
       return false;
@@ -185,6 +186,27 @@ bool FileSystem::CreateCache() {
     return false;
   }
 
+  // If there's a second cache directory to use, we upgrade the cache mgr to a tiered cache.
+  if (second_cache_dir_.size()) {
+    cache::CacheManager *second_cache_mgr = cache::PosixCacheManager::Create(
+                                              second_cache_dir_,
+                                              second_cache_mode_ & FileSystem::kCacheAlien,
+                                              second_cache_mode_ & FileSystem::kCacheNoRename);
+    if (second_cache_mgr == NULL) {
+      boot_error_ = "Failed to setup secondary cache in " + second_cache_dir_ + ": " +
+                    strerror(errno);
+      boot_status_ = loader::kFailCacheDir;
+      return false;
+    }
+
+    cache::CacheManager *tiered_cache = cache::TieredCacheManager::Create(cache_mgr_, second_cache_mgr);
+    if (tiered_cache == NULL) {
+      boot_error_ = "Failed to setup tiered cache manager.";
+      boot_status_ = loader::kFailCacheDir;
+      return false;
+    }
+    cache_mgr_ = tiered_cache;
+  }
   return true;
 }
 
@@ -234,17 +256,29 @@ void FileSystem::DetermineCacheDirs() {
   cache_dir_ = kDefaultCacheBase;
   if (options_mgr_->GetValue("CVMFS_CACHE_BASE", &optarg))
     cache_dir_ = MakeCanonicalPath(optarg);
+  if (options_mgr_->GetValue("CVMFS_SECOND_CACHE_BASE", &optarg)) {
+    second_cache_dir_ = MakeCanonicalPath(optarg);
+  }
 
   if (cache_mode_ & kCacheShared) {
     cache_dir_ += "/shared";
   } else {
     cache_dir_ += "/" + name_;
   }
+  if (second_cache_mode_ & kCacheShared) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogStderr, "Secondary cache cannot be shared.");
+  }
+  if (second_cache_dir_.size()) {
+    second_cache_dir_ += "/" + name_;
+  }
 
   workspace_ = cache_dir_;
 
   if (options_mgr_->GetValue("CVMFS_ALIEN_CACHE", &optarg))
     cache_dir_ = optarg;
+  if (options_mgr_->GetValue("CVMFS_SECOND_ALIEN_CACHE", &optarg)) {
+    second_cache_dir_ = optarg;
+  }
 
   nfs_maps_dir_ = cache_dir_;
   if (options_mgr_->GetValue("CVMFS_NFS_SHARED", &optarg))
@@ -262,9 +296,17 @@ void FileSystem::DetermineCacheMode() {
   } else {
     cache_mode_ = kCacheExclusive;
   }
+  // For now, we don't allow the secondary cache to be shared -
+  // we keep only one quota manager.
+  second_cache_mode_ = kCacheExclusive;
+
   if (options_mgr_->GetValue("CVMFS_ALIEN_CACHE", &optarg)) {
     cache_mode_ |= kCacheAlien;
   }
+  if (options_mgr_->GetValue("CVMFS_SECOND_ALIEN_CACHE", &optarg)) {
+    second_cache_mode_ |= kCacheAlien;
+  }
+
   if (options_mgr_->GetValue("CVMFS_NFS_SOURCE", &optarg) &&
       options_mgr_->IsOn(optarg))
   {
@@ -308,6 +350,7 @@ FileSystem::FileSystem(const FileSystem::FileSystemInfo &fs_info)
   , fd_workspace_lock_(-1)
   , found_previous_crash_(false)
   , cache_mode_(0)
+  , second_cache_mode_(0)
   , quota_limit_(kDefaultQuotaLimit)
   , cache_mgr_(NULL)
   , uuid_cache_(NULL)
