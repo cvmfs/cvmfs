@@ -88,6 +88,13 @@ Vagrant.configure(2) do |config|
     ub.vm.provision "shell", path: "vagrant/provision_ubuntu.sh"
   end
 
+  config.vm.define "ubuntu1204-32" do |ub|
+    ub.vm.box = "ubuntu/precise32"
+    ub.vm.network "private_network", ip: "192.168.33.18"
+    ub.vm.synced_folder '.', '/vagrant', nfs: true
+    ub.vm.provision "shell", path: "vagrant/provision_ubuntu.sh"
+  end
+
   config.vm.define "fedora" do |fedora|
     fedora.vm.box = "fedora/23-cloud-base"
     fedora.vm.network "private_network", ip: "192.168.33.13"
