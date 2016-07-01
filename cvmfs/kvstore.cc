@@ -1,5 +1,7 @@
 #include <errno.h>
 #include <string.h>
+#include <assert.h>
+#include <limits.h>
 #include "kvstore.h"
 
 using namespace std;  // NOLINT
@@ -8,6 +10,13 @@ namespace kvstore {
 
 bool MemoryKvStore::GetBuffer(const shash::Any &id, MemoryBuffer *buf) {
   return Entries.Lookup(id, buf);
+}
+
+bool MemoryKvStore::PopBuffer(const shash::Any &id, MemoryBuffer *buf) {
+  if (!Entries.Lookup(id, buf)) return false;
+  used_bytes -= (*buf).size;
+  Entries.Forget(id);
+  return true;
 }
 
 int64_t MemoryKvStore::GetSize(const shash::Any &id) {
@@ -31,8 +40,9 @@ int64_t MemoryKvStore::GetRefcount(const shash::Any &id) {
 bool MemoryKvStore::Ref(const shash::Any &id) {
   MemoryBuffer mem;
   if (Entries.Lookup(id, &mem)) {
-    // is an overflow check necessary here?
+    assert(mem.refcount < UINT_MAX);
     ++mem.refcount;
+    Entries.Insert(id, mem);
     return true;
   } else {
     return false;
@@ -43,13 +53,14 @@ bool MemoryKvStore::Unref(const shash::Any &id) {
   MemoryBuffer mem;
   if (Entries.Lookup(id, &mem) && mem.refcount > 0) {
     --mem.refcount;
+    Entries.Insert(id, mem);
     return true;
   } else {
     return false;
   }
 }
 
-int64_t MemoryKvStore::Read(const shash::Any &id, void *buf, uint64_t size, uint64_t offset) {
+int64_t MemoryKvStore::Read(const shash::Any &id, void *buf, size_t size, off_t offset) {
   MemoryBuffer mem;
   if (Entries.Lookup(id, &mem)) {
     uint64_t copy_size = min(mem.size - offset, size);
@@ -84,7 +95,7 @@ bool MemoryKvStore::Delete(const shash::Any &id) {
   }
 }
 
-bool MemoryKvStore::Shrink(uint64_t size) {
+bool MemoryKvStore::Shrink(size_t size) {
   shash::Any key;
   MemoryBuffer buf;
   while (used_bytes > size) {
