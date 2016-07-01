@@ -96,8 +96,8 @@ bool FileSystem::CheckCacheMode() {
   }
 
   if (type_ == kFsLibrary) {
-    if ((cache_mode_ & (kCacheShared | kCacheNfs | kCacheManaged)) || second_cache_mode_) {
-      boot_error_ = "Failure: libcvmfs supports only a single, unmanaged exclusive cache "
+    if (cache_mode_ & (kCacheShared | kCacheNfs | kCacheManaged)) {
+      boot_error_ = "Failure: libcvmfs supports only unmanaged exclusive cache "
                     "or alien cache.";
       boot_status_ = loader::kFailOptions;
       return false;
