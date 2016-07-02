@@ -7,6 +7,8 @@
 #ifndef CVMFS_TIERED_CACHE_H_
 #define CVMFS_TIERED_CACHE_H_
 
+#include <string>
+
 #include "cache.h"
 
 namespace cache {
@@ -23,9 +25,7 @@ namespace cache {
  * The quota manager is only applied to the upper cache.
  */
 class TieredCacheManager : public CacheManager {
-
  public:
-
   virtual CacheManagerIds id() { return kTieredCacheManager; }
 
   static CacheManager *Create(CacheManager *upper_cache,
@@ -44,7 +44,8 @@ class TieredCacheManager : public CacheManager {
   virtual int Dup(int fd) {return upper_->Dup(fd);}
   virtual int Readahead(int fd) {return upper_->Readahead(fd);}
 
-  virtual uint16_t SizeOfTxn() { return upper_->SizeOfTxn() + lower_->SizeOfTxn(); }
+  virtual uint16_t SizeOfTxn()
+  { return upper_->SizeOfTxn() + lower_->SizeOfTxn(); }
   virtual int StartTxn(const shash::Any &id, uint64_t size, void *txn);
   virtual void CtrlTxn(const std::string &description,
                        const ObjectType type,
@@ -57,7 +58,6 @@ class TieredCacheManager : public CacheManager {
   virtual int CommitTxn(void *txn);
 
  private:
-
   // NOTE: TieredCacheManager takes ownership of both caches passed.
   TieredCacheManager(CacheManager *upper_cache,
                      CacheManager *lower_cache)

@@ -1,9 +1,15 @@
+/**
+ * This file is part of the CernVM File System.
+ */
 
 #include "tiered_cache.h"
 
-#define BUFFER_SIZE (64*1024)
+#include <string>
+#include <vector>
 
-using namespace cache;
+namespace cache {
+
+#define BUFFER_SIZE (64*1024)
 
 int
 TieredCacheManager::Open(const shash::Any &id)
@@ -12,7 +18,7 @@ TieredCacheManager::Open(const shash::Any &id)
   if (fd >= 0) {return fd;}
 
   int fd2 = lower_->Open(id);
-  if (fd2 < 0) {return fd;} // NOTE: use error code from upper.
+  if (fd2 < 0) {return fd;}  // NOTE: use error code from upper.
 
   // Lower cache hit; upper cache miss.  Copy object into the
   // upper cache.
@@ -125,3 +131,4 @@ TieredCacheManager::CommitTxn(void *txn) {
   return (upper_result < 0) ? upper_result : lower_result;
 }
 
+}  // namespace cache
