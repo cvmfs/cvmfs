@@ -33,7 +33,6 @@
 #include "authz/authz_session.h"
 #include "backoff.h"
 #include "cache.h"
-#include "tiered_cache.h"
 #include "catalog.h"
 #include "catalog_mgr_client.h"
 #include "download.h"
@@ -58,6 +57,7 @@
 #include "sqlitemem.h"
 #include "sqlitevfs.h"
 #include "statistics.h"
+#include "tiered_cache.h"
 #include "tracer.h"
 #include "util/pointer.h"
 #include "util/posix.h"
@@ -186,20 +186,23 @@ bool FileSystem::CreateCache() {
     return false;
   }
 
-  // If there's a second cache directory to use, we upgrade the cache mgr to a tiered cache.
+  // If there's a second cache directory to use, we upgrade the cache mgr to
+  // a tiered cache.
   if (second_cache_dir_.size()) {
     cache::CacheManager *second_cache_mgr = cache::PosixCacheManager::Create(
-                                              second_cache_dir_,
-                                              second_cache_mode_ & FileSystem::kCacheAlien,
-                                              second_cache_mode_ & FileSystem::kCacheNoRename);
+                               second_cache_dir_,
+                               second_cache_mode_ & FileSystem::kCacheAlien,
+                               second_cache_mode_ & FileSystem::kCacheNoRename);
     if (second_cache_mgr == NULL) {
-      boot_error_ = "Failed to setup secondary cache in " + second_cache_dir_ + ": " +
-                    strerror(errno);
+      boot_error_ = "Failed to setup secondary cache in " + second_cache_dir
+                     + ": " + strerror(errno);
       boot_status_ = loader::kFailCacheDir;
       return false;
     }
 
-    cache::CacheManager *tiered_cache = cache::TieredCacheManager::Create(cache_mgr_, second_cache_mgr);
+    cache::CacheManager *tiered_cache = cache::TieredCacheManager::Create(
+                                          cache_mgr_,
+                                          second_cache_mgr);
     if (tiered_cache == NULL) {
       boot_error_ = "Failed to setup tiered cache manager.";
       boot_status_ = loader::kFailCacheDir;
@@ -266,7 +269,8 @@ void FileSystem::DetermineCacheDirs() {
     cache_dir_ += "/" + name_;
   }
   if (second_cache_mode_ & kCacheShared) {
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogStderr, "Secondary cache cannot be shared.");
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogStderr,
+             "Secondary cache cannot be shared.");
   }
   if (second_cache_dir_.size()) {
     second_cache_dir_ += "/" + name_;
