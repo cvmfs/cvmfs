@@ -194,8 +194,8 @@ bool FileSystem::CreateCache() {
                                second_cache_mode_ & FileSystem::kCacheAlien,
                                second_cache_mode_ & FileSystem::kCacheNoRename);
     if (second_cache_mgr == NULL) {
-      boot_error_ = "Failed to setup secondary cache in " + second_cache_dir
-                     + ": " + strerror(errno);
+      boot_error_ = "Failed to setup secondary cache in " + second_cache_dir_ +
+                    ": " + strerror(errno);
       boot_status_ = loader::kFailCacheDir;
       return false;
     }
