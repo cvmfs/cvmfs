@@ -3,7 +3,7 @@ cvmfs_test_name="Read-only alien cache"
 
 cleanup() {
   if [ x"$CVMFS_TEST068_TMPDIR" != x ]; then
-    rm -rf "$CVMFS_TEST068_TMPDIR"
+    sudo rm -rf "$CVMFS_TEST068_TMPDIR"
   fi
 }
 
