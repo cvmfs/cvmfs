@@ -148,7 +148,7 @@ int RamCacheManager::StartTxn(const shash::Any &id, uint64_t size, void *txn) {
   transaction->expected_size = size;
   transaction->size = (size == kSizeUnknown) ? kPageSize : size;
   if (transaction->size) {
-    transaction->buffer = smmap(transaction->size);
+    transaction->buffer = scalloc(1, transaction->size);
   }
   return 0;
 }
@@ -203,8 +203,7 @@ int RamCacheManager::AbortTxn(void *txn) {
 int RamCacheManager::CommitTxn(void *txn) {
   WriteLockGuard guard(rwlock_);
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
-  int retval = CommitToKvStore(transaction);
-  return retval;
+  return CommitToKvStore(transaction);
 }
 
 
