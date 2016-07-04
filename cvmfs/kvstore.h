@@ -24,10 +24,10 @@ struct MemoryBuffer {
 
 class MemoryKvStore :SingleCopy {
  public:
-  MemoryKvStore(unsigned int cache_entries, perf::Statistics *statistics)
+  MemoryKvStore(unsigned int cache_entries, const string &name, perf::Statistics *statistics)
     : used_bytes(0)
     , Entries(cache_entries, shash::Any(), lru::hasher_any,
-        statistics, "memory_cache") {
+        statistics, name) {
     int retval = pthread_rwlock_init(&rwlock_, NULL);
     assert(retval == 0);
   }

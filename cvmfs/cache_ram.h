@@ -30,9 +30,9 @@ class RamCacheManager : public CacheManager {
   RamCacheManager(uint64_t max_size, unsigned max_entries, perf::Statistics *statistics)
     : max_size(max_size)
     , invalid_fd_(shash::Any())
-    , pinned_entries_(max_entries/3, statistics)
-    , regular_entries_(max_entries/3, statistics)
-    , volatile_entries_(max_entries/3, statistics) {
+    , pinned_entries_(max_entries/3, "RamCache.pinned", statistics)
+    , regular_entries_(max_entries/3, "RamCache.regular", statistics)
+    , volatile_entries_(max_entries/3, "RamCache.volatile", statistics) {
     int retval = pthread_rwlock_init(&rwlock_, NULL);
     assert(retval == 0);
   }

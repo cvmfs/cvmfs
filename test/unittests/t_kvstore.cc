@@ -19,7 +19,7 @@ static const size_t malloc_size = 16;
 
 TEST(T_MemoryKvStore, Commit) {
   perf::Statistics statistics;
-  kvstore::MemoryKvStore store(cache_size, &statistics);
+  kvstore::MemoryKvStore store(cache_size, "T_MemoryKvStore", &statistics);
 
   kvstore::MemoryBuffer buf;
   shash::Md5 m(shash::AsciiPtr("!"));
@@ -40,7 +40,7 @@ TEST(T_MemoryKvStore, Commit) {
 
 TEST(T_MemoryKvStore, PopBuffer) {
   perf::Statistics statistics;
-  kvstore::MemoryKvStore store(cache_size, &statistics);
+  kvstore::MemoryKvStore store(cache_size, "T_MemoryKvStore", &statistics);
 
   kvstore::MemoryBuffer buf;
   shash::Md5 m(shash::AsciiPtr("!"));
@@ -66,7 +66,7 @@ TEST(T_MemoryKvStore, PopBuffer) {
 
 TEST(T_MemoryKvStore, Delete) {
   perf::Statistics statistics;
-  kvstore::MemoryKvStore store(cache_size, &statistics);
+  kvstore::MemoryKvStore store(cache_size, "T_MemoryKvStore", &statistics);
 
   kvstore::MemoryBuffer buf;
   shash::Md5 m1(shash::AsciiPtr("!"));
@@ -96,7 +96,7 @@ TEST(T_MemoryKvStore, Delete) {
 
 TEST(T_MemoryKvStore, Read) {
   perf::Statistics statistics;
-  kvstore::MemoryKvStore store(cache_size, &statistics);
+  kvstore::MemoryKvStore store(cache_size, "T_MemoryKvStore", &statistics);
 
   kvstore::MemoryBuffer buf;
   shash::Md5 m(shash::AsciiPtr("!"));
@@ -135,7 +135,7 @@ TEST(T_MemoryKvStore, Read) {
 
 TEST(T_MemoryKvStore, Refcount) {
   perf::Statistics statistics;
-  kvstore::MemoryKvStore store(cache_size, &statistics);
+  kvstore::MemoryKvStore store(cache_size, "T_MemoryKvStore", &statistics);
 
   kvstore::MemoryBuffer buf;
   shash::Md5 m(shash::AsciiPtr("!"));
@@ -176,7 +176,7 @@ TEST(T_MemoryKvStore, Refcount) {
 
 TEST(T_MemoryKvStore, Shrink) {
   perf::Statistics statistics;
-  kvstore::MemoryKvStore store(cache_size, &statistics);
+  kvstore::MemoryKvStore store(cache_size, "T_MemoryKvStore", &statistics);
 
   kvstore::MemoryBuffer buf;
   shash::Md5 m(shash::AsciiPtr("!"));
