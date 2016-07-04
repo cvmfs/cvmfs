@@ -146,6 +146,7 @@ int RamCacheManager::StartTxn(const shash::Any &id, uint64_t size, void *txn) {
   transaction->id = id;
   transaction->pos = 0;
   transaction->expected_size = size;
+  //TODO realloc() on write for kSizeUnknown?
   transaction->size = (size == kSizeUnknown) ? kPageSize : size;
   if (transaction->size) {
     transaction->buffer = scalloc(1, transaction->size);

@@ -41,23 +41,111 @@ class RamCacheManager : public CacheManager {
   }
   virtual bool AcquireQuotaManager(QuotaManager *quota_mgr);
 
+  /**
+   * Open a new file descriptor into the cache. Note that opening entries effectively pins them in the cache,
+   * so it may be necessary to close unneeded file descriptors to allow eviction to make room in the cache
+   * @param id The hash key
+   * @returns The smallest free integer file descriptor, or -ENOENT if the entry
+   * is not in the cache
+   */
   virtual int Open(const shash::Any &id);
+
+  /**
+   * Look up the size in bytes of the open cache entry
+   * @param id The hash key
+   * @returns The size of the entry, or -EBADFD if fd is not valid
+   */
   virtual int64_t GetSize(int fd);
+
+  /**
+   * Close the descriptor in the cache. Entries not marked as pinned will become subject to
+   * eviction once closed
+   * @param id The hash key
+   * @returns -EBADFD if fd is not valid
+   */
   virtual int Close(int fd);
+
+  /**
+   * Read a section from the cache entry. See pread(3) for a discussion of the arguments
+   * @param id The hash key
+   * @returns The number of bytes copied, or -EBADFD if fd is not valid
+   */
   virtual int64_t Pread(int fd, void *buf, uint64_t size, uint64_t offset);
+
+  /**
+   * Duplicates the open file descriptor, allowing the original and the new one to be
+   * used independently
+   * @param id The hash key
+   * @returns A new fd, or -EBADFD if fd is not valid
+   */
   virtual int Dup(int fd);
+
+  /**
+   * No effect for in-memory caches
+   * @param id The hash key
+   * @returns -EBADFD if fd is not valid
+   */
   virtual int Readahead(int fd);
 
+  /** Get the amount of space to be allocated for a call to @ref StartTxn */
   virtual uint16_t SizeOfTxn() { return sizeof(Transaction); }
+
+  /**
+   * Start a new transaction, allocating the required memory and initializing the transaction parameters
+   * @param id The hash key
+   * @param size The total size of the new cache entry
+   * @param txn A pointer to space allocated for storing the transaction details
+   */
   virtual int StartTxn(const shash::Any &id, uint64_t size, void *txn);
+
+  /**
+   * Set the transaction parameters. At present, only @ref type is used for pinned, volatile, etc.
+   * @param description Unused
+   * @param type The type of the entry, e.g. pinned
+   * @param flags Unused
+   * @param txn A pointer to space allocated for storing the transaction details
+   */
   virtual void CtrlTxn(const std::string &description,
                        const ObjectType type,
                        const int flags,
                        void *txn);
+
+  /**
+   * Copy the given memory region into the transaction buffer. Copying starts at the transaction's current offset
+   * @param buf The source address
+   * @param size The number of bytes to copy
+   * @param txn A pointer to space allocated for storing the transaction details
+   */
   virtual int64_t Write(const void *buf, uint64_t size, void *txn);
+
+  /**
+   * Seek to the beginning of the transaction buffer
+   * @param txn A pointer to space allocated for storing the transaction details
+   */
   virtual int Reset(void *txn);
+
+  /**
+   * Commit a transaction and open the resulting cache entry. This is necessary to avoid a race condition in which the
+   * cache entry is evicted between the calls to CommitTxn and Open.
+   * @param txn A pointer to space allocated for storing the transaction details
+   * @returns A file descriptor to the new cache entry, or a negative error from @ref CommitTxn
+   */
   virtual int OpenFromTxn(void *txn);
+
+  /**
+   * Free the resources allocated for the pending transaction
+   * @param txn A pointer to space allocated for storing the transaction details
+   */
   virtual int AbortTxn(void *txn);
+
+   /**
+   * Commit a transaction to the cache. If there is not enough free space in the cache, first try to make room by evicting
+   * volatile entries. If there is still not enough room, try evicting regular entries. If there is *still* not enough
+   * space, give up an return failure. Note that evictions only occur if they will produce enough space for the transaction;
+   * if -ENOSPC is returned, the states of the transaction and cache are unchanged.
+   * @param txn A pointer to space allocated for storing the transaction details
+   * @returns -ENOSPC if the transaction would exceed the size of the cache
+   */
   virtual int CommitTxn(void *txn);
 
  private:
