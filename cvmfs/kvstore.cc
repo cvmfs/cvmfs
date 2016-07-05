@@ -63,7 +63,8 @@ bool MemoryKvStore::Ref(const shash::Any &id) {
 bool MemoryKvStore::Unref(const shash::Any &id) {
   WriteLockGuard guard(rwlock_);
   MemoryBuffer mem;
-  if (entries_.Lookup(id, &mem) && mem.refcount > 0) {
+  if (entries_.Lookup(id, &mem)) {
+    assert(mem.refcount > 0);
     --mem.refcount;
     entries_.Insert(id, mem);
     return true;
