@@ -166,7 +166,8 @@ bool FileSystem::CreateCache() {
     return false;
   }
   // Sentinel file for future use
-  CreateFile(cache_dir_ + "/.cvmfscache", 0600);
+  const bool ignore_failure = IsAlienCache();  // Might be a read-only cache
+  CreateFile(cache_dir_ + "/.cvmfscache", 0600, ignore_failure);
 
   if (cache_mode_ & FileSystem::kCacheManaged) {
     if (!SetupQuotaMgmt())
@@ -472,7 +473,8 @@ bool FileSystem::SetupNfsMaps() {
   string no_nfs_sentinel = cache_dir_ + "/no_nfs_maps." + name_;
 
   if (!IsNfsSource()) {
-    CreateFile(no_nfs_sentinel, 0600);
+    const bool ignore_failure = IsAlienCache();  // Might be a read-only cache
+    CreateFile(no_nfs_sentinel, 0600, ignore_failure);
     return true;
   }
 

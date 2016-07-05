@@ -156,12 +156,21 @@ bool IsHttpUrl(const std::string &path) {
 
 
 /**
- * Abort() on failure
+ * By default abort() on failure
  */
-void CreateFile(const std::string &path, const int mode) {
+void CreateFile(
+  const std::string &path,
+  const int mode,
+  const bool ignore_failure)
+{
   int fd = open(path.c_str(), O_CREAT, mode);
-  assert(fd >= 0);
-  close(fd);
+  if (fd >= 0) {
+    close(fd);
+    return;
+  }
+  if (ignore_failure)
+    return;
+  assert(false);
 }
 
 
