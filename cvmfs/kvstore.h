@@ -86,17 +86,17 @@ class MemoryKvStore :SingleCopy {
 
   /**
    * Insert a new memory buffer. The KvStore takes ownership of the referred memory, so
-   * callers must not free() it themselves.
+   * callers must not free() it themselves
    * @param id The hash key
    * @param buf The memory buffer to insert
-   * @returns True iff this overwrites an existing entry at id
+   * @returns True iff the commit succeeds
    */
   bool Commit(const shash::Any &id, const kvstore::MemoryBuffer &buf);
 
   /**
-   * Delete an entry, free()ing its memory
+   * Delete an entry, free()ing its memory. Note that the entry not have any references
    * @param id The hash key
-   * @returns True iff there was an entry at id
+   * @returns True iff the entry was successfully deleted
    */
   bool Delete(const shash::Any &id);
 

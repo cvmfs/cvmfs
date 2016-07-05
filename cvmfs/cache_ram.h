@@ -152,7 +152,8 @@ class RamCacheManager : public CacheManager {
    * space, give up an return failure. Note that evictions only occur if they will produce enough space for the transaction;
    * if -ENOSPC is returned, the states of the transaction and cache are unchanged.
    * @param txn A pointer to space allocated for storing the transaction details
-   * @returns -ENOSPC if the transaction would exceed the size of the cache, or -ENFILE if no handles are available
+   * @returns -ENOSPC if the transaction would exceed the size of the cache, -ENFILE if no handles are available,
+   * or -EEXIST if an entry with nonzero reference count exists
    */
   virtual int CommitTxn(void *txn);
 

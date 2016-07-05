@@ -96,15 +96,13 @@ bool MemoryKvStore::Commit(
   const kvstore::MemoryBuffer &buf
 ) {
   WriteLockGuard guard(rwlock_);
-  bool existed = false;
   MemoryBuffer mem;
   if (entries_.Lookup(id, &mem)) {
-    Delete(id);
-    existed = true;
+    if (!DoDelete(id)) return false;
   }
   entries_.Insert(id, buf);
   used_bytes_ += buf.size;
-  return existed;
+  return true;
 }
 
 bool MemoryKvStore::Delete(const shash::Any &id) {
@@ -115,13 +113,12 @@ bool MemoryKvStore::Delete(const shash::Any &id) {
 bool MemoryKvStore::DoDelete(const shash::Any &id) {
   MemoryBuffer buf;
   if (entries_.Lookup(id, &buf)) {
+    if (buf.refcount > 0) return false;
     used_bytes_ -= buf.size;
     free(buf.address);
     entries_.Forget(id);
-    return true;
-  } else {
-    return false;
   }
+  return true;
 }
 
 bool MemoryKvStore::Shrink(size_t size) {

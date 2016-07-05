@@ -32,7 +32,7 @@ TEST(T_MemoryKvStore, Commit) {
 
   EXPECT_EQ(-ENOENT, store.GetSize(a));
   EXPECT_EQ(0, (int64_t) store.GetUsed());
-  EXPECT_FALSE(store.Commit(a, buf));
+  EXPECT_TRUE(store.Commit(a, buf));
   EXPECT_EQ((int64_t) malloc_size, store.GetSize(a));
   EXPECT_TRUE(store.Commit(a, buf));
   EXPECT_EQ(malloc_size, store.GetUsed());
@@ -52,7 +52,7 @@ TEST(T_MemoryKvStore, PopBuffer) {
   buf.object_type = cache::CacheManager::kTypeRegular;
 
   EXPECT_EQ(0, (int64_t) store.GetUsed());
-  EXPECT_FALSE(store.Commit(a, buf));
+  EXPECT_TRUE(store.Commit(a, buf));
   EXPECT_EQ(malloc_size, store.GetUsed());
   memset(buf.address, 42, malloc_size);
   kvstore::MemoryBuffer out;
@@ -80,15 +80,15 @@ TEST(T_MemoryKvStore, Delete) {
   buf.object_type = cache::CacheManager::kTypeRegular;
 
   EXPECT_EQ(0, (int64_t) store.GetUsed());
-  EXPECT_FALSE(store.Commit(a1, buf));
+  EXPECT_TRUE(store.Commit(a1, buf));
   EXPECT_EQ(malloc_size, store.GetUsed());
-  EXPECT_FALSE(store.Delete(a2));
+  EXPECT_TRUE(store.Delete(a2));
   buf.address = malloc(malloc_size);
-  EXPECT_FALSE(store.Commit(a2, buf));
+  EXPECT_TRUE(store.Commit(a2, buf));
   EXPECT_EQ(2*malloc_size, store.GetUsed());
   memset(buf.address, 42, malloc_size);
   EXPECT_TRUE(store.Delete(a1));
-  EXPECT_FALSE(store.Delete(a1));
+  EXPECT_TRUE(store.Delete(a1));
   EXPECT_EQ(malloc_size, store.GetUsed());
   EXPECT_TRUE(store.Delete(a2));
   EXPECT_EQ(0, (int64_t) store.GetUsed());
@@ -113,7 +113,7 @@ TEST(T_MemoryKvStore, Read) {
   memset(out, 0, malloc_size);
 
   EXPECT_EQ(0, (int64_t) store.GetUsed());
-  EXPECT_FALSE(store.Commit(a, buf));
+  EXPECT_TRUE(store.Commit(a, buf));
   EXPECT_EQ(malloc_size, store.GetUsed());
 
   EXPECT_EQ((int64_t) malloc_size, store.Read(a, out, malloc_size, 0));
@@ -149,11 +149,9 @@ TEST(T_MemoryKvStore, Refcount) {
   EXPECT_FALSE(store.Ref(a));
   EXPECT_FALSE(store.Unref(a));
   EXPECT_EQ(0, (int64_t) store.GetUsed());
-  EXPECT_FALSE(store.Commit(a, buf));
+  EXPECT_TRUE(store.Commit(a, buf));
   EXPECT_EQ(malloc_size, store.GetUsed());
 
-  EXPECT_EQ(0, store.GetRefcount(a));
-  EXPECT_FALSE(store.Unref(a));
   EXPECT_EQ(0, store.GetRefcount(a));
   EXPECT_TRUE(store.Ref(a));
   EXPECT_EQ(1, store.GetRefcount(a));
@@ -166,8 +164,6 @@ TEST(T_MemoryKvStore, Refcount) {
   EXPECT_EQ(1, store.GetRefcount(a));
 
   EXPECT_TRUE(store.Unref(a));
-  EXPECT_EQ(0, store.GetRefcount(a));
-  EXPECT_FALSE(store.Unref(a));
   EXPECT_EQ(0, store.GetRefcount(a));
 
   EXPECT_TRUE(store.Delete(a));
@@ -188,7 +184,7 @@ TEST(T_MemoryKvStore, Shrink) {
   buf.object_type = cache::CacheManager::kTypeRegular;
 
   EXPECT_EQ(0, (int64_t) store.GetUsed());
-  EXPECT_FALSE(store.Commit(a, buf));
+  EXPECT_TRUE(store.Commit(a, buf));
   EXPECT_EQ(malloc_size, store.GetUsed());
   for (int i = 0; i < 99; i++) {
     (*(reinterpret_cast<uint32_t *>(a.digest + 1)))++;

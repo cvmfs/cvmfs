@@ -89,11 +89,11 @@ int RamCacheManager::Close(int fd) {
     switch (buf.object_type) {
     case cache::CacheManager::kTypeRegular:
       assert(pinned_entries_.PopBuffer(file_descriptor.handle, &buf));
-      assert(!regular_entries_.Commit(file_descriptor.handle, buf));
+      assert(regular_entries_.Commit(file_descriptor.handle, buf));
       break;
     case cache::CacheManager::kTypeVolatile:
       assert(pinned_entries_.PopBuffer(file_descriptor.handle, &buf));
-      assert(!volatile_entries_.Commit(file_descriptor.handle, buf));
+      assert(volatile_entries_.Commit(file_descriptor.handle, buf));
       break;
     case cache::CacheManager::kTypePinned:
     case cache::CacheManager::kTypeCatalog:
@@ -243,14 +243,14 @@ int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
 
   switch (buf.object_type) {
   case cache::CacheManager::kTypeRegular:
-    regular_entries_.Commit(transaction->id, buf);
+    if (!regular_entries_.Commit(transaction->id, buf)) return -EEXIST;
     break;
   case cache::CacheManager::kTypeVolatile:
-    volatile_entries_.Commit(transaction->id, buf);
+    if (!volatile_entries_.Commit(transaction->id, buf)) return -EEXIST;
     break;
   case cache::CacheManager::kTypePinned:
   case cache::CacheManager::kTypeCatalog:
-    pinned_entries_.Commit(transaction->id, buf);
+    if (!pinned_entries_.Commit(transaction->id, buf)) return -EEXIST;
     break;
   }
   return 0;
