@@ -19,6 +19,10 @@
 
 namespace cache {
 
+// The null hash (hashed output is all null bytes) serves as a marker for
+// an invalid handle
+static const shash::Any kInvalidHandle;
+
 /**
  * ...
  * TODO(jblomer): save open file table for hotpatch
@@ -32,7 +36,6 @@ class RamCacheManager : public CacheManager {
     unsigned max_entries,
     perf::Statistics *statistics)
     : max_size_(max_size)
-    , invalid_fd_(shash::Any())
     , pinned_entries_(max_entries/3, "RamCache.pinned", statistics)
     , regular_entries_(max_entries/3, "RamCache.regular", statistics)
     , volatile_entries_(max_entries/3, "RamCache.volatile", statistics) {
@@ -178,7 +181,7 @@ class RamCacheManager : public CacheManager {
   inline bool IsValid(int fd) {
     if ((fd < 0) || (static_cast<unsigned>(fd) >= open_fds_.size()))
       return false;
-    return open_fds_[fd].handle != invalid_fd_;
+    return open_fds_[fd].handle != kInvalidHandle;
   }
 
   int AddFd(const ReadOnlyFd &fd);
@@ -186,7 +189,6 @@ class RamCacheManager : public CacheManager {
   virtual int DoOpen(const shash::Any &id);
 
   uint64_t max_size_;
-  shash::Any invalid_fd_;
   std::vector<ReadOnlyFd> open_fds_;
   pthread_rwlock_t rwlock_;
   kvstore::MemoryKvStore pinned_entries_;

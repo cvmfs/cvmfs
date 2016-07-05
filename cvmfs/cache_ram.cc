@@ -24,7 +24,7 @@ namespace cache {
 int RamCacheManager::AddFd(const ReadOnlyFd &fd) {
   unsigned i = 0;
   for ( ; i < open_fds_.size(); ++i) {
-    if (open_fds_[i].handle == invalid_fd_) {
+    if (open_fds_[i].handle == kInvalidHandle) {
       open_fds_[i] = fd;
       return i;
     }
@@ -95,13 +95,13 @@ int RamCacheManager::Close(int fd) {
       // just leave it in the pinned cache
       break;
     }
-    open_fds_[fd].handle = invalid_fd_;
+    open_fds_[fd].handle = kInvalidHandle;
     sweep_tail = (static_cast<unsigned>(fd) == (open_fds_.size() - 1));
   }
 
   if (sweep_tail) {
     unsigned last_good_idx = open_fds_.size() - 1;
-    while (open_fds_[last_good_idx].handle != invalid_fd_)
+    while (open_fds_[last_good_idx].handle != kInvalidHandle)
       last_good_idx--;
     open_fds_.resize(last_good_idx + 1);
   }
