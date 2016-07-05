@@ -4,11 +4,10 @@
 #include "cvmfs_config.h"
 #include "cache_ram.h"
 
-#include <assert.h>
 #include <errno.h>
-#include <string.h>
-
 #include <algorithm>
+#include <cassert>
+#include <cstring>
 #include <new>
 
 #include "kvstore.h"
