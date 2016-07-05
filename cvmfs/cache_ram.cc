@@ -165,7 +165,6 @@ int RamCacheManager::StartTxn(const shash::Any &id, uint64_t size, void *txn) {
   transaction->id = id;
   transaction->pos = 0;
   transaction->expected_size = size;
-  // TODO(trshaffer) realloc() on write for kSizeUnknown?
   transaction->size = (size == kSizeUnknown) ? kPageSize : size;
   if (transaction->size) {
     transaction->buffer = scalloc(1, transaction->size);
@@ -188,6 +187,18 @@ void RamCacheManager::CtrlTxn(
 
 int64_t RamCacheManager::Write(const void *buf, uint64_t size, void *txn) {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
+
+  if (transaction->pos + size > transaction->size) {
+    if (transaction->expected_size == kSizeUnknown) {
+      transaction->size = max(2*transaction->size, size + transaction->pos);
+      transaction->buffer = realloc(transaction->buffer, transaction->size);
+      if (!transaction->buffer) return -errno;
+    } else {
+      return -ENOSPC;
+    }
+  }
+
+
   uint64_t copy_size = min(size, transaction->size - transaction->pos);
   memcpy(static_cast<char *>(transaction->buffer) + transaction->pos,
          buf, copy_size);
@@ -231,7 +242,13 @@ int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
   bool rc;
   kvstore::MemoryBuffer buf;
   buf.address = transaction->buffer;
-  buf.size = transaction->size;
+  if (transaction->expected_size == kSizeUnknown) {
+    buf.size = transaction->pos;
+    buf.address = realloc(buf.address, buf.size);
+    if (!buf.address) return -errno;
+  } else {
+    buf.size = transaction->size;
+  }
   buf.refcount = 0;
   buf.object_type = transaction->object_type;
 

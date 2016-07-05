@@ -65,7 +65,7 @@ TEST(T_RamCacheManager, TransactionWrite) {
   void *txn = alloca(ramcache.SizeOfTxn());
   EXPECT_EQ(0, ramcache.StartTxn(a, alloc_size, txn));
   EXPECT_EQ(alloc_size/2, ramcache.Write(buf, alloc_size/2, txn));
-  EXPECT_EQ(alloc_size/2, ramcache.Write(buf + alloc_size/2, alloc_size, txn));
+  EXPECT_EQ(-ENOSPC, ramcache.Write(buf + alloc_size/2, alloc_size, txn));
   EXPECT_EQ(0, ramcache.CommitTxn(txn));
 }
 
