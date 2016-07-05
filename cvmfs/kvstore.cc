@@ -1,8 +1,16 @@
-#include <errno.h>
-#include <string.h>
-#include <assert.h>
-#include <limits.h>
+/**
+ * This file is part of the CernVM File System.
+ */
+
 #include "kvstore.h"
+
+#include <assert.h>
+#include <errno.h>
+#include <limits.h>
+#include <string.h>
+
+#include <algorithm>
+
 #include "util_concurrency.h"
 
 using namespace std;  // NOLINT
@@ -64,7 +72,12 @@ bool MemoryKvStore::Unref(const shash::Any &id) {
   }
 }
 
-int64_t MemoryKvStore::Read(const shash::Any &id, void *buf, size_t size, off_t offset) {
+int64_t MemoryKvStore::Read(
+  const shash::Any &id,
+  void *buf,
+  size_t size,
+  off_t offset
+) {
   MemoryBuffer mem;
   ReadLockGuard guard(rwlock_);
   if (Entries.Lookup(id, &mem)) {
@@ -76,7 +89,10 @@ int64_t MemoryKvStore::Read(const shash::Any &id, void *buf, size_t size, off_t 
   }
 }
 
-bool MemoryKvStore::Commit(const shash::Any &id, const kvstore::MemoryBuffer &buf) {
+bool MemoryKvStore::Commit(
+  const shash::Any &id,
+  const kvstore::MemoryBuffer &buf
+) {
   WriteLockGuard guard(rwlock_);
   bool existed = false;
   MemoryBuffer mem;
@@ -118,4 +134,4 @@ bool MemoryKvStore::Shrink(size_t size) {
   return true;
 }
 
-} // namespace kvstore
+}  // namespace kvstore

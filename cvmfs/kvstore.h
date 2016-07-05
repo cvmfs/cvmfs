@@ -5,11 +5,14 @@
 #ifndef CVMFS_KVSTORE_H_
 #define CVMFS_KVSTORE_H_
 
-#include <unistd.h>
 #include <pthread.h>
-#include "statistics.h"
-#include "lru.h"
+#include <unistd.h>
+
+#include <string>
+
 #include "cache.h"
+#include "lru.h"
+#include "statistics.h"
 
 using namespace std;  // NOLINT
 
@@ -24,7 +27,10 @@ struct MemoryBuffer {
 
 class MemoryKvStore :SingleCopy {
  public:
-  MemoryKvStore(unsigned int cache_entries, const string &name, perf::Statistics *statistics)
+  MemoryKvStore(
+    unsigned int cache_entries,
+    const string &name,
+    perf::Statistics *statistics)
     : used_bytes(0)
     , Entries(cache_entries, shash::Any(), lru::hasher_any,
         statistics, name) {
@@ -72,7 +78,11 @@ class MemoryKvStore :SingleCopy {
    * @param offset The offset within the entry to start the copy
    * @returns The number of bytes copied, or -ENOENT if the entry is absent
    */
-  virtual int64_t Read(const shash::Any &id, void *buf, size_t size, off_t offset);
+  virtual int64_t Read(
+    const shash::Any &id,
+    void *buf,
+    size_t size,
+    off_t offset);
 
   /**
    * Insert a new memory buffer. The KvStore takes ownership of the referred memory, so
@@ -116,11 +126,12 @@ class MemoryKvStore :SingleCopy {
    * Get the total space used for data
    */
   virtual size_t GetUsed() { return used_bytes; }
+
  protected:
   size_t used_bytes;
   lru::LruCache<shash::Any, MemoryBuffer> Entries;
   pthread_rwlock_t rwlock_;
   bool DoDelete(const shash::Any &id);
 };
-} // namespace kvstore
-#endif // CVMFS_KVSTORE_H_
+}  // namespace kvstore
+#endif  // CVMFS_KVSTORE_H_

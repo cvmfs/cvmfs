@@ -11,11 +11,11 @@
 #include <string>
 #include <vector>
 
-#include "statistics.h"
 #include "cache.h"
 #include "hash.h"
-#include "util/pointer.h"
 #include "kvstore.h"
+#include "statistics.h"
+#include "util/pointer.h"
 
 namespace cache {
 
@@ -27,7 +27,10 @@ class RamCacheManager : public CacheManager {
  public:
   virtual CacheManagerIds id() { return kRamCacheManager; }
 
-  RamCacheManager(uint64_t max_size, unsigned max_entries, perf::Statistics *statistics)
+  RamCacheManager(
+    uint64_t max_size,
+    unsigned max_entries,
+    perf::Statistics *statistics)
     : max_size(max_size)
     , invalid_fd_(shash::Any())
     , pinned_entries_(max_entries/3, "RamCache.pinned", statistics)
@@ -157,8 +160,12 @@ class RamCacheManager : public CacheManager {
   };
 
   struct Transaction {
-    Transaction() :
-      buffer(NULL), size(0), expected_size(0), pos(0), object_type(kTypeRegular) { }
+    Transaction()
+      : buffer(NULL)
+      , size(0)
+      , expected_size(0)
+      , pos(0)
+      , object_type(kTypeRegular) { }
     shash::Any id;
     void *buffer;
     uint64_t size;

@@ -3,12 +3,12 @@
  */
 
 #include <errno.h>
-#include <string.h>
 #include <stdint.h>
+#include <string.h>
 #include <gtest/gtest.h>
 
-#include "hash.h"
 #include "cache.h"
+#include "hash.h"
 #include "kvstore.h"
 #include "statistics.h"
 
@@ -117,7 +117,7 @@ TEST(T_MemoryKvStore, Read) {
   EXPECT_EQ(malloc_size, store.GetUsed());
 
   EXPECT_EQ((int64_t) malloc_size, store.Read(a, out, malloc_size, 0));
-  EXPECT_TRUE(strncmp(out, correct, malloc_size) > 0);
+  EXPECT_GT(strncmp(out, correct, malloc_size), 0);
   memset(correct, 42, malloc_size);
   memset(out, 0, malloc_size);
 
@@ -191,7 +191,7 @@ TEST(T_MemoryKvStore, Shrink) {
   EXPECT_FALSE(store.Commit(a, buf));
   EXPECT_EQ(malloc_size, store.GetUsed());
   for (int i = 0; i < 99; i++) {
-    (*((uint32_t *) (a.digest + 1)))++;
+    (*(reinterpret_cast<uint32_t *>(a.digest + 1)))++;
     buf.address = malloc(malloc_size);
     store.Commit(a, buf);
   }

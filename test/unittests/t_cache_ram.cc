@@ -2,15 +2,15 @@
  * This file is part of the CernVM File System.
  */
 
-#include <errno.h>
-#include <string.h>
-#include <stdint.h>
 #include <alloca.h>
+#include <errno.h>
+#include <stdint.h>
+#include <string.h>
 #include <gtest/gtest.h>
 
-#include "hash.h"
 #include "cache.h"
 #include "cache_ram.h"
+#include "hash.h"
 #include "statistics.h"
 
 using namespace std;  // NOLINT
@@ -86,7 +86,7 @@ TEST(T_RamCacheManager, Read) {
 
   char out[alloc_size];
   memset(out, 0, alloc_size);
-  EXPECT_TRUE((fd = ramcache.Open(a)) >= 0);
+  EXPECT_GE((fd = ramcache.Open(a)), 0);
   EXPECT_EQ(alloc_size, ramcache.Pread(fd, out, alloc_size, 0));
   EXPECT_EQ(0, memcmp(buf, out, alloc_size));
 
@@ -107,7 +107,7 @@ TEST(T_RamCacheManager, OpenFromTxn) {
   EXPECT_EQ(0, ramcache.StartTxn(a, alloc_size, txn));
   EXPECT_EQ(alloc_size, ramcache.Write(buf, alloc_size, txn));
 
-  EXPECT_TRUE((fd = ramcache.OpenFromTxn(txn)) >= 0);
+  EXPECT_GE((fd = ramcache.OpenFromTxn(txn)), 0);
   EXPECT_EQ(alloc_size, ramcache.GetSize(fd));
 
   EXPECT_EQ(0, ramcache.Close(fd));
@@ -130,9 +130,9 @@ TEST(T_RamCacheManager, Dup) {
 
   EXPECT_EQ(-EBADFD, ramcache.Dup(fd));
 
-  EXPECT_TRUE((fd = ramcache.OpenFromTxn(txn)) >= 0);
+  EXPECT_GE((fd = ramcache.OpenFromTxn(txn)), 0);
   EXPECT_EQ(alloc_size, ramcache.GetSize(fd));
-  EXPECT_TRUE((dupfd = ramcache.Dup(fd)) >= 0);
+  EXPECT_GE((dupfd = ramcache.Dup(fd)), 0);
   EXPECT_EQ(0, ramcache.Close(fd));
   EXPECT_EQ(alloc_size, ramcache.GetSize(dupfd));
   EXPECT_EQ(0, ramcache.Close(dupfd));
@@ -214,11 +214,11 @@ TEST(T_RamCacheManager, OpenEntries) {
   EXPECT_EQ(alloc_size, ramcache.Write(buf, alloc_size, txn4));
   EXPECT_EQ(alloc_size, ramcache.Write(buf, alloc_size, txn5));
 
-  EXPECT_TRUE(ramcache.OpenFromTxn(txn1) >= 0);
-  EXPECT_TRUE(ramcache.OpenFromTxn(txn2) >= 0);
-  EXPECT_TRUE(ramcache.OpenFromTxn(txn3) >= 0);
-  EXPECT_TRUE(ramcache.OpenFromTxn(txn4) >= 0);
-  EXPECT_FALSE(ramcache.OpenFromTxn(txn5) >= 0);
+  EXPECT_GE(ramcache.OpenFromTxn(txn1), 0);
+  EXPECT_GE(ramcache.OpenFromTxn(txn2), 0);
+  EXPECT_GE(ramcache.OpenFromTxn(txn3), 0);
+  EXPECT_GE(ramcache.OpenFromTxn(txn4), 0);
+  EXPECT_LT(ramcache.OpenFromTxn(txn5), 0);
 
   EXPECT_EQ(0, ramcache.AbortTxn(txn5));
 }
@@ -264,7 +264,7 @@ TEST(T_RamCacheManager, PinnedEntry) {
   EXPECT_EQ(0, ramcache.CommitTxn(txn5));
 
   a.digest[1] = 1;
-  EXPECT_TRUE(ramcache.Open(a) >= 0);
+  EXPECT_GE(ramcache.Open(a), 0);
   a.digest[1] = 2;
   EXPECT_EQ(-ENOENT, ramcache.Open(a));
 }
@@ -310,7 +310,7 @@ TEST(T_RamCacheManager, VolatileEntry) {
   EXPECT_EQ(0, ramcache.CommitTxn(txn5));
 
   a.digest[1] = 1;
-  EXPECT_TRUE(ramcache.Open(a) >= 0);
+  EXPECT_GE(ramcache.Open(a), 0);
   a.digest[1] = 4;
   EXPECT_EQ(-ENOENT, ramcache.Open(a));
 }
@@ -340,8 +340,8 @@ TEST(T_RamCacheManager, LargeCommit) {
   EXPECT_EQ(alloc_size, ramcache.Write(buf, alloc_size, txn3));
 
   EXPECT_EQ(0, ramcache.CommitTxn(txn1));
-  EXPECT_TRUE(ramcache.OpenFromTxn(txn2) >= 0);
+  EXPECT_GE(ramcache.OpenFromTxn(txn2), 0);
   EXPECT_EQ(-ENOSPC, ramcache.CommitTxn(txn3));
   a.digest[1] = 1;
-  EXPECT_TRUE(ramcache.Open(a) >= 0);
+  EXPECT_GE(ramcache.Open(a), 0);
 }

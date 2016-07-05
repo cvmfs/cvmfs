@@ -4,10 +4,12 @@
 #include "cvmfs_config.h"
 #include "cache_ram.h"
 
-#include <errno.h>
 #include <assert.h>
-#include <new>
+#include <errno.h>
 #include <string.h>
+
+#include <algorithm>
+#include <new>
 
 #include "kvstore.h"
 #include "smalloc.h"
@@ -146,7 +148,7 @@ int RamCacheManager::StartTxn(const shash::Any &id, uint64_t size, void *txn) {
   transaction->id = id;
   transaction->pos = 0;
   transaction->expected_size = size;
-  //TODO realloc() on write for kSizeUnknown?
+  // TODO(trshaffer) realloc() on write for kSizeUnknown?
   transaction->size = (size == kSizeUnknown) ? kPageSize : size;
   if (transaction->size) {
     transaction->buffer = scalloc(1, transaction->size);
@@ -169,7 +171,7 @@ void RamCacheManager::CtrlTxn(
 
 int64_t RamCacheManager::Write(const void *buf, uint64_t size, void *txn) {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
-  uint64_t copy_size= min(size, transaction->size - transaction->pos);
+  uint64_t copy_size = min(size, transaction->size - transaction->pos);
   memcpy(static_cast<char *>(transaction->buffer) + transaction->pos,
          buf, copy_size);
   transaction->pos += copy_size;
@@ -226,7 +228,8 @@ int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
       assert(volatile_entries_.Shrink(volatile_size - (total_size - max_size)));
     } else if (pinned_size + buf.size <= max_size) {
       assert(volatile_entries_.Shrink(0));
-      assert(regular_entries_.Shrink(regular_size - (total_size - max_size) + volatile_size));
+      assert(regular_entries_.Shrink(
+        regular_size - (total_size - max_size) + volatile_size));
     } else {
       return -ENOSPC;
     }
