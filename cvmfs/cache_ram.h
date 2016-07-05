@@ -23,6 +23,8 @@ namespace cache {
 // an invalid handle
 static const shash::Any kInvalidHandle;
 
+static const unsigned kMaxHandles = 8192;
+
 /**
  * ...
  * TODO(jblomer): save open file table for hotpatch
@@ -52,7 +54,7 @@ class RamCacheManager : public CacheManager {
    * so it may be necessary to close unneeded file descriptors to allow eviction to make room in the cache
    * @param id The hash key
    * @returns The smallest free integer file descriptor, or -ENOENT if the entry
-   * is not in the cache
+   * is not in the cache, or -ENFILE if no handles are available
    */
   virtual int Open(const shash::Any &id);
 
@@ -82,7 +84,7 @@ class RamCacheManager : public CacheManager {
    * Duplicates the open file descriptor, allowing the original and the new one to be
    * used independently
    * @param id The hash key
-   * @returns A new fd, or -EBADFD if fd is not valid
+   * @returns A new fd, -EBADFD if fd is not valid, or -ENFILE if no handles are available
    */
   virtual int Dup(int fd);
 
@@ -150,7 +152,7 @@ class RamCacheManager : public CacheManager {
    * space, give up an return failure. Note that evictions only occur if they will produce enough space for the transaction;
    * if -ENOSPC is returned, the states of the transaction and cache are unchanged.
    * @param txn A pointer to space allocated for storing the transaction details
-   * @returns -ENOSPC if the transaction would exceed the size of the cache
+   * @returns -ENOSPC if the transaction would exceed the size of the cache, or -ENFILE if no handles are available
    */
   virtual int CommitTxn(void *txn);
 

@@ -28,8 +28,12 @@ int RamCacheManager::AddFd(const ReadOnlyFd &fd) {
       return i;
     }
   }
-  open_fds_.push_back(fd);
-  return i;
+  if (open_fds_.size() < kMaxHandles) {
+    open_fds_.push_back(fd);
+    return i;
+  } else {
+    return -ENFILE;
+  }
 }
 
 bool RamCacheManager::AcquireQuotaManager(QuotaManager *quota_mgr) {
@@ -44,16 +48,18 @@ int RamCacheManager::Open(const shash::Any &id) {
 
 int RamCacheManager::DoOpen(const shash::Any &id) {
   kvstore::MemoryBuffer buf;
-  ReadOnlyFd fd(id, 0);
+  int fd = AddFd(ReadOnlyFd(id, 0));
+  if (fd < 0) return fd;
 
   if (pinned_entries_.Ref(id)) {
-    return AddFd(fd);
+    return fd;
   } else if (regular_entries_.PopBuffer(id, &buf) ||
              volatile_entries_.PopBuffer(id, &buf)) {
     pinned_entries_.Commit(id, buf);
     assert(pinned_entries_.Ref(id));
-    return AddFd(fd);
+    return fd;
   } else {
+    open_fds_[fd].handle = kInvalidHandle;
     return -ENOENT;
   }
 }
