@@ -47,7 +47,7 @@ int64_t MemoryKvStore::GetRefcount(const shash::Any &id) {
   }
 }
 
-bool MemoryKvStore::Ref(const shash::Any &id) {
+bool MemoryKvStore::IncRef(const shash::Any &id) {
   WriteLockGuard guard(rwlock_);
   MemoryBuffer mem;
   if (entries_.Lookup(id, &mem)) {

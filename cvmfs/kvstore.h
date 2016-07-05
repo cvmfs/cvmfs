@@ -61,7 +61,7 @@ class MemoryKvStore :SingleCopy {
    * @param id The hash key
    * @returns True if the entry exists and was updated
    */
-  bool Ref(const shash::Any &id);
+  bool IncRef(const shash::Any &id);
 
   /**
    * Decrease the reference count on the entry at id. If the refcount is zero, no effect

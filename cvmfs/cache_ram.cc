@@ -51,12 +51,12 @@ int RamCacheManager::DoOpen(const shash::Any &id) {
   int fd = AddFd(ReadOnlyFd(id, 0));
   if (fd < 0) return fd;
 
-  if (pinned_entries_.Ref(id)) {
+  if (pinned_entries_.IncRef(id)) {
     return fd;
   } else if (regular_entries_.PopBuffer(id, &buf) ||
              volatile_entries_.PopBuffer(id, &buf)) {
     pinned_entries_.Commit(id, buf);
-    assert(pinned_entries_.Ref(id));
+    assert(pinned_entries_.IncRef(id));
     return fd;
   } else {
     open_fds_[fd].handle = kInvalidHandle;
@@ -132,7 +132,7 @@ int RamCacheManager::Dup(int fd) {
   ReadOnlyFd file_descriptor;
   if (!IsValid(fd)) return -EBADFD;
   file_descriptor = open_fds_[fd];
-  assert(pinned_entries_.Ref(file_descriptor.handle));
+  assert(pinned_entries_.IncRef(file_descriptor.handle));
   return AddFd(file_descriptor);
 }
 

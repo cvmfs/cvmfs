@@ -146,18 +146,18 @@ TEST(T_MemoryKvStore, Refcount) {
   buf.refcount = 0;
   buf.object_type = cache::CacheManager::kTypeRegular;
 
-  EXPECT_FALSE(store.Ref(a));
+  EXPECT_FALSE(store.IncRef(a));
   EXPECT_FALSE(store.Unref(a));
   EXPECT_EQ(0, (int64_t) store.GetUsed());
   EXPECT_TRUE(store.Commit(a, buf));
   EXPECT_EQ(malloc_size, store.GetUsed());
 
   EXPECT_EQ(0, store.GetRefcount(a));
-  EXPECT_TRUE(store.Ref(a));
+  EXPECT_TRUE(store.IncRef(a));
   EXPECT_EQ(1, store.GetRefcount(a));
 
-  EXPECT_TRUE(store.Ref(a));
-  EXPECT_TRUE(store.Ref(a));
+  EXPECT_TRUE(store.IncRef(a));
+  EXPECT_TRUE(store.IncRef(a));
   EXPECT_EQ(3, store.GetRefcount(a));
   EXPECT_TRUE(store.Unref(a));
   EXPECT_TRUE(store.Unref(a));
