@@ -18,20 +18,20 @@ using namespace std;  // NOLINT
 namespace kvstore {
 
 bool MemoryKvStore::GetBuffer(const shash::Any &id, MemoryBuffer *buf) {
-  return Entries.Lookup(id, buf);
+  return entries_.Lookup(id, buf);
 }
 
 bool MemoryKvStore::PopBuffer(const shash::Any &id, MemoryBuffer *buf) {
   WriteLockGuard guard(rwlock_);
-  if (!Entries.Lookup(id, buf)) return false;
-  used_bytes -= (*buf).size;
-  Entries.Forget(id);
+  if (!entries_.Lookup(id, buf)) return false;
+  used_bytes_ -= (*buf).size;
+  entries_.Forget(id);
   return true;
 }
 
 int64_t MemoryKvStore::GetSize(const shash::Any &id) {
   MemoryBuffer mem;
-  if (Entries.Lookup(id, &mem)) {
+  if (entries_.Lookup(id, &mem)) {
     return mem.size;
   } else {
     return -ENOENT;
@@ -40,7 +40,7 @@ int64_t MemoryKvStore::GetSize(const shash::Any &id) {
 
 int64_t MemoryKvStore::GetRefcount(const shash::Any &id) {
   MemoryBuffer mem;
-  if (Entries.Lookup(id, &mem)) {
+  if (entries_.Lookup(id, &mem)) {
     return mem.refcount;
   } else {
     return -ENOENT;
@@ -50,10 +50,10 @@ int64_t MemoryKvStore::GetRefcount(const shash::Any &id) {
 bool MemoryKvStore::Ref(const shash::Any &id) {
   WriteLockGuard guard(rwlock_);
   MemoryBuffer mem;
-  if (Entries.Lookup(id, &mem)) {
+  if (entries_.Lookup(id, &mem)) {
     assert(mem.refcount < UINT_MAX);
     ++mem.refcount;
-    Entries.Insert(id, mem);
+    entries_.Insert(id, mem);
     return true;
   } else {
     return false;
@@ -63,9 +63,9 @@ bool MemoryKvStore::Ref(const shash::Any &id) {
 bool MemoryKvStore::Unref(const shash::Any &id) {
   WriteLockGuard guard(rwlock_);
   MemoryBuffer mem;
-  if (Entries.Lookup(id, &mem) && mem.refcount > 0) {
+  if (entries_.Lookup(id, &mem) && mem.refcount > 0) {
     --mem.refcount;
-    Entries.Insert(id, mem);
+    entries_.Insert(id, mem);
     return true;
   } else {
     return false;
@@ -80,7 +80,7 @@ int64_t MemoryKvStore::Read(
 ) {
   MemoryBuffer mem;
   ReadLockGuard guard(rwlock_);
-  if (Entries.Lookup(id, &mem)) {
+  if (entries_.Lookup(id, &mem)) {
     uint64_t copy_size = min(mem.size - offset, size);
     memcpy(buf, static_cast<char *>(mem.address) + offset, copy_size);
     return copy_size;
@@ -96,12 +96,12 @@ bool MemoryKvStore::Commit(
   WriteLockGuard guard(rwlock_);
   bool existed = false;
   MemoryBuffer mem;
-  if (Entries.Lookup(id, &mem)) {
+  if (entries_.Lookup(id, &mem)) {
     Delete(id);
     existed = true;
   }
-  Entries.Insert(id, buf);
-  used_bytes += buf.size;
+  entries_.Insert(id, buf);
+  used_bytes_ += buf.size;
   return existed;
 }
 
@@ -112,10 +112,10 @@ bool MemoryKvStore::Delete(const shash::Any &id) {
 
 bool MemoryKvStore::DoDelete(const shash::Any &id) {
   MemoryBuffer buf;
-  if (Entries.Lookup(id, &buf)) {
-    used_bytes -= buf.size;
+  if (entries_.Lookup(id, &buf)) {
+    used_bytes_ -= buf.size;
     free(buf.address);
-    Entries.Forget(id);
+    entries_.Forget(id);
     return true;
   } else {
     return false;
@@ -126,9 +126,9 @@ bool MemoryKvStore::Shrink(size_t size) {
   WriteLockGuard guard(rwlock_);
   shash::Any key;
   MemoryBuffer buf;
-  while (used_bytes > size) {
-    if (!Entries.PopOldest(&key, &buf)) return false;
-    used_bytes -= buf.size;
+  while (used_bytes_ > size) {
+    if (!entries_.PopOldest(&key, &buf)) return false;
+    used_bytes_ -= buf.size;
     free(buf.address);
   }
   return true;
