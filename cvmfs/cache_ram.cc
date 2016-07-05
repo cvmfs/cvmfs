@@ -223,13 +223,14 @@ int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
   uint64_t regular_size = regular_entries_.GetUsed();
   uint64_t volatile_size = volatile_entries_.GetUsed();
   uint64_t total_size = pinned_size + regular_size + volatile_size + buf.size;
-  if (total_size > max_size) {
-    if (pinned_size + regular_size + buf.size <= max_size) {
-      assert(volatile_entries_.Shrink(volatile_size - (total_size - max_size)));
-    } else if (pinned_size + buf.size <= max_size) {
+  if (total_size > max_size_) {
+    if (pinned_size + regular_size + buf.size <= max_size_) {
+      assert(volatile_entries_.Shrink(
+        volatile_size - (total_size - max_size_)));
+    } else if (pinned_size + buf.size <= max_size_) {
       assert(volatile_entries_.Shrink(0));
       assert(regular_entries_.Shrink(
-        regular_size - (total_size - max_size) + volatile_size));
+        regular_size - (total_size - max_size_) + volatile_size));
     } else {
       return -ENOSPC;
     }

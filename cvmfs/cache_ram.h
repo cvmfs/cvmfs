@@ -31,7 +31,7 @@ class RamCacheManager : public CacheManager {
     uint64_t max_size,
     unsigned max_entries,
     perf::Statistics *statistics)
-    : max_size(max_size)
+    : max_size_(max_size)
     , invalid_fd_(shash::Any())
     , pinned_entries_(max_entries/3, "RamCache.pinned", statistics)
     , regular_entries_(max_entries/3, "RamCache.regular", statistics)
@@ -185,7 +185,7 @@ class RamCacheManager : public CacheManager {
   int64_t CommitToKvStore(Transaction *transaction);
   virtual int DoOpen(const shash::Any &id);
 
-  uint64_t max_size;
+  uint64_t max_size_;
   shash::Any invalid_fd_;
   std::vector<ReadOnlyFd> open_fds_;
   pthread_rwlock_t rwlock_;
