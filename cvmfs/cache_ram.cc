@@ -47,6 +47,7 @@ int RamCacheManager::Open(const shash::Any &id) {
 }
 
 int RamCacheManager::DoOpen(const shash::Any &id) {
+  bool rc;
   kvstore::MemoryBuffer buf;
   int fd = AddFd(ReadOnlyFd(id, 0));
   if (fd < 0) return fd;
@@ -55,8 +56,10 @@ int RamCacheManager::DoOpen(const shash::Any &id) {
     return fd;
   } else if (regular_entries_.PopBuffer(id, &buf) ||
              volatile_entries_.PopBuffer(id, &buf)) {
-    pinned_entries_.Commit(id, buf);
-    assert(pinned_entries_.IncRef(id));
+    rc = pinned_entries_.Commit(id, buf);
+    assert(rc);
+    rc = pinned_entries_.IncRef(id);
+    assert(rc);
     return fd;
   } else {
     open_fds_[fd].handle = kInvalidHandle;
@@ -73,6 +76,7 @@ int64_t RamCacheManager::GetSize(int fd) {
 
 
 int RamCacheManager::Close(int fd) {
+  bool rc;
   kvstore::MemoryBuffer buf;
   ReadOnlyFd file_descriptor;
   bool sweep_tail = false;
@@ -80,20 +84,26 @@ int RamCacheManager::Close(int fd) {
     ReadLockGuard guard(rwlock_);
     if (!IsValid(fd)) return -EBADFD;
     file_descriptor = open_fds_[fd];
-    assert(pinned_entries_.GetBuffer(file_descriptor.handle, &buf));
+    rc = pinned_entries_.GetBuffer(file_descriptor.handle, &buf);
+    assert(rc);
   }
 
   WriteLockGuard guard(rwlock_);
-  assert(pinned_entries_.Unref(file_descriptor.handle));
+  rc = pinned_entries_.Unref(file_descriptor.handle);
+  assert(rc);
   if (pinned_entries_.GetRefcount(file_descriptor.handle) == 0) {
     switch (buf.object_type) {
     case cache::CacheManager::kTypeRegular:
-      assert(pinned_entries_.PopBuffer(file_descriptor.handle, &buf));
-      assert(regular_entries_.Commit(file_descriptor.handle, buf));
+      rc = pinned_entries_.PopBuffer(file_descriptor.handle, &buf);
+      assert(rc);
+      rc = regular_entries_.Commit(file_descriptor.handle, buf);
+      assert(rc);
       break;
     case cache::CacheManager::kTypeVolatile:
-      assert(pinned_entries_.PopBuffer(file_descriptor.handle, &buf));
-      assert(volatile_entries_.Commit(file_descriptor.handle, buf));
+      rc = pinned_entries_.PopBuffer(file_descriptor.handle, &buf);
+      assert(rc);
+      rc = volatile_entries_.Commit(file_descriptor.handle, buf);
+      assert(rc);
       break;
     case cache::CacheManager::kTypePinned:
     case cache::CacheManager::kTypeCatalog:
@@ -128,11 +138,13 @@ int64_t RamCacheManager::Pread(
 
 
 int RamCacheManager::Dup(int fd) {
+  bool rc;
   WriteLockGuard guard(rwlock_);
   ReadOnlyFd file_descriptor;
   if (!IsValid(fd)) return -EBADFD;
   file_descriptor = open_fds_[fd];
-  assert(pinned_entries_.IncRef(file_descriptor.handle));
+  rc = pinned_entries_.IncRef(file_descriptor.handle);
+  assert(rc);
   return AddFd(file_descriptor);
 }
 
@@ -216,6 +228,7 @@ int RamCacheManager::CommitTxn(void *txn) {
 
 
 int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
+  bool rc;
   kvstore::MemoryBuffer buf;
   buf.address = transaction->buffer;
   buf.size = transaction->size;
@@ -230,12 +243,15 @@ int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
   uint64_t total_size = pinned_size + regular_size + volatile_size + buf.size;
   if (total_size > max_size_) {
     if (pinned_size + regular_size + buf.size <= max_size_) {
-      assert(volatile_entries_.Shrink(
-        volatile_size - (total_size - max_size_)));
+      rc = volatile_entries_.Shrink(
+        volatile_size - (total_size - max_size_));
+      assert(rc);
     } else if (pinned_size + buf.size <= max_size_) {
-      assert(volatile_entries_.Shrink(0));
-      assert(regular_entries_.Shrink(
-        regular_size - (total_size - max_size_) + volatile_size));
+      rc = volatile_entries_.Shrink(0);
+      assert(rc);
+      rc = regular_entries_.Shrink(
+        regular_size - (total_size - max_size_) + volatile_size);
+      assert(rc);
     } else {
       return -ENOSPC;
     }
