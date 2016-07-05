@@ -82,7 +82,7 @@ class MemoryKvStore :SingleCopy {
     const shash::Any &id,
     void *buf,
     size_t size,
-    off_t offset);
+    size_t offset);
 
   /**
    * Insert a new memory buffer. The KvStore takes ownership of the referred memory, so

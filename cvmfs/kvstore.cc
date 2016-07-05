@@ -77,11 +77,12 @@ int64_t MemoryKvStore::Read(
   const shash::Any &id,
   void *buf,
   size_t size,
-  off_t offset
+  size_t offset
 ) {
   MemoryBuffer mem;
   ReadLockGuard guard(rwlock_);
   if (entries_.Lookup(id, &mem)) {
+    if (offset > mem.size) return 0;
     uint64_t copy_size = min(mem.size - offset, size);
     memcpy(buf, static_cast<char *>(mem.address) + offset, copy_size);
     return copy_size;
