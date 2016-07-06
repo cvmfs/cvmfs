@@ -8,7 +8,6 @@ do_faulty_mount() {
   cvmfs_disable_config_repository
   cvmfs_mount $repo \
               "CVMFS_HTTP_PROXY=http://no-such-proxy.cern.ch:3128" \
-              "CVMFS_USE_GEOAPI=no" \
               "CVMFS_DNS_SERVER=127.0.0.1" \
               "CVMFS_TIMEOUT=3" \
               "CVMFS_TIMEOUT_DIRECT=3" \
@@ -63,7 +62,7 @@ cvmfs_run_test() {
     CVMFS_TIME_WARNING_FLAG=1
   fi
   if [ $milliseconds -lt $expected_min ]; then
-    echo "timeout was too short: $milliseconds (expected at leat $expected_min)"
+    echo "timeout was too short: $milliseconds (expected at least $expected_min)"
     retcode=19
   fi
 

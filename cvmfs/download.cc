@@ -2649,8 +2649,7 @@ DownloadManager *DownloadManager::Clone(
     clone->opt_host_chain_ = new vector<string>(*opt_host_chain_);
     clone->opt_host_chain_rtt_ = new vector<int>(*opt_host_chain_rtt_);
   }
-  clone->SetProxyChain(opt_proxy_list_, opt_proxy_fallback_list_,
-                       kSetProxyBoth);
+  CloneProxyConfig(clone);
   clone->opt_ip_preference_ = opt_ip_preference_;
   clone->proxy_template_direct_ = proxy_template_direct_;
   clone->proxy_template_forced_ = proxy_template_forced_;
@@ -2659,6 +2658,21 @@ DownloadManager *DownloadManager::Clone(
   clone->credentials_attachment_ = credentials_attachment_;
 
   return clone;
+}
+
+
+void DownloadManager::CloneProxyConfig(DownloadManager *clone) {
+  clone->opt_proxy_groups_current_ = opt_proxy_groups_current_;
+  clone->opt_proxy_groups_current_burned_ = opt_proxy_groups_current_burned_;
+  clone->opt_proxy_groups_fallback_ = opt_proxy_groups_fallback_;
+  clone->opt_num_proxies_ = opt_num_proxies_;
+  clone->opt_proxy_list_ = opt_proxy_list_;
+  clone->opt_proxy_fallback_list_ = opt_proxy_fallback_list_;
+  if (opt_proxy_groups_ == NULL)
+    return;
+
+  clone->opt_proxy_groups_ = new vector< vector<ProxyInfo> >(
+    *opt_proxy_groups_);
 }
 
 }  // namespace download
