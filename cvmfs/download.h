@@ -422,6 +422,7 @@ class DownloadManager {
   bool VerifyAndFinalize(const int curl_error, JobInfo *info);
   void InitHeaders();
   void FiniHeaders();
+  void CloneProxyConfig(DownloadManager *clone);
 
   Prng prng_;
   std::set<CURL *> *pool_handles_idle_;

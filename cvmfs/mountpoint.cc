@@ -1177,10 +1177,6 @@ void MountPoint::SetupDnsTuning(download::DownloadManager *manager) {
   string optarg;
   OptionsManager *options_mgr = file_system_->options_mgr();
 
-  if (options_mgr->GetValue("CVMFS_DNS_SERVER", &optarg)) {
-    download_mgr_->SetDnsServer(optarg);
-  }
-
   unsigned dns_timeout_ms = download::DownloadManager::kDnsDefaultTimeoutMs;
   unsigned dns_retries = download::DownloadManager::kDnsDefaultRetries;
   if (options_mgr->GetValue("CVMFS_DNS_TIMEOUT", &optarg))
@@ -1188,6 +1184,13 @@ void MountPoint::SetupDnsTuning(download::DownloadManager *manager) {
   if (options_mgr->GetValue("CVMFS_DNS_RETRIES", &optarg))
     dns_retries = String2Uint64(optarg);
   manager->SetDnsParameters(dns_retries, dns_timeout_ms);
+
+  // Has to be after SetDnsParameters because SetDnsParameters might construct
+  // a new resolver object
+  if (options_mgr->GetValue("CVMFS_DNS_SERVER", &optarg)) {
+    download_mgr_->SetDnsServer(optarg);
+  }
+
   if (options_mgr->GetValue("CVMFS_IPFAMILY_PREFER", &optarg)) {
     switch (String2Int64(optarg)) {
       case 4:
