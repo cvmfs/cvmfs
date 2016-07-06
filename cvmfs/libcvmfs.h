@@ -23,7 +23,8 @@
 // 20: fix reading of chunked files
 // 21: CernVM-FS 2.2.3
 // 22: CernVM-FS 2.3.0
-#define LIBCVMFS_REVISION 22
+// 23: update initialization code
+#define LIBCVMFS_REVISION 23
 
 #include <sys/stat.h>
 #include <unistd.h>
