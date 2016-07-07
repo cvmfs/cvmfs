@@ -102,6 +102,13 @@ Vagrant.configure(2) do |config|
     fedora.vm.provision "shell", path: "vagrant/provision_fedora.sh"
   end
 
+  config.vm.define "fedora24" do |fedora|
+    fedora.vm.box = "fedora/24-cloud-base"
+    fedora.vm.network "private_network", ip: "192.168.33.19"
+    fedora.vm.synced_folder '.', '/vagrant', nfs: true
+    fedora.vm.provision "shell", path: "vagrant/provision_fedora.sh"
+  end
+
   config.vm.define "centos7" do |centos7|
     centos7.vm.box = "geerlingguy/centos7"
     centos7.vm.network "private_network", ip: "192.168.33.14"
