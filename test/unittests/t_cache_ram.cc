@@ -340,8 +340,12 @@ TEST(T_RamCacheManager, LargeCommit) {
   EXPECT_EQ(alloc_size, ramcache.Write(buf, alloc_size, txn3));
 
   EXPECT_EQ(0, ramcache.CommitTxn(txn1));
-  EXPECT_GE(ramcache.OpenFromTxn(txn2), 0);
+  int fd = ramcache.OpenFromTxn(txn2);
+  EXPECT_GE(fd, 0);
   EXPECT_EQ(-ENOSPC, ramcache.CommitTxn(txn3));
   a.digest[1] = 1;
-  EXPECT_GE(ramcache.Open(a), 0);
+  EXPECT_EQ(-ENOENT, ramcache.Open(a));
+  a.digest[1] = 2;
+  EXPECT_EQ(0, ramcache.Close(fd));
+  EXPECT_EQ(0, ramcache.CommitTxn(txn3));
 }

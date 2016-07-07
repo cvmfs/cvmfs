@@ -52,13 +52,14 @@ int RamCacheManager::DoOpen(const shash::Any &id) {
   int fd = AddFd(ReadOnlyFd(id, 0));
   if (fd < 0) return fd;
 
-  if (pinned_entries_.IncRef(id)) {
-    return fd;
-  } else if (regular_entries_.PopBuffer(id, &buf) ||
-             volatile_entries_.PopBuffer(id, &buf)) {
-    rc = pinned_entries_.Commit(id, buf);
+  if (regular_entries_.GetBuffer(id, &buf)) {
+    open_fds_[fd].store = &regular_entries_;
+    rc = regular_entries_.IncRef(id);
     assert(rc);
-    rc = pinned_entries_.IncRef(id);
+    return fd;
+  } else if (volatile_entries_.GetBuffer(id, &buf)) {
+    open_fds_[fd].store = &volatile_entries_;
+    rc = volatile_entries_.IncRef(id);
     assert(rc);
     return fd;
   } else {
@@ -71,48 +72,22 @@ int RamCacheManager::DoOpen(const shash::Any &id) {
 int64_t RamCacheManager::GetSize(int fd) {
   ReadLockGuard guard(rwlock_);
   if (!IsValid(fd)) return -EBADFD;
-  return pinned_entries_.GetSize(open_fds_[fd].handle);
+  assert(open_fds_[fd].store);
+  return open_fds_[fd].store->GetSize(open_fds_[fd].handle);
 }
 
 
 int RamCacheManager::Close(int fd) {
   bool rc;
-  kvstore::MemoryBuffer buf;
-  ReadOnlyFd file_descriptor;
   bool sweep_tail = false;
-  {
-    ReadLockGuard guard(rwlock_);
-    if (!IsValid(fd)) return -EBADFD;
-    file_descriptor = open_fds_[fd];
-    rc = pinned_entries_.GetBuffer(file_descriptor.handle, &buf);
-    assert(rc);
-  }
 
   WriteLockGuard guard(rwlock_);
-  rc = pinned_entries_.Unref(file_descriptor.handle);
+  if (!IsValid(fd)) return -EBADFD;
+  assert(open_fds_[fd].store);
+  rc = open_fds_[fd].store->Unref(open_fds_[fd].handle);
   assert(rc);
-  if (pinned_entries_.GetRefcount(file_descriptor.handle) == 0) {
-    switch (buf.object_type) {
-    case cache::CacheManager::kTypeRegular:
-      rc = pinned_entries_.PopBuffer(file_descriptor.handle, &buf);
-      assert(rc);
-      rc = regular_entries_.Commit(file_descriptor.handle, buf);
-      assert(rc);
-      break;
-    case cache::CacheManager::kTypeVolatile:
-      rc = pinned_entries_.PopBuffer(file_descriptor.handle, &buf);
-      assert(rc);
-      rc = volatile_entries_.Commit(file_descriptor.handle, buf);
-      assert(rc);
-      break;
-    case cache::CacheManager::kTypePinned:
-    case cache::CacheManager::kTypeCatalog:
-      // just leave it in the pinned cache
-      break;
-    }
-    open_fds_[fd].handle = kInvalidHandle;
-    sweep_tail = (static_cast<unsigned>(fd) == (open_fds_.size() - 1));
-  }
+  open_fds_[fd].handle = kInvalidHandle;
+  sweep_tail = (static_cast<unsigned>(fd) == (open_fds_.size() - 1));
 
   if (sweep_tail) {
     unsigned last_good_idx = open_fds_.size() - 1;
@@ -133,19 +108,19 @@ int64_t RamCacheManager::Pread(
 {
   ReadLockGuard guard(rwlock_);
   if (!IsValid(fd)) return -EBADFD;
-  return pinned_entries_.Read(open_fds_[fd].handle, buf, size, offset);
+  assert(open_fds_[fd].store);
+  return open_fds_[fd].store->Read(open_fds_[fd].handle, buf, size, offset);
 }
 
 
 int RamCacheManager::Dup(int fd) {
   bool rc;
   WriteLockGuard guard(rwlock_);
-  ReadOnlyFd file_descriptor;
   if (!IsValid(fd)) return -EBADFD;
-  file_descriptor = open_fds_[fd];
-  rc = pinned_entries_.IncRef(file_descriptor.handle);
+  assert(open_fds_[fd].store);
+  rc = open_fds_[fd].store->IncRef(open_fds_[fd].handle);
   assert(rc);
-  return AddFd(file_descriptor);
+  return AddFd(open_fds_[fd]);
 }
 
 
@@ -239,9 +214,9 @@ int RamCacheManager::CommitTxn(void *txn) {
 
 
 int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
-  bool rc;
   kvstore::MemoryBuffer buf;
   buf.address = transaction->buffer;
+  kvstore::MemoryKvStore *store;
   if (transaction->expected_size == kSizeUnknown) {
     buf.size = transaction->pos;
     buf.address = realloc(buf.address, buf.size);
@@ -249,43 +224,35 @@ int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
   } else {
     buf.size = transaction->size;
   }
-  buf.refcount = 0;
   buf.object_type = transaction->object_type;
 
-  // this entire section needs to be protected by a write lock or the accounting
-  // will be all messed up
-  uint64_t pinned_size = pinned_entries_.GetUsed();
-  uint64_t regular_size = regular_entries_.GetUsed();
-  uint64_t volatile_size = volatile_entries_.GetUsed();
-  uint64_t total_size = pinned_size + regular_size + volatile_size + buf.size;
-  if (total_size > max_size_) {
-    if (pinned_size + regular_size + buf.size <= max_size_) {
-      rc = volatile_entries_.ShrinkTo(
-        volatile_size - (total_size - max_size_));
-      assert(rc);
-    } else if (pinned_size + buf.size <= max_size_) {
-      rc = volatile_entries_.ShrinkTo(0);
-      assert(rc);
-      rc = regular_entries_.ShrinkTo(
-        regular_size - (total_size - max_size_) + volatile_size);
-      assert(rc);
-    } else {
-      return -ENOSPC;
-    }
+  if (buf.object_type == cache::CacheManager::kTypeVolatile) {
+    store = &volatile_entries_;
+  } else {
+    store = &regular_entries_;
+  }
+  if (buf.object_type == cache::CacheManager::kTypePinned ||
+      buf.object_type == cache::CacheManager::kTypePinned) {
+    buf.refcount = 1;
+  } else {
+    buf.refcount = 0;
   }
 
-  switch (buf.object_type) {
-  case cache::CacheManager::kTypeRegular:
-    if (!regular_entries_.Commit(transaction->id, buf)) return -EEXIST;
-    break;
-  case cache::CacheManager::kTypeVolatile:
-    if (!volatile_entries_.Commit(transaction->id, buf)) return -EEXIST;
-    break;
-  case cache::CacheManager::kTypePinned:
-  case cache::CacheManager::kTypeCatalog:
-    if (!pinned_entries_.Commit(transaction->id, buf)) return -EEXIST;
-    break;
+  int64_t regular_size = regular_entries_.GetUsed();
+  int64_t volatile_size = volatile_entries_.GetUsed();
+  int64_t overrun = regular_size + volatile_size + buf.size - max_size_;
+
+  if (overrun > 0) {
+    volatile_entries_.ShrinkTo(max((int64_t) 0, volatile_size - overrun));
   }
+  overrun -= volatile_size - volatile_entries_.GetUsed();
+  if (overrun > 0) {
+    regular_entries_.ShrinkTo(max((int64_t) 0, regular_size - overrun));
+  }
+  overrun -= regular_size - regular_entries_.GetUsed();
+  if (overrun > 0) return -ENOSPC;
+
+  if (!store->Commit(transaction->id, buf)) return -EEXIST;
   return 0;
 }
 

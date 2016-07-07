@@ -38,7 +38,6 @@ class RamCacheManager : public CacheManager {
     unsigned max_entries,
     perf::Statistics *statistics)
     : max_size_(max_size)
-    , pinned_entries_(max_entries/3, "RamCache.pinned", statistics)
     , regular_entries_(max_entries/3, "RamCache.regular", statistics)
     , volatile_entries_(max_entries/3, "RamCache.volatile", statistics) {
     int retval = pthread_rwlock_init(&rwlock_, NULL);
@@ -149,20 +148,23 @@ class RamCacheManager : public CacheManager {
    /**
    * Commit a transaction to the cache. If there is not enough free space in the cache, first try to make room by evicting
    * volatile entries. If there is still not enough room, try evicting regular entries. If there is *still* not enough
-   * space, give up an return failure. Note that evictions only occur if they will produce enough space for the transaction;
-   * if -ENOSPC is returned, the states of the transaction and cache are unchanged.
+   * space, give up an return failure.
    * @param txn A pointer to space allocated for storing the transaction details
    * @returns -ENOSPC if the transaction would exceed the size of the cache, -ENFILE if no handles are available,
-   * or -EEXIST if an entry with nonzero reference count exists
+   * or -EEXIST if an entry with nonzero reference count already exists
    */
   virtual int CommitTxn(void *txn);
 
  private:
   struct ReadOnlyFd {
-    ReadOnlyFd() : handle(shash::Any()), pos(0) { }
-    ReadOnlyFd(const shash::Any &h, uint64_t pos) : handle(h), pos(pos) { }
+    ReadOnlyFd() : handle(shash::Any()), pos(0), store(NULL) { }
+    ReadOnlyFd(const shash::Any &h, uint64_t pos)
+      : handle(h)
+      , pos(pos)
+      , store(NULL) { }
     shash::Any handle;
     uint64_t pos;
+    kvstore::MemoryKvStore *store;
   };
 
   struct Transaction {
@@ -194,7 +196,6 @@ class RamCacheManager : public CacheManager {
   uint64_t max_size_;
   std::vector<ReadOnlyFd> open_fds_;
   pthread_rwlock_t rwlock_;
-  kvstore::MemoryKvStore pinned_entries_;
   kvstore::MemoryKvStore regular_entries_;
   kvstore::MemoryKvStore volatile_entries_;
 };  // class RamCacheManager
