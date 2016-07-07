@@ -170,7 +170,7 @@ TEST(T_MemoryKvStore, Refcount) {
   EXPECT_EQ(0, (int64_t) store.GetUsed());
 }
 
-TEST(T_MemoryKvStore, Shrink) {
+TEST(T_MemoryKvStore, ShrinkTo) {
   perf::Statistics statistics;
   kvstore::MemoryKvStore store(cache_size, "T_MemoryKvStore", &statistics);
 
@@ -180,12 +180,13 @@ TEST(T_MemoryKvStore, Shrink) {
 
   buf.address = malloc(malloc_size);
   buf.size = malloc_size;
-  buf.refcount = 0;
+  buf.refcount = 1;
   buf.object_type = cache::CacheManager::kTypeRegular;
 
   EXPECT_EQ(0, (int64_t) store.GetUsed());
   EXPECT_TRUE(store.Commit(a, buf));
   EXPECT_EQ(malloc_size, store.GetUsed());
+  buf.refcount = 0;
   for (int i = 0; i < 99; i++) {
     (*(reinterpret_cast<uint32_t *>(a.digest + 1)))++;
     buf.address = malloc(malloc_size);
@@ -193,15 +194,15 @@ TEST(T_MemoryKvStore, Shrink) {
   }
   EXPECT_EQ(100*malloc_size, store.GetUsed());
 
-  EXPECT_TRUE(store.Shrink(1000*malloc_size));
-  EXPECT_TRUE(store.Shrink(100*malloc_size));
+  EXPECT_TRUE(store.ShrinkTo(1000*malloc_size));
+  EXPECT_TRUE(store.ShrinkTo(100*malloc_size));
   EXPECT_EQ(100*malloc_size, store.GetUsed());
-  EXPECT_TRUE(store.Shrink(94*malloc_size));
+  EXPECT_TRUE(store.ShrinkTo(94*malloc_size));
   EXPECT_EQ(94*malloc_size, store.GetUsed());
-  EXPECT_TRUE(store.Shrink(60*malloc_size - 1));
+  EXPECT_TRUE(store.ShrinkTo(60*malloc_size - 1));
   EXPECT_EQ(59*malloc_size, store.GetUsed());
-  EXPECT_TRUE(store.Shrink(90));
+  EXPECT_TRUE(store.ShrinkTo(90));
   EXPECT_EQ((90/malloc_size)*malloc_size, store.GetUsed());
-  EXPECT_TRUE(store.Shrink(0));
-  EXPECT_EQ(0, (int64_t) store.GetUsed());
+  EXPECT_FALSE(store.ShrinkTo(0));
+  EXPECT_EQ(malloc_size, store.GetUsed());
 }

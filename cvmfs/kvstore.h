@@ -101,11 +101,12 @@ class MemoryKvStore :SingleCopy {
   bool Delete(const shash::Any &id);
 
   /**
-   * Delete the oldest entries until the KvStore uses less than the given size
+   * Delete the oldest entries until the KvStore uses less than the given size.
+   * Entries with nonzero refcount will not be deleted.
    * @param size The maximum size to make the KvStore
    * @returns True iff the shrink succeeds
    */
-  bool Shrink(size_t size);
+  bool ShrinkTo(size_t size);
 
   /**
    * Get the memory buffer describing the entry at id

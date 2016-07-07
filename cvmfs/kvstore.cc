@@ -121,16 +121,24 @@ bool MemoryKvStore::DoDelete(const shash::Any &id) {
   return true;
 }
 
-bool MemoryKvStore::Shrink(size_t size) {
+bool MemoryKvStore::ShrinkTo(size_t size) {
   WriteLockGuard guard(rwlock_);
   shash::Any key;
   MemoryBuffer buf;
-  while (used_bytes_ > size) {
-    if (!entries_.PopOldest(&key, &buf)) return false;
+
+  if (used_bytes_ <= size) return true;
+
+  entries_.FilterBegin();
+  while (entries_.FilterNext()) {
+    if (used_bytes_ <= size) break;
+    entries_.FilterGet(&key, &buf);
+    if (buf.refcount > 0) continue;
+    entries_.FilterDelete();
     used_bytes_ -= buf.size;
     free(buf.address);
   }
-  return true;
+  entries_.FilterEnd();
+  return used_bytes_ <= size;
 }
 
 }  // namespace kvstore
