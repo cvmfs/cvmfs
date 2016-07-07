@@ -1,9 +1,12 @@
+/**
+ * This file is part of the CernVM File System.
+ */
 
-#ifndef __CHECKSUM_H_
-#define __CHECKSUM_H_
+#ifndef CVMFS_CHECKSUM_H_
+#define CVMFS_CHECKSUM_H_
 
-#include <sys/types.h>
 #include <stdint.h>
+#include <sys/types.h>
 
 #include <string>
 
@@ -34,8 +37,7 @@ namespace checksum {
  * This does not throw any non-standard exceptions.
  */
 class ChecksumFileWriter {
-
-public:
+ public:
   /**
    * Given an open file descriptor and an eventual file size, the
    * ChecksumFileWriter will fallocate enough space to keep the per-block
@@ -46,7 +48,7 @@ public:
    * @param sumonly: Do not write out checksum data; instead, keep a running
    * checksum-of-checksums.
    */
-  ChecksumFileWriter(int fd, off_t fsize, bool sumonly=false);
+  ChecksumFileWriter(int fd, off_t fsize, bool sumonly = false);
   ~ChecksumFileWriter();
 
     /*
@@ -68,11 +70,11 @@ public:
      * 
      * Returns 0 on success; negative on failure.
      */
-  int finalize(uint32_t &checksum);
+  int finalize(uint32_t *checksum);
 
   const bool isGood() {return !m_error;}
 
-private:
+ private:
   void checksum(const unsigned char * buf, size_t len);
 
   unsigned char m_partial_buffer[CHECKSUM_BLOCKSIZE];
@@ -88,15 +90,13 @@ private:
   int m_fd;
   bool m_error;
   bool m_done;
-
 };
 
 /*
  * Verify the contents of a data stream
  */
 class ChecksumFileReader {
-public:
-
+ public:
   /**
    * Given an open file descriptor to a data file, parse and read
    * the checksum contents.
@@ -124,8 +124,7 @@ public:
 
   bool isGood() {return !m_error;}
 
-private:
-
+ private:
   /**
    * Denotes an error has occurred; if set, no further computations
    * or writing will be performed.
@@ -143,7 +142,7 @@ private:
   off_t m_size;
 };
 
-}
+}  // namespace checksum
 
-#endif
+#endif  // CVMFS_CHECKSUM_H_
 

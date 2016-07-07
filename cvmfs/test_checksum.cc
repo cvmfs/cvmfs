@@ -1,17 +1,18 @@
-
 /**
+ * This file is part of the CernVM File System.
+ *
  * This is a small test utility which allows us to test the CRC32 checksums
  * independently of the rest of CVMFS.
  */
-
-#include "checksum.h"
-#include "hash.h"
-#include "platform.h"
 
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
+
+#include "checksum.h"
+#include "hash.h"
+#include "platform.h"
 
 // Note we made READ_BUFFER unaligned with the size of the checksum blocks
 // Hopefully this will help prevent against any alignment assumptions.
@@ -50,7 +51,8 @@ int verify(int fd, size_t size) {
 
 int main(int argc, char *argv[]) {
   if ((argc != 3) && (argc != 4)) {
-    fprintf(stderr, "Usage: %s [-v] cvmfs_cache_path /cvmfs/repo/path\n", argv[0]);
+    fprintf(stderr, "Usage: %s [-v] cvmfs_cache_path /cvmfs/repo/path\n",
+            argv[0]);
     return 1;
   }
 
@@ -60,7 +62,8 @@ int main(int argc, char *argv[]) {
     next_arg++;
     do_verify = true;
   } else if (argc == 4) {
-    fprintf(stderr, "Usage: %s [-v] cvmfs_cache_path /cvmfs/repo/path\n", argv[0]);
+    fprintf(stderr, "Usage: %s [-v] cvmfs_cache_path /cvmfs/repo/path\n",
+           argv[0]);
     return 1;
   }
   std::string cache_path = argv[next_arg++];
@@ -100,7 +103,9 @@ int main(int argc, char *argv[]) {
   errno = 0;
   size_t to_read = st.st_size;
   size_t to_read_chunk = to_read > READ_BUFFER ? READ_BUFFER : to_read;
-  while (to_read && (((result = read(fd, buffer, to_read_chunk)) > 0) || (errno == EINTR))) {
+  while (to_read &&
+         ( ((result = read(fd, buffer, to_read_chunk)) > 0)
+           || (errno == EINTR))) {
     if (errno) {continue;}
     writer.stream(buffer, result);
     to_read -= result;
@@ -112,7 +117,7 @@ int main(int argc, char *argv[]) {
     return errno;
   }
   uint32_t crc32;
-  if (writer.finalize(crc32)) {
+  if (writer.finalize(&crc32)) {
     fprintf(stderr, "Checksum calculation failed for %s\n", path.c_str());
     return 1;
   }

@@ -1,22 +1,22 @@
+/**
+ * This file is part of the CernVM File System.
+ */
 
 #include "checksum.h"
 
-#include "cache.h"
-#include "bulk_crc32.h"
-#include "logging.h"
-
 #include <errno.h>
-#include <string.h>
 #include <fcntl.h>
 #include <stdint.h>
+#include <string.h>
 
 #include <vector>
 
+#include "bulk_crc32.h"
+#include "cache.h"
+#include "logging.h"
+
 #define likely(x)    __builtin_expect (!!(x), 1)
 #define unlikely(x)  __builtin_expect (!!(x), 0)
-
-using namespace checksum;
-
 
 static int
 pread_full(int fd, void *in_buf, size_t len, off_t off) {
@@ -61,6 +61,7 @@ pwrite_full(int fd, void *in_buf, size_t len, off_t offset) {
   return counter;
 }
 
+namespace checksum {
 
 ChecksumFileWriter::ChecksumFileWriter(int fd, off_t fsize, bool sumonly)
   : m_size(fsize), m_count(0), m_running_sum(CRC_INITIAL_VAL),
@@ -83,12 +84,14 @@ ChecksumFileWriter::ChecksumFileWriter(int fd, off_t fsize, bool sumonly)
   }
   off_t block_size = ((m_size - 1) / CHECKSUM_BLOCKSIZE + 1) * sizeof(uint32_t);
   int retval;
-  if ((retval = posix_fallocate(m_fd, m_size, CHECKSUM_HEADERSIZE + block_size))) {
+  if ((retval = posix_fallocate(m_fd, m_size,
+                                CHECKSUM_HEADERSIZE + block_size))) {
     LogCvmfs(kLogChecksum, kLogDebug, "Could not pre-allocate checksum data: "
              "%s (errno=%d)", strerror(errno), errno);
     return;
   }
-  if (pwrite_full(m_fd, header, CHECKSUM_HEADERSIZE, m_size) != CHECKSUM_HEADERSIZE) {
+  if (pwrite_full(m_fd, header, CHECKSUM_HEADERSIZE, m_size)
+       != CHECKSUM_HEADERSIZE) {
     LogCvmfs(kLogChecksum, kLogDebug, "Could not write checksum header to "
              "file: %s (errno=%d)", strerror(errno), errno);
     return;
@@ -99,7 +102,7 @@ ChecksumFileWriter::ChecksumFileWriter(int fd, off_t fsize, bool sumonly)
 
 
 int
-ChecksumFileWriter::finalize(uint32_t &hash) {
+ChecksumFileWriter::finalize(uint32_t *hash) {
   if (unlikely(m_error)) {return -1;}
 
   if (m_buffer_offset) {
@@ -109,7 +112,7 @@ ChecksumFileWriter::finalize(uint32_t &hash) {
     m_buffer_offset = 0;
   }
   if (m_error) {return -1;}
-  hash = m_running_sum;
+  *hash = m_running_sum;
   m_done = true;
   return 0;
 }
@@ -117,7 +120,7 @@ ChecksumFileWriter::finalize(uint32_t &hash) {
 
 ChecksumFileWriter::~ChecksumFileWriter() {
   uint32_t hash;
-  if (!m_done) {finalize(hash);}
+  if (!m_done) {finalize(&hash);}
 }
 
 
@@ -125,7 +128,6 @@ ChecksumFileWriter::~ChecksumFileWriter() {
 // below.
 void
 ChecksumFileWriter::checksum(const uint8_t * buf, size_t len) {
-
   if (unlikely(m_error)) {return;}
 
   ssize_t c_count = len / CHECKSUM_BLOCKSIZE;
@@ -190,7 +192,7 @@ ChecksumFileReader::ChecksumFileReader(int fd, off_t fsize)
   : m_error(true), m_fd(fd), m_size(fsize)
 {
   char header[CHECKSUM_HEADERSIZE];
-  if (pread_full(m_fd, header, CHECKSUM_HEADERSIZE, m_size) == 
+  if (pread_full(m_fd, header, CHECKSUM_HEADERSIZE, m_size) ==
       CHECKSUM_HEADERSIZE)
   {
     if ((header[0] == '\1') && (header[1] == '\0') && (header[2] == '\0') &&
@@ -209,7 +211,6 @@ ChecksumFileReader::ChecksumFileReader(int fd, off_t fsize)
 
 int
 ChecksumFileReader::verify(const unsigned char *buf, size_t len, off_t off) {
-
   if (len == (size_t)-1) {
     return errno ? -errno : -EIO;
   }
@@ -222,7 +223,7 @@ ChecksumFileReader::verify(const unsigned char *buf, size_t len, off_t off) {
   off_t cfd_begin = (off / CHECKSUM_BLOCKSIZE) * CHECKSUM_BLOCKSIZE;
   off_t cfd_end = ((off+len) % CHECKSUM_BLOCKSIZE == 0) ?
     (off+len) :
-   (((off+len) / CHECKSUM_BLOCKSIZE + 1) * CHECKSUM_BLOCKSIZE);
+    (((off+len) / CHECKSUM_BLOCKSIZE + 1) * CHECKSUM_BLOCKSIZE);
 
   size_t sum_count = (cfd_end - cfd_begin) / CHECKSUM_BLOCKSIZE;
   ssize_t sum_byte_count = sum_count * CHECKSUM_SIZE;
@@ -234,8 +235,8 @@ ChecksumFileReader::verify(const unsigned char *buf, size_t len, off_t off) {
   off_t sum_byte_offset = m_size +
                           (cfd_begin/CHECKSUM_BLOCKSIZE)*CHECKSUM_SIZE +
                           CHECKSUM_HEADERSIZE;
-  if (pread_full(m_fd, sums_ptr, sum_byte_count, sum_byte_offset) != 
-      sum_byte_count) 
+  if (pread_full(m_fd, sums_ptr, sum_byte_count, sum_byte_offset) !=
+      sum_byte_count)
   {
     LogCvmfs(kLogChecksum, kLogDebug, "Failed to read checksum file: %s"
              " (errno=%d)", strerror(errno), errno);
@@ -251,7 +252,8 @@ ChecksumFileReader::verify(const unsigned char *buf, size_t len, off_t off) {
            sum_byte_count, sum_byte_offset);*/
 
   // Do a check on a partial beginning buffer.
-  if (off != cfd_begin) {  // FUSE ought to align our accesses... libcvmfs may not!
+  if (off != cfd_begin) {  // FUSE ought to align our accesses... libcvmfs may
+                           // not!
     if (pread_full(m_fd, data_buf, CHECKSUM_BLOCKSIZE, cfd_begin) < 0) {
       LogCvmfs(kLogChecksum, kLogDebug, "Failed to read data file for "
                "beginning buffer: %s (errno=%d)", strerror(errno), errno);
@@ -277,7 +279,7 @@ ChecksumFileReader::verify(const unsigned char *buf, size_t len, off_t off) {
 
   // Do a check on a partial end buffer.
   off_t end = off+len;
-  //LogCvmfs(kLogChecksum, kLogDebug, "End byte: %d", end);
+  // LogCvmfs(kLogChecksum, kLogDebug, "End byte: %d", end);
   if (end < cfd_end) {
     memset(data_buf, '\0', CHECKSUM_BLOCKSIZE);
     size_t left_to_read = ((cfd_end > m_size) ? m_size : cfd_end) - end;
@@ -291,9 +293,9 @@ ChecksumFileReader::verify(const unsigned char *buf, size_t len, off_t off) {
                " buffer: %s (errno=%d)", strerror(errno), errno);
       return (errno ? -errno : -EIO);
     }
-    //LogCvmfs(kLogChecksum, kLogDebug, "Read %d bytes starting at %d", res,
-    //         end);
-    //LogCvmfs(kLogChecksum, kLogDebug, "Checksum size - %d", sum_count-1);
+    // LogCvmfs(kLogChecksum, kLogDebug, "Read %d bytes starting at %d", res,
+    //          end);
+    // LogCvmfs(kLogChecksum, kLogDebug, "Checksum size - %d", sum_count-1);
     if (bulk_verify_crc(data_buf, CHECKSUM_BLOCKSIZE,
                         sums_ptr + (sum_count - 1), CRC32C_POLYNOMIAL,
                         CHECKSUM_BLOCKSIZE, &error_info))
@@ -324,3 +326,4 @@ ChecksumFileReader::verify(const unsigned char *buf, size_t len, off_t off) {
   return 0;
 }
 
+}  // namespace checksum
