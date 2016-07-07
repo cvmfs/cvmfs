@@ -119,7 +119,8 @@ do_copy     "sha3"
 patch_external "leveldb"     "dont_search_snappy.patch"           \
                              "dont_search_tcmalloc.patch"         \
                              "arm64_memory_barrier.patch"
-patch_external "pacparser"   "fix_find_proxy_ex.patch"
+patch_external "pacparser"   "fix_find_proxy_ex.patch"            \
+                             "fix_cflags.patch"
 patch_external "tbb"         "custom_library_suffix.patch"        \
                              "symlink_to_build_directories.patch" \
                              "32bit_mock.patch"

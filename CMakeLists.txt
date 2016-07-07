@@ -254,22 +254,25 @@ include (FindPythonModule)
 #
 # flags in CMAKE_C**_FLAGS are always passed to the compiler
 #
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -fno-exceptions -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fvisibility=hidden -Wall -D_REENTRANT -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES")
-set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fvisibility=hidden -Wall -D_REENTRANT -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES")
-
+set (CVMFS_BASE_C_FLAGS "-O2 -g -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fvisibility=hidden -Wall")
+set (CVMFS_BASE_CXX_FLAGS "${CVMFS_BASE_C_FLAGS} -fno-exceptions")
 if (NOT USING_CLANG)
-  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-optimize-sibling-calls")
-  set (CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -fno-optimize-sibling-calls")
+  set (CVMFS_BASE_C_FLAGS "${CVMFS_BASE_C_FLAGS} -fno-optimize-sibling-calls")
+  set (CVMFS_BASE_CXX_FLAGS "${CVMFS_BASE_CXX_FLAGS} -fno-optimize-sibling-calls")
 endif (NOT USING_CLANG)
+set (CVMFS_BASE_DEFINES "-D_REENTRANT -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES")
+
+set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CVMFS_BASE_C_FLAGS} ${CVMFS_BASE_DEFINES}")
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CVMFS_BASE_CXX_FLAGS} ${CVMFS_BASE_DEFINES}")
 
 if (NOT ARM AND NOT IS_64_BIT)
-  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=i686")
   set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=i686")
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=i686")
 endif (NOT ARM AND NOT IS_64_BIT)
 
 if (BUILD_COVERAGE AND NOT USING_CLANG)
-  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g -fprofile-arcs -ftest-coverage -fPIC")
   set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fprofile-arcs -ftest-coverage")
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g -fprofile-arcs -ftest-coverage -fPIC")
 endif (BUILD_COVERAGE AND NOT USING_CLANG)
 
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} cvmfs)

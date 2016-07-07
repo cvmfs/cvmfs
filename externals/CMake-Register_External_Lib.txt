@@ -43,9 +43,9 @@ if (NOT REG_EXT_LIB)
 			# create a build hook (invoked while compiling)
 			add_custom_command (
 				OUTPUT				${ARGV2}
-				COMMAND				sh
-				ARGS				"${LOCATION}/makeHook.sh"
-				WORKING_DIRECTORY	${LOCATION}
+				COMMAND				env CVMFS_BASE_C_FLAGS=${CVMFS_BASE_C_FLAGS} CVMFS_BASE_CXX_FLAGS=${CVMFS_BASE_CXX_FLAGS} sh
+				ARGS				${LOCATION}/makeHook.sh
+				WORKING_DIRECTORY		${LOCATION}
 				COMMENT				"Building ${NAME}..."
 			)
 			add_custom_target (${NAME} ALL DEPENDS ${ARGV2})
@@ -55,9 +55,9 @@ if (NOT REG_EXT_LIB)
 		if (NOT EXISTS ${LOCATION}/.external_is_configured)
 			message (STATUS "configuring external library: ${NAME} ...")
 			execute_process (
-				COMMAND				sh ${LOCATION}/configureHook.sh
+				COMMAND			env CVMFS_BASE_C_FLAGS=${CVMFS_BASE_C_FLAGS} CVMFS_BASE_CXX_FLAGS=${CVMFS_BASE_CXX_FLAGS} sh ${LOCATION}/configureHook.sh
 				WORKING_DIRECTORY	${LOCATION}
-				RESULT_VARIABLE     RETVAL
+				RESULT_VARIABLE		RETVAL
 			)
 			if (NOT ${RETVAL} EQUAL 0)
 				message (FATAL_ERROR "failed to configure ${NAME}. Aborting.")

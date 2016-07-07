@@ -1,3 +1,3 @@
 #!/bin/sh
 
-sh configure --with-pic
+sh configure CFLAGS="$CVMFS_BASE_C_FLAGS" --with-pic

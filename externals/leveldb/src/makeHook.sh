@@ -1,5 +1,5 @@
 #!/bin/sh
 
 make clean
-CXXFLAGS=-fPIC CFLAGS=-fPIC make
+CFLAGS="$CVMFS_BASE_C_FLAGS -fPIC" CXXFLAGS="$CVMFS_BASE_CXX_FLAGS -fPIC" make
 strip -S libleveldb.a
