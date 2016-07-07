@@ -35,7 +35,7 @@ bool AbstractUploader::Initialize() {
   // 'copy' the operating system thread construct. The assertions check for this
   // behaviour.
   assert(!writer_thread_.joinable());
-  writer_thread_ = thread;
+  writer_thread_.swap(thread);
   assert(writer_thread_.joinable());
   assert(!thread.joinable());
 
