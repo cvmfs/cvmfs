@@ -33,14 +33,17 @@ set (CVMFS_CLIENT_SOURCES
   authz/authz_session.h authz/authz_session.cc
   backoff.cc backoff.h
   bigvector.h
+  bulk_crc32.c bulk_crc32.h
   cache.cc cache.h
   catalog.cc catalog.h
   catalog_counters.cc catalog_counters.h catalog_counters_impl.h
   catalog_mgr.h catalog_mgr_impl.h
   catalog_mgr_client.cc catalog_mgr_client.h
   catalog_sql.cc catalog_sql.h
+  checksum.h checksum.cc
   clientctx.cc clientctx.h
   compression.cc compression.h
+  crc32c_tables.h crc32_zlib_polynomial_tables.h
   directory_entry.cc directory_entry.h
   dns.cc dns.h
   download.cc download.h
@@ -125,9 +128,20 @@ set (TEST_LIBCVMFS_SOURCES
   test_libcvmfs.cc
 )
 
+set (TEST_CHECKSUM_SOURCES
+  test_checksum.cc
+  checksum.h checksum.cc
+  bulk_crc32.c bulk_crc32.h
+  crc32c_tables.h crc32_zlib_polynomial_tables.h
+  hash.h hash.cc
+  logging.cc logging.h logging_internal.h
+)
+
 set (CVMFS_FSCK_SOURCES
   atomic.h
+  bulk_crc32.c bulk_crc32.h
   compression.cc compression.h
+  crc32c_tables.h crc32_zlib_polynomial_tables.h
   cvmfs_fsck.cc
   duplex_zlib.h
   hash.cc hash.h
@@ -497,6 +511,11 @@ if (BUILD_LIBCVMFS)
   add_executable( test_libcvmfs ${TEST_LIBCVMFS_SOURCES} )
   target_link_libraries( test_libcvmfs ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a ${SQLITE3_LIBRARY} ${CARES_LIBRARIES} ${CURL_LIBRARIES} ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl )
   add_dependencies (test_libcvmfs libcvmfs)
+
+  add_executable( test_checksum ${TEST_CHECKSUM_SOURCES} )
+  target_link_libraries( test_checksum ${OPENSSL_LIBRARIES} ${SHA2_ARCHIVE} ${SHA3_ARCHIVE} )
+  add_dependencies (test_checksum libsha3)
+
 endif (BUILD_LIBCVMFS)
 
 
