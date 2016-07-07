@@ -28,7 +28,7 @@ bool Reader<FileScrubbingTaskT, FileT>::Initialize() {
                          &Reader<FileScrubbingTaskT, FileT>::ReadThread);
 
   assert(!read_thread_.joinable());
-  read_thread_ = thread;
+  read_thread_.swap(thread);
   assert(read_thread_.joinable());
   assert(!thread.joinable());
 

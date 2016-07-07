@@ -228,7 +228,7 @@ void SyncMediator::InsertHardlink(const SyncItem &entry) {
   assert(handle_hardlinks_);
 
   uint64_t inode = entry.GetUnionInode();
-  LogCvmfs(kLogPublish, kLogVerboseMsg, "found hardlink %"PRIu64" at %s",
+  LogCvmfs(kLogPublish, kLogVerboseMsg, "found hardlink %" PRIu64 " at %s",
            inode, entry.GetUnionPath().c_str());
 
   // Find the hard link group in the lists

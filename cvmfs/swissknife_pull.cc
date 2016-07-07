@@ -428,7 +428,7 @@ bool CommandPull::Pull(const shash::Any   &catalog_hash,
 
   // Traverse the chunks
   LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
-           "  Processing chunks [%"PRIu64" registered chunks]: ",
+           "  Processing chunks [%" PRIu64 " registered chunks]: ",
            catalog->GetNumChunks());
   retval = catalog->AllChunksBegin();
   if (!retval) {
@@ -444,8 +444,8 @@ bool CommandPull::Pull(const shash::Any   &catalog_hash,
   while (atomic_read64(&chunk_queue) != 0) {
     SafeSleepMs(100);
   }
-  LogCvmfs(kLogCvmfs, kLogStdout, " fetched %"PRId64" new chunks out of "
-           "%"PRId64" unique chunks",
+  LogCvmfs(kLogCvmfs, kLogStdout, " fetched %" PRId64 " new chunks out of "
+           "%" PRId64 " unique chunks",
            atomic_read64(&overall_new)-gauge_new,
            atomic_read64(&overall_chunks)-gauge_chunks);
 
@@ -813,8 +813,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   }
 
   WaitForStorage();
-  LogCvmfs(kLogCvmfs, kLogStdout, "Fetched %"PRId64" new chunks out of %"
-           PRId64" processed chunks",
+  LogCvmfs(kLogCvmfs, kLogStdout, "Fetched %" PRId64 " new chunks out of %"
+           PRId64 " processed chunks",
            atomic_read64(&overall_new), atomic_read64(&overall_chunks));
   result = 0;
 

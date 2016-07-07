@@ -68,7 +68,7 @@ bool CommandCheck::CompareEntries(const catalog::DirectoryEntry &a,
     retval = false;
   }
   if (diffs & Difference::kSize) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "sizes differ: %"PRIu64" / %"PRIu64,
+    LogCvmfs(kLogCvmfs, kLogStderr, "sizes differ: %" PRIu64 " / %" PRIu64,
              a.size(), b.size());
     retval = false;
   }
@@ -118,8 +118,8 @@ bool CommandCheck::CompareCounters(const catalog::Counters &a,
 
     if (*(i->second) != *(comp->second)) {
       LogCvmfs(kLogCvmfs, kLogStderr,
-               "catalog statistics mismatch: %s (expected: %"PRIu64" / "
-               "in catalog: %"PRIu64")",
+               "catalog statistics mismatch: %s (expected: %" PRIu64 " / "
+               "in catalog: %" PRIu64 ")",
                comp->first.c_str(), *(i->second), *(comp->second));
       retval = false;
     }
@@ -460,7 +460,7 @@ catalog::Catalog* CommandCheck::FetchCatalog(const string      &path,
 
   if ((catalog_size > 0) && (uint64_t(catalog_file_size) != catalog_size)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "catalog file size mismatch, "
-             "expected %"PRIu64", got %"PRIu64,
+             "expected %" PRIu64 ", got %" PRIu64,
              catalog_size, catalog_file_size);
     delete catalog;
     return NULL;
@@ -586,7 +586,7 @@ bool CommandCheck::InspectTree(const string                  &path,
     computed_counters->self.symlinks + computed_counters->self.directories;
   if (num_found_entries != catalog->GetNumEntries()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "dangling entries in catalog, "
-             "expected %"PRIu64", got %"PRIu64,
+             "expected %" PRIu64 ", got %" PRIu64,
              catalog->GetNumEntries(), num_found_entries);
     retval = false;
   }
