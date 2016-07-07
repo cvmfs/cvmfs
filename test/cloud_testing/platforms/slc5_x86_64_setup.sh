@@ -38,6 +38,7 @@ echo "installing RPM packages... "
 install_rpm "$CONFIG_PACKAGES"
 install_rpm $CLIENT_PACKAGE
 install_rpm $SERVER_PACKAGE
+install_rpm $DEVEL_PACKAGE
 install_rpm $UNITTEST_PACKAGE
 
 # installing WSGI apache module
@@ -65,10 +66,26 @@ install_from_repo gcc-c++        || die "fail (installing gcc-c++)"
 install_from_repo python-sqlite2 || die "fail (installing python-sqlite2)"
 install_from_repo java           || die "fail (installing java)"
 
+# traffic shaping
+install_from_repo trickle || die "fail (installing trickle)"
+
+# install `libcvmfs` build dependencies
+install_from_repo openssl-devel  || die "fail (installing openssl-devel)"
+
+# install `cvmfs_preload` build dependencies
+install_from_repo cmake          || die "fail (installing cmake)"
+install_from_repo libattr-devel  || die "fail (installing libattr-devel)"
+
+# install test dependency for 600
+install_from_repo gridsite || die "fail (installing gridsite)"
+
 # increase open file descriptor limits
 echo -n "increasing ulimit -n ... "
 set_nofile_limit 65536 || die "fail"
 echo "done"
+
+# update kernel, we've seen ptherad mutex deadlocks with the given one
+sudo yum -y update kernel
 
 # rebooting the system (returning 0 value)
 echo "sleep 1 && reboot" > killme.sh

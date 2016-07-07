@@ -1,0 +1,87 @@
+cvmfs_test_name="Populate repository of uncompressed files"
+cvmfs_test_autofs_on_startup=false
+
+produce_files_in() {
+	local working_dir=$1
+  local large_file=$2
+
+  cp $large_file $working_dir/large
+	pushdir $working_dir
+
+	echo "meaningless file content" > file
+	echo "more clever file content" > clever
+
+	mkdir foo
+	mkdir bar
+  mkdir nested
+  touch nested/empty
+  touch nested/.cvmfscatalog
+
+	mkdir foo/bar
+	mkdir bar/foo
+
+	ln file hardlinkToFile
+	ln -s clever symlinkToClever
+
+	popdir
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local rdonly_repo_dir=/var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly
+
+  local scratch_dir=$(pwd)
+  mkdir reference_dir
+  local reference_dir=$scratch_dir/reference_dir
+
+  local large_file="large_file"
+  dd if=/dev/urandom of=$large_file bs=1024 count=$((100*1024))
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -Z none || return $?
+
+  grep "^CVMFS_COMPRESSION_ALGORITHM=none$" \
+    /etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/server.conf || return 20
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository"
+  produce_files_in $repo_dir $large_file || return 3
+
+  echo "putting exactly the same stuff in the scratch space for comparison"
+  produce_files_in $reference_dir $large_file || return 4
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "Make sure the compression xattr is set correctly"
+  local attrval=`attr -qg compression $rdonly_repo_dir/file`
+  if [ x"$attrval" != xnone ]; then
+    return 5
+  fi
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return $?
+
+  echo "validating the cvmfs cache"
+  load_repo_config $CVMFS_TEST_REPO
+  sudo cvmfs_fsck ${CVMFS_CACHE_BASE}/${CVMFS_TEST_REPO} || return 30
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+  rm -f $large_file
+
+  echo "overwrite compression algorithm"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  echo "zlib compressed" > /cvmfs/$CVMFS_TEST_REPO/zlib
+  publish_repo $CVMFS_TEST_REPO -Z zlib
+  attrval=`attr -qg compression $rdonly_repo_dir/zlib`
+  if [ x"$attrval" != xzlib ]; then
+    return 10
+  fi
+
+  return 0
+}

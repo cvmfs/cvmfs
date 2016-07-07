@@ -14,7 +14,7 @@
 
 #include "logging.h"
 #include "sanitizer.h"
-#include "util.h"
+#include "util/string.h"
 
 /**
  * This reads a mapping file of (roughly) the following format:
@@ -110,9 +110,14 @@ class IntegerMap {
 
     return (HasDefault())
       ? default_value_
-      : T(0);
+      : k;
   }
 
+  bool HasEffect() const {
+    return (map_.size() != 0) || has_default_value_;
+  }
+
+  bool   IsEmpty()    const { return map_.size() == 0;   }
   bool   IsValid()    const { return valid_;             }
   bool   HasDefault() const { return has_default_value_; }
   size_t RuleCount()  const { return map_.size();        }

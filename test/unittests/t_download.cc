@@ -8,13 +8,14 @@
 
 #include <cstdio>
 
-#include "../../cvmfs/compression.h"
-#include "../../cvmfs/download.h"
-#include "../../cvmfs/hash.h"
-#include "../../cvmfs/prng.h"
-#include "../../cvmfs/sink.h"
-#include "../../cvmfs/statistics.h"
-#include "../../cvmfs/util.h"
+#include "compression.h"
+#include "download.h"
+#include "hash.h"
+#include "prng.h"
+#include "sink.h"
+#include "statistics.h"
+#include "util/file_guard.h"
+#include "util/posix.h"
 
 using namespace std;  // NOLINT
 
@@ -96,6 +97,34 @@ TEST_F(T_Download, File) {
 }
 
 
+TEST_F(T_Download, Clone) {
+  DownloadManager *download_mgr_cloned = download_mgr.Clone(&statistics, "x");
+
+  string dest_path;
+  FILE *fdest = CreateTemporaryFile(&dest_path);
+  ASSERT_TRUE(fdest != NULL);
+  UnlinkGuard unlink_guard(dest_path);
+  char buf = '1';
+  fwrite(&buf, 1, 1, fdest);
+  fclose(fdest);
+
+  string url = "file://" + dest_path;
+  JobInfo info(&url, false /* compressed */, false /* probe hosts */, NULL);
+  download_mgr_cloned->Fetch(&info);
+  ASSERT_EQ(info.error_code, kFailOk);
+  ASSERT_EQ(info.destination_mem.pos, 1U);
+  EXPECT_EQ(info.destination_mem.data[0], '1');
+  download_mgr_cloned->Fini();
+  delete download_mgr_cloned;
+
+  // Don't crash
+  DownloadManager *dm = new DownloadManager();
+  download_mgr_cloned = dm->Clone(&statistics, "y");
+  delete dm;
+  delete download_mgr_cloned;
+}
+
+
 TEST_F(T_Download, Multiple) {
   string dest_path;
   FILE *fdest = CreateTemporaryFile(&dest_path);
@@ -131,7 +160,7 @@ TEST_F(T_Download, LocalFile2Mem) {
   JobInfo info(&url, false /* compressed */, false /* probe hosts */, NULL);
   download_mgr.Fetch(&info);
   ASSERT_EQ(info.error_code, kFailOk);
-  ASSERT_EQ(info.destination_mem.size, 1U);
+  ASSERT_EQ(info.destination_mem.pos, 1U);
   EXPECT_EQ(info.destination_mem.data[0], '1');
 }
 
@@ -257,6 +286,21 @@ TEST_F(T_Download, ValidateGeoReply) {
   EXPECT_EQ(geo_order[1], 2U);
   EXPECT_EQ(geo_order[2], 0U);
   EXPECT_EQ(geo_order[3], 1U);
+}
+
+
+TEST_F(T_Download, ParseHttpCode) {
+  char digits[3];
+  digits[0] = '0';  digits[1] = '0';  digits[2] = 'a';
+  EXPECT_EQ(-1, DownloadManager::ParseHttpCode(digits));
+  digits[0] = '0';  digits[1] = '0';  digits[2] = '0';
+  EXPECT_EQ(0, DownloadManager::ParseHttpCode(digits));
+  digits[0] = '0';  digits[1] = '0';  digits[2] = '1';
+  EXPECT_EQ(1, DownloadManager::ParseHttpCode(digits));
+  digits[0] = '1';  digits[1] = '0';  digits[2] = '1';
+  EXPECT_EQ(101, DownloadManager::ParseHttpCode(digits));
+  digits[0] = '9';  digits[1] = '9';  digits[2] = '9';
+  EXPECT_EQ(999, DownloadManager::ParseHttpCode(digits));
 }
 
 }  // namespace download

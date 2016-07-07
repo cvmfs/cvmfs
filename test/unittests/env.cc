@@ -13,7 +13,7 @@
 #include <sstream>
 #include <string>
 
-#include "../../cvmfs/util.h"
+#include "util/posix.h"
 
 
 const char* CvmfsEnvironment::kSandboxEnvVariable = "CVMFS_UT_SANDBOX";

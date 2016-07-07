@@ -8,11 +8,11 @@
 #include <cassert>
 #include <cerrno>
 
-#include "../util_concurrency.h"
-#include "chunk.h"
-#include "file.h"
-#include "file_processor.h"
-#include "processor.h"
+#include "file_processing/chunk.h"
+#include "file_processing/file.h"
+#include "file_processing/file_processor.h"
+#include "file_processing/processor.h"
+#include "util_concurrency.h"
 
 namespace upload {
 

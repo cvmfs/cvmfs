@@ -73,6 +73,12 @@ produce_files_in() {
   inflate_file big_file/ein_paar_mehr_heidenroeslein big_file/ein_paar_heidenroeslein 10000000
   inflate_file big_file/viele_heidenroeslein big_file/ein_paar_mehr_heidenroeslein 60000000
 
+  # regression test
+  mkdir regression
+  create_big_file regression/32   32
+  create_big_file regression/64   64
+  create_big_file regression/128 128
+
 	popdir
 }
 

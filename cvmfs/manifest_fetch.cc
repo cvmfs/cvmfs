@@ -13,18 +13,11 @@
 #include "hash.h"
 #include "manifest.h"
 #include "signature.h"
-#include "util.h"
 #include "whitelist.h"
 
 using namespace std;  // NOLINT
 
 namespace manifest {
-
-const int kWlInvalid       = 0x00;
-const int kWlVerifyRsa     = 0x01;
-const int kWlVerifyPkcs7   = 0x02;
-const int kWlVerifyCaChain = 0x04;
-
 
 /**
  * Downloads and verifies the manifest, the certificate, and the whitelist.
@@ -49,7 +42,7 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
   const string manifest_url = base_url + string("/.cvmfspublished");
   download::JobInfo download_manifest(&manifest_url, false, probe_hosts, NULL);
   shash::Any certificate_hash;
-  string certificate_url = base_url + "/data";  // rest is in manifest
+  string certificate_url = base_url + "/";  // rest is in manifest
   download::JobInfo download_certificate(&certificate_url, true, probe_hosts,
                                          &certificate_hash);
 
@@ -64,7 +57,7 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
   // Load Manifest
   ensemble->raw_manifest_buf =
     reinterpret_cast<unsigned char *>(download_manifest.destination_mem.data);
-  ensemble->raw_manifest_size = download_manifest.destination_mem.size;
+  ensemble->raw_manifest_size = download_manifest.destination_mem.pos;
   ensemble->manifest =
     manifest::Manifest::LoadMem(ensemble->raw_manifest_buf,
                                 ensemble->raw_manifest_size);
@@ -97,7 +90,7 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
   certificate_hash = ensemble->manifest->certificate();
   ensemble->FetchCertificate(certificate_hash);
   if (!ensemble->cert_buf) {
-    certificate_url += "/" + certificate_hash.MakePath();
+    certificate_url += ensemble->manifest->MakeCertificatePath();
     retval_dl = download_manager->Fetch(&download_certificate);
     if (retval_dl != download::kFailOk) {
       result = kFailLoad;
@@ -105,7 +98,7 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
     }
     ensemble->cert_buf = reinterpret_cast<unsigned char *>(
       download_certificate.destination_mem.data);
-    ensemble->cert_size = download_certificate.destination_mem.size;
+    ensemble->cert_size = download_certificate.destination_mem.pos;
   }
   retval_b = signature_manager->LoadCertificateMem(ensemble->cert_buf,
                                                    ensemble->cert_size);

@@ -7,6 +7,7 @@
   #include <sys/sysctl.h>
 #endif
 #include <syslog.h>
+#include <unistd.h>
 
 #include <algorithm>
 #include <cassert>
@@ -14,11 +15,13 @@
 #include <map>
 #include <sstream>  // TODO(jblomer): remove me
 
-#include "../../cvmfs/hash.h"
-#include "../../cvmfs/manifest.h"
+#include "fs_traversal.h"
+#include "hash.h"
+#include "manifest.h"
 #include "testutil.h"
 
 
+#ifndef __APPLE__
 static void SkipWhitespace(std::istringstream *iss) {
   while (iss->good()) {
     const char next = iss->peek();
@@ -28,6 +31,7 @@ static void SkipWhitespace(std::istringstream *iss) {
     iss->get();
   }
 }
+#endif
 
 
 pid_t GetParentPid(const pid_t pid) {
@@ -70,6 +74,35 @@ pid_t GetParentPid(const pid_t pid) {
 #endif
 
   return parent_pid;
+}
+
+
+class ShowOpenFilesHelper {
+ public:
+  void ShowSymlink(const string &parent_path, const string &name) {
+    char buf[1024];
+    string full_path = parent_path + "/" + name;
+    int size = readlink(full_path.c_str(), buf, 1024);
+    file_list += (size < 0)
+                  ? ("failed to read fd " + name + "\n")
+                  : string(buf, size) + "\n";
+  }
+
+  string file_list;
+};
+
+
+string ShowOpenFiles() {
+#ifdef __APPLE__
+  return "listing open files not supported on OS X";
+#else
+  ShowOpenFilesHelper open_files_helper;
+  FileSystemTraversal<ShowOpenFilesHelper>
+    traversal(&open_files_helper, "", false);
+  traversal.fn_new_symlink = &ShowOpenFilesHelper::ShowSymlink;
+  traversal.Recurse("/proc/self/fd");
+  return open_files_helper.file_list;
+#endif
 }
 
 
@@ -168,31 +201,58 @@ shash::Any h(const std::string &hash, const shash::Suffix suffix) {
 
 namespace catalog {
 
-DirectoryEntry DirectoryEntryTestFactory::RegularFile() {
+DirectoryEntry DirectoryEntryTestFactory::RegularFile(const string &name,
+                                                      unsigned size,
+                                                      shash::Any hash) {
   DirectoryEntry dirent;
   dirent.mode_ = 33188;
+  dirent.name_ = NameString(name);
+  dirent.checksum_ = hash;
+  dirent.size_ = size;
   return dirent;
 }
 
 
-DirectoryEntry DirectoryEntryTestFactory::Directory() {
+DirectoryEntry DirectoryEntryTestFactory::ExternalFile() {
+  DirectoryEntry dirent;
+  dirent.mode_ = 33188;
+  dirent.is_external_file_ = true;
+  return dirent;
+}
+
+DirectoryEntry DirectoryEntryTestFactory::Directory(
+    const string &name,
+    unsigned size,
+    shash::Any hash,
+    bool is_nested_catalog_mountpoint)
+{
   DirectoryEntry dirent;
   dirent.mode_ = 16893;
+  dirent.name_ = NameString(name);
+  dirent.checksum_ = hash;
+  dirent.size_ = size;
+  dirent.is_nested_catalog_mountpoint_ = is_nested_catalog_mountpoint;
   return dirent;
 }
 
 
-DirectoryEntry DirectoryEntryTestFactory::Symlink() {
+DirectoryEntry DirectoryEntryTestFactory::Symlink(const string &name,
+                                                  unsigned size,
+                                                  const string &symlink_path) {
   DirectoryEntry dirent;
   dirent.mode_ = 41471;
+  dirent.name_ = NameString(name);
+  dirent.size_ = size;
+  dirent.symlink_ = LinkString(symlink_path);
   return dirent;
 }
 
 
-DirectoryEntry DirectoryEntryTestFactory::ChunkedFile() {
+DirectoryEntry DirectoryEntryTestFactory::ChunkedFile(shash::Any content_hash) {
   DirectoryEntry dirent;
   dirent.mode_ = 33188;
   dirent.is_chunked_file_ = true;
+  dirent.checksum_ = content_hash;
   return dirent;
 }
 
@@ -258,7 +318,7 @@ void MockCatalog::RemoveChild(MockCatalog *child) {
   }
 }
 
-MockCatalog* MockCatalog::FindSubtree(const PathString &path) const {
+MockCatalog* MockCatalog::FindSubtree(const PathString &path) {
   for (unsigned i = 0; i < active_children_.size(); ++i) {
     if (active_children_[i].path == path)
       return active_children_[i].child;
@@ -283,7 +343,7 @@ bool MockCatalog::ListingPath(const PathString &path,
   unsigned initial_size = listing->size();
   shash::Md5 path_hash(path.GetChars(), path.GetLength());
   for (unsigned i = 0; i < files_.size(); ++i) {
-    if (files_[i].parent_hash == path_hash)
+    if (files_[i].parent_hash == path_hash && files_[i].name != "")
       listing->push_back(files_[i].ToDirectoryEntry());
   }
   return listing->size() > initial_size;
@@ -296,6 +356,17 @@ void MockCatalog::RegisterNestedCatalog(MockCatalog *child) {
   nested.child = child;
   nested.size  = child->catalog_size();
   children_.push_back(nested);
+
+  // update the directory entries in both catalogs
+  string path = child->root_path();
+  File *mountpoint = FindFile(path);
+  if (mountpoint != NULL) {
+    mountpoint->is_nested_catalog_mountpoint = true;
+  }
+  File *child_mountpoint = child->FindFile(path);
+  if (child_mountpoint != NULL) {
+    child_mountpoint->is_nested_catalog_mountpoint = true;
+  }
 }
 
 void MockCatalog::AddChild(MockCatalog *child) {
@@ -375,7 +446,7 @@ catalog::LoadError catalog::MockCatalogManager::LoadCatalog(
     MockCatalog *catalog = it->second;
     *catalog_hash = catalog->hash();
   } else {
-    MockCatalog * catalog = new MockCatalog(mountpoint.ToString(),
+    MockCatalog *catalog = new MockCatalog(mountpoint.ToString(),
                                            hash, 4096, 1, 0,
                                            true, NULL, NULL);
     catalog_map_[mountpoint] = catalog;
@@ -387,21 +458,47 @@ catalog::LoadError catalog::MockCatalogManager::LoadCatalog(
 //------------------------------------------------------------------------------
 
 
-manifest::Manifest* MockObjectFetcher::FetchManifest() {
+MockObjectFetcher::Failures
+MockObjectFetcher::FetchManifest(manifest::Manifest** manifest) {
   const uint64_t    catalog_size = 0;
   const std::string root_path    = "";
-  manifest::Manifest* manifest = new manifest::Manifest(MockCatalog::root_hash,
-                                                        catalog_size,
-                                                        root_path);
-  manifest->set_history(MockHistory::root_hash);
-  return manifest;
+  *manifest = new manifest::Manifest(
+      MockCatalog::root_hash,
+      catalog_size,
+      root_path);
+  (*manifest)->set_history(MockHistory::root_hash);
+  return MockObjectFetcher::kFailOk;
 }
 
-bool MockObjectFetcher::Fetch(const shash::Any &object_hash,
-                              std::string      *file_path) {
+MockObjectFetcher::Failures
+MockObjectFetcher::Fetch(const shash::Any   &object_hash,
+                               std::string  *file_path) {
   assert(file_path != NULL);
   *file_path = object_hash.ToString();
-  return true;
+  if (!ObjectExists(object_hash)) {
+    return MockObjectFetcher::kFailNotFound;
+  }
+  return MockObjectFetcher::kFailOk;
+}
+
+MockObjectFetcher::Failures
+MockObjectFetcher::Fetch(const std::string &relative_path,
+                         const bool         decompress,
+                         std::string *file_path) {
+  *file_path = relative_path;
+  if (!PathExists(relative_path)) {
+    return MockObjectFetcher::kFailNotFound;
+  }
+  return MockObjectFetcher::kFailOk;
+}
+
+bool MockObjectFetcher::ObjectExists(const shash::Any &object_hash) const {
+  return MockCatalog::Exists(object_hash) ||
+         MockHistory::Exists(object_hash);
+}
+
+bool MockObjectFetcher::PathExists(const std::string &path) const {
+  return MockReflog::Exists(path);
 }
 
 
@@ -599,4 +696,85 @@ bool MockHistory::GetHashes(std::vector<shash::Any> *hashes) const {
   std::transform(tags.rbegin(), tags.rend(),
                  hashes->begin(), MockHistory::get_hash);
   return true;
+}
+
+
+//------------------------------------------------------------------------------
+
+
+MockReflog* MockReflog::Open(const std::string &path) {
+  MockReflog* reflog = MockReflog::Get(path);
+  if (NULL == reflog) {
+    return NULL;
+  }
+  return reflog->Clone();
+}
+
+MockReflog* MockReflog::Create(const std::string &path,
+                               const std::string &repo_name) {
+  MockReflog *reflog = new MockReflog(repo_name);
+  MockReflog::RegisterPath(path, reflog);
+  return reflog;
+}
+
+
+MockReflog* MockReflog::Clone() const {
+  MockReflog *new_reflog = new MockReflog(*this);
+  return new_reflog;
+}
+
+MockReflog::MockReflog(const std::string fqrn)
+  : owns_database_file_(false)
+  , fqrn_(fqrn) {}
+
+bool MockReflog::AddCertificate(const shash::Any &certificate) {
+  references_.insert(certificate);
+  return true;
+}
+
+bool MockReflog::AddCatalog(const shash::Any &catalog) {
+  references_.insert(catalog);
+  return true;
+}
+
+bool MockReflog::AddHistory(const shash::Any &history) {
+  references_.insert(history);
+  return true;
+}
+
+bool MockReflog::AddMetainfo(const shash::Any &metainfo) {
+  references_.insert(metainfo);
+  return true;
+}
+
+bool MockReflog::ListCatalogs(std::vector<shash::Any> *hashes) const {
+  // TODO(rmeusel): C++11 use std::copy_if
+  hashes->clear();
+  ReferenceTypeFilter predicate(shash::kSuffixCatalog, true /* inverse */);
+  std::remove_copy_if(references_.begin(),
+                      references_.end(),
+                      std::back_inserter(*hashes),
+                      predicate);
+  return true;
+}
+
+bool MockReflog::RemoveCatalog(const shash::Any &catalog) {
+  references_.erase(catalog);
+  return true;
+}
+
+bool MockReflog::ContainsCertificate(const shash::Any &certificate) const {
+  return references_.count(certificate) == 1;
+}
+
+bool MockReflog::ContainsCatalog(const shash::Any &catalog) const {
+  return references_.count(catalog) == 1;
+}
+
+bool MockReflog::ContainsHistory(const shash::Any &history) const {
+  return references_.count(history) == 1;
+}
+
+bool MockReflog::ContainsMetainfo(const shash::Any &metainfo) const {
+  return references_.count(metainfo) == 1;
 }

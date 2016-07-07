@@ -1,0 +1,236 @@
+cvmfs_test_name="Stratum1 / preloaded snapshot with uncompressed and external files"
+cvmfs_test_autofs_on_startup=false
+
+produce_more_files_in() {
+  local working_dir=$1
+  local large_file=$2
+
+  cp $large_file $working_dir/large
+  pushdir $working_dir
+  echo "an uncompressed file" > nested/uncompressed
+  popdir
+}
+
+produce_files_in() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  mkdir poems
+  cat > poems/todo.txt << EOF
+the empty sheet.
+EOF
+
+  cat > poems/unordnung.txt << EOF
+ordnung    ordnung
+ordnung    ordnung
+ordnung    ordnung
+ordnung    ordnung
+ordnung    ordnung
+ordnung    ordnung
+ordnung    ordnung
+ordnung  unordn  g
+ordnung    ordnung
+EOF
+
+  ln -s poems/unordnung.txt unordnung
+
+  mkdir nested
+  touch nested/.cvmfscatalog
+  echo foo > nested/foo
+
+  popdir
+}
+
+graft_external() {
+  local cvmfs_dir=$1
+  local reference_dir=$2
+  local external_storage=$3
+
+  echo "I'm external" | cvmfs_swissknife zpipe > ${external_storage}/external_file
+  local hash=$(cat ${external_storage}/external_file | cvmfs_swissknife hash -a shake128)
+  local size=$(cat ${external_storage}/external_file | cvmfs_swissknife zpipe -d | wc -c)
+  touch ${cvmfs_dir}/external_file
+  cat > ${cvmfs_dir}/.cvmfsgraft-external_file << EOF
+checksum=$hash
+size=$size
+EOF
+
+  ls -lah $cvmfs_dir
+
+  cvmfs_swissknife zpipe -d < ${external_storage}/external_file > ${reference_dir}/external_file
+}
+
+CVMFS_TEST_620_MOUNTPOINT=
+CVMFS_TEST_620_REPLICA=
+CVMFS_TEST_620_HTTP_PID=
+cleanup() {
+  echo "running cleanup()..."
+  [ -z $CVMFS_TEST_620_MOUNTPOINT ] || sudo umount $CVMFS_TEST_620_MOUNTPOINT            > /dev/null 2>&1
+  [ -z $CVMFS_TEST_620_REPLICA    ] || sudo cvmfs_server rmfs -f $CVMFS_TEST_620_REPLICA > /dev/null 2>&1
+  [ -z $CVMFS_TEST_620_HTTP_PID   ] || sudo kill $CVMFS_TEST_620_HTTP_PID                > /dev/null 2>&1
+}
+
+check_stratum1_tmp_dir_emptiness() {
+  local tmp_dir="$1"
+  local tmp_dir_entries
+  echo "check stratum1 tmp directory"
+  tmp_dir_entries=$(ls $tmp_dir | wc -l)
+  echo "$tmp_dir contains: $tmp_dir_entries"
+  [ $tmp_dir_entries -eq 0 ]
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local script_location=$2
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  local scratch_dir=$(pwd)
+  mkdir reference_dir
+  local reference_dir=$scratch_dir/reference_dir
+
+  local mnt_point="$(pwd)/mountpount"
+  local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
+
+  echo -n "checking if cvmfs_preload is available... "
+  local source_tree="$(dirname $(dirname $(dirname $script_location)))"
+  local PRELOAD=
+  PRELOAD=$(find_or_build_cvmfs_preload $source_tree)
+  [ -x "$PRELOAD" ] || { echo "fail"; return 1; }
+  echo "found ($PRELOAD)"
+
+  local external_storage="${scratch_dir}/external_files"
+  echo "Creating external storage directory '$external_storage'"
+  mkdir -p $external_storage || return 51
+
+  local http_log="${scratch_dir}/http.log"
+  local http_port=8620
+  local external_http_base="http://localhost:$http_port"
+  local client_config="/etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/client.conf"
+
+  echo "install a desaster cleanup"
+  trap cleanup EXIT HUP INT TERM
+
+  echo "start an HTTP server to serve external files (logging to $http_log)"
+  CVMFS_TEST_620_HTTP_PID="$(open_http_server $external_storage $http_port $http_log)"
+  [ ! -z $CVMFS_TEST_620_HTTP_PID ] || kill -0 $CVMFS_TEST_620_HTTP_PID || { echo "fail"; return 41; }
+  echo "HTTP server running with PID $CVMFS_TEST_620_HTTP_PID"
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "configure external data location"
+  echo "CVMFS_EXTERNAL_URL=$external_http_base" | sudo tee --append $client_config
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository"
+  produce_files_in $repo_dir || return 3
+
+  echo "putting exactly the same stuff in the scratch space for comparison"
+  produce_files_in $reference_dir || return 4
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "graft external file"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  graft_external $repo_dir $reference_dir $external_storage || return 20
+  publish_repo $CVMFS_TEST_REPO -X || return $?
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "change to uncompressed files"
+  sudo sh -c "echo CVMFS_COMPRESSION_ALGORITHM=none >> \
+    /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf" || return 30
+  local large_file="large_file"
+  dd if=/dev/urandom of=$large_file bs=1024 count=$((100*1024))
+  start_transaction $CVMFS_TEST_REPO || return $?
+  produce_more_files_in $repo_dir $large_file || return 31
+  produce_more_files_in $reference_dir $large_file || return 32
+  publish_repo $CVMFS_TEST_REPO || return $?
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+
+  # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  echo "create Stratum1 repository on the same machine"
+  CVMFS_TEST_620_REPLICA=$replica_name
+  load_repo_config $CVMFS_TEST_REPO
+  create_stratum1 $replica_name                          \
+                  $CVMFS_TEST_USER                       \
+                  $CVMFS_STRATUM0                        \
+                  /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub \
+    || return 7
+
+  echo -n "get Stratum 1 spool directory: "
+  load_repo_config $replica_name
+  local s1_spool_tmp_dir="${CVMFS_SPOOL_DIR}/tmp"
+  load_repo_config $CVMFS_TEST_REPO
+  echo "$s1_spool_tmp_dir"
+
+  echo "create a Snapshot of the Stratum0 repository in the just created Stratum1 replica"
+  sudo cvmfs_server snapshot $replica_name || return 9
+
+  echo "check that Stratum1 spooler tmp dir is empty"
+  check_stratum1_tmp_dir_emptiness $s1_spool_tmp_dir || return 101
+
+  echo "mount the Stratum1 repository on a local mountpoint"
+  CVMFS_TEST_620_MOUNTPOINT=$mnt_point
+  do_local_mount $mnt_point $CVMFS_TEST_REPO $(get_repo_url $replica_name) "" "CVMFS_EXTERNAL_URL=$external_http_base" || return 10
+
+  echo "check if the Stratum1 repository contains exactly the same as the reference copy"
+  compare_directories $mnt_point $reference_dir || return 11
+
+  echo "unmount the Stratum1 repository"
+  sudo umount $mnt_point || return 12
+  CVMFS_TEST_620_MOUNTPOINT=""
+
+  echo "clean up"
+  sudo cvmfs_server rmfs -f $replica_name || return 13
+
+  echo "preloading a cache"
+  local preload_dir=${scratch_dir}/preloaded
+  $PRELOAD -u "$(get_repo_url $CVMFS_TEST_REPO)"     \
+           -r $preload_dir                           \
+           -k "/etc/cvmfs/keys/$CVMFS_TEST_REPO.pub" \
+           -m "$CVMFS_TEST_REPO" || return $?
+
+  local local_conf=$(pwd)/local.conf
+  echo "Create a local configuration file in $local_conf"
+  mkdir cache || return 40
+  cat > $local_conf << EOF
+CVMFS_CACHE_BASE=$(pwd)/cache
+CVMFS_QUOTA_LIMIT=-1
+CVMFS_RELOAD_SOCKETS=$(pwd)/cache
+CVMFS_ALIEN_CACHE=$preload_dir
+CVMFS_SERVER_URL=NOAVAIL
+CVMFS_HTTP_PROXY=NOAVAIL
+CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/$CVMFS_TEST_REPO.pub
+CVMFS_EXTERNAL_URL=$external_http_base
+EOF
+
+  echo "Mount the repository in $mnt_point to verify it"
+  local retval=0
+  CVMFS_TEST_620_MOUNTPOINT=$mnt_point
+  do_local_mount $mnt_point $CVMFS_TEST_REPO XXX $local_conf || retval=41
+
+  ls $mnt_point || retval=42
+  diff $mnt_point/large $reference_dir/large || retval=43
+
+  return 0
+}

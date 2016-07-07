@@ -6,13 +6,16 @@
 #include "hash.h"
 
 #include <alloca.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <openssl/md5.h>
 #include <openssl/ripemd.h>
 #include <openssl/sha.h>
+#include <unistd.h>
 
 #include <cstdio>
 
-#include "sha2.h"
+#include "KeccakHash.h"
 
 using namespace std;  // NOLINT
 
@@ -22,7 +25,8 @@ namespace CVMFS_NAMESPACE_GUARD {
 
 namespace shash {
 
-const char *kAlgorithmIds[] = {"", "", "-rmd160", "-sha256", ""};
+const char *kAlgorithmIds[] =
+  {"", "", "-rmd160", "-shake128", ""};
 
 
 bool HexPtr::IsValid() const {
@@ -65,8 +69,8 @@ Algorithms ParseHashAlgorithm(const string &algorithm_option) {
     return kSha1;
   if (algorithm_option == "rmd160")
     return kRmd160;
-  if (algorithm_option == "sha256")
-    return kSha256;
+  if (algorithm_option == "shake128")
+    return kShake128;
   return kAny;
 }
 
@@ -79,13 +83,56 @@ Any MkFromHexPtr(const HexPtr hex, const char suffix) {
     result = Any(kMd5, hex);
   if (length == 2*kDigestSizes[kSha1])
     result = Any(kSha1, hex);
-  // TODO(jblomer) compare -rmd160, -sha256
+  // TODO(jblomer) compare -rmd160, -shake128
   if ((length == 2*kDigestSizes[kRmd160] + kAlgorithmIdSizes[kRmd160]))
     result = Any(kRmd160, hex);
-  if ((length == 2*kDigestSizes[kSha256] + kAlgorithmIdSizes[kSha256]))
-    result = Any(kSha256, hex);
+  if ((length == 2*kDigestSizes[kShake128] + kAlgorithmIdSizes[kShake128]))
+    result = Any(kShake128, hex);
 
   result.suffix = suffix;
+  return result;
+}
+
+
+/**
+ * Similar to MkFromHexPtr but the suffix is deducted from the HexPtr string.
+ */
+Any MkFromSuffixedHexPtr(const HexPtr hex) {
+  Any result;
+
+  const unsigned length = hex.str->length();
+  if ((length == 2*kDigestSizes[kMd5]) || (length == 2*kDigestSizes[kMd5] + 1))
+  {
+    Suffix suffix = (length == 2*kDigestSizes[kMd5] + 1) ?
+      *(hex.str->rbegin()) : kSuffixNone;
+    result = Any(kMd5, hex, suffix);
+  }
+  if ((length == 2*kDigestSizes[kSha1]) ||
+      (length == 2*kDigestSizes[kSha1] + 1))
+  {
+    Suffix suffix = (length == 2*kDigestSizes[kSha1] + 1) ?
+      *(hex.str->rbegin()) : kSuffixNone;
+    result = Any(kSha1, hex, suffix);
+  }
+  if ((length == 2*kDigestSizes[kRmd160] + kAlgorithmIdSizes[kRmd160]) ||
+      (length == 2*kDigestSizes[kRmd160] + kAlgorithmIdSizes[kRmd160] + 1))
+  {
+    Suffix suffix =
+      (length == 2*kDigestSizes[kRmd160] + kAlgorithmIdSizes[kRmd160] + 1)
+        ? *(hex.str->rbegin())
+        : kSuffixNone;
+    result = Any(kRmd160, hex, suffix);
+  }
+  if ((length == 2*kDigestSizes[kShake128] + kAlgorithmIdSizes[kShake128]) ||
+      (length == 2*kDigestSizes[kShake128] + kAlgorithmIdSizes[kShake128] + 1))
+  {
+    Suffix suffix =
+      (length == 2*kDigestSizes[kShake128] + kAlgorithmIdSizes[kShake128] + 1)
+        ? *(hex.str->rbegin())
+        : kSuffixNone;
+    result = Any(kShake128, hex, suffix);
+  }
+
   return result;
 }
 
@@ -101,8 +148,8 @@ unsigned GetContextSize(const Algorithms algorithm) {
       return sizeof(SHA_CTX);
     case kRmd160:
       return sizeof(RIPEMD160_CTX);
-    case kSha256:
-      return sizeof(sha256_ctx);
+    case kShake128:
+      return sizeof(Keccak_HashInstance);
     default:
       LogCvmfs(kLogHash, kLogDebug | kLogSyslogErr, "tried to generate hash "
                "context for unspecified hash. Aborting...");
@@ -111,6 +158,7 @@ unsigned GetContextSize(const Algorithms algorithm) {
 }
 
 void Init(ContextPtr context) {
+  HashReturn keccak_result;
   switch (context.algorithm) {
     case kMd5:
       assert(context.size == sizeof(MD5_CTX));
@@ -124,9 +172,11 @@ void Init(ContextPtr context) {
       assert(context.size == sizeof(RIPEMD160_CTX));
       RIPEMD160_Init(reinterpret_cast<RIPEMD160_CTX *>(context.buffer));
       break;
-    case kSha256:
-      assert(context.size == sizeof(sha256_ctx));
-      sha256_init(reinterpret_cast<sha256_ctx *>(context.buffer));
+    case kShake128:
+      assert(context.size == sizeof(Keccak_HashInstance));
+      keccak_result = Keccak_HashInitialize_SHAKE128(
+        reinterpret_cast<Keccak_HashInstance *>(context.buffer));
+      assert(keccak_result == SUCCESS);
       break;
     default:
       abort();  // Undefined hash
@@ -136,6 +186,7 @@ void Init(ContextPtr context) {
 void Update(const unsigned char *buffer, const unsigned buffer_length,
             ContextPtr context)
 {
+  HashReturn keccak_result;
   switch (context.algorithm) {
     case kMd5:
       assert(context.size == sizeof(MD5_CTX));
@@ -152,10 +203,11 @@ void Update(const unsigned char *buffer, const unsigned buffer_length,
       RIPEMD160_Update(reinterpret_cast<RIPEMD160_CTX *>(context.buffer),
                        buffer, buffer_length);
       break;
-    case kSha256:
-      assert(context.size == sizeof(sha256_ctx));
-      sha256_update(reinterpret_cast<sha256_ctx *>(context.buffer),
-                    buffer, buffer_length);
+    case kShake128:
+      assert(context.size == sizeof(Keccak_HashInstance));
+      keccak_result = Keccak_HashUpdate(reinterpret_cast<Keccak_HashInstance *>(
+                        context.buffer), buffer, buffer_length * 8);
+      assert(keccak_result == SUCCESS);
       break;
     default:
       abort();  // Undefined hash
@@ -163,6 +215,7 @@ void Update(const unsigned char *buffer, const unsigned buffer_length,
 }
 
 void Final(ContextPtr context, Any *any_digest) {
+  HashReturn keccak_result;
   switch (context.algorithm) {
     case kMd5:
       assert(context.size == sizeof(MD5_CTX));
@@ -179,10 +232,14 @@ void Final(ContextPtr context, Any *any_digest) {
       RIPEMD160_Final(any_digest->digest,
                       reinterpret_cast<RIPEMD160_CTX *>(context.buffer));
       break;
-    case kSha256:
-      assert(context.size == sizeof(sha256_ctx));
-      sha256_final(reinterpret_cast<sha256_ctx *>(context.buffer),
-                   any_digest->digest);
+    case kShake128:
+      assert(context.size == sizeof(Keccak_HashInstance));
+      keccak_result = Keccak_HashFinal(reinterpret_cast<Keccak_HashInstance *>(
+                        context.buffer), NULL);
+      assert(keccak_result == SUCCESS);
+      keccak_result =
+        Keccak_HashSqueeze(reinterpret_cast<Keccak_HashInstance *>(
+          context.buffer), any_digest->digest, kDigestSizes[kShake128] * 8);
       break;
     default:
       abort();  // Undefined hash
@@ -256,11 +313,7 @@ void Hmac(
   Final(context_outer, any_digest);
 }
 
-bool HashFile(const std::string &filename, Any *any_digest) {
-  FILE *file = fopen(filename.c_str(), "r");
-  if (file == NULL)
-    return false;
-
+bool HashFd(int fd, Any *any_digest) {
   Algorithms algorithm = any_digest->algorithm;
   ContextPtr context(algorithm);
   context.buffer = alloca(context.size);
@@ -268,18 +321,27 @@ bool HashFile(const std::string &filename, Any *any_digest) {
   Init(context);
   unsigned char io_buffer[4096];
   int actual_bytes;
-  while ((actual_bytes = fread(io_buffer, 1, 4096, file))) {
+  while ((actual_bytes = read(fd, io_buffer, 4096)) != 0) {
+    if (actual_bytes == -1) {
+      if (errno == EINTR)
+        continue;
+      return false;
+    }
     Update(io_buffer, actual_bytes, context);
   }
-
-  if (ferror(file)) {
-    fclose(file);
-    return false;
-  }
-
   Final(context, any_digest);
-  fclose(file);
   return true;
+}
+
+
+bool HashFile(const std::string &filename, Any *any_digest) {
+  int fd = open(filename.c_str(), O_RDONLY);
+  if (fd == -1)
+    return false;
+
+  bool result = HashFd(fd, any_digest);
+  close(fd);
+  return result;
 }
 
 
@@ -318,6 +380,14 @@ Md5::Md5(const uint64_t lo, const uint64_t hi) {
 void Md5::ToIntPair(uint64_t *lo, uint64_t *hi) const {
   memcpy(lo, digest, 8);
   memcpy(hi, digest+8, 8);
+}
+
+
+Md5 Any::CastToMd5() {
+  assert(algorithm == kMd5);
+  Md5 result;
+  memcpy(result.digest, digest, kDigestSizes[kMd5]);
+  return result;
 }
 
 }  // namespace shash

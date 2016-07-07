@@ -76,10 +76,23 @@ cvmfs_run_test() {
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
   local scratch_dir=$(pwd)
 
-  local sudo_umask="$(sudo sh -c umask)"
+  # as stated in `cvmfs_server` (cf. get_user_shell()) the umask of the root
+  # user (default 022) is kept when impersonating the repository owner. This
+  # may vary on some platforms, though. Thus: we do not strictly check those
+  # permissions as they are rather configuration dependent
+  local sudo_umask=
+  if which runuser > /dev/null 2>&1; then
+    sudo_umask="$(sudo sh -c "runuser -m $CVMFS_TEST_USER -c umask")"
+  else
+    sudo_umask="$(sudo sh -c "su -m $CVMFS_TEST_USER -c umask")"
+  fi
 
   local usr_umask="$(umask)"
   local f_mode="$(mangle_umask $usr_umask)"
+
+  echo "when impersonating $CVMFS_TEST_USER through \`cvmfs_server\` we assume"
+  echo "umask to be ${sudo_umask}. This may be different on certain platforms."
+  echo "The normal user ($(whoami)) does currently have an umask of $usr_umask"
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
@@ -93,7 +106,8 @@ cvmfs_run_test() {
 
   echo "get a list of new files and their permissions"
   echo "(expecting that default sudo environment umask ($sudo_umask) took effect)"
-  check_permissions_of_new_files "$(mangle_umask $sudo_umask)" || return 3
+  echo "Note: we do not fail the test if this is not true"
+  check_permissions_of_new_files "$(mangle_umask $sudo_umask)" || true
 
   echo "create some more files in $CVMFS_TEST_REPO"
   local publish_log_1="${scratch_dir}/publish_1.log"

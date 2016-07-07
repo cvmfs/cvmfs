@@ -14,11 +14,13 @@ produce_files_in() {
 CVMFS_TEST_538_SELINUX_DISABLED=0
 CVMFS_TEST_538_S1_NAME=
 CVMFS_TEST_538_MOUNTPOINT=
+CVMFS_TEST_538_ALT_BACKEND=
 cleanup() {
   echo "running cleanup..."
   [ $CVMFS_TEST_538_SELINUX_DISABLED -eq 0 ] || sudo setenforce 1
   [ -z $CVMFS_TEST_538_S1_NAME ]             || sudo cvmfs_server rmfs -f $CVMFS_TEST_538_S1_NAME
   [ -z $CVMFS_TEST_538_MOUNTPOINT ]          || sudo umount $CVMFS_TEST_538_MOUNTPOINT
+  [ -z $CVMFS_TEST_538_ALT_BACKEND         ] || sudo rm -fR $CVMFS_TEST_538_ALT_BACKEND
 }
 
 cvmfs_run_test() {
@@ -34,7 +36,8 @@ cvmfs_run_test() {
   local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
 
   local backend_dir="/srv/cvmfs/${replica_name}"
-  local symlink_destination="${scratch_dir}/backend"
+  local alternative_backend="/opt/cvmfs"
+  local symlink_destination="${alternative_backend}/${replica_name}"
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
@@ -48,8 +51,9 @@ cvmfs_run_test() {
   echo "putting exactly the same stuff in the scratch space for comparison"
   produce_files_in $reference_dir || return 4
 
-  echo "creating CVMFS snapshot"
-  publish_repo $CVMFS_TEST_REPO || return $?
+  local publish_log_1="publish_1.log"
+  echo "creating CVMFS snapshot (logging to $publish_log_1)"
+  publish_repo $CVMFS_TEST_REPO > $publish_log_1 2>&1 || return $?
 
   echo "compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir || return $?
@@ -65,7 +69,9 @@ cvmfs_run_test() {
     sudo rm -fR $backend_dir || { echo "fail!"; return 5; }
     echo "done"
   fi
-  mkdir $symlink_destination || return 6
+  CVMFS_TEST_538_ALT_BACKEND="$alternative_backend"
+  sudo mkdir -p $symlink_destination || return 6
+  sudo chown $CVMFS_TEST_USER:$CVMFS_TEST_USER $symlink_destination || return 6
   sudo ln --symbolic $symlink_destination $backend_dir || return 7
 
   echo "register cleanup trap"

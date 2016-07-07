@@ -4,11 +4,16 @@
 script_location=$(dirname $(readlink --canonicalize $0))
 . ${script_location}/common_setup.sh
 
+# CernVM-FS server needs 'jq' from epel
+echo "enabling epel yum repository..."
+install_from_repo epel-release
+
 # install CernVM-FS RPM packages
 echo "installing RPM packages... "
 install_rpm "$CONFIG_PACKAGES"
 install_rpm $CLIENT_PACKAGE
 install_rpm $SERVER_PACKAGE
+install_rpm $DEVEL_PACKAGE
 install_rpm $UNITTEST_PACKAGE
 
 # installing WSGI apache module
@@ -32,6 +37,9 @@ install_from_repo gcc-c++
 install_from_repo rubygems
 install_from_repo wget
 install_from_repo redhat-lsb-core
+
+# traffic shaping
+install_from_repo trickle
 
 # install ruby gem for FakeS3
 install_ruby_gem fakes3

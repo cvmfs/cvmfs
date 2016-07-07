@@ -41,19 +41,19 @@
 #include <string>
 #include <vector>
 
-#include "cvmfs.h"
 #include "duplex_sqlite3.h"
 #include "hash.h"
 #include "logging.h"
 #include "monitor.h"
 #include "platform.h"
 #include "smalloc.h"
-#include "util.h"
+#include "statistics.h"
+#include "util/posix.h"
 #include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 
-const uint32_t QuotaManager::kProtocolRevision = 1;
+const uint32_t QuotaManager::kProtocolRevision = 2;
 
 void QuotaManager::BroadcastBackchannels(const string &message) {
   assert(message.length() > 0);
@@ -285,7 +285,8 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
   const std::string &exe_path,
   const std::string &cache_dir,
   const uint64_t limit,
-  const uint64_t cleanup_threshold)
+  const uint64_t cleanup_threshold,
+  bool foreground)
 {
   // Create lock file: only one fuse client at a time
   const int fd_lockfile = LockFile(cache_dir + "/lock_cachemgr");
@@ -364,7 +365,7 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
   command_line.push_back(StringifyInt(pipe_handshake[0]));
   command_line.push_back(StringifyInt(limit));
   command_line.push_back(StringifyInt(cleanup_threshold));
-  command_line.push_back(StringifyInt(cvmfs::foreground_));
+  command_line.push_back(StringifyInt(foreground));
   command_line.push_back(StringifyInt(GetLogSyslogLevel()));
   command_line.push_back(StringifyInt(GetLogSyslogFacility()));
   command_line.push_back(GetLogDebugFile() + ":" + GetLogMicroSyslog());
@@ -445,6 +446,7 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
   LogCvmfs(kLogQuota, kLogSyslog,
            "cleanup cache until %lu KB are free", leave_size/1024);
   LogCvmfs(kLogQuota, kLogDebug, "gauge %"PRIu64, gauge_);
+  cleanup_recorder_.Tick();
 
   bool result;
   string hash_str;
@@ -503,6 +505,14 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
       pid_t pid;
       int statloc;
       if ((pid = fork()) == 0) {
+        // TODO(jblomer): eviciting files in the cache should perhaps become a
+        // thread.  This would also allow to block the chunks and prevent the
+        // race with re-insertion.  Then again, a thread can block umount.
+#ifndef DEBUGMSG
+        int max_fd = sysconf(_SC_OPEN_MAX);
+        for (int i = 0; i < max_fd; ++i)
+          close(i);
+#endif
         if (fork() == 0) {
           for (unsigned i = 0, iEnd = trash.size(); i < iEnd; ++i) {
             LogCvmfs(kLogQuota, kLogDebug, "unlink %s", trash[i].c_str());
@@ -680,6 +690,24 @@ uint64_t PosixQuotaManager::GetSizePinned() {
   uint64_t gauge, size_pinned;
   GetSharedStatus(&gauge, &size_pinned);
   return size_pinned;
+}
+
+
+uint64_t PosixQuotaManager::GetCleanupRate(uint64_t period_s) {
+  if (!spawned_ || (protocol_revision_ < 2)) return 0;
+  uint64_t cleanup_rate;
+
+  int pipe_cleanup_rate[2];
+  MakeReturnPipe(pipe_cleanup_rate);
+  LruCommand cmd;
+  cmd.command_type = kCleanupRate;
+  cmd.size = period_s;
+  cmd.return_pipe = pipe_cleanup_rate[1];
+  WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
+  ReadHalfPipe(pipe_cleanup_rate[0], &cleanup_rate, sizeof(cleanup_rate));
+  CloseReturnPipe(pipe_cleanup_rate);
+
+  return cleanup_rate;
 }
 
 
@@ -1098,6 +1126,19 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
       continue;
     }
 
+    // The cleanup rate is returned immediately
+    if (command_type == kCleanupRate) {
+      int return_pipe =
+        quota_mgr->BindReturnPipe(command_buffer[num_commands].return_pipe);
+      if (return_pipe < 0)
+        continue;
+      uint64_t period_s = size;  // use the size field to transmit the period
+      uint64_t rate = quota_mgr->cleanup_recorder_.GetNoTicks(period_s);
+      WritePipe(return_pipe, &rate, sizeof(rate));
+      quota_mgr->UnbindReturnPipe(return_pipe);
+      continue;
+    }
+
     // Reservations are handled immediately and "out of band"
     if (command_type == kReserve) {
       bool success = true;
@@ -1231,7 +1272,7 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
       (command_type == kList) || (command_type == kListPinned) ||
       (command_type == kListCatalogs) || (command_type == kListVolatile) ||
       (command_type == kRemove) || (command_type == kStatus) ||
-      (command_type == kLimits) ||(command_type == kPid);
+      (command_type == kLimits) || (command_type == kPid);
     if (!immediate_command) num_commands++;
 
     if ((num_commands == kCommandBufferSize) || immediate_command)
@@ -1490,6 +1531,13 @@ PosixQuotaManager::PosixQuotaManager(
   , initialized_(false)
 {
   pipe_lru_[0] = pipe_lru_[1] = -1;
+  cleanup_recorder_.AddRecorder(1, 90);  // last 1.5 min with second resolution
+  // last 1.5 h with minute resolution
+  cleanup_recorder_.AddRecorder(60, 90*60);
+  // last 18 hours with 20 min resolution
+  cleanup_recorder_.AddRecorder(20*60, 60*60*18);
+  // last 4 days with hour resolution
+  cleanup_recorder_.AddRecorder(60*60, 60*60*24*4);
 }
 
 

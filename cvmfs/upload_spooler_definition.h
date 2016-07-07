@@ -7,6 +7,7 @@
 
 #include <string>
 
+#include "compression.h"
 #include "hash.h"
 
 namespace upload {
@@ -38,11 +39,19 @@ struct SpoolerDefinition {
   explicit SpoolerDefinition(
     const std::string       &definition_string,
     const shash::Algorithms  hash_algorithm,
+    const zlib::Algorithms   compression_algorithm = zlib::kZlibDefault,
     const bool               use_file_chunking   = false,
     const size_t             min_file_chunk_size = 0,
     const size_t             avg_file_chunk_size = 0,
     const size_t             max_file_chunk_size = 0);
   bool IsValid() const { return valid_; }
+
+  /**
+   * Creates a new SpoolerDefinition based on an existing one.  The new spooler
+   * has compression set to zlib, which is required for catalogs and other meta-
+   * objects.
+   */
+  SpoolerDefinition Dup2DefaultCompression() const;
 
   DriverType  driver_type;            //!< the type of the spooler driver
   std::string temporary_path;         //!< scratch space for the FileProcessor
@@ -53,6 +62,7 @@ struct SpoolerDefinition {
   std::string spooler_configuration;
 
   shash::Algorithms  hash_algorithm;
+  zlib::Algorithms   compression_alg;
   bool               use_file_chunking;
   size_t             min_file_chunk_size;
   size_t             avg_file_chunk_size;

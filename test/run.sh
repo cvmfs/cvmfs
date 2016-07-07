@@ -58,7 +58,7 @@ if [ -z "$testsuite" ]; then
 fi
 
 # start running the tests
-TEST_ROOT=$(readlink -f $(dirname $0))
+TEST_ROOT=$(cd "$(dirname "$0")"; pwd)
 export TEST_ROOT
 
 num_tests=0
@@ -74,7 +74,11 @@ report_failure() {
   local workdir=$2
   echo $message
   if [ x$workdir != x ]; then
-    sudo cp $CVMFS_TEST_SYSLOG_TARGET $workdir
+    if [ x$PARROT_ENABLED = "xTRUE" ]; then
+      cp $CVMFS_TEST_SYSLOG_TARGET $workdir
+    else
+      sudo cp $CVMFS_TEST_SYSLOG_TARGET $workdir
+    fi
   fi
   num_failures=$(($num_failures+1))
 }
@@ -94,26 +98,36 @@ report_skipped() {
   num_skipped=$(($num_skipped+1))
 }
 
+clean_workdir() {
+  if [ x$PARROT_ENABLED = "xTRUE" ]; then
+    rm -rf "$workdir" >> $logfile
+  else
+    sudo rm -rf "$workdir" >> $logfile
+  fi
+}
+
 # makes sure the test environment for the test case is sane
 setup_environment() {
   local autofs_demand=$1
   local workdir=$2
 
   # make sure the environment is clean
-  if ! cvmfs_clean; then
-    echo "failed to clean environment"
+  local clean_retval=0
+  cvmfs_clean || clean_retval=$?
+  if [ $clean_retval -ne 0 ]; then
+    echo "failed to clean environment (retval: $clean_retval)"
     return 101
   fi
 
   # create a workspace for the test case
-  rm -rf "$workdir"
-  if ! mkdir -p "$workdir"; then
+  rm -rf "$workdir" && mkdir -p "$workdir"
+  if [ $? -ne 0 ]; then
     echo "failed to create test working directory"
     return 102
   fi
 
   # if we are not inside a docker
-  if [ x"$CVMFS_TEST_DOCKER" = xno ]; then
+  if [ x"$CVMFS_TEST_DOCKER" = xno ] && ! running_on_osx; then
     # configure autofs to the test's needs
     service_switch autofs restart || true
     local timeout=10 # wait until autofs restarts (possible race >.<)
@@ -156,6 +170,8 @@ mkdir -p $scratch_basedir
 
 get_iso8601_timestamp > ${scratch_basedir}/starttime
 
+to_syslog "Test Suite started"
+
 # run the tests
 for t in $testsuite
 do
@@ -188,7 +204,9 @@ do
   fi
 
   # write some status info to the screen
-  echo "-- Testing ${cvmfs_test_name} ($(date) / test number $(basename $t | head -c3))" >> $logfile
+  TEST_NR="$(basename $t | head -c3)"
+  to_syslog "Test $TEST_NR (${cvmfs_test_name}) started"
+  echo "-- Testing ${cvmfs_test_name} ($(date) / test number $TEST_NR)" >> $logfile
   echo -n "Testing ${cvmfs_test_name}... "
   echo "$cvmfs_test_name"          > ${scratchdir}/name
   echo "$(basename $t | head -c3)" > ${scratchdir}/number
@@ -202,10 +220,16 @@ do
   fi
 
   # configure the environment for the test
-  if ! setup_environment $cvmfs_test_autofs_on_startup $workdir >> $logfile 2>&1; then
-    report_failure "failed to setup environment" >> $logfile
+  setup_retval=0
+  setup_environment $cvmfs_test_autofs_on_startup $workdir >> $logfile 2>&1 || setup_retval=$?
+  if [ $setup_retval -ne 0 ]; then
+    to_syslog "Test $TEST_NR (${cvmfs_test_name}) failed (setup)"
+    report_failure "failed to setup environment (retval: $setup_retval)" >> $logfile
     echo "Failed! (setup)"
-    echo "102" > ${scratchdir}/retval
+    echo "0"         > ${scratchdir}/elapsed
+    echo "102"       > ${scratchdir}/retval
+    wc -l < $logfile > ${scratchdir}/log_end
+    touch              ${scratchdir}/failure
     continue
   fi
 
@@ -234,31 +258,36 @@ do
   # check the final test result
   case $RETVAL in
     0)
-      sudo rm -rf "$workdir" >> $logfile
+      clean_workdir
+      to_syslog "Test $TEST_NR (${cvmfs_test_name}) finished successfully"
       report_passed "Test passed" >> $logfile
       touch ${scratchdir}/success
       echo "OK"
       ;;
     $CVMFS_MEMORY_WARNING)
-      sudo rm -rf "$workdir" >> $logfile
+      clean_workdir
+      to_syslog "Test $TEST_NR (${cvmfs_test_name}) finished with memory warning"
       report_warning "Memory limit exceeded!" >> $logfile
       touch ${scratchdir}/memorywarning
       echo "Memory Warning!"
       ;;
     $CVMFS_TIME_WARNING)
-      sudo rm -rf "$workdir" >> $logfile
+      clean_workdir
+      to_syslog "Test $TEST_NR (${cvmfs_test_name}) finished with time warning"
       report_warning "Time limit exceeded!" >> $logfile
       tail -n 50 /var/log/messages /var/log.syslog >> $logfile 2>/dev/null
       touch ${scratchdir}/timewarning
       echo "Time Warning!"
       ;;
     $CVMFS_GENERAL_WARNING)
-      sudo rm -rf "$workdir" >> $logfile
+      clean_workdir
+      to_syslog "Test $TEST_NR (${cvmfs_test_name}) finished with warning"
       report_warning "Test case finished with warnings!" >> $logfile
       touch ${scratchdir}/generalwarning
       echo "Warning!"
       ;;
     *)
+      to_syslog "Test $TEST_NR (${cvmfs_test_name}) failed"
       report_failure "Testcase failed with RETVAL $RETVAL" $workdir >> $logfile
       tail -n 50 /var/log/messages /var/log.syslog >> $logfile 2>/dev/null
       touch ${scratchdir}/failure
@@ -299,6 +328,8 @@ echo "Warnings: $num_warnings"
 echo "Failures: $num_failures"
 echo ""
 echo "took $(milliseconds_to_human_readable $testsuite_time_elapsed)"
+
+to_syslog "Test Suite finished"
 
 exit $num_failures
 

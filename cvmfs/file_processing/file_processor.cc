@@ -8,11 +8,11 @@
 #include <cassert>
 #include <string>
 
-#include "../logging.h"
-#include "chunk.h"
-#include "chunk_detector.h"
-#include "file.h"
-#include "io_dispatcher.h"
+#include "file_processing/chunk.h"
+#include "file_processing/chunk_detector.h"
+#include "file_processing/file.h"
+#include "file_processing/io_dispatcher.h"
+#include "logging.h"
 
 namespace upload {
 
@@ -21,6 +21,7 @@ FileProcessor::FileProcessor(AbstractUploader         *uploader,
   io_dispatcher_(new IoDispatcher(uploader,
                                   this,
                                   spooler_definition.number_of_threads)),
+  compression_alg_(spooler_definition.compression_alg),
   hash_algorithm_(spooler_definition.hash_algorithm),
   chunking_enabled_(spooler_definition.use_file_chunking),
   minimal_chunk_size_(spooler_definition.min_file_chunk_size),
@@ -54,6 +55,7 @@ void FileProcessor::Process(const std::string   &local_path,
                         io_dispatcher_,
                         chunk_detector,
                         hash_algorithm_,
+                        compression_alg_,
                         hash_suffix);
 
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "Scheduling '%s' for processing ("
@@ -95,7 +97,8 @@ void FileProcessor::FileDone(File *file) {
   NotifyListeners(SpoolerResult(0,
                                 file->path(),
                                 file->bulk_chunk()->content_hash(),
-                                resulting_chunks));
+                                resulting_chunks,
+                                compression_alg_));
 }
 
 

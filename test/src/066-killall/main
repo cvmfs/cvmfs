@@ -1,0 +1,29 @@
+
+cvmfs_test_name="Killing all cvmfs2 instances"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  echo "Run killall when idle"
+  sudo cvmfs_config killall || return 1
+
+  echo "Mount repositories and reload"
+  cvmfs_mount grid.cern.ch || return 10
+  cvmfs_mount atlas.cern.ch || return 11
+  sudo cvmfs_config reload &
+  local reload_pid=$!
+  echo "Reload PID is $reload_pid"
+
+  echo "Sleep a few seconds to let cvmfs_config reload start"
+  sleep 10
+
+  sudo cvmfs_config killall || return 20
+  echo "Wait for reload to finish"
+  wait $reload_pid
+
+  echo "Killall once again because we don't know where the reloaded was interrupted"
+  sudo cvmfs_config killall || return 30
+
+  return 0
+}
+

@@ -10,12 +10,11 @@
 #include <string>
 #include <vector>
 
-#include "../../cvmfs/file_processing/char_buffer.h"
-#include "../../cvmfs/file_processing/file_processor.h"
-#include "../../cvmfs/upload_spooler_result.h"
-#include "../../cvmfs/util.h"
 #include "c_file_sandbox.h"
+#include "file_processing/char_buffer.h"
+#include "file_processing/file_processor.h"
 #include "testutil.h"
+#include "upload_spooler_result.h"
 
 struct MockStreamHandle : public upload::UploadStreamHandle {
   explicit MockStreamHandle(const CallbackTN *commit_callback) :

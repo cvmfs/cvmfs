@@ -27,7 +27,7 @@ EOF
 
   cvmfs_mount grid.cern.ch
   if [ $? -eq 0 ]; then
-    echo "BLACKLIST NOT EFFETIVE"
+    echo "BLACKLIST NOT EFFECTIVE"
     retval=20
   fi
 

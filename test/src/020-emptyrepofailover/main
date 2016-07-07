@@ -1,11 +1,18 @@
 
-cvmfs_test_name="404 on Repository URL"
+cvmfs_test_name="Failover on 404"
 
 do_faulty_mount() {
   cvmfs_mount "atlas.cern.ch"          \
               "CVMFS_TIMEOUT=3"        \
               "CVMFS_TIMEOUT_DIRECT=3" \
               "CVMFS_HTTP_PROXY=DIRECT"
+}
+
+
+CVMFS_TEST_020_HTTP_PID=
+cleanup() {
+  echo "running cleanup()"
+  [ -z $CVMFS_TEST_020_HTTP_PID ] || sudo kill $CVMFS_TEST_020_HTTP_PID
 }
 
 cvmfs_run_test() {
@@ -19,21 +26,27 @@ cvmfs_run_test() {
   autofs_switch off || return 10
   autofs_switch on  || return 11
 
+  local http_log="${scratch_dir}/http.log"
+  local http_port=8020
+  local http_url="http://127.0.0.1:$http_port"
+
   echo "configure cvmfs with a host serving an empty directory"
-  sudo sh -c "echo \"CVMFS_SERVER_URL=\\\"http://127.0.0.1:8000/@org@;http://cvmfs-stratum-one.cern.ch/opt/@org@\\\"\" > /etc/cvmfs/domain.d/cern.ch.local" || return 1
+  sudo sh -c "echo \"CVMFS_SERVER_URL=\\\"${http_url}/@org@;http://cvmfs-stratum-one.cern.ch/opt/@org@\\\"\" > /etc/cvmfs/domain.d/cern.ch.local" || return 1
 
   echo "create the empty directory to be served"
   mkdir -p empty || return 1
   cd empty       || return 2
 
-  echo "run a simple HTTP server"
-  cmd="python -m SimpleHTTPServer 8000"
-  http_pid=$(run_background_service $logfile "$cmd")
-  if [ $? -ne 0 ]; then return 3; fi
-  echo "simple HTTP server serving empty directory started with PID $http_pid"
+  echo "install a desaster cleanup"
+  trap cleanup EXIT HUP INT TERM || return $?
+
+  echo "start an HTTP server to serve external files (logging to $http_log)"
+  CVMFS_TEST_020_HTTP_PID="$(open_http_server ${scratch_dir}/empty $http_port $http_log)"
+  [ ! -z $CVMFS_TEST_020_HTTP_PID ] || kill -0 $CVMFS_TEST_020_HTTP_PID || { echo "fail"; return 3; }
+  echo "HTTP server running with PID $CVMFS_TEST_020_HTTP_PID"
 
   echo "try to mount cvmfs"
-  seconds=$(stop_watch do_faulty_mount)
+  local milliseconds=$(stop_watch do_faulty_mount)
 
   echo "try to list the repository"
   ls /cvmfs/atlas.cern.ch || retval=4
@@ -43,16 +56,13 @@ cvmfs_run_test() {
   sudo cvmfs_talk -i atlas.cern.ch host info | grep 127.0.0.1 | grep -q "host down"
   local h1=$?
   sudo cvmfs_talk -i atlas.cern.ch host info
-
-  echo "killing simple HTTP server"
-  sudo kill $http_pid || retval=5
-
   [ $h1 -eq 0 ] || retval=6
 
   sudo rm -f /etc/cvmfs/domain.d/cern.ch.local || retval=7
 
-  if [ $seconds -gt 6 ]; then
-    echo "mounting took too long with $seconds seconds (expected 6)"
+  local expected_max=6000
+  if [ $milliseconds -gt $expected_max ]; then
+    echo "mounting took too long with $milliseconds seconds (expected $expected_max)"
     CVMFS_TIME_WARNING_FLAG=1
   fi
 

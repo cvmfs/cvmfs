@@ -2,14 +2,14 @@ Source: cvmfs
 Section: utils
 Priority: extra
 Maintainer: Jakob Blomer <jblomer@cern.ch>
-Build-Depends: debhelper (>= 9), autotools-dev, cmake, libssl-dev, make, gcc, g++, libfuse-dev, pkg-config, libattr1-dev, patch, python-dev, unzip, uuid-dev, libc6-dev
+Build-Depends: debhelper (>= 9), autotools-dev, cmake, libcap-dev, libssl-dev, make, gcc, g++, libfuse-dev, pkg-config, libattr1-dev, patch, python-dev, unzip, uuid-dev, libc6-dev, valgrind, voms-dev
 Standards-Version: 3.9.3.1
 Homepage: http://cernvm.cern.ch/portal/filesystem
 
 Package: cvmfs
 Architecture: i386 amd64 arm64
 #Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
-Depends: cvmfs-config, bash, coreutils, grep, gawk, sed, perl, sudo, psmisc, autofs, fuse, curl, attr, libfuse2, debianutils, libc-bin, sysvinit-utils, zlib1g, gdb, uuid-dev, uuid
+Depends: cvmfs-config, bash, coreutils, grep, gawk, sed, perl, psmisc, autofs, fuse, curl, attr, libfuse2, debianutils, libc-bin, sysvinit-utils, zlib1g, gdb, uuid-dev, uuid
 #Multi-Arch: same   (preparation for multiarch support)
 Homepage: http://cernvm.cern.ch
 Description: CernVM File System
@@ -18,12 +18,22 @@ Description: CernVM File System
 Package: cvmfs-server
 Architecture: i386 amd64 arm64
 #Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
-Depends: insserv, initscripts, bash, coreutils, grep, sed, sudo, psmisc, curl, gzip, attr, openssl, apache2
+Depends: insserv, initscripts, bash, coreutils, grep, sed, psmisc, curl, gzip, attr, openssl, apache2, libcap2, lsof, rsync
+Recommends: jq
 Conflicts: cvmfs-server (< 2.1)
 #Multi-Arch: same   (preparation for multiarch support)
 Homepage: http://cernvm.cern.ch
 Description: CernVM File System Server
  HTTP File System Repository Server for Distributing Software to CernVM.
+
+Package: cvmfs-dev
+Architecture: i386 amd64 arm64
+#Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
+Depends: openssl
+#Multi-Arch: same   (preparation for multiarch support)
+Homepage: http://cernvm.cern.ch
+Description: CernVM File System Server
+ CernVM-FS static client library
 
 Package: cvmfs-unittests
 Architecture: i386 amd64 arm64

@@ -1,0 +1,52 @@
+cvmfs_test_name="Libcvmfs test"
+cvmfs_test_autofs_on_startup=false
+
+CVMFS_TEST_602_REPO_COUNT=0
+CVMFS_TEST_602_REPO_PREFIX="test.cern.ch.libcvmfs_"
+cleanup() {
+  echo "running cleanup()"
+  #for i in $(seq 1 $CVMFS_TEST_602_REPO_COUNT); do
+  #  destroy_repo "$CVMFS_TEST_602_REPO_PREFIX$i"
+  #done
+}
+
+cvmfs_run_test() {
+  local workdir="$2"
+  local bin_name="602-test"
+  local num_repos=2
+  local base_name="$CVMFS_TEST_602_REPO_PREFIX"
+
+  echo "compiling libcvmfs test binary..."
+  g++ -o "$bin_name" -DDEBUGMSG "$workdir/main.cc" -lcvmfs -pthread -ldl -lssl -lcrypto -luuid -lrt || return 1
+
+  echo "register cleanup trap"
+  trap cleanup EXIT HUP INT TERM || return $?
+
+  echo "creating $num_repos local test repositories"
+  for i in $(seq 1 $num_repos); do
+    local repo_name="$base_name$i"
+    local repo_dir="/cvmfs/$repo_name"
+
+    CVMFS_TEST_602_REPO_COUNT=$(( $CVMFS_TEST_602_REPO_COUNT + 1 ))
+    create_empty_repo "$repo_name" $CVMFS_TEST_USER || return 2
+    start_transaction "$repo_name"                  || return 3
+
+    mkdir "$repo_dir/main"                || return 4
+    echo "$i" > "$repo_dir/main/mainfile" || return 5
+
+    mkdir "$repo_dir/list" || return 6
+    for j in $(seq 1 $i); do
+      touch "$repo_dir/list/file$j" || return 7
+    done
+
+    # 20MB file (should get chunked)
+    dd if=/dev/urandom of=$repo_dir/large bs=1024 count=20000
+
+    publish_repo "$repo_name" || return 8
+  done
+
+  echo "check libcvmfs with the generated binary"
+  ./$bin_name "$(get_repo_url)" "$base_name" "$num_repos" || return 9
+
+  return 0
+}

@@ -28,6 +28,7 @@ sub usage {
   print "  cache list pinned      gets pinned file catalogs in cache       \n";
   print "  cache list catalogs    gets all file catalogs in cache          \n";
   print "  cleanup <MB>           cleans file cache until size <= <MB>     \n";
+  print "  cleanup rate <period>  n.o. cleanups in the last <period> min   \n";
   print "  evict <path>           removes <path> from the cache            \n";
   print "  pin <path>             pins <path> in the cache                 \n";
   print "  mountpoint             returns the mount point                  \n";

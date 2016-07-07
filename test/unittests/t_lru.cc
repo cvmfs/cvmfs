@@ -4,8 +4,9 @@
 
 #include <gtest/gtest.h>
 
-#include "../../cvmfs/lru.h"
-#include "../../cvmfs/statistics.h"
+#include "lru.h"
+#include "statistics.h"
+#include "util/string.h"
 
 using lru::LruCache;
 

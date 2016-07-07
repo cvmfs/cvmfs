@@ -16,7 +16,6 @@
 #include "gtest/gtest_prod.h"
 #include "hash.h"
 #include "sink.h"
-#include "util.h"
 
 class BackoffThrottle;
 
@@ -71,12 +70,18 @@ class Fetcher : SingleCopy {
   Fetcher(cache::CacheManager *cache_mgr,
           download::DownloadManager *download_mgr,
           BackoffThrottle *backoff_throttle,
-          perf::Statistics *statistics);
+          perf::Statistics *statistics,
+          const std::string &name = "fetch",
+          bool external_data = false);
   ~Fetcher();
+  // TODO(jblomer): reduce number of arguments
   int Fetch(const shash::Any &id,
             const uint64_t size,
             const std::string &name,
-            const cache::CacheManager::ObjectType object_type);
+            const zlib::Algorithms compression_algorithm,
+            const cache::CacheManager::ObjectType object_type,
+            const std::string &alt_url = "",
+            off_t range_offset = -1);
 
   cache::CacheManager *cache_mgr() { return cache_mgr_; }
   download::DownloadManager *download_mgr() { return download_mgr_; }
@@ -91,6 +96,7 @@ class Fetcher : SingleCopy {
     ThreadLocalStorage() {
       pipe_wait[0] = -1;
       pipe_wait[1] = -1;
+      fetcher = NULL;
     }
 
     /**
@@ -129,6 +135,13 @@ class Fetcher : SingleCopy {
   int OpenSelect(const shash::Any &id,
                  const std::string &name,
                  const cache::CacheManager::ObjectType object_type);
+
+  /**
+   * If set to true, this fetcher is in 'external data' mode:
+   * instead of constructing the to-be-downloaded URL from the entry hash,
+   * it will use the filename.
+   */
+  bool external_;
 
   /**
    * Key to the thread's ThreadLocalStorage memory

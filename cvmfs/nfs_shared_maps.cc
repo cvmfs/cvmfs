@@ -29,7 +29,8 @@
 #include "duplex_sqlite3.h"
 #include "logging.h"
 #include "prng.h"
-#include "util.h"
+#include "util/posix.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 

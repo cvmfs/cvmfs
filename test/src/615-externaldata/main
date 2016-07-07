@@ -1,0 +1,175 @@
+
+cvmfs_test_name="External data"
+cvmfs_test_autofs_on_startup=false
+
+is_external_file() {
+  local full_file_path="$1"
+  [ x"$(attr -qg external_file "$full_file_path")" = x"1" ]
+}
+
+get_content_hash() {
+  local full_file_path="$1"
+  attr -qg hash "$full_file_path"
+}
+
+get_chunk_count() {
+  local full_file_path="$1"
+  attr -qg chunks "$full_file_path"
+}
+
+CVMFS_TEST_615_HTTP_PID=
+cleanup() {
+  echo "running cleanup()"
+  [ -z $CVMFS_TEST_615_HTTP_PID ] || sudo kill $CVMFS_TEST_615_HTTP_PID
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  src_location=$2
+  local repo_dir="/cvmfs/${CVMFS_TEST_REPO}"
+  local scratch_dir="$(pwd)"
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  echo "Note: cvmfs_server mkfs -X --> enabled external files"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -X -Z none || return $?
+
+  echo "get some global base paths and configs"
+  load_repo_config $CVMFS_TEST_REPO
+  local cvmfs_mnt="${CVMFS_SPOOL_DIR}/rdonly"
+  local cvmfs_cache="${CVMFS_CACHE_BASE}/$CVMFS_TEST_REPO"
+  local http_port=8615
+  local external_http_base="http://localhost:$http_port"
+  local client_config="/etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/client.conf"
+
+  echo "install a desaster cleanup"
+  trap cleanup EXIT HUP INT TERM || return $?
+
+  echo "configure external data location"
+  echo "CVMFS_EXTERNAL_URL=$external_http_base" | sudo tee --append $client_config
+
+  echo "fill repository with some files"
+  start_transaction $CVMFS_TEST_REPO                     || return $?
+  mkdir -p ${repo_dir}/external                          || return 1
+  mkdir -p ${repo_dir}/internal                          || return 2
+  echo "Hello World" > ${repo_dir}/external/file         || return 3
+  cp ${repo_dir}/external/file ${repo_dir}/internal/file || return 4
+
+  echo "create a large file to be chunked"
+  dd if=/dev/urandom of=chunked_file bs=1M count=32 || return 5
+  cp chunked_file ${repo_dir}/chunked_file          || return 6
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO -v || return $?
+
+  echo "Locating internal/file in backend storage"
+  local object_hash=$(get_content_hash ${cvmfs_mnt}/internal/file)
+  local object_url="$(get_object_url $CVMFS_TEST_REPO $object_hash)"
+  local object_file="${scratch_dir}/${object_hash}"
+  echo "File in backend is $object_url"
+
+  echo "downloading the file to local scratch space '$object_file'"
+  download_from_backend $CVMFS_TEST_REPO $(make_path $object_hash) $object_file || return 7
+
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+  local external_storage="${scratch_dir}/external_files"
+  echo "Creating external storage directory '$external_storage'"
+  mkdir -p $external_storage || return 51
+
+  echo "Make sure the file is NOT in the repository storage but instead in the external area"
+  mkdir -p ${external_storage}/external
+  delete_from_backend $CVMFS_TEST_REPO $(make_path $object_hash) || return 52
+  cp "$object_file" ${external_storage}/external/file            || return 53
+
+  echo "Check the external file data (should fail to read - external storage not served yet)"
+  is_external_file ${cvmfs_mnt}/external/file || return 20
+  ! cat ${repo_dir}/external/file             || return 22
+
+  local http_log="${scratch_dir}/http.log"
+  echo "start an HTTP server to serve external files (logging to $http_log)"
+  CVMFS_TEST_615_HTTP_PID="$(open_http_server $external_storage $http_port $http_log)"
+  [ ! -z $CVMFS_TEST_615_HTTP_PID ] || kill -0 $CVMFS_TEST_615_HTTP_PID || { echo "fail"; return 4; }
+  echo "HTTP server running with PID $CVMFS_TEST_615_HTTP_PID"
+
+  echo "Check the external file data"
+  is_external_file ${cvmfs_mnt}/external/file               || return 20
+  [ x"$(cat ${repo_dir}/external/file)" == x"Hello World" ] || return 22
+
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+  echo "Try reading chunked file (should fail - not served by external yet)"
+  cat ${repo_dir}/chunked_file > /dev/null && return 35
+
+  echo "copy chunked file into external storage"
+  cp chunked_file "${external_storage}/chunked_file" || return 52
+
+  echo "verify chunked files are really properly chunked and readable"
+  local chunked_true_hash=$(cat chunked_file | sha1sum | awk '{print $1;}')
+  local chunked_cvmfs_hash=$(get_content_hash ${cvmfs_mnt}/chunked_file)
+  local chunked_cvmfs_read=$(cat ${repo_dir}/chunked_file | sha1sum | awk '{print $1;}')
+  local chunk_count=$(get_chunk_count ${cvmfs_mnt}/chunked_file)
+
+  if ! is_external_file ${cvmfs_mnt}/chunked_file; then
+    echo "Chunked file is not marked as external."
+    return 24
+  fi
+  if [ x"$chunked_true_hash" != x"$chunked_cvmfs_hash" ]; then
+    echo "Correct hash is $chunked_true_hash but CVMFS thinks file hash is $chunked_cvmfs_hash"
+    return 25
+  fi
+  if [ x"$chunked_cvmfs_read" != x"$chunked_cvmfs_hash" ]; then
+    echo "Correct hash is $chunked_cvmfs_hash but CVMFS output was $chunked_cvmfs_read"
+    return 26
+  fi
+  if [[ "$chunk_count" -lt 2 ]]; then
+    echo "Chunk count is $chunk_count"
+    return 27
+  fi
+
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+  local cache_object="${cvmfs_cache}/$(get_hash_path $object_hash)"
+  echo "Verify the expected file ($cache_object) is in the cache."
+  sudo test -f "$cache_object" || return 53
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+  echo "publish file that is NOT marked as external (cvmfs_server publish -N)"
+  start_transaction $CVMFS_TEST_REPO                       || return $?
+  echo "not external" > ${repo_dir}/native                 || return 61
+  dd if=/dev/urandom of=chunked_file_native bs=1M count=32 || return 62
+  cp chunked_file_native ${repo_dir}/chunked_file_native   || return 63
+  publish_repo $CVMFS_TEST_REPO -v -N                      || return $?
+
+  echo "check that 'native' is NOT external"
+  ! is_external_file ${cvmfs_mnt}/native              || return 30
+  ! is_external_file ${cvmfs_mnt}/chunked_file_native || return 31
+
+  echo "Remove cached and external copy of the file; only copy"
+  echo "is in the backend storage, which should not be used."
+  upload_into_backend $CVMFS_TEST_REPO $object_file $(make_path $object_hash) || return 54
+  rm -f ${external_storage}/external/file                                     || return 55
+  sudo rm -f $cache_object                                                    || return 56
+
+  echo "disable HTTP server (stop serving external files)"
+  sudo kill $CVMFS_TEST_615_HTTP_PID || return 70
+  CVMFS_TEST_615_HTTP_PID=""
+  sleep 1
+
+  echo "read and validate internal files"
+  [ x"$(cat ${repo_dir}/native)" = x"not external" ] || return 71
+  local chunked_file_native_hash="$(cat chunked_file_native | sha1sum)"
+  local chunked_file_native_hash_cvmfs="$(cat ${repo_dir}/chunked_file_native | sha1sum)"
+  [ x"$chunked_file_native_hash" = x"$chunked_file_native_hash_cvmfs" ] || return 72
+
+  echo "Make sure access fails without the external copy."
+  if cat ${repo_dir}/external/file; then
+    echo "External file ${repo_dir}/external/file appears to be using internal data."
+    return 57
+  fi
+
+  return 0
+}

@@ -1,0 +1,70 @@
+
+cvmfs_test_name="Chunked, grafted, uncompressed, external files"
+cvmfs_test_autofs_on_startup=false
+
+CVMFS_TEST_624_HTTP_PID=
+cleanup() {
+  echo "running cleanup()"
+  [ -z $CVMFS_TEST_624_HTTP_PID ] || sudo kill $CVMFS_TEST_624_HTTP_PID
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local scratch_dir="$(pwd)"
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -X -Z none || return $?
+
+  echo "creating test file"
+  dd if=/dev/urandom of=chunks count=16 bs=1M
+  local correct_sha1=$(sha1sum chunks | awk '{print $1;}')
+
+  local external_storage="${scratch_dir}/external_files"
+  echo "Creating external storage directory '$external_storage'"
+  mkdir -p $external_storage || return 51
+
+  local http_log="${scratch_dir}/http.log"
+  local http_port=8624
+  local external_http_base="http://localhost:$http_port"
+  local client_config="/etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/client.conf"
+
+  echo "install a desaster cleanup"
+  trap cleanup EXIT HUP INT TERM || return $?
+
+  echo "start an HTTP server to serve external files (logging to $http_log)"
+  CVMFS_TEST_624_HTTP_PID="$(open_http_server $external_storage $http_port $http_log)"
+  [ ! -z $CVMFS_TEST_624_HTTP_PID ] || kill -0 $CVMFS_TEST_624_HTTP_PID || { echo "fail"; return 4; }
+  echo "HTTP server running with PID $CVMFS_TEST_624_HTTP_PID"
+
+  echo "configure external data location"
+  echo "CVMFS_EXTERNAL_URL=$external_http_base" | sudo tee --append $client_config
+
+  start_transaction $CVMFS_TEST_REPO || return $?
+  cvmfs_swissknife graft -i chunks -o /cvmfs/$CVMFS_TEST_REPO/chunks -c 1
+  echo "----- START GRAFT -----"
+  cat /cvmfs/$CVMFS_TEST_REPO/.cvmfsgraft-chunks
+  echo "----- END GRAFT -----"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "Verify we have an external file that is not (yet) accessible."
+  sha1sum /cvmfs/$CVMFS_TEST_REPO/chunks > /dev/null && return 1
+
+  echo "Now the file should become available."
+  cp chunks ${external_storage}/chunks || return 2
+
+  local chunks=$(attr -qg chunks /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/chunks)
+  if [ "$chunks" -ne 16 ]; then
+    echo "Chunk count incorrect; found $chunks, expected 16."
+    return 2
+  fi
+
+  local cvmfs_sha1=$(sha1sum /cvmfs/$CVMFS_TEST_REPO/chunks | awk '{print $1;}')
+  if [ "$cvmfs_sha1" != "$correct_sha1" ]; then
+    echo "CVMFS had the incorrect SHA1; expected $correct_sha1, found $cvmfs_sha1"
+    return 3
+  fi
+
+  return 0
+}
+

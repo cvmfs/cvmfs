@@ -16,6 +16,9 @@ cvmfs_run_test() {
   local retval=0
   local stratum1="http://cvmfs-stratum-one.cern.ch/opt"
 
+  echo -n "checking for wget... "
+  which wget > /dev/null 2>&1 && echo "done" || { echo "not found"; return 1; }
+
   echo "restarting autofs"
   autofs_switch off || return 10
   autofs_switch on  || return 11
@@ -49,7 +52,7 @@ cvmfs_run_test() {
   echo "simple HTTP server serving empty directory started with PID $http_pid"
 
   echo "try to mount cvmfs"
-  seconds=$(stop_watch do_faulty_mount)
+  local milliseconds=$(stop_watch do_faulty_mount)
 
   echo "try to list the repository"
   ls /cvmfs/atlas.cern.ch || retval=10
@@ -59,8 +62,9 @@ cvmfs_run_test() {
 
   sudo rm -f /etc/cvmfs/domain.d/cern.ch.local || retval=12
 
-  if [ $seconds -gt 6 ]; then
-    echo "mounting took too long with $seconds seconds (expected 6)"
+  local expected_max=6000
+  if [ $milliseconds -gt $expected_max ]; then
+    echo "mounting took too long with $milliseconds seconds (expected $expected_max)"
     CVMFS_TIME_WARNING_FLAG=1
   fi
 

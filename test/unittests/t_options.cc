@@ -4,8 +4,9 @@
 
 #include "gtest/gtest.h"
 
-#include "../../cvmfs/options.h"
-#include "../../cvmfs/util.h"
+#include "options.h"
+#include "util/file_guard.h"
+#include "util/posix.h"
 
 using namespace std;  // NOLINT
 
@@ -17,6 +18,12 @@ class T_Options : public ::testing::Test {
         &config_file_);
     ASSERT_TRUE(temp_file != NULL);
     unlink_guard_.Set(config_file_);
+
+    FILE *temp_file_2 = CreateTempFile("./cvmfs_ut_options2", 0600, "w",
+        &config_file_2_);
+    ASSERT_TRUE(temp_file_2 != NULL);
+    unlink_guard_2_.Set(config_file_2_);
+
     fprintf(temp_file,
             "CVMFS_CACHE_BASE=/root/cvmfs_testing/cache\n"
             "CVMFS_RELOAD_SOCKETS=/root/cvmfs_testing/cache\n"
@@ -29,6 +36,9 @@ class T_Options : public ::testing::Test {
             "CVMFS_HTTP_PROXY=DIRECT\n"
             "export A=B\n");
     int result = fclose(temp_file);
+    ASSERT_EQ(0, result);
+    fprintf(temp_file_2, "CVMFS_CACHE_BASE=/overwritten\n");
+    result = fclose(temp_file_2);
     ASSERT_EQ(0, result);
   }
 
@@ -54,7 +64,9 @@ class T_Options : public ::testing::Test {
  protected:
   OptionsT     options_manager_;
   UnlinkGuard  unlink_guard_;
+  UnlinkGuard  unlink_guard_2_;
   string       config_file_;
+  string       config_file_2_;
 };  // class T_Options
 
 typedef ::testing::Types<BashOptionsManager, SimpleOptionsParser>
@@ -108,3 +120,61 @@ TYPED_TEST(T_Options, ParsePathNoFile) {
   ASSERT_EQ(0u, TestFixture::options_manager_.GetAllKeys().size());
 }
 
+TYPED_TEST(T_Options, ProtectedParameter) {
+  string container;
+  OptionsManager &options_manager = TestFixture::options_manager_;
+  const string &config_file = TestFixture::config_file_;
+  const string &config_file_2 = TestFixture::config_file_2_;
+
+  options_manager.ParsePath(config_file, false);
+  options_manager.ParsePath(config_file_2, false);
+  EXPECT_TRUE(options_manager.GetValue("CVMFS_CACHE_BASE", &container));
+  EXPECT_EQ("/overwritten", container);
+
+  options_manager.ClearConfig();
+  options_manager.ParsePath(config_file, false);
+  options_manager.ProtectParameter("CVMFS_CACHE_BASE");
+  options_manager.ParsePath(config_file_2, false);
+  EXPECT_TRUE(options_manager.GetValue("CVMFS_CACHE_BASE", &container));
+  EXPECT_NE("/overwritten", container);
+}
+
+TYPED_TEST(T_Options, GetEnvironmentSubset) {
+  OptionsManager &options_manager = TestFixture::options_manager_;
+  const string &config_file = TestFixture::config_file_;
+  options_manager.ParsePath(config_file, false);
+
+  EXPECT_EQ(0U,
+    options_manager.GetEnvironmentSubset("NO_SUCH_PREFIX", false).size());
+  EXPECT_EQ(5U, options_manager.GetEnvironmentSubset("CVMFS", false).size());
+  vector<string> env =
+    options_manager.GetEnvironmentSubset("CVMFS_CACHE", false);
+  ASSERT_EQ(1U, env.size());
+  EXPECT_EQ(env[0], "CVMFS_CACHE_BASE=/root/cvmfs_testing/cache");
+
+  env = options_manager.GetEnvironmentSubset("CVMFS_CACHE_", true);
+  ASSERT_EQ(1U, env.size());
+  EXPECT_EQ(env[0], "BASE=/root/cvmfs_testing/cache");
+}
+
+
+TYPED_TEST(T_Options, SetValue) {
+  OptionsManager &options_manager = TestFixture::options_manager_;
+  const string &config_file = TestFixture::config_file_;
+  options_manager.ParsePath(config_file, false);
+
+  string arg;
+  EXPECT_TRUE(options_manager.GetValue("CVMFS_CACHE_BASE", &arg));
+  EXPECT_EQ("/root/cvmfs_testing/cache", arg);
+  options_manager.SetValue("CVMFS_CACHE_BASE", "new");
+  EXPECT_TRUE(options_manager.GetValue("CVMFS_CACHE_BASE", &arg));
+  EXPECT_EQ("new", arg);
+
+  options_manager.SetValue("UNKNOWN_BEFORE", "information");
+  EXPECT_TRUE(options_manager.GetValue("UNKNOWN_BEFORE", &arg));
+  EXPECT_EQ("information", arg);
+
+  EXPECT_TRUE(options_manager.IsDefined("CVMFS_SERVER_URL"));
+  options_manager.UnsetValue("CVMFS_SERVER_URL");
+  EXPECT_FALSE(options_manager.IsDefined("CVMFS_SERVER_URL"));
+}

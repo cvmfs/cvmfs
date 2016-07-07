@@ -11,7 +11,6 @@
 #include <string>
 
 #include "upload_spooler_definition.h"
-#include "util.h"
 #include "util_concurrency.h"
 
 namespace upload {
@@ -233,6 +232,17 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    * @return      true if the file was found in the backend storage
    */
   virtual bool Peek(const std::string &path) const = 0;
+
+
+  /**
+   * Creates a top-level shortcut to the given data object. This is particularly
+   * useful for bootstrapping repositories whose data-directory is secured by
+   * a VOMS certificate.
+   *
+   * @param object  content hash of the object to be exposed on the top-level
+   * @return        true on success
+   */
+  virtual bool PlaceBootstrappingShortcut(const shash::Any &object) const = 0;
 
 
   /**

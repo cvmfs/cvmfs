@@ -8,6 +8,7 @@
 #define CVMFS_PLATFORM_LINUX_H_
 
 #include <sys/types.h>  // contains ssize_t needed inside <attr/xattr.h>
+#include <sys/xattr.h>
 #include <attr/xattr.h>  // NOLINT(build/include_alpha)
 #include <dirent.h>
 #include <errno.h>
@@ -21,12 +22,14 @@
 #include <sys/prctl.h>
 #include <sys/select.h>
 #include <sys/stat.h>
+#include <sys/utsname.h>
 #include <unistd.h>
 
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <string>
 #include <vector>
 
@@ -276,6 +279,34 @@ inline int platform_readahead(int filedes) {
   return readahead(filedes, 0, static_cast<size_t>(-1));
 }
 
+/**
+ * Advises the kernel to evict the given file region from the page cache.
+ *
+ * Note: Pages containing the data at `offset` and `offset + length` are NOT
+ *       evicted by the kernel. This means that a few pages are not purged when
+ *       offset and length are not exactly on page boundaries. See below:
+ *
+ *                offset                                  length
+ *                  |                                        |
+ *   +---------+----|----+---------+---------+---------+-----|---+---------+
+ *   |         |    |    | xxxxxxx | xxxxxxx | xxxxxxx |     |   |         |
+ *   |         |    |    | xxxxxxx | xxxxxxx | xxxxxxx |     |   |         |
+ *   +---------+----|----+---------+---------+---------+-----|---+---------+
+ *   0       4096   |  8192      12288     16384     20480   | 24576     28672
+ *
+ * git.kernel.org/cgit/linux/kernel/git/stable/linux-stable.git/tree/mm/fadvise.c#n115
+ *
+ * TODO(rmeusel): figure out a clever way how to align `offset` and `length`
+ *
+ * @param fd      file descriptor whose page cache should be (partially) evicted
+ * @param offset  start offset of the pages to be evicted
+ * @param length  number of bytes to be evicted
+ */
+inline int platform_invalidate_kcache(const int    fd,
+                                      const off_t  offset,
+                                      const size_t length) {
+  return posix_fadvise(fd, offset, length, POSIX_FADV_DONTNEED);
+}
 
 inline std::string platform_libname(const std::string &base_name) {
   return "lib" + base_name + ".so";
@@ -291,6 +322,28 @@ inline const char* platform_getexepath() {
     }
   }
   return buf;
+}
+
+
+inline void platform_get_os_version(int32_t *major,
+                                    int32_t *minor,
+                                    int32_t *patch) {
+  struct utsname uts_info;
+  const int res = uname(&uts_info);
+  assert(res == 0);
+  const int matches = sscanf(uts_info.release, "%u.%u.%u", major, minor, patch);
+  assert(matches == 3 && "failed to read version string");
+}
+
+inline uint64_t platform_monotonic_time() {
+  struct timespec tp;
+#ifdef CLOCK_MONOTONIC_COARSE
+  int retval = clock_gettime(CLOCK_MONOTONIC_COARSE, &tp);
+#else
+  int retval = clock_gettime(CLOCK_MONOTONIC, &tp);
+#endif
+  assert(retval == 0);
+  return tp.tv_sec + (tp.tv_nsec >= 500000000);
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD

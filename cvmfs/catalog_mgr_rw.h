@@ -32,12 +32,14 @@
 #include <pthread.h>
 #include <stdint.h>
 
+#include <map>
 #include <set>
 #include <string>
 
 #include "catalog_mgr_ro.h"
 #include "catalog_rw.h"
 #include "upload_spooler_result.h"
+#include "util_concurrency.h"
 #include "xattr.h"
 
 class XattrList;
@@ -58,20 +60,29 @@ class Statistics;
 }
 
 namespace catalog {
+template <class CatalogMgrT>
+class CatalogBalancer;
+}
+
+namespace catalog {
 
 class WritableCatalogManager : public SimpleCatalogManager {
  public:
+  friend class CatalogBalancer<WritableCatalogManager>;
   WritableCatalogManager(const shash::Any  &base_hash,
                          const std::string &stratum0,
                          const std::string &dir_temp,
                          upload::Spooler   *spooler,
                          download::DownloadManager *download_manager,
                          uint64_t catalog_entry_warn_threshold,
-                         perf::Statistics *statistics);
+                         perf::Statistics *statistics,
+                         bool is_balanceable,
+                         unsigned max_weight,
+                         unsigned min_weight);
   ~WritableCatalogManager();
   static manifest::Manifest *CreateRepository(const std::string &dir_temp,
                                               const bool volatile_content,
-                                              const bool garbage_collectable,
+                                              const std::string &voms_authz,
                                               upload::Spooler   *spooler);
 
   // DirectoryEntry handling
@@ -102,15 +113,28 @@ class WritableCatalogManager : public SimpleCatalogManager {
   // Nested catalog handling
   void CreateNestedCatalog(const std::string &mountpoint);
   void RemoveNestedCatalog(const std::string &mountpoint);
-  bool IsTransitionPoint(const std::string &path);
+  bool IsTransitionPoint(const std::string &mountpoint);
 
+  inline bool IsBalanceable() const { return is_balanceable_; }
   /**
    * TODO
    */
   void PrecalculateListings();
 
-  manifest::Manifest *Commit(const bool     stop_for_tweaks,
-                             const uint64_t manual_revision);
+  void SetTTL(const uint64_t new_ttl);
+  bool SetVOMSAuthz(const std::string &voms_authz);
+  bool Commit(const bool           stop_for_tweaks,
+              const uint64_t       manual_revision,
+              manifest::Manifest  *manifest);
+
+  void Balance() {
+      if (IsBalanceable()) {
+          DoBalance();
+      } else {
+          LogCvmfs(kLogCatalog, kLogVerboseMsg, "Not balancing the catalog "
+                  "manager because it is not balanceable");
+      }
+  }
 
  protected:
   void EnforceSqliteMemLimit() { }
@@ -125,23 +149,39 @@ class WritableCatalogManager : public SimpleCatalogManager {
                const std::string     &parent_directory);
 
  private:
-  bool FindCatalog(const std::string &path, WritableCatalog **result);
+  bool FindCatalog(const std::string  &path,
+                   WritableCatalog   **result,
+                   DirectoryEntry     *dirent = NULL);
+  void DoBalance();
+  void FixWeight(WritableCatalog *catalog);
 
-  /**
-   * Traverses all open catalogs and determines which catalogs need updated
-   * snapshots.
-   * @param[out] result the list of catalogs to snapshot
-   */
-  void GetModifiedCatalogs(WritableCatalogList *result) const {
-    const unsigned int number_of_dirty_catalogs =
-      GetModifiedCatalogsRecursively(GetRootCatalog(), result);
-    assert(number_of_dirty_catalogs <= result->size());
+  struct CatalogInfo {
+    uint64_t     ttl;
+    size_t       size;
+    shash::Any   content_hash;
+    unsigned int revision;
+  };
+
+  struct CatalogUploadContext {
+    Future<CatalogInfo>* root_catalog_info;
+    bool                 stop_for_tweaks;
+  };
+
+  CatalogInfo SnapshotCatalogs(const bool stop_for_tweaks);
+  void FinalizeCatalog(WritableCatalog *catalog,
+                       const bool stop_for_tweaks);
+  void ScheduleCatalogProcessing(WritableCatalog *catalog);
+
+  void GetModifiedCatalogLeafs(WritableCatalogList *result) const {
+    const bool dirty = GetModifiedCatalogLeafsRecursively(GetRootCatalog(),
+                                                          result);
+    assert(dirty);
   }
-  int GetModifiedCatalogsRecursively(const Catalog *catalog,
-                                     WritableCatalogList *result) const;
+  bool GetModifiedCatalogLeafsRecursively(Catalog             *catalog,
+                                          WritableCatalogList *result) const;
 
-  shash::Any SnapshotCatalog(WritableCatalog *catalog) const;
-  void CatalogUploadCallback(const upload::SpoolerResult &result);
+  void CatalogUploadCallback(const upload::SpoolerResult &result,
+                             const CatalogUploadContext   clg_upload_context);
 
  private:
   inline void SyncLock() { pthread_mutex_lock(sync_lock_); }
@@ -154,12 +194,44 @@ class WritableCatalogManager : public SimpleCatalogManager {
   pthread_mutex_t *sync_lock_;
   upload::Spooler *spooler_;
 
+  pthread_mutex_t                         *catalog_processing_lock_;
+  std::map<std::string, WritableCatalog*>  catalog_processing_map_;
+
   uint64_t catalog_entry_warn_threshold_;
 
   /**
    * Directories don't have extended attributes at this point.
    */
   XattrList empty_xattrs;
+
+  /**
+   * It indicates whether this catalog manager supports balancing operations
+   */
+  const bool is_balanceable_;
+
+  /**
+   * Defines the maximum weight an autogenerated catalog can have. If after a
+   * publishing operation the catalog's weight is greater than this threshold it
+   * will be considered overflowed and will automatically be split in different
+   * sub-catalogs.
+   */
+  const unsigned max_weight_;
+
+  /**
+   * Defines the minimum weight an autogenerated catalog can have. If after a
+   * publishing operation the catalog's weight is lesser than this threshold it
+   * will be considered underflowed and will automatically be merged with its
+   * parent.
+   * This last operation can provoke an overflow in the parent, though.
+   */
+  const unsigned min_weight_;
+
+  /**
+   * Defines the threshold that will be used to balance a catalog that has been
+   * overflowed. Its value should be lesser than max_weight_ and greater than
+   * min_weight. By default it is set to max_weight / 2.
+   */
+  const unsigned balance_weight_;
 };  // class WritableCatalogManager
 
 }  // namespace catalog

@@ -1,0 +1,95 @@
+cvmfs_test_name="Idle client picking up new catalog version"
+cvmfs_test_autofs_on_startup=false
+
+produce_files_in_1() {
+  local working_dir=$1
+  pushdir $working_dir
+
+  touch foo
+  touch bar
+  mkdir -p nested
+  touch nested/.cvmfscatalog
+  touch nested/more
+
+  popdir
+}
+
+produce_files_in_2() {
+  local working_dir=$1
+  pushdir $working_dir
+  touch nested/updated
+  popdir
+}
+
+TEST_611_MOUNTPOINT=""
+cleanup() {
+  if [ ! -z $TEST_611_MOUNTPOINT ]; then
+    echo -n "umounting ${TEST_611_MOUNTPOINT}... "
+    remove_local_mount $TEST_611_MOUNTPOINT && echo "done" || echo "fail"
+  fi
+}
+
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  local scratch_dir=$(pwd)
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "updating TTL"
+  sudo sh -c "echo CVMFS_REPOSITORY_TTL=1 >> /etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/server.conf"
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository"
+  produce_files_in_1 $repo_dir || return 1
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+  echo "set a trap for desaster cleanup"
+  trap cleanup EXIT HUP INT TERM
+
+  echo "create a local mount of the created repository"
+  TEST_611_MOUNTPOINT="$(pwd)/local_mount"
+  do_local_mount "$TEST_611_MOUNTPOINT" \
+                 "$CVMFS_TEST_REPO"     \
+                 "$(get_repo_url $CVMFS_TEST_REPO)" || return 4
+
+  stat $TEST_611_MOUNTPOINT/nested/updated
+  if [ $? -eq 0 ]; then
+    return 20
+  fi
+  stat $TEST_611_MOUNTPOINT/nested || return 25
+
+  echo "starting transaction to update repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "add new file"
+  produce_files_in_2 $repo_dir || return 1
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  local cache_dir="$(get_cache_directory $TEST_611_MOUNTPOINT)"
+  local kcache_timeout=$(sudo cvmfs_talk -p ${cache_dir}/${CVMFS_TEST_REPO}/cvmfs_io.${CVMFS_TEST_REPO} parameters | \
+    grep ^CVMFS_KCACHE_TIMEOUT= | cut -d= -f2 | awk '{print $1}')
+  # Add two seconds safety margin
+  local sleep_time=$((1 + $kcache_timeout + 2))
+  echo "sleeping $sleep_time seconds to let ttl and kernel caches expire"
+  sleep $sleep_time
+  stat $TEST_611_MOUNTPOINT/nested/updated
+  if [ $? -ne 0 ]; then
+    return 21
+  fi
+
+  return 0
+}
+

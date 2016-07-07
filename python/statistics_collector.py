@@ -35,7 +35,7 @@ class Database:
 
         for counter in counters.values():
             json_body[0]["columns"].append(counter.name)
-            json_body[0]["points"][0].append(counter.number)
+            json_body[0]["points"][0].append(int(counter.avg()))
         client.write_points(json_body)
 
 

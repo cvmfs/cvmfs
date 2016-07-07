@@ -1,38 +1,80 @@
 
 cvmfs_test_name="Read-only cache"
 
+ro_mount() {
+  local mountpoint=$1
+  local dir=$2
+  if running_on_osx; then
+    sudo mount -u -r -t hfs $mountpoint $dir
+  else
+    sudo mount -o remount,ro $dir
+  fi
+}
+
+CVMFS_TEST_041_TMPDIR=
+CVMFS_TEST_041_OSXMOUNTPOINT=
+
+cleanup() {
+  echo "cleanup $cvmfs_test_name"
+  if [ "x$CVMFS_TEST_041_TMPDIR" != "x" ]; then
+    # releasing the space in OSX
+    if running_on_osx; then
+      # TODO(jblomer)
+      # we have to force umount
+      # cvmfs_umount atlas.cern.ch
+      # sudo umount $CVMFS_TEST_041_TMPDIR
+      # if [ "x$CVMFS_TEST_041_OSXMOUNTPOINT" != "x" ]; then
+      #  sudo hdiutil detach $CVMFS_TEST_041_OSXMOUNTPOINT
+      # fi
+      sudo rmdir "$CVMFS_TEST_041_TMPDIR"
+    else
+      sudo umount -l $CVMFS_TEST_041_TMPDIR
+      sudo rmdir $CVMFS_TEST_041_TMPDIR
+    fi
+  fi
+  cvmfs_umount atlas.cern.ch
+  cvmfs_enable_config_repository
+}
+
 cvmfs_run_test() {
   logfile=$1
 
-  local tmpdir=$(sudo mktemp -d /var/lib/cvmfs/tmp.XXXXXXXX)
-  [ x"$tmpdir" = x"" ] && return 9
-  echo "tmpdir is $tmpdir"
-  sudo mount -t tmpfs tmpfs $tmpdir || return 1
+  trap cleanup HUP INT TERM EXIT || return $?
 
-  cvmfs_mount atlas.cern.ch \
-    "CVMFS_CACHE_BASE=$tmpdir" \
-    "CVMFS_SHARED_CACHE=no" \
-    "CVMFS_CONFIG_REPOSITORY="
-  if [ $? -ne 0 ]; then
-    sudo umount -l $tmpdir
-    sudo rmdir $tmpdir
-    return 2
+  echo "create temporary directory"
+  CVMFS_TEST_041_TMPDIR=$(sudo mktemp -d /var/lib/cvmfs/tmp.XXXXXXXX)
+  sudo [ -d "$CVMFS_TEST_041_TMPDIR" ] || return 9
+  echo "tmpdir is $CVMFS_TEST_041_TMPDIR"
+
+  cvmfs_disable_config_repository || return $?
+
+  echo "mount ramdisk"
+  if running_on_osx; then
+    :
+    # TODO(jblomer): OS X
+    # on OSX we firstly have to reserve the space
+    # CVMFS_TEST_041_OSXMOUNTPOINT=$(sudo hdid -nomount ram://256000)
+    # sudo newfs_hfs $CVMFS_TEST_041_OSXMOUNTPOINT || return 10
+    # sudo mount -t hfs $CVMFS_TEST_041_OSXMOUNTPOINT "$CVMFS_TEST_041_TMPDIR" || return 11
+  else
+    sudo mount -t tmpfs tmpfs $CVMFS_TEST_041_TMPDIR || return 1
   fi
-  sudo mount -o remount,ro $tmpdir
+
+  echo "mount atlas.cern.ch"
+  cvmfs_mount atlas.cern.ch \
+    "CVMFS_CACHE_BASE=$CVMFS_TEST_041_TMPDIR" \
+    "CVMFS_SHARED_CACHE=no" \
+    "CVMFS_STRICT_MOUNT=yes" || return 2
+
+  echo "try to remount with open r/w descriptors (should fail)"
+  sudo mount -o remount,ro $CVMFS_TEST_041_TMPDIR
   if [ $? -eq 0 ]; then
     echo "r/o remount is not supposed to work at this stage"
-    cvmfs_umount atlas.cern.ch
-    sudo umount -l $tmpdir
-    sudo rmdir $tmpdir
     return 4
   fi
-  sudo cvmfs_talk -i atlas.cern.ch tear down to read-only || return 3
-  sudo mount -o remount,ro $tmpdir
-  retval=$?
-  cvmfs_umount atlas.cern.ch
-  sudo umount -l $tmpdir
-  sudo rmdir $tmpdir
 
-  return $retval
+  echo "try to remount without open r/w descriptors (should work)"
+  sudo cvmfs_talk -i atlas.cern.ch tear down to read-only || return 3
+  sudo mount -o remount,ro $CVMFS_TEST_041_TMPDIR || return 10
 }
 

@@ -18,7 +18,7 @@
 #include "duplex_cares.h"
 #include "gtest/gtest_prod.h"
 #include "prng.h"
-#include "util.h"
+#include "util/single_copy.h"
 
 namespace dns {
 
@@ -39,6 +39,16 @@ enum Failures {
   kFailNumEntries
 };
 
+
+/**
+ * Steers IP protocol selection.
+ */
+enum IpPreference {
+  // use system default, currently unused and mapped to IPv4
+  kIpPreferSystem = 0,
+  kIpPreferV4,
+  kIpPreferV6,
+};
 
 inline const char *Code2Ascii(const Failures error) {
   const char *texts[kFailNumEntries + 1];
@@ -81,6 +91,7 @@ class Host {
   FRIEND_TEST(T_Dns, HostExpired);
   FRIEND_TEST(T_Dns, HostValid);
   FRIEND_TEST(T_Dns, HostExtendDeadline);
+  FRIEND_TEST(T_Dns, HostBestAddresses);
   friend class Resolver;
 
  public:
@@ -102,6 +113,7 @@ class Host {
   const std::set<std::string> &ipv6_addresses() const {
     return ipv6_addresses_;
   }
+  const std::set<std::string> &ViewBestAddresses(IpPreference preference) const;
   const std::string &name() const { return name_; }
   Failures status() const { return status_; }
 
@@ -287,6 +299,7 @@ class CaresResolver : public Resolver {
  private:
   void WaitOnCares();
   ares_channel *channel_;
+  char *lookup_options_;
   std::vector<std::string> system_resolvers_;
   std::vector<std::string> system_domains_;
 };

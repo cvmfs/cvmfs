@@ -92,6 +92,14 @@ class OptionsManager {
   std::vector<std::string> GetAllKeys();
 
   /**
+   * Returns key=value strings from the options array for all keys that match
+   * key_prefix.  Can be used to construct an environment pointer for execve.
+   */
+  std::vector<std::string> GetEnvironmentSubset(
+    const std::string &key_prefix,
+    bool strip_prefix);
+
+  /**
    * Gets all stored key-values of the map in an string format. This format
    * follows the following pattern:
    *
@@ -101,15 +109,23 @@ class OptionsManager {
    */
   std::string Dump();
 
+  bool HasConfigRepository(const std::string &fqrn, std::string *config_path);
+
   /**
-   * Parse a configuration file whose variables' values are positive integers
-   *
-   * @param  path absolute path to the configuration file
-   * @param  map map to store the generated key-value
-   * @return true if the file exists, is readable and all values can be parsed
-   *         to integers
+   * Similar to a bash "read-only" parameter: the current value will be locked
+   * and cannot be changed anymore by succeeding parsings of config files.
    */
-  bool ParseUIntMap(const std::string &path, std::map<uint64_t, uint64_t> *map);
+  void ProtectParameter(const std::string &param);
+
+  /**
+   * Artificially inject values in the option manager.
+   */
+  void SetValue(const std::string &key, const std::string &value);
+
+  /**
+   * Purge a value from the parameter map.  Used in unit tests.
+   */
+  void UnsetValue(const std::string &key);
 
  protected:
   /**
@@ -121,9 +137,10 @@ class OptionsManager {
     std::string source;
   };
 
-  bool HasConfigRepository(const std::string &fqrn, std::string *config_path);
+  void PopulateParameter(const std::string &param, const ConfigValue val);
 
   std::map<std::string, ConfigValue> config_;
+  std::map<std::string, std::string> protected_parameters_;
 };  // class OptionManager
 
 

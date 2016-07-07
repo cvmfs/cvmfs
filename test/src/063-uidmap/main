@@ -1,0 +1,36 @@
+
+cvmfs_test_name="Uid/Gid Mapping of files and directories"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  local uid_map=$(pwd)/uid.map
+  local gid_map=$(pwd)/gid.map
+
+  echo "* 1337" > "$uid_map"
+  echo "* 1338" > "$gid_map"
+  chmod 0444 "$uid_map" "$gid_map"
+
+  cvmfs_mount grid.cern.ch "CVMFS_CLAIM_OWNERSHIP=no" \
+    "CVMFS_UID_MAP=$uid_map" "CVMFS_GID_MAP=$gid_map"
+  local retval=$?
+  rm -f "$uid_map" "$gid_map"
+
+  if [ $retval -ne 0 ]; then
+    echo "mount returned $retval"
+    return 1
+  fi
+
+  local discovered_uid=$(stat_wrapper %u /cvmfs/grid.cern.ch)
+  local discovered_gid=$(stat_wrapper %g /cvmfs/grid.cern.ch)
+
+  echo "$discovered_uid $discovered_gid"
+  if [ "x1337" != "x$discovered_uid" ]; then
+    return 10
+  fi
+  if [ "x1338" != "x$discovered_gid" ]; then
+    return 11
+  fi
+
+  return 0
+}

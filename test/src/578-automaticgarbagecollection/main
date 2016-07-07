@@ -12,6 +12,17 @@ create_revision() {
   echo "$(get_current_root_catalog $repo_name)C"
 }
 
+count_gc_events_in_log() {
+  local log_file=$1
+  cat $log_file | grep "Garbage Collection started" | wc -l
+}
+
+peek_gc_log() {
+  local log_file=$1
+  local needle="$2"
+  cat $log_file | grep -q "$needle"
+}
+
 cvmfs_run_test() {
   local logfile=$1
   local script_location=$2
@@ -26,8 +37,8 @@ cvmfs_run_test() {
   local root_catalog5=""
   local root_catalog6=""
 
-  local seconds=10
-  local thresh_seconds=20 # Potential Race: Publishing is not supposed to take
+  local seconds=30
+  local thresh_seconds=60 # Potential Race: Publishing is not supposed to take
                           #                 longer than thresh_seconds-seconds !
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER and disabled auto-tagging ($(display_timestamp now))"
@@ -37,6 +48,10 @@ cvmfs_run_test() {
   echo "configure repository to automatically delete revisions older than $thresh_seconds seconds"
   local server_conf="/etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/server.conf"
   echo "CVMFS_AUTO_GC_TIMESPAN='$thresh_seconds seconds ago'" | sudo tee --append $server_conf || return 1
+
+  local gc_log="${scratch_dir}/gc.log"
+  echo "configure a deletion log ($gc_log) for $CVMFS_TEST_REPO"
+  echo "CVMFS_GC_DELETION_LOG=$gc_log" | sudo tee --append $server_conf || return 1
   cat $server_conf || return 2
 
   echo "check if initial catalog is there"
@@ -58,6 +73,11 @@ cvmfs_run_test() {
   peek_backend $CVMFS_TEST_REPO $root_catalog0 || return 4 # trunk-previous
   peek_backend $CVMFS_TEST_REPO $root_catalog1 || return 5 # trunk
 
+  echo "check GC log"
+  [ $(count_gc_events_in_log $gc_log) -eq 1 ] || return 101
+  peek_gc_log $gc_log $root_catalog0          && return 102
+  peek_gc_log $gc_log $root_catalog1          && return 103
+
   echo "sleep $seconds seconds"
   sleep $seconds
 
@@ -74,6 +94,12 @@ cvmfs_run_test() {
   peek_backend $CVMFS_TEST_REPO $root_catalog0 || return 6 # sentinel revision
   peek_backend $CVMFS_TEST_REPO $root_catalog1 || return 7 # trunk-previous
   peek_backend $CVMFS_TEST_REPO $root_catalog2 || return 8 # trunk
+
+  echo "check GC log"
+  [ $(count_gc_events_in_log $gc_log) -eq 2 ] || return 104
+  peek_gc_log $gc_log $root_catalog0          && return 105
+  peek_gc_log $gc_log $root_catalog1          && return 106
+  peek_gc_log $gc_log $root_catalog2          && return 107
 
   echo "sleep $seconds seconds"
   sleep $seconds
@@ -92,6 +118,13 @@ cvmfs_run_test() {
   peek_backend $CVMFS_TEST_REPO $root_catalog1 || return 10 # sentinel revision
   peek_backend $CVMFS_TEST_REPO $root_catalog2 || return 11 # trunk-previous
   peek_backend $CVMFS_TEST_REPO $root_catalog3 || return 12 # trunk
+
+  echo "check GC log"
+  [ $(count_gc_events_in_log $gc_log) -eq 3 ] || return 108
+  peek_gc_log $gc_log $root_catalog0          || return 109
+  peek_gc_log $gc_log $root_catalog1          && return 110
+  peek_gc_log $gc_log $root_catalog2          && return 111
+  peek_gc_log $gc_log $root_catalog3          && return 112
 
   echo "sleep $seconds seconds"
   sleep $seconds
@@ -112,6 +145,13 @@ cvmfs_run_test() {
   peek_backend $CVMFS_TEST_REPO $root_catalog3 || return 16 # trunk-previous
   peek_backend $CVMFS_TEST_REPO $root_catalog4 || return 17 # trunk
 
+  echo "check GC log"
+  [ $(count_gc_events_in_log $gc_log) -eq 4 ] || return 113
+  peek_gc_log $gc_log $root_catalog1          || return 114
+  peek_gc_log $gc_log $root_catalog2          && return 115
+  peek_gc_log $gc_log $root_catalog3          && return 116
+  peek_gc_log $gc_log $root_catalog4          && return 117
+
   echo "sleep $seconds seconds"
   sleep $seconds
 
@@ -131,6 +171,13 @@ cvmfs_run_test() {
   peek_backend $CVMFS_TEST_REPO $root_catalog3 || return 21 # sentinel revision
   peek_backend $CVMFS_TEST_REPO $root_catalog4 || return 22 # trunk-previous
   peek_backend $CVMFS_TEST_REPO $root_catalog5 || return 23 # trunk
+
+  echo "check GC log"
+  [ $(count_gc_events_in_log $gc_log) -eq 5 ] || return 119
+  peek_gc_log $gc_log $root_catalog2          || return 120
+  peek_gc_log $gc_log $root_catalog3          && return 121
+  peek_gc_log $gc_log $root_catalog4          && return 122
+  peek_gc_log $gc_log $root_catalog5          && return 123
 
   echo "disable automatic garbage collection"
   disable_auto_garbage_collection $CVMFS_TEST_REPO || return $?
@@ -156,6 +203,13 @@ cvmfs_run_test() {
   peek_backend $CVMFS_TEST_REPO $root_catalog5 || return 31 # trunk-previous
   peek_backend $CVMFS_TEST_REPO $root_catalog6 || return 32 # trunk
 
+  echo "check GC log"
+  [ $(count_gc_events_in_log $gc_log) -eq 5 ] || return 124 # auto-GC disabled
+  peek_gc_log $gc_log $root_catalog3          && return 125
+  peek_gc_log $gc_log $root_catalog4          && return 126
+  peek_gc_log $gc_log $root_catalog5          && return 127
+  peek_gc_log $gc_log $root_catalog6          && return 101
+
   echo "run a manual garbage collection (delete all but last two)"
   cvmfs_server gc -f $CVMFS_TEST_REPO || return 33
 
@@ -170,6 +224,13 @@ cvmfs_run_test() {
   peek_backend $CVMFS_TEST_REPO $root_catalog4 && return 38 # GC'ed
   peek_backend $CVMFS_TEST_REPO $root_catalog5 || return 39 # trunk-previous
   peek_backend $CVMFS_TEST_REPO $root_catalog6 || return 40 # trunk
+
+  echo "check GC log"
+  [ $(count_gc_events_in_log $gc_log) -eq 6 ] || return 41
+  peek_gc_log $gc_log $root_catalog3          || return 42
+  peek_gc_log $gc_log $root_catalog4          || return 43
+  peek_gc_log $gc_log $root_catalog5          && return 44
+  peek_gc_log $gc_log $root_catalog6          && return 45
 
   return 0
 }

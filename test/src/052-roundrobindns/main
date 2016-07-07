@@ -2,21 +2,12 @@
 cvmfs_test_name="Round-robin DNS handling"
 
 count_dns_changes() {
-  local syslog_file=/var/log/messages
-  if [ ! -f $syslog_file ]; then
-    syslog_file=/var/log/syslog
-  fi
-  sudo cat $syslog_file $CVMFS_TEST_SYSLOG_TARGET | \
-    grep 'DNS entries for proxy .* changed, adjusting' | wc -l
+  cat_syslog | grep 'DNS entries for proxy .* changed, adjusting' | wc -l
 }
 
 find_in_syslog() {
   local what="$1"
-  local syslog_file=/var/log/messages
-  if [ ! -f $syslog_file ]; then
-    syslog_file=/var/log/syslog
-  fi
-  sudo cat $syslog_file $CVMFS_TEST_SYSLOG_TARGET | grep "$what"
+  cat_syslog | grep "$what"
 }
 
 run_dns_test() {
@@ -25,6 +16,7 @@ run_dns_test() {
   echo "127.0.0.3 round-robin.localdomain" >> host_tests
   cvmfs_mount aleph.cern.ch \
     "HOST_ALIASES=${PWD}/host_tests" \
+    "CVMFS_MAX_IPADDR_PER_PROXY=100" \
     "CVMFS_HTTP_PROXY='DIRECT;http://round-robin.localdomain:3128;http://no-such-host.localdomain:3128'" \
     "CVMFS_PROXY_RESET_AFTER=84600" || return 2
   ls /cvmfs/aleph.cern.ch
@@ -188,9 +180,15 @@ cleanup_dns_test() {
 cvmfs_run_test() {
   logfile=$1
 
+  # Necessary on Ubuntu 15.10
+  sudo systemctl stop systemd-timesyncd
+  local timesync_stopped=$?
   run_dns_test
   retval=$?
   cleanup_dns_test
+  if [ timesync_stopped -eq 0 ]; then
+    sudo systemctl start systemd-timesyncd
+  fi
 
   return $retval
 }

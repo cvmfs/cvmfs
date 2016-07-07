@@ -1,10 +1,14 @@
+set (CVMFS_SOURCE_DIR "${CMAKE_SOURCE_DIR}/cvmfs")
 set (CVMFS_MOUNT_SOURCES
-  ../cvmfs/smalloc.h
-  ../cvmfs/platform.h ../cvmfs/platform_linux.h ../cvmfs/platform_osx.h
-  ../cvmfs/util.h ../cvmfs/util.cc
-  ../cvmfs/logging.h ../cvmfs/logging_internal.h ../cvmfs/logging.cc
-  ../cvmfs/options.h ../cvmfs/options.cc
-  ../cvmfs/sanitizer.h ../cvmfs/sanitizer.cc
+  ${CVMFS_SOURCE_DIR}/logging.cc ${CVMFS_SOURCE_DIR}/logging.h ${CVMFS_SOURCE_DIR}/logging_internal.h
+  ${CVMFS_SOURCE_DIR}/options.cc ${CVMFS_SOURCE_DIR}/options.h
+  ${CVMFS_SOURCE_DIR}/platform.h ${CVMFS_SOURCE_DIR}/platform_linux.h ${CVMFS_SOURCE_DIR}/platform_osx.h
+  ${CVMFS_SOURCE_DIR}/sanitizer.cc ${CVMFS_SOURCE_DIR}/sanitizer.h
+  ${CVMFS_SOURCE_DIR}/smalloc.h
+  ${CVMFS_SOURCE_DIR}/util/pointer.h
+  ${CVMFS_SOURCE_DIR}/util/posix.cc ${CVMFS_SOURCE_DIR}/util/posix.h
+  ${CVMFS_SOURCE_DIR}/util/single_copy.h
+  ${CVMFS_SOURCE_DIR}/util/string.cc ${CVMFS_SOURCE_DIR}/util/string.h
   mount.cvmfs.cc
 )
 
@@ -22,7 +26,7 @@ set_target_properties (${MOUNT_TARGET_NAME} PROPERTIES COMPILE_FLAGS "${CVMFS_MO
 if (MACOSX)
   install (
     FILES         auto_cvmfs
-    DESTINATION   "/etc"
+    DESTINATION   "${SYSCONF_INSTALL_DIR}"
   )
 
   install (
@@ -33,105 +37,111 @@ if (MACOSX)
 
   install (
     FILES         config.sh default.conf
-    DESTINATION   "/etc/cvmfs"
+    DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs"
+    PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+  )
+
+  install (
+    FILES         default.d/10-osx.conf
+    DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/default.d"
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 
   install (
     FILES         default.d/50-cern.conf
-    DESTINATION   "/etc/cvmfs/default.d"
+    DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/default.d"
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 
   install (
     FILES         default.d/60-egi.conf
-    DESTINATION   "/etc/cvmfs/default.d"
+    DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/default.d"
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 
   install (
     FILES         default.d/README
-    DESTINATION   "/etc/cvmfs/default.d"
+    DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/default.d"
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 
   install (
     FILES         domain.d/cern.ch.conf
-    DESTINATION   "/etc/cvmfs/domain.d"
+    DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/domain.d"
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
-  
+
   install (
     FILES         domain.d/egi.eu.conf
-    DESTINATION   "/etc/cvmfs/domain.d"
+    DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/domain.d"
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 
   install (
     FILES         domain.d/opensciencegrid.org.conf
-    DESTINATION   "/etc/cvmfs/domain.d"
+    DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/domain.d"
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 
   install (
     FILES         config.d/grid.cern.ch.conf
-    DESTINATION   "/etc/cvmfs/config.d"
+    DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/config.d"
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 
   install (
     FILES         config.d/atlas-nightlies.cern.ch.conf
-    DESTINATION   "/etc/cvmfs/config.d"
+    DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/config.d"
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 
   install (
     FILES         config.d/cms.cern.ch.conf
-    DESTINATION   "/etc/cvmfs/config.d"
+    DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/config.d"
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 
   if (INSTALL_PUBLIC_KEYS)
     install (
       FILES         keys/cern.ch.pub
-      DESTINATION   "/etc/cvmfs/keys/cern.ch"
+      DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/keys/cern.ch"
       PERMISSIONS   OWNER_READ GROUP_READ WORLD_READ
     )
 
     install (
       FILES         keys/cern-it1.cern.ch.pub
-      DESTINATION   "/etc/cvmfs/keys/cern.ch"
+      DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/keys/cern.ch"
       PERMISSIONS   OWNER_READ GROUP_READ WORLD_READ
     )
 
     install (
       FILES         keys/cern-it2.cern.ch.pub
-      DESTINATION   "/etc/cvmfs/keys/cern.ch"
+      DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/keys/cern.ch"
       PERMISSIONS   OWNER_READ GROUP_READ WORLD_READ
     )
 
     install (
       FILES         keys/cern-it3.cern.ch.pub
-      DESTINATION   "/etc/cvmfs/keys/cern.ch"
+      DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/keys/cern.ch"
       PERMISSIONS   OWNER_READ GROUP_READ WORLD_READ
     )
 
     install (
       FILES         keys/egi.eu.pub
-      DESTINATION   "/etc/cvmfs/keys/egi.eu"
+      DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/keys/egi.eu"
       PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
     )
 
     install (
       FILES         keys/opensciencegrid.org.pub
-      DESTINATION   "/etc/cvmfs/keys/opensciencegrid.org"
+      DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/keys/opensciencegrid.org"
       PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
     )
   endif (INSTALL_PUBLIC_KEYS)
 
   install (
     FILES         serverorder.sh
-    DESTINATION   "/etc/cvmfs"
+    DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs"
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 
@@ -170,113 +180,113 @@ else (MACOSX)
 
   install (
     FILES         config.sh default.conf
-    DESTINATION   "/etc/cvmfs"
+    DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs"
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 
   install (
     FILES         default.d/README
-    DESTINATION   "/etc/cvmfs/default.d"
+    DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/default.d"
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 
   if (DEBIAN)
     install (
       FILES         default.d/50-cern-debian.conf
-      DESTINATION   "/etc/cvmfs/default.d"
+      DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/default.d"
       PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
     )
   else (DEBIAN)
     install (
       FILES         default.d/50-cern.conf
-      DESTINATION   "/etc/cvmfs/default.d"
+      DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/default.d"
       PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
     )
   endif (DEBIAN)
 
   install (
     FILES         default.d/60-egi.conf
-    DESTINATION   "/etc/cvmfs/default.d"
+    DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/default.d"
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 
   install (
     FILES         domain.d/cern.ch.conf
-    DESTINATION   "/etc/cvmfs/domain.d"
+    DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/domain.d"
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 
   install (
     FILES         domain.d/egi.eu.conf
-    DESTINATION   "/etc/cvmfs/domain.d"
+    DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/domain.d"
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 
   install (
     FILES         domain.d/opensciencegrid.org.conf
-    DESTINATION   "/etc/cvmfs/domain.d"
+    DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/domain.d"
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 
   install (
     FILES         config.d/grid.cern.ch.conf
-    DESTINATION   "/etc/cvmfs/config.d"
+    DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/config.d"
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 
   install (
     FILES         config.d/atlas-nightlies.cern.ch.conf
-    DESTINATION   "/etc/cvmfs/config.d"
+    DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/config.d"
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 
   install (
     FILES         config.d/cms.cern.ch.conf
-    DESTINATION   "/etc/cvmfs/config.d"
+    DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/config.d"
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 
   if (INSTALL_PUBLIC_KEYS)
     install (
       FILES         keys/cern.ch.pub
-      DESTINATION   "/etc/cvmfs/keys/cern.ch"
+      DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/keys/cern.ch"
       PERMISSIONS   OWNER_READ GROUP_READ WORLD_READ
     )
 
     install (
       FILES         keys/cern-it1.cern.ch.pub
-      DESTINATION   "/etc/cvmfs/keys/cern.ch"
+      DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/keys/cern.ch"
       PERMISSIONS   OWNER_READ GROUP_READ WORLD_READ
     )
 
     install (
       FILES         keys/cern-it2.cern.ch.pub
-      DESTINATION   "/etc/cvmfs/keys/cern.ch"
+      DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/keys/cern.ch"
       PERMISSIONS   OWNER_READ GROUP_READ WORLD_READ
     )
 
     install (
       FILES         keys/cern-it3.cern.ch.pub
-      DESTINATION   "/etc/cvmfs/keys/cern.ch"
+      DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/keys/cern.ch"
       PERMISSIONS   OWNER_READ GROUP_READ WORLD_READ
     )
 
     install (
       FILES         keys/egi.eu.pub
-      DESTINATION   "/etc/cvmfs/keys/egi.eu"
+      DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/keys/egi.eu"
       PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
     )
 
     install (
       FILES         keys/opensciencegrid.org.pub
-      DESTINATION   "/etc/cvmfs/keys/opensciencegrid.org"
+      DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/keys/opensciencegrid.org"
       PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
     )
   endif (INSTALL_PUBLIC_KEYS)
 
   install (
     FILES         serverorder.sh
-    DESTINATION   "/etc/cvmfs"
+    DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs"
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 endif (MACOSX)

@@ -1,6 +1,9 @@
 
 %{?suse_version:%define dist .suse%suse_version}
-%if 0%{?el6} || 0%{?el7} || 0%{?fc17} || 0%{?fc18} || 0%{?fc19} || 0%{?fc20} || 0%{?fc21}
+%if 0%{?suse_version} == 1315
+%define dist .sle12
+%endif
+%if 0%{?el6} || 0%{?el7} || 0%{?fedora}
 %define selinux_cvmfs 1
 %define selinux_variants mls strict targeted
 %endif
@@ -21,7 +24,7 @@
 
 Summary: CernVM File System
 Name: cvmfs
-Version: 2.2.0
+Version: 2.4.0
 Release: 1%{?dist}
 Source0: https://ecsft.cern.ch/dist/cvmfs/%{name}-%{version}.tar.gz
 %if 0%{?selinux_cvmfs}
@@ -46,6 +49,7 @@ BuildRequires: gcc4-c++
 %else
 BuildRequires: gcc
 BuildRequires: gcc-c++
+BuildRequires: valgrind-devel
 %endif
 BuildRequires: cmake
 BuildRequires: fuse-devel
@@ -62,7 +66,6 @@ Requires: grep
 Requires: gawk
 Requires: sed
 Requires: perl
-Requires: sudo
 Requires: psmisc
 Requires: autofs
 Requires: fuse
@@ -91,7 +94,7 @@ Requires: shadow-utils
 Requires: SysVinit
 Requires: e2fsprogs
   %else
-    %if 0%{?fc21}
+    %if 0%{?fedora}
 Requires: procps-ng
     %else
 Requires: sysvinit-tools
@@ -134,6 +137,7 @@ CernVM-FS static client library for pure user-space use
 Summary: CernVM-FS server tools
 Group: Application/System
 BuildRequires: python-devel
+BuildRequires: libcap-devel
 BuildRequires: unzip
 %if 0%{?suse_version}
 Requires: insserv
@@ -144,13 +148,20 @@ Requires: bash
 Requires: coreutils
 Requires: grep
 Requires: sed
-Requires: sudo
 Requires: psmisc
 Requires: curl
 Requires: gzip
 Requires: attr
 Requires: openssl
 Requires: httpd
+Requires: libcap
+Requires: lsof
+Requires: rsync
+%if 0%{?el6} || 0%{?el7} || 0%{?fedora} || 0%{?suse_version} >= 1300
+# this is 'nice-to-have' at the moment
+# TODO(rmeusel): consider using 'Recommends:' in the far future
+Requires: jq
+%endif
 
 Conflicts: cvmfs-server < 2.1
 
@@ -177,6 +188,10 @@ cp %{SOURCE1} %{SOURCE2} SELinux
 %ifarch i386 i686
 export CXXFLAGS="`echo %{optflags}|sed 's/march=i386/march=i686/'`"
 export CFLAGS="`echo %{optflags}|sed 's/march=i386/march=i686/'`"
+%if 0%{?el5}
+export CFLAGS="$CFLAGS -O0"
+export CXXFLAGS="$CXXFLAGS -O0"
+%endif
 %endif
 
 %if 0%{?el4}
@@ -203,6 +218,27 @@ do
     make NAME=${variant} -f %{_datadir}/selinux/devel/Makefile clean
 done
 popd
+%endif
+
+%if 0%{?el4}
+%else
+%pretrans server
+[ -d "/var/spool/cvmfs"  ]          || exit 0
+[ -d "/etc/cvmfs/repositories.d/" ] || exit 0
+
+for repo in /var/spool/cvmfs/*; do
+  [ -d $repo ] && [ ! -f /etc/cvmfs/repositories.d/$(basename $repo)/replica.conf ] || continue
+
+  if [ -f ${repo}/in_transaction.lock ] || \
+     [ -d ${repo}/in_transaction      ] || \
+     [ -f ${repo}/in_transaction      ]; then
+    echo "     Found open CernVM-FS repository transactions."           >&2
+    echo "     Please abort or publish them before updating CernVM-FS." >&2
+    exit 1
+  fi
+done
+
+exit 0
 %endif
 
 %pre
@@ -258,8 +294,8 @@ mkdir -p %RPM_BUILD_ROOT/usr/share/doc/package/%{name}
 mv $RPM_BUILD_ROOT/usr/share/doc/%{name}-%{version} %RPM_BUILD_ROOT/usr/share/doc/package/%{name}
 %endif
 
-# Fix docdir on FC20, FC21
-%if 0%{?fc20} || 0%{?fc21}
+# Fix docdir on Fedora
+%if 0%{?fedora}
 rm -rf $RPM_BUILD_ROOT/usr/share/doc/%{name}-%{version}
 %endif
 
@@ -296,13 +332,15 @@ fi
 :
 
 %preun
-%if 0%{?selinux_cvmfs}
 if [ $1 = 0 ] ; then
-    for variant in %{selinux_variants} ; do
-        /usr/sbin/semodule -s ${variant} -r cvmfs &> /dev/null || :
-    done
-fi
+%if 0%{?selinux_cvmfs}
+  for variant in %{selinux_variants} ; do
+    /usr/sbin/semodule -s ${variant} -r cvmfs &> /dev/null || :
+  done
 %endif
+
+  /usr/bin/cvmfs_config umount
+fi
 
 %postun
 if [ $1 -eq 0 ]; then
@@ -332,6 +370,8 @@ fi
 %{_bindir}/cvmfs_fsck
 %{_bindir}/cvmfs_config
 /usr/libexec/cvmfs/auto.cvmfs
+/usr/libexec/cvmfs/authz/cvmfs_allow_helper
+/usr/libexec/cvmfs/authz/cvmfs_deny_helper
 %{_sysconfdir}/auto.cvmfs
 %{_sysconfdir}/cvmfs/config.sh
 %if 0%{?selinux_cvmfs}
@@ -362,6 +402,7 @@ fi
 %{_bindir}/cvmfs_swissknife_debug
 %{_bindir}/cvmfs_suid_helper
 %{_bindir}/cvmfs_server
+%{_bindir}/cvmfs_rsync
 %{_sysconfdir}/cvmfs/cvmfs_server_hooks.sh.demo
 %{_libdir}/libtbb_cvmfs.so
 %{_libdir}/libtbb_cvmfs.so.2
@@ -384,6 +425,38 @@ fi
 %doc COPYING AUTHORS README ChangeLog
 
 %changelog
+* Thu Jun 30 2016 Jakob Blomer <jblomer@cern.ch> - 2.4.0
+- Fix SLES12 dist tag
+* Mon Jun 13 2016 Jakob Blomer <jblomer@cern.ch> - 2.4.0
+- Update upstream package
+* Tue May 03 2016 Jakob Blomer <jblomer@cern.ch> - 2.3.0
+- No optimiziation on EL5/i686 to prevent faulty atomics
+* Fri Apr 29 2016 Jakob Blomer <jblomer@cern.ch> - 2.3.0
+- voms-devel not necessary anymore
+* Mon Apr 11 2016 Rene Meusel <rene.meusel@cern.ch> - 2.3.0
+- Disable open repo transaction check in EL4
+* Thu Apr 07 2016 Rene Meusel <rene.meusel@cern.ch> - 2.3.0
+- Check for open repo transactions before updating server package
+* Sat Jan 23 2016 Brian Bockelman <bbockelm@cse.unl.edu> - 2.2.0
+- Build with VOMS support
+* Thu Jan 21 2016 Jakob Blomer <jblomer@cern.ch> - 2.2.0
+- Remove sudo dependency
+* Fri Jan 15 2016 Jakob Blomer <jblomer@cern.ch> - 2.2.0
+- Add valgrind-devel except for EL4
+* Tue Jan 12 2016 Rene Meusel <rene.meusel@cern.ch> - 2.2.0
+- Fix dependency for Fedora 23
+* Tue Dec 15 2015 Jakob Blomer <jblomer@cern.ch> - 2.2.0
+- Unmount repositories when cvmfs is erased
+* Fri Dec 11 2015 Rene Meusel <rene.meusel@cern.ch> - 2.2.0
+- Add jq (weak) dependency
+* Fri Oct 23 2015 Rene Meusel <rene.meusel@cern.ch> - 2.2.0
+- Fix dependency for Fedora 22
+- Add lsof dependency for cvmfs-server
+* Tue Oct 13 2015 Rene Meusel <rene.meusel@cern.ch> - 2.2.0
+- Add libcap dependency for cvmfs-server
+* Wed Sep 30 2015 Rene Meusel <rene.meusel@cern.ch> - 2.2.0
+- Drop explicit support for Fedora < 21
+- Use generic 'fedora' macro name where possible
 * Mon Aug 17 2015 Jakob Blomer <jblomer@cern.ch> - 2.2.0
 - Avoid rm -f /var/lib/cvmfs-server/geo/* in preuninstall
 * Wed Jan 07 2015 Jakob Blomer <jblomer@cern.ch> - 2.1.20

@@ -32,9 +32,9 @@ ParameterList CommandGc::GetParams() {
   r.push_back(Parameter::Optional('z', "conserve revisions younger than <z>"));
   r.push_back(Parameter::Optional('k', "repository master key(s)"));
   r.push_back(Parameter::Optional('t', "temporary directory"));
+  r.push_back(Parameter::Optional('L', "path to deletion log file"));
   r.push_back(Parameter::Switch('d', "dry run"));
   r.push_back(Parameter::Switch('l', "list objects to be removed"));
-  // to be extended...
   return r;
 }
 
@@ -54,6 +54,8 @@ int CommandGc::Main(const ArgumentList &args) {
   const bool list_condemned_objects = (args.count('l') > 0);
   const std::string temp_directory = (args.count('t') > 0) ?
     *args.find('t')->second : "/tmp";
+  const std::string deletion_log_path = (args.count('L') > 0) ?
+    *args.find('L')->second : "";
 
   if (revisions < 0) {
     LogCvmfs(kLogCvmfs, kLogStderr,
@@ -68,24 +70,25 @@ int CommandGc::Main(const ArgumentList &args) {
     return 1;
   }
 
-  download::DownloadManager   download_manager;
-  signature::SignatureManager signature_manager;
-  download_manager.Init(1, true, g_statistics);
-  signature_manager.Init();
-  if (!signature_manager.LoadPublicRsaKeys(repo_keys)) {
-    LogCvmfs(kLogCatalog, kLogStderr, "failed to load public key(s)");
+  const bool follow_redirects = false;
+  if (!this->InitDownloadManager(follow_redirects) ||
+      !this->InitVerifyingSignatureManager(repo_keys)) {
+    LogCvmfs(kLogCatalog, kLogStderr, "failed to init repo connection");
     return 1;
   }
 
   ObjectFetcher object_fetcher(repo_name,
                                repo_url,
                                temp_directory,
-                               &download_manager,
-                               &signature_manager);
+                               download_manager(),
+                               signature_manager());
 
-  UniquePtr<manifest::Manifest> manifest(object_fetcher.FetchManifest());
-  if (!manifest.IsValid()) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load repository manifest");
+  UniquePtr<manifest::Manifest> manifest;
+  ObjectFetcher::Failures retval = object_fetcher.FetchManifest(&manifest);
+  if (retval != ObjectFetcher::kFailOk) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load repository manifest "
+                                    "(%d - %s)",
+                                    retval, Code2Ascii(retval));
     return 1;
   }
 
@@ -95,28 +98,97 @@ int CommandGc::Main(const ArgumentList &args) {
     return 1;
   }
 
-  GcConfig config;
-  const upload::SpoolerDefinition spooler_definition(spooler, shash::kAny);
-  config.uploader = upload::AbstractUploader::Construct(spooler_definition);
-  config.keep_history_depth = revisions;
-  config.keep_history_timestamp = timestamp;
-  config.dry_run = dry_run;
-  config.verbose = list_condemned_objects;
-  config.object_fetcher = &object_fetcher;
+  UniquePtr<manifest::Reflog> reflog;
+  reflog = FetchReflog(&object_fetcher, repo_name);
+  if (!reflog.IsValid()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "no Reflog found, cannot garbage collect");
+    return 1;
+  }
 
-  if (config.uploader == NULL) {
+  const upload::SpoolerDefinition spooler_definition(spooler, shash::kAny);
+  UniquePtr<upload::AbstractUploader> uploader(
+                       upload::AbstractUploader::Construct(spooler_definition));
+
+  if (!uploader.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to initialize spooler for '%s'",
              spooler.c_str());
     return 1;
   }
 
+  FILE *deletion_log_file = NULL;
+  if (!deletion_log_path.empty()) {
+    deletion_log_file = fopen(deletion_log_path.c_str(), "a+");
+    if (NULL == deletion_log_file) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to open deletion log file "
+                                      "(errno: %d)", errno);
+      uploader->TearDown();
+      return 1;
+    }
+  }
+
+  reflog->BeginTransaction();
+
+  GcConfig config;
+  config.uploader                = uploader.weak_ref();
+  config.keep_history_depth      = revisions;
+  config.keep_history_timestamp  = timestamp;
+  config.dry_run                 = dry_run;
+  config.verbose                 = list_condemned_objects;
+  config.object_fetcher          = &object_fetcher;
+  config.reflog                  = reflog.weak_ref();
+  config.deleted_objects_logfile = deletion_log_file;
+
+
+  if (deletion_log_file != NULL) {
+    const int bytes_written = fprintf(deletion_log_file,
+                                      "# Garbage Collection started at %s\n",
+                                      StringifyTime(time(NULL), true).c_str());
+    if (bytes_written < 0) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to write to deletion log '%s' "
+                                      "(errno: %d)",
+                                      deletion_log_path.c_str(), errno);
+      uploader->TearDown();
+      return 1;
+    }
+  }
+
   GC collector(config);
   const bool success = collector.Collect();
 
-  download_manager.Fini();
-  signature_manager.Fini();
+  if (!success) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "garbage collection failed");
+    uploader->TearDown();
+    return 1;
+  }
 
-  return success ? 0 : 1;
+  // As of here: garbage collection succeeded, cleanup & commit
+
+  if (deletion_log_file != NULL) {
+    const int bytes_written = fprintf(deletion_log_file,
+                                      "# Garbage Collection finished at %s\n\n",
+                                      StringifyTime(time(NULL), true).c_str());
+    assert(bytes_written >= 0);
+    fclose(deletion_log_file);
+  }
+
+  reflog->CommitTransaction();
+  const std::string reflog_db = reflog->CloseAndReturnDatabaseFile();
+
+  if (!dry_run) {
+    uploader->Upload(reflog_db, ".cvmfsreflog");
+    uploader->WaitForUpload();
+  }
+
+  unlink(reflog_db.c_str());
+
+  if (uploader->GetNumberOfErrors() > 0 && !dry_run) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to upload updated Reflog");
+    uploader->TearDown();
+    return 1;
+  }
+
+  uploader->TearDown();
+  return 0;
 }
 
 }  // namespace swissknife

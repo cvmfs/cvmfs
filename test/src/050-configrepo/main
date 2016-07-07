@@ -1,50 +1,100 @@
 
 cvmfs_test_name="Fetch configuration from config repository"
 
+CVMFS_TEST_050_CONF_FILE=
+CVMFS_TEST_050_CONF_EDIT=
+cleanup() {
+  [ -z $CVMFS_TEST_050_CONF_FILE ] || sudo rm -f $CVMFS_TEST_050_CONF_FILE
+  [ -z $CVMFS_TEST_050_CONF_EDIT ] || sudo sed -i -e "s,CVMFS_MOUNT_DIR=$PWD,CVMFS_MOUNT_DIR=/cvmfs," /etc/cvmfs/default.conf
+}
+
 cvmfs_run_test() {
   logfile=$1
 
-  mount | grep grid.cern.ch
-  if [ $? -eq 0 ]; then
-    return 3
-  fi
-  mount | grep alice.cern.ch
-  if [ $? -eq 0 ]; then
-    return 4
-  fi
-  cvmfs_mount grid.cern.ch "CVMFS_CONFIG_REPOSITORY=alice.cern.ch" || return 2
+  local defaultconf="/etc/cvmfs/default.d/99-local.conf"
+
+  echo "check if grid.cern.ch and alice.cern.ch is not mounted"
+  mount | grep grid.cern.ch  && return 3
+  mount | grep alice.cern.ch && return 4
+
+  echo "set a global cleanup"
+  trap cleanup EXIT HUP INT TERM || return $?
+
+  # this has to be in a default.d file in order to read default.conf
+  #   from the config repo, since default.local is read _after_ reading
+  #   the config repo.
+
+  echo "configure 'alice.cern.ch' as the global config repository"
+  CVMFS_TEST_050_CONF_FILE="$defaultconf"
+  echo "CVMFS_CONFIG_REPOSITORY=alice.cern.ch" | sudo tee $defaultconf || return 1
+
+  echo "mount grid.cern.ch with alice.cern.ch as config repository"
+  cvmfs_mount grid.cern.ch || return 2
+
+  echo "check if alice is mounted"
   mount | grep alice.cern.ch || return 5
 
-  cvmfs_umount grid.cern.ch || return 6
+  echo "umount alice and grid *.cern.ch"
+  cvmfs_umount grid.cern.ch  || return 6
   cvmfs_umount alice.cern.ch || return 6
+
+  echo "check if alice is umounted"
   [ -d /cvmfs/alice.cern.ch ] || return 7
-  cvmfs_mount grid.cern.ch "CVMFS_CONFIG_REPOSITORY=alice.cern.ch" || return 8
+
+  echo "remount grid.cern.ch with alice.cern.ch as config repository"
+  cvmfs_mount grid.cern.ch   || return 8
   mount | grep alice.cern.ch || return 9
 
-  cvmfs_umount grid.cern.ch || return 15
+  echo "umount alice and grid *.cern.ch"
+  cvmfs_umount grid.cern.ch  || return 15
   cvmfs_umount alice.cern.ch || return 16
-  cvmfs_mount grid.cern.ch "CVMFS_CONFIG_REPOSITORY=alice.cern.ch" \
-    "CVMFS_STRICT_MOUNT=yes" || return 17
+
+  echo "remount grid.cern.ch with alice.cern.ch as config repository (strict mount)"
+  cvmfs_mount grid.cern.ch "CVMFS_STRICT_MOUNT=yes" || return 17
   mount | grep alice.cern.ch || return 18
 
-  cvmfs_umount grid.cern.ch || return 10
+  echo "umount alice and grid *.cern.ch"
+  cvmfs_umount grid.cern.ch  || return 10
   cvmfs_umount alice.cern.ch || return 11
-  cvmfs_mount grid.cern.ch "CVMFS_CONFIG_REPOSITORY=notavail.cern.ch" || return 12
+
+  echo "prevent hang when config repository gets mistakenly changed"
+  cvmfs_umount grid.cern.ch
+  cvmfs_mount grid.cern.ch "CVMFS_CONFIG_REPOSITORY=lhcb.cern.ch" || return 50
+  mount | grep lhcb.cern.ch && return 51
+  cvmfs_umount grid.cern.ch  || return 52
+  cvmfs_umount alice.cern.ch || return 53
+
+  echo "set 'notavail.cern.ch' as the global config repo"
+  echo "CVMFS_CONFIG_REPOSITORY=notavail.cern.ch" | sudo tee $defaultconf || return 1
+
+  echo "try to mount grid.cern.ch with a broken config repo"
+  cvmfs_mount grid.cern.ch  || return 12
   mount | grep grid.cern.ch || return 13
 
   cvmfs_umount grid.cern.ch || return 20
   mkdir -p "$(pwd)/cvmfs-config.cern.ch/etc/cvmfs/domain.d"
   mkdir -p "$(pwd)/cvmfs-config.cern.ch/etc/cvmfs/config.d"
-  echo "EXTERNAL_DOMAIN_PARAMETER=" > "$(pwd)/cvmfs-config.cern.ch/etc/cvmfs/domain.d/cern.ch.conf"
-  echo "EXTERNAL_REPO_PARAMETER=" > "$(pwd)/cvmfs-config.cern.ch/etc/cvmfs/config.d/grid.cern.ch.conf"
+  echo "EXTERNAL_DOMAIN_PARAMETER=foo"  > "$(pwd)/cvmfs-config.cern.ch/etc/cvmfs/domain.d/cern.ch.conf"
+  echo "EXTERNAL_REPO_PARAMETER=bar"    > "$(pwd)/cvmfs-config.cern.ch/etc/cvmfs/config.d/grid.cern.ch.conf"
+  echo "EXTERNAL_DEFAULT_PARAMETER=baz" > "$(pwd)/cvmfs-config.cern.ch/etc/cvmfs/default.conf"
 
-  sudo sed -i -e "s,CVMFS_MOUNT_DIR=/cvmfs,CVMFS_MOUNT_DIR=$PWD," /etc/cvmfs/default.conf
-  local retval=0
-  cvmfs_mount grid.cern.ch "CVMFS_CONFIG_REPOSITORY=cvmfs-config.cern.ch"
-  ls /cvmfs/grid.cern.ch || retval=21
-  sudo cvmfs_talk -i grid.cern.ch parameters | grep EXTERNAL_DOMAIN_PARAMETER || retval=22
-  sudo cvmfs_talk -i grid.cern.ch parameters | grep EXTERNAL_REPO_PARAMETER || retval=23
-  sudo sed -i -e "s,CVMFS_MOUNT_DIR=$PWD,CVMFS_MOUNT_DIR=/cvmfs," /etc/cvmfs/default.conf
+  echo "set 'cvmfs-config.cern.ch' as the global config repo"
+  echo "CVMFS_CONFIG_REPOSITORY=cvmfs-config.cern.ch" | sudo tee $defaultconf || return 1
 
-  return $retval
+  echo "change global configuration"
+  sudo sed -i -e "s,CVMFS_MOUNT_DIR=/cvmfs,CVMFS_MOUNT_DIR=$PWD," /etc/cvmfs/default.conf || return $?
+  echo "=== default.conf ==="
+  cat /etc/cvmfs/default.conf
+  echo "===================="
+
+  CVMFS_TEST_050_CONF_EDIT=1
+
+  cvmfs_mount grid.cern.ch
+  ls /cvmfs/grid.cern.ch || return 21
+
+  sudo cvmfs_talk -i grid.cern.ch parameters | grep EXTERNAL_DOMAIN_PARAMETER  || return 22
+  sudo cvmfs_talk -i grid.cern.ch parameters | grep EXTERNAL_REPO_PARAMETER    || return 23
+  sudo cvmfs_talk -i grid.cern.ch parameters | grep EXTERNAL_DEFAULT_PARAMETER || return 24
+
+  return 0
 }

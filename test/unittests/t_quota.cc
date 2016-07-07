@@ -11,13 +11,13 @@
 #include <string>
 #include <vector>
 
-#include "../../cvmfs/cache.h"
-#include "../../cvmfs/compression.h"
-#include "../../cvmfs/fs_traversal.h"
-#include "../../cvmfs/hash.h"
-#include "../../cvmfs/quota.h"
-#include "../../cvmfs/util.h"
+#include "cache.h"
+#include "compression.h"
+#include "fs_traversal.h"
+#include "hash.h"
+#include "quota.h"
 #include "testutil.h"
+#include "util/algorithm.h"
 
 using namespace std;  // NOLINT
 
@@ -179,11 +179,15 @@ TEST_F(T_QuotaManager, Cleanup) {
 
   quota_mgr_->Insert(hash_null, 1, "");
   quota_mgr_->Insert(hash_rnd, 1, "");
+  EXPECT_EQ(0U, quota_mgr_->GetCleanupRate(60));
   EXPECT_TRUE(quota_mgr_->Cleanup(3));
+  EXPECT_EQ(0U, quota_mgr_->GetCleanupRate(60));
   EXPECT_EQ(2U, quota_mgr_->GetSize());
   EXPECT_TRUE(quota_mgr_->Cleanup(2));
+  EXPECT_EQ(0U, quota_mgr_->GetCleanupRate(60));
   EXPECT_EQ(2U, quota_mgr_->GetSize());
   EXPECT_TRUE(quota_mgr_->Cleanup(0));
+  EXPECT_EQ(1U, quota_mgr_->GetCleanupRate(60));
   EXPECT_EQ(0U, quota_mgr_->GetSize());
   EXPECT_FALSE(FileExists(tmp_path_ + "/" + hash_null.MakePath()));
   EXPECT_FALSE(FileExists(tmp_path_ + "/" + hash_rnd.MakePath()));
@@ -303,10 +307,10 @@ TEST_F(T_QuotaManager, Create) {
 TEST_F(T_QuotaManager, CreateShared) {
   delete quota_mgr_;
   EXPECT_EQ(NULL,
-    PosixQuotaManager::CreateShared("", tmp_path_ + "/noent", 5, 5));
+    PosixQuotaManager::CreateShared("", tmp_path_ + "/noent", 5, 5, false));
 
   // Forking fails
-  EXPECT_EQ(NULL, PosixQuotaManager::CreateShared("", tmp_path_, 5, 5));
+  EXPECT_EQ(NULL, PosixQuotaManager::CreateShared("", tmp_path_, 5, 5, false));
   EXPECT_EQ(0, unlink((tmp_path_ + "/cachemgr").c_str()));
 
   // TODO(jblomer): test fork logic (requires changes to __cachemgr__ execve)

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<installer-gui-script minSpecVersion="1">
+    <pkg-ref id="@CVMFS_CORE_PKG_IDENTIFIER@"/>
+    <options customize="never" require-scripts="false"/>
+    <choices-outline>
+        <line choice="default">
+            <line choice="@CVMFS_CORE_PKG_IDENTIFIER@"/>
+        </line>
+    </choices-outline>
+    <choice id="default"/>
+    <choice id="@CVMFS_CORE_PKG_IDENTIFIER@" visible="false">
+        <pkg-ref id="@CVMFS_CORE_PKG_IDENTIFIER@"/>
+    </choice>
+    <pkg-ref id="@CVMFS_CORE_PKG_IDENTIFIER@" version="@cvmfs_version@" onConclusion="none">@cvmfs_package@</pkg-ref>
+
+    <background file="cvmfs_retina.tif" alignment="bottomleft" mime-type="image/tiff" scaling="none" />
+    <conclusion file="conclusion.rtf" mime-type="text/richtext" />
+    <license file="license.txt" mime-type="text/plain" />
+    <os-version min="10.9" />
+
+    <required-bundles description="CernVM-FS depends on OSXFuse to be installed on the system. Available here: https://osxfuse.github.io/" all="false">
+        <bundle id="com.github.osxfuse.pkg.Core" path="/Library/Filesystems/osxfusefs.fs" search="true" />
+        <bundle id="com.github.osxfuse.pkg.Core" path="/Library/Filesystems/osxfuse.fs" search="true" />
+    </required-bundles>
+
+    <title>CernVM-FS</title>
+    <welcome file="welcome.rtf" mime-type="text/richtext" />
+</installer-gui-script>

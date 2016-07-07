@@ -9,10 +9,11 @@
 #include <sys/types.h>
 
 #include <algorithm>
+#include <cstdlib>
 #include <utility>
 #include <vector>
 
-#include "char_buffer.h"
+#include "file_processing/char_buffer.h"
 
 namespace upload {
 
@@ -124,7 +125,7 @@ class Xor32Detector : public ChunkDetector {
   }
 
   inline bool CheckThreshold() {
-    return std::abs(static_cast<int32_t>(xor32_) - magic_number_) < threshold_;
+    return abs(static_cast<int32_t>(xor32_) - magic_number_) < threshold_;
   }
 
  private:

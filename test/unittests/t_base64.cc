@@ -8,7 +8,7 @@
 
 #include <string>
 
-#include "../../cvmfs/util.h"
+#include "util/string.h"
 
 class T_Base64 : public ::testing::Test {
  protected:
@@ -55,6 +55,7 @@ TEST_F(T_Base64, MoreBasics) {
   "dWVkIGFuZCBpbmRlZmF0aWdhYmxlIGdlbmVyYXRpb24gb2Yga25vd2xlZGdlLCBleGNlZWRzIHRo"
   "ZSBzaG9ydCB2ZWhlbWVuY2Ugb2YgYW55IGNhcm5hbCBwbGVhc3VyZS4=");
 }
+
 
 TEST_F(T_Base64, Decode) {
   bool retval;
@@ -106,6 +107,34 @@ TEST_F(T_Base64, Decode) {
   EXPECT_EQ(retval, true);
   EXPECT_EQ(all_chars, dec);
 }
+
+
+TEST_F(T_Base64, UrlSafe) {
+  std::string all_chars;
+  for (unsigned i = 0; i < 255; ++i)
+    all_chars.push_back(i);
+
+  std::string enc_normal = Base64(all_chars);
+  std::string enc_url = Base64Url(all_chars);
+
+  bool unsafe_char_found = false;
+  for (unsigned i = 0; i < enc_normal.length(); ++i) {
+    if ((enc_normal[i] == '/') || (enc_normal[i] == '+'))
+      unsafe_char_found = true;
+  }
+  EXPECT_TRUE(unsafe_char_found);
+  unsafe_char_found = false;
+  for (unsigned i = 0; i < enc_url.length(); ++i) {
+    if ((enc_url[i] == '/') || (enc_url[i] == '+'))
+      unsafe_char_found = true;
+  }
+  EXPECT_FALSE(unsafe_char_found);
+
+  bool retval = Debase64(enc_url, &dec);
+  EXPECT_EQ(retval, true);
+  EXPECT_EQ(all_chars, dec);
+}
+
 
 TEST_F(T_Base64, Invalid) {
   bool retval;

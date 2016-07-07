@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-#include "../../cvmfs/backoff.h"
+#include "backoff.h"
 
 using namespace std;  // NOLINT
 

@@ -6,13 +6,15 @@
 #include "upload_local.h"
 
 #include <errno.h>
+#include <fcntl.h>
 
 #include <string>
 
 #include "compression.h"
 #include "file_processing/char_buffer.h"
 #include "logging.h"
-#include "util.h"
+#include "platform.h"
+#include "util/posix.h"
 
 
 namespace upload {
@@ -108,6 +110,8 @@ void LocalUploader::FileUpload(
                                           "'%s'",
              tmp_path.c_str(), remote_path.c_str());
     atomic_inc32(&copy_errors_);
+    Respond(callback, UploaderResults(retcode, local_path));
+    return;
   }
   Respond(callback, UploaderResults(retcode, local_path));
 }
@@ -157,6 +161,7 @@ void LocalUploader::Upload(UploadStreamHandle  *handle,
   assert(buffer->IsInitialized());
   LocalStreamHandle *local_handle = static_cast<LocalStreamHandle*>(handle);
 
+  const off_t offset = lseek(local_handle->file_descriptor, 0, SEEK_CUR);
   const size_t bytes_written = write(local_handle->file_descriptor,
                                      buffer->ptr(),
                                      buffer->used_bytes());
@@ -171,6 +176,11 @@ void LocalUploader::Upload(UploadStreamHandle  *handle,
     Respond(callback, UploaderResults(cpy_errno, buffer));
     return;
   }
+
+  // Tell kernel to evict written pages from the page cache.  We don't care if
+  // it succeeds or not.
+  (void) platform_invalidate_kcache(local_handle->file_descriptor,
+                                    offset, bytes_written);
 
   Respond(callback, UploaderResults(0, buffer));
 }
@@ -230,6 +240,13 @@ bool LocalUploader::Remove(const std::string& file_to_delete) {
 
 bool LocalUploader::Peek(const std::string& path) const {
   return FileExists(upstream_path_ + "/" + path);
+}
+
+
+bool LocalUploader::PlaceBootstrappingShortcut(const shash::Any &object) const {
+  const std::string src  = "data/" + object.MakePath();
+  const std::string dest = upstream_path_ + "/" + object.MakeAlternativePath();
+  return SymlinkForced(src, dest);
 }
 
 

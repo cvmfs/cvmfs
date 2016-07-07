@@ -11,12 +11,16 @@
 #include <cstdlib>
 
 #include "logging.h"
-#include "util.h"
+#include "util_concurrency.h"
 #include "xattr.h"
 
 using namespace std;  // NOLINT
 
 namespace catalog {
+
+const double WritableCatalog::kMaximalFreePageRatio = 0.20;
+const double WritableCatalog::kMaximalRowIdWasteRatio = 0.25;
+
 
 WritableCatalog::WritableCatalog(const string      &path,
                                  const shash::Any  &catalog_hash,
@@ -35,7 +39,10 @@ WritableCatalog::WritableCatalog(const string      &path,
   sql_chunks_count_(NULL),
   sql_max_link_id_(NULL),
   sql_inc_linkcount_(NULL),
-  dirty_(false) {}
+  dirty_(false)
+{
+  atomic_init32(&dirty_children_);
+}
 
 
 WritableCatalog *WritableCatalog::AttachFreely(const string      &root_path,
@@ -62,19 +69,17 @@ WritableCatalog::~WritableCatalog() {
 
 
 void WritableCatalog::Transaction() {
-  Sql transaction(database(), "BEGIN;");
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "opening SQLite transaction for '%s'",
                                         path().c_str());
-  bool retval = transaction.Execute();
+  const bool retval = database().BeginTransaction();
   assert(retval == true);
 }
 
 
 void WritableCatalog::Commit() {
-  Sql commit(database(), "COMMIT;");
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "closing SQLite transaction for '%s'",
                                         path().c_str());
-  bool retval = commit.Execute();
+  const bool retval = database().CommitTransaction();
   assert(retval == true);
   dirty_ = false;
 }
@@ -83,7 +88,7 @@ void WritableCatalog::Commit() {
 void WritableCatalog::InitPreparedStatements() {
   Catalog::InitPreparedStatements();  // polymorphism: up call
 
-  bool retval = Sql(database(), "PRAGMA foreign_keys = ON;").Execute();
+  bool retval = SqlCatalog(database(), "PRAGMA foreign_keys = ON;").Execute();
   assert(retval);
   sql_insert_        = new SqlDirentInsert     (database());
   sql_unlink_        = new SqlDirentUnlink     (database());
@@ -311,6 +316,16 @@ void WritableCatalog::SetRevision(const uint64_t new_revision) {
 }
 
 
+void WritableCatalog::SetTTL(const uint64_t new_ttl) {
+  database().SetProperty("TTL", new_ttl);
+}
+
+
+bool WritableCatalog::SetVOMSAuthz(const std::string &voms_authz) {
+  return database().SetVOMSAuthz(voms_authz);
+}
+
+
 /**
  * Sets the content hash of the previous catalog revision.
  */
@@ -472,8 +487,8 @@ void WritableCatalog::InsertNestedCatalog(const string &mountpoint,
   const string hash_string = (!content_hash.IsNull()) ?
                              content_hash.ToString() : "";
 
-  Sql stmt(database(), "INSERT INTO nested_catalogs (path, sha1, size) "
-                       "VALUES (:p, :sha1, :size);");
+  SqlCatalog stmt(database(), "INSERT INTO nested_catalogs (path, sha1, size) "
+                              "VALUES (:p, :sha1, :size);");
   bool retval =
     stmt.BindText(1, mountpoint) &&
     stmt.BindText(2, hash_string) &&
@@ -486,7 +501,7 @@ void WritableCatalog::InsertNestedCatalog(const string &mountpoint,
   if (attached_reference != NULL)
     AddChild(attached_reference);
 
-  ResetNestedCatalogCache();
+  ResetNestedCatalogCacheUnprotected();
 
   delta_counters_.self.nested_catalogs++;
 }
@@ -510,8 +525,8 @@ void WritableCatalog::RemoveNestedCatalog(const string &mountpoint,
                            &dummy, &dummy_size);
   assert(retval);
 
-  Sql stmt(database(),
-           "DELETE FROM nested_catalogs WHERE path = :p;");
+  SqlCatalog stmt(database(),
+                  "DELETE FROM nested_catalogs WHERE path = :p;");
   retval =
     stmt.BindText(1, mountpoint) &&
     stmt.Execute();
@@ -526,7 +541,7 @@ void WritableCatalog::RemoveNestedCatalog(const string &mountpoint,
   if (attached_reference != NULL)
     *attached_reference = child;
 
-  ResetNestedCatalogCache();
+  ResetNestedCatalogCacheUnprotected();
 
   delta_counters_.self.nested_catalogs--;
 }
@@ -534,17 +549,23 @@ void WritableCatalog::RemoveNestedCatalog(const string &mountpoint,
 
 /**
  * Updates the link to a nested catalog in the database.
- * @param path the path of the nested catalog to update
- * @param hash the hash to set the given nested catalog link to
+ * @param path             the path of the nested catalog to update
+ * @param hash             the hash to set the given nested catalog link to
+ * @param size             the uncompressed catalog database file size
+ * @param child_counters   the statistics counters of the nested catalog
  */
-void WritableCatalog::UpdateNestedCatalog(const string &path,
-                                          const shash::Any &hash,
-                                          const uint64_t size)
-{
+void WritableCatalog::UpdateNestedCatalog(const std::string   &path,
+                                          const shash::Any    &hash,
+                                          const uint64_t       size,
+                                          const DeltaCounters &child_counters) {
+  MutexLockGuard guard(lock_);
+
+  child_counters.PopulateToParent(&delta_counters_);
+
   const string hash_str = hash.ToString();
   const string sql = "UPDATE nested_catalogs SET sha1 = :sha1, size = :size  "
-    "WHERE path = :path;";
-  Sql stmt(database(), sql);
+                     "WHERE path = :path;";
+  SqlCatalog stmt(database(), sql);
 
   bool retval =
     stmt.BindText(1, hash_str) &&
@@ -552,7 +573,7 @@ void WritableCatalog::UpdateNestedCatalog(const string &path,
     stmt.BindText(3, path) &&
     stmt.Execute();
 
-  ResetNestedCatalogCache();
+  ResetNestedCatalogCacheUnprotected();
 
   assert(retval);
 }
@@ -617,7 +638,7 @@ void WritableCatalog::CopyToParent() {
     "UPDATE catalog SET hardlinks = hardlinks + " + StringifyInt(offset) +
     " WHERE hardlinks > (1 << 32);";
 
-  Sql sql_update_link_ids(database(), update_link_ids);
+  SqlCatalog sql_update_link_ids(database(), update_link_ids);
   bool retval = sql_update_link_ids.Execute();
   assert(retval);
 
@@ -631,17 +652,17 @@ void WritableCatalog::CopyToParent() {
     Commit();
   if (parent->dirty_)
     parent->Commit();
-  Sql sql_attach(database(), "ATTACH '" + parent->database_path() +
-                             "' AS other;");
+  SqlCatalog sql_attach(database(), "ATTACH '" + parent->database_path() + "' "
+                                    "AS other;");
   retval = sql_attach.Execute();
   assert(retval);
-  retval = Sql(database(), "INSERT INTO other.catalog "
-                           "SELECT * FROM main.catalog;").Execute();
+  retval = SqlCatalog(database(), "INSERT INTO other.catalog "
+                                  "SELECT * FROM main.catalog;").Execute();
   assert(retval);
-  retval = Sql(database(), "INSERT INTO other.chunks "
-                           "SELECT * FROM main.chunks;").Execute();
+  retval = SqlCatalog(database(), "INSERT INTO other.chunks "
+                                  "SELECT * FROM main.chunks;").Execute();
   assert(retval);
-  retval = Sql(database(), "DETACH other;").Execute();
+  retval = SqlCatalog(database(), "DETACH other;").Execute();
   assert(retval);
   parent->SetDirty();
 

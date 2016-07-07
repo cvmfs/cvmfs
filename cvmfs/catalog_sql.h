@@ -24,6 +24,7 @@
 
 #include <string>
 
+#include "compression.h"
 #include "directory_entry.h"
 #include "file_chunk.h"
 #include "hash.h"
@@ -47,6 +48,7 @@ class CatalogDatabase : public sqlite::Database<CatalogDatabase> {
   bool CreateEmptyDatabase();
   bool InsertInitialValues(const std::string     &root_path,
                            const bool             volatile_content,
+                           const std::string     &voms_authz,
                            const DirectoryEntry  &root_entry
                                              = DirectoryEntry(kDirentNegative));
 
@@ -55,6 +57,7 @@ class CatalogDatabase : public sqlite::Database<CatalogDatabase> {
   bool CompactDatabase() const;
 
   double GetRowIdWasteRatio() const;
+  bool SetVOMSAuthz(const std::string&);
 
  protected:
   // TODO(rmeusel): C++11 - constructor inheritance
@@ -72,17 +75,16 @@ class CatalogDatabase : public sqlite::Database<CatalogDatabase> {
  * Base class for all SQL statement classes.  It wraps a single SQL statement
  * and all neccessary calls of the sqlite3 API to deal with this statement.
  */
-class Sql : public sqlite::Sql {
+class SqlCatalog : public sqlite::Sql {
  public:
   /**
    * Basic constructor to use this class for a specific statement.
    * @param database the database to use the query on
    * @param statement the statement to prepare
    */
-  Sql(const CatalogDatabase &database, const std::string &statement) {
+  SqlCatalog(const CatalogDatabase &database, const std::string &statement) {
     Init(database.sqlite_db(), statement);
   }
-  virtual ~Sql() { /* Done by super class */ }
 
   /**
    * Wrapper for retrieving MD5-ified path names.
@@ -158,7 +160,7 @@ class Sql : public sqlite::Sql {
   }
 
  protected:
-  Sql() : sqlite::Sql() { }
+  SqlCatalog() : sqlite::Sql() {}
 };
 
 
@@ -168,7 +170,7 @@ class Sql : public sqlite::Sql {
 /**
  * Common ancestor of SQL statemnts that deal with directory entries.
  */
-class SqlDirent : public Sql {
+class SqlDirent : public SqlCatalog {
  public:
   // Definition of bit positions for the flags field of a DirectoryEntry
   // All other bit positions are unused
@@ -181,12 +183,22 @@ class SqlDirent : public Sql {
   static const int kFlagLink                = 8;
   static const int kFlagFileStat            = 16;  // currently unused
   static const int kFlagFileChunk           = 64;
+  /**
+   * The file is not natively stored in cvmfs but on a different storage system,
+   * for instance on HTTPS data federation services.
+   */
+  static const int kFlagFileExternal        = 128;
   // as of 2^8: 3 bit for hashes
   //   - 0: SHA-1
   //   - 1: RIPEMD-160
+  //   - ...
   // Corresponds to shash::algorithms with offset in order to support future
   // hashes
   static const int kFlagPosHash             = 8;
+  // Compression methods, 3 bits starting at 2^11
+  // Corresponds to zlib::Algorithms
+  static const int kFlagPosCompression      = 11;
+
 
  protected:
   /**
@@ -198,6 +210,7 @@ class SqlDirent : public Sql {
   unsigned CreateDatabaseFlags(const DirectoryEntry &entry) const;
   void StoreHashAlgorithm(const shash::Algorithms algo, unsigned *flags) const;
   shash::Algorithms RetrieveHashAlgorithm(const unsigned flags) const;
+  zlib::Algorithms RetrieveCompressionAlgorithm(const unsigned flags) const;
 
   /**
    * The hardlink information (hardlink group ID and linkcount) is saved in one
@@ -259,15 +272,6 @@ class SqlListContentHashes : public SqlDirent {
 
 
 class SqlLookup : public SqlDirent {
- protected:
-  /**
-   * There are several lookup statements which all share a list of elements to
-   * load.
-   * @return a list of sql fields to query for DirectoryEntry
-   */
-  std::string GetFieldsToSelect(const float schema_version,
-                                const unsigned schema_revision) const;
-
  public:
   /**
    * Retrieves a DirectoryEntry from a freshly performed SqlLookup statement.
@@ -327,6 +331,30 @@ class SqlLookupInode : public SqlLookup {
 
 
 /**
+ * This SQL statement is only used for legacy catalog migrations and has been
+ * moved here as it needs to use a locally defined macro inside catalog_sql.cc
+ *
+ * Queries a single catalog and looks for DirectoryEntrys that have direct
+ * children in the same catalog but are marked as 'nested catalog mountpoints'.
+ * This is an inconsistent situation, since a mountpoint is supposed to be empty
+ * and it's children are stored in the corresponding referenced nested catalog.
+ *
+ * Note: the user code needs to check if there is a corresponding nested catalog
+ *       reference for the found dangling mountpoints. If so, we also have a
+ *       bogus state, but it is not reliably fixable automatically. The child-
+ *       DirectoryEntrys would be masked by the mounting nested catalog but it
+ *       is not clear if we can simply delete them or if this would destroy data.
+ */
+class SqlLookupDanglingMountpoints : public catalog::SqlLookup {
+ public:
+  explicit SqlLookupDanglingMountpoints(const CatalogDatabase &database);
+};
+
+
+//------------------------------------------------------------------------------
+
+
+/**
  * Filesystem like _touch_ of a DirectoryEntry. Only file system specific meta
  * data will be modified.  All CVMFS-specific administrative data stays
  * unchanged.
@@ -334,7 +362,7 @@ class SqlLookupInode : public SqlLookup {
  *       DirectoryEntryBase objects, which are restricted to file system meta
  *       data.
  */
-class SqlDirentTouch : public Sql {
+class SqlDirentTouch : public SqlCatalog {
  public:
   explicit SqlDirentTouch(const CatalogDatabase &database);
 
@@ -346,7 +374,7 @@ class SqlDirentTouch : public Sql {
 //------------------------------------------------------------------------------
 
 
-class SqlNestedCatalogLookup : public Sql {
+class SqlNestedCatalogLookup : public SqlCatalog {
  public:
   explicit SqlNestedCatalogLookup(const CatalogDatabase &database);
   bool BindSearchPath(const PathString &path);
@@ -358,7 +386,7 @@ class SqlNestedCatalogLookup : public Sql {
 //------------------------------------------------------------------------------
 
 
-class SqlNestedCatalogListing : public Sql {
+class SqlNestedCatalogListing : public SqlCatalog {
  public:
   explicit SqlNestedCatalogListing(const CatalogDatabase &database);
   PathString GetMountpoint() const;
@@ -395,7 +423,7 @@ class SqlDirentUpdate : public SqlDirentWrite {
 //------------------------------------------------------------------------------
 
 
-class SqlDirentUnlink : public Sql {
+class SqlDirentUnlink : public SqlCatalog {
  public:
   explicit SqlDirentUnlink(const CatalogDatabase &database);
   bool BindPathHash(const shash::Md5 &hash);
@@ -408,7 +436,7 @@ class SqlDirentUnlink : public Sql {
 /**
  * Changes the linkcount for all files in a hardlink group.
  */
-class SqlIncLinkcount : public Sql {
+class SqlIncLinkcount : public SqlCatalog {
  public:
   explicit SqlIncLinkcount(const CatalogDatabase &database);
   bool BindPathHash(const shash::Md5 &hash);
@@ -419,7 +447,7 @@ class SqlIncLinkcount : public Sql {
 //------------------------------------------------------------------------------
 
 
-class SqlChunkInsert : public Sql {
+class SqlChunkInsert : public SqlCatalog {
  public:
   explicit SqlChunkInsert(const CatalogDatabase &database);
   bool BindPathHash(const shash::Md5 &hash);
@@ -430,7 +458,7 @@ class SqlChunkInsert : public Sql {
 //------------------------------------------------------------------------------
 
 
-class SqlChunksRemove : public Sql {
+class SqlChunksRemove : public SqlCatalog {
  public:
   explicit SqlChunksRemove(const CatalogDatabase &database);
   bool BindPathHash(const shash::Md5 &hash);
@@ -440,7 +468,7 @@ class SqlChunksRemove : public Sql {
 //------------------------------------------------------------------------------
 
 
-class SqlChunksListing : public Sql {
+class SqlChunksListing : public SqlCatalog {
  public:
   explicit SqlChunksListing(const CatalogDatabase &database);
   bool BindPathHash(const shash::Md5 &hash);
@@ -451,7 +479,7 @@ class SqlChunksListing : public Sql {
 //------------------------------------------------------------------------------
 
 
-class SqlChunksCount : public Sql {
+class SqlChunksCount : public SqlCatalog {
  public:
   explicit SqlChunksCount(const CatalogDatabase &database);
   bool BindPathHash(const shash::Md5 &hash);
@@ -462,7 +490,7 @@ class SqlChunksCount : public Sql {
 //------------------------------------------------------------------------------
 
 
-class SqlMaxHardlinkGroup : public Sql {
+class SqlMaxHardlinkGroup : public SqlCatalog {
  public:
   explicit SqlMaxHardlinkGroup(const CatalogDatabase &database);
   uint32_t GetMaxGroupId() const;
@@ -472,7 +500,7 @@ class SqlMaxHardlinkGroup : public Sql {
 //------------------------------------------------------------------------------
 
 
-class SqlGetCounter : public Sql {
+class SqlGetCounter : public SqlCatalog {
  public:
   explicit SqlGetCounter(const CatalogDatabase &database);
   bool BindCounter(const std::string &counter);
@@ -485,7 +513,7 @@ class SqlGetCounter : public Sql {
 //------------------------------------------------------------------------------
 
 
-class SqlUpdateCounter : public Sql {
+class SqlUpdateCounter : public SqlCatalog {
  public:
   explicit SqlUpdateCounter(const CatalogDatabase &database);
   bool BindCounter(const std::string &counter);
@@ -496,7 +524,7 @@ class SqlUpdateCounter : public Sql {
 //------------------------------------------------------------------------------
 
 
-class SqlCreateCounter : public Sql {
+class SqlCreateCounter : public SqlCatalog {
  public:
   explicit SqlCreateCounter(const CatalogDatabase &database);
   bool BindCounter(const std::string &counter);
@@ -507,11 +535,11 @@ class SqlCreateCounter : public Sql {
 //------------------------------------------------------------------------------
 
 
-class SqlAllChunks : public Sql {
+class SqlAllChunks : public SqlCatalog {
  public:
   explicit SqlAllChunks(const CatalogDatabase &database);
   bool Open();
-  bool Next(shash::Any *hash);
+  bool Next(shash::Any *hash, zlib::Algorithms *compression_alg);
   bool Close();
 };
 
@@ -519,7 +547,7 @@ class SqlAllChunks : public Sql {
 //------------------------------------------------------------------------------
 
 
-class SqlLookupXattrs : public Sql {
+class SqlLookupXattrs : public SqlCatalog {
  public:
   explicit SqlLookupXattrs(const CatalogDatabase &database);
   bool BindPathHash(const shash::Md5 &hash);

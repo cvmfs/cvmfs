@@ -1,0 +1,22 @@
+#!/bin/bash
+export TMPDIR=`mktemp -d /tmp/cvmfs_preload_selfextracted.XXXXXX`
+
+ARCHIVE=`awk '/^__ARCHIVE_BELOW__/ {print NR + 1; exit 0; }' $0`
+
+if ! tail -n+"$ARCHIVE" "$0" | base64 -d -i | tar xz -C "$TMPDIR"; then
+  echo "Couldn't extract the tar file" >&2
+  rm -f "${TMPDIR}"/*
+  rmdir "$TMPDIR"
+  exit 1
+fi
+
+# execute the command
+LD_LIBRARY_PATH="$TMPDIR" $TMPDIR/cvmfs_preload_bin $@
+RETVAL=$?
+
+rm -f "${TMPDIR}"/*
+rmdir "$TMPDIR"
+
+exit $RETVAL
+
+__ARCHIVE_BELOW__

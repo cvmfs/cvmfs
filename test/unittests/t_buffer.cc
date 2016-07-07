@@ -6,8 +6,7 @@
 
 #include <tbb/scalable_allocator.h>
 
-#include "../../cvmfs/file_processing/char_buffer.h"
-#include "../../cvmfs/util.h"
+#include "file_processing/char_buffer.h"
 
 
 TEST(T_Buffer, Initialize) {
@@ -183,4 +182,5 @@ TEST(T_Buffer, CloneCharBuffer) {
   EXPECT_EQ(str_length,    other->size());
   EXPECT_EQ(str_length,    other->used_bytes());
   EXPECT_EQ(test_base_off, other->base_offset());
+  delete other;
 }

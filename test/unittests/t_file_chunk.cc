@@ -6,7 +6,7 @@
 
 #include <vector>
 
-#include "../../cvmfs/file_chunk.h"
+#include "file_chunk.h"
 
 using namespace std;  // NOLINT
 
@@ -21,6 +21,8 @@ class T_FileChunk : public ::testing::Test {
     FileChunkReflist result;
     result.list = new FileChunkList();
     result.path.Assign("/42", 3);
+    result.compression_alg = zlib::kZlibDefault;
+    result.external_data = false;
     return result;
   }
 
@@ -30,7 +32,7 @@ class T_FileChunk : public ::testing::Test {
 
 TEST_F(T_FileChunk, FindChunkIdx) {
   FileChunkList single;
-  FileChunkReflist reflist(&single, PathString(""));
+  FileChunkReflist reflist(&single, PathString(""), zlib::kZlibDefault, false);
   EXPECT_DEATH(reflist.FindChunkIdx(0), ".*");
 
   single.PushBack(FileChunk());

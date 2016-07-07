@@ -29,7 +29,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  src/005-asetup                               \
                                  src/007-testjobs                             \
                                  src/024-reload-during-asetup                 \
-                                 src/045-oasis                                \
+                                 src/050-configrepo                           \
                                  --                                           \
                                  src/0*                                       \
                               || retval=1
@@ -42,11 +42,11 @@ CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
                               -x src/518-hardlinkstresstest                   \
                                  src/523-corruptchunkfailover                 \
                                  src/524-corruptmanifestfailover              \
-                                 src/577-garbagecollecthiddenstratum1revision \
-                                 src/579-garbagecollectstratum1legacytag      \
                                  src/585-xattrs                               \
+                                 src/600-securecvmfs                          \
                                  --                                           \
                                  src/5*                                       \
+                                 src/6*                                       \
                               || retval=1
 
 

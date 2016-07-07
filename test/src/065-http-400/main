@@ -1,0 +1,64 @@
+
+cvmfs_test_name="Probing host failover on HTTP 400"
+
+CVMFS_TEST_065_FAULTY_PID=
+cleanup() {
+  echo "running cleanup()"
+  [ -z $CVMFS_TEST_065_FAULTY_PID ] || sudo kill $CVMFS_TEST_065_FAULTY_PID
+}
+
+faulty_server_running() {
+  local pid=$1
+  local port=$2
+
+  kill -0 $pid                                                   || return 1
+  curl -I "http://localhost:${port}" 2>&1 | grep -e '^HTTP.*400' || return 1
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  src_location=$2
+
+  local faulty_port="9091"
+  local faulty_server="${src_location}/../../common/mock_services/http_400.py"
+
+  which curl > /dev/null 2>&1 || { echo "curl not found"; return 1; }
+  trap "cleanup" EXIT HUP INT TERM
+
+  local faulty_server_log="faulty_server.log"
+  echo "starting faulty server (logging to $faulty_server_log)"
+  CVMFS_TEST_065_FAULTY_PID=$(run_background_service $faulty_server_log "$faulty_server -p $faulty_port")
+  if [ $? -ne 0 ]; then return 9; fi
+
+  echo "wait that $faulty_port (PID $CVMFS_TEST_065_FAULTY_PID) actually returns HTTP 400"
+  sleep 1
+  local timeout=10
+  while ! faulty_server_running $CVMFS_TEST_065_FAULTY_PID $faulty_port && \
+        [ $timeout -gt 0 ]; do
+    timeout=$(( $timeout - 1 ))
+  done
+  [ $timeout -gt 0 ] || return 50
+
+  sudo tee /etc/cvmfs/config.d/grid.cern.ch.conf << EOF
+CVMFS_SERVER_URL="http://localhost:${faulty_port}/cvmfs/grid.cern.ch;http://cvmfs-stratum-one.cern.ch/cvmfs/grid.cern.ch"
+CVMFS_USE_GEOAPI=no
+EOF
+  cvmfs_mount grid.cern.ch \
+    "CVMFS_HTTP_PROXY='DIRECT;DIRECT'" || return 1
+
+  no_host_failover="$(get_internal_value grid.cern.ch download.n_host_failover)"
+  no_proxy_failover="$(get_internal_value grid.cern.ch download.n_proxy_failover)"
+
+  if [ "x$no_host_failover" != "x1" ]; then
+    echo "number of host failovers: $no_host_failover, expected: 1"
+    return 10
+  fi
+
+  if [ "x$no_proxy_failover" != "x0" ]; then
+    echo "number of proxy failovers: $no_proxy_failover, expected: 0"
+    return 20
+  fi
+
+  return 0
+}
+

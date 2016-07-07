@@ -1,0 +1,134 @@
+cvmfs_test_name="Create Repository (S0 and S1) w/o Apache"
+cvmfs_test_autofs_on_startup=false
+
+get_http_response() {
+  local url="$1"
+  curl -I -s $url | head -n 1 || return 0
+}
+
+CVMFS_TEST_607_HTTP_PID=
+CVMFS_TEST_607_REPLICA_NAME=
+CVMFS_TEST_607_S1_MOUNTPOINT=
+cleanup() {
+  echo "running cleanup..."
+  [ -z $CVMFS_TEST_607_HTTP_PID ]      || sudo kill -9 $CVMFS_TEST_607_HTTP_PID
+  [ -z $CVMFS_TEST_607_S1_MOUNTPOINT ] || sudo umount $CVMFS_TEST_607_S1_MOUNTPOINT
+  [ -z $CVMFS_TEST_607_REPLICA_NAME ]  || destroy_repo $CVMFS_TEST_607_REPLICA_NAME
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  src_location=$2
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  local replica_name="${CVMFS_TEST_REPO}.replic"
+  local s1_mnt_point="$(pwd)/s1_mnt"
+
+  local scratch_dir=$(pwd)
+  mkdir reference_dir
+  local reference_dir=$scratch_dir/reference_dir
+
+  local http_logfile="$(pwd)/http.log"
+  local document_root="$(pwd)/docroot"
+
+  echo "install a desaster cleanup"
+  trap cleanup EXIT HUP INT TERM || return $?
+
+  echo "create the document root"
+  local s0_location=${document_root}/cvmfs/${CVMFS_TEST_REPO}
+  local s1_location=${document_root}/cvmfs/${replica_name}
+
+  mkdir -p $s0_location || return 1
+  mkdir -p $s1_location || return 2
+  touch ${document_root}/sentinel || return 3
+
+  local http_port=8888
+  echo -n "spawning a simple HTTP server (logging to $http_logfile)... "
+  CVMFS_TEST_607_HTTP_PID="$(open_http_server $document_root $http_port $http_logfile)"
+  kill -0 $CVMFS_TEST_607_HTTP_PID || { echo "fail"; return 4; }
+  local http_base_url="http://localhost:${http_port}"
+  local s0_http_address="${http_base_url}/cvmfs/${CVMFS_TEST_REPO}"
+  local s1_http_address="${http_base_url}/cvmfs/${replica_name}"
+  echo "done"
+
+  echo "create a repository without apache backend"
+  local s0_upstream="local,${s0_location}/data/txn,${s0_location}"
+  create_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER $logfile -w $s0_http_address \
+                                                         -u $s0_upstream     \
+                                                         -p || return $?
+
+  echo "check that apache doesn't have access to the new repository"
+  local bogus_apache_s0_url="http://localhost/cvmfs/${CVMFS_TEST_REPO}/.cvmfspublished"
+  local http_response=$(get_http_response $bogus_apache_s0_url)
+  echo "$http_response" | grep "200 OK" && return 4
+
+  echo "opening a new transaction"
+  start_transaction $CVMFS_TEST_REPO || return 5
+
+  echo "putting some stuff into the repository"
+  rm -fR ${repo_dir}/new_repository
+  cp_bin $repo_dir || return 6
+
+  echo "putting the same stuff in the reference directory"
+  cp_bin $reference_dir || return 7
+
+  local publish_1_log="publish_1.log"
+  echo "publishing transaction (logging into $publish_1_log)"
+  publish_repo $CVMFS_TEST_REPO > $publish_1_log 2>&1 || return 8
+
+  echo "compare reference and repository"
+  compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return $?
+
+  echo "create a replication of the repository w/o apache"
+  local s1_upstream="local,${s1_location}/data/txn,${s1_location}"
+  CVMFS_TEST_607_REPLICA_NAME="$replica_name"
+  create_stratum1 $replica_name                          \
+                  $CVMFS_TEST_USER                       \
+                  $s0_http_address                       \
+                  /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub \
+                  -w $s1_http_address                    \
+                  -u $s1_upstream                        \
+                  -p || return 9
+
+  echo "snapshot the changes"
+  cvmfs_server snapshot $replica_name || return 10
+
+  echo "check that apache doesn't serve the Stratum 1"
+  local bogus_apache_s1_url="http://localhost/cvmfs/${replica_name}/.cvmfspublished"
+  local http_response=$(get_http_response $bogus_apache_s1_url)
+  echo "$http_response" | grep "200 OK" && return 11
+
+  echo "mount the stratum 1 for comparison"
+  CVMFS_TEST_607_S1_MOUNTPOINT=$s1_mnt_point
+  do_local_mount $s1_mnt_point $CVMFS_TEST_REPO $s1_http_address || return 12
+
+  echo "compare reference and stratum 1 mountpoint"
+  compare_directories $s1_mnt_point $reference_dir $CVMFS_TEST_REPO || return $?
+
+  echo "gracefully remove stratum0"
+  destroy_repo $CVMFS_TEST_REPO -p || return 13
+
+  echo "check that the stratum 0 storage is still there"
+  [ -d $s0_location ] || return 14
+
+  echo "import just deleted stratum 0"
+  import_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER -u $s0_upstream     \
+                                                -w $s0_http_address \
+                                                -p || return 15
+
+  echo "check that apache doesn't serve the imported Stratum 0"
+  local http_response=$(get_http_response $bogus_apache_s0_url)
+  echo "$http_response" | grep "200 OK" && return 16
+
+  echo "compare reference and stratum 1 mountpoint"
+  compare_directories $s1_mnt_point $reference_dir $CVMFS_TEST_REPO || return $?
+
+  local publish_2_log="publish_2.log"
+  echo "create another transaction (publish log: $publish_2_log)"
+  start_transaction $CVMFS_TEST_REPO                  || return 17
+  cp_usrbin $repo_dir                                 || return 18
+  publish_repo $CVMFS_TEST_REPO > $publish_2_log 2>&1 || return 19
+
+  return 0
+}
+

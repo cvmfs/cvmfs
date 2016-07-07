@@ -24,11 +24,13 @@ struct SpoolerResult {
   SpoolerResult(const int             return_code = -1,
                 const std::string     &local_path  = "",
                 const shash::Any      &digest      = shash::Any(),
-                const FileChunkList   &file_chunks = FileChunkList()) :
+                const FileChunkList   &file_chunks = FileChunkList(),
+                const zlib::Algorithms  compression_alg = zlib::kZlibDefault) :
     return_code(return_code),
     local_path(local_path),
     content_hash(digest),
-    file_chunks(file_chunks) {}
+    file_chunks(file_chunks),
+    compression_alg(compression_alg) {}
 
   inline bool IsChunked() const { return !file_chunks.IsEmpty(); }
 
@@ -39,6 +41,7 @@ struct SpoolerResult {
    */
   shash::Any    content_hash;
   FileChunkList file_chunks;   //!< the file chunks generated during processing
+  zlib::Algorithms  compression_alg;
 };
 
 }  // namespace upload

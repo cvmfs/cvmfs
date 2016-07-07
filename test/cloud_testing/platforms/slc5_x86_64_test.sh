@@ -90,11 +90,13 @@ CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
                               -x src/518-hardlinkstresstest                   \
                                  src/523-corruptchunkfailover                 \
                                  src/524-corruptmanifestfailover              \
-                                 src/577-garbagecollecthiddenstratum1revision \
-                                 src/579-garbagecollectstratum1legacytag      \
                                  src/585-xattrs                               \
+                                 src/600-securecvmfs                          \
+                                 src/608-infofile                             \
+                                 src/609-metainfofile                         \
                                  --                                           \
                                  src/5*                                       \
+                                 src/6*                                       \
                               || retval=1
 
 

@@ -1,0 +1,148 @@
+
+cvmfs_test_name="Graft creation"
+cvmfs_test_autofs_on_startup=false
+
+verify_hello_world() {
+  local output=$1
+  if [ "`echo "$output" | grep '^size' | tr '=' ' ' | awk '{print $2;}'`" -ne 13 ]; then
+    echo "Graft produced wrong size."
+    return 2
+  fi
+
+  if [ `echo "$output" | grep '^checksum' | tr '=' ' ' | awk '{print $2;}'` != "c2b7b4181ba9ff6411881a613301a76458cb9666" ]; then
+    echo "Graft produced wrong checksum."
+    return 3
+  fi
+  echo "Valid hello world file."
+  return 0
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  #################################################################
+  echo "Test stdout"
+  output=$(echo 'Hello World!' | cvmfs_swissknife graft -i - -Z zlib)
+  if [ $? -ne 0 ]; then
+    return 1
+  fi
+  echo "$output"
+
+  verify_hello_world "$output"
+  local verify_result=$?
+  if [ $verify_result -ne 0 ]; then
+    return $verify_result
+  fi
+
+  #################################################################
+  echo "Test compression algorithm"
+  output=$(echo 'Hello World!' | cvmfs_swissknife graft -i - -Z zlib)
+  if [ $? -ne 0 ]; then
+    return 1
+  fi
+  echo "$output"
+
+  verify_hello_world "$output"
+  verify_result=$?
+  if [ $verify_result -ne 0 ]; then
+    return $verify_result
+  fi
+
+  local uncompressed_cksum=$(echo "hello world" | cvmfs_swissknife graft -i - | grep checksum | tr '=' ' ' | awk '{print $2;}')
+  local uncompressed_cksum_real=$(echo "hello world" | sha1sum | awk '{print $1;}')
+  if [ x"$uncompressed_cksum_real" != x"$uncompressed_cksum" ]; then
+    echo "Uncompressed check failed; produced $uncompressed_cksum, expected $uncompressed_cksum_real"
+    return 24
+  fi
+
+  #################################################################
+  echo "Single file output"
+  mkdir -p simple1
+  echo "Hello World!" > hello_world
+  cvmfs_swissknife graft -i hello_world -o simple1 -Z zlib
+  if [ $? -ne 0 ]; then
+    return 4
+  fi
+  if [ ! -e simple1/hello_world ]; then
+    return 5
+  fi
+
+  verify_hello_world "`cat simple1/.cvmfsgraft-hello_world`"
+  verify_result=$?
+  if [ $verify_result -ne 0 ]; then
+    return $verify_result
+  fi
+
+  #################################################################
+  echo "Single file output, absolute graft path"
+  mkdir -p simple2
+  cvmfs_swissknife graft -i hello_world -o simple2/hello_world2 -Z zlib
+  if [ $? -ne 0 ]; then
+    return 4
+  fi
+  if [ ! -e simple2/hello_world2 ]; then
+    return 5
+  fi
+
+  verify_hello_world "`cat simple2/.cvmfsgraft-hello_world2`"
+  verify_result=$?
+  if [ $verify_result -ne 0 ]; then
+    return $verify_result
+  fi
+
+  #################################################################
+  echo "Test nested directory."
+  mkdir -p deep_input/sub1/sub2/sub3
+  mkdir -p deep_output
+  cp hello_world deep_input/
+  cp hello_world deep_input/sub1/sub2
+  echo "Break" > deep_input/sub1/sub2/check_break
+  cvmfs_swissknife graft -i deep_input -o deep_output -Z zlib
+  if [ $? -ne 0 ]; then
+    return 6
+  fi
+  if [ ! -d deep_output/sub1/sub2/sub3 ]; then
+    return 7
+  fi
+  if [ ! -e deep_output/hello_world ]; then
+    return 8
+  fi
+  if [ ! -e deep_output/hello_world ]; then
+    return 8
+  fi
+  if [ ! -e deep_output/sub1/sub2/hello_world ]; then
+    return 9
+  fi
+  if [ ! -e deep_output/sub1/sub2/check_break ]; then
+    return 10
+  fi
+
+  verify_hello_world "`cat deep_output/.cvmfsgraft-hello_world`"
+  verify_result=$?
+  if [ $verify_result -ne 0 ]; then
+    return $verify_result
+  fi
+
+  verify_hello_world "`cat deep_output/sub1/sub2/.cvmfsgraft-hello_world`"
+  verify_result=$?
+  if [ $verify_result -ne 0 ]; then
+    return $verify_result
+  fi
+
+  echo "Verifying test breaks on invalid input:"
+  verify_hello_world "`cat deep_output/sub1/sub2/.cvmfsgraft-check_break`"
+  verify_result=$?
+  if [ $verify_result -eq 0 ]; then
+    return $verify_result
+  fi
+
+  echo "Test hash algorithm"
+  local shake_checksum=$(echo -n "abc" | cvmfs_swissknife graft -i - -a shake128 \
+    | grep ^checksum= | cut -d= -f2)
+  echo "checksum is $shake_checksum"
+  if [ x"$shake_checksum" != "x5881092dd818bf5cf8a3ddb793fbcba74097d5c5-shake128" ]; then
+    return 40
+  fi
+
+  return 0
+}

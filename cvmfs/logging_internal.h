@@ -63,13 +63,15 @@ enum LogSource {
   kLogUtility,
   kLogGlueBuffer,
   kLogHistory,
-  kLogChecksum,
   kLogUnionFs,
   kLogPathspec,
   kLogUploadS3,
   kLogS3Fanout,
   kLogGc,
-  kLogDns
+  kLogDns,
+  kLogAuthz,
+  kLogReflog,
+  kLogChecksum,
 };
 
 const int kLogVerboseMsg = kLogStdout | kLogShowSource | kLogVerbose;

@@ -1,0 +1,149 @@
+cvmfs_test_name="HTTP headers for cache expiry"
+cvmfs_test_autofs_on_startup=false
+
+get_header() {
+  local url="$1"
+  local header="$2"
+
+  local content="$(curl -sI "$url" | grep -e "^$header" | sed -e "s/^$header: \(.*\)\r\+$/\1/")"
+  echo -n "$content"
+}
+
+get_epoch() {
+  local date_string="$1"
+  date --date "$date_string" \
+       --utc                 \
+       +"%s"
+}
+
+get_expiry_time() {
+  local url="$1"
+  get_epoch "$(get_header $url 'Expires')"
+}
+
+get_max_age() {
+  local url="$1"
+  get_header "$url" "Cache-Control" | sed -e 's/^max-age=\([0-9]*\)$/\1/'
+}
+
+
+CVMFS_TEST_626_REPLICA_NAME=""
+cleanup() {
+  echo "running cleanup()"
+  if [ ! -z $CVMFS_TEST_626_REPLICA_NAME ]; then
+    sudo cvmfs_server rmfs -f $CVMFS_TEST_626_REPLICA_NAME
+  fi
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local scratch_dir=$(pwd)
+
+  echo -n "check for 'curl' utility... "
+  which curl > /dev/null 2>&1 || { echo "not found"; return 1; }
+  echo "found"
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+  local url="$(get_repo_url $CVMFS_TEST_REPO)"
+  local xcvmfs="application/x-cvmfs"
+  local xcvmfs_maxage=120     # 2 minutes
+  local default_maxage=259200 # 3 days
+
+  echo "check HTTP headers for .cvmfspublished"
+  local murl="${url}/.cvmfspublished"
+  [ $(get_epoch "1 minutes") -lt $(get_expiry_time $murl) ] || return  2
+  [ $(get_epoch "3 minutes") -gt $(get_expiry_time $murl) ] || return  3
+  [ $(get_max_age $murl)     -eq $xcvmfs_maxage           ] || return  4
+  [ x"$(get_header $murl "Content-Type")" = x"$xcvmfs"    ] || return  5
+
+  echo "check HTTP headers for .cvmfswhitelist"
+  local wurl="${url}/.cvmfswhitelist"
+  [ $(get_epoch "1 minutes") -lt $(get_expiry_time $wurl) ] || return  6
+  [ $(get_epoch "3 minutes") -gt $(get_expiry_time $wurl) ] || return  7
+  [ $(get_max_age $wurl)     -eq $xcvmfs_maxage           ] || return  8
+  [ x"$(get_header $wurl "Content-Type")" = x"$xcvmfs"    ] || return  9
+
+  echo "check HTTP headers for .cvmfs_master_replica"
+  local surl="${url}/.cvmfs_master_replica"
+  [ $(get_epoch "1 minutes") -lt $(get_expiry_time $surl) ] || return 10
+  [ $(get_epoch "3 minutes") -gt $(get_expiry_time $surl) ] || return 11
+  [ $(get_max_age $surl)     -eq $xcvmfs_maxage           ] || return 12
+  [ x"$(get_header $surl "Content-Type")" = x"$xcvmfs"    ] || return 13
+
+  local root_clg="$(get_current_root_catalog $CVMFS_TEST_REPO)C"
+  echo "check HTTP headers for root catalog ($root_clg)"
+  local rurl="$(get_object_url $CVMFS_TEST_REPO $root_clg)"
+  [ $(get_epoch "2 days 23 hour") -lt $(get_expiry_time $rurl) ] || return 14
+  [ $(get_epoch "3 days  1 hour") -gt $(get_expiry_time $rurl) ] || return 15
+  [ $(get_max_age $rurl)          -eq $default_maxage          ] || return 16
+
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+  echo "install a desaster cleanup function"
+  trap cleanup EXIT HUP INT TERM || return $?
+
+  echo "create Stratum1 repository on the same machine"
+  local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
+  CVMFS_TEST_626_REPLICA_NAME="$replica_name"
+  load_repo_config $CVMFS_TEST_REPO
+  create_stratum1 $replica_name                          \
+                  $CVMFS_TEST_USER                       \
+                  $CVMFS_STRATUM0                        \
+                  /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub || return 30
+  url=$(get_repo_url $replica_name)
+
+  echo "do a snapshot"
+  cvmfs_server snapshot $replica_name || return 31
+
+  echo "check HTTP headers for .cvmfspublished"
+  murl="${url}/.cvmfspublished"
+  [ $(get_epoch "1 minutes") -lt $(get_expiry_time $murl) ] || return 32
+  [ $(get_epoch "3 minutes") -gt $(get_expiry_time $murl) ] || return 33
+  [ $(get_max_age $murl)     -eq $xcvmfs_maxage           ] || return 34
+  [ x"$(get_header $murl "Content-Type")" = x"$xcvmfs"    ] || return 35
+
+  echo "check HTTP headers for .cvmfswhitelist"
+  wurl="${url}/.cvmfswhitelist"
+  [ $(get_epoch "1 minutes") -lt $(get_expiry_time $wurl) ] || return 36
+  [ $(get_epoch "3 minutes") -gt $(get_expiry_time $wurl) ] || return 37
+  [ $(get_max_age $wurl)     -eq $xcvmfs_maxage           ] || return 38
+  [ x"$(get_header $wurl "Content-Type")" = x"$xcvmfs"    ] || return 39
+
+  echo "check HTTP headers for .cvmfs_last_snapshot"
+  surl="${url}/.cvmfs_last_snapshot"
+  [ $(get_epoch "1 minutes") -lt $(get_expiry_time $surl) ] || return 40
+  [ $(get_epoch "3 minutes") -gt $(get_expiry_time $surl) ] || return 41
+  [ $(get_max_age $surl)     -eq $xcvmfs_maxage           ] || return 42
+  [ x"$(get_header $surl "Content-Type")" = x"$xcvmfs"    ] || return 43
+
+  echo "check HTTP headers for root catalog ($root_clg)"
+  rurl="$(get_object_url $replica_name $root_clg)"
+  [ $(get_epoch "2 days 23 hour") -lt $(get_expiry_time $rurl) ] || return 44
+  [ $(get_epoch "3 days  1 hour") -gt $(get_expiry_time $rurl) ] || return 45
+  [ $(get_max_age $rurl)          -eq $default_maxage          ] || return 46
+
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+  url=$(get_repo_url info)
+  local jsontype="application/json"
+  local jsonmaxage=120
+
+  echo "check HTTP headers for /cvmfs/info/v1/repositories.json"
+  local irurl="${url}/v1/repositories.json"
+  [ $(get_epoch "1 minutes") -lt $(get_expiry_time $irurl) ] || return 47
+  [ $(get_epoch "3 minutes") -gt $(get_expiry_time $irurl) ] || return 48
+  [ $(get_max_age $irurl)    -eq $jsonmaxage               ] || return 49
+  [ x"$(get_header $irurl "Content-Type")" = x"$jsontype"  ] || return 50
+
+  echo "check HTTP headers for /cvmfs/info/v1/meta.json"
+  local imurl="${url}/v1/meta.json"
+  [ $(get_epoch "1 minutes") -lt $(get_expiry_time $imurl) ] || return 51
+  [ $(get_epoch "3 minutes") -gt $(get_expiry_time $imurl) ] || return 52
+  [ $(get_max_age $imurl)    -eq $jsonmaxage               ] || return 53
+  [ x"$(get_header $imurl "Content-Type")" = x"$jsontype"  ] || return 54
+
+  return 0
+}
+

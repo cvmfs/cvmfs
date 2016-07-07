@@ -10,6 +10,12 @@
 #include <string>
 #include <vector>
 
+#include "download.h"
+#include "manifest_fetch.h"
+#include "reflog.h"
+#include "signature.h"
+#include "statistics.h"
+
 namespace download {
 class DownloadManager;
 }
@@ -19,14 +25,11 @@ class SignatureManager;
 namespace perf {
 class Statistics;
 }
+namespace manifest {
+class Manifest;
+}
 
 namespace swissknife {
-
-extern download::DownloadManager *g_download_manager;
-extern signature::SignatureManager *g_signature_manager;
-extern perf::Statistics *g_statistics;
-
-void Usage();
 
 class Parameter {
  public:
@@ -72,13 +75,51 @@ typedef std::map<char, std::string *> ArgumentList;
 class Command {
  public:
   Command() { }
-  virtual ~Command() { }
+  virtual ~Command();
   virtual std::string GetName() = 0;
   virtual std::string GetDescription() = 0;
   virtual ParameterList GetParams() = 0;
   virtual int Main(const ArgumentList &args) = 0;
+
+ protected:
+  bool InitDownloadManager(const bool     follow_redirects,
+                           const unsigned max_pool_handles = 1,
+                           const bool     use_system_proxy = true);
+  bool InitVerifyingSignatureManager(const std::string &pubkey_path,
+                                     const std::string &trusted_certs = "");
+  bool InitSigningSignatureManager(const std::string &certificate_path,
+                                   const std::string &private_key_path,
+                                   const std::string &private_key_password);
+
+  manifest::Manifest* OpenLocalManifest(const std::string path) const;
+  manifest::Failures  FetchRemoteManifestEnsemble(
+                              const std::string &repository_url,
+                              const std::string &repository_name,
+                                    manifest::ManifestEnsemble *ensemble) const;
+  manifest::Manifest* FetchRemoteManifest(
+                             const std::string &repository_url,
+                             const std::string &repository_name,
+                             const shash::Any  &base_hash = shash::Any()) const;
+
+  template <class ObjectFetcherT>
+  manifest::Reflog* FetchReflog(ObjectFetcherT    *object_fetcher,
+                                const std::string &repo_name);
+
+  manifest::Reflog* CreateEmptyReflog(const std::string &temp_directory,
+                                      const std::string &repo_name);
+
+  download::DownloadManager*   download_manager()  const;
+  signature::SignatureManager* signature_manager() const;
+  perf::Statistics*            statistics() { return &statistics_; }
+
+ private:
+  UniquePtr<download::DownloadManager>    download_manager_;
+  UniquePtr<signature::SignatureManager>  signature_manager_;
+  perf::Statistics                        statistics_;
 };
 
 }  // namespace swissknife
+
+#include "swissknife_impl.h"
 
 #endif  // CVMFS_SWISSKNIFE_H_

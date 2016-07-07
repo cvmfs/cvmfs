@@ -6,10 +6,11 @@ cvmfs_run_test() {
 
   cvmfs_mount "atlas.cern.ch,atlas-nightlies.cern.ch,atlas-condb.cern.ch" \
     "CVMFS_QUOTA_LIMIT=2000" \
-    "CVMFS_CHECK_PERMISSIONS=no" || return 1
+    "CVMFS_CHECK_PERMISSIONS=no" \
+    "CVMFS_AUTO_UPDATE=no" || return 1
 
   echo "Walking through /cvmfs/atlas.cern.ch"
-  find /cvmfs/atlas.cern.ch > /dev/null
+  find /cvmfs/atlas.cern.ch -ignore_readdir_race > /dev/null
   local retval=$?
   if [ $retval -ne 0 ]; then
     echo "retval $retval"

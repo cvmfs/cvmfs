@@ -12,6 +12,7 @@
 #include <fcntl.h>
 #include <libkern/OSAtomic.h>
 #include <mach/mach.h>
+#include <mach/mach_time.h>
 #include <mach-o/dyld.h>
 #include <signal.h>
 #include <sys/mount.h>
@@ -21,6 +22,7 @@
 #include <sys/xattr.h>
 
 #include <cassert>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 
@@ -188,10 +190,83 @@ inline void platform_disable_kcache(int filedes) {
   fcntl(filedes, F_NOCACHE, 1);
 }
 
+inline void platform_invalidate_kcache(const int    fd,
+                                       const off_t  offset,
+                                       const size_t length) {
+  // NOOP
+  // TODO(rmeusel): implement
+}
+
 inline int platform_readahead(int filedes) {
   // TODO(jblomer): is there a readahead equivalent?
   return 0;
 }
+
+inline bool read_line(FILE *f, std::string *line) {
+  char   *buffer_line = NULL;
+  size_t  buffer_size = 0;
+  const int res = getline(&buffer_line, &buffer_size, f);
+  if (res < 0) {
+    free(buffer_line);
+    return false;
+  }
+
+  line->clear();
+  line->assign(buffer_line);
+  free(buffer_line);
+  return true;
+}
+
+inline void platform_get_os_version(int32_t *major,
+                                    int32_t *minor,
+                                    int32_t *patch) {
+  const std::string plist = "/System/Library/CoreServices/SystemVersion.plist";
+  const std::string plist_key = "ProductVersion";
+
+  FILE *plist_file = fopen(plist.c_str(), "r");
+  assert(plist_file != NULL && "couldn't open SystemVersion.plist");
+
+  std::string line;
+  bool found_key = false;
+  while (read_line(plist_file, &line) && !found_key) {
+    if (line.find(plist_key) != std::string::npos) {
+      found_key = true;
+      break;
+    }
+  }
+  assert(found_key && "didn't find key in SystemVersion.plist");
+
+  const std::string start_tag = "<string>";
+  const std::string end_tag   = "</string>";
+  size_t start, end;
+  bool found_value = false;
+  while (read_line(plist_file, &line) && !found_value) {
+    start = line.find(start_tag);
+    end   = line.find(end_tag);
+    if (start != std::string::npos && end != std::string::npos) {
+      found_value = true;
+      break;
+    }
+  }
+  assert(found_value && "didn't find value in SystemVersion.plist");
+  fclose(plist_file);
+
+  start = start + start_tag.length();
+  const std::string version = line.substr(start, end - start);
+  const int matches = sscanf(version.c_str(), "%u.%u.%u", major, minor, patch);
+  assert(matches == 3 && "failed to read OS X version string");
+}
+
+
+inline uint64_t platform_monotonic_time() {
+  uint64_t val_abs = mach_absolute_time();
+  // Doing the conversion every time is slow but thread-safe
+  mach_timebase_info_data_t info;
+  mach_timebase_info(&info);
+  uint64_t val_ns = val_abs * (info.numer / info.denom);
+  return val_ns * 1e-9;
+}
+
 
 /**
  * strdupa does not exist on OSX

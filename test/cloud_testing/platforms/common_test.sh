@@ -10,6 +10,7 @@ script_location=$(dirname $(readlink --canonicalize $0))
 #    SOURCE_DIRECTORY      location of the CernVM-FS sources
 #    SERVER_PACKAGE        location of the CernVM-FS server package to test
 #    CLIENT_PACKAGE        location of the CernVM-FS client package to test
+#    DEVEL_PACKAGE         location of the CernVM-FS devel package to test
 #    LOG_DIRECTORY         location of the test log files to be created
 #
 # Additionally the following configuration variables will be defined:
@@ -23,6 +24,7 @@ script_location=$(dirname $(readlink --canonicalize $0))
 SOURCE_DIRECTORY=""
 SERVER_PACKAGE=""
 CLIENT_PACKAGE=""
+DEVEL_PACKAGE=""
 LOG_DIRECTORY=""
 
 FAKE_S3_PORT=13337
@@ -47,7 +49,7 @@ usage() {
 
 
 # parse script parameters (same for all platforms)
-while getopts "t:s:c:l:" option; do
+while getopts "t:s:c:d:l:" option; do
   case $option in
     t)
       SOURCE_DIRECTORY=$OPTARG
@@ -57,6 +59,9 @@ while getopts "t:s:c:l:" option; do
       ;;
     c)
       CLIENT_PACKAGE=$OPTARG
+      ;;
+    d)
+      DEVEL_PACKAGE=$OPTARG
       ;;
     l)
       LOG_DIRECTORY=$OPTARG
@@ -72,10 +77,17 @@ done
 if [ x$SOURCE_DIRECTORY      = "x" ] ||
    [ x$LOG_DIRECTORY         = "x" ] ||
    [ x$SERVER_PACKAGE        = "x" ] ||
-   [ x$CLIENT_PACKAGE        = "x" ]; then
+   [ x$CLIENT_PACKAGE        = "x" ] ||
+   [ x$DEVEL_PACKAGE         = "x" ]; then
   echo "missing parameter(s), cannot run platform dependent test script"
   exit 100
 fi
+
+sudo tee /etc/cvmfs/cvmfs_server_hooks.sh << EOF
+# download GeoIP database from a copy at CERN instead of directly from MaxMind
+CVMFS_UPDATEGEO_URLBASE="https://ecsft.cern.ch/dist/cvmfs/geodb"
+CVMFS_UPDATEGEO_URLBASE6="https://ecsft.cern.ch/dist/cvmfs/geodb/GeoLiteCityv6-beta"
+EOF
 
 CLIENT_TEST_LOGFILE="${LOG_DIRECTORY}/test_client.log"
 SERVER_TEST_LOGFILE="${LOG_DIRECTORY}/test_server.log"

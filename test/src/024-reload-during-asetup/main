@@ -75,8 +75,10 @@ cvmfs_run_test() {
     return 6
   fi
 
-  local num_forget=$(sudo cvmfs_talk -i atlas.cern.ch internal affairs | grep -o "forget(): [0-9]*" | awk '{print $2}')
+  local num_forget=$(sudo cvmfs_talk -i atlas.cern.ch internal affairs | \
+    grep ^cvmfs.n_fs_forget | cut -f2 -d\|)
   echo "Number of forget(): $num_forget"
+  [ x"$num_forget" != x"" ] || return 11
   if [ $num_forget -gt 50000 ]; then
     return 10
   fi

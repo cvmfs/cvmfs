@@ -18,8 +18,8 @@ cvmfs_run_test() {
   make_huge_repo $repo_dir || return 1
 
   echo "creating CVMFS snapshot"
-  echo "--> redirecting publishing output to publish_output_1.log"
-  publish_repo $CVMFS_TEST_REPO > publish_output_1.log || return $?
+  echo "--> redirecting publishing output to publish_output_1.log and publish_error_1.log"
+  publish_repo $CVMFS_TEST_REPO > publish_output_1.log 2>publish_error_1.log || return $?
 
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
@@ -41,8 +41,8 @@ cvmfs_run_test() {
   echo "generated $num_nested_catalogs catalogs"
 
   echo "creating nested catalogs by cvmfs_server publish"
-  echo "--> redirecting publishing output to publish_output_2.log"
-  publish_repo $CVMFS_TEST_REPO > publish_output_2.log || return $?
+  echo "--> redirecting publishing output to publish_output_2.log and publish_error_2.log"
+  publish_repo $CVMFS_TEST_REPO > publish_output_2.log 2>publish_error_2.log || return $?
 
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?

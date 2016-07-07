@@ -14,12 +14,12 @@
 #include <cstring>
 #include <string>
 
-#include "../../cvmfs/cache.h"
-#include "../../cvmfs/compression.h"
-#include "../../cvmfs/hash.h"
-#include "../../cvmfs/platform.h"
-#include "../../cvmfs/quota.h"
-#include "../../cvmfs/smalloc.h"
+#include "cache.h"
+#include "compression.h"
+#include "hash.h"
+#include "platform.h"
+#include "quota.h"
+#include "smalloc.h"
 #include "testutil.h"
 
 using namespace std;  // NOLINT
@@ -213,6 +213,7 @@ class TestQuotaManager : public QuotaManager {
   virtual uint64_t GetCapacity() { return 100*1024*1024; }
   virtual uint64_t GetSize() { return 0; }
   virtual uint64_t GetSizePinned() { return 0; }
+  virtual uint64_t GetCleanupRate(uint64_t period_s) { return 0; }
 
   virtual void Spawn() { }
   virtual pid_t GetPid() { return getpid(); }
@@ -671,7 +672,7 @@ TEST_F(T_CacheManager, Rename) {
   EXPECT_EQ(-ENOENT, cache_mgr_->Rename(path_null.c_str(), path_one.c_str()));
 
   EXPECT_TRUE(CopyPath2Path(path_one, path_null));
-  cache_mgr_->alien_cache_on_nfs_ = true;
+  cache_mgr_->workaround_rename_ = true;
   EXPECT_EQ(0, cache_mgr_->Rename(path_null.c_str(), path_one.c_str()));
   EXPECT_FALSE(FileExists(path_null));
   EXPECT_TRUE(FileExists(path_one));

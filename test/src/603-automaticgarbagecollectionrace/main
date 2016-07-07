@@ -1,0 +1,179 @@
+
+cvmfs_test_name="Automatic Garbage Collection Preserves Re-added Objects"
+cvmfs_test_autofs_on_startup=false
+
+#
+# Regression Test for Automatic Garbage Collection
+#
+# Both 2.1.20 and the server pre-release of 2.2.0 might delete data objects that
+# have just been added to the repository when running automatic GC. For that the
+# affected data object must have been present in the repository before and later
+# re-added after a period where it was not present in the repository.
+#
+# The scenario is as follows (revision timeline):
+#
+#                         auto-GC                         currently publishing
+#                        threshold                        transaction (8)
+#                            |                                   |
+#     1        2        3    |   4        5        6        7    |   8
+# ----#--------:--------:----|---:--------:--------:--------:----|---:->
+#  already    contains the   |   doesn't contain the object X    | new revision
+#   swept       object X     |                                   | containing X
+#  earlier                   |                                   | again
+#
+# The publish operation has created (and uploaded) all objects for the upcoming
+# revision 8 but it is not yet committed (.cvmfspublished not updated yet). Now
+# the automatic garbage collection runs with a threshold so that revisions 4-8
+# are preserved and revisions 2 and 3 are swept.
+# Object X is referenced in revision 2 and/or 3 but not in 4-7. However it has
+# been re-added in revision 8 and is therefore _not_ garbage.
+#
+# In the affected CVMFS versions auto-GC will only consider revisions 4-7 for
+# preservation but NOT revision 8. Hence, it will not mark object X as 'needed'.
+# Since object X is referenced by the condemned revisions 2 and/or 3 it will be
+# removed even though revision 8 has a reference to it.
+#
+# Bug is tracked in CVM-942
+#
+
+
+create_revision() {
+  local repo_name=$1
+  local with_file=$2
+  local publish_log="$(mktemp ./publish.log.XXXXX)"
+
+  start_transaction $repo_name > /dev/null 2>&1                    || return 1
+  [ -z "$with_file" ] || cp $with_file /cvmfs/${repo_name}/culprit || return 2
+  publish_repo      $repo_name > $publish_log 2>&1                 || return 3
+
+  echo "$(get_current_root_catalog $repo_name)C"
+}
+
+cvmfs_run_test() {
+  local logfile=$1
+  local script_location=$2
+  local scratch_dir=$(pwd)
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  local culprit="${scratch_dir}/santas_little_helper.txt"
+  local dummy="${scratch_dir}/knecht_ruprecht.txt"
+
+  local culprit_hash="759a27e9e657d78c6e6ef3f4ec1bf2c58833f5ab"
+  local dummy_hash="d3c5654e98d744dfda6b8a03c3e2ee54a7eef2e7"
+
+  local root_catalog0=""
+  local root_catalog1=""
+  local root_catalog2=""
+  local root_catalog3=""
+  local root_catalog4=""
+
+  local seconds=30
+  local thresh_seconds=60 # Potential Race: Publishing is not supposed to take
+                          #                 longer than thresh_seconds-seconds !
+                          #
+                          # Note: thresh_seconds should be 2 * seconds
+
+  echo "create the culprit file"
+  echo "I was pre-maturely deleted by 2.1.20 and 2.2.0-prerelease" > $culprit
+  echo "I am just a little innocent placeholder for $culprit"      > $dummy
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER and disabled auto-tagging ($(display_timestamp now))"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -g -z || return $?
+  root_catalog0="$(get_current_root_catalog $CVMFS_TEST_REPO)C"
+
+  echo "configure repository to automatically delete revisions older than $thresh_seconds seconds"
+  local server_conf="/etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/server.conf"
+  echo "CVMFS_AUTO_GC_TIMESPAN='$thresh_seconds seconds ago'" | sudo tee --append $server_conf || return 1
+  cat $server_conf || return 2
+
+  echo "check if initial catalog is there"
+  peek_backend $CVMFS_TEST_REPO $root_catalog0 || return 3 # just created
+
+  echo "list named snapshots"
+  cvmfs_server tag -l $CVMFS_TEST_REPO || return 4
+
+  echo "create revision 1 ($(display_timestamp now)) - containing the culprit"
+  root_catalog1="$(create_revision $CVMFS_TEST_REPO $culprit)"
+
+  echo "list named snapshots"
+  cvmfs_server tag -l $CVMFS_TEST_REPO || return 5
+
+  echo "check repository integrity"
+  check_repository $CVMFS_TEST_REPO -i || return 6
+
+  echo "check catalogs"
+  peek_backend $CVMFS_TEST_REPO $root_catalog0 || return 7 # trunk-previous
+  peek_backend $CVMFS_TEST_REPO $root_catalog1 || return 8 # trunk
+
+  echo "check the data chunks"
+  peek_backend $CVMFS_TEST_REPO $culprit_hash || return 9 # just added
+  peek_backend $CVMFS_TEST_REPO $dummy_hash   && return 9 # not added yet
+
+  echo "sleep $seconds seconds"
+  sleep $seconds
+
+  echo "create revision 2 ($(display_timestamp now)) - overwriting the culprit"
+  root_catalog2="$(create_revision $CVMFS_TEST_REPO $dummy)"
+
+  echo "list named snapshots"
+  cvmfs_server tag -l $CVMFS_TEST_REPO || return 10
+
+  echo "check repository integrity"
+  check_repository $CVMFS_TEST_REPO -i || return 11
+
+  echo "check catalogs"
+  peek_backend $CVMFS_TEST_REPO $root_catalog0 || return 12 # sentinel revision
+  peek_backend $CVMFS_TEST_REPO $root_catalog1 || return 13 # trunk-previous
+  peek_backend $CVMFS_TEST_REPO $root_catalog2 || return 14 # trunk
+
+  echo "check the data chunks"
+  peek_backend $CVMFS_TEST_REPO $culprit_hash || return 15
+  peek_backend $CVMFS_TEST_REPO $dummy_hash   || return 16 # just added
+
+  echo "sleep $seconds seconds"
+  sleep $seconds
+
+  echo "create revision 3 ($(display_timestamp now)) - no changes"
+  root_catalog3="$(create_revision $CVMFS_TEST_REPO)"
+
+  echo "list named snapshots"
+  cvmfs_server tag -l $CVMFS_TEST_REPO || return 17
+
+  echo "check repository integrity"
+  check_repository $CVMFS_TEST_REPO -i || return 18
+
+  echo "check catalogs"
+  peek_backend $CVMFS_TEST_REPO $root_catalog0 && return 19  # GC'ed
+  peek_backend $CVMFS_TEST_REPO $root_catalog1 || return 20 # sentinel revision
+  peek_backend $CVMFS_TEST_REPO $root_catalog2 || return 21 # trunk-previous
+  peek_backend $CVMFS_TEST_REPO $root_catalog3 || return 22 # trunk
+
+  echo "check the data chunks"
+  peek_backend $CVMFS_TEST_REPO $culprit_hash || return 23
+  peek_backend $CVMFS_TEST_REPO $dummy_hash   || return 24
+
+  echo "sleep $seconds seconds"
+  sleep $seconds
+
+  echo "create revision 4 ($(display_timestamp now)) - re-adding the culprit"
+  root_catalog4="$(create_revision $CVMFS_TEST_REPO $culprit)"
+
+  echo "list named snapshots"
+  cvmfs_server tag -l $CVMFS_TEST_REPO || return 25
+
+  echo "check repository integrity"
+  check_repository $CVMFS_TEST_REPO -i || return 26
+
+  echo "check catalogs"
+  peek_backend $CVMFS_TEST_REPO $root_catalog0 && return 27 # GC'ed
+  peek_backend $CVMFS_TEST_REPO $root_catalog1 && return 28 # GC'ed
+  peek_backend $CVMFS_TEST_REPO $root_catalog2 || return 29 # sentinel revision
+  peek_backend $CVMFS_TEST_REPO $root_catalog3 || return 30 # trunk-previous
+  peek_backend $CVMFS_TEST_REPO $root_catalog4 || return 31 # trunk
+
+  echo "check the data chunks"
+  peek_backend $CVMFS_TEST_REPO $culprit_hash || return 32 # just re-added (BUG)
+  peek_backend $CVMFS_TEST_REPO $dummy_hash   || return 33 # not old enough
+
+  return 0
+}

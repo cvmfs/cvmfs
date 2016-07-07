@@ -20,10 +20,12 @@
 #include <string>
 #include <vector>
 
+#include "logging.h"
 #include "options.h"
 #include "platform.h"
 #include "sanitizer.h"
-#include "util.h"
+#include "util/posix.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 
@@ -220,6 +222,36 @@ static bool GetCvmfsUser(string *cvmfs_user) {
 }
 
 
+static std::string GetCvmfsBinary() {
+  std::string result;
+  vector<string> paths;
+  paths.push_back("/usr/bin");
+
+#ifdef __APPLE__
+  int major, minor, patch;
+  platform_get_os_version(&major, &minor, &patch);
+  // OS X El Capitan came with SIP, forcing us to become relocatable. CVMFS
+  // 2.2.0+ installs into /usr/local always
+  if (major == 10 && minor >= 9) {
+    paths.push_back("/usr/local/bin");
+  }
+#endif
+
+  // TODO(reneme): C++11 range based for loop
+        vector<string>::const_iterator i    = paths.begin();
+  const vector<string>::const_iterator iend = paths.end();
+  for (; i != iend; ++i) {
+    const std::string cvmfs2 = *i + "/cvmfs2";
+    if (FileExists(cvmfs2) || SymlinkExists(cvmfs2)) {
+      result = cvmfs2;
+      break;
+    }
+  }
+
+  return result;
+}
+
+
 int main(int argc, char **argv) {
   bool dry_run = false;
   vector<string> mount_options;
@@ -307,7 +339,7 @@ int main(int argc, char **argv) {
   has_fuse_group = GetGidOf("fuse", &gid_fuse);
 
   // Prepare cache directory
-  retval = MkdirDeep(cachedir, 0755);
+  retval = MkdirDeep(cachedir, 0755, false);
   if (!retval) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed to create cache directory %s",
              cachedir.c_str());
@@ -390,7 +422,11 @@ int main(int argc, char **argv) {
   if (options_manager_.IsDefined("CVMFS_DEBUGLOG"))
     AddMountOption("debug", &mount_options);
 
-  const string cvmfs_binary = "/usr/bin/cvmfs2";
+  const string cvmfs_binary = GetCvmfsBinary();
+  if (cvmfs_binary.empty()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to locate the cvmfs2 binary");
+    return 1;
+  }
 
   // Dry run early exit
   if (dry_run) {

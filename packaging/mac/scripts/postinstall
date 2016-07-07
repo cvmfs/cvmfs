@@ -1,17 +1,31 @@
 #!/bin/bash
 
-cvmfs_cfg=/usr/bin/cvmfs_config
+set -e
 
-if [ -f $cvmfs_cfg ]; then
-  $cvmfs_cfg setup &> /tmp/cvmfs_postinstall
-  if [ $? -ne 0 ]; then
-    echo "Configuring cvmfs failed." >> /tmp/cvmfs_postinstall
-    exit 1
-  fi
-  if [ -d /var/run/cvmfs ]; then
-    /usr/bin/cvmfs_config reload
-  fi
-else
-  echo "Could not find cvmfs_config script in $cvmfs_config!" >> /tmp/cvmfs_postinstall
-  exit 2
-fi
+cvmfs_cfg=/usr/local/bin/cvmfs_config
+postinstall_log=/tmp/cvmfs_postinstall
+
+log() {
+  local msg="$1"
+  echo "$msg" >> $postinstall_log
+}
+
+die() {
+  local msg="$1"
+  log "$msg"
+  exit 1
+}
+
+[ -x $cvmfs_cfg ] || die "Could not find cvmfs_config script!"
+
+export PATH="$PATH:/usr/local/bin"
+
+log "running postinstall script for CernVM-FS"
+log "$(date)"
+log "----------------------------------------"
+log "\$PATH: $PATH"
+log ""
+log ""
+
+$cvmfs_cfg setup >> $postinstall_log 2>&1 || die "Configuring cvmfs failed."
+[ ! -d /var/run/cvmfs ] || $cvmfs_cfg reload >> $postinstall_log 2>&1

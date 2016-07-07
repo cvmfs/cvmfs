@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "catalog_mgr_rw.h"
+#include "compression.h"
 #include "platform.h"
 #include "swissknife_sync.h"
 #include "sync_item.h"
@@ -105,15 +106,20 @@ class SyncMediator {
   void EnterDirectory(const SyncItem &entry);
   void LeaveDirectory(const SyncItem &entry);
 
-  manifest::Manifest *Commit();
+  bool Commit(manifest::Manifest *manifest);
+
+  // The sync union engine uses this information to create properly initialized
+  // sync items
+  bool IsExternalData() const { return params_->external_data; }
+  zlib::Algorithms GetCompressionAlgorithm() const {
+    return params_->compression_alg;
+  }
 
  private:
   typedef std::stack<HardlinkGroupMap> HardlinkGroupMapStack;
   typedef std::vector<HardlinkGroup> HardlinkGroupList;
 
-  void RegisterUnionEngine(SyncUnion *engine) {
-    union_engine_ = engine;
-  }
+  void RegisterUnionEngine(SyncUnion *engine);
 
   void PrintChangesetNotice(const ChangesetAction action,
                             const std::string &extra_info) const;
@@ -126,8 +132,8 @@ class SyncMediator {
   void RemoveDirectory(const SyncItem &entry);
   void TouchDirectory(const SyncItem &entry);
 
-  void CreateNestedCatalog(const SyncItem &requestFile);
-  void RemoveNestedCatalog(const SyncItem &requestFile);
+  void CreateNestedCatalog(const SyncItem &directory);
+  void RemoveNestedCatalog(const SyncItem &directory);
 
   // Called by file system traversal
   void EnterAddedDirectoryCallback(const std::string &parent_dir,
@@ -154,6 +160,10 @@ class SyncMediator {
   bool IgnoreFileCallback(const std::string &parent_dir,
                           const std::string &file_name);
 
+  SyncItem CreateSyncItem(const std::string  &relative_parent_path,
+                          const std::string  &filename,
+                          const SyncItemType  entry_type) const;
+
   // Called by Upload Spooler
   void PublishFilesCallback(const upload::SpoolerResult &result);
   void PublishHardlinksCallback(const upload::SpoolerResult &result);
@@ -174,6 +184,8 @@ class SyncMediator {
 
   catalog::WritableCatalogManager *catalog_manager_;
   SyncUnion *union_engine_;
+
+  bool handle_hardlinks_;
 
   /**
    * Hardlinks are supported as long as they all reside in the same directory.

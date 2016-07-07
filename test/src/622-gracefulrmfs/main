@@ -1,0 +1,118 @@
+cvmfs_test_name="Data Preservation when Removing Repository"
+cvmfs_test_autofs_on_startup=false
+
+produce_files_in() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  echo "meaningless file content" > file
+  echo "more clever file content" > clever
+
+  mkdir foo
+  mkdir bar
+
+  mkdir foo/bar
+  mkdir bar/foo
+
+  ln file hardlinkToFile
+  ln -s clever symlinkToClever
+
+  popdir
+}
+
+check_repo_data() {
+  local repo_name="$1"
+  local backend_dir="$2"
+
+  [ -d $backend_dir ]                   || return 1
+  [ -f ${backend_dir}/.cvmfspublished ] || return 2
+  [ -f ${backend_dir}/.cvmfswhitelist ] || return 3
+  [ -d ${backend_dir}/data            ] || return 4
+
+  [ -f /etc/cvmfs/keys/${repo_name}.pub       ] || return 5
+  [ -f /etc/cvmfs/keys/${repo_name}.key       ] || return 6
+  [ -f /etc/cvmfs/keys/${repo_name}.crt       ] || return 7
+  [ -f /etc/cvmfs/keys/${repo_name}.masterkey ] || return 8
+}
+
+check_repo_data_inversed() {
+  local repo_name="$1"
+  local backend_dir="$2"
+
+  [ -d $backend_dir ]                   && { echo 1; return 1; }
+  [ -f ${backend_dir}/.cvmfspublished ] && { echo 2; return 2; }
+  [ -f ${backend_dir}/.cvmfswhitelist ] && { echo 3; return 3; }
+  [ -d ${backend_dir}/data            ] && { echo 4; return 4; }
+
+  [ -f /etc/cvmfs/keys/${repo_name}.pub       ] && return 5
+  [ -f /etc/cvmfs/keys/${repo_name}.key       ] && return 6
+  [ -f /etc/cvmfs/keys/${repo_name}.crt       ] && return 7
+  [ -f /etc/cvmfs/keys/${repo_name}.masterkey ] && return 8
+
+  return 0
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  local scratch_dir=$(pwd)
+  mkdir reference_dir
+  local reference_dir=$scratch_dir/reference_dir
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo -n "retrieving the created backend directory... "
+  load_repo_config $CVMFS_TEST_REPO || return 1
+  local backend_dir=$(read_upstream_config $CVMFS_UPSTREAM_STORAGE)
+  echo "done ($backend_dir)"
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository"
+  produce_files_in $repo_dir || return 3
+
+  echo "putting exactly the same stuff in the scratch space for comparison"
+  produce_files_in $reference_dir || return 4
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+  echo "check if backend storage and keys are there"
+  check_repo_data $CVMFS_TEST_REPO $backend_dir || return $?
+
+  echo "remove the repository (keeping the authorative data)"
+  destroy_repo $CVMFS_TEST_REPO -p || return 5
+
+  echo "check if backend storage and keys are there"
+  check_repo_data $CVMFS_TEST_REPO $backend_dir || return $?
+
+  echo "importing the repository again"
+  import_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return 6
+
+  echo "compare the imported repository to our reference copy"
+  compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+  echo "check if backend storage and keys are there"
+  check_repo_data $CVMFS_TEST_REPO $backend_dir || return $?
+
+  echo "remove the repository (removing the authorative data)"
+  destroy_repo $CVMFS_TEST_REPO || return 7
+
+  echo "check if backend storage and keys are gone"
+  check_repo_data_inversed $CVMFS_TEST_REPO $backend_dir || return $?
+
+  return 0
+}

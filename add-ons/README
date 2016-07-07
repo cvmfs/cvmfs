@@ -3,5 +3,13 @@ This directory contains some useful bits and pieces related to cvmfs.
 check_cvmfs.sh
 Nagios check for the cvmfs client
 
+s3rewrite.py
+A sample rewrite script that can be used if a repository is stored using
+multiple buckets.  In such a case, the logical location under which clients
+access the repository needs to be rewritten to the different bucket URLs.
+Spreading a repository over multiple bucket URLs has been developed as a
+performance optimization for the Huawei UDS system and so far has not been
+applied elsewhere.
+
 tools
 Python scripts to access repository catalogs

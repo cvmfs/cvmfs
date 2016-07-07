@@ -13,7 +13,8 @@
 
 #include "platform.h"
 #include "smalloc.h"
-#include "util.h"
+#include "util/pointer.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 
@@ -96,6 +97,11 @@ XattrList *XattrList::Deserialize(
       return NULL;
   }
   return result.Release();
+}
+
+
+bool XattrList::Has(const string &key) const {
+  return xattrs_.find(key) != xattrs_.end();
 }
 
 

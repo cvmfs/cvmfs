@@ -75,11 +75,6 @@ class CommandTag : public Command {
                       const history::History::Tag  &current_head_template,
                       const bool                    undo_rollback = false);
 
-  manifest::Manifest* FetchManifest(const std::string  &repository_url,
-                                    const std::string  &repository_name,
-                                    const std::string  &pubkey_path,
-                                    const std::string  &trusted_certs,
-                                    const shash::Any   &base_hash) const;
   bool FetchObject(const std::string    &repository_url,
                    const shash::Any     &object_hash,
                    const std::string    &destination_path) const;

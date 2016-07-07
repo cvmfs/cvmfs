@@ -5,19 +5,17 @@
 #ifndef CVMFS_CATALOG_MGR_IMPL_H_
 #define CVMFS_CATALOG_MGR_IMPL_H_
 
+#ifndef __STDC_FORMAT_MACROS
 #define __STDC_FORMAT_MACROS
+#endif
 
 #include "cvmfs_config.h"
-#include "catalog_mgr.h"
-
-#include <inttypes.h>
 
 #include <cassert>
 #include <string>
 
 #include "logging.h"
 #include "shortstring.h"
-#include "smalloc.h"
 #include "statistics.h"
 #include "xattr.h"
 
@@ -32,6 +30,8 @@ AbstractCatalogManager<CatalogT>::AbstractCatalogManager(
   inode_watermark_status_ = 0;
   inode_gauge_ = AbstractCatalogManager<CatalogT>::kInodeOffset;
   revision_cache_ = 0;
+  volatile_flag_ = false;
+  has_authz_cache_ = false;
   inode_annotation_ = NULL;
   incarnation_ = 0;
   rwlock_ =
@@ -218,7 +218,7 @@ bool AbstractCatalogManager<CatalogT>::LookupPath(const PathString &path,
 
       CatalogT *nested_catalog;
       found = MountSubtree(path, best_fit, &nested_catalog);
-      // DowngradeLock(); TODO
+
 
       if (!found) {
         LogCvmfs(kLogCatalog, kLogDebug,
@@ -255,29 +255,6 @@ bool AbstractCatalogManager<CatalogT>::LookupPath(const PathString &path,
 
   LogCvmfs(kLogCatalog, kLogDebug, "found entry '%s' in catalog '%s'",
            path.c_str(), best_fit->path().c_str());
-
-  // Look for parent entry
-  if ((options & kLookupFull) == kLookupFull) {
-    assert(dirent != NULL);
-
-    DirectoryEntry parent;
-    PathString parent_path = GetParentPath(path);
-    if (dirent->IsNestedCatalogRoot()) {
-      if (best_fit->parent())
-        found = best_fit->parent()->LookupPath(parent_path, &parent);
-      else
-        found = false;
-    } else {
-      found = best_fit->LookupPath(parent_path, &parent);
-    }
-    if (!found) {
-      LogCvmfs(kLogCatalog, kLogDebug | kLogSyslogErr,
-               "cannot find parent '%s' for entry '%s' --> data corrupt?",
-               parent_path.c_str(), path.c_str());
-      goto lookup_path_notfound;
-    }
-    dirent->set_parent_inode(parent.inode());
-  }
 
   if ((options & kLookupRawSymlink) == kLookupRawSymlink) {
     LinkString raw_symlink;
@@ -453,11 +430,13 @@ uint64_t AbstractCatalogManager<CatalogT>::GetRevision() const {
 }
 
 template <class CatalogT>
-bool AbstractCatalogManager<CatalogT>::GetVolatileFlag() const {
+bool AbstractCatalogManager<CatalogT>::GetVOMSAuthz(std::string *authz) const {
   ReadLock();
-  const bool volatile_flag = GetRootCatalog()->volatile_flag();
+  const bool has_authz = has_authz_cache_;
+  if (has_authz && authz)
+    *authz = authz_cache_;
   Unlock();
-  return volatile_flag;
+  return has_authz;
 }
 
 template <class CatalogT>
@@ -695,8 +674,11 @@ bool AbstractCatalogManager<CatalogT>::AttachCatalog(const string &db_path,
   CheckInodeWatermark();
 
   // The revision of the catalog tree is given by the root catalog revision
-  if (catalogs_.empty())
+  if (catalogs_.empty()) {
     revision_cache_ = new_catalog->GetRevision();
+    has_authz_cache_ = new_catalog->GetVOMSAuthz(&authz_cache_);
+    volatile_flag_ = new_catalog->volatile_flag();
+  }
 
   catalogs_.push_back(new_catalog);
   ActivateCatalog(new_catalog);
@@ -783,6 +765,36 @@ string AbstractCatalogManager<CatalogT>::PrintHierarchyRecursively(
 
   return output;
 }
+
+
+template <class CatalogT>
+std::string AbstractCatalogManager<CatalogT>::PrintMemStatsRecursively(
+  const CatalogT *catalog) const
+{
+  string result = catalog->PrintMemStatistics() + "\n";
+
+  CatalogList children = catalog->GetChildren();
+  typename CatalogList::const_iterator i = children.begin();
+  typename CatalogList::const_iterator iend = children.end();
+  for (; i != iend; ++i) {
+    result += PrintMemStatsRecursively(*i);
+  }
+  return result;
+}
+
+
+/**
+ * Statistics from all catalogs
+ */
+template <class CatalogT>
+std::string AbstractCatalogManager<CatalogT>::PrintAllMemStatistics() const {
+  string result;
+  ReadLock();
+  result = PrintMemStatsRecursively(GetRootCatalog());
+  Unlock();
+  return result;
+}
+
 
 template <class CatalogT>
 void AbstractCatalogManager<CatalogT>::EnforceSqliteMemLimit() {

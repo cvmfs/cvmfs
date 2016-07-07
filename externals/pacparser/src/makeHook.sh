@@ -4,10 +4,10 @@ set -e
 
 static_result_dir=src/static
 
-echo "make clean && make for libpacparser..."
+echo "make clean && make for libpacparser (omitting test execution)..."
 [ -d $static_result_dir ] && rm -fR $static_result_dir
 make -C src clean
-make -j1 -C src
+make -j1 -C src pacparser.o libjs.a # default target runs tests!
 echo "finished internal build of libpacparser"
 
 echo "creating static link library for libpacparser..."

@@ -147,6 +147,13 @@ cvmfs_run_test() {
 
   local revisions=17
 
+  echo -n "check if 'bc' is installed... "
+  if ! which bc > /dev/null 2>&1; then
+    echo "fail"
+    return 100
+  fi
+  echo "done"
+
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER and disabled auto-tagging"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -g -z || return $?
 

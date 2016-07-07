@@ -12,7 +12,9 @@
 #include "history_sqlite.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
+#include "reflog.h"
 #include "signature.h"
+#include "util/posix.h"
 
 /**
  * Trait class to define the concrete object types produced by the methods of
@@ -26,6 +28,36 @@
  */
 template <class ConcreteObjectFetcherT>
 struct object_fetcher_traits;
+
+struct ObjectFetcherFailures {
+  enum Failures {
+    kFailOk,
+    kFailNotFound,
+    kFailLocalIO,
+    kFailNetwork,
+    kFailDecompression,
+    kFailManifestNameMismatch,
+    kFailManifestSignatureMismatch,
+    kFailBadData,
+    kFailUnknown,
+
+    kFailNumEntries
+  };
+};
+
+inline const char* Code2Ascii(const ObjectFetcherFailures::Failures error) {
+  const char *texts[ObjectFetcherFailures::kFailNumEntries + 1];
+  texts[0] = "OK";
+  texts[1] = "object not found";
+  texts[2] = "local I/O failure";
+  texts[3] = "network failure";
+  texts[4] = "decompression failed";
+  texts[5] = "manifest name doesn't match";
+  texts[6] = "manifest signature is invalid";
+  texts[7] = "bad data received";
+  texts[8] = "no text";
+  return texts[error];
+}
 
 /**
  * This is the default class implementing the data object fetching strategy. It
@@ -44,22 +76,27 @@ struct object_fetcher_traits;
  * backend storage like CatalogTraversal<> or GarbageCollector<>.
  */
 template <class DerivedT>
-class AbstractObjectFetcher {
+class AbstractObjectFetcher : public ObjectFetcherFailures {
  public:
   typedef typename object_fetcher_traits<DerivedT>::CatalogTN CatalogTN;
   typedef typename object_fetcher_traits<DerivedT>::HistoryTN HistoryTN;
+  typedef typename object_fetcher_traits<DerivedT>::ReflogTN  ReflogTN;
+
+  typedef ObjectFetcherFailures::Failures Failures;
 
   static const std::string kManifestFilename;
+  static const std::string kReflogFilename;
 
  public:
   /**
    * Fetches and opens the manifest of the repository this object fetcher is
    * configured for. Note that the user is responsible to clean up this object.
    *
-   * @return  a manifest object or NULL on error
+   * @param manifest  pointer to a manifest object pointer
+   * @return          failure code, specifying the action's result
    */
-  manifest::Manifest* FetchManifest() {
-    return static_cast<DerivedT*>(this)->FetchManifest();
+  Failures FetchManifest(manifest::Manifest** manifest) {
+    return static_cast<DerivedT*>(this)->FetchManifest(manifest);
   }
 
   /**
@@ -68,32 +105,38 @@ class AbstractObjectFetcher {
    * database file will be unlinked automatically during the destruction of the
    * HistoryTN object.
    *
+   * @param history       pointer to a history database object pointer
    * @param history_hash  (optional) the content hash of the history database
    *                                 if left blank, the latest one is downloaded
-   * @return              a history database object or NULL on error
+   * @return              failure code, specifying the action's result
    */
-  HistoryTN* FetchHistory(const shash::Any &history_hash = shash::Any()) {
+  Failures FetchHistory(HistoryTN        **history,
+                        const shash::Any  &history_hash = shash::Any()) {
     // retrieve the current HEAD history hash (if nothing else given)
     shash::Any effective_history_hash = (!history_hash.IsNull())
             ? history_hash
             : GetHistoryHash();
+    if (effective_history_hash.IsNull()) {
+      return kFailNotFound;
+    }
     assert(history_hash.suffix == shash::kSuffixHistory ||
            history_hash.IsNull());
 
     // download the history hash
     std::string path;
-    if (effective_history_hash.IsNull() ||
-        !Fetch(effective_history_hash, &path)) {
-      return NULL;
+    const Failures retval = Fetch(effective_history_hash, &path);
+    if (retval != kFailOk) {
+      return retval;
     }
 
     // open the history file
-    HistoryTN *history = HistoryTN::Open(path);
-    if (NULL != history) {
-      history->TakeDatabaseFileOwnership();
+    *history = HistoryTN::Open(path);
+    if (NULL == *history) {
+      return kFailLocalIO;
     }
 
-    return history;
+    (*history)->TakeDatabaseFileOwnership();
+    return kFailOk;
   }
 
   /**
@@ -102,41 +145,105 @@ class AbstractObjectFetcher {
    *
    * @param catalog_hash   the content hash of the catalog object
    * @param catalog_path   the root_path the catalog is mounted on
+   * @param catalog        pointer to the fetched catalog object pointer
    * @param is_nested      a hint if the catalog to be loaded is a nested one
    * @param parent         (optional) parent catalog of the requested catalog
-   * @return               a catalog object or NULL on error
+   * @return               failure code, specifying the action's result
    */
-  CatalogTN* FetchCatalog(const shash::Any  &catalog_hash,
-                          const std::string &catalog_path,
-                          const bool         is_nested = false,
-                                CatalogTN   *parent    = NULL) {
+  Failures FetchCatalog(const shash::Any   &catalog_hash,
+                        const std::string  &catalog_path,
+                              CatalogTN   **catalog,
+                        const bool          is_nested = false,
+                              CatalogTN    *parent    = NULL) {
     assert(!catalog_hash.IsNull());
     assert(catalog_hash.suffix == shash::kSuffixCatalog);
 
     std::string path;
-    if (!Fetch(catalog_hash, &path)) {
-      return NULL;
+    const Failures retval = Fetch(catalog_hash, &path);
+    if (retval != kFailOk) {
+      return retval;
     }
 
-    CatalogTN *catalog = CatalogTN::AttachFreely(catalog_path,
-                                                 path,
-                                                 catalog_hash,
-                                                 parent,
-                                                 is_nested);
-    if (NULL != catalog) {
-      catalog->TakeDatabaseFileOwnership();
+    *catalog = CatalogTN::AttachFreely(catalog_path,
+                                       path,
+                                       catalog_hash,
+                                       parent,
+                                       is_nested);
+    if (NULL == *catalog) {
+      return kFailLocalIO;
     }
 
-    return catalog;
+    (*catalog)->TakeDatabaseFileOwnership();
+    return kFailOk;
   }
 
- public:
+  Failures FetchReflog(ReflogTN **reflog) {
+    std::string tmp_path;
+    const bool decompress = false;
+    Failures failure = Fetch(kReflogFilename, decompress, &tmp_path);
+    if (failure != kFailOk) {
+      return failure;
+    }
+
+    *reflog = ReflogTN::Open(tmp_path);
+    if (NULL == *reflog) {
+      return kFailLocalIO;
+    }
+
+    (*reflog)->TakeDatabaseFileOwnership();
+    return kFailOk;
+  }
+
+  Failures FetchManifest(UniquePtr<manifest::Manifest> *manifest) {
+    manifest::Manifest *raw_manifest_ptr = NULL;
+    Failures failure = FetchManifest(&raw_manifest_ptr);
+    if (failure == kFailOk) *manifest = raw_manifest_ptr;
+    return failure;
+  }
+
+  Failures FetchHistory(UniquePtr<HistoryTN>  *history,
+                        const shash::Any      &history_hash = shash::Any()) {
+    HistoryTN *raw_history_ptr = NULL;
+    Failures failure = FetchHistory(&raw_history_ptr, history_hash);
+    if (failure == kFailOk) *history = raw_history_ptr;
+    return failure;
+  }
+
+  Failures FetchCatalog(const shash::Any            &catalog_hash,
+                        const std::string           &catalog_path,
+                              UniquePtr<CatalogTN>  *catalog,
+                        const bool                   is_nested = false,
+                              CatalogTN             *parent    = NULL) {
+    CatalogTN *raw_catalog_ptr = NULL;
+    Failures failure = FetchCatalog(catalog_hash,
+                                    catalog_path,
+                                    &raw_catalog_ptr,
+                                    is_nested,
+                                    parent);
+    if (failure == kFailOk) *catalog = raw_catalog_ptr;
+    return failure;
+  }
+
+  Failures FetchReflog(UniquePtr<ReflogTN>  *reflog) {
+    ReflogTN *raw_reflog_ptr = NULL;
+    Failures failure = FetchReflog(&raw_reflog_ptr);
+    if (failure == kFailOk) *reflog = raw_reflog_ptr;
+    return failure;
+  }
+
   bool HasHistory() {
     shash::Any history_hash = GetHistoryHash();
     return !history_hash.IsNull();
   }
 
+  const std::string& temporary_directory() const {
+    return temporary_directory_;
+  }
+
  protected:
+  explicit AbstractObjectFetcher(const std::string &temp_dir)
+    : temporary_directory_(temp_dir) {}
+
   /**
    * Internal function used to download objects defined by the given content
    * hash. This needs to be implemented depending on the concrete implementation
@@ -144,10 +251,18 @@ class AbstractObjectFetcher {
    *
    * @param object_hash  the content hash of the object to be downloaded
    * @param file_path    temporary file path to store the download result
-   * @return             true on success (if false, file_path is invalid)
+   * @return             failure code (if not kFailOk, file_path is invalid)
    */
-  bool Fetch(const shash::Any &object_hash, std::string *file_path) {
+  Failures Fetch(const shash::Any &object_hash, std::string *file_path) {
     return static_cast<DerivedT*>(this)->Fetch(object_hash, file_path);
+  }
+
+  Failures Fetch(const std::string &relative_path,
+                 const bool         decompress,
+                       std::string *file_path) {
+    return static_cast<DerivedT*>(this)->Fetch(relative_path,
+                                               decompress,
+                                               file_path);
   }
 
   /**
@@ -157,18 +272,28 @@ class AbstractObjectFetcher {
    * @return  the content hash of the HEAD history db or a null-hash on error
    */
   shash::Any GetHistoryHash() {
-    UniquePtr<manifest::Manifest> manifest(FetchManifest());
-    if (!manifest || manifest->history().IsNull()) {
+    UniquePtr<manifest::Manifest> manifest;
+    const Failures retval = FetchManifest(&manifest);
+
+    if (retval != kFailOk   ||
+        !manifest.IsValid() ||
+        manifest->history().IsNull()) {
       return shash::Any();
     }
 
     return manifest->history();
   }
+
+ private:
+  const std::string temporary_directory_;
 };
 
 template <class DerivedT>
 const std::string AbstractObjectFetcher<DerivedT>::kManifestFilename =
                                                               ".cvmfspublished";
+template <class DerivedT>
+const std::string AbstractObjectFetcher<DerivedT>::kReflogFilename =
+                                                                 ".cvmfsreflog";
 
 
 /**
@@ -177,13 +302,17 @@ const std::string AbstractObjectFetcher<DerivedT>::kManifestFilename =
  * verification.
  */
 template <class CatalogT = catalog::Catalog,
-          class HistoryT = history::SqliteHistory>
+          class HistoryT = history::SqliteHistory,
+          class ReflogT  = manifest::Reflog>
 class LocalObjectFetcher :
-  public AbstractObjectFetcher<LocalObjectFetcher<CatalogT, HistoryT> >
+  public AbstractObjectFetcher<LocalObjectFetcher<CatalogT, HistoryT, ReflogT> >
 {
  protected:
-  typedef LocalObjectFetcher<CatalogT, HistoryT> ThisTN;
-  typedef AbstractObjectFetcher<ThisTN>          BaseTN;
+  typedef LocalObjectFetcher<CatalogT, HistoryT, ReflogT> ThisTN;
+  typedef AbstractObjectFetcher<ThisTN>                   BaseTN;
+
+ public:
+  typedef typename BaseTN::Failures Failures;
 
  public:
   /**
@@ -194,71 +323,93 @@ class LocalObjectFetcher :
    */
   LocalObjectFetcher(const std::string &base_path,
                      const std::string &temp_dir)
-    : base_path_(base_path)
-    , temporary_directory_(temp_dir) {}
+    : BaseTN(temp_dir)
+    , base_path_(base_path) {}
 
-  manifest::Manifest* FetchManifest() {
-    return manifest::Manifest::LoadFile(BuildPath(BaseTN::kManifestFilename));
+  using BaseTN::FetchManifest;  // un-hiding convenience overload
+  Failures FetchManifest(manifest::Manifest** manifest) {
+    const std::string path = BuildPath(BaseTN::kManifestFilename);
+    if (!FileExists(path)) {
+      return BaseTN::kFailNotFound;
+    }
+
+    *manifest = manifest::Manifest::LoadFile(path);
+    return (*manifest != NULL) ? BaseTN::kFailOk
+                               : BaseTN::kFailUnknown;
   }
 
-  bool Fetch(const shash::Any &object_hash, std::string *file_path) {
+  Failures Fetch(const shash::Any &object_hash, std::string *file_path) {
+    assert(file_path != NULL);
+    file_path->clear();
+
+    const std::string relative_path = BuildRelativePath(object_hash);
+    const bool        decompress    = true;
+    return Fetch(relative_path, decompress, file_path);
+  }
+
+
+  Failures Fetch(const std::string &relative_path,
+                 const bool         decompress,
+                       std::string *file_path) {
     assert(file_path != NULL);
     file_path->clear();
 
     // check if the requested file object is available locally
-    const std::string source = BuildPath(object_hash);
+    const std::string source = BuildPath(relative_path);
     if (!FileExists(source)) {
-      LogCvmfs(kLogDownload, kLogDebug, "failed to locate object %s",
-               object_hash.ToStringWithSuffix().c_str());
-      return false;
+      LogCvmfs(kLogDownload, kLogDebug, "failed to locate file '%s'",
+               relative_path.c_str());
+      return BaseTN::kFailNotFound;
     }
 
-    // create a temporary file to store the decompressed object file
-    const std::string tmp_path = temporary_directory_ + "/" +
-                                 object_hash.ToStringWithSuffix();
+    // create a temporary file to store the (decompressed) object file
+    const std::string tmp_path = BaseTN::temporary_directory() + "/" +
+                                 GetFileName(relative_path);
     FILE *f = CreateTempFile(tmp_path, 0600, "w", file_path);
     if (NULL == f) {
       LogCvmfs(kLogDownload, kLogStderr,
-               "failed to create temp file (errno: %d)", errno);
-      return false;
+               "failed to create temp file '%s' (errno: %d)",
+               tmp_path.c_str(), errno);
+      return BaseTN::kFailLocalIO;
     }
 
-    // decompress the requested object file
-    const bool success = zlib::DecompressPath2File(source, f);
+    // decompress or copy the requested object file
+    const bool success = (decompress)
+      ? zlib::DecompressPath2File(source, f)
+      : CopyPath2File(source, f);
     fclose(f);
 
     // check the decompression success and remove the temporary file otherwise
     if (!success) {
-      LogCvmfs(kLogDownload, kLogDebug, "failed to extract object %s from '%s' "
+      LogCvmfs(kLogDownload, kLogDebug, "failed to fetch file from '%s' "
                                         "to '%s' (errno: %d)",
-               object_hash.ToString().c_str(), source.c_str(),
-               file_path->c_str(), errno);
+               source.c_str(), file_path->c_str(), errno);
       unlink(file_path->c_str());
       file_path->clear();
+      return BaseTN::kFailDecompression;
     }
 
-    return success;
+    return BaseTN::kFailOk;
   }
-
 
  protected:
   std::string BuildPath(const std::string &relative_path) const {
     return base_path_ + "/" + relative_path;
   }
 
-  std::string BuildPath(const shash::Any &hash) const {
-    return BuildPath("data/" + hash.MakePath());
+  std::string BuildRelativePath(const shash::Any &hash) const {
+    return "data/" + hash.MakePath();
   }
 
  private:
   const std::string base_path_;
-  const std::string temporary_directory_;
 };
 
-template <class CatalogT, class HistoryT>
-struct object_fetcher_traits<LocalObjectFetcher<CatalogT, HistoryT> > {
+template <class CatalogT, class HistoryT, class ReflogT>
+struct object_fetcher_traits<LocalObjectFetcher<CatalogT, HistoryT, ReflogT> > {
     typedef CatalogT CatalogTN;
     typedef HistoryT HistoryTN;
+    typedef ReflogT  ReflogTN;
 };
 
 
@@ -268,13 +419,17 @@ struct object_fetcher_traits<LocalObjectFetcher<CatalogT, HistoryT> > {
  * and the downloaded data integrity.
  */
 template <class CatalogT = catalog::Catalog,
-          class HistoryT = history::SqliteHistory>
+          class HistoryT = history::SqliteHistory,
+          class ReflogT  = manifest::Reflog>
 class HttpObjectFetcher :
-  public AbstractObjectFetcher<HttpObjectFetcher<CatalogT, HistoryT> >
+  public AbstractObjectFetcher<HttpObjectFetcher<CatalogT, HistoryT, ReflogT> >
 {
  protected:
-  typedef HttpObjectFetcher<CatalogT, HistoryT>  ThisTN;
-  typedef AbstractObjectFetcher<ThisTN>          BaseTN;
+  typedef HttpObjectFetcher<CatalogT, HistoryT, ReflogT>  ThisTN;
+  typedef AbstractObjectFetcher<ThisTN>                   BaseTN;
+
+ public:
+  typedef typename BaseTN::Failures Failures;
 
  public:
   /**
@@ -293,14 +448,16 @@ class HttpObjectFetcher :
                     const std::string           &repo_url,
                     const std::string           &temp_dir,
                     download::DownloadManager   *download_mgr,
-                    signature::SignatureManager *signature_mgr) :
-    repo_url_(repo_url), repo_name_(repo_name), temporary_directory_(temp_dir),
-    download_manager_(download_mgr), signature_manager_(signature_mgr) {}
+                    signature::SignatureManager *signature_mgr)
+    : BaseTN(temp_dir)
+    , repo_url_(repo_url)
+    , repo_name_(repo_name)
+    , download_manager_(download_mgr)
+    , signature_manager_(signature_mgr) {}
 
  public:
-  manifest::Manifest* FetchManifest() {
-    manifest::Manifest *manifest = NULL;
-
+  using BaseTN::FetchManifest;  // un-hiding convenience overload
+  Failures FetchManifest(manifest::Manifest** manifest) {
     const std::string url = BuildUrl(BaseTN::kManifestFilename);
 
     // Download manifest file
@@ -315,59 +472,49 @@ class HttpObjectFetcher :
                                   &manifest_ensemble);
 
     // Check if manifest was loaded correctly
-    if (retval == manifest::kFailOk) {
-      manifest = new manifest::Manifest(*manifest_ensemble.manifest);
-    } else if (retval == manifest::kFailNameMismatch) {
-      LogCvmfs(kLogDownload, kLogDebug,
-               "repository name mismatch. No name provided?");
-    } else if (retval == manifest::kFailBadSignature   ||
-               retval == manifest::kFailBadCertificate ||
-               retval == manifest::kFailBadWhitelist) {
-      LogCvmfs(kLogDownload, kLogDebug,
-               "repository signature mismatch. No key(s) provided?");
-    } else {
-      LogCvmfs(kLogDownload, kLogDebug,
-               "failed to load manifest (%d - %s)",
-               retval, Code2Ascii(retval));
+    switch (retval) {
+      case manifest::kFailOk:
+        break;
+
+      case manifest::kFailNameMismatch:
+        LogCvmfs(kLogDownload, kLogDebug,
+                 "repository name mismatch. No name provided?");
+        return BaseTN::kFailManifestNameMismatch;
+
+      case manifest::kFailBadSignature:
+      case manifest::kFailBadCertificate:
+      case manifest::kFailBadWhitelist:
+        LogCvmfs(kLogDownload, kLogDebug,
+                 "repository signature mismatch. No key(s) provided?");
+        return BaseTN::kFailManifestSignatureMismatch;
+
+      default:
+        LogCvmfs(kLogDownload, kLogDebug,
+                 "failed to load manifest (%d - %s)",
+                 retval, Code2Ascii(retval));
+        return BaseTN::kFailUnknown;
     }
 
-    return manifest;
+    assert(retval == manifest::kFailOk);
+    *manifest = new manifest::Manifest(*manifest_ensemble.manifest);
+    return (*manifest != NULL) ? BaseTN::kFailOk
+                               : BaseTN::kFailUnknown;
   }
 
-  bool Fetch(const shash::Any &object_hash, std::string *object_file) {
+  Failures Fetch(const shash::Any &object_hash, std::string *object_file) {
     assert(object_file != NULL);
     assert(!object_hash.IsNull());
 
-    object_file->clear();
+    const bool decompress = true;
+    const std::string url = BuildRelativeUrl(object_hash);
+    return Download(url, decompress, &object_hash, object_file);
+  }
 
-    // create temporary file to host the fetching result
-    const std::string tmp_path = temporary_directory_ + "/" +
-                                 object_hash.ToStringWithSuffix();
-    FILE *f = CreateTempFile(tmp_path, 0600, "w", object_file);
-    if (NULL == f) {
-      LogCvmfs(kLogDownload, kLogStderr,
-               "failed to create temp file (errno: %d)", errno);
-      return false;
-    }
-
-    // fetch and decompress the requested objected
-    const std::string url = BuildUrl(object_hash);
-    download::JobInfo download_catalog(&url, true, false, f, &object_hash);
-    download::Failures retval = download_manager_->Fetch(&download_catalog);
-    const bool success = (retval == download::kFailOk);
-    fclose(f);
-
-    // check if download worked and remove temporary file if not
-    if (!success) {
-      LogCvmfs(kLogDownload, kLogDebug, "failed to download object "
-                                        "%s to '%s' (%d - %s)",
-               object_hash.ToString().c_str(), object_file->c_str(),
-               retval, Code2Ascii(retval));
-      unlink(object_file->c_str());
-      object_file->clear();
-    }
-
-    return success;
+  Failures Fetch(const std::string &relative_path,
+                 const bool         decompress,
+                       std::string *file_path) {
+    const shash::Any *expected_hash = NULL;
+    return Download(relative_path, decompress, expected_hash, file_path);
   }
 
  protected:
@@ -375,22 +522,84 @@ class HttpObjectFetcher :
     return repo_url_ + "/" + relative_path;
   }
 
-  std::string BuildUrl(const shash::Any &hash) const {
-    return BuildUrl("data/" + hash.MakePath());
+  std::string BuildRelativeUrl(const shash::Any &hash) const {
+    return "data/" + hash.MakePath();
+  }
+
+  Failures Download(const std::string &relative_path,
+                    const bool         decompress,
+                    const shash::Any  *expected_hash,
+                          std::string *file_path) {
+    file_path->clear();
+
+    // create temporary file to host the fetching result
+    const std::string tmp_path = BaseTN::temporary_directory() + "/" +
+                                 GetFileName(relative_path);
+    FILE *f = CreateTempFile(tmp_path, 0600, "w", file_path);
+    if (NULL == f) {
+      LogCvmfs(kLogDownload, kLogStderr,
+               "failed to create temp file '%s' (errno: %d)",
+               tmp_path.c_str(), errno);
+      return BaseTN::kFailLocalIO;
+    }
+
+    // fetch and decompress the requested object
+    const std::string url = BuildUrl(relative_path);
+    const bool probe_hosts = false;
+    download::JobInfo download_job(&url,
+                                        decompress,
+                                        probe_hosts,
+                                        f,
+                                        expected_hash);
+    download::Failures retval = download_manager_->Fetch(&download_job);
+    const bool success = (retval == download::kFailOk);
+    fclose(f);
+
+    // check if download worked and remove temporary file if not
+    if (!success) {
+      LogCvmfs(kLogDownload, kLogDebug, "failed to download file "
+                                        "%s to '%s' (%d - %s)",
+               relative_path.c_str(), file_path->c_str(),
+               retval, Code2Ascii(retval));
+      unlink(file_path->c_str());
+      file_path->clear();
+
+      // hand out the error status
+      switch (retval) {
+        case download::kFailLocalIO:
+          return BaseTN::kFailLocalIO;
+
+        case download::kFailProxyHttp:
+        case download::kFailHostHttp:
+          return (download_job.http_code == 404)
+            ? BaseTN::kFailNotFound
+            : BaseTN::kFailNetwork;
+
+        case download::kFailBadData:
+        case download::kFailTooBig:
+          return BaseTN::kFailBadData;
+
+        default:
+          return BaseTN::kFailUnknown;
+      }
+    }
+
+    assert(success);
+    return BaseTN::kFailOk;
   }
 
  private:
   const std::string            repo_url_;
   const std::string            repo_name_;
-  const std::string            temporary_directory_;
   download::DownloadManager   *download_manager_;
   signature::SignatureManager *signature_manager_;
 };
 
-template <class CatalogT, class HistoryT>
-struct object_fetcher_traits<HttpObjectFetcher<CatalogT, HistoryT> > {
+template <class CatalogT, class HistoryT, class ReflogT>
+struct object_fetcher_traits<HttpObjectFetcher<CatalogT, HistoryT, ReflogT> > {
     typedef CatalogT CatalogTN;
     typedef HistoryT HistoryTN;
+    typedef ReflogT  ReflogTN;
 };
 
 #endif  // CVMFS_OBJECT_FETCHER_H_

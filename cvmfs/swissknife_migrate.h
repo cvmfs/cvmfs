@@ -17,7 +17,7 @@
 #include "hash.h"
 #include "uid_map.h"
 #include "upload.h"
-#include "util.h"
+#include "util/algorithm.h"
 #include "util_concurrency.h"
 
 namespace catalog {
@@ -61,10 +61,11 @@ class CommandMigrate : public Command {
   struct PendingCatalog;
   typedef std::vector<PendingCatalog *> PendingCatalogList;
   struct PendingCatalog {
-    explicit PendingCatalog(const catalog::Catalog *old_catalog = NULL) :
-      success(false),
-      old_catalog(old_catalog),
-      new_catalog(NULL) { }
+    explicit PendingCatalog(const catalog::Catalog *old_catalog = NULL)
+      : success(false)
+      , old_catalog(old_catalog)
+      , new_catalog(NULL)
+      , new_catalog_size(0) { }
     virtual ~PendingCatalog();
 
     inline const std::string root_path() const {
@@ -72,6 +73,15 @@ class CommandMigrate : public Command {
     }
     inline bool IsRoot() const { return old_catalog->IsRoot(); }
     inline bool HasNew() const { return new_catalog != NULL;   }
+
+    inline bool HasChanges() const {
+      return (new_catalog != NULL ||
+              old_catalog->database().GetModifiedRowCount() > 0);
+    }
+
+    inline shash::Any GetOldContentHash() const {
+      return old_catalog->hash();
+    }
 
     bool                              success;
 
@@ -84,8 +94,12 @@ class CommandMigrate : public Command {
 
     CatalogStatistics                 statistics;
 
-    Future<shash::Any>                new_catalog_hash;
-    Future<size_t>                    new_catalog_size;
+    // Note: As soon as the `was_updated` future is set to 'true', both
+    //       `new_catalog_hash` and `new_catalog_size` are assumed to be set
+    //       accordingly. If it is set to 'false' they will be ignored.
+    Future<bool>                      was_updated;
+    shash::Any                        new_catalog_hash;
+    size_t                            new_catalog_size;
   };
 
   class PendingCatalogMap : public std::map<std::string, const PendingCatalog*>,
@@ -116,6 +130,7 @@ class CommandMigrate : public Command {
     bool RunMigration(PendingCatalog *data) const { return false; }
 
     bool UpdateNestedCatalogReferences(PendingCatalog *data) const;
+    bool UpdateCatalogMetadata(PendingCatalog *data) const;
     bool CleanupNestedCatalogs(PendingCatalog *data) const;
     bool CollectAndAggregateStatistics(PendingCatalog *data) const;
 
@@ -241,6 +256,22 @@ class CommandMigrate : public Command {
     const std::string gid_map_statement_;
   };
 
+  class HardlinkRemovalMigrationWorker :
+    public AbstractMigrationWorker<HardlinkRemovalMigrationWorker>
+  {
+    friend class AbstractMigrationWorker<HardlinkRemovalMigrationWorker>;
+
+   public:
+    explicit HardlinkRemovalMigrationWorker(const worker_context *context) :
+      AbstractMigrationWorker<HardlinkRemovalMigrationWorker>(context) {}
+
+   protected:
+    bool RunMigration(PendingCatalog *data) const;
+
+    bool CheckDatabaseSchemaCompatibility(PendingCatalog *data) const;
+    bool BreakUpHardlinks(PendingCatalog *data) const;
+  };
+
  public:
   CommandMigrate();
   ~CommandMigrate() { }
@@ -276,6 +307,10 @@ class CommandMigrate : public Command {
   void MigrationCallback(PendingCatalog *const &data);
   void UploadCallback(const upload::SpoolerResult &result);
 
+  void PrintStatusMessage(const PendingCatalog *catalog,
+                          const shash::Any     &content_hash,
+                          const std::string    &message);
+
   template <class MigratorT>
   bool DoMigrationAndCommit(const std::string                   &manifest_path,
                             typename MigratorT::worker_context  *context);
@@ -299,6 +334,7 @@ class CommandMigrate : public Command {
   CatalogStatisticsList  catalog_statistics_list_;
   unsigned int           catalog_count_;
   atomic_int32           catalogs_processed_;
+  bool                   has_committed_new_revision_;
 
   uid_t                  uid_;
   gid_t                  gid_;

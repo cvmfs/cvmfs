@@ -42,15 +42,23 @@ cvmfs_run_test() {
           $legacy_repo_storage/pub/catalogs/.cvmfswhitelist         \
           $legacy_repo_storage/pub/catalogs/.cvmfs_master_replica   \
           $legacy_repo_storage || return 3
-  sudo cvmfs_server import \
-    -o $CVMFS_TEST_USER    \
-    -l                     \
-    -s                     \
-    -g                     \
-    $legacy_repo_name || return 4
+  import_repo "$legacy_repo_name" "$CVMFS_TEST_USER" \
+    -l                                               \
+    -s                                               \
+    -g || return 4
 
-  echo "make sure that we are not suffering from the exdev bug"
-  apply_server_cache_config $legacy_repo_name
+  echo -n "get root catalog hash after migration... "
+  local root_clg_after="$(get_current_root_catalog $legacy_repo_name)"
+  echo "$root_clg_after"
+
+  echo "download catalog $root_clg_after and check its previous pointer"
+  local root_clg_after_db=$(get_and_decompress_root_catalog $legacy_repo_name)
+  local prev_ptr="$(sqlite3 $root_clg_after_db "SELECT value FROM properties WHERE key = 'previous_revision';")"
+  local root_clg_legacy="07df6f3a10a70ca17df82370ca3845e82ca6a9af"
+  echo "  legacy:   $root_clg_legacy"
+  echo "  after:    $root_clg_after"
+  echo "  prev_ptr: $prev_ptr"
+  [ x"$prev_ptr" = x"$root_clg_legacy" ] || return 101
 
   echo "list newly generated repository under /cvmfs/${legacy_repo_name}"
   ls -lisa /cvmfs/${legacy_repo_name} || return 5
@@ -68,6 +76,11 @@ cvmfs_run_test() {
   echo "create an empty repository revision (exdev workaround)"
   start_transaction $legacy_repo_name || return $?
   publish_repo      $legacy_repo_name || return $?
+
+  if uses_overlayfs $legacy_repo_name; then
+    echo "we are running on OverlayFS. We need to erase all hardlinks now..."
+    sudo cvmfs_server eliminate-hardlinks -f $legacy_repo_name || return 101
+  fi
 
   # cheate a new repository revision of the migrated catalogs
   echo "create a new repository revision"

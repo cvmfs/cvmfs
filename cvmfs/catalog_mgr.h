@@ -24,7 +24,6 @@
 #include "hash.h"
 #include "logging.h"
 #include "statistics.h"
-#include "util.h"
 
 class XattrList;
 
@@ -37,7 +36,7 @@ const unsigned kSqliteMemPerThread = 1*1024*1024;
  */
 enum LookupOptions {
   kLookupSole        = 0x01,
-  kLookupFull        = 0x02,
+  // kLookupFull        = 0x02  not used anymore
   kLookupRawSymlink  = 0x10,
 };
 
@@ -139,6 +138,7 @@ template <class CatalogT>
 class AbstractCatalogManager : public SingleCopy {
  public:
   typedef std::vector<CatalogT*> CatalogList;
+  typedef CatalogT catalog_t;
 
   static const inode_t kInodeOffset = 255;
   explicit AbstractCatalogManager(perf::Statistics *statistics);
@@ -180,11 +180,13 @@ class AbstractCatalogManager : public SingleCopy {
   uint64_t inode_gauge() {
     ReadLock(); uint64_t r = inode_gauge_; Unlock(); return r;
   }
+  bool volatile_flag() const { return volatile_flag_; }
   uint64_t GetRevision() const;
-  bool GetVolatileFlag() const;
   uint64_t GetTTL() const;
+  bool GetVOMSAuthz(std::string *authz) const;
   int GetNumCatalogs() const;
   std::string PrintHierarchy() const;
+  std::string PrintAllMemStatistics() const;
 
   /**
    * Get the inode number of the root DirectoryEntry
@@ -274,6 +276,19 @@ class AbstractCatalogManager : public SingleCopy {
   uint64_t inode_gauge_;  /**< highest issued inode */
   uint64_t revision_cache_;
   /**
+   * Not protected by a read lock because it can only change when the root
+   * catalog is exchanged (during big global lock of the file system).
+   */
+  bool volatile_flag_;
+  /**
+   * Saves the result of GetVOMSAuthz when a root catalog is attached
+   */
+  bool has_authz_cache_;
+  /**
+   * Saves the VOMS requirements when a root catalog is attached
+   */
+  std::string authz_cache_;
+  /**
    * Counts how often the inodes have been invalidated.
    */
   uint64_t incarnation_;
@@ -289,6 +304,7 @@ class AbstractCatalogManager : public SingleCopy {
   // Catalog *Inode2Catalog(const inode_t inode);
   std::string PrintHierarchyRecursively(const CatalogT *catalog,
                                         const int level) const;
+  std::string PrintMemStatsRecursively(const CatalogT *catalog) const;
 
   InodeRange AcquireInodes(uint64_t size);
   void ReleaseInodes(const InodeRange chunk);

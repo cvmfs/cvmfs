@@ -19,7 +19,6 @@
 #include "manifest.h"
 #include "object_fetcher.h"
 #include "signature.h"
-#include "util.h"
 #include "util_concurrency.h"
 
 namespace catalog {
@@ -119,6 +118,7 @@ class CatalogTraversal
  public:
   typedef ObjectFetcherT                      ObjectFetcherTN;
   typedef typename ObjectFetcherT::CatalogTN  CatalogTN;
+  typedef typename ObjectFetcherT::HistoryTN  HistoryTN;
   typedef CatalogTraversalData<CatalogTN>     CallbackDataTN;
 
   /**
@@ -254,14 +254,14 @@ class CatalogTraversal
    * Constructs a new catalog traversal engine based on the construction
    * parameters described in struct ConstructionParams.
    */
-  explicit CatalogTraversal(const Parameters &params) :
-    object_fetcher_(params.object_fetcher),
-    no_close_(params.no_close),
-    ignore_load_failure_(params.ignore_load_failure),
-    no_repeat_history_(params.no_repeat_history),
-    default_history_depth_(params.history),
-    default_timestamp_threshold_(params.timestamp),
-    error_sink_((params.quiet) ? kLogDebug : kLogStderr)
+  explicit CatalogTraversal(const Parameters &params)
+    : object_fetcher_(params.object_fetcher)
+    , no_close_(params.no_close)
+    , ignore_load_failure_(params.ignore_load_failure)
+    , no_repeat_history_(params.no_repeat_history)
+    , default_history_depth_(params.history)
+    , default_timestamp_threshold_(params.timestamp)
+    , error_sink_((params.quiet) ? kLogDebug : kLogStderr)
   {
     assert(object_fetcher_ != NULL);
   }
@@ -308,6 +308,25 @@ class CatalogTraversal
   }
 
   /**
+   * Starts the traversal process at the catalog pointed to by the given hash
+   * but doesn't traverse into predecessor catalog revisions. This overrides the
+   * TraversalParameter settings provided at construction.
+   *
+   * @param root_catalog_hash  the entry point into the catalog traversal
+   * @param type               breadths or depth first traversal
+   * @return                   true when catalogs were successfully traversed
+   */
+  bool TraverseRevision(const shash::Any     &root_catalog_hash,
+                        const TraversalType   type = kBreadthFirstTraversal) {
+    // add the given root catalog as the first element on the job stack
+    TraversalContext ctx(Parameters::kNoHistory,
+                         Parameters::kNoTimestampThreshold,
+                         type);
+    Push(root_catalog_hash, &ctx);
+    return DoTraverse(&ctx);
+  }
+
+  /**
    * Figures out all named tags in a repository and uses all of them as entry
    * points into the traversal process.
    *
@@ -322,11 +341,23 @@ class CatalogTraversal
     TraversalContext ctx(Parameters::kNoHistory,
                          Parameters::kNoTimestampThreshold,
                          type);
-    const UniquePtr<history::History> tag_db(object_fetcher_->FetchHistory());
-    if (!tag_db.IsValid()) {
-      LogCvmfs(kLogCatalogTraversal, kLogDebug,
-               "didn't find a history database to traverse");
-      return true;
+    UniquePtr<HistoryTN> tag_db;
+    const typename ObjectFetcherT::Failures retval =
+                                         object_fetcher_->FetchHistory(&tag_db);
+    switch (retval) {
+      case ObjectFetcherT::kFailOk:
+        break;
+
+      case ObjectFetcherT::kFailNotFound:
+        LogCvmfs(kLogCatalogTraversal, kLogDebug,
+                 "didn't find a history database to traverse");
+        return true;
+
+      default:
+        LogCvmfs(kLogCatalogTraversal, kLogStderr,
+                 "failed to download history database (%d - %s)",
+                 retval, Code2Ascii(retval));
+        return false;
     }
 
     HashList root_hashes;
@@ -344,42 +375,6 @@ class CatalogTraversal
 
     return DoTraverse(&ctx);
   }
-
-  /**
-   * This traverses all catalogs that were left out by previous traversal runs.
-   *
-   * Note: This method asserts that previous traversal runs left out certain
-   *       catalogs due to history_depth or timestamp restrictions.
-   *       CatalogTraversal keeps track of the root catalog hashes of catalog
-   *       revisions that have been pruned before. TraversePruned() will use
-   *       those as entry points.
-   *
-   * Note: TraversaPruned() will neither take the history nor the timestamp
-   *       based thresholds into account but traverse all catalogs in can reach
-   *       from the catalogs previously been pruned by those thresholds.
-   *
-   * @param type  breadths or depth first traversal
-   * @return      true on successful traversal of all necessary catalogs or
-   *              false in case of failure or no_repeat_history == false
-   */
-  bool TraversePruned(const TraversalType type = kBreadthFirstTraversal) {
-    TraversalContext ctx(Parameters::kFullHistory,
-                         Parameters::kNoTimestampThreshold,
-                         type);
-    if (pruned_revisions_.empty()) {
-      return false;
-    }
-
-          HashSet::const_iterator i    = pruned_revisions_.begin();
-    const HashSet::const_iterator iend = pruned_revisions_.end();
-    for (; i != iend; ++i) {
-      Push(*i, &ctx);
-    }
-    pruned_revisions_.clear();
-    return DoTraverse(&ctx);
-  }
-
-  size_t pruned_revision_count() const { return pruned_revisions_.size(); }
 
  protected:
   /**
@@ -464,22 +459,31 @@ class CatalogTraversal
       return true;
     }
 
-    job->catalog = object_fetcher_->FetchCatalog(job->hash,
-                                                 job->path,
-                                                 !job->IsRootCatalog(),
-                                                 job->parent);
-    if (!job->catalog) {
-      if (ignore_load_failure_) {
-        LogCvmfs(kLogCatalogTraversal, kLogDebug, "ignoring missing catalog %s "
-                                                  "(possibly swept before)",
-                 job->hash.ToString().c_str());
-        job->ignore = true;
-        return true;
-      } else {
-        LogCvmfs(kLogCatalogTraversal, error_sink_, "failed to load catalog %s",
-                 job->hash.ToString().c_str());
+    const typename ObjectFetcherT::Failures retval =
+      object_fetcher_->FetchCatalog(job->hash,
+                                    job->path,
+                                    &job->catalog,
+                                    !job->IsRootCatalog(),
+                                    job->parent);
+    switch (retval) {
+      case ObjectFetcherT::kFailOk:
+        break;
+
+      case ObjectFetcherT::kFailNotFound:
+        if (ignore_load_failure_) {
+          LogCvmfs(kLogCatalogTraversal, kLogDebug, "ignoring missing catalog "
+                                                    "%s (swept before?)",
+                   job->hash.ToString().c_str());
+          job->ignore = true;
+          return true;
+        }
+
+      default:
+        LogCvmfs(kLogCatalogTraversal, error_sink_, "failed to load catalog %s "
+                                                    "(%d - %s)",
+                 job->hash.ToStringWithSuffix().c_str(),
+                 retval, Code2Ascii(retval));
         return false;
-      }
     }
 
     // catalogs returned by ObjectFetcher<> are managing their database files by
@@ -595,12 +599,9 @@ class CatalogTraversal
     }
 
     // check if the next deeper history level is actually requested
-    // Note: otherwise it is marked to be 'pruned' for possible later traversal
-    //       (see: TraversePruned())
     // Note: if the current catalog is below the timestamp threshold it will be
     //       traversed and only its ancestor revision will not be pushed anymore
     if (IsBelowPruningThresholds(job, *ctx)) {
-      MarkAsPrunedRevision(previous_revision);
       return 0;
     }
 
@@ -762,10 +763,6 @@ class CatalogTraversal
     return job;
   }
 
-  void MarkAsPrunedRevision(const shash::Any &root_catalog_hash) {
-    pruned_revisions_.insert(root_catalog_hash);
-  }
-
   void MarkAsVisited(const CatalogJob &job) {
     if (no_repeat_history_) {
       visited_catalogs_.insert(job.hash);
@@ -786,11 +783,17 @@ class CatalogTraversal
   shash::Any GetRepositoryRootCatalogHash() {
     // get the manifest of the repository to learn about the entry point or the
     // root catalog of the repository to be traversed
-    UniquePtr<manifest::Manifest> manifest(object_fetcher_->FetchManifest());
-    if (!manifest) {
+    UniquePtr<manifest::Manifest> manifest;
+    const typename ObjectFetcherT::Failures retval =
+                                      object_fetcher_->FetchManifest(&manifest);
+    if (retval != ObjectFetcherT::kFailOk) {
+      LogCvmfs(kLogCatalogTraversal, kLogStderr, "failed to load manifest "
+                                                 "(%d - %s)",
+                                                 retval, Code2Ascii(retval));
       return shash::Any();
     }
 
+    assert(manifest.IsValid());
     return manifest->catalog_hash();
   }
 
@@ -802,7 +805,6 @@ class CatalogTraversal
   const unsigned int      default_history_depth_;
   const time_t            default_timestamp_threshold_;
   HashSet                 visited_catalogs_;
-  HashSet                 pruned_revisions_;
   LogFacilities           error_sink_;
 };
 

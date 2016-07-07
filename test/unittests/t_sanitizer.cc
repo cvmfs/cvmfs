@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-#include "../../cvmfs/sanitizer.h"
+#include "sanitizer.h"
 
 class T_Sanitizer : public ::testing::Test {
  protected:
@@ -75,4 +75,22 @@ TEST_F(T_Sanitizer, IntegerSanitizer) {
   EXPECT_EQ(test_sanitizer.Filter("1+2"), "12");
   EXPECT_EQ(test_sanitizer.Filter("0abc1243"), "01243");
   EXPECT_EQ(test_sanitizer.Filter("-4-1243"), "-41243");
+}
+
+TEST_F(T_Sanitizer, Base64) {
+  sanitizer::Base64Sanitizer test_sanitizer;
+
+  EXPECT_TRUE(test_sanitizer.IsValid("abcABC012"));
+  EXPECT_TRUE(test_sanitizer.IsValid("abcABC-012/+_"));
+  EXPECT_TRUE(test_sanitizer.IsValid("abcABC-012/+_="));
+  EXPECT_FALSE(test_sanitizer.IsValid("abcABC-012 /+_"));
+}
+
+TEST_F(T_Sanitizer, Uuid) {
+  sanitizer::UuidSanitizer test_sanitizer;
+
+  EXPECT_TRUE(test_sanitizer.IsValid("abcABC012"));
+  EXPECT_TRUE(test_sanitizer.IsValid("abcABC-012"));
+  EXPECT_FALSE(test_sanitizer.IsValid("abcABC-012/+_"));
+  EXPECT_FALSE(test_sanitizer.IsValid("abcABCXYZ"));
 }

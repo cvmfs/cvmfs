@@ -66,6 +66,8 @@ class LocalUploader : public AbstractUploader {
 
   bool Peek(const std::string& path) const;
 
+  bool PlaceBootstrappingShortcut(const shash::Any &object) const;
+
   /**
    * Determines the number of failed jobs in the LocalCompressionWorker as
    * well as in the Upload() command.

@@ -80,6 +80,7 @@ if [ ! -z $CVMFS_CI_PLATFORM_LABEL ]; then
     "$CVMFS_CI_PLATFORM_LABEL"                                                \
     "$(basename $(find . -regex '.*cvmfs-[0-9].*\.rpm' ! -name '*.src.rpm'))" \
     "$(basename $(find . -regex '.*cvmfs-server-[0-9].*\.rpm'))"              \
+    "$(basename $(find . -regex '.*cvmfs-devel-[0-9].*\.rpm'))"               \
     "$(basename $(find . -regex '.*cvmfs-unittests-[0-9].*\.rpm'))"           \
     "$CVMFS_CONFIG_PACKAGE"
 fi

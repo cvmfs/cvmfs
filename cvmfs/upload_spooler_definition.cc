@@ -8,19 +8,21 @@
 #include <vector>
 
 #include "logging.h"
-#include "util.h"
+#include "util/string.h"
 
 namespace upload {
 
 SpoolerDefinition::SpoolerDefinition(
                       const std::string&       definition_string,
                       const shash::Algorithms  hash_algorithm,
+                      const zlib::Algorithms   compression_algorithm,
                       const bool               use_file_chunking,
                       const size_t             min_file_chunk_size,
                       const size_t             avg_file_chunk_size,
                       const size_t             max_file_chunk_size) :
   driver_type(Unknown),
   hash_algorithm(hash_algorithm),
+  compression_alg(compression_algorithm),
   use_file_chunking(use_file_chunking),
   min_file_chunk_size(min_file_chunk_size),
   avg_file_chunk_size(avg_file_chunk_size),
@@ -61,6 +63,13 @@ SpoolerDefinition::SpoolerDefinition(
   temporary_path        = upstream[1];
   spooler_configuration = upstream[2];
   valid_ = true;
+}
+
+
+SpoolerDefinition SpoolerDefinition::Dup2DefaultCompression() const {
+  SpoolerDefinition result(*this);
+  result.compression_alg = zlib::kZlibDefault;
+  return result;
 }
 
 }  // namespace upload

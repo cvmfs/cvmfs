@@ -40,7 +40,7 @@
 #include "logging.h"
 #include "platform.h"
 #include "smalloc.h"
-#include "util.h"
+#include "util/posix.h"
 
 using namespace std;  // NOLINT
 
@@ -55,8 +55,11 @@ namespace monitor {
  * Minmum threshold for the maximum number of open files
  */
 const unsigned kMinOpenFiles = 8192;
-const unsigned kMaxBacktrace = 64;  /**< reported stracktrace depth */
 const unsigned kSignalHandlerStacksize = 2*1024*1024;  /**< 2 MB */
+#ifndef CVMFS_LIBCVMFS
+const unsigned kMaxBacktrace = 64;  /**< reported stracktrace depth */
+#endif
+
 
 string *cache_dir_ = NULL;
 string *process_name_ = NULL;

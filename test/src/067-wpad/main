@@ -1,0 +1,43 @@
+
+cvmfs_test_name="Proxy auto-discovery"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  local wpad_file="$(pwd)/wpad"
+  local wpadex_file="$(pwd)/wpadex"
+  cat > $wpad_file << EOF
+  function FindProxyForURL(url, host) {
+    return "PROXY http://no-such-proxy.cern.ch:3128"
+  }
+EOF
+  cat > $wpadex_file << EOF
+  function FindProxyForURLEx(url, host) {
+    return "PROXY http://no-such-proxy-ex.cern.ch:3128"
+  }
+EOF
+  chmod 666 $wpad_file $wpadex_file || return 10
+
+  cvmfs_mount grid.cern.ch || return 1
+  cvmfs_umount grid.cern.ch
+
+  cvmfs_mount grid.cern.ch "CVMFS_HTTP_PROXY=auto" \
+    "CVMFS_PAC_URLS=file://$wpad_file" || return 20
+  proxy="$(get_xattr proxy /cvmfs/grid.cern.ch)"
+  echo "Proxy is $proxy"
+  if [ x"$proxy" != x"http://no-such-proxy.cern.ch:3128" ]; then
+    return 30
+  fi
+  cvmfs_umount grid.cern.ch
+
+  # Microsoft extensions
+  cvmfs_mount grid.cern.ch "CVMFS_HTTP_PROXY=auto" \
+    "CVMFS_PAC_URLS=file://$wpadex_file" || return 21
+  proxy="$(get_xattr proxy /cvmfs/grid.cern.ch)"
+  echo "Proxy is $proxy"
+  if [ x"$proxy" != x"http://no-such-proxy-ex.cern.ch:3128" ]; then
+    return 31
+  fi
+
+  return 0
+}

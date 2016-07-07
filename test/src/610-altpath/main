@@ -1,0 +1,92 @@
+
+cvmfs_test_name="Alternative catalog path"
+cvmfs_test_autofs_on_startup=false
+
+produce_files_in() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  echo foo > foo
+  echo bar > bar
+  mkdir -p nested/foo/bar
+  touch nested/.cvmfscatalog
+
+  popdir
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local scratch_dir=$(pwd)
+  local backend_dir="/srv/cvmfs/$CVMFS_TEST_REPO"
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "configure repository to provide bootstrapping shortcuts"
+  local server_conf="/etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/server.conf"
+  echo "CVMFS_CATALOG_ALT_PATHS=true" | sudo tee --append $server_conf || return 1
+
+  echo "Open transaction to put some files into repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "put some files into repository"
+  produce_files_in $repo_dir || return 3
+
+  echo "publish repository"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "check repository consistency"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+  echo "hide .cvmfsalt- symlinks"
+  local stash="${scratch_dir}/cvmfsalt-stash"
+  mkdir -p $stash || return 50
+  sudo find $backend_dir -maxdepth 1 -type l -exec mv -f {} $stash \; || return 51
+
+  echo "check that missing .cvmfsalt- symlinks are detected"
+  check_repository $CVMFS_TEST_REPO -i && return 20
+
+  echo "put .cvmfsalt- symlinks back in place"
+  sudo find $stash -maxdepth 1 -type l -exec mv -f {} $backend_dir \; || return 52
+
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+  echo "load repository config to find the repository's cache location"
+  load_repo_config $CVMFS_TEST_REPO
+  local cache_location="${CVMFS_CACHE_BASE}/${CVMFS_TEST_REPO}"
+  echo "cache is at '${cache_location}'"
+
+  echo "unmount both union fs and cvmfs"
+  cvmfs_suid_helper rw_umount $CVMFS_TEST_REPO || return 10
+  cvmfs_suid_helper rdonly_umount $CVMFS_TEST_REPO || return 11
+  sudo rm -rf "$cache_location"
+
+  echo "replace .cvmfsalt symlinks by the actual backend files"
+  local f
+  for l in $(find $backend_dir -maxdepth 1 -type l); do
+    f="$backend_dir/$(readlink $l)"
+    sudo rm -f $l
+    sudo mv $f $l
+  done
+  sudo sh -c "echo CVMFS_ALT_ROOT_PATH=yes >> ${CVMFS_SPOOL_DIR}/client.local"
+
+  echo "Mount with fixed root hash"
+  cvmfs_suid_helper rdonly_mount $CVMFS_TEST_REPO || return 12
+
+  echo "Force failed mount"
+  cvmfs_suid_helper rdonly_umount $CVMFS_TEST_REPO || return 30
+  sudo sh -c "echo CVMFS_ALT_ROOT_PATH=no >> ${CVMFS_SPOOL_DIR}/client.local" || return 51
+  sudo rm -rf "$cache_location"                                               || return 52
+  cvmfs_suid_helper rdonly_mount $CVMFS_TEST_REPO && return 31
+
+  echo "Mount latest"
+  sudo rm -rf "$cache_location"
+  sudo rm -f "${CVMFS_SPOOL_DIR}/client.local"
+  cvmfs_suid_helper rdonly_mount $CVMFS_TEST_REPO || return 14
+
+  return 0
+}

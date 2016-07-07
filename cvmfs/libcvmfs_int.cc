@@ -49,6 +49,7 @@
 #include "atomic.h"
 #include "cache.h"
 #include "catalog_mgr_client.h"
+#include "clientctx.h"
 #include "compression.h"
 #include "directory_entry.h"
 #include "download.h"
@@ -66,9 +67,10 @@
 #include "shortstring.h"
 #include "signature.h"
 #include "smalloc.h"
+#include "sqlitemem.h"
 #include "sqlitevfs.h"
 #include "statistics.h"
-#include "util.h"
+#include "util/posix.h"
 #include "wpad.h"
 
 using namespace std;  // NOLINT
@@ -116,9 +118,7 @@ cvmfs_globals::cvmfs_globals()
   , cache_mgr_(NULL)
   , uid_(0)
   , gid_(0)
-  , fd_lockfile_(-1)
   , libcrypto_locks_(NULL)
-  , sqlite_page_cache(NULL)
   , lock_created_(false)
   , vfs_registered_(false)
   { }
@@ -142,7 +142,10 @@ cvmfs_globals::~cvmfs_globals() {
   }
 
   sqlite3_shutdown();
+  SqliteMemoryManager::CleanupInstance();
   delete statistics_;
+
+  ClientCtx::CleanupInstance();
 }
 
 int cvmfs_globals::Setup(const options &opts) {
@@ -158,13 +161,9 @@ int cvmfs_globals::Setup(const options &opts) {
   int retval;
 
   // Tune SQlite3
-  sqlite_page_cache = smalloc(1280*3275);  // 4MB
-  retval = sqlite3_config(SQLITE_CONFIG_PAGECACHE, sqlite_page_cache,
-                          1280, 3275);
+  retval = sqlite3_config(SQLITE_CONFIG_MULTITHREAD);
   assert(retval == SQLITE_OK);
-  // 4 KB
-  retval = sqlite3_config(SQLITE_CONFIG_LOOKASIDE, 32, 128);
-  assert(retval == SQLITE_OK);
+  SqliteMemoryManager::GetInstance()->AssignGlobalArenas();
 
   // Libcrypto
   libcrypto_locks_ = static_cast<pthread_mutex_t *>(OPENSSL_malloc(
@@ -203,7 +202,7 @@ int cvmfs_globals::Setup(const options &opts) {
   }
 
   // Create cache directory, if necessary
-  if (!MkdirDeep(cache_directory_, 0700)) {
+  if (!MkdirDeep(cache_directory_, 0700, false)) {
     PrintError("cannot create cache directory " + cache_directory_);
     return LIBCVMFS_FAIL_MKCACHE;
   }
@@ -229,7 +228,7 @@ int cvmfs_globals::Setup(const options &opts) {
   // Also, it brings speed later on.
   if (opts.change_to_cache_directory) {
     if (opts.alien_cachedir != "")
-      MkdirDeep(opts.alien_cachedir, 0770);
+      MkdirDeep(opts.alien_cachedir, 0770, false);
     if (chdir(cache_directory_.c_str()) != 0) {
       PrintError("cache directory " + cache_directory_ + " is unavailable");
       return LIBCVMFS_FAIL_OPENCACHE;
@@ -251,6 +250,8 @@ int cvmfs_globals::Setup(const options &opts) {
   vfs_registered_ = true;
 
   cvmfs::pid_ = getpid();
+
+  ClientCtx::GetInstance();
 
   return LIBCVMFS_FAIL_OK;
 }
@@ -315,6 +316,17 @@ int cvmfs_context::Setup(const options &opts, perf::Statistics *statistics) {
   // ctx.download_manager_->EnableInfoHeader();
   download_ready_ = true;
 
+  external_download_manager_ = new download::DownloadManager();
+  external_download_manager_->Init(16, false, statistics, "download-external");
+  external_download_manager_->SetHostChain(opts.external_url);
+  external_download_manager_->SetTimeout(opts.timeout,
+                                opts.timeout_direct);
+  external_download_manager_->SetProxyChain(
+    download::ResolveProxyDescription(opts.proxies, external_download_manager_),
+    opts.fallback_proxies,
+    download::DownloadManager::kSetProxyBoth);
+  external_download_ready_ = true;
+
   signature_manager_ = new signature::SignatureManager();
   signature_manager_->Init();
   if (!signature_manager_->LoadPublicRsaKeys(opts.pubkey)) {
@@ -328,7 +340,8 @@ int cvmfs_context::Setup(const options &opts, perf::Statistics *statistics) {
   signature_ready_ = true;
 
   if (!opts.blacklist.empty()) {
-    if (!signature_manager_->LoadBlacklist(opts.blacklist)) {
+    const bool append = false;
+    if (!signature_manager_->LoadBlacklist(opts.blacklist, append)) {
       LogCvmfs(kLogCvmfs, kLogDebug, "failed to load blacklist");
       return -2;
     }
@@ -340,6 +353,14 @@ int cvmfs_context::Setup(const options &opts, perf::Statistics *statistics) {
     &backoff_throttle_,
     statistics_);
 
+  external_fetcher_ = new cvmfs::Fetcher(
+    cvmfs_globals::Instance()->cache_mgr(),
+    external_download_manager_,
+    &backoff_throttle_,
+    statistics_,
+    "fetch-external",
+    true);
+
   // Load initial file catalog
   catalog_manager_ = new catalog::ClientCatalogManager(
     repository_name_, fetcher_, signature_manager_, statistics_);
@@ -347,7 +368,7 @@ int cvmfs_context::Setup(const options &opts, perf::Statistics *statistics) {
   if (!opts.root_hash.empty()) {
     const shash::Any hash = shash::MkFromHexPtr(shash::HexPtr(opts.root_hash),
                                                 shash::kSuffixCatalog);
-    clg_mgr_init = catalog_manager_->InitFixed(hash);
+    clg_mgr_init = catalog_manager_->InitFixed(hash, false);
   } else {
     clg_mgr_init = catalog_manager_->Init();
   }
@@ -373,15 +394,16 @@ cvmfs_context::cvmfs_context(const options &opts)
   : statistics_(NULL)
   , cfg_(opts)
   , repository_name_(opts.repo_name)
-  , pid_(0)
   , boot_time_(time(NULL))
   , catalog_manager_(NULL)
   , signature_manager_(NULL)
   , download_manager_(NULL)
+  , external_download_manager_(NULL)
   , fetcher_(NULL)
+  , external_fetcher_(NULL)
   , md5path_cache_(NULL)
-  , fd_lockfile(-1)
   , download_ready_(false)
+  , external_download_ready_(false)
   , signature_ready_(false)
   , catalog_ready_(false)
   , pathcache_ready_(false)
@@ -392,6 +414,8 @@ cvmfs_context::cvmfs_context(const options &opts)
 cvmfs_context::~cvmfs_context() {
   delete fetcher_;
   fetcher_ = NULL;
+  delete external_fetcher_;
+  external_fetcher_ = NULL;
 
   if (catalog_ready_) {
     delete catalog_manager_;
@@ -402,6 +426,12 @@ cvmfs_context::~cvmfs_context() {
     download_manager_->Fini();
     delete download_manager_;
     download_manager_ = NULL;
+  }
+
+  if (external_download_ready_) {
+    external_download_manager_->Fini();
+    delete external_download_manager_;
+    external_download_manager_ = NULL;
   }
 
   if (signature_ready_) {
@@ -467,6 +497,7 @@ void cvmfs_context::AppendStringToList(char const   *str,
 
 int cvmfs_context::GetAttr(const char *c_path, struct stat *info) {
   atomic_inc64(&num_fs_stat_);
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
 
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_getattr (stat) for path: %s", c_path);
 
@@ -487,6 +518,7 @@ int cvmfs_context::GetAttr(const char *c_path, struct stat *info) {
 int cvmfs_context::Readlink(const char *c_path, char *buf, size_t size) {
   atomic_inc64(&num_fs_readlink_);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_readlink on path: %s", c_path);
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
 
   PathString p;
   p.Assign(c_path, strlen(c_path));
@@ -516,6 +548,7 @@ int cvmfs_context::ListDirectory(
   size_t *buflen
 ) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_listdir on path: %s", c_path);
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
 
   if (c_path[0] == '/' && c_path[1] == '\0') {
     // root path is expected to be "", not "/"
@@ -565,6 +598,7 @@ int cvmfs_context::ListDirectory(
 
 int cvmfs_context::Open(const char *c_path) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_open on path: %s", c_path);
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
 
   int fd = -1;
   catalog::DirectoryEntry dirent;
@@ -590,17 +624,21 @@ int cvmfs_context::Open(const char *c_path) {
       LogCvmfs(kLogCvmfs, kLogDebug| kLogSyslogErr, "file %s is marked as "
                "'chunked', but no chunks found.", path.c_str());
       atomic_inc32(&num_io_error_);
+      delete chunks;
       return -EIO;
     }
 
-    fd = chunk_tables_.Add(FileChunkReflist(chunks, path));
+    fd = chunk_tables_.Add(
+      FileChunkReflist(chunks, path, dirent.compression_algorithm(),
+                       dirent.IsExternalFile()));
     return fd | kFdChunked;
   }
 
-  fd = fetcher_->Fetch(
+  fd = (dirent.IsExternalFile() ? external_fetcher_ : fetcher_)->Fetch(
     dirent.checksum(),
     dirent.size(),
     string(path.GetChars(), path.GetLength()),
+    dirent.compression_algorithm(),
     cache::CacheManager::kTypeRegular);
   atomic_inc64(&num_fs_open_);
 
@@ -628,9 +666,12 @@ int64_t cvmfs_context::Pread(
   uint64_t off)
 {
   if (fd & kFdChunked) {
+    ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
     const int chunk_handle = fd & ~kFdChunked;
     SimpleChunkTables::OpenChunks open_chunks = chunk_tables_.Get(chunk_handle);
     FileChunkList *chunk_list = open_chunks.chunk_reflist.list;
+    zlib::Algorithms compression_alg =
+      open_chunks.chunk_reflist.compression_alg;
     if (chunk_list == NULL)
       return -EBADF;
 
@@ -643,11 +684,23 @@ int64_t cvmfs_context::Pread(
       ChunkFd *chunk_fd = open_chunks.chunk_fd;
       if ((chunk_fd->fd == -1) || (chunk_fd->chunk_idx != chunk_idx)) {
         if (chunk_fd->fd != -1) fetcher_->cache_mgr()->Close(chunk_fd->fd);
-        chunk_fd->fd = fetcher_->Fetch(
-          chunk_list->AtPtr(chunk_idx)->content_hash(),
-          chunk_list->AtPtr(chunk_idx)->size(),
-          "no path info",
-          cache::CacheManager::kTypeRegular);
+        if (open_chunks.chunk_reflist.external_data) {
+          chunk_fd->fd = external_fetcher_->Fetch(
+            chunk_list->AtPtr(chunk_idx)->content_hash(),
+            chunk_list->AtPtr(chunk_idx)->size(),
+            "no path info",
+            compression_alg,
+            cache::CacheManager::kTypeRegular,
+            open_chunks.chunk_reflist.path.ToString(),
+            chunk_list->AtPtr(chunk_idx)->offset());
+        } else {
+          chunk_fd->fd = fetcher_->Fetch(
+            chunk_list->AtPtr(chunk_idx)->content_hash(),
+            chunk_list->AtPtr(chunk_idx)->size(),
+            "no path info",
+            compression_alg,
+            cache::CacheManager::kTypeRegular);
+        }
         if (chunk_fd->fd < 0) {
           chunk_fd->fd = -1;
           return -EIO;

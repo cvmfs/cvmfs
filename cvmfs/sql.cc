@@ -6,13 +6,18 @@
 #include "sql.h"
 
 #include "logging.h"
-#include "util.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 
 namespace sqlite {
 
-Sql::Sql(sqlite3 *sqlite_db, const std::string &statement) {
+Sql::Sql(sqlite3 *sqlite_db, const std::string &statement)
+  : database_(NULL)
+  , statement_(NULL)
+  , query_string_(NULL)
+  , last_error_code_(0)
+{
   Init(sqlite_db, statement);
 }
 
@@ -34,6 +39,7 @@ Sql::~Sql() {
  * @return true on success otherwise false
  */
 bool Sql::Execute() {
+  LazyInit();
   last_error_code_ = sqlite3_step(statement_);
 #ifdef DEBUGMSG
   if (!Successful()) {
@@ -53,6 +59,7 @@ bool Sql::Execute() {
  * @return true if a new row was fetched otherwise false
  */
 bool Sql::FetchRow() {
+  LazyInit();
   last_error_code_ = sqlite3_step(statement_);
   return SQLITE_ROW == last_error_code_;
 }
@@ -122,27 +129,39 @@ bool Sql::Reset() {
 
 
 bool Sql::Init(const sqlite3 *database, const std::string &statement) {
-  last_error_code_ = sqlite3_prepare_v2(const_cast<sqlite3 *>(database),
-                                        statement.c_str(),
+  database_ = const_cast<sqlite3 *>(database);
+  return Init(statement.c_str());
+}
+
+bool Sql::Init(const char *statement) {
+  assert(NULL == statement_);
+  assert(NULL != database_);
+
+  last_error_code_ = sqlite3_prepare_v2(database_,
+                                        statement,
                                         -1,  // parse until null termination
                                         &statement_,
                                         NULL);
 
   if (!Successful()) {
     LogCvmfs(kLogSql, kLogDebug, "failed to prepare statement '%s' (%d: %s)",
-             statement.c_str(), GetLastError(),
-             sqlite3_errmsg(const_cast<sqlite3 *>(database)));
+             statement, GetLastError(), sqlite3_errmsg(database_));
     return false;
   }
 
   LogCvmfs(kLogSql, kLogDebug, "successfully prepared statement '%s'",
-           statement.c_str());
+           statement);
   return true;
 }
 
+void Sql::DeferredInit(const sqlite3 *database, const char *statement) {
+  assert(NULL == database_);
+  database_     = const_cast<sqlite3 *>(database);
+  query_string_ = statement;
+}
+
 std::string Sql::GetLastErrorMsg() const {
-  sqlite3* db     = sqlite3_db_handle(statement_);
-  std::string msg = sqlite3_errmsg(db);
+  std::string msg = sqlite3_errmsg(database_);
   return msg;
 }
 

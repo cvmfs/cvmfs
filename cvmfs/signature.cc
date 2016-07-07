@@ -14,6 +14,7 @@
 #include "cvmfs_config.h"
 #include "signature.h"
 
+#include <openssl/evp.h>
 #include <openssl/pkcs7.h>
 #include <openssl/x509v3.h>
 
@@ -30,7 +31,7 @@
 #include "logging.h"
 #include "platform.h"
 #include "smalloc.h"
-#include "util.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 
@@ -290,11 +291,52 @@ bool SignatureManager::LoadPublicRsaKeys(const string &path_list) {
 }
 
 
+std::string SignatureManager::GenerateKeyText(RSA *pubkey) {
+  if (!pubkey) {return "";}
+
+  BIO *bp = BIO_new(BIO_s_mem());
+  if (bp == NULL) {
+    LogCvmfs(kLogSignature, kLogDebug | kLogSyslogErr, "Failed to allocate"
+             " memory for pubkey");
+    return "";
+  }
+  if (!PEM_write_bio_RSA_PUBKEY(bp, pubkey)) {
+    LogCvmfs(kLogSignature, kLogDebug | kLogSyslogErr, "Failed to write"
+             " pubkey to memory");
+    return "";
+  }
+  char *bio_pubkey_text;
+  long bytes = BIO_get_mem_data(bp, &bio_pubkey_text);  // NOLINT
+  std::string bio_pubkey_str(bio_pubkey_text, bytes);
+  BIO_free(bp);
+
+  return bio_pubkey_str;
+}
+
+
+std::string SignatureManager::GetActivePubkeys() {
+  std::string pubkeys;
+  for (std::vector<RSA *>::const_iterator it = public_keys_.begin();
+       it != public_keys_.end();
+       it++) {
+    pubkeys += GenerateKeyText(*it);
+  }
+  // NOTE: we do not add the pubkey of the certificate here, as it is
+  // not used for the whitelist verification.
+  return pubkeys;
+}
+
 /**
  * Loads a list of blacklisted certificates (fingerprints) from a file.
  */
-bool SignatureManager::LoadBlacklist(const std::string &path_blacklist) {
-  blacklisted_certificates_.clear();
+bool SignatureManager::LoadBlacklist(
+  const std::string &path_blacklist,
+  bool append)
+{
+  LogCvmfs(kLogSignature, kLogDebug, "reading from blacklist %s",
+           path_blacklist.c_str());
+  if (!append)
+    blacklisted_certificates_.clear();
 
   char *buffer;
   unsigned buffer_size;
@@ -557,20 +599,22 @@ bool SignatureManager::Verify(const unsigned char *buffer,
   EVP_MD_CTX ctx;
 
   EVP_MD_CTX_init(&ctx);
+  EVP_PKEY *pubkey = X509_get_pubkey(certificate_);
   if (EVP_VerifyInit(&ctx, EVP_sha1()) &&
       EVP_VerifyUpdate(&ctx, buffer, buffer_size) &&
 #if OPENSSL_VERSION_NUMBER < 0x00908000L
       EVP_VerifyFinal(&ctx,
                       const_cast<unsigned char *>(signature), signature_size,
-                      X509_get_pubkey(certificate_))
+                      pubkey)
 #else
-      EVP_VerifyFinal(&ctx, signature, signature_size,
-                      X509_get_pubkey(certificate_))
+      EVP_VerifyFinal(&ctx, signature, signature_size, pubkey)
 #endif
     )
   {
     result = true;
   }
+  if (pubkey != NULL)
+    EVP_PKEY_free(pubkey);
   EVP_MD_CTX_cleanup(&ctx);
 
   return result;

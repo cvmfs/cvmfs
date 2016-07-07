@@ -88,7 +88,7 @@ cvmfs_run_test() {
   publish_repo $CVMFS_TEST_REPO || return $?
 
   echo "compare the results of cvmfs to our reference copy"
-  compare_directories $repo_dir $reference_dir || return $?
+  compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return $?
 
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?

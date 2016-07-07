@@ -16,18 +16,18 @@
 #include <string>
 #include <vector>
 
-#include "../../cvmfs/catalog_mgr.h"
-#include "../../cvmfs/directory_entry.h"
-#include "../../cvmfs/hash.h"
-#include "../../cvmfs/history.h"
-#include "../../cvmfs/object_fetcher.h"
-#include "../../cvmfs/upload_facility.h"
-#include "../../cvmfs/util.h"
+#include "catalog_mgr.h"
+#include "directory_entry.h"
+#include "hash.h"
+#include "history.h"
+#include "object_fetcher.h"
+#include "upload_facility.h"
 
 pid_t GetParentPid(const pid_t pid);
 std::string GetExecutablePath(const std::string &exe_name);
 
 unsigned GetNoUsedFds();
+std::string ShowOpenFiles();
 
 time_t t(const int day, const int month, const int year);
 shash::Any h(const std::string &hash,
@@ -51,10 +51,20 @@ class DirectoryEntryTestFactory {
   };
 
  public:
-  static catalog::DirectoryEntry RegularFile();
-  static catalog::DirectoryEntry Directory();
-  static catalog::DirectoryEntry Symlink();
-  static catalog::DirectoryEntry ChunkedFile();
+  static catalog::DirectoryEntry RegularFile(
+      const string &name = "",
+      unsigned size = 4096,
+      shash::Any content_hash = shash::Any());
+  static catalog::DirectoryEntry Directory(
+      const string &name = "", unsigned size = 4096,
+      shash::Any content_hash = shash::Any(),
+      bool is_nested_catalog_mountpint = false);
+  static catalog::DirectoryEntry Symlink(const string &name = "",
+                                         unsigned size = 4096,
+                                         const string &symlink_path = "");
+  static catalog::DirectoryEntry ChunkedFile(
+      shash::Any content_hash = shash::Any());
+  static catalog::DirectoryEntry ExternalFile();
   static catalog::DirectoryEntry Make(const Metadata &metadata);
 };
 
@@ -87,6 +97,7 @@ static inline upload::SpoolerDefinition MockSpoolerDefinition() {
   return upload::SpoolerDefinition("mock," + std::string(g_sandbox_path) + "," +
                                              std::string(g_sandbox_tmp_dir),
                                    shash::kSha1,
+                                   zlib::kZlibDefault,
                                    true,
                                    min_chunk_size,
                                    avg_chunk_size,
@@ -187,7 +198,15 @@ class AbstractMockUploader : public upload::AbstractUploader {
     assert(AbstractMockUploader::not_implemented);
   }
 
+  virtual bool Remove(const shash::Any &hash_to_delete) {
+    assert(AbstractMockUploader::not_implemented);
+  }
+
   virtual bool Peek(const std::string &path) const {
+    assert(AbstractMockUploader::not_implemented);
+  }
+
+  virtual bool PlaceBootstrappingShortcut(const shash::Any &object) const {
     assert(AbstractMockUploader::not_implemented);
   }
 
@@ -216,8 +235,13 @@ class MockObjectStorage {
   typedef std::map<shash::Any, ObjectT*> AvailableObjects;
   static AvailableObjects available_objects;
 
+  typedef std::map<std::string, ObjectT*> AvailablePathObjects;
+  static AvailablePathObjects available_paths;
+
  public:
   static std::set<shash::Any> *s_deleted_objects;
+
+  friend class MockObjectFetcher;
 
  public:
   static void Reset() {
@@ -231,6 +255,11 @@ class MockObjectStorage {
     MockObjectStorage::available_objects[hash] = object;
   }
 
+  static void RegisterPath(const std::string &path, ObjectT *object) {
+    ASSERT_FALSE(Exists(path)) << "exists already: " << path;
+    MockObjectStorage::available_paths[path] = object;
+  }
+
   static void UnregisterObjects() {
     typename MockObjectStorage<ObjectT>::AvailableObjects::const_iterator
       i, iend;
@@ -241,11 +270,27 @@ class MockObjectStorage {
       delete i->second;
     }
     MockObjectStorage<ObjectT>::available_objects.clear();
+
+    typename MockObjectStorage<ObjectT>::AvailablePathObjects::const_iterator
+      j, jend;
+    for (j    = MockObjectStorage<ObjectT>::available_paths.begin(),
+         jend = MockObjectStorage<ObjectT>::available_paths.end();
+         j != jend; ++j)
+    {
+      delete j->second;
+    }
+    MockObjectStorage<ObjectT>::available_paths.clear();
   }
 
   static ObjectT* Get(const shash::Any &hash) {
     return (Exists(hash) && !IsDeleted(hash))
       ? available_objects[hash]
+      : NULL;
+  }
+
+  static ObjectT* Get(const std::string &path) {
+    return (Exists(path))
+      ? available_paths[path]
       : NULL;
   }
 
@@ -256,13 +301,22 @@ class MockObjectStorage {
   }
 
   static bool Exists(const shash::Any &hash) {
-    return available_objects.find(hash) != available_objects.end();
+    return available_objects.find(hash) != available_objects.end() &&
+           !IsDeleted(hash);
+  }
+
+  static bool Exists(const std::string &path) {
+    return available_paths.find(path) != available_paths.end();
   }
 };
 
 template <class ObjectT>
 typename MockObjectStorage<ObjectT>::AvailableObjects
   MockObjectStorage<ObjectT>::available_objects;
+
+template <class ObjectT>
+typename MockObjectStorage<ObjectT>::AvailablePathObjects
+  MockObjectStorage<ObjectT>::available_paths;
 
 template <class ObjectT>
 std::set<shash::Any>* MockObjectStorage<ObjectT>::s_deleted_objects;
@@ -304,17 +358,20 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
     shash::Md5  path_hash;
     shash::Md5  parent_hash;
     string      name;
+    bool        is_nested_catalog_mountpoint;
 
     File() : hash(shash::Any()), size(0), path_hash(shash::Md5()),
-        parent_hash(shash::Md5()), name("") { }
+        parent_hash(shash::Md5()), name(""), is_nested_catalog_mountpoint(false)
+    { }
 
     File(const shash::Any &hash, size_t size, const string &parent_path,
          const string &name) :
-      hash(hash), size(size), name(name)
+      hash(hash), size(size), name(name), is_nested_catalog_mountpoint(false)
     {
       if (parent_path == "" && name == "") {
         parent_hash = shash::Md5("", 0);
         path_hash = shash::Md5("", 0);
+        is_nested_catalog_mountpoint = true;
       } else {
         string full_path = parent_path + "/" + name;
         parent_hash = shash::Md5(parent_path.c_str(), parent_path.length());
@@ -325,8 +382,9 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
     catalog::DirectoryEntry ToDirectoryEntry() const {
       bool is_directory = hash.IsNull();
       if (is_directory)
-        return catalog::DirectoryEntryTestFactory::Directory();
-      return catalog::DirectoryEntryTestFactory::RegularFile();
+        return catalog::DirectoryEntryTestFactory::Directory(name, size, hash,
+                                                  is_nested_catalog_mountpoint);
+      return catalog::DirectoryEntryTestFactory::RegularFile(name, size, hash);
     }
   };
   typedef std::vector<File> FileList;
@@ -394,8 +452,8 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
 
   std::vector<MockCatalog*> GetChildren() const {
     std::vector<MockCatalog*> children_arr;
-    for (unsigned i = 0; i < children_.size(); ++i)
-      children_arr.push_back(children_[i].child);
+    for (unsigned i = 0; i < active_children_.size(); ++i)
+      children_arr.push_back(active_children_[i].child);
     return children_arr;
   }
   bool HasParent() const { return parent_ != NULL; }
@@ -417,7 +475,7 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
   void SetOwnerMaps(const catalog::OwnerMap *uid_map,
                     const catalog::OwnerMap *gid_map) { }
   bool IsInitialized() const { return initialized_; }
-  MockCatalog* FindSubtree(const PathString &path) const;
+  MockCatalog* FindSubtree(const PathString &path);
   uint64_t GetTTL() const { return 0; }
   bool LookupRawSymlink(const PathString &path,
                                 LinkString *raw_symlink) const { return false; }
@@ -426,6 +484,7 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
   bool ListingPath(const PathString &path,
                    catalog::DirectoryEntryList *listing) const;
 
+  bool GetVOMSAuthz(std::string *authz) { return false; }
 
  protected:
   // silence coverity
@@ -474,6 +533,14 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
    * @param child new catalog to be added to the unmounted catalog list
    */
   void RegisterNestedCatalog(MockCatalog *child);
+  File *FindFile(std::string path) {
+    shash::Md5 md5_path(path.c_str(), path.length());
+    for (unsigned i = 0; i < files_.size(); ++i) {
+      if (files_[i].path_hash == md5_path)
+        return &files_[i];
+    }
+    return NULL;
+  }
   void AddFile(const shash::Any &content_hash,
                const size_t file_size,
                const string &parent_path = "",
@@ -508,11 +575,18 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
 
 namespace catalog {
 
+template <class CatalogMgrT>
+class CatalogBalancer;
 
 class MockCatalogManager : public AbstractCatalogManager<MockCatalog> {
  public:
+  friend class CatalogBalancer<MockCatalogManager>;
   explicit MockCatalogManager(perf::Statistics *statistics) :
-    AbstractCatalogManager<MockCatalog>(statistics) { }
+    AbstractCatalogManager<MockCatalog>(statistics), spooler_(new Spooler()),
+    max_weight_(5), min_weight_(1), balance_weight_(3),
+    autogenerated_catalogs_(0), num_added_files_(0) { }
+
+  virtual ~MockCatalogManager() { delete spooler_; }
 
   virtual LoadError LoadCatalog(const PathString &mountpoint,
                                 const shash::Any &hash,
@@ -523,14 +597,63 @@ class MockCatalogManager : public AbstractCatalogManager<MockCatalog> {
                                  const shash::Any  &catalog_hash,
                                  MockCatalog *parent_catalog);
   MockCatalog* RetrieveRootCatalog() { return GetRootCatalog(); }
+  void AddFile(const DirectoryEntryBase &entry,
+               const XattrList &xattrs,
+               const std::string &parent_directory)
+  {
+    ++num_added_files_;
+  }
+
   void RegisterNewCatalog(MockCatalog *new_catalog) {
     string mountpoint_str = new_catalog->root_path();
     PathString mountpoint(mountpoint_str.c_str(), mountpoint_str.length());
     catalog_map_[mountpoint] = new_catalog;
   }
 
- protected:
+  unsigned GetNumAutogeneratedCatalogs() { return autogenerated_catalogs_; }
+  unsigned GetNumAddedFiles() { return num_added_files_; }
+
+  MockCatalog *FindCatalog(const PathString &path) {
+    map<PathString, MockCatalog*>::iterator it;
+    string best_match = "";
+    unsigned best_match_length = 0;
+    for (it = catalog_map_.begin(); it != catalog_map_.end(); ++it) {
+      string key = it->first.ToString();
+      if (path.ToString().find(key) == 0) {
+        unsigned length = key.length();
+        if (length > best_match_length) {
+          best_match_length = length;
+          best_match = key;
+        }
+      }
+    }
+    return catalog_map_[PathString(best_match)];
+  }
+
+  /**
+   * This method simply increases the number of autogenerated catalogs.
+   * If this catalog is reused the counter would be wrong
+   */
+  void CreateNestedCatalog(
+    const string &mountpoint)
+  {
+    ++autogenerated_catalogs_;
+  }
+
+
+
+ private:
+  typedef struct {
+    shash::Algorithms GetHashAlgorithm() { return shash::kShake128; }
+  } Spooler;
+
+  Spooler *spooler_;
   map<PathString, MockCatalog*> catalog_map_;
+  unsigned max_weight_;
+  unsigned min_weight_;
+  unsigned balance_weight_;
+  unsigned autogenerated_catalogs_;
+  unsigned num_added_files_;
 };
 
 }  // namespace catalog
@@ -548,6 +671,8 @@ class MockHistory : public history::History,
   static const std::string rhs;
   static const shash::Any  root_hash;
   static unsigned int      instances;
+
+  using MockObjectStorage<MockHistory>::Exists;
 
  public:
   static void ResetGlobalState();
@@ -673,12 +798,69 @@ class MockHistory : public history::History,
 //------------------------------------------------------------------------------
 
 
+class MockReflog : public MockObjectStorage<MockReflog> {
+ protected:
+  struct ReferenceTypeFilter {
+    explicit ReferenceTypeFilter(const shash::Suffix suffix,
+                                 const bool          inverse)
+      : suffix_(suffix)
+      , inverse_(inverse) { }
+    bool operator()(const shash::Any &hash) const {
+      return (hash.suffix == suffix_) ^ inverse_;
+    }
+    const shash::Suffix suffix_;
+    const bool          inverse_;
+  };
+
+  MockReflog* Clone() const;
+
+ public:
+  static MockReflog* Open(const std::string &path);
+  static MockReflog* Create(const std::string &path,
+                            const std::string &repo_name);
+  static void ResetGlobalState() {}
+
+  bool AddCertificate(const shash::Any &certificate);
+  bool AddCatalog(const shash::Any &catalog);
+  bool AddHistory(const shash::Any &history);
+  bool AddMetainfo(const shash::Any &metainfo);
+
+  uint64_t CountEntries() { return references_.size(); }
+  bool ListCatalogs(std::vector<shash::Any> *hashes) const;
+
+  bool RemoveCatalog(const shash::Any &catalog);
+
+  bool ContainsCertificate(const shash::Any &certificate) const;
+  bool ContainsCatalog(const shash::Any &catalog) const;
+  bool ContainsHistory(const shash::Any &history) const;
+  bool ContainsMetainfo(const shash::Any &metainfo) const;
+
+  void TakeDatabaseFileOwnership() { owns_database_file_ = true;  }
+  void DropDatabaseFileOwnership() { owns_database_file_ = false; }
+  bool OwnsDatabaseFile() const    { return owns_database_file_;  }
+
+  std::string fqrn() const { return fqrn_; }
+
+ protected:
+  explicit MockReflog(const std::string fqrn);
+
+ private:
+  bool                  owns_database_file_;
+  const std::string     fqrn_;
+  std::set<shash::Any>  references_;
+};
+
+
+//------------------------------------------------------------------------------
+
+
 class MockObjectFetcher;
 
 template <>
 struct object_fetcher_traits<MockObjectFetcher> {
   typedef MockCatalog CatalogTN;
   typedef MockHistory HistoryTN;
+  typedef MockReflog  ReflogTN;
 };
 
 /**
@@ -686,8 +868,22 @@ struct object_fetcher_traits<MockObjectFetcher> {
  */
 class MockObjectFetcher : public AbstractObjectFetcher<MockObjectFetcher> {
  public:
-  manifest::Manifest* FetchManifest();
-  bool Fetch(const shash::Any &object_hash, std::string *file_path);
+  typedef AbstractObjectFetcher<MockObjectFetcher>::Failures Failures;
+  typedef AbstractObjectFetcher<MockObjectFetcher>           BaseTN;
+
+ public:
+  MockObjectFetcher() : BaseTN("") {}
+
+  using BaseTN::FetchManifest;  // un-hiding convenience overload
+  Failures FetchManifest(manifest::Manifest** manifest);
+  Failures Fetch(const shash::Any &object_hash, std::string *file_path);
+  Failures Fetch(const std::string &relative_path,
+                 const bool         decompress,
+                       std::string *file_path);
+
+ private:
+  bool ObjectExists(const shash::Any &object_hash) const;
+  bool PathExists(const std::string &path) const;
 };
 
 

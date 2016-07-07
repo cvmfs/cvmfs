@@ -23,7 +23,7 @@
 #include "logging.h"
 #include "smalloc.h"
 #include "statistics.h"
-#include "util.h"
+#include "util/posix.h"
 
 using namespace std;  // NOLINT
 
@@ -255,6 +255,10 @@ static void usage() {
                                "(performance tweak)\n"
   " alien_cache                Treat cache directory as alien cache\n"
   " alien_cachedir=DIR         Explicitly set an alien cache directory\n"
+  " lock_directory=DIR         Directory for per instance lock files.\n"
+  "                            Needs to be on a file system with POSIX locks.\n"
+  "                            Should be different from alien cache directory."
+  "                            \nDefaults to cache_directory.\n"
   " (log_)syslog_level=LEVEL   Sets the level used for syslog to "
                                "DEBUG (1), INFO (2), or NOTICE (3).\n"
   "                            Default is NOTICE.\n"

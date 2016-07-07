@@ -12,8 +12,10 @@
 #include <ctime>
 #include <string>
 
-#include "../../cvmfs/dns.h"
-#include "../../cvmfs/util.h"
+#include "dns.h"
+#include "util/pointer.h"
+#include "util/posix.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 
@@ -407,6 +409,30 @@ TEST_F(T_Dns, HostValid) {
 }
 
 
+TEST_F(T_Dns, HostBestAddresses) {
+  Host host;
+  host.name_ = "name";
+  host.status_ = kFailOk;
+  host.deadline_ = time(NULL) + 10;
+  host.ipv4_addresses_.insert("10.0.0.1");
+  EXPECT_TRUE(host.IsValid());
+
+  EXPECT_EQ("10.0.0.1", *host.ViewBestAddresses(kIpPreferSystem).begin());
+  EXPECT_EQ("10.0.0.1", *host.ViewBestAddresses(kIpPreferV4).begin());
+  EXPECT_EQ("10.0.0.1", *host.ViewBestAddresses(kIpPreferV6).begin());
+
+  host.ipv6_addresses_.insert("[::1]");
+  EXPECT_EQ("10.0.0.1", *host.ViewBestAddresses(kIpPreferSystem).begin());
+  EXPECT_EQ("10.0.0.1", *host.ViewBestAddresses(kIpPreferV4).begin());
+  EXPECT_EQ("[::1]", *host.ViewBestAddresses(kIpPreferV6).begin());
+
+  host.ipv4_addresses_.clear();
+  EXPECT_EQ("[::1]", *host.ViewBestAddresses(kIpPreferSystem).begin());
+  EXPECT_EQ("[::1]", *host.ViewBestAddresses(kIpPreferV4).begin());
+  EXPECT_EQ("[::1]", *host.ViewBestAddresses(kIpPreferV6).begin());
+}
+
+
 TEST_F(T_Dns, HostExtendDeadline) {
   Host host;
   host.name_ = "name";
@@ -488,11 +514,11 @@ TEST_F(T_Dns, ResolverTtlRange) {
 
   time_t now = time(NULL);
   Host host = resolver.Resolve("small-ttl");
-  EXPECT_GE(host.deadline(), now + Resolver::kMinTtl);
+  EXPECT_GE(host.deadline(), now + static_cast<time_t>(Resolver::kMinTtl));
 
   host = resolver.Resolve("large-ttl");
   now = time(NULL);
-  EXPECT_LE(host.deadline(), now + Resolver::kMaxTtl);
+  EXPECT_LE(host.deadline(), now + static_cast<time_t>(Resolver::kMaxTtl));
 }
 
 
@@ -517,7 +543,7 @@ TEST_F(T_Dns, ResolverEmpty) {
 }
 
 
-TEST_F(T_Dns, ResolverMany) {
+TEST_F(T_Dns, ResolverManySlow) {
   DummyResolver resolver;
 
   Host host = resolver.Resolve("many");
@@ -580,7 +606,7 @@ TEST_F(T_Dns, CaresResolverMany) {
                      "192.5.5.241", "[2001:500:2f::f]");
   ExpectResolvedName(hosts[6], "g.root-servers.net", "192.112.36.4", "");
   ExpectResolvedName(hosts[7], "h.root-servers.net",
-                     "128.63.2.53", "[2001:500:1::803f:235]");
+                     "198.97.190.53", "[2001:500:1::53]");
   ExpectResolvedName(hosts[8], "i.root-servers.net",
                      "192.36.148.17", "[2001:7fe::53]");
   ExpectResolvedName(hosts[9], "j.root-servers.net",
@@ -588,11 +614,12 @@ TEST_F(T_Dns, CaresResolverMany) {
   ExpectResolvedName(hosts[10], "k.root-servers.net",
                      "193.0.14.129", "[2001:7fd::1]");
   ExpectResolvedName(hosts[11], "l.root-servers.net",
-                     "199.7.83.42", "[2001:500:3::42]");
+                     "199.7.83.42", "[2001:500:9f::42]");
   ExpectResolvedName(hosts[12], "m.root-servers.net",
                      "202.12.27.33", "[2001:dc3::35]");
   ExpectResolvedName(hosts[13], "127.0.0.1", "127.0.0.1", "");
-  EXPECT_EQ(hosts[14].status(), kFailUnknownHost);
+  EXPECT_TRUE((hosts[14].status() == kFailUnknownHost) ||
+              (hosts[14].status() == kFailTimeout));
 }
 
 
@@ -618,6 +645,7 @@ TEST_F(T_Dns, CaresResolverFinalDot) {
 }
 
 
+// TODO(jblomer): figure out why this fails on Travis
 TEST_F(T_Dns, CaresResolverLocalhost) {
   Host host = default_resolver->Resolve("localhost");
   // Not using ExpectResolvedName because the canonical name for localhost
@@ -633,9 +661,10 @@ TEST_F(T_Dns, CaresResolverLocalhost) {
 }
 
 
-TEST_F(T_Dns, CaresResolverSearchDomain) {
+TEST_F(T_Dns, CaresResolverSearchDomainSlow) {
   Host host = default_resolver->Resolve("a");
-  EXPECT_EQ(host.status(), kFailUnknownHost);
+  EXPECT_TRUE((host.status() == kFailUnknownHost) ||
+              (host.status() == kFailTimeout));
 
   vector<string> new_domains;
   new_domains.push_back("no.such.domain");
@@ -652,7 +681,8 @@ TEST_F(T_Dns, CaresResolverSearchDomain) {
   retval = default_resolver->SetSearchDomains(new_domains);
   EXPECT_EQ(retval, true);
   host = default_resolver->Resolve("a");
-  EXPECT_EQ(host.status(), kFailUnknownHost);
+  EXPECT_TRUE((host.status() == kFailUnknownHost) ||
+              (host.status() == kFailTimeout));
 }
 
 
@@ -669,8 +699,9 @@ TEST_F(T_Dns, CaresResolverReadConfig) {
         nameservers.push_back("[" + tokens[1] + "]:53");
       else
         nameservers.push_back(tokens[1] + ":53");
-    } else if (tokens[0] == "search") {
-      domains.push_back(tokens[1]);
+    } else if ((tokens[0] == "search") || (tokens[0] == "domain")) {
+      for (unsigned i = 1; i < tokens.size(); ++i)
+        domains.push_back(tokens[i]);
     }
   }
   fclose(f);
@@ -686,10 +717,7 @@ TEST_F(T_Dns, CaresResolverReadConfig) {
 }
 
 
-// TODO(reneme): it is not entirely clear what is the error condition here. In
-//               particular this behaves differently on OS X and Linux. For now
-//               I just disable the test case.
-TEST_F(T_Dns, DISABLED_CaresResolverBadResolver) {
+TEST_F(T_Dns, CaresResolverBadResolver) {
   UniquePtr<CaresResolver> quick_resolver(CaresResolver::Create(false, 0, 100));
   ASSERT_TRUE(quick_resolver.IsValid());
 
@@ -700,7 +728,8 @@ TEST_F(T_Dns, DISABLED_CaresResolverBadResolver) {
   time_t before = time(NULL);
   Host host = quick_resolver->Resolve("a.root-servers.net");
   time_t after = time(NULL);
-  EXPECT_EQ(host.status(), kFailInvalidResolvers);
+  EXPECT_TRUE((host.status() == kFailInvalidResolvers) ||
+              (host.status() == kFailTimeout));
   EXPECT_LE(after-before, 1);
 }
 
@@ -741,7 +770,7 @@ TEST_F(T_Dns, HostfileResolverSimple) {
   ExpectResolvedName(host, "localhost", "127.0.0.1", "[::1]");
 
   host = hostfile_resolver->Resolve("unknown");
-  EXPECT_EQ(host.status(), kFailUnknownHost);
+  EXPECT_EQ(kFailUnknownHost, host.status());
 }
 
 
@@ -808,13 +837,13 @@ TEST_F(T_Dns, HostfileResolverSkip) {
   names.push_back("[::1]");
   hostfile_resolver->ResolveMany(names, &hosts);
   // IP addresses are "resolved" by the base class
-  EXPECT_EQ(hosts[0].status(), kFailOk);
-  EXPECT_EQ(hosts[1].status(), kFailOk);
-  EXPECT_EQ(hosts[2].status(), kFailOk);
-  EXPECT_EQ(hosts[3].status(), kFailOk);
-  EXPECT_EQ(hosts[4].status(), kFailOk);
-  EXPECT_EQ(hosts[5].status(), kFailUnknownHost);
-  EXPECT_EQ(hosts[6].status(), kFailOk);
+  EXPECT_EQ(kFailOk, hosts[0].status());
+  EXPECT_EQ(kFailOk, hosts[1].status());
+  EXPECT_EQ(kFailOk, hosts[2].status());
+  EXPECT_EQ(kFailOk, hosts[3].status());
+  EXPECT_EQ(kFailOk, hosts[4].status());
+  EXPECT_EQ(kFailUnknownHost, hosts[5].status());
+  EXPECT_EQ(kFailOk, hosts[6].status());
 }
 
 
@@ -831,9 +860,9 @@ TEST_F(T_Dns, HostfileResolverSearchDomains) {
   search_domains.push_back("mydomain");
   search_domains.push_back("remotedomain");
   bool retval = hostfile_resolver->SetSearchDomains(search_domains);
-  EXPECT_EQ(retval, true);
+  EXPECT_EQ(true, retval);
   host = hostfile_resolver->Resolve("myhost.");
-  EXPECT_EQ(host.status(), kFailUnknownHost);
+  EXPECT_EQ(kFailUnknownHost, host.status());
   host = hostfile_resolver->Resolve("myhost");
   ExpectResolvedName(host, "myhost.remotedomain", "127.0.0.2", "");
 }
@@ -841,7 +870,7 @@ TEST_F(T_Dns, HostfileResolverSearchDomains) {
 
 TEST_F(T_Dns, HostfileResolverEmptyFile) {
   Host host = hostfile_resolver->Resolve("localhost");
-  EXPECT_EQ(host.status(), kFailUnknownHost);
+  EXPECT_EQ(kFailUnknownHost, host.status());
 }
 
 
@@ -849,13 +878,13 @@ TEST_F(T_Dns, HostfileResolverComment) {
   CreateHostfile("#127.0.0.1 localhost\n127.0.0.2 localhost\n"
                  "127.0.0.3 localh#ost\n127.0.0.4 localhost2#\n");
   Host host = hostfile_resolver->Resolve("localhost");
-  EXPECT_EQ(host.status(), kFailOk);
+  EXPECT_EQ(kFailOk, host.status());
   ExpectResolvedName(host, "localhost", "127.0.0.2", "");
   host = hostfile_resolver->Resolve("localh");
-  EXPECT_EQ(host.status(), kFailOk);
+  EXPECT_EQ(kFailOk, host.status());
   ExpectResolvedName(host, "localh", "127.0.0.3", "");
   host = hostfile_resolver->Resolve("localhost2");
-  EXPECT_EQ(host.status(), kFailOk);
+  EXPECT_EQ(kFailOk, host.status());
   ExpectResolvedName(host, "localhost2", "127.0.0.4", "");
 }
 
@@ -864,13 +893,13 @@ TEST_F(T_Dns, HostfileResolverWhitespace) {
   CreateHostfile("127.0.0.1 localhost\n\n\n  127.0.0.2 localhost2\n"
                  "127.0.0.3   localhost3   ");
   Host host = hostfile_resolver->Resolve("localhost");
-  EXPECT_EQ(host.status(), kFailOk);
+  EXPECT_EQ(kFailOk, host.status());
   ExpectResolvedName(host, "localhost", "127.0.0.1", "");
   host = hostfile_resolver->Resolve("localhost2");
-  EXPECT_EQ(host.status(), kFailOk);
+  EXPECT_EQ(kFailOk, host.status());
   ExpectResolvedName(host, "localhost2", "127.0.0.2", "");
   host = hostfile_resolver->Resolve("localhost3");
-  EXPECT_EQ(host.status(), kFailOk);
+  EXPECT_EQ(kFailOk, host.status());
   ExpectResolvedName(host, "localhost3", "127.0.0.3", "");
 }
 
@@ -879,14 +908,14 @@ TEST_F(T_Dns, HostfileResolverMultipleAddresses) {
   CreateHostfile("127.0.0.1 localhost\n127.0.0.2 localhost\n"
                  "::1 localhost\n::2 localhost\n");
   Host host = hostfile_resolver->Resolve("localhost");
-  EXPECT_EQ(host.status(), kFailOk);
+  EXPECT_EQ(kFailOk, host.status());
   set<string> expected_ipv4;
   set<string> expected_ipv6;
   expected_ipv4.insert("127.0.0.1");
   expected_ipv4.insert("127.0.0.2");
   expected_ipv6.insert("[::1]");
   expected_ipv6.insert("[::2]");
-  EXPECT_EQ(host.status(), kFailOk);
+  EXPECT_EQ(kFailOk, host.status());
   EXPECT_EQ(host.ipv4_addresses(), expected_ipv4);
   EXPECT_EQ(host.ipv6_addresses(), expected_ipv6);
 }
@@ -901,7 +930,7 @@ TEST_F(T_Dns, NormalResolverConstruct) {
   ASSERT_EQ(resolver->retries(), resolver->cares_resolver_->retries());
 
   int retval = setenv("HOST_ALIASES", "/no/such/file", 1);
-  ASSERT_EQ(retval, 0);
+  ASSERT_EQ(0, retval);
   UniquePtr<NormalResolver> resolver2(NormalResolver::Create(false, 2, 2000));
   ASSERT_FALSE(resolver2.IsValid());
 }
@@ -912,7 +941,7 @@ TEST_F(T_Dns, NormalResolverSimple) {
   ASSERT_TRUE(resolver.IsValid());
 
   Host host = resolver->Resolve("localhost");
-  EXPECT_EQ(host.status(), kFailOk);
+  EXPECT_EQ(kFailOk, host.status());
   host = resolver->Resolve("a.root-servers.net");
   ExpectResolvedName(host, "a.root-servers.net",
                      "198.41.0.4", "[2001:503:ba3e::2:30]");
@@ -927,11 +956,12 @@ TEST_F(T_Dns, NormalResolverLocalonly) {
   no_resolvers.push_back("127.0.0.2");
   resolver->SetResolvers(no_resolvers);
   Host host = resolver->Resolve("localhost");
-  EXPECT_EQ(host.status(), kFailOk);
+  EXPECT_EQ(kFailOk, host.status());
 }
 
 
-TEST_F(T_Dns, NormalResolverCombined) {
+// TODO(jblomer): figure out why this fails on Travis
+TEST_F(T_Dns, NormalResolverCombinedSlow) {
   UniquePtr<NormalResolver> resolver(NormalResolver::Create(false, 2, 2000));
   ASSERT_TRUE(resolver.IsValid());
 
@@ -944,15 +974,16 @@ TEST_F(T_Dns, NormalResolverCombined) {
   names.push_back("nemo.root-servers.net");
   vector<Host> hosts;
   default_resolver->ResolveMany(names, &hosts);
-  ASSERT_EQ(hosts.size(), names.size());
+  ASSERT_EQ(names.size(), hosts.size());
   ExpectResolvedName(hosts[0], "a.root-servers.net",
                      "198.41.0.4", "[2001:503:ba3e::2:30]");
   ExpectResolvedName(hosts[1], "b.root-servers.net",
                      "192.228.79.201", "[2001:500:84::b]");
-  EXPECT_EQ(hosts[2].status(), kFailOk);
+  EXPECT_EQ(kFailOk, hosts[2].status());
   ExpectResolvedName(hosts[3], "127.0.0.1", "127.0.0.1", "");
   ExpectResolvedName(hosts[4], "[::1]", "", "[::1]");
-  EXPECT_EQ(hosts[5].status(), kFailUnknownHost);
+  EXPECT_TRUE((hosts[5].status() == kFailUnknownHost) ||
+              (hosts[5].status() == kFailTimeout));
 }
 
 }  // namespace dns

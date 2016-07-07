@@ -6,9 +6,8 @@
 
 #include <unistd.h>
 
-#include "../../cvmfs/file_processing/char_buffer.h"
-#include "../../cvmfs/hash.h"
-#include "../../cvmfs/util.h"
+#include "file_processing/char_buffer.h"
+#include "hash.h"
 #include "testutil.h"
 
 

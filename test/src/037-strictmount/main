@@ -6,8 +6,8 @@ cvmfs_run_test() {
 
   cvmfs_mount "atlas.cern.ch" \
     "CVMFS_STRICT_MOUNT=yes" || return 1
-  
-  ls /cvmfs/lhcb.cern.ch
+
+  try_automount lhcb.cern.ch
   RETVAL=$?
   if [ $RETVAL -eq 0 ]; then
     return 2

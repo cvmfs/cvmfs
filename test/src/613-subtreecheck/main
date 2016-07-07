@@ -1,0 +1,114 @@
+
+cvmfs_test_name="Health Check a Catalog Subtree"
+cvmfs_test_autofs_on_startup=false
+
+produce_files_in() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  mkdir -p foo
+  mkdir -p foo/1
+  mkdir -p foo/2
+  mkdir -p foo/2/hallo
+  mkdir -p foo/2/welt
+  mkdir -p foo/2/hallo/welt
+  mkdir -p foo/3
+  mkdir -p foo/4
+  mkdir -p bar
+  mkdir -p baz
+  mkdir -p baz/foo
+  mkdir -p baz/bar
+
+  echo "foobar" > foo/3/foobar
+
+  echo "/*"                >  .cvmfsdirtab
+  echo "/foo/*"            >> .cvmfsdirtab
+  echo "/foo/2/hallo/welt" >> .cvmfsdirtab
+
+  create_big_file foo/4/moo 100
+  create_big_file foo/2/muh 100
+
+  popdir
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local scratch_dir=$(pwd)
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  # ============================================================================
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository"
+  produce_files_in $repo_dir || return 3
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  local check_log_1="check_1.log"
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i > $check_log_1 2>&1 || return $?
+
+  echo "checking the log file"
+  cat $check_log_1 | grep -e 'at /$'                || return  4
+  cat $check_log_1 | grep -e 'at /baz$'             || return  5
+  cat $check_log_1 | grep -e 'at /bar$'             || return  6
+  cat $check_log_1 | grep -e 'at /foo$'             || return  7
+  cat $check_log_1 | grep -e 'at /foo/4$'           || return  8
+  cat $check_log_1 | grep -e 'at /foo/2$'           || return  9
+  cat $check_log_1 | grep -e 'at /foo/3$'           || return 10
+  cat $check_log_1 | grep -e 'at /foo/1$'           || return 11
+  cat $check_log_1 | grep -e 'at /foo/2/hallo/welt' || return 12
+
+  # ============================================================================
+
+  local check_log_2="check_2.log"
+  echo "check only subtree (foo) - logging to $check_log_2"
+  check_repository $CVMFS_TEST_REPO -s /foo > $check_log_2 2>&1 || return 13
+
+  echo "checking log file"
+  cat $check_log_2 | grep -e 'at /$'                 && return 20
+  cat $check_log_2 | grep -e 'at /baz$'              && return 21
+  cat $check_log_2 | grep -e 'at /bar$'              && return 22
+  cat $check_log_2 | grep -e 'at /foo$'              || return 23
+  cat $check_log_2 | grep -e 'at /foo/4$'            || return 24
+  cat $check_log_2 | grep -e 'at /foo/2$'            || return 25
+  cat $check_log_2 | grep -e 'at /foo/3$'            || return 26
+  cat $check_log_2 | grep -e 'at /foo/1$'            || return 27
+  cat $check_log_2 | grep -e 'at /foo/2/hallo/welt$' || return 28
+
+  # ============================================================================
+
+  local check_log_3="check_3.log"
+  echo "try to base the check outside a nested catalog"
+  check_repository $CVMFS_TEST_REPO -s /baz/foo > $check_log_3 2>&1 && return 29
+
+  echo "checking the log"
+  cat $check_log_3 | grep -e "cannot find .* catalog at /baz/foo" || return 30
+
+  # ============================================================================
+
+  local check_log_4="check_4.log"
+  echo "check a second-level nested catalog (/foo/2)"
+  check_repository $CVMFS_TEST_REPO -s /foo/2 > $check_log_4 2>&1 || return 31
+
+  echo "checking the log file"
+  cat $check_log_4 | grep -e 'at /$'                 && return 40
+  cat $check_log_4 | grep -e 'at /baz$'              && return 41
+  cat $check_log_4 | grep -e 'at /bar$'              && return 42
+  cat $check_log_4 | grep -e 'at /foo$'              && return 43
+  cat $check_log_4 | grep -e 'at /foo/4$'            && return 44
+  cat $check_log_4 | grep -e 'at /foo/3$'            && return 46
+  cat $check_log_4 | grep -e 'at /foo/1$'            && return 47
+  cat $check_log_4 | grep -e 'at /foo/2$'            || return 45
+  cat $check_log_4 | grep -e 'at /foo/2/hallo/welt$' || return 48
+
+  return 0
+}
+

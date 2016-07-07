@@ -1,0 +1,90 @@
+cvmfs_test_name="Repository meta info JSON file"
+cvmfs_test_autofs_on_startup=false
+
+CVMFS_TEST_618_REPLICA_NAME=
+cleanup() {
+  echo "running cleanup()"
+  [ -z $CVMFS_TEST_618_REPLICA_NAME ] || destroy_repo $CVMFS_TEST_618_REPLICA_NAME
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local scratch_dir=$(pwd)
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  local tty_bin=$(which tty)
+  sudo mv $tty_bin ${tty_bin}.disabled || return 10
+  sudo sh -c "echo '#!/bin/sh' > $tty_bin" || return 11
+  sudo sh -c "echo 'echo reference' >> $tty_bin" || return 12
+  sudo chmod +x $tty_bin || return 13
+  touch reference
+  yes | EDITOR="cat" cvmfs_server update-repoinfo $CVMFS_TEST_REPO
+  local retval=$?
+  sudo mv ${tty_bin}.disabled $tty_bin || return 14
+  if [ $retval -ne 0 ]; then
+    return 21
+  fi
+  curl -q "$(get_repo_url $CVMFS_TEST_REPO)/.cvmfspublished" | grep -a "^M" || return 20
+
+  cvmfs_swissknife info -r $(get_repo_url $CVMFS_TEST_REPO) -M > downloaded || return 30
+  diff reference downloaded || return 40
+
+  echo "create a revision in the repository" # Regression test: used to lose the
+                                             # hash to the repoinfo on publish
+  start_transaction $CVMFS_TEST_REPO || return 41
+  publish_repo      $CVMFS_TEST_REPO || return 42
+
+  cvmfs_swissknife info -r $(get_repo_url $CVMFS_TEST_REPO) -M > downloaded || return 50
+  diff reference downloaded || return 51
+
+
+  echo "set a trap for desaster cleanup"
+  trap cleanup EXIT HUP INT TERM
+
+  echo "create Stratum1 repository on the same machine"
+  local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
+  CVMFS_TEST_618_REPLICA_NAME=$replica_name
+  load_repo_config $CVMFS_TEST_REPO
+  create_stratum1 $replica_name    \
+                  $CVMFS_TEST_USER \
+                  $CVMFS_STRATUM0  \
+                  /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub || return 55
+
+  echo "create a snapshot of the Stratum0"
+  sudo cvmfs_server snapshot $replica_name || return 56
+
+  echo "check if the meta information was pulled along with the repository"
+  cvmfs_swissknife info -r $(get_repo_url $replica_name) -M > downloaded1 || return 57
+  diff reference downloaded1 || return 58
+
+  local json_file="test_json_file.json"
+  cat >> $json_file << EOF
+{
+  "administrator" : "Rene Meusel",
+  "email"         : "dont.send.me.spam@cern.ch",
+  "organisation"  : "CERN",
+  "description"   : "This is just a test repository"
+}
+EOF
+
+  echo "update repo info on Stratum 0"
+  cvmfs_server update-repoinfo -f $json_file $CVMFS_TEST_REPO || return 60
+  cvmfs_swissknife info -r $(get_repo_url $CVMFS_TEST_REPO) -M > downloaded2 || return 61
+  diff $json_file downloaded2 || return 62
+
+  echo "check that the metainfo on Stratum1 lacks behind"
+  cvmfs_swissknife info -r $(get_repo_url $replica_name) -M > downloaded3 || return 65
+  diff $json_file downloaded3 && return 66
+
+  echo "create a snapshot of the Stratum0"
+  sudo cvmfs_server snapshot $replica_name || return 56
+
+  echo "check that the metainfo on Stratum1 has updated"
+  cvmfs_swissknife info -r $(get_repo_url $replica_name) -M > downloaded4 || return 70
+  diff $json_file downloaded4 || return 71
+
+  return 0
+}

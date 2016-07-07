@@ -10,11 +10,12 @@
 #include <string>
 #include <vector>
 
-#include "../hash.h"
-#include "../platform.h"
-#include "char_buffer.h"
-#include "chunk_detector.h"
-#include "file_scrubbing_task.h"
+#include "compression.h"
+#include "file_processing/char_buffer.h"
+#include "file_processing/chunk_detector.h"
+#include "file_processing/file_scrubbing_task.h"
+#include "hash.h"
+#include "platform.h"
 
 namespace upload {
 
@@ -34,6 +35,7 @@ class File : public AbstractFile {
        IoDispatcher         *io_dispatcher,
        ChunkDetector        *chunk_detector,
        shash::Algorithms     hash_algorithm,
+       zlib::Algorithms      compression_alg,
        const shash::Suffix   hash_suffix = shash::kSuffixNone);
   ~File();
 
@@ -100,6 +102,10 @@ class File : public AbstractFile {
    * Suffix to be appended to the bulk chunk content hash
    */
   const shash::Suffix hash_suffix_;
+  /**
+   * Compression algorithm for the chunks
+   */
+  const zlib::Algorithms compression_alg_;
 
   ChunkVector chunks_;  ///< List of generated Chunks
   Chunk *bulk_chunk_;  ///< Associated bulk Chunk

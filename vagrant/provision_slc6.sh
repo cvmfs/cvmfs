@@ -17,6 +17,9 @@ PREV_DIR="$(pwd)"
 mkdir -p $WORKSPACE
 cd $WORKSPACE
 
+# update installed packages
+yum -y --exclude='kernel*' update
+
 # install cvmfs-release RPM
 if ! rpm -q cvmfs-release > /dev/null 2>&1; then
   echo "installing cvmfs-release package"
@@ -33,9 +36,6 @@ if ! rpm -q kernel | grep -q 'aufs'; then
   yum -y --disablerepo='*' --enablerepo='cernvm-kernel' install kernel kernel-headers
 fi
 
-# update installed packages
-yum -y --exclude='kernel*' update
-
 # activate EPEL to get as much of the fun stuff as possible
 yum -y install epel-release
 
@@ -46,10 +46,14 @@ yum -y install libuuid-devel gcc gcc-c++ glibc-common cmake fuse fuse-devel  \
                shadow-utils util-linux-ng selinux-policy checkpolicy         \
                selinux-policy-devel hardlink selinux-policy-targeted         \
                python-devel initscripts bash coreutils grep sed sudo psmisc  \
-               curl attr httpd
+               curl attr httpd libcap-devel voms-devel rpm-build             \
+               globus-common-devel globus-gsi-callback-devel                 \
+               globus-gsi-cert-utils-devel globus-gsi-credential-devel       \
+               globus-gsi-sysconfig-devel compat-expat1 openssl098e gridsite
 
 # install convenience packages for development
-yum -y install git tig iftop htop jq rubygems screen nc python-unittest2
+yum -y install git tig iftop htop jq rubygems screen nc python-unittest2 \
+               policycoreutils-python
 gem install fakes3 --version 0.2.0
 
 # setup and run a FakeS3 server
@@ -90,3 +94,5 @@ if ! id $CVMFS_TEST_USER > /dev/null 2>&1; then
   usermod -a -G fuse $CVMFS_TEST_USER
   echo "$CVMFS_TEST_USER ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 fi
+
+usermod -a -G fuse vagrant

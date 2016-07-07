@@ -45,12 +45,10 @@ int CommandListCatalogs::Main(const ArgumentList &args) {
 
   bool success = false;
   if (IsHttpUrl(repo_url)) {
-    download::DownloadManager   download_manager;
-    signature::SignatureManager signature_manager;
-    download_manager.Init(1, true, g_statistics);
-    signature_manager.Init();
-    if (!signature_manager.LoadPublicRsaKeys(repo_keys)) {
-      LogCvmfs(kLogCatalog, kLogStderr, "Failed to load public key(s)");
+    const bool follow_redirects = false;
+    if (!this->InitDownloadManager(follow_redirects) ||
+        !this->InitVerifyingSignatureManager(repo_keys)) {
+      LogCvmfs(kLogCatalog, kLogStderr, "Failed to init remote connection");
       return 1;
     }
 
@@ -58,12 +56,9 @@ int CommandListCatalogs::Main(const ArgumentList &args) {
                       history::SqliteHistory> fetcher(repo_name,
                                                       repo_url,
                                                       tmp_dir,
-                                                      &download_manager,
-                                                      &signature_manager);
+                                                      download_manager(),
+                                                      signature_manager());
     success = Run(&fetcher);
-
-    download_manager.Fini();
-    signature_manager.Fini();
   } else {
     LocalObjectFetcher<> fetcher(repo_url, tmp_dir);
     success = Run(&fetcher);

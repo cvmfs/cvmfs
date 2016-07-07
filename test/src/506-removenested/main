@@ -113,7 +113,7 @@ cvmfs_run_test() {
   publish_repo $CVMFS_TEST_REPO || return $?
 
   echo "compare the results of cvmfs to our reference copy"
-  compare_directories $repo_dir $reference_dir || return $?
+  compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return $?
 
   echo "check if the right catalogs are present after the first stage"
   check_initial_nested_catalog_presence $CVMFS_TEST_REPO || return $?
@@ -133,7 +133,7 @@ cvmfs_run_test() {
   publish_repo $CVMFS_TEST_REPO || return $?
 
   echo "compare the changed directories"
-  compare_directories $repo_dir $reference_dir || return $?
+  compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return $?
 
   # ============================================================================
 

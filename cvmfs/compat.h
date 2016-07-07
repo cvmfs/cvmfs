@@ -22,7 +22,7 @@
 #include "glue_buffer.h"
 #include "hash.h"
 #include "shortstring.h"
-#include "util.h"
+#include "util/algorithm.h"
 
 namespace compat {
 
@@ -832,6 +832,9 @@ void Migrate(InodeTracker *old_tracker, glue::InodeTracker *new_tracker);
 }  // namespace inode_tracker_v3
 
 
+//------------------------------------------------------------------------------
+
+
 namespace chunk_tables {
 
 class FileChunk {
@@ -945,6 +948,41 @@ struct ChunkTables {
 void Migrate(ChunkTables *old_tables, ::ChunkTables *new_tables);
 
 }  // namespace chunk_tables_v2
+
+
+//------------------------------------------------------------------------------
+
+
+namespace chunk_tables_v3 {
+
+struct ChunkTables {
+  ChunkTables() { assert(false); }
+  ~ChunkTables();
+  ChunkTables(const ChunkTables &other) { assert(false); }
+  ChunkTables &operator= (const ChunkTables &other) { assert(false); }
+  void CopyFrom(const ChunkTables &other) { assert(false); }
+  void InitLocks() { assert(false); }
+  void InitHashmaps() { assert(false); }
+  pthread_mutex_t *Handle2Lock(const uint64_t handle) const { assert(false); }
+  inline void Lock() { assert(false); }
+  inline void Unlock() { assert(false); }
+
+  int version;
+  static const unsigned kNumHandleLocks = 128;
+  SmallHashDynamic<uint64_t, ::ChunkFd> handle2fd;
+  // The file descriptors attached to handles need to be locked.
+  // Using a hash map to survive with a small, fixed number of locks
+  BigVector<pthread_mutex_t *> handle_locks;
+  SmallHashDynamic<uint64_t, FileChunkReflist> inode2chunks;
+  SmallHashDynamic<uint64_t, uint32_t> inode2references;
+  uint64_t next_handle;
+  pthread_mutex_t *lock;
+};
+
+void Migrate(ChunkTables *old_tables, ::ChunkTables *new_tables);
+
+}  // namespace chunk_tables_v3
+
 
 }  // namespace compat
 

@@ -5,16 +5,16 @@ cvmfs_run_test() {
   logfile=$1
 
   local cache_dir=$(cvmfs_config showconfig grid.cern.ch | grep ^CVMFS_CACHE_DIR | cut -d= -f2)
-  if sudo [ -d ${cache_dir}/00 ]; then
+  if [ "x${cache_dir}" = "x" ]; then
     return 1
   fi
+  # unmount config repository
+  sudo cvmfs_config umount
+
+  echo "removing ${cache_dir}"
+  sudo rm -rf "${cache_dir}"
 
   sudo mkdir -p ${cache_dir}/10 ${cache_dir}/20
-  cvmfs_mount grid.cern.ch
-  if [ $? -eq 0 ]; then
-    return 10
-  fi
-  
   sudo chown -R cvmfs:cvmfs ${cache_dir}
   ls -lah ${cache_dir}
   autofs_switch off

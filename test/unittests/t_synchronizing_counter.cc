@@ -4,12 +4,12 @@
 
 #include <gtest/gtest.h>
 
+#include <errno.h>
 #include <unistd.h>
 
 #include <cassert>
 
-#include "../../cvmfs/util.h"
-#include "../../cvmfs/util_concurrency.h"
+#include "util_concurrency.h"
 
 
 struct thread_args {

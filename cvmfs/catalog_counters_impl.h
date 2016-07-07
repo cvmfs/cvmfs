@@ -5,9 +5,20 @@
 #ifndef CVMFS_CATALOG_COUNTERS_IMPL_H_
 #define CVMFS_CATALOG_COUNTERS_IMPL_H_
 
+#include <string>
+
 #include "catalog_sql.h"
 
 namespace catalog {
+
+template<typename FieldT>
+FieldT TreeCountersBase<FieldT>::Get(const std::string &key) const {
+  FieldsMap map = GetFieldsMap();
+  if (map.find(key) != map.end())
+    return *map[key];
+  return FieldT(0);
+}
+
 
 template<typename FieldT>
 typename TreeCountersBase<FieldT>::FieldsMap
@@ -36,11 +47,24 @@ bool TreeCountersBase<FieldT>::ReadFromDatabase(
     bool current_retval = sql_counter.BindCounter(i->first) &&
                           sql_counter.FetchRow();
 
+    // TODO(jblomer): nicify this
     if (current_retval) {
       *(const_cast<FieldT*>(i->second)) =
         static_cast<FieldT>(sql_counter.GetCounter());
+    } else if ( (legacy == LegacyMode::kNoExternals) &&
+                ((i->first == "self_external")
+                  || (i->first == "subtree_external") ||
+                 (i->first == "self_external_file_size")
+                  || (i->first == "subtree_external_file_size")) )
+    {
+      *(const_cast<FieldT*>(i->second)) = FieldT(0);
+      current_retval = true;
     } else if ( (legacy == LegacyMode::kNoXattrs) &&
-                ((i->first == "self_xattr") || (i->first == "subtree_xattr")) )
+                ((i->first == "self_external")
+                 || (i->first == "subtree_external") ||
+                (i->first == "self_external_file_size")
+                 || (i->first == "subtree_external_file_size") ||
+                (i->first == "self_xattr") || (i->first == "subtree_xattr")) )
     {
       *(const_cast<FieldT*>(i->second)) = FieldT(0);
       current_retval = true;

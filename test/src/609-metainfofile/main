@@ -1,0 +1,69 @@
+cvmfs_test_name="Stratum meta info JSON file"
+cvmfs_test_autofs_on_startup=false
+
+
+d() {
+  curl -sf $@ 2>/dev/null
+}
+
+json() {
+  jq --raw-output "$@"
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local scratch_dir=$(pwd)
+
+  local info_dir=/srv/cvmfs/info
+  local info_file=/srv/cvmfs/info/v1/meta.json
+  local info_url="$(get_local_repo_url info)/v1/meta.json"
+
+  echo "check if the jq utility is installed"
+  which jq > /dev/null 2>&1 || return 1
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "check that the meta info file is available"
+  d $info_url > /dev/null || return 2
+
+  echo "dump crucial information from $info_url"
+  d $info_url | json ".administrator" || return 3
+  d $info_url | json ".email"         || return 4
+  d $info_url | json ".organisation"  || return 5
+  d $info_url | json ".custom"        || return 6
+
+  echo "remove the meta info file"
+  sudo rm -fR $info_dir || return 7
+
+  echo "check that the meta info file is gone"
+  d $info_url > /dev/null && return 8
+
+  echo "run update-info -e (not starting an interactive editor)"
+  sudo cvmfs_server update-info -e || return 9
+
+  echo "check that the meta info file is available"
+  d $info_url > /dev/null || return 10
+
+  echo "update the information in /info/meta"
+  sudo tee $info_file << EOF
+{
+  "administrator" : "Rene Meusel",
+  "email"         : "dont.send.me.spam@cern.ch",
+  "organisation"  : "CERN",
+
+  "custom" : {
+    "sla" : "it never fails"
+  }
+}
+EOF
+
+  echo "check the content of $info_url"
+  [ x"$(d $info_url | json ".administrator")" = x"Rene Meusel"               ] || return 11
+  [ x"$(d $info_url | json ".email")"         = x"dont.send.me.spam@cern.ch" ] || return 12
+  [ x"$(d $info_url | json ".organisation")"  = x"CERN"                      ] || return 13
+  [ x"$(d $info_url | json ".custom.sla")"    = x"it never fails"            ] || return 14
+
+  return 0
+}

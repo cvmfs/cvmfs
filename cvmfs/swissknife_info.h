@@ -22,6 +22,9 @@ class CommandInfo : public Command {
   }
   ParameterList GetParams();
   int Main(const ArgumentList &args);
+
+ protected:
+  bool Exists(const std::string &repository, const std::string &file) const;
 };
 
 class CommandVersion : public Command {

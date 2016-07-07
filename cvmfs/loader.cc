@@ -35,11 +35,19 @@
 #include <vector>
 
 #include "atomic.h"
+#include "fence.h"
 #include "loader_talk.h"
 #include "logging.h"
 #include "options.h"
+#include "platform.h"
 #include "sanitizer.h"
-#include "util.h"
+#include "util/string.h"
+
+// If valgrind headers are present on the build system,
+// then we can detect valgrind at runtime.
+#ifdef HAS_VALGRIND_HEADERS
+#include <valgrind/valgrind.h>
+#endif
 
 using namespace std;  // NOLINT
 
@@ -121,9 +129,8 @@ bool parse_options_only_ = false;
 bool suid_mode_ = false;
 bool disable_watchdog_ = false;
 bool simple_options_parsing_ = false;
-atomic_int32 blocking_;
-atomic_int64 num_operations_;
 void *library_handle_;
+Fence *fence_reload_;
 CvmfsExports *cvmfs_exports_;
 LoaderExports *loader_exports_;
 
@@ -160,122 +167,91 @@ static void Usage(const string &exename) {
 }
 
 
-static inline void FileSystemFence() {
-  while (atomic_read32(&blocking_)) {
-    SafeSleepMs(100);
-  }
-}
-
-
 static void stub_init(void *userdata, struct fuse_conn_info *conn) {
-  FileSystemFence();
-  atomic_inc64(&num_operations_);
+  FenceGuard fence_guard(fence_reload_);
   cvmfs_exports_->cvmfs_operations.init(userdata, conn);
-  atomic_dec64(&num_operations_);
 }
 
 
 static void stub_destroy(void *userdata) {
-  FileSystemFence();
-  atomic_inc64(&num_operations_);
+  FenceGuard fence_guard(fence_reload_);
   cvmfs_exports_->cvmfs_operations.destroy(userdata);
-  // Unmounting, don't decrease num_operations_ counter
 }
 
 
 static void stub_lookup(fuse_req_t req, fuse_ino_t parent,
                         const char *name)
 {
-  FileSystemFence();
-  atomic_inc64(&num_operations_);
+  FenceGuard fence_guard(fence_reload_);
   cvmfs_exports_->cvmfs_operations.lookup(req, parent, name);
-  atomic_dec64(&num_operations_);
 }
 
 
 static void stub_getattr(fuse_req_t req, fuse_ino_t ino,
                          struct fuse_file_info *fi)
 {
-  FileSystemFence();
-  atomic_inc64(&num_operations_);
+  FenceGuard fence_guard(fence_reload_);
   cvmfs_exports_->cvmfs_operations.getattr(req, ino, fi);
-  atomic_dec64(&num_operations_);
 }
 
 
 static void stub_readlink(fuse_req_t req, fuse_ino_t ino) {
-  FileSystemFence();
-  atomic_inc64(&num_operations_);
+  FenceGuard fence_guard(fence_reload_);
   cvmfs_exports_->cvmfs_operations.readlink(req, ino);
-  atomic_dec64(&num_operations_);
 }
 
 
 static void stub_opendir(fuse_req_t req, fuse_ino_t ino,
                          struct fuse_file_info *fi)
 {
-  FileSystemFence();
-  atomic_inc64(&num_operations_);
+  FenceGuard fence_guard(fence_reload_);
   cvmfs_exports_->cvmfs_operations.opendir(req, ino, fi);
-  atomic_dec64(&num_operations_);
 }
 
 
 static void stub_releasedir(fuse_req_t req, fuse_ino_t ino,
                             struct fuse_file_info *fi)
 {
-  FileSystemFence();
-  atomic_inc64(&num_operations_);
+  FenceGuard fence_guard(fence_reload_);
   cvmfs_exports_->cvmfs_operations.releasedir(req, ino, fi);
-  atomic_dec64(&num_operations_);
 }
 
 
 static void stub_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
                          off_t off, struct fuse_file_info *fi)
 {
-  FileSystemFence();
-  atomic_inc64(&num_operations_);
+  FenceGuard fence_guard(fence_reload_);
   cvmfs_exports_->cvmfs_operations.readdir(req, ino, size, off, fi);
-  atomic_dec64(&num_operations_);
 }
 
 
 static void stub_open(fuse_req_t req, fuse_ino_t ino,
                       struct fuse_file_info *fi)
 {
-  FileSystemFence();
-  atomic_inc64(&num_operations_);
+  FenceGuard fence_guard(fence_reload_);
   cvmfs_exports_->cvmfs_operations.open(req, ino, fi);
-  atomic_dec64(&num_operations_);
 }
 
 
 static void stub_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
                        struct fuse_file_info *fi)
 {
-  FileSystemFence();
-  atomic_inc64(&num_operations_);
+  FenceGuard fence_guard(fence_reload_);
   cvmfs_exports_->cvmfs_operations.read(req, ino, size, off, fi);
-  atomic_dec64(&num_operations_);
 }
 
 
 static void stub_release(fuse_req_t req, fuse_ino_t ino,
                          struct fuse_file_info *fi)
 {
-  FileSystemFence();
-  atomic_inc64(&num_operations_);
+  FenceGuard fence_guard(fence_reload_);
   cvmfs_exports_->cvmfs_operations.release(req, ino, fi);
-  atomic_dec64(&num_operations_);
 }
 
 
 static void stub_statfs(fuse_req_t req, fuse_ino_t ino) {
-  FileSystemFence();
-  atomic_inc64(&num_operations_);
+  FenceGuard fence_guard(fence_reload_);
   cvmfs_exports_->cvmfs_operations.statfs(req, ino);
-  atomic_dec64(&num_operations_);
 }
 
 
@@ -287,22 +263,18 @@ static void stub_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
                           size_t size)
 #endif
 {
-  FileSystemFence();
-  atomic_inc64(&num_operations_);
+  FenceGuard fence_guard(fence_reload_);
 #ifdef __APPLE__
   cvmfs_exports_->cvmfs_operations.getxattr(req, ino, name, size, position);
 #else
   cvmfs_exports_->cvmfs_operations.getxattr(req, ino, name, size);
 #endif
-  atomic_dec64(&num_operations_);
 }
 
 
 static void stub_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
-  FileSystemFence();
-  atomic_inc64(&num_operations_);
+  FenceGuard fence_guard(fence_reload_);
   cvmfs_exports_->cvmfs_operations.listxattr(req, ino, size);
-  atomic_dec64(&num_operations_);
 }
 
 
@@ -311,10 +283,8 @@ static void stub_forget(
   fuse_ino_t ino,
   unsigned long nlookup  // NOLINT
 ) {
-  FileSystemFence();
-  atomic_inc64(&num_operations_);
+  FenceGuard fence_guard(fence_reload_);
   cvmfs_exports_->cvmfs_operations.forget(req, ino, nlookup);
-  atomic_dec64(&num_operations_);
 }
 
 
@@ -436,6 +406,25 @@ static void SetFuseOperations(struct fuse_lowlevel_ops *loader_operations) {
 }
 
 
+static void *OpenLibrary(const string &path) {
+  return dlopen(path.c_str(), RTLD_NOW | RTLD_LOCAL);
+}
+
+
+static void CloseLibrary() {
+#ifdef HAS_VALGRIND_HEADERS
+  // If the libcvmfs_fuse library is unloaded, valgrind can't resolve the
+  // symbols anymore.  We skip under valgrind.
+  if (!RUNNING_ON_VALGRIND) {
+#endif
+    dlclose(library_handle_);
+    library_handle_ = NULL;
+#ifdef HAS_VALGRIND_HEADERS
+  }
+#endif
+}
+
+
 static CvmfsExports *LoadLibrary(const bool debug_mode,
                                  LoaderExports *loader_exports)
 {
@@ -448,12 +437,17 @@ static CvmfsExports *LoadLibrary(const bool debug_mode,
     library_paths.push_back(library_name);
     library_paths.push_back("/usr/lib/"   + library_name);
     library_paths.push_back("/usr/lib64/" + library_name);
+#ifdef __APPLE__
+    // Since OS X El Capitan (10.11) came with SIP, we needed to relocate our
+    // binaries from /usr/... to /usr/local/...
+    library_paths.push_back("/usr/local/lib/" + library_name);
+#endif
   }
 
   vector<string>::const_iterator i    = library_paths.begin();
   vector<string>::const_iterator iend = library_paths.end();
   for (; i != iend; ++i) {  // TODO(rmeusel): C++11 range based for
-    library_handle_ = dlopen((*i).c_str(), RTLD_NOW | RTLD_LOCAL);
+    library_handle_ = OpenLibrary(*i);
     if (library_handle_ != NULL) {
       break;
     }
@@ -492,12 +486,10 @@ Failures Reload(const int fd_progress, const bool stop_and_go) {
     return kFailMaintenanceMode;
 
   SendMsg2Socket(fd_progress, "Blocking new file system calls\n");
-  atomic_cas32(&blocking_, 0, 1);
+  fence_reload_->Close();
 
   SendMsg2Socket(fd_progress, "Waiting for active file system calls\n");
-  while (atomic_read64(&num_operations_)) {
-    sched_yield();
-  }
+  fence_reload_->Drain();
 
   retval = cvmfs_exports_->fnSaveState(fd_progress,
                                        &loader_exports_->saved_states);
@@ -506,8 +498,7 @@ Failures Reload(const int fd_progress, const bool stop_and_go) {
 
   SendMsg2Socket(fd_progress, "Unloading Fuse module\n");
   cvmfs_exports_->fnFini();
-  dlclose(library_handle_);
-  library_handle_ = NULL;
+  CloseLibrary();
 
   if (stop_and_go) {
     CreateFile(*socket_path_ + ".paused", 0600);
@@ -542,7 +533,7 @@ Failures Reload(const int fd_progress, const bool stop_and_go) {
   SendMsg2Socket(fd_progress, "Activating Fuse module\n");
   cvmfs_exports_->fnSpawn();
 
-  atomic_cas32(&blocking_, 1, 0);
+  fence_reload_->Open();
   return kFailOk;
 }
 
@@ -768,8 +759,15 @@ int main(int argc, char *argv[]) {
         LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
                  "Failed to set maximum number of open files, "
                  "insufficient permissions");
-        // TODO(jblomer) detect valgrind and don't fail
+#ifdef HAS_VALGRIND_HEADERS
+        if (!RUNNING_ON_VALGRIND) {
+          return kFailPermission;
+        } else {
+          LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: running under valgrind");
+        }
+#else
         return kFailPermission;
+#endif
       }
     }
   }
@@ -860,8 +858,7 @@ int main(int argc, char *argv[]) {
   LogCvmfs(kLogCvmfs, kLogStdout, "done");
 
   // Mount
-  atomic_init64(&num_operations_);
-  atomic_init32(&blocking_);
+  fence_reload_ = new Fence();
 
   if (suid_mode_) {
     const bool retrievable = true;
@@ -941,19 +938,20 @@ int main(int argc, char *argv[]) {
   session = NULL;
   mount_options = NULL;
 
-  dlclose(library_handle_);
-  library_handle_ = NULL;
+  CloseLibrary();
 
   LogCvmfs(kLogCvmfs, kLogSyslog, "CernVM-FS: unmounted %s (%s)",
            mount_point_->c_str(), repository_name_->c_str());
 
   CleanupLibcryptoMt();
 
+  delete fence_reload_;
   delete loader_exports_;
   delete config_files_;
   delete repository_name_;
   delete mount_point_;
   delete socket_path_;
+  fence_reload_ = NULL;
   loader_exports_ = NULL;
   config_files_ = NULL;
   repository_name_ = NULL;

@@ -1,6 +1,8 @@
 test/test.log
 *.DS_Store
 *._.DS_Store
+._*
+.fuse_hidden*
 build/
 benchmark/
 *.pyc
@@ -33,7 +35,6 @@ cvmfs/cmake_install.cmake
 mount/cmake_install.cmake
 test/unittests/CTestTestfile.cmake
 test/unittests/cmake_install.cmake
-Makefile
 cvmfs/Makefile
 mount/Makefile
 test/unittests/Makefile

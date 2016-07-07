@@ -1,0 +1,8 @@
+include ("${EXTERNALS_LIB_LOCATION}/CMake-Register_External_Lib.txt")
+
+set (SHA3_ARCHIVE "${SHA3_BUILTIN_LOCATION}/libsha3.a")
+
+register_external_lib (libsha3 ${SHA3_BUILTIN_LOCATION} ${SHA3_ARCHIVE})
+
+set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -I${SHA3_BUILTIN_LOCATION}")
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I${SHA3_BUILTIN_LOCATION}")

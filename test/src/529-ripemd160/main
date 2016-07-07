@@ -52,14 +52,14 @@ cvmfs_run_test() {
 
   echo "checking repository health after recreating nested catalog structure"
   check_repository $CVMFS_TEST_REPO -i || return $?
+  load_repo_config $CVMFS_TEST_REPO
 
   find /cvmfs/$CVMFS_TEST_REPO -type f -exec cat {} \; >/dev/null || return 10
-  sudo find /var/spool/cvmfs/$CVMFS_TEST_REPO/cache -type f | grep rmd160 || return 11
+  sudo find $CVMFS_CACHE_BASE -type f | grep rmd160 || return 11
 
   local mnt_point="$(pwd)/mountpoint"
   local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
   echo "create Stratum1 repository on the same machine"
-  load_repo_config $CVMFS_TEST_REPO
   create_stratum1 $replica_name                          \
                   $CVMFS_TEST_USER                       \
                   $CVMFS_STRATUM0                        \
@@ -71,7 +71,7 @@ cvmfs_run_test() {
   sudo cvmfs_server snapshot $replica_name || { desaster_cleanup $mnt_point $replica_name; return 13; }
 
   echo "check catalog integrity"
-  check_repository $replica_name -i || { desaster_cleanup $mnt_point $replica_name; return $?; }
+  check_repository $replica_name -i || { desaster_cleanup $mnt_point $replica_name; return 14; }
 
   echo "changing hash algorithm to sha1"
   sudo sed -i -e 's/CVMFS_HASH_ALGORITHM=rmd160/CVMFS_HASH_ALGORITHM=sha1/' /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf

@@ -1,0 +1,137 @@
+cvmfs_test_name="GeoIP Service"
+cvmfs_test_autofs_on_startup=false
+
+CVMFS_TEST_614_REPLICA_NAME=
+
+cleanup() {
+  [ -z "$CVMFS_TEST_614_REPLICA_NAME" ] || sudo cvmfs_server rmfs -f $CVMFS_TEST_614_REPLICA_NAME
+}
+
+cvmfs_getaddr() {
+  # exit after the first line in case there are multiple addresses
+  ip $1 -o addr show scope global|awk '{split($4,a,"/");print a[1];exit}'
+}
+
+# check the results from an ordering of 3 servers
+cvmfs_check_georesult() {
+  local result=$1
+  local from=$2
+  local reqorder=$3
+  local expectorder
+  echo "  result for $reqorder from $from is $result"
+  [ -n "$1" ] || return 1
+  if [[ "$from" == *.cern.ch ]] || [[ "$from" == *.fnal.gov ]]; then
+    local cern
+    local fnal
+    local asgc
+    local n=1
+    for site in ${reqorder//,/ }; do
+      eval $site=$n
+      let n+=1
+    done
+    if [[ "$from" == *.cern.ch ]]; then
+      expectorder=$cern,$fnal,$asgc
+    elif [[ "$from" == *.fnal.gov ]]; then
+      expectorder=$fnal,$cern,$asgc
+    fi
+  else
+    # not testing at CERN or FNAL, so any order will do unless there's
+    #  an exact match; if so, that one should be first
+    if [[ "$reqorder" = $from,*,* ]]; then
+      expectorder="1,[23],[23]"
+    elif [[ "$reqorder" = *,$from,* ]]; then
+      expectorder="2,[13],[13]"
+    elif [[ "$reqorder" = *,*,$from ]]; then
+      expectorder="3,[12],[12]"
+    else
+      expectorder="[123],[123],[123]"
+    fi
+  fi
+  echo "  expected order is $expectorder"
+  [[ $result == $expectorder ]] || return 2
+}
+
+
+cvmfs_run_test() {
+  logfile=$1
+
+  echo "checking if both IPv4 and IPv6 addresses are available"
+  local ipv4addr="`cvmfs_getaddr -4`"
+  local ipv6addr="`cvmfs_getaddr -6`"
+  [ -n "$ipv4addr" ] || return 1
+  if [ -z "$ipv6addr" ]; then
+    echo "WARNING: No IPv6 address available, skipping IPv6 tests"
+    CVMFS_GENERAL_WARNING_FLAG=1
+  fi
+
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
+
+  CVMFS_TEST_614_REPLICA_NAME=$replica_name
+  echo "install a cleanup function"
+  trap cleanup EXIT HUP INT TERM || return $?
+
+  echo "create Stratum1 repository on the same machine"
+  load_repo_config $CVMFS_TEST_REPO
+  create_stratum1 $replica_name                          \
+                  root                                   \
+                  $CVMFS_STRATUM0                        \
+                  /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub \
+                  || return 3
+
+  echo "do a snapshot to make sure geo ip database is downloaded"
+  sudo cvmfs_server snapshot $replica_name || return 4
+
+  local me="`uname -n`"
+  local api="cvmfs/$replica_name/api/v1.0/geo"
+  local fnal=cvmfs.fnal.gov
+  local cern=cvmfs-stratum-one.cern.ch
+  local asgc=cvmfs02.grid.sinica.edu.tw
+  local ipv6=ipv6.cybernode.com  # has only ipv6 address
+  local other=google.com # has both ipv4 and ipv6.  if multiple addresses,
+                         #  should resolve to same or close-by geolocation.
+  local result
+
+  # limit the output from curl to 5 lines so in case there's some kind
+  #   of error some useful output will show but not too much
+
+  echo "checking x-forwarded-for IPv4"
+  result="`curl -s -H "x-forwarded-for: $ipv4addr" http://localhost/$api/x/$fnal,$cern,$asgc|head -5`"
+  cvmfs_check_georesult "$result" $me fnal,cern,asgc || return 5
+
+  if [ -n "$ipv6addr" ]; then
+    echo "checking x-forwarded-for IPv6"
+    result="`curl -s -H "x-forwarded-for: $ipv6addr" http://localhost/$api/x/$asgc,$fnal,$cern|head -5`"
+    cvmfs_check_georesult "$result" $me asgc,fnal,cern || return 6
+  fi
+
+  echo "checking direct IPv4"
+  result="`curl -s http://$ipv4addr/$api/x/$cern,$asgc,$fnal|head -5`"
+  cvmfs_check_georesult "$result" $me cern,asgc,fnal || return 7
+
+  if [ -n "$ipv6addr" ]; then
+    echo "checking direct IPv6"
+    result="`curl -s -g http://[$ipv6addr]/$api/x/$fnal,$asgc,$cern|head -5`"
+    cvmfs_check_georesult "$result" $me fnal,asgc,cern || return 8
+  fi
+
+  echo "checking IPv6-only server"
+  result="`curl -s http://$ipv4addr/$api/x/$ipv6,$cern,$fnal|head -5`"
+  cvmfs_check_georesult "$result" ipv6onlytest ipv6,cern,fnal || return 9
+
+  echo "checking proxy name IPv4"
+  result="`curl -s http://localhost/$api/$other/$cern,$ipv6,$other|head -5`"
+  cvmfs_check_georesult "$result" $other $cern,$ipv6,$other || return 10
+
+  echo "checking proxy name IPv6"
+  result="`curl -s http://localhost/$api/$ipv6/$ipv6,$fnal,$other|head -5`"
+  cvmfs_check_georesult "$result" $ipv6 $ipv6,$fnal,$other || return 11
+
+  return 0
+}

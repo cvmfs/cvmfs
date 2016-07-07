@@ -65,7 +65,7 @@
 #include "smallhash.h"
 #include "smalloc.h"
 #include "statistics.h"
-#include "util.h"
+#include "util/single_copy.h"
 
 namespace lru {
 

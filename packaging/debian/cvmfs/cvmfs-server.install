@@ -10,6 +10,7 @@ usr/bin/cvmfs_swissknife
 usr/bin/cvmfs_swissknife_debug
 usr/bin/cvmfs_suid_helper
 usr/bin/cvmfs_server
+usr/bin/cvmfs_rsync
 etc/cvmfs/cvmfs_server_hooks.sh.demo
 var/www/wsgi-scripts/cvmfs-api.wsgi
 usr/share/cvmfs-server/webapi/cvmfs_api.py

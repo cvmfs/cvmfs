@@ -1,0 +1,60 @@
+cvmfs_test_name="Setting non-standard repository TTL"
+cvmfs_test_autofs_on_startup=false
+
+TEST_612_MOUNTPOINT=""
+cleanup() {
+  if [ ! -z $TEST_612_MOUNTPOINT ]; then
+    echo -n "umounting ${TEST_612_MOUNTPOINT}... "
+    remove_local_mount $TEST_612_MOUNTPOINT && echo "done" || echo "fail"
+  fi
+}
+
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  local scratch_dir=$(pwd)
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "set a trap for desaster cleanup"
+  trap cleanup EXIT HUP INT TERM
+
+  echo "create a local mount of the created repository"
+  TEST_612_MOUNTPOINT="$(pwd)/local_mount"
+  do_local_mount "$TEST_612_MOUNTPOINT" \
+                 "$CVMFS_TEST_REPO"     \
+                 "$(get_repo_url $CVMFS_TEST_REPO)" || return 4
+
+  local ttl=$(attr -qg expires $TEST_612_MOUNTPOINT)
+  echo "TTL is $ttl"
+  if [ $ttl -ne 15 -a $ttl -ne 14 ]; then
+    return 20
+  fi
+
+  echo "umount private mount"
+  remove_local_mount $TEST_612_MOUNTPOINT || return 6
+
+  sudo sh -c "echo CVMFS_REPOSITORY_TTL=60 >> /etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/server.conf"
+
+  echo "open transaction to set new ttl"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "publish changes"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  do_local_mount "$TEST_612_MOUNTPOINT" \
+                 "$CVMFS_TEST_REPO"     \
+                 "$(get_repo_url $CVMFS_TEST_REPO)" || return 4
+
+  local ttl=$(attr -qg expires $TEST_612_MOUNTPOINT)
+  echo "TTL is $ttl"
+  if [ $ttl -ne 1 -a $ttl -ne 0 ]; then
+    return 21
+  fi
+
+  return 0
+}
+

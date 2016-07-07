@@ -8,6 +8,11 @@ cvmfs_run_test() {
   ls /cvmfs/atlas.cern.ch || return 2
   ls /cvmfs/lhcb.cern.ch || return 3
 
+  output_lines=$(cvmfs_config probe atlas.cern.ch lhcb.cern.ch | wc -l)
+  if [ $output_lines -ne 2 ]; then
+    return 4
+  fi
+
   return 0
 }
 

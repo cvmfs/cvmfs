@@ -1,0 +1,104 @@
+cvmfs_test_name="Create SHA3-256 repository"
+cvmfs_test_autofs_on_startup=false
+
+produce_files_in() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  echo foo > foo
+  echo bar > bar
+  mkdir -p nested/foo/bar
+  touch nested/.cvmfscatalog
+
+  popdir
+}
+
+desaster_cleanup() {
+  local mountpoint=$1
+  local replica_name=$2
+
+  sudo umount $mountpoint > /dev/null 2>&1
+  sudo cvmfs_server rmfs -f $replica_name > /dev/null 2>&1
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  echo "Warning: SHA3-256 is currently not supported but it might be in the future. Skipping."
+  CVMFS_GENERAL_WARNING_FLAG=1
+  return 0
+
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  CVMFS_TEST_HASHALGO=sha3 create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "createing nested catalog structure in repository"
+  produce_files_in $repo_dir || return 3
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "checking repository health"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "starting transaction to recreate nested catalog tree"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  rm -rf /cvmfs/$CVMFS_TEST_REPO/nested || return 5
+  produce_files_in $repo_dir || return 6
+
+  echo "creating new CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "checking repository health after recreating nested catalog structure"
+  load_repo_config $CVMFS_TEST_REPO
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  find /cvmfs/$CVMFS_TEST_REPO -type f -exec cat {} \; >/dev/null || return 10
+  sudo find $CVMFS_CACHE_BASE -type f | grep sha3 || return 11
+
+  local mnt_point="$(pwd)/mountpoint"
+  local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
+  echo "create Stratum1 repository on the same machine"
+  create_stratum1 $replica_name                          \
+                  $CVMFS_TEST_USER                       \
+                  $CVMFS_STRATUM0                        \
+                  /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub \
+    || { desaster_cleanup $mnt_point $replica_name; return 12; }
+
+
+  echo "create a snapshot of the Stratum0 repository in the just created Stratum1 replica"
+  sudo cvmfs_server snapshot $replica_name || { desaster_cleanup $mnt_point $replica_name; return 13; }
+
+  echo "check catalog integrity"
+  check_repository $replica_name -i || { desaster_cleanup $mnt_point $replica_name; return 15; }
+
+  echo "changing hash algorithm to sha1"
+  sudo sed -i -e 's/CVMFS_HASH_ALGORITHM=sha3/CVMFS_HASH_ALGORITHM=sha1/' /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf
+  start_transaction $CVMFS_TEST_REPO || { desaster_cleanup $mnt_point $replica_name; return 20; }
+  echo sha1-hashed > /cvmfs/$CVMFS_TEST_REPO/sha1-hashed
+  publish_repo $CVMFS_TEST_REPO || { desaster_cleanup $mnt_point $replica_name; return 21; }
+  sudo cvmfs_server resign $CVMFS_TEST_REPO || { desaster_cleanup $mnt_point $replica_name; return 22; }
+
+  echo "checking if the hash algorithm was changed"
+  local manifest_url="$(get_repo_url $CVMFS_TEST_REPO)/.cvmfspublished"
+  echo "Manifest URL: $manifest_url"
+  [ -z $(curl "$manifest_url" | grep -e '^C.*sha3$') ] || { desaster_cleanup $mnt_point $replica_name; return 23; }
+
+  echo "replicating mixed hashes"
+  sudo cvmfs_server snapshot $replica_name || { desaster_cleanup $mnt_point $replica_name; return 24; }
+
+  echo "mount the Stratum1 repository on a local mountpoint"
+  do_local_mount $mnt_point $CVMFS_TEST_REPO $(get_repo_url $replica_name) || { desaster_cleanup $mnt_point $replica_name; return 14; }
+
+  echo "clean up"
+  sudo umount $mnt_point || { desaster_cleanup $mnt_point $replica_name; return 15; }
+  sudo cvmfs_server rmfs -f $replica_name
+
+  return 0
+}
+

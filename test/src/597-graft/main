@@ -1,0 +1,128 @@
+
+cvmfs_test_name="Grafting"
+cvmfs_test_autofs_on_startup=false
+
+verify_grafting() {
+  testfname=$1
+  local file1=$(cat /cvmfs/$CVMFS_TEST_REPO/file1)
+  local file2=$(cat $testfname)
+  if [ "x$file1" == "x" ]; then
+    return 20
+  fi
+  if [ "x$file1" != "x$file2" ]; then
+    return 21
+  fi
+  return 0
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "gather some global information about $CVMFS_TEST_REPO"
+  load_repo_config $CVMFS_TEST_REPO
+  spool_dir="$CVMFS_SPOOL_DIR"
+
+  start_transaction $CVMFS_TEST_REPO || return $?
+  echo "Hello world" > /cvmfs/$CVMFS_TEST_REPO/file1
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  local hash=$(attr -qg hash ${spool_dir}/rdonly/file1)
+  local attrval=$(attr -qg compression ${spool_dir}/rdonly/file1)
+  if [ x"$attrval" != "xzlib" ]; then
+    return 22
+  fi
+
+  start_transaction $CVMFS_TEST_REPO || return $?
+  echo "Some other file" > /cvmfs/$CVMFS_TEST_REPO/file2
+  echo "checksum=$hash" > /cvmfs/$CVMFS_TEST_REPO/.cvmfsgraft-file2
+  echo "size=12" >> /cvmfs/$CVMFS_TEST_REPO/.cvmfsgraft-file2
+
+  #export CVMFS_LOG_LEVEL=4
+  publish_repo $CVMFS_TEST_REPO -v || return $?
+
+  echo "Contents of file2: `cat /cvmfs/$CVMFS_TEST_REPO/file2`"
+  verify_grafting /cvmfs/$CVMFS_TEST_REPO/file2
+  local verify_result=$?
+  if [ $verify_result -ne 0 ]; then
+    return $verify_result
+  fi
+
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "Verify grafting works in sub-catalogs"
+  mkdir -p /cvmfs/$CVMFS_TEST_REPO/subdir/
+  touch /cvmfs/$CVMFS_TEST_REPO/subdir/.cvmfscatalog
+  echo "Some other file" > /cvmfs/$CVMFS_TEST_REPO/subdir/file3
+  echo "checksum=$hash" > /cvmfs/$CVMFS_TEST_REPO/subdir/.cvmfsgraft-file3
+  echo "size=12" >> /cvmfs/$CVMFS_TEST_REPO/subdir/.cvmfsgraft-file3
+
+  echo "Verify that symlinks do not graft"
+  echo "Some other file" > /cvmfs/$CVMFS_TEST_REPO/subdir/file4
+  ln -s /cvmfs/$CVMFS_TEST_REPO/subdir/file4 /cvmfs/$CVMFS_TEST_REPO/subdir/file5
+  echo "checksum=$hash" > /cvmfs/$CVMFS_TEST_REPO/subdir/.cvmfsgraft-file5
+  echo "size=12" >> /cvmfs/$CVMFS_TEST_REPO/subdir/.cvmfsgraft-file5
+
+  echo "Verify that directories do not graft"
+  mkdir /cvmfs/$CVMFS_TEST_REPO/subdir2
+  echo "checksum=$hash" > /cvmfs/$CVMFS_TEST_REPO/.cvmfsgraft-subdir2
+  echo "size=12" >> /cvmfs/$CVMFS_TEST_REPO/.cvmfsgraft-subdir2
+
+  #export CVMFS_LOG_LEVEL=4
+  publish_repo $CVMFS_TEST_REPO -v || return $?
+
+  echo "Contents of file2: `cat /cvmfs/$CVMFS_TEST_REPO/subdir/file3`"
+  verify_grafting /cvmfs/$CVMFS_TEST_REPO/subdir/file3
+  local verify_result=$?
+  if [ $verify_result -ne 0 ]; then
+    return $verify_result
+  fi
+
+  if [ ! -L /cvmfs/$CVMFS_TEST_REPO/subdir/file5 ]; then
+    return 22
+  fi
+
+  if [ ! -d /cvmfs/$CVMFS_TEST_REPO/subdir2 ]; then
+    return 23
+  fi
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "############### Check chunk grafting ###############"
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -Z none || return $?
+
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  touch /cvmfs/$CVMFS_TEST_REPO/chunks
+  cat << EOF > /cvmfs/$CVMFS_TEST_REPO/.cvmfsgraft-chunks
+size=12
+checksum=22596363b3de40b06f981fb85d82312e8c0ed511
+chunk_offsets=0,6
+chunk_checksums=c4d871ad13ad00fde9a7bb7ff7ed2543aec54241,9591818c07e900db7e1e0bc4b884c945e6a61b24
+EOF
+
+  local h1=c4d871ad13ad00fde9a7bb7ff7ed2543aec54241P
+  local h2=9591818c07e900db7e1e0bc4b884c945e6a61b24P
+
+  echo -n "hello " > $h1 || return 50
+  echo    "world"  > $h2 || return 51
+
+  upload_into_backend $CVMFS_TEST_REPO $h1 $(make_path $h1)
+  upload_into_backend $CVMFS_TEST_REPO $h2 $(make_path $h2)
+
+  publish_repo $CVMFS_TEST_REPO -v || return $?
+
+  local chunk_hash=$(cat /cvmfs/$CVMFS_TEST_REPO/chunks | sha1sum | awk '{print $1;}')
+  if [ x"$chunk_hash" != x22596363b3de40b06f981fb85d82312e8c0ed511 ]; then
+    return 24
+  fi
+
+  return 0
+}

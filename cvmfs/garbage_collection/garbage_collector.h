@@ -34,14 +34,15 @@
 
 #include <vector>
 
-#include "../upload_facility.h"
-#include "hash_filter.h"
+#include "garbage_collection/hash_filter.h"
+#include "upload_facility.h"
 
 template<class CatalogTraversalT, class HashFilterT>
 class GarbageCollector {
  protected:
   typedef typename CatalogTraversalT::ObjectFetcherTN ObjectFetcherTN;
   typedef typename ObjectFetcherTN::HistoryTN         HistoryTN;
+  typedef typename ObjectFetcherTN::ReflogTN          ReflogTN;
   typedef typename CatalogTraversalT::CatalogTN       CatalogTN;
   typedef typename CatalogTraversalT::CallbackDataTN  TraversalCallbackDataTN;
   typedef typename CatalogTraversalT::Parameters      TraversalParameters;
@@ -57,17 +58,23 @@ class GarbageCollector {
     Configuration()
       : uploader(NULL)
       , object_fetcher(NULL)
+      , reflog(NULL)
       , keep_history_depth(kFullHistory)
       , keep_history_timestamp(kNoTimestamp)
       , dry_run(false)
-      , verbose(false) {}
+      , verbose(false)
+      , deleted_objects_logfile(NULL) {}
+
+    bool has_deletion_log() const { return deleted_objects_logfile != NULL; }
 
     upload::AbstractUploader  *uploader;
     ObjectFetcherTN           *object_fetcher;
+    ReflogTN                  *reflog;
     unsigned int               keep_history_depth;
     time_t                     keep_history_timestamp;
     bool                       dry_run;
     bool                       verbose;
+    FILE                      *deleted_objects_logfile;
   };
 
  public:
@@ -88,14 +95,15 @@ class GarbageCollector {
 
   bool AnalyzePreservedCatalogTree();
   bool CheckPreservedRevisions();
-  bool SweepCondemnedCatalogTree();
-  bool SweepHistoricRevisions();
+  bool SweepReflog();
 
   void CheckAndSweep(const shash::Any &hash);
   void Sweep(const shash::Any &hash);
+  bool RemoveCatalogFromReflog(const shash::Any &catalog);
 
   void PrintCatalogTreeEntry(const unsigned int  tree_level,
                              const CatalogTN    *catalog) const;
+  void LogDeletion(const shash::Any &hash) const;
 
  private:
   const Configuration   configuration_;

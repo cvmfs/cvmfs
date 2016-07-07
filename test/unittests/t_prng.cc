@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-#include "../../cvmfs/prng.h"
+#include "prng.h"
 
 class T_Prng : public ::testing::Test {
  protected:

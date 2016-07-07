@@ -1,0 +1,399 @@
+
+cvmfs_test_name="Detect Catalog Load Failures during Garbage Collection"
+cvmfs_test_autofs_on_startup=false
+
+produce_files_1_in() { # REVISION 3
+  local working_dir=$1
+  pushdir $working_dir
+
+  mkdir dir1
+  touch dir1/shakespeare
+
+  echo "That thou art blamed shall not be thy defect,"       >> dir1/shakespeare
+  echo "For slander's mark was ever yet the fair;"           >> dir1/shakespeare
+  echo "The ornament of beauty is suspect,"                  >> dir1/shakespeare
+  echo "A crow that flies in heaven's sweetest air."         >> dir1/shakespeare
+  echo "So thou be good, slander doth but approve"           >> dir1/shakespeare
+  echo "Thy worth the greater, being wooed of time;"         >> dir1/shakespeare
+  echo "For canker vice the sweetest buds doth love,"        >> dir1/shakespeare
+  echo "And thou present'st a pure unstained prime."         >> dir1/shakespeare
+  echo "Thou hast passed by the ambush of young days"        >> dir1/shakespeare
+  echo "Either not assailed, or victor being charged;"       >> dir1/shakespeare
+  echo "Yet this thy praise cannot be so thy praise,"        >> dir1/shakespeare
+  echo "To tie up envy, evermore enlarged,"                  >> dir1/shakespeare
+  echo "   If some suspect of ill masked not thy show,"      >> dir1/shakespeare
+  echo "   Then thou alone kingdoms of hearts shouldst owe." >> dir1/shakespeare
+
+  touch dir1/many_shakespeares
+  touch dir1/alotof_shakespeares
+  touch dir1/shakespeare_army
+
+  popdir
+}
+
+produce_files_2_in() { # REVISION 4
+  local working_dir=$1
+  pushdir $working_dir
+
+  mkdir dir2
+  mkdir dir3
+
+  touch dir3/kafka
+  echo "Deeply lost in the night."                                   >> dir3/kafka
+  echo ""                                                            >> dir3/kafka
+  echo "Just as one sometimes lowers one's head to reflect, "        >> dir3/kafka
+  echo "thus to be utterly lost in the night. "                      >> dir3/kafka
+  echo "All around people are asleep. It's just play acting, "       >> dir3/kafka
+  echo "an innocent self-deception, that they sleep in houses, "     >> dir3/kafka
+  echo "in safe beds, under a safe roof, stretched out or "          >> dir3/kafka
+  echo "curled up on mattresses, in sheets, under blankets; "        >> dir3/kafka
+  echo "in reality they have flocked together as they had once "     >> dir3/kafka
+  echo "upon a time and again later in a deserted region, a camp "   >> dir3/kafka
+  echo "in the open, a countless number of men, an army, a people, " >> dir3/kafka
+  echo "under a cold sky on cold earth, collapsed where once they "  >> dir3/kafka
+  echo "had stood, forehead pressed on the arm, face to the "        >> dir3/kafka
+  echo "ground, breathing quietly."                                  >> dir3/kafka
+  echo ""                                                            >> dir3/kafka
+  echo "And you are watching, are one of the watchmen, you find "    >> dir3/kafka
+  echo "the next one by brandishing a burning stick from the "       >> dir3/kafka
+  echo "brushwood pile beside you."                                  >> dir3/kafka
+  echo ""                                                            >> dir3/kafka
+  echo "Why are you watching?"                                       >> dir3/kafka
+  echo ""                                                            >> dir3/kafka
+  echo "Someone must watch, it is said. Someone must be there."      >> dir3/kafka
+
+  touch dir3/many_kafkas
+  touch dir3/alotof_kafkas
+  touch dir3/kafka_army
+
+  touch dir3/.cvmfscatalog
+
+  popdir
+}
+
+produce_files_3_in() { # REVISION 5
+  local working_dir=$1
+  pushdir $working_dir
+
+  rm -fR dir1
+
+  popdir
+}
+
+produce_files_4_in() { # REVISION 6
+  local working_dir=$1
+  pushdir $working_dir
+
+  rm -fR dir3
+
+  popdir
+}
+
+cvmfs_run_test() {
+  local logfile=$1
+  local script_location=$2
+  local scratch_dir=$(pwd)
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  mkdir reference_dir1
+  mkdir reference_dir2
+  mkdir reference_dir3
+  mkdir reference_dir4
+  local reference_dir1=$scratch_dir/reference_dir1
+  local reference_dir2=$scratch_dir/reference_dir2
+  local reference_dir3=$scratch_dir/reference_dir3
+  local reference_dir4=$scratch_dir/reference_dir4
+
+  local condemned_clgs=""
+  local preserved_clgs=""
+
+  local revision_4_clg=""
+  local revision_5_clg=""
+  local revision_5_nested_clg=""
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER and disabled auto-tagging"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -g -z || return $?
+  condemned_clgs="$condemned_clgs $(get_current_root_catalog $CVMFS_TEST_REPO)"
+
+  echo "load repository configuration"
+  load_repo_config $CVMFS_TEST_REPO
+
+  echo "disable automatic garbage collection"
+  disable_auto_garbage_collection $CVMFS_TEST_REPO || return $?
+
+  # ============================================================================
+
+  echo "starting transaction to edit repository (1)"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository"
+  produce_files_1_in $repo_dir || return 1
+
+  echo "putting exactly the same stuff in the scratch spaces for comparison"
+  produce_files_1_in $reference_dir1 || return 2
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO > publish_1.log 2>&1 || return $?
+  condemned_clgs="$condemned_clgs $(get_current_root_catalog $CVMFS_TEST_REPO)"
+
+  echo "check that the temporary scratch directory is empty"
+  [ $(ls ${CVMFS_SPOOL_DIR}/tmp | wc -l) -eq 0 ] || return 50
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir1 || return $?
+
+  # ============================================================================
+
+  echo "starting transaction to edit repository (2)"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository"
+  produce_files_2_in $repo_dir || return 3
+
+  echo "putting exactly the same stuff in the scratch spaces for comparison"
+  produce_files_1_in $reference_dir2 || return 4
+  produce_files_2_in $reference_dir2 || return 4
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO > publish_2.log 2>&1 || return $?
+  revision_4_clg="$(get_current_root_catalog $CVMFS_TEST_REPO)"
+  condemned_clgs="$condemned_clgs $revision_4_clg"
+
+  echo "check that the temporary scratch directory is empty"
+  [ $(ls ${CVMFS_SPOOL_DIR}/tmp | wc -l) -eq 0 ] || return 50
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir2 || return $?
+
+  # ============================================================================
+
+  echo "starting transaction to edit repository (3)"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository"
+  produce_files_3_in $repo_dir || return 5
+
+  echo "putting exactly the same stuff in the scratch spaces for comparison"
+  produce_files_1_in $reference_dir3 || return 6
+  produce_files_2_in $reference_dir3 || return 6
+  produce_files_3_in $reference_dir3 || return 6
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO > publish_3.log 2>&1 || return $?
+  revision_5_clg=$(get_current_root_catalog $CVMFS_TEST_REPO)
+  revision_5_nested_clg=$(cvmfs_server list-catalogs -xh $CVMFS_TEST_REPO | tail -n1 | awk '{print $1}')
+  preserved_clgs="$preserved_clgs $revision_5_clg $revision_5_nested_clg"
+
+  echo "check that the temporary scratch directory is empty"
+  [ $(ls ${CVMFS_SPOOL_DIR}/tmp | wc -l) -eq 0 ] || return 50
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir3 || return $?
+
+  # ============================================================================
+
+  echo "starting transaction to edit repository (4)"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository"
+  produce_files_4_in $repo_dir || return 7
+
+  echo "putting exactly the same stuff in the scratch spaces for comparison"
+  produce_files_1_in $reference_dir4 || return 8
+  produce_files_2_in $reference_dir4 || return 8
+  produce_files_3_in $reference_dir4 || return 8
+  produce_files_4_in $reference_dir4 || return 8
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO > publish_4.log 2>&1 || return $?
+  preserved_clgs="$preserved_clgs $(get_current_root_catalog $CVMFS_TEST_REPO)"
+
+  echo "check that the temporary scratch directory is empty"
+  [ $(ls ${CVMFS_SPOOL_DIR}/tmp | wc -l) -eq 0 ] || return 50
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir4 || return $?
+
+  # ============================================================================
+
+  local clg5="${revision_5_clg}C"
+  echo "destroy root catalog of (preserved) revision 5 ($clg5)"
+  local clg5_broken="${clg5}.broken"
+  download_from_backend $CVMFS_TEST_REPO $(make_path $clg5) $clg5 || return 13
+  echo "i am broken" >  $clg5_broken                              || return 14
+  cat $clg5          >> $clg5_broken                              || return 15
+  upload_into_backend $CVMFS_TEST_REPO \
+                      $clg5_broken     \
+                      $(make_path $clg5) || return 16
+
+  local gc_log_1="gc_1.log"
+  local deletion_log="condemned_objects.log"
+  echo "perform a basic garbage collection as dryrun (should fail) "
+  local gc_retcode=0
+  cvmfs_server gc -ldfL $deletion_log $CVMFS_TEST_REPO > $gc_log_1 2>&1 || gc_retcode=0
+
+  echo "---- Deletion Log ----"
+  cat $deletion_log
+  echo "---- ------------ ----"
+
+  echo "check that revision 5's root catalog ($clg5) is NOT in the deletion log"
+  cat $deletion_log | grep -q $clg5 && return 100
+
+  # before the fix was added, garbage collection would have swept $kafka_object
+  # but left revision5's root catalog intact (because it was falsely ignored)
+  local kafka_object="fd8370662e701313534bfc2d2b860a7bf0fbf5da"
+  echo "check that kafka ($kafka_object) is NOT in the deletion log (regression test CVM-966)"
+  cat $deletion_log | grep -q $kafka_object && return 101
+
+  echo "do defered GC retcode check (for the regression test)"
+  [ $gc_retcode -eq 0 ] || return 17
+
+  echo "check that the error was caught"
+  cat $gc_log_1 | grep -e "failed to load.*${clg5}.*bad data" || return 18
+
+  echo "repair catalog"
+  upload_into_backend $CVMFS_TEST_REPO \
+                      $clg5            \
+                      $(make_path $clg5) || return 19
+
+  # ============================================================================
+
+  if [ -z $CVMFS_TEST_S3_CONFIG ]; then
+    local clg5_path="$(get_local_repo_storage $CVMFS_TEST_REPO)/$(make_path $clg5)"
+    echo "locking up root catalog of (preserved) revision 5 ($clg5)"
+    chmod 0200 $clg5_path || return 9
+
+    local gc_log_2="gc_2.log"
+    echo "perform a basic garbage collection as dryrun (should fail) "
+    cvmfs_server gc -ldf $CVMFS_TEST_REPO > $gc_log_2 2>&1 && return 10
+
+    echo "check that the error was caught"
+    cat $gc_log_2 | grep -e "failed to load.*${clg5}.*network" || return 11
+
+    echo "repair the catalog"
+    chmod 0644 $clg5_path || return 12
+  else
+    echo "NOTE: skipping permission fiddling on S3"
+  fi
+
+  # ============================================================================
+
+  echo "check if the repository is still sane"
+  check_repository $CVMFS_TEST_REPO -i || return 20
+
+  echo "check if the repository's previous revision is still sane"
+  check_repository $CVMFS_TEST_REPO -i -t trunk-previous || return 21
+
+  # ============================================================================
+
+  local clg4="${revision_4_clg}C"
+  if [ -z $CVMFS_TEST_S3_CONFIG ]; then
+    local clg4_path="$(get_local_repo_storage $CVMFS_TEST_REPO)/$(make_path $clg4)"
+    echo "locking up root catalog of (condemned) revision 4 ($clg4)"
+    chmod 0200 $clg4_path || return 22
+
+    local gc_log_3="gc_3.log"
+    echo "perform a basic garbage collection as dryrun (should fail) "
+    cvmfs_server gc -ldf $CVMFS_TEST_REPO > $gc_log_3 2>&1 && return 23
+
+    echo "check that the error was caught"
+    cat $gc_log_3 | grep -e "failed to load.*${clg4}.*network" || return 24
+
+    echo "repair the catalog"
+    chmod 0644 $clg4_path || return 25
+  else
+    echo "NOTE: skipping permission fiddling on S3"
+  fi
+
+  # ============================================================================
+
+  echo "destroy root catalog of (condemned) revision 4 ($clg4)"
+  local clg4_broken="${clg4}.broken"
+  download_from_backend $CVMFS_TEST_REPO $(make_path $clg4) $clg4 || return 26
+  echo "i am broken" >  $clg4_broken                              || return 27
+  cat $clg4          >> $clg4_broken                              || return 28
+  upload_into_backend $CVMFS_TEST_REPO \
+                      $clg4_broken     \
+                      $(make_path $clg4) || return 29
+
+  local gc_log_4="gc_4.log"
+  echo "perform a basic garbage collection as dryrun (should fail) "
+  cvmfs_server gc -ldf $CVMFS_TEST_REPO > $gc_log_4 2>&1 && return 30
+
+  echo "check that the error was caught"
+  cat $gc_log_4 | grep -e "failed to load.*${clg4}.*bad data" || return 31
+
+  echo "repair catalog"
+  upload_into_backend $CVMFS_TEST_REPO \
+                      $clg4            \
+                      $(make_path $clg4) || return 32
+
+  # ============================================================================
+
+  echo "check if the repository is still sane"
+  check_repository $CVMFS_TEST_REPO -i || return 33
+
+  echo "check if the repository's previous revision is still sane"
+  check_repository $CVMFS_TEST_REPO -i -t trunk-previous || return 34
+
+  # ============================================================================
+
+  local gc_log_5="gc_5.log"
+  echo "run garbage collection to delete all old revisions"
+  cvmfs_server gc -lf $CVMFS_TEST_REPO > $gc_log_5 2>&1 || return 35
+
+  echo "check that catalog 4 is gone"
+  peek_backend $CVMFS_TEST_REPO $clg4 && return 36
+
+  # ============================================================================
+
+  local gc_log_6="gc_6.log"
+  echo "run a garbage collection that should not fail (error 404)"
+  cvmfs_server gc -ldf $CVMFS_TEST_REPO > $gc_log_6 2>&1 || return 37
+
+  # ============================================================================
+
+  local clg5n="${revision_5_nested_clg}C"
+  if [ -z $CVMFS_TEST_S3_CONFIG ]; then
+    local clg5n_path="$(get_local_repo_storage $CVMFS_TEST_REPO)/$(make_path $clg5n)"
+    echo "locking up nested catalog of (preserved) revision 5 ($clg5n)"
+    chmod 0200 $clg5n_path || return 38
+
+    local gc_log_7="gc_7.log"
+    echo "perform a basic garbage collection as dryrun (should fail) "
+    cvmfs_server gc -ldf $CVMFS_TEST_REPO > $gc_log_7 2>&1 && return 39
+
+    echo "check that the error was caught"
+    cat $gc_log_7 | grep -e "failed to load.*${clg5n}.*network" || return 40
+
+    echo "repair the catalog"
+    chmod 0644 $clg5n_path || return 41
+  else
+    echo "NOTE: skipping permission fiddling on S3"
+  fi
+
+  # ============================================================================
+
+  echo "destroy nested catalog of (preserved) revision 5 ($clg5n)"
+  local clg5n_broken="${clg5n}.broken"
+  download_from_backend $CVMFS_TEST_REPO $(make_path $clg5n) $clg5n || return 42
+  echo "i am broken" >  $clg5n_broken                               || return 43
+  cat $clg5n         >> $clg5n_broken                               || return 44
+  upload_into_backend $CVMFS_TEST_REPO \
+                      $clg5n_broken    \
+                      $(make_path $clg5n) || return 45
+
+  local gc_log_8="gc_8.log"
+  echo "perform a basic garbage collection as dryrun (should fail) "
+  cvmfs_server gc -ldf $CVMFS_TEST_REPO > $gc_log_8 2>&1 && return 46
+
+  echo "check that the error was caught"
+  cat $gc_log_8 | grep -e "failed to load.*${clg5n}.*bad data" || return 47
+
+  echo "repair catalog"
+  upload_into_backend $CVMFS_TEST_REPO \
+                      $clg5n           \
+                      $(make_path $clg5n) || return 48
+
+  return 0
+}

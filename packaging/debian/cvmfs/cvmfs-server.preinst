@@ -1,0 +1,37 @@
+#!/bin/sh
+set -e
+
+CVMFS_INSTALL_ACTION=$1
+CVMFS_SPOOL_DIR_BASE="/var/spool/cvmfs"
+CVMFS_CONFIG_DIR_BASE="/etc/cvmfs/repositories.d"
+CVMFS_OPEN_TXN=0
+
+#DEBHELPER#
+
+# check that the expected CernVM-FS repo infrastructure is in place
+[ -d "$CVMFS_SPOOL_DIR_BASE"  ] || exit 0
+[ -d "$CVMFS_CONFIG_DIR_BASE" ] || exit 0
+
+# count open transactions in Stratum0 repositories
+for repo in ${CVMFS_SPOOL_DIR_BASE}/*; do
+  [   -d $repo ]                                                   || continue
+  [ ! -f ${CVMFS_CONFIG_DIR_BASE}/$(basename $repo)/replica.conf ] || continue
+
+  # CernVM-FS 2.2.0+          --> 'in_transaction.lock' file
+  # CernVM-FS 2.1.18 - 2.1.20 --> 'in_transaction' lock directory
+  # CernVM-FS 2.1.0  - 2.1.17 --> 'in_transaction' lock file
+  if [ -f ${repo}/in_transaction.lock ] || \
+     [ -d ${repo}/in_transaction      ] || \
+     [ -f ${repo}/in_transaction      ]; then
+    CVMFS_OPEN_TXN=$(( $CVMFS_OPEN_TXN + 1 ))
+  fi
+done
+
+# check if there are any open transactions
+if [ $CVMFS_OPEN_TXN -gt 0 ]; then
+  echo "     Found $CVMFS_OPEN_TXN open CernVM-FS repository transactions." >&2
+  echo "     Please abort or publish them before updating CernVM-FS."       >&2
+  exit 1
+fi
+
+exit 0

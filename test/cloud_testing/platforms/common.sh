@@ -228,8 +228,13 @@ install_rpm() {
 
     # install the RPM
     echo -n "Installing RPM '$rpm_name' ... "
-    yum_output=$(sudo yum -y install --nogpgcheck $this_rpm 2>&1)
-    check_package_manager_response $? "Yum" "$yum_output"
+    if which dnf > /dev/null 2>&1; then
+      yum_output=$(sudo dnf -y install --nogpgcheck $this_rpm 2>&1)
+      check_package_manager_response $? "DNF" "$yum_output"
+    else
+      yum_output=$(sudo yum -y install --nogpgcheck $this_rpm 2>&1)
+      check_package_manager_response $? "Yum" "$yum_output"
+    fi
   done
 }
 
@@ -257,6 +262,8 @@ install_from_repo() {
   # find out which package manager to use
   if which apt-get > /dev/null 2>&1; then
     pkg_mgr="apt-get"
+  elif which dnf > /dev/null 2>&1; then
+    pkg_mgr="dnf"
   else
     pkg_mgr="yum"
   fi

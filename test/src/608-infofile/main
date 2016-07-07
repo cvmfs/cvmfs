@@ -1,0 +1,105 @@
+cvmfs_test_name="Repository info JSON file"
+cvmfs_test_autofs_on_startup=false
+
+# TODO(rmeusel): Make this S3 compliant after CVM-980 is implemented
+
+
+CVMFS_TEST_608_REPLICA_NAME=
+cleanup() {
+  echo "running cleanup..."
+  [ -z $CVMFS_TEST_608_REPLICA_NAME ] ||  sudo cvmfs_server rmfs -f $CVMFS_TEST_608_REPLICA_NAME
+}
+
+d() {
+  curl -sf $@ 2>/dev/null
+}
+
+json() {
+  jq --raw-output "$@"
+}
+
+repo_is_registered() {
+  local repo="$1"
+  [ ! -z "$(d $info_url | json ".repositories[] | select(.name == \"$repo\")")" ]
+}
+
+replica_is_registered() {
+  local repo="$1"
+  local alias_name="$2"
+  [ ! -z "$(d $info_url | json ".replicas[] | select(.name == \"$repo\")")" ] || return 1
+  [ -z $alias_name ] || [ ! -z "$(d $info_url | json ".replicas[] | select(.alias == \"$alias_name\")")" ]
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local scratch_dir=$(pwd)
+
+  local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
+  local info_url="$(get_local_repo_url info)/v1/repositories.json"
+
+  echo "check if the jq utility is installed"
+  which jq > /dev/null 2>&1 || return 1
+
+  echo "register cleanup trap"
+  trap cleanup EXIT HUP INT TERM || return $?
+
+  echo "make sure that $CVMFS_TEST_REPO is not yet there"
+  ! has_repo $CVMFS_TEST_REPO || destroy_repo $CVMFS_TEST_REPO || return 2
+
+  echo "check that neither $CVMFS_TEST_REPO nor $replica_name are registered"
+  if d $info_url > /dev/null; then
+    ! repo_is_registered $CVMFS_TEST_REPO                  || return 4
+    ! replica_is_registered $CVMFS_TEST_REPO $replica_name || return 5
+  else
+    echo "--> info file doesn't exist yet"
+  fi
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "check that $CVMFS_TEST_REPO is registered but $replica_name isn't"
+  repo_is_registered $CVMFS_TEST_REPO || return 6
+  ! repo_is_registered $replica_name  || return 7
+
+  echo "create Stratum1 repository on the same machine"
+  load_repo_config $CVMFS_TEST_REPO
+  CVMFS_TEST_608_REPLICA_NAME=$replica_name
+  create_stratum1 $replica_name                          \
+                  $CVMFS_TEST_USER                       \
+                  $CVMFS_STRATUM0                        \
+                  /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub || return $?
+
+  echo "check that both $CVMFS_TEST_REPO and $replica_name are registered"
+  repo_is_registered $CVMFS_TEST_REPO                  || return 8
+  replica_is_registered $CVMFS_TEST_REPO $replica_name || return 9
+
+  # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  echo "remove $CVMFS_TEST_REPO gracefully (keeping the backend)"
+  destroy_repo $CVMFS_TEST_REPO -p || return 10
+
+  echo "check that $CVMFS_TEST_REPO is gone and $replica_name persisted"
+  ! repo_is_registered $CVMFS_TEST_REPO                || return 11
+  replica_is_registered $CVMFS_TEST_REPO $replica_name || return 12
+
+  echo "import $CVMFS_TEST_REPO again"
+  import_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return 13
+
+  echo "check that both $CVMFS_TEST_REPO and $replica_name are registered"
+  repo_is_registered $CVMFS_TEST_REPO                  || return 14
+  replica_is_registered $CVMFS_TEST_REPO $replica_name || return 15
+
+  # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  echo "remove the replica"
+  destroy_repo $replica_name || return 16
+  CVMFS_TEST_608_REPLICA_NAME=""
+
+  echo "check that $CVMFS_TEST_REPO is registerd but $replica_name is gone"
+  repo_is_registered $CVMFS_TEST_REPO                    || return 17
+  ! replica_is_registered $CVMFS_TEST_REPO $replica_name || return 18
+
+  return 0
+}
+

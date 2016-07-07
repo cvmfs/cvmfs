@@ -15,6 +15,12 @@ get_apache_config_filename() {
   echo "${repo_name}.conf"
 }
 
+set_selinux_httpd_context_if_needed() {
+  local directory="$1"
+  if has_selinux; then
+    sudo chcon -Rv --type=httpd_sys_content_t ${directory}/ > /dev/null
+  fi
+}
 
 mock_apache_access_to_legacy_repo() {
   local legacy_repo_name="$1"
@@ -41,6 +47,7 @@ Alias /cvmfs/${legacy_repo_name} ${legacy_repo_storage}/pub/catalogs
   ExpiresByType application/x-cvmfs "access plus 1 minutes"
 </Directory>
 EOF
+  set_selinux_httpd_context_if_needed $legacy_repo_storage
   apache_switch off > /dev/null
   apache_switch on  > /dev/null
   curl --output /dev/null --silent --head --fail "$legacy_repo_url/.cvmfspublished" || die "fail (404 on .cvmfspublished)"
@@ -103,6 +110,7 @@ TEST550_S0_MOUNTPOINT=""
 TEST550_S1_MOUNTPOINT=""
 TEST550_NEW_REPO_NAME=""
 cleanup() {
+  echo "running cleanup()"
   [ -z "$TEST550_LEGACY_STORAGE" ] || sudo rm -fR $TEST550_LEGACY_STORAGE
   [ -z "$TEST550_APACHE_CONF" ]    || remove_apache_config_file $TEST550_APACHE_CONF
   [ -z "$TEST550_REPLICA_NAME" ]   || sudo cvmfs_server rmfs -f $TEST550_REPLICA_NAME
@@ -196,15 +204,18 @@ cvmfs_run_test() {
           $legacy_repo_storage/pub/catalogs/.cvmfswhitelist         \
           $legacy_repo_storage/pub/catalogs/.cvmfs_master_replica   \
           $legacy_repo_storage || return 13
-  sudo cvmfs_server import \
-    -o $CVMFS_TEST_USER    \
-    -l                     \
-    -s                     \
-    -g                     \
-    $legacy_repo_name || return 14
+  import_repo $legacy_repo_name $CVMFS_TEST_USER \
+    -l                                           \
+    -s                                           \
+    -g || return 14
 
   echo "list newly generated repository under /cvmfs/${legacy_repo_name}"
   ls -lisa /cvmfs/${legacy_repo_name} || return 15
+
+  if uses_overlayfs $legacy_repo_name; then
+    echo "we are running on OverlayFS. We need to erase all hardlinks now..."
+    sudo cvmfs_server eliminate-hardlinks -f $legacy_repo_name || return 101
+  fi
 
   echo "do a snapshot on stratum 1 that spans from CernVM-FS 2.1.x to 2.0"
   sudo cvmfs_server snapshot $replica_name || return 16
@@ -229,11 +240,12 @@ cvmfs_run_test() {
   local big_sha1="$(cat $big_file | sha1sum | head -c40)"
   [ x"181e8566ef9ef4063a00e56ec82cc99682ac795c" = x"$big_sha1" ] || return 22
 
-  echo "run a new transaction"
-  start_transaction "$legacy_repo_name"  || return 23
-  cp_bin /cvmfs/${legacy_repo_name}/dir7 || return 24
-  touch $big_file                        || return 25
-  publish_repo "$legacy_repo_name"       || return 26
+  local publish_log_1="publish_1.log"
+  echo "run a new transaction (logging to $publish_log_1)"
+  start_transaction "$legacy_repo_name"                  || return 23
+  cp_bin /cvmfs/${legacy_repo_name}/dir7                 || return 24
+  touch $big_file                                        || return 25
+  publish_repo "$legacy_repo_name" > $publish_log_1 2>&1 || return 26
 
   echo "check if big file is still the same content hash (now it should be chunked)"
   local big_sha1_2="$(cat $big_file | sha1sum | head -c40)"

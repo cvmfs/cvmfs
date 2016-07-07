@@ -1,0 +1,69 @@
+
+cvmfs_test_name="Certificate blacklist in config repository"
+cvmfs_test_autofs_on_startup=false
+
+TEST_616_MOUNTPOINT_MORE=""
+TEST_616_EXTRA_REPO=""
+cleanup() {
+  if [ ! -z $TEST_616_MOUNTPOINT_MORE ]; then
+    echo -n "umounting ${TEST_616_MOUNTPOINT_MORE}... "
+    remove_local_mount $TEST_616_MOUNTPOINT_MORE && echo "done" || echo "fail"
+  fi
+
+  if [ ! -z $TEST_616_EXTRA_REPO ]; then
+    echo "removing ${TEST_616_EXTRA_REPO}..."
+    destroy_repo $TEST_616_EXTRA_REPO
+  fi
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  echo "create a fresh repositories with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+  TEST_616_EXTRA_REPO=$CVMFS_TEST_REPO_MORE
+  create_empty_repo $CVMFS_TEST_REPO_MORE $CVMFS_TEST_USER || return $?
+
+  echo "set a trap for desaster cleanup"
+  trap cleanup EXIT HUP INT TERM
+
+  echo "create a local mount of the created repositories"
+  TEST_616_MOUNTPOINT_MORE="$(pwd)/local_mount_more"
+  do_local_mount "$TEST_616_MOUNTPOINT_MORE" \
+                 "$CVMFS_TEST_REPO_MORE"     \
+                 "$(get_repo_url $CVMFS_TEST_REPO_MORE)" \
+                 "" \
+                 "CVMFS_CONFIG_REPOSITORY=$CVMFS_TEST_REPO" || return 5
+
+  ls $TEST_611_MOUNTPOINT_MORE || return 11
+  remove_local_mount $TEST_616_MOUNTPOINT_MORE || return 13
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "download whitelist for getting the fingeprint"
+  download_from_backend $CVMFS_TEST_REPO_MORE .cvmfswhitelist whitelist || return 50
+  local fingerprint=$(cat whitelist | grep -a -A1 ^N | tail -1)
+
+  echo "creating blacklist"
+  mkdir -p "${repo_dir}/etc/cvmfs"
+  echo "$fingerprint" > "${repo_dir}/etc/cvmfs/blacklist"
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "Printing /cvmfs/${CVMFS_TEST_REPO}/etc/cvmfs/blacklist"
+  cat "/cvmfs/${CVMFS_TEST_REPO}/etc/cvmfs/blacklist" || return 22
+  do_local_mount "$TEST_616_MOUNTPOINT_MORE" \
+                 "$CVMFS_TEST_REPO_MORE"     \
+                 "$(get_repo_url $CVMFS_TEST_REPO_MORE)" \
+                 "" \
+                 "CVMFS_CONFIG_REPOSITORY=$CVMFS_TEST_REPO"
+  if [ $? -eq 0 ]; then
+    echo "BLACKLIST IN CONFIG REPO NOT EFFECTIVE"
+    return 23
+  fi
+
+  return 0
+}

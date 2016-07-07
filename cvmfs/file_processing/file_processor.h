@@ -7,10 +7,9 @@
 
 #include <string>
 
-#include "../hash.h"
-#include "../upload_spooler_result.h"
-#include "../util.h"
-#include "../util_concurrency.h"
+#include "hash.h"
+#include "upload_spooler_result.h"
+#include "util_concurrency.h"
 
 namespace upload {
 
@@ -91,6 +90,7 @@ class FileProcessor : public Observable<SpoolerResult> {
  private:
   IoDispatcher  *io_dispatcher_;
 
+  zlib::Algorithms   compression_alg_;
   shash::Algorithms  hash_algorithm_;
   const bool         chunking_enabled_;
   const size_t       minimal_chunk_size_;

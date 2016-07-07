@@ -36,6 +36,9 @@ echo "installing additional RPM packages..."
 install_from_repo gcc
 install_from_repo gcc-c++
 
+# traffic shaping
+install_from_repo trickle
+
 # rebooting the system (returning 0 value)
 echo "sleep 1 && reboot" > killme.sh
 sudo nohup sh < killme.sh &

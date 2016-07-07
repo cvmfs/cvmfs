@@ -11,7 +11,7 @@ cvmfs_run_test() {
   local cache_dir
   local cache_list
   local pid
-  
+
   cache_dir=$(get_cvmfs_cachedir ${repo})
   sudo [ -f ${cache_dir}/cachedb ] || return 2
   sudo [ -f ${cache_dir}/cachemgr.running ] || cvmfs_config showconfig ${repo} | grep -q CVMFS_SHARED_CACHE=no || return 3
@@ -24,29 +24,29 @@ cvmfs_run_test() {
   fi
 
   cvmfs_umount ${repo} || return 10
-  ls /cvmfs/${repo} || return 11
+  try_automount ${repo} || return 11
   cat /cvmfs/${repo}/.cvmfsdirtab || return 12
   cache_list=$(sudo cvmfs_talk -i ${repo} cache list)
   if echo $cache_list | grep -q "automatic rebuild"; then
     echo "$cache_list"
     return 13
   fi
-  
+
   pid=$(sudo cvmfs_talk -i ${repo} pid cachemgr) || return 20
   sudo kill -9 $pid || return 21
   cvmfs_umount ${repo} || return 22
-  
+
   # make sure autofs is in a sane condition
   service_switch autofs restart || return 23
   sleep 2
 
-  ls /cvmfs/${repo} || return 30
+  try_automount ${repo} || return 30
   cache_list=$(sudo cvmfs_talk -i ${repo} cache list)
   if echo $cache_list | grep -v -q "automatic rebuild"; then
     echo "$cache_list"
     return 31
   fi
-  
-  return 0 
+
+  return 0
 }
 

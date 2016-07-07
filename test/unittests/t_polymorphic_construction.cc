@@ -7,9 +7,9 @@
 #include <cstdlib>
 #include <string>
 
-#include "../../cvmfs/prng.h"
-#include "../../cvmfs/util.h"
+#include "prng.h"
 #include "testutil.h"
+#include "util/plugin.h"
 
 struct DecisionType {
   DecisionType() : type(-1), fail(false) {}

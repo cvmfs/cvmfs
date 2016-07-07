@@ -18,11 +18,14 @@
 
 #define _FILE_OFFSET_BITS 64
 
+#define __STDC_FORMAT_MACROS
+
 #include "cvmfs_config.h"
 #include "swissknife_sync.h"
 
 #include <fcntl.h>
 #include <glob.h>
+#include <inttypes.h>
 
 #include <cstdio>
 #include <cstdlib>
@@ -31,14 +34,13 @@
 
 #include "catalog_mgr_ro.h"
 #include "catalog_mgr_rw.h"
-#include "dirtab.h"
 #include "download.h"
 #include "logging.h"
 #include "manifest.h"
+#include "path_filters/dirtab.h"
 #include "platform.h"
 #include "sync_mediator.h"
 #include "sync_union.h"
-#include "util.h"
 
 using namespace std;  // NOLINT
 
@@ -90,11 +92,12 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
   const string manifest_path = *args.find('o')->second;
   const string dir_temp = *args.find('t')->second;
   const string spooler_definition = *args.find('r')->second;
+  const string repo_name = *args.find('n')->second;
   if (args.find('l') != args.end()) {
     unsigned log_level =
       1 << (kLogLevel0 + String2Uint64(*args.find('l')->second));
     if (log_level > kLogNone) {
-      swissknife::Usage();
+      LogCvmfs(kLogCvmfs, kLogStderr, "invalid log level");
       return 1;
     }
     SetLogVerbosity(static_cast<LogLevels>(log_level));
@@ -107,24 +110,44 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
       return 1;
     }
   }
+
   const bool volatile_content    = (args.count('v') > 0);
   const bool garbage_collectable = (args.count('z') > 0);
+  std::string voms_authz;
+  if (args.find('V') != args.end()) {
+    voms_authz = *args.find('V')->second;
+  }
 
-  const upload::SpoolerDefinition sd(spooler_definition, hash_algorithm);
+  const upload::SpoolerDefinition sd(spooler_definition,
+                                     hash_algorithm, zlib::kZlibDefault);
   upload::Spooler *spooler = upload::Spooler::Construct(sd);
   assert(spooler);
 
   // TODO(rmeusel): use UniquePtr
   manifest::Manifest *manifest =
-    catalog::WritableCatalogManager::CreateRepository(
-      dir_temp, volatile_content, garbage_collectable, spooler);
+    catalog::WritableCatalogManager::CreateRepository(dir_temp,
+                                                      volatile_content,
+                                                      voms_authz,
+                                                      spooler);
   if (!manifest) {
     PrintError("Failed to create new repository");
     return 1;
   }
 
+  UniquePtr<manifest::Reflog> reflog(CreateEmptyReflog(dir_temp, repo_name));
+  if (!reflog.IsValid()) {
+    PrintError("Failed to create fresh Reflog");
+    return 1;
+  }
+
+  spooler->UploadReflog(reflog->CloseAndReturnDatabaseFile());
   spooler->WaitForUpload();
   delete spooler;
+
+  // set optional manifest fields
+  const bool needs_bootstrap_shortcuts = !voms_authz.empty();
+  manifest->set_garbage_collectability(garbage_collectable);
+  manifest->set_has_alt_catalog_path(needs_bootstrap_shortcuts);
 
   if (!manifest->Export(manifest_path)) {
     PrintError("Failed to create new repository");
@@ -236,34 +259,34 @@ int swissknife::CommandApplyDirtab::Main(const ArgumentList &args) {
   }
 
   // parse dirtab file
-  catalog::Dirtab dirtab(dirtab_file);
-  if (!dirtab.IsValid()) {
+  catalog::Dirtab *dirtab = catalog::Dirtab::Create(dirtab_file);
+  if (!dirtab->IsValid()) {
     LogCvmfs(kLogCatalog, kLogStderr, "Invalid or not readable dirtab '%s'",
              dirtab_file.c_str());
     return 1;
   }
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "Found %d rules in dirtab '%s'",
-           dirtab.RuleCount(), dirtab_file.c_str());
+           dirtab->RuleCount(), dirtab_file.c_str());
 
   // initialize catalog infrastructure
-  g_download_manager->Init(1, true, g_statistics);
   const bool auto_manage_catalog_files = true;
   const bool follow_redirects = (args.count('L') > 0);
-  if (follow_redirects) {
-    g_download_manager->EnableRedirects();
+  if (!this->InitDownloadManager(follow_redirects)) {
+    return 1;
   }
   catalog::SimpleCatalogManager catalog_manager(base_hash,
                                                 stratum0,
                                                 dir_temp,
-                                                g_download_manager,
-                                                g_statistics,
+                                                download_manager(),
+                                                statistics(),
                                                 auto_manage_catalog_files);
   catalog_manager.Init();
 
   vector<string> new_nested_catalogs;
-  DetermineNestedCatalogCandidates(dirtab, &catalog_manager,
+  DetermineNestedCatalogCandidates(*dirtab, &catalog_manager,
                                    &new_nested_catalogs);
   const bool success = CreateCatalogMarkers(new_nested_catalogs);
+  delete dirtab;
 
   return (success) ? 0 : 1;
 }
@@ -480,24 +503,35 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   params.manifest_path = *args.find('o')->second;
   params.spooler_definition = *args.find('r')->second;
 
+  params.public_keys = *args.find('K')->second;
+  params.repo_name = *args.find('N')->second;
+
   if (args.find('f') != args.end())
     params.union_fs_type = *args.find('f')->second;
+  if (args.find('A') != args.end()) params.is_balanced = true;
   if (args.find('x') != args.end()) params.print_changeset = true;
   if (args.find('y') != args.end()) params.dry_run = true;
   if (args.find('m') != args.end()) params.mucatalogs = true;
   if (args.find('i') != args.end()) params.ignore_xdir_hardlinks = true;
   if (args.find('d') != args.end()) params.stop_for_catalog_tweaks = true;
-  if (args.find('g') != args.end()) params.garbage_collectable = true;
+  if (args.find('V') != args.end()) params.voms_authz = true;
+  if (args.find('F') != args.end()) params.authz_file = *args.find('F')->second;
   if (args.find('k') != args.end()) params.include_xattrs = true;
+  if (args.find('Y') != args.end()) params.external_data = true;
   if (args.find('z') != args.end()) {
     unsigned log_level =
     1 << (kLogLevel0 + String2Uint64(*args.find('z')->second));
     if (log_level > kLogNone) {
-      swissknife::Usage();
+      LogCvmfs(kLogCvmfs, kLogStderr, "invalid log level");
       return 1;
     }
     SetLogVerbosity(static_cast<LogLevels>(log_level));
   }
+
+  if (args.find('X') != args.end())
+    params.max_weight = String2Uint64(*args.find('X')->second);
+  if (args.find('M') != args.end())
+    params.min_weight = String2Uint64(*args.find('M')->second);
 
   if (args.find('p') != args.end()) {
     params.use_file_chunking = true;
@@ -514,6 +548,14 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
       return 1;
     }
   }
+  if (args.find('Z') != args.end()) {
+    params.compression_alg =
+      zlib::ParseCompressionAlgorithm(*args.find('Z')->second);
+  }
+
+  if (args.find('C') != args.end()) {
+    params.trusted_certs = *args.find('C')->second;
+  }
 
   if (args.find('j') != args.end()) {
     params.catalog_entry_warn_threshold =
@@ -528,12 +570,17 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     params.max_concurrent_write_jobs = String2Uint64(*args.find('q')->second);
   }
 
+  if (args.find('T') != args.end()) {
+    params.ttl_seconds = String2Uint64(*args.find('T')->second);
+  }
+
   if (!CheckParams(params)) return 2;
 
   // Start spooler
   upload::SpoolerDefinition spooler_definition(
     params.spooler_definition,
     hash_algorithm,
+    params.compression_alg,
     params.use_file_chunking,
     params.min_file_chunk_size,
     params.avg_file_chunk_size,
@@ -543,21 +590,45 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
                                                params.max_concurrent_write_jobs;
   }
 
+  upload::SpoolerDefinition spooler_definition_catalogs(
+    spooler_definition.Dup2DefaultCompression());
+
   params.spooler = upload::Spooler::Construct(spooler_definition);
   if (NULL == params.spooler)
     return 3;
+  UniquePtr<upload::Spooler> spooler_catalogs(
+    upload::Spooler::Construct(spooler_definition_catalogs));
+  if (!spooler_catalogs.IsValid())
+    return 3;
 
-  g_download_manager->Init(1, true, g_statistics);
   const bool follow_redirects = (args.count('L') > 0);
-  if (follow_redirects) {
-    g_download_manager->EnableRedirects();
+  if (!this->InitDownloadManager(follow_redirects)) {
+    return 3;
   }
+
+  if (!this->InitVerifyingSignatureManager(params.public_keys,
+                                           params.trusted_certs)) {
+    return 3;
+  }
+
+  UniquePtr<manifest::Manifest> manifest;
+  manifest = this->FetchRemoteManifest(params.stratum0,
+                                       params.repo_name,
+                                       params.base_hash);
+  if (!manifest) {
+    return 3;
+  }
+
   catalog::WritableCatalogManager
     catalog_manager(params.base_hash, params.stratum0, params.dir_temp,
-                    params.spooler, g_download_manager,
+                    spooler_catalogs, download_manager(),
                     params.catalog_entry_warn_threshold,
-                    g_statistics);
+                    statistics(),
+                    params.is_balanced,
+                    params.max_weight,
+                    params.min_weight);
   catalog_manager.Init();
+
   publish::SyncMediator mediator(&catalog_manager, &params);
   publish::SyncUnion *sync;
   if (params.union_fs_type == "overlayfs") {
@@ -576,26 +647,60 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     return 3;
   }
 
-  sync->Traverse();
-
-  LogCvmfs(kLogCvmfs, kLogStdout, "Exporting repository manifest");
-  UniquePtr<manifest::Manifest> manifest(mediator.Commit());
-
-  if (!manifest.IsValid()) {
-    PrintError("something went wrong during sync");
+  if (!sync->Initialize()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Initialization of the synchronisation "
+                                    "engine failed");
     return 4;
   }
 
-  manifest->set_garbage_collectability(params.garbage_collectable);
-  g_download_manager->Fini();
+  sync->Traverse();
+
+  if (params.ttl_seconds > 0) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "Setting repository TTL to %"PRIu64" s",
+             params.ttl_seconds);
+    catalog_manager.SetTTL(params.ttl_seconds);
+  }
+
+  if (!params.authz_file.empty()) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "Adding contents of authz file %s to"
+                                   " root catalog.",
+                                   params.authz_file.c_str());
+    int fd = open(params.authz_file.c_str(), O_RDONLY);
+    if (fd == -1) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Unable to open authz file (%s)"
+               "from the publication process: %s", params.authz_file.c_str(),
+               strerror(errno));
+      return 7;
+    }
+
+    std::string new_authz;
+    const bool read_successful = SafeReadToString(fd, &new_authz);
+    close(fd);
+
+    if (!read_successful) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to read authz file (%s): %s",
+               params.authz_file.c_str(),
+               strerror(errno));
+      return 8;
+    }
+
+    catalog_manager.SetVOMSAuthz(new_authz);
+  }
+
+  if (!mediator.Commit(manifest.weak_ref())) {
+    PrintError("something went wrong during sync");
+    return 5;
+  }
 
   // finalize the spooler
+  LogCvmfs(kLogCvmfs, kLogStdout, "Exporting repository manifest");
   params.spooler->WaitForUpload();
+  spooler_catalogs->WaitForUpload();
   delete params.spooler;
 
   if (!manifest->Export(params.manifest_path)) {
     PrintError("Failed to create new repository");
-    return 5;
+    return 6;
   }
 
   return 0;

@@ -7,11 +7,11 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "../../cvmfs/catalog.h"
-#include "../../cvmfs/catalog_mgr.h"
-#include "../../cvmfs/hash.h"
-#include "../../cvmfs/shortstring.h"
-#include "../../cvmfs/util.h"
+#include "catalog.h"
+#include "catalog_balancer.h"
+#include "catalog_mgr.h"
+#include "hash.h"
+#include "shortstring.h"
 #include "testutil.h"
 
 using namespace std;  // NOLINT
@@ -20,7 +20,6 @@ using namespace std;  // NOLINT
 namespace catalog {
 
 class T_CatalogManager : public ::testing::Test {
-
  public:
   T_CatalogManager() : statistics_(), catalog_mgr_(&statistics_) { }
 
@@ -83,8 +82,6 @@ class T_CatalogManager : public ::testing::Test {
                                                4096, 1, 0, false,
                                                root_catalog, NULL);
     ASSERT_NE(static_cast<MockCatalog*>(NULL), new_catalog);
-    ASSERT_EQ(1u, root_catalog->GetChildren().size());
-    catalog_mgr_.RegisterNewCatalog(new_catalog);
     // adding "/dir/dir/dir/file3" to the new nested catalog
     hash = shash::Any(shash::kSha1,
                       reinterpret_cast<const unsigned char*>(hashes[2]),
@@ -107,8 +104,6 @@ class T_CatalogManager : public ::testing::Test {
                                                  shash::Any(),
                                                  4096, 1, 0, false,
                                                  new_catalog, NULL);
-    ASSERT_EQ(1u, root_catalog->GetChildren().size());
-    catalog_mgr_.RegisterNewCatalog(new_catalog_2);
     // adding "/dir/dir/dir/dir/dir/file5"
     hash = shash::Any(shash::kSha1,
                       reinterpret_cast<const unsigned char*>(hashes[4]),
@@ -116,10 +111,12 @@ class T_CatalogManager : public ::testing::Test {
     new_catalog_2->AddFile(hash, file_size, "/dir/dir/dir/dir/dir", "file5");
     // we haven't mounted the third catalog yet!
     ASSERT_EQ(1, catalog_mgr_.GetNumCatalogs());
+    catalog_mgr_.RegisterNewCatalog(new_catalog);
+    catalog_mgr_.RegisterNewCatalog(new_catalog_2);
   }
 
  protected:
-  const static char *hashes[];
+  static const char *hashes[];
   perf::Statistics statistics_;
   MockCatalogManager catalog_mgr_;
 };
@@ -138,7 +135,7 @@ TEST_F(T_CatalogManager, InitialConfiguration) {
   EXPECT_TRUE(catalog_mgr_.Init());
   EXPECT_EQ(1, catalog_mgr_.GetNumCatalogs());
   EXPECT_EQ(1u, catalog_mgr_.GetRevision());
-  EXPECT_FALSE(catalog_mgr_.GetVolatileFlag());
+  EXPECT_FALSE(catalog_mgr_.volatile_flag());
   EXPECT_EQ(0u, catalog_mgr_.GetTTL());
 }
 
@@ -175,27 +172,19 @@ TEST_F(T_CatalogManager, Lookup) {
   EXPECT_TRUE(dirent.IsDirectory());
   EXPECT_TRUE(catalog_mgr_.LookupPath("/file1", kLookupSole, &dirent));
   EXPECT_TRUE(dirent.IsRegular());
-  EXPECT_TRUE(catalog_mgr_.LookupPath("/file1", kLookupFull, &dirent));
-  EXPECT_TRUE(dirent.IsRegular());
-  // the father directory belongs to the catalog, so there is no problem
-  EXPECT_TRUE(catalog_mgr_.LookupPath("/dir/dir/file2", kLookupFull, &dirent));
-  EXPECT_TRUE(dirent.IsRegular());
   // /dir/dir/dir/file4 belongs to a catalog that is not mounted yet
   EXPECT_TRUE(catalog_mgr_.LookupPath("/dir/dir/dir/file4", kLookupSole,
                                       &dirent));
   // the new catalog should be mounted now
   EXPECT_EQ(2, catalog_mgr_.GetNumCatalogs());
 
-  // the father directory should also belong to the nested catalog
-  EXPECT_TRUE(catalog_mgr_.LookupPath("/dir/dir/dir/file4", kLookupFull,
-                                      &dirent));
   // it is not a symplink, so it should crash
   EXPECT_DEATH(catalog_mgr_.LookupPath("/dir/dir/dir/file4", kLookupRawSymlink,
                                       &dirent), ".*");
 
   // load the next catalog
   EXPECT_TRUE(catalog_mgr_.LookupPath("/dir/dir/dir/dir/dir/file5",
-                                      kLookupFull, &dirent));
+                                      kLookupSole, &dirent));
   // the new catalog should be mounted now
   EXPECT_EQ(3, catalog_mgr_.GetNumCatalogs());
 }
@@ -205,7 +194,7 @@ TEST_F(T_CatalogManager, LongLookup) {
   ASSERT_TRUE(catalog_mgr_.Init());
   AddTree();
   EXPECT_TRUE(catalog_mgr_.LookupPath("/dir/dir/dir/dir/dir/file5",
-                                      kLookupFull, &dirent));
+                                      kLookupSole, &dirent));
   EXPECT_TRUE(dirent.IsRegular());
   // we should have mounted two catalogs
   EXPECT_EQ(3, catalog_mgr_.GetNumCatalogs());
@@ -255,10 +244,38 @@ TEST_F(T_CatalogManager, FailListing) {
   EXPECT_EQ(0u, del.size());
   // even though the listing failed it should have loaded the nested catalog
   EXPECT_EQ(2, catalog_mgr_.GetNumCatalogs());
-  //trying now with the next nested catalog
+  // trying now with the next nested catalog
   EXPECT_FALSE(catalog_mgr_.Listing("/dir/dir/dir/dir/dir/fakedir", &del));
   EXPECT_EQ(0u, del.size());
   EXPECT_EQ(3, catalog_mgr_.GetNumCatalogs());
+}
+
+TEST_F(T_CatalogManager, Balance) {
+  catalog::DirectoryEntry dirent;
+  ASSERT_TRUE(catalog_mgr_.Init());
+  EXPECT_EQ(1, catalog_mgr_.GetNumCatalogs());
+  AddTree();
+  // load and mount the catalogs
+  EXPECT_EQ(0u, catalog_mgr_.GetNumAutogeneratedCatalogs());
+  CatalogBalancer<MockCatalogManager> balancer(&catalog_mgr_);
+
+  // initial balancing parameters for a MockCatalogManager are:
+  // maximum weight = 5: not used here
+  // minimum weight = 1: not used here
+  // balance weight = 3: This parameter will be used, we won't check the others
+  // because here only the actual balancing process is tested
+  SetLogVerbosity(kLogDiscrete);
+  balancer.Balance(NULL);
+  SetLogVerbosity(kLogNormal);
+
+  // it should now create nested catalogs in:
+  //    - /dir/dir
+  // notice that we have only loaded the first catalog!
+  EXPECT_EQ(1u, catalog_mgr_.GetNumAutogeneratedCatalogs());
+
+  // load the other catalogs so that they can be removed
+  EXPECT_TRUE(catalog_mgr_.LookupPath("/dir/dir/dir/dir/dir/file5",
+                                      kLookupSole, &dirent));
 }
 
 TEST_F(T_CatalogManager, Remount) {
@@ -268,4 +285,4 @@ TEST_F(T_CatalogManager, Remount) {
   EXPECT_EQ(kLoadNew, catalog_mgr_.Remount(false));
 }
 
-}
+}  // namespace catalog

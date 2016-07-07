@@ -19,6 +19,25 @@ create_revision() {
   echo "$(get_current_root_catalog $repo_name)C"
 }
 
+print_reflog() {
+  local repo_name=$1
+  local reflog_tmp="$(mktemp ./reflog.XXXXXX)"
+  download_from_backend $repo_name ".cvmfsreflog" $reflog_tmp || return 1
+  sqlite3 $reflog_tmp "SELECT hash || 'C' FROM refs WHERE type = 0 ORDER BY hash;"
+  rm -f $reflog_tmp
+}
+
+check_reflog() {
+  local repo=$1
+  local needle_hash=$2
+  if print_reflog $repo | grep -q $needle_hash; then
+    echo "Reflog: $needle_hash found"
+  else
+    echo "Reflog: $needle_hash not found"
+    return 1
+  fi
+}
+
 snapshot_repo() {
   local replica_name=$1
 
@@ -94,6 +113,15 @@ cvmfs_run_test() {
   peek_backend $replica_name    $catalog3 && return 12
   peek_backend $replica_name    $catalog4 && return 13
 
+  echo "check if the new catalogs are in the reflogs"
+  check_reflog $CVMFS_TEST_REPO $catalog2 || return 201
+  check_reflog $CVMFS_TEST_REPO $catalog3 || return 202
+  check_reflog $CVMFS_TEST_REPO $catalog4 || return 203
+
+  check_reflog $replica_name    $catalog2 && return 204
+  check_reflog $replica_name    $catalog3 && return 205
+  check_reflog $replica_name    $catalog4 && return 206
+
   echo "list repository tags"
   cvmfs_server tag -l $CVMFS_TEST_REPO || return 14
 
@@ -112,6 +140,17 @@ cvmfs_run_test() {
   peek_backend $replica_name    $catalog2 && return 21 # not replicated yet
   peek_backend $replica_name    $catalog3 && return 22 # not replicated yet
   peek_backend $replica_name    $catalog4 && return 23 # not replicated yet
+
+  echo "check if the new catalogs are in the reflogs"
+  check_reflog $CVMFS_TEST_REPO $catalog1 && return 206
+  check_reflog $CVMFS_TEST_REPO $catalog2 && return 207
+  check_reflog $CVMFS_TEST_REPO $catalog3 || return 208
+  check_reflog $CVMFS_TEST_REPO $catalog4 || return 209
+
+  check_reflog $replica_name    $catalog1 || return 210
+  check_reflog $replica_name    $catalog2 && return 211
+  check_reflog $replica_name    $catalog3 && return 212
+  check_reflog $replica_name    $catalog4 && return 213
 
   # ============================================================================
 
@@ -132,6 +171,19 @@ cvmfs_run_test() {
   peek_backend $replica_name    $catalog4 || return 33 # trunk-previous
   peek_backend $replica_name    $catalog5 || return 34 # trunk
 
+  echo "check if the new catalogs are in the reflogs"
+  check_reflog $CVMFS_TEST_REPO $catalog1 && return 214
+  check_reflog $CVMFS_TEST_REPO $catalog2 && return 215
+  check_reflog $CVMFS_TEST_REPO $catalog3 || return 216
+  check_reflog $CVMFS_TEST_REPO $catalog4 || return 217
+  check_reflog $CVMFS_TEST_REPO $catalog5 || return 218
+
+  check_reflog $replica_name    $catalog1 || return 219
+  check_reflog $replica_name    $catalog2 && return 220
+  check_reflog $replica_name    $catalog3 || return 221
+  check_reflog $replica_name    $catalog4 || return 222
+  check_reflog $replica_name    $catalog5 || return 223
+
   # ============================================================================
 
   echo "run garbage collection on stratum 0"
@@ -150,6 +202,19 @@ cvmfs_run_test() {
   peek_backend $replica_name    $catalog4 || return 44 # trunk-previous
   peek_backend $replica_name    $catalog5 || return 45 # trunk
 
+  echo "check if the new catalogs are in the reflogs"
+  check_reflog $CVMFS_TEST_REPO $catalog1 && return 224
+  check_reflog $CVMFS_TEST_REPO $catalog2 && return 225
+  check_reflog $CVMFS_TEST_REPO $catalog3 && return 226
+  check_reflog $CVMFS_TEST_REPO $catalog4 || return 227
+  check_reflog $CVMFS_TEST_REPO $catalog5 || return 228
+
+  check_reflog $replica_name    $catalog1 || return 229
+  check_reflog $replica_name    $catalog2 && return 230
+  check_reflog $replica_name    $catalog3 || return 231
+  check_reflog $replica_name    $catalog4 || return 232
+  check_reflog $replica_name    $catalog5 || return 233
+
   # ============================================================================
 
   echo "run garbage collection on stratum 1"
@@ -162,11 +227,24 @@ cvmfs_run_test() {
   peek_backend $CVMFS_TEST_REPO $catalog4 || return 50 # trunk-previous
   peek_backend $CVMFS_TEST_REPO $catalog5 || return 51 # trunk
 
-  peek_backend $replica_name    $catalog1 && return 52 # deleted by GC  <-- TODO: this test case fails here
+  peek_backend $replica_name    $catalog1 && return 52 # deleted by GC
   peek_backend $replica_name    $catalog2 && return 53 # never replicated...
   peek_backend $replica_name    $catalog3 && return 54 # deleted by GC
   peek_backend $replica_name    $catalog4 || return 55 # trunk-previous
   peek_backend $replica_name    $catalog5 || return 56 # trunk
+
+  echo "check if the new catalogs are in the reflogs"
+  check_reflog $CVMFS_TEST_REPO $catalog1 && return 234
+  check_reflog $CVMFS_TEST_REPO $catalog2 && return 235
+  check_reflog $CVMFS_TEST_REPO $catalog3 && return 236
+  check_reflog $CVMFS_TEST_REPO $catalog4 || return 237
+  check_reflog $CVMFS_TEST_REPO $catalog5 || return 238
+
+  check_reflog $replica_name    $catalog1 && return 239
+  check_reflog $replica_name    $catalog2 && return 240
+  check_reflog $replica_name    $catalog3 && return 241
+  check_reflog $replica_name    $catalog4 || return 242
+  check_reflog $replica_name    $catalog5 || return 243
 
   return 0
 }

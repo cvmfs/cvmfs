@@ -21,9 +21,6 @@ CVMFS_NIGHTLY_BUILD_NUMBER="${3-0}"
 
 CVMFS_CONFIG_PACKAGE="cvmfs-config-default_1.1-1_all.deb"
 
-# sanity checks
-[ ! -d ${CVMFS_SOURCE_LOCATION}/debian ] || die "source directory seemed to be built before (${CVMFS_SOURCE_LOCATION}/debian exists)"
-
 # retrieve the upstream version string from CVMFS
 cvmfs_version="$(get_cvmfs_version_from_cmake $CVMFS_SOURCE_LOCATION)"
 echo "detected upstream version: $cvmfs_version"
@@ -37,16 +34,23 @@ else
   echo "creating release: $cvmfs_version"
 fi
 
+# copy the entire source tree into a working directory
+echo "copying source into workspace..."
+mkdir -p $CVMFS_RESULT_LOCATION
+copied_source="${CVMFS_RESULT_LOCATION}/wd_src"
+[ ! -d $copied_source ] || die "build directory is not empty"
+mkdir -p $copied_source
+cp -r ${CVMFS_SOURCE_LOCATION}/* $copied_source
+
 # produce the debian package
 echo "copy packaging meta information and get in place..."
-cp -r ${CVMFS_SOURCE_LOCATION}/packaging/debian/cvmfs ${CVMFS_SOURCE_LOCATION}/debian
-mkdir -p $CVMFS_RESULT_LOCATION
-cd ${CVMFS_SOURCE_LOCATION}
+cp -r ${CVMFS_SOURCE_LOCATION}/packaging/debian/cvmfs ${copied_source}/debian
+cd $copied_source
 
-echo "do the build..."
+cpu_cores=$(get_number_of_cpu_cores)
+echo "do the build (with $cpu_cores cores)..."
 dch -v $cvmfs_version -M "bumped upstream version number"
-cd debian
-pdebuild --buildresult $CVMFS_RESULT_LOCATION
+DEB_BUILD_OPTIONS=parallel=$cpu_cores debuild -us -uc # -us -uc == skip signing
 cd ${CVMFS_RESULT_LOCATION}
 
 # generating package map section for specific platform
@@ -55,10 +59,11 @@ if [ ! -z $CVMFS_CI_PLATFORM_LABEL ]; then
   generate_package_map "$CVMFS_CI_PLATFORM_LABEL"                           \
                        "$(basename $(find . -name 'cvmfs_*.deb'))"          \
                        "$(basename $(find . -name 'cvmfs-server*.deb'))"    \
+                       "$(basename $(find . -name 'cvmfs-dev*.deb'))"       \
                        "$(basename $(find . -name 'cvmfs-unittests*.deb'))" \
                        "$CVMFS_CONFIG_PACKAGE"
 fi
 
 # clean up the source tree
 echo "cleaning up..."
-rm -fR ${CVMFS_SOURCE_LOCATION}/debian
+rm -fR $copied_source

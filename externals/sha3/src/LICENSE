@@ -1,0 +1,8 @@
+## License
+
+Most of the source and header files in the Keccak Code Package are released to the public domain and associated to the [CC0](http://creativecommons.org/publicdomain/zero/1.0/) deed. The exceptions are the following:
+
+* [`Common/brg_endian.h`](Common/brg_endian.h) is copyrighted by Brian Gladman and comes with a BSD 3-clause license;
+* [`Tests/genKAT.c`](Tests/genKAT.c) is based on [SHA-3 contest's code by Larry Bassham, NIST](http://csrc.nist.gov/groups/ST/hash/sha-3/documents/KAT1.zip), which he licensed under a BSD 3-clause license;
+* [`Tests/timing.h`](Tests/timing.h) is based on code by Doug Whiting, which he released to the public domain.
+

@@ -81,12 +81,10 @@ create_cvmfs_source_tarball() {
   cp -R ${source_directory}/AUTHORS            \
         ${source_directory}/CMakeLists.txt     \
         ${source_directory}/COPYING            \
-        ${source_directory}/CPackLists.txt     \
         ${source_directory}/ChangeLog          \
         ${source_directory}/INSTALL            \
         ${source_directory}/NEWS               \
         ${source_directory}/README             \
-        ${source_directory}/InstallerResources \
         ${source_directory}/add-ons            \
         ${source_directory}/bootstrap.sh       \
         ${source_directory}/cmake              \
@@ -94,7 +92,6 @@ create_cvmfs_source_tarball() {
         ${source_directory}/cvmfs              \
         ${source_directory}/doc                \
         ${source_directory}/externals          \
-        ${source_directory}/keys               \
         ${source_directory}/mount              \
         ${source_directory}/test               \
         $tar_name
@@ -110,16 +107,28 @@ generate_package_map() {
   local platform="$1"
   local client="$2"
   local server="$3"
-  local unittests="$4"
-  local config="$5"
+  local devel="$4"
+  local unittests="$5"
+  local config="$6"
 
   cat > pkgmap.${platform} << EOF
 [$platform]
 client=$client
 server=$server
+devel=$devel
 unittests=$unittests
 config=$config
 EOF
+}
+
+get_number_of_cpu_cores() {
+  if is_linux; then
+    cat /proc/cpuinfo | grep -e '^processor' | wc -l
+  elif is_macos; then
+    sysctl -n hw.ncpu
+  else
+    echo "1"
+  fi
 }
 
 python_version() {
@@ -158,4 +167,42 @@ compare_versions() {
   local rhs3=$(prepend_zeros $(version_patch $rhs))
 
   [ $lhs1$lhs2$lhs3 $comparison_operator $rhs1$rhs2$rhs3 ]
+}
+
+_template_placeholders() {
+  local template_path="$1"
+  cat $template_path | grep -ohe '@[^@]\+@' | sort | uniq
+}
+
+_unwrap_placeholder() {
+  local placeholder="$1"
+  echo "$placeholder" | sed -e 's/^@\([^@]*\)@/\1/'
+}
+
+_unwrap_variable() {
+  local var="$1"
+  echo $(eval "echo \$$var")
+}
+
+_escape_slashes() {
+  echo "$1" | sed -e 's/\//\\\//g'
+}
+
+# Expands placeholder strings in a template file using all shell variables in
+# the caller's scope. Placeholders look like this: @VARIABLE_NAME@
+#
+# @param template_path  path to the template file to be expanded
+# @return               content of $template_path with expanded placeholders
+expand_template() {
+  local template_path="$1"
+
+  local tmp="$(cat $template_path)"
+  for placeholder in $(_template_placeholders $template_path); do
+    local var=$(_unwrap_placeholder $placeholder)
+    local cont="$(_unwrap_variable $var)"
+    [ ! -z $cont ] || die "\$$var for '$template_path' is empty!"
+    tmp="$(echo "$tmp" | sed -e "s/$placeholder/$(_escape_slashes $cont)/g")"
+  done
+
+  echo "$tmp"
 }

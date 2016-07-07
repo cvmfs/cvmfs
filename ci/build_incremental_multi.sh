@@ -8,14 +8,17 @@
 
 set -e
 
-if [ $# -lt 1 ]; then
-  echo "Usage: $0 <CernVM-FS source directory> [<number of CPU cores>]"
+if [ $# -lt 2 ]; then
+  echo "Usage: $0 <CernVM-FS source directory> <build directory> [<number of CPU cores>]"
   echo "This script builds CernVM-FS in its current working."
   exit 1
 fi
 
 CVMFS_SOURCE_LOCATION="$1"
-CVMFS_CONCURRENT_BUILD_JOBS="${2-1}"
+CVMFS_BUILD_LOCATION="$2"
+CVMFS_CONCURRENT_BUILD_JOBS="${3-1}"
+
+cd ${CVMFS_BUILD_LOCATION}
 
 # figure out if the standard compiler is too old and if so look for alternatives
 if [ x"$(uname)" = x"Linux" ] && which gcc > /dev/null 2>&1; then
@@ -48,6 +51,7 @@ cmake -DBUILD_SERVER=$build_server       \
       -DBUILD_SERVER_DEBUG=$build_server \
       -DBUILD_UNITTESTS=yes              \
       -DBUILD_LIBCVMFS=$build_libcvmfs   \
+      -DBUILD_PRELOAD=yes                \
       $CVMFS_SOURCE_LOCATION
 
 echo "building using make ($CVMFS_CONCURRENT_BUILD_JOBS concurrent jobs)..."

@@ -48,6 +48,7 @@ enum Failures {
   kFailBadData,
   kFailTooBig,
   kFailOther,
+  kFailUnsupportedProtocol,
 
   kFailNumEntries
 };  // Failures
@@ -68,7 +69,8 @@ inline const char *Code2Ascii(const Failures error) {
   texts[10] = "corrupted data received";
   texts[11] = "resource too big to download";
   texts[12] = "unknown network error";
-  texts[13] = "no text";
+  texts[13] = "Unsupported URL in protocol";
+  texts[14] = "no text";
   return texts[error];
 }
 
@@ -118,6 +120,10 @@ struct JobInfo {
   bool probe_hosts;
   bool head_request;
   bool follow_redirects;
+  pid_t pid;
+  uid_t uid;
+  gid_t gid;
+  void *cred_data;  // Per-transfer credential data
   Destination destination;
   struct {
     size_t size;
@@ -130,6 +136,10 @@ struct JobInfo {
   const shash::Any *expected_hash;
   const std::string *extra_info;
 
+  // Allow byte ranges to be specified.
+  off_t range_offset;
+  off_t range_size;
+
   // Default initialization of fields
   void Init() {
     url = NULL;
@@ -137,6 +147,10 @@ struct JobInfo {
     probe_hosts = false;
     head_request = false;
     follow_redirects = false;
+    pid = -1;
+    uid = -1;
+    gid = -1;
+    cred_data = NULL;
     destination = kDestinationNone;
     destination_mem.size = destination_mem.pos = 0;
     destination_mem.data = NULL;
@@ -155,6 +169,10 @@ struct JobInfo {
     error_code = kFailOther;
     num_used_proxies = num_used_hosts = num_retries = 0;
     backoff_ms = 0;
+
+    range_offset = -1;
+    range_size = -1;
+    http_code = -1;
   }
 
   // One constructor per destination + head request
@@ -226,6 +244,7 @@ struct JobInfo {
   std::string proxy;
   bool nocache;
   Failures error_code;
+  int http_code;
   unsigned char num_used_proxies;
   unsigned char num_used_hosts;
   unsigned char num_retries;
@@ -264,6 +283,24 @@ class HeaderLists {
 };
 
 
+/**
+ * Provides hooks to attach per-transfer credentials to curl handles.
+ * Overwritten by the AuthzX509Attachment in authz_curl.cc.  Needs to be
+ * thread-safe because it can be potentially used by multiple DownloadManagers.
+ */
+class CredentialsAttachment {
+ public:
+  virtual ~CredentialsAttachment() { }
+  virtual bool ConfigureCurlHandle(CURL *curl_handle,
+                                   pid_t pid,
+                                   void **info_data) = 0;
+  virtual void ReleaseCurlHandle(CURL *curl_handle, void *info_data) = 0;
+};
+
+
+/**
+ * Note when adding new fields: Clone() probably needs to be adjusted, too.
+ */
 class DownloadManager {
   FRIEND_TEST(T_Download, ValidateGeoReply);
   FRIEND_TEST(T_Download, StripDirect);
@@ -306,25 +343,40 @@ class DownloadManager {
    */
   static const unsigned kMaxMemSize;
 
+  static const unsigned kDnsDefaultRetries = 1;
+  static const unsigned kDnsDefaultTimeoutMs = 3000;
+
   DownloadManager();
   ~DownloadManager();
 
+  static int ParseHttpCode(const char digits[3]);
+
   void Init(const unsigned max_pool_handles, const bool use_system_proxy,
-      perf::Statistics * statistics, const std::string &name = "download");
+      perf::Statistics *statistics, const std::string &name = "download");
   void Fini();
   void Spawn();
+  DownloadManager *Clone(perf::Statistics *statistics, const std::string &name);
   Failures Fetch(JobInfo *info);
 
+  void SetCredentialsAttachment(CredentialsAttachment *ca);
   void SetDnsServer(const std::string &address);
-  void SetDnsParameters(const unsigned retries, const unsigned timeout_sec);
+  void SetDnsParameters(const unsigned retries, const unsigned timeout_ms);
+  void SetIpPreference(const dns::IpPreference preference);
   void SetTimeout(const unsigned seconds_proxy, const unsigned seconds_direct);
   void GetTimeout(unsigned *seconds_proxy, unsigned *seconds_direct);
   void SetLowSpeedLimit(const unsigned low_speed_limit);
   void SetHostChain(const std::string &host_list);
+  void SetHostChain(const std::vector<std::string> &host_list);
   void GetHostInfo(std::vector<std::string> *host_chain,
                    std::vector<int> *rtt, unsigned *current_host);
   void ProbeHosts();
   bool ProbeGeo();
+    // Sort list of servers using the Geo API.  If the output_order
+    // vector is NULL, then the servers vector input is itself sorted.
+    // If it is non-NULL, then servers is left unchanged and the zero-based
+    // ordering is stored into output_order.
+  bool GeoSortServers(std::vector<std::string> *servers,
+                      std::vector<uint64_t>    *output_order = NULL);
   void SwitchHost();
   void SetProxyChain(const std::string &proxy_list,
                      const std::string &fallback_proxy_list,
@@ -370,6 +422,7 @@ class DownloadManager {
   bool VerifyAndFinalize(const int curl_error, JobInfo *info);
   void InitHeaders();
   void FiniHeaders();
+  void CloneProxyConfig(DownloadManager *clone);
 
   Prng prng_;
   std::set<CURL *> *pool_handles_idle_;
@@ -402,6 +455,7 @@ class DownloadManager {
   bool enable_info_header_;
   bool opt_ipv4_only_;
   bool follow_redirects_;
+  bool use_system_proxy_;
 
   // Host list
   std::vector<std::string> *opt_host_chain_;
@@ -444,7 +498,12 @@ class DownloadManager {
   /**
    * Used to resolve proxy addresses (host addresses are resolved by the proxy).
    */
-  dns::NormalResolver *resolver;
+  dns::NormalResolver *resolver_;
+
+  /**
+   * If a proxy has IPv4 and IPv6 addresses, which one to prefer
+   */
+  dns::IpPreference opt_ip_preference_;
 
   /**
    * Used to replace @proxy@ in the Geo-API calls to order Stratum 1 servers,
@@ -476,6 +535,8 @@ class DownloadManager {
    */
   time_t opt_timestamp_backup_host_;
   unsigned opt_host_reset_after_;
+
+  CredentialsAttachment *credentials_attachment_;
 
   // Writes and reads should be atomic because reading happens in a different
   // thread than writing.

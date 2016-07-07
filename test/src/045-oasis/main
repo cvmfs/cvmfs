@@ -1,28 +1,11 @@
 
 cvmfs_test_name="Probing oasis"
 
-configure_and_mount_oasis() {
-  sudo rpm -Uvh http://repo.grid.iu.edu/osg/3.2/osg-3.2-el6-release-latest.rpm || return 1
-  sudo yum -y install oasis-config || retuen 2
-  cvmfs_mount oasis.opensciencegrid.org,atlas.cern.ch \
-    "CVMFS_HTTP_PROXY=DIRECT" || return 3
-
-  return 0
-}
-
-cleanup_oasis() {
-  cvmfs_umount oasis.opensciencegrid.org,atlas.cern.ch
-  sudo yum -y erase oasis-config
-  sudo rpm -e osg-release
-  sudo rm -f /etc/cvmfs/domain.d/opensciencegrid.org.serverorder
-}
-
 cvmfs_run_test() {
   logfile=$1
-
-  configure_and_mount_oasis
-  local retval=$?
-  cleanup_oasis
+  
+  cvmfs_mount oasis.opensciencegrid.org,atlas.cern.ch \
+    "CVMFS_HTTP_PROXY=DIRECT" || return 3
 
   return $retval
 }

@@ -4,19 +4,37 @@ cvmfs_test_name="Auto unmount of stalled mountpoint after crash"
 cvmfs_run_test() {
   logfile=$1
 
+  echo "mounting atlas.cern.ch"
   cvmfs_mount atlas.cern.ch || return 1
 
+  echo "change directory into /cvmfs/atlas.cern.ch"
   cd /cvmfs/atlas.cern.ch || return 2
+
+  echo -n "looking for PID of cvmfs2 process... "
   local pid=$(sudo cvmfs_talk -i atlas pid)
+  echo "$pid"
+
+  echo "segfaulting cvmfs2 ($pid)"
   sudo kill -11 $pid || return 3
 
+  echo "wait for things to settle"
   sleep 20
+
+  echo "try to list /cvmfs/atlas.cern.ch again"
   ls .
   if [ $? -eq 0 ]; then
     return 4
   fi
+
+  echo "change directory out of /cvmfs/atlas.cern.ch to $OLDPWD"
   cd $OLDPWD
-  ls /cvmfs/atlas.cern.ch || return 5
+  if running_on_osx; then
+    echo "trying to remount (OSX only)"
+    cvmfs_mount_direct atlas.cern.ch || return 5
+  fi
+
+  echo "try to list /cvmfs/atlas.cern.ch again"
+  ls /cvmfs/atlas.cern.ch || return 6
 
   return 0
 }
