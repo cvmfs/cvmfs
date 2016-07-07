@@ -235,11 +235,11 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
   {
     char *tmp = reinterpret_cast<char *>(alloca(num_bytes+1));
     uint64_t length = 0;
-    sscanf(header_line.c_str(), "%s %"PRIu64, tmp, &length);
+    sscanf(header_line.c_str(), "%s %" PRIu64, tmp, &length);
     if (length > 0) {
       if (length > DownloadManager::kMaxMemSize) {
         LogCvmfs(kLogDownload, kLogDebug | kLogSyslogErr,
-                 "resource %s too large to store in memory (%"PRIu64")",
+                 "resource %s too large to store in memory (%" PRIu64 ")",
                  info->url->c_str(), length);
         info->error_code = kFailTooBig;
         return 0;
@@ -793,7 +793,7 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
     const int64_t range_upper = static_cast<int64_t>(
       info->range_offset + info->range_size - 1);
     if (snprintf(byte_range_array, sizeof(byte_range_array),
-                 "%" PRId64"-%" PRId64,
+                 "%" PRId64 "-%" PRId64,
                  range_lower, range_upper) == 100)
     {
       abort();  // Should be impossible given limits on offset size.

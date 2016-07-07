@@ -552,7 +552,7 @@ int PosixCacheManager::Readahead(int fd) {
     nbytes = Pread(fd, buf, 4096, pos);
     pos += nbytes;
   } while (nbytes == 4096);
-  LogCvmfs(kLogCache, kLogDebug, "read-ahead %d, %"PRIu64, fd, pos);
+  LogCvmfs(kLogCache, kLogDebug, "read-ahead %d, %" PRIu64, fd, pos);
   if (nbytes < 0)
     return nbytes;
   return 0;
@@ -586,8 +586,8 @@ int PosixCacheManager::StartTxn(
 
   if (size != kSizeUnknown) {
     if (size > quota_mgr_->GetMaxFileSize()) {
-      LogCvmfs(kLogCache, kLogDebug, "file too big for lru cache (%"PRIu64" "
-                                     "requested but only %"PRIu64" bytes free)",
+      LogCvmfs(kLogCache, kLogDebug, "file too big for lru cache (%" PRIu64 " "
+               "requested but only %" PRIu64 " bytes free)",
                size, quota_mgr_->GetMaxFileSize());
       atomic_dec32(&no_inflight_txns_);
       return -ENOSPC;
@@ -638,7 +638,7 @@ int64_t PosixCacheManager::Write(const void *buf, uint64_t size, void *txn) {
   if (transaction->expected_size != kSizeUnknown) {
     if (transaction->size + size > transaction->expected_size) {
       LogCvmfs(kLogCache, kLogDebug,
-               "Transaction size (%"PRIu64") > expected size (%"PRIu64")",
+               "Transaction size (%" PRIu64 ") > expected size (%" PRIu64 ")",
                transaction->size + size, transaction->expected_size);
       return -ENOSPC;
     }
