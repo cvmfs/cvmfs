@@ -40,7 +40,7 @@ class ObjectPack : SingleCopy {
   FRIEND_TEST(T_Pack, ObjectPackTransfer);
 
  private:
-  class Bucket;
+  struct Bucket;
 
  public:
   typedef Bucket * BucketHandle;

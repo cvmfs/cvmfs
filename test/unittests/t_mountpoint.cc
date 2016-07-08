@@ -59,7 +59,7 @@ class T_MountPoint : public ::testing::Test {
 
   void CreateMiniRepository() {
     char abs_path[MAXPATHLEN];
-    getcwd(abs_path, MAXPATHLEN);
+    ASSERT_TRUE(getcwd(abs_path, MAXPATHLEN) != NULL);
     repo_path_ =  string(abs_path) + "/repo";
     MakeCacheDirectories(repo_path_ + "/data", 0700);
 
@@ -444,7 +444,7 @@ TEST_F(T_MountPoint, UuidCache) {
     ASSERT_EQ(loader::kFailOk, fs->boot_status());
     cached_uuid = fs->uuid_cache()->uuid();
   }
-  fchdir(fd_cwd_);
+  ASSERT_EQ(fchdir(fd_cwd_), 0);
 
   UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
   ASSERT_EQ(loader::kFailOk, fs->boot_status());

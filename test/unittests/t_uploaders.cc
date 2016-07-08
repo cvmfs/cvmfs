@@ -459,7 +459,7 @@ class T_Uploaders : public FileSandbox {
         int left_to_read = content_length;
         while (left_to_read > 0) {
           int n = read(accept_sockfd, buffer, kReadBufferSize-1);
-          write(fid, buffer, n);
+          EXPECT_EQ(n, write(fid, buffer, n));
           left_to_read -= n;
         }
         retval = fsync(fid);

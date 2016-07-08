@@ -110,12 +110,6 @@
 #include "wpad.h"
 #include "xattr.h"
 
-#ifdef FUSE_CAP_EXPORT_SUPPORT
-#define CVMFS_NFS_SUPPORT
-#else
-#warning "No NFS support, Fuse too old"
-#endif
-
 using namespace std;  // NOLINT
 
 namespace cvmfs {

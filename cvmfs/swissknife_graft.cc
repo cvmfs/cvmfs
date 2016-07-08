@@ -56,7 +56,7 @@ swissknife::CommandGraft::ChecksumFdWithChunks(
     chunk_offsets->push_back(0);
   }
 
-  bool flush;
+  bool flush = 0;
   do {
     bytes_read = read(fd, cur_in_buf + avail_in, in_buf_size);
     if (-1 == bytes_read) {
