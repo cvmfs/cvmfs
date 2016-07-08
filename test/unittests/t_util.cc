@@ -77,7 +77,8 @@ class T_Util : public ::testing::Test {
 
  protected:
   static void WriteBuffer(int fd, const string &text) {
-    write(fd, text.c_str(), text.length());
+    int size = text.length();
+    EXPECT_EQ(size, write(fd, text.c_str(), size));
   }
 
   static string GetDebugger() {
@@ -430,7 +431,8 @@ TEST_F(T_Util, MakePipe) {
   int fd[2];
   void *buffer_output = scalloc(100, sizeof(char));
   MakePipe(fd);
-  write(fd[1], to_write.c_str(), to_write.length());
+  int bytes_write = to_write.length();
+  EXPECT_EQ(bytes_write, write(fd[1], to_write.c_str(), bytes_write));
   ssize_t bytes_read = read(fd[0], buffer_output, to_write.length());
   EXPECT_EQ(static_cast<size_t>(bytes_read), to_write.length());
 
@@ -459,7 +461,8 @@ TEST_F(T_Util, ReadPipe) {
   int fd[2];
   void *buffer_output = scalloc(20, sizeof(char));
   MakePipe(fd);
-  write(fd[1], to_write.c_str(), to_write.length());
+  int bytes_write = to_write.length();
+  EXPECT_EQ(bytes_write, write(fd[1], to_write.c_str(), bytes_write));
   ReadPipe(fd[0], buffer_output, to_write.length());
 
   EXPECT_STREQ(to_write.c_str(), static_cast<const char*>(buffer_output));
@@ -693,7 +696,7 @@ TEST_F(T_Util, DirectoryExists) {
 TEST_F(T_Util, SymlinkExists) {
   string symlinkname = sandbox + "/mysymlink";
   string filename = CreateFileWithContent("mysymlinkfile.txt", to_write);
-  symlink(filename.c_str(), symlinkname.c_str());
+  EXPECT_EQ(0, symlink(filename.c_str(), symlinkname.c_str()));
 
   EXPECT_TRUE(SymlinkExists(symlinkname));
   EXPECT_FALSE(SymlinkExists("/fakepath/myfakepath"));

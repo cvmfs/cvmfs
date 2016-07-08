@@ -90,7 +90,7 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
   string certificate_path;
   string certificate_password;
   shash::Algorithms hash_algorithm = shash::kSha1;
-  uint64_t max_age;
+  uint64_t max_age = kDefaultMaxAge;
   if (verify) {
     repository_url = *args.find('r')->second;
     max_age = String2Uint64(*args.find('m')->second);

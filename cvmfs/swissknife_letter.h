@@ -36,6 +36,9 @@ class CommandLetter : public Command {
     return r;
   }
   int Main(const ArgumentList &args);
+
+ private:
+  static const unsigned kDefaultMaxAge = 300;  // 5 minutes
 };
 
 }  // namespace swissknife

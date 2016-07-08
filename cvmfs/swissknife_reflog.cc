@@ -234,7 +234,7 @@ void RootChainWalker::WalkListedCatalogs(
 
 RootChainWalker::CatalogTN* RootChainWalker::FetchCatalog(
                                                 const shash::Any catalog_hash) {
-  CatalogTN *catalog;
+  CatalogTN *catalog = NULL;
   const char *root_path = "";
   ObjectFetcherFailures::Failures failure =
     object_fetcher_->FetchCatalog(catalog_hash, root_path, &catalog);
@@ -245,7 +245,7 @@ RootChainWalker::CatalogTN* RootChainWalker::FetchCatalog(
 
 RootChainWalker::HistoryTN* RootChainWalker::FetchHistory(
                                                 const shash::Any history_hash) {
-  HistoryTN *history;
+  HistoryTN *history = NULL;
   ObjectFetcherFailures::Failures failure =
     object_fetcher_->FetchHistory(&history, history_hash);
 
