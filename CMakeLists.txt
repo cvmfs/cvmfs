@@ -184,6 +184,7 @@ option (BUILD_OCTOPUS           "Build the octopus REST server"                 
 option (BUILD_SERVER_DEBUG      "Build writer's end programs with debug symbols and debug outputs" OFF)
 option (BUILD_UNITTESTS         "Build the CernVM-FS unit test set"                                OFF)
 option (BUILD_UNITTESTS_DEBUG   "Build the CernVM-FS unit test set with verbose output and -g"     OFF)
+option (BUILD_UBENCHMARKS       "Build the CernVM-FS micro benchmarks"                             OFF)
 option (BUILD_DOCUMENTATION     "Build the CerVM-FS documentation using Doxygen"                   OFF)
 option (INSTALL_UNITTESTS       "Install the unit test binary (mainly for packaging)"              OFF)
 option (INSTALL_UNITTESTS_DEBUG "Install the unit test debug binary"                               OFF)
@@ -517,6 +518,10 @@ if (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
   add_custom_target (check ${CMAKE_CTEST_COMMAND} -VV)
   add_subdirectory (test/unittests)
 endif (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
+
+if (BUILD_UBENCHMARKS)
+  add_subdirectory (test/micro-benchmarks)
+endif (BUILD_UBENCHMARKS)
 
 #
 # Documentation
