@@ -400,7 +400,7 @@ _CPP_HEADERS = frozenset([
 #   uppercase character, such as Python.h or nsStringAPI.h, for example).
 # - Lua headers.
 _THIRD_PARTY_HEADERS_PATTERN = re.compile(
-    r'^(?:[^/]*[A-Z][^/]*\.h|lua\.h|lauxlib\.h|lualib\.h|cvmfs_config\.h|sys/xattr\.h|gtest/gtest\.h)$')
+    r'^(?:[^/]*[A-Z][^/]*\.h|lua\.h|lauxlib\.h|lualib\.h|cvmfs_config\.h|sys/xattr\.h|gtest/gtest\.h|benchmark/benchmark\.h)$')
 
 
 # Assertion macros.  These are defined in base/logging.h and
@@ -1666,7 +1666,7 @@ def GetHeaderGuardCPPVariable(filename):
   filename = re.sub(r'/\.flymake/([^/]*)$', r'/\1', filename)
   # Replace 'c++' with 'cpp'.
   filename = filename.replace('C++', 'cpp').replace('c++', 'cpp')
-  
+
   fileinfo = FileInfo(filename)
   file_path_from_root = fileinfo.RepositoryName()
   if _root:
@@ -4797,7 +4797,7 @@ def CheckLanguage(filename, clean_lines, linenum, file_extension,
 
   # Make Windows paths like Unix.
   fullname = os.path.abspath(filename).replace('\\', '/')
-  
+
   # Perform other checks now that we are sure that this is not an include line
   CheckCasts(filename, clean_lines, linenum, error)
   CheckGlobalStatic(filename, clean_lines, linenum, error)
@@ -5182,6 +5182,10 @@ def CheckForNonConstReference(filename, clean_lines, linenum,
 
   # Avoid preprocessors
   if Search(r'\\\s*$', line):
+    return
+
+  # Google benchmark passes the State as non-const reference
+  if Search(r'benchmark::State', line):
     return
 
   # Avoid constructor initializer lists
@@ -6037,7 +6041,7 @@ def ProcessFileData(filename, file_extension, lines, error,
   nesting_state.CheckCompletedBlocks(filename, error)
 
   CheckForIncludeWhatYouUse(filename, clean_lines, include_state, error)
-  
+
   # Check that the .cc file has included its header if it exists.
   if file_extension == 'cc':
     CheckHeaderFileIncluded(filename, include_state, error)

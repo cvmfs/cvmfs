@@ -8,6 +8,7 @@ set (PROJECT_UBENCHMARKS_NAME "cvmfs_ubenchmarks")
 # micro benchmarks files
 #
 set(CVMFS_UBENCHMARKS_FILES
+  bm_util.h
   main.cc
 
   b_smallhash.cc
@@ -23,18 +24,32 @@ set (CVMFS_UBENCHMARKS_SOURCES
 
   # dependencies
   ${CVMFS_SOURCE_DIR}/atomic.h
+  ${CVMFS_SOURCE_DIR}/bigvector.h
+  ${CVMFS_SOURCE_DIR}/compression.cc ${CVMFS_SOURCE_DIR}/compression.h
+  ${CVMFS_SOURCE_DIR}/directory_entry.cc ${CVMFS_SOURCE_DIR}/directory_entry.h
+  ${CVMFS_SOURCE_DIR}/duplex_zlib.h
+  ${CVMFS_SOURCE_DIR}/fs_traversal.h
+  ${CVMFS_SOURCE_DIR}/logging.cc ${CVMFS_SOURCE_DIR}/logging.h ${CVMFS_SOURCE_DIR}/logging_internal.h
+  ${CVMFS_SOURCE_DIR}/hash.cc ${CVMFS_SOURCE_DIR}/hash.h
   ${CVMFS_SOURCE_DIR}/murmur.h
+  ${CVMFS_SOURCE_DIR}/platform.h
   ${CVMFS_SOURCE_DIR}/prng.h
+  ${CVMFS_SOURCE_DIR}/sink.h
+  ${CVMFS_SOURCE_DIR}/shortstring.h
   ${CVMFS_SOURCE_DIR}/smallhash.h
   ${CVMFS_SOURCE_DIR}/smalloc.h
+  ${CVMFS_SOURCE_DIR}/util/plugin.h
+  ${CVMFS_SOURCE_DIR}/util/pointer.h
+  ${CVMFS_SOURCE_DIR}/util/posix.cc ${CVMFS_SOURCE_DIR}/util/posix.h
+  ${CVMFS_SOURCE_DIR}/util/single_copy.h
 )
 
 
 #
 # Compiler and Linker Flags for micro benchmarks
 #
-set (CVMFS_UBENCHMARKS_CFLAGS "${CVMFS_UBENCHMARKS_CFLAGS} -DNDEBUG")
-set (CVMFS_UBENCHMARKS_LDFLAGS "${CVMFS_UBENCHMARKS_LDFLAGS} -DNDEBUG")
+set (CVMFS_UBENCHMARKS_CFLAGS "${CVMFS_UBENCHMARKS_CFLAGS}")
+set (CVMFS_UBENCHMARKS_LDFLAGS "${CVMFS_UBENCHMARKS_LDFLAGS}")
 
 #
 # build CernVM-FS micro benchmarks
@@ -53,9 +68,9 @@ add_dependencies (${PROJECT_UBENCHMARKS_NAME} googlebench)
 # add optional dependencies
 #
 if (BUILD_UBENCHMARKS)
-  #if (ZLIB_BUILTIN)
-  #  add_dependencies (${PROJECT_UBENCHMARKS_NAME} zlib)
-  #endif (ZLIB_BUILTIN)
+  if (ZLIB_BUILTIN)
+    add_dependencies (${PROJECT_UBENCHMARKS_NAME} zlib)
+  endif (ZLIB_BUILTIN)
 
   add_dependencies (${PROJECT_UBENCHMARKS_NAME} libsha3)
 endif (BUILD_UBENCHMARKS)
@@ -71,7 +86,8 @@ set_target_properties (${PROJECT_UBENCHMARKS_NAME} PROPERTIES
 #
 # link the stuff (*_LIBRARIES are dynamic link libraries)
 #
-set (UBENCHMARKS_LINK_LIBRARIES ${GOOGLEBENCH_ARCHIVE} ${RT_LIBRARY}
-                                pthread dl)
+set (UBENCHMARKS_LINK_LIBRARIES ${GOOGLEBENCH_ARCHIVE} ${OPENSSL_LIBRARIES}
+                                ${RT_LIBRARY} ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE}
+                                ${RT_LIBRARY} ${SHA3_ARCHIVE} pthread dl)
 
 target_link_libraries (${PROJECT_UBENCHMARKS_NAME} ${UBENCHMARKS_LINK_LIBRARIES})

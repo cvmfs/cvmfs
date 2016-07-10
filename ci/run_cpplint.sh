@@ -35,7 +35,7 @@ if [ $PYTHON_MAJOR -lt 2 -o $PYTHON_MAJOR -eq 2 -a $PYTHON_MINOR -lt 6 ]; then
 fi
 
 # define locations and file extensions of source files
-SOURCE_DIRS="cvmfs mount test/unittests"
+SOURCE_DIRS="cvmfs mount test/unittests test/micro-benchmarks"
 
 ################################################################################
 

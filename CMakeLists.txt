@@ -186,6 +186,7 @@ option (BUILD_UNITTESTS         "Build the CernVM-FS unit test set"             
 option (BUILD_UNITTESTS_DEBUG   "Build the CernVM-FS unit test set with verbose output and -g"     OFF)
 option (BUILD_UBENCHMARKS       "Build the CernVM-FS micro benchmarks"                             OFF)
 option (BUILD_DOCUMENTATION     "Build the CerVM-FS documentation using Doxygen"                   OFF)
+option (BUILD_COVERAGE          "Compile to collect code coverage reports"                         OFF)
 option (INSTALL_UNITTESTS       "Install the unit test binary (mainly for packaging)"              OFF)
 option (INSTALL_UNITTESTS_DEBUG "Install the unit test debug binary"                               OFF)
 option (INSTALL_MOUNT_SCRIPTS   "Install CernVM-FS mount tools in /etc and /sbin (/usr/bin)"       ON)
@@ -198,10 +199,8 @@ option (ZLIB_BUILTIN            "Don't use system zlib"                         
 option (SPARSEHASH_BUILTIN      "Don't use system installation of google sparse hash"              ON)
 option (LEVELDB_BUILTIN         "Don't use system leveldb"                                         ON)
 option (GOOGLETEST_BUILTIN      "Don't use system installation of google test"                     ON)
-option (GOOGLEBENCH_BUILTIN     "Don't use system installation of google benchmark"                ON)
 option (GEOIP_BUILTIN           "Don't use system GeoIP library and python-GeoIP"                  ON)
 option (TBB_PRIVATE_LIB         "Compile our own TBB shared libraries"                             ON)
-option (BUILD_COVERAGE          "Compile to collect code coverage reports"                         OFF)
 
 #
 # define where to find the external dependencies
@@ -380,16 +379,28 @@ include (${VJSON_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${VJSON_BUILTIN_LOCATION}/src)
 
 
-# Only micro benchmarks need google bench
-if (BUILD_UBENCHMARKS)
-  # TODO(jblomer): find system installation of google benchmark
-  include (${GOOGLEBENCH_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GOOGLEBENCH_BUILTIN_LOCATION}/include)
-endif (BUILD_UBENCHMARKS)
+# Almost all build targets require zlib, sha2/3
+if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR
+    BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG OR BUILD_PRELOADER OR
+    BUILD_UBENCHMARKS)
+  if (ZLIB_BUILTIN)
+    include (${ZLIB_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
+    set (ZLIB_LIBRARIES "")
+  else (ZLIB_BUILTIN)
+    find_package (ZLIB REQUIRED)
+    set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${ZLIB_INCLUDE_DIRS})
+  endif (ZLIB_BUILTIN)
+
+  include (${SHA2_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
+  include (${SHA3_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
+endif (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR
+       BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG OR BUILD_PRELOADER OR
+       BUILD_UBENCHMARKS)
 
 
-# Most build target require curl/c-ares, sqlite, zlib, sha2/3, uuid, leveldb
-if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG OR BUILD_PRELOADER)
+# Most build target require also curl/c-ares, sqlite, uuid, leveldb
+if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR
+    BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG OR BUILD_PRELOADER)
   if (LIBCURL_BUILTIN)
     include (${CARES_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
     include (${LIBCURL_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
@@ -425,14 +436,6 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR BUILD
     set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${SQLITE3_INCLUDE_DIR})
   endif (SQLITE3_BUILTIN)
 
-  if (ZLIB_BUILTIN)
-    include (${ZLIB_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
-    set (ZLIB_LIBRARIES "")
-  else (ZLIB_BUILTIN)
-    find_package (ZLIB REQUIRED)
-    set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${ZLIB_INCLUDE_DIRS})
-  endif (ZLIB_BUILTIN)
-
   if (LEVELDB_BUILTIN)
     include (${LEVELDB_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
     set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${LEVELDB_BUILTIN_LOCATION}/src)
@@ -441,14 +444,13 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR BUILD
     set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${LEVELDB_INCLUDE_DIR})
   endif (LEVELDB_BUILTIN)
 
-  include (${SHA2_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
-  include (${SHA3_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
-
   find_package (UUID REQUIRED)
-endif (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG OR BUILD_PRELOADER)
+endif (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR
+       BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG OR BUILD_PRELOADER)
 
 # Client/libcvmfs/preloader only: pacparser, sparsehash
-if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_PRELOADER OR BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
+if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_PRELOADER OR
+    BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
   if (PACPARSER_BUILTIN)
     include (${PACPARSER_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
     set (PACPARSER_LIBRARIES "")
@@ -464,7 +466,8 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_PRELOADER OR BUILD_UNITTESTS OR BUILD
     find_package(Sparsehash)
     set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${SPARSEHASH_INCLUDE_DIR})
   endif (SPARSEHASH_BUILTIN)
-endif (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_PRELOADER OR BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
+endif (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_PRELOADER OR
+       BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
 
 # Fuse client only
 if (BUILD_CVMFS)
@@ -479,7 +482,8 @@ if (BUILD_CVMFS)
 endif (BUILD_CVMFS)
 
 # Server/preloader only: tbb
-if (BUILD_SERVER OR BUILD_SERVER_DEBUG OR BUILD_PRELOADER OR BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
+if (BUILD_SERVER OR BUILD_SERVER_DEBUG OR BUILD_PRELOADER OR
+    BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
   if (TBB_PRIVATE_LIB)
     include (${TBB_BUILD_LOCATION}/CVMFS-CMakeLists.txt)
     set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${TBB_BUILD_LOCATION}/include)
@@ -487,7 +491,8 @@ if (BUILD_SERVER OR BUILD_SERVER_DEBUG OR BUILD_PRELOADER OR BUILD_UNITTESTS OR 
     find_package(TBB REQUIRED)
     set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${TBB_INCLUDE_DIRS})
   endif (TBB_PRIVATE_LIB)
-endif (BUILD_SERVER OR BUILD_SERVER_DEBUG OR BUILD_PRELOADER OR BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
+endif (BUILD_SERVER OR BUILD_SERVER_DEBUG OR BUILD_PRELOADER OR
+       BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
 
 # Server only: python/geoip, unzip, libcap
 if (BUILD_SERVER OR BUILD_SERVER_DEBUG)
@@ -508,6 +513,12 @@ if (BUILD_SERVER OR BUILD_SERVER_DEBUG)
   endif (GEOIP_BUILTIN)
 endif (BUILD_SERVER OR BUILD_SERVER_DEBUG)
 
+
+# Only micro benchmarks need google bench
+if (BUILD_UBENCHMARKS)
+  include (${GOOGLEBENCH_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
+  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GOOGLEBENCH_BUILTIN_LOCATION}/include)
+endif (BUILD_UBENCHMARKS)
 
 include_directories (${INCLUDE_DIRECTORIES})
 
