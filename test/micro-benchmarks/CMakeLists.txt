@@ -33,8 +33,8 @@ set (CVMFS_UBENCHMARKS_SOURCES
 #
 # Compiler and Linker Flags for micro benchmarks
 #
-set (CVMFS_UBENCHMARKS_CFLAGS "${CVMFS_UBENCHMARKS_CFLAGS}")
-set (CVMFS_UBENCHMARKS_LDFLAGS "${CVMFS_UBENCHMARKS_LDFLAGS}")
+set (CVMFS_UBENCHMARKS_CFLAGS "${CVMFS_UBENCHMARKS_CFLAGS} -DNDEBUG")
+set (CVMFS_UBENCHMARKS_LDFLAGS "${CVMFS_UBENCHMARKS_LDFLAGS} -DNDEBUG")
 
 #
 # build CernVM-FS micro benchmarks
@@ -47,7 +47,7 @@ else (BUILD_UBENCHMARKS)
   add_executable (${PROJECT_UBENCHMARKS_NAME} EXCLUDE_FROM_ALL ${CVMFS_UBENCHMARKS_SOURCES})
 endif (BUILD_UBENCHMARKS)
 
-# add_dependencies (${PROJECT_UBENCHMARKS_NAME} googletest)
+add_dependencies (${PROJECT_UBENCHMARKS_NAME} googlebench)
 
 #
 # add optional dependencies
@@ -71,7 +71,7 @@ set_target_properties (${PROJECT_UBENCHMARKS_NAME} PROPERTIES
 #
 # link the stuff (*_LIBRARIES are dynamic link libraries)
 #
-set (UBENCHMARKS_LINK_LIBRARIES ${OPENSSL_LIBRARIES} ${ZLIB_ARCHIVE} ${RT_LIBRARY}
-                                ${SHA3_ARCHIVE} pthread dl)
+set (UBENCHMARKS_LINK_LIBRARIES ${GOOGLEBENCH_ARCHIVE} ${RT_LIBRARY}
+                                pthread dl)
 
 target_link_libraries (${PROJECT_UBENCHMARKS_NAME} ${UBENCHMARKS_LINK_LIBRARIES})

@@ -198,6 +198,7 @@ option (ZLIB_BUILTIN            "Don't use system zlib"                         
 option (SPARSEHASH_BUILTIN      "Don't use system installation of google sparse hash"              ON)
 option (LEVELDB_BUILTIN         "Don't use system leveldb"                                         ON)
 option (GOOGLETEST_BUILTIN      "Don't use system installation of google test"                     ON)
+option (GOOGLEBENCH_BUILTIN     "Don't use system installation of google benchmark"                ON)
 option (GEOIP_BUILTIN           "Don't use system GeoIP library and python-GeoIP"                  ON)
 option (TBB_PRIVATE_LIB         "Compile our own TBB shared libraries"                             ON)
 option (BUILD_COVERAGE          "Compile to collect code coverage reports"                         OFF)
@@ -221,6 +222,7 @@ set (VJSON_BUILTIN_LOCATION       "${EXTERNALS_BUILD_LOCATION}/build_vjson")
 set (SHA2_BUILTIN_LOCATION        "${EXTERNALS_BUILD_LOCATION}/build_sha2")
 set (SHA3_BUILTIN_LOCATION        "${EXTERNALS_BUILD_LOCATION}/build_sha3")
 set (GOOGLETEST_BUILTIN_LOCATION  "${EXTERNALS_BUILD_LOCATION}/build_googletest")
+set (GOOGLEBENCH_BUILTIN_LOCATION "${EXTERNALS_BUILD_LOCATION}/build_googlebench")
 set (LIBGEOIP_BUILTIN_LOCATION    "${EXTERNALS_BUILD_LOCATION}/build_libgeoip")
 set (PYTHON_GEOIP_BUILTIN_LOCATION "${EXTERNALS_BUILD_LOCATION}/build_python-geoip")
 set (TBB_BUILD_LOCATION           "${EXTERNALS_BUILD_LOCATION}/build_tbb")
@@ -376,6 +378,14 @@ endif (GOOGLETEST_BUILTIN)
 
 include (${VJSON_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${VJSON_BUILTIN_LOCATION}/src)
+
+
+# Only micro benchmarks need google bench
+if (BUILD_UBENCHMARKS)
+  # TODO(jblomer): find system installation of google benchmark
+  include (${GOOGLEBENCH_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
+  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GOOGLEBENCH_BUILTIN_LOCATION}/include)
+endif (BUILD_UBENCHMARKS)
 
 
 # Most build target require curl/c-ares, sqlite, zlib, sha2/3, uuid, leveldb
