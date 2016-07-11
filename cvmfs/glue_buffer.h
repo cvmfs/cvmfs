@@ -20,12 +20,13 @@
 #include <vector>
 
 #include "atomic.h"
-#include "catalog_mgr.h"
+#include "bigvector.h"
 #include "hash.h"
 #include "shortstring.h"
 #include "smallhash.h"
 #include "smalloc.h"
 #include "util/posix.h"
+#include "util/string.h"
 
 #ifndef CVMFS_GLUE_BUFFER_H_
 #define CVMFS_GLUE_BUFFER_H_

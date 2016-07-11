@@ -111,6 +111,7 @@ do_extract  "libgeoip"    "GeoIP-${LIBGEOIP_VERSION}.tar.gz"
 do_extract  "python-geoip" "GeoIP-${PYTHON_GEOIP_VERSION}.tar.gz"
 do_extract  "tbb"         "tbb-${TBB_VERSION}.tar.gz"
 
+do_copy     "googlebench"
 do_copy     "sqlite3"
 do_copy     "vjson"
 do_copy     "sha2"
