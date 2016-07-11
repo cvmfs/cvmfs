@@ -25,7 +25,8 @@ BENCHMARK_DEFINE_F(BM_Syscalls, FileOpenClose)(benchmark::State &st) {
   }
   st.SetLabel("/dev/null");
 }
-BENCHMARK_REGISTER_F(BM_Syscalls, FileOpenClose)->Repetitions(3);
+BENCHMARK_REGISTER_F(BM_Syscalls, FileOpenClose)->Repetitions(3)->
+  UseRealTime();
 
 
 BENCHMARK_DEFINE_F(BM_Syscalls, Stat)(benchmark::State &st) {
@@ -36,4 +37,5 @@ BENCHMARK_DEFINE_F(BM_Syscalls, Stat)(benchmark::State &st) {
   }
   st.SetLabel("/dev/null");
 }
-BENCHMARK_REGISTER_F(BM_Syscalls, Stat)->Repetitions(3);
+BENCHMARK_REGISTER_F(BM_Syscalls, Stat)->Repetitions(3)->
+  UseRealTime();

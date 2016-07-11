@@ -11,6 +11,8 @@ set(CVMFS_UBENCHMARKS_FILES
   bm_util.h
   main.cc
 
+  b_compression.cc
+  b_gluebuffer.cc
   b_hash.cc
   b_smallhash.cc
   b_syscalls.cc
@@ -31,6 +33,7 @@ set (CVMFS_UBENCHMARKS_SOURCES
   ${CVMFS_SOURCE_DIR}/directory_entry.cc ${CVMFS_SOURCE_DIR}/directory_entry.h
   ${CVMFS_SOURCE_DIR}/duplex_zlib.h
   ${CVMFS_SOURCE_DIR}/fs_traversal.h
+  ${CVMFS_SOURCE_DIR}/glue_buffer.cc ${CVMFS_SOURCE_DIR}/glue_buffer.h
   ${CVMFS_SOURCE_DIR}/logging.cc ${CVMFS_SOURCE_DIR}/logging.h ${CVMFS_SOURCE_DIR}/logging_internal.h
   ${CVMFS_SOURCE_DIR}/hash.cc ${CVMFS_SOURCE_DIR}/hash.h
   ${CVMFS_SOURCE_DIR}/murmur.h
@@ -40,6 +43,7 @@ set (CVMFS_UBENCHMARKS_SOURCES
   ${CVMFS_SOURCE_DIR}/shortstring.h
   ${CVMFS_SOURCE_DIR}/smallhash.h
   ${CVMFS_SOURCE_DIR}/smalloc.h
+  ${CVMFS_SOURCE_DIR}/util/algorithm.cc ${CVMFS_SOURCE_DIR}/util/algorithm.h
   ${CVMFS_SOURCE_DIR}/util/plugin.h
   ${CVMFS_SOURCE_DIR}/util/pointer.h
   ${CVMFS_SOURCE_DIR}/util/posix.cc ${CVMFS_SOURCE_DIR}/util/posix.h

@@ -3,8 +3,8 @@
  */
 #include <benchmark/benchmark.h>
 
-#include <cstring>
 #include <cstdlib>
+#include <cstring>
 
 #include "bm_util.h"
 #include "hash.h"
