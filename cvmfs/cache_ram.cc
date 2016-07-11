@@ -37,7 +37,10 @@ int RamCacheManager::AddFd(const ReadOnlyFd &fd) {
 }
 
 bool RamCacheManager::AcquireQuotaManager(QuotaManager *quota_mgr) {
-  return false;
+  if (quota_mgr == NULL)
+    return false;
+  quota_mgr_ = quota_mgr;
+  return true;
 }
 
 
