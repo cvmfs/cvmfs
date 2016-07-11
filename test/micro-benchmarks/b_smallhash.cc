@@ -49,7 +49,7 @@ class BM_SmallHash : public benchmark::Fixture {
                          benchmark::State *st)
   {
     char label[64];
-    snprintf(label, sizeof(label), "collisions (avg/max) %f/%" PRIu32,
+    snprintf(label, sizeof(label), "collisions (avg/max) %f / %" PRIu32,
              static_cast<float>(num_collisions) /
                static_cast<float>(iterations),
              max_collisions);
