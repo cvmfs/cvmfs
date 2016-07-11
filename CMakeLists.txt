@@ -187,6 +187,7 @@ option (BUILD_UNITTESTS_DEBUG   "Build the CernVM-FS unit test set with verbose 
 option (BUILD_UBENCHMARKS       "Build the CernVM-FS micro benchmarks"                             OFF)
 option (BUILD_DOCUMENTATION     "Build the CerVM-FS documentation using Doxygen"                   OFF)
 option (BUILD_COVERAGE          "Compile to collect code coverage reports"                         OFF)
+option (BUILD_ALL               "Build client, server, lib, preload, octopus, unit tests"          OFF)
 option (INSTALL_UNITTESTS       "Install the unit test binary (mainly for packaging)"              OFF)
 option (INSTALL_UNITTESTS_DEBUG "Install the unit test debug binary"                               OFF)
 option (INSTALL_MOUNT_SCRIPTS   "Install CernVM-FS mount tools in /etc and /sbin (/usr/bin)"       ON)
@@ -201,6 +202,17 @@ option (LEVELDB_BUILTIN         "Don't use system leveldb"                      
 option (GOOGLETEST_BUILTIN      "Don't use system installation of google test"                     ON)
 option (GEOIP_BUILTIN           "Don't use system GeoIP library and python-GeoIP"                  ON)
 option (TBB_PRIVATE_LIB         "Compile our own TBB shared libraries"                             ON)
+
+if (BUILD_ALL)
+  set (BUILD_CVMFS ON)
+  set (BUILD_UNITTESTS ON)
+  if (!MACOSX)
+    set (BUILD_SERVER ON)
+    set (BUILD_LIBCVMFS ON)
+    set (BUILD_PRELOADER ON)
+    set (BUILD_OCTOPUS ON)
+  endif (!MACOSX)
+endif (BUILD_ALL)
 
 #
 # define where to find the external dependencies
