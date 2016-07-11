@@ -205,11 +205,13 @@ option (TBB_PRIVATE_LIB         "Compile our own TBB shared libraries"          
 
 if (BUILD_ALL)
   set (BUILD_CVMFS ON)
-  set (BUILD_SERVER ON)
-  set (BUILD_LIBCVMFS ON)
-  set (BUILD_PRELOADER ON)
-  set (BUILD_OCTOPUS ON)
   set (BUILD_UNITTESTS ON)
+  if (!MACOSX)
+    set (BUILD_SERVER ON)
+    set (BUILD_LIBCVMFS ON)
+    set (BUILD_PRELOADER ON)
+    set (BUILD_OCTOPUS ON)
+  endif (!MACOSX)
 endif (BUILD_ALL)
 
 #
