@@ -19,7 +19,7 @@
 
 class BM_SmallHash : public benchmark::Fixture {
  protected:
-  static const unsigned kNumRandomNumbers = 100000;
+  static const unsigned kNumRandomNumbers = 1000000;
 
   virtual void SetUp(const benchmark::State &st) {
     prng_.InitLocaltime();

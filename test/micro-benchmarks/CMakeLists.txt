@@ -11,7 +11,9 @@ set(CVMFS_UBENCHMARKS_FILES
   bm_util.h
   main.cc
 
+  b_hash.cc
   b_smallhash.cc
+  b_syscalls.cc
 )
 
 #
@@ -42,6 +44,7 @@ set (CVMFS_UBENCHMARKS_SOURCES
   ${CVMFS_SOURCE_DIR}/util/pointer.h
   ${CVMFS_SOURCE_DIR}/util/posix.cc ${CVMFS_SOURCE_DIR}/util/posix.h
   ${CVMFS_SOURCE_DIR}/util/single_copy.h
+  ${CVMFS_SOURCE_DIR}/util/string.cc ${CVMFS_SOURCE_DIR}/util/string.h
 )
 
 
