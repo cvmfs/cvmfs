@@ -95,14 +95,21 @@ bool MemoryKvStore::Commit(
   const shash::Any &id,
   const kvstore::MemoryBuffer &buf
 ) {
-  WriteLockGuard guard(rwlock_);
+  bool overwrote = false;
   MemoryBuffer mem;
+  WriteLockGuard guard(rwlock_);
   if (entries_.Lookup(id, &mem)) {
-    if (!DoDelete(id)) return false;
+    used_bytes_ -= mem.size;
+    overwrote = true;
+  } else {
+    mem.refcount = buf.refcount;
   }
-  entries_.Insert(id, buf);
-  used_bytes_ += buf.size;
-  return true;
+  mem.address = buf.address;
+  mem.size = buf.size;
+  mem.object_type = buf.object_type;
+  entries_.Insert(id, mem);
+  used_bytes_ += mem.size;
+  return overwrote;
 }
 
 bool MemoryKvStore::Delete(const shash::Any &id) {
