@@ -19,11 +19,13 @@ using namespace std;  // NOLINT
 namespace kvstore {
 
 bool MemoryKvStore::GetBuffer(const shash::Any &id, MemoryBuffer *buf) {
+  perf::Inc(counters_.n_getbuffer);
   LogCvmfs(kLogKvStore, kLogDebug, "get buffer %s", id.ToString().c_str());
   return entries_.Lookup(id, buf);
 }
 
 bool MemoryKvStore::PopBuffer(const shash::Any &id, MemoryBuffer *buf) {
+  perf::Inc(counters_.n_popbuffer);
   WriteLockGuard guard(rwlock_);
   if (!entries_.Lookup(id, buf)) {
     LogCvmfs(kLogKvStore, kLogDebug, "miss %s on PopBuffer",
@@ -31,6 +33,7 @@ bool MemoryKvStore::PopBuffer(const shash::Any &id, MemoryBuffer *buf) {
     return false;
   }
   used_bytes_ -= (*buf).size;
+  counters_.sz_size->Set(used_bytes_);
   entries_.Forget(id);
   LogCvmfs(kLogKvStore, kLogDebug, "popped %s (%uB)", id.ToString().c_str(),
            (*buf).size);
@@ -39,6 +42,7 @@ bool MemoryKvStore::PopBuffer(const shash::Any &id, MemoryBuffer *buf) {
 
 int64_t MemoryKvStore::GetSize(const shash::Any &id) {
   MemoryBuffer mem;
+  perf::Inc(counters_.n_getsize);
   if (entries_.Lookup(id, &mem)) {
     LogCvmfs(kLogKvStore, kLogDebug, "%s is %u B", id.ToString().c_str(),
              mem.size);
@@ -53,6 +57,7 @@ int64_t MemoryKvStore::GetSize(const shash::Any &id) {
 
 int64_t MemoryKvStore::GetRefcount(const shash::Any &id) {
   MemoryBuffer mem;
+  perf::Inc(counters_.n_getrefcount);
   if (entries_.Lookup(id, &mem)) {
     LogCvmfs(kLogKvStore, kLogDebug, "%s has refcount %u",
              id.ToString().c_str(), mem.refcount);
@@ -65,6 +70,7 @@ int64_t MemoryKvStore::GetRefcount(const shash::Any &id) {
 }
 
 bool MemoryKvStore::IncRef(const shash::Any &id) {
+  perf::Inc(counters_.n_incref);
   WriteLockGuard guard(rwlock_);
   MemoryBuffer mem;
   if (entries_.Lookup(id, &mem)) {
@@ -82,6 +88,7 @@ bool MemoryKvStore::IncRef(const shash::Any &id) {
 }
 
 bool MemoryKvStore::Unref(const shash::Any &id) {
+  perf::Inc(counters_.n_unref);
   WriteLockGuard guard(rwlock_);
   MemoryBuffer mem;
   if (entries_.Lookup(id, &mem)) {
@@ -105,6 +112,7 @@ int64_t MemoryKvStore::Read(
   size_t offset
 ) {
   MemoryBuffer mem;
+  perf::Inc(counters_.n_read);
   ReadLockGuard guard(rwlock_);
   if (entries_.Lookup(id, &mem)) {
     if (offset > mem.size) {
@@ -116,6 +124,7 @@ int64_t MemoryKvStore::Read(
     LogCvmfs(kLogKvStore, kLogDebug, "copy %u B from offset %u of %s",
              copy_size, offset, id.ToString().c_str());
     memcpy(buf, static_cast<char *>(mem.address) + offset, copy_size);
+    perf::Xadd(counters_.sz_read, copy_size);
     return copy_size;
   } else {
     LogCvmfs(kLogKvStore, kLogDebug, "miss %s on Read", id.ToString().c_str());
@@ -129,11 +138,14 @@ bool MemoryKvStore::Commit(
 ) {
   bool overwrote = false;
   MemoryBuffer mem;
+  perf::Inc(counters_.n_commit);
   WriteLockGuard guard(rwlock_);
   LogCvmfs(kLogKvStore, kLogDebug, "commit %s", id.ToString().c_str());
   if (entries_.Lookup(id, &mem)) {
     LogCvmfs(kLogKvStore, kLogDebug, "commit overwrites existing entry");
     used_bytes_ -= mem.size;
+    perf::Xadd(counters_.sz_deleted, mem.size);
+    counters_.sz_size->Set(used_bytes_);
     overwrote = true;
   } else {
     mem.refcount = buf.refcount;
@@ -143,10 +155,13 @@ bool MemoryKvStore::Commit(
   mem.object_type = buf.object_type;
   entries_.Insert(id, mem);
   used_bytes_ += mem.size;
+  counters_.sz_size->Set(used_bytes_);
+  perf::Xadd(counters_.sz_committed, mem.size);
   return overwrote;
 }
 
 bool MemoryKvStore::Delete(const shash::Any &id) {
+  perf::Inc(counters_.n_delete);
   WriteLockGuard guard(rwlock_);
   return DoDelete(id);
 }
@@ -160,7 +175,10 @@ bool MemoryKvStore::DoDelete(const shash::Any &id) {
       return false;
     }
     used_bytes_ -= buf.size;
+    counters_.sz_size->Set(used_bytes_);
+    perf::Xadd(counters_.sz_deleted, buf.size);
     free(buf.address);
+    perf::Xadd(counters_.sz_freed, buf.size);
     entries_.Forget(id);
   }
   LogCvmfs(kLogKvStore, kLogDebug, "deleted %s", id.ToString().c_str());
@@ -168,6 +186,7 @@ bool MemoryKvStore::DoDelete(const shash::Any &id) {
 }
 
 bool MemoryKvStore::ShrinkTo(size_t size) {
+  perf::Inc(counters_.n_shrinkto);
   WriteLockGuard guard(rwlock_);
   shash::Any key;
   MemoryBuffer buf;
@@ -189,7 +208,10 @@ bool MemoryKvStore::ShrinkTo(size_t size) {
     }
     entries_.FilterDelete();
     used_bytes_ -= buf.size;
+    perf::Xadd(counters_.sz_shrunk, buf.size);
+    counters_.sz_size->Set(used_bytes_);
     free(buf.address);
+    perf::Xadd(counters_.sz_freed, buf.size);
     LogCvmfs(kLogKvStore, kLogDebug, "delete %s", key.ToString().c_str());
   }
   entries_.FilterEnd();

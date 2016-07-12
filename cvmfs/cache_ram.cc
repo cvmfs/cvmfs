@@ -23,24 +23,29 @@ namespace cache {
 
 int RamCacheManager::AddFd(const ReadOnlyFd &fd) {
   unsigned i = 0;
+  perf::Inc(counters_.n_addfd);
   for ( ; i < open_fds_.size(); ++i) {
     if (open_fds_[i].handle == kInvalidHandle) {
       open_fds_[i] = fd;
       LogCvmfs(kLogCache, kLogDebug, "found free fd %u", i);
+      perf::Inc(counters_.n_reusefd);
       return i;
     }
   }
   if (open_fds_.size() < kMaxHandles) {
     open_fds_.push_back(fd);
     LogCvmfs(kLogCache, kLogDebug, "adding fd %u", i);
+    perf::Inc(counters_.n_appendfd);
     return i;
   } else {
     LogCvmfs(kLogCache, kLogDebug, "too many open files (%u)", kMaxHandles);
+    perf::Inc(counters_.n_enfile);
     return -ENFILE;
   }
 }
 
 bool RamCacheManager::AcquireQuotaManager(QuotaManager *quota_mgr) {
+  perf::Inc(counters_.n_acquire);
   if (quota_mgr == NULL) {
     LogCvmfs(kLogCache, kLogDebug, "null quota manager");
     return false;
@@ -52,6 +57,7 @@ bool RamCacheManager::AcquireQuotaManager(QuotaManager *quota_mgr) {
 
 
 int RamCacheManager::Open(const shash::Any &id) {
+  perf::Inc(counters_.n_open);
   WriteLockGuard guard(rwlock_);
   return DoOpen(id);
 }
@@ -72,6 +78,7 @@ int RamCacheManager::DoOpen(const shash::Any &id) {
     assert(rc);
     LogCvmfs(kLogCache, kLogDebug, "hit in regular entries for %s",
              id.ToString().c_str());
+    perf::Inc(counters_.n_openregular);
     return fd;
   } else if (volatile_entries_.GetBuffer(id, &buf)) {
     open_fds_[fd].store = &volatile_entries_;
@@ -79,11 +86,13 @@ int RamCacheManager::DoOpen(const shash::Any &id) {
     assert(rc);
     LogCvmfs(kLogCache, kLogDebug, "hit in volatile entries for %s",
              id.ToString().c_str());
+    perf::Inc(counters_.n_openvolatile);
     return fd;
   } else {
     open_fds_[fd].handle = kInvalidHandle;
     LogCvmfs(kLogCache, kLogDebug, "miss for %s",
              id.ToString().c_str());
+    perf::Inc(counters_.n_openmiss);
     return -ENOENT;
   }
 }
@@ -96,6 +105,7 @@ int64_t RamCacheManager::GetSize(int fd) {
     return -EBADFD;
   }
   assert(open_fds_[fd].store);
+  perf::Inc(counters_.n_getsize);
   return open_fds_[fd].store->GetSize(open_fds_[fd].handle);
 }
 
@@ -117,6 +127,7 @@ int RamCacheManager::Close(int fd) {
   sweep_tail = (static_cast<unsigned>(fd) == (open_fds_.size() - 1));
 
   if (sweep_tail) {
+    perf::Inc(counters_.n_closesweep);
     unsigned last_good_idx = open_fds_.size() - 1;
     while (open_fds_[last_good_idx].handle != kInvalidHandle)
       last_good_idx--;
@@ -125,6 +136,7 @@ int RamCacheManager::Close(int fd) {
              last_good_idx + 1);
   }
 
+  perf::Inc(counters_.n_close);
   return 0;
 }
 
@@ -141,6 +153,7 @@ int64_t RamCacheManager::Pread(
     return -EBADFD;
   }
   assert(open_fds_[fd].store);
+  perf::Inc(counters_.n_pread);
   return open_fds_[fd].store->Read(open_fds_[fd].handle, buf, size, offset);
 }
 
@@ -156,6 +169,7 @@ int RamCacheManager::Dup(int fd) {
   rc = open_fds_[fd].store->IncRef(open_fds_[fd].handle);
   assert(rc);
   LogCvmfs(kLogCache, kLogDebug, "dup fd %d", fd);
+  perf::Inc(counters_.n_dup);
   return AddFd(open_fds_[fd]);
 }
 
@@ -170,6 +184,7 @@ int RamCacheManager::Readahead(int fd) {
     return -EBADFD;
   }
   LogCvmfs(kLogCache, kLogDebug, "readahead (no-op) on %d", fd);
+  perf::Inc(counters_.n_readahead);
   return 0;
 }
 
@@ -184,7 +199,9 @@ int RamCacheManager::StartTxn(const shash::Any &id, uint64_t size, void *txn) {
   transaction->size = (size == kSizeUnknown) ? kPageSize : size;
   if (transaction->size) {
     transaction->buffer = scalloc(1, transaction->size);
+    perf::Xadd(counters_.sz_alloc, transaction->size);
   }
+  perf::Inc(counters_.n_starttxn);
   return 0;
 }
 
@@ -200,6 +217,7 @@ void RamCacheManager::CtrlTxn(
   transaction->object_type = type;
   LogCvmfs(kLogCache, kLogDebug, "modified transaction %s",
            transaction->id.ToString().c_str());
+  perf::Inc(counters_.n_ctrltxn);
 }
 
 
@@ -208,6 +226,7 @@ int64_t RamCacheManager::Write(const void *buf, uint64_t size, void *txn) {
 
   if (transaction->pos + size > transaction->size) {
     if (transaction->expected_size == kSizeUnknown) {
+      perf::Inc(counters_.n_realloc);
       transaction->size = max(2*transaction->size, size + transaction->pos);
       LogCvmfs(kLogCache, kLogDebug, "reallocate transaction for %s to %u B",
                transaction->id.ToString().c_str(), transaction->size);
@@ -231,6 +250,7 @@ int64_t RamCacheManager::Write(const void *buf, uint64_t size, void *txn) {
   memcpy(static_cast<char *>(transaction->buffer) + transaction->pos,
          buf, copy_size);
   transaction->pos += copy_size;
+  perf::Inc(counters_.n_write);
   return copy_size;
 }
 
@@ -240,6 +260,7 @@ int RamCacheManager::Reset(void *txn) {
   transaction->pos = 0;
   LogCvmfs(kLogCache, kLogDebug, "reset transaction %s",
            transaction->id.ToString().c_str());
+  perf::Inc(counters_.n_reset);
   return 0;
 }
 
@@ -256,6 +277,7 @@ int RamCacheManager::OpenFromTxn(void *txn) {
   }
   LogCvmfs(kLogCache, kLogDebug, "open pending transaction for %s",
            transaction->id.ToString().c_str());
+  perf::Inc(counters_.n_openfromtxn);
   return DoOpen(transaction->id);
 }
 
@@ -266,6 +288,7 @@ int RamCacheManager::AbortTxn(void *txn) {
     free(transaction->buffer);
   LogCvmfs(kLogCache, kLogDebug, "abort transaction %s",
            transaction->id.ToString().c_str());
+  perf::Inc(counters_.n_aborttxn);
   return 0;
 }
 
@@ -273,6 +296,7 @@ int RamCacheManager::AbortTxn(void *txn) {
 int RamCacheManager::CommitTxn(void *txn) {
   WriteLockGuard guard(rwlock_);
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
+  perf::Inc(counters_.n_committxn);
   return CommitToKvStore(transaction);
 }
 
@@ -312,6 +336,7 @@ int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
   int64_t overrun = regular_size + volatile_size + buf.size - max_size_;
 
   if (overrun > 0) {
+    perf::Inc(counters_.n_overrun);
     volatile_entries_.ShrinkTo(max((int64_t) 0, volatile_size - overrun));
   }
   overrun -= volatile_size - volatile_entries_.GetUsed();
@@ -323,12 +348,15 @@ int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
     LogCvmfs(kLogCache, kLogDebug,
              "transaction for %s would overrun the cache limit by %d",
              transaction->id.ToString().c_str(), -overrun);
+    perf::Inc(counters_.n_full);
     return -ENOSPC;
   }
 
   store->Commit(transaction->id, buf);
+  perf::Xadd(counters_.sz_committed, buf.size);
   LogCvmfs(kLogCache, kLogDebug, "committed %s to cache",
            transaction->id.ToString().c_str());
+  perf::Inc(counters_.n_committokvstore);
   return 0;
 }
 

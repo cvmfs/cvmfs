@@ -27,13 +27,67 @@ struct MemoryBuffer {
 
 class MemoryKvStore :SingleCopy {
  public:
+  struct Counters {
+    perf::Counter *sz_size;
+    perf::Counter *n_getbuffer;
+    perf::Counter *n_popbuffer;
+    perf::Counter *n_getsize;
+    perf::Counter *n_getrefcount;
+    perf::Counter *n_incref;
+    perf::Counter *n_unref;
+    perf::Counter *n_read;
+    perf::Counter *n_commit;
+    perf::Counter *n_delete;
+    perf::Counter *n_shrinkto;
+    perf::Counter *sz_read;
+    perf::Counter *sz_committed;
+    perf::Counter *sz_deleted;
+    perf::Counter *sz_shrunk;
+    perf::Counter *sz_freed;
+
+    Counters(perf::Statistics *statistics, const std::string &name) {
+      sz_size = statistics->Register(name + ".sz_size", "Size for " + name);
+      n_getbuffer = statistics->Register(name + ".n_getbuffer",
+        "Number of GetBuffer calls for " + name);
+      n_popbuffer = statistics->Register(name + ".n_popbuffer",
+        "Number of PopBuffer calls for " + name);
+      n_getsize = statistics->Register(name + ".n_getsize",
+        "Number of GetSize calls for " + name);
+      n_getrefcount = statistics->Register(name + ".n_getrefcount",
+        "Number of GetRefcount calls for " + name);
+      n_incref = statistics->Register(name + ".n_incref",
+        "Number of IncRef calls for " + name);
+      n_unref = statistics->Register(name + ".n_unref",
+        "Number of Unref calls for " + name);
+      n_read = statistics->Register(name + ".n_read",
+        "Number of Read calls for " + name);
+      n_commit = statistics->Register(name + ".n_commit",
+        "Number of Commit calls for " + name);
+      n_delete = statistics->Register(name + ".n_delete",
+        "Number of Delete calls for " + name);
+      n_shrinkto = statistics->Register(name + ".n_shrinkto",
+        "Number of ShrinkTo calls for " + name);
+      sz_read = statistics->Register(name + ".sz_read",
+        "Bytes read for " + name);
+      sz_committed = statistics->Register(name + ".sz_committed",
+        "Bytes committed for " + name);
+      sz_deleted = statistics->Register(name + ".sz_deleted",
+        "Bytes deleted for " + name);
+      sz_shrunk = statistics->Register(name + ".sz_shrunk",
+        "Bytes shrunk for " + name);
+      sz_freed = statistics->Register(name + ".sz_freed",
+        "Bytes freed for " + name);
+    }
+  };
+
   MemoryKvStore(
     unsigned int cache_entries,
     const string &name,
     perf::Statistics *statistics)
     : used_bytes_(0)
     , entries_(cache_entries, shash::Any(), lru::hasher_any,
-        statistics, name) {
+        statistics, name)
+    , counters_(statistics, name + ".lru") {
     int retval = pthread_rwlock_init(&rwlock_, NULL);
     assert(retval == 0);
   }
@@ -133,6 +187,7 @@ class MemoryKvStore :SingleCopy {
   lru::LruCache<shash::Any, MemoryBuffer> entries_;
   pthread_rwlock_t rwlock_;
   bool DoDelete(const shash::Any &id);
+  Counters counters_;
 };
 }  // namespace kvstore
 #endif  // CVMFS_KVSTORE_H_
