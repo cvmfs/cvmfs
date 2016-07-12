@@ -42,6 +42,7 @@ class RamCacheManager : public CacheManager {
     , volatile_entries_(max_entries/3, "RamCache.volatile", statistics) {
     int retval = pthread_rwlock_init(&rwlock_, NULL);
     assert(retval == 0);
+    LogCvmfs(kLogCache, kLogDebug, "max %u B, %u entries", max_size, max_entries);
   }
   virtual ~RamCacheManager() {
     pthread_rwlock_destroy(&rwlock_);

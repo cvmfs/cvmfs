@@ -11,6 +11,7 @@
 #include <new>
 
 #include "kvstore.h"
+#include "logging.h"
 #include "smalloc.h"
 #include "util/posix.h"
 #include "util_concurrency.h"
@@ -25,21 +26,27 @@ int RamCacheManager::AddFd(const ReadOnlyFd &fd) {
   for ( ; i < open_fds_.size(); ++i) {
     if (open_fds_[i].handle == kInvalidHandle) {
       open_fds_[i] = fd;
+      LogCvmfs(kLogCache, kLogDebug, "found free fd %u", i);
       return i;
     }
   }
   if (open_fds_.size() < kMaxHandles) {
     open_fds_.push_back(fd);
+    LogCvmfs(kLogCache, kLogDebug, "adding fd %u", i);
     return i;
   } else {
+    LogCvmfs(kLogCache, kLogDebug, "too many open files (%u)", kMaxHandles);
     return -ENFILE;
   }
 }
 
 bool RamCacheManager::AcquireQuotaManager(QuotaManager *quota_mgr) {
-  if (quota_mgr == NULL)
+  if (quota_mgr == NULL) {
+    LogCvmfs(kLogCache, kLogDebug, "null quota manager");
     return false;
+  }
   quota_mgr_ = quota_mgr;
+  LogCvmfs(kLogCache, kLogDebug, "set quota manager");
   return true;
 }
 
@@ -53,20 +60,30 @@ int RamCacheManager::DoOpen(const shash::Any &id) {
   bool rc;
   kvstore::MemoryBuffer buf;
   int fd = AddFd(ReadOnlyFd(id, 0));
-  if (fd < 0) return fd;
+  if (fd < 0) {
+    LogCvmfs(kLogCache, kLogDebug, "error while opening %s: %s",
+             id.ToString().c_str(), strerror(-fd));
+    return fd;
+  }
 
   if (regular_entries_.GetBuffer(id, &buf)) {
     open_fds_[fd].store = &regular_entries_;
     rc = regular_entries_.IncRef(id);
     assert(rc);
+    LogCvmfs(kLogCache, kLogDebug, "hit in regular entries for %s",
+             id.ToString().c_str());
     return fd;
   } else if (volatile_entries_.GetBuffer(id, &buf)) {
     open_fds_[fd].store = &volatile_entries_;
     rc = volatile_entries_.IncRef(id);
     assert(rc);
+    LogCvmfs(kLogCache, kLogDebug, "hit in volatile entries for %s",
+             id.ToString().c_str());
     return fd;
   } else {
     open_fds_[fd].handle = kInvalidHandle;
+    LogCvmfs(kLogCache, kLogDebug, "miss for %s",
+             id.ToString().c_str());
     return -ENOENT;
   }
 }
@@ -74,7 +91,10 @@ int RamCacheManager::DoOpen(const shash::Any &id) {
 
 int64_t RamCacheManager::GetSize(int fd) {
   ReadLockGuard guard(rwlock_);
-  if (!IsValid(fd)) return -EBADFD;
+  if (!IsValid(fd)) {
+    LogCvmfs(kLogCache, kLogDebug, "bad fd %d on GetSize", fd);
+    return -EBADFD;
+  }
   assert(open_fds_[fd].store);
   return open_fds_[fd].store->GetSize(open_fds_[fd].handle);
 }
@@ -85,11 +105,15 @@ int RamCacheManager::Close(int fd) {
   bool sweep_tail = false;
 
   WriteLockGuard guard(rwlock_);
-  if (!IsValid(fd)) return -EBADFD;
+  if (!IsValid(fd)) {
+    LogCvmfs(kLogCache, kLogDebug, "bad fd %d on Close", fd);
+    return -EBADFD;
+  }
   assert(open_fds_[fd].store);
   rc = open_fds_[fd].store->Unref(open_fds_[fd].handle);
   assert(rc);
   open_fds_[fd].handle = kInvalidHandle;
+  LogCvmfs(kLogCache, kLogDebug, "closed fd %d", fd);
   sweep_tail = (static_cast<unsigned>(fd) == (open_fds_.size() - 1));
 
   if (sweep_tail) {
@@ -97,6 +121,8 @@ int RamCacheManager::Close(int fd) {
     while (open_fds_[last_good_idx].handle != kInvalidHandle)
       last_good_idx--;
     open_fds_.resize(last_good_idx + 1);
+    LogCvmfs(kLogCache, kLogDebug, "resized fd vector to %u",
+             last_good_idx + 1);
   }
 
   return 0;
@@ -110,7 +136,10 @@ int64_t RamCacheManager::Pread(
   uint64_t offset)
 {
   ReadLockGuard guard(rwlock_);
-  if (!IsValid(fd)) return -EBADFD;
+  if (!IsValid(fd)) {
+    LogCvmfs(kLogCache, kLogDebug, "bad fd %d on Pread", fd);
+    return -EBADFD;
+  }
   assert(open_fds_[fd].store);
   return open_fds_[fd].store->Read(open_fds_[fd].handle, buf, size, offset);
 }
@@ -119,10 +148,14 @@ int64_t RamCacheManager::Pread(
 int RamCacheManager::Dup(int fd) {
   bool rc;
   WriteLockGuard guard(rwlock_);
-  if (!IsValid(fd)) return -EBADFD;
+  if (!IsValid(fd)) {
+    LogCvmfs(kLogCache, kLogDebug, "bad fd %d on Dup", fd);
+    return -EBADFD;
+  }
   assert(open_fds_[fd].store);
   rc = open_fds_[fd].store->IncRef(open_fds_[fd].handle);
   assert(rc);
+  LogCvmfs(kLogCache, kLogDebug, "dup fd %d", fd);
   return AddFd(open_fds_[fd]);
 }
 
@@ -132,13 +165,18 @@ int RamCacheManager::Dup(int fd) {
  */
 int RamCacheManager::Readahead(int fd) {
   ReadLockGuard guard(rwlock_);
-  if (!IsValid(fd))
-    return -EBADF;
+  if (!IsValid(fd)) {
+    LogCvmfs(kLogCache, kLogDebug, "bad fd %d on Readahead", fd);
+    return -EBADFD;
+  }
+  LogCvmfs(kLogCache, kLogDebug, "readahead (no-op) on %d", fd);
   return 0;
 }
 
 
 int RamCacheManager::StartTxn(const shash::Any &id, uint64_t size, void *txn) {
+  LogCvmfs(kLogCache, kLogDebug, "new transaction with id %s",
+           id.ToString().c_str());
   Transaction *transaction = new (txn) Transaction();
   transaction->id = id;
   transaction->pos = 0;
@@ -160,6 +198,8 @@ void RamCacheManager::CtrlTxn(
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
   transaction->description = description;
   transaction->object_type = type;
+  LogCvmfs(kLogCache, kLogDebug, "modified transaction %s",
+           transaction->id.ToString().c_str());
 }
 
 
@@ -169,15 +209,25 @@ int64_t RamCacheManager::Write(const void *buf, uint64_t size, void *txn) {
   if (transaction->pos + size > transaction->size) {
     if (transaction->expected_size == kSizeUnknown) {
       transaction->size = max(2*transaction->size, size + transaction->pos);
+      LogCvmfs(kLogCache, kLogDebug, "reallocate transaction for %s to %u B",
+               transaction->id.ToString().c_str(), transaction->size);
       transaction->buffer = realloc(transaction->buffer, transaction->size);
-      if (!transaction->buffer) return -errno;
+      if (!transaction->buffer) {
+        LogCvmfs(kLogCache, kLogDebug, "realloc failed: %s", strerror(errno));
+        return -errno;
+      }
     } else {
+      LogCvmfs(kLogCache, kLogDebug,
+               "attempted to write more than requested (%u>%u)",
+               size, transaction->size);
       return -ENOSPC;
     }
   }
 
 
   uint64_t copy_size = min(size, transaction->size - transaction->pos);
+  LogCvmfs(kLogCache, kLogDebug, "copy %u bytes of transaction %s",
+           copy_size, transaction->id.ToString().c_str());
   memcpy(static_cast<char *>(transaction->buffer) + transaction->pos,
          buf, copy_size);
   transaction->pos += copy_size;
@@ -188,6 +238,8 @@ int64_t RamCacheManager::Write(const void *buf, uint64_t size, void *txn) {
 int RamCacheManager::Reset(void *txn) {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
   transaction->pos = 0;
+  LogCvmfs(kLogCache, kLogDebug, "reset transaction %s",
+           transaction->id.ToString().c_str());
   return 0;
 }
 
@@ -196,7 +248,14 @@ int RamCacheManager::OpenFromTxn(void *txn) {
   WriteLockGuard guard(rwlock_);
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
   int64_t retval = CommitToKvStore(transaction);
-  if (retval < 0) return retval;
+  if (retval < 0) {
+    LogCvmfs(kLogCache, kLogDebug,
+             "error while commiting transaction on %s: %s",
+             transaction->id.ToString().c_str(), strerror(-retval));
+    return retval;
+  }
+  LogCvmfs(kLogCache, kLogDebug, "open pending transaction for %s",
+           transaction->id.ToString().c_str());
   return DoOpen(transaction->id);
 }
 
@@ -205,6 +264,8 @@ int RamCacheManager::AbortTxn(void *txn) {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
   if (transaction->buffer)
     free(transaction->buffer);
+  LogCvmfs(kLogCache, kLogDebug, "abort transaction %s",
+           transaction->id.ToString().c_str());
   return 0;
 }
 
@@ -223,7 +284,12 @@ int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
   if (transaction->expected_size == kSizeUnknown) {
     buf.size = transaction->pos;
     buf.address = realloc(buf.address, buf.size);
-    if (!buf.address) return -errno;
+    LogCvmfs(kLogCache, kLogDebug, "reallocating transaction on %s to %u B",
+             transaction->id.ToString().c_str(), buf.size);
+    if (!buf.address) {
+      LogCvmfs(kLogCache, kLogDebug, "realloc failed: %s", strerror(errno));
+      return -errno;
+    }
   } else {
     buf.size = transaction->size;
   }
@@ -253,9 +319,16 @@ int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
     regular_entries_.ShrinkTo(max((int64_t) 0, regular_size - overrun));
   }
   overrun -= regular_size - regular_entries_.GetUsed();
-  if (overrun > 0) return -ENOSPC;
+  if (overrun > 0) {
+    LogCvmfs(kLogCache, kLogDebug,
+             "transaction for %s would overrun the cache limit by %d",
+             transaction->id.ToString().c_str(), -overrun);
+    return -ENOSPC;
+  }
 
-  if (!store->Commit(transaction->id, buf)) return -EEXIST;
+  store->Commit(transaction->id, buf);
+  LogCvmfs(kLogCache, kLogDebug, "committed %s to cache",
+           transaction->id.ToString().c_str());
   return 0;
 }
 
