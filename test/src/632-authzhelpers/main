@@ -90,6 +90,7 @@ cvmfs_run_test() {
   echo "checking authz attribute"
   attr -l $mntpnt || return 72
   local authz_attr=$(get_xattr authz $mntpnt)
+  echo "extended attribute 'authz' is $authz_attr"
   [ "x$authz_attr" = "xallow%PUBLICACCESS" ] || return 73
 
   echo "checking environment of authz helper"
