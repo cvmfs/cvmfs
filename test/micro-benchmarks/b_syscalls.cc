@@ -44,6 +44,26 @@ BENCHMARK_REGISTER_F(BM_Syscalls, Stat)->Repetitions(3)->
   UseRealTime();
 
 
+BENCHMARK_DEFINE_F(BM_Syscalls, Read)(benchmark::State &st) {
+  int fd = open("/dev/zero", O_RDONLY);
+  unsigned size = st.range_x();
+  char *buf[size];
+  assert(fd >= 0);
+
+  while (st.KeepRunning()) {
+    SafeRead(fd, buf, size);
+    Escape(buf);
+  }
+  st.SetItemsProcessed(st.iterations());
+  st.SetBytesProcessed(int64_t(st.iterations()) * int64_t(size));
+  st.SetLabel("/dev/zero");
+
+  close(fd);
+}
+BENCHMARK_REGISTER_F(BM_Syscalls, Read)->Repetitions(3)->
+  UseRealTime()->Arg(4096)->Arg(128*1024);
+
+
 /**
  * Command-response with 100B commands and 4k responses
  */
@@ -59,7 +79,7 @@ BENCHMARK_DEFINE_F(BM_Syscalls, Pipe)(benchmark::State &st) {
       close(pipe_cmd[1]);
       close(pipe_data[0]);
       char cmd_buf[100];
-      char data_buf[4096];
+      char data_buf[st.range_x()];
       while (true) {
         ReadPipe(pipe_cmd[0], cmd_buf, sizeof(cmd_buf));
         if (pipe_cmd[0] == 'Q')
@@ -70,15 +90,17 @@ BENCHMARK_DEFINE_F(BM_Syscalls, Pipe)(benchmark::State &st) {
   close(pipe_cmd[0]);
   close(pipe_data[1]);
   char cmd_buf[100];
-  char data_buf[4096];
+  char data_buf[st.range_x()];
   cmd_buf[0] = 'C';
 
   while (st.KeepRunning()) {
     WritePipe(pipe_cmd[1], cmd_buf, sizeof(cmd_buf));
-    ReadPipe(pipe_data[0], data_buf, sizeof(data_buf));
+    SafeRead(pipe_data[0], data_buf, sizeof(data_buf));
     ClobberMemory();
   }
   st.SetItemsProcessed(st.iterations());
+  st.SetBytesProcessed(int64_t(st.iterations()) * int64_t(st.range_x()));
+
 
   close(pipe_data[0]);
   cmd_buf[0] = 'Q';
@@ -86,4 +108,4 @@ BENCHMARK_DEFINE_F(BM_Syscalls, Pipe)(benchmark::State &st) {
   close(pipe_cmd[1]);
 }
 BENCHMARK_REGISTER_F(BM_Syscalls, Pipe)->Repetitions(3)->
-  UseRealTime();
+  UseRealTime()->Arg(4096)->Arg(128*1024);
