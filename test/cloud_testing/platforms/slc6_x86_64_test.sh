@@ -59,9 +59,6 @@ cd ${SOURCE_DIRECTORY}/test
 echo "running CernVM-FS client test cases..."
 CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
 ./run.sh $CLIENT_TEST_LOGFILE -o ${CLIENT_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
-                              -x src/005-asetup                               \
-                                 src/024-reload-during-asetup                 \
-                                 --                                           \
                                  src/0*                                       \
                               || retval=1
 
