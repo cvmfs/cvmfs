@@ -131,8 +131,8 @@ class RamCacheManager : public CacheManager {
     unsigned max_entries,
     perf::Statistics *statistics)
     : max_size_(max_size)
-    , regular_entries_(max_entries/3, "RamCache.regular", statistics)
-    , volatile_entries_(max_entries/3, "RamCache.volatile", statistics)
+    , regular_entries_(max_entries/2, "RamCache.regular", statistics)
+    , volatile_entries_(max_entries/2, "RamCache.volatile", statistics)
     , counters_(statistics, "RamCache") {
     int retval = pthread_rwlock_init(&rwlock_, NULL);
     assert(retval == 0);

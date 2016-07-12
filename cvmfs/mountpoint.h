@@ -13,6 +13,7 @@
 #include <ctime>
 #include <string>
 
+#include "cache.h"
 #include "hash.h"
 #include "loader.h"
 #include "util/pointer.h"
@@ -219,7 +220,7 @@ class FileSystem : SingleCopy, public BootFactory {
   bool LockWorkspace();
   bool SetupCrashGuard();
   bool CreateCache();
-  bool SetupQuotaMgmt();
+  bool SetupQuotaMgmt(cache::CacheManagerIds mgr_type);
   bool SetupNfsMaps();
 
   bool CheckCacheMode();

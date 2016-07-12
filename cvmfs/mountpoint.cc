@@ -34,6 +34,7 @@
 #include "backoff.h"
 #include "cache.h"
 #include "cache_posix.h"
+#include "cache_ram.h"
 #include "catalog.h"
 #include "catalog_mgr_client.h"
 #include "download.h"
@@ -151,14 +152,55 @@ FileSystem *FileSystem::Create(const FileSystem::FileSystemInfo &fs_info) {
  * Initialize the cache directory and start the quota manager.
  */
 bool FileSystem::CreateCache() {
-  cache_mgr_ = cache::PosixCacheManager::Create(
-                 cache_dir_,
-                 cache_mode_ & FileSystem::kCacheAlien,
-                 cache_mode_ & FileSystem::kCacheNoRename);
-  if (cache_mgr_ == NULL) {
-    boot_error_ = "Failed to setup cache in " + cache_dir_ + ": " +
-                  strerror(errno);
-    boot_status_ = loader::kFailCacheDir;
+  string optarg;
+  uint64_t nfiles;
+  int64_t ram_size;
+
+  cache::CacheManagerIds cache_mgr_type = cache::kPosixCacheManager;
+  if (options_mgr_->GetValue("CVMFS_CACHE_PRIMARY", &optarg)) {
+    LogCvmfs(kLogCache, kLogDebug, "requested cache type %s", optarg.c_str());
+    if (optarg == "posix") {
+      cache_mgr_type = cache::kPosixCacheManager;
+    } else if (optarg == "ram") {
+      cache_mgr_type = cache::kRamCacheManager;
+    } else {
+      cache_mgr_type = cache::kUnknownCacheManager;
+    }
+  }
+
+  switch (cache_mgr_type) {
+  case cache::kPosixCacheManager:
+    cache_mgr_ = cache::PosixCacheManager::Create(
+                   cache_dir_,
+                   cache_mode_ & FileSystem::kCacheAlien,
+                   cache_mode_ & FileSystem::kCacheNoRename);
+    if (cache_mgr_ == NULL) {
+      boot_error_ = "Failed to setup cache in " + cache_dir_ + ": " +
+                    strerror(errno);
+      boot_status_ = loader::kFailCacheDir;
+      return false;
+    }
+    break;
+  case cache::kRamCacheManager:
+    if (options_mgr_->GetValue("CVMFS_NFILES", &optarg)) {
+      nfiles = String2Uint64(optarg);
+    } else {
+      nfiles = 8192;
+    }
+    if (options_mgr_->GetValue("CVMFS_CACHE_RAM_SIZE", &optarg)) {
+      ram_size = String2Uint64(optarg)*1024*1024;
+    } else {
+      ram_size = (sysconf(_SC_PHYS_PAGES)*sysconf(_SC_PAGE_SIZE)) >> 3;
+      assert(ram_size > 0);
+    }
+    cache_mgr_ = new cache::RamCacheManager(
+      ram_size,
+      nfiles,
+      statistics_);
+    break;
+  case cache::kUnknownCacheManager:
+    boot_error_ = "Failure: unknown primary cache";
+    boot_status_ = loader::kFailOptions;
     return false;
   }
   // Sentinel file for future use
@@ -166,7 +208,7 @@ bool FileSystem::CreateCache() {
   CreateFile(cache_dir_ + "/.cvmfscache", 0600, ignore_failure);
 
   if (cache_mode_ & FileSystem::kCacheManaged) {
-    if (!SetupQuotaMgmt())
+    if (!SetupQuotaMgmt(cache_mgr_type))
       return false;
   }
 
@@ -175,7 +217,17 @@ bool FileSystem::CreateCache() {
 
   // Create or load from cache, used as id by the download manager when the
   // proxy template is replaced
-  uuid_cache_ = cvmfs::Uuid::Create(cache_dir_ + "/uuid");
+  switch (cache_mgr_type) {
+  case cache::kPosixCacheManager:
+    uuid_cache_ = cvmfs::Uuid::Create(cache_dir_ + "/uuid");
+    break;
+  case cache::kRamCacheManager:
+    uuid_cache_ = cvmfs::Uuid::Create("");
+    break;
+  case cache::kUnknownCacheManager:
+    uuid_cache_ = NULL;
+    break;
+  }
   if (uuid_cache_ == NULL) {
     boot_error_ = "failed to load/store uuid";
     boot_status_ = loader::kFailCacheDir;
@@ -510,56 +562,67 @@ bool FileSystem::SetupNfsMaps() {
 }
 
 
-bool FileSystem::SetupQuotaMgmt() {
-  assert(quota_limit_ >= 0);
-  int64_t quota_threshold = quota_limit_ / 2;
-  PosixQuotaManager *quota_mgr;
+bool FileSystem::SetupQuotaMgmt(cache::CacheManagerIds mgr_type) {
+  int64_t quota_threshold;
+  int retval;
+  PosixQuotaManager *posix_quota_mgr;
+  switch (mgr_type) {
+  case cache::kPosixCacheManager:
+    assert(quota_limit_ >= 0);
+    quota_threshold = quota_limit_ / 2;
 
-  if (cache_mode_ & FileSystem::kCacheShared) {
-    quota_mgr = PosixQuotaManager::CreateShared(
-                  exe_path_,
-                  cache_dir_,
-                  quota_limit_,
-                  quota_threshold,
-                  foreground_);
-    if (quota_mgr == NULL) {
-      boot_error_ = "Failed to initialize shared lru cache";
-      boot_status_ = loader::kFailQuota;
-      return false;
+    if (cache_mode_ & FileSystem::kCacheShared) {
+      posix_quota_mgr = PosixQuotaManager::CreateShared(
+                    exe_path_,
+                    cache_dir_,
+                    quota_limit_,
+                    quota_threshold,
+                    foreground_);
+      if (posix_quota_mgr == NULL) {
+        boot_error_ = "Failed to initialize shared lru cache";
+        boot_status_ = loader::kFailQuota;
+        return false;
+      }
+    } else {
+      // Cache database should to be protected by workspace lock
+      assert(workspace_ == cache_dir_);
+      posix_quota_mgr = PosixQuotaManager::Create(
+                    cache_dir_,
+                    quota_limit_,
+                    quota_threshold,
+                    found_previous_crash_);
+      if (posix_quota_mgr == NULL) {
+        boot_error_ = "Failed to initialize lru cache";
+        boot_status_ = loader::kFailQuota;
+        return false;
+      }
     }
-  } else {
-    // Cache database should to be protected by workspace lock
-    assert(workspace_ == cache_dir_);
-    quota_mgr = PosixQuotaManager::Create(
-                  cache_dir_,
-                  quota_limit_,
-                  quota_threshold,
-                  found_previous_crash_);
-    if (quota_mgr == NULL) {
-      boot_error_ = "Failed to initialize lru cache";
-      boot_status_ = loader::kFailQuota;
-      return false;
+
+    if (posix_quota_mgr->GetSize() > posix_quota_mgr->GetCapacity()) {
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+               "cache is already beyond quota size "
+               "(size: %" PRId64 ", capacity: %" PRId64 "), cleaning up",
+               posix_quota_mgr->GetSize(), posix_quota_mgr->GetCapacity());
+      if (!posix_quota_mgr->Cleanup(quota_threshold)) {
+        delete posix_quota_mgr;
+        boot_error_ = "Failed to clean up cache";
+        boot_status_ = loader::kFailQuota;
+        return false;
+      }
     }
+    retval = cache_mgr_->AcquireQuotaManager(posix_quota_mgr);
+    assert(retval);
+    LogCvmfs(kLogCvmfs, kLogDebug,
+             "CernVM-FS: quota initialized, current size %luMB",
+             posix_quota_mgr->GetSize() / (1024 * 1024));
+    break;
+  case cache::kRamCacheManager:
+    retval = cache_mgr_->AcquireQuotaManager(new NoopQuotaManager());
+    assert(retval);
+    break;
+  case cache::kUnknownCacheManager:
+    return false;
   }
-
-  if (quota_mgr->GetSize() > quota_mgr->GetCapacity()) {
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
-             "cache is already beyond quota size "
-             "(size: %" PRId64 ", capacity: %" PRId64 "), cleaning up",
-             quota_mgr->GetSize(), quota_mgr->GetCapacity());
-    if (!quota_mgr->Cleanup(quota_threshold)) {
-      delete quota_mgr;
-      boot_error_ = "Failed to clean up cache";
-      boot_status_ = loader::kFailQuota;
-      return false;
-    }
-  }
-
-  int retval = cache_mgr_->AcquireQuotaManager(quota_mgr);
-  assert(retval);
-  LogCvmfs(kLogCvmfs, kLogDebug,
-           "CernVM-FS: quota initialized, current size %luMB",
-           quota_mgr->GetSize() / (1024 * 1024));
   return true;
 }
 
