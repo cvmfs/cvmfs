@@ -88,11 +88,6 @@ bool FileSystem::CheckCacheMode() {
     boot_status_ = loader::kFailOptions;
     return false;
   }
-  if ((cache_mode_ & kCacheAlien) && (cache_mode_ & kCacheNfs)) {
-    boot_error_ = "Failure: NFS cache mode and alien cache mutually exclusive.";
-    boot_status_ = loader::kFailOptions;
-    return false;
-  }
 
   if (type_ == kFsLibrary) {
     if (cache_mode_ & (kCacheShared | kCacheNfs | kCacheManaged)) {
@@ -247,7 +242,7 @@ void FileSystem::DetermineCacheDirs() {
   if (options_mgr_->GetValue("CVMFS_ALIEN_CACHE", &optarg))
     cache_dir_ = optarg;
 
-  nfs_maps_dir_ = cache_dir_;
+  nfs_maps_dir_ = workspace_;
   if (options_mgr_->GetValue("CVMFS_NFS_SHARED", &optarg))
     nfs_maps_dir_ = optarg;
 }
