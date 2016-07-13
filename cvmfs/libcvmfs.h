@@ -61,9 +61,11 @@
 
 #ifdef __cplusplus
 extern "C" {
+class cvmfs_context;
+#else
+struct cvmfs_context;
 #endif
 
-class cvmfs_context;
 
 /**
  * Initialize global CVMFS library structures
@@ -90,23 +92,25 @@ void cvmfs_fini();
 cvmfs_context* cvmfs_attach_repo(char const *options);
 
 /**
- * Uninitialize a CVMFS remote repository and release all in memory resources
- * for it.
+ * Uninitialize a CVMFS remote repository and release all resources for it.
  */
 void cvmfs_detach_repo(cvmfs_context *ctx);
 
-/* Load a new catalog if there is one
+/**
+ * Load a new catalog if there is one
  * \return 0 on success
  */
 int cvmfs_remount(cvmfs_context *ctx);
 
-/* Send syslog and debug messages to log_fn instead.  This may (and
+/**
+ * Send syslog and debug messages to log_fn instead.  This may (and
  * probably should) be called before cvmfs_init().  Setting this to
  * NULL restores the default logging behavior.
  */
 void cvmfs_set_log_fn( void (*log_fn)(const char *msg) );
 
-/* Open a file in the CVMFS cache.
+/**
+ * Open a file in the CVMFS cache.
  *
  * @param[in] path, path to open (e.g. /dir/file, not /cvmfs/repo/dir/file)
  * \return read-only file descriptor, -1 on failure (sets errno)
@@ -120,14 +124,15 @@ int cvmfs_open(cvmfs_context *ctx, const char *path);
 ssize_t cvmfs_pread(cvmfs_context *ctx,
                     int fd, void *buf, size_t size, off_t off);
 
-/* Closes a file previously opened with cvmfs_open().
+/**
+ * Closes a file previously opened with cvmfs_open().
  *
  * @param[in] fd, file descriptor to close
  * \return 0 on success, -1 on failure (sets errno)
  */
 int cvmfs_close(cvmfs_context *ctx, int fd);
 
-/*
+/**
  * Reads a symlink from the catalog.  Environment variables in the
  * symlink that are of the form $(varname) are expanded.  If the
  * provided buffer is not long enough for the null-terminated value of
@@ -143,7 +148,8 @@ int cvmfs_readlink(cvmfs_context *ctx,
   char *buf,
   size_t size);
 
-/* Get information about a file.  If the file is a symlink,
+/**
+ * Get information about a file.  If the file is a symlink,
  * return info about the file it points to, not the symlink itself.
  *
  * @param[in] path, path of file (e.g. /dir/file, not /cvmfs/repo/dir/file)
@@ -152,7 +158,8 @@ int cvmfs_readlink(cvmfs_context *ctx,
  */
 int cvmfs_stat(cvmfs_context *ctx, const char *path, struct stat *st);
 
-/* Get information about a file.  If the file is a symlink,
+/**
+ * Get information about a file.  If the file is a symlink,
  * return info about the link, not the file it points to.
  *
  * @param[in] path, path of file (e.g. /dir/file, not /cvmfs/repo/dir/file)
@@ -161,12 +168,13 @@ int cvmfs_stat(cvmfs_context *ctx, const char *path, struct stat *st);
  */
 int cvmfs_lstat(cvmfs_context *ctx, const char *path, struct stat *st);
 
-/* Get list of directory contents.  The directory contents
- * includes "." and "..".
+/**
+ * Get list of directory contents.  The directory contents includes "." and
+ * "..".
  *
- * On return, the array will contain a NULL-terminated list of
- * strings.  The caller must free the strings and the array containing
- * them.  The array (*buf) may be NULL when this function is called.
+ * On return, the array will contain a NULL-terminated list of strings.  The
+ * caller must free the strings and the array containing them.  The array (*buf)
+ * may be NULL when this function is called.
  *
  * @param[in] path, path of directory (e.g. /dir, not /cvmfs/repo/dir)
  * @param[out] buf, pointer to dynamically allocated NULL-terminated array of
