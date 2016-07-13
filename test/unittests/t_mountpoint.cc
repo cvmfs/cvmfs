@@ -319,14 +319,9 @@ TEST_F(T_MountPoint, CacheSettings) {
   options_mgr_.SetValue("CVMFS_NFS_SOURCE", "yes");
   {
     UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
-    EXPECT_EQ(loader::kFailOptions, fs->boot_status());
-  }
-
-  options_mgr_.UnsetValue("CVMFS_NFS_SOURCE");
-  {
-    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
     EXPECT_EQ(loader::kFailOk, fs->boot_status());
   }
+  options_mgr_.UnsetValue("CVMFS_NFS_SOURCE");
 
   fs_info_.type = FileSystem::kFsLibrary;
   options_mgr_.SetValue("CVMFS_SHARED_CACHE", "yes");

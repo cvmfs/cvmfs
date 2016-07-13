@@ -4,6 +4,7 @@
 
 #include <gtest/gtest.h>
 
+#include <errno.h>
 #include <tbb/atomic.h>
 #include <unistd.h>
 
@@ -151,7 +152,11 @@ class T_Uploaders : public FileSandbox {
 
     // Wait S3 mockup server to finish
     int stat_loc = 0;
-    wait(&stat_loc);
+    int retval;
+    do {
+      retval = wait(&stat_loc);
+    } while ((retval == -1) && (errno == EINTR));
+    EXPECT_NE(-1, retval) << "wait returned with errno " << errno;
     EXPECT_TRUE(WIFEXITED(stat_loc));
     EXPECT_EQ(0, WEXITSTATUS(stat_loc));
   }

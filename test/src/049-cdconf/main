@@ -17,7 +17,9 @@ cvmfs_run_test() {
 
   local retval=0
   create_config_files || return 0
+  echo "config file has /etc/cvmfs/default.d/50-testcdconf.conf"
 
+  echo "mounting grid"
   cvmfs_mount grid.cern.ch || retval=2
   if [ $retval -eq 0 ]; then
     if [ "x$(cat /tmp/cvmfs_pwd)" != "xWorking-Dir-/etc/cvmfs/default.d" ]; then

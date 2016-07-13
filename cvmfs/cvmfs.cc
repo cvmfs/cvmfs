@@ -1509,10 +1509,6 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     attribute_value = StringifyInt(revision);
   } else if (attr == "user.root_hash") {
     attribute_value = catalog_mgr->GetRootHash().ToString();
-  } else if ((attr == "user.voms_authz") &&
-             mount_point_->has_membership_req())
-  {
-    attribute_value = mount_point_->membership_req();
   } else if (attr == "user.tag") {
     attribute_value = mount_point_->repository_tag();
   } else if (attr == "user.expires") {
@@ -1545,6 +1541,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
       fuse_reply_err(req, ENOATTR);
       return;
     }
+    attribute_value = mount_point_->membership_req();
   } else if (attr == "user.chunks") {
     if (d.IsRegular()) {
       if (d.IsChunkedFile()) {
