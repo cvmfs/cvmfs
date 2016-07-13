@@ -33,7 +33,6 @@ CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
                               -x src/518-hardlinkstresstest                   \
                                  src/523-corruptchunkfailover                 \
                                  src/524-corruptmanifestfailover              \
-                                 src/585-xattrs                               \
                                  src/600-securecvmfs                          \
                                  --                                           \
                                  src/5*                                       \
