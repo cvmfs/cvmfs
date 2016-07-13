@@ -42,9 +42,9 @@ CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
 
 
 echo "NOT running CernVM-FS migration test cases (disabled)..."
-CVMFS_TEST_CLASS_NAME=MigrationTests                                              \
-./run.sh $MIGRATIONTEST_LOGFILE -o ${MIGRATIONTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
-                                   migration_tests/*                              \
-                                || retval=1
+#CVMFS_TEST_CLASS_NAME=MigrationTests                                              \
+#./run.sh $MIGRATIONTEST_LOGFILE -o ${MIGRATIONTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+#                                   migration_tests/*                              \
+#                                || retval=1
 
 exit $retval
