@@ -47,7 +47,7 @@
 #include <vector>
 
 #include "atomic.h"
-#include "cache.h"
+#include "cache_posix.h"
 #include "catalog_mgr_client.h"
 #include "clientctx.h"
 #include "compression.h"

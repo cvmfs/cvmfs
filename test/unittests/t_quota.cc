@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-#include "cache.h"
+#include "cache_posix.h"
 #include "compression.h"
 #include "fs_traversal.h"
 #include "hash.h"

@@ -108,6 +108,8 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/backoff.cc ${CVMFS_SOURCE_DIR}/backoff.h
   ${CVMFS_SOURCE_DIR}/bigvector.h
   ${CVMFS_SOURCE_DIR}/cache.cc ${CVMFS_SOURCE_DIR}/cache.h
+  ${CVMFS_SOURCE_DIR}/cache_posix.cc ${CVMFS_SOURCE_DIR}/cache_posix.h
+  ${CVMFS_SOURCE_DIR}/cache_ram.cc ${CVMFS_SOURCE_DIR}/cache_ram.h
   ${CVMFS_SOURCE_DIR}/catalog.cc
   ${CVMFS_SOURCE_DIR}/catalog_counters.cc ${CVMFS_SOURCE_DIR}/catalog_counters.h
   ${CVMFS_SOURCE_DIR}/catalog_mgr.h
