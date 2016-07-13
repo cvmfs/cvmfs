@@ -4,7 +4,9 @@
 # to cvmfs.  It is only used during development, so we might as well pull it
 # in as necessary
 if [ ! -f CMakeLists.txt ]; then
-  git clone https://github.com/google/benchmark.git .
+  git init
+  git remote add origin https://github.com/google/benchmark.git
+  git fetch
   git checkout 2149577f892116d4080d16fbf0b0455b1026b219
 fi
 
