@@ -33,6 +33,7 @@
 #include "authz/authz_session.h"
 #include "backoff.h"
 #include "cache.h"
+#include "cache_posix.h"
 #include "catalog.h"
 #include "catalog_mgr_client.h"
 #include "download.h"
