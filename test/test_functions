@@ -2285,7 +2285,7 @@ find_or_build_cvmfs_preload() {
         -DINSTALL_MOUNT_SCRIPTS=no \
         -DBUILD_DOCUMENTATION=no   \
         $cvmfs_source_dir > $cvmfs_preload_build_log 2>&1 || return 4
-  make -j                 > $cvmfs_preload_build_log 2>&1 || return 5
+  make -j $(nproc)        > $cvmfs_preload_build_log 2>&1 || return 5
 
   popdir > /dev/null 2>&1
 
