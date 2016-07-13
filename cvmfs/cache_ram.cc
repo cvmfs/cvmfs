@@ -58,7 +58,7 @@ int RamCacheManager::Open(const shash::Any &id) {
 int64_t RamCacheManager::GetSize(int fd) {
   ReadLockGuard guard(rwlock_);
   if (!IsValid(fd))
-    return -EBADFD;
+    return -EBADF;
   return open_fds_[fd].size;
 }
 
@@ -68,7 +68,7 @@ int RamCacheManager::Close(int fd) {
   {
     ReadLockGuard guard(rwlock_);
     if (!IsValid(fd))
-      return -EBADFD;
+      return -EBADF;
     // TODO(jblomer): KvStore
     open_fds_[fd].handle = -1;
     sweep_tail = (static_cast<unsigned>(fd) == (open_fds_.size() - 1));
@@ -101,7 +101,7 @@ int RamCacheManager::Dup(int fd) {
   {
     ReadLockGuard guard(rwlock_);
     if (!IsValid(fd))
-      return -EBADFD;
+      return -EBADF;
     file_descriptor = open_fds_[fd];
   }
 
@@ -117,7 +117,7 @@ int RamCacheManager::Dup(int fd) {
 int RamCacheManager::Readahead(int fd) {
   ReadLockGuard guard(rwlock_);
   if (!IsValid(fd))
-    return -EBADFD;
+    return -EBADF;
   return 0;
 }
 
