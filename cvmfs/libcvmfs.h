@@ -61,9 +61,12 @@
 
 #ifdef __cplusplus
 extern "C" {
-class cvmfs_context;
+// Map C++ clases to their C interface names
+typedef class LibContext cvmfs_context;
+typedef class OptionsManager cvmfs_option_map;  // TODO: rename to cvmfs_options
 #else
-struct cvmfs_context;
+typedef struct LibContext cvmfs_context;
+typedef struct OptionsManager cvmfs_option_map;
 #endif
 
 

@@ -82,48 +82,71 @@ namespace cvmfs {
 }
 
 
-cvmfs_globals* cvmfs_globals::instance = NULL;
-cvmfs_globals* cvmfs_globals::Instance() {
-  assert(cvmfs_globals::instance != NULL);
-  return cvmfs_globals::instance;
+LibGlobals* LibGlobals::instance_ = NULL;
+LibGlobals* LibGlobals::GetInstance() {
+  assert(LibGlobals::instance_ != NULL);
+  return LibGlobals::instance_;
 }
 
-int cvmfs_globals::Initialize(const options &opts) {
-  assert(cvmfs_globals::instance == NULL);
+
+int LibGlobals::Initialize(const options &opts) {
+  assert(instance_ == NULL);
 
   // create singleton instance
-  cvmfs_globals::instance = new cvmfs_globals;
-  assert(cvmfs_globals::instance != NULL);
+  instance_ = new LibGlobals();
+  assert(instance_ != NULL);
 
   // setup the globals
-  const int retval = cvmfs_globals::instance->Setup(opts);
+  const int retval = instance_->Setup(opts);
   if (retval != 0) {
-    delete cvmfs_globals::instance;
-    cvmfs_globals::instance = NULL;
+    delete instance_;
+    instance_ = NULL;
   }
 
   return retval;
 }
 
-void cvmfs_globals::Destroy() {
-  if (cvmfs_globals::instance != NULL) {
-    delete cvmfs_globals::instance;
-    cvmfs_globals::instance = NULL;
-  }
-  assert(cvmfs_globals::instance == NULL);
+
+int LibGlobals::Initialize(OptionsManager *options_mgr) {
+  assert(instance_ == NULL);
+  instance_ = new LibGlobals();
+  assert(instance_ != NULL);
+
+  FileSystem::FileSystemInfo fs_info;
+  fs_info.name = "libcvmfs";
+  fs_info.type = FileSystem::kFsLibrary;
+  fs_info.options_mgr = options_mgr;
+  instance_->file_system_ = FileSystem::Create(fs_info);
+  return instance_->file_system_->boot_status();
 }
 
-cvmfs_globals::cvmfs_globals()
-  : statistics_(new perf::Statistics())
+
+void LibGlobals::CleanupInstance() {
+  if (instance_ != NULL) {
+    delete instance_;
+    instance_ = NULL;
+  }
+  assert(instance_ == NULL);
+}
+
+
+LibGlobals::LibGlobals()
+  : options_mgr_(NULL)
+  , file_system_(NULL)
+  , statistics_(new perf::Statistics())
   , cache_mgr_(NULL)
   , uid_(0)
   , gid_(0)
   , libcrypto_locks_(NULL)
   , lock_created_(false)
   , vfs_registered_(false)
-  { }
+{ }
 
-cvmfs_globals::~cvmfs_globals() {
+
+LibGlobals::~LibGlobals() {
+  delete file_system_;
+  delete options_mgr_;
+
   if (vfs_registered_)
     sqlite::UnregisterVfsRdOnly();
 
@@ -148,7 +171,8 @@ cvmfs_globals::~cvmfs_globals() {
   ClientCtx::CleanupInstance();
 }
 
-int cvmfs_globals::Setup(const options &opts) {
+
+int LibGlobals::Setup(const options &opts) {
   // Fill cvmfs option variables from arguments
   cache_directory_ = opts.cache_directory;
   lock_directory_ = opts.lock_directory;
@@ -172,8 +196,8 @@ int cvmfs_globals::Setup(const options &opts) {
     int retval = pthread_mutex_init(&(libcrypto_locks_[i]), NULL);
     assert(retval == 0);
   }
-  CRYPTO_set_id_callback(cvmfs_globals::CallbackLibcryptoThreadId);
-  CRYPTO_set_locking_callback(cvmfs_globals::CallbackLibcryptoLock);
+  CRYPTO_set_id_callback(LibGlobals::CallbackLibcryptoThreadId);
+  CRYPTO_set_locking_callback(LibGlobals::CallbackLibcryptoLock);
 
   // Logging
   SetLogSyslogLevel(opts.log_syslog_level);
@@ -256,33 +280,41 @@ int cvmfs_globals::Setup(const options &opts) {
   return LIBCVMFS_FAIL_OK;
 }
 
-void cvmfs_globals::CallbackLibcryptoLock(int mode, int type,
-                                          const char *file, int line) {
+
+void LibGlobals::CallbackLibcryptoLock(
+  int mode,
+  int type,
+  const char *file,
+  int line)
+{
   (void)file;
   (void)line;
 
   int retval;
-  cvmfs_globals   *globals = cvmfs_globals::Instance();
-  pthread_mutex_t *locks   = globals->libcrypto_locks();
-  pthread_mutex_t *lock    = &(locks[type]);
+  LibGlobals *globals = LibGlobals::GetInstance();
+  pthread_mutex_t *locks = globals->libcrypto_locks();
+  pthread_mutex_t *lock = &(locks[type]);
 
   if (mode & CRYPTO_LOCK) {
     retval = pthread_mutex_lock(lock);
   } else {
     retval = pthread_mutex_unlock(lock);
   }
-
   assert(retval == 0);
 }
 
+
 // Type unsigned long required by libcrypto (openssl)
-unsigned long cvmfs_globals::CallbackLibcryptoThreadId() {  // NOLINT
+unsigned long LibGlobals::CallbackLibcryptoThreadId() {  // NOLINT
   return platform_gettid();
 }
 
 
-cvmfs_context* cvmfs_context::Create(const options &opts) {
-  cvmfs_context *ctx = new cvmfs_context(opts);
+//------------------------------------------------------------------------------
+
+
+LibContext* LibContext::Create(const options &opts) {
+  LibContext *ctx = new LibContext(opts);
   assert(ctx != NULL);
 
   perf::Statistics *statistics = new perf::Statistics();
@@ -294,13 +326,13 @@ cvmfs_context* cvmfs_context::Create(const options &opts) {
   return ctx;
 }
 
-void cvmfs_context::Destroy(cvmfs_context *ctx) {
+void LibContext::Destroy(LibContext *ctx) {
   perf::Statistics *statistics = ctx->statistics();
   delete ctx;
   delete statistics;
 }
 
-int cvmfs_context::Setup(const options &opts, perf::Statistics *statistics) {
+int LibContext::Setup(const options &opts, perf::Statistics *statistics) {
   statistics_ = statistics;
 
   // Network initialization
@@ -348,13 +380,13 @@ int cvmfs_context::Setup(const options &opts, perf::Statistics *statistics) {
   }
 
   fetcher_ = new cvmfs::Fetcher(
-    cvmfs_globals::Instance()->cache_mgr(),
+    LibGlobals::GetInstance()->cache_mgr(),
     download_manager_,
     &backoff_throttle_,
     statistics_);
 
   external_fetcher_ = new cvmfs::Fetcher(
-    cvmfs_globals::Instance()->cache_mgr(),
+    LibGlobals::GetInstance()->cache_mgr(),
     external_download_manager_,
     &backoff_throttle_,
     statistics_,
@@ -390,7 +422,7 @@ int cvmfs_context::Setup(const options &opts, perf::Statistics *statistics) {
   return 0;
 }
 
-cvmfs_context::cvmfs_context(const options &opts)
+LibContext::LibContext(const options &opts)
   : statistics_(NULL)
   , cfg_(opts)
   , repository_name_(opts.repo_name)
@@ -411,7 +443,7 @@ cvmfs_context::cvmfs_context(const options &opts)
   InitRuntimeCounters();
 }
 
-cvmfs_context::~cvmfs_context() {
+LibContext::~LibContext() {
   delete fetcher_;
   fetcher_ = NULL;
   delete external_fetcher_;
@@ -446,8 +478,8 @@ cvmfs_context::~cvmfs_context() {
   }
 }
 
-bool cvmfs_context::GetDirentForPath(const PathString         &path,
-                                     catalog::DirectoryEntry  *dirent)
+bool LibContext::GetDirentForPath(const PathString         &path,
+                                  catalog::DirectoryEntry  *dirent)
 {
   if (path.GetLength() == 1 && path.GetChars()[0] == '/') {
     // root path is expected to be "", not "/"
@@ -472,10 +504,10 @@ bool cvmfs_context::GetDirentForPath(const PathString         &path,
   return false;
 }
 
-void cvmfs_context::AppendStringToList(char const   *str,
-                                       char       ***buf,
-                                       size_t       *listlen,
-                                       size_t       *buflen)
+void LibContext::AppendStringToList(char const   *str,
+                                    char       ***buf,
+                                    size_t       *listlen,
+                                    size_t       *buflen)
 {
   if (*listlen + 1 >= *buflen) {
        size_t newbuflen = (*listlen)*2 + 5;
@@ -495,7 +527,7 @@ void cvmfs_context::AppendStringToList(char const   *str,
 }
 
 
-int cvmfs_context::GetAttr(const char *c_path, struct stat *info) {
+int LibContext::GetAttr(const char *c_path, struct stat *info) {
   atomic_inc64(&num_fs_stat_);
   ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
 
@@ -515,7 +547,8 @@ int cvmfs_context::GetAttr(const char *c_path, struct stat *info) {
   return 0;
 }
 
-int cvmfs_context::Readlink(const char *c_path, char *buf, size_t size) {
+
+int LibContext::Readlink(const char *c_path, char *buf, size_t size) {
   atomic_inc64(&num_fs_readlink_);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_readlink on path: %s", c_path);
   ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
@@ -542,7 +575,8 @@ int cvmfs_context::Readlink(const char *c_path, char *buf, size_t size) {
   return 0;
 }
 
-int cvmfs_context::ListDirectory(
+
+int LibContext::ListDirectory(
   const char *c_path,
   char ***buf,
   size_t *buflen
@@ -596,7 +630,8 @@ int cvmfs_context::ListDirectory(
   return 0;
 }
 
-int cvmfs_context::Open(const char *c_path) {
+
+int LibContext::Open(const char *c_path) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_open on path: %s", c_path);
   ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
 
@@ -659,7 +694,8 @@ int cvmfs_context::Open(const char *c_path) {
   return fd;
 }
 
-int64_t cvmfs_context::Pread(
+
+int64_t LibContext::Pread(
   int fd,
   void *buf,
   uint64_t size,
@@ -741,7 +777,8 @@ int64_t cvmfs_context::Pread(
   }
 }
 
-int cvmfs_context::Close(int fd) {
+
+int LibContext::Close(int fd) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_close on file number: %d", fd);
   if (fd & kFdChunked) {
     const int chunk_handle = fd & ~kFdChunked;
@@ -749,10 +786,10 @@ int cvmfs_context::Close(int fd) {
     if (open_chunks.chunk_reflist.list == NULL)
       return -EBADF;
     if (open_chunks.chunk_fd->fd != -1)
-      cvmfs_globals::Instance()->cache_mgr()->Close(open_chunks.chunk_fd->fd);
+      LibGlobals::GetInstance()->cache_mgr()->Close(open_chunks.chunk_fd->fd);
     chunk_tables_.Release(chunk_handle);
   } else {
-    cvmfs_globals::Instance()->cache_mgr()->Close(fd);
+    LibGlobals::GetInstance()->cache_mgr()->Close(fd);
   }
   return 0;
 }
@@ -761,7 +798,8 @@ catalog::LoadError cvmfs_context::RemountStart() {
   return catalog::kLoadNew;
 }
 
-void cvmfs_context::InitRuntimeCounters() {
+
+void LibContext::InitRuntimeCounters() {
   // Runtime counters
   atomic_init64(&num_fs_open_);
   atomic_init64(&num_fs_dir_open_);

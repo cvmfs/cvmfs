@@ -1,8 +1,13 @@
 /**
  * This file is part of the CernVM File System.
  *
- * This is the internal implementation of libcvmfs,
- * not to be exposed to the code using the library.
+ * This is the internal implementation of libcvmfs, not to be exposed to the
+ * code using the library.
+ *
+ * Defines LibGlobals and LibContext classes that wrap around a FileSystem
+ * and a MountPoint.  The libcvmfs.cc implementation of the libcvmfs interface
+ * uses LibGlobals for library initialization and deinitialization.  It uses
+ * LibContext objects for all the file system heavy lifting.
  */
 
 #ifndef CVMFS_LIBCVMFS_INT_H_
@@ -19,6 +24,8 @@
 #include "catalog_mgr.h"
 #include "file_chunk.h"
 #include "lru.h"
+#include "mountpoint.h"
+#include "options.h"
 
 namespace cache {
 class CacheManager;
@@ -47,10 +54,11 @@ extern bool          foreground_;
 class Fetcher;
 }
 
+
 /**
  * A singleton managing the cvmfs resources for all attached repositories.
  */
-class cvmfs_globals : SingleCopy {
+class LibGlobals : SingleCopy {
  public:
   // Common options for all repositories
   struct options {
@@ -88,9 +96,10 @@ class cvmfs_globals : SingleCopy {
     bool rebuild_cachedb;
   };
 
-  static int            Initialize(const options &opts);
-  static void           Destroy();
-  static cvmfs_globals* Instance();
+  static int Initialize(const options &opts);
+  static int Initialize(OptionsManager *options_mgr);
+  static void CleanupInstance();
+  static LibGlobals* GetInstance();
 
   pthread_mutex_t *libcrypto_locks() { return libcrypto_locks_; }
   cache::CacheManager *cache_mgr() { return cache_mgr_; }
@@ -103,10 +112,13 @@ class cvmfs_globals : SingleCopy {
   static unsigned long CallbackLibcryptoThreadId();  // NOLINT
 
  private:
-  cvmfs_globals();
-  ~cvmfs_globals();
+  LibGlobals();
+  ~LibGlobals();
 
-  static cvmfs_globals *instance;
+  static LibGlobals *instance_;
+
+  OptionsManager *options_mgr_;
+  FileSystem *file_system_;
 
   perf::Statistics *statistics_;
   cache::CacheManager *cache_mgr_;
@@ -124,7 +136,7 @@ class cvmfs_globals : SingleCopy {
 /**
  * Encapsulates state and manager objects for a single attached repository.
  */
-class cvmfs_context : SingleCopy {
+class LibContext : SingleCopy {
  public:
   struct options {
     unsigned       timeout;
@@ -151,8 +163,9 @@ class cvmfs_context : SingleCopy {
       allow_unsigned(false) {}
   };
 
-  static cvmfs_context* Create(const options &options);
-  static void Destroy(cvmfs_context *ctx);
+  static LibContext *Create(const options &options);
+  static void Destroy(LibContext *ctx);  // To be removed
+  ~LibContext();
 
   int GetAttr(const char *c_path, struct stat *info);
   int Readlink(const char *path, char *buf, size_t size);
@@ -171,8 +184,7 @@ class cvmfs_context : SingleCopy {
   /**
    * use static method Create() for construction
    */
-  explicit cvmfs_context(const options &options);
-  ~cvmfs_context();
+  explicit LibContext(const options &options);
 
  private:
   static const int kFdChunked = 1 << 30;

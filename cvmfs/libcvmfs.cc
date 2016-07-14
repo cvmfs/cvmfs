@@ -83,7 +83,7 @@ int set_option(char const *name, char const *value, string *var) {
 #define CVMFS_OPT(var) if (strcmp(name, #var) == 0) \
   return ::set_option(name, value, &var)
 
-struct cvmfs_repo_options : public cvmfs_context::options {
+struct cvmfs_repo_options : public LibContext::options {
   int set_option(char const *name, char const *value) {
     CVMFS_OPT(allow_unsigned);
     CVMFS_OPT(blacklist);
@@ -116,7 +116,7 @@ struct cvmfs_repo_options : public cvmfs_context::options {
   }
 };
 
-struct cvmfs_global_options : public cvmfs_globals::options {
+struct cvmfs_global_options : public LibGlobals::options {
   int set_option(char const *name, char const *value) {
     CVMFS_OPT(alien_cache);
     CVMFS_OPT(alien_cachedir);
@@ -296,15 +296,15 @@ static void usage() {
   PACKAGE_VERSION, defaults.timeout, defaults.timeout_direct);
 }
 
-/* Expand symlinks in all levels of a path.  Also, expand ".." and
- * ".".  This also has the side-effect of ensuring that
- * cvmfs_getattr() is called on all parent paths, which is needed to
- * ensure proper loading of nested catalogs before the child is
- * accessed.
+/**
+ * Expand symlinks in all levels of a path.  Also, expand ".." and ".".  This
+ * also has the side-effect of ensuring that cvmfs_getattr() is called on all
+ * parent paths, which is needed to ensure proper loading of nested catalogs
+ * before the child is accessed.
  */
 static int expand_path(
   const int depth,
-  cvmfs_context *ctx,
+  LibContext *ctx,
   char const *path,
   string *expanded_path)
 {
@@ -413,8 +413,10 @@ static int expand_path(
   return expand_path(depth + 1, ctx, buf.c_str(), expanded_path);
 }
 
-/* Like expand_path(), but do not expand the final element of the path. */
-static int expand_ppath(cvmfs_context *ctx,
+/**
+ * Like expand_path(), but do not expand the final element of the path.
+ */
+static int expand_ppath(LibContext *ctx,
                         const char *path,
                         string *expanded_path)
 {
@@ -437,7 +439,8 @@ static int expand_ppath(cvmfs_context *ctx,
   return 0;
 }
 
-int cvmfs_open(cvmfs_context *ctx, const char *path) {
+
+int cvmfs_open(LibContext *ctx, const char *path) {
   string lpath;
   int rc;
   rc = expand_path(0, ctx, path, &lpath);
@@ -456,7 +459,7 @@ int cvmfs_open(cvmfs_context *ctx, const char *path) {
 
 
 ssize_t cvmfs_pread(
-  cvmfs_context *ctx,
+  LibContext *ctx,
   int fd,
   void *buf,
   size_t size,
@@ -471,7 +474,7 @@ ssize_t cvmfs_pread(
 }
 
 
-int cvmfs_close(cvmfs_context *ctx, int fd)
+int cvmfs_close(LibContext *ctx, int fd)
 {
   int rc = ctx->Close(fd);
   if (rc < 0) {
@@ -481,8 +484,9 @@ int cvmfs_close(cvmfs_context *ctx, int fd)
   return 0;
 }
 
+
 int cvmfs_readlink(
-  cvmfs_context *ctx,
+  LibContext *ctx,
   const char *path,
   char *buf,
   size_t size
@@ -503,7 +507,8 @@ int cvmfs_readlink(
   return 0;
 }
 
-int cvmfs_stat(cvmfs_context *ctx, const char *path, struct stat *st) {
+
+int cvmfs_stat(LibContext *ctx, const char *path, struct stat *st) {
   string lpath;
   int rc;
   rc = expand_path(0, ctx, path, &lpath);
@@ -520,7 +525,8 @@ int cvmfs_stat(cvmfs_context *ctx, const char *path, struct stat *st) {
   return 0;
 }
 
-int cvmfs_lstat(cvmfs_context *ctx, const char *path, struct stat *st) {
+
+int cvmfs_lstat(LibContext *ctx, const char *path, struct stat *st) {
   string lpath;
   int rc;
   rc = expand_ppath(ctx, path, &lpath);
@@ -537,8 +543,9 @@ int cvmfs_lstat(cvmfs_context *ctx, const char *path, struct stat *st) {
   return 0;
 }
 
+
 int cvmfs_listdir(
-  cvmfs_context *ctx,
+  LibContext *ctx,
   const char *path,
   char ***buf,
   size_t *buflen
@@ -559,9 +566,10 @@ int cvmfs_listdir(
   return 0;
 }
 
-cvmfs_context* cvmfs_attach_repo(char const *options)
+
+LibContext* cvmfs_attach_repo(char const *options)
 {
-  /* Parse options */
+  // Parse options
   repo_options opts;
   int parse_result = opts.parse_options(options);
   if (parse_result != 0)
@@ -578,12 +586,14 @@ cvmfs_context* cvmfs_attach_repo(char const *options)
     return NULL;
   }
 
-  return cvmfs_context::Create(opts);
+  return LibContext::Create(opts);
 }
 
-void cvmfs_detach_repo(cvmfs_context *ctx) {
-  cvmfs_context::Destroy(ctx);
+
+void cvmfs_detach_repo(LibContext *ctx) {
+  LibContext::Destroy(ctx);
 }
+
 
 int cvmfs_init(char const *options) {
   global_options opts;
@@ -594,14 +604,17 @@ int cvmfs_init(char const *options) {
     return parse_result;
   }
 
-  return cvmfs_globals::Initialize(opts);
+  return LibGlobals::Initialize(opts);
 }
+
 
 void cvmfs_fini() {
-  cvmfs_globals::Destroy();
+  LibGlobals::CleanupInstance();
 }
 
+
 static void (*ext_log_fn)(const char *msg) = NULL;
+
 
 static void libcvmfs_log_fn(
   const LogSource /*source*/,
@@ -613,6 +626,7 @@ static void libcvmfs_log_fn(
   }
 }
 
+
 void cvmfs_set_log_fn(void (*log_fn)(const char *msg))
 {
   ext_log_fn = log_fn;
@@ -623,7 +637,8 @@ void cvmfs_set_log_fn(void (*log_fn)(const char *msg))
   }
 }
 
-int cvmfs_remount(cvmfs_context *ctx) {
+
+int cvmfs_remount(LibContext *ctx) {
   catalog::LoadError retval = ctx->RemountStart();
   if (retval == catalog::kLoadNew || retval == catalog::kLoadUp2Date) {
     return 0;
