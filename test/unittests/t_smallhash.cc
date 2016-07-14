@@ -159,7 +159,7 @@ TEST_F(T_Smallhash, Lookup) {
     smallhash_.Insert(i, i);
   }
   for (unsigned i = 0; i < N; ++i) {
-    int value;
+    int value = -1;
     bool found = smallhash_.Lookup(i, &value);
     EXPECT_TRUE(found);
     EXPECT_EQ(unsigned(value), i);
@@ -174,7 +174,7 @@ TEST_F(T_Smallhash, MultihashCycleSlow) {
   }
   EXPECT_EQ(N, GetMultiSize());
   for (unsigned i = 0; i < N; ++i) {
-    int value;
+    int value = -1;
     bool found = multihash_.Lookup(i, &value);
     EXPECT_TRUE(found);
     EXPECT_EQ(unsigned(value), i);

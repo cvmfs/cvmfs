@@ -399,7 +399,8 @@ bool DecompressPath2Path(const string &src, const string &dest) {
 
 
 bool CompressFile2Null(FILE *fsrc, shash::Any *compressed_hash) {
-  int z_ret, flush;
+  int z_ret = 0;
+  int flush = 0;
   bool result = -1;
   unsigned have;
   z_stream strm;
@@ -451,7 +452,8 @@ bool CompressFile2Null(FILE *fsrc, shash::Any *compressed_hash) {
 
 bool CompressFd2Null(int fd_src, shash::Any *compressed_hash,
                      uint64_t *processed_bytes) {
-  int z_ret, flush;
+  int z_ret = 0;
+  int flush = 0;
   bool result = false;
   unsigned have;
   z_stream strm;
@@ -521,7 +523,8 @@ bool CompressPath2Null(const string &src, shash::Any *compressed_hash) {
 
 
 bool CompressFile2File(FILE *fsrc, FILE *fdest) {
-  int z_ret, flush;
+  int z_ret = 0;
+  int flush = 0;
   bool result = false;
   unsigned have;
   z_stream strm;
@@ -581,7 +584,8 @@ bool CompressPath2File(const string &src, FILE *fdest,
 
 
 bool CompressFile2File(FILE *fsrc, FILE *fdest, shash::Any *compressed_hash) {
-  int z_ret, flush;
+  int z_ret = 0;
+  int flush = 0;
   bool result = false;
   unsigned have;
   z_stream strm;
@@ -673,7 +677,8 @@ bool DecompressPath2File(const string &src, FILE *fdest) {
 
 bool CompressMem2File(const unsigned char *buf, const size_t size,
                       FILE *fdest, shash::Any *compressed_hash) {
-  int z_ret, flush;
+  int z_ret = 0;
+  int flush = 0;
   bool result = false;
   unsigned have;
   z_stream strm;

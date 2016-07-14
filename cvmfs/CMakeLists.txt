@@ -34,7 +34,8 @@ set (CVMFS_CLIENT_SOURCES
   backoff.cc backoff.h
   bigvector.h
   cache.cc cache.h
-  tiered_cache.cc tiered_cache.h
+  cache_posix.cc cache_posix.h
+  cache_ram.cc cache_ram.h
   catalog.cc catalog.h
   catalog_counters.cc catalog_counters.h catalog_counters_impl.h
   catalog_mgr.h catalog_mgr_impl.h
@@ -81,6 +82,7 @@ set (CVMFS_CLIENT_SOURCES
   sqlitemem.cc sqlitemem.h
   sqlitevfs.cc sqlitevfs.h
   statistics.cc statistics.h
+  tiered_cache.cc tiered_cache.h
   tracer.cc tracer.h
   uid_map.h
   uuid.cc uuid.h

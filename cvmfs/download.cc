@@ -235,11 +235,11 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
   {
     char *tmp = reinterpret_cast<char *>(alloca(num_bytes+1));
     uint64_t length = 0;
-    sscanf(header_line.c_str(), "%s %"PRIu64, tmp, &length);
+    sscanf(header_line.c_str(), "%s %" PRIu64, tmp, &length);
     if (length > 0) {
       if (length > DownloadManager::kMaxMemSize) {
         LogCvmfs(kLogDownload, kLogDebug | kLogSyslogErr,
-                 "resource %s too large to store in memory (%"PRIu64")",
+                 "resource %s too large to store in memory (%" PRIu64 ")",
                  info->url->c_str(), length);
         info->error_code = kFailTooBig;
         return 0;
@@ -793,7 +793,7 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
     const int64_t range_upper = static_cast<int64_t>(
       info->range_offset + info->range_size - 1);
     if (snprintf(byte_range_array, sizeof(byte_range_array),
-                 "%" PRId64"-%" PRId64,
+                 "%" PRId64 "-%" PRId64,
                  range_lower, range_upper) == 100)
     {
       abort();  // Should be impossible given limits on offset size.
@@ -2649,8 +2649,7 @@ DownloadManager *DownloadManager::Clone(
     clone->opt_host_chain_ = new vector<string>(*opt_host_chain_);
     clone->opt_host_chain_rtt_ = new vector<int>(*opt_host_chain_rtt_);
   }
-  clone->SetProxyChain(opt_proxy_list_, opt_proxy_fallback_list_,
-                       kSetProxyBoth);
+  CloneProxyConfig(clone);
   clone->opt_ip_preference_ = opt_ip_preference_;
   clone->proxy_template_direct_ = proxy_template_direct_;
   clone->proxy_template_forced_ = proxy_template_forced_;
@@ -2659,6 +2658,21 @@ DownloadManager *DownloadManager::Clone(
   clone->credentials_attachment_ = credentials_attachment_;
 
   return clone;
+}
+
+
+void DownloadManager::CloneProxyConfig(DownloadManager *clone) {
+  clone->opt_proxy_groups_current_ = opt_proxy_groups_current_;
+  clone->opt_proxy_groups_current_burned_ = opt_proxy_groups_current_burned_;
+  clone->opt_proxy_groups_fallback_ = opt_proxy_groups_fallback_;
+  clone->opt_num_proxies_ = opt_num_proxies_;
+  clone->opt_proxy_list_ = opt_proxy_list_;
+  clone->opt_proxy_fallback_list_ = opt_proxy_fallback_list_;
+  if (opt_proxy_groups_ == NULL)
+    return;
+
+  clone->opt_proxy_groups_ = new vector< vector<ProxyInfo> >(
+    *opt_proxy_groups_);
 }
 
 }  // namespace download

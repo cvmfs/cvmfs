@@ -59,7 +59,7 @@ class T_MountPoint : public ::testing::Test {
 
   void CreateMiniRepository() {
     char abs_path[MAXPATHLEN];
-    getcwd(abs_path, MAXPATHLEN);
+    ASSERT_TRUE(getcwd(abs_path, MAXPATHLEN) != NULL);
     repo_path_ =  string(abs_path) + "/repo";
     MakeCacheDirectories(repo_path_ + "/data", 0700);
 
@@ -319,14 +319,9 @@ TEST_F(T_MountPoint, CacheSettings) {
   options_mgr_.SetValue("CVMFS_NFS_SOURCE", "yes");
   {
     UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
-    EXPECT_EQ(loader::kFailOptions, fs->boot_status());
-  }
-
-  options_mgr_.UnsetValue("CVMFS_NFS_SOURCE");
-  {
-    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
     EXPECT_EQ(loader::kFailOk, fs->boot_status());
   }
+  options_mgr_.UnsetValue("CVMFS_NFS_SOURCE");
 
   fs_info_.type = FileSystem::kFsLibrary;
   options_mgr_.SetValue("CVMFS_SHARED_CACHE", "yes");
@@ -444,7 +439,7 @@ TEST_F(T_MountPoint, UuidCache) {
     ASSERT_EQ(loader::kFailOk, fs->boot_status());
     cached_uuid = fs->uuid_cache()->uuid();
   }
-  fchdir(fd_cwd_);
+  ASSERT_EQ(fchdir(fd_cwd_), 0);
 
   UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
   ASSERT_EQ(loader::kFailOk, fs->boot_status());
@@ -576,7 +571,11 @@ TEST_F(T_MountPoint, History) {
     EXPECT_EQ(loader::kFailHistory, mp->boot_status());
   }
 
-  options_mgr_.SetValue("CVMFS_REPOSITORY_DATE", "2424-01-01T00:00:00Z");
+  if (sizeof(time_t) > 32) {
+    options_mgr_.SetValue("CVMFS_REPOSITORY_DATE", "2424-01-01T00:00:00Z");
+  } else {
+    options_mgr_.SetValue("CVMFS_REPOSITORY_DATE", "2038-01-01T00:00:00Z");
+  }
   {
     UniquePtr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
     EXPECT_EQ(loader::kFailOk, mp->boot_status());

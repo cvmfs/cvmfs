@@ -28,7 +28,7 @@ namespace catalog {
 class ClientCatalogManager;
 class InodeGenerationAnnotation;
 }
-class ChunkTables;
+struct ChunkTables;
 namespace cvmfs {
 class Fetcher;
 class Uuid;
@@ -170,6 +170,7 @@ class FileSystem : SingleCopy, public BootFactory {
   ~FileSystem();
 
   bool IsNfsSource() { return cache_mode_ & kCacheNfs; }
+  bool IsAlienCache() { return cache_mode_ & kCacheAlien; }
   void ResetErrorCounters();
   void TearDown2ReadOnly();
 

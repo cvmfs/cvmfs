@@ -52,7 +52,7 @@ int set_option(char const *name, char const *value, unsigned *var) {
 int set_option(char const *name, char const *value, uint64_t *var) {
   uint64_t v = 0;
   int end = 0;
-  int rc = sscanf(value, "%"PRIu64"%n", &v, &end);
+  int rc = sscanf(value, "%" PRIu64 "%n", &v, &end);
   if (rc != 1 || value[end] != '\0') {
     fprintf(stderr, "Invalid unsigned long integer value for %s=%s\n",
             name, value);

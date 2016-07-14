@@ -58,6 +58,20 @@ Vagrant.configure(2) do |config|
     cvm.vm.provision "shell", path: "vagrant/provision_cernvm.sh"
   end
 
+  config.vm.define "cernvm4" do |cvm|
+    cvm.vm.box = "cernvm4"
+    cvm.vm.box_url = "http://cernvm.cern.ch/releases/ucernvm-images.2.6-9.cernvm.x86_64/ucernvm-sl7.2.6-9.cernvm.x86_64.box"
+
+    cvm.vm.boot_timeout = 1200 # CernVM might load stuff over a slow network
+                                  # and need a lot of time on first boot up
+
+    #cvm.vm.network "private_network", ip: "192.168.33.10"
+    cvm.vm.network "private_network", type: "dhcp", auto_config: false
+    cvm.vm.synced_folder '.', '/vagrant', nfs: true
+
+    cvm.vm.provision "shell", path: "vagrant/provision_cernvm4.sh"
+  end
+
   config.vm.define "slc6" do |slc6|
     unless Vagrant.has_plugin?("vagrant-reload")
       puts "-------------------- WARNING --------------------"
@@ -88,9 +102,23 @@ Vagrant.configure(2) do |config|
     ub.vm.provision "shell", path: "vagrant/provision_ubuntu.sh"
   end
 
+  config.vm.define "ubuntu1204-32" do |ub|
+    ub.vm.box = "ubuntu/precise32"
+    ub.vm.network "private_network", ip: "192.168.33.18"
+    ub.vm.synced_folder '.', '/vagrant', nfs: true
+    ub.vm.provision "shell", path: "vagrant/provision_ubuntu.sh"
+  end
+
   config.vm.define "fedora" do |fedora|
     fedora.vm.box = "fedora/23-cloud-base"
     fedora.vm.network "private_network", ip: "192.168.33.13"
+    fedora.vm.synced_folder '.', '/vagrant', nfs: true
+    fedora.vm.provision "shell", path: "vagrant/provision_fedora.sh"
+  end
+
+  config.vm.define "fedora24" do |fedora|
+    fedora.vm.box = "fedora/24-cloud-base"
+    fedora.vm.network "private_network", ip: "192.168.33.19"
     fedora.vm.synced_folder '.', '/vagrant', nfs: true
     fedora.vm.provision "shell", path: "vagrant/provision_fedora.sh"
   end

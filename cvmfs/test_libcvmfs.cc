@@ -65,7 +65,8 @@ int cvmfs_test_list(cvmfs_context *ctx, const char *path)
   for (i = 0; buffer[i]; i++) {
     snprintf(filepath, TEST_LINE_MAX, "%s/%s", path, buffer[i]);
     cvmfs_stat(ctx, filepath, &info);
-    printf("%10"PRIu64" %s\n", static_cast<uint64_t>(info.st_size), buffer[i]);
+    printf("%10" PRIu64 " %s\n",
+           static_cast<uint64_t>(info.st_size), buffer[i]);
   }
 
   free(buffer);

@@ -47,7 +47,8 @@ Uuid *Uuid::Create(const string &store_path) {
   if (!retval)
     return NULL;
   int nitems = sscanf(uuid->uuid_.c_str(),
-    "%08"SCNx32"-%04"SCNx16"-%04"SCNx16"-%04"SCNx16"-%08"SCNx32"%04"SCNx16,
+    "%08" SCNx32 "-%04" SCNx16 "-%04" SCNx16 "-%04" SCNx16 "-%08" SCNx32 "%04"
+      SCNx16,
     &uuid->uuid_presentation_.split.a, &uuid->uuid_presentation_.split.b,
     &uuid->uuid_presentation_.split.c, &uuid->uuid_presentation_.split.d,
     &uuid->uuid_presentation_.split.e1, &uuid->uuid_presentation_.split.e2);

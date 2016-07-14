@@ -42,7 +42,8 @@ void SplitPath(const std::string &path,
 bool IsAbsolutePath(const std::string &path);
 bool IsHttpUrl(const std::string &path);
 
-void CreateFile(const std::string &path, const int mode);
+void CreateFile(const std::string &path, const int mode,
+                const bool ignore_failure = false);
 int MakeSocket(const std::string &path, const int mode);
 int ConnectSocket(const std::string &path);
 void MakePipe(int pipe_fd[2]);

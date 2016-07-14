@@ -33,6 +33,7 @@
 #include "authz/authz_session.h"
 #include "backoff.h"
 #include "cache.h"
+#include "cache_posix.h"
 #include "catalog.h"
 #include "catalog_mgr_client.h"
 #include "download.h"
@@ -86,11 +87,6 @@ bool FileSystem::CheckCacheMode() {
   if ((cache_mode_ & kCacheAlien) && (cache_mode_ & kCacheManaged)) {
     boot_error_ = "Failure: quota management and alien cache mutually "
                   "exclusive. Turn off quota limit.";
-    boot_status_ = loader::kFailOptions;
-    return false;
-  }
-  if ((cache_mode_ & kCacheAlien) && (cache_mode_ & kCacheNfs)) {
-    boot_error_ = "Failure: NFS cache mode and alien cache mutually exclusive.";
     boot_status_ = loader::kFailOptions;
     return false;
   }
@@ -167,7 +163,8 @@ bool FileSystem::CreateCache() {
     return false;
   }
   // Sentinel file for future use
-  CreateFile(cache_dir_ + "/.cvmfscache", 0600);
+  const bool ignore_failure = IsAlienCache();  // Might be a read-only cache
+  CreateFile(cache_dir_ + "/.cvmfscache", 0600, ignore_failure);
 
   if (cache_mode_ & FileSystem::kCacheManaged) {
     if (!SetupQuotaMgmt())
@@ -284,7 +281,7 @@ void FileSystem::DetermineCacheDirs() {
     second_cache_dir_ = optarg;
   }
 
-  nfs_maps_dir_ = cache_dir_;
+  nfs_maps_dir_ = workspace_;
   if (options_mgr_->GetValue("CVMFS_NFS_SHARED", &optarg))
     nfs_maps_dir_ = optarg;
 }
@@ -519,7 +516,8 @@ bool FileSystem::SetupNfsMaps() {
   string no_nfs_sentinel = cache_dir_ + "/no_nfs_maps." + name_;
 
   if (!IsNfsSource()) {
-    CreateFile(no_nfs_sentinel, 0600);
+    const bool ignore_failure = IsAlienCache();  // Might be a read-only cache
+    CreateFile(no_nfs_sentinel, 0600, ignore_failure);
     return true;
   }
 
@@ -1222,10 +1220,6 @@ void MountPoint::SetupDnsTuning(download::DownloadManager *manager) {
   string optarg;
   OptionsManager *options_mgr = file_system_->options_mgr();
 
-  if (options_mgr->GetValue("CVMFS_DNS_SERVER", &optarg)) {
-    download_mgr_->SetDnsServer(optarg);
-  }
-
   unsigned dns_timeout_ms = download::DownloadManager::kDnsDefaultTimeoutMs;
   unsigned dns_retries = download::DownloadManager::kDnsDefaultRetries;
   if (options_mgr->GetValue("CVMFS_DNS_TIMEOUT", &optarg))
@@ -1233,6 +1227,13 @@ void MountPoint::SetupDnsTuning(download::DownloadManager *manager) {
   if (options_mgr->GetValue("CVMFS_DNS_RETRIES", &optarg))
     dns_retries = String2Uint64(optarg);
   manager->SetDnsParameters(dns_retries, dns_timeout_ms);
+
+  // Has to be after SetDnsParameters because SetDnsParameters might construct
+  // a new resolver object
+  if (options_mgr->GetValue("CVMFS_DNS_SERVER", &optarg)) {
+    download_mgr_->SetDnsServer(optarg);
+  }
+
   if (options_mgr->GetValue("CVMFS_IPFAMILY_PREFER", &optarg)) {
     switch (String2Int64(optarg)) {
       case 4:

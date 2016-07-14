@@ -1,6 +1,9 @@
 cvmfs_test_name="Data Corruption in Manifest File"
 cvmfs_test_autofs_on_startup=false
 
+# Note: this test is currently supposed to fail because cvmfs does not fail-over
+# on S1 data corruption
+
 desaster_cleanup() {
   local mnt_point=$1
   local replica_name=$2

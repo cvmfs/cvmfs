@@ -341,7 +341,7 @@ TEST_F(T_AsyncReader, MultipleWaitsSlow) {
                                   static_cast<void*>(&files));
   ASSERT_EQ(0, res);
 
-  unsigned int timeout = 10;
+  unsigned int timeout = 30;
   while (pthread_kill(thread, 0) != ESRCH && timeout > 0) {
     sleep(1);
     --timeout;

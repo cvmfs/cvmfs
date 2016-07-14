@@ -656,7 +656,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   sync->Traverse();
 
   if (params.ttl_seconds > 0) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "Setting repository TTL to %"PRIu64" s",
+    LogCvmfs(kLogCvmfs, kLogStdout, "Setting repository TTL to %" PRIu64 " s",
              params.ttl_seconds);
     catalog_manager.SetTTL(params.ttl_seconds);
   }

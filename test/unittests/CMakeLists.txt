@@ -86,6 +86,7 @@ set(CVMFS_UNITTEST_FILES
   t_util.cc
   t_util_concurrency.cc
   t_uuid.cc
+  t_whitelist.cc
   t_wpad.cc
   t_xattr.cc
 )
@@ -107,7 +108,8 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/backoff.cc ${CVMFS_SOURCE_DIR}/backoff.h
   ${CVMFS_SOURCE_DIR}/bigvector.h
   ${CVMFS_SOURCE_DIR}/cache.cc ${CVMFS_SOURCE_DIR}/cache.h
-  ${CVMFS_SOURCE_DIR}/tiered_cache.cc ${CVMFS_SOURCE_DIR}/tiered_cache.h
+  ${CVMFS_SOURCE_DIR}/cache_posix.cc ${CVMFS_SOURCE_DIR}/cache_posix.h
+  ${CVMFS_SOURCE_DIR}/cache_ram.cc ${CVMFS_SOURCE_DIR}/cache_ram.h
   ${CVMFS_SOURCE_DIR}/catalog.cc
   ${CVMFS_SOURCE_DIR}/catalog_counters.cc ${CVMFS_SOURCE_DIR}/catalog_counters.h
   ${CVMFS_SOURCE_DIR}/catalog_mgr.h
@@ -172,6 +174,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/sqlitemem.cc ${CVMFS_SOURCE_DIR}/sqlitemem.h
   ${CVMFS_SOURCE_DIR}/sqlitevfs.cc ${CVMFS_SOURCE_DIR}/sqlitevfs.h
   ${CVMFS_SOURCE_DIR}/statistics.cc ${CVMFS_SOURCE_DIR}/statistics.h
+  ${CVMFS_SOURCE_DIR}/tiered_cache.cc ${CVMFS_SOURCE_DIR}/tiered_cache.h
   ${CVMFS_SOURCE_DIR}/tracer.cc ${CVMFS_SOURCE_DIR}/tracer.h
   ${CVMFS_SOURCE_DIR}/uid_map.h
   ${CVMFS_SOURCE_DIR}/upload.cc ${CVMFS_SOURCE_DIR}/upload.h
