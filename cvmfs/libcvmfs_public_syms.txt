@@ -3,7 +3,15 @@ __x86.get_pc_thunk.bx
 __x86.get_pc_thunk.dx
 __i686.get_pc_thunk.bx
 __i686.get_pc_thunk.cx
+cvmfs_options_init
+cvmfs_options_clone
+cvmfs_options_fini
+cvmfs_options_set
+cvmfs_options_unset
+cvmfs_options_get
+cvmfs_options_free
 cvmfs_init
+cvmfs_init_v2
 cvmfs_fini
 cvmfs_attach_repo
 cvmfs_detach_repo

@@ -145,7 +145,6 @@ LibGlobals::LibGlobals()
 
 LibGlobals::~LibGlobals() {
   delete file_system_;
-  delete options_mgr_;
 
   if (vfs_registered_)
     sqlite::UnregisterVfsRdOnly();

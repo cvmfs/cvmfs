@@ -608,6 +608,11 @@ int cvmfs_init(char const *options) {
 }
 
 
+int cvmfs_init_v2(OptionsManager *opts) {
+  return LibGlobals::Initialize(opts);
+}
+
+
 void cvmfs_fini() {
   LibGlobals::CleanupInstance();
 }

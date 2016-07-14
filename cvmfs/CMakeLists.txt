@@ -120,6 +120,7 @@ set (LIBCVMFS_SOURCES
 
   libcvmfs.cc libcvmfs.h
   libcvmfs_int.cc libcvmfs_int.h
+  libcvmfs_options.cc
 )
 
 set (TEST_LIBCVMFS_SOURCES

@@ -1,14 +1,13 @@
 /**
  * This file is part of the CernVM File System.
+ *
+ * NOTE: when adding or removing public symbols, you must also update the list
+ * in libcvmfs_public_syms.txt.
  */
 
 #ifndef CVMFS_LIBCVMFS_H_
 #define CVMFS_LIBCVMFS_H_
 
-/*
- * NOTE: when adding or removing public symbols, you must also update
- * the list in libcvmfs_public_syms.txt.
- */
 #define LIBCVMFS_VERSION 2
 #define LIBCVMFS_VERSION_MAJOR LIBCVMFS_VERSION
 #define LIBCVMFS_VERSION_MINOR 4
@@ -29,35 +28,16 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+// Legacy error codes
 #define LIBCVMFS_FAIL_OK         0
-/**
- * Could not increase the number of open files limit
- */
 #define LIBCVMFS_FAIL_NOFILES   -1
-/**
- * Could not create the cache directory
- */
 #define LIBCVMFS_FAIL_MKCACHE   -2
-/**
- * Could not change into the cache directory
- */
 #define LIBCVMFS_FAIL_OPENCACHE -3
-/**
- * Could not acquire lock file (flock)
- */
 #define LIBCVMFS_FAIL_LOCKFILE  -4
-/**
- * Could not create cache directory skeleton
- */
 #define LIBCVMFS_FAIL_INITCACHE -5
-/**
- * Could not initialize quota manager
- */
 #define LIBCVMFS_FAIL_INITQUOTA -6
-/**
- * Unknown option
- */
 #define LIBCVMFS_FAIL_BADOPT    -7
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -69,6 +49,49 @@ typedef struct LibContext cvmfs_context;
 typedef struct OptionsManager cvmfs_option_map;
 #endif
 
+/**
+ * Error codes for cvmfs_init_v2.  Mirrors the failure codes in loader.h
+ */
+typedef enum {
+  LIBCVMFS_ERR_OK = 0,
+  LIBCVMFS_ERR_UNKNOWN,
+  LIBCVMFS_ERR_OPTIONS,
+  LIBCVMFS_ERR_PERMISSION,
+  LIBCVMFS_ERR_MOUNT,                  // unused in the library
+  LIBCVMFS_ERR_LOADER_TALK,            // unused in the library
+  LIBCVMFS_ERR_FUSE_LOOP,              // unused in the library
+  LIBCVMFS_ERR_LOAD_LIBRARY,           // unused in the library
+  LIBCVMFS_ERR_INCOMPATIBLE_VERSIONS,  // unused
+  LIBCVMFS_ERR_CACHE_DIR,
+  LIBCVMFS_ERR_PEERS,                  // unused
+  LIBCVMFS_ERR_NFS_MAPS,
+  LIBCVMFS_ERR_QUOTA,
+  LIBCVMFS_ERR_MONITOR,                // unused in the library
+  LIBCVMFS_ERR_TALK,                   // unused in the library
+  LIBCVMFS_ERR_SIGNATURE,
+  LIBCVMFS_ERR_CATALOG,
+  LIBCVMFS_ERR_MAINTENANCE_MODE,       // unused in the library
+  LIBCVMFS_ERR_SAVE_STATE,             // unused in the library
+  LIBCVMFS_ERR_RESTORE_STATE,          // unused in the library
+  LIBCVMFS_ERR_OTHER_MOUNT,            // unused in the library
+  LIBCVMFS_ERR_DOUBLE_MOUNT,           // unused in the library
+  LIBCVMFS_ERR_HISTORY,
+  LIBCVMFS_ERR_WPAD,
+  LIBCVMFS_ERR_LOCK_WORKSPACE,
+} cvmfs_errors;
+
+
+/**
+ * An option map must be created an populated before calling cvmfs_init_v2.
+ */
+cvmfs_option_map *cvmfs_options_init();
+cvmfs_option_map *cvmfs_options_clone(cvmfs_option_map *opts);
+void cvmfs_options_fini(cvmfs_option_map *opts);
+void cvmfs_options_set(cvmfs_option_map *opts, char *key, char *value);
+void cvmfs_options_unset(cvmfs_option_map *opts, char *key);
+char *cvmfs_options_get(cvmfs_option_map *opts, char *key);
+void cvmfs_options_free(char *value);
+
 
 /**
  * Initialize global CVMFS library structures
@@ -79,8 +102,13 @@ typedef struct OptionsManager cvmfs_option_map;
  */
 int cvmfs_init(char const *options);
 
+int cvmfs_init_v2(cvmfs_option_map *opts);
+
+
 /**
- * Shut down the CVMFS library and release all resources.
+ * Shut down the CVMFS library and release all resources.  The cvmfs_option_map
+ * object passed to cvmfs_init_v2 must be deleted afterwards by a call to
+ * cvmfs_options_fini().
  */
 void cvmfs_fini();
 
