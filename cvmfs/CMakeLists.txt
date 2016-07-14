@@ -82,6 +82,7 @@ set (CVMFS_CLIENT_SOURCES
   sqlitemem.cc sqlitemem.h
   sqlitevfs.cc sqlitevfs.h
   statistics.cc statistics.h
+  tiered_cache.cc tiered_cache.h
   tracer.cc tracer.h
   uid_map.h
   uuid.cc uuid.h

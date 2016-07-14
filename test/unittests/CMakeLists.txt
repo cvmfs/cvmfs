@@ -174,6 +174,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/sqlitemem.cc ${CVMFS_SOURCE_DIR}/sqlitemem.h
   ${CVMFS_SOURCE_DIR}/sqlitevfs.cc ${CVMFS_SOURCE_DIR}/sqlitevfs.h
   ${CVMFS_SOURCE_DIR}/statistics.cc ${CVMFS_SOURCE_DIR}/statistics.h
+  ${CVMFS_SOURCE_DIR}/tiered_cache.cc ${CVMFS_SOURCE_DIR}/tiered_cache.h
   ${CVMFS_SOURCE_DIR}/tracer.cc ${CVMFS_SOURCE_DIR}/tracer.h
   ${CVMFS_SOURCE_DIR}/uid_map.h
   ${CVMFS_SOURCE_DIR}/upload.cc ${CVMFS_SOURCE_DIR}/upload.h
