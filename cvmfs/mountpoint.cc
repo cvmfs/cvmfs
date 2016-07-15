@@ -99,6 +99,15 @@ bool FileSystem::CheckCacheMode() {
     }
   }
 
+  if (options_mgr_->IsDefined("CVMFS_CACHE_BASE") &&
+      options_mgr_->IsDefined("CVMFS_CACHE_DIR"))
+  {
+    boot_error_ =
+      "'CVMFS_CACHE_BASE' and 'CVMFS_CACHE_DIR' are mutually exclusive";
+    boot_status_ = loader::kFailOptions;
+    return false;
+  }
+
   return true;
 }
 
@@ -125,7 +134,7 @@ FileSystem *FileSystem::Create(const FileSystem::FileSystemInfo &fs_info) {
   if (!file_system->SetupWorkspace())
     return file_system.Release();
 
-  // Redirect SQlite temp directory to cache (global variable)
+  // Redirect SQlite temp directory to workspace (global variable)
   unsigned length_tempdir = file_system->workspace_.length() + 1;
   sqlite3_temp_directory = static_cast<char *>(sqlite3_malloc(length_tempdir));
   snprintf(sqlite3_temp_directory,
@@ -177,9 +186,10 @@ bool FileSystem::CreateCache() {
   // proxy template is replaced
   uuid_cache_ = cvmfs::Uuid::Create(cache_dir_ + "/uuid");
   if (uuid_cache_ == NULL) {
-    boot_error_ = "failed to load/store uuid";
-    boot_status_ = loader::kFailCacheDir;
-    return false;
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+             "failed to load/store %s/uuid", cache_dir_.c_str());
+    uuid_cache_ = cvmfs::Uuid::Create("");
+    assert(uuid_cache_ != NULL);
   }
 
   return true;
@@ -237,6 +247,11 @@ void FileSystem::DetermineCacheDirs() {
   } else {
     cache_dir_ += "/" + name_;
   }
+
+  // CheckCacheMode makes sure that CVMFS_CACHE_DIR and CVMFS_CACHE_BASE are
+  // not set at the same time.
+  if (options_mgr_->GetValue("CVMFS_CACHE_DIR", &optarg))
+    cache_dir_ = optarg;
 
   workspace_ = cache_dir_;
 
@@ -305,7 +320,7 @@ FileSystem::FileSystem(const FileSystem::FileSystemInfo &fs_info)
   , fd_workspace_lock_(-1)
   , found_previous_crash_(false)
   , cache_mode_(0)
-  , quota_limit_(kDefaultQuotaLimit)
+  , quota_limit_((fs_info.type == kFsLibrary) ? 0 : kDefaultQuotaLimit)
   , cache_mgr_(NULL)
   , uuid_cache_(NULL)
   , has_nfs_maps_(false)
@@ -587,7 +602,7 @@ bool FileSystem::SetupWorkspace() {
   const int mode = ((cache_mode_ & kCacheAlien) && (workspace_ == cache_dir_)) ?
                    0770 : 0700;
   if (!MkdirDeep(workspace_, mode, false)) {
-    boot_error_ = "cannot create cache directory " + cache_dir_;
+    boot_error_ = "cannot create workspace directory " + workspace_;
     boot_status_ = loader::kFailCacheDir;
     return false;
   }

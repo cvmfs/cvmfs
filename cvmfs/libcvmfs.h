@@ -82,14 +82,23 @@ typedef enum {
 
 
 /**
+ * Send syslog and debug messages to log_fn instead.  This may (and probably
+ * should) be called before any other routine.  Setting this to NULL restores
+ * the default logging behavior.
+ */
+void cvmfs_set_log_fn( void (*log_fn)(const char *msg) );
+
+
+/**
  * An option map must be created an populated before calling cvmfs_init_v2.
  */
 cvmfs_option_map *cvmfs_options_init();
 cvmfs_option_map *cvmfs_options_clone(cvmfs_option_map *opts);
 void cvmfs_options_fini(cvmfs_option_map *opts);
-void cvmfs_options_set(cvmfs_option_map *opts, char *key, char *value);
-void cvmfs_options_unset(cvmfs_option_map *opts, char *key);
-char *cvmfs_options_get(cvmfs_option_map *opts, char *key);
+void cvmfs_options_set(cvmfs_option_map *opts,
+                       const char *key, const char *value);
+void cvmfs_options_unset(cvmfs_option_map *opts, const char *key);
+char *cvmfs_options_get(cvmfs_option_map *opts, const char *key);
 void cvmfs_options_free(char *value);
 
 
@@ -102,7 +111,7 @@ void cvmfs_options_free(char *value);
  */
 int cvmfs_init(char const *options);
 
-int cvmfs_init_v2(cvmfs_option_map *opts);
+cvmfs_errors cvmfs_init_v2(cvmfs_option_map *opts);
 
 
 /**
@@ -132,13 +141,6 @@ void cvmfs_detach_repo(cvmfs_context *ctx);
  * \return 0 on success
  */
 int cvmfs_remount(cvmfs_context *ctx);
-
-/**
- * Send syslog and debug messages to log_fn instead.  This may (and
- * probably should) be called before cvmfs_init().  Setting this to
- * NULL restores the default logging behavior.
- */
-void cvmfs_set_log_fn( void (*log_fn)(const char *msg) );
 
 /**
  * Open a file in the CVMFS cache.

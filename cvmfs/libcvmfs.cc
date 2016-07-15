@@ -608,8 +608,9 @@ int cvmfs_init(char const *options) {
 }
 
 
-int cvmfs_init_v2(OptionsManager *opts) {
-  return LibGlobals::Initialize(opts);
+cvmfs_errors cvmfs_init_v2(OptionsManager *opts) {
+  int result = LibGlobals::Initialize(opts);
+  return static_cast<cvmfs_errors>(result);
 }
 
 

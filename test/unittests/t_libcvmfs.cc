@@ -204,3 +204,12 @@ TEST_F(T_Libcvmfs, OptionAliases) {
   EXPECT_EQ(LIBCVMFS_FAIL_OK, retval);
   cvmfs_fini();
 }
+
+
+TEST_F(T_Libcvmfs, Initv2) {
+  cvmfs_option_map *opts = cvmfs_options_init();
+  cvmfs_options_set(opts, "CVMFS_CACHE_DIR", tmp_path_.c_str());
+  EXPECT_EQ(LIBCVMFS_ERR_OK, cvmfs_init_v2(opts));
+  cvmfs_fini();
+  cvmfs_options_fini(opts);
+}

@@ -101,7 +101,6 @@ class LibGlobals : SingleCopy {
   static void CleanupInstance();
   static LibGlobals* GetInstance();
 
-  pthread_mutex_t *libcrypto_locks() { return libcrypto_locks_; }
   cache::CacheManager *cache_mgr() { return cache_mgr_; }
 
  protected:
@@ -114,6 +113,7 @@ class LibGlobals : SingleCopy {
  private:
   LibGlobals();
   ~LibGlobals();
+  pthread_mutex_t *libcrypto_locks() { return libcrypto_locks_; }
 
   static LibGlobals *instance_;
 

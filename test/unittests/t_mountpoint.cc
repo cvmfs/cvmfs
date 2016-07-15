@@ -359,6 +359,17 @@ TEST_F(T_MountPoint, CacheSettings) {
     EXPECT_EQ(".", fs->workspace());
     EXPECT_EQ(tmp_path_ + "/nfs", fs->nfs_maps_dir());
   }
+
+  options_mgr_.SetValue("CVMFS_CACHE_DIR", tmp_path_ + "/cachedir_direct");
+  {
+    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    EXPECT_EQ(loader::kFailOptions, fs->boot_status());
+  }
+  options_mgr_.UnsetValue("CVMFS_CACHE_BASE");
+  {
+    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    EXPECT_EQ(loader::kFailOk, fs->boot_status());
+  }
 }
 
 
