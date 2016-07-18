@@ -156,7 +156,7 @@ class RamCacheManager : public CacheManager {
   /**
    * Look up the size in bytes of the open cache entry
    * @param id The hash key
-   * @returns The size of the entry, or -EBADFD if fd is not valid
+   * @returns The size of the entry, or -EBADF if fd is not valid
    */
   virtual int64_t GetSize(int fd);
 
@@ -164,14 +164,14 @@ class RamCacheManager : public CacheManager {
    * Close the descriptor in the cache. Entries not marked as pinned will become subject to
    * eviction once closed
    * @param id The hash key
-   * @returns -EBADFD if fd is not valid
+   * @returns -EBADF if fd is not valid
    */
   virtual int Close(int fd);
 
   /**
    * Read a section from the cache entry. See pread(3) for a discussion of the arguments
    * @param id The hash key
-   * @returns The number of bytes copied, or -EBADFD if fd is not valid
+   * @returns The number of bytes copied, or -EBADF if fd is not valid
    */
   virtual int64_t Pread(int fd, void *buf, uint64_t size, uint64_t offset);
 
@@ -179,14 +179,14 @@ class RamCacheManager : public CacheManager {
    * Duplicates the open file descriptor, allowing the original and the new one to be
    * used independently
    * @param id The hash key
-   * @returns A new fd, -EBADFD if fd is not valid, or -ENFILE if no handles are available
+   * @returns A new fd, -EBADF if fd is not valid, or -ENFILE if no handles are available
    */
   virtual int Dup(int fd);
 
   /**
    * No effect for in-memory caches
    * @param id The hash key
-   * @returns -EBADFD if fd is not valid
+   * @returns -EBADF if fd is not valid
    */
   virtual int Readahead(int fd);
 

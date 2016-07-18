@@ -102,7 +102,7 @@ int64_t RamCacheManager::GetSize(int fd) {
   ReadLockGuard guard(rwlock_);
   if (!IsValid(fd)) {
     LogCvmfs(kLogCache, kLogDebug, "bad fd %d on GetSize", fd);
-    return -EBADFD;
+    return -EBADF;
   }
   assert(open_fds_[fd].store);
   perf::Inc(counters_.n_getsize);
@@ -117,7 +117,7 @@ int RamCacheManager::Close(int fd) {
   WriteLockGuard guard(rwlock_);
   if (!IsValid(fd)) {
     LogCvmfs(kLogCache, kLogDebug, "bad fd %d on Close", fd);
-    return -EBADFD;
+    return -EBADF;
   }
   assert(open_fds_[fd].store);
   rc = open_fds_[fd].store->Unref(open_fds_[fd].handle);
@@ -150,7 +150,7 @@ int64_t RamCacheManager::Pread(
   ReadLockGuard guard(rwlock_);
   if (!IsValid(fd)) {
     LogCvmfs(kLogCache, kLogDebug, "bad fd %d on Pread", fd);
-    return -EBADFD;
+    return -EBADF;
   }
   assert(open_fds_[fd].store);
   perf::Inc(counters_.n_pread);
@@ -163,7 +163,7 @@ int RamCacheManager::Dup(int fd) {
   WriteLockGuard guard(rwlock_);
   if (!IsValid(fd)) {
     LogCvmfs(kLogCache, kLogDebug, "bad fd %d on Dup", fd);
-    return -EBADFD;
+    return -EBADF;
   }
   assert(open_fds_[fd].store);
   rc = open_fds_[fd].store->IncRef(open_fds_[fd].handle);
@@ -181,7 +181,7 @@ int RamCacheManager::Readahead(int fd) {
   ReadLockGuard guard(rwlock_);
   if (!IsValid(fd)) {
     LogCvmfs(kLogCache, kLogDebug, "bad fd %d on Readahead", fd);
-    return -EBADFD;
+    return -EBADF;
   }
   LogCvmfs(kLogCache, kLogDebug, "readahead (no-op) on %d", fd);
   perf::Inc(counters_.n_readahead);

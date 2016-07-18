@@ -112,7 +112,7 @@ TEST_F(T_RamCacheManager, Dup) {
   EXPECT_EQ(0, ramcache_.StartTxn(a_, alloc_size, txn));
   EXPECT_EQ(alloc_size, ramcache_.Write(buf, alloc_size, txn));
 
-  EXPECT_EQ(-EBADFD, ramcache_.Dup(fd));
+  EXPECT_EQ(-EBADF, ramcache_.Dup(fd));
 
   EXPECT_GE((fd = ramcache_.OpenFromTxn(txn)), 0);
   EXPECT_EQ(alloc_size, ramcache_.GetSize(fd));
