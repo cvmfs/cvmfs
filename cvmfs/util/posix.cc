@@ -16,6 +16,7 @@
 #include <pthread.h>
 #include <pwd.h>
 #include <signal.h>
+#include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -23,6 +24,11 @@
 #include <sys/un.h>
 #include <sys/wait.h>
 #include <unistd.h>
+// If valgrind headers are present on the build system, then we can detect
+// valgrind at runtime.
+#ifdef HAS_VALGRIND_HEADERS
+#include <valgrind/valgrind.h>
+#endif
 
 #include <algorithm>
 #include <cassert>
@@ -754,6 +760,29 @@ bool AddGroup2Persona(const gid_t gid) {
   retval = setgroups(ngroups+1, groups);
   free(groups);
   return retval == 0;
+}
+
+
+/**
+ * Sets soft and hard limit for maximum number of open file descriptors.
+ * Returns 0 on success, -1 on failure, -2 if running under valgrind.
+ */
+int SetLimitNoFile(unsigned limit_nofile) {
+  struct rlimit rpl;
+  memset(&rpl, 0, sizeof(rpl));
+  getrlimit(RLIMIT_NOFILE, &rpl);
+  if (rpl.rlim_max < limit_nofile)
+    rpl.rlim_max = limit_nofile;
+  rpl.rlim_cur = limit_nofile;
+  int retval = setrlimit(RLIMIT_NOFILE, &rpl);
+  if (retval == 0)
+    return 0;
+
+#ifdef HAS_VALGRIND_HEADERS
+  return RUNNING_ON_VALGRIND ? -2 : -1;
+#else
+  return -1;
+#endif
 }
 
 
