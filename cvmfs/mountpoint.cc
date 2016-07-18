@@ -652,12 +652,16 @@ void FileSystem::TearDown2ReadOnly() {
 
 
 const char *MountPoint::kDefaultAuthzSearchPath = "/usr/libexec/cvmfs/authz";
+const char *MountPoint::kDefaultBlacklist = "/etc/cvmfs/blacklist";
 
 bool MountPoint::CheckBlacklists() {
-  if (FileExists("/etc/cvmfs/blacklist")) {
+  string blacklist;
+  if (!options_mgr_->GetValue("CVMFS_BLACKLIST", &blacklist))
+    blacklist = kDefaultBlacklist;
+  if (FileExists(blacklist)) {
     const bool append = false;
-    if (!signature_mgr_->LoadBlacklist("/etc/cvmfs/blacklist", append)) {
-      boot_error_ = "failed to load blacklist";
+    if (!signature_mgr_->LoadBlacklist(blacklist, append)) {
+      boot_error_ = "failed to load blacklist " + blacklist;
       boot_status_ = loader::kFailSignature;
       return false;
     }
@@ -709,10 +713,11 @@ MountPoint *MountPoint::Create(
   mountpoint->CreateFetchers();
   if (!mountpoint->CreateCatalogManager())
     return mountpoint.Release();
+  if (!mountpoint->CreateTracer())
+    return mountpoint.Release();
 
   mountpoint->ReEvaluateAuthz();
   mountpoint->CreateTables();
-  mountpoint->CreateTracer();
   mountpoint->SetupBehavior();
 
   mountpoint->boot_status_ = loader::kFailOk;
@@ -937,12 +942,18 @@ void MountPoint::CreateTables() {
 }
 
 
-void MountPoint::CreateTracer() {
+bool MountPoint::CreateTracer() {
   string optarg;
   tracer_ = new Tracer();
   if (options_mgr_->GetValue("CVMFS_TRACEFILE", &optarg)) {
+    if (file_system_->type() != FileSystem::kFsFuse) {
+      boot_error_ = "tracer is only supported in the fuse module";
+      boot_status_ = loader::kFailOptions;
+      return false;
+    }
     tracer_->Activate(kTracerBufferSize, kTracerFlushThreshold, optarg);
   }
+  return true;
 }
 
 

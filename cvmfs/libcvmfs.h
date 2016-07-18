@@ -3,6 +3,13 @@
  *
  * NOTE: when adding or removing public symbols, you must also update the list
  * in libcvmfs_public_syms.txt.
+ *
+ * Not supported in the library:
+ *   - Quota management
+ *   - Asynchronous HTTP I/O
+ *   - Automatic update of root file catalog
+ *   - Tracer
+ *   - Authz helper
  */
 
 #ifndef CVMFS_LIBCVMFS_H_

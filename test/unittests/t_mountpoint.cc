@@ -567,6 +567,25 @@ TEST_F(T_MountPoint, Blacklist) {
     UniquePtr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
     EXPECT_EQ(loader::kFailCatalog, mp->boot_status());
   }
+
+  options_mgr_.UnsetValue("CVMFS_CONFIG_REPOSITORY");
+  options_mgr_.SetValue("CVMFS_BLACKLIST", "/no/such/file");
+  {
+    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    ASSERT_EQ(loader::kFailOk, fs->boot_status());
+    UniquePtr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
+    EXPECT_EQ(loader::kFailOk, mp->boot_status());
+  }
+  RemoveTree("cvmfs_ut_cache");
+
+  options_mgr_.SetValue("CVMFS_BLACKLIST",
+                        repo_path_ + "/config.test/etc/cvmfs/blacklist");
+  {
+    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    ASSERT_EQ(loader::kFailOk, fs->boot_status());
+    UniquePtr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
+    EXPECT_EQ(loader::kFailCatalog, mp->boot_status());
+  }
 }
 
 

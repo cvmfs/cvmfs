@@ -414,6 +414,7 @@ class MountPoint : SingleCopy, public BootFactory {
    */
   static const unsigned kTracerBufferSize = 8192;
   static const unsigned kTracerFlushThreshold = 7000;
+  static const char *kDefaultBlacklist;  // "/etc/cvmfs/blacklist"
 
   MountPoint(const std::string &fqrn,
              FileSystem *file_system,
@@ -427,7 +428,7 @@ class MountPoint : SingleCopy, public BootFactory {
   void CreateFetchers();
   bool CreateCatalogManager();
   void CreateTables();
-  void CreateTracer();
+  bool CreateTracer();
   void SetupBehavior();
   void SetupDnsTuning(download::DownloadManager *manager);
   void SetupHttpTuning();
