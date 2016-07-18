@@ -219,3 +219,23 @@ TEST_F(T_Libcvmfs, Initv2) {
 
   cvmfs_options_fini(opts);
 }
+
+
+TEST_F(T_Libcvmfs, Attachv2) {
+  cvmfs_option_map *opts = cvmfs_options_init();
+
+  cvmfs_options_set(opts, "CVMFS_CACHE_DIR", tmp_path_.c_str());
+  ASSERT_EQ(LIBCVMFS_ERR_OK, cvmfs_init_v2(opts));
+
+  cvmfs_option_map *opts_repo = cvmfs_options_clone(opts);
+  cvmfs_options_set(opts_repo, "CVMFS_HTTP_PROXY", "DIRECT");
+  cvmfs_options_set(opts_repo, "CVMFS_SERVER_URL", "file:///no/such/dir");
+  cvmfs_options_set(opts_repo, "CVMFS_MAX_RETRIES", "0");
+  cvmfs_context *ctx;
+  ASSERT_EQ(LIBCVMFS_ERR_CATALOG, cvmfs_attach_repo_v2("xxx", opts_repo, &ctx));
+  cvmfs_detach_repo(ctx);
+  cvmfs_options_fini(opts_repo);
+
+  cvmfs_fini();
+  cvmfs_options_fini(opts);
+}

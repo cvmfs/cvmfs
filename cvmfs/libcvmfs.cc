@@ -16,6 +16,7 @@
 #include <stddef.h>
 #include <sys/stat.h>
 
+#include <cassert>
 #include <cstdlib>
 #include <string>
 
@@ -587,6 +588,18 @@ LibContext* cvmfs_attach_repo(char const *options)
   }
 
   return LibContext::Create(opts);
+}
+
+
+cvmfs_errors cvmfs_attach_repo_v2(
+  const char *fqrn,
+  OptionsManager *opts,
+  LibContext **ctx)
+{
+  assert(ctx != NULL);
+  *ctx = LibContext::Create(fqrn, opts);
+  assert(*ctx != NULL);
+  return static_cast<cvmfs_errors>((*ctx)->mount_point()->boot_status());
 }
 
 

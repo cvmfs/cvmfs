@@ -103,6 +103,8 @@ class LibGlobals : SingleCopy {
 
   cache::CacheManager *cache_mgr() { return cache_mgr_; }
 
+  FileSystem *file_system() { return file_system_; }
+
  protected:
   int Setup(const options &opts);
   static void CallbackLibcryptoLock(int mode, int type,
@@ -164,6 +166,8 @@ class LibContext : SingleCopy {
   };
 
   static LibContext *Create(const options &options);
+  static LibContext *Create(const std::string &fqrn,
+                            OptionsManager *options_mgr);
   static void Destroy(LibContext *ctx);  // To be removed
   ~LibContext();
 
@@ -180,11 +184,14 @@ class LibContext : SingleCopy {
   perf::Statistics *statistics() const { return statistics_; }
   std::string mountpoint() const { return cfg_.mountpoint; }
 
+  MountPoint *mount_point() { return mount_point_; }
+
  protected:
   /**
    * use static method Create() for construction
    */
   explicit LibContext(const options &options);
+  LibContext();
 
  private:
   static const int kFdChunked = 1 << 30;
@@ -200,6 +207,8 @@ class LibContext : SingleCopy {
 
   bool GetDirentForPath(const PathString         &path,
                         catalog::DirectoryEntry  *dirent);
+
+  MountPoint *mount_point_;
 
   perf::Statistics *statistics_;
 

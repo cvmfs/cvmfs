@@ -114,6 +114,16 @@ int LibGlobals::Initialize(OptionsManager *options_mgr) {
   instance_ = new LibGlobals();
   assert(instance_ != NULL);
 
+  // Multi-threaded libcrypto (otherwise done by the loader)
+  instance_->libcrypto_locks_ = static_cast<pthread_mutex_t *>(
+    OPENSSL_malloc(CRYPTO_num_locks() * sizeof(pthread_mutex_t)));
+  for (int i = 0; i < CRYPTO_num_locks(); ++i) {
+    int retval = pthread_mutex_init(&(instance_->libcrypto_locks_[i]), NULL);
+    assert(retval == 0);
+  }
+  CRYPTO_set_id_callback(LibGlobals::CallbackLibcryptoThreadId);
+  CRYPTO_set_locking_callback(LibGlobals::CallbackLibcryptoLock);
+
   FileSystem::FileSystemInfo fs_info;
   fs_info.name = "libcvmfs";
   fs_info.type = FileSystem::kFsLibrary;
@@ -329,6 +339,20 @@ unsigned long LibGlobals::CallbackLibcryptoThreadId() {  // NOLINT
 //------------------------------------------------------------------------------
 
 
+LibContext *LibContext::Create(
+  const string &fqrn,
+  OptionsManager *options_mgr)
+{
+  assert(options_mgr != NULL);
+  LibContext *ctx = new LibContext();
+  assert(ctx != NULL);
+
+  ctx->mount_point_ = MountPoint::Create(
+    fqrn, LibGlobals::GetInstance()->file_system(), options_mgr);
+  return ctx;
+}
+
+
 LibContext* LibContext::Create(const options &opts) {
   LibContext *ctx = new LibContext(opts);
   assert(ctx != NULL);
@@ -341,6 +365,7 @@ LibContext* LibContext::Create(const options &opts) {
 
   return ctx;
 }
+
 
 void LibContext::Destroy(LibContext *ctx) {
   perf::Statistics *statistics = ctx->statistics();
@@ -439,7 +464,8 @@ int LibContext::Setup(const options &opts, perf::Statistics *statistics) {
 }
 
 LibContext::LibContext(const options &opts)
-  : statistics_(NULL)
+  : mount_point_(NULL)
+  , statistics_(NULL)
   , cfg_(opts)
   , repository_name_(opts.repo_name)
   , boot_time_(time(NULL))
@@ -459,7 +485,29 @@ LibContext::LibContext(const options &opts)
   InitRuntimeCounters();
 }
 
+LibContext::LibContext()
+  : mount_point_(NULL)
+  , statistics_(NULL)
+  , repository_name_("")
+  , boot_time_(time(NULL))
+  , catalog_manager_(NULL)
+  , signature_manager_(NULL)
+  , download_manager_(NULL)
+  , external_download_manager_(NULL)
+  , fetcher_(NULL)
+  , external_fetcher_(NULL)
+  , md5path_cache_(NULL)
+  , download_ready_(false)
+  , external_download_ready_(false)
+  , signature_ready_(false)
+  , catalog_ready_(false)
+  , pathcache_ready_(false)
+{
+}
+
 LibContext::~LibContext() {
+  delete mount_point_;
+
   delete fetcher_;
   fetcher_ = NULL;
   delete external_fetcher_;

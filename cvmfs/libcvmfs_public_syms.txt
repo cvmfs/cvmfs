@@ -14,6 +14,7 @@ cvmfs_init
 cvmfs_init_v2
 cvmfs_fini
 cvmfs_attach_repo
+cvmfs_attach_repo_v2
 cvmfs_detach_repo
 cvmfs_remount
 cvmfs_set_log_fn
