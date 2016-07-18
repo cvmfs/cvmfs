@@ -130,7 +130,7 @@ class FileSystem : SingleCopy, public BootFactory {
      */
     bool wait_workspace;
     /**
-     * The fuse module should not daemonize.  That means the quota manager 
+     * The fuse module should not daemonize.  That means the quota manager
      * should not daemonize, too, but print debug messages to stdout.
      */
     bool foreground;
@@ -231,6 +231,9 @@ class FileSystem : SingleCopy, public BootFactory {
   std::string name_;
   std::string exe_path_;
   Type type_;
+  /**
+   * Not owned by the FileSystem object
+   */
   OptionsManager *options_mgr_;
   bool wait_workspace_;
   bool foreground_;
@@ -324,7 +327,8 @@ class MountPoint : SingleCopy, public BootFactory {
   static const time_t kIndefiniteDeadline = time_t(-1);
 
   static MountPoint *Create(const std::string &fqrn,
-                            FileSystem *file_system);
+                            FileSystem *file_system,
+                            OptionsManager *options_mgr = NULL);
   ~MountPoint();
 
   unsigned GetMaxTtlMn();
@@ -411,7 +415,9 @@ class MountPoint : SingleCopy, public BootFactory {
   static const unsigned kTracerBufferSize = 8192;
   static const unsigned kTracerFlushThreshold = 7000;
 
-  MountPoint(const std::string &fqrn, FileSystem *file_system);
+  MountPoint(const std::string &fqrn,
+             FileSystem *file_system,
+             OptionsManager *options_mgr);
 
   void CreateStatistics();
   void CreateAuthz();
@@ -438,6 +444,10 @@ class MountPoint : SingleCopy, public BootFactory {
    * In contrast to the manager objects, the FileSystem is not owned.
    */
   FileSystem *file_system_;
+  /**
+   * The options manager is not owned.
+   */
+  OptionsManager *options_mgr_;
 
   perf::Statistics *statistics_;
   AuthzFetcher *authz_fetcher_;
