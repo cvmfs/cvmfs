@@ -208,8 +208,14 @@ TEST_F(T_Libcvmfs, OptionAliases) {
 
 TEST_F(T_Libcvmfs, Initv2) {
   cvmfs_option_map *opts = cvmfs_options_init();
+
   cvmfs_options_set(opts, "CVMFS_CACHE_DIR", tmp_path_.c_str());
   EXPECT_EQ(LIBCVMFS_ERR_OK, cvmfs_init_v2(opts));
   cvmfs_fini();
+
+  cvmfs_options_set(opts, "CVMFS_NFILES", "100000000");
+  EXPECT_EQ(LIBCVMFS_ERR_PERMISSION, cvmfs_init_v2(opts));
+  cvmfs_fini();
+
   cvmfs_options_fini(opts);
 }

@@ -71,6 +71,7 @@
 #include "sqlitevfs.h"
 #include "statistics.h"
 #include "util/posix.h"
+#include "util/string.h"
 #include "wpad.h"
 
 using namespace std;  // NOLINT
@@ -108,6 +109,7 @@ int LibGlobals::Initialize(const options &opts) {
 
 
 int LibGlobals::Initialize(OptionsManager *options_mgr) {
+  assert(options_mgr != NULL);
   assert(instance_ == NULL);
   instance_ = new LibGlobals();
   assert(instance_ != NULL);
@@ -117,7 +119,22 @@ int LibGlobals::Initialize(OptionsManager *options_mgr) {
   fs_info.type = FileSystem::kFsLibrary;
   fs_info.options_mgr = options_mgr;
   instance_->file_system_ = FileSystem::Create(fs_info);
-  return instance_->file_system_->boot_status();
+
+  if (instance_->file_system_->boot_status() != loader::kFailOk)
+    return instance_->file_system_->boot_status();
+
+  // Maximum number of open files, handled otherwise as root by the fuse loader
+  string arg;
+  if (options_mgr->GetValue("CVMFS_NFILES", &arg)) {
+    int retval = SetLimitNoFile(String2Uint64(arg));
+    if (retval != 0) {
+      PrintError("Failed to set maximum number of open files, "
+                 "insufficient permissions");
+      return loader::kFailPermission;
+    }
+  }
+
+  return loader::kFailOk;
 }
 
 
