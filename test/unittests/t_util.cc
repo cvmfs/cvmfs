@@ -1496,3 +1496,14 @@ TEST_F(T_Util, SetLimitNoFile) {
   getrlimit(RLIMIT_NOFILE, &rpl);
   EXPECT_EQ(0, SetLimitNoFile(rpl.rlim_cur));
 }
+
+
+TEST_F(T_Util, GetAbsolutePath) {
+  bool ignore_failure = false;
+  EXPECT_EQ("/xxx", GetAbsolutePath("/xxx"));
+  EXPECT_NE("xxx", GetAbsolutePath("xxx"));
+
+  EXPECT_FALSE(FileExists(GetAbsolutePath("xxx")));
+  CreateFile("xxx", 0600, ignore_failure);
+  EXPECT_TRUE(FileExists(GetAbsolutePath("xxx")));
+}

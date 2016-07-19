@@ -40,6 +40,7 @@ void SplitPath(const std::string &path,
                std::string *dirname,
                std::string *filename);
 bool IsAbsolutePath(const std::string &path);
+std::string GetAbsolutePath(const std::string &path);
 bool IsHttpUrl(const std::string &path);
 
 void CreateFile(const std::string &path, const int mode,

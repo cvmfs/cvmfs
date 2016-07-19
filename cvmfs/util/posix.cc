@@ -144,8 +144,16 @@ NameString GetFileName(const PathString &path) {
 }
 
 
-bool IsAbsolutePath(const std::string &path) {
+bool IsAbsolutePath(const string &path) {
   return (!path.empty() && path[0] == '/');
+}
+
+
+string GetAbsolutePath(const string &path) {
+  if (IsAbsolutePath(path))
+    return path;
+
+  return GetCurrentWorkingDirectory() + "/" + path;
 }
 
 
