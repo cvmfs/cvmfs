@@ -50,6 +50,8 @@ OptionsManager *cvmfs_options_init() {
   // In contrast to the fuse module, we don't want to taint the process'
   // environment with parameters from the cvmfs configuration in libcvmfs
   result->set_taint_environment(false);
+  // Not strictly necessary but avoids a failure log message
+  result->SetValue("CVMFS_MOUNT_DIR", "/cvmfs");
   return result;
 }
 

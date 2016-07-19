@@ -52,6 +52,7 @@ class Statistics;
 namespace signature {
 class SignatureManager;
 }
+class SimpleChunkTables;
 class Tracer;
 
 
@@ -216,6 +217,7 @@ class FileSystem : SingleCopy, public BootFactory {
   void CreateStatistics();
   void SetupSqlite();
   bool SetupWorkspace();
+  bool SetupCwd();
   bool LockWorkspace();
   bool SetupCrashGuard();
   bool CreateCache();
@@ -361,6 +363,7 @@ class MountPoint : SingleCopy, public BootFactory {
   std::string membership_req() { return membership_req_; }
   lru::PathCache *path_cache() { return path_cache_; }
   std::string repository_tag() { return repository_tag_; }
+  SimpleChunkTables *simple_chunk_tables() { return simple_chunk_tables_; }
   perf::Statistics *statistics() { return statistics_; }
   signature::SignatureManager *signature_mgr() { return signature_mgr_; }
   Tracer *tracer() { return tracer_; }
@@ -463,6 +466,7 @@ class MountPoint : SingleCopy, public BootFactory {
   catalog::InodeGenerationAnnotation *inode_annotation_;
   catalog::ClientCatalogManager *catalog_mgr_;
   ChunkTables *chunk_tables_;
+  SimpleChunkTables *simple_chunk_tables_;
   lru::InodeCache *inode_cache_;
   lru::PathCache *path_cache_;
   lru::Md5PathCache *md5path_cache_;

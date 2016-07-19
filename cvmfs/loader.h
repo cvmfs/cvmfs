@@ -22,7 +22,7 @@ extern std::string *usyslog_path_;
 
 /**
  * Possible failures when booting/mounting cvmfs.  Remember to add a constant
- * to libcvmfs.h when a constant to this enum is added.
+ * to libcvmfs.h and libcvmfs_legacy.cc when a constant to this enum is added.
  */
 enum Failures {
   kFailOk = 0,

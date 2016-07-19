@@ -41,6 +41,11 @@ void cvmfs_test_help()
   printf("   quit\n");
 }
 
+static void cvmfs_log_ignore(const char *msg) {
+  // Remove comment to debug test failures
+  fprintf(stderr, "%s\n", msg);
+}
+
 int cvmfs_test_list(cvmfs_context *ctx, const char *path)
 {
   if (ctx == NULL) {
@@ -108,8 +113,10 @@ cvmfs_context* cvmfs_test_attach(const char *repo_name)
   RepoMap::const_iterator i = attached_repos.find(repo_name);
   if (i == attached_repos.end()) {
     const char *repo_options =
-      "repo_name=%s.cern.ch,url=http://cvmfs-stratum-one.cern.ch/opt/%s;"
-      "http://cernvmfs.gridpp.rl.ac.uk/opt/%s;http://cvmfs.racf.bnl.gov/opt/%s,"
+      "repo_name=%s.cern.ch,"
+      "url=http://cvmfs-stratum-one.cern.ch/cvmfs/%s.cern.ch;"
+      "http://cernvmfs.gridpp.rl.ac.uk/cvmfs/%s.cern.ch;"
+      "http://cvmfs.racf.bnl.gov/cvmfs/%s.cern.ch,"
       "pubkey=/etc/cvmfs/keys/cern.ch/cern.ch.pub";
     char options[TEST_LINE_MAX];
     snprintf(options, TEST_LINE_MAX, repo_options, repo_name, repo_name,
@@ -156,6 +163,7 @@ int main(int argc, char *argv[])
 
   const char *global_options = "cache_directory=/tmp/test-libcvmfs-cache";
 
+  cvmfs_set_log_fn(cvmfs_log_ignore);
   printf("%s: initializing with options: %s\n", argv[0], global_options);
   int retval = cvmfs_init(global_options);
   if (retval != 0) {

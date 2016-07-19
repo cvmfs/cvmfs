@@ -2013,10 +2013,6 @@ static int Init(const loader::LoaderExports *loader_exports) {
   LogCvmfs(kLogCvmfs, kLogDebug, "root inode is %" PRIu64,
            uint64_t(cvmfs::mount_point_->catalog_mgr()->GetRootInode()));
 
-  // Make sure client context TLS has been initialized
-  // (first initialization is not thread safe).
-  ClientCtx::GetInstance();
-
   cvmfs::pipe_remount_trigger_[0] = cvmfs::pipe_remount_trigger_[1] = -1;
   cvmfs::fence_remount_ = new Fence();
   auto_umount::SetMountpoint(loader_exports->mount_point);
@@ -2137,10 +2133,6 @@ static void Fini() {
   delete g_boot_error;
   g_boot_error = NULL;
   auto_umount::SetMountpoint("");
-
-  // Make sure client context TLS is cleaned up
-  // (destruction is not thread safe)
-  ClientCtx::CleanupInstance();
 }
 
 

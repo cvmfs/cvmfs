@@ -36,6 +36,7 @@
 #include "cache_posix.h"
 #include "catalog.h"
 #include "catalog_mgr_client.h"
+#include "clientctx.h"
 #include "download.h"
 #include "duplex_sqlite3.h"
 #include "fetch.h"
@@ -151,6 +152,8 @@ FileSystem *FileSystem::Create(const FileSystem::FileSystemInfo &fs_info) {
   assert(retval);
   file_system->has_custom_sqlitevfs_ = true;
 
+  ClientCtx::GetInstance();
+
   file_system->boot_status_ = loader::kFailOk;
   return file_system.Release();
 }
@@ -254,6 +257,9 @@ void FileSystem::DetermineCacheDirs() {
     cache_dir_ = optarg;
 
   workspace_ = cache_dir_;
+  // Used by libcvmfs
+  if (options_mgr_->GetValue("CVMFS_WORKSPACE", &optarg))
+    workspace_ = optarg;
 
   if (options_mgr_->GetValue("CVMFS_ALIEN_CACHE", &optarg))
     cache_dir_ = optarg;
@@ -341,6 +347,8 @@ FileSystem::FileSystem(const FileSystem::FileSystemInfo &fs_info)
 
 
 FileSystem::~FileSystem() {
+  ClientCtx::CleanupInstance();
+
   if (has_custom_sqlitevfs_)
     sqlite::UnregisterVfsRdOnly();
 
@@ -465,6 +473,54 @@ bool FileSystem::SetupCrashGuard() {
 }
 
 
+bool FileSystem::SetupCwd() {
+  if (type_ == kFsFuse) {
+    // Try to jump to workspace / cache directory.  This tests, if it is
+    // accessible and it brings speed later on.
+    int retval = chdir(workspace_.c_str());
+    if (retval != 0) {
+      boot_error_ = "workspace " + workspace_ + " is unavailable";
+      boot_status_ = loader::kFailCacheDir;
+      return false;
+    }
+    if (workspace_ == cache_dir_)
+      cache_dir_ = ".";
+    workspace_ = ".";
+    return true;
+  }
+
+  // Libcvmfs: change to cache directory (not workspace) if requested,
+  // otherwise don't touch current working directory.  We also need to create
+  // the cache directory.  This has to happen before we setup the crash guard
+  // or any other file where we remember the path.
+  // TODO(jblomer): can this be simplified?
+  string optarg;
+  if (options_mgr_->GetValue("CVMFS_CWD_CACHE", &optarg) &&
+      options_mgr_->IsOn(optarg))
+  {
+    const int mode = (cache_mode_ & kCacheAlien) ? 0770 : 0700;
+    if (!MkdirDeep(cache_dir_, mode, false)) {
+      boot_error_ = "cannot create cache directory " + cache_dir_;
+      boot_status_ = loader::kFailCacheDir;
+      return false;
+    }
+    if (workspace_ == cache_dir_) {
+      workspace_ = ".";
+    } else {
+      workspace_ = GetAbsolutePath(workspace_);
+    }
+    int retval = chdir(cache_dir_.c_str());
+    if (retval != 0) {
+      boot_error_ = "cache directory " + cache_dir_ + " is unavailable";
+      boot_status_ = loader::kFailCacheDir;
+      return false;
+    }
+    cache_dir_ = ".";
+  }
+  return true;
+}
+
+
 void FileSystem::SetupLogging() {
   string optarg;
   if (options_mgr_->GetValue("CVMFS_SYSLOG_LEVEL", &optarg))
@@ -475,7 +531,11 @@ void FileSystem::SetupLogging() {
     SetLogMicroSyslog(optarg);
   if (options_mgr_->GetValue("CVMFS_DEBUGLOG", &optarg))
     SetLogDebugFile(optarg);
-  SetLogSyslogPrefix(name_);
+  if (options_mgr_->GetValue("CVMFS_SYSLOG_PREFIX", &optarg)) {
+    SetLogSyslogPrefix(optarg);
+  } else {
+    SetLogSyslogPrefix(name_);
+  }
 }
 
 
@@ -609,21 +669,8 @@ bool FileSystem::SetupWorkspace() {
 
   if (!LockWorkspace())
     return false;
-
-  if (type_ == kFsFuse) {
-    // Try to jump to workspace / cache directory.  This tests, if it is
-    // accassible and it brings speed later on.
-    int retval = chdir(workspace_.c_str());
-    if (retval != 0) {
-      boot_error_ = "workspace " + workspace_ + " is unavailable";
-      boot_status_ = loader::kFailCacheDir;
-      return false;
-    }
-    if (workspace_ == cache_dir_)
-      cache_dir_ = ".";
-    workspace_ = ".";
-  }
-
+  if (!SetupCwd())
+    return false;
   if (!SetupCrashGuard())
     return false;
 
@@ -915,7 +962,9 @@ void MountPoint::CreateStatistics() {
 
 void MountPoint::CreateTables() {
   if (file_system_->type() != FileSystem::kFsFuse) {
+    // Libcvmfs simplified tables
     md5path_cache_ = new lru::Md5PathCache(kLibPathCacheSize, statistics_);
+    simple_chunk_tables_ = new SimpleChunkTables();
     return;
   }
 
@@ -1097,6 +1146,7 @@ MountPoint::MountPoint(
   , inode_annotation_(NULL)
   , catalog_mgr_(NULL)
   , chunk_tables_(NULL)
+  , simple_chunk_tables_(NULL)
   , inode_cache_(NULL)
   , path_cache_(NULL)
   , md5path_cache_(NULL)
@@ -1121,6 +1171,7 @@ MountPoint::~MountPoint() {
   delete md5path_cache_;
   delete path_cache_;
   delete inode_cache_;
+  delete simple_chunk_tables_;
   delete chunk_tables_;
 
   delete catalog_mgr_;
