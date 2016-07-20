@@ -27,14 +27,14 @@ int RamCacheManager::AddFd(const ReadOnlyFd &fd) {
   for ( ; i < open_fds_.size(); ++i) {
     if (open_fds_[i].handle == kInvalidHandle) {
       open_fds_[i] = fd;
-      LogCvmfs(kLogCache, kLogDebug, "found free fd %u", i);
+      // LogCvmfs(kLogCache, kLogDebug, "found free fd %u", i);
       perf::Inc(counters_.n_reusefd);
       return i;
     }
   }
   if (open_fds_.size() < kMaxHandles) {
     open_fds_.push_back(fd);
-    LogCvmfs(kLogCache, kLogDebug, "adding fd %u", i);
+    // LogCvmfs(kLogCache, kLogDebug, "adding fd %u", i);
     perf::Inc(counters_.n_appendfd);
     return i;
   } else {

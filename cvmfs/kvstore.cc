@@ -20,7 +20,7 @@ namespace kvstore {
 
 bool MemoryKvStore::GetBuffer(const shash::Any &id, MemoryBuffer *buf) {
   perf::Inc(counters_.n_getbuffer);
-  LogCvmfs(kLogKvStore, kLogDebug, "get buffer %s", id.ToString().c_str());
+  // LogCvmfs(kLogKvStore, kLogDebug, "get buffer %s", id.ToString().c_str());
   return entries_.Lookup(id, buf);
 }
 
@@ -35,8 +35,8 @@ bool MemoryKvStore::PopBuffer(const shash::Any &id, MemoryBuffer *buf) {
   used_bytes_ -= (*buf).size;
   counters_.sz_size->Set(used_bytes_);
   entries_.Forget(id);
-  LogCvmfs(kLogKvStore, kLogDebug, "popped %s (%uB)", id.ToString().c_str(),
-           (*buf).size);
+  // LogCvmfs(kLogKvStore, kLogDebug, "popped %s (%uB)", id.ToString().c_str(),
+  //          (*buf).size);
   return true;
 }
 
@@ -44,8 +44,8 @@ int64_t MemoryKvStore::GetSize(const shash::Any &id) {
   MemoryBuffer mem;
   perf::Inc(counters_.n_getsize);
   if (entries_.Lookup(id, &mem)) {
-    LogCvmfs(kLogKvStore, kLogDebug, "%s is %u B", id.ToString().c_str(),
-             mem.size);
+    // LogCvmfs(kLogKvStore, kLogDebug, "%s is %u B", id.ToString().c_str(),
+    //          mem.size);
     return mem.size;
   } else {
     LogCvmfs(kLogKvStore, kLogDebug,
@@ -59,8 +59,8 @@ int64_t MemoryKvStore::GetRefcount(const shash::Any &id) {
   MemoryBuffer mem;
   perf::Inc(counters_.n_getrefcount);
   if (entries_.Lookup(id, &mem)) {
-    LogCvmfs(kLogKvStore, kLogDebug, "%s has refcount %u",
-             id.ToString().c_str(), mem.refcount);
+    // LogCvmfs(kLogKvStore, kLogDebug, "%s has refcount %u",
+    //          id.ToString().c_str(), mem.refcount);
     return mem.refcount;
   } else {
     LogCvmfs(kLogKvStore, kLogDebug, "miss %s on GetRefcount",
@@ -121,8 +121,8 @@ int64_t MemoryKvStore::Read(
       return 0;
     }
     uint64_t copy_size = min(mem.size - offset, size);
-    LogCvmfs(kLogKvStore, kLogDebug, "copy %u B from offset %u of %s",
-             copy_size, offset, id.ToString().c_str());
+    // LogCvmfs(kLogKvStore, kLogDebug, "copy %u B from offset %u of %s",
+    //          copy_size, offset, id.ToString().c_str());
     memcpy(buf, static_cast<char *>(mem.address) + offset, copy_size);
     perf::Xadd(counters_.sz_read, copy_size);
     return copy_size;
