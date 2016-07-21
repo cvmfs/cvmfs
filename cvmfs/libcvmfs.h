@@ -146,6 +146,8 @@ cvmfs_context* cvmfs_attach_repo(char const *options);
 cvmfs_errors cvmfs_attach_repo_v2(const char *fqrn, cvmfs_option_map *opts,
                                   cvmfs_context **ctx);
 
+void cvmfs_adopt_options(cvmfs_context *ctx, cvmfs_option_map *opts);
+
 /**
  * Uninitialize a CVMFS remote repository and release all resources for it.
  */

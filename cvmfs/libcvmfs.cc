@@ -318,6 +318,11 @@ cvmfs_errors cvmfs_attach_repo_v2(
 }
 
 
+void cvmfs_adopt_options(cvmfs_context *ctx, OptionsManager *opts) {
+  ctx->set_options_mgr(opts);
+}
+
+
 void cvmfs_detach_repo(LibContext *ctx) {
   delete ctx;
 }
