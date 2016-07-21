@@ -307,7 +307,14 @@ cvmfs_errors cvmfs_attach_repo_v2(
   assert(ctx != NULL);
   *ctx = LibContext::Create(fqrn, opts);
   assert(*ctx != NULL);
-  return static_cast<cvmfs_errors>((*ctx)->mount_point()->boot_status());
+  loader::Failures result = (*ctx)->mount_point()->boot_status();
+  if (result != loader::kFailOk) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Attaching %s failed: %s (%d)",
+             fqrn, (*ctx)->mount_point()->boot_error().c_str(), result);
+    delete *ctx;
+    *ctx = NULL;
+  }
+  return static_cast<cvmfs_errors>(result);
 }
 
 
@@ -318,6 +325,12 @@ void cvmfs_detach_repo(LibContext *ctx) {
 
 cvmfs_errors cvmfs_init_v2(OptionsManager *opts) {
   int result = LibGlobals::Initialize(opts);
+  if (result != loader::kFailOk) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Initialization failed: %s (%d)",
+             LibGlobals::GetInstance()->file_system()->boot_error().c_str(),
+             result);
+    LibGlobals::CleanupInstance();
+  }
   return static_cast<cvmfs_errors>(result);
 }
 

@@ -50,7 +50,7 @@
 extern "C" {
 // Map C++ clases to their C interface names
 typedef class LibContext cvmfs_context;
-typedef class OptionsManager cvmfs_option_map;  // TODO: rename to cvmfs_options
+typedef class OptionsManager cvmfs_option_map;
 #else
 typedef struct LibContext cvmfs_context;
 typedef struct OptionsManager cvmfs_option_map;
@@ -139,8 +139,8 @@ void cvmfs_fini();
 cvmfs_context* cvmfs_attach_repo(char const *options);
 
 /**
- * Creates a new ctx.  On return, *ctx is not NULL and must be freed by a call
- * to cvmfs_detach_repo.
+ * Creates a new ctx.  On successful return, *ctx is not NULL and must be freed
+ * by a call to cvmfs_detach_repo.  Otherwise *ctx is NULL.
  */
 cvmfs_errors cvmfs_attach_repo_v2(const char *fqrn, cvmfs_option_map *opts,
                                   cvmfs_context **ctx);
