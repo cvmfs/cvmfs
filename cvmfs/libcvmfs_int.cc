@@ -90,6 +90,9 @@ LibGlobals* LibGlobals::GetInstance() {
  * Always creates the singleton, even in case of failure.
  */
 loader::Failures LibGlobals::Initialize(OptionsManager *options_mgr) {
+  LogCvmfs(kLogCvmfs, kLogStdout, "LibCvmfs version %d.%d, revision %d",
+           LIBCVMFS_VERSION_MAJOR, LIBCVMFS_VERSION_MINOR, LIBCVMFS_REVISION);
+
   assert(options_mgr != NULL);
   assert(instance_ == NULL);
   instance_ = new LibGlobals();
@@ -397,7 +400,7 @@ int LibContext::Open(const char *c_path) {
           path, dirent.hash_algorithm(), chunks) ||
         chunks->IsEmpty())
     {
-      LogCvmfs(kLogCvmfs, kLogDebug| kLogSyslogErr, "file %s is marked as "
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr, "file %s is marked as "
                "'chunked', but no chunks found.", path.c_str());
       perf::Inc(file_system()->n_io_error());
       delete chunks;
