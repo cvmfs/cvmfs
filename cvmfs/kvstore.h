@@ -25,6 +25,17 @@ struct MemoryBuffer {
   cache::CacheManager::ObjectType object_type;
 };
 
+/**
+ * @p MemoryKvStore provides a simple RAM-backed key/value store suited to
+ * use with @ref RamCacheManager. To insert entries, the caller must allocate
+ * some memory and can choose set some metadata such as object type.
+ * @p MemoryKvStore takes ownership of the passed-in memory and maintains
+ * reference counts for all its objects. Callers must increment the reference
+ * count on an entry before reading to ensure that the entry is not removed
+ * mid-operation, and decrement the reference count when done. The store
+ * can attempt to reduce its size by removing the least recently used
+ * entries without any outstanding references.
+ */
 class MemoryKvStore :SingleCopy {
  public:
   struct Counters {

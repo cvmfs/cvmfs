@@ -26,8 +26,19 @@ static const shash::Any kInvalidHandle;
 static const unsigned kMaxHandles = 8192;
 
 /**
- * ...
- * TODO(jblomer): save open file table for hotpatch
+ * The @p RamCacheManager class provides a cache backend that operates
+ * entirely from the host's RAM. This backend does not require any
+ * additional privileges on the host such as filesystem access.
+ * This cache resides in a single process' memory, and does not
+ * support sharing or persistence. This cache backend is a good
+ * choice in highly restrictive environments, e.g. HPC resources,
+ * where it is not possible to make use of a shared/local filesystem.
+ *
+ * To use this cache backend, set @p CVMFS_CACHE_PRIMARY=ram. There
+ * are not many knobs to configure; at present only the size to be
+ * used for cached objects. @p CVMFS_CACHE_RAM_MB sets the cache size
+ * as an absolute value, while @p CVMFS_CACHE_RAM_PERCENT sets the
+ * size as a percentage of the host memory size.
  */
 class RamCacheManager : public CacheManager {
  public:
