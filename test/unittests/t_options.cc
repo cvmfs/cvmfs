@@ -4,6 +4,8 @@
 
 #include "gtest/gtest.h"
 
+#include <cstdlib>
+
 #include "options.h"
 #include "util/file_guard.h"
 #include "util/posix.h"
@@ -177,4 +179,29 @@ TYPED_TEST(T_Options, SetValue) {
   EXPECT_TRUE(options_manager.IsDefined("CVMFS_SERVER_URL"));
   options_manager.UnsetValue("CVMFS_SERVER_URL");
   EXPECT_FALSE(options_manager.IsDefined("CVMFS_SERVER_URL"));
+}
+
+
+TYPED_TEST(T_Options, TaintEnvironment) {
+  OptionsManager &options_manager = TestFixture::options_manager_;
+  const string &config_file = TestFixture::config_file_;
+  options_manager.ParsePath(config_file, false);
+
+  string arg;
+  EXPECT_FALSE(options_manager.GetValue("NO_SUCH_OPTION", &arg));
+  options_manager.SetValue("NO_SUCH_OPTION", "xxx");
+  EXPECT_TRUE(options_manager.GetValue("NO_SUCH_OPTION", &arg));
+  EXPECT_EQ(arg, string(getenv("NO_SUCH_OPTION")));
+
+  EXPECT_TRUE(getenv("CVMFS_CACHE_BASE") != NULL);
+  options_manager.UnsetValue("CVMFS_CACHE_BASE");
+  EXPECT_EQ(NULL, getenv("CVMFS_CACHE_BASE"));
+
+  options_manager.set_taint_environment(false);
+  options_manager.UnsetValue("NO_SUCH_OPTION");
+  EXPECT_EQ(arg, string(getenv("NO_SUCH_OPTION")));
+
+  options_manager.SetValue("NO_SUCH_OPTION_NOTAINT", "xxx");
+  EXPECT_TRUE(options_manager.GetValue("NO_SUCH_OPTION_NOTAINT", &arg));
+  EXPECT_EQ(NULL, getenv("NO_SUCH_OPTION_NOTAINT"));
 }

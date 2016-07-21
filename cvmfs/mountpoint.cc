@@ -36,6 +36,7 @@
 #include "cache_posix.h"
 #include "catalog.h"
 #include "catalog_mgr_client.h"
+#include "clientctx.h"
 #include "download.h"
 #include "duplex_sqlite3.h"
 #include "fetch.h"
@@ -99,6 +100,15 @@ bool FileSystem::CheckCacheMode() {
     }
   }
 
+  if (options_mgr_->IsDefined("CVMFS_CACHE_BASE") &&
+      options_mgr_->IsDefined("CVMFS_CACHE_DIR"))
+  {
+    boot_error_ =
+      "'CVMFS_CACHE_BASE' and 'CVMFS_CACHE_DIR' are mutually exclusive";
+    boot_status_ = loader::kFailOptions;
+    return false;
+  }
+
   return true;
 }
 
@@ -125,7 +135,7 @@ FileSystem *FileSystem::Create(const FileSystem::FileSystemInfo &fs_info) {
   if (!file_system->SetupWorkspace())
     return file_system.Release();
 
-  // Redirect SQlite temp directory to cache (global variable)
+  // Redirect SQlite temp directory to workspace (global variable)
   unsigned length_tempdir = file_system->workspace_.length() + 1;
   sqlite3_temp_directory = static_cast<char *>(sqlite3_malloc(length_tempdir));
   snprintf(sqlite3_temp_directory,
@@ -141,6 +151,8 @@ FileSystem *FileSystem::Create(const FileSystem::FileSystemInfo &fs_info) {
     sqlite::kVfsOptDefault);
   assert(retval);
   file_system->has_custom_sqlitevfs_ = true;
+
+  ClientCtx::GetInstance();
 
   file_system->boot_status_ = loader::kFailOk;
   return file_system.Release();
@@ -177,9 +189,10 @@ bool FileSystem::CreateCache() {
   // proxy template is replaced
   uuid_cache_ = cvmfs::Uuid::Create(cache_dir_ + "/uuid");
   if (uuid_cache_ == NULL) {
-    boot_error_ = "failed to load/store uuid";
-    boot_status_ = loader::kFailCacheDir;
-    return false;
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+             "failed to load/store %s/uuid", cache_dir_.c_str());
+    uuid_cache_ = cvmfs::Uuid::Create("");
+    assert(uuid_cache_ != NULL);
   }
 
   return true;
@@ -238,7 +251,15 @@ void FileSystem::DetermineCacheDirs() {
     cache_dir_ += "/" + name_;
   }
 
+  // CheckCacheMode makes sure that CVMFS_CACHE_DIR and CVMFS_CACHE_BASE are
+  // not set at the same time.
+  if (options_mgr_->GetValue("CVMFS_CACHE_DIR", &optarg))
+    cache_dir_ = optarg;
+
   workspace_ = cache_dir_;
+  // Used by libcvmfs
+  if (options_mgr_->GetValue("CVMFS_WORKSPACE", &optarg))
+    workspace_ = optarg;
 
   if (options_mgr_->GetValue("CVMFS_ALIEN_CACHE", &optarg))
     cache_dir_ = optarg;
@@ -305,7 +326,7 @@ FileSystem::FileSystem(const FileSystem::FileSystemInfo &fs_info)
   , fd_workspace_lock_(-1)
   , found_previous_crash_(false)
   , cache_mode_(0)
-  , quota_limit_(kDefaultQuotaLimit)
+  , quota_limit_((fs_info.type == kFsLibrary) ? 0 : kDefaultQuotaLimit)
   , cache_mgr_(NULL)
   , uuid_cache_(NULL)
   , has_nfs_maps_(false)
@@ -326,6 +347,8 @@ FileSystem::FileSystem(const FileSystem::FileSystemInfo &fs_info)
 
 
 FileSystem::~FileSystem() {
+  ClientCtx::CleanupInstance();
+
   if (has_custom_sqlitevfs_)
     sqlite::UnregisterVfsRdOnly();
 
@@ -450,6 +473,54 @@ bool FileSystem::SetupCrashGuard() {
 }
 
 
+bool FileSystem::SetupCwd() {
+  if (type_ == kFsFuse) {
+    // Try to jump to workspace / cache directory.  This tests, if it is
+    // accessible and it brings speed later on.
+    int retval = chdir(workspace_.c_str());
+    if (retval != 0) {
+      boot_error_ = "workspace " + workspace_ + " is unavailable";
+      boot_status_ = loader::kFailCacheDir;
+      return false;
+    }
+    if (workspace_ == cache_dir_)
+      cache_dir_ = ".";
+    workspace_ = ".";
+    return true;
+  }
+
+  // Libcvmfs: change to cache directory (not workspace) if requested,
+  // otherwise don't touch current working directory.  We also need to create
+  // the cache directory.  This has to happen before we setup the crash guard
+  // or any other file where we remember the path.
+  // TODO(jblomer): can this be simplified?
+  string optarg;
+  if (options_mgr_->GetValue("CVMFS_CWD_CACHE", &optarg) &&
+      options_mgr_->IsOn(optarg))
+  {
+    const int mode = (cache_mode_ & kCacheAlien) ? 0770 : 0700;
+    if (!MkdirDeep(cache_dir_, mode, false)) {
+      boot_error_ = "cannot create cache directory " + cache_dir_;
+      boot_status_ = loader::kFailCacheDir;
+      return false;
+    }
+    if (workspace_ == cache_dir_) {
+      workspace_ = ".";
+    } else {
+      workspace_ = GetAbsolutePath(workspace_);
+    }
+    int retval = chdir(cache_dir_.c_str());
+    if (retval != 0) {
+      boot_error_ = "cache directory " + cache_dir_ + " is unavailable";
+      boot_status_ = loader::kFailCacheDir;
+      return false;
+    }
+    cache_dir_ = ".";
+  }
+  return true;
+}
+
+
 void FileSystem::SetupLogging() {
   string optarg;
   if (options_mgr_->GetValue("CVMFS_SYSLOG_LEVEL", &optarg))
@@ -460,7 +531,11 @@ void FileSystem::SetupLogging() {
     SetLogMicroSyslog(optarg);
   if (options_mgr_->GetValue("CVMFS_DEBUGLOG", &optarg))
     SetLogDebugFile(optarg);
-  SetLogSyslogPrefix(name_);
+  if (options_mgr_->GetValue("CVMFS_SYSLOG_PREFIX", &optarg)) {
+    SetLogSyslogPrefix(optarg);
+  } else {
+    SetLogSyslogPrefix(name_);
+  }
 }
 
 
@@ -587,28 +662,15 @@ bool FileSystem::SetupWorkspace() {
   const int mode = ((cache_mode_ & kCacheAlien) && (workspace_ == cache_dir_)) ?
                    0770 : 0700;
   if (!MkdirDeep(workspace_, mode, false)) {
-    boot_error_ = "cannot create cache directory " + cache_dir_;
+    boot_error_ = "cannot create workspace directory " + workspace_;
     boot_status_ = loader::kFailCacheDir;
     return false;
   }
 
   if (!LockWorkspace())
     return false;
-
-  if (type_ == kFsFuse) {
-    // Try to jump to workspace / cache directory.  This tests, if it is
-    // accassible and it brings speed later on.
-    int retval = chdir(workspace_.c_str());
-    if (retval != 0) {
-      boot_error_ = "workspace " + workspace_ + " is unavailable";
-      boot_status_ = loader::kFailCacheDir;
-      return false;
-    }
-    if (workspace_ == cache_dir_)
-      cache_dir_ = ".";
-    workspace_ = ".";
-  }
-
+  if (!SetupCwd())
+    return false;
   if (!SetupCrashGuard())
     return false;
 
@@ -637,20 +699,23 @@ void FileSystem::TearDown2ReadOnly() {
 
 
 const char *MountPoint::kDefaultAuthzSearchPath = "/usr/libexec/cvmfs/authz";
+const char *MountPoint::kDefaultBlacklist = "/etc/cvmfs/blacklist";
 
 bool MountPoint::CheckBlacklists() {
-  if (FileExists("/etc/cvmfs/blacklist")) {
+  string blacklist;
+  if (!options_mgr_->GetValue("CVMFS_BLACKLIST", &blacklist))
+    blacklist = kDefaultBlacklist;
+  if (FileExists(blacklist)) {
     const bool append = false;
-    if (!signature_mgr_->LoadBlacklist("/etc/cvmfs/blacklist", append)) {
-      boot_error_ = "failed to load blacklist";
+    if (!signature_mgr_->LoadBlacklist(blacklist, append)) {
+      boot_error_ = "failed to load blacklist " + blacklist;
       boot_status_ = loader::kFailSignature;
       return false;
     }
   }
 
   string config_repository_path;
-  OptionsManager *options_mgr = file_system_->options_mgr();
-  if (options_mgr->HasConfigRepository(fqrn_, &config_repository_path)
+  if (options_mgr_->HasConfigRepository(fqrn_, &config_repository_path)
       && FileExists(config_repository_path + "blacklist"))
   {
     const bool append = true;
@@ -667,15 +732,22 @@ bool MountPoint::CheckBlacklists() {
 }
 
 
+/**
+ * The option_mgr parameter can be NULL, in which case the global option manager
+ * from the file system is used.
+ */
 MountPoint *MountPoint::Create(
   const string &fqrn,
-  FileSystem *file_system)
+  FileSystem *file_system,
+  OptionsManager *options_mgr)
 {
-  string optarg;
-  UniquePtr<MountPoint> mountpoint(new MountPoint(fqrn, file_system));
+  if (options_mgr == NULL)
+    options_mgr = file_system->options_mgr();
+  UniquePtr<MountPoint> mountpoint(new MountPoint(
+    fqrn, file_system, options_mgr));
 
   // At this point, we have a repository name, the type (fuse or library) and
-  // an options manager from the FileSystem object.
+  // an options manager (which can be the same than the FileSystem's one).
 
   mountpoint->CreateStatistics();
   mountpoint->CreateAuthz();
@@ -688,10 +760,11 @@ MountPoint *MountPoint::Create(
   mountpoint->CreateFetchers();
   if (!mountpoint->CreateCatalogManager())
     return mountpoint.Release();
+  if (!mountpoint->CreateTracer())
+    return mountpoint.Release();
 
   mountpoint->ReEvaluateAuthz();
   mountpoint->CreateTables();
-  mountpoint->CreateTracer();
   mountpoint->SetupBehavior();
 
   mountpoint->boot_status_ = loader::kFailOk;
@@ -700,20 +773,19 @@ MountPoint *MountPoint::Create(
 
 
 void MountPoint::CreateAuthz() {
-  OptionsManager *options_mgr = file_system_->options_mgr();
   string optarg;
   string authz_helper;
-  if (options_mgr->GetValue("CVMFS_AUTHZ_HELPER", &optarg))
+  if (options_mgr_->GetValue("CVMFS_AUTHZ_HELPER", &optarg))
     authz_helper = optarg;
   string authz_search_path(kDefaultAuthzSearchPath);
-  if (options_mgr->GetValue("CVMFS_AUTHZ_SEARCH_PATH", &optarg))
+  if (options_mgr_->GetValue("CVMFS_AUTHZ_SEARCH_PATH", &optarg))
     authz_search_path = optarg;
 
   authz_fetcher_ = new AuthzExternalFetcher(
     fqrn_,
     authz_helper,
     authz_search_path,
-    options_mgr);
+    options_mgr_);
   assert(authz_fetcher_ != NULL);
 
   authz_session_mgr_ = AuthzSessionManager::Create(
@@ -728,7 +800,6 @@ void MountPoint::CreateAuthz() {
 
 bool MountPoint::CreateCatalogManager() {
   string optarg;
-  OptionsManager *options_manager = file_system_->options_mgr();
 
   catalog_mgr_ = new catalog::ClientCatalogManager(
     fqrn_, fetcher_, signature_mgr_, statistics_);
@@ -746,8 +817,8 @@ bool MountPoint::CreateCatalogManager() {
   } else {
     fixed_catalog_ = true;
     bool alt_root_path =
-      options_manager->GetValue("CVMFS_ALT_ROOT_PATH", &optarg) &&
-      options_manager->IsOn(optarg);
+      options_mgr_->GetValue("CVMFS_ALT_ROOT_PATH", &optarg) &&
+      options_mgr_->IsOn(optarg);
     retval = catalog_mgr_->InitFixed(root_hash, alt_root_path);
   }
   if (!retval) {
@@ -756,8 +827,8 @@ bool MountPoint::CreateCatalogManager() {
     return false;
   }
 
-  if (options_manager->GetValue("CVMFS_AUTO_UPDATE", &optarg) &&
-      !options_manager->IsOn(optarg))
+  if (options_mgr_->GetValue("CVMFS_AUTO_UPDATE", &optarg) &&
+      !options_mgr_->IsOn(optarg))
   {
     fixed_catalog_ = true;
   }
@@ -772,14 +843,12 @@ bool MountPoint::CreateCatalogManager() {
 
 bool MountPoint::CreateDownloadManagers() {
   string optarg;
-  OptionsManager *options_mgr = file_system_->options_mgr();
-
   download_mgr_ = new download::DownloadManager();
   const bool use_system_proxy = false;
   download_mgr_->Init(kDefaultNumConnections, use_system_proxy, statistics_);
   download_mgr_->SetCredentialsAttachment(authz_attachment_);
 
-  if (options_mgr->GetValue("CVMFS_SERVER_URL", &optarg)) {
+  if (options_mgr_->GetValue("CVMFS_SERVER_URL", &optarg)) {
     download_mgr_->SetHostChain(ReplaceHosts(optarg));
   }
 
@@ -787,13 +856,13 @@ bool MountPoint::CreateDownloadManagers() {
   SetupHttpTuning();
 
   string forced_proxy_template;
-  if (options_mgr->GetValue("CVMFS_PROXY_TEMPLATE", &optarg))
+  if (options_mgr_->GetValue("CVMFS_PROXY_TEMPLATE", &optarg))
     forced_proxy_template = optarg;
   download_mgr_->SetProxyTemplates(file_system_->uuid_cache()->uuid(),
                                    forced_proxy_template);
 
   string proxies;
-  if (options_mgr->GetValue("CVMFS_HTTP_PROXY", &optarg))
+  if (options_mgr_->GetValue("CVMFS_HTTP_PROXY", &optarg))
     proxies = optarg;
   proxies = download::ResolveProxyDescription(proxies, download_mgr_);
   if (proxies == "") {
@@ -802,13 +871,13 @@ bool MountPoint::CreateDownloadManagers() {
     return false;
   }
   string fallback_proxies;
-  if (options_mgr->GetValue("CVMFS_FALLBACK_PROXY", &optarg))
+  if (options_mgr_->GetValue("CVMFS_FALLBACK_PROXY", &optarg))
     fallback_proxies = optarg;
   download_mgr_->SetProxyChain(proxies, fallback_proxies,
                                download::DownloadManager::kSetProxyBoth);
 
-  if (options_mgr->GetValue("CVMFS_USE_GEOAPI", &optarg) &&
-      options_mgr->IsOn(optarg))
+  if (options_mgr_->GetValue("CVMFS_USE_GEOAPI", &optarg) &&
+      options_mgr_->IsOn(optarg))
   {
     download_mgr_->ProbeGeo();
   }
@@ -837,14 +906,13 @@ void MountPoint::CreateFetchers() {
 
 bool MountPoint::CreateSignatureManager() {
   string optarg;
-  OptionsManager *options_mgr = file_system_->options_mgr();
   signature_mgr_ = new signature::SignatureManager();
   signature_mgr_->Init();
 
   string public_keys;
-  if (options_mgr->GetValue("CVMFS_PUBLIC_KEY", &optarg)) {
+  if (options_mgr_->GetValue("CVMFS_PUBLIC_KEY", &optarg)) {
     public_keys = optarg;
-  } else if (options_mgr->GetValue("CVMFS_KEYS_DIR", &optarg)) {
+  } else if (options_mgr_->GetValue("CVMFS_KEYS_DIR", &optarg)) {
     // Collect .pub files from CVMFS_KEYS_DIR
     public_keys = JoinStrings(FindFiles(optarg, ".pub"), ":");
   } else {
@@ -859,7 +927,7 @@ bool MountPoint::CreateSignatureManager() {
   LogCvmfs(kLogCvmfs, kLogDebug, "CernVM-FS: using public key(s) %s",
            public_keys.c_str());
 
-  if (options_mgr->GetValue("CVMFS_TRUSTED_CERTS", &optarg)) {
+  if (options_mgr_->GetValue("CVMFS_TRUSTED_CERTS", &optarg)) {
     if (!signature_mgr_->LoadTrustedCaCrl(optarg)) {
       boot_error_ = "failed to load trusted certificates";
       boot_status_ = loader::kFailSignature;
@@ -894,16 +962,17 @@ void MountPoint::CreateStatistics() {
 
 void MountPoint::CreateTables() {
   if (file_system_->type() != FileSystem::kFsFuse) {
+    // Libcvmfs simplified tables
     md5path_cache_ = new lru::Md5PathCache(kLibPathCacheSize, statistics_);
+    simple_chunk_tables_ = new SimpleChunkTables();
     return;
   }
 
   chunk_tables_ = new ChunkTables();
 
   string optarg;
-  OptionsManager *options_manager = file_system_->options_mgr();
   uint64_t mem_cache_size = kDefaultMemcacheSize;
-  if (options_manager->GetValue("CVMFS_MEMCACHE_SIZE", &optarg))
+  if (options_mgr_->GetValue("CVMFS_MEMCACHE_SIZE", &optarg))
     mem_cache_size = String2Uint64(optarg) * 1024 * 1024;
 
   const double memcache_unit_size =
@@ -922,26 +991,30 @@ void MountPoint::CreateTables() {
 }
 
 
-void MountPoint::CreateTracer() {
+bool MountPoint::CreateTracer() {
   string optarg;
-  OptionsManager *options_manager = file_system_->options_mgr();
   tracer_ = new Tracer();
-  if (options_manager->GetValue("CVMFS_TRACEFILE", &optarg)) {
+  if (options_mgr_->GetValue("CVMFS_TRACEFILE", &optarg)) {
+    if (file_system_->type() != FileSystem::kFsFuse) {
+      boot_error_ = "tracer is only supported in the fuse module";
+      boot_status_ = loader::kFailOptions;
+      return false;
+    }
     tracer_->Activate(kTracerBufferSize, kTracerFlushThreshold, optarg);
   }
+  return true;
 }
 
 
 bool MountPoint::DetermineRootHash(shash::Any *root_hash) {
   string optarg;
-  OptionsManager *options_manager = file_system_->options_mgr();
-  if (options_manager->GetValue("CVMFS_ROOT_HASH", &optarg)) {
+  if (options_mgr_->GetValue("CVMFS_ROOT_HASH", &optarg)) {
     *root_hash = MkFromHexPtr(shash::HexPtr(optarg), shash::kSuffixCatalog);
     return true;
   }
 
-  if (!options_manager->IsDefined("CVMFS_REPOSITORY_TAG") &&
-      !options_manager->IsDefined("CVMFS_REPOSITORY_DATE"))
+  if (!options_mgr_->IsDefined("CVMFS_REPOSITORY_TAG") &&
+      !options_mgr_->IsDefined("CVMFS_REPOSITORY_DATE"))
   {
     root_hash->SetNull();
     return true;
@@ -963,9 +1036,9 @@ bool MountPoint::DetermineRootHash(shash::Any *root_hash) {
 
   history::History::Tag tag;
   bool retval;
-  if (!options_manager->GetValue("CVMFS_REPOSITORY_TAG", &repository_tag_)) {
+  if (!options_mgr_->GetValue("CVMFS_REPOSITORY_TAG", &repository_tag_)) {
     string repository_date;
-    options_manager->GetValue("CVMFS_REPOSITORY_DATE", &repository_date);
+    options_mgr_->GetValue("CVMFS_REPOSITORY_DATE", &repository_date);
     time_t repository_utctime = IsoTimestamp2UtcTime(repository_date);
     if (repository_utctime == 0) {
       boot_error_ = "invalid timestamp in CVMFS_REPOSITORY_DATE: " +
@@ -1052,10 +1125,14 @@ unsigned MountPoint::GetMaxTtlMn() {
 }
 
 
-MountPoint::MountPoint(const string &fqrn, FileSystem *file_system)
+MountPoint::MountPoint(
+  const string &fqrn,
+  FileSystem *file_system,
+  OptionsManager *options_mgr)
   : fqrn_(fqrn)
   , uuid_(cvmfs::Uuid::Create(""))
   , file_system_(file_system)
+  , options_mgr_(options_mgr)
   , statistics_(NULL)
   , authz_fetcher_(NULL)
   , authz_session_mgr_(NULL)
@@ -1069,6 +1146,7 @@ MountPoint::MountPoint(const string &fqrn, FileSystem *file_system)
   , inode_annotation_(NULL)
   , catalog_mgr_(NULL)
   , chunk_tables_(NULL)
+  , simple_chunk_tables_(NULL)
   , inode_cache_(NULL)
   , path_cache_(NULL)
   , md5path_cache_(NULL)
@@ -1093,6 +1171,7 @@ MountPoint::~MountPoint() {
   delete md5path_cache_;
   delete path_cache_;
   delete inode_cache_;
+  delete simple_chunk_tables_;
   delete chunk_tables_;
 
   delete catalog_mgr_;
@@ -1143,13 +1222,12 @@ void MountPoint::SetMaxTtlMn(unsigned value_minutes) {
 
 
 void MountPoint::SetupBehavior() {
-  OptionsManager *options_manager = file_system_->options_mgr();
   string optarg;
 
-  if (options_manager->GetValue("CVMFS_MAX_TTL", &optarg))
+  if (options_mgr_->GetValue("CVMFS_MAX_TTL", &optarg))
     SetMaxTtlMn(String2Uint64(optarg));
 
-  if (options_manager->GetValue("CVMFS_KCACHE_TIMEOUT", &optarg)) {
+  if (options_mgr_->GetValue("CVMFS_KCACHE_TIMEOUT", &optarg)) {
     // Can be negative and should then be interpreted as 0.0
     kcache_timeout_sec_ =
       std::max(0.0, static_cast<double>(String2Int64(optarg)));
@@ -1157,8 +1235,8 @@ void MountPoint::SetupBehavior() {
   LogCvmfs(kLogCvmfs, kLogDebug, "kernel caches expire after %d seconds",
            static_cast<int>(kcache_timeout_sec_));
 
-  if (options_manager->GetValue("CVMFS_HIDE_MAGIC_XATTRS", &optarg)
-      && options_manager->IsOn(optarg))
+  if (options_mgr_->GetValue("CVMFS_HIDE_MAGIC_XATTRS", &optarg)
+      && options_mgr_->IsOn(optarg))
   {
     hide_magic_xattrs_ = true;
   }
@@ -1171,23 +1249,21 @@ void MountPoint::SetupBehavior() {
  */
 void MountPoint::SetupDnsTuning(download::DownloadManager *manager) {
   string optarg;
-  OptionsManager *options_mgr = file_system_->options_mgr();
-
   unsigned dns_timeout_ms = download::DownloadManager::kDnsDefaultTimeoutMs;
   unsigned dns_retries = download::DownloadManager::kDnsDefaultRetries;
-  if (options_mgr->GetValue("CVMFS_DNS_TIMEOUT", &optarg))
+  if (options_mgr_->GetValue("CVMFS_DNS_TIMEOUT", &optarg))
     dns_timeout_ms = String2Uint64(optarg) * 1000;
-  if (options_mgr->GetValue("CVMFS_DNS_RETRIES", &optarg))
+  if (options_mgr_->GetValue("CVMFS_DNS_RETRIES", &optarg))
     dns_retries = String2Uint64(optarg);
   manager->SetDnsParameters(dns_retries, dns_timeout_ms);
 
   // Has to be after SetDnsParameters because SetDnsParameters might construct
   // a new resolver object
-  if (options_mgr->GetValue("CVMFS_DNS_SERVER", &optarg)) {
+  if (options_mgr_->GetValue("CVMFS_DNS_SERVER", &optarg)) {
     download_mgr_->SetDnsServer(optarg);
   }
 
-  if (options_mgr->GetValue("CVMFS_IPFAMILY_PREFER", &optarg)) {
+  if (options_mgr_->GetValue("CVMFS_IPFAMILY_PREFER", &optarg)) {
     switch (String2Int64(optarg)) {
       case 4:
         manager->SetIpPreference(dns::kIpPreferV4);
@@ -1197,35 +1273,34 @@ void MountPoint::SetupDnsTuning(download::DownloadManager *manager) {
         break;
     }
   }
-  if (options_mgr->GetValue("CVMFS_MAX_IPADDR_PER_PROXY", &optarg))
+  if (options_mgr_->GetValue("CVMFS_MAX_IPADDR_PER_PROXY", &optarg))
     manager->SetMaxIpaddrPerProxy(String2Uint64(optarg));
 }
 
 
 bool MountPoint::SetupExternalDownloadMgr() {
   string optarg;
-  OptionsManager *options_mgr = file_system_->options_mgr();
   external_download_mgr_ =
     download_mgr_->Clone(statistics_, "download-external");
 
   unsigned timeout;
   unsigned timeout_direct;
   download_mgr_->GetTimeout(&timeout, &timeout_direct);
-  if (options_mgr->GetValue("CVMFS_EXTERNAL_TIMEOUT", &optarg)) {
+  if (options_mgr_->GetValue("CVMFS_EXTERNAL_TIMEOUT", &optarg)) {
     timeout = String2Uint64(optarg);
   }
-  if (options_mgr->GetValue("CVMFS_EXTERNAL_TIMEOUT_DIRECT", &optarg)) {
+  if (options_mgr_->GetValue("CVMFS_EXTERNAL_TIMEOUT_DIRECT", &optarg)) {
     timeout_direct = String2Uint64(optarg);
   }
   external_download_mgr_->SetTimeout(timeout, timeout_direct);
 
-  if (options_mgr->GetValue("CVMFS_EXTERNAL_URL", &optarg)) {
+  if (options_mgr_->GetValue("CVMFS_EXTERNAL_URL", &optarg)) {
     external_download_mgr_->SetHostChain(ReplaceHosts(optarg));
     external_download_mgr_->ProbeGeo();
   }
 
   string proxies = "DIRECT";
-  if (options_mgr->GetValue("CVMFS_EXTERNAL_HTTP_PROXY", &optarg)) {
+  if (options_mgr_->GetValue("CVMFS_EXTERNAL_HTTP_PROXY", &optarg)) {
     proxies = download::ResolveProxyDescription(optarg, external_download_mgr_);
     if (proxies == "") {
       boot_error_ = "failed to discover external HTTP proxy servers";
@@ -1235,7 +1310,7 @@ bool MountPoint::SetupExternalDownloadMgr() {
   }
   external_download_mgr_->SetProxyChain(
     proxies, "", download::DownloadManager::kSetProxyRegular);
-  if (options_mgr->GetValue("CVMFS_EXTERNAL_FALLBACK_PROXY", &optarg)) {
+  if (options_mgr_->GetValue("CVMFS_EXTERNAL_FALLBACK_PROXY", &optarg)) {
     external_download_mgr_->SetProxyChain(
       "", optarg, download::DownloadManager::kSetProxyFallback);
   }
@@ -1246,43 +1321,42 @@ bool MountPoint::SetupExternalDownloadMgr() {
 
 void MountPoint::SetupHttpTuning() {
   string optarg;
-  OptionsManager *options_mgr = file_system_->options_mgr();
 
   // TODO(jblomer): avoid double default settings
 
   unsigned timeout = kDefaultTimeoutSec;
   unsigned timeout_direct = kDefaultTimeoutSec;
-  if (options_mgr->GetValue("CVMFS_TIMEOUT", &optarg))
+  if (options_mgr_->GetValue("CVMFS_TIMEOUT", &optarg))
     timeout = String2Uint64(optarg);
-  if (options_mgr->GetValue("CVMFS_TIMEOUT_DIRECT", &optarg))
+  if (options_mgr_->GetValue("CVMFS_TIMEOUT_DIRECT", &optarg))
     timeout_direct = String2Uint64(optarg);
   download_mgr_->SetTimeout(timeout, timeout_direct);
 
   unsigned max_retries = kDefaultRetries;
   unsigned backoff_init = kDefaultBackoffInitMs;
   unsigned backoff_max = kDefaultBackoffMaxMs;
-  if (options_mgr->GetValue("CVMFS_MAX_RETRIES", &optarg))
+  if (options_mgr_->GetValue("CVMFS_MAX_RETRIES", &optarg))
     max_retries = String2Uint64(optarg);
-  if (options_mgr->GetValue("CVMFS_BACKOFF_INIT", &optarg))
+  if (options_mgr_->GetValue("CVMFS_BACKOFF_INIT", &optarg))
     backoff_init = String2Uint64(optarg) * 1000;
-  if (options_mgr->GetValue("CVMFS_BACKOFF_MAX", &optarg))
+  if (options_mgr_->GetValue("CVMFS_BACKOFF_MAX", &optarg))
     backoff_max = String2Uint64(optarg) * 1000;
   download_mgr_->SetRetryParameters(max_retries, backoff_init, backoff_max);
 
-  if (options_mgr->GetValue("CVMFS_LOW_SPEED_LIMIT", &optarg))
+  if (options_mgr_->GetValue("CVMFS_LOW_SPEED_LIMIT", &optarg))
     download_mgr_->SetLowSpeedLimit(String2Uint64(optarg));
-  if (options_mgr->GetValue("CVMFS_PROXY_RESET_AFTER", &optarg))
+  if (options_mgr_->GetValue("CVMFS_PROXY_RESET_AFTER", &optarg))
     download_mgr_->SetProxyGroupResetDelay(String2Uint64(optarg));
-  if (options_mgr->GetValue("CVMFS_HOST_RESET_AFTER", &optarg))
+  if (options_mgr_->GetValue("CVMFS_HOST_RESET_AFTER", &optarg))
     download_mgr_->SetHostResetDelay(String2Uint64(optarg));
 
-  if (options_mgr->GetValue("CVMFS_FOLLOW_REDIRECTS", &optarg) &&
-      options_mgr->IsOn(optarg))
+  if (options_mgr_->GetValue("CVMFS_FOLLOW_REDIRECTS", &optarg) &&
+      options_mgr_->IsOn(optarg))
   {
     download_mgr_->EnableRedirects();
   }
-  if (options_mgr->GetValue("CVMFS_SEND_INFO_HEADER", &optarg) &&
-      options_mgr->IsOn(optarg))
+  if (options_mgr_->GetValue("CVMFS_SEND_INFO_HEADER", &optarg) &&
+      options_mgr_->IsOn(optarg))
   {
     download_mgr_->EnableInfoHeader();
   }
@@ -1291,10 +1365,9 @@ void MountPoint::SetupHttpTuning() {
 
 void MountPoint::SetupInodeAnnotation() {
   string optarg;
-  OptionsManager *options_manager = file_system_->options_mgr();
 
   inode_annotation_ = new catalog::InodeGenerationAnnotation();
-  if (options_manager->GetValue("CVMFS_INITIAL_GENERATION", &optarg)) {
+  if (options_mgr_->GetValue("CVMFS_INITIAL_GENERATION", &optarg)) {
     inode_annotation_->IncGeneration(String2Uint64(optarg));
   }
 
@@ -1308,18 +1381,17 @@ void MountPoint::SetupInodeAnnotation() {
 
 bool MountPoint::SetupOwnerMaps() {
   string optarg;
-  OptionsManager *options_manager = file_system_->options_mgr();
   catalog::OwnerMap uid_map;
   catalog::OwnerMap gid_map;
 
-  if (options_manager->GetValue("CVMFS_UID_MAP", &optarg)) {
+  if (options_mgr_->GetValue("CVMFS_UID_MAP", &optarg)) {
     if (!uid_map.Read(optarg)) {
       boot_error_ = "failed to parse uid map " + optarg;
       boot_status_ = loader::kFailOptions;
       return false;
     }
   }
-  if (options_manager->GetValue("CVMFS_GID_MAP", &optarg)) {
+  if (options_mgr_->GetValue("CVMFS_GID_MAP", &optarg)) {
     if (!gid_map.Read(optarg)) {
       boot_error_ = "failed to parse gid map " + optarg;
       boot_status_ = loader::kFailOptions;
@@ -1329,8 +1401,8 @@ bool MountPoint::SetupOwnerMaps() {
   catalog_mgr_->SetOwnerMaps(uid_map, gid_map);
 
   // TODO(jblomer): make local to catalog manager
-  if (options_manager->GetValue("CVMFS_CLAIM_OWNERSHIP", &optarg) &&
-      options_manager->IsOn(optarg))
+  if (options_mgr_->GetValue("CVMFS_CLAIM_OWNERSHIP", &optarg) &&
+      options_mgr_->IsOn(optarg))
   {
     g_claim_ownership = true;
   }

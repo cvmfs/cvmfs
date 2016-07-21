@@ -40,6 +40,7 @@ void SplitPath(const std::string &path,
                std::string *dirname,
                std::string *filename);
 bool IsAbsolutePath(const std::string &path);
+std::string GetAbsolutePath(const std::string &path);
 bool IsHttpUrl(const std::string &path);
 
 void CreateFile(const std::string &path, const int mode,
@@ -85,6 +86,8 @@ bool GetUidOf(const std::string &username, uid_t *uid, gid_t *main_gid);
 bool GetGidOf(const std::string &groupname, gid_t *gid);
 mode_t GetUmask();
 bool AddGroup2Persona(const gid_t gid);
+
+int SetLimitNoFile(unsigned limit_nofile);
 
 void BlockSignal(int signum);
 void WaitForSignal(int signum);

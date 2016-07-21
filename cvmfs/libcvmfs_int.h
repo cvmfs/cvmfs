@@ -1,8 +1,13 @@
 /**
  * This file is part of the CernVM File System.
  *
- * This is the internal implementation of libcvmfs,
- * not to be exposed to the code using the library.
+ * This is the internal implementation of libcvmfs, not to be exposed to the
+ * code using the library.
+ *
+ * Defines LibGlobals and LibContext classes that wrap around a FileSystem
+ * and a MountPoint.  The libcvmfs.cc implementation of the libcvmfs interface
+ * uses LibGlobals for library initialization and deinitialization.  It uses
+ * LibContext objects for all the file system heavy lifting.
  */
 
 #ifndef CVMFS_LIBCVMFS_INT_H_
@@ -18,7 +23,10 @@
 #include "backoff.h"
 #include "catalog_mgr.h"
 #include "file_chunk.h"
+#include "loader.h"
 #include "lru.h"
+#include "mountpoint.h"
+#include "options.h"
 
 namespace cache {
 class CacheManager;
@@ -47,112 +55,51 @@ extern bool          foreground_;
 class Fetcher;
 }
 
+
 /**
- * A singleton managing the cvmfs resources for all attached repositories.
+ * A singleton managing the cvmfs resources for all attached repositories.  A
+ * thin wrapper around the FileSystem object that does most of the heavy work.
  */
-class cvmfs_globals : SingleCopy {
+class LibGlobals : SingleCopy {
  public:
-  // Common options for all repositories
-  struct options {
-    options()
-      : change_to_cache_directory(false)
-      , alien_cache(false)
-      , syslog_level(-1)
-      , log_syslog_level(-1)
-      , nofiles(-1)
-      , max_open_files(0)
-      , quota_limit(0)
-      , quota_threshold(0)
-      , rebuild_cachedb(0)
-    { }
+  static loader::Failures Initialize(OptionsManager *options_mgr);
+  static void CleanupInstance();
+  static LibGlobals* GetInstance();
 
-    std::string    cache_directory;
-    std::string    cachedir;  // Alias of cache_directory
-    std::string    alien_cachedir;
-    std::string    lock_directory;
-    bool           change_to_cache_directory;
-    bool           alien_cache;
+  FileSystem *file_system() { return file_system_; }
+  void set_options_mgr(OptionsManager *value) { options_mgr_ = value; }
 
-    int            syslog_level;
-    int            log_syslog_level;
-    std::string    log_prefix;
-    std::string    logfile;
-    std::string    log_file;
-
-    int            nofiles;
-    int            max_open_files;  // Alias of nofiles
-
-    // Currently ignored
-    unsigned quota_limit;
-    unsigned quota_threshold;
-    bool rebuild_cachedb;
-  };
-
-  static int            Initialize(const options &opts);
-  static void           Destroy();
-  static cvmfs_globals* Instance();
-
-  pthread_mutex_t *libcrypto_locks() { return libcrypto_locks_; }
-  cache::CacheManager *cache_mgr() { return cache_mgr_; }
-
- protected:
-  int Setup(const options &opts);
+ private:
+  LibGlobals();
+  ~LibGlobals();
   static void CallbackLibcryptoLock(int mode, int type,
                                     const char *file, int line);
   // unsigned long type required by libcrypto (openssl)
   static unsigned long CallbackLibcryptoThreadId();  // NOLINT
 
- private:
-  cvmfs_globals();
-  ~cvmfs_globals();
+  static LibGlobals *instance_;
 
-  static cvmfs_globals *instance;
+  /**
+   * Only non-NULL if cvmfs_init is used for initialization.  In this case, the
+   * options manager needs to be cleaned up by cvmfs_fini.
+   */
+  OptionsManager *options_mgr_;
+  FileSystem *file_system_;
 
-  perf::Statistics *statistics_;
-  cache::CacheManager *cache_mgr_;
-  std::string       cache_directory_;
-  std::string       lock_directory_;
-  uid_t             uid_;
-  gid_t             gid_;
-  int               fd_lockfile_;
   pthread_mutex_t  *libcrypto_locks_;
-  bool lock_created_;
-  bool vfs_registered_;
 };
 
 
 /**
- * Encapsulates state and manager objects for a single attached repository.
+ * Encapsulates a single attached repository.  It uses a MountPoint object for
+ * creating the state of all the necessary manager objects.  On top of the
+ * managers it implements file system operations (read, list, ...).
  */
-class cvmfs_context : SingleCopy {
+class LibContext : SingleCopy {
  public:
-  struct options {
-    unsigned       timeout;
-    unsigned       timeout_direct;
-    std::string    url;
-    std::string    external_url;
-    std::string    proxies;
-    std::string    fallback_proxies;
-    std::string    tracefile;  // unused
-    std::string    pubkey;
-    std::string    deep_mount;
-    std::string    blacklist;
-    std::string    repo_name;
-    std::string    root_hash;
-    std::string    mountpoint;
-    bool           allow_unsigned;
-
-   public:
-    options() :
-      timeout(2),
-      timeout_direct(2),
-      pubkey("/etc/cvmfs/keys/cern.ch.pub"),
-      blacklist(""),
-      allow_unsigned(false) {}
-  };
-
-  static cvmfs_context* Create(const options &options);
-  static void Destroy(cvmfs_context *ctx);
+  static LibContext *Create(const std::string &fqrn,
+                            OptionsManager *options_mgr);
+  ~LibContext();
 
   int GetAttr(const char *c_path, struct stat *info);
   int Readlink(const char *path, char *buf, size_t size);
@@ -164,74 +111,33 @@ class cvmfs_context : SingleCopy {
 
   catalog::LoadError RemountStart();
 
-  perf::Statistics *statistics() const { return statistics_; }
-  std::string mountpoint() const { return cfg_.mountpoint; }
+  MountPoint *mount_point() { return mount_point_; }
+  void set_options_mgr(OptionsManager *value) { options_mgr_ = value; }
 
- protected:
+ private:
+  /**
+   * File descriptors of chunked files have bit 30 set.
+   */
+  static const int kFdChunked = 1 << 30;
   /**
    * use static method Create() for construction
    */
-  explicit cvmfs_context(const options &options);
-  ~cvmfs_context();
-
- private:
-  static const int kFdChunked = 1 << 30;
-
-  int Setup(const options &opts, perf::Statistics *statistics);
-
-  void InitRuntimeCounters();
+  LibContext();
+  FileSystem *file_system() { return LibGlobals::GetInstance()->file_system(); }
 
   void AppendStringToList(char const   *str,
                           char       ***buf,
                           size_t       *listlen,
                           size_t       *buflen);
-
   bool GetDirentForPath(const PathString         &path,
                         catalog::DirectoryEntry  *dirent);
 
-  perf::Statistics *statistics_;
-
-  const options cfg_;
-
-  std::string mountpoint_;
-  std::string cachedir_;
-  std::string tracefile_;
   /**
-   * Expected repository name, e.g. atlas.cern.ch
+   * Only non-NULL if cvmfs_attache_repo is used for initialization.  In this
+   * case, the options manager needs to be cleaned up by cvmfs_fini.
    */
-  std::string repository_name_;
-  time_t boot_time_;
-  catalog::ClientCatalogManager *catalog_manager_;
-  signature::SignatureManager *signature_manager_;
-  download::DownloadManager *download_manager_;
-  download::DownloadManager *external_download_manager_;
-  cvmfs::Fetcher *fetcher_;
-  cvmfs::Fetcher *external_fetcher_;
-  lru::Md5PathCache *md5path_cache_;
-
-  atomic_int64 num_fs_open_;
-  atomic_int64 num_fs_dir_open_;
-  atomic_int64 num_fs_lookup_;
-  atomic_int64 num_fs_lookup_negative_;
-  atomic_int64 num_fs_stat_;
-  atomic_int64 num_fs_read_;
-  atomic_int64 num_fs_readlink_;
-  atomic_int32 num_io_error_;
-  atomic_int32 open_dirs_; /**< number of currently open directories */
-  /**
-   * Number of reserved file descriptors for internal use
-   */
-  static const int kNumReservedFd = 512;
-  static const unsigned int kMd5pathCacheSize = 32000;
-
-  BackoffThrottle backoff_throttle_;
-  SimpleChunkTables chunk_tables_;
-
-  bool download_ready_;
-  bool external_download_ready_;
-  bool signature_ready_;
-  bool catalog_ready_;
-  bool pathcache_ready_;
+  OptionsManager *options_mgr_;
+  MountPoint *mount_point_;
 };
 
 #endif  // CVMFS_LIBCVMFS_INT_H_

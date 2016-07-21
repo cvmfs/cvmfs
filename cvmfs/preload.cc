@@ -18,6 +18,7 @@
 #include "swissknife.h"
 #include "swissknife_pull.h"
 #include "util/posix.h"
+#include "uuid.h"
 
 
 using namespace std;  // NOLINT
@@ -218,6 +219,14 @@ int main(int argc, char *argv[]) {
   if (retval == 0) {
     CopyPath2Path(dirtab, dirtab_in_cache);
   }
+
+  // Create cache uuid if not present
+  cvmfs::Uuid *uuid = cvmfs::Uuid::Create(cache_directory + "/uuid");
+  if (uuid == NULL) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Warning: failed to create %s/uuid",
+             cache_directory.c_str());
+  }
+  delete uuid;
 
   if (keys_created) {
     unlink(cern_pk_path.c_str());

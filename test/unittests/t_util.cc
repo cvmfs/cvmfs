@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <pthread.h>
+#include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <tbb/tbb_thread.h>
@@ -1484,4 +1485,25 @@ TEST_F(T_Util, MemoryMappedFile) {
   ASSERT_TRUE(mf.Map());
   EXPECT_TRUE(mf.IsMapped());
   mf.Unmap();
+}
+
+
+TEST_F(T_Util, SetLimitNoFile) {
+  EXPECT_EQ(-1, SetLimitNoFile(100000000));
+
+  struct rlimit rpl;
+  memset(&rpl, 0, sizeof(rpl));
+  getrlimit(RLIMIT_NOFILE, &rpl);
+  EXPECT_EQ(0, SetLimitNoFile(rpl.rlim_cur));
+}
+
+
+TEST_F(T_Util, GetAbsolutePath) {
+  bool ignore_failure = false;
+  EXPECT_EQ("/xxx", GetAbsolutePath("/xxx"));
+  EXPECT_NE("xxx", GetAbsolutePath("xxx"));
+
+  EXPECT_FALSE(FileExists(GetAbsolutePath("xxx")));
+  CreateFile("xxx", 0600, ignore_failure);
+  EXPECT_TRUE(FileExists(GetAbsolutePath("xxx")));
 }

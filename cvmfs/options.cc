@@ -228,8 +228,10 @@ bool OptionsManager::HasConfigRepository(const string &fqrn,
 
 
 void OptionsManager::ParseDefault(const string &fqrn) {
-  int retval = setenv("CVMFS_FQRN", fqrn.c_str(), 1);
-  assert(retval == 0);
+  if (taint_environment_) {
+    int retval = setenv("CVMFS_FQRN", fqrn.c_str(), 1);
+    assert(retval == 0);
+  }
 
   protected_parameters_.clear();
 
@@ -278,8 +280,10 @@ void OptionsManager::PopulateParameter(
   }
 
   config_[param] = val;
-  int retval = setenv(param.c_str(), val.value.c_str(), 1);
-  assert(retval == 0);
+  if (taint_environment_) {
+    int retval = setenv(param.c_str(), val.value.c_str(), 1);
+    assert(retval == 0);
+  }
 }
 
 
@@ -392,7 +396,8 @@ void OptionsManager::SetValue(const string &key, const string &value) {
 void OptionsManager::UnsetValue(const string &key) {
   protected_parameters_.erase(key);
   config_.erase(key);
-  unsetenv(key.c_str());
+  if (taint_environment_)
+    unsetenv(key.c_str());
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD

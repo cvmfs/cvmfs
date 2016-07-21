@@ -120,6 +120,8 @@ set (LIBCVMFS_SOURCES
 
   libcvmfs.cc libcvmfs.h
   libcvmfs_int.cc libcvmfs_int.h
+  libcvmfs_legacy.cc
+  libcvmfs_options.cc
 )
 
 set (TEST_LIBCVMFS_SOURCES
@@ -311,6 +313,7 @@ set (CVMFS_PRELOADER_SOURCES
   util/single_copy.h
   util/string.cc util/string.h
   util_concurrency.cc util_concurrency.h
+  uuid.cc uuid.h
   whitelist.cc whitelist.h
   xattr.cc xattr.h
 )
@@ -497,7 +500,10 @@ if (BUILD_LIBCVMFS)
   add_dependencies (libcvmfs cvmfs_only)
 
   add_executable( test_libcvmfs ${TEST_LIBCVMFS_SOURCES} )
-  target_link_libraries( test_libcvmfs ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a ${SQLITE3_LIBRARY} ${CARES_LIBRARIES} ${CURL_LIBRARIES} ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl )
+  target_link_libraries(test_libcvmfs ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a
+                        ${SQLITE3_LIBRARY} ${CARES_LIBRARIES} ${CURL_LIBRARIES}
+                        ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES}
+                        ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl )
   add_dependencies (test_libcvmfs libcvmfs)
 endif (BUILD_LIBCVMFS)
 
@@ -650,7 +656,7 @@ if (BUILD_PRELOADER)
                         ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE} ${ZLIB_LIBRARIES}
                         ${OPENSSL_LIBRARIES} ${CARES_ARCHIVE} ${SQLITE3_ARCHIVE}
                         ${ZLIB_ARCHIVE} ${TBB_LIBRARIES} ${RT_LIBRARY}
-                        ${VJSON_ARCHIVE} ${SHA3_ARCHIVE}
+                        ${UUID_LIBRARIES} ${VJSON_ARCHIVE} ${SHA3_ARCHIVE}
                         pthread dl)
 endif (BUILD_PRELOADER)
 

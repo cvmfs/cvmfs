@@ -204,3 +204,37 @@ TEST_F(T_Libcvmfs, OptionAliases) {
   EXPECT_EQ(LIBCVMFS_FAIL_OK, retval);
   cvmfs_fini();
 }
+
+
+TEST_F(T_Libcvmfs, Initv2) {
+  cvmfs_option_map *opts = cvmfs_options_init();
+
+  cvmfs_options_set(opts, "CVMFS_CACHE_DIR", tmp_path_.c_str());
+  EXPECT_EQ(LIBCVMFS_ERR_OK, cvmfs_init_v2(opts));
+  cvmfs_fini();
+
+  cvmfs_options_set(opts, "CVMFS_NFILES", "100000000");
+  EXPECT_EQ(LIBCVMFS_ERR_PERMISSION, cvmfs_init_v2(opts));
+
+  cvmfs_options_fini(opts);
+}
+
+
+TEST_F(T_Libcvmfs, Attachv2) {
+  cvmfs_option_map *opts = cvmfs_options_init();
+
+  cvmfs_options_set(opts, "CVMFS_CACHE_DIR", tmp_path_.c_str());
+  ASSERT_EQ(LIBCVMFS_ERR_OK, cvmfs_init_v2(opts));
+
+  cvmfs_option_map *opts_repo = cvmfs_options_clone(opts);
+  cvmfs_options_set(opts_repo, "CVMFS_HTTP_PROXY", "DIRECT");
+  cvmfs_options_set(opts_repo, "CVMFS_SERVER_URL", "file:///no/such/dir");
+  cvmfs_options_set(opts_repo, "CVMFS_MAX_RETRIES", "0");
+  cvmfs_context *ctx = reinterpret_cast<cvmfs_context *>(1);
+  EXPECT_EQ(LIBCVMFS_ERR_CATALOG, cvmfs_attach_repo_v2("xxx", opts_repo, &ctx));
+  EXPECT_EQ(NULL, ctx);
+  cvmfs_options_fini(opts_repo);
+
+  cvmfs_fini();
+  cvmfs_options_fini(opts);
+}

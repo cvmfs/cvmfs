@@ -52,6 +52,7 @@ class Statistics;
 namespace signature {
 class SignatureManager;
 }
+class SimpleChunkTables;
 class Tracer;
 
 
@@ -130,7 +131,7 @@ class FileSystem : SingleCopy, public BootFactory {
      */
     bool wait_workspace;
     /**
-     * The fuse module should not daemonize.  That means the quota manager 
+     * The fuse module should not daemonize.  That means the quota manager
      * should not daemonize, too, but print debug messages to stdout.
      */
     bool foreground;
@@ -216,6 +217,7 @@ class FileSystem : SingleCopy, public BootFactory {
   void CreateStatistics();
   void SetupSqlite();
   bool SetupWorkspace();
+  bool SetupCwd();
   bool LockWorkspace();
   bool SetupCrashGuard();
   bool CreateCache();
@@ -231,6 +233,9 @@ class FileSystem : SingleCopy, public BootFactory {
   std::string name_;
   std::string exe_path_;
   Type type_;
+  /**
+   * Not owned by the FileSystem object
+   */
   OptionsManager *options_mgr_;
   bool wait_workspace_;
   bool foreground_;
@@ -324,7 +329,8 @@ class MountPoint : SingleCopy, public BootFactory {
   static const time_t kIndefiniteDeadline = time_t(-1);
 
   static MountPoint *Create(const std::string &fqrn,
-                            FileSystem *file_system);
+                            FileSystem *file_system,
+                            OptionsManager *options_mgr = NULL);
   ~MountPoint();
 
   unsigned GetMaxTtlMn();
@@ -357,6 +363,7 @@ class MountPoint : SingleCopy, public BootFactory {
   std::string membership_req() { return membership_req_; }
   lru::PathCache *path_cache() { return path_cache_; }
   std::string repository_tag() { return repository_tag_; }
+  SimpleChunkTables *simple_chunk_tables() { return simple_chunk_tables_; }
   perf::Statistics *statistics() { return statistics_; }
   signature::SignatureManager *signature_mgr() { return signature_mgr_; }
   Tracer *tracer() { return tracer_; }
@@ -410,8 +417,11 @@ class MountPoint : SingleCopy, public BootFactory {
    */
   static const unsigned kTracerBufferSize = 8192;
   static const unsigned kTracerFlushThreshold = 7000;
+  static const char *kDefaultBlacklist;  // "/etc/cvmfs/blacklist"
 
-  MountPoint(const std::string &fqrn, FileSystem *file_system);
+  MountPoint(const std::string &fqrn,
+             FileSystem *file_system,
+             OptionsManager *options_mgr);
 
   void CreateStatistics();
   void CreateAuthz();
@@ -421,7 +431,7 @@ class MountPoint : SingleCopy, public BootFactory {
   void CreateFetchers();
   bool CreateCatalogManager();
   void CreateTables();
-  void CreateTracer();
+  bool CreateTracer();
   void SetupBehavior();
   void SetupDnsTuning(download::DownloadManager *manager);
   void SetupHttpTuning();
@@ -438,6 +448,10 @@ class MountPoint : SingleCopy, public BootFactory {
    * In contrast to the manager objects, the FileSystem is not owned.
    */
   FileSystem *file_system_;
+  /**
+   * The options manager is not owned.
+   */
+  OptionsManager *options_mgr_;
 
   perf::Statistics *statistics_;
   AuthzFetcher *authz_fetcher_;
@@ -452,6 +466,7 @@ class MountPoint : SingleCopy, public BootFactory {
   catalog::InodeGenerationAnnotation *inode_annotation_;
   catalog::ClientCatalogManager *catalog_mgr_;
   ChunkTables *chunk_tables_;
+  SimpleChunkTables *simple_chunk_tables_;
   lru::InodeCache *inode_cache_;
   lru::PathCache *path_cache_;
   lru::Md5PathCache *md5path_cache_;

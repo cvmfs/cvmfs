@@ -359,6 +359,17 @@ TEST_F(T_MountPoint, CacheSettings) {
     EXPECT_EQ(".", fs->workspace());
     EXPECT_EQ(tmp_path_ + "/nfs", fs->nfs_maps_dir());
   }
+
+  options_mgr_.SetValue("CVMFS_CACHE_DIR", tmp_path_ + "/cachedir_direct");
+  {
+    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    EXPECT_EQ(loader::kFailOptions, fs->boot_status());
+  }
+  options_mgr_.UnsetValue("CVMFS_CACHE_BASE");
+  {
+    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    EXPECT_EQ(loader::kFailOk, fs->boot_status());
+  }
 }
 
 
@@ -550,6 +561,25 @@ TEST_F(T_MountPoint, Blacklist) {
   EXPECT_TRUE(SafeWriteToFile(blacklist,
                               repo_path_ + "/config.test/etc/cvmfs/blacklist",
                               0600));
+  {
+    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    ASSERT_EQ(loader::kFailOk, fs->boot_status());
+    UniquePtr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
+    EXPECT_EQ(loader::kFailCatalog, mp->boot_status());
+  }
+
+  options_mgr_.UnsetValue("CVMFS_CONFIG_REPOSITORY");
+  options_mgr_.SetValue("CVMFS_BLACKLIST", "/no/such/file");
+  {
+    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    ASSERT_EQ(loader::kFailOk, fs->boot_status());
+    UniquePtr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
+    EXPECT_EQ(loader::kFailOk, mp->boot_status());
+  }
+  RemoveTree("cvmfs_ut_cache");
+
+  options_mgr_.SetValue("CVMFS_BLACKLIST",
+                        repo_path_ + "/config.test/etc/cvmfs/blacklist");
   {
     UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
     ASSERT_EQ(loader::kFailOk, fs->boot_status());

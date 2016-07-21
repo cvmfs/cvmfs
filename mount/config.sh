@@ -28,14 +28,17 @@ cvmfs_readconfig() {
   local domain; domain=`cvmfs_getdomain $fqrn`
 
   CVMFS_PARMS=$(cvmfs2 -o parse "$fqrn" /)
+  unset CVMFS_CACHE_DIR
   eval "$CVMFS_PARMS"
 
   if [ "x$fqrn" != "x" ]
   then
-    if [ x"$CVMFS_SHARED_CACHE" = xyes ]; then
-      CVMFS_CACHE_DIR="$CVMFS_CACHE_BASE/shared"
-    else
-      CVMFS_CACHE_DIR="$CVMFS_CACHE_BASE/$fqrn"
+    if [ "x$CVMFS_CACHE_DIR" = "x" ]; then
+      if [ x"$CVMFS_SHARED_CACHE" = xyes ]; then
+        CVMFS_CACHE_DIR="$CVMFS_CACHE_BASE/shared"
+      else
+        CVMFS_CACHE_DIR="$CVMFS_CACHE_BASE/$fqrn"
+      fi
     fi
   fi
 

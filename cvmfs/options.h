@@ -24,7 +24,7 @@ namespace CVMFS_NAMESPACE_GUARD {
  */
 class OptionsManager {
  public:
-  OptionsManager() {}
+  OptionsManager() : taint_environment_(true) {}
   virtual ~OptionsManager() {}
 
   /**
@@ -127,6 +127,8 @@ class OptionsManager {
    */
   void UnsetValue(const std::string &key);
 
+  void set_taint_environment(bool value) { taint_environment_ = value; }
+
  protected:
   /**
     * The ConfigValue structure contains a concrete value of a variable, as well
@@ -141,6 +143,12 @@ class OptionsManager {
 
   std::map<std::string, ConfigValue> config_;
   std::map<std::string, std::string> protected_parameters_;
+
+  /**
+   * Whether to add environment variables to the process' environment or not.
+   * In libcvmfs, we don't want a tainted environment.
+   */
+  bool taint_environment_;
 };  // class OptionManager
 
 
