@@ -1,4 +1,5 @@
 2.4.0:
+  * Add new initialization interface to libcvmfs (CVM-947)
   * Fix build with gcc 6 (CVM-1051)
   * Use cache for fetching history database on mount
   * Fix small memory leak during remount of root catalog
