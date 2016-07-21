@@ -45,6 +45,13 @@ char *cvmfs_options_get(OptionsManager *opts, const char *key) {
 }
 
 
+char *cvmfs_options_dump(OptionsManager *opts) {
+  char *result = strdup(opts->Dump().c_str());
+  assert(result != NULL);
+  return result;
+}
+
+
 OptionsManager *cvmfs_options_init() {
   OptionsManager *result = new SimpleOptionsParser();
   // In contrast to the fuse module, we don't want to taint the process'

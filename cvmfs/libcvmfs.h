@@ -106,6 +106,7 @@ void cvmfs_options_set(cvmfs_option_map *opts,
                        const char *key, const char *value);
 void cvmfs_options_unset(cvmfs_option_map *opts, const char *key);
 char *cvmfs_options_get(cvmfs_option_map *opts, const char *key);
+char *cvmfs_options_dump(cvmfs_option_map *opts);
 void cvmfs_options_free(char *value);
 
 

@@ -9,6 +9,7 @@ cvmfs_options_fini
 cvmfs_options_set
 cvmfs_options_unset
 cvmfs_options_get
+cvmfs_options_dump
 cvmfs_options_free
 cvmfs_init
 cvmfs_init_v2
