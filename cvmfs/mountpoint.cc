@@ -187,12 +187,17 @@ bool FileSystem::CreateCache() {
     } else {
       nfiles = 8192;
     }
-    if (options_mgr_->GetValue("CVMFS_CACHE_RAM_SIZE", &optarg)) {
+    // cache size in MB takes precedence
+    if (options_mgr_->GetValue("CVMFS_CACHE_RAM_MB", &optarg)) {
       cache_bytes = String2Uint64(optarg)*1024*1024;
     } else {
-      cache_bytes = platform_memsize() >> 3;
+      if (options_mgr_->GetValue("CVMFS_CACHE_RAM_PERCENT", &optarg)) {
+        cache_bytes = platform_memsize() * String2Uint64(optarg)/100;
+      } else {
+        cache_bytes = platform_memsize() >> 5;  // ~3%
+      }
     }
-    assert(cache_bytes > 0);
+    cache_bytes = max((uint64_t) 200*1024*1024, cache_bytes);
     cache_mgr_ = new cache::RamCacheManager(
       cache_bytes,
       nfiles,
