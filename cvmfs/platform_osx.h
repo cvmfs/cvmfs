@@ -18,6 +18,8 @@
 #include <sys/mount.h>
 #include <sys/param.h>
 #include <sys/stat.h>
+#include <sys/sysctl.h>
+#include <sys/types.h>
 #include <sys/ucred.h>
 #include <sys/xattr.h>
 
@@ -282,6 +284,23 @@ inline std::string platform_libname(const std::string &base_name) {
 inline const char* platform_getexepath() {
   static const char* path = _dyld_get_image_name(0);
   return path;
+}
+
+/**
+ * sysconf() is broken on OSX
+ */
+inline uint64_t platform_memsize() {
+  int mib[2];
+  int ramsize;
+  int rc;
+  size_t len;
+
+  mib[0] = CTL_HW;
+  mib[1] = HW_MEMSIZE;
+  len = sizeof(ramsize);
+  rc = sysctl(mib, 2, &ramsize, &len, NULL, 0);
+  assert(rc == 0);
+  return ramsize;
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD

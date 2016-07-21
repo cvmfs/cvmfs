@@ -154,7 +154,7 @@ FileSystem *FileSystem::Create(const FileSystem::FileSystemInfo &fs_info) {
 bool FileSystem::CreateCache() {
   string optarg;
   uint64_t nfiles;
-  int64_t ram_size;
+  uint64_t cache_bytes;
 
   cache::CacheManagerIds cache_mgr_type = cache::kPosixCacheManager;
   if (options_mgr_->GetValue("CVMFS_CACHE_PRIMARY", &optarg)) {
@@ -188,13 +188,13 @@ bool FileSystem::CreateCache() {
       nfiles = 8192;
     }
     if (options_mgr_->GetValue("CVMFS_CACHE_RAM_SIZE", &optarg)) {
-      ram_size = String2Uint64(optarg)*1024*1024;
+      cache_bytes = String2Uint64(optarg)*1024*1024;
     } else {
-      ram_size = (sysconf(_SC_PHYS_PAGES)*sysconf(_SC_PAGE_SIZE)) >> 3;
-      assert(ram_size > 0);
+      cache_bytes = platform_memsize() >> 3;
     }
+    assert(cache_bytes > 0);
     cache_mgr_ = new cache::RamCacheManager(
-      ram_size,
+      cache_bytes,
       nfiles,
       statistics_);
     break;
