@@ -32,9 +32,7 @@ static const unsigned kMaxHandles = 8192;
 class RamCacheManager : public CacheManager {
  public:
   struct Counters {
-    perf::Counter *n_addfd;
     perf::Counter *n_acquire;
-    perf::Counter *n_open;
     perf::Counter *n_getsize;
     perf::Counter *n_close;
     perf::Counter *n_pread;
@@ -48,29 +46,17 @@ class RamCacheManager : public CacheManager {
     perf::Counter *n_openfromtxn;
     perf::Counter *n_aborttxn;
     perf::Counter *n_committxn;
-    perf::Counter *n_committokvstore;
-    perf::Counter *n_reusefd;
-    perf::Counter *n_appendfd;
     perf::Counter *n_enfile;
     perf::Counter *n_openregular;
     perf::Counter *n_openvolatile;
     perf::Counter *n_openmiss;
-    perf::Counter *n_closesweep;
     perf::Counter *n_overrun;
     perf::Counter *n_full;
     perf::Counter *n_realloc;
-    perf::Counter *sz_alloc;
-    perf::Counter *sz_committed;
 
     Counters(perf::Statistics *statistics, const std::string &name) {
       n_acquire = statistics->Register(name + ".n_acquire",
         "Number of AcquireQuotaManager calls for " + name);
-      n_addfd = statistics->Register(name + ".n_addfd",
-        "Number of AddFd calls for " + name);
-      n_committokvstore = statistics->Register(name + ".n_committokvstore",
-        "Number of CommitToKvStore calls for " + name);
-      n_open = statistics->Register(name + ".n_open",
-        "Number of Open calls for " + name);
       n_getsize = statistics->Register(name + ".n_getsize",
         "Number of GetSize calls for " + name);
       n_close = statistics->Register(name + ".n_close",
@@ -97,10 +83,6 @@ class RamCacheManager : public CacheManager {
         "Number of AbortTxn calls for " + name);
       n_committxn = statistics->Register(name + ".n_committxn",
         "Number of Commit calls for " + name);
-      n_reusefd = statistics->Register(name + ".n_reusefd",
-        "Number of reused handles for " + name);
-      n_appendfd = statistics->Register(name + ".n_appendfd",
-        "Number of newly appended handles for " + name);
       n_enfile = statistics->Register(name + ".n_enfile",
         "Number of times " + name + " reached the limit on handles");
       n_openregular = statistics->Register(name + ".n_openregular",
@@ -111,16 +93,10 @@ class RamCacheManager : public CacheManager {
         "Number of missed opens for " + name);
       n_realloc = statistics->Register(name + ".n_realloc",
         "Number of reallocs for " + name);
-      n_closesweep = statistics->Register(name + ".n_closesweep",
-        "Number of times the handles vector was swept for " + name);
       n_overrun = statistics->Register(name + ".n_overrun",
         "Number of cache limit overruns for " + name);
       n_full = statistics->Register(name + ".n_full",
         "Number of overruns that could not be resolved for " + name);
-      sz_alloc = statistics->Register(name + ".sz_alloc",
-        "Number of bytes allocated for " + name);
-      sz_committed = statistics->Register(name + ".sz_committed",
-        "Number of bytes committed for " + name);
     }
   };
 

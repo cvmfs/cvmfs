@@ -23,19 +23,16 @@ namespace cache {
 
 int RamCacheManager::AddFd(const ReadOnlyFd &fd) {
   unsigned i = 0;
-  perf::Inc(counters_.n_addfd);
   for ( ; i < open_fds_.size(); ++i) {
     if (open_fds_[i].handle == kInvalidHandle) {
       open_fds_[i] = fd;
       // LogCvmfs(kLogCache, kLogDebug, "found free fd %u", i);
-      perf::Inc(counters_.n_reusefd);
       return i;
     }
   }
   if (open_fds_.size() < kMaxHandles) {
     open_fds_.push_back(fd);
     // LogCvmfs(kLogCache, kLogDebug, "adding fd %u", i);
-    perf::Inc(counters_.n_appendfd);
     return i;
   } else {
     LogCvmfs(kLogCache, kLogDebug, "too many open files (%u)", kMaxHandles);
@@ -57,7 +54,6 @@ bool RamCacheManager::AcquireQuotaManager(QuotaManager *quota_mgr) {
 
 
 int RamCacheManager::Open(const shash::Any &id) {
-  perf::Inc(counters_.n_open);
   WriteLockGuard guard(rwlock_);
   return DoOpen(id);
 }
@@ -127,7 +123,6 @@ int RamCacheManager::Close(int fd) {
   sweep_tail = (static_cast<unsigned>(fd) == (open_fds_.size() - 1));
 
   if (sweep_tail) {
-    perf::Inc(counters_.n_closesweep);
     unsigned last_good_idx = open_fds_.size() - 1;
     while (open_fds_[last_good_idx].handle != kInvalidHandle)
       last_good_idx--;
@@ -199,7 +194,6 @@ int RamCacheManager::StartTxn(const shash::Any &id, uint64_t size, void *txn) {
   transaction->size = (size == kSizeUnknown) ? kPageSize : size;
   if (transaction->size) {
     transaction->buffer = scalloc(1, transaction->size);
-    perf::Xadd(counters_.sz_alloc, transaction->size);
   }
   perf::Inc(counters_.n_starttxn);
   return 0;
@@ -353,10 +347,8 @@ int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
   }
 
   store->Commit(transaction->id, buf);
-  perf::Xadd(counters_.sz_committed, buf.size);
   LogCvmfs(kLogCache, kLogDebug, "committed %s to cache",
            transaction->id.ToString().c_str());
-  perf::Inc(counters_.n_committokvstore);
   return 0;
 }
 
