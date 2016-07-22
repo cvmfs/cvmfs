@@ -17,6 +17,10 @@ using namespace std;  // NOLINT
 
 class T_MallocArena : public ::testing::Test {
  protected:
+  // 8MB SqliteMemoryManager arena
+  static const unsigned kSmallArena = 8 * 1024 * 1024;
+  static const unsigned kBigArena = 512 * 1024 * 1024;  // 512MB RAM Cache arena
+
   virtual void SetUp() {
   }
 
@@ -34,8 +38,10 @@ class T_MallocArena : public ::testing::Test {
     return MurmurHash2(&values, sizeof(values), 0x07387a4f);
   }
 
-  uint32_t SimulateMalloc(unsigned N, unsigned S_max, unsigned T_max) {
-    MallocArena M;
+  uint32_t SimulateMalloc(
+    unsigned arena_size, unsigned N, unsigned S_max, unsigned T_max)
+  {
+    MallocArena M(arena_size);
     Prng prng;
     prng.InitLocaltime();
     // prng.InitSeed(42);
@@ -98,7 +104,7 @@ class T_MallocArena : public ::testing::Test {
 
 
 TEST_F(T_MallocArena, Basic) {
-  MallocArena M;
+  MallocArena M(kSmallArena);
 
   EXPECT_TRUE(M.IsEmpty());
 
@@ -108,7 +114,7 @@ TEST_F(T_MallocArena, Basic) {
   } while (ptrs.back() != NULL);
   // More than 90% utiliziation
   unsigned num = ptrs.size();
-  EXPECT_GE(num, (M.kArenaSize / 8192) * 90 / 100);
+  EXPECT_GE(num, (kSmallArena / 8192) * 90 / 100);
   EXPECT_FALSE(M.IsEmpty());
 
   // Free and again
@@ -126,20 +132,30 @@ TEST_F(T_MallocArena, Basic) {
 
 
 TEST_F(T_MallocArena, MonteCarlo) {
-  SimulateMalloc(10000, 200, 100);
-  SimulateMalloc(10000, 2000, 1000);
-  SimulateMalloc(10000, 20000, 10000);
-  SimulateMalloc(10000, 200000, 1000);
-  SimulateMalloc(10000, 2000, 10000);
-  SimulateMalloc(10000, 4000, 20000);
+  SimulateMalloc(kSmallArena, 10000, 12800, 100);
+  SimulateMalloc(kSmallArena, 10000, 128000, 1000);
+  SimulateMalloc(kSmallArena, 10000, 1280000, 10000);
+  SimulateMalloc(kSmallArena, 10000, 12800000, 1000);
+  SimulateMalloc(kSmallArena, 10000, 128000, 10000);
+  SimulateMalloc(kSmallArena, 10000, 256000, 20000);
+}
+
+
+TEST_F(T_MallocArena, MCBigArena) {
+  SimulateMalloc(kBigArena, 10000, 200, 100);
+  SimulateMalloc(kBigArena, 10000, 2000, 1000);
+  SimulateMalloc(kBigArena, 10000, 20000, 10000);
+  SimulateMalloc(kBigArena, 10000, 200000, 1000);
+  SimulateMalloc(kBigArena, 10000, 2000, 10000);
+  SimulateMalloc(kBigArena, 10000, 4000, 20000);
 }
 
 
 TEST_F(T_MallocArena, MonteCarloSlow) {
-  SimulateMalloc(1000000, 200, 100);
-  SimulateMalloc(1000000, 2000, 1000);
-  SimulateMalloc(1000000, 20000, 10000);
-  SimulateMalloc(1000000, 200000, 1000);
-  SimulateMalloc(1000000, 2000, 10000);
-  SimulateMalloc(1000000, 4000, 20000);
+  SimulateMalloc(kSmallArena, 1000000, 200, 100);
+  SimulateMalloc(kSmallArena, 1000000, 2000, 1000);
+  SimulateMalloc(kSmallArena, 1000000, 20000, 10000);
+  SimulateMalloc(kSmallArena, 1000000, 200000, 1000);
+  SimulateMalloc(kSmallArena, 1000000, 2000, 10000);
+  SimulateMalloc(kSmallArena, 1000000, 4000, 20000);
 }

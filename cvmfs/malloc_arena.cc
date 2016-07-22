@@ -158,15 +158,19 @@ void *MallocArena::Malloc(const uint32_t size) {
  * followed by a free block spanning the arena until the end tag.  The end tag
  * is a single negative int, which mimics another reserved block.
  */
-MallocArena::MallocArena()
-  : arena_(reinterpret_cast<char *>(sxmmap_align(kArenaSize)))
+MallocArena::MallocArena(unsigned arena_size)
+  : arena_(reinterpret_cast<char *>(sxmmap_align(arena_size)))
   , head_avail_(reinterpret_cast<AvailBlockCtl *>(arena_ + sizeof(uint64_t)))
   , rover_(head_avail_)
   , no_reserved_(0)
+  , arena_size_(arena_size)
 {
+  assert(arena_size_ > 0);
+  assert((arena_size_ % (2*1024*1024)) == 0);  // Multiple of 2MB
+
   const unsigned char padding = 7;
   // Size of the initial free block: everything minus arena boundaries
-  int32_t usable_size = kArenaSize -
+  int32_t usable_size = arena_size_ -
     (sizeof(uint64_t) + sizeof(AvailBlockCtl) + padding + 1 + sizeof(int32_t));
   assert((usable_size % 8) == 0);
 
@@ -190,7 +194,7 @@ MallocArena::MallocArena()
   // Prevent succeeding blocks from merging
   *(reinterpret_cast<char *>(free_block) - 1) = kTagReserved;
   // Final tag: reserved block marker
-  *reinterpret_cast<int32_t *>(arena_ + kArenaSize - sizeof(int32_t)) = -1;
+  *reinterpret_cast<int32_t *>(arena_ + arena_size_ - sizeof(int32_t)) = -1;
 }
 
 
@@ -198,8 +202,11 @@ MallocArena::MallocArena()
  * Initializes the arena with repeated copies of the given pattern.  Used for
  * testing.
  */
-MallocArena *MallocArena::CreateInitialized(unsigned char pattern) {
-  MallocArena *result = new MallocArena();
+MallocArena *MallocArena::CreateInitialized(
+  unsigned arena_size,
+  unsigned char pattern)
+{
+  MallocArena *result = new MallocArena(arena_size);
   // At this point, there is one big free block linked to by head_avail_
   AvailBlockCtl *free_block = result->head_avail_->GetNextPtr(result->arena_);
   assert(free_block != result->head_avail_);
@@ -214,7 +221,7 @@ MallocArena *MallocArena::CreateInitialized(unsigned char pattern) {
 
 
 MallocArena::~MallocArena() {
-  sxunmap(arena_, kArenaSize);
+  sxunmap(arena_, arena_size_);
 }
 
 

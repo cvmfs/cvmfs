@@ -118,7 +118,7 @@ TEST_F(T_Sqlitemem, Malloc) {
   EXPECT_EQ(1U, mem_mgr_->malloc_arenas_.size());
   void *p[4];
   for (unsigned i = 0; i < 4; ++i) {
-    p[i] = mem_mgr_->GetMemory(MallocArena::kArenaSize / 4);
+    p[i] = mem_mgr_->GetMemory(SqliteMemoryManager::kArenaSize / 4);
   }
   EXPECT_EQ(2U, mem_mgr_->malloc_arenas_.size());
   mem_mgr_->PutMemory(p[3]);
@@ -139,7 +139,8 @@ TEST_F(T_Sqlitemem, Realloc) {
 
   // Switch default memory arena against initialized one
   delete mem_mgr_->malloc_arenas_[0];
-  mem_mgr_->malloc_arenas_[0] = MallocArena::CreateInitialized(pattern_one);
+  mem_mgr_->malloc_arenas_[0] = MallocArena::CreateInitialized(
+    SqliteMemoryManager::kArenaSize, pattern_one);
 
   // Allocate 2 times 1kB from the end of the arena and set both areas to zero
   void *p1 = mem_mgr_->GetMemory(1024);

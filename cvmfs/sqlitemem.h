@@ -146,6 +146,13 @@ class SqliteMemoryManager {
   void ReleaseLookasideBuffer(void *buffer);
 
  private:
+  /**
+   * Should be larger than 10 times the largest allocation, which for reading
+   * sqlite file catalogs is 64kB.  An arena size of 8MB limits the total
+   * number of arenas (mapped blocks) to <40, given typical storage needs for
+   * 10,000 open catalogs.  Has to be a power of 2MB (see MallocArena).
+   */
+  static const unsigned kArenaSize = 8 * 1024 * 1024;
   static SqliteMemoryManager *instance_;
 
   /**

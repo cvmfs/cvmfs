@@ -198,7 +198,7 @@ void *SqliteMemoryManager::GetLookasideBuffer() {
 
 
 int SqliteMemoryManager::GetMemorySize(void *ptr) {
-  return MallocArena::GetMallocArena(ptr)->GetSize(ptr);
+  return MallocArena::GetMallocArena(ptr, kArenaSize)->GetSize(ptr);
 }
 
 
@@ -218,7 +218,7 @@ void *SqliteMemoryManager::GetMemory(int size) {
     }
   }
   idx_last_arena_ = N;
-  MallocArena *M = new MallocArena();
+  MallocArena *M = new MallocArena(kArenaSize);
   malloc_arenas_.push_back(M);
   p = M->Malloc(size);
   assert(p != NULL);
@@ -237,7 +237,7 @@ SqliteMemoryManager::SqliteMemoryManager()
   assert(retval == 0);
 
   lookaside_buffer_arenas_.push_back(new LookasideBufferArena());
-  malloc_arenas_.push_back(new MallocArena());
+  malloc_arenas_.push_back(new MallocArena(kArenaSize));
 
   memset(&mem_methods_, 0, sizeof(mem_methods_));
   mem_methods_.xMalloc = xMalloc;
@@ -301,7 +301,7 @@ void SqliteMemoryManager::PutLookasideBuffer(void *buffer) {
  * Closes empty areas.
  */
 void SqliteMemoryManager::PutMemory(void *ptr) {
-  MallocArena *M = MallocArena::GetMallocArena(ptr);
+  MallocArena *M = MallocArena::GetMallocArena(ptr, kArenaSize);
   M->Free(ptr);
   unsigned N = malloc_arenas_.size();
   if ((N > 1) && M->IsEmpty()) {

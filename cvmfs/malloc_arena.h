@@ -55,18 +55,12 @@
  * lower | this [+ pad@32] |                       lower |int(-1) |outside#
  *       +--------+--------+                             +--------+########
  *        B0             B7                               B0    B4
+ *
+ * The arena size has to be a power of 2MB.  It also has to be a multiple of 8
+ * for alignment reasons.
  */
 class MallocArena {
  public:
-  /**
-   * Should be larger than 10 times the largest allocation, which for reading
-   * sqlite file catalogs is 64kB.  An arena size of 8MB limits the total
-   * number of arenas (mapped blocks) to <40, given typical storage needs for
-   * 10,000 open catalogs.
-   * Has to be a power of 2MB.  (Has to be a multiple of 8 for alignment.)
-   */
-  static const unsigned kArenaSize = 8 * 1024 * 1024;
-
   /**
    * Avoid very small free blocks.  This must be a larger than
    * sizeof(AvailBlockCtl) + sizeof(AvailBlockTag) and a multiple of 8.
@@ -76,20 +70,21 @@ class MallocArena {
   /**
    * Returns the MallocArena that houses the destination of ptr.
    */
-  static inline MallocArena *GetMallocArena(void *ptr) {
+  static inline MallocArena *GetMallocArena(void *ptr, unsigned arena_size) {
     void *arena = reinterpret_cast<void *>(
-      uintptr_t(ptr) & ~(uintptr_t(kArenaSize) - uintptr_t(1)));
+      uintptr_t(ptr) & ~(uintptr_t(arena_size) - uintptr_t(1)));
     return *reinterpret_cast<MallocArena **>(arena);
   }
 
-  MallocArena();
-  static MallocArena *CreateInitialized(unsigned char pattern);
+  explicit MallocArena(unsigned arena_size);
+  static MallocArena *CreateInitialized(unsigned arena_size,
+                                        unsigned char pattern);
   ~MallocArena();
 
   void *Malloc(const uint32_t size);
   void Free(void *ptr);
   inline bool Contains(void *ptr) const {
-    return GetMallocArena(ptr) == this;
+    return GetMallocArena(ptr, arena_size_) == this;
   }
   uint32_t GetSize(void *ptr) const;
   bool IsEmpty() const { return no_reserved_ == 0; }
@@ -167,7 +162,7 @@ class MallocArena {
   /**
    * Starts with the address of the MallocArena object followed by a
    * head_avail_ block and ends with a -1 guard integer to mimic a reserved
-   * end block.  The arena is aligned at a multiple of kArenaSize.  Therefore,
+   * end block.  The arena is aligned at a multiple of arena_size.  Therefore,
    * a pointer pointing into it can get the corresponding MallocArena object
    * in O(1).
    */
@@ -181,6 +176,7 @@ class MallocArena {
   AvailBlockCtl *head_avail_;
   AvailBlockCtl *rover_;  ///< The free block where the next search starts.
   uint32_t no_reserved_;
+  unsigned arena_size_;
 };  // class MallocArena
 
 #endif  // CVMFS_MALLOC_ARENA_H_
