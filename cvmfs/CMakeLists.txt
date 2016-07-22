@@ -63,6 +63,7 @@ set (CVMFS_CLIENT_SOURCES
   loader.h
   logging.cc logging.h logging_internal.h
   lru.h
+  malloc_arena.cc malloc_arena.h
   manifest.cc manifest.h
   manifest_fetch.cc manifest_fetch.h
   monitor.cc monitor.h
@@ -186,6 +187,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   json_document.cc json_document.h
   letter.cc letter.h
   logging.cc logging.h logging_internal.h
+  malloc_arena.cc malloc_arena.h
   manifest.cc manifest.h
   manifest_fetch.cc manifest_fetch.h
   object_fetcher.h
@@ -281,6 +283,7 @@ set (CVMFS_PRELOADER_SOURCES
   history_sql.cc history_sql.h
   history_sqlite.cc history_sqlite.h
   logging.cc logging.h logging_internal.h
+  malloc_arena.cc malloc_arena.h
   manifest.cc manifest.h
   manifest_fetch.cc manifest_fetch.h
   options.cc options.h

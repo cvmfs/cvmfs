@@ -55,6 +55,7 @@ set(CVMFS_UNITTEST_FILES
   t_libcvmfs.cc
   t_lru.cc
   t_macaroon.cc
+  t_malloc_arena.cc
   t_manifest.cc
   t_mountpoint.cc
   t_object_fetcher.cc
@@ -149,6 +150,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/libcvmfs_legacy.cc
   ${CVMFS_SOURCE_DIR}/libcvmfs_options.cc
   ${CVMFS_SOURCE_DIR}/logging.cc ${CVMFS_SOURCE_DIR}/logging.h ${CVMFS_SOURCE_DIR}/logging_internal.h
+  ${CVMFS_SOURCE_DIR}/malloc_arena.cc ${CVMFS_SOURCE_DIR}/malloc_arena.h
   ${CVMFS_SOURCE_DIR}/manifest.cc ${CVMFS_SOURCE_DIR}/manifest.h
   ${CVMFS_SOURCE_DIR}/manifest_fetch.cc ${CVMFS_SOURCE_DIR}/manifest_fetch.h
   ${CVMFS_SOURCE_DIR}/monitor.cc ${CVMFS_SOURCE_DIR}/monitor.h
