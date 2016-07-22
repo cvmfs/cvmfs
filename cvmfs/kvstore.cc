@@ -32,8 +32,11 @@ bool MemoryKvStore::PopBuffer(const shash::Any &id, MemoryBuffer *buf) {
              id.ToString().c_str() );
     return false;
   }
+  assert(used_bytes_ >= (*buf).size);
   used_bytes_ -= (*buf).size;
   counters_.sz_size->Set(used_bytes_);
+  assert(entry_count_ > 0);
+  --entry_count_;
   entries_.Forget(id);
   // LogCvmfs(kLogKvStore, kLogDebug, "popped %s (%uB)", id.ToString().c_str(),
   //          (*buf).size);
@@ -136,7 +139,6 @@ bool MemoryKvStore::Commit(
   const shash::Any &id,
   const kvstore::MemoryBuffer &buf
 ) {
-  bool overwrote = false;
   MemoryBuffer mem;
   perf::Inc(counters_.n_commit);
   WriteLockGuard guard(rwlock_);
@@ -146,18 +148,23 @@ bool MemoryKvStore::Commit(
     used_bytes_ -= mem.size;
     perf::Xadd(counters_.sz_deleted, mem.size);
     counters_.sz_size->Set(used_bytes_);
-    overwrote = true;
   } else {
+    if (entry_count_ == max_entries_) {
+      LogCvmfs(kLogKvStore, kLogDebug, "too many entries in kvstore");
+      return false;
+    }
     mem.refcount = buf.refcount;
   }
   mem.address = buf.address;
   mem.size = buf.size;
   mem.object_type = buf.object_type;
   entries_.Insert(id, mem);
+  ++entry_count_;
+  assert(SSIZE_MAX - mem.size > used_bytes_);
   used_bytes_ += mem.size;
   counters_.sz_size->Set(used_bytes_);
   perf::Xadd(counters_.sz_committed, mem.size);
-  return overwrote;
+  return true;
 }
 
 bool MemoryKvStore::Delete(const shash::Any &id) {
@@ -174,6 +181,8 @@ bool MemoryKvStore::DoDelete(const shash::Any &id) {
                id.ToString().c_str());
       return false;
     }
+    assert(entry_count_ > 0);
+    --entry_count_;
     used_bytes_ -= buf.size;
     counters_.sz_size->Set(used_bytes_);
     perf::Xadd(counters_.sz_deleted, buf.size);
@@ -206,6 +215,8 @@ bool MemoryKvStore::ShrinkTo(size_t size) {
                key.ToString().c_str());
       continue;
     }
+    assert(entry_count_ > 0);
+    --entry_count_;
     entries_.FilterDelete();
     used_bytes_ -= buf.size;
     perf::Xadd(counters_.sz_shrunk, buf.size);

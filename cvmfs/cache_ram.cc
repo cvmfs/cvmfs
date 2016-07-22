@@ -346,10 +346,16 @@ int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
     return -ENOSPC;
   }
 
-  store->Commit(transaction->id, buf);
-  LogCvmfs(kLogCache, kLogDebug, "committed %s to cache",
-           transaction->id.ToString().c_str());
-  return 0;
+  if (store->Commit(transaction->id, buf)) {
+    LogCvmfs(kLogCache, kLogDebug, "committed %s to cache",
+             transaction->id.ToString().c_str());
+    return 0;
+  } else {
+    LogCvmfs(kLogCache, kLogDebug,
+             "commit on %s failed, kvstore has too many entries",
+             transaction->id.ToString().c_str());
+    return -ENFILE;
+  }
 }
 
 }  // namespace cache

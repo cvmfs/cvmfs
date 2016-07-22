@@ -96,6 +96,8 @@ class MemoryKvStore :SingleCopy {
     const string &name,
     perf::Statistics *statistics)
     : used_bytes_(0)
+    , entry_count_(0)
+    , max_entries_(cache_entries)
     , entries_(cache_entries, shash::Any(), lru::hasher_any,
         statistics, name)
     , counters_(statistics, name + ".lru") {
@@ -195,6 +197,8 @@ class MemoryKvStore :SingleCopy {
 
  private:
   size_t used_bytes_;
+  unsigned int entry_count_;
+  unsigned int max_entries_;
   lru::LruCache<shash::Any, MemoryBuffer> entries_;
   pthread_rwlock_t rwlock_;
   bool DoDelete(const shash::Any &id);
