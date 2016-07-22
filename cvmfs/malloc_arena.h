@@ -11,6 +11,10 @@
 #include <cassert>
 #include <new>
 
+// TODO(jblomer): the arena size could be a template parameter.  In order to
+// reduce code duplication, all functions not requiring the arena size could be
+// moved to a base class.
+
 /**
  * An mmap'd block of general purpose memory for malloc/free in sqlite.  Uses
  * the "boundary-tag system" as described in TAOCP vol 1 section 2.5.
