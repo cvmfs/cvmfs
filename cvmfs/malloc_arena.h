@@ -57,7 +57,7 @@
  *        B0             B7                               B0    B4
  *
  * The arena size has to be a power of 2MB.  It also has to be a multiple of 8
- * for alignment reasons.
+ * for alignment reasons.  It needs to be <= 512MB.
  */
 class MallocArena {
  public:

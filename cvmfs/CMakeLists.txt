@@ -283,6 +283,7 @@ set (CVMFS_PRELOADER_SOURCES
   history_sql.cc history_sql.h
   history_sqlite.cc history_sqlite.h
   logging.cc logging.h logging_internal.h
+  malloc_arena.cc malloc_arena.h
   manifest.cc manifest.h
   manifest_fetch.cc manifest_fetch.h
   options.cc options.h

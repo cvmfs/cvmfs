@@ -166,7 +166,8 @@ MallocArena::MallocArena(unsigned arena_size)
   , arena_size_(arena_size)
 {
   assert(arena_size_ > 0);
-  assert((arena_size_ % (2*1024*1024)) == 0);  // Multiple of 2MB
+  assert((arena_size_ % (2 * 1024 * 1024)) == 0);  // Multiple of 2MB
+  assert(arena_size_ <= (512 * 1024 * 1024));  // <= 512MB
 
   const unsigned char padding = 7;
   // Size of the initial free block: everything minus arena boundaries
