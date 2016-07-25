@@ -46,18 +46,14 @@ static const unsigned kMaxHandles = 8192;
 class RamCacheManager : public CacheManager {
  public:
   struct Counters {
-    perf::Counter *n_acquire;
     perf::Counter *n_getsize;
     perf::Counter *n_close;
     perf::Counter *n_pread;
     perf::Counter *n_dup;
     perf::Counter *n_readahead;
-    perf::Counter *n_sizeoftxn;
     perf::Counter *n_starttxn;
-    perf::Counter *n_ctrltxn;
     perf::Counter *n_write;
     perf::Counter *n_reset;
-    perf::Counter *n_openfromtxn;
     perf::Counter *n_aborttxn;
     perf::Counter *n_committxn;
     perf::Counter *n_enfile;
@@ -69,8 +65,6 @@ class RamCacheManager : public CacheManager {
     perf::Counter *n_realloc;
 
     Counters(perf::Statistics *statistics, const std::string &name) {
-      n_acquire = statistics->Register(name + ".n_acquire",
-        "Number of AcquireQuotaManager calls for " + name);
       n_getsize = statistics->Register(name + ".n_getsize",
         "Number of GetSize calls for " + name);
       n_close = statistics->Register(name + ".n_close",
@@ -81,18 +75,12 @@ class RamCacheManager : public CacheManager {
         "Number of Dup calls for " + name);
       n_readahead = statistics->Register(name + ".n_readahead",
         "Number of ReadAhead calls for " + name);
-      n_sizeoftxn = statistics->Register(name + ".n_sizeoftxn",
-        "Number of SizeOfTxn calls for " + name);
       n_starttxn = statistics->Register(name + ".n_starttxn",
         "Number of StartTxn calls for " + name);
-      n_ctrltxn = statistics->Register(name + ".n_ctrltxn",
-        "Number of CtrlTxn calls for " + name);
       n_write = statistics->Register(name + ".n_write",
         "Number of Write calls for " + name);
       n_reset = statistics->Register(name + ".n_reset",
         "Number of Reset calls for " + name);
-      n_openfromtxn = statistics->Register(name + ".n_openfromtxn",
-        "Number of OpenFromTxn calls for " + name);
       n_aborttxn = statistics->Register(name + ".n_aborttxn",
         "Number of AbortTxn calls for " + name);
       n_committxn = statistics->Register(name + ".n_committxn",

@@ -42,7 +42,6 @@ int RamCacheManager::AddFd(const ReadOnlyFd &fd) {
 }
 
 bool RamCacheManager::AcquireQuotaManager(QuotaManager *quota_mgr) {
-  perf::Inc(counters_.n_acquire);
   if (quota_mgr == NULL) {
     LogCvmfs(kLogCache, kLogDebug, "null quota manager");
     return false;
@@ -211,7 +210,6 @@ void RamCacheManager::CtrlTxn(
   transaction->object_type = type;
   LogCvmfs(kLogCache, kLogDebug, "modified transaction %s",
            transaction->id.ToString().c_str());
-  perf::Inc(counters_.n_ctrltxn);
 }
 
 
@@ -271,7 +269,7 @@ int RamCacheManager::OpenFromTxn(void *txn) {
   }
   LogCvmfs(kLogCache, kLogDebug, "open pending transaction for %s",
            transaction->id.ToString().c_str());
-  perf::Inc(counters_.n_openfromtxn);
+  perf::Inc(counters_.n_committxn);
   return DoOpen(transaction->id);
 }
 
