@@ -239,8 +239,8 @@ int64_t RamCacheManager::Write(const void *buf, uint64_t size, void *txn) {
 
 
   uint64_t copy_size = min(size, transaction->size - transaction->pos);
-  LogCvmfs(kLogCache, kLogDebug, "copy %u bytes of transaction %s",
-           copy_size, transaction->id.ToString().c_str());
+  // LogCvmfs(kLogCache, kLogDebug, "copy %u bytes of transaction %s",
+  //          copy_size, transaction->id.ToString().c_str());
   memcpy(static_cast<char *>(transaction->buffer) + transaction->pos,
          buf, copy_size);
   transaction->pos += copy_size;

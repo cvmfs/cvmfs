@@ -36,9 +36,12 @@ static const unsigned kMaxHandles = 8192;
  *
  * To use this cache backend, set @p CVMFS_CACHE_PRIMARY=ram. There
  * are not many knobs to configure; at present only the size to be
- * used for cached objects. @p CVMFS_CACHE_RAM_MB sets the cache size
- * as an absolute value, while @p CVMFS_CACHE_RAM_PERCENT sets the
- * size as a percentage of the host memory size.
+ * used for cached objects. @p CVMFS_CACHE_RAM_SIZE sets the amount
+ * of memory to use (in MB) for caching objects. If the size ends
+ * with a percent sign, the cache size will be set to that
+ * percentage of the system memory. If no size is specified, the
+ * RAM cache size defaults to ~3% of the system memory.
+ * The minimum cache size is 200 MB.
  */
 class RamCacheManager : public CacheManager {
  public:
