@@ -112,14 +112,16 @@ class MemoryKvStore :SingleCopy {
   /**
    * Get the size in bytes of the entry at id
    * @param id The hash key
-   * @returns A size, or -ENOENT if the entry is absent
+   * @returns The entry's size
+   * @retval -ENOENT The entry is absent
    */
   int64_t GetSize(const shash::Any &id);
 
   /**
    * Get the number of references to the entry at id
    * @param id The hash key
-   * @returns A reference count, or -ENOENT if the entry is absent
+   * @returns A reference count
+   * @retval -ENOENT The entry is absent
    */
   int64_t GetRefcount(const shash::Any &id);
 
@@ -143,7 +145,8 @@ class MemoryKvStore :SingleCopy {
    * @param buf The address at which to write the data
    * @param size The number of bytes to copy
    * @param offset The offset within the entry to start the copy
-   * @returns The number of bytes copied, or -ENOENT if the entry is absent
+   * @returns The number of bytes copied
+   * @retval -ENOENT The entry is absent
    */
   int64_t Read(
     const shash::Any &id,

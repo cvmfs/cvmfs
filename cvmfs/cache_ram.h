@@ -126,15 +126,17 @@ class RamCacheManager : public CacheManager {
    * Open a new file descriptor into the cache. Note that opening entries effectively pins them in the cache,
    * so it may be necessary to close unneeded file descriptors to allow eviction to make room in the cache
    * @param id The hash key
-   * @returns The smallest free integer file descriptor, or -ENOENT if the entry
-   * is not in the cache, or -ENFILE if no handles are available
+   * @returns A nonnegative integer file descriptor
+   * @retval -ENOENT The entry is not in the cache
+   * @retval -ENFILE No handles are available
    */
   virtual int Open(const shash::Any &id);
 
   /**
    * Look up the size in bytes of the open cache entry
    * @param id The hash key
-   * @returns The size of the entry, or -EBADF if fd is not valid
+   * @returns The size of the entry
+   * @retval -EBADF @p fd is not valid
    */
   virtual int64_t GetSize(int fd);
 
@@ -142,14 +144,15 @@ class RamCacheManager : public CacheManager {
    * Close the descriptor in the cache. Entries not marked as pinned will become subject to
    * eviction once closed
    * @param id The hash key
-   * @returns -EBADF if fd is not valid
+   * @retval -EBADF @p fd is not valid
    */
   virtual int Close(int fd);
 
   /**
    * Read a section from the cache entry. See pread(3) for a discussion of the arguments
    * @param id The hash key
-   * @returns The number of bytes copied, or -EBADF if fd is not valid
+   * @returns The number of bytes copied
+   * @retval -EBADF @p fd is not valid
    */
   virtual int64_t Pread(int fd, void *buf, uint64_t size, uint64_t offset);
 
@@ -157,14 +160,16 @@ class RamCacheManager : public CacheManager {
    * Duplicates the open file descriptor, allowing the original and the new one to be
    * used independently
    * @param id The hash key
-   * @returns A new fd, -EBADF if fd is not valid, or -ENFILE if no handles are available
+   * @returns A new, nonnegative integer fd
+   * @retval -EBADF @p fd is not valid
+   * @retval -ENFILE No handles are available
    */
   virtual int Dup(int fd);
 
   /**
    * No effect for in-memory caches
    * @param id The hash key
-   * @returns -EBADF if fd is not valid
+   * @retval -EBADF @p fd is not valid
    */
   virtual int Readahead(int fd);
 
@@ -219,13 +224,14 @@ class RamCacheManager : public CacheManager {
    */
   virtual int AbortTxn(void *txn);
 
-   /**
+  /**
    * Commit a transaction to the cache. If there is not enough free space in the cache, first try to make room by evicting
    * volatile entries. If there is still not enough room, try evicting regular entries. If there is *still* not enough
    * space, give up an return failure.
    * @param txn A pointer to space allocated for storing the transaction details
-   * @returns -ENOSPC if the transaction would exceed the size of the cache, -ENFILE if no handles are available,
-   * or -EEXIST if an entry with nonzero reference count already exists
+   * @retval -ENOSPC The transaction would exceed the size of the cache
+   * @retval -ENFILE No handles are available
+   * @retval -EEXIST An entry with nonzero reference count already exists
    */
   virtual int CommitTxn(void *txn);
 
