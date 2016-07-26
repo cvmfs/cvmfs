@@ -244,7 +244,7 @@ class RamCacheManager : public CacheManager {
       , store(NULL) { }
     shash::Any handle;
     uint64_t pos;
-    kvstore::MemoryKvStore *store;
+    MemoryKvStore *store;
   };
 
   struct Transaction {
@@ -276,8 +276,8 @@ class RamCacheManager : public CacheManager {
   uint64_t max_size_;
   std::vector<ReadOnlyFd> open_fds_;
   pthread_rwlock_t rwlock_;
-  kvstore::MemoryKvStore regular_entries_;
-  kvstore::MemoryKvStore volatile_entries_;
+  MemoryKvStore regular_entries_;
+  MemoryKvStore volatile_entries_;
   Counters counters_;
 };  // class RamCacheManager
 

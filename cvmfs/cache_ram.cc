@@ -56,7 +56,7 @@ int RamCacheManager::Open(const shash::Any &id) {
 
 int RamCacheManager::DoOpen(const shash::Any &id) {
   bool rc;
-  kvstore::MemoryBuffer buf;
+  MemoryBuffer buf;
   int fd = AddFd(ReadOnlyFd(id, 0));
   if (fd < 0) {
     LogCvmfs(kLogCache, kLogDebug, "error while opening %s: %s",
@@ -290,9 +290,9 @@ int RamCacheManager::CommitTxn(void *txn) {
 
 
 int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
-  kvstore::MemoryBuffer buf;
+  MemoryBuffer buf;
   buf.address = transaction->buffer;
-  kvstore::MemoryKvStore *store;
+  MemoryKvStore *store;
   if (transaction->expected_size == kSizeUnknown) {
     buf.size = transaction->pos;
     buf.address = realloc(buf.address, buf.size);

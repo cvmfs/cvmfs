@@ -39,8 +39,8 @@ class T_MemoryKvStore : public ::testing::Test {
   virtual void TearDown() {}
 
   perf::Statistics statistics_;
-  kvstore::MemoryKvStore store_;
-  kvstore::MemoryBuffer buf_;
+  MemoryKvStore store_;
+  MemoryBuffer buf_;
   shash::Md5 m1_;
   shash::Any a1_;
   shash::Md5 m2_;
@@ -62,7 +62,7 @@ TEST_F(T_MemoryKvStore, PopBuffer) {
   EXPECT_TRUE(store_.Commit(a1_, buf_));
   EXPECT_EQ(malloc_size, store_.GetUsed());
   memset(buf_.address, 42, malloc_size);
-  kvstore::MemoryBuffer out;
+  MemoryBuffer out;
   EXPECT_FALSE(store_.PopBuffer(shash::Any(), &out));
   EXPECT_TRUE(store_.PopBuffer(a1_, &out));
   EXPECT_EQ(out.address, buf_.address);

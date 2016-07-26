@@ -16,8 +16,6 @@
 
 using namespace std;  // NOLINT
 
-namespace kvstore {
-
 struct MemoryBuffer {
   void *address;
   size_t size;
@@ -161,7 +159,7 @@ class MemoryKvStore :SingleCopy {
    * @param buf The memory buffer to insert
    * @returns True iff the commit succeeds
    */
-  bool Commit(const shash::Any &id, const kvstore::MemoryBuffer &buf);
+  bool Commit(const shash::Any &id, const MemoryBuffer &buf);
 
   /**
    * Delete an entry, free()ing its memory. Note that the entry not have any references
@@ -207,5 +205,5 @@ class MemoryKvStore :SingleCopy {
   bool DoDelete(const shash::Any &id);
   Counters counters_;
 };
-}  // namespace kvstore
+
 #endif  // CVMFS_KVSTORE_H_

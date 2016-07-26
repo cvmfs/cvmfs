@@ -16,8 +16,6 @@
 
 using namespace std;  // NOLINT
 
-namespace kvstore {
-
 bool MemoryKvStore::GetBuffer(const shash::Any &id, MemoryBuffer *buf) {
   perf::Inc(counters_.n_getbuffer);
   // LogCvmfs(kLogKvStore, kLogDebug, "get buffer %s", id.ToString().c_str());
@@ -137,7 +135,7 @@ int64_t MemoryKvStore::Read(
 
 bool MemoryKvStore::Commit(
   const shash::Any &id,
-  const kvstore::MemoryBuffer &buf
+  const MemoryBuffer &buf
 ) {
   MemoryBuffer mem;
   perf::Inc(counters_.n_commit);
@@ -229,5 +227,3 @@ bool MemoryKvStore::ShrinkTo(size_t size) {
   LogCvmfs(kLogKvStore, kLogDebug, "shrunk to %u B", used_bytes_);
   return used_bytes_ <= size;
 }
-
-}  // namespace kvstore
