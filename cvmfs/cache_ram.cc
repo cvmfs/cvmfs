@@ -42,10 +42,7 @@ int RamCacheManager::AddFd(const ReadOnlyFd &fd) {
 }
 
 bool RamCacheManager::AcquireQuotaManager(QuotaManager *quota_mgr) {
-  if (quota_mgr == NULL) {
-    LogCvmfs(kLogCache, kLogDebug, "null quota manager");
-    return false;
-  }
+  assert(quota_mgr != NULL);
   quota_mgr_ = quota_mgr;
   LogCvmfs(kLogCache, kLogDebug, "set quota manager");
   return true;
@@ -123,7 +120,8 @@ int RamCacheManager::Close(int fd) {
 
   if (sweep_tail) {
     unsigned last_good_idx = open_fds_.size() - 1;
-    while (open_fds_[last_good_idx].handle != kInvalidHandle)
+    while (last_good_idx > 0 &&
+           open_fds_[last_good_idx].handle == kInvalidHandle)
       last_good_idx--;
     open_fds_.resize(last_good_idx + 1);
     LogCvmfs(kLogCache, kLogDebug, "resized fd vector to %u",
@@ -153,18 +151,21 @@ int64_t RamCacheManager::Pread(
 
 
 int RamCacheManager::Dup(int fd) {
-  bool rc;
+  bool ok;
+  int rc;
   WriteLockGuard guard(rwlock_);
   if (!IsValid(fd)) {
     LogCvmfs(kLogCache, kLogDebug, "bad fd %d on Dup", fd);
     return -EBADF;
   }
   assert(open_fds_[fd].store);
-  rc = open_fds_[fd].store->IncRef(open_fds_[fd].handle);
-  assert(rc);
+  rc = AddFd(open_fds_[fd]);
+  if (rc < 0) return rc;
+  ok = open_fds_[fd].store->IncRef(open_fds_[fd].handle);
+  assert(ok);
   LogCvmfs(kLogCache, kLogDebug, "dup fd %d", fd);
   perf::Inc(counters_.n_dup);
-  return AddFd(open_fds_[fd]);
+  return rc;
 }
 
 
@@ -192,7 +193,7 @@ int RamCacheManager::StartTxn(const shash::Any &id, uint64_t size, void *txn) {
   transaction->expected_size = size;
   transaction->size = (size == kSizeUnknown) ? kPageSize : size;
   if (transaction->size) {
-    transaction->buffer = scalloc(1, transaction->size);
+    transaction->buffer = smalloc(transaction->size);
   }
   perf::Inc(counters_.n_starttxn);
   return 0;
@@ -222,28 +223,23 @@ int64_t RamCacheManager::Write(const void *buf, uint64_t size, void *txn) {
       transaction->size = max(2*transaction->size, size + transaction->pos);
       LogCvmfs(kLogCache, kLogDebug, "reallocate transaction for %s to %u B",
                transaction->id.ToString().c_str(), transaction->size);
-      transaction->buffer = realloc(transaction->buffer, transaction->size);
-      if (!transaction->buffer) {
-        LogCvmfs(kLogCache, kLogDebug, "realloc failed: %s", strerror(errno));
-        return -errno;
-      }
+      transaction->buffer = srealloc(transaction->buffer, transaction->size);
     } else {
       LogCvmfs(kLogCache, kLogDebug,
                "attempted to write more than requested (%u>%u)",
                size, transaction->size);
-      return -ENOSPC;
+      return -EIO;
     }
   }
 
 
-  uint64_t copy_size = min(size, transaction->size - transaction->pos);
   // LogCvmfs(kLogCache, kLogDebug, "copy %u bytes of transaction %s",
-  //          copy_size, transaction->id.ToString().c_str());
+  //          size, transaction->id.ToString().c_str());
   memcpy(static_cast<char *>(transaction->buffer) + transaction->pos,
-         buf, copy_size);
-  transaction->pos += copy_size;
+         buf, size);
+  transaction->pos += size;
   perf::Inc(counters_.n_write);
-  return copy_size;
+  return size;
 }
 
 
@@ -300,6 +296,14 @@ int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
   if (transaction->expected_size == kSizeUnknown) {
     buf.size = transaction->pos;
     buf.address = realloc(buf.address, buf.size);
+    if (buf.size == 0) {
+      // realloc() to size 0 is equivalent to free(), so we should put
+      // something here that's always safe to free(). malloc(0) "returns
+      // either NULL, or a unique pointer value that can later be
+      // successfully passed to free()" so callers mustn't attempt to
+      // dereference the address of a buffer of size 0.
+      buf.address = malloc(0);
+    }
     LogCvmfs(kLogCache, kLogDebug, "reallocating transaction on %s to %u B",
              transaction->id.ToString().c_str(), buf.size);
     if (!buf.address) {
@@ -328,6 +332,8 @@ int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
   int64_t overrun = regular_size + volatile_size + buf.size - max_size_;
 
   if (overrun > 0) {
+    // if we're going to clean the cache, remove at least 25%
+    overrun = max(overrun, (int64_t) (max_size_>>2));
     perf::Inc(counters_.n_overrun);
     volatile_entries_.ShrinkTo(max((int64_t) 0, volatile_size - overrun));
   }
