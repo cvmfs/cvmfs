@@ -220,7 +220,7 @@ class FileSystem : SingleCopy, public BootFactory {
   bool LockWorkspace();
   bool SetupCrashGuard();
   bool CreateCache();
-  bool SetupQuotaMgmt(cache::CacheManagerIds mgr_type);
+  bool SetupQuotaMgmt();
   bool SetupNfsMaps();
 
   bool CheckCacheMode();
@@ -302,6 +302,11 @@ class FileSystem : SingleCopy, public BootFactory {
    * down.
    */
   bool has_custom_sqlitevfs_;
+
+  /**
+   * Indicates which type of cache to use
+   */
+  cache::CacheManagerIds cache_mgr_type_;
 };
 
 
