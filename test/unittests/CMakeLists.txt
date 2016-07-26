@@ -26,6 +26,7 @@ set(CVMFS_UNITTEST_FILES
   t_blocking_counter.cc
   t_buffer.cc
   t_cache.cc
+  t_cache_ram.cc
   t_callbacks.cc
   t_catalog.cc
   t_catalog_counters.cc
@@ -52,6 +53,7 @@ set(CVMFS_UNITTEST_FILES
   t_header_lists.cc
   t_history.cc
   t_json.cc
+  t_kvstore.cc
   t_libcvmfs.cc
   t_lru.cc
   t_macaroon.cc
@@ -145,6 +147,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/history_sql.cc
   ${CVMFS_SOURCE_DIR}/history_sqlite.cc
   ${CVMFS_SOURCE_DIR}/json_document.cc ${CVMFS_SOURCE_DIR}/json_document.h
+  ${CVMFS_SOURCE_DIR}/kvstore.cc ${CVMFS_SOURCE_DIR}/kvstore.h
   ${CVMFS_SOURCE_DIR}/libcvmfs.cc ${CVMFS_SOURCE_DIR}/libcvmfs.h
   ${CVMFS_SOURCE_DIR}/libcvmfs_int.cc ${CVMFS_SOURCE_DIR}/libcvmfs_int.h
   ${CVMFS_SOURCE_DIR}/libcvmfs_legacy.cc

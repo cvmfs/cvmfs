@@ -305,6 +305,7 @@ class LruCache : SingleCopy {
    * The list keeps track of the least recently used keys in the cache.
    */
   template<class T> class ListEntry {
+  friend class LruCache;
    public:
     /**
      * Create a new list entry as lonely, both next and prev pointing to this.
@@ -534,6 +535,7 @@ class LruCache : SingleCopy {
     assert(cache_size > 0);
 
     counters_.sz_size->Set(cache_size_);
+    filter_entry_ = NULL;
     // cache_ = Cache(cache_size_);
     cache_.Init(cache_size_, empty_key, hasher);
     perf::Xadd(counters_.sz_allocated, allocator_.bytes_allocated() +
@@ -700,6 +702,66 @@ class LruCache : SingleCopy {
     return counters_;
   }
 
+  /**
+   * Prepares for in-order iteration of the cache entries to perform a filter operation.
+   * To ensure consistency, the LruCache must be locked for the duration of the filter operation.
+   */
+  virtual void FilterBegin() {
+    assert(!filter_entry_);
+    Lock();
+    filter_entry_ = &lru_list_;
+  }
+
+  /**
+   * Get the current key and value for the filter operation
+   * @param key Address to write the key
+   * @param value Address to write the value
+   */
+  virtual void FilterGet(Key *key, Value *value) {
+    CacheEntry entry;
+    assert(filter_entry_);
+    assert(!filter_entry_->IsListHead());
+    *key = static_cast<ConcreteListEntryContent *>(filter_entry_)->content();
+    bool rc = this->DoLookup(*key, &entry);
+    assert(rc);
+    *value = entry.value;
+  }
+
+  /**
+   * Advance to the next entry in the list
+   * @returns false upon reaching the end of the cache list
+   */
+  virtual bool FilterNext() {
+    assert(filter_entry_);
+    filter_entry_ = filter_entry_->next;
+    return !filter_entry_->IsListHead();
+  }
+
+ /**
+  * Delete the current cache list entry
+  */
+  virtual void FilterDelete() {
+    assert(filter_entry_);
+    assert(!filter_entry_->IsListHead());
+    ListEntry<Key> *new_current = filter_entry_->prev;
+    perf::Inc(counters_.n_forget);
+    Key k = static_cast<ConcreteListEntryContent *>(filter_entry_)->content();
+    filter_entry_->RemoveFromList();
+    allocator_.Destruct(static_cast<ConcreteListEntryContent *>(filter_entry_));
+    cache_.Erase(k);
+    --cache_gauge_;
+    filter_entry_ = new_current;
+  }
+
+ /**
+  * Finish filtering the entries and unlock the cache
+  */
+  virtual void FilterEnd() {
+    assert(filter_entry_);
+    filter_entry_ = NULL;
+    Unlock();
+  }
+
  protected:
   Counters counters_;
 
@@ -772,6 +834,8 @@ class LruCache : SingleCopy {
    */
   ListEntryHead<Key>              lru_list_;
   SmallHashFixed<Key, CacheEntry> cache_;
+
+  ListEntry<Key> *filter_entry_;
 #ifdef LRU_CACHE_THREAD_SAFE
   pthread_mutex_t lock_;  /**< Mutex to make cache thread safe. */
 #endif
@@ -782,6 +846,13 @@ static inline uint32_t hasher_md5(const shash::Md5 &key) {
   // Don't start with the first bytes, because == is using them as well
   return (uint32_t) *(reinterpret_cast<const uint32_t *>(key.digest) + 1);
 }
+
+static inline uint32_t hasher_any(const shash::Any &key) {
+  // We'll just do the same thing as hasher_md5, since every hash is at
+  // least as large.
+  return (uint32_t) *(reinterpret_cast<const uint32_t *>(key.digest) + 1);
+}
+
 
 static inline uint32_t hasher_inode(const fuse_ino_t &inode) {
   return MurmurHash2(&inode, sizeof(inode), 0x07387a4f);

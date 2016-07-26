@@ -34,6 +34,7 @@
 #include "backoff.h"
 #include "cache.h"
 #include "cache_posix.h"
+#include "cache_ram.h"
 #include "catalog.h"
 #include "catalog_mgr_client.h"
 #include "clientctx.h"
@@ -163,14 +164,59 @@ FileSystem *FileSystem::Create(const FileSystem::FileSystemInfo &fs_info) {
  * Initialize the cache directory and start the quota manager.
  */
 bool FileSystem::CreateCache() {
-  cache_mgr_ = cache::PosixCacheManager::Create(
-                 cache_dir_,
-                 cache_mode_ & FileSystem::kCacheAlien,
-                 cache_mode_ & FileSystem::kCacheNoRename);
-  if (cache_mgr_ == NULL) {
-    boot_error_ = "Failed to setup cache in " + cache_dir_ + ": " +
-                  strerror(errno);
-    boot_status_ = loader::kFailCacheDir;
+  string optarg;
+  uint64_t nfiles;
+  uint64_t cache_bytes;
+
+  cache_mgr_type_ = cache::kPosixCacheManager;
+  if (options_mgr_->GetValue("CVMFS_CACHE_PRIMARY", &optarg)) {
+    LogCvmfs(kLogCache, kLogDebug, "requested cache type %s", optarg.c_str());
+    if (optarg == "posix") {
+      cache_mgr_type_ = cache::kPosixCacheManager;
+    } else if (optarg == "ram") {
+      cache_mgr_type_ = cache::kRamCacheManager;
+    } else {
+      cache_mgr_type_ = cache::kUnknownCacheManager;
+    }
+  }
+
+  switch (cache_mgr_type_) {
+  case cache::kPosixCacheManager:
+    cache_mgr_ = cache::PosixCacheManager::Create(
+                   cache_dir_,
+                   cache_mode_ & FileSystem::kCacheAlien,
+                   cache_mode_ & FileSystem::kCacheNoRename);
+    if (cache_mgr_ == NULL) {
+      boot_error_ = "Failed to setup cache in " + cache_dir_ + ": " +
+                    strerror(errno);
+      boot_status_ = loader::kFailCacheDir;
+      return false;
+    }
+    break;
+  case cache::kRamCacheManager:
+    if (options_mgr_->GetValue("CVMFS_NFILES", &optarg)) {
+      nfiles = String2Uint64(optarg);
+    } else {
+      nfiles = 8192;
+    }
+    if (options_mgr_->GetValue("CVMFS_CACHE_RAM_SIZE", &optarg)) {
+      if (HasSuffix(optarg, "%", false)) {
+        cache_bytes = platform_memsize() * String2Uint64(optarg)/100;
+      } else {
+        cache_bytes = String2Uint64(optarg)*1024*1024;
+      }
+    } else {
+      cache_bytes = platform_memsize() >> 5;  // ~3%
+    }
+    cache_bytes = max((uint64_t) 200*1024*1024, cache_bytes);
+    cache_mgr_ = new cache::RamCacheManager(
+      cache_bytes,
+      nfiles,
+      statistics_);
+    break;
+  case cache::kUnknownCacheManager:
+    boot_error_ = "Failure: unknown primary cache";
+    boot_status_ = loader::kFailOptions;
     return false;
   }
   // Sentinel file for future use
@@ -187,7 +233,16 @@ bool FileSystem::CreateCache() {
 
   // Create or load from cache, used as id by the download manager when the
   // proxy template is replaced
-  uuid_cache_ = cvmfs::Uuid::Create(cache_dir_ + "/uuid");
+  switch (cache_mgr_type_) {
+  case cache::kPosixCacheManager:
+    uuid_cache_ = cvmfs::Uuid::Create(cache_dir_ + "/uuid");
+    break;
+  case cache::kRamCacheManager:
+    uuid_cache_ = cvmfs::Uuid::Create("");
+    break;
+  case cache::kUnknownCacheManager:
+    abort();
+  }
   if (uuid_cache_ == NULL) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
              "failed to load/store %s/uuid", cache_dir_.c_str());
@@ -586,6 +641,11 @@ bool FileSystem::SetupNfsMaps() {
 
 
 bool FileSystem::SetupQuotaMgmt() {
+  if (cache_mgr_type_ == cache::kRamCacheManager) {
+    cache_mgr_->AcquireQuotaManager(new NoopQuotaManager());
+    return true;
+  }
+
   assert(quota_limit_ >= 0);
   int64_t quota_threshold = quota_limit_ / 2;
   PosixQuotaManager *quota_mgr;

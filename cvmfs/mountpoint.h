@@ -13,6 +13,7 @@
 #include <ctime>
 #include <string>
 
+#include "cache.h"
 #include "hash.h"
 #include "loader.h"
 #include "util/pointer.h"
@@ -306,6 +307,11 @@ class FileSystem : SingleCopy, public BootFactory {
    * down.
    */
   bool has_custom_sqlitevfs_;
+
+  /**
+   * Indicates which type of cache to use
+   */
+  cache::CacheManagerIds cache_mgr_type_;
 };
 
 
