@@ -197,12 +197,13 @@ class MemoryKvStore :SingleCopy {
   size_t GetUsed() { return used_bytes_; }
 
  private:
+  bool DoDelete(const shash::Any &id);
+
   size_t used_bytes_;
   unsigned int entry_count_;
   unsigned int max_entries_;
   lru::LruCache<shash::Any, MemoryBuffer> entries_;
   pthread_rwlock_t rwlock_;
-  bool DoDelete(const shash::Any &id);
   Counters counters_;
 };
 

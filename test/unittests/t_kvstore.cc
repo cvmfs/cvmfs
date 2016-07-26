@@ -75,13 +75,13 @@ TEST_F(T_MemoryKvStore, Delete) {
   EXPECT_EQ(0, (int64_t) store_.GetUsed());
   EXPECT_TRUE(store_.Commit(a1_, buf_));
   EXPECT_EQ(malloc_size, store_.GetUsed());
-  EXPECT_TRUE(store_.Delete(a2_));
+  EXPECT_FALSE(store_.Delete(a2_));
   buf_.address = malloc(malloc_size);
   EXPECT_TRUE(store_.Commit(a2_, buf_));
   EXPECT_EQ(2*malloc_size, store_.GetUsed());
   memset(buf_.address, 42, malloc_size);
   EXPECT_TRUE(store_.Delete(a1_));
-  EXPECT_TRUE(store_.Delete(a1_));
+  EXPECT_FALSE(store_.Delete(a1_));
   EXPECT_EQ(malloc_size, store_.GetUsed());
   EXPECT_TRUE(store_.Delete(a2_));
   EXPECT_EQ(0, (int64_t) store_.GetUsed());
