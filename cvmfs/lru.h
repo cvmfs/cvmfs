@@ -661,24 +661,6 @@ class LruCache : SingleCopy {
   }
 
   /**
-   * Removes and returns the least recently used cache entry
-   * @param key (out) address at which to write the removed key
-   * @param value (out) address at which to write the removed value
-   * @return true iff an entry was deleted
-   */
-  virtual bool PopOldest(Key *key, Value *value) {
-    FilterBegin();
-    if (pause_ || !FilterNext()) {
-      FilterEnd();
-      return false;
-    }
-    FilterGet(key, value);
-    FilterDelete();
-    FilterEnd();
-    return true;
-  }
-
-  /**
    * Clears all elements from the cache.
    * All memory of internal data structures will be freed but data of
    * cache entries may stay in use, we do not call delete on any user data.
