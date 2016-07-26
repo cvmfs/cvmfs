@@ -295,20 +295,10 @@ int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
   MemoryKvStore *store;
   if (transaction->expected_size == kSizeUnknown) {
     buf.size = transaction->pos;
-    buf.address = realloc(buf.address, buf.size);
-    if (buf.size == 0) {
-      // realloc() to size 0 is equivalent to free(), so we should put
-      // something here that's always safe to free(). malloc(0) "returns
-      // either NULL, or a unique pointer value that can later be
-      // successfully passed to free()" so callers mustn't attempt to
-      // dereference the address of a buffer of size 0.
-      buf.address = malloc(0);
-    }
-    LogCvmfs(kLogCache, kLogDebug, "reallocating transaction on %s to %u B",
-             transaction->id.ToString().c_str(), buf.size);
-    if (!buf.address) {
-      LogCvmfs(kLogCache, kLogDebug, "realloc failed: %s", strerror(errno));
-      return -errno;
+    if (buf.size > 0) {
+      buf.address = srealloc(buf.address, buf.size);
+      LogCvmfs(kLogCache, kLogDebug, "reallocating transaction on %s to %u B",
+               transaction->id.ToString().c_str(), buf.size);
     }
   } else {
     buf.size = transaction->size;
