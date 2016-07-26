@@ -721,7 +721,7 @@ class LruCache : SingleCopy {
   }
 
   /**
-   * Prepares for in-order iteration of the cache entries to perform a filter operatoin.
+   * Prepares for in-order iteration of the cache entries to perform a filter operation.
    * To ensure consistency, the LruCache must be locked for the duration of the filter operation.
    */
   virtual void FilterBegin() {
