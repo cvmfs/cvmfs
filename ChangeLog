@@ -1,3 +1,6 @@
+2.3.1:
+  * Fix false warning on graft files when removing trees on overlayda (CVM-932)
+
 2.3.0:
   * Fix null pointer dereference for authz extended attribute
   * Add well-defined client-side authz interface and allow/deny helpers
