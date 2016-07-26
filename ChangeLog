@@ -5,7 +5,9 @@
   * Fix small memory leak during remount of root catalog
   * Fix handling of file:// url in CVMFS_SERVER_URL
   * Fix RPM dist tag for SLES12 (CVM-1032)
-  * Fix false warning on graft files when removing trees on overlayda (CVM-932)
+
+2.3.1:
+  * Fix false warning on graft files when removing trees on overlayfs (CVM-932)
 
 2.3.0:
   * Fix null pointer dereference for authz extended attribute
