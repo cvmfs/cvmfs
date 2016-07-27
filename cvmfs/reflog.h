@@ -37,9 +37,14 @@ namespace manifest {
  */
 class Reflog {
  public:
-  static Reflog* Open(const std::string &database_path);
-  static Reflog* Create(const std::string &database_path,
+  static Reflog *Open(const std::string &database_path);
+  static Reflog *Create(const std::string &database_path,
                         const std::string &repo_name);
+  static void HashDatabase(const std::string &database_path,
+                           shash::Any *hash_reflog);
+
+  static shash::Any ReadChecksum(const std::string &path);
+  static void WriteChecksum(const std::string &path, const shash::Any &value);
 
   std::string CloseAndReturnDatabaseFile() {
     return database_->CloseAndReturnDatabaseFile();

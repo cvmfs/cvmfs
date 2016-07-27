@@ -1041,6 +1041,29 @@ has_reference_log() {
   [ x"$(get_repo_info_from_url "$url" -o)" = x"true" ]
 }
 
+
+# checks if a the reflog checksum is present in the spool directory
+#
+# @param name  the name of the repository to be checked
+# @return      0 if the reflog checksum is available
+has_reflog_checksum() {
+  local name=$1
+
+  [ -f $(get_reflog_checksum $name) ]
+}
+
+
+# get the path of the file that contains the content hash of the reference log
+#
+# @param name  the name of the repository to be checked
+# @return      the full path name
+get_reflog_checksum() {
+  local name=$1
+
+  echo "/var/spool/cvmfs/${name}/reflog.chksum"
+}
+
+
 # checks if a repository has automatic garbage collection enabled
 #
 # @param name  the name of the repository to be checked
@@ -1884,6 +1907,9 @@ sign_manifest() {
   fi
   if [ x"$CVMFS_CATALOG_ALT_PATHS" = x"true" ]; then
     sign_command="$sign_command -A"
+  fi
+  if has_reflog_checksum $name; then
+    sign_command="$sign_command -R $(get_reflog_checksum $name)"
   fi
 
   $user_shell "$sign_command" > /dev/null
@@ -3218,7 +3244,8 @@ cvmfs_server_mkfs() {
     -r $upstream                                \
     -n $name                                    \
     -a $hash_algo $volatile_opt                 \
-    -o ${temp_dir}/new_manifest"
+    -o ${temp_dir}/new_manifest"                \
+    -R $(get_reflog_checksum)
   if $garbage_collectable; then
     create_cmd="$create_cmd -z"
   fi
@@ -5169,7 +5196,8 @@ __run_gc() {
                                                   -u $CVMFS_UPSTREAM_STORAGE     \
                                                   -n $CVMFS_REPOSITORY_NAME      \
                                                   -t ${CVMFS_SPOOL_DIR}/tmp/     \
-                                                  -k $CVMFS_PUBLIC_KEY"
+                                                  -k $CVMFS_PUBLIC_KEY"          \
+                                                  -R $(get_reflog_checksum)
     if ! $user_shell "$reflog_reconstruct_command"; then
       to_syslog_for_repo $name "failed to reconstruction reference log"
     else
@@ -5184,6 +5212,7 @@ __run_gc() {
                                             -n $CVMFS_REPOSITORY_NAME  \
                                             -k $CVMFS_PUBLIC_KEY       \
                                             -t ${CVMFS_SPOOL_DIR}/tmp/ \
+                                            -R $(get_reflog_checksum)  \
                                             $additional_switches"
 
   if ! $user_shell "$gc_command"; then
@@ -5348,7 +5377,10 @@ __do_snapshot() {
 
     # do the actual snapshot actions
     local with_history=""
+    local with_reflog=""
     [ $initial_snapshot -ne 1 ] && with_history="-p"
+    [ $initial_snapshot -eq 1 -o has_reflog_checksum ] && \
+      with_reflog="-R $(get_reflog_checksum)"
     $user_shell "$(__swissknife_cmd dbg) pull -m $name \
         -u $stratum0                                   \
         -w $stratum1                                   \
@@ -5357,7 +5389,7 @@ __do_snapshot() {
         -k $public_key                                 \
         -n $num_workers                                \
         -t $timeout                                    \
-        -a $retries $with_history $initial_snapshot_flag $log_level"
+        -a $retries $with_history $with_reflog $initial_snapshot_flag $log_level"
 
     local last_snapshot_tmp="${spool_dir}/tmp/last_snapshot"
     $user_shell "date --utc > $last_snapshot_tmp"

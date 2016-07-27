@@ -13,6 +13,7 @@
 #include "garbage_collection/garbage_collector.h"
 #include "garbage_collection/hash_filter.h"
 #include "manifest.h"
+#include "reflog.h"
 #include "upload_facility.h"
 
 namespace swissknife {
@@ -28,6 +29,7 @@ ParameterList CommandGc::GetParams() {
   r.push_back(Parameter::Mandatory('r', "repository url"));
   r.push_back(Parameter::Mandatory('u', "spooler definition string"));
   r.push_back(Parameter::Mandatory('n', "fully qualified repository name"));
+  r.push_back(Parameter::Mandatory('R', "path to reflog.chksum file"));
   r.push_back(Parameter::Optional('h', "conserve <h> revisions"));
   r.push_back(Parameter::Optional('z', "conserve revisions younger than <z>"));
   r.push_back(Parameter::Optional('k', "repository master key(s)"));
@@ -43,6 +45,8 @@ int CommandGc::Main(const ArgumentList &args) {
   const std::string &repo_url = *args.find('r')->second;
   const std::string &spooler = *args.find('u')->second;
   const std::string &repo_name = *args.find('n')->second;
+  const std::string &reflog_chksum_path = *args.find('R')->second;
+  shash::Any reflog_hash = manifest::Reflog::ReadChecksum(reflog_chksum_path);
   const int64_t revisions = (args.count('h') > 0) ?
     String2Int64(*args.find('h')->second) : GcConfig::kFullHistory;
   const time_t timestamp  = (args.count('z') > 0)
@@ -99,11 +103,8 @@ int CommandGc::Main(const ArgumentList &args) {
   }
 
   UniquePtr<manifest::Reflog> reflog;
-  reflog = FetchReflog(&object_fetcher, repo_name);
-  if (!reflog.IsValid()) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "no Reflog found, cannot garbage collect");
-    return 1;
-  }
+  reflog = FetchReflog(&object_fetcher, repo_name, reflog_hash);
+  assert(reflog.IsValid());
 
   const upload::SpoolerDefinition spooler_definition(spooler, shash::kAny);
   UniquePtr<upload::AbstractUploader> uploader(
@@ -177,6 +178,8 @@ int CommandGc::Main(const ArgumentList &args) {
   if (!dry_run) {
     uploader->Upload(reflog_db, ".cvmfsreflog");
     uploader->WaitForUpload();
+    manifest::Reflog::HashDatabase(reflog_db, &reflog_hash);
+    manifest::Reflog::WriteChecksum(reflog_chksum_path, reflog_hash);
   }
 
   unlink(reflog_db.c_str());
