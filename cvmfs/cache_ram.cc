@@ -30,12 +30,12 @@ int RamCacheManager::AddFd(const ReadOnlyFd &fd) {
       return i;
     }
   }
-  if (open_fds_.size() < kMaxHandles) {
+  if (open_fds_.size() < max_entries_) {
     open_fds_.push_back(fd);
     // LogCvmfs(kLogCache, kLogDebug, "adding fd %u", i);
     return i;
   } else {
-    LogCvmfs(kLogCache, kLogDebug, "too many open files (%u)", kMaxHandles);
+    LogCvmfs(kLogCache, kLogDebug, "too many open files (%u)", max_entries_);
     perf::Inc(counters_.n_enfile);
     return -ENFILE;
   }

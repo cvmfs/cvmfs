@@ -23,8 +23,6 @@ namespace cache {
 // an invalid handle
 static const shash::Any kInvalidHandle;
 
-static const unsigned kMaxHandles = 8192;
-
 /**
  * The @p RamCacheManager class provides a cache backend that operates
  * entirely from the host's RAM. This backend does not require any
@@ -109,6 +107,7 @@ class RamCacheManager : public CacheManager {
     unsigned max_entries,
     perf::Statistics *statistics)
     : max_size_(max_size)
+    , max_entries_(max_entries)
     , regular_entries_(max_entries/2, "RamCache.regular", statistics)
     , volatile_entries_(max_entries/2, "RamCache.volatile", statistics)
     , counters_(statistics, "RamCache") {
@@ -274,6 +273,7 @@ class RamCacheManager : public CacheManager {
   virtual int DoOpen(const shash::Any &id);
 
   uint64_t max_size_;
+  uint64_t max_entries_;
   std::vector<ReadOnlyFd> open_fds_;
   pthread_rwlock_t rwlock_;
   MemoryKvStore regular_entries_;
