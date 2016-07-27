@@ -15,7 +15,6 @@
 
 #include <cstdio>
 #include <cstdlib>
-#include <iostream>  // TODO(jblomer): remove
 #include <set>
 #include <string>
 #include <vector>
@@ -53,6 +52,12 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   if (args.find('M') != args.end()) meta_info = *args.find('M')->second;
   const bool garbage_collectable = (args.count('g') > 0);
   const bool bootstrap_shortcuts = (args.count('A') > 0);
+  string reflog_chksum_path;
+  shash::Any reflog_hash;
+  if (args.find('R') != args.end()) {
+    reflog_chksum_path = *args.find('R')->second;
+    reflog_hash = manifest::Reflog::ReadChecksum(reflog_chksum_path);
+  }
 
   UniquePtr<upload::Spooler>    spooler;
   UniquePtr<manifest::Manifest> manifest;
@@ -94,9 +99,16 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   }
 
   UniquePtr<manifest::Reflog> reflog;
-  reflog = FetchReflog(&object_fetcher, repo_name);
-  if (!reflog) {
-    LogCvmfs(kLogCvmfs, kLogVerboseMsg, "failed to fetch Reflog (ignoring)");
+  if (!reflog_hash.IsNull()) {
+    reflog = FetchReflog(&object_fetcher, repo_name, reflog_hash);
+    assert(reflog.IsValid());
+  } else {
+    LogCvmfs(kLogCvmfs, kLogVerboseMsg, "no reflog (ignoring)");
+    if (spooler->Peek("/.cvmfsreflog")) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "no reflog hash specified but reflog is present");
+      return 1;
+    }
   }
 
   // Fron here on things are potentially put in backend storage
@@ -165,12 +177,16 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     const std::string reflog_db_file = reflog->CloseAndReturnDatabaseFile();
     spooler->UploadReflog(reflog_db_file);
     spooler->WaitForUpload();
+    reflog_hash.algorithm = manifest->GetHashAlgorithm();
+    manifest::Reflog::HashDatabase(reflog_db_file, &reflog_hash);
     unlink(reflog_db_file.c_str());
     if (spooler->GetNumberOfErrors()) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to upload Reflog (errors: %d)",
                spooler->GetNumberOfErrors());
       return 1;
     }
+    assert(!reflog_chksum_path.empty());
+    manifest::Reflog::WriteChecksum(reflog_chksum_path, reflog_hash);
   }
 
   // Update manifest

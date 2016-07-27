@@ -5,6 +5,8 @@
 #ifndef CVMFS_OBJECT_FETCHER_H_
 #define CVMFS_OBJECT_FETCHER_H_
 
+#include <unistd.h>
+
 #include <string>
 
 #include "catalog.h"
@@ -177,12 +179,23 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
     return kFailOk;
   }
 
-  Failures FetchReflog(ReflogTN **reflog) {
+  Failures FetchReflog(const shash::Any &reflog_hash, ReflogTN **reflog) {
+    assert(!reflog_hash.IsNull());
+    assert(reflog_hash.suffix == shash::kSuffixNone);
+
     std::string tmp_path;
     const bool decompress = false;
     Failures failure = Fetch(kReflogFilename, decompress, &tmp_path);
     if (failure != kFailOk) {
       return failure;
+    }
+
+    // Ensure data integrity
+    shash::Any computed_hash(reflog_hash.algorithm);
+    ReflogTN::HashDatabase(tmp_path, &computed_hash);
+    if (computed_hash != reflog_hash) {
+      unlink(tmp_path.c_str());
+      return kFailBadData;
     }
 
     *reflog = ReflogTN::Open(tmp_path);
@@ -224,9 +237,11 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
     return failure;
   }
 
-  Failures FetchReflog(UniquePtr<ReflogTN>  *reflog) {
+  Failures FetchReflog(const shash::Any &reflog_hash,
+                       UniquePtr<ReflogTN> *reflog)
+  {
     ReflogTN *raw_reflog_ptr = NULL;
-    Failures failure = FetchReflog(&raw_reflog_ptr);
+    Failures failure = FetchReflog(reflog_hash, &raw_reflog_ptr);
     if (failure == kFailOk) *reflog = raw_reflog_ptr;
     return failure;
   }

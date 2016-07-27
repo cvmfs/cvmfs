@@ -32,6 +32,7 @@
 #include "manifest_fetch.h"
 #include "object_fetcher.h"
 #include "path_filters/relaxed_path_filter.h"
+#include "reflog.h"
 #include "signature.h"
 #include "smalloc.h"
 #include "upload.h"
@@ -523,6 +524,13 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     stratum1_url = args.find('w')->second;
   if (args.find('i') != args.end())
     initial_snapshot = true;
+  shash::Any reflog_hash;
+  string reflog_chksum_path;
+  if (args.find('R') != args.end()) {
+    reflog_chksum_path = *args.find('R')->second;
+    if (!initial_snapshot)
+      reflog_hash = manifest::Reflog::ReadChecksum(reflog_chksum_path);
+  }
 
   if (!preload_cache && stratum1_url == NULL) {
     LogCvmfs(kLogCvmfs, kLogStderr, "need -w <stratum 1 URL>");
@@ -615,33 +623,6 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     goto fini;
   }
 
-  if (!preload_cache) {
-    if (initial_snapshot) {
-      LogCvmfs(kLogCvmfs, kLogStdout, "Creating an empty Reflog for '%s'",
-                                      repository_name.c_str());
-      reflog = CreateEmptyReflog(*temp_dir, repository_name);
-      if (reflog == NULL) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "failed to create initial Reflog");
-        goto fini;
-      }
-    } else {
-      ObjectFetcher object_fetcher_stratum1(repository_name,
-                                            *stratum1_url,
-                                            *temp_dir,
-                                            download_manager(),
-                                            signature_manager());
-
-      reflog = FetchReflog(&object_fetcher_stratum1, repository_name);
-      if (reflog == NULL) {
-        LogCvmfs(kLogCvmfs, kLogVerboseMsg, "failed to get Reflog (ignoring)");
-      }
-    }
-
-    if (reflog != NULL) {
-      reflog->BeginTransaction();
-    }
-  }
-
   // Get meta info
   meta_info_hash = ensemble.manifest->meta_info();
   if (!meta_info_hash.IsNull()) {
@@ -669,6 +650,44 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     spooler = upload::Spooler::Construct(spooler_definition);
     assert(spooler);
     spooler->RegisterListener(&SpoolerOnUpload);
+  }
+
+  // Open the reflog for modification
+  if (!preload_cache) {
+    if (initial_snapshot) {
+      LogCvmfs(kLogCvmfs, kLogStdout, "Creating an empty Reflog for '%s'",
+                                      repository_name.c_str());
+      reflog = CreateEmptyReflog(*temp_dir, repository_name);
+      if (reflog == NULL) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "failed to create initial Reflog");
+        goto fini;
+      }
+    } else {
+      ObjectFetcher object_fetcher_stratum1(repository_name,
+                                            *stratum1_url,
+                                            *temp_dir,
+                                            download_manager(),
+                                            signature_manager());
+
+      if (!reflog_hash.IsNull()) {
+        reflog =
+          FetchReflog(&object_fetcher_stratum1, repository_name, reflog_hash);
+        assert(reflog != NULL);
+      } else {
+        LogCvmfs(kLogCvmfs, kLogVerboseMsg, "no reflog (ignoring)");
+        if (spooler->Peek("/.cvmfsreflog")) {
+          LogCvmfs(kLogCvmfs, kLogStderr,
+                   "no reflog hash specified but reflog is present");
+          goto fini;
+        }
+      }
+    }
+
+    if (reflog != NULL) {
+      reflog->BeginTransaction();
+      // On commit: use manifest's hash algorithm
+      reflog_hash.algorithm = ensemble.manifest->GetHashAlgorithm();
+    }
   }
 
   // Fetch tag list.
@@ -785,13 +804,17 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     // upload Reflog database
     if (!preload_cache && reflog != NULL) {
       reflog->CommitTransaction();
-      spooler->UploadReflog(reflog->CloseAndReturnDatabaseFile());
+      string reflog_path = reflog->CloseAndReturnDatabaseFile();
+      manifest::Reflog::HashDatabase(reflog_path, &reflog_hash);
+      spooler->UploadReflog(reflog_path);
       spooler->WaitForUpload();
       if (spooler->GetNumberOfErrors()) {
         LogCvmfs(kLogCvmfs, kLogStderr, "Failed to upload Reflog (errors: %d)",
                  spooler->GetNumberOfErrors());
         goto fini;
       }
+      assert(!reflog_chksum_path.empty());
+      manifest::Reflog::WriteChecksum(reflog_chksum_path, reflog_hash);
     }
 
     if (preload_cache) {

@@ -30,6 +30,7 @@ class CommandSign : public Command {
     r.push_back(Parameter::Mandatory('u', "repository URL"));
     r.push_back(Parameter::Mandatory('r', "spooler definition"));
     r.push_back(Parameter::Mandatory('t', "directory for temporary files"));
+    r.push_back(Parameter::Optional('R', "path to reflog.chksum file"));
     r.push_back(Parameter::Optional('c', "x509 certificate"));
     r.push_back(Parameter::Optional('k', "private key of the certificate"));
     r.push_back(Parameter::Optional('s', "password for the private key"));

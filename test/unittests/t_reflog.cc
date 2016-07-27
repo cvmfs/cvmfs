@@ -120,6 +120,15 @@ typedef ::testing::Types<manifest::Reflog, MockReflog> ReflogTypes;
 TYPED_TEST_CASE(T_Reflog, ReflogTypes);
 
 
+TEST(T_Reflog, Checksum) {
+  shash::Any content_hash(shash::kSha1);
+  content_hash.Randomize();
+  manifest::Reflog::WriteChecksum("./reflog.chksum", content_hash);
+  shash::Any read_hash = manifest::Reflog::ReadChecksum("./reflog.chksum");
+  EXPECT_EQ(content_hash, read_hash);
+}
+
+
 TYPED_TEST(T_Reflog, Initalize) {}
 
 
