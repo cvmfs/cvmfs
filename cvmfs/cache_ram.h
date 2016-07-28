@@ -240,16 +240,11 @@ class RamCacheManager : public CacheManager {
 
  private:
   struct ReadOnlyFd {
-    ReadOnlyFd() : handle(kInvalidHandle), pos(0), index(0), store(NULL) { }
-    ReadOnlyFd(const shash::Any &h, uint64_t pos)
-      : handle(h)
-      , pos(pos)
-      , index(0)
-      , store(NULL) { }
+    ReadOnlyFd() : handle(kInvalidHandle) { }
+    explicit ReadOnlyFd(const shash::Any &h) : handle(h) { }
     shash::Any handle;
-    uint64_t pos;
+    bool is_volatile;
     size_t index;
-    MemoryKvStore *store;
   };
 
   struct Transaction {
@@ -272,6 +267,14 @@ class RamCacheManager : public CacheManager {
     if ((fd < 0) || (static_cast<unsigned>(fd) >= open_fds_.size()))
       return false;
     return open_fds_[fd].handle != kInvalidHandle;
+  }
+
+  inline MemoryKvStore *GetStore(const ReadOnlyFd &fd) {
+    if (fd.is_volatile) {
+      return &volatile_entries_;
+    } else {
+      return &regular_entries_;
+    }
   }
 
   int AddFd(const ReadOnlyFd &fd);
