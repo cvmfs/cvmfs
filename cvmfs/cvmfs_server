@@ -3653,7 +3653,8 @@ cvmfs_server_import() {
   trap _import_desaster_cleanup EXIT HUP INT QUIT TERM
 
   # create the configuration for the new repository
-  # TODO(jblomer): make a better guess for hash and compression algorithm
+  # TODO(jblomer): make a better guess for hash and compression algorithm (see
+  # also reflog creation)
   echo -n "Creating configuration files... "
   create_config_files_for_new_repository "$name"             \
                                          "$upstream"         \
@@ -3682,6 +3683,15 @@ cvmfs_server_import() {
   create_spool_area_for_new_repository $name               || die "fail!"
   [ $configure_apache -eq 0 ] || reload_apache > /dev/null || die "fail!"
   echo "done"
+
+  # create reflog checksum
+  if [ -f ${storage_location}/.cvmfsreflog ]; then
+    echo -n "Re-creating reflog content hash... "
+    local reflog_hash=$(cat ${storage_location}/.cvmfsreflog | cvmfs_swissknife hash -a sha1)
+    echo -n $reflog_hash > "${CVMFS_SPOOL_DIR}/reflog.chksum"
+    chown $CVMFS_USER "${CVMFS_SPOOL_DIR}/reflog.chksum"
+    echo $reflog_hash
+  fi
 
   # load repository configuration file
   load_repo_config $name
