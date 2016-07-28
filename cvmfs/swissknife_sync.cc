@@ -39,6 +39,7 @@
 #include "manifest.h"
 #include "path_filters/dirtab.h"
 #include "platform.h"
+#include "reflog.h"
 #include "sync_mediator.h"
 #include "sync_union.h"
 
@@ -93,6 +94,7 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
   const string dir_temp = *args.find('t')->second;
   const string spooler_definition = *args.find('r')->second;
   const string repo_name = *args.find('n')->second;
+  const string reflog_chksum_path = *args.find('R')->second;
   if (args.find('l') != args.end()) {
     unsigned log_level =
       1 << (kLogLevel0 + String2Uint64(*args.find('l')->second));
@@ -140,9 +142,13 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
     return 1;
   }
 
-  spooler->UploadReflog(reflog->CloseAndReturnDatabaseFile());
+  string reflog_path = reflog->CloseAndReturnDatabaseFile();
+  spooler->UploadReflog(reflog_path);
+  shash::Any reflog_hash(hash_algorithm);
+  manifest::Reflog::HashDatabase(reflog_path, &reflog_hash);
   spooler->WaitForUpload();
   delete spooler;
+  manifest::Reflog::WriteChecksum(reflog_chksum_path, reflog_hash);
 
   // set optional manifest fields
   const bool needs_bootstrap_shortcuts = !voms_authz.empty();

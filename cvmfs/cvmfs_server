@@ -1041,6 +1041,29 @@ has_reference_log() {
   [ x"$(get_repo_info_from_url "$url" -o)" = x"true" ]
 }
 
+
+# checks if a the reflog checksum is present in the spool directory
+#
+# @param name  the name of the repository to be checked
+# @return      0 if the reflog checksum is available
+has_reflog_checksum() {
+  local name=$1
+
+  [ -f $(get_reflog_checksum $name) ]
+}
+
+
+# get the path of the file that contains the content hash of the reference log
+#
+# @param name  the name of the repository to be checked
+# @return      the full path name
+get_reflog_checksum() {
+  local name=$1
+
+  echo "/var/spool/cvmfs/${name}/reflog.chksum"
+}
+
+
 # checks if a repository has automatic garbage collection enabled
 #
 # @param name  the name of the repository to be checked
@@ -1884,6 +1907,9 @@ sign_manifest() {
   fi
   if [ x"$CVMFS_CATALOG_ALT_PATHS" = x"true" ]; then
     sign_command="$sign_command -A"
+  fi
+  if has_reflog_checksum $name; then
+    sign_command="$sign_command -R $(get_reflog_checksum $name)"
   fi
 
   $user_shell "$sign_command" > /dev/null
@@ -3218,7 +3244,8 @@ cvmfs_server_mkfs() {
     -r $upstream                                \
     -n $name                                    \
     -a $hash_algo $volatile_opt                 \
-    -o ${temp_dir}/new_manifest"
+    -o ${temp_dir}/new_manifest                 \
+    -R $(get_reflog_checksum $name)"
   if $garbage_collectable; then
     create_cmd="$create_cmd -z"
   fi
@@ -3626,7 +3653,8 @@ cvmfs_server_import() {
   trap _import_desaster_cleanup EXIT HUP INT QUIT TERM
 
   # create the configuration for the new repository
-  # TODO(jblomer): make a better guess for hash and compression algorithm
+  # TODO(jblomer): make a better guess for hash and compression algorithm (see
+  # also reflog creation)
   echo -n "Creating configuration files... "
   create_config_files_for_new_repository "$name"             \
                                          "$upstream"         \
@@ -3655,6 +3683,15 @@ cvmfs_server_import() {
   create_spool_area_for_new_repository $name               || die "fail!"
   [ $configure_apache -eq 0 ] || reload_apache > /dev/null || die "fail!"
   echo "done"
+
+  # create reflog checksum
+  if [ -f ${storage_location}/.cvmfsreflog ]; then
+    echo -n "Re-creating reflog content hash... "
+    local reflog_hash=$(cat ${storage_location}/.cvmfsreflog | cvmfs_swissknife hash -a sha1)
+    echo -n $reflog_hash > "${CVMFS_SPOOL_DIR}/reflog.chksum"
+    chown $CVMFS_USER "${CVMFS_SPOOL_DIR}/reflog.chksum"
+    echo $reflog_hash
+  fi
 
   # load repository configuration file
   load_repo_config $name
@@ -4221,7 +4258,7 @@ cvmfs_server_check() {
   local name
   local upstream
   local storage_dir
-  local stratum0
+  local url
   local check_chunks=1
   local check_integrity=0
   local subtree_path=""
@@ -4270,7 +4307,11 @@ cvmfs_server_check() {
   check_repository_compatibility $name
 
   upstream=$CVMFS_UPSTREAM_STORAGE
-  stratum0=$CVMFS_STRATUM0
+  if is_stratum1 $name; then
+    url=$CVMFS_STRATUM1
+  else
+    url=$CVMFS_STRATUM0
+  fi
 
   # do it!
   if [ $check_integrity -ne 0 ]; then
@@ -4294,6 +4335,9 @@ cvmfs_server_check() {
     subtree_msg=" (starting at nested catalog '$subtree_path')"
   fi
 
+  local with_reflog=
+  has_reflog_checksum $name && with_reflog="-R $(get_reflog_checksum $name)"
+
   echo "Verifying Catalog Integrity of ${name}${subtree_msg}..."
   local user_shell="$(get_user_shell $name)"
   local check_cmd
@@ -4301,11 +4345,12 @@ cvmfs_server_check() {
                      $check_chunks_param               \
                      $log_level_param                  \
                      $subtree_param                    \
-                     -r $stratum0                      \
+                     -r $url                           \
                      -t ${CVMFS_SPOOL_DIR}/tmp         \
                      -k ${CVMFS_PUBLIC_KEY}            \
                      -N ${CVMFS_REPOSITORY_NAME}       \
                      $(get_follow_http_redirects_flag) \
+                     $with_reflog                      \
                      -z /etc/cvmfs/repositories.d/${name}/trusted_certs"
   $user_shell "$check_cmd"
 }
@@ -5169,7 +5214,8 @@ __run_gc() {
                                                   -u $CVMFS_UPSTREAM_STORAGE     \
                                                   -n $CVMFS_REPOSITORY_NAME      \
                                                   -t ${CVMFS_SPOOL_DIR}/tmp/     \
-                                                  -k $CVMFS_PUBLIC_KEY"
+                                                  -k $CVMFS_PUBLIC_KEY           \
+                                                  -R $(get_reflog_checksum $name)"
     if ! $user_shell "$reflog_reconstruct_command"; then
       to_syslog_for_repo $name "failed to reconstruction reference log"
     else
@@ -5178,12 +5224,13 @@ __run_gc() {
   fi
 
   [ $dry_run -ne 0 ] || to_syslog_for_repo $name "started garbage collection"
-  local gc_command="$(__swissknife_cmd dbg) gc                         \
-                                            -r $repository_url         \
-                                            -u $CVMFS_UPSTREAM_STORAGE \
-                                            -n $CVMFS_REPOSITORY_NAME  \
-                                            -k $CVMFS_PUBLIC_KEY       \
-                                            -t ${CVMFS_SPOOL_DIR}/tmp/ \
+  local gc_command="$(__swissknife_cmd dbg) gc                              \
+                                            -r $repository_url              \
+                                            -u $CVMFS_UPSTREAM_STORAGE      \
+                                            -n $CVMFS_REPOSITORY_NAME       \
+                                            -k $CVMFS_PUBLIC_KEY            \
+                                            -t ${CVMFS_SPOOL_DIR}/tmp/      \
+                                            -R $(get_reflog_checksum $name) \
                                             $additional_switches"
 
   if ! $user_shell "$gc_command"; then
@@ -5348,7 +5395,12 @@ __do_snapshot() {
 
     # do the actual snapshot actions
     local with_history=""
+    local with_reflog=""
     [ $initial_snapshot -ne 1 ] && with_history="-p"
+    [ $initial_snapshot -eq 1 ] && \
+      with_reflog="-R $(get_reflog_checksum $alias_name)"
+    has_reflog_checksum $alias_name && \
+      with_reflog="-R $(get_reflog_checksum $alias_name)"
     $user_shell "$(__swissknife_cmd dbg) pull -m $name \
         -u $stratum0                                   \
         -w $stratum1                                   \
@@ -5357,7 +5409,7 @@ __do_snapshot() {
         -k $public_key                                 \
         -n $num_workers                                \
         -t $timeout                                    \
-        -a $retries $with_history $initial_snapshot_flag $log_level"
+        -a $retries $with_history $with_reflog $initial_snapshot_flag $log_level"
 
     local last_snapshot_tmp="${spool_dir}/tmp/last_snapshot"
     $user_shell "date --utc > $last_snapshot_tmp"

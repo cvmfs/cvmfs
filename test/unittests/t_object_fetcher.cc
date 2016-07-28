@@ -58,6 +58,7 @@ class T_ObjectFetcher : public ::testing::Test {
   static shash::Any history_hash;
   static shash::Any previous_history_hash;
   static shash::Any certificate_hash;
+  static shash::Any reflog_hash;
 
  protected:
   virtual void SetUp() {
@@ -89,11 +90,12 @@ class T_ObjectFetcher : public ::testing::Test {
     history_hash          = shash::Any();
     previous_history_hash = shash::Any();
     certificate_hash      = shash::Any();
+    reflog_hash           = shash::Any();
   }
 
   void InitializeSandbox() {
     // create a Reflog
-    CreateReflog();
+    CreateReflog(&reflog_hash);
 
     // create some history objects
     CreateHistory(&previous_history_hash);
@@ -358,8 +360,8 @@ class T_ObjectFetcher : public ::testing::Test {
     return GetObjectFetcher(type<ObjectFetcherT>());
   }
 
-  void CreateReflog() {
-    CreateReflog(type<ObjectFetcherT>());
+  void CreateReflog(shash::Any *content_hash) {
+    CreateReflog(type<ObjectFetcherT>(), content_hash);
   }
 
   void CreateHistory(
@@ -450,18 +452,33 @@ class T_ObjectFetcher : public ::testing::Test {
     return new MockObjectFetcher();
   }
 
-  void CreateReflog(const type<MockObjectFetcher> type_spec) {
+  void CreateReflog(
+    const type<MockObjectFetcher> type_spec,
+    shash::Any *content_hash)
+  {
     MockReflog::Create(GetFileName(reflog_path), fqrn);
+    content_hash->algorithm = shash::kSha1;
+    HashString("", content_hash);
   }
 
-  void CreateReflog(const type<LocalObjectFetcher<> > type_spec) {
+  void CreateReflog(
+    const type<LocalObjectFetcher<> > type_spec,
+    shash::Any *content_hash)
+  {
     UniquePtr<manifest::Reflog> reflog(manifest::Reflog::Create(reflog_path,
                                                                 fqrn));
+    content_hash->algorithm = shash::kSha1;
+    manifest::Reflog::HashDatabase(reflog_path, content_hash);
   }
 
-  void CreateReflog(const type<HttpObjectFetcher<> > type_spec) {
+  void CreateReflog(
+    const type<HttpObjectFetcher<> > type_spec,
+    shash::Any *content_hash
+  ) {
     UniquePtr<manifest::Reflog> reflog(manifest::Reflog::Create(reflog_path,
                                                                 fqrn));
+    content_hash->algorithm = shash::kSha1;
+    manifest::Reflog::HashDatabase(reflog_path, content_hash);
   }
 
   void CreateHistory(const type<LocalObjectFetcher<> >  type_spec,
@@ -652,6 +669,9 @@ shash::Any T_ObjectFetcher<ObjectFetcherT>::previous_history_hash;
 template <class ObjectFetcherT>
 shash::Any T_ObjectFetcher<ObjectFetcherT>::certificate_hash;
 
+template <class ObjectFetcherT>
+shash::Any T_ObjectFetcher<ObjectFetcherT>::reflog_hash;
+
 typedef ::testing::Types<
   MockObjectFetcher,
   LocalObjectFetcher<>,
@@ -828,7 +848,8 @@ TYPED_TEST(T_ObjectFetcher, FetchReflogSlow) {
   ASSERT_TRUE(object_fetcher.IsValid());
 
   typename TypeParam::ReflogTN *reflog = NULL;
-  typename TypeParam::Failures retval = object_fetcher->FetchReflog(&reflog);
+  typename TypeParam::Failures retval =
+    object_fetcher->FetchReflog(TestFixture::reflog_hash, &reflog);
   EXPECT_EQ(TypeParam::kFailOk, retval);
   ASSERT_NE(static_cast<typename TypeParam::ReflogTN*>(NULL), reflog);
 
@@ -843,13 +864,18 @@ TYPED_TEST(T_ObjectFetcher, FetchReflogSlow) {
   UniquePtr<typename TypeParam::ReflogTN> reflog_ptr;
   EXPECT_FALSE(reflog_ptr.IsValid());
   typename TypeParam::Failures retval2 =
-    object_fetcher->FetchReflog(&reflog_ptr);
+    object_fetcher->FetchReflog(TestFixture::reflog_hash, &reflog_ptr);
   EXPECT_EQ(TypeParam::kFailOk, retval2);
   ASSERT_TRUE(reflog_ptr.IsValid());
 
   if (TestFixture::NeedsFilesystemSandbox()) {
     EXPECT_LE(0u, TestFixture::CountTemporaryFiles());
   }
+
+  shash::Any hash_random(shash::kSha1);
+  hash_random.Randomize();
+  retval = object_fetcher->FetchReflog(hash_random, &reflog);
+  EXPECT_EQ(TypeParam::kFailBadData, retval);
 }
 
 

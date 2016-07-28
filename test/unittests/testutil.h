@@ -817,6 +817,8 @@ class MockReflog : public MockObjectStorage<MockReflog> {
   static MockReflog* Open(const std::string &path);
   static MockReflog* Create(const std::string &path,
                             const std::string &repo_name);
+  static void HashDatabase(const std::string &database_path,
+                           shash::Any *hash_reflog);
   static void ResetGlobalState() {}
 
   bool AddCertificate(const shash::Any &certificate);

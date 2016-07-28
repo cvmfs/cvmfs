@@ -1,0 +1,108 @@
+cvmfs_test_name="Creation and validation of reflog checksum"
+cvmfs_test_autofs_on_startup=false
+
+CVMFS_TEST634_REPLICA_NAME=
+
+cleanup() {
+  sudo cvmfs_server rmfs -f $CVMFS_TEST634_REPLICA_NAME > /dev/null 2>&1
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local checksum=/var/spool/cvmfs/${CVMFS_TEST_REPO}/reflog.chksum
+
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "*** check for checksum presence"
+  [ -f $checksum ] || return 10
+  local checksum_content=$(cat $checksum)
+
+  echo "*** check if checksum changes during publishes"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  publish_repo $CVMFS_TEST_REPO || return $?
+  [ -f $checksum ] || return 11
+  [ "x$checksum_content" != "x$(cat $checksum)" ] || return 12
+  check_repository $CVMFS_TEST_REPO || return 13
+
+  echo "*** check validation of checksum"
+  mv $checksum $checksum.backup
+  cat /dev/zero | head -c 40 > $checksum
+  check_repository $CVMFS_TEST_REPO && return 21
+  start_transaction $CVMFS_TEST_REPO || return $?
+  publish_repo $CVMFS_TEST_REPO && return 20
+  mv $checksum.backup $checksum
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "*** check missing checksum"
+  mv $checksum $checksum.backup
+  check_repository $CVMFS_TEST_REPO && return 31
+  start_transaction $CVMFS_TEST_REPO || return $?
+  publish_repo $CVMFS_TEST_REPO && return 30
+
+  echo "*** check missing checksum and missing reflog"
+  delete_from_backend $CVMFS_TEST_REPO ".cvmfsreflog" || return 40
+  publish_repo $CVMFS_TEST_REPO || return 41
+  [ -f $checksum ] && return 42
+  check_repository $CVMFS_TEST_REPO || return 43
+
+  echo "*** check reflog reconstruction"
+  toggle_gc $CVMFS_TEST_REPO || return 50
+  start_transaction $CVMFS_TEST_REPO || return $?
+  publish_repo $CVMFS_TEST_REPO || return 51
+  cvmfs_server gc -f $CVMFS_TEST_REPO || return 52
+  [ -f $checksum ] || return 53
+  start_transaction $CVMFS_TEST_REPO || return $?
+  publish_repo $CVMFS_TEST_REPO || return 54
+  [ -f $checksum ] || return 55
+  check_repository $CVMFS_TEST_REPO || return 56
+
+  echo "*** set stratum 1 cleanup trap"
+  CVMFS_TEST634_REPLICA_NAME="$(get_stratum1_name $CVMFS_TEST_REPO)"
+  local replica_checksum=/var/spool/cvmfs/${CVMFS_TEST634_REPLICA_NAME}/reflog.chksum
+  trap cleanup EXIT HUP INT TERM
+
+  echo "*** check reflog checksum for fresh replica"
+  load_repo_config $CVMFS_TEST_REPO
+  create_stratum1 $CVMFS_TEST634_REPLICA_NAME            \
+                  $CVMFS_TEST_USER                       \
+                  $CVMFS_STRATUM0                        \
+                  /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub || return 60
+  sudo cvmfs_server snapshot $CVMFS_TEST634_REPLICA_NAME || return 61
+  [ -f $replica_checksum ] || return 62
+  [ "x$(cat $checksum)" != "x$(cat $replica_checksum)" ] || return 62
+  check_repository $CVMFS_TEST634_REPLICA_NAME || return 63
+
+  echo "*** check reflog maintenance on replica"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  publish_repo $CVMFS_TEST_REPO || return 70
+  mv $replica_checksum $replica_checksum.backup
+  check_repository $CVMFS_TEST634_REPLICA_NAME && return 74
+  sudo cvmfs_server snapshot $CVMFS_TEST634_REPLICA_NAME && return 71
+  cat /dev/zero | head -c 40 > $replica_checksum
+  check_repository $CVMFS_TEST634_REPLICA_NAME && return 75
+  sudo cvmfs_server snapshot $CVMFS_TEST634_REPLICA_NAME && return 72
+  mv $replica_checksum.backup $replica_checksum
+  sudo cvmfs_server snapshot $CVMFS_TEST634_REPLICA_NAME || return 73
+  check_repository $CVMFS_TEST634_REPLICA_NAME || return 76
+
+  echo "*** check missing checksum and missing reflog on replica"
+  rm -f $replica_checksum
+  delete_from_backend $CVMFS_TEST634_REPLICA_NAME ".cvmfsreflog" || return 80
+  start_transaction $CVMFS_TEST_REPO || return $?
+  publish_repo $CVMFS_TEST_REPO || return 82
+  sudo cvmfs_server snapshot $CVMFS_TEST634_REPLICA_NAME || return 83
+  check_repository $CVMFS_TEST634_REPLICA_NAME || return 84
+
+  echo "*** check reflog reconstruction on replica"
+  cvmfs_server gc -f $CVMFS_TEST634_REPLICA_NAME || return 90
+  [ -f $checksum ] || return 91
+  start_transaction $CVMFS_TEST_REPO || return $?
+  publish_repo $CVMFS_TEST_REPO || return 92
+  sudo cvmfs_server snapshot $CVMFS_TEST634_REPLICA_NAME || return 93
+  [ -f $checksum ] || return 94
+  check_repository $CVMFS_TEST634_REPLICA_NAME || return 95
+
+  return 0
+}
