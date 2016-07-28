@@ -240,8 +240,14 @@ class RamCacheManager : public CacheManager {
 
  private:
   struct ReadOnlyFd {
-    ReadOnlyFd() : handle(kInvalidHandle) { }
-    explicit ReadOnlyFd(const shash::Any &h) : handle(h) { }
+    ReadOnlyFd()
+      : handle(kInvalidHandle)
+      , is_volatile(false)
+      , index(0) {}
+    explicit ReadOnlyFd(const shash::Any &h)
+      : handle(h)
+      , is_volatile(false)
+      , index(0) {}
     shash::Any handle;
     bool is_volatile;
     size_t index;
