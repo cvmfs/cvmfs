@@ -104,32 +104,32 @@ cvmfs_run_test() {
 
   local scratch_dir=$(pwd)
 
-  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
-  echo "starting transaction to edit repository"
+  echo "*** starting transaction to edit repository"
   start_transaction $CVMFS_TEST_REPO || return $?
 
-  echo "putting some stuff in the new repository"
+  echo "*** putting some stuff in the new repository"
   produce_files_in $repo_dir || return 3
 
-  echo "creating CVMFS snapshot"
+  echo "*** creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO || return $?
 
-  echo "check catalog and data integrity"
+  echo "*** check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
 
-  echo "unmounting repository"
+  echo "*** unmounting repository"
   sudo umount $repo_dir || return 4
   sudo umount $spool_dir/rdonly || return 5
 
-  echo "deleting spool area"
+  echo "*** deleting spool area"
   sudo rm -fR $spool_dir || return 6
 
-  echo "deleting /etc/cvmfs/repositories.d/ entry"
+  echo "*** deleting /etc/cvmfs/repositories.d/ entry"
   sudo rm -fR $config_dir || return 7
 
-  echo "saving repository keys"
+  echo "*** saving repository keys"
   mkdir keys || return 8
   sudo mv ${keys_dir}/$CVMFS_TEST_REPO.crt       \
           ${keys_dir}/$CVMFS_TEST_REPO.key       \
@@ -137,22 +137,22 @@ cvmfs_run_test() {
           ${keys_dir}/$CVMFS_TEST_REPO.pub       \
           keys || return 9
 
-  echo "recreating repository spool area"
+  echo "*** recreating repository spool area"
   import_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER -k keys || return 10
 
-  echo "check catalog and data integrity"
+  echo "*** check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
 
-  echo "creating new revision of recreated repository"
+  echo "*** creating new revision of recreated repository"
   start_transaction $CVMFS_TEST_REPO || return $?
 
-  echo "doing some changes"
+  echo "*** doing some changes"
   remove_files_from $repo_dir || return 11
 
-  echo "publish changes"
+  echo "*** publish changes"
   publish_repo $CVMFS_TEST_REPO || return $?
 
-  echo "check catalog and data integrity"
+  echo "*** check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
 
   return 0
