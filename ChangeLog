@@ -7,6 +7,7 @@
   * Fix RPM dist tag for SLES12 (CVM-1032)
 
 2.3.1:
+  * Add local reflog checksum to ensure data integrity (CVM-1006)
   * Fix false warning on graft files when removing trees on overlayfs (CVM-932)
 
 2.3.0:
