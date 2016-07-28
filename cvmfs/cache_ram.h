@@ -107,12 +107,16 @@ class RamCacheManager : public CacheManager {
     unsigned max_entries,
     perf::Statistics *statistics)
     : max_size_(max_size)
-    , max_entries_(max_entries)
+    , fd_pivot_(0)
+    , open_fds_(max_entries)
+    , fd_index_(max_entries)
     , regular_entries_(max_entries/2, "RamCache.regular", statistics)
     , volatile_entries_(max_entries/2, "RamCache.volatile", statistics)
     , counters_(statistics, "RamCache") {
     int retval = pthread_rwlock_init(&rwlock_, NULL);
     assert(retval == 0);
+    for (size_t i = 0; i < fd_index_.size(); i++)
+      fd_index_[i] = i;
     LogCvmfs(kLogCache, kLogDebug, "max %u B, %u entries",
              max_size, max_entries);
   }
@@ -236,13 +240,15 @@ class RamCacheManager : public CacheManager {
 
  private:
   struct ReadOnlyFd {
-    ReadOnlyFd() : handle(shash::Any()), pos(0), store(NULL) { }
+    ReadOnlyFd() : handle(kInvalidHandle), pos(0), index(0), store(NULL) { }
     ReadOnlyFd(const shash::Any &h, uint64_t pos)
       : handle(h)
       , pos(pos)
+      , index(0)
       , store(NULL) { }
     shash::Any handle;
     uint64_t pos;
+    size_t index;
     MemoryKvStore *store;
   };
 
@@ -273,8 +279,9 @@ class RamCacheManager : public CacheManager {
   virtual int DoOpen(const shash::Any &id);
 
   uint64_t max_size_;
-  uint64_t max_entries_;
+  size_t fd_pivot_;
   std::vector<ReadOnlyFd> open_fds_;
+  std::vector<int> fd_index_;
   pthread_rwlock_t rwlock_;
   MemoryKvStore regular_entries_;
   MemoryKvStore volatile_entries_;

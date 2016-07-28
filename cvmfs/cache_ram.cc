@@ -22,23 +22,18 @@ namespace cache {
 
 
 int RamCacheManager::AddFd(const ReadOnlyFd &fd) {
-  unsigned i = 0;
-  for ( ; i < open_fds_.size(); ++i) {
-    if (open_fds_[i].handle == kInvalidHandle) {
-      open_fds_[i] = fd;
-      // LogCvmfs(kLogCache, kLogDebug, "found free fd %u", i);
-      return i;
-    }
-  }
-  if (open_fds_.size() < max_entries_) {
-    open_fds_.push_back(fd);
-    // LogCvmfs(kLogCache, kLogDebug, "adding fd %u", i);
-    return i;
-  } else {
-    LogCvmfs(kLogCache, kLogDebug, "too many open files (%u)", max_entries_);
+  if (fd_pivot_ >= fd_index_.size()) {
+    LogCvmfs(kLogCache, kLogDebug, "too many open files (%u)", fd_pivot_);
     perf::Inc(counters_.n_enfile);
     return -ENFILE;
   }
+  int next_fd = fd_index_[fd_pivot_];
+  assert(next_fd < static_cast<int>(open_fds_.size()));
+  assert(open_fds_[next_fd].handle == kInvalidHandle);
+  open_fds_[next_fd] = fd;
+  open_fds_[next_fd].index = fd_pivot_;
+  ++fd_pivot_;
+  return next_fd;
 }
 
 bool RamCacheManager::AcquireQuotaManager(QuotaManager *quota_mgr) {
@@ -54,39 +49,42 @@ int RamCacheManager::Open(const shash::Any &id) {
   return DoOpen(id);
 }
 
+
 int RamCacheManager::DoOpen(const shash::Any &id) {
-  bool rc;
+  bool ok;
   MemoryBuffer buf;
+  MemoryKvStore *store;
+
+  if (regular_entries_.GetBuffer(id, &buf)) {
+    store = &regular_entries_;
+  } else if (volatile_entries_.GetBuffer(id, &buf)) {
+    store = &volatile_entries_;
+  } else {
+    LogCvmfs(kLogCache, kLogDebug, "miss for %s",
+             id.ToString().c_str());
+    perf::Inc(counters_.n_openmiss);
+    return -ENOENT;
+  }
+
   int fd = AddFd(ReadOnlyFd(id, 0));
   if (fd < 0) {
     LogCvmfs(kLogCache, kLogDebug, "error while opening %s: %s",
              id.ToString().c_str(), strerror(-fd));
     return fd;
   }
-
-  if (regular_entries_.GetBuffer(id, &buf)) {
-    open_fds_[fd].store = &regular_entries_;
-    rc = regular_entries_.IncRef(id);
-    assert(rc);
+  open_fds_[fd].store = store;
+  ok = store->IncRef(id);
+  assert(ok);
+  if (store == &regular_entries_) {
     LogCvmfs(kLogCache, kLogDebug, "hit in regular entries for %s",
              id.ToString().c_str());
     perf::Inc(counters_.n_openregular);
-    return fd;
-  } else if (volatile_entries_.GetBuffer(id, &buf)) {
-    open_fds_[fd].store = &volatile_entries_;
-    rc = volatile_entries_.IncRef(id);
-    assert(rc);
+  } else {
     LogCvmfs(kLogCache, kLogDebug, "hit in volatile entries for %s",
              id.ToString().c_str());
     perf::Inc(counters_.n_openvolatile);
-    return fd;
-  } else {
-    open_fds_[fd].handle = kInvalidHandle;
-    LogCvmfs(kLogCache, kLogDebug, "miss for %s",
-             id.ToString().c_str());
-    perf::Inc(counters_.n_openmiss);
-    return -ENOENT;
   }
+  return fd;
 }
 
 
@@ -104,7 +102,6 @@ int64_t RamCacheManager::GetSize(int fd) {
 
 int RamCacheManager::Close(int fd) {
   bool rc;
-  bool sweep_tail = false;
 
   WriteLockGuard guard(rwlock_);
   if (!IsValid(fd)) {
@@ -115,19 +112,22 @@ int RamCacheManager::Close(int fd) {
   rc = open_fds_[fd].store->Unref(open_fds_[fd].handle);
   assert(rc);
   open_fds_[fd].handle = kInvalidHandle;
-  LogCvmfs(kLogCache, kLogDebug, "closed fd %d", fd);
-  sweep_tail = (static_cast<unsigned>(fd) == (open_fds_.size() - 1));
 
-  if (sweep_tail) {
-    unsigned last_good_idx = open_fds_.size() - 1;
-    while (last_good_idx > 0 &&
-           open_fds_[last_good_idx].handle == kInvalidHandle)
-      last_good_idx--;
-    open_fds_.resize(last_good_idx + 1);
-    LogCvmfs(kLogCache, kLogDebug, "resized fd vector to %u",
-             last_good_idx + 1);
+  size_t index = open_fds_[fd].index;
+  assert(index < fd_index_.size());
+  assert(fd_pivot_ < fd_index_.size());
+  assert(fd_pivot_ > 0);
+  --fd_pivot_;
+  if (index < fd_pivot_) {
+    int other = fd_index_[fd_pivot_];
+    assert(other >= 0);
+    assert(other < static_cast<int>(open_fds_.size()));
+    assert(open_fds_[other].handle != kInvalidHandle);
+    open_fds_[other].index = index;
+    fd_index_[index] = other;
+    fd_index_[fd_pivot_] = fd;
   }
-
+  LogCvmfs(kLogCache, kLogDebug, "closed fd %d", fd);
   perf::Inc(counters_.n_close);
   return 0;
 }
