@@ -4248,7 +4248,7 @@ cvmfs_server_check() {
   local name
   local upstream
   local storage_dir
-  local stratum0
+  local url
   local check_chunks=1
   local check_integrity=0
   local subtree_path=""
@@ -4297,7 +4297,11 @@ cvmfs_server_check() {
   check_repository_compatibility $name
 
   upstream=$CVMFS_UPSTREAM_STORAGE
-  stratum0=$CVMFS_STRATUM0
+  if is_stratum1 $name; then
+    url=$CVMFS_STRATUM1
+  else
+    url=$CVMFS_STRATUM0
+  fi
 
   # do it!
   if [ $check_integrity -ne 0 ]; then
@@ -4321,6 +4325,9 @@ cvmfs_server_check() {
     subtree_msg=" (starting at nested catalog '$subtree_path')"
   fi
 
+  local with_reflog=
+  has_reflog_checksum $name && with_reflog="-R $(get_reflog_checksum $name)"
+
   echo "Verifying Catalog Integrity of ${name}${subtree_msg}..."
   local user_shell="$(get_user_shell $name)"
   local check_cmd
@@ -4328,11 +4335,12 @@ cvmfs_server_check() {
                      $check_chunks_param               \
                      $log_level_param                  \
                      $subtree_param                    \
-                     -r $stratum0                      \
+                     -r $url                           \
                      -t ${CVMFS_SPOOL_DIR}/tmp         \
                      -k ${CVMFS_PUBLIC_KEY}            \
                      -N ${CVMFS_REPOSITORY_NAME}       \
                      $(get_follow_http_redirects_flag) \
+                     $with_reflog                      \
                      -z /etc/cvmfs/repositories.d/${name}/trusted_certs"
   $user_shell "$check_cmd"
 }
