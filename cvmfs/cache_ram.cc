@@ -27,8 +27,8 @@ int RamCacheManager::AddFd(const ReadOnlyFd &fd) {
     perf::Inc(counters_.n_enfile);
     return -ENFILE;
   }
-  int next_fd = fd_index_[fd_pivot_];
-  assert(next_fd < static_cast<int>(open_fds_.size()));
+  size_t next_fd = fd_index_[fd_pivot_];
+  assert(next_fd < open_fds_.size());
   assert(open_fds_[next_fd].handle == kInvalidHandle);
   open_fds_[next_fd] = fd;
   open_fds_[next_fd].index = fd_pivot_;
@@ -116,9 +116,8 @@ int RamCacheManager::Close(int fd) {
   assert(fd_pivot_ > 0);
   --fd_pivot_;
   if (index < fd_pivot_) {
-    int other = fd_index_[fd_pivot_];
-    assert(other >= 0);
-    assert(other < static_cast<int>(open_fds_.size()));
+    size_t other = fd_index_[fd_pivot_];
+    assert(other < open_fds_.size());
     assert(open_fds_[other].handle != kInvalidHandle);
     open_fds_[other].index = index;
     fd_index_[index] = other;

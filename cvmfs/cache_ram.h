@@ -284,7 +284,7 @@ class RamCacheManager : public CacheManager {
   uint64_t max_size_;
   size_t fd_pivot_;
   std::vector<ReadOnlyFd> open_fds_;
-  std::vector<int> fd_index_;
+  std::vector<size_t> fd_index_;
   pthread_rwlock_t rwlock_;
   MemoryKvStore regular_entries_;
   MemoryKvStore volatile_entries_;
