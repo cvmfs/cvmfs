@@ -1,4 +1,5 @@
 2.3.1:
+  * Fix RPM dist tag for SLES12 (CVM-1032)
   * Fix remote URL of `cvmfs_server check` on stratum 1
   * Add local reflog checksum to ensure data integrity (CVM-1006)
   * Fix false warning on graft files when removing trees on overlayfs (CVM-932)
