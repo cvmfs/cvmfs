@@ -5,9 +5,11 @@
   * Use cache for fetching history database on mount
   * Fix small memory leak during remount of root catalog
   * Fix handling of file:// url in CVMFS_SERVER_URL
-  * Fix RPM dist tag for SLES12 (CVM-1032)
 
 2.3.1:
+  * Use tbb version 4.4 update 5
+  * Minimal set of fixes to allow compilation on Fedora 24
+  * Fix RPM dist tag for SLES12 (CVM-1032)
   * Fix remote URL of `cvmfs_server check` on stratum 1
   * Add local reflog checksum to ensure data integrity (CVM-1006)
   * Fix false warning on graft files when removing trees on overlayfs (CVM-932)
