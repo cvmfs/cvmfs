@@ -3244,8 +3244,8 @@ cvmfs_server_mkfs() {
     -r $upstream                                \
     -n $name                                    \
     -a $hash_algo $volatile_opt                 \
-    -o ${temp_dir}/new_manifest"                \
-    -R $(get_reflog_checksum)
+    -o ${temp_dir}/new_manifest                 \
+    -R $(get_reflog_checksum $name)"
   if $garbage_collectable; then
     create_cmd="$create_cmd -z"
   fi
@@ -5196,8 +5196,8 @@ __run_gc() {
                                                   -u $CVMFS_UPSTREAM_STORAGE     \
                                                   -n $CVMFS_REPOSITORY_NAME      \
                                                   -t ${CVMFS_SPOOL_DIR}/tmp/     \
-                                                  -k $CVMFS_PUBLIC_KEY"          \
-                                                  -R $(get_reflog_checksum)
+                                                  -k $CVMFS_PUBLIC_KEY           \
+                                                  -R $(get_reflog_checksum $name)"
     if ! $user_shell "$reflog_reconstruct_command"; then
       to_syslog_for_repo $name "failed to reconstruction reference log"
     else
@@ -5206,13 +5206,13 @@ __run_gc() {
   fi
 
   [ $dry_run -ne 0 ] || to_syslog_for_repo $name "started garbage collection"
-  local gc_command="$(__swissknife_cmd dbg) gc                         \
-                                            -r $repository_url         \
-                                            -u $CVMFS_UPSTREAM_STORAGE \
-                                            -n $CVMFS_REPOSITORY_NAME  \
-                                            -k $CVMFS_PUBLIC_KEY       \
-                                            -t ${CVMFS_SPOOL_DIR}/tmp/ \
-                                            -R $(get_reflog_checksum)  \
+  local gc_command="$(__swissknife_cmd dbg) gc                              \
+                                            -r $repository_url              \
+                                            -u $CVMFS_UPSTREAM_STORAGE      \
+                                            -n $CVMFS_REPOSITORY_NAME       \
+                                            -k $CVMFS_PUBLIC_KEY            \
+                                            -t ${CVMFS_SPOOL_DIR}/tmp/      \
+                                            -R $(get_reflog_checksum $name) \
                                             $additional_switches"
 
   if ! $user_shell "$gc_command"; then
@@ -5379,8 +5379,10 @@ __do_snapshot() {
     local with_history=""
     local with_reflog=""
     [ $initial_snapshot -ne 1 ] && with_history="-p"
-    [ $initial_snapshot -eq 1 -o has_reflog_checksum ] && \
-      with_reflog="-R $(get_reflog_checksum)"
+    [ $initial_snapshot -eq 1 ] && \
+      with_reflog="-R $(get_reflog_checksum $alias_name)"
+    has_reflog_checksum $alias_name && \
+      with_reflog="-R $(get_reflog_checksum $alias_name)"
     $user_shell "$(__swissknife_cmd dbg) pull -m $name \
         -u $stratum0                                   \
         -w $stratum1                                   \
