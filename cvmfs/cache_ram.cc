@@ -112,7 +112,7 @@ int RamCacheManager::Close(int fd) {
 
   size_t index = open_fds_[fd].index;
   assert(index < fd_index_.size());
-  assert(fd_pivot_ < fd_index_.size());
+  assert(fd_pivot_ <= fd_index_.size());
   assert(fd_pivot_ > 0);
   --fd_pivot_;
   if (index < fd_pivot_) {
