@@ -425,10 +425,12 @@ fi
 %doc COPYING AUTHORS README ChangeLog
 
 %changelog
-* Thu Jun 30 2016 Jakob Blomer <jblomer@cern.ch> - 2.4.0
-- Fix SLES12 dist tag
-* Mon Jun 13 2016 Jakob Blomer <jblomer@cern.ch> - 2.4.0
+* Thu Jul 28 2016 Jakob Blomer <jblomer@cern.ch> - 2.4.0
 - Update upstream package
+* Thu Jul 28 2016 Jakob Blomer <jblomer@cern.ch> - 2.3.1
+- Update upstream package
+* Thu Jun 30 2016 Jakob Blomer <jblomer@cern.ch> - 2.3.1
+- Fix SLES12 dist tag
 * Tue May 03 2016 Jakob Blomer <jblomer@cern.ch> - 2.3.0
 - No optimiziation on EL5/i686 to prevent faulty atomics
 * Fri Apr 29 2016 Jakob Blomer <jblomer@cern.ch> - 2.3.0
