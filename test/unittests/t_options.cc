@@ -32,11 +32,18 @@ class T_Options : public ::testing::Test {
             "CVMFS_SERVER_URL=http://volhcb28:3128/data\n"
             "IdontHaveAnEqual\n"
             "I=have=twoEquals\n"
-            "I = and spaces\n"
+            "X = and spaces\n"
             "value=\n"
             "CVMFS_SHARED_CACHE=no\n"
             "CVMFS_HTTP_PROXY=DIRECT\n"
-            "export A=B\n");
+            "export A=B\n"
+            "=only equal sign\n"
+            " =equal sign with space\n"
+            "\n"
+            "#\n"
+            "D=E # with a comment\n"
+            "F=\"G\"\n"
+            "H='I' ");
     int result = fclose(temp_file);
     ASSERT_EQ(0, result);
     fprintf(temp_file_2, "CVMFS_CACHE_BASE=/overwritten\n");
@@ -52,11 +59,11 @@ class T_Options : public ::testing::Test {
   template <typename T> struct type {};
 
   unsigned ExpectedValues(const type<BashOptionsManager>  type_specifier) {
-    return 9u;
+    return 12u;
   }
 
   unsigned ExpectedValues(const type<SimpleOptionsParser>  type_specifier) {
-    return 6u;
+    return 12u;
   }
 
   unsigned ExpectedValues() {
@@ -83,6 +90,7 @@ TYPED_TEST(T_Options, ParsePath) {
   const unsigned expected_number_elements = TestFixture::ExpectedValues();
   options_manager.ParsePath(config_file, false);
 
+  // printf("DUMP: ***\n%s\n***\n", options_manager.Dump().c_str());
   ASSERT_EQ(expected_number_elements, options_manager.GetAllKeys().size());
 
   EXPECT_TRUE(options_manager.GetValue("CVMFS_CACHE_BASE", &container));
@@ -114,6 +122,13 @@ TYPED_TEST(T_Options, ParsePath) {
   EXPECT_EQ("", container);
   EXPECT_TRUE(options_manager.GetSource("value", &container));
   EXPECT_EQ(config_file, container);
+
+  EXPECT_TRUE(options_manager.GetValue("D", &container));
+  EXPECT_EQ("E", container);
+  EXPECT_TRUE(options_manager.GetValue("F", &container));
+  EXPECT_EQ("G", container);
+  EXPECT_TRUE(options_manager.GetValue("H", &container));
+  EXPECT_EQ("I", container);
 }
 
 TYPED_TEST(T_Options, ParsePathNoFile) {

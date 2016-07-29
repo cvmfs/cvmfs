@@ -17,14 +17,14 @@
 using namespace std;  // NOLINT
 
 
-OptionsManager *cvmfs_options_clone(OptionsManager *opts) {
-  OptionsManager *result = new SimpleOptionsParser(
+SimpleOptionsParser *cvmfs_options_clone(SimpleOptionsParser *opts) {
+  SimpleOptionsParser *result = new SimpleOptionsParser(
     *reinterpret_cast<SimpleOptionsParser *>(opts));
   return result;
 }
 
 
-void cvmfs_options_fini(OptionsManager *opts) {
+void cvmfs_options_fini(SimpleOptionsParser *opts) {
   delete opts;
 }
 
@@ -34,7 +34,7 @@ void cvmfs_options_free(char *value) {
 }
 
 
-char *cvmfs_options_get(OptionsManager *opts, const char *key) {
+char *cvmfs_options_get(SimpleOptionsParser *opts, const char *key) {
   string arg;
   bool retval = opts->GetValue(key, &arg);
   if (!retval)
@@ -45,15 +45,15 @@ char *cvmfs_options_get(OptionsManager *opts, const char *key) {
 }
 
 
-char *cvmfs_options_dump(OptionsManager *opts) {
+char *cvmfs_options_dump(SimpleOptionsParser *opts) {
   char *result = strdup(opts->Dump().c_str());
   assert(result != NULL);
   return result;
 }
 
 
-OptionsManager *cvmfs_options_init() {
-  OptionsManager *result = new SimpleOptionsParser();
+SimpleOptionsParser *cvmfs_options_init() {
+  SimpleOptionsParser *result = new SimpleOptionsParser();
   // In contrast to the fuse module, we don't want to taint the process'
   // environment with parameters from the cvmfs configuration in libcvmfs
   result->set_taint_environment(false);
@@ -64,7 +64,7 @@ OptionsManager *cvmfs_options_init() {
 
 
 void cvmfs_options_set(
-  OptionsManager *opts,
+  SimpleOptionsParser *opts,
   const char *key, const
   char *value)
 {
@@ -72,6 +72,12 @@ void cvmfs_options_set(
 }
 
 
-void cvmfs_options_unset(OptionsManager *opts, const char *key) {
+int cvmfs_options_parse(SimpleOptionsParser *opts, const char *path) {
+  bool result = opts->TryParsePath(path);
+  return result ? 0 : -1;
+}
+
+
+void cvmfs_options_unset(SimpleOptionsParser *opts, const char *key) {
   opts->UnsetValue(key);
 }
