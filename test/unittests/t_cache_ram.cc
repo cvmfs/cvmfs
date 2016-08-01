@@ -11,6 +11,7 @@
 #include "cache.h"
 #include "cache_ram.h"
 #include "hash.h"
+#include "prng.h"
 #include "statistics.h"
 
 using namespace std;  // NOLINT
@@ -23,7 +24,7 @@ namespace cache {
 class T_RamCacheManager : public ::testing::Test {
  public:
   T_RamCacheManager()
-    : ramcache_(4*alloc_size, 3*cache_size, &statistics_) {
+    : ramcache_(4*alloc_size, cache_size, &statistics_) {
     a_.digest[1] = 1;
   }
 
@@ -307,6 +308,36 @@ TEST_F(T_RamCacheManager, LargeCommit) {
   a_.digest[1] = 2;
   EXPECT_EQ(0, ramcache_.Close(fd));
   EXPECT_EQ(0, ramcache_.CommitTxn(txn3));
+}
+
+
+TEST_F(T_RamCacheManager, OpenClose) {
+  Prng prng;
+  prng.InitLocaltime();
+  int fds[cache_size];
+  char buf[alloc_size];
+  memset(buf, 42, alloc_size);
+  void *txn = alloca(ramcache_.SizeOfTxn());
+  EXPECT_EQ(0, ramcache_.StartTxn(a_, alloc_size, txn));
+  EXPECT_EQ(alloc_size, ramcache_.Write(buf, alloc_size, txn));
+  EXPECT_GE((fds[0] = ramcache_.OpenFromTxn(txn)), 0);
+  EXPECT_EQ(0, ramcache_.CommitTxn(txn));
+
+  for (size_t i = 1; i < cache_size; ++i) {
+    EXPECT_GE((fds[i] = ramcache_.Dup(fds[0])), 0);
+  }
+  EXPECT_EQ(-ENFILE, ramcache_.Dup(fds[0]));
+
+  for (size_t i = 0; i < 10000; ++i) {
+    size_t j = prng.Next(cache_size);
+    EXPECT_EQ(0, ramcache_.Close(fds[j]));
+    size_t adj = j > 0 ? j - 1 : cache_size - 1;
+    EXPECT_GE((fds[j] = ramcache_.Dup(adj)), 0);
+  }
+
+  for (size_t i = 0; i < cache_size; ++i) {
+    EXPECT_EQ(0, ramcache_.Close(fds[i]));
+  }
 }
 
 }  // namespace cache
