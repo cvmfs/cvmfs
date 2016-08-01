@@ -50,7 +50,7 @@
 extern "C" {
 // Map C++ clases to their C interface names
 typedef class LibContext cvmfs_context;
-typedef class OptionsManager cvmfs_option_map;
+typedef class SimpleOptionsParser cvmfs_option_map;
 #else
 typedef struct LibContext cvmfs_context;
 typedef struct OptionsManager cvmfs_option_map;
@@ -118,6 +118,11 @@ void cvmfs_options_fini(cvmfs_option_map *opts);
  */
 void cvmfs_options_set(cvmfs_option_map *opts,
                        const char *key, const char *value);
+/**
+ * Sets options from a file with linewise KEY=VALUE pairs.  Returns 0 on success
+ * and -1 otherwise.
+ */
+int cvmfs_options_parse(cvmfs_option_map *opts, const char *path);
 /**
  * Removes a key-value pair from a cvmfs_options_map.  The key may or may not
  * exist before the call.

@@ -301,7 +301,7 @@ int cvmfs_listdir(
 
 cvmfs_errors cvmfs_attach_repo_v2(
   const char *fqrn,
-  OptionsManager *opts,
+  SimpleOptionsParser *opts,
   LibContext **ctx)
 {
   assert(ctx != NULL);
@@ -318,7 +318,7 @@ cvmfs_errors cvmfs_attach_repo_v2(
 }
 
 
-void cvmfs_adopt_options(cvmfs_context *ctx, OptionsManager *opts) {
+void cvmfs_adopt_options(cvmfs_context *ctx, SimpleOptionsParser *opts) {
   ctx->set_options_mgr(opts);
 }
 
@@ -328,7 +328,7 @@ void cvmfs_detach_repo(LibContext *ctx) {
 }
 
 
-cvmfs_errors cvmfs_init_v2(OptionsManager *opts) {
+cvmfs_errors cvmfs_init_v2(SimpleOptionsParser *opts) {
   int result = LibGlobals::Initialize(opts);
   if (result != loader::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Initialization failed: %s (%d)",
