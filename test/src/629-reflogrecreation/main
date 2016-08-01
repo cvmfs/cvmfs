@@ -38,6 +38,7 @@ check_reflog_contains() {
 cvmfs_run_test() {
   logfile=$1
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local reflog_checksum=/var/spool/cvmfs/${CVMFS_TEST_REPO}/reflog.chksum
 
   local scratch_dir=$(pwd)
   mkdir reference_dir
@@ -107,6 +108,7 @@ cvmfs_run_test() {
 
   echo "removing Reflog from Stratum0"
   delete_from_backend $CVMFS_TEST_REPO ".cvmfsreflog" || return 72
+  rm -f "$reflog_checksum" || return 73
 
   echo "creating a tag in Stratum0"
   cvmfs_server tag -a "foobar"                          \
