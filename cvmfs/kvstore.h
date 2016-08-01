@@ -52,7 +52,6 @@ class MemoryKvStore :SingleCopy {
     perf::Counter *sz_committed;
     perf::Counter *sz_deleted;
     perf::Counter *sz_shrunk;
-    perf::Counter *sz_freed;
 
     Counters(perf::Statistics *statistics, const std::string &name) {
       sz_size = statistics->Register(name + ".sz_size", "Size for " + name);
@@ -84,8 +83,6 @@ class MemoryKvStore :SingleCopy {
         "Bytes deleted for " + name);
       sz_shrunk = statistics->Register(name + ".sz_shrunk",
         "Bytes shrunk for " + name);
-      sz_freed = statistics->Register(name + ".sz_freed",
-        "Bytes freed for " + name);
     }
   };
 
@@ -93,7 +90,8 @@ class MemoryKvStore :SingleCopy {
     unsigned int cache_entries,
     const string &name,
     perf::Statistics *statistics)
-    : used_bytes_(0)
+    : use_malloc_(true)
+    , used_bytes_(0)
     , entry_count_(0)
     , max_entries_(cache_entries)
     , entries_(cache_entries, shash::Any(), lru::hasher_any,
@@ -177,6 +175,24 @@ class MemoryKvStore :SingleCopy {
   bool ShrinkTo(size_t size);
 
   /**
+   * Allocate a new buffer of size @p size using the KvStore's memory allocator.
+   * See @p malloc(3)
+   */
+  void *MallocBuffer(size_t size);
+
+  /**
+   * Resize the given buffer using the KvStore's memory allocator.
+   * See @p malloc(3)
+   */
+  void *ReallocBuffer(void *ptr, size_t size);
+
+  /**
+   * Frees the given buffer, returning the space to the KvStore's memory allocator.
+   * See @p malloc(3)
+   */
+  void FreeBuffer(void *ptr);
+
+  /**
    * Get the memory buffer describing the entry at id
    * @param id The hash key
    * @returns True iff the entry is present
@@ -198,7 +214,11 @@ class MemoryKvStore :SingleCopy {
 
  private:
   bool DoDelete(const shash::Any &id);
+  void *DoMalloc(size_t size);
+  void *DoRealloc(void *ptr, size_t size);
+  void DoFree(void *ptr);
 
+  bool use_malloc_;
   size_t used_bytes_;
   unsigned int entry_count_;
   unsigned int max_entries_;

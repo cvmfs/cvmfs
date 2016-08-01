@@ -41,6 +41,45 @@ bool MemoryKvStore::PopBuffer(const shash::Any &id, MemoryBuffer *buf) {
   return true;
 }
 
+void *MemoryKvStore::MallocBuffer(size_t size) {
+  WriteLockGuard guard(rwlock_);
+  return DoMalloc(size);
+}
+
+void *MemoryKvStore::DoMalloc(size_t size) {
+  if (use_malloc_) {
+    return malloc(size);
+  } else {
+    abort();
+  }
+}
+
+void *MemoryKvStore::ReallocBuffer(void *ptr, size_t size) {
+  WriteLockGuard guard(rwlock_);
+  return DoRealloc(ptr, size);
+}
+
+void *MemoryKvStore::DoRealloc(void *ptr, size_t size) {
+  if (use_malloc_) {
+    return realloc(ptr, size);
+  } else {
+    abort();
+  }
+}
+
+void MemoryKvStore::FreeBuffer(void *ptr) {
+  WriteLockGuard guard(rwlock_);
+  DoFree(ptr);
+}
+
+void MemoryKvStore::DoFree(void *ptr) {
+  if (use_malloc_) {
+    free(ptr);
+  } else {
+    abort();
+  }
+}
+
 int64_t MemoryKvStore::GetSize(const shash::Any &id) {
   MemoryBuffer mem;
   perf::Inc(counters_.n_getsize);
@@ -206,8 +245,7 @@ bool MemoryKvStore::DoDelete(const shash::Any &id) {
   used_bytes_ -= buf.size;
   counters_.sz_size->Set(used_bytes_);
   perf::Xadd(counters_.sz_deleted, buf.size);
-  free(buf.address);
-  perf::Xadd(counters_.sz_freed, buf.size);
+  DoFree(buf.address);
   entries_.Forget(id);
   LogCvmfs(kLogKvStore, kLogDebug, "deleted %s", id.ToString().c_str());
   return true;
@@ -240,8 +278,7 @@ bool MemoryKvStore::ShrinkTo(size_t size) {
     used_bytes_ -= buf.size;
     perf::Xadd(counters_.sz_shrunk, buf.size);
     counters_.sz_size->Set(used_bytes_);
-    free(buf.address);
-    perf::Xadd(counters_.sz_freed, buf.size);
+    DoFree(buf.address);
     LogCvmfs(kLogKvStore, kLogDebug, "delete %s", key.ToString().c_str());
   }
   entries_.FilterEnd();

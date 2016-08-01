@@ -259,12 +259,14 @@ class RamCacheManager : public CacheManager {
       , size(0)
       , expected_size(0)
       , pos(0)
+      , allocated(false)
       , object_type(kTypeRegular) { }
     shash::Any id;
     void *buffer;
     uint64_t size;
     uint64_t expected_size;
     uint64_t pos;
+    bool allocated;
     ObjectType object_type;
     std::string description;
   };
@@ -277,6 +279,14 @@ class RamCacheManager : public CacheManager {
 
   inline MemoryKvStore *GetStore(const ReadOnlyFd &fd) {
     if (fd.is_volatile) {
+      return &volatile_entries_;
+    } else {
+      return &regular_entries_;
+    }
+  }
+
+  inline MemoryKvStore *GetTransactionStore(Transaction *txn) {
+    if (txn->object_type == cache::CacheManager::kTypeVolatile) {
       return &volatile_entries_;
     } else {
       return &regular_entries_;
