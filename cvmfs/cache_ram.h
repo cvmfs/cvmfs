@@ -23,8 +23,6 @@ namespace cache {
 // an invalid handle
 static const shash::Any kInvalidHandle;
 
-static const unsigned kMaxHandles = 8192;
-
 /**
  * The @p RamCacheManager class provides a cache backend that operates
  * entirely from the host's RAM. This backend does not require any
@@ -109,11 +107,16 @@ class RamCacheManager : public CacheManager {
     unsigned max_entries,
     perf::Statistics *statistics)
     : max_size_(max_size)
+    , fd_pivot_(0)
+    , open_fds_(max_entries)
+    , fd_index_(max_entries)
     , regular_entries_(max_entries/2, "RamCache.regular", statistics)
     , volatile_entries_(max_entries/2, "RamCache.volatile", statistics)
     , counters_(statistics, "RamCache") {
     int retval = pthread_rwlock_init(&rwlock_, NULL);
     assert(retval == 0);
+    for (size_t i = 0; i < fd_index_.size(); i++)
+      fd_index_[i] = i;
     LogCvmfs(kLogCache, kLogDebug, "max %u B, %u entries",
              max_size, max_entries);
   }
@@ -237,14 +240,17 @@ class RamCacheManager : public CacheManager {
 
  private:
   struct ReadOnlyFd {
-    ReadOnlyFd() : handle(shash::Any()), pos(0), store(NULL) { }
-    ReadOnlyFd(const shash::Any &h, uint64_t pos)
+    ReadOnlyFd()
+      : handle(kInvalidHandle)
+      , is_volatile(false)
+      , index(0) {}
+    explicit ReadOnlyFd(const shash::Any &h)
       : handle(h)
-      , pos(pos)
-      , store(NULL) { }
+      , is_volatile(false)
+      , index(0) {}
     shash::Any handle;
-    uint64_t pos;
-    MemoryKvStore *store;
+    bool is_volatile;
+    size_t index;
   };
 
   struct Transaction {
@@ -269,12 +275,22 @@ class RamCacheManager : public CacheManager {
     return open_fds_[fd].handle != kInvalidHandle;
   }
 
+  inline MemoryKvStore *GetStore(const ReadOnlyFd &fd) {
+    if (fd.is_volatile) {
+      return &volatile_entries_;
+    } else {
+      return &regular_entries_;
+    }
+  }
+
   int AddFd(const ReadOnlyFd &fd);
   int64_t CommitToKvStore(Transaction *transaction);
   virtual int DoOpen(const shash::Any &id);
 
   uint64_t max_size_;
+  size_t fd_pivot_;
   std::vector<ReadOnlyFd> open_fds_;
+  std::vector<size_t> fd_index_;
   pthread_rwlock_t rwlock_;
   MemoryKvStore regular_entries_;
   MemoryKvStore volatile_entries_;
