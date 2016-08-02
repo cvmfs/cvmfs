@@ -387,40 +387,54 @@ static int TranslateReturnValue(loader::Failures code) {
 }
 
 
-int cvmfs_init(char const *options) {
-  global_options opts;
-  int parse_result = opts.parse_options(options);
+SimpleOptionsParser *cvmfs_options_init_legacy(char const *legacy_options) {
+  global_options global_opts;
+  int parse_result = global_opts.parse_options(legacy_options);
   if (parse_result != 0) {
-    fprintf(stderr, "Invalid CVMFS global options: %s.\n", options);
+    fprintf(stderr, "Invalid CVMFS global options: %s.\n", legacy_options);
     usage();
-    return parse_result;
+    return NULL;
   }
 
-  OptionsManager *options_mgr = cvmfs_options_init();
-  options_mgr->SetValue("CVMFS_CACHE_DIR", opts.cache_directory);
-  if (!opts.lock_directory.empty()) {
-    options_mgr->SetValue("CVMFS_WORKSPACE", opts.lock_directory);
+  SimpleOptionsParser *options_mgr = cvmfs_options_init();
+  options_mgr->SetValue("CVMFS_CACHE_DIR", global_opts.cache_directory);
+  if (!global_opts.lock_directory.empty()) {
+    options_mgr->SetValue("CVMFS_WORKSPACE", global_opts.lock_directory);
   }
-  if (opts.alien_cache) {
-    options_mgr->SetValue("CVMFS_ALIEN_CACHE", opts.cache_directory);
+  if (global_opts.alien_cache) {
+    options_mgr->SetValue("CVMFS_ALIEN_CACHE", global_opts.cache_directory);
   }
-  if (!opts.alien_cachedir.empty()) {
-    options_mgr->SetValue("CVMFS_ALIEN_CACHE", opts.alien_cachedir);
+  if (!global_opts.alien_cachedir.empty()) {
+    options_mgr->SetValue("CVMFS_ALIEN_CACHE", global_opts.alien_cachedir);
   }
-  if (opts.change_to_cache_directory) {
+  if (global_opts.change_to_cache_directory) {
     options_mgr->SetValue("CVMFS_CWD_CACHE", "on");
   }
   options_mgr->SetValue("CVMFS_SYSLOG_LEVEL",
-                        StringifyInt(opts.log_syslog_level));
-  if (!opts.log_prefix.empty()) {
-    options_mgr->SetValue("CVMFS_SYSLOG_PREFIX", opts.log_prefix);
+                        StringifyInt(global_opts.log_syslog_level));
+  if (!global_opts.log_prefix.empty()) {
+    options_mgr->SetValue("CVMFS_SYSLOG_PREFIX", global_opts.log_prefix);
   }
-  if (!opts.log_file.empty()) {
-    options_mgr->SetValue("CVMFS_DEBUGLOG", opts.log_file);
+  if (!global_opts.log_file.empty()) {
+    options_mgr->SetValue("CVMFS_DEBUGLOG", global_opts.log_file);
   }
-  if (opts.max_open_files > 0) {
-    options_mgr->SetValue("CVMFS_NFILES", StringifyInt(opts.max_open_files));
+  if (global_opts.max_open_files > 0) {
+    options_mgr->SetValue("CVMFS_NFILES",
+                          StringifyInt(global_opts.max_open_files));
   }
+
+  return options_mgr;
+}
+
+
+int cvmfs_init(char const *options) {
+  SimpleOptionsParser *options_mgr = cvmfs_options_init_legacy(options);
+  if (options_mgr == NULL) {
+    fprintf(stderr, "Invalid CVMFS global options: %s.\n", options);
+    usage();
+    return LIBCVMFS_FAIL_BADOPT;
+  }
+
   loader::Failures result = LibGlobals::Initialize(options_mgr);
   LibGlobals::GetInstance()->set_options_mgr(options_mgr);
   if (result != loader::kFailOk)
@@ -429,51 +443,64 @@ int cvmfs_init(char const *options) {
 }
 
 
-LibContext* cvmfs_attach_repo(char const *options)
+SimpleOptionsParser *cvmfs_options_clone_legacy(
+  SimpleOptionsParser *opts,
+  const char *legacy_options)
 {
   // Parse options
-  repo_options opts;
-  int parse_result = opts.parse_options(options);
-  if (parse_result != 0)
-  {
-    if (parse_result < 0) {
-      fprintf(stderr, "Invalid CVMFS options: %s.\n", options);
-      usage();
-    }
-    return NULL;
-  }
-  if (opts.url.empty()) {
-    fprintf(stderr, "No url specified in CVMFS repository options: %s.\n",
-            options);
+  repo_options repo_opts;
+  int parse_result = repo_opts.parse_options(legacy_options);
+  if ((parse_result != 0) || repo_opts.url.empty()) {
     return NULL;
   }
 
-  OptionsManager *options_mgr = cvmfs_options_init();
-  options_mgr->SetValue("CVMFS_TIMEOUT", StringifyInt(opts.timeout));
+  SimpleOptionsParser *options_mgr = cvmfs_options_clone(opts);
+  options_mgr->SetValue("CVMFS_FQRN", repo_opts.repo_name);
+  options_mgr->SetValue("CVMFS_TIMEOUT", StringifyInt(repo_opts.timeout));
   options_mgr->SetValue("CVMFS_TIMEOUT_DIRECT",
-                       StringifyInt(opts.timeout_direct));
-  options_mgr->SetValue("CVMFS_SERVER_URL", opts.url);
-  if (!opts.external_url.empty()) {
-    options_mgr->SetValue("CVMFS_EXTERNAL_SERVER_URL", opts.external_url);
+                       StringifyInt(repo_opts.timeout_direct));
+  options_mgr->SetValue("CVMFS_SERVER_URL", repo_opts.url);
+  if (!repo_opts.external_url.empty()) {
+    options_mgr->SetValue("CVMFS_EXTERNAL_SERVER_URL", repo_opts.external_url);
   }
-  if (opts.proxies.empty()) {
+  if (repo_opts.proxies.empty()) {
     options_mgr->SetValue("CVMFS_HTTP_PROXY", "DIRECT");
   } else {
-    options_mgr->SetValue("CVMFS_HTTP_PROXY", opts.proxies);
+    options_mgr->SetValue("CVMFS_HTTP_PROXY", repo_opts.proxies);
   }
-  options_mgr->SetValue("CVMFS_FALLBACK_PROXY", opts.fallback_proxies);
-  options_mgr->SetValue("CVMFS_PUBLIC_KEY", opts.pubkey);
-  if (!opts.blacklist.empty()) {
-    options_mgr->SetValue("CVMFS_BLACKLIST", opts.blacklist);
+  options_mgr->SetValue("CVMFS_FALLBACK_PROXY", repo_opts.fallback_proxies);
+  options_mgr->SetValue("CVMFS_PUBLIC_KEY", repo_opts.pubkey);
+  if (!repo_opts.blacklist.empty()) {
+    options_mgr->SetValue("CVMFS_BLACKLIST", repo_opts.blacklist);
   }
-  if (!opts.root_hash.empty()) {
-    options_mgr->SetValue("CVMFS_ROOT_HASH", opts.root_hash);
+  if (!repo_opts.root_hash.empty()) {
+    options_mgr->SetValue("CVMFS_ROOT_HASH", repo_opts.root_hash);
   }
-  LibContext *ctx = LibContext::Create(opts.repo_name, options_mgr);
+
+  return options_mgr;
+}
+
+
+LibContext* cvmfs_attach_repo(char const *options)
+{
+  SimpleOptionsParser *options_mgr_base = cvmfs_options_init();
+  SimpleOptionsParser *options_mgr =
+    cvmfs_options_clone_legacy(options_mgr_base, options);
+  cvmfs_options_fini(options_mgr_base);
+  if (options_mgr == NULL) {
+    fprintf(stderr, "Invalid CVMFS options: %s.\n", options);
+    usage();
+    return NULL;
+  }
+
+  string repo_name;
+  bool retval = options_mgr->GetValue("CVMFS_FQRN", &repo_name);
+  assert(retval);
+  LibContext *ctx = LibContext::Create(repo_name, options_mgr);
   assert(ctx != NULL);
   if (ctx->mount_point()->boot_status() != loader::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogDebug, "failed attaching %s, %s (%d)",
-             opts.repo_name.c_str(), ctx->mount_point()->boot_error().c_str(),
+             repo_name.c_str(), ctx->mount_point()->boot_error().c_str(),
              ctx->mount_point()->boot_status());
     delete ctx;
     return NULL;
