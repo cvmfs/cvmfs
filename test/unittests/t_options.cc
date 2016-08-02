@@ -32,7 +32,7 @@ class T_Options : public ::testing::Test {
             "CVMFS_SERVER_URL=http://volhcb28:3128/data\n"
             "IdontHaveAnEqual\n"
             "I=have=twoEquals\n"
-            "X = and spaces\n"
+            "XYZABC = and spaces\n"
             "value=\n"
             "CVMFS_SHARED_CACHE=no\n"
             "CVMFS_HTTP_PROXY=DIRECT\n"
