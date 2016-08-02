@@ -1807,7 +1807,7 @@ setup_benchmark_environment() {
   if [ -z "$CVMFS_OPT_CONFIG_FILE" ]; then
     create_default_cvmfs_config $workspace
   else
-    cp -f "$CVMFS_OPT_CONFIG_FILE" $workspace
+    cp -f "$CVMFS_OPT_CONFIG_FILE" $workspace/cvmfs.conf
   fi
 
   return 0
