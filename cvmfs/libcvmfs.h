@@ -102,11 +102,25 @@ void cvmfs_set_log_fn( void (*log_fn)(const char *msg) );
  */
 cvmfs_option_map *cvmfs_options_init();
 /**
+ * Creates a new option map based on the legacy option string that would be
+ * passed to the legacy function cvmfs_init().  Returns NULL if legacy_options
+ * is invalid.
+ */
+cvmfs_option_map *cvmfs_options_init_legacy(const char *legacy_options);
+/**
  * Creates a new option map based on an existing one.  Should be used to add
  * repository specific options passed to cvmfs_attach_repo_v2() based on the
  * global options that were passed to cvmfs_init_v2().
  */
 cvmfs_option_map *cvmfs_options_clone(cvmfs_option_map *opts);
+/**
+ * Derives an option map based on the legacy option string that would be passed
+ * to the legacy function cvmfs_attach_repo().  Returns NULL if legacy_options
+ * is invalid.  On success, the repository name is in the CVMFS_FQRN key in the
+ * options manager.
+ */
+cvmfs_option_map *cvmfs_options_clone_legacy(cvmfs_option_map *opts,
+                                             const char *legacy_options);
 /**
  * Frees the resources of a cvmfs_options_map, which was created either by a
  * call to cvmfs_options_init() or by a call to cvmfs_options_clone().
