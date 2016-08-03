@@ -143,9 +143,9 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
   }
 
   string reflog_path = reflog->CloseAndReturnDatabaseFile();
-  spooler->UploadReflog(reflog_path);
   shash::Any reflog_hash(hash_algorithm);
   manifest::Reflog::HashDatabase(reflog_path, &reflog_hash);
+  spooler->UploadReflog(reflog_path);
   spooler->WaitForUpload();
   delete spooler;
   manifest::Reflog::WriteChecksum(reflog_chksum_path, reflog_hash);
