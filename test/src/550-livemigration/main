@@ -76,7 +76,7 @@ initiate_reload() {
 }
 
 
-TEST550_MAX_WAITING_TIMEOUT=900
+TEST550_MAX_WAITING_TIMEOUT=1000
 wait_for_revision() {
   local mountpoint="$1"
   local repo_name="$2"
