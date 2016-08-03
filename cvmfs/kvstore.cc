@@ -41,17 +41,49 @@ bool MemoryKvStore::PopBuffer(const shash::Any &id, MemoryBuffer *buf) {
   return true;
 }
 
+size_t MemoryKvStore::GetBufferSize(void *ptr) {
+  return MallocArena::GetMallocArena(ptr, kArenaSize)->GetSize(ptr);
+}
+
 void *MemoryKvStore::MallocBuffer(size_t size) {
   WriteLockGuard guard(rwlock_);
   return DoMalloc(size);
 }
 
 void *MemoryKvStore::DoMalloc(size_t size) {
-  if (use_malloc_) {
+  size_t N;
+  void *p;
+  MallocArena *M;
+
+  switch (allocator_) {
+  case kMallocLibc:
     return malloc(size);
-  } else {
-    abort();
+  case kMallocArena:
+    if (size > kArenaSize) {
+      errno = ENOMEM;
+      return NULL;
+    }
+    N = malloc_arenas_.size();
+    assert(idx_last_arena_ < N);
+    p = malloc_arenas_[idx_last_arena_]->Malloc(size);
+    if (p != NULL)
+      return p;
+    for (unsigned i = 0; i < N; ++i) {
+      p = malloc_arenas_[i]->Malloc(size);
+      if (p != NULL) {
+        idx_last_arena_ = i;
+        return p;
+      }
+    }
+    idx_last_arena_ = N;
+    M = new MallocArena(kArenaSize);
+    malloc_arenas_.push_back(M);
+    p = M->Malloc(size);
+    assert(p != NULL);
+    return p;
   }
+  // Shouldn't be reachable
+  abort();
 }
 
 void *MemoryKvStore::ReallocBuffer(void *ptr, size_t size) {
@@ -60,11 +92,25 @@ void *MemoryKvStore::ReallocBuffer(void *ptr, size_t size) {
 }
 
 void *MemoryKvStore::DoRealloc(void *ptr, size_t size) {
-  if (use_malloc_) {
+  size_t old_size;
+  void *new_ptr;
+
+  switch (allocator_) {
+  case kMallocLibc:
     return realloc(ptr, size);
-  } else {
-    abort();
+  case kMallocArena:
+    old_size = GetBufferSize(ptr);
+    if (old_size >= size)
+      return ptr;
+
+    new_ptr = DoMalloc(size);
+    if (!new_ptr) return NULL;
+    memcpy(new_ptr, ptr, old_size);
+    DoFree(ptr);
+    return new_ptr;
   }
+  // Shouldn't be reachable
+  abort();
 }
 
 void MemoryKvStore::FreeBuffer(void *ptr) {
@@ -73,10 +119,28 @@ void MemoryKvStore::FreeBuffer(void *ptr) {
 }
 
 void MemoryKvStore::DoFree(void *ptr) {
-  if (use_malloc_) {
+  MallocArena *M;
+  size_t N;
+
+  switch (allocator_) {
+  case kMallocLibc:
     free(ptr);
-  } else {
-    abort();
+    return;
+  case kMallocArena:
+    M = MallocArena::GetMallocArena(ptr, kArenaSize);
+    M->Free(ptr);
+    N = malloc_arenas_.size();
+    if ((N > 1) && M->IsEmpty()) {
+      for (unsigned i = 0; i < N; ++i) {
+        if (malloc_arenas_[i] == M) {
+          delete malloc_arenas_[i];
+          malloc_arenas_.erase(malloc_arenas_.begin() + i);
+          idx_last_arena_ = 0;
+          return;
+        }
+      }
+      assert(false);
+    }
   }
 }
 

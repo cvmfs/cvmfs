@@ -24,7 +24,10 @@ namespace cache {
 class T_RamCacheManager : public ::testing::Test {
  public:
   T_RamCacheManager()
-    : ramcache_(4*alloc_size, cache_size, &statistics_) {
+    : ramcache_(4*alloc_size,
+                cache_size,
+                MemoryKvStore::kMallocLibc,
+                &statistics_) {
     a_.digest[1] = 1;
   }
 

@@ -9,12 +9,16 @@
 #include <unistd.h>
 
 #include <string>
+#include <vector>
 
 #include "cache.h"
 #include "lru.h"
+#include "malloc_arena.h"
 #include "statistics.h"
 
 using namespace std;  // NOLINT
+
+static const size_t kArenaSize = 512*1024*1024;
 
 struct MemoryBuffer {
   void *address;
@@ -36,6 +40,11 @@ struct MemoryBuffer {
  */
 class MemoryKvStore :SingleCopy {
  public:
+  enum MemoryAllocator {
+    kMallocArena,
+    kMallocLibc,
+  };
+
   struct Counters {
     perf::Counter *sz_size;
     perf::Counter *n_getbuffer;
@@ -89,9 +98,11 @@ class MemoryKvStore :SingleCopy {
   MemoryKvStore(
     unsigned int cache_entries,
     const string &name,
+    MemoryAllocator alloc,
     perf::Statistics *statistics)
-    : use_malloc_(true)
+    : allocator_(alloc)
     , used_bytes_(0)
+    , idx_last_arena_(0)
     , entry_count_(0)
     , max_entries_(cache_entries)
     , entries_(cache_entries, shash::Any(), lru::hasher_any,
@@ -99,9 +110,15 @@ class MemoryKvStore :SingleCopy {
     , counters_(statistics, name + ".lru") {
     int retval = pthread_rwlock_init(&rwlock_, NULL);
     assert(retval == 0);
+    if (alloc == kMallocArena) {
+      malloc_arenas_.push_back(new MallocArena(kArenaSize));
+    }
   }
 
   ~MemoryKvStore() {
+    for (size_t i = 0; i < malloc_arenas_.size(); ++i) {
+      delete malloc_arenas_[i];
+    }
     pthread_rwlock_destroy(&rwlock_);
   }
 
@@ -217,14 +234,17 @@ class MemoryKvStore :SingleCopy {
   void *DoMalloc(size_t size);
   void *DoRealloc(void *ptr, size_t size);
   void DoFree(void *ptr);
+  size_t GetBufferSize(void *ptr);
 
-  bool use_malloc_;
+  MemoryAllocator allocator_;
   size_t used_bytes_;
+  size_t idx_last_arena_;
   unsigned int entry_count_;
   unsigned int max_entries_;
   lru::LruCache<shash::Any, MemoryBuffer> entries_;
   pthread_rwlock_t rwlock_;
   Counters counters_;
+  vector<MallocArena *> malloc_arenas_;
 };
 
 #endif  // CVMFS_KVSTORE_H_
