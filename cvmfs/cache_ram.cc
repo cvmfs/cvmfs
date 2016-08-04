@@ -216,7 +216,7 @@ int64_t RamCacheManager::Write(const void *buf, uint64_t size, void *txn) {
   if (!transaction->allocated) {
     transaction->buffer = GetTransactionStore(transaction)->MallocBuffer(
       transaction->size);
-    assert(transaction->buffer);
+    assert(!size || transaction->buffer);
     transaction->allocated = true;
   }
 
@@ -237,11 +237,12 @@ int64_t RamCacheManager::Write(const void *buf, uint64_t size, void *txn) {
     }
   }
 
-
-  // LogCvmfs(kLogCache, kLogDebug, "copy %u bytes of transaction %s",
-  //          size, transaction->id.ToString().c_str());
-  memcpy(static_cast<char *>(transaction->buffer) + transaction->pos,
-         buf, size);
+  if (transaction->buffer && buf) {
+    // LogCvmfs(kLogCache, kLogDebug, "copy %u bytes of transaction %s",
+    //          size, transaction->id.ToString().c_str());
+    memcpy(static_cast<char *>(transaction->buffer) + transaction->pos,
+           buf, size);
+  }
   transaction->pos += size;
   perf::Inc(counters_.n_write);
   return size;
@@ -304,7 +305,7 @@ int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
     if (buf.size > 0) {
       buf.address = GetTransactionStore(transaction)->ReallocBuffer(
         buf.address, buf.size);
-      assert(buf.address);
+      assert(!buf.size || buf.address);
       LogCvmfs(kLogCache, kLogDebug, "reallocating transaction on %s to %u B",
                transaction->id.ToString().c_str(), buf.size);
     }

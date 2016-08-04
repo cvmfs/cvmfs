@@ -62,6 +62,8 @@ void *MemoryKvStore::DoMalloc(size_t size) {
     if (size > kArenaSize) {
       errno = ENOMEM;
       return NULL;
+    } else if (size == 0) {
+      return NULL;
     }
     N = malloc_arenas_.size();
     assert(idx_last_arena_ < N);
@@ -99,14 +101,20 @@ void *MemoryKvStore::DoRealloc(void *ptr, size_t size) {
   case kMallocLibc:
     return realloc(ptr, size);
   case kMallocArena:
+    if (size == 0) {
+      DoFree(ptr);
+      return NULL;
+    }
     old_size = GetBufferSize(ptr);
     if (old_size >= size)
       return ptr;
 
     new_ptr = DoMalloc(size);
     if (!new_ptr) return NULL;
-    memcpy(new_ptr, ptr, old_size);
-    DoFree(ptr);
+    if (ptr) {
+      memcpy(new_ptr, ptr, old_size);
+      DoFree(ptr);
+    }
     return new_ptr;
   }
   // Shouldn't be reachable
@@ -127,6 +135,7 @@ void MemoryKvStore::DoFree(void *ptr) {
     free(ptr);
     return;
   case kMallocArena:
+    if (!ptr) return;
     M = MallocArena::GetMallocArena(ptr, kArenaSize);
     M->Free(ptr);
     N = malloc_arenas_.size();

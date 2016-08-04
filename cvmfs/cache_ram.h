@@ -115,11 +115,11 @@ class RamCacheManager : public CacheManager {
     , fd_pivot_(0)
     , open_fds_(max_entries)
     , fd_index_(max_entries)
-    , regular_entries_(max_entries/2,
+    , regular_entries_(max_entries,
                        "RamCache.regular",
                        alloc,
                        statistics)
-    , volatile_entries_(max_entries/2,
+    , volatile_entries_(max_entries,
                         "RamCache.volatile",
                         alloc,
                         statistics)
