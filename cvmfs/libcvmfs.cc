@@ -370,7 +370,7 @@ void cvmfs_set_log_fn(void (*log_fn)(const char *msg))
 }
 
 
-char *cvmfs_format_statistics(cvmfs_context *ctx) {
+char *cvmfs_statistics_format(cvmfs_context *ctx) {
   assert(ctx != NULL);
   std::string stats = ctx->mount_point()->statistics()
     ->PrintList(perf::Statistics::kPrintHeader);

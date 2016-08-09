@@ -102,7 +102,7 @@ void cvmfs_set_log_fn( void (*log_fn)(const char *msg) );
  * @p cvmfs_statistics() allocates a new string, which the caller must free.
  * Returns NULL if insufficient  memory  was  available.
  */
-char *cvmfs_format_statistics(cvmfs_context *ctx);
+char *cvmfs_statistics_format(cvmfs_context *ctx);
 
 /**
  * An option map must be created an populated before calling cvmfs_init_v2().
