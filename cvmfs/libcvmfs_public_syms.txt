@@ -23,6 +23,7 @@ cvmfs_adopt_options
 cvmfs_detach_repo
 cvmfs_remount
 cvmfs_set_log_fn
+cvmfs_statistics_format
 cvmfs_open
 cvmfs_pread
 cvmfs_close

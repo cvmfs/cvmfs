@@ -370,6 +370,14 @@ void cvmfs_set_log_fn(void (*log_fn)(const char *msg))
 }
 
 
+char *cvmfs_statistics_format(cvmfs_context *ctx) {
+  assert(ctx != NULL);
+  std::string stats = ctx->mount_point()->statistics()
+    ->PrintList(perf::Statistics::kPrintHeader);
+  return strdup(stats.c_str());
+}
+
+
 int cvmfs_remount(LibContext *ctx) {
   catalog::LoadError retval = ctx->RemountStart();
   if (retval == catalog::kLoadNew || retval == catalog::kLoadUp2Date) {
