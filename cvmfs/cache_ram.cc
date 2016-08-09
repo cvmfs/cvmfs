@@ -331,8 +331,8 @@ int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
   int64_t overrun = regular_size + volatile_size + buf.size - max_size_;
 
   if (overrun > 0) {
-    // if we're going to clean the cache, remove at least 25%
-    overrun = max(overrun, (int64_t) (max_size_>>2));
+    // if we're going to clean the cache, try to remove at least 25%
+    overrun = max(overrun, (int64_t) max_size_*3/4);
     perf::Inc(counters_.n_overrun);
     volatile_entries_.ShrinkTo(max((int64_t) 0, volatile_size - overrun));
   }
@@ -340,11 +340,10 @@ int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
   if (overrun > 0) {
     regular_entries_.ShrinkTo(max((int64_t) 0, regular_size - overrun));
   }
-  overrun -= regular_size - regular_entries_.GetUsed();
-  if (overrun > 0) {
+  if (regular_entries_.GetUsed() + volatile_entries_.GetUsed() > max_size_) {
     LogCvmfs(kLogCache, kLogDebug,
-             "transaction for %s would overrun the cache limit by %d",
-             transaction->id.ToString().c_str(), -overrun);
+             "transaction for %s would overrun the cache limit",
+             transaction->id.ToString().c_str());
     perf::Inc(counters_.n_full);
     return -ENOSPC;
   }
