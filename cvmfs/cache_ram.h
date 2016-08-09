@@ -43,7 +43,7 @@ static const shash::Any kInvalidHandle;
  *
  * RamCacheManager can also use a custom arena allocator rather than
  * the default libc @p malloc(). To enable this feature, set
- * @p CVMFS_CACHE_MALLOC=arena
+ * @p CVMFS_CACHE_RAM_MALLOC=arena
  */
 class RamCacheManager : public CacheManager {
  public:

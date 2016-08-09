@@ -209,7 +209,7 @@ bool FileSystem::CreateCache() {
     } else {
       cache_bytes = platform_memsize() >> 5;  // ~3%
     }
-    if (options_mgr_->GetValue("CVMFS_CACHE_MALLOC", &optarg)) {
+    if (options_mgr_->GetValue("CVMFS_CACHE_RAM_MALLOC", &optarg)) {
       if (optarg == "arena") {
         alloc = MemoryKvStore::kMallocArena;
       }
