@@ -501,6 +501,9 @@ least CernVM-FS $creator to manipulate this repository."
   #     -> CVMFS_AUTO_REPAIR_MOUNTPOINT=true becomes the enforced default
   #     -> Apache configuration updated
   #
+  #   2.2.0-1+ -> 2.3.0-1
+  #     -> new scratch directory layout (which also effects /etc/fstab)
+  #
   # Note: I tried to make this code as verbose as possible
   #
   if [ "$creator" = "2.1.6" ] && version_greater_or_equal "2.1.7"; then
@@ -543,7 +546,8 @@ least CernVM-FS $creator to manipulate this repository."
   fi
 
   if [ "$creator" = "2.2.0-1" ] || [ "$creator" = "2.2.1-1" ] || \
-     [ "$creator" = "2.2.2-1" ]; then
+     [ "$creator" = "2.2.2-1" ] || [ "$creator" = "2.2.3-1" ] && \
+     is_stratum0 $name; then
     if version_greater_or_equal "2.3.0"; then
       _repo_is_incompatible "$creator" $nokill
       return $?
@@ -5816,7 +5820,7 @@ _migrate_2_1_20() {
   load_repo_config $name
 }
 
-_migrate_2_2_0() {
+_migrate_2_2() {
   local name=$1
   local destination_version="2.3.0-1"
   local server_conf="/etc/cvmfs/repositories.d/${name}/server.conf"
@@ -5928,10 +5932,11 @@ cvmfs_server_migrate() {
 
     if [ x"$creator" = x"2.2.0-1" -o   \
          x"$creator" = x"2.2.1-1" -o   \
-         x"$creator" = x"2.2.2-1" ] && \
+         x"$creator" = x"2.2.2-1" -o   \
+         x"$creator" = x"2.2.3-1" ] && \
          is_stratum0 $name;
     then
-      _migrate_2_2_0 $name
+      _migrate_2_2 $name
     fi
 
   done
