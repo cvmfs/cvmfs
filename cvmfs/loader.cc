@@ -27,6 +27,11 @@
 #include <sys/resource.h>
 #include <time.h>
 #include <unistd.h>
+// If valgrind headers are present on the build system, then we can detect
+// valgrind at runtime.
+#ifdef HAS_VALGRIND_HEADERS
+#include <valgrind/valgrind.h>
+#endif
 
 #include <cassert>
 #include <cstdlib>
@@ -41,13 +46,8 @@
 #include "options.h"
 #include "platform.h"
 #include "sanitizer.h"
+#include "util/posix.h"
 #include "util/string.h"
-
-// If valgrind headers are present on the build system,
-// then we can detect valgrind at runtime.
-#ifdef HAS_VALGRIND_HEADERS
-#include <valgrind/valgrind.h>
-#endif
 
 using namespace std;  // NOLINT
 
@@ -746,29 +746,14 @@ int main(int argc, char *argv[]) {
 
   // Number of file descriptors
   if (options_manager->GetValue("CVMFS_NFILES", &parameter)) {
-    uint64_t nfiles = String2Uint64(parameter);
-    struct rlimit rpl;
-    memset(&rpl, 0, sizeof(rpl));
-    getrlimit(RLIMIT_NOFILE, &rpl);
-    if (rpl.rlim_cur < nfiles) {
-      if (rpl.rlim_max < nfiles)
-        rpl.rlim_max = nfiles;
-      rpl.rlim_cur = nfiles;
-      retval = setrlimit(RLIMIT_NOFILE, &rpl);
-      if (retval != 0) {
-        LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-                 "Failed to set maximum number of open files, "
-                 "insufficient permissions");
-#ifdef HAS_VALGRIND_HEADERS
-        if (!RUNNING_ON_VALGRIND) {
-          return kFailPermission;
-        } else {
-          LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: running under valgrind");
-        }
-#else
-        return kFailPermission;
-#endif
-      }
+    int retval = SetLimitNoFile(String2Uint64(parameter));
+    if (retval == -2) {
+      LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: running under valgrind");
+    } else if (retval == -1) {
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+               "Failed to set maximum number of open files, "
+               "insufficient permissions");
+      return kFailPermission;
     }
   }
 

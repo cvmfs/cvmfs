@@ -5,8 +5,10 @@
 #ifndef CVMFS_WHITELIST_H_
 #define CVMFS_WHITELIST_H_
 
+#include <gtest/gtest_prod.h>
 #include <inttypes.h>
 
+#include <ctime>
 #include <string>
 #include <vector>
 #include "hash.h"
@@ -64,6 +66,8 @@ inline const char *Code2Ascii(const Failures error) {
 
 
 class Whitelist {
+  FRIEND_TEST(T_Whitelist, ParseWhitelist);
+
  public:
   enum Status {
     kStNone,
@@ -85,10 +89,13 @@ class Whitelist {
   Failures VerifyLoadedCertificate() const;
 
  private:
+  Whitelist();
+
   static const int kFlagVerifyRsa;
   static const int kFlagVerifyPkcs7;
   static const int kFlagVerifyCaChain;
 
+  bool IsBefore(time_t now, const struct tm &t_whitelist);
   Failures ParseWhitelist(const unsigned char *whitelist,
                           const unsigned whitelist_size);
   void Reset();

@@ -40,9 +40,11 @@ void SplitPath(const std::string &path,
                std::string *dirname,
                std::string *filename);
 bool IsAbsolutePath(const std::string &path);
+std::string GetAbsolutePath(const std::string &path);
 bool IsHttpUrl(const std::string &path);
 
-void CreateFile(const std::string &path, const int mode);
+void CreateFile(const std::string &path, const int mode,
+                const bool ignore_failure = false);
 int MakeSocket(const std::string &path, const int mode);
 int ConnectSocket(const std::string &path);
 void MakePipe(int pipe_fd[2]);
@@ -85,6 +87,8 @@ bool GetGidOf(const std::string &groupname, gid_t *gid);
 mode_t GetUmask();
 bool AddGroup2Persona(const gid_t gid);
 
+int SetLimitNoFile(unsigned limit_nofile);
+
 void BlockSignal(int signum);
 void WaitForSignal(int signum);
 void Daemonize();
@@ -111,6 +115,8 @@ bool SafeWrite(int fd, const void *buf, size_t nbyte);
 
 // Read the contents of a file descriptor to a string.
 bool SafeReadToString(int fd, std::string *final_result);
+bool SafeWriteToFile(const std::string &content,
+                     const std::string &path, int mode);
 
 
 struct Pipe : public SingleCopy {

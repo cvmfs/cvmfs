@@ -27,6 +27,7 @@ pid_t GetParentPid(const pid_t pid);
 std::string GetExecutablePath(const std::string &exe_name);
 
 unsigned GetNoUsedFds();
+std::string ShowOpenFiles();
 
 time_t t(const int day, const int month, const int year);
 shash::Any h(const std::string &hash,
@@ -817,6 +818,8 @@ class MockReflog : public MockObjectStorage<MockReflog> {
   static MockReflog* Open(const std::string &path);
   static MockReflog* Create(const std::string &path,
                             const std::string &repo_name);
+  static void HashDatabase(const std::string &database_path,
+                           shash::Any *hash_reflog);
   static void ResetGlobalState() {}
 
   bool AddCertificate(const shash::Any &certificate);

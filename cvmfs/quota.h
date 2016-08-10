@@ -19,6 +19,7 @@
 #include "hash.h"
 #include "statistics.h"
 #include "util/single_copy.h"
+#include "util/string.h"
 
 namespace perf {
 class Recorder;
@@ -176,9 +177,12 @@ class PosixQuotaManager : public QuotaManager {
   static PosixQuotaManager *Create(const std::string &cache_dir,
     const uint64_t limit, const uint64_t cleanup_threshold,
     const bool rebuild_database);
-  static PosixQuotaManager *CreateShared(const std::string &exe_path,
+  static PosixQuotaManager *CreateShared(
+    const std::string &exe_path,
     const std::string &cache_dir,
-    const uint64_t limit, const uint64_t cleanup_threshold);
+    const uint64_t limit,
+    const uint64_t cleanup_threshold,
+    bool foreground);
   static int MainCacheManager(int argc, char **argv);
 
   virtual ~PosixQuotaManager();

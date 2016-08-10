@@ -37,7 +37,7 @@ cvmfs_run_test() {
 
   attr -s foo -V bar /cvmfs/$CVMFS_TEST_REPO/xattr || return 10
   attr -s foo2 -V bar2 /cvmfs/$CVMFS_TEST_REPO/dir/xattr || return 11
-  setcap "cap_chown=p cap_chown+e" /cvmfs/$CVMFS_TEST_REPO/dir/capabilities || return 12
+  sudo setcap "cap_chown=p cap_chown+e" /cvmfs/$CVMFS_TEST_REPO/dir/capabilities || return 12
 
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO || return $?

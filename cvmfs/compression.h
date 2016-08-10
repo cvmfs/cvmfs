@@ -147,6 +147,7 @@ bool CompressPath2Path(const std::string &src, const std::string &dest,
                        shash::Any *compressed_hash);
 bool DecompressPath2Path(const std::string &src, const std::string &dest);
 
+bool CompressPath2Null(const std::string &src, shash::Any *compressed_hash);
 bool CompressFile2Null(FILE *fsrc, shash::Any *compressed_hash);
 bool CompressFd2Null(int fd_src, shash::Any *compressed_hash,
                      uint64_t* size = NULL);

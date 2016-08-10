@@ -9,7 +9,7 @@ ZLIB_VERSION=1.2.8
 SPARSEHASH_VERSION=1.12
 LEVELDB_VERSION=1.18
 GOOGLETEST_VERSION=1.7.0
-TBB_VERSION=4.3-1
+TBB_VERSION=4.4-5
 LIBGEOIP_VERSION=1.6.0
 PYTHON_GEOIP_VERSION=1.3.1
 
@@ -111,6 +111,7 @@ do_extract  "libgeoip"    "GeoIP-${LIBGEOIP_VERSION}.tar.gz"
 do_extract  "python-geoip" "GeoIP-${PYTHON_GEOIP_VERSION}.tar.gz"
 do_extract  "tbb"         "tbb-${TBB_VERSION}.tar.gz"
 
+do_copy     "googlebench"
 do_copy     "sqlite3"
 do_copy     "vjson"
 do_copy     "sha2"
@@ -119,12 +120,14 @@ do_copy     "sha3"
 patch_external "leveldb"     "dont_search_snappy.patch"           \
                              "dont_search_tcmalloc.patch"         \
                              "arm64_memory_barrier.patch"
-patch_external "pacparser"   "fix_find_proxy_ex.patch"
+patch_external "pacparser"   "fix_find_proxy_ex.patch"            \
+                             "fix_cflags.patch"
 patch_external "tbb"         "custom_library_suffix.patch"        \
                              "symlink_to_build_directories.patch" \
                              "32bit_mock.patch"
 patch_external "vjson"       "missing_include.patch"
-patch_external "sparsehash"  "fix_sl4_compilation.patch"
+patch_external "sparsehash"  "fix_sl4_compilation.patch"          \
+                             "fix_warning_gcc48.patch"
 patch_external "libcurl"     "disable_sslv3.patch"
 
 replace_in_external "c-ares"      "config.guess.latest" "config.guess"

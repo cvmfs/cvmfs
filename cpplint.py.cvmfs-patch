@@ -5,9 +5,9 @@
  # - Lua headers.
  _THIRD_PARTY_HEADERS_PATTERN = re.compile(
 -    r'^(?:[^/]*[A-Z][^/]*\.h|lua\.h|lauxlib\.h|lualib\.h)$')
-+    r'^(?:[^/]*[A-Z][^/]*\.h|lua\.h|lauxlib\.h|lualib\.h|cvmfs_config\.h|sys/xattr\.h|gtest/gtest\.h)$')
- 
- 
++    r'^(?:[^/]*[A-Z][^/]*\.h|lua\.h|lauxlib\.h|lualib\.h|cvmfs_config\.h|sys/xattr\.h|gtest/gtest\.h|benchmark/benchmark\.h)$')
+
+
  # Assertion macros.  These are defined in base/logging.h and
 @@ -1625,11 +1625,11 @@
    # We'll say it should occur by line 10. Don't forget there's a
@@ -21,8 +21,8 @@
 -          'You should have a line: "Copyright [year] <Copyright Owner>"')
 +          'No cvmfs ownerhip tag found.  '
 +          'You should have a line: "This file is part of the CernVM File System"')
- 
- 
+
+
  def GetIndentLevel(line):
 @@ -3907,8 +3907,11 @@
      # perfectly: we just don't complain if the last non-whitespace character on
@@ -68,6 +68,6 @@
 +  #if match and not _THIRD_PARTY_HEADERS_PATTERN.match(match.group(1)):
 +  #  error(filename, linenum, 'build/include', 4,
 +  #        'Include the directory when naming .h files')
- 
+
    # we shouldn't include a file more than once. actually, there are a
    # handful of instances where doing so is okay, but in general it's

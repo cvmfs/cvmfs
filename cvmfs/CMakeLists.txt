@@ -34,6 +34,8 @@ set (CVMFS_CLIENT_SOURCES
   backoff.cc backoff.h
   bigvector.h
   cache.cc cache.h
+  cache_posix.cc cache_posix.h
+  cache_ram.cc cache_ram.h
   catalog.cc catalog.h
   catalog_counters.cc catalog_counters.h catalog_counters_impl.h
   catalog_mgr.h catalog_mgr_impl.h
@@ -52,13 +54,21 @@ set (CVMFS_CLIENT_SOURCES
   file_chunk.cc file_chunk.h
   fs_traversal.h
   globals.cc globals.h
+  glue_buffer.cc glue_buffer.h
   hash.cc hash.h
+  history.h
+  history_sql.cc history_sql.h
+  history_sqlite.cc history_sqlite.h
   json_document.cc json_document.h
+  kvstore.h kvstore.cc
+  loader.h
   logging.cc logging.h logging_internal.h
   lru.h
+  malloc_arena.cc malloc_arena.h
   manifest.cc manifest.h
   manifest_fetch.cc manifest_fetch.h
   monitor.cc monitor.h
+  mountpoint.cc mountpoint.h
   murmur.h
   options.cc options.h
   platform.h platform_linux.h platform_osx.h
@@ -74,6 +84,7 @@ set (CVMFS_CLIENT_SOURCES
   sqlitemem.cc sqlitemem.h
   sqlitevfs.cc sqlitevfs.h
   statistics.cc statistics.h
+  tracer.cc tracer.h
   uid_map.h
   uuid.cc uuid.h
   util/algorithm.cc util/algorithm.h
@@ -96,16 +107,10 @@ set (CVMFS2_DEBUG_SOURCES
   compat.cc compat.h
   cvmfs.cc cvmfs.h
   fence.h
-  glue_buffer.cc glue_buffer.h
-  history.h
-  history_sql.cc history_sql.h
-  history_sqlite.cc history_sqlite.h
-  loader.h
   nfs_maps.cc nfs_maps.h
   nfs_shared_maps.cc nfs_shared_maps.h
   quota_listener.cc quota_listener.h
   talk.cc talk.h
-  tracer.cc tracer.h
 )
 
 set (CVMFS2_SOURCES
@@ -117,6 +122,8 @@ set (LIBCVMFS_SOURCES
 
   libcvmfs.cc libcvmfs.h
   libcvmfs_int.cc libcvmfs_int.h
+  libcvmfs_legacy.cc
+  libcvmfs_options.cc
 )
 
 set (TEST_LIBCVMFS_SOURCES
@@ -181,6 +188,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   json_document.cc json_document.h
   letter.cc letter.h
   logging.cc logging.h logging_internal.h
+  malloc_arena.cc malloc_arena.h
   manifest.cc manifest.h
   manifest_fetch.cc manifest_fetch.h
   object_fetcher.h
@@ -276,6 +284,7 @@ set (CVMFS_PRELOADER_SOURCES
   history_sql.cc history_sql.h
   history_sqlite.cc history_sqlite.h
   logging.cc logging.h logging_internal.h
+  malloc_arena.cc malloc_arena.h
   manifest.cc manifest.h
   manifest_fetch.cc manifest_fetch.h
   options.cc options.h
@@ -308,6 +317,7 @@ set (CVMFS_PRELOADER_SOURCES
   util/single_copy.h
   util/string.cc util/string.h
   util_concurrency.cc util_concurrency.h
+  uuid.cc uuid.h
   whitelist.cc whitelist.h
   xattr.cc xattr.h
 )
@@ -494,7 +504,10 @@ if (BUILD_LIBCVMFS)
   add_dependencies (libcvmfs cvmfs_only)
 
   add_executable( test_libcvmfs ${TEST_LIBCVMFS_SOURCES} )
-  target_link_libraries( test_libcvmfs ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a ${SQLITE3_LIBRARY} ${CARES_LIBRARIES} ${CURL_LIBRARIES} ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl )
+  target_link_libraries(test_libcvmfs ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a
+                        ${SQLITE3_LIBRARY} ${CARES_LIBRARIES} ${CURL_LIBRARIES}
+                        ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES}
+                        ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl )
   add_dependencies (test_libcvmfs libcvmfs)
 endif (BUILD_LIBCVMFS)
 
@@ -647,7 +660,7 @@ if (BUILD_PRELOADER)
                         ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE} ${ZLIB_LIBRARIES}
                         ${OPENSSL_LIBRARIES} ${CARES_ARCHIVE} ${SQLITE3_ARCHIVE}
                         ${ZLIB_ARCHIVE} ${TBB_LIBRARIES} ${RT_LIBRARY}
-                        ${VJSON_ARCHIVE} ${SHA3_ARCHIVE}
+                        ${UUID_LIBRARIES} ${VJSON_ARCHIVE} ${SHA3_ARCHIVE}
                         pthread dl)
 endif (BUILD_PRELOADER)
 

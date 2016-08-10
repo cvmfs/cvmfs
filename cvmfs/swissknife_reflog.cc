@@ -65,16 +65,18 @@ ParameterList CommandReconstructReflog::GetParams() {
   r.push_back(Parameter::Mandatory('n', "fully qualified repository name"));
   r.push_back(Parameter::Mandatory('t', "temporary directory"));
   r.push_back(Parameter::Mandatory('k', "repository keychain"));
+  r.push_back(Parameter::Mandatory('R', "path to reflog.chksum file"));
   return r;
 }
 
 
 int CommandReconstructReflog::Main(const ArgumentList &args) {
-  const std::string &repo_url  = *args.find('r')->second;
-  const std::string &spooler   = *args.find('u')->second;
-  const std::string &repo_name = *args.find('n')->second;
-  const std::string &tmp_dir   = *args.find('t')->second;
-  const std::string &repo_keys = *args.find('k')->second;
+  const std::string &repo_url           = *args.find('r')->second;
+  const std::string &spooler            = *args.find('u')->second;
+  const std::string &repo_name          = *args.find('n')->second;
+  const std::string &tmp_dir            = *args.find('t')->second;
+  const std::string &repo_keys          = *args.find('k')->second;
+  const std::string &reflog_chksum_path = *args.find('R')->second;
 
   const bool follow_redirects = false;
   if (!this->InitDownloadManager(follow_redirects) ||
@@ -123,6 +125,8 @@ int CommandReconstructReflog::Main(const ArgumentList &args) {
 
   const std::string reflog_db = reflog->CloseAndReturnDatabaseFile();
   uploader->Upload(reflog_db, ".cvmfsreflog");
+  shash::Any reflog_hash(manifest->GetHashAlgorithm());
+  manifest::Reflog::HashDatabase(reflog_db, &reflog_hash);
   uploader->WaitForUpload();
   unlink(reflog_db.c_str());
 
@@ -132,6 +136,8 @@ int CommandReconstructReflog::Main(const ArgumentList &args) {
   }
 
   uploader->TearDown();
+
+  manifest::Reflog::WriteChecksum(reflog_chksum_path, reflog_hash);
 
   return (errors == 0) ? 0 : 1;
 }
@@ -234,7 +240,7 @@ void RootChainWalker::WalkListedCatalogs(
 
 RootChainWalker::CatalogTN* RootChainWalker::FetchCatalog(
                                                 const shash::Any catalog_hash) {
-  CatalogTN *catalog;
+  CatalogTN *catalog = NULL;
   const char *root_path = "";
   ObjectFetcherFailures::Failures failure =
     object_fetcher_->FetchCatalog(catalog_hash, root_path, &catalog);
@@ -245,7 +251,7 @@ RootChainWalker::CatalogTN* RootChainWalker::FetchCatalog(
 
 RootChainWalker::HistoryTN* RootChainWalker::FetchHistory(
                                                 const shash::Any history_hash) {
-  HistoryTN *history;
+  HistoryTN *history = NULL;
   ObjectFetcherFailures::Failures failure =
     object_fetcher_->FetchHistory(&history, history_hash);
 

@@ -20,6 +20,10 @@ namespace loader {
 
 extern std::string *usyslog_path_;
 
+/**
+ * Possible failures when booting/mounting cvmfs.  Remember to add a constant
+ * to libcvmfs.h and libcvmfs_legacy.cc when a constant to this enum is added.
+ */
 enum Failures {
   kFailOk = 0,
   kFailUnknown,
@@ -45,6 +49,7 @@ enum Failures {
   kFailDoubleMount,
   kFailHistory,
   kFailWpad,
+  kFailLockWorkspace,
 
   kFailNumEntries
 };
@@ -75,7 +80,8 @@ inline const char *Code2Ascii(const Failures error) {
   texts[21] = "double mount";
   texts[22] = "history init failure";
   texts[23] = "proxy auto-discovery failed";
-  texts[24] = "no text";
+  texts[24] = "workspace already locked";
+  texts[25] = "no text";
   return texts[error];
 }
 

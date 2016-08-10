@@ -88,7 +88,7 @@ Failures Whitelist::Load(const std::string &base_url) {
   retval_dl = download_manager_->Fetch(&download_whitelist);
   if (retval_dl != download::kFailOk)
     return kFailLoad;
-  plain_size_ = download_whitelist.destination_mem.size;
+  plain_size_ = download_whitelist.destination_mem.pos;
   if (plain_size_ == 0)
     return kFailEmpty;
   plain_buf_ =
@@ -115,7 +115,7 @@ Failures Whitelist::Load(const std::string &base_url) {
     retval_dl = download_manager_->Fetch(&download_whitelist_pkcs7);
     if (retval_dl != download::kFailOk)
       return kFailLoadPkcs7;
-    pkcs7_size_ = download_whitelist_pkcs7.destination_mem.size;
+    pkcs7_size_ = download_whitelist_pkcs7.destination_mem.pos;
     if (pkcs7_size_ == 0)
       return kFailEmptyPkcs7;
     pkcs7_buf_ = reinterpret_cast<unsigned char *>
@@ -173,6 +173,25 @@ Failures Whitelist::Load(const std::string &base_url) {
 }
 
 
+/**
+ * Helps for the time being with whitelists valid until after Y2038 on 32 bit
+ * systems.
+ */
+bool Whitelist::IsBefore(time_t now, const struct tm &t_whitelist) {
+  struct tm t_local;
+  if (gmtime_r(&now, &t_local) == NULL)
+    return false;
+  if (t_local.tm_year < t_whitelist.tm_year) return true;
+  if (t_local.tm_year > t_whitelist.tm_year) return false;
+  if (t_local.tm_mon < t_whitelist.tm_mon) return true;
+  if (t_local.tm_mon > t_whitelist.tm_mon) return false;
+  if (t_local.tm_mday < t_whitelist.tm_mday) return true;
+  if (t_local.tm_mday > t_whitelist.tm_mday) return false;
+  if (t_local.tm_hour < t_whitelist.tm_hour) return true;
+  return false;
+}
+
+
 Failures Whitelist::ParseWhitelist(const unsigned char *whitelist,
                                    const unsigned whitelist_size)
 {
@@ -208,17 +227,24 @@ Failures Whitelist::ParseWhitelist(const unsigned char *whitelist,
   LogCvmfs(kLogSignature, kLogDebug,
            "whitelist UTC expiry timestamp in localtime: %s",
            StringifyTime(timestamp, false).c_str());
-  if (timestamp < 0) {
-    LogCvmfs(kLogSignature, kLogDebug, "invalid timestamp");
-    return kFailMalformed;
-  }
   LogCvmfs(kLogSignature, kLogDebug,  "local time: %s",
-           StringifyTime(local_timestamp, true).c_str());
-  if (local_timestamp > timestamp) {
+          StringifyTime(local_timestamp, true).c_str());
+  // Makeshift solution to deal with whitelists valid after Y2038 on 32bit
+  // machines.  Still unclear how glibc is going to treat the problem.
+  if (!IsBefore(local_timestamp, tm_wl)) {
     LogCvmfs(kLogSignature, kLogDebug | kLogSyslogErr,
              "whitelist lifetime verification failed, expired");
     return kFailExpired;
   }
+  // if (timestamp < 0) {
+  //   LogCvmfs(kLogSignature, kLogDebug, "invalid timestamp");
+  //   return kFailMalformed;
+  // }
+  // if (local_timestamp > timestamp) {
+  //   LogCvmfs(kLogSignature, kLogDebug | kLogSyslogErr,
+  //            "whitelist lifetime verification failed, expired");
+  //   return kFailExpired;
+  // }
   expires_ = timestamp;
   payload_bytes += 16;
 
@@ -318,6 +344,20 @@ Whitelist::Whitelist(const Whitelist &other) :
   other.CopyBuffers(&plain_size_, &plain_buf_, &pkcs7_size_, &pkcs7_buf_);
 }
 
+
+// Testing only
+Whitelist::Whitelist()
+  : download_manager_(NULL)
+  , signature_manager_(NULL)
+  , status_(kStNone)
+  , expires_(0)
+  , verification_flags_(0)
+  , plain_buf_(NULL)
+  , plain_size_(0)
+  , pkcs7_buf_(NULL)
+  , pkcs7_size_(0)
+{
+}
 
 Whitelist &Whitelist::operator= (const Whitelist &other) {
   if (&other == this)

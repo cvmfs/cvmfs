@@ -285,7 +285,8 @@ class HeaderLists {
 
 /**
  * Provides hooks to attach per-transfer credentials to curl handles.
- * Overwritten by the AuthzX509Attachment in authz_curl.cc.
+ * Overwritten by the AuthzX509Attachment in authz_curl.cc.  Needs to be
+ * thread-safe because it can be potentially used by multiple DownloadManagers.
  */
 class CredentialsAttachment {
  public:
@@ -297,6 +298,9 @@ class CredentialsAttachment {
 };
 
 
+/**
+ * Note when adding new fields: Clone() probably needs to be adjusted, too.
+ */
 class DownloadManager {
   FRIEND_TEST(T_Download, ValidateGeoReply);
   FRIEND_TEST(T_Download, StripDirect);
@@ -348,9 +352,10 @@ class DownloadManager {
   static int ParseHttpCode(const char digits[3]);
 
   void Init(const unsigned max_pool_handles, const bool use_system_proxy,
-      perf::Statistics * statistics, const std::string &name = "download");
+      perf::Statistics *statistics, const std::string &name = "download");
   void Fini();
   void Spawn();
+  DownloadManager *Clone(perf::Statistics *statistics, const std::string &name);
   Failures Fetch(JobInfo *info);
 
   void SetCredentialsAttachment(CredentialsAttachment *ca);
@@ -417,6 +422,7 @@ class DownloadManager {
   bool VerifyAndFinalize(const int curl_error, JobInfo *info);
   void InitHeaders();
   void FiniHeaders();
+  void CloneProxyConfig(DownloadManager *clone);
 
   Prng prng_;
   std::set<CURL *> *pool_handles_idle_;
@@ -449,6 +455,7 @@ class DownloadManager {
   bool enable_info_header_;
   bool opt_ipv4_only_;
   bool follow_redirects_;
+  bool use_system_proxy_;
 
   // Host list
   std::vector<std::string> *opt_host_chain_;
@@ -535,7 +542,6 @@ class DownloadManager {
   // thread than writing.
   Counters *counters_;
 };  // DownloadManager
-
 
 }  // namespace download
 

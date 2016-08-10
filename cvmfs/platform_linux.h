@@ -346,6 +346,10 @@ inline uint64_t platform_monotonic_time() {
   return tp.tv_sec + (tp.tv_nsec >= 500000000);
 }
 
+inline uint64_t platform_memsize() {
+  return sysconf(_SC_PHYS_PAGES) * sysconf(_SC_PAGE_SIZE);
+}
+
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD
 #endif

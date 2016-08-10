@@ -16,6 +16,7 @@
 #include <pthread.h>
 #include <pwd.h>
 #include <signal.h>
+#include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -23,6 +24,11 @@
 #include <sys/un.h>
 #include <sys/wait.h>
 #include <unistd.h>
+// If valgrind headers are present on the build system, then we can detect
+// valgrind at runtime.
+#ifdef HAS_VALGRIND_HEADERS
+#include <valgrind/valgrind.h>
+#endif
 
 #include <algorithm>
 #include <cassert>
@@ -138,8 +144,16 @@ NameString GetFileName(const PathString &path) {
 }
 
 
-bool IsAbsolutePath(const std::string &path) {
+bool IsAbsolutePath(const string &path) {
   return (!path.empty() && path[0] == '/');
+}
+
+
+string GetAbsolutePath(const string &path) {
+  if (IsAbsolutePath(path))
+    return path;
+
+  return GetCurrentWorkingDirectory() + "/" + path;
 }
 
 
@@ -156,12 +170,21 @@ bool IsHttpUrl(const std::string &path) {
 
 
 /**
- * Abort() on failure
+ * By default abort() on failure
  */
-void CreateFile(const std::string &path, const int mode) {
+void CreateFile(
+  const std::string &path,
+  const int mode,
+  const bool ignore_failure)
+{
   int fd = open(path.c_str(), O_CREAT, mode);
-  assert(fd >= 0);
-  close(fd);
+  if (fd >= 0) {
+    close(fd);
+    return;
+  }
+  if (ignore_failure)
+    return;
+  assert(false);
 }
 
 
@@ -644,6 +667,7 @@ bool RemoveTree(const string &path) {
   traversal.fn_new_file = &RemoveTreeHelper::RemoveFile;
   traversal.fn_new_symlink = &RemoveTreeHelper::RemoveFile;
   traversal.fn_new_socket = &RemoveTreeHelper::RemoveFile;
+  traversal.fn_new_fifo = &RemoveTreeHelper::RemoveFile;
   traversal.fn_leave_dir = &RemoveTreeHelper::RemoveDir;
   traversal.Recurse(path);
   bool result = remove_tree_helper->success;
@@ -744,6 +768,29 @@ bool AddGroup2Persona(const gid_t gid) {
   retval = setgroups(ngroups+1, groups);
   free(groups);
   return retval == 0;
+}
+
+
+/**
+ * Sets soft and hard limit for maximum number of open file descriptors.
+ * Returns 0 on success, -1 on failure, -2 if running under valgrind.
+ */
+int SetLimitNoFile(unsigned limit_nofile) {
+  struct rlimit rpl;
+  memset(&rpl, 0, sizeof(rpl));
+  getrlimit(RLIMIT_NOFILE, &rpl);
+  if (rpl.rlim_max < limit_nofile)
+    rpl.rlim_max = limit_nofile;
+  rpl.rlim_cur = limit_nofile;
+  int retval = setrlimit(RLIMIT_NOFILE, &rpl);
+  if (retval == 0)
+    return 0;
+
+#ifdef HAS_VALGRIND_HEADERS
+  return RUNNING_ON_VALGRIND ? -2 : -1;
+#else
+  return -1;
+#endif
 }
 
 
@@ -1108,6 +1155,15 @@ bool SafeReadToString(int fd, std::string *final_result) {
   } while (total_bytes == buf_size);
   final_result->swap(tmp_result);
   return true;
+}
+
+bool SafeWriteToFile(const string &content, const string &path, int mode) {
+  int fd = open(path.c_str(), O_WRONLY | O_CREAT, mode);
+  if (fd < 0)
+    return false;
+  int retval = SafeWrite(fd, content.data(), content.size());
+  close(fd);
+  return retval;
 }
 
 

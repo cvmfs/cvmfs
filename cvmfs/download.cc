@@ -235,11 +235,11 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
   {
     char *tmp = reinterpret_cast<char *>(alloca(num_bytes+1));
     uint64_t length = 0;
-    sscanf(header_line.c_str(), "%s %"PRIu64, tmp, &length);
+    sscanf(header_line.c_str(), "%s %" PRIu64, tmp, &length);
     if (length > 0) {
       if (length > DownloadManager::kMaxMemSize) {
         LogCvmfs(kLogDownload, kLogDebug | kLogSyslogErr,
-                 "resource %s too large to store in memory (%"PRIu64")",
+                 "resource %s too large to store in memory (%" PRIu64 ")",
                  info->url->c_str(), length);
         info->error_code = kFailTooBig;
         return 0;
@@ -787,20 +787,13 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
     shash::Init(info->hash_context);
   }
 
-  if ((info->destination == kDestinationMem) &&
-      (HasPrefix(*(info->url), "file://", false)))
-  {
-    info->destination_mem.size = 64*1024;
-    info->destination_mem.data = static_cast<char *>(smalloc(64*1024));
-  }
-
   if ((info->range_offset != -1) && (info->range_size)) {
     char byte_range_array[100];
     const int64_t range_lower = static_cast<int64_t>(info->range_offset);
     const int64_t range_upper = static_cast<int64_t>(
       info->range_offset + info->range_size - 1);
     if (snprintf(byte_range_array, sizeof(byte_range_array),
-                 "%" PRId64"-%" PRId64,
+                 "%" PRId64 "-%" PRId64,
                  range_lower, range_upper) == 100)
     {
       abort();  // Should be impossible given limits on offset size.
@@ -979,6 +972,14 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
   }
   pthread_mutex_unlock(lock_options_);
 
+  if ((info->destination == kDestinationMem) &&
+      (info->destination_mem.size == 0) &&
+      HasPrefix(url, "file://", false))
+  {
+    info->destination_mem.size = 64*1024;
+    info->destination_mem.data = static_cast<char *>(smalloc(64*1024));
+  }
+
   curl_easy_setopt(curl_handle, CURLOPT_URL, EscapeUrl(url).c_str());
 }
 
@@ -1146,24 +1147,17 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
         }
       }
 
-      // Set actual size in case of file:// download into memory
-      if ((info->destination == kDestinationMem) &&
-          (HasPrefix(*(info->url), "file://", false)))
-      {
-        info->destination_mem.size = info->destination_mem.pos;
-      }
-
       // Decompress memory in a single run
       if ((info->destination == kDestinationMem) && info->compressed) {
         void *buf;
         uint64_t size;
         bool retval = zlib::DecompressMem2Mem(info->destination_mem.data,
-                                              info->destination_mem.size,
+                                              info->destination_mem.pos,
                                               &buf, &size);
         if (retval) {
           free(info->destination_mem.data);
           info->destination_mem.data = static_cast<char *>(buf);
-          info->destination_mem.size = size;
+          info->destination_mem.pos = info->destination_mem.size = size;
         } else {
           LogCvmfs(kLogDownload, kLogDebug,
                    "decompression (memory) of url %s failed",
@@ -1192,6 +1186,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     case CURLE_PARTIAL_FILE:
     case CURLE_GOT_NOTHING:
     case CURLE_RECV_ERROR:
+    case CURLE_FILE_COULDNT_READ_FILE:
       if (info->proxy != "DIRECT")
         // This is a guess.  Fail-over can still change to switching host
         info->error_code = kFailProxyConnection;
@@ -1438,6 +1433,7 @@ DownloadManager::DownloadManager() {
   enable_info_header_ = false;
   opt_ipv4_only_ = false;
   follow_redirects_ = false;
+  use_system_proxy_ = false;
 
   resolver_ = NULL;
 
@@ -1541,6 +1537,7 @@ void DownloadManager::Init(const unsigned max_pool_handles,
 
   // Parsing environment variables
   if (use_system_proxy) {
+    use_system_proxy_ = true;
     if (getenv("http_proxy") == NULL) {
       SetProxyChain("", "", kSetProxyRegular);
     } else {
@@ -1734,6 +1731,12 @@ void DownloadManager::SetDnsParameters(
   const unsigned timeout_ms)
 {
   pthread_mutex_lock(lock_options_);
+  if ((resolver_->retries() == retries) &&
+      (resolver_->timeout_ms() == timeout_ms))
+  {
+    pthread_mutex_unlock(lock_options_);
+    return;
+  }
   delete resolver_;
   resolver_ = NULL;
   resolver_ =
@@ -2615,6 +2618,61 @@ void DownloadManager::EnablePipelining() {
 
 void DownloadManager::EnableRedirects() {
   follow_redirects_ = true;
+}
+
+
+/**
+ * Creates a copy of the existing download manager.  Must only be called in
+ * single-threaded stage because it calls curl_global_init().
+ */
+DownloadManager *DownloadManager::Clone(
+  perf::Statistics *statistics,
+  const string &name)
+{
+  DownloadManager *clone = new DownloadManager();
+  clone->Init(pool_max_handles_, use_system_proxy_, statistics, name);
+  if (resolver_) {
+    clone->SetDnsParameters(resolver_->retries(), resolver_->timeout_ms());
+    clone->SetMaxIpaddrPerProxy(resolver_->throttle());
+  }
+  if (opt_dns_server_)
+    clone->SetDnsServer(opt_dns_server_);
+  clone->opt_timeout_proxy_ = opt_timeout_proxy_;
+  clone->opt_timeout_direct_ = opt_timeout_direct_;
+  clone->opt_low_speed_limit_ = opt_low_speed_limit_;
+  clone->opt_max_retries_ = opt_max_retries_;
+  clone->opt_backoff_init_ms_ = opt_backoff_init_ms_;
+  clone->opt_backoff_max_ms_ = opt_backoff_max_ms_;
+  clone->enable_info_header_ = enable_info_header_;
+  clone->follow_redirects_ = follow_redirects_;
+  if (opt_host_chain_) {
+    clone->opt_host_chain_ = new vector<string>(*opt_host_chain_);
+    clone->opt_host_chain_rtt_ = new vector<int>(*opt_host_chain_rtt_);
+  }
+  CloneProxyConfig(clone);
+  clone->opt_ip_preference_ = opt_ip_preference_;
+  clone->proxy_template_direct_ = proxy_template_direct_;
+  clone->proxy_template_forced_ = proxy_template_forced_;
+  clone->opt_proxy_groups_reset_after_ = opt_proxy_groups_reset_after_;
+  clone->opt_host_reset_after_ = opt_host_reset_after_;
+  clone->credentials_attachment_ = credentials_attachment_;
+
+  return clone;
+}
+
+
+void DownloadManager::CloneProxyConfig(DownloadManager *clone) {
+  clone->opt_proxy_groups_current_ = opt_proxy_groups_current_;
+  clone->opt_proxy_groups_current_burned_ = opt_proxy_groups_current_burned_;
+  clone->opt_proxy_groups_fallback_ = opt_proxy_groups_fallback_;
+  clone->opt_num_proxies_ = opt_num_proxies_;
+  clone->opt_proxy_list_ = opt_proxy_list_;
+  clone->opt_proxy_fallback_list_ = opt_proxy_fallback_list_;
+  if (opt_proxy_groups_ == NULL)
+    return;
+
+  clone->opt_proxy_groups_ = new vector< vector<ProxyInfo> >(
+    *opt_proxy_groups_);
 }
 
 }  // namespace download

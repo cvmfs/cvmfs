@@ -4,6 +4,8 @@
 
 #include "gtest/gtest.h"
 
+#include <cstdlib>
+
 #include "options.h"
 #include "util/file_guard.h"
 #include "util/posix.h"
@@ -30,11 +32,18 @@ class T_Options : public ::testing::Test {
             "CVMFS_SERVER_URL=http://volhcb28:3128/data\n"
             "IdontHaveAnEqual\n"
             "I=have=twoEquals\n"
-            "I = and spaces\n"
+            "XYZABC = and spaces\n"
             "value=\n"
             "CVMFS_SHARED_CACHE=no\n"
             "CVMFS_HTTP_PROXY=DIRECT\n"
-            "export A=B\n");
+            "export A=B\n"
+            "=only equal sign\n"
+            " =equal sign with space\n"
+            "\n"
+            "#\n"
+            "D=E # with a comment\n"
+            "F=\"G\"\n"
+            "H='I' ");
     int result = fclose(temp_file);
     ASSERT_EQ(0, result);
     fprintf(temp_file_2, "CVMFS_CACHE_BASE=/overwritten\n");
@@ -50,11 +59,11 @@ class T_Options : public ::testing::Test {
   template <typename T> struct type {};
 
   unsigned ExpectedValues(const type<BashOptionsManager>  type_specifier) {
-    return 9u;
+    return 12u;
   }
 
   unsigned ExpectedValues(const type<SimpleOptionsParser>  type_specifier) {
-    return 6u;
+    return 12u;
   }
 
   unsigned ExpectedValues() {
@@ -81,6 +90,7 @@ TYPED_TEST(T_Options, ParsePath) {
   const unsigned expected_number_elements = TestFixture::ExpectedValues();
   options_manager.ParsePath(config_file, false);
 
+  // printf("DUMP: ***\n%s\n***\n", options_manager.Dump().c_str());
   ASSERT_EQ(expected_number_elements, options_manager.GetAllKeys().size());
 
   EXPECT_TRUE(options_manager.GetValue("CVMFS_CACHE_BASE", &container));
@@ -112,6 +122,13 @@ TYPED_TEST(T_Options, ParsePath) {
   EXPECT_EQ("", container);
   EXPECT_TRUE(options_manager.GetSource("value", &container));
   EXPECT_EQ(config_file, container);
+
+  EXPECT_TRUE(options_manager.GetValue("D", &container));
+  EXPECT_EQ("E", container);
+  EXPECT_TRUE(options_manager.GetValue("F", &container));
+  EXPECT_EQ("G", container);
+  EXPECT_TRUE(options_manager.GetValue("H", &container));
+  EXPECT_EQ("I", container);
 }
 
 TYPED_TEST(T_Options, ParsePathNoFile) {
@@ -155,4 +172,51 @@ TYPED_TEST(T_Options, GetEnvironmentSubset) {
   env = options_manager.GetEnvironmentSubset("CVMFS_CACHE_", true);
   ASSERT_EQ(1U, env.size());
   EXPECT_EQ(env[0], "BASE=/root/cvmfs_testing/cache");
+}
+
+
+TYPED_TEST(T_Options, SetValue) {
+  OptionsManager &options_manager = TestFixture::options_manager_;
+  const string &config_file = TestFixture::config_file_;
+  options_manager.ParsePath(config_file, false);
+
+  string arg;
+  EXPECT_TRUE(options_manager.GetValue("CVMFS_CACHE_BASE", &arg));
+  EXPECT_EQ("/root/cvmfs_testing/cache", arg);
+  options_manager.SetValue("CVMFS_CACHE_BASE", "new");
+  EXPECT_TRUE(options_manager.GetValue("CVMFS_CACHE_BASE", &arg));
+  EXPECT_EQ("new", arg);
+
+  options_manager.SetValue("UNKNOWN_BEFORE", "information");
+  EXPECT_TRUE(options_manager.GetValue("UNKNOWN_BEFORE", &arg));
+  EXPECT_EQ("information", arg);
+
+  EXPECT_TRUE(options_manager.IsDefined("CVMFS_SERVER_URL"));
+  options_manager.UnsetValue("CVMFS_SERVER_URL");
+  EXPECT_FALSE(options_manager.IsDefined("CVMFS_SERVER_URL"));
+}
+
+
+TYPED_TEST(T_Options, TaintEnvironment) {
+  OptionsManager &options_manager = TestFixture::options_manager_;
+  const string &config_file = TestFixture::config_file_;
+  options_manager.ParsePath(config_file, false);
+
+  string arg;
+  EXPECT_FALSE(options_manager.GetValue("NO_SUCH_OPTION", &arg));
+  options_manager.SetValue("NO_SUCH_OPTION", "xxx");
+  EXPECT_TRUE(options_manager.GetValue("NO_SUCH_OPTION", &arg));
+  EXPECT_EQ(arg, string(getenv("NO_SUCH_OPTION")));
+
+  EXPECT_TRUE(getenv("CVMFS_CACHE_BASE") != NULL);
+  options_manager.UnsetValue("CVMFS_CACHE_BASE");
+  EXPECT_EQ(NULL, getenv("CVMFS_CACHE_BASE"));
+
+  options_manager.set_taint_environment(false);
+  options_manager.UnsetValue("NO_SUCH_OPTION");
+  EXPECT_EQ(arg, string(getenv("NO_SUCH_OPTION")));
+
+  options_manager.SetValue("NO_SUCH_OPTION_NOTAINT", "xxx");
+  EXPECT_TRUE(options_manager.GetValue("NO_SUCH_OPTION_NOTAINT", &arg));
+  EXPECT_EQ(NULL, getenv("NO_SUCH_OPTION_NOTAINT"));
 }

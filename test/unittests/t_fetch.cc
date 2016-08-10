@@ -9,7 +9,7 @@
 
 #include "atomic.h"
 #include "backoff.h"
-#include "cache.h"
+#include "cache_posix.h"
 #include "download.h"
 #include "fetch.h"
 #include "hash.h"

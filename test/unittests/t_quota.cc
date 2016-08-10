@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-#include "cache.h"
+#include "cache_posix.h"
 #include "compression.h"
 #include "fs_traversal.h"
 #include "hash.h"
@@ -307,10 +307,10 @@ TEST_F(T_QuotaManager, Create) {
 TEST_F(T_QuotaManager, CreateShared) {
   delete quota_mgr_;
   EXPECT_EQ(NULL,
-    PosixQuotaManager::CreateShared("", tmp_path_ + "/noent", 5, 5));
+    PosixQuotaManager::CreateShared("", tmp_path_ + "/noent", 5, 5, false));
 
   // Forking fails
-  EXPECT_EQ(NULL, PosixQuotaManager::CreateShared("", tmp_path_, 5, 5));
+  EXPECT_EQ(NULL, PosixQuotaManager::CreateShared("", tmp_path_, 5, 5, false));
   EXPECT_EQ(0, unlink((tmp_path_ + "/cachemgr").c_str()));
 
   // TODO(jblomer): test fork logic (requires changes to __cachemgr__ execve)

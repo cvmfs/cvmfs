@@ -15,6 +15,7 @@
 #include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <inttypes.h>
 #include <stdint.h>
 #include <sys/select.h>
 #include <sys/time.h>
@@ -33,6 +34,7 @@
 #include "platform.h"
 #include "smalloc.h"
 #include "statistics.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 
@@ -269,7 +271,7 @@ static int VfsRdOnlyOpen(
   p->vfs_rdonly = reinterpret_cast<VfsRdOnly *>(vfs->pAppData);
   p->base.pMethods = &io_methods;
   perf::Inc(p->vfs_rdonly->no_open);
-  LogCvmfs(kLogSql, kLogDebug, "open sqlite3 catalog on fd %d, size %"PRIu64,
+  LogCvmfs(kLogSql, kLogDebug, "open sqlite3 catalog on fd %d, size %" PRIu64,
            p->fd, p->size);
   return SQLITE_OK;
 }

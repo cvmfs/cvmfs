@@ -41,7 +41,6 @@
 #include <string>
 #include <vector>
 
-#include "cvmfs.h"
 #include "duplex_sqlite3.h"
 #include "hash.h"
 #include "logging.h"
@@ -132,7 +131,7 @@ void PosixQuotaManager::CheckHighPinWatermark() {
   const uint64_t watermark = kHighPinWatermark*cleanup_threshold_/100;
   if ((cleanup_threshold_ > 0) && (pinned_ > watermark)) {
     LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
-             "high watermark of pinned files (%"PRIu64"M > %"PRIu64"M)",
+             "high watermark of pinned files (%" PRIu64 "M > %" PRIu64 "M)",
              pinned_/(1024*1024), watermark/(1024*1024));
     BroadcastBackchannels("R");  // clients: please release pinned catalogs
   }
@@ -257,9 +256,8 @@ PosixQuotaManager *PosixQuotaManager::Create(
   const bool rebuild_database)
 {
   if (cleanup_threshold >= limit) {
-    LogCvmfs(kLogQuota, kLogDebug,
-             "invalid parameters: limit %"PRIu64", cleanup_threshold %"PRIu64"",
-             limit, cleanup_threshold);
+    LogCvmfs(kLogQuota, kLogDebug, "invalid parameters: limit %" PRIu64 ", "
+             "cleanup_threshold %" PRIu64, limit, cleanup_threshold);
     return NULL;
   }
 
@@ -286,7 +284,8 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
   const std::string &exe_path,
   const std::string &cache_dir,
   const uint64_t limit,
-  const uint64_t cleanup_threshold)
+  const uint64_t cleanup_threshold,
+  bool foreground)
 {
   // Create lock file: only one fuse client at a time
   const int fd_lockfile = LockFile(cache_dir + "/lock_cachemgr");
@@ -312,7 +311,7 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
     UnlockFile(fd_lockfile);
     quota_mgr->GetLimits(&quota_mgr->limit_, &quota_mgr->cleanup_threshold_);
     LogCvmfs(kLogQuota, kLogDebug,
-             "received limit %"PRIu64", threshold %"PRIu64,
+             "received limit %" PRIu64 ", threshold %" PRIu64,
              quota_mgr->limit_, quota_mgr->cleanup_threshold_);
     if (FileExists(cache_dir + "/cachemgr.protocol")) {
       quota_mgr->protocol_revision_ = quota_mgr->GetProtocolRevision();
@@ -365,7 +364,7 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
   command_line.push_back(StringifyInt(pipe_handshake[0]));
   command_line.push_back(StringifyInt(limit));
   command_line.push_back(StringifyInt(cleanup_threshold));
-  command_line.push_back(StringifyInt(cvmfs::foreground_));
+  command_line.push_back(StringifyInt(foreground));
   command_line.push_back(StringifyInt(GetLogSyslogLevel()));
   command_line.push_back(StringifyInt(GetLogSyslogFacility()));
   command_line.push_back(GetLogDebugFile() + ":" + GetLogMicroSyslog());
@@ -432,7 +431,8 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
 
   quota_mgr->initialized_ = true;
   quota_mgr->GetLimits(&quota_mgr->limit_, &quota_mgr->cleanup_threshold_);
-  LogCvmfs(kLogQuota, kLogDebug, "received limit %"PRIu64", threshold %"PRIu64,
+  LogCvmfs(kLogQuota, kLogDebug, "received limit %" PRIu64 ", "
+           "threshold %" PRIu64,
            quota_mgr->limit_, quota_mgr->cleanup_threshold_);
   return quota_mgr;
 }
@@ -445,7 +445,7 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
   // TODO(jblomer) transaction
   LogCvmfs(kLogQuota, kLogSyslog,
            "cleanup cache until %lu KB are free", leave_size/1024);
-  LogCvmfs(kLogQuota, kLogDebug, "gauge %"PRIu64, gauge_);
+  LogCvmfs(kLogQuota, kLogDebug, "gauge %" PRIu64, gauge_);
   cleanup_recorder_.Tick();
 
   bool result;
@@ -470,7 +470,7 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
     if (pinned_chunks_.find(hash) == pinned_chunks_.end()) {
       trash.push_back(cache_dir_ + "/" + hash.MakePathWithoutSuffix());
       gauge_ -= sqlite3_column_int64(stmt_lru_, 1);
-      LogCvmfs(kLogQuota, kLogDebug, "lru cleanup %s, new gauge %"PRIu64,
+      LogCvmfs(kLogQuota, kLogDebug, "lru cleanup %s, new gauge %" PRIu64,
                hash_str.c_str(), gauge_);
 
       sqlite3_bind_text(stmt_rm_, 1, &hash_str[0], hash_str.length(),
@@ -537,8 +537,8 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
 
   if (gauge_ > leave_size) {
     LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
-             "request to clean until %"PRIu64", but effective gauge is %"PRIu64,
-             leave_size, gauge_);
+             "request to clean until %" PRIu64 ", "
+             "but effective gauge is %" PRIu64, leave_size, gauge_);
     return false;
   }
   return true;
@@ -1770,7 +1770,7 @@ bool PosixQuotaManager::RebuildDatabase() {
   seq_ = seq;
   result = true;
   LogCvmfs(kLogQuota, kLogDebug,
-           "rebuilding finished, seqence %"PRIu64 ", gauge %"PRIu64,
+           "rebuilding finished, seqence %" PRIu64 ", gauge %" PRIu64,
            seq_, gauge_);
 
  build_return:

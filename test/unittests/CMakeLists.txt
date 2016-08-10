@@ -26,6 +26,7 @@ set(CVMFS_UNITTEST_FILES
   t_blocking_counter.cc
   t_buffer.cc
   t_cache.cc
+  t_cache_ram.cc
   t_callbacks.cc
   t_catalog.cc
   t_catalog_counters.cc
@@ -52,10 +53,13 @@ set(CVMFS_UNITTEST_FILES
   t_header_lists.cc
   t_history.cc
   t_json.cc
+  t_kvstore.cc
   t_libcvmfs.cc
   t_lru.cc
   t_macaroon.cc
+  t_malloc_arena.cc
   t_manifest.cc
+  t_mountpoint.cc
   t_object_fetcher.cc
   t_options.cc
   t_pack.cc
@@ -85,6 +89,7 @@ set(CVMFS_UNITTEST_FILES
   t_util.cc
   t_util_concurrency.cc
   t_uuid.cc
+  t_whitelist.cc
   t_wpad.cc
   t_xattr.cc
 )
@@ -100,16 +105,21 @@ set (CVMFS_UNITTEST_SOURCES
   # test dependencies
   ${CVMFS_SOURCE_DIR}/atomic.h
   ${CVMFS_SOURCE_DIR}/authz/authz.cc ${CVMFS_SOURCE_DIR}/authz/authz.h
+  ${CVMFS_SOURCE_DIR}/authz/authz_curl.cc ${CVMFS_SOURCE_DIR}/authz/authz_curl.h
   ${CVMFS_SOURCE_DIR}/authz/authz_fetch.cc ${CVMFS_SOURCE_DIR}/authz/authz_fetch.h
   ${CVMFS_SOURCE_DIR}/authz/authz_session.cc ${CVMFS_SOURCE_DIR}/authz/authz_session.h
   ${CVMFS_SOURCE_DIR}/backoff.cc ${CVMFS_SOURCE_DIR}/backoff.h
   ${CVMFS_SOURCE_DIR}/bigvector.h
   ${CVMFS_SOURCE_DIR}/cache.cc ${CVMFS_SOURCE_DIR}/cache.h
+  ${CVMFS_SOURCE_DIR}/cache_posix.cc ${CVMFS_SOURCE_DIR}/cache_posix.h
+  ${CVMFS_SOURCE_DIR}/cache_ram.cc ${CVMFS_SOURCE_DIR}/cache_ram.h
   ${CVMFS_SOURCE_DIR}/catalog.cc
   ${CVMFS_SOURCE_DIR}/catalog_counters.cc ${CVMFS_SOURCE_DIR}/catalog_counters.h
   ${CVMFS_SOURCE_DIR}/catalog_mgr.h
   ${CVMFS_SOURCE_DIR}/catalog_mgr_client.cc ${CVMFS_SOURCE_DIR}/catalog_mgr_client.h
   ${CVMFS_SOURCE_DIR}/catalog_mgr_impl.h
+  ${CVMFS_SOURCE_DIR}/catalog_mgr_ro.cc ${CVMFS_SOURCE_DIR}/catalog_mgr_ro.h
+  ${CVMFS_SOURCE_DIR}/catalog_mgr_rw.cc ${CVMFS_SOURCE_DIR}/catalog_mgr_rw.h
   ${CVMFS_SOURCE_DIR}/catalog_sql.cc ${CVMFS_SOURCE_DIR}/catalog_sql.h
   ${CVMFS_SOURCE_DIR}/catalog_rw.cc ${CVMFS_SOURCE_DIR}/catalog_rw.h
   ${CVMFS_SOURCE_DIR}/clientctx.cc ${CVMFS_SOURCE_DIR}/clientctx.h
@@ -132,16 +142,22 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/file_processing/io_dispatcher.cc
   ${CVMFS_SOURCE_DIR}/file_processing/processor.cc
   ${CVMFS_SOURCE_DIR}/globals.cc ${CVMFS_SOURCE_DIR}/globals.h
+  ${CVMFS_SOURCE_DIR}/glue_buffer.cc ${CVMFS_SOURCE_DIR}/glue_buffer.h
   ${CVMFS_SOURCE_DIR}/hash.cc ${CVMFS_SOURCE_DIR}/hash.h
   ${CVMFS_SOURCE_DIR}/history_sql.cc
   ${CVMFS_SOURCE_DIR}/history_sqlite.cc
   ${CVMFS_SOURCE_DIR}/json_document.cc ${CVMFS_SOURCE_DIR}/json_document.h
+  ${CVMFS_SOURCE_DIR}/kvstore.cc ${CVMFS_SOURCE_DIR}/kvstore.h
   ${CVMFS_SOURCE_DIR}/libcvmfs.cc ${CVMFS_SOURCE_DIR}/libcvmfs.h
   ${CVMFS_SOURCE_DIR}/libcvmfs_int.cc ${CVMFS_SOURCE_DIR}/libcvmfs_int.h
+  ${CVMFS_SOURCE_DIR}/libcvmfs_legacy.cc
+  ${CVMFS_SOURCE_DIR}/libcvmfs_options.cc
   ${CVMFS_SOURCE_DIR}/logging.cc ${CVMFS_SOURCE_DIR}/logging.h ${CVMFS_SOURCE_DIR}/logging_internal.h
+  ${CVMFS_SOURCE_DIR}/malloc_arena.cc ${CVMFS_SOURCE_DIR}/malloc_arena.h
   ${CVMFS_SOURCE_DIR}/manifest.cc ${CVMFS_SOURCE_DIR}/manifest.h
   ${CVMFS_SOURCE_DIR}/manifest_fetch.cc ${CVMFS_SOURCE_DIR}/manifest_fetch.h
   ${CVMFS_SOURCE_DIR}/monitor.cc ${CVMFS_SOURCE_DIR}/monitor.h
+  ${CVMFS_SOURCE_DIR}/mountpoint.cc ${CVMFS_SOURCE_DIR}/mountpoint.h
   ${CVMFS_SOURCE_DIR}/murmur.h
   ${CVMFS_SOURCE_DIR}/options.cc ${CVMFS_SOURCE_DIR}/options.h
   ${CVMFS_SOURCE_DIR}/pack.cc ${CVMFS_SOURCE_DIR}/pack.h
@@ -167,6 +183,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/statistics.cc ${CVMFS_SOURCE_DIR}/statistics.h
   ${CVMFS_SOURCE_DIR}/tracer.cc ${CVMFS_SOURCE_DIR}/tracer.h
   ${CVMFS_SOURCE_DIR}/uid_map.h
+  ${CVMFS_SOURCE_DIR}/upload.cc ${CVMFS_SOURCE_DIR}/upload.h
   ${CVMFS_SOURCE_DIR}/upload_facility.cc
   ${CVMFS_SOURCE_DIR}/upload_local.cc
   ${CVMFS_SOURCE_DIR}/upload_s3.cc

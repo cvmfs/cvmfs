@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <pthread.h>
+#include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <tbb/tbb_thread.h>
@@ -77,7 +78,8 @@ class T_Util : public ::testing::Test {
 
  protected:
   static void WriteBuffer(int fd, const string &text) {
-    write(fd, text.c_str(), text.length());
+    int size = text.length();
+    EXPECT_EQ(size, write(fd, text.c_str(), size));
   }
 
   static string GetDebugger() {
@@ -430,7 +432,8 @@ TEST_F(T_Util, MakePipe) {
   int fd[2];
   void *buffer_output = scalloc(100, sizeof(char));
   MakePipe(fd);
-  write(fd[1], to_write.c_str(), to_write.length());
+  int bytes_write = to_write.length();
+  EXPECT_EQ(bytes_write, write(fd[1], to_write.c_str(), bytes_write));
   ssize_t bytes_read = read(fd[0], buffer_output, to_write.length());
   EXPECT_EQ(static_cast<size_t>(bytes_read), to_write.length());
 
@@ -459,7 +462,8 @@ TEST_F(T_Util, ReadPipe) {
   int fd[2];
   void *buffer_output = scalloc(20, sizeof(char));
   MakePipe(fd);
-  write(fd[1], to_write.c_str(), to_write.length());
+  int bytes_write = to_write.length();
+  EXPECT_EQ(bytes_write, write(fd[1], to_write.c_str(), bytes_write));
   ReadPipe(fd[0], buffer_output, to_write.length());
 
   EXPECT_STREQ(to_write.c_str(), static_cast<const char*>(buffer_output));
@@ -526,6 +530,14 @@ TEST_F(T_Util, SafeWrite) {
   ClosePipe(fd);
 
   EXPECT_FALSE(SafeWrite(-1, &stop, 1));
+
+  EXPECT_TRUE(SafeWriteToFile("abc", sandbox + "/new_file", 0600));
+  string result;
+  int fd_file = open((sandbox + "/new_file").c_str(), O_RDONLY);
+  EXPECT_GE(fd_file, 0);
+  EXPECT_TRUE(SafeReadToString(fd_file, &result));
+  close(fd_file);
+  EXPECT_EQ("abc", result);
 }
 
 
@@ -685,7 +697,7 @@ TEST_F(T_Util, DirectoryExists) {
 TEST_F(T_Util, SymlinkExists) {
   string symlinkname = sandbox + "/mysymlink";
   string filename = CreateFileWithContent("mysymlinkfile.txt", to_write);
-  symlink(filename.c_str(), symlinkname.c_str());
+  EXPECT_EQ(0, symlink(filename.c_str(), symlinkname.c_str()));
 
   EXPECT_TRUE(SymlinkExists(symlinkname));
   EXPECT_FALSE(SymlinkExists("/fakepath/myfakepath"));
@@ -1473,4 +1485,25 @@ TEST_F(T_Util, MemoryMappedFile) {
   ASSERT_TRUE(mf.Map());
   EXPECT_TRUE(mf.IsMapped());
   mf.Unmap();
+}
+
+
+TEST_F(T_Util, SetLimitNoFile) {
+  EXPECT_EQ(-1, SetLimitNoFile(100000000));
+
+  struct rlimit rpl;
+  memset(&rpl, 0, sizeof(rpl));
+  getrlimit(RLIMIT_NOFILE, &rpl);
+  EXPECT_EQ(0, SetLimitNoFile(rpl.rlim_cur));
+}
+
+
+TEST_F(T_Util, GetAbsolutePath) {
+  bool ignore_failure = false;
+  EXPECT_EQ("/xxx", GetAbsolutePath("/xxx"));
+  EXPECT_NE("xxx", GetAbsolutePath("xxx"));
+
+  EXPECT_FALSE(FileExists(GetAbsolutePath("xxx")));
+  CreateFile("xxx", 0600, ignore_failure);
+  EXPECT_TRUE(FileExists(GetAbsolutePath("xxx")));
 }

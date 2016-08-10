@@ -1,7 +1,0 @@
-#!/bin/sh
-
-KEY=`cat /dev/urandom | head -c32 | hexdump -v -e '1/1 "%02x"'`
-KEY_ID=`echo -n $KEY | openssl sha1`
-echo -n $KEY > $KEY_ID
-echo "CernVM-FS key file $KEY_ID created"
-

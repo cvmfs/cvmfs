@@ -7,6 +7,7 @@
   #include <sys/sysctl.h>
 #endif
 #include <syslog.h>
+#include <unistd.h>
 
 #include <algorithm>
 #include <cassert>
@@ -14,6 +15,7 @@
 #include <map>
 #include <sstream>  // TODO(jblomer): remove me
 
+#include "fs_traversal.h"
 #include "hash.h"
 #include "manifest.h"
 #include "testutil.h"
@@ -72,6 +74,35 @@ pid_t GetParentPid(const pid_t pid) {
 #endif
 
   return parent_pid;
+}
+
+
+class ShowOpenFilesHelper {
+ public:
+  void ShowSymlink(const string &parent_path, const string &name) {
+    char buf[1024];
+    string full_path = parent_path + "/" + name;
+    int size = readlink(full_path.c_str(), buf, 1024);
+    file_list += (size < 0)
+                  ? ("failed to read fd " + name + "\n")
+                  : string(buf, size) + "\n";
+  }
+
+  string file_list;
+};
+
+
+string ShowOpenFiles() {
+#ifdef __APPLE__
+  return "listing open files not supported on OS X";
+#else
+  ShowOpenFilesHelper open_files_helper;
+  FileSystemTraversal<ShowOpenFilesHelper>
+    traversal(&open_files_helper, "", false);
+  traversal.fn_new_symlink = &ShowOpenFilesHelper::ShowSymlink;
+  traversal.Recurse("/proc/self/fd");
+  return open_files_helper.file_list;
+#endif
 }
 
 
@@ -684,6 +715,14 @@ MockReflog* MockReflog::Create(const std::string &path,
   MockReflog *reflog = new MockReflog(repo_name);
   MockReflog::RegisterPath(path, reflog);
   return reflog;
+}
+
+
+void MockReflog::HashDatabase(
+  const std::string &database_path,
+  shash::Any *hash_reflog)
+{
+  HashString("", hash_reflog);
 }
 
 

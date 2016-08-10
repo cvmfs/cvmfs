@@ -23,6 +23,12 @@ wait_for_file() {
   return 1
 }
 
+# NOTE: During this test, a python interpreter is used from cvmfs and cvmfs
+# is forcefully remounted.  This works only with python interpreters that link
+# their actual logic against libpython.  On Ubuntu 16.04 (and possibly others)
+# the interpreter is one large binary and it doesn't survive cvmfs being killed
+# underneath.
+
 # Regression Test: This issue was seen on the lhcbdev.cern.ch release manager
 #                  machine where a misconfigured environment caused a python
 #                  script to be interpreted with a python interpreter hosted on

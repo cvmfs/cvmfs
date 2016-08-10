@@ -235,6 +235,9 @@ cvmfs_run_test() {
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER /dev/stdout -V "x509%cvmfs:/cvmfs" || return $?
+  echo "Make sure we don't lock out ourselves when publishing"
+  echo "CVMFS_AUTHZ_HELPER=/usr/libexec/cvmfs/authz/cvmfs_allow_helper" | \
+    sudo tee -a /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/client.conf
 
   echo "gather information about the just created repo"
   load_repo_config $CVMFS_TEST_REPO

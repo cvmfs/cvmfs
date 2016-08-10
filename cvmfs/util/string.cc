@@ -81,7 +81,7 @@ string StringifyBool(const bool value) {
 
 string StringifyInt(const int64_t value) {
   char buffer[48];
-  snprintf(buffer, sizeof(buffer), "%"PRId64, value);
+  snprintf(buffer, sizeof(buffer), "%" PRId64, value);
   return string(buffer);
 }
 
@@ -148,7 +148,7 @@ string StringifyTimeval(const timeval value) {
   char buffer[64];
   int64_t msec = value.tv_sec * 1000;
   msec += value.tv_usec / 1000;
-  snprintf(buffer, sizeof(buffer), "%"PRId64".%03d",
+  snprintf(buffer, sizeof(buffer), "%" PRId64 ".%03d",
            msec, static_cast<int>(value.tv_usec % 1000));
   return string(buffer);
 }
@@ -188,14 +188,14 @@ time_t IsoTimestamp2UtcTime(const std::string &iso8601) {
 
 int64_t String2Int64(const string &value) {
   int64_t result;
-  sscanf(value.c_str(), "%"PRId64, &result);
+  sscanf(value.c_str(), "%" PRId64, &result);
   return result;
 }
 
 
 uint64_t String2Uint64(const string &value) {
   uint64_t result;
-  sscanf(value.c_str(), "%"PRIu64, &result);
+  sscanf(value.c_str(), "%" PRIu64, &result);
   return result;
 }
 
@@ -229,7 +229,7 @@ bool String2Uint64Parse(const std::string &value, uint64_t *result) {
 }
 
 void String2Uint64Pair(const string &value, uint64_t *a, uint64_t *b) {
-  sscanf(value.c_str(), "%"PRIu64" %"PRIu64, a, b);
+  sscanf(value.c_str(), "%" PRIu64 " %" PRIu64, a, b);
 }
 
 

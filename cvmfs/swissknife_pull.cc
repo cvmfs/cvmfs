@@ -32,6 +32,7 @@
 #include "manifest_fetch.h"
 #include "object_fetcher.h"
 #include "path_filters/relaxed_path_filter.h"
+#include "reflog.h"
 #include "signature.h"
 #include "smalloc.h"
 #include "upload.h"
@@ -428,7 +429,7 @@ bool CommandPull::Pull(const shash::Any   &catalog_hash,
 
   // Traverse the chunks
   LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
-           "  Processing chunks [%"PRIu64" registered chunks]: ",
+           "  Processing chunks [%" PRIu64 " registered chunks]: ",
            catalog->GetNumChunks());
   retval = catalog->AllChunksBegin();
   if (!retval) {
@@ -444,8 +445,8 @@ bool CommandPull::Pull(const shash::Any   &catalog_hash,
   while (atomic_read64(&chunk_queue) != 0) {
     SafeSleepMs(100);
   }
-  LogCvmfs(kLogCvmfs, kLogStdout, " fetched %"PRId64" new chunks out of "
-           "%"PRId64" unique chunks",
+  LogCvmfs(kLogCvmfs, kLogStdout, " fetched %" PRId64 " new chunks out of "
+           "%" PRId64 " unique chunks",
            atomic_read64(&overall_new)-gauge_new,
            atomic_read64(&overall_chunks)-gauge_chunks);
 
@@ -523,6 +524,13 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     stratum1_url = args.find('w')->second;
   if (args.find('i') != args.end())
     initial_snapshot = true;
+  shash::Any reflog_hash;
+  string reflog_chksum_path;
+  if (args.find('R') != args.end()) {
+    reflog_chksum_path = *args.find('R')->second;
+    if (!initial_snapshot)
+      reflog_hash = manifest::Reflog::ReadChecksum(reflog_chksum_path);
+  }
 
   if (!preload_cache && stratum1_url == NULL) {
     LogCvmfs(kLogCvmfs, kLogStderr, "need -w <stratum 1 URL>");
@@ -615,6 +623,36 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     goto fini;
   }
 
+  // Get meta info
+  meta_info_hash = ensemble.manifest->meta_info();
+  if (!meta_info_hash.IsNull()) {
+    meta_info_hash = ensemble.manifest->meta_info();
+    const string url = *stratum0_url + "/data/" + meta_info_hash.MakePath();
+    download::JobInfo download_metainfo(&url, true, false, &meta_info_hash);
+    dl_retval = download_manager()->Fetch(&download_metainfo);
+    if (dl_retval != download::kFailOk) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch meta info (%d - %s)",
+               dl_retval, download::Code2Ascii(dl_retval));
+      goto fini;
+    }
+    meta_info = string(download_metainfo.destination_mem.data,
+                       download_metainfo.destination_mem.pos);
+  }
+
+  is_garbage_collectable = ensemble.manifest->garbage_collectable();
+
+  // Manifest available, now the spooler's hash algorithm can be determined
+  // That doesn't actually matter because the replication does no re-hashing
+  if (!preload_cache) {
+    const upload::SpoolerDefinition
+      spooler_definition(spooler_definition_str,
+                         ensemble.manifest->GetHashAlgorithm());
+    spooler = upload::Spooler::Construct(spooler_definition);
+    assert(spooler);
+    spooler->RegisterListener(&SpoolerOnUpload);
+  }
+
+  // Open the reflog for modification
   if (!preload_cache) {
     if (initial_snapshot) {
       LogCvmfs(kLogCvmfs, kLogStdout, "Creating an empty Reflog for '%s'",
@@ -631,44 +669,25 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
                                             download_manager(),
                                             signature_manager());
 
-      reflog = FetchReflog(&object_fetcher_stratum1, repository_name);
-      if (reflog == NULL) {
-        LogCvmfs(kLogCvmfs, kLogVerboseMsg, "failed to get Reflog (ignoring)");
+      if (!reflog_hash.IsNull()) {
+        reflog =
+          FetchReflog(&object_fetcher_stratum1, repository_name, reflog_hash);
+        assert(reflog != NULL);
+      } else {
+        LogCvmfs(kLogCvmfs, kLogVerboseMsg, "no reflog (ignoring)");
+        if (spooler->Peek("/.cvmfsreflog")) {
+          LogCvmfs(kLogCvmfs, kLogStderr,
+                   "no reflog hash specified but reflog is present");
+          goto fini;
+        }
       }
     }
 
     if (reflog != NULL) {
       reflog->BeginTransaction();
+      // On commit: use manifest's hash algorithm
+      reflog_hash.algorithm = ensemble.manifest->GetHashAlgorithm();
     }
-  }
-
-  // Get meta info
-  meta_info_hash = ensemble.manifest->meta_info();
-  if (!meta_info_hash.IsNull()) {
-    meta_info_hash = ensemble.manifest->meta_info();
-    const string url = *stratum0_url + "/data/" + meta_info_hash.MakePath();
-    download::JobInfo download_metainfo(&url, true, false, &meta_info_hash);
-    dl_retval = download_manager()->Fetch(&download_metainfo);
-    if (dl_retval != download::kFailOk) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch meta info (%d - %s)",
-               dl_retval, download::Code2Ascii(dl_retval));
-      goto fini;
-    }
-    meta_info = string(download_metainfo.destination_mem.data,
-                       download_metainfo.destination_mem.size);
-  }
-
-  is_garbage_collectable = ensemble.manifest->garbage_collectable();
-
-  // Manifest available, now the spooler's hash algorithm can be determined
-  // That doesn't actually matter because the replication does no re-hashing
-  if (!preload_cache) {
-    const upload::SpoolerDefinition
-      spooler_definition(spooler_definition_str,
-                         ensemble.manifest->GetHashAlgorithm());
-    spooler = upload::Spooler::Construct(spooler_definition);
-    assert(spooler);
-    spooler->RegisterListener(&SpoolerOnUpload);
   }
 
   // Fetch tag list.
@@ -785,13 +804,17 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     // upload Reflog database
     if (!preload_cache && reflog != NULL) {
       reflog->CommitTransaction();
-      spooler->UploadReflog(reflog->CloseAndReturnDatabaseFile());
+      string reflog_path = reflog->CloseAndReturnDatabaseFile();
+      manifest::Reflog::HashDatabase(reflog_path, &reflog_hash);
+      spooler->UploadReflog(reflog_path);
       spooler->WaitForUpload();
       if (spooler->GetNumberOfErrors()) {
         LogCvmfs(kLogCvmfs, kLogStderr, "Failed to upload Reflog (errors: %d)",
                  spooler->GetNumberOfErrors());
         goto fini;
       }
+      assert(!reflog_chksum_path.empty());
+      manifest::Reflog::WriteChecksum(reflog_chksum_path, reflog_hash);
     }
 
     if (preload_cache) {
@@ -813,8 +836,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   }
 
   WaitForStorage();
-  LogCvmfs(kLogCvmfs, kLogStdout, "Fetched %"PRId64" new chunks out of %"
-           PRId64" processed chunks",
+  LogCvmfs(kLogCvmfs, kLogStdout, "Fetched %" PRId64 " new chunks out of %"
+           PRId64 " processed chunks",
            atomic_read64(&overall_new), atomic_read64(&overall_chunks));
   result = 0;
 

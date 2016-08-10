@@ -5,7 +5,7 @@
 #include "cvmfs_config.h"
 #include "catalog_mgr_client.h"
 
-#include "cache.h"
+#include "cache_posix.h"
 #include "download.h"
 #include "fetch.h"
 #include "manifest.h"

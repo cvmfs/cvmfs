@@ -12,6 +12,7 @@
 #include <inttypes.h>
 #include <unistd.h>
 
+#include <cassert>
 #include <map>
 #include <queue>
 #include <string>
@@ -24,7 +25,10 @@
 #include "history_sqlite.h"
 #include "logging.h"
 #include "manifest.h"
+#include "reflog.h"
 #include "shortstring.h"
+#include "util/pointer.h"
+#include "util/posix.h"
 
 using namespace std;  // NOLINT
 
@@ -68,7 +72,7 @@ bool CommandCheck::CompareEntries(const catalog::DirectoryEntry &a,
     retval = false;
   }
   if (diffs & Difference::kSize) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "sizes differ: %"PRIu64" / %"PRIu64,
+    LogCvmfs(kLogCvmfs, kLogStderr, "sizes differ: %" PRIu64 " / %" PRIu64,
              a.size(), b.size());
     retval = false;
   }
@@ -118,8 +122,8 @@ bool CommandCheck::CompareCounters(const catalog::Counters &a,
 
     if (*(i->second) != *(comp->second)) {
       LogCvmfs(kLogCvmfs, kLogStderr,
-               "catalog statistics mismatch: %s (expected: %"PRIu64" / "
-               "in catalog: %"PRIu64")",
+               "catalog statistics mismatch: %s (expected: %" PRIu64 " / "
+               "in catalog: %" PRIu64 ")",
                comp->first.c_str(), *(i->second), *(comp->second));
       retval = false;
     }
@@ -141,6 +145,90 @@ bool CommandCheck::Exists(const string &file)
     download::JobInfo head(&url, false);
     return download_manager()->Fetch(&head) == download::kFailOk;
   }
+}
+
+
+/**
+ * Copies a file from the repository into a temporary file.
+ */
+string CommandCheck::FetchPath(const string &path) {
+  string tmp_path;
+  FILE *f = CreateTempFile(temp_directory_ + "/cvmfstmp", kDefaultFileMode,
+                           "w+", &tmp_path);
+  assert(f != NULL);
+
+  const string url = repo_base_path_ + "/" + path;
+  if (is_remote_) {
+    download::JobInfo download_job(&url, false, false, f, NULL);
+    download::Failures retval = download_manager()->Fetch(&download_job);
+    assert(retval == download::kFailOk);
+  } else {
+    bool retval = CopyPath2File(url, f);
+    assert(retval);
+  }
+
+  fclose(f);
+  return tmp_path;
+}
+
+
+/**
+ * Verifies reflog checksum and looks for presence of the entry points
+ * referenced in the manifest.
+ */
+bool CommandCheck::InspectReflog(
+  const shash::Any &reflog_hash,
+  manifest::Manifest *manifest)
+{
+  LogCvmfs(kLogCvmfs, kLogStdout, "Inspecting log of references");
+  string reflog_path = FetchPath(".cvmfsreflog");
+  shash::Any computed_hash(reflog_hash.algorithm);
+  manifest::Reflog::HashDatabase(reflog_path, &computed_hash);
+  if (computed_hash != reflog_hash) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "The .cvmfsreflog has unexpected content hash %s (expected %s)",
+             computed_hash.ToString().c_str(), reflog_hash.ToString().c_str());
+    unlink(reflog_path.c_str());
+    return false;
+  }
+
+  UniquePtr<manifest::Reflog> reflog(manifest::Reflog::Open(reflog_path));
+  assert(reflog.IsValid());
+  reflog->TakeDatabaseFileOwnership();
+
+  if (!reflog->ContainsCatalog(manifest->catalog_hash())) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "failed to find catalog root hash %s in .cvmfsreflog",
+             manifest->catalog_hash().ToString().c_str());
+    return false;
+  }
+
+  if (!reflog->ContainsCertificate(manifest->certificate())) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "failed to find certificate hash %s in .cvmfsreflog",
+             manifest->certificate().ToString().c_str());
+    return false;
+  }
+
+  if (!manifest->history().IsNull() &&
+      !reflog->ContainsHistory(manifest->history()))
+  {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "failed to find tag database's hash %s in .cvmfsreflog",
+             manifest->history().ToString().c_str());
+    return false;
+  }
+
+  if (!manifest->meta_info().IsNull() &&
+      !reflog->ContainsMetainfo(manifest->meta_info()))
+  {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "failed to find meta info hash %s in .cvmfsreflog",
+             manifest->meta_info().ToString().c_str());
+    return false;
+  }
+
+  return true;
 }
 
 
@@ -460,7 +548,7 @@ catalog::Catalog* CommandCheck::FetchCatalog(const string      &path,
 
   if ((catalog_size > 0) && (uint64_t(catalog_file_size) != catalog_size)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "catalog file size mismatch, "
-             "expected %"PRIu64", got %"PRIu64,
+             "expected %" PRIu64 ", got %" PRIu64,
              catalog_size, catalog_file_size);
     delete catalog;
     return NULL;
@@ -586,7 +674,7 @@ bool CommandCheck::InspectTree(const string                  &path,
     computed_counters->self.symlinks + computed_counters->self.directories;
   if (num_found_entries != catalog->GetNumEntries()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "dangling entries in catalog, "
-             "expected %"PRIu64", got %"PRIu64,
+             "expected %" PRIu64 ", got %" PRIu64,
              catalog->GetNumEntries(), num_found_entries);
     retval = false;
   }
@@ -643,6 +731,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   string pubkey_path = "";
   string trusted_certs = "";
   string repo_name = "";
+  string reflog_chksum_path = "";
 
   temp_directory_ = (args.find('t') != args.end()) ? *args.find('t')->second
                                                    : "/tmp";
@@ -669,6 +758,8 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   repo_base_path_ = MakeCanonicalPath(*args.find('r')->second);
   if (args.find('s') != args.end())
     subtree_path = MakeCanonicalPath(*args.find('s')->second);
+  if (args.find('R') != args.end())
+    reflog_chksum_path = *args.find('R')->second;
 
   // Repository can be HTTP address or on local file system
   is_remote_ = (repo_base_path_.substr(0, 7) == "http://");
@@ -691,6 +782,13 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     }
   }
 
+  // If there is a reflog, we want to check it
+  if (reflog_chksum_path.empty() && Exists(".cvmfsreflog")) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             ".cvmfsreflog present but no checksum provided, aborting");
+    return 1;
+  }
+
   // Load Manifest
   manifest::Manifest *manifest = NULL;
   if (is_remote_) {
@@ -707,6 +805,16 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   if (!manifest) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to load repository manifest");
     return 1;
+  }
+
+  if (!reflog_chksum_path.empty()) {
+    shash::Any reflog_hash = manifest::Reflog::ReadChecksum(reflog_chksum_path);
+    bool retval = InspectReflog(reflog_hash, manifest);
+    if (!retval) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to verify reflog");
+      delete manifest;
+      return 1;
+    }
   }
 
   if (manifest->has_alt_catalog_path()) {

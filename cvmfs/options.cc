@@ -55,31 +55,67 @@ static string EscapeShell(const std::string &raw) {
 }
 
 
-void SimpleOptionsParser::ParsePath(const string &config_file,
-                                 const bool external __attribute__((unused))) {
+string OptionsManager::TrimParameter(const string &parameter) {
+  string result = Trim(parameter);
+  // Strip "readonly"
+  if (result.find("readonly ") == 0) {
+    result = result.substr(9);
+    result = Trim(result);
+  } else if (result.find("export ") == 0) {
+    result = result.substr(7);
+    result = Trim(result);
+  } else if (result.find("eval ") == 0) {
+    result = result.substr(5);
+    result = Trim(result);
+  }
+  return result;
+}
+
+
+bool SimpleOptionsParser::TryParsePath(const string &config_file) {
   LogCvmfs(kLogCvmfs, kLogDebug, "Fast-parsing config file %s",
       config_file.c_str());
   string line;
   FILE *fconfig = fopen(config_file.c_str(), "r");
   if (fconfig == NULL)
-    return;
+    return false;
 
   // Read line by line and extract parameters
   while (GetLineFile(fconfig, &line)) {
+    size_t comment_idx = line.find("#");
+    if (comment_idx != string::npos)
+      line = line.substr(0, comment_idx);
     line = Trim(line);
-    if (line.empty() || line[0] == '#' || line.find(" ") < string::npos)
+    if (line.empty())
       continue;
     vector<string> tokens = SplitString(line, '=');
-    if (tokens.size() < 2 || tokens.size() > 2)
+    if (tokens.size() < 2)
+      continue;
+    string parameter = TrimParameter(tokens[0]);
+    if (parameter.find(" ") != string::npos)
+      continue;
+    if (parameter.empty())
       continue;
 
-    ConfigValue value;
-    value.source = config_file;
-    value.value = tokens[1];
-    string parameter = tokens[0];
-    PopulateParameter(parameter, value);
+    // Strip quotes from value
+    tokens.erase(tokens.begin());
+    string value = Trim(JoinStrings(tokens, "="));
+    unsigned value_length = value.length();
+    if (value_length > 2) {
+      if ( ((value[0] == '"') && ((value[value_length - 1] == '"'))) ||
+           ((value[0] == '\'') && ((value[value_length - 1] == '\''))) )
+      {
+        value = value.substr(1, value_length - 2);
+      }
+    }
+
+    ConfigValue config_value;
+    config_value.source = config_file;
+    config_value.value = value;
+    PopulateParameter(parameter, config_value);
   }
   fclose(fconfig);
+  return true;
 }
 
 
@@ -171,22 +207,9 @@ void BashOptionsManager::ParsePath(const string &config_file,
 
     ConfigValue value;
     value.source = config_file;
-    string parameter = tokens[0];
-    // Strip "readonly"
-    if (parameter.find("readonly") == 0) {
-      parameter = parameter.substr(8);
-      parameter = Trim(parameter);
-    }
-    // Strip export
-    if (parameter.find("export") == 0) {
-      parameter = parameter.substr(6);
-      parameter = Trim(parameter);
-    }
-    // Strip eval
-    if (parameter.find("eval") == 0) {
-      parameter = parameter.substr(4);
-      parameter = Trim(parameter);
-    }
+    string parameter = TrimParameter(tokens[0]);
+    if (parameter.empty())
+      continue;
 
     const string sh_echo = "echo $" + parameter + "\n";
     WritePipe(fd_stdin, sh_echo.data(), sh_echo.length());
@@ -228,8 +251,10 @@ bool OptionsManager::HasConfigRepository(const string &fqrn,
 
 
 void OptionsManager::ParseDefault(const string &fqrn) {
-  int retval = setenv("CVMFS_FQRN", fqrn.c_str(), 1);
-  assert(retval == 0);
+  if (taint_environment_) {
+    int retval = setenv("CVMFS_FQRN", fqrn.c_str(), 1);
+    assert(retval == 0);
+  }
 
   protected_parameters_.clear();
 
@@ -278,8 +303,10 @@ void OptionsManager::PopulateParameter(
   }
 
   config_[param] = val;
-  int retval = setenv(param.c_str(), val.value.c_str(), 1);
-  assert(retval == 0);
+  if (taint_environment_) {
+    int retval = setenv(param.c_str(), val.value.c_str(), 1);
+    assert(retval == 0);
+  }
 }
 
 
@@ -378,6 +405,22 @@ string OptionsManager::Dump() {
               "    # from " + source + "\n";
   }
   return result;
+}
+
+
+void OptionsManager::SetValue(const string &key, const string &value) {
+  ConfigValue config_value;
+  config_value.source = "@INTERNAL@";
+  config_value.value = value;
+  PopulateParameter(key, config_value);
+}
+
+
+void OptionsManager::UnsetValue(const string &key) {
+  protected_parameters_.erase(key);
+  config_.erase(key);
+  if (taint_environment_)
+    unsetenv(key.c_str());
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD

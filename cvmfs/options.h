@@ -24,7 +24,7 @@ namespace CVMFS_NAMESPACE_GUARD {
  */
 class OptionsManager {
  public:
-  OptionsManager() {}
+  OptionsManager() : taint_environment_(true) {}
   virtual ~OptionsManager() {}
 
   /**
@@ -117,6 +117,18 @@ class OptionsManager {
    */
   void ProtectParameter(const std::string &param);
 
+  /**
+   * Artificially inject values in the option manager.
+   */
+  void SetValue(const std::string &key, const std::string &value);
+
+  /**
+   * Purge a value from the parameter map.  Used in unit tests.
+   */
+  void UnsetValue(const std::string &key);
+
+  void set_taint_environment(bool value) { taint_environment_ = value; }
+
  protected:
   /**
     * The ConfigValue structure contains a concrete value of a variable, as well
@@ -127,10 +139,17 @@ class OptionsManager {
     std::string source;
   };
 
+  std::string TrimParameter(const std::string &parameter);
   void PopulateParameter(const std::string &param, const ConfigValue val);
 
   std::map<std::string, ConfigValue> config_;
   std::map<std::string, std::string> protected_parameters_;
+
+  /**
+   * Whether to add environment variables to the process' environment or not.
+   * In libcvmfs, we don't want a tainted environment.
+   */
+  bool taint_environment_;
 };  // class OptionManager
 
 
@@ -151,7 +170,14 @@ class OptionsManager {
  */
 class SimpleOptionsParser : public OptionsManager {
  public:
-  void ParsePath(const std::string &config_file, const bool external);
+  virtual void ParsePath(
+    const std::string &config_file,
+    const bool external __attribute__((unused)))
+  {
+    (void) TryParsePath(config_file);
+  }
+  // Libcvmfs returns success or failure, the fuse module fails silently
+  bool TryParsePath(const std::string &config_file);
 };  // class SimpleOptionsManager
 
 

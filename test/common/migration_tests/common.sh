@@ -43,6 +43,12 @@ guess_package_url() {
     local architecture=$(uname -m)
     package_file_name="${package_name}-${cvmfs_version_string}.el${slc_major_version}.centos.${architecture}.rpm"
 
+  # Fedora
+  elif [ -f /etc/fedora-release ]; then
+    local fedora_version=$(cat /etc/fedora-release | tr -Cd 0-9)
+    local architecture=$(uname -m)
+    package_file_name="${package_name}-${cvmfs_version_string}.fc${fedora_version}.${architecture}.rpm"
+
   # to be extended
   else
     return 2
