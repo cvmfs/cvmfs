@@ -14,6 +14,9 @@
 namespace download {
 class DownloadManager;
 }
+namespace manifest {
+class Manifest;
+}
 
 namespace swissknife {
 
@@ -39,6 +42,7 @@ class CommandCheck : public Command {
     r.push_back(Parameter::Optional('k', "public key of the repository"));
     r.push_back(Parameter::Optional('z', "trusted certificates"));
     r.push_back(Parameter::Optional('N', "name of the repository"));
+    r.push_back(Parameter::Optional('R', "path to reflog.chksum file"));
     r.push_back(Parameter::Switch('c', "check availability of data chunks"));
     r.push_back(Parameter::Switch('L', "follow HTTP redirects"));
     return r;
@@ -61,6 +65,9 @@ class CommandCheck : public Command {
 
   std::string DecompressPiece(const shash::Any catalog_hash);
   std::string DownloadPiece(const shash::Any catalog_hash);
+  std::string FetchPath(const std::string &path);
+  bool InspectReflog(const shash::Any &reflog_hash,
+                     manifest::Manifest *manifest);
   bool Find(const catalog::Catalog *catalog,
             const PathString &path,
             catalog::DeltaCounters *computed_counters);

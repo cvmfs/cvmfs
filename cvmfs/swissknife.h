@@ -103,7 +103,8 @@ class Command {
 
   template <class ObjectFetcherT>
   manifest::Reflog* FetchReflog(ObjectFetcherT    *object_fetcher,
-                                const std::string &repo_name);
+                                const std::string &repo_name,
+                                const shash::Any  &reflog_hash);
 
   manifest::Reflog* CreateEmptyReflog(const std::string &temp_directory,
                                       const std::string &repo_name);

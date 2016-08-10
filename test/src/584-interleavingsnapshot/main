@@ -263,7 +263,7 @@ cvmfs_run_test() {
 
   echo "create a snapshot (should work - despite the stale lock)"
   local snapshot_log_9="snapshot_9.log"
-  run_background_snapshot $replica_name $snapshot_log_9 30 || return 40
+  run_background_snapshot $replica_name $snapshot_log_9 300 || return 40
 
   echo "check if the lock is gone"
   check_lock $replica_name && return 41

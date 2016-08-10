@@ -687,6 +687,14 @@ MockReflog* MockReflog::Create(const std::string &path,
 }
 
 
+void MockReflog::HashDatabase(
+  const std::string &database_path,
+  shash::Any *hash_reflog)
+{
+  HashString("", hash_reflog);
+}
+
+
 MockReflog* MockReflog::Clone() const {
   MockReflog *new_reflog = new MockReflog(*this);
   return new_reflog;

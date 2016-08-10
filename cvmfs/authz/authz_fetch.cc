@@ -90,7 +90,14 @@ AuthzExternalFetcher::~AuthzExternalFetcher() {
       if (platform_monotonic_time() > (now + kChildTimeout)) {
         LogCvmfs(kLogAuthz, kLogSyslogWarn | kLogDebug,
                  "authz helper %s unresponsive, killing", progname_.c_str());
-        kill(pid_, SIGKILL);
+        retval = kill(pid_, SIGKILL);
+        if (retval == 0) {
+          // Pick up client return status
+          (void) waitpid(pid_, &statloc, 0);
+        } else {
+          // Process might have been terminated just before the kill() call
+          (void) waitpid(pid_, &statloc, WNOHANG);
+        }
         break;
       }
     } while (retval == 0);
