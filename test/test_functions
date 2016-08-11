@@ -1625,6 +1625,24 @@ toggle_gc() {
   return 0
 }
 
+
+set_auto_tag_timespan() {
+  local name=$1
+  local timespan="$2"
+
+  local cfg_file="/etc/cvmfs/repositories.d/${name}/server.conf"
+  local tmp_file="$(mktemp)"
+
+  cat "$cfg_file" > "$tmp_file" || return 1
+  cat >> $tmp_file << EOF
+CVMFS_AUTO_TAG_TIMESPAN="$timespan"
+EOF
+  sudo cp $tmp_file $cfg_file || return 2
+  rm -f $tmp_file
+  return 0
+}
+
+
 # disables the automatic garbage collection of a given repository configuration
 #
 # @param name  the name of the repository to reconfigure
