@@ -33,6 +33,7 @@ CVMFS_TEST_SERVER_CACHE=${CVMFS_TEST_SERVER_CACHE:=}
 
 # These OPT variables are for the benchmark options under the benchmarks folder
 CVMFS_OPT_WARM_CACHE=${CVMFS_OPT_WARM_CACHE:=yes}
+CVMFS_OPT_HOT_CACHE=${CVMFS_OPT_HOT_CACHE:=no}
 CVMFS_OPT_TALK_STATISTICS=${CVMFS_OPT_TALK_STATISTICS:=yes}
 CVMFS_OPT_VALGRIND=${CVMFS_OPT_VALGRIND:=yes}
 CVMFS_OPT_ITERATIONS=${CVMFS_OPT_ITERATIONS:=1}
@@ -383,6 +384,10 @@ cvmfs_mount_direct() {
 }
 
 cvmfs_mount() {
+  if [ x$PARROT_ENABLED = "xTRUE" ]; then
+    return 0
+  fi
+
   repositories=$1
   shift 1
 
@@ -423,6 +428,10 @@ _cvmfs_mount_manually() {
 
 
 cvmfs_umount() {
+  if [ x$PARROT_ENABLED = "xTRUE" ]; then
+    return 0
+  fi
+
   local repositories=$1
   local times=5
   local result=-1
@@ -1696,6 +1705,10 @@ benchmark_log() {
 
 # waits until cvmfs is mounted
 wait_fqrn_mount() {
+  if [ x$PARROT_ENABLED = "xTRUE" ]; then
+    return 0
+  fi
+
   local waits=0
   while ! mount | grep -q "/cvmfs/${FQRN}"; do
     waits=$(( waits + 1 ))
@@ -1908,6 +1921,15 @@ execute_statistics_loop() {
     wait_fqrn_mount
     statistics_daemon $memory_file $PID >/dev/null 2>&1 & # it kills himself when there is no cvmfs process
 
+    if [ x"$CVMFS_OPT_HOT_CACHE" = x"yes" ]; then
+      benchmark_log "Starting early execution to fill the cache"
+      ( cvmfs_run_benchmark ) > /dev/null 2>&1
+      local code=$?
+      if [ $code -ne 0 ]; then
+        die "Failed in the hot cache execution"
+      fi
+    fi
+
     for i in $(seq 1 1 $CVMFS_OPT_PARALLEL_RUNS); do
       ( cvmfs_run_benchmark ) > /tmp/$FQRN.log.$i 2>&1 &
       processes[$i]=$!
@@ -1947,6 +1969,11 @@ execute_benchmark_loop() {
   local iteration=1
   local code=0
   local count=$CVMFS_OPT_ITERATIONS
+
+  if [ x$PARROT_ENABLED != "xTRUE" ]; then
+    benchmark_log "Valgrind is not available with Parrot"
+    exit 100
+  fi
 
   valgrind $OPTIONS cvmfs2 -f -o config=cvmfs.conf,disable_watchdog,simple_options_parsing $FQRN /cvmfs/$FQRN &
   PID=$!
