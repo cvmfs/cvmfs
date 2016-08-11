@@ -2172,6 +2172,69 @@ check_tag_existence() {
 }
 
 
+# get the configured timespan for removing old auto-generated tags.
+#
+# @param name  the name of the repository to be checked
+# @return      the configured CVMFS_AUTO_TAG_TIMESPAN or 0 (forever)
+#              as a timestamp threshold (unix timestamp)
+#              Note: in case of a malformed timespan it might print an error to
+#                     stderr and return a non-zero code
+get_auto_tags_timespan() {
+  local repository_name=$1
+
+  load_repo_config $repository_name
+  local timespan="$CVMFS_AUTO_TAG_TIMESPAN"
+  if [ -z "$timespan" ]; then
+    echo "0"
+    return 0
+  fi
+
+  if ! date --date "$timespan" +%s 2>/dev/null; then
+    echo "Failed to parse CVMFS_AUTO_TAG_TIMESPAN: '$timespan'" >&2
+    return 1
+  fi
+  return 0
+}
+
+
+# Lists all auto-generated tags
+#
+# @param repository_name   the name of the repository to be filtered
+# @return                  list of outdated auto-generate tags, space-separated
+#              Note: in case of a errors it might print an error to stderr and
+#              return a non-zero code
+filter_auto_tags() {
+  local repository_name="$1"
+  local auto_tags_timespan=
+  auto_tags_timespan=$(get_auto_tags_timespan "$repository_name") || return 1
+  [ $auto_tags_timespan -eq 0 ] && return 0 || true
+
+  load_repo_config $repository_name
+  local auto_tags=$(__swissknife tag_list      \
+    -w $CVMFS_STRATUM0                         \
+    -t ${CVMFS_SPOOL_DIR}/tmp                  \
+    -p /etc/cvmfs/keys/${repository_name}.pub  \
+    -f $repository_name                        \
+    -x $(get_follow_http_redirects_flag)       | \
+    grep -E \
+    "^generic(_[[:digit:]]+)?-[[:digit:]]{4}-[[:digit:]]{2}-[[:digit:]]{2}T[[:digit:]]{2}:[[:digit:]]{2}:[[:digit:]]{2}Z" | \
+    awk '{print $1 " " $5}')
+  [ "x$auto_tags" = "x" ] && return 0 || true
+
+  local tag_name=
+  local timestamp=
+  local old_tags=$(echo "$auto_tags" | while read tag_name timestamp; do
+    if [ "$timestamp" -lt "$auto_tags_timespan" ]; then
+      echo -n "$tag_name "
+    else
+      break
+    fi
+  done)
+  # Trim old_tags
+  echo $old_tags
+}
+
+
 migrate_legacy_dirtab() {
   local name=$1
   local dirtab_path="/cvmfs/${name}/.cvmfsdirtab"
@@ -2278,6 +2341,7 @@ create_config_files_for_new_repository() {
   local compression_alg=${10}
   local external_data=${11}
   local voms_authz=${12}
+  local auto_tag_timespan="${13}"
 
   # other configurations
   local spool_dir="/var/spool/cvmfs/${name}"
@@ -2310,6 +2374,7 @@ CVMFS_HASH_ALGORITHM=$hash_algo
 CVMFS_COMPRESSION_ALGORITHM=$compression_alg
 CVMFS_EXTERNAL_DATA=$external_data
 CVMFS_AUTO_TAG=$autotagging
+CVMFS_AUTO_TAG_TIMESPAN="$auto_tag_timespan"
 CVMFS_GARBAGE_COLLECTION=$garbage_collectable
 CVMFS_AUTO_REPAIR_MOUNTPOINT=true
 CVMFS_AUTOCATALOGS=false
@@ -3035,6 +3100,7 @@ cvmfs_server_mkfs() {
   local replicable=1
   local volatile_content=0
   local autotagging=true
+  local auto_tag_timespan=
   local unionfs
   local hash_algo
   local compression_alg
@@ -3048,7 +3114,7 @@ cvmfs_server_mkfs() {
 
   # parameter handling
   OPTIND=1
-  while getopts "Xw:u:o:mf:vga:zs:k:pV:Z:" option; do
+  while getopts "Xw:u:o:mf:vgG:a:zs:k:pV:Z:" option; do
     case $option in
       X)
         external_data=true
@@ -3073,6 +3139,9 @@ cvmfs_server_mkfs() {
       ;;
       g)
         autotagging=false
+      ;;
+      G)
+        auto_tag_timespan="$OPTARG"
       ;;
       a)
         hash_algo=$OPTARG
@@ -3148,6 +3217,9 @@ cvmfs_server_mkfs() {
     check_apache                    || die "Apache must be installed and running"
     ensure_enabled_apache_modules
   fi
+  if [ "x$auto_tag_timespan" != "x" ]; then
+    date --date "$auto_tag_timespan" +%s >/dev/null 2>&1 || die "Auto tags time span cannot be parsed"
+  fi
 
   # check if the keychain for the repository to create is already in place
   local keys_location="/etc/cvmfs/keys"
@@ -3174,7 +3246,7 @@ cvmfs_server_mkfs() {
   check_user $cvmfs_user || die "No user $cvmfs_user"
 
   # GC and auto-tag warning
-  if [ x"$autotagging" = x"true" ] && [ x"$garbage_collectable" = x"true" ]; then
+  if [ x"$autotagging" = x"true" ] && [ x"$auto_tag_timespan" = "x" ] && [ x"$garbage_collectable" = x"true" ]; then
     echo "Note: Autotagging all revisions impedes garbage collection"
   fi
 
@@ -3191,7 +3263,8 @@ cvmfs_server_mkfs() {
                                          "$configure_apache"    \
                                          "$compression_alg"     \
                                          "$external_data"       \
-                                         "$voms_authz" || die "fail"
+                                         "$voms_authz"          \
+                                         "$auto_tag_timespan" || die "fail"
   if is_local_upstream $upstream && [ $configure_apache -eq 1 ]; then
     reload_apache > /dev/null
   fi
@@ -3667,6 +3740,7 @@ cvmfs_server_import() {
                                          "$configure_apache" \
                                          "default"           \
                                          "false"             \
+                                         ""                  \
                                          "" || die "fail!"
   echo "done"
 
@@ -4711,6 +4785,8 @@ cvmfs_server_publish() {
       echo "Using auto tag '$tag_name'"
     fi
 
+    local auto_tag_cleanup_list=
+    auto_tag_cleanup_list="$(filter_auto_tags $name)" || { echo "failed to determine outdated auto tags on $name"; retcode=1; continue; }
 
     # prepare the commands to be used for the publishing later
     local user_shell="$(get_user_shell $name)"
@@ -4807,6 +4883,21 @@ cvmfs_server_publish() {
       tag_command="$tag_command -d \"$tag_description\""
     fi
 
+    local tag_cleanup_command=
+    if [ ! -z "$auto_tag_cleanup_list" ]; then
+      tag_cleanup_command="$(__swissknife_cmd dbg) tag_remove \
+        -r $upstream                                        \
+        -w $stratum0                                        \
+        -t ${spool_dir}/tmp                                 \
+        -m $manifest                                        \
+        -p /etc/cvmfs/keys/${name}.pub                      \
+        -f $name                                            \
+        -b $base_hash                                       \
+        -e $hash_algorithm                                  \
+        $(get_follow_http_redirects_flag)                   \
+        -d \"$auto_tag_cleanup_list\""
+    fi
+
     # ---> do it! (from here on we are changing things)
     publish_before_hook $name
     $user_shell "$dirtab_command" || die "Failed to apply .cvmfsdirtab"
@@ -4820,6 +4911,12 @@ cvmfs_server_publish() {
     $user_shell "$sync_command" || { publish_failed $name; die "Synchronization failed\n\nExecuted Command:\n$sync_command";   }
     [ -f $manifest ]            || { publish_failed $name; die "Manifest creation failed\n\nExecuted Command:\n$sync_command"; }
     local trunk_hash=$(grep "^C" $manifest | tr -d C)
+
+    # Remove outdated automatically created tags
+    if [ ! -z "$tag_cleanup_command" ]; then
+      echo "Removing outdated automatically generated tags for $name..."
+      $user_shell "$tag_cleanup_command" || { publish_failed $name; die "Removing tags failed\n\nExecuted Command:\n$tag_cleanup_command";  }
+    fi
 
     # add a tag for the new revision
     echo "Tagging $name"
