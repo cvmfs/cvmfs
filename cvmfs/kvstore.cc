@@ -59,7 +59,7 @@ void *MemoryKvStore::DoMalloc(size_t size) {
   case kMallocLibc:
     return malloc(size);
   case kMallocArena:
-    if (size > kArenaSize) {
+    if (size > kArenaSize - 2*1024*1024) {
       errno = ENOMEM;
       return NULL;
     } else if (size == 0) {
@@ -79,6 +79,7 @@ void *MemoryKvStore::DoMalloc(size_t size) {
     }
     idx_last_arena_ = N;
     M = new MallocArena(kArenaSize);
+    assert(M != NULL);
     malloc_arenas_.push_back(M);
     p = M->Malloc(size);
     assert(p != NULL);
