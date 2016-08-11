@@ -24,7 +24,7 @@
 
 Summary: CernVM File System
 Name: cvmfs
-Version: 2.3.0
+Version: 2.3.1
 Release: 1%{?dist}
 Source0: https://ecsft.cern.ch/dist/cvmfs/%{name}-%{version}.tar.gz
 %if 0%{?selinux_cvmfs}
@@ -425,6 +425,8 @@ fi
 %doc COPYING AUTHORS README ChangeLog
 
 %changelog
+* Wed Aug 10 2016 Dave Dykstra <dwd@fnal.gov> - 2.3.1
+- Update version number to 2.3.1
 * Thu Jul 28 2016 Jakob Blomer <jblomer@cern.ch> - 2.3.1
 - Update upstream package
 * Thu Jun 30 2016 Jakob Blomer <jblomer@cern.ch> - 2.3.1
