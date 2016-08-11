@@ -3224,6 +3224,8 @@ cvmfs_server_mkfs() {
   fi
   if [ "x$auto_tag_timespan" != "x" ]; then
     date --date "$auto_tag_timespan" +%s >/dev/null 2>&1 || die "Auto tags time span cannot be parsed"
+    [ x"$autotagging" = x"false" ] &&
+      echo "Warning: auto tags time span set but auto tagging turned off" || true
   fi
 
   # check if the keychain for the repository to create is already in place
