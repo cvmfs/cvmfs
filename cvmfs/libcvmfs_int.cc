@@ -396,7 +396,7 @@ int LibContext::Open(const char *c_path) {
              path.c_str());
 
     FileChunkList *chunks = new FileChunkList();
-    if (mount_point_->catalog_mgr()->ListFileChunks(
+    if (!mount_point_->catalog_mgr()->ListFileChunks(
           path, dirent.hash_algorithm(), chunks) ||
         chunks->IsEmpty())
     {
