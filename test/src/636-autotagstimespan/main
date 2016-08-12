@@ -1,0 +1,68 @@
+cvmfs_test_name="Cleanup outdated repository tags"
+cvmfs_test_autofs_on_startup=false
+
+count_auto_tags() {
+  local name="$1"
+
+  cvmfs_server tag -l -x "$name" | grep "^generic" | wc -l
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  local scratch_dir=$(pwd)
+  mkdir reference_dir
+  local reference_dir=$scratch_dir/reference_dir
+
+  echo "*** create a repo $CVMFS_TEST_REPO for user $CVMFS_TEST_USER with invalid auto tag timespan"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -G "bla" && return 10
+
+  echo "*** create a repo $CVMFS_TEST_REPO with correct auto tag timespan"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO '-G "3 days ago"' || return 20
+
+  local auto_tags_1=$(count_auto_tags $CVMFS_TEST_REPO)
+
+  echo "*** check that auto-removal waits within timespan before removing"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  publish_repo $CVMFS_TEST_REPO || return $?
+  local auto_tags_2=$(count_auto_tags $CVMFS_TEST_REPO)
+  [ $auto_tags_2 -eq $(($auto_tags_1 + 1)) ] || return 30
+
+  echo "*** check that auto-removal deletes the right tags"
+  set_auto_tag_timespan $CVMFS_TEST_REPO "$(date)" || return 40
+  sleep 5
+  start_transaction $CVMFS_TEST_REPO || return $?
+  publish_repo $CVMFS_TEST_REPO || return $?
+  start_transaction $CVMFS_TEST_REPO || return $?
+  publish_repo $CVMFS_TEST_REPO || return $?
+  local auto_tags_3=$(count_auto_tags $CVMFS_TEST_REPO)
+  [ $auto_tags_3 -eq 2 ] || return 41
+
+  echo "*** check that publish fails with invalid timespan"
+  set_auto_tag_timespan $CVMFS_TEST_REPO "bla" || return 50
+  start_transaction $CVMFS_TEST_REPO || return $?
+  publish_repo $CVMFS_TEST_REPO && return 51
+  abort_transaction $CVMFS_TEST_REPO || return 52
+
+  echo "*** check that latest auto tag is set in any case"
+  set_auto_tag_timespan $CVMFS_TEST_REPO "tomorrow" || return 60
+  start_transaction $CVMFS_TEST_REPO || return $?
+  publish_repo $CVMFS_TEST_REPO || return 61
+  local auto_tags_4=$(count_auto_tags $CVMFS_TEST_REPO)
+  [ $auto_tags_4 -eq 1 ] || return 62
+
+  echo "*** check that tags survive if auto tag timespan is off"
+  set_auto_tag_timespan $CVMFS_TEST_REPO "" || return 70
+  start_transaction $CVMFS_TEST_REPO || return $?
+  publish_repo $CVMFS_TEST_REPO || return 71
+  start_transaction $CVMFS_TEST_REPO || return $?
+  publish_repo $CVMFS_TEST_REPO || return 72
+  start_transaction $CVMFS_TEST_REPO || return $?
+  publish_repo $CVMFS_TEST_REPO || return 73
+  local auto_tags_5=$(count_auto_tags $CVMFS_TEST_REPO)
+  [ $auto_tags_5 -eq $(($auto_tags_4 + 3)) ] || return 74
+
+  return 0
+}
+
