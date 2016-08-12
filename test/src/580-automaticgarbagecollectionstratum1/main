@@ -249,7 +249,7 @@ cvmfs_run_test() {
   peek_backend $replica_name    $root_catalog6 || return 87 # trunk
 
   echo "run a manual garbage collection (delete all but last two) on stratum 1"
-  cvmfs_server gc -f $replica_name || return 88
+  cvmfs_server gc -r0 -f $replica_name || return 88
 
   echo "check repository integrity"
   check_repository $CVMFS_TEST_REPO -i || return 89

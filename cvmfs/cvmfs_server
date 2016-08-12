@@ -328,6 +328,12 @@ Supported Commands:
                   [-f use force remount if necessary]
                   <fully qualified name>
                   Make a new repository snapshot
+  gc              [-r number of revisions to preserve]
+                  [-t time stamp after which revisions are reseved]
+                  [-l (print deleted objects)] [-L log of deleted objects]
+                  [-f (force)] [-d (dry run)]
+                  <fully qualified repository name>
+                  Remove unreferenced data from garbage collectable repository
   rmfs            [-p(reserve) repo data and keys] [-f don't ask again]
                   <fully qualified name>
                   Remove the repository
@@ -5146,7 +5152,7 @@ cvmfs_server_gc() {
   [ $preserve_revisions -ge 0 ] && [ $preserve_timestamp -gt 0 ] && die "Please specify either timestamp OR revision thresholds (-r and -t are mutual exclusive)"
   if [ $preserve_revisions -lt 0 ] && [ $preserve_timestamp -le 0 ]; then
     # neither revision nor timestamp threshold given... fallback to default
-    preserve_revisions=0
+    preserve_timestamp="$(date --date '3 days ago' +%s 2>/dev/null)"
   fi
 
   for name in $names; do

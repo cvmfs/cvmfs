@@ -211,7 +211,7 @@ cvmfs_run_test() {
   peek_gc_log $gc_log $root_catalog6          && return 101
 
   echo "run a manual garbage collection (delete all but last two)"
-  cvmfs_server gc -f $CVMFS_TEST_REPO || return 33
+  cvmfs_server gc -r0 -f $CVMFS_TEST_REPO || return 33
 
   echo "check repository integrity"
   check_repository $CVMFS_TEST_REPO -i || return 50

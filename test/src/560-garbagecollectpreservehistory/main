@@ -345,10 +345,10 @@ cvmfs_run_test() {
   cvmfs_server tag -l $CVMFS_TEST_REPO || return 24
 
   echo "run a garbage collection dry run"
-  cvmfs_server gc -l -d -f $CVMFS_TEST_REPO || return 25
+  cvmfs_server gc -r0 -l -d -f $CVMFS_TEST_REPO || return 25
 
   echo "run garbage collection (should remove probe file 10)"
-  cvmfs_server gc -f $CVMFS_TEST_REPO || return 26
+  cvmfs_server gc -r0 -f $CVMFS_TEST_REPO || return 26
 
   echo "check if all expected files are still there"
   i=0

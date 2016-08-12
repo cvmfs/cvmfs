@@ -294,7 +294,7 @@ EOF
   local gc_log_1="${scratch_dir}/gc_s0_1.log"
   local gc_stdout_log_1="${scratch_dir}/gc_s0_stdout_1.log"
   echo "run garbage collection on Stratum0 (deleting as much as possible | logging to: $gc_log_1 and $gc_stdout_log_1)"
-  cvmfs_server gc -fL "$gc_log_1" $CVMFS_TEST_REPO > $gc_stdout_log_1 2>&1 || return 45
+  cvmfs_server gc -r0 -fL "$gc_log_1" $CVMFS_TEST_REPO > $gc_stdout_log_1 2>&1 || return 45
 
   echo "check that Stratum0 spooler tmp dir is empty"
   check_tmp_dir_emptiness $s0_spool_tmp_dir || return 126
@@ -352,7 +352,7 @@ EOF
   local gc_log_2="${scratch_dir}/gc_s1_2.log"
   local gc_stdout_log_2="${scratch_dir}/gc_s1_stdout_2.log"
   echo "run garbage collection on Stratum1 (deleting as much as possible | logging to: $gc_log_2 and $gc_stdout_log_2)"
-  cvmfs_server gc -fL "$gc_log_2" $replica_name > $gc_stdout_log_2 2>&1 || return 58
+  cvmfs_server gc -r0 -fL "$gc_log_2" $replica_name > $gc_stdout_log_2 2>&1 || return 58
 
   echo "check that Stratum1 spooler tmp dir is empty"
   check_tmp_dir_emptiness $s1_spool_tmp_dir || return 128

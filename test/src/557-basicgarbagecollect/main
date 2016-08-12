@@ -254,7 +254,7 @@ cvmfs_run_test() {
 
   local gc_log="${scratch_dir}/gc.log"
   echo "perform basic garbage collection (logging deletions to $gc_log)"
-  cvmfs_server gc -fL "$gc_log" $CVMFS_TEST_REPO || return 11
+  cvmfs_server gc -r0 -fL "$gc_log" $CVMFS_TEST_REPO || return 11
 
   echo "deletion log:"
   echo "------------------------"
@@ -312,7 +312,7 @@ cvmfs_run_test() {
   # ============================================================================
 
   echo "perform another basic garbage collection as dryrun (empty tmp dir regression)"
-  cvmfs_server gc -ldf $CVMFS_TEST_REPO || return 18
+  cvmfs_server gc -r0 -ldf $CVMFS_TEST_REPO || return 18
 
   echo "check that the temporary scratch directory is empty"
   [ $(ls ${CVMFS_SPOOL_DIR}/tmp | wc -l) -eq 0 ] || return 50

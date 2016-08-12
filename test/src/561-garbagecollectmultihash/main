@@ -295,7 +295,7 @@ cvmfs_run_test() {
   done
 
   echo "perform basic garbage collection"
-  cvmfs_server gc -f $CVMFS_TEST_REPO || return 11
+  cvmfs_server gc -r0 -f $CVMFS_TEST_REPO || return 11
 
   echo "check if shakespeare is gone"
   peek_backend $CVMFS_TEST_REPO $shakespeare_object    && return 12
@@ -340,7 +340,7 @@ cvmfs_run_test() {
 
   local manual_gc_log="${scratch_dir}/manual.gc.log"
   echo "perform another garbage collection (should remove kafka) (logging to $manual_gc_log)"
-  cvmfs_server gc -fL $manual_gc_log $CVMFS_TEST_REPO || return 18
+  cvmfs_server gc -r0 -fL $manual_gc_log $CVMFS_TEST_REPO || return 18
 
   echo "check if kafka is gone"
   peek_backend $CVMFS_TEST_REPO $kafka_object    && return 19
