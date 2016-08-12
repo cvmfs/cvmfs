@@ -5152,7 +5152,7 @@ cvmfs_server_gc() {
   [ $preserve_revisions -ge 0 ] && [ $preserve_timestamp -gt 0 ] && die "Please specify either timestamp OR revision thresholds (-r and -t are mutual exclusive)"
   if [ $preserve_revisions -lt 0 ] && [ $preserve_timestamp -le 0 ]; then
     # neither revision nor timestamp threshold given... fallback to default
-    preserve_revisions=0
+    preserve_timestamp="$(date --date '3 days ago' +%s 2>/dev/null)"
   fi
 
   for name in $names; do

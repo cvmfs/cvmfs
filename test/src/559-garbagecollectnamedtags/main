@@ -314,7 +314,7 @@ cvmfs_run_test() {
   cvmfs_server tag -l $CVMFS_TEST_REPO || return 13
 
   echo "perform garbage collection (removing all revisions that have no named snapshots)"
-  cvmfs_server gc -f $CVMFS_TEST_REPO || return 13
+  cvmfs_server gc -r0 -f $CVMFS_TEST_REPO || return 13
 
   echo "check if shakespeare is still there"
   peek_backend $CVMFS_TEST_REPO $shakespeare_object    || return 14
@@ -354,7 +354,7 @@ cvmfs_run_test() {
   done
 
   echo "perform garbage collection (removing all revisions that have no named snapshots)"
-  cvmfs_server gc -f $CVMFS_TEST_REPO || return 21
+  cvmfs_server gc -r0 -f $CVMFS_TEST_REPO || return 21
 
   echo "check if shakespeare is gone now"
   peek_backend $CVMFS_TEST_REPO $shakespeare_object    && return 22
@@ -394,7 +394,7 @@ cvmfs_run_test() {
   done
 
   echo "perform garbage collection (removing all revisions that have no named snapshots)"
-  cvmfs_server gc -f $CVMFS_TEST_REPO || return 29
+  cvmfs_server gc -r0 -f $CVMFS_TEST_REPO || return 29
 
   echo "check if kafka is still there"
   peek_backend $CVMFS_TEST_REPO $kafka_object    || return 31

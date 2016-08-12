@@ -128,7 +128,7 @@ cvmfs_run_test() {
   # ============================================================================
 
   echo "run a garbage collection on the stratum 0"
-  cvmfs_server gc -f $CVMFS_TEST_REPO || return 15
+  cvmfs_server gc -r0 -f $CVMFS_TEST_REPO || return 15
 
   echo "check that the appropriate catalogs are available on both stratum0 and 1"
   peek_backend $CVMFS_TEST_REPO $catalog1 && return 16 # deleted by GC
@@ -187,7 +187,7 @@ cvmfs_run_test() {
   # ============================================================================
 
   echo "run garbage collection on stratum 0"
-  cvmfs_server gc -f $CVMFS_TEST_REPO || return 35
+  cvmfs_server gc -r0 -f $CVMFS_TEST_REPO || return 35
 
   echo "check presence of catalogs"
   peek_backend $CVMFS_TEST_REPO $catalog1 && return 36 # deleted by GC
@@ -218,7 +218,7 @@ cvmfs_run_test() {
   # ============================================================================
 
   echo "run garbage collection on stratum 1"
-  cvmfs_server gc -f $replica_name || return 46
+  cvmfs_server gc -r0 -f $replica_name || return 46
 
   echo "check presence of catalogs"
   peek_backend $CVMFS_TEST_REPO $catalog1 && return 47 # deleted by GC
