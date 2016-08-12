@@ -7,6 +7,7 @@
   * Fix handling of file:// url in CVMFS_SERVER_URL
 
 2.3.1:
+  * Add gc command to cvmfs_server help text (CVM-1011)
   * Add mount command to cvmfs_server help text (CVM-1008)
   * Add CVMFS_AUTO_TAG_TIMESPAN parameter to control automatic cleanup of old,
     automatically created repository tags (CVM-982)
