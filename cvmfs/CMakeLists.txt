@@ -65,6 +65,7 @@ set (CVMFS_CLIENT_SOURCES
   logging.cc logging.h logging_internal.h
   lru.h
   malloc_arena.cc malloc_arena.h
+  malloc_heap.cc malloc_heap.h
   manifest.cc manifest.h
   manifest_fetch.cc manifest_fetch.h
   monitor.cc monitor.h

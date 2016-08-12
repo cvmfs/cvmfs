@@ -154,6 +154,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/libcvmfs_options.cc
   ${CVMFS_SOURCE_DIR}/logging.cc ${CVMFS_SOURCE_DIR}/logging.h ${CVMFS_SOURCE_DIR}/logging_internal.h
   ${CVMFS_SOURCE_DIR}/malloc_arena.cc ${CVMFS_SOURCE_DIR}/malloc_arena.h
+  ${CVMFS_SOURCE_DIR}/malloc_heap.cc ${CVMFS_SOURCE_DIR}/malloc_heap.h
   ${CVMFS_SOURCE_DIR}/manifest.cc ${CVMFS_SOURCE_DIR}/manifest.h
   ${CVMFS_SOURCE_DIR}/manifest_fetch.cc ${CVMFS_SOURCE_DIR}/manifest_fetch.h
   ${CVMFS_SOURCE_DIR}/monitor.cc ${CVMFS_SOURCE_DIR}/monitor.h
