@@ -36,6 +36,7 @@ enum Failures {
   kFailBadWhitelist,
   kFailInvalidCertificate,
   kFailUnknown,
+  kFailBlacklisted,
 
   kFailNumEntries
 };
@@ -53,7 +54,8 @@ inline const char *Code2Ascii(const Failures error) {
   texts[8] = "bad whitelist";
   texts[9] = "invalid certificate";
   texts[10] = "unknown error";
-  texts[11] = "no text";
+  texts[11] = "certificate blacklisted";
+  texts[12] = "no text";
   return texts[error];
 }
 

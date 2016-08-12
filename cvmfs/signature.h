@@ -46,7 +46,7 @@ class SignatureManager {
 
   bool LoadPublicRsaKeys(const std::string &path_list);
   bool LoadBlacklist(const std::string &path_blacklist, bool append);
-  std::vector<std::string> GetBlacklistedCertificates();
+  bool CertificateBlacklisted();
 
   bool LoadTrustedCaCrl(const std::string &path_list);
 
