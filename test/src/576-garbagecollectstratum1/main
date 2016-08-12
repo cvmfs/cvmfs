@@ -354,7 +354,7 @@ cvmfs_run_test() {
   done
 
   echo "perform basic garbage collection (stratum 0)"
-  cvmfs_server gc -f $CVMFS_TEST_REPO || return 17
+  cvmfs_server gc -r0 -f $CVMFS_TEST_REPO || return 17
 
   echo "check if shakespeare is gone (stratum 0)"
   peek_backend $CVMFS_TEST_REPO $shakespeare_object    && return 18
@@ -417,7 +417,7 @@ cvmfs_run_test() {
   # ============================================================================
 
   echo "perform basic garbage collection (stratum 1)"
-  cvmfs_server gc -f -l $replica_name || return 30
+  cvmfs_server gc -r0 -f -l $replica_name || return 30
 
   echo "check if shakespeare is gone (stratum 0)"
   peek_backend $CVMFS_TEST_REPO $shakespeare_object    && return 31

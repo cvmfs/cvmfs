@@ -230,7 +230,7 @@ cvmfs_run_test() {
   local deletion_log="condemned_objects.log"
   echo "perform a basic garbage collection as dryrun (should fail) "
   local gc_retcode=0
-  cvmfs_server gc -ldfL $deletion_log $CVMFS_TEST_REPO > $gc_log_1 2>&1 || gc_retcode=0
+  cvmfs_server gc -r0 -ldfL $deletion_log $CVMFS_TEST_REPO > $gc_log_1 2>&1 || gc_retcode=0
 
   echo "---- Deletion Log ----"
   cat $deletion_log
@@ -265,7 +265,7 @@ cvmfs_run_test() {
 
     local gc_log_2="gc_2.log"
     echo "perform a basic garbage collection as dryrun (should fail) "
-    cvmfs_server gc -ldf $CVMFS_TEST_REPO > $gc_log_2 2>&1 && return 10
+    cvmfs_server gc -r0 -ldf $CVMFS_TEST_REPO > $gc_log_2 2>&1 && return 10
 
     echo "check that the error was caught"
     cat $gc_log_2 | grep -e "failed to load.*${clg5}.*network" || return 11
@@ -294,7 +294,7 @@ cvmfs_run_test() {
 
     local gc_log_3="gc_3.log"
     echo "perform a basic garbage collection as dryrun (should fail) "
-    cvmfs_server gc -ldf $CVMFS_TEST_REPO > $gc_log_3 2>&1 && return 23
+    cvmfs_server gc -r0 -ldf $CVMFS_TEST_REPO > $gc_log_3 2>&1 && return 23
 
     echo "check that the error was caught"
     cat $gc_log_3 | grep -e "failed to load.*${clg4}.*network" || return 24
@@ -318,7 +318,7 @@ cvmfs_run_test() {
 
   local gc_log_4="gc_4.log"
   echo "perform a basic garbage collection as dryrun (should fail) "
-  cvmfs_server gc -ldf $CVMFS_TEST_REPO > $gc_log_4 2>&1 && return 30
+  cvmfs_server gc -r0 -ldf $CVMFS_TEST_REPO > $gc_log_4 2>&1 && return 30
 
   echo "check that the error was caught"
   cat $gc_log_4 | grep -e "failed to load.*${clg4}.*bad data" || return 31
@@ -340,7 +340,7 @@ cvmfs_run_test() {
 
   local gc_log_5="gc_5.log"
   echo "run garbage collection to delete all old revisions"
-  cvmfs_server gc -lf $CVMFS_TEST_REPO > $gc_log_5 2>&1 || return 35
+  cvmfs_server gc -r0 -lf $CVMFS_TEST_REPO > $gc_log_5 2>&1 || return 35
 
   echo "check that catalog 4 is gone"
   peek_backend $CVMFS_TEST_REPO $clg4 && return 36
@@ -349,7 +349,7 @@ cvmfs_run_test() {
 
   local gc_log_6="gc_6.log"
   echo "run a garbage collection that should not fail (error 404)"
-  cvmfs_server gc -ldf $CVMFS_TEST_REPO > $gc_log_6 2>&1 || return 37
+  cvmfs_server gc -r0 -ldf $CVMFS_TEST_REPO > $gc_log_6 2>&1 || return 37
 
   # ============================================================================
 
@@ -361,7 +361,7 @@ cvmfs_run_test() {
 
     local gc_log_7="gc_7.log"
     echo "perform a basic garbage collection as dryrun (should fail) "
-    cvmfs_server gc -ldf $CVMFS_TEST_REPO > $gc_log_7 2>&1 && return 39
+    cvmfs_server gc -r0 -ldf $CVMFS_TEST_REPO > $gc_log_7 2>&1 && return 39
 
     echo "check that the error was caught"
     cat $gc_log_7 | grep -e "failed to load.*${clg5n}.*network" || return 40
@@ -385,7 +385,7 @@ cvmfs_run_test() {
 
   local gc_log_8="gc_8.log"
   echo "perform a basic garbage collection as dryrun (should fail) "
-  cvmfs_server gc -ldf $CVMFS_TEST_REPO > $gc_log_8 2>&1 && return 46
+  cvmfs_server gc -r0 -ldf $CVMFS_TEST_REPO > $gc_log_8 2>&1 && return 46
 
   echo "check that the error was caught"
   cat $gc_log_8 | grep -e "failed to load.*${clg5n}.*bad data" || return 47
