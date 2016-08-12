@@ -369,6 +369,8 @@ Supported Commands:
                   [-n do not warn if /etc/logrotate.d/cvmfs does not exist]
                   [-i skip repositories that have not run initial snapshot]
                   Do snapshot on all active replica repositories
+  mount           [-a | <fully qualified name>]
+                  Mount repositories in /cvmfs, for instance after reboot
   migrate         <fully qualified name>
                   Migrates a repository to the current version of CernVM-FS
   list            List available repositories
