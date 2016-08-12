@@ -1,4 +1,6 @@
 2.3.1:
+  * Add CVMFS_AUTO_TAG_TIMESPAN parameter to control automatic cleanup of old,
+    automatically created repository tags (CVM-982)
   * Fix lsof report in cvmfs_server on newer Linux distributions
   * Use tbb version 4.4 update 5
   * Minimal set of fixes to allow compilation on Fedora 24
