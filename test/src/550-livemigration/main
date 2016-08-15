@@ -81,7 +81,6 @@ wait_for_revision() {
   local mountpoint="$1"
   local repo_name="$2"
   local expected_revision="$3"
-  local talk_pipe="$(get_talk_pipe $mountpoint $repo_name)"
   local waited=0
   local revision=0
   local interval=5
@@ -89,7 +88,7 @@ wait_for_revision() {
   echo -n "waiting for revision $expected_revision to become picked up by $mountpoint ..."
   while [ $waited -lt $TEST550_MAX_WAITING_TIMEOUT ] && [ $revision -ne $expected_revision ]; do
     ls $mountpoint > /dev/null 2>&1 || return 2
-    revision="$(cvmfs_talk -p $talk_pipe revision)"
+    revision="$(get_xattr revision $mountpoint)"
     if [ x"$revision" = x"$expected_revision" ]; then
       echo " done"
       return 0
@@ -98,7 +97,7 @@ wait_for_revision() {
     sleep $interval
     waited=$(( $waited + $interval ))
   done
-  echo " Timeout!"
+  echo " Timeout! (revision was $revision, expected revision was $expected_revision)"
   return 1
 }
 
