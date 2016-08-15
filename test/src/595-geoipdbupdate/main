@@ -229,7 +229,7 @@ cvmfs_run_test() {
 
   echo "change GeoIP database update policy"
   local yesterday_weekday=$(( $current_weekday - 1 ))
-  [ $yesterday_weekday -ge 0 ] || yesterday_weekday=0
+  [ $yesterday_weekday -ge 0 ] || yesterday_weekday=6
   sudo sed -i -e "s/^\(CVMFS_UPDATEGEO_HOUR\)=.*$/\1=$current_hour/"     $CVMFS_TEST_595_SERVER_HOOKS || return 33
   sudo sed -i -e "s/^\(CVMFS_UPDATEGEO_DAY\)=.*$/\1=$yesterday_weekday/" $CVMFS_TEST_595_SERVER_HOOKS || return 34
 

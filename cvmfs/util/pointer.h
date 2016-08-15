@@ -43,6 +43,7 @@ class UniquePtrBase : SingleCopy {
   inline T* weak_ref() const          { return ref_; }
   inline bool IsValid() const         { return (ref_ != NULL); }
   inline T*   Release()               { T* r = ref_; ref_ = NULL; return r; }
+  inline void Destroy()               { Free(); ref_ = NULL; }
 
  protected:
   void Free() {
