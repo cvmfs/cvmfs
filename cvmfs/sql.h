@@ -128,17 +128,6 @@ class Database : SingleCopy {
   static DerivedT* Open(const std::string  &filename,
                         const OpenMode      open_mode);
 
-  /**
-   * This closes the underlying SQLite database and returns the database file.
-   * Use this when the (closed) database file is needed after the database has
-   * been committed.
-   * Note: This method always drops the database file ownership and passes it
-   *       to the caller. Hence, clean up the database file after usage
-   *
-   * @return  the path to the database file that has just been closed
-   */
-  std::string CloseAndReturnDatabaseFile();
-
   bool IsEqualSchema(const float value, const float compare) const {
     return (value > compare - kSchemaEpsilon &&
             value < compare + kSchemaEpsilon);

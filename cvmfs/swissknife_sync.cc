@@ -142,7 +142,9 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
     return 1;
   }
 
-  string reflog_path = reflog->CloseAndReturnDatabaseFile();
+  reflog->DropDatabaseFileOwnership();
+  string reflog_path = reflog->database_file();
+  reflog.Destroy();
   shash::Any reflog_hash(hash_algorithm);
   manifest::Reflog::HashDatabase(reflog_path, &reflog_hash);
   spooler->UploadReflog(reflog_path);

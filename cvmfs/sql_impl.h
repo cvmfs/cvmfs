@@ -145,14 +145,6 @@ bool Database<DerivedT>::OpenDatabase(const int flags) {
 
 
 template <class DerivedT>
-std::string Database<DerivedT>::CloseAndReturnDatabaseFile() {
-  database_.DropFileOwnership();
-  database_.Close();
-  return database_.filename();
-}
-
-
-template <class DerivedT>
 Database<DerivedT>::DatabaseRaiiWrapper::~DatabaseRaiiWrapper() {
   if (NULL != sqlite_db) {
     const bool close_successful = Close();
