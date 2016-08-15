@@ -2223,26 +2223,26 @@ filter_auto_tags() {
   [ $auto_tags_timespan -eq 0 ] && return 0 || true
 
   load_repo_config $repository_name
-  local auto_tags=$(__swissknife tag_list      \
+  local auto_tags="$(__swissknife tag_list      \
     -w $CVMFS_STRATUM0                         \
     -t ${CVMFS_SPOOL_DIR}/tmp                  \
     -p /etc/cvmfs/keys/${repository_name}.pub  \
     -f $repository_name                        \
     -x $(get_follow_http_redirects_flag)       | \
     grep -E \
-    "^generic(_[[:digit:]]+)?-[[:digit:]]{4}-[[:digit:]]{2}-[[:digit:]]{2}T[[:digit:]]{2}:[[:digit:]]{2}:[[:digit:]]{2}Z" | \
-    awk '{print $1 " " $5}')
+    '^generic(_[[:digit:]]+)?-[[:digit:]]{4}-[[:digit:]]{2}-[[:digit:]]{2}T[[:digit:]]{2}:[[:digit:]]{2}:[[:digit:]]{2}Z' | \
+    awk '{print $1 " " $5}')"
   [ "x$auto_tags" = "x" ] && return 0 || true
 
   local tag_name=
   local timestamp=
-  local old_tags=$(echo "$auto_tags" | while read tag_name timestamp; do
+  local old_tags="$(echo "$auto_tags" | while read tag_name timestamp; do
     if [ "$timestamp" -lt "$auto_tags_timespan" ]; then
       echo -n "$tag_name "
     else
       break
     fi
-  done)
+  done)"
   # Trim old_tags
   echo $old_tags
 }
