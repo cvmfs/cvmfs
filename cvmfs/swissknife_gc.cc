@@ -173,7 +173,9 @@ int CommandGc::Main(const ArgumentList &args) {
   }
 
   reflog->CommitTransaction();
-  const std::string reflog_db = reflog->CloseAndReturnDatabaseFile();
+  reflog->DropDatabaseFileOwnership();
+  const std::string reflog_db = reflog->database_file();
+  reflog.Destroy();
 
   if (!dry_run) {
     uploader->Upload(reflog_db, ".cvmfsreflog");

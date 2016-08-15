@@ -173,7 +173,9 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     reflog->CommitTransaction();
 
     // upload Reflog database
-    const std::string reflog_db_file = reflog->CloseAndReturnDatabaseFile();
+    reflog->DropDatabaseFileOwnership();
+    const std::string reflog_db_file = reflog->database_file();
+    reflog.Destroy();
     spooler->UploadReflog(reflog_db_file);
     spooler->WaitForUpload();
     reflog_hash.algorithm = manifest->GetHashAlgorithm();

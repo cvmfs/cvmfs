@@ -804,7 +804,9 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     // upload Reflog database
     if (!preload_cache && reflog != NULL) {
       reflog->CommitTransaction();
-      string reflog_path = reflog->CloseAndReturnDatabaseFile();
+      reflog->DropDatabaseFileOwnership();
+      string reflog_path = reflog->database_file();
+      delete reflog;
       manifest::Reflog::HashDatabase(reflog_path, &reflog_hash);
       spooler->UploadReflog(reflog_path);
       spooler->WaitForUpload();

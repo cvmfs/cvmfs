@@ -46,10 +46,6 @@ class Reflog {
   static shash::Any ReadChecksum(const std::string &path);
   static void WriteChecksum(const std::string &path, const shash::Any &value);
 
-  std::string CloseAndReturnDatabaseFile() {
-    return database_->CloseAndReturnDatabaseFile();
-  }
-
   bool AddCertificate(const shash::Any &certificate);
   bool AddCatalog(const shash::Any &catalog);
   bool AddHistory(const shash::Any &history);
