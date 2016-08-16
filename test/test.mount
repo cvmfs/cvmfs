@@ -1,6 +1,0 @@
-/usr/bin/mount		/usr/bin/true
-/usr/bin/umount		/usr/bin/true
-/usr/bin/cvmfs2		/usr/bin/true
-/usr/bin/fusermount	/usr/bin/true
-/cvmfs/atlas-nightlies.cern.ch	/mnt
-/cvmfs/cms.cern.ch/SITECONF/local /home/tim/cvmfs/test/benchmarks/004-cms
