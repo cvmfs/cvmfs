@@ -8,6 +8,8 @@
 #include <inttypes.h>
 #include <stdint.h>
 
+#include <cstdlib>
+
 #include "util/async.h"
 
 /**
@@ -33,17 +35,30 @@
  */
 class MallocHeap {
  public:
+  struct BlockPtr {
+    BlockPtr() : pointer(NULL) { }
+    explicit BlockPtr(void *p) : pointer(p) { }
+    void *pointer;
+  };
+
   // Pointer to the callback method invoked for each memory block that gets
   // compacted.
-  typedef Callbackable<void *>::CallbackTN* CallbackPtr;
+  typedef Callbackable<BlockPtr>::CallbackTN* CallbackPtr;
 
   MallocHeap(uint64_t capacity, CallbackPtr callback_ptr);
   ~MallocHeap();
 
-  void *Allocate(uint64_t size, unsigned char *header, unsigned header_size);
+  void *Allocate(uint64_t size, void *header, unsigned header_size);
   void Free(void *block);
   uint64_t GetSize(void *block);
   void Compact();
+
+  inline uint64_t num_blocks() { return num_blocks_; }
+  inline uint64_t used_bytes() { return gauge_; }
+  inline uint64_t stored_bytes() { return stored_; }
+  inline double utilization() {
+    return static_cast<double>(stored_) / static_cast<double>(gauge_);
+  }
 
  private:
   /**
@@ -80,8 +95,8 @@ class MallocHeap {
    * Round up size to the next larger multiple of 8.  This is used to enforce
    * 8-byte alignment.
    */
-  static inline uint32_t RoundUp8(const uint32_t size) {
-    return (size + 7) & ~7;
+  static inline uint64_t RoundUp8(const uint64_t size) {
+    return (size + 7) & ~static_cast<uint64_t>(7);
   }
 
   /**
@@ -96,6 +111,14 @@ class MallocHeap {
    * End of the area of reserved blocks, used for the next allocation.
    */
   uint64_t gauge_;
+  /**
+   * Sum of the non-free block sizes.
+   */
+  uint64_t stored_;
+  /**
+   * Number of reserved blocks
+   */
+  uint64_t num_blocks_;
   /**
    * The big mmap'd memory block used to serve allocation requests.
    */

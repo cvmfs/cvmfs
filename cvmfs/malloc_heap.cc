@@ -15,7 +15,7 @@ using namespace std;  // NOLINT
 
 void *MallocHeap::Allocate(
   uint64_t size,
-  unsigned char *header,
+  void *header,
   unsigned header_size)
 {
   assert(size > 0);
@@ -30,6 +30,8 @@ void *MallocHeap::Allocate(
   new_block += sizeof(Tag);
   memcpy(new_block, header, header_size);
   gauge_ += real_size;
+  stored_ += rounded_size;
+  num_blocks_++;
   return new_block;
 }
 
@@ -57,7 +59,7 @@ void MallocHeap::Compact() {
         current_tag->size = next_tag->size;
         memmove(current_tag->GetBlock(),
                 next_tag->GetBlock(), next_tag->GetSize());
-        (*callback_ptr_)(current_tag->GetBlock());
+        (*callback_ptr_)(BlockPtr(current_tag->GetBlock()));
         next_tag = current_tag->JumpToNext();
         next_tag->size = free_space;
       }
@@ -78,6 +80,8 @@ void MallocHeap::Free(void *block) {
   Tag *tag = reinterpret_cast<Tag *>(block) - 1;
   assert(tag->size > 0);
   tag->size = -(tag->size);
+  stored_ -= tag->GetSize();
+  num_blocks_--;
   // TODO(jblomer): if Free() takes place at the top of the heap, one could
   // move back the gauge_ pointer.  If this is an optimiziation or unnecessary
   // extra work depends on how the MallocHeap is used.
@@ -95,15 +99,18 @@ MallocHeap::MallocHeap(uint64_t capacity, CallbackPtr callback_ptr)
   : callback_ptr_(callback_ptr)
   , capacity_(capacity)
   , gauge_(0)
+  , stored_(0)
+  , num_blocks_(0)
 {
   assert(capacity_ > kMinCapacity);
   // Ensure 8-byte alignment
   assert((capacity_ % 8) == 0);
   heap_ = reinterpret_cast<unsigned char *>(sxmmap(capacity + 7));
-  uintptr_t head = capacity - (uintptr_t(heap_) % 8);
-  sxunmap(heap_, head);
+  uintptr_t head = uintptr_t(heap_) % 8;
+  if (head > 0)
+    sxunmap(heap_, head);
   heap_ += head;
-  uintptr_t tail = capacity - head;
+  uintptr_t tail = 7 - head;
   if (tail > 0)
     sxunmap(heap_ + capacity, tail);
 }
