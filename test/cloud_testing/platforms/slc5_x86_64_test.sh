@@ -96,6 +96,7 @@ CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
                                  src/600-securecvmfs                          \
                                  src/608-infofile                             \
                                  src/609-metainfofile                         \
+                                 src/628-pythonwrappedcvmfsserver             \
                                  --                                           \
                                  src/5*                                       \
                                  src/6*                                       \
