@@ -76,13 +76,13 @@ void MallocHeap::Compact() {
 }
 
 
-void MallocHeap::Free(void *block) {
+void MallocHeap::MarkFree(void *block) {
   Tag *tag = reinterpret_cast<Tag *>(block) - 1;
   assert(tag->size > 0);
   tag->size = -(tag->size);
   stored_ -= tag->GetSize();
   num_blocks_--;
-  // TODO(jblomer): if Free() takes place at the top of the heap, one could
+  // TODO(jblomer): if MarkFree() takes place at the top of the heap, one could
   // move back the gauge_ pointer.  If this is an optimiziation or unnecessary
   // extra work depends on how the MallocHeap is used.
 }

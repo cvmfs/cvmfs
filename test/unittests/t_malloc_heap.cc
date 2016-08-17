@@ -100,7 +100,7 @@ TEST_F(T_MallocHeap, Basic) {
   EXPECT_EQ(used_bytes, M.used_bytes());
 
   for (unsigned i = 1; i <= N; ++i)
-    M.Free(pointers[i-1]);
+    M.MarkFree(pointers[i-1]);
   M.Compact();
   EXPECT_EQ(0U, M.used_bytes());
   EXPECT_EQ(0U, M.stored_bytes());
@@ -112,8 +112,7 @@ TEST_F(T_MallocHeap, Stress) {
   MallocHeap M(kBigArena,
                int_map.MakeCallback(&IntMap::OnBlockMove, &int_map));
   Prng prng;
-  //prng.InitLocaltime();
-  prng.InitSeed(52);
+  prng.InitLocaltime();
   // 512M can host ~100000 4k + 8 bytes blocks
   unsigned N = 100000;
   unsigned max_size = 4096;
@@ -132,11 +131,16 @@ TEST_F(T_MallocHeap, Stress) {
     uint32_t coin = prng.Next(512);
     if (coin < 256)
       continue;
-    M.Free(int_map.mem_digest[i].ptr);
+    M.MarkFree(int_map.mem_digest[i].ptr);
     int_map.mem_digest.erase(i);
   }
   EXPECT_LT(0, M.num_blocks());
   EXPECT_LT(M.num_blocks(), N);
+  // One more to ensure non-overlapping gauge
+  unsigned next_gen = N + 1;
+  void *ptr = M.Allocate(4096, &next_gen, sizeof(next_gen));
+  ASSERT_TRUE(ptr != NULL);
+  int_map.mem_digest[next_gen] = IntMap::Info(ptr, MemChecksum(ptr, 4096));
 
   M.Compact();
   EXPECT_EQ(int_map.mem_digest.size(), M.num_blocks());
@@ -152,4 +156,36 @@ TEST_F(T_MallocHeap, Stress) {
     EXPECT_EQ(MemChecksum(iter->second.ptr, M.GetSize(iter->second.ptr)),
               iter->second.checksum);
   }
+}
+
+
+TEST_F(T_MallocHeap, Fill) {
+  IntMap int_map;
+  MallocHeap M(kSmallArena,
+               int_map.MakeCallback(&IntMap::OnBlockMove, &int_map));
+  unsigned elem_size = 4096 - 8;
+  unsigned num_elems = kSmallArena / 4096;
+
+  for (unsigned i = 0; i < num_elems; ++i) {
+    void *ptr = M.Allocate(elem_size, &i, sizeof(i));
+    EXPECT_TRUE(ptr != NULL);
+    int_map.mem_digest[i] = IntMap::Info(ptr, 0);
+  }
+  void *ptr = M.Allocate(4096, &num_elems, sizeof(num_elems));
+  EXPECT_EQ(NULL, ptr);
+
+  for (unsigned i = 0; i < num_elems; i += 2) {
+    M.MarkFree(int_map.mem_digest[i].ptr);
+  }
+  ptr = M.Allocate(4096, &num_elems, sizeof(num_elems));
+  EXPECT_EQ(NULL, ptr);
+
+  M.Compact();
+  for (unsigned i = 0; i < num_elems; i += 2) {
+    void *ptr = M.Allocate(elem_size, &i, sizeof(i));
+    EXPECT_TRUE(ptr != NULL);
+    int_map.mem_digest[i] = IntMap::Info(ptr, 0);
+  }
+  ptr = M.Allocate(4096, &num_elems, sizeof(num_elems));
+  EXPECT_EQ(NULL, ptr);
 }
