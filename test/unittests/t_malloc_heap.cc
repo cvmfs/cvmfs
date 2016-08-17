@@ -50,7 +50,7 @@ class T_MallocHeap : public ::testing::Test {
 
   class CallbackNull : public Callbackable<MallocHeap::BlockPtr> {
    public:
-    void Ignore(const MallocHeap::BlockPtr &ptr) { };
+    void Ignore(const MallocHeap::BlockPtr &ptr) { }
   };
 
   class IntMap : public Callbackable<MallocHeap::BlockPtr> {
@@ -68,7 +68,7 @@ class T_MallocHeap : public ::testing::Test {
       unsigned id = *reinterpret_cast<unsigned *>(new_ptr.pointer);
       mem_digest[id].ptr = new_ptr.pointer;
       num_moves++;
-    };
+    }
 
     unsigned num_moves;
     map<unsigned, Info> mem_digest;
