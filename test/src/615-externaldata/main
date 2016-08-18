@@ -104,7 +104,7 @@ cvmfs_run_test() {
   echo "But setting CVMFS_FALLBACK_PROXY should work"
   sudo umount ${repo_dir}                                || return 41
   sudo umount ${cvmfs_mnt}                               || return 42
-  sudo sed -i 's/CVMFS_EXTERNAL_FALLBACK/CVMFS_FALLBACK/p' $client_config || return 43
+  sudo sed -i 's/CVMFS_EXTERNAL_FALLBACK/CVMFS_FALLBACK/' $client_config || return 43
   sudo cvmfs_server mount $CVMFS_TEST_REPO               || return 44
 
   echo "Check the external file data"
