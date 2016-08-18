@@ -42,6 +42,7 @@ class TalkManager : SingleCopy {
   void Answer(int con_fd, const std::string &msg);
   void AnswerStringList(int con_fd, const std::vector<std::string> &list);
   std::string FormatHostInfo(download::DownloadManager *download_mgr);
+  std::string FormatProxyInfo(download::DownloadManager *download_mgr);
 
   std::string socket_path_;
   int socket_fd_;
