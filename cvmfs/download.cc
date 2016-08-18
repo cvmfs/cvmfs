@@ -769,7 +769,6 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
   info->curl_handle = handle;
   info->error_code = kFailOk;
   info->http_code = -1;
-  info->nocache = false;
   info->follow_redirects = follow_redirects_;
   info->num_used_proxies = 1;
   info->num_used_hosts = 1;
@@ -778,6 +777,11 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
   info->headers = header_lists_->DuplicateList(default_headers_);
   if (info->info_header) {
     header_lists_->AppendHeader(info->headers, info->info_header);
+  }
+  if (info->force_nocache) {
+    SetNocache(info);
+  } else {
+    info->nocache = false;
   }
   if (info->compressed) {
     zlib::DecompressInit(&(info->zstream));
@@ -1110,6 +1114,16 @@ void DownloadManager::Backoff(JobInfo *info) {
 }
 
 
+void DownloadManager::SetNocache(JobInfo *info) {
+  if (info->nocache)
+    return;
+  header_lists_->AppendHeader(info->headers, "Pragma: no-cache");
+  header_lists_->AppendHeader(info->headers, "Cache-Control: no-cache");
+  curl_easy_setopt(info->curl_handle, CURLOPT_HTTPHEADER, info->headers);
+  info->nocache = true;
+}
+
+
 /**
  * Checks the result of a curl download and implements the failure logic, such
  * as changing the proxy server.  Takes care of cleanup.
@@ -1327,10 +1341,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     bool switch_host = false;
     switch (info->error_code) {
       case kFailBadData:
-        header_lists_->AppendHeader(info->headers, "Pragma: no-cache");
-        header_lists_->AppendHeader(info->headers, "Cache-Control: no-cache");
-        curl_easy_setopt(info->curl_handle, CURLOPT_HTTPHEADER, info->headers);
-        info->nocache = true;
+        SetNocache(info);
         break;
       case kFailProxyResolve:
       case kFailProxyHttp:

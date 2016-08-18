@@ -880,6 +880,7 @@ class MockObjectFetcher : public AbstractObjectFetcher<MockObjectFetcher> {
   Failures Fetch(const shash::Any &object_hash, std::string *file_path);
   Failures Fetch(const std::string &relative_path,
                  const bool         decompress,
+                 const bool         nocache,
                        std::string *file_path);
 
  private:
