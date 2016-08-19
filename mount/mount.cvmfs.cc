@@ -153,11 +153,6 @@ static bool CheckConcurrentMount(const string &fqrn, const string &cachedir) {
     mountpoint.push_back(buf);
   }
   close(socket_fd);
-  int output_flags = kLogStderr;
-  if (!mountpoint.empty() && (mountpoint[mountpoint.length()-1] == '\n'))
-    output_flags |= kLogNoLinebreak;
-  LogCvmfs(kLogCvmfs, output_flags, "Repository %s is already mounted on %s",
-           fqrn.c_str(), mountpoint.c_str());
   return false;
 }
 
@@ -254,9 +249,11 @@ static std::string GetCvmfsBinary() {
 
 int main(int argc, char **argv) {
   bool dry_run = false;
+  bool remount = false;
   vector<string> mount_options;
 
   // Option parsing
+  vector<string> option_tokens;
   int c;
   while ((c = getopt(argc, argv, "vfnho:")) != -1) {
     switch (c) {
@@ -274,6 +271,11 @@ int main(int argc, char **argv) {
         return 0;
       case 'o':
         AddMountOption(optarg, &mount_options);
+        option_tokens = SplitString(optarg, ',');
+        for (unsigned i = 0; i < option_tokens.size(); ++i) {
+          if (option_tokens[i] == string("remount"))
+            remount = true;
+        }
         break;
       default:
         Usage(kLogStderr);
@@ -322,8 +324,25 @@ int main(int argc, char **argv) {
   // If the same repository is mounted multiple times at the same time, there
   // is a race here.  Eventually, only one repository will be mounted while the
   // other cvmfs processes block on a file lock in the cache.
+  int output_flags = kLogStderr;
+  if (!mountpoint.empty() && (mountpoint[mountpoint.length()-1] == '\n'))
+    output_flags |= kLogNoLinebreak;
   retval = CheckConcurrentMount(fqrn, cachedir);
-  if (!retval) return 1;
+  if (!retval) {
+    if (remount)
+      return 0;
+
+    LogCvmfs(kLogCvmfs, output_flags, "Repository %s is already mounted on %s",
+             fqrn.c_str(), mountpoint.c_str());
+    return 1;
+  } else {
+    // No double mount
+    if (remount) {
+      LogCvmfs(kLogCvmfs, output_flags, "Repository %s is not mounted on %s",
+               fqrn.c_str(), mountpoint.c_str());
+      return 1;
+    }
+  }
 
   // Retrieve cvmfs uid/gid and fuse gid if exists
   uid_t uid_cvmfs;
