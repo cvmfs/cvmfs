@@ -1,0 +1,46 @@
+
+cvmfs_test_name="System mount -o remount"
+
+CVMFS_TEST069_MOUNTPOINT=
+
+cleanup() {
+  if [ ! -z "$CVMFS_TEST069_MOUNTPOINT" ]; then
+    sudo umount $CVMFS_TEST069_MOUNTPOINT
+    sudo rmdir $CVMFS_TEST069_MOUNTPOINT
+  fi
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  local repo=grid.cern.ch
+  local other_repo=cms.cern.ch
+
+  echo "*** creating mount point"
+  local mountpoint="$(mktemp -d)"
+  [ -d $mountpoint ] || return 10
+
+  echo "*** set cleanup trap"
+  CVMFS_TEST069_MOUNTPOINT="$mountpoint"
+  trap cleanup EXIT HUP INT TERM
+
+  echo "*** manual mount of $repo"
+  sudo mount -t cvmfs $repo $mountpoint || return 20
+  ls $mountpoint || return 21
+
+  echo "*** double mount, should fail"
+  sudo mount -t cvmfs $repo $mountpoint && return 30
+
+  echo "*** remount, should succeed"
+  sudo mount -t cvmfs -o remount $repo $mountpoint || return 40
+  ls $mountpoint || return 41
+
+  echo "*** remount on wrong repository (should fail)"
+  sudo mount -t cvmfs -o remount $other_repo $mountpoint && return 50
+
+  echo "*** remount on wrong directory (should fail)"
+  sudo umount $mountpoint || return 60
+  sudo mount -t cvmfs -o remount $repo $mountpoint && return 61
+
+  return 0
+}
