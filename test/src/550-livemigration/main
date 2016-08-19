@@ -223,9 +223,11 @@ cvmfs_run_test() {
   initiate_reload "$s0_mnt" "$legacy_repo_name" || return 17
   initiate_reload "$s1_mnt" "$legacy_repo_name" || return 18
 
-  echo "wait for the clients to pick up revision 7"
-  wait_for_revision "$s0_mnt" "$legacy_repo_name" 7 || return 19
-  wait_for_revision "$s1_mnt" "$legacy_repo_name" 7 || return 20
+  local migrate_revision=7
+  [ uses_overlayfs $legacy_repo_name ] && migrate_revision=8
+  echo "wait for the clients to pick up revision $migrate_revision"
+  wait_for_revision "$s0_mnt" "$legacy_repo_name" $migrate_revision || return 19
+  wait_for_revision "$s1_mnt" "$legacy_repo_name" $migrate_revision || return 20
 
   echo "try a final listing"
   ls -lisa $s0_mnt $s1_mnt || return 21

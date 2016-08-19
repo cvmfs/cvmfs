@@ -484,6 +484,7 @@ MockObjectFetcher::Fetch(const shash::Any   &object_hash,
 MockObjectFetcher::Failures
 MockObjectFetcher::Fetch(const std::string &relative_path,
                          const bool         decompress,
+                         const bool         nocache,
                          std::string *file_path) {
   *file_path = relative_path;
   if (!PathExists(relative_path)) {

@@ -185,7 +185,8 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
 
     std::string tmp_path;
     const bool decompress = false;
-    Failures failure = Fetch(kReflogFilename, decompress, &tmp_path);
+    const bool nocache = true;
+    Failures failure = Fetch(kReflogFilename, decompress, nocache, &tmp_path);
     if (failure != kFailOk) {
       return failure;
     }
@@ -274,9 +275,11 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
 
   Failures Fetch(const std::string &relative_path,
                  const bool         decompress,
+                 const bool         nocache,
                        std::string *file_path) {
     return static_cast<DerivedT*>(this)->Fetch(relative_path,
                                                decompress,
+                                               nocache,
                                                file_path);
   }
 
@@ -359,12 +362,14 @@ class LocalObjectFetcher :
 
     const std::string relative_path = BuildRelativePath(object_hash);
     const bool        decompress    = true;
-    return Fetch(relative_path, decompress, file_path);
+    const bool        nocache       = false;
+    return Fetch(relative_path, decompress, nocache, file_path);
   }
 
 
   Failures Fetch(const std::string &relative_path,
                  const bool         decompress,
+                 const bool         nocache,
                        std::string *file_path) {
     assert(file_path != NULL);
     file_path->clear();
@@ -521,15 +526,18 @@ class HttpObjectFetcher :
     assert(!object_hash.IsNull());
 
     const bool decompress = true;
+    const bool nocache = false;
     const std::string url = BuildRelativeUrl(object_hash);
-    return Download(url, decompress, &object_hash, object_file);
+    return Download(url, decompress, nocache, &object_hash, object_file);
   }
 
   Failures Fetch(const std::string &relative_path,
                  const bool         decompress,
+                 const bool         nocache,
                        std::string *file_path) {
     const shash::Any *expected_hash = NULL;
-    return Download(relative_path, decompress, expected_hash, file_path);
+    return Download(relative_path, decompress, nocache, expected_hash,
+                    file_path);
   }
 
  protected:
@@ -543,6 +551,7 @@ class HttpObjectFetcher :
 
   Failures Download(const std::string &relative_path,
                     const bool         decompress,
+                    const bool         nocache,
                     const shash::Any  *expected_hash,
                           std::string *file_path) {
     file_path->clear();
@@ -566,6 +575,7 @@ class HttpObjectFetcher :
                                         probe_hosts,
                                         f,
                                         expected_hash);
+    download_job.force_nocache = nocache;
     download::Failures retval = download_manager_->Fetch(&download_job);
     const bool success = (retval == download::kFailOk);
     fclose(f);
