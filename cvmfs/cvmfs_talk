@@ -52,6 +52,12 @@ sub usage {
   print "  proxy set <proxy list> sets a new chain of load-balance proxy   \n";
   print "                         groups (not including fallback proxies)  \n";
   print "  proxy fallback <list>  sets a new list of fallback proxies      \n";
+  print "  external host info     gets info about external host chain      \n";
+  print "  external host set                                               \n";
+  print "       <host list>       sets external host chain                 \n";
+  print "  external proxy info    gets info about external proxy groups    \n";
+  print "  external proxy set                                              \n";
+  print "       <proxy list>      sets chain of external proxy groups      \n";
   print "  timeout info           gets the network timeouts                \n";
   print "  timeout set                                                     \n";
   print "       <proxy> <direct>  sets the network timeouts in seconds     \n";

@@ -120,6 +120,7 @@ struct JobInfo {
   bool probe_hosts;
   bool head_request;
   bool follow_redirects;
+  bool force_nocache;
   pid_t pid;
   uid_t uid;
   gid_t gid;
@@ -147,6 +148,7 @@ struct JobInfo {
     probe_hosts = false;
     head_request = false;
     follow_redirects = false;
+    force_nocache = false;
     pid = -1;
     uid = -1;
     gid = -1;
@@ -414,6 +416,7 @@ class DownloadManager {
   void UpdateStatistics(CURL *handle);
   bool CanRetry(const JobInfo *info);
   void Backoff(JobInfo *info);
+  void SetNocache(JobInfo *info);
   bool VerifyAndFinalize(const int curl_error, JobInfo *info);
   void InitHeaders();
   void FiniHeaders();
