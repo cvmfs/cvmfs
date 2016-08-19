@@ -182,15 +182,15 @@ cvmfs_run_test() {
   local test_pipe="${cvmfs_cache}/cvmfs_io.$CVMFS_TEST_REPO"
 
   echo "test external host set"
-  cvmfs_talk -p $test_pipe external host set "$test_host"         || return 80
+  sudo cvmfs_talk -p $test_pipe external host set "$test_host"         || return 80
   echo "test external host info"
-  cvmfs_talk -p $test_pipe external host info                     || return 81
-  cvmfs_talk -p $test_pipe external host info | grep "$test_dom"  || return 82
+  sudo cvmfs_talk -p $test_pipe external host info                     || return 81
+  sudo cvmfs_talk -p $test_pipe external host info | grep "$test_dom"  || return 82
   echo "test external proxy set"
-  cvmfs_talk -p $test_pipe external proxy set "$test_proxy"       || return 83
+  sudo cvmfs_talk -p $test_pipe external proxy set "$test_proxy"       || return 83
   echo "test external proxy info"
-  cvmfs_talk -p $test_pipe external proxy info                    || return 84
-  cvmfs_talk -p $test_pipe external proxy info | grep "$test_dom" || return 85
+  sudo cvmfs_talk -p $test_pipe external proxy info                    || return 84
+  sudo cvmfs_talk -p $test_pipe external proxy info | grep "$test_dom" || return 85
 
   return 0
 }
