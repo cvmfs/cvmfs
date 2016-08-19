@@ -74,31 +74,55 @@ cvmfs_run_test() {
 
   local external_storage="${scratch_dir}/external_files"
   echo "Creating external storage directory '$external_storage'"
-  mkdir -p $external_storage || return 51
+  mkdir -p $external_storage || return 35
 
   echo "Make sure the file is NOT in the repository storage but instead in the external area"
   mkdir -p ${external_storage}/external
-  delete_from_backend $CVMFS_TEST_REPO $(make_path $object_hash) || return 52
-  cp "$object_file" ${external_storage}/external/file            || return 53
+  delete_from_backend $CVMFS_TEST_REPO $(make_path $object_hash) || return 36
+  cp "$object_file" ${external_storage}/external/file            || return 37
 
   echo "Check the external file data (should fail to read - external storage not served yet)"
   is_external_file ${cvmfs_mnt}/external/file || return 20
-  ! cat ${repo_dir}/external/file             || return 22
+  ! cat ${repo_dir}/external/file             || return 21
 
   local http_log="${scratch_dir}/http.log"
   echo "start an HTTP server to serve external files (logging to $http_log)"
   CVMFS_TEST_615_HTTP_PID="$(open_http_server $external_storage $http_port $http_log)"
-  [ ! -z $CVMFS_TEST_615_HTTP_PID ] || kill -0 $CVMFS_TEST_615_HTTP_PID || { echo "fail"; return 4; }
+  [ ! -z $CVMFS_TEST_615_HTTP_PID ] || kill -0 $CVMFS_TEST_615_HTTP_PID || { echo "fail"; return 8; }
   echo "HTTP server running with PID $CVMFS_TEST_615_HTTP_PID"
 
+  # Since CVMFS_EXTERNAL_HTTP_PROXY is the default DIRECT, setting
+  #   CVMFS_EXTERNAL_FALLBACK_PROXY to an invalid address causes failure
+  echo "Setting CVMFS_EXTERNAL_FALLBACK_PROXY should also block access"
+  sudo umount ${repo_dir}                                || return 38
+  sudo umount ${cvmfs_mnt}                               || return 39
+  echo "CVMFS_EXTERNAL_FALLBACK_PROXY=http://example.com:3128" | sudo tee --append $client_config
+  sudo cvmfs_server mount $CVMFS_TEST_REPO               || return 40
+
+  ! cat ${repo_dir}/external/file                        || return 22
+
+  echo "But setting CVMFS_FALLBACK_PROXY should work"
+  sudo umount ${repo_dir}                                || return 41
+  sudo umount ${cvmfs_mnt}                               || return 42
+  sudo sed -i 's/CVMFS_EXTERNAL_FALLBACK/CVMFS_FALLBACK/' $client_config || return 43
+  sudo cvmfs_server mount $CVMFS_TEST_REPO               || return 44
+
   echo "Check the external file data"
-  is_external_file ${cvmfs_mnt}/external/file               || return 20
-  [ x"$(cat ${repo_dir}/external/file)" == x"Hello World" ] || return 22
+  is_external_file ${cvmfs_mnt}/external/file               || return 23
+  [ x"$(cat ${repo_dir}/external/file)" == x"Hello World" ] || return 24
+
+  # CVMFS_FALLBACK_PROXY does however interfere with internal files
+  #   because CVMFS_HTTP_PROXY=DIRECT
+  echo "Now deleting CVMFS_FALLBACK_PROXY"
+  sudo umount ${repo_dir}                                || return 45
+  sudo umount ${cvmfs_mnt}                               || return 46
+  sudo sed -i '/CVMFS_FALLBACK_PROXY/d' $client_config   || return 47
+  sudo cvmfs_server mount $CVMFS_TEST_REPO               || return 48
 
   # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
   echo "Try reading chunked file (should fail - not served by external yet)"
-  cat ${repo_dir}/chunked_file > /dev/null && return 35
+  cat ${repo_dir}/chunked_file > /dev/null && return 30
 
   echo "copy chunked file into external storage"
   cp chunked_file "${external_storage}/chunked_file" || return 52
@@ -111,19 +135,19 @@ cvmfs_run_test() {
 
   if ! is_external_file ${cvmfs_mnt}/chunked_file; then
     echo "Chunked file is not marked as external."
-    return 24
+    return 25
   fi
   if [ x"$chunked_true_hash" != x"$chunked_cvmfs_hash" ]; then
     echo "Correct hash is $chunked_true_hash but CVMFS thinks file hash is $chunked_cvmfs_hash"
-    return 25
+    return 26
   fi
   if [ x"$chunked_cvmfs_read" != x"$chunked_cvmfs_hash" ]; then
     echo "Correct hash is $chunked_cvmfs_hash but CVMFS output was $chunked_cvmfs_read"
-    return 26
+    return 27
   fi
   if [[ "$chunk_count" -lt 2 ]]; then
     echo "Chunk count is $chunk_count"
-    return 27
+    return 28
   fi
 
   # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -145,8 +169,8 @@ cvmfs_run_test() {
   publish_repo $CVMFS_TEST_REPO -v -N                      || return $?
 
   echo "check that 'native' is NOT external"
-  ! is_external_file ${cvmfs_mnt}/native              || return 30
-  ! is_external_file ${cvmfs_mnt}/chunked_file_native || return 31
+  ! is_external_file ${cvmfs_mnt}/native              || return 31
+  ! is_external_file ${cvmfs_mnt}/chunked_file_native || return 32
 
   echo "Remove cached and external copy of the file; only copy"
   echo "is in the backend storage, which should not be used."
