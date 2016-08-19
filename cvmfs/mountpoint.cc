@@ -1368,12 +1368,11 @@ bool MountPoint::SetupExternalDownloadMgr() {
       return false;
     }
   }
+  string fallback_proxies;
+  if (options_mgr_->GetValue("CVMFS_EXTERNAL_FALLBACK_PROXY", &optarg))
+    fallback_proxies = optarg;
   external_download_mgr_->SetProxyChain(
-    proxies, "", download::DownloadManager::kSetProxyRegular);
-  if (options_mgr_->GetValue("CVMFS_EXTERNAL_FALLBACK_PROXY", &optarg)) {
-    external_download_mgr_->SetProxyChain(
-      "", optarg, download::DownloadManager::kSetProxyFallback);
-  }
+    proxies, fallback_proxies, download::DownloadManager::kSetProxyBoth);
 
   return true;
 }
