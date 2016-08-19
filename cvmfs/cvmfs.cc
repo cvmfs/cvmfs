@@ -2214,8 +2214,6 @@ static int Init(const loader::LoaderExports *loader_exports) {
   if (cvmfs::options_manager_->GetValue("CVMFS_EXTERNAL_FALLBACK_PROXY",
       &parameter))
     fallback_external_proxies = parameter;
-  else
-    fallback_external_proxies = fallback_proxies;
   if (cvmfs::options_manager_->GetValue("CVMFS_DNS_SERVER", &parameter))
     dns_server = parameter;
   if (cvmfs::options_manager_->GetValue("CVMFS_EXTERNAL_URL", &parameter)) {
