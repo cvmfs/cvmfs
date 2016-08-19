@@ -7,6 +7,7 @@
   * Fix handling of file:// url in CVMFS_SERVER_URL
 
 2.3.1:
+  * Fix `mount -t cvmfs -o remount ...` (CVM-1068)
   * Prevent fallback proxies from interfering with external data (CVM-1058)
   * Fix up cvmfs_talk external commands (CVM-981)
   * Fixes in upload and download of the reflog
