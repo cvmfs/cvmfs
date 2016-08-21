@@ -2519,15 +2519,6 @@ create_repository_storage() {
 }
 
 
-remove_repository_storage() {
-  local name=$1
-  load_repo_config $name
-  local storage_dir="$(get_upstream_config $CVMFS_UPSTREAM_STORAGE)"
-  [ x"$storage_dir" != x"" ] || return 0
-  rm -fR "$storage_dir"
-}
-
-
 setup_and_mount_new_repository() {
   local name=$1
   local http_timeout=15
@@ -3280,9 +3271,6 @@ cvmfs_server_mkfs() {
                                          "$external_data"       \
                                          "$voms_authz"          \
                                          "$auto_tag_timespan" || die "fail"
-  if is_local_upstream $upstream && [ $configure_apache -eq 1 ]; then
-    reload_apache > /dev/null
-  fi
   echo "done"
 
   # create or import security keys and certificates
@@ -3321,6 +3309,11 @@ cvmfs_server_mkfs() {
   local repoinfo_file=${temp_dir}/new_repoinfo
   touch $repoinfo_file
   create_repometa_skeleton $repoinfo_file
+  sync
+  if is_local_upstream $upstream && [ $configure_apache -eq 1 ]; then
+    reload_apache > /dev/null
+  fi
+
   local volatile_opt=
   if [ $volatile_content -eq 1 ]; then
     volatile_opt="-v"
@@ -3965,10 +3958,17 @@ cvmfs_server_rmfs() {
     remove_spool_area $name
     echo done
 
+    echo -n "Removing Configuration... "
+    remove_config_files $name || die "fail"
+    echo "done"
+
     if [ $preserve_data -eq 0 ] && \
        is_local_upstream $CVMFS_UPSTREAM_STORAGE; then
       echo -n "Removing Repository Storage... "
-      remove_repository_storage $name || die "fail"
+      local storage_dir="$(get_upstream_config $CVMFS_UPSTREAM_STORAGE)"
+      if [ x"$storage_dir" != x"" ]; then
+        rm -fR "$storage_dir" || die "fail"
+      fi
       echo "done"
     fi
 
@@ -3981,10 +3981,6 @@ cvmfs_server_rmfs() {
             /etc/cvmfs/keys/$name.crt || die "fail"
       echo "done"
     fi
-
-    echo -n "Removing Configuration... "
-    remove_config_files $name || die "fail"
-    echo "done"
 
     echo -n "Updating global JSON information... "
     update_global_repository_info && echo "done" || echo "fail"
