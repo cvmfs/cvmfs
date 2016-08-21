@@ -13,6 +13,9 @@ cleanup() {
 cvmfs_run_test() {
   logfile=$1
 
+  echo "*** regular autofs mount"
+  cvmfs_mount cvmfs-config.cern.ch || return 5
+
   local repo=grid.cern.ch
   local other_repo=cms.cern.ch
 
