@@ -1041,6 +1041,18 @@ is_garbage_collectable() {
   fi
 }
 
+# checks if a manifest ist present
+#
+# @param name  the name of the repository to be checked
+# @return      0 if it is empty
+is_empty_repository() {
+  local name=$1
+  local url=""
+  load_repo_config $name
+  is_stratum0 $name && url="$CVMFS_STRATUM0" || url="$CVMFS_STRATUM1"
+  [ x"$(get_repo_info_from_url "$url" -e)" = x"yes" ]
+}
+
 # checks if a repository contains a reference log that is necessary to run
 # garbage collections
 #
@@ -5200,6 +5212,10 @@ cvmfs_server_gc() {
 
     # sanity checks
     check_repository_compatibility $name
+    if is_empty_repository $name; then
+      echo "Repository $name is empty, nothing to do"
+      continue
+    fi
     is_garbage_collectable $name || die "Garbage Collection is not enabled for $name"
     is_owner_or_root       $name || die "Permission denied: Repository $name is owned by $user"
     is_in_transaction      $name && die "Cannot run garbage collection while in a transaction"

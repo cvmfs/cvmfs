@@ -132,6 +132,9 @@ cvmfs_run_test() {
   load_repo_config $CVMFS_TEST_REPO
   echo "$s1_spool_tmp_dir"
 
+  echo "try to garbage-collect an empty repository"
+  cvmfs_server gc -f $replica_name || { desaster_cleanup $mnt_point $replica_name; return 8; }
+
   echo "create a Snapshot of the Stratum0 repository in the just created Stratum1 replica"
   sudo cvmfs_server snapshot $replica_name || { desaster_cleanup $mnt_point $replica_name; return 9; }
 
