@@ -224,7 +224,9 @@ cvmfs_run_test() {
   initiate_reload "$s1_mnt" "$legacy_repo_name" || return 18
 
   local migrate_revision=7
-  [ uses_overlayfs $legacy_repo_name ] && migrate_revision=8
+  if uses_overlayfs $legacy_repo_name; then
+    migrate_revision=8
+  fi
   echo "wait for the clients to pick up revision $migrate_revision"
   wait_for_revision "$s0_mnt" "$legacy_repo_name" $migrate_revision || return 19
   wait_for_revision "$s1_mnt" "$legacy_repo_name" $migrate_revision || return 20
