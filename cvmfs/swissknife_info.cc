@@ -64,6 +64,7 @@ ParameterList CommandInfo::GetParams() {
                                         "in the root catalog."));
   r.push_back(Parameter::Switch('M', "print repository meta info."));
   r.push_back(Parameter::Switch('R', "print raw manifest."));
+  r.push_back(Parameter::Switch('e', "check if the repository is empty"));
   return r;
 }
 
@@ -89,6 +90,27 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
     return 1;
   }
 
+  if (IsRemote(repository)) {
+    const bool follow_redirects = args.count('L') > 0;
+    if (!this->InitDownloadManager(follow_redirects)) {
+      return 1;
+    }
+  }
+
+  // Check if we should be human readable
+  const bool human_readable = (args.count('h') > 0);
+
+  if (args.count('e') > 0) {
+    string manifest_path = IsRemote(repository) ?
+      ".cvmfspublished" : repository + "/.cvmfspublished";
+    bool is_empty = !Exists(repository, manifest_path);
+    LogCvmfs(kLogCvmfs, kLogStdout, "%s%s",
+             (human_readable) ? "Empty Repository:                " : "",
+             StringifyBool(is_empty).c_str());
+    if (is_empty)
+      return 0;
+  }
+
   // Load manifest file
   // Repository can be HTTP address or on local file system
   // TODO(jblomer): do this using Manifest::Fetch
@@ -97,11 +119,6 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
   //       Possible Fix: Allow for a Manifest::Fetch with an empty name.
   UniquePtr<manifest::Manifest> manifest;
   if (IsRemote(repository)) {
-    const bool follow_redirects = args.count('L') > 0;
-    if (!this->InitDownloadManager(follow_redirects)) {
-      return 1;
-    }
-
     const string url = repository + "/.cvmfspublished";
     download::JobInfo download_manifest(&url, false, false, NULL);
     download::Failures retval = download_manager()->Fetch(&download_manifest);
@@ -136,9 +153,6 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
              certificate_path.c_str());
     return 1;
   }
-
-  // Check if we should be human readable
-  const bool human_readable = (args.count('h') > 0);
 
   // Get information from the mount point
   if (args.count('C') > 0) {
