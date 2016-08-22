@@ -308,6 +308,18 @@ TEST_F(T_Dns, StripIp) {
 }
 
 
+TEST_F(T_Dns, AddDefaultScheme) {
+  EXPECT_EQ("http://[::1]", AddDefaultScheme("[::1]"));
+  EXPECT_EQ("http://http:/", AddDefaultScheme("http:/"));
+  EXPECT_EQ("http://localhost", AddDefaultScheme("http://localhost"));
+  EXPECT_EQ("https://host.example.com:3128",
+            AddDefaultScheme("https://host.example.com:3128"));
+  EXPECT_EQ("", AddDefaultScheme(""));
+  EXPECT_EQ("DIRECT", AddDefaultScheme("DIRECT"));
+  EXPECT_EQ("http://direct", AddDefaultScheme("direct"));
+}
+
+
 TEST_F(T_Dns, Host) {
   Host host;
   Host host2;
