@@ -331,6 +331,9 @@ if [ -d /var/run/cvmfs ]; then
 fi
 :
 
+%post server
+/usr/bin/cvmfs_server fix-permissions || :
+
 %preun
 if [ $1 = 0 ] ; then
 %if 0%{?selinux_cvmfs}
@@ -425,6 +428,8 @@ fi
 %doc COPYING AUTHORS README ChangeLog
 
 %changelog
+* Mon Aug 22 2016 Jakob Blomer <jblomer@cern.ch> - 2.3.1
+- Reset cvmfs_swissknife capability if overlayfs is used
 * Wed Aug 10 2016 Dave Dykstra <dwd@fnal.gov> - 2.3.1
 - Update version number to 2.3.1
 * Thu Jul 28 2016 Jakob Blomer <jblomer@cern.ch> - 2.3.1
