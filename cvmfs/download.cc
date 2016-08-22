@@ -2396,6 +2396,7 @@ void DownloadManager::SetProxyChain(
   for (unsigned i = 0; i < proxy_groups.size(); ++i) {
     vector<string> this_group = SplitString(proxy_groups[i], '|');
     for (unsigned j = 0; j < this_group.size(); ++j) {
+      this_group[j] = dns::AddDefaultScheme(this_group[j]);
       // Note: DIRECT strings will be "extracted" to an empty string.
       string hostname = dns::ExtractHost(this_group[j]);
       // Save the hostname.  Leave empty (DIRECT) names so indexes will
@@ -2420,6 +2421,7 @@ void DownloadManager::SetProxyChain(
     // objects, one for each IP address.
     vector<ProxyInfo> infos;
     for (unsigned j = 0; j < this_group.size(); ++j, ++num_proxy) {
+      this_group[j] = dns::AddDefaultScheme(this_group[j]);
       if (this_group[j] == "DIRECT") {
         infos.push_back(ProxyInfo("DIRECT"));
         continue;

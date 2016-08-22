@@ -167,6 +167,22 @@ string StripIp(const string &decorated_ip) {
 }
 
 
+/**
+ * Adds http:// if it is missing from proxy
+ */
+std::string AddDefaultScheme(const std::string &proxy) {
+  const bool ignore_case = true;
+  if (HasPrefix(proxy, "http://", ignore_case) ||
+      HasPrefix(proxy, "https://", ignore_case) ||
+      (proxy == "DIRECT") ||
+      proxy.empty())
+  {
+    return proxy;
+  }
+  return "http://" + proxy;
+}
+
+
 //------------------------------------------------------------------------------
 
 

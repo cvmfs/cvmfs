@@ -70,6 +70,7 @@ std::string ExtractHost(const std::string &url);
 std::string ExtractPort(const std::string &url);
 std::string RewriteUrl(const std::string &url, const std::string &ip);
 std::string StripIp(const std::string &decorated_ip);
+std::string AddDefaultScheme(const std::string &proxy);
 
 
 /**
