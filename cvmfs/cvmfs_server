@@ -215,7 +215,7 @@ is_subcommand() {
   local supported_commands="mkfs add-replica import publish rollback rmfs alterfs    \
     resign list info tag list-tags lstags check transaction abort snapshot           \
     skeleton migrate list-catalogs update-geodb gc catalog-chown eliminate-hardlinks \
-    update-info update-repoinfo mount"
+    update-info update-repoinfo mount fix-permissions"
 
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
@@ -6503,6 +6503,18 @@ cvmfs_server_skeleton() {
 
   # do it!
   create_repository_skeleton $skeleton_dir $skeleton_user
+}
+
+
+################################################################################
+
+
+cvmfs_server_fix_permissions() {
+  local num_overlayfs=$(find /etc/cvmfs/repositories.d -name server.conf \
+    -exec grep "CVMFS_UNION_FS_TYPE=overlayfs" {} \; | wc -l)
+  if [ $num_overlayfs -gt 0 ]; then
+    ensure_swissknife_suid overlayfs
+  fi
 }
 
 
