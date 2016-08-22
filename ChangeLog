@@ -7,6 +7,7 @@
   * Fix handling of file:// url in CVMFS_SERVER_URL
 
 2.3.1:
+  * Reset file capabilities of cvmfs_swissknife on package update (CVM-1038)
   * Fix `cvmfs_server gc` for freshly created replicas (CVM-1043)
   * Fix `mount -t cvmfs -o remount ...` (CVM-1068)
   * Prevent fallback proxies from interfering with external data (CVM-1058)
