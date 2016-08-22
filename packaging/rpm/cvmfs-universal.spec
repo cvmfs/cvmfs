@@ -430,7 +430,7 @@ fi
 %changelog
 * Mon Aug 22 2016 Jakob Blomer <jblomer@cern.ch> - 2.4.0
 - Update upstream package
-* Mon Aug 22 2016 Jakob Blomer <jblomer@cenr.ch> - 2.3.1
+* Mon Aug 22 2016 Jakob Blomer <jblomer@cern.ch> - 2.3.1
 - Reset cvmfs_swissknife capability if overlayfs is used
 * Thu Jul 28 2016 Jakob Blomer <jblomer@cern.ch> - 2.3.1
 - Update upstream package
