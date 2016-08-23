@@ -97,6 +97,8 @@ string              *stratum1_url = NULL;
 string              *temp_dir = NULL;
 unsigned             num_parallel = 1;
 bool                 pull_history = false;
+bool                 apply_timestamp_threshold = false;
+uint64_t             timestamp_threshold = 0;
 bool                 is_garbage_collectable = false;
 bool                 initial_snapshot = false;
 upload::Spooler     *spooler = NULL;
@@ -427,6 +429,19 @@ bool CommandPull::Pull(const shash::Any   &catalog_hash,
     goto pull_cleanup;
   }
 
+  // Always pull the HEAD root catalog and nested catalogs
+  if (apply_timestamp_threshold && (path == "") &&
+      (catalog->GetLastModified() < timestamp_threshold))
+  {
+    LogCvmfs(kLogCvmfs, kLogStdout,
+             "  Pruning at root catalog from %s due to threshold at %s",
+             StringifyTime(catalog->GetLastModified(), false).c_str(),
+             StringifyTime(timestamp_threshold, false).c_str());
+    delete catalog;
+    goto pull_skip;
+  }
+  apply_timestamp_threshold = true;
+
   // Traverse the chunks
   LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
            "  Processing chunks [%" PRIu64 " registered chunks]: ",
@@ -530,6 +545,9 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     reflog_chksum_path = *args.find('R')->second;
     if (!initial_snapshot)
       reflog_hash = manifest::Reflog::ReadChecksum(reflog_chksum_path);
+  }
+  if (args.find('R') != args.end()) {
+    timestamp_threshold = String2Int64(*args.find('Z')->second);
   }
 
   if (!preload_cache && stratum1_url == NULL) {
@@ -757,6 +775,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
        i != iend; ++i) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from %s repository tag",
              i->name.c_str());
+    apply_timestamp_threshold = false;
     bool retval2 = Pull(i->root_hash, "");
     retval = retval && retval2;
   }
