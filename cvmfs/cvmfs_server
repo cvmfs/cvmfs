@@ -1041,6 +1041,18 @@ is_garbage_collectable() {
   fi
 }
 
+
+# checks if the (corresponding) stratum 0 is garbage collectable
+#
+# @param name  the name of the stratum1/stratum0 repository to be checked
+# @return      0 if it is garbage collectable
+is_stratum0_garbage_collectable() {
+  local name=$1
+  load_repo_config $name
+  [ x"$(get_repo_info_from_url $CVMFS_STRATUM0 -g)" = x"yes" ]
+}
+
+
 # checks if a manifest ist present
 #
 # @param name  the name of the repository to be checked
@@ -5520,11 +5532,14 @@ __do_snapshot() {
     # do the actual snapshot actions
     local with_history=""
     local with_reflog=""
+    local timestamp_threshold=""
     [ $initial_snapshot -ne 1 ] && with_history="-p"
     [ $initial_snapshot -eq 1 ] && \
       with_reflog="-R $(get_reflog_checksum $alias_name)"
     has_reflog_checksum $alias_name && \
       with_reflog="-R $(get_reflog_checksum $alias_name)"
+    is_stratum0_garbage_collectable $alias_name &&
+      timestamp_threshold="-Z $gc_timespan"
     $user_shell "$(__swissknife_cmd dbg) pull -m $name \
         -u $stratum0                                   \
         -w $stratum1                                   \
@@ -5533,7 +5548,8 @@ __do_snapshot() {
         -k $public_key                                 \
         -n $num_workers                                \
         -t $timeout                                    \
-        -a $retries $with_history $with_reflog $initial_snapshot_flag $log_level"
+        -a $retries $with_history $with_reflog         \
+           $initial_snapshot_flag $timestamp_threshold $log_level"
 
     local last_snapshot_tmp="${spool_dir}/tmp/last_snapshot"
     $user_shell "date --utc > $last_snapshot_tmp"
