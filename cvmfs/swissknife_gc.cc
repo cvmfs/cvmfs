@@ -179,8 +179,8 @@ int CommandGc::Main(const ArgumentList &args) {
 
   if (!dry_run) {
     uploader->Upload(reflog_db, ".cvmfsreflog");
-    uploader->WaitForUpload();
     manifest::Reflog::HashDatabase(reflog_db, &reflog_hash);
+    uploader->WaitForUpload();
     manifest::Reflog::WriteChecksum(reflog_chksum_path, reflog_hash);
   }
 
