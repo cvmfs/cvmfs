@@ -90,7 +90,7 @@ shash::Suffix SqlReflog::ToSuffix(const ReferenceType type) const {
 
 
 SqlInsertReference::SqlInsertReference(const ReflogDatabase *database) {
-  MAKE_STATEMENTS("INSERT OR IGNORE INTO refs (@DB_FIELDS@) "
+  MAKE_STATEMENTS("INSERT OR REPLACE INTO refs (@DB_FIELDS@) "
                   "VALUES (@DB_PLACEHOLDERS@);");
   DEFERRED_INITS(database);
 }
