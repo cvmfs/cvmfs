@@ -728,6 +728,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
 
     LogCvmfs(kLogCvmfs, kLogStdout, "Found %u named snapshots",
              historic_tags.size());
+    // TODO(jblomer): We should repliacte the previous history dbs, too,
+    // in order to avoid races on fail-over between non-synchronized stratum 1s
     LogCvmfs(kLogCvmfs, kLogStdout, "Uploading history database");
     Store(history_path, history_hash);
     WaitForStorage();
