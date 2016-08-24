@@ -140,13 +140,16 @@ uint64_t Reflog::CountEntries() {
 }
 
 
-bool Reflog::ListCatalogs(std::vector<shash::Any> *hashes) const {
+bool Reflog::List(
+  SqlReflog::ReferenceType type,
+  std::vector<shash::Any> *hashes) const
+{
   assert(database_);
   assert(NULL != hashes);
 
   hashes->clear();
 
-  const bool success_bind = list_references_->BindType(SqlReflog::kRefCatalog);
+  const bool success_bind = list_references_->BindType(type);
   assert(success_bind);
   while (list_references_->FetchRow()) {
     hashes->push_back(list_references_->RetrieveHash());

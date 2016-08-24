@@ -52,7 +52,8 @@ class Reflog {
   bool AddMetainfo(const shash::Any &metainfo);
 
   uint64_t CountEntries();
-  bool ListCatalogs(std::vector<shash::Any> *hashes) const;
+  bool List(SqlReflog::ReferenceType type,
+            std::vector<shash::Any> *hashes) const;
 
   bool RemoveCatalog(const shash::Any &hash);
 

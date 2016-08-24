@@ -828,7 +828,8 @@ class MockReflog : public MockObjectStorage<MockReflog> {
   bool AddMetainfo(const shash::Any &metainfo);
 
   uint64_t CountEntries() { return references_.size(); }
-  bool ListCatalogs(std::vector<shash::Any> *hashes) const;
+  bool List(SqlReflog::ReferenceType type,
+            std::vector<shash::Any> *hashes) const;
 
   bool RemoveCatalog(const shash::Any &catalog);
 

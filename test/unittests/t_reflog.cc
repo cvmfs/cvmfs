@@ -185,7 +185,7 @@ TYPED_TEST(T_Reflog, InsertAndCountReferences) {
 }
 
 
-TYPED_TEST(T_Reflog, ListCatalogs) {
+TYPED_TEST(T_Reflog, List) {
   const std::string rp = TestFixture::GetReflogFilename();
   typedef TypeParam Reflog;
 
@@ -199,7 +199,17 @@ TYPED_TEST(T_Reflog, ListCatalogs) {
                     shash::kSuffixCatalog));
   rl1->AddCertificate(h("b778b910390254b37ec66366aeef04f034c51941",
                         shash::kSuffixCertificate));
+  rl1->AddCertificate(h("b778b910390254b37ec66366aeef04f034c51942",
+                        shash::kSuffixCertificate));
+  rl1->AddCertificate(h("b778b910390254b37ec66366aeef04f034c51943",
+                        shash::kSuffixCertificate));
   rl1->AddMetainfo(h("8de3e8cbd611ce225d62341698b9408a47edf76b",
+                     shash::kSuffixMetainfo));
+  rl1->AddMetainfo(h("8de3e8cbd611ce225d62341698b9408a47edf76c",
+                     shash::kSuffixMetainfo));
+  rl1->AddMetainfo(h("8de3e8cbd611ce225d62341698b9408a47edf76d",
+                     shash::kSuffixMetainfo));
+  rl1->AddMetainfo(h("8de3e8cbd611ce225d62341698b9408a47edf76e",
                      shash::kSuffixMetainfo));
   rl1->AddHistory(h("cab790100c3b10afd7e755b3c93eaeda6a0db9ab",
                      shash::kSuffixHistory));
@@ -208,11 +218,23 @@ TYPED_TEST(T_Reflog, ListCatalogs) {
   Reflog *rl2 = TestFixture::OpenReflog(rp);
   ASSERT_NE(static_cast<Reflog*>(NULL), rl2);
   EXPECT_EQ(TestFixture::fqrn, rl2->fqrn());
-  EXPECT_EQ(5u, rl2->CountEntries());
+  EXPECT_EQ(10u, rl2->CountEntries());
 
   std::vector<shash::Any> catalog_hashes;
-  ASSERT_TRUE(rl2->ListCatalogs(&catalog_hashes));
+  ASSERT_TRUE(rl2->List(SqlReflog::kRefCatalog, &catalog_hashes));
   EXPECT_EQ(2u, catalog_hashes.size());
+
+  std::vector<shash::Any> certificate_hashes;
+  ASSERT_TRUE(rl2->List(SqlReflog::kRefCertificate, &certificate_hashes));
+  EXPECT_EQ(3u, certificate_hashes.size());
+
+  std::vector<shash::Any> metainfo_hashes;
+  ASSERT_TRUE(rl2->List(SqlReflog::kRefMetainfo, &metainfo_hashes));
+  EXPECT_EQ(4u, metainfo_hashes.size());
+
+  std::vector<shash::Any> history_hashes;
+  ASSERT_TRUE(rl2->List(SqlReflog::kRefHistory, &history_hashes));
+  EXPECT_EQ(1u, history_hashes.size());
 
   TestFixture::CloseReflog(rl2);
 }

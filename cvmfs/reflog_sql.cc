@@ -70,7 +70,7 @@ static const std::string REV =               \
   DEFERRED_INIT((DB), V1R0)
 
 
-shash::Suffix SqlReflog::ToSuffix(const ReferenceType type) const {
+shash::Suffix SqlReflog::ToSuffix(const ReferenceType type) {
   switch (type) {
     case kRefCatalog:
       return shash::kSuffixCatalog;

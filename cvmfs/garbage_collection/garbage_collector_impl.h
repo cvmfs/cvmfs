@@ -205,7 +205,7 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepReflog() {
 
   const ReflogTN *reflog = configuration_.reflog;
   std::vector<shash::Any> catalogs;
-  if (NULL == reflog || !reflog->ListCatalogs(&catalogs)) {
+  if (NULL == reflog || !reflog->List(SqlReflog::kRefCatalog, &catalogs)) {
     LogCvmfs(kLogGc, kLogStderr, "Failed to list catalog reference log");
     return false;
   }
