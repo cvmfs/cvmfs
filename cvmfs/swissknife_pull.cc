@@ -804,11 +804,11 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
       StoreBuffer(ensemble.cert_buf,
                   ensemble.cert_size,
                   ensemble.manifest->certificate(), true);
-      if (reflog != NULL &&
-          !reflog->AddCertificate(ensemble.manifest->certificate())) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "Failed to add certificate to Reflog.");
-        goto fini;
-      }
+    }
+    if (reflog != NULL &&
+        !reflog->AddCertificate(ensemble.manifest->certificate())) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to add certificate to Reflog.");
+      goto fini;
     }
     if (!meta_info_hash.IsNull()) {
       const unsigned char *info = reinterpret_cast<const unsigned char *>(
