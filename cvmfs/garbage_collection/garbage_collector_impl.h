@@ -5,6 +5,7 @@
 #ifndef CVMFS_GARBAGE_COLLECTION_GARBAGE_COLLECTOR_IMPL_H_
 #define CVMFS_GARBAGE_COLLECTION_GARBAGE_COLLECTOR_IMPL_H_
 
+#include <algorithm>
 #include <limits>
 #include <string>
 #include <vector>
@@ -33,6 +34,8 @@ GarbageCollector<CatalogTraversalT, HashFilterT>::GarbageCollector(
       GarbageCollector<CatalogTraversalT, HashFilterT>::GetTraversalParams(
                                                                 configuration))
   , hash_filter_()
+  , oldest_trunk_catalog_(static_cast<uint64_t>(-1))
+  , oldest_trunk_catalog_found_(false)
   , preserved_catalogs_(0)
   , condemned_catalogs_(0)
   , condemned_objects_(0)
@@ -64,14 +67,16 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::PreserveDataObjects(
 ) {
   ++preserved_catalogs_;
 
-  if (configuration_.verbose) {
-    if (data.catalog->IsRoot()) {
+  if (data.catalog->IsRoot()) {
+    const uint64_t mtime = data.catalog->GetLastModified();
+    if (!oldest_trunk_catalog_found_)
+      oldest_trunk_catalog_ = std::min(oldest_trunk_catalog_, mtime);
+    if (configuration_.verbose) {
       const int    rev   = data.catalog->revision();
-      const time_t mtime = static_cast<time_t>(data.catalog->GetLastModified());
       LogCvmfs(kLogGc, kLogStdout, "Preserving Revision %d (%s)",
                                    rev, StringifyTime(mtime, true).c_str());
+      PrintCatalogTreeEntry(data.tree_level, data.catalog);
     }
-    PrintCatalogTreeEntry(data.tree_level, data.catalog);
   }
 
   // the hash of the actual catalog needs to preserved
@@ -171,8 +176,9 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::
        &GarbageCollector<CatalogTraversalT, HashFilterT>::PreserveDataObjects,
         this);
 
-  const bool success = traversal_.Traverse() &&
-                       traversal_.TraverseNamedSnapshots();
+  bool success = traversal_.Traverse();
+  oldest_trunk_catalog_found_ = true;
+  success = success && traversal_.TraverseNamedSnapshots();
   traversal_.UnregisterListener(callback);
 
   return success;
