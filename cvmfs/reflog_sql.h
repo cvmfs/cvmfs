@@ -49,8 +49,7 @@ class SqlReflog : public sqlite::Sql {
     kRefMetainfo
   };
 
- protected:
-  shash::Suffix ToSuffix(const ReferenceType type) const;
+  static shash::Suffix ToSuffix(const ReferenceType type);
 };
 
 
