@@ -240,6 +240,37 @@ TYPED_TEST(T_Reflog, List) {
 }
 
 
+TYPED_TEST(T_Reflog, ListOlderThan) {
+  const std::string rp = TestFixture::GetReflogFilename();
+  typedef TypeParam Reflog;
+
+  Reflog *rl = TestFixture::CreateReflog(rp);
+  ASSERT_NE(static_cast<Reflog*>(NULL), rl);
+
+  rl->AddCatalog(h("b99a789dcdffff8f95b977cc8e2037fcd3960b5b",
+                   shash::kSuffixCatalog));
+  uint64_t t1 = time(NULL);
+  uint64_t t2;
+  do {
+    t2 = time(NULL);
+  } while (t1 >= t2);
+  rl->AddCatalog(h("b99a789dcdffff8f95b977cc8e2037fcd3960b5c",
+                   shash::kSuffixCatalog));
+  std::vector<shash::Any> hashes;
+  EXPECT_TRUE(rl->ListOlderThan(SqlReflog::kRefCatalog,
+                                static_cast<uint64_t>(-1),
+                                &hashes));
+  EXPECT_EQ(2U, hashes.size());
+  EXPECT_TRUE(rl->ListOlderThan(SqlReflog::kRefCatalog, 0, &hashes));
+  EXPECT_EQ(0U, hashes.size());
+  EXPECT_TRUE(rl->ListOlderThan(SqlReflog::kRefCatalog, t2, &hashes));
+  ASSERT_EQ(1U, hashes.size());
+  EXPECT_EQ("b99a789dcdffff8f95b977cc8e2037fcd3960b5b", hashes[0].ToString());
+
+  TestFixture::CloseReflog(rl);
+}
+
+
 TYPED_TEST(T_Reflog, RemoveCatalog) {
   const std::string rp = TestFixture::GetReflogFilename();
   typedef TypeParam Reflog;
