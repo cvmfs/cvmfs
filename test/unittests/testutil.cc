@@ -752,8 +752,8 @@ bool MockReflog::ListOlderThan(
   return true;
 }
 
-bool MockReflog::RemoveCatalog(const shash::Any &catalog) {
-  references_.erase(catalog);
+bool MockReflog::Remove(const shash::Any &hash) {
+  references_.erase(hash);
   return true;
 }
 

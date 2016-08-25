@@ -821,7 +821,7 @@ class MockReflog : public MockObjectStorage<MockReflog> {
                      uint64_t timestamp,
                      std::vector<shash::Any> *hashes) const;
 
-  bool RemoveCatalog(const shash::Any &catalog);
+  bool Remove(const shash::Any &hash);
 
   bool ContainsCertificate(const shash::Any &certificate) const;
   bool ContainsCatalog(const shash::Any &catalog) const;
