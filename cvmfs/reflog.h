@@ -54,6 +54,9 @@ class Reflog {
   uint64_t CountEntries();
   bool List(SqlReflog::ReferenceType type,
             std::vector<shash::Any> *hashes) const;
+  bool ListOlderThan(SqlReflog::ReferenceType type,
+                     uint64_t timestamp,
+                     std::vector<shash::Any> *hashes) const;
 
   bool RemoveCatalog(const shash::Any &hash);
 

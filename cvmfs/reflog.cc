@@ -144,12 +144,23 @@ bool Reflog::List(
   SqlReflog::ReferenceType type,
   std::vector<shash::Any> *hashes) const
 {
+  return ListOlderThan(type, static_cast<uint64_t>(-1), hashes);
+}
+
+
+bool Reflog::ListOlderThan(
+  SqlReflog::ReferenceType type,
+  uint64_t timestamp,
+  std::vector<shash::Any> *hashes) const
+{
   assert(database_);
   assert(NULL != hashes);
 
   hashes->clear();
 
-  const bool success_bind = list_references_->BindType(type);
+  bool success_bind = list_references_->BindType(type);
+  assert(success_bind);
+  success_bind = list_references_->BindOlderThan(timestamp);
   assert(success_bind);
   while (list_references_->FetchRow()) {
     hashes->push_back(list_references_->RetrieveHash());

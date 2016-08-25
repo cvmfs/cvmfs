@@ -5,6 +5,7 @@
 #include "reflog_sql.h"
 
 #include <cassert>
+#include <limits>
 
 #include "util/string.h"
 
@@ -121,12 +122,21 @@ uint64_t SqlCountReferences::RetrieveCount() {
 
 SqlListReferences::SqlListReferences(const ReflogDatabase *database) {
   DeferredInit(database->sqlite_db(), "SELECT hash, type FROM refs "
-                                      "WHERE type = :type "
-                                      "ORDER BY timestamp ASC;");
+                                      "WHERE type = :type AND "
+                                      "timestamp < :timestamp "
+                                      "ORDER BY timestamp DESC;");
 }
 
 bool SqlListReferences::BindType(const ReferenceType type) {
   return BindInt64(1, static_cast<uint64_t>(type));
+}
+
+bool SqlListReferences::BindOlderThan(const uint64_t timestamp) {
+  int64_t sqlite_timestamp = static_cast<uint64_t>(timestamp);
+  if (sqlite_timestamp < 0) {
+    sqlite_timestamp = std::numeric_limits<int64_t>::max();
+  }
+  return BindInt64(2, sqlite_timestamp);
 }
 
 shash::Any SqlListReferences::RetrieveHash() const {

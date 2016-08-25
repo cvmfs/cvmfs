@@ -72,6 +72,7 @@ class SqlListReferences : public SqlReflog {
  public:
   explicit SqlListReferences(const ReflogDatabase *database);
   bool BindType(const ReferenceType type);
+  bool BindOlderThan(const uint64_t timestamp);
   shash::Any RetrieveHash() const;
 };
 

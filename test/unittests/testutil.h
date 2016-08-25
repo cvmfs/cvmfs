@@ -800,18 +800,6 @@ class MockHistory : public history::History,
 
 class MockReflog : public MockObjectStorage<MockReflog> {
  protected:
-  struct ReferenceTypeFilter {
-    explicit ReferenceTypeFilter(const shash::Suffix suffix,
-                                 const bool          inverse)
-      : suffix_(suffix)
-      , inverse_(inverse) { }
-    bool operator()(const shash::Any &hash) const {
-      return (hash.suffix == suffix_) ^ inverse_;
-    }
-    const shash::Suffix suffix_;
-    const bool          inverse_;
-  };
-
   MockReflog* Clone() const;
 
  public:
@@ -830,6 +818,9 @@ class MockReflog : public MockObjectStorage<MockReflog> {
   uint64_t CountEntries() { return references_.size(); }
   bool List(SqlReflog::ReferenceType type,
             std::vector<shash::Any> *hashes) const;
+  bool ListOlderThan(SqlReflog::ReferenceType type,
+                     uint64_t timestamp,
+                     std::vector<shash::Any> *hashes) const;
 
   bool RemoveCatalog(const shash::Any &catalog);
 
@@ -850,7 +841,7 @@ class MockReflog : public MockObjectStorage<MockReflog> {
  private:
   bool                  owns_database_file_;
   const std::string     fqrn_;
-  std::set<shash::Any>  references_;
+  std::map<shash::Any, uint64_t>  references_;
 };
 
 
