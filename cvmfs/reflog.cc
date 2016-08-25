@@ -170,12 +170,30 @@ bool Reflog::ListOlderThan(
 }
 
 
-bool Reflog::RemoveCatalog(const shash::Any &hash) {
+bool Reflog::Remove(const shash::Any &hash) {
   assert(database_);
 
+  SqlReflog::ReferenceType type;
+  switch (hash.suffix) {
+    case shash::kSuffixCatalog:
+      type = SqlReflog::kRefCatalog;
+      break;
+    case shash::kSuffixHistory:
+      type = SqlReflog::kRefHistory;
+      break;
+    case shash::kSuffixCertificate:
+      type = SqlReflog::kRefCertificate;
+      break;
+    case shash::kSuffixMetainfo:
+      type = SqlReflog::kRefMetainfo;
+      break;
+    default:
+      return false;
+  }
+
   return
-    remove_reference_->BindReference(hash, SqlReflog::kRefCatalog) &&
-    remove_reference_->Execute()                                   &&
+    remove_reference_->BindReference(hash, type) &&
+    remove_reference_->Execute()                 &&
     remove_reference_->Reset();
 }
 

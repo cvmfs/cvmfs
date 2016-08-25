@@ -150,9 +150,10 @@ template <class CatalogTraversalT, class HashFilterT>
 bool GarbageCollector<CatalogTraversalT, HashFilterT>::
   RemoveCatalogFromReflog(const shash::Any &catalog)
 {
+  assert(catalog.suffix == shash::kSuffixCatalog);
   return (configuration_.dry_run)
     ? true
-    : configuration_.reflog->RemoveCatalog(catalog);
+    : configuration_.reflog->Remove(catalog);
 }
 
 
@@ -200,7 +201,7 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::CheckPreservedRevisions()
 template <class CatalogTraversalT, class HashFilterT>
 bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepReflog() {
   if (configuration_.verbose) {
-    LogCvmfs(kLogGc, kLogStdout, "Sweeping Reference Logs");
+    LogCvmfs(kLogGc, kLogStdout, "Sweeping reference logs");
   }
 
   const ReflogTN *reflog = configuration_.reflog;
