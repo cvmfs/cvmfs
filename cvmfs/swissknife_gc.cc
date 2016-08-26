@@ -11,6 +11,7 @@
 #include <string>
 
 #include "garbage_collection/garbage_collector.h"
+#include "garbage_collection/gc_aux.h"
 #include "garbage_collection/hash_filter.h"
 #include "manifest.h"
 #include "reflog.h"
@@ -20,7 +21,9 @@ namespace swissknife {
 
 typedef HttpObjectFetcher<> ObjectFetcher;
 typedef CatalogTraversal<ObjectFetcher> ReadonlyCatalogTraversal;
-typedef GarbageCollector<ReadonlyCatalogTraversal, SimpleHashFilter> GC;
+typedef SmallhashFilter HashFilter;
+typedef GarbageCollector<ReadonlyCatalogTraversal, HashFilter> GC;
+typedef GarbageCollectorAux<ReadonlyCatalogTraversal, HashFilter> GCAux;
 typedef GC::Configuration GcConfig;
 
 
@@ -153,11 +156,27 @@ int CommandGc::Main(const ArgumentList &args) {
     }
   }
 
+  // File catalogs
   GC collector(config);
-  const bool success = collector.Collect();
+  bool success = collector.Collect();
 
   if (!success) {
     LogCvmfs(kLogCvmfs, kLogStderr, "garbage collection failed");
+    uploader->TearDown();
+    return 1;
+  }
+
+  // Tag databases, meta infos, certificates
+  HashFilter preserved_objects;
+  preserved_objects.Fill(manifest->certificate());
+  preserved_objects.Fill(manifest->history());
+  preserved_objects.Fill(manifest->meta_info());
+  GCAux collector_aux(config);
+  success = collector_aux.CollectOlderThan(
+    collector.oldest_trunk_catalog(), preserved_objects);
+  if (!success) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "garbage collection of auxiliary files failed");
     uploader->TearDown();
     return 1;
   }
