@@ -6,6 +6,7 @@
 #define CVMFS_GARBAGE_COLLECTION_GC_AUX_IMPL_H_
 
 #include <cstdio>
+#include <string>
 #include <vector>
 
 #include "logging.h"
