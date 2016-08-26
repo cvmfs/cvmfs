@@ -7,10 +7,6 @@ cleanup() {
   sudo cvmfs_server rmfs -f $CVMFS_TEST637_REPLICA_NAME > /dev/null 2>&1
 }
 
-
-
-
-
 cvmfs_run_test() {
   logfile=$1
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
@@ -77,24 +73,30 @@ cvmfs_run_test() {
   local metainfo_t2=$(get_object_from_manifest $CVMFS_TEST_REPO M)
   echo "--> new meta info: $metainfo_t2"
 
-  echo "*** run snapshot"
-  sudo cvmfs_server snapshot $CVMFS_TEST637_REPLICA_NAME || return 51
+  echo "*** now the catalog in s0 reflog is newer than on s1 reflog,"
+  echo "    republish before snapshotting to restore space and time"
+  start_transaction $CVMFS_TEST_REPO || return 51
+  publish_repo $CVMFS_TEST_REPO || return 52
+  local history_t2=$(get_object_from_manifest $CVMFS_TEST_REPO H)
+  echo "--> latest history: $history_t2"
 
-  echo "*** another gc run"
+  echo "*** run snapshot"
+  sudo cvmfs_server snapshot $CVMFS_TEST637_REPLICA_NAME || return 53
+
+  echo "*** another gc run should remove old meta info objects (time `date`)"
   cvmfs_server gc -f -r0 -l -L log_s0 $CVMFS_TEST_REPO || return 60
   cvmfs_server gc -f -r0 -l -L log_s1 $CVMFS_TEST637_REPLICA_NAME || return 61
   peek_backend $CVMFS_TEST_REPO $certificate_t0 || return 62
   peek_backend $CVMFS_TEST_REPO $metainfo_t0 && return 63
   peek_backend $CVMFS_TEST_REPO $metainfo_t2 || return 64
   peek_backend $CVMFS_TEST637_REPLICA_NAME $certificate_t0 || return 65
-  peek_backend $CVMFS_TEST637_REPLICA_NAME $history_t1 || return 66
+  peek_backend $CVMFS_TEST637_REPLICA_NAME $history_t2 || return 66
   peek_backend $CVMFS_TEST637_REPLICA_NAME $metainfo_t0 && return 67
   peek_backend $CVMFS_TEST637_REPLICA_NAME $metainfo_t2 || return 68
 
   echo "*** checking deletion logs"
   grep 'M$' log_s0 || return 70
-  grep 'M$' log_s1 || return 70
+  grep 'M$' log_s1 || return 71
 
   return 0
 }
-

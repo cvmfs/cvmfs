@@ -26,8 +26,8 @@ bool GarbageCollectorAux<CatalogTraversalT, HashFilterT>::CollectOlderThan(
   const HashFilterT &preserved_objects)
 {
   if (config_.verbose) {
-    LogCvmfs(kLogGc, kLogStdout, "Sweeping auxiliary objects older than %s (%u)",
-             StringifyTime(timestamp, true).c_str(), timestamp);
+    LogCvmfs(kLogGc, kLogStdout, "Sweeping auxiliary objects older than %s",
+             StringifyTime(timestamp, true).c_str());
   }
   std::vector<SqlReflog::ReferenceType> aux_types;
   aux_types.push_back(SqlReflog::kRefCertificate);
@@ -43,7 +43,7 @@ bool GarbageCollectorAux<CatalogTraversalT, HashFilterT>::CollectOlderThan(
       return 1;
     }
     if (config_.verbose) {
-      LogCvmfs(kLogGc, kLogStdout, "Looking at %u %s objects",
+      LogCvmfs(kLogGc, kLogStdout, "Scanning %u %s objects",
                hashes.size(), PrintAuxType(aux_types[i]).c_str());
     }
 

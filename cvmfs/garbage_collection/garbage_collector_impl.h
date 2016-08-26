@@ -30,10 +30,12 @@ template <class CatalogTraversalT, class HashFilterT>
 GarbageCollector<CatalogTraversalT, HashFilterT>::GarbageCollector(
                                              const Configuration &configuration)
   : configuration_(configuration)
+  , catalog_info_shim_(configuration.reflog)
   , traversal_(
       GarbageCollector<CatalogTraversalT, HashFilterT>::GetTraversalParams(
                                                                 configuration))
   , hash_filter_()
+  , use_reflog_timestamps_(false)
   , oldest_trunk_catalog_(static_cast<uint64_t>(-1))
   , oldest_trunk_catalog_found_(false)
   , preserved_catalogs_(0)
@@ -41,6 +43,13 @@ GarbageCollector<CatalogTraversalT, HashFilterT>::GarbageCollector(
   , condemned_objects_(0)
 {
   assert(configuration_.uploader != NULL);
+}
+
+
+template <class CatalogTraversalT, class HashFilterT>
+void GarbageCollector<CatalogTraversalT, HashFilterT>::UseReflogTimestamps() {
+  traversal_.SetCatalogInfoShim(&catalog_info_shim_);
+  use_reflog_timestamps_ = true;
 }
 
 
@@ -68,13 +77,18 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::PreserveDataObjects(
   ++preserved_catalogs_;
 
   if (data.catalog->IsRoot()) {
-    const uint64_t mtime = data.catalog->GetLastModified();
+    const uint64_t mtime = use_reflog_timestamps_
+      ? catalog_info_shim_.GetLastModified(data.catalog)
+      : data.catalog->GetLastModified();
     if (!oldest_trunk_catalog_found_)
       oldest_trunk_catalog_ = std::min(oldest_trunk_catalog_, mtime);
     if (configuration_.verbose) {
       const int    rev   = data.catalog->revision();
-      LogCvmfs(kLogGc, kLogStdout, "Preserving Revision %d (%s)",
-                                   rev, StringifyTime(mtime, true).c_str());
+      LogCvmfs(kLogGc, kLogStdout, "Preserving Revision %d (%s / added @ %s)",
+               rev,
+               StringifyTime(data.catalog->GetLastModified(), true).c_str(),
+               StringifyTime(catalog_info_shim_.GetLastModified(data.catalog),
+                             true).c_str());
       PrintCatalogTreeEntry(data.tree_level, data.catalog);
     }
   }
