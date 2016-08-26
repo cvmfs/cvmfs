@@ -101,6 +101,7 @@ void Reflog::PrepareQueries() {
   list_references_    = new SqlListReferences(database_.weak_ref());
   remove_reference_   = new SqlRemoveReference(database_.weak_ref());
   contains_reference_ = new SqlContainsReference(database_.weak_ref());
+  get_timestamp_      = new SqlGetTimestamp(database_.weak_ref());
 }
 
 
@@ -140,13 +141,27 @@ uint64_t Reflog::CountEntries() {
 }
 
 
-bool Reflog::ListCatalogs(std::vector<shash::Any> *hashes) const {
+bool Reflog::List(
+  SqlReflog::ReferenceType type,
+  std::vector<shash::Any> *hashes) const
+{
+  return ListOlderThan(type, static_cast<uint64_t>(-1), hashes);
+}
+
+
+bool Reflog::ListOlderThan(
+  SqlReflog::ReferenceType type,
+  uint64_t timestamp,
+  std::vector<shash::Any> *hashes) const
+{
   assert(database_);
   assert(NULL != hashes);
 
   hashes->clear();
 
-  const bool success_bind = list_references_->BindType(SqlReflog::kRefCatalog);
+  bool success_bind = list_references_->BindType(type);
+  assert(success_bind);
+  success_bind = list_references_->BindOlderThan(timestamp);
   assert(success_bind);
   while (list_references_->FetchRow()) {
     hashes->push_back(list_references_->RetrieveHash());
@@ -156,12 +171,30 @@ bool Reflog::ListCatalogs(std::vector<shash::Any> *hashes) const {
 }
 
 
-bool Reflog::RemoveCatalog(const shash::Any &hash) {
+bool Reflog::Remove(const shash::Any &hash) {
   assert(database_);
 
+  SqlReflog::ReferenceType type;
+  switch (hash.suffix) {
+    case shash::kSuffixCatalog:
+      type = SqlReflog::kRefCatalog;
+      break;
+    case shash::kSuffixHistory:
+      type = SqlReflog::kRefHistory;
+      break;
+    case shash::kSuffixCertificate:
+      type = SqlReflog::kRefCertificate;
+      break;
+    case shash::kSuffixMetainfo:
+      type = SqlReflog::kRefMetainfo;
+      break;
+    default:
+      return false;
+  }
+
   return
-    remove_reference_->BindReference(hash, SqlReflog::kRefCatalog) &&
-    remove_reference_->Execute()                                   &&
+    remove_reference_->BindReference(hash, type) &&
+    remove_reference_->Execute()                 &&
     remove_reference_->Reset();
 }
 
@@ -176,6 +209,17 @@ bool Reflog::ContainsCertificate(const shash::Any &certificate) const {
 bool Reflog::ContainsCatalog(const shash::Any &catalog) const {
   assert(catalog.HasSuffix() && catalog.suffix == shash::kSuffixCatalog);
   return ContainsReference(catalog, SqlReflog::kRefCatalog);
+}
+
+
+bool Reflog::GetCatalogTimestamp(
+  const shash::Any &catalog,
+  uint64_t *timestamp) const
+{
+  assert(catalog.HasSuffix() && catalog.suffix == shash::kSuffixCatalog);
+  bool result = GetReferenceTimestamp(catalog, SqlReflog::kRefCatalog,
+                                      timestamp);
+  return result;
 }
 
 
@@ -212,6 +256,27 @@ bool Reflog::ContainsReference(const shash::Any               &hash,
   assert(reset);
 
   return answer;
+}
+
+
+bool Reflog::GetReferenceTimestamp(
+  const shash::Any &hash,
+  const SqlReflog::ReferenceType type,
+  uint64_t *timestamp) const
+{
+  bool retval =
+    get_timestamp_->BindReference(hash, type) &&
+    get_timestamp_->FetchRow();
+
+  if (retval) {
+    *timestamp = get_timestamp_->RetrieveTimestamp();
+  }
+
+  const uint64_t result = get_timestamp_->RetrieveTimestamp();
+  const bool reset = get_timestamp_->Reset();
+  assert(reset);
+
+  return retval;
 }
 
 

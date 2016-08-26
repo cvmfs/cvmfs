@@ -746,6 +746,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
 
     LogCvmfs(kLogCvmfs, kLogStdout, "Found %u named snapshots",
              historic_tags.size());
+    // TODO(jblomer): We should repliacte the previous history dbs, too,
+    // in order to avoid races on fail-over between non-synchronized stratum 1s
     LogCvmfs(kLogCvmfs, kLogStdout, "Uploading history database");
     Store(history_path, history_hash);
     WaitForStorage();
@@ -804,11 +806,11 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
       StoreBuffer(ensemble.cert_buf,
                   ensemble.cert_size,
                   ensemble.manifest->certificate(), true);
-      if (reflog != NULL &&
-          !reflog->AddCertificate(ensemble.manifest->certificate())) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "Failed to add certificate to Reflog.");
-        goto fini;
-      }
+    }
+    if (reflog != NULL &&
+        !reflog->AddCertificate(ensemble.manifest->certificate())) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to add certificate to Reflog.");
+      goto fini;
     }
     if (!meta_info_hash.IsNull()) {
       const unsigned char *info = reinterpret_cast<const unsigned char *>(

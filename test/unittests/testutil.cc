@@ -737,38 +737,67 @@ MockReflog::MockReflog(const std::string fqrn)
   , fqrn_(fqrn) {}
 
 bool MockReflog::AddCertificate(const shash::Any &certificate) {
-  references_.insert(certificate);
+  references_[certificate] = time(NULL);
   return true;
 }
 
 bool MockReflog::AddCatalog(const shash::Any &catalog) {
-  references_.insert(catalog);
+  references_[catalog] = time(NULL);
   return true;
 }
 
 bool MockReflog::AddHistory(const shash::Any &history) {
-  references_.insert(history);
+  references_[history] = time(NULL);
   return true;
 }
 
 bool MockReflog::AddMetainfo(const shash::Any &metainfo) {
-  references_.insert(metainfo);
+  references_[metainfo] = time(NULL);
   return true;
 }
 
-bool MockReflog::ListCatalogs(std::vector<shash::Any> *hashes) const {
-  // TODO(rmeusel): C++11 use std::copy_if
+bool MockReflog::List(
+  SqlReflog::ReferenceType type,
+  std::vector<shash::Any> *hashes) const
+{
+  return ListOlderThan(type, static_cast<uint64_t>(-1), hashes);
+}
+
+bool MockReflog::ListOlderThan(
+  SqlReflog::ReferenceType type,
+  uint64_t timestamp,
+  std::vector<shash::Any> *hashes) const
+{
   hashes->clear();
-  ReferenceTypeFilter predicate(shash::kSuffixCatalog, true /* inverse */);
-  std::remove_copy_if(references_.begin(),
-                      references_.end(),
-                      std::back_inserter(*hashes),
-                      predicate);
+  for (map<shash::Any, uint64_t>::const_iterator i = references_.begin(),
+       i_end = references_.end(); i != i_end; ++i)
+  {
+    if ((i->first.suffix == SqlReflog::ToSuffix(type)) &&
+        (i->second < timestamp))
+    {
+      hashes->push_back(i->first);
+    }
+  }
+  std::sort(hashes->begin(), hashes->end());
+
   return true;
 }
 
-bool MockReflog::RemoveCatalog(const shash::Any &catalog) {
-  references_.erase(catalog);
+bool MockReflog::GetCatalogTimestamp(
+  const shash::Any &catalog,
+  uint64_t *timestamp)
+{
+  std::map<shash::Any, uint64_t>::const_iterator iter =
+    references_.find(catalog);
+  if (iter == references_.end())
+    return false;
+  *timestamp = iter->second;
+  return true;
+}
+
+
+bool MockReflog::Remove(const shash::Any &hash) {
+  references_.erase(hash);
   return true;
 }
 

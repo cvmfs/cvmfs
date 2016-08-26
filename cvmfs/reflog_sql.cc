@@ -5,6 +5,7 @@
 #include "reflog_sql.h"
 
 #include <cassert>
+#include <limits>
 
 #include "util/string.h"
 
@@ -70,7 +71,7 @@ static const std::string REV =               \
   DEFERRED_INIT((DB), V1R0)
 
 
-shash::Suffix SqlReflog::ToSuffix(const ReferenceType type) const {
+shash::Suffix SqlReflog::ToSuffix(const ReferenceType type) {
   switch (type) {
     case kRefCatalog:
       return shash::kSuffixCatalog;
@@ -90,7 +91,7 @@ shash::Suffix SqlReflog::ToSuffix(const ReferenceType type) const {
 
 
 SqlInsertReference::SqlInsertReference(const ReflogDatabase *database) {
-  MAKE_STATEMENTS("INSERT OR IGNORE INTO refs (@DB_FIELDS@) "
+  MAKE_STATEMENTS("INSERT OR REPLACE INTO refs (@DB_FIELDS@) "
                   "VALUES (@DB_PLACEHOLDERS@);");
   DEFERRED_INITS(database);
 }
@@ -121,12 +122,21 @@ uint64_t SqlCountReferences::RetrieveCount() {
 
 SqlListReferences::SqlListReferences(const ReflogDatabase *database) {
   DeferredInit(database->sqlite_db(), "SELECT hash, type FROM refs "
-                                      "WHERE type = :type "
-                                      "ORDER BY timestamp ASC;");
+                                      "WHERE type = :type AND "
+                                      "timestamp < :timestamp "
+                                      "ORDER BY timestamp DESC;");
 }
 
 bool SqlListReferences::BindType(const ReferenceType type) {
   return BindInt64(1, static_cast<uint64_t>(type));
+}
+
+bool SqlListReferences::BindOlderThan(const uint64_t timestamp) {
+  int64_t sqlite_timestamp = static_cast<uint64_t>(timestamp);
+  if (sqlite_timestamp < 0) {
+    sqlite_timestamp = std::numeric_limits<int64_t>::max();
+  }
+  return BindInt64(2, sqlite_timestamp);
 }
 
 shash::Any SqlListReferences::RetrieveHash() const {
@@ -172,4 +182,25 @@ bool SqlContainsReference::RetrieveAnswer() {
   const int64_t count = RetrieveInt64(0);
   assert(count == 0 || count == 1);
   return count > 0;
+}
+
+
+//------------------------------------------------------------------------------
+
+
+SqlGetTimestamp::SqlGetTimestamp(const ReflogDatabase *database) {
+  DeferredInit(database->sqlite_db(), "SELECT timestamp FROM refs "
+                                      "WHERE type = :type "
+                                      "  AND hash = :hash");
+}
+
+bool SqlGetTimestamp::BindReference(const shash::Any    &reference_hash,
+                                    const ReferenceType  type) {
+  return
+    BindInt64(1, static_cast<uint64_t>(type)) &&
+    BindTextTransient(2, reference_hash.ToString());
+}
+
+uint64_t SqlGetTimestamp::RetrieveTimestamp() {
+  return RetrieveInt64(0);
 }

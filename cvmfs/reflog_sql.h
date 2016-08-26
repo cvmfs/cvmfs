@@ -49,8 +49,7 @@ class SqlReflog : public sqlite::Sql {
     kRefMetainfo
   };
 
- protected:
-  shash::Suffix ToSuffix(const ReferenceType type) const;
+  static shash::Suffix ToSuffix(const ReferenceType type);
 };
 
 
@@ -73,6 +72,7 @@ class SqlListReferences : public SqlReflog {
  public:
   explicit SqlListReferences(const ReflogDatabase *database);
   bool BindType(const ReferenceType type);
+  bool BindOlderThan(const uint64_t timestamp);
   shash::Any RetrieveHash() const;
 };
 
@@ -91,6 +91,15 @@ class SqlContainsReference : public SqlReflog {
   bool BindReference(const shash::Any    &reference_hash,
                      const ReferenceType  type);
   bool RetrieveAnswer();
+};
+
+
+class SqlGetTimestamp : public SqlReflog {
+ public:
+  explicit SqlGetTimestamp(const ReflogDatabase *database);
+  bool BindReference(const shash::Any    &reference_hash,
+                     const ReferenceType  type);
+  uint64_t RetrieveTimestamp();
 };
 
 #endif  // CVMFS_REFLOG_SQL_H_
