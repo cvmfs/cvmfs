@@ -129,7 +129,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   }
 
   // Safe repository meta info file
-  shash::Any metainfo_hash;
+  shash::Any metainfo_hash = manifest->meta_info();
   if (!meta_info.empty()) {
     upload::Spooler::CallbackPtr callback =
       spooler->RegisterListener(&CommandSign::MetainfoUploadCallback, this);

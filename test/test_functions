@@ -1626,6 +1626,16 @@ toggle_gc() {
 }
 
 
+get_object_from_manifest() {
+  local name=$1
+  local type=$2
+
+  local url="http://localhost/cvmfs/$name"
+  hash=$(cvmfs_swissknife info -r $url -R | grep "^$type" | tr -d $type)
+  echo "${hash}${type}"
+}
+
+
 set_auto_tag_timespan() {
   local name=$1
   local timespan="$2"
