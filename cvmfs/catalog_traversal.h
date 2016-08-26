@@ -59,6 +59,24 @@ struct CatalogTraversalData {
   const unsigned int  history_depth;
 };
 
+
+/**
+ * A layer to extract information from a catalog.  Users of the catalog
+ * traversal can provide derived classes to overwrite behavior.  Currently used
+ * to get the last-modified timestamp in configurable manner: for the garbage
+ * collection, the timestamp of the catalog hash in the reflog counts, which
+ * is the same or newer than the one stored in the catalog.
+ */
+template <class CatalogT>
+class CatalogTraversalInfoShim {
+ public:
+  // Default implementation: use the catalog's timestamp
+  virtual uint64_t GetLastModified(const CatalogT *catalog) {
+    return catalog->GetLastModified();
+  }
+};
+
+
 /**
  * This class traverses the catalog hierarchy of a CVMFS repository recursively.
  * Also historic catalog trees can be traversed. The user needs to specify a
@@ -256,6 +274,7 @@ class CatalogTraversal
    */
   explicit CatalogTraversal(const Parameters &params)
     : object_fetcher_(params.object_fetcher)
+    , catalog_info_shim_(&catalog_info_default_shim_)
     , no_close_(params.no_close)
     , ignore_load_failure_(params.ignore_load_failure)
     , no_repeat_history_(params.no_repeat_history)
@@ -264,6 +283,11 @@ class CatalogTraversal
     , error_sink_((params.quiet) ? kLogDebug : kLogStderr)
   {
     assert(object_fetcher_ != NULL);
+  }
+
+
+  void SetCatalogInfoShim(CatalogTraversalInfoShim<CatalogTN> *shim) {
+    catalog_info_shim_ = shim;
   }
 
 
@@ -552,7 +576,8 @@ class CatalogTraversal
     const bool h = job.history_depth >= ctx.history_depth;
     assert(ctx.timestamp_threshold >= 0);
     const bool t =
-      job.catalog->GetLastModified() < unsigned(ctx.timestamp_threshold);
+      catalog_info_shim_->GetLastModified(job.catalog) <
+      unsigned(ctx.timestamp_threshold);
 
     return t || h;
   }
@@ -799,6 +824,8 @@ class CatalogTraversal
 
  private:
   ObjectFetcherT         *object_fetcher_;
+  CatalogTraversalInfoShim<CatalogTN> catalog_info_default_shim_;
+  CatalogTraversalInfoShim<CatalogTN> *catalog_info_shim_;
   const bool              no_close_;
   const bool              ignore_load_failure_;
   const bool              no_repeat_history_;

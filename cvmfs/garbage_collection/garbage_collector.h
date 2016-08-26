@@ -36,6 +36,7 @@
 
 #include <vector>
 
+#include "catalog_traversal.h"
 #include "garbage_collection/hash_filter.h"
 #include "upload_facility.h"
 
@@ -82,6 +83,7 @@ class GarbageCollector {
  public:
   explicit GarbageCollector(const Configuration &configuration);
 
+  void UseReflogTimestamps();
   bool Collect();
 
   unsigned int preserved_catalog_count() const { return preserved_catalogs_; }
@@ -90,8 +92,7 @@ class GarbageCollector {
   uint64_t oldest_trunk_catalog() const { return oldest_trunk_catalog_; }
 
  protected:
-  static TraversalParameters GetTraversalParams(
-                                            const Configuration &configuration);
+  TraversalParameters GetTraversalParams(const Configuration &configuration);
 
   void PreserveDataObjects(const TraversalCallbackDataTN &data);
   void SweepDataObjects(const TraversalCallbackDataTN &data);
@@ -109,10 +110,27 @@ class GarbageCollector {
   void LogDeletion(const shash::Any &hash) const;
 
  private:
-  const Configuration   configuration_;
-  CatalogTraversalT     traversal_;
-  HashFilterT           hash_filter_;
+  class ReflogBasedInfoShim :
+    public swissknife::CatalogTraversalInfoShim<CatalogTN>
+  {
+   public:
+    explicit ReflogBasedInfoShim(ReflogTN *reflog) : reflog_(reflog) { }
+    virtual uint64_t GetLastModified(const CatalogTN *catalog) {
+      uint64_t timestamp;
+      bool retval = reflog_->GetCatalogTimestamp(catalog->hash(), &timestamp);
+      return retval ? timestamp : catalog->GetLastModified();
+    }
 
+   private:
+    ReflogTN *reflog_;
+  };
+
+  const Configuration  configuration_;
+  ReflogBasedInfoShim  catalog_info_shim_;
+  CatalogTraversalT    traversal_;
+  HashFilterT          hash_filter_;
+
+  bool use_reflog_timestamps_;
   /**
    * A marker for the garbage collection grace period, the time span that is
    * walked back from the current head catalog.  There can be named snapshots

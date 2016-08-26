@@ -1162,6 +1162,19 @@ TEST_F(T_GarbageCollector, KeepOnlyFutureRevisions) {
 }
 
 
+TEST_F(T_GarbageCollector, UseReflogTimestamps) {
+  GcConfiguration config = GetStandardGarbageCollectorConfiguration();
+  config.keep_history_timestamp = t(24, 12, 2004) - 1;  // just before rev 3
+  config.keep_history_depth     = GcConfiguration::kFullHistory;
+
+  MyGarbageCollector gc(config);
+  gc.UseReflogTimestamps();
+  EXPECT_TRUE(gc.Collect());
+  EXPECT_EQ(16u, gc.preserved_catalog_count());
+  EXPECT_EQ(0u, gc.condemned_catalog_count());
+}
+
+
 TEST_F(T_GarbageCollector, NamedTagsInRecycleBin) {
   GcConfiguration config = GetStandardGarbageCollectorConfiguration();
   config.keep_history_depth = 0;

@@ -158,6 +158,7 @@ int CommandGc::Main(const ArgumentList &args) {
 
   // File catalogs
   GC collector(config);
+  collector.UseReflogTimestamps();
   bool success = collector.Collect();
 
   if (!success) {
