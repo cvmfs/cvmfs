@@ -783,6 +783,19 @@ bool MockReflog::ListOlderThan(
   return true;
 }
 
+bool MockReflog::GetCatalogTimestamp(
+  const shash::Any &catalog,
+  uint64_t *timestamp)
+{
+  std::map<shash::Any, uint64_t>::const_iterator iter =
+    references_.find(catalog);
+  if (iter == references_.end())
+    return false;
+  *timestamp = iter->second;
+  return true;
+}
+
+
 bool MockReflog::Remove(const shash::Any &hash) {
   references_.erase(hash);
   return true;

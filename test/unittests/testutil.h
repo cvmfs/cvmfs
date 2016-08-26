@@ -822,6 +822,8 @@ class MockReflog : public MockObjectStorage<MockReflog> {
                      uint64_t timestamp,
                      std::vector<shash::Any> *hashes) const;
 
+  bool GetCatalogTimestamp(const shash::Any &catalog, uint64_t *timestamp);
+
   bool Remove(const shash::Any &hash);
 
   bool ContainsCertificate(const shash::Any &certificate) const;
