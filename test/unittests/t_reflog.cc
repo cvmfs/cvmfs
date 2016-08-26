@@ -391,3 +391,30 @@ TYPED_TEST(T_Reflog, ContainsObject) {
 
   TestFixture::CloseReflog(rl2);
 }
+
+
+TYPED_TEST(T_Reflog, GetTimestamp) {
+  const std::string rp = TestFixture::GetReflogFilename();
+  typedef TypeParam Reflog;
+
+  Reflog *rl = TestFixture::CreateReflog(rp);
+  ASSERT_NE(static_cast<Reflog*>(NULL), rl);
+
+  uint64_t t1 = time(NULL);
+  rl->AddCatalog(h("b99a789dcdffff8f95b977cc8e2037fcd3960b5b",
+                   shash::kSuffixCatalog));
+  rl->AddCertificate(h("b778b910390254b37ec66366aeef04f034c51941",
+                       shash::kSuffixCertificate));
+  uint64_t t2 = time(NULL);
+
+  uint64_t timestamp;
+  EXPECT_FALSE(rl->GetCatalogTimestamp(
+                     h("1234567812345678123456781234567812345678",
+                     shash::kSuffixCatalog), &timestamp));
+  EXPECT_TRUE(rl->GetCatalogTimestamp(
+                    h("b99a789dcdffff8f95b977cc8e2037fcd3960b5b",
+                    shash::kSuffixCatalog), &timestamp));
+
+  EXPECT_LE(t1, timestamp);
+  EXPECT_LE(timestamp, t2);
+}

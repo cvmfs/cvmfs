@@ -183,3 +183,24 @@ bool SqlContainsReference::RetrieveAnswer() {
   assert(count == 0 || count == 1);
   return count > 0;
 }
+
+
+//------------------------------------------------------------------------------
+
+
+SqlGetTimestamp::SqlGetTimestamp(const ReflogDatabase *database) {
+  DeferredInit(database->sqlite_db(), "SELECT timestamp FROM refs "
+                                      "WHERE type = :type "
+                                      "  AND hash = :hash");
+}
+
+bool SqlGetTimestamp::BindReference(const shash::Any    &reference_hash,
+                                    const ReferenceType  type) {
+  return
+    BindInt64(1, static_cast<uint64_t>(type)) &&
+    BindTextTransient(2, reference_hash.ToString());
+}
+
+uint64_t SqlGetTimestamp::RetrieveTimestamp() {
+  return RetrieveInt64(0);
+}

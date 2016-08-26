@@ -93,4 +93,13 @@ class SqlContainsReference : public SqlReflog {
   bool RetrieveAnswer();
 };
 
+
+class SqlGetTimestamp : public SqlReflog {
+ public:
+  explicit SqlGetTimestamp(const ReflogDatabase *database);
+  bool BindReference(const shash::Any    &reference_hash,
+                     const ReferenceType  type);
+  uint64_t RetrieveTimestamp();
+};
+
 #endif  // CVMFS_REFLOG_SQL_H_

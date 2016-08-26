@@ -65,6 +65,9 @@ class Reflog {
   bool ContainsHistory(const shash::Any &history) const;
   bool ContainsMetainfo(const shash::Any &metainfo) const;
 
+  bool GetCatalogTimestamp(const shash::Any &catalog,
+                           uint64_t *timestamp) const;
+
   void BeginTransaction();
   void CommitTransaction();
 
@@ -82,6 +85,9 @@ class Reflog {
                     const SqlReflog::ReferenceType  type);
   bool ContainsReference(const shash::Any               &hash,
                          const SqlReflog::ReferenceType  type) const;
+  bool GetReferenceTimestamp(const shash::Any               &hash,
+                             const SqlReflog::ReferenceType  type,
+                             uint64_t *timestamp) const;
 
  private:
   bool CreateDatabase(const std::string &database_path,
@@ -98,6 +104,7 @@ class Reflog {
   UniquePtr<SqlListReferences>    list_references_;
   UniquePtr<SqlRemoveReference>   remove_reference_;
   UniquePtr<SqlContainsReference> contains_reference_;
+  UniquePtr<SqlGetTimestamp>      get_timestamp_;
 };
 
 }  // namespace manifest

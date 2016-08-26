@@ -101,6 +101,7 @@ void Reflog::PrepareQueries() {
   list_references_    = new SqlListReferences(database_.weak_ref());
   remove_reference_   = new SqlRemoveReference(database_.weak_ref());
   contains_reference_ = new SqlContainsReference(database_.weak_ref());
+  get_timestamp_      = new SqlGetTimestamp(database_.weak_ref());
 }
 
 
@@ -211,6 +212,17 @@ bool Reflog::ContainsCatalog(const shash::Any &catalog) const {
 }
 
 
+bool Reflog::GetCatalogTimestamp(
+  const shash::Any &catalog,
+  uint64_t *timestamp) const
+{
+  assert(catalog.HasSuffix() && catalog.suffix == shash::kSuffixCatalog);
+  bool result = GetReferenceTimestamp(catalog, SqlReflog::kRefCatalog,
+                                      timestamp);
+  return result;
+}
+
+
 bool Reflog::ContainsHistory(const shash::Any &history) const {
   assert(history.HasSuffix() && history.suffix == shash::kSuffixHistory);
   return ContainsReference(history, SqlReflog::kRefHistory);
@@ -244,6 +256,27 @@ bool Reflog::ContainsReference(const shash::Any               &hash,
   assert(reset);
 
   return answer;
+}
+
+
+bool Reflog::GetReferenceTimestamp(
+  const shash::Any &hash,
+  const SqlReflog::ReferenceType type,
+  uint64_t *timestamp) const
+{
+  bool retval =
+    get_timestamp_->BindReference(hash, type) &&
+    get_timestamp_->FetchRow();
+
+  if (retval) {
+    *timestamp = get_timestamp_->RetrieveTimestamp();
+  }
+
+  const uint64_t result = get_timestamp_->RetrieveTimestamp();
+  const bool reset = get_timestamp_->Reset();
+  assert(reset);
+
+  return retval;
 }
 
 
