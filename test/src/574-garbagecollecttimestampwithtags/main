@@ -190,102 +190,102 @@ cvmfs_run_test() {
   local tag5="dummy"
 
   timestamp0="$(get_timestamp)"
-  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER and disabled auto-tagging ($(display_timestamp $timestamp0))"
+  echo "*** {0} create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER and disabled auto-tagging ($(display_timestamp $timestamp0))"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -g -z || return $?
   root_catalog0="$(get_current_root_catalog $CVMFS_TEST_REPO)"
 
-  echo "disable automatic garbage collection"
+  echo "*** {0} disable automatic garbage collection"
   disable_auto_garbage_collection $CVMFS_TEST_REPO || return $?
 
   # ============================================================================
 
-  echo "starting transaction to edit repository (1)"
+  echo "*** {1} starting transaction to edit repository (1)"
   start_transaction $CVMFS_TEST_REPO || return $?
 
-  echo "putting some stuff in the new repository"
+  echo "*** {1} putting some stuff in the new repository"
   produce_files_1_in $repo_dir || return 1
 
-  echo "putting exactly the same stuff in the scratch spaces for comparison"
+  echo "*** {1} putting exactly the same stuff in the scratch spaces for comparison"
   produce_files_1_in $reference_dir1 || return 2
 
   timestamp1="$(get_timestamp)"
-  echo "creating CVMFS snapshot ($(display_timestamp $timestamp1))"
+  echo "*** {1} creating CVMFS snapshot ($(display_timestamp $timestamp1))"
   publish_repo $CVMFS_TEST_REPO -a "$tag1" > publish_1.log 2>&1 || return $?
   root_catalog1="$(get_current_root_catalog $CVMFS_TEST_REPO)"
 
-  echo "compare the results of cvmfs to our reference copy"
+  echo "*** {1} compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir1 || return $?
 
   # ============================================================================
 
-  echo "starting transaction to edit repository (2)"
+  echo "*** {2} starting transaction to edit repository"
   start_transaction $CVMFS_TEST_REPO || return $?
 
-  echo "putting some stuff in the new repository"
+  echo "*** {2} putting some stuff in the new repository"
   produce_files_2_in $repo_dir || return 3
 
-  echo "putting exactly the same stuff in the scratch spaces for comparison"
+  echo "*** {2} putting exactly the same stuff in the scratch spaces for comparison"
   produce_files_1_in $reference_dir2 || return 4
   produce_files_2_in $reference_dir2 || return 4
 
   timestamp2="$(get_timestamp)"
-  echo "creating CVMFS snapshot ($(display_timestamp $timestamp2))"
+  echo "*** {2} creating CVMFS snapshot ($(display_timestamp $timestamp2))"
   publish_repo $CVMFS_TEST_REPO -a "$tag2" > publish_2.log 2>&1 || return $?
   root_catalog2="$(get_current_root_catalog $CVMFS_TEST_REPO)"
 
-  echo "compare the results of cvmfs to our reference copy"
+  echo "*** {2} compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir2 || return $?
 
   # ============================================================================
 
-  echo "starting transaction to edit repository (3)"
+  echo "*** {3} starting transaction to edit repository"
   start_transaction $CVMFS_TEST_REPO || return $?
 
-  echo "putting some stuff in the new repository"
+  echo "*** {3} putting some stuff in the new repository"
   produce_files_3_in $repo_dir || return 5
 
-  echo "putting exactly the same stuff in the scratch spaces for comparison"
+  echo "*** {3} putting exactly the same stuff in the scratch spaces for comparison"
   produce_files_1_in $reference_dir3 || return 6
   produce_files_2_in $reference_dir3 || return 6
   produce_files_3_in $reference_dir3 || return 6
 
   timestamp3="$(get_timestamp)"
-  echo "creating CVMFS snapshot ($(display_timestamp $timestamp3))"
+  echo "*** {3} creating CVMFS snapshot ($(display_timestamp $timestamp3))"
   publish_repo $CVMFS_TEST_REPO -a "$tag3" > publish_3.log 2>&1 || return $?
   root_catalog3="$(get_current_root_catalog $CVMFS_TEST_REPO)"
 
-  echo "compare the results of cvmfs to our reference copy"
+  echo "*** {3} compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir3 || return $?
 
   # ============================================================================
 
-  echo "starting transaction to edit repository (4)"
+  echo "*** {4} starting transaction to edit repository"
   start_transaction $CVMFS_TEST_REPO || return $?
 
-  echo "putting some stuff in the new repository"
+  echo "*** {4} putting some stuff in the new repository"
   produce_files_4_in $repo_dir || return 7
 
-  echo "putting exactly the same stuff in the scratch spaces for comparison"
+  echo "*** {4} putting exactly the same stuff in the scratch spaces for comparison"
   produce_files_1_in $reference_dir4 || return 8
   produce_files_2_in $reference_dir4 || return 8
   produce_files_3_in $reference_dir4 || return 8
   produce_files_4_in $reference_dir4 || return 8
 
   timestamp4="$(get_timestamp)"
-  echo "creating CVMFS snapshot ($(display_timestamp $timestamp4))"
+  echo "*** {4} creating CVMFS snapshot ($(display_timestamp $timestamp4))"
   publish_repo $CVMFS_TEST_REPO -a "$tag4" > publish_4.log 2>&1 || return $?
   root_catalog4="$(get_current_root_catalog $CVMFS_TEST_REPO)"
 
-  echo "compare the results of cvmfs to our reference copy"
+  echo "*** {4} compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir4 || return $?
 
   # ============================================================================
 
-  echo "starting transaction to move up the undo tags (5)"
+  echo "*** {5} starting transaction to move up the undo tags"
   start_transaction $CVMFS_TEST_REPO || return $?
 
   timestamp5="$(get_timestamp)"
-  echo "creating CVMFS snapshot ($(display_timestamp $timestamp5))"
+  echo "*** {5} creating CVMFS snapshot ($(display_timestamp $timestamp5))"
   publish_repo $CVMFS_TEST_REPO -a "$tag5" > publish_5.log 2>&1 || return $?
   root_catalog5="$(get_current_root_catalog $CVMFS_TEST_REPO)"
 
@@ -300,11 +300,11 @@ cvmfs_run_test() {
   local chopped_kafka_2="78d66a3880097d4b4bcd5145fea11498c4306ed0P"
   local chopped_kafka_3="ed021be42b51c299560b9617c6585a4c40607158P"
 
-  echo "check if poem objects are there ($shakespeare_object)..."
+  echo "*** {6} check if poem objects are there ($shakespeare_object)..."
   peek_backend $CVMFS_TEST_REPO $shakespeare_object || return 9
   peek_backend $CVMFS_TEST_REPO $kafka_object       || return 9
 
-  echo "check if the file chunks are there"
+  echo "*** {6} check if the file chunks are there"
   peek_backend $CVMFS_TEST_REPO $chopped_shakespeare_1 || return 9
   peek_backend $CVMFS_TEST_REPO $chopped_shakespeare_2 || return 9
   peek_backend $CVMFS_TEST_REPO $chopped_shakespeare_3 || return 9
@@ -312,36 +312,36 @@ cvmfs_run_test() {
   peek_backend $CVMFS_TEST_REPO $chopped_kafka_2       || return 9
   peek_backend $CVMFS_TEST_REPO $chopped_kafka_3       || return 9
 
-  echo "check if all catalog revisions are still there"
+  echo "*** {6} check if all catalog revisions are still there"
   for clg_hash in $root_catalog0 $root_catalog1 $root_catalog2 \
                   $root_catalog3 $root_catalog4 $root_catalog5; do
     peek_backend $CVMFS_TEST_REPO ${clg_hash}C || return 10
   done
 
-  echo "list the tags"
+  echo "*** {6} list the tags"
   cvmfs_server tag $CVMFS_TEST_REPO;
 
   # ============================================================================
 
-  echo "try some invalid date formats for garbage collection"
+  echo "*** {7} try some invalid date formats for garbage collection"
   cvmfs_server gc -f -t 'foo'            $CVMFS_TEST_REPO && return 11
   cvmfs_server gc -f -t 'in the morning' $CVMFS_TEST_REPO && return 12
   cvmfs_server gc -f -t 'later today'    $CVMFS_TEST_REPO && return 13
   cvmfs_server gc -f -t '13.12.'         $CVMFS_TEST_REPO && return 14
 
-  echo "try to provide a timestamp in the future"
+  echo "*** {7} try to provide a timestamp in the future"
   cvmfs_server gc -f -t 'tomorrow' $CVMFS_TEST_REPO && return 15
 
   # ============================================================================
 
-  echo "perform garbage collection with initial time stamp (nothing to be deleted)"
+  echo "*** {8} perform garbage collection with initial time stamp (nothing to be deleted)"
   cvmfs_server gc -f -t "$timestamp0" $CVMFS_TEST_REPO  || return 16
 
-  echo "check if poem objects are there ($shakespeare_object)..."
+  echo "*** {8} check if poem objects are there ($shakespeare_object)..."
   peek_backend $CVMFS_TEST_REPO $shakespeare_object || return 17
   peek_backend $CVMFS_TEST_REPO $kafka_object       || return 17
 
-  echo "check if the file chunks are there"
+  echo "*** {8} check if the file chunks are there"
   peek_backend $CVMFS_TEST_REPO $chopped_shakespeare_1 || return 18
   peek_backend $CVMFS_TEST_REPO $chopped_shakespeare_2 || return 18
   peek_backend $CVMFS_TEST_REPO $chopped_shakespeare_3 || return 18
@@ -349,7 +349,7 @@ cvmfs_run_test() {
   peek_backend $CVMFS_TEST_REPO $chopped_kafka_2       || return 18
   peek_backend $CVMFS_TEST_REPO $chopped_kafka_3       || return 18
 
-  echo "check if all catalog revisions are still there"
+  echo "*** {8} check if all catalog revisions are still there"
   for clg_hash in $root_catalog0 $root_catalog1 $root_catalog2 \
                   $root_catalog3 $root_catalog4 $root_catalog5; do
     peek_backend $CVMFS_TEST_REPO ${clg_hash}C || return 19
@@ -357,116 +357,116 @@ cvmfs_run_test() {
 
   # ============================================================================
 
-  echo "perform garbage collection with timestamp and revision threshold (should fail)"
+  echo "*** {9} perform garbage collection with timestamp and revision threshold (should fail)"
   cvmfs_server gc -f -t "$timestamp0" -r 2 $CVMFS_TEST_REPO && return 20
 
   # ============================================================================
 
-  echo "perform garbage collection to delete initial (mkfs) revisions"
+  echo "*** {10} perform garbage collection to delete initial (mkfs) revisions"
   cvmfs_server gc -f -t "$timestamp2" $CVMFS_TEST_REPO || return 21
 
-  echo "check if the catalog revisions 2-6 are preserved"
+  echo "*** {10} check if the catalog revisions 2-6 are preserved"
   for clg_hash in $root_catalog1 $root_catalog2 \
                   $root_catalog3 $root_catalog4 $root_catalog5; do
     peek_backend $CVMFS_TEST_REPO ${clg_hash}C || return 22
   done
 
-  echo "check if the initial catalog is gone"
+  echo "*** {10} check if the initial catalog is gone"
   for clg_hash in $root_catalog0; do
     peek_backend $CVMFS_TEST_REPO ${clg_hash}C && return 23
   done
 
-  echo "check repository integrity"
+  echo "*** {10} check repository integrity"
   check_repository $CVMFS_TEST_REPO -i || return 24
 
   # ============================================================================
 
-  echo "perform garbage collection to delete shakespeare revisions"
-  echo "(should not delete anything since it still has a tag)"
+  echo "*** {10} perform garbage collection to delete shakespeare revisions"
+  echo "         (should not delete anything since it still has a tag)"
   cvmfs_server gc -f -t "$timestamp4" $CVMFS_TEST_REPO || return 25
 
-  echo "check if shakespeare is still there"
+  echo "*** {10} check if shakespeare is still there"
   peek_backend $CVMFS_TEST_REPO $shakespeare_object    || return 26
   peek_backend $CVMFS_TEST_REPO $chopped_shakespeare_1 || return 26
   peek_backend $CVMFS_TEST_REPO $chopped_shakespeare_2 || return 26
   peek_backend $CVMFS_TEST_REPO $chopped_shakespeare_3 || return 26
 
-  echo "check if kafka is still there"
+  echo "*** {10} check if kafka is still there"
   peek_backend $CVMFS_TEST_REPO $kafka_object    || return 27
   peek_backend $CVMFS_TEST_REPO $chopped_kafka_1 || return 27
   peek_backend $CVMFS_TEST_REPO $chopped_kafka_2 || return 27
   peek_backend $CVMFS_TEST_REPO $chopped_kafka_3 || return 27
 
-  echo "check if the catalog revisions 2-6 are preserved"
+  echo "*** {10} check if the catalog revisions 2-6 are preserved"
   for clg_hash in $root_catalog1 $root_catalog2 \
                   $root_catalog3 $root_catalog4 $root_catalog5; do
     peek_backend $CVMFS_TEST_REPO ${clg_hash}C || return 28
   done
 
-  echo "check repository integrity"
+  echo "*** {10} check repository integrity"
   check_repository $CVMFS_TEST_REPO -i || return 29
 
   # ============================================================================
 
-  echo "remove the tag that just guarded shakespeare from extinction"
+  echo "*** {11} remove the tag that just guarded shakespeare from extinction"
   cvmfs_server tag -r $tag1 -r $tag2 -f $CVMFS_TEST_REPO || return 30
 
-  echo "list tags"
+  echo "*** {11} list tags"
   cvmfs_server tag -l $CVMFS_TEST_REPO || return 30
 
-  echo "perform garbage collection again to delete shakespeare revisions"
+  echo "*** {11} perform garbage collection again to delete shakespeare revisions"
   cvmfs_server gc -f -t "$timestamp4" $CVMFS_TEST_REPO || return 31
 
-  echo "check if shakespeare is gone"
+  echo "*** {11} check if shakespeare is gone"
   peek_backend $CVMFS_TEST_REPO $shakespeare_object    && return 32
   peek_backend $CVMFS_TEST_REPO $chopped_shakespeare_1 && return 32
   peek_backend $CVMFS_TEST_REPO $chopped_shakespeare_2 && return 32
   peek_backend $CVMFS_TEST_REPO $chopped_shakespeare_3 && return 32
 
-  echo "check if kafka is still there"
+  echo "*** {11} check if kafka is still there"
   peek_backend $CVMFS_TEST_REPO $kafka_object    || return 33
   peek_backend $CVMFS_TEST_REPO $chopped_kafka_1 || return 33
   peek_backend $CVMFS_TEST_REPO $chopped_kafka_2 || return 33
   peek_backend $CVMFS_TEST_REPO $chopped_kafka_3 || return 33
 
-  echo "check if the catalog revisions 4-6 are preserved"
+  echo "*** {11} check if the catalog revisions 4-6 are preserved"
   for clg_hash in $root_catalog3 $root_catalog4 $root_catalog5; do
     peek_backend $CVMFS_TEST_REPO ${clg_hash}C || return 34
   done
 
-  echo "check if the catalogs 1-3 are gone"
+  echo "*** {11} check if the catalogs 1-3 are gone"
   for clg_hash in $root_catalog0 $root_catalog1 $root_catalog2; do
     peek_backend $CVMFS_TEST_REPO ${clg_hash}C && return 35
   done
 
-  echo "check repository integrity"
+  echo "*** {11} check repository integrity"
   check_repository $CVMFS_TEST_REPO -i || return 36
 
   # ============================================================================
 
   timestamp6="$(get_timestamp)"
-  echo "rollback to the time where kafka was still among us ($(display_timestamp $timestamp6))"
+  echo "*** {12} rollback to the time where kafka was still among us ($(display_timestamp $timestamp6))"
   rollback_repo $CVMFS_TEST_REPO $tag3 || return 37
 
-  echo "list tags"
+  echo "*** {12} list tags"
   cvmfs_server tag -l $CVMFS_TEST_REPO || return 38
 
-  echo "perform garbage collection to delete everything but HEAD"
+  echo "*** {12} perform garbage collection to delete everything but HEAD"
   cvmfs_server gc -f -t "$timestamp6" $CVMFS_TEST_REPO || return 39
 
-  echo "check if shakespeare is gone"
+  echo "*** {12} check if shakespeare is gone"
   peek_backend $CVMFS_TEST_REPO $shakespeare_object    && return 40
   peek_backend $CVMFS_TEST_REPO $chopped_shakespeare_1 && return 40
   peek_backend $CVMFS_TEST_REPO $chopped_shakespeare_2 && return 40
   peek_backend $CVMFS_TEST_REPO $chopped_shakespeare_3 && return 40
 
-  echo "check if kafka is still there (we rolled back to it)"
+  echo "*** {12} check if kafka is still there (we rolled back to it)"
   peek_backend $CVMFS_TEST_REPO $kafka_object    || return 41
   peek_backend $CVMFS_TEST_REPO $chopped_kafka_1 || return 41
   peek_backend $CVMFS_TEST_REPO $chopped_kafka_2 || return 41
   peek_backend $CVMFS_TEST_REPO $chopped_kafka_3 || return 41
 
-  echo "check if the catalogs 1-5 are gone"
+  echo "*** {12} check if the catalogs 1-5 are gone"
   for clg_hash in $root_catalog0 $root_catalog1 $root_catalog2 \
                   $root_catalog3 $root_catalog4; do
     peek_backend $CVMFS_TEST_REPO ${clg_hash}C && return 42
