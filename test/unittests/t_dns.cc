@@ -687,8 +687,8 @@ TEST_F(T_Dns, CaresResolverSearchDomainSlow) {
   host = default_resolver->Resolve("a");
   ExpectResolvedName(host, "a.root-servers.net",
                      "198.41.0.4", "[2001:503:ba3e::2:30]");
-  host = default_resolver->Resolve("e");
-  ExpectResolvedName(host, "e.root-servers.net", "192.203.230.10", "");
+  host = default_resolver->Resolve("g");
+  ExpectResolvedName(host, "g.root-servers.net", "192.112.36.4", "");
 
   new_domains.clear();
   retval = default_resolver->SetSearchDomains(new_domains);
