@@ -546,7 +546,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     if (!initial_snapshot)
       reflog_hash = manifest::Reflog::ReadChecksum(reflog_chksum_path);
   }
-  if (args.find('R') != args.end()) {
+  if (args.find('Z') != args.end()) {
     timestamp_threshold = String2Int64(*args.find('Z')->second);
   }
 
