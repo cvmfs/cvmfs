@@ -16,7 +16,7 @@ mount_cvmfs_cernvm() {
   rm -rf "${cache_dir}"/*
   ls -lah ${cache_dir}
 
-  echo "writing config in ${cache_dir}/client.conf"
+  echo "*** writing config in ${cache_dir}/client.conf"
   cat << EOF > ${cache_dir}/client.conf
 CVMFS_CACHE_BASE=$cache_dir
 CVMFS_RELOAD_SOCKETS=$cache_dir
@@ -33,12 +33,12 @@ EOF
   local trickle_cmd=
   if [ "x$shape_kbps" != "x" ]; then
     trickle_cmd="trickle -d $shape_kbps -s -v"
-    echo "trickle: $trickle_cmd"
+    echo "*** trickle: $trickle_cmd"
   fi
   $trickle_cmd cvmfs2 -f -o config=${cache_dir}/client.conf,disable_watchdog,simple_options_parsing cernvm-prod.cern.ch $mountpoint &
   local i=0
   local timeout=20
-  echo "waiting $timeout seconds for mount"
+  echo "*** waiting $timeout seconds for mount"
   while [ $i -lt $timeout ]; do
     if grep "$mountpoint" /proc/mounts; then
       break;
@@ -65,12 +65,12 @@ cvmfs_run_test() {
   CVMFS_TEST056_MOUNTPOINT=$(pwd)/cvmfs-cernvm/mountpoint
   local cache_dir=$(pwd)/cvmfs-cernvm/cache
 
-  echo "set a trap for system directory cleanup"
+  echo "*** set a trap for system directory cleanup"
   trap cleanup EXIT HUP INT TERM
   mount_cvmfs_cernvm $CVMFS_TEST056_MOUNTPOINT $cache_dir 1 || return 1
   cleanup
 
-  echo "Fail on speed limit"
+  echo "*** fail on speed limit"
   mount_cvmfs_cernvm $CVMFS_TEST056_MOUNTPOINT $cache_dir 100 50
   if [ $? -eq 0 ]; then
     return 10
