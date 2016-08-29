@@ -25,8 +25,8 @@
 
 #include <cassert>
 #include <cstdlib>
-#include <vector>
 
+#include "atomic.h"
 #include "leveldb/cache.h"
 #include "leveldb/db.h"
 #include "leveldb/env.h"
