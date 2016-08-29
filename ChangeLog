@@ -1,4 +1,5 @@
 2.3.1:
+  * Fix rare corruption on NFS maps during mount / reload
   * Use reflog timestamp instead of catalog inherent timestamp (CVM-764)
   * Garbage collect auxiliary objects (CVM-1007)
   * Prune previous catalog chain during replication of gc-enabled repositories
