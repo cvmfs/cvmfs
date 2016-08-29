@@ -25,6 +25,7 @@
 
 #include <cassert>
 #include <cstdlib>
+#include <vector>
 
 #include "leveldb/cache.h"
 #include "leveldb/db.h"
@@ -65,17 +66,12 @@ struct FuncArg {
   void *arg;
 };
 
-static void *MainFakeThread(void *data) {
-  FuncArg *funcarg = reinterpret_cast<FuncArg *>(data);
-  funcarg->function(funcarg->arg);
-  delete funcarg;
-  return NULL;
-}
+static void *MainFakeThread(void *data);
 
 class ForkAwareEnv : public leveldb::EnvWrapper {
  public:
   ForkAwareEnv() : leveldb::EnvWrapper(leveldb::Env::Default()) {
-    fake_thread_running_ = false;
+    atomic_init32(&num_bg_threads_);
   }
 
   void StartThread(void (*f)(void*), void* a) {
@@ -97,19 +93,20 @@ class ForkAwareEnv : public leveldb::EnvWrapper {
 
     LogCvmfs(kLogNfsMaps, kLogDebug,
              "single threaded leveldb::Schedule called");
-    WaitForBGThreads();
     FuncArg *funcarg = new FuncArg();
     funcarg->function = function;
     funcarg->arg = arg;
-    int retval = pthread_create(&fake_thread_, NULL, MainFakeThread, funcarg);
+    atomic_inc32(&num_bg_threads_);
+    pthread_t bg_thread;
+    int retval = pthread_create(&bg_thread, NULL, MainFakeThread, funcarg);
     assert(retval == 0);
-    fake_thread_running_ = true;
+    retval = pthread_detach(bg_thread);
+    assert(retval == 0);
   }
 
   void WaitForBGThreads() {
-    if (fake_thread_running_)
-      pthread_join(fake_thread_, NULL);
-    fake_thread_running_ = false;
+    while (atomic_read32(&num_bg_threads_) > 0)
+      SafeSleepMs(100);
   }
 
   // Leveldb's usleep might collide with the ALARM timer
@@ -117,12 +114,18 @@ class ForkAwareEnv : public leveldb::EnvWrapper {
     SafeSleepMs(micros/1000);
   }
 
- private:
-  pthread_t fake_thread_;  // A real thread is required to prevent deadlocks.
-  bool fake_thread_running_;
+  atomic_int32 num_bg_threads_;
 };
 
 ForkAwareEnv *fork_aware_env_ = NULL;
+
+static void *MainFakeThread(void *data) {
+  FuncArg *funcarg = reinterpret_cast<FuncArg *>(data);
+  funcarg->function(funcarg->arg);
+  delete funcarg;
+  atomic_dec32(&(fork_aware_env_->num_bg_threads_));
+  return NULL;
+}
 
 
 static void PutPath2Inode(const shash::Md5 &path, const uint64_t inode) {
