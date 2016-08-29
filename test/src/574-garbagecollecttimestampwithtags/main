@@ -335,7 +335,7 @@ cvmfs_run_test() {
   # ============================================================================
 
   echo "*** {8} perform garbage collection with initial time stamp (nothing to be deleted)"
-  cvmfs_server gc -f -t "$timestamp0" $CVMFS_TEST_REPO  || return 16
+  cvmfs_server gc -l -f -t "$timestamp0" $CVMFS_TEST_REPO  || return 16
 
   echo "*** {8} check if poem objects are there ($shakespeare_object)..."
   peek_backend $CVMFS_TEST_REPO $shakespeare_object || return 17
@@ -358,12 +358,12 @@ cvmfs_run_test() {
   # ============================================================================
 
   echo "*** {9} perform garbage collection with timestamp and revision threshold (should fail)"
-  cvmfs_server gc -f -t "$timestamp0" -r 2 $CVMFS_TEST_REPO && return 20
+  cvmfs_server gc -l -f -t "$timestamp0" -r 2 $CVMFS_TEST_REPO && return 20
 
   # ============================================================================
 
   echo "*** {10} perform garbage collection to delete initial (mkfs) revisions"
-  cvmfs_server gc -f -t "$timestamp2" $CVMFS_TEST_REPO || return 21
+  cvmfs_server gc -l -f -t "$timestamp2" $CVMFS_TEST_REPO || return 21
 
   echo "*** {10} check if the catalog revisions 2-6 are preserved"
   for clg_hash in $root_catalog1 $root_catalog2 \
@@ -383,7 +383,7 @@ cvmfs_run_test() {
 
   echo "*** {10} perform garbage collection to delete shakespeare revisions"
   echo "         (should not delete anything since it still has a tag)"
-  cvmfs_server gc -f -t "$timestamp4" $CVMFS_TEST_REPO || return 25
+  cvmfs_server gc -l -f -t "$timestamp4" $CVMFS_TEST_REPO || return 25
 
   echo "*** {10} check if shakespeare is still there"
   peek_backend $CVMFS_TEST_REPO $shakespeare_object    || return 26
@@ -415,7 +415,7 @@ cvmfs_run_test() {
   cvmfs_server tag -l $CVMFS_TEST_REPO || return 30
 
   echo "*** {11} perform garbage collection again to delete shakespeare revisions"
-  cvmfs_server gc -f -t "$timestamp4" $CVMFS_TEST_REPO || return 31
+  cvmfs_server gc -l -f -t "$timestamp4" $CVMFS_TEST_REPO || return 31
 
   echo "*** {11} check if shakespeare is gone"
   peek_backend $CVMFS_TEST_REPO $shakespeare_object    && return 32
@@ -444,7 +444,10 @@ cvmfs_run_test() {
 
   # ============================================================================
 
+  echo "*** {12} let the clock move forward"
+  sleep 5
   timestamp6="$(get_timestamp)"
+
   echo "*** {12} rollback to the time where kafka was still among us ($(display_timestamp $timestamp6))"
   rollback_repo $CVMFS_TEST_REPO $tag3 || return 37
 
@@ -452,7 +455,7 @@ cvmfs_run_test() {
   cvmfs_server tag -l $CVMFS_TEST_REPO || return 38
 
   echo "*** {12} perform garbage collection to delete everything but HEAD"
-  cvmfs_server gc -f -t "$timestamp6" $CVMFS_TEST_REPO || return 39
+  cvmfs_server gc -l -f -t "$timestamp6" $CVMFS_TEST_REPO || return 39
 
   echo "*** {12} check if shakespeare is gone"
   peek_backend $CVMFS_TEST_REPO $shakespeare_object    && return 40

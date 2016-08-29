@@ -32,12 +32,15 @@ cvmfs_run_test() {
     sudo cvmfs_config probe  || return 5
   fi
 
+  local find_stdout="$(pwd)/find_stdout.gz"
+  local find_stderr="$(pwd)/find_stderr"
+
   # do a detached find call
   # (sudo because sometimes the permissions in the repo are scrambled)
-  # TODO(jblomer): On Fedora23, this test works find with the lcg subdirectory
+  # TODO(jblomer): On Fedora23, this test works fine with the lcg subdirectory
   # but on the root directory it fails to list the remaining two regular files
   # in the root directory.  This remains to be solved!
-  sudo find /cvmfs/sft.cern.ch/lcg -ignore_readdir_race > /tmp/find1 2>/tmp/find1.errors &
+  sudo find /cvmfs/sft.cern.ch/lcg -ignore_readdir_race 2> "$find_stderr" | gzip > "$find_stdout" &
   find_cmd=$!
 
   # reload the catalog every now and then
@@ -61,6 +64,7 @@ cvmfs_run_test() {
     return 6
   fi
 
+  rm -f "$find_stdout" "$find_stderr"
+
   return 0
 }
-
