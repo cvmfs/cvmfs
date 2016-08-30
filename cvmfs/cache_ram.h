@@ -40,6 +40,10 @@ static const shash::Any kInvalidHandle;
  * percentage of the system memory. If no size is specified, the
  * RAM cache size defaults to ~3% of the system memory.
  * The minimum cache size is 200 MB.
+ *
+ * RamCacheManager can also use a custom arena allocator rather than
+ * the default libc @p malloc(). To enable this feature, set
+ * @p CVMFS_CACHE_RAM_MALLOC=arena
  */
 class RamCacheManager : public CacheManager {
  public:
@@ -105,13 +109,20 @@ class RamCacheManager : public CacheManager {
   RamCacheManager(
     uint64_t max_size,
     unsigned max_entries,
+    MemoryKvStore::MemoryAllocator alloc,
     perf::Statistics *statistics)
     : max_size_(max_size)
     , fd_pivot_(0)
     , open_fds_(max_entries)
     , fd_index_(max_entries)
-    , regular_entries_(max_entries/2, "RamCache.regular", statistics)
-    , volatile_entries_(max_entries/2, "RamCache.volatile", statistics)
+    , regular_entries_(max_entries,
+                       "RamCache.regular",
+                       alloc,
+                       statistics)
+    , volatile_entries_(max_entries,
+                        "RamCache.volatile",
+                        alloc,
+                        statistics)
     , counters_(statistics, "RamCache") {
     int retval = pthread_rwlock_init(&rwlock_, NULL);
     assert(retval == 0);
@@ -259,12 +270,14 @@ class RamCacheManager : public CacheManager {
       , size(0)
       , expected_size(0)
       , pos(0)
+      , allocated(false)
       , object_type(kTypeRegular) { }
     shash::Any id;
     void *buffer;
     uint64_t size;
     uint64_t expected_size;
     uint64_t pos;
+    bool allocated;
     ObjectType object_type;
     std::string description;
   };
@@ -277,6 +290,14 @@ class RamCacheManager : public CacheManager {
 
   inline MemoryKvStore *GetStore(const ReadOnlyFd &fd) {
     if (fd.is_volatile) {
+      return &volatile_entries_;
+    } else {
+      return &regular_entries_;
+    }
+  }
+
+  inline MemoryKvStore *GetTransactionStore(Transaction *txn) {
+    if (txn->object_type == cache::CacheManager::kTypeVolatile) {
       return &volatile_entries_;
     } else {
       return &regular_entries_;

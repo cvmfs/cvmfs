@@ -1,0 +1,37 @@
+<site-local-config>
+<site name="T2_CH_CERN">
+   <event-data>
+     <catalog url="trivialcatalog_file:/afs/cern.ch/cms/SITECONF/T2_CH_CERN/PhEDEx/storage.xml?protocol=rfio"/>
+     <catalog url="trivialcatalog_file:/afs/cern.ch/cms/SITECONF/T2_CH_CERN/PhEDEx/storage.xml?protocol=xrootd"/>
+   </event-data>
+   <source-config>
+     <statistics-destination name="cms-udpmon-collector.cern.ch:9331" />
+   </source-config>
+   <local-stage-out>
+     <command value="rfcp-CERN"/>
+     <option value=""/>
+     <catalog url="trivialcatalog_file:/afs/cern.ch/cms/SITECONF/T2_CH_CERN/PhEDEx/storage.xml?protocol=stageout"/>
+     <se-name value="srm-eoscms.cern.ch"/>
+     <phedex-node value="T2_CH_CERN"/>
+   </local-stage-out>
+   <calib-data>
+     <frontier-connect>
+       <proxy url="http://cmst0frontier.cern.ch:3128"/>
+       <proxy url="http://cmst0frontier.cern.ch:3128"/>
+       <proxy url="http://cmst0frontier1.cern.ch:3128"/>
+       <proxy url="http://cmst0frontier2.cern.ch:3128"/>
+       <backupproxy url="http://cmsbpfrontier.cern.ch:3128"/>
+       <backupproxy url="http://cmsbpfrontier1.cern.ch:3128"/>
+       <backupproxy url="http://cmsbpfrontier2.cern.ch:3128"/>
+       <backupproxy url="http://cmsbproxy.fnal.gov:3128"/>
+       <server url="http://cmsfrontier.cern.ch:8000/FrontierInt"/>
+       <server url="http://cmsfrontier.cern.ch:8000/FrontierInt"/>
+       <server url="http://cmsfrontier1.cern.ch:8000/FrontierInt"/>
+       <server url="http://cmsfrontier2.cern.ch:8000/FrontierInt"/>
+       <server url="http://cmsfrontier3.cern.ch:8000/FrontierInt"/>
+       <server url="http://cmsfrontier4.cern.ch:8000/FrontierInt"/>
+     </frontier-connect>
+     <catalog url=""/>
+   </calib-data>
+</site>
+</site-local-config>

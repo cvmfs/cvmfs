@@ -24,7 +24,10 @@ namespace cache {
 class T_RamCacheManager : public ::testing::Test {
  public:
   T_RamCacheManager()
-    : ramcache_(4*alloc_size, cache_size, &statistics_) {
+    : ramcache_(4*alloc_size,
+                cache_size,
+                MemoryKvStore::kMallocLibc,
+                &statistics_) {
     a_.digest[1] = 1;
   }
 
@@ -219,13 +222,13 @@ TEST_F(T_RamCacheManager, PinnedEntry) {
   a_.digest[1] = 5;
   EXPECT_EQ(0, ramcache_.StartTxn(a_, alloc_size, txn5));
 
+  ramcache_.CtrlTxn("", cache::CacheManager::kTypePinned, 0, txn1);
+
   EXPECT_EQ(alloc_size, ramcache_.Write(buf, alloc_size, txn1));
   EXPECT_EQ(alloc_size, ramcache_.Write(buf, alloc_size, txn2));
   EXPECT_EQ(alloc_size, ramcache_.Write(buf, alloc_size, txn3));
   EXPECT_EQ(alloc_size, ramcache_.Write(buf, alloc_size, txn4));
   EXPECT_EQ(alloc_size, ramcache_.Write(buf, alloc_size, txn5));
-
-  ramcache_.CtrlTxn("", cache::CacheManager::kTypePinned, 0, txn1);
 
   EXPECT_EQ(0, ramcache_.CommitTxn(txn1));
   EXPECT_EQ(0, ramcache_.CommitTxn(txn2));
@@ -260,13 +263,13 @@ TEST_F(T_RamCacheManager, VolatileEntry) {
   a_.digest[1] = 5;
   EXPECT_EQ(0, ramcache_.StartTxn(a_, alloc_size, txn5));
 
+  ramcache_.CtrlTxn("", cache::CacheManager::kTypeVolatile, 0, txn4);
+
   EXPECT_EQ(alloc_size, ramcache_.Write(buf, alloc_size, txn1));
   EXPECT_EQ(alloc_size, ramcache_.Write(buf, alloc_size, txn2));
   EXPECT_EQ(alloc_size, ramcache_.Write(buf, alloc_size, txn3));
   EXPECT_EQ(alloc_size, ramcache_.Write(buf, alloc_size, txn4));
   EXPECT_EQ(alloc_size, ramcache_.Write(buf, alloc_size, txn5));
-
-  ramcache_.CtrlTxn("", cache::CacheManager::kTypeVolatile, 0, txn4);
 
   EXPECT_EQ(0, ramcache_.CommitTxn(txn1));
   EXPECT_EQ(0, ramcache_.CommitTxn(txn2));

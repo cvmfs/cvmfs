@@ -12,7 +12,6 @@
 
 #include "kvstore.h"
 #include "logging.h"
-#include "smalloc.h"
 #include "util/posix.h"
 #include "util_concurrency.h"
 
@@ -186,9 +185,6 @@ int RamCacheManager::StartTxn(const shash::Any &id, uint64_t size, void *txn) {
   transaction->pos = 0;
   transaction->expected_size = size;
   transaction->size = (size == kSizeUnknown) ? kPageSize : size;
-  if (transaction->size) {
-    transaction->buffer = smalloc(transaction->size);
-  }
   perf::Inc(counters_.n_starttxn);
   return 0;
 }
@@ -202,7 +198,7 @@ void RamCacheManager::CtrlTxn(
 {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
   transaction->description = description;
-  transaction->object_type = type;
+  if (!transaction->allocated) transaction->object_type = type;
   LogCvmfs(kLogCache, kLogDebug, "modified transaction %s",
            transaction->id.ToString().c_str());
 }
@@ -211,13 +207,28 @@ void RamCacheManager::CtrlTxn(
 int64_t RamCacheManager::Write(const void *buf, uint64_t size, void *txn) {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
 
+  /*
+   * The initial buffer for the transaction must be allocated on the first
+   * write so the caller has time to use CtrlTxn to set regular/volatile.
+   * Transactions of unknown size will often be immediately reallocated,
+   * but this is no worse than allocate on start.
+   */
+  if (!transaction->allocated) {
+    transaction->buffer = GetTransactionStore(transaction)->MallocBuffer(
+      transaction->size);
+    assert(!size || transaction->buffer);
+    transaction->allocated = true;
+  }
+
   if (transaction->pos + size > transaction->size) {
     if (transaction->expected_size == kSizeUnknown) {
       perf::Inc(counters_.n_realloc);
       transaction->size = max(2*transaction->size, size + transaction->pos);
       LogCvmfs(kLogCache, kLogDebug, "reallocate transaction for %s to %u B",
                transaction->id.ToString().c_str(), transaction->size);
-      transaction->buffer = srealloc(transaction->buffer, transaction->size);
+      transaction->buffer = GetTransactionStore(transaction)->ReallocBuffer(
+        transaction->buffer, transaction->size);
+      assert(transaction->buffer);
     } else {
       LogCvmfs(kLogCache, kLogDebug,
                "attempted to write more than requested (%u>%u)",
@@ -226,11 +237,12 @@ int64_t RamCacheManager::Write(const void *buf, uint64_t size, void *txn) {
     }
   }
 
-
-  // LogCvmfs(kLogCache, kLogDebug, "copy %u bytes of transaction %s",
-  //          size, transaction->id.ToString().c_str());
-  memcpy(static_cast<char *>(transaction->buffer) + transaction->pos,
-         buf, size);
+  if (transaction->buffer && buf) {
+    // LogCvmfs(kLogCache, kLogDebug, "copy %u bytes of transaction %s",
+    //          size, transaction->id.ToString().c_str());
+    memcpy(static_cast<char *>(transaction->buffer) + transaction->pos,
+           buf, size);
+  }
   transaction->pos += size;
   perf::Inc(counters_.n_write);
   return size;
@@ -266,8 +278,9 @@ int RamCacheManager::OpenFromTxn(void *txn) {
 
 int RamCacheManager::AbortTxn(void *txn) {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
-  if (transaction->buffer)
-    free(transaction->buffer);
+  if (transaction->buffer) {
+    GetTransactionStore(transaction)->FreeBuffer(transaction->buffer);
+  }
   LogCvmfs(kLogCache, kLogDebug, "abort transaction %s",
            transaction->id.ToString().c_str());
   perf::Inc(counters_.n_aborttxn);
@@ -290,7 +303,9 @@ int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
   if (transaction->expected_size == kSizeUnknown) {
     buf.size = transaction->pos;
     if (buf.size > 0) {
-      buf.address = srealloc(buf.address, buf.size);
+      buf.address = GetTransactionStore(transaction)->ReallocBuffer(
+        buf.address, buf.size);
+      assert(!buf.size || buf.address);
       LogCvmfs(kLogCache, kLogDebug, "reallocating transaction on %s to %u B",
                transaction->id.ToString().c_str(), buf.size);
     }
@@ -316,8 +331,8 @@ int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
   int64_t overrun = regular_size + volatile_size + buf.size - max_size_;
 
   if (overrun > 0) {
-    // if we're going to clean the cache, remove at least 25%
-    overrun = max(overrun, (int64_t) (max_size_>>2));
+    // if we're going to clean the cache, try to remove at least 25%
+    overrun = max(overrun, (int64_t) max_size_>>2);
     perf::Inc(counters_.n_overrun);
     volatile_entries_.ShrinkTo(max((int64_t) 0, volatile_size - overrun));
   }
@@ -325,11 +340,11 @@ int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
   if (overrun > 0) {
     regular_entries_.ShrinkTo(max((int64_t) 0, regular_size - overrun));
   }
-  overrun -= regular_size - regular_entries_.GetUsed();
+  overrun -= regular_size -regular_entries_.GetUsed();
   if (overrun > 0) {
     LogCvmfs(kLogCache, kLogDebug,
              "transaction for %s would overrun the cache limit by %d",
-             transaction->id.ToString().c_str(), -overrun);
+             transaction->id.ToString().c_str(), overrun);
     perf::Inc(counters_.n_full);
     return -ENOSPC;
   }

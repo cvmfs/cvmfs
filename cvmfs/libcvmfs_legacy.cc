@@ -464,7 +464,8 @@ SimpleOptionsParser *cvmfs_options_clone_legacy(
     options_mgr->SetValue("CVMFS_EXTERNAL_SERVER_URL", repo_opts.external_url);
   }
   if (repo_opts.proxies.empty()) {
-    options_mgr->SetValue("CVMFS_HTTP_PROXY", "DIRECT");
+    if (!options_mgr->IsDefined("CVMFS_HTTP_PROXY"))
+      options_mgr->SetValue("CVMFS_HTTP_PROXY", "DIRECT");
   } else {
     options_mgr->SetValue("CVMFS_HTTP_PROXY", repo_opts.proxies);
   }
