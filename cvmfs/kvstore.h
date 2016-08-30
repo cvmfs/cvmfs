@@ -9,12 +9,16 @@
 #include <unistd.h>
 
 #include <string>
+#include <vector>
 
 #include "cache.h"
 #include "lru.h"
+#include "malloc_arena.h"
 #include "statistics.h"
 
 using namespace std;  // NOLINT
+
+static const size_t kArenaSize = 512*1024*1024;
 
 struct MemoryBuffer {
   void *address;
@@ -36,6 +40,11 @@ struct MemoryBuffer {
  */
 class MemoryKvStore :SingleCopy {
  public:
+  enum MemoryAllocator {
+    kMallocArena,
+    kMallocLibc,
+  };
+
   struct Counters {
     perf::Counter *sz_size;
     perf::Counter *n_getbuffer;
@@ -52,7 +61,6 @@ class MemoryKvStore :SingleCopy {
     perf::Counter *sz_committed;
     perf::Counter *sz_deleted;
     perf::Counter *sz_shrunk;
-    perf::Counter *sz_freed;
 
     Counters(perf::Statistics *statistics, const std::string &name) {
       sz_size = statistics->Register(name + ".sz_size", "Size for " + name);
@@ -84,16 +92,17 @@ class MemoryKvStore :SingleCopy {
         "Bytes deleted for " + name);
       sz_shrunk = statistics->Register(name + ".sz_shrunk",
         "Bytes shrunk for " + name);
-      sz_freed = statistics->Register(name + ".sz_freed",
-        "Bytes freed for " + name);
     }
   };
 
   MemoryKvStore(
     unsigned int cache_entries,
     const string &name,
+    MemoryAllocator alloc,
     perf::Statistics *statistics)
-    : used_bytes_(0)
+    : allocator_(alloc)
+    , used_bytes_(0)
+    , idx_last_arena_(0)
     , entry_count_(0)
     , max_entries_(cache_entries)
     , entries_(cache_entries, shash::Any(), lru::hasher_any,
@@ -101,9 +110,15 @@ class MemoryKvStore :SingleCopy {
     , counters_(statistics, name + ".lru") {
     int retval = pthread_rwlock_init(&rwlock_, NULL);
     assert(retval == 0);
+    if (alloc == kMallocArena) {
+      malloc_arenas_.push_back(new MallocArena(kArenaSize));
+    }
   }
 
   ~MemoryKvStore() {
+    for (size_t i = 0; i < malloc_arenas_.size(); ++i) {
+      delete malloc_arenas_[i];
+    }
     pthread_rwlock_destroy(&rwlock_);
   }
 
@@ -177,6 +192,24 @@ class MemoryKvStore :SingleCopy {
   bool ShrinkTo(size_t size);
 
   /**
+   * Allocate a new buffer of size @p size using the KvStore's memory allocator.
+   * See @p malloc(3)
+   */
+  void *MallocBuffer(size_t size);
+
+  /**
+   * Resize the given buffer using the KvStore's memory allocator.
+   * See @p malloc(3)
+   */
+  void *ReallocBuffer(void *ptr, size_t size);
+
+  /**
+   * Frees the given buffer, returning the space to the KvStore's memory allocator.
+   * See @p malloc(3)
+   */
+  void FreeBuffer(void *ptr);
+
+  /**
    * Get the memory buffer describing the entry at id
    * @param id The hash key
    * @returns True iff the entry is present
@@ -198,13 +231,20 @@ class MemoryKvStore :SingleCopy {
 
  private:
   bool DoDelete(const shash::Any &id);
+  void *DoMalloc(size_t size);
+  void *DoRealloc(void *ptr, size_t size);
+  void DoFree(void *ptr);
+  size_t GetBufferSize(void *ptr);
 
+  MemoryAllocator allocator_;
   size_t used_bytes_;
+  size_t idx_last_arena_;
   unsigned int entry_count_;
   unsigned int max_entries_;
   lru::LruCache<shash::Any, MemoryBuffer> entries_;
   pthread_rwlock_t rwlock_;
   Counters counters_;
+  vector<MallocArena *> malloc_arenas_;
 };
 
 #endif  // CVMFS_KVSTORE_H_

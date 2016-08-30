@@ -1,0 +1,20 @@
+
+cvmfs_test_name="Dummy benchmark"
+cvmfs_test_autofs_on_startup=false
+cvmfs_benchmark="yes"
+
+FQRN=sft.cern.ch
+
+
+cvmfs_run_benchmark() {
+  echo "Dummy benchmark to test the framework"
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  run_benchmark
+  local return_code=$?
+
+  return $return_code
+}

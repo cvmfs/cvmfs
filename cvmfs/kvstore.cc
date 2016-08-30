@@ -41,6 +41,119 @@ bool MemoryKvStore::PopBuffer(const shash::Any &id, MemoryBuffer *buf) {
   return true;
 }
 
+size_t MemoryKvStore::GetBufferSize(void *ptr) {
+  return MallocArena::GetMallocArena(ptr, kArenaSize)->GetSize(ptr);
+}
+
+void *MemoryKvStore::MallocBuffer(size_t size) {
+  WriteLockGuard guard(rwlock_);
+  return DoMalloc(size);
+}
+
+void *MemoryKvStore::DoMalloc(size_t size) {
+  size_t N;
+  void *p;
+  MallocArena *M;
+
+  switch (allocator_) {
+  case kMallocLibc:
+    return malloc(size);
+  case kMallocArena:
+    if (size > kArenaSize - 2*1024*1024) {
+      errno = ENOMEM;
+      return NULL;
+    } else if (size == 0) {
+      return NULL;
+    }
+    N = malloc_arenas_.size();
+    assert(idx_last_arena_ < N);
+    p = malloc_arenas_[idx_last_arena_]->Malloc(size);
+    if (p != NULL)
+      return p;
+    for (unsigned i = 0; i < N; ++i) {
+      p = malloc_arenas_[i]->Malloc(size);
+      if (p != NULL) {
+        idx_last_arena_ = i;
+        return p;
+      }
+    }
+    idx_last_arena_ = N;
+    M = new MallocArena(kArenaSize);
+    assert(M != NULL);
+    malloc_arenas_.push_back(M);
+    p = M->Malloc(size);
+    assert(p != NULL);
+    return p;
+  }
+  // Shouldn't be reachable
+  abort();
+}
+
+void *MemoryKvStore::ReallocBuffer(void *ptr, size_t size) {
+  WriteLockGuard guard(rwlock_);
+  return DoRealloc(ptr, size);
+}
+
+void *MemoryKvStore::DoRealloc(void *ptr, size_t size) {
+  size_t old_size;
+  void *new_ptr;
+
+  switch (allocator_) {
+  case kMallocLibc:
+    return realloc(ptr, size);
+  case kMallocArena:
+    if (size == 0) {
+      DoFree(ptr);
+      return NULL;
+    }
+    old_size = GetBufferSize(ptr);
+    if (old_size >= size)
+      return ptr;
+
+    new_ptr = DoMalloc(size);
+    if (!new_ptr) return NULL;
+    if (ptr) {
+      memcpy(new_ptr, ptr, old_size);
+      DoFree(ptr);
+    }
+    return new_ptr;
+  }
+  // Shouldn't be reachable
+  abort();
+}
+
+void MemoryKvStore::FreeBuffer(void *ptr) {
+  WriteLockGuard guard(rwlock_);
+  DoFree(ptr);
+}
+
+void MemoryKvStore::DoFree(void *ptr) {
+  MallocArena *M;
+  size_t N;
+
+  switch (allocator_) {
+  case kMallocLibc:
+    free(ptr);
+    return;
+  case kMallocArena:
+    if (!ptr) return;
+    M = MallocArena::GetMallocArena(ptr, kArenaSize);
+    M->Free(ptr);
+    N = malloc_arenas_.size();
+    if ((N > 1) && M->IsEmpty()) {
+      for (unsigned i = 0; i < N; ++i) {
+        if (malloc_arenas_[i] == M) {
+          delete malloc_arenas_[i];
+          malloc_arenas_.erase(malloc_arenas_.begin() + i);
+          idx_last_arena_ = 0;
+          return;
+        }
+      }
+      assert(false);
+    }
+  }
+}
+
 int64_t MemoryKvStore::GetSize(const shash::Any &id) {
   MemoryBuffer mem;
   perf::Inc(counters_.n_getsize);
@@ -206,8 +319,7 @@ bool MemoryKvStore::DoDelete(const shash::Any &id) {
   used_bytes_ -= buf.size;
   counters_.sz_size->Set(used_bytes_);
   perf::Xadd(counters_.sz_deleted, buf.size);
-  free(buf.address);
-  perf::Xadd(counters_.sz_freed, buf.size);
+  DoFree(buf.address);
   entries_.Forget(id);
   LogCvmfs(kLogKvStore, kLogDebug, "deleted %s", id.ToString().c_str());
   return true;
@@ -240,8 +352,7 @@ bool MemoryKvStore::ShrinkTo(size_t size) {
     used_bytes_ -= buf.size;
     perf::Xadd(counters_.sz_shrunk, buf.size);
     counters_.sz_size->Set(used_bytes_);
-    free(buf.address);
-    perf::Xadd(counters_.sz_freed, buf.size);
+    DoFree(buf.address);
     LogCvmfs(kLogKvStore, kLogDebug, "delete %s", key.ToString().c_str());
   }
   entries_.FilterEnd();

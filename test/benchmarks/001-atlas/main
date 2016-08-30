@@ -17,13 +17,8 @@ cvmfs_run_benchmark() {
 cvmfs_run_test() {
   logfile=$1
 
-  sudo mkdir -p /cvmfs/sft.cern.ch
-  sudo mount -t cvmfs sft.cern.ch /cvmfs/sft.cern.ch
-
   run_benchmark
   local return_code=$?
-
-  cvmfs_umount sft.cern.ch
 
   return $return_code
 }

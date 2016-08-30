@@ -23,13 +23,8 @@ cvmfs_run_test() {
   logfile=$1
   test_location=$2
 
-  sudo mkdir -p /cvmfs/alice-ocdb.cern.ch
-  sudo mount -t cvmfs alice-ocdb.cern.ch /cvmfs/alice-ocdb.cern.ch
-
   run_benchmark
   local return_code=$?
-
-  cvmfs_umount alice-ocdb.cern.ch
 
   return $return_code
 }
