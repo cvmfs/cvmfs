@@ -1998,7 +1998,7 @@ execute_benchmark_loop() {
   local code=0
   local count=$CVMFS_OPT_ITERATIONS
 
-  if [ x$PARROT_ENABLED != "xTRUE" ]; then
+  if [ "x$PARROT_ENABLED" = "xTRUE" ]; then
     benchmark_log "Valgrind is not available with Parrot"
     exit 100
   fi
