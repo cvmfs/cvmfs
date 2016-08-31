@@ -14,6 +14,7 @@
 #include "cache.h"
 #include "lru.h"
 #include "malloc_arena.h"
+#include "malloc_heap.h"
 #include "statistics.h"
 
 using namespace std;  // NOLINT
@@ -21,10 +22,22 @@ using namespace std;  // NOLINT
 static const size_t kArenaSize = 512*1024*1024;
 
 struct MemoryBuffer {
+  MemoryBuffer()
+    : address(NULL)
+    , size(0)
+    , refcount(0)
+    , object_type(cache::CacheManager::kTypeRegular)
+    , id() {}
   void *address;
   size_t size;
   unsigned int refcount;
   cache::CacheManager::ObjectType object_type;
+  shash::Any id;
+};
+
+class CacheCallback : public Callbackable<MallocHeap::BlockPtr> {
+ public:
+  void OnBlockMove(const MallocHeap::BlockPtr &ptr);
 };
 
 /**
@@ -43,6 +56,7 @@ class MemoryKvStore :SingleCopy {
   enum MemoryAllocator {
     kMallocArena,
     kMallocLibc,
+    kMallocHeap,
   };
 
   struct Counters {
@@ -99,6 +113,7 @@ class MemoryKvStore :SingleCopy {
     unsigned int cache_entries,
     const string &name,
     MemoryAllocator alloc,
+    unsigned alloc_size,
     perf::Statistics *statistics)
     : allocator_(alloc)
     , used_bytes_(0)
@@ -107,17 +122,30 @@ class MemoryKvStore :SingleCopy {
     , max_entries_(cache_entries)
     , entries_(cache_entries, shash::Any(), lru::hasher_any,
         statistics, name)
+    , cb_()
+    , heap_(NULL)
     , counters_(statistics, name + ".lru") {
     int retval = pthread_rwlock_init(&rwlock_, NULL);
     assert(retval == 0);
-    if (alloc == kMallocArena) {
+    switch (alloc) {
+    case kMallocArena:
       malloc_arenas_.push_back(new MallocArena(kArenaSize));
+      break;
+    case kMallocHeap:
+      heap_ = new MallocHeap(alloc_size,
+          cb_.MakeCallback(&CacheCallback::OnBlockMove, &cb_));
+      break;
+    default:
+      break;
     }
   }
 
   ~MemoryKvStore() {
     for (size_t i = 0; i < malloc_arenas_.size(); ++i) {
       delete malloc_arenas_[i];
+    }
+    if (heap_) {
+      delete heap_;
     }
     pthread_rwlock_destroy(&rwlock_);
   }
@@ -170,11 +198,10 @@ class MemoryKvStore :SingleCopy {
   /**
    * Insert a new memory buffer. The KvStore takes ownership of the referred memory, so
    * callers must not free() it themselves
-   * @param id The hash key
    * @param buf The memory buffer to insert
    * @returns True iff the commit succeeds
    */
-  bool Commit(const shash::Any &id, const MemoryBuffer &buf);
+  bool Commit(const MemoryBuffer &buf);
 
   /**
    * Delete an entry, free()ing its memory. Note that the entry not have any references
@@ -192,22 +219,21 @@ class MemoryKvStore :SingleCopy {
   bool ShrinkTo(size_t size);
 
   /**
-   * Allocate a new buffer of size @p size using the KvStore's memory allocator.
-   * See @p malloc(3)
+   * Allocate a new buffer using the KvStore's memory allocator.
+   * @returns -errno on failure
    */
-  void *MallocBuffer(size_t size);
+  int MallocBuffer(MemoryBuffer *buf);
 
   /**
    * Resize the given buffer using the KvStore's memory allocator.
-   * See @p malloc(3)
+   * @returns -errno on failure
    */
-  void *ReallocBuffer(void *ptr, size_t size);
+  int ReallocBuffer(MemoryBuffer *buf, size_t size);
 
   /**
    * Frees the given buffer, returning the space to the KvStore's memory allocator.
-   * See @p malloc(3)
    */
-  void FreeBuffer(void *ptr);
+  void FreeBuffer(MemoryBuffer *buf);
 
   /**
    * Get the memory buffer describing the entry at id
@@ -231,10 +257,10 @@ class MemoryKvStore :SingleCopy {
 
  private:
   bool DoDelete(const shash::Any &id);
-  void *DoMalloc(size_t size);
-  void *DoRealloc(void *ptr, size_t size);
-  void DoFree(void *ptr);
-  size_t GetBufferSize(void *ptr);
+  int DoMalloc(MemoryBuffer *buf);
+  int DoRealloc(MemoryBuffer *buf, size_t size);
+  void DoFree(MemoryBuffer *buf);
+  size_t GetBufferSize(MemoryBuffer *buf);
 
   MemoryAllocator allocator_;
   size_t used_bytes_;
@@ -242,6 +268,8 @@ class MemoryKvStore :SingleCopy {
   unsigned int entry_count_;
   unsigned int max_entries_;
   lru::LruCache<shash::Any, MemoryBuffer> entries_;
+  CacheCallback cb_;
+  MallocHeap *heap_;
   pthread_rwlock_t rwlock_;
   Counters counters_;
   vector<MallocArena *> malloc_arenas_;

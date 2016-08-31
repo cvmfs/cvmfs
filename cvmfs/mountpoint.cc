@@ -212,6 +212,8 @@ bool FileSystem::CreateCache() {
     if (options_mgr_->GetValue("CVMFS_CACHE_RAM_MALLOC", &optarg)) {
       if (optarg == "arena") {
         alloc = MemoryKvStore::kMallocArena;
+      } else if (optarg == "heap") {
+        alloc = MemoryKvStore::kMallocHeap;
       }
     }
     cache_bytes = max((uint64_t) 200*1024*1024, cache_bytes);

@@ -118,10 +118,12 @@ class RamCacheManager : public CacheManager {
     , regular_entries_(max_entries,
                        "RamCache.regular",
                        alloc,
+                       max_size,
                        statistics)
     , volatile_entries_(max_entries,
                         "RamCache.volatile",
                         alloc,
+                        max_size,
                         statistics)
     , counters_(statistics, "RamCache") {
     int retval = pthread_rwlock_init(&rwlock_, NULL);
@@ -266,19 +268,14 @@ class RamCacheManager : public CacheManager {
 
   struct Transaction {
     Transaction()
-      : buffer(NULL)
-      , size(0)
+      : buffer()
       , expected_size(0)
       , pos(0)
-      , allocated(false)
-      , object_type(kTypeRegular) { }
-    shash::Any id;
-    void *buffer;
-    uint64_t size;
+      , allocated(false) { }
+    MemoryBuffer buffer;
     uint64_t expected_size;
     uint64_t pos;
     bool allocated;
-    ObjectType object_type;
     std::string description;
   };
 
@@ -297,7 +294,7 @@ class RamCacheManager : public CacheManager {
   }
 
   inline MemoryKvStore *GetTransactionStore(Transaction *txn) {
-    if (txn->object_type == cache::CacheManager::kTypeVolatile) {
+    if (txn->buffer.object_type == cache::CacheManager::kTypeVolatile) {
       return &volatile_entries_;
     } else {
       return &regular_entries_;
