@@ -17,8 +17,22 @@
 
 using namespace std;  // NOLINT
 
-void CacheCallback::OnBlockMove(const MallocHeap::BlockPtr &ptr) {
-  LogCvmfs(kLogKvStore, kLogDebug, "compaction moved %p", ptr.pointer);
+void MemoryKvStore::OnBlockMove(const MallocHeap::BlockPtr &ptr) {
+  bool ok;
+  shash::Any id;
+  MemoryBuffer buf;
+
+  assert(ptr.pointer);
+  LogCvmfs(kLogKvStore, kLogDebug, "compaction moved %s to %p",
+    id.ToString().c_str(), ptr.pointer);
+  memcpy(&id, static_cast<char *>(ptr.pointer) - sizeof(id), sizeof(id));
+
+  WriteLockGuard guard(rwlock_);
+  ok = GetBuffer(id, &buf);
+  assert(ok);
+  buf.address = static_cast<char *>(ptr.pointer) + sizeof(id);
+  ok = DoCommit(buf);
+  assert(ok);
 }
 
 bool MemoryKvStore::GetBuffer(const shash::Any &id, MemoryBuffer *buf) {
@@ -53,7 +67,7 @@ size_t MemoryKvStore::GetBufferSize(MemoryBuffer *buf) {
     return MallocArena::GetMallocArena(buf->address, kArenaSize)
       ->GetSize(buf->address);
   case kMallocHeap:
-    return heap_->GetSize(buf->address);
+    return heap_->GetSize(static_cast<char *>(buf->address) - sizeof(buf->id));
   default:
     abort();  // shouldn't be reachable
   }
@@ -111,6 +125,7 @@ int MemoryKvStore::DoMalloc(MemoryBuffer *buf) {
     }
     tmp.address = heap_->Allocate(tmp.size, &tmp.id, sizeof(tmp.id));
     if (!tmp.address) return -ENOMEM;
+    tmp.address = static_cast<char *>(tmp.address) + sizeof(tmp.id);
     break;
   }
   memcpy(buf, &tmp, sizeof(*buf));
@@ -128,6 +143,7 @@ int MemoryKvStore::DoRealloc(MemoryBuffer *buf, size_t size) {
   int rc;
 
   assert(buf);
+  size_t header_bytes = allocator_ == kMallocHeap ? sizeof(buf->id) : 0;
   memcpy(&tmp, buf, sizeof(tmp));
   tmp.size = size;
 
@@ -142,7 +158,7 @@ int MemoryKvStore::DoRealloc(MemoryBuffer *buf, size_t size) {
       DoFree(buf);
       return 0;
     }
-    old_size = GetBufferSize(buf);
+    old_size = GetBufferSize(buf) - header_bytes;
     if (old_size >= size) return 0;
 
     rc = DoMalloc(&tmp);
@@ -188,7 +204,7 @@ void MemoryKvStore::DoFree(MemoryBuffer *buf) {
       assert(false);
     }
   case kMallocHeap:
-    heap_->MarkFree(buf->address);
+    heap_->MarkFree(static_cast<char *>(buf->address) - sizeof(buf->id));
     return;
   }
 }
@@ -285,6 +301,11 @@ int64_t MemoryKvStore::Read(
 }
 
 bool MemoryKvStore::Commit(const MemoryBuffer &buf) {
+  WriteLockGuard guard(rwlock_);
+  return DoCommit(buf);
+}
+
+bool MemoryKvStore::DoCommit(const MemoryBuffer &buf) {
   /*
    * Commit allows overwriting existing entries without free()ing the
    * associated memory buffer. It's assumed that the caller knows about the
@@ -304,7 +325,6 @@ bool MemoryKvStore::Commit(const MemoryBuffer &buf) {
 
   MemoryBuffer mem;
   perf::Inc(counters_.n_commit);
-  WriteLockGuard guard(rwlock_);
   LogCvmfs(kLogKvStore, kLogDebug, "commit %s", buf.id.ToString().c_str());
   if (entries_.Lookup(buf.id, &mem)) {
     LogCvmfs(kLogKvStore, kLogDebug, "commit overwrites existing entry");
@@ -323,6 +343,7 @@ bool MemoryKvStore::Commit(const MemoryBuffer &buf) {
   mem.address = buf.address;
   mem.size = buf.size;
   mem.object_type = buf.object_type;
+  mem.id = buf.id;
   entries_.Insert(buf.id, mem);
   ++entry_count_;
   assert(SSIZE_MAX - mem.size > used_bytes_);

@@ -35,11 +35,6 @@ struct MemoryBuffer {
   shash::Any id;
 };
 
-class CacheCallback : public Callbackable<MallocHeap::BlockPtr> {
- public:
-  void OnBlockMove(const MallocHeap::BlockPtr &ptr);
-};
-
 /**
  * @p MemoryKvStore provides a simple RAM-backed key/value store suited to
  * use with @ref RamCacheManager. To insert entries, the caller must allocate
@@ -51,7 +46,7 @@ class CacheCallback : public Callbackable<MallocHeap::BlockPtr> {
  * can attempt to reduce its size by removing the least recently used
  * entries without any outstanding references.
  */
-class MemoryKvStore :SingleCopy {
+class MemoryKvStore :SingleCopy, public Callbackable<MallocHeap::BlockPtr> {
  public:
   enum MemoryAllocator {
     kMallocArena,
@@ -122,7 +117,6 @@ class MemoryKvStore :SingleCopy {
     , max_entries_(cache_entries)
     , entries_(cache_entries, shash::Any(), lru::hasher_any,
         statistics, name)
-    , cb_()
     , heap_(NULL)
     , counters_(statistics, name + ".lru") {
     int retval = pthread_rwlock_init(&rwlock_, NULL);
@@ -133,7 +127,7 @@ class MemoryKvStore :SingleCopy {
       break;
     case kMallocHeap:
       heap_ = new MallocHeap(alloc_size,
-          cb_.MakeCallback(&CacheCallback::OnBlockMove, &cb_));
+          this->MakeCallback(&MemoryKvStore::OnBlockMove, this));
       break;
     default:
       break;
@@ -260,7 +254,9 @@ class MemoryKvStore :SingleCopy {
   int DoMalloc(MemoryBuffer *buf);
   int DoRealloc(MemoryBuffer *buf, size_t size);
   void DoFree(MemoryBuffer *buf);
+  bool DoCommit(const MemoryBuffer &buf);
   size_t GetBufferSize(MemoryBuffer *buf);
+  void OnBlockMove(const MallocHeap::BlockPtr &ptr);
 
   MemoryAllocator allocator_;
   size_t used_bytes_;
@@ -268,7 +264,6 @@ class MemoryKvStore :SingleCopy {
   unsigned int entry_count_;
   unsigned int max_entries_;
   lru::LruCache<shash::Any, MemoryBuffer> entries_;
-  CacheCallback cb_;
   MallocHeap *heap_;
   pthread_rwlock_t rwlock_;
   Counters counters_;
