@@ -123,7 +123,8 @@ int MemoryKvStore::DoMalloc(MemoryBuffer *buf) {
       tmp.address = NULL;
       break;
     }
-    tmp.address = heap_->Allocate(tmp.size, &tmp.id, sizeof(tmp.id));
+    tmp.address = heap_->Allocate(tmp.size + sizeof(tmp.id),
+      &tmp.id, sizeof(tmp.id));
     if (!tmp.address) return -ENOMEM;
     tmp.address = static_cast<char *>(tmp.address) + sizeof(tmp.id);
     break;
@@ -138,12 +139,10 @@ int MemoryKvStore::ReallocBuffer(MemoryBuffer *buf, size_t size) {
 }
 
 int MemoryKvStore::DoRealloc(MemoryBuffer *buf, size_t size) {
-  size_t old_size;
   MemoryBuffer tmp;
   int rc;
 
   assert(buf);
-  size_t header_bytes = allocator_ == kMallocHeap ? sizeof(buf->id) : 0;
   memcpy(&tmp, buf, sizeof(tmp));
   tmp.size = size;
 
@@ -158,13 +157,12 @@ int MemoryKvStore::DoRealloc(MemoryBuffer *buf, size_t size) {
       DoFree(buf);
       return 0;
     }
-    old_size = GetBufferSize(buf) - header_bytes;
-    if (old_size >= size) return 0;
+    if (buf->size >= size) return 0;
 
     rc = DoMalloc(&tmp);
-    if (rc < 0) return -rc;
+    if (rc < 0) return rc;
     if (buf->address) {
-      memcpy(tmp.address, buf->address, old_size);
+      memcpy(tmp.address, buf->address, buf->size);
       DoFree(buf);
     }
     break;
@@ -183,12 +181,12 @@ void MemoryKvStore::DoFree(MemoryBuffer *buf) {
   size_t N;
 
   assert(buf);
+  if (!buf->address) return;
   switch (allocator_) {
   case kMallocLibc:
     free(buf->address);
     return;
   case kMallocArena:
-    if (!buf->address) return;
     M = MallocArena::GetMallocArena(buf->address, kArenaSize);
     M->Free(buf->address);
     N = malloc_arenas_.size();
