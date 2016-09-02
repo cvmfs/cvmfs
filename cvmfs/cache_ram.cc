@@ -213,6 +213,7 @@ int64_t RamCacheManager::Write(const void *buf, uint64_t size, void *txn) {
    * Transactions of unknown size will often be immediately reallocated,
    * but this is no worse than allocate on start.
    */
+AGAIN:
   if (!transaction->allocated) {
     int rc = GetTransactionStore(transaction)
       ->MallocBuffer(&transaction->buffer);
@@ -221,6 +222,7 @@ int64_t RamCacheManager::Write(const void *buf, uint64_t size, void *txn) {
                "failed to allocate %lu B for %s",
                transaction->buffer.size,
                transaction->buffer.id.ToString().c_str());
+      if (GetTransactionStore(transaction)->Cleanup()) goto AGAIN;
       return -EIO;
     }
     transaction->allocated = true;
@@ -241,6 +243,7 @@ int64_t RamCacheManager::Write(const void *buf, uint64_t size, void *txn) {
         LogCvmfs(kLogCache, kLogDebug,
                  "failed to allocate %lu B for %s",
                  new_size, transaction->buffer.id.ToString().c_str());
+        if (GetTransactionStore(transaction)->Cleanup()) goto AGAIN;
         return -EIO;
       }
     } else {

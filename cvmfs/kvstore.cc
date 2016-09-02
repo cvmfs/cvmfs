@@ -207,6 +207,24 @@ void MemoryKvStore::DoFree(MemoryBuffer *buf) {
   }
 }
 
+bool MemoryKvStore::Cleanup() {
+  double utilization;
+  LogCvmfs(kLogKvStore, kLogDebug, "Cleanup requested");
+  switch (allocator_) {
+  case kMallocHeap:
+    utilization = heap_->utilization();
+    if (utilization < 0.75) {
+      LogCvmfs(kLogKvStore, kLogDebug, "Compacting heap");
+      heap_->Compact();
+      if (heap_->utilization() > utilization) return true;
+    }
+    return false;
+  default:
+    // the others can't do any cleanup, so just ignore
+    return false;
+  }
+}
+
 int64_t MemoryKvStore::GetSize(const shash::Any &id) {
   MemoryBuffer mem;
   perf::Inc(counters_.n_getsize);

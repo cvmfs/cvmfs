@@ -249,6 +249,18 @@ class MemoryKvStore :SingleCopy, public Callbackable<MallocHeap::BlockPtr> {
    */
   size_t GetUsed() { return used_bytes_; }
 
+  /**
+   * Advise the KvStore to free up any available memory.
+   * Depending on the allocator in use, this might be a no op. Callers should
+   * advise the KvStore to clean up if they have already run out of space and
+   * done what they can to make room. The KvStore is free to decide whether
+   * any cleanup operations are a good idea. Note that callers should assume
+   * that Cleanup could block the entire cache for an unspecified amount of
+   * time, so frequent, unnecessary calls are likely to hurt performance.
+   * Cleanup returns true if any cleanup happened.
+   */
+  bool Cleanup();
+
  private:
   bool DoDelete(const shash::Any &id);
   int DoMalloc(MemoryBuffer *buf);
