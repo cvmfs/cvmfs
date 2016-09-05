@@ -22,12 +22,12 @@ void MemoryKvStore::OnBlockMove(const MallocHeap::BlockPtr &ptr) {
   shash::Any id;
   MemoryBuffer buf;
 
+  // must be locked by caller
   assert(ptr.pointer);
+  memcpy(&id, ptr.pointer, sizeof(id));
   LogCvmfs(kLogKvStore, kLogDebug, "compaction moved %s to %p",
     id.ToString().c_str(), ptr.pointer);
-  memcpy(&id, static_cast<char *>(ptr.pointer) - sizeof(id), sizeof(id));
 
-  WriteLockGuard guard(rwlock_);
   ok = GetBuffer(id, &buf);
   assert(ok);
   buf.address = static_cast<char *>(ptr.pointer) + sizeof(id);
@@ -209,12 +209,13 @@ void MemoryKvStore::DoFree(MemoryBuffer *buf) {
 
 bool MemoryKvStore::Cleanup() {
   double utilization;
-  LogCvmfs(kLogKvStore, kLogDebug, "Cleanup requested");
+  LogCvmfs(kLogKvStore, kLogDebug, "cleanup requested");
   switch (allocator_) {
   case kMallocHeap:
     utilization = heap_->utilization();
-    if (utilization < 0.75) {
-      LogCvmfs(kLogKvStore, kLogDebug, "Compacting heap");
+    if (utilization < 0.8) {
+      LogCvmfs(kLogKvStore, kLogDebug, "compacting heap");
+      WriteLockGuard guard(rwlock_);
       heap_->Compact();
       if (heap_->utilization() > utilization) return true;
     }
