@@ -709,7 +709,7 @@ TEST_F(T_FsTraversal, BlockDevice) {
   CustomDelegate delegate("/dev");
   FileSystemTraversal<CustomDelegate> traverse(&delegate,
                                                 "/dev",
-                                                true);
+                                                false);
   traverse.fn_new_block_dev = &CustomDelegate::BlockDevice;
   traverse.fn_ignore_file = &CustomDelegate::CheckPermissions;
   traverse.Recurse("/dev");
@@ -720,7 +720,7 @@ TEST_F(T_FsTraversal, CharacterDevice) {
   CustomDelegate delegate("/dev");
   FileSystemTraversal<CustomDelegate> traverse(&delegate,
                                                 "/dev",
-                                                true);
+                                                false);
   traverse.fn_new_character_dev = &CustomDelegate::CharacterDevice;
   traverse.fn_ignore_file       = &CustomDelegate::CheckPermissions;
   traverse.Recurse("/dev");
