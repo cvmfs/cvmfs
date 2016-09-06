@@ -28,36 +28,17 @@ void MemoryKvStore::OnBlockMove(const MallocHeap::BlockPtr &ptr) {
   LogCvmfs(kLogKvStore, kLogDebug, "compaction moved %s to %p",
     id.ToString().c_str(), ptr.pointer);
 
-  ok = GetBuffer(id, &buf);
+  ok = entries_.Lookup(id, &buf);
   assert(ok);
   buf.address = static_cast<char *>(ptr.pointer) + sizeof(id);
   ok = DoCommit(buf);
   assert(ok);
 }
 
-bool MemoryKvStore::GetBuffer(const shash::Any &id, MemoryBuffer *buf) {
-  perf::Inc(counters_.n_getbuffer);
-  // LogCvmfs(kLogKvStore, kLogDebug, "get buffer %s", id.ToString().c_str());
-  return entries_.Lookup(id, buf);
-}
-
-bool MemoryKvStore::PopBuffer(const shash::Any &id, MemoryBuffer *buf) {
-  perf::Inc(counters_.n_popbuffer);
-  WriteLockGuard guard(rwlock_);
-  if (!entries_.Lookup(id, buf)) {
-    LogCvmfs(kLogKvStore, kLogDebug, "miss %s on PopBuffer",
-             id.ToString().c_str() );
-    return false;
-  }
-  assert(used_bytes_ >= (*buf).size);
-  used_bytes_ -= (*buf).size;
-  counters_.sz_size->Set(used_bytes_);
-  assert(entry_count_ > 0);
-  --entry_count_;
-  entries_.Forget(id);
-  // LogCvmfs(kLogKvStore, kLogDebug, "popped %s (%uB)", id.ToString().c_str(),
-  //          (*buf).size);
-  return true;
+bool MemoryKvStore::Contains(const shash::Any &id) {
+  MemoryBuffer buf;
+  // LogCvmfs(kLogKvStore, kLogDebug, "check buffer %s", id.ToString().c_str());
+  return entries_.Lookup(id, &buf);
 }
 
 size_t MemoryKvStore::GetBufferSize(MemoryBuffer *buf) {

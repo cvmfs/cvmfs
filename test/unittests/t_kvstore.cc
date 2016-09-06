@@ -62,21 +62,6 @@ TEST_F(T_MemoryKvStore, Commit) {
   free(buf_.address);
 }
 
-TEST_F(T_MemoryKvStore, PopBuffer) {
-  EXPECT_EQ(0, (int64_t) store_.GetUsed());
-  buf_.id = a1_;
-  EXPECT_TRUE(store_.Commit(buf_));
-  EXPECT_EQ(malloc_size, store_.GetUsed());
-  memset(buf_.address, 42, malloc_size);
-  MemoryBuffer out;
-  EXPECT_FALSE(store_.PopBuffer(shash::Any(), &out));
-  EXPECT_TRUE(store_.PopBuffer(a1_, &out));
-  EXPECT_EQ(out.address, buf_.address);
-  EXPECT_EQ(0, (int64_t) store_.GetUsed());
-  memset(out.address, 24, malloc_size);
-  free(out.address);
-}
-
 TEST_F(T_MemoryKvStore, Delete) {
   EXPECT_EQ(0, (int64_t) store_.GetUsed());
   buf_.id = a1_;

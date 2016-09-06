@@ -56,8 +56,6 @@ class MemoryKvStore :SingleCopy, public Callbackable<MallocHeap::BlockPtr> {
 
   struct Counters {
     perf::Counter *sz_size;
-    perf::Counter *n_getbuffer;
-    perf::Counter *n_popbuffer;
     perf::Counter *n_getsize;
     perf::Counter *n_getrefcount;
     perf::Counter *n_incref;
@@ -73,10 +71,6 @@ class MemoryKvStore :SingleCopy, public Callbackable<MallocHeap::BlockPtr> {
 
     Counters(perf::Statistics *statistics, const std::string &name) {
       sz_size = statistics->Register(name + ".sz_size", "Size for " + name);
-      n_getbuffer = statistics->Register(name + ".n_getbuffer",
-        "Number of GetBuffer calls for " + name);
-      n_popbuffer = statistics->Register(name + ".n_popbuffer",
-        "Number of PopBuffer calls for " + name);
       n_getsize = statistics->Register(name + ".n_getsize",
         "Number of GetSize calls for " + name);
       n_getrefcount = statistics->Register(name + ".n_getrefcount",
@@ -145,6 +139,13 @@ class MemoryKvStore :SingleCopy, public Callbackable<MallocHeap::BlockPtr> {
   }
 
   /**
+   * Check for the existence of an entry
+   * @param id The hash key
+   * @returns True iff the entry exists
+   */
+  bool Contains(const shash::Any &id);
+
+  /**
    * Get the size in bytes of the entry at id
    * @param id The hash key
    * @returns The entry's size
@@ -211,21 +212,6 @@ class MemoryKvStore :SingleCopy, public Callbackable<MallocHeap::BlockPtr> {
    * @returns True iff the shrink succeeds
    */
   bool ShrinkTo(size_t size);
-
-  /**
-   * Get the memory buffer describing the entry at id
-   * @param id The hash key
-   * @returns True iff the entry is present
-   */
-  bool GetBuffer(const shash::Any &id, MemoryBuffer *buf);
-
-  /**
-   * Get the memory buffer describing the entry at id as in @ref GetBuffer,
-   * and remove the entry *without* freeing the associated memory
-   * @param id The hash key
-   * @returns True iff the entry is present
-   */
-  bool PopBuffer(const shash::Any &id, MemoryBuffer *buf);
 
   /**
    * Get the total space used for data

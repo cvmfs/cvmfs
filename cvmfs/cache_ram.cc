@@ -54,9 +54,9 @@ int RamCacheManager::DoOpen(const shash::Any &id) {
   bool is_volatile;
   MemoryBuffer buf;
 
-  if (regular_entries_.GetBuffer(id, &buf)) {
+  if (regular_entries_.Contains(id)) {
     is_volatile = false;
-  } else if (volatile_entries_.GetBuffer(id, &buf)) {
+  } else if (volatile_entries_.Contains(id)) {
     is_volatile = true;
   } else {
     LogCvmfs(kLogCache, kLogDebug, "miss for %s",
