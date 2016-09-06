@@ -134,7 +134,7 @@ TEST_F(T_MallocHeap, Stress) {
     M.MarkFree(int_map.mem_digest[i].ptr);
     int_map.mem_digest.erase(i);
   }
-  EXPECT_LT(0, M.num_blocks());
+  EXPECT_LT(0U, M.num_blocks());
   EXPECT_LT(M.num_blocks(), N);
   // One more to ensure non-overlapping gauge
   unsigned next_gen = N + 1;
@@ -144,7 +144,7 @@ TEST_F(T_MallocHeap, Stress) {
 
   M.Compact();
   EXPECT_EQ(int_map.mem_digest.size(), M.num_blocks());
-  EXPECT_GT(int_map.num_moves, 0);
+  EXPECT_GT(int_map.num_moves, 0U);
   EXPECT_LE(int_map.num_moves, int_map.mem_digest.size());
 
   // Verify survivor blocks

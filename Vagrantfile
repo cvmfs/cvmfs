@@ -39,7 +39,7 @@ Vagrant.configure(2) do |config|
 
     #cvm2.vm.network "private_network", ip: "192.168.33.10"
     cvm2.vm.network "private_network", type: "dhcp", auto_config: false
-    cvm2.vm.synced_folder '.', '/vagrant', nfs: false
+    cvm2.vm.synced_folder '.', '/vagrant'
 
     cvm2.vm.provision "shell", path: "vagrant/provision_cernvm.sh"
   end
@@ -53,7 +53,7 @@ Vagrant.configure(2) do |config|
 
     #cvm.vm.network "private_network", ip: "192.168.33.10"
     cvm.vm.network "private_network", type: "dhcp", auto_config: false
-    cvm.vm.synced_folder '.', '/vagrant', nfs: true
+    cvm.vm.synced_folder '.', '/vagrant'
 
     cvm.vm.provision "shell", path: "vagrant/provision_cernvm.sh"
   end
@@ -67,7 +67,7 @@ Vagrant.configure(2) do |config|
 
     #cvm.vm.network "private_network", ip: "192.168.33.10"
     cvm.vm.network "private_network", type: "dhcp", auto_config: false
-    cvm.vm.synced_folder '.', '/vagrant', nfs: true
+    cvm.vm.synced_folder '.', '/vagrant'
 
     cvm.vm.provision "shell", path: "vagrant/provision_cernvm4.sh"
   end
@@ -82,7 +82,7 @@ Vagrant.configure(2) do |config|
 
     slc6.vm.box = "bytepark/scientific-6.5-64"
     slc6.vm.network "private_network", ip: "192.168.33.11"
-    slc6.vm.synced_folder '.', '/vagrant', nfs: true
+    slc6.vm.synced_folder '.', '/vagrant'
 
     slc6.vm.provision "shell", path: "vagrant/provision_slc6.sh"
     slc6.vm.provision :reload
@@ -91,42 +91,42 @@ Vagrant.configure(2) do |config|
   config.vm.define "ubuntu1604" do |ub|
     ub.vm.box = "geerlingguy/ubuntu1604"
     ub.vm.network "private_network", ip: "192.168.33.15"
-    ub.vm.synced_folder '.', '/vagrant', nfs: true
+    ub.vm.synced_folder '.', '/vagrant'
     ub.vm.provision "shell", path: "vagrant/provision_ubuntu.sh"
   end
 
   config.vm.define "ubuntu1204" do |ub|
     ub.vm.box = "ubuntu/precise64"
     ub.vm.network "private_network", ip: "192.168.33.16"
-    ub.vm.synced_folder '.', '/vagrant', nfs: true
+    ub.vm.synced_folder '.', '/vagrant'
     ub.vm.provision "shell", path: "vagrant/provision_ubuntu.sh"
   end
 
   config.vm.define "ubuntu1204-32" do |ub|
     ub.vm.box = "ubuntu/precise32"
     ub.vm.network "private_network", ip: "192.168.33.18"
-    ub.vm.synced_folder '.', '/vagrant', nfs: true
+    ub.vm.synced_folder '.', '/vagrant'
     ub.vm.provision "shell", path: "vagrant/provision_ubuntu.sh"
   end
 
   config.vm.define "fedora" do |fedora|
     fedora.vm.box = "fedora/23-cloud-base"
     fedora.vm.network "private_network", ip: "192.168.33.13"
-    fedora.vm.synced_folder '.', '/vagrant', nfs: true
+    fedora.vm.synced_folder '.', '/vagrant'
     fedora.vm.provision "shell", path: "vagrant/provision_fedora.sh"
   end
 
   config.vm.define "fedora24" do |fedora|
     fedora.vm.box = "fedora/24-cloud-base"
     fedora.vm.network "private_network", ip: "192.168.33.19"
-    fedora.vm.synced_folder '.', '/vagrant', nfs: true
+    fedora.vm.synced_folder '.', '/vagrant' 
     fedora.vm.provision "shell", path: "vagrant/provision_fedora.sh"
   end
 
   config.vm.define "centos7" do |centos7|
     centos7.vm.box = "geerlingguy/centos7"
     centos7.vm.network "private_network", ip: "192.168.33.14"
-    centos7.vm.synced_folder '.', '/vagrant', nfs: true
+    centos7.vm.synced_folder '.', '/vagrant'
     centos7.vm.provision "shell", path: "vagrant/provision_centos7.sh"
   end
 end

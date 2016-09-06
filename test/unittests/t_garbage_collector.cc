@@ -503,7 +503,7 @@ TEST_F(T_GarbageCollector, KeepEverything) {
   EXPECT_EQ(16u, gc.preserved_catalog_count());
   EXPECT_EQ(0u, gc.condemned_catalog_count());
   EXPECT_EQ(0u, gc.condemned_objects_count());
-  EXPECT_EQ(t(27, 11, 1987), gc.oldest_trunk_catalog());
+  EXPECT_EQ(static_cast<unsigned>(t(27, 11, 1987)), gc.oldest_trunk_catalog());
 }
 
 
@@ -516,7 +516,7 @@ TEST_F(T_GarbageCollector, KeepLastRevision) {
   EXPECT_TRUE(gc1);
   EXPECT_EQ(11u, gc.preserved_catalog_count());
   EXPECT_EQ(5u, gc.condemned_catalog_count());
-  EXPECT_EQ(t(26, 12, 2004), gc.oldest_trunk_catalog());
+  EXPECT_EQ(static_cast<unsigned>(t(26, 12, 2004)), gc.oldest_trunk_catalog());
 
   GC_MockUploader *upl = static_cast<GC_MockUploader*>(config.uploader);
   RevisionMap     &c   = catalogs_;
@@ -592,7 +592,7 @@ TEST_F(T_GarbageCollector, KeepLastThreeRevisions) {
   EXPECT_TRUE(gc1);
   EXPECT_EQ(14u, gc.preserved_catalog_count());
   EXPECT_EQ(2u, gc.condemned_catalog_count());
-  EXPECT_EQ(t(24, 12, 2004), gc.oldest_trunk_catalog());
+  EXPECT_EQ(static_cast<unsigned>(t(24, 12, 2004)), gc.oldest_trunk_catalog());
 
   GC_MockUploader *upl = static_cast<GC_MockUploader*>(config.uploader);
   RevisionMap     &c   = catalogs_;
@@ -668,7 +668,7 @@ TEST_F(T_GarbageCollector, KeepOnlyNamedSnapshots) {
   EXPECT_TRUE(gc1);
   EXPECT_EQ(11u, gc.preserved_catalog_count());
   EXPECT_EQ(5u, gc.condemned_catalog_count());
-  EXPECT_EQ(t(26, 12, 2004), gc.oldest_trunk_catalog());
+  EXPECT_EQ(static_cast<unsigned>(t(26, 12, 2004)), gc.oldest_trunk_catalog());
 
   GC_MockUploader *upl = static_cast<GC_MockUploader*>(config.uploader);
   RevisionMap     &c   = catalogs_;
@@ -736,7 +736,7 @@ TEST_F(T_GarbageCollector, KeepNamedSnapshotsWithAlreadySweepedRevisions) {
   EXPECT_TRUE(gc1);
   EXPECT_EQ(11u, gc.preserved_catalog_count());
   EXPECT_EQ(0u, gc.condemned_catalog_count());
-  EXPECT_EQ(t(25, 12, 2004), gc.oldest_trunk_catalog());
+  EXPECT_EQ(static_cast<unsigned>(t(25, 12, 2004)), gc.oldest_trunk_catalog());
 }
 
 
@@ -763,7 +763,7 @@ TEST_F(T_GarbageCollector, UnreachableNestedCatalog) {
   EXPECT_EQ(8u, gc.preserved_catalog_count());
   // Note: should be 8 but (3,"10") was already gone!
   EXPECT_EQ(7u, gc.condemned_catalog_count());
-  EXPECT_EQ(t(25, 12, 2004), gc.oldest_trunk_catalog());
+  EXPECT_EQ(static_cast<unsigned>(t(25, 12, 2004)), gc.oldest_trunk_catalog());
 
   GC_MockUploader *upl = static_cast<GC_MockUploader*>(config.uploader);
 
@@ -859,7 +859,7 @@ TEST_F(T_GarbageCollector, OnTheFlyDeletionOfCatalogs) {
 
   EXPECT_EQ(11u, gc.preserved_catalog_count());
   EXPECT_EQ(5u, gc.condemned_catalog_count());
-  EXPECT_EQ(t(26, 12, 2004), gc.oldest_trunk_catalog());
+  EXPECT_EQ(static_cast<unsigned>(t(26, 12, 2004)), gc.oldest_trunk_catalog());
 
   EXPECT_FALSE(upl->HasDeleted(h("b52945d780f8cc16711d4e670d82499dad99032d")));
   EXPECT_FALSE(upl->HasDeleted(h("d650d325d59ea9ca754f9b37293cd08d0b12584c")));
@@ -930,7 +930,7 @@ TEST_F(T_GarbageCollector, KeepRevisionsBasedOnTimestamp) {
   EXPECT_TRUE(gc1.Collect());
   EXPECT_EQ(14u, gc1.preserved_catalog_count());
   EXPECT_EQ(2u, gc1.condemned_catalog_count());
-  EXPECT_EQ(t(3, 3, 2000), gc1.oldest_trunk_catalog());
+  EXPECT_EQ(static_cast<unsigned>(t(3, 3, 2000)), gc1.oldest_trunk_catalog());
 
   GC_MockUploader *upl = static_cast<GC_MockUploader*>(config.uploader);
   RevisionMap     &c   = catalogs_;
@@ -969,7 +969,7 @@ TEST_F(T_GarbageCollector, KeepRevisionsBasedOnTimestamp) {
   EXPECT_EQ(14u, gc2.preserved_catalog_count());
   EXPECT_EQ(0u, gc2.condemned_catalog_count());  // Reflog doesn't contain
                                                  // deleted catalogs anymore
-  EXPECT_EQ(t(3, 3, 2000), gc2.oldest_trunk_catalog());
+  EXPECT_EQ(static_cast<unsigned>(t(3, 3, 2000)), gc2.oldest_trunk_catalog());
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -979,7 +979,7 @@ TEST_F(T_GarbageCollector, KeepRevisionsBasedOnTimestamp) {
 
   EXPECT_EQ(14u, gc3.preserved_catalog_count());
   EXPECT_EQ(0u, gc3.condemned_catalog_count());
-  EXPECT_EQ(t(24, 12, 2004), gc3.oldest_trunk_catalog());
+  EXPECT_EQ(static_cast<unsigned>(t(24, 12, 2004)), gc3.oldest_trunk_catalog());
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -989,7 +989,7 @@ TEST_F(T_GarbageCollector, KeepRevisionsBasedOnTimestamp) {
 
   EXPECT_EQ(11u, gc4.preserved_catalog_count());
   EXPECT_EQ(3u, gc4.condemned_catalog_count());
-  EXPECT_EQ(t(25, 12, 2004), gc4.oldest_trunk_catalog());
+  EXPECT_EQ(static_cast<unsigned>(t(25, 12, 2004)), gc4.oldest_trunk_catalog());
   EXPECT_EQ(11u, upl->deleted_hashes.size());
 
   EXPECT_TRUE(upl->HasDeleted(c[mp(1, "00")]->hash()));
@@ -1079,7 +1079,7 @@ TEST_F(T_GarbageCollector, KeepRevisionsBasedOnTimestamp) {
 
   EXPECT_EQ(11u, gc5.preserved_catalog_count());
   EXPECT_EQ(0u, gc5.condemned_catalog_count());
-  EXPECT_EQ(t(25, 12, 2004), gc5.oldest_trunk_catalog());
+  EXPECT_EQ(static_cast<unsigned>(t(25, 12, 2004)), gc5.oldest_trunk_catalog());
   EXPECT_EQ(11u, upl->deleted_hashes.size());
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -1090,7 +1090,7 @@ TEST_F(T_GarbageCollector, KeepRevisionsBasedOnTimestamp) {
 
   EXPECT_EQ(11u, gc6.preserved_catalog_count());
   EXPECT_EQ(0u, gc6.condemned_catalog_count());
-  EXPECT_EQ(t(25, 12, 2004), gc6.oldest_trunk_catalog());
+  EXPECT_EQ(static_cast<unsigned>(t(25, 12, 2004)), gc6.oldest_trunk_catalog());
   EXPECT_EQ(11u, upl->deleted_hashes.size());
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -1101,7 +1101,7 @@ TEST_F(T_GarbageCollector, KeepRevisionsBasedOnTimestamp) {
 
   EXPECT_EQ(7u, gc7.preserved_catalog_count());
   EXPECT_EQ(4u, gc7.condemned_catalog_count());
-  EXPECT_EQ(t(26, 12, 2004), gc7.oldest_trunk_catalog());
+  EXPECT_EQ(static_cast<unsigned>(t(26, 12, 2004)), gc7.oldest_trunk_catalog());
   EXPECT_EQ(29u, upl->deleted_hashes.size());
 
   EXPECT_TRUE(upl->HasDeleted(c[mp(4, "00")]->hash()));
@@ -1158,7 +1158,7 @@ TEST_F(T_GarbageCollector, KeepOnlyFutureRevisions) {
   EXPECT_FALSE(upl->HasDeleted(c[mp(5, "10")]->hash()));
   EXPECT_FALSE(upl->HasDeleted(c[mp(5, "11")]->hash()));
   EXPECT_FALSE(upl->HasDeleted(c[mp(5, "20")]->hash()));
-  EXPECT_EQ(t(26, 12, 2004), gc1.oldest_trunk_catalog());
+  EXPECT_EQ(static_cast<unsigned>(t(26, 12, 2004)), gc1.oldest_trunk_catalog());
 }
 
 
@@ -1191,7 +1191,7 @@ TEST_F(T_GarbageCollector, NamedTagsInRecycleBin) {
 
   EXPECT_EQ(11u, gc1.preserved_catalog_count());
   EXPECT_EQ(5u, gc1.condemned_catalog_count());
-  EXPECT_EQ(t(26, 12, 2004), gc1.oldest_trunk_catalog());
+  EXPECT_EQ(static_cast<unsigned>(t(26, 12, 2004)), gc1.oldest_trunk_catalog());
 
   EXPECT_FALSE(upl->HasDeleted(c[mp(2, "00")]->hash()));
   EXPECT_FALSE(upl->HasDeleted(c[mp(2, "10")]->hash()));
@@ -1237,7 +1237,7 @@ TEST_F(T_GarbageCollector, NamedTagsInRecycleBin) {
 
   EXPECT_EQ(8u, gc2.preserved_catalog_count());
   EXPECT_EQ(3u, gc2.condemned_catalog_count());
-  EXPECT_EQ(t(26, 12, 2004), gc2.oldest_trunk_catalog());
+  EXPECT_EQ(static_cast<unsigned>(t(26, 12, 2004)), gc2.oldest_trunk_catalog());
 
   EXPECT_TRUE(upl->HasDeleted(c[mp(2, "00")]->hash()));
   EXPECT_TRUE(upl->HasDeleted(c[mp(2, "10")]->hash()));
@@ -1270,7 +1270,7 @@ TEST_F(T_GarbageCollector, LogDeletionToFile) {
   EXPECT_TRUE(gc1);
   EXPECT_EQ(11u, gc.preserved_catalog_count());
   EXPECT_EQ(5u, gc.condemned_catalog_count());
-  EXPECT_EQ(t(26, 12, 2004), gc.oldest_trunk_catalog());
+  EXPECT_EQ(static_cast<unsigned>(t(26, 12, 2004)), gc.oldest_trunk_catalog());
 
   RevisionMap     &c   = catalogs_;
 
@@ -1389,7 +1389,7 @@ TEST_F(T_GarbageCollector, FindAndSweepOrphanedNamedSnapshot) {
   EXPECT_TRUE(upl->HasDeleted(c[mp(1, "10")]->hash()));
 
   EXPECT_EQ(11u, gc.preserved_catalog_count());
-  EXPECT_EQ(t(25, 12, 2004), gc.oldest_trunk_catalog());
+  EXPECT_EQ(static_cast<unsigned>(t(25, 12, 2004)), gc.oldest_trunk_catalog());
 
   // mock a history database chain that contains the information of the deleted
   // snapshot "Revision2" in its recycle bin and remove it entirely from the
@@ -1437,5 +1437,6 @@ TEST_F(T_GarbageCollector, FindAndSweepOrphanedNamedSnapshot) {
   EXPECT_TRUE(upl->HasDeleted(c[mp(1, "10")]->hash()));
 
   EXPECT_EQ(8u, new_gc.preserved_catalog_count());
-  EXPECT_EQ(t(25, 12, 2004), new_gc.oldest_trunk_catalog());
+  EXPECT_EQ(static_cast<unsigned>(t(25, 12, 2004)),
+            new_gc.oldest_trunk_catalog());
 }

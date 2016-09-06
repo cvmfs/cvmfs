@@ -272,7 +272,6 @@ bool Reflog::GetReferenceTimestamp(
     *timestamp = get_timestamp_->RetrieveTimestamp();
   }
 
-  const uint64_t result = get_timestamp_->RetrieveTimestamp();
   const bool reset = get_timestamp_->Reset();
   assert(reset);
 

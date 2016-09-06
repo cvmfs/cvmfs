@@ -12,11 +12,9 @@ if [ -f .tmp/*.egg ]; then
   # older python versions like 2.4 install a .egg; extract GeoIP.so
   (cd .tmp; unzip -o *.egg GeoIP.so)
 elif [ -d .tmp/*.egg ]; then
-  # for some reason SLC6 produces an uncompressed *.egg directory containing GeoIP.so
-  cp .tmp/*.egg/GeoIP.so .tmp
-elif [ -f .tmp/GeoIP.*.so ]; then
-  # on ArchLinux no *.egg is created but a GeoIP.<system tag>.so file
-  cp .tmp/GeoIP.*.so .tmp/GeoIP.so
+  # the .so might be in an uncompressed *.egg directory
+  # on arch linux the shared object is called GeoIP.<system tag>.so
+  cp .tmp/*.egg/GeoIP*.so .tmp
 fi
-cp .tmp/GeoIP.so dist
+cp .tmp/GeoIP*.so dist/GeoIP.so
 rm -rf .tmp
