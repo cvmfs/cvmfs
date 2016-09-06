@@ -270,12 +270,10 @@ class RamCacheManager : public CacheManager {
     Transaction()
       : buffer()
       , expected_size(0)
-      , pos(0)
-      , allocated(false) { }
+      , pos(0) { }
     MemoryBuffer buffer;
     uint64_t expected_size;
     uint64_t pos;
-    bool allocated;
     std::string description;
   };
 

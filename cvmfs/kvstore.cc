@@ -73,11 +73,6 @@ size_t MemoryKvStore::GetBufferSize(MemoryBuffer *buf) {
   }
 }
 
-int MemoryKvStore::MallocBuffer(MemoryBuffer *buf) {
-  WriteLockGuard guard(rwlock_);
-  return DoMalloc(buf);
-}
-
 int MemoryKvStore::DoMalloc(MemoryBuffer *buf) {
   size_t N;
   MallocArena *M;
@@ -133,11 +128,6 @@ int MemoryKvStore::DoMalloc(MemoryBuffer *buf) {
   return 0;
 }
 
-int MemoryKvStore::ReallocBuffer(MemoryBuffer *buf, size_t size) {
-  WriteLockGuard guard(rwlock_);
-  return DoRealloc(buf, size);
-}
-
 int MemoryKvStore::DoRealloc(MemoryBuffer *buf, size_t size) {
   MemoryBuffer tmp;
   int rc;
@@ -169,11 +159,6 @@ int MemoryKvStore::DoRealloc(MemoryBuffer *buf, size_t size) {
   }
   memcpy(buf, &tmp, sizeof(*buf));
   return 0;
-}
-
-void MemoryKvStore::FreeBuffer(MemoryBuffer *buf) {
-  WriteLockGuard guard(rwlock_);
-  DoFree(buf);
 }
 
 void MemoryKvStore::DoFree(MemoryBuffer *buf) {
@@ -209,19 +194,19 @@ void MemoryKvStore::DoFree(MemoryBuffer *buf) {
 
 bool MemoryKvStore::Cleanup() {
   double utilization;
-  LogCvmfs(kLogKvStore, kLogDebug, "cleanup requested");
   switch (allocator_) {
   case kMallocHeap:
     utilization = heap_->utilization();
+    LogCvmfs(kLogKvStore, kLogDebug, "cleanup requested (%f)", utilization);
     if (utilization < 0.8) {
       LogCvmfs(kLogKvStore, kLogDebug, "compacting heap");
-      WriteLockGuard guard(rwlock_);
       heap_->Compact();
       if (heap_->utilization() > utilization) return true;
     }
     return false;
   default:
     // the others can't do any cleanup, so just ignore
+    LogCvmfs(kLogKvStore, kLogDebug, "cleanup requested");
     return false;
   }
 }
@@ -324,10 +309,6 @@ bool MemoryKvStore::Commit(const MemoryBuffer &buf) {
 
 bool MemoryKvStore::DoCommit(const MemoryBuffer &buf) {
   /*
-   * Commit allows overwriting existing entries without free()ing the
-   * associated memory buffer. It's assumed that the caller knows about the
-   * existing entry and free()ed or realloc()ed themselves.
-   * To support both RamCacheManager::CommitTxn and RamCacheManager::OpenFromTxn,
    * we need to be careful about refcounts. If another thread wants to read
    * a cache entry while it's being written (OpenFromTxn put partial data in
    * the kvstore, will be committed again later) the refcount in the kvstore
@@ -340,25 +321,37 @@ bool MemoryKvStore::DoCommit(const MemoryBuffer &buf) {
    * refcount like a lock and not directly modify the numeric value.
    */
 
+  Cleanup();
+
   MemoryBuffer mem;
   perf::Inc(counters_.n_commit);
   LogCvmfs(kLogKvStore, kLogDebug, "commit %s", buf.id.ToString().c_str());
   if (entries_.Lookup(buf.id, &mem)) {
     LogCvmfs(kLogKvStore, kLogDebug, "commit overwrites existing entry");
-    used_bytes_ -= mem.size;
-    perf::Xadd(counters_.sz_deleted, mem.size);
+    size_t old_size = mem.size;
+    if (DoRealloc(&mem, buf.size) < 0) {
+      LogCvmfs(kLogKvStore, kLogDebug, "failed to reallocate %s",
+        buf.id.ToString().c_str());
+      return false;
+    }
+    used_bytes_ -= old_size;
     counters_.sz_size->Set(used_bytes_);
   } else {
     if (entry_count_ == max_entries_) {
       LogCvmfs(kLogKvStore, kLogDebug, "too many entries in kvstore");
       return false;
     }
+    mem.size = buf.size;
+    if (DoMalloc(&mem) < 0) {
+      LogCvmfs(kLogKvStore, kLogDebug, "failed to allocate %s",
+        buf.id.ToString().c_str());
+      return false;
+    }
     // since this is a new entry, the caller can choose the starting
     // refcount (starting at 1 for pinning, for example)
     mem.refcount = buf.refcount;
   }
-  mem.address = buf.address;
-  mem.size = buf.size;
+  memcpy(mem.address, buf.address, min(mem.size, buf.size));
   mem.object_type = buf.object_type;
   mem.id = buf.id;
   entries_.Insert(buf.id, mem);

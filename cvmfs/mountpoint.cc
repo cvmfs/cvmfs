@@ -216,6 +216,10 @@ bool FileSystem::CreateCache() {
         alloc = MemoryKvStore::kMallocHeap;
       }
     }
+    if (cache_bytes % 8 != 0) {
+      // Ensure 8-byte alignment for heap allocator
+      cache_bytes += 8 - (cache_bytes % 8);
+    }
     cache_bytes = max((uint64_t) 200*1024*1024, cache_bytes);
     cache_mgr_ = new cache::RamCacheManager(
       cache_bytes,

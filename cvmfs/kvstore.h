@@ -213,23 +213,6 @@ class MemoryKvStore :SingleCopy, public Callbackable<MallocHeap::BlockPtr> {
   bool ShrinkTo(size_t size);
 
   /**
-   * Allocate a new buffer using the KvStore's memory allocator.
-   * @returns -errno on failure
-   */
-  int MallocBuffer(MemoryBuffer *buf);
-
-  /**
-   * Resize the given buffer using the KvStore's memory allocator.
-   * @returns -errno on failure
-   */
-  int ReallocBuffer(MemoryBuffer *buf, size_t size);
-
-  /**
-   * Frees the given buffer, returning the space to the KvStore's memory allocator.
-   */
-  void FreeBuffer(MemoryBuffer *buf);
-
-  /**
    * Get the memory buffer describing the entry at id
    * @param id The hash key
    * @returns True iff the entry is present
@@ -249,18 +232,6 @@ class MemoryKvStore :SingleCopy, public Callbackable<MallocHeap::BlockPtr> {
    */
   size_t GetUsed() { return used_bytes_; }
 
-  /**
-   * Advise the KvStore to free up any available memory.
-   * Depending on the allocator in use, this might be a no op. Callers should
-   * advise the KvStore to clean up if they have already run out of space and
-   * done what they can to make room. The KvStore is free to decide whether
-   * any cleanup operations are a good idea. Note that callers should assume
-   * that Cleanup could block the entire cache for an unspecified amount of
-   * time, so frequent, unnecessary calls are likely to hurt performance.
-   * Cleanup returns true if any cleanup happened.
-   */
-  bool Cleanup();
-
  private:
   bool DoDelete(const shash::Any &id);
   int DoMalloc(MemoryBuffer *buf);
@@ -269,6 +240,7 @@ class MemoryKvStore :SingleCopy, public Callbackable<MallocHeap::BlockPtr> {
   bool DoCommit(const MemoryBuffer &buf);
   size_t GetBufferSize(MemoryBuffer *buf);
   void OnBlockMove(const MallocHeap::BlockPtr &ptr);
+  bool Cleanup();
 
   MemoryAllocator allocator_;
   size_t used_bytes_;

@@ -185,6 +185,13 @@ int RamCacheManager::StartTxn(const shash::Any &id, uint64_t size, void *txn) {
   transaction->pos = 0;
   transaction->expected_size = size;
   transaction->buffer.size = (size == kSizeUnknown) ? kPageSize : size;
+  transaction->buffer.address = malloc(transaction->buffer.size);
+  if (!transaction->buffer.address && size > 0) {
+    LogCvmfs(kLogCache, kLogDebug,
+             "failed to allocate %lu B for %s",
+             size, id.ToString().c_str());
+    return -errno;
+  }
   perf::Inc(counters_.n_starttxn);
   return 0;
 }
@@ -198,7 +205,7 @@ void RamCacheManager::CtrlTxn(
 {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
   transaction->description = description;
-  if (!transaction->allocated) transaction->buffer.object_type = type;
+  transaction->buffer.object_type = type;
   LogCvmfs(kLogCache, kLogDebug, "modified transaction %s",
            transaction->buffer.id.ToString().c_str());
 }
@@ -206,27 +213,6 @@ void RamCacheManager::CtrlTxn(
 
 int64_t RamCacheManager::Write(const void *buf, uint64_t size, void *txn) {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
-
-  /*
-   * The initial buffer for the transaction must be allocated on the first
-   * write so the caller has time to use CtrlTxn to set regular/volatile.
-   * Transactions of unknown size will often be immediately reallocated,
-   * but this is no worse than allocate on start.
-   */
-AGAIN:
-  if (!transaction->allocated) {
-    int rc = GetTransactionStore(transaction)
-      ->MallocBuffer(&transaction->buffer);
-    if (transaction->buffer.size > 0 && rc < 0) {
-      LogCvmfs(kLogCache, kLogDebug,
-               "failed to allocate %lu B for %s",
-               transaction->buffer.size,
-               transaction->buffer.id.ToString().c_str());
-      if (GetTransactionStore(transaction)->Cleanup()) goto AGAIN;
-      return -EIO;
-    }
-    transaction->allocated = true;
-  }
 
   assert(transaction->pos <= transaction->buffer.size);
   if (transaction->pos + size > transaction->buffer.size) {
@@ -237,15 +223,15 @@ AGAIN:
       LogCvmfs(kLogCache, kLogDebug, "reallocate transaction for %s to %u B",
                transaction->buffer.id.ToString().c_str(),
                transaction->buffer.size);
-      int rc = GetTransactionStore(transaction)->ReallocBuffer(
-        &transaction->buffer, new_size);
-      if (rc < 0) {
+      void *new_ptr = realloc(transaction->buffer.address, new_size);
+      if (!new_ptr) {
         LogCvmfs(kLogCache, kLogDebug,
                  "failed to allocate %lu B for %s",
                  new_size, transaction->buffer.id.ToString().c_str());
-        if (GetTransactionStore(transaction)->Cleanup()) goto AGAIN;
         return -EIO;
       }
+      transaction->buffer.address = new_ptr;
+      transaction->buffer.size = new_size;
     } else {
       LogCvmfs(kLogCache, kLogDebug,
                "attempted to write more than requested (%u>%u)",
@@ -295,7 +281,7 @@ int RamCacheManager::OpenFromTxn(void *txn) {
 
 int RamCacheManager::AbortTxn(void *txn) {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
-  GetTransactionStore(transaction)->FreeBuffer(&transaction->buffer);
+  free(transaction->buffer.address);
   LogCvmfs(kLogCache, kLogDebug, "abort transaction %s",
            transaction->buffer.id.ToString().c_str());
   perf::Inc(counters_.n_aborttxn);
@@ -307,27 +293,15 @@ int RamCacheManager::CommitTxn(void *txn) {
   WriteLockGuard guard(rwlock_);
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
   perf::Inc(counters_.n_committxn);
-  return CommitToKvStore(transaction);
+  int64_t rc = CommitToKvStore(transaction);
+  if (rc < 0) return rc;
+  free(transaction->buffer.address);
+  return rc;
 }
 
 
 int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
   MemoryKvStore *store;
-  if (transaction->expected_size == kSizeUnknown) {
-    if (transaction->buffer.size > 0) {
-      int rc = GetTransactionStore(transaction)
-        ->ReallocBuffer(&transaction->buffer, transaction->pos);
-      if (rc < 0 && transaction->pos > 0) {
-        LogCvmfs(kLogCache, kLogDebug,
-                 "failed to realloc to %lu B for %s",
-                 transaction->pos, transaction->buffer.id.ToString().c_str());
-        return -EIO;
-      }
-      LogCvmfs(kLogCache, kLogDebug, "reallocating transaction on %s to %u B",
-               transaction->buffer.id.ToString().c_str(),
-               transaction->buffer.size);
-    }
-  }
 
   if (transaction->buffer.object_type == cache::CacheManager::kTypeVolatile) {
     store = &volatile_entries_;
@@ -371,9 +345,9 @@ int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
     return 0;
   } else {
     LogCvmfs(kLogCache, kLogDebug,
-             "commit on %s failed, kvstore has too many entries",
+             "commit on %s failed",
              transaction->buffer.id.ToString().c_str());
-    return -ENFILE;
+    return -EIO;
   }
 }
 
