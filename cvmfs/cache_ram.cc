@@ -219,7 +219,7 @@ int64_t RamCacheManager::Write(const void *buf, uint64_t size, void *txn) {
     if (transaction->expected_size == kSizeUnknown) {
       perf::Inc(counters_.n_realloc);
       size_t new_size = max(2*transaction->buffer.size,
-        size + transaction->pos);
+        (size_t) (size + transaction->pos));
       LogCvmfs(kLogCache, kLogDebug, "reallocate transaction for %s to %u B",
                transaction->buffer.id.ToString().c_str(),
                transaction->buffer.size);
