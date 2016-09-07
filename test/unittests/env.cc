@@ -4,6 +4,8 @@
 
 #include "env.h"
 
+#include <unistd.h>
+
 #include <cassert>
 #include <cerrno>
 #include <cstdlib>
@@ -62,7 +64,10 @@ void CvmfsEnvironment::CreateSandbox() {
   assert(sandbox_.empty());
 
   // create sandbox directory
-  const std::string sandbox = CreateTempDir("/tmp/cvmfs_ut_sandbox");
+  std::string tmp_base = "/tmp";
+  if (getenv("CVMFS_TEST_SCRATCH") != NULL)
+    tmp_base = getenv("CVMFS_TEST_SCRATCH");
+  const std::string sandbox = CreateTempDir(tmp_base + "/cvmfs_ut_sandbox");
   if (sandbox.empty()) {
     std::cerr << "Unittest Setup: Failed to create sandbox directory in /tmp "
               << " (errno: " << errno << ")."
