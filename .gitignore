@@ -4,6 +4,7 @@ test/test.log
 ._*
 .fuse_hidden*
 build/
+build-*/
 benchmark/
 *.pyc
 test/cloud_testing/ec2_config.sh
