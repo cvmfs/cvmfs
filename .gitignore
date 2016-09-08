@@ -13,6 +13,9 @@ python/python_cvmfsutils.egg-info/*
 python/MANIFEST
 .vagrant/
 
+# Visual Studio Code
+.browse.VC.*
+
 # Eclipse-related files
 .project
 .cproject
