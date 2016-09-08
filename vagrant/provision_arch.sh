@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# link the cvmfs source tree conveniently into the home directory
+[ -L cvmfs ] || ln -s /vagrant cvmfs
+
+# install dependencies
+pacman -Sy --noconfirm \
+  base-devel apache libutil-linux fuse attr openssl python curl autofs gdb jq
+  libcap lsof rsync valgrind cmake unzip bind-tools
+
+# convenience packages
+pacman -Sy --noconfirm screen iftop htop git tig
+
+# enable httpd on boot
+systemctl enable httpd
+systemctl start httpd
