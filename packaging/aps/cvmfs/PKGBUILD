@@ -10,7 +10,6 @@ license=('BSD')
 depends=('libutil-linux' 'fuse' 'attr' 'openssl' 'python' 'curl' 'autofs' 'gdb'
          'cvmfs-config')
 makedepends=('valgrind' 'cmake' 'unzip')
-install=cvmfs.install
 source=("https://ecsft.cern.ch/dist/cvmfs/cvmfs-$pkgver/cvmfs-$pkgver.tar.gz")
 options=('!strip' 'emptydirs')
 
@@ -20,7 +19,11 @@ prepare() {
 
 build() {
   cd "$srcdir/$pkgname-$pkgver"
-  cmake -DBUILD_UNITTESTS=yes
+  cmake -DBUILD_SERVER=yes \
+    -DBUILD_SERVER_DEBUG=yes \
+    -DBUILD_LIBCVMFS=yes \
+    -DBUILD_UNITTESTS=yes \
+    -DINSTALL_UNITTESTS=yes
   make -j $(nproc)
 }
 
@@ -29,24 +32,51 @@ check() {
   make check
 }
 
+
+_remove_keys_and_config() {
+  local pkgdir="$1"
+
+  rm -rf "$pkgdir/etc/cvmfs/keys"
+  rm -rf "$pkgdir/etc/cvmfs/config.d"
+  rm -rf "$pkgdir/etc/cvmfs/domain.d"
+  rm -rf "$pkgdir/etc/cvmfs/default.d/50-cern.conf"
+  rm -rf "$pkgdir/etc/cvmfs/default.d/60-egi.conf"
+  rm -f "$pkgdir/etc/cvmfs/serverorder.sh"
+}
+
+
 _remove_client() {
+  local pkgdir="$1"
+
+  _remove_keys_and_config "$pkgdir"
   for client_bin in cvmfs2 cvmfs_talk cvmfs_fsck cvmfs_config mount.cvmfs; do
     rm -f "$pkgdir/usr/bin/$client_bin"
   done
-  rm -f "$pkgdir/usr/lib/libcvmfs_fuse*" "$pkgdir/etc/cvmfs/config.sh" \
-    "$pkgdir/etc/autofs/auto.cvmfs"
-  rmdir "$pkgdir/cvmfs" "$pkgdir/etc/cvmfs/config.d" \
-    "$pkgdir/etc/cvmfs/domain.d" "$pkgdir/var/lib/cvmfs"
+  rm -f "$pkgdir/etc/cvmfs/config.sh" "$pkgdir/etc/autofs/auto.cvmfs" \
+    "$pkgdir/etc/cvmfs/default.conf"
+  rm -f "$pkgdir/usr/lib/libcvmfs_fuse.so" \
+    "$pkgdir/usr/lib/libcvmfs_fuse.so.$pkgver" \
+    "$pkgdir/usr/lib/libcvmfs_fuse_debug.so" \
+    "$pkgdir/usr/lib/libcvmfs_fuse_debug.so.$pkgver"
   rm -rf "$pkgdir/etc/cvmfs/default.d" "$pkgdir/usr/lib/cvmfs" \
-    "$pkgdir/etc/bash_completion.d/cvmfs"
-  rm -f "$pkgdir/usr/lib/libcvmfs.a" "$pkgdir/usr/include/libcvmfs.h"
+    "$pkgdir/etc/bash_completion.d"
 }
 
+
 _remove_server() {
-  rm -f "$pkgdir/usr/lib/libtbb*" "$pkgdir/etc/cvmfs/cvmfs_server_hooks.sh.demo"
+  local pkgdir="$1"
+
+  rm -f "$pkgdir/etc/cvmfs/cvmfs_server_hooks.sh.demo" \
+    "$pkgdir/usr/lib/libtbb_cvmfs.so" \
+    "$pkgdir/usr/lib/libtbb_cvmfs.so.2" \
+    "$pkgdir/usr/lib/libtbb_cvmfs_debug.so" \
+    "$pkgdir/usr/lib/libtbb_cvmfs_debug.so.2" \
+    "$pkgdir/usr/lib/libtbbmalloc_cvmfs.so" \
+    "$pkgdir/usr/lib/libtbbmalloc_cvmfs.so.2" \
+    "$pkgdir/usr/lib/libtbbmalloc_cvmfs_debug.so" \
+    "$pkgdir/usr/lib/libtbbmalloc_cvmfs_debug.so.2"
   rm -rf "$pkgdir/usr/share/cvmfs-server" "$pkgdir/var/lib/cvmfs-server" \
     "$pkgdir/var/www" "$pkgdir/var/spool"
-  rmdir "$pkgdir/etc/cvmfs/repositories.d"
   for server_bin in cvmfs_server cvmfs_swissknife cvmfs_swissknife_debug \
     cvmfs_suid_helper cvmfs_rsync
   do
@@ -54,62 +84,85 @@ _remove_server() {
   done
 }
 
+
 _remove_devel() {
+  local pkgdir="$1"
+
   rm -f "$pkgdir/usr/lib/libcvmfs.a" "$pkgdir/usr/include/libcvmfs.h"
+  rmdir "$pkgdir/usr/include"
 }
+
 
 _remove_unittests() {
-  rm -f /usr/bin/cvmfs_unittests
+  local pkgdir="$1"
+
+  rm -f "$pkgdir/usr/bin/cvmfs_unittests"
 }
 
-package() {
+
+package_cvmfs() {
+  install=cvmfs.install
+
   cd "$srcdir/$pkgname-$pkgver"
+  mkdir -p "$pkgdir/etc/autofs"
   make -j $(nproc) DESTDIR="$pkgdir/" install
 
+  _remove_keys_and_config "$pkgdir"
+  mkdir -p "$pkgdir/cvmfs"
+  mkdir -p "$pkgdir/var/lib/cvmfs"
+  mkdir -p "$pkgdir/etc/cvmfs/keys"
+  mkdir -p "$pkgdir/etc/cvmfs/config.d"
+  mkdir -p "$pkgdir/etc/cvmfs/domain.d"
   mv "$pkgdir/usr/share/doc/cvmfs-$pkgver" "$pkgdir/usr/share/doc/cvmfs"
-  _remove_server
-  _remove_devel
-  _remove_unittests
+  rm -rf "$pkgdir/etc/bash_completion.d"
+  _remove_server "$pkgdir"
+  _remove_devel "$pkgdir"
+  _remove_unittests "$pkgdir"
 }
+
 
 package_cvmfs-server() {
   pkgdesc="CernVM-FS tools to maintain Stratum 0/1 repositories"
   makedepends=('cmake' 'unzip')
   depends=('curl' 'attr' 'openssl' 'apache' 'libcap' 'lsof' 'rsync' 'jq')
   optdepends=('mod_wsgi: support for stratum 1 GeoAPI')
+  install=cvmfs-server.install
 
-  cd "$srcdir/$pkgname-$pkgver"
+  cd "$srcdir/cvmfs-$pkgver"
   make -j $(nproc) DESTDIR="$pkgdir/" install
 
+  mkdir -p "$pkgdir/etc/cvmfs/repositories.d"
   mv "$pkgdir/usr/share/doc/cvmfs-$pkgver" "$pkgdir/usr/share/doc/cvmfs-server"
-  _remove_client
-  _remove_devel
-  _remove_unittests
+  _remove_client "$pkgdir"
+  _remove_devel "$pkgdir"
+  _remove_unittests "$pkgdir"
 }
+
 
 package_cvmfs-devel() {
   pkgdesc="CernVM-FS static client library for repository access without fuse"
   depends=('openssl')
-  options=('!strip' '!emptydirs')
+  options=('staticlibs' '!strip' '!emptydirs')
 
-  cd "$srcdir/$pkgname-$pkgver"
+  cd "$srcdir/cvmfs-$pkgver"
   make -j $(nproc) DESTDIR="$pkgdir/" install
 
   mv "$pkgdir/usr/share/doc/cvmfs-$pkgver" "$pkgdir/usr/share/doc/cvmfs-devel"
-  _remove_client
-  _remove_server
-  _remove_unittests
+  _remove_client "$pkgdir"
+  _remove_server "$pkgdir"
+  _remove_unittests "$pkgdir"
 }
 
+
 package_cvmfs-unittests() {
-	pkgdesc="CernVM-FS unit tests binary, testing only"
+  pkgdesc="CernVM-FS unit tests binary, testing only"
   options=('!strip' '!emptydirs')
 
-  cd "$srcdir/$pkgname-$pkgver"
+  cd "$srcdir/cvmfs-$pkgver"
   make -j $(nproc) DESTDIR="$pkgdir/" install
 
   rm -rf "$pkgdir/usr/share/doc/cvmfs-$pkgver"
-  _remove_client
-  _remove_server
-  _remove_devel
+  _remove_client "$pkgdir"
+  _remove_server "$pkgdir"
+  _remove_devel "$pkgdir"
 }

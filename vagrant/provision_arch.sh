@@ -14,7 +14,7 @@ pacman -Sy --noconfirm \
   libcap lsof rsync valgrind cmake unzip bind-tools
 
 # convenience packages
-pacman -Sy --noconfirm screen iftop htop git tig strace
+pacman -Sy --noconfirm screen iftop htop git tig strace vim tree
 
 # enable httpd on boot
 systemctl enable httpd

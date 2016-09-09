@@ -1,0 +1,31 @@
+pre_install() {
+  /usr/bin/getent passwd cvmfs >/dev/null
+  if [ $? -ne 0 ]; then
+     /usr/sbin/useradd -r -d /var/lib/cvmfs -s /sbin/nologin -c "CernVM-FS service account" cvmfs
+  fi
+
+  # The useradd command will add a cvmfs group too - but we're in trouble if
+  # the sysadmin has the cvmfs user, but not the group, pre-created.
+  /usr/bin/getent group cvmfs >/dev/null
+  if [ $? -ne 0 ]; then
+    /usr/sbin/groupadd -r cvmfs
+  fi
+}
+
+post_upgrade() {
+  /usr/bin/ldconfig
+  if [ -d /var/run/cvmfs ]; then
+    /usr/bin/cvmfs_config reload
+  fi
+}
+
+pre_remove() {
+  /usr/bin/cvmfs_config umount
+}
+
+post_remove() {
+  /usr/bin/systemctl try-reload-or-restart autofs
+  if [ -e /etc/fuse.conf ]; then
+    sed -i "/added by CernVM-FS/d" /etc/fuse.conf
+  fi
+}
