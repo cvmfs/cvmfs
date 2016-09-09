@@ -690,7 +690,7 @@ if (BUILD_CVMFS)
   install (
     TARGETS      cvmfs_allow_helper cvmfs_deny_helper
     RUNTIME
-    DESTINATION  libexec/cvmfs/authz
+    DESTINATION  ${CVMFS_LIBEXEC_DIR}/authz
   )
 
   install (

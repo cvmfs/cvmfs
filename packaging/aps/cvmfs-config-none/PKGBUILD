@@ -1,0 +1,26 @@
+# Maintainer: Jakob Blomer <jblomer@cern.ch>
+
+pkgname=('cvmfs-config-none')
+pkgver=1.0
+pkgrel=1
+pkgdesc='Empty configuration for CernVM-FS, used to fulfill the cvmfs dependency on cvmfs-config'
+arch=('any')
+url='https://cernvm.cern.ch'
+license=('BSD')
+provides=("cvmfs-config=$pkgver-$pkgrel")
+
+prepare() {
+  :
+}
+
+build() {
+  :
+}
+
+check() {
+  :
+}
+
+package() {
+  :
+}
