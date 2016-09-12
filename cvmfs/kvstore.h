@@ -103,40 +103,9 @@ class MemoryKvStore :SingleCopy, public Callbackable<MallocHeap::BlockPtr> {
     const string &name,
     MemoryAllocator alloc,
     unsigned alloc_size,
-    perf::Statistics *statistics)
-    : allocator_(alloc)
-    , used_bytes_(0)
-    , idx_last_arena_(0)
-    , entry_count_(0)
-    , max_entries_(cache_entries)
-    , entries_(cache_entries, shash::Any(), lru::hasher_any,
-        statistics, name)
-    , heap_(NULL)
-    , counters_(statistics, name + ".lru") {
-    int retval = pthread_rwlock_init(&rwlock_, NULL);
-    assert(retval == 0);
-    switch (alloc) {
-    case kMallocArena:
-      malloc_arenas_.push_back(new MallocArena(kArenaSize));
-      break;
-    case kMallocHeap:
-      heap_ = new MallocHeap(alloc_size,
-          this->MakeCallback(&MemoryKvStore::OnBlockMove, this));
-      break;
-    default:
-      break;
-    }
-  }
+    perf::Statistics *statistics);
 
-  ~MemoryKvStore() {
-    for (size_t i = 0; i < malloc_arenas_.size(); ++i) {
-      delete malloc_arenas_[i];
-    }
-    if (heap_) {
-      delete heap_;
-    }
-    pthread_rwlock_destroy(&rwlock_);
-  }
+  ~MemoryKvStore();
 
   /**
    * Check for the existence of an entry
