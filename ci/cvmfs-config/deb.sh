@@ -37,7 +37,7 @@ build_config_package() {
 
   echo "running the debian package build ($config_package)..."
   debuild --check-dirname-regex=cvmfs-config --no-tgz-check -us -uc # -us -uc == skip signing
-  mv ${CVMFS_SOURCE_LOCATION}/../cvmfs-config_* ${CVMFS_RESULT_LOCATION}/
+  mv ${CVMFS_SOURCE_LOCATION}/../cvmfs-config-*_* ${CVMFS_RESULT_LOCATION}/
 
   echo "switching back to the source directory..."
   cd ${CVMFS_SOURCE_LOCATION}
