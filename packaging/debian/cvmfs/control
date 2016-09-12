@@ -7,7 +7,7 @@ Standards-Version: 3.9.3.1
 Homepage: http://cernvm.cern.ch/portal/filesystem
 
 Package: cvmfs
-Architecture: i386 amd64 armv7l arm64
+Architecture: i386 amd64 armhf arm64
 #Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
 Depends: cvmfs-config, bash, coreutils, grep, gawk, sed, perl, psmisc, autofs, fuse, curl, attr, libfuse2, debianutils, libc-bin, sysvinit-utils, zlib1g, gdb, uuid-dev, uuid
 #Multi-Arch: same   (preparation for multiarch support)
@@ -16,7 +16,7 @@ Description: CernVM File System
  HTTP File System for Distributing Software to CernVM.
 
 Package: cvmfs-server
-Architecture: i386 amd64 armv7l arm64
+Architecture: i386 amd64 armhf arm64
 #Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
 Depends: insserv, initscripts, bash, coreutils, grep, sed, psmisc, curl, gzip, attr, openssl, apache2, libcap2, lsof, rsync
 Recommends: jq
@@ -27,7 +27,7 @@ Description: CernVM File System Server
  HTTP File System Repository Server for Distributing Software to CernVM.
 
 Package: cvmfs-dev
-Architecture: i386 amd64 armv7l arm64
+Architecture: i386 amd64 armhf arm64
 #Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
 Depends: openssl
 #Multi-Arch: same   (preparation for multiarch support)
@@ -36,7 +36,7 @@ Description: CernVM File System Server
  CernVM-FS static client library
 
 Package: cvmfs-unittests
-Architecture: i386 amd64 armv7l arm64
+Architecture: i386 amd64 armhf arm64
 #Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
 Depends: libssl-dev, uuid-dev, cvmfs-server (= ${source:Version})
 #Multi-Arch: same   (preparation for multiarch support)
