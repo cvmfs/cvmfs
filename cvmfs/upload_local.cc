@@ -6,7 +6,6 @@
 #include "upload_local.h"
 
 #include <errno.h>
-#include <fcntl.h>
 
 #include <string>
 
@@ -39,36 +38,6 @@ bool LocalUploader::WillHandle(const SpoolerDefinition &spooler_definition) {
 
 unsigned int LocalUploader::GetNumberOfErrors() const {
   return atomic_read32(&copy_errors_);
-}
-
-
-void LocalUploader::WorkerThread() {
-  bool running = true;
-
-  LogCvmfs(kLogSpooler, kLogVerboseMsg, "Local WorkerThread started.");
-
-  while (running) {
-    UploadJob job = AcquireNewJob();
-    switch (job.type) {
-      case UploadJob::Upload:
-        Upload(job.stream_handle,
-               job.buffer,
-               job.callback);
-        break;
-      case UploadJob::Commit:
-        FinalizeStreamedUpload(job.stream_handle, job.content_hash);
-        break;
-      case UploadJob::Terminate:
-        running = false;
-        break;
-      default:
-        const bool unknown_job_type = false;
-        assert(unknown_job_type);
-        break;
-    }
-  }
-
-  LogCvmfs(kLogSpooler, kLogVerboseMsg, "Local WorkerThread exited.");
 }
 
 
@@ -117,37 +86,12 @@ void LocalUploader::FileUpload(
 }
 
 
-int LocalUploader::CreateAndOpenTemporaryChunkFile(std::string *path) const {
-  const std::string tmp_path = CreateTempPath(temporary_path_ + "/" + "chunk",
-                                              0644);
-  if (tmp_path.empty()) {
-    LogCvmfs(kLogSpooler, kLogStderr,
-             "Failed to create temp file for upload of file chunk (errno: %d).",
-             errno);
-    atomic_inc32(&copy_errors_);
-    return -1;
-  }
-
-  const int tmp_fd = open(tmp_path.c_str(), O_WRONLY);
-  if (tmp_fd < 0) {
-    LogCvmfs(kLogSpooler, kLogStderr,
-             "Failed to open temp file '%s' for upload of file chunk "
-             "(errno: %d)", tmp_path.c_str(), errno);
-    unlink(tmp_path.c_str());
-    atomic_inc32(&copy_errors_);
-    return tmp_fd;
-  }
-
-  *path = tmp_path;
-  return tmp_fd;
-}
-
-
 UploadStreamHandle* LocalUploader::InitStreamedUpload(
                                                    const CallbackTN *callback) {
   std::string tmp_path;
   const int tmp_fd = CreateAndOpenTemporaryChunkFile(&tmp_path);
   if (tmp_fd < 0) {
+    atomic_inc32(&copy_errors_);
     return NULL;
   }
 
@@ -155,9 +99,9 @@ UploadStreamHandle* LocalUploader::InitStreamedUpload(
 }
 
 
-void LocalUploader::Upload(UploadStreamHandle  *handle,
-                           CharBuffer          *buffer,
-                           const CallbackTN    *callback) {
+void LocalUploader::StreamedUpload(UploadStreamHandle  *handle,
+                                   CharBuffer          *buffer,
+                                   const CallbackTN    *callback) {
   assert(buffer->IsInitialized());
   LocalStreamHandle *local_handle = static_cast<LocalStreamHandle*>(handle);
 

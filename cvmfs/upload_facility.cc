@@ -44,6 +44,61 @@ bool AbstractUploader::Initialize() {
 }
 
 
+int AbstractUploader::CreateAndOpenTemporaryChunkFile(std::string *path) const {
+  const std::string tmp_path = CreateTempPath(
+    spooler_definition_.temporary_path + "/" + "chunk", 0644);
+  if (tmp_path.empty()) {
+    LogCvmfs(kLogSpooler, kLogStderr,
+             "Failed to create temp file for upload of file chunk (errno: %d).",
+             errno);
+    return -1;
+  }
+
+  const int tmp_fd = open(tmp_path.c_str(), O_WRONLY);
+  if (tmp_fd < 0) {
+    LogCvmfs(kLogSpooler, kLogStderr,
+             "Failed to open temp file '%s' for upload of file chunk "
+             "(errno: %d)", tmp_path.c_str(), errno);
+    unlink(tmp_path.c_str());
+  } else {
+    *path = tmp_path;
+  }
+
+  return tmp_fd;
+}
+
+
+void AbstractUploader::WorkerThread() {
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "Uploader WorkerThread started.");
+  while (PerformJob() != JobStatus::kTerminate) {}
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "Uploader WorkerThread exited.");
+}
+
+
+AbstractUploader::JobStatus::State AbstractUploader::DispatchJob(
+                                                         const UploadJob &job) {
+  switch (job.type) {
+    case UploadJob::Upload:
+      StreamedUpload(job.stream_handle,
+                     job.buffer,
+                     job.callback);
+      return JobStatus::kOk;
+
+    case UploadJob::Commit:
+      FinalizeStreamedUpload(job.stream_handle, job.content_hash);
+      return JobStatus::kOk;
+
+    case UploadJob::Terminate:
+      return JobStatus::kTerminate;
+
+    default:
+      const bool unknown_job_type = false;
+      assert(unknown_job_type);
+      return JobStatus::kTerminate;
+  }
+}
+
+
 void AbstractUploader::TearDown() {
   assert(!torn_down_);
   upload_queue_.push(UploadJob());  // Termination signal
