@@ -18,6 +18,7 @@
 
 #include "logging.h"
 #include "platform.h"
+#include "util/posix.h"
 
 using namespace std;  // NOLINT
 
@@ -444,8 +445,8 @@ bool FastCgi::ProcessValues(const Header &request_header) {
   FlattenUint16(ret_pos,
                 &ret_header.content_length_b1,
                 &ret_header.content_length_b0);
-  write(fd_transport_, &ret_header, sizeof(ret_header));
-  write(fd_transport_, ret_buf, ret_pos);
+  SafeWrite(fd_transport_, &ret_header, sizeof(ret_header));
+  SafeWrite(fd_transport_, ret_buf, ret_pos);
   return true;
 }
 
@@ -554,7 +555,7 @@ void FastCgi::ReplyEndRequest(
   reply.body.app_status_b1 =
     static_cast<unsigned char>((exit_code >> 8) & 0xff);
   reply.body.app_status_b0 = static_cast<unsigned char>(exit_code & 0xff);
-  write(fd_transport, &reply, sizeof(reply));
+  SafeWrite(fd_transport, &reply, sizeof(reply));
 }
 
 
@@ -599,7 +600,7 @@ void FastCgi::ReplyUnknownType(int fd_transport, unsigned char received_type) {
   } reply;
   reply.raw_header.type = kTypeUnknown;
   reply.body.type = received_type;
-  write(fd_transport, &reply, sizeof(reply));
+  SafeWrite(fd_transport, &reply, sizeof(reply));
 }
 
 
