@@ -1,5 +1,11 @@
+cvmfs-config-none (1.0-2) lucid; urgency=low
+
+  * Fix packaging errors
+
+ -- Jakob Blomer <jblomer@cern.ch>  Thu, 12 Sep 2016 12:00:00 +0000
+
 cvmfs-config-none (1.0-1) lucid; urgency=low
 
   * Initial packaging
-  
+
  -- Jakob Blomer <jblomer@cern.ch>  Thu, 18 Dec 2014 12:00:00 +0000
