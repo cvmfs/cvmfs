@@ -3,7 +3,7 @@ Maintainer: Jakob Blomer <jblomer@cern.ch>
 Section: utils
 Priority: extra
 Standards-Version: 3.9.3.1
-Build-Depends: debhelper (>= 9), make
+Build-Depends: debhelper (>= 9)
 Homepage: http://cernvm.cern.ch/portal/filesystem
 
 Package: cvmfs-config-none
@@ -11,3 +11,5 @@ Architecture: all
 Breaks: cvmfs (<< 2.1.20), cvmfs-server (<< 2.1.20)
 Provides: cvmfs-config
 Description:  CernVM File System Empty Configuration
+ Empty package to fulfill the "cvmfs-config" dependency of cvmfs.  Can be used
+ to provide custom configuration to CernVM-FS.
