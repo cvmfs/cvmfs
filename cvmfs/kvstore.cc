@@ -51,9 +51,7 @@ MemoryKvStore::~MemoryKvStore() {
   for (size_t i = 0; i < malloc_arenas_.size(); ++i) {
     delete malloc_arenas_[i];
   }
-  if (heap_) {
-    delete heap_;
-  }
+  delete heap_;
   pthread_rwlock_destroy(&rwlock_);
 }
 
