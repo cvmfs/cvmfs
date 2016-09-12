@@ -95,11 +95,11 @@ class Cipher {
   static bool Decrypt(const std::string &ciphertext, const Key &key,
                       std::string *plaintext);
 
-  virtual std::string const name() = 0;
-  virtual Algorithms const algorithm() = 0;
-  virtual unsigned const key_size() = 0;
-  virtual unsigned const iv_size() = 0;
-  virtual unsigned const block_size() = 0;
+  virtual std::string name() const = 0;
+  virtual Algorithms algorithm() const = 0;
+  virtual unsigned key_size() const = 0;
+  virtual unsigned iv_size() const = 0;
+  virtual unsigned block_size() const = 0;
 
  protected:
   Cipher() { }
@@ -123,11 +123,11 @@ class CipherAes256Cbc : public Cipher {
 
   virtual ~CipherAes256Cbc() { }
 
-  virtual std::string const name() { return "AES-256-CBC"; }
-  virtual Algorithms const algorithm() { return kAes256Cbc; }
-  virtual unsigned const key_size() { return kKeySize; }
-  virtual unsigned const iv_size() { return kIvSize; }
-  virtual unsigned const block_size() { return kBlockSize; }
+  virtual std::string name() const { return "AES-256-CBC"; }
+  virtual Algorithms algorithm() const { return kAes256Cbc; }
+  virtual unsigned key_size() const { return kKeySize; }
+  virtual unsigned iv_size() const { return kIvSize; }
+  virtual unsigned block_size() const { return kBlockSize; }
 
  protected:
   virtual std::string DoEncrypt(const std::string &plaintext, const Key &key);
@@ -145,11 +145,11 @@ class CipherNone : public Cipher {
  public:
   virtual ~CipherNone() { }
 
-  virtual std::string const name() { return "FOR TESTING ONLY"; }
-  virtual Algorithms const algorithm() { return kNone; }
-  virtual unsigned const key_size() { return 256/8; }
-  virtual unsigned const iv_size() { return 128/8; }
-  virtual unsigned const block_size() { return 128/8; }
+  virtual std::string name() const { return "FOR TESTING ONLY"; }
+  virtual Algorithms algorithm() const { return kNone; }
+  virtual unsigned key_size() const { return 256/8; }
+  virtual unsigned iv_size() const { return 128/8; }
+  virtual unsigned block_size() const { return 128/8; }
 
  protected:
   virtual std::string DoEncrypt(const std::string &plaintext, const Key &key);

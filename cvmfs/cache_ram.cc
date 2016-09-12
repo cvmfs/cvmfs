@@ -319,8 +319,7 @@ int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
   } else {
     store = &regular_entries_;
   }
-  if (buf.object_type == cache::CacheManager::kTypePinned ||
-      buf.object_type == cache::CacheManager::kTypePinned) {
+  if (buf.object_type == cache::CacheManager::kTypePinned) {
     buf.refcount = 1;
   } else {
     buf.refcount = 0;

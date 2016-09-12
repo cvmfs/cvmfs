@@ -220,6 +220,7 @@ void Tracer::Spawn() {
 
 Tracer::Tracer()
   : active_(false)
+  , spawned_(false)
   , buffer_size_(0)
   , flush_threshold_(0)
   , ring_buffer_(NULL)
