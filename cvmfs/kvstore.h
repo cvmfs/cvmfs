@@ -13,7 +13,6 @@
 
 #include "cache.h"
 #include "lru.h"
-#include "malloc_arena.h"
 #include "malloc_heap.h"
 #include "statistics.h"
 
@@ -213,7 +212,6 @@ class MemoryKvStore :SingleCopy, public Callbackable<MallocHeap::BlockPtr> {
   MallocHeap *heap_;
   pthread_rwlock_t rwlock_;
   Counters counters_;
-  vector<MallocArena *> malloc_arenas_;
 };
 
 #endif  // CVMFS_KVSTORE_H_

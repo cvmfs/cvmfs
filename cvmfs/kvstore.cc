@@ -35,9 +35,6 @@ MemoryKvStore::MemoryKvStore(
   int retval = pthread_rwlock_init(&rwlock_, NULL);
   assert(retval == 0);
   switch (alloc) {
-  case kMallocArena:
-    malloc_arenas_.push_back(new MallocArena(kArenaSize));
-    break;
   case kMallocHeap:
     heap_ = new MallocHeap(alloc_size,
         this->MakeCallback(&MemoryKvStore::OnBlockMove, this));
@@ -48,9 +45,6 @@ MemoryKvStore::MemoryKvStore(
 }
 
 MemoryKvStore::~MemoryKvStore() {
-  for (size_t i = 0; i < malloc_arenas_.size(); ++i) {
-    delete malloc_arenas_[i];
-  }
   delete heap_;
   pthread_rwlock_destroy(&rwlock_);
 }
@@ -82,9 +76,6 @@ bool MemoryKvStore::Contains(const shash::Any &id) {
 size_t MemoryKvStore::GetBufferSize(MemoryBuffer *buf) {
   assert(buf);
   switch (allocator_) {
-  case kMallocArena:
-    return MallocArena::GetMallocArena(buf->address, kArenaSize)
-      ->GetSize(buf->address);
   case kMallocHeap:
     return heap_->GetSize(static_cast<char *>(buf->address)
       - sizeof(struct AllocHeader));
@@ -94,8 +85,6 @@ size_t MemoryKvStore::GetBufferSize(MemoryBuffer *buf) {
 }
 
 int MemoryKvStore::DoMalloc(MemoryBuffer *buf) {
-  size_t N;
-  MallocArena *M;
   MemoryBuffer tmp;
   AllocHeader a;
 
@@ -106,32 +95,6 @@ int MemoryKvStore::DoMalloc(MemoryBuffer *buf) {
   case kMallocLibc:
     tmp.address = malloc(tmp.size);
     if (!tmp.address) return -errno;
-    break;
-  case kMallocArena:
-    if (tmp.size > kArenaSize - 2*1024*1024) {
-      return -ENOMEM;
-    } else if (tmp.size == 0) {
-      tmp.address = NULL;
-      break;
-    }
-    N = malloc_arenas_.size();
-    assert(idx_last_arena_ < N);
-    tmp.address = malloc_arenas_[idx_last_arena_]
-      ->Malloc(tmp.size);
-    if (tmp.address != NULL) break;
-    for (unsigned i = 0; i < N; ++i) {
-      tmp.address = malloc_arenas_[i]->Malloc(tmp.size);
-      if (tmp.address != NULL) {
-        idx_last_arena_ = i;
-        break;
-      }
-    }
-    idx_last_arena_ = N;
-    M = new MallocArena(kArenaSize);
-    assert(M != NULL);
-    malloc_arenas_.push_back(M);
-    tmp.address = M->Malloc(tmp.size);
-    assert(tmp.address != NULL);
     break;
   case kMallocHeap:
     assert(heap_);
@@ -163,7 +126,6 @@ int MemoryKvStore::DoRealloc(MemoryBuffer *buf, size_t size) {
     tmp.address = realloc(tmp.address, tmp.size);
     if (!tmp.address && tmp.size > 0) return -errno;
     break;
-  case kMallocArena:
   case kMallocHeap:
     if (size == 0) {
       DoFree(buf);
@@ -184,9 +146,7 @@ int MemoryKvStore::DoRealloc(MemoryBuffer *buf, size_t size) {
 }
 
 void MemoryKvStore::DoFree(MemoryBuffer *buf) {
-  MallocArena *M;
   AllocHeader a;
-  size_t N;
 
   assert(buf);
   if (!buf->address) return;
@@ -194,21 +154,6 @@ void MemoryKvStore::DoFree(MemoryBuffer *buf) {
   case kMallocLibc:
     free(buf->address);
     return;
-  case kMallocArena:
-    M = MallocArena::GetMallocArena(buf->address, kArenaSize);
-    M->Free(buf->address);
-    N = malloc_arenas_.size();
-    if ((N > 1) && M->IsEmpty()) {
-      for (unsigned i = 0; i < N; ++i) {
-        if (malloc_arenas_[i] == M) {
-          delete malloc_arenas_[i];
-          malloc_arenas_.erase(malloc_arenas_.begin() + i);
-          idx_last_arena_ = 0;
-          return;
-        }
-      }
-      assert(false);
-    }
   case kMallocHeap:
     heap_->MarkFree(static_cast<char *>(buf->address) - sizeof(a));
     return;

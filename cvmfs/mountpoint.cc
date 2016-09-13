@@ -210,10 +210,14 @@ bool FileSystem::CreateCache() {
       cache_bytes = platform_memsize() >> 5;  // ~3%
     }
     if (options_mgr_->GetValue("CVMFS_CACHE_RAM_MALLOC", &optarg)) {
-      if (optarg == "arena") {
-        alloc = MemoryKvStore::kMallocArena;
-      } else if (optarg == "libc") {
+      if (optarg == "libc") {
         alloc = MemoryKvStore::kMallocLibc;
+      } else if (optarg == "heap") {
+        alloc = MemoryKvStore::kMallocHeap;
+      } else {
+        boot_error_ = "Failure: unknown malloc";
+        boot_status_ = loader::kFailOptions;
+        return false;
       }
     }
     cache_bytes = RoundUp8(max((uint64_t) 200*1024*1024, cache_bytes));

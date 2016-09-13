@@ -41,9 +41,9 @@ static const shash::Any kInvalidHandle;
  * RAM cache size defaults to ~3% of the system memory.
  * The minimum cache size is 200 MB.
  *
- * RamCacheManager can also use a custom arena allocator rather than
- * the default libc @p malloc(). To enable this feature, set
- * @p CVMFS_CACHE_RAM_MALLOC=arena
+ * RamCacheManager uses a custom heap allocator rather than
+ * the system's libc @p malloc(). To switch to libc malloc, set
+ * @p CVMFS_CACHE_RAM_MALLOC=libc
  */
 class RamCacheManager : public CacheManager {
  public:
