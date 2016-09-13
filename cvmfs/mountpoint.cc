@@ -393,6 +393,7 @@ FileSystem::FileSystem(const FileSystem::FileSystemInfo &fs_info)
   , uuid_cache_(NULL)
   , has_nfs_maps_(false)
   , has_custom_sqlitevfs_(false)
+  , cache_mgr_type_(cache::kUnknownCacheManager)
 {
   assert(!g_alive);
   g_alive = true;
@@ -1105,6 +1106,7 @@ bool MountPoint::DetermineRootHash(shash::Any *root_hash) {
   bool retval;
   if (!options_mgr_->GetValue("CVMFS_REPOSITORY_TAG", &repository_tag_)) {
     string repository_date;
+    // options_mgr_->IsDefined("CVMFS_REPOSITORY_DATE") must be true
     options_mgr_->GetValue("CVMFS_REPOSITORY_DATE", &repository_date);
     time_t repository_utctime = IsoTimestamp2UtcTime(repository_date);
     if (repository_utctime == 0) {

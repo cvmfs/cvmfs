@@ -511,7 +511,7 @@ TEST_F(T_MountPoint, MountErrors) {
     UniquePtr<MountPoint> mp(MountPoint::Create("test", fs.weak_ref()));
     EXPECT_EQ(loader::kFailOk, mp->boot_status());
     string root_hash;
-    options_mgr_.GetValue("CVMFS_ROOT_HASH", &root_hash);
+    EXPECT_TRUE(options_mgr_.GetValue("CVMFS_ROOT_HASH", &root_hash));
     EXPECT_EQ(root_hash, mp->catalog_mgr()->GetRootHash().ToString());
   }
 

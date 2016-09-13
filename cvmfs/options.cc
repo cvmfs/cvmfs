@@ -148,8 +148,8 @@ void BashOptionsManager::ParsePath(const string &config_file,
         (void)open(config_file.c_str(), O_RDONLY);
         char ready = 'R';
         WritePipe(pipe_open[1], &ready, 1);
-        read(pipe_quit[0], &ready, 1);
-        _exit(0);  // Don't flush shared file descriptors
+        retval = read(pipe_quit[0], &ready, 1);
+        _exit(retval);  // Don't flush shared file descriptors
       }
     }
     // Parent
