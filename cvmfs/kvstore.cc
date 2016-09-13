@@ -57,18 +57,18 @@ MemoryKvStore::~MemoryKvStore() {
 
 void MemoryKvStore::OnBlockMove(const MallocHeap::BlockPtr &ptr) {
   bool ok;
-  shash::Any id;
+  struct AllocHeader a;
   MemoryBuffer buf;
 
   // must be locked by caller
   assert(ptr.pointer);
-  memcpy(&id, ptr.pointer, sizeof(id));
+  memcpy(&a, ptr.pointer, sizeof(a));
   LogCvmfs(kLogKvStore, kLogDebug, "compaction moved %s to %p",
-    id.ToString().c_str(), ptr.pointer);
-
-  ok = entries_.Lookup(id, &buf);
+    a.id.ToString().c_str(), ptr.pointer);
+  assert(a.version == 0);
+  ok = entries_.Lookup(a.id, &buf);
   assert(ok);
-  buf.address = static_cast<char *>(ptr.pointer) + sizeof(id);
+  buf.address = static_cast<char *>(ptr.pointer) + sizeof(a);
   ok = DoCommit(buf);
   assert(ok);
 }
@@ -86,7 +86,8 @@ size_t MemoryKvStore::GetBufferSize(MemoryBuffer *buf) {
     return MallocArena::GetMallocArena(buf->address, kArenaSize)
       ->GetSize(buf->address);
   case kMallocHeap:
-    return heap_->GetSize(static_cast<char *>(buf->address) - sizeof(buf->id));
+    return heap_->GetSize(static_cast<char *>(buf->address)
+      - sizeof(struct AllocHeader));
   default:
     abort();  // shouldn't be reachable
   }
@@ -96,6 +97,7 @@ int MemoryKvStore::DoMalloc(MemoryBuffer *buf) {
   size_t N;
   MallocArena *M;
   MemoryBuffer tmp;
+  AllocHeader a;
 
   assert(buf);
   memcpy(&tmp, buf, sizeof(tmp));
@@ -137,10 +139,11 @@ int MemoryKvStore::DoMalloc(MemoryBuffer *buf) {
       tmp.address = NULL;
       break;
     }
-    tmp.address = heap_->Allocate(tmp.size + sizeof(tmp.id),
-      &tmp.id, sizeof(tmp.id));
+    a.id = tmp.id;
+    tmp.address = heap_->Allocate(tmp.size + sizeof(a),
+      &a, sizeof(a));
     if (!tmp.address) return -ENOMEM;
-    tmp.address = static_cast<char *>(tmp.address) + sizeof(tmp.id);
+    tmp.address = static_cast<char *>(tmp.address) + sizeof(a);
     break;
   }
   memcpy(buf, &tmp, sizeof(*buf));
@@ -182,6 +185,7 @@ int MemoryKvStore::DoRealloc(MemoryBuffer *buf, size_t size) {
 
 void MemoryKvStore::DoFree(MemoryBuffer *buf) {
   MallocArena *M;
+  AllocHeader a;
   size_t N;
 
   assert(buf);
@@ -206,7 +210,7 @@ void MemoryKvStore::DoFree(MemoryBuffer *buf) {
       assert(false);
     }
   case kMallocHeap:
-    heap_->MarkFree(static_cast<char *>(buf->address) - sizeof(buf->id));
+    heap_->MarkFree(static_cast<char *>(buf->address) - sizeof(a));
     return;
   }
 }

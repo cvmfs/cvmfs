@@ -21,6 +21,14 @@ using namespace std;  // NOLINT
 
 static const size_t kArenaSize = 512*1024*1024;
 
+struct AllocHeader {
+  AllocHeader()
+  : version(0)
+  , id() {}
+  uint8_t version;
+  shash::Any id;
+};
+
 struct MemoryBuffer {
   MemoryBuffer()
     : address(NULL)
@@ -49,7 +57,6 @@ struct MemoryBuffer {
 class MemoryKvStore :SingleCopy, public Callbackable<MallocHeap::BlockPtr> {
  public:
   enum MemoryAllocator {
-    kMallocArena,
     kMallocLibc,
     kMallocHeap,
   };
