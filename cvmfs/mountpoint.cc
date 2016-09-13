@@ -167,7 +167,7 @@ bool FileSystem::CreateCache() {
   string optarg;
   uint64_t nfiles;
   uint64_t cache_bytes;
-  MemoryKvStore::MemoryAllocator alloc = MemoryKvStore::kMallocLibc;
+  MemoryKvStore::MemoryAllocator alloc = MemoryKvStore::kMallocHeap;
 
   cache_mgr_type_ = cache::kPosixCacheManager;
   if (options_mgr_->GetValue("CVMFS_CACHE_PRIMARY", &optarg)) {
@@ -212,8 +212,8 @@ bool FileSystem::CreateCache() {
     if (options_mgr_->GetValue("CVMFS_CACHE_RAM_MALLOC", &optarg)) {
       if (optarg == "arena") {
         alloc = MemoryKvStore::kMallocArena;
-      } else if (optarg == "heap") {
-        alloc = MemoryKvStore::kMallocHeap;
+      } else if (optarg == "libc") {
+        alloc = MemoryKvStore::kMallocLibc;
       }
     }
     cache_bytes = RoundUp8(max((uint64_t) 200*1024*1024, cache_bytes));
