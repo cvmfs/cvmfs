@@ -1,7 +1,7 @@
 CVMFS Repository Services
 =========================
 
-Gitlab CI: [![build status](https://github.com/cvmfs/cvmfs_services/badges/master/build.svg)](https://github.com/cvmfs/cvmfs_services/commits/master)
+Gitlab CI: [![build status](https://travis-ci.org/cvmfs/cvmfs_services.svg?branch=master)](https://travis-ci.org/cvmfs/cvmfs_services.svg?branch=master)
 
 CVMFS Repository Services (part of the CernVM File System)
 
