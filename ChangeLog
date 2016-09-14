@@ -7,6 +7,9 @@
   * Fix small memory leak during remount of root catalog
   * Fix handling of file:// url in CVMFS_SERVER_URL
 
+2.3.2:
+  * Fix segfault in debug logging of certain download failures (CVM-1076)
+
 2.3.1:
   * Fix rare corruption on NFS maps during mount / reload
   * Use reflog timestamp instead of catalog inherent timestamp (CVM-764)
