@@ -11,7 +11,7 @@ notifications:
     on_failure: always
 
 before_script:
-  - wget -O ~/bin/rebar3 https://s3.amazonaws.com/rebar3/rebar3 && chmod +x ~/bin/rebar3
+  - wget -O ~/rebar3 https://s3.amazonaws.com/rebar3/rebar3 && chmod +x ~/rebar3
 
 script:
-  - rebar3 compile
+  - ~/rebar3 compile

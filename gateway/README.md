@@ -1,13 +1,12 @@
 CVMFS Repository Services
 =========================
 
-Gitlab CI: [![build status](https://travis-ci.org/cvmfs/cvmfs_services.svg?branch=master)](https://travis-ci.org/cvmfs/cvmfs_services.svg?branch=master)
+Gitlab CI: [![build status](https://travis-ci.org/cvmfs/cvmfs_services.svg?branch=master)](https://travis-ci.org/cvmfs/cvmfs_services)
 
 CVMFS Repository Services (part of the CernVM File System)
 
-The CVMFS Repository Services (http://github.com/cvmfs/cvmfs_services.git) is an umbrella project
-(organized as an OTP release) which hosts the development of the different components of the service
-architecture:
+The CVMFS Repository Services is an umbrella project (organized as an OTP release) which hosts the
+development of the different components of the service architecture:
 
 + Authorization service (cvmfs_auth) - access control, user credentials
 + Lease service (cvmfs_lease) - manages leases (locks) on different sub-paths in the repository
