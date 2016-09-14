@@ -320,7 +320,7 @@ Supported Commands:
                   [-k path to keys] [-g chown backend] [-r recreate whitelist]
                   [-p no apache config] [-t recreate repo key and certificate]
                   <fully qualified repository name>
-                  Imports an old CernVM-FS repository into a fresh 2.1.x repo
+                  Imports an old CernVM-FS repository into a fresh repo
   publish         [-p pause for tweaks] [-n manual revision number] [-v verbose]
                   [-a tag name] [-c tag channel] [-m tag description]
                   [-X (force external data) | -N (force native data)]
