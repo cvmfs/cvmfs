@@ -1,0 +1,17 @@
+language: erlang
+
+otp_release:
+  - 19.0
+
+notifications:
+  email:
+    recipients:
+      - mail@radupopescu.net
+    on_success: change
+    on_failure: always
+
+before_script:
+  - wget -O ~/bin/rebar3 https://s3.amazonaws.com/rebar3/rebar3 && chmod +x ~/bin/rebar3
+
+script:
+  - rebar3 compile
