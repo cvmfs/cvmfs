@@ -10,8 +10,13 @@ notifications:
     on_success: change
     on_failure: always
 
+cache:
+  directories:
+    - $HOME/.cache/rebar3
+    - $HOME/bin
+
 before_script:
-  - wget -O ~/rebar3 https://s3.amazonaws.com/rebar3/rebar3 && chmod +x ~/rebar3
+  - ./ci/travis_before.sh
 
 script:
-  - ~/rebar3 compile
+  - ./ci/travis_main.sh
