@@ -295,8 +295,8 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
     } else {
       int64_t written = info->destination_sink->Write(ptr, num_bytes);
       if ((written < 0) || (static_cast<uint64_t>(written) != num_bytes)) {
-        LogCvmfs(kLogDownload, kLogDebug, "Failed to perform write on path"
-                 " %s.", info->destination_path->c_str());
+        LogCvmfs(kLogDownload, kLogDebug, "Failed to perform write on %s (%"
+                 PRId64 ")", info->url->c_str(), written);
         info->error_code = kFailLocalIO;
         return 0;
       }
