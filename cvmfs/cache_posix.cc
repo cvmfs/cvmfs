@@ -488,7 +488,7 @@ int64_t PosixCacheManager::Write(const void *buf, uint64_t size, void *txn) {
       LogCvmfs(kLogCache, kLogDebug,
                "Transaction size (%" PRIu64 ") > expected size (%" PRIu64 ")",
                transaction->size + size, transaction->expected_size);
-      return -ENOSPC;
+      return -EFBIG;
     }
   }
 

@@ -831,7 +831,7 @@ TEST_F(T_CacheManager, Write) {
   fd = cache_mgr_->StartTxn(rnd_hash, 1, txn);
   EXPECT_GE(fd, 0);
   EXPECT_EQ(1, cache_mgr_->Write(large_buf, 1, txn));
-  EXPECT_EQ(-ENOSPC, cache_mgr_->Write(large_buf, 1, txn));
+  EXPECT_EQ(-EFBIG, cache_mgr_->Write(large_buf, 1, txn));
   cache_mgr_->AbortTxn(txn);
 }
 
