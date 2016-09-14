@@ -1,0 +1,15 @@
+{application, cvmfs_lease,
+ [{description, "CVMFS Lease Service"},
+  {vsn, "0.1.0"},
+  {registered, []},
+  {mod, { cvmfs_lease_app, []}},
+  {applications,
+   [kernel,
+    stdlib,
+    cvmfs_om
+   ]},
+  {env,[]},
+  {modules, [cvmfs_lease_app, cvmfs_lease_sup, cvmfs_lease_storage]},
+
+  {maintainers, []}
+ ]}.
