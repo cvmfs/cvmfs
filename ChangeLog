@@ -1,3 +1,5 @@
+2.3.2:
+
 2.3.1:
   * Fix rare corruption on NFS maps during mount / reload
   * Use reflog timestamp instead of catalog inherent timestamp (CVM-764)
