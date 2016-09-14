@@ -41,9 +41,9 @@ static const shash::Any kInvalidHandle;
  * RAM cache size defaults to ~3% of the system memory.
  * The minimum cache size is 200 MB.
  *
- * RamCacheManager can also use a custom arena allocator rather than
- * the default libc @p malloc(). To enable this feature, set
- * @p CVMFS_CACHE_RAM_MALLOC=arena
+ * RamCacheManager uses a custom heap allocator rather than
+ * the system's libc @p malloc(). To switch to libc malloc, set
+ * @p CVMFS_CACHE_RAM_MALLOC=libc
  */
 class RamCacheManager : public CacheManager {
  public:
@@ -118,10 +118,12 @@ class RamCacheManager : public CacheManager {
     , regular_entries_(max_entries,
                        "RamCache.regular",
                        alloc,
+                       max_size,
                        statistics)
     , volatile_entries_(max_entries,
                         "RamCache.volatile",
                         alloc,
+                        max_size,
                         statistics)
     , counters_(statistics, "RamCache") {
     int retval = pthread_rwlock_init(&rwlock_, NULL);
@@ -266,19 +268,12 @@ class RamCacheManager : public CacheManager {
 
   struct Transaction {
     Transaction()
-      : buffer(NULL)
-      , size(0)
+      : buffer()
       , expected_size(0)
-      , pos(0)
-      , allocated(false)
-      , object_type(kTypeRegular) { }
-    shash::Any id;
-    void *buffer;
-    uint64_t size;
+      , pos(0) { }
+    MemoryBuffer buffer;
     uint64_t expected_size;
     uint64_t pos;
-    bool allocated;
-    ObjectType object_type;
     std::string description;
   };
 
@@ -297,7 +292,7 @@ class RamCacheManager : public CacheManager {
   }
 
   inline MemoryKvStore *GetTransactionStore(Transaction *txn) {
-    if (txn->object_type == cache::CacheManager::kTypeVolatile) {
+    if (txn->buffer.object_type == cache::CacheManager::kTypeVolatile) {
       return &volatile_entries_;
     } else {
       return &regular_entries_;

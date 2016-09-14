@@ -161,8 +161,6 @@ TEST_F(T_RamCacheManager, Eviction) {
 
   a_.digest[1] = 1;
   EXPECT_EQ(-ENOENT, ramcache_.Open(a_));
-
-  EXPECT_EQ(0, ramcache_.AbortTxn(txn5));
 }
 
 TEST_F(T_RamCacheManager, OpenEntries) {

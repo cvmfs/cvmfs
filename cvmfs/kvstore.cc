@@ -12,145 +12,170 @@
 #include <algorithm>
 
 #include "logging.h"
+#include "util/async.h"
 #include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 
-bool MemoryKvStore::GetBuffer(const shash::Any &id, MemoryBuffer *buf) {
-  perf::Inc(counters_.n_getbuffer);
-  // LogCvmfs(kLogKvStore, kLogDebug, "get buffer %s", id.ToString().c_str());
-  return entries_.Lookup(id, buf);
-}
-
-bool MemoryKvStore::PopBuffer(const shash::Any &id, MemoryBuffer *buf) {
-  perf::Inc(counters_.n_popbuffer);
-  WriteLockGuard guard(rwlock_);
-  if (!entries_.Lookup(id, buf)) {
-    LogCvmfs(kLogKvStore, kLogDebug, "miss %s on PopBuffer",
-             id.ToString().c_str() );
-    return false;
+MemoryKvStore::MemoryKvStore(
+  unsigned int cache_entries,
+  const string &name,
+  MemoryAllocator alloc,
+  unsigned alloc_size,
+  perf::Statistics *statistics)
+  : allocator_(alloc)
+  , used_bytes_(0)
+  , idx_last_arena_(0)
+  , entry_count_(0)
+  , max_entries_(cache_entries)
+  , entries_(cache_entries, shash::Any(), lru::hasher_any,
+      statistics, name)
+  , heap_(NULL)
+  , counters_(statistics, name + ".lru") {
+  int retval = pthread_rwlock_init(&rwlock_, NULL);
+  assert(retval == 0);
+  switch (alloc) {
+  case kMallocHeap:
+    heap_ = new MallocHeap(alloc_size,
+        this->MakeCallback(&MemoryKvStore::OnBlockMove, this));
+    break;
+  default:
+    break;
   }
-  assert(used_bytes_ >= (*buf).size);
-  used_bytes_ -= (*buf).size;
-  counters_.sz_size->Set(used_bytes_);
-  assert(entry_count_ > 0);
-  --entry_count_;
-  entries_.Forget(id);
-  // LogCvmfs(kLogKvStore, kLogDebug, "popped %s (%uB)", id.ToString().c_str(),
-  //          (*buf).size);
-  return true;
 }
 
-size_t MemoryKvStore::GetBufferSize(void *ptr) {
-  return MallocArena::GetMallocArena(ptr, kArenaSize)->GetSize(ptr);
+MemoryKvStore::~MemoryKvStore() {
+  delete heap_;
+  pthread_rwlock_destroy(&rwlock_);
 }
 
-void *MemoryKvStore::MallocBuffer(size_t size) {
-  WriteLockGuard guard(rwlock_);
-  return DoMalloc(size);
+void MemoryKvStore::OnBlockMove(const MallocHeap::BlockPtr &ptr) {
+  bool ok;
+  struct AllocHeader a;
+  MemoryBuffer buf;
+
+  // must be locked by caller
+  assert(ptr.pointer);
+  memcpy(&a, ptr.pointer, sizeof(a));
+  LogCvmfs(kLogKvStore, kLogDebug, "compaction moved %s to %p",
+    a.id.ToString().c_str(), ptr.pointer);
+  assert(a.version == 0);
+  ok = entries_.Lookup(a.id, &buf);
+  assert(ok);
+  buf.address = static_cast<char *>(ptr.pointer) + sizeof(a);
+  ok = DoCommit(buf);
+  assert(ok);
 }
 
-void *MemoryKvStore::DoMalloc(size_t size) {
-  size_t N;
-  void *p;
-  MallocArena *M;
+bool MemoryKvStore::Contains(const shash::Any &id) {
+  MemoryBuffer buf;
+  // LogCvmfs(kLogKvStore, kLogDebug, "check buffer %s", id.ToString().c_str());
+  return entries_.Lookup(id, &buf);
+}
+
+size_t MemoryKvStore::GetBufferSize(MemoryBuffer *buf) {
+  assert(buf);
+  switch (allocator_) {
+  case kMallocHeap:
+    return heap_->GetSize(static_cast<char *>(buf->address)
+      - sizeof(struct AllocHeader));
+  default:
+    abort();  // shouldn't be reachable
+  }
+}
+
+int MemoryKvStore::DoMalloc(MemoryBuffer *buf) {
+  MemoryBuffer tmp;
+  AllocHeader a;
+
+  assert(buf);
+  memcpy(&tmp, buf, sizeof(tmp));
 
   switch (allocator_) {
   case kMallocLibc:
-    return malloc(size);
-  case kMallocArena:
-    if (size > kArenaSize - 2*1024*1024) {
-      errno = ENOMEM;
-      return NULL;
-    } else if (size == 0) {
-      return NULL;
+    tmp.address = malloc(tmp.size);
+    if (!tmp.address) return -errno;
+    break;
+  case kMallocHeap:
+    assert(heap_);
+    if (tmp.size == 0) {
+      tmp.address = NULL;
+      break;
     }
-    N = malloc_arenas_.size();
-    assert(idx_last_arena_ < N);
-    p = malloc_arenas_[idx_last_arena_]->Malloc(size);
-    if (p != NULL)
-      return p;
-    for (unsigned i = 0; i < N; ++i) {
-      p = malloc_arenas_[i]->Malloc(size);
-      if (p != NULL) {
-        idx_last_arena_ = i;
-        return p;
-      }
-    }
-    idx_last_arena_ = N;
-    M = new MallocArena(kArenaSize);
-    assert(M != NULL);
-    malloc_arenas_.push_back(M);
-    p = M->Malloc(size);
-    assert(p != NULL);
-    return p;
+    a.id = tmp.id;
+    tmp.address = heap_->Allocate(tmp.size + sizeof(a),
+      &a, sizeof(a));
+    if (!tmp.address) return -ENOMEM;
+    tmp.address = static_cast<char *>(tmp.address) + sizeof(a);
+    break;
   }
-  // Shouldn't be reachable
-  abort();
+  memcpy(buf, &tmp, sizeof(*buf));
+  return 0;
 }
 
-void *MemoryKvStore::ReallocBuffer(void *ptr, size_t size) {
-  WriteLockGuard guard(rwlock_);
-  return DoRealloc(ptr, size);
-}
+int MemoryKvStore::DoRealloc(MemoryBuffer *buf, size_t size) {
+  MemoryBuffer tmp;
+  int rc;
 
-void *MemoryKvStore::DoRealloc(void *ptr, size_t size) {
-  size_t old_size;
-  void *new_ptr;
+  assert(buf);
+  memcpy(&tmp, buf, sizeof(tmp));
+  tmp.size = size;
 
   switch (allocator_) {
   case kMallocLibc:
-    return realloc(ptr, size);
-  case kMallocArena:
+    tmp.address = realloc(tmp.address, tmp.size);
+    if (!tmp.address && tmp.size > 0) return -errno;
+    break;
+  case kMallocHeap:
     if (size == 0) {
-      DoFree(ptr);
-      return NULL;
+      DoFree(buf);
+      return 0;
     }
-    old_size = GetBufferSize(ptr);
-    if (old_size >= size)
-      return ptr;
+    if (buf->size >= size) return 0;
 
-    new_ptr = DoMalloc(size);
-    if (!new_ptr) return NULL;
-    if (ptr) {
-      memcpy(new_ptr, ptr, old_size);
-      DoFree(ptr);
+    rc = DoMalloc(&tmp);
+    if (rc < 0) return rc;
+    if (buf->address) {
+      memcpy(tmp.address, buf->address, buf->size);
+      DoFree(buf);
     }
-    return new_ptr;
+    break;
   }
-  // Shouldn't be reachable
-  abort();
+  memcpy(buf, &tmp, sizeof(*buf));
+  return 0;
 }
 
-void MemoryKvStore::FreeBuffer(void *ptr) {
-  WriteLockGuard guard(rwlock_);
-  DoFree(ptr);
-}
+void MemoryKvStore::DoFree(MemoryBuffer *buf) {
+  AllocHeader a;
 
-void MemoryKvStore::DoFree(void *ptr) {
-  MallocArena *M;
-  size_t N;
-
+  assert(buf);
+  if (!buf->address) return;
   switch (allocator_) {
   case kMallocLibc:
-    free(ptr);
+    free(buf->address);
     return;
-  case kMallocArena:
-    if (!ptr) return;
-    M = MallocArena::GetMallocArena(ptr, kArenaSize);
-    M->Free(ptr);
-    N = malloc_arenas_.size();
-    if ((N > 1) && M->IsEmpty()) {
-      for (unsigned i = 0; i < N; ++i) {
-        if (malloc_arenas_[i] == M) {
-          delete malloc_arenas_[i];
-          malloc_arenas_.erase(malloc_arenas_.begin() + i);
-          idx_last_arena_ = 0;
-          return;
-        }
-      }
-      assert(false);
+  case kMallocHeap:
+    heap_->MarkFree(static_cast<char *>(buf->address) - sizeof(a));
+    return;
+  }
+}
+
+bool MemoryKvStore::Cleanup() {
+  double utilization;
+  switch (allocator_) {
+  case kMallocHeap:
+    utilization = heap_->utilization();
+    LogCvmfs(kLogKvStore, kLogDebug, "cleanup requested (%f)", utilization);
+    if (utilization < 0.8) {
+      LogCvmfs(kLogKvStore, kLogDebug, "compacting heap");
+      heap_->Compact();
+      if (heap_->utilization() > utilization) return true;
     }
+    return false;
+  default:
+    // the others can't do any cleanup, so just ignore
+    LogCvmfs(kLogKvStore, kLogDebug, "cleanup requested");
+    return false;
   }
 }
 
@@ -245,15 +270,13 @@ int64_t MemoryKvStore::Read(
   return copy_size;
 }
 
-bool MemoryKvStore::Commit(
-  const shash::Any &id,
-  const MemoryBuffer &buf
-) {
+bool MemoryKvStore::Commit(const MemoryBuffer &buf) {
+  WriteLockGuard guard(rwlock_);
+  return DoCommit(buf);
+}
+
+bool MemoryKvStore::DoCommit(const MemoryBuffer &buf) {
   /*
-   * Commit allows overwriting existing entries without free()ing the
-   * associated memory buffer. It's assumed that the caller knows about the
-   * existing entry and free()ed or realloc()ed themselves.
-   * To support both RamCacheManager::CommitTxn and RamCacheManager::OpenFromTxn,
    * we need to be careful about refcounts. If another thread wants to read
    * a cache entry while it's being written (OpenFromTxn put partial data in
    * the kvstore, will be committed again later) the refcount in the kvstore
@@ -266,28 +289,40 @@ bool MemoryKvStore::Commit(
    * refcount like a lock and not directly modify the numeric value.
    */
 
+  Cleanup();
+
   MemoryBuffer mem;
   perf::Inc(counters_.n_commit);
-  WriteLockGuard guard(rwlock_);
-  LogCvmfs(kLogKvStore, kLogDebug, "commit %s", id.ToString().c_str());
-  if (entries_.Lookup(id, &mem)) {
+  LogCvmfs(kLogKvStore, kLogDebug, "commit %s", buf.id.ToString().c_str());
+  if (entries_.Lookup(buf.id, &mem)) {
     LogCvmfs(kLogKvStore, kLogDebug, "commit overwrites existing entry");
-    used_bytes_ -= mem.size;
-    perf::Xadd(counters_.sz_deleted, mem.size);
+    size_t old_size = mem.size;
+    if (DoRealloc(&mem, buf.size) < 0) {
+      LogCvmfs(kLogKvStore, kLogDebug, "failed to reallocate %s",
+        buf.id.ToString().c_str());
+      return false;
+    }
+    used_bytes_ -= old_size;
     counters_.sz_size->Set(used_bytes_);
   } else {
     if (entry_count_ == max_entries_) {
       LogCvmfs(kLogKvStore, kLogDebug, "too many entries in kvstore");
       return false;
     }
+    mem.size = buf.size;
+    if (DoMalloc(&mem) < 0) {
+      LogCvmfs(kLogKvStore, kLogDebug, "failed to allocate %s",
+        buf.id.ToString().c_str());
+      return false;
+    }
     // since this is a new entry, the caller can choose the starting
     // refcount (starting at 1 for pinning, for example)
     mem.refcount = buf.refcount;
   }
-  mem.address = buf.address;
-  mem.size = buf.size;
+  memcpy(mem.address, buf.address, min(mem.size, buf.size));
   mem.object_type = buf.object_type;
-  entries_.Insert(id, mem);
+  mem.id = buf.id;
+  entries_.Insert(buf.id, mem);
   ++entry_count_;
   assert(SSIZE_MAX - mem.size > used_bytes_);
   used_bytes_ += mem.size;
@@ -319,7 +354,7 @@ bool MemoryKvStore::DoDelete(const shash::Any &id) {
   used_bytes_ -= buf.size;
   counters_.sz_size->Set(used_bytes_);
   perf::Xadd(counters_.sz_deleted, buf.size);
-  DoFree(buf.address);
+  DoFree(&buf);
   entries_.Forget(id);
   LogCvmfs(kLogKvStore, kLogDebug, "deleted %s", id.ToString().c_str());
   return true;
@@ -352,7 +387,7 @@ bool MemoryKvStore::ShrinkTo(size_t size) {
     used_bytes_ -= buf.size;
     perf::Xadd(counters_.sz_shrunk, buf.size);
     counters_.sz_size->Set(used_bytes_);
-    DoFree(buf.address);
+    DoFree(&buf);
     LogCvmfs(kLogKvStore, kLogDebug, "delete %s", key.ToString().c_str());
   }
   entries_.FilterEnd();

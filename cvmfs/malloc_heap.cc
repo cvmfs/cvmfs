@@ -105,14 +105,8 @@ MallocHeap::MallocHeap(uint64_t capacity, CallbackPtr callback_ptr)
   assert(capacity_ > kMinCapacity);
   // Ensure 8-byte alignment
   assert((capacity_ % 8) == 0);
-  heap_ = reinterpret_cast<unsigned char *>(sxmmap(capacity + 7));
-  uintptr_t head = uintptr_t(heap_) % 8;
-  if (head > 0)
-    sxunmap(heap_, head);
-  heap_ += head;
-  uintptr_t tail = 7 - head;
-  if (tail > 0)
-    sxunmap(heap_ + capacity, tail);
+  heap_ = reinterpret_cast<unsigned char *>(sxmmap(capacity));
+  assert(uintptr_t(heap_) % 8 == 0);
 }
 
 
