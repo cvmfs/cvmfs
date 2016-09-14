@@ -1,0 +1,10 @@
+image: erlang:19
+
+stages:
+  - build
+
+rebar3_compile:
+  stage: build
+  tags:
+    - docker
+  script: rebar3 compile

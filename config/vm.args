@@ -1,0 +1,6 @@
+-sname cvmfs_services
+
+-setcookie cvmfs_services_cookie
+
++K true
++A30

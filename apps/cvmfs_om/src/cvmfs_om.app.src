@@ -1,0 +1,17 @@
+{application, cvmfs_om,
+ [{description, "An OTP application"},
+  {vsn, "0.1.0"},
+  {registered, []},
+  {mod, { cvmfs_om_app, []}},
+  {applications,
+   [kernel,
+    stdlib,
+    lager
+   ]},
+  {env,[]},
+  {modules, [cvmfs_om_log]},
+
+  {maintainers, []},
+  {licenses, []},
+  {links, []}
+ ]}.
