@@ -19,6 +19,40 @@ using namespace std;  // NOLINT
 
 namespace cache {
 
+RamCacheManager::RamCacheManager(
+  uint64_t max_size,
+  unsigned max_entries,
+  MemoryKvStore::MemoryAllocator alloc,
+  perf::Statistics *statistics)
+  : max_size_(max_size)
+  , fd_pivot_(0)
+  , open_fds_(max_entries)
+  , fd_index_(max_entries)
+  , regular_entries_(max_entries,
+                     "RamCache.regular",
+                     alloc,
+                     max_size,
+                     statistics)
+  , volatile_entries_(max_entries,
+                      "RamCache.volatile",
+                      alloc,
+                      max_size,
+                      statistics)
+  , counters_(statistics, "RamCache")
+{
+  int retval = pthread_rwlock_init(&rwlock_, NULL);
+  assert(retval == 0);
+  for (size_t i = 0; i < fd_index_.size(); i++)
+    fd_index_[i] = i;
+  LogCvmfs(kLogCache, kLogDebug, "max %u B, %u entries",
+           max_size, max_entries);
+}
+
+
+RamCacheManager::~RamCacheManager() {
+  pthread_rwlock_destroy(&rwlock_);
+}
+
 
 int RamCacheManager::AddFd(const ReadOnlyFd &fd) {
   if (fd_pivot_ >= fd_index_.size()) {
@@ -34,6 +68,7 @@ int RamCacheManager::AddFd(const ReadOnlyFd &fd) {
   ++fd_pivot_;
   return next_fd;
 }
+
 
 bool RamCacheManager::AcquireQuotaManager(QuotaManager *quota_mgr) {
   assert(quota_mgr != NULL);
@@ -236,7 +271,7 @@ int64_t RamCacheManager::Write(const void *buf, uint64_t size, void *txn) {
       LogCvmfs(kLogCache, kLogDebug,
                "attempted to write more than requested (%u>%u)",
                size, transaction->buffer.size);
-      return -EIO;
+      return -EFBIG;
     }
   }
 
