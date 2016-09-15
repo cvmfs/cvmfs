@@ -39,7 +39,7 @@ init([]) ->
                              restart => permanent,
                              shutdown => 2000,
                              type => worker,
-                             modules => [cvmfs_lease]},
+                             modules => [cvmfs_lease,cvmfs_lease_storage]},
     {ok, {SupervisorSpecs, [CvmfsLeasesMainSpecs]}}.
 
 %%====================================================================
