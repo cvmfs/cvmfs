@@ -18,8 +18,12 @@
 
 using namespace std;  // NOLINT
 
-static const size_t kArenaSize = 512*1024*1024;
 
+/**
+ * All objects in memory are prepended by an AllocHeader that allows the
+ * Key-Value store to find the pointer when the heap memory manager compacts
+ * the allocations.
+ */
 struct AllocHeader {
   AllocHeader()
   : version(0)
@@ -28,6 +32,11 @@ struct AllocHeader {
   shash::Any id;
 };
 
+
+/**
+ * A MmeoryBuffer is used in the staging phase of new objects until they are
+ * committed.
+ */
 struct MemoryBuffer {
   MemoryBuffer()
     : address(NULL)
@@ -42,10 +51,11 @@ struct MemoryBuffer {
   shash::Any id;
 };
 
+
 /**
  * @p MemoryKvStore provides a simple RAM-backed key/value store suited to
  * use with @ref RamCacheManager. To insert entries, the caller must allocate
- * some memory and can choose set some metadata such as object type.
+ * some memory and can choose to set some metadata such as object type.
  * @p MemoryKvStore takes ownership of the passed-in memory and maintains
  * reference counts for all its objects. Callers must increment the reference
  * count on an entry before reading to ensure that the entry is not removed
@@ -194,18 +204,19 @@ class MemoryKvStore :SingleCopy, public Callbackable<MallocHeap::BlockPtr> {
   size_t GetUsed() { return used_bytes_; }
 
  private:
+  // Compact memory once utilization falls below the threshold
+  static const double kCompactThreshold;  // = 0.8
+
   bool DoDelete(const shash::Any &id);
   int DoMalloc(MemoryBuffer *buf);
   int DoRealloc(MemoryBuffer *buf, size_t size);
   void DoFree(MemoryBuffer *buf);
   bool DoCommit(const MemoryBuffer &buf);
-  size_t GetBufferSize(MemoryBuffer *buf);
   void OnBlockMove(const MallocHeap::BlockPtr &ptr);
-  bool Cleanup();
+  bool CompactMemory();
 
   MemoryAllocator allocator_;
   size_t used_bytes_;
-  size_t idx_last_arena_;
   unsigned int entry_count_;
   unsigned int max_entries_;
   lru::LruCache<shash::Any, MemoryBuffer> entries_;
