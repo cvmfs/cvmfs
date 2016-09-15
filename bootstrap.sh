@@ -12,6 +12,7 @@ GOOGLETEST_VERSION=1.7.0
 TBB_VERSION=4.4-5
 LIBGEOIP_VERSION=1.6.0
 PYTHON_GEOIP_VERSION=1.3.1
+PROTOBUF_VERSION=2.6.1
 
 if [ $# -ne 1 ]; then
   echo "Usage: $0 <decompress location>"
@@ -40,16 +41,21 @@ get_destination_dir() {
 do_extract() {
   local library_name="$1"
   local library_archive="$2"
+  local archive_format=$(echo "$library_archive" | sed 's/.*\(\.tar\.[^\.]*\)$/\1/')
 
   local library_dir="$externals_dir/$library_name"
   local dest_dir=$(get_destination_dir $library_name)
   local cdir=$(pwd)
-  local library_decompressed_dir=$(basename $library_archive .tar.gz)
+  local library_decompressed_dir=$(basename $library_archive $archive_format)
 
   print_hint "Extracting $library_archive"
 
   cd $externals_build_dir
-  tar xvfz "$library_dir/$library_archive"
+  if [ $archive_format = ".tar.bz2" ]; then
+    tar xvfj "$library_dir/$library_archive"
+  else
+    tar xvfz "$library_dir/$library_archive"
+  fi
   mv $library_decompressed_dir $dest_dir
   cd $cdir
   cp $library_dir/src/* $dest_dir
@@ -110,6 +116,7 @@ do_extract  "googletest"  "gtest-${GOOGLETEST_VERSION}.tar.gz"
 do_extract  "libgeoip"    "GeoIP-${LIBGEOIP_VERSION}.tar.gz"
 do_extract  "python-geoip" "GeoIP-${PYTHON_GEOIP_VERSION}.tar.gz"
 do_extract  "tbb"         "tbb-${TBB_VERSION}.tar.gz"
+do_extract  "protobuf"    "protobuf-${PROTOBUF_VERSION}.tar.bz2"
 
 do_copy     "googlebench"
 do_copy     "sqlite3"

@@ -238,6 +238,7 @@ add_dependencies (${PROJECT_TEST_NAME} googletest)
 add_dependencies (${PROJECT_TEST_NAME} libvjson)
 add_dependencies (${PROJECT_TEST_NAME} sparsehash)
 add_dependencies (${PROJECT_TEST_NAME} libsha3)
+add_dependencies (${PROJECT_TEST_NAME} protobuf)
 add_test (NAME ${PROJECT_TEST_NAME} COMMAND ${PROJECT_TEST_NAME} --gtest_filter=-*Slow)
 add_dependencies (check ${PROJECT_TEST_NAME})
 
@@ -245,6 +246,7 @@ if (BUILD_UNITTESTS_DEBUG)
   add_executable (${PROJECT_TEST_DEBUG_NAME} ${CVMFS_UNITTEST_DEBUG_SOURCES})
   add_dependencies (${PROJECT_TEST_DEBUG_NAME} googletest)
   add_dependencies (${PROJECT_TEST_DEBUG_NAME} libvjson)
+  add_dependencies (${PROJECT_TEST_DEBUG_NAME} protobuf)
 endif (BUILD_UNITTESTS_DEBUG)
 
 #
@@ -317,7 +319,7 @@ set (UNITTEST_LINK_LIBRARIES ${GTEST_LIBRARIES} ${GOOGLETEST_ARCHIVE} ${OPENSSL_
                              ${SQLITE3_LIBRARY} ${SQLITE3_ARCHIVE} ${TBB_LIBRARIES}
                              ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${UUID_LIBRARIES}
                              ${SHA3_ARCHIVE} ${PACPARSER_LIBRARIES} ${PACPARSER_ARCHIVE}
-                             ${VJSON_ARCHIVE} pthread dl)
+                             ${VJSON_ARCHIVE} ${PROTOBUF_ARCHIVE} pthread dl)
 
 target_link_libraries (${PROJECT_TEST_NAME} ${UNITTEST_LINK_LIBRARIES})
 
