@@ -374,16 +374,16 @@ int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
     return -ENOSPC;
   }
 
-  if (store->Commit(transaction->buffer)) {
-    LogCvmfs(kLogCache, kLogDebug, "committed %s to cache",
-             transaction->buffer.id.ToString().c_str());
-    return 0;
-  } else {
+  int rc = store->Commit(transaction->buffer);
+  if (rc < 0) {
     LogCvmfs(kLogCache, kLogDebug,
              "commit on %s failed",
              transaction->buffer.id.ToString().c_str());
-    return -EIO;
+    return rc;
   }
+  LogCvmfs(kLogCache, kLogDebug, "committed %s to cache",
+           transaction->buffer.id.ToString().c_str());
+  return 0;
 }
 
 }  // namespace cache

@@ -116,41 +116,6 @@ int MemoryKvStore::DoMalloc(MemoryBuffer *buf) {
 }
 
 
-int MemoryKvStore::DoRealloc(MemoryBuffer *buf, size_t size) {
-  MemoryBuffer tmp;
-  int rc;
-
-  assert(buf);
-  memcpy(&tmp, buf, sizeof(tmp));
-  tmp.size = size;
-
-  switch (allocator_) {
-    case kMallocLibc:
-      tmp.address = realloc(tmp.address, tmp.size);
-      if (!tmp.address && tmp.size > 0) return -errno;
-      break;
-    case kMallocHeap:
-      if (size == 0) {
-        DoFree(buf);
-        return 0;
-      }
-      if (buf->size >= size) return 0;
-
-      rc = DoMalloc(&tmp);
-      if (rc < 0) return rc;
-      if (buf->address) {
-        memcpy(tmp.address, buf->address, buf->size);
-        DoFree(buf);
-      }
-      break;
-    default:
-        abort();
-  }
-  memcpy(buf, &tmp, sizeof(*buf));
-  return 0;
-}
-
-
 void MemoryKvStore::DoFree(MemoryBuffer *buf) {
   AllocHeader a;
 
@@ -286,13 +251,13 @@ int64_t MemoryKvStore::Read(
 }
 
 
-bool MemoryKvStore::Commit(const MemoryBuffer &buf) {
+int MemoryKvStore::Commit(const MemoryBuffer &buf) {
   WriteLockGuard guard(rwlock_);
   return DoCommit(buf);
 }
 
 
-bool MemoryKvStore::DoCommit(const MemoryBuffer &buf) {
+int MemoryKvStore::DoCommit(const MemoryBuffer &buf) {
   // we need to be careful about refcounts. If another thread wants to read
   // a cache entry while it's being written (OpenFromTxn put partial data in
   // the kvstore, will be committed again later) the refcount in the kvstore
@@ -312,38 +277,35 @@ bool MemoryKvStore::DoCommit(const MemoryBuffer &buf) {
   if (entries_.Lookup(buf.id, &mem)) {
     LogCvmfs(kLogKvStore, kLogDebug, "commit overwrites existing entry");
     size_t old_size = mem.size;
-    if (DoRealloc(&mem, buf.size) < 0) {
-      LogCvmfs(kLogKvStore, kLogDebug, "failed to reallocate %s",
-        buf.id.ToString().c_str());
-      return false;
-    }
+    DoFree(&mem);
     used_bytes_ -= old_size;
     counters_.sz_size->Set(used_bytes_);
+    --entry_count_;
   } else {
-    if (entry_count_ == max_entries_) {
-      LogCvmfs(kLogKvStore, kLogDebug, "too many entries in kvstore");
-      return false;
-    }
-    mem.size = buf.size;
-    if (DoMalloc(&mem) < 0) {
-      LogCvmfs(kLogKvStore, kLogDebug, "failed to allocate %s",
-        buf.id.ToString().c_str());
-      return false;
-    }
     // since this is a new entry, the caller can choose the starting
     // refcount (starting at 1 for pinning, for example)
     mem.refcount = buf.refcount;
   }
-  memcpy(mem.address, buf.address, min(mem.size, buf.size));
   mem.object_type = buf.object_type;
   mem.id = buf.id;
+  mem.size = buf.size;
+  if (entry_count_ == max_entries_) {
+    LogCvmfs(kLogKvStore, kLogDebug, "too many entries in kvstore");
+    return -ENFILE;
+  }
+  if (DoMalloc(&mem) < 0) {
+    LogCvmfs(kLogKvStore, kLogDebug, "failed to allocate %s",
+      buf.id.ToString().c_str());
+    return -EIO;
+  }
+  assert(SSIZE_MAX - mem.size > used_bytes_);
+  memcpy(mem.address, buf.address, mem.size);
   entries_.Insert(buf.id, mem);
   ++entry_count_;
-  assert(SSIZE_MAX - mem.size > used_bytes_);
   used_bytes_ += mem.size;
   counters_.sz_size->Set(used_bytes_);
   perf::Xadd(counters_.sz_committed, mem.size);
-  return true;
+  return 0;
 }
 
 
