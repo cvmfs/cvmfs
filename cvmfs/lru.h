@@ -638,7 +638,7 @@ class LruCache : SingleCopy {
    * @param value (out) here the result is saved (not touch in case of miss)
    * @return true on successful lookup, false if key was not found
    */
-  virtual bool Lookup(const Key &key, Value *value) {
+  virtual bool Lookup(const Key &key, Value *value, bool update_lru = true) {
     bool found = false;
     Lock();
     if (pause_) {
@@ -650,7 +650,8 @@ class LruCache : SingleCopy {
     if (DoLookup(key, &entry)) {
       // Hit
       perf::Inc(counters_.n_hit);
-      Touch(entry);
+      if (update_lru)
+        Touch(entry);
       *value = entry.value;
       found = true;
     } else {
