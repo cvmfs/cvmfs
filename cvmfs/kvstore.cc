@@ -293,16 +293,16 @@ bool MemoryKvStore::Commit(const MemoryBuffer &buf) {
 
 
 bool MemoryKvStore::DoCommit(const MemoryBuffer &buf) {
-   // we need to be careful about refcounts. If another thread wants to read
-   // a cache entry while it's being written (OpenFromTxn put partial data in
-   // the kvstore, will be committed again later) the refcount in the kvstore
-   // will differ from the refcount in the cache transaction. To avoid leaks,
-   // either the caller needs to fetch the cache entry before every write to
-   // find the current refcount, or the kvstore can ignore the passed-in
-   // refcount if the entry already exists. This implementation does the latter,
-   // and as a result it's not possible to directly modify the refcount
-   // without a race condition. This is a hint that callers should use the
-   // refcount like a lock and not directly modify the numeric value.
+  // we need to be careful about refcounts. If another thread wants to read
+  // a cache entry while it's being written (OpenFromTxn put partial data in
+  // the kvstore, will be committed again later) the refcount in the kvstore
+  // will differ from the refcount in the cache transaction. To avoid leaks,
+  // either the caller needs to fetch the cache entry before every write to
+  // find the current refcount, or the kvstore can ignore the passed-in
+  // refcount if the entry already exists. This implementation does the latter,
+  // and as a result it's not possible to directly modify the refcount
+  // without a race condition. This is a hint that callers should use the
+  // refcount like a lock and not directly modify the numeric value.
 
   CompactMemory();
 
