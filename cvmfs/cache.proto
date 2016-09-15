@@ -1,0 +1,19 @@
+package cvmfs;
+
+option optimize_for = LITE_RUNTIME;
+
+enum EnumStatus {
+  STATUS_OK = 0;
+  STATUS_FAIL = 1;
+}
+
+// client --> cache manager
+message HandshakeRequest {
+  optional string name = 1;
+}
+
+// cache manager --> client
+message HandshakeReply {
+  required EnumStatus status = 1;
+  optional int64 client_id = 2;
+}

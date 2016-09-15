@@ -34,6 +34,7 @@ set (CVMFS_CLIENT_SOURCES
   backoff.cc backoff.h
   bigvector.h
   cache.cc cache.h
+  cache.pb.cc cache.pb.h
   cache_posix.cc cache_posix.h
   cache_ram.cc cache_ram.h
   cache_tiered.cc cache_tiered.h
@@ -101,6 +102,17 @@ set (CVMFS_CLIENT_SOURCES
   wpad.cc wpad.h
   xattr.cc xattr.h
 )
+
+set_source_files_properties(cache.pb.cc cache.pb.h
+                            PROPERTIES GENERATED true)
+
+add_custom_command(OUTPUT cache.pb.cc cache.pb.h
+                   COMMAND ${PROTOBUF_C} --cpp_out=.
+                           ${CMAKE_CURRENT_SOURCE_DIR}/cache.proto
+                           -I${CMAKE_CURRENT_SOURCE_DIR}
+                   DEPENDS ${PROTOBUF_ARCHIVE}
+                           ${CMAKE_CURRENT_SOURCE_DIR}/cache.proto
+                   COMMENT "Generating protobuf sources")
 
 
 set (CVMFS2_DEBUG_SOURCES
