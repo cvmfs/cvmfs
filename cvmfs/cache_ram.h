@@ -41,9 +41,9 @@ static const shash::Any kInvalidHandle;
  * RAM cache size defaults to ~3% of the system memory.
  * The minimum cache size is 200 MB.
  *
- * RamCacheManager can also use a custom arena allocator rather than
- * the default libc @p malloc(). To enable this feature, set
- * @p CVMFS_CACHE_RAM_MALLOC=arena
+ * RamCacheManager uses a custom heap allocator rather than
+ * the system's libc @p malloc(). To switch to libc malloc, set
+ * @p CVMFS_CACHE_RAM_MALLOC=libc
  */
 class RamCacheManager : public CacheManager {
  public:
@@ -110,35 +110,16 @@ class RamCacheManager : public CacheManager {
     uint64_t max_size,
     unsigned max_entries,
     MemoryKvStore::MemoryAllocator alloc,
-    perf::Statistics *statistics)
-    : max_size_(max_size)
-    , fd_pivot_(0)
-    , open_fds_(max_entries)
-    , fd_index_(max_entries)
-    , regular_entries_(max_entries,
-                       "RamCache.regular",
-                       alloc,
-                       statistics)
-    , volatile_entries_(max_entries,
-                        "RamCache.volatile",
-                        alloc,
-                        statistics)
-    , counters_(statistics, "RamCache") {
-    int retval = pthread_rwlock_init(&rwlock_, NULL);
-    assert(retval == 0);
-    for (size_t i = 0; i < fd_index_.size(); i++)
-      fd_index_[i] = i;
-    LogCvmfs(kLogCache, kLogDebug, "max %u B, %u entries",
-             max_size, max_entries);
-  }
-  virtual ~RamCacheManager() {
-    pthread_rwlock_destroy(&rwlock_);
-  }
+    perf::Statistics *statistics);
+
+  virtual ~RamCacheManager();
+
   virtual bool AcquireQuotaManager(QuotaManager *quota_mgr);
 
   /**
-   * Open a new file descriptor into the cache. Note that opening entries effectively pins them in the cache,
-   * so it may be necessary to close unneeded file descriptors to allow eviction to make room in the cache
+   * Open a new file descriptor into the cache. Note that opening entries
+   * effectively pins them in the cache, so it may be necessary to close
+   * unneeded file descriptors to allow eviction to make room in the cache
    * @param id The hash key
    * @returns A nonnegative integer file descriptor
    * @retval -ENOENT The entry is not in the cache
@@ -155,15 +136,16 @@ class RamCacheManager : public CacheManager {
   virtual int64_t GetSize(int fd);
 
   /**
-   * Close the descriptor in the cache. Entries not marked as pinned will become subject to
-   * eviction once closed
+   * Close the descriptor in the cache. Entries not marked as pinned will become
+   * subject to eviction once closed
    * @param id The hash key
    * @retval -EBADF @p fd is not valid
    */
   virtual int Close(int fd);
 
   /**
-   * Read a section from the cache entry. See pread(3) for a discussion of the arguments
+   * Read a section from the cache entry. See pread(3) for a discussion of the
+   * arguments
    * @param id The hash key
    * @returns The number of bytes copied
    * @retval -EBADF @p fd is not valid
@@ -171,8 +153,8 @@ class RamCacheManager : public CacheManager {
   virtual int64_t Pread(int fd, void *buf, uint64_t size, uint64_t offset);
 
   /**
-   * Duplicates the open file descriptor, allowing the original and the new one to be
-   * used independently
+   * Duplicates the open file descriptor, allowing the original and the new one
+   * to be used independently
    * @param id The hash key
    * @returns A new, nonnegative integer fd
    * @retval -EBADF @p fd is not valid
@@ -187,11 +169,16 @@ class RamCacheManager : public CacheManager {
    */
   virtual int Readahead(int fd);
 
-  /** Get the amount of space to be allocated for a call to @ref StartTxn */
-  virtual uint16_t SizeOfTxn() { return sizeof(Transaction); }
 
   /**
-   * Start a new transaction, allocating the required memory and initializing the transaction parameters
+   * Get the amount of space to be allocated for a call to @ref StartTxn
+   */
+  virtual uint16_t SizeOfTxn() { return sizeof(Transaction); }
+
+
+  /**
+   * Start a new transaction, allocating the required memory and initializing
+   * the transaction parameters
    * @param id The hash key
    * @param size The total size of the new cache entry
    * @param txn A pointer to space allocated for storing the transaction details
@@ -199,7 +186,8 @@ class RamCacheManager : public CacheManager {
   virtual int StartTxn(const shash::Any &id, uint64_t size, void *txn);
 
   /**
-   * Set the transaction parameters. At present, only @ref type is used for pinned, volatile, etc.
+   * Set the transaction parameters. At present, only @ref type is used for
+   * pinned, volatile, etc.
    * @param description Unused
    * @param type The type of the entry, e.g. pinned
    * @param flags Unused
@@ -211,7 +199,8 @@ class RamCacheManager : public CacheManager {
                        void *txn);
 
   /**
-   * Copy the given memory region into the transaction buffer. Copying starts at the transaction's current offset
+   * Copy the given memory region into the transaction buffer. Copying starts at
+   * the transaction's current offset
    * @param buf The source address
    * @param size The number of bytes to copy
    * @param txn A pointer to space allocated for storing the transaction details
@@ -225,10 +214,12 @@ class RamCacheManager : public CacheManager {
   virtual int Reset(void *txn);
 
   /**
-   * Commit a transaction and open the resulting cache entry. This is necessary to avoid a race condition in which the
-   * cache entry is evicted between the calls to CommitTxn and Open.
+   * Commit a transaction and open the resulting cache entry. This is necessary
+   * to avoid a race condition in which the cache entry is evicted between the
+   * calls to CommitTxn and Open.
    * @param txn A pointer to space allocated for storing the transaction details
-   * @returns A file descriptor to the new cache entry, or a negative error from @ref CommitTxn
+   * @returns A file descriptor to the new cache entry, or a negative error from
+   *          @ref CommitTxn
    */
   virtual int OpenFromTxn(void *txn);
 
@@ -239,9 +230,10 @@ class RamCacheManager : public CacheManager {
   virtual int AbortTxn(void *txn);
 
   /**
-   * Commit a transaction to the cache. If there is not enough free space in the cache, first try to make room by evicting
-   * volatile entries. If there is still not enough room, try evicting regular entries. If there is *still* not enough
-   * space, give up an return failure.
+   * Commit a transaction to the cache. If there is not enough free space in the
+   * cache, first try to make room by evicting volatile entries. If there is
+   * still not enough room, try evicting regular entries. If there is *still*
+   * not enough space, give up an return failure.
    * @param txn A pointer to space allocated for storing the transaction details
    * @retval -ENOSPC The transaction would exceed the size of the cache
    * @retval -ENFILE No handles are available
@@ -266,19 +258,12 @@ class RamCacheManager : public CacheManager {
 
   struct Transaction {
     Transaction()
-      : buffer(NULL)
-      , size(0)
+      : buffer()
       , expected_size(0)
-      , pos(0)
-      , allocated(false)
-      , object_type(kTypeRegular) { }
-    shash::Any id;
-    void *buffer;
-    uint64_t size;
+      , pos(0) { }
+    MemoryBuffer buffer;
     uint64_t expected_size;
     uint64_t pos;
-    bool allocated;
-    ObjectType object_type;
     std::string description;
   };
 
@@ -297,7 +282,7 @@ class RamCacheManager : public CacheManager {
   }
 
   inline MemoryKvStore *GetTransactionStore(Transaction *txn) {
-    if (txn->object_type == cache::CacheManager::kTypeVolatile) {
+    if (txn->buffer.object_type == cache::CacheManager::kTypeVolatile) {
       return &volatile_entries_;
     } else {
       return &regular_entries_;
@@ -309,6 +294,9 @@ class RamCacheManager : public CacheManager {
   virtual int DoOpen(const shash::Any &id);
 
   uint64_t max_size_;
+  /**
+   * The index of the first available file descriptor in fd_index_.
+   */
   size_t fd_pivot_;
   std::vector<ReadOnlyFd> open_fds_;
   std::vector<size_t> fd_index_;

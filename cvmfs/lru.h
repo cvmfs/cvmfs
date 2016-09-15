@@ -81,6 +81,7 @@ struct Counters {
   uint64_t num_collisions;
   uint32_t max_collisions;
   perf::Counter *n_update;
+  perf::Counter *n_update_value;
   perf::Counter *n_replace;
   perf::Counter *n_forget;
   perf::Counter *n_drop;
@@ -99,6 +100,8 @@ struct Counters {
         "Number of negative inserts for " + name);
     n_update = statistics->Register(name + ".n_update",
         "Number of updates for " + name);
+    n_update_value = statistics->Register(name + ".n_update_value",
+        "Number of value changes for " + name);
     n_replace = statistics->Register(name + ".n_replace",
         "Number of replaces for " + name);
     n_forget = statistics->Register(name + ".n_forget",
@@ -602,6 +605,32 @@ class LruCache : SingleCopy {
     return true;
   }
 
+
+  /**
+   * Changes the value of an entry in the LRU cache without updating the LRU
+   * order.
+   */
+  virtual bool UpdateValue(const Key &key, const Value &value) {
+    this->Lock();
+    if (pause_) {
+      Unlock();
+      return false;
+    }
+
+    CacheEntry entry;
+    if (!this->DoLookup(key, &entry)) {
+      this->Unlock();
+      return false;
+    }
+
+    perf::Inc(counters_.n_update_value);
+    entry.value = value;
+    cache_.Insert(key, entry);
+    this->Unlock();
+    return true;
+  }
+
+
   /**
    * Retrieve an element from the cache.
    * If the element was found, it will be marked as 'recently used' and returned
@@ -609,7 +638,7 @@ class LruCache : SingleCopy {
    * @param value (out) here the result is saved (not touch in case of miss)
    * @return true on successful lookup, false if key was not found
    */
-  virtual bool Lookup(const Key &key, Value *value) {
+  virtual bool Lookup(const Key &key, Value *value, bool update_lru = true) {
     bool found = false;
     Lock();
     if (pause_) {
@@ -621,7 +650,8 @@ class LruCache : SingleCopy {
     if (DoLookup(key, &entry)) {
       // Hit
       perf::Inc(counters_.n_hit);
-      Touch(entry);
+      if (update_lru)
+        Touch(entry);
       *value = entry.value;
       found = true;
     } else {
@@ -703,8 +733,9 @@ class LruCache : SingleCopy {
   }
 
   /**
-   * Prepares for in-order iteration of the cache entries to perform a filter operation.
-   * To ensure consistency, the LruCache must be locked for the duration of the filter operation.
+   * Prepares for in-order iteration of the cache entries to perform a filter
+   * operation. To ensure consistency, the LruCache must be locked for the
+   * duration of the filter operation.
    */
   virtual void FilterBegin() {
     assert(!filter_entry_);

@@ -4,6 +4,8 @@
 
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "lru.h"
 #include "statistics.h"
 #include "util/string.h"
@@ -46,6 +48,36 @@ TEST(T_LruCache, Insert) {
 
   EXPECT_FALSE(cache.IsEmpty());
   EXPECT_FALSE(cache.IsFull());
+}
+
+
+TEST(T_LruCache, UpdateValue) {
+  perf::Statistics statistics;
+  LruCache<int, std::string> cache(cache_size, -1, hasher_int,
+      &statistics, name);
+
+  EXPECT_TRUE(cache.Insert(1, "one"));
+  EXPECT_TRUE(cache.Insert(2, "two"));
+  EXPECT_FALSE(cache.IsFull());
+  unsigned i = 3;
+  for (; !cache.IsFull(); ++i) {
+    cache.Insert(i, "");
+  }
+  EXPECT_EQ(0U, statistics.Lookup(name + ".n_replace")->Get());
+
+  EXPECT_FALSE(cache.UpdateValue(i, "BIGNUMBER"));
+  EXPECT_TRUE(cache.UpdateValue(1, "ONE"));
+
+  std::string value;
+  EXPECT_TRUE(cache.Lookup(1, &value));
+  EXPECT_EQ("ONE", value);
+
+  EXPECT_TRUE(cache.UpdateValue(2, "TWO"));
+  // Overflow, 2 should be removed, and not be the "newest" entry after
+  // UpdateValue
+  cache.Insert(i, "");
+  EXPECT_EQ(1U, statistics.Lookup(name + ".n_replace")->Get());
+  EXPECT_FALSE(cache.Lookup(2, &value));
 }
 
 
@@ -344,13 +376,14 @@ TEST(T_LruCache, LeastRecentlyUsedReplacementSlow) {
   std::string v;
   const std::string neg = "notfound";
 
-  // lookup a couple of entries to make then "Least Recently Used"
+  // lookup a couple of entries to make then "Least Recently Used" except for
+  // the last one
   found = cache.Lookup(2, &v); EXPECT_TRUE(found); EXPECT_EQ("2", v);
   found = cache.Lookup(4, &v); EXPECT_TRUE(found); EXPECT_EQ("4", v);
   found = cache.Lookup(5, &v); EXPECT_TRUE(found); EXPECT_EQ("5", v);
   found = cache.Lookup(6, &v); EXPECT_TRUE(found); EXPECT_EQ("6", v);
   found = cache.Lookup(7, &v); EXPECT_TRUE(found); EXPECT_EQ("7", v);
-  found = cache.Lookup(9, &v); EXPECT_TRUE(found); EXPECT_EQ("9", v);
+  found = cache.Lookup(9, &v, false); EXPECT_TRUE(found); EXPECT_EQ("9", v);
 
   EXPECT_FALSE(cache.IsEmpty());
   EXPECT_TRUE(cache.IsFull());
@@ -369,7 +402,7 @@ TEST(T_LruCache, LeastRecentlyUsedReplacementSlow) {
   found = cache.Lookup(5, &v); EXPECT_TRUE(found); EXPECT_EQ("5", v);
   found = cache.Lookup(6, &v); EXPECT_TRUE(found); EXPECT_EQ("6", v);
   found = cache.Lookup(7, &v); EXPECT_TRUE(found); EXPECT_EQ("7", v);
-  found = cache.Lookup(9, &v); EXPECT_TRUE(found); EXPECT_EQ("9", v);
+  found = cache.Lookup(9, &v); EXPECT_FALSE(found);
 
   v = neg;
   found = cache.Lookup(8, &v); EXPECT_FALSE(found); EXPECT_EQ(neg, v);

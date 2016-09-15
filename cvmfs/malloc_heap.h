@@ -92,14 +92,6 @@ class MallocHeap {
   };
 
   /**
-   * Round up size to the next larger multiple of 8.  This is used to enforce
-   * 8-byte alignment.
-   */
-  static inline uint64_t RoundUp8(const uint64_t size) {
-    return (size + 7) & ~static_cast<uint64_t>(7);
-  }
-
-  /**
    * Invoked when a block is moved during compact.
    */
   CallbackPtr callback_ptr_;
