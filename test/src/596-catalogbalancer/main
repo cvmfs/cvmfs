@@ -36,19 +36,21 @@ cvmfs_run_test() {
   add_catalog "$repo_dir/dir4"
   publish_repo "$repo" || return 3
 
-  echo "Checking first iteration"
-  ! [ -f "$repo_dir/dir3/.cvmfscatalog" ]                     || return 1
-  ! [ -f "$repo_dir/dir3/.cvmfsautocatalog" ]                 || return 2
-  if check_catalog_presence "/dir3" "$repo"; then return 3; fi
-  ! [ -f "$repo_dir/.cvmfscatalog" ]                          || return 4
-  ! [ -f "$repo_dir/.cvmfsautocatalog" ]                      || return 5
-  if ! check_catalog_presence "/" "$repo"; then return 6; fi
-    [ -f "$repo_dir/dir100/.cvmfscatalog" ]                   || return 7
-    [ -f "$repo_dir/dir100/.cvmfsautocatalog" ]               || return 8
-  if ! check_catalog_presence "/dir100" "$repo"; then return 9; fi
-    [ -f "$repo_dir/dir4/.cvmfscatalog" ]                     || return 10
-  ! [ -f "$repo_dir/dir4/.cvmfsautocatalog" ]                 || return 11
-  if ! check_catalog_presence "/dir4" "$repo"; then return 12; fi
+  check_repository "$CVMFS_TEST_REPO" || return 4
+
+  echo "*** Checking first iteration"
+  ! [ -f "$repo_dir/dir3/.cvmfscatalog" ]                     || return 11
+  ! [ -f "$repo_dir/dir3/.cvmfsautocatalog" ]                 || return 12
+  if check_catalog_presence "/dir3" "$repo"; then return 13; fi
+  ! [ -f "$repo_dir/.cvmfscatalog" ]                          || return 14
+  ! [ -f "$repo_dir/.cvmfsautocatalog" ]                      || return 15
+  if ! check_catalog_presence "/" "$repo"; then return 16; fi
+    [ -f "$repo_dir/dir100/.cvmfscatalog" ]                   || return 17
+    [ -f "$repo_dir/dir100/.cvmfsautocatalog" ]               || return 18
+  if ! check_catalog_presence "/dir100" "$repo"; then return 19; fi
+    [ -f "$repo_dir/dir4/.cvmfscatalog" ]                     || return 20
+  ! [ -f "$repo_dir/dir4/.cvmfsautocatalog" ]                 || return 21
+  if ! check_catalog_presence "/dir4" "$repo"; then return 22; fi
 
   start_transaction "$repo"
   add_files "$repo_dir/dir/dir30" 30
@@ -57,28 +59,32 @@ cvmfs_run_test() {
   done
   publish_repo "$repo"
 
-  echo "Checking second iteration"
-  ! [ -f "$repo_dir/dir3/.cvmfscatalog" ]                     || return 13
-  ! [ -f "$repo_dir/dir3/.cvmfsautocatalog" ]                 || return 14
-  if check_catalog_presence "/dir3" "$repo"; then return 15; fi
-  ! [ -f "$repo_dir/.cvmfscatalog" ]                          || return 16
-  ! [ -f "$repo_dir/.cvmfsautocatalog" ]                      || return 17
-  if ! check_catalog_presence "/" "$repo"; then return 18; fi
-    [ -f "$repo_dir/dir100/.cvmfscatalog" ]                   || return 19
-    [ -f "$repo_dir/dir100/.cvmfsautocatalog" ]               || return 20
-  if ! check_catalog_presence "/dir100" "$repo"; then return 21; fi
-    [ -f "$repo_dir/dir4/.cvmfscatalog" ]                     || return 22
-  ! [ -f "$repo_dir/dir4/.cvmfsautocatalog" ]                 || return 23
-  if ! check_catalog_presence "/dir4" "$repo"; then return 24; fi
-    [ -f "$repo_dir/dir/dir30/.cvmfscatalog" ]                || return 25
-    [ -f "$repo_dir/dir/dir30/.cvmfsautocatalog" ]            || return 26
-  if ! check_catalog_presence "/dir/dir30" "$repo"; then return 27; fi
+  check_repository "$CVMFS_TEST_REPO" || return 31
+
+  echo "*** Checking second iteration"
+  ! [ -f "$repo_dir/dir3/.cvmfscatalog" ]                     || return 33
+  ! [ -f "$repo_dir/dir3/.cvmfsautocatalog" ]                 || return 34
+  if check_catalog_presence "/dir3" "$repo"; then return 35; fi
+  ! [ -f "$repo_dir/.cvmfscatalog" ]                          || return 36
+  ! [ -f "$repo_dir/.cvmfsautocatalog" ]                      || return 37
+  if ! check_catalog_presence "/" "$repo"; then return 38; fi
+    [ -f "$repo_dir/dir100/.cvmfscatalog" ]                   || return 39
+    [ -f "$repo_dir/dir100/.cvmfsautocatalog" ]               || return 40
+  if ! check_catalog_presence "/dir100" "$repo"; then return 41; fi
+    [ -f "$repo_dir/dir4/.cvmfscatalog" ]                     || return 42
+  ! [ -f "$repo_dir/dir4/.cvmfsautocatalog" ]                 || return 43
+  if ! check_catalog_presence "/dir4" "$repo"; then return 44; fi
+    [ -f "$repo_dir/dir/dir30/.cvmfscatalog" ]                || return 45
+    [ -f "$repo_dir/dir/dir30/.cvmfsautocatalog" ]            || return 46
+  if ! check_catalog_presence "/dir/dir30" "$repo"; then return 47; fi
 
   start_transaction "$repo"
   add_files "$repo_dir/dir60" 60
   publish_repo "$repo"
 
-  echo "Checking third iteration"
+  check_repository "$CVMFS_TEST_REPO" || return 61
+
+  echo "*** Checking third iteration"
   ! [ -f "$repo_dir/dir3/.cvmfscatalog" ]                     || return 28
   ! [ -f "$repo_dir/dir3/.cvmfsautocatalog" ]                 || return 29
   if check_catalog_presence "/dir3" "$repo"; then return 30; fi
@@ -104,6 +110,8 @@ cvmfs_run_test() {
   done
   add_files "$repo_dir/dir60" 1
   publish_repo "$repo"
+
+  check_repository "$CVMFS_TEST_REPO" || return 2
 
   echo "Checking fourth iteration"
   ! [ -f "$repo_dir/dir3/.cvmfscatalog" ]                     || return 46
@@ -132,7 +140,9 @@ cvmfs_run_test() {
   # now the system should get rid of the catalog in /dir4 and delete both entries
   publish_repo "$repo"
 
-  echo "Checking fifth iteration"
+  check_repository "$CVMFS_TEST_REPO" || return 2
+
+  echo "*** Checking fifth iteration"
   ! [ -f "$repo_dir/dir3/.cvmfscatalog" ]                     || return 64
   ! [ -f "$repo_dir/dir3/.cvmfsautocatalog" ]                 || return 65
   if check_catalog_presence "/dir3" "$repo"; then return 66; fi
@@ -162,7 +172,9 @@ cvmfs_run_test() {
   add_files "$repo_dir/dir/dir30/dir/dir11" 11  # this one is a catalog
   publish_repo "$repo"
 
-  echo "Checking sixth iteration"
+  check_repository "$CVMFS_TEST_REPO" || return 2
+
+  echo "*** Checking sixth iteration"
   ! [ -f "$repo_dir/dir3/.cvmfscatalog" ]                     || return 82
   ! [ -f "$repo_dir/dir3/.cvmfsautocatalog" ]                 || return 83
   if check_catalog_presence "/dir3" "$repo"; then return 84; fi
@@ -204,7 +216,9 @@ cvmfs_run_test() {
   publish_repo "$repo"
   # now there should be an overflow in $repo_dir/dir/dir30/dir and it should create a catalog in $repo_dir/dir/dir30/dir/dir7
 
-  echo "Checking seventh iteration"
+  check_repository "$CVMFS_TEST_REPO" || return 2
+
+  echo "*** Checking seventh iteration"
   ! [ -f "$repo_dir/dir3/.cvmfscatalog" ]                     || return 106
   ! [ -f "$repo_dir/dir3/.cvmfsautocatalog" ]                 || return 107
   if check_catalog_presence "/dir3" "$repo"; then return 108; fi
