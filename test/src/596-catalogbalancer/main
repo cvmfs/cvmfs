@@ -8,13 +8,13 @@ add_files() {
   local body="$directory/file"
 
   for i in $(seq 1 1 $num_files); do
-    touch "$body$i"
+    echo -n "x" > "$body$i"
   done
 }
 
 add_catalog() {
   local repo_dir=$1
-  touch "$repo_dir/.cvmfscatalog"
+  echo -n "y" > "$repo_dir/.cvmfscatalog"
 }
 
 cvmfs_run_test() {
