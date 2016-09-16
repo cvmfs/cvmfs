@@ -627,8 +627,14 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   download::JobInfo download_sentinel(&url_sentinel, false);
   retval = download_manager()->Fetch(&download_sentinel);
   if (retval != download::kFailOk) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-             "This is not a CernVM-FS server for replication");
+    if (download_sentinel.http_code == 404) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "This is not a CernVM-FS server for replication");
+    } else {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "Failed to contact stratum 0 server (%d - %s)",
+               retval, download::Code2Ascii(download_sentinel.error_code));
+    }
     goto fini;
   }
 
