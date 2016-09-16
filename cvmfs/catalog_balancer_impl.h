@@ -9,10 +9,12 @@
 #include <inttypes.h>
 
 #include <cassert>
+#include <cstdlib>
 #include <string>
 #include <vector>
 
 #include "catalog_mgr.h"
+#include "compression.h"
 #include "directory_entry.h"
 #include "hash.h"
 #include "logging.h"
@@ -25,10 +27,22 @@ namespace catalog {
 template <class CatalogMgrT>
 DirectoryEntryBase
 CatalogBalancer<CatalogMgrT>::MakeEmptyDirectoryEntryBase(
-    string name, uid_t uid, gid_t gid) {
+  string name,
+  uid_t uid,
+  gid_t gid)
+{
+  // Note that another entity needs to ensure that the object of an empty
+  // file is in the repository!  It is currently done by the sync_mediator.
   shash::Algorithms algorithm = catalog_mgr_->spooler_->GetHashAlgorithm();
   shash::Any file_hash(algorithm);
-  shash::HashString("x\x9c\x03\x00\x00\x00\x00\x01", &file_hash);
+  void *empty_compressed;
+  uint64_t sz_empty_compressed;
+  bool retval = zlib::CompressMem2Mem(
+    NULL, 0, &empty_compressed, &sz_empty_compressed);
+  assert(retval);
+  shash::HashMem(static_cast<unsigned char *>(empty_compressed),
+                 sz_empty_compressed, &file_hash);
+  free(empty_compressed);
 
   DirectoryEntryBase deb;
   deb.name_ = NameString(name);
@@ -185,7 +199,4 @@ void CatalogBalancer<CatalogMgrT>::VirtualNode::FixWeight() {
 
 }  // namespace catalog
 
-
-
 #endif  // CVMFS_CATALOG_BALANCER_IMPL_H_
-
