@@ -7,6 +7,17 @@ enum EnumStatus {
   STATUS_FAIL = 1;
 }
 
+enum EnumHashAlgorithm {
+  HASH_SHA1 = 1;
+  HASH_RIPEMD160 = 2;
+  HASH_SHAKE128 = 3;
+}
+
+message Hash {
+  required EnumHashAlgorithm algorithm = 1;
+
+}
+
 // client --> cache manager
 message HandshakeRequest {
   optional string name = 1;
@@ -16,4 +27,8 @@ message HandshakeRequest {
 message HandshakeReply {
   required EnumStatus status = 1;
   optional int64 client_id = 2;
+}
+
+message PutRequest {
+  optional int64 client_id = 1;
 }
