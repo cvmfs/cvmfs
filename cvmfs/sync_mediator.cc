@@ -20,6 +20,7 @@
 #include "sync_union.h"
 #include "upload.h"
 #include "util_concurrency.h"
+#include "util/posix.h"
 
 using namespace std;  // NOLINT
 
@@ -216,6 +217,16 @@ bool SyncMediator::Commit(manifest::Manifest *manifest) {
 
   if (catalog_manager_->IsBalanceable()) {
     catalog_manager_->Balance();
+    // Commit empty string to ensure that the "content" of the auto catalog
+    // markers is present in the repository.
+    string empty_file = CreateTempPath(params_->dir_temp + "/empty", 0600);
+    params_->spooler->Process(empty_file);
+    params_->spooler->WaitForUpload();
+    unlink(empty_file.c_str());
+    if (params_->spooler->GetNumberOfErrors() > 0) {
+      LogCvmfs(kLogPublish, kLogStderr, "failed to commit auto catalog marker");
+      return false;
+    }
   }
   catalog_manager_->PrecalculateListings();
   return catalog_manager_->Commit(params_->stop_for_catalog_tweaks,

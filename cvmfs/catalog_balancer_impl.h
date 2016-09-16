@@ -31,6 +31,8 @@ CatalogBalancer<CatalogMgrT>::MakeEmptyDirectoryEntryBase(
   uid_t uid,
   gid_t gid)
 {
+  // Note that another entity needs to ensure that the object of an empty
+  // file is in the repository!  It is currently done by the sync_mediator.
   shash::Algorithms algorithm = catalog_mgr_->spooler_->GetHashAlgorithm();
   shash::Any file_hash(algorithm);
   void *empty_compressed;
@@ -197,7 +199,4 @@ void CatalogBalancer<CatalogMgrT>::VirtualNode::FixWeight() {
 
 }  // namespace catalog
 
-
-
 #endif  // CVMFS_CATALOG_BALANCER_IMPL_H_
-
