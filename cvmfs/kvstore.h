@@ -176,12 +176,13 @@ class MemoryKvStore :SingleCopy, public Callbackable<MallocHeap::BlockPtr> {
     size_t offset);
 
   /**
-   * Insert a new memory buffer. The KvStore takes ownership of the referred memory, so
-   * callers must not free() it themselves
+   * Insert a new memory buffer. The KvStore copies the referred memory, so
+   * callers may free() their buffers after Commit returns
    * @param buf The memory buffer to insert
-   * @returns True iff the commit succeeds
+   * @returns -ENFILE if too many file handles are in use
+   * @returns -EIO if memory allocation fails
    */
-  bool Commit(const MemoryBuffer &buf);
+  int Commit(const MemoryBuffer &buf);
 
   /**
    * Delete an entry, free()ing its memory. Note that the entry not have any references
@@ -209,9 +210,8 @@ class MemoryKvStore :SingleCopy, public Callbackable<MallocHeap::BlockPtr> {
 
   bool DoDelete(const shash::Any &id);
   int DoMalloc(MemoryBuffer *buf);
-  int DoRealloc(MemoryBuffer *buf, size_t size);
   void DoFree(MemoryBuffer *buf);
-  bool DoCommit(const MemoryBuffer &buf);
+  int DoCommit(const MemoryBuffer &buf);
   void OnBlockMove(const MallocHeap::BlockPtr &ptr);
   bool CompactMemory();
 
