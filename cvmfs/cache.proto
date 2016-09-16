@@ -3,32 +3,116 @@ package cvmfs;
 option optimize_for = LITE_RUNTIME;
 
 enum EnumStatus {
-  STATUS_OK = 0;
-  STATUS_FAIL = 1;
+  STATUS_UNKNOWN = 0;
+  STATUS_OK      = 1;
 }
 
 enum EnumHashAlgorithm {
-  HASH_SHA1 = 1;
+  HASH_UNKNOWN   = 0;
+  HASH_SHA1      = 1;
   HASH_RIPEMD160 = 2;
-  HASH_SHAKE128 = 3;
+  HASH_SHAKE128  = 3;
+}
+
+enum EnumObjectType {
+  OBJECT_REGULAR  = 0;
+  OBJECT_CATALOG  = 1;
+  OBJECT_VOLATILE = 2;
 }
 
 message Hash {
   required EnumHashAlgorithm algorithm = 1;
-
+  required bytes digest = 2;
 }
 
-// client --> cache manager
+// Connection handling
+
 message HandshakeRequest {
-  optional string name = 1;
+  required uint32 protocol_version = 1;
+  optional string name             = 2;
 }
 
-// cache manager --> client
 message HandshakeReply {
-  required EnumStatus status = 1;
-  optional int64 client_id = 2;
+  required EnumStatus status      = 1;
+  required uint64 client_id       = 2;
+  required uint32 max_object_size = 3;
 }
 
-message PutRequest {
-  optional int64 client_id = 1;
+message Quit {
+  required uint64 client_id = 1;
+}
+
+message StoreRequest {
+  required uint64 client_id        = 1;
+  required Hash  object_id         = 2;
+  required uint64 initial_refcount = 3;
+  optional bool multipart          = 4 [default = false];
+  optional fixed32 data_crc32      = 5;
+}
+
+message StorePartRequest {
+  required uint64 client_id           = 1;
+  required Hash object_id             = 2;
+  required uint64 part_nr             = 3;
+  required EnumObjectType object_type = 4;
+  optional bool last_part             = 5 [default = false];
+  optional fixed32 data_crc32         = 6;
+}
+
+message StoreReply {
+  required EnumStatus status      = 1;
+  optional uint32 parts_available = 2;
+}
+
+message IncRefRequest {
+  required uint64 client_id = 1;
+  required Hash object_id   = 2;
+  optional uint32 inc_by    = 3 [default = 1];
+}
+
+message UnrefRequest {
+  required uint64 client_id = 1;
+  required Hash object_id   = 2;
+  optional uint32 dec_by    = 3 [default = 1];
+}
+
+message RefcountReply {
+  required EnumStatus status = 1;
+}
+
+message DetachCatalogs {
+}
+
+message ReadRequest {
+  required uint64 client_id = 1;
+  required Hash object_id   = 2;
+  required uint64 offset    = 3;
+  required uint32 size      = 4;
+}
+
+message ReadReply {
+  required EnumStatus status =  1;
+  optional fixed32 data_crc32 = 2;
+}
+
+message ClientMessage {
+  oneof message_type {
+    HandshakeRequest msg_handshake  = 1;
+    Quit msg_quit                   = 2;
+    StoreRequest msg_store          = 3;
+    StorePartRequest msg_store_part = 4;
+    IncRefRequest msg_inc_ref       = 5;
+    UnrefRequest msg_unref          = 6;
+    ReadRequest msg_read            = 7;
+  }
+}
+
+message ServerMessage {
+  oneof message_type {
+    HandshakeReply msg_handshake = 1;
+    StoreReply msg_store         = 2;
+    RefcountReply msg_refcount   = 3;
+    ReadReply msg_read           = 4;
+    DetachCatalogs msg_detach    = 5;
+  }
 }
