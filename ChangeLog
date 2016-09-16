@@ -8,6 +8,8 @@
   * Fix handling of file:// url in CVMFS_SERVER_URL
 
 2.3.2:
+  * Fix error reporting when downloading replication sentinal file (CVM-1078)
+  * Fix publishing of auto catalog markers (CVM-1079)
   * Fix segfault in debug logging of certain download failures (CVM-1076)
 
 2.3.1:
