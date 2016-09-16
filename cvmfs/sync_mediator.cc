@@ -19,8 +19,8 @@
 #include "smalloc.h"
 #include "sync_union.h"
 #include "upload.h"
-#include "util_concurrency.h"
 #include "util/posix.h"
+#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 
