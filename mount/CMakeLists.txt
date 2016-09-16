@@ -151,15 +151,20 @@ else (MACOSX)
   )
   add_executable (auto.cvmfs ${CVMFS_AUTO_SOURCES})
 
-  SET( autofsmap_link    /etc/auto.cvmfs)
-  SET( autofsmap_dest    /usr/libexec/cvmfs)
-  SET( autofsmap_target  ${autofsmap_dest}/auto.cvmfs)
   install (
     TARGETS       auto.cvmfs
-    DESTINATION   ${autofsmap_dest}
+    DESTINATION   ${CVMFS_LIBEXEC_DIR}
     PERMISSIONS   OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
   )
-  # Symlink /etc/auto.cvmfs --> /sbin/auto.cvmfs
+
+  if (ARCHLINUX)
+    SET( autofsmap_link    /etc/autofs/auto.cvmfs)
+  else (ARCHLINUX)
+    SET( autofsmap_link    /etc/auto.cvmfs)
+  endif (ARCHLINUX)
+  SET( autofsmap_dest    ${CMAKE_INSTALL_PREFIX}/${CVMFS_LIBEXEC_DIR})
+  SET( autofsmap_target  ${autofsmap_dest}/auto.cvmfs)
+  # Symlink /etc/(autofs)/auto.cvmfs --> /usr/lib(exec)/cvmfs/auto.cvmfs
   install(CODE "
     if (\"\$ENV{DESTDIR}\" STREQUAL \"\")
       execute_process(COMMAND ln -sf
@@ -189,6 +194,14 @@ else (MACOSX)
     DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/default.d"
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
+
+  if (ARCHLINUX)
+    install (
+      FILES         default.d/10-arch.conf
+      DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/default.d"
+      PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+    )
+  endif (ARCHLINUX)
 
   if (DEBIAN)
     install (

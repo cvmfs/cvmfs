@@ -1,0 +1,49 @@
+# Maintainer: Jakob Blomer <jblomer@cern.ch>
+
+pkgname=('cvmfs-config-default')
+pkgver=1.0
+pkgrel=1
+pkgdesc='Default configuration and public keys to access CernVM-FS repositories'
+arch=('any')
+url='https://cernvm.cern.ch'
+license=('BSD')
+source=('cern.ch.pub' 'cern-it1.cern.ch.pub' 'cern-it2.cern.ch.pub'
+        'cern-it3.cern.ch.pub' 'egi.eu.pub' 'opensciencegrid.org.pub'
+        'cern.ch.conf' 'egi.eu.conf' 'opensciencegrid.org.conf' '50-cern.conf'
+        '60-egi.conf' 'atlas-nightlies.cern.ch.conf' 'cms.cern.ch.conf'
+        'grid.cern.ch.conf')
+provides=("cvmfs-config=$pkgver-$pkgrel")
+
+prepare() {
+  :
+}
+
+build() {
+  :
+}
+
+check() {
+  :
+}
+
+package() {
+  cd "$srcdir"
+  for dir in default.d config.d domain.d; do
+    mkdir -p "$pkgdir/etc/cvmfs/$dir"
+  done
+  for dir in cern.ch egi.eu opensciencegrid.org; do
+    mkdir -p "$pkgdir/etc/cvmfs/keys/$dir"
+  done
+  install -D -m 444 cern*.pub "$pkgdir/etc/cvmfs/keys/cern.ch"
+  install -D -m 444 egi.eu.pub "$pkgdir/etc/cvmfs/keys/egi.eu"
+  install -D -m 444 opensciencegrid.org.pub \
+    "$pkgdir/etc/cvmfs/keys/opensciencegrid.org"
+  for conf in cern.ch.conf egi.eu.conf opensciencegrid.org.conf; do
+    install -D -m 444 $conf "$pkgdir/etc/cvmfs/domain.d"
+  done
+  install -D -m 444 50-cern.conf "$pkgdir/etc/cvmfs/default.d"
+  install -D -m 444 60-egi.conf "$pkgdir/etc/cvmfs/default.d"
+  install -D -m 444 atlas-nightlies.cern.ch.conf "$pkgdir/etc/cvmfs/config.d"
+  install -D -m 444 cms.cern.ch.conf "$pkgdir/etc/cvmfs/config.d"
+  install -D -m 444 grid.cern.ch.conf "$pkgdir/etc/cvmfs/config.d"
+}
