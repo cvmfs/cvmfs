@@ -20,99 +20,179 @@ enum EnumObjectType {
   OBJECT_VOLATILE = 2;
 }
 
-message Hash {
+message MsgHash {
   required EnumHashAlgorithm algorithm = 1;
   required bytes digest = 2;
 }
 
+message MsgObjectInfo {
+  required EnumObjectType object_type = 1;
+  required uint64 no_parts            = 2;
+}
+
+message MsgListRecord {
+  required MsgHash hash       = 1;
+  optional string description = 2;
+}
+
 // Connection handling
 
-message HandshakeRequest {
+message MsgHandshake {
   required uint32 protocol_version = 1;
   optional string name             = 2;
 }
 
-message HandshakeReply {
+message MsgHandshakeAck {
   required EnumStatus status      = 1;
   required uint64 client_id       = 2;
   required uint32 max_object_size = 3;
 }
 
-message Quit {
+message MsgQuit {
   required uint64 client_id = 1;
 }
 
-message StoreRequest {
-  required uint64 client_id        = 1;
-  required Hash  object_id         = 2;
-  required uint64 initial_refcount = 3;
-  optional bool multipart          = 4 [default = false];
-  optional fixed32 data_crc32      = 5;
+message MsgStoreReq {
+  required uint64 client_id           = 1;
+  required uint64 req_id              = 2;
+  required MsgHash object_id          = 3;
+  required EnumObjectType object_type = 4;
+  required uint64 initial_refcount    = 5;
+  optional string description         = 6;
+  optional bool wait_for_txn          = 7 [default = false];
+  optional bool multipart             = 8 [default = false];
+  optional fixed32 data_crc32         = 9;
 }
 
-message StorePartRequest {
+message MsgStorePartReq {
   required uint64 client_id           = 1;
-  required Hash object_id             = 2;
-  required uint64 part_nr             = 3;
-  required EnumObjectType object_type = 4;
+  required uint64 req_id              = 2;
+  required MsgHash object_id          = 3;
+  required uint64 part_nr             = 4;
   optional bool last_part             = 5 [default = false];
   optional fixed32 data_crc32         = 6;
 }
 
-message StoreReply {
-  required EnumStatus status      = 1;
-  optional uint32 parts_available = 2;
+message MsgStoreReply {
+  required uint64 req_id       = 1;
+  required EnumStatus status   = 2;
 }
 
-message IncRefRequest {
-  required uint64 client_id = 1;
-  required Hash object_id   = 2;
-  optional uint32 inc_by    = 3 [default = 1];
+message MsgIncRefReq {
+  required uint64 client_id  = 1;
+  required uint64 req_id     = 2;
+  required MsgHash object_id = 3;
+  optional uint32 inc_by     = 4 [default = 1];
 }
 
-message UnrefRequest {
-  required uint64 client_id = 1;
-  required Hash object_id   = 2;
-  optional uint32 dec_by    = 3 [default = 1];
+message MsgUnrefReq {
+  required uint64 client_id  = 1;
+  required uint64 req_id     = 2;
+  required MsgHash object_id = 3;
+  optional uint32 dec_by     = 4 [default = 1];
 }
 
-message RefcountReply {
-  required EnumStatus status = 1;
+message MsgRefcountReply {
+  required uint64 req_id     = 1;
+  required EnumStatus status = 2;
 }
 
-message DetachCatalogs {
+message MsgDetachCatalogs {
 }
 
-message ReadRequest {
-  required uint64 client_id = 1;
-  required Hash object_id   = 2;
-  required uint64 offset    = 3;
-  required uint32 size      = 4;
+message MsgShrinkReq {
+  required uint64 client_id  = 1;
+  required uint64 req_id     = 2;
+  required uint64 shrink_to  = 3;
 }
 
-message ReadReply {
-  required EnumStatus status =  1;
-  optional fixed32 data_crc32 = 2;
+message MsgShrinkReply {
+  required uint64 req_id      = 1;
+  required EnumStatus status  = 2;
+  required uint64 used_bytes  = 3;
 }
 
-message ClientMessage {
+message MsgReadReq {
+  required uint64 client_id  = 1;
+  required uint64 req_id     = 2;
+  required MsgHash object_id = 3;
+  required uint64 offset     = 4;
+  required uint32 size       = 5;
+}
+
+message MsgReadReply {
+  required uint64 req_id      = 1;
+  required EnumStatus status  = 2;
+  optional fixed32 data_crc32 = 3;
+}
+
+message MsgInfoReq {
+  required uint64 client_id  = 1;
+  required uint64 req_id     = 2;
+}
+
+message MsgInfoReply {
+  required uint64 req_id         = 1;
+  required EnumStatus status     = 2;
+  required uint64 size_bytes     = 3;
+  required uint64 used_bytes     = 4;
+  required uint64 pinned_bytes   = 5;
+  required uint64 size_objects   = 6;
+  required uint64 used_objects   = 7;
+  required uint64 pinned_objects = 8;
+}
+
+message MsgObjectInfoReq {
+  required uint64 client_id  = 1;
+  required uint64 req_id     = 2;
+  required MsgHash object_id = 3;
+}
+
+message MsgObjectInfoReply {
+  required uint64 req_id             = 1;
+  required EnumStatus status         = 2;
+  required MsgObjectInfo object_info = 3;
+}
+
+message MsgListReq {
+  required uint64 client_id           = 1;
+  required uint64 req_id              = 2;
+  required EnumObjectType object_type = 3;
+}
+
+message MsgListReply {
+  required uint64 req_id             = 1;
+  required EnumStatus status         = 2;
+  required bool last_part            = 3;
+  repeated MsgListRecord list_record = 4;
+}
+
+message MsgClientCall {
   oneof message_type {
-    HandshakeRequest msg_handshake  = 1;
-    Quit msg_quit                   = 2;
-    StoreRequest msg_store          = 3;
-    StorePartRequest msg_store_part = 4;
-    IncRefRequest msg_inc_ref       = 5;
-    UnrefRequest msg_unref          = 6;
-    ReadRequest msg_read            = 7;
+    MsgHandshake msg_handshake           = 1;
+    MsgQuit msg_quit                     = 2;
+    MsgStoreReq msg_store_req            = 3;
+    MsgStorePartReq msg_store_part_req   = 4;
+    MsgIncRefReq msg_inc_ref_req         = 5;
+    MsgUnrefReq msg_unref_req            = 6;
+    MsgShrinkReq msg_shrink_req          = 7;
+    MsgReadReq msg_read_req              = 8;
+    MsgInfoReq msg_info_req              = 9;
+    MsgObjectInfoReq msg_object_info_req = 10;
+    MsgListReq msg_list_req              = 11;
   }
 }
 
-message ServerMessage {
+message MsgServerCall {
   oneof message_type {
-    HandshakeReply msg_handshake = 1;
-    StoreReply msg_store         = 2;
-    RefcountReply msg_refcount   = 3;
-    ReadReply msg_read           = 4;
-    DetachCatalogs msg_detach    = 5;
+    MsgHandshakeAck msg_handshake      = 1;
+    MsgStoreReply msg_store            = 2;
+    MsgRefcountReply msg_refcount      = 3;
+    MsgReadReply msg_read              = 4;
+    MsgDetachCatalogs msg_detach       = 5;
+    MsgShrinkReply msg_shrink          = 6;
+    MsgInfoReply msg_info              = 7;
+    MsgObjectInfoReply msg_object_info = 8;
+    MsgListReply msg_list_reply        = 9;
   }
 }
