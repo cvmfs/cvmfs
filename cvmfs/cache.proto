@@ -128,6 +128,8 @@ message MsgQuit {
 // than the maximum object size need to be sent in multiple parts, i.e. a single
 // MsgStoreReq message followed by one or more MsgStorePartReq.  Every
 // MsgStoreReq and MsgStorePartReq message is acknowledged by a MsgStoreReply.
+// The request id doesn't change for a stream of MsgStoreReq, MsgStorePartReq,
+// MsgAbortMultipartReq messages.
 message MsgStoreReq {
   required uint64 session_id          = 1;
   required uint64 req_id              = 2;
@@ -148,16 +150,27 @@ message MsgStorePartReq {
   required uint64 session_id          = 1;
   required uint64 req_id              = 2;
   required MsgHash object_id          = 3;
+  // Starts with 2
   required uint64 part_nr             = 4;
   optional bool is_last_part          = 5 [default = false];
   optional fixed32 data_crc32         = 6;
 }
 
+// Discard a partially uploaded object
+message MsgAbortMultipartReq {
+  required uint64 session_id          = 1;
+  required uint64 req_id              = 2;
+  required MsgHash object_id          = 3;
+}
+
 message MsgStoreReply {
   required uint64 req_id       = 1;
   required EnumStatus status   = 2;
+  // The part number that is being acknowledged (or zero for
+  // MsgAbortMultipartReq)
+  required uint64 part_nr      = 3;
   // The object is already in the cache
-  optional bool is_present     = 3;
+  optional bool is_present     = 4;
 }
 
 
@@ -271,17 +284,18 @@ message MsgListReply {
 
 message MsgClientCall {
   oneof message_type {
-    MsgHandshake msg_handshake           = 1;
-    MsgQuit msg_quit                     = 2;
-    MsgStoreReq msg_store_req            = 3;
-    MsgStorePartReq msg_store_part_req   = 4;
-    MsgIncRefReq msg_inc_ref_req         = 5;
-    MsgUnrefReq msg_unref_req            = 6;
-    MsgShrinkReq msg_shrink_req          = 7;
-    MsgReadReq msg_read_req              = 8;
-    MsgInfoReq msg_info_req              = 9;
-    MsgObjectInfoReq msg_object_info_req = 10;
-    MsgListReq msg_list_req              = 11;
+    MsgHandshake msg_handshake                   = 1;
+    MsgQuit msg_quit                             = 2;
+    MsgStoreReq msg_store_req                    = 3;
+    MsgStorePartReq msg_store_part_req           = 4;
+    MsgAbortMultipartReq msg_abort_multipart_req = 5;
+    MsgIncRefReq msg_inc_ref_req                 = 6;
+    MsgUnrefReq msg_unref_req                    = 7;
+    MsgShrinkReq msg_shrink_req                  = 8;
+    MsgReadReq msg_read_req                      = 9;
+    MsgInfoReq msg_info_req                      = 10;
+    MsgObjectInfoReq msg_object_info_req         = 11;
+    MsgListReq msg_list_req                      = 12;
   }
 }
 
