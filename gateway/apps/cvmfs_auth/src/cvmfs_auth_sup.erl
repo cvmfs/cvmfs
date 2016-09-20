@@ -1,6 +1,9 @@
 %%%-------------------------------------------------------------------
-%% @doc cvmfs_auth top level supervisor.
-%% @end
+%%% This file is part of the CernVM File System.
+%%%
+%%% @doc cvmfs_lease top level supervisor.
+%%%
+%%% @end
 %%%-------------------------------------------------------------------
 
 -module(cvmfs_auth_sup).
@@ -28,7 +31,16 @@ start_link() ->
 
 %% Child :: {Id,StartFunc,Restart,Shutdown,Type,Modules}
 init([]) ->
-    {ok, { {one_for_all, 0, 1}, []} }.
+    SupervisorSpecs = #{strategy => one_for_all,
+                        intensity => 5,
+                        period => 5},
+    CvmfsAuthMainSpecs = #{id => cvmfs_auth,
+                             start => {cvmfs_auth, start_link, []},
+                             restart => permanent,
+                             shutdown => 2000,
+                             type => worker,
+                             modules => [cvmfs_auth,cvmfs_auth_storage]},
+    {ok, {SupervisorSpecs, [CvmfsAuthMainSpecs]}}.
 
 %%====================================================================
 %% Internal functions
