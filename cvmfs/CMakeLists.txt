@@ -35,6 +35,7 @@ set (CVMFS_CLIENT_SOURCES
   bigvector.h
   cache.cc cache.h
   cache.pb.cc cache.pb.h
+  cache_extern.cc cache_extern.h
   cache_posix.cc cache_posix.h
   cache_ram.cc cache_ram.h
   cache_tiered.cc cache_tiered.h
