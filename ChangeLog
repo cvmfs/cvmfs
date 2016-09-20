@@ -1,4 +1,6 @@
 2.4.0:
+  * Add micro benchmark framework
+  * Fix building on Arch Linux
   * Fix building on the Raspberry Pi
   * Add new initialization interface to libcvmfs (CVM-947)
   * Use tbb version 4.4 update 5
