@@ -12,7 +12,8 @@
 -export([init/0]).
 
 %% Records used as table entries
--include("cvmfs_lease_storage.hrl").
+-record(repo_entry, {repo_id :: binary(), repo_path :: binary()}).
+-record(acl_entry, {client_id :: binary(), repo_ids :: [binary()]}).
 
 %%%===================================================================
 %%% API
