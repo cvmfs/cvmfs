@@ -6,14 +6,16 @@
 %%% TESTS DESCRIPTIONS %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%
 start_stop_test_() ->
-    {"The ETS tables can be created and destroyed",
-      {setup, fun start/0, fun stop/1, fun tables_exist/1}}.
+    {"The ETS tables can be created and destroyed"
+    ,{setup, fun start/0, fun stop/1, fun tables_exist/1}}.
 
-get_user_credentials_test_() ->
-    [{"A valid username returns appropriate repo entries",
-      {setup, fun start/0, fun stop/1, fun valid_username_is_recognized/1}}
-    ,{"An invalid username should return no repo results",
-      {setup, fun start/0, fun stop/1, fun invalid_username_is_recognized/1}}].
+get_user_paths_test_() ->
+    [{"A valid username returns appropriate repo entries"
+     ,{setup, fun start/0, fun stop/1, fun valid_username_returns_paths/1}}
+    ,{"A valid username may have no rights"
+     ,{setup, fun start/0, fun stop/1, fun valid_username_can_have_no_paths/1}}
+    ,{"An invalid username should return no repo results"
+     ,{setup, fun start/0, fun stop/1, fun invalid_username_returns_error/1}}].
 
 %%%%%%%%%%%%%%%%%%%%%%%
 %%% SETUP FUNCTIONS %%%
@@ -30,13 +32,19 @@ stop(_) ->
 tables_exist(_) ->
     [?_assert(is_list(ets:info(repos)) and is_list(ets:info(acl)))].
 
-valid_username_is_recognized(_) ->
-    Results = cvmfs_auth_db:get_user_credentials(<<"user1">>),
-    [?_assert(Results =:= [<<"/path/to/repo/1">>, <<"/path/to/another/repo">>])].
+valid_username_returns_paths(_) ->
+    {ok, Results} = cvmfs_auth_db:get_user_paths(<<"user1">>),
+    [?_assertEqual(Results, [<<"/path/to/repo/1">>
+                            ,<<"/path/to/another/repo">>
+                            ,<<"/path/to/last/repo">>])].
 
-invalid_username_is_recognized(_) ->
-    Results = cvmfs_auth_db:get_user_credentials(<<"not_a_username">>),
-    [?_assert(Results =:= [])].
+valid_username_can_have_no_paths(_) ->
+    {ok, Results} = cvmfs_auth_db:get_user_paths(<<"user4">>),
+    [?_assertEqual(Results, [])].
+
+invalid_username_returns_error(_) ->
+    Error = cvmfs_auth_db:get_user_paths(<<"not_a_username">>),
+    [?_assertEqual(Error, user_not_found)].
 
 %%%%%%%%%%%%%%%%%%%%%%%%
 %%% HELPER FUNCTIONS %%%
@@ -47,6 +55,7 @@ make_repos() ->
     ,{<<"repo3">>, <<"/path/to/last/repo">>}].
 
 make_acl() ->
-    [{<<"user1">>, [<<"repo1">>, <<"repo2">>]}
+    [{<<"user1">>, [<<"repo1">>, <<"repo2">>, <<"repo3">>]}
     ,{<<"user2">>, [<<"repo2">>, <<"repo3">>]}
-    ,{<<"user3">>, [<<"repo3">>, <<"repo1">>]}].
+    ,{<<"user3">>, [<<"repo3">>]}
+    ,{<<"user4">>, []}].
