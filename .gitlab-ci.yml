@@ -7,4 +7,4 @@ rebar3_compile:
   stage: build
   tags:
     - docker
-  script: rebar3 compile
+  script: rebar3 eunit
