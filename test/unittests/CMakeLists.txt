@@ -41,6 +41,7 @@ set(CVMFS_UNITTEST_FILES
   t_dns.cc
   t_download.cc
   t_encrypt.cc
+  t_fd_table.cc
   t_fence.cc
   t_fetch.cc
   t_file_chunk.cc
@@ -133,6 +134,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/duplex_sqlite3.h
   ${CVMFS_SOURCE_DIR}/duplex_zlib.h
   ${CVMFS_SOURCE_DIR}/encrypt.cc ${CVMFS_SOURCE_DIR}/encrypt.h
+  ${CVMFS_SOURCE_DIR}/fd_table.h
   ${CVMFS_SOURCE_DIR}/fence.h
   ${CVMFS_SOURCE_DIR}/fetch.cc ${CVMFS_SOURCE_DIR}/fetch.h
   ${CVMFS_SOURCE_DIR}/file_chunk.cc
