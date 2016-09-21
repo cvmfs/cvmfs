@@ -3,7 +3,7 @@ image: erlang:19
 stages:
   - build
 
-rebar3_compile:
+rebar3_eunit:
   stage: build
   tags:
     - docker
