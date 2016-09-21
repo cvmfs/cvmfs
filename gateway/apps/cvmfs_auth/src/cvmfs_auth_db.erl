@@ -50,12 +50,9 @@ terminate() ->
 %% --------------------------------------------------------------------
 -spec get_user_credentials(binary()) -> [binary()].
 get_user_credentials(User) when is_binary(User) ->
-    [#acl_entry{client_id = User, repo_ids = Repos} | _] = ets:lookup(acl, User),
-    RepoPathSelector = fun (Repo, Acc) ->
-                               [#repo_entry{repo_id = Repo, repo_path = P} | _] = ets:lookup(repos, Repo),
-                               [P | Acc]
-                       end,
-    lists:foldl(RepoPathSelector, [], Repos).
+    [P || #acl_entry{repo_ids = Repos} <- ets:lookup(acl, User),
+          Repo <- Repos,
+          #repo_entry{repo_path = P} <- ets:lookup(repos, Repo)].
 
 %%%===================================================================
 %%% Internal functions
