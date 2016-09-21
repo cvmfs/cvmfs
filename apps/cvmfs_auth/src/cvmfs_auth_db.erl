@@ -9,7 +9,7 @@
 -module(cvmfs_auth_db).
 
 %% API
--export([init/2, terminate/0, get_user_credentials/1]).
+-export([init/2, terminate/0, get_user_paths/1]).
 
 %% Records used as table entries
 -record(repo_entry, {repo_id :: binary(), repo_path :: binary()}).
@@ -42,17 +42,22 @@ terminate() ->
     ok.
 
 %%--------------------------------------------------------------------
-%% @doc Queries the 'acl' table for the entry corresponding to 'User'
-%% and returns the list of repository paths which the user is allowed
-%% to modify
+%% @doc Queries the 'acl' and 'repos' tables for the paths which
+%%      `User` is allowed to modify
 %%
 %% @end
 %% --------------------------------------------------------------------
--spec get_user_credentials(binary()) -> [binary()].
-get_user_credentials(User) when is_binary(User) ->
-    [P || #acl_entry{repo_ids = Repos} <- ets:lookup(acl, User),
-          Repo <- Repos,
-          #repo_entry{repo_path = P} <- ets:lookup(repos, Repo)].
+-spec get_user_paths(binary()) -> {ok, [binary()]} | user_not_found.
+get_user_paths(User) when is_binary(User) ->
+    case ets:lookup(acl, User) of
+        [] ->
+            user_not_found;
+        AclEntries ->
+                    {ok, [Path || #acl_entry{repo_ids = Repos} <- AclEntries,
+                                  Repo <- Repos,
+                                  #repo_entry{repo_path = Path} <- ets:lookup(repos, Repo)]}
+    end.
+
 
 %%%===================================================================
 %%% Internal functions
@@ -64,6 +69,7 @@ populate_acl(ACL) ->
     [ets:insert(acl, #acl_entry{client_id = ClientId,
                                 repo_ids = RepoList}) || {ClientId, RepoList} <- ACL].
 
+%% has side-effects. Will fill the ETS table 'repos'
 -spec populate_repos([{binary(), binary()}]) -> [true].
 populate_repos(RepoList) ->
     [ets:insert(repos, #repo_entry{repo_id = RepoId,
