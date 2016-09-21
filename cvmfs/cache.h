@@ -23,6 +23,7 @@ enum CacheManagerIds {
   kUnknownCacheManager = 0,
   kPosixCacheManager,
   kRamCacheManager,
+  kTieredCacheManager,
 };
 
 enum CacheModes {
