@@ -1,8 +1,8 @@
 /**
  * This file is part of the CernVM File System.
  */
-
-#include "tiered_cache.h"
+#include "cvmfs_config.h"
+#include "cache_tiered.h"
 
 #include <string>
 #include <vector>
