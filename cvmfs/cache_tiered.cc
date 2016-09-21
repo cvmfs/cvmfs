@@ -7,13 +7,11 @@
 #include <string>
 #include <vector>
 
+#include "platform.h"
+
 namespace cache {
 
-#define BUFFER_SIZE (64*1024)
-
-int
-TieredCacheManager::Open(const shash::Any &id)
-{
+int TieredCacheManager::Open(const shash::Any &id) {
   int fd = upper_->Open(id);
   if (fd >= 0) {return fd;}
 
@@ -34,11 +32,12 @@ TieredCacheManager::Open(const shash::Any &id)
     return fd;
   }
 
-  std::vector<char> m_buffer; m_buffer.reserve(BUFFER_SIZE);
-  int64_t remaining = size;
+  std::vector<char> m_buffer;
+  m_buffer.reserve(kCopyBufferSize);
+  uint64_t remaining = size;
   uint64_t offset = 0;
-  while (remaining) {
-    int nbytes = remaining > BUFFER_SIZE ? BUFFER_SIZE : remaining;
+  while (remaining > 0) {
+    unsigned nbytes = remaining > kCopyBufferSize ? kCopyBufferSize : remaining;
     int64_t result = lower_->Pread(fd2, &m_buffer[0], nbytes, offset);
     // The file we are reading is supposed to be exactly `size` bytes.
     if ((result < 0) || (result != nbytes)) {
@@ -56,21 +55,27 @@ TieredCacheManager::Open(const shash::Any &id)
     remaining -= nbytes;
   }
   lower_->Close(fd2);
-  if (upper_->CommitTxn(txn) < 0) {
+  int fd_return = upper_->OpenFromTxn(txn);
+  if (fd_return < 0) {
+    upper_->AbortTxn(txn);
     return fd;
   }
-  return upper_->Open(id);
+  if (upper_->CommitTxn(txn) < 0) {
+    upper_->Close(fd_return);
+    return fd;
+  }
+  return fd_return;
 }
 
 
-int
-TieredCacheManager::StartTxn(const shash::Any &id, uint64_t size, void *txn) {
+int TieredCacheManager::StartTxn(const shash::Any &id, uint64_t size, void *txn)
+{
   int upper_result = upper_->StartTxn(id, size, txn);
   if (upper_result < 0) {
     return upper_result;
   }
 
-  void *txn2 = static_cast<char*>(txn) + upper_->SizeOfTxn();
+  void *txn2 = static_cast<char *>(txn) + upper_->SizeOfTxn();
   int lower_result = lower_->StartTxn(id, size, txn2);
   if (lower_result < 0) {
     upper_->AbortTxn(txn);
@@ -79,21 +84,21 @@ TieredCacheManager::StartTxn(const shash::Any &id, uint64_t size, void *txn) {
 }
 
 
-void
-TieredCacheManager::CtrlTxn(const std::string &description,
-                       const ObjectType type,
-                       const int flags,
-                       void *txn) {
+void TieredCacheManager::CtrlTxn(
+  const std::string &description,
+  const ObjectType type,
+  const int flags,
+  void *txn)
+{
   upper_->CtrlTxn(description, type, flags, txn);
   void *txn2 = static_cast<char*>(txn) + upper_->SizeOfTxn();
   lower_->CtrlTxn(description, type, flags, txn2);
 }
 
 
-int64_t
-TieredCacheManager::Write(const void *buf, uint64_t size, void *txn) {
+int64_t TieredCacheManager::Write(const void *buf, uint64_t size, void *txn) {
   int upper_result = upper_->Write(buf, size, txn);
-  if (upper_result < 0) {return upper_result;}
+  if (upper_result < 0) { return upper_result; }
 
   void *txn2 = static_cast<char*>(txn) + upper_->SizeOfTxn();
   return lower_->Write(buf, size, txn2);
@@ -110,8 +115,7 @@ int TieredCacheManager::Reset(void *txn) {
 }
 
 
-int
-TieredCacheManager::AbortTxn(void *txn) {
+int TieredCacheManager::AbortTxn(void *txn) {
   int upper_result = upper_->AbortTxn(txn);
 
   void *txn2 = static_cast<char*>(txn) + upper_->SizeOfTxn();
@@ -121,8 +125,7 @@ TieredCacheManager::AbortTxn(void *txn) {
 }
 
 
-int
-TieredCacheManager::CommitTxn(void *txn) {
+int TieredCacheManager::CommitTxn(void *txn) {
   int upper_result = upper_->CommitTxn(txn);
 
   void *txn2 = static_cast<char*>(txn) + upper_->SizeOfTxn();

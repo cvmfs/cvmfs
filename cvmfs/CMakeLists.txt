@@ -51,6 +51,7 @@ set (CVMFS_CLIENT_SOURCES
   duplex_curl.h
   duplex_sqlite3.h
   duplex_zlib.h
+  fd_table.h
   fetch.cc fetch.h
   file_chunk.cc file_chunk.h
   fs_traversal.h

@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "cache.h"
+#include "fd_table.h"
 #include "hash.h"
 #include "kvstore.h"
 #include "statistics.h"
@@ -242,18 +243,24 @@ class RamCacheManager : public CacheManager {
   virtual int CommitTxn(void *txn);
 
  private:
-  struct ReadOnlyFd {
-    ReadOnlyFd()
+  struct ReadOnlyHandle {
+    ReadOnlyHandle()
       : handle(kInvalidHandle)
       , is_volatile(false)
-      , index(0) {}
-    explicit ReadOnlyFd(const shash::Any &h)
+      { }
+    ReadOnlyHandle(const shash::Any &h, bool v)
       : handle(h)
-      , is_volatile(false)
-      , index(0) {}
+      , is_volatile(v)
+      { }
+    bool operator ==(const ReadOnlyHandle &other) const {
+      return this->handle == other.handle;
+    }
+    bool operator !=(const ReadOnlyHandle &other) const {
+      return this->handle != other.handle;
+    }
+
     shash::Any handle;
     bool is_volatile;
-    size_t index;
   };
 
   struct Transaction {
@@ -267,13 +274,7 @@ class RamCacheManager : public CacheManager {
     std::string description;
   };
 
-  inline bool IsValid(int fd) {
-    if ((fd < 0) || (static_cast<unsigned>(fd) >= open_fds_.size()))
-      return false;
-    return open_fds_[fd].handle != kInvalidHandle;
-  }
-
-  inline MemoryKvStore *GetStore(const ReadOnlyFd &fd) {
+  inline MemoryKvStore *GetStore(const ReadOnlyHandle &fd) {
     if (fd.is_volatile) {
       return &volatile_entries_;
     } else {
@@ -289,17 +290,12 @@ class RamCacheManager : public CacheManager {
     }
   }
 
-  int AddFd(const ReadOnlyFd &fd);
+  int AddFd(const ReadOnlyHandle &handle);
   int64_t CommitToKvStore(Transaction *transaction);
   virtual int DoOpen(const shash::Any &id);
 
   uint64_t max_size_;
-  /**
-   * The index of the first available file descriptor in fd_index_.
-   */
-  size_t fd_pivot_;
-  std::vector<ReadOnlyFd> open_fds_;
-  std::vector<size_t> fd_index_;
+  FdTable<ReadOnlyHandle> fd_table_;
   pthread_rwlock_t rwlock_;
   MemoryKvStore regular_entries_;
   MemoryKvStore volatile_entries_;

@@ -25,9 +25,7 @@ RamCacheManager::RamCacheManager(
   MemoryKvStore::MemoryAllocator alloc,
   perf::Statistics *statistics)
   : max_size_(max_size)
-  , fd_pivot_(0)
-  , open_fds_(max_entries)
-  , fd_index_(max_entries)
+  , fd_table_(max_entries, ReadOnlyHandle())
   , regular_entries_(max_entries,
                      "RamCache.regular",
                      alloc,
@@ -42,8 +40,6 @@ RamCacheManager::RamCacheManager(
 {
   int retval = pthread_rwlock_init(&rwlock_, NULL);
   assert(retval == 0);
-  for (size_t i = 0; i < fd_index_.size(); i++)
-    fd_index_[i] = i;
   LogCvmfs(kLogCache, kLogDebug, "max %u B, %u entries",
            max_size, max_entries);
 }
@@ -54,19 +50,13 @@ RamCacheManager::~RamCacheManager() {
 }
 
 
-int RamCacheManager::AddFd(const ReadOnlyFd &fd) {
-  if (fd_pivot_ >= fd_index_.size()) {
-    LogCvmfs(kLogCache, kLogDebug, "too many open files (%u)", fd_pivot_);
+int RamCacheManager::AddFd(const ReadOnlyHandle &handle) {
+  int result = fd_table_.OpenFd(handle);
+  if (result == -ENFILE) {
+    LogCvmfs(kLogCache, kLogDebug, "too many open files");
     perf::Inc(counters_.n_enfile);
-    return -ENFILE;
   }
-  size_t next_fd = fd_index_[fd_pivot_];
-  assert(next_fd < open_fds_.size());
-  assert(open_fds_[next_fd].handle == kInvalidHandle);
-  open_fds_[next_fd] = fd;
-  open_fds_[next_fd].index = fd_pivot_;
-  ++fd_pivot_;
-  return next_fd;
+  return result;
 }
 
 
@@ -99,13 +89,13 @@ int RamCacheManager::DoOpen(const shash::Any &id) {
     perf::Inc(counters_.n_openmiss);
     return -ENOENT;
   }
-  int fd = AddFd(ReadOnlyFd(id));
+  ReadOnlyHandle generic_handle(id, is_volatile);
+  int fd = AddFd(generic_handle);
   if (fd < 0) {
     LogCvmfs(kLogCache, kLogDebug, "error while opening %s: %s",
              id.ToString().c_str(), strerror(-fd));
     return fd;
   }
-  open_fds_[fd].is_volatile = is_volatile;
   if (is_volatile) {
     LogCvmfs(kLogCache, kLogDebug, "hit in volatile entries for %s",
              id.ToString().c_str());
@@ -115,7 +105,7 @@ int RamCacheManager::DoOpen(const shash::Any &id) {
              id.ToString().c_str());
     perf::Inc(counters_.n_openregular);
   }
-  ok = GetStore(open_fds_[fd])->IncRef(id);
+  ok = GetStore(generic_handle)->IncRef(id);
   assert(ok);
   return fd;
 }
@@ -123,12 +113,13 @@ int RamCacheManager::DoOpen(const shash::Any &id) {
 
 int64_t RamCacheManager::GetSize(int fd) {
   ReadLockGuard guard(rwlock_);
-  if (!IsValid(fd)) {
+  ReadOnlyHandle generic_handle = fd_table_.GetHandle(fd);
+  if (generic_handle.handle == kInvalidHandle) {
     LogCvmfs(kLogCache, kLogDebug, "bad fd %d on GetSize", fd);
     return -EBADF;
   }
   perf::Inc(counters_.n_getsize);
-  return GetStore(open_fds_[fd])->GetSize(open_fds_[fd].handle);
+  return GetStore(generic_handle)->GetSize(generic_handle.handle);
 }
 
 
@@ -136,27 +127,16 @@ int RamCacheManager::Close(int fd) {
   bool rc;
 
   WriteLockGuard guard(rwlock_);
-  if (!IsValid(fd)) {
+  ReadOnlyHandle generic_handle = fd_table_.GetHandle(fd);
+  if (generic_handle.handle == kInvalidHandle) {
     LogCvmfs(kLogCache, kLogDebug, "bad fd %d on Close", fd);
     return -EBADF;
   }
-  rc = GetStore(open_fds_[fd])->Unref(open_fds_[fd].handle);
+  rc = GetStore(generic_handle)->Unref(generic_handle.handle);
   assert(rc);
-  open_fds_[fd].handle = kInvalidHandle;
 
-  size_t index = open_fds_[fd].index;
-  assert(index < fd_index_.size());
-  assert(fd_pivot_ <= fd_index_.size());
-  assert(fd_pivot_ > 0);
-  --fd_pivot_;
-  if (index < fd_pivot_) {
-    size_t other = fd_index_[fd_pivot_];
-    assert(other < open_fds_.size());
-    assert(open_fds_[other].handle != kInvalidHandle);
-    open_fds_[other].index = index;
-    fd_index_[index] = other;
-    fd_index_[fd_pivot_] = fd;
-  }
+  int rc_int = fd_table_.CloseFd(fd);
+  assert(rc_int == 0);
   LogCvmfs(kLogCache, kLogDebug, "closed fd %d", fd);
   perf::Inc(counters_.n_close);
   return 0;
@@ -170,12 +150,14 @@ int64_t RamCacheManager::Pread(
   uint64_t offset)
 {
   ReadLockGuard guard(rwlock_);
-  if (!IsValid(fd)) {
+  ReadOnlyHandle generic_handle = fd_table_.GetHandle(fd);
+  if (generic_handle.handle == kInvalidHandle) {
     LogCvmfs(kLogCache, kLogDebug, "bad fd %d on Pread", fd);
     return -EBADF;
   }
   perf::Inc(counters_.n_pread);
-  return GetStore(open_fds_[fd])->Read(open_fds_[fd].handle, buf, size, offset);
+  return GetStore(generic_handle)->Read(
+    generic_handle.handle, buf, size, offset);
 }
 
 
@@ -183,13 +165,14 @@ int RamCacheManager::Dup(int fd) {
   bool ok;
   int rc;
   WriteLockGuard guard(rwlock_);
-  if (!IsValid(fd)) {
+  ReadOnlyHandle generic_handle = fd_table_.GetHandle(fd);
+  if (generic_handle.handle == kInvalidHandle) {
     LogCvmfs(kLogCache, kLogDebug, "bad fd %d on Dup", fd);
     return -EBADF;
   }
-  rc = AddFd(open_fds_[fd]);
+  rc = AddFd(generic_handle);
   if (rc < 0) return rc;
-  ok = GetStore(open_fds_[fd])->IncRef(open_fds_[fd].handle);
+  ok = GetStore(generic_handle)->IncRef(generic_handle.handle);
   assert(ok);
   LogCvmfs(kLogCache, kLogDebug, "dup fd %d", fd);
   perf::Inc(counters_.n_dup);
@@ -202,7 +185,8 @@ int RamCacheManager::Dup(int fd) {
  */
 int RamCacheManager::Readahead(int fd) {
   ReadLockGuard guard(rwlock_);
-  if (!IsValid(fd)) {
+  ReadOnlyHandle generic_handle = fd_table_.GetHandle(fd);
+  if (generic_handle.handle == kInvalidHandle) {
     LogCvmfs(kLogCache, kLogDebug, "bad fd %d on Readahead", fd);
     return -EBADF;
   }
