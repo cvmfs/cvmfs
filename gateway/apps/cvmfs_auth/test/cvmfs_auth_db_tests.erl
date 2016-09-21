@@ -14,7 +14,7 @@ start_stop_test_() ->
 %%% SETUP FUNCTIONS %%%
 %%%%%%%%%%%%%%%%%%%%%%%
 start() ->
-    cvmfs_auth_db:init(make_acl()).
+    ok = cvmfs_auth_db:init(make_repos(), make_acl()).
 
 stop(_) ->
     cvmfs_auth_db:terminate().
@@ -29,6 +29,11 @@ tables_exist(_) ->
 %%%%%%%%%%%%%%%%%%%%%%%%
 %%% HELPER FUNCTIONS %%%
 %%%%%%%%%%%%%%%%%%%%%%%%
+make_repos() ->
+    [{<<"repo1">>, <<"/path/to/repo/1">>}
+    ,{<<"repo2">>, <<"/path/to/another/repo">>}
+    ,{<<"repo3">>, <<"/path/to/last/repo">>}].
+
 make_acl() ->
     [{<<"user1">>, [<<"repo1">>, <<"repo2">>]}
     ,{<<"user2">>, [<<"repo2">>, <<"repo3">>]}
