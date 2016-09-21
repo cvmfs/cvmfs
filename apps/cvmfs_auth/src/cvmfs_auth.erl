@@ -20,8 +20,6 @@
 
 -define(SERVER, ?MODULE).
 
--record(state, {}).
-
 %%%===================================================================
 %%% API
 %%%===================================================================
@@ -52,8 +50,10 @@ start_link() ->
 %% @end
 %%--------------------------------------------------------------------
 init([]) ->
-    process_flag(trap_exit, true),
-    {ok, #state{}}.
+    {ok, RepoList} = application:get_env(cvmfs_auth, repo_list),
+    {ok, ACL} = application:get_env(cvmfs_auth, acl),
+    cvmfs_auth_db:init(RepoList, ACL),
+    {ok, []}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -111,7 +111,8 @@ handle_info(_Info, State) ->
 %% @end
 %%--------------------------------------------------------------------
 terminate(_Reason, _State) ->
-    ok.
+    ok = cvmfs_auth_db:terminate().
+
 
 %%--------------------------------------------------------------------
 %% @private

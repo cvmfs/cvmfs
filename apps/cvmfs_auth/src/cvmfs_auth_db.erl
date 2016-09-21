@@ -9,7 +9,7 @@
 -module(cvmfs_auth_db).
 
 %% API
--export([init/0, init/1, terminate/0, get_user_credentials/1]).
+-export([init/2, terminate/0, get_user_credentials/1]).
 
 %% Records used as table entries
 -record(repo_entry, {repo_id :: binary(), repo_path :: binary()}).
@@ -25,26 +25,20 @@
 %%
 %% @end
 %% --------------------------------------------------------------------
--spec init() -> ok | acl_init_error.
-init() ->
-    case application:get_env(cvmfs_auth, acl) of
-        {ok, ACL} ->
-            init(ACL);
-        _ ->
-            cvmfs_om_log:error("Error initializing storage module - 'acl' app environment variable not found"),
-            acl_init_error
-    end.
-
-init(ACL) ->
+-spec init([{binary(), binary()}], [{binary(), [binary()]}]) -> ok.
+init(RepoList, ACL) ->
     ets:new(repos, [private, named_table, set, {keypos, #repo_entry.repo_id}]),
     ets:new(acl, [private, named_table, set, {keypos, #acl_entry.client_id}]),
+
+    populate_repos(RepoList),
     populate_acl(ACL),
+
     cvmfs_om_log:info("CVMFS Auth storage module initialized."),
     ok.
 
 terminate() ->
-    ets:delete(repos),
     ets:delete(acl),
+    ets:delete(repos),
     ok.
 
 %%--------------------------------------------------------------------
@@ -72,3 +66,8 @@ get_user_credentials(User) when is_binary(User) ->
 populate_acl(ACL) ->
     [ets:insert(acl, #acl_entry{client_id = ClientId,
                                 repo_ids = RepoList}) || {ClientId, RepoList} <- ACL].
+
+-spec populate_repos([{binary(), binary()}]) -> [true].
+populate_repos(RepoList) ->
+    [ets:insert(repos, #repo_entry{repo_id = RepoId,
+                                   repo_path = RepoPath}) || {RepoId, RepoPath} <- RepoList].
