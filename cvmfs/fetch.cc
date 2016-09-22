@@ -79,7 +79,7 @@ int Fetcher::Fetch(
   const uint64_t size,
   const std::string &name,
   const zlib::Algorithms compression_algorithm,
-  const cache::CacheManager::ObjectType object_type,
+  const CacheManager::ObjectType object_type,
   const std::string &alt_url,
   off_t range_offset)
 {
@@ -139,7 +139,7 @@ int Fetcher::Fetch(
     SignalWaitingThreads(retval, id, tls);
     return retval;
   }
-  cache_mgr_->CtrlTxn(name, object_type, 0, txn);
+  cache_mgr_->CtrlTxn(CacheManager::ObjectInfo(object_type, name), 0, txn);
 
   LogCvmfs(kLogCache, kLogDebug, "miss: %s %s", name.c_str(), url.c_str());
   TransactionSink sink(cache_mgr_, txn);
@@ -191,7 +191,7 @@ int Fetcher::Fetch(
 
 
 Fetcher::Fetcher(
-  cache::CacheManager *cache_mgr,
+  CacheManager *cache_mgr,
   download::DownloadManager *download_mgr,
   BackoffThrottle *backoff_throttle,
   perf::Statistics *statistics,
@@ -248,13 +248,13 @@ Fetcher::~Fetcher() {
 int Fetcher::OpenSelect(
   const shash::Any &id,
   const std::string &name,
-  const cache::CacheManager::ObjectType object_type)
+  const CacheManager::ObjectType object_type)
 {
-  bool is_catalog = object_type == cache::CacheManager::kTypeCatalog;
-  if (is_catalog || (object_type == cache::CacheManager::kTypePinned)) {
+  bool is_catalog = object_type == CacheManager::kTypeCatalog;
+  if (is_catalog || (object_type == CacheManager::kTypePinned)) {
     return cache_mgr_->OpenPinned(id, name, is_catalog);
   } else {
-    return cache_mgr_->Open(id);
+    return cache_mgr_->Open(CacheManager::Bless(id, object_type, name));
   }
 }
 

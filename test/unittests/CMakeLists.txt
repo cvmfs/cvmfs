@@ -27,6 +27,7 @@ set(CVMFS_UNITTEST_FILES
   t_buffer.cc
   t_cache.cc
   t_cache_ram.cc
+  t_cache_tiered.cc
   t_callbacks.cc
   t_catalog.cc
   t_catalog_counters.cc

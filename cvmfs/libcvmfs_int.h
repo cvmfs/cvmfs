@@ -28,22 +28,17 @@
 #include "mountpoint.h"
 #include "options.h"
 
-namespace cache {
-class CacheManager;
-}
 
+class CacheManager;
 namespace catalog {
 class ClientCatalogManager;
 }
-
 namespace signature {
 class SignatureManager;
 }
-
 namespace download {
 class DownloadManager;
 }
-
 namespace perf {
 class Statistics;
 }

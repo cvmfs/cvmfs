@@ -18,11 +18,6 @@
 #include "statistics.h"
 #include "util/pointer.h"
 
-namespace cache {
-
-// The null hash (hashed output is all null bytes) serves as a marker for
-// an invalid handle
-static const shash::Any kInvalidHandle;
 
 /**
  * The @p RamCacheManager class provides a cache backend that operates
@@ -121,12 +116,12 @@ class RamCacheManager : public CacheManager {
    * Open a new file descriptor into the cache. Note that opening entries
    * effectively pins them in the cache, so it may be necessary to close
    * unneeded file descriptors to allow eviction to make room in the cache
-   * @param id The hash key
+   * @param object The blessed hash key
    * @returns A nonnegative integer file descriptor
    * @retval -ENOENT The entry is not in the cache
    * @retval -ENFILE No handles are available
    */
-  virtual int Open(const shash::Any &id);
+  virtual int Open(const BlessedObject &object);
 
   /**
    * Look up the size in bytes of the open cache entry
@@ -194,8 +189,7 @@ class RamCacheManager : public CacheManager {
    * @param flags Unused
    * @param txn A pointer to space allocated for storing the transaction details
    */
-  virtual void CtrlTxn(const std::string &description,
-                       const ObjectType type,
+  virtual void CtrlTxn(const ObjectInfo &object_info,
                        const int flags,
                        void *txn);
 
@@ -243,6 +237,10 @@ class RamCacheManager : public CacheManager {
   virtual int CommitTxn(void *txn);
 
  private:
+  // The null hash (hashed output is all null bytes) serves as a marker for
+  // an invalid handle
+  static const shash::Any kInvalidHandle;
+
   struct ReadOnlyHandle {
     ReadOnlyHandle()
       : handle(kInvalidHandle)
@@ -283,7 +281,7 @@ class RamCacheManager : public CacheManager {
   }
 
   inline MemoryKvStore *GetTransactionStore(Transaction *txn) {
-    if (txn->buffer.object_type == cache::CacheManager::kTypeVolatile) {
+    if (txn->buffer.object_type == kTypeVolatile) {
       return &volatile_entries_;
     } else {
       return &regular_entries_;
@@ -301,7 +299,5 @@ class RamCacheManager : public CacheManager {
   MemoryKvStore volatile_entries_;
   Counters counters_;
 };  // class RamCacheManager
-
-}  // namespace cache
 
 #endif  // CVMFS_CACHE_RAM_H_

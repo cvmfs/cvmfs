@@ -9,13 +9,11 @@
 
 #include "platform.h"
 
-namespace cache {
-
-int TieredCacheManager::Open(const shash::Any &id) {
-  int fd = upper_->Open(id);
+int TieredCacheManager::Open(const BlessedObject &object) {
+  int fd = upper_->Open(object);
   if (fd >= 0) {return fd;}
 
-  int fd2 = lower_->Open(id);
+  int fd2 = lower_->Open(object);
   if (fd2 < 0) {return fd;}  // NOTE: use error code from upper.
 
   // Lower cache hit; upper cache miss.  Copy object into the
@@ -27,10 +25,11 @@ int TieredCacheManager::Open(const shash::Any &id) {
   }
 
   void *txn = alloca(upper_->SizeOfTxn());
-  if (upper_->StartTxn(id, size, txn) < 0) {
+  if (upper_->StartTxn(object.id, size, txn) < 0) {
     lower_->Close(fd2);
     return fd;
   }
+  upper_->CtrlTxn(object.info, 0, txn);
 
   std::vector<char> m_buffer;
   m_buffer.reserve(kCopyBufferSize);
@@ -85,14 +84,13 @@ int TieredCacheManager::StartTxn(const shash::Any &id, uint64_t size, void *txn)
 
 
 void TieredCacheManager::CtrlTxn(
-  const std::string &description,
-  const ObjectType type,
+  const ObjectInfo &object_info,
   const int flags,
   void *txn)
 {
-  upper_->CtrlTxn(description, type, flags, txn);
+  upper_->CtrlTxn(object_info, flags, txn);
   void *txn2 = static_cast<char*>(txn) + upper_->SizeOfTxn();
-  lower_->CtrlTxn(description, type, flags, txn2);
+  lower_->CtrlTxn(object_info, flags, txn2);
 }
 
 
@@ -133,5 +131,3 @@ int TieredCacheManager::CommitTxn(void *txn) {
 
   return (upper_result < 0) ? upper_result : lower_result;
 }
-
-}  // namespace cache

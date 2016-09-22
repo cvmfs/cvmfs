@@ -473,16 +473,16 @@ void *TalkManager::MainResponder(void *data) {
       mount_point->statistics()->Lookup("inode_tracker.n_miss_path")->Set(
         atomic_read64(&inode_stats.num_misses_path));
 
-      if (file_system->cache_mgr()->id() == cache::kPosixCacheManager) {
-        cache::PosixCacheManager *cache_mgr =
-          reinterpret_cast<cache::PosixCacheManager *>(
+      if (file_system->cache_mgr()->id() == kPosixCacheManager) {
+        PosixCacheManager *cache_mgr =
+          reinterpret_cast<PosixCacheManager *>(
             file_system->cache_mgr());
         result += "\nCache Mode: ";
         switch (cache_mgr->cache_mode()) {
-          case cache::PosixCacheManager::kCacheReadWrite:
+          case PosixCacheManager::kCacheReadWrite:
             result += "read-write";
             break;
-          case cache::PosixCacheManager::kCacheReadOnly:
+          case PosixCacheManager::kCacheReadOnly:
             result += "read-only";
             break;
           default:
@@ -579,7 +579,7 @@ void *TalkManager::MainResponder(void *data) {
     } else if (line == "version patchlevel") {
       talk_mgr->Answer(con_fd, string(CVMFS_PATCH_LEVEL) + "\n");
     } else if (line == "tear down to read-only") {
-      if (file_system->cache_mgr()->id() != cache::kPosixCacheManager) {
+      if (file_system->cache_mgr()->id() != kPosixCacheManager) {
         talk_mgr->Answer(con_fd, "not supported\n");
       } else {
         // hack

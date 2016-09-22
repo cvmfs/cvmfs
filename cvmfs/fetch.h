@@ -32,7 +32,7 @@ namespace cvmfs {
  */
 class TransactionSink : public Sink {
  public:
-  TransactionSink(cache::CacheManager *cache_mgr, void *open_txn)
+  TransactionSink(CacheManager *cache_mgr, void *open_txn)
     : cache_mgr_(cache_mgr)
     , open_txn_(open_txn)
   { }
@@ -45,7 +45,7 @@ class TransactionSink : public Sink {
   }
 
  private:
-  cache::CacheManager *cache_mgr_;
+  CacheManager *cache_mgr_;
   void *open_txn_;
 };
 
@@ -67,7 +67,7 @@ class Fetcher : SingleCopy {
   friend void TLSDestructor(void *data);
 
  public:
-  Fetcher(cache::CacheManager *cache_mgr,
+  Fetcher(CacheManager *cache_mgr,
           download::DownloadManager *download_mgr,
           BackoffThrottle *backoff_throttle,
           perf::Statistics *statistics,
@@ -79,11 +79,11 @@ class Fetcher : SingleCopy {
             const uint64_t size,
             const std::string &name,
             const zlib::Algorithms compression_algorithm,
-            const cache::CacheManager::ObjectType object_type,
+            const CacheManager::ObjectType object_type,
             const std::string &alt_url = "",
             off_t range_offset = -1);
 
-  cache::CacheManager *cache_mgr() { return cache_mgr_; }
+  CacheManager *cache_mgr() { return cache_mgr_; }
   download::DownloadManager *download_mgr() { return download_mgr_; }
 
  private:
@@ -134,7 +134,7 @@ class Fetcher : SingleCopy {
                             ThreadLocalStorage *tls);
   int OpenSelect(const shash::Any &id,
                  const std::string &name,
-                 const cache::CacheManager::ObjectType object_type);
+                 const CacheManager::ObjectType object_type);
 
   /**
    * If set to true, this fetcher is in 'external data' mode:
@@ -158,7 +158,7 @@ class Fetcher : SingleCopy {
   std::vector<ThreadLocalStorage *> tls_blocks_;
   pthread_mutex_t *lock_tls_blocks_;
 
-  cache::CacheManager *cache_mgr_;
+  CacheManager *cache_mgr_;
   download::DownloadManager *download_mgr_;
   BackoffThrottle *backoff_throttle_;
   perf::Counter *n_downloads;

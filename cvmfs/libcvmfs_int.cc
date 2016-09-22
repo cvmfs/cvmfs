@@ -421,7 +421,7 @@ int LibContext::Open(const char *c_path) {
     dirent.size(),
     string(path.GetChars(), path.GetLength()),
     dirent.compression_algorithm(),
-    cache::CacheManager::kTypeRegular);
+    CacheManager::kTypeRegular);
   perf::Inc(file_system()->n_fs_open());
 
   if (fd >= 0) {
@@ -474,7 +474,7 @@ int64_t LibContext::Pread(
             chunk_list->AtPtr(chunk_idx)->size(),
             "no path info",
             compression_alg,
-            cache::CacheManager::kTypeRegular,
+            CacheManager::kTypeRegular,
             open_chunks.chunk_reflist.path.ToString(),
             chunk_list->AtPtr(chunk_idx)->offset());
         } else {
@@ -483,7 +483,7 @@ int64_t LibContext::Pread(
             chunk_list->AtPtr(chunk_idx)->size(),
             "no path info",
             compression_alg,
-            cache::CacheManager::kTypeRegular);
+            CacheManager::kTypeRegular);
         }
         if (chunk_fd->fd < 0) {
           chunk_fd->fd = -1;

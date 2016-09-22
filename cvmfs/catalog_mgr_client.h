@@ -17,19 +17,14 @@
 #include "manifest_fetch.h"
 #include "shortstring.h"
 
-namespace cache {
 class CacheManager;
-}
-
 namespace cvmfs {
 class Fetcher;
 }
-
 namespace perf {
 class Counter;
 class Statistics;
 }
-
 namespace signature {
 class SignatureManager;
 }
@@ -68,6 +63,7 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
   bool offline_mode() const { return offline_mode_; }
   uint64_t all_inodes() const { return all_inodes_; }
   uint64_t loaded_inodes() const { return loaded_inodes_; }
+  std::string repo_name() const { return repo_name_; }
 
  protected:
   LoadError LoadCatalog(const PathString  &mountpoint,
@@ -111,7 +107,7 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
 class CachedManifestEnsemble : public manifest::ManifestEnsemble {
  public:
   CachedManifestEnsemble(
-    cache::CacheManager *cache_mgr,
+    CacheManager *cache_mgr,
     ClientCatalogManager *catalog_mgr)
     : cache_mgr_(cache_mgr)
     , catalog_mgr_(catalog_mgr)
@@ -119,7 +115,7 @@ class CachedManifestEnsemble : public manifest::ManifestEnsemble {
   void FetchCertificate(const shash::Any &hash);
 
  private:
-  cache::CacheManager *cache_mgr_;
+  CacheManager *cache_mgr_;
   ClientCatalogManager *catalog_mgr_;
 };
 

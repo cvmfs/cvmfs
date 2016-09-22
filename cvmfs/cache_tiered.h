@@ -11,8 +11,6 @@
 
 #include "cache.h"
 
-namespace cache {
-
 /**
  * Cache manager implementation that provides a hierarchical cache.
  * Given an "upper" and "lower" cache manager object:
@@ -36,7 +34,7 @@ class TieredCacheManager : public CacheManager {
   virtual bool AcquireQuotaManager(QuotaManager *quota_mgr)
   { return upper_->AcquireQuotaManager(quota_mgr); }
 
-  virtual int Open(const shash::Any &id);
+  virtual int Open(const BlessedObject &object);
   virtual int64_t GetSize(int fd) {return upper_->GetSize(fd);}
   virtual int Close(int fd) {return upper_->Close(fd);}
   virtual int64_t Pread(int fd, void *buf, uint64_t size, uint64_t offset)
@@ -47,8 +45,7 @@ class TieredCacheManager : public CacheManager {
   virtual uint16_t SizeOfTxn()
   { return upper_->SizeOfTxn() + lower_->SizeOfTxn(); }
   virtual int StartTxn(const shash::Any &id, uint64_t size, void *txn);
-  virtual void CtrlTxn(const std::string &description,
-                       const ObjectType type,
+  virtual void CtrlTxn(const ObjectInfo &object_info,
                        const int flags,
                        void *txn);
   virtual int64_t Write(const void *buf, uint64_t size, void *txn);
@@ -70,7 +67,5 @@ class TieredCacheManager : public CacheManager {
   CacheManager *upper_;
   CacheManager *lower_;
 };  // class TieredCacheManager
-
-}  // namespace cache
 
 #endif  // CVMFS_TIERED_CACHE_H_

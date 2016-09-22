@@ -22,9 +22,7 @@ class AuthzAttachment;
 class AuthzFetcher;
 class AuthzSessionManager;
 class BackoffThrottle;
-namespace cache {
 class CacheManager;
-}
 namespace catalog {
 class ClientCatalogManager;
 class InodeGenerationAnnotation;
@@ -178,7 +176,7 @@ class FileSystem : SingleCopy, public BootFactory {
 
   std::string cache_dir() { return cache_dir_; }
   std::string second_cache_dir() { return second_cache_dir_; }
-  cache::CacheManager *cache_mgr() { return cache_mgr_; }
+  CacheManager *cache_mgr() { return cache_mgr_; }
   int cache_mode() { return cache_mode_; }
   int second_cache_mode() { return cache_mode_; }
   std::string exe_path() { return exe_path_; }
@@ -295,7 +293,7 @@ class FileSystem : SingleCopy, public BootFactory {
    * cache when the limit is exceeded.
    */
   int64_t quota_limit_;
-  cache::CacheManager *cache_mgr_;
+  CacheManager *cache_mgr_;
   /**
    * Persistent for the cache directory + name combination.  It is used in the
    * Geo-API to allow for per-client responses when no proxy is used.
@@ -315,7 +313,7 @@ class FileSystem : SingleCopy, public BootFactory {
   /**
    * Indicates which type of cache to use
    */
-  cache::CacheManagerIds cache_mgr_type_;
+  CacheManagerIds cache_mgr_type_;
 };
 
 

@@ -42,8 +42,8 @@ class T_QuotaManager : public ::testing::Test {
     // Prepare cache directories
     tmp_path_ = CreateTempDir("./cvmfs_ut_quota_manager");
     MkdirDeep(tmp_path_ + "/not_spawned", 0700);
-    delete cache::PosixCacheManager::Create(tmp_path_, false);
-    delete cache::PosixCacheManager::Create(tmp_path_ + "/not_spawned", false);
+    delete PosixCacheManager::Create(tmp_path_, false);
+    delete PosixCacheManager::Create(tmp_path_ + "/not_spawned", false);
 
     limit_ = 10*1024*1024;  // 10M
     threshold_ = 5*1024*1024;  // 5M

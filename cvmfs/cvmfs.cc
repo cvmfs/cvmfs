@@ -1111,8 +1111,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     string(path.GetChars(), path.GetLength()),
     dirent.compression_algorithm(),
     mount_point_->catalog_mgr()->volatile_flag()
-      ? cache::CacheManager::kTypeVolatile
-      : cache::CacheManager::kTypeRegular);
+      ? CacheManager::kTypeVolatile
+      : CacheManager::kTypeRegular);
 
   if (fd >= 0) {
     if (perf::Xadd(file_system_->no_open_files(), 1) <
@@ -1214,8 +1214,8 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
             verbose_path,
             chunks.compression_alg,
             mount_point_->catalog_mgr()->volatile_flag()
-              ? cache::CacheManager::kTypeVolatile
-              : cache::CacheManager::kTypeRegular,
+              ? CacheManager::kTypeVolatile
+              : CacheManager::kTypeRegular,
             chunks.path.ToString(),
             chunks.list->AtPtr(chunk_idx)->offset());
         } else {
@@ -1225,8 +1225,8 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
             verbose_path,
             chunks.compression_alg,
             mount_point_->catalog_mgr()->volatile_flag()
-              ? cache::CacheManager::kTypeVolatile
-              : cache::CacheManager::kTypeRegular);
+              ? CacheManager::kTypeVolatile
+              : CacheManager::kTypeRegular);
         }
         if (chunk_fd.fd < 0) {
           chunk_fd.fd = -1;
@@ -1440,21 +1440,21 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   bool retval;
   XattrList xattrs;
 
-  if (d.HasXattrs()) {
-    PathString path;
-    retval = GetPathForInode(ino, &path);
-    assert(retval);
-    retval = catalog_mgr->LookupXattrs(path, &xattrs);
-    assert(retval);
-  }
+  PathString path;
   if (d.IsLink()) {
-    PathString path;
     catalog::LookupOptions lookup_options = static_cast<catalog::LookupOptions>(
       catalog::kLookupSole | catalog::kLookupRawSymlink);
     catalog::DirectoryEntry raw_symlink;
     retval = catalog_mgr->LookupPath(path, lookup_options, &raw_symlink);
     assert(retval);
     d.set_symlink(raw_symlink.symlink());
+  } else {
+    retval = GetPathForInode(ino, &path);
+    assert(retval);
+  }
+  if (d.HasXattrs()) {
+    retval = catalog_mgr->LookupXattrs(path, &xattrs);
+    assert(retval);
   }
   fence_remount_->Leave();
 
@@ -1481,7 +1481,12 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   } else if (attr == "user.lhash") {
     if (!d.checksum().IsNull()) {
       string result;
-      int fd = file_system_->cache_mgr()->Open(d.checksum());
+      CacheManager::ObjectInfo object_info;
+      object_info.description = path.ToString();
+      if (mount_point_->catalog_mgr()->volatile_flag())
+        object_info.type = CacheManager::kTypeVolatile;
+      int fd = file_system_->cache_mgr()->Open(
+        CacheManager::Bless(d.checksum(), object_info));
       if (fd < 0) {
         attribute_value = "Not in cache";
       } else {
@@ -1545,10 +1550,6 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   } else if (attr == "user.chunks") {
     if (d.IsRegular()) {
       if (d.IsChunkedFile()) {
-        PathString path;
-        retval = GetPathForInode(ino, &path);
-        assert(retval);
-
         FileChunkList chunks;
         if (!catalog_mgr->ListFileChunks(path, d.hash_algorithm(), &chunks) ||
             chunks.IsEmpty())
@@ -1795,7 +1796,7 @@ bool Pin(const string &path) {
           chunks.AtPtr(i)->size(),
           "Part of " + path,
           dirent.compression_algorithm(),
-          cache::CacheManager::kTypePinned,
+          CacheManager::kTypePinned,
           path,
           chunks.AtPtr(i)->offset());
       } else {
@@ -1804,7 +1805,7 @@ bool Pin(const string &path) {
           chunks.AtPtr(i)->size(),
           "Part of " + path,
           dirent.compression_algorithm(),
-          cache::CacheManager::kTypePinned);
+          CacheManager::kTypePinned);
       }
       if (fd < 0) {
         return false;
@@ -1823,7 +1824,7 @@ bool Pin(const string &path) {
     : mount_point_->fetcher();
   int fd = this_fetcher->Fetch(
     dirent.checksum(), dirent.size(), path, dirent.compression_algorithm(),
-    cache::CacheManager::kTypePinned);
+    CacheManager::kTypePinned);
   if (fd < 0) {
     return false;
   }

@@ -17,7 +17,8 @@
 
 using namespace std;  // NOLINT
 
-namespace cache {
+const shash::Any RamCacheManager::kInvalidHandle;
+
 
 RamCacheManager::RamCacheManager(
   uint64_t max_size,
@@ -68,9 +69,9 @@ bool RamCacheManager::AcquireQuotaManager(QuotaManager *quota_mgr) {
 }
 
 
-int RamCacheManager::Open(const shash::Any &id) {
+int RamCacheManager::Open(const BlessedObject &object) {
   WriteLockGuard guard(rwlock_);
-  return DoOpen(id);
+  return DoOpen(object.id);
 }
 
 
@@ -217,14 +218,13 @@ int RamCacheManager::StartTxn(const shash::Any &id, uint64_t size, void *txn) {
 
 
 void RamCacheManager::CtrlTxn(
-  const string &description,
-  const ObjectType type,
+  const ObjectInfo &object_info,
   const int flags,
   void *txn)
 {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
-  transaction->description = description;
-  transaction->buffer.object_type = type;
+  transaction->description = object_info.description;
+  transaction->buffer.object_type = object_info.type;
   LogCvmfs(kLogCache, kLogDebug, "modified transaction %s",
            transaction->buffer.id.ToString().c_str());
 }
@@ -322,13 +322,13 @@ int RamCacheManager::CommitTxn(void *txn) {
 int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
   MemoryKvStore *store;
 
-  if (transaction->buffer.object_type == cache::CacheManager::kTypeVolatile) {
+  if (transaction->buffer.object_type == kTypeVolatile) {
     store = &volatile_entries_;
   } else {
     store = &regular_entries_;
   }
-  if (transaction->buffer.object_type == cache::CacheManager::kTypePinned ||
-      transaction->buffer.object_type == cache::CacheManager::kTypeCatalog) {
+  if (transaction->buffer.object_type == kTypePinned ||
+      transaction->buffer.object_type == kTypeCatalog) {
     transaction->buffer.refcount = 1;
   } else {
     transaction->buffer.refcount = 0;
@@ -369,5 +369,3 @@ int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
            transaction->buffer.id.ToString().c_str());
   return 0;
 }
-
-}  // namespace cache

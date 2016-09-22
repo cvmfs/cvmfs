@@ -70,10 +70,7 @@
 
 using namespace std;  // NOLINT
 
-namespace cache {
-
-uint64_t kBigFile = 25*1024*1024;  // As of 25M, a file is considered "big file"
-
+namespace {
 
 /**
  * A CallGuard object can be placed at the beginning of a function.  It counts
@@ -108,11 +105,13 @@ class CallGuard {
 atomic_int32 CallGuard::num_inflight_calls_ = 0;
 atomic_int32 CallGuard::global_drainout_ = 0;
 
+}  // anonymous namespace
+
 
 //------------------------------------------------------------------------------
 
 
-const uint64_t PosixCacheManager::kBigFile = 25*1024*1024;  // 25M
+const uint64_t PosixCacheManager::kBigFile = 25 * 1024 * 1024;  // 25M
 
 
 int PosixCacheManager::AbortTxn(void *txn) {
@@ -185,11 +184,12 @@ int PosixCacheManager::CommitTxn(void *txn) {
     }
   }
 
-  if ((transaction->type == kTypePinned) || (transaction->type == kTypeCatalog))
+  if ((transaction->object_info.type == kTypePinned) ||
+      (transaction->object_info.type == kTypeCatalog))
   {
     bool retval = quota_mgr_->Pin(
-      transaction->id, transaction->size, transaction->description,
-      (transaction->type == kTypeCatalog));
+      transaction->id, transaction->size, transaction->object_info.description,
+      (transaction->object_info.type == kTypeCatalog));
     if (!retval) {
       LogCvmfs(kLogCache, kLogDebug, "commit failed: cannot pin %s",
                transaction->id.ToString().c_str());
@@ -210,19 +210,19 @@ int PosixCacheManager::CommitTxn(void *txn) {
   if (result < 0) {
     LogCvmfs(kLogCache, kLogDebug, "commit failed: %s", strerror(errno));
     unlink(transaction->tmp_path.c_str());
-    if ((transaction->type == kTypePinned) ||
-        (transaction->type == kTypeCatalog))
+    if ((transaction->object_info.type == kTypePinned) ||
+        (transaction->object_info.type == kTypeCatalog))
     {
       quota_mgr_->Remove(transaction->id);
     }
   } else {
     // Success, inform quota manager
-    if (transaction->type == kTypeVolatile) {
+    if (transaction->object_info.type == kTypeVolatile) {
       quota_mgr_->InsertVolatile(transaction->id, transaction->size,
-                                 transaction->description);
-    } else if (transaction->type == kTypeRegular) {
+                                 transaction->object_info.description);
+    } else if (transaction->object_info.type == kTypeRegular) {
       quota_mgr_->Insert(transaction->id, transaction->size,
-                         transaction->description);
+                         transaction->object_info.description);
     }
   }
   transaction->~Transaction();
@@ -271,14 +271,12 @@ PosixCacheManager *PosixCacheManager::Create(
 
 
 void PosixCacheManager::CtrlTxn(
-  const std::string &description,
-  const ObjectType type,
+  const ObjectInfo &object_info,
   const int flags,
   void *txn)
 {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
-  transaction->description = description;
-  transaction->type = type;
+  transaction->object_info = object_info;
 }
 
 
@@ -320,14 +318,14 @@ int64_t PosixCacheManager::GetSize(int fd) {
 }
 
 
-int PosixCacheManager::Open(const shash::Any &id) {
-  const string path = GetPathInCache(id);
+int PosixCacheManager::Open(const BlessedObject &object) {
+  const string path = GetPathInCache(object.id);
   int result = open(path.c_str(), O_RDONLY);
 
   if (result >= 0) {
     LogCvmfs(kLogCache, kLogDebug, "hit %s", path.c_str());
     // platform_disable_kcache(result);
-    quota_mgr_->Touch(id);
+    quota_mgr_->Touch(object.id);
   } else {
     result = -errno;
     LogCvmfs(kLogCache, kLogDebug, "miss %s (%d)", path.c_str(), result);
@@ -514,5 +512,3 @@ int64_t PosixCacheManager::Write(const void *buf, uint64_t size, void *txn) {
   transaction->size += written;
   return written;
 }
-
-}  // namespace cache
