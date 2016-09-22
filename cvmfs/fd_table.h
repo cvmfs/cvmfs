@@ -47,10 +47,11 @@ class FdTable : SingleCopy {
    * returns -ENFILE;
    */
   int OpenFd(const HandleT &handle) {
+    if (handle == invalid_handle_)
+      return -EINVAL;
     if (fd_pivot_ >= fd_index_.size())
       return -ENFILE;
 
-    assert(handle != invalid_handle_);
     size_t next_fd = fd_index_[fd_pivot_];
     assert(next_fd < open_fds_.size());
     assert(open_fds_[next_fd].handle == invalid_handle_);
