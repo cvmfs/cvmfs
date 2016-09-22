@@ -15,7 +15,10 @@
 %%====================================================================
 
 start(_StartType, _StartArgs) ->
-    cvmfs_auth_sup:start_link().
+    {ok, RepoList} = application:get_env(cvmfs_auth, repo_list),
+    {ok, ACL} = application:get_env(cvmfs_auth, acl),
+
+    cvmfs_auth_sup:start_link({RepoList, ACL}).
 
 %%--------------------------------------------------------------------
 stop(_State) ->

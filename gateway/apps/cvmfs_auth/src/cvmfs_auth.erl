@@ -12,7 +12,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0]).
+-export([start_link/1, get_user_permissions/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -24,6 +24,10 @@
 %%% API
 %%%===================================================================
 
+-spec get_user_permissions(binary()) -> user_not_found | {ok, [binary()]}.
+get_user_permissions(User) when is_binary(User) ->
+    gen_server:call(?MODULE, {auth_req, user_perms, User}).
+
 %%--------------------------------------------------------------------
 %% @doc
 %% Starts the server
@@ -31,8 +35,8 @@
 %% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
-start_link() ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
+start_link(Args) ->
+    gen_server:start_link({local, ?SERVER}, ?MODULE, Args, []).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -49,10 +53,8 @@ start_link() ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([]) ->
-    {ok, RepoList} = application:get_env(cvmfs_auth, repo_list),
-    {ok, ACL} = application:get_env(cvmfs_auth, acl),
-    cvmfs_auth_db:init(RepoList, ACL),
+init(Args) ->
+    ok = cvmfs_auth_db:init(Args),
     {ok, []}.
 
 %%--------------------------------------------------------------------
@@ -69,9 +71,13 @@ init([]) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call(_Request, _From, State) ->
-    Reply = ok,
-    {reply, Reply, State}.
+handle_call({auth_req, user_perms, User}, _From, _State) when is_binary(User) ->
+    case cvmfs_auth_db:get_user_paths(User) of
+        user_not_found ->
+            {reply, user_not_found, _State};
+        {ok, Paths} when is_list(Paths) ->
+            {reply, {ok, Paths}, _State}
+    end.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -112,7 +118,6 @@ handle_info(_Info, State) ->
 %%--------------------------------------------------------------------
 terminate(_Reason, _State) ->
     ok = cvmfs_auth_db:terminate().
-
 
 %%--------------------------------------------------------------------
 %% @private
