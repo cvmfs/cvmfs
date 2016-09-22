@@ -6,13 +6,13 @@
 %%% HELPER FUNCTIONS %%%
 %%%%%%%%%%%%%%%%%%%%%%%%
 
+read_cvmfs_auth_vars() ->
+    {ok, [L | _]} = file:consult(<<"config/sys.config">>),
+    #{cvmfs_auth := Vars} = maps:from_list(L),
+    maps:from_list(Vars).
+
 make_repos() ->
-    [{<<"repo1">>, <<"/path/to/repo/1">>}
-    ,{<<"repo2">>, <<"/path/to/another/repo">>}
-    ,{<<"repo3">>, <<"/path/to/last/repo">>}].
+    maps:get(repo_list, read_cvmfs_auth_vars()).
 
 make_acl() ->
-    [{<<"user1">>, [<<"repo1">>, <<"repo2">>, <<"repo3">>]}
-    ,{<<"user2">>, [<<"repo2">>, <<"repo3">>]}
-    ,{<<"user3">>, [<<"repo3">>]}
-    ,{<<"user4">>, []}].
+    maps:get(acl, read_cvmfs_auth_vars()).
