@@ -26,6 +26,8 @@ start_stop_test_() ->
 get_user_permissions_test_() ->
     [{"A valid username returns appropriate repo entries"
      ,{setup, fun start/0, fun stop/1, fun valid_username_returns_paths/1}}
+    ,{"A valid username can have invalid paths; should return empty results"
+     ,{setup, fun start/0, fun stop/1, fun valid_username_can_have_invalid_path/1}}
     ,{"A valid username may have no rights"
      ,{setup, fun start/0, fun stop/1, fun valid_username_can_have_no_paths/1}}
     ,{"An invalid username should return no repo results"
@@ -44,12 +46,7 @@ start() ->
     end.
 
 stop(_) ->
-    case whereis(cvmfs_auth) of
-        undefined ->
-            true;
-        _ ->
-            gen_server:stop(cvmfs_auth)
-    end.
+    true.
 
 %%%%%%%%%%%%%%%%%%%%
 %%% ACTUAL TESTS %%%
@@ -65,8 +62,12 @@ valid_username_returns_paths(_) ->
                             ,<<"/path/to/another/repo">>
                             ,<<"/path/to/last/repo">>])].
 
+valid_username_can_have_invalid_path(_) ->
+    {ok, Results} = cvmfs_auth:get_user_permissions(<<"user2">>),
+    [?_assertEqual(Results, [])].
+
 valid_username_can_have_no_paths(_) ->
-    {ok, Results} = cvmfs_auth:get_user_permissions(<<"user4">>),
+    {ok, Results} = cvmfs_auth:get_user_permissions(<<"user3">>),
     [?_assertEqual(Results, [])].
 
 invalid_username_returns_error(_) ->
