@@ -9,7 +9,7 @@
 -module(cvmfs_auth_db).
 
 %% API
--export([init/2, terminate/0, get_user_paths/1]).
+-export([init/1, terminate/0, get_user_paths/1]).
 
 %% Records used as table entries
 -record(repo_entry, {repo_id :: binary(), repo_path :: binary()}).
@@ -25,8 +25,8 @@
 %%
 %% @end
 %% --------------------------------------------------------------------
--spec init([{binary(), binary()}], [{binary(), [binary()]}]) -> ok.
-init(RepoList, ACL) ->
+-spec init({[{binary(), binary()}], [{binary(), [binary()]}]}) -> ok.
+init({RepoList, ACL}) ->
     ets:new(repos, [private, named_table, set, {keypos, #repo_entry.repo_id}]),
     ets:new(acl, [private, named_table, set, {keypos, #acl_entry.client_id}]),
 
