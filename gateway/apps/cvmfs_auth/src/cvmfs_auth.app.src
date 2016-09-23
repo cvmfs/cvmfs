@@ -6,10 +6,11 @@
   {applications,
    [kernel,
     stdlib,
-    cvmfs_om
+    cvmfs_om,
+    mnesia
    ]},
   {env,[]},
-  {modules, [cvmfs_auth_app, cvmfs_auth_sup]},
+  {modules, [cvmfs_auth_app, cvmfs_auth_sup, cvmfs_auth]},
 
   {maintainers, []}
  ]}.
