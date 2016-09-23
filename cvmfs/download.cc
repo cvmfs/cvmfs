@@ -928,7 +928,7 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
   curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYPEER, 1L);
   if (url.substr(0, 5) == "https") {
     const char *cadir = getenv("X509_CERT_DIR");
-    if (!cadir) {cadir = "/etc/grid-security/certificates";}
+    if (!cadir || !*cadir) {cadir = "/etc/grid-security/certificates";}
     curl_easy_setopt(curl_handle, CURLOPT_CAPATH, cadir);
     if (info->pid != -1) {
       if (credentials_attachment_ == NULL) {
