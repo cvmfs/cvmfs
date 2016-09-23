@@ -4,8 +4,8 @@
  * This provides a framework for a cache with an upper and a lower branch.
  */
 
-#ifndef CVMFS_TIERED_CACHE_H_
-#define CVMFS_TIERED_CACHE_H_
+#ifndef CVMFS_CACHE_TIERED_H_
+#define CVMFS_CACHE_TIERED_H_
 
 #include <string>
 
@@ -71,4 +71,4 @@ class TieredCacheManager : public CacheManager {
   CacheManager *lower_;
 };  // class TieredCacheManager
 
-#endif  // CVMFS_TIERED_CACHE_H_
+#endif  // CVMFS_CACHE_TIERED_H_
