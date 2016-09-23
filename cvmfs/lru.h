@@ -909,7 +909,9 @@ class InodeCache : public LruCache<fuse_ino_t, catalog::DirectoryEntry>
     return result;
   }
 
-  bool Lookup(const fuse_ino_t &inode, catalog::DirectoryEntry *dirent) {
+  bool Lookup(const fuse_ino_t &inode, catalog::DirectoryEntry *dirent,
+              bool update_lru = true)
+  {
     const bool result =
       LruCache<fuse_ino_t, catalog::DirectoryEntry>::Lookup(inode, dirent);
     LogCvmfs(kLogLru, kLogDebug, "lookup inode --> dirent: %u (%s)",
@@ -940,7 +942,9 @@ class PathCache : public LruCache<fuse_ino_t, PathString> {
     return result;
   }
 
-  bool Lookup(const fuse_ino_t &inode, PathString *path) {
+  bool Lookup(const fuse_ino_t &inode, PathString *path,
+              bool update_lru = true)
+  {
     const bool found =
       LruCache<fuse_ino_t, PathString>::Lookup(inode, path);
     LogCvmfs(kLogLru, kLogDebug, "lookup inode --> path: %u (%s)",
@@ -982,7 +986,9 @@ class Md5PathCache :
     return result;
   }
 
-  bool Lookup(const shash::Md5 &hash, catalog::DirectoryEntry *dirent) {
+  bool Lookup(const shash::Md5 &hash, catalog::DirectoryEntry *dirent,
+              bool update_lru = true)
+  {
     const bool result =
       LruCache<shash::Md5, catalog::DirectoryEntry>::Lookup(hash, dirent);
     LogCvmfs(kLogLru, kLogDebug, "lookup md5 --> dirent: %s (%s)",
