@@ -11,7 +11,7 @@
 
 int TieredCacheManager::Open(const BlessedObject &object) {
   int fd = upper_->Open(object);
-  if (fd >= 0) {return fd;}
+  if ((fd >= 0) || (fd != -ENOENT)) {return fd;}
 
   int fd2 = lower_->Open(object);
   if (fd2 < 0) {return fd;}  // NOTE: use error code from upper.
