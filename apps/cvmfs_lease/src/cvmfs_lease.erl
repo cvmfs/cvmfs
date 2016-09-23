@@ -137,7 +137,7 @@ code_change(_OldVsn, State, _Extra) ->
 %%         [] ->
 %%             cmvfs_om_log:debug("ACL entry not found for client id ~p", [ClientId]),
 %%             no_acl_entry;
-%%         [#acl_entry{client_id = ClientId, repo_ids = Repos} | _ ] ->
+%%         [#acl_entry{user_id = ClientId, repo_ids = Repos} | _ ] ->
 %%             {ok, Repos}
 %%     end.
 
@@ -148,7 +148,7 @@ code_change(_OldVsn, State, _Extra) ->
 %% -spec insert_lease(RepoPath ::string(), ClientId :: string(), SessionId :: string()) -> true.
 %% insert_lease(RepoPath, ClientId, SessionId) ->
 %%     ets:insert(leases, #lease_entry{repo_path = RepoPath,
-%%                                     client_id = ClientId,
+%%                                     user_id = ClientId,
 %%                                     session_id = SessionId,
 %%                                     timestamp = erlang:monotonic_time(seconds)}).
 
