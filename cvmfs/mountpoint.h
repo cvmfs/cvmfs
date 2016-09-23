@@ -175,10 +175,8 @@ class FileSystem : SingleCopy, public BootFactory {
   void TearDown2ReadOnly();
 
   std::string cache_dir() { return cache_dir_; }
-  std::string second_cache_dir() { return second_cache_dir_; }
   CacheManager *cache_mgr() { return cache_mgr_; }
   int cache_mode() { return cache_mode_; }
-  int second_cache_mode() { return cache_mode_; }
   std::string exe_path() { return exe_path_; }
   bool found_previous_crash() { return found_previous_crash_; }
   perf::Counter *n_fs_dir_open() { return n_fs_dir_open_; }
@@ -195,6 +193,8 @@ class FileSystem : SingleCopy, public BootFactory {
   perf::Counter *no_open_files() { return no_open_files_; }
   OptionsManager *options_mgr() { return options_mgr_; }
   int64_t quota_limit() { return quota_limit_; }
+  std::string second_cache_dir() { return second_cache_dir_; }
+  int second_cache_mode() { return cache_mode_; }
   perf::Statistics *statistics() { return statistics_; }
   Type type() { return type_; }
   cvmfs::Uuid *uuid_cache() { return uuid_cache_; }
@@ -287,6 +287,9 @@ class FileSystem : SingleCopy, public BootFactory {
    * Combination of kCache... flags
    */
   int cache_mode_;
+  /**
+   * The lower cache tier currently can only be
+   */
   int second_cache_mode_;
   /**
    * Soft limit in bytes for the cache.  The quota manager removes half the

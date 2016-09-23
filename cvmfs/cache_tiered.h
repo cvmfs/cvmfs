@@ -31,8 +31,11 @@ class TieredCacheManager : public CacheManager {
   { return new TieredCacheManager(upper_cache, lower_cache); }
 
   virtual ~TieredCacheManager() { delete upper_; delete lower_; }
-  virtual bool AcquireQuotaManager(QuotaManager *quota_mgr)
-  { return upper_->AcquireQuotaManager(quota_mgr); }
+  virtual bool AcquireQuotaManager(QuotaManager *quota_mgr) {
+    bool result = upper_->AcquireQuotaManager(quota_mgr);
+    quota_mgr_ = upper_->quota_mgr();
+    return result;
+  }
 
   virtual int Open(const BlessedObject &object);
   virtual int64_t GetSize(int fd) {return upper_->GetSize(fd);}

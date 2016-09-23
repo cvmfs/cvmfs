@@ -1,0 +1,36 @@
+
+cvmfs_test_name="Probing tiered cache"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  local second_cache_dir="$(get_cvmfs_cachedir atlas.cern.ch)/second"
+
+  echo "*** mount with tiered cached"
+  cvmfs_mount atlas.cern.ch \
+    "CVMFS_CACHE_PRIMARY=tiered" \
+    "CVMFS_SECOND_CACHE_DIR=$second_cache_dir" || return 1
+  ls /cvmfs/atlas.cern.ch || return 2
+
+  echo "*** stage file in both caches"
+  local test_file=/cvmfs/atlas.cern.ch/.cvmfsdirtab
+  md5sum $test_file || return 10
+  local checksum_1="$(md5sum $test_file)"
+
+  echo "*** remove file from upper layer"
+  sudo cvmfs_talk -i atlas.cern.ch cleanup 0
+  cvmfs_umount atlas.cern.ch
+
+  echo "*** remount without network and trigger copyup"
+  cvmfs_mount atlas.cern.ch \
+    "CVMFS_CACHE_PRIMARY=tiered" \
+    "CVMFS_SECOND_CACHE_DIR=$(get_cvmfs_cachedir)/second" \
+    "CVMFS_HTTP_PROXY=http://no-such-proxy.cern.ch:1234" || return 22
+  sudo cvmfs_talk -i atlas.cern.ch cache list | grep cvmfsdirtab && return 21
+  md5sum $test_file || return 22
+  sudo cvmfs_talk -i atlas.cern.ch cache list | grep cvmfsdirtab || return 23
+  local checksum_2="$(md5sum $test_file)"
+  [ "$checksum_1" = "$checksum_2" ] || return 24
+
+  return 0
+}
