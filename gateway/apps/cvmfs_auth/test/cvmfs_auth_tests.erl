@@ -33,6 +33,14 @@ get_user_permissions_test_() ->
     ,{"An invalid username should return no repo results"
      ,{setup, fun start/0, fun stop/1, fun invalid_username_returns_error/1}}].
 
+repo_operations_test_() ->
+    [{"Repo operations work"
+     ,{setup, fun start/0, fun stop/1, fun repo_operations_work/1}}].
+
+user_operations_test_() ->
+    [{"User operations work"
+     ,{setup, fun start/0, fun stop/1, fun user_operations_work/1}}].
+
 %%%%%%%%%%%%%%%%%%%%%%%
 %%% SETUP FUNCTIONS %%%
 %%%%%%%%%%%%%%%%%%%%%%%
@@ -51,11 +59,15 @@ stop(_) ->
 %%%%%%%%%%%%%%%%%%%%
 %%% ACTUAL TESTS %%%
 %%%%%%%%%%%%%%%%%%%%
+
+%% Start stop
 start_stop(_) ->
     [?_assert(is_pid(whereis(cvmfs_auth))
               and is_list(ets:info(repos))
               and is_list(ets:info(acl)))].
 
+
+%% Get permissions
 valid_username_returns_paths(_) ->
     {ok, Results} = cvmfs_auth:get_user_permissions(<<"user1">>),
     [?_assertEqual(Results, [<<"/path/to/repo/1">>
@@ -73,3 +85,21 @@ valid_username_can_have_no_paths(_) ->
 invalid_username_returns_error(_) ->
     Error = cvmfs_auth:get_user_permissions(<<"not_a_username">>),
     [?_assertEqual(Error, user_not_found)].
+
+
+%% Add/remove repos
+repo_operations_work(_) ->
+    ok = cvmfs_auth:add_repo(<<"new_repo">>, <<"/new/repo/path">>),
+    CouldAdd = lists:member(<<"new_repo">>, cvmfs_auth:get_repos()),
+    cvmfs_auth:remove_repo(<<"new_repo">>),
+    CouldRemove = not lists:member(<<"new_repo">>, cvmfs_auth:get_repos()),
+    [?_assert(CouldAdd) ,?_assert(CouldRemove)].
+
+%% Add/remove users
+user_operations_work(_) ->
+    ok = cvmfs_auth:add_user(<<"new_user">>, [<<"repo1">>]),
+    CouldAdd = lists:member(<<"new_user">>, cvmfs_auth:get_users()),
+    cvmfs_auth:remove_user(<<"new_user">>),
+    CouldRemove = not lists:member(<<"new_user">>, cvmfs_auth:get_users()),
+    [?_assert(CouldAdd) ,?_assert(CouldRemove)].
+
