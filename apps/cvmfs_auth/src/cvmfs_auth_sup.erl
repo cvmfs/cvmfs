@@ -39,7 +39,7 @@ init([Args]) ->
                              restart => permanent,
                              shutdown => 2000,
                              type => worker,
-                             modules => [cvmfs_auth,cvmfs_auth_db]},
+                             modules => [cvmfs_auth]},
     {ok, {SupervisorSpecs, [CvmfsAuthMainSpecs]}}.
 
 %%====================================================================

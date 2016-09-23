@@ -12,7 +12,9 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/1, get_user_permissions/1]).
+-export([start_link/1, get_user_permissions/1
+        ,add_user/2, remove_user/1
+        ,add_repo/2, remove_repo/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -20,13 +22,13 @@
 
 -define(SERVER, ?MODULE).
 
+%% Records used as table entries
+-record(repo_entry, {repo_id :: binary(), repo_path :: binary()}).
+-record(acl_entry, {client_id :: binary(), repo_ids :: [binary()]}).
+
 %%%===================================================================
 %%% API
 %%%===================================================================
-
--spec get_user_permissions(binary()) -> user_not_found | {ok, [binary()]}.
-get_user_permissions(User) when is_binary(User) ->
-    gen_server:call(?MODULE, {auth_req, user_perms, User}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -37,6 +39,22 @@ get_user_permissions(User) when is_binary(User) ->
 %%--------------------------------------------------------------------
 start_link(Args) ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, Args, []).
+
+-spec get_user_permissions(binary()) -> user_not_found | {ok, [binary()]}.
+get_user_permissions(User) when is_binary(User) ->
+    gen_server:call(?MODULE, {auth_req, user_perms, User}).
+
+add_user(_User, _Repos) ->
+    ok.
+
+remove_user(_User) ->
+    ok.
+
+add_repo(_Repo, _Paths) ->
+    ok.
+
+remove_repo(_Repo) ->
+    ok.
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -53,8 +71,14 @@ start_link(Args) ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init(Args) ->
-    ok = cvmfs_auth_db:init(Args),
+init({RepoList, ACL}) ->
+    ets:new(repos, [private, named_table, set, {keypos, #repo_entry.repo_id}]),
+    ets:new(acl, [private, named_table, set, {keypos, #acl_entry.client_id}]),
+
+    populate_repos(RepoList),
+    populate_acl(ACL),
+
+    cvmfs_om_log:info("CVMFS Auth storage module initialized."),
     {ok, []}.
 
 %%--------------------------------------------------------------------
@@ -72,7 +96,7 @@ init(Args) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_call({auth_req, user_perms, User}, _From, _State) when is_binary(User) ->
-    case cvmfs_auth_db:get_user_paths(User) of
+    case get_user_paths(User) of
         user_not_found ->
             {reply, user_not_found, _State};
         {ok, Paths} when is_list(Paths) ->
@@ -117,7 +141,9 @@ handle_info(_Info, State) ->
 %% @end
 %%--------------------------------------------------------------------
 terminate(_Reason, _State) ->
-    ok = cvmfs_auth_db:terminate().
+    ets:delete(acl),
+    ets:delete(repos),
+    ok.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -133,3 +159,25 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+-spec get_user_paths(binary()) -> {ok, [binary()]} | user_not_found.
+get_user_paths(User) when is_binary(User) ->
+    case ets:lookup(acl, User) of
+        [] ->
+            user_not_found;
+        AclEntries ->
+                    {ok, [Path || #acl_entry{repo_ids = Repos} <- AclEntries,
+                                  Repo <- Repos,
+                                  #repo_entry{repo_path = Path} <- ets:lookup(repos, Repo)]}
+    end.
+
+-spec populate_acl([{binary(), [binary()]}]) -> [true].
+populate_acl(ACL) ->
+    [ets:insert(acl, #acl_entry{client_id = ClientId,
+                                repo_ids = RepoList}) || {ClientId, RepoList} <- ACL].
+
+%% has side-effects. Will fill the ETS table 'repos'
+-spec populate_repos([{binary(), binary()}]) -> [true].
+populate_repos(RepoList) ->
+    [ets:insert(repos, #repo_entry{repo_id = RepoId,
+                                   repo_path = RepoPath}) || {RepoId, RepoPath} <- RepoList].
