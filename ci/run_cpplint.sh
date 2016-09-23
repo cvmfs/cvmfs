@@ -20,6 +20,7 @@ CPPLINT="${REPO_ROOT}/cpplint.py"
 [ -d $REPO_ROOT ] || die "$REPO_ROOT is malformed"
 [ -f $CPPLINT ]   || die "$CPPLINT missing"
 
+set +x
 PYTHON=python2
 PYTHON_VERSION_STR=$($PYTHON -V 2>&1)
 if [ $? -ne 0 ]; then
@@ -31,6 +32,8 @@ if [ $? -ne 0 ]; then
   cat /dev/null > ${SCRIPT_OUTPUT}
   exit 0
 fi
+set -e
+
 PYTHON_MAJOR=$(echo $PYTHON_VERSION_STR | awk '{print $2}' | cut -d. -f1)
 PYTHON_MINOR=$(echo $PYTHON_VERSION_STR | awk '{print $2}' | cut -d. -f2)
 if [ $PYTHON_MAJOR -lt 2 -o $PYTHON_MAJOR -eq 2 -a $PYTHON_MINOR -lt 6 ]; then
