@@ -1,7 +1,7 @@
 {application, cvmfs_auth,
  [{description, "CVMFS Auth Service"},
   {vsn, "0.1.0"},
-  {registered, []},
+  {registered, [cvmfs_auth]},
   {mod, { cvmfs_auth_app, []}},
   {applications,
    [kernel,
