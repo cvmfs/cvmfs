@@ -9,7 +9,7 @@
     cvmfs_om
    ]},
   {env,[]},
-  {modules, [cvmfs_auth_app, cvmfs_auth_sup, cvmfs_auth_db]},
+  {modules, [cvmfs_auth_app, cvmfs_auth_sup]},
 
   {maintainers, []}
  ]}.
