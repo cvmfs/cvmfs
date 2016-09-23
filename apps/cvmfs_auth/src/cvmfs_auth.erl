@@ -25,8 +25,8 @@
 -define(SERVER, ?MODULE).
 
 %% Records used as table entries
--record(repo_entry, {repo_id :: binary(), repo_path :: binary()}).
--record(acl_entry, {user_id :: binary(), repo_ids :: [binary()]}).
+-record(repo, {r_id :: binary(), path :: binary()}).
+-record(acl, {u_id :: binary(), r_ids :: [binary()]}).
 
 %%%===================================================================
 %%% API
@@ -77,7 +77,7 @@ remove_repo(Repo) when is_binary(Repo) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Returns a list of all repo names in the `repos` table.
+%% Returns a list of all repo names in the `repo` table.
 %% Potentially expensive!
 %%
 %% @spec spec get_users() -> [binary()]
@@ -103,11 +103,20 @@ get_repos() ->
 %% @end
 %%--------------------------------------------------------------------
 init({RepoList, ACL}) ->
-    ets:new(repos, [private, named_table, set, {keypos, #repo_entry.repo_id}]),
-    ets:new(acl, [private, named_table, set, {keypos, #acl_entry.user_id}]),
-
+    %% Note: Don't create tables anymore, once Mnesia persistence is configured
+    {atomic, ok} = mnesia:create_table(repo, [{ram_copies, [node() | nodes()]}
+                                             ,{type, set}
+                                             ,{attributes, record_info(fields, repo)}]),
+    mnesia:wait_for_tables([repo], 10000),
     priv_populate_repos(RepoList),
+    lager:info("Repository list initialized."),
+
+    {atomic, ok} = mnesia:create_table(acl, [{ram_copies, [node() | nodes()]}
+                                            ,{type, set}
+                                            ,{attributes, record_info(fields, acl)}]),
+    mnesia:wait_for_tables([acl], 10000),
     priv_populate_acl(ACL),
+    lager:info("Access control list initialized."),
 
     lager:info("CVMFS auth module initialized."),
     {ok, []}.
@@ -179,8 +188,6 @@ handle_info(_Info, State) ->
 %% @end
 %%--------------------------------------------------------------------
 terminate(_Reason, _State) ->
-    ets:delete(acl),
-    ets:delete(repos),
     lager:info("CVMFS auth module terminated."),
     ok.
 
@@ -201,54 +208,78 @@ code_change(_OldVsn, State, _Extra) ->
 
 -spec priv_get_user_paths(binary()) -> {ok, [binary()]} | user_not_found.
 priv_get_user_paths(User) when is_binary(User) ->
-    case ets:lookup(acl, User) of
-        [] ->
-            user_not_found;
-        AclEntries ->
-                    {ok, [Path || #acl_entry{repo_ids = Repos} <- AclEntries,
-                                  Repo <- Repos,
-                                  #repo_entry{repo_path = Path} <- ets:lookup(repos, Repo)]}
-    end.
+    T1 = fun() ->
+                case mnesia:read(acl, User) of
+                    [] ->
+                        user_not_found;
+                    AclEntries ->
+                        T2 = fun() ->
+                                     {ok, [Path || #acl{r_ids = Repos} <- AclEntries,
+                                                   Repo <- Repos,
+                                                   #repo{path = Path} <- mnesia:read(repo, Repo)]}
+                             end,
+                        {atomic, Result} = mnesia:transaction(T2),
+                        Result
+                end
+        end,
+    {atomic, Result} = mnesia:transaction(T1),
+    Result.
 
 priv_add_user(User, Repos) ->
-    Status = ets:insert_new(acl, #acl_entry{user_id = User, repo_ids = Repos}),
-    case Status of
-        false ->
-            user_already_exists;
-        true ->
-            ok
-    end.
+    T = fun() ->
+                mnesia:write(#acl{u_id = User, r_ids = Repos})
+        end,
+    {atomic, Result} = mnesia:transaction(T),
+    Result.
 
 priv_remove_user(User) ->
-    ets:delete(acl, User),
-    ok.
+    T = fun() ->
+                mnesia:delete({acl, User})
+        end,
+    {atomic, Result} = mnesia:transaction(T),
+    Result.
 
 priv_get_users() ->
-    ets:foldl(fun(#acl_entry{user_id = User}, Acc) -> [User | Acc] end, [], acl).
+    T = fun() ->
+                mnesia:foldl(fun(#acl{u_id = User}, Acc) -> [User | Acc] end, [], acl)
+        end,
+    {atomic, Result} = mnesia:transaction(T),
+    Result.
 
 priv_add_repo(Repo, Path) ->
-    Status = ets:insert_new(repos, #repo_entry{repo_id = Repo, repo_path = Path}),
-    case Status of
-        false ->
-            repo_already_exists;
-        true ->
-            ok
-    end.
+    T = fun() ->
+                mnesia:write(#repo{r_id = Repo, path = Path})
+        end,
+    {atomic, Result} = mnesia:transaction(T),
+    Result.
 
 priv_remove_repo(Repo) ->
-    ets:delete(repos, Repo),
-    ok.
+    T = fun() ->
+                mnesia:delete({repo, Repo})
+        end,
+    {atomic, Result} = mnesia:transaction(T),
+    Result.
 
 priv_get_repos() ->
-    ets:foldl(fun(#repo_entry{repo_id = Repo}, Acc) -> [Repo | Acc] end, [], repos).
+    T = fun() ->
+                mnesia:foldl(fun(#repo{r_id = Repo}, Acc) -> [Repo | Acc] end, [], repo)
+        end,
+    {atomic, Result} = mnesia:transaction(T),
+    Result.
 
 -spec priv_populate_acl([{binary(), [binary()]}]) -> [true].
 priv_populate_acl(ACL) ->
-    [ets:insert(acl, #acl_entry{user_id = ClientId,
-                                repo_ids = RepoList}) || {ClientId, RepoList} <- ACL].
+    T = fun() ->
+                [mnesia:write(#acl{u_id = ClientId, r_ids = RepoList}) || {ClientId, RepoList} <- ACL]
+        end,
+    {atomic, Result} = mnesia:transaction(T),
+    Result.
 
 %% has side-effects. Will fill the ETS table 'repos'
 -spec priv_populate_repos([{binary(), binary()}]) -> [true].
 priv_populate_repos(RepoList) ->
-    [ets:insert(repos, #repo_entry{repo_id = RepoId,
-                                   repo_path = RepoPath}) || {RepoId, RepoPath} <- RepoList].
+    T = fun() ->
+                [mnesia:write(#repo{r_id = RepoId, path = RepoPath}) || {RepoId, RepoPath} <- RepoList]
+        end,
+    {atomic, Result} = mnesia:transaction(T),
+    Result.

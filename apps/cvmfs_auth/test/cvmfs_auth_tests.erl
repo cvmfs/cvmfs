@@ -50,7 +50,7 @@ start() ->
             {ok, _} = cvmfs_auth:start_link({cvmfs_auth_test_helper:make_repos(),
                                              cvmfs_auth_test_helper:make_acl()});
         _ ->
-            true
+            ok
     end.
 
 stop(_) ->
@@ -62,9 +62,9 @@ stop(_) ->
 
 %% Start stop
 start_stop(_) ->
-    [?_assert(is_pid(whereis(cvmfs_auth))
-              and is_list(ets:info(repos))
-              and is_list(ets:info(acl)))].
+    [?_assert(is_pid(whereis(cvmfs_auth)))
+    ,?_assert(is_list(mnesia:table_info(repo, all)))
+    ,?_assert(is_list(mnesia:table_info(acl, all)))].
 
 
 %% Get permissions
