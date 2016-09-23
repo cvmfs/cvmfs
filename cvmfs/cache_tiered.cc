@@ -4,6 +4,8 @@
 #include "cvmfs_config.h"
 #include "cache_tiered.h"
 
+#include <errno.h>
+
 #include <string>
 #include <vector>
 
