@@ -9,6 +9,8 @@
 
 -module(cvmfs_auth).
 
+-compile([{parse_transform, lager_transform}]).
+
 -behaviour(gen_server).
 
 %% API
@@ -107,7 +109,7 @@ init({RepoList, ACL}) ->
     priv_populate_repos(RepoList),
     priv_populate_acl(ACL),
 
-    cvmfs_om_log:info("CVMFS Auth storage module initialized."),
+    lager:info("CVMFS auth module initialized."),
     {ok, []}.
 
 %%--------------------------------------------------------------------
@@ -179,6 +181,7 @@ handle_info(_Info, State) ->
 terminate(_Reason, _State) ->
     ets:delete(acl),
     ets:delete(repos),
+    lager:info("CVMFS auth module terminated."),
     ok.
 
 %%--------------------------------------------------------------------

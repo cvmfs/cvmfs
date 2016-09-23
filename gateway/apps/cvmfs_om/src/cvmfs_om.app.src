@@ -9,7 +9,7 @@
     lager
    ]},
   {env,[]},
-  {modules, [cvmfs_om_log]},
+  {modules, [cvmfs_om_app, cvmfs_om_sup]},
 
   {maintainers, []},
   {licenses, []},
