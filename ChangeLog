@@ -1,4 +1,5 @@
 2.4.0:
+  * Use default X509_CERT_DIR also if it is empty string (CVM-1083)
   * Add micro benchmark framework
   * Fix building on Arch Linux
   * Fix building on the Raspberry Pi
