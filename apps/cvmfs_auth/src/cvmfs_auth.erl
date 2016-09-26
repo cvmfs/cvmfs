@@ -14,7 +14,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/1, start/1, stop/0
+-export([start_link/1, stop/0
         ,get_user_permissions/1
         ,add_user/2, remove_user/1, get_users/0
         ,add_repo/2, remove_repo/1, get_repos/0]).
@@ -42,12 +42,6 @@
 %%--------------------------------------------------------------------
 start_link(Args) ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, Args, []).
-
-%% Note: start/1 does not link the gen_server to its parent. It's only
-%% used in the test suite. The supervisors should always call
-%% start_link/1
-start(Args) ->
-    gen_server:start({local, ?SERVER}, ?MODULE, Args, []).
 
 stop() ->
     gen_server:cast({local, ?SERVER}, stop).
@@ -186,8 +180,7 @@ handle_cast(_Msg, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_info(Info, State) ->
-    lager:info("CVMFS Auth module received message: ~p~n", [Info]),
+handle_info(_Info, State) ->
     {noreply, State}.
 
 %%--------------------------------------------------------------------

@@ -41,15 +41,23 @@ groups() ->
 
 %% Set up, tear down
 
-init_per_suite(_Config) ->
+init_per_suite(Config) ->
     application:start(mnesia),
     ok = ct:require(repos),
     ok = ct:require(acl),
-    {ok, _} = cvmfs_auth:start({ct:get_config(repos), ct:get_config(acl)}),
-    [].
+    Watcher = spawn(fun() ->
+                            {ok, _} = cvmfs_auth:start_link({ct:get_config(repos),
+                                                             ct:get_config(acl)}),
+                            receive
+                                test_suite_end ->
+                                    cvmfs_auth:stop()
+                            end
+                    end),
+    [{watcher_process, Watcher} | Config].
 
-end_per_suite(_Config) ->
-    cvmfs_auth:stop(),
+end_per_suite(Config) ->
+    Watcher = ?config(watcher_process, Config),
+    Watcher ! test_suite_end,
     application:stop(mnesia),
     ok.
 
