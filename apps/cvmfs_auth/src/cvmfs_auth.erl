@@ -14,7 +14,8 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/1, get_user_permissions/1
+-export([start_link/1, start/1, stop/0
+        ,get_user_permissions/1
         ,add_user/2, remove_user/1, get_users/0
         ,add_repo/2, remove_repo/1, get_repos/0]).
 
@@ -41,6 +42,16 @@
 %%--------------------------------------------------------------------
 start_link(Args) ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, Args, []).
+
+%% Note: start/1 does not link the gen_server to its parent. It's only
+%% used in the test suite. The supervisors should always call
+%% start_link/1
+start(Args) ->
+    gen_server:start({local, ?SERVER}, ?MODULE, Args, []).
+
+stop() ->
+    gen_server:cast({local, ?SERVER}, stop).
+
 
 -spec get_user_permissions(binary()) -> user_not_found | {ok, [binary()]}.
 get_user_permissions(User) when is_binary(User) ->
@@ -104,17 +115,17 @@ get_repos() ->
 %%--------------------------------------------------------------------
 init({RepoList, ACL}) ->
     %% Note: Don't create tables anymore, once Mnesia persistence is configured
-    {atomic, ok} = mnesia:create_table(repo, [{ram_copies, [node() | nodes()]}
-                                             ,{type, set}
-                                             ,{attributes, record_info(fields, repo)}]),
-    mnesia:wait_for_tables([repo], 10000),
+    mnesia:create_table(repo, [{ram_copies, [node() | nodes()]}
+                              ,{type, set}
+                              ,{attributes, record_info(fields, repo)}]),
+    ok = mnesia:wait_for_tables([repo], 10000),
     priv_populate_repos(RepoList),
     lager:info("Repository list initialized."),
 
-    {atomic, ok} = mnesia:create_table(acl, [{ram_copies, [node() | nodes()]}
-                                            ,{type, set}
-                                            ,{attributes, record_info(fields, acl)}]),
-    mnesia:wait_for_tables([acl], 10000),
+    mnesia:create_table(acl, [{ram_copies, [node() | nodes()]}
+                             ,{type, set}
+                             ,{attributes, record_info(fields, acl)}]),
+    ok = mnesia:wait_for_tables([acl], 10000),
     priv_populate_acl(ACL),
     lager:info("Access control list initialized."),
 
@@ -160,6 +171,8 @@ handle_call({auth_req, get_repos}, _From, _State) ->
 %%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_cast(stop, State) ->
+    {stop, normal, State};
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
@@ -173,7 +186,8 @@ handle_cast(_Msg, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_info(_Info, State) ->
+handle_info(Info, State) ->
+    lager:info("CVMFS Auth module received message: ~p~n", [Info]),
     {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -275,7 +289,6 @@ priv_populate_acl(ACL) ->
     {atomic, Result} = mnesia:transaction(T),
     Result.
 
-%% has side-effects. Will fill the ETS table 'repos'
 -spec priv_populate_repos([{binary(), binary()}]) -> [true].
 priv_populate_repos(RepoList) ->
     T = fun() ->
