@@ -1,0 +1,9 @@
+[{lager, [{log_root, "log/"}
+         ,{crash_log, "crash.log"}
+         ,{handlers, [{lager_console_backend, info}
+                     ,{lager_file_backend, [{file, "error.log"}, {level, error}]}
+                     ,{lager_file_backend, [{file, "info.log"}, {level, info}]}]}]}
+
+,{cvmfs_auth, [{repo_config, "./etc/repo.config"}]}
+
+,{cvmfs_lease, [{max_lease_time, 60}]}]. % max lease time in seconds
