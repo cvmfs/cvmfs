@@ -11,61 +11,92 @@
 
 -include_lib("common_test/include/ct.hrl").
 
--export([all/0, init_per_testcase/2, end_per_testcase/2]).
--export([get_user_permissions_test/1
-        ,repo_operations_test/1
-        ,user_operations_test/1]).
+-export([all/0, groups/0, init_per_suite/1, end_per_suite/1, init_per_testcase/2, end_per_testcase/2]).
+-export([add_repo/1, remove_repo/1
+        ,add_user/1, remove_user/1
+        ,list_repos/1, list_users/1
+        ,valid_username_valid_paths/1
+        ,valid_username_invalid_paths/1
+        ,valid_username_no_paths/1
+        ,invalid_username_error/1]).
 
-%% Note: These tests are for the API of the main cvmfs_auth module and
-%% since they exercise multiple other modules, they should become
-%% integration tests. Should move them to common test (ct), which is
-%% better suited for the testing of stateful systems.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% TESTS DESCRIPTIONS %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%
 all() ->
-    [get_user_permissions_test
-    ,repo_operations_test
-    ,user_operations_test].
+    [{group, queries}
+    ,{group, repo_operations}
+    ,{group, user_operations}].
 
-init_per_testcase(_TestCaseName, _Config) ->
+groups() ->
+    [{queries, [parallel], [list_repos
+                   ,valid_username_valid_paths
+                   ,valid_username_invalid_paths
+                   ,valid_username_no_paths
+                   ,invalid_username_error]}
+    ,{repo_operations, [], [add_repo, remove_repo]}
+    ,{user_operations, [], [add_user, remove_user]}].
+
+
+%% Set up, tear down
+
+init_per_suite(_Config) ->
     application:start(mnesia),
     ok = ct:require(repos),
     ok = ct:require(acl),
-    {ok, _} = cvmfs_auth:start_link({ct:get_config({repos})
-                                    ,ct:get_config({acl})}),
+    {ok, _} = cvmfs_auth:start({ct:get_config(repos), ct:get_config(acl)}),
     [].
 
-end_per_testcase(_TestCaseName, _Config) ->
+end_per_suite(_Config) ->
+    cvmfs_auth:stop(),
     application:stop(mnesia),
     ok.
 
-get_user_permissions_test(_Config) ->
-    %% Valid username returns valid paths
+init_per_testcase(_TestCase, _Config) ->
+    [].
+
+end_per_testcase(_TestCase, _Config) ->
+    ok.
+
+%% Test cases follow
+
+list_repos(_Config) ->
+    Repos1 = lists:sort(cvmfs_auth:get_repos()),
+    Repos2 = lists:sort(lists:foldl(fun({N, _}, Acc) -> [N | Acc] end, [], ct:get_config(repos))),
+    lists:zipwith(fun(A, B) -> A = B end, Repos1, Repos2).
+
+list_users(_Config) ->
+    Users1 = lists:sort(cvmfs_auth:get_users()),
+    Users2 = lists:sort(lists:foldl(fun({U, _}, Acc) -> [U | Acc] end, [], ct:get_config(acl))),
+    lists:zipwith(fun(A, B) -> A = B end, Users1, Users2).
+
+valid_username_valid_paths(_Config) ->
     {ok, Results} = cvmfs_auth:get_user_permissions(<<"user1">>),
-    Results = [<<"/path/to/repo/1">>, <<"/path/to/another/repo">>, <<"/path/to/last/repo">>],
+    Results = [<<"/path/to/repo/1">>, <<"/path/to/another/repo">>, <<"/path/to/last/repo">>].
 
-    %% Valid username can have invalid paths, should return nothing
-    {ok, []} = cvmfs_auth:get_user_permissions(<<"user2">>),
+valid_username_invalid_paths(_Config) ->
+    {ok, []} = cvmfs_auth:get_user_permissions(<<"user2">>).
 
-    %% Valid username can have no paths
-    {ok, []} = cvmfs_auth:get_user_permissions(<<"user3">>),
+valid_username_no_paths(_Config) ->
+    {ok, []} = cvmfs_auth:get_user_permissions(<<"user3">>).
 
-    %% Invalid username returns error
+invalid_username_error(_Config) ->
     user_not_found = cvmfs_auth:get_user_permissions(<<"not_a_username">>).
 
-repo_operations_test(_Config) ->
-    %% Repo operations work
+add_repo(_Config) ->
     ok = cvmfs_auth:add_repo(<<"new_repo">>, <<"/new/repo/path">>),
-    true = lists:member(<<"new_repo">>, cvmfs_auth:get_repos()),
-    cvmfs_auth:remove_repo(<<"new_repo">>),
-    false = lists:member(<<"new_repo">>, cvmfs_auth:get_repos()).
+    true = lists:member(<<"new_repo">>, cvmfs_auth:get_repos()).
 
-user_operations_test(_Config) ->
-    %% User operations work
+remove_repo(_Config) ->
+    cvmfs_auth:remove_repo(<<"repo3">>),
+    false = lists:member(<<"repo3">>, cvmfs_auth:get_repos()).
+
+add_user(_Config) ->
     ok = cvmfs_auth:add_user(<<"new_user">>, [<<"repo1">>]),
-    true = lists:member(<<"new_user">>, cvmfs_auth:get_users()),
-    cvmfs_auth:remove_user(<<"new_user">>),
-    false = lists:member(<<"new_user">>, cvmfs_auth:get_users()).
+    true = lists:member(<<"new_user">>, cvmfs_auth:get_users()).
+
+remove_user(_Config) ->
+    cvmfs_auth:remove_user(<<"user3">>),
+    false = lists:member(<<"user3">>, cvmfs_auth:get_users()).
 
