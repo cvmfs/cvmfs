@@ -20,7 +20,7 @@ CPPLINT="${REPO_ROOT}/cpplint.py"
 [ -d $REPO_ROOT ] || die "$REPO_ROOT is malformed"
 [ -f $CPPLINT ]   || die "$CPPLINT missing"
 
-set +x
+set +e
 PYTHON=python2
 PYTHON_VERSION_STR=$($PYTHON -V 2>&1)
 if [ $? -ne 0 ]; then
