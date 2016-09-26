@@ -7,7 +7,7 @@
 %%%
 %%%-------------------------------------------------------------------
 
--module(cvmfs_auth_tests_SUITE).
+-module(cvmfs_auth_SUITE).
 
 -include_lib("common_test/include/ct.hrl").
 
@@ -31,8 +31,10 @@ all() ->
 
 init_per_testcase(_TestCaseName, _Config) ->
     application:start(mnesia),
-    {ok, _} = cvmfs_auth:start_link({cvmfs_auth_test_helper:make_repos(),
-                                     cvmfs_auth_test_helper:make_acl()}),
+    ok = ct:require(repos),
+    ok = ct:require(acl),
+    {ok, _} = cvmfs_auth:start_link({ct:get_config({repos})
+                                    ,ct:get_config({acl})}),
     [].
 
 end_per_testcase(_TestCaseName, _Config) ->
@@ -66,3 +68,4 @@ user_operations_test(_Config) ->
     true = lists:member(<<"new_user">>, cvmfs_auth:get_users()),
     cvmfs_auth:remove_user(<<"new_user">>),
     false = lists:member(<<"new_user">>, cvmfs_auth:get_users()).
+

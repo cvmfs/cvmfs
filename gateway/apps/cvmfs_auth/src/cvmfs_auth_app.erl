@@ -15,10 +15,12 @@
 %%====================================================================
 
 start(_StartType, _StartArgs) ->
-    {ok, RepoList} = application:get_env(cvmfs_auth, repo_list),
-    {ok, ACL} = application:get_env(cvmfs_auth, acl),
+    {ok, RepoConfigFile} = application:get_env(cvmfs_auth, repo_config),
+    {ok, VarList} = file:consult(RepoConfigFile),
+    Vars = maps:from_list(VarList),
 
-    cvmfs_auth_sup:start_link({RepoList, ACL}).
+    cvmfs_auth_sup:start_link({maps:get(repos, Vars),
+                               maps:get(acl, Vars)}).
 
 %%--------------------------------------------------------------------
 stop(_State) ->
