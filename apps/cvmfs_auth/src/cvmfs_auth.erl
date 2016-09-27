@@ -26,7 +26,13 @@
 -define(SERVER, ?MODULE).
 
 %% Records used as table entries
+
+%% r_id - repo identifier
+%% path - the path of the repository
 -record(repo, {r_id :: binary(), path :: binary()}).
+
+%% u_id - user identifier
+%% r_ids - identifiers of repos to which user can make changes
 -record(acl, {u_id :: binary(), r_ids :: [binary()]}).
 
 %%%===================================================================
