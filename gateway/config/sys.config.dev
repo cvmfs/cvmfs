@@ -4,7 +4,8 @@
                      ,{lager_file_backend, [{file, "error.log"}, {level, error}]}
                      ,{lager_file_backend, [{file, "info.log"}, {level, info}]}]}]}
 
-,{cvmfs_auth, [{repo_config, "./config/repo.config"}
-              ,{mnesia_schema, disc_copies}]} % disc_copies | ram_copies
+,{cvmfs_auth, [{repo_config, "./config/repo.config"}]}
 
-,{cvmfs_lease, [{max_lease_time, 60}]}]. % max lease time in seconds
+,{cvmfs_lease, [{max_lease_time, 60}]} % max lease time in seconds
+
+,{cvmfs_services, [{mnesia_schema, disc_copies}]}]. % disc_copies | ram_copies
