@@ -23,14 +23,14 @@
 %%====================================================================
 
 start_link(Args) ->
-    supervisor:start_link({local, ?SERVER}, ?MODULE, [Args]).
+    supervisor:start_link({local, ?SERVER}, ?MODULE, Args).
 
 %%====================================================================
 %% Supervisor callbacks
 %%====================================================================
 
 %% Child :: {Id,StartFunc,Restart,Shutdown,Type,Modules}
-init([Args]) ->
+init(Args) ->
     SupervisorSpecs = #{strategy => one_for_all,
                         intensity => 5,
                         period => 5},
