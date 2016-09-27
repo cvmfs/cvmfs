@@ -16,11 +16,13 @@
 
 start(_StartType, _StartArgs) ->
     {ok, RepoConfigFile} = application:get_env(cvmfs_auth, repo_config),
+    {ok, MnesiaSchema} = application:get_env(cvmfs_auth, mnesia_schema),
     {ok, VarList} = file:consult(RepoConfigFile),
     Vars = maps:from_list(VarList),
 
-    cvmfs_auth_sup:start_link({maps:get(repos, Vars),
-                               maps:get(acl, Vars)}).
+    cvmfs_auth_sup:start_link({maps:get(repos, Vars)
+                              ,maps:get(acl, Vars)
+                              ,MnesiaSchema}).
 
 %%--------------------------------------------------------------------
 stop(_State) ->

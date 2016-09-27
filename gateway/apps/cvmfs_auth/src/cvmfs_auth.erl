@@ -101,22 +101,28 @@ get_repos() ->
 %% @doc
 %% Initializes the server
 %%
+%% Arguments:
+%%   RepoList - list of managed repositories
+%%   ACL - access control list ([{username, [repo_name]}])
+%%   MnesiaSchema - mnesia database schema. 'disc_copies' for normal use,
+%%                  'ram_copies' for the test suite.
+%%
 %% @spec init(Args) -> {ok, State} |
 %%                     {ok, State, Timeout} |
 %%                     ignore |
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init({RepoList, ACL}) ->
+init({RepoList, ACL, MnesiaSchema}) ->
     %% Note: Don't create tables anymore, once Mnesia persistence is configured
-    mnesia:create_table(repo, [{ram_copies, [node() | nodes()]}
+    mnesia:create_table(repo, [{MnesiaSchema, [node() | nodes()]}
                               ,{type, set}
                               ,{attributes, record_info(fields, repo)}]),
     ok = mnesia:wait_for_tables([repo], 10000),
     priv_populate_repos(RepoList),
     lager:info("Repository list initialized."),
 
-    mnesia:create_table(acl, [{ram_copies, [node() | nodes()]}
+    mnesia:create_table(acl, [{MnesiaSchema, [node() | nodes()]}
                              ,{type, set}
                              ,{attributes, record_info(fields, acl)}]),
     ok = mnesia:wait_for_tables([acl], 10000),

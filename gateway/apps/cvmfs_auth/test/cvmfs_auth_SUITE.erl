@@ -46,8 +46,9 @@ init_per_suite(Config) ->
     ok = ct:require(repos),
     ok = ct:require(acl),
     Watcher = spawn(fun() ->
-                            {ok, _} = cvmfs_auth:start_link({ct:get_config(repos),
-                                                             ct:get_config(acl)}),
+                            {ok, _} = cvmfs_auth:start_link({ct:get_config(repos)
+                                                            ,ct:get_config(acl)
+                                                            ,ram_copies}),
                             receive
                                 test_suite_end ->
                                     cvmfs_auth:stop()
