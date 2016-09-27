@@ -9,10 +9,12 @@
 
 -module(cvmfs_lease).
 
+-compile([{parse_transform, lager_transform}]).
+
 -behaviour(gen_server).
 
 %% API
--export([start_link/0]).
+-export([start_link/1, stop/0]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -20,7 +22,7 @@
 
 -define(SERVER, ?MODULE).
 
--record(state, {}).
+%% Records used as table entries
 
 %%%===================================================================
 %%% API
@@ -33,8 +35,12 @@
 %% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
-start_link() ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
+start_link(Args) ->
+    gen_server:start_link({local, ?SERVER}, ?MODULE, Args, []).
+
+stop() ->
+    gen_server:cast({local, ?SERVER}, stop).
+
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -51,8 +57,8 @@ start_link() ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([]) ->
-    {ok, #state{}}.
+init({_MaxLeaseTime, _MnesiaSchema}) ->
+    {ok, []}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -82,7 +88,11 @@ handle_call(_Request, _From, State) ->
 %%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_cast(_Msg, State) ->
+handle_cast(stop, State) ->
+    lager:info("Request received: stop"),
+    {stop, normal, State};
+handle_cast(Msg, State) ->
+    lager:info("Cast received: ~p -> noreply", [Msg]),
     {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -95,7 +105,8 @@ handle_cast(_Msg, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_info(_Info, State) ->
+handle_info(Info, State) ->
+    lager:warning("Unknown message received: ~p", [Info]),
     {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -109,7 +120,8 @@ handle_info(_Info, State) ->
 %% @spec terminate(Reason, State) -> void()
 %% @end
 %%--------------------------------------------------------------------
-terminate(_Reason, _State) ->
+terminate(Reason, _State) ->
+    lager:info("CVMFS lease module terminating with reason: ~p", [Reason]),
     ok.
 
 %%--------------------------------------------------------------------
@@ -120,50 +132,10 @@ terminate(_Reason, _State) ->
 %% @spec code_change(OldVsn, State, Extra) -> {ok, NewState}
 %% @end
 %%--------------------------------------------------------------------
-code_change(_OldVsn, State, _Extra) ->
+code_change(OldVsn, State, _Extra) ->
+    lager:info("Code change request received. Old version: ~p", [OldVsn]),
     {ok, State}.
 
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-
-%% %%--------------------------------------------------------------------
-%% %% @doc Returns the list of repos for which ClientId can obtain leases
-%% %% @end
-%% %%--------------------------------------------------------------------
-%% -spec get_client_acl(ClientId :: string()) -> no_acl_entry | {ok, [string()]}.
-%% get_client_acl(ClientId) when is_list(ClientId) ->
-%%     case ets:lookup(acl, ClientId) of
-%%         [] ->
-%%             cmvfs_om_log:debug("ACL entry not found for client id ~p", [ClientId]),
-%%             no_acl_entry;
-%%         [#acl_entry{user_id = ClientId, repo_ids = Repos} | _ ] ->
-%%             {ok, Repos}
-%%     end.
-
-%% %%--------------------------------------------------------------------
-%% %% @doc Inserts a new lease into the 'leases' table
-%% %% @end
-%% %%--------------------------------------------------------------------
-%% -spec insert_lease(RepoPath ::string(), ClientId :: string(), SessionId :: string()) -> true.
-%% insert_lease(RepoPath, ClientId, SessionId) ->
-%%     ets:insert(leases, #lease_entry{repo_path = RepoPath,
-%%                                     user_id = ClientId,
-%%                                     session_id = SessionId,
-%%                                     timestamp = erlang:monotonic_time(seconds)}).
-
-%% %%--------------------------------------------------------------------
-%% %% @doc Deletes a lease from the 'leases' table
-%% %% @end
-%% %%--------------------------------------------------------------------
-%% -spec delete_lease(RepoPath :: string()) -> true.
-%% delete_lease(RepoPath) ->
-%%     ets:delete(leases, RepoPath).
-
-%% %%--------------------------------------------------------------------
-%% %% @doc Returns a list of pairs {Path, Timestamp} representing all the
-%% %%      active leases
-%% %% @end
-%% %%--------------------------------------------------------------------
-%% get_leases_for_path(Path) ->
-%%     [].
