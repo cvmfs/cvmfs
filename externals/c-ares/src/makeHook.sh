@@ -2,5 +2,6 @@
 
 make clean
 make
-strip -S .libs/libcares.a
+# Don't strip debug symbols
+# strip -S .libs/libcares.a
 
