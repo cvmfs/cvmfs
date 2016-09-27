@@ -4,7 +4,7 @@
  * The SimpleCatalogManager is a simplistic concrete implementation of the
  * AbstractCatalogManager and allows for easy-to-use access to the catalog
  * structure of a given repository. This class is tailored for simplicity, not
- * for performance. Have a look into cache::CatalogManager if you are working
+ * for performance. Have a look into ClientCatalogManager if you are working
  * on the CVMFS client.
  */
 

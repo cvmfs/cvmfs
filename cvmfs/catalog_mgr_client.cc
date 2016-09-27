@@ -139,9 +139,9 @@ LoadError ClientCatalogManager::LoadCatalog(
   string checksum_dir = ".";
   // TODO(jblomer): find a way to remove this hack
   if (!FileExists("cvmfschecksum." + repo_name_)) {
-    if (fetcher_->cache_mgr()->id() == cache::kPosixCacheManager) {
-      cache::PosixCacheManager *cache_mgr =
-        reinterpret_cast<cache::PosixCacheManager *>(fetcher_->cache_mgr());
+    if (fetcher_->cache_mgr()->id() == kPosixCacheManager) {
+      PosixCacheManager *cache_mgr =
+        reinterpret_cast<PosixCacheManager *>(fetcher_->cache_mgr());
       if (cache_mgr->alien_cache())
         checksum_dir = cache_mgr->cache_path();
     }
@@ -235,8 +235,8 @@ LoadError ClientCatalogManager::LoadCatalogCas(
   string *catalog_path)
 {
   assert(hash.suffix == shash::kSuffixCatalog);
-  int fd = fetcher_->Fetch(hash, cache::CacheManager::kSizeUnknown, name,
-    zlib::kZlibDefault, cache::CacheManager::kTypeCatalog, alt_catalog_path);
+  int fd = fetcher_->Fetch(hash, CacheManager::kSizeUnknown, name,
+    zlib::kZlibDefault, CacheManager::kTypeCatalog, alt_catalog_path);
   if (fd >= 0) {
     *catalog_path = "@" + StringifyInt(fd);
     return kLoadNew;
@@ -268,7 +268,8 @@ void ClientCatalogManager::UnloadCatalog(const Catalog *catalog) {
 
 void CachedManifestEnsemble::FetchCertificate(const shash::Any &hash) {
   uint64_t size;
-  bool retval = cache_mgr_->Open2Mem(hash, &cert_buf, &size);
+  bool retval = cache_mgr_->Open2Mem(
+    hash, "certificate for " + catalog_mgr_->repo_name(), &cert_buf, &size);
   cert_size = size;
   if (retval)
     perf::Inc(catalog_mgr_->n_certificate_hits_);

@@ -27,6 +27,7 @@ set(CVMFS_UNITTEST_FILES
   t_buffer.cc
   t_cache.cc
   t_cache_ram.cc
+  t_cache_tiered.cc
   t_callbacks.cc
   t_catalog.cc
   t_catalog_counters.cc
@@ -41,6 +42,7 @@ set(CVMFS_UNITTEST_FILES
   t_dns.cc
   t_download.cc
   t_encrypt.cc
+  t_fd_table.cc
   t_fence.cc
   t_fetch.cc
   t_file_chunk.cc
@@ -114,6 +116,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/cache.cc ${CVMFS_SOURCE_DIR}/cache.h
   ${CVMFS_SOURCE_DIR}/cache_posix.cc ${CVMFS_SOURCE_DIR}/cache_posix.h
   ${CVMFS_SOURCE_DIR}/cache_ram.cc ${CVMFS_SOURCE_DIR}/cache_ram.h
+  ${CVMFS_SOURCE_DIR}/cache_tiered.cc ${CVMFS_SOURCE_DIR}/cache_tiered.h
   ${CVMFS_SOURCE_DIR}/catalog.cc
   ${CVMFS_SOURCE_DIR}/catalog_counters.cc ${CVMFS_SOURCE_DIR}/catalog_counters.h
   ${CVMFS_SOURCE_DIR}/catalog_mgr.h
@@ -132,6 +135,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/duplex_sqlite3.h
   ${CVMFS_SOURCE_DIR}/duplex_zlib.h
   ${CVMFS_SOURCE_DIR}/encrypt.cc ${CVMFS_SOURCE_DIR}/encrypt.h
+  ${CVMFS_SOURCE_DIR}/fd_table.h
   ${CVMFS_SOURCE_DIR}/fence.h
   ${CVMFS_SOURCE_DIR}/fetch.cc ${CVMFS_SOURCE_DIR}/fetch.h
   ${CVMFS_SOURCE_DIR}/file_chunk.cc

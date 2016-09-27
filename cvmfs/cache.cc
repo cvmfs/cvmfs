@@ -20,9 +20,6 @@
 
 using namespace std;  // NOLINT
 
-namespace cache {
-
-
 const uint64_t CacheManager::kSizeUnknown = uint64_t(-1);
 
 
@@ -88,7 +85,7 @@ bool CacheManager::CommitFromMem(
   int fd = this->StartTxn(id, size, txn);
   if (fd < 0)
     return false;
-  this->CtrlTxn(description, kTypeRegular, 0, txn);
+  this->CtrlTxn(ObjectInfo(kTypeRegular, description), 0, txn);
   int64_t retval = this->Write(buffer, size, txn);
   if ((retval < 0) || (static_cast<uint64_t>(retval) != size)) {
     this->AbortTxn(txn);
@@ -110,13 +107,14 @@ bool CacheManager::CommitFromMem(
  */
 bool CacheManager::Open2Mem(
   const shash::Any &id,
+  const std::string &description,
   unsigned char **buffer,
   uint64_t *size)
 {
   *size = 0;
   *buffer = NULL;
 
-  int fd = this->Open(id);
+  int fd = this->Open(Bless(id, kTypeRegular, description));
   if (fd < 0)
     return false;
 
@@ -155,7 +153,8 @@ int CacheManager::OpenPinned(
   const string &description,
   bool is_catalog)
 {
-  int fd = this->Open(id);
+  ObjectInfo object_info(is_catalog ? kTypeCatalog : kTypeRegular, description);
+  int fd = this->Open(Bless(id, object_info));
   if (fd >= 0) {
     int64_t size = this->GetSize(fd);
     if (size < 0) {
@@ -171,5 +170,3 @@ int CacheManager::OpenPinned(
   }
   return fd;
 }
-
-}  // namespace cache

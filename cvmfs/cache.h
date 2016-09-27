@@ -9,20 +9,17 @@
 
 #include <string>
 
+#include "hash.h"
 #include "util/pointer.h"
 
-namespace shash {
-struct Any;
-}
 
 class QuotaManager;
-
-namespace cache {
 
 enum CacheManagerIds {
   kUnknownCacheManager = 0,
   kPosixCacheManager,
   kRamCacheManager,
+  kTieredCacheManager,
 };
 
 enum CacheModes {
@@ -78,12 +75,85 @@ class CacheManager : SingleCopy {
     kTypeVolatile,
   };
 
+  /**
+   * Meta-data of an object that the cache may or may not maintain.  Good cache
+   * implementations should at least distinguish between volatile and regular
+   * objects.
+   */
+  struct ObjectInfo {
+    ObjectInfo() : type(kTypeRegular), description() { }
+    ObjectInfo(ObjectType t, const std::string &d) : type(t), description(d) { }
+
+    ObjectType type;
+    /**
+     * Typically the path that triggered storing the object in the cache
+     */
+    std::string description;
+  };
+
+  /**
+   * A content hash together with a (partial) ObjectInfo meta-data.
+   */
+  struct BlessedObject {
+    explicit BlessedObject(const shash::Any &id) : id(id), info() { }
+    BlessedObject(const shash::Any &id, const ObjectInfo info)
+      : id(id)
+      , info(info) { }
+    BlessedObject(const shash::Any &id, ObjectType type)
+      : id(id)
+      , info(type, "") { }
+    BlessedObject(const shash::Any &id, const std::string &description)
+      : id(id)
+      , info(kTypeRegular, description) { }
+    BlessedObject(
+      const shash::Any &id,
+      ObjectType type,
+      const std::string &description)
+      : id(id)
+      , info(type, description) { }
+
+    shash::Any id;
+    ObjectInfo info;
+  };
+  // Convenience constructors, users can call Open(CacheManager::Bless(my_hash))
+  static inline BlessedObject Bless(const shash::Any &id) {
+    return BlessedObject(id);
+  }
+  static inline BlessedObject Bless(
+    const shash::Any &id,
+    const ObjectInfo &info)
+  {
+    return BlessedObject(id, info);
+  }
+  static inline BlessedObject Bless(const shash::Any &id, ObjectType type) {
+    return BlessedObject(id, type);
+  }
+  static inline BlessedObject Bless(
+    const shash::Any &id,
+    const std::string &description)
+  {
+    return BlessedObject(id, description);
+  }
+  static inline BlessedObject Bless(
+    const shash::Any &id,
+    ObjectType type,
+    const std::string &description)
+  {
+    return BlessedObject(id, type, description);
+  }
+
   virtual CacheManagerIds id() = 0;
 
   virtual bool AcquireQuotaManager(QuotaManager *quota_mgr) = 0;
 
   virtual ~CacheManager();
-  virtual int Open(const shash::Any &id) = 0;
+  /**
+   * Opening an object might get it from a third-party source, e.g. when the
+   * tiered cache manager issues a copy-up operation.  In this case it is
+   * beneficial to register the object with the accurate meta-data, in the same
+   * way it is done during transactions.
+   */
+  virtual int Open(const BlessedObject &object) = 0;
   virtual int64_t GetSize(int fd) = 0;
   virtual int Close(int fd) = 0;
   virtual int64_t Pread(int fd, void *buf, uint64_t size, uint64_t offset) = 0;
@@ -92,8 +162,7 @@ class CacheManager : SingleCopy {
 
   virtual uint16_t SizeOfTxn() = 0;
   virtual int StartTxn(const shash::Any &id, uint64_t size, void *txn) = 0;
-  virtual void CtrlTxn(const std::string &description,
-                       const ObjectType type,
+  virtual void CtrlTxn(const ObjectInfo &object_info,
                        const int flags,  // reserved for future use
                        void *txn) = 0;
   virtual int64_t Write(const void *buf, uint64_t sz, void *txn) = 0;
@@ -106,7 +175,8 @@ class CacheManager : SingleCopy {
                  const std::string &description,
                  bool is_catalog);
   int ChecksumFd(int fd, shash::Any *id);
-  bool Open2Mem(const shash::Any &id, unsigned char **buffer, uint64_t *size);
+  bool Open2Mem(const shash::Any &id, const std::string &description,
+                unsigned char **buffer, uint64_t *size);
   bool CommitFromMem(const shash::Any &id,
                      const unsigned char *buffer,
                      const uint64_t size,
@@ -122,7 +192,5 @@ class CacheManager : SingleCopy {
    */
   QuotaManager *quota_mgr_;
 };  // class CacheManager
-
-}  // namespace cache
 
 #endif  // CVMFS_CACHE_H_

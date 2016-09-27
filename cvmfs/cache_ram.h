@@ -12,16 +12,12 @@
 #include <vector>
 
 #include "cache.h"
+#include "fd_table.h"
 #include "hash.h"
 #include "kvstore.h"
 #include "statistics.h"
 #include "util/pointer.h"
 
-namespace cache {
-
-// The null hash (hashed output is all null bytes) serves as a marker for
-// an invalid handle
-static const shash::Any kInvalidHandle;
 
 /**
  * The @p RamCacheManager class provides a cache backend that operates
@@ -120,12 +116,12 @@ class RamCacheManager : public CacheManager {
    * Open a new file descriptor into the cache. Note that opening entries
    * effectively pins them in the cache, so it may be necessary to close
    * unneeded file descriptors to allow eviction to make room in the cache
-   * @param id The hash key
+   * @param object The blessed hash key
    * @returns A nonnegative integer file descriptor
    * @retval -ENOENT The entry is not in the cache
    * @retval -ENFILE No handles are available
    */
-  virtual int Open(const shash::Any &id);
+  virtual int Open(const BlessedObject &object);
 
   /**
    * Look up the size in bytes of the open cache entry
@@ -193,8 +189,7 @@ class RamCacheManager : public CacheManager {
    * @param flags Unused
    * @param txn A pointer to space allocated for storing the transaction details
    */
-  virtual void CtrlTxn(const std::string &description,
-                       const ObjectType type,
+  virtual void CtrlTxn(const ObjectInfo &object_info,
                        const int flags,
                        void *txn);
 
@@ -242,18 +237,28 @@ class RamCacheManager : public CacheManager {
   virtual int CommitTxn(void *txn);
 
  private:
-  struct ReadOnlyFd {
-    ReadOnlyFd()
+  // The null hash (hashed output is all null bytes) serves as a marker for
+  // an invalid handle
+  static const shash::Any kInvalidHandle;
+
+  struct ReadOnlyHandle {
+    ReadOnlyHandle()
       : handle(kInvalidHandle)
       , is_volatile(false)
-      , index(0) {}
-    explicit ReadOnlyFd(const shash::Any &h)
+      { }
+    ReadOnlyHandle(const shash::Any &h, bool v)
       : handle(h)
-      , is_volatile(false)
-      , index(0) {}
+      , is_volatile(v)
+      { }
+    bool operator ==(const ReadOnlyHandle &other) const {
+      return this->handle == other.handle;
+    }
+    bool operator !=(const ReadOnlyHandle &other) const {
+      return this->handle != other.handle;
+    }
+
     shash::Any handle;
     bool is_volatile;
-    size_t index;
   };
 
   struct Transaction {
@@ -267,13 +272,7 @@ class RamCacheManager : public CacheManager {
     std::string description;
   };
 
-  inline bool IsValid(int fd) {
-    if ((fd < 0) || (static_cast<unsigned>(fd) >= open_fds_.size()))
-      return false;
-    return open_fds_[fd].handle != kInvalidHandle;
-  }
-
-  inline MemoryKvStore *GetStore(const ReadOnlyFd &fd) {
+  inline MemoryKvStore *GetStore(const ReadOnlyHandle &fd) {
     if (fd.is_volatile) {
       return &volatile_entries_;
     } else {
@@ -282,30 +281,23 @@ class RamCacheManager : public CacheManager {
   }
 
   inline MemoryKvStore *GetTransactionStore(Transaction *txn) {
-    if (txn->buffer.object_type == cache::CacheManager::kTypeVolatile) {
+    if (txn->buffer.object_type == kTypeVolatile) {
       return &volatile_entries_;
     } else {
       return &regular_entries_;
     }
   }
 
-  int AddFd(const ReadOnlyFd &fd);
+  int AddFd(const ReadOnlyHandle &handle);
   int64_t CommitToKvStore(Transaction *transaction);
   virtual int DoOpen(const shash::Any &id);
 
   uint64_t max_size_;
-  /**
-   * The index of the first available file descriptor in fd_index_.
-   */
-  size_t fd_pivot_;
-  std::vector<ReadOnlyFd> open_fds_;
-  std::vector<size_t> fd_index_;
+  FdTable<ReadOnlyHandle> fd_table_;
   pthread_rwlock_t rwlock_;
   MemoryKvStore regular_entries_;
   MemoryKvStore volatile_entries_;
   Counters counters_;
 };  // class RamCacheManager
-
-}  // namespace cache
 
 #endif  // CVMFS_CACHE_RAM_H_

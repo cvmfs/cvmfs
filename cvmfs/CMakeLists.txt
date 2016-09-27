@@ -36,6 +36,7 @@ set (CVMFS_CLIENT_SOURCES
   cache.cc cache.h
   cache_posix.cc cache_posix.h
   cache_ram.cc cache_ram.h
+  cache_tiered.cc cache_tiered.h
   catalog.cc catalog.h
   catalog_counters.cc catalog_counters.h catalog_counters_impl.h
   catalog_mgr.h catalog_mgr_impl.h
@@ -50,6 +51,7 @@ set (CVMFS_CLIENT_SOURCES
   duplex_curl.h
   duplex_sqlite3.h
   duplex_zlib.h
+  fd_table.h
   fetch.cc fetch.h
   file_chunk.cc file_chunk.h
   fs_traversal.h

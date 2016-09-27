@@ -60,7 +60,7 @@ struct VfsRdOnly {
     , sz_sleep(NULL)
     , n_time(NULL)
   { }
-  cache::CacheManager *cache_mgr;
+  CacheManager *cache_mgr;
   perf::Counter *n_access;
   perf::Counter *no_open;
   perf::Counter *n_rand;
@@ -238,7 +238,7 @@ static int VfsRdOnlyOpen(
   };
 
   VfsRdOnlyFile *p = reinterpret_cast<VfsRdOnlyFile *>(pFile);
-  cache::CacheManager *cache_mgr =
+  CacheManager *cache_mgr =
     reinterpret_cast<VfsRdOnly *>(vfs->pAppData)->cache_mgr;
   // Prevent xClose from being called in case of errors
   p->base.pMethods = NULL;
@@ -438,7 +438,7 @@ static int VfsRdOnlyGetLastError(
  * Can only be registered once.
  */
 bool RegisterVfsRdOnly(
-  cache::CacheManager *cache_mgr,
+  CacheManager *cache_mgr,
   perf::Statistics *statistics,
   const VfsOptions options)
 {
