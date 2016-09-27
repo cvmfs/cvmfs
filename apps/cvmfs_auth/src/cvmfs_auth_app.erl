@@ -16,7 +16,7 @@
 
 start(_StartType, _StartArgs) ->
     {ok, RepoConfigFile} = application:get_env(cvmfs_auth, repo_config),
-    {ok, MnesiaSchema} = application:get_env(cvmfs_auth, mnesia_schema),
+    {ok, MnesiaSchema} = application:get_env(cvmfs_services, mnesia_schema),
     {ok, VarList} = file:consult(RepoConfigFile),
     Vars = maps:from_list(VarList),
 
