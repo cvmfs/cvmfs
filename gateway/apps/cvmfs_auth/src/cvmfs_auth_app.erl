@@ -1,6 +1,8 @@
 %%%-------------------------------------------------------------------
-%% @doc cvmfs_auth public API
-%% @end
+%%% This file is part of the CernVM File System.
+%%%
+%%% @doc cvmfs_auth public API
+%%% @end
 %%%-------------------------------------------------------------------
 
 -module(cvmfs_auth_app).
