@@ -1,5 +1,5 @@
 {application, cvmfs_om,
- [{description, "An OTP application"},
+ [{description, "CVMFS Operations and Monitoring Service"},
   {vsn, "0.1.0"},
   {registered, []},
   {mod, { cvmfs_om_app, []}},
@@ -11,7 +11,5 @@
   {env,[]},
   {modules, [cvmfs_om_app, cvmfs_om_sup]},
 
-  {maintainers, []},
-  {licenses, []},
-  {links, []}
+  {maintainers, []}
  ]}.
