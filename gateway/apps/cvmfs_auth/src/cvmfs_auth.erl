@@ -129,7 +129,7 @@ init({RepoList, ACL, MnesiaSchema}) ->
     priv_populate_acl(ACL),
     lager:info("Access control list initialized."),
 
-    lager:info("CVMFS auth module initialized."),
+    lager:info("Auth module initialized."),
     {ok, []}.
 
 %%--------------------------------------------------------------------
@@ -147,19 +147,33 @@ init({RepoList, ACL, MnesiaSchema}) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_call({auth_req, user_perms, User}, _From, _State) when is_binary(User) ->
-    {reply, priv_get_user_paths(User), _State};
+    Reply = priv_get_user_paths(User),
+    lager:info("Request received: {user_perms, ~p} -> Reply: ~p", [User, Reply]),
+    {reply, Reply, _State};
 handle_call({auth_req, add_user, {User, Repos}}, _From, _State) ->
-    {reply, priv_add_user(User, Repos), _State};
+    Reply = priv_add_user(User, Repos),
+    lager:info("Request received: {add_user, {~p, ~p}} -> Reply: ~p", [User, Repos, Reply]),
+    {reply, Reply, _State};
 handle_call({auth_req, remove_user, User}, _From, _State) ->
-    {reply, priv_remove_user(User), _State};
+    Reply = priv_remove_user(User),
+    lager:info("Request received: {remove_user, ~p} -> Reply: ~p", [User, Reply]),
+    {reply, Reply, _State};
 handle_call({auth_req, get_users}, _From, _State) ->
-    {reply, priv_get_users(), _State};
+    Reply = priv_get_users(),
+    lager:info("Request received: {get_users} -> Reply: ~p", [Reply]),
+    {reply, Reply, _State};
 handle_call({auth_req, add_repo, {Repo, Path}}, _From, _State) ->
-    {reply, priv_add_repo(Repo, Path), _State};
+    Reply = priv_add_repo(Repo, Path),
+    lager:info("Request received: {add_repo, {~p, ~p}} -> Reply: ~p", [Repo, Path, Reply]),
+    {reply, Reply, _State};
 handle_call({auth_req, remove_repo, Repo}, _From, _State) ->
-    {reply, priv_remove_repo(Repo), _State};
+    Reply = priv_remove_repo(Repo),
+    lager:info("Request received: {remove_repo, ~p} -> Reply: ~p", [Repo, Reply]),
+    {reply, Reply, _State};
 handle_call({auth_req, get_repos}, _From, _State) ->
-    {reply, priv_get_repos(), _State}.
+    Reply = priv_get_repos(),
+    lager:info("Request received: {get_repos} -> Reply: ~p", [Reply]),
+    {reply, Reply, _State}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -172,8 +186,10 @@ handle_call({auth_req, get_repos}, _From, _State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast(stop, State) ->
+    lager:info("Request received: stop"),
     {stop, normal, State};
-handle_cast(_Msg, State) ->
+handle_cast(Msg, State) ->
+    lager:info("Cast received: ~p -> noreply", [Msg]),
     {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -186,7 +202,8 @@ handle_cast(_Msg, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_info(_Info, State) ->
+handle_info(Info, State) ->
+    lager:warning("Unknown message received: ~p", [Info]),
     {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -200,8 +217,8 @@ handle_info(_Info, State) ->
 %% @spec terminate(Reason, State) -> void()
 %% @end
 %%--------------------------------------------------------------------
-terminate(_Reason, _State) ->
-    lager:info("CVMFS auth module terminated."),
+terminate(Reason, _State) ->
+    lager:info("CVMFS auth module terminating with reason: ~p", [Reason]),
     ok.
 
 %%--------------------------------------------------------------------
@@ -212,7 +229,8 @@ terminate(_Reason, _State) ->
 %% @spec code_change(OldVsn, State, Extra) -> {ok, NewState}
 %% @end
 %%--------------------------------------------------------------------
-code_change(_OldVsn, State, _Extra) ->
+code_change(OldVsn, State, _Extra) ->
+    lager:info("Code change request received. Old version: ~p", [OldVsn]),
     {ok, State}.
 
 %%%===================================================================
