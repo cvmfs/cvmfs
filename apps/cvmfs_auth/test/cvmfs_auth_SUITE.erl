@@ -72,16 +72,18 @@ end_per_testcase(_TestCase, _Config) ->
 list_repos(_Config) ->
     Repos1 = lists:sort(cvmfs_auth:get_repos()),
     Repos2 = lists:sort(lists:foldl(fun({N, _}, Acc) -> [N | Acc] end, [], ct:get_config(repos))),
-    lists:zipwith(fun(A, B) -> A = B end, Repos1, Repos2).
+    Repos1 = Repos2.
 
 list_users(_Config) ->
     Users1 = lists:sort(cvmfs_auth:get_users()),
     Users2 = lists:sort(lists:foldl(fun({U, _}, Acc) -> [U | Acc] end, [], ct:get_config(acl))),
-    lists:zipwith(fun(A, B) -> A = B end, Users1, Users2).
+    Users1 = Users2.
 
 valid_username_valid_paths(_Config) ->
-    {ok, Results} = cvmfs_auth:get_user_permissions(<<"user1">>),
-    Results = [<<"/path/to/repo/1">>, <<"/path/to/another/repo">>, <<"/path/to/last/repo">>].
+    {ok, P1} = cvmfs_auth:get_user_permissions(<<"user1">>),
+    Paths1 = lists:sort(P1),
+    Paths2 = lists:sort(lists:foldl(fun({_, P}, Acc) -> [P | Acc] end, [], ct:get_config(repos))),
+    Paths1 = Paths2.
 
 valid_username_invalid_paths(_Config) ->
     {ok, []} = cvmfs_auth:get_user_permissions(<<"user2">>).
