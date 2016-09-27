@@ -1,7 +1,7 @@
 {application, cvmfs_lease,
  [{description, "CVMFS Lease Service"},
   {vsn, "0.1.0"},
-  {registered, cvmfs_lease[]},
+  {registered, [cvmfs_lease]},
   {mod, { cvmfs_lease_app, []}},
   {applications,
    [kernel,

@@ -18,7 +18,9 @@
 %%====================================================================
 
 start(_StartType, _StartArgs) ->
-    cvmfs_lease_sup:start_link().
+    {ok, MaxLeaseTime} = application:get_env(cvmfs_lease, max_lease_time),
+    {ok, MnesiaSchema} = application:get_env(cvmfs_services, mnesia_schema),
+    cvmfs_lease_sup:start_link({MaxLeaseTime, MnesiaSchema}).
 
 %%--------------------------------------------------------------------
 stop(_State) ->
