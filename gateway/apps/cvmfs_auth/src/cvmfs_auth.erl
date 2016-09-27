@@ -146,34 +146,34 @@ init({RepoList, ACL, MnesiaSchema}) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call({auth_req, user_perms, User}, _From, _State) when is_binary(User) ->
+handle_call({auth_req, user_perms, User}, _From, State) when is_binary(User) ->
     Reply = priv_get_user_paths(User),
     lager:info("Request received: {user_perms, ~p} -> Reply: ~p", [User, Reply]),
-    {reply, Reply, _State};
-handle_call({auth_req, add_user, {User, Repos}}, _From, _State) ->
+    {reply, Reply, State};
+handle_call({auth_req, add_user, {User, Repos}}, _From, State) ->
     Reply = priv_add_user(User, Repos),
     lager:info("Request received: {add_user, {~p, ~p}} -> Reply: ~p", [User, Repos, Reply]),
-    {reply, Reply, _State};
-handle_call({auth_req, remove_user, User}, _From, _State) ->
+    {reply, Reply, State};
+handle_call({auth_req, remove_user, User}, _From, State) ->
     Reply = priv_remove_user(User),
     lager:info("Request received: {remove_user, ~p} -> Reply: ~p", [User, Reply]),
-    {reply, Reply, _State};
-handle_call({auth_req, get_users}, _From, _State) ->
+    {reply, Reply, State};
+handle_call({auth_req, get_users}, _From, State) ->
     Reply = priv_get_users(),
     lager:info("Request received: {get_users} -> Reply: ~p", [Reply]),
-    {reply, Reply, _State};
-handle_call({auth_req, add_repo, {Repo, Path}}, _From, _State) ->
+    {reply, Reply, State};
+handle_call({auth_req, add_repo, {Repo, Path}}, _From, State) ->
     Reply = priv_add_repo(Repo, Path),
     lager:info("Request received: {add_repo, {~p, ~p}} -> Reply: ~p", [Repo, Path, Reply]),
-    {reply, Reply, _State};
-handle_call({auth_req, remove_repo, Repo}, _From, _State) ->
+    {reply, Reply, State};
+handle_call({auth_req, remove_repo, Repo}, _From, State) ->
     Reply = priv_remove_repo(Repo),
     lager:info("Request received: {remove_repo, ~p} -> Reply: ~p", [Repo, Reply]),
-    {reply, Reply, _State};
-handle_call({auth_req, get_repos}, _From, _State) ->
+    {reply, Reply, State};
+handle_call({auth_req, get_repos}, _From, State) ->
     Reply = priv_get_repos(),
     lager:info("Request received: {get_repos} -> Reply: ~p", [Reply]),
-    {reply, Reply, _State}.
+    {reply, Reply, State}.
 
 %%--------------------------------------------------------------------
 %% @private
