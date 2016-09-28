@@ -8,6 +8,8 @@
 
 -module(cvmfs_lease_app).
 
+-compile([{parse_transform, lager_transform}]).
+
 -behaviour(application).
 
 %% Application callbacks

@@ -24,6 +24,13 @@
 
 %% Records used as table entries
 
+-record(lease, { r_id :: binary()   % repo identifier
+               , s_path :: binary() % repo subpath which is locked
+               , u_id :: binary()   % user identifier
+               , l_id :: binary()   % lease identifier
+               , time :: integer()  % timestamp (time when lease acquired)
+               }).
+
 %%%===================================================================
 %%% API
 %%%===================================================================
@@ -39,7 +46,7 @@ start_link(Args) ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, Args, []).
 
 stop() ->
-    gen_server:cast({local, ?SERVER}, stop).
+    gen_server:cast(?MODULE, stop).
 
 
 %%%===================================================================
@@ -57,8 +64,13 @@ stop() ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init({_MaxLeaseTime, _MnesiaSchema}) ->
-    {ok, []}.
+init({MaxLeaseTime, MnesiaSchema}) ->
+    mnesia:create_table(lease, [{MnesiaSchema, [node() | nodes()]}
+                               ,{type, set}
+                               ,{attributes, record_info(fields, lease)}]),
+    ok = mnesia:wait_for_tables([lease], 10000),
+    lager:info("Lease table initialized"),
+    {ok, [MaxLeaseTime]}.
 
 %%--------------------------------------------------------------------
 %% @private
