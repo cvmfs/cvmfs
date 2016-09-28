@@ -7,6 +7,11 @@
 %%%
 %%%-------------------------------------------------------------------
 
+%% TODO:
+%% - how should lease times be stored in the table?
+%% - this process needs to flush the lease table on exit.
+%%   - make it trap exits and flush the table before mnesia exits
+
 -module(cvmfs_lease).
 
 -compile([{parse_transform, lager_transform}]).
@@ -15,7 +20,7 @@
 
 %% API
 -export([start_link/1, stop/0,
-         request_lease/3, end_lease/2]).
+         request_lease/3, end_lease/2, get_leases/0]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -81,6 +86,18 @@ request_lease(User, Repo, Path) when is_binary(User),
 end_lease(Repo, Path) when is_binary(Repo), is_binary(Path) ->
     gen_server:call(?MODULE, {lease_req, end_lease, {Repo, Path}}).
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Returns list of all active leases
+%%
+%% @spec get_leases() -> Leases
+%% @end
+%%--------------------------------------------------------------------
+-spec get_leases() -> [#lease{}].
+get_leases() ->
+    gen_server:call(?MODULE, {lease_req, get_leases}).
+
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -127,6 +144,11 @@ handle_call({lease_req, end_lease, {Repo, Path}}, _From, State) ->
     Reply = priv_end_lease(Repo, Path),
     lager:info("Request received: {end_lease, ~p} -> Reply: ~p"
               ,[{Repo, Path}, Reply]),
+    {reply, Reply, State};
+handle_call({lease_req, get_leases}, _From, State) ->
+    Reply = priv_get_leases(),
+    lager:info("Request received: {get_leases} -> Reply: ~p"
+              ,[Reply]),
     {reply, Reply, State};
 handle_call(_Request, _From, State) ->
     Reply = ok,
@@ -206,9 +228,24 @@ priv_new_lease(User, Repo, Path, State) ->
                         {busy, MaxLeaseTime - (erlang:monotonic_time(seconds) - Time)}
                 end
         end,
-    Result = mnesia:transaction(T),
-    lager:info("Result: ~p", [Result]),
-    {ok, Result}.
+    {atomic, Result} = mnesia:transaction(T),
+    Result.
 
-priv_end_lease(_Repo, _Path) ->
-    ok.
+priv_end_lease(Repo, Path) ->
+    T = fun() ->
+                case mnesia:read(lease, {Repo, Path}) of
+                    [] ->
+                        {error, lease_not_found};
+                    _ ->
+                        mnesia:delete({lease, {Repo, Path}})
+                end
+        end,
+    {atomic, Result} = mnesia:transaction(T),
+    Result.
+
+priv_get_leases() ->
+    T = fun() ->
+                mnesia:foldl(fun(Lease, Acc) -> [Lease | Acc] end, [], lease)
+        end,
+    {atomic, Result} = mnesia:transaction(T),
+    Result.
