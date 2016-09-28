@@ -14,7 +14,8 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/1, stop/0]).
+-export([start_link/1, stop/0,
+         request_lease/3, end_lease/2]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -24,12 +25,12 @@
 
 %% Records used as table entries
 
--record(lease, { r_id :: binary()   % repo identifier
-               , s_path :: binary() % repo subpath which is locked
-               , u_id :: binary()   % user identifier
-               , l_id :: binary()   % lease identifier
-               , time :: integer()  % timestamp (time when lease acquired)
+-record(lease, { s_path :: {binary(), binary()} % repo + subpath which is locked
+               , u_id   :: binary()  % user identifier
+               , time   :: integer()  % timestamp (time when lease acquired)
                }).
+
+-record(state, { max_lease_time :: integer() }).
 
 %%%===================================================================
 %%% API
@@ -45,9 +46,40 @@
 start_link(Args) ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, Args, []).
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Stops the server (only useful without a supervision tree)
+%%
+%% @spec stop() -> ok
+%% @end
+%%--------------------------------------------------------------------
 stop() ->
     gen_server:cast(?MODULE, stop).
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Requests a new lease
+%%
+%% @spec request_lease(User, Repo, Path)) -> {ok, LeaseId}
+%%                                         | {busy, TimeRemaining}
+%% @end
+%%--------------------------------------------------------------------
+-spec request_lease(binary(), binary(), binary()) -> {ok, binary()}
+                                                   | {busy, integer()}.
+request_lease(User, Repo, Path) when is_binary(User),
+                                     is_binary(Repo),
+                                     is_binary(Path) ->
+    gen_server:call(?MODULE, {lease_req, new_lease, {User, Repo, Path}}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Gives up an existing lease
+%%
+%% @spec end_lease(Path, Repo) -> ok | {error, lease_not_found}
+%% @end
+%%--------------------------------------------------------------------
+end_lease(Repo, Path) when is_binary(Repo), is_binary(Path) ->
+    gen_server:call(?MODULE, {lease_req, end_lease, {Repo, Path}}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -70,7 +102,7 @@ init({MaxLeaseTime, MnesiaSchema}) ->
                                ,{attributes, record_info(fields, lease)}]),
     ok = mnesia:wait_for_tables([lease], 10000),
     lager:info("Lease table initialized"),
-    {ok, [MaxLeaseTime]}.
+    {ok, #state{max_lease_time = MaxLeaseTime}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -86,6 +118,16 @@ init({MaxLeaseTime, MnesiaSchema}) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_call({lease_req, new_lease, {User, Repo, Path}}, _From, State) ->
+    Reply = priv_new_lease(User, Repo, Path, State),
+    lager:info("Request received: {new_lease, ~p} -> Reply: ~p"
+              ,[{User, Repo, Path}, Reply]),
+    {reply, Reply, State};
+handle_call({lease_req, end_lease, {Repo, Path}}, _From, State) ->
+    Reply = priv_end_lease(Repo, Path),
+    lager:info("Request received: {end_lease, ~p} -> Reply: ~p"
+              ,[{Repo, Path}, Reply]),
+    {reply, Reply, State};
 handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
@@ -151,3 +193,22 @@ code_change(OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+priv_new_lease(User, Repo, Path, State) ->
+    #state{max_lease_time = MaxLeaseTime} = State,
+    T = fun() ->
+                case mnesia:read(lease, {Repo, Path}) of
+                    [] ->
+                        mnesia:write(#lease{s_path = {Repo, Path},
+                                            u_id = User,
+                                            time = erlang:monotonic_time(seconds)});
+                    [#lease{time = Time} | _] ->
+                        {busy, MaxLeaseTime - (erlang:monotonic_time(seconds) - Time)}
+                end
+        end,
+    Result = mnesia:transaction(T),
+    lager:info("Result: ~p", [Result]),
+    {ok, Result}.
+
+priv_end_lease(_Repo, _Path) ->
+    ok.
