@@ -27,9 +27,9 @@
 
 %% Records used as table entries
 
-%% r_id - repo identifier
-%% path - the path of the repository
--record(repo, {r_id :: binary(), path :: binary()}).
+-record(repo, { r_id :: binary() % repo identifier
+              , path :: binary() % the path of the repository
+              }).
 
 %% u_id - user identifier
 %% r_ids - identifiers of repos to which user can make changes
@@ -50,7 +50,7 @@ start_link(Args) ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, Args, []).
 
 stop() ->
-    gen_server:cast({local, ?SERVER}, stop).
+    gen_server:cast(?MODULE, stop).
 
 
 -spec get_user_permissions(binary()) -> user_not_found | {ok, [binary()]}.
@@ -120,7 +120,6 @@ get_repos() ->
 %% @end
 %%--------------------------------------------------------------------
 init({RepoList, ACL, MnesiaSchema}) ->
-    %% Note: Don't create tables anymore, once Mnesia persistence is configured
     mnesia:create_table(repo, [{MnesiaSchema, [node() | nodes()]}
                               ,{type, set}
                               ,{attributes, record_info(fields, repo)}]),
