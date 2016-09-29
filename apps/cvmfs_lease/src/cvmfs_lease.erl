@@ -14,8 +14,9 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/1, stop/0,
-         request_lease/3, end_lease/2, get_leases/0]).
+-export([start_link/1, stop/0
+        ,request_lease/3, end_lease/2
+        ,get_leases/0, clear_leases/0]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -92,6 +93,17 @@ end_lease(Repo, Path) when is_binary(Repo), is_binary(Path) ->
 get_leases() ->
     gen_server:call(?MODULE, {lease_req, get_leases}).
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Clears all existing leases from the table.
+%%
+%% @spec clear_leases() -> ok.
+%% @end
+%%--------------------------------------------------------------------
+-spec clear_leases() -> ok.
+clear_leases() ->
+    gen_server:call(?MODULE, {lease_req, clear_leases}).
+
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -143,6 +155,11 @@ handle_call({lease_req, end_lease, {Repo, Path}}, _From, State) ->
 handle_call({lease_req, get_leases}, _From, State) ->
     Reply = priv_get_leases(),
     lager:info("Request received: {get_leases} -> Reply: ~p"
+              ,[Reply]),
+    {reply, Reply, State};
+handle_call({lease_req, clear_leases}, _From, State) ->
+    Reply = priv_clear_leases(),
+    lager:info("Request received: {clear_leases} -> Reply: ~p"
               ,[Reply]),
     {reply, Reply, State};
 handle_call(_Request, _From, State) ->
@@ -245,3 +262,6 @@ priv_get_leases() ->
         end,
     {atomic, Result} = mnesia:transaction(T),
     Result.
+
+priv_clear_leases() ->
+    mnesia:clear_table(lease).
