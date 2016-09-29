@@ -55,7 +55,9 @@ int64_t ExternalCacheManager::GetSize(int fd) {
 }
 
 
-ExternalCacheManager::ExternalCacheManager() {
+ExternalCacheManager::ExternalCacheManager()
+  : fd_socket_(-1)
+{
 }
 
 

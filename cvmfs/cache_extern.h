@@ -36,6 +36,7 @@ class ExternalCacheManager : public CacheManager {
   virtual int CommitTxn(void *txn);
 
  private:
+  int fd_socket_;
 };  // class ExternalCacheManager
 
 }  // namespace cache

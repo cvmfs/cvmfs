@@ -26,6 +26,7 @@ set(CVMFS_UNITTEST_FILES
   t_blocking_counter.cc
   t_buffer.cc
   t_cache.cc
+  t_cache_extern.cc
   t_cache_ram.cc
   t_cache_tiered.cc
   t_callbacks.cc
@@ -114,6 +115,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/backoff.cc ${CVMFS_SOURCE_DIR}/backoff.h
   ${CVMFS_SOURCE_DIR}/bigvector.h
   ${CVMFS_SOURCE_DIR}/cache.cc ${CVMFS_SOURCE_DIR}/cache.h
+  ${CVMFS_SOURCE_DIR}/cache_extern.cc ${CVMFS_SOURCE_DIR}/cache_extern.h
   ${CVMFS_SOURCE_DIR}/cache_posix.cc ${CVMFS_SOURCE_DIR}/cache_posix.h
   ${CVMFS_SOURCE_DIR}/cache_ram.cc ${CVMFS_SOURCE_DIR}/cache_ram.h
   ${CVMFS_SOURCE_DIR}/cache_tiered.cc ${CVMFS_SOURCE_DIR}/cache_tiered.h
@@ -211,9 +213,22 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/whitelist.cc
   ${CVMFS_SOURCE_DIR}/wpad.cc ${CVMFS_SOURCE_DIR}/wpad.h
   ${CVMFS_SOURCE_DIR}/xattr.cc ${CVMFS_SOURCE_DIR}/xattr.h
+  cache.pb.cc
+  cache.pb.h
 )
 
 set (CVMFS_UNITTEST_DEBUG_SOURCES ${CVMFS_UNITTEST_SOURCES})
+
+set_source_files_properties(cache.pb.cc cache.pb.h
+                            PROPERTIES GENERATED true)
+
+add_custom_command(OUTPUT cache.pb.cc cache.pb.h
+                   COMMAND ${PROTOBUF_C} --cpp_out=.
+                           ${CVMFS_SOURCE_DIR}/cache.proto
+                           -I${CVMFS_SOURCE_DIR}
+                   DEPENDS ${PROTOBUF_ARCHIVE}
+                           ${CVMFS_SOURCE_DIR}/cache.proto
+                   COMMENT "Generating protobuf sources")
 
 #
 # Compiler and Linker Flags for unit tests
@@ -226,6 +241,7 @@ set (CVMFS_UNITTESTS_DEBUG_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
 #
 # build CernVM-FS test cases
 #
+set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${CMAKE_CURRENT_BINARY_DIR})
 include_directories (${INCLUDE_DIRECTORIES})
 
 if (BUILD_UNITTESTS)
