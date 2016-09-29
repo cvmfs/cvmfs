@@ -29,7 +29,7 @@ bool CacheTransport::RecvHeader(uint32_t *size) {
   ssize_t nbytes = SafeRead(fd_connection_, header, sizeof(header));
   if (nbytes != sizeof(header))
     return false;
-  if (header[0] != kProtocolVersion)
+  if (header[0] != kWireProtocolVersion)
     return false;
   *size = header[1] + (header[2] << 8) + (header[3] << 16);
   return (*size > 0) && (*size <= kMaxMsgSize);
@@ -71,7 +71,7 @@ void CacheTransport::SendData(void *data, uint32_t size) {
            "sending message of size %u to external cache plugin", size);
 
   unsigned char header[4];
-  header[0] = kProtocolVersion;
+  header[0] = kWireProtocolVersion;
   header[1] = (size & 0x000000FF);
   header[2] = (size & 0x0000FF00) >> 8;
   header[3] = (size & 0x00FF0000) >> 16;

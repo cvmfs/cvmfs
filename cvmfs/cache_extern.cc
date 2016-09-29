@@ -45,8 +45,10 @@ ExternalCacheManager *ExternalCacheManager::Create(int fd_connection) {
 
   cvmfs::MsgClientCall msg_client_call;
   cvmfs::MsgHandshake msg_handshake;
+  msg_handshake.set_protocol_version(kPbProtocolVersion);
   msg_client_call.set_allocated_msg_handshake(&msg_handshake);
   cache_mgr->transport_.SendMsg(&msg_client_call);
+  msg_client_call.release_msg_handshake();
 
   cvmfs::MsgServerCall msg_ack;
   bool retval = cache_mgr->transport_.RecvMsg(&msg_ack);
@@ -89,6 +91,7 @@ ExternalCacheManager::~ExternalCacheManager() {
     cvmfs::MsgClientCall msg_client_call;
     msg_client_call.set_allocated_msg_quit(&msg_quit);
     transport_.SendMsg(&msg_client_call);
+    msg_client_call.release_msg_quit();
   }
   close(transport_.fd_connection());
 }

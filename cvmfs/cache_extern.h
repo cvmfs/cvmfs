@@ -9,6 +9,8 @@
 
 class ExternalCacheManager : public CacheManager {
  public:
+  static const unsigned kPbProtocolVersion = 1;
+
   static ExternalCacheManager *Create(int fd_connection);
   virtual ~ExternalCacheManager();
 

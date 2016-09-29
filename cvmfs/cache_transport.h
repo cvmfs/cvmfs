@@ -22,7 +22,7 @@ class CacheTransport {
    * Version of the wire protocol.  The effective protocol version is negotiated
    * through the handshake.
    */
-  static const unsigned char kProtocolVersion = 1;
+  static const unsigned char kWireProtocolVersion = 1;
   static const uint32_t kMaxMsgSize = (2 << 24) - 1;  // 24MB (3 bytes)
 
   explicit CacheTransport(int fd_connection);

@@ -57,10 +57,12 @@ class TestCachePlugin {
         cvmfs::MsgHandshakeAck msg_ack;
         msg_ack.set_status(cvmfs::STATUS_OK);
         msg_ack.set_name("unit test cache manager");
+        msg_ack.set_protocol_version(ExternalCacheManager::kPbProtocolVersion);
         msg_ack.set_session_id(42);
         msg_ack.set_max_object_size(1024 * 1024);  // 1MB
         msg_server_call.set_allocated_msg_handshake_ack(&msg_ack);
         transport.SendMsg(&msg_server_call);
+        msg_server_call.release_msg_handshake_ack();
       } else if (msg_client_call.has_msg_quit()) {
         break;
       } else {
@@ -111,6 +113,7 @@ class T_ExternalCacheManager : public ::testing::Test {
   }
 
   virtual void TearDown() {
+    delete cache_mgr_;
     unlink(socket_path_.c_str());
     delete test_plugin_;
   }
