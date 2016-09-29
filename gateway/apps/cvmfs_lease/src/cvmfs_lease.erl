@@ -31,7 +31,7 @@
                , time   :: integer()  % timestamp (time when lease acquired)
                }).
 
--record(state, { max_lease_time :: integer() }).
+-record(state, { max_lease_time :: integer() }). % max lease time in milliseconds
 
 %%%===================================================================
 %%% API
@@ -231,14 +231,14 @@ code_change(OldVsn, State, _Extra) ->
 priv_new_lease(User, Repo, Path, State) ->
     #state{max_lease_time = MaxLeaseTime} = State,
     T = fun() ->
-                CurrentTime = erlang:system_time(seconds),
+                CurrentTime = erlang:system_time(milli_seconds),
                 case mnesia:read(lease, {Repo, Path}) of
                     [#lease{time = Time} | _] when (MaxLeaseTime - (CurrentTime - Time)) > 0 ->
                         {busy, MaxLeaseTime - (CurrentTime - Time)};
                     _ ->
                         mnesia:write(#lease{s_path = {Repo, Path},
                                             u_id = User,
-                                            time = erlang:system_time(seconds)})
+                                            time = erlang:system_time(milli_seconds)})
                 end
         end,
     {atomic, Result} = mnesia:transaction(T),
@@ -264,4 +264,5 @@ priv_get_leases() ->
     Result.
 
 priv_clear_leases() ->
-    mnesia:clear_table(lease).
+    {atomic, Result} = mnesia:clear_table(lease),
+    Result.
