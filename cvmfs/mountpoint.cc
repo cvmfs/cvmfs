@@ -45,6 +45,7 @@
 #include "file_chunk.h"
 #include "globals.h"
 #include "glue_buffer.h"
+#include "google/protobuf/stubs/common.h"
 #include "history.h"
 #include "history_sqlite.h"
 #include "logging.h"
@@ -492,6 +493,7 @@ FileSystem::~FileSystem() {
   SetLogSyslogPrefix("");
   SetLogMicroSyslog("");
   SetLogDebugFile("");
+  google::protobuf::ShutdownProtobufLibrary();
   g_alive = false;
 }
 

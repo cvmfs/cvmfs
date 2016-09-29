@@ -86,7 +86,7 @@ message MsgListRecord {
 // versions.
 
 message MsgHandshake {
-  required uint32 protocol_version = 1;
+  required uint32 protocol_version = 1 [default = 1];
   // The client might identify itself with a descriptive name
   optional string name             = 2;
   // Flags are specific to the cache manager plugin and can request a certain
@@ -98,7 +98,7 @@ message MsgHandshakeAck {
   required EnumStatus status       = 1;
   // The cache manager plugin identifies itself with a descriptive name
   required string name             = 2;
-  required uint32 protocol_version = 3;
+  required uint32 protocol_version = 3 [default = 1];
   // Every connection gets an id that is unique for the life time of the cache
   // manager
   required uint64 session_id       = 4;
@@ -301,7 +301,7 @@ message MsgClientCall {
 
 message MsgServerCall {
   oneof message_type {
-    MsgHandshakeAck msg_handshake      = 1;
+    MsgHandshakeAck msg_handshake_ack  = 1;
     MsgStoreReply msg_store            = 2;
     MsgRefcountReply msg_refcount      = 3;
     MsgReadReply msg_read              = 4;

@@ -4,13 +4,16 @@
 #include "cvmfs_config.h"
 #include "cache_extern.h"
 
+#include <unistd.h>
+
 #include <cassert>
 
+#include "cache.pb.h"
 #include "logging.h"
+#include "util/pointer.h"
+#include "util/posix.h"
 
 using namespace std;  // NOLINT
-
-namespace cache {
 
 int ExternalCacheManager::AbortTxn(void *txn) {
   return -1;
@@ -35,13 +38,30 @@ int ExternalCacheManager::CommitTxn(void *txn) {
 }
 
 
-int ExternalCacheManager::ControlTxn(
-  const string &description,
-  const ObjectType type,
+ExternalCacheManager *ExternalCacheManager::Create(int fd_connection) {
+  UniquePtr<ExternalCacheManager> cache_mgr(
+    new ExternalCacheManager(fd_connection));
+  assert(cache_mgr.IsValid());
+
+  cvmfs::MsgClientCall msg_client_call;
+  cvmfs::MsgHandshake msg_handshake;
+  msg_client_call.set_allocated_msg_handshake(&msg_handshake);
+  cache_mgr->transport_.SendMsg(&msg_client_call);
+
+  cvmfs::MsgServerCall msg_ack;
+  bool retval = cache_mgr->transport_.RecvMsg(&msg_ack);
+  if (!retval || !msg_ack.has_msg_handshake_ack())
+    return NULL;
+  cache_mgr->session_id_ = msg_ack.msg_handshake_ack().session_id();
+  return cache_mgr.Release();
+}
+
+
+void ExternalCacheManager::CtrlTxn(
+  const ObjectInfo &object_info,
   const int flags,
   void *txn)
 {
-  return -1;
 }
 
 
@@ -55,17 +75,26 @@ int64_t ExternalCacheManager::GetSize(int fd) {
 }
 
 
-ExternalCacheManager::ExternalCacheManager()
-  : fd_socket_(-1)
+ExternalCacheManager::ExternalCacheManager(int fd_connection)
+  : transport_(fd_connection)
+  , session_id_(-1)
 {
 }
 
 
 ExternalCacheManager::~ExternalCacheManager() {
+  if (session_id_ >= 0) {
+    cvmfs::MsgQuit msg_quit;
+    msg_quit.set_session_id(session_id_);
+    cvmfs::MsgClientCall msg_client_call;
+    msg_client_call.set_allocated_msg_quit(&msg_quit);
+    transport_.SendMsg(&msg_client_call);
+  }
+  close(transport_.fd_connection());
 }
 
 
-int ExternalCacheManager::Open(const shash::Any &id) {
+int ExternalCacheManager::Open(const BlessedObject &object) {
   return -1;
 }
 
@@ -112,5 +141,3 @@ int ExternalCacheManager::StartTxn(
 int64_t ExternalCacheManager::Write(const void *buf, uint64_t sz, void *txn) {
   return -1;
 }
-
-}  // namespace cache

@@ -39,6 +39,7 @@ set (CVMFS_CLIENT_SOURCES
   cache_posix.cc cache_posix.h
   cache_ram.cc cache_ram.h
   cache_tiered.cc cache_tiered.h
+  cache_transport.cc cache_transport.h
   catalog.cc catalog.h
   catalog_counters.cc catalog_counters.h catalog_counters_impl.h
   catalog_mgr.h catalog_mgr_impl.h
@@ -358,7 +359,7 @@ set (LIBCVMFS_CFLAGS "${LIBCVMFS_CFLAGS} -D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -
 # set some include and linking stuff
 #
 set (CVMFS2_LD_FLAGS "${CVMFS2_LD_FLAGS} -ldl -lm")
-include_directories (cvmfs ${INCLUDE_DIRECTORIES})
+include_directories (cvmfs ${CMAKE_CURRENT_BINARY_DIR} ${INCLUDE_DIRECTORIES})
 
 #
 # do the job!
