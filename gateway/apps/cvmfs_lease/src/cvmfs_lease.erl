@@ -7,11 +7,6 @@
 %%%
 %%%-------------------------------------------------------------------
 
-%% TODO:
-%% - how should lease times be stored in the table?
-%% - this process needs to flush the lease table on exit.
-%%   - make it trap exits and flush the table before mnesia exits
-
 -module(cvmfs_lease).
 
 -compile([{parse_transform, lager_transform}]).
@@ -219,13 +214,14 @@ code_change(OldVsn, State, _Extra) ->
 priv_new_lease(User, Repo, Path, State) ->
     #state{max_lease_time = MaxLeaseTime} = State,
     T = fun() ->
+                CurrentTime = erlang:system_time(seconds),
                 case mnesia:read(lease, {Repo, Path}) of
-                    [] ->
+                    [#lease{time = Time} | _] when (MaxLeaseTime - (CurrentTime - Time)) > 0 ->
+                        {busy, MaxLeaseTime - (CurrentTime - Time)};
+                    _ ->
                         mnesia:write(#lease{s_path = {Repo, Path},
                                             u_id = User,
-                                            time = erlang:monotonic_time(seconds)});
-                    [#lease{time = Time} | _] ->
-                        {busy, MaxLeaseTime - (erlang:monotonic_time(seconds) - Time)}
+                                            time = erlang:system_time(seconds)})
                 end
         end,
     {atomic, Result} = mnesia:transaction(T),
