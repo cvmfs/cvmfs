@@ -23,7 +23,13 @@
 %%--------------------------------------------------------------------
 
 are_overlapping(Path1, Path2) when is_binary(Path1), is_binary(Path2),
-                                   size(Path1) > 0, size(Path2) > 0 ->
-    CommonPrefixLength = binary:longest_common_prefix([Path1, Path2]),
-    (CommonPrefixLength =:= size(Path1)) orelse (CommonPrefixLength =:= size(Path2)).
+                                    size(Path1) > 0, size(Path2) > 0 ->
+    SplitPath1 = filename:split(drop_leading_slash(Path1)),
+    SplitPath2 = filename:split(drop_leading_slash(Path2)),
 
+    lists:prefix(SplitPath1, SplitPath2) or lists:prefix(SplitPath2, SplitPath1).
+
+drop_leading_slash(<<"/",Rest/binary>>) ->
+    Rest;
+drop_leading_slash(Path) ->
+    Path.
