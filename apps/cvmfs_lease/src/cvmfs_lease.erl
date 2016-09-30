@@ -11,6 +11,8 @@
 
 -compile([{parse_transform, lager_transform}]).
 
+-include_lib("stdlib/include/ms_transform.hrl").
+
 -behaviour(gen_server).
 
 %% API
@@ -230,15 +232,39 @@ code_change(OldVsn, State, _Extra) ->
 
 priv_new_lease(User, Repo, Path, State) ->
     #state{max_lease_time = MaxLeaseTime} = State,
+
+    %% Match statement that selects all rows with a given repo,
+    %% returning a list of {Path, Time} pairs
+    MS = ets:fun2ms(fun(#lease{u_id = U, time = T, s_path = {R, P}}) when R =:= Repo ->
+                            {P, T}
+                    end),
+
     T = fun() ->
                 CurrentTime = erlang:system_time(milli_seconds),
-                case mnesia:read(lease, {Repo, Path}) of
-                    [#lease{time = Time} | _] when (MaxLeaseTime - (CurrentTime - Time)) > 0 ->
-                        {busy, MaxLeaseTime - (CurrentTime - Time)};
+
+                %% We select the rows related to a given repository
+                Results = mnesia:select(lease, MS),
+
+                %% We filter out entries which don't overlap with {Repo, Path}
+                case lists:filter(fun({P, _}) ->
+                                          cvmfs_lease_path_util:are_overlapping(P, Path)
+                                  end,
+                                  Results) of
+                    %% An everlapping path was found
+                    [{P, Time} | _] ->
+                        RemainingTime = MaxLeaseTime - (CurrentTime - Time),
+                        case RemainingTime > 0 of
+                            %% The old lease is still valid, return busy message
+                            true ->
+                                {busy, RemainingTime};
+                            %% The old lease is expired. Delete it and insert the new one
+                            false ->
+                                mnesia:delete({lease, {Repo, P}}),
+                                priv_write_row(User, Repo, Path)
+                        end;
+                    %% No overlapping paths were found; just insert the new entry
                     _ ->
-                        mnesia:write(#lease{s_path = {Repo, Path},
-                                            u_id = User,
-                                            time = erlang:system_time(milli_seconds)})
+                        priv_write_row(User, Repo, Path)
                 end
         end,
     {atomic, Result} = mnesia:transaction(T),
@@ -266,3 +292,8 @@ priv_get_leases() ->
 priv_clear_leases() ->
     {atomic, Result} = mnesia:clear_table(lease),
     Result.
+
+priv_write_row(User, Repo, Path) ->
+    mnesia:write(#lease{s_path = {Repo, Path},
+                        u_id = User,
+                        time = erlang:system_time(milli_seconds)}).
