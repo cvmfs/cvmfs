@@ -8,6 +8,7 @@
 #include <pthread.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/uio.h>
 #include <unistd.h>
 
 #include <cassert>
@@ -112,6 +113,7 @@ void SafeSleepMs(const unsigned ms);
 // SafeRead can (as we may have hit the EOF).
 ssize_t SafeRead(int fd, void *buf, size_t nbyte);
 bool SafeWrite(int fd, const void *buf, size_t nbyte);
+bool SafeWriteV(int fd, struct iovec *iov, unsigned iovcnt);
 
 // Read the contents of a file descriptor to a string.
 bool SafeReadToString(int fd, std::string *final_result);
