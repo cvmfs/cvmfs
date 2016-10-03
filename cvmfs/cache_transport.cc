@@ -76,10 +76,12 @@ void CacheTransport::SendData(void *data, uint32_t size) {
   header[2] = (size & 0x0000FF00) >> 8;
   header[3] = (size & 0x00FF0000) >> 16;
 
-  // TODO(jblomer): writev()
-  bool retval = SafeWrite(fd_connection_, header, sizeof(header));
-  if (retval)
-    retval = SafeWrite(fd_connection_, data, size);
+  struct iovec iov[3];
+  iov[0].iov_base = header;
+  iov[0].iov_len = sizeof(header);
+  iov[1].iov_base = data;
+  iov[1].iov_len = size;
+  bool retval = SafeWriteV(fd_connection_, iov, 2);
 
   if (!retval) {
     LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
