@@ -44,12 +44,14 @@ enum EnumStatus {
   STATUS_OUTOFBOUNDS = 9;
 }
 
+
 enum EnumHashAlgorithm {
   HASH_UNKNOWN   = 0;
   HASH_SHA1      = 1;
   HASH_RIPEMD160 = 2;
   HASH_SHAKE128  = 3;
 }
+
 
 enum EnumObjectType {
   OBJECT_REGULAR  = 0;
@@ -158,9 +160,9 @@ message MsgStorePartReq {
 
 // Discard a partially uploaded object
 message MsgAbortMultipartReq {
-  required uint64 session_id          = 1;
-  required uint64 req_id              = 2;
-  required MsgHash object_id          = 3;
+  required uint64 session_id = 1;
+  required uint64 req_id     = 2;
+  required MsgHash object_id = 3;
 }
 
 message MsgStoreReply {
@@ -175,18 +177,11 @@ message MsgStoreReply {
 
 
 // Reference counting of objects in the store
-message MsgIncRefReq {
-  required uint64 session_id  = 1;
-  required uint64 req_id      = 2;
-  required MsgHash object_id  = 3;
-  optional uint32 inc_by      = 4 [default = 1];
-}
-
-message MsgUnrefReq {
-  required uint64 session_id  = 1;
-  required uint64 req_id      = 2;
-  required MsgHash object_id  = 3;
-  optional uint32 dec_by      = 4 [default = 1];
+message MsgRefcountReq {
+  required uint64 session_id = 1;
+  required uint64 req_id     = 2;
+  required MsgHash object_id = 3;
+  required sint32 change_by  = 4;
 }
 
 message MsgRefcountReply {
@@ -217,11 +212,11 @@ message MsgShrinkReply {
 // Read a portion from a stored object.  Garuanteed to work for objects with a
 // reference counter larger than zero.
 message MsgReadReq {
-  required uint64 session_id  = 1;
-  required uint64 req_id      = 2;
-  required MsgHash object_id  = 3;
-  required uint64 offset      = 4;
-  required uint32 size        = 5;
+  required uint64 session_id = 1;
+  required uint64 req_id     = 2;
+  required MsgHash object_id = 3;
+  required uint64 offset     = 4;
+  required uint32 size       = 5;
 }
 
 message MsgReadReply {
@@ -289,26 +284,25 @@ message MsgClientCall {
     MsgStoreReq msg_store_req                    = 3;
     MsgStorePartReq msg_store_part_req           = 4;
     MsgAbortMultipartReq msg_abort_multipart_req = 5;
-    MsgIncRefReq msg_inc_ref_req                 = 6;
-    MsgUnrefReq msg_unref_req                    = 7;
-    MsgShrinkReq msg_shrink_req                  = 8;
-    MsgReadReq msg_read_req                      = 9;
-    MsgInfoReq msg_info_req                      = 10;
-    MsgObjectInfoReq msg_object_info_req         = 11;
-    MsgListReq msg_list_req                      = 12;
+    MsgRefcountReq msg_refcount_req              = 6;
+    MsgShrinkReq msg_shrink_req                  = 7;
+    MsgReadReq msg_read_req                      = 8;
+    MsgInfoReq msg_info_req                      = 9;
+    MsgObjectInfoReq msg_object_info_req         = 10;
+    MsgListReq msg_list_req                      = 11;
   }
 }
 
 message MsgServerCall {
   oneof message_type {
-    MsgHandshakeAck msg_handshake_ack  = 1;
-    MsgStoreReply msg_store            = 2;
-    MsgRefcountReply msg_refcount      = 3;
-    MsgReadReply msg_read              = 4;
-    MsgDetachCatalogs msg_detach       = 5;
-    MsgShrinkReply msg_shrink          = 6;
-    MsgInfoReply msg_info              = 7;
-    MsgObjectInfoReply msg_object_info = 8;
-    MsgListReply msg_list_reply        = 9;
+    MsgHandshakeAck msg_handshake_ack        = 1;
+    MsgStoreReply msg_store_reply            = 2;
+    MsgRefcountReply msg_refcount_reply      = 3;
+    MsgReadReply msg_read_reply              = 4;
+    MsgDetachCatalogs msg_detach             = 5;
+    MsgShrinkReply msg_shrink_reply          = 6;
+    MsgInfoReply msg_info_reply              = 7;
+    MsgObjectInfoReply msg_object_info_reply = 8;
+    MsgListReply msg_list_reply              = 9;
   }
 }

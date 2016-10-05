@@ -10,7 +10,8 @@
 #include <cassert>
 #include <cstdlib>
 
-#include "google/protobuf/message_lite.h"
+#include "cache.pb.h"
+#include "hash.h"
 #include "logging.h"
 #include "smalloc.h"
 #include "util/posix.h"
@@ -21,6 +22,52 @@ CacheTransport::CacheTransport(int fd_connection)
   : fd_connection_(fd_connection)
 {
   assert(fd_connection_ >= 0);
+}
+
+
+void CacheTransport::FillMsgHash(
+  const shash::Any &hash,
+  cvmfs::MsgHash *msg_hash)
+{
+  switch (hash.algorithm) {
+    case shash::kSha1:
+      msg_hash->set_algorithm(cvmfs::HASH_SHA1);
+      break;
+    case shash::kRmd160:
+      msg_hash->set_algorithm(cvmfs::HASH_RIPEMD160);
+      break;
+    case shash::kShake128:
+      msg_hash->set_algorithm(cvmfs::HASH_SHAKE128);
+      break;
+    default:
+      abort();
+  }
+  msg_hash->set_digest(hash.digest, shash::kDigestSizes[hash.algorithm]);
+}
+
+
+bool CacheTransport::ParseMsgHash(
+  const cvmfs::MsgHash &msg_hash,
+  shash::Any *hash)
+{
+  switch (msg_hash.algorithm()) {
+    case cvmfs::HASH_SHA1:
+      hash->algorithm = shash::kSha1;
+      break;
+    case cvmfs::HASH_RIPEMD160:
+      hash->algorithm = shash::kRmd160;
+      break;
+    case cvmfs::HASH_SHAKE128:
+      hash->algorithm = shash::kShake128;
+      break;
+    default:
+      return false;
+  }
+  const unsigned digest_size = shash::kDigestSizes[hash->algorithm];
+  if (msg_hash.digest().length() != digest_size)
+    return false;
+  memcpy(hash->digest, msg_hash.digest().data(), digest_size);
+  return true;
 }
 
 
@@ -65,7 +112,12 @@ bool CacheTransport::RecvRawMsg(void *buffer, uint32_t size) {
 }
 
 
-void CacheTransport::SendData(void *data, uint32_t size) {
+void CacheTransport::SendData(
+  void *data,
+  uint32_t size,
+  void *attachment,
+  uint32_t att_size)
+{
   assert(size <= kMaxMsgSize);
   LogCvmfs(kLogCache, kLogDebug,
            "sending message of size %u to external cache plugin", size);
@@ -81,7 +133,9 @@ void CacheTransport::SendData(void *data, uint32_t size) {
   iov[0].iov_len = sizeof(header);
   iov[1].iov_base = data;
   iov[1].iov_len = size;
-  bool retval = SafeWriteV(fd_connection_, iov, 2);
+  iov[2].iov_base = attachment;
+  iov[2].iov_len = att_size;
+  bool retval = SafeWriteV(fd_connection_, iov, (att_size == 0) ? 2 : 3);
 
   if (!retval) {
     LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,

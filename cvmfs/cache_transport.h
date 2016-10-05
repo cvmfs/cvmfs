@@ -6,10 +6,18 @@
 
 #include <stdint.h>
 
+#include <cstdlib>
+
+namespace cvmfs {
+class MsgHash;
+}
 namespace google {
 namespace protobuf {
 class MessageLite;
 }
+}
+namespace shash {
+class Any;
 }
 
 /**
@@ -31,12 +39,16 @@ class CacheTransport {
   void SendMsg(google::protobuf::MessageLite *msg);
   bool RecvMsg(google::protobuf::MessageLite *msg);
 
+  void FillMsgHash(const shash::Any &hash, cvmfs::MsgHash *msg_hash);
+  bool ParseMsgHash(const cvmfs::MsgHash &msg_hash, shash::Any *hash);
+
   int fd_connection() const { return fd_connection_; }
 
  private:
   const static unsigned kMaxStackAlloc = 128 * 1024;  // 128 kB
 
-  void SendData(void *data, uint32_t size);
+  void SendData(void *data, uint32_t size,
+                void *attachment = NULL, uint32_t att_size = 0);
   bool RecvHeader(uint32_t *size);
   bool RecvRawMsg(void *buffer, uint32_t size);
 

@@ -7,13 +7,46 @@
 #include <unistd.h>
 
 #include <cassert>
+#include <string>
 
 #include "cache.pb.h"
 #include "logging.h"
 #include "util/pointer.h"
 #include "util/posix.h"
+#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
+
+namespace {
+
+int Ack2Errno(cvmfs::EnumStatus status_code) {
+  switch (status_code) {
+    case cvmfs::STATUS_OK:
+      return 0;
+    case cvmfs::STATUS_FORBIDDEN:
+      return -EPERM;
+    case cvmfs::STATUS_NOSPACE:
+      return -ENOSPC;
+    case cvmfs::STATUS_NOENTRY:
+      return -ENOENT;
+    case cvmfs::STATUS_MALFORMED:
+      return -EINVAL;
+    case cvmfs::STATUS_CORRUPTED:
+      return -EIO;
+    case cvmfs::STATUS_TIMEOUT:
+      return -EIO;
+    case cvmfs::STATUS_BADCOUNT:
+      return -EINVAL;
+    case cvmfs::STATUS_OUTOFBOUNDS:
+      return -EINVAL;
+    default:
+      return -EIO;
+  }
+}
+
+}  // anonymous namespace
+
+const shash::Any ExternalCacheManager::kInvalidHandle;
 
 int ExternalCacheManager::AbortTxn(void *txn) {
   return -1;
@@ -28,8 +61,49 @@ bool ExternalCacheManager::AcquireQuotaManager(QuotaManager *quota_mgr) {
 }
 
 
+void ExternalCacheManager::CallRemotely(
+  google::protobuf::MessageLite *msg_req,
+  google::protobuf::MessageLite *msg_reply)
+{
+  if (!spawned_) {
+    transport_.SendMsg(msg_req);
+    bool retval = transport_.RecvMsg(msg_reply);
+    assert(retval);
+  } else {
+    // TODO
+    abort();
+  }
+}
+
+
 int ExternalCacheManager::Close(int fd) {
-  return -1;
+  ReadOnlyHandle handle;
+  {
+    WriteLockGuard guard(rwlock_fd_table_);
+    handle = fd_table_.GetHandle(fd);
+    if (handle.id == kInvalidHandle)
+      return -EBADF;
+    int retval = fd_table_.CloseFd(fd);
+    assert(retval == 0);
+  }
+
+  cvmfs::MsgHash object_id;
+  transport_.FillMsgHash(handle.id, &object_id);
+  cvmfs::MsgRefcountReq msg_refcount;
+  msg_refcount.set_session_id(session_id_);
+  msg_refcount.set_req_id(NextRequestId());
+  msg_refcount.set_allocated_object_id(&object_id);
+  msg_refcount.set_change_by(-1);
+  cvmfs::MsgClientCall msg_req;
+  msg_req.set_allocated_msg_refcount_req(&msg_refcount);
+  cvmfs::MsgServerCall msg_reply;
+  CallRemotely(&msg_req, &msg_reply);
+  msg_req.release_msg_refcount_req();
+  msg_refcount.release_object_id();
+
+  assert(msg_reply.has_msg_refcount_reply());
+  assert(msg_reply.msg_refcount_reply().req_id() == msg_refcount.req_id());
+  return Ack2Errno(msg_reply.msg_refcount_reply().status());
 }
 
 
@@ -38,9 +112,12 @@ int ExternalCacheManager::CommitTxn(void *txn) {
 }
 
 
-ExternalCacheManager *ExternalCacheManager::Create(int fd_connection) {
+ExternalCacheManager *ExternalCacheManager::Create(
+  int fd_connection,
+  unsigned max_open_fds)
+{
   UniquePtr<ExternalCacheManager> cache_mgr(
-    new ExternalCacheManager(fd_connection));
+    new ExternalCacheManager(fd_connection, max_open_fds));
   assert(cache_mgr.IsValid());
 
   cvmfs::MsgClientCall msg_client_call;
@@ -77,10 +154,17 @@ int64_t ExternalCacheManager::GetSize(int fd) {
 }
 
 
-ExternalCacheManager::ExternalCacheManager(int fd_connection)
-  : transport_(fd_connection)
+ExternalCacheManager::ExternalCacheManager(
+  int fd_connection,
+  unsigned max_open_fds)
+  : fd_table_(max_open_fds, ReadOnlyHandle())
+  , transport_(fd_connection)
   , session_id_(-1)
+  , spawned_(false)
 {
+  int retval = pthread_rwlock_init(&rwlock_fd_table_, NULL);
+  assert(retval == 0);
+  atomic_init64(&next_request_id_);
 }
 
 
@@ -94,11 +178,46 @@ ExternalCacheManager::~ExternalCacheManager() {
     msg_client_call.release_msg_quit();
   }
   close(transport_.fd_connection());
+  pthread_rwlock_destroy(&rwlock_fd_table_);
 }
 
 
 int ExternalCacheManager::Open(const BlessedObject &object) {
-  return -1;
+  int fd = -1;
+  {
+    WriteLockGuard guard(rwlock_fd_table_);
+    fd = fd_table_.OpenFd(ReadOnlyHandle(object.id));
+    if (fd < 0) {
+      LogCvmfs(kLogCache, kLogDebug, "error while opening %s: %s",
+               object.id.ToString().c_str(), strerror(-fd));
+      return fd;
+    }
+  }
+
+  cvmfs::MsgHash object_id;
+  transport_.FillMsgHash(object.id, &object_id);
+  cvmfs::MsgRefcountReq msg_refcount;
+  msg_refcount.set_session_id(session_id_);
+  msg_refcount.set_req_id(NextRequestId());
+  msg_refcount.set_allocated_object_id(&object_id);
+  msg_refcount.set_change_by(1);
+  cvmfs::MsgClientCall msg_req;
+  msg_req.set_allocated_msg_refcount_req(&msg_refcount);
+  cvmfs::MsgServerCall msg_reply;
+  CallRemotely(&msg_req, &msg_reply);
+  msg_req.release_msg_refcount_req();
+  msg_refcount.release_object_id();
+
+  assert(msg_reply.has_msg_refcount_reply());
+  assert(msg_reply.msg_refcount_reply().req_id() == msg_refcount.req_id());
+  cvmfs::EnumStatus status_code = msg_reply.msg_refcount_reply().status();
+  if (status_code == cvmfs::STATUS_OK)
+    return fd;
+
+  WriteLockGuard guard(rwlock_fd_table_);
+  int retval = fd_table_.CloseFd(fd);
+  assert(retval == 0);
+  return Ack2Errno(status_code);
 }
 
 

@@ -4,14 +4,19 @@
 #ifndef CVMFS_CACHE_EXTERN_H_
 #define CVMFS_CACHE_EXTERN_H_
 
+#include <pthread.h>
+
+#include "atomic.h"
 #include "cache.h"
 #include "cache_transport.h"
+#include "fd_table.h"
+#include "hash.h"
 
 class ExternalCacheManager : public CacheManager {
  public:
   static const unsigned kPbProtocolVersion = 1;
 
-  static ExternalCacheManager *Create(int fd_connection);
+  static ExternalCacheManager *Create(int fd_connection, unsigned max_open_fds);
   virtual ~ExternalCacheManager();
 
   virtual CacheManagerIds id() { return kExternalCacheManager; }
@@ -35,11 +40,38 @@ class ExternalCacheManager : public CacheManager {
   virtual int OpenFromTxn(void *txn);
   virtual int CommitTxn(void *txn);
 
- private:
-  explicit ExternalCacheManager(int fd_connection);
+  int64_t session_id() const { return session_id_; }
 
+ private:
+  /**
+   * The null hash (hashed output is all null bytes) serves as a marker for an
+   * invalid handle
+   */
+  static const shash::Any kInvalidHandle;
+
+  struct ReadOnlyHandle {
+    ReadOnlyHandle() : id(kInvalidHandle) { }
+    explicit ReadOnlyHandle(const shash::Any &h) : id(h) { }
+    bool operator ==(const ReadOnlyHandle &other) const {
+      return this->id == other.id;
+    }
+    bool operator !=(const ReadOnlyHandle &other) const {
+      return this->id != other.id;
+    }
+    shash::Any id;
+  };
+
+  explicit ExternalCacheManager(int fd_connection, unsigned max_open_fds);
+  int64_t NextRequestId() { return atomic_xadd64(&next_request_id_, 1); }
+  void CallRemotely(google::protobuf::MessageLite *msg_req,
+                    google::protobuf::MessageLite *msg_reply);
+
+  FdTable<ReadOnlyHandle> fd_table_;
   CacheTransport transport_;
   int64_t session_id_;
+  bool spawned_;
+  pthread_rwlock_t rwlock_fd_table_;
+  atomic_int64 next_request_id_;
 };  // class ExternalCacheManager
 
 #endif  // CVMFS_CACHE_EXTERN_H_
