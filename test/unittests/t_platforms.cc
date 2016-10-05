@@ -6,13 +6,5 @@
 
 #include "platform.h"
 
-TEST(T_Platforms, OsVersion) {
-  int major = -1;
-  int minor = -1;
-  int patch = -1;
-  platform_get_os_version(&major, &minor, &patch);
-
-  EXPECT_GT(major, 0);
-  EXPECT_GE(minor, 0);
-  EXPECT_GE(patch, 0);
-}
+// TODO(Radu): Could add some unit tests for all the functions in
+//             platform_{linux,osx}.h
