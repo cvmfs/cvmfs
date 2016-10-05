@@ -53,7 +53,6 @@ class MockCachePlugin {
     CacheTransport transport(cache_plugin->fd_connection_);
     while (true) {
       cvmfs::MsgClientCall msg_client_call;
-      cvmfs::MsgServerCall msg_server_call;
       bool retval = transport.RecvMsg(&msg_client_call);
       if (!retval)
         abort();
@@ -65,9 +64,7 @@ class MockCachePlugin {
         msg_ack.set_protocol_version(ExternalCacheManager::kPbProtocolVersion);
         msg_ack.set_session_id(42);
         msg_ack.set_max_object_size(1024 * 1024);  // 1MB
-        msg_server_call.set_allocated_msg_handshake_ack(&msg_ack);
-        transport.SendMsg(&msg_server_call);
-        msg_server_call.release_msg_handshake_ack();
+        transport.SendMsg(&msg_ack);
       } else if (msg_client_call.has_msg_quit()) {
         break;
       } else if (msg_client_call.has_msg_refcount_req()) {
@@ -92,9 +89,7 @@ class MockCachePlugin {
           msg_reply.set_status(static_cast<cvmfs::EnumStatus>(
                                cache_plugin->next_status));
         }
-        msg_server_call.set_allocated_msg_refcount_reply(&msg_reply);
-        transport.SendMsg(&msg_server_call);
-        msg_server_call.release_msg_refcount_reply();
+        transport.SendMsg(&msg_reply);
       } else {
         abort();
       }

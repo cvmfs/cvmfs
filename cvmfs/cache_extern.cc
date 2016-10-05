@@ -67,8 +67,19 @@ void ExternalCacheManager::CallRemotely(
 {
   if (!spawned_) {
     transport_.SendMsg(msg_req);
-    bool retval = transport_.RecvMsg(msg_reply);
+    cvmfs::MsgServerCall msg_wrapped;
+    bool retval = transport_.RecvMsg(&msg_wrapped);
     assert(retval);
+
+    if (msg_req->GetTypeName() == "cvmfs.MsgRefcountReq") {
+      assert(msg_wrapped.has_msg_refcount_reply());
+      assert(msg_reply->GetTypeName() == "cvmfs.MsgRefcountReply");
+      msg_reply->CheckTypeAndMergeFrom(msg_wrapped.msg_refcount_reply());
+      assert(reinterpret_cast<cvmfs::MsgRefcountReq *>(msg_req)->req_id() ==
+             reinterpret_cast<cvmfs::MsgRefcountReply *>(msg_reply)->req_id());
+    } else {
+      abort();
+    }
   } else {
     // TODO
     abort();
@@ -94,16 +105,11 @@ int ExternalCacheManager::Close(int fd) {
   msg_refcount.set_req_id(NextRequestId());
   msg_refcount.set_allocated_object_id(&object_id);
   msg_refcount.set_change_by(-1);
-  cvmfs::MsgClientCall msg_req;
-  msg_req.set_allocated_msg_refcount_req(&msg_refcount);
-  cvmfs::MsgServerCall msg_reply;
-  CallRemotely(&msg_req, &msg_reply);
-  msg_req.release_msg_refcount_req();
+  cvmfs::MsgRefcountReply msg_reply;
+  CallRemotely(&msg_refcount, &msg_reply);
   msg_refcount.release_object_id();
 
-  assert(msg_reply.has_msg_refcount_reply());
-  assert(msg_reply.msg_refcount_reply().req_id() == msg_refcount.req_id());
-  return Ack2Errno(msg_reply.msg_refcount_reply().status());
+  return Ack2Errno(msg_reply.status());
 }
 
 
@@ -120,12 +126,9 @@ ExternalCacheManager *ExternalCacheManager::Create(
     new ExternalCacheManager(fd_connection, max_open_fds));
   assert(cache_mgr.IsValid());
 
-  cvmfs::MsgClientCall msg_client_call;
   cvmfs::MsgHandshake msg_handshake;
   msg_handshake.set_protocol_version(kPbProtocolVersion);
-  msg_client_call.set_allocated_msg_handshake(&msg_handshake);
-  cache_mgr->transport_.SendMsg(&msg_client_call);
-  msg_client_call.release_msg_handshake();
+  cache_mgr->transport_.SendMsg(&msg_handshake);
 
   cvmfs::MsgServerCall msg_ack;
   bool retval = cache_mgr->transport_.RecvMsg(&msg_ack);
@@ -172,10 +175,7 @@ ExternalCacheManager::~ExternalCacheManager() {
   if (session_id_ >= 0) {
     cvmfs::MsgQuit msg_quit;
     msg_quit.set_session_id(session_id_);
-    cvmfs::MsgClientCall msg_client_call;
-    msg_client_call.set_allocated_msg_quit(&msg_quit);
-    transport_.SendMsg(&msg_client_call);
-    msg_client_call.release_msg_quit();
+    transport_.SendMsg(&msg_quit);
   }
   close(transport_.fd_connection());
   pthread_rwlock_destroy(&rwlock_fd_table_);
@@ -201,23 +201,17 @@ int ExternalCacheManager::Open(const BlessedObject &object) {
   msg_refcount.set_req_id(NextRequestId());
   msg_refcount.set_allocated_object_id(&object_id);
   msg_refcount.set_change_by(1);
-  cvmfs::MsgClientCall msg_req;
-  msg_req.set_allocated_msg_refcount_req(&msg_refcount);
-  cvmfs::MsgServerCall msg_reply;
-  CallRemotely(&msg_req, &msg_reply);
-  msg_req.release_msg_refcount_req();
+  cvmfs::MsgRefcountReply msg_reply;
+  CallRemotely(&msg_refcount, &msg_reply);
   msg_refcount.release_object_id();
 
-  assert(msg_reply.has_msg_refcount_reply());
-  assert(msg_reply.msg_refcount_reply().req_id() == msg_refcount.req_id());
-  cvmfs::EnumStatus status_code = msg_reply.msg_refcount_reply().status();
-  if (status_code == cvmfs::STATUS_OK)
+  if (msg_reply.status() == cvmfs::STATUS_OK)
     return fd;
 
   WriteLockGuard guard(rwlock_fd_table_);
   int retval = fd_table_.CloseFd(fd);
   assert(retval == 0);
-  return Ack2Errno(status_code);
+  return Ack2Errno(msg_reply.status());
 }
 
 

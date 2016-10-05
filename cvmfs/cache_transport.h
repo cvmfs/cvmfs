@@ -36,7 +36,7 @@ class CacheTransport {
   explicit CacheTransport(int fd_connection);
   ~CacheTransport() { }
 
-  void SendMsg(google::protobuf::MessageLite *msg);
+  void SendMsg(google::protobuf::MessageLite *msg_typed);
   bool RecvMsg(google::protobuf::MessageLite *msg);
 
   void FillMsgHash(const shash::Any &hash, cvmfs::MsgHash *msg_hash);
@@ -47,6 +47,7 @@ class CacheTransport {
  private:
   const static unsigned kMaxStackAlloc = 128 * 1024;  // 128 kB
 
+  void SendRawMsg(google::protobuf::MessageLite *msg);
   void SendData(void *data, uint32_t size,
                 void *attachment = NULL, uint32_t att_size = 0);
   bool RecvHeader(uint32_t *size);

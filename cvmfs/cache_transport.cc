@@ -145,7 +145,44 @@ void CacheTransport::SendData(
 }
 
 
-void CacheTransport::SendMsg(google::protobuf::MessageLite *msg) {
+void CacheTransport::SendMsg(google::protobuf::MessageLite *msg_typed) {
+  if (msg_typed->GetTypeName() == "cvmfs.MsgHandshake") {
+    cvmfs::MsgClientCall msg;
+    msg.set_allocated_msg_handshake(
+      reinterpret_cast<cvmfs::MsgHandshake *>(msg_typed));
+    SendRawMsg(&msg);
+    msg.release_msg_handshake();
+  } else if (msg_typed->GetTypeName() == "cvmfs.MsgHandshakeAck") {
+    cvmfs::MsgServerCall msg;
+    msg.set_allocated_msg_handshake_ack(
+      reinterpret_cast<cvmfs::MsgHandshakeAck *>(msg_typed));
+    SendRawMsg(&msg);
+    msg.release_msg_handshake_ack();
+  } else if (msg_typed->GetTypeName() == "cvmfs.MsgQuit") {
+    cvmfs::MsgClientCall msg;
+    msg.set_allocated_msg_quit(
+      reinterpret_cast<cvmfs::MsgQuit *>(msg_typed));
+    SendRawMsg(&msg);
+    msg.release_msg_quit();
+  } else if (msg_typed->GetTypeName() == "cvmfs.MsgRefcountReq") {
+    cvmfs::MsgClientCall msg;
+    msg.set_allocated_msg_refcount_req(
+      reinterpret_cast<cvmfs::MsgRefcountReq *>(msg_typed));
+    SendRawMsg(&msg);
+    msg.release_msg_refcount_req();
+  } else if (msg_typed->GetTypeName() == "cvmfs.MsgRefcountReply") {
+    cvmfs::MsgServerCall msg;
+    msg.set_allocated_msg_refcount_reply(
+      reinterpret_cast<cvmfs::MsgRefcountReply *>(msg_typed));
+    SendRawMsg(&msg);
+    msg.release_msg_refcount_reply();
+  } else {
+    abort();
+  }
+}
+
+
+void CacheTransport::SendRawMsg(google::protobuf::MessageLite *msg) {
   int32_t size = msg->ByteSize();
   assert(size >= 0);
   void *buffer = alloca(size);
