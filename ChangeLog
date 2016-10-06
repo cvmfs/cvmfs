@@ -1,3 +1,6 @@
+2.3.3:
+  * Fixes for macOS 10.12 Sierra (CVM-1084)
+
 2.3.2:
   * Fix error reporting when downloading replication sentinal file (CVM-1078)
   * Fix publishing of auto catalog markers (CVM-1079)
