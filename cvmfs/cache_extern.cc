@@ -77,6 +77,12 @@ void ExternalCacheManager::CallRemotely(
       msg_reply->CheckTypeAndMergeFrom(msg_wrapped.msg_refcount_reply());
       assert(reinterpret_cast<cvmfs::MsgRefcountReq *>(msg_req)->req_id() ==
              reinterpret_cast<cvmfs::MsgRefcountReply *>(msg_reply)->req_id());
+    } else if (msg_req->GetTypeName() == "cvmfs.MsgObjectInfoReq") {
+      assert(msg_wrapped.has_msg_object_info_reply());
+      assert(msg_reply->GetTypeName() == "cvmfs.MsgObjectInfoReply");
+      msg_reply->CheckTypeAndMergeFrom(msg_wrapped.msg_object_info_reply());
+      assert(reinterpret_cast<cvmfs::MsgObjectInfoReq *>(msg_req)->req_id() ==
+             reinterpret_cast<cvmfs::MsgObjectInfoReply*>(msg_reply)->req_id());
     } else {
       abort();
     }
@@ -153,7 +159,30 @@ int ExternalCacheManager::Dup(int fd) {
 
 
 int64_t ExternalCacheManager::GetSize(int fd) {
-  return -1;
+  ReadOnlyHandle handle;
+  {
+    ReadLockGuard guard(rwlock_fd_table_);
+    handle = fd_table_.GetHandle(fd);
+    if (handle.id == kInvalidHandle)
+      return -EBADF;
+  }
+
+  cvmfs::MsgHash object_id;
+  transport_.FillMsgHash(handle.id, &object_id);
+  cvmfs::MsgObjectInfoReq msg_info;
+  msg_info.set_session_id(session_id_);
+  msg_info.set_req_id(NextRequestId());
+  msg_info.set_allocated_object_id(&object_id);
+  msg_info.set_info_flags(cvmfs::OBJECT_INFO_SIZE);
+  cvmfs::MsgObjectInfoReply msg_reply;
+  CallRemotely(&msg_info, &msg_reply);
+  msg_info.release_object_id();
+
+  if (msg_reply.status() == cvmfs::STATUS_OK) {
+    assert(msg_reply.has_size());
+    return msg_reply.size();
+  }
+  return Ack2Errno(msg_reply.status());
 }
 
 

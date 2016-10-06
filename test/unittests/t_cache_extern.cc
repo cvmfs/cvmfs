@@ -36,7 +36,8 @@ class MockCachePlugin {
       assert(retval == 0);
     }
     known_object.algorithm = shash::kSha1;
-    shash::HashString("Hello, World", &known_object);
+    known_object_content = "Hello, World";
+    shash::HashString(known_object_content, &known_object);
     known_object_refcnt = 0;
     next_status = -1;
   }
@@ -90,6 +91,27 @@ class MockCachePlugin {
                                cache_plugin->next_status));
         }
         transport.SendMsg(&msg_reply);
+      } else if (msg_client_call.has_msg_object_info_req()) {
+        cvmfs::MsgObjectInfoReq msg_req = msg_client_call.msg_object_info_req();
+        cvmfs::MsgObjectInfoReply msg_reply;
+        msg_reply.set_req_id(msg_req.req_id());
+        shash::Any object_id;
+        bool retval = transport.ParseMsgHash(msg_req.object_id(), &object_id);
+        if (!retval) {
+          msg_reply.set_status(cvmfs::STATUS_MALFORMED);
+        } else if (object_id != cache_plugin->known_object) {
+          msg_reply.set_status(cvmfs::STATUS_NOENTRY);
+        } else {
+          msg_reply.set_status(cvmfs::STATUS_OK);
+          msg_reply.set_object_type(cvmfs::OBJECT_REGULAR);
+          msg_reply.set_nparts(1);
+          msg_reply.set_size(cache_plugin->known_object_content.length());
+        }
+        if (cache_plugin->next_status >= 0) {
+          msg_reply.set_status(static_cast<cvmfs::EnumStatus>(
+                               cache_plugin->next_status));
+        }
+        transport.SendMsg(&msg_reply);
       } else {
         abort();
       }
@@ -121,6 +143,7 @@ class MockCachePlugin {
   int fd_connection_;
   int fd_socket_;
   pthread_t thread_recv_;
+  string known_object_content;
   shash::Any known_object;
   int known_object_refcnt;
   int next_status;
@@ -184,4 +207,19 @@ TEST_F(T_ExternalCacheManager, OpenClose) {
   EXPECT_EQ(-EINVAL,
             cache_mgr_->Open(CacheManager::Bless(mock_plugin_->known_object)));
   mock_plugin_->next_status = -1;
+}
+
+
+TEST_F(T_ExternalCacheManager, GetSize) {
+  EXPECT_EQ(-EBADF, cache_mgr_->GetSize(0));
+  int fd = cache_mgr_->Open(CacheManager::Bless(mock_plugin_->known_object));
+  EXPECT_GE(fd, 0);
+  EXPECT_EQ(static_cast<int64_t>(mock_plugin_->known_object_content.length()),
+            cache_mgr_->GetSize(fd));
+
+  mock_plugin_->next_status = cvmfs::STATUS_MALFORMED;
+  EXPECT_EQ(-EINVAL, cache_mgr_->GetSize(fd));
+  mock_plugin_->next_status = -1;
+
+  EXPECT_EQ(0, cache_mgr_->Close(fd));
 }

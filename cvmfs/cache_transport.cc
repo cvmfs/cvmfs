@@ -176,6 +176,18 @@ void CacheTransport::SendMsg(google::protobuf::MessageLite *msg_typed) {
       reinterpret_cast<cvmfs::MsgRefcountReply *>(msg_typed));
     SendRawMsg(&msg);
     msg.release_msg_refcount_reply();
+  } else if (msg_typed->GetTypeName() == "cvmfs.MsgObjectInfoReq") {
+    cvmfs::MsgClientCall msg;
+    msg.set_allocated_msg_object_info_req(
+      reinterpret_cast<cvmfs::MsgObjectInfoReq *>(msg_typed));
+    SendRawMsg(&msg);
+    msg.release_msg_object_info_req();
+  } else if (msg_typed->GetTypeName() == "cvmfs.MsgObjectInfoReply") {
+    cvmfs::MsgServerCall msg;
+    msg.set_allocated_msg_object_info_reply(
+      reinterpret_cast<cvmfs::MsgObjectInfoReply *>(msg_typed));
+    SendRawMsg(&msg);
+    msg.release_msg_object_info_reply();
   } else {
     abort();
   }

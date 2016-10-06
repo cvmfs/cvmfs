@@ -60,19 +60,19 @@ enum EnumObjectType {
 }
 
 
+enum EnumObjectInfoFlags {
+  OBJECT_INFO_TYPE   = 1;
+  OBJECT_INFO_NPARTS = 2;
+  OBJECT_INFO_SIZE   = 4;
+}
+
+
 //------------------------------------------------------------------------------
 // Data containers
 
 message MsgHash {
   required EnumHashAlgorithm algorithm = 1;
   required bytes digest = 2;
-}
-
-message MsgObjectInfo {
-  required EnumObjectType object_type = 1;
-  // A single object might be stored in multiple parts, e.g. for key-value
-  // stores that
-  required uint64 no_parts            = 2;
 }
 
 message MsgListRecord {
@@ -248,12 +248,15 @@ message MsgObjectInfoReq {
   required uint64 session_id = 1;
   required uint64 req_id     = 2;
   required MsgHash object_id = 3;
+  required uint32 info_flags = 4;
 }
 
 message MsgObjectInfoReply {
-  required uint64 req_id             = 1;
-  required EnumStatus status         = 2;
-  required MsgObjectInfo object_info = 3;
+  required uint64 req_id              = 1;
+  required EnumStatus status          = 2;
+  optional EnumObjectType object_type = 3;
+  optional uint64 nparts              = 4;
+  optional uint64 size                = 5;
 }
 
 // Enumerate cache contents, possibly in multiple messages for large caches
