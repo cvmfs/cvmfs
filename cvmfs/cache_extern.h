@@ -65,9 +65,8 @@ class ExternalCacheManager : public CacheManager {
   int64_t NextRequestId() { return atomic_xadd64(&next_request_id_, 1); }
   void CallRemotely(google::protobuf::MessageLite *msg_req,
                     google::protobuf::MessageLite *msg_reply);
-  void UnwrapReply(const google::protobuf::MessageLite &msg_req,
-                   const google::protobuf::MessageLite &msg_reply_wrapped,
-                   google::protobuf::MessageLite *msg_reply);
+  int ChangeRefcount(const shash::Any &id, int change_by);
+  int DoOpen(const shash::Any &id);
 
   FdTable<ReadOnlyHandle> fd_table_;
   CacheTransport transport_;

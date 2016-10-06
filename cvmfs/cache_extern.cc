@@ -93,6 +93,22 @@ void ExternalCacheManager::CallRemotely(
 }
 
 
+int ExternalCacheManager::ChangeRefcount(const shash::Any &id, int change_by) {
+  cvmfs::MsgHash object_id;
+  transport_.FillMsgHash(id, &object_id);
+  cvmfs::MsgRefcountReq msg_refcount;
+  msg_refcount.set_session_id(session_id_);
+  msg_refcount.set_req_id(NextRequestId());
+  msg_refcount.set_allocated_object_id(&object_id);
+  msg_refcount.set_change_by(change_by);
+  cvmfs::MsgRefcountReply msg_reply;
+  CallRemotely(&msg_refcount, &msg_reply);
+  msg_refcount.release_object_id();
+
+  return Ack2Errno(msg_reply.status());
+}
+
+
 int ExternalCacheManager::Close(int fd) {
   ReadOnlyHandle handle;
   {
@@ -104,18 +120,7 @@ int ExternalCacheManager::Close(int fd) {
     assert(retval == 0);
   }
 
-  cvmfs::MsgHash object_id;
-  transport_.FillMsgHash(handle.id, &object_id);
-  cvmfs::MsgRefcountReq msg_refcount;
-  msg_refcount.set_session_id(session_id_);
-  msg_refcount.set_req_id(NextRequestId());
-  msg_refcount.set_allocated_object_id(&object_id);
-  msg_refcount.set_change_by(-1);
-  cvmfs::MsgRefcountReply msg_reply;
-  CallRemotely(&msg_refcount, &msg_reply);
-  msg_refcount.release_object_id();
-
-  return Ack2Errno(msg_reply.status());
+  return ChangeRefcount(handle.id, -1);
 }
 
 
@@ -153,8 +158,38 @@ void ExternalCacheManager::CtrlTxn(
 }
 
 
+int ExternalCacheManager::DoOpen(const shash::Any &id) {
+  int fd = -1;
+  {
+    WriteLockGuard guard(rwlock_fd_table_);
+    fd = fd_table_.OpenFd(ReadOnlyHandle(id));
+    if (fd < 0) {
+      LogCvmfs(kLogCache, kLogDebug, "error while creating new fd",
+               strerror(-fd));
+      return fd;
+    }
+  }
+
+  int status_refcnt = ChangeRefcount(id, 1);
+  if (status_refcnt == 0)
+    return fd;
+
+  WriteLockGuard guard(rwlock_fd_table_);
+  int retval = fd_table_.CloseFd(fd);
+  assert(retval == 0);
+  return status_refcnt;
+}
+
+
 int ExternalCacheManager::Dup(int fd) {
-  return -1;
+  ReadOnlyHandle handle;
+  {
+    ReadLockGuard guard(rwlock_fd_table_);
+    handle = fd_table_.GetHandle(fd);
+    if (handle.id == kInvalidHandle)
+      return -EBADF;
+  }
+  return DoOpen(handle.id);
 }
 
 
@@ -212,35 +247,7 @@ ExternalCacheManager::~ExternalCacheManager() {
 
 
 int ExternalCacheManager::Open(const BlessedObject &object) {
-  int fd = -1;
-  {
-    WriteLockGuard guard(rwlock_fd_table_);
-    fd = fd_table_.OpenFd(ReadOnlyHandle(object.id));
-    if (fd < 0) {
-      LogCvmfs(kLogCache, kLogDebug, "error while opening %s: %s",
-               object.id.ToString().c_str(), strerror(-fd));
-      return fd;
-    }
-  }
-
-  cvmfs::MsgHash object_id;
-  transport_.FillMsgHash(object.id, &object_id);
-  cvmfs::MsgRefcountReq msg_refcount;
-  msg_refcount.set_session_id(session_id_);
-  msg_refcount.set_req_id(NextRequestId());
-  msg_refcount.set_allocated_object_id(&object_id);
-  msg_refcount.set_change_by(1);
-  cvmfs::MsgRefcountReply msg_reply;
-  CallRemotely(&msg_refcount, &msg_reply);
-  msg_refcount.release_object_id();
-
-  if (msg_reply.status() == cvmfs::STATUS_OK)
-    return fd;
-
-  WriteLockGuard guard(rwlock_fd_table_);
-  int retval = fd_table_.CloseFd(fd);
-  assert(retval == 0);
-  return Ack2Errno(msg_reply.status());
+  return DoOpen(object.id);
 }
 
 

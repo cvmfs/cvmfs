@@ -223,3 +223,21 @@ TEST_F(T_ExternalCacheManager, GetSize) {
 
   EXPECT_EQ(0, cache_mgr_->Close(fd));
 }
+
+
+TEST_F(T_ExternalCacheManager, Dup) {
+  EXPECT_EQ(-EBADF, cache_mgr_->Dup(0));
+  int fds[nfiles];
+  fds[0] = cache_mgr_->Open(CacheManager::Bless(mock_plugin_->known_object));
+  EXPECT_GE(fds[0], 0);
+  for (unsigned i = 1; i < nfiles; ++i) {
+    fds[i] = cache_mgr_->Dup(fds[0]);
+    EXPECT_GE(fds[i], 0);
+  }
+  EXPECT_EQ(nfiles, mock_plugin_->known_object_refcnt);
+  EXPECT_EQ(-ENFILE, cache_mgr_->Dup(fds[0]));
+  for (unsigned i = 0; i < nfiles; ++i) {
+    EXPECT_EQ(0, cache_mgr_->Close(fds[i]));
+  }
+  EXPECT_EQ(0, mock_plugin_->known_object_refcnt);
+}

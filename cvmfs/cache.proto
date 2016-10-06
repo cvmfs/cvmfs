@@ -2,7 +2,7 @@
 //
 // Protocol defintion for RPCs between cvmfs client and cache manager plugin.
 // The protocol is used to access a store of content-addressable objects that
-// are maintained by a cache manager plugin.  Objects are reference counted
+// are maintained by a cache manager plugin.  Objects are reference counted,
 // mirroring currently open files.  Only objects with reference count zero can
 // be removed from the store.
 
