@@ -328,16 +328,6 @@ inline const char* platform_getexepath() {
 }
 
 
-inline void platform_get_os_version(int32_t *major,
-                                    int32_t *minor,
-                                    int32_t *patch) {
-  struct utsname uts_info;
-  const int res = uname(&uts_info);
-  assert(res == 0);
-  const int matches = sscanf(uts_info.release, "%u.%u.%u", major, minor, patch);
-  assert(matches == 3 && "failed to read version string");
-}
-
 inline uint64_t platform_monotonic_time() {
   struct timespec tp;
 #ifdef CLOCK_MONOTONIC_COARSE
