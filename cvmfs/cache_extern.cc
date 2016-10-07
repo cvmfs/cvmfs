@@ -66,21 +66,18 @@ void ExternalCacheManager::CallRemotely(
   google::protobuf::MessageLite *msg_reply)
 {
   if (!spawned_) {
-    transport_.SendMsg(msg_req);
-    cvmfs::MsgServerCall msg_wrapped;
-    bool retval = transport_.RecvMsg(&msg_wrapped);
+    CacheTransport::Frame frame_send(msg_req);
+    transport_.SendFrame(&frame_send);
+    CacheTransport::Frame frame_recv;
+    bool retval = transport_.RecvFrame(&frame_recv);
     assert(retval);
+    google::protobuf::MessageLite *msg_typed = frame_recv.GetMsgTyped();
+    msg_reply->CheckTypeAndMergeFrom(*msg_typed);
 
     if (msg_req->GetTypeName() == "cvmfs.MsgRefcountReq") {
-      assert(msg_wrapped.has_msg_refcount_reply());
-      assert(msg_reply->GetTypeName() == "cvmfs.MsgRefcountReply");
-      msg_reply->CheckTypeAndMergeFrom(msg_wrapped.msg_refcount_reply());
       assert(reinterpret_cast<cvmfs::MsgRefcountReq *>(msg_req)->req_id() ==
              reinterpret_cast<cvmfs::MsgRefcountReply *>(msg_reply)->req_id());
     } else if (msg_req->GetTypeName() == "cvmfs.MsgObjectInfoReq") {
-      assert(msg_wrapped.has_msg_object_info_reply());
-      assert(msg_reply->GetTypeName() == "cvmfs.MsgObjectInfoReply");
-      msg_reply->CheckTypeAndMergeFrom(msg_wrapped.msg_object_info_reply());
       assert(reinterpret_cast<cvmfs::MsgObjectInfoReq *>(msg_req)->req_id() ==
              reinterpret_cast<cvmfs::MsgObjectInfoReply*>(msg_reply)->req_id());
     } else {
@@ -139,13 +136,18 @@ ExternalCacheManager *ExternalCacheManager::Create(
 
   cvmfs::MsgHandshake msg_handshake;
   msg_handshake.set_protocol_version(kPbProtocolVersion);
-  cache_mgr->transport_.SendMsg(&msg_handshake);
+  CacheTransport::Frame frame_send(&msg_handshake);
+  cache_mgr->transport_.SendFrame(&frame_send);
 
-  cvmfs::MsgServerCall msg_ack;
-  bool retval = cache_mgr->transport_.RecvMsg(&msg_ack);
-  if (!retval || !msg_ack.has_msg_handshake_ack())
+  CacheTransport::Frame frame_recv;
+  bool retval = cache_mgr->transport_.RecvFrame(&frame_recv);
+  if (!retval)
     return NULL;
-  cache_mgr->session_id_ = msg_ack.msg_handshake_ack().session_id();
+  google::protobuf::MessageLite *msg_typed = frame_recv.GetMsgTyped();
+  if (msg_typed->GetTypeName() != "cvmfs.MsgHandshakeAck")
+    return NULL;
+  cache_mgr->session_id_ =
+    reinterpret_cast<cvmfs::MsgHandshakeAck *>(msg_typed)->session_id();
   return cache_mgr.Release();
 }
 
@@ -182,28 +184,27 @@ int ExternalCacheManager::DoOpen(const shash::Any &id) {
 
 
 int ExternalCacheManager::Dup(int fd) {
-  ReadOnlyHandle handle;
-  {
-    ReadLockGuard guard(rwlock_fd_table_);
-    handle = fd_table_.GetHandle(fd);
-    if (handle.id == kInvalidHandle)
-      return -EBADF;
-  }
-  return DoOpen(handle.id);
+  shash::Any id = GetHandle(fd);
+  if (id == kInvalidHandle)
+    return -EBADF;
+  return DoOpen(id);
+}
+
+
+shash::Any ExternalCacheManager::GetHandle(int fd) {
+  ReadLockGuard guard(rwlock_fd_table_);
+  ReadOnlyHandle handle = fd_table_.GetHandle(fd);
+  return handle.id;
 }
 
 
 int64_t ExternalCacheManager::GetSize(int fd) {
-  ReadOnlyHandle handle;
-  {
-    ReadLockGuard guard(rwlock_fd_table_);
-    handle = fd_table_.GetHandle(fd);
-    if (handle.id == kInvalidHandle)
-      return -EBADF;
-  }
+  shash::Any id = GetHandle(fd);
+  if (id == kInvalidHandle)
+    return -EBADF;
 
   cvmfs::MsgHash object_id;
-  transport_.FillMsgHash(handle.id, &object_id);
+  transport_.FillMsgHash(id, &object_id);
   cvmfs::MsgObjectInfoReq msg_info;
   msg_info.set_session_id(session_id_);
   msg_info.set_req_id(NextRequestId());
@@ -239,7 +240,8 @@ ExternalCacheManager::~ExternalCacheManager() {
   if (session_id_ >= 0) {
     cvmfs::MsgQuit msg_quit;
     msg_quit.set_session_id(session_id_);
-    transport_.SendMsg(&msg_quit);
+    CacheTransport::Frame frame(&msg_quit);
+    transport_.SendFrame(&frame);
   }
   close(transport_.fd_connection());
   pthread_rwlock_destroy(&rwlock_fd_table_);
@@ -262,7 +264,22 @@ int64_t ExternalCacheManager::Pread(
   uint64_t size,
   uint64_t offset)
 {
-  return -1;
+  shash::Any id = GetHandle(fd);
+  if (id == kInvalidHandle)
+    return -EBADF;
+
+  cvmfs::MsgHash object_id;
+  transport_.FillMsgHash(id, &object_id);
+  cvmfs::MsgReadReq msg_read;
+  msg_read.set_session_id(session_id_);
+  msg_read.set_req_id(NextRequestId());
+  msg_read.set_allocated_object_id(&object_id);
+  msg_read.set_offset(offset);
+  msg_read.set_size(size);
+  cvmfs::MsgReadReply msg_reply;
+  CallRemotely(&msg_read, &msg_reply);
+  msg_read.release_object_id();
+  return Ack2Errno(msg_reply.status());
 }
 
 

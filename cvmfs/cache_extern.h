@@ -67,6 +67,7 @@ class ExternalCacheManager : public CacheManager {
                     google::protobuf::MessageLite *msg_reply);
   int ChangeRefcount(const shash::Any &id, int change_by);
   int DoOpen(const shash::Any &id);
+  shash::Any GetHandle(int fd);
 
   FdTable<ReadOnlyHandle> fd_table_;
   CacheTransport transport_;

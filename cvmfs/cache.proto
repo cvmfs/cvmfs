@@ -19,7 +19,9 @@ option optimize_for = LITE_RUNTIME;
 // After the header, there will be protobuf message either of type MsgClientCall
 // (from client to server) or of type MsgServerCall (from server to client).
 // Messages for storing or retrieving data have the data payload appended after
-// the protobuf message.
+// the protobuf message.  For messages with a data payload (attachment), there
+// are two bytes (little endian) before the protobuf message specifying the size
+// of the  protobuf message without the attachment.
 
 // # Protocol changelog
 // Version 1: First version
@@ -277,35 +279,41 @@ message MsgListReply {
 
 
 //------------------------------------------------------------------------------
-// # RPC Messages
+// # RPC Wrapper
 // Used to dispatch the possible message types
 
-message MsgClientCall {
+message MsgRpc {
   oneof message_type {
-    MsgHandshake msg_handshake                   = 1;
-    MsgQuit msg_quit                             = 2;
-    MsgStoreReq msg_store_req                    = 3;
-    MsgStorePartReq msg_store_part_req           = 4;
-    MsgAbortMultipartReq msg_abort_multipart_req = 5;
-    MsgRefcountReq msg_refcount_req              = 6;
-    MsgShrinkReq msg_shrink_req                  = 7;
-    MsgReadReq msg_read_req                      = 8;
-    MsgInfoReq msg_info_req                      = 9;
-    MsgObjectInfoReq msg_object_info_req         = 10;
-    MsgListReq msg_list_req                      = 11;
-  }
-}
+    // Frequent and performance-critical calls
+    MsgRefcountReq msg_refcount_req              = 1;
+    MsgRefcountReply msg_refcount_reply          = 2;
 
-message MsgServerCall {
-  oneof message_type {
-    MsgHandshakeAck msg_handshake_ack        = 1;
-    MsgStoreReply msg_store_reply            = 2;
-    MsgRefcountReply msg_refcount_reply      = 3;
-    MsgReadReply msg_read_reply              = 4;
-    MsgDetachCatalogs msg_detach             = 5;
-    MsgShrinkReply msg_shrink_reply          = 6;
-    MsgInfoReply msg_info_reply              = 7;
-    MsgObjectInfoReply msg_object_info_reply = 8;
-    MsgListReply msg_list_reply              = 9;
+    MsgReadReq msg_read_req                      = 3;
+    MsgReadReply msg_read_reply                  = 4;
+
+    MsgObjectInfoReq msg_object_info_req         = 5;
+    MsgObjectInfoReply msg_object_info_reply     = 6;
+
+    MsgStoreReq msg_store_req                    = 7;
+    MsgStorePartReq msg_store_part_req           = 8;
+    MsgAbortMultipartReq msg_abort_multipart_req = 9;
+    MsgStoreReply msg_store_reply                = 10;
+
+
+    // Rare RPCs
+    MsgHandshake msg_handshake                   = 16;
+    MsgHandshakeAck msg_handshake_ack            = 17;
+    MsgQuit msg_quit                             = 18;
+
+    MsgInfoReq msg_info_req                      = 19;
+    MsgInfoReply msg_info_reply                  = 20;
+
+    MsgShrinkReq msg_shrink_req                  = 21;
+    MsgShrinkReply msg_shrink_reply              = 22;
+
+    MsgListReq msg_list_req                      = 23;
+    MsgListReply msg_list_reply                  = 24;
+
+    MsgDetachCatalogs msg_detach                 = 25;
   }
 }

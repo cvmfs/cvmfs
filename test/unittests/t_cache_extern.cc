@@ -53,36 +53,39 @@ class MockCachePlugin {
   static void HandleConnection(MockCachePlugin *cache_plugin) {
     CacheTransport transport(cache_plugin->fd_connection_);
     while (true) {
-      cvmfs::MsgClientCall msg_client_call;
-      bool retval = transport.RecvMsg(&msg_client_call);
+      CacheTransport::Frame frame_recv;
+      bool retval = transport.RecvFrame(&frame_recv);
       if (!retval)
         abort();
+      google::protobuf::MessageLite *msg_typed = frame_recv.GetMsgTyped();
 
-      if (msg_client_call.has_msg_handshake()) {
+      if (msg_typed->GetTypeName() == "cvmfs.MsgHandshake") {
         cvmfs::MsgHandshakeAck msg_ack;
         msg_ack.set_status(cvmfs::STATUS_OK);
         msg_ack.set_name("unit test cache manager");
         msg_ack.set_protocol_version(ExternalCacheManager::kPbProtocolVersion);
         msg_ack.set_session_id(42);
         msg_ack.set_max_object_size(1024 * 1024);  // 1MB
-        transport.SendMsg(&msg_ack);
-      } else if (msg_client_call.has_msg_quit()) {
+        CacheTransport::Frame frame_send(&msg_ack);
+        transport.SendFrame(&frame_send);
+      } else if (msg_typed->GetTypeName() == "cvmfs.MsgQuit") {
         break;
-      } else if (msg_client_call.has_msg_refcount_req()) {
-        cvmfs::MsgRefcountReq msg_req = msg_client_call.msg_refcount_req();
+      } else if (msg_typed->GetTypeName() == "cvmfs.MsgRefcountReq") {
+        cvmfs::MsgRefcountReq *msg_req =
+          reinterpret_cast<cvmfs::MsgRefcountReq *>(msg_typed);
         cvmfs::MsgRefcountReply msg_reply;
-        msg_reply.set_req_id(msg_req.req_id());
+        msg_reply.set_req_id(msg_req->req_id());
         shash::Any object_id;
-        bool retval = transport.ParseMsgHash(msg_req.object_id(), &object_id);
+        bool retval = transport.ParseMsgHash(msg_req->object_id(), &object_id);
         if (!retval) {
           msg_reply.set_status(cvmfs::STATUS_MALFORMED);
         } else if (object_id != cache_plugin->known_object) {
           msg_reply.set_status(cvmfs::STATUS_NOENTRY);
         } else {
-          if ((cache_plugin->known_object_refcnt + msg_req.change_by()) < 0) {
+          if ((cache_plugin->known_object_refcnt + msg_req->change_by()) < 0) {
             msg_reply.set_status(cvmfs::STATUS_BADCOUNT);
           } else {
-            cache_plugin->known_object_refcnt += msg_req.change_by();
+            cache_plugin->known_object_refcnt += msg_req->change_by();
             msg_reply.set_status(cvmfs::STATUS_OK);
           }
         }
@@ -90,13 +93,15 @@ class MockCachePlugin {
           msg_reply.set_status(static_cast<cvmfs::EnumStatus>(
                                cache_plugin->next_status));
         }
-        transport.SendMsg(&msg_reply);
-      } else if (msg_client_call.has_msg_object_info_req()) {
-        cvmfs::MsgObjectInfoReq msg_req = msg_client_call.msg_object_info_req();
+        CacheTransport::Frame frame_send(&msg_reply);
+        transport.SendFrame(&frame_send);
+      } else if (msg_typed->GetTypeName() == "cvmfs.MsgObjectInfoReq") {
+        cvmfs::MsgObjectInfoReq *msg_req =
+          reinterpret_cast<cvmfs::MsgObjectInfoReq *>(msg_typed);
         cvmfs::MsgObjectInfoReply msg_reply;
-        msg_reply.set_req_id(msg_req.req_id());
+        msg_reply.set_req_id(msg_req->req_id());
         shash::Any object_id;
-        bool retval = transport.ParseMsgHash(msg_req.object_id(), &object_id);
+        bool retval = transport.ParseMsgHash(msg_req->object_id(), &object_id);
         if (!retval) {
           msg_reply.set_status(cvmfs::STATUS_MALFORMED);
         } else if (object_id != cache_plugin->known_object) {
@@ -111,7 +116,8 @@ class MockCachePlugin {
           msg_reply.set_status(static_cast<cvmfs::EnumStatus>(
                                cache_plugin->next_status));
         }
-        transport.SendMsg(&msg_reply);
+        CacheTransport::Frame frame_send(&msg_reply);
+        transport.SendFrame(&frame_send);
       } else {
         abort();
       }

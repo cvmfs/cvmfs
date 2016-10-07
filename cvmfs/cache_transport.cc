@@ -10,13 +10,154 @@
 #include <cassert>
 #include <cstdlib>
 
-#include "cache.pb.h"
 #include "hash.h"
 #include "logging.h"
 #include "smalloc.h"
 #include "util/posix.h"
 
 using namespace std;  // NOLINT
+
+/**
+ * Called on the sender side to wrap a message into a MsgRpc message for wire
+ * transfer.
+ */
+cvmfs::MsgRpc *CacheTransport::Frame::GetMsgRpc() {
+  assert(msg_typed_ != NULL);
+  if (!is_wrapped_)
+    WrapMsg();
+  return &msg_rpc_;
+}
+
+
+/**
+ * Called on the receiving end of an RPC to extract the actual message from the
+ * MsgRpc.
+ */
+google::protobuf::MessageLite *CacheTransport::Frame::GetMsgTyped() {
+  assert(msg_rpc_.IsInitialized());
+  if (msg_typed_ == NULL)
+    UnwrapMsg();
+  return msg_typed_;
+}
+
+
+CacheTransport::Frame::Frame()
+  : owns_msg_typed_(false)
+  , msg_typed_(NULL)
+  , attachment_(NULL)
+  , att_size_(0)
+  , is_wrapped_(false)
+{ }
+
+
+CacheTransport::Frame::Frame(google::protobuf::MessageLite *m)
+  : owns_msg_typed_(false)
+  , msg_typed_(m)
+  , attachment_(NULL)
+  , att_size_(0)
+  , is_wrapped_(false)
+{ }
+
+
+CacheTransport::Frame::~Frame() {
+  if (owns_msg_typed_)
+    return;
+
+  msg_rpc_.release_msg_refcount_req();
+  msg_rpc_.release_msg_refcount_reply();
+  msg_rpc_.release_msg_read_req();
+  msg_rpc_.release_msg_read_reply();
+  msg_rpc_.release_msg_object_info_req();
+  msg_rpc_.release_msg_object_info_reply();
+  msg_rpc_.release_msg_store_req();
+  msg_rpc_.release_msg_store_part_req();
+  msg_rpc_.release_msg_abort_multipart_req();
+  msg_rpc_.release_msg_store_reply();
+  msg_rpc_.release_msg_handshake();
+  msg_rpc_.release_msg_handshake_ack();
+  msg_rpc_.release_msg_quit();
+  msg_rpc_.release_msg_info_req();
+  msg_rpc_.release_msg_info_reply();
+  msg_rpc_.release_msg_shrink_req();
+  msg_rpc_.release_msg_shrink_reply();
+  msg_rpc_.release_msg_list_req();
+  msg_rpc_.release_msg_list_reply();
+  msg_rpc_.release_msg_detach();
+}
+
+
+bool CacheTransport::Frame::ParseMsgRpc(void *buffer, uint32_t size) {
+  bool retval = msg_rpc_.ParseFromArray(buffer, size);
+  if (!retval)
+    return false;
+
+  // Cleanup typed message when Frame leaves scope
+  owns_msg_typed_ = true;
+  return true;
+}
+
+
+void CacheTransport::Frame::WrapMsg() {
+  if (msg_typed_->GetTypeName() == "cvmfs.MsgHandshake") {
+    msg_rpc_.set_allocated_msg_handshake(
+      reinterpret_cast<cvmfs::MsgHandshake *>(msg_typed_));
+  } else if (msg_typed_->GetTypeName() == "cvmfs.MsgHandshakeAck") {
+    msg_rpc_.set_allocated_msg_handshake_ack(
+      reinterpret_cast<cvmfs::MsgHandshakeAck *>(msg_typed_));
+  } else if (msg_typed_->GetTypeName() == "cvmfs.MsgQuit") {
+    msg_rpc_.set_allocated_msg_quit(
+      reinterpret_cast<cvmfs::MsgQuit *>(msg_typed_));
+  } else if (msg_typed_->GetTypeName() == "cvmfs.MsgRefcountReq") {
+    msg_rpc_.set_allocated_msg_refcount_req(
+      reinterpret_cast<cvmfs::MsgRefcountReq *>(msg_typed_));
+  } else if (msg_typed_->GetTypeName() == "cvmfs.MsgRefcountReply") {
+    msg_rpc_.set_allocated_msg_refcount_reply(
+      reinterpret_cast<cvmfs::MsgRefcountReply *>(msg_typed_));
+  } else if (msg_typed_->GetTypeName() == "cvmfs.MsgObjectInfoReq") {
+    msg_rpc_.set_allocated_msg_object_info_req(
+      reinterpret_cast<cvmfs::MsgObjectInfoReq *>(msg_typed_));
+  } else if (msg_typed_->GetTypeName() == "cvmfs.MsgObjectInfoReply") {
+    msg_rpc_.set_allocated_msg_object_info_reply(
+      reinterpret_cast<cvmfs::MsgObjectInfoReply *>(msg_typed_));
+  } else if (msg_typed_->GetTypeName() == "cvmfs.MsgReadReq") {
+    msg_rpc_.set_allocated_msg_read_req(
+      reinterpret_cast<cvmfs::MsgReadReq *>(msg_typed_));
+  } else {
+    // Unexpected message type, should never happen
+    abort();
+  }
+  is_wrapped_ = true;
+}
+
+
+void CacheTransport::Frame::UnwrapMsg() {
+  if (msg_rpc_.has_msg_handshake()) {
+    msg_typed_ = msg_rpc_.mutable_msg_handshake();
+  } else if (msg_rpc_.has_msg_handshake_ack()) {
+    msg_typed_ = msg_rpc_.mutable_msg_handshake_ack();
+  } else if (msg_rpc_.has_msg_quit()) {
+    msg_typed_ = msg_rpc_.mutable_msg_quit();
+  } else if (msg_rpc_.has_msg_refcount_req()) {
+    msg_typed_ = msg_rpc_.mutable_msg_refcount_req();
+  } else if (msg_rpc_.has_msg_refcount_reply()) {
+    msg_typed_ = msg_rpc_.mutable_msg_refcount_reply();
+  } else if (msg_rpc_.has_msg_object_info_req()) {
+    msg_typed_ = msg_rpc_.mutable_msg_object_info_req();
+  } else if (msg_rpc_.has_msg_object_info_reply()) {
+    msg_typed_ = msg_rpc_.mutable_msg_object_info_reply();
+  } else if (msg_rpc_.has_msg_read_req()) {
+    msg_typed_ = msg_rpc_.mutable_msg_read_req();
+  } else if (msg_rpc_.has_msg_read_reply()) {
+    msg_typed_ = msg_rpc_.mutable_msg_read_reply();
+  } else {
+    // Unexpected message type, should never happen
+    abort();
+  }
+}
+
+
+//------------------------------------------------------------------------------
+
 
 CacheTransport::CacheTransport(int fd_connection)
   : fd_connection_(fd_connection)
@@ -71,21 +212,10 @@ bool CacheTransport::ParseMsgHash(
 }
 
 
-bool CacheTransport::RecvHeader(uint32_t *size) {
-  unsigned char header[4];
-  ssize_t nbytes = SafeRead(fd_connection_, header, sizeof(header));
-  if (nbytes != sizeof(header))
-    return false;
-  if (header[0] != kWireProtocolVersion)
-    return false;
-  *size = header[1] + (header[2] << 8) + (header[3] << 16);
-  return (*size > 0) && (*size <= kMaxMsgSize);
-}
-
-
-bool CacheTransport::RecvMsg(google::protobuf::MessageLite *msg) {
+bool CacheTransport::RecvFrame(CacheTransport::Frame *frame) {
   uint32_t size;
-  bool retval = RecvHeader(&size);
+  bool has_attachment;
+  bool retval = RecvHeader(&size, &has_attachment);
   if (!retval)
     return false;
 
@@ -94,48 +224,101 @@ bool CacheTransport::RecvMsg(google::protobuf::MessageLite *msg) {
     buffer = alloca(size);
   else
     buffer = smalloc(size);
-  retval = RecvRawMsg(buffer, size);
+  ssize_t nbytes = SafeRead(fd_connection_, buffer, size);
+  if (nbytes != size) {
+    if (size > kMaxStackAlloc) { free(buffer); }
+    return false;
+  }
+
+  uint16_t msg_size = size;
+  if (has_attachment) {
+    if (size < 2) {
+      if (size > kMaxStackAlloc) { free(buffer); }
+      return false;
+    }
+    msg_size = (*reinterpret_cast<unsigned char *>(buffer)) +
+               (*(reinterpret_cast<unsigned char *>(buffer) + 1) << 8);
+    if ((msg_size + kInnerHeaderSize) > size) {
+      if (size > kMaxStackAlloc) { free(buffer); }
+      return false;
+    }
+  }
+
+  void *ptr_msg = has_attachment
+    ? (reinterpret_cast<char *>(buffer) + kInnerHeaderSize)
+    : buffer;
+  retval = frame->ParseMsgRpc(ptr_msg, msg_size);
   if (!retval) {
     if (size > kMaxStackAlloc) { free(buffer); }
     return false;
   }
-  retval = msg->ParseFromArray(buffer, size);
+
+  if (has_attachment) {
+    // TODO: Copy in preallocated buffer
+    uint32_t attachment_size = size - (msg_size + kInnerHeaderSize);
+    void *ptr_attachment =
+      reinterpret_cast<char *>(buffer) + kInnerHeaderSize + msg_size;
+    frame->set_attachment(ptr_attachment, attachment_size);
+  }
   if (size > kMaxStackAlloc) { free(buffer); }
-  return retval;
+  return true;
 }
 
 
-bool CacheTransport::RecvRawMsg(void *buffer, uint32_t size) {
-  assert(size > 0);
-  ssize_t nbytes = SafeRead(fd_connection_, buffer, size);
-  return (nbytes == size);
+bool CacheTransport::RecvHeader(uint32_t *size, bool *has_attachment) {
+  unsigned char header[kHeaderSize];
+  ssize_t nbytes = SafeRead(fd_connection_, header, kHeaderSize);
+  if (nbytes != kHeaderSize)
+    return false;
+  if ((header[0] & (~kFlagHasAttachment)) != kWireProtocolVersion)
+    return false;
+  *has_attachment = header[0] & kFlagHasAttachment;
+  *size = header[1] + (header[2] << 8) + (header[3] << 16);
+  return (*size > 0) && (*size <= kMaxMsgSize);
 }
 
 
 void CacheTransport::SendData(
-  void *data,
-  uint32_t size,
+  void *message,
+  uint32_t msg_size,
   void *attachment,
   uint32_t att_size)
 {
-  assert(size <= kMaxMsgSize);
+  uint32_t total_size =
+    msg_size + att_size + ((att_size > 0) ? kInnerHeaderSize : 0);
+
+  assert(total_size > 0);
+  assert(total_size <= kMaxMsgSize);
   LogCvmfs(kLogCache, kLogDebug,
-           "sending message of size %u to external cache plugin", size);
+           "sending message of size %u to external cache plugin", total_size);
 
-  unsigned char header[4];
-  header[0] = kWireProtocolVersion;
-  header[1] = (size & 0x000000FF);
-  header[2] = (size & 0x0000FF00) >> 8;
-  header[3] = (size & 0x00FF0000) >> 16;
+  unsigned char header[kHeaderSize];
+  header[0] = kWireProtocolVersion | ((att_size == 0) ? 0 : kFlagHasAttachment);
+  header[1] = (total_size & 0x000000FF);
+  header[2] = (total_size & 0x0000FF00) >> 8;
+  header[3] = (total_size & 0x00FF0000) >> 16;
 
-  struct iovec iov[3];
+  struct iovec iov[4];
   iov[0].iov_base = header;
-  iov[0].iov_len = sizeof(header);
-  iov[1].iov_base = data;
-  iov[1].iov_len = size;
-  iov[2].iov_base = attachment;
-  iov[2].iov_len = att_size;
-  bool retval = SafeWriteV(fd_connection_, iov, (att_size == 0) ? 2 : 3);
+  iov[0].iov_len = kHeaderSize;
+
+  if (att_size > 0) {
+    // Only transferred if an attachment is present.  Otherwise the overall size
+    // is also the size of the protobuf message.
+    unsigned char inner_header[2];
+    inner_header[0] = (msg_size & 0x000000FF);
+    inner_header[1] = (msg_size & 0x0000FF00) >> 8;
+    iov[1].iov_base = inner_header;
+    iov[1].iov_len = kInnerHeaderSize;
+    iov[2].iov_base = message;
+    iov[2].iov_len = msg_size;
+    iov[3].iov_base = attachment;
+    iov[3].iov_len = att_size;
+  } else {
+    iov[1].iov_base = message;
+    iov[1].iov_len = msg_size;
+  }
+  bool retval = SafeWriteV(fd_connection_, iov, (att_size == 0) ? 2 : 4);
 
   if (!retval) {
     LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
@@ -145,60 +328,12 @@ void CacheTransport::SendData(
 }
 
 
-void CacheTransport::SendMsg(google::protobuf::MessageLite *msg_typed) {
-  if (msg_typed->GetTypeName() == "cvmfs.MsgHandshake") {
-    cvmfs::MsgClientCall msg;
-    msg.set_allocated_msg_handshake(
-      reinterpret_cast<cvmfs::MsgHandshake *>(msg_typed));
-    SendRawMsg(&msg);
-    msg.release_msg_handshake();
-  } else if (msg_typed->GetTypeName() == "cvmfs.MsgHandshakeAck") {
-    cvmfs::MsgServerCall msg;
-    msg.set_allocated_msg_handshake_ack(
-      reinterpret_cast<cvmfs::MsgHandshakeAck *>(msg_typed));
-    SendRawMsg(&msg);
-    msg.release_msg_handshake_ack();
-  } else if (msg_typed->GetTypeName() == "cvmfs.MsgQuit") {
-    cvmfs::MsgClientCall msg;
-    msg.set_allocated_msg_quit(
-      reinterpret_cast<cvmfs::MsgQuit *>(msg_typed));
-    SendRawMsg(&msg);
-    msg.release_msg_quit();
-  } else if (msg_typed->GetTypeName() == "cvmfs.MsgRefcountReq") {
-    cvmfs::MsgClientCall msg;
-    msg.set_allocated_msg_refcount_req(
-      reinterpret_cast<cvmfs::MsgRefcountReq *>(msg_typed));
-    SendRawMsg(&msg);
-    msg.release_msg_refcount_req();
-  } else if (msg_typed->GetTypeName() == "cvmfs.MsgRefcountReply") {
-    cvmfs::MsgServerCall msg;
-    msg.set_allocated_msg_refcount_reply(
-      reinterpret_cast<cvmfs::MsgRefcountReply *>(msg_typed));
-    SendRawMsg(&msg);
-    msg.release_msg_refcount_reply();
-  } else if (msg_typed->GetTypeName() == "cvmfs.MsgObjectInfoReq") {
-    cvmfs::MsgClientCall msg;
-    msg.set_allocated_msg_object_info_req(
-      reinterpret_cast<cvmfs::MsgObjectInfoReq *>(msg_typed));
-    SendRawMsg(&msg);
-    msg.release_msg_object_info_req();
-  } else if (msg_typed->GetTypeName() == "cvmfs.MsgObjectInfoReply") {
-    cvmfs::MsgServerCall msg;
-    msg.set_allocated_msg_object_info_reply(
-      reinterpret_cast<cvmfs::MsgObjectInfoReply *>(msg_typed));
-    SendRawMsg(&msg);
-    msg.release_msg_object_info_reply();
-  } else {
-    abort();
-  }
-}
-
-
-void CacheTransport::SendRawMsg(google::protobuf::MessageLite *msg) {
-  int32_t size = msg->ByteSize();
-  assert(size >= 0);
+void CacheTransport::SendFrame(CacheTransport::Frame *frame) {
+  cvmfs::MsgRpc *msg_rpc = frame->GetMsgRpc();
+  int32_t size = msg_rpc->ByteSize();
+  assert(size > 0);
   void *buffer = alloca(size);
-  bool retval = msg->SerializeToArray(buffer, size);
+  bool retval = msg_rpc->SerializeToArray(buffer, size);
   assert(retval);
-  SendData(buffer, size);
+  SendData(buffer, size, frame->attachment(), frame->att_size());
 }
