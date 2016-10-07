@@ -1,0 +1,123 @@
+
+cvmfs_test_name="OverlayFS Validation"
+cvmfs_test_autofs_on_startup=false
+
+# 1. Delete files in the lower read-only branch of the union fs
+delete_file_in_lower_branch() {
+    echo "Check deleting files in the lower read-only branch of the union fs"
+
+    root_dir=$(pwd)
+    read_only=$root_dir/read_only
+    read_write=$root_dir/read_write
+    work_dir=$root_dir/work_dir
+    union=$root_dir/union
+
+    # preparation
+    echo "Creating overlay fs"
+    mkdir -p $read_only $read_write $work_dir $union
+    echo "foobar" > $read_only/foobar
+    sudo mount -t overlay -o rw,lowerdir=$read_only,upperdir=$read_write,workdir=$work_dir test_ofs $union
+
+    # reproduction
+    echo "Delete file from read-only layer"
+    rm -f $union/foobar
+
+    # ls produces obviously bogus output
+    ls -lisa $union
+
+    # cat encounters ENOENT as expected
+    cat $union/foobar
+    local status=$?
+
+    # Cleaning up
+    sudo umount test_ofs
+    sudo rm -r $root_dir
+
+    if [ "$status" != 0 ]; then
+        return 1;
+    fi
+    return 0
+}
+
+# 2. Open file paths in /proc/\$PID/fd
+check_file_path() {
+    printf "\nCheck open file paths in /proc/\$PID/fd\n"
+
+    root_dir=$(pwd)
+    read_only=$root_dir/read_only
+    read_write=$root_dir/read_write
+    work_dir=$root_dir/work_dir
+    union=$root_dir/union
+
+    # preparation
+    echo "Creating overlay fs"
+    mkdir -p $read_only $read_write $work_dir $union
+    echo foobar > $read_only/foobar
+    sudo mount -t overlay -o rw,lowerdir=$read_only,upperdir=$read_write,workdir=$work_dir test_ofs $union
+
+    # open a file on OverlayFS
+    tail -f $union/foobar &
+    tail_pid=$!
+
+    # ls produces obviously bogus output
+    echo "Check /proc/\$PID/fd"
+    ls -lisa /proc/$tail_pid/fd
+    local status=$?
+
+    # Cleaning up
+    kill $tail_pid
+    sudo umount test_ofs
+    sudo rm -r $root_dir
+
+    if [ "$status" != 0 ]; then
+        return 1;
+    fi
+    return 0
+}
+
+# 3. Delete directories in the lower read-only branch of the union fs
+delete_dir_in_lower_branch () {
+    echo "Check deleting directories in the lower read-only branch of the union fs"
+
+    root_dir=$(pwd)
+    read_only=$root_dir/read_only
+    read_write=$root_dir/read_write
+    work_dir=$root_dir/work_dir
+    union=$root_dir/union
+
+    # preparation
+    mkdir -p $read_only $read_write $work_dir $union
+    mkdir $read_only/foo
+    echo foobar > $read_only/foo/foobar
+    sudo mount -t overlay -o rw,lowerdir=$read_only,upperdir=$read_write,workdir=$work_dir test_ofs $union
+
+    # reproduction
+    rm -fR $union/foo
+
+    # ls shows that 'foo' is still there
+    ls -lisa $union
+    local status=$?
+
+    # Cleaning up
+    sudo umount test_ofs
+    sudo rm -r $root_dir
+
+    if [ "$status" != 0 ]; then
+        return 1;
+    fi
+    return 0
+}
+
+cvmfs_run_test() {
+    delete_file_in_lower_branch
+    local status1=$?
+    check_file_path
+    local status2=$?
+    delete_dir_in_lower_branch
+    local status3=$?
+
+    if [ "$status1" != 0 -o "$status2" != 0 -o "$status3" != 0 ]; then
+        return 1;
+    fi
+    return 0;
+}
