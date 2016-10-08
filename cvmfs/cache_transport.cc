@@ -9,6 +9,7 @@
 
 #include <cassert>
 #include <cstdlib>
+#include <cstring>
 
 #include "hash.h"
 #include "logging.h"
@@ -122,6 +123,9 @@ void CacheTransport::Frame::WrapMsg() {
   } else if (msg_typed_->GetTypeName() == "cvmfs.MsgReadReq") {
     msg_rpc_.set_allocated_msg_read_req(
       reinterpret_cast<cvmfs::MsgReadReq *>(msg_typed_));
+  } else if (msg_typed_->GetTypeName() == "cvmfs.MsgReadReply") {
+    msg_rpc_.set_allocated_msg_read_reply(
+      reinterpret_cast<cvmfs::MsgReadReply *>(msg_typed_));
   } else {
     // Unexpected message type, should never happen
     abort();
@@ -230,14 +234,14 @@ bool CacheTransport::RecvFrame(CacheTransport::Frame *frame) {
     return false;
   }
 
-  uint16_t msg_size = size;
+  uint32_t msg_size = size;
   if (has_attachment) {
     if (size < 2) {
       if (size > kMaxStackAlloc) { free(buffer); }
       return false;
     }
     msg_size = (*reinterpret_cast<unsigned char *>(buffer)) +
-               (*(reinterpret_cast<unsigned char *>(buffer) + 1) << 8);
+               ((*(reinterpret_cast<unsigned char *>(buffer) + 1)) << 8);
     if ((msg_size + kInnerHeaderSize) > size) {
       if (size > kMaxStackAlloc) { free(buffer); }
       return false;
@@ -254,11 +258,15 @@ bool CacheTransport::RecvFrame(CacheTransport::Frame *frame) {
   }
 
   if (has_attachment) {
-    // TODO: Copy in preallocated buffer
     uint32_t attachment_size = size - (msg_size + kInnerHeaderSize);
+    if (frame->att_size() < attachment_size) {
+      if (size > kMaxStackAlloc) { free(buffer); }
+      return false;
+    }
     void *ptr_attachment =
       reinterpret_cast<char *>(buffer) + kInnerHeaderSize + msg_size;
-    frame->set_attachment(ptr_attachment, attachment_size);
+    memcpy(frame->attachment(), ptr_attachment, attachment_size);
+    frame->set_att_size(attachment_size);
   }
   if (size > kMaxStackAlloc) { free(buffer); }
   return true;
@@ -297,15 +305,15 @@ void CacheTransport::SendData(
   header[1] = (total_size & 0x000000FF);
   header[2] = (total_size & 0x0000FF00) >> 8;
   header[3] = (total_size & 0x00FF0000) >> 16;
+  // Only transferred if an attachment is present.  Otherwise the overall size
+  // is also the size of the protobuf message.
+  unsigned char inner_header[kInnerHeaderSize];
 
   struct iovec iov[4];
   iov[0].iov_base = header;
   iov[0].iov_len = kHeaderSize;
 
   if (att_size > 0) {
-    // Only transferred if an attachment is present.  Otherwise the overall size
-    // is also the size of the protobuf message.
-    unsigned char inner_header[2];
     inner_header[0] = (msg_size & 0x000000FF);
     inner_header[1] = (msg_size & 0x0000FF00) >> 8;
     iov[1].iov_base = inner_header;

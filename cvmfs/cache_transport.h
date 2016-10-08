@@ -66,6 +66,7 @@ class CacheTransport {
 
     void *attachment() const { return attachment_; }
     uint32_t att_size() const { return att_size_; }
+    void set_att_size(uint32_t size) { att_size_ = size; }
     void set_attachment(void *attachment, uint32_t att_size) {
       attachment_ = attachment;
       att_size_ = att_size;

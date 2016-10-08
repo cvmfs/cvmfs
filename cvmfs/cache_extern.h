@@ -64,7 +64,9 @@ class ExternalCacheManager : public CacheManager {
   explicit ExternalCacheManager(int fd_connection, unsigned max_open_fds);
   int64_t NextRequestId() { return atomic_xadd64(&next_request_id_, 1); }
   void CallRemotely(google::protobuf::MessageLite *msg_req,
-                    google::protobuf::MessageLite *msg_reply);
+                    google::protobuf::MessageLite *msg_reply,
+                    void *buffer = NULL,
+                    uint64_t *buf_size = NULL);
   int ChangeRefcount(const shash::Any &id, int change_by);
   int DoOpen(const shash::Any &id);
   shash::Any GetHandle(int fd);

@@ -9,6 +9,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
+#include <algorithm>
 #include <cassert>
 #include <cstring>
 #include <string>
@@ -117,6 +118,37 @@ class MockCachePlugin {
                                cache_plugin->next_status));
         }
         CacheTransport::Frame frame_send(&msg_reply);
+        transport.SendFrame(&frame_send);
+      } else if (msg_typed->GetTypeName() == "cvmfs.MsgReadReq") {
+        cvmfs::MsgReadReq *msg_req =
+          reinterpret_cast<cvmfs::MsgReadReq *>(msg_typed);
+        cvmfs::MsgReadReply msg_reply;
+        CacheTransport::Frame frame_send(&msg_reply);
+        msg_reply.set_req_id(msg_req->req_id());
+        shash::Any object_id;
+        bool retval = transport.ParseMsgHash(msg_req->object_id(), &object_id);
+        if (!retval) {
+          msg_reply.set_status(cvmfs::STATUS_MALFORMED);
+        } else if (object_id != cache_plugin->known_object) {
+          msg_reply.set_status(cvmfs::STATUS_NOENTRY);
+        } else {
+          const char *data = cache_plugin->known_object_content.data();
+          uint32_t data_size = cache_plugin->known_object_content.length();
+          if (msg_req->offset() >= data_size) {
+            msg_reply.set_status(cvmfs::STATUS_OUTOFBOUNDS);
+          } else {
+            frame_send.set_attachment(
+              const_cast<char *>(data) + msg_req->offset(),
+              std::min(msg_req->size(),
+                       static_cast<uint32_t>(data_size - msg_req->offset()))
+            );
+            msg_reply.set_status(cvmfs::STATUS_OK);
+          }
+        }
+        if (cache_plugin->next_status >= 0) {
+          msg_reply.set_status(static_cast<cvmfs::EnumStatus>(
+                               cache_plugin->next_status));
+        }
         transport.SendFrame(&frame_send);
       } else {
         abort();
@@ -246,4 +278,21 @@ TEST_F(T_ExternalCacheManager, Dup) {
     EXPECT_EQ(0, cache_mgr_->Close(fds[i]));
   }
   EXPECT_EQ(0, mock_plugin_->known_object_refcnt);
+}
+
+
+TEST_F(T_ExternalCacheManager, Pread) {
+  unsigned buf_size = 64;
+  char buffer[64];
+  EXPECT_EQ(-EBADF, cache_mgr_->Pread(0, buffer, buf_size, 0));
+
+  int fd = cache_mgr_->Open(CacheManager::Bless(mock_plugin_->known_object));
+  EXPECT_GE(fd, 0);
+  EXPECT_EQ(-EINVAL, cache_mgr_->Pread(fd, buffer, 0, 64));
+  int64_t len = cache_mgr_->Pread(fd, buffer, 64, 0);
+  EXPECT_EQ(static_cast<int>(mock_plugin_->known_object_content.length()), len);
+  EXPECT_EQ(mock_plugin_->known_object_content, string(buffer, len));
+  EXPECT_EQ(1, cache_mgr_->Pread(fd, buffer, 1, len-1));
+  EXPECT_EQ(mock_plugin_->known_object_content[len-1], buffer[0]);
+  EXPECT_EQ(0, cache_mgr_->Close(fd));
 }

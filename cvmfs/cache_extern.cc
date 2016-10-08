@@ -63,12 +63,16 @@ bool ExternalCacheManager::AcquireQuotaManager(QuotaManager *quota_mgr) {
 
 void ExternalCacheManager::CallRemotely(
   google::protobuf::MessageLite *msg_req,
-  google::protobuf::MessageLite *msg_reply)
+  google::protobuf::MessageLite *msg_reply,
+  void *buffer,
+  uint64_t *buf_size)
 {
   if (!spawned_) {
     CacheTransport::Frame frame_send(msg_req);
     transport_.SendFrame(&frame_send);
     CacheTransport::Frame frame_recv;
+    if (buffer)
+      frame_recv.set_attachment(buffer, *buf_size);
     bool retval = transport_.RecvFrame(&frame_recv);
     assert(retval);
     google::protobuf::MessageLite *msg_typed = frame_recv.GetMsgTyped();
@@ -80,6 +84,10 @@ void ExternalCacheManager::CallRemotely(
     } else if (msg_req->GetTypeName() == "cvmfs.MsgObjectInfoReq") {
       assert(reinterpret_cast<cvmfs::MsgObjectInfoReq *>(msg_req)->req_id() ==
              reinterpret_cast<cvmfs::MsgObjectInfoReply*>(msg_reply)->req_id());
+    } else if (msg_req->GetTypeName() == "cvmfs.MsgReadReq") {
+     assert(reinterpret_cast<cvmfs::MsgReadReq *>(msg_req)->req_id() ==
+            reinterpret_cast<cvmfs::MsgReadReply*>(msg_reply)->req_id());
+     *buf_size = frame_recv.att_size();
     } else {
       abort();
     }
@@ -277,8 +285,12 @@ int64_t ExternalCacheManager::Pread(
   msg_read.set_offset(offset);
   msg_read.set_size(size);
   cvmfs::MsgReadReply msg_reply;
-  CallRemotely(&msg_read, &msg_reply);
+  CallRemotely(&msg_read, &msg_reply, buf, &size);
   msg_read.release_object_id();
+
+  if (msg_reply.status() == cvmfs::STATUS_OK)
+    return size;
+
   return Ack2Errno(msg_reply.status());
 }
 
