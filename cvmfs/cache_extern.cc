@@ -48,6 +48,7 @@ int Ack2Errno(cvmfs::EnumStatus status_code) {
 
 const shash::Any ExternalCacheManager::kInvalidHandle;
 
+
 int ExternalCacheManager::AbortTxn(void *txn) {
   return -1;
 }
@@ -61,36 +62,11 @@ bool ExternalCacheManager::AcquireQuotaManager(QuotaManager *quota_mgr) {
 }
 
 
-void ExternalCacheManager::CallRemotely(
-  google::protobuf::MessageLite *msg_req,
-  google::protobuf::MessageLite *msg_reply,
-  void *buffer,
-  uint64_t *buf_size)
-{
+void ExternalCacheManager::CallRemotely(ExternalCacheManager::RpcJob *rpc_job) {
   if (!spawned_) {
-    CacheTransport::Frame frame_send(msg_req);
-    transport_.SendFrame(&frame_send);
-    CacheTransport::Frame frame_recv;
-    if (buffer)
-      frame_recv.set_attachment(buffer, *buf_size);
-    bool retval = transport_.RecvFrame(&frame_recv);
+    transport_.SendFrame(rpc_job->frame_send());
+    bool retval = transport_.RecvFrame(rpc_job->frame_recv());
     assert(retval);
-    google::protobuf::MessageLite *msg_typed = frame_recv.GetMsgTyped();
-    msg_reply->CheckTypeAndMergeFrom(*msg_typed);
-
-    if (msg_req->GetTypeName() == "cvmfs.MsgRefcountReq") {
-      assert(reinterpret_cast<cvmfs::MsgRefcountReq *>(msg_req)->req_id() ==
-             reinterpret_cast<cvmfs::MsgRefcountReply *>(msg_reply)->req_id());
-    } else if (msg_req->GetTypeName() == "cvmfs.MsgObjectInfoReq") {
-      assert(reinterpret_cast<cvmfs::MsgObjectInfoReq *>(msg_req)->req_id() ==
-             reinterpret_cast<cvmfs::MsgObjectInfoReply*>(msg_reply)->req_id());
-    } else if (msg_req->GetTypeName() == "cvmfs.MsgReadReq") {
-     assert(reinterpret_cast<cvmfs::MsgReadReq *>(msg_req)->req_id() ==
-            reinterpret_cast<cvmfs::MsgReadReply*>(msg_reply)->req_id());
-     *buf_size = frame_recv.att_size();
-    } else {
-      abort();
-    }
   } else {
     // TODO
     abort();
@@ -106,11 +82,12 @@ int ExternalCacheManager::ChangeRefcount(const shash::Any &id, int change_by) {
   msg_refcount.set_req_id(NextRequestId());
   msg_refcount.set_allocated_object_id(&object_id);
   msg_refcount.set_change_by(change_by);
-  cvmfs::MsgRefcountReply msg_reply;
-  CallRemotely(&msg_refcount, &msg_reply);
+  RpcJob rpc_job(&msg_refcount);
+  CallRemotely(&rpc_job);
   msg_refcount.release_object_id();
 
-  return Ack2Errno(msg_reply.status());
+  cvmfs::MsgRefcountReply *msg_reply = rpc_job.msg_refcount_reply();
+  return Ack2Errno(msg_reply->status());
 }
 
 
@@ -218,15 +195,16 @@ int64_t ExternalCacheManager::GetSize(int fd) {
   msg_info.set_req_id(NextRequestId());
   msg_info.set_allocated_object_id(&object_id);
   msg_info.set_info_flags(cvmfs::OBJECT_INFO_SIZE);
-  cvmfs::MsgObjectInfoReply msg_reply;
-  CallRemotely(&msg_info, &msg_reply);
+  RpcJob rpc_job(&msg_info);
+  CallRemotely(&rpc_job);
   msg_info.release_object_id();
 
-  if (msg_reply.status() == cvmfs::STATUS_OK) {
-    assert(msg_reply.has_size());
-    return msg_reply.size();
+  cvmfs::MsgObjectInfoReply *msg_reply = rpc_job.msg_object_info_reply();
+  if (msg_reply->status() == cvmfs::STATUS_OK) {
+    assert(msg_reply->has_size());
+    return msg_reply->size();
   }
-  return Ack2Errno(msg_reply.status());
+  return Ack2Errno(msg_reply->status());
 }
 
 
@@ -284,14 +262,16 @@ int64_t ExternalCacheManager::Pread(
   msg_read.set_allocated_object_id(&object_id);
   msg_read.set_offset(offset);
   msg_read.set_size(size);
-  cvmfs::MsgReadReply msg_reply;
-  CallRemotely(&msg_read, &msg_reply, buf, &size);
+  RpcJob rpc_job(&msg_read);
+  rpc_job.set_attachment_recv(buf, size);
+  CallRemotely(&rpc_job);
   msg_read.release_object_id();
 
-  if (msg_reply.status() == cvmfs::STATUS_OK)
-    return size;
+  cvmfs::MsgReadReply *msg_reply = rpc_job.msg_read_reply();
+  if (msg_reply->status() == cvmfs::STATUS_OK)
+    return rpc_job.frame_recv()->att_size();
 
-  return Ack2Errno(msg_reply.status());
+  return Ack2Errno(msg_reply->status());
 }
 
 

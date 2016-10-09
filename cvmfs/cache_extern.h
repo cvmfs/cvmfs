@@ -5,6 +5,9 @@
 #define CVMFS_CACHE_EXTERN_H_
 
 #include <pthread.h>
+#include <stdint.h>
+
+#include <cassert>
 
 #include "atomic.h"
 #include "cache.h"
@@ -61,12 +64,58 @@ class ExternalCacheManager : public CacheManager {
     shash::Any id;
   };
 
+  class RpcJob {
+   public:
+    explicit RpcJob(cvmfs::MsgRefcountReq *msg)
+      : req_id_(msg->req_id()), msg_req_(msg), frame_send_(msg) { }
+    explicit RpcJob(cvmfs::MsgObjectInfoReq *msg)
+      : req_id_(msg->req_id()), msg_req_(msg), frame_send_(msg) { }
+    explicit RpcJob(cvmfs::MsgReadReq *msg)
+      : req_id_(msg->req_id()), msg_req_(msg), frame_send_(msg) { }
+
+    void set_attachment_send(void *data, unsigned size) {
+      frame_send_.set_attachment(data, size);
+    }
+
+    void set_attachment_recv(void *data, unsigned size) {
+      frame_recv_.set_attachment(data, size);
+    }
+
+    google::protobuf::MessageLite *msg_req() { return msg_req_; }
+    // Type checking has been already performed
+    cvmfs::MsgRefcountReply *msg_refcount_reply() {
+      cvmfs::MsgRefcountReply *m = reinterpret_cast<cvmfs::MsgRefcountReply *>(
+        frame_recv_.GetMsgTyped());
+      assert(m->req_id() == req_id_);
+      return m;
+    }
+    cvmfs::MsgObjectInfoReply *msg_object_info_reply() {
+      cvmfs::MsgObjectInfoReply *m =
+        reinterpret_cast<cvmfs::MsgObjectInfoReply *>(
+          frame_recv_.GetMsgTyped());
+      assert(m->req_id() == req_id_);
+      return m;
+    }
+    cvmfs::MsgReadReply *msg_read_reply() {
+      cvmfs::MsgReadReply *m = reinterpret_cast<cvmfs::MsgReadReply *>(
+        frame_recv_.GetMsgTyped());
+      assert(m->req_id() == req_id_);
+      return m;
+    }
+
+    CacheTransport::Frame *frame_send() { return &frame_send_; }
+    CacheTransport::Frame *frame_recv() { return &frame_recv_; }
+
+   private:
+    uint64_t req_id_;
+    google::protobuf::MessageLite *msg_req_;
+    CacheTransport::Frame frame_send_;
+    CacheTransport::Frame frame_recv_;
+  };
+
   explicit ExternalCacheManager(int fd_connection, unsigned max_open_fds);
   int64_t NextRequestId() { return atomic_xadd64(&next_request_id_, 1); }
-  void CallRemotely(google::protobuf::MessageLite *msg_req,
-                    google::protobuf::MessageLite *msg_reply,
-                    void *buffer = NULL,
-                    uint64_t *buf_size = NULL);
+  void CallRemotely(RpcJob *rpc_job);
   int ChangeRefcount(const shash::Any &id, int change_by);
   int DoOpen(const shash::Any &id);
   shash::Any GetHandle(int fd);
