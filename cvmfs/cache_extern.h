@@ -52,10 +52,32 @@ class ExternalCacheManager : public CacheManager {
    */
   static const shash::Any kInvalidHandle;
   /**
-   * Objects cannot be larger than 4 MB.  Keeps transaction memory consumption
+   * Objects cannot be larger than 512 kB.  Keeps transaction memory consumption
    * under control.
    */
-  static const unsigned kMaxSupportedObjectSize = 4 * 1024 * 1024;
+  static const unsigned kMaxSupportedObjectSize = 512 * 1024;
+
+  struct Transaction {
+    Transaction(const shash::Any &id)
+      : buffer(reinterpret_cast<unsigned char *>(this) + sizeof(this))
+      , buf_pos(0)
+      , size(0)
+      , expected_size(kSizeUnknown)
+      , object_info(kTypeRegular, "")
+      , id(id)
+    { }
+
+    /**
+     * Allocated size is max_object_size_, allocated by the caller at the end
+     * of the transaction.
+     */
+    unsigned char *buffer;
+    unsigned buf_pos;
+    uint64_t size;
+    uint64_t expected_size;
+    ObjectInfo object_info;
+    shash::Any id;
+  };
 
   struct ReadOnlyHandle {
     ReadOnlyHandle() : id(kInvalidHandle) { }

@@ -135,6 +135,7 @@ ExternalCacheManager *ExternalCacheManager::Create(
     reinterpret_cast<cvmfs::MsgHandshakeAck *>(msg_typed);
   cache_mgr->session_id_ = msg_ack->session_id();
   cache_mgr->max_object_size_ = msg_ack->max_object_size();
+  assert(cache_mgr->max_object_size_ > 0);
   if (cache_mgr->max_object_size_ > kMaxSupportedObjectSize) {
     LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
              "external cache manager object size too large (%u)",

@@ -66,7 +66,7 @@ class MockCachePlugin {
         msg_ack.set_name("unit test cache manager");
         msg_ack.set_protocol_version(ExternalCacheManager::kPbProtocolVersion);
         msg_ack.set_session_id(42);
-        msg_ack.set_max_object_size(1024 * 1024);  // 1MB
+        msg_ack.set_max_object_size(128 * 1024);  // 128kB
         CacheTransport::Frame frame_send(&msg_ack);
         transport.SendFrame(&frame_send);
       } else if (msg_typed->GetTypeName() == "cvmfs.MsgQuit") {
