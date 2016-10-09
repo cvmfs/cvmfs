@@ -51,6 +51,11 @@ class ExternalCacheManager : public CacheManager {
    * invalid handle
    */
   static const shash::Any kInvalidHandle;
+  /**
+   * Objects cannot be larger than 4 MB.  Keeps transaction memory consumption
+   * under control.
+   */
+  static const unsigned kMaxSupportedObjectSize = 4 * 1024 * 1024;
 
   struct ReadOnlyHandle {
     ReadOnlyHandle() : id(kInvalidHandle) { }
@@ -123,6 +128,7 @@ class ExternalCacheManager : public CacheManager {
   FdTable<ReadOnlyHandle> fd_table_;
   CacheTransport transport_;
   int64_t session_id_;
+  uint32_t max_object_size_;
   bool spawned_;
   pthread_rwlock_t rwlock_fd_table_;
   atomic_int64 next_request_id_;

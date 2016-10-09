@@ -296,3 +296,12 @@ TEST_F(T_ExternalCacheManager, Pread) {
   EXPECT_EQ(mock_plugin_->known_object_content[len-1], buffer[0]);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
 }
+
+
+TEST_F(T_ExternalCacheManager, Readahead) {
+  EXPECT_EQ(-EBADF, cache_mgr_->Readahead(0));
+  int fd = cache_mgr_->Open(CacheManager::Bless(mock_plugin_->known_object));
+  EXPECT_GE(fd, 0);
+  EXPECT_EQ(0, cache_mgr_->Readahead(fd));
+  EXPECT_EQ(0, cache_mgr_->Close(fd));
+}

@@ -131,8 +131,16 @@ ExternalCacheManager *ExternalCacheManager::Create(
   google::protobuf::MessageLite *msg_typed = frame_recv.GetMsgTyped();
   if (msg_typed->GetTypeName() != "cvmfs.MsgHandshakeAck")
     return NULL;
-  cache_mgr->session_id_ =
-    reinterpret_cast<cvmfs::MsgHandshakeAck *>(msg_typed)->session_id();
+  cvmfs::MsgHandshakeAck *msg_ack =
+    reinterpret_cast<cvmfs::MsgHandshakeAck *>(msg_typed);
+  cache_mgr->session_id_ = msg_ack->session_id();
+  cache_mgr->max_object_size_ = msg_ack->max_object_size();
+  if (cache_mgr->max_object_size_ > kMaxSupportedObjectSize) {
+    LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
+             "external cache manager object size too large (%u)",
+             cache_mgr->max_object_size_);
+    return NULL;
+  }
   return cache_mgr.Release();
 }
 
@@ -214,6 +222,7 @@ ExternalCacheManager::ExternalCacheManager(
   : fd_table_(max_open_fds, ReadOnlyHandle())
   , transport_(fd_connection)
   , session_id_(-1)
+  , max_object_size_(0)
   , spawned_(false)
 {
   int retval = pthread_rwlock_init(&rwlock_fd_table_, NULL);
@@ -276,7 +285,11 @@ int64_t ExternalCacheManager::Pread(
 
 
 int ExternalCacheManager::Readahead(int fd) {
-  return -1;
+  shash::Any id = GetHandle(fd);
+  if (id == kInvalidHandle)
+    return -EBADF;
+  // No-op
+  return 0;
 }
 
 
