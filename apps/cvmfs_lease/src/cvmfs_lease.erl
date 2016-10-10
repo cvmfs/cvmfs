@@ -9,10 +9,16 @@
 
 -module(cvmfs_lease).
 
+-compile([{parse_transform, lager_transform}]).
+
+-include_lib("stdlib/include/ms_transform.hrl").
+
 -behaviour(gen_server).
 
 %% API
--export([start_link/0]).
+-export([start_link/1, stop/0
+        ,request_lease/3, end_lease/2
+        ,get_leases/0, clear_leases/0]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -20,7 +26,14 @@
 
 -define(SERVER, ?MODULE).
 
--record(state, {}).
+%% Records used as table entries
+
+-record(lease, { s_path :: {binary(), binary()} % repo + subpath which is locked
+               , u_id   :: binary()  % user identifier
+               , time   :: integer()  % timestamp (time when lease acquired)
+               }).
+
+-record(state, { max_lease_time :: integer() }). % max lease time in milliseconds
 
 %%%===================================================================
 %%% API
@@ -33,8 +46,66 @@
 %% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
-start_link() ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
+start_link(Args) ->
+    gen_server:start_link({local, ?SERVER}, ?MODULE, Args, []).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Stops the server (only useful without a supervision tree)
+%%
+%% @spec stop() -> ok
+%% @end
+%%--------------------------------------------------------------------
+stop() ->
+    gen_server:cast(?MODULE, stop).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Requests a new lease
+%%
+%% @spec request_lease(User, Repo, Path)) -> {ok, LeaseId}
+%%                                         | {busy, TimeRemaining}
+%% @end
+%%--------------------------------------------------------------------
+-spec request_lease(binary(), binary(), binary()) -> {ok, binary()}
+                                                   | {busy, integer()}.
+request_lease(User, Repo, Path) when is_binary(User),
+                                     is_binary(Repo),
+                                     is_binary(Path) ->
+    gen_server:call(?MODULE, {lease_req, new_lease, {User, Repo, Path}}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Gives up an existing lease
+%%
+%% @spec end_lease(Path, Repo) -> ok | {error, lease_not_found}
+%% @end
+%%--------------------------------------------------------------------
+end_lease(Repo, Path) when is_binary(Repo), is_binary(Path) ->
+    gen_server:call(?MODULE, {lease_req, end_lease, {Repo, Path}}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Returns list of all active leases
+%%
+%% @spec get_leases() -> Leases
+%% @end
+%%--------------------------------------------------------------------
+-spec get_leases() -> [#lease{}].
+get_leases() ->
+    gen_server:call(?MODULE, {lease_req, get_leases}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Clears all existing leases from the table.
+%%
+%% @spec clear_leases() -> ok.
+%% @end
+%%--------------------------------------------------------------------
+-spec clear_leases() -> ok.
+clear_leases() ->
+    gen_server:call(?MODULE, {lease_req, clear_leases}).
+
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -51,8 +122,13 @@ start_link() ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([]) ->
-    {ok, #state{}}.
+init({MaxLeaseTime, MnesiaSchema}) ->
+    mnesia:create_table(lease, [{MnesiaSchema, [node() | nodes()]}
+                               ,{type, set}
+                               ,{attributes, record_info(fields, lease)}]),
+    ok = mnesia:wait_for_tables([lease], 10000),
+    lager:info("Lease table initialized"),
+    {ok, #state{max_lease_time = MaxLeaseTime}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -68,6 +144,26 @@ init([]) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_call({lease_req, new_lease, {User, Repo, Path}}, _From, State) ->
+    Reply = priv_new_lease(User, Repo, Path, State),
+    lager:info("Request received: {new_lease, ~p} -> Reply: ~p"
+              ,[{User, Repo, Path}, Reply]),
+    {reply, Reply, State};
+handle_call({lease_req, end_lease, {Repo, Path}}, _From, State) ->
+    Reply = priv_end_lease(Repo, Path),
+    lager:info("Request received: {end_lease, ~p} -> Reply: ~p"
+              ,[{Repo, Path}, Reply]),
+    {reply, Reply, State};
+handle_call({lease_req, get_leases}, _From, State) ->
+    Reply = priv_get_leases(),
+    lager:info("Request received: {get_leases} -> Reply: ~p"
+              ,[Reply]),
+    {reply, Reply, State};
+handle_call({lease_req, clear_leases}, _From, State) ->
+    Reply = priv_clear_leases(),
+    lager:info("Request received: {clear_leases} -> Reply: ~p"
+              ,[Reply]),
+    {reply, Reply, State};
 handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
@@ -82,7 +178,11 @@ handle_call(_Request, _From, State) ->
 %%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_cast(_Msg, State) ->
+handle_cast(stop, State) ->
+    lager:info("Request received: stop"),
+    {stop, normal, State};
+handle_cast(Msg, State) ->
+    lager:info("Cast received: ~p -> noreply", [Msg]),
     {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -95,7 +195,8 @@ handle_cast(_Msg, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_info(_Info, State) ->
+handle_info(Info, State) ->
+    lager:warning("Unknown message received: ~p", [Info]),
     {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -109,7 +210,8 @@ handle_info(_Info, State) ->
 %% @spec terminate(Reason, State) -> void()
 %% @end
 %%--------------------------------------------------------------------
-terminate(_Reason, _State) ->
+terminate(Reason, _State) ->
+    lager:info("CVMFS lease module terminating with reason: ~p", [Reason]),
     ok.
 
 %%--------------------------------------------------------------------
@@ -120,50 +222,78 @@ terminate(_Reason, _State) ->
 %% @spec code_change(OldVsn, State, Extra) -> {ok, NewState}
 %% @end
 %%--------------------------------------------------------------------
-code_change(_OldVsn, State, _Extra) ->
+code_change(OldVsn, State, _Extra) ->
+    lager:info("Code change request received. Old version: ~p", [OldVsn]),
     {ok, State}.
 
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
 
-%% %%--------------------------------------------------------------------
-%% %% @doc Returns the list of repos for which ClientId can obtain leases
-%% %% @end
-%% %%--------------------------------------------------------------------
-%% -spec get_client_acl(ClientId :: string()) -> no_acl_entry | {ok, [string()]}.
-%% get_client_acl(ClientId) when is_list(ClientId) ->
-%%     case ets:lookup(acl, ClientId) of
-%%         [] ->
-%%             cmvfs_om_log:debug("ACL entry not found for client id ~p", [ClientId]),
-%%             no_acl_entry;
-%%         [#acl_entry{user_id = ClientId, repo_ids = Repos} | _ ] ->
-%%             {ok, Repos}
-%%     end.
+priv_new_lease(User, Repo, Path, State) ->
+    #state{max_lease_time = MaxLeaseTime} = State,
 
-%% %%--------------------------------------------------------------------
-%% %% @doc Inserts a new lease into the 'leases' table
-%% %% @end
-%% %%--------------------------------------------------------------------
-%% -spec insert_lease(RepoPath ::string(), ClientId :: string(), SessionId :: string()) -> true.
-%% insert_lease(RepoPath, ClientId, SessionId) ->
-%%     ets:insert(leases, #lease_entry{repo_path = RepoPath,
-%%                                     user_id = ClientId,
-%%                                     session_id = SessionId,
-%%                                     timestamp = erlang:monotonic_time(seconds)}).
+    %% Match statement that selects all rows with a given repo,
+    %% returning a list of {Path, Time} pairs
+    MS = ets:fun2ms(fun(#lease{u_id = U, time = T, s_path = {R, P}}) when R =:= Repo ->
+                            {P, T}
+                    end),
 
-%% %%--------------------------------------------------------------------
-%% %% @doc Deletes a lease from the 'leases' table
-%% %% @end
-%% %%--------------------------------------------------------------------
-%% -spec delete_lease(RepoPath :: string()) -> true.
-%% delete_lease(RepoPath) ->
-%%     ets:delete(leases, RepoPath).
+    T = fun() ->
+                CurrentTime = erlang:system_time(milli_seconds),
 
-%% %%--------------------------------------------------------------------
-%% %% @doc Returns a list of pairs {Path, Timestamp} representing all the
-%% %%      active leases
-%% %% @end
-%% %%--------------------------------------------------------------------
-%% get_leases_for_path(Path) ->
-%%     [].
+                %% We select the rows related to a given repository
+                Results = mnesia:select(lease, MS),
+
+                %% We filter out entries which don't overlap with {Repo, Path}
+                case lists:filter(fun({P, _}) ->
+                                          cvmfs_lease_path_util:are_overlapping(P, Path)
+                                  end,
+                                  Results) of
+                    %% An everlapping path was found
+                    [{P, Time} | _] ->
+                        RemainingTime = MaxLeaseTime - (CurrentTime - Time),
+                        case RemainingTime > 0 of
+                            %% The old lease is still valid, return busy message
+                            true ->
+                                {busy, RemainingTime};
+                            %% The old lease is expired. Delete it and insert the new one
+                            false ->
+                                mnesia:delete({lease, {Repo, P}}),
+                                priv_write_row(User, Repo, Path)
+                        end;
+                    %% No overlapping paths were found; just insert the new entry
+                    _ ->
+                        priv_write_row(User, Repo, Path)
+                end
+        end,
+    {atomic, Result} = mnesia:transaction(T),
+    Result.
+
+priv_end_lease(Repo, Path) ->
+    T = fun() ->
+                case mnesia:read(lease, {Repo, Path}) of
+                    [] ->
+                        {error, lease_not_found};
+                    _ ->
+                        mnesia:delete({lease, {Repo, Path}})
+                end
+        end,
+    {atomic, Result} = mnesia:transaction(T),
+    Result.
+
+priv_get_leases() ->
+    T = fun() ->
+                mnesia:foldl(fun(Lease, Acc) -> [Lease | Acc] end, [], lease)
+        end,
+    {atomic, Result} = mnesia:transaction(T),
+    Result.
+
+priv_clear_leases() ->
+    {atomic, Result} = mnesia:clear_table(lease),
+    Result.
+
+priv_write_row(User, Repo, Path) ->
+    mnesia:write(#lease{s_path = {Repo, Path},
+                        u_id = User,
+                        time = erlang:system_time(milli_seconds)}).
