@@ -11,7 +11,7 @@
 -behaviour(supervisor).
 
 %% API
--export([start_link/0]).
+-export([start_link/1]).
 
 %% Supervisor callbacks
 -export([init/1]).
@@ -22,25 +22,25 @@
 %% API functions
 %%====================================================================
 
-start_link() ->
-    supervisor:start_link({local, ?SERVER}, ?MODULE, []).
+start_link(Args) ->
+    supervisor:start_link({local, ?SERVER}, ?MODULE, Args).
 
 %%====================================================================
 %% Supervisor callbacks
 %%====================================================================
 
 %% Child :: {Id,StartFunc,Restart,Shutdown,Type,Modules}
-init([]) ->
+init(Args) ->
     SupervisorSpecs = #{strategy => one_for_all,
                         intensity => 5,
                         period => 5},
-    CvmfsLeasesMainSpecs = #{id => cvmfs_lease,
-                             start => {cvmfs_lease, start_link, []},
-                             restart => permanent,
-                             shutdown => 2000,
-                             type => worker,
-                             modules => [cvmfs_lease,cvmfs_lease_storage]},
-    {ok, {SupervisorSpecs, [CvmfsLeasesMainSpecs]}}.
+    CvmfsLeaseMainSpecs = #{id => cvmfs_lease,
+                            start => {cvmfs_lease, start_link, [Args]},
+                            restart => permanent,
+                            shutdown => 2000,
+                            type => worker,
+                            modules => [cvmfs_lease]},
+    {ok, {SupervisorSpecs, [CvmfsLeaseMainSpecs]}}.
 
 %%====================================================================
 %% Internal functions
