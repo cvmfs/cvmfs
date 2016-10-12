@@ -8,6 +8,7 @@
 
 #include <cstdlib>
 
+#include "cache.h"
 #include "cache.pb.h"
 #include "util/single_copy.h"
 
@@ -101,6 +102,10 @@ class CacheTransport {
 
   void FillMsgHash(const shash::Any &hash, cvmfs::MsgHash *msg_hash);
   bool ParseMsgHash(const cvmfs::MsgHash &msg_hash, shash::Any *hash);
+  void FillObjectType(CacheManager::ObjectType object_type,
+                      cvmfs::EnumObjectType *wire_type);
+  bool ParseObjectType(cvmfs::EnumObjectType wire_type,
+                       CacheManager::ObjectType *object_type);
 
   int fd_connection() const { return fd_connection_; }
 

@@ -161,7 +161,7 @@ class CacheManager : SingleCopy {
   virtual int Dup(int fd) = 0;
   virtual int Readahead(int fd) = 0;
 
-  virtual uint16_t SizeOfTxn() = 0;
+  virtual uint32_t SizeOfTxn() = 0;
   virtual int StartTxn(const shash::Any &id, uint64_t size, void *txn) = 0;
   virtual void CtrlTxn(const ObjectInfo &object_info,
                        const int flags,  // reserved for future use

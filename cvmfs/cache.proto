@@ -118,6 +118,8 @@ message MsgHandshakeAck {
 message MsgQuit {
   // The connection identifier from the handshake acknowledgement
   required uint64 session_id = 1;
+  // The client can express its interest to reconnect soon (e.g. during reload)
+  optional bool temporary    = 2;
 }
 
 
@@ -138,30 +140,19 @@ message MsgStoreReq {
   required uint64 session_id          = 1;
   required uint64 req_id              = 2;
   required MsgHash object_id          = 3;
-  required EnumObjectType object_type = 4;
-  required uint64 initial_refcount    = 5;
+  required uint64 part_nr             = 4;
+  required bool last_part             = 5;
+  optional uint64 initial_refcount    = 6;
+  optional EnumObjectType object_type = 7;
   // This can be the path under /cvmfs that triggered storing the object
-  optional string description         = 6;
-  // If another client downloads the same object at the same time, wait for
-  // the other client to complete the operation
-  optional bool wait_for_txn          = 7 [default = false];
-  optional bool is_multipart          = 8 [default = false];
+  optional string description         = 8;
   // A checksum of the payload might be added
   optional fixed32 data_crc32         = 9;
 }
 
-message MsgStorePartReq {
-  required uint64 session_id          = 1;
-  required uint64 req_id              = 2;
-  required MsgHash object_id          = 3;
-  // Starts with 2
-  required uint64 part_nr             = 4;
-  optional bool is_last_part          = 5 [default = false];
-  optional fixed32 data_crc32         = 6;
-}
 
 // Discard a partially uploaded object
-message MsgAbortMultipartReq {
+message MsgStoreAbortReq {
   required uint64 session_id = 1;
   required uint64 req_id     = 2;
   required MsgHash object_id = 3;
@@ -173,8 +164,7 @@ message MsgStoreReply {
   // The part number that is being acknowledged (or zero for
   // MsgAbortMultipartReq)
   required uint64 part_nr      = 3;
-  // The object is already in the cache
-  optional bool is_present     = 4;
+  // TODO(jblomer): indicate if an object is already present in the cache
 }
 
 
@@ -285,35 +275,34 @@ message MsgListReply {
 message MsgRpc {
   oneof message_type {
     // Frequent and performance-critical calls
-    MsgRefcountReq msg_refcount_req              = 1;
-    MsgRefcountReply msg_refcount_reply          = 2;
+    MsgRefcountReq msg_refcount_req          = 1;
+    MsgRefcountReply msg_refcount_reply      = 2;
 
-    MsgReadReq msg_read_req                      = 3;
-    MsgReadReply msg_read_reply                  = 4;
+    MsgReadReq msg_read_req                  = 3;
+    MsgReadReply msg_read_reply              = 4;
 
-    MsgObjectInfoReq msg_object_info_req         = 5;
-    MsgObjectInfoReply msg_object_info_reply     = 6;
+    MsgObjectInfoReq msg_object_info_req     = 5;
+    MsgObjectInfoReply msg_object_info_reply = 6;
 
-    MsgStoreReq msg_store_req                    = 7;
-    MsgStorePartReq msg_store_part_req           = 8;
-    MsgAbortMultipartReq msg_abort_multipart_req = 9;
-    MsgStoreReply msg_store_reply                = 10;
+    MsgStoreReq msg_store_req                = 7;
+    MsgStoreAbortReq msg_store_abort_req     = 8;
+    MsgStoreReply msg_store_reply            = 9;
 
 
     // Rare RPCs
-    MsgHandshake msg_handshake                   = 16;
-    MsgHandshakeAck msg_handshake_ack            = 17;
-    MsgQuit msg_quit                             = 18;
+    MsgHandshake msg_handshake               = 16;
+    MsgHandshakeAck msg_handshake_ack        = 17;
+    MsgQuit msg_quit                         = 18;
 
-    MsgInfoReq msg_info_req                      = 19;
-    MsgInfoReply msg_info_reply                  = 20;
+    MsgInfoReq msg_info_req                  = 19;
+    MsgInfoReply msg_info_reply              = 20;
 
-    MsgShrinkReq msg_shrink_req                  = 21;
-    MsgShrinkReply msg_shrink_reply              = 22;
+    MsgShrinkReq msg_shrink_req              = 21;
+    MsgShrinkReply msg_shrink_reply          = 22;
 
-    MsgListReq msg_list_req                      = 23;
-    MsgListReply msg_list_reply                  = 24;
+    MsgListReq msg_list_req                  = 23;
+    MsgListReply msg_list_reply              = 24;
 
-    MsgDetachCatalogs msg_detach                 = 25;
+    MsgDetachCatalogs msg_detach             = 25;
   }
 }

@@ -71,8 +71,7 @@ CacheTransport::Frame::~Frame() {
   msg_rpc_.release_msg_object_info_req();
   msg_rpc_.release_msg_object_info_reply();
   msg_rpc_.release_msg_store_req();
-  msg_rpc_.release_msg_store_part_req();
-  msg_rpc_.release_msg_abort_multipart_req();
+  msg_rpc_.release_msg_store_abort_req();
   msg_rpc_.release_msg_store_reply();
   msg_rpc_.release_msg_handshake();
   msg_rpc_.release_msg_handshake_ack();
@@ -126,6 +125,12 @@ void CacheTransport::Frame::WrapMsg() {
   } else if (msg_typed_->GetTypeName() == "cvmfs.MsgReadReply") {
     msg_rpc_.set_allocated_msg_read_reply(
       reinterpret_cast<cvmfs::MsgReadReply *>(msg_typed_));
+  } else if (msg_typed_->GetTypeName() == "cvmfs.MsgStoreReq") {
+    msg_rpc_.set_allocated_msg_store_req(
+      reinterpret_cast<cvmfs::MsgStoreReq *>(msg_typed_));
+  } else if (msg_typed_->GetTypeName() == "cvmfs.MsgStoreReply") {
+    msg_rpc_.set_allocated_msg_store_reply(
+      reinterpret_cast<cvmfs::MsgStoreReply *>(msg_typed_));
   } else {
     // Unexpected message type, should never happen
     abort();
@@ -153,6 +158,10 @@ void CacheTransport::Frame::UnwrapMsg() {
     msg_typed_ = msg_rpc_.mutable_msg_read_req();
   } else if (msg_rpc_.has_msg_read_reply()) {
     msg_typed_ = msg_rpc_.mutable_msg_read_reply();
+  } else if (msg_rpc_.has_msg_store_req()) {
+    msg_typed_ = msg_rpc_.mutable_msg_store_req();
+  } else if (msg_rpc_.has_msg_store_reply()) {
+    msg_typed_ = msg_rpc_.mutable_msg_store_reply();
   } else {
     // Unexpected message type, should never happen
     abort();
@@ -191,6 +200,28 @@ void CacheTransport::FillMsgHash(
 }
 
 
+void CacheTransport::FillObjectType(
+  CacheManager::ObjectType object_type,
+  cvmfs::EnumObjectType *wire_type)
+{
+  switch (object_type) {
+    case CacheManager::kTypeRegular:
+    // TODO(jblomer): "pinned" should mean a permanently open fd
+    case CacheManager::kTypePinned:
+      *wire_type = cvmfs::OBJECT_REGULAR;
+      break;
+    case CacheManager::kTypeCatalog:
+      *wire_type = cvmfs::OBJECT_CATALOG;
+      break;
+    case CacheManager::kTypeVolatile:
+      *wire_type = cvmfs::OBJECT_VOLATILE;
+      break;
+    default:
+      abort();
+  }
+}
+
+
 bool CacheTransport::ParseMsgHash(
   const cvmfs::MsgHash &msg_hash,
   shash::Any *hash)
@@ -213,6 +244,26 @@ bool CacheTransport::ParseMsgHash(
     return false;
   memcpy(hash->digest, msg_hash.digest().data(), digest_size);
   return true;
+}
+
+
+bool CacheTransport::ParseObjectType(
+  cvmfs::EnumObjectType wire_type,
+  CacheManager::ObjectType *object_type)
+{
+  switch (wire_type) {
+    case cvmfs::OBJECT_REGULAR:
+      *object_type = CacheManager::kTypeRegular;
+      return true;
+    case cvmfs::OBJECT_CATALOG:
+      *object_type = CacheManager::kTypeCatalog;
+      return true;
+    case cvmfs::OBJECT_VOLATILE:
+      *object_type = CacheManager::kTypeVolatile;
+      return true;
+    default:
+      return false;
+  }
 }
 
 
@@ -298,7 +349,7 @@ void CacheTransport::SendData(
   assert(total_size > 0);
   assert(total_size <= kMaxMsgSize);
   LogCvmfs(kLogCache, kLogDebug,
-           "sending message of size %u to external cache plugin", total_size);
+           "sending message of size %u to cache transport", total_size);
 
   unsigned char header[kHeaderSize];
   header[0] = kWireProtocolVersion | ((att_size == 0) ? 0 : kFlagHasAttachment);
@@ -330,7 +381,8 @@ void CacheTransport::SendData(
 
   if (!retval) {
     LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
-             "failed to write to external cache plugin (%d), aborting", errno);
+             "failed to write to external cache transport (%d), aborting",
+             errno);
     abort();
   }
 }

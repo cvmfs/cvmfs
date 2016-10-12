@@ -45,7 +45,7 @@ class TieredCacheManager : public CacheManager {
   virtual int Dup(int fd) { return upper_->Dup(fd); }
   virtual int Readahead(int fd) { return upper_->Readahead(fd); }
 
-  virtual uint16_t SizeOfTxn()
+  virtual uint32_t SizeOfTxn()
   { return upper_->SizeOfTxn() + lower_->SizeOfTxn(); }
   virtual int StartTxn(const shash::Any &id, uint64_t size, void *txn);
   virtual void CtrlTxn(const ObjectInfo &object_info,

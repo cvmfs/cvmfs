@@ -32,12 +32,14 @@ class ExternalCacheManager : public CacheManager {
   virtual int Dup(int fd);
   virtual int Readahead(int fd);
 
-  virtual uint16_t SizeOfTxn();
+  virtual uint32_t SizeOfTxn() {
+    return sizeof(Transaction) + max_object_size_;
+  }
   virtual int StartTxn(const shash::Any &id, uint64_t size, void *txn);
   virtual void CtrlTxn(const ObjectInfo &object_info,
                        const int flags,
                        void *txn);
-  virtual int64_t Write(const void *buf, uint64_t sz, void *txn);
+  virtual int64_t Write(const void *buf, uint64_t size, void *txn);
   virtual int Reset(void *txn);
   virtual int AbortTxn(void *txn);
   virtual int OpenFromTxn(void *txn);
@@ -59,11 +61,14 @@ class ExternalCacheManager : public CacheManager {
 
   struct Transaction {
     Transaction(const shash::Any &id)
-      : buffer(reinterpret_cast<unsigned char *>(this) + sizeof(this))
+      : buffer(reinterpret_cast<unsigned char *>(this) + sizeof(Transaction))
       , buf_pos(0)
       , size(0)
       , expected_size(kSizeUnknown)
       , object_info(kTypeRegular, "")
+      , open_fds(0)
+      , committed(false)
+      , object_info_modified(false)
       , id(id)
     { }
 
@@ -76,6 +81,9 @@ class ExternalCacheManager : public CacheManager {
     uint64_t size;
     uint64_t expected_size;
     ObjectInfo object_info;
+    int open_fds;
+    bool committed;
+    bool object_info_modified;
     shash::Any id;
   };
 
@@ -94,11 +102,14 @@ class ExternalCacheManager : public CacheManager {
   class RpcJob {
    public:
     explicit RpcJob(cvmfs::MsgRefcountReq *msg)
-      : req_id_(msg->req_id()), msg_req_(msg), frame_send_(msg) { }
+      : req_id_(msg->req_id()), part_nr_(0), msg_req_(msg), frame_send_(msg) { }
     explicit RpcJob(cvmfs::MsgObjectInfoReq *msg)
-      : req_id_(msg->req_id()), msg_req_(msg), frame_send_(msg) { }
+      : req_id_(msg->req_id()), part_nr_(0), msg_req_(msg), frame_send_(msg) { }
     explicit RpcJob(cvmfs::MsgReadReq *msg)
-      : req_id_(msg->req_id()), msg_req_(msg), frame_send_(msg) { }
+      : req_id_(msg->req_id()), part_nr_(0), msg_req_(msg), frame_send_(msg) { }
+    explicit RpcJob(cvmfs::MsgStoreReq *msg)
+      : req_id_(msg->req_id()), part_nr_(msg->part_nr()), msg_req_(msg),
+        frame_send_(msg) { }
 
     void set_attachment_send(void *data, unsigned size) {
       frame_send_.set_attachment(data, size);
@@ -129,12 +140,20 @@ class ExternalCacheManager : public CacheManager {
       assert(m->req_id() == req_id_);
       return m;
     }
+    cvmfs::MsgStoreReply *msg_store_reply() {
+      cvmfs::MsgStoreReply *m = reinterpret_cast<cvmfs::MsgStoreReply *>(
+        frame_recv_.GetMsgTyped());
+      assert(m->req_id() == req_id_);
+      assert(m->part_nr() == part_nr_);
+      return m;
+    }
 
     CacheTransport::Frame *frame_send() { return &frame_send_; }
     CacheTransport::Frame *frame_recv() { return &frame_recv_; }
 
    private:
     uint64_t req_id_;
+    uint64_t part_nr_;
     google::protobuf::MessageLite *msg_req_;
     CacheTransport::Frame frame_send_;
     CacheTransport::Frame frame_recv_;
@@ -146,6 +165,7 @@ class ExternalCacheManager : public CacheManager {
   int ChangeRefcount(const shash::Any &id, int change_by);
   int DoOpen(const shash::Any &id);
   shash::Any GetHandle(int fd);
+  int Flush(bool do_commit, Transaction *transaction);
 
   FdTable<ReadOnlyHandle> fd_table_;
   CacheTransport transport_;

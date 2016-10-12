@@ -13,6 +13,7 @@
 #include <cassert>
 #include <cstring>
 #include <string>
+#include <vector>
 
 #include "cache.pb.h"
 #include "cache_extern.h"
@@ -27,6 +28,8 @@ using namespace std;  // NOLINT
  */
 class MockCachePlugin {
  public:
+  static const unsigned kObjectSize = 256 * 1024;
+
   explicit MockCachePlugin(const string &socket_path) {
     fd_connection_ = -1;
     fd_socket_ = MakeSocket(socket_path, 0600);
@@ -53,8 +56,10 @@ class MockCachePlugin {
 
   static void HandleConnection(MockCachePlugin *cache_plugin) {
     CacheTransport transport(cache_plugin->fd_connection_);
+    char buffer[kObjectSize];
     while (true) {
       CacheTransport::Frame frame_recv;
+      frame_recv.set_attachment(buffer, kObjectSize);
       bool retval = transport.RecvFrame(&frame_recv);
       if (!retval)
         abort();
@@ -66,7 +71,7 @@ class MockCachePlugin {
         msg_ack.set_name("unit test cache manager");
         msg_ack.set_protocol_version(ExternalCacheManager::kPbProtocolVersion);
         msg_ack.set_session_id(42);
-        msg_ack.set_max_object_size(128 * 1024);  // 128kB
+        msg_ack.set_max_object_size(kObjectSize);  // 256kB
         CacheTransport::Frame frame_send(&msg_ack);
         transport.SendFrame(&frame_send);
       } else if (msg_typed->GetTypeName() == "cvmfs.MsgQuit") {
@@ -81,7 +86,10 @@ class MockCachePlugin {
         if (!retval) {
           msg_reply.set_status(cvmfs::STATUS_MALFORMED);
         } else if (object_id != cache_plugin->known_object) {
-          msg_reply.set_status(cvmfs::STATUS_NOENTRY);
+          if (object_id == cache_plugin->new_object)
+            msg_reply.set_status(cvmfs::STATUS_OK);
+          else
+            msg_reply.set_status(cvmfs::STATUS_NOENTRY);
         } else {
           if ((cache_plugin->known_object_refcnt + msg_req->change_by()) < 0) {
             msg_reply.set_status(cvmfs::STATUS_BADCOUNT);
@@ -150,6 +158,24 @@ class MockCachePlugin {
                                cache_plugin->next_status));
         }
         transport.SendFrame(&frame_send);
+      } else if (msg_typed->GetTypeName() == "cvmfs.MsgStoreReq") {
+        cvmfs::MsgStoreReq *msg_req =
+          reinterpret_cast<cvmfs::MsgStoreReq *>(msg_typed);
+        cvmfs::MsgStoreReply msg_reply;
+        CacheTransport::Frame frame_send(&msg_reply);
+        msg_reply.set_req_id(msg_req->req_id());
+        msg_reply.set_part_nr(msg_req->part_nr());
+        bool retval = transport.ParseMsgHash(msg_req->object_id(),
+                                             &(cache_plugin->new_object));
+        if (!retval) {
+          msg_reply.set_status(cvmfs::STATUS_MALFORMED);
+        } else {
+          string data(reinterpret_cast<char *>(frame_recv.attachment()),
+                      frame_recv.att_size());
+          cache_plugin->chunks.push_back(data);
+          msg_reply.set_status(cvmfs::STATUS_OK);
+        }
+        transport.SendFrame(&frame_send);
       } else {
         abort();
       }
@@ -183,6 +209,8 @@ class MockCachePlugin {
   pthread_t thread_recv_;
   string known_object_content;
   shash::Any known_object;
+  shash::Any new_object;
+  vector<string> chunks;
   int known_object_refcnt;
   int next_status;
 };
@@ -304,4 +332,19 @@ TEST_F(T_ExternalCacheManager, Readahead) {
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->Readahead(fd));
   EXPECT_EQ(0, cache_mgr_->Close(fd));
+}
+
+
+TEST_F(T_ExternalCacheManager, Transaction) {
+  shash::Any id(shash::kSha1);
+  string content = "foo";
+  HashString(content, &id);
+  unsigned char *data = const_cast<unsigned char *>(
+    reinterpret_cast<const unsigned char *>(content.data()));
+  EXPECT_TRUE(
+    cache_mgr_->CommitFromMem(id, data, content.length(), "test"));
+
+  // test 0-byte
+  // test large
+  // test large and multiple of max object size
 }

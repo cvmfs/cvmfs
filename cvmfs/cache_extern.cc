@@ -4,9 +4,13 @@
 #include "cvmfs_config.h"
 #include "cache_extern.h"
 
+#define __STDC_FORMAT_MACROS
+
+#include <inttypes.h>
 #include <unistd.h>
 
 #include <cassert>
+#include <new>
 #include <string>
 
 #include "cache.pb.h"
@@ -107,7 +111,17 @@ int ExternalCacheManager::Close(int fd) {
 
 
 int ExternalCacheManager::CommitTxn(void *txn) {
-  return -1;
+  Transaction *transaction = reinterpret_cast<Transaction *>(txn);
+  LogCvmfs(kLogCache, kLogDebug, "committing %s",
+           transaction->id.ToString().c_str());
+  int retval = Flush(true, transaction);
+  if (retval != 0)
+    return retval;
+
+  int refcount = transaction->open_fds - 1;
+  if (refcount != 0)
+    return ChangeRefcount(transaction->id, refcount);
+  return 0;
 }
 
 
@@ -151,6 +165,9 @@ void ExternalCacheManager::CtrlTxn(
   const int flags,
   void *txn)
 {
+  Transaction *transaction = reinterpret_cast<Transaction *>(txn);
+  transaction->object_info = object_info;
+  transaction->object_info_modified = true;
 }
 
 
@@ -182,6 +199,67 @@ int ExternalCacheManager::Dup(int fd) {
   if (id == kInvalidHandle)
     return -EBADF;
   return DoOpen(id);
+}
+
+
+ExternalCacheManager::ExternalCacheManager(
+  int fd_connection,
+  unsigned max_open_fds)
+  : fd_table_(max_open_fds, ReadOnlyHandle())
+  , transport_(fd_connection)
+  , session_id_(-1)
+  , max_object_size_(0)
+  , spawned_(false)
+{
+  int retval = pthread_rwlock_init(&rwlock_fd_table_, NULL);
+  assert(retval == 0);
+  atomic_init64(&next_request_id_);
+}
+
+
+ExternalCacheManager::~ExternalCacheManager() {
+  if (session_id_ >= 0) {
+    cvmfs::MsgQuit msg_quit;
+    msg_quit.set_session_id(session_id_);
+    CacheTransport::Frame frame(&msg_quit);
+    transport_.SendFrame(&frame);
+  }
+  close(transport_.fd_connection());
+  pthread_rwlock_destroy(&rwlock_fd_table_);
+}
+
+
+int ExternalCacheManager::Flush(bool do_commit, Transaction *transaction) {
+  if (transaction->committed)
+    return 0;
+  LogCvmfs(kLogCache, kLogDebug, "flushing %u bytes for %s",
+           transaction->buf_pos, transaction->id.ToString().c_str());
+  cvmfs::MsgHash object_id;
+  transport_.FillMsgHash(transaction->id, &object_id);
+  cvmfs::MsgStoreReq msg_store;
+  msg_store.set_session_id(session_id_);
+  msg_store.set_req_id(NextRequestId());
+  msg_store.set_allocated_object_id(&object_id);
+  msg_store.set_part_nr((transaction->size % max_object_size_) + 1);
+  msg_store.set_last_part(do_commit);
+  msg_store.set_initial_refcount(1);
+
+  if (transaction->object_info_modified) {
+    cvmfs::EnumObjectType object_type;
+    transport_.FillObjectType(transaction->object_info.type, &object_type);
+    msg_store.set_object_type(object_type);
+    msg_store.set_description(transaction->object_info.description);
+  }
+
+  RpcJob rpc_job(&msg_store);
+  rpc_job.set_attachment_send(transaction->buffer, transaction->buf_pos);
+  CallRemotely(&rpc_job);
+  msg_store.release_object_id();
+
+  cvmfs::MsgStoreReply *msg_reply = rpc_job.msg_store_reply();
+  if (do_commit && (msg_reply->status() == cvmfs::STATUS_OK))
+    transaction->committed = true;
+  return Ack2Errno(msg_reply->status());
 }
 
 
@@ -217,40 +295,31 @@ int64_t ExternalCacheManager::GetSize(int fd) {
 }
 
 
-ExternalCacheManager::ExternalCacheManager(
-  int fd_connection,
-  unsigned max_open_fds)
-  : fd_table_(max_open_fds, ReadOnlyHandle())
-  , transport_(fd_connection)
-  , session_id_(-1)
-  , max_object_size_(0)
-  , spawned_(false)
-{
-  int retval = pthread_rwlock_init(&rwlock_fd_table_, NULL);
-  assert(retval == 0);
-  atomic_init64(&next_request_id_);
-}
-
-
-ExternalCacheManager::~ExternalCacheManager() {
-  if (session_id_ >= 0) {
-    cvmfs::MsgQuit msg_quit;
-    msg_quit.set_session_id(session_id_);
-    CacheTransport::Frame frame(&msg_quit);
-    transport_.SendFrame(&frame);
-  }
-  close(transport_.fd_connection());
-  pthread_rwlock_destroy(&rwlock_fd_table_);
-}
-
-
 int ExternalCacheManager::Open(const BlessedObject &object) {
   return DoOpen(object.id);
 }
 
 
 int ExternalCacheManager::OpenFromTxn(void *txn) {
-  return -1;
+  Transaction *transaction = reinterpret_cast<Transaction *>(txn);
+  LogCvmfs(kLogCache, kLogDebug, "open fd for transaction %s",
+           transaction->id.ToString().c_str());
+  int retval = Flush(true, transaction);
+  if (retval != 0)
+    return retval;
+
+  int fd = -1;
+  {
+    WriteLockGuard guard(rwlock_fd_table_);
+    fd = fd_table_.OpenFd(ReadOnlyHandle(transaction->id));
+    if (fd < 0) {
+      LogCvmfs(kLogCache, kLogDebug, "error while creating new fd",
+               strerror(-fd));
+      return fd;
+    }
+  }
+  transaction->open_fds++;
+  return fd;
 }
 
 
@@ -299,20 +368,53 @@ int ExternalCacheManager::Reset(void *txn) {
 }
 
 
-uint16_t ExternalCacheManager::SizeOfTxn() {
-  return 0;
-}
-
-
 int ExternalCacheManager::StartTxn(
   const shash::Any &id,
   uint64_t size,
   void *txn)
 {
-  return -1;
+  Transaction *transaction = new (txn) Transaction(id);
+  transaction->expected_size = size;
+  return 0;
 }
 
 
-int64_t ExternalCacheManager::Write(const void *buf, uint64_t sz, void *txn) {
-  return -1;
+int64_t ExternalCacheManager::Write(const void *buf, uint64_t size, void *txn) {
+  Transaction *transaction = reinterpret_cast<Transaction *>(txn);
+  assert(!transaction->committed);
+  LogCvmfs(kLogCache, kLogDebug, "writing %" PRIu64 " bytes for %s",
+           size, transaction->id.ToString().c_str());
+
+  if (transaction->expected_size != kSizeUnknown) {
+    if (transaction->size + size > transaction->expected_size) {
+      LogCvmfs(kLogCache, kLogDebug,
+               "Transaction size (%" PRIu64 ") > expected size (%" PRIu64 ")",
+               transaction->size + size, transaction->expected_size);
+      return -EFBIG;
+    }
+  }
+
+  uint64_t written = 0;
+  const unsigned char *read_pos = reinterpret_cast<const unsigned char *>(buf);
+  while (written < size) {
+    if (transaction->buf_pos == max_object_size_) {
+      bool do_commit = false;
+      if (transaction->expected_size != kSizeUnknown)
+        do_commit = (transaction->size + written) == transaction->expected_size;
+      int retval = Flush(do_commit, transaction);
+      if (retval != 0) {
+        transaction->size += written;
+        return retval;
+      }
+    }
+    uint64_t remaining = size - written;
+    uint64_t space_in_buffer = max_object_size_ - transaction->buf_pos;
+    uint64_t batch_size = std::min(remaining, space_in_buffer);
+    memcpy(transaction->buffer + transaction->buf_pos, read_pos, batch_size);
+    transaction->buf_pos += batch_size;
+    written += batch_size;
+    read_pos += batch_size;
+  }
+  transaction->size += written;
+  return written;
 }

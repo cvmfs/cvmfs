@@ -74,7 +74,7 @@ class PosixCacheManager : public CacheManager {
   virtual int Dup(int fd);
   virtual int Readahead(int fd);
 
-  virtual uint16_t SizeOfTxn() { return sizeof(Transaction); }
+  virtual uint32_t SizeOfTxn() { return sizeof(Transaction); }
   virtual int StartTxn(const shash::Any &id, uint64_t size, void *txn);
   virtual void CtrlTxn(const ObjectInfo &object_info,
                        const int flags,

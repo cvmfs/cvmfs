@@ -169,7 +169,7 @@ class RamCacheManager : public CacheManager {
   /**
    * Get the amount of space to be allocated for a call to @ref StartTxn
    */
-  virtual uint16_t SizeOfTxn() { return sizeof(Transaction); }
+  virtual uint32_t SizeOfTxn() { return sizeof(Transaction); }
 
 
   /**
