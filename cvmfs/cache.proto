@@ -142,7 +142,6 @@ message MsgStoreReq {
   required MsgHash object_id          = 3;
   required uint64 part_nr             = 4;
   required bool last_part             = 5;
-  optional uint64 initial_refcount    = 6;
   optional EnumObjectType object_type = 7;
   // This can be the path under /cvmfs that triggered storing the object
   optional string description         = 8;

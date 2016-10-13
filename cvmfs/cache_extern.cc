@@ -240,9 +240,8 @@ int ExternalCacheManager::Flush(bool do_commit, Transaction *transaction) {
   msg_store.set_session_id(session_id_);
   msg_store.set_req_id(NextRequestId());
   msg_store.set_allocated_object_id(&object_id);
-  msg_store.set_part_nr((transaction->size % max_object_size_) + 1);
+  msg_store.set_part_nr((transaction->size / max_object_size_) + 1);
   msg_store.set_last_part(do_commit);
-  msg_store.set_initial_refcount(1);
 
   if (transaction->object_info_modified) {
     cvmfs::EnumObjectType object_type;

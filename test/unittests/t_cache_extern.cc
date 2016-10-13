@@ -13,7 +13,6 @@
 #include <cassert>
 #include <cstring>
 #include <string>
-#include <vector>
 
 #include "cache.pb.h"
 #include "cache_extern.h"
@@ -42,6 +41,7 @@ class MockCachePlugin {
     known_object.algorithm = shash::kSha1;
     known_object_content = "Hello, World";
     shash::HashString(known_object_content, &known_object);
+    latest_part = 0;
     known_object_refcnt = 0;
     next_status = -1;
   }
@@ -52,6 +52,140 @@ class MockCachePlugin {
       close(fd_socket_);
       pthread_join(thread_recv_, NULL);
     }
+  }
+
+  void HandleHandshake(CacheTransport *transport) {
+    cvmfs::MsgHandshakeAck msg_ack;
+    msg_ack.set_status(cvmfs::STATUS_OK);
+    msg_ack.set_name("unit test cache manager");
+    msg_ack.set_protocol_version(ExternalCacheManager::kPbProtocolVersion);
+    msg_ack.set_session_id(42);
+    msg_ack.set_max_object_size(kObjectSize);  // 256kB
+    CacheTransport::Frame frame_send(&msg_ack);
+    transport->SendFrame(&frame_send);
+  }
+
+  void HandleRefcountRequest(
+    cvmfs::MsgRefcountReq *msg_req,
+    CacheTransport *transport)
+  {
+    cvmfs::MsgRefcountReply msg_reply;
+    msg_reply.set_req_id(msg_req->req_id());
+    shash::Any object_id;
+    bool retval = transport->ParseMsgHash(msg_req->object_id(), &object_id);
+    if (!retval) {
+      msg_reply.set_status(cvmfs::STATUS_MALFORMED);
+    } else if (object_id != known_object) {
+      if (object_id == new_object)
+        msg_reply.set_status(cvmfs::STATUS_OK);
+      else
+        msg_reply.set_status(cvmfs::STATUS_NOENTRY);
+    } else {
+      if ((known_object_refcnt + msg_req->change_by()) < 0) {
+        msg_reply.set_status(cvmfs::STATUS_BADCOUNT);
+      } else {
+        known_object_refcnt += msg_req->change_by();
+        msg_reply.set_status(cvmfs::STATUS_OK);
+      }
+    }
+    if (next_status >= 0)
+      msg_reply.set_status(static_cast<cvmfs::EnumStatus>(next_status));
+    CacheTransport::Frame frame_send(&msg_reply);
+    transport->SendFrame(&frame_send);
+  }
+
+  void HandleObjectInfo(
+    cvmfs::MsgObjectInfoReq *msg_req,
+    CacheTransport *transport)
+  {
+    cvmfs::MsgObjectInfoReply msg_reply;
+    msg_reply.set_req_id(msg_req->req_id());
+    shash::Any object_id;
+    bool retval = transport->ParseMsgHash(msg_req->object_id(), &object_id);
+    if (!retval) {
+      msg_reply.set_status(cvmfs::STATUS_MALFORMED);
+    } else if (object_id == known_object) {
+      msg_reply.set_status(cvmfs::STATUS_OK);
+      msg_reply.set_object_type(cvmfs::OBJECT_REGULAR);
+      msg_reply.set_nparts(1);
+      msg_reply.set_size(known_object_content.length());
+    } else if (object_id == new_object) {
+      msg_reply.set_status(cvmfs::STATUS_OK);
+      msg_reply.set_object_type(cvmfs::OBJECT_REGULAR);
+      msg_reply.set_nparts(0); // <-- wrong but ignored
+      msg_reply.set_size(new_object_content.length());
+    } else {
+      msg_reply.set_status(cvmfs::STATUS_NOENTRY);
+    }
+    if (next_status >= 0)
+      msg_reply.set_status(static_cast<cvmfs::EnumStatus>(next_status));
+    CacheTransport::Frame frame_send(&msg_reply);
+    transport->SendFrame(&frame_send);
+  }
+
+  void HandleRead(cvmfs::MsgReadReq *msg_req, CacheTransport *transport) {
+    cvmfs::MsgReadReply msg_reply;
+    CacheTransport::Frame frame_send(&msg_reply);
+    msg_reply.set_req_id(msg_req->req_id());
+    shash::Any object_id;
+    bool retval = transport->ParseMsgHash(msg_req->object_id(), &object_id);
+    if (!retval) {
+      msg_reply.set_status(cvmfs::STATUS_MALFORMED);
+    } else if ((object_id != known_object) && (object_id != new_object)) {
+      msg_reply.set_status(cvmfs::STATUS_NOENTRY);
+    } else {
+      const char *data;
+      uint32_t data_size;
+      if (object_id == known_object) {
+        data = known_object_content.data();
+        data_size = known_object_content.length();
+      } else {
+        data = new_object_content.data();
+        data_size = new_object_content.length();
+      }
+      if (msg_req->offset() >= data_size) {
+        msg_reply.set_status(cvmfs::STATUS_OUTOFBOUNDS);
+      } else {
+        frame_send.set_attachment(
+          const_cast<char *>(data) + msg_req->offset(),
+          std::min(msg_req->size(),
+                   static_cast<uint32_t>(data_size - msg_req->offset()))
+        );
+        msg_reply.set_status(cvmfs::STATUS_OK);
+      }
+    }
+    if (next_status >= 0)
+      msg_reply.set_status(static_cast<cvmfs::EnumStatus>(next_status));
+    transport->SendFrame(&frame_send);
+  }
+
+  void HandleStore(
+    cvmfs::MsgStoreReq *msg_req,
+    CacheTransport::Frame *frame_recv,
+    CacheTransport *transport)
+  {
+    cvmfs::MsgStoreReply msg_reply;
+    CacheTransport::Frame frame_send(&msg_reply);
+    msg_reply.set_req_id(msg_req->req_id());
+    msg_reply.set_part_nr(msg_req->part_nr());
+    bool retval = transport->ParseMsgHash(msg_req->object_id(), &new_object);
+    if (!retval) {
+      msg_reply.set_status(cvmfs::STATUS_MALFORMED);
+    } else {
+      if (msg_req->part_nr() == 1) {
+        new_object_content.clear();
+        latest_part = 0;
+      }
+      if (frame_recv->att_size() > 0) {
+        string data(reinterpret_cast<char *>(frame_recv->attachment()),
+                    frame_recv->att_size());
+        new_object_content += data;
+      }
+      assert(msg_req->part_nr() == (latest_part + 1));
+      latest_part++;
+      msg_reply.set_status(cvmfs::STATUS_OK);
+    }
+    transport->SendFrame(&frame_send);
   }
 
   static void HandleConnection(MockCachePlugin *cache_plugin) {
@@ -66,116 +200,25 @@ class MockCachePlugin {
       google::protobuf::MessageLite *msg_typed = frame_recv.GetMsgTyped();
 
       if (msg_typed->GetTypeName() == "cvmfs.MsgHandshake") {
-        cvmfs::MsgHandshakeAck msg_ack;
-        msg_ack.set_status(cvmfs::STATUS_OK);
-        msg_ack.set_name("unit test cache manager");
-        msg_ack.set_protocol_version(ExternalCacheManager::kPbProtocolVersion);
-        msg_ack.set_session_id(42);
-        msg_ack.set_max_object_size(kObjectSize);  // 256kB
-        CacheTransport::Frame frame_send(&msg_ack);
-        transport.SendFrame(&frame_send);
+        cache_plugin->HandleHandshake(&transport);
       } else if (msg_typed->GetTypeName() == "cvmfs.MsgQuit") {
         break;
       } else if (msg_typed->GetTypeName() == "cvmfs.MsgRefcountReq") {
         cvmfs::MsgRefcountReq *msg_req =
           reinterpret_cast<cvmfs::MsgRefcountReq *>(msg_typed);
-        cvmfs::MsgRefcountReply msg_reply;
-        msg_reply.set_req_id(msg_req->req_id());
-        shash::Any object_id;
-        bool retval = transport.ParseMsgHash(msg_req->object_id(), &object_id);
-        if (!retval) {
-          msg_reply.set_status(cvmfs::STATUS_MALFORMED);
-        } else if (object_id != cache_plugin->known_object) {
-          if (object_id == cache_plugin->new_object)
-            msg_reply.set_status(cvmfs::STATUS_OK);
-          else
-            msg_reply.set_status(cvmfs::STATUS_NOENTRY);
-        } else {
-          if ((cache_plugin->known_object_refcnt + msg_req->change_by()) < 0) {
-            msg_reply.set_status(cvmfs::STATUS_BADCOUNT);
-          } else {
-            cache_plugin->known_object_refcnt += msg_req->change_by();
-            msg_reply.set_status(cvmfs::STATUS_OK);
-          }
-        }
-        if (cache_plugin->next_status >= 0) {
-          msg_reply.set_status(static_cast<cvmfs::EnumStatus>(
-                               cache_plugin->next_status));
-        }
-        CacheTransport::Frame frame_send(&msg_reply);
-        transport.SendFrame(&frame_send);
+        cache_plugin->HandleRefcountRequest(msg_req, &transport);
       } else if (msg_typed->GetTypeName() == "cvmfs.MsgObjectInfoReq") {
         cvmfs::MsgObjectInfoReq *msg_req =
           reinterpret_cast<cvmfs::MsgObjectInfoReq *>(msg_typed);
-        cvmfs::MsgObjectInfoReply msg_reply;
-        msg_reply.set_req_id(msg_req->req_id());
-        shash::Any object_id;
-        bool retval = transport.ParseMsgHash(msg_req->object_id(), &object_id);
-        if (!retval) {
-          msg_reply.set_status(cvmfs::STATUS_MALFORMED);
-        } else if (object_id != cache_plugin->known_object) {
-          msg_reply.set_status(cvmfs::STATUS_NOENTRY);
-        } else {
-          msg_reply.set_status(cvmfs::STATUS_OK);
-          msg_reply.set_object_type(cvmfs::OBJECT_REGULAR);
-          msg_reply.set_nparts(1);
-          msg_reply.set_size(cache_plugin->known_object_content.length());
-        }
-        if (cache_plugin->next_status >= 0) {
-          msg_reply.set_status(static_cast<cvmfs::EnumStatus>(
-                               cache_plugin->next_status));
-        }
-        CacheTransport::Frame frame_send(&msg_reply);
-        transport.SendFrame(&frame_send);
+        cache_plugin->HandleObjectInfo(msg_req, &transport);
       } else if (msg_typed->GetTypeName() == "cvmfs.MsgReadReq") {
         cvmfs::MsgReadReq *msg_req =
           reinterpret_cast<cvmfs::MsgReadReq *>(msg_typed);
-        cvmfs::MsgReadReply msg_reply;
-        CacheTransport::Frame frame_send(&msg_reply);
-        msg_reply.set_req_id(msg_req->req_id());
-        shash::Any object_id;
-        bool retval = transport.ParseMsgHash(msg_req->object_id(), &object_id);
-        if (!retval) {
-          msg_reply.set_status(cvmfs::STATUS_MALFORMED);
-        } else if (object_id != cache_plugin->known_object) {
-          msg_reply.set_status(cvmfs::STATUS_NOENTRY);
-        } else {
-          const char *data = cache_plugin->known_object_content.data();
-          uint32_t data_size = cache_plugin->known_object_content.length();
-          if (msg_req->offset() >= data_size) {
-            msg_reply.set_status(cvmfs::STATUS_OUTOFBOUNDS);
-          } else {
-            frame_send.set_attachment(
-              const_cast<char *>(data) + msg_req->offset(),
-              std::min(msg_req->size(),
-                       static_cast<uint32_t>(data_size - msg_req->offset()))
-            );
-            msg_reply.set_status(cvmfs::STATUS_OK);
-          }
-        }
-        if (cache_plugin->next_status >= 0) {
-          msg_reply.set_status(static_cast<cvmfs::EnumStatus>(
-                               cache_plugin->next_status));
-        }
-        transport.SendFrame(&frame_send);
+        cache_plugin->HandleRead(msg_req, &transport);
       } else if (msg_typed->GetTypeName() == "cvmfs.MsgStoreReq") {
         cvmfs::MsgStoreReq *msg_req =
           reinterpret_cast<cvmfs::MsgStoreReq *>(msg_typed);
-        cvmfs::MsgStoreReply msg_reply;
-        CacheTransport::Frame frame_send(&msg_reply);
-        msg_reply.set_req_id(msg_req->req_id());
-        msg_reply.set_part_nr(msg_req->part_nr());
-        bool retval = transport.ParseMsgHash(msg_req->object_id(),
-                                             &(cache_plugin->new_object));
-        if (!retval) {
-          msg_reply.set_status(cvmfs::STATUS_MALFORMED);
-        } else {
-          string data(reinterpret_cast<char *>(frame_recv.attachment()),
-                      frame_recv.att_size());
-          cache_plugin->chunks.push_back(data);
-          msg_reply.set_status(cvmfs::STATUS_OK);
-        }
-        transport.SendFrame(&frame_send);
+        cache_plugin->HandleStore(msg_req, &frame_recv, &transport);
       } else {
         abort();
       }
@@ -210,7 +253,8 @@ class MockCachePlugin {
   string known_object_content;
   shash::Any known_object;
   shash::Any new_object;
-  vector<string> chunks;
+  string new_object_content;
+  unsigned latest_part;
   int known_object_refcnt;
   int next_status;
 };
@@ -343,7 +387,20 @@ TEST_F(T_ExternalCacheManager, Transaction) {
     reinterpret_cast<const unsigned char *>(content.data()));
   EXPECT_TRUE(
     cache_mgr_->CommitFromMem(id, data, content.length(), "test"));
+  unsigned char *buffer;
+  uint64_t size;
+  EXPECT_TRUE(cache_mgr_->Open2Mem(id, "test", &buffer, &size));
+  EXPECT_EQ(content, string(reinterpret_cast<char *>(buffer), size));
+  free(buffer);
 
+  content = "";
+  HashString(content, &id);
+  data = NULL;
+  EXPECT_TRUE(
+    cache_mgr_->CommitFromMem(id, data, content.length(), "test"));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(id, "test", &buffer, &size));
+  EXPECT_EQ(0U, size);
+  EXPECT_EQ(NULL, buffer);
   // test 0-byte
   // test large
   // test large and multiple of max object size

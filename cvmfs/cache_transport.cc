@@ -318,6 +318,8 @@ bool CacheTransport::RecvFrame(CacheTransport::Frame *frame) {
       reinterpret_cast<char *>(buffer) + kInnerHeaderSize + msg_size;
     memcpy(frame->attachment(), ptr_attachment, attachment_size);
     frame->set_att_size(attachment_size);
+  } else {
+    frame->set_att_size(0);
   }
   if (size > kMaxStackAlloc) { free(buffer); }
   return true;
