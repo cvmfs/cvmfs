@@ -1,7 +1,8 @@
-language: erlang
+# Language doesn't matter in this case, since we are building in Docker
+language: c++
 
-otp_release:
-  - 19.0
+services:
+  - docker
 
 notifications:
   email:
@@ -9,14 +10,6 @@ notifications:
       - mail@radupopescu.net
     on_success: change
     on_failure: always
-
-cache:
-  directories:
-    - $HOME/.cache/rebar3
-    - $HOME/bin
-
-before_script:
-  - ./ci/travis_before.sh
 
 script:
   - ./ci/travis_main.sh
