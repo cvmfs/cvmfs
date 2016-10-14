@@ -1,0 +1,16 @@
+{application, cvmfs_proc,
+ [{description, "CVMFS Processing Service"},
+  {vsn, "0.1.0"},
+  {registered, [cvmfs_proc]},
+  {mod, { cvmfs_proc_app, []}},
+  {applications,
+   [kernel
+   ,stdlib
+   ,cvmfs_auth
+   ,cvmfs_lease
+   ,cvmfs_om]},
+  {env,[]},
+  {modules, [cvmfs_proc_app, cvmfs_proc_sup, cvmfs_proc]},
+
+  {maintainers, []}
+ ]}.
