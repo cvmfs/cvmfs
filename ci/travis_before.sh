@@ -8,6 +8,6 @@ if [ ! -f ~/bin/rebar3 ]; then
 
     # Libsodium
     wget https://github.com/jedisct1/libsodium/releases/download/1.0.11/libsodium-1.0.11.tar.gz
-    tar xzf libsodium-1.0.11.tar.gz && cd libsodium-1.0.1 && ./configure && make && make install
+    tar xzf libsodium-1.0.11.tar.gz && cd libsodium-1.0.11 && ./configure && make && make install
 fi
 
