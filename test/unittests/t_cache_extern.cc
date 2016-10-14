@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 
@@ -18,6 +19,7 @@
 #include "cache_extern.h"
 #include "cache_transport.h"
 #include "hash.h"
+#include "smalloc.h"
 #include "util/posix.h"
 
 using namespace std;  // NOLINT
@@ -360,7 +362,7 @@ TEST_F(T_ExternalCacheManager, Pread) {
 
   int fd = cache_mgr_->Open(CacheManager::Bless(mock_plugin_->known_object));
   EXPECT_GE(fd, 0);
-  EXPECT_EQ(-EINVAL, cache_mgr_->Pread(fd, buffer, 0, 64));
+  EXPECT_EQ(-EINVAL, cache_mgr_->Pread(fd, buffer, 1, 64));
   int64_t len = cache_mgr_->Pread(fd, buffer, 64, 0);
   EXPECT_EQ(static_cast<int>(mock_plugin_->known_object_content.length()), len);
   EXPECT_EQ(mock_plugin_->known_object_content, string(buffer, len));
@@ -393,6 +395,8 @@ TEST_F(T_ExternalCacheManager, Transaction) {
   EXPECT_EQ(content, string(reinterpret_cast<char *>(buffer), size));
   free(buffer);
 
+  mock_plugin_->new_object = shash::Any(shash::kSha1);
+
   content = "";
   HashString(content, &id);
   data = NULL;
@@ -401,7 +405,22 @@ TEST_F(T_ExternalCacheManager, Transaction) {
   EXPECT_TRUE(cache_mgr_->Open2Mem(id, "test", &buffer, &size));
   EXPECT_EQ(0U, size);
   EXPECT_EQ(NULL, buffer);
-  // test 0-byte
+
+  mock_plugin_->new_object = shash::Any(shash::kSha1);
+
+  unsigned large_size = 50 * 1024 * 1024;
+  unsigned char *large_buffer = reinterpret_cast<unsigned char *>(
+    scalloc(large_size, 1));
+  EXPECT_TRUE(
+    cache_mgr_->CommitFromMem(id, large_buffer, large_size, "test"));
+  unsigned char *large_buffer_verify = reinterpret_cast<unsigned char *>(
+    smalloc(large_size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(id, "test", &large_buffer_verify, &size));
+  EXPECT_EQ(large_size, size);
+  free(large_buffer_verify);
+  free(large_buffer);
   // test large
   // test large and multiple of max object size
+
+  // test unordered upload of chunks (and failure inbetween)
 }

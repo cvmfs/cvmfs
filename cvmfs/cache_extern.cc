@@ -9,6 +9,7 @@
 #include <inttypes.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <cassert>
 #include <new>
 #include <string>
@@ -252,6 +253,7 @@ int ExternalCacheManager::Flush(bool do_commit, Transaction *transaction) {
 
   RpcJob rpc_job(&msg_store);
   rpc_job.set_attachment_send(transaction->buffer, transaction->buf_pos);
+  // TODO(jblomer): allow for out of order chunk upload
   CallRemotely(&rpc_job);
   msg_store.release_object_id();
 
@@ -334,22 +336,32 @@ int64_t ExternalCacheManager::Pread(
 
   cvmfs::MsgHash object_id;
   transport_.FillMsgHash(id, &object_id);
-  cvmfs::MsgReadReq msg_read;
-  msg_read.set_session_id(session_id_);
-  msg_read.set_req_id(NextRequestId());
-  msg_read.set_allocated_object_id(&object_id);
-  msg_read.set_offset(offset);
-  msg_read.set_size(size);
-  RpcJob rpc_job(&msg_read);
-  rpc_job.set_attachment_recv(buf, size);
-  CallRemotely(&rpc_job);
-  msg_read.release_object_id();
+  uint64_t nbytes = 0;
+  while (nbytes < size) {
+    uint64_t batch_size =
+      std::min(size - nbytes, static_cast<uint64_t>(max_object_size_));
+    cvmfs::MsgReadReq msg_read;
+    msg_read.set_session_id(session_id_);
+    msg_read.set_req_id(NextRequestId());
+    msg_read.set_allocated_object_id(&object_id);
+    msg_read.set_offset(offset + nbytes);
+    msg_read.set_size(batch_size);
+    RpcJob rpc_job(&msg_read);
+    rpc_job.set_attachment_recv(reinterpret_cast<char *>(buf) + nbytes,
+                                batch_size);
+    CallRemotely(&rpc_job);
+    msg_read.release_object_id();
 
-  cvmfs::MsgReadReply *msg_reply = rpc_job.msg_read_reply();
-  if (msg_reply->status() == cvmfs::STATUS_OK)
-    return rpc_job.frame_recv()->att_size();
-
-  return Ack2Errno(msg_reply->status());
+    cvmfs::MsgReadReply *msg_reply = rpc_job.msg_read_reply();
+    if (msg_reply->status() == cvmfs::STATUS_OK) {
+      if (rpc_job.frame_recv()->att_size() < batch_size)
+        return rpc_job.frame_recv()->att_size();
+      nbytes += batch_size;
+    } else {
+      return Ack2Errno(msg_reply->status());
+    }
+  }
+  return size;
 }
 
 
@@ -405,6 +417,8 @@ int64_t ExternalCacheManager::Write(const void *buf, uint64_t size, void *txn) {
         transaction->size += written;
         return retval;
       }
+      transaction->size += transaction->buf_pos;
+      transaction->buf_pos = 0;
     }
     uint64_t remaining = size - written;
     uint64_t space_in_buffer = max_object_size_ - transaction->buf_pos;
@@ -414,6 +428,5 @@ int64_t ExternalCacheManager::Write(const void *buf, uint64_t size, void *txn) {
     written += batch_size;
     read_pos += batch_size;
   }
-  transaction->size += written;
   return written;
 }
