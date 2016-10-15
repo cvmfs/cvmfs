@@ -55,7 +55,7 @@ const shash::Any ExternalCacheManager::kInvalidHandle;
 
 
 int ExternalCacheManager::AbortTxn(void *txn) {
-  return -1;
+  return Reset(txn);
 }
 
 
@@ -239,7 +239,7 @@ int ExternalCacheManager::Flush(bool do_commit, Transaction *transaction) {
   transport_.FillMsgHash(transaction->id, &object_id);
   cvmfs::MsgStoreReq msg_store;
   msg_store.set_session_id(session_id_);
-  msg_store.set_req_id(NextRequestId());
+  msg_store.set_req_id(transaction->transaction_id);
   msg_store.set_allocated_object_id(&object_id);
   msg_store.set_part_nr((transaction->size / max_object_size_) + 1);
   msg_store.set_last_part(do_commit);
@@ -258,8 +258,11 @@ int ExternalCacheManager::Flush(bool do_commit, Transaction *transaction) {
   msg_store.release_object_id();
 
   cvmfs::MsgStoreReply *msg_reply = rpc_job.msg_store_reply();
-  if (do_commit && (msg_reply->status() == cvmfs::STATUS_OK))
-    transaction->committed = true;
+  if (msg_reply->status() == cvmfs::STATUS_OK) {
+    transaction->flushed = true;
+    if (do_commit)
+      transaction->committed = true;
+  }
   return Ack2Errno(msg_reply->status());
 }
 
@@ -375,7 +378,29 @@ int ExternalCacheManager::Readahead(int fd) {
 
 
 int ExternalCacheManager::Reset(void *txn) {
-  return -1;
+  Transaction *transaction = reinterpret_cast<Transaction *>(txn);
+  transaction->buf_pos = 0;
+  transaction->size = 0;
+  transaction->open_fds = 0;
+  transaction->committed = false;
+  transaction->object_info_modified = true;
+
+  if (!transaction->flushed)
+    return 0;
+
+  cvmfs::MsgHash object_id;
+  transport_.FillMsgHash(transaction->id, &object_id);
+  cvmfs::MsgStoreAbortReq msg_abort;
+  msg_abort.set_session_id(session_id_);
+  msg_abort.set_req_id(transaction->transaction_id);
+  msg_abort.set_allocated_object_id(&object_id);
+  RpcJob rpc_job(&msg_abort);
+  CallRemotely(&rpc_job);
+  msg_abort.release_object_id();
+  cvmfs::MsgStoreReply *msg_reply = rpc_job.msg_store_reply();
+  transaction->transaction_id = NextRequestId();
+  transaction->flushed = false;
+  return Ack2Errno(msg_reply->status());
 }
 
 
@@ -386,6 +411,7 @@ int ExternalCacheManager::StartTxn(
 {
   Transaction *transaction = new (txn) Transaction(id);
   transaction->expected_size = size;
+  transaction->transaction_id = NextRequestId();
   return 0;
 }
 

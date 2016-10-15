@@ -4,6 +4,7 @@
 
 #include <gtest/gtest.h>
 
+#include <alloca.h>
 #include <pthread.h>
 #include <unistd.h>
 #include <sys/socket.h>
@@ -190,6 +191,20 @@ class MockCachePlugin {
     transport->SendFrame(&frame_send);
   }
 
+  void HandleStoreAbort(
+    cvmfs::MsgStoreAbortReq *msg_req,
+    CacheTransport *transport)
+  {
+    new_object_content.clear();
+    latest_part = 0;
+    cvmfs::MsgStoreReply msg_reply;
+    CacheTransport::Frame frame_send(&msg_reply);
+    msg_reply.set_req_id(msg_req->req_id());
+    msg_reply.set_part_nr(0);
+    msg_reply.set_status(cvmfs::STATUS_OK);
+    transport->SendFrame(&frame_send);
+  }
+
   static void HandleConnection(MockCachePlugin *cache_plugin) {
     CacheTransport transport(cache_plugin->fd_connection_);
     char buffer[kObjectSize];
@@ -221,6 +236,10 @@ class MockCachePlugin {
         cvmfs::MsgStoreReq *msg_req =
           reinterpret_cast<cvmfs::MsgStoreReq *>(msg_typed);
         cache_plugin->HandleStore(msg_req, &frame_recv, &transport);
+      } else if (msg_typed->GetTypeName() == "cvmfs.MsgStoreAbortReq") {
+        cvmfs::MsgStoreAbortReq *msg_req =
+          reinterpret_cast<cvmfs::MsgStoreAbortReq *>(msg_typed);
+        cache_plugin->HandleStoreAbort(msg_req, &transport);
       } else {
         abort();
       }
@@ -395,8 +414,6 @@ TEST_F(T_ExternalCacheManager, Transaction) {
   EXPECT_EQ(content, string(reinterpret_cast<char *>(buffer), size));
   free(buffer);
 
-  mock_plugin_->new_object = shash::Any(shash::kSha1);
-
   content = "";
   HashString(content, &id);
   data = NULL;
@@ -405,8 +422,6 @@ TEST_F(T_ExternalCacheManager, Transaction) {
   EXPECT_TRUE(cache_mgr_->Open2Mem(id, "test", &buffer, &size));
   EXPECT_EQ(0U, size);
   EXPECT_EQ(NULL, buffer);
-
-  mock_plugin_->new_object = shash::Any(shash::kSha1);
 
   unsigned large_size = 50 * 1024 * 1024;
   unsigned char *large_buffer = reinterpret_cast<unsigned char *>(
@@ -417,10 +432,39 @@ TEST_F(T_ExternalCacheManager, Transaction) {
     smalloc(large_size));
   EXPECT_TRUE(cache_mgr_->Open2Mem(id, "test", &large_buffer_verify, &size));
   EXPECT_EQ(large_size, size);
+  EXPECT_EQ(0, memcmp(large_buffer, large_buffer_verify, large_size));
   free(large_buffer_verify);
   free(large_buffer);
-  // test large
-  // test large and multiple of max object size
+
+  large_size = 50 * 1024 * 1024 + 1;
+  large_buffer = reinterpret_cast<unsigned char *>(scalloc(large_size, 1));
+  EXPECT_TRUE(
+    cache_mgr_->CommitFromMem(id, large_buffer, large_size, "test"));
+  large_buffer_verify = reinterpret_cast<unsigned char *>(smalloc(large_size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(id, "test", &large_buffer_verify, &size));
+  EXPECT_EQ(large_size, size);
+  EXPECT_EQ(0, memcmp(large_buffer, large_buffer_verify, large_size));
+  free(large_buffer_verify);
+  free(large_buffer);
 
   // test unordered upload of chunks (and failure inbetween)
+}
+
+TEST_F(T_ExternalCacheManager, TransactionAbort) {
+  shash::Any id(shash::kSha1);
+  string content = "foo";
+  HashString(content, &id);
+  void *txn = alloca(cache_mgr_->SizeOfTxn());
+  EXPECT_EQ(0, cache_mgr_->StartTxn(id, content.length(), txn));
+  EXPECT_EQ(0, cache_mgr_->Reset(txn));
+  EXPECT_EQ(2, cache_mgr_->Write(content.data(), 2, txn));
+  EXPECT_EQ(0, cache_mgr_->Reset(txn));
+  EXPECT_EQ(3, cache_mgr_->Write(content.data(), 3, txn));
+  EXPECT_EQ(0, cache_mgr_->CommitTxn(txn));
+
+  unsigned char *buf;
+  uint64_t size;
+  EXPECT_TRUE(cache_mgr_->Open2Mem(id, "test", &buf, &size));
+  EXPECT_EQ(content, string(reinterpret_cast<char *>(buf), size));
+  free(buf);
 }

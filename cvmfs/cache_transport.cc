@@ -160,6 +160,8 @@ void CacheTransport::Frame::UnwrapMsg() {
     msg_typed_ = msg_rpc_.mutable_msg_read_reply();
   } else if (msg_rpc_.has_msg_store_req()) {
     msg_typed_ = msg_rpc_.mutable_msg_store_req();
+  } else if (msg_rpc_.has_msg_store_abort_req()) {
+    msg_typed_ = msg_rpc_.mutable_msg_store_abort_req();
   } else if (msg_rpc_.has_msg_store_reply()) {
     msg_typed_ = msg_rpc_.mutable_msg_store_reply();
   } else {

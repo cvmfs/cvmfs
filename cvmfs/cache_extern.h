@@ -67,6 +67,7 @@ class ExternalCacheManager : public CacheManager {
       , expected_size(kSizeUnknown)
       , object_info(kTypeRegular, "")
       , open_fds(0)
+      , flushed(false)
       , committed(false)
       , object_info_modified(false)
       , id(id)
@@ -82,10 +83,12 @@ class ExternalCacheManager : public CacheManager {
     uint64_t expected_size;
     ObjectInfo object_info;
     int open_fds;
+    bool flushed;
     bool committed;
     bool object_info_modified;
+    uint64_t transaction_id;
     shash::Any id;
-  };
+  };  // class Transaction
 
   struct ReadOnlyHandle {
     ReadOnlyHandle() : id(kInvalidHandle) { }
@@ -97,7 +100,7 @@ class ExternalCacheManager : public CacheManager {
       return this->id != other.id;
     }
     shash::Any id;
-  };
+  };  // class ReadOnlyHandle
 
   class RpcJob {
    public:
@@ -109,6 +112,9 @@ class ExternalCacheManager : public CacheManager {
       : req_id_(msg->req_id()), part_nr_(0), msg_req_(msg), frame_send_(msg) { }
     explicit RpcJob(cvmfs::MsgStoreReq *msg)
       : req_id_(msg->req_id()), part_nr_(msg->part_nr()), msg_req_(msg),
+        frame_send_(msg) { }
+    explicit RpcJob(cvmfs::MsgStoreAbortReq *msg)
+      : req_id_(msg->req_id()), part_nr_(0), msg_req_(msg),
         frame_send_(msg) { }
 
     void set_attachment_send(void *data, unsigned size) {
