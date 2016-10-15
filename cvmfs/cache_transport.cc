@@ -86,6 +86,16 @@ CacheTransport::Frame::~Frame() {
 }
 
 
+void CacheTransport::Frame::MergeFrom(const Frame &other) {
+  msg_rpc_ = other.msg_rpc_;
+  owns_msg_typed_ = other.owns_msg_typed_;
+  msg_typed_ = other.msg_typed_;
+  memcpy(attachment_, other.attachment_, other.att_size_);
+  att_size_ = other.att_size_;
+  is_wrapped_ = other.is_wrapped_;
+}
+
+
 bool CacheTransport::Frame::ParseMsgRpc(void *buffer, uint32_t size) {
   bool retval = msg_rpc_.ParseFromArray(buffer, size);
   if (!retval)

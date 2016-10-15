@@ -8,6 +8,7 @@
 #include <stdint.h>
 
 #include <cassert>
+#include <vector>
 
 #include "atomic.h"
 #include "cache.h"
@@ -159,6 +160,8 @@ class ExternalCacheManager : public CacheManager {
 
     CacheTransport::Frame *frame_send() { return &frame_send_; }
     CacheTransport::Frame *frame_recv() { return &frame_recv_; }
+    uint64_t req_id() const { return req_id_; }
+    uint64_t part_nr() const { return part_nr_; }
 
    private:
     uint64_t req_id_;
@@ -167,6 +170,16 @@ class ExternalCacheManager : public CacheManager {
     CacheTransport::Frame frame_send_;
     CacheTransport::Frame frame_recv_;
   };  // class RpcJob
+
+  struct RpcInFlight {
+    RpcInFlight() : rpc_job(NULL), signal(NULL) { }
+    RpcInFlight(RpcJob *r, Signal *s) : rpc_job(r), signal(s) { }
+
+    RpcJob *rpc_job;
+    Signal *signal;
+  };
+
+  static void *MainRead(void *data);
 
   explicit ExternalCacheManager(int fd_connection, unsigned max_open_fds);
   int64_t NextRequestId() { return atomic_xadd64(&next_request_id_, 1); }
@@ -181,6 +194,7 @@ class ExternalCacheManager : public CacheManager {
   int64_t session_id_;
   uint32_t max_object_size_;
   bool spawned_;
+  bool terminated_;
   pthread_rwlock_t rwlock_fd_table_;
   atomic_int64 next_request_id_;
 
@@ -188,6 +202,9 @@ class ExternalCacheManager : public CacheManager {
    * Serialize concurrent write access to the session fd
    */
   pthread_mutex_t lock_send_fd_;
+  std::vector<RpcInFlight> inflight_rpcs_;
+  pthread_mutex_t lock_inflight_rpcs_;
+  pthread_t thread_read_;
 };  // class ExternalCacheManager
 
 #endif  // CVMFS_CACHE_EXTERN_H_

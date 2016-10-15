@@ -64,6 +64,7 @@ class CacheTransport {
     Frame();
     explicit Frame(google::protobuf::MessageLite *m);
     ~Frame();
+    void MergeFrom(const Frame &other);
 
     void *attachment() const { return attachment_; }
     uint32_t att_size() const { return att_size_; }

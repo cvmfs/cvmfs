@@ -6,7 +6,9 @@
 
 #define __STDC_FORMAT_MACROS
 
+#include <errno.h>
 #include <inttypes.h>
+#include <sys/socket.h>
 #include <unistd.h>
 
 #include <algorithm>
@@ -73,11 +75,16 @@ void ExternalCacheManager::CallRemotely(ExternalCacheManager::RpcJob *rpc_job) {
     bool retval = transport_.RecvFrame(rpc_job->frame_recv());
     assert(retval);
   } else {
-    pthread_mutex_lock(&lock_send_fd_);
-    transport_.SendFrame(rpc_job->frame_send());
-    pthread_mutex_unlock(&lock_send_fd_);
-    // TODO
-
+    Signal signal;
+    {
+      MutexLockGuard guard(lock_inflight_rpcs_);
+      inflight_rpcs_.push_back(RpcInFlight(rpc_job, &signal));
+    }
+    {
+      MutexLockGuard guard(lock_send_fd_);
+      transport_.SendFrame(rpc_job->frame_send());
+    }
+    signal.Wait();
   }
 }
 
@@ -214,10 +221,14 @@ ExternalCacheManager::ExternalCacheManager(
   , session_id_(-1)
   , max_object_size_(0)
   , spawned_(false)
+  , terminated_(false)
 {
   int retval = pthread_rwlock_init(&rwlock_fd_table_, NULL);
   assert(retval == 0);
   retval = pthread_mutex_init(&lock_send_fd_, NULL);
+  assert(retval == 0);
+  retval = pthread_mutex_init(&lock_inflight_rpcs_, NULL);
+  assert(retval == 0);
   atomic_init64(&next_request_id_);
 }
 
@@ -229,9 +240,14 @@ ExternalCacheManager::~ExternalCacheManager() {
     CacheTransport::Frame frame(&msg_quit);
     transport_.SendFrame(&frame);
   }
+  terminated_ = true;
+  shutdown(transport_.fd_connection(), SHUT_RDWR);
+  if (spawned_)
+    pthread_join(thread_read_, NULL);
   close(transport_.fd_connection());
   pthread_rwlock_destroy(&rwlock_fd_table_);
   pthread_mutex_destroy(&lock_send_fd_);
+  pthread_mutex_destroy(&lock_inflight_rpcs_);
 }
 
 
@@ -301,6 +317,69 @@ int64_t ExternalCacheManager::GetSize(int fd) {
     return msg_reply->size();
   }
   return Ack2Errno(msg_reply->status());
+}
+
+
+void *ExternalCacheManager::MainRead(void *data) {
+  ExternalCacheManager *cache_mgr =
+    reinterpret_cast<ExternalCacheManager *>(data);
+  LogCvmfs(kLogCache, kLogDebug, "starting external cache reader thread");
+
+  unsigned char buffer[cache_mgr->max_object_size_];
+  CacheTransport::Frame frame_recv;
+  frame_recv.set_attachment(buffer, cache_mgr->max_object_size_);
+  while (true) {
+    bool retval = cache_mgr->transport_.RecvFrame(&frame_recv);
+    if (!retval)
+      break;
+
+    uint64_t req_id;
+    uint64_t part_nr = 0;
+    google::protobuf::MessageLite *msg = frame_recv.GetMsgTyped();
+    if (msg->GetTypeName() == "cvmfs.MsgRefcountReply") {
+      req_id = reinterpret_cast<cvmfs::MsgRefcountReply *>(msg)->req_id();
+    } else if (msg->GetTypeName() == "cvmfs.MsgObjectInfoReply") {
+      req_id = reinterpret_cast<cvmfs::MsgObjectInfoReply *>(msg)->req_id();
+    } else if (msg->GetTypeName() == "cvmfs.MsgReadReply") {
+      req_id = reinterpret_cast<cvmfs::MsgReadReply *>(msg)->req_id();
+    } else if (msg->GetTypeName() == "cvmfs.MsgStoreReply") {
+      req_id = reinterpret_cast<cvmfs::MsgStoreReply *>(msg)->req_id();
+      part_nr = reinterpret_cast<cvmfs::MsgStoreReply *>(msg)->part_nr();
+    } else {
+      LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug, "unexpected message %s",
+               msg->GetTypeName().c_str());
+      abort();
+    }
+
+    RpcInFlight rpc_inflight;
+    {
+      MutexLockGuard guard(cache_mgr->lock_inflight_rpcs_);
+      for (unsigned i = 0; i < cache_mgr->inflight_rpcs_.size(); ++i) {
+        RpcJob *rpc_job = cache_mgr->inflight_rpcs_[i].rpc_job;
+        if ((rpc_job->req_id() == req_id) && (rpc_job->part_nr() == part_nr)) {
+          rpc_inflight = cache_mgr->inflight_rpcs_[i];
+          cache_mgr->inflight_rpcs_.erase(
+            cache_mgr->inflight_rpcs_.begin() + i);
+          break;
+        }
+      }
+    }
+    if (rpc_inflight.rpc_job == NULL) {
+      LogCvmfs(kLogCache, kLogSyslogWarn | kLogDebug,
+               "got unmatched rpc reply");
+      continue;
+    }
+    rpc_inflight.rpc_job->frame_recv()->MergeFrom(frame_recv);
+    rpc_inflight.signal->Wakeup();
+  }
+
+  if (!cache_mgr->terminated_) {
+    LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
+             "connection to external cache manager broken (%d)", errno);
+    abort();
+  }
+  LogCvmfs(kLogCache, kLogDebug, "stopping external cache reader thread");
+  return NULL;
 }
 
 
@@ -410,6 +489,8 @@ int ExternalCacheManager::Reset(void *txn) {
 
 
 void ExternalCacheManager::Spawn() {
+  int retval = pthread_create(&thread_read_, NULL, MainRead, this);
+  assert(retval == 0);
   spawned_ = true;
 }
 

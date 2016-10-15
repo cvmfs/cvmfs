@@ -469,3 +469,7 @@ TEST_F(T_ExternalCacheManager, TransactionAbort) {
   EXPECT_EQ(content, string(reinterpret_cast<char *>(buf), size));
   free(buf);
 }
+
+TEST_F(T_ExternalCacheManager, MultiThreaded) {
+  cache_mgr_->Spawn();
+}

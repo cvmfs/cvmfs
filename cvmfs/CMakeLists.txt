@@ -100,6 +100,7 @@ set (CVMFS_CLIENT_SOURCES
   util/posix.cc util/posix.h
   util/single_copy.h
   util/string.cc util/string.h
+  util_concurrency.cc util_concurrency.h util_concurrency_impl.h
   whitelist.cc whitelist.h
   wpad.cc wpad.h
   xattr.cc xattr.h
