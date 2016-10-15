@@ -6,9 +6,9 @@
 
 #include <alloca.h>
 #include <pthread.h>
-#include <unistd.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <unistd.h>
 
 #include <algorithm>
 #include <cassert>
@@ -449,6 +449,7 @@ TEST_F(T_ExternalCacheManager, Transaction) {
 
   // test unordered upload of chunks (and failure inbetween)
 }
+
 
 TEST_F(T_ExternalCacheManager, TransactionAbort) {
   shash::Any id(shash::kSha1);
