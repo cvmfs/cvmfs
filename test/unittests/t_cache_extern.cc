@@ -470,6 +470,54 @@ TEST_F(T_ExternalCacheManager, TransactionAbort) {
   free(buf);
 }
 
+namespace {
+
+struct ThreadData {
+  ExternalCacheManager *cache_mgr;
+  unsigned large_size;
+  unsigned char *large_buffer;
+  shash::Any id;
+};
+
+static void *MainMultiThread(void *data) {
+  ThreadData *td = reinterpret_cast<ThreadData *>(data);
+
+  uint64_t size;
+  unsigned char *buffer;
+  EXPECT_TRUE(td->cache_mgr->Open2Mem(td->id, "test", &buffer, &size));
+  EXPECT_EQ(td->large_size, size);
+  EXPECT_EQ(0, memcmp(buffer, td->large_buffer, size));
+  free(buffer);
+  return NULL;
+}
+
+}  // anonymous namespace
+
 TEST_F(T_ExternalCacheManager, MultiThreaded) {
   cache_mgr_->Spawn();
+
+  unsigned large_size = 50 * 1024 * 1024;
+  unsigned char *large_buffer = reinterpret_cast<unsigned char *>(
+    smalloc(large_size));
+  memset(large_buffer, 1, large_size);
+  shash::Any id(shash::kSha1);
+  shash::HashMem(large_buffer, large_size, &id);
+  EXPECT_TRUE(
+    cache_mgr_->CommitFromMem(id, large_buffer, large_size, "test"));
+
+  unsigned num_threads = 10;
+  pthread_t threads[num_threads];
+  ThreadData td[num_threads];
+  for (unsigned i = 0; i < num_threads; ++i) {
+    td[i].cache_mgr = cache_mgr_;
+    td[i].large_size = large_size;
+    td[i].large_buffer = large_buffer;
+    td[i].id = id;
+
+    int retval = pthread_create(&threads[i], NULL, MainMultiThread, &td[i]);
+    assert(retval == 0);
+  }
+  for (unsigned i = 0; i < num_threads; ++i) {
+    pthread_join(threads[i], NULL);
+  }
 }

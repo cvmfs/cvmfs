@@ -87,12 +87,13 @@ CacheTransport::Frame::~Frame() {
 
 
 void CacheTransport::Frame::MergeFrom(const Frame &other) {
-  msg_rpc_ = other.msg_rpc_;
-  owns_msg_typed_ = other.owns_msg_typed_;
-  msg_typed_ = other.msg_typed_;
-  memcpy(attachment_, other.attachment_, other.att_size_);
-  att_size_ = other.att_size_;
-  is_wrapped_ = other.is_wrapped_;
+  msg_rpc_.CheckTypeAndMergeFrom(other.msg_rpc_);
+  owns_msg_typed_ = true;
+  if (other.att_size_ > 0) {
+    assert(att_size_ >= other.att_size_);
+    memcpy(attachment_, other.attachment_, other.att_size_);
+    att_size_ = other.att_size_;
+  }
 }
 
 

@@ -326,9 +326,9 @@ void *ExternalCacheManager::MainRead(void *data) {
   LogCvmfs(kLogCache, kLogDebug, "starting external cache reader thread");
 
   unsigned char buffer[cache_mgr->max_object_size_];
-  CacheTransport::Frame frame_recv;
-  frame_recv.set_attachment(buffer, cache_mgr->max_object_size_);
   while (true) {
+    CacheTransport::Frame frame_recv;
+    frame_recv.set_attachment(buffer, cache_mgr->max_object_size_);
     bool retval = cache_mgr->transport_.RecvFrame(&frame_recv);
     if (!retval)
       break;
