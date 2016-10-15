@@ -14,6 +14,7 @@
 #include "cache_transport.h"
 #include "fd_table.h"
 #include "hash.h"
+#include "util_concurrency.h"
 
 class ExternalCacheManager : public CacheManager {
  public:
@@ -44,6 +45,8 @@ class ExternalCacheManager : public CacheManager {
   virtual int AbortTxn(void *txn);
   virtual int OpenFromTxn(void *txn);
   virtual int CommitTxn(void *txn);
+
+  void Spawn();
 
   int64_t session_id() const { return session_id_; }
 
@@ -163,7 +166,7 @@ class ExternalCacheManager : public CacheManager {
     google::protobuf::MessageLite *msg_req_;
     CacheTransport::Frame frame_send_;
     CacheTransport::Frame frame_recv_;
-  };
+  };  // class RpcJob
 
   explicit ExternalCacheManager(int fd_connection, unsigned max_open_fds);
   int64_t NextRequestId() { return atomic_xadd64(&next_request_id_, 1); }
@@ -180,6 +183,11 @@ class ExternalCacheManager : public CacheManager {
   bool spawned_;
   pthread_rwlock_t rwlock_fd_table_;
   atomic_int64 next_request_id_;
+
+  /**
+   * Serialize concurrent write access to the session fd
+   */
+  pthread_mutex_t lock_send_fd_;
 };  // class ExternalCacheManager
 
 #endif  // CVMFS_CACHE_EXTERN_H_

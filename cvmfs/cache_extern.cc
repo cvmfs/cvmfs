@@ -73,8 +73,11 @@ void ExternalCacheManager::CallRemotely(ExternalCacheManager::RpcJob *rpc_job) {
     bool retval = transport_.RecvFrame(rpc_job->frame_recv());
     assert(retval);
   } else {
+    pthread_mutex_lock(&lock_send_fd_);
+    transport_.SendFrame(rpc_job->frame_send());
+    pthread_mutex_unlock(&lock_send_fd_);
     // TODO
-    abort();
+
   }
 }
 
@@ -214,6 +217,7 @@ ExternalCacheManager::ExternalCacheManager(
 {
   int retval = pthread_rwlock_init(&rwlock_fd_table_, NULL);
   assert(retval == 0);
+  retval = pthread_mutex_init(&lock_send_fd_, NULL);
   atomic_init64(&next_request_id_);
 }
 
@@ -227,6 +231,7 @@ ExternalCacheManager::~ExternalCacheManager() {
   }
   close(transport_.fd_connection());
   pthread_rwlock_destroy(&rwlock_fd_table_);
+  pthread_mutex_destroy(&lock_send_fd_);
 }
 
 
@@ -401,6 +406,11 @@ int ExternalCacheManager::Reset(void *txn) {
   transaction->transaction_id = NextRequestId();
   transaction->flushed = false;
   return Ack2Errno(msg_reply->status());
+}
+
+
+void ExternalCacheManager::Spawn() {
+  spawned_ = true;
 }
 
 
