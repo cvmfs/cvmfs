@@ -149,6 +149,11 @@ set (TEST_LIBCVMFS_SOURCES
   test_libcvmfs.cc
 )
 
+set (LIBCVMFS_CACHE_SOURCES
+  cache_plugin/libcvmfs_cache.cc cache_plugin/libcvmfs_cache.h
+  cache_plugin/channel.cc cache_plugin/channel.h
+)
+
 set (CVMFS_FSCK_SOURCES
   atomic.h
   compression.cc compression.h
@@ -356,6 +361,8 @@ set (CVMFS_FSCK_CFLAGS "${CVMFS_FSCK_CFLAGS} -DCVMFS_CLIENT")
 
 set (LIBCVMFS_CFLAGS "${LIBCVMFS_CFLAGS} -D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -DCVMFS_LIBCVMFS -fexceptions")
 
+set (LIBCVMFS_CACHE_CFLAGS "${LIBCVMFS_CACHE_CFLAGS} -D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -DCVMFS_LIBCVMFS -fexceptions")
+
 #
 # set some include and linking stuff
 #
@@ -469,6 +476,35 @@ if (BUILD_CVMFS)
   add_dependencies (cvmfs_deny_helper libvjson)
   target_link_libraries (cvmfs_deny_helper ${VJSON_ARCHIVE})
 endif (BUILD_CVMFS)
+
+
+if (BUILD_LIBCVMFS_CACHE)
+  # libcvmfs_cache_only.a is a static lib of cvmfs without externals
+  # libcvmfs_cache.a includes the externals as well
+  add_library (cvmfs_cache_only STATIC ${LIBCVMFS_CACHE_SOURCES})
+  set (LIBCVMFS_CACHE_LIBS ${LIBCVMFS_CACHE_LIBS} ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache_only.a)
+  add_dependencies (cvmfs_cache_only protobuf)
+  set (LIBCVMFS_CACHE_LIBS ${PROTOBUF_ARCHIVE} ${LIBCVMFS_CACHE_LIBS})
+  set_target_properties (cvmfs_cache_only PROPERTIES COMPILE_FLAGS
+                         "${LIBCVMFS_CACHE_CFLAGS}")
+  if (NOT MACOSX)
+    # We do not (yet) have a recipe for localizing private symbols
+    # in Mac OS X, so skip that step on Mac
+    set (LIBCVMFS_CACHE_PUBLIC_SYMS "-public" "${CMAKE_CURRENT_SOURCE_DIR}/cache_plugin/libcvmfs_cache_public_syms.txt")
+  endif (NOT MACOSX)
+
+  add_custom_command(
+    OUTPUT libcvmfs_cache.a
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/combine_libs ${LIBCVMFS_CACHE_PUBLIC_SYMS} libcvmfs_cache.a ${LIBCVMFS_CACHE_LIBS}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    DEPENDS ${LIBCVMFS_CACHE_LIBS}
+  )
+
+  # dummy target to cause merged libcvmfs to be produced
+  add_custom_target (libcvmfs_cache ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a)
+  add_dependencies (libcvmfs_cache cvmfs_cache_only)
+endif (BUILD_LIBCVMFS_CACHE)
+
 
 if (BUILD_LIBCVMFS)
   # libcvmfs_only.a is a static lib of cvmfs without externals

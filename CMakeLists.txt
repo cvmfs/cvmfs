@@ -183,6 +183,7 @@ else (MACOSX)
   option (BUILD_LIBCVMFS        "Build the CernVM-FS client library"                               ON)
   option (BUILD_SERVER          "Build writer's end programs"                                      ON)
 endif(MACOSX)
+option (BUILD_LIBCVMFS_CACHE    "Build the cache plugin library"                                     ON)
 option (BUILD_PRELOADER         "Build the alien cache pre-loader"                                 OFF)
 option (BUILD_OCTOPUS           "Build the octopus REST server"                                    OFF)
 option (BUILD_SERVER_DEBUG      "Build writer's end programs with debug symbols and debug outputs" OFF)
@@ -209,6 +210,7 @@ option (TBB_PRIVATE_LIB         "Compile our own TBB shared libraries"          
 
 if (BUILD_ALL)
   set (BUILD_CVMFS ON)
+  set (BUILD_LIBCVMFS_CACHE ON)
   set (BUILD_UNITTESTS ON)
   if (!MACOSX)
     set (BUILD_SERVER ON)
@@ -493,11 +495,11 @@ endif (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_PRELOADER OR
        BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
 
 # Client/libcvmfs only
-if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG OR
-    BUILD_UBENCHMARKS)
+if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_LIBCVMFS_CACHE OR
+    BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG OR BUILD_UBENCHMARKS)
   include (${PROTOBUF_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
-endif (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_UNITTESTS OR
-       BUILD_UNITTESTS_DEBUG OR BUILD_UBENCHMARKS)
+endif (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_LIBCVMFS_CACHE OR
+       BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG OR BUILD_UBENCHMARKS)
 
 # Fuse client only
 if (BUILD_CVMFS)
