@@ -53,9 +53,12 @@ stop() ->
 %%                                  {error, invalid_path}.
 %% @end
 %%--------------------------------------------------------------------
--spec new_session(binary(), binary()) -> {ok, binary()} |
-                                         {error, invalid_user} |
-                                         {error, invalid_path}.
+-spec new_session(User, Path) -> {ok, SessionToken} |
+                                 {error, invalid_user} |
+                                 {error, invalid_path}
+                                     when User :: binary(),
+                                          Path :: binary(),
+                                          SessionToken :: binary().
 new_session(User, Path) ->
     gen_server:call(?MODULE, {proc_req, new_session, {User, Path}}).
 
@@ -68,7 +71,8 @@ new_session(User, Path) ->
 %% @spec end_session() -> ok | {error, invalid_token}.
 %% @end
 %%--------------------------------------------------------------------
--spec end_session(binary()) -> ok | {error, invalid_token}.
+-spec end_session(SessionToken) -> ok | {error, invalid_token}
+                                       when SessionToken :: binary().
 end_session(SessionToken) ->
     gen_server:call(?MODULE, {proc_req, end_session, SessionToken}).
 
@@ -82,10 +86,15 @@ end_session(SessionToken) ->
 %%              {error, Reason}
 %% @end
 %%--------------------------------------------------------------------
--spec submit_payload(binary(), binary(), binary(), boolean()) ->
+-spec submit_payload(User, SessionToken, Payload, Final) ->
                             {ok, payload_added} |
                             {ok, payload_added, session_ended} |
-                            {error, string()}.
+                            {error, Reason}
+                                when User :: binary(),
+                                     SessionToken :: binary(),
+                                     Payload :: binary(),
+                                     Final :: boolean(),
+                                     Reason :: binary().
 submit_payload(User, SessionToken, Payload, Final) ->
     gen_server:call(?MODULE, {proc_req, submit_payload, {User,
                                                          SessionToken,
@@ -206,9 +215,12 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
--spec priv_new_session(binary(), binary()) -> {ok, binary()} |
-                                              {error, invalid_user} |
-                                              {error, invalid_path}.
+-spec priv_new_session(User, Path) -> {ok, Token} |
+                                      {error, invalid_user} |
+                                      {error, invalid_path}
+                                          when User :: binary(),
+                                               Path :: binary(),
+                                               Token :: binary().
 priv_new_session(User, Path) ->
     % Check if user is registered with the cvmfs_auth service and which
     % paths he is allowed to modify
@@ -224,14 +236,21 @@ priv_new_session(User, Path) ->
             end
     end.
 
--spec priv_end_session(binary()) -> ok | {error, invalid_token}.
+-spec priv_end_session(SessionToken) -> ok | {error, invalid_token}
+                                            when SessionToken :: binary().
 priv_end_session(_SessionToken) ->
     ok.
 
--spec priv_submit_payload(binary(), binary(), binary(), map(), boolean()) ->
+-spec priv_submit_payload(User, SessionToken, Payload, State, Final) ->
                                  {ok, payload_added} |
                                  {ok, payload_added, session_ended} |
-                                 {error, string()}.
+                                 {error, Reason}
+                                     when User :: binary(),
+                                          SessionToken :: binary(),
+                                          Payload :: binary(),
+                                          State :: map(),
+                                          Final :: boolean(),
+                                          Reason :: binary().
 priv_submit_payload(User, SessionToken, Payload, State, _Final) ->
     case priv_check_payload(User, SessionToken, Payload, State) of
         ok ->
@@ -244,7 +263,12 @@ priv_submit_payload(User, SessionToken, Payload, State, _Final) ->
             {error, Reason}
     end.
 
--spec priv_generate_token(binary(), binary()) -> binary().
+-spec priv_generate_token(User, Path) -> {Token, Public, Secret}
+                                             when User :: binary(),
+                                                  Path :: binary(),
+                                                  Token :: binary(),
+                                                  Public :: binary(),
+                                                  Secret :: binary().
 priv_generate_token(User, Path) ->
     Secret = enacl_p:randombytes(macaroon:suggested_secret_length()),
     Public = <<User/binary,Path/binary>>,
@@ -257,7 +281,12 @@ priv_generate_token(User, Path) ->
     {ok, Token} = macaroon:serialize(M3),
     {Token, Public, Secret}.
 
--spec priv_check_payload(binary(), binary(), binary(), map()) -> ok | {error, invalid_token}.
+-spec priv_check_payload(User, SessionToken, Payload, State) ->
+                                ok | {error, invalid_token}
+                                    when User :: binary(),
+                                         SessionToken :: binary(),
+                                         Payload :: binary(),
+                                         State :: map().
 priv_check_payload(_User, _SessionToken, _Payload, State)
   when map_size(State) == 0 ->
     {error, invalid_session_token};
