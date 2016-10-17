@@ -18,6 +18,7 @@
 
 #include "cache.pb.h"
 #include "cache_extern.h"
+#include "cache_plugin/channel.h"
 #include "cache_transport.h"
 #include "hash.h"
 #include "smalloc.h"
@@ -28,256 +29,121 @@ using namespace std;  // NOLINT
 /**
  * Receiving end of the cache manager.
  */
-class MockCachePlugin {
+class MockCachePlugin : public CachePlugin {
  public:
-  static const unsigned kObjectSize = 256 * 1024;
-
-  explicit MockCachePlugin(const string &socket_path) {
-    fd_connection_ = -1;
-    fd_socket_ = MakeSocket(socket_path, 0600);
-    if (fd_socket_ >= 0) {
-      int retval = listen(fd_socket_, 1);
-      assert(retval == 0);
-      retval = pthread_create(&thread_recv_, NULL, MainServer, this);
-      assert(retval == 0);
-    }
+  explicit MockCachePlugin(const string &socket_path)
+   : CachePlugin(socket_path)
+  {
+    bool retval = Listen();
+    assert(retval);
+    ProcessRequests();
     known_object.algorithm = shash::kSha1;
     known_object_content = "Hello, World";
     shash::HashString(known_object_content, &known_object);
-    latest_part = 0;
     known_object_refcnt = 0;
     next_status = -1;
   }
 
-  ~MockCachePlugin() {
-    if (fd_socket_ >= 0) {
-      shutdown(fd_socket_, SHUT_RDWR);
-      close(fd_socket_);
-      pthread_join(thread_recv_, NULL);
-    }
-  }
+  virtual ~MockCachePlugin() { }
 
-  void HandleHandshake(CacheTransport *transport) {
-    cvmfs::MsgHandshakeAck msg_ack;
-    msg_ack.set_status(cvmfs::STATUS_OK);
-    msg_ack.set_name("unit test cache manager");
-    msg_ack.set_protocol_version(ExternalCacheManager::kPbProtocolVersion);
-    msg_ack.set_session_id(42);
-    msg_ack.set_max_object_size(kObjectSize);  // 256kB
-    CacheTransport::Frame frame_send(&msg_ack);
-    transport->SendFrame(&frame_send);
-  }
-
-  void HandleRefcountRequest(
-    cvmfs::MsgRefcountReq *msg_req,
-    CacheTransport *transport)
-  {
-    cvmfs::MsgRefcountReply msg_reply;
-    msg_reply.set_req_id(msg_req->req_id());
-    shash::Any object_id;
-    bool retval = transport->ParseMsgHash(msg_req->object_id(), &object_id);
-    if (!retval) {
-      msg_reply.set_status(cvmfs::STATUS_MALFORMED);
-    } else if (object_id != known_object) {
-      if (object_id == new_object)
-        msg_reply.set_status(cvmfs::STATUS_OK);
-      else
-        msg_reply.set_status(cvmfs::STATUS_NOENTRY);
-    } else {
-      if ((known_object_refcnt + msg_req->change_by()) < 0) {
-        msg_reply.set_status(cvmfs::STATUS_BADCOUNT);
-      } else {
-        known_object_refcnt += msg_req->change_by();
-        msg_reply.set_status(cvmfs::STATUS_OK);
-      }
-    }
-    if (next_status >= 0)
-      msg_reply.set_status(static_cast<cvmfs::EnumStatus>(next_status));
-    CacheTransport::Frame frame_send(&msg_reply);
-    transport->SendFrame(&frame_send);
-  }
-
-  void HandleObjectInfo(
-    cvmfs::MsgObjectInfoReq *msg_req,
-    CacheTransport *transport)
-  {
-    cvmfs::MsgObjectInfoReply msg_reply;
-    msg_reply.set_req_id(msg_req->req_id());
-    shash::Any object_id;
-    bool retval = transport->ParseMsgHash(msg_req->object_id(), &object_id);
-    if (!retval) {
-      msg_reply.set_status(cvmfs::STATUS_MALFORMED);
-    } else if (object_id == known_object) {
-      msg_reply.set_status(cvmfs::STATUS_OK);
-      msg_reply.set_object_type(cvmfs::OBJECT_REGULAR);
-      msg_reply.set_nparts(1);
-      msg_reply.set_size(known_object_content.length());
-    } else if (object_id == new_object) {
-      msg_reply.set_status(cvmfs::STATUS_OK);
-      msg_reply.set_object_type(cvmfs::OBJECT_REGULAR);
-      msg_reply.set_nparts(0); // <-- wrong but ignored
-      msg_reply.set_size(new_object_content.length());
-    } else {
-      msg_reply.set_status(cvmfs::STATUS_NOENTRY);
-    }
-    if (next_status >= 0)
-      msg_reply.set_status(static_cast<cvmfs::EnumStatus>(next_status));
-    CacheTransport::Frame frame_send(&msg_reply);
-    transport->SendFrame(&frame_send);
-  }
-
-  void HandleRead(cvmfs::MsgReadReq *msg_req, CacheTransport *transport) {
-    cvmfs::MsgReadReply msg_reply;
-    CacheTransport::Frame frame_send(&msg_reply);
-    msg_reply.set_req_id(msg_req->req_id());
-    shash::Any object_id;
-    bool retval = transport->ParseMsgHash(msg_req->object_id(), &object_id);
-    if (!retval) {
-      msg_reply.set_status(cvmfs::STATUS_MALFORMED);
-    } else if ((object_id != known_object) && (object_id != new_object)) {
-      msg_reply.set_status(cvmfs::STATUS_NOENTRY);
-    } else {
-      const char *data;
-      uint32_t data_size;
-      if (object_id == known_object) {
-        data = known_object_content.data();
-        data_size = known_object_content.length();
-      } else {
-        data = new_object_content.data();
-        data_size = new_object_content.length();
-      }
-      if (msg_req->offset() >= data_size) {
-        msg_reply.set_status(cvmfs::STATUS_OUTOFBOUNDS);
-      } else {
-        frame_send.set_attachment(
-          const_cast<char *>(data) + msg_req->offset(),
-          std::min(msg_req->size(),
-                   static_cast<uint32_t>(data_size - msg_req->offset()))
-        );
-        msg_reply.set_status(cvmfs::STATUS_OK);
-      }
-    }
-    if (next_status >= 0)
-      msg_reply.set_status(static_cast<cvmfs::EnumStatus>(next_status));
-    transport->SendFrame(&frame_send);
-  }
-
-  void HandleStore(
-    cvmfs::MsgStoreReq *msg_req,
-    CacheTransport::Frame *frame_recv,
-    CacheTransport *transport)
-  {
-    cvmfs::MsgStoreReply msg_reply;
-    CacheTransport::Frame frame_send(&msg_reply);
-    msg_reply.set_req_id(msg_req->req_id());
-    msg_reply.set_part_nr(msg_req->part_nr());
-    bool retval = transport->ParseMsgHash(msg_req->object_id(), &new_object);
-    if (!retval) {
-      msg_reply.set_status(cvmfs::STATUS_MALFORMED);
-    } else {
-      if (msg_req->part_nr() == 1) {
-        new_object_content.clear();
-        latest_part = 0;
-      }
-      if (frame_recv->att_size() > 0) {
-        string data(reinterpret_cast<char *>(frame_recv->attachment()),
-                    frame_recv->att_size());
-        new_object_content += data;
-      }
-      assert(msg_req->part_nr() == (latest_part + 1));
-      latest_part++;
-      msg_reply.set_status(cvmfs::STATUS_OK);
-    }
-    transport->SendFrame(&frame_send);
-  }
-
-  void HandleStoreAbort(
-    cvmfs::MsgStoreAbortReq *msg_req,
-    CacheTransport *transport)
-  {
-    new_object_content.clear();
-    latest_part = 0;
-    cvmfs::MsgStoreReply msg_reply;
-    CacheTransport::Frame frame_send(&msg_reply);
-    msg_reply.set_req_id(msg_req->req_id());
-    msg_reply.set_part_nr(0);
-    msg_reply.set_status(cvmfs::STATUS_OK);
-    transport->SendFrame(&frame_send);
-  }
-
-  static void HandleConnection(MockCachePlugin *cache_plugin) {
-    CacheTransport transport(cache_plugin->fd_connection_);
-    char buffer[kObjectSize];
-    while (true) {
-      CacheTransport::Frame frame_recv;
-      frame_recv.set_attachment(buffer, kObjectSize);
-      bool retval = transport.RecvFrame(&frame_recv);
-      if (!retval)
-        abort();
-      google::protobuf::MessageLite *msg_typed = frame_recv.GetMsgTyped();
-
-      if (msg_typed->GetTypeName() == "cvmfs.MsgHandshake") {
-        cache_plugin->HandleHandshake(&transport);
-      } else if (msg_typed->GetTypeName() == "cvmfs.MsgQuit") {
-        break;
-      } else if (msg_typed->GetTypeName() == "cvmfs.MsgRefcountReq") {
-        cvmfs::MsgRefcountReq *msg_req =
-          reinterpret_cast<cvmfs::MsgRefcountReq *>(msg_typed);
-        cache_plugin->HandleRefcountRequest(msg_req, &transport);
-      } else if (msg_typed->GetTypeName() == "cvmfs.MsgObjectInfoReq") {
-        cvmfs::MsgObjectInfoReq *msg_req =
-          reinterpret_cast<cvmfs::MsgObjectInfoReq *>(msg_typed);
-        cache_plugin->HandleObjectInfo(msg_req, &transport);
-      } else if (msg_typed->GetTypeName() == "cvmfs.MsgReadReq") {
-        cvmfs::MsgReadReq *msg_req =
-          reinterpret_cast<cvmfs::MsgReadReq *>(msg_typed);
-        cache_plugin->HandleRead(msg_req, &transport);
-      } else if (msg_typed->GetTypeName() == "cvmfs.MsgStoreReq") {
-        cvmfs::MsgStoreReq *msg_req =
-          reinterpret_cast<cvmfs::MsgStoreReq *>(msg_typed);
-        cache_plugin->HandleStore(msg_req, &frame_recv, &transport);
-      } else if (msg_typed->GetTypeName() == "cvmfs.MsgStoreAbortReq") {
-        cvmfs::MsgStoreAbortReq *msg_req =
-          reinterpret_cast<cvmfs::MsgStoreAbortReq *>(msg_typed);
-        cache_plugin->HandleStoreAbort(msg_req, &transport);
-      } else {
-        abort();
-      }
-    }
-  }
-
-  static void *MainServer(void *data) {
-    MockCachePlugin *cache_plugin = reinterpret_cast<MockCachePlugin *>(data);
-
-    struct sockaddr_un remote;
-    socklen_t socket_size = sizeof(remote);
-    while (true) {
-      if (cache_plugin->fd_connection_ >= 0) {
-        shutdown(cache_plugin->fd_connection_, SHUT_RDWR);
-        close(cache_plugin->fd_connection_);
-        cache_plugin->fd_connection_ = -1;
-      }
-      cache_plugin->fd_connection_ = accept(cache_plugin->fd_socket_,
-                                            (struct sockaddr *)&remote,
-                                            &socket_size);
-      if (cache_plugin->fd_connection_ < 0)
-        return NULL;
-
-      HandleConnection(cache_plugin);
-    }
-    return NULL;
-  }
-
-  int fd_connection_;
-  int fd_socket_;
-  pthread_t thread_recv_;
   string known_object_content;
   shash::Any known_object;
   shash::Any new_object;
   string new_object_content;
-  unsigned latest_part;
   int known_object_refcnt;
   int next_status;
+
+ protected:
+  virtual cvmfs::EnumStatus ChangeRefcount(
+    const shash::Any &id,
+    int32_t change_by)
+  {
+    if (next_status >= 0)
+      return static_cast<cvmfs::EnumStatus>(next_status);
+    if (id == new_object)
+      return cvmfs::STATUS_OK;
+    if (id == known_object) {
+      if ((known_object_refcnt + change_by) < 0) {
+        return cvmfs::STATUS_BADCOUNT;
+      } else {
+        known_object_refcnt += change_by;
+        return cvmfs::STATUS_OK;
+      }
+    }
+    return cvmfs::STATUS_NOENTRY;
+  }
+
+  virtual cvmfs::EnumStatus GetObjectInfo(
+    const shash::Any &id,
+    ObjectInfo *info)
+  {
+    if (next_status >= 0)
+      return static_cast<cvmfs::EnumStatus>(next_status);
+    if (id == known_object) {
+      info->size = known_object_content.length();
+      return cvmfs::STATUS_OK;
+    }
+    if (id == new_object) {
+      info->size = new_object_content.length();
+      return cvmfs::STATUS_OK;
+    }
+    return cvmfs::STATUS_NOENTRY;
+  }
+
+  virtual cvmfs::EnumStatus Pread(
+    const shash::Any &id,
+    uint64_t offset,
+    unsigned *size,
+    unsigned char *buffer)
+  {
+    if (next_status >= 0)
+      return static_cast<cvmfs::EnumStatus>(next_status);
+    const char *data;
+    unsigned data_size;
+    if (id == known_object) {
+      data = known_object_content.data();
+      data_size = known_object_content.length();
+    } else if (id == new_object) {
+      data = new_object_content.data();
+      data_size = new_object_content.length();
+    } else {
+      return cvmfs::STATUS_NOENTRY;
+    }
+    if (offset > data_size)
+      return cvmfs::STATUS_OUTOFBOUNDS;
+    *size = std::min(static_cast<uint64_t>(*size), data_size - offset);
+    memcpy(buffer, data + offset, *size);
+    return cvmfs::STATUS_OK;
+  }
+
+  virtual cvmfs::EnumStatus StartTxn(
+    const shash::Any &id,
+    const uint64_t txn_id,
+    const ObjectInfo &info)
+  {
+    new_object = id;
+    new_object_content.clear();
+    return cvmfs::STATUS_OK;
+  }
+
+  virtual cvmfs::EnumStatus WriteTxn(
+    const uint64_t txn_id,
+    unsigned char *buffer,
+    unsigned size)
+  {
+    string data(reinterpret_cast<char *>(buffer), size);
+    new_object_content += data;
+    return cvmfs::STATUS_OK;
+  }
+
+  virtual cvmfs::EnumStatus CommitTxn(const uint64_t txn_id) {
+    return cvmfs::STATUS_OK;
+  }
+
+  virtual cvmfs::EnumStatus AbortTxn(const uint64_t txn_id) {
+    new_object_content.clear();
+    return cvmfs::STATUS_OK;
+  }
 };
 
 
@@ -286,7 +152,6 @@ class T_ExternalCacheManager : public ::testing::Test {
   virtual void SetUp() {
     socket_path_ = "cvmfs_cache_plugin.socket";
     mock_plugin_ = new MockCachePlugin(socket_path_);
-    ASSERT_GE(mock_plugin_->fd_socket_, 0);
 
     int fd_client = ConnectSocket(socket_path_);
     ASSERT_GE(fd_client, 0);
@@ -311,7 +176,7 @@ const int T_ExternalCacheManager::nfiles = 128;
 
 
 TEST_F(T_ExternalCacheManager, Connection) {
-  EXPECT_EQ(42, cache_mgr_->session_id());
+  EXPECT_GE(cache_mgr_->session_id(), 0);
 }
 
 

@@ -150,8 +150,26 @@ set (TEST_LIBCVMFS_SOURCES
 )
 
 set (LIBCVMFS_CACHE_SOURCES
+  atomic.h
+  cache.h
+  cache.pb.cc cache.pb.h
   cache_plugin/libcvmfs_cache.cc cache_plugin/libcvmfs_cache.h
   cache_plugin/channel.cc cache_plugin/channel.h
+  cache_transport.cc cache_transport.h
+  fs_traversal.h
+  hash.h hash.cc
+  logging.cc logging.h logging_internal.h
+  murmur.h
+  platform.h platform_linux.h platform_osx.h
+  prng.h
+  shortstring.h
+  smallhash.h
+  smalloc.h
+  util/async.h
+  util/pointer.h
+  util/posix.cc util/posix.cc
+  util/single_copy.h
+  util_concurrency.cc util_concurrency.h util_concurrency_impl.h
 )
 
 set (CVMFS_FSCK_SOURCES
@@ -483,8 +501,10 @@ if (BUILD_LIBCVMFS_CACHE)
   # libcvmfs_cache.a includes the externals as well
   add_library (cvmfs_cache_only STATIC ${LIBCVMFS_CACHE_SOURCES})
   set (LIBCVMFS_CACHE_LIBS ${LIBCVMFS_CACHE_LIBS} ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache_only.a)
+  add_dependencies (cvmfs_cache_only libsha3)
   add_dependencies (cvmfs_cache_only protobuf)
-  set (LIBCVMFS_CACHE_LIBS ${PROTOBUF_ARCHIVE} ${LIBCVMFS_CACHE_LIBS})
+  set (LIBCVMFS_CACHE_LIBS ${SHA3_ARCHIVE} ${PROTOBUF_ARCHIVE}
+                           ${LIBCVMFS_CACHE_LIBS})
   set_target_properties (cvmfs_cache_only PROPERTIES COMPILE_FLAGS
                          "${LIBCVMFS_CACHE_CFLAGS}")
   if (NOT MACOSX)

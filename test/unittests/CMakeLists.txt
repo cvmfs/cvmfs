@@ -117,6 +117,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/cache.cc ${CVMFS_SOURCE_DIR}/cache.h
   ${CVMFS_SOURCE_DIR}/cache_extern.cc ${CVMFS_SOURCE_DIR}/cache_extern.h
   ${CVMFS_SOURCE_DIR}/cache_posix.cc ${CVMFS_SOURCE_DIR}/cache_posix.h
+  ${CVMFS_SOURCE_DIR}/cache_plugin/channel.cc ${CVMFS_SOURCE_DIR}/cache_plugin/channel.h
   ${CVMFS_SOURCE_DIR}/cache_ram.cc ${CVMFS_SOURCE_DIR}/cache_ram.h
   ${CVMFS_SOURCE_DIR}/cache_tiered.cc ${CVMFS_SOURCE_DIR}/cache_tiered.h
   ${CVMFS_SOURCE_DIR}/cache_transport.cc ${CVMFS_SOURCE_DIR}/cache_transport.h
