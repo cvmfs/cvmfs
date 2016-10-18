@@ -35,7 +35,7 @@ init([]) ->
                         intensity => 5,
                         period => 5},
     CvmfsProcMainSpecs = #{id => cvmfs_proc,
-                            start => {cvmfs_proc, start_link, []},
+                            start => {cvmfs_proc, start_link, [{}]},
                             restart => permanent,
                             shutdown => 2000,
                             type => worker,
