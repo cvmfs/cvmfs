@@ -149,7 +149,12 @@ handle_call({proc_req, end_session, SessionToken}, _From, State) ->
     lager:info("Request received: {end_session, ~p} -> Reply: ~p", [SessionToken, Reply]),
     {reply, Reply, State};
 handle_call({proc_req, submit_payload, {User, SessionToken, Payload, Final}}, _From, State) ->
-    Reply = priv_submit_payload(User, SessionToken, Payload, State, Final),
+    Reply = priv_submit_payload(User, SessionToken, Payload, State),
+    case Final of
+        true ->
+            {ok, Macaroon} = macaroon:deserialize(SessionToken),
+            TokenId = macaroon:identifier(SessionToken)
+            NewState =
     lager:info("Request received: {submit_payload, {~p, ~p, ~p, ~p}} -> Reply: ~p",
                [User, SessionToken, Payload, Final, Reply]),
     {reply, Reply, State}.
@@ -241,23 +246,22 @@ priv_new_session(User, Path) ->
 priv_end_session(_SessionToken) ->
     ok.
 
--spec priv_submit_payload(User, SessionToken, Payload, State, Final) ->
-                                 {ok, payload_added} |
+-spec priv_submit_payload(User, SessionToken, Payload, State) ->
+                                 {{ok, payload_added}} |
                                  {ok, payload_added, session_ended} |
                                  {error, Reason}
                                      when User :: binary(),
                                           SessionToken :: binary(),
                                           Payload :: binary(),
                                           State :: map(),
-                                          Final :: boolean(),
                                           Reason :: binary().
-priv_submit_payload(User, SessionToken, Payload, State, _Final) ->
+priv_submit_payload(User, SessionToken, Payload, State) ->
     case priv_check_payload(User, SessionToken, Payload, State) of
         ok ->
             %% Acquire lease on the subpath and submit payload to GW
-            {ok, payload_added};
 
             %% If Final == true, request session end
+            {ok, payload_added};
         {error, Reason} ->
             %% Payload is invalid, return with reason
             {error, Reason}
