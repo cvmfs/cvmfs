@@ -17,10 +17,14 @@
 %%====================================================================
 
 start(_StartType, _StartArgs) ->
-    {ok, RepoConfigFile} = application:get_env(cvmfs_auth, repo_config),
     {ok, MnesiaSchema} = application:get_env(cvmfs_services, mnesia_schema),
-    {ok, VarList} = file:consult(RepoConfigFile),
-    Vars = maps:from_list(VarList),
+    case application:get_env(cvmfs_auth, repo_config) of
+        {ok, {file, RepoConfigFile}} ->
+            {ok, VarList} = file:consult(RepoConfigFile),
+            Vars = maps:from_list(VarList);
+        {ok, RepoConfigMap} ->
+            Vars = RepoConfigMap
+    end,
 
     cvmfs_auth_sup:start_link({maps:get(repos, Vars)
                               ,maps:get(acl, Vars)
