@@ -43,22 +43,20 @@ groups() ->
 
 init_per_suite(Config) ->
     application:start(mnesia),
+
+    application:set_env(cvmfs_services, mnesia_schema, ram_copies),
+
+    ok = application:load(cvmfs_auth),
     ok = ct:require(repos),
     ok = ct:require(acl),
-    Watcher = spawn(fun() ->
-                            {ok, _} = cvmfs_auth:start_link({ct:get_config(repos)
-                                                            ,ct:get_config(acl)
-                                                            ,ram_copies}),
-                            receive
-                                test_suite_end ->
-                                    cvmfs_auth:stop()
-                            end
-                    end),
-    [{watcher_process, Watcher} | Config].
+    ok = application:set_env(cvmfs_auth, repo_config, #{repos => ct:get_config(repos)
+                                                       ,acl => ct:get_config(acl)}),
+    {ok, _} = application:ensure_all_started(cvmfs_auth),
+    Config.
 
-end_per_suite(Config) ->
-    Watcher = ?config(watcher_process, Config),
-    Watcher ! test_suite_end,
+end_per_suite(_Config) ->
+    application:stop(cvmfs_auth),
+    application:unload(cvmfs_auth),
     application:stop(mnesia),
     ok.
 

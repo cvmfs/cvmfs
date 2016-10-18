@@ -38,19 +38,18 @@ groups() ->
 
 init_per_suite(Config) ->
     application:start(mnesia),
-    MaxLeaseTime = 50, % milliseconds
-    Watcher = spawn(fun() ->
-                            {ok, _} = cvmfs_lease:start_link({MaxLeaseTime, ram_copies}),
-                            receive
-                                test_suite_end ->
-                                    cvmfs_lease:stop()
-                            end
-                    end),
-    lists:flatten([{max_lease_time, MaxLeaseTime}, {watcher_process, Watcher}, Config]).
 
-end_per_suite(Config) ->
-    Watcher = ?config(watcher_process, Config),
-    Watcher ! test_suite_end,
+    application:set_env(cvmfs_services, mnesia_schema, ram_copies),
+
+    MaxLeaseTime = 50, % milliseconds
+    ok = application:load(cvmfs_lease),
+    ok = application:set_env(cvmfs_lease, max_lease_time, MaxLeaseTime),
+    {ok, _} = application:ensure_all_started(cvmfs_lease),
+    lists:flatten([{max_lease_time, MaxLeaseTime}, Config]).
+
+end_per_suite(_Config) ->
+    application:stop(cvmfs_lease),
+    application:unload(cvmfs_lease),
     application:stop(mnesia),
     ok.
 
