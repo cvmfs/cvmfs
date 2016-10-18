@@ -4,7 +4,7 @@
                      ,{lager_file_backend, [{file, "error.log"}, {level, error}]}
                      ,{lager_file_backend, [{file, "info.log"}, {level, info}]}]}]}
 
-,{cvmfs_auth, [{repo_config, "./etc/repo.config"}]}
+,{cvmfs_auth, [{repo_config, {file, "./etc/repo.config"}}]}
 
 ,{cvmfs_lease, [{max_lease_time, 10000}]} % max lease time in milliseconds
 
