@@ -8,6 +8,7 @@
 
 #include <errno.h>
 #include <inttypes.h>
+#include <stdint.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
@@ -306,7 +307,6 @@ int64_t ExternalCacheManager::GetSize(int fd) {
   msg_info.set_session_id(session_id_);
   msg_info.set_req_id(NextRequestId());
   msg_info.set_allocated_object_id(&object_id);
-  msg_info.set_info_flags(cvmfs::OBJECT_INFO_SIZE);
   RpcJob rpc_job(&msg_info);
   CallRemotely(&rpc_job);
   msg_info.release_object_id();

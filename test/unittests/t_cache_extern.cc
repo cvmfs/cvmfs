@@ -31,10 +31,8 @@ using namespace std;  // NOLINT
  */
 class MockCachePlugin : public CachePlugin {
  public:
-  explicit MockCachePlugin(const string &socket_path)
-   : CachePlugin(socket_path)
-  {
-    bool retval = Listen();
+  explicit MockCachePlugin(const string &socket_path) {
+    bool retval = Listen(socket_path);
     assert(retval);
     ProcessRequests();
     known_object.algorithm = shash::kSha1;
@@ -93,7 +91,7 @@ class MockCachePlugin : public CachePlugin {
   virtual cvmfs::EnumStatus Pread(
     const shash::Any &id,
     uint64_t offset,
-    unsigned *size,
+    uint32_t *size,
     unsigned char *buffer)
   {
     if (next_status >= 0)
@@ -129,7 +127,7 @@ class MockCachePlugin : public CachePlugin {
   virtual cvmfs::EnumStatus WriteTxn(
     const uint64_t txn_id,
     unsigned char *buffer,
-    unsigned size)
+    uint32_t size)
   {
     string data(reinterpret_cast<char *>(buffer), size);
     new_object_content += data;

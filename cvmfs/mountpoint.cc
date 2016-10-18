@@ -33,6 +33,7 @@
 #include "authz/authz_session.h"
 #include "backoff.h"
 #include "cache.h"
+#include "cache_extern.h"
 #include "cache_posix.h"
 #include "cache_ram.h"
 #include "cache_tiered.h"
@@ -182,12 +183,20 @@ bool FileSystem::CreateCache() {
       cache_mgr_type_ = kRamCacheManager;
     } else if (optarg == "tiered") {
       cache_mgr_type_ = kTieredCacheManager;
+    } else if (optarg == "external") {
+      cache_mgr_type_ = kExternalCacheManager;
     } else {
       cache_mgr_type_ = kUnknownCacheManager;
     }
   }
 
   switch (cache_mgr_type_) {
+    case kExternalCacheManager: {
+      int fd_client = ConnectSocket("/tmp/first_plugin");
+      assert(fd_client >= 0);
+      cache_mgr_ = ExternalCacheManager::Create(fd_client, 1024);
+      break;
+    }
     case kPosixCacheManager:
     case kTieredCacheManager:
       cache_mgr_ = PosixCacheManager::Create(
@@ -284,6 +293,7 @@ bool FileSystem::CreateCache() {
       uuid_cache_ = cvmfs::Uuid::Create(cache_dir_ + "/uuid");
       break;
     case kRamCacheManager:
+    case kExternalCacheManager:
       uuid_cache_ = cvmfs::Uuid::Create("");
       break;
     case kUnknownCacheManager:

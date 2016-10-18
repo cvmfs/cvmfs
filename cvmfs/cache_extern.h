@@ -4,6 +4,8 @@
 #ifndef CVMFS_CACHE_EXTERN_H_
 #define CVMFS_CACHE_EXTERN_H_
 
+#define __STDC_FORMAT_MACROS
+
 #include <pthread.h>
 #include <stdint.h>
 

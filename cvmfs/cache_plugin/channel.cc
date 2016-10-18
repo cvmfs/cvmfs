@@ -22,8 +22,8 @@ using namespace std;  // NOLINT
 const uint64_t CachePlugin::kSizeUnknown = uint64_t(-1);
 
 
-CachePlugin::CachePlugin(const string &socket_path)
-  : socket_path_(socket_path)
+CachePlugin::CachePlugin()
+  : socket_path_()
   , fd_socket_(-1)
   , running_(false)
   , max_object_size_(kDefaultMaxObjectSize)
@@ -275,7 +275,8 @@ void CachePlugin::HandleStore(
 }
 
 
-bool CachePlugin::Listen() {
+bool CachePlugin::Listen(const string &socket_path) {
+  socket_path_ = socket_path;
   fd_socket_ = MakeSocket(socket_path_, 0600);
   if (fd_socket_ < 0) {
     LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,

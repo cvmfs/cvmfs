@@ -62,13 +62,6 @@ enum EnumObjectType {
 }
 
 
-enum EnumObjectInfoFlags {
-  OBJECT_INFO_TYPE   = 1;
-  OBJECT_INFO_NPARTS = 2;
-  OBJECT_INFO_SIZE   = 4;
-}
-
-
 //------------------------------------------------------------------------------
 // Data containers
 
@@ -240,7 +233,6 @@ message MsgObjectInfoReq {
   required uint64 session_id = 1;
   required uint64 req_id     = 2;
   required MsgHash object_id = 3;
-  required uint32 info_flags = 4;
 }
 
 message MsgObjectInfoReply {

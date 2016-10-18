@@ -29,14 +29,14 @@ class CachePlugin : SingleCopy {
     std::string description;
   };
 
-  bool Listen();
+  bool Listen(const std::string &socket_path);
   ~CachePlugin();
   void ProcessRequests();
 
   unsigned max_object_size() const { return max_object_size_; }
 
  protected:
-  explicit CachePlugin(const std::string &socket_path);
+  explicit CachePlugin();
 
   virtual cvmfs::EnumStatus ChangeRefcount(const shash::Any &id,
                                            int32_t change_by) = 0;
@@ -44,14 +44,14 @@ class CachePlugin : SingleCopy {
                                           ObjectInfo *info) = 0;
   virtual cvmfs::EnumStatus Pread(const shash::Any &id,
                                   uint64_t offset,
-                                  unsigned *size,
+                                  uint32_t *size,
                                   unsigned char *buffer) = 0;
   virtual cvmfs::EnumStatus StartTxn(const shash::Any &id,
                                      const uint64_t txn_id,
                                      const ObjectInfo &info) = 0;
   virtual cvmfs::EnumStatus WriteTxn(const uint64_t txn_id,
                                      unsigned char *buffer,
-                                     unsigned size) = 0;
+                                     uint32_t size) = 0;
   virtual cvmfs::EnumStatus AbortTxn(const uint64_t txn_id) = 0;
   virtual cvmfs::EnumStatus CommitTxn(const uint64_t txn_id) = 0;
 
