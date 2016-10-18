@@ -236,6 +236,8 @@ class RamCacheManager : public CacheManager {
    */
   virtual int CommitTxn(void *txn);
 
+  virtual void Spawn() { }
+
  private:
   // The null hash (hashed output is all null bytes) serves as a marker for
   // an invalid handle

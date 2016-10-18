@@ -56,6 +56,7 @@ class TieredCacheManager : public CacheManager {
   virtual int OpenFromTxn(void *txn) { return upper_->OpenFromTxn(txn); }
   virtual int AbortTxn(void *txn);
   virtual int CommitTxn(void *txn);
+  virtual void Spawn();
 
  private:
   static const unsigned kCopyBufferSize = 64 * 1024;  // 64kB

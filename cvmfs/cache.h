@@ -172,6 +172,8 @@ class CacheManager : SingleCopy {
   virtual int OpenFromTxn(void *txn) = 0;
   virtual int CommitTxn(void *txn) = 0;
 
+  virtual void Spawn() = 0;
+
   int OpenPinned(const shash::Any &id,
                  const std::string &description,
                  bool is_catalog);

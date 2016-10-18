@@ -49,7 +49,7 @@ class ExternalCacheManager : public CacheManager {
   virtual int OpenFromTxn(void *txn);
   virtual int CommitTxn(void *txn);
 
-  void Spawn();
+  virtual void Spawn();
 
   int64_t session_id() const { return session_id_; }
 

@@ -2082,6 +2082,8 @@ static void Spawn() {
   cvmfs::talk_mgr_->Spawn();
   if (cvmfs::file_system_->IsNfsSource())
     nfs_maps::Spawn();
+
+  cvmfs::file_system_->cache_mgr()->Spawn();
 }
 
 

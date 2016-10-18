@@ -85,6 +85,8 @@ class PosixCacheManager : public CacheManager {
   virtual int AbortTxn(void *txn);
   virtual int CommitTxn(void *txn);
 
+  virtual void Spawn() { }
+
   void TearDown2ReadOnly();
   CacheModes cache_mode() { return cache_mode_; }
   bool alien_cache() { return alien_cache_; }

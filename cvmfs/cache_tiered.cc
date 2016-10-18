@@ -133,3 +133,9 @@ int TieredCacheManager::CommitTxn(void *txn) {
 
   return (upper_result < 0) ? upper_result : lower_result;
 }
+
+
+void TieredCacheManager::Spawn() {
+  upper_->Spawn();
+  lower_->Spawn();
+}

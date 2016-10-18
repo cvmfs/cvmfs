@@ -261,6 +261,7 @@ class TestCacheManager : public CacheManager {
   virtual int CommitTxn(void *txn) {
     return 0;
   }
+  virtual void Spawn() { }
 };
 
 

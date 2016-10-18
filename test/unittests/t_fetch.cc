@@ -174,6 +174,7 @@ class BuggyCacheManager : public CacheManager {
   virtual int CommitTxn(void *txn) {
     return close(*static_cast<int *>(txn));
   }
+  virtual void Spawn() { }
 
   bool open_2nd_try;
   bool allow_open;
