@@ -120,10 +120,25 @@ class ForwardCachePlugin : public CachePlugin {
 
 }  // anonymous namespace
 
+
 struct cvmcache_context {
   explicit cvmcache_context(ForwardCachePlugin *p) : plugin(p) { }
   UniquePtr<ForwardCachePlugin> plugin;
 };
+
+
+int cvmcache_hash_cmp(const cvmcache_hash *a, const cvmcache_hash *b) {
+  const shash::Any *hash_a = reinterpret_cast<const shash::Any *>(a);
+  const shash::Any *hash_b = reinterpret_cast<const shash::Any *>(b);
+  if (*hash_a < *hash_b) return -1;
+  else if (*hash_a == *hash_b) return 0;
+  else return 1;
+}
+
+char *cvmcache_hash_print(const cvmcache_hash *h) {
+  const shash::Any *hash = reinterpret_cast<const shash::Any *>(h);
+  return strdup(hash->ToString().c_str());
+}
 
 
 struct cvmcache_context *cvmcache_init(struct cvmcache_callbacks *callbacks) {

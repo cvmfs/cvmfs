@@ -43,7 +43,7 @@ typedef void cvmcache_hash;
 struct cvmcache_context;
 
 int cvmcache_hash_cmp(const cvmcache_hash *a, const cvmcache_hash *b);
-char *cvmcache_hash_print(const cvmcache_hash *hash);
+char *cvmcache_hash_print(const cvmcache_hash *h);
 
 struct cvmcache_callbacks {
   int (*cvmcache_chrefcnt)(const cvmcache_hash *id, int32_t change_by);
