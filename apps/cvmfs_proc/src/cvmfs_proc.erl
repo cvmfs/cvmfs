@@ -13,7 +13,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, stop/0
+-export([start_link/1, stop/0
         ,new_session/2, end_session/1
         ,submit_payload/4]).
 
@@ -34,7 +34,7 @@
 %% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
-start_link() ->
+start_link(_) ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
 stop() ->
