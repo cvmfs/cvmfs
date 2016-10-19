@@ -23,7 +23,8 @@
         ,valid_user_invalid_path/1
         ,invalid_user_invalid_path/1]).
 
--export([session_success/1]).
+-export([session_success/1
+        ,submission_without_token_fails/1]).
 
 
 %% Tests description
@@ -39,7 +40,8 @@ groups() ->
                        ,invalid_user_valid_path
                        ,valid_user_invalid_path
                        ,invalid_user_invalid_path]}
-    ,{submit_payload, [], [session_success]}
+    ,{submit_payload, [], [session_success
+                          ,submission_without_token_fails]}
     ,{properties, [], [api_qc]}].
 
 %% Set up and tear down
@@ -117,10 +119,18 @@ session_success(_Config) ->
     % After the session has been closed, the token should be rejected
     {error, _} = cvmfs_proc:submit_payload(User, Token, Payload, true).
 
+% Attempt to submit a payload without first obtaining a token
+submission_without_token_fails(_Config) ->
+    {User, _} = valid_user_and_path(),
+    Token = <<"invalid_token">>,
+    Payload = <<"placeholder">>,
+    {error, invalid_token} = cvmfs_proc:submit_payload(User, Token, Payload, false).
+
+
+
 %% Properties
 api_qc(_Config) ->
     ?assert(true).
-
 
 %% Private functions
 valid_user_and_path() ->

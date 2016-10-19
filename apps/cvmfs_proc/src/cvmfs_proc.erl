@@ -291,8 +291,7 @@ priv_generate_token(User, Path) ->
                                          SessionToken :: binary(),
                                          Payload :: binary(),
                                          State :: map().
-priv_check_payload(_User, _SessionToken, _Payload, State)
-  when map_size(State) == 0 ->
+priv_check_payload(_User, _SessionToken, _Payload, State) when map_size(State) == 0 ->
     {error, invalid_token};
 priv_check_payload(User, SessionToken, _Payload, State) ->
     % Here we should perform all sanity checks on the request
