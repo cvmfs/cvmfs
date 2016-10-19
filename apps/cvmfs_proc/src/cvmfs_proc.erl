@@ -244,12 +244,13 @@ priv_end_session(_SessionToken) ->
 -spec priv_submit_payload(User, SessionToken, Payload, State, Final) ->
                                  {{ok, payload_added} |
                                   {ok, payload_added, session_ended} |
-                                  {error, invalid_token}, State}
+                                  {error, Reason}, State}
                                      when User :: binary(),
                                           SessionToken :: binary(),
                                           Payload :: binary(),
                                           State :: map(),
-                                          Final :: boolean().
+                                          Final :: boolean(),
+                                          Reason :: atom().
 priv_submit_payload(User, SessionToken, Payload, State, Final) ->
     case priv_check_payload(User, SessionToken, Payload, State) of
         ok ->
@@ -262,9 +263,11 @@ priv_submit_payload(User, SessionToken, Payload, State, Final) ->
                 false ->
                     {{ok, payload_added}, State}
             end;
-        {error, invalid_token} ->
+        {error, {unverified_caveat, <<"time < ", _/binary>>}} ->
+            {{error, session_expired}, State};
+        {error, Reason} ->
             %% Payload is invalid, return with reason
-            {{error, invalid_token}, State}
+            {{error, Reason}, State}
     end.
 
 -spec priv_generate_token(User, Path) -> {Token, Public, Secret}
@@ -279,13 +282,16 @@ priv_generate_token(User, Path) ->
     Location = <<"">>, %% Location isn't used
     M = macaroon:create(Location, Secret, Public),
     M1 = macaroon:add_first_party_caveat(M, "user = " ++ User),
-    M2 = macaroon:add_first_party_caveat(M1, "path = " ++ Path),
 
     {ok, MaxSessionTime} = application:get_env(cvmfs_services, max_session_time),
-    Time = erlang:system_time(seconds) + erlang:convert_time_unit(MaxSessionTime, milli_seconds, seconds),
+    SessionTime = erlang:convert_time_unit(MaxSessionTime, milli_seconds, seconds),
+    Time = erlang:system_time(seconds) + SessionTime,
 
-    M3 = macaroon:add_first_party_caveat(M2, "time < " ++ erlang:integer_to_binary(Time)),
-    {ok, Token} = macaroon:serialize(M3),
+    M2 = macaroon:add_first_party_caveat(M1, "time < " ++ erlang:integer_to_binary(Time)),
+
+    %%M3 = macaroon:add_first_party_caveat(M2, "path = " ++ Path),
+
+    {ok, Token} = macaroon:serialize(M2),
     {Token, Public, Secret}.
 
 -spec priv_check_payload(User, SessionToken, Payload, State) ->
@@ -309,20 +315,21 @@ priv_check_payload(User, SessionToken, _Payload, State) ->
                         false
                 end,
     CheckTime = fun(<<"time < ", Exp/binary>>) ->
+                        lager:info("Current time = ~p", [erlang:system_time(seconds)]),
                         erlang:binary_to_integer(Exp) > erlang:system_time(seconds);
                    (_) ->
                         false
                 end,
-    CheckPaths = fun(_) ->
-                         true
-                 end,
+    %% CheckPaths = fun(_) ->
+    %%                      true
+    %%              end,
 
     V = macaroon_verifier:create(),
     V1 = macaroon_verifier:satisfy_general(V, CheckUser),
     V2 = macaroon_verifier:satisfy_general(V1, CheckTime),
-    V3 = macaroon_verifier:satisfy_general(V2, CheckPaths),
+    %% V3 = macaroon_verifier:satisfy_general(V2, CheckPaths),
 
-    macaroon_verifier:verify(V3, M, Secret).
+    macaroon_verifier:verify(V2, M, Secret).
 
 priv_delete_token(State, SessionToken) ->
     {ok, Macaroon} = macaroon:deserialize(SessionToken),

@@ -24,7 +24,8 @@
         ,invalid_user_invalid_path/1]).
 
 -export([session_success/1
-        ,submission_without_token_fails/1]).
+        ,submission_with_invalid_token_fails/1
+        ,submission_with_expired_token_fails/1]).
 
 
 %% Tests description
@@ -41,7 +42,8 @@ groups() ->
                        ,valid_user_invalid_path
                        ,invalid_user_invalid_path]}
     ,{submit_payload, [], [session_success
-                          ,submission_without_token_fails]}
+                          ,submission_with_invalid_token_fails
+                          ,submission_with_expired_token_fails]}
     ,{properties, [], [api_qc]}].
 
 %% Set up and tear down
@@ -62,12 +64,14 @@ init_per_suite(Config) ->
     ok = application:set_env(cvmfs_services, max_lease_time, MaxLeaseTime),
     {ok, _} = application:ensure_all_started(cvmfs_lease),
 
-    MaxSessionTime = 50, % milliseconds
+    MaxSessionTime = 1000, % milliseconds
     ok = application:load(cvmfs_proc),
     ok = application:set_env(cvmfs_services, max_session_time, MaxSessionTime),
     {ok, _} = application:ensure_all_started(cvmfs_proc),
 
-    lists:flatten([{max_lease_time, MaxLeaseTime}, Config]).
+    lists:flatten([[{max_lease_time, MaxLeaseTime}
+                   ,{max_session_time, MaxSessionTime}]
+                  ,Config]).
 
 end_per_suite(_Config) ->
     application:stop(cvmfs_proc),
@@ -120,15 +124,24 @@ session_success(_Config) ->
     % Submit final payload
     {ok, payload_added, session_ended} = cvmfs_proc:submit_payload(User, Token, Payload, true),
     % After the session has been closed, the token should be rejected
-    {error, _} = cvmfs_proc:submit_payload(User, Token, Payload, true).
+    {error, invalid_token} = cvmfs_proc:submit_payload(User, Token, Payload, true).
 
 % Attempt to submit a payload without first obtaining a token
-submission_without_token_fails(_Config) ->
+submission_with_invalid_token_fails(_Config) ->
     {User, _} = valid_user_and_path(),
     Token = <<"invalid_token">>,
     Payload = <<"placeholder">>,
     {error, invalid_token} = cvmfs_proc:submit_payload(User, Token, Payload, false).
 
+% Start a valid session, make submission after the token has expired
+submission_with_expired_token_fails(_Config) ->
+    {User, Path} = valid_user_and_path(),
+    Payload = <<"placeholder">>,
+    {ok, Token} = cvmfs_proc:new_session(User, Path),
+    %% SleepTime = ?config(max_session_time, Config),
+    SleepTime = 2000,
+    ct:sleep(SleepTime),
+    {error, session_expired} = cvmfs_proc:submit_payload(User, Token, Payload, false).
 
 
 %% Properties
