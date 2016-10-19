@@ -9,4 +9,5 @@
 ,{cvmfs_proc, [{max_session_time, 3600000}]}
 
 ,{cvmfs_services, [{mnesia_schema, disc_copies} % disc_copies | ram_copies
+                  ,{max_session_time, 60000}    % max session time in milliseconds
                   ,{max_lease_time, 10000}]}].  % max lease time in milliseconds
