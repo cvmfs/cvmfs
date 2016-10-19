@@ -78,6 +78,7 @@ struct cvmcache_context *cvmcache_init(struct cvmcache_callbacks *callbacks);
 int cvmcache_listen(struct cvmcache_context *ctx, char *socket_path);
 void cvmcache_process_requests(struct cvmcache_context *ctx);
 void cvmcache_terminate(struct cvmcache_context *ctx);
+
 uint32_t cvmcache_max_object_size(struct cvmcache_context *ctx);
 
 #ifdef __cplusplus

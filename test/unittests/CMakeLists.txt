@@ -4,6 +4,7 @@
 #
 set (PROJECT_TEST_NAME "cvmfs_unittests")
 set (PROJECT_TEST_DEBUG_NAME ${PROJECT_TEST_NAME}_debug)
+set (PROJECT_TEST_CACHE_NAME "cvmfs_test_cache")
 
 #
 # unit test files
@@ -232,13 +233,20 @@ add_custom_command(OUTPUT cache.pb.cc cache.pb.h
                            ${CVMFS_SOURCE_DIR}/cache.proto
                    COMMENT "Generating protobuf sources")
 
+
+set (CVMFS_TEST_CACHE_SOURCES
+  cache_plugin/main.cc
+)
+
 #
 # Compiler and Linker Flags for unit tests
 #
 set (CVMFS_UNITTESTS_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -DGTEST_HAS_TR1_TUPLE=0 -DCVMFS_LIBCVMFS -D_FILE_OFFSET_BITS=64 -fexceptions")
 set (CVMFS_UNITTESTS_DEBUG_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -O0 -DDEBUGMSG -g")
+set (CVMFS_TEST_CACHE_CFLAGS "${CVMFS_TEST_CACHE_CFLAGS} -DGTEST_HAS_TR1_TUPLE=0 -DCVMFS_LIBCVMFS -D_FILE_OFFSET_BITS=64 -fexceptions")
 set (CVMFS_UNITTESTS_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
 set (CVMFS_UNITTESTS_DEBUG_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
+set (CVMFS_TEST_CACHE_LD_FLAGS "${CVMFS_TEST_CACHE_LD_FLAGS}")
 
 #
 # build CernVM-FS test cases
@@ -247,6 +255,9 @@ include_directories (${CMAKE_CURRENT_BINARY_DIR} ${INCLUDE_DIRECTORIES})
 
 if (BUILD_UNITTESTS)
   add_executable (${PROJECT_TEST_NAME} ${CVMFS_UNITTEST_SOURCES})
+  if (BUILD_LIBCVMFS_CACHE)
+    add_executable (${PROJECT_TEST_CACHE_NAME} ${CVMFS_TEST_CACHE_SOURCES})
+  endif (BUILD_LIBCVMFS_CACHE)
 else (BUILD_UNITTESTS)
   add_executable (${PROJECT_TEST_NAME} EXCLUDE_FROM_ALL ${CVMFS_UNITTEST_SOURCES})
 endif (BUILD_UNITTESTS)
@@ -258,6 +269,10 @@ add_dependencies (${PROJECT_TEST_NAME} libsha3)
 add_dependencies (${PROJECT_TEST_NAME} protobuf)
 add_test (NAME ${PROJECT_TEST_NAME} COMMAND ${PROJECT_TEST_NAME} --gtest_filter=-*Slow)
 add_dependencies (check ${PROJECT_TEST_NAME})
+
+add_dependencies (${PROJECT_TEST_CACHE_NAME} googletest)
+add_dependencies (${PROJECT_TEST_CACHE_NAME} protobuf)
+add_dependencies (${PROJECT_TEST_CACHE_NAME} libsha3)
 
 if (BUILD_UNITTESTS_DEBUG)
   add_executable (${PROJECT_TEST_DEBUG_NAME} ${CVMFS_UNITTEST_DEBUG_SOURCES})
@@ -328,6 +343,11 @@ if (BUILD_UNITTESTS_DEBUG)
   set_target_properties (${PROJECT_TEST_DEBUG_NAME} PROPERTIES COMPILE_FLAGS "${CVMFS_UNITTESTS_DEBUG_CFLAGS}" LINK_FLAGS "${CVMFS_UNITTESTS_DEBUG_LD_FLAGS}")
 endif (BUILD_UNITTESTS_DEBUG)
 
+if (BUILD_LIBCVMFS_CACHE)
+  set_target_properties (${PROJECT_TEST_CACHE_NAME} PROPERTIES COMPILE_FLAGS "${CVMFS_TEST_CACHE_CFLAGS}" LINK_FLAGS "${CVMFS_TEST_CACHE_LD_FLAGS}")
+endif (BUILD_LIBCVMFS_CACHE)
+
+
 #
 # link the stuff (*_LIBRARIES are dynamic link libraries)
 #
@@ -343,6 +363,14 @@ target_link_libraries (${PROJECT_TEST_NAME} ${UNITTEST_LINK_LIBRARIES})
 if (BUILD_UNITTESTS_DEBUG)
   target_link_libraries (${PROJECT_TEST_DEBUG_NAME} ${UNITTEST_LINK_LIBRARIES})
 endif (BUILD_UNITTESTS_DEBUG)
+
+if (BUILD_LIBCVMFS_CACHE)
+  target_link_libraries (${PROJECT_TEST_CACHE_NAME}
+                         ${GTEST_LIBRARIES} ${GOOGLETEST_ARCHIVE}
+                         ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${SHA3_ARCHIVE}
+                         ${PROTOBUF_ARCHIVE} pthread)
+endif (BUILD_LIBCVMFS_CACHE)
+
 
 #
 # Install the generated unit test binary
