@@ -1,4 +1,3 @@
 #!/bin/bash
 
-# Compile using the "test" profile
-~/bin/rebar3 ct
+docker run --rm -it -v "${PWD}":/mnt radupopescu/erlang-libsodium:19 sh -c "cd /mnt && rebar3 ct"

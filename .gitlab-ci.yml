@@ -1,4 +1,4 @@
-image: erlang:19
+image: radupopescu/erlang-libsodium:19
 
 stages:
   - build
