@@ -62,6 +62,9 @@ init_per_suite(Config) ->
     ok = application:set_env(cvmfs_services, max_lease_time, MaxLeaseTime),
     {ok, _} = application:ensure_all_started(cvmfs_lease),
 
+    MaxSessionTime = 50, % milliseconds
+    ok = application:load(cvmfs_proc),
+    ok = application:set_env(cvmfs_services, max_session_time, MaxSessionTime),
     {ok, _} = application:ensure_all_started(cvmfs_proc),
 
     lists:flatten([{max_lease_time, MaxLeaseTime}, Config]).
