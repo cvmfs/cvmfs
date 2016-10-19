@@ -1,12 +1,12 @@
 %%%-------------------------------------------------------------------
 %%% This file is part of the CernVM File System.
 %%%
-%%% @doc cvmfs_lease public API
+%%% @doc cvmfs_proc_app public API
 %%%
 %%% @end
 %%%-------------------------------------------------------------------
 
--module(cvmfs_lease_app).
+-module(cvmfs_proc_app).
 
 -behaviour(application).
 
@@ -18,9 +18,7 @@
 %%====================================================================
 
 start(_StartType, _StartArgs) ->
-    {ok, MaxLeaseTime} = application:get_env(cvmfs_lease, max_lease_time),
-    {ok, MnesiaSchema} = application:get_env(cvmfs_services, mnesia_schema),
-    cvmfs_lease_sup:start_link({MaxLeaseTime, MnesiaSchema}).
+    cvmfs_proc_sup:start_link().
 
 %%--------------------------------------------------------------------
 stop(_State) ->

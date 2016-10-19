@@ -54,15 +54,15 @@ stop() ->
 
 
 -spec get_user_permissions(binary()) -> user_not_found | {ok, [binary()]}.
-get_user_permissions(User) when is_binary(User) ->
+get_user_permissions(User) ->
     gen_server:call(?MODULE, {auth_req, user_perms, User}).
 
 -spec add_user(binary(), [binary()]) -> user_already_exists | ok.
-add_user(User, [H | _] = Repos) when is_binary(User), is_list(Repos), is_binary(H) ->
+add_user(User, Repos) ->
     gen_server:call(?MODULE, {auth_req, add_user, {User, Repos}}).
 
 -spec remove_user(binary()) -> ok.
-remove_user(User) when is_binary(User) ->
+remove_user(User) ->
     gen_server:call(?MODULE, {auth_req, remove_user, User}).
 
 
@@ -79,11 +79,11 @@ get_users() ->
     gen_server:call(?MODULE, {auth_req, get_users}).
 
 -spec add_repo(binary(), binary()) -> repo_already_exists | ok.
-add_repo(Repo, Path) when is_binary(Repo), is_binary(Path) ->
+add_repo(Repo, Path) ->
     gen_server:call(?MODULE, {auth_req, add_repo, {Repo, Path}}).
 
 -spec remove_repo(binary()) -> ok.
-remove_repo(Repo) when is_binary(Repo) ->
+remove_repo(Repo) ->
     gen_server:call(?MODULE, {auth_req, remove_repo, Repo}).
 
 %%--------------------------------------------------------------------
@@ -151,7 +151,7 @@ init({RepoList, ACL, MnesiaSchema}) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call({auth_req, user_perms, User}, _From, State) when is_binary(User) ->
+handle_call({auth_req, user_perms, User}, _From, State) ->
     Reply = priv_get_user_paths(User),
     lager:info("Request received: {user_perms, ~p} -> Reply: ~p", [User, Reply]),
     {reply, Reply, State};
@@ -191,7 +191,7 @@ handle_call({auth_req, get_repos}, _From, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast(stop, State) ->
-    lager:info("Request received: stop"),
+    lager:info("Cast received: stop"),
     {stop, normal, State};
 handle_cast(Msg, State) ->
     lager:info("Cast received: ~p -> noreply", [Msg]),
@@ -223,7 +223,7 @@ handle_info(Info, State) ->
 %% @end
 %%--------------------------------------------------------------------
 terminate(Reason, _State) ->
-    lager:info("CVMFS auth module terminating with reason: ~p", [Reason]),
+    lager:info("Terminating with reason: ~p", [Reason]),
     ok.
 
 %%--------------------------------------------------------------------
@@ -243,7 +243,7 @@ code_change(OldVsn, State, _Extra) ->
 %%%===================================================================
 
 -spec priv_get_user_paths(binary()) -> {ok, [binary()]} | user_not_found.
-priv_get_user_paths(User) when is_binary(User) ->
+priv_get_user_paths(User) ->
     T1 = fun() ->
                 case mnesia:read(acl, User) of
                     [] ->

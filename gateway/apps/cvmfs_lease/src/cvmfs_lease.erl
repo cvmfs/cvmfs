@@ -69,9 +69,7 @@ stop() ->
 %%--------------------------------------------------------------------
 -spec request_lease(binary(), binary(), binary()) -> {ok, binary()}
                                                    | {busy, integer()}.
-request_lease(User, Repo, Path) when is_binary(User),
-                                     is_binary(Repo),
-                                     is_binary(Path) ->
+request_lease(User, Repo, Path) ->
     gen_server:call(?MODULE, {lease_req, new_lease, {User, Repo, Path}}).
 
 %%--------------------------------------------------------------------
@@ -81,7 +79,7 @@ request_lease(User, Repo, Path) when is_binary(User),
 %% @spec end_lease(Path, Repo) -> ok | {error, lease_not_found}
 %% @end
 %%--------------------------------------------------------------------
-end_lease(Repo, Path) when is_binary(Repo), is_binary(Path) ->
+end_lease(Repo, Path) ->
     gen_server:call(?MODULE, {lease_req, end_lease, {Repo, Path}}).
 
 %%--------------------------------------------------------------------
@@ -179,7 +177,7 @@ handle_call(_Request, _From, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast(stop, State) ->
-    lager:info("Request received: stop"),
+    lager:info("Cast received: stop"),
     {stop, normal, State};
 handle_cast(Msg, State) ->
     lager:info("Cast received: ~p -> noreply", [Msg]),
@@ -211,7 +209,7 @@ handle_info(Info, State) ->
 %% @end
 %%--------------------------------------------------------------------
 terminate(Reason, _State) ->
-    lager:info("CVMFS lease module terminating with reason: ~p", [Reason]),
+    lager:info("Terminating with reason: ~p", [Reason]),
     ok.
 
 %%--------------------------------------------------------------------
