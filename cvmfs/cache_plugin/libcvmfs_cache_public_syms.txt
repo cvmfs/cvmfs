@@ -3,7 +3,10 @@ __x86.get_pc_thunk.bx
 __x86.get_pc_thunk.dx
 __i686.get_pc_thunk.bx
 __i686.get_pc_thunk.cx
+cvmcache_hash_cmp
+cvmcache_hash_print
 cvmcache_init
 cvmcache_listen
 cvmcache_process_requests
 cvmcache_terminate
+cvmcache_max_object_size

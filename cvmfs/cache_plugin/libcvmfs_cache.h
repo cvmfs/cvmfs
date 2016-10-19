@@ -13,6 +13,17 @@
 extern "C" {
 #endif
 
+enum cvmcache_hash_algorithm {
+  HASH_SHA1 = 1,
+  HASH_RIPEMD160,
+  HASH_SHAKE128
+};
+
+struct cvmcache_hash {
+  unsigned char digest[20];
+  char algorithm;
+} __attribute__((__packed__));
+
 enum cvmcache_status {
   STATUS_UNKNOWN = 0,
   STATUS_OK,
@@ -20,6 +31,7 @@ enum cvmcache_status {
   STATUS_NOSPACE,    // Cache is full
   STATUS_NOENTRY,    // Object is not in cache
   STATUS_MALFORMED,  // Malformed request
+  STATUS_IOERR,      // General I/O error
   STATUS_CORRUPTED,  // Crc32 verification failed
   STATUS_TIMEOUT,    // Certain parts of a multipart request never arrived
   STATUS_BADCOUNT,   // Attempt to set a negative reference count
@@ -39,21 +51,20 @@ struct cvmcache_object_info {
   char *description;
 };
 
-typedef void cvmcache_hash;
 struct cvmcache_context;
 
-int cvmcache_hash_cmp(const cvmcache_hash *a, const cvmcache_hash *b);
-char *cvmcache_hash_print(const cvmcache_hash *h);
+int cvmcache_hash_cmp(struct cvmcache_hash *a, struct cvmcache_hash *b);
+char *cvmcache_hash_print(struct cvmcache_hash *h);
 
 struct cvmcache_callbacks {
-  int (*cvmcache_chrefcnt)(const cvmcache_hash *id, int32_t change_by);
-  int (*cvmcache_obj_info)(const cvmcache_hash *id,
+  int (*cvmcache_chrefcnt)(struct cvmcache_hash *id, int32_t change_by);
+  int (*cvmcache_obj_info)(struct cvmcache_hash *id,
                            struct cvmcache_object_info *info);
-  int (*cvmcache_pread)(const cvmcache_hash *id,
+  int (*cvmcache_pread)(struct cvmcache_hash *id,
                         uint64_t offset,
                         uint32_t *size,
                         unsigned char *buffer);
-  int (*cvmcache_start_txn)(const cvmcache_hash *id,
+  int (*cvmcache_start_txn)(struct cvmcache_hash *id,
                             uint64_t txn_id,
                             struct cvmcache_object_info *info);
   int (*cvmcache_write_txn)(uint64_t txn_id,
@@ -67,6 +78,7 @@ struct cvmcache_context *cvmcache_init(struct cvmcache_callbacks *callbacks);
 int cvmcache_listen(struct cvmcache_context *ctx, char *socket_path);
 void cvmcache_process_requests(struct cvmcache_context *ctx);
 void cvmcache_terminate(struct cvmcache_context *ctx);
+uint32_t cvmcache_max_object_size(struct cvmcache_context *ctx);
 
 #ifdef __cplusplus
 }

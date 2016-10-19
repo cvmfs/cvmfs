@@ -22,6 +22,20 @@ using namespace std;  // NOLINT
 
 namespace {
 
+static shash::Any Chash2Cpphash(struct cvmcache_hash *h) {
+  shash::Any hash;
+  memcpy(hash.digest, h->digest, sizeof(h->digest));
+  hash.algorithm = static_cast<shash::Algorithms>(h->algorithm);
+  return hash;
+}
+
+static struct cvmcache_hash Cpphash2Chash(const shash::Any &hash) {
+  struct cvmcache_hash h;
+  memcpy(h.digest, hash.digest, sizeof(h.digest));
+  h.algorithm = hash.algorithm;
+  return h;
+}
+
 class ForwardCachePlugin : public CachePlugin {
  public:
   ForwardCachePlugin(struct cvmcache_callbacks *callbacks)
@@ -33,7 +47,8 @@ class ForwardCachePlugin : public CachePlugin {
     const shash::Any &id,
     int32_t change_by)
   {
-    int result = callbacks_.cvmcache_chrefcnt(&id, change_by);
+    struct cvmcache_hash c_hash = Cpphash2Chash(id);
+    int result = callbacks_.cvmcache_chrefcnt(&c_hash, change_by);
     return static_cast<cvmfs::EnumStatus>(result);
   }
 
@@ -41,11 +56,12 @@ class ForwardCachePlugin : public CachePlugin {
     const shash::Any &id,
     ObjectInfo *info)
   {
+    struct cvmcache_hash c_hash = Cpphash2Chash(id);
     cvmcache_object_info c_info;
     c_info.size = CachePlugin::kSizeUnknown;
     c_info.type = OBJECT_REGULAR;
     c_info.description = NULL;
-    int result = callbacks_.cvmcache_obj_info(&id, &c_info);
+    int result = callbacks_.cvmcache_obj_info(&c_hash, &c_info);
     info->size = c_info.size;
     info->object_type = static_cast<cvmfs::EnumObjectType>(c_info.type);
     if (c_info.description) {
@@ -61,7 +77,8 @@ class ForwardCachePlugin : public CachePlugin {
     uint32_t *size,
     unsigned char *buffer)
   {
-    int result = callbacks_.cvmcache_pread(&id, offset, size, buffer);
+    struct cvmcache_hash c_hash = Cpphash2Chash(id);
+    int result = callbacks_.cvmcache_pread(&c_hash, offset, size, buffer);
     return static_cast<cvmfs::EnumStatus>(result);
   }
 
@@ -70,6 +87,7 @@ class ForwardCachePlugin : public CachePlugin {
     const uint64_t txn_id,
     const ObjectInfo &info)
   {
+    struct cvmcache_hash c_hash = Cpphash2Chash(id);
     cvmcache_object_info c_info;
     c_info.size = info.size;
     switch (info.object_type) {
@@ -90,7 +108,7 @@ class ForwardCachePlugin : public CachePlugin {
     } else {
       c_info.description = strdup(info.description.c_str());
     }
-    int result = callbacks_.cvmcache_start_txn(&id, txn_id, &c_info);
+    int result = callbacks_.cvmcache_start_txn(&c_hash, txn_id, &c_info);
     free(c_info.description);
     return static_cast<cvmfs::EnumStatus>(result);
   }
@@ -127,18 +145,19 @@ struct cvmcache_context {
 };
 
 
-int cvmcache_hash_cmp(const cvmcache_hash *a, const cvmcache_hash *b) {
-  const shash::Any *hash_a = reinterpret_cast<const shash::Any *>(a);
-  const shash::Any *hash_b = reinterpret_cast<const shash::Any *>(b);
-  if (*hash_a < *hash_b) return -1;
-  else if (*hash_a == *hash_b) return 0;
+int cvmcache_hash_cmp(struct cvmcache_hash *a, struct cvmcache_hash *b) {
+  const shash::Any hash_a = Chash2Cpphash(a);
+  const shash::Any hash_b = Chash2Cpphash(b);
+  if (hash_a < hash_b) return -1;
+  else if (hash_a == hash_b) return 0;
   else return 1;
 }
 
-char *cvmcache_hash_print(const cvmcache_hash *h) {
-  const shash::Any *hash = reinterpret_cast<const shash::Any *>(h);
-  return strdup(hash->ToString().c_str());
+char *cvmcache_hash_print(struct cvmcache_hash *h) {
+  const shash::Any hash = Chash2Cpphash(h);
+  return strdup(hash.ToString().c_str());
 }
+
 
 
 struct cvmcache_context *cvmcache_init(struct cvmcache_callbacks *callbacks) {
@@ -155,4 +174,8 @@ void cvmcache_process_requests(struct cvmcache_context *ctx) {
 
 void cvmcache_terminate(struct cvmcache_context *ctx) {
   delete ctx;
+}
+
+uint32_t cvmcache_max_object_size(struct cvmcache_context *ctx) {
+  return ctx->plugin->max_object_size();
 }

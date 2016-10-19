@@ -39,11 +39,12 @@ enum EnumStatus {
   STATUS_NOSPACE     = 3;  // Cache is full
   STATUS_NOENTRY     = 4;  // Object is not in cache
   STATUS_MALFORMED   = 5;  // Malformed request
-  STATUS_CORRUPTED   = 6;  // Crc32 verification failed
-  STATUS_TIMEOUT     = 7;  // Certain parts of a multipart request never arrived
-  STATUS_BADCOUNT    = 8;  // Attempt to set a negative reference count
+  STATUS_IOERR       = 6;  // General I/O error
+  STATUS_CORRUPTED   = 7;  // Crc32 verification failed
+  STATUS_TIMEOUT     = 8;  // Certain parts of a multipart request never arrived
+  STATUS_BADCOUNT    = 9;  // Attempt to set a negative reference count
   // Attempt to read from an offset larger than the object size
-  STATUS_OUTOFBOUNDS = 9;
+  STATUS_OUTOFBOUNDS = 10;
 }
 
 

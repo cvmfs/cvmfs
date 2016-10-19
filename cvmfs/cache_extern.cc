@@ -39,6 +39,8 @@ int Ack2Errno(cvmfs::EnumStatus status_code) {
       return -ENOENT;
     case cvmfs::STATUS_MALFORMED:
       return -EINVAL;
+    case cvmfs::STATUS_IOERR:
+      return -EIO;
     case cvmfs::STATUS_CORRUPTED:
       return -EIO;
     case cvmfs::STATUS_TIMEOUT:
