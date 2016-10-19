@@ -64,7 +64,7 @@ init_per_suite(Config) ->
     ok = application:set_env(cvmfs_services, max_lease_time, MaxLeaseTime),
     {ok, _} = application:ensure_all_started(cvmfs_lease),
 
-    MaxSessionTime = 1000, % milliseconds
+    MaxSessionTime = 1, % seconds
     ok = application:load(cvmfs_proc),
     ok = application:set_env(cvmfs_services, max_session_time, MaxSessionTime),
     {ok, _} = application:ensure_all_started(cvmfs_proc),
@@ -139,7 +139,7 @@ submission_with_expired_token_fails(_Config) ->
     Payload = <<"placeholder">>,
     {ok, Token} = cvmfs_proc:new_session(User, Path),
     %% SleepTime = ?config(max_session_time, Config),
-    SleepTime = 2000,
+    SleepTime = 1500,
     ct:sleep(SleepTime),
     {error, session_expired} = cvmfs_proc:submit_payload(User, Token, Payload, false).
 
