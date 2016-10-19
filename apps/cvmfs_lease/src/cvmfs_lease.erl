@@ -33,7 +33,6 @@
                , time   :: integer()  % timestamp (time when lease acquired)
                }).
 
--record(state, { max_lease_time :: integer() }). % max lease time in milliseconds
 
 %%%===================================================================
 %%% API
@@ -120,13 +119,13 @@ clear_leases() ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init({MaxLeaseTime, MnesiaSchema}) ->
+init(MnesiaSchema) ->
     mnesia:create_table(lease, [{MnesiaSchema, [node() | nodes()]}
                                ,{type, set}
                                ,{attributes, record_info(fields, lease)}]),
     ok = mnesia:wait_for_tables([lease], 10000),
     lager:info("Lease table initialized"),
-    {ok, #state{max_lease_time = MaxLeaseTime}}.
+    {ok, {}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -228,8 +227,8 @@ code_change(OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-priv_new_lease(User, Repo, Path, State) ->
-    #state{max_lease_time = MaxLeaseTime} = State,
+priv_new_lease(User, Repo, Path, _State) ->
+    {ok, MaxLeaseTime} = application:get_env(cvmfs_services, max_lease_time),
 
     %% Match statement that selects all rows with a given repo,
     %% returning a list of {Path, Time} pairs
