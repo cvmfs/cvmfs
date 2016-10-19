@@ -284,8 +284,7 @@ priv_generate_token(User, Path) ->
     M1 = macaroon:add_first_party_caveat(M, "user = " ++ User),
 
     {ok, MaxSessionTime} = application:get_env(cvmfs_services, max_session_time),
-    SessionTime = erlang:convert_time_unit(MaxSessionTime, milli_seconds, seconds),
-    Time = erlang:system_time(seconds) + SessionTime,
+    Time = erlang:system_time(seconds) + MaxSessionTime,
 
     M2 = macaroon:add_first_party_caveat(M1, "time < " ++ erlang:integer_to_binary(Time)),
 
@@ -315,7 +314,6 @@ priv_check_payload(User, SessionToken, _Payload, State) ->
                         false
                 end,
     CheckTime = fun(<<"time < ", Exp/binary>>) ->
-                        lager:info("Current time = ~p", [erlang:system_time(seconds)]),
                         erlang:binary_to_integer(Exp) > erlang:system_time(seconds);
                    (_) ->
                         false
