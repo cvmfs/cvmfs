@@ -149,15 +149,10 @@ handle_call({proc_req, end_session, SessionToken}, _From, State) ->
     lager:info("Request received: {end_session, ~p} -> Reply: ~p", [SessionToken, Reply]),
     {reply, Reply, State};
 handle_call({proc_req, submit_payload, {User, SessionToken, Payload, Final}}, _From, State) ->
-    Reply = priv_submit_payload(User, SessionToken, Payload, State),
-    case Final of
-        true ->
-            {ok, Macaroon} = macaroon:deserialize(SessionToken),
-            TokenId = macaroon:identifier(SessionToken)
-            NewState =
+    {Reply, NewState} = priv_submit_payload(User, SessionToken, Payload, State, Final),
     lager:info("Request received: {submit_payload, {~p, ~p, ~p, ~p}} -> Reply: ~p",
                [User, SessionToken, Payload, Final, Reply]),
-    {reply, Reply, State}.
+    {reply, Reply, NewState}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -246,25 +241,30 @@ priv_new_session(User, Path) ->
 priv_end_session(_SessionToken) ->
     ok.
 
--spec priv_submit_payload(User, SessionToken, Payload, State) ->
-                                 {{ok, payload_added}} |
-                                 {ok, payload_added, session_ended} |
-                                 {error, Reason}
+-spec priv_submit_payload(User, SessionToken, Payload, State, Final) ->
+                                 {{ok, payload_added} |
+                                  {ok, payload_added, session_ended} |
+                                  {error, invalid_token}, State}
                                      when User :: binary(),
                                           SessionToken :: binary(),
                                           Payload :: binary(),
                                           State :: map(),
-                                          Reason :: binary().
-priv_submit_payload(User, SessionToken, Payload, State) ->
+                                          Final :: boolean().
+priv_submit_payload(User, SessionToken, Payload, State, Final) ->
     case priv_check_payload(User, SessionToken, Payload, State) of
         ok ->
-            %% Acquire lease on the subpath and submit payload to GW
+            %% TODO Acquire lease on the subpath and submit payload to GW
 
-            %% If Final == true, request session end
-            {ok, payload_added};
-        {error, Reason} ->
+            case Final of
+                true ->
+                    {{ok, payload_added, session_ended},
+                     priv_delete_token(State, SessionToken)};
+                false ->
+                    {{ok, payload_added}, State}
+            end;
+        {error, invalid_token} ->
             %% Payload is invalid, return with reason
-            {error, Reason}
+            {{error, invalid_token}, State}
     end.
 
 -spec priv_generate_token(User, Path) -> {Token, Public, Secret}
@@ -293,7 +293,7 @@ priv_generate_token(User, Path) ->
                                          State :: map().
 priv_check_payload(_User, _SessionToken, _Payload, State)
   when map_size(State) == 0 ->
-    {error, invalid_session_token};
+    {error, invalid_token};
 priv_check_payload(User, SessionToken, _Payload, State) ->
     % Here we should perform all sanity checks on the request
 
@@ -321,3 +321,8 @@ priv_check_payload(User, SessionToken, _Payload, State) ->
     V3 = macaroon_verifier:satisfy_general(V2, CheckPaths),
 
     macaroon_verifier:verify(V3, M, Secret).
+
+priv_delete_token(State, SessionToken) ->
+    {ok, Macaroon} = macaroon:deserialize(SessionToken),
+    TokenId = macaroon:identifier(Macaroon),
+    maps:remove(TokenId, State).
