@@ -25,7 +25,8 @@
 
 -export([session_success/1
         ,submission_with_invalid_token_fails/1
-        ,submission_with_expired_token_fails/1]).
+        ,submission_with_expired_token_fails/1
+        ,submission_with_different_user_name/1]).
 
 
 %% Tests description
@@ -43,7 +44,8 @@ groups() ->
                        ,invalid_user_invalid_path]}
     ,{submit_payload, [], [session_success
                           ,submission_with_invalid_token_fails
-                          ,submission_with_expired_token_fails]}
+                          ,submission_with_expired_token_fails
+                          ,submission_with_different_user_name]}
     ,{properties, [], [api_qc]}].
 
 %% Set up and tear down
@@ -142,6 +144,13 @@ submission_with_expired_token_fails(_Config) ->
     SleepTime = 1500,
     ct:sleep(SleepTime),
     {error, session_expired} = cvmfs_proc:submit_payload(User, Token, Payload, false).
+
+submission_with_different_user_name(_Config) ->
+    {VUser, VPath} = valid_user_and_path(),
+    {IUser, _} = invalid_user_and_path(VUser, VPath),
+    Payload = <<"placeholder">>,
+    {ok, Token} = cvmfs_proc:new_session(VUser, VPath),
+    {error, invalid_user} = cvmfs_proc:submit_payload(IUser, Token, Payload, false).
 
 
 %% Properties

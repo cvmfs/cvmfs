@@ -250,7 +250,7 @@ priv_end_session(_SessionToken) ->
                                           Payload :: binary(),
                                           State :: map(),
                                           Final :: boolean(),
-                                          Reason :: atom().
+                                          Reason :: session_expired | invalid_user | invalid_token.
 priv_submit_payload(User, SessionToken, Payload, State, Final) ->
     case priv_check_payload(User, SessionToken, Payload, State) of
         ok ->
@@ -265,9 +265,10 @@ priv_submit_payload(User, SessionToken, Payload, State, Final) ->
             end;
         {error, {unverified_caveat, <<"time < ", _/binary>>}} ->
             {{error, session_expired}, State};
-        {error, Reason} ->
-            %% Payload is invalid, return with reason
-            {{error, Reason}, State}
+        {error, {unverified_caveat, <<"user = ", _/binary>>}} ->
+            {{error, invalid_user}, State};
+        {error, _} ->
+            {{error, invalid_token}, State}
     end.
 
 -spec priv_generate_token(User, Path) -> {Token, Public, Secret}
