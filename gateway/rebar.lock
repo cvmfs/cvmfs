@@ -3,18 +3,32 @@
   {git,"https://github.com/dvv/base64url.git",
        {ref,"f2c64ed8b9bebc536fad37ad97243452b674b837"}},
   1},
+ {<<"cowboy">>,
+  {git,"https://github.com/ninenines/cowboy.git",
+       {ref,"8fe700f341d324c44f6c5f196f8c699c85ee6d78"}},
+  0},
+ {<<"cowlib">>,
+  {git,"https://github.com/ninenines/cowlib",
+       {ref,"7e8ff1bf56b6ea816ea9516b9f88b6b01f3d3d1a"}},
+  1},
  {<<"enacl_p">>,
   {git,"https://github.com/kzemek/enacl_p.git",
        {ref,"ea22638b684a79eba831d2df54666905bd451b15"}},
   1},
  {<<"goldrush">>,{pkg,<<"goldrush">>,<<"0.1.8">>},1},
+ {<<"jsx">>,{pkg,<<"jsx">>,<<"2.8.0">>},0},
  {<<"lager">>,{pkg,<<"lager">>,<<"3.2.1">>},0},
  {<<"macaroons">>,
   {git,"https://github.com/kzemek/macaroons.git",
        {ref,"9d2fef9f37e6b96a68aaaa81c0e5272d61a8b3b0"}},
-  0}]}.
+  0},
+ {<<"ranch">>,
+  {git,"https://github.com/ninenines/ranch",
+       {ref,"a5d2efcde9a34ad38ab89a26d98ea5335e88625a"}},
+  1}]}.
 [
 {pkg_hash,[
  {<<"goldrush">>, <<"2024BA375CEEA47E27EA70E14D2C483B2D8610101B4E852EF7F89163CDB6E649">>},
+ {<<"jsx">>, <<"749BEC6D205C694AE1786D62CEA6CC45A390437E24835FD16D12D74F07097727">>},
  {<<"lager">>, <<"EEF4E18B39E4195D37606D9088EA05BF1B745986CF8EC84F01D332456FE88D17">>}]}
 ].
