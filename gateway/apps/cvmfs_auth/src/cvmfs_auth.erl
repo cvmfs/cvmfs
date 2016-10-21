@@ -126,16 +126,14 @@ init({RepoList, ACL}) ->
                      ram ->
                          []
                  end,
-    mnesia:create_table(repo, [{ram_copies, Nodes}
-                              ,{disc_copies, DiskNodes}
+    mnesia:create_table(repo, [{disc_copies, DiskNodes}
                               ,{type, set}
                               ,{attributes, record_info(fields, repo)}]),
     ok = mnesia:wait_for_tables([repo], 10000),
     priv_populate_repos(RepoList),
     lager:info("Repository list initialized."),
 
-    mnesia:create_table(acl, [{ram_copies, Nodes}
-                             ,{disc_copies, DiskNodes}
+    mnesia:create_table(acl, [{disc_copies, DiskNodes}
                              ,{type, set}
                              ,{attributes, record_info(fields, acl)}]),
     ok = mnesia:wait_for_tables([acl], 10000),
