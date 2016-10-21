@@ -119,21 +119,21 @@ get_repos() ->
 %%--------------------------------------------------------------------
 init({RepoList, ACL}) ->
     {ok, MnesiaSchemaLocation} = application:get_env(mnesia, schema_location),
-    Nodes = [node() | nodes()],
-    DiskNodes = case MnesiaSchemaLocation of
-                     disc ->
-                         Nodes;
-                     ram ->
-                         []
-                 end,
-    mnesia:create_table(repo, [{disc_copies, DiskNodes}
+    AllNodes = [node() | nodes()],
+    CopyMode = case MnesiaSchemaLocation of
+                   disc ->
+                       {disc_copies, AllNodes};
+                   ram ->
+                       {ram_copies, AllNodes}
+               end,
+    mnesia:create_table(repo, [CopyMode
                               ,{type, set}
                               ,{attributes, record_info(fields, repo)}]),
     ok = mnesia:wait_for_tables([repo], 10000),
     priv_populate_repos(RepoList),
     lager:info("Repository list initialized."),
 
-    mnesia:create_table(acl, [{disc_copies, DiskNodes}
+    mnesia:create_table(acl, [CopyMode
                              ,{type, set}
                              ,{attributes, record_info(fields, acl)}]),
     ok = mnesia:wait_for_tables([acl], 10000),
