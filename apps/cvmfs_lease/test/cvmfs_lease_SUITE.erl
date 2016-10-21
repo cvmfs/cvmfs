@@ -37,13 +37,13 @@ groups() ->
 %% Set up, tear down
 
 init_per_suite(Config) ->
+    application:load(mnesia),
+    application:set_env(mnesia, schema_location, ram),
     application:start(mnesia),
-
-    application:set_env(cvmfs_services, mnesia_schema, ram_copies),
 
     MaxLeaseTime = 50, % milliseconds
     ok = application:load(cvmfs_lease),
-    ok = application:set_env(cvmfs_services, max_lease_time, MaxLeaseTime),
+    ok = application:set_env(cvmfs_lease, max_lease_time, MaxLeaseTime),
     {ok, _} = application:ensure_all_started(cvmfs_lease),
     lists:flatten([{max_lease_time, MaxLeaseTime}, Config]).
 
@@ -51,6 +51,7 @@ end_per_suite(_Config) ->
     application:stop(cvmfs_lease),
     application:unload(cvmfs_lease),
     application:stop(mnesia),
+    application:unload(mnesia),
     ok.
 
 init_per_testcase(_TestCase, Config) ->
