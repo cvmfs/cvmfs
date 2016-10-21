@@ -128,8 +128,7 @@ init(_) ->
                      ram ->
                          []
                  end,
-    mnesia:create_table(lease, [{ram_copies, Nodes}
-                               ,{disc_copies, DiskNodes}
+    mnesia:create_table(lease, [{disc_copies, DiskNodes}
                                ,{type, set}
                                ,{attributes, record_info(fields, lease)}]),
     ok = mnesia:wait_for_tables([lease], 10000),
