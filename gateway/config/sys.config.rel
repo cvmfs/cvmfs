@@ -4,7 +4,7 @@
                      ,{lager_file_backend, [{file, "error.log"}, {level, error}]}
                      ,{lager_file_backend, [{file, "info.log"}, {level, info}]}]}]}
 
-,{mnesia, [{dir, "/tmp/cvmfs_mnesia"}
+,{mnesia, [{dir, "/opt/cvmfs_mnesia"}
           ,{schema_location, disc}]}
 
 ,{cvmfs_auth, [{repo_config, {file, "./etc/repo.config"}}]}
