@@ -121,14 +121,14 @@ clear_leases() ->
 %%--------------------------------------------------------------------
 init(_) ->
     {ok, MnesiaSchemaLocation} = application:get_env(mnesia, schema_location),
-    Nodes = [node() | nodes()],
-    DiskNodes = case MnesiaSchemaLocation of
-                     disc ->
-                         Nodes;
-                     ram ->
-                         []
-                 end,
-    mnesia:create_table(lease, [{disc_copies, DiskNodes}
+    AllNodes = [node() | nodes()],
+    CopyMode = case MnesiaSchemaLocation of
+                   disc ->
+                       {disc_copies, AllNodes};
+                   ram ->
+                       {ram_copies, AllNodes}
+               end,
+    mnesia:create_table(lease, [CopyMode
                                ,{type, set}
                                ,{attributes, record_info(fields, lease)}]),
     ok = mnesia:wait_for_tables([lease], 10000),
