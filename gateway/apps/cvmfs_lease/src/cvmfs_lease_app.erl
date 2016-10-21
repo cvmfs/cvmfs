@@ -18,8 +18,7 @@
 %%====================================================================
 
 start(_StartType, _StartArgs) ->
-    {ok, MnesiaSchema} = application:get_env(cvmfs_services, mnesia_schema),
-    cvmfs_lease_sup:start_link(MnesiaSchema).
+    cvmfs_lease_sup:start_link([]).
 
 %%--------------------------------------------------------------------
 stop(_State) ->

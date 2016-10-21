@@ -42,9 +42,9 @@ groups() ->
 %% Set up, tear down
 
 init_per_suite(Config) ->
+    application:load(mnesia),
+    application:set_env(mnesia, schema_location, ram),
     application:start(mnesia),
-
-    application:set_env(cvmfs_services, mnesia_schema, ram_copies),
 
     ok = application:load(cvmfs_auth),
     ok = ct:require(repos),
@@ -58,6 +58,7 @@ end_per_suite(_Config) ->
     application:stop(cvmfs_auth),
     application:unload(cvmfs_auth),
     application:stop(mnesia),
+    application:unload(mnesia),
     ok.
 
 init_per_testcase(_TestCase, _Config) ->
