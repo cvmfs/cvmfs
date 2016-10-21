@@ -17,7 +17,6 @@
 %%====================================================================
 
 start(_StartType, _StartArgs) ->
-    {ok, MnesiaSchema} = application:get_env(cvmfs_services, mnesia_schema),
     case application:get_env(cvmfs_auth, repo_config) of
         {ok, {file, RepoConfigFile}} ->
             {ok, VarList} = file:consult(RepoConfigFile),
@@ -27,8 +26,7 @@ start(_StartType, _StartArgs) ->
     end,
 
     cvmfs_auth_sup:start_link({maps:get(repos, Vars)
-                              ,maps:get(acl, Vars)
-                              ,MnesiaSchema}).
+                              ,maps:get(acl, Vars)}).
 
 %%--------------------------------------------------------------------
 stop(_State) ->

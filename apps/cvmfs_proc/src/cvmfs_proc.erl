@@ -284,7 +284,7 @@ priv_generate_token(User, Path) ->
     M = macaroon:create(Location, Secret, Public),
     M1 = macaroon:add_first_party_caveat(M, "user = " ++ User),
 
-    {ok, MaxSessionTime} = application:get_env(cvmfs_services, max_session_time),
+    {ok, MaxSessionTime} = application:get_env(cvmfs_proc, max_session_time),
     Time = erlang:system_time(seconds) + MaxSessionTime,
 
     M2 = macaroon:add_first_party_caveat(M1, "time < " ++ erlang:integer_to_binary(Time)),
