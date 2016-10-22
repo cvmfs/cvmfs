@@ -50,6 +50,9 @@ class CacheTransport {
    */
   static const unsigned kInnerHeaderSize = 2;
 
+  static const uint32_t kFlagSendIgnoreFailure = 0x01;
+  static const uint32_t kFlagSendNonBlocking   = 0x02;
+
 
   /**
    * A single unit of data transfer contains a "typed" Msg... protobuf message
@@ -101,7 +104,7 @@ class CacheTransport {
 
 
   explicit CacheTransport(int fd_connection);
-  CacheTransport(int fd_connection, bool ignore_send_failures);
+  CacheTransport(int fd_connection, uint32_t flags);
   ~CacheTransport() { }
 
   void SendFrame(Frame *frame);
@@ -123,10 +126,11 @@ class CacheTransport {
                 uint32_t msg_size,
                 void *attachment = NULL,
                 uint32_t att_size = 0);
+  void SendNonBlocking(struct iovec *iov, unsigned iovcnt);
   bool RecvHeader(uint32_t *size, bool *has_attachment);
 
   int fd_connection_;
-  bool ignore_send_failures_;
+  uint32_t flags_;
 };  // class CacheTransport
 
 #endif  // CVMFS_CACHE_TRANSPORT_H_

@@ -6,6 +6,7 @@
 
 #include <alloca.h>
 #include <errno.h>
+#include <sys/socket.h>
 
 #include <cassert>
 #include <cstdlib>
@@ -15,6 +16,9 @@
 #include "logging.h"
 #include "smalloc.h"
 #include "util/posix.h"
+
+// TODO(jblomer): Check for possible starvation of plugin by dying clients
+// (blocking read).  Probably only relevant for TCP sockets.
 
 using namespace std;  // NOLINT
 
@@ -220,15 +224,15 @@ void CacheTransport::Frame::UnwrapMsg() {
 
 CacheTransport::CacheTransport(int fd_connection)
   : fd_connection_(fd_connection)
-  , ignore_send_failures_(false)
+  , flags_(0)
 {
   assert(fd_connection_ >= 0);
 }
 
 
-CacheTransport::CacheTransport(int fd_connection, bool ignore_send_failures)
+CacheTransport::CacheTransport(int fd_connection, uint32_t flags)
   : fd_connection_(fd_connection)
-  , ignore_send_failures_(ignore_send_failures)
+  , flags_(flags)
 {
   assert(fd_connection_ >= 0);
 }
@@ -434,13 +438,41 @@ void CacheTransport::SendData(
     iov[1].iov_base = message;
     iov[1].iov_len = msg_size;
   }
+  if (flags_ & kFlagSendNonBlocking) {
+    SendNonBlocking(iov, (att_size == 0) ? 2 : 4);
+    return;
+  }
   bool retval = SafeWriteV(fd_connection_, iov, (att_size == 0) ? 2 : 4);
 
-  if (!retval && !ignore_send_failures_) {
+  if (!retval && !(flags_ & kFlagSendIgnoreFailure)) {
     LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
              "failed to write to external cache transport (%d), aborting",
              errno);
     abort();
+  }
+}
+
+void CacheTransport::SendNonBlocking(struct iovec *iov, unsigned iovcnt) {
+  unsigned total_size = 0;
+  for (unsigned i = 0; i < iovcnt; ++i)
+    total_size += iov[i].iov_len;
+  unsigned char *buffer = reinterpret_cast<unsigned char *>(alloca(total_size));
+
+  unsigned pos = 0;
+  for (unsigned i = 0; i < iovcnt; ++i) {
+    memcpy(buffer + pos, iov[i].iov_base, iov[i].iov_len);
+    pos += iov[i].iov_len;
+  }
+
+  int retval = send(fd_connection_, buffer, total_size, MSG_DONTWAIT);
+  if (retval < 0) {
+    assert(errno != EMSGSIZE);
+    if (!(flags_ & kFlagSendIgnoreFailure)) {
+      LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
+             "failed to write to external cache transport (%d), aborting",
+             errno);
+      abort();
+    }
   }
 }
 

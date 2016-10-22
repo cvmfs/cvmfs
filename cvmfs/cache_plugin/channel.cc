@@ -140,7 +140,7 @@ void CachePlugin::HandleRefcount(
 
 
 bool CachePlugin::HandleRequest(int fd_con) {
-  CacheTransport transport(fd_con, true);
+  CacheTransport transport(fd_con, CacheTransport::kFlagSendIgnoreFailure);
   char buffer[max_object_size_];
   CacheTransport::Frame frame_recv;
   frame_recv.set_attachment(buffer, max_object_size_);
@@ -396,7 +396,9 @@ void CachePlugin::SendDetachRequests() {
   set<int>::const_iterator iter = connections_.begin();
   set<int>::const_iterator iter_end = connections_.end();
   for (; iter != iter_end; ++iter) {
-    CacheTransport transport(*iter, true);
+    CacheTransport transport(*iter,
+      CacheTransport::kFlagSendIgnoreFailure |
+      CacheTransport::kFlagSendNonBlocking);
     cvmfs::MsgDetach msg_detach;
     CacheTransport::Frame frame_send(&msg_detach);
     transport.SendFrame(&frame_send);
