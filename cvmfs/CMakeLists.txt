@@ -173,6 +173,11 @@ set (LIBCVMFS_CACHE_SOURCES
   util_concurrency.cc util_concurrency.h util_concurrency_impl.h
 )
 
+set (CVMFS_CACHE_NULL_SOURCES
+  cache_plugin/libcvmfs_cache.h
+  cache_plugin/cvmfs_cache_null.cc
+)
+
 set (CVMFS_FSCK_SOURCES
   atomic.h
   compression.cc compression.h
@@ -524,6 +529,12 @@ if (BUILD_LIBCVMFS_CACHE)
   # dummy target to cause merged libcvmfs to be produced
   add_custom_target (libcvmfs_cache ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a)
   add_dependencies (libcvmfs_cache cvmfs_cache_only)
+
+  add_executable(cvmfs_cache_null ${CVMFS_CACHE_NULL_SOURCES})
+  target_link_libraries(cvmfs_cache_null
+                        ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a
+                        ${OPENSSL_LIBRARIES} ${RT_LIBRARY} pthread)
+  add_dependencies (cvmfs_cache_null libcvmfs_cache)
 endif (BUILD_LIBCVMFS_CACHE)
 
 

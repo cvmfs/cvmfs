@@ -250,7 +250,6 @@ set (CVMFS_TEST_CACHE_SOURCES
   ${CVMFS_SOURCE_DIR}/fd_table.h
   ${CVMFS_SOURCE_DIR}/hash.cc ${CVMFS_SOURCE_DIR}/hash.h
   ${CVMFS_SOURCE_DIR}/logging.cc ${CVMFS_SOURCE_DIR}/logging.h ${CVMFS_SOURCE_DIR}/logging_internal.h
-  ${CVMFS_SOURCE_DIR}/platform.h ${CVMFS_SOURCE_DIR}/platform_linux.h ${CVMFS_SOURCE_DIR}/platform_osx.h
   ${CVMFS_SOURCE_DIR}/prng.h
   ${CVMFS_SOURCE_DIR}/quota.cc ${CVMFS_SOURCE_DIR}/quota.h
   ${CVMFS_SOURCE_DIR}/smalloc.h
