@@ -12,10 +12,6 @@
 
 std::string g_plugin_locator;
 
-// TODO(jblomer): remove.  Only needed to satisfy monitor.cc
-namespace cvmfs {
-  pid_t pid_ = 0;
-}
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);

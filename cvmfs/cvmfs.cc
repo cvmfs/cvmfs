@@ -95,7 +95,7 @@
 #include "nfs_maps.h"
 #include "options.h"
 #include "platform.h"
-#include "quota.h"
+#include "quota_posix.h"
 #include "quota_listener.h"
 #include "shortstring.h"
 #include "signature.h"

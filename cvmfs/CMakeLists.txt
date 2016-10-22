@@ -80,6 +80,7 @@ set (CVMFS_CLIENT_SOURCES
   platform.h platform_linux.h platform_osx.h
   prng.h
   quota.cc quota.h
+  quota_posix.cc quota_posix.h
   sanitizer.cc sanitizer.h
   shortstring.h
   signature.cc signature.h

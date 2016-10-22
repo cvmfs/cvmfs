@@ -58,7 +58,7 @@
 #endif
 #include "options.h"
 #include "platform.h"
-#include "quota.h"
+#include "quota_posix.h"
 #include "signature.h"
 #include "sqlitemem.h"
 #include "sqlitevfs.h"
