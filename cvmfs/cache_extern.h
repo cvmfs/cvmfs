@@ -52,6 +52,7 @@ class ExternalCacheManager : public CacheManager {
   virtual void Spawn();
 
   int64_t session_id() const { return session_id_; }
+  uint32_t max_object_size() const { return max_object_size_; }
 
  private:
   /**
@@ -64,6 +65,10 @@ class ExternalCacheManager : public CacheManager {
    * under control.
    */
   static const unsigned kMaxSupportedObjectSize = 512 * 1024;
+  /**
+   * Statistically, at least half of our objects should not be further chunked.
+   */
+  static const unsigned kMinSupportedObjectSize = 4 * 1024;
 
   struct Transaction {
     Transaction(const shash::Any &id)

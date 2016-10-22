@@ -235,7 +235,35 @@ add_custom_command(OUTPUT cache.pb.cc cache.pb.h
 
 
 set (CVMFS_TEST_CACHE_SOURCES
+  cache.pb.cc cache.pb.h
+  cache_plugin/globals.h
   cache_plugin/main.cc
+  cache_plugin/t_cache_plugin.cc
+
+  ${CVMFS_SOURCE_DIR}/atomic.h
+  ${CVMFS_SOURCE_DIR}/cache.cc ${CVMFS_SOURCE_DIR}/cache.h
+  ${CVMFS_SOURCE_DIR}/cache_extern.cc ${CVMFS_SOURCE_DIR}/cache_extern.h
+  ${CVMFS_SOURCE_DIR}/cache_transport.cc ${CVMFS_SOURCE_DIR}/cache_transport.h
+  ${CVMFS_SOURCE_DIR}/compression.cc ${CVMFS_SOURCE_DIR}/compression.h
+  ${CVMFS_SOURCE_DIR}/cvmfs.h
+  ${CVMFS_SOURCE_DIR}/directory_entry.h
+  ${CVMFS_SOURCE_DIR}/download.h
+  ${CVMFS_SOURCE_DIR}/duplex_sqlite3.h
+  ${CVMFS_SOURCE_DIR}/fd_table.h
+  ${CVMFS_SOURCE_DIR}/hash.cc ${CVMFS_SOURCE_DIR}/hash.h
+  ${CVMFS_SOURCE_DIR}/logging.cc ${CVMFS_SOURCE_DIR}/logging.h ${CVMFS_SOURCE_DIR}/logging_internal.h
+  ${CVMFS_SOURCE_DIR}/monitor.cc ${CVMFS_SOURCE_DIR}/monitor.h
+  ${CVMFS_SOURCE_DIR}/platform.h ${CVMFS_SOURCE_DIR}/platform_linux.h ${CVMFS_SOURCE_DIR}/platform_osx.h
+  ${CVMFS_SOURCE_DIR}/prng.h
+  ${CVMFS_SOURCE_DIR}/quota.cc ${CVMFS_SOURCE_DIR}/quota.h
+  ${CVMFS_SOURCE_DIR}/smalloc.h
+  ${CVMFS_SOURCE_DIR}/statistics.cc ${CVMFS_SOURCE_DIR}/statistics.h
+  ${CVMFS_SOURCE_DIR}/util/async.h
+  ${CVMFS_SOURCE_DIR}/util/pointer.h
+  ${CVMFS_SOURCE_DIR}/util/posix.cc ${CVMFS_SOURCE_DIR}/util/posix.h
+  ${CVMFS_SOURCE_DIR}/util/single_copy.h
+  ${CVMFS_SOURCE_DIR}/util/string.cc ${CVMFS_SOURCE_DIR}/util/string.h
+  ${CVMFS_SOURCE_DIR}/util_concurrency.cc ${CVMFS_SOURCE_DIR}/util_concurrency.h
 )
 
 #
@@ -365,10 +393,20 @@ if (BUILD_UNITTESTS_DEBUG)
 endif (BUILD_UNITTESTS_DEBUG)
 
 if (BUILD_LIBCVMFS_CACHE)
+  if (ZLIB_BUILTIN)
+    add_dependencies (${PROJECT_TEST_CACHE_NAME} zlib)
+  endif (ZLIB_BUILTIN)
+
+  if (SQLITE3_BUILTIN)
+    add_dependencies (${PROJECT_TEST_DEBUG_NAME} sqlite3)
+  endif (SQLITE3_BUILTIN)
+
   target_link_libraries (${PROJECT_TEST_CACHE_NAME}
                          ${GTEST_LIBRARIES} ${GOOGLETEST_ARCHIVE}
-                         ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${SHA3_ARCHIVE}
-                         ${PROTOBUF_ARCHIVE} pthread)
+                         ${OPENSSL_LIBRARIES} ${SQLITE3_LIBRARY}
+                         ${SQLITE3_ARCHIVE} ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE}
+                         ${RT_LIBRARY} ${SHA3_ARCHIVE} ${PROTOBUF_ARCHIVE}
+                         pthread dl)
 endif (BUILD_LIBCVMFS_CACHE)
 
 

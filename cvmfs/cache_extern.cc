@@ -170,6 +170,12 @@ ExternalCacheManager *ExternalCacheManager::Create(
              cache_mgr->max_object_size_);
     return NULL;
   }
+  if (cache_mgr->max_object_size_ < kMinSupportedObjectSize) {
+    LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
+             "external cache manager object size too small (%u)",
+             cache_mgr->max_object_size_);
+    return NULL;
+  }
   return cache_mgr.Release();
 }
 
