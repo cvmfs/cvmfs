@@ -246,7 +246,6 @@ set (CVMFS_TEST_CACHE_SOURCES
   ${CVMFS_SOURCE_DIR}/cache_extern.cc ${CVMFS_SOURCE_DIR}/cache_extern.h
   ${CVMFS_SOURCE_DIR}/cache_transport.cc ${CVMFS_SOURCE_DIR}/cache_transport.h
   ${CVMFS_SOURCE_DIR}/compression.cc ${CVMFS_SOURCE_DIR}/compression.h
-  ${CVMFS_SOURCE_DIR}/download.h
   ${CVMFS_SOURCE_DIR}/fd_table.h
   ${CVMFS_SOURCE_DIR}/hash.cc ${CVMFS_SOURCE_DIR}/hash.h
   ${CVMFS_SOURCE_DIR}/logging.cc ${CVMFS_SOURCE_DIR}/logging.h ${CVMFS_SOURCE_DIR}/logging_internal.h

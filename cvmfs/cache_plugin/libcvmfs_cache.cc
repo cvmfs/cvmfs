@@ -39,7 +39,8 @@ static struct cvmcache_hash Cpphash2Chash(const shash::Any &hash) {
 class ForwardCachePlugin : public CachePlugin {
  public:
   ForwardCachePlugin(struct cvmcache_callbacks *callbacks)
-    : callbacks_(*callbacks) { }
+    : CachePlugin(callbacks->capabilities)
+    , callbacks_(*callbacks) { }
   virtual ~ForwardCachePlugin() { }
 
  protected:

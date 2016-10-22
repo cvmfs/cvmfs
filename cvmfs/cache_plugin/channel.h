@@ -7,6 +7,7 @@
 #include <pthread.h>
 #include <stdint.h>
 
+#include <set>
 #include <string>
 
 #include "atomic.h"
@@ -32,11 +33,13 @@ class CachePlugin : SingleCopy {
   bool Listen(const std::string &socket_path);
   ~CachePlugin();
   void ProcessRequests();
+  void AskToDetach();
 
   unsigned max_object_size() const { return max_object_size_; }
+  uint64_t capabilities() const { return capabilities_; }
 
  protected:
-  explicit CachePlugin();
+  explicit CachePlugin(uint64_t capabilities);
 
   virtual cvmfs::EnumStatus ChangeRefcount(const shash::Any &id,
                                            int32_t change_by) = 0;
@@ -57,6 +60,8 @@ class CachePlugin : SingleCopy {
 
  private:
   static const unsigned kDefaultMaxObjectSize = 256 * 1024;  // 256kB
+  static const char kSignalTerminate = 'q';
+  static const char kSignalDetach = 'd';
 
   struct UniqueRequest {
     UniqueRequest() : session_id(-1), req_id(-1) { }
@@ -98,7 +103,9 @@ class CachePlugin : SingleCopy {
                    CacheTransport *transport);
   void HandleStoreAbort(cvmfs::MsgStoreAbortReq *msg_req,
                         CacheTransport *transport);
+  void SendDetachRequests();
 
+  uint64_t capabilities_;
   std::string socket_path_;
   int fd_socket_;
   bool running_;
@@ -107,6 +114,7 @@ class CachePlugin : SingleCopy {
   atomic_int64 next_session_id_;
   atomic_int64 next_txn_id_;
   SmallHashDynamic<UniqueRequest, uint64_t> txn_ids_;
+  std::set<int> connections_;
   pthread_t thread_io_;
   int pipe_ctrl_[2];
 };  // class CachePlugin

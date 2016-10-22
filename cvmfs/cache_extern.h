@@ -10,6 +10,7 @@
 #include <stdint.h>
 
 #include <cassert>
+#include <string>
 #include <vector>
 
 #include "atomic.h"
@@ -17,9 +18,12 @@
 #include "cache_transport.h"
 #include "fd_table.h"
 #include "hash.h"
+#include "quota.h"
 #include "util_concurrency.h"
 
 class ExternalCacheManager : public CacheManager {
+  friend class ExternalQuotaManager;
+
  public:
   static const unsigned kPbProtocolVersion = 1;
 
@@ -212,6 +216,62 @@ class ExternalCacheManager : public CacheManager {
   std::vector<RpcInFlight> inflight_rpcs_;
   pthread_mutex_t lock_inflight_rpcs_;
   pthread_t thread_read_;
+  uint64_t capabilities_;
 };  // class ExternalCacheManager
+
+
+class ExternalQuotaManager : public QuotaManager {
+ public:
+  static ExternalQuotaManager *Create(ExternalCacheManager *cache_mgr);
+  virtual bool IsEnforcing() { return true; }
+
+  virtual void Insert(const shash::Any &hash, const uint64_t size,
+                      const std::string &description)
+  { }
+
+  virtual void InsertVolatile(const shash::Any &hash, const uint64_t size,
+                              const std::string &description)
+  { }
+
+  virtual bool Pin(const shash::Any &hash, const uint64_t size,
+                   const std::string &description, const bool is_catalog)
+  { return false; }
+
+  virtual void Unpin(const shash::Any &hash) { }
+  virtual void Touch(const shash::Any &hash) { }
+  virtual void Remove(const shash::Any &file) { }
+  virtual bool Cleanup(const uint64_t leave_size) { return false; }
+
+  virtual void RegisterBackChannel(int back_channel[2],
+                                   const std::string &channel_id) { }
+  virtual void UnregisterBackChannel(int back_channel[2],
+                                     const std::string &channel_id) { }
+
+  virtual std::vector<std::string> List() { return std::vector<std::string>(); }
+  virtual std::vector<std::string> ListPinned() {
+    return std::vector<std::string>();
+  }
+  virtual std::vector<std::string> ListCatalogs() {
+    return std::vector<std::string>();
+  }
+  virtual std::vector<std::string> ListVolatile() {
+    return std::vector<std::string>();
+  }
+  virtual uint64_t GetMaxFileSize() { return 0; }
+  virtual uint64_t GetCapacity() { return 0; }
+  virtual uint64_t GetSize() { return 0; }
+  virtual uint64_t GetSizePinned() { return 0; }
+  virtual uint64_t GetCleanupRate(uint64_t period_s) { return 0; }
+
+  virtual void Spawn() { }
+  virtual pid_t GetPid() { return getpid(); }
+  virtual uint32_t GetProtocolRevision() { return 0; }
+
+ private:
+  explicit ExternalQuotaManager(ExternalCacheManager *cache_mgr)
+    : cache_mgr_(cache_mgr) { }
+
+  ExternalCacheManager *cache_mgr_;
+};
 
 #endif  // CVMFS_CACHE_EXTERN_H_

@@ -75,8 +75,21 @@ bool ExternalCacheManager::AcquireQuotaManager(QuotaManager *quota_mgr) {
 void ExternalCacheManager::CallRemotely(ExternalCacheManager::RpcJob *rpc_job) {
   if (!spawned_) {
     transport_.SendFrame(rpc_job->frame_send());
-    bool retval = transport_.RecvFrame(rpc_job->frame_recv());
-    assert(retval);
+    uint32_t save_att_size = rpc_job->frame_recv()->att_size();
+    bool again;
+    do {
+      again = false;
+      bool retval = transport_.RecvFrame(rpc_job->frame_recv());
+      assert(retval);
+      if (rpc_job->frame_recv()->IsMsgOutOfBand()) {
+        google::protobuf::MessageLite *msg_typed =
+          rpc_job->frame_recv()->GetMsgTyped();
+        assert(msg_typed->GetTypeName() == "cvmfs.MsgDetach");
+        // TODO(jblomer) Handle
+        rpc_job->frame_recv()->Reset(save_att_size);
+        again = true;
+      }
+    } while (again);
   } else {
     Signal signal;
     {
@@ -93,6 +106,9 @@ void ExternalCacheManager::CallRemotely(ExternalCacheManager::RpcJob *rpc_job) {
 
 
 int ExternalCacheManager::ChangeRefcount(const shash::Any &id, int change_by) {
+  if (!(capabilities_ & cvmfs::CAP_REFCOUNT))
+    return cvmfs::STATUS_OK;
+
   cvmfs::MsgHash object_id;
   transport_.FillMsgHash(id, &object_id);
   cvmfs::MsgRefcountReq msg_refcount;
@@ -162,6 +178,7 @@ ExternalCacheManager *ExternalCacheManager::Create(
   cvmfs::MsgHandshakeAck *msg_ack =
     reinterpret_cast<cvmfs::MsgHandshakeAck *>(msg_typed);
   cache_mgr->session_id_ = msg_ack->session_id();
+  cache_mgr->capabilities_ = msg_ack->capabilities();
   cache_mgr->max_object_size_ = msg_ack->max_object_size();
   assert(cache_mgr->max_object_size_ > 0);
   if (cache_mgr->max_object_size_ > kMaxSupportedObjectSize) {
@@ -231,6 +248,7 @@ ExternalCacheManager::ExternalCacheManager(
   , max_object_size_(0)
   , spawned_(false)
   , terminated_(false)
+  , capabilities_(cvmfs::CAP_ALL)
 {
   int retval = pthread_rwlock_init(&rwlock_fd_table_, NULL);
   assert(retval == 0);
@@ -353,6 +371,9 @@ void *ExternalCacheManager::MainRead(void *data) {
     } else if (msg->GetTypeName() == "cvmfs.MsgStoreReply") {
       req_id = reinterpret_cast<cvmfs::MsgStoreReply *>(msg)->req_id();
       part_nr = reinterpret_cast<cvmfs::MsgStoreReply *>(msg)->part_nr();
+    } else if (msg->GetTypeName() == "cvmfs.MsgDetach") {
+      // TODO(jblomer): Handle
+      continue;
     } else {
       LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug, "unexpected message %s",
                msg->GetTypeName().c_str());

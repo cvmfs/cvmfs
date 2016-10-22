@@ -65,6 +65,7 @@ class CacheTransport {
     explicit Frame(google::protobuf::MessageLite *m);
     ~Frame();
     void MergeFrom(const Frame &other);
+    void Reset(uint32_t original_att_size);
 
     void *attachment() const { return attachment_; }
     uint32_t att_size() const { return att_size_; }
@@ -77,10 +78,13 @@ class CacheTransport {
     bool ParseMsgRpc(void *buffer, uint32_t size);
     cvmfs::MsgRpc *GetMsgRpc();
     google::protobuf::MessageLite *GetMsgTyped();
+    // The Detach message does not follow the command-reply pattern
+    bool IsMsgOutOfBand();
 
    private:
     void WrapMsg();
     void UnwrapMsg();
+    void Release();
 
     cvmfs::MsgRpc msg_rpc_;
     bool owns_msg_typed_;
@@ -92,10 +96,12 @@ class CacheTransport {
     void *attachment_;
     uint32_t att_size_;
     bool is_wrapped_;
+    bool is_msg_out_of_band_;
   };  // class CacheTransport::Frame
 
 
   explicit CacheTransport(int fd_connection);
+  CacheTransport(int fd_connection, bool ignore_send_failures);
   ~CacheTransport() { }
 
   void SendFrame(Frame *frame);
@@ -120,6 +126,7 @@ class CacheTransport {
   bool RecvHeader(uint32_t *size, bool *has_attachment);
 
   int fd_connection_;
+  bool ignore_send_failures_;
 };  // class CacheTransport
 
 #endif  // CVMFS_CACHE_TRANSPORT_H_

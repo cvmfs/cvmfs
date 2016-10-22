@@ -31,7 +31,9 @@ using namespace std;  // NOLINT
  */
 class MockCachePlugin : public CachePlugin {
  public:
-  explicit MockCachePlugin(const string &socket_path) {
+  explicit MockCachePlugin(const string &socket_path)
+    : CachePlugin(cvmfs::CAP_ALL)
+  {
     bool retval = Listen(socket_path);
     assert(retval);
     ProcessRequests();
@@ -151,7 +153,7 @@ class T_ExternalCacheManager : public ::testing::Test {
     socket_path_ = "cvmfs_cache_plugin.socket";
     mock_plugin_ = new MockCachePlugin(socket_path_);
 
-    int fd_client = ConnectSocket(socket_path_);
+    fd_client = ConnectSocket(socket_path_);
     ASSERT_GE(fd_client, 0);
     cache_mgr_ = ExternalCacheManager::Create(fd_client, nfiles);
     ASSERT_TRUE(cache_mgr_ != NULL);
@@ -164,6 +166,7 @@ class T_ExternalCacheManager : public ::testing::Test {
   }
 
   static const int nfiles;
+  int fd_client;
   string socket_path_;
   MockCachePlugin *mock_plugin_;
   ExternalCacheManager *cache_mgr_;
@@ -314,6 +317,24 @@ TEST_F(T_ExternalCacheManager, Transaction) {
 }
 
 
+TEST_F(T_ExternalCacheManager, Detach) {
+  int fd = cache_mgr_->Open(CacheManager::Bless(mock_plugin_->known_object));
+  EXPECT_GE(fd, 0);
+
+  mock_plugin_->AskToDetach();
+
+  unsigned size = 64;
+  char buf[size];
+  EXPECT_EQ(static_cast<int>(mock_plugin_->known_object_content.length()),
+            cache_mgr_->Pread(fd, buf, size, 0));
+  EXPECT_EQ(mock_plugin_->known_object_content,
+            string(buf, mock_plugin_->known_object_content.length()));
+  EXPECT_EQ(0, cache_mgr_->Close(fd));
+
+  mock_plugin_->AskToDetach();
+}
+
+
 TEST_F(T_ExternalCacheManager, TransactionAbort) {
   shash::Any id(shash::kSha1);
   string content = "foo";
@@ -337,6 +358,7 @@ namespace {
 
 struct ThreadData {
   ExternalCacheManager *cache_mgr;
+  MockCachePlugin *mock_plugin;
   unsigned large_size;
   unsigned char *large_buffer;
   shash::Any id;
@@ -351,6 +373,15 @@ static void *MainMultiThread(void *data) {
   EXPECT_EQ(td->large_size, size);
   EXPECT_EQ(0, memcmp(buffer, td->large_buffer, size));
   free(buffer);
+  return NULL;
+}
+
+static void *MainDetach(void *data) {
+  ThreadData *td = reinterpret_cast<ThreadData *>(data);
+
+  for (unsigned i = 0; i < 1000; ++i) {
+    td->mock_plugin->AskToDetach();
+  }
   return NULL;
 }
 
@@ -373,12 +404,18 @@ TEST_F(T_ExternalCacheManager, MultiThreaded) {
   ThreadData td[num_threads];
   for (unsigned i = 0; i < num_threads; ++i) {
     td[i].cache_mgr = cache_mgr_;
+    td[i].mock_plugin = mock_plugin_;
     td[i].large_size = large_size;
     td[i].large_buffer = large_buffer;
     td[i].id = id;
 
-    int retval = pthread_create(&threads[i], NULL, MainMultiThread, &td[i]);
-    assert(retval == 0);
+    if (i == num_threads - 1) {
+      int retval = pthread_create(&threads[i], NULL, MainDetach, &td[i]);
+      assert(retval == 0);
+    } else {
+      int retval = pthread_create(&threads[i], NULL, MainMultiThread, &td[i]);
+      assert(retval == 0);
+    }
   }
   for (unsigned i = 0; i < num_threads; ++i) {
     pthread_join(threads[i], NULL);

@@ -48,6 +48,7 @@ CacheTransport::Frame::Frame()
   , attachment_(NULL)
   , att_size_(0)
   , is_wrapped_(false)
+  , is_msg_out_of_band_(false)
 { }
 
 
@@ -57,10 +58,46 @@ CacheTransport::Frame::Frame(google::protobuf::MessageLite *m)
   , attachment_(NULL)
   , att_size_(0)
   , is_wrapped_(false)
+  , is_msg_out_of_band_(false)
 { }
 
 
 CacheTransport::Frame::~Frame() {
+  Reset(0);
+}
+
+
+bool CacheTransport::Frame::IsMsgOutOfBand() {
+  assert(msg_rpc_.IsInitialized());
+  if (msg_typed_ == NULL)
+    UnwrapMsg();
+  return is_msg_out_of_band_;
+}
+
+
+void CacheTransport::Frame::MergeFrom(const Frame &other) {
+  msg_rpc_.CheckTypeAndMergeFrom(other.msg_rpc_);
+  owns_msg_typed_ = true;
+  if (other.att_size_ > 0) {
+    assert(att_size_ >= other.att_size_);
+    memcpy(attachment_, other.attachment_, other.att_size_);
+    att_size_ = other.att_size_;
+  }
+}
+
+
+bool CacheTransport::Frame::ParseMsgRpc(void *buffer, uint32_t size) {
+  bool retval = msg_rpc_.ParseFromArray(buffer, size);
+  if (!retval)
+    return false;
+
+  // Cleanup typed message when Frame leaves scope
+  owns_msg_typed_ = true;
+  return true;
+}
+
+
+void CacheTransport::Frame::Release() {
   if (owns_msg_typed_)
     return;
 
@@ -86,25 +123,14 @@ CacheTransport::Frame::~Frame() {
 }
 
 
-void CacheTransport::Frame::MergeFrom(const Frame &other) {
-  msg_rpc_.CheckTypeAndMergeFrom(other.msg_rpc_);
-  owns_msg_typed_ = true;
-  if (other.att_size_ > 0) {
-    assert(att_size_ >= other.att_size_);
-    memcpy(attachment_, other.attachment_, other.att_size_);
-    att_size_ = other.att_size_;
-  }
-}
-
-
-bool CacheTransport::Frame::ParseMsgRpc(void *buffer, uint32_t size) {
-  bool retval = msg_rpc_.ParseFromArray(buffer, size);
-  if (!retval)
-    return false;
-
-  // Cleanup typed message when Frame leaves scope
-  owns_msg_typed_ = true;
-  return true;
+void CacheTransport::Frame::Reset(uint32_t original_att_size) {
+  msg_typed_ = NULL;
+  att_size_ = original_att_size;
+  is_wrapped_ = false;
+  is_msg_out_of_band_ = false;
+  Release();
+  msg_rpc_.Clear();
+  owns_msg_typed_ = false;
 }
 
 
@@ -142,6 +168,10 @@ void CacheTransport::Frame::WrapMsg() {
   } else if (msg_typed_->GetTypeName() == "cvmfs.MsgStoreReply") {
     msg_rpc_.set_allocated_msg_store_reply(
       reinterpret_cast<cvmfs::MsgStoreReply *>(msg_typed_));
+  } else if (msg_typed_->GetTypeName() == "cvmfs.MsgDetach") {
+    msg_rpc_.set_allocated_msg_detach(
+      reinterpret_cast<cvmfs::MsgDetach *>(msg_typed_));
+    is_msg_out_of_band_ = true;
   } else {
     // Unexpected message type, should never happen
     abort();
@@ -175,6 +205,9 @@ void CacheTransport::Frame::UnwrapMsg() {
     msg_typed_ = msg_rpc_.mutable_msg_store_abort_req();
   } else if (msg_rpc_.has_msg_store_reply()) {
     msg_typed_ = msg_rpc_.mutable_msg_store_reply();
+  } else if (msg_rpc_.has_msg_detach()) {
+    msg_typed_ = msg_rpc_.mutable_msg_detach();
+    is_msg_out_of_band_ = true;
   } else {
     // Unexpected message type, should never happen
     abort();
@@ -187,6 +220,15 @@ void CacheTransport::Frame::UnwrapMsg() {
 
 CacheTransport::CacheTransport(int fd_connection)
   : fd_connection_(fd_connection)
+  , ignore_send_failures_(false)
+{
+  assert(fd_connection_ >= 0);
+}
+
+
+CacheTransport::CacheTransport(int fd_connection, bool ignore_send_failures)
+  : fd_connection_(fd_connection)
+  , ignore_send_failures_(ignore_send_failures)
 {
   assert(fd_connection_ >= 0);
 }
@@ -394,7 +436,7 @@ void CacheTransport::SendData(
   }
   bool retval = SafeWriteV(fd_connection_, iov, (att_size == 0) ? 2 : 4);
 
-  if (!retval) {
+  if (!retval && !ignore_send_failures_) {
     LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
              "failed to write to external cache transport (%d), aborting",
              errno);

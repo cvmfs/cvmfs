@@ -6,6 +6,7 @@
 
 #include <errno.h>
 #include <poll.h>
+#include <signal.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
@@ -22,8 +23,15 @@ using namespace std;  // NOLINT
 const uint64_t CachePlugin::kSizeUnknown = uint64_t(-1);
 
 
-CachePlugin::CachePlugin()
-  : socket_path_()
+void CachePlugin::AskToDetach() {
+  char detach = kSignalDetach;
+  WritePipe(pipe_ctrl_[1], &detach, 1);
+}
+
+
+CachePlugin::CachePlugin(uint64_t capabilities)
+  : capabilities_(capabilities)
+  , socket_path_()
   , fd_socket_(-1)
   , running_(false)
   , max_object_size_(kDefaultMaxObjectSize)
@@ -37,7 +45,7 @@ CachePlugin::CachePlugin()
 
 CachePlugin::~CachePlugin() {
   if (running_) {
-    char terminate = 'q';
+    char terminate = kSignalTerminate;
     WritePipe(pipe_ctrl_[1], &terminate, 1);
     pthread_join(thread_io_, NULL);
   }
@@ -56,6 +64,7 @@ void CachePlugin::HandleHandshake(CacheTransport *transport) {
   msg_ack.set_protocol_version(kPbProtocolVersion);
   msg_ack.set_max_object_size(max_object_size_);
   msg_ack.set_session_id(NextSessionId());
+  msg_ack.set_capabilities(capabilities_);
   transport->SendFrame(&frame_send);
 }
 
@@ -131,7 +140,7 @@ void CachePlugin::HandleRefcount(
 
 
 bool CachePlugin::HandleRequest(int fd_con) {
-  CacheTransport transport(fd_con);
+  CacheTransport transport(fd_con, true);
   char buffer[max_object_size_];
   CacheTransport::Frame frame_recv;
   frame_recv.set_attachment(buffer, max_object_size_);
@@ -293,6 +302,8 @@ bool CachePlugin::Listen(const string &socket_path) {
 void *CachePlugin::MainProcessRequests(void *data) {
   CachePlugin *cache_plugin = reinterpret_cast<CachePlugin *>(data);
 
+  sighandler_t save_sigpipe = signal(SIGPIPE, SIG_IGN);
+
   vector<struct pollfd> watch_fds;
   // Elements 0, 1: control pipe, socket fd
   struct pollfd watch_ctrl;
@@ -316,8 +327,16 @@ void *CachePlugin::MainProcessRequests(void *data) {
       abort();
     }
 
-    // Termination
+    // Termination or detach
     if (watch_fds[0].revents) {
+      char signal;
+      ReadPipe(watch_fds[0].fd, &signal, 1);
+      if (signal == kSignalDetach) {
+        cache_plugin->SendDetachRequests();
+        continue;
+      }
+
+      // termination
       if (watch_fds.size() > 2) {
         LogCvmfs(kLogCache, kLogSyslogWarn | kLogDebug,
                  "terminating external cache manager with pending connections");
@@ -340,6 +359,7 @@ void *CachePlugin::MainProcessRequests(void *data) {
       watch_con.fd = fd_con;
       watch_con.events = POLLIN | POLLPRI;
       watch_fds.push_back(watch_con);
+      cache_plugin->connections_.insert(fd_con);
     }
 
     // New request
@@ -349,6 +369,7 @@ void *CachePlugin::MainProcessRequests(void *data) {
         if (!proceed) {
           close(watch_fds[i].fd);
           watch_fds.erase(watch_fds.begin() + i);
+          cache_plugin->connections_.erase(watch_fds[i].fd);
         }
       }
     }
@@ -358,6 +379,8 @@ void *CachePlugin::MainProcessRequests(void *data) {
   for (unsigned i = 2; i < watch_fds.size(); ++i)
     close(watch_fds[i].fd);
   cache_plugin->txn_ids_.Clear();
+
+  signal(SIGPIPE, save_sigpipe);
   return NULL;
 }
 
@@ -366,4 +389,16 @@ void CachePlugin::ProcessRequests() {
   int retval = pthread_create(&thread_io_, NULL, MainProcessRequests, this);
   assert(retval == 0);
   running_ = true;
+}
+
+
+void CachePlugin::SendDetachRequests() {
+  set<int>::const_iterator iter = connections_.begin();
+  set<int>::const_iterator iter_end = connections_.end();
+  for (; iter != iter_end; ++iter) {
+    CacheTransport transport(*iter, true);
+    cvmfs::MsgDetach msg_detach;
+    CacheTransport::Frame frame_send(&msg_detach);
+    transport.SendFrame(&frame_send);
+  }
 }

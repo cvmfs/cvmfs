@@ -62,6 +62,17 @@ enum EnumObjectType {
   OBJECT_VOLATILE = 2;  // volatile objects are cleaned up before other objects
 }
 
+enum EnumCapabilities {
+  CAP_NONE      = 0;
+  // refcounting is implemented; if not, cache can only act as a lower tier
+  // cache
+  CAP_REFCOUNT  = 1;
+  CAP_SHRINK    = 2;   // clients can ask the cache to shrink
+  CAP_INFO      = 4;   // cache plugin knows about its size and fill level
+  CAP_LIST      = 8;   // cache can return a list of objects
+  CAP_ALL       = 15;
+}
+
 
 //------------------------------------------------------------------------------
 // Data containers
@@ -104,9 +115,12 @@ message MsgHandshakeAck {
   // size max_object_size; typical maximum object sizes for distributed k-v-
   // stores are ~1MB
   required uint32 max_object_size  = 5;
+  // Cache manager are not required to implement all functions.  Combination
+  // of flags from EnumCapabilities.
+  required uint64 capabilities     = 6;
   // The server might instruct the client to proceed in a certain mode of
   // operation in the future
-  optional uint32 flags            = 6;
+  optional uint32 flags            = 7;
 }
 
 message MsgQuit {
@@ -177,7 +191,7 @@ message MsgRefcountReply {
 
 // Request from the cache manager to the client to close as many open file
 // descriptors as possible to help the cache manager freeing space.
-message MsgDetachCatalogs {
+message MsgDetach {
 }
 
 // Tries to free space in the cache until not more than shrink_to bytes are
@@ -295,6 +309,6 @@ message MsgRpc {
     MsgListReq msg_list_req                  = 23;
     MsgListReply msg_list_reply              = 24;
 
-    MsgDetachCatalogs msg_detach             = 25;
+    MsgDetach msg_detach                     = 25;
   }
 }

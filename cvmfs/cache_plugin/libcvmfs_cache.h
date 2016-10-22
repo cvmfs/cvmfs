@@ -45,6 +45,15 @@ enum cvmcache_object_type {
   OBJECT_VOLATILE
 };
 
+enum cvmcache_capabilities {
+  CAP_NONE      = 0,
+  CAP_REFCOUNT  = 1,
+  CAP_SHRINK    = 2,
+  CAP_INFO      = 4,
+  CAP_LIST      = 8,
+  CAP_ALL       = 15
+};
+
 struct cvmcache_object_info {
   uint64_t size;
   enum cvmcache_object_type type;
@@ -72,6 +81,8 @@ struct cvmcache_callbacks {
                             uint32_t size);
   int (*cvmcache_commit_txn)(uint64_t txn_id);
   int (*cvmcache_abort_txn)(uint64_t txn_id);
+
+  int capabilities;
 };
 
 struct cvmcache_context *cvmcache_init(struct cvmcache_callbacks *callbacks);
