@@ -2,7 +2,7 @@
 
 set -e
 
-CARES_VERSION=1.10.0
+CARES_VERSION=1.12.0
 CURL_VERSION=7.39.0
 PACPARSER_VERSION=1.3.5
 ZLIB_VERSION=1.2.8
@@ -130,8 +130,6 @@ patch_external "sparsehash"  "fix_sl4_compilation.patch"          \
                              "fix_warning_gcc48.patch"
 patch_external "libcurl"     "disable_sslv3.patch"
 
-replace_in_external "c-ares"      "config.guess.latest" "config.guess"
-replace_in_external "c-ares"      "config.sub.latest" "config.sub"
 replace_in_external "googletest"  "config.guess.latest" "build-aux/config.guess"
 replace_in_external "googletest"  "config.sub.latest" "build-aux/config.sub"
 replace_in_external "libcurl"     "config.guess.latest" "config.guess"
