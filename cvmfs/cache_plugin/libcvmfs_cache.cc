@@ -133,6 +133,15 @@ class ForwardCachePlugin : public CachePlugin {
     return static_cast<cvmfs::EnumStatus>(result);
   }
 
+  virtual cvmfs::EnumStatus GetInfo(
+    uint64_t *size,
+    uint64_t *used,
+    uint64_t *pinned)
+  {
+    int result = callbacks_.cvmcache_info(size, used, pinned);
+    return static_cast<cvmfs::EnumStatus>(result);
+  }
+
  private:
   struct cvmcache_callbacks callbacks_;
 };

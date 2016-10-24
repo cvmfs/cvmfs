@@ -31,6 +31,8 @@ int Ack2Errno(cvmfs::EnumStatus status_code) {
   switch (status_code) {
     case cvmfs::STATUS_OK:
       return 0;
+    case cvmfs::STATUS_NOSUPPORT:
+      return -EOPNOTSUPP;
     case cvmfs::STATUS_FORBIDDEN:
       return -EPERM;
     case cvmfs::STATUS_NOSPACE:
@@ -374,6 +376,8 @@ void *ExternalCacheManager::MainRead(void *data) {
     } else if (msg->GetTypeName() == "cvmfs.MsgDetach") {
       // TODO(jblomer): Handle
       continue;
+    } else if (msg->GetTypeName() == "cvmfs.MsgInfoReply") {
+      req_id = reinterpret_cast<cvmfs::MsgInfoReply *>(msg)->req_id();
     } else {
       LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug, "unexpected message %s",
                msg->GetTypeName().c_str());
@@ -575,4 +579,65 @@ int64_t ExternalCacheManager::Write(const void *buf, uint64_t size, void *txn) {
     read_pos += batch_size;
   }
   return written;
+}
+
+
+//------------------------------------------------------------------------------
+
+
+ExternalQuotaManager *ExternalQuotaManager::Create(
+  ExternalCacheManager *cache_mgr)
+{
+  UniquePtr<ExternalQuotaManager> quota_mgr(
+    new ExternalQuotaManager(cache_mgr));
+  assert(quota_mgr.IsValid());
+
+  return quota_mgr.Release();
+}
+
+
+int ExternalQuotaManager::GetInfo(QuotaInfo *quota_info) {
+  if (!(cache_mgr_->capabilities_ && cvmfs::CAP_INFO))
+    return Ack2Errno(cvmfs::STATUS_NOSUPPORT);
+
+  cvmfs::MsgInfoReq msg_info;
+  msg_info.set_session_id(cache_mgr_->session_id_);
+  msg_info.set_req_id(cache_mgr_->NextRequestId());
+  ExternalCacheManager::RpcJob rpc_job(&msg_info);
+  cache_mgr_->CallRemotely(&rpc_job);
+
+  cvmfs::MsgInfoReply *msg_reply = rpc_job.msg_info_reply();
+  if (msg_reply->status() == cvmfs::STATUS_OK) {
+    quota_info->size = msg_reply->size_bytes();
+    quota_info->used = msg_reply->used_bytes();
+    quota_info->pinned = msg_reply->pinned_bytes();
+  }
+  return Ack2Errno(msg_reply->status());
+}
+
+
+uint64_t ExternalQuotaManager::GetCapacity() {
+  QuotaInfo info;
+  int retval = GetInfo(&info);
+  if (retval != 0)
+    return uint64_t(-1);
+  return info.size;
+}
+
+
+uint64_t ExternalQuotaManager::GetSize(){
+  QuotaInfo info;
+  int retval = GetInfo(&info);
+  if (retval != 0)
+    return uint64_t(-1);
+  return info.used;
+}
+
+
+uint64_t ExternalQuotaManager::GetSizePinned() {
+  QuotaInfo info;
+  int retval = GetInfo(&info);
+  if (retval != 0)
+    return uint64_t(-1);
+  return info.pinned;
 }

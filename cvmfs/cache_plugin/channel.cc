@@ -69,6 +69,26 @@ void CachePlugin::HandleHandshake(CacheTransport *transport) {
 }
 
 
+void CachePlugin::HandleInfo(
+  cvmfs::MsgInfoReq *msg_req,
+  CacheTransport *transport)
+{
+  cvmfs::MsgInfoReply msg_reply;
+  CacheTransport::Frame frame_send(&msg_reply);
+
+  msg_reply.set_req_id(msg_req->req_id());
+  uint64_t size = 0;
+  uint64_t used = 0;
+  uint64_t pinned = 0;
+  cvmfs::EnumStatus status = GetInfo(&size, &used, &pinned);
+  msg_reply.set_size_bytes(size);
+  msg_reply.set_used_bytes(used);
+  msg_reply.set_pinned_bytes(pinned);
+  msg_reply.set_status(status);
+  transport->SendFrame(&frame_send);
+}
+
+
 void CachePlugin::HandleObjectInfo(
   cvmfs::MsgObjectInfoReq *msg_req,
   CacheTransport *transport)
@@ -177,6 +197,10 @@ bool CachePlugin::HandleRequest(int fd_con) {
     cvmfs::MsgStoreAbortReq *msg_req =
       reinterpret_cast<cvmfs::MsgStoreAbortReq *>(msg_typed);
     HandleStoreAbort(msg_req, &transport);
+  } else if (msg_typed->GetTypeName() == "cvmfs.MsgInfoReq") {
+    cvmfs::MsgInfoReq *msg_req =
+      reinterpret_cast<cvmfs::MsgInfoReq *>(msg_typed);
+    HandleInfo(msg_req, &transport);
   } else {
     LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
              "unexpected message from client: %s",

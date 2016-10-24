@@ -31,6 +31,8 @@ using namespace std;  // NOLINT
  */
 class MockCachePlugin : public CachePlugin {
  public:
+  static const unsigned kMockCacheSize = 10 * 1024 * 1024;
+
   explicit MockCachePlugin(const string &socket_path)
     : CachePlugin(cvmfs::CAP_ALL)
   {
@@ -144,6 +146,16 @@ class MockCachePlugin : public CachePlugin {
     new_object_content.clear();
     return cvmfs::STATUS_OK;
   }
+
+  virtual cvmfs::EnumStatus GetInfo(uint64_t *size_bytes,
+                                    uint64_t *used_bytes,
+                                    uint64_t *pinned_bytes)
+  {
+    *size_bytes = kMockCacheSize;
+    *used_bytes = known_object_content.length();
+    *pinned_bytes = (known_object_refcnt == 0) ? 0 : *used_bytes;
+    return cvmfs::STATUS_OK;
+  }
 };
 
 
@@ -157,6 +169,9 @@ class T_ExternalCacheManager : public ::testing::Test {
     ASSERT_GE(fd_client, 0);
     cache_mgr_ = ExternalCacheManager::Create(fd_client, nfiles);
     ASSERT_TRUE(cache_mgr_ != NULL);
+    quota_mgr_ = ExternalQuotaManager::Create(cache_mgr_);
+    ASSERT_TRUE(cache_mgr_ != NULL);
+    cache_mgr_->AcquireQuotaManager(quota_mgr_);
   }
 
   virtual void TearDown() {
@@ -170,6 +185,7 @@ class T_ExternalCacheManager : public ::testing::Test {
   string socket_path_;
   MockCachePlugin *mock_plugin_;
   ExternalCacheManager *cache_mgr_;
+  ExternalQuotaManager *quota_mgr_;
 };
 
 const int T_ExternalCacheManager::nfiles = 128;
@@ -335,6 +351,11 @@ TEST_F(T_ExternalCacheManager, Detach) {
 }
 
 
+TEST_F(T_ExternalCacheManager, Info) {
+  EXPECT_EQ(0, quota_mgr_->GetSizePinned());
+}
+
+
 TEST_F(T_ExternalCacheManager, TransactionAbort) {
   shash::Any id(shash::kSha1);
   string content = "foo";
@@ -417,6 +438,7 @@ TEST_F(T_ExternalCacheManager, MultiThreaded) {
       assert(retval == 0);
     }
   }
+  // TODO(jblomer): Test info and listing calls multithreaded
   for (unsigned i = 0; i < num_threads; ++i) {
     pthread_join(threads[i], NULL);
   }

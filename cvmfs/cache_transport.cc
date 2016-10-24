@@ -176,6 +176,14 @@ void CacheTransport::Frame::WrapMsg() {
     msg_rpc_.set_allocated_msg_detach(
       reinterpret_cast<cvmfs::MsgDetach *>(msg_typed_));
     is_msg_out_of_band_ = true;
+  } else if (msg_typed_->GetTypeName() == "cvmfs.MsgInfoReq") {
+    msg_rpc_.set_allocated_msg_info_req(
+      reinterpret_cast<cvmfs::MsgInfoReq *>(msg_typed_));
+    is_msg_out_of_band_ = true;
+  } else if (msg_typed_->GetTypeName() == "cvmfs.MsgInfoReply") {
+    msg_rpc_.set_allocated_msg_info_reply(
+      reinterpret_cast<cvmfs::MsgInfoReply *>(msg_typed_));
+    is_msg_out_of_band_ = true;
   } else {
     // Unexpected message type, should never happen
     abort();
@@ -212,6 +220,10 @@ void CacheTransport::Frame::UnwrapMsg() {
   } else if (msg_rpc_.has_msg_detach()) {
     msg_typed_ = msg_rpc_.mutable_msg_detach();
     is_msg_out_of_band_ = true;
+  } else if (msg_rpc_.has_msg_info_req()) {
+    msg_typed_ = msg_rpc_.mutable_msg_info_req();
+  } else if (msg_rpc_.has_msg_info_reply()) {
+    msg_typed_ = msg_rpc_.mutable_msg_info_reply();
   } else {
     // Unexpected message type, should never happen
     abort();

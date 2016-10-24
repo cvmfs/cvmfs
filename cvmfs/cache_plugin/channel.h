@@ -58,6 +58,10 @@ class CachePlugin : SingleCopy {
   virtual cvmfs::EnumStatus AbortTxn(const uint64_t txn_id) = 0;
   virtual cvmfs::EnumStatus CommitTxn(const uint64_t txn_id) = 0;
 
+  virtual cvmfs::EnumStatus GetInfo(uint64_t *size_bytes,
+                                    uint64_t *used_bytes,
+                                    uint64_t *pinned_bytes) = 0;
+
  private:
   static const unsigned kDefaultMaxObjectSize = 256 * 1024;  // 256kB
   static const char kSignalTerminate = 'q';
@@ -103,6 +107,7 @@ class CachePlugin : SingleCopy {
                    CacheTransport *transport);
   void HandleStoreAbort(cvmfs::MsgStoreAbortReq *msg_req,
                         CacheTransport *transport);
+  void HandleInfo(cvmfs::MsgInfoReq *msg_req, CacheTransport *transport);
   void SendDetachRequests();
 
   uint64_t capabilities_;

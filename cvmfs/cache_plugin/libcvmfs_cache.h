@@ -82,6 +82,8 @@ struct cvmcache_callbacks {
   int (*cvmcache_commit_txn)(uint64_t txn_id);
   int (*cvmcache_abort_txn)(uint64_t txn_id);
 
+  int (*cvmcache_info)(uint64_t *size, uint64_t *used, uint64_t *pinned);
+
   int capabilities;
 };
 

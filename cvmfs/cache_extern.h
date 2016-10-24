@@ -131,6 +131,8 @@ class ExternalCacheManager : public CacheManager {
     explicit RpcJob(cvmfs::MsgStoreAbortReq *msg)
       : req_id_(msg->req_id()), part_nr_(0), msg_req_(msg),
         frame_send_(msg) { }
+    explicit RpcJob(cvmfs::MsgInfoReq *msg)
+      : req_id_(msg->req_id()),msg_req_(msg), frame_send_(msg) { }
 
     void set_attachment_send(void *data, unsigned size) {
       frame_send_.set_attachment(data, size);
@@ -166,6 +168,12 @@ class ExternalCacheManager : public CacheManager {
         frame_recv_.GetMsgTyped());
       assert(m->req_id() == req_id_);
       assert(m->part_nr() == part_nr_);
+      return m;
+    }
+    cvmfs::MsgInfoReply *msg_info_reply() {
+      cvmfs::MsgInfoReply *m = reinterpret_cast<cvmfs::MsgInfoReply *>(
+        frame_recv_.GetMsgTyped());
+      assert(m->req_id() == req_id_);
       return m;
     }
 
@@ -257,10 +265,10 @@ class ExternalQuotaManager : public QuotaManager {
   virtual std::vector<std::string> ListVolatile() {
     return std::vector<std::string>();
   }
-  virtual uint64_t GetMaxFileSize() { return 0; }
-  virtual uint64_t GetCapacity() { return 0; }
-  virtual uint64_t GetSize() { return 0; }
-  virtual uint64_t GetSizePinned() { return 0; }
+  virtual uint64_t GetMaxFileSize() { return uint64_t(-1); }
+  virtual uint64_t GetCapacity();
+  virtual uint64_t GetSize();
+  virtual uint64_t GetSizePinned();
   virtual uint64_t GetCleanupRate(uint64_t period_s) { return 0; }
 
   virtual void Spawn() { }
@@ -268,8 +276,16 @@ class ExternalQuotaManager : public QuotaManager {
   virtual uint32_t GetProtocolRevision() { return 0; }
 
  private:
+  struct QuotaInfo {
+    QuotaInfo() : size(0), used(0), pinned(0) { }
+    uint64_t size;
+    uint64_t used;
+    uint64_t pinned;
+  };
+
   explicit ExternalQuotaManager(ExternalCacheManager *cache_mgr)
     : cache_mgr_(cache_mgr) { }
+  int GetInfo(QuotaInfo *quota_info);
 
   ExternalCacheManager *cache_mgr_;
 };

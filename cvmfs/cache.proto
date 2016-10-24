@@ -35,16 +35,17 @@ option optimize_for = LITE_RUNTIME;
 enum EnumStatus {
   STATUS_UNKNOWN     = 0;
   STATUS_OK          = 1;
-  STATUS_FORBIDDEN   = 2;  // Client is not allowed to perform the operation
-  STATUS_NOSPACE     = 3;  // Cache is full
-  STATUS_NOENTRY     = 4;  // Object is not in cache
-  STATUS_MALFORMED   = 5;  // Malformed request
-  STATUS_IOERR       = 6;  // General I/O error
-  STATUS_CORRUPTED   = 7;  // Crc32 verification failed
-  STATUS_TIMEOUT     = 8;  // Certain parts of a multipart request never arrived
-  STATUS_BADCOUNT    = 9;  // Attempt to set a negative reference count
+  STATUS_NOSUPPORT   = 2;  // Not implemented by the cache plugin
+  STATUS_FORBIDDEN   = 3;  // Client is not allowed to perform the operation
+  STATUS_NOSPACE     = 4;  // Cache is full
+  STATUS_NOENTRY     = 5;  // Object is not in cache
+  STATUS_MALFORMED   = 6;  // Malformed request
+  STATUS_IOERR       = 7;  // General I/O error
+  STATUS_CORRUPTED   = 8;  // Crc32 verification failed
+  STATUS_TIMEOUT     = 9;  // Certain parts of a multipart request never arrived
+  STATUS_BADCOUNT    = 10;  // Attempt to set a negative reference count
   // Attempt to read from an offset larger than the object size
-  STATUS_OUTOFBOUNDS = 10;
+  STATUS_OUTOFBOUNDS = 11;
 }
 
 
@@ -238,9 +239,6 @@ message MsgInfoReply {
   required uint64 size_bytes     = 3;
   required uint64 used_bytes     = 4;
   required uint64 pinned_bytes   = 5;
-  required uint64 size_objects   = 6;
-  required uint64 used_objects   = 7;
-  required uint64 pinned_objects = 8;
 }
 
 // Asks about a specific object
@@ -257,20 +255,25 @@ message MsgObjectInfoReply {
   optional uint64 size                = 5;
 }
 
-// Enumerate cache contents, possibly in multiple messages for large caches
+// Enumerate cache contents, possibly in multiple messages for large caches.
+// Initial calls need to set listing_id to zero.
 message MsgListReq {
   required uint64 session_id          = 1;
   required uint64 req_id              = 2;
-  required EnumObjectType object_type = 3;
+  required uint64 listing_id          = 3;
+  required EnumObjectType object_type = 4;
 }
 
-// The cache manager decides how many objects are in each part
+// The cache manager decides how many objects are in each part.  The cache
+// manager assignes a unique listing id so that clients can continue to query
+// for more listings.
 message MsgListReply {
   required uint64 req_id             = 1;
   required EnumStatus status         = 2;
-  required uint64 part_nr            = 3;
-  required bool is_last_part         = 4;
-  repeated MsgListRecord list_record = 5;
+  required uint64 listing_id         = 3;
+  required uint64 part_nr            = 4;
+  required bool is_last_part         = 5;
+  repeated MsgListRecord list_record = 6;
 }
 
 
