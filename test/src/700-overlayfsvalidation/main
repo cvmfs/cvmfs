@@ -108,6 +108,50 @@ delete_dir_in_lower_branch () {
     return 0
 }
 
+# 4. Clear suid or sgid bits during writes on overlayfs
+clear_suid_sgid_during_write () {
+    echo "Check suid or sgid bits during writes on overlayfs"
+
+    root_dir=$(pwd)
+    read_only=$root_dir/read_only
+    read_write=$root_dir/read_write
+    work_dir=$root_dir/work_dir
+    union=$root_dir/union
+
+    # preparation
+    mkdir -p $read_only $read_write $work_dir $union
+    sudo mount -t overlay -o rw,lowerdir=$read_only,upperdir=$read_write,workdir=$work_dir test_ofs $union
+
+    echo "  Clear suid during write"
+    touch $work_dir/test.file
+    chmod u+s $work_dir/test.file
+    dd if=/dev/zero of=$work_dir/test.file bs=1M count=1024 &
+    pid=$!
+    chmod u-s $work_dir/test.file
+    local status1=$?
+    wait $pid
+
+    echo "  Clear sgid during write"
+    rm $work_dir/test.file
+    touch $work_dir/test.file
+    chmod g+s $work_dir/test.file
+    dd if=/dev/zero of=$work_dir/test.file bs=1M count=1024 &
+    pid=$!
+    chmod g-s $work_dir/test.file
+    local status2=$?
+    wait $pid
+
+
+    # Cleaning up
+    sudo umount test_ofs
+    sudo rm -r $root_dir
+
+    if [ "$status1" != 0 -o "$status2" != 0 ]; then
+        return 1;
+    fi
+    return 0
+}
+
 cvmfs_run_test() {
     delete_file_in_lower_branch
     local status1=$?
@@ -115,8 +159,10 @@ cvmfs_run_test() {
     local status2=$?
     delete_dir_in_lower_branch
     local status3=$?
+    clear_suid_sgid_during_write
+    local status4=$?
 
-    if [ "$status1" != 0 -o "$status2" != 0 -o "$status3" != 0 ]; then
+    if [ "$status1" != 0 -o "$status2" != 0 -o "$status3" != 0 -o "$status4" != 0 ]; then
         return 1;
     fi
     return 0;
