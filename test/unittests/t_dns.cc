@@ -617,7 +617,8 @@ TEST_F(T_Dns, CaresResolverMany) {
                      "192.203.230.10", "[2001:500:a8::e]");
   ExpectResolvedName(hosts[5], "f.root-servers.net",
                      "192.5.5.241", "[2001:500:2f::f]");
-  ExpectResolvedName(hosts[6], "g.root-servers.net", "192.112.36.4", "");
+  ExpectResolvedName(hosts[6], "g.root-servers.net",
+                     "192.112.36.4", "[2001:500:12::d0d]");
   ExpectResolvedName(hosts[7], "h.root-servers.net",
                      "198.97.190.53", "[2001:500:1::53]");
   ExpectResolvedName(hosts[8], "i.root-servers.net",
@@ -688,7 +689,8 @@ TEST_F(T_Dns, CaresResolverSearchDomainSlow) {
   ExpectResolvedName(host, "a.root-servers.net",
                      "198.41.0.4", "[2001:503:ba3e::2:30]");
   host = default_resolver->Resolve("g");
-  ExpectResolvedName(host, "g.root-servers.net", "192.112.36.4", "");
+  ExpectResolvedName(host, "g.root-servers.net",
+                     "192.112.36.4", "[2001:500:12::d0d]");
 
   new_domains.clear();
   retval = default_resolver->SetSearchDomains(new_domains);
