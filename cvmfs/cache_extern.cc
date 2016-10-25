@@ -629,7 +629,7 @@ uint64_t ExternalQuotaManager::GetSize(){
   QuotaInfo info;
   int retval = GetInfo(&info);
   if (retval != 0)
-    return uint64_t(-1);
+    return 0;
   return info.used;
 }
 
@@ -638,6 +638,6 @@ uint64_t ExternalQuotaManager::GetSizePinned() {
   QuotaInfo info;
   int retval = GetInfo(&info);
   if (retval != 0)
-    return uint64_t(-1);
+    return 0;
   return info.pinned;
 }

@@ -27,6 +27,7 @@ struct cvmcache_hash {
 enum cvmcache_status {
   STATUS_UNKNOWN = 0,
   STATUS_OK,
+  STATUS_NOSUPPORT,  // Not implemented by the cache plugin
   STATUS_FORBIDDEN,  // Client is not allowed to perform the operation
   STATUS_NOSPACE,    // Cache is full
   STATUS_NOENTRY,    // Object is not in cache

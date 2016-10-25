@@ -31,7 +31,7 @@ using namespace std;  // NOLINT
  */
 class MockCachePlugin : public CachePlugin {
  public:
-  static const unsigned kMockCacheSize = 10 * 1024 * 1024;
+  static const unsigned kMockCacheSize;
 
   explicit MockCachePlugin(const string &socket_path)
     : CachePlugin(cvmfs::CAP_ALL)
@@ -157,6 +157,8 @@ class MockCachePlugin : public CachePlugin {
     return cvmfs::STATUS_OK;
   }
 };
+
+const unsigned MockCachePlugin::kMockCacheSize = 10 * 1024 * 1024;
 
 
 class T_ExternalCacheManager : public ::testing::Test {
@@ -352,7 +354,15 @@ TEST_F(T_ExternalCacheManager, Detach) {
 
 
 TEST_F(T_ExternalCacheManager, Info) {
-  EXPECT_EQ(0, quota_mgr_->GetSizePinned());
+  EXPECT_EQ(MockCachePlugin::kMockCacheSize, quota_mgr_->GetCapacity());
+  EXPECT_EQ(mock_plugin_->known_object_content.length(), quota_mgr_->GetSize());
+  EXPECT_EQ(0U, quota_mgr_->GetSizePinned());
+
+  int fd = cache_mgr_->Open(CacheManager::Bless(mock_plugin_->known_object));
+  EXPECT_GE(fd, 0);
+  EXPECT_EQ(mock_plugin_->known_object_content.length(),
+            quota_mgr_->GetSizePinned());
+  EXPECT_EQ(0, cache_mgr_->Close(fd));
 }
 
 

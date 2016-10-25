@@ -40,7 +40,13 @@ class ForwardCachePlugin : public CachePlugin {
  public:
   ForwardCachePlugin(struct cvmcache_callbacks *callbacks)
     : CachePlugin(callbacks->capabilities)
-    , callbacks_(*callbacks) { }
+    , callbacks_(*callbacks)
+  {
+    if (callbacks->capabilities & CAP_REFCOUNT)
+      assert(callbacks->cvmcache_chrefcnt != NULL);
+    if (callbacks->capabilities & CAP_INFO)
+      assert(callbacks->cvmcache_info != NULL);
+  }
   virtual ~ForwardCachePlugin() { }
 
  protected:
@@ -48,6 +54,9 @@ class ForwardCachePlugin : public CachePlugin {
     const shash::Any &id,
     int32_t change_by)
   {
+    if (!(callbacks_.capabilities & CAP_REFCOUNT))
+      return cvmfs::STATUS_NOSUPPORT;
+
     struct cvmcache_hash c_hash = Cpphash2Chash(id);
     int result = callbacks_.cvmcache_chrefcnt(&c_hash, change_by);
     return static_cast<cvmfs::EnumStatus>(result);
@@ -138,6 +147,9 @@ class ForwardCachePlugin : public CachePlugin {
     uint64_t *used,
     uint64_t *pinned)
   {
+    if (!(callbacks_.capabilities & CAP_INFO))
+      return cvmfs::STATUS_NOSUPPORT;
+
     int result = callbacks_.cvmcache_info(size, used, pinned);
     return static_cast<cvmfs::EnumStatus>(result);
   }
