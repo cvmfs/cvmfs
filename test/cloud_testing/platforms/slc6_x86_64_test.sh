@@ -71,9 +71,11 @@ CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
                                  src/523-corruptchunkfailover                 \
                                  src/524-corruptmanifestfailover              \
                                  src/585-xattrs                               \
+                                 src/700-overlayfsvalidation                  \
                                  --                                           \
                                  src/5*                                       \
                                  src/6*                                       \
+                                 src/7*                                       \
                               || retval=1
 
 
@@ -119,9 +121,11 @@ if [ $s3_retval -eq 0 ]; then
                                src/614-geoservice                           \
                                src/622-gracefulrmfs                         \
                                src/626-cacheexpiry                          \
+                               src/700-overlayfsvalidation                  \
                                --                                           \
                                src/5*                                       \
                                src/6*                                       \
+                               src/7*                                       \
                                || retval=1
 
   echo -n "killing FakeS3... "
