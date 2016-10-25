@@ -201,6 +201,10 @@ bool CachePlugin::HandleRequest(int fd_con) {
     cvmfs::MsgInfoReq *msg_req =
       reinterpret_cast<cvmfs::MsgInfoReq *>(msg_typed);
     HandleInfo(msg_req, &transport);
+  } else if (msg_typed->GetTypeName() == "cvmfs.MsgShrinkReq") {
+    cvmfs::MsgShrinkReq *msg_req =
+      reinterpret_cast<cvmfs::MsgShrinkReq *>(msg_typed);
+    HandleShrink(msg_req, &transport);
   } else {
     LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
              "unexpected message from client: %s",
@@ -209,6 +213,22 @@ bool CachePlugin::HandleRequest(int fd_con) {
   }
 
   return true;
+}
+
+
+void CachePlugin::HandleShrink(
+  cvmfs::MsgShrinkReq *msg_req,
+  CacheTransport *transport)
+{
+  cvmfs::MsgShrinkReply msg_reply;
+  CacheTransport::Frame frame_send(&msg_reply);
+
+  msg_reply.set_req_id(msg_req->req_id());
+  uint64_t used_bytes = 0;
+  cvmfs::EnumStatus status = Shrink(msg_req->shrink_to(), &used_bytes);
+  msg_reply.set_used_bytes(used_bytes);
+  msg_reply.set_status(status);
+  transport->SendFrame(&frame_send);
 }
 
 

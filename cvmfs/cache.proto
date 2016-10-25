@@ -46,6 +46,7 @@ enum EnumStatus {
   STATUS_BADCOUNT    = 10;  // Attempt to set a negative reference count
   // Attempt to read from an offset larger than the object size
   STATUS_OUTOFBOUNDS = 11;
+  STATUS_PARTIAL     = 12;  // Cache could not be cleaned to requested size
 }
 
 

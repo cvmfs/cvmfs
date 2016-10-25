@@ -37,7 +37,8 @@ enum cvmcache_status {
   STATUS_TIMEOUT,    // Certain parts of a multipart request never arrived
   STATUS_BADCOUNT,   // Attempt to set a negative reference count
   // Attempt to read from an offset larger than the object size
-  STATUS_OUTOFBOUNDS
+  STATUS_OUTOFBOUNDS,
+  STATUS_PARTIAL     // Cache could not be cleaned to requested size
 };
 
 enum cvmcache_object_type {
@@ -84,6 +85,7 @@ struct cvmcache_callbacks {
   int (*cvmcache_abort_txn)(uint64_t txn_id);
 
   int (*cvmcache_info)(uint64_t *size, uint64_t *used, uint64_t *pinned);
+  int (*cvmcache_shrink)(uint64_t shrink_to, uint64_t *used);
 
   int capabilities;
 };

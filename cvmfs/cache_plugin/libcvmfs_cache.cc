@@ -46,6 +46,8 @@ class ForwardCachePlugin : public CachePlugin {
       assert(callbacks->cvmcache_chrefcnt != NULL);
     if (callbacks->capabilities & CAP_INFO)
       assert(callbacks->cvmcache_info != NULL);
+    if (callbacks->capabilities & CAP_SHRINK)
+      assert(callbacks->cvmcache_shrink != NULL);
   }
   virtual ~ForwardCachePlugin() { }
 
@@ -151,6 +153,14 @@ class ForwardCachePlugin : public CachePlugin {
       return cvmfs::STATUS_NOSUPPORT;
 
     int result = callbacks_.cvmcache_info(size, used, pinned);
+    return static_cast<cvmfs::EnumStatus>(result);
+  }
+
+  virtual cvmfs::EnumStatus Shrink(uint64_t shrink_to, uint64_t *used) {
+    if (!(callbacks_.capabilities & CAP_SHRINK))
+      return cvmfs::STATUS_NOSUPPORT;
+
+    int result = callbacks_.cvmcache_shrink(shrink_to, used);
     return static_cast<cvmfs::EnumStatus>(result);
   }
 

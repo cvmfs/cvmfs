@@ -156,6 +156,11 @@ class MockCachePlugin : public CachePlugin {
     *pinned_bytes = (known_object_refcnt == 0) ? 0 : *used_bytes;
     return cvmfs::STATUS_OK;
   }
+
+  virtual cvmfs::EnumStatus Shrink(uint64_t shrink_to, uint64_t *used_bytes) {
+    return
+      (known_object_refcnt == 0) ? cvmfs::STATUS_OK : cvmfs::STATUS_PARTIAL;
+  }
 };
 
 const unsigned MockCachePlugin::kMockCacheSize = 10 * 1024 * 1024;
@@ -335,6 +340,26 @@ TEST_F(T_ExternalCacheManager, Transaction) {
 }
 
 
+TEST_F(T_ExternalCacheManager, TransactionAbort) {
+  shash::Any id(shash::kSha1);
+  string content = "foo";
+  HashString(content, &id);
+  void *txn = alloca(cache_mgr_->SizeOfTxn());
+  EXPECT_EQ(0, cache_mgr_->StartTxn(id, content.length(), txn));
+  EXPECT_EQ(0, cache_mgr_->Reset(txn));
+  EXPECT_EQ(2, cache_mgr_->Write(content.data(), 2, txn));
+  EXPECT_EQ(0, cache_mgr_->Reset(txn));
+  EXPECT_EQ(3, cache_mgr_->Write(content.data(), 3, txn));
+  EXPECT_EQ(0, cache_mgr_->CommitTxn(txn));
+
+  unsigned char *buf;
+  uint64_t size;
+  EXPECT_TRUE(cache_mgr_->Open2Mem(id, "test", &buf, &size));
+  EXPECT_EQ(content, string(reinterpret_cast<char *>(buf), size));
+  free(buf);
+}
+
+
 TEST_F(T_ExternalCacheManager, Detach) {
   int fd = cache_mgr_->Open(CacheManager::Bless(mock_plugin_->known_object));
   EXPECT_GE(fd, 0);
@@ -366,23 +391,12 @@ TEST_F(T_ExternalCacheManager, Info) {
 }
 
 
-TEST_F(T_ExternalCacheManager, TransactionAbort) {
-  shash::Any id(shash::kSha1);
-  string content = "foo";
-  HashString(content, &id);
-  void *txn = alloca(cache_mgr_->SizeOfTxn());
-  EXPECT_EQ(0, cache_mgr_->StartTxn(id, content.length(), txn));
-  EXPECT_EQ(0, cache_mgr_->Reset(txn));
-  EXPECT_EQ(2, cache_mgr_->Write(content.data(), 2, txn));
-  EXPECT_EQ(0, cache_mgr_->Reset(txn));
-  EXPECT_EQ(3, cache_mgr_->Write(content.data(), 3, txn));
-  EXPECT_EQ(0, cache_mgr_->CommitTxn(txn));
-
-  unsigned char *buf;
-  uint64_t size;
-  EXPECT_TRUE(cache_mgr_->Open2Mem(id, "test", &buf, &size));
-  EXPECT_EQ(content, string(reinterpret_cast<char *>(buf), size));
-  free(buf);
+TEST_F(T_ExternalCacheManager, Shrink) {
+  EXPECT_TRUE(quota_mgr_->Cleanup(0));
+  int fd = cache_mgr_->Open(CacheManager::Bless(mock_plugin_->known_object));
+  EXPECT_GE(fd, 0);
+  EXPECT_FALSE(quota_mgr_->Cleanup(0));
+  EXPECT_EQ(0, cache_mgr_->Close(fd));
 }
 
 namespace {

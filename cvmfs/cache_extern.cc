@@ -378,6 +378,8 @@ void *ExternalCacheManager::MainRead(void *data) {
       continue;
     } else if (msg->GetTypeName() == "cvmfs.MsgInfoReply") {
       req_id = reinterpret_cast<cvmfs::MsgInfoReply *>(msg)->req_id();
+    } else if (msg->GetTypeName() == "cvmfs.MsgShrinkReply") {
+      req_id = reinterpret_cast<cvmfs::MsgShrinkReply *>(msg)->req_id();
     } else {
       LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug, "unexpected message %s",
                msg->GetTypeName().c_str());
@@ -583,6 +585,22 @@ int64_t ExternalCacheManager::Write(const void *buf, uint64_t size, void *txn) {
 
 
 //------------------------------------------------------------------------------
+
+
+bool ExternalQuotaManager::Cleanup(const uint64_t leave_size) {
+  if (!(cache_mgr_->capabilities_ && cvmfs::CAP_INFO))
+    return false;
+
+  cvmfs::MsgShrinkReq msg_shrink;
+  msg_shrink.set_session_id(cache_mgr_->session_id_);
+  msg_shrink.set_req_id(cache_mgr_->NextRequestId());
+  msg_shrink.set_shrink_to(leave_size);
+  ExternalCacheManager::RpcJob rpc_job(&msg_shrink);
+  cache_mgr_->CallRemotely(&rpc_job);
+
+  cvmfs::MsgShrinkReply *msg_reply = rpc_job.msg_shrink_reply();
+  return msg_reply->status() == cvmfs::STATUS_OK;
+}
 
 
 ExternalQuotaManager *ExternalQuotaManager::Create(

@@ -61,6 +61,8 @@ class CachePlugin : SingleCopy {
   virtual cvmfs::EnumStatus GetInfo(uint64_t *size_bytes,
                                     uint64_t *used_bytes,
                                     uint64_t *pinned_bytes) = 0;
+  virtual cvmfs::EnumStatus Shrink(uint64_t shrink_to,
+                                   uint64_t *used_bytes) = 0;
 
  private:
   static const unsigned kDefaultMaxObjectSize = 256 * 1024;  // 256kB
@@ -108,6 +110,7 @@ class CachePlugin : SingleCopy {
   void HandleStoreAbort(cvmfs::MsgStoreAbortReq *msg_req,
                         CacheTransport *transport);
   void HandleInfo(cvmfs::MsgInfoReq *msg_req, CacheTransport *transport);
+  void HandleShrink(cvmfs::MsgShrinkReq *msg_req, CacheTransport *transport);
   void SendDetachRequests();
 
   uint64_t capabilities_;

@@ -132,7 +132,9 @@ class ExternalCacheManager : public CacheManager {
       : req_id_(msg->req_id()), part_nr_(0), msg_req_(msg),
         frame_send_(msg) { }
     explicit RpcJob(cvmfs::MsgInfoReq *msg)
-      : req_id_(msg->req_id()),msg_req_(msg), frame_send_(msg) { }
+      : req_id_(msg->req_id()), msg_req_(msg), frame_send_(msg) { }
+    explicit RpcJob(cvmfs::MsgShrinkReq *msg)
+      : req_id_(msg->req_id()), msg_req_(msg), frame_send_(msg) { }
 
     void set_attachment_send(void *data, unsigned size) {
       frame_send_.set_attachment(data, size);
@@ -172,6 +174,12 @@ class ExternalCacheManager : public CacheManager {
     }
     cvmfs::MsgInfoReply *msg_info_reply() {
       cvmfs::MsgInfoReply *m = reinterpret_cast<cvmfs::MsgInfoReply *>(
+        frame_recv_.GetMsgTyped());
+      assert(m->req_id() == req_id_);
+      return m;
+    }
+    cvmfs::MsgShrinkReply *msg_shrink_reply() {
+      cvmfs::MsgShrinkReply *m = reinterpret_cast<cvmfs::MsgShrinkReply *>(
         frame_recv_.GetMsgTyped());
       assert(m->req_id() == req_id_);
       return m;
@@ -248,7 +256,7 @@ class ExternalQuotaManager : public QuotaManager {
   virtual void Unpin(const shash::Any &hash) { }
   virtual void Touch(const shash::Any &hash) { }
   virtual void Remove(const shash::Any &file) { }
-  virtual bool Cleanup(const uint64_t leave_size) { return false; }
+  virtual bool Cleanup(const uint64_t leave_size);
 
   virtual void RegisterBackChannel(int back_channel[2],
                                    const std::string &channel_id) { }
