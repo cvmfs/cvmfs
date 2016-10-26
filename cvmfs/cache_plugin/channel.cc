@@ -89,6 +89,53 @@ void CachePlugin::HandleInfo(
 }
 
 
+void CachePlugin::HandleList(
+  cvmfs::MsgListReq *msg_req,
+  CacheTransport *transport)
+{
+  cvmfs::MsgListReply msg_reply;
+  CacheTransport::Frame frame_send(&msg_reply);
+
+  msg_reply.set_req_id(msg_req->req_id());
+  int64_t listing_id = msg_req->listing_id();
+  msg_reply.set_listing_id(listing_id);
+  msg_reply.set_is_last_part(true);
+  if (msg_req->listing_id() == 0) {
+    int64_t listing_id = ListingBegin(msg_req->object_type());
+    assert(listing_id != 0);
+    if (listing_id < 0) {
+      msg_reply.set_status(static_cast<cvmfs::EnumStatus>(-listing_id));
+      transport->SendFrame(&frame_send);
+      return;
+    }
+    msg_reply.set_listing_id(listing_id);
+  }
+
+  ObjectInfo item;
+  unsigned total_size = 0;
+  cvmfs::EnumStatus status;
+  while ((status = ListingNext(listing_id, &item)) == cvmfs::STATUS_OK) {
+    cvmfs::MsgListRecord *msg_list_record = msg_reply.add_list_record();
+    cvmfs::MsgHash *msg_hash = new cvmfs::MsgHash();
+    transport->FillMsgHash(item.id, msg_hash);
+    msg_list_record->set_allocated_hash(msg_hash);
+    msg_list_record->set_pinned(item.pinned);
+    msg_list_record->set_description(item.description);
+    // Approximation of the message size
+    total_size += sizeof(item) + item.description.length();
+    if (total_size > kListingSize)
+      break;
+  }
+  if (status == cvmfs::STATUS_OUTOFBOUNDS) {
+    status = cvmfs::STATUS_OK;
+  } else {
+    msg_reply.set_is_last_part(false);
+  }
+  msg_reply.set_status(status);
+  transport->SendFrame(&frame_send);
+}
+
+
 void CachePlugin::HandleObjectInfo(
   cvmfs::MsgObjectInfoReq *msg_req,
   CacheTransport *transport)
@@ -205,6 +252,10 @@ bool CachePlugin::HandleRequest(int fd_con) {
     cvmfs::MsgShrinkReq *msg_req =
       reinterpret_cast<cvmfs::MsgShrinkReq *>(msg_typed);
     HandleShrink(msg_req, &transport);
+  } else if (msg_typed->GetTypeName() == "cvmfs.MsgListReq") {
+    cvmfs::MsgListReq *msg_req =
+      reinterpret_cast<cvmfs::MsgListReq *>(msg_typed);
+    HandleList(msg_req, &transport);
   } else {
     LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
              "unexpected message from client: %s",
@@ -287,6 +338,7 @@ void CachePlugin::HandleStore(
     }
     txn_id = NextTxnId();
     ObjectInfo info;
+    info.id = object_id;
     if (msg_req->has_expected_size()) {info.size = msg_req->expected_size();}
     if (msg_req->has_object_type()) {info.object_type = msg_req->object_type();}
     if (msg_req->has_description()) {info.description = msg_req->description();}

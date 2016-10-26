@@ -36,6 +36,18 @@ static struct cvmcache_hash Cpphash2Chash(const shash::Any &hash) {
   return h;
 }
 
+static enum cvmcache_object_type ObjectType2CType(cvmfs::EnumObjectType type) {
+    switch (type) {
+      case cvmfs::OBJECT_REGULAR:
+        return OBJECT_REGULAR;
+      case cvmfs::OBJECT_CATALOG:
+        return OBJECT_CATALOG;
+      case cvmfs::OBJECT_VOLATILE:
+        return OBJECT_VOLATILE;
+    }
+    abort();
+  }
+
 class ForwardCachePlugin : public CachePlugin {
  public:
   ForwardCachePlugin(struct cvmcache_callbacks *callbacks)
@@ -48,6 +60,11 @@ class ForwardCachePlugin : public CachePlugin {
       assert(callbacks->cvmcache_info != NULL);
     if (callbacks->capabilities & CAP_SHRINK)
       assert(callbacks->cvmcache_shrink != NULL);
+    if (callbacks->capabilities & CAP_LIST) {
+      assert(callbacks->cvmcache_listing_begin != NULL);
+      assert(callbacks->cvmcache_listing_next != NULL);
+      assert(callbacks->cvmcache_listing_end != NULL);
+    }
   }
   virtual ~ForwardCachePlugin() { }
 
@@ -102,19 +119,7 @@ class ForwardCachePlugin : public CachePlugin {
     struct cvmcache_hash c_hash = Cpphash2Chash(id);
     cvmcache_object_info c_info;
     c_info.size = info.size;
-    switch (info.object_type) {
-      case cvmfs::OBJECT_REGULAR:
-        c_info.type = OBJECT_REGULAR;
-        break;
-      case cvmfs::OBJECT_CATALOG:
-        c_info.type = OBJECT_CATALOG;
-        break;
-      case cvmfs::OBJECT_VOLATILE:
-        c_info.type = OBJECT_VOLATILE;
-        break;
-      default:
-        abort();
-    }
+    c_info.type = ObjectType2CType(info.object_type);
     if (info.description.empty()) {
       c_info.description = NULL;
     } else {
@@ -161,6 +166,41 @@ class ForwardCachePlugin : public CachePlugin {
       return cvmfs::STATUS_NOSUPPORT;
 
     int result = callbacks_.cvmcache_shrink(shrink_to, used);
+    return static_cast<cvmfs::EnumStatus>(result);
+  }
+
+  virtual int64_t ListingBegin(cvmfs::EnumObjectType type) {
+    if (!(callbacks_.capabilities & CAP_LIST))
+      return -cvmfs::STATUS_NOSUPPORT;
+
+    return callbacks_.cvmcache_listing_begin(ObjectType2CType(type));
+  }
+
+  virtual cvmfs::EnumStatus ListingNext(
+    int64_t listing_id,
+    ObjectInfo *item)
+  {
+    if (!(callbacks_.capabilities & CAP_LIST))
+      return cvmfs::STATUS_NOSUPPORT;
+
+    struct cvmcache_object_info c_item;
+    int result = callbacks_.cvmcache_listing_next(listing_id, &c_item);
+    item->id = Chash2Cpphash(&c_item.id);
+    item->size = c_item.size;
+    item->object_type = static_cast<cvmfs::EnumObjectType>(c_item.type);
+    item->pinned = c_item.pinned;
+    if (c_item.description) {
+      item->description = string(c_item.description);
+      free(c_item.description);
+    }
+    return static_cast<cvmfs::EnumStatus>(result);
+  }
+
+  virtual cvmfs::EnumStatus ListingEnd(int64_t listing_id) {
+    if (!(callbacks_.capabilities & CAP_LIST))
+      return cvmfs::STATUS_NOSUPPORT;
+
+    int result = callbacks_.cvmcache_listing_end(listing_id);
     return static_cast<cvmfs::EnumStatus>(result);
   }
 

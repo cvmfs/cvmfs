@@ -24,9 +24,15 @@ class CachePlugin : SingleCopy {
   static const uint64_t kSizeUnknown;
 
   struct ObjectInfo {
-    ObjectInfo() : size(kSizeUnknown), object_type(cvmfs::OBJECT_REGULAR) { }
+    ObjectInfo()
+      : id()
+      , size(kSizeUnknown)
+      , object_type(cvmfs::OBJECT_REGULAR)
+      , pinned(false) { }
+    shash::Any id;
     uint64_t size;
     cvmfs::EnumObjectType object_type;
+    bool pinned;
     std::string description;
   };
 
@@ -63,9 +69,14 @@ class CachePlugin : SingleCopy {
                                     uint64_t *pinned_bytes) = 0;
   virtual cvmfs::EnumStatus Shrink(uint64_t shrink_to,
                                    uint64_t *used_bytes) = 0;
+  virtual int64_t ListingBegin(cvmfs::EnumObjectType type) = 0;
+  virtual cvmfs::EnumStatus ListingNext(int64_t listing_id,
+                                        ObjectInfo *item) = 0;
+  virtual cvmfs::EnumStatus ListingEnd(int64_t listing_id) = 0;
 
  private:
   static const unsigned kDefaultMaxObjectSize = 256 * 1024;  // 256kB
+  static const unsigned kListingSize = 4 * 1024 * 1024;  // 4MB
   static const char kSignalTerminate = 'q';
   static const char kSignalDetach = 'd';
 
@@ -111,6 +122,7 @@ class CachePlugin : SingleCopy {
                         CacheTransport *transport);
   void HandleInfo(cvmfs::MsgInfoReq *msg_req, CacheTransport *transport);
   void HandleShrink(cvmfs::MsgShrinkReq *msg_req, CacheTransport *transport);
+  void HandleList(cvmfs::MsgListReq *msg_req, CacheTransport *transport);
   void SendDetachRequests();
 
   uint64_t capabilities_;

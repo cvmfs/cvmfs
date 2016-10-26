@@ -373,13 +373,15 @@ void *ExternalCacheManager::MainRead(void *data) {
     } else if (msg->GetTypeName() == "cvmfs.MsgStoreReply") {
       req_id = reinterpret_cast<cvmfs::MsgStoreReply *>(msg)->req_id();
       part_nr = reinterpret_cast<cvmfs::MsgStoreReply *>(msg)->part_nr();
-    } else if (msg->GetTypeName() == "cvmfs.MsgDetach") {
-      // TODO(jblomer): Handle
-      continue;
     } else if (msg->GetTypeName() == "cvmfs.MsgInfoReply") {
       req_id = reinterpret_cast<cvmfs::MsgInfoReply *>(msg)->req_id();
     } else if (msg->GetTypeName() == "cvmfs.MsgShrinkReply") {
       req_id = reinterpret_cast<cvmfs::MsgShrinkReply *>(msg)->req_id();
+    } else if (msg->GetTypeName() == "cvmfs.MsgListReply") {
+      req_id = reinterpret_cast<cvmfs::MsgListReply *>(msg)->req_id();
+    } else if (msg->GetTypeName() == "cvmfs.MsgDetach") {
+      // TODO(jblomer): Handle
+      continue;
     } else {
       LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug, "unexpected message %s",
                msg->GetTypeName().c_str());
@@ -587,8 +589,40 @@ int64_t ExternalCacheManager::Write(const void *buf, uint64_t size, void *txn) {
 //------------------------------------------------------------------------------
 
 
+bool ExternalQuotaManager::DoListing(
+  cvmfs::EnumObjectType type,
+  vector<cvmfs::MsgListRecord> *result)
+{
+  if (!(cache_mgr_->capabilities_ && cvmfs::CAP_LIST))
+    return false;
+
+  uint64_t listing_id = 0;
+  bool more_data = false;
+  do {
+    cvmfs::MsgListReq msg_list;
+    msg_list.set_session_id(cache_mgr_->session_id_);
+    msg_list.set_req_id(cache_mgr_->NextRequestId());
+    msg_list.set_listing_id(listing_id);
+    msg_list.set_object_type(type);
+    ExternalCacheManager::RpcJob rpc_job(&msg_list);
+    cache_mgr_->CallRemotely(&rpc_job);
+
+    cvmfs::MsgListReply *msg_reply = rpc_job.msg_list_reply();
+    if (msg_reply->status() != cvmfs::STATUS_OK)
+      return false;
+    more_data = !msg_reply->is_last_part();
+    listing_id = msg_reply->listing_id();
+    for (int i = 0; i < msg_reply->list_record_size(); ++i) {
+      result->push_back(msg_reply->list_record(i));
+    }
+  } while (more_data);
+
+  return true;
+}
+
+
 bool ExternalQuotaManager::Cleanup(const uint64_t leave_size) {
-  if (!(cache_mgr_->capabilities_ && cvmfs::CAP_INFO))
+  if (!(cache_mgr_->capabilities_ && cvmfs::CAP_SHRINK))
     return false;
 
   cvmfs::MsgShrinkReq msg_shrink;
@@ -658,4 +692,62 @@ uint64_t ExternalQuotaManager::GetSizePinned() {
   if (retval != 0)
     return 0;
   return info.pinned;
+}
+
+
+vector<string> ExternalQuotaManager::List() {
+  vector<string> result;
+  vector<cvmfs::MsgListRecord> raw_list;
+  bool retval = DoListing(cvmfs::OBJECT_REGULAR, &raw_list);
+  if (!retval)
+    return result;
+  for (unsigned i = 0; i < raw_list.size(); ++i)
+    result.push_back(raw_list[i].description());
+  return result;
+}
+
+
+vector<string> ExternalQuotaManager::ListCatalogs() {
+  vector<string> result;
+  vector<cvmfs::MsgListRecord> raw_list;
+  bool retval = DoListing(cvmfs::OBJECT_CATALOG, &raw_list);
+  if (!retval)
+    return result;
+  for (unsigned i = 0; i < raw_list.size(); ++i)
+    result.push_back(raw_list[i].description());
+  return result;
+}
+
+
+vector<string> ExternalQuotaManager::ListPinned() {
+  vector<string> result;
+  vector<cvmfs::MsgListRecord> raw_lists[3];
+  bool retval = DoListing(cvmfs::OBJECT_REGULAR, &raw_lists[0]);
+  if (!retval)
+    return result;
+  retval = DoListing(cvmfs::OBJECT_CATALOG, &raw_lists[1]);
+  if (!retval)
+    return result;
+  retval = DoListing(cvmfs::OBJECT_VOLATILE, &raw_lists[2]);
+  if (!retval)
+    return result;
+  for (unsigned i = 0; i < sizeof(raw_lists); ++i) {
+    for (unsigned j = 0; j < raw_lists[i].size(); ++j) {
+      if (raw_lists[i][j].pinned())
+        result.push_back(raw_lists[i][j].description());
+    }
+  }
+  return result;
+}
+
+
+vector<string> ExternalQuotaManager::ListVolatile() {
+  vector<string> result;
+  vector<cvmfs::MsgListRecord> raw_list;
+  bool retval = DoListing(cvmfs::OBJECT_VOLATILE, &raw_list);
+  if (!retval)
+    return result;
+  for (unsigned i = 0; i < raw_list.size(); ++i)
+    result.push_back(raw_list[i].description());
+  return result;
 }

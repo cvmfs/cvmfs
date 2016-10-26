@@ -38,7 +38,7 @@ enum cvmcache_status {
   STATUS_BADCOUNT,   // Attempt to set a negative reference count
   // Attempt to read from an offset larger than the object size
   STATUS_OUTOFBOUNDS,
-  STATUS_PARTIAL     // Cache could not be cleaned to requested size
+  STATUS_PARTIAL     // Cache content could not be evicted to requested size
 };
 
 enum cvmcache_object_type {
@@ -57,8 +57,10 @@ enum cvmcache_capabilities {
 };
 
 struct cvmcache_object_info {
+  struct cvmcache_hash id;
   uint64_t size;
   enum cvmcache_object_type type;
+  int pinned;
   char *description;
 };
 
@@ -86,6 +88,10 @@ struct cvmcache_callbacks {
 
   int (*cvmcache_info)(uint64_t *size, uint64_t *used, uint64_t *pinned);
   int (*cvmcache_shrink)(uint64_t shrink_to, uint64_t *used);
+  int64_t (*cvmcache_listing_begin)(enum cvmcache_object_type type);
+  int (*cvmcache_listing_next)(int64_t listing_id,
+                               struct cvmcache_object_info *item);
+  int (*cvmcache_listing_end)(int64_t listing_id);
 
   int capabilities;
 };

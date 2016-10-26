@@ -15,6 +15,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#include <vector>
 
 #include "cache.pb.h"
 #include "cache_extern.h"
@@ -32,6 +33,7 @@ using namespace std;  // NOLINT
 class MockCachePlugin : public CachePlugin {
  public:
   static const unsigned kMockCacheSize;
+  static const unsigned kMockListingNitems;
 
   explicit MockCachePlugin(const string &socket_path)
     : CachePlugin(cvmfs::CAP_ALL)
@@ -54,6 +56,7 @@ class MockCachePlugin : public CachePlugin {
   string new_object_content;
   int known_object_refcnt;
   int next_status;
+  unsigned listing_nitems;
 
  protected:
   virtual cvmfs::EnumStatus ChangeRefcount(
@@ -161,9 +164,33 @@ class MockCachePlugin : public CachePlugin {
     return
       (known_object_refcnt == 0) ? cvmfs::STATUS_OK : cvmfs::STATUS_PARTIAL;
   }
+
+  virtual int64_t ListingBegin(cvmfs::EnumObjectType type) {
+    listing_nitems = 0;
+    return 1;
+  }
+
+  virtual cvmfs::EnumStatus ListingNext(int64_t listing_id,
+                                        ObjectInfo *item)
+  {
+    if (listing_nitems >= kMockListingNitems)
+      return cvmfs::STATUS_OUTOFBOUNDS;
+    item->id = known_object;
+    item->size = known_object_content.length();
+    item->object_type = cvmfs::OBJECT_REGULAR;
+    item->pinned = known_object_refcnt > 0;
+    item->description = "/known_object";
+    listing_nitems++;
+    return cvmfs::STATUS_OK;
+  }
+
+  virtual cvmfs::EnumStatus ListingEnd(int64_t listing_id) {
+    return cvmfs::STATUS_OK;
+  }
 };
 
 const unsigned MockCachePlugin::kMockCacheSize = 10 * 1024 * 1024;
+const unsigned MockCachePlugin::kMockListingNitems = 250000;
 
 
 class T_ExternalCacheManager : public ::testing::Test {
@@ -397,6 +424,16 @@ TEST_F(T_ExternalCacheManager, Shrink) {
   EXPECT_GE(fd, 0);
   EXPECT_FALSE(quota_mgr_->Cleanup(0));
   EXPECT_EQ(0, cache_mgr_->Close(fd));
+}
+
+
+TEST_F(T_ExternalCacheManager, Listing) {
+  vector<string> expected_listing;
+  for (unsigned i = 0; i < MockCachePlugin::kMockListingNitems; ++i)
+    expected_listing.push_back("/known_object");
+  vector<string> listing = quota_mgr_->List();
+  EXPECT_EQ(expected_listing.size(), listing.size());
+  EXPECT_EQ(expected_listing, listing);
 }
 
 namespace {

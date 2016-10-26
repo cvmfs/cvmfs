@@ -135,6 +135,8 @@ class ExternalCacheManager : public CacheManager {
       : req_id_(msg->req_id()), msg_req_(msg), frame_send_(msg) { }
     explicit RpcJob(cvmfs::MsgShrinkReq *msg)
       : req_id_(msg->req_id()), msg_req_(msg), frame_send_(msg) { }
+    explicit RpcJob(cvmfs::MsgListReq *msg)
+      : req_id_(msg->req_id()), msg_req_(msg), frame_send_(msg) { }
 
     void set_attachment_send(void *data, unsigned size) {
       frame_send_.set_attachment(data, size);
@@ -180,6 +182,12 @@ class ExternalCacheManager : public CacheManager {
     }
     cvmfs::MsgShrinkReply *msg_shrink_reply() {
       cvmfs::MsgShrinkReply *m = reinterpret_cast<cvmfs::MsgShrinkReply *>(
+        frame_recv_.GetMsgTyped());
+      assert(m->req_id() == req_id_);
+      return m;
+    }
+    cvmfs::MsgListReply *msg_list_reply() {
+      cvmfs::MsgListReply *m = reinterpret_cast<cvmfs::MsgListReply *>(
         frame_recv_.GetMsgTyped());
       assert(m->req_id() == req_id_);
       return m;
@@ -263,16 +271,10 @@ class ExternalQuotaManager : public QuotaManager {
   virtual void UnregisterBackChannel(int back_channel[2],
                                      const std::string &channel_id) { }
 
-  virtual std::vector<std::string> List() { return std::vector<std::string>(); }
-  virtual std::vector<std::string> ListPinned() {
-    return std::vector<std::string>();
-  }
-  virtual std::vector<std::string> ListCatalogs() {
-    return std::vector<std::string>();
-  }
-  virtual std::vector<std::string> ListVolatile() {
-    return std::vector<std::string>();
-  }
+  virtual std::vector<std::string> List();
+  virtual std::vector<std::string> ListPinned();
+  virtual std::vector<std::string> ListCatalogs();
+  virtual std::vector<std::string> ListVolatile();
   virtual uint64_t GetMaxFileSize() { return uint64_t(-1); }
   virtual uint64_t GetCapacity();
   virtual uint64_t GetSize();
@@ -294,6 +296,8 @@ class ExternalQuotaManager : public QuotaManager {
   explicit ExternalQuotaManager(ExternalCacheManager *cache_mgr)
     : cache_mgr_(cache_mgr) { }
   int GetInfo(QuotaInfo *quota_info);
+  bool DoListing(cvmfs::EnumObjectType type,
+                 std::vector<cvmfs::MsgListRecord> *result);
 
   ExternalCacheManager *cache_mgr_;
 };

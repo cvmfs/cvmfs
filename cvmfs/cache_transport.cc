@@ -172,10 +172,6 @@ void CacheTransport::Frame::WrapMsg() {
   } else if (msg_typed_->GetTypeName() == "cvmfs.MsgStoreReply") {
     msg_rpc_.set_allocated_msg_store_reply(
       reinterpret_cast<cvmfs::MsgStoreReply *>(msg_typed_));
-  } else if (msg_typed_->GetTypeName() == "cvmfs.MsgDetach") {
-    msg_rpc_.set_allocated_msg_detach(
-      reinterpret_cast<cvmfs::MsgDetach *>(msg_typed_));
-    is_msg_out_of_band_ = true;
   } else if (msg_typed_->GetTypeName() == "cvmfs.MsgInfoReq") {
     msg_rpc_.set_allocated_msg_info_req(
       reinterpret_cast<cvmfs::MsgInfoReq *>(msg_typed_));
@@ -188,6 +184,16 @@ void CacheTransport::Frame::WrapMsg() {
   } else if (msg_typed_->GetTypeName() == "cvmfs.MsgShrinkReply") {
     msg_rpc_.set_allocated_msg_shrink_reply(
       reinterpret_cast<cvmfs::MsgShrinkReply *>(msg_typed_));
+  } else if (msg_typed_->GetTypeName() == "cvmfs.MsgListReq") {
+    msg_rpc_.set_allocated_msg_list_req(
+      reinterpret_cast<cvmfs::MsgListReq *>(msg_typed_));
+  } else if (msg_typed_->GetTypeName() == "cvmfs.MsgListReply") {
+    msg_rpc_.set_allocated_msg_list_reply(
+      reinterpret_cast<cvmfs::MsgListReply *>(msg_typed_));
+  } else if (msg_typed_->GetTypeName() == "cvmfs.MsgDetach") {
+    msg_rpc_.set_allocated_msg_detach(
+      reinterpret_cast<cvmfs::MsgDetach *>(msg_typed_));
+    is_msg_out_of_band_ = true;
   } else {
     // Unexpected message type, should never happen
     abort();
@@ -221,9 +227,6 @@ void CacheTransport::Frame::UnwrapMsg() {
     msg_typed_ = msg_rpc_.mutable_msg_store_abort_req();
   } else if (msg_rpc_.has_msg_store_reply()) {
     msg_typed_ = msg_rpc_.mutable_msg_store_reply();
-  } else if (msg_rpc_.has_msg_detach()) {
-    msg_typed_ = msg_rpc_.mutable_msg_detach();
-    is_msg_out_of_band_ = true;
   } else if (msg_rpc_.has_msg_info_req()) {
     msg_typed_ = msg_rpc_.mutable_msg_info_req();
   } else if (msg_rpc_.has_msg_info_reply()) {
@@ -232,6 +235,13 @@ void CacheTransport::Frame::UnwrapMsg() {
     msg_typed_ = msg_rpc_.mutable_msg_shrink_req();
   } else if (msg_rpc_.has_msg_shrink_reply()) {
     msg_typed_ = msg_rpc_.mutable_msg_shrink_reply();
+  } else if (msg_rpc_.has_msg_list_req()) {
+    msg_typed_ = msg_rpc_.mutable_msg_list_req();
+  } else if (msg_rpc_.has_msg_list_reply()) {
+    msg_typed_ = msg_rpc_.mutable_msg_list_reply();
+  } else if (msg_rpc_.has_msg_detach()) {
+    msg_typed_ = msg_rpc_.mutable_msg_detach();
+    is_msg_out_of_band_ = true;
   } else {
     // Unexpected message type, should never happen
     abort();

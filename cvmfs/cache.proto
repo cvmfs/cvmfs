@@ -3,7 +3,7 @@
 // Protocol defintion for RPCs between cvmfs client and cache manager plugin.
 // The protocol is used to access a store of content-addressable objects that
 // are maintained by a cache manager plugin.  Objects are reference counted,
-// mirroring currently open files.  Only objects with reference count zero can
+// mirroring currently open files.  Only objects with reference count zero may
 // be removed from the store.
 
 package cvmfs;
@@ -44,7 +44,8 @@ enum EnumStatus {
   STATUS_CORRUPTED   = 8;  // Crc32 verification failed
   STATUS_TIMEOUT     = 9;  // Certain parts of a multipart request never arrived
   STATUS_BADCOUNT    = 10;  // Attempt to set a negative reference count
-  // Attempt to read from an offset larger than the object size
+  // Attempt to read from an offset larger than the object size; also indicates
+  // the end of a cache contents listing
   STATUS_OUTOFBOUNDS = 11;
   STATUS_PARTIAL     = 12;  // Cache could not be cleaned to requested size
 }
@@ -86,7 +87,8 @@ message MsgHash {
 
 message MsgListRecord {
   required MsgHash hash       = 1;
-  optional string description = 2;
+  optional bool pinned        = 2;
+  optional string description = 3;
 }
 
 
@@ -253,7 +255,7 @@ message MsgObjectInfoReply {
   required uint64 req_id              = 1;
   required EnumStatus status          = 2;
   optional EnumObjectType object_type = 3;
-  optional uint64 size                = 5;
+  optional uint64 size                = 4;
 }
 
 // Enumerate cache contents, possibly in multiple messages for large caches.
@@ -272,9 +274,8 @@ message MsgListReply {
   required uint64 req_id             = 1;
   required EnumStatus status         = 2;
   required uint64 listing_id         = 3;
-  required uint64 part_nr            = 4;
-  required bool is_last_part         = 5;
-  repeated MsgListRecord list_record = 6;
+  required bool is_last_part         = 4;
+  repeated MsgListRecord list_record = 5;
 }
 
 
