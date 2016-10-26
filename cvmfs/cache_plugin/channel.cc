@@ -101,8 +101,7 @@ void CachePlugin::HandleList(
   msg_reply.set_listing_id(listing_id);
   msg_reply.set_is_last_part(true);
   if (msg_req->listing_id() == 0) {
-    int64_t listing_id = ListingBegin(msg_req->object_type());
-    assert(listing_id != 0);
+    listing_id = ListingBegin(msg_req->object_type());
     if (listing_id < 0) {
       msg_reply.set_status(static_cast<cvmfs::EnumStatus>(-listing_id));
       transport->SendFrame(&frame_send);
@@ -110,6 +109,7 @@ void CachePlugin::HandleList(
     }
     msg_reply.set_listing_id(listing_id);
   }
+  assert(listing_id != 0);
 
   ObjectInfo item;
   unsigned total_size = 0;
@@ -127,6 +127,7 @@ void CachePlugin::HandleList(
       break;
   }
   if (status == cvmfs::STATUS_OUTOFBOUNDS) {
+    ListingEnd(listing_id);
     status = cvmfs::STATUS_OK;
   } else {
     msg_reply.set_is_last_part(false);

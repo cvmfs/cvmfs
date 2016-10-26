@@ -167,13 +167,22 @@ class MockCachePlugin : public CachePlugin {
 
   virtual int64_t ListingBegin(cvmfs::EnumObjectType type) {
     listing_nitems = 0;
-    return 1;
+    switch (type) {
+      case cvmfs::OBJECT_REGULAR:
+        return 1;
+      case cvmfs::OBJECT_CATALOG:
+        return 2;
+      case cvmfs::OBJECT_VOLATILE:
+        return 3;
+      default:
+        abort();
+    }
   }
 
   virtual cvmfs::EnumStatus ListingNext(int64_t listing_id,
                                         ObjectInfo *item)
   {
-    if (listing_nitems >= kMockListingNitems)
+    if ((listing_id != 1) || (listing_nitems >= kMockListingNitems))
       return cvmfs::STATUS_OUTOFBOUNDS;
     item->id = known_object;
     item->size = known_object_content.length();
@@ -190,7 +199,7 @@ class MockCachePlugin : public CachePlugin {
 };
 
 const unsigned MockCachePlugin::kMockCacheSize = 10 * 1024 * 1024;
-const unsigned MockCachePlugin::kMockListingNitems = 250000;
+const unsigned MockCachePlugin::kMockListingNitems = 100000;
 
 
 class T_ExternalCacheManager : public ::testing::Test {
@@ -434,6 +443,12 @@ TEST_F(T_ExternalCacheManager, Listing) {
   vector<string> listing = quota_mgr_->List();
   EXPECT_EQ(expected_listing.size(), listing.size());
   EXPECT_EQ(expected_listing, listing);
+
+  vector<string> empty;
+  EXPECT_EQ(0, mock_plugin_->known_object_refcnt);
+  EXPECT_EQ(empty, quota_mgr_->ListCatalogs());
+  EXPECT_EQ(empty, quota_mgr_->ListVolatile());
+  EXPECT_EQ(empty, quota_mgr_->ListPinned());
 }
 
 namespace {

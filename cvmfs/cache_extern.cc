@@ -731,7 +731,7 @@ vector<string> ExternalQuotaManager::ListPinned() {
   retval = DoListing(cvmfs::OBJECT_VOLATILE, &raw_lists[2]);
   if (!retval)
     return result;
-  for (unsigned i = 0; i < sizeof(raw_lists); ++i) {
+  for (unsigned i = 0; i < sizeof(raw_lists) / sizeof(raw_lists[0]); ++i) {
     for (unsigned j = 0; j < raw_lists[i].size(); ++j) {
       if (raw_lists[i][j].pinned())
         result.push_back(raw_lists[i][j].description());
