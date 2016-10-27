@@ -57,6 +57,7 @@ class ExternalCacheManager : public CacheManager {
 
   int64_t session_id() const { return session_id_; }
   uint32_t max_object_size() const { return max_object_size_; }
+  uint64_t capabilities() const { return capabilities_; }
 
  private:
   /**

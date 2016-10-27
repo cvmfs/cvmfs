@@ -187,14 +187,17 @@ class ForwardCachePlugin : public CachePlugin {
       return cvmfs::STATUS_NOSUPPORT;
 
     struct cvmcache_object_info c_item;
+    memset(&c_item, 0, sizeof(c_item));
     int result = callbacks_.cvmcache_listing_next(listing_id, &c_item);
-    item->id = Chash2Cpphash(&c_item.id);
-    item->size = c_item.size;
-    item->object_type = static_cast<cvmfs::EnumObjectType>(c_item.type);
-    item->pinned = c_item.pinned;
-    if (c_item.description) {
-      item->description = string(c_item.description);
-      free(c_item.description);
+    if (result == CVMCACHE_STATUS_OK) {
+      item->id = Chash2Cpphash(&c_item.id);
+      item->size = c_item.size;
+      item->object_type = static_cast<cvmfs::EnumObjectType>(c_item.type);
+      item->pinned = c_item.pinned;
+      if (c_item.description) {
+        item->description = string(c_item.description);
+        free(c_item.description);
+      }
     }
     return static_cast<cvmfs::EnumStatus>(result);
   }

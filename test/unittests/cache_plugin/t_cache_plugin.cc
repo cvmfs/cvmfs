@@ -4,7 +4,11 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdio>
 #include <cstring>
+#include <set>
+#include <string>
+#include <vector>
 
 #include "cache.pb.h"
 #include "cache_extern.h"
@@ -23,6 +27,9 @@ class T_CachePlugin : public ::testing::Test {
     ASSERT_GE(fd_client, 0);
     cache_mgr_ = ExternalCacheManager::Create(fd_client, nfiles);
     ASSERT_TRUE(cache_mgr_ != NULL);
+    quota_mgr_ = ExternalQuotaManager::Create(cache_mgr_);
+    ASSERT_TRUE(cache_mgr_ != NULL);
+    cache_mgr_->AcquireQuotaManager(quota_mgr_);
   }
 
   virtual void TearDown() {
@@ -31,6 +38,7 @@ class T_CachePlugin : public ::testing::Test {
 
   static const int nfiles;
   ExternalCacheManager *cache_mgr_;
+  ExternalQuotaManager *quota_mgr_;
 };
 
 const int T_CachePlugin::nfiles = 128;
@@ -186,4 +194,113 @@ TEST_F(T_CachePlugin, TransactionAbort) {
   EXPECT_TRUE(cache_mgr_->Open2Mem(id, "test", &buf, &size));
   EXPECT_EQ(content, string(reinterpret_cast<char *>(buf), size));
   free(buf);
+}
+
+
+TEST_F(T_CachePlugin, Info) {
+  if (!(cache_mgr_->capabilities() & cvmfs::CAP_INFO)) {
+    printf("Skipping\n");
+    return;
+  }
+
+  EXPECT_GT(quota_mgr_->GetCapacity(), 0U);
+  EXPECT_GE(quota_mgr_->GetCapacity(), quota_mgr_->GetSize());
+  EXPECT_GE(quota_mgr_->GetSize(), quota_mgr_->GetSizePinned());
+
+  unsigned size_pinned = quota_mgr_->GetSizePinned();
+  shash::Any id(shash::kSha1);
+  string content = "foo";
+  HashString(content, &id);
+  unsigned char *data = const_cast<unsigned char *>(
+    reinterpret_cast<const unsigned char *>(content.data()));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(id, data, content.length(), "test"));
+  int fd = cache_mgr_->Open(CacheManager::Bless(id));
+  EXPECT_GE(fd, 0);
+  EXPECT_EQ(size_pinned + 3, quota_mgr_->GetSizePinned());
+  EXPECT_EQ(0, cache_mgr_->Close(fd));
+}
+
+
+TEST_F(T_CachePlugin, Shrink) {
+  if (!(cache_mgr_->capabilities() & cvmfs::CAP_SHRINK)) {
+    printf("Skipping\n");
+    return;
+  }
+
+  EXPECT_TRUE(quota_mgr_->Cleanup(0));
+  EXPECT_TRUE(quota_mgr_->Cleanup(0));
+  shash::Any id_vol(shash::kSha1);
+  shash::Any id_reg(shash::kSha1);
+  shash::Any id_clg(shash::kSha1);
+  string str_vol = "volatile";
+  string str_reg = "regular";
+  string str_clg = "catalog";
+  HashString(str_vol, &id_vol);
+  HashString(str_reg, &id_reg);
+  HashString(str_clg, &id_clg);
+  unsigned char *dat_vol = const_cast<unsigned char *>(
+    reinterpret_cast<const unsigned char *>(str_vol.data()));
+  unsigned char *dat_reg = const_cast<unsigned char *>(
+    reinterpret_cast<const unsigned char *>(str_reg.data()));
+  unsigned char *dat_clg = const_cast<unsigned char *>(
+    reinterpret_cast<const unsigned char *>(str_clg.data()));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(id_vol, dat_vol, str_vol.length(), ""));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(id_reg, dat_reg, str_reg.length(), ""));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(id_clg, dat_clg, str_clg.length(), ""));
+  EXPECT_EQ(str_vol.length() + str_reg.length() + str_clg.length(),
+            quota_mgr_->GetSize());
+  int fd_clg = cache_mgr_->Open(CacheManager::Bless(id_clg));
+  int fd_vol = cache_mgr_->Open(CacheManager::Bless(id_vol));
+  EXPECT_GE(fd_clg, 0);
+  EXPECT_GE(fd_vol, 0);
+  EXPECT_TRUE(quota_mgr_->Cleanup(str_clg.length() + str_vol.length()));
+  EXPECT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::Bless(id_reg)));
+  EXPECT_EQ(0, cache_mgr_->Close(fd_clg));
+  EXPECT_EQ(0, cache_mgr_->Close(fd_vol));
+  EXPECT_TRUE(quota_mgr_->Cleanup(str_clg.length()));
+  EXPECT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::Bless(id_vol)));
+  EXPECT_TRUE(quota_mgr_->Cleanup(0));
+  EXPECT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::Bless(id_clg)));
+}
+
+
+TEST_F(T_CachePlugin, List) {
+  if (!(cache_mgr_->capabilities() & cvmfs::CAP_LIST)) {
+    printf("Skipping\n");
+    return;
+  }
+
+  set<int> open_fds;
+  set<string> descriptions;
+  unsigned N = 1000;
+  for (unsigned i = 0; i < N; ++i) {
+    shash::Any id(shash::kSha1);
+    unsigned char *data = reinterpret_cast<unsigned char *>(&i);
+    HashMem(data, sizeof(i), &id);
+    descriptions.insert(id.ToString());
+    EXPECT_TRUE(cache_mgr_->CommitFromMem(id, data, sizeof(i), id.ToString()));
+    if ((i % 10) == 0) {
+      int fd = cache_mgr_->Open(CacheManager::Bless(id));
+      EXPECT_GE(fd, 0);
+      open_fds.insert(fd);
+    }
+  }
+
+  vector<string> list_pinned = quota_mgr_->ListPinned();
+  EXPECT_EQ(open_fds.size(), list_pinned.size());
+  for (unsigned i = 0; i < list_pinned.size(); ++i) {
+    descriptions.erase(list_pinned[i]);
+  }
+  EXPECT_EQ(N - list_pinned.size(), descriptions.size());
+
+  vector<string> list = quota_mgr_->List();
+  for (unsigned i = 0; i < list.size(); ++i) {
+    descriptions.erase(list[i]);
+  }
+  EXPECT_TRUE(descriptions.empty());
+  for (set<int>::const_iterator i = open_fds.begin(), i_end = open_fds.end();
+       i != i_end; ++i)
+  {
+    EXPECT_EQ(0, cache_mgr_->Close(*i));
+  }
 }
