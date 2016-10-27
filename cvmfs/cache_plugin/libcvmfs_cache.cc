@@ -39,11 +39,11 @@ static struct cvmcache_hash Cpphash2Chash(const shash::Any &hash) {
 static enum cvmcache_object_type ObjectType2CType(cvmfs::EnumObjectType type) {
     switch (type) {
       case cvmfs::OBJECT_REGULAR:
-        return OBJECT_REGULAR;
+        return CVMCACHE_OBJECT_REGULAR;
       case cvmfs::OBJECT_CATALOG:
-        return OBJECT_CATALOG;
+        return CVMCACHE_OBJECT_CATALOG;
       case cvmfs::OBJECT_VOLATILE:
-        return OBJECT_VOLATILE;
+        return CVMCACHE_OBJECT_VOLATILE;
     }
     abort();
   }
@@ -61,11 +61,11 @@ class ForwardCachePlugin : public CachePlugin {
     assert(callbacks->cvmcache_write_txn != NULL);
     assert(callbacks->cvmcache_commit_txn != NULL);
     assert(callbacks->cvmcache_abort_txn != NULL);
-    if (callbacks->capabilities & CAP_INFO)
+    if (callbacks->capabilities & CVMCACHE_CAP_INFO)
       assert(callbacks->cvmcache_info != NULL);
-    if (callbacks->capabilities & CAP_SHRINK)
+    if (callbacks->capabilities & CVMCACHE_CAP_SHRINK)
       assert(callbacks->cvmcache_shrink != NULL);
-    if (callbacks->capabilities & CAP_LIST) {
+    if (callbacks->capabilities & CVMCACHE_CAP_LIST) {
       assert(callbacks->cvmcache_listing_begin != NULL);
       assert(callbacks->cvmcache_listing_next != NULL);
       assert(callbacks->cvmcache_listing_end != NULL);
@@ -91,8 +91,6 @@ class ForwardCachePlugin : public CachePlugin {
     cvmcache_object_info c_info;
     memset(&c_info, 0, sizeof(c_info));
     c_info.size = CachePlugin::kSizeUnknown;
-    c_info.type = OBJECT_REGULAR;
-    c_info.description = NULL;
     int result = callbacks_.cvmcache_obj_info(&c_hash, &c_info);
     info->size = c_info.size;
     info->object_type = static_cast<cvmfs::EnumObjectType>(c_info.type);
@@ -159,7 +157,7 @@ class ForwardCachePlugin : public CachePlugin {
     uint64_t *used,
     uint64_t *pinned)
   {
-    if (!(callbacks_.capabilities & CAP_INFO))
+    if (!(callbacks_.capabilities & CVMCACHE_CAP_INFO))
       return cvmfs::STATUS_NOSUPPORT;
 
     int result = callbacks_.cvmcache_info(size, used, pinned);
@@ -167,7 +165,7 @@ class ForwardCachePlugin : public CachePlugin {
   }
 
   virtual cvmfs::EnumStatus Shrink(uint64_t shrink_to, uint64_t *used) {
-    if (!(callbacks_.capabilities & CAP_SHRINK))
+    if (!(callbacks_.capabilities & CVMCACHE_CAP_SHRINK))
       return cvmfs::STATUS_NOSUPPORT;
 
     int result = callbacks_.cvmcache_shrink(shrink_to, used);
@@ -175,7 +173,7 @@ class ForwardCachePlugin : public CachePlugin {
   }
 
   virtual int64_t ListingBegin(cvmfs::EnumObjectType type) {
-    if (!(callbacks_.capabilities & CAP_LIST))
+    if (!(callbacks_.capabilities & CVMCACHE_CAP_LIST))
       return -cvmfs::STATUS_NOSUPPORT;
 
     return callbacks_.cvmcache_listing_begin(ObjectType2CType(type));
@@ -185,7 +183,7 @@ class ForwardCachePlugin : public CachePlugin {
     int64_t listing_id,
     ObjectInfo *item)
   {
-    if (!(callbacks_.capabilities & CAP_LIST))
+    if (!(callbacks_.capabilities & CVMCACHE_CAP_LIST))
       return cvmfs::STATUS_NOSUPPORT;
 
     struct cvmcache_object_info c_item;
@@ -202,7 +200,7 @@ class ForwardCachePlugin : public CachePlugin {
   }
 
   virtual cvmfs::EnumStatus ListingEnd(int64_t listing_id) {
-    if (!(callbacks_.capabilities & CAP_LIST))
+    if (!(callbacks_.capabilities & CVMCACHE_CAP_LIST))
       return cvmfs::STATUS_NOSUPPORT;
 
     int result = callbacks_.cvmcache_listing_end(listing_id);
@@ -245,8 +243,9 @@ int cvmcache_listen(struct cvmcache_context *ctx, char *socket_path) {
   return ctx->plugin->Listen(socket_path);
 }
 
-void cvmcache_process_requests(struct cvmcache_context *ctx) {
-  ctx->plugin->ProcessRequests();
+void cvmcache_process_requests(struct cvmcache_context *ctx, unsigned nworkers)
+{
+  ctx->plugin->ProcessRequests(nworkers);
 }
 
 void cvmcache_terminate(struct cvmcache_context *ctx) {

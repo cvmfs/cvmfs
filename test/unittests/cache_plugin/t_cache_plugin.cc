@@ -152,8 +152,7 @@ TEST_F(T_CachePlugin, Read) {
 
   uint64_t total_size = 0;
   Prng prng;
-  //prng.InitLocaltime();
-  prng.InitSeed(6);
+  prng.InitLocaltime();
   while (total_size < size_odd) {
     int32_t next_size = prng.Next(2 * cache_mgr_->max_object_size() - 1) + 1;
     int bytes_read = cache_mgr_->Pread(fd, read_buffer, next_size, total_size);

@@ -40,7 +40,7 @@ class MockCachePlugin : public CachePlugin {
   {
     bool retval = Listen(socket_path);
     assert(retval);
-    ProcessRequests();
+    ProcessRequests(0);
     known_object.algorithm = shash::kSha1;
     known_object_content = "Hello, World";
     shash::HashString(known_object_content, &known_object);

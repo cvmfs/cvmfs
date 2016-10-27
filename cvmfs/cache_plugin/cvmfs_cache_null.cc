@@ -50,30 +50,31 @@ struct cvmcache_context *ctx;
 static int null_chrefcnt(struct cvmcache_hash *id, int32_t change_by) {
   ComparableHash h(*id);
   if (storage.find(h) == storage.end())
-    return STATUS_NOENTRY;
+    return CVMCACHE_STATUS_NOENTRY;
 
   Object obj = storage[h];
   obj.refcnt += change_by;
   if (obj.refcnt < 0)
-    return STATUS_BADCOUNT;
+    return CVMCACHE_STATUS_BADCOUNT;
   storage[h] = obj;
-  return STATUS_OK;
+  return CVMCACHE_STATUS_OK;
 }
 
 
-int null_obj_info(struct cvmcache_hash *id,
-                struct cvmcache_object_info *info)
+static int null_obj_info(
+  struct cvmcache_hash *id,
+  struct cvmcache_object_info *info)
 {
   ComparableHash h(*id);
   if (storage.find(h) == storage.end())
-    return STATUS_NOENTRY;
+    return CVMCACHE_STATUS_NOENTRY;
 
   Object obj = storage[h];
   info->size = obj.data.length();
   info->type = obj.type;
   info->pinned = obj.refcnt > 0;
   info->description = strdup(obj.description.c_str());
-  return STATUS_OK;
+  return CVMCACHE_STATUS_OK;
 }
 
 
@@ -85,12 +86,12 @@ static int null_pread(struct cvmcache_hash *id,
   ComparableHash h(*id);
   string data = storage[h].data;
   if (offset >= data.length())
-    return STATUS_OUTOFBOUNDS;
+    return CVMCACHE_STATUS_OUTOFBOUNDS;
   unsigned nbytes =
     std::min(*size, static_cast<uint32_t>(data.length() - offset));
   memcpy(buffer, data.data() + offset, nbytes);
   *size = nbytes;
-  return STATUS_OK;
+  return CVMCACHE_STATUS_OK;
 }
 
 
@@ -107,34 +108,58 @@ static int null_start_txn(struct cvmcache_hash *id,
   txn.id = *id;
   txn.partial_object = partial_object;
   transactions[txn_id] = txn;
-  return STATUS_OK;
+  return CVMCACHE_STATUS_OK;
 }
 
 
-int null_write_txn(uint64_t txn_id,
-                 unsigned char *buffer,
-                 uint32_t size)
+static int null_write_txn(
+  uint64_t txn_id,
+  unsigned char *buffer,
+  uint32_t size)
 {
   TxnInfo txn = transactions[txn_id];
   txn.partial_object.data += string(reinterpret_cast<char *>(buffer), size);
   transactions[txn_id] = txn;
-  return STATUS_OK;
+  return CVMCACHE_STATUS_OK;
 }
 
 
-int null_commit_txn(uint64_t txn_id) {
+static int null_commit_txn(uint64_t txn_id) {
   TxnInfo txn = transactions[txn_id];
   ComparableHash h(txn.id);
   storage[h] = txn.partial_object;
-  return STATUS_OK;
+  return CVMCACHE_STATUS_OK;
 }
 
-int null_abort_txn(uint64_t txn_id) {
+static int null_abort_txn(uint64_t txn_id) {
   transactions.erase(txn_id);
-  return STATUS_OK;
+  return CVMCACHE_STATUS_OK;
 }
 
-void Usage(const char *progname) {
+static int null_info(uint64_t *size, uint64_t *used, uint64_t *pinned) {
+  return CVMCACHE_STATUS_OK;
+}
+
+static int null_shrink(uint64_t shrink_to, uint64_t *used) {
+  return CVMCACHE_STATUS_OK;
+}
+
+static int64_t null_listing_begin(enum cvmcache_object_type type) {
+  return CVMCACHE_STATUS_OK;
+}
+
+static int null_listing_next(
+  int64_t listing_id,
+  struct cvmcache_object_info *item)
+{
+  return CVMCACHE_STATUS_OK;
+}
+
+static int null_listing_end(int64_t listing_id) {
+  return CVMCACHE_STATUS_OK;
+}
+
+static void Usage(const char *progname) {
   printf("%s <Cvmfs cache socket>\n", progname);
 }
 
@@ -154,13 +179,19 @@ int main(int argc, char **argv) {
   callbacks.cvmcache_write_txn = null_write_txn;
   callbacks.cvmcache_commit_txn = null_commit_txn;
   callbacks.cvmcache_abort_txn = null_abort_txn;
+  callbacks.cvmcache_info = null_info;
+  callbacks.cvmcache_shrink = null_shrink;
+  callbacks.cvmcache_listing_begin = null_listing_begin;
+  callbacks.cvmcache_listing_next = null_listing_next;
+  callbacks.cvmcache_listing_end = null_listing_end;
+  callbacks.capabilities = CVMCACHE_CAP_ALL;
 
   ctx = cvmcache_init(&callbacks);
   int retval = cvmcache_listen(ctx, argv[1]);
   assert(retval);
   printf("Listening for cvmfs clients on %s\n", argv[1]);
   chown(argv[1], 993, 992);
-  cvmcache_process_requests(ctx);
+  cvmcache_process_requests(ctx, 0);
   while (true) {
     sleep(1);
   }

@@ -38,7 +38,7 @@ class CachePlugin : SingleCopy {
 
   bool Listen(const std::string &socket_path);
   ~CachePlugin();
-  void ProcessRequests();
+  void ProcessRequests(unsigned num_workers);
   void AskToDetach();
 
   unsigned max_object_size() const { return max_object_size_; }
@@ -129,6 +129,7 @@ class CachePlugin : SingleCopy {
   std::string socket_path_;
   int fd_socket_;
   bool running_;
+  unsigned num_workers_;
   unsigned max_object_size_;
   std::string name_;
   atomic_int64 next_session_id_;

@@ -14,9 +14,9 @@ extern "C" {
 #endif
 
 enum cvmcache_hash_algorithm {
-  HASH_SHA1 = 1,
-  HASH_RIPEMD160,
-  HASH_SHAKE128
+  CVMCACHE_HASH_SHA1 = 1,
+  CVMCACHE_HASH_RIPEMD160,
+  CVMCACHE_HASH_SHAKE128
 };
 
 struct cvmcache_hash {
@@ -25,35 +25,37 @@ struct cvmcache_hash {
 } __attribute__((__packed__));
 
 enum cvmcache_status {
-  STATUS_UNKNOWN = 0,
-  STATUS_OK,
-  STATUS_NOSUPPORT,  // Not implemented by the cache plugin
-  STATUS_FORBIDDEN,  // Client is not allowed to perform the operation
-  STATUS_NOSPACE,    // Cache is full
-  STATUS_NOENTRY,    // Object is not in cache
-  STATUS_MALFORMED,  // Malformed request
-  STATUS_IOERR,      // General I/O error
-  STATUS_CORRUPTED,  // Crc32 verification failed
-  STATUS_TIMEOUT,    // Certain parts of a multipart request never arrived
-  STATUS_BADCOUNT,   // Attempt to set a negative reference count
+  CVMCACHE_STATUS_UNKNOWN = 0,
+  CVMCACHE_STATUS_OK,
+  CVMCACHE_STATUS_NOSUPPORT,  // Not implemented by the cache plugin
+  CVMCACHE_STATUS_FORBIDDEN,  // Client is not allowed to perform the operation
+  CVMCACHE_STATUS_NOSPACE,    // Cache is full
+  CVMCACHE_STATUS_NOENTRY,    // Object is not in cache
+  CVMCACHE_STATUS_MALFORMED,  // Malformed request
+  CVMCACHE_STATUS_IOERR,      // General I/O error
+  CVMCACHE_STATUS_CORRUPTED,  // Crc32 verification failed
+  // Certain parts of a multipart request never arrived
+  CVMCACHE_STATUS_TIMEOUT,
+  CVMCACHE_STATUS_BADCOUNT,   // Attempt to set a negative reference count
   // Attempt to read from an offset larger than the object size
-  STATUS_OUTOFBOUNDS,
-  STATUS_PARTIAL     // Cache content could not be evicted to requested size
+  CVMCACHE_STATUS_OUTOFBOUNDS,
+  // Cache content could not be evicted to requested size
+  CVMCACHE_STATUS_PARTIAL
 };
 
 enum cvmcache_object_type {
-  OBJECT_REGULAR = 0,
-  OBJECT_CATALOG,
-  OBJECT_VOLATILE
+  CVMCACHE_OBJECT_REGULAR = 0,
+  CVMCACHE_OBJECT_CATALOG,
+  CVMCACHE_OBJECT_VOLATILE
 };
 
 enum cvmcache_capabilities {
-  CAP_NONE      = 0,
-  CAP_REFCOUNT  = 1,
-  CAP_SHRINK    = 2,
-  CAP_INFO      = 4,
-  CAP_LIST      = 8,
-  CAP_ALL       = 15
+  CVMCACHE_CAP_NONE      = 0,
+  CVMCACHE_CAP_REFCOUNT  = 1,
+  CVMCACHE_CAP_SHRINK    = 2,
+  CVMCACHE_CAP_INFO      = 4,
+  CVMCACHE_CAP_LIST      = 8,
+  CVMCACHE_CAP_ALL       = 15
 };
 
 struct cvmcache_object_info {
@@ -98,7 +100,7 @@ struct cvmcache_callbacks {
 
 struct cvmcache_context *cvmcache_init(struct cvmcache_callbacks *callbacks);
 int cvmcache_listen(struct cvmcache_context *ctx, char *socket_path);
-void cvmcache_process_requests(struct cvmcache_context *ctx);
+void cvmcache_process_requests(struct cvmcache_context *ctx, unsigned nworkers);
 void cvmcache_terminate(struct cvmcache_context *ctx);
 
 uint32_t cvmcache_max_object_size(struct cvmcache_context *ctx);

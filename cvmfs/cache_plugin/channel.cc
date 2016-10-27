@@ -34,6 +34,7 @@ CachePlugin::CachePlugin(uint64_t capabilities)
   , socket_path_()
   , fd_socket_(-1)
   , running_(false)
+  , num_workers_(0)
   , max_object_size_(kDefaultMaxObjectSize)
 {
   atomic_init64(&next_session_id_);
@@ -482,7 +483,8 @@ void *CachePlugin::MainProcessRequests(void *data) {
 }
 
 
-void CachePlugin::ProcessRequests() {
+void CachePlugin::ProcessRequests(unsigned num_workers) {
+  num_workers_ = num_workers;
   int retval = pthread_create(&thread_io_, NULL, MainProcessRequests, this);
   assert(retval == 0);
   running_ = true;
