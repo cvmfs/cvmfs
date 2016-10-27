@@ -108,9 +108,6 @@ void ExternalCacheManager::CallRemotely(ExternalCacheManager::RpcJob *rpc_job) {
 
 
 int ExternalCacheManager::ChangeRefcount(const shash::Any &id, int change_by) {
-  if (!(capabilities_ & cvmfs::CAP_REFCOUNT))
-    return cvmfs::STATUS_OK;
-
   cvmfs::MsgHash object_id;
   transport_.FillMsgHash(id, &object_id);
   cvmfs::MsgRefcountReq msg_refcount;
@@ -478,9 +475,9 @@ int64_t ExternalCacheManager::Pread(
 
     cvmfs::MsgReadReply *msg_reply = rpc_job.msg_read_reply();
     if (msg_reply->status() == cvmfs::STATUS_OK) {
+      nbytes += rpc_job.frame_recv()->att_size();
       if (rpc_job.frame_recv()->att_size() < batch_size)
-        return rpc_job.frame_recv()->att_size();
-      nbytes += batch_size;
+        return nbytes;
     } else {
       return Ack2Errno(msg_reply->status());
     }

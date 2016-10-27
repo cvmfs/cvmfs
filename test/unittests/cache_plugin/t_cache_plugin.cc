@@ -152,14 +152,17 @@ TEST_F(T_CachePlugin, Read) {
 
   uint64_t total_size = 0;
   Prng prng;
-  prng.InitLocaltime();
+  //prng.InitLocaltime();
+  prng.InitSeed(6);
   while (total_size < size_odd) {
     int32_t next_size = prng.Next(2 * cache_mgr_->max_object_size() - 1) + 1;
     int bytes_read = cache_mgr_->Pread(fd, read_buffer, next_size, total_size);
     EXPECT_GT(bytes_read, 0);
     EXPECT_EQ(0, memcmp(read_buffer, buffer, bytes_read));
     total_size += bytes_read;
-    EXPECT_TRUE((bytes_read == next_size) || (total_size == size_odd));
+    EXPECT_TRUE((bytes_read == next_size) || (total_size == size_odd))
+      << next_size << " bytes requested, " << bytes_read << " bytes received, "
+      << "read so far: " << total_size << "/" << size_odd << " bytes";
   }
 
   EXPECT_EQ(0, cache_mgr_->Close(fd));

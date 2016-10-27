@@ -54,8 +54,13 @@ class ForwardCachePlugin : public CachePlugin {
     : CachePlugin(callbacks->capabilities)
     , callbacks_(*callbacks)
   {
-    if (callbacks->capabilities & CAP_REFCOUNT)
-      assert(callbacks->cvmcache_chrefcnt != NULL);
+    assert(callbacks->cvmcache_chrefcnt != NULL);
+    assert(callbacks->cvmcache_obj_info != NULL);
+    assert(callbacks->cvmcache_pread != NULL);
+    assert(callbacks->cvmcache_start_txn != NULL);
+    assert(callbacks->cvmcache_write_txn != NULL);
+    assert(callbacks->cvmcache_commit_txn != NULL);
+    assert(callbacks->cvmcache_abort_txn != NULL);
     if (callbacks->capabilities & CAP_INFO)
       assert(callbacks->cvmcache_info != NULL);
     if (callbacks->capabilities & CAP_SHRINK)
@@ -73,9 +78,6 @@ class ForwardCachePlugin : public CachePlugin {
     const shash::Any &id,
     int32_t change_by)
   {
-    if (!(callbacks_.capabilities & CAP_REFCOUNT))
-      return cvmfs::STATUS_NOSUPPORT;
-
     struct cvmcache_hash c_hash = Cpphash2Chash(id);
     int result = callbacks_.cvmcache_chrefcnt(&c_hash, change_by);
     return static_cast<cvmfs::EnumStatus>(result);
@@ -87,12 +89,14 @@ class ForwardCachePlugin : public CachePlugin {
   {
     struct cvmcache_hash c_hash = Cpphash2Chash(id);
     cvmcache_object_info c_info;
+    memset(&c_info, 0, sizeof(c_info));
     c_info.size = CachePlugin::kSizeUnknown;
     c_info.type = OBJECT_REGULAR;
     c_info.description = NULL;
     int result = callbacks_.cvmcache_obj_info(&c_hash, &c_info);
     info->size = c_info.size;
     info->object_type = static_cast<cvmfs::EnumObjectType>(c_info.type);
+    info->pinned = c_info.pinned;
     if (c_info.description) {
       info->description = string(c_info.description);
       free(c_info.description);
@@ -118,6 +122,7 @@ class ForwardCachePlugin : public CachePlugin {
   {
     struct cvmcache_hash c_hash = Cpphash2Chash(id);
     cvmcache_object_info c_info;
+    memset(&c_info, 0, sizeof(c_info));
     c_info.size = info.size;
     c_info.type = ObjectType2CType(info.object_type);
     if (info.description.empty()) {

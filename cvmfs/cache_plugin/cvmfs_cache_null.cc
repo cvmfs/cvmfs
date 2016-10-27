@@ -20,45 +20,60 @@
 
 using namespace std;
 
-struct TxnInfo {
-  struct cvmcache_hash id;
-  string partial_data;
+struct Object {
+  string data;
+  cvmcache_object_type type;
+  int32_t refcnt;
+  string description;
 };
 
-struct CmpHash {
-  CmpHash() { }
-  explicit CmpHash(const struct cvmcache_hash &h) : hash(h) { }
+struct TxnInfo {
+  struct cvmcache_hash id;
+  Object partial_object;
+};
+
+struct ComparableHash {
+  ComparableHash() { }
+  explicit ComparableHash(const struct cvmcache_hash &h) : hash(h) { }
   struct cvmcache_hash hash;
-  bool operator <(const CmpHash &other) const {
+  bool operator <(const ComparableHash &other) const {
     return cvmcache_hash_cmp(const_cast<cvmcache_hash *>(&(this->hash)),
                              const_cast<cvmcache_hash *>(&(other.hash))) < 0;
   }
 };
 
 map<uint64_t, TxnInfo> transactions;
-map<CmpHash, string> data;
+map<ComparableHash, Object> storage;
 
 struct cvmcache_context *ctx;
 
 static int null_chrefcnt(struct cvmcache_hash *id, int32_t change_by) {
-  CmpHash h(*id);
-  if (data.find(h) != data.end())
-    return STATUS_OK;
-  return STATUS_NOENTRY;
+  ComparableHash h(*id);
+  if (storage.find(h) == storage.end())
+    return STATUS_NOENTRY;
+
+  Object obj = storage[h];
+  obj.refcnt += change_by;
+  if (obj.refcnt < 0)
+    return STATUS_BADCOUNT;
+  storage[h] = obj;
+  return STATUS_OK;
 }
 
 
 int null_obj_info(struct cvmcache_hash *id,
                 struct cvmcache_object_info *info)
 {
-  CmpHash h(*id);
-  if (data.find(h) != data.end()) {
-    info->size = data[h].length();
-    info->type = OBJECT_REGULAR;
-    info->description = NULL;
-    return STATUS_OK;
-  }
-  return STATUS_NOENTRY;
+  ComparableHash h(*id);
+  if (storage.find(h) == storage.end())
+    return STATUS_NOENTRY;
+
+  Object obj = storage[h];
+  info->size = obj.data.length();
+  info->type = obj.type;
+  info->pinned = obj.refcnt > 0;
+  info->description = strdup(obj.description.c_str());
+  return STATUS_OK;
 }
 
 
@@ -67,13 +82,13 @@ static int null_pread(struct cvmcache_hash *id,
                     uint32_t *size,
                     unsigned char *buffer)
 {
-  CmpHash h(*id);
-  string object = data[h];
-  if (offset >= object.length())
+  ComparableHash h(*id);
+  string data = storage[h].data;
+  if (offset >= data.length())
     return STATUS_OUTOFBOUNDS;
   unsigned nbytes =
-    std::min(*size, static_cast<uint32_t>(object.length() - offset));
-  memcpy(buffer, object.data() + offset, nbytes);
+    std::min(*size, static_cast<uint32_t>(data.length() - offset));
+  memcpy(buffer, data.data() + offset, nbytes);
   *size = nbytes;
   return STATUS_OK;
 }
@@ -83,9 +98,14 @@ static int null_start_txn(struct cvmcache_hash *id,
                         uint64_t txn_id,
                         struct cvmcache_object_info *info)
 {
-  //printf("Start transaction %" PRIu64 "\n", txn_id);
+  Object partial_object;
+  partial_object.type = info->type;
+  partial_object.refcnt = 1;
+  if (info->description != NULL)
+    partial_object.description = string(info->description);
   TxnInfo txn;
   txn.id = *id;
+  txn.partial_object = partial_object;
   transactions[txn_id] = txn;
   return STATUS_OK;
 }
@@ -95,27 +115,22 @@ int null_write_txn(uint64_t txn_id,
                  unsigned char *buffer,
                  uint32_t size)
 {
-  //printf("Write transaction %" PRIu64 "\n", txn_id);
   TxnInfo txn = transactions[txn_id];
-  txn.partial_data += string(reinterpret_cast<char *>(buffer), size);
+  txn.partial_object.data += string(reinterpret_cast<char *>(buffer), size);
   transactions[txn_id] = txn;
   return STATUS_OK;
 }
 
 
 int null_commit_txn(uint64_t txn_id) {
-  //printf("Commit transaction %" PRIu64 "\n", txn_id);
   TxnInfo txn = transactions[txn_id];
-  CmpHash h(txn.id);
-  data[h] = txn.partial_data;
+  ComparableHash h(txn.id);
+  storage[h] = txn.partial_object;
   return STATUS_OK;
 }
 
 int null_abort_txn(uint64_t txn_id) {
-  //printf("Abort transaction %" PRIu64 "\n", txn_id);
   transactions.erase(txn_id);
-  // TODO(jblomer): race-free deletion of written blocks: write random
-  // id into metadata block with refcount 0
   return STATUS_OK;
 }
 
