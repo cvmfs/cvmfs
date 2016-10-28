@@ -16,12 +16,11 @@ option optimize_for = LITE_RUNTIME;
 // following message (little-endian).  That means that the maximum message size
 // is 24MB.
 //
-// After the header, there will be protobuf message either of type MsgClientCall
-// (from client to server) or of type MsgServerCall (from server to client).
-// Messages for storing or retrieving data have the data payload appended after
-// the protobuf message.  For messages with a data payload (attachment), there
-// are two bytes (little endian) before the protobuf message specifying the size
-// of the  protobuf message without the attachment.
+// After the header, there will be protobuf message type MsgRpc. Messages for
+// storing or retrieving data have the data payload appended after the protobuf
+// message.  For messages with a data payload (attachment), there are two bytes
+// (little endian) before the protobuf message specifying the size of the
+// protobuf message without the attachment.
 
 // # Protocol changelog
 // Version 1: First version
@@ -32,17 +31,19 @@ option optimize_for = LITE_RUNTIME;
 // Unrecognized enum constants are mapped to the first enum constant by the
 // protobuf deserialization.
 
+// Then enum definitions are mirrored in libcvmfs.h
+
 enum EnumStatus {
   STATUS_UNKNOWN     = 0;
   STATUS_OK          = 1;
-  STATUS_NOSUPPORT   = 2;  // Not implemented by the cache plugin
-  STATUS_FORBIDDEN   = 3;  // Client is not allowed to perform the operation
-  STATUS_NOSPACE     = 4;  // Cache is full
-  STATUS_NOENTRY     = 5;  // Object is not in cache
-  STATUS_MALFORMED   = 6;  // Malformed request
-  STATUS_IOERR       = 7;  // General I/O error
-  STATUS_CORRUPTED   = 8;  // Crc32 verification failed
-  STATUS_TIMEOUT     = 9;  // Certain parts of a multipart request never arrived
+  STATUS_NOSUPPORT   = 2;   // Not implemented by the cache plugin
+  STATUS_FORBIDDEN   = 3;   // Client is not allowed to perform the operation
+  STATUS_NOSPACE     = 4;   // Cache is full
+  STATUS_NOENTRY     = 5;   // Object is not in cache
+  STATUS_MALFORMED   = 6;   // Malformed request
+  STATUS_IOERR       = 7;   // General I/O error
+  STATUS_CORRUPTED   = 8;   // Crc32 verification failed
+  STATUS_TIMEOUT     = 9;   // Certain parts of a multipart request never arrived
   STATUS_BADCOUNT    = 10;  // Attempt to set a negative reference count
   // Attempt to read from an offset larger than the object size; also indicates
   // the end of a cache contents listing
@@ -67,8 +68,8 @@ enum EnumObjectType {
 
 enum EnumCapabilities {
   CAP_NONE      = 0;
-  // refcounting is implemented; if not, cache can only act as a lower tier
-  // cache
+  // Proper refcounting is implemented; for lower tier caches, this capability
+  // can be unset and reference counting can simply beomce file existence check
   CAP_REFCOUNT  = 1;
   CAP_SHRINK    = 2;   // clients can ask the cache to shrink
   CAP_INFO      = 4;   // cache plugin knows about its size and fill level

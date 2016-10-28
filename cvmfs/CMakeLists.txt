@@ -155,14 +155,17 @@ set (LIBCVMFS_CACHE_SOURCES
   cache.h
   cache.pb.cc cache.pb.h
   cache_plugin/libcvmfs_cache.cc cache_plugin/libcvmfs_cache.h
+  cache_plugin/libcvmfs_cache_options.cc
   cache_plugin/channel.cc cache_plugin/channel.h
   cache_transport.cc cache_transport.h
   fs_traversal.h
   hash.h hash.cc
   logging.cc logging.h logging_internal.h
   murmur.h
+  options.h options.cc
   platform.h platform_linux.h platform_osx.h
   prng.h
+  sanitizer.cc sanitizer.h
   shortstring.h
   smallhash.h
   smalloc.h
@@ -170,6 +173,7 @@ set (LIBCVMFS_CACHE_SOURCES
   util/pointer.h
   util/posix.cc util/posix.cc
   util/single_copy.h
+  util/string.cc util/string.h
   util_concurrency.cc util_concurrency.h util_concurrency_impl.h
 )
 

@@ -1,5 +1,7 @@
 /**
  * This file is part of the CernVM File System.
+ *
+ * See cvmfs_cache_null plugin for a demo user of the library.
  */
 #ifndef CVMFS_LIBCVMFS_CACHE_H_
 #define CVMFS_LIBCVMFS_CACHE_H_
@@ -11,19 +13,20 @@
 
 #ifdef __cplusplus
 extern "C" {
+// Map C++ clases to their C interface names
+typedef class SimpleOptionsParser cvmcache_option_map;
+#else
+typedef struct OptionsManager cvmcache_option_map;
 #endif
 
+// Mirrors cvmfs::EnumHashAlgorithm protobuf definition
 enum cvmcache_hash_algorithm {
   CVMCACHE_HASH_SHA1 = 1,
   CVMCACHE_HASH_RIPEMD160,
   CVMCACHE_HASH_SHAKE128
 };
 
-struct cvmcache_hash {
-  unsigned char digest[20];
-  char algorithm;
-} __attribute__((__packed__));
-
+// Mirrors cvmfs::EnumStatus protobuf definition
 enum cvmcache_status {
   CVMCACHE_STATUS_UNKNOWN = 0,
   CVMCACHE_STATUS_OK,
@@ -43,20 +46,30 @@ enum cvmcache_status {
   CVMCACHE_STATUS_PARTIAL
 };
 
+// Mirrors cvmfs::EnumObjectType protobuf definition
 enum cvmcache_object_type {
   CVMCACHE_OBJECT_REGULAR = 0,
   CVMCACHE_OBJECT_CATALOG,
   CVMCACHE_OBJECT_VOLATILE
 };
 
+// Mirrors cvmfs::EnumCapability protobuf definition
 enum cvmcache_capabilities {
   CVMCACHE_CAP_NONE      = 0,
+  // Proper refcounting is implemented; for lower tier caches, this capability
+  // can be unset and reference counting can simply beomce file existence check
   CVMCACHE_CAP_REFCOUNT  = 1,
-  CVMCACHE_CAP_SHRINK    = 2,
-  CVMCACHE_CAP_INFO      = 4,
-  CVMCACHE_CAP_LIST      = 8,
+  CVMCACHE_CAP_SHRINK    = 2,  // clients can ask the cache to shrink
+  CVMCACHE_CAP_INFO      = 4,  // cache plugin knows about its fill level
+  CVMCACHE_CAP_LIST      = 8,  // cache can return a list of objects
   CVMCACHE_CAP_ALL       = 15
 };
+
+
+struct cvmcache_hash {
+  unsigned char digest[20];
+  char algorithm;
+} __attribute__((__packed__));
 
 struct cvmcache_object_info {
   struct cvmcache_hash id;
@@ -68,9 +81,18 @@ struct cvmcache_object_info {
 
 struct cvmcache_context;
 
+/**
+ * Returns -1, 0, or 1 like other C comparison functions
+ */
 int cvmcache_hash_cmp(struct cvmcache_hash *a, struct cvmcache_hash *b);
+/**
+ * The caller has to free the resulting string
+ */
 char *cvmcache_hash_print(struct cvmcache_hash *h);
 
+/**
+ * According to capabilities, some of the callbacks can be NULL
+ */
 struct cvmcache_callbacks {
   int (*cvmcache_chrefcnt)(struct cvmcache_hash *id, int32_t change_by);
   int (*cvmcache_obj_info)(struct cvmcache_hash *id,
@@ -100,10 +122,54 @@ struct cvmcache_callbacks {
 
 struct cvmcache_context *cvmcache_init(struct cvmcache_callbacks *callbacks);
 int cvmcache_listen(struct cvmcache_context *ctx, char *socket_path);
+/**
+ * Spawns a separate I/O thread that can be stopped with cvmcache_terminate.
+ * The nworkers parameter is currently unused.
+ */
 void cvmcache_process_requests(struct cvmcache_context *ctx, unsigned nworkers);
 void cvmcache_terminate(struct cvmcache_context *ctx);
 
 uint32_t cvmcache_max_object_size(struct cvmcache_context *ctx);
+
+
+// Options parsing from libcvmfs without legacy support
+
+cvmcache_option_map *cvmcache_options_init();
+/**
+ * Frees the resources of a cvmfs_options_map, which was created by a call to
+ * cvmfs_options_init().
+ */
+void cvmcache_options_fini(cvmcache_option_map *opts);
+/**
+ * Fills a cvmfs_options_map.  Use the same key/value pairs as the configuration
+ * parameters used by the fuse module in /etc/cvmfs/...
+ */
+void cvmcache_options_set(cvmcache_option_map *opts,
+                          const char *key, const char *value);
+/**
+ * Sets options from a file with linewise KEY=VALUE pairs.  Returns 0 on success
+ * and -1 otherwise.
+ */
+int cvmcache_options_parse(cvmcache_option_map *opts, const char *path);
+/**
+ * Removes a key-value pair from a cvmfs_options_map.  The key may or may not
+ * exist before the call.
+ */
+void cvmcache_options_unset(cvmcache_option_map *opts, const char *key);
+/**
+ * Retrieves the value for a given key or NULL of the key does not exist.  If
+ * the result is not NULL, it must be freed by a call to cvmfs_options_free().
+ */
+char *cvmcache_options_get(cvmcache_option_map *opts, const char *key);
+/**
+ * Prints the key-value pairs of cvmfs_option_map line-by-line.  The resulting
+ * string needs to be freed by a call to cvmfs_options_free().
+ */
+char *cvmcache_options_dump(cvmcache_option_map *opts);
+/**
+ * Frees a string returned from cvmfs_options_get() or cvmfs_options_dump().
+ */
+void cvmcache_options_free(char *value);
 
 #ifdef __cplusplus
 }

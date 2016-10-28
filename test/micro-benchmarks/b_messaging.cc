@@ -58,6 +58,7 @@ BENCHMARK_DEFINE_F(BM_Messaging, CacheHandshake)(benchmark::State &st) {
           msg.set_protocol_version(1);
           msg.set_session_id(42);
           msg.set_max_object_size(128 * 1024 * 1024);
+          msg.set_capabilities(0);
           CacheTransport::Frame frame_send(&msg);
           transport.SendFrame(&frame_send);
         } else if (msg_typed->GetTypeName() == "cvmfs.MsgQuit") {

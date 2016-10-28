@@ -1,5 +1,8 @@
 /**
  * This file is part of the CernVM File System.
+ *
+ * A demo external cache plugin.  All data is stored in std::string.  Feature-
+ * complete but quite inefficient.
  */
 
 #define __STDC_FORMAT_MACROS

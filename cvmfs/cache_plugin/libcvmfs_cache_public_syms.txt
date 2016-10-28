@@ -10,3 +10,11 @@ cvmcache_listen
 cvmcache_process_requests
 cvmcache_terminate
 cvmcache_max_object_size
+cvmcache_options_init
+cvmcache_options_fini
+cvmcache_options_set
+cvmcache_options_parse
+cvmcache_options_unset
+cvmcache_options_get
+cvmcache_options_dump
+cvmcache_options_free
