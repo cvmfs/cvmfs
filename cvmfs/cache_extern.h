@@ -76,7 +76,7 @@ class ExternalCacheManager : public CacheManager {
   static const unsigned kMinSupportedObjectSize = 4 * 1024;
 
   struct Transaction {
-    Transaction(const shash::Any &id)
+    explicit Transaction(const shash::Any &id)
       : buffer(reinterpret_cast<unsigned char *>(this) + sizeof(Transaction))
       , buf_pos(0)
       , size(0)

@@ -11,8 +11,8 @@
 #include <cassert>
 #include <string>
 
-#include "cache_transport.h"
 #include "bm_util.h"
+#include "cache_transport.h"
 #include "util/posix.h"
 
 using namespace std;  // NOLINT

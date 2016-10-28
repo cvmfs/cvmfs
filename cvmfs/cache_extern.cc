@@ -674,7 +674,7 @@ uint64_t ExternalQuotaManager::GetCapacity() {
 }
 
 
-uint64_t ExternalQuotaManager::GetSize(){
+uint64_t ExternalQuotaManager::GetSize() {
   QuotaInfo info;
   int retval = GetInfo(&info);
   if (retval != 0)

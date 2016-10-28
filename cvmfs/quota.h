@@ -9,7 +9,6 @@
 #include <stdint.h>
 #include <unistd.h>
 
-#include <pthread.h>
 #include <map>
 #include <string>
 #include <vector>

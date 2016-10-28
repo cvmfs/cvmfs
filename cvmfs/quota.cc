@@ -11,8 +11,8 @@
 #include <cstdlib>
 
 #include "logging.h"
-#include "util_concurrency.h"
 #include "smalloc.h"
+#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 

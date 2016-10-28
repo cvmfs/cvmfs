@@ -22,7 +22,7 @@
 
 #include "libcvmfs_cache.h"
 
-using namespace std;
+using namespace std;  // NOLINT
 
 struct Object {
   struct cvmcache_hash id;

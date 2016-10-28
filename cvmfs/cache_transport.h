@@ -120,7 +120,7 @@ class CacheTransport {
   int fd_connection() const { return fd_connection_; }
 
  private:
-  const static unsigned kMaxStackAlloc = 256 * 1024;  // 256 kB
+  static const unsigned kMaxStackAlloc = 256 * 1024;  // 256 kB
 
   void SendData(void *message,
                 uint32_t msg_size,

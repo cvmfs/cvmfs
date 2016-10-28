@@ -3,8 +3,8 @@
  *
  * See cvmfs_cache_null plugin for a demo user of the library.
  */
-#ifndef CVMFS_LIBCVMFS_CACHE_H_
-#define CVMFS_LIBCVMFS_CACHE_H_
+#ifndef CVMFS_CACHE_PLUGIN_LIBCVMFS_CACHE_H_
+#define CVMFS_CACHE_PLUGIN_LIBCVMFS_CACHE_H_
 
 // Revision Changelog
 #define LIBCVMFS_CACHE_REVISION 1
@@ -94,9 +94,20 @@ char *cvmcache_hash_print(struct cvmcache_hash *h);
  * According to capabilities, some of the callbacks can be NULL
  */
 struct cvmcache_callbacks {
+  /**
+   * Returns CVMCACHE_STATUS_OK or CVMCACHE_STATUS_BADCOUNT if objects reference
+   * counter would fall below zero.
+   */
   int (*cvmcache_chrefcnt)(struct cvmcache_hash *id, int32_t change_by);
+  /**
+   * Needs to fill only the size of the object.
+   */
   int (*cvmcache_obj_info)(struct cvmcache_hash *id,
                            struct cvmcache_object_info *info);
+  /**
+   * Returns CVMCACHE_STATUS_OUTOFBOUNDS if offset is larger than file size.
+   * Otherwise must work if object's reference counter is larger than zero.
+   */
   int (*cvmcache_pread)(struct cvmcache_hash *id,
                         uint64_t offset,
                         uint32_t *size,
@@ -104,14 +115,24 @@ struct cvmcache_callbacks {
   int (*cvmcache_start_txn)(struct cvmcache_hash *id,
                             uint64_t txn_id,
                             struct cvmcache_object_info *info);
+  /**
+   * A full block is appended expect possibly for the file's last block
+   */
   int (*cvmcache_write_txn)(uint64_t txn_id,
                             unsigned char *buffer,
                             uint32_t size);
+  /**
+   * Only as of commit the object must appear to other clients.
+   */
   int (*cvmcache_commit_txn)(uint64_t txn_id);
   int (*cvmcache_abort_txn)(uint64_t txn_id);
 
   int (*cvmcache_info)(uint64_t *size, uint64_t *used, uint64_t *pinned);
   int (*cvmcache_shrink)(uint64_t shrink_to, uint64_t *used);
+  /**
+   * Listing can be "approximate", e.g. if files are removed and/or addded in
+   * the meantime, this may or may not be reflected.
+   */
   int64_t (*cvmcache_listing_begin)(enum cvmcache_object_type type);
   int (*cvmcache_listing_next)(int64_t listing_id,
                                struct cvmcache_object_info *item);
@@ -175,4 +196,4 @@ void cvmcache_options_free(char *value);
 }
 #endif
 
-#endif  // CVMFS_LIBCVMFS_CACHE_H_
+#endif  // CVMFS_CACHE_PLUGIN_LIBCVMFS_CACHE_H_

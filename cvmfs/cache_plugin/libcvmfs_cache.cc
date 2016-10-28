@@ -37,20 +37,20 @@ static struct cvmcache_hash Cpphash2Chash(const shash::Any &hash) {
 }
 
 static enum cvmcache_object_type ObjectType2CType(cvmfs::EnumObjectType type) {
-    switch (type) {
-      case cvmfs::OBJECT_REGULAR:
-        return CVMCACHE_OBJECT_REGULAR;
-      case cvmfs::OBJECT_CATALOG:
-        return CVMCACHE_OBJECT_CATALOG;
-      case cvmfs::OBJECT_VOLATILE:
-        return CVMCACHE_OBJECT_VOLATILE;
-    }
-    abort();
+  switch (type) {
+    case cvmfs::OBJECT_REGULAR:
+      return CVMCACHE_OBJECT_REGULAR;
+    case cvmfs::OBJECT_CATALOG:
+      return CVMCACHE_OBJECT_CATALOG;
+    case cvmfs::OBJECT_VOLATILE:
+      return CVMCACHE_OBJECT_VOLATILE;
   }
+  abort();
+}
 
 class ForwardCachePlugin : public CachePlugin {
  public:
-  ForwardCachePlugin(struct cvmcache_callbacks *callbacks)
+  explicit ForwardCachePlugin(struct cvmcache_callbacks *callbacks)
     : CachePlugin(callbacks->capabilities)
     , callbacks_(*callbacks)
   {
@@ -226,9 +226,12 @@ struct cvmcache_context {
 int cvmcache_hash_cmp(struct cvmcache_hash *a, struct cvmcache_hash *b) {
   const shash::Any hash_a = Chash2Cpphash(a);
   const shash::Any hash_b = Chash2Cpphash(b);
-  if (hash_a < hash_b) return -1;
-  else if (hash_a == hash_b) return 0;
-  else return 1;
+  if (hash_a < hash_b)
+    return -1;
+  else if (hash_a == hash_b)
+    return 0;
+  else
+    return 1;
 }
 
 char *cvmcache_hash_print(struct cvmcache_hash *h) {
