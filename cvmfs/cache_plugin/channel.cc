@@ -39,6 +39,9 @@ CachePlugin::CachePlugin(uint64_t capabilities)
 {
   atomic_init64(&next_session_id_);
   atomic_init64(&next_txn_id_);
+  atomic_init64(&next_lst_id_);
+  // Don't use listing id zero
+  atomic_inc64(&next_lst_id_);
   txn_ids_.Init(128, UniqueRequest(), HashUniqueRequest);
   MakePipe(pipe_ctrl_);
 }
@@ -101,10 +104,13 @@ void CachePlugin::HandleList(
   int64_t listing_id = msg_req->listing_id();
   msg_reply.set_listing_id(listing_id);
   msg_reply.set_is_last_part(true);
+
+  cvmfs::EnumStatus status;
   if (msg_req->listing_id() == 0) {
-    listing_id = ListingBegin(msg_req->object_type());
-    if (listing_id < 0) {
-      msg_reply.set_status(static_cast<cvmfs::EnumStatus>(-listing_id));
+    listing_id = NextLstId();
+    status = ListingBegin(listing_id, msg_req->object_type());
+    if (status != cvmfs::STATUS_OK) {
+      msg_reply.set_status(status);
       transport->SendFrame(&frame_send);
       return;
     }
@@ -114,7 +120,6 @@ void CachePlugin::HandleList(
 
   ObjectInfo item;
   unsigned total_size = 0;
-  cvmfs::EnumStatus status;
   while ((status = ListingNext(listing_id, &item)) == cvmfs::STATUS_OK) {
     cvmfs::MsgListRecord *msg_list_record = msg_reply.add_list_record();
     cvmfs::MsgHash *msg_hash = new cvmfs::MsgHash();

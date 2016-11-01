@@ -69,10 +69,11 @@ class CachePlugin : SingleCopy {
                                     uint64_t *pinned_bytes) = 0;
   virtual cvmfs::EnumStatus Shrink(uint64_t shrink_to,
                                    uint64_t *used_bytes) = 0;
-  virtual int64_t ListingBegin(cvmfs::EnumObjectType type) = 0;
-  virtual cvmfs::EnumStatus ListingNext(int64_t listing_id,
+  virtual cvmfs::EnumStatus ListingBegin(uint64_t lst_id,
+                                         cvmfs::EnumObjectType type) = 0;
+  virtual cvmfs::EnumStatus ListingNext(int64_t lst_id,
                                         ObjectInfo *item) = 0;
-  virtual cvmfs::EnumStatus ListingEnd(int64_t listing_id) = 0;
+  virtual cvmfs::EnumStatus ListingEnd(int64_t lst_id) = 0;
 
  private:
   static const unsigned kDefaultMaxObjectSize = 256 * 1024;  // 256kB
@@ -97,11 +98,14 @@ class CachePlugin : SingleCopy {
 
   static void *MainProcessRequests(void *data);
 
-  uint64_t NextSessionId() {
+  inline uint64_t NextSessionId() {
     return atomic_xadd64(&next_session_id_, 1);
   }
-  uint64_t NextTxnId() {
+  inline uint64_t NextTxnId() {
     return atomic_xadd64(&next_txn_id_, 1);
+  }
+  inline uint64_t NextLstId() {
+    return atomic_xadd64(&next_lst_id_, 1);
   }
   static inline uint32_t HashUniqueRequest(const UniqueRequest &req) {
     return MurmurHash2(&req, sizeof(req), 0x07387a4f);
@@ -134,6 +138,7 @@ class CachePlugin : SingleCopy {
   std::string name_;
   atomic_int64 next_session_id_;
   atomic_int64 next_txn_id_;
+  atomic_int64 next_lst_id_;
   SmallHashDynamic<UniqueRequest, uint64_t> txn_ids_;
   std::set<int> connections_;
   pthread_t thread_io_;

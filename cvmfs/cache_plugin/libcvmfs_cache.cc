@@ -172,15 +172,20 @@ class ForwardCachePlugin : public CachePlugin {
     return static_cast<cvmfs::EnumStatus>(result);
   }
 
-  virtual int64_t ListingBegin(cvmfs::EnumObjectType type) {
+  virtual cvmfs::EnumStatus ListingBegin(
+    uint64_t lst_id,
+    cvmfs::EnumObjectType type)
+  {
     if (!(callbacks_.capabilities & CVMCACHE_CAP_LIST))
-      return -cvmfs::STATUS_NOSUPPORT;
+      return cvmfs::STATUS_NOSUPPORT;
 
-    return callbacks_.cvmcache_listing_begin(ObjectType2CType(type));
+    int result =
+      callbacks_.cvmcache_listing_begin(lst_id, ObjectType2CType(type));
+    return static_cast<cvmfs::EnumStatus>(result);
   }
 
   virtual cvmfs::EnumStatus ListingNext(
-    int64_t listing_id,
+    int64_t lst_id,
     ObjectInfo *item)
   {
     if (!(callbacks_.capabilities & CVMCACHE_CAP_LIST))
@@ -188,7 +193,7 @@ class ForwardCachePlugin : public CachePlugin {
 
     struct cvmcache_object_info c_item;
     memset(&c_item, 0, sizeof(c_item));
-    int result = callbacks_.cvmcache_listing_next(listing_id, &c_item);
+    int result = callbacks_.cvmcache_listing_next(lst_id, &c_item);
     if (result == CVMCACHE_STATUS_OK) {
       item->id = Chash2Cpphash(&c_item.id);
       item->size = c_item.size;
@@ -202,11 +207,11 @@ class ForwardCachePlugin : public CachePlugin {
     return static_cast<cvmfs::EnumStatus>(result);
   }
 
-  virtual cvmfs::EnumStatus ListingEnd(int64_t listing_id) {
+  virtual cvmfs::EnumStatus ListingEnd(int64_t lst_id) {
     if (!(callbacks_.capabilities & CVMCACHE_CAP_LIST))
       return cvmfs::STATUS_NOSUPPORT;
 
-    int result = callbacks_.cvmcache_listing_end(listing_id);
+    int result = callbacks_.cvmcache_listing_end(lst_id);
     return static_cast<cvmfs::EnumStatus>(result);
   }
 

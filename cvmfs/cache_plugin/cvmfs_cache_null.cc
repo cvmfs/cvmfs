@@ -59,7 +59,6 @@ map<ComparableHash, Object> storage;
 map<uint64_t, Listing> listings;
 
 struct cvmcache_context *ctx;
-uint64_t next_listing_id = 1;
 
 static int null_chrefcnt(struct cvmcache_hash *id, int32_t change_by) {
   ComparableHash h(*id);
@@ -206,7 +205,10 @@ static int null_shrink(uint64_t shrink_to, uint64_t *used) {
   return CVMCACHE_STATUS_PARTIAL;
 }
 
-static int64_t null_listing_begin(enum cvmcache_object_type type) {
+static int null_listing_begin(
+  uint64_t lst_id,
+  enum cvmcache_object_type type)
+{
   Listing lst;
   lst.type = type;
   lst.elems = new vector<Object>();
@@ -215,8 +217,8 @@ static int64_t null_listing_begin(enum cvmcache_object_type type) {
   {
     lst.elems->push_back(i->second);
   }
-  listings[next_listing_id] = lst;
-  return next_listing_id++;
+  listings[lst_id] = lst;
+  return CVMCACHE_STATUS_OK;
 }
 
 static int null_listing_next(

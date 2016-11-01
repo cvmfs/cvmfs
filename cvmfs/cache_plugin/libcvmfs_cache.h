@@ -133,10 +133,11 @@ struct cvmcache_callbacks {
    * Listing can be "approximate", e.g. if files are removed and/or addded in
    * the meantime, this may or may not be reflected.
    */
-  int64_t (*cvmcache_listing_begin)(enum cvmcache_object_type type);
-  int (*cvmcache_listing_next)(int64_t listing_id,
+  int (*cvmcache_listing_begin)(uint64_t lst_id,
+                                enum cvmcache_object_type type);
+  int (*cvmcache_listing_next)(int64_t lst_id,
                                struct cvmcache_object_info *item);
-  int (*cvmcache_listing_end)(int64_t listing_id);
+  int (*cvmcache_listing_end)(int64_t lst_id);
 
   int capabilities;
 };

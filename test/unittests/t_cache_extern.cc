@@ -57,6 +57,7 @@ class MockCachePlugin : public CachePlugin {
   int known_object_refcnt;
   int next_status;
   unsigned listing_nitems;
+  cvmfs::EnumObjectType listing_type;
 
  protected:
   virtual cvmfs::EnumStatus ChangeRefcount(
@@ -165,24 +166,18 @@ class MockCachePlugin : public CachePlugin {
       (known_object_refcnt == 0) ? cvmfs::STATUS_OK : cvmfs::STATUS_PARTIAL;
   }
 
-  virtual int64_t ListingBegin(cvmfs::EnumObjectType type) {
+  virtual cvmfs::EnumStatus ListingBegin(
+    uint64_t lst_id,
+    cvmfs::EnumObjectType type)
+  {
     listing_nitems = 0;
-    switch (type) {
-      case cvmfs::OBJECT_REGULAR:
-        return 1;
-      case cvmfs::OBJECT_CATALOG:
-        return 2;
-      case cvmfs::OBJECT_VOLATILE:
-        return 3;
-      default:
-        abort();
-    }
+    listing_type = type;
+    return cvmfs::STATUS_OK;
   }
 
-  virtual cvmfs::EnumStatus ListingNext(int64_t listing_id,
-                                        ObjectInfo *item)
-  {
-    if ((listing_id != 1) || (listing_nitems >= kMockListingNitems))
+  virtual cvmfs::EnumStatus ListingNext(int64_t lst_id, ObjectInfo *item) {
+    if ((listing_type != cvmfs::OBJECT_REGULAR) ||
+        (listing_nitems >= kMockListingNitems))
       return cvmfs::STATUS_OUTOFBOUNDS;
     item->id = known_object;
     item->size = known_object_content.length();
@@ -193,7 +188,7 @@ class MockCachePlugin : public CachePlugin {
     return cvmfs::STATUS_OK;
   }
 
-  virtual cvmfs::EnumStatus ListingEnd(int64_t listing_id) {
+  virtual cvmfs::EnumStatus ListingEnd(int64_t lst_id) {
     return cvmfs::STATUS_OK;
   }
 };
