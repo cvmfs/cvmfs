@@ -286,12 +286,14 @@ TEST_F(T_CachePlugin, List) {
     }
   }
 
-  vector<string> list_pinned = quota_mgr_->ListPinned();
-  EXPECT_EQ(open_fds.size(), list_pinned.size());
-  for (unsigned i = 0; i < list_pinned.size(); ++i) {
-    descriptions.erase(list_pinned[i]);
+  if ((cache_mgr_->capabilities() & cvmfs::CAP_REFCOUNT)) {
+    vector<string> list_pinned = quota_mgr_->ListPinned();
+    EXPECT_EQ(open_fds.size(), list_pinned.size());
+    for (unsigned i = 0; i < list_pinned.size(); ++i) {
+      descriptions.erase(list_pinned[i]);
+    }
+    EXPECT_EQ(N - list_pinned.size(), descriptions.size());
   }
-  EXPECT_EQ(N - list_pinned.size(), descriptions.size());
 
   vector<string> list = quota_mgr_->List();
   for (unsigned i = 0; i < list.size(); ++i) {
