@@ -197,6 +197,32 @@ TEST_F(T_CachePlugin, TransactionAbort) {
 }
 
 
+TEST_F(T_CachePlugin, CommitHandover) {
+  shash::Any id(shash::kSha1);
+  string content = "handover";
+  HashString(content, &id);
+  void *txn = alloca(cache_mgr_->SizeOfTxn());
+  EXPECT_EQ(0, cache_mgr_->StartTxn(id, content.length(), txn));
+  EXPECT_EQ(static_cast<int>(content.length()),
+            cache_mgr_->Write(content.data(), content.length(), txn));
+  int fd = cache_mgr_->OpenFromTxn(txn);
+  EXPECT_GE(fd, 0);
+  EXPECT_EQ(static_cast<int>(content.length()), cache_mgr_->GetSize(fd));
+  char char_buffer[64];
+  EXPECT_EQ(static_cast<int>(content.length()),
+            cache_mgr_->Pread(fd, char_buffer, 64, 0));
+  EXPECT_EQ(content, string(char_buffer, content.length()));
+  EXPECT_EQ(0, cache_mgr_->CommitTxn(txn));
+  EXPECT_EQ(0, cache_mgr_->Close(fd));
+
+  unsigned char *buf;
+  uint64_t size;
+  EXPECT_TRUE(cache_mgr_->Open2Mem(id, "test", &buf, &size));
+  EXPECT_EQ(content, string(reinterpret_cast<char *>(buf), size));
+  free(buf);
+}
+
+
 TEST_F(T_CachePlugin, Info) {
   if (!(cache_mgr_->capabilities() & cvmfs::CAP_INFO)) {
     printf("Skipping\n");
