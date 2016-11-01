@@ -192,7 +192,14 @@ bool FileSystem::CreateCache() {
 
   switch (cache_mgr_type_) {
     case kExternalCacheManager: {
-      int fd_client = ConnectSocket("/tmp/first_plugin");
+      if (!options_mgr_->GetValue("CVMFS_CACHE_EXTERNAL_LOCATOR", &optarg)) {
+        boot_error_ = "CVMFS_CACHE_EXTERNAL_LOCATOR missing";
+        boot_status_ = loader::kFailCacheDir;
+        return false;
+      }
+      vector<string> tokens = SplitString(optarg, '=');
+      assert(tokens[0] == "unix");
+      int fd_client = ConnectSocket(tokens[1]);
       assert(fd_client >= 0);
       cache_mgr_ = ExternalCacheManager::Create(fd_client, 1024);
       break;

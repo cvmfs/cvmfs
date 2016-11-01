@@ -250,8 +250,8 @@ struct cvmcache_context *cvmcache_init(struct cvmcache_callbacks *callbacks) {
   return new cvmcache_context(new ForwardCachePlugin(callbacks));
 }
 
-int cvmcache_listen(struct cvmcache_context *ctx, char *socket_path) {
-  return ctx->plugin->Listen(socket_path);
+int cvmcache_listen(struct cvmcache_context *ctx, char *locator) {
+  return ctx->plugin->Listen(locator);
 }
 
 void cvmcache_process_requests(struct cvmcache_context *ctx, unsigned nworkers)

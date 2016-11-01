@@ -143,7 +143,11 @@ struct cvmcache_callbacks {
 };
 
 struct cvmcache_context *cvmcache_init(struct cvmcache_callbacks *callbacks);
-int cvmcache_listen(struct cvmcache_context *ctx, char *socket_path);
+/**
+ * The locator is either a UNIX domain socket (unix=/path/to/socket) or a
+ * tcp socket (tcp=hostname:port)
+ */
+int cvmcache_listen(struct cvmcache_context *ctx, char *locator);
 /**
  * Spawns a separate I/O thread that can be stopped with cvmcache_terminate.
  * The nworkers parameter is currently unused.

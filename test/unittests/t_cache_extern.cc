@@ -38,7 +38,7 @@ class MockCachePlugin : public CachePlugin {
   explicit MockCachePlugin(const string &socket_path)
     : CachePlugin(cvmfs::CAP_ALL)
   {
-    bool retval = Listen(socket_path);
+    bool retval = Listen("unix=" + socket_path);
     assert(retval);
     ProcessRequests(0);
     known_object.algorithm = shash::kSha1;

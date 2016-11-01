@@ -255,7 +255,7 @@ static int null_listing_end(int64_t listing_id) {
 }
 
 static void Usage(const char *progname) {
-  printf("%s <Cvmfs cache socket>\n", progname);
+  printf("%s <locator (e.g. unix=/tmp/socket)>\n", progname);
 }
 
 

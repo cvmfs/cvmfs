@@ -36,7 +36,7 @@ class CachePlugin : SingleCopy {
     std::string description;
   };
 
-  bool Listen(const std::string &socket_path);
+  bool Listen(const std::string &locator);
   ~CachePlugin();
   void ProcessRequests(unsigned num_workers);
   void AskToDetach();

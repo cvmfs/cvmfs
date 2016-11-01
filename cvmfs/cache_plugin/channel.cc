@@ -17,6 +17,7 @@
 #include "logging.h"
 #include "util/pointer.h"
 #include "util/posix.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 
@@ -387,8 +388,11 @@ void CachePlugin::HandleStore(
 }
 
 
-bool CachePlugin::Listen(const string &socket_path) {
-  socket_path_ = socket_path;
+bool CachePlugin::Listen(const string &locator) {
+  vector<string> tokens = SplitString(locator, '=');
+  // TODO(jblomer): implement TCP
+  assert(tokens[0] == "unix");
+  socket_path_ = tokens[1];
   fd_socket_ = MakeSocket(socket_path_, 0600);
   if (fd_socket_ < 0) {
     LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
