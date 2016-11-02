@@ -186,6 +186,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   globals.cc globals.h
   hash.cc hash.h
   history.h
+  history_fs.cc history_fs.h
   history_sql.cc history_sql.h
   history_sqlite.cc history_sqlite.h
   json_document.cc json_document.h
