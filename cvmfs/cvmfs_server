@@ -4897,6 +4897,9 @@ cvmfs_server_publish() {
     if [ "x${CVMFS_VOMS_AUTHZ}" != x ]; then
       sync_command="$sync_command -V"
     fi
+    if [ "x${CVMFS_VIRTUAL_TAGDIR}" = "xtrue" ]; then
+      sync_command="$sync_command -S"
+    fi
     local tag_command="$(__swissknife_cmd dbg) tag_create \
       -r $upstream                                        \
       -w $stratum0                                        \
