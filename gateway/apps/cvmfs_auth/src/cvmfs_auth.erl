@@ -260,53 +260,53 @@ priv_get_user_paths(User) ->
                                                    Repo <- Repos,
                                                    #repo{path = Path} <- mnesia:read(repo, Repo)]}
                              end,
-                        {atomic, Result} = mnesia:transaction(T2),
+                        {atomic, Result} = mnesia:sync_transaction(T2),
                         Result
                 end
         end,
-    {atomic, Result} = mnesia:transaction(T1),
+    {atomic, Result} = mnesia:sync_transaction(T1),
     Result.
 
 priv_add_user(User, Repos) ->
     T = fun() ->
                 mnesia:write(#acl{u_id = User, r_ids = Repos})
         end,
-    {atomic, Result} = mnesia:transaction(T),
+    {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
 priv_remove_user(User) ->
     T = fun() ->
                 mnesia:delete({acl, User})
         end,
-    {atomic, Result} = mnesia:transaction(T),
+    {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
 priv_get_users() ->
     T = fun() ->
                 mnesia:foldl(fun(#acl{u_id = User}, Acc) -> [User | Acc] end, [], acl)
         end,
-    {atomic, Result} = mnesia:transaction(T),
+    {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
 priv_add_repo(Repo, Path) ->
     T = fun() ->
                 mnesia:write(#repo{r_id = Repo, path = Path})
         end,
-    {atomic, Result} = mnesia:transaction(T),
+    {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
 priv_remove_repo(Repo) ->
     T = fun() ->
                 mnesia:delete({repo, Repo})
         end,
-    {atomic, Result} = mnesia:transaction(T),
+    {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
 priv_get_repos() ->
     T = fun() ->
                 mnesia:foldl(fun(#repo{r_id = Repo}, Acc) -> [Repo | Acc] end, [], repo)
         end,
-    {atomic, Result} = mnesia:transaction(T),
+    {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
 -spec priv_populate_acl([{binary(), [binary()]}]) -> [true].
@@ -314,7 +314,7 @@ priv_populate_acl(ACL) ->
     T = fun() ->
                 [mnesia:write(#acl{u_id = ClientId, r_ids = RepoList}) || {ClientId, RepoList} <- ACL]
         end,
-    {atomic, Result} = mnesia:transaction(T),
+    {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
 -spec priv_populate_repos([{binary(), binary()}]) -> [true].
@@ -322,5 +322,5 @@ priv_populate_repos(RepoList) ->
     T = fun() ->
                 [mnesia:write(#repo{r_id = RepoId, path = RepoPath}) || {RepoId, RepoPath} <- RepoList]
         end,
-    {atomic, Result} = mnesia:transaction(T),
+    {atomic, Result} = mnesia:sync_transaction(T),
     Result.
