@@ -255,13 +255,25 @@ static int null_listing_end(int64_t listing_id) {
 }
 
 static void Usage(const char *progname) {
-  printf("%s <locator (e.g. unix=/tmp/socket)>\n", progname);
+  printf("%s <config file>\n", progname);
 }
 
 
 int main(int argc, char **argv) {
   if (argc < 2) {
     Usage(argv[0]);
+    return 1;
+  }
+
+  cvmcache_option_map *options = cvmcache_options_init();
+  if (cvmcache_options_parse(options, argv[1]) != 0) {
+    printf("cannot parse options file %s\n", argv[1]);
+    return 1;
+  }
+  char *locator = cvmcache_options_get(options, "CVMFS_CACHE_EXTERNAL_LOCATOR");
+  if (locator == NULL) {
+    printf("CVMFS_CACHE_EXTERNAL_LOCATOR missing\n");
+    cvmcache_options_fini(options);
     return 1;
   }
 
@@ -282,12 +294,14 @@ int main(int argc, char **argv) {
   callbacks.capabilities = CVMCACHE_CAP_ALL;
 
   ctx = cvmcache_init(&callbacks);
-  int retval = cvmcache_listen(ctx, argv[1]);
+  int retval = cvmcache_listen(ctx, locator);
   assert(retval);
-  printf("Listening for cvmfs clients on %s\n", argv[1]);
+  printf("Listening for cvmfs clients on %s\n", locator);
   cvmcache_process_requests(ctx, 0);
   while (true) {
     sleep(1);
   }
+  cvmcache_options_free(locator);
+  cvmcache_options_fini(options);
   return 0;
 }
