@@ -151,13 +151,12 @@ class MockCachePlugin : public CachePlugin {
     return cvmfs::STATUS_OK;
   }
 
-  virtual cvmfs::EnumStatus GetInfo(uint64_t *size_bytes,
-                                    uint64_t *used_bytes,
-                                    uint64_t *pinned_bytes)
+  virtual cvmfs::EnumStatus GetInfo(Info *info)
   {
-    *size_bytes = kMockCacheSize;
-    *used_bytes = known_object_content.length();
-    *pinned_bytes = (known_object_refcnt == 0) ? 0 : *used_bytes;
+    info->size_bytes = kMockCacheSize;
+    info->used_bytes = known_object_content.length();
+    info->pinned_bytes = (known_object_refcnt == 0) ? 0 : info->used_bytes;
+    info->no_shrink = 0;
     return cvmfs::STATUS_OK;
   }
 

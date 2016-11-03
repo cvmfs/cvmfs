@@ -36,6 +36,14 @@ class CachePlugin : SingleCopy {
     std::string description;
   };
 
+  struct Info {
+    Info() : size_bytes(0), used_bytes(0), pinned_bytes(0), no_shrink(-1) { }
+    uint64_t size_bytes;
+    uint64_t used_bytes;
+    uint64_t pinned_bytes;
+    int64_t no_shrink;
+  };
+
   bool Listen(const std::string &locator);
   ~CachePlugin();
   void ProcessRequests(unsigned num_workers);
@@ -64,9 +72,7 @@ class CachePlugin : SingleCopy {
   virtual cvmfs::EnumStatus AbortTxn(const uint64_t txn_id) = 0;
   virtual cvmfs::EnumStatus CommitTxn(const uint64_t txn_id) = 0;
 
-  virtual cvmfs::EnumStatus GetInfo(uint64_t *size_bytes,
-                                    uint64_t *used_bytes,
-                                    uint64_t *pinned_bytes) = 0;
+  virtual cvmfs::EnumStatus GetInfo(Info *info) = 0;
   virtual cvmfs::EnumStatus Shrink(uint64_t shrink_to,
                                    uint64_t *used_bytes) = 0;
   virtual cvmfs::EnumStatus ListingBegin(uint64_t lst_id,

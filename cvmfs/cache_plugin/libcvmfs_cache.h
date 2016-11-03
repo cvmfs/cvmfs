@@ -55,14 +55,15 @@ enum cvmcache_object_type {
 
 // Mirrors cvmfs::EnumCapability protobuf definition
 enum cvmcache_capabilities {
-  CVMCACHE_CAP_NONE      = 0,
+  CVMCACHE_CAP_NONE        = 0,
   // Proper refcounting is implemented; for lower tier caches, this capability
   // can be unset and reference counting can simply beomce file existence check
-  CVMCACHE_CAP_REFCOUNT  = 1,
-  CVMCACHE_CAP_SHRINK    = 2,  // clients can ask the cache to shrink
-  CVMCACHE_CAP_INFO      = 4,  // cache plugin knows about its fill level
-  CVMCACHE_CAP_LIST      = 8,  // cache can return a list of objects
-  CVMCACHE_CAP_ALL       = 15
+  CVMCACHE_CAP_REFCOUNT    = 1,
+  CVMCACHE_CAP_SHRINK      = 2,   // clients can ask the cache to shrink
+  CVMCACHE_CAP_INFO        = 4,   // cache plugin knows about its fill level
+  CVMCACHE_CAP_SHRINK_RATE = 8,   // cache knows number of cleanup operations
+  CVMCACHE_CAP_LIST        = 16,  // cache can return a list of objects
+  CVMCACHE_CAP_ALL         = 31
 };
 
 
@@ -77,6 +78,13 @@ struct cvmcache_object_info {
   enum cvmcache_object_type type;
   int pinned;
   char *description;
+};
+
+struct cvmcache_info {
+  uint64_t size_bytes;
+  uint64_t used_bytes;
+  uint64_t pinned_bytes;
+  int64_t no_shrink;
 };
 
 struct cvmcache_context;
@@ -127,7 +135,7 @@ struct cvmcache_callbacks {
   int (*cvmcache_commit_txn)(uint64_t txn_id);
   int (*cvmcache_abort_txn)(uint64_t txn_id);
 
-  int (*cvmcache_info)(uint64_t *size, uint64_t *used, uint64_t *pinned);
+  int (*cvmcache_info)(struct cvmcache_info *info);
   int (*cvmcache_shrink)(uint64_t shrink_to, uint64_t *used);
   /**
    * Listing can be "approximate", e.g. if files are removed and/or addded in

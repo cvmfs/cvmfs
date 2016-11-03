@@ -63,6 +63,8 @@ class ForwardCachePlugin : public CachePlugin {
     assert(callbacks->cvmcache_abort_txn != NULL);
     if (callbacks->capabilities & CVMCACHE_CAP_INFO)
       assert(callbacks->cvmcache_info != NULL);
+    if (callbacks->capabilities & CVMCACHE_CAP_SHRINK_RATE)
+      assert(callbacks->capabilities & CVMCACHE_CAP_INFO);
     if (callbacks->capabilities & CVMCACHE_CAP_SHRINK)
       assert(callbacks->cvmcache_shrink != NULL);
     if (callbacks->capabilities & CVMCACHE_CAP_LIST) {
@@ -152,15 +154,22 @@ class ForwardCachePlugin : public CachePlugin {
     return static_cast<cvmfs::EnumStatus>(result);
   }
 
-  virtual cvmfs::EnumStatus GetInfo(
-    uint64_t *size,
-    uint64_t *used,
-    uint64_t *pinned)
-  {
+  virtual cvmfs::EnumStatus GetInfo(Info *info) {
     if (!(callbacks_.capabilities & CVMCACHE_CAP_INFO))
       return cvmfs::STATUS_NOSUPPORT;
 
-    int result = callbacks_.cvmcache_info(size, used, pinned);
+    cvmcache_info c_info;
+    c_info.size_bytes = info->size_bytes;
+    c_info.used_bytes = info->used_bytes;
+    c_info.pinned_bytes = info->pinned_bytes;
+    c_info.no_shrink = info->no_shrink;
+    int result = callbacks_.cvmcache_info(&c_info);
+    if (result == CVMCACHE_STATUS_OK) {
+      info->size_bytes = c_info.size_bytes;
+      info->used_bytes = c_info.used_bytes;
+      info->pinned_bytes = c_info.pinned_bytes;
+      info->no_shrink = c_info.no_shrink;
+    }
     return static_cast<cvmfs::EnumStatus>(result);
   }
 

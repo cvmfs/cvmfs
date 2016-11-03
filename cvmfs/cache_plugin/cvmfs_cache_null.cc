@@ -151,23 +151,25 @@ static int null_abort_txn(uint64_t txn_id) {
   return CVMCACHE_STATUS_OK;
 }
 
-static int null_info(uint64_t *size, uint64_t *used, uint64_t *pinned) {
-  *size = uint64_t(-1);
-  *used = *pinned = 0;
+static int null_info(struct cvmcache_info *info) {
+  info->size_bytes = uint64_t(-1);
+  info->used_bytes = info->pinned_bytes = 0;
   for (map<ComparableHash, Object>::const_iterator i = storage.begin(),
        i_end = storage.end(); i != i_end; ++i)
   {
-    *used += i->second.data.length();
+    info->used_bytes += i->second.data.length();
     if (i->second.refcnt > 0)
-      *pinned += i->second.data.length();
+      info->pinned_bytes += i->second.data.length();
   }
+  info->no_shrink = 0;
   return CVMCACHE_STATUS_OK;
 }
 
 static int null_shrink(uint64_t shrink_to, uint64_t *used) {
-  uint64_t size, pinned;
-  null_info(&size, used, &pinned);
-  if (*used <= shrink_to)
+  struct cvmcache_info info;
+  null_info(&info);
+  *used = info.used_bytes;
+  if (info.used_bytes <= shrink_to)
     return CVMCACHE_STATUS_OK;
 
   // Volatile objects
@@ -182,9 +184,11 @@ static int null_shrink(uint64_t shrink_to, uint64_t *used) {
     unsigned length = i->second.data.length();
     map<ComparableHash, Object>::iterator delete_me = i++;
     storage.erase(delete_me);
-    *used -= length;
-    if (*used <= shrink_to)
+    info.used_bytes -= length;
+    if (info.used_bytes <= shrink_to) {
+      *used = info.used_bytes;
       return CVMCACHE_STATUS_OK;
+    }
   }
   // All other objects
   for (map<ComparableHash, Object>::iterator i = storage.begin(),
@@ -197,11 +201,14 @@ static int null_shrink(uint64_t shrink_to, uint64_t *used) {
     unsigned length = i->second.data.length();
     map<ComparableHash, Object>::iterator delete_me = i++;
     storage.erase(delete_me);
-    *used -= length;
-    if (*used <= shrink_to)
+    info.used_bytes -= length;
+    if (info.used_bytes <= shrink_to) {
+      *used = info.used_bytes;
       return CVMCACHE_STATUS_OK;
+    }
   }
 
+  *used = info.used_bytes;
   return CVMCACHE_STATUS_PARTIAL;
 }
 

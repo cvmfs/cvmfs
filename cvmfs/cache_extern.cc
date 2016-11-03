@@ -660,6 +660,8 @@ int ExternalQuotaManager::GetInfo(QuotaInfo *quota_info) {
     quota_info->size = msg_reply->size_bytes();
     quota_info->used = msg_reply->used_bytes();
     quota_info->pinned = msg_reply->pinned_bytes();
+    if (msg_reply->no_shrink() >= 0)
+      quota_info->no_shrink = msg_reply->no_shrink();
   }
   return Ack2Errno(msg_reply->status());
 }
@@ -671,6 +673,15 @@ uint64_t ExternalQuotaManager::GetCapacity() {
   if (retval != 0)
     return uint64_t(-1);
   return info.size;
+}
+
+
+uint64_t ExternalQuotaManager::GetCleanupRate(uint64_t period_s) {
+  QuotaInfo info;
+  int retval = GetInfo(&info);
+  if (retval != 0)
+    return 0;
+  return info.no_shrink;
 }
 
 
@@ -696,6 +707,8 @@ bool ExternalQuotaManager::HasCapability(Capabilities capability) {
   switch (capability) {
     case kCapIntrospectSize:
       return cache_mgr_->capabilities_ & cvmfs::CAP_INFO;
+    case kCapIntrospectCleanupRate:
+      return cache_mgr_->capabilities_ & cvmfs::CAP_SHRINK_RATE;
     case kCapList:
       return cache_mgr_->capabilities_ & cvmfs::CAP_LIST;
     case kCapShrink:

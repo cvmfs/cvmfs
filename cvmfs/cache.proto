@@ -67,14 +67,15 @@ enum EnumObjectType {
 }
 
 enum EnumCapabilities {
-  CAP_NONE      = 0;
+  CAP_NONE        = 0;
   // Proper refcounting is implemented; for lower tier caches, this capability
   // can be unset and reference counting can simply beomce file existence check
-  CAP_REFCOUNT  = 1;
-  CAP_SHRINK    = 2;   // clients can ask the cache to shrink
-  CAP_INFO      = 4;   // cache plugin knows about its size and fill level
-  CAP_LIST      = 8;   // cache can return a list of objects
-  CAP_ALL       = 15;
+  CAP_REFCOUNT    = 1;
+  CAP_SHRINK      = 2;   // clients can ask the cache to shrink
+  CAP_INFO        = 4;   // cache plugin knows about its size and fill level
+  CAP_SHRINK_RATE = 8;   // cache knows number of cleanup operations
+  CAP_LIST        = 16;  // cache can return a list of objects
+  CAP_ALL         = 31;
 }
 
 
@@ -233,8 +234,10 @@ message MsgReadReply {
 
 // Asks for fill gauge of the cache
 message MsgInfoReq {
-  required uint64 session_id = 1;
-  required uint64 req_id     = 2;
+  required uint64 session_id          = 1;
+  required uint64 req_id              = 2;
+  // Number of cleanups in the last X seconds
+  optional uint64 no_shrink_in_period = 3;
 }
 
 message MsgInfoReply {
@@ -243,6 +246,8 @@ message MsgInfoReply {
   required uint64 size_bytes     = 3;
   required uint64 used_bytes     = 4;
   required uint64 pinned_bytes   = 5;
+  // -1 if the capability is missing
+  required int64 no_shrink       = 6;
 }
 
 // Asks about a specific object

@@ -82,13 +82,12 @@ void CachePlugin::HandleInfo(
   CacheTransport::Frame frame_send(&msg_reply);
 
   msg_reply.set_req_id(msg_req->req_id());
-  uint64_t size = 0;
-  uint64_t used = 0;
-  uint64_t pinned = 0;
-  cvmfs::EnumStatus status = GetInfo(&size, &used, &pinned);
-  msg_reply.set_size_bytes(size);
-  msg_reply.set_used_bytes(used);
-  msg_reply.set_pinned_bytes(pinned);
+  Info info;
+  cvmfs::EnumStatus status = GetInfo(&info);
+  msg_reply.set_size_bytes(info.size_bytes);
+  msg_reply.set_used_bytes(info.used_bytes);
+  msg_reply.set_pinned_bytes(info.pinned_bytes);
+  msg_reply.set_no_shrink(info.no_shrink);
   msg_reply.set_status(status);
   transport->SendFrame(&frame_send);
 }

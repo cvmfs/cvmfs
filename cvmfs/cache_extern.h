@@ -280,7 +280,7 @@ class ExternalQuotaManager : public QuotaManager {
   virtual uint64_t GetCapacity();
   virtual uint64_t GetSize();
   virtual uint64_t GetSizePinned();
-  virtual uint64_t GetCleanupRate(uint64_t period_s) { return 0; }
+  virtual uint64_t GetCleanupRate(uint64_t period_s);
 
   virtual void Spawn() { }
   virtual pid_t GetPid() { return getpid(); }
@@ -288,10 +288,11 @@ class ExternalQuotaManager : public QuotaManager {
 
  private:
   struct QuotaInfo {
-    QuotaInfo() : size(0), used(0), pinned(0) { }
+    QuotaInfo() : size(0), used(0), pinned(0), no_shrink(0) { }
     uint64_t size;
     uint64_t used;
     uint64_t pinned;
+    int64_t no_shrink;
   };
 
   explicit ExternalQuotaManager(ExternalCacheManager *cache_mgr)
