@@ -133,11 +133,11 @@ class ExternalCacheManager : public CacheManager {
       : req_id_(msg->req_id()), part_nr_(0), msg_req_(msg),
         frame_send_(msg) { }
     explicit RpcJob(cvmfs::MsgInfoReq *msg)
-      : req_id_(msg->req_id()), msg_req_(msg), frame_send_(msg) { }
+      : req_id_(msg->req_id()), part_nr_(0), msg_req_(msg), frame_send_(msg) { }
     explicit RpcJob(cvmfs::MsgShrinkReq *msg)
-      : req_id_(msg->req_id()), msg_req_(msg), frame_send_(msg) { }
+      : req_id_(msg->req_id()), part_nr_(0), msg_req_(msg), frame_send_(msg) { }
     explicit RpcJob(cvmfs::MsgListReq *msg)
-      : req_id_(msg->req_id()), msg_req_(msg), frame_send_(msg) { }
+      : req_id_(msg->req_id()), part_nr_(0), msg_req_(msg), frame_send_(msg) { }
 
     void set_attachment_send(void *data, unsigned size) {
       frame_send_.set_attachment(data, size);
@@ -248,7 +248,7 @@ class ExternalCacheManager : public CacheManager {
 class ExternalQuotaManager : public QuotaManager {
  public:
   static ExternalQuotaManager *Create(ExternalCacheManager *cache_mgr);
-  virtual bool IsEnforcing() { return true; }
+  virtual bool HasCapability(Capabilities capability);
 
   virtual void Insert(const shash::Any &hash, const uint64_t size,
                       const std::string &description)

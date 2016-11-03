@@ -590,7 +590,7 @@ bool ExternalQuotaManager::DoListing(
   cvmfs::EnumObjectType type,
   vector<cvmfs::MsgListRecord> *result)
 {
-  if (!(cache_mgr_->capabilities_ && cvmfs::CAP_LIST))
+  if (!(cache_mgr_->capabilities_ & cvmfs::CAP_LIST))
     return false;
 
   uint64_t listing_id = 0;
@@ -619,7 +619,7 @@ bool ExternalQuotaManager::DoListing(
 
 
 bool ExternalQuotaManager::Cleanup(const uint64_t leave_size) {
-  if (!(cache_mgr_->capabilities_ && cvmfs::CAP_SHRINK))
+  if (!(cache_mgr_->capabilities_ & cvmfs::CAP_SHRINK))
     return false;
 
   cvmfs::MsgShrinkReq msg_shrink;
@@ -646,7 +646,7 @@ ExternalQuotaManager *ExternalQuotaManager::Create(
 
 
 int ExternalQuotaManager::GetInfo(QuotaInfo *quota_info) {
-  if (!(cache_mgr_->capabilities_ && cvmfs::CAP_INFO))
+  if (!(cache_mgr_->capabilities_ & cvmfs::CAP_INFO))
     return Ack2Errno(cvmfs::STATUS_NOSUPPORT);
 
   cvmfs::MsgInfoReq msg_info;
@@ -689,6 +689,20 @@ uint64_t ExternalQuotaManager::GetSizePinned() {
   if (retval != 0)
     return 0;
   return info.pinned;
+}
+
+
+bool ExternalQuotaManager::HasCapability(Capabilities capability) {
+  switch (capability) {
+    case kCapIntrospectSize:
+      return cache_mgr_->capabilities_ & cvmfs::CAP_INFO;
+    case kCapList:
+      return cache_mgr_->capabilities_ & cvmfs::CAP_LIST;
+    case kCapShrink:
+      return cache_mgr_->capabilities_ & cvmfs::CAP_SHRINK;
+    default:
+      return false;
+  }
 }
 
 

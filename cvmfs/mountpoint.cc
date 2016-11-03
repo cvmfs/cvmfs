@@ -202,6 +202,7 @@ bool FileSystem::CreateCache() {
       int fd_client = ConnectSocket(tokens[1]);
       assert(fd_client >= 0);
       cache_mgr_ = ExternalCacheManager::Create(fd_client, 1024);
+      assert(cache_mgr_ != NULL);
       break;
     }
     case kPosixCacheManager:
@@ -720,6 +721,11 @@ bool FileSystem::SetupNfsMaps() {
 bool FileSystem::SetupQuotaMgmt() {
   if (cache_mgr_type_ == kRamCacheManager) {
     cache_mgr_->AcquireQuotaManager(new NoopQuotaManager());
+    return true;
+  }
+  if (cache_mgr_type_ == kExternalCacheManager) {
+    cache_mgr_->AcquireQuotaManager(ExternalQuotaManager::Create(
+      reinterpret_cast<ExternalCacheManager *>(cache_mgr_)));
     return true;
   }
 

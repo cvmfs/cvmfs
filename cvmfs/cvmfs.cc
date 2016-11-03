@@ -48,9 +48,6 @@
 #include <sys/mount.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
-#ifndef __APPLE__
-#include <sys/statfs.h>
-#endif
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -1371,7 +1368,9 @@ static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
   memset(&info, 0, sizeof(info));
 
   // Unmanaged cache
-  if (!file_system_->cache_mgr()->quota_mgr()->IsEnforcing()) {
+  if (!file_system_->cache_mgr()->quota_mgr()->HasCapability(
+       QuotaManager::kCapIntrospectSize))
+  {
     fuse_reply_statfs(req, &info);
     return;
   }
@@ -1382,14 +1381,8 @@ static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
   info.f_bsize = 1;
 
   if (capacity == (uint64_t)(-1)) {
-    // Unrestricted cache, look at free space on cache dir fs
-    struct statfs cache_buf;
-    if (statfs(".", &cache_buf) == 0) {
-      available = cache_buf.f_bavail * cache_buf.f_bsize;
-      info.f_blocks = size + available;
-    } else {
-      info.f_blocks = size;
-    }
+    // Unknown capacity, set capacity = size
+    info.f_blocks = size;
   } else {
     // Take values from LRU module
     info.f_blocks = capacity;
@@ -2069,7 +2062,7 @@ static void Spawn() {
   cvmfs::mount_point_->external_download_mgr()->Spawn();
   QuotaManager *quota_mgr = cvmfs::file_system_->cache_mgr()->quota_mgr();
   quota_mgr->Spawn();
-  if (quota_mgr->IsEnforcing()) {
+  if (quota_mgr->HasCapability(QuotaManager::kCapListeners)) {
     cvmfs::watchdog_listener_ = quota::RegisterWatchdogListener(
       quota_mgr,
       cvmfs::mount_point_->uuid()->uuid() + "-watchdog");

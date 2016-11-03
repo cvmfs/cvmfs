@@ -27,6 +27,9 @@
 #include <stdint.h>
 #include <sys/dir.h>
 #include <sys/stat.h>
+#ifndef __APPLE__
+#include <sys/statfs.h>
+#endif
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -541,7 +544,18 @@ vector<string> PosixQuotaManager::DoList(const CommandType list_command) {
 
 
 uint64_t PosixQuotaManager::GetCapacity() {
-  return limit_;
+  if (limit_ != (uint64_t)(-1))
+    return limit_;
+
+  // Unrestricted cache, look at free space on cache dir fs
+  struct statfs info;
+  if (statfs(".", &info) == 0) {
+    return info.f_bavail * info.f_bsize;
+  } else {
+    LogCvmfs(kLogQuota, kLogSyslogErr | kLogDebug,
+             "failed to query file system info of cache (%d)", errno);
+    return limit_;
+  }
 }
 
 

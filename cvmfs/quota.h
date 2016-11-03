@@ -44,9 +44,17 @@ class QuotaManager : SingleCopy {
    */
   static const uint32_t kProtocolRevision;
 
+  enum Capabilities {
+    kCapIntrospectSize = 0,
+    kCapIntrospectCleanupRate,
+    kCapList,
+    kCapShrink,
+    kCapListeners,
+  };
+
   QuotaManager();
   virtual ~QuotaManager();
-  virtual bool IsEnforcing() = 0;
+  virtual bool HasCapability(Capabilities capability) = 0;
 
   virtual void Insert(const shash::Any &hash, const uint64_t size,
                       const std::string &description) = 0;
@@ -108,7 +116,7 @@ class QuotaManager : SingleCopy {
 class NoopQuotaManager : public QuotaManager {
  public:
   virtual ~NoopQuotaManager() { }
-  virtual bool IsEnforcing() { return false; }
+  virtual bool HasCapability(Capabilities capability) { return false; }
 
   virtual void Insert(const shash::Any &hash, const uint64_t size,
                       const std::string &description) { }

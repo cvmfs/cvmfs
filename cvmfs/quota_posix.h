@@ -52,7 +52,7 @@ class PosixQuotaManager : public QuotaManager {
   static int MainCacheManager(int argc, char **argv);
 
   virtual ~PosixQuotaManager();
-  virtual bool IsEnforcing() { return true; }
+  virtual bool HasCapability(Capabilities capability) { return true; }
 
   virtual void Insert(const shash::Any &hash, const uint64_t size,
                       const std::string &description);
