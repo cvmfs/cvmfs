@@ -272,7 +272,7 @@ priv_new_lease(User, Repo, Path, _State) ->
                         priv_write_row(User, Repo, Path)
                 end
         end,
-    {atomic, Result} = mnesia:transaction(T),
+    {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
 priv_end_lease(Repo, Path) ->
@@ -284,14 +284,14 @@ priv_end_lease(Repo, Path) ->
                         mnesia:delete({lease, {Repo, Path}})
                 end
         end,
-    {atomic, Result} = mnesia:transaction(T),
+    {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
 priv_get_leases() ->
     T = fun() ->
                 mnesia:foldl(fun(Lease, Acc) -> [Lease | Acc] end, [], lease)
         end,
-    {atomic, Result} = mnesia:transaction(T),
+    {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
 priv_clear_leases() ->
