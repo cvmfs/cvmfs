@@ -75,6 +75,7 @@ class CommandTag : public Command {
                       const history::History::Tag  &current_head_template,
                       const bool                    undo_rollback = false);
 
+  // TODO(jblomer): replace by swissknife::Assistant
   bool FetchObject(const std::string    &repository_url,
                    const shash::Any     &object_hash,
                    const std::string    &destination_path) const;

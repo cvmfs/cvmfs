@@ -19,14 +19,14 @@
 namespace download {
 class DownloadManager;
 }
-namespace signature {
-class SignatureManager;
+namespace manifest {
+class Manifest;
 }
 namespace perf {
 class Statistics;
 }
-namespace manifest {
-class Manifest;
+namespace signature {
+class SignatureManager;
 }
 
 namespace swissknife {

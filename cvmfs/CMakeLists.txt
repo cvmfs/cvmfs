@@ -215,6 +215,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   sqlitemem.cc sqlitemem.h
   statistics.cc statistics.h
   swissknife.cc swissknife.h
+  swissknife_assistant.cc swissknife_assistant.h
   swissknife_check.cc swissknife_check.h
   swissknife_gc.cc swissknife_gc.h
   swissknife_graft.cc swissknife_graft.h
