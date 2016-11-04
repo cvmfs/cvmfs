@@ -8,6 +8,7 @@ cvmcache_hash_print
 cvmcache_init
 cvmcache_listen
 cvmcache_process_requests
+cvmcache_ask_detach
 cvmcache_terminate
 cvmcache_max_object_size
 cvmcache_options_init

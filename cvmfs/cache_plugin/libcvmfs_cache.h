@@ -161,6 +161,11 @@ int cvmcache_listen(struct cvmcache_context *ctx, char *locator);
  * The nworkers parameter is currently unused.
  */
 void cvmcache_process_requests(struct cvmcache_context *ctx, unsigned nworkers);
+/**
+ * Politely ask connected clients to release open nested catalogs so that more
+ * objects in the cache become unpinned.
+ */
+void cvmcache_ask_detach(struct cvmcache_context *ctx);
 void cvmcache_terminate(struct cvmcache_context *ctx);
 
 uint32_t cvmcache_max_object_size(struct cvmcache_context *ctx);

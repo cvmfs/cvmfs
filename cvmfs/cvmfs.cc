@@ -1868,6 +1868,7 @@ static void SetCvmfsOperations(struct fuse_lowlevel_ops *cvmfs_operations) {
   cvmfs_operations->forget      = cvmfs_forget;
 }
 
+// Called by cvmfs_talk when switching into read-only cache mode
 void UnregisterQuotaListener() {
   if (cvmfs::unpin_listener_) {
     quota::UnregisterListener(cvmfs::unpin_listener_);

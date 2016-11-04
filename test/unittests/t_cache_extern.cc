@@ -390,9 +390,39 @@ TEST_F(T_ExternalCacheManager, TransactionAbort) {
 }
 
 
+namespace {
+
+struct BackchannelData {
+  BackchannelData() : nfired(0) { };
+  unsigned nfired;
+  int channel[2];
+};
+
+void *MainBackchannel(void *data) {
+  BackchannelData *bd = reinterpret_cast<BackchannelData *>(data);
+  while (true) {
+    char buf;
+    ReadPipe(bd->channel[0], &buf, 1);
+    if (buf == 'R') {
+      bd->nfired++;
+      continue;
+    }
+    if (buf == 'T')
+      return NULL;
+    abort();
+  }
+}
+
+}
+
 TEST_F(T_ExternalCacheManager, Detach) {
   int fd = cache_mgr_->Open(CacheManager::Bless(mock_plugin_->known_object));
   EXPECT_GE(fd, 0);
+  BackchannelData bd;
+  quota_mgr_->RegisterBackChannel(bd.channel, "xyz");
+  pthread_t thread_backchannel;
+  int retval = pthread_create(&thread_backchannel, NULL, MainBackchannel, &bd);
+  ASSERT_EQ(0, retval);
 
   mock_plugin_->AskToDetach();
 
@@ -404,7 +434,14 @@ TEST_F(T_ExternalCacheManager, Detach) {
             string(buf, mock_plugin_->known_object_content.length()));
   EXPECT_EQ(0, cache_mgr_->Close(fd));
 
+  // Not picked up anymore by single threaded cache manager
   mock_plugin_->AskToDetach();
+
+  buf[0] = 'T';
+  WritePipe(bd.channel[1], &buf[0], 1);
+  pthread_join(thread_backchannel, NULL);
+  quota_mgr_->UnregisterBackChannel(bd.channel, "xyz");
+  EXPECT_EQ(1U, bd.nfired);
 }
 
 

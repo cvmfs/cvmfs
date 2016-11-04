@@ -268,9 +268,9 @@ class ExternalQuotaManager : public QuotaManager {
   virtual bool Cleanup(const uint64_t leave_size);
 
   virtual void RegisterBackChannel(int back_channel[2],
-                                   const std::string &channel_id) { }
+                                   const std::string &channel_id);
   virtual void UnregisterBackChannel(int back_channel[2],
-                                     const std::string &channel_id) { }
+                                     const std::string &channel_id);
 
   virtual std::vector<std::string> List();
   virtual std::vector<std::string> ListPinned();
@@ -292,7 +292,7 @@ class ExternalQuotaManager : public QuotaManager {
     uint64_t size;
     uint64_t used;
     uint64_t pinned;
-    int64_t no_shrink;
+    uint64_t no_shrink;
   };
 
   explicit ExternalQuotaManager(ExternalCacheManager *cache_mgr)

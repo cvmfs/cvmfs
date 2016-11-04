@@ -268,6 +268,10 @@ void cvmcache_process_requests(struct cvmcache_context *ctx, unsigned nworkers)
   ctx->plugin->ProcessRequests(nworkers);
 }
 
+void cvmcache_ask_detach(struct cvmcache_context *ctx) {
+  ctx->plugin->AskToDetach();
+}
+
 void cvmcache_terminate(struct cvmcache_context *ctx) {
   delete ctx;
 }

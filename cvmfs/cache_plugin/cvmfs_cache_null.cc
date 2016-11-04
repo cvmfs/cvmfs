@@ -304,10 +304,22 @@ int main(int argc, char **argv) {
   int retval = cvmcache_listen(ctx, locator);
   assert(retval);
   printf("Listening for cvmfs clients on %s\n", locator);
+  printf("NOTE: this process needs to run as user cvmfs\n\n");
+  printf("Press <R ENTER> to ask clients to release nested catalogs\n");
+  printf("Press <Ctrl+D> to quit\n");
+
   cvmcache_process_requests(ctx, 0);
   while (true) {
-    sleep(1);
+    char buf;
+    retval = read(fileno(stdin), &buf, 1);
+    if (retval != 1)
+      break;
+    if (buf == 'R') {
+      printf("  ... asking clients to release nested catalogs\n");
+      cvmcache_ask_detach(ctx);
+    }
   }
+  printf("  ... good bye\n");
   cvmcache_options_free(locator);
   cvmcache_options_fini(options);
   return 0;

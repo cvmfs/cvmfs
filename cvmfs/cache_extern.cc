@@ -18,6 +18,7 @@
 #include <string>
 
 #include "cache.pb.h"
+#include "hash.h"
 #include "logging.h"
 #include "util/pointer.h"
 #include "util/posix.h"
@@ -87,7 +88,7 @@ void ExternalCacheManager::CallRemotely(ExternalCacheManager::RpcJob *rpc_job) {
         google::protobuf::MessageLite *msg_typed =
           rpc_job->frame_recv()->GetMsgTyped();
         assert(msg_typed->GetTypeName() == "cvmfs.MsgDetach");
-        // TODO(jblomer) Handle
+        quota_mgr_->BroadcastBackchannels("R");  //  release pinned catalogs
         rpc_job->frame_recv()->Reset(save_att_size);
         again = true;
       }
@@ -377,7 +378,8 @@ void *ExternalCacheManager::MainRead(void *data) {
     } else if (msg->GetTypeName() == "cvmfs.MsgListReply") {
       req_id = reinterpret_cast<cvmfs::MsgListReply *>(msg)->req_id();
     } else if (msg->GetTypeName() == "cvmfs.MsgDetach") {
-      // TODO(jblomer): Handle
+      // Release pinned catalogs
+      cache_mgr->quota_mgr_->BroadcastBackchannels("R");
       continue;
     } else {
       LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug, "unexpected message %s",
@@ -713,6 +715,8 @@ bool ExternalQuotaManager::HasCapability(Capabilities capability) {
       return cache_mgr_->capabilities_ & cvmfs::CAP_LIST;
     case kCapShrink:
       return cache_mgr_->capabilities_ & cvmfs::CAP_SHRINK;
+    case kCapListeners:
+      return true;
     default:
       return false;
   }
@@ -774,4 +778,29 @@ vector<string> ExternalQuotaManager::ListVolatile() {
   for (unsigned i = 0; i < raw_list.size(); ++i)
     result.push_back(raw_list[i].description());
   return result;
+}
+
+
+void ExternalQuotaManager::RegisterBackChannel(
+  int back_channel[2],
+  const string &channel_id)
+{
+  shash::Md5 hash_id = shash::Md5(shash::AsciiPtr(channel_id));
+  MakePipe(back_channel);
+  LockBackChannels();
+  assert(back_channels_.find(hash_id) == back_channels_.end());
+  back_channels_[hash_id] = back_channel[1];
+  UnlockBackChannels();
+}
+
+
+void ExternalQuotaManager::UnregisterBackChannel(
+  int back_channel[2],
+  const string &channel_id)
+{
+  shash::Md5 hash_id = shash::Md5(shash::AsciiPtr(channel_id));
+  LockBackChannels();
+  back_channels_.erase(hash_id);
+  UnlockBackChannels();
+  ClosePipe(back_channel);
 }
