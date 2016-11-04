@@ -1,11 +1,7 @@
 %%%-------------------------------------------------------------------
 %%% This file is part of the CernVM File System.
 %%%
-<<<<<<< 8f9f0f7588f2c92dbf2d00b6b1434dc08d6a53f6
-%%% @doc cvmfs_fe_test_handler
-=======
 %%% @doc cvmfs_fe_root_handler
->>>>>>> Fre Nov  4 17:29:01 CET 2016
 %%%
 %%% @end
 %%%-------------------------------------------------------------------
