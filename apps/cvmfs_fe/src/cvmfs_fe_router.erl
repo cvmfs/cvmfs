@@ -15,6 +15,7 @@ start_link() ->
                                              {"/api", cvmfs_fe_root_handler, []}
                                             ,{"/api/user/[:id]", cvmfs_fe_user_handler, []}
                                             ,{"/api/repo/[:id]", cvmfs_fe_repo_handler, []}
+                                            ,{"/api/session/[:id]", cvmfs_fe_session_handler, []}
                                             ]}]),
     cowboy:start_clear(cvmfs_fe_http_listener, 100,
                        [{port, 8080}],
