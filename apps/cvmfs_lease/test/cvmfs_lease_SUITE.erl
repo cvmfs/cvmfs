@@ -16,14 +16,17 @@
         ,init_per_testcase/2, end_per_testcase/2]).
 
 -export([new_lease/1, new_lease_busy/1, new_lease_expired/1
-        ,remove_lease_existing/1, remove_lease_nonexisting/1, clear_leases/1]).
+        ,remove_lease_existing/1, remove_lease_nonexisting/1
+        ,check_lease_valid/1, check_lease_expired/1, check_lease_not_found/1
+        ,clear_leases/1]).
 
 
 %% Tests description
 
 all() ->
     [{group, new_leases}
-    ,{group, end_leases}].
+    ,{group, end_leases}
+    ,{group, check_leases}].
 
 groups() ->
     [{new_leases, [], [new_lease
@@ -31,7 +34,10 @@ groups() ->
                       ,new_lease_expired]}
     ,{end_leases, [], [remove_lease_existing
                       ,remove_lease_nonexisting
-                      ,clear_leases]}].
+                      ,clear_leases]}
+    ,{check_leases, [], [check_lease_valid
+                        ,check_lease_expired
+                        ,check_lease_not_found]}].
 
 
 %% Set up, tear down
@@ -109,4 +115,26 @@ clear_leases(_Config) ->
     [{lease, {R, P}, U, _}] = cvmfs_lease:get_leases(),
     ok = cvmfs_lease:clear_leases(),
     [] = cvmfs_lease:get_leases().
+
+check_lease_valid(_Config) ->
+    U = <<"user">>,
+    R = <<"repo">>,
+    P = <<"path">>,
+    ok = cvmfs_lease:request_lease(U, R, P),
+    ok = cvmfs_lease:check_lease(U, R, P).
+
+check_lease_expired(_Config) ->
+    U = <<"user">>,
+    R = <<"repo">>,
+    P = <<"path">>,
+    ok = cvmfs_lease:request_lease(U, R, P),
+    SleepTime = 1500,
+    ct:sleep(SleepTime),
+    {error, lease_expired} = cvmfs_lease:check_lease(U, R, P).
+
+check_lease_not_found(_Config) ->
+    U = <<"user">>,
+    R = <<"repo">>,
+    P = <<"path">>,
+    {error, lease_not_found} = cvmfs_lease:check_lease(U, R, P).
 

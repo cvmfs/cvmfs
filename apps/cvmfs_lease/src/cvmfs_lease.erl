@@ -18,6 +18,7 @@
 %% API
 -export([start_link/1, stop/0
         ,request_lease/3, end_lease/2
+        ,check_lease/3
         ,get_leases/0, clear_leases/0]).
 
 %% gen_server callbacks
@@ -80,6 +81,22 @@ request_lease(User, Repo, Path) ->
 %%--------------------------------------------------------------------
 end_lease(Repo, Path) ->
     gen_server:call(?MODULE, {lease_req, end_lease, {Repo, Path}}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Checks the validity of a lease
+%%
+%% @spec check_lease(User, Repo, Path) -> ok | {error, invalid_lease}
+%% @end
+%%--------------------------------------------------------------------
+-spec check_lease(User, Repo, Path) -> ok | {error, Reason}
+                                           when User :: binary(),
+                                                Repo :: binary(),
+                                                Path :: binary(),
+                                                Reason :: lease_not_found |
+                                                          lease_expired.
+check_lease(User, Repo, Path) ->
+    gen_server:call(?MODULE, {lease_req, check_lease, {User, Repo, Path}}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -158,6 +175,11 @@ handle_call({lease_req, end_lease, {Repo, Path}}, _From, State) ->
     Reply = priv_end_lease(Repo, Path),
     lager:info("Request received: {end_lease, ~p} -> Reply: ~p"
               ,[{Repo, Path}, Reply]),
+    {reply, Reply, State};
+handle_call({lease_req, check_lease, {User, Repo, Path}}, _From, State) ->
+    Reply = priv_check_lease(User, Repo, Path),
+    lager:info("Request received: {check_lease, ~p} -> Reply: ~p"
+              ,[{User, Repo, Path}, Reply]),
     {reply, Reply, State};
 handle_call({lease_req, get_leases}, _From, State) ->
     Reply = priv_get_leases(),
@@ -270,6 +292,26 @@ priv_new_lease(User, Repo, Path, _State) ->
                     %% No overlapping paths were found; just insert the new entry
                     _ ->
                         priv_write_row(User, Repo, Path)
+                end
+        end,
+    {atomic, Result} = mnesia:sync_transaction(T),
+    Result.
+
+priv_check_lease(User, Repo, Path) ->
+    {ok, MaxLeaseTime} = application:get_env(cvmfs_lease, max_lease_time),
+    T = fun() ->
+                CurrentTime = erlang:system_time(milli_seconds),
+                case mnesia:read(lease, {Repo, Path}) of
+                    [] ->
+                        {error, lease_not_found};
+                    [#lease{s_path = {Repo, Path}, u_id = User, time = Time} | _]  ->
+                        RemainingTime = MaxLeaseTime - (CurrentTime - Time),
+                        case RemainingTime > 0 of
+                            true ->
+                                ok;
+                            false ->
+                                {error, lease_expired}
+                        end
                 end
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
