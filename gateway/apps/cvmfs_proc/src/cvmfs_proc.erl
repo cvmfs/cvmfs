@@ -14,7 +14,7 @@
 
 %% API
 -export([start_link/1, stop/0
-        ,new_session/2, end_session/1
+        ,new_lease/2, end_lease/1
         ,submit_payload/4]).
 
 %% gen_server callbacks
@@ -42,62 +42,62 @@ stop() ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Requests the initiation of a new session where User will modify
+%% Requests the initiation of a new lease where User will modify
 %% Path. Either returns error messages if user is invalid or the user
-%% is not allowed to modify the path, or returns a session token.
+%% is not allowed to modify the path, or returns a lease token.
 %%
-%% The session token is needed for making any other request.
+%% The lease token is needed for making any other request.
 %%
-%% @spec new_session(User, Path) -> {ok, SessionToken} |
+%% @spec new_lease(User, Path) -> {ok, LeaseToken} |
 %%                                  {error, invalid_user} |
 %%                                  {error, invalid_path}.
 %% @end
 %%--------------------------------------------------------------------
--spec new_session(User, Path) -> {ok, SessionToken} |
+-spec new_lease(User, Path) -> {ok, LeaseToken} |
                                  {error, invalid_user} |
                                  {error, invalid_path}
                                      when User :: binary(),
                                           Path :: binary(),
-                                          SessionToken :: binary().
-new_session(User, Path) ->
-    gen_server:call(?MODULE, {proc_req, new_session, {User, Path}}).
+                                          LeaseToken :: binary().
+new_lease(User, Path) ->
+    gen_server:call(?MODULE, {proc_req, new_lease, {User, Path}}).
 
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Ends the session identified by SessionToken.
+%% Ends the lease identified by LeaseToken.
 %%
 %%
-%% @spec end_session() -> ok | {error, invalid_token}.
+%% @spec end_lease() -> ok | {error, invalid_token}.
 %% @end
 %%--------------------------------------------------------------------
--spec end_session(SessionToken) -> ok | {error, invalid_token}
-                                       when SessionToken :: binary().
-end_session(SessionToken) ->
-    gen_server:call(?MODULE, {proc_req, end_session, SessionToken}).
+-spec end_lease(LeaseToken) -> ok | {error, invalid_token}
+                                       when LeaseToken :: binary().
+end_lease(LeaseToken) ->
+    gen_server:call(?MODULE, {proc_req, end_lease, LeaseToken}).
 
 %%--------------------------------------------------------------------
 %% @doc
 %% Submit a new payload
 %%
 %%
-%% @spec submit_payload(User, SessionToken, Payload, Final)
-%%           -> {ok, payload_added} | {ok, payload_added, session_ended} |
+%% @spec submit_payload(User, LeaseToken, Payload, Final)
+%%           -> {ok, payload_added} | {ok, payload_added, lease_ended} |
 %%              {error, Reason}
 %% @end
 %%--------------------------------------------------------------------
--spec submit_payload(User, SessionToken, Payload, Final) ->
+-spec submit_payload(User, LeaseToken, Payload, Final) ->
                             {ok, payload_added} |
-                            {ok, payload_added, session_ended} |
+                            {ok, payload_added, lease_ended} |
                             {error, Reason}
                                 when User :: binary(),
-                                     SessionToken :: binary(),
+                                     LeaseToken :: binary(),
                                      Payload :: binary(),
                                      Final :: boolean(),
                                      Reason :: binary().
-submit_payload(User, SessionToken, Payload, Final) ->
+submit_payload(User, LeaseToken, Payload, Final) ->
     gen_server:call(?MODULE, {proc_req, submit_payload, {User,
-                                                         SessionToken,
+                                                         LeaseToken,
                                                          Payload,
                                                          Final}}).
 
@@ -134,24 +134,24 @@ init([]) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call({proc_req, new_session, {User, Path}}, _From, State) ->
-    case priv_new_session(User, Path) of
-        {ok, {SessionToken, Public, Secret}} ->
+handle_call({proc_req, new_lease, {User, Path}}, _From, State) ->
+    case priv_new_lease(User, Path) of
+        {ok, {LeaseToken, Public, Secret}} ->
             NewState = State#{Public => Secret},
-            lager:info("Request received: {new_session, {~p, ~p}} -> Reply: ~p", [User, Path, SessionToken]),
-            {reply, {ok, SessionToken}, NewState};
+            lager:info("Request received: {new_lease, {~p, ~p}} -> Reply: ~p", [User, Path, LeaseToken]),
+            {reply, {ok, LeaseToken}, NewState};
         Other ->
-            lager:info("Request received: {new_session, {~p, ~p}} -> Reply: ~p", [User, Path, Other]),
+            lager:info("Request received: {new_lease, {~p, ~p}} -> Reply: ~p", [User, Path, Other]),
             {reply, Other, State}
     end;
-handle_call({proc_req, end_session, SessionToken}, _From, State) ->
-    Reply = priv_end_session(SessionToken),
-    lager:info("Request received: {end_session, ~p} -> Reply: ~p", [SessionToken, Reply]),
+handle_call({proc_req, end_lease, LeaseToken}, _From, State) ->
+    Reply = priv_end_lease(LeaseToken),
+    lager:info("Request received: {end_lease, ~p} -> Reply: ~p", [LeaseToken, Reply]),
     {reply, Reply, State};
-handle_call({proc_req, submit_payload, {User, SessionToken, Payload, Final}}, _From, State) ->
-    {Reply, NewState} = priv_submit_payload(User, SessionToken, Payload, State, Final),
+handle_call({proc_req, submit_payload, {User, LeaseToken, Payload, Final}}, _From, State) ->
+    {Reply, NewState} = priv_submit_payload(User, LeaseToken, Payload, State, Final),
     lager:info("Request received: {submit_payload, {~p, ~p, ~p, ~p}} -> Reply: ~p",
-               [User, SessionToken, Payload, Final, Reply]),
+               [User, LeaseToken, Payload, Final, Reply]),
     {reply, Reply, NewState}.
 
 %%--------------------------------------------------------------------
@@ -215,13 +215,13 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
--spec priv_new_session(User, Path) -> {ok, Token} |
+-spec priv_new_lease(User, Path) -> {ok, Token} |
                                       {error, invalid_user} |
                                       {error, invalid_path}
                                           when User :: binary(),
                                                Path :: binary(),
                                                Token :: binary().
-priv_new_session(User, Path) ->
+priv_new_lease(User, Path) ->
     % Check if user is registered with the cvmfs_auth service and which
     % paths he is allowed to modify
     case cvmfs_auth:get_user_permissions(User) of
@@ -232,39 +232,40 @@ priv_new_session(User, Path) ->
                 false ->
                     {error, invalid_path};
                 true ->
+                    %% TODO: acquire lease for subpath here
                     {ok, priv_generate_token(User, Path)}
             end
     end.
 
--spec priv_end_session(SessionToken) -> ok | {error, invalid_token}
-                                            when SessionToken :: binary().
-priv_end_session(_SessionToken) ->
+-spec priv_end_lease(LeaseToken) -> ok | {error, invalid_token}
+                                            when LeaseToken :: binary().
+priv_end_lease(_LeaseToken) ->
     ok.
 
--spec priv_submit_payload(User, SessionToken, Payload, State, Final) ->
+-spec priv_submit_payload(User, LeaseToken, Payload, State, Final) ->
                                  {{ok, payload_added} |
-                                  {ok, payload_added, session_ended} |
+                                  {ok, payload_added, lease_ended} |
                                   {error, Reason}, State}
                                      when User :: binary(),
-                                          SessionToken :: binary(),
+                                          LeaseToken :: binary(),
                                           Payload :: binary(),
                                           State :: map(),
                                           Final :: boolean(),
-                                          Reason :: session_expired | invalid_user | invalid_token.
-priv_submit_payload(User, SessionToken, Payload, State, Final) ->
-    case priv_check_payload(User, SessionToken, Payload, State) of
+                                          Reason :: lease_expired | invalid_user | invalid_token.
+priv_submit_payload(User, LeaseToken, Payload, State, Final) ->
+    case priv_check_payload(User, LeaseToken, Payload, State) of
         ok ->
-            %% TODO Acquire lease on the subpath and submit payload to GW
+            %% TODO: submit payload to GW
 
             case Final of
                 true ->
-                    {{ok, payload_added, session_ended},
-                     priv_delete_token(State, SessionToken)};
+                    {{ok, payload_added, lease_ended},
+                     priv_delete_token(State, LeaseToken)};
                 false ->
                     {{ok, payload_added}, State}
             end;
         {error, {unverified_caveat, <<"time < ", _/binary>>}} ->
-            {{error, session_expired}, State};
+            {{error, lease_expired}, State};
         {error, {unverified_caveat, <<"user = ", _/binary>>}} ->
             {{error, invalid_user}, State};
         {error, _} ->
@@ -284,8 +285,8 @@ priv_generate_token(User, Path) ->
     M = macaroon:create(Location, Secret, Public),
     M1 = macaroon:add_first_party_caveat(M, "user = " ++ User),
 
-    {ok, MaxSessionTime} = application:get_env(cvmfs_proc, max_session_time),
-    Time = erlang:system_time(seconds) + MaxSessionTime,
+    {ok, MaxLeaseTime} = application:get_env(cvmfs_lease, max_lease_time),
+    Time = erlang:system_time(milli_seconds) + MaxLeaseTime,
 
     M2 = macaroon:add_first_party_caveat(M1, "time < " ++ erlang:integer_to_binary(Time)),
 
@@ -294,19 +295,19 @@ priv_generate_token(User, Path) ->
     {ok, Token} = macaroon:serialize(M2),
     {Token, Public, Secret}.
 
--spec priv_check_payload(User, SessionToken, Payload, State) ->
+-spec priv_check_payload(User, LeaseToken, Payload, State) ->
                                 ok | {error, invalid_token}
                                     when User :: binary(),
-                                         SessionToken :: binary(),
+                                         LeaseToken :: binary(),
                                          Payload :: binary(),
                                          State :: map().
-priv_check_payload(_User, _SessionToken, _Payload, State) when map_size(State) == 0 ->
+priv_check_payload(_User, _LeaseToken, _Payload, State) when map_size(State) == 0 ->
     {error, invalid_token};
-priv_check_payload(User, SessionToken, _Payload, State) ->
+priv_check_payload(User, LeaseToken, _Payload, State) ->
     % Here we should perform all sanity checks on the request
 
-    % Verify session token (check user, check time-stamp, extract path).
-    {ok, M} = macaroon:deserialize(SessionToken),
+    % Verify lease token (check user, check time-stamp, extract path).
+    {ok, M} = macaroon:deserialize(LeaseToken),
     Public = macaroon:identifier(M),
     #{Public := Secret} = State,
     CheckUser = fun(<<"user = ", U/binary>>) ->
@@ -315,7 +316,7 @@ priv_check_payload(User, SessionToken, _Payload, State) ->
                         false
                 end,
     CheckTime = fun(<<"time < ", Exp/binary>>) ->
-                        erlang:binary_to_integer(Exp) > erlang:system_time(seconds);
+                        erlang:binary_to_integer(Exp) > erlang:system_time(milli_seconds);
                    (_) ->
                         false
                 end,
@@ -330,7 +331,7 @@ priv_check_payload(User, SessionToken, _Payload, State) ->
 
     macaroon_verifier:verify(V2, M, Secret).
 
-priv_delete_token(State, SessionToken) ->
-    {ok, Macaroon} = macaroon:deserialize(SessionToken),
+priv_delete_token(State, LeaseToken) ->
+    {ok, Macaroon} = macaroon:deserialize(LeaseToken),
     TokenId = macaroon:identifier(Macaroon),
     maps:remove(TokenId, State).
