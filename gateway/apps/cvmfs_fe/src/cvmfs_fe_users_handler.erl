@@ -6,7 +6,7 @@
 %%% @end
 %%%-------------------------------------------------------------------
 
--module(cvmfs_fe_user_handler).
+-module(cvmfs_fe_users_handler).
 
 -export([init/2]).
 

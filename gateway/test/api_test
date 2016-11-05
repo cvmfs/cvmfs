@@ -26,13 +26,13 @@ my @resources = @{$payload_ref->{'resources'}};
 print "Resources: @resources\n";
 
 # Hit the user resource
-my $user_url = "http://localhost:8080/api/user";
+my $user_url = "http://localhost:8080/api/users";
 $payload_ref = do_req($user_url);
 my @users = @{$payload_ref->{'users'}};
 print "Users: @users\n";
 
 # Hit the repo resource
-my $repo_url = "http://localhost:8080/api/repo";
+my $repo_url = "http://localhost:8080/api/repos";
 $payload_ref = do_req($repo_url);
 my @repos = @{$payload_ref->{'repos'}};
 print "Repos: @repos\n";
