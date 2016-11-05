@@ -527,7 +527,7 @@ TEST_F(T_ExternalCacheManager, MultiThreaded) {
   EXPECT_TRUE(
     cache_mgr_->CommitFromMem(id, large_buffer, large_size, "test"));
 
-  unsigned num_threads = 10;
+  const unsigned num_threads = 10;
   pthread_t threads[num_threads];
   ThreadData td[num_threads];
   for (unsigned i = 0; i < num_threads; ++i) {
