@@ -10,8 +10,5 @@
 ,{cvmfs_auth, [{repo_config, {file, "./etc/repo.config"}}]}
 
 ,{cvmfs_lease, [{max_lease_time, 10000}]} % max lease time in milliseconds
-
-,{cvmfs_proc, [{max_session_time, 60}]} % max session time in seconds
-
 ].
 
