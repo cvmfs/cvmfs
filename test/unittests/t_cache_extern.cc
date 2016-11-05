@@ -393,7 +393,7 @@ TEST_F(T_ExternalCacheManager, TransactionAbort) {
 namespace {
 
 struct BackchannelData {
-  BackchannelData() : nfired(0) { };
+  BackchannelData() : nfired(0) { }
   unsigned nfired;
   int channel[2];
 };
@@ -413,7 +413,7 @@ void *MainBackchannel(void *data) {
   }
 }
 
-}
+}  // anonymous namespace
 
 TEST_F(T_ExternalCacheManager, Detach) {
   int fd = cache_mgr_->Open(CacheManager::Bless(mock_plugin_->known_object));
