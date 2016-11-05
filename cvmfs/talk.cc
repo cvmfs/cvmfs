@@ -208,7 +208,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
         if (!quota_mgr->IsEnforcing()) {
           Answer(con_fd, "Cache is unmanaged\n");
         } else {
-          if (line.length() < 9) {
+          if (line.length() < 14) {
             Answer(con_fd, "Usage: cleanup rate <period in mn>\n");
           } else {
             const uint64_t period_s = String2Uint64(line.substr(13)) * 60;

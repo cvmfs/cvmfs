@@ -1,4 +1,5 @@
 2.3.3:
+  * Fix crash when 'cvmfs_talk cleanup rate' is called without argument
   * Fixes for macOS 10.12 Sierra (CVM-1084)
 
 2.3.2:
