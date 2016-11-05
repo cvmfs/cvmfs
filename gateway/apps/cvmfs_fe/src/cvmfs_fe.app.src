@@ -15,7 +15,8 @@
             ,cvmfs_fe_router
             ,cvmfs_fe_root_handler
             ,cvmfs_fe_user_handler
-            ,cvmfs_fe_repo_handler]},
+            ,cvmfs_fe_repo_handler
+            ,cvmfs_fe_session_handler]},
 
   {maintainers, []}
  ]}.
