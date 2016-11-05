@@ -1,0 +1,39 @@
+#!/usr/bin/env perl
+
+use LWP::Simple;
+use JSON;
+
+my $browser = LWP::UserAgent->new;
+
+# do_req($url)
+sub do_req {
+    my ($url) = @_;
+
+    my $reply = $browser->get($url);
+
+    die "Error: ", $reply->status_line
+        unless $reply->is_success;
+    die "Expecting plain text response, not: ", $reply->content_type
+        unless $reply->content_type eq 'text/plain';
+
+    decode_json($reply->content);
+}
+
+# Hit the API root
+my $root_url = "http://localhost:8080/api";
+my $payload_ref = do_req($root_url);
+my @resources = @{$payload_ref->{'resources'}};
+print "Resources: @resources\n";
+
+# Hit the user resource
+my $user_url = "http://localhost:8080/api/users";
+$payload_ref = do_req($user_url);
+my @users = @{$payload_ref->{'users'}};
+print "Users: @users\n";
+
+# Hit the repo resource
+my $repo_url = "http://localhost:8080/api/repos";
+$payload_ref = do_req($repo_url);
+my @repos = @{$payload_ref->{'repos'}};
+print "Repos: @repos\n";
+
