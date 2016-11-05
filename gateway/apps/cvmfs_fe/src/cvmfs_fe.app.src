@@ -1,0 +1,22 @@
+{application, cvmfs_fe,
+ [{description, "CVMFS Service Front-end"},
+  {vsn, "0.1.0"},
+  {registered, [cvmfs_fe]},
+  {mod, { cvmfs_fe_app, []}},
+  {applications,
+   [kernel
+   ,stdlib
+   ,cowboy
+   ,cvmfs_om
+   ,cvmfs_proc]},
+  {env,[]},
+  {modules, [cvmfs_fe_app
+            ,cvmfs_fe_sup
+            ,cvmfs_fe_router
+            ,cvmfs_fe_root_handler
+            ,cvmfs_fe_user_handler
+            ,cvmfs_fe_repo_handler
+            ,cvmfs_fe_session_handler]},
+
+  {maintainers, []}
+ ]}.
