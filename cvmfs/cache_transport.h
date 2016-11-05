@@ -13,7 +13,7 @@
 #include "util/single_copy.h"
 
 namespace shash {
-class Any;
+struct Any;
 }
 
 /**
