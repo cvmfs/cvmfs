@@ -1,7 +1,7 @@
 %%%-------------------------------------------------------------------
 %%% This file is part of the CernVM File System.
 %%%
-%%% @doc cvmfs_fe_session_handler
+%%% @doc cvmfs_fe_lease_handler
 %%%
 %%% @end
 %%%-------------------------------------------------------------------
@@ -13,7 +13,7 @@
 init(Req0 = #{method := <<"GET">>}, State) ->
     Req = cowboy_req:reply(200,
                            #{<<"content-type">> => <<"text/plain">>},
-                           <<"Sessions!">>,
+                           <<"Leases!">>,
                            Req0),
     {ok, Req, State};
 init(Req0 = #{method := <<"PUT">>}, State) ->
