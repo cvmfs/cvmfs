@@ -6,9 +6,21 @@
 
 #include "catalog_mgr_rw.h"
 #include "history.h"
-#include "swissknife_assistant.h"
 #include "swissknife_sync.h"
 
-void TagFolderCreator::Generate() {
+using namespace std;  // NOLINT
+
+
+TagFolderGenerator::TagFolderGenerator(
+  manifest::Manifest *m,
+  download::DownloadManager *d,
+  catalog::WritableCatalogManager *c,
+  SyncParameters *p)
+  : catalog_mgr_(c)
+  , assistant_(d, m, p->stratum0, p->dir_temp)
+{ }
+
+
+void TagFolderGenerator::Generate() {
 
 }

@@ -4,28 +4,31 @@
 #ifndef CVMFS_HISTORY_FS_H_
 #define CVMFS_HISTORY_FS_H_
 
+#include "swissknife_assistant.h"
+
 namespace catalog {
 class WritableCatalogManager;
 }
-namespace history {
-class History;
+namespace download {
+class DownloadManager;
+}
+namespace manifest {
+class Manifest;
 }
 struct SyncParameters;
 
-class TagFolderCreator {
- public:
-  TagFolderCreator(
-    history::History *h,
-    catalog::WritableCatalogManager *c,
-    SyncParameters *p)
-    : catalog_mgr_(c), history_(h), sync_params_(p) { }
 
-   void Generate();
+class TagFolderGenerator {
+ public:
+  TagFolderGenerator(manifest::Manifest *m,
+                     download::DownloadManager *d,
+                     catalog::WritableCatalogManager *c,
+                     SyncParameters *p);
+  void Generate();
 
  private:
   catalog::WritableCatalogManager *catalog_mgr_;
-  history::History *history_;
-  SyncParameters *sync_params_;
-};
+  swissknife::Assistant assistant_;
+};  // class TagFolderGenerator
 
 #endif  // CVMFS_HISTORY_FS_H_
