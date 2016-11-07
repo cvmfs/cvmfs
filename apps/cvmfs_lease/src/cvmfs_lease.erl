@@ -18,7 +18,7 @@
 %% API
 -export([start_link/1, stop/0
         ,request_lease/4, end_lease/1
-        ,check_lease/2
+        ,check_lease/1
         ,get_leases/0, clear_leases/0]).
 
 %% gen_server callbacks
@@ -93,16 +93,16 @@ end_lease(Path) ->
 %% @doc
 %% Checks the validity of a lease
 %%
-%% @spec check_lease(User, Path) -> ok | {error, invalid_lease}
+%% @spec check_lease(Public) -> ok | {error, invalid_lease}
 %% @end
 %%--------------------------------------------------------------------
--spec check_lease(User, Path) -> ok | {error, Reason}
-                                     when User :: binary(),
-                                          Path :: binary(),
+-spec check_lease(Public) -> {ok, Secret} | {error, Reason}
+                                     when Public :: binary(),
+                                          Secret :: binary(),
                                           Reason :: lease_not_found |
                                                     lease_expired.
-check_lease(User, Path) ->
-    gen_server:call(?MODULE, {lease_req, check_lease, {User, Path}}).
+check_lease(Public) ->
+    gen_server:call(?MODULE, {lease_req, check_lease, Public}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -183,10 +183,10 @@ handle_call({lease_req, end_lease, Path}, _From, State) ->
     lager:info("Request received: {end_lease, ~p} -> Reply: ~p"
               ,[Path, Reply]),
     {reply, Reply, State};
-handle_call({lease_req, check_lease, {User, Path}}, _From, State) ->
-    Reply = priv_check_lease(User, Path),
+handle_call({lease_req, check_lease, Public}, _From, State) ->
+    Reply = priv_check_lease(Public),
     lager:info("Request received: {check_lease, ~p} -> Reply: ~p"
-              ,[{User, Path}, Reply]),
+              ,[Public, Reply]),
     {reply, Reply, State};
 handle_call({lease_req, get_leases}, _From, State) ->
     Reply = priv_get_leases(),
@@ -269,7 +269,7 @@ priv_new_lease(User, Path, Public, Secret, _State) ->
 
     %% Match statement that selects all rows with a given repo,
     %% returning a list of {Path, Time} pairs
-    MS = ets:fun2ms(fun(#lease{u_id = U, time = T, path = P}) ->
+    MS = ets:fun2ms(fun(#lease{u_id = U, time = T, path = P}) when P =:= Path ->
                             {P, T}
                     end),
 
@@ -304,18 +304,24 @@ priv_new_lease(User, Path, Public, Secret, _State) ->
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
-priv_check_lease(User, Path) ->
+priv_check_lease(Public) ->
     {ok, MaxLeaseTime} = application:get_env(cvmfs_lease, max_lease_time),
+
+    MS = ets:fun2ms(fun(#lease{public = P} = Lease) when P =:= Public ->
+                            Lease
+                    end),
+
     T = fun() ->
                 CurrentTime = erlang:system_time(milli_seconds),
-                case mnesia:read(lease, Path) of
+
+                case mnesia:select(lease, MS) of
                     [] ->
                         {error, lease_not_found};
-                    [#lease{path = Path, u_id = User, time = Time} | _]  ->
+                    [#lease{public = Public, secret = Secret, time = Time} | _]  ->
                         RemainingTime = MaxLeaseTime - (CurrentTime - Time),
                         case RemainingTime > 0 of
                             true ->
-                                ok;
+                                {ok, Secret};
                             false ->
                                 {error, lease_expired}
                         end
