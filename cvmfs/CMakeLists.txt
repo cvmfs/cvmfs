@@ -530,7 +530,7 @@ if (BUILD_LIBCVMFS_CACHE)
     DEPENDS ${LIBCVMFS_CACHE_LIBS}
   )
 
-  # dummy target to cause merged libcvmfs to be produced
+  # dummy target to cause merged libcvmfs_cache to be produced
   add_custom_target (libcvmfs_cache ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a)
   add_dependencies (libcvmfs_cache cvmfs_cache_only)
 
