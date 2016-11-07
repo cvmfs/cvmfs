@@ -54,11 +54,13 @@ stop() ->
 %% @end
 %%--------------------------------------------------------------------
 -spec new_lease(User, Path) -> {ok, LeaseToken} |
-                                 {error, invalid_user} |
-                                 {error, invalid_path}
+                               {error, invalid_user} |
+                               {error, invalid_path} |
+                               {busy, TimeRemaining}
                                      when User :: binary(),
                                           Path :: binary(),
-                                          LeaseToken :: binary().
+                                          LeaseToken :: binary(),
+                                          TimeRemaining :: integer().
 new_lease(User, Path) ->
     gen_server:call(?MODULE, {proc_req, new_lease, {User, Path}}).
 
