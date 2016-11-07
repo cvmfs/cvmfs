@@ -83,8 +83,8 @@ end_per_suite(_Config) ->
     application:unload(mnesia),
     ok.
 
-init_per_testcase(_TestCase, _Config) ->
-    [].
+init_per_testcase(_TestCase, Config) ->
+    Config.
 
 end_per_testcase(_TestCase, _Config) ->
     ok.
@@ -124,23 +124,21 @@ lease_success(_Config) ->
     % Submit final payload
     {ok, payload_added, lease_ended} = cvmfs_proc:submit_payload(User, Token, Payload, true),
     % After the lease has been closed, the token should be rejected
-    {error, invalid_token} = cvmfs_proc:submit_payload(User, Token, Payload, true).
+    {error, lease_not_found} = cvmfs_proc:submit_payload(User, Token, Payload, true).
 
 % Attempt to submit a payload without first obtaining a token
 submission_with_invalid_token_fails(_Config) ->
     {User, _} = valid_user_and_path(),
     Token = <<"invalid_token">>,
     Payload = <<"placeholder">>,
-    {error, invalid_token} = cvmfs_proc:submit_payload(User, Token, Payload, false).
+    {error, invalid_macaroon} = cvmfs_proc:submit_payload(User, Token, Payload, false).
 
 % Start a valid lease, make submission after the token has expired
-submission_with_expired_token_fails(_Config) ->
+submission_with_expired_token_fails(Config) ->
     {User, Path} = valid_user_and_path(),
     Payload = <<"placeholder">>,
     {ok, Token} = cvmfs_proc:new_lease(User, Path),
-    %% SleepTime = ?config(max_lease_time, Config),
-    SleepTime = 1500,
-    ct:sleep(SleepTime),
+    ct:sleep(?config(max_lease_time, Config)),
     {error, lease_expired} = cvmfs_proc:submit_payload(User, Token, Payload, false).
 
 submission_with_different_user_name(_Config) ->
