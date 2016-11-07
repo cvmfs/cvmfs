@@ -126,7 +126,7 @@ check_lease_valid(_Config) ->
     Public = <<"public">>,
     Secret = <<"secret">>,
     ok = cvmfs_lease:request_lease(U, P, Public, Secret),
-    ok = cvmfs_lease:check_lease(U, P).
+    {ok, Secret} = cvmfs_lease:check_lease(Public).
 
 check_lease_expired(_Config) ->
     U = <<"user">>,
@@ -136,10 +136,9 @@ check_lease_expired(_Config) ->
     ok = cvmfs_lease:request_lease(U, P, Public, Secret),
     SleepTime = 1500,
     ct:sleep(SleepTime),
-    {error, lease_expired} = cvmfs_lease:check_lease(U, P).
+    {error, lease_expired} = cvmfs_lease:check_lease(Public).
 
 check_lease_not_found(_Config) ->
-    U = <<"user">>,
-    P = <<"path">>,
-    {error, lease_not_found} = cvmfs_lease:check_lease(U, P).
+    Public = <<"public">>,
+    {error, lease_not_found} = cvmfs_lease:check_lease(Public).
 
