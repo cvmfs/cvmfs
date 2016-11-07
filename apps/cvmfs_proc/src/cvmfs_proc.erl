@@ -260,7 +260,7 @@ priv_end_lease(_LeaseToken) ->
                                           Final :: boolean(),
                                           Reason :: lease_expired | invalid_user | invalid_token.
 priv_submit_payload(User, LeaseToken, Payload, State, Final) ->
-    case priv_check_payload(User, LeaseToken, Payload, State) of
+    case priv_check_payload(User, LeaseToken, Payload) of
         ok ->
             %% TODO: submit payload to GW
 
@@ -302,41 +302,42 @@ priv_generate_token(User, Path) ->
     {ok, Token} = macaroon:serialize(M2),
     {Public, Secret, Token}.
 
--spec priv_check_payload(User, LeaseToken, Payload, State) ->
+-spec priv_check_payload(User, LeaseToken, Payload) ->
                                 ok | {error, invalid_token}
                                     when User :: binary(),
                                          LeaseToken :: binary(),
-                                         Payload :: binary(),
-                                         State :: map().
-priv_check_payload(_User, _LeaseToken, _Payload, State) when map_size(State) == 0 ->
-    {error, invalid_token};
-priv_check_payload(User, LeaseToken, _Payload, State) ->
+                                         Payload :: binary().
+priv_check_payload(User, LeaseToken, _Payload) ->
     % Here we should perform all sanity checks on the request
 
     % Verify lease token (check user, check time-stamp, extract path).
     {ok, M} = macaroon:deserialize(LeaseToken),
     Public = macaroon:identifier(M),
-    #{Public := Secret} = State,
-    CheckUser = fun(<<"user = ", U/binary>>) ->
-                        U =:= User;
-                   (_) ->
-                        false
-                end,
-    CheckTime = fun(<<"time < ", Exp/binary>>) ->
-                        erlang:binary_to_integer(Exp) > erlang:system_time(milli_seconds);
-                   (_) ->
-                        false
-                end,
-    %% CheckPaths = fun(_) ->
-    %%                      true
-    %%              end,
+    case cvmfs_lease:check_lease(Public) of
+        {ok, Secret} ->
+            CheckUser = fun(<<"user = ", U/binary>>) ->
+                                U =:= User;
+                           (_) ->
+                                false
+                        end,
+            CheckTime = fun(<<"time < ", Exp/binary>>) ->
+                                erlang:binary_to_integer(Exp) > erlang:system_time(milli_seconds);
+                           (_) ->
+                                false
+                        end,
+            %% CheckPaths = fun(_) ->
+            %%                      true
+            %%              end,
 
-    V = macaroon_verifier:create(),
-    V1 = macaroon_verifier:satisfy_general(V, CheckUser),
-    V2 = macaroon_verifier:satisfy_general(V1, CheckTime),
-    %% V3 = macaroon_verifier:satisfy_general(V2, CheckPaths),
+            V = macaroon_verifier:create(),
+            V1 = macaroon_verifier:satisfy_general(V, CheckUser),
+            V2 = macaroon_verifier:satisfy_general(V1, CheckTime),
+            %% V3 = macaroon_verifier:satisfy_general(V2, CheckPaths),
 
-    macaroon_verifier:verify(V2, M, Secret).
+            macaroon_verifier:verify(V2, M, Secret);
+        {error, _Reason} ->
+            {error, invalid_token}
+    end.
 
 priv_delete_token(State, LeaseToken) ->
     {ok, Macaroon} = macaroon:deserialize(LeaseToken),
