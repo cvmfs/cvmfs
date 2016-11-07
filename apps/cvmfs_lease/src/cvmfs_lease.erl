@@ -83,11 +83,11 @@ request_lease(User, Path, Public, Secret) ->
 %% @doc
 %% Gives up an existing lease
 %%
-%% @spec end_lease(Path) -> ok | {error, lease_not_found}
+%% @spec end_lease(Public) -> ok | {error, lease_not_found}
 %% @end
 %%--------------------------------------------------------------------
-end_lease(Path) ->
-    gen_server:call(?MODULE, {lease_req, end_lease, Path}).
+end_lease(Public) ->
+    gen_server:call(?MODULE, {lease_req, end_lease, Public}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -178,10 +178,10 @@ handle_call({lease_req, new_lease, {User, Path, Public, Secret}}, _From, State) 
     lager:info("Request received: {new_lease, ~p} -> Reply: ~p"
               ,[{User, Path}, Reply]),
     {reply, Reply, State};
-handle_call({lease_req, end_lease, Path}, _From, State) ->
-    Reply = priv_end_lease(Path),
+handle_call({lease_req, end_lease, Public}, _From, State) ->
+    Reply = priv_end_lease(Public),
     lager:info("Request received: {end_lease, ~p} -> Reply: ~p"
-              ,[Path, Reply]),
+              ,[Public, Reply]),
     {reply, Reply, State};
 handle_call({lease_req, check_lease, Public}, _From, State) ->
     Reply = priv_check_lease(Public),
@@ -330,12 +330,15 @@ priv_check_lease(Public) ->
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
-priv_end_lease(Path) ->
+priv_end_lease(Public) ->
+    MS = ets:fun2ms(fun(#lease{public = Pub, path = Path}) when Pub =:= Public ->
+                            Path
+                    end),
     T = fun() ->
-                case mnesia:read(lease, Path) of
+                case mnesia:select(lease, MS) of
                     [] ->
                         {error, lease_not_found};
-                    _ ->
+                    [Path | _] ->
                         mnesia:delete({lease, Path})
                 end
         end,
