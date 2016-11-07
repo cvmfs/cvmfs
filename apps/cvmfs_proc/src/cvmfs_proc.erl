@@ -136,7 +136,7 @@ init([]) ->
 %%--------------------------------------------------------------------
 handle_call({proc_req, new_lease, {User, Path}}, _From, State) ->
     case priv_new_lease(User, Path) of
-        {ok, {LeaseToken, Public, Secret}} ->
+        {ok, {Public, Secret, LeaseToken}} ->
             NewState = State#{Public => Secret},
             lager:info("Request received: {new_lease, {~p, ~p}} -> Reply: ~p", [User, Path, LeaseToken]),
             {reply, {ok, LeaseToken}, NewState};
@@ -216,14 +216,14 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 -spec priv_new_lease(User, Path) -> {ok, Token} |
-                                      {error, invalid_user} |
-                                      {error, invalid_path}
-                                          when User :: binary(),
-                                               Path :: binary(),
-                                               Token :: binary().
+                                    {error, invalid_user} |
+                                    {error, invalid_path}
+                                        when User :: binary(),
+                                             Path :: binary(),
+                                             Token :: binary().
 priv_new_lease(User, Path) ->
-    % Check if user is registered with the cvmfs_auth service and which
-    % paths he is allowed to modify
+    % Check if user is registered with the cvmfs_auth service and
+    % which paths he is allowed to modify
     case cvmfs_auth:get_user_permissions(User) of
         user_not_found ->
             {error, invalid_user};
@@ -232,8 +232,13 @@ priv_new_lease(User, Path) ->
                 false ->
                     {error, invalid_path};
                 true ->
-                    %% TODO: acquire lease for subpath here
-                    {ok, priv_generate_token(User, Path)}
+                    {Public, Secret, Token} = priv_generate_token(User, Path),
+                    case cvmfs_lease:request_lease(User, Path, Public, Secret) of
+                        ok ->
+                            {ok, {Public, Secret, Token}};
+                        {busy, TimeRemaining} ->
+                            {error, path_busy, TimeRemaining}
+                    end
             end
     end.
 
@@ -293,7 +298,7 @@ priv_generate_token(User, Path) ->
     %%M3 = macaroon:add_first_party_caveat(M2, "path = " ++ Path),
 
     {ok, Token} = macaroon:serialize(M2),
-    {Token, Public, Secret}.
+    {Public, Secret, Token}.
 
 -spec priv_check_payload(User, LeaseToken, Payload, State) ->
                                 ok | {error, invalid_token}
