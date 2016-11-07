@@ -50,6 +50,8 @@ namespace CVMFS_NAMESPACE_GUARD {
  */
 #define HOST_NAME_MAX _POSIX_HOST_NAME_MAX
 
+#define platform_sighandler_t sig_t
+
 
 inline std::vector<std::string> platform_mountlist() {
   std::vector<std::string> result;

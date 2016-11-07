@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "logging.h"
+#include "platform.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
@@ -408,7 +409,7 @@ bool CachePlugin::Listen(const string &locator) {
 void *CachePlugin::MainProcessRequests(void *data) {
   CachePlugin *cache_plugin = reinterpret_cast<CachePlugin *>(data);
 
-  sighandler_t save_sigpipe = signal(SIGPIPE, SIG_IGN);
+  platform_sighandler_t save_sigpipe = signal(SIGPIPE, SIG_IGN);
 
   vector<struct pollfd> watch_fds;
   // Elements 0, 1: control pipe, socket fd

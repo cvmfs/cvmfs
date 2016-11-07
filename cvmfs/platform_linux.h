@@ -39,6 +39,8 @@
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
+#define platform_sighandler_t sighandler_t
+
 
 inline std::vector<std::string> platform_mountlist() {
   std::vector<std::string> result;
