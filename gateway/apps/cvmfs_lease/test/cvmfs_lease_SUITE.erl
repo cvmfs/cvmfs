@@ -104,7 +104,7 @@ remove_lease_existing(_Config) ->
     Public = <<"public">>,
     Secret = <<"secret">>,
     ok = cvmfs_lease:request_lease(U, P, Public, Secret),
-    ok = cvmfs_lease:end_lease(P).
+    ok = cvmfs_lease:end_lease(Public).
 
 remove_lease_nonexisting(_Config) ->
     P = <<"path">>,
