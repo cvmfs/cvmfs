@@ -29,10 +29,10 @@
 
 %% Records used as table entries
 
--record(lease, { s_path :: binary()   % subpath which is locked
+-record(lease, { path :: binary()   % subpath which is locked
                , u_id   :: binary()   % user identifier
-               , s_pub  :: binary()   % public string used for token generation
-               , s_sec  :: binary()   % secret used for token generation
+               , public  :: binary()   % public string used for token generation
+               , secret  :: binary()   % secret used for token generation
                , time   :: integer()  % timestamp (time when lease acquired)
                }).
 
@@ -154,7 +154,7 @@ init(_) ->
     mnesia:create_table(lease, [CopyMode
                                ,{type, set}
                                ,{attributes, record_info(fields, lease)}
-                               ,{index, [s_pub]}]),
+                               ,{index, [public]}]),
     ok = mnesia:wait_for_tables([lease], 10000),
     lager:info("Lease table initialized"),
     {ok, {}}.
@@ -269,7 +269,7 @@ priv_new_lease(User, Path, Public, Secret, _State) ->
 
     %% Match statement that selects all rows with a given repo,
     %% returning a list of {Path, Time} pairs
-    MS = ets:fun2ms(fun(#lease{u_id = U, time = T, s_path = P}) ->
+    MS = ets:fun2ms(fun(#lease{u_id = U, time = T, path = P}) ->
                             {P, T}
                     end),
 
@@ -311,7 +311,7 @@ priv_check_lease(User, Path) ->
                 case mnesia:read(lease, Path) of
                     [] ->
                         {error, lease_not_found};
-                    [#lease{s_path = Path, u_id = User, time = Time} | _]  ->
+                    [#lease{path = Path, u_id = User, time = Time} | _]  ->
                         RemainingTime = MaxLeaseTime - (CurrentTime - Time),
                         case RemainingTime > 0 of
                             true ->
@@ -348,8 +348,8 @@ priv_clear_leases() ->
     Result.
 
 priv_write_row(User, Path, Public, Secret) ->
-    mnesia:write(#lease{s_path = Path,
+    mnesia:write(#lease{path = Path,
                         u_id = User,
-                        s_pub = Public,
-                        s_sec = Secret,
+                        public = Public,
+                        secret = Secret,
                         time = erlang:system_time(milli_seconds)}).
