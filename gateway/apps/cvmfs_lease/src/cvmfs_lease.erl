@@ -17,7 +17,7 @@
 
 %% API
 -export([start_link/1, stop/0
-        ,request_lease/2, end_lease/1
+        ,request_lease/4, end_lease/1
         ,check_lease/2
         ,get_leases/0, clear_leases/0]).
 
@@ -29,8 +29,10 @@
 
 %% Records used as table entries
 
--record(lease, { s_path :: binary() % subpath which is locked
-               , u_id   :: binary()  % user identifier
+-record(lease, { s_path :: binary()   % subpath which is locked
+               , u_id   :: binary()   % user identifier
+               , s_pub  :: binary()   % public string used for token generation
+               , s_sec  :: binary()   % secret used for token generation
                , time   :: integer()  % timestamp (time when lease acquired)
                }).
 
@@ -66,13 +68,16 @@ stop() ->
 %% @spec request_lease(User, Path)) -> {ok, LeaseId} | {busy, TimeRemaining}
 %% @end
 %%--------------------------------------------------------------------
--spec request_lease(User, Path) -> {ok, LeaseId} | {busy, TimeRemaining}
+-spec request_lease(User, Path, Public, Secret) ->
+                           {ok, LeaseId} | {busy, TimeRemaining}
                                        when User :: binary(),
                                             Path :: binary(),
+                                            Public :: binary(),
+                                            Secret :: binary(),
                                             LeaseId :: binary(),
                                             TimeRemaining :: integer().
-request_lease(User, Path) ->
-    gen_server:call(?MODULE, {lease_req, new_lease, {User, Path}}).
+request_lease(User, Path, Public, Secret) ->
+    gen_server:call(?MODULE, {lease_req, new_lease, {User, Path, Public, Secret}}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -148,7 +153,8 @@ init(_) ->
                end,
     mnesia:create_table(lease, [CopyMode
                                ,{type, set}
-                               ,{attributes, record_info(fields, lease)}]),
+                               ,{attributes, record_info(fields, lease)}
+                               ,{index, [s_pub]}]),
     ok = mnesia:wait_for_tables([lease], 10000),
     lager:info("Lease table initialized"),
     {ok, {}}.
@@ -167,8 +173,8 @@ init(_) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call({lease_req, new_lease, {User, Path}}, _From, State) ->
-    Reply = priv_new_lease(User, Path, State),
+handle_call({lease_req, new_lease, {User, Path, Public, Secret}}, _From, State) ->
+    Reply = priv_new_lease(User, Path, Public, Secret, State),
     lager:info("Request received: {new_lease, ~p} -> Reply: ~p"
               ,[{User, Path}, Reply]),
     {reply, Reply, State};
@@ -258,7 +264,7 @@ code_change(OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-priv_new_lease(User, Path, _State) ->
+priv_new_lease(User, Path, Public, Secret, _State) ->
     {ok, MaxLeaseTime} = application:get_env(cvmfs_lease, max_lease_time),
 
     %% Match statement that selects all rows with a given repo,
@@ -288,11 +294,11 @@ priv_new_lease(User, Path, _State) ->
                             %% The old lease is expired. Delete it and insert the new one
                             false ->
                                 mnesia:delete({lease, P}),
-                                priv_write_row(User, Path)
+                                priv_write_row(User, Path, Public, Secret)
                         end;
                     %% No overlapping paths were found; just insert the new entry
                     _ ->
-                        priv_write_row(User, Path)
+                        priv_write_row(User, Path, Public, Secret)
                 end
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
@@ -341,7 +347,9 @@ priv_clear_leases() ->
     {atomic, Result} = mnesia:clear_table(lease),
     Result.
 
-priv_write_row(User, Path) ->
+priv_write_row(User, Path, Public, Secret) ->
     mnesia:write(#lease{s_path = Path,
                         u_id = User,
+                        s_pub = Public,
+                        s_sec = Secret,
                         time = erlang:system_time(milli_seconds)}).
