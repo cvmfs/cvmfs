@@ -70,11 +70,12 @@ new_lease(User, Path) ->
 %% Ends the lease identified by LeaseToken.
 %%
 %%
-%% @spec end_lease() -> ok | {error, invalid_token}.
+%% @spec end_lease() -> ok | {error, Reason}.
 %% @end
 %%--------------------------------------------------------------------
--spec end_lease(LeaseToken) -> ok | {error, invalid_token}
-                                       when LeaseToken :: binary().
+-spec end_lease(LeaseToken) -> ok | {error, Reason}
+                                   when LeaseToken :: binary(),
+                                        Reason :: atom().
 end_lease(LeaseToken) ->
     gen_server:call(?MODULE, {proc_req, end_lease, LeaseToken}).
 
@@ -96,7 +97,7 @@ end_lease(LeaseToken) ->
                                      LeaseToken :: binary(),
                                      Payload :: binary(),
                                      Final :: boolean(),
-                                     Reason :: binary().
+                                     Reason :: atom().
 submit_payload(User, LeaseToken, Payload, Final) ->
     gen_server:call(?MODULE, {proc_req, submit_payload, {User,
                                                          LeaseToken,
@@ -138,10 +139,9 @@ init([]) ->
 %%--------------------------------------------------------------------
 handle_call({proc_req, new_lease, {User, Path}}, _From, State) ->
     case priv_new_lease(User, Path) of
-        {ok, {Public, Secret, LeaseToken}} ->
-            NewState = State#{Public => Secret},
+        {ok, LeaseToken} ->
             lager:info("Request received: {new_lease, {~p, ~p}} -> Reply: ~p", [User, Path, LeaseToken]),
-            {reply, {ok, LeaseToken}, NewState};
+            {reply, {ok, LeaseToken}, State};
         Other ->
             lager:info("Request received: {new_lease, {~p, ~p}} -> Reply: ~p", [User, Path, Other]),
             {reply, Other, State}
@@ -151,10 +151,10 @@ handle_call({proc_req, end_lease, LeaseToken}, _From, State) ->
     lager:info("Request received: {end_lease, ~p} -> Reply: ~p", [LeaseToken, Reply]),
     {reply, Reply, State};
 handle_call({proc_req, submit_payload, {User, LeaseToken, Payload, Final}}, _From, State) ->
-    {Reply, NewState} = priv_submit_payload(User, LeaseToken, Payload, State, Final),
+    Reply = priv_submit_payload(User, LeaseToken, Payload, Final),
     lager:info("Request received: {submit_payload, {~p, ~p, ~p, ~p}} -> Reply: ~p",
                [User, LeaseToken, Payload, Final, Reply]),
-    {reply, Reply, NewState}.
+    {reply, Reply, State}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -237,46 +237,46 @@ priv_new_lease(User, Path) ->
                     {Public, Secret, Token} = priv_generate_token(User, Path),
                     case cvmfs_lease:request_lease(User, Path, Public, Secret) of
                         ok ->
-                            {ok, {Public, Secret, Token}};
+                            {ok, Token};
                         {busy, TimeRemaining} ->
                             {error, path_busy, TimeRemaining}
                     end
             end
     end.
 
--spec priv_end_lease(LeaseToken) -> ok | {error, invalid_token}
-                                            when LeaseToken :: binary().
+-spec priv_end_lease(LeaseToken) -> ok | {error, Reason}
+                                        when LeaseToken :: binary(),
+                                             Reason :: atom().
 priv_end_lease(_LeaseToken) ->
     ok.
 
--spec priv_submit_payload(User, LeaseToken, Payload, State, Final) ->
-                                 {{ok, payload_added} |
-                                  {ok, payload_added, lease_ended} |
-                                  {error, Reason}, State}
+-spec priv_submit_payload(User, LeaseToken, Payload, Final) ->
+                                 {ok, payload_added} |
+                                 {ok, payload_added, lease_ended} |
+                                 {error, Reason}
                                      when User :: binary(),
                                           LeaseToken :: binary(),
                                           Payload :: binary(),
-                                          State :: map(),
                                           Final :: boolean(),
-                                          Reason :: lease_expired | invalid_user | invalid_token.
-priv_submit_payload(User, LeaseToken, Payload, State, Final) ->
+                                          Reason :: lease_expired | leason_not_found | invalid_user.
+priv_submit_payload(User, LeaseToken, Payload, Final) ->
     case priv_check_payload(User, LeaseToken, Payload) of
-        ok ->
+        {ok, Public} ->
             %% TODO: submit payload to GW
 
             case Final of
                 true ->
-                    {{ok, payload_added, lease_ended},
-                     priv_delete_token(State, LeaseToken)};
+                    cvmfs_lease:end_lease(Public),
+                    {ok, payload_added, lease_ended};
                 false ->
-                    {{ok, payload_added}, State}
+                    {ok, payload_added}
             end;
         {error, {unverified_caveat, <<"time < ", _/binary>>}} ->
-            {{error, lease_expired}, State};
+            {error, lease_expired};
         {error, {unverified_caveat, <<"user = ", _/binary>>}} ->
-            {{error, invalid_user}, State};
-        {error, _} ->
-            {{error, invalid_token}, State}
+            {error, invalid_user};
+        {error, Reason} ->
+            {error, Reason}
     end.
 
 -spec priv_generate_token(User, Path) -> {Token, Public, Secret}
@@ -303,43 +303,49 @@ priv_generate_token(User, Path) ->
     {Public, Secret, Token}.
 
 -spec priv_check_payload(User, LeaseToken, Payload) ->
-                                ok | {error, invalid_token}
+                                {ok, Public} | {error, Reason}
                                     when User :: binary(),
                                          LeaseToken :: binary(),
-                                         Payload :: binary().
+                                         Payload :: binary(),
+                                         Public :: binary(),
+                                         Reason :: atom().
 priv_check_payload(User, LeaseToken, _Payload) ->
     % Here we should perform all sanity checks on the request
 
     % Verify lease token (check user, check time-stamp, extract path).
-    {ok, M} = macaroon:deserialize(LeaseToken),
-    Public = macaroon:identifier(M),
-    case cvmfs_lease:check_lease(Public) of
-        {ok, Secret} ->
-            CheckUser = fun(<<"user = ", U/binary>>) ->
-                                U =:= User;
-                           (_) ->
-                                false
-                        end,
-            CheckTime = fun(<<"time < ", Exp/binary>>) ->
-                                erlang:binary_to_integer(Exp) > erlang:system_time(milli_seconds);
-                           (_) ->
-                                false
-                        end,
-            %% CheckPaths = fun(_) ->
-            %%                      true
-            %%              end,
+    case  macaroon:deserialize(LeaseToken) of
+        {ok, M} ->
+            Public = macaroon:identifier(M),
+            case cvmfs_lease:check_lease(Public) of
+                {ok, Secret} ->
+                    CheckUser = fun(<<"user = ", U/binary>>) ->
+                                        U =:= User;
+                                   (_) ->
+                                        false
+                                end,
+                    CheckTime = fun(<<"time < ", Exp/binary>>) ->
+                                        erlang:binary_to_integer(Exp) > erlang:system_time(milli_seconds);
+                                   (_) ->
+                                        false
+                                end,
+                    %% CheckPaths = fun(_) ->
+                    %%                      true
+                    %%              end,
 
-            V = macaroon_verifier:create(),
-            V1 = macaroon_verifier:satisfy_general(V, CheckUser),
-            V2 = macaroon_verifier:satisfy_general(V1, CheckTime),
-            %% V3 = macaroon_verifier:satisfy_general(V2, CheckPaths),
+                    V = macaroon_verifier:create(),
+                    V1 = macaroon_verifier:satisfy_general(V, CheckUser),
+                    V2 = macaroon_verifier:satisfy_general(V1, CheckTime),
+                    %% V3 = macaroon_verifier:satisfy_general(V2, CheckPaths),
 
-            macaroon_verifier:verify(V2, M, Secret);
-        {error, _Reason} ->
-            {error, invalid_token}
+                    case macaroon_verifier:verify(V2, M, Secret) of
+                        ok ->
+                            {ok, Public};
+                        Reason ->
+                            Reason
+                    end;
+                {error, Reason} ->
+                    {error, Reason}
+            end;
+        _ ->
+            {error, invalid_macaroon}
     end.
-
-priv_delete_token(State, LeaseToken) ->
-    {ok, Macaroon} = macaroon:deserialize(LeaseToken),
-    TokenId = macaroon:identifier(Macaroon),
-    maps:remove(TokenId, State).
