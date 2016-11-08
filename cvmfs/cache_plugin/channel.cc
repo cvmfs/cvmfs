@@ -16,6 +16,9 @@
 
 #include "logging.h"
 #include "platform.h"
+#ifdef __APPLE__
+#include "smalloc.h"
+#endif
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
@@ -185,12 +188,19 @@ void CachePlugin::HandleRead(
     return;
   }
   unsigned size = msg_req->size();
+#ifdef __APPLE__
+  unsigned char *buffer = reinterpret_cast<unsigned char *>(smalloc(size));
+#else
   unsigned char buffer[size];
+#endif
   cvmfs::EnumStatus status = Pread(object_id, msg_req->offset(), &size, buffer);
   msg_reply.set_status(status);
   if (status == cvmfs::STATUS_OK)
     frame_send.set_attachment(buffer, size);
   transport->SendFrame(&frame_send);
+#ifdef __APPLE__
+  free(buffer);
+#endif
 }
 
 

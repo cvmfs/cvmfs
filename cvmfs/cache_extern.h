@@ -40,9 +40,13 @@ class ExternalCacheManager : public CacheManager {
   virtual int Dup(int fd);
   virtual int Readahead(int fd);
 
+#ifdef __APPLE__
+  virtual uint32_t SizeOfTxn() { return sizeof(Transaction); }
+#else
   virtual uint32_t SizeOfTxn() {
     return sizeof(Transaction) + max_object_size_;
   }
+#endif
   virtual int StartTxn(const shash::Any &id, uint64_t size, void *txn);
   virtual void CtrlTxn(const ObjectInfo &object_info,
                        const int flags,
@@ -91,7 +95,7 @@ class ExternalCacheManager : public CacheManager {
 
     /**
      * Allocated size is max_object_size_, allocated by the caller at the end
-     * of the transaction.
+     * of the transaction (Linux only).
      */
     unsigned char *buffer;
     unsigned buf_pos;

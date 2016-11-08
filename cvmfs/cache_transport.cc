@@ -511,8 +511,15 @@ void CacheTransport::SendFrame(CacheTransport::Frame *frame) {
   cvmfs::MsgRpc *msg_rpc = frame->GetMsgRpc();
   int32_t size = msg_rpc->ByteSize();
   assert(size > 0);
+#ifdef __APPLE__
+  void *buffer = smalloc(size);
+#else
   void *buffer = alloca(size);
+#endif
   bool retval = msg_rpc->SerializeToArray(buffer, size);
   assert(retval);
   SendData(buffer, size, frame->attachment(), frame->att_size());
+#ifdef __APPLE__
+  free(buffer);
+#endif
 }
