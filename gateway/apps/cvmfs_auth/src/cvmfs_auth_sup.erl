@@ -35,11 +35,11 @@ init(Args) ->
                         intensity => 5,
                         period => 5},
     CvmfsAuthMainSpecs = #{id => cvmfs_auth,
-                             start => {cvmfs_auth, start_link, [Args]},
-                             restart => permanent,
-                             shutdown => 2000,
-                             type => worker,
-                             modules => [cvmfs_auth]},
+                           start => {cvmfs_auth, start_link, [Args]},
+                           restart => permanent,
+                           shutdown => 2000,
+                           type => worker,
+                           modules => [cvmfs_auth]},
     {ok, {SupervisorSpecs, [CvmfsAuthMainSpecs]}}.
 
 %%====================================================================

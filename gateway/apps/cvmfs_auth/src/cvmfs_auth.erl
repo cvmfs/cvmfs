@@ -43,9 +43,11 @@
 %% @doc
 %% Starts the server
 %%
-%% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
+-spec start_link(Args) -> {ok, Pid} | ignore | {error, Error}
+                              when Args :: term(), Pid :: pid(),
+                                   Error :: {already_start, pid()} | term().
 start_link(Args) ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, Args, []).
 
@@ -71,7 +73,6 @@ remove_user(User) ->
 %% Returns a list of all usernames in the `acl` table.
 %% Potentially expensive!
 %%
-%% @spec spec get_users() -> [binary()]
 %% @end
 %%--------------------------------------------------------------------
 -spec get_users() -> [binary()].
@@ -91,7 +92,6 @@ remove_repo(Repo) ->
 %% Returns a list of all repo names in the `repo` table.
 %% Potentially expensive!
 %%
-%% @spec spec get_users() -> [binary()]
 %% @end
 %%--------------------------------------------------------------------
 -spec get_repos() -> [binary()].
@@ -111,10 +111,6 @@ get_repos() ->
 %%   RepoList - list of managed repositories
 %%   ACL - access control list ([{username, [repo_name]}])
 %%
-%% @spec init(Args) -> {ok, State} |
-%%                     {ok, State, Timeout} |
-%%                     ignore |
-%%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
 init({RepoList, ACL}) ->
@@ -148,13 +144,6 @@ init({RepoList, ACL}) ->
 %% @doc
 %% Handling call messages
 %%
-%% @spec handle_call(Request, From, State) ->
-%%                                   {reply, Reply, State} |
-%%                                   {reply, Reply, State, Timeout} |
-%%                                   {noreply, State} |
-%%                                   {noreply, State, Timeout} |
-%%                                   {stop, Reason, Reply, State} |
-%%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
 handle_call({auth_req, user_perms, User}, _From, State) ->
@@ -191,9 +180,6 @@ handle_call({auth_req, get_repos}, _From, State) ->
 %% @doc
 %% Handling cast messages
 %%
-%% @spec handle_cast(Msg, State) -> {noreply, State} |
-%%                                  {noreply, State, Timeout} |
-%%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
 handle_cast(stop, State) ->
@@ -208,9 +194,6 @@ handle_cast(Msg, State) ->
 %% @doc
 %% Handling all non call/cast messages
 %%
-%% @spec handle_info(Info, State) -> {noreply, State} |
-%%                                   {noreply, State, Timeout} |
-%%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
 handle_info(Info, State) ->
@@ -225,7 +208,6 @@ handle_info(Info, State) ->
 %% necessary cleaning up. When it returns, the gen_server terminates
 %% with Reason. The return value is ignored.
 %%
-%% @spec terminate(Reason, State) -> void()
 %% @end
 %%--------------------------------------------------------------------
 terminate(Reason, _State) ->
@@ -237,7 +219,6 @@ terminate(Reason, _State) ->
 %% @doc
 %% Convert process state when code is changed
 %%
-%% @spec code_change(OldVsn, State, Extra) -> {ok, NewState}
 %% @end
 %%--------------------------------------------------------------------
 code_change(OldVsn, State, _Extra) ->

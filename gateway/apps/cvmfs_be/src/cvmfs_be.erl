@@ -24,6 +24,15 @@
 -define(SERVER, ?MODULE).
 
 %%%===================================================================
+%%% Type specifications
+%%%===================================================================
+-type submission_error() :: {error,
+                             lease_expired |
+                             lease_not_found |
+                             invalid_user |
+                             invalid_macaroon}.
+
+%%%===================================================================
 %%% API
 %%%===================================================================
 
@@ -31,7 +40,6 @@
 %% @doc
 %% Starts the server
 %%
-%% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
 start_link(_) ->
@@ -48,9 +56,6 @@ stop() ->
 %%
 %% The lease token is needed for making any other request.
 %%
-%% @spec new_lease(User, Path) -> {ok, LeaseToken} |
-%%                                  {error, invalid_user} |
-%%                                  {error, invalid_path}.
 %% @end
 %%--------------------------------------------------------------------
 -spec new_lease(User, Path) -> {ok, LeaseToken} |
@@ -70,7 +75,6 @@ new_lease(User, Path) ->
 %% Ends the lease identified by LeaseToken.
 %%
 %%
-%% @spec end_lease() -> ok | {error, Reason}.
 %% @end
 %%--------------------------------------------------------------------
 -spec end_lease(LeaseToken) -> ok | {error, Reason}
@@ -84,20 +88,17 @@ end_lease(LeaseToken) ->
 %% Submit a new payload
 %%
 %%
-%% @spec submit_payload(User, LeaseToken, Payload, Final)
-%%           -> {ok, payload_added} | {ok, payload_added, lease_ended} |
-%%              {error, Reason}
 %% @end
 %%--------------------------------------------------------------------
 -spec submit_payload(User, LeaseToken, Payload, Final) ->
                             {ok, payload_added} |
                             {ok, payload_added, lease_ended} |
-                            {error, Reason}
+                            submission_error()
                                 when User :: binary(),
                                      LeaseToken :: binary(),
                                      Payload :: binary(),
-                                     Final :: boolean(),
-                                     Reason :: atom().
+                                     Final :: boolean().
+
 submit_payload(User, LeaseToken, Payload, Final) ->
     gen_server:call(?MODULE, {be_req, submit_payload, {User,
                                                          LeaseToken,
@@ -113,10 +114,6 @@ submit_payload(User, LeaseToken, Payload, Final) ->
 %% @doc
 %% Initializes the server
 %%
-%% @spec init(Args) -> {ok, State} |
-%%                     {ok, State, Timeout} |
-%%                     ignore |
-%%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
 init([]) ->
@@ -128,13 +125,6 @@ init([]) ->
 %% @doc
 %% Handling call messages
 %%
-%% @spec handle_call(Request, From, State) ->
-%%                                   {reply, Reply, State} |
-%%                                   {reply, Reply, State, Timeout} |
-%%                                   {noreply, State} |
-%%                                   {noreply, State, Timeout} |
-%%                                   {stop, Reason, Reply, State} |
-%%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
 handle_call({be_req, new_lease, {User, Path}}, _From, State) ->
@@ -161,9 +151,6 @@ handle_call({be_req, submit_payload, {User, LeaseToken, Payload, Final}}, _From,
 %% @doc
 %% Handling cast messages
 %%
-%% @spec handle_cast(Msg, State) -> {noreply, State} |
-%%                                  {noreply, State, Timeout} |
-%%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
 handle_cast(stop, State) ->
@@ -178,9 +165,6 @@ handle_cast(Msg, State) ->
 %% @doc
 %% Handling all non call/cast messages
 %%
-%% @spec handle_info(Info, State) -> {noreply, State} |
-%%                                   {noreply, State, Timeout} |
-%%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
 handle_info(Info, State) ->
@@ -195,7 +179,6 @@ handle_info(Info, State) ->
 %% necessary cleaning up. When it returns, the gen_server terminates
 %% with Reason. The return value is ignored.
 %%
-%% @spec terminate(Reason, State) -> void()
 %% @end
 %%--------------------------------------------------------------------
 terminate(Reason, _State) ->
@@ -207,7 +190,6 @@ terminate(Reason, _State) ->
 %% @doc
 %% Convert process state when code is changed
 %%
-%% @spec code_change(OldVsn, State, Extra) -> {ok, NewState}
 %% @end
 %%--------------------------------------------------------------------
 code_change(_OldVsn, State, _Extra) ->
@@ -218,14 +200,15 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 -spec p_new_lease(User, Path) -> {ok, Token} |
-                                 {error, invalid_user} |
-                                 {error, invalid_path}
+                                 {error, invalid_user | invalid_path} |
+                                 {error, path_busy, Time}
                                      when User :: binary(),
                                           Path :: binary(),
-                                          Token :: binary().
+                                          Token :: binary(),
+                                          Time :: integer().
 p_new_lease(User, Path) ->
-                                                % Check if user is registered with the cvmfs_auth service and
-                                                % which paths he is allowed to modify
+    % Check if user is registered with the cvmfs_auth service and
+    % which paths he is allowed to modify
     case cvmfs_auth:get_user_permissions(User) of
         user_not_found ->
             {error, invalid_user};
@@ -253,12 +236,11 @@ p_end_lease(_LeaseToken) ->
 -spec p_submit_payload(User, LeaseToken, Payload, Final) ->
                               {ok, payload_added} |
                               {ok, payload_added, lease_ended} |
-                              {error, Reason}
+                              submission_error()
                                   when User :: binary(),
                                        LeaseToken :: binary(),
                                        Payload :: binary(),
-                                       Final :: boolean(),
-                                       Reason :: lease_expired | leason_not_found | invalid_user.
+                                       Final :: boolean().
 p_submit_payload(User, LeaseToken, Payload, Final) ->
     case p_check_payload(User, LeaseToken, Payload) of
         {ok, Public} ->
@@ -303,16 +285,16 @@ p_generate_token(User, Path) ->
     {Public, Secret, Token}.
 
 -spec p_check_payload(User, LeaseToken, Payload) ->
-                             {ok, Public} | {error, Reason}
+                             {ok, Public} | {error, invalid_macaroon |
+                                             {unverified_caveat, Caveat}}
                                  when User :: binary(),
                                       LeaseToken :: binary(),
                                       Payload :: binary(),
                                       Public :: binary(),
-                                      Reason :: atom().
+                                      Caveat :: binary().
 p_check_payload(User, LeaseToken, _Payload) ->
-                                                % Here we should perform all sanity checks on the request
-
-                                                % Verify lease token (check user, check time-stamp, extract path).
+    % Here we should perform all sanity checks on the request
+    % Verify lease token (check user, check time-stamp, extract path).
     case  macaroon:deserialize(LeaseToken) of
         {ok, M} ->
             Public = macaroon:identifier(M),
@@ -340,8 +322,8 @@ p_check_payload(User, LeaseToken, _Payload) ->
                     case macaroon_verifier:verify(V2, M, Secret) of
                         ok ->
                             {ok, Public};
-                        Reason ->
-                            Reason
+                        {error, Reason} ->
+                            {error, Reason}
                     end;
                 {error, Reason} ->
                     {error, Reason}

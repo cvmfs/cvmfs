@@ -45,7 +45,6 @@
 %% @doc
 %% Starts the server
 %%
-%% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
 start_link(Args) ->
@@ -55,7 +54,6 @@ start_link(Args) ->
 %% @doc
 %% Stops the server (only useful without a supervision tree)
 %%
-%% @spec stop() -> ok
 %% @end
 %%--------------------------------------------------------------------
 stop() ->
@@ -65,17 +63,14 @@ stop() ->
 %% @doc
 %% Requests a new lease
 %%
-%% @spec request_lease(User, Path)) -> {ok, LeaseId} | {busy, TimeRemaining}
 %% @end
 %%--------------------------------------------------------------------
--spec request_lease(User, Path, Public, Secret) ->
-                           {ok, LeaseId} | {busy, TimeRemaining}
-                               when User :: binary(),
-                                    Path :: binary(),
-                                    Public :: binary(),
-                                    Secret :: binary(),
-                                    LeaseId :: binary(),
-                                    TimeRemaining :: integer().
+-spec request_lease(User, Path, Public, Secret) -> ok | {busy, TimeRemaining}
+                                                       when User :: binary(),
+                                                            Path :: binary(),
+                                                            Public :: binary(),
+                                                            Secret :: binary(),
+                                                            TimeRemaining :: integer().
 request_lease(User, Path, Public, Secret) ->
     gen_server:call(?MODULE, {lease_req, new_lease, {User, Path, Public, Secret}}).
 
@@ -83,7 +78,6 @@ request_lease(User, Path, Public, Secret) ->
 %% @doc
 %% Gives up an existing lease
 %%
-%% @spec end_lease(Public) -> ok | {error, lease_not_found}
 %% @end
 %%--------------------------------------------------------------------
 end_lease(Public) ->
@@ -93,7 +87,6 @@ end_lease(Public) ->
 %% @doc
 %% Checks the validity of a lease
 %%
-%% @spec check_lease(Public) -> ok | {error, invalid_lease}
 %% @end
 %%--------------------------------------------------------------------
 -spec check_lease(Public) -> {ok, Secret} | {error, Reason}
@@ -108,7 +101,6 @@ check_lease(Public) ->
 %% @doc
 %% Returns list of all active leases
 %%
-%% @spec get_leases() -> Leases
 %% @end
 %%--------------------------------------------------------------------
 -spec get_leases() -> [#lease{}].
@@ -119,7 +111,6 @@ get_leases() ->
 %% @doc
 %% Clears all existing leases from the table.
 %%
-%% @spec clear_leases() -> ok.
 %% @end
 %%--------------------------------------------------------------------
 -spec clear_leases() -> ok.
@@ -136,10 +127,6 @@ clear_leases() ->
 %% @doc
 %% Initializes the server
 %%
-%% @spec init(Args) -> {ok, State} |
-%%                     {ok, State, Timeout} |
-%%                     ignore |
-%%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
 init(_) ->
@@ -164,13 +151,6 @@ init(_) ->
 %% @doc
 %% Handling call messages
 %%
-%% @spec handle_call(Request, From, State) ->
-%%                                   {reply, Reply, State} |
-%%                                   {reply, Reply, State, Timeout} |
-%%                                   {noreply, State} |
-%%                                   {noreply, State, Timeout} |
-%%                                   {stop, Reason, Reply, State} |
-%%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
 handle_call({lease_req, new_lease, {User, Path, Public, Secret}}, _From, State) ->
@@ -207,9 +187,6 @@ handle_call(_Request, _From, State) ->
 %% @doc
 %% Handling cast messages
 %%
-%% @spec handle_cast(Msg, State) -> {noreply, State} |
-%%                                  {noreply, State, Timeout} |
-%%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
 handle_cast(stop, State) ->
@@ -224,9 +201,6 @@ handle_cast(Msg, State) ->
 %% @doc
 %% Handling all non call/cast messages
 %%
-%% @spec handle_info(Info, State) -> {noreply, State} |
-%%                                   {noreply, State, Timeout} |
-%%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
 handle_info(Info, State) ->
@@ -241,7 +215,6 @@ handle_info(Info, State) ->
 %% necessary cleaning up. When it returns, the gen_server terminates
 %% with Reason. The return value is ignored.
 %%
-%% @spec terminate(Reason, State) -> void()
 %% @end
 %%--------------------------------------------------------------------
 terminate(Reason, _State) ->
@@ -253,7 +226,6 @@ terminate(Reason, _State) ->
 %% @doc
 %% Convert process state when code is changed
 %%
-%% @spec code_change(OldVsn, State, Extra) -> {ok, NewState}
 %% @end
 %%--------------------------------------------------------------------
 code_change(OldVsn, State, _Extra) ->
