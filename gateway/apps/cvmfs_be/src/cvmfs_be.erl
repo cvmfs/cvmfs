@@ -26,11 +26,19 @@
 %%%===================================================================
 %%% Type specifications
 %%%===================================================================
+-type new_lease_result() :: {ok, LeaseToken :: binary()} |
+                            {error, invalid_user} |
+                            {error, invalid_path} |
+                            {busy, TimeRemaining :: binary()}.
 -type submission_error() :: {error,
                              lease_expired |
                              lease_not_found |
                              invalid_user |
                              invalid_macaroon}.
+-type submit_payload_result() :: {ok, payload_added} |
+                                 {ok, payload_added, lease_ended} |
+                                 submission_error().
+
 
 %%%===================================================================
 %%% API
@@ -42,6 +50,9 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec start_link(Args) -> {ok, Pid} | ignore | {error, Error}
+                              when Args :: term(), Pid :: pid(),
+                                   Error :: {already_start, pid()} | term().
 start_link(_) ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
@@ -55,14 +66,9 @@ start_link(_) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec new_lease(User, Path) -> {ok, LeaseToken} |
-                               {error, invalid_user} |
-                               {error, invalid_path} |
-                               {busy, TimeRemaining}
+-spec new_lease(User, Path) -> new_lease_result()
                                    when User :: binary(),
-                                        Path :: binary(),
-                                        LeaseToken :: binary(),
-                                        TimeRemaining :: integer().
+                                        Path :: binary().
 new_lease(User, Path) ->
     gen_server:call(?MODULE, {be_req, new_lease, {User, Path}}).
 
@@ -88,19 +94,16 @@ end_lease(LeaseToken) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec submit_payload(User, LeaseToken, Payload, Final) ->
-                            {ok, payload_added} |
-                            {ok, payload_added, lease_ended} |
-                            submission_error()
+                            submit_payload_result()
                                 when User :: binary(),
                                      LeaseToken :: binary(),
                                      Payload :: binary(),
                                      Final :: boolean().
-
 submit_payload(User, LeaseToken, Payload, Final) ->
     gen_server:call(?MODULE, {be_req, submit_payload, {User,
-                                                         LeaseToken,
-                                                         Payload,
-                                                         Final}}).
+                                                       LeaseToken,
+                                                       Payload,
+                                                       Final}}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -193,13 +196,9 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
--spec p_new_lease(User, Path) -> {ok, Token} |
-                                 {error, invalid_user | invalid_path} |
-                                 {error, path_busy, Time}
+-spec p_new_lease(User, Path) -> new_lease_result()
                                      when User :: binary(),
-                                          Path :: binary(),
-                                          Token :: binary(),
-                                          Time :: integer().
+                                          Path :: binary().
 p_new_lease(User, Path) ->
     % Check if user is registered with the cvmfs_auth service and
     % which paths he is allowed to modify
@@ -221,16 +220,16 @@ p_new_lease(User, Path) ->
             end
     end.
 
+
 -spec p_end_lease(LeaseToken) -> ok | {error, Reason}
                                      when LeaseToken :: binary(),
-                                          Reason :: atom().
+                                          Reason :: atom(). %% TODO: implemented this + test
 p_end_lease(_LeaseToken) ->
     ok.
 
+
 -spec p_submit_payload(User, LeaseToken, Payload, Final) ->
-                              {ok, payload_added} |
-                              {ok, payload_added, lease_ended} |
-                              submission_error()
+                              submit_payload_result()
                                   when User :: binary(),
                                        LeaseToken :: binary(),
                                        Payload :: binary(),
@@ -255,6 +254,7 @@ p_submit_payload(User, LeaseToken, Payload, Final) ->
             {error, Reason}
     end.
 
+
 -spec p_generate_token(User, Path) -> {Token, Public, Secret}
                                           when User :: binary(),
                                                Path :: binary(),
@@ -277,6 +277,7 @@ p_generate_token(User, Path) ->
 
     {ok, Token} = macaroon:serialize(M2),
     {Public, Secret, Token}.
+
 
 -spec p_check_payload(User, LeaseToken, Payload) ->
                              {ok, Public} | {error, invalid_macaroon |

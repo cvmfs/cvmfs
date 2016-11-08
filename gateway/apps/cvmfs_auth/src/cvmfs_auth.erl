@@ -1,7 +1,7 @@
 %%%-------------------------------------------------------------------
 %%% This file is part of the CernVM File System.
 %%%
-%%% @doc
+%%% @doc cvmfs_auth public API
 %%%
 %%% @end
 %%%
@@ -51,15 +51,22 @@
 start_link(Args) ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, Args, []).
 
--spec get_user_permissions(binary()) -> user_not_found | {ok, [binary()]}.
+
+-spec get_user_permissions(User) -> user_not_found | {ok, Permissions}
+                                        when User :: binary(),
+                                             Permissions :: [binary()].
 get_user_permissions(User) ->
     gen_server:call(?MODULE, {auth_req, user_perms, User}).
 
--spec add_user(binary(), [binary()]) -> user_already_exists | ok.
+
+-spec add_user(User, Repos) -> user_already_exists | ok
+                                   when User :: binary(),
+                                        Repos :: [binary()].
 add_user(User, Repos) ->
     gen_server:call(?MODULE, {auth_req, add_user, {User, Repos}}).
 
--spec remove_user(binary()) -> ok.
+
+-spec remove_user(User :: binary()) -> ok.
 remove_user(User) ->
     gen_server:call(?MODULE, {auth_req, remove_user, User}).
 
@@ -71,17 +78,22 @@ remove_user(User) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec get_users() -> [binary()].
+-spec get_users() -> Users :: [binary()].
 get_users() ->
     gen_server:call(?MODULE, {auth_req, get_users}).
 
--spec add_repo(binary(), binary()) -> repo_already_exists | ok.
+
+-spec add_repo(Repo, Path) -> repo_already_exists | ok
+                                  when Repo :: binary(),
+                                       Path :: binary().
 add_repo(Repo, Path) ->
     gen_server:call(?MODULE, {auth_req, add_repo, {Repo, Path}}).
 
--spec remove_repo(binary()) -> ok.
+
+-spec remove_repo(Repo :: binary()) -> ok.
 remove_repo(Repo) ->
     gen_server:call(?MODULE, {auth_req, remove_repo, Repo}).
+
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -90,7 +102,7 @@ remove_repo(Repo) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec get_repos() -> [binary()].
+-spec get_repos() -> Repos :: [binary()].
 get_repos() ->
     gen_server:call(?MODULE, {auth_req, get_repos}).
 
@@ -222,7 +234,9 @@ code_change(OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
--spec p_get_user_paths(binary()) -> {ok, [binary()]} | user_not_found.
+-spec p_get_user_paths(User) -> {ok, Paths} | user_not_found
+                                    when User :: binary(),
+                                         Paths :: [binary()].
 p_get_user_paths(User) ->
     T1 = fun() ->
                  case mnesia:read(acl, User) of
@@ -241,6 +255,8 @@ p_get_user_paths(User) ->
     {atomic, Result} = mnesia:sync_transaction(T1),
     Result.
 
+
+-spec p_add_user(User :: binary(), Repos :: [binary()]) -> ok.
 p_add_user(User, Repos) ->
     T = fun() ->
                 mnesia:write(#acl{u_id = User, r_ids = Repos})
@@ -248,6 +264,8 @@ p_add_user(User, Repos) ->
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
+
+-spec p_remove_user(User :: binary()) -> ok.
 p_remove_user(User) ->
     T = fun() ->
                 mnesia:delete({acl, User})
@@ -255,6 +273,8 @@ p_remove_user(User) ->
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
+
+-spec p_get_users() -> Users :: [binary()].
 p_get_users() ->
     T = fun() ->
                 mnesia:foldl(fun(#acl{u_id = User}, Acc) -> [User | Acc] end, [], acl)
@@ -262,6 +282,8 @@ p_get_users() ->
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
+
+-spec p_add_repo(Repo :: binary(), Path :: binary()) -> ok.
 p_add_repo(Repo, Path) ->
     T = fun() ->
                 mnesia:write(#repo{r_id = Repo, path = Path})
@@ -269,6 +291,8 @@ p_add_repo(Repo, Path) ->
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
+
+-spec p_remove_repo(Repo :: binary()) -> ok.
 p_remove_repo(Repo) ->
     T = fun() ->
                 mnesia:delete({repo, Repo})
@@ -276,6 +300,8 @@ p_remove_repo(Repo) ->
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
+
+-spec p_get_repos() -> Repos :: [binary()].
 p_get_repos() ->
     T = fun() ->
                 mnesia:foldl(fun(#repo{r_id = Repo}, Acc) -> [Repo | Acc] end, [], repo)
@@ -283,18 +309,22 @@ p_get_repos() ->
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
--spec p_populate_acl([{binary(), [binary()]}]) -> [true].
+
+-spec p_populate_acl(ACL :: [{User :: binary, Repos :: [binary()]}]) -> boolean().
 p_populate_acl(ACL) ->
     T = fun() ->
-                [mnesia:write(#acl{u_id = ClientId, r_ids = RepoList}) || {ClientId, RepoList} <- ACL]
+                lists:all(fun(V) -> V =:= ok end,
+                          [mnesia:write(#acl{u_id = User, r_ids = RepoList}) || {User, RepoList} <- ACL])
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
--spec p_populate_repos([{binary(), binary()}]) -> [true].
+
+-spec p_populate_repos(RepoList :: [{Repo :: binary(), Path :: binary()}]) -> boolean().
 p_populate_repos(RepoList) ->
     T = fun() ->
-                [mnesia:write(#repo{r_id = RepoId, path = RepoPath}) || {RepoId, RepoPath} <- RepoList]
+                lists:all(fun(V) -> V =:= ok end,
+                          [mnesia:write(#repo{r_id = Repo, path = Path}) || {Repo, Path} <- RepoList])
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
