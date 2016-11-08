@@ -425,7 +425,7 @@ void *CachePlugin::MainProcessRequests(void *data) {
   while (true) {
     for (unsigned i = 0; i < watch_fds.size(); ++i)
       watch_fds[i].revents = 0;
-    int retval = poll(watch_fds.data(), watch_fds.size(), -1);
+    int retval = poll(&watch_fds[0], watch_fds.size(), -1);
     if (retval < 0) {
       if (errno == EINTR)
         continue;
