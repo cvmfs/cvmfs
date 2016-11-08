@@ -1,12 +1,12 @@
 %%%-------------------------------------------------------------------
 %%% This file is part of the CernVM File System.
 %%%
-%%% @doc cvmfs_proc public API
+%%% @doc cvmfs_be public API
 %%%
 %%% @end
 %%%-------------------------------------------------------------------
 
--module(cvmfs_proc).
+-module(cvmfs_be).
 
 -compile([{parse_transform, lager_transform}]).
 
@@ -62,7 +62,7 @@ stop() ->
                                         LeaseToken :: binary(),
                                         TimeRemaining :: integer().
 new_lease(User, Path) ->
-    gen_server:call(?MODULE, {proc_req, new_lease, {User, Path}}).
+    gen_server:call(?MODULE, {be_req, new_lease, {User, Path}}).
 
 
 %%--------------------------------------------------------------------
@@ -77,7 +77,7 @@ new_lease(User, Path) ->
                                    when LeaseToken :: binary(),
                                         Reason :: atom().
 end_lease(LeaseToken) ->
-    gen_server:call(?MODULE, {proc_req, end_lease, LeaseToken}).
+    gen_server:call(?MODULE, {be_req, end_lease, LeaseToken}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -99,7 +99,7 @@ end_lease(LeaseToken) ->
                                      Final :: boolean(),
                                      Reason :: atom().
 submit_payload(User, LeaseToken, Payload, Final) ->
-    gen_server:call(?MODULE, {proc_req, submit_payload, {User,
+    gen_server:call(?MODULE, {be_req, submit_payload, {User,
                                                          LeaseToken,
                                                          Payload,
                                                          Final}}).
@@ -137,7 +137,7 @@ init([]) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call({proc_req, new_lease, {User, Path}}, _From, State) ->
+handle_call({be_req, new_lease, {User, Path}}, _From, State) ->
     case p_new_lease(User, Path) of
         {ok, LeaseToken} ->
             lager:info("Request received: {new_lease, {~p, ~p}} -> Reply: ~p", [User, Path, LeaseToken]),
@@ -146,11 +146,11 @@ handle_call({proc_req, new_lease, {User, Path}}, _From, State) ->
             lager:info("Request received: {new_lease, {~p, ~p}} -> Reply: ~p", [User, Path, Other]),
             {reply, Other, State}
     end;
-handle_call({proc_req, end_lease, LeaseToken}, _From, State) ->
+handle_call({be_req, end_lease, LeaseToken}, _From, State) ->
     Reply = p_end_lease(LeaseToken),
     lager:info("Request received: {end_lease, ~p} -> Reply: ~p", [LeaseToken, Reply]),
     {reply, Reply, State};
-handle_call({proc_req, submit_payload, {User, LeaseToken, Payload, Final}}, _From, State) ->
+handle_call({be_req, submit_payload, {User, LeaseToken, Payload, Final}}, _From, State) ->
     Reply = p_submit_payload(User, LeaseToken, Payload, Final),
     lager:info("Request received: {submit_payload, {~p, ~p, ~p, ~p}} -> Reply: ~p",
                [User, LeaseToken, Payload, Final, Reply]),

@@ -1,12 +1,12 @@
 %%%-------------------------------------------------------------------
 %%% This file is part of the CernVM File System.
 %%%
-%%% @doc cvmfs_proc_app public API
+%%% @doc cvmfs_be_app public API
 %%%
 %%% @end
 %%%-------------------------------------------------------------------
 
--module(cvmfs_proc_app).
+-module(cvmfs_be_app).
 
 -behaviour(application).
 
@@ -18,7 +18,7 @@
 %%====================================================================
 
 start(_StartType, _StartArgs) ->
-    cvmfs_proc_sup:start_link().
+    cvmfs_be_sup:start_link().
 
 %%--------------------------------------------------------------------
 stop(_State) ->
