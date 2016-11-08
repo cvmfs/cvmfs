@@ -130,14 +130,14 @@ init({RepoList, ACL}) ->
                               ,{type, set}
                               ,{attributes, record_info(fields, repo)}]),
     ok = mnesia:wait_for_tables([repo], 10000),
-    priv_populate_repos(RepoList),
+    p_populate_repos(RepoList),
     lager:info("Repository list initialized."),
 
     mnesia:create_table(acl, [CopyMode
                              ,{type, set}
                              ,{attributes, record_info(fields, acl)}]),
     ok = mnesia:wait_for_tables([acl], 10000),
-    priv_populate_acl(ACL),
+    p_populate_acl(ACL),
     lager:info("Access control list initialized."),
 
     lager:info("Auth module initialized."),
@@ -158,31 +158,31 @@ init({RepoList, ACL}) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_call({auth_req, user_perms, User}, _From, State) ->
-    Reply = priv_get_user_paths(User),
+    Reply = p_get_user_paths(User),
     lager:info("Request received: {user_perms, ~p} -> Reply: ~p", [User, Reply]),
     {reply, Reply, State};
 handle_call({auth_req, add_user, {User, Repos}}, _From, State) ->
-    Reply = priv_add_user(User, Repos),
+    Reply = p_add_user(User, Repos),
     lager:info("Request received: {add_user, {~p, ~p}} -> Reply: ~p", [User, Repos, Reply]),
     {reply, Reply, State};
 handle_call({auth_req, remove_user, User}, _From, State) ->
-    Reply = priv_remove_user(User),
+    Reply = p_remove_user(User),
     lager:info("Request received: {remove_user, ~p} -> Reply: ~p", [User, Reply]),
     {reply, Reply, State};
 handle_call({auth_req, get_users}, _From, State) ->
-    Reply = priv_get_users(),
+    Reply = p_get_users(),
     lager:info("Request received: {get_users} -> Reply: ~p", [Reply]),
     {reply, Reply, State};
 handle_call({auth_req, add_repo, {Repo, Path}}, _From, State) ->
-    Reply = priv_add_repo(Repo, Path),
+    Reply = p_add_repo(Repo, Path),
     lager:info("Request received: {add_repo, {~p, ~p}} -> Reply: ~p", [Repo, Path, Reply]),
     {reply, Reply, State};
 handle_call({auth_req, remove_repo, Repo}, _From, State) ->
-    Reply = priv_remove_repo(Repo),
+    Reply = p_remove_repo(Repo),
     lager:info("Request received: {remove_repo, ~p} -> Reply: ~p", [Repo, Reply]),
     {reply, Reply, State};
 handle_call({auth_req, get_repos}, _From, State) ->
-    Reply = priv_get_repos(),
+    Reply = p_get_repos(),
     lager:info("Request received: {get_repos} -> Reply: ~p", [Reply]),
     {reply, Reply, State}.
 
@@ -248,77 +248,77 @@ code_change(OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
--spec priv_get_user_paths(binary()) -> {ok, [binary()]} | user_not_found.
-priv_get_user_paths(User) ->
+-spec p_get_user_paths(binary()) -> {ok, [binary()]} | user_not_found.
+p_get_user_paths(User) ->
     T1 = fun() ->
-                case mnesia:read(acl, User) of
-                    [] ->
-                        user_not_found;
-                    AclEntries ->
-                        T2 = fun() ->
-                                     {ok, [Path || #acl{r_ids = Repos} <- AclEntries,
-                                                   Repo <- Repos,
-                                                   #repo{path = Path} <- mnesia:read(repo, Repo)]}
-                             end,
-                        {atomic, Result} = mnesia:sync_transaction(T2),
-                        Result
-                end
-        end,
+                 case mnesia:read(acl, User) of
+                     [] ->
+                         user_not_found;
+                     AclEntries ->
+                         T2 = fun() ->
+                                      {ok, [Path || #acl{r_ids = Repos} <- AclEntries,
+                                                    Repo <- Repos,
+                                                    #repo{path = Path} <- mnesia:read(repo, Repo)]}
+                              end,
+                         {atomic, Result} = mnesia:sync_transaction(T2),
+                         Result
+                 end
+         end,
     {atomic, Result} = mnesia:sync_transaction(T1),
     Result.
 
-priv_add_user(User, Repos) ->
+p_add_user(User, Repos) ->
     T = fun() ->
                 mnesia:write(#acl{u_id = User, r_ids = Repos})
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
-priv_remove_user(User) ->
+p_remove_user(User) ->
     T = fun() ->
                 mnesia:delete({acl, User})
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
-priv_get_users() ->
+p_get_users() ->
     T = fun() ->
                 mnesia:foldl(fun(#acl{u_id = User}, Acc) -> [User | Acc] end, [], acl)
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
-priv_add_repo(Repo, Path) ->
+p_add_repo(Repo, Path) ->
     T = fun() ->
                 mnesia:write(#repo{r_id = Repo, path = Path})
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
-priv_remove_repo(Repo) ->
+p_remove_repo(Repo) ->
     T = fun() ->
                 mnesia:delete({repo, Repo})
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
-priv_get_repos() ->
+p_get_repos() ->
     T = fun() ->
                 mnesia:foldl(fun(#repo{r_id = Repo}, Acc) -> [Repo | Acc] end, [], repo)
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
--spec priv_populate_acl([{binary(), [binary()]}]) -> [true].
-priv_populate_acl(ACL) ->
+-spec p_populate_acl([{binary(), [binary()]}]) -> [true].
+p_populate_acl(ACL) ->
     T = fun() ->
                 [mnesia:write(#acl{u_id = ClientId, r_ids = RepoList}) || {ClientId, RepoList} <- ACL]
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
--spec priv_populate_repos([{binary(), binary()}]) -> [true].
-priv_populate_repos(RepoList) ->
+-spec p_populate_repos([{binary(), binary()}]) -> [true].
+p_populate_repos(RepoList) ->
     T = fun() ->
                 [mnesia:write(#repo{r_id = RepoId, path = RepoPath}) || {RepoId, RepoPath} <- RepoList]
         end,

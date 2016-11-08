@@ -70,12 +70,12 @@ stop() ->
 %%--------------------------------------------------------------------
 -spec request_lease(User, Path, Public, Secret) ->
                            {ok, LeaseId} | {busy, TimeRemaining}
-                                       when User :: binary(),
-                                            Path :: binary(),
-                                            Public :: binary(),
-                                            Secret :: binary(),
-                                            LeaseId :: binary(),
-                                            TimeRemaining :: integer().
+                               when User :: binary(),
+                                    Path :: binary(),
+                                    Public :: binary(),
+                                    Secret :: binary(),
+                                    LeaseId :: binary(),
+                                    TimeRemaining :: integer().
 request_lease(User, Path, Public, Secret) ->
     gen_server:call(?MODULE, {lease_req, new_lease, {User, Path, Public, Secret}}).
 
@@ -97,10 +97,10 @@ end_lease(Public) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec check_lease(Public) -> {ok, Secret} | {error, Reason}
-                                     when Public :: binary(),
-                                          Secret :: binary(),
-                                          Reason :: lease_not_found |
-                                                    lease_expired.
+                                 when Public :: binary(),
+                                      Secret :: binary(),
+                                      Reason :: lease_not_found |
+                                                lease_expired.
 check_lease(Public) ->
     gen_server:call(?MODULE, {lease_req, check_lease, Public}).
 
@@ -174,27 +174,27 @@ init(_) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_call({lease_req, new_lease, {User, Path, Public, Secret}}, _From, State) ->
-    Reply = priv_new_lease(User, Path, Public, Secret, State),
+    Reply = p_new_lease(User, Path, Public, Secret, State),
     lager:info("Request received: {new_lease, ~p} -> Reply: ~p"
               ,[{User, Path}, Reply]),
     {reply, Reply, State};
 handle_call({lease_req, end_lease, Public}, _From, State) ->
-    Reply = priv_end_lease(Public),
+    Reply = p_end_lease(Public),
     lager:info("Request received: {end_lease, ~p} -> Reply: ~p"
               ,[Public, Reply]),
     {reply, Reply, State};
 handle_call({lease_req, check_lease, Public}, _From, State) ->
-    Reply = priv_check_lease(Public),
+    Reply = p_check_lease(Public),
     lager:info("Request received: {check_lease, ~p} -> Reply: ~p"
               ,[Public, Reply]),
     {reply, Reply, State};
 handle_call({lease_req, get_leases}, _From, State) ->
-    Reply = priv_get_leases(),
+    Reply = p_get_leases(),
     lager:info("Request received: {get_leases} -> Reply: ~p"
               ,[Reply]),
     {reply, Reply, State};
 handle_call({lease_req, clear_leases}, _From, State) ->
-    Reply = priv_clear_leases(),
+    Reply = p_clear_leases(),
     lager:info("Request received: {clear_leases} -> Reply: ~p"
               ,[Reply]),
     {reply, Reply, State};
@@ -264,7 +264,7 @@ code_change(OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-priv_new_lease(User, Path, Public, Secret, _State) ->
+p_new_lease(User, Path, Public, Secret, _State) ->
     {ok, MaxLeaseTime} = application:get_env(cvmfs_lease, max_lease_time),
 
     %% Match statement that selects all rows with a given repo,
@@ -294,17 +294,17 @@ priv_new_lease(User, Path, Public, Secret, _State) ->
                             %% The old lease is expired. Delete it and insert the new one
                             false ->
                                 mnesia:delete({lease, P}),
-                                priv_write_row(User, Path, Public, Secret)
+                                p_write_row(User, Path, Public, Secret)
                         end;
                     %% No overlapping paths were found; just insert the new entry
                     _ ->
-                        priv_write_row(User, Path, Public, Secret)
+                        p_write_row(User, Path, Public, Secret)
                 end
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
-priv_check_lease(Public) ->
+p_check_lease(Public) ->
     {ok, MaxLeaseTime} = application:get_env(cvmfs_lease, max_lease_time),
 
     MS = ets:fun2ms(fun(#lease{public = P} = Lease) when P =:= Public ->
@@ -330,7 +330,7 @@ priv_check_lease(Public) ->
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
-priv_end_lease(Public) ->
+p_end_lease(Public) ->
     MS = ets:fun2ms(fun(#lease{public = Pub, path = Path}) when Pub =:= Public ->
                             Path
                     end),
@@ -345,18 +345,18 @@ priv_end_lease(Public) ->
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
-priv_get_leases() ->
+p_get_leases() ->
     T = fun() ->
                 mnesia:foldl(fun(Lease, Acc) -> [Lease | Acc] end, [], lease)
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
-priv_clear_leases() ->
+p_clear_leases() ->
     {atomic, Result} = mnesia:clear_table(lease),
     Result.
 
-priv_write_row(User, Path, Public, Secret) ->
+p_write_row(User, Path, Public, Secret) ->
     mnesia:write(#lease{path = Path,
                         u_id = User,
                         public = Public,
