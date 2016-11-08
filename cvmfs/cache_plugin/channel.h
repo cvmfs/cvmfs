@@ -45,7 +45,7 @@ class CachePlugin : SingleCopy {
   };
 
   bool Listen(const std::string &locator);
-  ~CachePlugin();
+  virtual ~CachePlugin();
   void ProcessRequests(unsigned num_workers);
   void AskToDetach();
 

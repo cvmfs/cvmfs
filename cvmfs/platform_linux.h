@@ -58,8 +58,6 @@ inline std::vector<std::string> platform_mountlist() {
 #ifndef MNT_DETACH
 #define MNT_DETACH 0x00000002
 #endif
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-result"
 inline bool platform_umount(const char* mountpoint, const bool lazy) {
   struct stat64 mtab_info;
   int retval = lstat64(_PATH_MOUNTED, &mtab_info);
@@ -136,7 +134,6 @@ inline bool platform_umount(const char* mountpoint, const bool lazy) {
   retval = umount2(mountpoint, flags);
   return retval == 0;
 }
-#pragma GCC diagnostic pop
 
 
 /**

@@ -14,12 +14,18 @@
 
 #include <algorithm>
 #include <cassert>
+#ifdef __APPLE__
+#include <cstdlib>
+#endif
 #include <new>
 #include <string>
 
 #include "cache.pb.h"
 #include "hash.h"
 #include "logging.h"
+#ifdef __APPLE__
+#include "smalloc.h"
+#endif
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util_concurrency.h"
@@ -63,7 +69,11 @@ const shash::Any ExternalCacheManager::kInvalidHandle;
 
 
 int ExternalCacheManager::AbortTxn(void *txn) {
-  return Reset(txn);
+  int result = Reset(txn);
+#ifdef __APPLE__
+  free(reinterpret_cast<Transaction *>(txn)->buffer);
+#endif
+  return result;
 }
 
 
@@ -151,6 +161,9 @@ int ExternalCacheManager::CommitTxn(void *txn) {
   int refcount = transaction->open_fds - 1;
   if (refcount != 0)
     return ChangeRefcount(transaction->id, refcount);
+#ifdef __APPLE__
+  free(transaction->buffer);
+#endif
   return 0;
 }
 
@@ -539,6 +552,10 @@ int ExternalCacheManager::StartTxn(
   Transaction *transaction = new (txn) Transaction(id);
   transaction->expected_size = size;
   transaction->transaction_id = NextRequestId();
+#ifdef __APPLE__
+  transaction->buffer =
+    reinterpret_cast<unsigned char *>(smalloc(max_object_size_));
+#endif
   return 0;
 }
 
