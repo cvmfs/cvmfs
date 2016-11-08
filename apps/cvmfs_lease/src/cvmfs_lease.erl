@@ -1,7 +1,7 @@
 %%%-------------------------------------------------------------------
 %%% This file is part of the CernVM File System.
 %%%
-%%% @doc
+%%% @doc cvmfs_lease public API
 %%%
 %%% @end
 %%%
@@ -38,6 +38,14 @@
 
 
 %%%===================================================================
+%%% Type specifications
+%%%===================================================================
+-type new_lease_result() :: ok | {busy, TimeRemaining :: binary()}.
+-type lease_check_result() :: {ok, Secret :: binary()} |
+                              {error, lease_not_found | lease_expired}.
+-type end_lease_result() :: ok | {error, lease_not_found}.
+
+%%%===================================================================
 %%% API
 %%%===================================================================
 
@@ -47,6 +55,9 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec start_link(Args) -> {ok, Pid} | ignore | {error, Error}
+                              when Args :: term(), Pid :: pid(),
+                                   Error :: {already_start, pid()} | term().
 start_link(Args) ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, Args, []).
 
@@ -56,12 +67,11 @@ start_link(Args) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec request_lease(User, Path, Public, Secret) -> ok | {busy, TimeRemaining}
+-spec request_lease(User, Path, Public, Secret) -> new_lease_result()
                                                        when User :: binary(),
                                                             Path :: binary(),
                                                             Public :: binary(),
-                                                            Secret :: binary(),
-                                                            TimeRemaining :: integer().
+                                                            Secret :: binary().
 request_lease(User, Path, Public, Secret) ->
     gen_server:call(?MODULE, {lease_req, new_lease, {User, Path, Public, Secret}}).
 
@@ -71,6 +81,7 @@ request_lease(User, Path, Public, Secret) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec end_lease(Public :: binary()) -> end_lease_result().
 end_lease(Public) ->
     gen_server:call(?MODULE, {lease_req, end_lease, Public}).
 
@@ -80,11 +91,8 @@ end_lease(Public) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec check_lease(Public) -> {ok, Secret} | {error, Reason}
-                                 when Public :: binary(),
-                                      Secret :: binary(),
-                                      Reason :: lease_not_found |
-                                                lease_expired.
+-spec check_lease(Public) -> lease_check_result()
+                                 when Public :: binary().
 check_lease(Public) ->
     gen_server:call(?MODULE, {lease_req, check_lease, Public}).
 
@@ -94,7 +102,7 @@ check_lease(Public) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec get_leases() -> [#lease{}].
+-spec get_leases() -> Leases :: [#lease{}].
 get_leases() ->
     gen_server:call(?MODULE, {lease_req, get_leases}).
 
@@ -224,6 +232,12 @@ code_change(OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
+-spec p_new_lease(User, Path, Public, Secret, State) -> new_lease_result()
+                                                            when User :: binary(),
+                                                                 Path :: binary(),
+                                                                 Public :: binary(),
+                                                                 Secret :: binary(),
+                                                                 State :: map().
 p_new_lease(User, Path, Public, Secret, _State) ->
     {ok, MaxLeaseTime} = application:get_env(cvmfs_lease, max_lease_time),
 
@@ -264,6 +278,9 @@ p_new_lease(User, Path, Public, Secret, _State) ->
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
+
+-spec p_check_lease(Public) -> lease_check_result()
+                                   when Public :: binary().
 p_check_lease(Public) ->
     {ok, MaxLeaseTime} = application:get_env(cvmfs_lease, max_lease_time),
 
@@ -290,6 +307,8 @@ p_check_lease(Public) ->
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
+
+-spec p_end_lease(Public :: binary()) -> end_lease_result().
 p_end_lease(Public) ->
     MS = ets:fun2ms(fun(#lease{public = Pub, path = Path}) when Pub =:= Public ->
                             Path
@@ -305,6 +324,8 @@ p_end_lease(Public) ->
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
+
+-spec p_get_leases() -> Leases :: [#lease{}].
 p_get_leases() ->
     T = fun() ->
                 mnesia:foldl(fun(Lease, Acc) -> [Lease | Acc] end, [], lease)
@@ -312,10 +333,14 @@ p_get_leases() ->
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
+
+-spec p_clear_leases() -> ok.
 p_clear_leases() ->
     {atomic, Result} = mnesia:clear_table(lease),
     Result.
 
+
+-spec p_write_row(User :: binary(), Path :: binary(), Public :: binary(), Secret :: binary()) -> ok.
 p_write_row(User, Path, Public, Secret) ->
     mnesia:write(#lease{path = Path,
                         u_id = User,
