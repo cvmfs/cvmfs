@@ -186,8 +186,8 @@ void *TalkManager::MainResponder(void *data) {
       talk_mgr->Answer(con_fd, "OK\n");
     } else if (line == "cache size") {
       QuotaManager *quota_mgr = file_system->cache_mgr()->quota_mgr();
-      if (!quota_mgr->IsEnforcing()) {
-        talk_mgr->Answer(con_fd, "Cache is unmanaged\n");
+      if (!quota_mgr->HasCapability(QuotaManager::kCapIntrospectSize)) {
+        talk_mgr->Answer(con_fd, "Cache cannot report its size\n");
       } else {
         uint64_t size_unpinned = quota_mgr->GetSize();
         uint64_t size_pinned = quota_mgr->GetSizePinned();
@@ -200,34 +200,34 @@ void *TalkManager::MainResponder(void *data) {
       }
     } else if (line == "cache list") {
       QuotaManager *quota_mgr = file_system->cache_mgr()->quota_mgr();
-      if (!quota_mgr->IsEnforcing()) {
-        talk_mgr->Answer(con_fd, "Cache is unmanaged\n");
+      if (!quota_mgr->HasCapability(QuotaManager::kCapList)) {
+        talk_mgr->Answer(con_fd, "Cache cannot list its entries\n");
       } else {
         vector<string> ls = quota_mgr->List();
         talk_mgr->AnswerStringList(con_fd, ls);
       }
     } else if (line == "cache list pinned") {
       QuotaManager *quota_mgr = file_system->cache_mgr()->quota_mgr();
-      if (!quota_mgr->IsEnforcing()) {
-        talk_mgr->Answer(con_fd, "Cache is unmanaged\n");
+      if (!quota_mgr->HasCapability(QuotaManager::kCapList)) {
+        talk_mgr->Answer(con_fd, "Cache cannot list its entries\n");
       } else {
         vector<string> ls_pinned = quota_mgr->ListPinned();
         talk_mgr->AnswerStringList(con_fd, ls_pinned);
       }
     } else if (line == "cache list catalogs") {
       QuotaManager *quota_mgr = file_system->cache_mgr()->quota_mgr();
-      if (!quota_mgr->IsEnforcing()) {
-        talk_mgr->Answer(con_fd, "Cache is unmanaged\n");
+      if (!quota_mgr->HasCapability(QuotaManager::kCapList)) {
+        talk_mgr->Answer(con_fd, "Cache cannot list its entries\n");
       } else {
         vector<string> ls_catalogs = quota_mgr->ListCatalogs();
         talk_mgr->AnswerStringList(con_fd, ls_catalogs);
       }
     } else if (line.substr(0, 12) == "cleanup rate") {
       QuotaManager *quota_mgr = file_system->cache_mgr()->quota_mgr();
-      if (!quota_mgr->IsEnforcing()) {
-        talk_mgr->Answer(con_fd, "Cache is unmanaged\n");
+      if (!quota_mgr->HasCapability(QuotaManager::kCapIntrospectCleanupRate)) {
+        talk_mgr->Answer(con_fd, "Unsupported by this cache\n");
       } else {
-        if (line.length() < 9) {
+        if (line.length() < 14) {
           talk_mgr->Answer(con_fd, "Usage: cleanup rate <period in mn>\n");
         } else {
           const uint64_t period_s = String2Uint64(line.substr(13)) * 60;
@@ -237,8 +237,8 @@ void *TalkManager::MainResponder(void *data) {
       }
     } else if (line.substr(0, 7) == "cleanup") {
       QuotaManager *quota_mgr = file_system->cache_mgr()->quota_mgr();
-      if (!quota_mgr->IsEnforcing()) {
-        talk_mgr->Answer(con_fd, "Cache is unmanaged\n");
+      if (!quota_mgr->HasCapability(QuotaManager::kCapShrink)) {
+        talk_mgr->Answer(con_fd, "Cache cannot trigger eviction\n");
       } else {
         if (line.length() < 9) {
           talk_mgr->Answer(con_fd, "Usage: cleanup <MB>\n");

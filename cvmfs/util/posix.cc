@@ -1114,6 +1114,45 @@ bool SafeWrite(int fd, const void *buf, size_t nbyte) {
   return true;
 }
 
+/**
+ * The contents of the iov vector might be modified by the function.
+ */
+bool SafeWriteV(int fd, struct iovec *iov, unsigned iovcnt) {
+  unsigned nbytes = 0;
+  for (unsigned i = 0; i < iovcnt; ++i)
+    nbytes += iov[i].iov_len;
+  unsigned iov_idx = 0;
+
+  while (nbytes) {
+    ssize_t retval = writev(fd, &iov[iov_idx], iovcnt - iov_idx);
+    if (retval < 0) {
+      if (errno == EINTR)
+        continue;
+      return false;
+    }
+    assert(static_cast<size_t>(retval) <= nbytes);
+    nbytes -= retval;
+
+    unsigned sum_written_blocks = 0;
+    while ((sum_written_blocks + iov[iov_idx].iov_len) <=
+           static_cast<size_t>(retval))
+    {
+      sum_written_blocks += iov[iov_idx].iov_len;
+      iov_idx++;
+      if (iov_idx == iovcnt) {
+        assert(sum_written_blocks = retval);
+        return true;
+      }
+    }
+    unsigned offset = retval - sum_written_blocks;
+    iov[iov_idx].iov_len -= offset;
+    iov[iov_idx].iov_base =
+      reinterpret_cast<char *>(iov[iov_idx].iov_base) + offset;
+  }
+
+  return true;
+}
+
 
 /**
  * Deal with EINTR and partial reads.

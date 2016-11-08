@@ -541,6 +541,49 @@ TEST_F(T_Util, SafeWrite) {
 }
 
 
+TEST_F(T_Util, SafeWriteV) {
+  int fd[2];
+  void *buffer_output = scalloc(20, sizeof(char));
+  MakePipe(fd);
+
+  struct iovec iov[3];
+  iov[0].iov_base = const_cast<char *>(to_write.data());
+  iov[0].iov_len = to_write.length();
+  SafeWriteV(fd[1], iov, 1);
+  ssize_t bytes_read = read(fd[0], buffer_output, to_write.length());
+  EXPECT_EQ(static_cast<size_t>(bytes_read), to_write.length());
+  EXPECT_STREQ(to_write.c_str(), static_cast<const char*>(buffer_output));
+  free(buffer_output);
+
+  buffer_output = scalloc(60, sizeof(char));
+  iov[2].iov_base = iov[1].iov_base = iov[0].iov_base;
+  iov[2].iov_len = iov[1].iov_len = iov[0].iov_len;
+  SafeWriteV(fd[1], iov, 3);
+  bytes_read = read(fd[0], buffer_output, 3 * to_write.length());
+  EXPECT_EQ(3 * to_write.length(), static_cast<size_t>(bytes_read));
+  free(buffer_output);
+
+  // Large write
+  int size = 1024*1024;  // 1M
+  buffer_output = scalloc(size, 1);
+  pthread_t thread;
+  int retval = pthread_create(&thread, NULL, MainReadPipe, &fd[0]);
+  EXPECT_EQ(0, retval);
+  iov[0].iov_base = buffer_output;
+  iov[0].iov_len = size;
+  iov[2].iov_base = iov[1].iov_base = iov[0].iov_base;
+  iov[2].iov_len = iov[1].iov_len = iov[0].iov_len;
+  EXPECT_TRUE(SafeWriteV(fd[1], iov, 3));
+  char stop = 's';
+  WritePipe(fd[1], &stop, 1);
+  pthread_join(thread, NULL);
+  free(buffer_output);
+  ClosePipe(fd);
+
+  EXPECT_FALSE(SafeWrite(-1, iov, 1));
+}
+
+
 struct write_pipe_data {
   int fd;
   const char *data;

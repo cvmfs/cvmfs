@@ -398,3 +398,21 @@ TEST(T_UtilConcurrency, MultiThreadedFifoChannel) {
                                          g_insert_cycles * g_cpu_burn_cycles;
   EXPECT_EQ(expected_checksum, checksum);
 }
+
+
+static void *MainSignal(void *data) {
+  Signal *signal = reinterpret_cast<Signal *>(data);
+  signal->Wakeup();
+  return 0;
+}
+
+TEST(T_UtilConcurrency, Signal) {
+  pthread_t thread_signal;
+  for (unsigned i = 0; i < 1000; ++i) {
+    Signal signal;
+    int retval = pthread_create(&thread_signal, NULL, MainSignal, &signal);
+    assert(retval == 0);
+    signal.Wait();
+    pthread_join(thread_signal, NULL);
+  }
+}

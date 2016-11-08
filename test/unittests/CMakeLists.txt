@@ -4,6 +4,7 @@
 #
 set (PROJECT_TEST_NAME "cvmfs_unittests")
 set (PROJECT_TEST_DEBUG_NAME ${PROJECT_TEST_NAME}_debug)
+set (PROJECT_TEST_CACHE_NAME "cvmfs_test_cache")
 
 #
 # unit test files
@@ -26,6 +27,7 @@ set(CVMFS_UNITTEST_FILES
   t_blocking_counter.cc
   t_buffer.cc
   t_cache.cc
+  t_cache_extern.cc
   t_cache_ram.cc
   t_cache_tiered.cc
   t_callbacks.cc
@@ -114,9 +116,12 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/backoff.cc ${CVMFS_SOURCE_DIR}/backoff.h
   ${CVMFS_SOURCE_DIR}/bigvector.h
   ${CVMFS_SOURCE_DIR}/cache.cc ${CVMFS_SOURCE_DIR}/cache.h
+  ${CVMFS_SOURCE_DIR}/cache_extern.cc ${CVMFS_SOURCE_DIR}/cache_extern.h
   ${CVMFS_SOURCE_DIR}/cache_posix.cc ${CVMFS_SOURCE_DIR}/cache_posix.h
+  ${CVMFS_SOURCE_DIR}/cache_plugin/channel.cc ${CVMFS_SOURCE_DIR}/cache_plugin/channel.h
   ${CVMFS_SOURCE_DIR}/cache_ram.cc ${CVMFS_SOURCE_DIR}/cache_ram.h
   ${CVMFS_SOURCE_DIR}/cache_tiered.cc ${CVMFS_SOURCE_DIR}/cache_tiered.h
+  ${CVMFS_SOURCE_DIR}/cache_transport.cc ${CVMFS_SOURCE_DIR}/cache_transport.h
   ${CVMFS_SOURCE_DIR}/catalog.cc
   ${CVMFS_SOURCE_DIR}/catalog_counters.cc ${CVMFS_SOURCE_DIR}/catalog_counters.h
   ${CVMFS_SOURCE_DIR}/catalog_mgr.h
@@ -174,6 +179,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/platform.h ${CVMFS_SOURCE_DIR}/platform_linux.h ${CVMFS_SOURCE_DIR}/platform_osx.h
   ${CVMFS_SOURCE_DIR}/prng.h
   ${CVMFS_SOURCE_DIR}/quota.cc ${CVMFS_SOURCE_DIR}/quota.h
+  ${CVMFS_SOURCE_DIR}/quota_posix.cc ${CVMFS_SOURCE_DIR}/quota_posix.h
   ${CVMFS_SOURCE_DIR}/reflog.cc ${CVMFS_SOURCE_DIR}/reflog.h
   ${CVMFS_SOURCE_DIR}/reflog_sql.cc ${CVMFS_SOURCE_DIR}/reflog_sql.h
   ${CVMFS_SOURCE_DIR}/s3fanout.cc
@@ -211,25 +217,72 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/whitelist.cc
   ${CVMFS_SOURCE_DIR}/wpad.cc ${CVMFS_SOURCE_DIR}/wpad.h
   ${CVMFS_SOURCE_DIR}/xattr.cc ${CVMFS_SOURCE_DIR}/xattr.h
+  cache.pb.cc
+  cache.pb.h
 )
 
 set (CVMFS_UNITTEST_DEBUG_SOURCES ${CVMFS_UNITTEST_SOURCES})
+
+set_source_files_properties(cache.pb.cc cache.pb.h
+                            PROPERTIES GENERATED true)
+
+add_custom_command(OUTPUT cache.pb.cc cache.pb.h
+                   COMMAND ${PROTOBUF_C} --cpp_out=.
+                           ${CVMFS_SOURCE_DIR}/cache.proto
+                           -I${CVMFS_SOURCE_DIR}
+                   DEPENDS ${PROTOBUF_ARCHIVE}
+                           ${CVMFS_SOURCE_DIR}/cache.proto
+                   COMMENT "Generating protobuf sources")
+
+
+set (CVMFS_TEST_CACHE_SOURCES
+  cache.pb.cc cache.pb.h
+  cache_plugin/globals.h
+  cache_plugin/main.cc
+  cache_plugin/t_cache_plugin.cc
+
+  ${CVMFS_SOURCE_DIR}/atomic.h
+  ${CVMFS_SOURCE_DIR}/cache.cc ${CVMFS_SOURCE_DIR}/cache.h
+  ${CVMFS_SOURCE_DIR}/cache_extern.cc ${CVMFS_SOURCE_DIR}/cache_extern.h
+  ${CVMFS_SOURCE_DIR}/cache_transport.cc ${CVMFS_SOURCE_DIR}/cache_transport.h
+  ${CVMFS_SOURCE_DIR}/compression.cc ${CVMFS_SOURCE_DIR}/compression.h
+  ${CVMFS_SOURCE_DIR}/fd_table.h
+  ${CVMFS_SOURCE_DIR}/hash.cc ${CVMFS_SOURCE_DIR}/hash.h
+  ${CVMFS_SOURCE_DIR}/logging.cc ${CVMFS_SOURCE_DIR}/logging.h ${CVMFS_SOURCE_DIR}/logging_internal.h
+  ${CVMFS_SOURCE_DIR}/prng.h
+  ${CVMFS_SOURCE_DIR}/quota.cc ${CVMFS_SOURCE_DIR}/quota.h
+  ${CVMFS_SOURCE_DIR}/smalloc.h
+  ${CVMFS_SOURCE_DIR}/util/async.h
+  ${CVMFS_SOURCE_DIR}/util/pointer.h
+  ${CVMFS_SOURCE_DIR}/util/posix.cc ${CVMFS_SOURCE_DIR}/util/posix.h
+  ${CVMFS_SOURCE_DIR}/util/single_copy.h
+  ${CVMFS_SOURCE_DIR}/util/string.cc ${CVMFS_SOURCE_DIR}/util/string.h
+  ${CVMFS_SOURCE_DIR}/util_concurrency.cc ${CVMFS_SOURCE_DIR}/util_concurrency.h
+)
 
 #
 # Compiler and Linker Flags for unit tests
 #
 set (CVMFS_UNITTESTS_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -DGTEST_HAS_TR1_TUPLE=0 -DCVMFS_LIBCVMFS -D_FILE_OFFSET_BITS=64 -fexceptions")
 set (CVMFS_UNITTESTS_DEBUG_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -O0 -DDEBUGMSG -g")
+set (CVMFS_TEST_CACHE_CFLAGS "${CVMFS_TEST_CACHE_CFLAGS} -DGTEST_HAS_TR1_TUPLE=0 -DCVMFS_LIBCVMFS -D_FILE_OFFSET_BITS=64 -fexceptions")
 set (CVMFS_UNITTESTS_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
 set (CVMFS_UNITTESTS_DEBUG_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
+set (CVMFS_TEST_CACHE_LD_FLAGS "${CVMFS_TEST_CACHE_LD_FLAGS}")
 
 #
 # build CernVM-FS test cases
 #
-include_directories (${INCLUDE_DIRECTORIES})
+include_directories (${CMAKE_CURRENT_BINARY_DIR} ${INCLUDE_DIRECTORIES})
 
 if (BUILD_UNITTESTS)
   add_executable (${PROJECT_TEST_NAME} ${CVMFS_UNITTEST_SOURCES})
+  if (BUILD_LIBCVMFS_CACHE)
+    add_executable (${PROJECT_TEST_CACHE_NAME} ${CVMFS_TEST_CACHE_SOURCES})
+    add_dependencies (${PROJECT_TEST_CACHE_NAME} googletest)
+    add_dependencies (${PROJECT_TEST_CACHE_NAME} protobuf)
+    add_dependencies (${PROJECT_TEST_CACHE_NAME} libsha3)
+  endif (BUILD_LIBCVMFS_CACHE)
 else (BUILD_UNITTESTS)
   add_executable (${PROJECT_TEST_NAME} EXCLUDE_FROM_ALL ${CVMFS_UNITTEST_SOURCES})
 endif (BUILD_UNITTESTS)
@@ -238,6 +291,7 @@ add_dependencies (${PROJECT_TEST_NAME} googletest)
 add_dependencies (${PROJECT_TEST_NAME} libvjson)
 add_dependencies (${PROJECT_TEST_NAME} sparsehash)
 add_dependencies (${PROJECT_TEST_NAME} libsha3)
+add_dependencies (${PROJECT_TEST_NAME} protobuf)
 add_test (NAME ${PROJECT_TEST_NAME} COMMAND ${PROJECT_TEST_NAME} --gtest_filter=-*Slow)
 add_dependencies (check ${PROJECT_TEST_NAME})
 
@@ -245,6 +299,7 @@ if (BUILD_UNITTESTS_DEBUG)
   add_executable (${PROJECT_TEST_DEBUG_NAME} ${CVMFS_UNITTEST_DEBUG_SOURCES})
   add_dependencies (${PROJECT_TEST_DEBUG_NAME} googletest)
   add_dependencies (${PROJECT_TEST_DEBUG_NAME} libvjson)
+  add_dependencies (${PROJECT_TEST_DEBUG_NAME} protobuf)
 endif (BUILD_UNITTESTS_DEBUG)
 
 #
@@ -309,6 +364,11 @@ if (BUILD_UNITTESTS_DEBUG)
   set_target_properties (${PROJECT_TEST_DEBUG_NAME} PROPERTIES COMPILE_FLAGS "${CVMFS_UNITTESTS_DEBUG_CFLAGS}" LINK_FLAGS "${CVMFS_UNITTESTS_DEBUG_LD_FLAGS}")
 endif (BUILD_UNITTESTS_DEBUG)
 
+if (BUILD_LIBCVMFS_CACHE)
+  set_target_properties (${PROJECT_TEST_CACHE_NAME} PROPERTIES COMPILE_FLAGS "${CVMFS_TEST_CACHE_CFLAGS}" LINK_FLAGS "${CVMFS_TEST_CACHE_LD_FLAGS}")
+endif (BUILD_LIBCVMFS_CACHE)
+
+
 #
 # link the stuff (*_LIBRARIES are dynamic link libraries)
 #
@@ -317,13 +377,25 @@ set (UNITTEST_LINK_LIBRARIES ${GTEST_LIBRARIES} ${GOOGLETEST_ARCHIVE} ${OPENSSL_
                              ${SQLITE3_LIBRARY} ${SQLITE3_ARCHIVE} ${TBB_LIBRARIES}
                              ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${UUID_LIBRARIES}
                              ${SHA3_ARCHIVE} ${PACPARSER_LIBRARIES} ${PACPARSER_ARCHIVE}
-                             ${VJSON_ARCHIVE} pthread dl)
+                             ${VJSON_ARCHIVE} ${PROTOBUF_ARCHIVE} pthread dl)
 
 target_link_libraries (${PROJECT_TEST_NAME} ${UNITTEST_LINK_LIBRARIES})
 
 if (BUILD_UNITTESTS_DEBUG)
   target_link_libraries (${PROJECT_TEST_DEBUG_NAME} ${UNITTEST_LINK_LIBRARIES})
 endif (BUILD_UNITTESTS_DEBUG)
+
+if (BUILD_LIBCVMFS_CACHE)
+  if (ZLIB_BUILTIN)
+    add_dependencies (${PROJECT_TEST_CACHE_NAME} zlib)
+  endif (ZLIB_BUILTIN)
+  target_link_libraries (${PROJECT_TEST_CACHE_NAME}
+                         ${GTEST_LIBRARIES} ${GOOGLETEST_ARCHIVE}
+                         ${OPENSSL_LIBRARIES} ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE}
+                         ${RT_LIBRARY} ${SHA3_ARCHIVE} ${PROTOBUF_ARCHIVE}
+                         pthread)
+endif (BUILD_LIBCVMFS_CACHE)
+
 
 #
 # Install the generated unit test binary

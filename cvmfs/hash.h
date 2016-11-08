@@ -33,6 +33,8 @@ namespace shash {
 /**
  * Don't change order!  The integer value of the enum constants is used
  * as file catalog flags and as flags in communication with the cache manager.
+ * If algorithms are added, the protocol definition for external cache managers
+ * needs to be updated, too.
  */
 enum Algorithms {
   kMd5 = 0,

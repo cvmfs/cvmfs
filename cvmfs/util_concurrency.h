@@ -414,6 +414,23 @@ unsigned int GetNumberOfCpuCores();
 static const unsigned int kFallbackNumberOfCpus = 1;
 
 
+/**
+ * A blocking signal for thread synchronization
+ */
+class Signal : SingleCopy {
+ public:
+  Signal();
+  ~Signal();
+  void Wakeup();
+  void Wait();
+
+ private:
+  bool fired_;
+  pthread_mutex_t lock_;
+  pthread_cond_t signal_;
+};
+
+
 //
 // -----------------------------------------------------------------------------
 //

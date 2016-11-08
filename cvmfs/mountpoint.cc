@@ -33,6 +33,7 @@
 #include "authz/authz_session.h"
 #include "backoff.h"
 #include "cache.h"
+#include "cache_extern.h"
 #include "cache_posix.h"
 #include "cache_ram.h"
 #include "cache_tiered.h"
@@ -45,6 +46,7 @@
 #include "file_chunk.h"
 #include "globals.h"
 #include "glue_buffer.h"
+#include "google/protobuf/stubs/common.h"
 #include "history.h"
 #include "history_sqlite.h"
 #include "logging.h"
@@ -56,7 +58,7 @@
 #endif
 #include "options.h"
 #include "platform.h"
-#include "quota.h"
+#include "quota_posix.h"
 #include "signature.h"
 #include "sqlitemem.h"
 #include "sqlitevfs.h"
@@ -181,12 +183,28 @@ bool FileSystem::CreateCache() {
       cache_mgr_type_ = kRamCacheManager;
     } else if (optarg == "tiered") {
       cache_mgr_type_ = kTieredCacheManager;
+    } else if (optarg == "external") {
+      cache_mgr_type_ = kExternalCacheManager;
     } else {
       cache_mgr_type_ = kUnknownCacheManager;
     }
   }
 
   switch (cache_mgr_type_) {
+    case kExternalCacheManager: {
+      if (!options_mgr_->GetValue("CVMFS_CACHE_EXTERNAL_LOCATOR", &optarg)) {
+        boot_error_ = "CVMFS_CACHE_EXTERNAL_LOCATOR missing";
+        boot_status_ = loader::kFailCacheDir;
+        return false;
+      }
+      vector<string> tokens = SplitString(optarg, '=');
+      assert(tokens[0] == "unix");
+      int fd_client = ConnectSocket(tokens[1]);
+      assert(fd_client >= 0);
+      cache_mgr_ = ExternalCacheManager::Create(fd_client, 1024);
+      assert(cache_mgr_ != NULL);
+      break;
+    }
     case kPosixCacheManager:
     case kTieredCacheManager:
       cache_mgr_ = PosixCacheManager::Create(
@@ -283,6 +301,7 @@ bool FileSystem::CreateCache() {
       uuid_cache_ = cvmfs::Uuid::Create(cache_dir_ + "/uuid");
       break;
     case kRamCacheManager:
+    case kExternalCacheManager:
       uuid_cache_ = cvmfs::Uuid::Create("");
       break;
     case kUnknownCacheManager:
@@ -492,6 +511,7 @@ FileSystem::~FileSystem() {
   SetLogSyslogPrefix("");
   SetLogMicroSyslog("");
   SetLogDebugFile("");
+  google::protobuf::ShutdownProtobufLibrary();
   g_alive = false;
 }
 
@@ -701,6 +721,11 @@ bool FileSystem::SetupNfsMaps() {
 bool FileSystem::SetupQuotaMgmt() {
   if (cache_mgr_type_ == kRamCacheManager) {
     cache_mgr_->AcquireQuotaManager(new NoopQuotaManager());
+    return true;
+  }
+  if (cache_mgr_type_ == kExternalCacheManager) {
+    cache_mgr_->AcquireQuotaManager(ExternalQuotaManager::Create(
+      reinterpret_cast<ExternalCacheManager *>(cache_mgr_)));
     return true;
   }
 

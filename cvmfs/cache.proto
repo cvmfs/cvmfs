@@ -1,0 +1,325 @@
+// This file is part of the CernVM File System.
+//
+// Protocol defintion for RPCs between cvmfs client and cache manager plugin.
+// The protocol is used to access a store of content-addressable objects that
+// are maintained by a cache manager plugin.  Objects are reference counted,
+// mirroring currently open files.  Only objects with reference count zero may
+// be removed from the store.
+
+package cvmfs;
+
+option optimize_for = LITE_RUNTIME;
+
+// # Wire format
+// All RPCs start with a 4 byte header.  The first byte encodes a wire format
+// version (currently 0), the remaining three bytes encode the size of the
+// following message (little-endian).  That means that the maximum message size
+// is 24MB.
+//
+// After the header, there will be protobuf message type MsgRpc. Messages for
+// storing or retrieving data have the data payload appended after the protobuf
+// message.  For messages with a data payload (attachment), there are two bytes
+// (little endian) before the protobuf message specifying the size of the
+// protobuf message without the attachment.
+
+// # Protocol changelog
+// Version 1: First version
+
+
+//------------------------------------------------------------------------------
+// # Enum definitions
+// Unrecognized enum constants are mapped to the first enum constant by the
+// protobuf deserialization.
+
+// Then enum definitions are mirrored in libcvmfs.h
+
+enum EnumStatus {
+  STATUS_UNKNOWN     = 0;
+  STATUS_OK          = 1;
+  STATUS_NOSUPPORT   = 2;   // Not implemented by the cache plugin
+  STATUS_FORBIDDEN   = 3;   // Client is not allowed to perform the operation
+  STATUS_NOSPACE     = 4;   // Cache is full
+  STATUS_NOENTRY     = 5;   // Object is not in cache
+  STATUS_MALFORMED   = 6;   // Malformed request
+  STATUS_IOERR       = 7;   // General I/O error
+  STATUS_CORRUPTED   = 8;   // Crc32 verification failed
+  STATUS_TIMEOUT     = 9;   // Certain parts of a multipart request never arrived
+  STATUS_BADCOUNT    = 10;  // Attempt to set a negative reference count
+  // Attempt to read from an offset larger than the object size; also indicates
+  // the end of a cache contents listing
+  STATUS_OUTOFBOUNDS = 11;
+  STATUS_PARTIAL     = 12;  // Cache could not be cleaned to requested size
+}
+
+
+enum EnumHashAlgorithm {
+  HASH_UNKNOWN   = 0;
+  HASH_SHA1      = 1;
+  HASH_RIPEMD160 = 2;
+  HASH_SHAKE128  = 3;
+}
+
+
+enum EnumObjectType {
+  OBJECT_REGULAR  = 0;
+  OBJECT_CATALOG  = 1;
+  OBJECT_VOLATILE = 2;  // volatile objects are cleaned up before other objects
+}
+
+enum EnumCapabilities {
+  CAP_NONE        = 0;
+  // Proper refcounting is implemented; for lower tier caches, this capability
+  // can be unset and reference counting can simply beomce file existence check
+  CAP_REFCOUNT    = 1;
+  CAP_SHRINK      = 2;   // clients can ask the cache to shrink
+  CAP_INFO        = 4;   // cache plugin knows about its size and fill level
+  CAP_SHRINK_RATE = 8;   // cache knows number of cleanup operations
+  CAP_LIST        = 16;  // cache can return a list of objects
+  CAP_ALL         = 31;
+}
+
+
+//------------------------------------------------------------------------------
+// Data containers
+
+message MsgHash {
+  required EnumHashAlgorithm algorithm = 1;
+  required bytes digest = 2;
+}
+
+message MsgListRecord {
+  required MsgHash hash       = 1;
+  optional bool pinned        = 2;
+  optional string description = 3;
+}
+
+
+//------------------------------------------------------------------------------
+// Connection handling
+// Clients initiate the handshake.  Client and server transmit the highest
+// protocol version they support and agree on the lower of the two transmitted
+// versions.
+
+message MsgHandshake {
+  required uint32 protocol_version = 1;
+  // The client might identify itself with a descriptive name
+  optional string name             = 2;
+  // Flags are specific to the cache manager plugin and can request a certain
+  // mode of operation in the future
+  optional uint32 flags            = 3;
+}
+
+message MsgHandshakeAck {
+  required EnumStatus status       = 1;
+  // The cache manager plugin identifies itself with a descriptive name
+  required string name             = 2;
+  required uint32 protocol_version = 3;
+  // Every connection gets an id that is unique for the life time of the cache
+  // manager
+  required uint64 session_id       = 4;
+  // Objects larger than the maximum size need to be split in multiple parts of
+  // size max_object_size; typical maximum object sizes for distributed k-v-
+  // stores are ~1MB
+  required uint32 max_object_size  = 5;
+  // Cache manager are not required to implement all functions.  Combination
+  // of flags from EnumCapabilities.
+  required uint64 capabilities     = 6;
+  // The server might instruct the client to proceed in a certain mode of
+  // operation in the future
+  optional uint32 flags            = 7;
+}
+
+message MsgQuit {
+  // The connection identifier from the handshake acknowledgement
+  required uint64 session_id = 1;
+  // The client can express its interest to reconnect soon (e.g. during reload)
+  optional bool temporary    = 2;
+}
+
+
+//------------------------------------------------------------------------------
+// # Request - Reply Messages
+// Every client-side request contains the connection identifier from the
+// handshake acknowledgement and a request identifier that is unique for the
+// life time of the session.  The server sends back the request identifier and
+// allows the client to match a response to a request.
+
+// Small objects can be stored in a single MsgStoreReq message.  Objects larger
+// than the maximum object size need to be sent in multiple parts, i.e. a single
+// MsgStoreReq message followed by one or more MsgStorePartReq.  Every
+// MsgStoreReq and MsgStorePartReq message is acknowledged by a MsgStoreReply.
+// The request id doesn't change for a stream of MsgStoreReq, MsgStorePartReq,
+// MsgAbortMultipartReq messages.
+message MsgStoreReq {
+  required uint64 session_id          = 1;
+  required uint64 req_id              = 2;
+  required MsgHash object_id          = 3;
+  required uint64 part_nr             = 4;
+  required bool last_part             = 5;
+  optional uint64 expected_size       = 6;
+  optional EnumObjectType object_type = 7;
+  // This can be the path under /cvmfs that triggered storing the object
+  optional string description         = 8;
+  // A checksum of the payload might be added
+  optional fixed32 data_crc32         = 9;
+}
+
+
+// Discard a partially uploaded object
+message MsgStoreAbortReq {
+  required uint64 session_id = 1;
+  required uint64 req_id     = 2;
+  required MsgHash object_id = 3;
+}
+
+message MsgStoreReply {
+  required uint64 req_id       = 1;
+  required EnumStatus status   = 2;
+  // The part number that is being acknowledged (or zero for
+  // MsgAbortMultipartReq)
+  required uint64 part_nr      = 3;
+  // TODO(jblomer): indicate if an object is already present in the cache
+}
+
+
+// Reference counting of objects in the store
+message MsgRefcountReq {
+  required uint64 session_id = 1;
+  required uint64 req_id     = 2;
+  required MsgHash object_id = 3;
+  required sint32 change_by  = 4;
+}
+
+message MsgRefcountReply {
+  required uint64 req_id     = 1;
+  required EnumStatus status = 2;
+}
+
+// Request from the cache manager to the client to close as many open file
+// descriptors as possible to help the cache manager freeing space.
+message MsgDetach {
+}
+
+// Tries to free space in the cache until not more than shrink_to bytes are
+// used.
+message MsgShrinkReq {
+  required uint64 session_id  = 1;
+  required uint64 req_id      = 2;
+  required uint64 shrink_to   = 3;
+}
+
+message MsgShrinkReply {
+  required uint64 req_id      = 1;
+  required EnumStatus status  = 2;
+  // Number of bytes used after the cleanup
+  required uint64 used_bytes  = 3;
+}
+
+// Read a portion from a stored object.  Garuanteed to work for objects with a
+// reference counter larger than zero.
+message MsgReadReq {
+  required uint64 session_id = 1;
+  required uint64 req_id     = 2;
+  required MsgHash object_id = 3;
+  required uint64 offset     = 4;
+  required uint32 size       = 5;
+}
+
+message MsgReadReply {
+  required uint64 req_id      = 1;
+  required EnumStatus status  = 2;
+  // Might return the checksum of the payload
+  optional fixed32 data_crc32 = 3;
+}
+
+// Asks for fill gauge of the cache
+message MsgInfoReq {
+  required uint64 session_id          = 1;
+  required uint64 req_id              = 2;
+  // Number of cleanups in the last X seconds
+  optional uint64 no_shrink_in_period = 3;
+}
+
+message MsgInfoReply {
+  required uint64 req_id         = 1;
+  required EnumStatus status     = 2;
+  required uint64 size_bytes     = 3;
+  required uint64 used_bytes     = 4;
+  required uint64 pinned_bytes   = 5;
+  // -1 if the capability is missing
+  required int64 no_shrink       = 6;
+}
+
+// Asks about a specific object
+message MsgObjectInfoReq {
+  required uint64 session_id = 1;
+  required uint64 req_id     = 2;
+  required MsgHash object_id = 3;
+}
+
+message MsgObjectInfoReply {
+  required uint64 req_id              = 1;
+  required EnumStatus status          = 2;
+  optional EnumObjectType object_type = 3;
+  optional uint64 size                = 4;
+}
+
+// Enumerate cache contents, possibly in multiple messages for large caches.
+// Initial calls need to set listing_id to zero.
+message MsgListReq {
+  required uint64 session_id          = 1;
+  required uint64 req_id              = 2;
+  required uint64 listing_id          = 3;
+  required EnumObjectType object_type = 4;
+}
+
+// The cache manager decides how many objects are in each part.  The cache
+// manager assignes a unique listing id so that clients can continue to query
+// for more listings.
+message MsgListReply {
+  required uint64 req_id             = 1;
+  required EnumStatus status         = 2;
+  required uint64 listing_id         = 3;
+  required bool is_last_part         = 4;
+  repeated MsgListRecord list_record = 5;
+}
+
+
+//------------------------------------------------------------------------------
+// # RPC Wrapper
+// Used to dispatch the possible message types
+
+message MsgRpc {
+  oneof message_type {
+    // Frequent and performance-critical calls
+    MsgRefcountReq msg_refcount_req          = 1;
+    MsgRefcountReply msg_refcount_reply      = 2;
+
+    MsgReadReq msg_read_req                  = 3;
+    MsgReadReply msg_read_reply              = 4;
+
+    MsgObjectInfoReq msg_object_info_req     = 5;
+    MsgObjectInfoReply msg_object_info_reply = 6;
+
+    MsgStoreReq msg_store_req                = 7;
+    MsgStoreAbortReq msg_store_abort_req     = 8;
+    MsgStoreReply msg_store_reply            = 9;
+
+
+    // Rare RPCs
+    MsgHandshake msg_handshake               = 16;
+    MsgHandshakeAck msg_handshake_ack        = 17;
+    MsgQuit msg_quit                         = 18;
+
+    MsgInfoReq msg_info_req                  = 19;
+    MsgInfoReply msg_info_reply              = 20;
+
+    MsgShrinkReq msg_shrink_req              = 21;
+    MsgShrinkReply msg_shrink_reply          = 22;
+
+    MsgListReq msg_list_req                  = 23;
+    MsgListReply msg_list_reply              = 24;
+
+    MsgDetach msg_detach                     = 25;
+  }
+}

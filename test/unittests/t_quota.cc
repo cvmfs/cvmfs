@@ -15,7 +15,7 @@
 #include "compression.h"
 #include "fs_traversal.h"
 #include "hash.h"
-#include "quota.h"
+#include "quota_posix.h"
 #include "testutil.h"
 #include "util/algorithm.h"
 

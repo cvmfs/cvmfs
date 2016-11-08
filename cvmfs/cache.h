@@ -20,6 +20,7 @@ enum CacheManagerIds {
   kPosixCacheManager,
   kRamCacheManager,
   kTieredCacheManager,
+  kExternalCacheManager,
 };
 
 enum CacheModes {
@@ -160,7 +161,7 @@ class CacheManager : SingleCopy {
   virtual int Dup(int fd) = 0;
   virtual int Readahead(int fd) = 0;
 
-  virtual uint16_t SizeOfTxn() = 0;
+  virtual uint32_t SizeOfTxn() = 0;
   virtual int StartTxn(const shash::Any &id, uint64_t size, void *txn) = 0;
   virtual void CtrlTxn(const ObjectInfo &object_info,
                        const int flags,  // reserved for future use
@@ -170,6 +171,8 @@ class CacheManager : SingleCopy {
   virtual int AbortTxn(void *txn) = 0;
   virtual int OpenFromTxn(void *txn) = 0;
   virtual int CommitTxn(void *txn) = 0;
+
+  virtual void Spawn() = 0;
 
   int OpenPinned(const shash::Any &id,
                  const std::string &description,
