@@ -16,7 +16,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/1, stop/0
+-export([start_link/1
         ,request_lease/4, end_lease/1
         ,check_lease/1
         ,get_leases/0, clear_leases/0]).
@@ -49,15 +49,6 @@
 %%--------------------------------------------------------------------
 start_link(Args) ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, Args, []).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Stops the server (only useful without a supervision tree)
-%%
-%% @end
-%%--------------------------------------------------------------------
-stop() ->
-    gen_server:cast(?MODULE, stop).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -189,9 +180,6 @@ handle_call(_Request, _From, State) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-handle_cast(stop, State) ->
-    lager:info("Cast received: stop"),
-    {stop, normal, State};
 handle_cast(Msg, State) ->
     lager:info("Cast received: ~p -> noreply", [Msg]),
     {noreply, State}.
