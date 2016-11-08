@@ -80,9 +80,8 @@ new_lease(User, Path) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec end_lease(LeaseToken) -> ok | {error, Reason}
-                                   when LeaseToken :: binary(),
-                                        Reason :: atom().
+-spec end_lease(LeaseToken) -> cvmfs_lease:end_lease_result() | {error, invalid_macaroon}
+                                   when LeaseToken :: binary().
 end_lease(LeaseToken) ->
     gen_server:call(?MODULE, {be_req, end_lease, LeaseToken}).
 
@@ -221,12 +220,16 @@ p_new_lease(User, Path) ->
     end.
 
 
--spec p_end_lease(LeaseToken) -> ok | {error, Reason}
-                                     when LeaseToken :: binary(),
-                                          Reason :: atom(). %% TODO: implemented this + test
-p_end_lease(_LeaseToken) ->
-    ok.
-
+-spec p_end_lease(LeaseToken) -> cvmfs_lease:end_lease_result() | {error, invalid_macaroon}
+                                     when LeaseToken :: binary().
+p_end_lease(LeaseToken) ->
+    case macaroon:deserialize(LeaseToken) of
+        {ok, M} ->
+            Public = macaroon:identifier(M),
+            cvmfs_lease:end_lease(Public);
+        _ ->
+            {error, invalid_macaroon}
+    end.
 
 -spec p_submit_payload(User, LeaseToken, Payload, Final) ->
                               submit_payload_result()

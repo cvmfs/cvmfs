@@ -23,6 +23,10 @@
         ,valid_user_invalid_path/1
         ,invalid_user_invalid_path/1]).
 
+-export([end_valid_lease/1
+        ,end_invalid_lease/1
+        ,end_lease_invalid_macaroon/1]).
+
 -export([lease_success/1
         ,submission_with_invalid_token_fails/1
         ,submission_with_expired_token_fails/1
@@ -37,11 +41,15 @@ all() ->
 
 groups() ->
     [{specifications, [], [{group, new_lease}
+                          ,{group, end_lease}
                           ,{group, submit_payload}]}
     ,{new_lease, [], [valid_user_valid_path
-                       ,invalid_user_valid_path
-                       ,valid_user_invalid_path
-                       ,invalid_user_invalid_path]}
+                     ,invalid_user_valid_path
+                     ,valid_user_invalid_path
+                     ,invalid_user_invalid_path]}
+    ,{end_lease, [], [end_valid_lease
+                     ,end_invalid_lease
+                     ,end_lease_invalid_macaroon]}
     ,{submit_payload, [], [lease_success
                           ,submission_with_invalid_token_fails
                           ,submission_with_expired_token_fails
@@ -111,6 +119,25 @@ invalid_user_invalid_path(_Config) ->
     {VUser, VPath} = valid_user_and_path(),
     {IUser, IPath} = invalid_user_and_path(VUser, VPath),
     {error, invalid_user} = cvmfs_be:new_lease(IUser, IPath).
+
+% End lease
+% End valid lease
+end_valid_lease(_Config) ->
+    {VUser, VPath} = valid_user_and_path(),
+    {ok, Token} = cvmfs_be:new_lease(VUser, VPath),
+    ok = cvmfs_be:end_lease(Token).
+
+% End invalid lease
+end_invalid_lease(_Config) ->
+    {VUser, VPath} = valid_user_and_path(),
+    {ok, Token} = cvmfs_be:new_lease(VUser, VPath),
+    ok = cvmfs_be:end_lease(Token),
+    {error, lease_not_found} = cvmfs_be:end_lease(Token).
+
+% End lease invalid macaroon
+end_lease_invalid_macaroon(_Config) ->
+    Token = <<"fake_token">>,
+    {error, invalid_macaroon} = cvmfs_be:end_lease(Token).
 
 % Submit payload
 % Normal lease check
