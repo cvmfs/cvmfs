@@ -17,8 +17,8 @@
 
 %% API
 -export([start_link/1, stop/0
-        ,request_lease/3, end_lease/2
-        ,check_lease/3
+        ,request_lease/4, end_lease/1
+        ,check_lease/1
         ,get_leases/0, clear_leases/0]).
 
 %% gen_server callbacks
@@ -29,8 +29,10 @@
 
 %% Records used as table entries
 
--record(lease, { s_path :: {binary(), binary()} % repo + subpath which is locked
-               , u_id   :: binary()  % user identifier
+-record(lease, { path :: binary()   % subpath which is locked
+               , u_id   :: binary()   % user identifier
+               , public  :: binary()   % public string used for token generation
+               , secret  :: binary()   % secret used for token generation
                , time   :: integer()  % timestamp (time when lease acquired)
                }).
 
@@ -63,40 +65,44 @@ stop() ->
 %% @doc
 %% Requests a new lease
 %%
-%% @spec request_lease(User, Repo, Path)) -> {ok, LeaseId}
-%%                                         | {busy, TimeRemaining}
+%% @spec request_lease(User, Path)) -> {ok, LeaseId} | {busy, TimeRemaining}
 %% @end
 %%--------------------------------------------------------------------
--spec request_lease(binary(), binary(), binary()) -> {ok, binary()}
-                                                   | {busy, integer()}.
-request_lease(User, Repo, Path) ->
-    gen_server:call(?MODULE, {lease_req, new_lease, {User, Repo, Path}}).
+-spec request_lease(User, Path, Public, Secret) ->
+                           {ok, LeaseId} | {busy, TimeRemaining}
+                                       when User :: binary(),
+                                            Path :: binary(),
+                                            Public :: binary(),
+                                            Secret :: binary(),
+                                            LeaseId :: binary(),
+                                            TimeRemaining :: integer().
+request_lease(User, Path, Public, Secret) ->
+    gen_server:call(?MODULE, {lease_req, new_lease, {User, Path, Public, Secret}}).
 
 %%--------------------------------------------------------------------
 %% @doc
 %% Gives up an existing lease
 %%
-%% @spec end_lease(Path, Repo) -> ok | {error, lease_not_found}
+%% @spec end_lease(Public) -> ok | {error, lease_not_found}
 %% @end
 %%--------------------------------------------------------------------
-end_lease(Repo, Path) ->
-    gen_server:call(?MODULE, {lease_req, end_lease, {Repo, Path}}).
+end_lease(Public) ->
+    gen_server:call(?MODULE, {lease_req, end_lease, Public}).
 
 %%--------------------------------------------------------------------
 %% @doc
 %% Checks the validity of a lease
 %%
-%% @spec check_lease(User, Repo, Path) -> ok | {error, invalid_lease}
+%% @spec check_lease(Public) -> ok | {error, invalid_lease}
 %% @end
 %%--------------------------------------------------------------------
--spec check_lease(User, Repo, Path) -> ok | {error, Reason}
-                                           when User :: binary(),
-                                                Repo :: binary(),
-                                                Path :: binary(),
-                                                Reason :: lease_not_found |
-                                                          lease_expired.
-check_lease(User, Repo, Path) ->
-    gen_server:call(?MODULE, {lease_req, check_lease, {User, Repo, Path}}).
+-spec check_lease(Public) -> {ok, Secret} | {error, Reason}
+                                     when Public :: binary(),
+                                          Secret :: binary(),
+                                          Reason :: lease_not_found |
+                                                    lease_expired.
+check_lease(Public) ->
+    gen_server:call(?MODULE, {lease_req, check_lease, Public}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -147,7 +153,8 @@ init(_) ->
                end,
     mnesia:create_table(lease, [CopyMode
                                ,{type, set}
-                               ,{attributes, record_info(fields, lease)}]),
+                               ,{attributes, record_info(fields, lease)}
+                               ,{index, [public]}]),
     ok = mnesia:wait_for_tables([lease], 10000),
     lager:info("Lease table initialized"),
     {ok, {}}.
@@ -166,20 +173,20 @@ init(_) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call({lease_req, new_lease, {User, Repo, Path}}, _From, State) ->
-    Reply = priv_new_lease(User, Repo, Path, State),
+handle_call({lease_req, new_lease, {User, Path, Public, Secret}}, _From, State) ->
+    Reply = priv_new_lease(User, Path, Public, Secret, State),
     lager:info("Request received: {new_lease, ~p} -> Reply: ~p"
-              ,[{User, Repo, Path}, Reply]),
+              ,[{User, Path}, Reply]),
     {reply, Reply, State};
-handle_call({lease_req, end_lease, {Repo, Path}}, _From, State) ->
-    Reply = priv_end_lease(Repo, Path),
+handle_call({lease_req, end_lease, Public}, _From, State) ->
+    Reply = priv_end_lease(Public),
     lager:info("Request received: {end_lease, ~p} -> Reply: ~p"
-              ,[{Repo, Path}, Reply]),
+              ,[Public, Reply]),
     {reply, Reply, State};
-handle_call({lease_req, check_lease, {User, Repo, Path}}, _From, State) ->
-    Reply = priv_check_lease(User, Repo, Path),
+handle_call({lease_req, check_lease, Public}, _From, State) ->
+    Reply = priv_check_lease(Public),
     lager:info("Request received: {check_lease, ~p} -> Reply: ~p"
-              ,[{User, Repo, Path}, Reply]),
+              ,[Public, Reply]),
     {reply, Reply, State};
 handle_call({lease_req, get_leases}, _From, State) ->
     Reply = priv_get_leases(),
@@ -257,12 +264,12 @@ code_change(OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-priv_new_lease(User, Repo, Path, _State) ->
+priv_new_lease(User, Path, Public, Secret, _State) ->
     {ok, MaxLeaseTime} = application:get_env(cvmfs_lease, max_lease_time),
 
     %% Match statement that selects all rows with a given repo,
     %% returning a list of {Path, Time} pairs
-    MS = ets:fun2ms(fun(#lease{u_id = U, time = T, s_path = {R, P}}) when R =:= Repo ->
+    MS = ets:fun2ms(fun(#lease{u_id = U, time = T, path = P}) when P =:= Path ->
                             {P, T}
                     end),
 
@@ -272,7 +279,7 @@ priv_new_lease(User, Repo, Path, _State) ->
                 %% We select the rows related to a given repository
                 Results = mnesia:select(lease, MS),
 
-                %% We filter out entries which don't overlap with {Repo, Path}
+                %% We filter out entries which don't overlap with Path
                 case lists:filter(fun({P, _}) ->
                                           cvmfs_lease_path_util:are_overlapping(P, Path)
                                   end,
@@ -286,29 +293,35 @@ priv_new_lease(User, Repo, Path, _State) ->
                                 {busy, RemainingTime};
                             %% The old lease is expired. Delete it and insert the new one
                             false ->
-                                mnesia:delete({lease, {Repo, P}}),
-                                priv_write_row(User, Repo, Path)
+                                mnesia:delete({lease, P}),
+                                priv_write_row(User, Path, Public, Secret)
                         end;
                     %% No overlapping paths were found; just insert the new entry
                     _ ->
-                        priv_write_row(User, Repo, Path)
+                        priv_write_row(User, Path, Public, Secret)
                 end
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
-priv_check_lease(User, Repo, Path) ->
+priv_check_lease(Public) ->
     {ok, MaxLeaseTime} = application:get_env(cvmfs_lease, max_lease_time),
+
+    MS = ets:fun2ms(fun(#lease{public = P} = Lease) when P =:= Public ->
+                            Lease
+                    end),
+
     T = fun() ->
                 CurrentTime = erlang:system_time(milli_seconds),
-                case mnesia:read(lease, {Repo, Path}) of
+
+                case mnesia:select(lease, MS) of
                     [] ->
                         {error, lease_not_found};
-                    [#lease{s_path = {Repo, Path}, u_id = User, time = Time} | _]  ->
+                    [#lease{public = Public, secret = Secret, time = Time} | _]  ->
                         RemainingTime = MaxLeaseTime - (CurrentTime - Time),
                         case RemainingTime > 0 of
                             true ->
-                                ok;
+                                {ok, Secret};
                             false ->
                                 {error, lease_expired}
                         end
@@ -317,13 +330,16 @@ priv_check_lease(User, Repo, Path) ->
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
-priv_end_lease(Repo, Path) ->
+priv_end_lease(Public) ->
+    MS = ets:fun2ms(fun(#lease{public = Pub, path = Path}) when Pub =:= Public ->
+                            Path
+                    end),
     T = fun() ->
-                case mnesia:read(lease, {Repo, Path}) of
+                case mnesia:select(lease, MS) of
                     [] ->
                         {error, lease_not_found};
-                    _ ->
-                        mnesia:delete({lease, {Repo, Path}})
+                    [Path | _] ->
+                        mnesia:delete({lease, Path})
                 end
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
@@ -340,7 +356,9 @@ priv_clear_leases() ->
     {atomic, Result} = mnesia:clear_table(lease),
     Result.
 
-priv_write_row(User, Repo, Path) ->
-    mnesia:write(#lease{s_path = {Repo, Path},
+priv_write_row(User, Path, Public, Secret) ->
+    mnesia:write(#lease{path = Path,
                         u_id = User,
+                        public = Public,
+                        secret = Secret,
                         time = erlang:system_time(milli_seconds)}).
