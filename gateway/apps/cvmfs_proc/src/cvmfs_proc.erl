@@ -57,10 +57,10 @@ stop() ->
                                {error, invalid_user} |
                                {error, invalid_path} |
                                {busy, TimeRemaining}
-                                     when User :: binary(),
-                                          Path :: binary(),
-                                          LeaseToken :: binary(),
-                                          TimeRemaining :: integer().
+                                   when User :: binary(),
+                                        Path :: binary(),
+                                        LeaseToken :: binary(),
+                                        TimeRemaining :: integer().
 new_lease(User, Path) ->
     gen_server:call(?MODULE, {proc_req, new_lease, {User, Path}}).
 
@@ -138,7 +138,7 @@ init([]) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_call({proc_req, new_lease, {User, Path}}, _From, State) ->
-    case priv_new_lease(User, Path) of
+    case p_new_lease(User, Path) of
         {ok, LeaseToken} ->
             lager:info("Request received: {new_lease, {~p, ~p}} -> Reply: ~p", [User, Path, LeaseToken]),
             {reply, {ok, LeaseToken}, State};
@@ -147,11 +147,11 @@ handle_call({proc_req, new_lease, {User, Path}}, _From, State) ->
             {reply, Other, State}
     end;
 handle_call({proc_req, end_lease, LeaseToken}, _From, State) ->
-    Reply = priv_end_lease(LeaseToken),
+    Reply = p_end_lease(LeaseToken),
     lager:info("Request received: {end_lease, ~p} -> Reply: ~p", [LeaseToken, Reply]),
     {reply, Reply, State};
 handle_call({proc_req, submit_payload, {User, LeaseToken, Payload, Final}}, _From, State) ->
-    Reply = priv_submit_payload(User, LeaseToken, Payload, Final),
+    Reply = p_submit_payload(User, LeaseToken, Payload, Final),
     lager:info("Request received: {submit_payload, {~p, ~p, ~p, ~p}} -> Reply: ~p",
                [User, LeaseToken, Payload, Final, Reply]),
     {reply, Reply, State}.
@@ -217,15 +217,15 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
--spec priv_new_lease(User, Path) -> {ok, Token} |
-                                    {error, invalid_user} |
-                                    {error, invalid_path}
-                                        when User :: binary(),
-                                             Path :: binary(),
-                                             Token :: binary().
-priv_new_lease(User, Path) ->
-    % Check if user is registered with the cvmfs_auth service and
-    % which paths he is allowed to modify
+-spec p_new_lease(User, Path) -> {ok, Token} |
+                                 {error, invalid_user} |
+                                 {error, invalid_path}
+                                     when User :: binary(),
+                                          Path :: binary(),
+                                          Token :: binary().
+p_new_lease(User, Path) ->
+                                                % Check if user is registered with the cvmfs_auth service and
+                                                % which paths he is allowed to modify
     case cvmfs_auth:get_user_permissions(User) of
         user_not_found ->
             {error, invalid_user};
@@ -234,7 +234,7 @@ priv_new_lease(User, Path) ->
                 false ->
                     {error, invalid_path};
                 true ->
-                    {Public, Secret, Token} = priv_generate_token(User, Path),
+                    {Public, Secret, Token} = p_generate_token(User, Path),
                     case cvmfs_lease:request_lease(User, Path, Public, Secret) of
                         ok ->
                             {ok, Token};
@@ -244,23 +244,23 @@ priv_new_lease(User, Path) ->
             end
     end.
 
--spec priv_end_lease(LeaseToken) -> ok | {error, Reason}
-                                        when LeaseToken :: binary(),
-                                             Reason :: atom().
-priv_end_lease(_LeaseToken) ->
+-spec p_end_lease(LeaseToken) -> ok | {error, Reason}
+                                     when LeaseToken :: binary(),
+                                          Reason :: atom().
+p_end_lease(_LeaseToken) ->
     ok.
 
--spec priv_submit_payload(User, LeaseToken, Payload, Final) ->
-                                 {ok, payload_added} |
-                                 {ok, payload_added, lease_ended} |
-                                 {error, Reason}
-                                     when User :: binary(),
-                                          LeaseToken :: binary(),
-                                          Payload :: binary(),
-                                          Final :: boolean(),
-                                          Reason :: lease_expired | leason_not_found | invalid_user.
-priv_submit_payload(User, LeaseToken, Payload, Final) ->
-    case priv_check_payload(User, LeaseToken, Payload) of
+-spec p_submit_payload(User, LeaseToken, Payload, Final) ->
+                              {ok, payload_added} |
+                              {ok, payload_added, lease_ended} |
+                              {error, Reason}
+                                  when User :: binary(),
+                                       LeaseToken :: binary(),
+                                       Payload :: binary(),
+                                       Final :: boolean(),
+                                       Reason :: lease_expired | leason_not_found | invalid_user.
+p_submit_payload(User, LeaseToken, Payload, Final) ->
+    case p_check_payload(User, LeaseToken, Payload) of
         {ok, Public} ->
             %% TODO: submit payload to GW
 
@@ -279,13 +279,13 @@ priv_submit_payload(User, LeaseToken, Payload, Final) ->
             {error, Reason}
     end.
 
--spec priv_generate_token(User, Path) -> {Token, Public, Secret}
-                                             when User :: binary(),
-                                                  Path :: binary(),
-                                                  Token :: binary(),
-                                                  Public :: binary(),
-                                                  Secret :: binary().
-priv_generate_token(User, Path) ->
+-spec p_generate_token(User, Path) -> {Token, Public, Secret}
+                                          when User :: binary(),
+                                               Path :: binary(),
+                                               Token :: binary(),
+                                               Public :: binary(),
+                                               Secret :: binary().
+p_generate_token(User, Path) ->
     Secret = enacl_p:randombytes(macaroon:suggested_secret_length()),
     Public = <<User/binary,Path/binary>>,
     Location = <<"">>, %% Location isn't used
@@ -302,17 +302,17 @@ priv_generate_token(User, Path) ->
     {ok, Token} = macaroon:serialize(M2),
     {Public, Secret, Token}.
 
--spec priv_check_payload(User, LeaseToken, Payload) ->
-                                {ok, Public} | {error, Reason}
-                                    when User :: binary(),
-                                         LeaseToken :: binary(),
-                                         Payload :: binary(),
-                                         Public :: binary(),
-                                         Reason :: atom().
-priv_check_payload(User, LeaseToken, _Payload) ->
-    % Here we should perform all sanity checks on the request
+-spec p_check_payload(User, LeaseToken, Payload) ->
+                             {ok, Public} | {error, Reason}
+                                 when User :: binary(),
+                                      LeaseToken :: binary(),
+                                      Payload :: binary(),
+                                      Public :: binary(),
+                                      Reason :: atom().
+p_check_payload(User, LeaseToken, _Payload) ->
+                                                % Here we should perform all sanity checks on the request
 
-    % Verify lease token (check user, check time-stamp, extract path).
+                                                % Verify lease token (check user, check time-stamp, extract path).
     case  macaroon:deserialize(LeaseToken) of
         {ok, M} ->
             Public = macaroon:identifier(M),
