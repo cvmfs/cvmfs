@@ -13,7 +13,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/1, stop/0
+-export([start_link/1
         ,new_lease/2, end_lease/1
         ,submit_payload/4]).
 
@@ -44,9 +44,6 @@
 %%--------------------------------------------------------------------
 start_link(_) ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
-
-stop() ->
-    gen_server:cast(?MODULE, stop).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -153,9 +150,6 @@ handle_call({be_req, submit_payload, {User, LeaseToken, Payload, Final}}, _From,
 %%
 %% @end
 %%--------------------------------------------------------------------
-handle_cast(stop, State) ->
-    lager:info("Cast received: stop"),
-    {stop, normal, State};
 handle_cast(Msg, State) ->
     lager:info("Cast received: ~p -> noreply", [Msg]),
     {noreply, State}.

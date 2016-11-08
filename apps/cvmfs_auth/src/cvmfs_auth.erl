@@ -14,7 +14,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/1, stop/0
+-export([start_link/1
         ,get_user_permissions/1
         ,add_user/2, remove_user/1, get_users/0
         ,add_repo/2, remove_repo/1, get_repos/0]).
@@ -50,10 +50,6 @@
                                    Error :: {already_start, pid()} | term().
 start_link(Args) ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, Args, []).
-
-stop() ->
-    gen_server:cast(?MODULE, stop).
-
 
 -spec get_user_permissions(binary()) -> user_not_found | {ok, [binary()]}.
 get_user_permissions(User) ->
@@ -182,9 +178,6 @@ handle_call({auth_req, get_repos}, _From, State) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-handle_cast(stop, State) ->
-    lager:info("Cast received: stop"),
-    {stop, normal, State};
 handle_cast(Msg, State) ->
     lager:info("Cast received: ~p -> noreply", [Msg]),
     {noreply, State}.
