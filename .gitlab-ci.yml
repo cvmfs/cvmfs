@@ -3,8 +3,14 @@ image: radupopescu/erlang-libsodium:19
 stages:
   - build
 
-rebar3_eunit:
+dialyzer:
   stage: build
   tags:
     - docker
-  script: rebar3 dialyzer && rebar3 ct
+  script: rebar3 dialyzer
+
+common_test:
+  stage: build
+  tags:
+    - docker
+  script: rebar3 ct
