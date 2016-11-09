@@ -52,16 +52,14 @@ start_link(Args) ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, Args, []).
 
 
--spec get_user_permissions(User) -> user_not_found | {ok, Permissions}
+-spec get_user_permissions(User) -> {ok, Permissions} | {error, invalid_user}
                                         when User :: binary(),
                                              Permissions :: [binary()].
 get_user_permissions(User) ->
     gen_server:call(?MODULE, {auth_req, user_perms, User}).
 
 
--spec add_user(User, Repos) -> user_already_exists | ok
-                                   when User :: binary(),
-                                        Repos :: [binary()].
+-spec add_user(User :: binary(), Repos :: binary()) -> ok.
 add_user(User, Repos) ->
     gen_server:call(?MODULE, {auth_req, add_user, {User, Repos}}).
 
@@ -83,9 +81,7 @@ get_users() ->
     gen_server:call(?MODULE, {auth_req, get_users}).
 
 
--spec add_repo(Repo, Path) -> repo_already_exists | ok
-                                  when Repo :: binary(),
-                                       Path :: binary().
+-spec add_repo(Repo :: binary(), Path :: binary()) -> ok.
 add_repo(Repo, Path) ->
     gen_server:call(?MODULE, {auth_req, add_repo, {Repo, Path}}).
 
@@ -234,14 +230,14 @@ code_change(OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
--spec p_get_user_paths(User) -> {ok, Paths} | user_not_found
+-spec p_get_user_paths(User) -> {ok, Paths} | {error, invalid_user}
                                     when User :: binary(),
                                          Paths :: [binary()].
 p_get_user_paths(User) ->
     T1 = fun() ->
                  case mnesia:read(acl, User) of
                      [] ->
-                         user_not_found;
+                         {error, invalid_user};
                      AclEntries ->
                          T2 = fun() ->
                                       {ok, [Path || #acl{r_ids = Repos} <- AclEntries,

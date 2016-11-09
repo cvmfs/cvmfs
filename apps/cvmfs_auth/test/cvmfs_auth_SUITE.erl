@@ -92,7 +92,7 @@ valid_username_no_paths(_Config) ->
     {ok, []} = cvmfs_auth:get_user_permissions(<<"user3">>).
 
 invalid_username_error(_Config) ->
-    user_not_found = cvmfs_auth:get_user_permissions(<<"not_a_username">>).
+    {error, invalid_user} = cvmfs_auth:get_user_permissions(<<"not_a_username">>).
 
 add_repo(_Config) ->
     ok = cvmfs_auth:add_repo(<<"new_repo">>, <<"/new/repo/path">>),
