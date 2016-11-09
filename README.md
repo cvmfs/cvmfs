@@ -11,7 +11,7 @@ development of the different components of the service architecture:
 + Authorization service (cvmfs_auth) - access control, user credentials
 + Lease service (cvmfs_lease) - manages leases (locks) on different sub-paths in the repository
 + Gateway service (cvmfs_gw) - interface to the Stratum 0 repository
-+ Processing (cvmfs_proc) - backend, "business logic", compression and hashing, interaction with gateway
++ Processing (cvmfs_be) - backend, "business logic", compression and hashing, interaction with gateway
 + Front-end (cvmfs_fe) - REST API, routing
 + Operations and monitoring (cvmfs_om) - logging, metrics, alarms etc.
 

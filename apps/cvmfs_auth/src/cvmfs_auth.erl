@@ -1,7 +1,7 @@
 %%%-------------------------------------------------------------------
 %%% This file is part of the CernVM File System.
 %%%
-%%% @doc
+%%% @doc cvmfs_auth public API
 %%%
 %%% @end
 %%%
@@ -14,7 +14,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/1, stop/0
+-export([start_link/1
         ,get_user_permissions/1
         ,add_user/2, remove_user/1, get_users/0
         ,add_repo/2, remove_repo/1, get_repos/0]).
@@ -43,25 +43,28 @@
 %% @doc
 %% Starts the server
 %%
-%% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
+-spec start_link(Args) -> {ok, Pid} | ignore | {error, Error}
+                              when Args :: term(), Pid :: pid(),
+                                   Error :: {already_start, pid()} | term().
 start_link(Args) ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, Args, []).
 
-stop() ->
-    gen_server:cast(?MODULE, stop).
 
-
--spec get_user_permissions(binary()) -> user_not_found | {ok, [binary()]}.
+-spec get_user_permissions(User) -> {ok, Permissions} | {error, invalid_user}
+                                        when User :: binary(),
+                                             Permissions :: [binary()].
 get_user_permissions(User) ->
     gen_server:call(?MODULE, {auth_req, user_perms, User}).
 
--spec add_user(binary(), [binary()]) -> user_already_exists | ok.
+
+-spec add_user(User :: binary(), Repos :: binary()) -> ok.
 add_user(User, Repos) ->
     gen_server:call(?MODULE, {auth_req, add_user, {User, Repos}}).
 
--spec remove_user(binary()) -> ok.
+
+-spec remove_user(User :: binary()) -> ok.
 remove_user(User) ->
     gen_server:call(?MODULE, {auth_req, remove_user, User}).
 
@@ -71,30 +74,31 @@ remove_user(User) ->
 %% Returns a list of all usernames in the `acl` table.
 %% Potentially expensive!
 %%
-%% @spec spec get_users() -> [binary()]
 %% @end
 %%--------------------------------------------------------------------
--spec get_users() -> [binary()].
+-spec get_users() -> Users :: [binary()].
 get_users() ->
     gen_server:call(?MODULE, {auth_req, get_users}).
 
--spec add_repo(binary(), binary()) -> repo_already_exists | ok.
+
+-spec add_repo(Repo :: binary(), Path :: binary()) -> ok.
 add_repo(Repo, Path) ->
     gen_server:call(?MODULE, {auth_req, add_repo, {Repo, Path}}).
 
--spec remove_repo(binary()) -> ok.
+
+-spec remove_repo(Repo :: binary()) -> ok.
 remove_repo(Repo) ->
     gen_server:call(?MODULE, {auth_req, remove_repo, Repo}).
+
 
 %%--------------------------------------------------------------------
 %% @doc
 %% Returns a list of all repo names in the `repo` table.
 %% Potentially expensive!
 %%
-%% @spec spec get_users() -> [binary()]
 %% @end
 %%--------------------------------------------------------------------
--spec get_repos() -> [binary()].
+-spec get_repos() -> Repos :: [binary()].
 get_repos() ->
     gen_server:call(?MODULE, {auth_req, get_repos}).
 
@@ -111,10 +115,6 @@ get_repos() ->
 %%   RepoList - list of managed repositories
 %%   ACL - access control list ([{username, [repo_name]}])
 %%
-%% @spec init(Args) -> {ok, State} |
-%%                     {ok, State, Timeout} |
-%%                     ignore |
-%%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
 init({RepoList, ACL}) ->
@@ -130,14 +130,14 @@ init({RepoList, ACL}) ->
                               ,{type, set}
                               ,{attributes, record_info(fields, repo)}]),
     ok = mnesia:wait_for_tables([repo], 10000),
-    priv_populate_repos(RepoList),
+    p_populate_repos(RepoList),
     lager:info("Repository list initialized."),
 
     mnesia:create_table(acl, [CopyMode
                              ,{type, set}
                              ,{attributes, record_info(fields, acl)}]),
     ok = mnesia:wait_for_tables([acl], 10000),
-    priv_populate_acl(ACL),
+    p_populate_acl(ACL),
     lager:info("Access control list initialized."),
 
     lager:info("Auth module initialized."),
@@ -148,41 +148,34 @@ init({RepoList, ACL}) ->
 %% @doc
 %% Handling call messages
 %%
-%% @spec handle_call(Request, From, State) ->
-%%                                   {reply, Reply, State} |
-%%                                   {reply, Reply, State, Timeout} |
-%%                                   {noreply, State} |
-%%                                   {noreply, State, Timeout} |
-%%                                   {stop, Reason, Reply, State} |
-%%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
 handle_call({auth_req, user_perms, User}, _From, State) ->
-    Reply = priv_get_user_paths(User),
+    Reply = p_get_user_paths(User),
     lager:info("Request received: {user_perms, ~p} -> Reply: ~p", [User, Reply]),
     {reply, Reply, State};
 handle_call({auth_req, add_user, {User, Repos}}, _From, State) ->
-    Reply = priv_add_user(User, Repos),
+    Reply = p_add_user(User, Repos),
     lager:info("Request received: {add_user, {~p, ~p}} -> Reply: ~p", [User, Repos, Reply]),
     {reply, Reply, State};
 handle_call({auth_req, remove_user, User}, _From, State) ->
-    Reply = priv_remove_user(User),
+    Reply = p_remove_user(User),
     lager:info("Request received: {remove_user, ~p} -> Reply: ~p", [User, Reply]),
     {reply, Reply, State};
 handle_call({auth_req, get_users}, _From, State) ->
-    Reply = priv_get_users(),
+    Reply = p_get_users(),
     lager:info("Request received: {get_users} -> Reply: ~p", [Reply]),
     {reply, Reply, State};
 handle_call({auth_req, add_repo, {Repo, Path}}, _From, State) ->
-    Reply = priv_add_repo(Repo, Path),
+    Reply = p_add_repo(Repo, Path),
     lager:info("Request received: {add_repo, {~p, ~p}} -> Reply: ~p", [Repo, Path, Reply]),
     {reply, Reply, State};
 handle_call({auth_req, remove_repo, Repo}, _From, State) ->
-    Reply = priv_remove_repo(Repo),
+    Reply = p_remove_repo(Repo),
     lager:info("Request received: {remove_repo, ~p} -> Reply: ~p", [Repo, Reply]),
     {reply, Reply, State};
 handle_call({auth_req, get_repos}, _From, State) ->
-    Reply = priv_get_repos(),
+    Reply = p_get_repos(),
     lager:info("Request received: {get_repos} -> Reply: ~p", [Reply]),
     {reply, Reply, State}.
 
@@ -191,14 +184,8 @@ handle_call({auth_req, get_repos}, _From, State) ->
 %% @doc
 %% Handling cast messages
 %%
-%% @spec handle_cast(Msg, State) -> {noreply, State} |
-%%                                  {noreply, State, Timeout} |
-%%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_cast(stop, State) ->
-    lager:info("Cast received: stop"),
-    {stop, normal, State};
 handle_cast(Msg, State) ->
     lager:info("Cast received: ~p -> noreply", [Msg]),
     {noreply, State}.
@@ -208,9 +195,6 @@ handle_cast(Msg, State) ->
 %% @doc
 %% Handling all non call/cast messages
 %%
-%% @spec handle_info(Info, State) -> {noreply, State} |
-%%                                   {noreply, State, Timeout} |
-%%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
 handle_info(Info, State) ->
@@ -225,7 +209,6 @@ handle_info(Info, State) ->
 %% necessary cleaning up. When it returns, the gen_server terminates
 %% with Reason. The return value is ignored.
 %%
-%% @spec terminate(Reason, State) -> void()
 %% @end
 %%--------------------------------------------------------------------
 terminate(Reason, _State) ->
@@ -237,7 +220,6 @@ terminate(Reason, _State) ->
 %% @doc
 %% Convert process state when code is changed
 %%
-%% @spec code_change(OldVsn, State, Extra) -> {ok, NewState}
 %% @end
 %%--------------------------------------------------------------------
 code_change(OldVsn, State, _Extra) ->
@@ -248,79 +230,97 @@ code_change(OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
--spec priv_get_user_paths(binary()) -> {ok, [binary()]} | user_not_found.
-priv_get_user_paths(User) ->
+-spec p_get_user_paths(User) -> {ok, Paths} | {error, invalid_user}
+                                    when User :: binary(),
+                                         Paths :: [binary()].
+p_get_user_paths(User) ->
     T1 = fun() ->
-                case mnesia:read(acl, User) of
-                    [] ->
-                        user_not_found;
-                    AclEntries ->
-                        T2 = fun() ->
-                                     {ok, [Path || #acl{r_ids = Repos} <- AclEntries,
-                                                   Repo <- Repos,
-                                                   #repo{path = Path} <- mnesia:read(repo, Repo)]}
-                             end,
-                        {atomic, Result} = mnesia:sync_transaction(T2),
-                        Result
-                end
-        end,
+                 case mnesia:read(acl, User) of
+                     [] ->
+                         {error, invalid_user};
+                     AclEntries ->
+                         T2 = fun() ->
+                                      {ok, [Path || #acl{r_ids = Repos} <- AclEntries,
+                                                    Repo <- Repos,
+                                                    #repo{path = Path} <- mnesia:read(repo, Repo)]}
+                              end,
+                         {atomic, Result} = mnesia:sync_transaction(T2),
+                         Result
+                 end
+         end,
     {atomic, Result} = mnesia:sync_transaction(T1),
     Result.
 
-priv_add_user(User, Repos) ->
+
+-spec p_add_user(User :: binary(), Repos :: [binary()]) -> ok.
+p_add_user(User, Repos) ->
     T = fun() ->
                 mnesia:write(#acl{u_id = User, r_ids = Repos})
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
-priv_remove_user(User) ->
+
+-spec p_remove_user(User :: binary()) -> ok.
+p_remove_user(User) ->
     T = fun() ->
                 mnesia:delete({acl, User})
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
-priv_get_users() ->
+
+-spec p_get_users() -> Users :: [binary()].
+p_get_users() ->
     T = fun() ->
                 mnesia:foldl(fun(#acl{u_id = User}, Acc) -> [User | Acc] end, [], acl)
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
-priv_add_repo(Repo, Path) ->
+
+-spec p_add_repo(Repo :: binary(), Path :: binary()) -> ok.
+p_add_repo(Repo, Path) ->
     T = fun() ->
                 mnesia:write(#repo{r_id = Repo, path = Path})
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
-priv_remove_repo(Repo) ->
+
+-spec p_remove_repo(Repo :: binary()) -> ok.
+p_remove_repo(Repo) ->
     T = fun() ->
                 mnesia:delete({repo, Repo})
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
-priv_get_repos() ->
+
+-spec p_get_repos() -> Repos :: [binary()].
+p_get_repos() ->
     T = fun() ->
                 mnesia:foldl(fun(#repo{r_id = Repo}, Acc) -> [Repo | Acc] end, [], repo)
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
--spec priv_populate_acl([{binary(), [binary()]}]) -> [true].
-priv_populate_acl(ACL) ->
+
+-spec p_populate_acl(ACL :: [{User :: binary, Repos :: [binary()]}]) -> boolean().
+p_populate_acl(ACL) ->
     T = fun() ->
-                [mnesia:write(#acl{u_id = ClientId, r_ids = RepoList}) || {ClientId, RepoList} <- ACL]
+                lists:all(fun(V) -> V =:= ok end,
+                          [mnesia:write(#acl{u_id = User, r_ids = RepoList}) || {User, RepoList} <- ACL])
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
--spec priv_populate_repos([{binary(), binary()}]) -> [true].
-priv_populate_repos(RepoList) ->
+
+-spec p_populate_repos(RepoList :: [{Repo :: binary(), Path :: binary()}]) -> boolean().
+p_populate_repos(RepoList) ->
     T = fun() ->
-                [mnesia:write(#repo{r_id = RepoId, path = RepoPath}) || {RepoId, RepoPath} <- RepoList]
+                lists:all(fun(V) -> V =:= ok end,
+                          [mnesia:write(#repo{r_id = Repo, path = Path}) || {Repo, Path} <- RepoList])
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.

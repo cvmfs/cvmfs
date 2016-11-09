@@ -1,7 +1,7 @@
 %%%-------------------------------------------------------------------
 %%% This file is part of the CernVM File System.
 %%%
-%%% @doc
+%%% @doc cvmfs_lease public API
 %%%
 %%% @end
 %%%
@@ -16,7 +16,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/1, stop/0
+-export([start_link/1
         ,request_lease/4, end_lease/1
         ,check_lease/1
         ,get_leases/0, clear_leases/0]).
@@ -29,13 +29,20 @@
 
 %% Records used as table entries
 
--record(lease, { path :: binary()   % subpath which is locked
+-record(lease, { path   :: binary()   % subpath which is locked
                , u_id   :: binary()   % user identifier
-               , public  :: binary()   % public string used for token generation
-               , secret  :: binary()   % secret used for token generation
+               , public :: binary()   % public string used for token generation
+               , secret :: binary()   % secret used for token generation
                , time   :: integer()  % timestamp (time when lease acquired)
                }).
 
+
+%%%===================================================================
+%%% Type specifications
+%%%===================================================================
+-type new_lease_result() :: ok | {busy, TimeRemaining :: binary()}.
+-type lease_check_result() :: {ok, Secret :: binary()} |
+                              {error, invalid_lease | lease_expired}.
 
 %%%===================================================================
 %%% API
@@ -45,37 +52,25 @@
 %% @doc
 %% Starts the server
 %%
-%% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
+-spec start_link(Args) -> {ok, Pid} | ignore | {error, Error}
+                              when Args :: term(), Pid :: pid(),
+                                   Error :: {already_start, pid()} | term().
 start_link(Args) ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, Args, []).
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Stops the server (only useful without a supervision tree)
-%%
-%% @spec stop() -> ok
-%% @end
-%%--------------------------------------------------------------------
-stop() ->
-    gen_server:cast(?MODULE, stop).
-
-%%--------------------------------------------------------------------
-%% @doc
 %% Requests a new lease
 %%
-%% @spec request_lease(User, Path)) -> {ok, LeaseId} | {busy, TimeRemaining}
 %% @end
 %%--------------------------------------------------------------------
--spec request_lease(User, Path, Public, Secret) ->
-                           {ok, LeaseId} | {busy, TimeRemaining}
-                                       when User :: binary(),
-                                            Path :: binary(),
-                                            Public :: binary(),
-                                            Secret :: binary(),
-                                            LeaseId :: binary(),
-                                            TimeRemaining :: integer().
+-spec request_lease(User, Path, Public, Secret) -> new_lease_result()
+                                                       when User :: binary(),
+                                                            Path :: binary(),
+                                                            Public :: binary(),
+                                                            Secret :: binary().
 request_lease(User, Path, Public, Secret) ->
     gen_server:call(?MODULE, {lease_req, new_lease, {User, Path, Public, Secret}}).
 
@@ -83,9 +78,9 @@ request_lease(User, Path, Public, Secret) ->
 %% @doc
 %% Gives up an existing lease
 %%
-%% @spec end_lease(Public) -> ok | {error, lease_not_found}
 %% @end
 %%--------------------------------------------------------------------
+-spec end_lease(Public :: binary()) -> ok.
 end_lease(Public) ->
     gen_server:call(?MODULE, {lease_req, end_lease, Public}).
 
@@ -93,14 +88,10 @@ end_lease(Public) ->
 %% @doc
 %% Checks the validity of a lease
 %%
-%% @spec check_lease(Public) -> ok | {error, invalid_lease}
 %% @end
 %%--------------------------------------------------------------------
--spec check_lease(Public) -> {ok, Secret} | {error, Reason}
-                                     when Public :: binary(),
-                                          Secret :: binary(),
-                                          Reason :: lease_not_found |
-                                                    lease_expired.
+-spec check_lease(Public) -> lease_check_result()
+                                 when Public :: binary().
 check_lease(Public) ->
     gen_server:call(?MODULE, {lease_req, check_lease, Public}).
 
@@ -108,10 +99,9 @@ check_lease(Public) ->
 %% @doc
 %% Returns list of all active leases
 %%
-%% @spec get_leases() -> Leases
 %% @end
 %%--------------------------------------------------------------------
--spec get_leases() -> [#lease{}].
+-spec get_leases() -> Leases :: [#lease{}].
 get_leases() ->
     gen_server:call(?MODULE, {lease_req, get_leases}).
 
@@ -119,7 +109,6 @@ get_leases() ->
 %% @doc
 %% Clears all existing leases from the table.
 %%
-%% @spec clear_leases() -> ok.
 %% @end
 %%--------------------------------------------------------------------
 -spec clear_leases() -> ok.
@@ -136,10 +125,6 @@ clear_leases() ->
 %% @doc
 %% Initializes the server
 %%
-%% @spec init(Args) -> {ok, State} |
-%%                     {ok, State, Timeout} |
-%%                     ignore |
-%%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
 init(_) ->
@@ -164,37 +149,30 @@ init(_) ->
 %% @doc
 %% Handling call messages
 %%
-%% @spec handle_call(Request, From, State) ->
-%%                                   {reply, Reply, State} |
-%%                                   {reply, Reply, State, Timeout} |
-%%                                   {noreply, State} |
-%%                                   {noreply, State, Timeout} |
-%%                                   {stop, Reason, Reply, State} |
-%%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
 handle_call({lease_req, new_lease, {User, Path, Public, Secret}}, _From, State) ->
-    Reply = priv_new_lease(User, Path, Public, Secret, State),
+    Reply = p_new_lease(User, Path, Public, Secret, State),
     lager:info("Request received: {new_lease, ~p} -> Reply: ~p"
               ,[{User, Path}, Reply]),
     {reply, Reply, State};
 handle_call({lease_req, end_lease, Public}, _From, State) ->
-    Reply = priv_end_lease(Public),
+    Reply = p_end_lease(Public),
     lager:info("Request received: {end_lease, ~p} -> Reply: ~p"
               ,[Public, Reply]),
     {reply, Reply, State};
 handle_call({lease_req, check_lease, Public}, _From, State) ->
-    Reply = priv_check_lease(Public),
+    Reply = p_check_lease(Public),
     lager:info("Request received: {check_lease, ~p} -> Reply: ~p"
               ,[Public, Reply]),
     {reply, Reply, State};
 handle_call({lease_req, get_leases}, _From, State) ->
-    Reply = priv_get_leases(),
+    Reply = p_get_leases(),
     lager:info("Request received: {get_leases} -> Reply: ~p"
               ,[Reply]),
     {reply, Reply, State};
 handle_call({lease_req, clear_leases}, _From, State) ->
-    Reply = priv_clear_leases(),
+    Reply = p_clear_leases(),
     lager:info("Request received: {clear_leases} -> Reply: ~p"
               ,[Reply]),
     {reply, Reply, State};
@@ -207,14 +185,8 @@ handle_call(_Request, _From, State) ->
 %% @doc
 %% Handling cast messages
 %%
-%% @spec handle_cast(Msg, State) -> {noreply, State} |
-%%                                  {noreply, State, Timeout} |
-%%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_cast(stop, State) ->
-    lager:info("Cast received: stop"),
-    {stop, normal, State};
 handle_cast(Msg, State) ->
     lager:info("Cast received: ~p -> noreply", [Msg]),
     {noreply, State}.
@@ -224,9 +196,6 @@ handle_cast(Msg, State) ->
 %% @doc
 %% Handling all non call/cast messages
 %%
-%% @spec handle_info(Info, State) -> {noreply, State} |
-%%                                   {noreply, State, Timeout} |
-%%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
 handle_info(Info, State) ->
@@ -241,7 +210,6 @@ handle_info(Info, State) ->
 %% necessary cleaning up. When it returns, the gen_server terminates
 %% with Reason. The return value is ignored.
 %%
-%% @spec terminate(Reason, State) -> void()
 %% @end
 %%--------------------------------------------------------------------
 terminate(Reason, _State) ->
@@ -253,7 +221,6 @@ terminate(Reason, _State) ->
 %% @doc
 %% Convert process state when code is changed
 %%
-%% @spec code_change(OldVsn, State, Extra) -> {ok, NewState}
 %% @end
 %%--------------------------------------------------------------------
 code_change(OldVsn, State, _Extra) ->
@@ -264,28 +231,33 @@ code_change(OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-priv_new_lease(User, Path, Public, Secret, _State) ->
+-spec p_new_lease(User, Path, Public, Secret, State) -> new_lease_result()
+                                                            when User :: binary(),
+                                                                 Path :: binary(),
+                                                                 Public :: binary(),
+                                                                 Secret :: binary(),
+                                                                 State :: map().
+p_new_lease(User, Path, Public, Secret, _State) ->
     {ok, MaxLeaseTime} = application:get_env(cvmfs_lease, max_lease_time),
 
     %% Match statement that selects all rows with a given repo,
     %% returning a list of {Path, Time} pairs
-    MS = ets:fun2ms(fun(#lease{u_id = U, time = T, path = P}) when P =:= Path ->
-                            {P, T}
+    MS = ets:fun2ms(fun(#lease{path = P} = Lease) when P =:= Path ->
+                            Lease
                     end),
+
+    AreOverlapping = fun(#lease{path = P}) ->
+                             cvmfs_lease_path_util:are_overlapping(P, Path)
+                     end,
 
     T = fun() ->
                 CurrentTime = erlang:system_time(milli_seconds),
 
                 %% We select the rows related to a given repository
-                Results = mnesia:select(lease, MS),
-
                 %% We filter out entries which don't overlap with Path
-                case lists:filter(fun({P, _}) ->
-                                          cvmfs_lease_path_util:are_overlapping(P, Path)
-                                  end,
-                                  Results) of
+                case lists:filter(AreOverlapping, mnesia:select(lease, MS)) of
                     %% An everlapping path was found
-                    [{P, Time} | _] ->
+                    [#lease{path = Path, time = Time} | _] ->
                         RemainingTime = MaxLeaseTime - (CurrentTime - Time),
                         case RemainingTime > 0 of
                             %% The old lease is still valid, return busy message
@@ -293,18 +265,21 @@ priv_new_lease(User, Path, Public, Secret, _State) ->
                                 {busy, RemainingTime};
                             %% The old lease is expired. Delete it and insert the new one
                             false ->
-                                mnesia:delete({lease, P}),
-                                priv_write_row(User, Path, Public, Secret)
+                                mnesia:delete({lease, Path}),
+                                p_write_row(User, Path, Public, Secret)
                         end;
                     %% No overlapping paths were found; just insert the new entry
                     _ ->
-                        priv_write_row(User, Path, Public, Secret)
+                        p_write_row(User, Path, Public, Secret)
                 end
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
-priv_check_lease(Public) ->
+
+-spec p_check_lease(Public) -> lease_check_result()
+                                   when Public :: binary().
+p_check_lease(Public) ->
     {ok, MaxLeaseTime} = application:get_env(cvmfs_lease, max_lease_time),
 
     MS = ets:fun2ms(fun(#lease{public = P} = Lease) when P =:= Public ->
@@ -316,13 +291,14 @@ priv_check_lease(Public) ->
 
                 case mnesia:select(lease, MS) of
                     [] ->
-                        {error, lease_not_found};
-                    [#lease{public = Public, secret = Secret, time = Time} | _]  ->
+                        {error, invalid_lease};
+                    [#lease{path = Path, secret = Secret, time = Time} | _]  ->
                         RemainingTime = MaxLeaseTime - (CurrentTime - Time),
                         case RemainingTime > 0 of
                             true ->
                                 {ok, Secret};
                             false ->
+                                mnesia:delete({lease, Path}),
                                 {error, lease_expired}
                         end
                 end
@@ -330,33 +306,45 @@ priv_check_lease(Public) ->
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
-priv_end_lease(Public) ->
+
+-spec p_end_lease(Public :: binary()) -> ok.
+p_end_lease(Public) ->
     MS = ets:fun2ms(fun(#lease{public = Pub, path = Path}) when Pub =:= Public ->
                             Path
                     end),
     T = fun() ->
                 case mnesia:select(lease, MS) of
-                    [] ->
-                        {error, lease_not_found};
                     [Path | _] ->
-                        mnesia:delete({lease, Path})
+                        mnesia:delete({lease, Path});
+                    [] ->
+                        ok
                 end
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
-priv_get_leases() ->
+
+-spec p_get_leases() -> Leases :: [#lease{}].
+p_get_leases() ->
     T = fun() ->
                 mnesia:foldl(fun(Lease, Acc) -> [Lease | Acc] end, [], lease)
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
-priv_clear_leases() ->
+
+-spec p_clear_leases() -> ok.
+p_clear_leases() ->
     {atomic, Result} = mnesia:clear_table(lease),
     Result.
 
-priv_write_row(User, Path, Public, Secret) ->
+
+-spec p_write_row(User, Path, Public, Secret) -> ok
+                                                     when User :: binary(),
+                                                          Path :: binary(),
+                                                          Public :: binary(),
+                                                          Secret :: binary().
+p_write_row(User, Path, Public, Secret) ->
     mnesia:write(#lease{path = Path,
                         u_id = User,
                         public = Public,

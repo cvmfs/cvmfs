@@ -18,12 +18,10 @@
 %% Two paths overlap if one is a subpath of the other(foo/bar/baz and
 %% foo/bar)
 %%
-%% @spec are_overlapping(Path1, Path2) -> boolean().
 %% @end
 %%--------------------------------------------------------------------
-
-are_overlapping(Path1, Path2) when is_binary(Path1), is_binary(Path2),
-                                    size(Path1) > 0, size(Path2) > 0 ->
+-spec are_overlapping(Path1 :: binary(), Path2 :: binary()) -> boolean().
+are_overlapping(Path1, Path2) when size(Path1) > 0, size(Path2) > 0 ->
     SplitPath1 = filename:split(drop_leading_slash(Path1)),
     SplitPath2 = filename:split(drop_leading_slash(Path2)),
 

@@ -1,10 +1,13 @@
 image: radupopescu/erlang-libsodium:19
 
 stages:
-  - build
+  - test
 
-rebar3_eunit:
-  stage: build
+test_and_package:
+  stage: test
   tags:
     - docker
-  script: rebar3 ct
+  script:
+    - rebar3 dialyzer
+    - rebar3 ct
+    - rebar3 as prod tar
