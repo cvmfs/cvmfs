@@ -17,7 +17,7 @@
 
 -export([new_lease/1, new_lease_busy/1, new_lease_expired/1
         ,remove_lease_existing/1, remove_lease_nonexisting/1
-        ,check_lease_valid/1, check_lease_expired/1, check_lease_not_found/1
+        ,check_lease_valid/1, check_lease_expired/1, check_invalid_lease/1
         ,clear_leases/1]).
 
 
@@ -37,7 +37,7 @@ groups() ->
                       ,clear_leases]}
     ,{check_leases, [], [check_lease_valid
                         ,check_lease_expired
-                        ,check_lease_not_found]}].
+                        ,check_invalid_lease]}].
 
 
 %% Set up, tear down
@@ -108,7 +108,7 @@ remove_lease_existing(_Config) ->
 
 remove_lease_nonexisting(_Config) ->
     P = <<"path">>,
-    {error, lease_not_found} = cvmfs_lease:end_lease(P).
+    ok = cvmfs_lease:end_lease(P).
 
 clear_leases(_Config) ->
     U = <<"user">>,
@@ -138,7 +138,7 @@ check_lease_expired(_Config) ->
     ct:sleep(SleepTime),
     {error, lease_expired} = cvmfs_lease:check_lease(Public).
 
-check_lease_not_found(_Config) ->
+check_invalid_lease(_Config) ->
     Public = <<"public">>,
-    {error, lease_not_found} = cvmfs_lease:check_lease(Public).
+    {error, invalid_lease} = cvmfs_lease:check_lease(Public).
 

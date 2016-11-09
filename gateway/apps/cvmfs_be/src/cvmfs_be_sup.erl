@@ -1,12 +1,12 @@
 %%%-------------------------------------------------------------------
 %%% This file is part of the CernVM File System.
 %%%
-%%% @doc cvmfs_proc_sup public API
+%%% @doc cvmfs_be_sup public API
 %%%
 %%% @end
 %%%-------------------------------------------------------------------
 
--module(cvmfs_proc_sup).
+-module(cvmfs_be_sup).
 
 -behaviour(supervisor).
 
@@ -34,13 +34,13 @@ init([]) ->
     SupervisorSpecs = #{strategy => one_for_all,
                         intensity => 5,
                         period => 5},
-    CvmfsProcMainSpecs = #{id => cvmfs_proc,
-                           start => {cvmfs_proc, start_link, [{}]},
-                           restart => permanent,
-                           shutdown => 2000,
-                           type => worker,
-                           modules => [cvmfs_proc]},
-    {ok, {SupervisorSpecs, [CvmfsProcMainSpecs]}}.
+    CvmfsBeMainSpecs = #{id => cvmfs_be,
+                         start => {cvmfs_be, start_link, [{}]},
+                         restart => permanent,
+                         shutdown => 2000,
+                         type => worker,
+                         modules => [cvmfs_be]},
+    {ok, {SupervisorSpecs, [CvmfsBeMainSpecs]}}.
 
 %%====================================================================
 %% Internal functions

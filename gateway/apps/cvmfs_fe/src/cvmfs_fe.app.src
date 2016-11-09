@@ -8,7 +8,7 @@
    ,stdlib
    ,cowboy
    ,cvmfs_om
-   ,cvmfs_proc]},
+   ,cvmfs_be]},
   {env,[]},
   {modules, [cvmfs_fe_app
             ,cvmfs_fe_sup
