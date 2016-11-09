@@ -8,7 +8,7 @@ stages:
 compile:
   stage: build
   tags:
-    -docker
+    - docker
   script: rebar3 release
 
 dialyzer:
