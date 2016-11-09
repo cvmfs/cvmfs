@@ -217,7 +217,7 @@ class T_ExternalCacheManager : public ::testing::Test {
     delete mock_plugin_;
   }
 
-  static const int nfiles;
+  static const unsigned nfiles;
   int fd_client;
   string socket_path_;
   MockCachePlugin *mock_plugin_;
@@ -225,7 +225,7 @@ class T_ExternalCacheManager : public ::testing::Test {
   ExternalQuotaManager *quota_mgr_;
 };
 
-const int T_ExternalCacheManager::nfiles = 128;
+const unsigned T_ExternalCacheManager::nfiles = 128;
 
 
 
@@ -245,7 +245,7 @@ TEST_F(T_ExternalCacheManager, OpenClose) {
     fds[i] = cache_mgr_->Open(CacheManager::Bless(mock_plugin_->known_object));
     EXPECT_GE(fds[i], 0);
   }
-  EXPECT_EQ(nfiles, mock_plugin_->known_object_refcnt);
+  EXPECT_EQ(static_cast<int>(nfiles), mock_plugin_->known_object_refcnt);
   EXPECT_EQ(-ENFILE,
             cache_mgr_->Open(CacheManager::Bless(mock_plugin_->known_object)));
   for (unsigned i = 0; i < nfiles; ++i) {
@@ -284,7 +284,7 @@ TEST_F(T_ExternalCacheManager, Dup) {
     fds[i] = cache_mgr_->Dup(fds[0]);
     EXPECT_GE(fds[i], 0);
   }
-  EXPECT_EQ(nfiles, mock_plugin_->known_object_refcnt);
+  EXPECT_EQ(static_cast<int>(nfiles), mock_plugin_->known_object_refcnt);
   EXPECT_EQ(-ENFILE, cache_mgr_->Dup(fds[0]));
   for (unsigned i = 0; i < nfiles; ++i) {
     EXPECT_EQ(0, cache_mgr_->Close(fds[i]));

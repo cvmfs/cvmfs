@@ -115,6 +115,7 @@ class GarbageCollector {
   {
    public:
     explicit ReflogBasedInfoShim(ReflogTN *reflog) : reflog_(reflog) { }
+    virtual ~ReflogBasedInfoShim() { }
     virtual uint64_t GetLastModified(const CatalogTN *catalog) {
       uint64_t timestamp;
       bool retval = reflog_->GetCatalogTimestamp(catalog->hash(), &timestamp);
