@@ -32,7 +32,7 @@
                             {busy, TimeRemaining :: binary()}.
 -type submission_error() :: {error,
                              lease_expired |
-                             lease_not_found |
+                             invalid_lease |
                              invalid_user |
                              invalid_macaroon}.
 -type submit_payload_result() :: {ok, payload_added} |
@@ -80,7 +80,7 @@ new_lease(User, Path) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec end_lease(LeaseToken) -> cvmfs_lease:end_lease_result() | {error, invalid_macaroon}
+-spec end_lease(LeaseToken) -> ok | {error, invalid_macaroon}
                                    when LeaseToken :: binary().
 end_lease(LeaseToken) ->
     gen_server:call(?MODULE, {be_req, end_lease, LeaseToken}).
@@ -129,10 +129,12 @@ init([]) ->
 handle_call({be_req, new_lease, {User, Path}}, _From, State) ->
     case p_new_lease(User, Path) of
         {ok, LeaseToken} ->
-            lager:info("Request received: {new_lease, {~p, ~p}} -> Reply: ~p", [User, Path, LeaseToken]),
+            lager:info("Request received: {new_lease, {~p, ~p}} -> Reply: ~p",
+                       [User, Path, LeaseToken]),
             {reply, {ok, LeaseToken}, State};
         Other ->
-            lager:info("Request received: {new_lease, {~p, ~p}} -> Reply: ~p", [User, Path, Other]),
+            lager:info("Request received: {new_lease, {~p, ~p}} -> Reply: ~p",
+                       [User, Path, Other]),
             {reply, Other, State}
     end;
 handle_call({be_req, end_lease, LeaseToken}, _From, State) ->
@@ -202,8 +204,6 @@ p_new_lease(User, Path) ->
     % Check if user is registered with the cvmfs_auth service and
     % which paths he is allowed to modify
     case cvmfs_auth:get_user_permissions(User) of
-        user_not_found ->
-            {error, invalid_user};
         {ok, Paths} ->
             case lists:member(Path, Paths) of
                 false ->
@@ -216,11 +216,13 @@ p_new_lease(User, Path) ->
                         {busy, TimeRemaining} ->
                             {error, path_busy, TimeRemaining}
                     end
-            end
+            end;
+        Error ->
+            Error
     end.
 
 
--spec p_end_lease(LeaseToken) -> cvmfs_lease:end_lease_result() | {error, invalid_macaroon}
+-spec p_end_lease(LeaseToken) -> ok | {error, invalid_macaroon}
                                      when LeaseToken :: binary().
 p_end_lease(LeaseToken) ->
     case macaroon:deserialize(LeaseToken) of
@@ -274,7 +276,8 @@ p_generate_token(User, Path) ->
     {ok, MaxLeaseTime} = application:get_env(cvmfs_lease, max_lease_time),
     Time = erlang:system_time(milli_seconds) + MaxLeaseTime,
 
-    M2 = macaroon:add_first_party_caveat(M1, "time < " ++ erlang:integer_to_binary(Time)),
+    M2 = macaroon:add_first_party_caveat(M1,
+                                         "time < " ++ erlang:integer_to_binary(Time)),
 
     %%M3 = macaroon:add_first_party_caveat(M2, "path = " ++ Path),
 
@@ -304,7 +307,8 @@ p_check_payload(User, LeaseToken, _Payload) ->
                                         false
                                 end,
                     CheckTime = fun(<<"time < ", Exp/binary>>) ->
-                                        erlang:binary_to_integer(Exp) > erlang:system_time(milli_seconds);
+                                        erlang:binary_to_integer(Exp)
+                                            > erlang:system_time(milli_seconds);
                                    (_) ->
                                         false
                                 end,

@@ -29,10 +29,10 @@
 
 %% Records used as table entries
 
--record(lease, { path :: binary()   % subpath which is locked
+-record(lease, { path   :: binary()   % subpath which is locked
                , u_id   :: binary()   % user identifier
-               , public  :: binary()   % public string used for token generation
-               , secret  :: binary()   % secret used for token generation
+               , public :: binary()   % public string used for token generation
+               , secret :: binary()   % secret used for token generation
                , time   :: integer()  % timestamp (time when lease acquired)
                }).
 
@@ -42,8 +42,7 @@
 %%%===================================================================
 -type new_lease_result() :: ok | {busy, TimeRemaining :: binary()}.
 -type lease_check_result() :: {ok, Secret :: binary()} |
-                              {error, lease_not_found | lease_expired}.
--type end_lease_result() :: ok | {error, lease_not_found}.
+                              {error, invalid_lease | lease_expired}.
 
 %%%===================================================================
 %%% API
@@ -81,7 +80,7 @@ request_lease(User, Path, Public, Secret) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec end_lease(Public :: binary()) -> end_lease_result().
+-spec end_lease(Public :: binary()) -> ok.
 end_lease(Public) ->
     gen_server:call(?MODULE, {lease_req, end_lease, Public}).
 
@@ -243,23 +242,22 @@ p_new_lease(User, Path, Public, Secret, _State) ->
 
     %% Match statement that selects all rows with a given repo,
     %% returning a list of {Path, Time} pairs
-    MS = ets:fun2ms(fun(#lease{u_id = U, time = T, path = P}) when P =:= Path ->
-                            {P, T}
+    MS = ets:fun2ms(fun(#lease{path = P} = Lease) when P =:= Path ->
+                            Lease
                     end),
+
+    AreOverlapping = fun(#lease{path = P}) ->
+                             cvmfs_lease_path_util:are_overlapping(P, Path)
+                     end,
 
     T = fun() ->
                 CurrentTime = erlang:system_time(milli_seconds),
 
                 %% We select the rows related to a given repository
-                Results = mnesia:select(lease, MS),
-
                 %% We filter out entries which don't overlap with Path
-                case lists:filter(fun({P, _}) ->
-                                          cvmfs_lease_path_util:are_overlapping(P, Path)
-                                  end,
-                                  Results) of
+                case lists:filter(AreOverlapping, mnesia:select(lease, MS)) of
                     %% An everlapping path was found
-                    [{P, Time} | _] ->
+                    [#lease{path = Path, time = Time} | _] ->
                         RemainingTime = MaxLeaseTime - (CurrentTime - Time),
                         case RemainingTime > 0 of
                             %% The old lease is still valid, return busy message
@@ -267,7 +265,7 @@ p_new_lease(User, Path, Public, Secret, _State) ->
                                 {busy, RemainingTime};
                             %% The old lease is expired. Delete it and insert the new one
                             false ->
-                                mnesia:delete({lease, P}),
+                                mnesia:delete({lease, Path}),
                                 p_write_row(User, Path, Public, Secret)
                         end;
                     %% No overlapping paths were found; just insert the new entry
@@ -293,13 +291,14 @@ p_check_lease(Public) ->
 
                 case mnesia:select(lease, MS) of
                     [] ->
-                        {error, lease_not_found};
-                    [#lease{public = Public, secret = Secret, time = Time} | _]  ->
+                        {error, invalid_lease};
+                    [#lease{path = Path, secret = Secret, time = Time} | _]  ->
                         RemainingTime = MaxLeaseTime - (CurrentTime - Time),
                         case RemainingTime > 0 of
                             true ->
                                 {ok, Secret};
                             false ->
+                                mnesia:delete({lease, Path}),
                                 {error, lease_expired}
                         end
                 end
@@ -308,17 +307,17 @@ p_check_lease(Public) ->
     Result.
 
 
--spec p_end_lease(Public :: binary()) -> end_lease_result().
+-spec p_end_lease(Public :: binary()) -> ok.
 p_end_lease(Public) ->
     MS = ets:fun2ms(fun(#lease{public = Pub, path = Path}) when Pub =:= Public ->
                             Path
                     end),
     T = fun() ->
                 case mnesia:select(lease, MS) of
-                    [] ->
-                        {error, lease_not_found};
                     [Path | _] ->
-                        mnesia:delete({lease, Path})
+                        mnesia:delete({lease, Path});
+                    [] ->
+                        ok
                 end
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
@@ -340,7 +339,11 @@ p_clear_leases() ->
     Result.
 
 
--spec p_write_row(User :: binary(), Path :: binary(), Public :: binary(), Secret :: binary()) -> ok.
+-spec p_write_row(User, Path, Public, Secret) -> ok
+                                                     when User :: binary(),
+                                                          Path :: binary(),
+                                                          Public :: binary(),
+                                                          Secret :: binary().
 p_write_row(User, Path, Public, Secret) ->
     mnesia:write(#lease{path = Path,
                         u_id = User,

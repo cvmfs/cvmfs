@@ -132,7 +132,7 @@ end_invalid_lease(_Config) ->
     {VUser, VPath} = valid_user_and_path(),
     {ok, Token} = cvmfs_be:new_lease(VUser, VPath),
     ok = cvmfs_be:end_lease(Token),
-    {error, lease_not_found} = cvmfs_be:end_lease(Token).
+    ok = cvmfs_be:end_lease(Token).
 
 % End lease invalid macaroon
 end_lease_invalid_macaroon(_Config) ->
@@ -151,7 +151,7 @@ lease_success(_Config) ->
     % Submit final payload
     {ok, payload_added, lease_ended} = cvmfs_be:submit_payload(User, Token, Payload, true),
     % After the lease has been closed, the token should be rejected
-    {error, lease_not_found} = cvmfs_be:submit_payload(User, Token, Payload, true).
+    {error, invalid_lease} = cvmfs_be:submit_payload(User, Token, Payload, true).
 
 % Attempt to submit a payload without first obtaining a token
 submission_with_invalid_token_fails(_Config) ->
