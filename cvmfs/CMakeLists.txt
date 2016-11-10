@@ -164,6 +164,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   catalog_sql.cc catalog_sql.h
   catalog_traversal.h
   catalog_rw.cc catalog_rw.h
+  catalog_virtual.cc catalog_virtual.h
   clientctx.cc clientctx.h
   compression.cc compression.h
   directory_entry.cc directory_entry.h
@@ -186,7 +187,6 @@ set (CVMFS_SWISSKNIFE_SOURCES
   globals.cc globals.h
   hash.cc hash.h
   history.h
-  history_fs.cc history_fs.h
   history_sql.cc history_sql.h
   history_sqlite.cc history_sqlite.h
   json_document.cc json_document.h
