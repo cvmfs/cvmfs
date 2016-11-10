@@ -214,6 +214,15 @@ bool WritableCatalogManager::FindCatalog(const string     &path,
 }
 
 
+WritableCatalog *WritableCatalogManager::GetHostingCatalog(
+  const std::string &path)
+{
+  WritableCatalog *result = NULL;
+  FindCatalog(MakeRelativePath(path), &result, NULL);
+  return result;
+}
+
+
 /**
  * Remove the given file from the catalogs.
  * @param file_path the full path to the file to be removed

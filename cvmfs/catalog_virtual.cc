@@ -4,15 +4,15 @@
 #include "cvmfs_config.h"
 #include "catalog_virtual.h"
 
+#include <algorithm>
 #include <cassert>
 
 #include "catalog_mgr_rw.h"
-#include "catalog_rw.h"
 #include "compression.h"
 #include "logging.h"
-#include "hash.h"
 #include "history.h"
 #include "swissknife_sync.h"
+#include "util/pointer.h"
 #include "util/posix.h"
 #include "xattr.h"
 
@@ -21,6 +21,22 @@ using namespace std;  // NOLINT
 namespace catalog {
 
 const string VirtualCatalog::kVirtualPath = ".cvmfs";
+
+namespace {
+
+bool CmpTagName(const history::History::Tag &a, const history::History::Tag &b)
+{
+  return a.name < b.name;
+}
+
+bool CmpNestedCatalogPath(
+  const Catalog::NestedCatalog &a,
+  const Catalog::NestedCatalog &b)
+{
+  return a.path < b.path;
+}
+
+}  // anonymous namespace
 
 
 void VirtualCatalog::CreateCatalog() {
@@ -59,6 +75,10 @@ void VirtualCatalog::CreateCatalog() {
 }
 
 
+/**
+ * Checks for the top-level /.cvmfs directory and creates it as a nested catalog
+ * if necessary.
+ */
 void VirtualCatalog::EnsurePresence() {
   DirectoryEntry e;
   bool retval = catalog_mgr_->LookupPath("/" + kVirtualPath, kLookupSole, &e);
@@ -70,6 +90,88 @@ void VirtualCatalog::EnsurePresence() {
 
 void VirtualCatalog::GenerateSnapshots() {
   EnsurePresence();
+
+  vector<TagId> tags_history;
+  vector<TagId> tags_catalog;
+  GetSortedTagsFromHistory(&tags_history);
+  GetSortedTagsFromCatalog(&tags_catalog);
+  // Add artifical end markers to both lists
+  tags_history.push_back(TagId("", shash::Any()));
+  tags_catalog.push_back(TagId("", shash::Any()));
+
+  // Walk through both sorted lists concurrently and determine change set
+  unsigned i_history = 0, i_catalog = 0;
+  unsigned last_history = tags_history.size() - 1;
+  unsigned last_catalog = tags_catalog.size() - 1;
+  while ((i_history != last_history) && (i_catalog != last_catalog)) {
+    TagId t_history = tags_history[i_history];
+    TagId t_catalog = tags_catalog[i_catalog];
+
+    // Both the same, nothing to do
+    if (t_history == t_catalog) {
+      i_history++;
+      i_catalog++;
+      continue;
+    }
+
+    // Same tag name for different hash, re-insert
+    if (t_history.name == t_catalog.name) {
+      RemoveSnapshot(t_catalog);
+      InsertSnapshot(t_history);
+      i_history++;
+      i_catalog++;
+      continue;
+    }
+
+    // New tag that's missing
+    if (t_history.name < t_catalog.name) {
+      InsertSnapshot(t_history);
+      i_history++;
+      continue;
+    }
+
+    // A tag was removed but it is still present in the catalog
+    assert(t_history.name > t_catalog.name);
+    RemoveSnapshot(t_catalog);
+    i_catalog++;
+  }
+}
+
+
+void VirtualCatalog::GetSortedTagsFromHistory(vector<TagId> *tags) {
+  UniquePtr<history::History> history(
+    assistant_.GetHistory(swissknife::Assistant::kOpenReadOnly));
+  vector<history::History::Tag> tags_history;
+  bool retval = history->List(&tags_history);
+  assert(retval);
+  sort(tags_history.begin(), tags_history.end(), CmpTagName);
+  for (unsigned i = 0, l = tags_history.size(); i < l; ++i) {
+    tags->push_back(TagId(tags_history[i].name, tags_history[i].root_hash));
+  }
+}
+
+
+void VirtualCatalog::GetSortedTagsFromCatalog(vector<TagId> *tags) {
+  WritableCatalog *virtual_catalog =
+    catalog_mgr_->GetHostingCatalog(kVirtualPath);
+  assert(virtual_catalog != NULL);
+  Catalog::NestedCatalogList nested_catalogs =
+    virtual_catalog->ListNestedCatalogs();
+  sort(nested_catalogs.begin(), nested_catalogs.end(), CmpNestedCatalogPath);
+  for (unsigned i = 0, l = nested_catalogs.size(); i < l; ++i) {
+    tags->push_back(TagId(GetFileName(nested_catalogs[i].path).ToString(),
+                          nested_catalogs[i].hash));
+  }
+}
+
+
+void VirtualCatalog::InsertSnapshot(TagId tag) {
+
+}
+
+
+void VirtualCatalog::RemoveSnapshot(TagId tag) {
+
 }
 
 

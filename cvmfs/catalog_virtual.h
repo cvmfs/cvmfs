@@ -6,10 +6,12 @@
 
 #include "swissknife_assistant.h"
 
-#include <string.h>
+#include <string>
+#include <vector>
+
+#include "hash.h"
 
 namespace catalog {
-class WritableCatalog;
 class WritableCatalogManager;
 }
 namespace download {
@@ -34,8 +36,23 @@ class VirtualCatalog {
  private:
   static const std::string kVirtualPath;
 
+  struct TagId {
+    TagId() { }
+    TagId(const std::string &n, const shash::Any &h) : name(n), hash(h) { }
+    bool operator ==(const TagId &other) const {
+      return (this->name == other.name) && (this->hash == other.hash);
+    }
+
+    std::string name;
+    shash::Any hash;
+  };
+
   void EnsurePresence();
   void CreateCatalog();
+  void GetSortedTagsFromHistory(std::vector<TagId> *tags);
+  void GetSortedTagsFromCatalog(std::vector<TagId> *tags);
+  void RemoveSnapshot(TagId tag);
+  void InsertSnapshot(TagId tag);
 
   catalog::WritableCatalogManager *catalog_mgr_;
   swissknife::Assistant assistant_;
