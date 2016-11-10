@@ -4,8 +4,6 @@
 #include "cvmfs_config.h"
 #include "cache_extern.h"
 
-#define __STDC_FORMAT_MACROS
-
 #include <errno.h>
 #include <inttypes.h>
 #include <stdint.h>

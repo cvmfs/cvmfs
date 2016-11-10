@@ -70,6 +70,8 @@ struct CatalogTraversalData {
 template <class CatalogT>
 class CatalogTraversalInfoShim {
  public:
+  virtual ~CatalogTraversalInfoShim() { }
+
   // Default implementation: use the catalog's timestamp
   virtual uint64_t GetLastModified(const CatalogT *catalog) {
     return catalog->GetLastModified();

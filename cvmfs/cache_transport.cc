@@ -369,7 +369,7 @@ bool CacheTransport::RecvFrame(CacheTransport::Frame *frame) {
   else
     buffer = smalloc(size);
   ssize_t nbytes = SafeRead(fd_connection_, buffer, size);
-  if (nbytes != size) {
+  if ((nbytes < 0) || (static_cast<uint32_t>(nbytes) != size)) {
     if (size > kMaxStackAlloc) { free(buffer); }
     return false;
   }
@@ -418,7 +418,7 @@ bool CacheTransport::RecvFrame(CacheTransport::Frame *frame) {
 bool CacheTransport::RecvHeader(uint32_t *size, bool *has_attachment) {
   unsigned char header[kHeaderSize];
   ssize_t nbytes = SafeRead(fd_connection_, header, kHeaderSize);
-  if (nbytes != kHeaderSize)
+  if ((nbytes < 0) || (static_cast<unsigned>(nbytes) != kHeaderSize))
     return false;
   if ((header[0] & (~kFlagHasAttachment)) != kWireProtocolVersion)
     return false;

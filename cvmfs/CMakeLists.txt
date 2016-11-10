@@ -171,7 +171,7 @@ set (LIBCVMFS_CACHE_SOURCES
   smalloc.h
   util/async.h
   util/pointer.h
-  util/posix.cc util/posix.cc
+  util/posix.cc util/posix.h
   util/single_copy.h
   util/string.cc util/string.h
   util_concurrency.cc util_concurrency.h util_concurrency_impl.h
