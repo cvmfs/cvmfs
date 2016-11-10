@@ -62,6 +62,8 @@ class DirectoryEntryBase {
   friend class publish::SyncItem;
   // Simplify file system like _touch_ of DirectoryEntry objects
   friend class SqlDirentTouch;
+  // Allow creation of virtual directories and files
+  friend class VirtualCatalog;
 
  public:
   static const inode_t kInvalidInode = 0;

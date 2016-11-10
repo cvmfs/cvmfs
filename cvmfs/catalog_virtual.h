@@ -34,7 +34,7 @@ class VirtualCatalog {
  private:
   static const std::string kVirtualPath;
 
-  WritableCatalog *GetCatalog();
+  void EnsurePresence();
   void CreateCatalog();
 
   catalog::WritableCatalogManager *catalog_mgr_;

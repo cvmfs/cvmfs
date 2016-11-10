@@ -67,8 +67,10 @@ class CatalogBalancer;
 namespace catalog {
 
 class WritableCatalogManager : public SimpleCatalogManager {
- public:
   friend class CatalogBalancer<WritableCatalogManager>;
+  friend class VirtualCatalog;
+
+ public:
   WritableCatalogManager(const shash::Any  &base_hash,
                          const std::string &stratum0,
                          const std::string &dir_temp,

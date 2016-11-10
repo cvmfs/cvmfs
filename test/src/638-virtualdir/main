@@ -1,0 +1,32 @@
+cvmfs_test_name="Create Virtual .cvmfs Directory"
+cvmfs_test_autofs_on_startup=false
+
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  local scratch_dir=$(pwd)
+
+  echo "--- create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "--- check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+  echo "--- enable virtual directory"
+  echo "CVMFS_VIRTUAL_DIR=true" | sudo tee -a /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf
+  start_transaction $CVMFS_TEST_REPO || return $?
+  publish_repo $CVMFS_TEST_REPO || return $?
+  ls -lah /cvmfs/$CVMFS_TEST_REPO/.cvmfs || return 20
+  check_repository $CVMFS_TEST_REPO -i  || return 21
+
+  echo "--- reuse virtual directory"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  publish_repo $CVMFS_TEST_REPO || return $?
+  ls -lah /cvmfs/$CVMFS_TEST_REPO/.cvmfs || return 30
+  check_repository $CVMFS_TEST_REPO -i  || return 31
+
+  return 0
+}
+

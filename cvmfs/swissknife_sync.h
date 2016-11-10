@@ -32,7 +32,7 @@ struct SyncParameters {
     include_xattrs(false),
     external_data(false),
     voms_authz(false),
-    virtual_tagdir(false),
+    virtual_dir(false),
     compression_alg(zlib::kZlibDefault),
     catalog_entry_warn_threshold(kDefaultEntryWarnThreshold),
     min_file_chunk_size(kDefaultMinFileChunkSize),
@@ -68,7 +68,7 @@ struct SyncParameters {
   bool             include_xattrs;
   bool             external_data;
   bool             voms_authz;
-  bool             virtual_tagdir;
+  bool             virtual_dir;
   zlib::Algorithms compression_alg;
   uint64_t         catalog_entry_warn_threshold;
   size_t           min_file_chunk_size;

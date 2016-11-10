@@ -34,6 +34,7 @@
 
 #include "catalog_mgr_ro.h"
 #include "catalog_mgr_rw.h"
+#include "catalog_virtual.h"
 #include "download.h"
 #include "logging.h"
 #include "manifest.h"
@@ -526,7 +527,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (args.find('F') != args.end()) params.authz_file = *args.find('F')->second;
   if (args.find('k') != args.end()) params.include_xattrs = true;
   if (args.find('Y') != args.end()) params.external_data = true;
-  if (args.find('S') != args.end()) params.virtual_tagdir = true;
+  if (args.find('S') != args.end()) params.virtual_dir = true;
   if (args.find('z') != args.end()) {
     unsigned log_level =
     1 << (kLogLevel0 + String2Uint64(*args.find('z')->second));
@@ -696,8 +697,11 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     catalog_manager.SetVOMSAuthz(new_authz);
   }
 
-  if (params.virtual_tagdir && !manifest->history().IsNull()) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "creating virtual snapshots");
+  if (params.virtual_dir && !manifest->history().IsNull()) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "Creating virtual snapshots");
+    catalog::VirtualCatalog virtual_catalog(
+      manifest.weak_ref(), download_manager(), &catalog_manager, &params);
+    virtual_catalog.GenerateSnapshots();
   }
 
   if (!mediator.Commit(manifest.weak_ref())) {
