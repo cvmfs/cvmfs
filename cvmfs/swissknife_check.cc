@@ -237,7 +237,8 @@ bool CommandCheck::InspectReflog(
  */
 bool CommandCheck::Find(const catalog::Catalog *catalog,
                         const PathString &path,
-                        catalog::DeltaCounters *computed_counters)
+                        catalog::DeltaCounters *computed_counters,
+                        set<PathString> *bind_mountpoints)
 {
   catalog::DirectoryEntryList entries;
   catalog::DirectoryEntry this_directory;
@@ -345,7 +346,9 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
                  full_path.c_str());
         retval = false;
       }
-      if (entries[i].IsNestedCatalogMountpoint()) {
+      if (entries[i].IsNestedCatalogMountpoint() ||
+          entries[i].IsBindMountpoint())
+      {
         // Find transition point
         computed_counters->self.nested_catalogs++;
         shash::Any tmp;
@@ -365,9 +368,19 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
                    full_path.c_str());
           retval = false;
         }
+
+        if (entries[i].IsBindMountpoint()) {
+          bind_mountpoints->insert(full_path);
+          if (entries[i].IsNestedCatalogMountpoint()) {
+            LogCvmfs(kLogCvmfs, kLogStderr,
+                     "bind mountpoint and nested mountpoint mutually exclusive"
+                     " at %s.", full_path.c_str());
+            retval = false;
+          }
+        }
       } else {
         // Recurse
-        if (!Find(catalog, full_path, computed_counters))
+        if (!Find(catalog, full_path, computed_counters, bind_mountpoints))
           retval = false;
       }
     } else if (entries[i].IsLink()) {
@@ -664,7 +677,9 @@ bool CommandCheck::InspectTree(const string                  &path,
   }
 
   // Traverse the catalog
-  if (!Find(catalog, PathString(path.data(), path.length()), computed_counters))
+  set<PathString> bind_mountpoints;
+  if (!Find(catalog, PathString(path.data(), path.length()),
+            computed_counters, &bind_mountpoints))
   {
     retval = false;
   }
@@ -693,6 +708,11 @@ bool CommandCheck::InspectTree(const string                  &path,
   for (catalog::Catalog::NestedCatalogList::const_iterator i =
        nested_catalogs.begin(), iEnd = nested_catalogs.end(); i != iEnd; ++i)
   {
+    if (bind_mountpoints.find(i->path) != bind_mountpoints.end()) {
+      LogCvmfs(kLogCvmfs, kLogDebug, "skipping bind mountpoint %s",
+               i->path.c_str());
+      continue;
+    }
     catalog::DirectoryEntry nested_transition_point;
     if (!catalog->LookupPath(i->path, &nested_transition_point)) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to lookup transition point %s",

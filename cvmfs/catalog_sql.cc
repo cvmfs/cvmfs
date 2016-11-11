@@ -63,7 +63,10 @@ const float CatalogDatabase::kLatestSupportedSchema = 2.5;  // + 1.X (r/o)
 //            * add kFlagFileExternal to entries in catalog table
 //            * add self_external and subtree_external statistics counters
 //            * store compression algorithm in flags
-const unsigned CatalogDatabase::kLatestSchemaRevision = 3;
+//   3 --> 4: (Nov 11 2016 - Git):
+//            * add kFlagDirBindMountpoint
+//            * add kFlagHidden
+const unsigned CatalogDatabase::kLatestSchemaRevision = 4;
 
 bool CatalogDatabase::CheckSchemaCompatibility() {
   return !( (schema_version() >= 2.0-kSchemaEpsilon)                   &&
@@ -138,6 +141,15 @@ bool CatalogDatabase::LiveSchemaUpgradeIfNecessary() {
     }
 
     set_schema_revision(3);
+    if (!StoreSchemaRevision()) {
+      LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade schema revision");
+      return false;
+    }
+  }
+
+  if (IsEqualSchema(schema_version(), 2.5) && (schema_revision() == 3)) {
+    LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision (3 --> 4)");
+    set_schema_revision(4);
     if (!StoreSchemaRevision()) {
       LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade schema revision");
       return false;
@@ -346,6 +358,8 @@ unsigned SqlDirent::CreateDatabaseFlags(const DirectoryEntry &entry) const {
     database_flags |= kFlagDirNestedRoot;
   else if (entry.IsNestedCatalogMountpoint())
     database_flags |= kFlagDirNestedMountpoint;
+  else if (entry.IsBindMountpoint())
+    database_flags |= kFlagDirBindMountpoint;
 
   if (entry.IsDirectory()) {
     database_flags |= kFlagDir;
@@ -362,6 +376,9 @@ unsigned SqlDirent::CreateDatabaseFlags(const DirectoryEntry &entry) const {
 
   if (!entry.checksum_ptr()->IsNull())
     StoreHashAlgorithm(entry.checksum_ptr()->algorithm, &database_flags);
+
+  if (entry.IsHidden())
+    database_flags |= kFlagHidden;
 
   return database_flags;
 }
@@ -629,15 +646,17 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
     result.uid_             = g_uid;
     result.gid_             = g_gid;
   } else {
-    const uint64_t hardlinks = RetrieveInt64(1);
-    result.linkcount_        = Hardlinks2Linkcount(hardlinks);
-    result.hardlink_group_   = Hardlinks2HardlinkGroup(hardlinks);
-    result.inode_            = catalog->GetMangledInode(RetrieveInt64(12),
-                                                        result.hardlink_group_);
-    result.is_chunked_file_  = (database_flags & kFlagFileChunk);
-    result.is_external_file_ = (database_flags & kFlagFileExternal);
-    result.has_xattrs_       = RetrieveInt(15) != 0;
-    result.checksum_         =
+    const uint64_t hardlinks   = RetrieveInt64(1);
+    result.linkcount_          = Hardlinks2Linkcount(hardlinks);
+    result.hardlink_group_     = Hardlinks2HardlinkGroup(hardlinks);
+    result.inode_              =
+      catalog->GetMangledInode(RetrieveInt64(12), result.hardlink_group_);
+    result.is_bind_mountpoint_ = (database_flags & kFlagDirBindMountpoint);
+    result.is_chunked_file_    = (database_flags & kFlagFileChunk);
+    result.is_hidden_          = (database_flags & kFlagHidden);
+    result.is_external_file_   = (database_flags & kFlagFileExternal);
+    result.has_xattrs_         = RetrieveInt(15) != 0;
+    result.checksum_           =
       RetrieveHashBlob(0, RetrieveHashAlgorithm(database_flags));
     result.compression_algorithm_ =
       RetrieveCompressionAlgorithm(database_flags);

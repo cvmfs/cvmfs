@@ -103,7 +103,7 @@ TEST_F(T_CatalogSql, SchemaMigration) {
   fclose(ftmp);
   UnlinkGuard unlink_guard(path);
 
-  // Revision 1 --> 3
+  // Revision 1 --> 4
   {
     UniquePtr<catalog::CatalogDatabase>
       db(catalog::CatalogDatabase::Create(path));
@@ -121,7 +121,7 @@ TEST_F(T_CatalogSql, SchemaMigration) {
     sqlite::Sql sql2(db->sqlite_db(),
       "SELECT value FROM properties WHERE key='schema_revision'");
     ASSERT_TRUE(sql2.FetchRow());
-    EXPECT_EQ(3, sql2.RetrieveInt(0));
+    EXPECT_EQ(4, sql2.RetrieveInt(0));
     sqlite::Sql sql3(db->sqlite_db(),
       "SELECT value FROM statistics WHERE counter='self_xattr'");
     ASSERT_TRUE(sql3.FetchRow());
@@ -132,7 +132,7 @@ TEST_F(T_CatalogSql, SchemaMigration) {
     EXPECT_EQ(0, sql4.RetrieveInt(0));
   }
 
-  // Revision 0 --> 3
+  // Revision 0 --> 4
   {
     UniquePtr<catalog::CatalogDatabase> db(catalog::CatalogDatabase::Open(
       path, catalog::CatalogDatabase::kOpenReadWrite));
@@ -152,7 +152,7 @@ TEST_F(T_CatalogSql, SchemaMigration) {
     sqlite::Sql sql3(db->sqlite_db(),
       "SELECT value FROM properties WHERE key='schema_revision'");
     ASSERT_TRUE(sql3.FetchRow());
-    EXPECT_EQ(3, sql3.RetrieveInt(0));
+    EXPECT_EQ(4, sql3.RetrieveInt(0));
     sqlite::Sql sql4(db->sqlite_db(),
       "SELECT value FROM statistics WHERE counter='self_xattr'");
     ASSERT_TRUE(sql4.FetchRow());

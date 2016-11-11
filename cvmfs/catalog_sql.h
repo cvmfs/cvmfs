@@ -198,6 +198,16 @@ class SqlDirent : public SqlCatalog {
   // Compression methods, 3 bits starting at 2^11
   // Corresponds to zlib::Algorithms
   static const int kFlagPosCompression      = 11;
+  /**
+   * A transition point to a root catalog (instead of a nested catalog).  Used
+   * to link previous snapshots into the catalog structure.
+   */
+  static const int kFlagDirBindMountpoint   = 0x4000;  // 2^14
+  /**
+   * An entry that should not appear in listings.  Used for the /.cvmfs
+   * directory.
+   */
+  static const int kFlagHidden              = 0x8000;  // 2^15
 
 
  protected:

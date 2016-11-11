@@ -298,6 +298,8 @@ bool Catalog::ListingMd5PathStat(const shash::Md5 &md5path,
   sql_listing_->BindPathHash(md5path);
   while (sql_listing_->FetchRow()) {
     dirent = sql_listing_->GetDirent(this);
+    if (dirent.IsHidden())
+      continue;
     FixTransitionPoint(md5path, &dirent);
     entry.name = dirent.name();
     entry.info = dirent.GetStatStructure();

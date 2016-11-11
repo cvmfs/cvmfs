@@ -85,6 +85,8 @@ class DirectoryEntryBase {
     static const unsigned int kChunkedFileFlag              = 0x200;
     static const unsigned int kHasXattrsFlag                = 0x400;
     static const unsigned int kExternalFileFlag             = 0x800;
+    static const unsigned int kBindMountpointFlag           = 0x1000;
+    static const unsigned int kHiddenFlag                   = 0x2000;
   };
   typedef unsigned int Differences;
 
@@ -244,21 +246,27 @@ class DirectoryEntry : public DirectoryEntryBase {
     , hardlink_group_(0)
     , is_nested_catalog_root_(false)
     , is_nested_catalog_mountpoint_(false)
+    , is_bind_mountpoint_(false)
     , is_chunked_file_(false)
+    , is_hidden_(false)
     , is_negative_(false) { }
 
   inline DirectoryEntry()
     : hardlink_group_(0)
     , is_nested_catalog_root_(false)
     , is_nested_catalog_mountpoint_(false)
+    , is_bind_mountpoint_(false)
     , is_chunked_file_(false)
+    , is_hidden_(false)
     , is_negative_(false) { }
 
   inline explicit DirectoryEntry(SpecialDirents special_type)
     : hardlink_group_(0)
     , is_nested_catalog_root_(false)
     , is_nested_catalog_mountpoint_(false)
+    , is_bind_mountpoint_(false)
     , is_chunked_file_(false)
+    , is_hidden_(false)
     , is_negative_(true) { assert(special_type == kDirentNegative); }
 
   inline SpecialDirents GetSpecial() const {
@@ -278,7 +286,9 @@ class DirectoryEntry : public DirectoryEntryBase {
   inline bool IsNestedCatalogMountpoint() const {
     return is_nested_catalog_mountpoint_;
   }
+  inline bool IsBindMountpoint() const { return is_bind_mountpoint_; }
   inline bool IsChunkedFile() const { return is_chunked_file_; }
+  inline bool IsHidden() const { return is_hidden_; }
   inline uint32_t hardlink_group() const { return hardlink_group_; }
 
   inline void set_hardlink_group(const uint32_t group) {
@@ -290,8 +300,14 @@ class DirectoryEntry : public DirectoryEntryBase {
   inline void set_is_nested_catalog_root(const bool val) {
     is_nested_catalog_root_ = val;
   }
+  inline void set_is_bind_mountpoint(const bool val) {
+    is_bind_mountpoint_ = val;
+  }
   inline void set_is_chunked_file(const bool val) {
     is_chunked_file_ = val;
+  }
+  inline void set_is_hidden(const bool val) {
+    is_hidden_ = val;
   }
 
  private:
@@ -304,7 +320,9 @@ class DirectoryEntry : public DirectoryEntryBase {
   // TODO(jblomer): transform into bitfield to save memory
   bool is_nested_catalog_root_;
   bool is_nested_catalog_mountpoint_;
+  bool is_bind_mountpoint_;
   bool is_chunked_file_;
+  bool is_hidden_;
   bool is_negative_;
 };
 
