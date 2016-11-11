@@ -40,6 +40,7 @@ bool CmpNestedCatalogPath(
 
 
 void VirtualCatalog::CreateCatalog() {
+  LogCvmfs(kLogCatalog, kLogDebug, "creating new virtual catalog");
   DirectoryEntryBase entry_dir;
   entry_dir.name_ = NameString(kVirtualPath);
   entry_dir.mode_ = S_IFDIR |
@@ -103,7 +104,7 @@ void VirtualCatalog::GenerateSnapshots() {
   unsigned i_history = 0, i_catalog = 0;
   unsigned last_history = tags_history.size() - 1;
   unsigned last_catalog = tags_catalog.size() - 1;
-  while ((i_history != last_history) && (i_catalog != last_catalog)) {
+  while ((i_history < last_history) || (i_catalog < last_catalog)) {
     TagId t_history = tags_history[i_history];
     TagId t_catalog = tags_catalog[i_catalog];
 
@@ -124,14 +125,14 @@ void VirtualCatalog::GenerateSnapshots() {
     }
 
     // New tag that's missing
-    if (t_history.name < t_catalog.name) {
+    if ((t_history.name < t_catalog.name) || t_catalog.name.empty()) {
       InsertSnapshot(t_history);
       i_history++;
       continue;
     }
 
     // A tag was removed but it is still present in the catalog
-    assert(t_history.name > t_catalog.name);
+    assert((t_history.name > t_catalog.name) || t_history.name.empty());
     RemoveSnapshot(t_catalog);
     i_catalog++;
   }
@@ -146,6 +147,11 @@ void VirtualCatalog::GetSortedTagsFromHistory(vector<TagId> *tags) {
   assert(retval);
   sort(tags_history.begin(), tags_history.end(), CmpTagName);
   for (unsigned i = 0, l = tags_history.size(); i < l; ++i) {
+    if ((tags_history[i].name == "trunk") ||
+        (tags_history[i].name == "trunk-previous"))
+    {
+      continue;
+    }
     tags->push_back(TagId(tags_history[i].name, tags_history[i].root_hash));
   }
 }
@@ -166,11 +172,15 @@ void VirtualCatalog::GetSortedTagsFromCatalog(vector<TagId> *tags) {
 
 
 void VirtualCatalog::InsertSnapshot(TagId tag) {
-
+  LogCvmfs(kLogCatalog, kLogDebug, "add snapshot %s (%s) to virtual catalog",
+           tag.name.c_str(), tag.hash.ToString().c_str());
 }
 
 
 void VirtualCatalog::RemoveSnapshot(TagId tag) {
+  LogCvmfs(kLogCatalog, kLogDebug,
+           "remove snapshot %s (%s) from virtual catalog",
+           tag.name.c_str(), tag.hash.ToString().c_str());
 
 }
 
