@@ -36,6 +36,7 @@ class WritableCatalogManager;
 class WritableCatalog : public Catalog {
   friend class WritableCatalogManager;
   friend class swissknife::CommandMigrate;  // needed for catalog migrations
+  friend class VirtualCatalog;  // needed for /.cvmfs creation
 
  public:
   WritableCatalog(const std::string &path,

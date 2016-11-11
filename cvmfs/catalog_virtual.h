@@ -35,6 +35,7 @@ class VirtualCatalog {
 
  private:
   static const std::string kVirtualPath;
+  static const std::string kSnapshotDirectory;
 
   struct TagId {
     TagId() { }
@@ -49,6 +50,9 @@ class VirtualCatalog {
 
   void EnsurePresence();
   void CreateCatalog();
+  void CreateBaseDirectory();
+  void CreateNestedCatalogMarker();
+  void CreateSnapshotDirectory();
   void GetSortedTagsFromHistory(std::vector<TagId> *tags);
   void GetSortedTagsFromCatalog(std::vector<TagId> *tags);
   void RemoveSnapshot(TagId tag);
