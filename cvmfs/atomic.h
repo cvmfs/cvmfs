@@ -100,6 +100,11 @@ static int32_t inline __attribute__((used)) atomic_cas32(
   return __sync_bool_compare_and_swap(a, cmp, newval);
 }
 
+
+static void inline __attribute__((used)) MemoryFence() {
+  asm __volatile__("": : :"memory");
+}
+
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD
 #endif
