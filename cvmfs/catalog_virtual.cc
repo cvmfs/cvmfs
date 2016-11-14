@@ -234,13 +234,14 @@ void VirtualCatalog::InsertSnapshot(TagId tag) {
   WritableCatalog *virtual_catalog =
     catalog_mgr_->GetHostingCatalog(kVirtualPath);
   assert(virtual_catalog != NULL);
-  const string mountpoint =
+  string mountpoint =
     "/" + kVirtualPath + "/" + kSnapshotDirectory + "/" + tag.name;
   DirectoryEntry entry_bind_mountpoint(entry_dir);
   entry_bind_mountpoint.set_is_bind_mountpoint(true);
   virtual_catalog->UpdateEntry(entry_bind_mountpoint, mountpoint);
 
   // Register nested catalog
+  mountpoint[0] = '@';
   uint64_t catalog_size = GetFileSize(catalog->database_path());
   assert(catalog_size > 0);
   virtual_catalog->InsertNestedCatalog(
@@ -252,7 +253,13 @@ void VirtualCatalog::RemoveSnapshot(TagId tag) {
   LogCvmfs(kLogCatalog, kLogDebug,
            "remove snapshot %s (%s) from virtual catalog",
            tag.name.c_str(), tag.hash.ToString().c_str());
+  string tag_dir = kVirtualPath + "/" + kSnapshotDirectory + "/" + tag.name;
+  catalog_mgr_->RemoveDirectory(tag_dir);
 
+  WritableCatalog *virtual_catalog =
+    catalog_mgr_->GetHostingCatalog(kVirtualPath);
+  assert(virtual_catalog != NULL);
+  virtual_catalog->RemoveNestedCatalog("@" + tag_dir, NULL);
 }
 
 

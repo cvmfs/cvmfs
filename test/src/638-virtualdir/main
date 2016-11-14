@@ -27,6 +27,28 @@ cvmfs_run_test() {
   ls -lah /cvmfs/$CVMFS_TEST_REPO/.cvmfs || return 30
   check_repository $CVMFS_TEST_REPO -i  || return 31
 
+  echo "--- creating some tags"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  publish_repo $CVMFS_TEST_REPO -a tag_x || return $?
+  start_transaction $CVMFS_TEST_REPO || return $?
+  publish_repo $CVMFS_TEST_REPO -a tag_y || return $?
+  start_transaction $CVMFS_TEST_REPO || return $?
+  publish_repo $CVMFS_TEST_REPO -a tag_z || return $?
+
+  echo "--- look for created tags"
+  ls /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/tag_x || return 40
+  ls /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/tag_y || return 41
+  ls /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/tag_z || return 42
+
+  # Test removal of tags
+
+  # Test only creating / removing tags (without active publishing)
+
+  # Test removeal of virtual catalog
+
+  echo "--- Ensure that special tag names are not listed"
+  #ls -la
+  #ls /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/
+
   return 0
 }
-

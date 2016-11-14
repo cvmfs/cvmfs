@@ -353,7 +353,10 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
         computed_counters->self.nested_catalogs++;
         shash::Any tmp;
         uint64_t tmp2;
-        if (!catalog->FindNested(full_path, &tmp, &tmp2)) {
+        PathString mountpoint(entries[i].IsBindMountpoint()
+                     ? PathString(("@" + full_path.ToString().substr(1)))
+                     : full_path);
+        if (!catalog->FindNested(mountpoint, &tmp, &tmp2)) {
           LogCvmfs(kLogCvmfs, kLogStderr, "nested catalog at %s not registered",
                    full_path.c_str());
           retval = false;
@@ -370,7 +373,8 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
         }
 
         if (entries[i].IsBindMountpoint()) {
-          bind_mountpoints->insert(full_path);
+          PathString mountpoint("@" + full_path.ToString().substr(1));
+          bind_mountpoints->insert(mountpoint);
           if (entries[i].IsNestedCatalogMountpoint()) {
             LogCvmfs(kLogCvmfs, kLogStderr,
                      "bind mountpoint and nested mountpoint mutually exclusive"
@@ -709,6 +713,13 @@ bool CommandCheck::InspectTree(const string                  &path,
        nested_catalogs.begin(), iEnd = nested_catalogs.end(); i != iEnd; ++i)
   {
     if (bind_mountpoints.find(i->path) != bind_mountpoints.end()) {
+      catalog::DirectoryEntry bind_mountpoint;
+      PathString mountpoint("/" + i->path.ToString().substr(1));
+      if (!catalog->LookupPath(mountpoint, &bind_mountpoint)) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "failed to lookup bind mountpoint %s",
+                 mountpoint.c_str());
+        retval = false;
+      }
       LogCvmfs(kLogCvmfs, kLogDebug, "skipping bind mountpoint %s",
                i->path.c_str());
       continue;
