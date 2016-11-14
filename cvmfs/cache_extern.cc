@@ -18,6 +18,7 @@
 #include <new>
 #include <string>
 
+#include "atomic.h"
 #include "cache.pb.h"
 #include "hash.h"
 #include "logging.h"
@@ -272,13 +273,14 @@ ExternalCacheManager::ExternalCacheManager(
 
 
 ExternalCacheManager::~ExternalCacheManager() {
+  terminated_ = true;
+  MemoryFence();
   if (session_id_ >= 0) {
     cvmfs::MsgQuit msg_quit;
     msg_quit.set_session_id(session_id_);
     CacheTransport::Frame frame(&msg_quit);
     transport_.SendFrame(&frame);
   }
-  terminated_ = true;
   shutdown(transport_.fd_connection(), SHUT_RDWR);
   if (spawned_)
     pthread_join(thread_read_, NULL);
