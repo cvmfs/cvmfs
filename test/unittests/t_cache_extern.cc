@@ -549,4 +549,6 @@ TEST_F(T_ExternalCacheManager, MultiThreaded) {
   for (unsigned i = 0; i < num_threads; ++i) {
     pthread_join(threads[i], NULL);
   }
+
+  free(large_buffer);
 }
