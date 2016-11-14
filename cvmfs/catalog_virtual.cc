@@ -23,22 +23,6 @@ namespace catalog {
 const string VirtualCatalog::kVirtualPath = ".cvmfs";
 const string VirtualCatalog::kSnapshotDirectory = "snapshots";
 
-namespace {
-
-bool CmpTagName(const history::History::Tag &a, const history::History::Tag &b)
-{
-  return a.name < b.name;
-}
-
-bool CmpNestedCatalogPath(
-  const Catalog::NestedCatalog &a,
-  const Catalog::NestedCatalog &b)
-{
-  return a.path < b.path;
-}
-
-}  // anonymous namespace
-
 
 void VirtualCatalog::CreateBaseDirectory() {
   // Add /.cvmfs as a nested catalog
@@ -187,7 +171,6 @@ void VirtualCatalog::GetSortedTagsFromHistory(vector<TagId> *tags) {
   vector<history::History::Tag> tags_history;
   bool retval = history->List(&tags_history);
   assert(retval);
-  sort(tags_history.begin(), tags_history.end(), CmpTagName);
   for (unsigned i = 0, l = tags_history.size(); i < l; ++i) {
     if ((tags_history[i].name == "trunk") ||
         (tags_history[i].name == "trunk-previous"))
@@ -196,6 +179,7 @@ void VirtualCatalog::GetSortedTagsFromHistory(vector<TagId> *tags) {
     }
     tags->push_back(TagId(tags_history[i].name, tags_history[i].root_hash));
   }
+  std::sort(tags->begin(), tags->end());
 }
 
 
@@ -205,11 +189,11 @@ void VirtualCatalog::GetSortedTagsFromCatalog(vector<TagId> *tags) {
   assert(virtual_catalog != NULL);
   Catalog::NestedCatalogList nested_catalogs =
     virtual_catalog->ListNestedCatalogs();
-  sort(nested_catalogs.begin(), nested_catalogs.end(), CmpNestedCatalogPath);
   for (unsigned i = 0, l = nested_catalogs.size(); i < l; ++i) {
     tags->push_back(TagId(GetFileName(nested_catalogs[i].path).ToString(),
                           nested_catalogs[i].hash));
   }
+  std::sort(tags->begin(), tags->end());
 }
 
 

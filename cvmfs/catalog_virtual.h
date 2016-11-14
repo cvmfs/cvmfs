@@ -43,6 +43,11 @@ class VirtualCatalog {
     bool operator ==(const TagId &other) const {
       return (this->name == other.name) && (this->hash == other.hash);
     }
+    bool operator <(const TagId &other) const {
+      if (this->name < other.name) { return true; }
+      else if (this->name > other.name) { return false; }
+      return this->hash < other.hash;
+    }
 
     std::string name;
     shash::Any hash;
