@@ -699,7 +699,7 @@ Catalog* Catalog::FindSubtree(const PathString &path) const {
   Catalog *result = NULL;
   // Skip the first '/'
   path_prefix.Append("/", 1);
-  const char *c = remaining.GetChars()+1;
+  const char *c = remaining.GetChars() + 1;
   for (unsigned i = 1; i < remaining.GetLength(); ++i, ++c) {
     if (*c == '/') {
       result = FindChild(path_prefix);

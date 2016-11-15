@@ -87,15 +87,12 @@ class InodeAnnotation {
  *
  * Read-only catalog. A sub-class provides read-write access.
  */
-class Catalog : public SingleCopy {
-  friend class AbstractCatalogManager<Catalog>;
-  friend class SqlLookup;                   // for mangled inode and uid maps
+class Catalog : SingleCopy {
   friend class swissknife::CommandMigrate;  // for catalog version migration
 
  public:
   typedef std::vector<shash::Any> HashVector;
 
- public:
   static const uint64_t kDefaultTTL = 900;  /**< 15 minutes default TTL */
 
   /**
@@ -116,20 +113,15 @@ class Catalog : public SingleCopy {
 
   bool OpenDatabase(const std::string &db_path);
 
-  bool LookupMd5Path(const shash::Md5 &md5path, DirectoryEntry *dirent) const;
   inline bool LookupPath(const PathString &path, DirectoryEntry *dirent) const {
     return LookupMd5Path(shash::Md5(path.GetChars(), path.GetLength()), dirent);
   }
   bool LookupRawSymlink(const PathString &path, LinkString *raw_symlink) const;
-  bool LookupXattrsMd5Path(const shash::Md5 &md5path, XattrList *xattrs) const;
   bool LookupXattrsPath(const PathString &path, XattrList *xattrs) const {
     return LookupXattrsMd5Path(
       shash::Md5(path.GetChars(), path.GetLength()), xattrs);
   }
 
-  bool ListingMd5Path(const shash::Md5 &md5path,
-                      DirectoryEntryList *listing,
-                      const bool expand_symlink = true) const;
   inline bool ListingPath(const PathString &path,
                           DirectoryEntryList *listing,
                           const bool expand_symlink = true) const
@@ -137,8 +129,6 @@ class Catalog : public SingleCopy {
     return ListingMd5Path(shash::Md5(path.GetChars(), path.GetLength()),
                           listing, expand_symlink);
   }
-  bool ListingMd5PathStat(const shash::Md5 &md5path,
-                          StatEntryList *listing) const;
   bool ListingPathStat(const PathString &path,
                        StatEntryList *listing) const
   {
@@ -156,9 +146,12 @@ class Catalog : public SingleCopy {
     return ListMd5PathChunks(shash::Md5(path.GetChars(), path.GetLength()),
                              interpret_hashes_as, chunks);
   }
-  bool ListMd5PathChunks(const shash::Md5 &md5path,
-                         const shash::Algorithms interpret_hashes_as,
-                         FileChunkList *chunks) const;
+
+  CatalogList GetChildren() const;
+  Catalog* FindSubtree(const PathString &path) const;
+  Catalog* FindChild(const PathString &mountpoint) const;
+  void AddChild(Catalog *child);
+  void RemoveChild(Catalog *child);
 
   const HashVector& GetReferencedObjects() const;
   void TakeDatabaseFileOwnership();
@@ -213,7 +206,18 @@ class Catalog : public SingleCopy {
                   shash::Any *hash, uint64_t *size) const;
 
   void SetInodeAnnotation(InodeAnnotation *new_annotation);
+  inode_t GetMangledInode(const uint64_t row_id,
+                          const uint64_t hardlink_group) const;
+
   void SetOwnerMaps(const OwnerMap *uid_map, const OwnerMap *gid_map);
+  uint64_t MapUid(const uint64_t uid) const {
+    if (uid_map_) { return uid_map_->Map(uid); }
+    return uid;
+  }
+  uint64_t MapGid(const uint64_t gid) const {
+    if (gid_map_) { return uid_map_->Map(gid); }
+    return gid;
+  }
 
  protected:
   typedef std::map<uint64_t, inode_t> HardlinkGroupMap;
@@ -234,12 +238,6 @@ class Catalog : public SingleCopy {
   virtual void InitPreparedStatements();
   void FinalizePreparedStatements();
 
-  void AddChild(Catalog *child);
-  void RemoveChild(Catalog *child);
-  CatalogList GetChildren() const;
-  Catalog* FindSubtree(const PathString &path) const;
-  Catalog* FindChild(const PathString &mountpoint) const;
-
   Counters& GetCounters() { return counters_; }
 
   inline const CatalogDatabase &database() const { return *database_; }
@@ -251,22 +249,29 @@ class Catalog : public SingleCopy {
  private:
   typedef std::map<PathString, Catalog*> NestedCatalogMap;
 
-  uint64_t GetRowIdFromInode(const inode_t inode) const;
-  inode_t GetMangledInode(const uint64_t row_id,
-                          const uint64_t hardlink_group) const;
-
-  void FixTransitionPoint(const shash::Md5 &md5path,
-                          DirectoryEntry *dirent) const;
-
- private:
   enum VomsAuthzStatus {
     kVomsUnknown,  // Not yet looked up
     kVomsNone,     // No voms_authz key in properties table
     kVomsPresent,  // voms_authz property available
   };
 
+  uint64_t GetRowIdFromInode(const inode_t inode) const;
+  void FixTransitionPoint(const shash::Md5 &md5path,
+                          DirectoryEntry *dirent) const;
+
+  bool LookupMd5Path(const shash::Md5 &md5path, DirectoryEntry *dirent) const;
+  bool LookupXattrsMd5Path(const shash::Md5 &md5path, XattrList *xattrs) const;
+  bool ListMd5PathChunks(const shash::Md5 &md5path,
+                         const shash::Algorithms interpret_hashes_as,
+                         FileChunkList *chunks) const;
+  bool ListingMd5Path(const shash::Md5 &md5path,
+                      DirectoryEntryList *listing,
+                      const bool expand_symlink = true) const;
+  bool ListingMd5PathStat(const shash::Md5 &md5path,
+                          StatEntryList *listing) const;
   bool LookupEntry(const shash::Md5 &md5path, const bool expand_symlink,
                    DirectoryEntry *dirent) const;
+
   CatalogDatabase *database_;
 
   const shash::Any catalog_hash_;

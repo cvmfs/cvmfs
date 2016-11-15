@@ -181,10 +181,8 @@ void WritableCatalog::AddEntry(
  * @param entry_path the full path of the DirectoryEntry to delete
  */
 void WritableCatalog::RemoveEntry(const string &file_path) {
-  shash::Md5 path_hash = shash::Md5(shash::AsciiPtr(file_path));
-
   DirectoryEntry entry;
-  bool retval = LookupMd5Path(path_hash, &entry);
+  bool retval = LookupPath(PathString(file_path), &entry);
   assert(retval);
 
   SetDirty();
@@ -195,6 +193,7 @@ void WritableCatalog::RemoveEntry(const string &file_path) {
   }
 
   // remove the entry itself
+  shash::Md5 path_hash = shash::Md5(shash::AsciiPtr(file_path));
   retval =
     sql_unlink_->BindPathHash(path_hash) &&
     sql_unlink_->Execute();

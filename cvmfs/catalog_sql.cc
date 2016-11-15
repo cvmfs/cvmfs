@@ -665,12 +665,8 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
       result.uid_             = g_uid;
       result.gid_             = g_gid;
     } else {
-      result.uid_              = RetrieveInt64(13);
-      result.gid_              = RetrieveInt64(14);
-      if (catalog->uid_map_)
-        result.uid_ = catalog->uid_map_->Map(result.uid_);
-      if (catalog->gid_map_)
-        result.gid_ = catalog->gid_map_->Map(result.gid_);
+      result.uid_              = catalog->MapUid(RetrieveInt64(13));
+      result.gid_              = catalog->MapGid(RetrieveInt64(14));
     }
   }
 
