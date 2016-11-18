@@ -321,8 +321,8 @@ bool CommandPull::PullRecursion(catalog::Catalog   *catalog,
          i != iEnd; ++i)
     {
       LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from catalog at %s",
-               i->path.c_str());
-      bool retval = Pull(i->hash, i->path.ToString());
+               i->mountpoint.c_str());
+      bool retval = Pull(i->hash, i->mountpoint.ToString());
       if (!retval)
         return false;
     }

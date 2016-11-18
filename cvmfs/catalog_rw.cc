@@ -70,7 +70,7 @@ WritableCatalog::~WritableCatalog() {
 
 void WritableCatalog::Transaction() {
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "opening SQLite transaction for '%s'",
-                                        path().c_str());
+                                        mountpoint().c_str());
   const bool retval = database().BeginTransaction();
   assert(retval == true);
 }
@@ -78,7 +78,7 @@ void WritableCatalog::Transaction() {
 
 void WritableCatalog::Commit() {
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "closing SQLite transaction for '%s'",
-                                        path().c_str());
+                                        mountpoint().c_str());
   const bool retval = database().CommitTransaction();
   assert(retval == true);
   dirty_ = false;
@@ -148,7 +148,7 @@ void WritableCatalog::AddEntry(
 
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "add entry '%s' to '%s'",
                                         entry_path.c_str(),
-                                        path().c_str());
+                                        mountpoint().c_str());
 
   shash::Md5 path_hash((shash::AsciiPtr(entry_path)));
   shash::Md5 parent_hash((shash::AsciiPtr(parent_path)));
@@ -338,7 +338,7 @@ void WritableCatalog::SetPreviousRevision(const shash::Any &hash) {
  */
 void WritableCatalog::Partition(WritableCatalog *new_nested_catalog) {
   // Create connection between parent and child catalogs
-  MakeTransitionPoint(new_nested_catalog->path().ToString());
+  MakeTransitionPoint(new_nested_catalog->mountpoint().ToString());
   new_nested_catalog->MakeNestedRoot();
   delta_counters_.subtree.directories++;  // Root directory in nested catalog
 
@@ -346,7 +346,7 @@ void WritableCatalog::Partition(WritableCatalog *new_nested_catalog) {
   // if we hit nested catalog mountpoints on the way, we return them through
   // the passed list
   vector<string> GrandChildMountpoints;
-  MoveToNested(new_nested_catalog->path().ToString(), new_nested_catalog,
+  MoveToNested(new_nested_catalog->mountpoint().ToString(), new_nested_catalog,
                &GrandChildMountpoints);
 
   // Nested catalog mountpoints found in the moved directory structure are now
@@ -373,13 +373,13 @@ void WritableCatalog::MakeTransitionPoint(const string &mountpoint) {
 
 void WritableCatalog::MakeNestedRoot() {
   DirectoryEntry root_entry;
-  bool retval = LookupPath(path(), &root_entry);
+  bool retval = LookupPath(mountpoint(), &root_entry);
   assert(retval);
 
   assert(root_entry.IsDirectory() && !root_entry.IsNestedCatalogMountpoint());
 
   root_entry.set_is_nested_catalog_root(true);
-  UpdateEntry(root_entry, path().ToString());
+  UpdateEntry(root_entry, mountpoint().ToString());
 }
 
 
@@ -595,7 +595,7 @@ void WritableCatalog::MergeIntoParent() {
 
   // Remove the nested catalog reference for this nested catalog.
   // From now on this catalog will be dangling!
-  parent->RemoveNestedCatalog(this->path().ToString(), NULL);
+  parent->RemoveNestedCatalog(this->mountpoint().ToString(), NULL);
 }
 
 
@@ -611,8 +611,9 @@ void WritableCatalog::CopyCatalogsToParent() {
   for (NestedCatalogList::const_iterator i = nested_catalog_references.begin(),
        iEnd = nested_catalog_references.end(); i != iEnd; ++i)
   {
-    Catalog *child = FindChild(i->path);
-    parent->InsertNestedCatalog(i->path.ToString(), child, i->hash, i->size);
+    Catalog *child = FindChild(i->mountpoint);
+    parent->InsertNestedCatalog(
+      i->mountpoint.ToString(), child, i->hash, i->size);
     parent->delta_counters_.self.nested_catalogs--;  // Will be fixed later
   }
 }
@@ -643,7 +644,7 @@ void WritableCatalog::CopyToParent() {
 
   // Remove the nested catalog root.
   // It is already present in the parent.
-  RemoveEntry(this->path().ToString());
+  RemoveEntry(this->mountpoint().ToString());
 
   // Now copy all DirectoryEntries to the 'other' catalog.
   // There will be no data collisions, as we resolved them beforehand
@@ -668,7 +669,7 @@ void WritableCatalog::CopyToParent() {
   // Change the just copied nested catalog root to an ordinary directory
   // (the nested catalog is merged into it's parent)
   DirectoryEntry old_root_entry;
-  retval = parent->LookupPath(this->path(), &old_root_entry);
+  retval = parent->LookupPath(this->mountpoint(), &old_root_entry);
   assert(retval);
 
   assert(old_root_entry.IsDirectory() &&
@@ -677,7 +678,7 @@ void WritableCatalog::CopyToParent() {
 
   // Remove the nested catalog root mark
   old_root_entry.set_is_nested_catalog_mountpoint(false);
-  parent->UpdateEntry(old_root_entry, this->path().ToString());
+  parent->UpdateEntry(old_root_entry, this->mountpoint().ToString());
 }
 
 
@@ -712,7 +713,9 @@ void WritableCatalog::VacuumDatabaseIfNecessary() {
   if (needs_defragmentation) {
     LogCvmfs(kLogCatalog, kLogStdout | kLogNoLinebreak,
              "Note: Catalog at %s gets defragmented (%.2f%% %s)... ",
-             (IsRoot()) ? "/" : path().c_str(), ratio * 100.0, reason.c_str());
+             (IsRoot()) ? "/" : mountpoint().c_str(),
+             ratio * 100.0,
+             reason.c_str());
     if (!db.Vacuum()) {
       LogCvmfs(kLogCatalog, kLogStderr, "failed (SQLite: %s)",
                db.GetLastErrorMsg().c_str());

@@ -190,7 +190,7 @@ void VirtualCatalog::GetSortedTagsFromCatalog(vector<TagId> *tags) {
   Catalog::NestedCatalogList nested_catalogs =
     virtual_catalog->ListNestedCatalogs();
   for (unsigned i = 0, l = nested_catalogs.size(); i < l; ++i) {
-    tags->push_back(TagId(GetFileName(nested_catalogs[i].path).ToString(),
+    tags->push_back(TagId(GetFileName(nested_catalogs[i].mountpoint).ToString(),
                           nested_catalogs[i].hash));
   }
   std::sort(tags->begin(), tags->end());

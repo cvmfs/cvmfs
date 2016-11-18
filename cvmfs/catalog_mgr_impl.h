@@ -197,7 +197,7 @@ bool AbstractCatalogManager<CatalogT>::LookupPath(const PathString &path,
 
   perf::Inc(statistics_.n_lookup_path);
   LogCvmfs(kLogCatalog, kLogDebug, "looking up '%s' in catalog: '%s'",
-           path.c_str(), best_fit->path().c_str());
+           path.c_str(), best_fit->mountpoint().c_str());
   bool found = best_fit->LookupPath(path, dirent);
 
   // Possibly in a nested catalog
@@ -218,7 +218,6 @@ bool AbstractCatalogManager<CatalogT>::LookupPath(const PathString &path,
 
       CatalogT *nested_catalog;
       found = MountSubtree(path, best_fit, &nested_catalog);
-
 
       if (!found) {
         LogCvmfs(kLogCatalog, kLogDebug,
@@ -254,7 +253,7 @@ bool AbstractCatalogManager<CatalogT>::LookupPath(const PathString &path,
   }
 
   LogCvmfs(kLogCatalog, kLogDebug, "found entry '%s' in catalog '%s'",
-           path.c_str(), best_fit->path().c_str());
+           path.c_str(), best_fit->mountpoint().c_str());
 
   if ((options & kLookupRawSymlink) == kLookupRawSymlink) {
     LinkString raw_symlink;
@@ -272,6 +271,7 @@ bool AbstractCatalogManager<CatalogT>::LookupPath(const PathString &path,
   perf::Inc(statistics_.n_lookup_path_negative);
   return false;
 }
+
 
 template <class CatalogT>
 bool AbstractCatalogManager<CatalogT>::LookupXattrs(
@@ -291,7 +291,6 @@ bool AbstractCatalogManager<CatalogT>::LookupXattrs(
     // Check again to avoid race
     best_fit = FindCatalog(path);
     result = MountSubtree(path, best_fit, &catalog);
-    // DowngradeLock(); TODO
     if (!result) {
       Unlock();
       return false;
@@ -329,7 +328,6 @@ bool AbstractCatalogManager<CatalogT>::Listing(const PathString &path,
     // Check again to avoid race
     best_fit = FindCatalog(path);
     result = MountSubtree(path, best_fit, &catalog);
-    // DowngradeLock(); TODO
     if (!result) {
       Unlock();
       return false;
@@ -367,7 +365,6 @@ bool AbstractCatalogManager<CatalogT>::ListingStat(const PathString &path,
     // Check again to avoid race
     best_fit = FindCatalog(path);
     result = MountSubtree(path, best_fit, &catalog);
-    // DowngradeLock(); TODO
     if (!result) {
       Unlock();
       return false;
@@ -429,6 +426,7 @@ uint64_t AbstractCatalogManager<CatalogT>::GetRevision() const {
   return revision;
 }
 
+
 template <class CatalogT>
 bool AbstractCatalogManager<CatalogT>::GetVOMSAuthz(std::string *authz) const {
   ReadLock();
@@ -439,6 +437,7 @@ bool AbstractCatalogManager<CatalogT>::GetVOMSAuthz(std::string *authz) const {
   return has_authz;
 }
 
+
 template <class CatalogT>
 uint64_t AbstractCatalogManager<CatalogT>::GetTTL() const {
   ReadLock();
@@ -446,6 +445,7 @@ uint64_t AbstractCatalogManager<CatalogT>::GetTTL() const {
   Unlock();
   return revision;
 }
+
 
 template <class CatalogT>
 int AbstractCatalogManager<CatalogT>::GetNumCatalogs() const {
@@ -470,7 +470,6 @@ string AbstractCatalogManager<CatalogT>::PrintHierarchy() const {
 
 /**
  * Assigns the next free numbers in the 64 bit space
- * TODO: this may run out of free inodes at some point (with 32bit at least)
  */
 template <class CatalogT>
 InodeRange AbstractCatalogManager<CatalogT>::AcquireInodes(uint64_t size) {
@@ -511,7 +510,7 @@ CatalogT* AbstractCatalogManager<CatalogT>::FindCatalog(
   // Start at the root catalog and successively go down the catalog tree
   CatalogT *best_fit = GetRootCatalog();
   CatalogT *next_fit = NULL;
-  while (best_fit->path() != path) {
+  while (best_fit->mountpoint() != path) {
     next_fit = best_fit->FindSubtree(path);
     if (next_fit == NULL)
       break;
@@ -536,7 +535,7 @@ bool AbstractCatalogManager<CatalogT>::IsAttached(const PathString &root_path,
     return false;
 
   CatalogT *best_fit = FindCatalog(root_path);
-  if (best_fit->path() != root_path)
+  if (best_fit->mountpoint() != root_path)
     return false;
 
   if (attached_catalog != NULL) *attached_catalog = best_fit;
@@ -558,7 +557,7 @@ bool AbstractCatalogManager<CatalogT>::MountSubtree(const PathString &path,
   bool result = true;
   CatalogT *parent = (entry_point == NULL) ?
                     GetRootCatalog() : const_cast<CatalogT *>(entry_point);
-  assert(path.StartsWith(parent->path()));
+  assert(path.StartsWith(parent->mountpoint()));
 
   // Try to find path as a super string of nested catalog mount points
   PathString path_slash(path);
@@ -571,19 +570,19 @@ bool AbstractCatalogManager<CatalogT>::MountSubtree(const PathString &path,
        iEnd = nested_catalogs.end(); i != iEnd; ++i)
   {
     // Next nesting level
-    PathString nested_path_slash(i->path);
+    PathString nested_path_slash(i->mountpoint);
     nested_path_slash.Append("/", 1);
     if (path_slash.StartsWith(nested_path_slash)) {
       if (leaf_catalog == NULL)
         return true;
       CatalogT *new_nested;
       LogCvmfs(kLogCatalog, kLogDebug, "load nested catalog at %s",
-               i->path.c_str());
+               i->mountpoint.c_str());
       // prevent endless recursion with corrupted catalogs
       // (due to reloading root)
       if (i->hash.IsNull())
         return false;
-      new_nested = MountCatalog(i->path, i->hash, parent);
+      new_nested = MountCatalog(i->mountpoint, i->hash, parent);
       if (!new_nested)
         return false;
 
@@ -753,8 +752,9 @@ string AbstractCatalogManager<CatalogT>::PrintHierarchyRecursively(
   for (int i = 0; i < level; ++i)
     output += "    ";
 
-  output += "-> " +
-    string(catalog->path().GetChars(), catalog->path().GetLength()) + "\n";
+  output += "-> " + string(catalog->mountpoint().GetChars(),
+                           catalog->mountpoint().GetLength())
+            + "\n";
 
   CatalogList children = catalog->GetChildren();
   typename CatalogList::const_iterator i = children.begin();

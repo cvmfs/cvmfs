@@ -269,7 +269,7 @@ TEST_F(T_Catalog, Listing) {
 
   Catalog::NestedCatalogList nc_list = catalog->ListNestedCatalogs();
   EXPECT_EQ(1u, nc_list.size());
-  EXPECT_EQ(PathString("/dir/folder"), nc_list.at(0).path);
+  EXPECT_EQ(PathString("/dir/folder"), nc_list.at(0).mountpoint);
 
   FileChunkList file_chunk_list;
   EXPECT_TRUE(catalog->ListPathChunks(PathString("/foo"),

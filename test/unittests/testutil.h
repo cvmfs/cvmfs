@@ -325,7 +325,7 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
 
  public:
   struct NestedCatalog {
-    PathString   path;
+    PathString   mountpoint;
     shash::Any   hash;
     MockCatalog *child;
     uint64_t     size;
@@ -494,7 +494,7 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
     return (previous_ != NULL) ? previous_->hash() : shash::Any();
   }
 
-  const PathString   path()          const { return PathString(root_path_);  }
+  const PathString   mountpoint()    const { return PathString(root_path_);  }
   const std::string& root_path()     const { return root_path_;              }
   const shash::Any&  hash()          const { return catalog_hash_;           }
   uint64_t           catalog_size()  const { return catalog_size_;           }

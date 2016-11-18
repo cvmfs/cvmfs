@@ -85,7 +85,7 @@ void CatalogBalancer<CatalogMgrT>::Balance(catalog_t *catalog) {
       Balance(catalogs[i]);
     return;
   }
-  string catalog_path = catalog->path().ToString();
+  string catalog_path = catalog->mountpoint().ToString();
   virtual_node_t root_node(catalog_path, catalog_mgr_);
   root_node.ExtractChildren(catalog_mgr_);
   // we have just recursively loaded the entire virtual tree!

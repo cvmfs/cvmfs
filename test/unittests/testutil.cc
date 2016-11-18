@@ -320,7 +320,7 @@ void MockCatalog::RemoveChild(MockCatalog *child) {
 
 MockCatalog* MockCatalog::FindSubtree(const PathString &path) {
   for (unsigned i = 0; i < active_children_.size(); ++i) {
-    if (active_children_[i].path == path)
+    if (active_children_[i].mountpoint == path)
       return active_children_[i].child;
   }
   return NULL;
@@ -351,8 +351,8 @@ bool MockCatalog::ListingPath(const PathString &path,
 
 void MockCatalog::RegisterNestedCatalog(MockCatalog *child) {
   NestedCatalog nested;
-  nested.path  = PathString(child->root_path());
-  nested.hash  = child->hash();
+  nested.mountpoint = PathString(child->root_path());
+  nested.hash = child->hash();
   nested.child = child;
   nested.size  = child->catalog_size();
   children_.push_back(nested);
@@ -371,10 +371,10 @@ void MockCatalog::RegisterNestedCatalog(MockCatalog *child) {
 
 void MockCatalog::AddChild(MockCatalog *child) {
   NestedCatalog nested;
-  nested.path  = PathString(child->root_path());
-  nested.hash  = child->hash();
+  nested.mountpoint = PathString(child->root_path());
+  nested.hash = child->hash();
   nested.child = child;
-  nested.size  = child->catalog_size();
+  nested.size = child->catalog_size();
   active_children_.push_back(nested);
 }
 

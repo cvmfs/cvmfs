@@ -99,13 +99,13 @@ class Catalog : SingleCopy {
    * Note: is_nested only has an effect if parent == NULL otherwise being
    *       a root catalog is determined by having a parent pointer or not.
    */
-  Catalog(const PathString  &path,
+  Catalog(const PathString  &mountpoint,
           const shash::Any  &catalog_hash,
                 Catalog     *parent,
           const bool         is_nested = false);
   virtual ~Catalog();
 
-  static Catalog *AttachFreely(const std::string  &root_path,
+  static Catalog *AttachFreely(const std::string  &imaginary_mountpoint,
                                const std::string  &file,
                                const shash::Any   &catalog_hash,
                                      Catalog      *parent    = NULL,
@@ -171,7 +171,7 @@ class Catalog : SingleCopy {
   std::string PrintMemStatistics() const;
 
   inline float schema() const { return database().schema_version(); }
-  inline PathString path() const { return path_; }
+  inline PathString mountpoint() const { return mountpoint_; }
   inline Catalog* parent() const { return parent_; }
   inline uint64_t max_row_id() const { return max_row_id_; }
   inline InodeRange inode_range() const { return inode_range_; }
@@ -190,13 +190,13 @@ class Catalog : SingleCopy {
     DirectoryEntry dirent;
     assert(IsInitialized());
     return LookupPath(PathString(
-            path_.ToString() + "/.cvmfsautocatalog"), &dirent);
+            mountpoint_.ToString() + "/.cvmfsautocatalog"), &dirent);
   }
   inline bool HasParent() const { return parent_ != NULL; }
   inline virtual bool IsWritable() const { return false; }
 
   typedef struct {
-    PathString path;
+    PathString mountpoint;
     shash::Any hash;
     uint64_t size;
   } NestedCatalog;
@@ -255,7 +255,6 @@ class Catalog : SingleCopy {
     kVomsPresent,  // voms_authz property available
   };
 
-  uint64_t GetRowIdFromInode(const inode_t inode) const;
   void FixTransitionPoint(const shash::Md5 &md5path,
                           DirectoryEntry *dirent) const;
 
@@ -276,7 +275,7 @@ class Catalog : SingleCopy {
 
   const shash::Any catalog_hash_;
   PathString root_prefix_;
-  PathString path_;
+  PathString mountpoint_;
   bool volatile_flag_;
   const bool is_root_;
   bool managed_database_;

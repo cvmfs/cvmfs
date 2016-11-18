@@ -23,13 +23,14 @@ namespace catalog {
 /**
  * Open a catalog outside the framework of a catalog manager.
  */
-Catalog* Catalog::AttachFreely(const string     &root_path,
+Catalog* Catalog::AttachFreely(const string     &imaginary_mountpoint,
                                const string     &file,
                                const shash::Any &catalog_hash,
                                      Catalog    *parent,
                                const bool        is_nested) {
   Catalog *catalog =
-    new Catalog(PathString(root_path.data(), root_path.length()),
+    new Catalog(PathString(imaginary_mountpoint.data(),
+                           imaginary_mountpoint.length()),
                 catalog_hash,
                 parent,
                 is_nested);
@@ -42,12 +43,12 @@ Catalog* Catalog::AttachFreely(const string     &root_path,
 }
 
 
-Catalog::Catalog(const PathString &path,
+Catalog::Catalog(const PathString &mountpoint,
                  const shash::Any &catalog_hash,
                        Catalog    *parent,
                  const bool        is_nested) :
   catalog_hash_(catalog_hash),
-  path_(path),
+  mountpoint_(mountpoint),
   volatile_flag_(false),
   is_root_(parent == NULL && !is_nested),
   managed_database_(false),
@@ -197,7 +198,7 @@ bool Catalog::OpenDatabase(const string &db_path) {
   if (!ReadCatalogCounters()) {
     LogCvmfs(kLogCatalog, kLogStderr,
              "failed to load statistics counters for catalog %s (file %s)",
-             path_.c_str(), db_path.c_str());
+             mountpoint_.c_str(), db_path.c_str());
     return false;
   }
 
@@ -379,6 +380,9 @@ bool Catalog::ListMd5PathChunks(const shash::Md5  &md5path,
 }
 
 
+/**
+ * Only used by the garbage collection
+ */
 const Catalog::HashVector& Catalog::GetReferencedObjects() const {
   if (!referenced_hashes_.empty()) {
     return referenced_hashes_;
@@ -490,7 +494,7 @@ string Catalog::PrintMemStatistics() const {
   pthread_mutex_lock(lock_);
   database().GetMemStatistics(&stats);
   pthread_mutex_unlock(lock_);
-  return string(path().GetChars(), path().GetLength()) + ": " +
+  return string(mountpoint().GetChars(), mountpoint().GetLength()) + ": " +
     StringifyInt(stats.lookaside_slots_used) + " / " +
       StringifyInt(stats.lookaside_slots_max) + " slots -- " +
       StringifyInt(stats.lookaside_hit) + " hits, " +
@@ -545,18 +549,6 @@ inode_t Catalog::GetMangledInode(const uint64_t row_id,
 
 
 /**
- * Revert the inode mangling.  Required to lookup using inodes.
- */
-uint64_t Catalog::GetRowIdFromInode(const inode_t inode) const {
-  inode_t row_id = inode;
-  if (inode_annotation_)
-    row_id = inode_annotation_->Strip(row_id);
-
-  return row_id - inode_range_.offset;
-}
-
-
-/**
  * Get a list of all registered nested catalogs in this catalog.
  * @return  a list of all nested catalog references of this catalog.
  */
@@ -565,10 +557,10 @@ const Catalog::NestedCatalogList& Catalog::ListNestedCatalogs() const {
 
   if (nested_catalog_cache_dirty_) {
     LogCvmfs(kLogCatalog, kLogDebug, "refreshing nested catalog cache of '%s'",
-             path().c_str());
+             mountpoint().c_str());
     while (sql_list_nested_->FetchRow()) {
       NestedCatalog nested;
-      nested.path = sql_list_nested_->GetMountpoint();
+      nested.mountpoint = sql_list_nested_->GetMountpoint();
       nested.hash = sql_list_nested_->GetContentHash();
       nested.size = sql_list_nested_->GetSize();
       nested_catalog_cache_.push_back(nested);
@@ -640,10 +632,10 @@ void Catalog::SetOwnerMaps(const OwnerMap *uid_map, const OwnerMap *gid_map) {
  * @param child the Catalog to define as child
  */
 void Catalog::AddChild(Catalog *child) {
-  assert(NULL == FindChild(child->path()));
+  assert(NULL == FindChild(child->mountpoint()));
 
   pthread_mutex_lock(lock_);
-  children_[child->path()] = child;
+  children_[child->mountpoint()] = child;
   child->set_parent(this);
   pthread_mutex_unlock(lock_);
 }
@@ -654,11 +646,11 @@ void Catalog::AddChild(Catalog *child) {
  * @param child the Catalog to delete as child
  */
 void Catalog::RemoveChild(Catalog *child) {
-  assert(NULL != FindChild(child->path()));
+  assert(NULL != FindChild(child->mountpoint()));
 
   pthread_mutex_lock(lock_);
   child->set_parent(NULL);
-  children_.erase(child->path());
+  children_.erase(child->mountpoint());
   pthread_mutex_unlock(lock_);
 }
 
@@ -687,15 +679,15 @@ CatalogList Catalog::GetChildren() const {
  */
 Catalog* Catalog::FindSubtree(const PathString &path) const {
   // Check if this catalog fits the beginning of the path.
-  if (!path.StartsWith(path_))
+  if (!path.StartsWith(mountpoint_))
     return NULL;
 
-  PathString remaining(path.Suffix(path_.GetLength()));
+  PathString remaining(path.Suffix(mountpoint_.GetLength()));
   remaining.Append("/", 1);
 
   // now we recombine the path elements successively
   // in order to find a child which serves a part of the path
-  PathString path_prefix(path_);
+  PathString path_prefix(mountpoint_);
   Catalog *result = NULL;
   // Skip the first '/'
   path_prefix.Append("/", 1);
@@ -734,7 +726,7 @@ Catalog* Catalog::FindChild(const PathString &mountpoint) const {
 
 
 /**
- * For the transtion points for nested catalogs, the inode is ambiquitous.
+ * For the transtion points for nested catalogs, the inode is ambiguous.
  * It has to be set to the parent inode because nested catalogs are lazily
  * loaded.
  * @param md5path the MD5 hash of the entry to check

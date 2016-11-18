@@ -649,7 +649,7 @@ class CatalogTraversal
     typename NestedCatalogList::const_iterator iend = nested.end();
     for (; i != iend; ++i) {
       CatalogTN* parent = (no_close_) ? job.catalog : NULL;
-      const CatalogJob new_job(i->path.ToString(),
+      const CatalogJob new_job(i->mountpoint.ToString(),
                                i->hash,
                                job.tree_level + 1,
                                job.history_depth,
