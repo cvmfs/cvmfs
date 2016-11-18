@@ -444,7 +444,7 @@ bool SyncUnionOverlayfs::IsWhiteoutEntry(const SyncItem &entry) const {
    * 1. whiteouts are 'character device' files
    * 2. whiteouts are symlinks pointing to '(overlay-whiteout)'
    */
-  return (entry.IsCharacterDevice() && entry.Major() == 0 && entry.Minor() == 0) ||
+  return (entry.IsCharacterDevice() && entry.GetMajor() == 0 && entry.GetMinor() == 0) ||
         (entry.IsSymlink() && IsWhiteoutSymlinkPath(entry.GetScratchPath()));
 }
 
