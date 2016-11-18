@@ -47,7 +47,9 @@ bool IsHttpUrl(const std::string &path);
 void CreateFile(const std::string &path, const int mode,
                 const bool ignore_failure = false);
 int MakeSocket(const std::string &path, const int mode);
+int MakeTcpEndpoint(const std::string &ipv4_address, int portno);
 int ConnectSocket(const std::string &path);
+int ConnectTcpEndpoint(const std::string &ipv4_address, int portno);
 void MakePipe(int pipe_fd[2]);
 void WritePipe(int fd, const void *buf, size_t nbyte);
 void ReadPipe(int fd, void *buf, size_t nbyte);

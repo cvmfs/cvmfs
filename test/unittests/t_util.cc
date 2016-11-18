@@ -695,6 +695,42 @@ TEST_F(T_Util, SendMes2Socket) {
   EXPECT_STREQ(to_write.c_str(), static_cast<const char*>(buffer));
 }
 
+
+TEST_F(T_Util, TcpEndpoints) {
+  EXPECT_EQ(-1, MakeTcpEndpoint("foobar", 0));
+  int fd_server = MakeTcpEndpoint("", 12345);
+  EXPECT_GE(fd_server, 0);
+  close(fd_server);
+
+  fd_server = MakeTcpEndpoint("127.0.0.1", 12345);
+  EXPECT_GE(fd_server, 0);
+  EXPECT_EQ(0, listen(fd_server, 1));
+  int fd_server2 = MakeTcpEndpoint("127.0.0.1", 12345);
+  EXPECT_NE(0, listen(fd_server2, 1));
+  close(fd_server2);
+
+  EXPECT_EQ(-1, ConnectTcpEndpoint("foobar", 12345));
+  EXPECT_EQ(-1, ConnectTcpEndpoint("127.0.0.1", 12346));
+  int fd_client = ConnectTcpEndpoint("127.0.0.1", 12345);
+  EXPECT_GE(fd_client, 0);
+  SendMsg2Socket(fd_client, to_write);
+  struct sockaddr_in client_addr;
+  unsigned client_addr_len = sizeof(client_addr);
+  int fd_conn = accept(fd_server, (struct sockaddr *) &client_addr,
+                       &client_addr_len);
+  EXPECT_GE(fd_conn, 0);
+  void *buffer = alloca(20);
+  memset(buffer, 0, 20);
+  ssize_t bytes_read = read(fd_conn, buffer, to_write.length());
+  EXPECT_EQ(static_cast<size_t>(bytes_read), to_write.length());
+  EXPECT_STREQ(to_write.c_str(), static_cast<const char*>(buffer));
+
+  close(fd_conn);
+  close(fd_client);
+  close(fd_server);
+}
+
+
 TEST_F(T_Util, Mutex) {
   ASSERT_DEATH(LockMutex(static_cast<pthread_mutex_t*>(NULL)), ".*");
   ASSERT_DEATH(UnlockMutex(static_cast<pthread_mutex_t*>(NULL)), ".*");
