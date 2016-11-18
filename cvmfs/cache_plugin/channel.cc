@@ -36,7 +36,6 @@ void CachePlugin::AskToDetach() {
 
 CachePlugin::CachePlugin(uint64_t capabilities)
   : capabilities_(capabilities)
-  , socket_path_()
   , fd_socket_(-1)
   , running_(false)
   , num_workers_(0)
@@ -400,13 +399,24 @@ void CachePlugin::HandleStore(
 
 bool CachePlugin::Listen(const string &locator) {
   vector<string> tokens = SplitString(locator, '=');
-  // TODO(jblomer): implement TCP
-  assert(tokens[0] == "unix");
-  socket_path_ = tokens[1];
-  fd_socket_ = MakeSocket(socket_path_, 0600);
+  if (tokens[0] == "unix") {
+    fd_socket_ = MakeSocket(tokens[1], 0600);
+  } else if (tokens[0] == "tcp") {
+    vector<string> tcp_address = SplitString(tokens[1], ':');
+    if (tcp_address.size() != 2) {
+      LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
+               "invalid locator: %s", locator.c_str());
+      abort();
+    }
+    fd_socket_ = MakeTcpEndpoint(tcp_address[0], String2Uint64(tcp_address[1]));
+  } else {
+    LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
+             "unknown endpoint in locator: %s", locator.c_str());
+    abort();
+  }
   if (fd_socket_ < 0) {
     LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
-             "failed to create socket %s (%d)", socket_path_.c_str(), errno);
+             "failed to create endpoint %s (%d)", locator.c_str(), errno);
     return false;
   }
   int retval = listen(fd_socket_, 32);
