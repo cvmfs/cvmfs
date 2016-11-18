@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <set>
 #include <string>
@@ -24,10 +25,7 @@ using namespace std;  // NOLINT
 class T_CachePlugin : public ::testing::Test {
  protected:
   virtual void SetUp() {
-    vector<string> tokens = SplitString(g_plugin_locator, '=');
-    assert(tokens[0] == "unix");
-    socket_path_ = tokens[1];
-    int fd_client = ConnectSocket(socket_path_);
+    int fd_client = Connect();
     ASSERT_GE(fd_client, 0);
     cache_mgr_ = ExternalCacheManager::Create(fd_client, nfiles);
     ASSERT_TRUE(cache_mgr_ != NULL);
@@ -40,10 +38,26 @@ class T_CachePlugin : public ::testing::Test {
     delete cache_mgr_;
   }
 
+  int Connect() {
+    vector<string> tokens = SplitString(g_plugin_locator, '=');
+    if (tokens[0] == "unix") {
+      return ConnectSocket(tokens[1]);
+    } else if (tokens[0] == "tcp") {
+      vector<string> tcp_address = SplitString(tokens[1], ':');
+      if (tcp_address.size() != 2) {
+        printf("invalid locator: %s\n", g_plugin_locator.c_str());
+        abort();
+       }
+      return ConnectTcpEndpoint(tcp_address[0], String2Uint64(tcp_address[1]));
+    } else {
+      printf("invalid locator: %s\n", g_plugin_locator.c_str());
+      abort();
+    }
+  }
+
   static const int nfiles;
   ExternalCacheManager *cache_mgr_;
   ExternalQuotaManager *quota_mgr_;
-  string socket_path_;
 };
 
 const int T_CachePlugin::nfiles = 128;
@@ -52,7 +66,7 @@ const int T_CachePlugin::nfiles = 128;
 TEST_F(T_CachePlugin, Connection) {
   EXPECT_GE(cache_mgr_->session_id(), 0);
 
-  int fd_second = ConnectSocket(socket_path_);
+  int fd_second = Connect();
   ASSERT_GE(fd_second, 0);
   ExternalCacheManager *cache_mgr_second =
     ExternalCacheManager::Create(fd_second, nfiles);

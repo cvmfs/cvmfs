@@ -190,16 +190,39 @@ bool FileSystem::CreateCache() {
 
   switch (cache_mgr_type_) {
     case kExternalCacheManager: {
+      unsigned nfiles = 1024;
+      if (options_mgr_->GetValue("CVMFS_NFILES", &optarg))
+        nfiles = String2Uint64(optarg);
       if (!options_mgr_->GetValue("CVMFS_CACHE_EXTERNAL_LOCATOR", &optarg)) {
         boot_error_ = "CVMFS_CACHE_EXTERNAL_LOCATOR missing";
         boot_status_ = loader::kFailCacheDir;
         return false;
       }
+
       vector<string> tokens = SplitString(optarg, '=');
-      assert(tokens[0] == "unix");
-      int fd_client = ConnectSocket(tokens[1]);
-      assert(fd_client >= 0);
-      cache_mgr_ = ExternalCacheManager::Create(fd_client, 1024);
+      int fd_client = -1;
+      if (tokens[0] == "unix") {
+        fd_client = ConnectSocket(tokens[1]);
+      } else if (tokens[0] == "tcp") {
+        vector<string> tcp_address = SplitString(tokens[1], ':');
+        if (tcp_address.size() != 2) {
+          boot_error_ = "Invalid locator: " + optarg;
+          boot_status_ = loader::kFailCacheDir;
+          return false;
+        }
+        fd_client =
+          ConnectTcpEndpoint(tcp_address[0], String2Uint64(tcp_address[1]));
+      } else {
+        boot_error_ = "Invalid locator: " + optarg;
+        boot_status_ = loader::kFailCacheDir;
+        return false;
+      }
+      if (fd_client < 0) {
+        boot_error_ = "Failed to connect to external cache manager";
+        boot_status_ = loader::kFailCacheDir;
+        return false;
+      }
+      cache_mgr_ = ExternalCacheManager::Create(fd_client, nfiles);
       assert(cache_mgr_ != NULL);
       break;
     }

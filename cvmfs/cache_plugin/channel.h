@@ -136,7 +136,6 @@ class CachePlugin : SingleCopy {
   void SendDetachRequests();
 
   uint64_t capabilities_;
-  std::string socket_path_;
   int fd_socket_;
   bool running_;
   unsigned num_workers_;
