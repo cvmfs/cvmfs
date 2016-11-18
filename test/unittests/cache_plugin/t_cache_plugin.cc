@@ -166,7 +166,7 @@ TEST_F(T_CachePlugin, Read) {
   read_buffer = reinterpret_cast<unsigned char *> (
     smalloc(2 * cache_mgr_->max_object_size()));
   EXPECT_EQ(0, cache_mgr_->Pread(fd, read_buffer, 0, size_odd));
-  EXPECT_EQ(-EINVAL, cache_mgr_->Pread(fd, read_buffer, 1, size_odd));
+  EXPECT_EQ(-EINVAL, cache_mgr_->Pread(fd, read_buffer, 1, size_odd + 1));
   EXPECT_EQ(1, cache_mgr_->Pread(fd, read_buffer, 1, size_odd - 1));
   EXPECT_EQ(1, read_buffer[0]);
 

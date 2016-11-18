@@ -98,7 +98,7 @@ static int null_pread(struct cvmcache_hash *id,
 {
   ComparableHash h(*id);
   string data = storage[h].data;
-  if ((offset > 0) && (offset >= data.length()))
+  if (offset > data.length())
     return CVMCACHE_STATUS_OUTOFBOUNDS;
   unsigned nbytes =
     std::min(*size, static_cast<uint32_t>(data.length() - offset));
