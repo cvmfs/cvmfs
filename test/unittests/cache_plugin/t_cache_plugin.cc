@@ -98,9 +98,9 @@ TEST_F(T_CachePlugin, StoreEmpty) {
 
   int fd = cache_mgr_->Open(CacheManager::Bless(empty_id));
   EXPECT_GE(fd, 0);
-  unsigned char small_buf[2];
-  EXPECT_EQ(0, cache_mgr_->Pread(fd, small_buf, 0, 2));
-  EXPECT_EQ(-EINVAL, cache_mgr_->Pread(fd, small_buf, 1, 2));
+  unsigned char small_buf[1];
+  EXPECT_EQ(0, cache_mgr_->Pread(fd, small_buf, 1, 0));
+  EXPECT_EQ(-EINVAL, cache_mgr_->Pread(fd, small_buf, 1, 1));
   EXPECT_EQ(0, cache_mgr_->Close(fd));
 }
 
