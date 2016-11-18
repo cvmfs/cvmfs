@@ -146,6 +146,10 @@ class SyncMediator {
                             const std::string &dir_name);
   void AddFileCallback(const std::string &parent_dir,
                        const std::string &file_name);
+  void AddCharacterDeviceCallback(const std::string &parent_dir,
+                       const std::string &file_name);
+  void AddBlockDeviceCallback(const std::string &parent_dir,
+                       const std::string &file_name);
   void AddSymlinkCallback(const std::string &parent_dir,
                           const std::string &link_name);
 

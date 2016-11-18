@@ -75,6 +75,11 @@ void SyncMediator::Add(const SyncItem &entry) {
     return;  // Ignore markers.
   }
 
+  if (entry.IsSpecialFile() && !entry.IsWhiteout()) {
+    PrintWarning("'" + entry.GetRelativePath() + "' is a special file, ignoring.");
+    return;
+  }
+
   PrintWarning("'" + entry.GetRelativePath() + "' cannot be added. "
                "Unrecognized file type.");
 }
@@ -353,6 +358,8 @@ void SyncMediator::AddDirectoryRecursively(const SyncItem &entry) {
   traversal.fn_new_symlink    = &SyncMediator::AddSymlinkCallback;
   traversal.fn_new_dir_prefix = &SyncMediator::AddDirectoryCallback;
   traversal.fn_ignore_file    = &SyncMediator::IgnoreFileCallback;
+  traversal.fn_new_character_dev = &SyncMediator::AddCharacterDeviceCallback;
+  traversal.fn_new_block_dev = &SyncMediator::AddBlockDeviceCallback;
   traversal.Recurse(entry.GetScratchPath());
 }
 
@@ -373,6 +380,20 @@ void SyncMediator::AddFileCallback(const std::string &parent_dir,
   Add(entry);
 }
 
+
+void SyncMediator::AddCharacterDeviceCallback(const std::string &parent_dir,
+                                    const std::string &file_name)
+{
+  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemCharacterDevice);
+  Add(entry);
+}
+
+void SyncMediator::AddBlockDeviceCallback(const std::string &parent_dir,
+                                    const std::string &file_name)
+{
+  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemBlockDevice);
+  Add(entry);
+}
 
 void SyncMediator::AddSymlinkCallback(const std::string &parent_dir,
                                       const std::string &link_name)

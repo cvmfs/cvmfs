@@ -117,6 +117,7 @@ void SyncUnion::ProcessSymlink(const string &parent_dir,
 void SyncUnion::ProcessFile(const SyncItem &entry) {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessFile(%s)",
            entry.filename().c_str());
+
   if (entry.IsWhiteout()) {
     mediator_->Remove(entry);
   } else {
@@ -313,7 +314,9 @@ bool SyncUnionOverlayfs::ObtainSysAdminCapability() const {
 
 void SyncUnionOverlayfs::PreprocessSyncItem(SyncItem *entry) const {
   SyncUnion::PreprocessSyncItem(entry);
-  if (entry->IsGraftMarker() || entry->IsWhiteout() || entry->IsDirectory()) {
+  if (entry->IsGraftMarker() || entry->IsWhiteout()
+      || entry->IsDirectory() || entry->IsSpecialFile())
+  {
     return;
   }
 
@@ -340,6 +343,7 @@ void SyncUnionOverlayfs::CheckForBrokenHardlink(const SyncItem &entry) const {
 }
 
 void SyncUnionOverlayfs::MaskFileHardlinks(SyncItem *entry) const {
+  LogCvmfs(kLogCvmfs, kLogDebug, "masking: %s", entry->GetRelativePath().c_str());
   assert(entry->IsRegularFile() || entry->IsSymlink());
   if (entry->GetUnionLinkcount() > 1) {
     LogCvmfs(kLogPublish, kLogStderr, "Warning: Found file with linkcount > 1 "
@@ -360,6 +364,7 @@ void SyncUnionOverlayfs::Traverse() {
   traversal.fn_leave_dir          = &SyncUnionOverlayfs::LeaveDirectory;
   traversal.fn_new_file           = &SyncUnionOverlayfs::ProcessRegularFile;
   traversal.fn_new_character_dev  = &SyncUnionOverlayfs::ProcessCharacterDevice;
+  traversal.fn_new_block_dev      = &SyncUnionOverlayfs::ProcessBlockDevice;
   traversal.fn_ignore_file        = &SyncUnionOverlayfs::IgnoreFilePredicate;
   traversal.fn_new_dir_prefix     = &SyncUnionOverlayfs::ProcessDirectory;
   traversal.fn_new_symlink        = &SyncUnionOverlayfs::ProcessSymlink;
@@ -439,7 +444,7 @@ bool SyncUnionOverlayfs::IsWhiteoutEntry(const SyncItem &entry) const {
    * 1. whiteouts are 'character device' files
    * 2. whiteouts are symlinks pointing to '(overlay-whiteout)'
    */
-  return entry.IsCharacterDevice() ||
+  return (entry.IsCharacterDevice() && entry.Major() == 0 && entry.Minor() == 0) ||
         (entry.IsSymlink() && IsWhiteoutSymlinkPath(entry.GetScratchPath()));
 }
 
@@ -485,6 +490,15 @@ void SyncUnionOverlayfs::ProcessCharacterDevice(const std::string &parent_dir,
            "SyncUnionOverlayfs::ProcessCharacterDevice(%s, %s)",
            parent_dir.c_str(), filename.c_str());
   SyncItem entry = CreateSyncItem(parent_dir, filename, kItemCharacterDevice);
+  ProcessFile(entry);
+}
+
+void SyncUnionOverlayfs::ProcessBlockDevice(const std::string &parent_dir,
+                                            const std::string &filename) {
+  LogCvmfs(kLogUnionFs, kLogDebug,
+           "SyncUnionOverlayfs::ProcessBlockDevice(%s, %s)",
+           parent_dir.c_str(), filename.c_str());
+  SyncItem entry = CreateSyncItem(parent_dir, filename, kItemBlockDevice);
   ProcessFile(entry);
 }
 

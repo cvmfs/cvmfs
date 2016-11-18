@@ -257,6 +257,8 @@ class SyncUnionOverlayfs : public SyncUnion {
 
   void ProcessCharacterDevice(const std::string &parent_dir,
                               const std::string &filename);
+  void ProcessBlockDevice(const std::string &parent_dir,
+                              const std::string &filename);
   std::string UnwindWhiteoutFilename(const SyncItem &entry) const;
   std::set<std::string> GetIgnoreFilenames() const;
 
