@@ -117,7 +117,6 @@ void SyncUnion::ProcessSymlink(const string &parent_dir,
 void SyncUnion::ProcessFile(const SyncItem &entry) {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessFile(%s)",
            entry.filename().c_str());
-
   if (entry.IsWhiteout()) {
     mediator_->Remove(entry);
   } else {
@@ -343,7 +342,6 @@ void SyncUnionOverlayfs::CheckForBrokenHardlink(const SyncItem &entry) const {
 }
 
 void SyncUnionOverlayfs::MaskFileHardlinks(SyncItem *entry) const {
-  LogCvmfs(kLogCvmfs, kLogDebug, "masking: %s", entry->GetRelativePath().c_str());
   assert(entry->IsRegularFile() || entry->IsSymlink());
   if (entry->GetUnionLinkcount() > 1) {
     LogCvmfs(kLogPublish, kLogStderr, "Warning: Found file with linkcount > 1 "
@@ -444,8 +442,13 @@ bool SyncUnionOverlayfs::IsWhiteoutEntry(const SyncItem &entry) const {
    * 1. whiteouts are 'character device' files
    * 2. whiteouts are symlinks pointing to '(overlay-whiteout)'
    */
-  return (entry.IsCharacterDevice() && entry.GetMajor() == 0 && entry.GetMinor() == 0) ||
-        (entry.IsSymlink() && IsWhiteoutSymlinkPath(entry.GetScratchPath()));
+  bool is_chardev_whiteout = entry.IsCharacterDevice() &&
+    entry.GetMajor() == 0 && entry.GetMinor() == 0;
+
+  bool is_symlink_whiteout = entry.IsSymlink() &&
+    IsWhiteoutSymlinkPath(entry.GetScratchPath());
+
+  return is_chardev_whiteout || is_symlink_whiteout;
 }
 
 

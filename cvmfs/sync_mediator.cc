@@ -76,7 +76,8 @@ void SyncMediator::Add(const SyncItem &entry) {
   }
 
   if (entry.IsSpecialFile() && !entry.IsWhiteout()) {
-    PrintWarning("'" + entry.GetRelativePath() + "' is a special file, ignoring.");
+    PrintWarning("'" + entry.GetRelativePath() + "' "
+                 "is a special file, ignoring.");
     return;
   }
 
