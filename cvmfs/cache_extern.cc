@@ -303,6 +303,7 @@ int ExternalCacheManager::Flush(bool do_commit, Transaction *transaction) {
   msg_store.set_req_id(transaction->transaction_id);
   msg_store.set_allocated_object_id(&object_id);
   msg_store.set_part_nr((transaction->size / max_object_size_) + 1);
+  msg_store.set_expected_size(transaction->expected_size);
   msg_store.set_last_part(do_commit);
 
   if (transaction->object_info_modified) {
@@ -491,6 +492,7 @@ int64_t ExternalCacheManager::Pread(
     cvmfs::MsgReadReply *msg_reply = rpc_job.msg_read_reply();
     if (msg_reply->status() == cvmfs::STATUS_OK) {
       nbytes += rpc_job.frame_recv()->att_size();
+      // Fuse sends in rounded up buffers, so short reads are expected
       if (rpc_job.frame_recv()->att_size() < batch_size)
         return nbytes;
     } else {

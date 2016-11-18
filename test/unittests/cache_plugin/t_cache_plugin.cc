@@ -16,6 +16,7 @@
 #include "hash.h"
 #include "prng.h"
 #include "util/posix.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 
@@ -23,7 +24,10 @@ using namespace std;  // NOLINT
 class T_CachePlugin : public ::testing::Test {
  protected:
   virtual void SetUp() {
-    int fd_client = ConnectSocket(g_plugin_locator);
+    vector<string> tokens = SplitString(g_plugin_locator, '=');
+    assert(tokens[0] == "unix");
+    socket_path_ = tokens[1];
+    int fd_client = ConnectSocket(socket_path_);
     ASSERT_GE(fd_client, 0);
     cache_mgr_ = ExternalCacheManager::Create(fd_client, nfiles);
     ASSERT_TRUE(cache_mgr_ != NULL);
@@ -39,6 +43,7 @@ class T_CachePlugin : public ::testing::Test {
   static const int nfiles;
   ExternalCacheManager *cache_mgr_;
   ExternalQuotaManager *quota_mgr_;
+  string socket_path_;
 };
 
 const int T_CachePlugin::nfiles = 128;
@@ -47,7 +52,7 @@ const int T_CachePlugin::nfiles = 128;
 TEST_F(T_CachePlugin, Connection) {
   EXPECT_GE(cache_mgr_->session_id(), 0);
 
-  int fd_second = ConnectSocket(g_plugin_locator);
+  int fd_second = ConnectSocket(socket_path_);
   ASSERT_GE(fd_second, 0);
   ExternalCacheManager *cache_mgr_second =
     ExternalCacheManager::Create(fd_second, nfiles);
@@ -90,6 +95,13 @@ TEST_F(T_CachePlugin, StoreEmpty) {
   EXPECT_EQ(0U, size);
   EXPECT_EQ(NULL, buffer);
   free(buffer);
+
+  int fd = cache_mgr_->Open(CacheManager::Bless(empty_id));
+  EXPECT_GE(fd, 0);
+  unsigned char small_buf[1];
+  EXPECT_EQ(0, cache_mgr_->Pread(fd, small_buf, 1, 0));
+  EXPECT_EQ(-EINVAL, cache_mgr_->Pread(fd, small_buf, 1, 1));
+  EXPECT_EQ(0, cache_mgr_->Close(fd));
 }
 
 
@@ -154,7 +166,7 @@ TEST_F(T_CachePlugin, Read) {
   read_buffer = reinterpret_cast<unsigned char *> (
     smalloc(2 * cache_mgr_->max_object_size()));
   EXPECT_EQ(0, cache_mgr_->Pread(fd, read_buffer, 0, size_odd));
-  EXPECT_EQ(-EINVAL, cache_mgr_->Pread(fd, read_buffer, 1, size_odd));
+  EXPECT_EQ(-EINVAL, cache_mgr_->Pread(fd, read_buffer, 1, size_odd + 1));
   EXPECT_EQ(1, cache_mgr_->Pread(fd, read_buffer, 1, size_odd - 1));
   EXPECT_EQ(1, read_buffer[0]);
 
