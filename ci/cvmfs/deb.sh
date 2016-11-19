@@ -28,10 +28,10 @@ echo "detected upstream version: $cvmfs_version"
 # generate the release tag for either a nightly build or a release
 if [ $CVMFS_NIGHTLY_BUILD_NUMBER -gt 0 ]; then
   git_hash="$(get_cvmfs_git_revision $CVMFS_SOURCE_LOCATION)"
-  cvmfs_version="${cvmfs_version}-0.${CVMFS_NIGHTLY_BUILD_NUMBER}git${git_hash}"
+  cvmfs_version="${cvmfs_version}~0.${CVMFS_NIGHTLY_BUILD_NUMBER}git${git_hash}"
   echo "creating nightly build '$cvmfs_version'"
 else
-  cvmfs_version="${cvmfs_version}-1"
+  cvmfs_version="${cvmfs_version}~1"
 fi
 cvmfs_version="${cvmfs_version}+$(lsb_release -si | tr [:upper:] [:lower:])"
 cvmfs_version="${cvmfs_version}$(lsb_release -sr)"
@@ -53,8 +53,7 @@ cd $copied_source
 cpu_cores=$(get_number_of_cpu_cores)
 echo "do the build (with $cpu_cores cores)..."
 dch -v $cvmfs_version -M "bumped upstream version number"
-# -us -uc == skip signing
-DEB_BUILD_OPTIONS=parallel=$cpu_cores debuild --no-tgz-check -us -uc
+DEB_BUILD_OPTIONS=parallel=$cpu_cores debuild -us -uc  # -us -uc == skip signing
 cd ${CVMFS_RESULT_LOCATION}
 
 # generating package map section for specific platform
