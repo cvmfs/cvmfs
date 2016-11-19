@@ -28,11 +28,14 @@ echo "detected upstream version: $cvmfs_version"
 # generate the release tag for either a nightly build or a release
 if [ $CVMFS_NIGHTLY_BUILD_NUMBER -gt 0 ]; then
   git_hash="$(get_cvmfs_git_revision $CVMFS_SOURCE_LOCATION)"
-  cvmfs_version="${cvmfs_version}.${CVMFS_NIGHTLY_BUILD_NUMBER}git${git_hash}"
+  cvmfs_version="${cvmfs_version}-0.${CVMFS_NIGHTLY_BUILD_NUMBER}git${git_hash}"
   echo "creating nightly build '$cvmfs_version'"
 else
-  echo "creating release: $cvmfs_version"
+  cvmfs_version="${cvmfs_version}-1"
 fi
+cvmfs_version="${cvmfs_version}+$(lsb_release -si | tr [:upper:] [:lower:])"
+cvmfs_version="${cvmfs_version}$(lsb_release -sr)"
+echo "creating release: $cvmfs_version"
 
 # copy the entire source tree into a working directory
 echo "copying source into workspace..."
