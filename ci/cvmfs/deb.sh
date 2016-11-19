@@ -53,7 +53,8 @@ cd $copied_source
 cpu_cores=$(get_number_of_cpu_cores)
 echo "do the build (with $cpu_cores cores)..."
 dch -v $cvmfs_version -M "bumped upstream version number"
-DEB_BUILD_OPTIONS=parallel=$cpu_cores debuild -us -uc # -us -uc == skip signing
+# -us -uc == skip signing
+DEB_BUILD_OPTIONS=parallel=$cpu_cores debuild --no-tgz-check -us -uc
 cd ${CVMFS_RESULT_LOCATION}
 
 # generating package map section for specific platform
