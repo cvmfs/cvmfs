@@ -1,0 +1,118 @@
+cvmfs_test_name="Handling special files"
+
+export CVMFS_TEST_UNIONFS="overlayfs"
+
+_setup() {
+    create_repo "$CVMFS_TEST_REPO" "$CVMFS_TEST_USER" "/tmp/debug.log" 1>/dev/null
+}
+
+_cleanup() {
+    destroy_repo "$CVMFS_TEST_REPO" 1>/dev/null
+}
+
+# check character device with major-minor other than 0-0 in alredy existing dir
+test_chrdev_basic() {
+    local filename="chardev_10_20"
+
+    _setup
+    start_transaction "$CVMFS_TEST_REPO" || return 1
+    sudo mknod "/cvmfs/$CVMFS_TEST_REPO/$filename" c 10 20 || return 2
+
+    local publish_output="$(publish_repo $CVMFS_TEST_REPO 2>&1)"
+    [ $? = 0 ] || return 3
+
+    # assert 1: check the old message
+    echo "$publish_output" | grep -i "'$filename' should be deleted"
+    local status1=$(( $? == 1 ))
+
+    # assert 2: check the new message
+    echo  "$publish_output" | grep -i "'$filename'.*ignoring"
+    local status2=$?
+
+    _cleanup
+
+    return $(( $status1 == 0 && $status2 == 0 ))
+}
+
+# check block device in an alredy existing dir
+test_blkdev_basic() {
+    local filename="blockdev_10_20"
+
+    _setup
+    start_transaction "$CVMFS_TEST_REPO" || return 1
+
+    sudo mknod "/cvmfs/$CVMFS_TEST_REPO/$filename" b 10 20 || return 2
+    local publish_output="$(publish_repo $CVMFS_TEST_REPO 2>&1)"
+    [ $? = 0 ] || return 3
+
+    echo "$publish_output" | grep -i "$filename.*ignoring"
+    local status1=$?
+
+    _cleanup
+
+    return $status1
+}
+
+# check character device with major-minor other than 0-0 in a new dir
+test_chrdev_newdir() {
+    local filename="chardev_10_20"
+
+    _setup
+    start_transaction "$CVMFS_TEST_REPO" || return 1
+    mkdir "/cvmfs/$CVMFS_TEST_REPO/dev"
+    sudo mknod "/cvmfs/$CVMFS_TEST_REPO/dev/$filename" c 10 20 || return 2
+
+    local publish_output="$(publish_repo $CVMFS_TEST_REPO 2>&1)"
+    local status0=$?
+    [ $status0 = 0 ] || return 3
+
+    echo "$publish_output" | grep -i "$filename.*ignoring"
+    local status1=$?
+
+    _cleanup
+
+    return $status1
+}
+
+# check block device with major-minor other than 0-0 in a new dir
+test_blkdev_newdir() {
+    local filename="blockdev_10_20"
+
+    _setup
+    start_transaction "$CVMFS_TEST_REPO" || return 1
+    mkdir "/cvmfs/$CVMFS_TEST_REPO/dev"
+    sudo mknod "/cvmfs/$CVMFS_TEST_REPO/dev/$filename" b 10 20 || return 2
+
+    local publish_output="$(publish_repo $CVMFS_TEST_REPO 2>&1)"
+    local status0=$?
+    [ $status0 = 0 ] || return 3
+
+    echo "$publish_output" | grep -i "$filename.*ignoring"
+    local status1=$?
+
+    _cleanup
+
+    return $status1
+}
+
+cvmfs_run_test() {
+    logfile=$1
+
+    test_chrdev_basic
+    local status1=$?
+    [ $status1 = 0 ] || echo "Check 1 Failed with err code: $status1"
+
+    test_blkdev_basic
+    local status2=$?
+    [ $status2 = 0 ] || echo "Check 2 Failed with err code: $status2"
+
+    test_chrdev_newdir
+    local status3=$?
+    [ $status3 = 0 ] || echo "Check 3 Failed with err code: $status3"
+
+    test_blkdev_newdir
+    local status4=$?
+    [ $status4 = 0 ] || echo "Check 4 Failed with err code: $status4"
+
+    return $(($status1 || $status2 || $status3 || $status4))
+}

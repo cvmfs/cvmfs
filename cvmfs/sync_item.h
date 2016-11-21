@@ -21,6 +21,7 @@ enum SyncItemType {
   kItemFile,
   kItemSymlink,
   kItemCharacterDevice,
+  kItemBlockDevice,
   kItemNew,
   kItemMarker,
   kItemUnknown
@@ -57,12 +58,27 @@ class SyncItem {
   inline bool WasSymlink()        const { return WasType(kItemSymlink);        }
   inline bool IsNew()             const { return WasType(kItemNew);            }
   inline bool IsCharacterDevice() const { return IsType(kItemCharacterDevice); }
+  inline bool IsBlockDevice()     const { return IsType(kItemBlockDevice);     }
   inline bool IsGraftMarker()     const { return IsType(kItemMarker);          }
   inline bool IsExternalData()    const { return external_data_;               }
 
   inline bool IsWhiteout()        const { return whiteout_;                    }
   inline bool IsCatalogMarker()   const { return filename_ == ".cvmfscatalog"; }
   inline bool IsOpaqueDirectory() const { return IsDirectory() && opaque_;     }
+
+  inline bool IsSpecialFile()     const {
+    return IsCharacterDevice() || IsBlockDevice();
+  }
+
+  inline unsigned int GetRdevMajor()     const {
+    assert(IsSpecialFile());
+    StatUnion(true); return major(union_stat_.stat.st_rdev);
+  }
+
+  inline unsigned int GetRdevMinor()     const {
+    assert(IsSpecialFile());
+    StatUnion(true); return minor(union_stat_.stat.st_rdev);
+  }
 
   bool HasCatalogMarker()         const { return has_catalog_marker_;          }
   bool HasGraftMarker()           const { return graft_marker_present_;        }
@@ -195,9 +211,10 @@ class SyncItem {
     inline SyncItemType GetSyncItemType() const {
       assert(obtained);
       if (S_ISDIR(stat.st_mode)) return kItemDir;
+      if (S_ISCHR(stat.st_mode)) return kItemCharacterDevice;
+      if (S_ISBLK(stat.st_mode)) return kItemBlockDevice;
       if (S_ISREG(stat.st_mode)) return kItemFile;
       if (S_ISLNK(stat.st_mode)) return kItemSymlink;
-      if (S_ISCHR(stat.st_mode)) return kItemCharacterDevice;
       return kItemUnknown;
     }
 
