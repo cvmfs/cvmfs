@@ -75,6 +75,9 @@ void SyncMediator::Add(const SyncItem &entry) {
     return;  // Ignore markers.
   }
 
+  // In OverlayFS whiteouts can be represented as character devices with major
+  // and minor numbers equal to 0. Special files will be ignored except if they
+  // are whiteout files.
   if (entry.IsSpecialFile() && !entry.IsWhiteout()) {
     PrintWarning("'" + entry.GetRelativePath() + "' "
                  "is a special file, ignoring.");
