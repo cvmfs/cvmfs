@@ -1,4 +1,5 @@
 2.4.0:
+  * Ignore special files with a warning on publish (CVM-1106)
   * Add support for Debian 8 (CVM-1104)
   * Add support for pluggable, external cache managers (CVM-1054)
   * Update c-ares to 1.12.0
