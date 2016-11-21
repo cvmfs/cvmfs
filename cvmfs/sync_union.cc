@@ -443,7 +443,7 @@ bool SyncUnionOverlayfs::IsWhiteoutEntry(const SyncItem &entry) const {
    * 2. whiteouts are symlinks pointing to '(overlay-whiteout)'
    */
   bool is_chardev_whiteout = entry.IsCharacterDevice() &&
-    entry.GetMajor() == 0 && entry.GetMinor() == 0;
+    entry.GetRdevMajor() == 0 && entry.GetRdevMinor() == 0;
 
   bool is_symlink_whiteout = entry.IsSymlink() &&
     IsWhiteoutSymlinkPath(entry.GetScratchPath());

@@ -70,12 +70,12 @@ class SyncItem {
     return IsCharacterDevice() || IsBlockDevice();
   }
 
-  inline unsigned int GetMajor()     const {
+  inline unsigned int GetRdevMajor()     const {
     assert(IsSpecialFile());
     StatUnion(true); return major(union_stat_.stat.st_rdev);
   }
 
-  inline unsigned int GetMinor()     const {
+  inline unsigned int GetRdevMinor()     const {
     assert(IsSpecialFile());
     StatUnion(true); return minor(union_stat_.stat.st_rdev);
   }
