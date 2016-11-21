@@ -4897,6 +4897,10 @@ cvmfs_server_publish() {
     if [ "x${CVMFS_VOMS_AUTHZ}" != x ]; then
       sync_command="$sync_command -V"
     fi
+    if [ "x$CVMFS_IGNORE_SPECIAL_FILES" = "xtrue" ]; then
+      sync_command="$sync_command -g"
+    fi
+
     local tag_command="$(__swissknife_cmd dbg) tag_create \
       -r $upstream                                        \
       -w $stratum0                                        \

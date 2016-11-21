@@ -79,9 +79,16 @@ void SyncMediator::Add(const SyncItem &entry) {
   // and minor numbers equal to 0. Special files will be ignored except if they
   // are whiteout files.
   if (entry.IsSpecialFile() && !entry.IsWhiteout()) {
-    PrintWarning("'" + entry.GetRelativePath() + "' "
-                 "is a special file, ignoring.");
-    return;
+    if (params_->ignore_special_files == true) {
+      PrintWarning("'" + entry.GetRelativePath() + "' "
+                  "is a special file, ignoring.");
+      return;
+    } else {
+      PrintWarning("'" + entry.GetRelativePath() + "' "
+                   "is a special file, stopping. "
+                   "Enable CVMFS_IGNORE_SPECIAL_FILES in the cvmfs config.");
+      abort();
+    }
   }
 
   PrintWarning("'" + entry.GetRelativePath() + "' cannot be added. "

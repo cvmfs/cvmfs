@@ -1,6 +1,7 @@
 cvmfs_test_name="Handling special files"
 
 export CVMFS_TEST_UNIONFS="overlayfs"
+export CVMFS_IGNORE_SPECIAL_FILES="true"
 
 _setup() {
     create_repo "$CVMFS_TEST_REPO" "$CVMFS_TEST_USER" "/tmp/debug.log" 1>/dev/null
