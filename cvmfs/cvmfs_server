@@ -19,6 +19,22 @@ die() {
 export LANG=C
 
 
+# Includes
+if [ -z ${CVMFS_SERVER_DEVEL+x} ]; then
+    #####
+    # The following files should be sourced in this order and before the other files
+    source "server/cvmfs_server_util.sh"
+    source "server/cvmfs_server_common.sh"
+    source "server/cvmfs_server_health_check.sh"
+    source "server/cvmfs_server_compat.sh"
+    #####
+
+    # The following files contain the implementation of various subcommands. The can be sourced
+    # in any order
+    source "./server/cvmfs_server_transaction.sh"
+fi
+
+
 ################################################################################
 #                                                                              #
 #                              Environment Setup                               #
@@ -168,44 +184,6 @@ if [ $CVMFS_SERVER_DEBUG -ne 0 ]; then
   fi
 fi
 
-__swissknife_cmd() {
-  local might_be_debugging="$1"
-  if [ ! -z $might_be_debugging ]; then
-    echo "$CVMFS_SERVER_SWISSKNIFE_DEBUG"
-  else
-    echo "$CVMFS_SERVER_SWISSKNIFE"
-  fi
-}
-
-__swissknife() {
-  $(__swissknife_cmd) $@
-}
-
-
-to_syslog() {
-  logger -t cvmfs_server "$1" > /dev/null 2>&1 || return 0
-}
-
-to_syslog_for_repo() {
-  local repo_name="$1"
-  local message="$2"
-  to_syslog "(${repo_name}) $message"
-}
-
-
-cvmfs_mkfqrn() {
-   local repo=$1
-
-   if [ -z "$repo" ]; then
-      echo
-      return 0
-   fi
-
-   echo $repo | grep \\. || echo "${repo}.${CVMFS_DEFAULT_DOMAIN}"
-   return 0
-}
-
-
 # checks if the given command name is a supported command of cvmfs_server
 #
 # @param subcommand   the subcommand to be called
@@ -226,64 +204,6 @@ is_subcommand() {
   return 1
 }
 
-
-# makes sure that a version is always of the form x.y.z-b
-normalize_version() {
-  local version_string="$1"
-  while [ $(echo "$version_string" | grep -o '\.' | wc -l) -lt 2 ]; do
-    version_string="${version_string}.0"
-  done
-  while [ $(echo "$version_string" | grep -o '-' | wc -l) -lt 1 ]; do
-    version_string="${version_string}-1"
-  done
-  echo "$version_string"
-}
-# returns the version string of the current cvmfs installation
-cvmfs_version_string() {
-  local version_string
-  if ! __swissknife version > /dev/null 2>&1; then
-    # Fallback: for CernVM-FS versions before 2.1.7
-    # this is just a security measure... it should never happen, since this
-    # function was introduced with CernVM-FS 2.1.7
-    version_string=$(__swissknife --version | sed -n '2{p;q}' | awk '{print $2}')
-  else
-    version_string=$(__swissknife --version)
-  fi
-  echo $(normalize_version $version_string)
-}
-version_major() { echo $1 | cut --delimiter=. --fields=1 | grep -oe '^[0-9]\+'; }
-version_minor() { echo $1 | cut --delimiter=. --fields=2 | grep -oe '^[0-9]\+'; }
-version_patch() { echo $1 | cut --delimiter=. --fields=3 | grep -oe '^[0-9]\+'; }
-version_build() { echo $1 | cut --delimiter=- --fields=2 | grep -oe '^[0-9]\+'; }
-prepend_zeros() { printf %03d "$1"; }
-compare_versions() {
-  local lhs="$(normalize_version $1)"
-  local comparison_operator=$2
-  local rhs="$(normalize_version $3)"
-
-  local lhs1=$(prepend_zeros $(version_major $lhs))
-  local lhs2=$(prepend_zeros $(version_minor $lhs))
-  local lhs3=$(prepend_zeros $(version_patch $lhs))
-  local lhs4=$(prepend_zeros $(version_build $lhs))
-  local rhs1=$(prepend_zeros $(version_major $rhs))
-  local rhs2=$(prepend_zeros $(version_minor $rhs))
-  local rhs3=$(prepend_zeros $(version_patch $rhs))
-  local rhs4=$(prepend_zeros $(version_build $rhs))
-
-  [ $lhs1$lhs2$lhs3$lhs4 $comparison_operator $rhs1$rhs2$rhs3$rhs4 ]
-}
-version_greater_or_equal() {
-  local needle=$1
-  compare_versions $(cvmfs_version_string) -ge $needle
-}
-version_lower_or_equal() {
-  local needle=$1
-  compare_versions $(cvmfs_version_string) -le $needle
-}
-version_equal() {
-  local needle=$1
-  compare_versions "$(cvmfs_version_string)" = "$needle"
-}
 
 # prints some help information optionally followed by an error message
 # afterwards it aborts the script
@@ -406,36 +326,6 @@ is_redhat() {
   [ -f /etc/redhat-release ]
 }
 
-load_repo_config() {
-  local name=$1
-  . /etc/cvmfs/repositories.d/${name}/server.conf
-  if [ x"$CVMFS_REPOSITORY_TYPE" = x"stratum0" ]; then
-    . /etc/cvmfs/repositories.d/${name}/client.conf
-  else
-    . /etc/cvmfs/repositories.d/${name}/replica.conf
-  fi
-}
-
-# retrieves (or guesses) the version of CernVM-FS that was used to create this
-# repository.
-# @param name  the name of the repository to be checked
-repository_creator_version() {
-  local name="$1"
-  load_repo_config $name
-  local version="$CVMFS_CREATOR_VERSION"
-  if [ x"$version" = x ]; then
-    version="2.1.6" # 2.1.6 was the last version, that did not store the creator
-                    # version... therefore this has to be handled as "<= 2.1.6"
-                    # Note: see also `mangle_version_string()`
-  elif [ x"$version" = x"2.2.0" ]; then
-    version="2.2.0-0" # CernVM-FS 2.2.0-0 was a server-only pre-release which is
-                      # incompatible with 2.2.0-1
-                      # 2.2.0-0 marks itself as CVMFS_CREATOR_VERSION=2.2.0
-                      # while 2.2.0-1 features  CVMFS_CREATOR_VERSION=2.2.0-1
-  fi
-  echo $version
-}
-
 # whenever you print the version string you should use this function since
 # a repository created before CernVM-FS 2.1.7 cannot be fingerprinted
 # correctly...
@@ -448,167 +338,6 @@ mangle_version_string() {
     echo $version_string
   fi
 }
-
-# only called by check_repository_compatibility()!
-# @param creator  the creator version of the (incompatible) repository
-# @param nokill   (optional) see check_repository_compatibility()
-_repo_is_incompatible() {
-  local creator=$1
-  # if 'nokill' is set, be silent and just return 1
-  if [ $# -gt 1 ]; then
-    return 1
-  fi
-
-  echo "\
-This repository was created with CernVM-FS $(mangle_version_string $creator).
-You are currently running CernVM-FS $(cvmfs_version_string), which is
-incompatible to $(mangle_version_string $creator).
-
-Please run \`cvmfs_server migrate\` to update your repository before proceeding."
-  exit 1
-}
-
-
-# checks if the sourced server.conf is compatible with the running version of
-# this script.
-# Note: this assumes that server.conf was already sourced!
-# @param nokill  (optional) if not set -> `exit 1` on incompatibility
-check_repository_compatibility() {
-  local name="$1"
-  local nokill=$2
-  local creator=$(repository_creator_version $name)
-  if version_equal "$creator"; then
-    return 0 # trivial case... no update of CernVM-FS taken place
-  fi
-
-  if version_lower_or_equal "$creator"; then
-    if [ $# -gt 0 ]; then
-      return 1 # nokill
-    fi
-    echo "This repository was created with CernVM-FS $creator which is newer
-than the currently installed version $(cvmfs_version_string). Please install at
-least CernVM-FS $creator to manipulate this repository."
-    exit 1
-  fi
-
-  # Migration History:
-  #   2.1.6 -> 2.1.7
-  #     -> repository format changed
-  #
-  #   2.1.7+ -> 2.1.15
-  #     -> config files changed (adding client.local)
-  #     -> adjustments in /etc/fstab
-  #     -> additional statistics counters in file catalogs
-  #
-  #   2.1.15+ -> 2.1.20
-  #     -> replica (i.e. stratum 1) with local upstream storage has
-  #        additional apache config for wsgi
-  #
-  #   2.1.20+ -> 2.2.0-1 (2.2.0-0 was a server pre-release and needs migration)
-  #     -> new (mandatory) parameters in client.conf (Stratum 0)
-  #     -> adjustments in /etc/fstab
-  #     -> CVMFS_AUTO_REPAIR_MOUNTPOINT=true becomes the enforced default
-  #     -> Apache configuration updated
-  #
-  #   2.2.0-1+ -> 2.3.0-1
-  #     -> new scratch directory layout (which also effects /etc/fstab)
-  #
-  # Note: I tried to make this code as verbose as possible
-  #
-  if [ "$creator" = "2.1.6" ] && version_greater_or_equal "2.1.7"; then
-    _repo_is_incompatible "$creator" $nokill
-    return $?
-  fi
-
-  if [ "$creator" = "2.1.7"  ] || [ "$creator" = "2.1.8"  ] || \
-     [ "$creator" = "2.1.9"  ] || [ "$creator" = "2.1.10" ] || \
-     [ "$creator" = "2.1.11" ] || [ "$creator" = "2.1.12" ] || \
-     [ "$creator" = "2.1.13" ] || [ "$creator" = "2.1.14" ];
-  then
-    if version_greater_or_equal "2.1.15"; then
-      _repo_is_incompatible "$creator" $nokill
-      return $?
-    fi
-  fi
-
-  if [ "$creator" = "2.1.15" ] || [ "$creator" = "2.1.16" ] || \
-     [ "$creator" = "2.1.17" ] || [ "$creator" = "2.1.18" ] || \
-     [ "$creator" = "2.1.19" ];
-  then
-    if version_greater_or_equal "2.1.20" && \
-       is_stratum1 $name                 && \
-       is_local_upstream $CVMFS_UPSTREAM_STORAGE; then
-      _repo_is_incompatible "$creator" $nokill
-      return $?
-    fi
-  fi
-
-  if [ "$creator" = "2.1.15"  ] || [ "$creator" = "2.1.16"  ] || \
-     [ "$creator" = "2.1.17"  ] || [ "$creator" = "2.1.18"  ] || \
-     [ "$creator" = "2.1.19"  ] || [ "$creator" = "2.1.20"  ] || \
-     [ "$creator" = "2.2.0-0" ];
-  then
-    if version_greater_or_equal "2.2.0"; then
-      _repo_is_incompatible "$creator" $nokill
-      return $?
-    fi
-  fi
-
-  if [ "$creator" = "2.2.0-1" ] || [ "$creator" = "2.2.1-1" ] || \
-     [ "$creator" = "2.2.2-1" ] || [ "$creator" = "2.2.3-1" ] && \
-     is_stratum0 $name; then
-    if version_greater_or_equal "2.3.0"; then
-      _repo_is_incompatible "$creator" $nokill
-      return $?
-    fi
-  fi
-
-  return 0
-}
-
-
-# checks if the given repository name already exists
-#
-# @param given_name   the name of the repository to be checked
-# @return             0 if the repository was found
-check_repository_existence() {
-  local given_name="$1"
-  local fqrn
-
-  # empty name or wildcards are not allowed (and thus does not exist)
-  if [ x"$given_name" = x ] || echo "$given_name" | grep -q "*"; then
-    return 1
-  fi
-
-  # Check if exists
-  fqrn=$(cvmfs_mkfqrn $given_name)
-  [ -d /etc/cvmfs/repositories.d/$fqrn ]
-}
-
-
-# checks the existence of a list of repositories
-# Note: the function echo's an error message and stops the execution of the
-#       script by default.
-#
-# @param given_names   the list of repository names to be checked
-# @param no_kill       (optional) skip the termination on error
-# @return              0 if all listed repositories exist
-check_multiple_repository_existence() {
-  local given_names="$1"
-  local no_kill=$2
-
-  for name in $given_names; do
-    if ! check_repository_existence $name; then
-      if [ x"$no_kill" = x"" ]; then
-        die "The repository $name does not exist."
-      else
-        return 1
-      fi
-    fi
-  done
-  return 0
-}
-
 
 # checks if the aufs kernel module is present
 # or if aufs is compiled in
@@ -651,13 +380,6 @@ get_available_union_fs() {
   fi
 }
 
-
-# checks if autofs is disabled on /cvmfs
-#
-# @return  0 if autofs is not used for /cvmfs
-check_autofs_on_cvmfs() {
-  cat /proc/mounts | grep -q "^/etc/auto.cvmfs /cvmfs "
-}
 
 request_apache_service() {
   local request_verb="$1"
@@ -897,23 +619,6 @@ check_cvmfs2_client() {
 }
 
 
-# checks if the running user is root
-#
-# @return   0 if the current user is root
-is_root() {
-  [ $(id -u) -eq 0 ]
-}
-
-# checks if the running user is either the owner of a repository or root
-#
-# @param name  the name of the repository
-is_owner_or_root() {
-  local name="$1"
-  is_root && return 0
-  load_repo_config $name
-  [ x"$(whoami)" = x"$CVMFS_USER" ]
-}
-
 # create a shell invocation to be used by commands to impersonate the owner of
 # a specific CVMFS repository.
 # Note: when impersonating the non-root repository owner, root's environment is
@@ -941,71 +646,6 @@ get_user_shell() {
   [ ! -z "$shell_cmd" ] # return false if no suitable shell could be constructed
 }
 
-
-# checks if a given path is mounted
-# Note: this takes care of symlink resolving and should be
-#       used exclusively for mount checks
-#
-# @param mountpoint  the mountpoint to be checked
-# @param regexp      additional regexp to be validated on the mountpoint record
-#                    found in /proc/mounts
-is_mounted() {
-  local mountpoint="$1"
-  local regexp="$2"
-
-  local absolute_mnt=
-  # Use canonicalize-missing because the mount point can be broken and
-  # inaccessible
-  absolute_mnt="$(readlink --canonicalize-missing $mountpoint)" || return 2
-  local mnt_record="$(cat /proc/mounts 2>/dev/null | grep " $absolute_mnt ")"
-  if [ x"$mnt_record" = x"" ]; then
-    return 1
-  fi
-
-  [ x"$regexp" = x"" ] || echo "$mnt_record" | grep -q "$regexp"
-}
-
-
-# checks if a given repository is a stratum 0 repository
-#
-# @param name   the repository name to be checked
-# @return       0 if it is a stratum 0 repository
-is_stratum0() {
-  local name=$1
-  ! [ -f /etc/cvmfs/repositories.d/$name/replica.conf ]
-}
-
-
-# checks if a given repository is a stratum 1 repository
-#
-# @param name   the repository name to be checked
-# @return       0 if it is a stratum 1 repository
-is_stratum1() {
-  local name=$1
-  ! is_stratum0 $name
-}
-
-
-# Parse redirects configuration into redirect flag.
-# Assumes that config is loaded already, i.e. load_repo_config().
-get_follow_http_redirects_flag() {
-  if [ x"$CVMFS_FOLLOW_REDIRECTS" = x"yes" ]; then
-    echo "-L"
-  fi
-}
-
-
-get_repo_info_from_url() {
-  local url="$1"
-  shift 1
-  __swissknife info $(get_follow_http_redirects_flag) -r "$url" $@ 2>/dev/null
-}
-
-# expects load_repo_config to be called with the right repository before
-# possible parameters, see `cvmfs_swissknife info`
-get_repo_info() {
-  get_repo_info_from_url "$CVMFS_STRATUM0" $@
-}
 
 # checks if a given repository is replicable
 #
@@ -1135,97 +775,6 @@ get_auto_garbage_collection_timespan() {
 }
 
 
-# Helper functions for file locking including detection of stale locks
-# Note: The implementation idea was found here:
-#       http://rute.2038bug.com/node23.html.gz
-__is_valid_lock() {
-  local path="$1"
-  local ignore_stale="$2"
-
-  local lock_file="${path}.lock"
-  [ -f $lock_file ]      || return 1 # lock doesn't exist
-  [ -z "$ignore_stale" ] || return 0 # lock is there (skip the stale test)
-
-  local stale_pid=$(cat $lock_file 2>/dev/null)
-  [ $stale_pid -gt 0 ]     && \
-  kill -0 $stale_pid 2>/dev/null
-}
-
-acquire_lock() { # hardlink creation is guaranteed to be atomic!
-  local path="$1"
-  local ignore_stale="$2"
-
-  local pid="$$"
-  local temp_file="${path}.${pid}"
-  local lock_file="${path}.lock"
-  echo $pid > $temp_file || return 1 # probably no access to $path
-
-  if ln $temp_file $lock_file 2>/dev/null; then
-    rm -f $temp_file 2>/dev/null
-    return 0 # lock acquired
-  fi
-
-  if __is_valid_lock "$path" "$ignore_stale"; then
-    rm -f $temp_file 2>/dev/null
-    return 1 # lock couldn't be acquired and appears valid
-  fi
-
-  rm -f $lock_file 2>/dev/null # lock was stale and can be removed
-  if ln $temp_file $lock_file; then
-    rm -f $temp_file 2>/dev/null
-    return 0 # lock acquired
-  fi
-
-  rm -f $temp_file 2>/dev/null
-  return 1 # lock couldn't be acquired after removing stale lock (lost the race)
-}
-
-wait_and_acquire_lock() {
-  local path="$1"
-  while ! acquire_lock "$path"; do
-    sleep 5
-  done
-}
-
-release_lock() {
-  local path="$1"
-  local lock_file="${path}.lock"
-  rm -f $lock_file 2>/dev/null
-}
-
-check_lock() {
-  local path="$1"
-  local ignore_stale="$2"
-  __is_valid_lock "${path}" "$ignore_stale"
-}
-
-run_suid_helper() {
-  env -i /usr/bin/cvmfs_suid_helper $@
-}
-
-
-# checks if a repository is currently in a transaction
-#
-# @param name  the repository name to be checked
-# @return      0 if in a transaction
-is_in_transaction() {
-  local name=$1
-  load_repo_config $name
-  check_lock ${CVMFS_SPOOL_DIR}/in_transaction ignore_stale
-}
-
-open_transaction() {
-  local name=$1
-  load_repo_config $name
-  local tx_lock="${CVMFS_SPOOL_DIR}/in_transaction"
-
-  is_stratum0 $name                    || die "Cannot open transaction on Stratum1"
-  acquire_lock "$tx_lock" ignore_stale || die "Failed to create transaction lock"
-  run_suid_helper open $name           || die "Failed to make /cvmfs/$name writable"
-
-  to_syslog_for_repo $name "opened transaction"
-}
-
 # closes a previously opened transaction
 # Note: This function will perform remounts on /cvmfs/${name} and the underlying
 #       read-only CVMFS branch. Hence, check for open file descriptors first!
@@ -1291,16 +840,6 @@ close_transaction() {
   to_syslog_for_repo $name "closed transaction $fallback_msg $async_msg"
 }
 
-# checks if a repository is currently runing a publish procedure
-#
-# @param name  the repository name to be checked
-# @return      0 if a publishing procedure is running
-is_publishing() {
-  local name=$1
-  load_repo_config $name
-  check_lock ${CVMFS_SPOOL_DIR}/is_publishing ignore_stale
-}
-
 publish_starting() {
   local name=$1
   load_repo_config $name
@@ -1348,25 +887,6 @@ has_selinux() {
 }
 
 
-# checks if a given list of strings contains a specific item
-#
-# @param haystack   the list to be searched
-# @param needle     the string item to be found in the haystack
-# @return           0 if the item was found
-contains() {
-  local haystack="$1"
-  local needle=$2
-
-  for elem in $haystack; do
-    if [ x"$elem" = x"$needle" ]; then
-      return 0
-    fi
-  done
-
-  return 1
-}
-
-
 _cleanup_tmrc() {
   local tmpdir=$1
   umount ${tmpdir}/c > /dev/null 2>&1 || umount -l > /dev/null 2>&1
@@ -1392,23 +912,6 @@ try_mount_remount_cycle_aufs() {
 }
 
 
-# download a given file from the backend storage
-# @param noproxy  (optional)
-get_item() {
-  local name="$1"
-  local url="$2"
-  local noproxy="$3"
-
-  load_repo_config $name
-
-  if [ x"$noproxy" != x"" ]; then
-    unset http_proxy && curl $(get_follow_http_redirects_flag) "$url" 2>/dev/null
-  else
-    curl $(get_follow_http_redirects_flag) "$url" 2>/dev/null
-  fi
-}
-
-
 # checks if the right number of arguments was provided
 # if the wrong number was provided it will kill the script after printing the
 # usage text and an error message
@@ -1429,60 +932,6 @@ check_parameter_count() {
 
 
 # mangles the repository name into a fully qualified repository name
-#
-# @param repository_name       the repository name given by the user
-# @return                      echoes the correct repository name to use
-get_repository_name() {
-  local repository_name=$1
-  echo $(cvmfs_mkfqrn $repository_name)
-}
-
-
-# checks the parameter count for a situation where we might be able to guess
-# the repository name based on the repositories present in the system
-# Note: if the parameter count does not fit or if guessing is impossible,
-#       this will print the usage string with an error message and exit
-# Note: this method is commonly used right before invoking
-#       `get_or_guess_repository_name` to check its preconditions and report
-#       error before actually doing something wrong
-#
-# @param provided_parameter_count  number of parameters provided by the user
-# @param allow_multiple_names      switches off the usage print for too many
-#                                  detected script parameters (see next fn)
-check_parameter_count_with_guessing() {
-  local provided_parameter_count=$1
-  local allow_multiple_names=$2
-
-  if [ $provided_parameter_count -lt 1 ]; then
-    # check if we have not _exactly_ one repository present
-    if [ $(ls /etc/cvmfs/repositories.d/ | wc -l) -ne 1 ]; then
-      usage "Please provide a repository name"
-    fi
-  fi
-
-  if [ $provided_parameter_count -gt 1 ] && \
-     [ x"$allow_multiple_names" = x"" ]; then
-    usage "Too many arguments provided"
-  fi
-
-  return 0
-}
-
-
-# checks the parameter count when we accept more than one repository for the
-# command.
-# Note: this method prints an error message if appropriate and exists the script
-#       execution
-#
-# @param provided_parameter_count  number of parameters provided by the user
-check_parameter_count_for_multiple_repositories() {
-  local provided_parameter_count=$1
-  check_parameter_count_with_guessing $provided_parameter_count allow_multiple
-  return $?
-}
-
-
-# mangles the repository name into a fully qualified repository name
 # if there was no repository name given and there is only one repository present
 # in the system, it automatically returns the name of this one.
 #
@@ -1496,37 +945,6 @@ get_or_guess_repository_name() {
   else
     echo $(get_repository_name $repository_name)
   fi
-}
-
-
-# guesses a list of repository names based on file system wildcards
-#
-# @param ...    all repository hints provided by the user of the script
-#               Like: test.local repo.* *.cern.ch
-get_or_guess_multiple_repository_names() {
-  local repo_dir="/etc/cvmfs/repositories.d"
-  local repo_names=""
-
-  if [ $# -eq 0 ]; then
-    repo_names=$(get_or_guess_repository_name)
-    echo $repo_names
-    return 0;
-  fi
-
-  for input_pattern in $@; do
-    local names="$(ls --directory $repo_dir/$input_pattern 2>/dev/null)"
-    if [ x"$names" = x"" ]; then
-      repo_names="$repo_names $input_pattern"
-    else
-      for name in $names; do
-        if ! contains "$repo_names" $(basename $name); then
-          repo_names="$(basename $name) $repo_names"
-        fi
-      done
-    fi
-  done
-
-  echo "$repo_names"
 }
 
 
@@ -1561,242 +979,6 @@ foreclose_legacy_cvmfs() {
   fi
 
   return $found_something
-}
-
-
-__hc_print_status_report() {
-  local name="$1"
-  local rdonly_broken=$2
-  local rdonly_outdated=$3
-  local rw_broken=$4
-  local rw_should_be_rdonly=$5
-  local rw_should_be_rw=$6
-
-  [ $rdonly_broken       -eq 0 ] || echo "${CVMFS_SPOOL_DIR}/rdonly is not mounted properly."                   >&2
-  [ $rdonly_outdated     -eq 0 ] || echo "$name is not based on the newest published revision"                  >&2
-  [ $rw_broken           -eq 0 ] || echo "/cvmfs/$name is not mounted properly."                                >&2
-  [ $rw_should_be_rdonly -eq 0 ] || echo "$name is not in a transaction but /cvmfs/$name is mounted read/write" >&2
-  [ $rw_should_be_rw     -eq 0 ] || echo "$name is in a transaction but /cvmfs/$name is not mounted read/write" >&2
-}
-
-__hc_transition() {
-  local name="$1"
-  local quiet="$2"
-  local transition="$3"
-  local msg=""
-  local stdout_msg=""
-  local retcode=0
-
-  case $transition in
-    rw_umount)     msg="Trying to umount /cvmfs/${name}"             ;;
-    rdonly_umount) msg="Trying to umount ${CVMFS_SPOOL_DIR}/rdonly"  ;;
-    rw_mount)      msg="Trying to mount /cvmfs/${name}"              ;;
-    rdonly_mount)  msg="Trying to mount ${CVMFS_SPOOL_DIR}/rdonly"   ;;
-    open)          msg="Trying to remount /cvmfs/${name} read/write" ;;
-    lock)          msg="Trying to remount /cvmfs/${name} read-only"  ;;
-    *)             exit 2                                            ;;
-  esac
-
-  stdout_msg="Note: ${msg}... "
-  [ $quiet = 0 ] && echo -n "$stdout_msg" >&2
-
-  if run_suid_helper $transition $name > /dev/null; then
-    [ $quiet = 0 ] && echo "success" >&2
-    to_syslog_for_repo $name "${msg}... success"
-  else
-    [ $quiet = 0 ] || echo -n "${stdout_msg}" >&2 # error messages are not quiet
-    echo "fail"                               >&2
-    to_syslog_for_repo $name "${msg}... fail"
-    exit 1
-  fi
-}
-
-# Checks for inconsistent repository states or unfavorable configs. Can repair
-# inconsistent repository mount states (-r)
-# Parameters:
-#   -q    silence notifications to stdout/stderr (syslog messages stay in place)
-#   -r    try to repair detected inconsistencies (non-zero exit on failure)
-#   -t    repair even if the repository is in a transaction
-#   -f    force repair (even if CVMFS_AUTO_REPAIR_MOUNTPOINT=false)
-#
-# @param name   the FQRN of the repository to be checked
-# @return       0 if repository is healthy (or has been successfully repaired)
-#               otherwise 1 (or abort when -r is given and repair fails)
-health_check() {
-  local name=""
-  local quiet=0
-  local repair=0
-  local repair_in_txn=0
-  local force_repair=0
-
-  OPTIND=0
-  while getopts "qrtf" option; do
-    case $option in
-      q)
-        quiet=1
-      ;;
-      r)
-        repair=1
-      ;;
-      t)
-        repair=1
-        repair_in_txn=1
-      ;;
-      f)
-        repair=1
-        force_repair=1
-      ;;
-      ?)
-        shift $(($OPTIND-2))
-        die "health_check: Unrecognized option: $1"
-      ;;
-    esac
-  done
-  shift $(($OPTIND-1))
-
-  [ $# -eq 1 ] || die "health_check: No repository name provided"
-  name=$(get_repository_name $1)
-
-  local rdonly_broken=0
-  local rw_broken=0
-  local rw_should_be_rdonly=0
-  local rw_should_be_rw=0
-  local rdonly_outdated=0
-
-  load_repo_config $name
-
-  # for stratum 1 repositories there are no health checks
-  if is_stratum1 $name; then
-    return 0
-  fi
-
-  # check mounted read-only cvmfs client
-  if ! is_mounted "${CVMFS_SPOOL_DIR}/rdonly"; then
-    rdonly_broken=1
-  elif [ x"$(get_mounted_root_hash $name)"      != \
-         x"$(get_published_root_hash $name)" ]; then
-    rdonly_outdated=1
-  fi
-
-  # check mounted union file system
-  if ! is_mounted "/cvmfs/$name"; then
-    rw_broken=1
-    if is_in_transaction $name; then
-      rw_should_be_rw=1
-      rw_should_be_ro=0
-    else
-      rw_should_be_rw=0
-      rw_should_be_ro=1
-    fi
-  else
-    if ! is_in_transaction $name && \
-         is_mounted "/cvmfs/$name" "^.* rw[, ].*$"; then
-      rw_should_be_rdonly=1
-    elif is_in_transaction $name && \
-         is_mounted "/cvmfs/$name" "^.* ro[, ].*$"; then
-      rw_should_be_rw=1
-    fi
-  fi
-
-  # did we detect any kind of problem?
-  if [ $((   $rdonly_broken       \
-           + $rdonly_outdated     \
-           + $rw_broken           \
-           + $rw_should_be_rdonly \
-           + $rw_should_be_rw )) -eq 0 ]; then
-    return 0
-  fi
-
-  # should we print the found status?
-  if [ $quiet = 0 ]; then
-    __hc_print_status_report $name $rdonly_broken       \
-                                   $rdonly_outdated     \
-                                   $rw_broken           \
-                                   $rw_should_be_rdonly \
-                                   $rw_should_be_rw
-  fi
-
-  # should we try a repair?
-  if [ $repair = 0 ]; then
-    return 1
-  fi
-
-  # check if we are allowed to attempt a repair
-  if [ x"$CVMFS_AUTO_REPAIR_MOUNTPOINT" = x"false" ] && \
-     [ $force_repair = 0 ]; then
-    echo "Auto-Repair is disabled (CVMFS_AUTO_REPAIR_MOUNTPOINT = false)" >&2
-    exit 1
-  fi
-
-  if is_publishing $name; then
-    echo "WARNING: The repository $name is currently publishing and should not" >&2
-    echo "be touched. If you are absolutely sure, that this is _not_ the case," >&2
-    echo "please run the following command and retry:"                          >&2
-    echo                                                                        >&2
-    echo "   rm -fR ${CVMFS_SPOOL_DIR}/is_publishing.lock"                      >&2
-    echo                                                                        >&2
-    exit 1
-  fi
-
-  if is_in_transaction $name && [ $repair_in_txn = 0 ]; then
-    echo "Repository $name is in a transaction and cannot be repaired." >&2
-    echo "--> Run \`cvmfs_server abort $name\` to revert and repair."   >&2
-    exit 1
-  fi
-
-  to_syslog_for_repo $name "attempting mountpoint repair ($rdonly_broken $rdonly_outdated $rw_broken $rw_should_be_rdonly $rw_should_be_rw)"
-
-  # consecutively bring the mountpoints into a sane state by working bottom up:
-  #   1. solve problems with the rdonly mountpoint
-  #      Note: this might require to 'break' the rw mountpoint (rw_broken --> 1)
-  #      1.1. solve outdated rdonly mountpoint (rdonly_outdated --> 0)
-  #      1.2. remount rdonly mountpoint        (rdonly_broken   --> 0)
-  #   2. solve problems with the rw mountpoint
-  #      2.1. mount the rw mountpoint as read-only    (rw_broken       --> 0)
-  #      2.2. remount the rw mountpoint as read-only  (rw_should_be_ro --> 0)
-  #      2.2. remount the rw mountpoint as read-write (rw_should_be_rw --> 0)
-  if [ $rdonly_outdated -eq 1 ]; then
-    if [ $rw_broken -eq 0 ]; then
-      __hc_transition $name $quiet "rw_umount"
-      rw_broken=1 # ... remount happens downstream
-    fi
-
-    if [ $rdonly_broken -eq 0 ]; then
-      __hc_transition $name $quiet "rdonly_umount"
-      rdonly_broken=1 # ... remount happens downstream
-    fi
-
-    set_ro_root_hash $name "$(get_published_root_hash $name)" || die "failed to update root hash"
-    rdonly_outdated=0 # ... remount will mount the latest revision
-  fi
-
-  if [ $rdonly_broken -eq 1 ]; then
-    if [ $rw_broken -eq 0 ]; then
-      __hc_transition $name $quiet "rw_umount"
-      rw_broken=1 # ... remount happens downstream
-    fi
-
-    __hc_transition $name $quiet "rdonly_mount"
-    rdonly_broken=0 # ... rdonly is repaired
-  fi
-
-  if [ $rw_broken -eq 1 ]; then
-    __hc_transition $name $quiet "rw_mount"
-    rw_broken=0           # ... rw is repaired
-    rw_should_be_rdonly=0 # ... and already mounted read-only by default
-  fi
-
-  if [ $rw_should_be_rw -eq 1 ]; then
-    __hc_transition $name $quiet "open"
-    rw_should_be_rw=0 # ... rw is repaired
-  fi
-
-  if [ $rw_should_be_rdonly -eq 1 ]; then
-    __hc_transition $name $quiet "lock"
-    rw_should_be_rdonly=0 # ... rw is repaired
-  fi
-
-  to_syslog_for_repo $name "finished mountpoint repair ($rdonly_broken $rdonly_outdated $rw_broken $rw_should_be_rdonly $rw_should_be_rw)"
 }
 
 
@@ -1866,59 +1048,6 @@ create_whitelist() {
 }
 
 
-get_expiry_from_string() {
-  local whitelist="$1"
-
-  local expires=$(echo "$whitelist" | grep --text -e '^E[0-9]\{14\}$' | tr -d E)
-  if echo "$expires" | grep -q -E --invert-match '^[0-9]{14}$'; then
-    echo -1
-    return 1
-  fi
-  local year=$(echo $expires | head -c4)
-  local month=$(echo $expires | head -c6 | tail -c2)
-  local day=$(echo $expires | head -c8 | tail -c2)
-  local hour=$(echo $expires | head -c10 | tail -c2)
-  local minute=$(echo $expires | head -c12 | tail -c2)
-  local second=$(echo $expires | head -c14 | tail -c2)
-  local expires_fmt="${year}-${month}-${day} ${hour}:${minute}:${second}"
-  local expires_num=$(date -u -d "$expires_fmt" +%s)
-
-  local now=$(/bin/date -u +%s)
-  local valid_countdown=$(( $expires_num-$now ))
-  echo $valid_countdown
-}
-
-
-# figures out the time to expiry of the repository's whitelist
-#
-# @param stratum0  path/URL to stratum0 storage
-# @return          number of seconds until expiry (negativ if already expired)
-get_expiry() {
-  local name=$1
-  local stratum0=$2
-  get_expiry_from_string "$(get_item $name $stratum0/.cvmfswhitelist 'noproxy')"
-}
-
-
-# checks if the repository's whitelist is valid
-#
-# @param stratum0  path/URL to stratum0 storage
-# @return          0 if whitelist is still valid
-check_expiry() {
-  local name=$1
-  local stratum0=$2
-  local expiry="-1"
-
-  expiry=$(get_expiry $name $stratum0)
-  if [ $? -ne 0 ]; then
-    echo "Failed to retrieve repository expiry date" >&2
-    return 100
-  fi
-
-  [ $expiry -ge 0 ]
-}
-
-
 sign_manifest() {
   local name=$1
   local unsigned_manifest=$2
@@ -1980,22 +1109,6 @@ check_upstream_validity() {
       <spooler type> , <tmp directory> , <spooler configuration>"
   fi
   return 1
-}
-
-get_upstream_type() {
-  local upstream=$1
-  echo "$upstream" | cut -d, -f1
-}
-
-check_upstream_type() {
-  local upstream=$1
-  local needle_type=$2
-  [ x$(get_upstream_type $upstream) = x"$needle_type" ]
-}
-
-is_local_upstream() {
-  local upstream=$1
-  check_upstream_type $upstream "local"
 }
 
 is_s3_upstream() {
@@ -2150,43 +1263,6 @@ get_cvmfs_owner() {
   fi
   check_user $cvmfs_user || return 1
   echo $cvmfs_owner
-}
-
-
-set_ro_root_hash() {
-  local name=$1
-  local root_hash=$2
-  local client_config=/var/spool/cvmfs/${name}/client.local
-
-  if grep -q ^CVMFS_ROOT_HASH= ${client_config}; then
-    sed -i -e "s/CVMFS_ROOT_HASH=.*/CVMFS_ROOT_HASH=${root_hash}/" $client_config
-  else
-    echo "CVMFS_ROOT_HASH=${root_hash}" >> $client_config
-  fi
-}
-
-
-# retrieves the currently mounted root catalog hash in the spool area
-#
-# @param repository_name    the name of the repository to be checked
-# @return                   echoes the currently mounted root catalog hash
-get_mounted_root_hash() {
-  local repository_name=$1
-
-  load_repo_config $repository_name
-  get_repo_info -u ${CVMFS_SPOOL_DIR}/rdonly -C
-}
-
-
-# retrieves the latest published root catalog hash in the backend storage
-#
-# @param repository_name   the name of the repository to be checked
-# @return                  echoes the last published (HEAD) root catalog hash
-get_published_root_hash() {
-  local repository_name=$1
-
-  load_repo_config $repository_name
-  get_repo_info -c
 }
 
 
@@ -4533,73 +3609,6 @@ cvmfs_server_list() {
     echo "$name ($CVMFS_REPOSITORY_TYPE / $storage_type$transaction_info$whitelist_info$health_info) $stratum1_info $version_info"
     CVMFS_CREATOR_VERSION=""
   done
-}
-
-
-################################################################################
-
-
-cvmfs_server_transaction() {
-  local names
-  local spool_dir
-  local stratum0
-  local force=0
-  local retcode=0
-
-  # optional parameter handling
-  OPTIND=1
-  while getopts "f" option
-  do
-    case $option in
-      f)
-        force=1
-      ;;
-      ?)
-        shift $(($OPTIND-2))
-        usage "Command transaction: Unrecognized option: $1"
-      ;;
-    esac
-  done
-
-  # get repository names
-  shift $(($OPTIND-1))
-  check_parameter_count_for_multiple_repositories $#
-  names=$(get_or_guess_multiple_repository_names $@)
-  check_multiple_repository_existence "$names"
-
-  # sanity checks
-  check_autofs_on_cvmfs && die "Autofs on /cvmfs has to be disabled"
-
-  # go through the repositories
-  for name in $names; do
-
-    # sanity checks
-    is_stratum0 $name || { echo "Repository $name is not a stratum 0 repository"; retcode=1; continue; }
-    health_check -r $name
-
-    # get repository information
-    load_repo_config $name
-    spool_dir=$CVMFS_SPOOL_DIR
-    stratum0=$CVMFS_STRATUM0
-    user=$CVMFS_USER
-
-    # more sanity checks
-    is_owner_or_root $name || { echo "Permission denied: Repository $name is owned by $user"; retcode=1; continue; }
-    check_repository_compatibility $name
-    if [ $force -eq 0 ]; then
-      is_in_transaction $name && { echo "Repository $name is already in a transaction"; retcode=1; continue; }
-    fi
-    check_expiry $name $stratum0 || { echo "Repository whitelist for $name is expired!"; retcode=1; continue; }
-    [ $(get_expiry $name $stratum0) -le $(( 12 * 60 * 60 )) ] && { echo "Warning: Repository whitelist stays valid for less than 12 hours!"; }
-
-    # do it!
-    transaction_before_hook $name
-    open_transaction        $name
-    transaction_after_hook  $name
-
-  done
-
-  return $retcode
 }
 
 
