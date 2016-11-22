@@ -1,10 +1,12 @@
 cvmfs_test_name="Handling special files"
 
 export CVMFS_TEST_UNIONFS="overlayfs"
-export CVMFS_IGNORE_SPECIAL_FILES="true"
+# export CVMFS_IGNORE_SPECIAL_FILES="true"
+test_repo_config="/etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf"
 
 _setup() {
     create_repo "$CVMFS_TEST_REPO" "$CVMFS_TEST_USER" "/tmp/debug.log" 1>/dev/null
+    echo "CVMFS_IGNORE_SPECIAL_FILES=true" | sudo tee -a $test_repo_config
 }
 
 _cleanup() {
