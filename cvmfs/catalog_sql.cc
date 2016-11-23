@@ -838,9 +838,9 @@ SqlNestedCatalogListing::SqlNestedCatalogListing(
 }
 
 
-PathString SqlNestedCatalogListing::GetMountpoint() const {
-  const char *mountpoint = reinterpret_cast<const char *>(RetrieveText(0));
-  PathString result(mountpoint, strlen(mountpoint));
+PathString SqlNestedCatalogListing::GetPath() const {
+  const char *path = reinterpret_cast<const char *>(RetrieveText(0));
+  PathString result(path, strlen(path));
 
   // Previous versions of cvmfs did not know about bind mountpoints.  In order
   // to not confuse them, registered bind mountpoints have a "@" as a first

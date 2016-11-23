@@ -399,7 +399,7 @@ class SqlNestedCatalogLookup : public SqlCatalog {
 class SqlNestedCatalogListing : public SqlCatalog {
  public:
   explicit SqlNestedCatalogListing(const CatalogDatabase &database);
-  PathString GetMountpoint() const;
+  PathString GetPath() const;
   shash::Any GetContentHash() const;
   uint64_t GetSize() const;
 };

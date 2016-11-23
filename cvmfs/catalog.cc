@@ -590,7 +590,7 @@ const Catalog::NestedCatalogList& Catalog::ListNestedCatalogs() const {
              mountpoint().c_str());
     while (sql_list_nested_->FetchRow()) {
       NestedCatalog nested;
-      nested.mountpoint = sql_list_nested_->GetMountpoint();
+      nested.mountpoint = sql_list_nested_->GetPath();
       nested.hash = sql_list_nested_->GetContentHash();
       nested.size = sql_list_nested_->GetSize();
       nested_catalog_cache_.push_back(nested);
