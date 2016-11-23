@@ -161,6 +161,27 @@ TEST_F(T_Catalog, NormalizePath) {
 }
 
 
+TEST_F(T_Catalog, PlantPath) {
+  catalog::Catalog c1(PathString(""), shash::Any(), NULL, false);
+  EXPECT_TRUE(c1.is_regular_mountpoint_);
+  EXPECT_EQ(PathString(""), c1.PlantPath(PathString("")));
+  EXPECT_EQ(PathString("/foo/bar"), c1.PlantPath(PathString("/foo/bar")));
+
+  catalog::Catalog c2(PathString("/.cvmfs"), shash::Any(), NULL, false);
+  EXPECT_EQ(PathString(""), c2.root_prefix_);
+  EXPECT_FALSE(c2.is_regular_mountpoint_);
+  EXPECT_EQ(PathString("/.cvmfs"), c2.PlantPath(PathString("")));
+  EXPECT_EQ(PathString("/.cvmfs/nested"), c2.PlantPath(PathString("/nested")));
+
+  catalog::Catalog c3(PathString("/.cvmfs/nested"), shash::Any(), NULL, false);
+  EXPECT_FALSE(c3.is_regular_mountpoint_);
+  c3.root_prefix_ = PathString("/nested");
+  EXPECT_EQ(PathString("/.cvmfs/nested"), c3.PlantPath(PathString("/nested")));
+  EXPECT_EQ(PathString("/.cvmfs/nested/foo/bar"),
+            c3.PlantPath(PathString("/nested/foo/bar")));
+}
+
+
 TEST_F(T_Catalog, Attach) {
   catalog = catalog::Catalog::AttachFreely("",
                                            catalog_db_root,

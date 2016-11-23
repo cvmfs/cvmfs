@@ -90,6 +90,7 @@ class InodeAnnotation {
  */
 class Catalog : SingleCopy {
   FRIEND_TEST(T_Catalog, NormalizePath);
+  FRIEND_TEST(T_Catalog, PlantPath);
   friend class swissknife::CommandMigrate;  // for catalog version migration
 
  public:
@@ -258,6 +259,7 @@ class Catalog : SingleCopy {
   };
 
   shash::Md5 NormalizePath(const PathString &path);
+  PathString PlantPath(const PathString &path);
 
   void FixTransitionPoint(const shash::Md5 &md5path,
                           DirectoryEntry *dirent) const;

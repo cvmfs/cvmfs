@@ -843,7 +843,7 @@ PathString SqlNestedCatalogListing::GetPath() const {
   PathString result(path, strlen(path));
 
   // Previous versions of cvmfs did not know about bind mountpoints.  In order
-  // to not confuse them, registered bind mountpoints have a "@" as a first
+  // to not confuse them, registered bind mountpoints have an "@" as a first
   // character instead of a "/".  Older versions of cvmfs thus won't try to
   // load a nested catalog (which would crash) when hitting a bind mountpoint.
   assert(result.GetLength() > 0);

@@ -242,6 +242,23 @@ shash::Md5 Catalog::NormalizePath(const PathString &path) {
 
 
 /**
+ * The opposite of NormalizePath: from a full path remove the root prefix and
+ * add the catalogs current mountpoint.  Needed for normalized paths from the
+ * SQlite tables, such as nested catalog entry points.
+ */
+PathString Catalog::PlantPath(const PathString &path) {
+  if (is_regular_mountpoint_)
+    return path;
+
+  assert(path.GetLength() >= root_prefix_.GetLength());
+  PathString result = mountpoint_;
+  PathString suffix = path.Suffix(root_prefix_.GetLength());
+  result.Append(suffix.GetChars(), suffix.GetLength());
+  return result;
+}
+
+
+/**
  * Performs a lookup on this Catalog for a given MD5 path hash.
  * @param md5path the MD5 hash of the searched path
  * @param expand_symlink indicates if variables in symlink should be resolved
