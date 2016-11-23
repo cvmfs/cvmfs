@@ -4,6 +4,7 @@
 
 #include "catalog.h"
 
+#include <alloca.h>
 #include <errno.h>
 
 #include <algorithm>
@@ -49,6 +50,7 @@ Catalog::Catalog(const PathString &mountpoint,
                  const bool        is_nested) :
   catalog_hash_(catalog_hash),
   mountpoint_(mountpoint),
+  is_regular_mountpoint_(mountpoint_ == root_prefix_),
   volatile_flag_(false),
   is_root_(parent == NULL && !is_nested),
   managed_database_(false),
@@ -184,6 +186,7 @@ bool Catalog::OpenDatabase(const string &db_path) {
       LogCvmfs(kLogCatalog, kLogDebug,
                "found root prefix %s in root catalog file %s",
                root_prefix_.c_str(), db_path.c_str());
+      is_regular_mountpoint_ = (root_prefix_ == mountpoint_);
     } else {
       LogCvmfs(kLogCatalog, kLogDebug,
                "no root prefix for root catalog file %s", db_path.c_str());
@@ -208,6 +211,33 @@ bool Catalog::OpenDatabase(const string &db_path) {
 
   initialized_ = true;
   return true;
+}
+
+
+/**
+ * Removes the mountpoint and prepends the root prefix to path
+ */
+shash::Md5 Catalog::NormalizePath(const PathString &path) {
+  if (is_regular_mountpoint_)
+    return shash::Md5(path.GetChars(), path.GetLength());
+
+  assert(path.GetLength() >= mountpoint_.GetLength());
+  // Piecewise hash calculation: root_prefix plus tail of path
+  shash::Any result(shash::kMd5);
+  shash::ContextPtr ctx(shash::kMd5);
+  ctx.buffer = alloca(ctx.size);
+  shash::Init(ctx);
+  shash::Update(
+    reinterpret_cast<const unsigned char *>(root_prefix_.GetChars()),
+    root_prefix_.GetLength(),
+    ctx);
+  shash::Update(
+    reinterpret_cast<const unsigned char *>(path.GetChars()) +
+      mountpoint_.GetLength(),
+    path.GetLength() - mountpoint_.GetLength(),
+    ctx);
+  shash::Final(ctx, &result);
+  return result.CastToMd5();
 }
 
 

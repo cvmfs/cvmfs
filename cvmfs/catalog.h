@@ -17,6 +17,7 @@
 #include "catalog_sql.h"
 #include "directory_entry.h"
 #include "file_chunk.h"
+#include "gtest/gtest_prod.h"
 #include "hash.h"
 #include "shortstring.h"
 #include "sql.h"
@@ -88,6 +89,7 @@ class InodeAnnotation {
  * Read-only catalog. A sub-class provides read-write access.
  */
 class Catalog : SingleCopy {
+  FRIEND_TEST(T_Catalog, NormalizePath);
   friend class swissknife::CommandMigrate;  // for catalog version migration
 
  public:
@@ -255,6 +257,8 @@ class Catalog : SingleCopy {
     kVomsPresent,  // voms_authz property available
   };
 
+  shash::Md5 NormalizePath(const PathString &path);
+
   void FixTransitionPoint(const shash::Md5 &md5path,
                           DirectoryEntry *dirent) const;
 
@@ -275,8 +279,19 @@ class Catalog : SingleCopy {
 
   const shash::Any catalog_hash_;
   PathString root_prefix_;
+  /**
+   * Normally, catalogs are mounted at their root_prefix_. But for the structure
+   * under /.cvmfs/snapshots/..., that's not the case.
+   */
   PathString mountpoint_;
+  /**
+   * True, iff root_prefix_ == mountpoint_
+   */
+  bool is_regular_mountpoint_;
   bool volatile_flag_;
+  /**
+   * For catalogs in a catalog manager: doesn't have a parent catalog
+   */
   const bool is_root_;
   bool managed_database_;
 

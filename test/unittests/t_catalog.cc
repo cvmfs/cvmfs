@@ -135,6 +135,32 @@ class T_Catalog : public ::testing::Test {
 };
 
 
+TEST_F(T_Catalog, NormalizePath) {
+  catalog::Catalog c1(PathString(""), shash::Any(), NULL, false);
+  EXPECT_TRUE(c1.is_regular_mountpoint_);
+  EXPECT_EQ(shash::Md5(shash::AsciiPtr("")),
+            c1.NormalizePath(PathString("")));
+  EXPECT_EQ(shash::Md5(shash::AsciiPtr("/foo/bar")),
+            c1.NormalizePath(PathString("/foo/bar")));
+
+  catalog::Catalog c2(PathString("/.cvmfs"), shash::Any(), NULL, false);
+  EXPECT_FALSE(c2.is_regular_mountpoint_);
+  EXPECT_EQ(PathString(""), c2.root_prefix_);
+  EXPECT_EQ(shash::Md5(shash::AsciiPtr("")),
+            c2.NormalizePath(PathString("/.cvmfs")));
+  EXPECT_EQ(shash::Md5(shash::AsciiPtr("/foo/bar")),
+            c2.NormalizePath(PathString("/.cvmfs/foo/bar")));
+
+  catalog::Catalog c3(PathString("/.cvmfs/nested"), shash::Any(), NULL, false);
+  EXPECT_FALSE(c3.is_regular_mountpoint_);
+  c3.root_prefix_ = PathString("/nested");
+  EXPECT_EQ(shash::Md5(shash::AsciiPtr("/nested")),
+            c3.NormalizePath(PathString("/.cvmfs/nested")));
+  EXPECT_EQ(shash::Md5(shash::AsciiPtr("/nested/foo/bar")),
+            c3.NormalizePath(PathString("/.cvmfs/nested/foo/bar")));
+}
+
+
 TEST_F(T_Catalog, Attach) {
   catalog = catalog::Catalog::AttachFreely("",
                                            catalog_db_root,
