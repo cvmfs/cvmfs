@@ -20,21 +20,19 @@ export LANG=C
 
 
 # Includes
-if [ -z ${CVMFS_SERVER_DEVEL+x} ]; then
-    #####
-    # The following files should be sourced in this order and before the other files
-    source "server/cvmfs_server_util.sh"
-    source "server/cvmfs_server_common.sh"
-    source "server/cvmfs_server_health_check.sh"
-    source "server/cvmfs_server_compat.sh"
-    #####
+#####
+# The following files should be sourced in this order and before the other files
+source "server/cvmfs_server_util.sh"
+source "server/cvmfs_server_common.sh"
+source "server/cvmfs_server_health_check.sh"
+source "server/cvmfs_server_compat.sh"
+#####
 
-    # The following files contain the implementation of various subcommands. The can be sourced
-    # in any order
-    source "./server/cvmfs_server_transaction.sh"
-    source "./server/cvmfs_server_abort.sh"
-    source "./server/cvmfs_server_publish.sh"
-fi
+# The following files contain the implementation of various subcommands. The can be sourced
+# in any order
+source "./server/cvmfs_server_transaction.sh"
+source "./server/cvmfs_server_abort.sh"
+source "./server/cvmfs_server_publish.sh"
 
 
 ################################################################################
