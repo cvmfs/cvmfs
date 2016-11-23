@@ -178,19 +178,17 @@ bool Catalog::OpenDatabase(const string &db_path) {
   max_row_id_ = sql_max_row_id.RetrieveInt64(0);
 
   // Get root prefix
-  if (IsRoot()) {
-    if (database_->HasProperty("root_prefix")) {
-      const std::string root_prefix =
-                             database_->GetProperty<std::string>("root_prefix");
-      root_prefix_.Assign(root_prefix.data(), root_prefix.size());
-      LogCvmfs(kLogCatalog, kLogDebug,
-               "found root prefix %s in root catalog file %s",
-               root_prefix_.c_str(), db_path.c_str());
-      is_regular_mountpoint_ = (root_prefix_ == mountpoint_);
-    } else {
-      LogCvmfs(kLogCatalog, kLogDebug,
-               "no root prefix for root catalog file %s", db_path.c_str());
-    }
+  if (database_->HasProperty("root_prefix")) {
+    const std::string root_prefix =
+                           database_->GetProperty<std::string>("root_prefix");
+    root_prefix_.Assign(root_prefix.data(), root_prefix.size());
+    LogCvmfs(kLogCatalog, kLogDebug,
+             "found root prefix %s in root catalog file %s",
+             root_prefix_.c_str(), db_path.c_str());
+    is_regular_mountpoint_ = (root_prefix_ == mountpoint_);
+  } else {
+    LogCvmfs(kLogCatalog, kLogDebug,
+             "no root prefix for root catalog file %s", db_path.c_str());
   }
 
   // Get volatile content flag
@@ -217,7 +215,7 @@ bool Catalog::OpenDatabase(const string &db_path) {
 /**
  * Removes the mountpoint and prepends the root prefix to path
  */
-shash::Md5 Catalog::NormalizePath(const PathString &path) {
+shash::Md5 Catalog::NormalizePath(const PathString &path) const {
   if (is_regular_mountpoint_)
     return shash::Md5(path.GetChars(), path.GetLength());
 
@@ -242,11 +240,26 @@ shash::Md5 Catalog::NormalizePath(const PathString &path) {
 
 
 /**
+ * Same as NormalizePath but returns a PathString instead of an Md5 hash.
+ */
+PathString Catalog::NormalizePath2(const PathString &path) const {
+  if (is_regular_mountpoint_)
+    return path;
+
+  assert(path.GetLength() >= mountpoint_.GetLength());
+  PathString result = root_prefix_;
+  PathString suffix = path.Suffix(mountpoint_.GetLength());
+  result.Append(suffix.GetChars(), suffix.GetLength());
+  return result;
+}
+
+
+/**
  * The opposite of NormalizePath: from a full path remove the root prefix and
  * add the catalogs current mountpoint.  Needed for normalized paths from the
  * SQlite tables, such as nested catalog entry points.
  */
-PathString Catalog::PlantPath(const PathString &path) {
+PathString Catalog::PlantPath(const PathString &path) const {
   if (is_regular_mountpoint_)
     return path;
 
@@ -301,8 +314,7 @@ bool Catalog::LookupRawSymlink(const PathString &path,
                                LinkString *raw_symlink) const
 {
   DirectoryEntry dirent;
-  bool result = (LookupEntry(shash::Md5(path.GetChars(), path.GetLength()),
-                             false, &dirent));
+  bool result = (LookupEntry(NormalizePath(path), false, &dirent));
   if (result)
     raw_symlink->Assign(dirent.symlink());
   return result;
@@ -607,7 +619,7 @@ const Catalog::NestedCatalogList& Catalog::ListNestedCatalogs() const {
              mountpoint().c_str());
     while (sql_list_nested_->FetchRow()) {
       NestedCatalog nested;
-      nested.mountpoint = sql_list_nested_->GetPath();
+      nested.mountpoint = PlantPath(sql_list_nested_->GetPath());
       nested.hash = sql_list_nested_->GetContentHash();
       nested.size = sql_list_nested_->GetSize();
       nested_catalog_cache_.push_back(nested);
@@ -641,7 +653,7 @@ bool Catalog::FindNested(const PathString &mountpoint,
                          shash::Any *hash, uint64_t *size) const
 {
   pthread_mutex_lock(lock_);
-  sql_lookup_nested_->BindSearchPath(mountpoint);
+  sql_lookup_nested_->BindSearchPath(NormalizePath2(mountpoint));
   bool found = sql_lookup_nested_->FetchRow();
   if (found && (hash != NULL)) {
     *hash = sql_lookup_nested_->GetContentHash();
@@ -773,9 +785,9 @@ Catalog* Catalog::FindChild(const PathString &mountpoint) const {
 
 
 /**
- * For the transtion points for nested catalogs, the inode is ambiguous.
- * It has to be set to the parent inode because nested catalogs are lazily
- * loaded.
+ * For the transtion points for nested catalogs and bind mountpoints, the inode
+ * is ambiguous. It has to be set to the parent inode because nested catalogs
+ * are lazily loaded.
  * @param md5path the MD5 hash of the entry to check
  * @param dirent the DirectoryEntry to perform coherence fixes on
  */

@@ -373,8 +373,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
         }
 
         if (entries[i].IsBindMountpoint()) {
-          PathString mountpoint("@" + full_path.ToString().substr(1));
-          bind_mountpoints->insert(mountpoint);
+          bind_mountpoints->insert(full_path);
           if (entries[i].IsNestedCatalogMountpoint()) {
             LogCvmfs(kLogCvmfs, kLogStderr,
                      "bind mountpoint and nested mountpoint mutually exclusive"

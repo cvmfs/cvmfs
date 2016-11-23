@@ -117,26 +117,23 @@ class Catalog : SingleCopy {
   bool OpenDatabase(const std::string &db_path);
 
   inline bool LookupPath(const PathString &path, DirectoryEntry *dirent) const {
-    return LookupMd5Path(shash::Md5(path.GetChars(), path.GetLength()), dirent);
+    return LookupMd5Path(NormalizePath(path), dirent);
   }
   bool LookupRawSymlink(const PathString &path, LinkString *raw_symlink) const;
   bool LookupXattrsPath(const PathString &path, XattrList *xattrs) const {
-    return LookupXattrsMd5Path(
-      shash::Md5(path.GetChars(), path.GetLength()), xattrs);
+    return LookupXattrsMd5Path(NormalizePath(path), xattrs);
   }
 
   inline bool ListingPath(const PathString &path,
                           DirectoryEntryList *listing,
                           const bool expand_symlink = true) const
   {
-    return ListingMd5Path(shash::Md5(path.GetChars(), path.GetLength()),
-                          listing, expand_symlink);
+    return ListingMd5Path(NormalizePath(path), listing, expand_symlink);
   }
   bool ListingPathStat(const PathString &path,
                        StatEntryList *listing) const
   {
-    return ListingMd5PathStat(shash::Md5(path.GetChars(), path.GetLength()),
-                              listing);
+    return ListingMd5PathStat(NormalizePath(path), listing);
   }
   bool AllChunksBegin();
   bool AllChunksNext(shash::Any *hash, zlib::Algorithms *compression_alg);
@@ -146,8 +143,7 @@ class Catalog : SingleCopy {
                              const shash::Algorithms interpret_hashes_as,
                              FileChunkList *chunks) const
   {
-    return ListMd5PathChunks(shash::Md5(path.GetChars(), path.GetLength()),
-                             interpret_hashes_as, chunks);
+    return ListMd5PathChunks(NormalizePath(path), interpret_hashes_as, chunks);
   }
 
   CatalogList GetChildren() const;
@@ -258,8 +254,9 @@ class Catalog : SingleCopy {
     kVomsPresent,  // voms_authz property available
   };
 
-  shash::Md5 NormalizePath(const PathString &path);
-  PathString PlantPath(const PathString &path);
+  shash::Md5 NormalizePath(const PathString &path) const;
+  PathString NormalizePath2(const PathString &path) const;
+  PathString PlantPath(const PathString &path) const;
 
   void FixTransitionPoint(const shash::Md5 &md5path,
                           DirectoryEntry *dirent) const;
