@@ -112,6 +112,20 @@ run_suid_helper() {
 }
 
 
+# gets the number of open writable file descriptors beneath a given path
+#
+# @param path  the path to look at for open writable fds
+# @return      the number of open writable file descriptors
+count_wr_fds() {
+  local path=$1
+  local cnt=0
+  for line in $(get_fd_modes $path); do
+    if echo "$line" | grep -qe '^\a[wu]$'; then cnt=$(( $cnt + 1 )); fi
+  done
+  echo $cnt
+}
+
+
 ### Logging functions
 
 to_syslog() {
@@ -319,27 +333,6 @@ version_lower_or_equal() {
 }
 
 
-# retrieves (or guesses) the version of CernVM-FS that was used to create this
-# repository.
-# @param name  the name of the repository to be checked
-repository_creator_version() {
-  local name="$1"
-  load_repo_config $name
-  local version="$CVMFS_CREATOR_VERSION"
-  if [ x"$version" = x ]; then
-    version="2.1.6" # 2.1.6 was the last version, that did not store the creator
-                    # version... therefore this has to be handled as "<= 2.1.6"
-                    # Note: see also `mangle_version_string()`
-  elif [ x"$version" = x"2.2.0" ]; then
-    version="2.2.0-0" # CernVM-FS 2.2.0-0 was a server-only pre-release which is
-                      # incompatible with 2.2.0-1
-                      # 2.2.0-0 marks itself as CVMFS_CREATOR_VERSION=2.2.0
-                      # while 2.2.0-1 features  CVMFS_CREATOR_VERSION=2.2.0-1
-  fi
-  echo $version
-}
-
-
 get_upstream_type() {
   local upstream=$1
   echo "$upstream" | cut -d, -f1
@@ -356,5 +349,23 @@ check_upstream_type() {
 is_local_upstream() {
   local upstream=$1
   check_upstream_type $upstream "local"
+}
+
+
+# returns 0 if the current working dir is somewhere under $path
+#
+# @param path  the path to look at
+# @return      0 if cwd is on path or below, 1 otherwise
+is_cwd_on_path() {
+  local path=$1
+
+  if [ "x$(pwd)" = "x${path}" ]; then
+    return 0
+  fi
+  if echo "x$(pwd)" | grep -q "^x${path}/"; then
+    return 0
+  fi
+
+  return 1
 }
 
