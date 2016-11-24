@@ -20,6 +20,8 @@ using namespace std;  // NOLINT
 
 namespace catalog {
 
+const shash::Md5 Catalog::kMd5PathEmpty("", 0);
+
 
 /**
  * Open a catalog outside the framework of a catalog manager.
@@ -794,11 +796,22 @@ Catalog* Catalog::FindChild(const PathString &mountpoint) const {
 void Catalog::FixTransitionPoint(const shash::Md5 &md5path,
                                  DirectoryEntry *dirent) const
 {
-  if (dirent->IsNestedCatalogRoot() && HasParent()) {
+  if (!HasParent())
+    return;
+
+  // Normal nested catalog
+  if (dirent->IsNestedCatalogRoot()) {
     DirectoryEntry parent_dirent;
     const bool retval = parent_->LookupMd5Path(md5path, &parent_dirent);
     assert(retval);
+    dirent->set_inode(parent_dirent.inode());
+  }
 
+  // Bind mountpoint
+  if (md5path == kMd5PathEmpty) {
+    DirectoryEntry parent_dirent;
+    const bool retval = parent_->LookupPath(mountpoint_, &parent_dirent);
+    assert(retval);
     dirent->set_inode(parent_dirent.inode());
   }
 }

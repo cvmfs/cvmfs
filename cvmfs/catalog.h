@@ -248,6 +248,12 @@ class Catalog : SingleCopy {
  private:
   typedef std::map<PathString, Catalog*> NestedCatalogMap;
 
+  /**
+   * The hash of the empty string.  Used to identify the root entry of a
+   * repository, which is the child transition point of a bind mountpoint.
+   */
+  static const shash::Md5 kMd5PathEmpty;
+
   enum VomsAuthzStatus {
     kVomsUnknown,  // Not yet looked up
     kVomsNone,     // No voms_authz key in properties table
