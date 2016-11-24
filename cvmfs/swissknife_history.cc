@@ -1035,7 +1035,7 @@ int CommandRollbackTag::Main(const ArgumentList &args) {
     return 1;
   }
 
-  // check if the catalog has a supported revision
+  // check if the catalog has a supported schema version
   if (catalog->schema() < catalog::CatalogDatabase::kLatestSupportedSchema -
                           catalog::CatalogDatabase::kSchemaEpsilon) {
     LogCvmfs(kLogCvmfs, kLogStderr, "not rolling back to outdated and "

@@ -37,10 +37,11 @@ class CommandTag : public Command {
   static const std::string kPreviousHeadTag;
   static const std::string kPreviousHeadTagDescription;
 
+  CommandTag() { }
+
  protected:
   typedef std::vector<history::History::Tag> TagList;
 
- protected:
   struct Environment {
     Environment(const std::string &repository_url,
                 const std::string &tmp_path) :
@@ -57,10 +58,7 @@ class CommandTag : public Command {
     UnlinkGuard                    history_path;
   };
 
- public:
-  CommandTag() { }
 
- protected:
   void InsertCommonParameters(ParameterList *parameters);
 
   Environment* InitializeEnvironment(const ArgumentList &args,
