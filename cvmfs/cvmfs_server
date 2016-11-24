@@ -5636,7 +5636,7 @@ EOF
     #  same time
     fulllog=/var/log/cvmfs/snapshots.log
     log=/tmp/cvmfs_snapshots.$$.log
-    trap "rm -f $log" 0
+    trap "rm -f $log" EXIT HUP INT TERM
     (echo; echo "Logging in $log at `date`") >>$fulllog
   fi
 
