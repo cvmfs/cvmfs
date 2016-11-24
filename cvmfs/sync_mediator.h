@@ -80,22 +80,12 @@ typedef std::map<uint64_t, HardlinkGroup> HardlinkGroupMap;
  * and hashing.
  */
 class SyncMediator {
-  friend class SyncUnion;
- private:
-  enum ChangesetAction {
-    kAdd,
-    kAddCatalog,
-    kAddHardlinks,
-    kTouch,
-    kRemove,
-    kRemoveCatalog
-  };
-
  public:
   static const unsigned int processing_dot_interval = 100;
 
   SyncMediator(catalog::WritableCatalogManager *catalog_manager,
                const SyncParameters *params);
+  void RegisterUnionEngine(SyncUnion *engine);
   virtual ~SyncMediator();
 
   void Add(const SyncItem &entry);
@@ -116,13 +106,22 @@ class SyncMediator {
   }
 
  private:
+  enum ChangesetAction {
+    kAdd,
+    kAddCatalog,
+    kAddHardlinks,
+    kTouch,
+    kRemove,
+    kRemoveCatalog
+  };
+
   typedef std::stack<HardlinkGroupMap> HardlinkGroupMapStack;
   typedef std::vector<HardlinkGroup> HardlinkGroupList;
 
-  void RegisterUnionEngine(SyncUnion *engine);
-
   void PrintChangesetNotice(const ChangesetAction action,
                             const std::string &extra_info) const;
+
+  void EnsureAllowed(const SyncItem &entry);
 
   // Called after figuring out the type of a path (file, symlink, dir)
   void AddFile(const SyncItem &entry);

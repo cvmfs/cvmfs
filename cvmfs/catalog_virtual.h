@@ -27,6 +27,8 @@ namespace catalog {
 
 class VirtualCatalog {
  public:
+  static const std::string kVirtualPath;
+
   VirtualCatalog(manifest::Manifest *m,
                  download::DownloadManager *d,
                  catalog::WritableCatalogManager *c,
@@ -34,7 +36,6 @@ class VirtualCatalog {
   void GenerateSnapshots();
 
  private:
-  static const std::string kVirtualPath;
   static const std::string kSnapshotDirectory;
 
   struct TagId {
