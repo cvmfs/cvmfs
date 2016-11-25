@@ -74,6 +74,7 @@ Catalog::Catalog(const PathString &mountpoint,
   sql_lookup_md5path_ = NULL;
   sql_lookup_nested_ = NULL;
   sql_list_nested_ = NULL;
+  sql_own_list_nested_ = NULL;
   sql_all_chunks_ = NULL;
   sql_chunks_listing_ = NULL;
   sql_lookup_xattrs_ = NULL;
@@ -95,13 +96,14 @@ Catalog::~Catalog() {
  * the WritableCatalog and the Catalog destructor
  */
 void Catalog::InitPreparedStatements() {
-  sql_listing_         = new SqlListing(database());
-  sql_lookup_md5path_  = new SqlLookupPathHash(database());
-  sql_lookup_nested_   = new SqlNestedCatalogLookup(database());
-  sql_list_nested_     = new SqlNestedCatalogListing(database());
-  sql_all_chunks_      = new SqlAllChunks(database());
-  sql_chunks_listing_  = new SqlChunksListing(database());
-  sql_lookup_xattrs_   = new SqlLookupXattrs(database());
+  sql_listing_          = new SqlListing(database());
+  sql_lookup_md5path_   = new SqlLookupPathHash(database());
+  sql_lookup_nested_    = new SqlNestedCatalogLookup(database());
+  sql_list_nested_      = new SqlNestedCatalogListing(database());
+  sql_own_list_nested_  = new SqlOwnNestedCatalogListing(database());
+  sql_all_chunks_       = new SqlAllChunks(database());
+  sql_chunks_listing_   = new SqlChunksListing(database());
+  sql_lookup_xattrs_    = new SqlLookupXattrs(database());
 }
 
 
@@ -113,6 +115,7 @@ void Catalog::FinalizePreparedStatements() {
   delete sql_lookup_md5path_;
   delete sql_lookup_nested_;
   delete sql_list_nested_;
+  delete sql_own_list_nested_;
 }
 
 
@@ -610,8 +613,9 @@ inode_t Catalog::GetMangledInode(const uint64_t row_id,
 
 
 /**
- * Get a list of all registered nested catalogs in this catalog.
- * @return  a list of all nested catalog references of this catalog.
+ * Get a list of all registered nested catalogs and bind mountpoints in this
+ * catalog.
+ * @return  a list of all nested catalog and bind mountpoints.
  */
 const Catalog::NestedCatalogList& Catalog::ListNestedCatalogs() const {
   pthread_mutex_lock(lock_);
@@ -632,6 +636,31 @@ const Catalog::NestedCatalogList& Catalog::ListNestedCatalogs() const {
 
   pthread_mutex_unlock(lock_);
   return nested_catalog_cache_;
+}
+
+
+/**
+ * Get a list of all registered nested catalogs without bind mountpoints.  Used
+ * for replication.
+ * @return  a list of all nested catalogs.
+ */
+const Catalog::NestedCatalogList Catalog::ListOwnNestedCatalogs() const {
+  NestedCatalogList result;
+
+  pthread_mutex_lock(lock_);
+
+  while (sql_own_list_nested_->FetchRow()) {
+    NestedCatalog nested;
+    nested.mountpoint = PlantPath(sql_own_list_nested_->GetPath());
+    nested.hash = sql_own_list_nested_->GetContentHash();
+    nested.size = sql_own_list_nested_->GetSize();
+    result.push_back(nested);
+  }
+  sql_own_list_nested_->Reset();
+
+  pthread_mutex_unlock(lock_);
+
+  return result;
 }
 
 

@@ -201,6 +201,7 @@ class Catalog : SingleCopy {
   } NestedCatalog;
   typedef std::vector<NestedCatalog> NestedCatalogList;
   const NestedCatalogList& ListNestedCatalogs() const;
+  const NestedCatalogList ListOwnNestedCatalogs() const;
   bool FindNested(const PathString &mountpoint,
                   shash::Any *hash, uint64_t *size) const;
 
@@ -317,13 +318,14 @@ class Catalog : SingleCopy {
   const OwnerMap *uid_map_;
   const OwnerMap *gid_map_;
 
-  SqlListing               *sql_listing_;
-  SqlLookupPathHash        *sql_lookup_md5path_;
-  SqlNestedCatalogLookup   *sql_lookup_nested_;
-  SqlNestedCatalogListing  *sql_list_nested_;
-  SqlAllChunks             *sql_all_chunks_;
-  SqlChunksListing         *sql_chunks_listing_;
-  SqlLookupXattrs          *sql_lookup_xattrs_;
+  SqlListing                  *sql_listing_;
+  SqlLookupPathHash           *sql_lookup_md5path_;
+  SqlNestedCatalogLookup      *sql_lookup_nested_;
+  SqlNestedCatalogListing     *sql_list_nested_;
+  SqlOwnNestedCatalogListing  *sql_own_list_nested_;
+  SqlAllChunks                *sql_all_chunks_;
+  SqlChunksListing            *sql_chunks_listing_;
+  SqlLookupXattrs             *sql_lookup_xattrs_;
 
   mutable HashVector        referenced_hashes_;
 };  // class Catalog

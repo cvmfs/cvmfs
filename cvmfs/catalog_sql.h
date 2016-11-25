@@ -384,6 +384,9 @@ class SqlDirentTouch : public SqlCatalog {
 //------------------------------------------------------------------------------
 
 
+/**
+ * Nested catalogs and bind mountpoints.
+ */
 class SqlNestedCatalogLookup : public SqlCatalog {
  public:
   explicit SqlNestedCatalogLookup(const CatalogDatabase &database);
@@ -396,9 +399,27 @@ class SqlNestedCatalogLookup : public SqlCatalog {
 //------------------------------------------------------------------------------
 
 
+/**
+ * Nested catalogs and bind mountpoints.
+ */
 class SqlNestedCatalogListing : public SqlCatalog {
  public:
   explicit SqlNestedCatalogListing(const CatalogDatabase &database);
+  PathString GetPath() const;
+  shash::Any GetContentHash() const;
+  uint64_t GetSize() const;
+};
+
+
+//------------------------------------------------------------------------------
+
+
+/**
+ * Only nested catalogs, no bind mountpoints. Used for replication.
+ */
+class SqlOwnNestedCatalogListing : public SqlCatalog {
+ public:
+  explicit SqlOwnNestedCatalogListing(const CatalogDatabase &database);
   PathString GetPath() const;
   shash::Any GetContentHash() const;
   uint64_t GetSize() const;

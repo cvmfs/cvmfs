@@ -893,6 +893,47 @@ uint64_t SqlNestedCatalogListing::GetSize() const {
 //------------------------------------------------------------------------------
 
 
+SqlOwnNestedCatalogListing::SqlOwnNestedCatalogListing(
+  const CatalogDatabase &database)
+{
+  static const char *stmt_2_5_ge_1 =
+    "SELECT path, sha1, size FROM nested_catalogs;";
+  // Internally converts NULL to 0 for size
+  static const char *stmt_2_5_lt_1 =
+    "SELECT path, sha1, 0 FROM nested_catalogs;";
+
+  if (database.IsEqualSchema(database.schema_version(), 2.5) &&
+     (database.schema_revision() >= 1))
+  {
+    DeferredInit(database.sqlite_db(), stmt_2_5_ge_1);
+  } else {
+    DeferredInit(database.sqlite_db(), stmt_2_5_lt_1);
+  }
+}
+
+
+PathString SqlOwnNestedCatalogListing::GetPath() const {
+  const char *path = reinterpret_cast<const char *>(RetrieveText(0));
+  return PathString(path, strlen(path));
+}
+
+
+shash::Any SqlOwnNestedCatalogListing::GetContentHash() const {
+  const string hash = string(reinterpret_cast<const char *>(RetrieveText(1)));
+  return (hash.empty()) ? shash::Any(shash::kAny) :
+                          shash::MkFromHexPtr(shash::HexPtr(hash),
+                                              shash::kSuffixCatalog);
+}
+
+
+uint64_t SqlOwnNestedCatalogListing::GetSize() const {
+  return RetrieveInt64(2);
+}
+
+
+//------------------------------------------------------------------------------
+
+
 SqlDirentInsert::SqlDirentInsert(const CatalogDatabase &database) {
   DeferredInit(database.sqlite_db(),
     "INSERT INTO catalog "
