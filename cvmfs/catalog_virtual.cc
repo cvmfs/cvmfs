@@ -12,6 +12,7 @@
 #include "logging.h"
 #include "history.h"
 #include "swissknife_sync.h"
+#include "swissknife_history.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "xattr.h"
@@ -172,8 +173,8 @@ void VirtualCatalog::GetSortedTagsFromHistory(vector<TagId> *tags) {
   bool retval = history->List(&tags_history);
   assert(retval);
   for (unsigned i = 0, l = tags_history.size(); i < l; ++i) {
-    if ((tags_history[i].name == "trunk") ||
-        (tags_history[i].name == "trunk-previous"))
+    if ((tags_history[i].name == swissknife::CommandTag::kHeadTag) ||
+        (tags_history[i].name == swissknife::CommandTag::kPreviousHeadTag))
     {
       continue;
     }
