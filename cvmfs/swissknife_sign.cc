@@ -51,6 +51,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   if (args.find('M') != args.end()) meta_info = *args.find('M')->second;
   const bool garbage_collectable = (args.count('g') > 0);
   const bool bootstrap_shortcuts = (args.count('A') > 0);
+  const bool return_early = (args.count('e') > 0);
   string reflog_chksum_path;
   shash::Any reflog_hash;
   if (args.find('R') != args.end()) {
@@ -110,7 +111,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     }
   }
 
-  // Fron here on things are potentially put in backend storage
+  // From here on things are potentially put in backend storage
   LogCvmfs(kLogCvmfs, kLogStdout, "Signing %s", manifest_path.c_str());
 
   // Register callback for retrieving the certificate hash
@@ -188,6 +189,12 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     }
     assert(!reflog_chksum_path.empty());
     manifest::Reflog::WriteChecksum(reflog_chksum_path, reflog_hash);
+  }
+
+  // Don't activate new manifest, just make sure all its references are uploaded
+  // and entered into the reflog
+  if (return_early) {
+    return 0;
   }
 
   // Update manifest
