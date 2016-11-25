@@ -61,6 +61,10 @@ cvmfs_run_test() {
 
   echo "--- create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+  start_transaction $CVMFS_TEST_REPO || return $?
+  mkdir /cvmfs/$CVMFS_TEST_REPO/nested || return 1
+  touch /cvmfs/$CVMFS_TEST_REPO/nested/.cvmfscatalog || return 2
+  publish_repo $CVMFS_TEST_REPO || return 3
 
   echo "--- check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?

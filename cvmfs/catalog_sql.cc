@@ -66,6 +66,7 @@ const float CatalogDatabase::kLatestSupportedSchema = 2.5;  // + 1.X (r/o)
 //   3 --> 4: (Nov 11 2016 - Git):
 //            * add kFlagDirBindMountpoint
 //            * add kFlagHidden
+//            * add table bind_mountpoints
 const unsigned CatalogDatabase::kLatestSchemaRevision = 4;
 
 bool CatalogDatabase::CheckSchemaCompatibility() {
@@ -149,6 +150,15 @@ bool CatalogDatabase::LiveSchemaUpgradeIfNecessary() {
 
   if (IsEqualSchema(schema_version(), 2.5) && (schema_revision() == 3)) {
     LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision (3 --> 4)");
+
+    SqlCatalog sql_upgrade8(*this,
+      "CREATE TABLE bind_mountpoints (path TEXT, sha1 TEXT, size INTEGER, "
+      "CONSTRAINT pk_bind_mountpoints PRIMARY KEY (path));");
+    if (!sql_upgrade8.Execute()) {
+      LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade catalogs (3 --> 4)");
+      return false;
+    }
+
     set_schema_revision(4);
     if (!StoreSchemaRevision()) {
       LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade schema revision");
@@ -185,6 +195,15 @@ bool CatalogDatabase::CreateEmptyDatabase() {
   SqlCatalog(*this,
     "CREATE TABLE nested_catalogs (path TEXT, sha1 TEXT, size INTEGER, "
     "CONSTRAINT pk_nested_catalogs PRIMARY KEY (path));")         .Execute()  &&
+  // Bind mountpoints and nested catalogs are almost the same. We put them in
+  // separate tables to
+  //   - not confuse previous client versions, which would crash on bind
+  //     mountpoints
+  //   - prevent catalogs referenced as bind mountpoints from being replicated,
+  //     which would cause exhaustive recursive catalog tree walking
+  SqlCatalog(*this,
+    "CREATE TABLE bind_mountpoints (path TEXT, sha1 TEXT, size INTEGER, "
+    "CONSTRAINT pk_bind_mountpoints PRIMARY KEY (path));")        .Execute()  &&
   SqlCatalog(*this,
     "CREATE TABLE statistics (counter TEXT, value INTEGER, "
     "CONSTRAINT pk_statistics PRIMARY KEY (counter));")           .Execute();
@@ -782,16 +801,23 @@ bool SqlDirentTouch::BindPathHash(const shash::Md5 &hash) {
 
 SqlNestedCatalogLookup::SqlNestedCatalogLookup(const CatalogDatabase &database)
 {
-  static const char *stmt_2_5_ge_1 =
+  static const char *stmt_2_5_ge_4 =
+    "SELECT sha1, size FROM nested_catalogs WHERE path=:path "
+    "UNION ALL SELECT sha1, size FROM bind_mountpoints WHERE path=:path;";
+  static const char *stmt_2_5_ge_1_lt_4 =
     "SELECT sha1, size FROM nested_catalogs WHERE path=:path;";
-
   // Internally converts NULL to 0 for size
   static const char *stmt_2_5_lt_1 =
     "SELECT sha1, 0 FROM nested_catalogs WHERE path=:path;";
 
   if (database.IsEqualSchema(database.schema_version(), 2.5) &&
-      (database.schema_revision() >= 1)) {
-    DeferredInit(database.sqlite_db(), stmt_2_5_ge_1);
+     (database.schema_revision() >= 4))
+  {
+    DeferredInit(database.sqlite_db(), stmt_2_5_ge_4);
+  } else if (database.IsEqualSchema(database.schema_version(), 2.5) &&
+            (database.schema_revision() >= 1))
+  {
+    DeferredInit(database.sqlite_db(), stmt_2_5_ge_1_lt_4);
   } else {
     DeferredInit(database.sqlite_db(), stmt_2_5_lt_1);
   }
@@ -822,16 +848,23 @@ uint64_t SqlNestedCatalogLookup::GetSize() const {
 SqlNestedCatalogListing::SqlNestedCatalogListing(
   const CatalogDatabase &database)
 {
-  static const char *stmt_2_5_ge_1 =
+  static const char *stmt_2_5_ge_4 =
+    "SELECT path, sha1, size FROM nested_catalogs "
+    "UNION ALL SELECT path, sha1, size FROM bind_mountpoints;";
+  static const char *stmt_2_5_ge_1_lt_4 =
     "SELECT path, sha1, size FROM nested_catalogs;";
-
   // Internally converts NULL to 0 for size
   static const char *stmt_2_5_lt_1 =
     "SELECT path, sha1, 0 FROM nested_catalogs;";
 
   if (database.IsEqualSchema(database.schema_version(), 2.5) &&
-      (database.schema_revision() >= 1)) {
-    DeferredInit(database.sqlite_db(), stmt_2_5_ge_1);
+     (database.schema_revision() >= 4))
+  {
+    DeferredInit(database.sqlite_db(), stmt_2_5_ge_4);
+  } else if (database.IsEqualSchema(database.schema_version(), 2.5) &&
+            (database.schema_revision() >= 1))
+  {
+    DeferredInit(database.sqlite_db(), stmt_2_5_ge_1_lt_4);
   } else {
     DeferredInit(database.sqlite_db(), stmt_2_5_lt_1);
   }
@@ -840,18 +873,7 @@ SqlNestedCatalogListing::SqlNestedCatalogListing(
 
 PathString SqlNestedCatalogListing::GetPath() const {
   const char *path = reinterpret_cast<const char *>(RetrieveText(0));
-  PathString result(path, strlen(path));
-
-  // Previous versions of cvmfs did not know about bind mountpoints.  In order
-  // to not confuse them, registered bind mountpoints have an "@" as a first
-  // character instead of a "/".  Older versions of cvmfs thus won't try to
-  // load a nested catalog (which would crash) when hitting a bind mountpoint.
-  assert(result.GetLength() > 0);
-  if (result.GetChars()[0] == '@') {
-    result.SetCharAt('/', 0);
-  }
-
-  return result;
+  return PathString(path, strlen(path));
 }
 
 

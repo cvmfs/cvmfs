@@ -17,7 +17,16 @@ class T_CatalogSql : public ::testing::Test {
   }
 };
 
+static void RevertToRevision3(catalog::CatalogDatabase *db) {
+  ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
+    "DROP TABLE bind_mountpoints;").Execute());
+  ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
+    "UPDATE properties SET value=3 WHERE key='schema_revision';").Execute());
+}
+
 static void RevertToRevision2(catalog::CatalogDatabase *db) {
+  RevertToRevision3(db);
+
   ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
     "DELETE FROM statistics WHERE counter='self_external';").Execute());
   ASSERT_TRUE(sqlite::Sql(db->sqlite_db(), "DELETE FROM statistics WHERE "
@@ -130,6 +139,10 @@ TEST_F(T_CatalogSql, SchemaMigration) {
       "SELECT value FROM statistics WHERE counter='subtree_xattr'");
     ASSERT_TRUE(sql4.FetchRow());
     EXPECT_EQ(0, sql4.RetrieveInt(0));
+    sqlite::Sql sql5(db->sqlite_db(),
+      "SELECT COUNT(*) FROM bind_mountpoints");
+    ASSERT_TRUE(sql5.FetchRow());
+    EXPECT_EQ(0, sql5.RetrieveInt(0));
   }
 
   // Revision 0 --> 4
@@ -142,6 +155,7 @@ TEST_F(T_CatalogSql, SchemaMigration) {
   {
     UniquePtr<catalog::CatalogDatabase> db(catalog::CatalogDatabase::Open(
       path, catalog::CatalogDatabase::kOpenReadWrite));
+    ASSERT_TRUE(db.IsValid());
     sqlite::Sql sql1(db->sqlite_db(), "SELECT COUNT(xattr) FROM catalog");
     ASSERT_TRUE(sql1.FetchRow());
     EXPECT_EQ(0, sql1.RetrieveInt(0));

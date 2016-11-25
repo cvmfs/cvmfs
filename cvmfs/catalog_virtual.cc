@@ -225,11 +225,9 @@ void VirtualCatalog::InsertSnapshot(TagId tag) {
   virtual_catalog->UpdateEntry(entry_bind_mountpoint, mountpoint);
 
   // Register nested catalog
-  mountpoint[0] = '@';
   uint64_t catalog_size = GetFileSize(catalog->database_path());
   assert(catalog_size > 0);
-  virtual_catalog->InsertNestedCatalog(
-    mountpoint, NULL, tag.hash, catalog_size);
+  virtual_catalog->InsertBindMountpoint(mountpoint, tag.hash, catalog_size);
 }
 
 
@@ -243,7 +241,7 @@ void VirtualCatalog::RemoveSnapshot(TagId tag) {
   WritableCatalog *virtual_catalog =
     catalog_mgr_->GetHostingCatalog(kVirtualPath);
   assert(virtual_catalog != NULL);
-  virtual_catalog->RemoveNestedCatalog("@" + tag_dir, NULL);
+  virtual_catalog->RemoveBindMountpoint("/" + tag_dir);
 }
 
 

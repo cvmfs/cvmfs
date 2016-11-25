@@ -507,6 +507,33 @@ void WritableCatalog::InsertNestedCatalog(const string &mountpoint,
 
 
 /**
+ * Registeres a snapshot in /.cvmfs/snapshots. Note that bind mountpoints are
+ * not universally handled: in Partition and MergeIntoParent, bind mountpoint
+ * handling is missing!
+ */
+void WritableCatalog::InsertBindMountpoint(
+  const string &mountpoint,
+  const shash::Any content_hash,
+  const uint64_t size)
+{
+   SqlCatalog stmt(database(),
+     "INSERT INTO bind_mountpoints (path, sha1, size) "
+     "VALUES (:p, :sha1, :size);");
+   bool retval =
+     stmt.BindText(1, mountpoint) &&
+     stmt.BindText(2, content_hash.ToString()) &&
+     stmt.BindInt64(3, size) &&
+     stmt.Execute();
+  assert(retval);
+
+  ResetNestedCatalogCacheUnprotected();
+
+  delta_counters_.self.nested_catalogs++;
+}
+
+
+
+/**
  * Remove a nested catalog reference from the database.
  * If the catalog 'mountpoint' is currently attached as a child, it will be
  * removed, too (but not detached).
@@ -539,6 +566,31 @@ void WritableCatalog::RemoveNestedCatalog(const string &mountpoint,
     RemoveChild(child);
   if (attached_reference != NULL)
     *attached_reference = child;
+
+  ResetNestedCatalogCacheUnprotected();
+
+  delta_counters_.self.nested_catalogs--;
+}
+
+
+/**
+ * Unregisteres a snapshot from /.cvmfs/snapshots. Note that bind mountpoints
+ * are not universally handled: in Partition and MergeIntoParent, bind
+ * mountpoint handling is missing!
+ */
+void WritableCatalog::RemoveBindMountpoint(const std::string &mountpoint) {
+  shash::Any dummy;
+  uint64_t dummy_size;
+  bool retval = FindNested(PathString(mountpoint.data(), mountpoint.length()),
+                           &dummy, &dummy_size);
+  assert(retval);
+
+  SqlCatalog stmt(database(),
+                  "DELETE FROM bind_mountpoints WHERE path = :p;");
+  retval =
+    stmt.BindText(1, mountpoint) &&
+    stmt.Execute();
+  assert(retval);
 
   ResetNestedCatalogCacheUnprotected();
 

@@ -100,16 +100,6 @@ class ShortString {
       return stack_;
   }
 
-  void SetCharAt(char c, unsigned idx) {
-    if (long_string_) {
-      if (idx < long_string_->length())
-        long_string_[idx] = c;
-    } else {
-      if (idx < length_)
-        stack_[idx] = c;
-    }
-  }
-
   unsigned GetLength() const {
     if (long_string_)
       return long_string_->length();

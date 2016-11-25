@@ -15,6 +15,7 @@
 #include <cassert>
 #include <map>
 #include <queue>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -353,9 +354,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
         computed_counters->self.nested_catalogs++;
         shash::Any tmp;
         uint64_t tmp2;
-        PathString mountpoint(entries[i].IsBindMountpoint()
-                     ? PathString(("@" + full_path.ToString().substr(1)))
-                     : full_path);
+        PathString mountpoint(full_path);
         if (!catalog->FindNested(mountpoint, &tmp, &tmp2)) {
           LogCvmfs(kLogCvmfs, kLogStderr, "nested catalog at %s not registered",
                    full_path.c_str());
@@ -710,6 +709,18 @@ bool CommandCheck::InspectTree(const string                  &path,
              nested_catalogs.size());
     retval = false;
   }
+  set<PathString> nested_catalog_paths;
+  for (catalog::Catalog::NestedCatalogList::const_iterator i =
+       nested_catalogs.begin(), iEnd = nested_catalogs.end(); i != iEnd; ++i)
+  {
+    nested_catalog_paths.insert(i->mountpoint);
+  }
+  if (nested_catalog_paths.size() != nested_catalogs.size()) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "duplicates among nested catalogs and bind mountpoints");
+    retval = false;
+  }
+
   for (catalog::Catalog::NestedCatalogList::const_iterator i =
        nested_catalogs.begin(), iEnd = nested_catalogs.end(); i != iEnd; ++i)
   {
