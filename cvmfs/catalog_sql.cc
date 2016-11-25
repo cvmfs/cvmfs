@@ -201,6 +201,7 @@ bool CatalogDatabase::CreateEmptyDatabase() {
   //     mountpoints
   //   - prevent catalogs referenced as bind mountpoints from being replicated,
   //     which would cause exhaustive recursive catalog tree walking
+  //   - don't walk into bind mountpoints in catalog traversal (e.g. GC)
   SqlCatalog(*this,
     "CREATE TABLE bind_mountpoints (path TEXT, sha1 TEXT, size INTEGER, "
     "CONSTRAINT pk_bind_mountpoints PRIMARY KEY (path));")        .Execute()  &&

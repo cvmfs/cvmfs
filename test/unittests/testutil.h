@@ -482,6 +482,7 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
   bool IsRoot() const { return is_root_; }
 
   const NestedCatalogList& ListNestedCatalogs() const { return children_; }
+  const NestedCatalogList  ListOwnNestedCatalogs() const { return children_; }
   const HashVector&        GetReferencedObjects() const;
   void TakeDatabaseFileOwnership() { owns_database_file_ = true;  }
   void DropDatabaseFileOwnership() { owns_database_file_ = false; }

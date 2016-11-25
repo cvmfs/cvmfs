@@ -641,7 +641,7 @@ const Catalog::NestedCatalogList& Catalog::ListNestedCatalogs() const {
 
 /**
  * Get a list of all registered nested catalogs without bind mountpoints.  Used
- * for replication.
+ * for replication and garbage collection.
  * @return  a list of all nested catalogs.
  */
 const Catalog::NestedCatalogList Catalog::ListOwnNestedCatalogs() const {

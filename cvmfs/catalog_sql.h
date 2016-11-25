@@ -415,7 +415,7 @@ class SqlNestedCatalogListing : public SqlCatalog {
 
 
 /**
- * Only nested catalogs, no bind mountpoints. Used for replication.
+ * Only nested catalogs, no bind mountpoints. Used for replication and GC.
  */
 class SqlOwnNestedCatalogListing : public SqlCatalog {
  public:
