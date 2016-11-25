@@ -11,6 +11,7 @@
 
 #include "catalog_rw.h"
 #include "catalog_sql.h"
+#include "catalog_virtual.h"
 #include "logging.h"
 
 using namespace std;  // NOLINT
@@ -1741,6 +1742,13 @@ bool CommandMigrate::ChownMigrationWorker::ApplyPersonaMappings(
                                                    PendingCatalog *data) const {
   assert(data->old_catalog != NULL);
   assert(data->new_catalog == NULL);
+
+  if (data->old_catalog->mountpoint() ==
+      PathString("/" + catalog::VirtualCatalog::kVirtualPath))
+  {
+    // skipping virtual catalog
+    return true;
+  }
 
   const catalog::CatalogDatabase &db =
                                      GetWritable(data->old_catalog)->database();

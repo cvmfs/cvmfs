@@ -133,6 +133,16 @@ cvmfs_run_test() {
   grep "/.cvmfs/snapshots" gc-s1.log && return 57
   check_repository $CVMFS_TEST638_REPLICA_NAME -i || return 58
 
+  echo "--- (10) ensure that catalog-chown skips virtual catalog"
+  local uid_before=$(stat -c %u /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots)
+  local gid_before=$(stat -c %g /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots)
+  [ "x$uid_before" != "x0" -o "x$gid_before" != "x0" ] && return 60
+  echo "0 1" > uidmap
+  echo "0 1" > gidmap
+  sudo cvmfs_server catalog-chown -u uidmap -g gidmap $CVMFS_TEST_REPO || return 61
+  local uid_after=$(stat -c %u /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots)
+  local gid_after=$(stat -c %g /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots)
+  [ "x$uid_after" != "x0" -o "x$gid_after" != "x0" ] && return 62
 
   echo "--- creating some tags"
   start_transaction $CVMFS_TEST_REPO || return $?
