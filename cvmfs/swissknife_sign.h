@@ -40,6 +40,8 @@ class CommandSign : public Command {
                                        "repo backends"));
     r.push_back(Parameter::Switch('g', "repository is garbage collectible"));
     r.push_back(Parameter::Switch('A', "repository has bootstrap shortcuts"));
+    r.push_back(Parameter::Switch('e', "return early, don't upload signed "
+                                       "manifest"));
     return r;
   }
   int Main(const ArgumentList &args);
