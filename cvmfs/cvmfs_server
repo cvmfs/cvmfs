@@ -4295,7 +4295,7 @@ cvmfs_server_tag() {
   # adds (or moves) a tag in the database
   if [ $action_add -eq 1 ]; then
     local new_manifest="${CVMFS_SPOOL_DIR}/tmp/manifest"
-    local tag_create_command="$(__swissknife_cmd dbg) tag_create \
+    local tag_create_command="$(__swissknife_cmd dbg) tag_edit   \
       -w $CVMFS_STRATUM0                                         \
       -t ${CVMFS_SPOOL_DIR}/tmp                                  \
       -p /etc/cvmfs/keys/${name}.pub                             \
@@ -4311,7 +4311,7 @@ cvmfs_server_tag() {
       tag_create_command="$tag_create_command -c $add_tag_channel"
     fi
     if [ ! -z "$add_tag_description" ]; then
-      tag_create_command="$tag_create_command -d \"$add_tag_description\""
+      tag_create_command="$tag_create_command -D \"$add_tag_description\""
     fi
     if [ ! -z "$add_tag_root_hash" ]; then
       tag_create_command="$tag_create_command -h $add_tag_root_hash"
@@ -4334,7 +4334,7 @@ cvmfs_server_tag() {
     fi
 
     local new_manifest="${CVMFS_SPOOL_DIR}/tmp/manifest"
-    $user_shell "$(__swissknife_cmd dbg) tag_remove      \
+    $user_shell "$(__swissknife_cmd dbg) tag_edit        \
       -w $CVMFS_STRATUM0                                 \
       -t ${CVMFS_SPOOL_DIR}/tmp                          \
       -p /etc/cvmfs/keys/${name}.pub                     \
@@ -4904,16 +4904,16 @@ cvmfs_server_publish() {
     if [ "x${CVMFS_VIRTUAL_DIR}" = "xtrue" ]; then
       sync_command="$sync_command -S"
     fi
-    local tag_command="$(__swissknife_cmd dbg) tag_create \
-      -r $upstream                                        \
-      -w $stratum0                                        \
-      -t ${spool_dir}/tmp                                 \
-      -m $manifest                                        \
-      -p /etc/cvmfs/keys/${name}.pub                      \
-      -f $name                                            \
-      -b $base_hash                                       \
-      -e $hash_algorithm                                  \
-      $(get_follow_http_redirects_flag)                   \
+    local tag_command="$(__swissknife_cmd dbg) tag_edit \
+      -r $upstream                                      \
+      -w $stratum0                                      \
+      -t ${spool_dir}/tmp                               \
+      -m $manifest                                      \
+      -p /etc/cvmfs/keys/${name}.pub                    \
+      -f $name                                          \
+      -b $base_hash                                     \
+      -e $hash_algorithm                                \
+      $(get_follow_http_redirects_flag)                 \
       -x" # -x enables magic undo tag handling
     if [ ! -z "$tag_name" ]; then
       tag_command="$tag_command -a $tag_name"
@@ -4922,12 +4922,12 @@ cvmfs_server_publish() {
       tag_command="$tag_command -c $tag_channel"
     fi
     if [ ! -z "$tag_description" ]; then
-      tag_command="$tag_command -d \"$tag_description\""
+      tag_command="$tag_command -D \"$tag_description\""
     fi
 
     local tag_cleanup_command=
     if [ ! -z "$auto_tag_cleanup_list" ]; then
-      tag_cleanup_command="$(__swissknife_cmd dbg) tag_remove \
+      tag_cleanup_command="$(__swissknife_cmd dbg) tag_edit \
         -r $upstream                                        \
         -w $stratum0                                        \
         -t ${spool_dir}/tmp                                 \

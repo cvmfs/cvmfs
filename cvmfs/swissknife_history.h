@@ -101,17 +101,24 @@ class CommandTag : public Command {
 //------------------------------------------------------------------------------
 
 
-class CommandCreateTag : public CommandTag {
+/**
+ * If -a and -d are specified, removal of tags takes place before the new tag is
+ * added.
+ */
+class CommandEditTag : public CommandTag {
  public:
-  std::string GetName() { return "tag_create"; }
+  std::string GetName() { return "tag_edit"; }
   std::string GetDescription() {
-    return "Create a tag for a specific snapshot.";
+    return "Create a tag and/or remove tags.";
   }
 
   ParameterList GetParams();
   int Main(const ArgumentList &args);
 
  protected:
+  int RemoveTags(const ArgumentList &args, Environment *env);
+  int AddNewTag(const ArgumentList &args, Environment *env);
+
   shash::Any GetTagRootHash(Environment *env,
                             const std::string &root_hash_string) const;
   bool ManipulateTag(Environment                  *env,
@@ -121,21 +128,6 @@ class CommandCreateTag : public CommandTag {
                const history::History::Tag  &tag_template);
   bool CreateTag(Environment                  *env,
                  const history::History::Tag  &new_tag);
-};
-
-
-//------------------------------------------------------------------------------
-
-
-class CommandRemoveTag : public CommandTag {
- public:
-  std::string GetName() { return "tag_remove"; }
-  std::string GetDescription() {
-    return "Remove one or more tags.";
-  }
-
-  ParameterList GetParams();
-  int Main(const ArgumentList &args);
 };
 
 

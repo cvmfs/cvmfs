@@ -456,12 +456,13 @@ bool CommandTag::IsUndoTagName(const std::string &tag_name) const {
 //------------------------------------------------------------------------------
 
 
-ParameterList CommandCreateTag::GetParams() {
+ParameterList CommandEditTag::GetParams() {
   ParameterList r;
   InsertCommonParameters(&r);
 
+  r.push_back(Parameter::Optional('d', "space separated tags to be deleted"));
   r.push_back(Parameter::Optional('a', "name of the new tag"));
-  r.push_back(Parameter::Optional('d', "description of the tag"));
+  r.push_back(Parameter::Optional('D', "description of the tag"));
   r.push_back(Parameter::Optional('h', "root hash of the new tag"));
   r.push_back(Parameter::Optional('c', "channel of the new tag"));
   r.push_back(Parameter::Switch('x', "maintain undo tags"));
@@ -469,7 +470,43 @@ ParameterList CommandCreateTag::GetParams() {
 }
 
 
-int CommandCreateTag::Main(const ArgumentList &args) {
+int CommandEditTag::Main(const ArgumentList &args) {
+  if ( (args.find('d') == args.end()) &&
+       (args.find('a') == args.end()) && (args.find('x') == args.end()) )
+  {
+    LogCvmfs(kLogCvmfs, kLogStderr, "nothing to do");
+    return 1;
+  }
+
+  // initialize the Environment (taking ownership)
+  const bool history_read_write = true;
+  UniquePtr<Environment> env(InitializeEnvironment(args, history_read_write));
+  if (!env) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to init environment");
+    return 1;
+  }
+
+  int retval;
+  if (args.find('d') != args.end()) {
+    retval = RemoveTags(args, env.weak_ref());
+    if (retval != 0)
+      return retval;
+  }
+  if ((args.find('a') != args.end()) || (args.find('x') != args.end())) {
+    retval = AddNewTag(args, env.weak_ref());
+    if (retval != 0)
+      return retval;
+  }
+
+  // finalize processing and upload new history database
+  if (!CloseAndPublishHistory(env.weak_ref())) {
+    return 1;
+  }
+  return 0;
+}
+
+
+int CommandEditTag::AddNewTag(const ArgumentList &args, Environment *env) {
   typedef history::History::UpdateChannel TagChannel;
   const std::string tag_name         = (args.find('a') != args.end())
                                          ? *args.find('a')->second
@@ -492,27 +529,16 @@ int CommandCreateTag::Main(const ArgumentList &args) {
     return 1;
   }
 
-  if (tag_name.empty() && !undo_tags) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "nothing to do");
-    return 1;
-  }
+  assert(!tag_name.empty() || undo_tags);
 
   if (IsUndoTagName(tag_name)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "undo tags are managed internally");
     return 1;
   }
 
-  // initialize the Environment (taking ownership)
-  const bool history_read_write = true;
-  UniquePtr<Environment> env(InitializeEnvironment(args, history_read_write));
-  if (!env) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to init environment");
-    return 1;
-  }
-
   // set the root hash to be tagged to the current HEAD if no other hash was
   // given by the user
-  shash::Any root_hash = GetTagRootHash(env.weak_ref(), root_hash_string);
+  shash::Any root_hash = GetTagRootHash(env, root_hash_string);
   if (root_hash.IsNull()) {
     return 1;
   }
@@ -554,18 +580,13 @@ int CommandCreateTag::Main(const ArgumentList &args) {
     tag_template.name = tag_name;
     const bool user_provided_hash = (!root_hash_string.empty());
 
-    if (!ManipulateTag(env.weak_ref(), tag_template, user_provided_hash)) {
+    if (!ManipulateTag(env, tag_template, user_provided_hash)) {
       return 1;
     }
   }
 
   // handle undo tags ('trunk' and 'trunk-previous') if necessary
-  if (undo_tags && !UpdateUndoTags(env.weak_ref(), tag_template)) {
-    return 1;
-  }
-
-  // finalize processing and upload new history database
-  if (!CloseAndPublishHistory(env.weak_ref())) {
+  if (undo_tags && !UpdateUndoTags(env, tag_template)) {
     return 1;
   }
 
@@ -573,7 +594,7 @@ int CommandCreateTag::Main(const ArgumentList &args) {
 }
 
 
-shash::Any CommandCreateTag::GetTagRootHash(
+shash::Any CommandEditTag::GetTagRootHash(
   Environment *env,
   const std::string &root_hash_string) const
 {
@@ -598,7 +619,7 @@ shash::Any CommandCreateTag::GetTagRootHash(
 }
 
 
-bool CommandCreateTag::ManipulateTag(
+bool CommandEditTag::ManipulateTag(
   Environment                  *env,
   const history::History::Tag  &tag_template,
   const bool                    user_provided_hash
@@ -624,8 +645,8 @@ bool CommandCreateTag::ManipulateTag(
 }
 
 
-bool CommandCreateTag::MoveTag(Environment                  *env,
-                               const history::History::Tag  &tag_template) {
+bool CommandEditTag::MoveTag(Environment                  *env,
+                             const history::History::Tag  &tag_template) {
   const std::string     &tag_name = tag_template.name;
   history::History::Tag  new_tag  = tag_template;
 
@@ -673,7 +694,7 @@ bool CommandCreateTag::MoveTag(Environment                  *env,
 }
 
 
-bool CommandCreateTag::CreateTag(
+bool CommandEditTag::CreateTag(
   Environment                  *env,
   const history::History::Tag  &new_tag
 ) {
@@ -687,19 +708,7 @@ bool CommandCreateTag::CreateTag(
 }
 
 
-//------------------------------------------------------------------------------
-
-
-ParameterList CommandRemoveTag::GetParams() {
-  ParameterList r;
-  InsertCommonParameters(&r);
-
-  r.push_back(Parameter::Mandatory('d', "space separated tags to be deleted"));
-  return r;
-}
-
-
-int CommandRemoveTag::Main(const ArgumentList &args) {
+int CommandEditTag::RemoveTags(const ArgumentList &args, Environment *env) {
   typedef std::vector<std::string> TagNames;
   const std::string tags_to_delete = *args.find('d')->second;
 
@@ -718,14 +727,6 @@ int CommandRemoveTag::Main(const ArgumentList &args) {
 
   LogCvmfs(kLogCvmfs, kLogDebug, "proceeding to delete %d tags",
            condemned_tags.size());
-
-  // initialize the Environment (taking ownership)
-  const bool history_read_write = true;
-  UniquePtr<Environment> env(InitializeEnvironment(args, history_read_write));
-  if (!env) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to init environment");
-    return 1;
-  }
 
   // check if the tags to be deleted exist
   bool all_exist = true;
@@ -760,11 +761,6 @@ int CommandRemoveTag::Main(const ArgumentList &args) {
     }
   }
   env->history->CommitTransaction();
-
-  // finalize processing and upload new history database
-  if (!CloseAndPublishHistory(env.weak_ref())) {
-    return 1;
-  }
 
   return 0;
 }
