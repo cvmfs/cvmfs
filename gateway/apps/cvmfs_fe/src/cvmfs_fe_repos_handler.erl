@@ -13,7 +13,7 @@
 init(Req0, State) ->
     Repos = cvmfs_auth:get_repos(),
     Req = cowboy_req:reply(200,
-                           #{<<"content-type">> => <<"text/plain">>},
+                           #{<<"content-type">> => <<"application/json">>},
                            jsx:encode(#{<<"repos">> => Repos}),
                            Req0),
     {ok, Req, State}.
