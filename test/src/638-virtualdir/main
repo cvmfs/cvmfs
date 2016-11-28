@@ -144,26 +144,46 @@ cvmfs_run_test() {
   local gid_after=$(stat -c %g /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots)
   [ "x$uid_after" != "x0" -o "x$gid_after" != "x0" ] && return 62
 
-  echo "--- creating some tags"
+  echo "--- (11) creating some tags"
   start_transaction $CVMFS_TEST_REPO || return $?
+  rm -f /cvmfs/$CVMFS_TEST_REPO/file-in-*
+  touch /cvmfs/$CVMFS_TEST_REPO/file-in-tagx
   publish_repo $CVMFS_TEST_REPO -a tag_x || return $?
   start_transaction $CVMFS_TEST_REPO || return $?
+  rm -f /cvmfs/$CVMFS_TEST_REPO/file-in-*
+  touch /cvmfs/$CVMFS_TEST_REPO/file-in-tagy
   publish_repo $CVMFS_TEST_REPO -a tag_y || return $?
   start_transaction $CVMFS_TEST_REPO || return $?
+  rm -f /cvmfs/$CVMFS_TEST_REPO/file-in-*
+  touch /cvmfs/$CVMFS_TEST_REPO/file-in-tagz
   publish_repo $CVMFS_TEST_REPO -a tag_z || return $?
+  ls /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/tag_x/file-in-tagx || return 40
+  ls /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/tag_y/file-in-tagy || return 41
+  ls /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/tag_z/file-in-tagz || return 42
 
-  echo "--- look for created tags"
-  ls /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/tag_x || return 40
-  ls /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/tag_y || return 41
-  ls /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/tag_z || return 42
-
-  # Test removal of tags
+  echo "--- (12) test identical nested catalogs at different spots"
+  tree /cvmfs/$CVMFS_TEST_REPO || return 50
+  tree /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots || return 51
+  local num_open_nested=$(sudo cvmfs_talk -p /var/spool/cvmfs/$CVMFS_TEST_REPO/cache/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO \
+                          open catalogs | grep nested | wc -l)
+  if [ "x$num_open_nested" != "x4" ]; then
+    return 52
+  fi
+  sudo cvmfs_talk -p /var/spool/cvmfs/$CVMFS_TEST_REPO/cache/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO \
+                  detach nested catalogs || return 53
+  local num_open_nested=$(sudo cvmfs_talk -p /var/spool/cvmfs/$CVMFS_TEST_REPO/cache/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO \
+                          cache list pinned | grep nested | wc -l)
+  if [ "x$num_open_nested" != "x0" ]; then
+    return 54
+  fi
+  tree /cvmfs/$CVMFS_TEST_REPO || return 55
+  tree /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots || return 56
 
   # Test only creating / removing tags (without active publishing)
 
-  # Test same nested catalog mounted at different mount points
+  # Test removal / moving of tags
 
-  # Test removeal of virtual catalog
+  # Test removal of virtual catalog
 
   return 0
 }
