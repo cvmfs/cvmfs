@@ -622,9 +622,13 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   }
 
   UniquePtr<manifest::Manifest> manifest;
-  manifest = this->FetchRemoteManifest(params.stratum0,
-                                       params.repo_name,
-                                       params.base_hash);
+  if (params.virtual_dir) {
+    manifest = this->OpenLocalManifest(params.manifest_path);
+  } else {
+    manifest = this->FetchRemoteManifest(params.stratum0,
+                                         params.repo_name,
+                                         params.base_hash);
+  }
   if (!manifest) {
     return 3;
   }
@@ -640,30 +644,41 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   catalog_manager.Init();
 
   publish::SyncMediator mediator(&catalog_manager, &params);
-  publish::SyncUnion *sync;
-  if (params.union_fs_type == "overlayfs") {
-    sync = new publish::SyncUnionOverlayfs(&mediator,
-                                           params.dir_rdonly,
-                                           params.dir_union,
-                                           params.dir_scratch);
-  } else if (params.union_fs_type == "aufs") {
-    sync = new publish::SyncUnionAufs(&mediator,
-                                      params.dir_rdonly,
-                                      params.dir_union,
-                                      params.dir_scratch);
+
+  // Either real catalogs or virtual catalog
+  if (!params.virtual_dir) {
+    publish::SyncUnion *sync;
+    if (params.union_fs_type == "overlayfs") {
+      sync = new publish::SyncUnionOverlayfs(&mediator,
+                                             params.dir_rdonly,
+                                             params.dir_union,
+                                             params.dir_scratch);
+    } else if (params.union_fs_type == "aufs") {
+      sync = new publish::SyncUnionAufs(&mediator,
+                                        params.dir_rdonly,
+                                        params.dir_union,
+                                        params.dir_scratch);
+    } else {
+      LogCvmfs(kLogCvmfs, kLogStderr, "unknown union file system: %s",
+               params.union_fs_type.c_str());
+      return 3;
+    }
+
+    if (!sync->Initialize()) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Initialization of the synchronisation "
+                                      "engine failed");
+      return 4;
+    }
+
+    sync->Traverse();
   } else {
-    LogCvmfs(kLogCvmfs, kLogStderr, "unknown union file system: %s",
-             params.union_fs_type.c_str());
-    return 3;
+    if (!manifest->history().IsNull()) {
+      LogCvmfs(kLogCvmfs, kLogStdout, "Creating virtual snapshots");
+      catalog::VirtualCatalog virtual_catalog(
+        manifest.weak_ref(), download_manager(), &catalog_manager, &params);
+      virtual_catalog.GenerateSnapshots();
+    }
   }
-
-  if (!sync->Initialize()) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Initialization of the synchronisation "
-                                    "engine failed");
-    return 4;
-  }
-
-  sync->Traverse();
 
   if (params.ttl_seconds > 0) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Setting repository TTL to %" PRIu64 " s",
@@ -695,13 +710,6 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     }
 
     catalog_manager.SetVOMSAuthz(new_authz);
-  }
-
-  if (params.virtual_dir && !manifest->history().IsNull()) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "Creating virtual snapshots");
-    catalog::VirtualCatalog virtual_catalog(
-      manifest.weak_ref(), download_manager(), &catalog_manager, &params);
-    virtual_catalog.GenerateSnapshots();
   }
 
   if (!mediator.Commit(manifest.weak_ref())) {

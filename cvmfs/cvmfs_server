@@ -4901,8 +4901,9 @@ cvmfs_server_publish() {
     if [ "x${CVMFS_VOMS_AUTHZ}" != x ]; then
       sync_command="$sync_command -V"
     fi
+    local sync_command_virtual_dir=
     if [ "x${CVMFS_VIRTUAL_DIR}" = "xtrue" ]; then
-      sync_command="$sync_command -S"
+      sync_command_virtual_dir="$sync_command -S"
     fi
     local tag_command="$(__swissknife_cmd dbg) tag_edit \
       -r $upstream                                      \
@@ -4915,6 +4916,7 @@ cvmfs_server_publish() {
       -e $hash_algorithm                                \
       $(get_follow_http_redirects_flag)                 \
       -x" # -x enables magic undo tag handling
+    local tag_command_undo_tags="$tag_command"
     if [ ! -z "$tag_name" ]; then
       tag_command="$tag_command -a $tag_name"
     fi
@@ -4925,6 +4927,7 @@ cvmfs_server_publish() {
       tag_command="$tag_command -D \"$tag_description\""
     fi
 
+    # TODO(jblomer): combine tag creation/removal
     local tag_cleanup_command=
     if [ ! -z "$auto_tag_cleanup_list" ]; then
       tag_cleanup_command="$(__swissknife_cmd dbg) tag_edit \
@@ -4965,6 +4968,14 @@ cvmfs_server_publish() {
     # add a tag for the new revision
     echo "Tagging $name"
     $user_shell "$tag_command" || { publish_failed $name; die "Tagging failed\n\nExecuted Command:\n$tag_command";  }
+
+    if [ "x$sync_command_virtual_dir" != "x" ]; then
+      # write intermediate catalog hash and history to reflog
+      sign_manifest $name $manifest "" true
+      $user_shell "$sync_command_virtual_dir" || { publish_failed $name; die "Creating .cvmfs failed\n\nExecuted Command:\n$sync_command_virtual_dir";  }
+      local trunk_hash=$(grep "^C" $manifest | tr -d C)
+      $user_shell "$tag_command_undo_tags" || { publish_failed $name; die "Creating undo tags\n\nExecuted Command:\n$tag_command_undo_tags";  }
+    fi
 
     # finalizing transaction
     echo "Flushing file system buffers"
