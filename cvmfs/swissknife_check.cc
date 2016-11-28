@@ -351,7 +351,8 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
           entries[i].IsBindMountpoint())
       {
         // Find transition point
-        computed_counters->self.nested_catalogs++;
+        if (entries[i].IsNestedCatalogMountpoint())
+          computed_counters->self.nested_catalogs++;
         shash::Any tmp;
         uint64_t tmp2;
         PathString mountpoint(full_path);
@@ -701,12 +702,14 @@ bool CommandCheck::InspectTree(const string                  &path,
   // Recurse into nested catalogs
   const catalog::Catalog::NestedCatalogList &nested_catalogs =
     catalog->ListNestedCatalogs();
-  if (nested_catalogs.size() !=
+  const catalog::Catalog::NestedCatalogList own_nested_catalogs =
+    catalog->ListOwnNestedCatalogs();
+  if (own_nested_catalogs.size() !=
       static_cast<uint64_t>(computed_counters->self.nested_catalogs))
   {
     LogCvmfs(kLogCvmfs, kLogStderr, "number of nested catalogs does not match;"
              " expected %lu, got %lu", computed_counters->self.nested_catalogs,
-             nested_catalogs.size());
+             own_nested_catalogs.size());
     retval = false;
   }
   set<PathString> nested_catalog_paths;

@@ -525,10 +525,6 @@ void WritableCatalog::InsertBindMountpoint(
      stmt.BindInt64(3, size) &&
      stmt.Execute();
   assert(retval);
-
-  ResetNestedCatalogCacheUnprotected();
-
-  delta_counters_.self.nested_catalogs++;
 }
 
 
@@ -591,10 +587,6 @@ void WritableCatalog::RemoveBindMountpoint(const std::string &mountpoint) {
     stmt.BindText(1, mountpoint) &&
     stmt.Execute();
   assert(retval);
-
-  ResetNestedCatalogCacheUnprotected();
-
-  delta_counters_.self.nested_catalogs--;
 }
 
 
