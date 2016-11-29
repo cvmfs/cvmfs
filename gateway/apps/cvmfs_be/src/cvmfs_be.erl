@@ -29,7 +29,7 @@
 -type new_lease_result() :: {ok, LeaseToken :: binary()} |
                             {error, invalid_user} |
                             {error, invalid_path} |
-                            {busy, TimeRemaining :: binary()}.
+                            {path_busy, TimeRemaining :: binary()}.
 -type submission_error() :: {error,
                              lease_expired |
                              invalid_lease |
@@ -214,7 +214,7 @@ p_new_lease(User, Path) ->
                         ok ->
                             {ok, Token};
                         {busy, TimeRemaining} ->
-                            {error, path_busy, TimeRemaining}
+                            {path_busy, TimeRemaining}
                     end
             end;
         Error ->

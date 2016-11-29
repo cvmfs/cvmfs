@@ -19,6 +19,7 @@
 -export([api_qc/1]).
 
 -export([valid_user_valid_path/1
+        ,valid_user_busy_path/1
         ,invalid_user_valid_path/1
         ,valid_user_invalid_path/1
         ,invalid_user_invalid_path/1]).
@@ -44,6 +45,7 @@ groups() ->
                           ,{group, end_lease}
                           ,{group, submit_payload}]}
     ,{new_lease, [], [valid_user_valid_path
+                     ,valid_user_busy_path
                      ,invalid_user_valid_path
                      ,valid_user_invalid_path
                      ,invalid_user_invalid_path]}
@@ -103,7 +105,14 @@ end_per_testcase(_TestCase, _Config) ->
 % Valid user and valid path should be accepted
 valid_user_valid_path(_Config) ->
     {VUser, VPath} = valid_user_and_path(),
-    {ok, _} = cvmfs_be:new_lease(VUser, VPath).
+    {ok, Token} = cvmfs_be:new_lease(VUser, VPath),
+    ok = cvmfs_be:end_lease(Token).
+% Valid user and busy path should be rejected with remaining time
+valid_user_busy_path(_Config) ->
+    {VUser, VPath} = valid_user_and_path(),
+    {ok, Token} = cvmfs_be:new_lease(VUser, VPath),
+    {path_busy, _} = cvmfs_be:new_lease(VUser, VPath),
+    ok = cvmfs_be:end_lease(Token).
 % Invalid user and valid path should be rejected
 invalid_user_valid_path(_Config) ->
     {VUser, VPath} = valid_user_and_path(),
