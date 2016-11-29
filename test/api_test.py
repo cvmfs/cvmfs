@@ -13,10 +13,16 @@ def do_request(url, method, body):
         con = httplib.HTTPConnection(base_url, port)
         headers = {'Content-type' : 'application/json'}
         con.request(method, url, json.dumps(body), headers)
-        resp_js = json.loads(con.getresponse().read())
-        print resp_js
+        return json.loads(con.getresponse().read())
     except Exception:
         pass
+
+def create_and_delete_session():
+    rep1 = do_request('/api/leases', 'PUT', {'user' : 'user1', 'path' : '/path/to/repo/1'})
+    print 'New session: ', rep1
+    token = rep1['session_token']
+    rep2 = do_request('/api/leases/' + token, 'DELETE', {})
+    print 'End session: ', rep2
 
 def main():
     base_res = '/api/'
@@ -29,8 +35,12 @@ def main():
                 (base_res + 'leases', 'PUT', {'user' : 'user1', 'path' : '/bad/path'}),
                 (base_res + 'leases', 'PUT', {'user' : 'user1', 'path' : '/path/to/repo/1'})]
 
+    create_and_delete_session()
+
     for (u, m, b) in url_resp:
-        do_request(u, m, b)
+        rep = do_request(u, m, b)
+        print rep
+
 
 if __name__ == '__main__':
     main()
