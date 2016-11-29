@@ -22,8 +22,30 @@ init(Req0 = #{method := <<"PUT">>}, State) ->
                             #{<<"content-type">> => <<"application/json">>},
                             jsx:encode(Reply),
                             Req1),
-    {ok, Req2, State}.
+    {ok, Req2, State};
+init(Req0 = #{method := <<"DELETE">>}, State) ->
+    case cowboy_req:binding(id, Req0) of
+        undefined ->
+            Req1 = cowboy_req:reply(400,
+                                    #{<<"content-type">> => <<"application/json">>},
+                                    jsx:encode(#{<<"status">> => <<"error">>,
+                                                 <<"reason">> => <<"BAD Request. Missing token. Call /api/leases/<TOKEN>">>}),
+                                    Req0),
+            {ok, Req1, State};
+        Token ->
+            Reply = case cvmfs_be:end_lease(Token) of
+                        ok ->
+                            jsx:encode(#{<<"status">> => <<"ok">>});
+                        {error, invalid_macaroon} ->
+                            jsx:encode(#{<<"status">> => <<"error">>,
+                                         <<"reason">> => <<"invalid_token">>})
+                    end,
+            Req1 = cowboy_req:reply(200, #{<<"content-type">> => <<"application/json">>}, Reply, Req0),
+            {ok, Req1, State}
+    end.
 
+
+%%% Private functions
 
 decode_request(Req) ->
     case cowboy_req:has_body(Req) of
@@ -39,6 +61,7 @@ decode_request(Req) ->
         false ->
             {400, #{}, Req}
     end.
+
 
 new_lease(User, Path) ->
     case cvmfs_be:new_lease(User, Path) of
