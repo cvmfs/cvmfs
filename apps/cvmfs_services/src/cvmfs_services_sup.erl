@@ -30,35 +30,40 @@ start_link(Args) ->
 %%====================================================================
 
 %% Child :: {Id,StartFunc,Restart,Shutdown,Type,Modules}
-init(Args) ->
+init({EnabledWorkers, _, _} = Args) ->
     SupervisorSpecs = #{strategy => one_for_all,
                         intensity => 5,
                         period => 5},
-    AuthSpecs = #{id => auth,
-                  start => {auth, start_link, [Args]},
-                  restart => permanent,
-                  shutdown => 2000,
-                  type => worker,
-                  modules => [auth]},
-    BeSpecs = #{id => be,
-                start => {be, start_link, [{}]},
+    WorkerSpecs = #{
+      auth => #{id => auth,
+                start => {auth, start_link, [Args]},
                 restart => permanent,
                 shutdown => 2000,
                 type => worker,
-                modules => [be]},
-    LeaseSpecs = #{id => lease,
-                   start => {lease, start_link, [Args]},
-                   restart => permanent,
-                   shutdown => 2000,
-                   type => worker,
-                   modules => [lease]},
-    FeSpecs = #{id => fe,
-                start => {fe, start_link, []},
-                restart => permanent,
-                shutdown => 2000,
-                type => supervisor,
-                modules => [fe]},
-    {ok, {SupervisorSpecs, [AuthSpecs, BeSpecs, LeaseSpecs, FeSpecs]}}.
+                modules => [auth]},
+      be => #{id => be,
+              start => {be, start_link, [{}]},
+              restart => permanent,
+              shutdown => 2000,
+              type => worker,
+              modules => [be]},
+      lease => #{id => lease,
+                 start => {lease, start_link, [Args]},
+                 restart => permanent,
+                 shutdown => 2000,
+                 type => worker,
+                 modules => [lease]},
+      fe => #{id => fe,
+              start => {fe, start_link, []},
+              restart => permanent,
+              shutdown => 2000,
+              type => supervisor,
+              modules => [fe]}
+     },
+    {ok, {SupervisorSpecs, lists:foldr(fun(W, Acc) -> [maps:get(W, WorkerSpecs) | Acc] end,
+                                       [],
+                                       EnabledWorkers)}}.
+
 
 %%====================================================================
 %% Internal functions
