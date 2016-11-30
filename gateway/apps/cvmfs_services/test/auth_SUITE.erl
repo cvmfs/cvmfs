@@ -46,17 +46,18 @@ init_per_suite(Config) ->
     application:set_env(mnesia, schema_location, ram),
     application:start(mnesia),
 
-    ok = application:load(cvmfs_auth),
+    ok = application:load(cvmfs_services),
     ok = ct:require(repos),
     ok = ct:require(acl),
-    ok = application:set_env(cvmfs_auth, repo_config, #{repos => ct:get_config(repos)
-                                                       ,acl => ct:get_config(acl)}),
-    {ok, _} = application:ensure_all_started(cvmfs_auth),
+    ok = application:set_env(cvmfs_services, services, [auth]),
+    ok = application:set_env(cvmfs_services, repo_config, #{repos => ct:get_config(repos)
+                                                           ,acl => ct:get_config(acl)}),
+    {ok, _} = application:ensure_all_started(cvmfs_services),
     Config.
 
 end_per_suite(_Config) ->
-    application:stop(cvmfs_auth),
-    application:unload(cvmfs_auth),
+    application:stop(cvmfs_services),
+    application:unload(cvmfs_services),
     application:stop(mnesia),
     application:unload(mnesia),
     ok.

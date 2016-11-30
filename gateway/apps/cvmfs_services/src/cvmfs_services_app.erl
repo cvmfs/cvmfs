@@ -17,15 +17,17 @@
 %%====================================================================
 
 start(_StartType, _StartArgs) ->
-    case application:get_env(cvmfs_services, repo_config) of
+    case application:get_env(repo_config) of
         {ok, {file, RepoConfigFile}} ->
             {ok, VarList} = file:consult(RepoConfigFile),
             Vars = maps:from_list(VarList);
         {ok, RepoConfigMap} ->
             Vars = RepoConfigMap
     end,
+    {ok, Services} = application:get_env(services),
 
-    cvmfs_services_sup:start_link({maps:get(repos, Vars)
+    cvmfs_services_sup:start_link({Services
+                                  ,maps:get(repos, Vars)
                                   ,maps:get(acl, Vars)}).
 
 %%--------------------------------------------------------------------

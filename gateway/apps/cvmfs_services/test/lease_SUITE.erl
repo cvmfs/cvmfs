@@ -7,7 +7,7 @@
 %%%
 %%%-------------------------------------------------------------------
 
--module(cvmfs_lease_SUITE).
+-module(lease_SUITE).
 
 -include_lib("common_test/include/ct.hrl").
 
@@ -48,14 +48,15 @@ init_per_suite(Config) ->
     application:start(mnesia),
 
     MaxLeaseTime = 50, % milliseconds
-    ok = application:load(cvmfs_lease),
-    ok = application:set_env(cvmfs_lease, max_lease_time, MaxLeaseTime),
-    {ok, _} = application:ensure_all_started(cvmfs_lease),
+    ok = application:load(cvmfs_services),
+    ok = application:set_env(cvmfs_services, services, [lease]),
+    ok = application:set_env(cvmfs_services, max_lease_time, MaxLeaseTime),
+    {ok, _} = application:ensure_all_started(cvmfs_services),
     lists:flatten([{max_lease_time, MaxLeaseTime}, Config]).
 
 end_per_suite(_Config) ->
-    application:stop(cvmfs_lease),
-    application:unload(cvmfs_lease),
+    application:stop(cvmfs_services),
+    application:unload(cvmfs_services),
     application:stop(mnesia),
     application:unload(mnesia),
     ok.
