@@ -7,7 +7,7 @@
 %%%
 %%%-------------------------------------------------------------------
 
--module(cvmfs_lease_path_util).
+-module(cvmfs_path_util).
 
 -export([are_overlapping/2]).
 

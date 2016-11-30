@@ -1,12 +1,12 @@
 %%%-------------------------------------------------------------------
 %%% This file is part of the CernVM File System.
 %%%
-%%% @doc cvmfs_fe_user_handler
+%%% @doc cvmfs__user_handler
 %%%
 %%% @end
 %%%-------------------------------------------------------------------
 
--module(cvmfs_fe_users_handler).
+-module(cvmfs_users_handler).
 
 -export([init/2]).
 
