@@ -30,13 +30,13 @@ start_link(Args) ->
 %%====================================================================
 
 %% Child :: {Id,StartFunc,Restart,Shutdown,Type,Modules}
-init({EnabledWorkers, _, _} = Args) ->
+init({EnabledWorkers, Repos, ACL}) ->
     SupervisorSpecs = #{strategy => one_for_all,
                         intensity => 5,
                         period => 5},
     WorkerSpecs = #{
       cvmfs_auth => #{id => cvmfs_auth,
-                      start => {cvmfs_auth, start_link, [Args]},
+                      start => {cvmfs_auth, start_link, [{Repos, ACL}]},
                       restart => permanent,
                       shutdown => 2000,
                       type => worker,
@@ -48,7 +48,7 @@ init({EnabledWorkers, _, _} = Args) ->
                     type => worker,
                     modules => [cvmfs_be]},
       cvmfs_lease => #{id => cvmfs_lease,
-                       start => {cvmfs_lease, start_link, [Args]},
+                       start => {cvmfs_lease, start_link, [{}]},
                        restart => permanent,
                        shutdown => 2000,
                        type => worker,

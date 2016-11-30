@@ -7,7 +7,7 @@
 %%%
 %%%-------------------------------------------------------------------
 
--module(lease_SUITE).
+-module(cvmfs_lease_SUITE).
 
 -include_lib("common_test/include/ct.hrl").
 
@@ -49,7 +49,7 @@ init_per_suite(Config) ->
 
     MaxLeaseTime = 50, % milliseconds
     ok = application:load(cvmfs_services),
-    ok = application:set_env(cvmfs_services, services, [lease]),
+    ok = application:set_env(cvmfs_services, enabled_services, [cvmfs_lease]),
     ok = application:set_env(cvmfs_services, max_lease_time, MaxLeaseTime),
     {ok, _} = application:ensure_all_started(cvmfs_services),
     lists:flatten([{max_lease_time, MaxLeaseTime}, Config]).

@@ -49,7 +49,7 @@ init_per_suite(Config) ->
     ok = application:load(cvmfs_services),
     ok = ct:require(repos),
     ok = ct:require(acl),
-    ok = application:set_env(cvmfs_services, services, [auth]),
+    ok = application:set_env(cvmfs_services, enabled_services, [cvmfs_auth]),
     ok = application:set_env(cvmfs_services, repo_config, #{repos => ct:get_config(repos)
                                                            ,acl => ct:get_config(acl)}),
     {ok, _} = application:ensure_all_started(cvmfs_services),

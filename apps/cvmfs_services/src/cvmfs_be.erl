@@ -273,7 +273,7 @@ p_generate_token(User, Path) ->
     M = macaroon:create(Location, Secret, Public),
     M1 = macaroon:add_first_party_caveat(M, "user = " ++ User),
 
-    {ok, MaxLeaseTime} = application:get_env(cvmfs_lease, max_lease_time),
+    {ok, MaxLeaseTime} = application:get_env(cvmfs_services, max_lease_time),
     Time = erlang:system_time(milli_seconds) + MaxLeaseTime,
 
     M2 = macaroon:add_first_party_caveat(M1,

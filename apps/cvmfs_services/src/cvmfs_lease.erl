@@ -57,8 +57,8 @@
 -spec start_link(Args) -> {ok, Pid} | ignore | {error, Error}
                               when Args :: term(), Pid :: pid(),
                                    Error :: {already_start, pid()} | term().
-start_link(Args) ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, Args, []).
+start_link(_) ->
+    gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -238,7 +238,7 @@ code_change(OldVsn, State, _Extra) ->
                                                                  Secret :: binary(),
                                                                  State :: map().
 p_new_lease(User, Path, Public, Secret, _State) ->
-    {ok, MaxLeaseTime} = application:get_env(cvmfs_lease, max_lease_time),
+    {ok, MaxLeaseTime} = application:get_env(cvmfs_services, max_lease_time),
 
     %% Match statement that selects all rows with a given repo,
     %% returning a list of {Path, Time} pairs
@@ -247,7 +247,7 @@ p_new_lease(User, Path, Public, Secret, _State) ->
                     end),
 
     AreOverlapping = fun(#lease{path = P}) ->
-                             cvmfs_lease_path_util:are_overlapping(P, Path)
+                             cvmfs_path_util:are_overlapping(P, Path)
                      end,
 
     T = fun() ->
@@ -280,7 +280,7 @@ p_new_lease(User, Path, Public, Secret, _State) ->
 -spec p_check_lease(Public) -> lease_check_result()
                                    when Public :: binary().
 p_check_lease(Public) ->
-    {ok, MaxLeaseTime} = application:get_env(cvmfs_lease, max_lease_time),
+    {ok, MaxLeaseTime} = application:get_env(cvmfs_services, max_lease_time),
 
     MS = ets:fun2ms(fun(#lease{public = P} = Lease) when P =:= Public ->
                             Lease
