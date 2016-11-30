@@ -7,7 +7,7 @@
 ,{mnesia, [{dir, "/opt/cvmfs_mnesia"}
           ,{schema_location, disc}]}
 
-,{cvmfs_services, [{services, [fe, be, auth, lease]},
+,{cvmfs_services, [{enabled_services, [cvmfs_fe, cvmfs_be, cvmfs_auth, cvmfs_lease]},
                    {repo_config, {file, "./etc/repo.config"}},
                    {max_lease_time, 10000}]} % max lease time in milliseconds
 ].
