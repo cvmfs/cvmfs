@@ -269,6 +269,7 @@ catalog::DirectoryEntry catalog::DirectoryEntryTestFactory::Make(
   dirent.linkcount_  = metadata.linkcount;
   dirent.has_xattrs_ = metadata.has_xattrs;
   dirent.checksum_   = metadata.checksum;
+  dirent.is_hidden_  = metadata.is_hidden;
   return dirent;
 }
 

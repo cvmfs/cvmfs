@@ -47,6 +47,7 @@ class DirectoryEntryTestFactory {
     std::string symlink;
     uint32_t linkcount;
     bool has_xattrs;
+    bool is_hidden;
     shash::Any checksum;
   };
 
