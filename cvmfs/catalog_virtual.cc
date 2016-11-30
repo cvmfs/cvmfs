@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cstdlib>
 
 #include "catalog_mgr_rw.h"
 #include "compression.h"
@@ -131,6 +132,7 @@ void VirtualCatalog::Generate(int actions) {
 
 
 void VirtualCatalog::GenerateSnapshots() {
+  LogCvmfs(kLogCvmfs, kLogStdout, "Creating virtual snapshots");
   EnsurePresence();
 
   vector<TagId> tags_history;
@@ -269,8 +271,41 @@ void VirtualCatalog::InsertSnapshot(TagId tag) {
 
 
 void VirtualCatalog::Remove() {
-  LogCvmfs(kLogCatalog, kLogDebug, "remove .cvmfs virtual catalog");
+  LogCvmfs(kLogCvmfs, kLogStdout, "Removing .cvmfs virtual catalog");
 
+  // Safety check, make sure we don't remove the entire repository
+  WritableCatalog *virtual_catalog =
+    catalog_mgr_->GetHostingCatalog(kVirtualPath);
+  assert(!virtual_catalog->IsRoot());
+  DirectoryEntry entry_virtual;
+  bool retval = catalog_mgr_->LookupPath(
+    PathString("/" + kVirtualPath), kLookupSole, &entry_virtual);
+  assert(retval);
+  assert(entry_virtual.IsHidden());
+
+  RemoveRecursively(kVirtualPath);
+  catalog_mgr_->RemoveNestedCatalog(kVirtualPath);
+  catalog_mgr_->RemoveDirectory(kVirtualPath);
+}
+
+
+void VirtualCatalog::RemoveRecursively(const string &directory) {
+  DirectoryEntryList listing;
+  bool retval = catalog_mgr_->Listing(PathString("/" + directory), &listing);
+  assert(retval);
+  for (unsigned i = 0; i < listing.size(); ++i) {
+    string this_path = directory + "/" + listing[i].name().ToString();
+    if (listing[i].IsDirectory()) {
+      if (!listing[i].IsBindMountpoint())
+        RemoveRecursively(this_path);
+      catalog_mgr_->RemoveDirectory(this_path);
+    } else if (listing[i].IsRegular()) {
+      assert(listing[i].name().ToString() == ".cvmfscatalog");
+      catalog_mgr_->RemoveFile(this_path);
+    } else {
+      abort();
+    }
+  }
 }
 
 

@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "hash.h"
+#include "shortstring.h"
 
 namespace catalog {
 class WritableCatalogManager;
@@ -39,7 +40,6 @@ class VirtualCatalog {
                  catalog::WritableCatalogManager *c,
                  SyncParameters *p);
   void Generate(int actions);
-  void Remove();
 
  private:
   static const std::string kSnapshotDirectory;
@@ -70,6 +70,8 @@ class VirtualCatalog {
   void GetSortedTagsFromCatalog(std::vector<TagId> *tags);
   void RemoveSnapshot(TagId tag);
   void InsertSnapshot(TagId tag);
+  void Remove();
+  void RemoveRecursively(const std::string &directory);
 
   catalog::WritableCatalogManager *catalog_mgr_;
   swissknife::Assistant assistant_;

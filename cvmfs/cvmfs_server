@@ -5015,7 +5015,7 @@ cvmfs_server_publish() {
     if [ "x$sync_command_virtual_dir" != "x" ]; then
       # write intermediate catalog hash and history to reflog
       sign_manifest $name $manifest "" true
-      $user_shell "$sync_command_virtual_dir" || { publish_failed $name; die "Creating .cvmfs failed\n\nExecuted Command:\n$sync_command_virtual_dir";  }
+      $user_shell "$sync_command_virtual_dir" || { publish_failed $name; die "Editing .cvmfs failed\n\nExecuted Command:\n$sync_command_virtual_dir";  }
       local trunk_hash=$(grep "^C" $manifest | tr -d C)
       $user_shell "$tag_command_undo_tags" || { publish_failed $name; die "Creating undo tags\n\nExecuted Command:\n$tag_command_undo_tags";  }
     fi

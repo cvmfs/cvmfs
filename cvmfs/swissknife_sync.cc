@@ -680,12 +680,10 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 
     sync->Traverse();
   } else {
-    if (!manifest->history().IsNull()) {
-      LogCvmfs(kLogCvmfs, kLogStdout, "Creating virtual snapshots");
-      catalog::VirtualCatalog virtual_catalog(
-        manifest.weak_ref(), download_manager(), &catalog_manager, &params);
-      virtual_catalog.Generate(params.virtual_dir_actions);
-    }
+    assert(!manifest->history().IsNull());
+    catalog::VirtualCatalog virtual_catalog(
+      manifest.weak_ref(), download_manager(), &catalog_manager, &params);
+    virtual_catalog.Generate(params.virtual_dir_actions);
   }
 
   if (params.ttl_seconds > 0) {

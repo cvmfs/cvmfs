@@ -592,7 +592,7 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
   // entries of all "grand-nested" catalogs
   // Note: taking a copy of the nested catalog list here
   const Catalog::NestedCatalogList &grand_nested =
-    wr_new_catalog->ListNestedCatalogs();
+    wr_new_catalog->ListOwnNestedCatalogs();
   DeltaCounters fix_subtree_counters;
   for (Catalog::NestedCatalogList::const_iterator i = grand_nested.begin(),
        iEnd = grand_nested.end(); i != iEnd; ++i)

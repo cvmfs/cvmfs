@@ -1,4 +1,4 @@
-cvmfs_test_name="Create Virtual .cvmfs Directory"
+cvmfs_test_name="Virtual .cvmfs Directory"
 cvmfs_test_autofs_on_startup=false
 
 CVMFS_TEST638_REPLICA_NAME=
@@ -200,7 +200,14 @@ cvmfs_run_test() {
   ls /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/tag_rover/file-in-tagz || return 102
   check_repository $CVMFS_TEST_REPO -i || return 103
 
-  # Test removal of virtual catalog
+  echo "--- (14) removal of virtual catalog"
+  echo "CVMFS_VIRTUAL_DIR=false" | sudo tee -a /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf
+  start_transaction $CVMFS_TEST_REPO || return $?
+  publish_repo $CVMFS_TEST_REPO -v || return $?
+  check_repository $CVMFS_TEST_REPO -i || return 100
+  tree /cvmfs/$CVMFS_TEST_REPO || 101
+  ls /cvmfs/$CVMFS_TEST_REPO/nested || return 102
+  ls /cvmfs/$CVMFS_TEST_REPO/.cvmfs && return 103
 
   return 0
 }

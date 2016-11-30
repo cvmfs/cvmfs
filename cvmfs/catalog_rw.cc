@@ -647,7 +647,7 @@ void WritableCatalog::CopyCatalogsToParent() {
   WritableCatalog *parent = GetWritableParent();
 
   // Obtain a list of all nested catalog references
-  const NestedCatalogList &nested_catalog_references = ListNestedCatalogs();
+  const NestedCatalogList nested_catalog_references = ListOwnNestedCatalogs();
 
   // Go through the list and update the databases
   // simultaneously we are checking if the referenced catalogs are currently
