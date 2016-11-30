@@ -11,59 +11,65 @@
 -export([init/2]).
 
 init(Req0 = #{method := <<"GET">>}, State) ->
-    Req = cowboy_req:reply(405,
+    Req1 = cowboy_req:reply(405,
                            #{<<"content-type">> => <<"application/json">>},
                            jsx:encode(#{}),
                            Req0),
-    {ok, Req, State};
+    {ok, Req1, State};
 init(Req0 = #{method := <<"PUT">>}, State) ->
-    {Status, Reply, Req1} = decode_request(Req0),
-    Req2 = cowboy_req:reply(Status,
+    {Status, Reply, Req2} = case p_read_body(Req0) of
+                                {ok, Data, Req1} ->
+                                    case jsx:decode(Data, [return_maps]) of
+                                        #{<<"user">> := User, <<"path">> := Path} ->
+                                            Rep = p_new_lease(User, Path),
+                                            {200, Rep, Req1};
+                                        _ ->
+                                            {400, #{}, Req1}
+                                    end;
+                                _ ->
+                                    {400, #{}, Req0}
+                            end,
+    ReqF = cowboy_req:reply(Status,
                             #{<<"content-type">> => <<"application/json">>},
                             jsx:encode(Reply),
-                            Req1),
-    {ok, Req2, State};
+                            Req2),
+    {ok, ReqF, State};
 init(Req0 = #{method := <<"DELETE">>}, State) ->
     case cowboy_req:binding(id, Req0) of
         undefined ->
+            Reply = #{<<"status">> => <<"error">>,
+                      <<"reason">> => <<"BAD Request. Missing token. Call /api/leases/<TOKEN>">>},
             Req1 = cowboy_req:reply(400,
                                     #{<<"content-type">> => <<"application/json">>},
-                                    jsx:encode(#{<<"status">> => <<"error">>,
-                                                 <<"reason">> => <<"BAD Request. Missing token. Call /api/leases/<TOKEN>">>}),
+                                    jsx:encode(Reply),
                                     Req0),
             {ok, Req1, State};
         Token ->
             Reply = case cvmfs_be:end_lease(Token) of
                         ok ->
-                            jsx:encode(#{<<"status">> => <<"ok">>});
+                            #{<<"status">> => <<"ok">>};
                         {error, invalid_macaroon} ->
-                            jsx:encode(#{<<"status">> => <<"error">>,
-                                         <<"reason">> => <<"invalid_token">>})
+                            #{<<"status">> => <<"error">>,
+                              <<"reason">> => <<"invalid_token">>}
                     end,
-            Req1 = cowboy_req:reply(200, #{<<"content-type">> => <<"application/json">>}, Reply, Req0),
+            Req1 = cowboy_req:reply(200,
+                                    #{<<"content-type">> => <<"application/json">>},
+                                    jsx:encode(Reply),
+                                    Req0),
             {ok, Req1, State}
     end.
 
 
 %%% Private functions
-
-decode_request(Req) ->
+p_read_body(Req) ->
     case cowboy_req:has_body(Req) of
         true ->
-            {ok, Data, Req1} = cowboy_req:read_body(Req),
-            case jsx:decode(Data, [return_maps]) of
-                #{<<"user">> := User, <<"path">> := Path} ->
-                    Reply = new_lease(User, Path),
-                    {200, Reply, Req1};
-                _ ->
-                    {400, #{}, Req}
-            end;
+            cowboy_req:read_body(Req);
         false ->
-            {400, #{}, Req}
+            {}
     end.
 
-
-new_lease(User, Path) ->
+p_new_lease(User, Path) ->
     case cvmfs_be:new_lease(User, Path) of
         {ok, Token} ->
             #{<<"status">> => <<"ok">>, <<"session_token">> => Token};
