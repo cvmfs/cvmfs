@@ -143,6 +143,7 @@ cvmfs_run_test() {
   local uid_after=$(stat -c %u /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots)
   local gid_after=$(stat -c %g /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots)
   [ "x$uid_after" != "x0" -o "x$gid_after" != "x0" ] && return 62
+  check_repository $CVMFS_TEST_REPO -i || return 63
 
   echo "--- (11) creating some tags"
   start_transaction $CVMFS_TEST_REPO || return $?
@@ -157,44 +158,47 @@ cvmfs_run_test() {
   rm -f /cvmfs/$CVMFS_TEST_REPO/file-in-*
   touch /cvmfs/$CVMFS_TEST_REPO/file-in-tagz
   publish_repo $CVMFS_TEST_REPO -a tag_z || return $?
-  ls /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/tag_x/file-in-tagx || return 40
-  ls /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/tag_y/file-in-tagy || return 41
-  ls /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/tag_z/file-in-tagz || return 42
+  ls /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/tag_x/file-in-tagx || return 70
+  ls /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/tag_y/file-in-tagy || return 71
+  ls /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/tag_z/file-in-tagz || return 72
+  check_repository $CVMFS_TEST_REPO -i || return 73
 
   echo "--- (12) test identical nested catalogs at different spots"
-  tree /cvmfs/$CVMFS_TEST_REPO || return 50
-  tree /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots || return 51
+  tree /cvmfs/$CVMFS_TEST_REPO || return 80
+  tree /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots || return 81
   local num_open_nested=$(sudo cvmfs_talk -p /var/spool/cvmfs/$CVMFS_TEST_REPO/cache/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO \
                           open catalogs | grep nested | wc -l)
   if [ "x$num_open_nested" != "x4" ]; then
-    return 52
+    return 82
   fi
   sudo cvmfs_talk -p /var/spool/cvmfs/$CVMFS_TEST_REPO/cache/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO \
-                  detach nested catalogs || return 53
+                  detach nested catalogs || return 83
   local num_open_nested=$(sudo cvmfs_talk -p /var/spool/cvmfs/$CVMFS_TEST_REPO/cache/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO \
                           cache list pinned | grep nested | wc -l)
   if [ "x$num_open_nested" != "x0" ]; then
-    return 54
+    return 84
   fi
-  tree /cvmfs/$CVMFS_TEST_REPO || return 55
-  tree /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots || return 56
+  tree /cvmfs/$CVMFS_TEST_REPO || return 85
+  tree /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots || return 86
 
   echo "--- (13) test creating/removing tags"
   local tag_x_hash=$(cvmfs_server tag -lx $CVMFS_TEST_REPO | grep -i tag_x | \
                      awk '{print $2}')
-  cvmfs_server tag -a tag_rover -h $tag_x_hash $CVMFS_TEST_REPO || return 60
-  tree /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots || return 61
-  ls /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/tag_rover/file-in-tagx || return 62
-  cvmfs_server tag -r tag_y -f $CVMFS_TEST_REPO || return 63
-  tree /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots || return 64
-  ls /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/tag_y && return 65
+  cvmfs_server tag -a tag_rover -h $tag_x_hash $CVMFS_TEST_REPO || return 90
+  tree /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots || return 91
+  ls /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/tag_rover/file-in-tagx || return 92
+  cvmfs_server tag -r tag_y -f $CVMFS_TEST_REPO || return 93
+  tree /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots || return 94
+  ls /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/tag_y && return 95
+  check_repository $CVMFS_TEST_REPO -i || return 96
 
   echo "--- (13) test moving tags"
   local tag_z_hash=$(cvmfs_server tag -lx $CVMFS_TEST_REPO | grep -i tag_z | \
                      awk '{print $2}')
-  cvmfs_server tag -a tag_rover -h $tag_z_hash $CVMFS_TEST_REPO || return 70
-  tree /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots || return 71
-  ls /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/tag_rover/file-in-tagz || return 72
+  cvmfs_server tag -a tag_rover -h $tag_z_hash $CVMFS_TEST_REPO || return 100
+  tree /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots || return 101
+  ls /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/tag_rover/file-in-tagz || return 102
+  check_repository $CVMFS_TEST_REPO -i || return 103
 
   # Test removal of virtual catalog
 
