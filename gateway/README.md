@@ -5,20 +5,14 @@ Build status: [![build status](https://travis-ci.org/cvmfs/cvmfs_services.svg?br
 
 CVMFS Repository Services (part of the CernVM File System)
 
-The CVMFS Repository Services is an umbrella project (organized as an OTP release) which hosts the
-development of the different components of the service architecture:
+The CVMFS Repository Services is an OTP release consisting of different components:
 
-+ Authorization service (cvmfs_auth) - access control, user credentials
-+ Lease service (cvmfs_lease) - manages leases (locks) on different sub-paths in the repository
-+ Gateway service (cvmfs_gw) - interface to the Stratum 0 repository
-+ Processing (cvmfs_be) - backend, "business logic", compression and hashing, interaction with gateway
-+ Front-end (cvmfs_fe) - REST API, routing
-+ Operations and monitoring (cvmfs_om) - logging, metrics, alarms etc.
-
-Each component is implemented as a separate OTP Application. While they are initially developed
-together in the same Git repository, the OTP Application abstraction helps maintain loose coupling
-between the different components. If the need arises to split certain components into separate
-repositories, this can be done with minimal effort.
++ Authorization (auth) - access control, user credentials
++ Leases (lease) - managing leases (locks) on different sub-paths of repositories
++ Gateway (gw) - interface to the Stratum 0 repository
++ Back-end (be) - backend, "business logic", compression and hashing, interaction with gateway
++ Front-end (fe) - REST API, routing
++ Operations and monitoring (om) - logging, metrics, alarms etc.
 
 Build
 -----
