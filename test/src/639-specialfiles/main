@@ -1,12 +1,36 @@
 cvmfs_test_name="Handling special files"
 
-export CVMFS_TEST_UNIONFS="overlayfs"
-# export CVMFS_IGNORE_SPECIAL_FILES="true"
 test_repo_config="/etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf"
 
+filename=""
+publish_output=""
+
+unionfs="overlayfs"
+ignore_special_files="true"
+dev_type="c"
+newdir="false"
+
 _setup() {
+    export CVMFS_TEST_UNIONFS="$unionfs"
+
     create_repo "$CVMFS_TEST_REPO" "$CVMFS_TEST_USER" "/tmp/debug.log" 1>/dev/null
-    echo "CVMFS_IGNORE_SPECIAL_FILES=true" | sudo tee -a $test_repo_config
+
+    if [ $ignore_special_files = "true" ]; then
+        echo "CVMFS_IGNORE_SPECIAL_FILES=$ignore_special_files" | sudo tee -a $test_repo_config
+    fi
+
+    start_transaction "$CVMFS_TEST_REPO" || return 1
+
+    if [ $newdir = "true" ]; then
+        sudo mkdir "/cvmfs/$CVMFS_TEST_REPO/dev"
+        sudo mknod "/cvmfs/$CVMFS_TEST_REPO/dev/$filename" "$dev_type" 10 20 || return 2
+    else
+        sudo mknod "/cvmfs/$CVMFS_TEST_REPO/$filename" "$dev_type" 10 20 || return 2
+    fi
+
+    publish_output="$(publish_repo $CVMFS_TEST_REPO 2>&1)" || return 3
+
+    return 0
 }
 
 _cleanup() {
@@ -15,14 +39,11 @@ _cleanup() {
 
 # check character device with major-minor other than 0-0 in alredy existing dir
 test_chrdev_basic() {
-    local filename="chardev_10_20"
-
-    _setup
-    start_transaction "$CVMFS_TEST_REPO" || return 1
-    sudo mknod "/cvmfs/$CVMFS_TEST_REPO/$filename" c 10 20 || return 2
-
-    local publish_output="$(publish_repo $CVMFS_TEST_REPO 2>&1)"
-    [ $? = 0 ] || return 3
+    filename="chardev_10_20"
+    dev_type="c"
+    newdir="false"
+    ignore_special_files="true"
+    _setup || return $?
 
     # assert 1: check the old message
     echo "$publish_output" | grep -i "'$filename' should be deleted"
@@ -39,14 +60,11 @@ test_chrdev_basic() {
 
 # check block device in an alredy existing dir
 test_blkdev_basic() {
-    local filename="blockdev_10_20"
-
-    _setup
-    start_transaction "$CVMFS_TEST_REPO" || return 1
-
-    sudo mknod "/cvmfs/$CVMFS_TEST_REPO/$filename" b 10 20 || return 2
-    local publish_output="$(publish_repo $CVMFS_TEST_REPO 2>&1)"
-    [ $? = 0 ] || return 3
+    filename="blockdev_10_20"
+    dev_type="b"
+    newdir="false"
+    ignore_special_files="true"
+    _setup || return $?
 
     echo "$publish_output" | grep -i "$filename.*ignoring"
     local status1=$?
@@ -58,16 +76,11 @@ test_blkdev_basic() {
 
 # check character device with major-minor other than 0-0 in a new dir
 test_chrdev_newdir() {
-    local filename="chardev_10_20"
-
-    _setup
-    start_transaction "$CVMFS_TEST_REPO" || return 1
-    mkdir "/cvmfs/$CVMFS_TEST_REPO/dev"
-    sudo mknod "/cvmfs/$CVMFS_TEST_REPO/dev/$filename" c 10 20 || return 2
-
-    local publish_output="$(publish_repo $CVMFS_TEST_REPO 2>&1)"
-    local status0=$?
-    [ $status0 = 0 ] || return 3
+    filename="chardev_10_20"
+    dev_type="c"
+    newdir="true"
+    ignore_special_files="true"
+    _setup || return $?
 
     echo "$publish_output" | grep -i "$filename.*ignoring"
     local status1=$?
@@ -79,16 +92,11 @@ test_chrdev_newdir() {
 
 # check block device with major-minor other than 0-0 in a new dir
 test_blkdev_newdir() {
-    local filename="blockdev_10_20"
-
-    _setup
-    start_transaction "$CVMFS_TEST_REPO" || return 1
-    mkdir "/cvmfs/$CVMFS_TEST_REPO/dev"
-    sudo mknod "/cvmfs/$CVMFS_TEST_REPO/dev/$filename" b 10 20 || return 2
-
-    local publish_output="$(publish_repo $CVMFS_TEST_REPO 2>&1)"
-    local status0=$?
-    [ $status0 = 0 ] || return 3
+    filename="blockdev_10_20"
+    dev_type="b"
+    newdir="true"
+    ignore_special_files="true"
+    _setup || return $?
 
     echo "$publish_output" | grep -i "$filename.*ignoring"
     local status1=$?
@@ -98,9 +106,25 @@ test_blkdev_newdir() {
     return $status1
 }
 
-cvmfs_run_test() {
-    logfile=$1
+test_fail_chrdev() {
+    filename="chardev_10_20"
+    dev_type="c"
+    newdir="false"
+    ignore_special_files="false"
+    _setup
+    return $?
+}
 
+test_fail_blkdev() {
+    filename="blkdev_10_20"
+    dev_type="b"
+    newdir="false"
+    ignore_special_files="false"
+    _setup
+    return $?
+}
+
+run_tests_base() {
     test_chrdev_basic
     local status1=$?
     [ $status1 = 0 ] || echo "Check 1 Failed with err code: $status1"
@@ -117,5 +141,37 @@ cvmfs_run_test() {
     local status4=$?
     [ $status4 = 0 ] || echo "Check 4 Failed with err code: $status4"
 
-    return $(($status1 || $status2 || $status3 || $status4))
+    test_fail_chrdev
+    test $? -gt 0
+    local status5=$?
+    [ $status5 = 0 ] || echo "Check 5 Failed with err code: $status5"
+
+    test_fail_blkdev
+    test $? -gt 0
+    local status6=$?
+    [ $status6 = 0 ] || echo "Check 6 Failed with err code: $status6"
+
+    return $(($status1 || $status2 || $status3 || $status4 || $status5 || $status6))
+}
+
+run_aufs_tests() {
+    unionfs="aufs"
+    run_tests_base
+    return $?
+}
+
+run_overlayfs_tests() {
+    unionfs="overlayfs"
+    run_tests_base
+    return $?
+}
+
+cvmfs_run_test() {
+    run_aufs_tests
+    local status1=$?
+
+    run_overlayfs_tests
+    local status2=$?
+
+    return $(($status1 || $status2))
 }
