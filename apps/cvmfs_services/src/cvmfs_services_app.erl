@@ -1,11 +1,11 @@
 %%%-------------------------------------------------------------------
 %%% This file is part of the CernVM File System.
 %%%
-%%% @doc cvmfs_auth public API
+%%% @doc cvmfs_services_app public API
 %%% @end
 %%%-------------------------------------------------------------------
 
--module(cvmfs_auth_app).
+-module(cvmfs_services_app).
 
 -behaviour(application).
 
@@ -17,7 +17,7 @@
 %%====================================================================
 
 start(_StartType, _StartArgs) ->
-    case application:get_env(cvmfs_auth, repo_config) of
+    case application:get_env(cvmfs_services, repo_config) of
         {ok, {file, RepoConfigFile}} ->
             {ok, VarList} = file:consult(RepoConfigFile),
             Vars = maps:from_list(VarList);
@@ -25,8 +25,8 @@ start(_StartType, _StartArgs) ->
             Vars = RepoConfigMap
     end,
 
-    cvmfs_auth_sup:start_link({maps:get(repos, Vars)
-                              ,maps:get(acl, Vars)}).
+    cvmfs_services_sup:start_link({maps:get(repos, Vars)
+                                  ,maps:get(acl, Vars)}).
 
 %%--------------------------------------------------------------------
 stop(_State) ->

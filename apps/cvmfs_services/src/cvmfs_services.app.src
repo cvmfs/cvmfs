@@ -1,0 +1,27 @@
+{application, cvmfs_services,
+ [{description, "CVMFS Repository Services"},
+  {vsn, "0.1.0"},
+  {registered, [auth, be, lease, fe]},
+  {mod, { cvmfs_services_app, []}},
+  {applications,
+   [kernel,
+    stdlib,
+    lager,
+    mnesia,
+    cowboy
+   ]},
+  {env,[]},
+  {modules, [cvmfs_services_app,
+             cvmfs_services_sup,
+             auth,
+             be,
+             lease,
+             path_util,
+             router,
+             root_handler,
+             repos_handler,
+             users_handler,
+             leases_handler]},
+
+  {maintainers, []}
+ ]}.

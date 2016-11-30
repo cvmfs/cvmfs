@@ -6,7 +6,7 @@
 %%% @end
 %%%-------------------------------------------------------------------
 
--module(cvmfs_lease_sup).
+-module(cvmfs_services_sup).
 
 -behaviour(supervisor).
 
@@ -34,13 +34,31 @@ init(Args) ->
     SupervisorSpecs = #{strategy => one_for_all,
                         intensity => 5,
                         period => 5},
-    CvmfsLeaseMainSpecs = #{id => cvmfs_lease,
-                            start => {cvmfs_lease, start_link, [Args]},
-                            restart => permanent,
-                            shutdown => 2000,
-                            type => worker,
-                            modules => [cvmfs_lease]},
-    {ok, {SupervisorSpecs, [CvmfsLeaseMainSpecs]}}.
+    AuthSpecs = #{id => auth,
+                  start => {auth, start_link, [Args]},
+                  restart => permanent,
+                  shutdown => 2000,
+                  type => worker,
+                  modules => [auth]},
+    BeSpecs = #{id => be,
+                start => {be, start_link, [{}]},
+                restart => permanent,
+                shutdown => 2000,
+                type => worker,
+                modules => [be]},
+    LeaseSpecs = #{id => lease,
+                   start => {lease, start_link, [Args]},
+                   restart => permanent,
+                   shutdown => 2000,
+                   type => worker,
+                   modules => [lease]},
+    FeSpecs = #{id => fe,
+                start => {fe, start_link, []},
+                restart => permanent,
+                shutdown => 2000,
+                type => supervisor,
+                modules => [fe]},
+    {ok, {SupervisorSpecs, [AuthSpecs, BeSpecs, LeaseSpecs, FeSpecs]}}.
 
 %%====================================================================
 %% Internal functions
