@@ -27,13 +27,19 @@ namespace catalog {
 
 class VirtualCatalog {
  public:
-  static const std::string kVirtualPath;
+  static const std::string kVirtualPath;  // = ".cvmfs"
+  static const unsigned kActionNone;  // = 0x00
+  static const unsigned kActionGenerateSnapshots;  // = 0x01
+  static const unsigned kActionRemove;  // 0x02;
+
+  static bool ParseActions(const std::string &action_desc, unsigned *actions);
 
   VirtualCatalog(manifest::Manifest *m,
                  download::DownloadManager *d,
                  catalog::WritableCatalogManager *c,
                  SyncParameters *p);
-  void GenerateSnapshots();
+  void Generate(int actions);
+  void Remove();
 
  private:
   static const std::string kSnapshotDirectory;
@@ -54,6 +60,7 @@ class VirtualCatalog {
     shash::Any hash;
   };
 
+  void GenerateSnapshots();
   void EnsurePresence();
   void CreateCatalog();
   void CreateBaseDirectory();

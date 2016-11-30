@@ -32,7 +32,7 @@ struct SyncParameters {
     include_xattrs(false),
     external_data(false),
     voms_authz(false),
-    virtual_dir(false),
+    virtual_dir_actions(0),
     compression_alg(zlib::kZlibDefault),
     catalog_entry_warn_threshold(kDefaultEntryWarnThreshold),
     min_file_chunk_size(kDefaultMinFileChunkSize),
@@ -68,7 +68,7 @@ struct SyncParameters {
   bool             include_xattrs;
   bool             external_data;
   bool             voms_authz;
-  bool             virtual_dir;
+  unsigned         virtual_dir_actions;  // bit field
   zlib::Algorithms compression_alg;
   uint64_t         catalog_entry_warn_threshold;
   size_t           min_file_chunk_size;
@@ -248,6 +248,8 @@ class CommandSync : public Command {
     r.push_back(Parameter::Optional('X', "maximum weight of the autocatalogs"));
     r.push_back(Parameter::Optional('Z', "compression algorithm "
                                          "(default: zlib)"));
+    r.push_back(Parameter::Optional('S', "virtual directory options "
+                                         "[snapshots, remove]"));
 
     r.push_back(Parameter::Switch('d', "pause publishing to allow for catalog "
                                        "tweaks"));
@@ -263,7 +265,6 @@ class CommandSync : public Command {
     r.push_back(Parameter::Switch('V', "Publish format compatible with "
                                        "authenticated repos"));
     r.push_back(Parameter::Switch('Y', "enable external data"));
-    r.push_back(Parameter::Switch('S', "create a virtual tag folder"));
     return r;
   }
   int Main(const ArgumentList &args);

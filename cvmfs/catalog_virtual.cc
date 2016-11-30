@@ -15,6 +15,7 @@
 #include "swissknife_history.h"
 #include "util/pointer.h"
 #include "util/posix.h"
+#include "util/string.h"
 #include "xattr.h"
 
 using namespace std;  // NOLINT
@@ -23,6 +24,9 @@ namespace catalog {
 
 const string VirtualCatalog::kVirtualPath = ".cvmfs";
 const string VirtualCatalog::kSnapshotDirectory = "snapshots";
+const unsigned VirtualCatalog::kActionNone              = 0x00;
+const unsigned VirtualCatalog::kActionGenerateSnapshots = 0x01;
+const unsigned VirtualCatalog::kActionRemove            = 0x02;
 
 
 void VirtualCatalog::CreateBaseDirectory() {
@@ -116,6 +120,16 @@ void VirtualCatalog::EnsurePresence() {
 }
 
 
+void VirtualCatalog::Generate(int actions) {
+  if (actions & kActionGenerateSnapshots) {
+    GenerateSnapshots();
+  }
+  if (actions & kActionRemove) {
+    Remove();
+  }
+}
+
+
 void VirtualCatalog::GenerateSnapshots() {
   EnsurePresence();
 
@@ -163,6 +177,28 @@ void VirtualCatalog::GenerateSnapshots() {
     RemoveSnapshot(t_catalog);
     i_catalog++;
   }
+}
+
+
+bool VirtualCatalog::ParseActions(
+  const string &action_desc,
+  unsigned *actions)
+{
+  *actions = kActionNone;
+  if (action_desc.empty())
+    return true;
+
+  vector<string> action_tokens = SplitString(action_desc, ',');
+  for (unsigned i = 0; i < action_tokens.size(); ++i) {
+    if (action_tokens[i] == "snapshots") {
+      *actions |= kActionGenerateSnapshots;
+    } else if (action_tokens[i] == "remove") {
+      *actions |= kActionRemove;
+    } else {
+      return false;
+    }
+  }
+  return true;
 }
 
 
@@ -229,6 +265,12 @@ void VirtualCatalog::InsertSnapshot(TagId tag) {
   uint64_t catalog_size = GetFileSize(catalog->database_path());
   assert(catalog_size > 0);
   virtual_catalog->InsertBindMountpoint(mountpoint, tag.hash, catalog_size);
+}
+
+
+void VirtualCatalog::Remove() {
+  LogCvmfs(kLogCatalog, kLogDebug, "remove .cvmfs virtual catalog");
+
 }
 
 

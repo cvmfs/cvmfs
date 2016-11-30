@@ -527,7 +527,15 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (args.find('F') != args.end()) params.authz_file = *args.find('F')->second;
   if (args.find('k') != args.end()) params.include_xattrs = true;
   if (args.find('Y') != args.end()) params.external_data = true;
-  if (args.find('S') != args.end()) params.virtual_dir = true;
+  if (args.find('S') != args.end()) {
+    bool retval = catalog::VirtualCatalog::ParseActions(
+      *args.find('S')->second, &params.virtual_dir_actions);
+    if (!retval) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "invalid virtual catalog options: %s",
+               args.find('S')->second->c_str());
+      return 1;
+    }
+  }
   if (args.find('z') != args.end()) {
     unsigned log_level =
     1 << (kLogLevel0 + String2Uint64(*args.find('z')->second));
@@ -622,7 +630,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   }
 
   UniquePtr<manifest::Manifest> manifest;
-  if (params.virtual_dir) {
+  if (params.virtual_dir_actions != catalog::VirtualCatalog::kActionNone) {
     manifest = this->OpenLocalManifest(params.manifest_path);
   } else {
     manifest = this->FetchRemoteManifest(params.stratum0,
@@ -646,7 +654,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   publish::SyncMediator mediator(&catalog_manager, &params);
 
   // Either real catalogs or virtual catalog
-  if (!params.virtual_dir) {
+  if (params.virtual_dir_actions == catalog::VirtualCatalog::kActionNone) {
     publish::SyncUnion *sync;
     if (params.union_fs_type == "overlayfs") {
       sync = new publish::SyncUnionOverlayfs(&mediator,
@@ -676,7 +684,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
       LogCvmfs(kLogCvmfs, kLogStdout, "Creating virtual snapshots");
       catalog::VirtualCatalog virtual_catalog(
         manifest.weak_ref(), download_manager(), &catalog_manager, &params);
-      virtual_catalog.GenerateSnapshots();
+      virtual_catalog.Generate(params.virtual_dir_actions);
     }
   }
 

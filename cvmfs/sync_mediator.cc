@@ -244,7 +244,9 @@ bool SyncMediator::Commit(manifest::Manifest *manifest) {
     return false;
   }
 
-  if (catalog_manager_->IsBalanceable() || params_->virtual_dir) {
+  if (catalog_manager_->IsBalanceable() ||
+      (params_->virtual_dir_actions != catalog::VirtualCatalog::kActionNone))
+  {
     catalog_manager_->Balance();
     // Commit empty string to ensure that the "content" of the auto catalog
     // markers is present in the repository.

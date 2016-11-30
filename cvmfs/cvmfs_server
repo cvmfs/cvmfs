@@ -4309,7 +4309,7 @@ cvmfs_server_tag() {
       -C /etc/cvmfs/repositories.d/${name}/trusted_certs \
       -N $name                                           \
       -K $CVMFS_PUBLIC_KEY                               \
-      $(get_follow_http_redirects_flag) $log_level -S"
+      $(get_follow_http_redirects_flag) $log_level -S snapshots"
   local tag_command_undo_tags="$(__swissknife_cmd dbg) tag_edit \
       -r $CVMFS_UPSTREAM_STORAGE                        \
       -w $CVMFS_STRATUM0                                \
@@ -4942,7 +4942,11 @@ cvmfs_server_publish() {
     fi
     local sync_command_virtual_dir=
     if [ "x${CVMFS_VIRTUAL_DIR}" = "xtrue" ]; then
-      sync_command_virtual_dir="$sync_command -S"
+      sync_command_virtual_dir="$sync_command -S snapshots"
+    else
+      if [ -d /cvmfs/$name/.cvmfs ]; then
+        sync_command_virtual_dir="$sync_command -S remove"
+      fi
     fi
     local tag_command="$(__swissknife_cmd dbg) tag_edit \
       -r $upstream                                      \
