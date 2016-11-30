@@ -7,7 +7,7 @@
 %%%
 %%%-------------------------------------------------------------------
 
--module(cvmfs_lease_path_util_SUITE).
+-module(cvmfs_path_util_SUITE).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("proper/include/proper.hrl").
@@ -46,12 +46,12 @@ qc_overlap_test() ->
 
 % Test cases
 spec_overlap_test() ->
-    ?assert(cvmfs_lease_path_util:are_overlapping(<<"abc/def">>, <<"abc">>)),
-    ?assert(cvmfs_lease_path_util:are_overlapping(<<"abc">>, <<"abc/def">>)),
-    ?assertNot(cvmfs_lease_path_util:are_overlapping(<<"abcdef">>, <<"abc">>)),
-    ?assertNot(cvmfs_lease_path_util:are_overlapping(<<"abc">>, <<"abcdef">>)),
-    ?assertNot(cvmfs_lease_path_util:are_overlapping(<<"abc/def">>, <<"abc/de">>)),
-    ?assertNot(cvmfs_lease_path_util:are_overlapping(<<"abc/de">>, <<"abc/def">>)),
-    ?assertNot(cvmfs_lease_path_util:are_overlapping(<<"abc/def">>, <<"ab">>)),
-    ?assertNot(cvmfs_lease_path_util:are_overlapping(<<"ab">>, <<"abc/def">>)).
+    ?assert(cvmfs_path_util:are_overlapping(<<"abc/def">>, <<"abc">>)),
+    ?assert(cvmfs_path_util:are_overlapping(<<"abc">>, <<"abc/def">>)),
+    ?assertNot(cvmfs_path_util:are_overlapping(<<"abcdef">>, <<"abc">>)),
+    ?assertNot(cvmfs_path_util:are_overlapping(<<"abc">>, <<"abcdef">>)),
+    ?assertNot(cvmfs_path_util:are_overlapping(<<"abc/def">>, <<"abc/de">>)),
+    ?assertNot(cvmfs_path_util:are_overlapping(<<"abc/de">>, <<"abc/def">>)),
+    ?assertNot(cvmfs_path_util:are_overlapping(<<"abc/def">>, <<"ab">>)),
+    ?assertNot(cvmfs_path_util:are_overlapping(<<"ab">>, <<"abc/def">>)).
 

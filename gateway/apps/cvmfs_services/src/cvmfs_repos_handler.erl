@@ -1,12 +1,12 @@
 %%%-------------------------------------------------------------------
 %%% This file is part of the CernVM File System.
 %%%
-%%% @doc cvmfs_fe_repo_handler
+%%% @doc cvmfs_repo_handler
 %%%
 %%% @end
 %%%-------------------------------------------------------------------
 
--module(cvmfs_fe_repos_handler).
+-module(cvmfs_repos_handler).
 
 -export([init/2]).
 

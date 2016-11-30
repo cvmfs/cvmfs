@@ -1,12 +1,12 @@
 %%%-------------------------------------------------------------------
 %%% This file is part of the CernVM File System.
 %%%
-%%% @doc cvmfs_fe_lease_handler
+%%% @doc cvmfs_lease_handler
 %%%
 %%% @end
 %%%-------------------------------------------------------------------
 
--module(cvmfs_fe_leases_handler).
+-module(cvmfs_leases_handler).
 
 -export([init/2]).
 
