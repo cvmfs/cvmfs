@@ -10,10 +10,10 @@
 
 #include "catalog_mgr_rw.h"
 #include "compression.h"
-#include "logging.h"
 #include "history.h"
-#include "swissknife_sync.h"
+#include "logging.h"
 #include "swissknife_history.h"
+#include "swissknife_sync.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
@@ -23,8 +23,8 @@ using namespace std;  // NOLINT
 
 namespace catalog {
 
-const string VirtualCatalog::kVirtualPath = ".cvmfs";
-const string VirtualCatalog::kSnapshotDirectory = "snapshots";
+const char *VirtualCatalog::kVirtualPath = ".cvmfs";
+const char *VirtualCatalog::kSnapshotDirectory = "snapshots";
 const unsigned VirtualCatalog::kActionNone              = 0x00;
 const unsigned VirtualCatalog::kActionGenerateSnapshots = 0x01;
 const unsigned VirtualCatalog::kActionRemove            = 0x02;
@@ -33,7 +33,7 @@ const unsigned VirtualCatalog::kActionRemove            = 0x02;
 void VirtualCatalog::CreateBaseDirectory() {
   // Add /.cvmfs as a nested catalog
   DirectoryEntryBase entry_dir;
-  entry_dir.name_ = NameString(kVirtualPath);
+  entry_dir.name_ = NameString(string(kVirtualPath));
   entry_dir.mode_ = S_IFDIR |
                     S_IRUSR | S_IXUSR | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
   entry_dir.uid_ = 0;
@@ -50,19 +50,19 @@ void VirtualCatalog::CreateBaseDirectory() {
 
   // Set hidden flag in parent catalog
   DirectoryEntry entry_parent;
-  bool retval = parent_catalog->LookupPath(PathString("/" + kVirtualPath),
-                                           &entry_parent);
+  bool retval = parent_catalog->LookupPath(
+    PathString("/" + string(kVirtualPath)), &entry_parent);
   assert(retval);
   entry_parent.set_is_hidden(true);
-  parent_catalog->UpdateEntry(entry_parent, "/" + kVirtualPath);
+  parent_catalog->UpdateEntry(entry_parent, "/" + string(kVirtualPath));
 
   // Set hidden flag in nested catalog
   DirectoryEntry entry_virtual;
-  retval = virtual_catalog->LookupPath(PathString("/" + kVirtualPath),
+  retval = virtual_catalog->LookupPath(PathString("/" + string(kVirtualPath)),
                                        &entry_virtual);
   assert(retval);
   entry_virtual.set_is_hidden(true);
-  virtual_catalog->UpdateEntry(entry_virtual, "/" + kVirtualPath);
+  virtual_catalog->UpdateEntry(entry_virtual, "/" + string(kVirtualPath));
 }
 
 
@@ -93,7 +93,7 @@ void VirtualCatalog::CreateNestedCatalogMarker() {
 
 void VirtualCatalog::CreateSnapshotDirectory() {
   DirectoryEntryBase entry_dir;
-  entry_dir.name_ = NameString(kSnapshotDirectory);
+  entry_dir.name_ = NameString(string(kSnapshotDirectory));
   entry_dir.mode_ = S_IFDIR |
                     S_IRUSR | S_IXUSR | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
   entry_dir.uid_ = 0;
@@ -110,7 +110,8 @@ void VirtualCatalog::CreateSnapshotDirectory() {
  */
 void VirtualCatalog::EnsurePresence() {
   DirectoryEntry e;
-  bool retval = catalog_mgr_->LookupPath("/" + kVirtualPath, kLookupSole, &e);
+  bool retval = catalog_mgr_->LookupPath("/" + string(kVirtualPath),
+                                        kLookupSole, &e);
   if (!retval) {
     LogCvmfs(kLogCatalog, kLogDebug, "creating new virtual catalog");
     CreateBaseDirectory();
@@ -250,15 +251,16 @@ void VirtualCatalog::InsertSnapshot(TagId tag) {
   // Add directory entry
   DirectoryEntryBase entry_dir = entry_root;
   entry_dir.name_ = NameString(tag.name);
-  catalog_mgr_->AddDirectory(entry_dir,
-                             kVirtualPath + "/" + kSnapshotDirectory);
+  catalog_mgr_->AddDirectory(
+    entry_dir, string(kVirtualPath) + "/" + string(kSnapshotDirectory));
 
   // Set "bind mount" flag
   WritableCatalog *virtual_catalog =
     catalog_mgr_->GetHostingCatalog(kVirtualPath);
   assert(virtual_catalog != NULL);
   string mountpoint =
-    "/" + kVirtualPath + "/" + kSnapshotDirectory + "/" + tag.name;
+    "/" + string(kVirtualPath) + "/" + string(kSnapshotDirectory) + "/" +
+    tag.name;
   DirectoryEntry entry_bind_mountpoint(entry_dir);
   entry_bind_mountpoint.set_is_bind_mountpoint(true);
   virtual_catalog->UpdateEntry(entry_bind_mountpoint, mountpoint);
@@ -279,7 +281,7 @@ void VirtualCatalog::Remove() {
   assert(!virtual_catalog->IsRoot());
   DirectoryEntry entry_virtual;
   bool retval = catalog_mgr_->LookupPath(
-    PathString("/" + kVirtualPath), kLookupSole, &entry_virtual);
+    PathString("/" + string(kVirtualPath)), kLookupSole, &entry_virtual);
   assert(retval);
   assert(entry_virtual.IsHidden());
 
@@ -313,7 +315,8 @@ void VirtualCatalog::RemoveSnapshot(TagId tag) {
   LogCvmfs(kLogCatalog, kLogDebug,
            "remove snapshot %s (%s) from virtual catalog",
            tag.name.c_str(), tag.hash.ToString().c_str());
-  string tag_dir = kVirtualPath + "/" + kSnapshotDirectory + "/" + tag.name;
+  string tag_dir =
+    string(kVirtualPath) + "/" + string(kSnapshotDirectory) + "/" + tag.name;
   catalog_mgr_->RemoveDirectory(tag_dir);
 
   WritableCatalog *virtual_catalog =

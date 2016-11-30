@@ -14,8 +14,8 @@
 #include "download.h"
 #include "history.h"
 #include "history_sqlite.h"
-#include "manifest.h"
 #include "logging.h"
+#include "manifest.h"
 #include "util/posix.h"
 
 using namespace std;  // NOLINT

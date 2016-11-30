@@ -1744,7 +1744,7 @@ bool CommandMigrate::ChownMigrationWorker::ApplyPersonaMappings(
   assert(data->new_catalog == NULL);
 
   if (data->old_catalog->mountpoint() ==
-      PathString("/" + catalog::VirtualCatalog::kVirtualPath))
+      PathString("/" + string(catalog::VirtualCatalog::kVirtualPath)))
   {
     // skipping virtual catalog
     return true;

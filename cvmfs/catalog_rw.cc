@@ -516,10 +516,10 @@ void WritableCatalog::InsertBindMountpoint(
   const shash::Any content_hash,
   const uint64_t size)
 {
-   SqlCatalog stmt(database(),
+  SqlCatalog stmt(database(),
      "INSERT INTO bind_mountpoints (path, sha1, size) "
      "VALUES (:p, :sha1, :size);");
-   bool retval =
+  bool retval =
      stmt.BindText(1, mountpoint) &&
      stmt.BindText(2, content_hash.ToString()) &&
      stmt.BindInt64(3, size) &&

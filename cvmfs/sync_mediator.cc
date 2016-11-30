@@ -65,8 +65,9 @@ void SyncMediator::RegisterUnionEngine(SyncUnion *engine) {
 void SyncMediator::EnsureAllowed(const SyncItem &entry) {
   const bool ignore_case_setting = false;
   string relative_path = entry.GetRelativePath();
-  if ( (relative_path == catalog::VirtualCatalog::kVirtualPath) ||
-       (HasPrefix(relative_path, catalog::VirtualCatalog::kVirtualPath + "/",
+  if ( (relative_path == string(catalog::VirtualCatalog::kVirtualPath)) ||
+       (HasPrefix(relative_path,
+                  string(catalog::VirtualCatalog::kVirtualPath) + "/",
                   ignore_case_setting)) )
   {
     PrintError("invalid attempt to modify '" + relative_path + "'");

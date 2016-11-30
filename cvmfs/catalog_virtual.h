@@ -4,13 +4,12 @@
 #ifndef CVMFS_CATALOG_VIRTUAL_H_
 #define CVMFS_CATALOG_VIRTUAL_H_
 
-#include "swissknife_assistant.h"
-
 #include <string>
 #include <vector>
 
 #include "hash.h"
 #include "shortstring.h"
+#include "swissknife_assistant.h"
 
 namespace catalog {
 class WritableCatalogManager;
@@ -28,7 +27,7 @@ namespace catalog {
 
 class VirtualCatalog {
  public:
-  static const std::string kVirtualPath;  // = ".cvmfs"
+  static const char *kVirtualPath;  // = ".cvmfs"
   static const unsigned kActionNone;  // = 0x00
   static const unsigned kActionGenerateSnapshots;  // = 0x01
   static const unsigned kActionRemove;  // 0x02;
@@ -42,7 +41,7 @@ class VirtualCatalog {
   void Generate(int actions);
 
  private:
-  static const std::string kSnapshotDirectory;
+  static const char *kSnapshotDirectory;
 
   struct TagId {
     TagId() { }
