@@ -13,7 +13,7 @@
 init(Req0, State) ->
     Banner = <<"You are in an open field on the west side of a white house with a boarded front door.">>,
     API = #{<<"banner">> => Banner,
-            <<"resources">> => [<<"users">>, <<"repos">>, <<"leases">>]},
+            <<"resources">> => [<<"users">>, <<"repos">>, <<"leases">>, <<"payloads">>]},
     Req = cowboy_req:reply(200,
                            #{<<"content-type">> => <<"text/plain">>},
                            jsx:encode(API),
