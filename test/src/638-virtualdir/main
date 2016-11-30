@@ -179,9 +179,22 @@ cvmfs_run_test() {
   tree /cvmfs/$CVMFS_TEST_REPO || return 55
   tree /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots || return 56
 
-  # Test only creating / removing tags (without active publishing)
+  echo "--- (13) test creating/removing tags"
+  local tag_x_hash=$(cvmfs_server tag -lx $CVMFS_TEST_REPO | grep -i tag_x | \
+                     awk '{print $2}')
+  cvmfs_server tag -a tag_rover -h $tag_x_hash $CVMFS_TEST_REPO || return 60
+  tree /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots || return 61
+  ls /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/tag_rover/file-in-tagx || return 62
+  cvmfs_server tag -r tag_y -f $CVMFS_TEST_REPO || return 63
+  tree /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots || return 64
+  ls /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/tag_y && return 65
 
-  # Test removal / moving of tags
+  echo "--- (13) test moving tags"
+  local tag_z_hash=$(cvmfs_server tag -lx $CVMFS_TEST_REPO | grep -i tag_z | \
+                     awk '{print $2}')
+  cvmfs_server tag -a tag_rover -h $tag_z_hash $CVMFS_TEST_REPO || return 70
+  tree /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots || return 71
+  ls /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/tag_rover/file-in-tagz || return 72
 
   # Test removal of virtual catalog
 
