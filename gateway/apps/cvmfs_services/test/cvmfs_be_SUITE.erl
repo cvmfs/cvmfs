@@ -7,7 +7,7 @@
 %%%
 %%%-------------------------------------------------------------------
 
--module(be_SUITE).
+-module(cvmfs_be_SUITE).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("proper/include/proper.hrl").
@@ -67,7 +67,7 @@ init_per_suite(Config) ->
     ok = application:load(cvmfs_services),
     ok = ct:require(repos),
     ok = ct:require(acl),
-    ok = application:set_env(cvmfs_services, services, [be]),
+    ok = application:set_env(cvmfs_services, enabled_services, [cvmfs_auth, cvmfs_lease, cvmfs_be]),
     ok = application:set_env(cvmfs_services, repo_config, #{repos => ct:get_config(repos)
                                                            ,acl => ct:get_config(acl)}),
 

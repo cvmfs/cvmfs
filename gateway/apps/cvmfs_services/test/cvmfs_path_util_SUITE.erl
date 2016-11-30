@@ -38,7 +38,7 @@ ne_binary_pair() ->
 prop_are_overlapping() ->
     ?FORALL({Path1, Path2}
            ,ne_binary_pair()
-           ,cvmfs_lease_path_util:are_overlapping(Path1, Path2)).
+           ,cvmfs_path_util:are_overlapping(Path1, Path2)).
 
 % Test cases
 qc_overlap_test() ->

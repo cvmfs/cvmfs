@@ -22,13 +22,15 @@ start(_StartType, _StartArgs) ->
                    {ok, VarList} = file:consult(RepoConfigFile),
                    maps:from_list(VarList);
                {ok, RepoConfigMap} ->
-                   RepoConfigMap
+                   RepoConfigMap;
+               _ ->
+                   #{repos => [], acl => []}
            end,
     {ok, Services} = application:get_env(enabled_services),
 
-    cvmfs_services_sup:start_link({Services
-                                  ,maps:get(repos, Vars)
-                                  ,maps:get(acl, Vars)}).
+    cvmfs_services_sup:start_link({Services,
+                                   maps:get(repos, Vars),
+                                   maps:get(acl, Vars)}).
 
 %%--------------------------------------------------------------------
 stop(_State) ->
