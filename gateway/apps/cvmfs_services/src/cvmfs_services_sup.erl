@@ -1,7 +1,7 @@
 %%%-------------------------------------------------------------------
 %%% This file is part of the CernVM File System.
 %%%
-%%% @doc cvmfs_lease top level supervisor.
+%%% @doc cvmfs_services top level supervisor.
 %%%
 %%% @end
 %%%-------------------------------------------------------------------
@@ -35,30 +35,30 @@ init({EnabledWorkers, _, _} = Args) ->
                         intensity => 5,
                         period => 5},
     WorkerSpecs = #{
-      auth => #{id => auth,
-                start => {auth, start_link, [Args]},
-                restart => permanent,
-                shutdown => 2000,
-                type => worker,
-                modules => [auth]},
-      be => #{id => be,
-              start => {be, start_link, [{}]},
-              restart => permanent,
-              shutdown => 2000,
-              type => worker,
-              modules => [be]},
-      lease => #{id => lease,
-                 start => {lease, start_link, [Args]},
-                 restart => permanent,
-                 shutdown => 2000,
-                 type => worker,
-                 modules => [lease]},
-      fe => #{id => fe,
-              start => {fe, start_link, []},
-              restart => permanent,
-              shutdown => 2000,
-              type => supervisor,
-              modules => [fe]}
+      cvmfs_auth => #{id => cvmfs_auth,
+                      start => {cvmfs_auth, start_link, [Args]},
+                      restart => permanent,
+                      shutdown => 2000,
+                      type => worker,
+                      modules => [cvmfs_auth]},
+      cvmfs_be => #{id => cvmfs_be,
+                    start => {cvmfs_be, start_link, [{}]},
+                    restart => permanent,
+                    shutdown => 2000,
+                    type => worker,
+                    modules => [cvmfs_be]},
+      cvmfs_lease => #{id => cvmfs_lease,
+                       start => {cvmfs_lease, start_link, [Args]},
+                       restart => permanent,
+                       shutdown => 2000,
+                       type => worker,
+                       modules => [cvmfs_lease]},
+      cvmfs_fe => #{id => cvmfs_fe,
+                    start => {cvmfs_fe, start_link, []},
+                    restart => permanent,
+                    shutdown => 2000,
+                    type => supervisor,
+                    modules => [cvmfs_fe]}
      },
     {ok, {SupervisorSpecs, lists:foldr(fun(W, Acc) -> [maps:get(W, WorkerSpecs) | Acc] end,
                                        [],
