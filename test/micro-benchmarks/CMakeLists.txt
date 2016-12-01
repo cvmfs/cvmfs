@@ -16,6 +16,7 @@ set(CVMFS_UBENCHMARKS_FILES
   b_hash.cc
   b_smallhash.cc
   b_syscalls.cc
+  b_messaging.cc
 )
 
 #
@@ -29,6 +30,8 @@ set (CVMFS_UBENCHMARKS_SOURCES
   # dependencies
   ${CVMFS_SOURCE_DIR}/atomic.h
   ${CVMFS_SOURCE_DIR}/bigvector.h
+  ${CVMFS_SOURCE_DIR}/cache.h
+  ${CVMFS_SOURCE_DIR}/cache_transport.cc ${CVMFS_SOURCE_DIR}/cache_transport.h
   ${CVMFS_SOURCE_DIR}/compression.cc ${CVMFS_SOURCE_DIR}/compression.h
   ${CVMFS_SOURCE_DIR}/directory_entry.cc ${CVMFS_SOURCE_DIR}/directory_entry.h
   ${CVMFS_SOURCE_DIR}/duplex_zlib.h
@@ -49,7 +52,19 @@ set (CVMFS_UBENCHMARKS_SOURCES
   ${CVMFS_SOURCE_DIR}/util/posix.cc ${CVMFS_SOURCE_DIR}/util/posix.h
   ${CVMFS_SOURCE_DIR}/util/single_copy.h
   ${CVMFS_SOURCE_DIR}/util/string.cc ${CVMFS_SOURCE_DIR}/util/string.h
+  cache.pb.cc cache.pb.h
 )
+
+set_source_files_properties(cache.pb.cc cache.pb.h
+                            PROPERTIES GENERATED true)
+
+add_custom_command(OUTPUT cache.pb.cc cache.pb.h
+                   COMMAND ${PROTOBUF_C} --cpp_out=.
+                           ${CVMFS_SOURCE_DIR}/cache.proto
+                           -I${CVMFS_SOURCE_DIR}
+                   DEPENDS ${PROTOBUF_ARCHIVE}
+                           ${CVMFS_SOURCE_DIR}/cache.proto
+                   COMMENT "Generating protobuf sources")
 
 
 #
@@ -61,7 +76,7 @@ set (CVMFS_UBENCHMARKS_LDFLAGS "${CVMFS_UBENCHMARKS_LDFLAGS}")
 #
 # build CernVM-FS micro benchmarks
 #
-include_directories (${INCLUDE_DIRECTORIES})
+include_directories (${CMAKE_CURRENT_BINARY_DIR} ${INCLUDE_DIRECTORIES})
 
 if (BUILD_UBENCHMARKS)
   add_executable (${PROJECT_UBENCHMARKS_NAME} ${CVMFS_UBENCHMARKS_SOURCES})
@@ -70,6 +85,7 @@ else (BUILD_UBENCHMARKS)
 endif (BUILD_UBENCHMARKS)
 
 add_dependencies (${PROJECT_UBENCHMARKS_NAME} googlebench)
+add_dependencies (${PROJECT_UBENCHMARKS_NAME} protobuf)
 
 #
 # add optional dependencies
@@ -95,6 +111,7 @@ set_target_properties (${PROJECT_UBENCHMARKS_NAME} PROPERTIES
 #
 set (UBENCHMARKS_LINK_LIBRARIES ${GOOGLEBENCH_ARCHIVE} ${OPENSSL_LIBRARIES}
                                 ${RT_LIBRARY} ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE}
-                                ${RT_LIBRARY} ${SHA3_ARCHIVE} pthread dl)
+                                ${RT_LIBRARY} ${SHA3_ARCHIVE}
+                                ${PROTOBUF_ARCHIVE} pthread dl)
 
 target_link_libraries (${PROJECT_UBENCHMARKS_NAME} ${UBENCHMARKS_LINK_LIBRARIES})

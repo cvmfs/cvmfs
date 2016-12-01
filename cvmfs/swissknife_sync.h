@@ -33,6 +33,7 @@ struct SyncParameters {
     external_data(false),
     voms_authz(false),
     virtual_dir_actions(0),
+    ignore_special_files(false),
     compression_alg(zlib::kZlibDefault),
     catalog_entry_warn_threshold(kDefaultEntryWarnThreshold),
     min_file_chunk_size(kDefaultMinFileChunkSize),
@@ -69,6 +70,7 @@ struct SyncParameters {
   bool             external_data;
   bool             voms_authz;
   unsigned         virtual_dir_actions;  // bit field
+  bool             ignore_special_files;
   zlib::Algorithms compression_alg;
   uint64_t         catalog_entry_warn_threshold;
   size_t           min_file_chunk_size;
@@ -254,6 +256,7 @@ class CommandSync : public Command {
     r.push_back(Parameter::Switch('d', "pause publishing to allow for catalog "
                                        "tweaks"));
     r.push_back(Parameter::Switch('i', "ignore x-directory hardlinks"));
+    r.push_back(Parameter::Switch('g', "ignore special files"));
     r.push_back(Parameter::Switch('k', "include extended attributes"));
     r.push_back(Parameter::Switch('m', "create micro catalogs"));
     r.push_back(Parameter::Switch('n', "create new repository"));

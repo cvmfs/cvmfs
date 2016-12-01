@@ -4,10 +4,13 @@
 #include <benchmark/benchmark.h>
 
 #include <fcntl.h>
+#include <pthread.h>
 #include <sys/mman.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+#include <cassert>
 
 #include "bm_util.h"
 #include "platform.h"
@@ -65,6 +68,61 @@ BENCHMARK_DEFINE_F(BM_Syscalls, Read)(benchmark::State &st) {
 }
 BENCHMARK_REGISTER_F(BM_Syscalls, Read)->Repetitions(3)->
   UseRealTime()->Arg(4096)->Arg(128*1024);
+
+
+/**
+ * Just the overhead of creating and closing pipes
+ */
+BENCHMARK_DEFINE_F(BM_Syscalls, InprocMakePipe)(benchmark::State &st) {
+  int pipe_test[2];
+
+  while (st.KeepRunning()) {
+    MakePipe(pipe_test);
+    ClosePipe(pipe_test);
+  }
+
+  st.SetItemsProcessed(st.iterations());
+}
+BENCHMARK_REGISTER_F(BM_Syscalls, InprocMakePipe)->Repetitions(3)->
+  UseRealTime();
+
+
+
+void *MainPipeReader(void *data) {
+  int fd = *reinterpret_cast<int *>(data);
+  const unsigned buf_size = 128 * 1024;
+  char buf[buf_size];
+  while (true) {
+    int retval = read(fd, buf, buf_size);
+    if (retval < 0)
+      return NULL;
+  }
+  return NULL;
+}
+
+
+/**
+ * Sending data through a pipe between threads
+ */
+BENCHMARK_DEFINE_F(BM_Syscalls, InprocPipe)(benchmark::State &st) {
+  int pipe_test[2];
+  MakePipe(pipe_test);
+  pthread_t thread_reader;
+  int retval =
+    pthread_create(&thread_reader, NULL, MainPipeReader, &pipe_test[0]);
+  assert(retval == 0);
+  char data_buf[st.range_x()];
+
+  while (st.KeepRunning()) {
+    WritePipe(pipe_test[1], data_buf, sizeof(data_buf));
+  }
+
+  ClosePipe(pipe_test);
+  pthread_join(thread_reader, NULL);
+  st.SetItemsProcessed(st.iterations());
+}
+BENCHMARK_REGISTER_F(BM_Syscalls, InprocPipe)->Repetitions(3)->
+  UseRealTime()->Arg(20)->Arg(100)->Arg(4*1024)->Arg(128*1024);
 
 
 /**

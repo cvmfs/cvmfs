@@ -178,9 +178,11 @@ endif(MACOSX)
 option (BUILD_CVMFS             "Build the CernVM-FS FUSE module"                                  ON)
 if (MACOSX)
   option (BUILD_LIBCVMFS        "Build the CernVM-FS client library"                               OFF)
+  option (BUILD_LIBCVMFS_CACHE  "Build the cache plugin library"                                   OFF)
   option (BUILD_SERVER          "Build writer's end programs"                                      OFF)
 else (MACOSX)
   option (BUILD_LIBCVMFS        "Build the CernVM-FS client library"                               ON)
+  option (BUILD_LIBCVMFS_CACHE  "Build the cache plugin library"                                   ON)
   option (BUILD_SERVER          "Build writer's end programs"                                      ON)
 endif(MACOSX)
 option (BUILD_PRELOADER         "Build the alien cache pre-loader"                                 OFF)
@@ -213,6 +215,7 @@ if (BUILD_ALL)
   if (!MACOSX)
     set (BUILD_SERVER ON)
     set (BUILD_LIBCVMFS ON)
+    set (BUILD_LIBCVMFS_CACHE ON)
     set (BUILD_PRELOADER ON)
     set (BUILD_OCTOPUS ON)
   endif (!MACOSX)
@@ -237,6 +240,7 @@ set (VJSON_BUILTIN_LOCATION       "${EXTERNALS_BUILD_LOCATION}/build_vjson")
 set (SHA2_BUILTIN_LOCATION        "${EXTERNALS_BUILD_LOCATION}/build_sha2")
 set (SHA3_BUILTIN_LOCATION        "${EXTERNALS_BUILD_LOCATION}/build_sha3")
 set (GOOGLETEST_BUILTIN_LOCATION  "${EXTERNALS_BUILD_LOCATION}/build_googletest")
+set (PROTOBUF_BUILTIN_LOCATION    "${EXTERNALS_BUILD_LOCATION}/build_protobuf")
 set (GOOGLEBENCH_BUILTIN_LOCATION "${EXTERNALS_BUILD_LOCATION}/build_googlebench")
 set (LIBGEOIP_BUILTIN_LOCATION    "${EXTERNALS_BUILD_LOCATION}/build_libgeoip")
 set (PYTHON_GEOIP_BUILTIN_LOCATION "${EXTERNALS_BUILD_LOCATION}/build_python-geoip")
@@ -490,6 +494,13 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_PRELOADER OR
   endif (SPARSEHASH_BUILTIN)
 endif (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_PRELOADER OR
        BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
+
+# Client/libcvmfs only
+if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_LIBCVMFS_CACHE OR
+    BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG OR BUILD_UBENCHMARKS)
+  include (${PROTOBUF_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
+endif (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_LIBCVMFS_CACHE OR
+       BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG OR BUILD_UBENCHMARKS)
 
 # Fuse client only
 if (BUILD_CVMFS)

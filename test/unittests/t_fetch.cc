@@ -139,7 +139,7 @@ class BuggyCacheManager : public CacheManager {
   }
   virtual int Dup(int fd) { return -EROFS; }
   virtual int Readahead(int fd) { return 0; }
-  virtual uint16_t SizeOfTxn() { return sizeof(int); }
+  virtual uint32_t SizeOfTxn() { return sizeof(int); }
   virtual int StartTxn(const shash::Any &id, uint64_t size, void *txn) {
     int fd = open("/dev/null", O_RDONLY);
     assert(fd >= 0);
@@ -174,6 +174,7 @@ class BuggyCacheManager : public CacheManager {
   virtual int CommitTxn(void *txn) {
     return close(*static_cast<int *>(txn));
   }
+  virtual void Spawn() { }
 
   bool open_2nd_try;
   bool allow_open;

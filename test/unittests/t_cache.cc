@@ -138,7 +138,7 @@ class TestQuotaManager : public QuotaManager {
     bool is_catalog;
   };
 
-  virtual bool IsEnforcing() { return true; }
+  virtual bool HasCapability(Capabilities capability) { return true; }
 
   virtual void Insert(const shash::Any &hash, const uint64_t size,
                       const std::string &description)
@@ -242,7 +242,7 @@ class TestCacheManager : public CacheManager {
   }
   virtual int Dup(int fd) { return fd; }
   virtual int Readahead(int fd) { return 0; }
-  virtual uint16_t SizeOfTxn() { return sizeof(int); }
+  virtual uint32_t SizeOfTxn() { return sizeof(int); }
   virtual int StartTxn(const shash::Any &id, uint64_t size, void *txn) {
     int fd = open("/dev/null", O_RDONLY);
     assert(fd >= 0);
@@ -261,6 +261,7 @@ class TestCacheManager : public CacheManager {
   virtual int CommitTxn(void *txn) {
     return 0;
   }
+  virtual void Spawn() { }
 };
 
 

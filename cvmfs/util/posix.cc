@@ -13,6 +13,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <grp.h>
+#include <netinet/in.h>
 #include <pthread.h>
 #include <pwd.h>
 #include <signal.h>
@@ -233,6 +234,43 @@ int MakeSocket(const string &path, const int mode) {
 
 
 /**
+ * Creates and binds a TCP/IPv4 socket.  An empty address binds to the "any"
+ * address.
+ */
+int MakeTcpEndpoint(const std::string &ipv4_address, int portno) {
+  const int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
+  assert(socket_fd != -1);
+  const int on = 1;
+  int retval = setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+  assert(retval == 0);
+
+  struct sockaddr_in endpoint_addr;
+  memset(&endpoint_addr, 0, sizeof(endpoint_addr));
+  endpoint_addr.sin_family = AF_INET;
+  if (ipv4_address.empty()) {
+    endpoint_addr.sin_addr.s_addr = INADDR_ANY;
+  } else {
+    retval = inet_aton(ipv4_address.c_str(), &(endpoint_addr.sin_addr));
+    if (retval == 0) {
+      LogCvmfs(kLogCvmfs, kLogDebug, "invalid IPv4 address");
+      close(socket_fd);
+      return -1;
+    }
+  }
+  endpoint_addr.sin_port = htons(portno);
+
+  retval = bind(socket_fd, (struct sockaddr *)&endpoint_addr,
+                sizeof(endpoint_addr));
+  if (retval < 0) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "binding TCP endpoint failed (%d)", errno);
+    close(socket_fd);
+    return -1;
+  }
+  return socket_fd;
+}
+
+
+/**
  * Connects to a named socket.
  *
  * \return socket file descriptor on success, -1 else
@@ -254,6 +292,35 @@ int ConnectSocket(const string &path) {
     return -1;
   }
 
+  return socket_fd;
+}
+
+
+/**
+ * Connects to a (remote) TCP server
+ */
+int ConnectTcpEndpoint(const std::string &ipv4_address, int portno) {
+  const int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
+  assert(socket_fd != -1);
+
+  struct sockaddr_in endpoint_addr;
+  memset(&endpoint_addr, 0, sizeof(endpoint_addr));
+  endpoint_addr.sin_family = AF_INET;
+  int retval = inet_aton(ipv4_address.c_str(), &(endpoint_addr.sin_addr));
+  if (retval == 0) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "invalid IPv4 address");
+    close(socket_fd);
+    return -1;
+  }
+  endpoint_addr.sin_port = htons(portno);
+
+  retval = connect(socket_fd, (struct sockaddr *)&endpoint_addr,
+                   sizeof(endpoint_addr));
+  if (retval != 0) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "failed to connect to TCP endpoint (%d)",
+             errno);
+    return -1;
+  }
   return socket_fd;
 }
 
@@ -1111,6 +1178,45 @@ bool SafeWrite(int fd, const void *buf, size_t nbyte) {
     buf = reinterpret_cast<const char *>(buf) + retval;
     nbyte -= retval;
   }
+  return true;
+}
+
+/**
+ * The contents of the iov vector might be modified by the function.
+ */
+bool SafeWriteV(int fd, struct iovec *iov, unsigned iovcnt) {
+  unsigned nbytes = 0;
+  for (unsigned i = 0; i < iovcnt; ++i)
+    nbytes += iov[i].iov_len;
+  unsigned iov_idx = 0;
+
+  while (nbytes) {
+    ssize_t retval = writev(fd, &iov[iov_idx], iovcnt - iov_idx);
+    if (retval < 0) {
+      if (errno == EINTR)
+        continue;
+      return false;
+    }
+    assert(static_cast<size_t>(retval) <= nbytes);
+    nbytes -= retval;
+
+    unsigned sum_written_blocks = 0;
+    while ((sum_written_blocks + iov[iov_idx].iov_len) <=
+           static_cast<size_t>(retval))
+    {
+      sum_written_blocks += iov[iov_idx].iov_len;
+      iov_idx++;
+      if (iov_idx == iovcnt) {
+        assert(sum_written_blocks = retval);
+        return true;
+      }
+    }
+    unsigned offset = retval - sum_written_blocks;
+    iov[iov_idx].iov_len -= offset;
+    iov[iov_idx].iov_base =
+      reinterpret_cast<char *>(iov[iov_idx].iov_base) + offset;
+  }
+
   return true;
 }
 

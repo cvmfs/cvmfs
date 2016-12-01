@@ -191,6 +191,21 @@ class SyncUnion {
   virtual void LeaveDirectory(const std::string &parent_dir,
                               const std::string &dir_name);
 
+  /**
+   *Callback when a character device is found
+   * @param parent_dir the relative directory path
+   * @param filename the filename
+   */
+  void ProcessCharacterDevice(const std::string &parent_dir,
+                              const std::string &filename);
+
+  /**
+   *Callback when a block device is found
+   * @param parent_dir the relative directory path
+   * @param filename the filename
+   */
+  void ProcessBlockDevice(const std::string &parent_dir,
+                          const std::string &filename);
 
   /**
    * Called to actually process the file entry.
@@ -255,8 +270,6 @@ class SyncUnionOverlayfs : public SyncUnion {
   bool IsOpaqueDirectory(const SyncItem &directory) const;
   bool IsWhiteoutSymlinkPath(const std::string &path) const;
 
-  void ProcessCharacterDevice(const std::string &parent_dir,
-                              const std::string &filename);
   std::string UnwindWhiteoutFilename(const SyncItem &entry) const;
   std::set<std::string> GetIgnoreFilenames() const;
 

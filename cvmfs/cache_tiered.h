@@ -45,7 +45,7 @@ class TieredCacheManager : public CacheManager {
   virtual int Dup(int fd) { return upper_->Dup(fd); }
   virtual int Readahead(int fd) { return upper_->Readahead(fd); }
 
-  virtual uint16_t SizeOfTxn()
+  virtual uint32_t SizeOfTxn()
   { return upper_->SizeOfTxn() + lower_->SizeOfTxn(); }
   virtual int StartTxn(const shash::Any &id, uint64_t size, void *txn);
   virtual void CtrlTxn(const ObjectInfo &object_info,
@@ -56,6 +56,7 @@ class TieredCacheManager : public CacheManager {
   virtual int OpenFromTxn(void *txn) { return upper_->OpenFromTxn(txn); }
   virtual int AbortTxn(void *txn);
   virtual int CommitTxn(void *txn);
+  virtual void Spawn();
 
  private:
   static const unsigned kCopyBufferSize = 64 * 1024;  // 64kB

@@ -14,7 +14,7 @@ class Catalog;
 }
 
 namespace shash {
-class Any;
+struct Any;
 }
 
 namespace swissknife {

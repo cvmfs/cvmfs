@@ -186,17 +186,17 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
     unsigned i;
     for (i = 8; (i < header_line.length()) && (header_line[i] == ' '); ++i) {}
 
-    // TODO(jblomer): consolidate the code
+    // Code is initialized to -1
     if (header_line.length() > i+2) {
       info->http_code = DownloadManager::ParseHttpCode(&header_line[i]);
     }
 
-    if (header_line[i] == '2') {
+    if ((info->http_code / 100) == 2) {
       return num_bytes;
-    } else if ((header_line.length() > i+2) && (header_line[i] == '3') &&
-               (header_line[i+1] == '0') &&
-               ((header_line[i+2] == '1') || (header_line[i+2] == '2') ||
-                (header_line[i+2] == '3') || (header_line[i+2] == '7')))
+    } else if ((info->http_code == 301) ||
+               (info->http_code == 302) ||
+               (info->http_code == 303) ||
+               (info->http_code == 307))
     {
       if (!info->follow_redirects) {
         LogCvmfs(kLogDownload, kLogDebug, "redirect support not enabled: %s",
@@ -211,13 +211,10 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
     } else {
       LogCvmfs(kLogDownload, kLogDebug, "http status error code: %s",
                header_line.c_str());
-      if (header_line[i] == '5') {
+      if ((info->http_code / 100) == 5) {
         // 5XX returned by host
         info->error_code = kFailHostHttp;
-      } else if ( (header_line.length() > i+2) && (header_line[i] == '4') &&
-                  (header_line[i+1] == '0') &&
-                  ((header_line[i+2] == '4') || (header_line[i+2] == '0')) )
-      {
+      } else if ((info->http_code == 400) || (info->http_code == 404)) {
         // 400: error from the GeoAPI module
         // 404: the stratum 1 does not have the newest files
         info->error_code = kFailHostHttp;

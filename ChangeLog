@@ -1,4 +1,8 @@
 2.4.0:
+  * Add CVMFS_IGNORE_SPECIAL_FILES server parameter
+  * Ignore special files with a warning on publish (CVM-1106)
+  * Add support for Debian 8 (CVM-1104)
+  * Add support for pluggable, external cache managers (CVM-1054)
   * Update c-ares to 1.12.0
   * Keep debug symbols of libcurl and c-ares
   * Use default X509_CERT_DIR also if it is empty string (CVM-1083)
@@ -13,6 +17,8 @@
   * Fix handling of file:// url in CVMFS_SERVER_URL
 
 2.3.3:
+  * Fix history file leak on auto tag removal
+  * Fix crash when 'cvmfs_talk cleanup rate' is called without argument
   * Fixes for macOS 10.12 Sierra (CVM-1084)
 
 2.3.2:

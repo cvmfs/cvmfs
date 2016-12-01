@@ -4940,6 +4940,9 @@ cvmfs_server_publish() {
     if [ "x${CVMFS_VOMS_AUTHZ}" != x ]; then
       sync_command="$sync_command -V"
     fi
+    if [ "x$CVMFS_IGNORE_SPECIAL_FILES" = "xtrue" ]; then
+      sync_command="$sync_command -g"
+    fi
     local sync_command_virtual_dir=
     if [ "x${CVMFS_VIRTUAL_DIR}" = "xtrue" ]; then
       sync_command_virtual_dir="$sync_command -S snapshots"
@@ -4948,6 +4951,7 @@ cvmfs_server_publish() {
         sync_command_virtual_dir="$sync_command -S remove"
       fi
     fi
+
     local tag_command="$(__swissknife_cmd dbg) tag_edit \
       -r $upstream                                      \
       -w $stratum0                                      \
@@ -5699,7 +5703,7 @@ EOF
     #  same time
     fulllog=/var/log/cvmfs/snapshots.log
     log=/tmp/cvmfs_snapshots.$$.log
-    trap "rm -f $log" 0
+    trap "rm -f $log" EXIT HUP INT TERM
     (echo; echo "Logging in $log at `date`") >>$fulllog
   fi
 

@@ -34,9 +34,12 @@ set (CVMFS_CLIENT_SOURCES
   backoff.cc backoff.h
   bigvector.h
   cache.cc cache.h
+  cache.pb.cc cache.pb.h
+  cache_extern.cc cache_extern.h
   cache_posix.cc cache_posix.h
   cache_ram.cc cache_ram.h
   cache_tiered.cc cache_tiered.h
+  cache_transport.cc cache_transport.h
   catalog.cc catalog.h
   catalog_counters.cc catalog_counters.h catalog_counters_impl.h
   catalog_mgr.h catalog_mgr_impl.h
@@ -77,6 +80,7 @@ set (CVMFS_CLIENT_SOURCES
   platform.h platform_linux.h platform_osx.h
   prng.h
   quota.cc quota.h
+  quota_posix.cc quota_posix.h
   sanitizer.cc sanitizer.h
   shortstring.h
   signature.cc signature.h
@@ -97,10 +101,22 @@ set (CVMFS_CLIENT_SOURCES
   util/posix.cc util/posix.h
   util/single_copy.h
   util/string.cc util/string.h
+  util_concurrency.cc util_concurrency.h util_concurrency_impl.h
   whitelist.cc whitelist.h
   wpad.cc wpad.h
   xattr.cc xattr.h
 )
+
+set_source_files_properties(cache.pb.cc cache.pb.h
+                            PROPERTIES GENERATED true)
+
+add_custom_command(OUTPUT cache.pb.cc cache.pb.h
+                   COMMAND ${PROTOBUF_C} --cpp_out=.
+                           ${CMAKE_CURRENT_SOURCE_DIR}/cache.proto
+                           -I${CMAKE_CURRENT_SOURCE_DIR}
+                   DEPENDS ${PROTOBUF_ARCHIVE}
+                           ${CMAKE_CURRENT_SOURCE_DIR}/cache.proto
+                   COMMENT "Generating protobuf sources")
 
 
 set (CVMFS2_DEBUG_SOURCES
@@ -132,6 +148,38 @@ set (LIBCVMFS_SOURCES
 set (TEST_LIBCVMFS_SOURCES
   libcvmfs.h
   test_libcvmfs.cc
+)
+
+set (LIBCVMFS_CACHE_SOURCES
+  atomic.h
+  cache.h
+  cache.pb.cc cache.pb.h
+  cache_plugin/libcvmfs_cache.cc cache_plugin/libcvmfs_cache.h
+  cache_plugin/libcvmfs_cache_options.cc
+  cache_plugin/channel.cc cache_plugin/channel.h
+  cache_transport.cc cache_transport.h
+  fs_traversal.h
+  hash.h hash.cc
+  logging.cc logging.h logging_internal.h
+  murmur.h
+  options.h options.cc
+  platform.h platform_linux.h platform_osx.h
+  prng.h
+  sanitizer.cc sanitizer.h
+  shortstring.h
+  smallhash.h
+  smalloc.h
+  util/async.h
+  util/pointer.h
+  util/posix.cc util/posix.h
+  util/single_copy.h
+  util/string.cc util/string.h
+  util_concurrency.cc util_concurrency.h util_concurrency_impl.h
+)
+
+set (CVMFS_CACHE_NULL_SOURCES
+  cache_plugin/libcvmfs_cache.h
+  cache_plugin/cvmfs_cache_null.cc
 )
 
 set (CVMFS_FSCK_SOURCES
@@ -343,11 +391,13 @@ set (CVMFS_FSCK_CFLAGS "${CVMFS_FSCK_CFLAGS} -DCVMFS_CLIENT")
 
 set (LIBCVMFS_CFLAGS "${LIBCVMFS_CFLAGS} -D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -DCVMFS_LIBCVMFS -fexceptions")
 
+set (LIBCVMFS_CACHE_CFLAGS "${LIBCVMFS_CACHE_CFLAGS} -D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -DCVMFS_LIBCVMFS -fexceptions")
+
 #
 # set some include and linking stuff
 #
 set (CVMFS2_LD_FLAGS "${CVMFS2_LD_FLAGS} -ldl -lm")
-include_directories (cvmfs ${INCLUDE_DIRECTORIES})
+include_directories (cvmfs ${CMAKE_CURRENT_BINARY_DIR} ${INCLUDE_DIRECTORIES})
 
 #
 # do the job!
@@ -406,6 +456,9 @@ if (BUILD_CVMFS)
   add_dependencies (cvmfs_fuse_debug libvjson)
   add_dependencies (cvmfs_fuse libvjson)
 
+  add_dependencies (cvmfs_fuse_debug protobuf)
+  add_dependencies (cvmfs_fuse protobuf)
+
   # set some properties
   set (CVMFS_LOADER_LD_FLAGS "${CVMFS_LOADER_LD_FLAGS} -ldl -lm")
   set_target_properties (cvmfs2 PROPERTIES COMPILE_FLAGS "${CVMFS_LOADER_CFLAGS}" LINK_FLAGS "${CVMFS_LOADER_LD_FLAGS}")
@@ -423,7 +476,7 @@ if (BUILD_CVMFS)
          ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${ZLIB_LIBRARIES}
          ${PACPARSER_ARCHIVE} ${LEVELDB_ARCHIVE} ${CARES_ARCHIVE}
          ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${UUID_LIBRARIES}
-         ${SHA3_ARCHIVE} ${VJSON_ARCHIVE} pthread dl)
+         ${SHA3_ARCHIVE} ${VJSON_ARCHIVE} ${PROTOBUF_ARCHIVE} pthread dl)
 
   target_link_libraries (cvmfs2 ${CVMFS_LOADER_LIBS} ${OPENSSL_LIBRARIES}
                                 ${LIBFUSE} ${RT_LIBRARY} ${UUID_LIBRARIES}
@@ -453,6 +506,43 @@ if (BUILD_CVMFS)
   add_dependencies (cvmfs_deny_helper libvjson)
   target_link_libraries (cvmfs_deny_helper ${VJSON_ARCHIVE})
 endif (BUILD_CVMFS)
+
+
+if (BUILD_LIBCVMFS_CACHE)
+  # libcvmfs_cache_only.a is a static lib of cvmfs without externals
+  # libcvmfs_cache.a includes the externals as well
+  add_library (cvmfs_cache_only STATIC ${LIBCVMFS_CACHE_SOURCES})
+  set (LIBCVMFS_CACHE_LIBS ${LIBCVMFS_CACHE_LIBS} ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache_only.a)
+  add_dependencies (cvmfs_cache_only libsha3)
+  add_dependencies (cvmfs_cache_only protobuf)
+  set (LIBCVMFS_CACHE_LIBS ${SHA3_ARCHIVE} ${PROTOBUF_ARCHIVE}
+                           ${LIBCVMFS_CACHE_LIBS})
+  set_target_properties (cvmfs_cache_only PROPERTIES COMPILE_FLAGS
+                         "${LIBCVMFS_CACHE_CFLAGS}")
+  if (NOT MACOSX)
+    # We do not (yet) have a recipe for localizing private symbols
+    # in Mac OS X, so skip that step on Mac
+    set (LIBCVMFS_CACHE_PUBLIC_SYMS "-public" "${CMAKE_CURRENT_SOURCE_DIR}/cache_plugin/libcvmfs_cache_public_syms.txt")
+  endif (NOT MACOSX)
+
+  add_custom_command(
+    OUTPUT libcvmfs_cache.a
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/combine_libs ${LIBCVMFS_CACHE_PUBLIC_SYMS} libcvmfs_cache.a ${LIBCVMFS_CACHE_LIBS}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    DEPENDS ${LIBCVMFS_CACHE_LIBS}
+  )
+
+  # dummy target to cause merged libcvmfs_cache to be produced
+  add_custom_target (libcvmfs_cache ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a)
+  add_dependencies (libcvmfs_cache cvmfs_cache_only)
+
+  add_executable(cvmfs_cache_null ${CVMFS_CACHE_NULL_SOURCES})
+  target_link_libraries(cvmfs_cache_null
+                        ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a
+                        ${OPENSSL_LIBRARIES} ${RT_LIBRARY} pthread)
+  add_dependencies (cvmfs_cache_null libcvmfs_cache)
+endif (BUILD_LIBCVMFS_CACHE)
+
 
 if (BUILD_LIBCVMFS)
   # libcvmfs_only.a is a static lib of cvmfs without externals
@@ -487,7 +577,9 @@ if (BUILD_LIBCVMFS)
 
   add_dependencies (cvmfs_only libsha3)
   add_dependencies (cvmfs_only libvjson)
-  set (LIBCVMFS_LIBS ${SHA3_ARCHIVE} ${VJSON_ARCHIVE} ${LIBCVMFS_LIBS})
+  add_dependencies (cvmfs_only protobuf)
+  set (LIBCVMFS_LIBS ${SHA3_ARCHIVE} ${VJSON_ARCHIVE} ${PROTOBUF_ARCHIVE}
+                     ${LIBCVMFS_LIBS})
 
   set_target_properties (cvmfs_only PROPERTIES COMPILE_FLAGS "${LIBCVMFS_CFLAGS}")
 
