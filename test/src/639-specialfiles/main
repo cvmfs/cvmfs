@@ -1,34 +1,37 @@
 cvmfs_test_name="Handling special files"
 
-test_repo_config="/etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf"
+CVMFS_TEST639_TESTREPOCONFIG="/etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf"
 
-filename=""
-publish_output=""
+CVMFS_TEST639_FILENAME=""
+CVMFS_TEST639_PUBLISHOUTPUT=""
 
-unionfs="overlayfs"
-ignore_special_files="true"
-dev_type="c"
-newdir="false"
+CVMFS_TEST639_CVMFS_TEST639_UNIONFS="overlayfs"
+CVMFS_TEST639_IGNORE_SPECIAL_FILES="true"
+CVMFS_TEST639_DEVTYPE="c"
+CVMFS_TEST639_NEWDIR="false"
 
 _setup() {
-    export CVMFS_TEST_UNIONFS="$unionfs"
+    local filepath=""
 
-    create_repo "$CVMFS_TEST_REPO" "$CVMFS_TEST_USER" "/tmp/debug.log" 1>/dev/null
+    create_repo "$CVMFS_TEST_REPO" "$CVMFS_TEST_USER" "/tmp/debug.log"
 
-    if [ $ignore_special_files = "true" ]; then
-        echo "CVMFS_IGNORE_SPECIAL_FILES=$ignore_special_files" | sudo tee -a $test_repo_config
+    if [ $CVMFS_TEST639_IGNORE_SPECIAL_FILES = "true" ]; then
+        local l="CVMFS_IGNORE_SPECIAL_FILES=$CVMFS_TEST639_IGNORE_SPECIAL_FILES"
+        echo "$l" | sudo tee -a $CVMFS_TEST639_TESTREPOCONFIG
     fi
 
     start_transaction "$CVMFS_TEST_REPO" || return 1
 
-    if [ $newdir = "true" ]; then
+    if [ $CVMFS_TEST639_NEWDIR = "true" ]; then
         sudo mkdir "/cvmfs/$CVMFS_TEST_REPO/dev"
-        sudo mknod "/cvmfs/$CVMFS_TEST_REPO/dev/$filename" "$dev_type" 10 20 || return 2
+        filepath="/cvmfs/$CVMFS_TEST_REPO/dev/$CVMFS_TEST639_FILENAME"
     else
-        sudo mknod "/cvmfs/$CVMFS_TEST_REPO/$filename" "$dev_type" 10 20 || return 2
+        filepath="/cvmfs/$CVMFS_TEST_REPO/$CVMFS_TEST639_FILENAME"
     fi
 
-    publish_output="$(publish_repo $CVMFS_TEST_REPO 2>&1)" || return 3
+    sudo mknod "$filepath" "$CVMFS_TEST639_DEVTYPE" 10 20 || return 2
+
+    CVMFS_TEST639_PUBLISHOUTPUT="$(publish_repo $CVMFS_TEST_REPO 2>&1)" || return 3
 
     return 0
 }
@@ -39,18 +42,18 @@ _cleanup() {
 
 # check character device with major-minor other than 0-0 in alredy existing dir
 test_chrdev_basic() {
-    filename="chardev_10_20"
-    dev_type="c"
-    newdir="false"
-    ignore_special_files="true"
+    CVMFS_TEST639_FILENAME="chardev_10_20"
+    CVMFS_TEST639_DEVTYPE="c"
+    CVMFS_TEST639_NEWDIR="false"
+    CVMFS_TEST639_IGNORE_SPECIAL_FILES="true"
     _setup || return $?
 
     # assert 1: check the old message
-    echo "$publish_output" | grep -i "'$filename' should be deleted"
+    echo "$CVMFS_TEST639_PUBLISHOUTPUT" | grep -i "'$CVMFS_TEST639_FILENAME' should be deleted"
     local status1=$(( $? == 1 ))
 
     # assert 2: check the new message
-    echo  "$publish_output" | grep -i "'$filename'.*ignoring"
+    echo  "$CVMFS_TEST639_PUBLISHOUTPUT" | grep -i "'$CVMFS_TEST639_FILENAME'.*ignoring"
     local status2=$?
 
     _cleanup
@@ -60,13 +63,13 @@ test_chrdev_basic() {
 
 # check block device in an alredy existing dir
 test_blkdev_basic() {
-    filename="blockdev_10_20"
-    dev_type="b"
-    newdir="false"
-    ignore_special_files="true"
+    CVMFS_TEST639_FILENAME="blockdev_10_20"
+    CVMFS_TEST639_DEVTYPE="b"
+    CVMFS_TEST639_NEWDIR="false"
+    CVMFS_TEST639_IGNORE_SPECIAL_FILES="true"
     _setup || return $?
 
-    echo "$publish_output" | grep -i "$filename.*ignoring"
+    echo "$CVMFS_TEST639_PUBLISHOUTPUT" | grep -i "$CVMFS_TEST639_FILENAME.*ignoring"
     local status1=$?
 
     _cleanup
@@ -76,13 +79,13 @@ test_blkdev_basic() {
 
 # check character device with major-minor other than 0-0 in a new dir
 test_chrdev_newdir() {
-    filename="chardev_10_20"
-    dev_type="c"
-    newdir="true"
-    ignore_special_files="true"
+    CVMFS_TEST639_FILENAME="chardev_10_20"
+    CVMFS_TEST639_DEVTYPE="c"
+    CVMFS_TEST639_NEWDIR="true"
+    CVMFS_TEST639_IGNORE_SPECIAL_FILES="true"
     _setup || return $?
 
-    echo "$publish_output" | grep -i "$filename.*ignoring"
+    echo "$CVMFS_TEST639_PUBLISHOUTPUT" | grep -i "$CVMFS_TEST639_FILENAME.*ignoring"
     local status1=$?
 
     _cleanup
@@ -92,13 +95,13 @@ test_chrdev_newdir() {
 
 # check block device with major-minor other than 0-0 in a new dir
 test_blkdev_newdir() {
-    filename="blockdev_10_20"
-    dev_type="b"
-    newdir="true"
-    ignore_special_files="true"
+    CVMFS_TEST639_FILENAME="blockdev_10_20"
+    CVMFS_TEST639_DEVTYPE="b"
+    CVMFS_TEST639_NEWDIR="true"
+    CVMFS_TEST639_IGNORE_SPECIAL_FILES="true"
     _setup || return $?
 
-    echo "$publish_output" | grep -i "$filename.*ignoring"
+    echo "$CVMFS_TEST639_PUBLISHOUTPUT" | grep -i "$CVMFS_TEST639_FILENAME.*ignoring"
     local status1=$?
 
     _cleanup
@@ -107,19 +110,19 @@ test_blkdev_newdir() {
 }
 
 test_fail_chrdev() {
-    filename="chardev_10_20"
-    dev_type="c"
-    newdir="false"
-    ignore_special_files="false"
+    CVMFS_TEST639_FILENAME="chardev_10_20"
+    CVMFS_TEST639_DEVTYPE="c"
+    CVMFS_TEST639_NEWDIR="false"
+    CVMFS_TEST639_IGNORE_SPECIAL_FILES="false"
     _setup
     return $?
 }
 
 test_fail_blkdev() {
-    filename="blkdev_10_20"
-    dev_type="b"
-    newdir="false"
-    ignore_special_files="false"
+    CVMFS_TEST639_FILENAME="blkdev_10_20"
+    CVMFS_TEST639_DEVTYPE="b"
+    CVMFS_TEST639_NEWDIR="false"
+    CVMFS_TEST639_IGNORE_SPECIAL_FILES="false"
     _setup
     return $?
 }
@@ -155,13 +158,13 @@ run_tests_base() {
 }
 
 run_aufs_tests() {
-    unionfs="aufs"
+    CVMFS_TEST639_CVMFS_TEST639_UNIONFS="aufs"
     run_tests_base
     return $?
 }
 
 run_overlayfs_tests() {
-    unionfs="overlayfs"
+    CVMFS_TEST639_CVMFS_TEST639_UNIONFS="overlayfs"
     run_tests_base
     return $?
 }
