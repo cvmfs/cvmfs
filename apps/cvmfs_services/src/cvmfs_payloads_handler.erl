@@ -16,7 +16,7 @@ init(Req0 = #{method := <<"GET">>}, State) ->
                            <<"">>,
                            Req0),
     {ok, Req1, State};
-init(Req0 = #{method := <<"PUT">>}, State) ->
+init(Req0 = #{method := <<"POST">>}, State) ->
     {ok, Req0, State}.
 
 

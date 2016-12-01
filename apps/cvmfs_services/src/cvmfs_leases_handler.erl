@@ -16,7 +16,7 @@ init(Req0 = #{method := <<"GET">>}, State) ->
                            <<"">>,
                            Req0),
     {ok, Req1, State};
-init(Req0 = #{method := <<"PUT">>}, State) ->
+init(Req0 = #{method := <<"POST">>}, State) ->
     {Status, Reply, Req2} = case p_read_body(Req0) of
                                 {ok, Data, Req1} ->
                                     case jsx:decode(Data, [return_maps]) of

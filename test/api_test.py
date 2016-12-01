@@ -18,7 +18,7 @@ def do_request(url, method, body):
         pass
 
 def create_and_delete_session():
-    rep1 = do_request('/api/leases', 'PUT', {'user' : 'user1', 'path' : '/path/to/repo/1'})
+    rep1 = do_request('/api/leases', 'POST', {'userr' : 'user1', 'path' : '/path/to/repo/1'})
     print 'New session: ', rep1
     token = rep1['session_token']
     rep2 = do_request('/api/leases/' + token, 'DELETE', {})
@@ -30,16 +30,16 @@ def main():
                 (base_res + 'users', 'GET', {}),
                 (base_res + 'repos', 'GET', {}),
                 (base_res + 'leases', 'GET', {}),
-                (base_res + 'leases', 'PUT', {'user' : 'user1', 'path' : '/path/to/repo/1'}),
-                (base_res + 'leases', 'PUT', {'user' : 'bad_user', 'path' : '/path/to/repo/1'}),
-                (base_res + 'leases', 'PUT', {'user' : 'user1', 'path' : '/bad/path'}),
-                (base_res + 'leases', 'PUT', {'user' : 'user1', 'path' : '/path/to/repo/1'})]
+                (base_res + 'leases', 'POST', {'user' : 'user1', 'path' : '/path/to/repo/1'}),
+                (base_res + 'leases', 'POST', {'user' : 'bad_user', 'path' : '/path/to/repo/1'}),
+                (base_res + 'leases', 'POST', {'user' : 'user1', 'path' : '/bad/path'}),
+                (base_res + 'leases', 'POST', {'user' : 'user1', 'path' : '/path/to/repo/1'})]
 
     create_and_delete_session()
 
-    for (u, m, b) in url_resp:
-        rep = do_request(u, m, b)
-        print rep
+    # for (u, m, b) in url_resp:
+    #     rep = do_request(u, m, b)
+    #     print rep
 
 
 if __name__ == '__main__':
