@@ -1,4 +1,6 @@
 2.4.0:
+  * Add CVMFS_VIRTUAL_DIR server parameter (CVM-1062)
+  * Add catalog support for hidden files and bind mountpoints
   * Add CVMFS_IGNORE_SPECIAL_FILES server parameter
   * Ignore special files with a warning on publish (CVM-1106)
   * Add support for Debian 8 (CVM-1104)
