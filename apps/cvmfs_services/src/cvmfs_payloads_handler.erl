@@ -17,23 +17,19 @@ init(Req0 = #{method := <<"GET">>}, State) ->
                            Req0),
     {ok, Req1, State};
 init(Req0 = #{method := <<"POST">>}, State) ->
-    {Status, Reply, Req2} = case cvmfs_fe_util:read_body(Req0) of
-                                {ok, Data, Req1} ->
-                                    case jsx:decode(Data, [return_maps]) of
-                                        #{<<"user">> := User,
-                                          <<"session_token">> := Token,
-                                          <<"payload">> := Payload,
-                                          <<"final">> := Final} ->
-                                            Rep = p_submit_payload(User,
-                                                                   Token,
-                                                                   Payload,
-                                                                   binary_to_atom(Final, latin1)),
-                                            {200, Rep, Req1};
-                                        _ ->
-                                            {400, #{}, Req1}
-                                    end;
+    {ok, Data, Req1} = cvmfs_fe_util:read_body(Req0),
+    {Status, Reply, Req2} = case jsx:decode(Data, [return_maps]) of
+                                #{<<"user">> := User,
+                                  <<"session_token">> := Token,
+                                  <<"payload">> := Payload,
+                                  <<"final">> := Final} ->
+                                    Rep = p_submit_payload(User,
+                                                           Token,
+                                                           Payload,
+                                                           binary_to_atom(Final, latin1)),
+                                    {200, Rep, Req1};
                                 _ ->
-                                    {400, #{}, Req0}
+                                    {400, #{}, Req1}
                             end,
     ReqF = cowboy_req:reply(Status,
                             #{<<"content-type">> => <<"application/json">>},
