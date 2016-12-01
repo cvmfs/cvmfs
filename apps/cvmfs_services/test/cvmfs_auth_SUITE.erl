@@ -44,7 +44,7 @@ groups() ->
 init_per_suite(Config) ->
     application:load(mnesia),
     application:set_env(mnesia, schema_location, ram),
-    application:start(mnesia),
+    application:ensure_all_started(mnesia),
 
     ok = application:load(cvmfs_services),
     ok = ct:require(repos),
