@@ -1,4 +1,5 @@
 2.4.0:
+  * Add CVMFS_IGNORE_SPECIAL_FILES server parameter
   * Ignore special files with a warning on publish (CVM-1106)
   * Add support for Debian 8 (CVM-1104)
   * Add support for pluggable, external cache managers (CVM-1054)
