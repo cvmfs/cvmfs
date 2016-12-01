@@ -17,7 +17,7 @@ init(Req0 = #{method := <<"GET">>}, State) ->
                            Req0),
     {ok, Req1, State};
 init(Req0 = #{method := <<"POST">>}, State) ->
-    {Status, Reply, Req2} = case p_read_body(Req0) of
+    {Status, Reply, Req2} = case cvmfs_fe_util:read_body(Req0) of
                                 {ok, Data, Req1} ->
                                     case jsx:decode(Data, [return_maps]) of
                                         #{<<"user">> := User, <<"path">> := Path} ->
@@ -59,15 +59,6 @@ init(Req0 = #{method := <<"DELETE">>}, State) ->
             {ok, Req1, State}
     end.
 
-
-%%% Private functions
-p_read_body(Req) ->
-    case cowboy_req:has_body(Req) of
-        true ->
-            cowboy_req:read_body(Req);
-        false ->
-            {}
-    end.
 
 p_new_lease(User, Path) ->
     case cvmfs_be:new_lease(User, Path) of
