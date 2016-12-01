@@ -149,6 +149,23 @@ void SyncUnion::LeaveDirectory(const string &parent_dir,
   mediator_->LeaveDirectory(entry);
 }
 
+void SyncUnion::ProcessCharacterDevice(const std::string &parent_dir,
+                                        const std::string &filename) {
+  LogCvmfs(kLogUnionFs, kLogDebug,
+            "SyncUnionOverlayfs::ProcessCharacterDevice(%s, %s)",
+            parent_dir.c_str(), filename.c_str());
+  SyncItem entry = CreateSyncItem(parent_dir, filename, kItemCharacterDevice);
+  ProcessFile(entry);
+}
+
+void SyncUnion::ProcessBlockDevice(const std::string &parent_dir,
+                                    const std::string &filename) {
+  LogCvmfs(kLogUnionFs, kLogDebug,
+            "SyncUnionOverlayfs::ProcessBlockDevice(%s, %s)",
+            parent_dir.c_str(), filename.c_str());
+  SyncItem entry = CreateSyncItem(parent_dir, filename, kItemBlockDevice);
+  ProcessFile(entry);
+}
 
 //------------------------------------------------------------------------------
 
@@ -176,12 +193,14 @@ void SyncUnionAufs::Traverse() {
 
   FileSystemTraversal<SyncUnionAufs> traversal(this, scratch_path(), true);
 
-  traversal.fn_enter_dir      = &SyncUnionAufs::EnterDirectory;
-  traversal.fn_leave_dir      = &SyncUnionAufs::LeaveDirectory;
-  traversal.fn_new_file       = &SyncUnionAufs::ProcessRegularFile;
-  traversal.fn_ignore_file    = &SyncUnionAufs::IgnoreFilePredicate;
-  traversal.fn_new_dir_prefix = &SyncUnionAufs::ProcessDirectory;
-  traversal.fn_new_symlink    = &SyncUnionAufs::ProcessSymlink;
+  traversal.fn_enter_dir          = &SyncUnionAufs::EnterDirectory;
+  traversal.fn_leave_dir          = &SyncUnionAufs::LeaveDirectory;
+  traversal.fn_new_file           = &SyncUnionAufs::ProcessRegularFile;
+  traversal.fn_ignore_file        = &SyncUnionAufs::IgnoreFilePredicate;
+  traversal.fn_new_dir_prefix     = &SyncUnionAufs::ProcessDirectory;
+  traversal.fn_new_symlink        = &SyncUnionAufs::ProcessSymlink;
+  traversal.fn_new_character_dev  = &SyncUnionAufs::ProcessCharacterDevice;
+  traversal.fn_new_block_dev      = &SyncUnionAufs::ProcessBlockDevice;
   LogCvmfs(kLogUnionFs, kLogVerboseMsg, "Aufs starting traversal "
            "recursion for scratch_path=[%s] with external data set to %d",
            scratch_path().c_str(),
@@ -486,23 +505,4 @@ bool SyncUnionOverlayfs::IsOpaqueDirPath(const string &path) const {
 string SyncUnionOverlayfs::UnwindWhiteoutFilename(const SyncItem &entry) const {
   return entry.filename();
 }
-
-void SyncUnionOverlayfs::ProcessCharacterDevice(const std::string &parent_dir,
-                                                const std::string &filename) {
-  LogCvmfs(kLogUnionFs, kLogDebug,
-           "SyncUnionOverlayfs::ProcessCharacterDevice(%s, %s)",
-           parent_dir.c_str(), filename.c_str());
-  SyncItem entry = CreateSyncItem(parent_dir, filename, kItemCharacterDevice);
-  ProcessFile(entry);
-}
-
-void SyncUnionOverlayfs::ProcessBlockDevice(const std::string &parent_dir,
-                                            const std::string &filename) {
-  LogCvmfs(kLogUnionFs, kLogDebug,
-           "SyncUnionOverlayfs::ProcessBlockDevice(%s, %s)",
-           parent_dir.c_str(), filename.c_str());
-  SyncItem entry = CreateSyncItem(parent_dir, filename, kItemBlockDevice);
-  ProcessFile(entry);
-}
-
 }  // namespace publish

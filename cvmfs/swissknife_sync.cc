@@ -582,6 +582,10 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     params.ttl_seconds = String2Uint64(*args.find('T')->second);
   }
 
+  if (args.find('g') != args.end()) {
+    params.ignore_special_files = true;
+  }
+
   if (!CheckParams(params)) return 2;
 
   // Start spooler
