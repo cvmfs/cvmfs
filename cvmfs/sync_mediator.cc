@@ -264,7 +264,8 @@ bool SyncMediator::Commit(manifest::Manifest *manifest) {
   if (catalog_manager_->IsBalanceable() ||
       (params_->virtual_dir_actions != catalog::VirtualCatalog::kActionNone))
   {
-    catalog_manager_->Balance();
+    if (catalog_manager_->IsBalanceable())
+      catalog_manager_->Balance();
     // Commit empty string to ensure that the "content" of the auto catalog
     // markers is present in the repository.
     string empty_file = CreateTempPath(params_->dir_temp + "/empty", 0600);

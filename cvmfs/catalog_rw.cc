@@ -528,7 +528,6 @@ void WritableCatalog::InsertBindMountpoint(
 }
 
 
-
 /**
  * Remove a nested catalog reference from the database.
  * If the catalog 'mountpoint' is currently attached as a child, it will be

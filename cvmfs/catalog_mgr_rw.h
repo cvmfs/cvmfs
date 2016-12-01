@@ -68,6 +68,8 @@ namespace catalog {
 
 class WritableCatalogManager : public SimpleCatalogManager {
   friend class CatalogBalancer<WritableCatalogManager>;
+  // TODO(jblomer): only needed to get Spooler's hash algorithm.  Remove me
+  // after refactoring of the swissknife utility.
   friend class VirtualCatalog;
 
  public:
