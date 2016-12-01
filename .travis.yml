@@ -33,7 +33,7 @@ addons:
       - gdb
 
 before_script:
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update && brew cask install osxfuse; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update && brew cask install osxfuse && brew install cmake; fi
 
 script:
   - ci/run_travis.sh
