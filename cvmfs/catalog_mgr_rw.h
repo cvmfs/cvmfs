@@ -67,8 +67,12 @@ class CatalogBalancer;
 namespace catalog {
 
 class WritableCatalogManager : public SimpleCatalogManager {
- public:
   friend class CatalogBalancer<WritableCatalogManager>;
+  // TODO(jblomer): only needed to get Spooler's hash algorithm.  Remove me
+  // after refactoring of the swissknife utility.
+  friend class VirtualCatalog;
+
+ public:
   WritableCatalogManager(const shash::Any  &base_hash,
                          const std::string &stratum0,
                          const std::string &dir_temp,
@@ -114,6 +118,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
   void CreateNestedCatalog(const std::string &mountpoint);
   void RemoveNestedCatalog(const std::string &mountpoint);
   bool IsTransitionPoint(const std::string &mountpoint);
+  WritableCatalog *GetHostingCatalog(const std::string &path);
 
   inline bool IsBalanceable() const { return is_balanceable_; }
   /**

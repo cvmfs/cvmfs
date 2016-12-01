@@ -314,15 +314,15 @@ bool CommandPull::PullRecursion(catalog::Catalog   *catalog,
 
   // Nested catalogs (in a nested code block because goto fail...)
   {
-    const catalog::Catalog::NestedCatalogList &nested_catalogs =
-      catalog->ListNestedCatalogs();
+    const catalog::Catalog::NestedCatalogList nested_catalogs =
+      catalog->ListOwnNestedCatalogs();
     for (catalog::Catalog::NestedCatalogList::const_iterator i =
          nested_catalogs.begin(), iEnd = nested_catalogs.end();
          i != iEnd; ++i)
     {
       LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from catalog at %s",
-               i->path.c_str());
-      bool retval = Pull(i->hash, i->path.ToString());
+               i->mountpoint.c_str());
+      bool retval = Pull(i->hash, i->mountpoint.ToString());
       if (!retval)
         return false;
     }

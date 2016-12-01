@@ -17,7 +17,16 @@ class T_CatalogSql : public ::testing::Test {
   }
 };
 
+static void RevertToRevision3(catalog::CatalogDatabase *db) {
+  ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
+    "DROP TABLE bind_mountpoints;").Execute());
+  ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
+    "UPDATE properties SET value=3 WHERE key='schema_revision';").Execute());
+}
+
 static void RevertToRevision2(catalog::CatalogDatabase *db) {
+  RevertToRevision3(db);
+
   ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
     "DELETE FROM statistics WHERE counter='self_external';").Execute());
   ASSERT_TRUE(sqlite::Sql(db->sqlite_db(), "DELETE FROM statistics WHERE "
@@ -103,7 +112,7 @@ TEST_F(T_CatalogSql, SchemaMigration) {
   fclose(ftmp);
   UnlinkGuard unlink_guard(path);
 
-  // Revision 1 --> 3
+  // Revision 1 --> 4
   {
     UniquePtr<catalog::CatalogDatabase>
       db(catalog::CatalogDatabase::Create(path));
@@ -121,7 +130,7 @@ TEST_F(T_CatalogSql, SchemaMigration) {
     sqlite::Sql sql2(db->sqlite_db(),
       "SELECT value FROM properties WHERE key='schema_revision'");
     ASSERT_TRUE(sql2.FetchRow());
-    EXPECT_EQ(3, sql2.RetrieveInt(0));
+    EXPECT_EQ(4, sql2.RetrieveInt(0));
     sqlite::Sql sql3(db->sqlite_db(),
       "SELECT value FROM statistics WHERE counter='self_xattr'");
     ASSERT_TRUE(sql3.FetchRow());
@@ -130,9 +139,13 @@ TEST_F(T_CatalogSql, SchemaMigration) {
       "SELECT value FROM statistics WHERE counter='subtree_xattr'");
     ASSERT_TRUE(sql4.FetchRow());
     EXPECT_EQ(0, sql4.RetrieveInt(0));
+    sqlite::Sql sql5(db->sqlite_db(),
+      "SELECT COUNT(*) FROM bind_mountpoints");
+    ASSERT_TRUE(sql5.FetchRow());
+    EXPECT_EQ(0, sql5.RetrieveInt(0));
   }
 
-  // Revision 0 --> 3
+  // Revision 0 --> 4
   {
     UniquePtr<catalog::CatalogDatabase> db(catalog::CatalogDatabase::Open(
       path, catalog::CatalogDatabase::kOpenReadWrite));
@@ -142,6 +155,7 @@ TEST_F(T_CatalogSql, SchemaMigration) {
   {
     UniquePtr<catalog::CatalogDatabase> db(catalog::CatalogDatabase::Open(
       path, catalog::CatalogDatabase::kOpenReadWrite));
+    ASSERT_TRUE(db.IsValid());
     sqlite::Sql sql1(db->sqlite_db(), "SELECT COUNT(xattr) FROM catalog");
     ASSERT_TRUE(sql1.FetchRow());
     EXPECT_EQ(0, sql1.RetrieveInt(0));
@@ -152,7 +166,7 @@ TEST_F(T_CatalogSql, SchemaMigration) {
     sqlite::Sql sql3(db->sqlite_db(),
       "SELECT value FROM properties WHERE key='schema_revision'");
     ASSERT_TRUE(sql3.FetchRow());
-    EXPECT_EQ(3, sql3.RetrieveInt(0));
+    EXPECT_EQ(4, sql3.RetrieveInt(0));
     sqlite::Sql sql4(db->sqlite_db(),
       "SELECT value FROM statistics WHERE counter='self_xattr'");
     ASSERT_TRUE(sql4.FetchRow());

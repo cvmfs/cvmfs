@@ -198,6 +198,16 @@ class SqlDirent : public SqlCatalog {
   // Compression methods, 3 bits starting at 2^11
   // Corresponds to zlib::Algorithms
   static const int kFlagPosCompression      = 11;
+  /**
+   * A transition point to a root catalog (instead of a nested catalog).  Used
+   * to link previous snapshots into the catalog structure.
+   */
+  static const int kFlagDirBindMountpoint   = 0x4000;  // 2^14
+  /**
+   * An entry that should not appear in listings.  Used for the /.cvmfs
+   * directory.
+   */
+  static const int kFlagHidden              = 0x8000;  // 2^15
 
 
  protected:
@@ -374,6 +384,9 @@ class SqlDirentTouch : public SqlCatalog {
 //------------------------------------------------------------------------------
 
 
+/**
+ * Nested catalogs and bind mountpoints.
+ */
 class SqlNestedCatalogLookup : public SqlCatalog {
  public:
   explicit SqlNestedCatalogLookup(const CatalogDatabase &database);
@@ -386,10 +399,28 @@ class SqlNestedCatalogLookup : public SqlCatalog {
 //------------------------------------------------------------------------------
 
 
+/**
+ * Nested catalogs and bind mountpoints.
+ */
 class SqlNestedCatalogListing : public SqlCatalog {
  public:
   explicit SqlNestedCatalogListing(const CatalogDatabase &database);
-  PathString GetMountpoint() const;
+  PathString GetPath() const;
+  shash::Any GetContentHash() const;
+  uint64_t GetSize() const;
+};
+
+
+//------------------------------------------------------------------------------
+
+
+/**
+ * Only nested catalogs, no bind mountpoints. Used for replication and GC.
+ */
+class SqlOwnNestedCatalogListing : public SqlCatalog {
+ public:
+  explicit SqlOwnNestedCatalogListing(const CatalogDatabase &database);
+  PathString GetPath() const;
   shash::Any GetContentHash() const;
   uint64_t GetSize() const;
 };

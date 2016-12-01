@@ -4,6 +4,7 @@
 
 #include "catalog.h"
 
+#include <alloca.h>
 #include <errno.h>
 
 #include <algorithm>
@@ -19,17 +20,20 @@ using namespace std;  // NOLINT
 
 namespace catalog {
 
+const shash::Md5 Catalog::kMd5PathEmpty("", 0);
+
 
 /**
  * Open a catalog outside the framework of a catalog manager.
  */
-Catalog* Catalog::AttachFreely(const string     &root_path,
+Catalog* Catalog::AttachFreely(const string     &imaginary_mountpoint,
                                const string     &file,
                                const shash::Any &catalog_hash,
                                      Catalog    *parent,
                                const bool        is_nested) {
   Catalog *catalog =
-    new Catalog(PathString(root_path.data(), root_path.length()),
+    new Catalog(PathString(imaginary_mountpoint.data(),
+                           imaginary_mountpoint.length()),
                 catalog_hash,
                 parent,
                 is_nested);
@@ -42,12 +46,13 @@ Catalog* Catalog::AttachFreely(const string     &root_path,
 }
 
 
-Catalog::Catalog(const PathString &path,
+Catalog::Catalog(const PathString &mountpoint,
                  const shash::Any &catalog_hash,
                        Catalog    *parent,
                  const bool        is_nested) :
   catalog_hash_(catalog_hash),
-  path_(path),
+  mountpoint_(mountpoint),
+  is_regular_mountpoint_(mountpoint_ == root_prefix_),
   volatile_flag_(false),
   is_root_(parent == NULL && !is_nested),
   managed_database_(false),
@@ -69,6 +74,7 @@ Catalog::Catalog(const PathString &path,
   sql_lookup_md5path_ = NULL;
   sql_lookup_nested_ = NULL;
   sql_list_nested_ = NULL;
+  sql_own_list_nested_ = NULL;
   sql_all_chunks_ = NULL;
   sql_chunks_listing_ = NULL;
   sql_lookup_xattrs_ = NULL;
@@ -90,13 +96,14 @@ Catalog::~Catalog() {
  * the WritableCatalog and the Catalog destructor
  */
 void Catalog::InitPreparedStatements() {
-  sql_listing_         = new SqlListing(database());
-  sql_lookup_md5path_  = new SqlLookupPathHash(database());
-  sql_lookup_nested_   = new SqlNestedCatalogLookup(database());
-  sql_list_nested_     = new SqlNestedCatalogListing(database());
-  sql_all_chunks_      = new SqlAllChunks(database());
-  sql_chunks_listing_  = new SqlChunksListing(database());
-  sql_lookup_xattrs_   = new SqlLookupXattrs(database());
+  sql_listing_          = new SqlListing(database());
+  sql_lookup_md5path_   = new SqlLookupPathHash(database());
+  sql_lookup_nested_    = new SqlNestedCatalogLookup(database());
+  sql_list_nested_      = new SqlNestedCatalogListing(database());
+  sql_own_list_nested_  = new SqlOwnNestedCatalogListing(database());
+  sql_all_chunks_       = new SqlAllChunks(database());
+  sql_chunks_listing_   = new SqlChunksListing(database());
+  sql_lookup_xattrs_    = new SqlLookupXattrs(database());
 }
 
 
@@ -108,6 +115,7 @@ void Catalog::FinalizePreparedStatements() {
   delete sql_lookup_md5path_;
   delete sql_lookup_nested_;
   delete sql_list_nested_;
+  delete sql_own_list_nested_;
 }
 
 
@@ -175,18 +183,17 @@ bool Catalog::OpenDatabase(const string &db_path) {
   max_row_id_ = sql_max_row_id.RetrieveInt64(0);
 
   // Get root prefix
-  if (IsRoot()) {
-    if (database_->HasProperty("root_prefix")) {
-      const std::string root_prefix =
-                             database_->GetProperty<std::string>("root_prefix");
-      root_prefix_.Assign(root_prefix.data(), root_prefix.size());
-      LogCvmfs(kLogCatalog, kLogDebug,
-               "found root prefix %s in root catalog file %s",
-               root_prefix_.c_str(), db_path.c_str());
-    } else {
-      LogCvmfs(kLogCatalog, kLogDebug,
-               "no root prefix for root catalog file %s", db_path.c_str());
-    }
+  if (database_->HasProperty("root_prefix")) {
+    const std::string root_prefix =
+                           database_->GetProperty<std::string>("root_prefix");
+    root_prefix_.Assign(root_prefix.data(), root_prefix.size());
+    LogCvmfs(kLogCatalog, kLogDebug,
+             "found root prefix %s in root catalog file %s",
+             root_prefix_.c_str(), db_path.c_str());
+    is_regular_mountpoint_ = (root_prefix_ == mountpoint_);
+  } else {
+    LogCvmfs(kLogCatalog, kLogDebug,
+             "no root prefix for root catalog file %s", db_path.c_str());
   }
 
   // Get volatile content flag
@@ -197,7 +204,7 @@ bool Catalog::OpenDatabase(const string &db_path) {
   if (!ReadCatalogCounters()) {
     LogCvmfs(kLogCatalog, kLogStderr,
              "failed to load statistics counters for catalog %s (file %s)",
-             path_.c_str(), db_path.c_str());
+             mountpoint_.c_str(), db_path.c_str());
     return false;
   }
 
@@ -207,6 +214,65 @@ bool Catalog::OpenDatabase(const string &db_path) {
 
   initialized_ = true;
   return true;
+}
+
+
+/**
+ * Removes the mountpoint and prepends the root prefix to path
+ */
+shash::Md5 Catalog::NormalizePath(const PathString &path) const {
+  if (is_regular_mountpoint_)
+    return shash::Md5(path.GetChars(), path.GetLength());
+
+  assert(path.GetLength() >= mountpoint_.GetLength());
+  // Piecewise hash calculation: root_prefix plus tail of path
+  shash::Any result(shash::kMd5);
+  shash::ContextPtr ctx(shash::kMd5);
+  ctx.buffer = alloca(ctx.size);
+  shash::Init(ctx);
+  shash::Update(
+    reinterpret_cast<const unsigned char *>(root_prefix_.GetChars()),
+    root_prefix_.GetLength(),
+    ctx);
+  shash::Update(
+    reinterpret_cast<const unsigned char *>(path.GetChars()) +
+      mountpoint_.GetLength(),
+    path.GetLength() - mountpoint_.GetLength(),
+    ctx);
+  shash::Final(ctx, &result);
+  return result.CastToMd5();
+}
+
+
+/**
+ * Same as NormalizePath but returns a PathString instead of an Md5 hash.
+ */
+PathString Catalog::NormalizePath2(const PathString &path) const {
+  if (is_regular_mountpoint_)
+    return path;
+
+  assert(path.GetLength() >= mountpoint_.GetLength());
+  PathString result = root_prefix_;
+  PathString suffix = path.Suffix(mountpoint_.GetLength());
+  result.Append(suffix.GetChars(), suffix.GetLength());
+  return result;
+}
+
+
+/**
+ * The opposite of NormalizePath: from a full path remove the root prefix and
+ * add the catalogs current mountpoint.  Needed for normalized paths from the
+ * SQlite tables, such as nested catalog entry points.
+ */
+PathString Catalog::PlantPath(const PathString &path) const {
+  if (is_regular_mountpoint_)
+    return path;
+
+  assert(path.GetLength() >= root_prefix_.GetLength());
+  PathString result = mountpoint_;
+  PathString suffix = path.Suffix(root_prefix_.GetLength());
+  result.Append(suffix.GetChars(), suffix.GetLength());
+  return result;
 }
 
 
@@ -253,8 +319,7 @@ bool Catalog::LookupRawSymlink(const PathString &path,
                                LinkString *raw_symlink) const
 {
   DirectoryEntry dirent;
-  bool result = (LookupEntry(shash::Md5(path.GetChars(), path.GetLength()),
-                             false, &dirent));
+  bool result = (LookupEntry(NormalizePath(path), false, &dirent));
   if (result)
     raw_symlink->Assign(dirent.symlink());
   return result;
@@ -298,6 +363,8 @@ bool Catalog::ListingMd5PathStat(const shash::Md5 &md5path,
   sql_listing_->BindPathHash(md5path);
   while (sql_listing_->FetchRow()) {
     dirent = sql_listing_->GetDirent(this);
+    if (dirent.IsHidden())
+      continue;
     FixTransitionPoint(md5path, &dirent);
     entry.name = dirent.name();
     entry.info = dirent.GetStatStructure();
@@ -377,6 +444,9 @@ bool Catalog::ListMd5PathChunks(const shash::Md5  &md5path,
 }
 
 
+/**
+ * Only used by the garbage collection
+ */
 const Catalog::HashVector& Catalog::GetReferencedObjects() const {
   if (!referenced_hashes_.empty()) {
     return referenced_hashes_;
@@ -488,7 +558,7 @@ string Catalog::PrintMemStatistics() const {
   pthread_mutex_lock(lock_);
   database().GetMemStatistics(&stats);
   pthread_mutex_unlock(lock_);
-  return string(path().GetChars(), path().GetLength()) + ": " +
+  return string(mountpoint().GetChars(), mountpoint().GetLength()) + ": " +
     StringifyInt(stats.lookaside_slots_used) + " / " +
       StringifyInt(stats.lookaside_slots_max) + " slots -- " +
       StringifyInt(stats.lookaside_hit) + " hits, " +
@@ -543,30 +613,19 @@ inode_t Catalog::GetMangledInode(const uint64_t row_id,
 
 
 /**
- * Revert the inode mangling.  Required to lookup using inodes.
- */
-uint64_t Catalog::GetRowIdFromInode(const inode_t inode) const {
-  inode_t row_id = inode;
-  if (inode_annotation_)
-    row_id = inode_annotation_->Strip(row_id);
-
-  return row_id - inode_range_.offset;
-}
-
-
-/**
- * Get a list of all registered nested catalogs in this catalog.
- * @return  a list of all nested catalog references of this catalog.
+ * Get a list of all registered nested catalogs and bind mountpoints in this
+ * catalog.
+ * @return  a list of all nested catalog and bind mountpoints.
  */
 const Catalog::NestedCatalogList& Catalog::ListNestedCatalogs() const {
   pthread_mutex_lock(lock_);
 
   if (nested_catalog_cache_dirty_) {
     LogCvmfs(kLogCatalog, kLogDebug, "refreshing nested catalog cache of '%s'",
-             path().c_str());
+             mountpoint().c_str());
     while (sql_list_nested_->FetchRow()) {
       NestedCatalog nested;
-      nested.path = sql_list_nested_->GetMountpoint();
+      nested.mountpoint = PlantPath(sql_list_nested_->GetPath());
       nested.hash = sql_list_nested_->GetContentHash();
       nested.size = sql_list_nested_->GetSize();
       nested_catalog_cache_.push_back(nested);
@@ -577,6 +636,31 @@ const Catalog::NestedCatalogList& Catalog::ListNestedCatalogs() const {
 
   pthread_mutex_unlock(lock_);
   return nested_catalog_cache_;
+}
+
+
+/**
+ * Get a list of all registered nested catalogs without bind mountpoints.  Used
+ * for replication and garbage collection.
+ * @return  a list of all nested catalogs.
+ */
+const Catalog::NestedCatalogList Catalog::ListOwnNestedCatalogs() const {
+  NestedCatalogList result;
+
+  pthread_mutex_lock(lock_);
+
+  while (sql_own_list_nested_->FetchRow()) {
+    NestedCatalog nested;
+    nested.mountpoint = PlantPath(sql_own_list_nested_->GetPath());
+    nested.hash = sql_own_list_nested_->GetContentHash();
+    nested.size = sql_own_list_nested_->GetSize();
+    result.push_back(nested);
+  }
+  sql_own_list_nested_->Reset();
+
+  pthread_mutex_unlock(lock_);
+
+  return result;
 }
 
 
@@ -600,7 +684,7 @@ bool Catalog::FindNested(const PathString &mountpoint,
                          shash::Any *hash, uint64_t *size) const
 {
   pthread_mutex_lock(lock_);
-  sql_lookup_nested_->BindSearchPath(mountpoint);
+  sql_lookup_nested_->BindSearchPath(NormalizePath2(mountpoint));
   bool found = sql_lookup_nested_->FetchRow();
   if (found && (hash != NULL)) {
     *hash = sql_lookup_nested_->GetContentHash();
@@ -638,10 +722,10 @@ void Catalog::SetOwnerMaps(const OwnerMap *uid_map, const OwnerMap *gid_map) {
  * @param child the Catalog to define as child
  */
 void Catalog::AddChild(Catalog *child) {
-  assert(NULL == FindChild(child->path()));
+  assert(NULL == FindChild(child->mountpoint()));
 
   pthread_mutex_lock(lock_);
-  children_[child->path()] = child;
+  children_[child->mountpoint()] = child;
   child->set_parent(this);
   pthread_mutex_unlock(lock_);
 }
@@ -652,11 +736,11 @@ void Catalog::AddChild(Catalog *child) {
  * @param child the Catalog to delete as child
  */
 void Catalog::RemoveChild(Catalog *child) {
-  assert(NULL != FindChild(child->path()));
+  assert(NULL != FindChild(child->mountpoint()));
 
   pthread_mutex_lock(lock_);
   child->set_parent(NULL);
-  children_.erase(child->path());
+  children_.erase(child->mountpoint());
   pthread_mutex_unlock(lock_);
 }
 
@@ -685,19 +769,19 @@ CatalogList Catalog::GetChildren() const {
  */
 Catalog* Catalog::FindSubtree(const PathString &path) const {
   // Check if this catalog fits the beginning of the path.
-  if (!path.StartsWith(path_))
+  if (!path.StartsWith(mountpoint_))
     return NULL;
 
-  PathString remaining(path.Suffix(path_.GetLength()));
+  PathString remaining(path.Suffix(mountpoint_.GetLength()));
   remaining.Append("/", 1);
 
   // now we recombine the path elements successively
   // in order to find a child which serves a part of the path
-  PathString path_prefix(path_);
+  PathString path_prefix(mountpoint_);
   Catalog *result = NULL;
   // Skip the first '/'
   path_prefix.Append("/", 1);
-  const char *c = remaining.GetChars()+1;
+  const char *c = remaining.GetChars() + 1;
   for (unsigned i = 1; i < remaining.GetLength(); ++i, ++c) {
     if (*c == '/') {
       result = FindChild(path_prefix);
@@ -732,20 +816,29 @@ Catalog* Catalog::FindChild(const PathString &mountpoint) const {
 
 
 /**
- * For the transtion points for nested catalogs, the inode is ambiquitous.
- * It has to be set to the parent inode because nested catalogs are lazily
- * loaded.
+ * For the transtion points for nested catalogs and bind mountpoints, the inode
+ * is ambiguous. It has to be set to the parent inode because nested catalogs
+ * are lazily loaded.
  * @param md5path the MD5 hash of the entry to check
  * @param dirent the DirectoryEntry to perform coherence fixes on
  */
 void Catalog::FixTransitionPoint(const shash::Md5 &md5path,
                                  DirectoryEntry *dirent) const
 {
-  if (dirent->IsNestedCatalogRoot() && HasParent()) {
+  if (!HasParent())
+    return;
+
+  if (dirent->IsNestedCatalogRoot()) {
+    // Normal nested catalog
     DirectoryEntry parent_dirent;
     const bool retval = parent_->LookupMd5Path(md5path, &parent_dirent);
     assert(retval);
-
+    dirent->set_inode(parent_dirent.inode());
+  } else if (md5path == kMd5PathEmpty) {
+    // Bind mountpoint
+    DirectoryEntry parent_dirent;
+    const bool retval = parent_->LookupPath(mountpoint_, &parent_dirent);
+    assert(retval);
     dirent->set_inode(parent_dirent.inode());
   }
 }

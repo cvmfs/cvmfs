@@ -63,7 +63,11 @@ const float CatalogDatabase::kLatestSupportedSchema = 2.5;  // + 1.X (r/o)
 //            * add kFlagFileExternal to entries in catalog table
 //            * add self_external and subtree_external statistics counters
 //            * store compression algorithm in flags
-const unsigned CatalogDatabase::kLatestSchemaRevision = 3;
+//   3 --> 4: (Nov 11 2016 - Git):
+//            * add kFlagDirBindMountpoint
+//            * add kFlagHidden
+//            * add table bind_mountpoints
+const unsigned CatalogDatabase::kLatestSchemaRevision = 4;
 
 bool CatalogDatabase::CheckSchemaCompatibility() {
   return !( (schema_version() >= 2.0-kSchemaEpsilon)                   &&
@@ -144,6 +148,24 @@ bool CatalogDatabase::LiveSchemaUpgradeIfNecessary() {
     }
   }
 
+  if (IsEqualSchema(schema_version(), 2.5) && (schema_revision() == 3)) {
+    LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision (3 --> 4)");
+
+    SqlCatalog sql_upgrade8(*this,
+      "CREATE TABLE bind_mountpoints (path TEXT, sha1 TEXT, size INTEGER, "
+      "CONSTRAINT pk_bind_mountpoints PRIMARY KEY (path));");
+    if (!sql_upgrade8.Execute()) {
+      LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade catalogs (3 --> 4)");
+      return false;
+    }
+
+    set_schema_revision(4);
+    if (!StoreSchemaRevision()) {
+      LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade schema revision");
+      return false;
+    }
+  }
+
   return true;
 }
 
@@ -173,6 +195,16 @@ bool CatalogDatabase::CreateEmptyDatabase() {
   SqlCatalog(*this,
     "CREATE TABLE nested_catalogs (path TEXT, sha1 TEXT, size INTEGER, "
     "CONSTRAINT pk_nested_catalogs PRIMARY KEY (path));")         .Execute()  &&
+  // Bind mountpoints and nested catalogs are almost the same. We put them in
+  // separate tables to
+  //   - not confuse previous client versions, which would crash on bind
+  //     mountpoints
+  //   - prevent catalogs referenced as bind mountpoints from being replicated,
+  //     which would cause exhaustive recursive catalog tree walking
+  //   - don't walk into bind mountpoints in catalog traversal (e.g. GC)
+  SqlCatalog(*this,
+    "CREATE TABLE bind_mountpoints (path TEXT, sha1 TEXT, size INTEGER, "
+    "CONSTRAINT pk_bind_mountpoints PRIMARY KEY (path));")        .Execute()  &&
   SqlCatalog(*this,
     "CREATE TABLE statistics (counter TEXT, value INTEGER, "
     "CONSTRAINT pk_statistics PRIMARY KEY (counter));")           .Execute();
@@ -346,6 +378,8 @@ unsigned SqlDirent::CreateDatabaseFlags(const DirectoryEntry &entry) const {
     database_flags |= kFlagDirNestedRoot;
   else if (entry.IsNestedCatalogMountpoint())
     database_flags |= kFlagDirNestedMountpoint;
+  else if (entry.IsBindMountpoint())
+    database_flags |= kFlagDirBindMountpoint;
 
   if (entry.IsDirectory()) {
     database_flags |= kFlagDir;
@@ -362,6 +396,9 @@ unsigned SqlDirent::CreateDatabaseFlags(const DirectoryEntry &entry) const {
 
   if (!entry.checksum_ptr()->IsNull())
     StoreHashAlgorithm(entry.checksum_ptr()->algorithm, &database_flags);
+
+  if (entry.IsHidden())
+    database_flags |= kFlagHidden;
 
   return database_flags;
 }
@@ -629,15 +666,17 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
     result.uid_             = g_uid;
     result.gid_             = g_gid;
   } else {
-    const uint64_t hardlinks = RetrieveInt64(1);
-    result.linkcount_        = Hardlinks2Linkcount(hardlinks);
-    result.hardlink_group_   = Hardlinks2HardlinkGroup(hardlinks);
-    result.inode_            = catalog->GetMangledInode(RetrieveInt64(12),
-                                                        result.hardlink_group_);
-    result.is_chunked_file_  = (database_flags & kFlagFileChunk);
-    result.is_external_file_ = (database_flags & kFlagFileExternal);
-    result.has_xattrs_       = RetrieveInt(15) != 0;
-    result.checksum_         =
+    const uint64_t hardlinks   = RetrieveInt64(1);
+    result.linkcount_          = Hardlinks2Linkcount(hardlinks);
+    result.hardlink_group_     = Hardlinks2HardlinkGroup(hardlinks);
+    result.inode_              =
+      catalog->GetMangledInode(RetrieveInt64(12), result.hardlink_group_);
+    result.is_bind_mountpoint_ = (database_flags & kFlagDirBindMountpoint);
+    result.is_chunked_file_    = (database_flags & kFlagFileChunk);
+    result.is_hidden_          = (database_flags & kFlagHidden);
+    result.is_external_file_   = (database_flags & kFlagFileExternal);
+    result.has_xattrs_         = RetrieveInt(15) != 0;
+    result.checksum_           =
       RetrieveHashBlob(0, RetrieveHashAlgorithm(database_flags));
     result.compression_algorithm_ =
       RetrieveCompressionAlgorithm(database_flags);
@@ -646,12 +685,8 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
       result.uid_             = g_uid;
       result.gid_             = g_gid;
     } else {
-      result.uid_              = RetrieveInt64(13);
-      result.gid_              = RetrieveInt64(14);
-      if (catalog->uid_map_)
-        result.uid_ = catalog->uid_map_->Map(result.uid_);
-      if (catalog->gid_map_)
-        result.gid_ = catalog->gid_map_->Map(result.gid_);
+      result.uid_              = catalog->MapUid(RetrieveInt64(13));
+      result.gid_              = catalog->MapGid(RetrieveInt64(14));
     }
   }
 
@@ -767,16 +802,23 @@ bool SqlDirentTouch::BindPathHash(const shash::Md5 &hash) {
 
 SqlNestedCatalogLookup::SqlNestedCatalogLookup(const CatalogDatabase &database)
 {
-  static const char *stmt_2_5_ge_1 =
+  static const char *stmt_2_5_ge_4 =
+    "SELECT sha1, size FROM nested_catalogs WHERE path=:path "
+    "UNION ALL SELECT sha1, size FROM bind_mountpoints WHERE path=:path;";
+  static const char *stmt_2_5_ge_1_lt_4 =
     "SELECT sha1, size FROM nested_catalogs WHERE path=:path;";
-
   // Internally converts NULL to 0 for size
   static const char *stmt_2_5_lt_1 =
     "SELECT sha1, 0 FROM nested_catalogs WHERE path=:path;";
 
   if (database.IsEqualSchema(database.schema_version(), 2.5) &&
-      (database.schema_revision() >= 1)) {
-    DeferredInit(database.sqlite_db(), stmt_2_5_ge_1);
+     (database.schema_revision() >= 4))
+  {
+    DeferredInit(database.sqlite_db(), stmt_2_5_ge_4);
+  } else if (database.IsEqualSchema(database.schema_version(), 2.5) &&
+            (database.schema_revision() >= 1))
+  {
+    DeferredInit(database.sqlite_db(), stmt_2_5_ge_1_lt_4);
   } else {
     DeferredInit(database.sqlite_db(), stmt_2_5_lt_1);
   }
@@ -807,25 +849,32 @@ uint64_t SqlNestedCatalogLookup::GetSize() const {
 SqlNestedCatalogListing::SqlNestedCatalogListing(
   const CatalogDatabase &database)
 {
-  static const char *stmt_2_5_ge_1 =
+  static const char *stmt_2_5_ge_4 =
+    "SELECT path, sha1, size FROM nested_catalogs "
+    "UNION ALL SELECT path, sha1, size FROM bind_mountpoints;";
+  static const char *stmt_2_5_ge_1_lt_4 =
     "SELECT path, sha1, size FROM nested_catalogs;";
-
   // Internally converts NULL to 0 for size
   static const char *stmt_2_5_lt_1 =
     "SELECT path, sha1, 0 FROM nested_catalogs;";
 
   if (database.IsEqualSchema(database.schema_version(), 2.5) &&
-      (database.schema_revision() >= 1)) {
-    DeferredInit(database.sqlite_db(), stmt_2_5_ge_1);
+     (database.schema_revision() >= 4))
+  {
+    DeferredInit(database.sqlite_db(), stmt_2_5_ge_4);
+  } else if (database.IsEqualSchema(database.schema_version(), 2.5) &&
+            (database.schema_revision() >= 1))
+  {
+    DeferredInit(database.sqlite_db(), stmt_2_5_ge_1_lt_4);
   } else {
     DeferredInit(database.sqlite_db(), stmt_2_5_lt_1);
   }
 }
 
 
-PathString SqlNestedCatalogListing::GetMountpoint() const {
-  const char *mountpoint = reinterpret_cast<const char *>(RetrieveText(0));
-  return PathString(mountpoint, strlen(mountpoint));
+PathString SqlNestedCatalogListing::GetPath() const {
+  const char *path = reinterpret_cast<const char *>(RetrieveText(0));
+  return PathString(path, strlen(path));
 }
 
 
@@ -838,6 +887,47 @@ shash::Any SqlNestedCatalogListing::GetContentHash() const {
 
 
 uint64_t SqlNestedCatalogListing::GetSize() const {
+  return RetrieveInt64(2);
+}
+
+
+//------------------------------------------------------------------------------
+
+
+SqlOwnNestedCatalogListing::SqlOwnNestedCatalogListing(
+  const CatalogDatabase &database)
+{
+  static const char *stmt_2_5_ge_1 =
+    "SELECT path, sha1, size FROM nested_catalogs;";
+  // Internally converts NULL to 0 for size
+  static const char *stmt_2_5_lt_1 =
+    "SELECT path, sha1, 0 FROM nested_catalogs;";
+
+  if (database.IsEqualSchema(database.schema_version(), 2.5) &&
+     (database.schema_revision() >= 1))
+  {
+    DeferredInit(database.sqlite_db(), stmt_2_5_ge_1);
+  } else {
+    DeferredInit(database.sqlite_db(), stmt_2_5_lt_1);
+  }
+}
+
+
+PathString SqlOwnNestedCatalogListing::GetPath() const {
+  const char *path = reinterpret_cast<const char *>(RetrieveText(0));
+  return PathString(path, strlen(path));
+}
+
+
+shash::Any SqlOwnNestedCatalogListing::GetContentHash() const {
+  const string hash = string(reinterpret_cast<const char *>(RetrieveText(1)));
+  return (hash.empty()) ? shash::Any(shash::kAny) :
+                          shash::MkFromHexPtr(shash::HexPtr(hash),
+                                              shash::kSuffixCatalog);
+}
+
+
+uint64_t SqlOwnNestedCatalogListing::GetSize() const {
   return RetrieveInt64(2);
 }
 

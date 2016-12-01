@@ -57,6 +57,12 @@ DirectoryEntryBase::Differences DirectoryEntry::CompareTo(
   if (IsExternalFile() != other.IsExternalFile()) {
     result |= Difference::kExternalFileFlag;
   }
+  if (IsBindMountpoint() != other.IsBindMountpoint()) {
+    result |= Difference::kBindMountpointFlag;
+  }
+  if (IsHidden() != other.IsHidden()) {
+    result |= Difference::kHiddenFlag;
+  }
 
   return result;
 }

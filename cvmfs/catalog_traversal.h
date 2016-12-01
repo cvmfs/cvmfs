@@ -646,12 +646,12 @@ class CatalogTraversal
     TraversalContext *ctx
   ) {
     typedef typename CatalogTN::NestedCatalogList NestedCatalogList;
-    const NestedCatalogList &nested = job.catalog->ListNestedCatalogs();
+    const NestedCatalogList nested = job.catalog->ListOwnNestedCatalogs();
     typename NestedCatalogList::const_iterator i    = nested.begin();
     typename NestedCatalogList::const_iterator iend = nested.end();
     for (; i != iend; ++i) {
       CatalogTN* parent = (no_close_) ? job.catalog : NULL;
-      const CatalogJob new_job(i->path.ToString(),
+      const CatalogJob new_job(i->mountpoint.ToString(),
                                i->hash,
                                job.tree_level + 1,
                                job.history_depth,

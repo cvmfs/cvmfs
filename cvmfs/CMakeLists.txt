@@ -212,6 +212,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   catalog_sql.cc catalog_sql.h
   catalog_traversal.h
   catalog_rw.cc catalog_rw.h
+  catalog_virtual.cc catalog_virtual.h
   clientctx.cc clientctx.h
   compression.cc compression.h
   directory_entry.cc directory_entry.h
@@ -262,6 +263,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   sqlitemem.cc sqlitemem.h
   statistics.cc statistics.h
   swissknife.cc swissknife.h
+  swissknife_assistant.cc swissknife_assistant.h
   swissknife_check.cc swissknife_check.h
   swissknife_gc.cc swissknife_gc.h
   swissknife_graft.cc swissknife_graft.h

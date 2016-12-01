@@ -36,6 +36,7 @@ set(CVMFS_UNITTEST_FILES
   t_catalog_mgr.cc
   t_catalog_sql.cc
   t_catalog_traversal.cc
+  t_catalog_virtual.cc
   t_chunk_detectors.cc
   t_clientctx.cc
   t_compression.cc
@@ -131,6 +132,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/catalog_mgr_rw.cc ${CVMFS_SOURCE_DIR}/catalog_mgr_rw.h
   ${CVMFS_SOURCE_DIR}/catalog_sql.cc ${CVMFS_SOURCE_DIR}/catalog_sql.h
   ${CVMFS_SOURCE_DIR}/catalog_rw.cc ${CVMFS_SOURCE_DIR}/catalog_rw.h
+  ${CVMFS_SOURCE_DIR}/catalog_virtual.cc ${CVMFS_SOURCE_DIR}/catalog_virtual.h
   ${CVMFS_SOURCE_DIR}/clientctx.cc ${CVMFS_SOURCE_DIR}/clientctx.h
   ${CVMFS_SOURCE_DIR}/compression.cc ${CVMFS_SOURCE_DIR}/compression.h
   ${CVMFS_SOURCE_DIR}/dns.cc ${CVMFS_SOURCE_DIR}/dns.h
@@ -143,7 +145,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/fd_table.h
   ${CVMFS_SOURCE_DIR}/fence.h
   ${CVMFS_SOURCE_DIR}/fetch.cc ${CVMFS_SOURCE_DIR}/fetch.h
-  ${CVMFS_SOURCE_DIR}/file_chunk.cc
+  ${CVMFS_SOURCE_DIR}/file_chunk.cc ${CVMFS_SOURCE_DIR}/file_chunk.h
   ${CVMFS_SOURCE_DIR}/file_processing/async_reader.cc
   ${CVMFS_SOURCE_DIR}/file_processing/chunk.cc
   ${CVMFS_SOURCE_DIR}/file_processing/chunk_detector.cc
@@ -193,6 +195,10 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/sqlitemem.cc ${CVMFS_SOURCE_DIR}/sqlitemem.h
   ${CVMFS_SOURCE_DIR}/sqlitevfs.cc ${CVMFS_SOURCE_DIR}/sqlitevfs.h
   ${CVMFS_SOURCE_DIR}/statistics.cc ${CVMFS_SOURCE_DIR}/statistics.h
+  ${CVMFS_SOURCE_DIR}/swissknife.cc ${CVMFS_SOURCE_DIR}/swissknife.h
+  ${CVMFS_SOURCE_DIR}/swissknife_assistant.cc ${CVMFS_SOURCE_DIR}/swissknife_assistant.h
+  ${CVMFS_SOURCE_DIR}/swissknife_history.cc ${CVMFS_SOURCE_DIR}/swissknife_history.h
+  ${CVMFS_SOURCE_DIR}/swissknife_sync.h
   ${CVMFS_SOURCE_DIR}/tracer.cc ${CVMFS_SOURCE_DIR}/tracer.h
   ${CVMFS_SOURCE_DIR}/uid_map.h
   ${CVMFS_SOURCE_DIR}/upload.cc ${CVMFS_SOURCE_DIR}/upload.h

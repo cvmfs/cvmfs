@@ -149,9 +149,6 @@ class AbstractCatalogManager : public SingleCopy {
   LoadError Remount(const bool dry_run);
   void DetachNested();
 
-  //  Not needed anymore since there are the glue buffers
-  //  bool LookupInode(const inode_t inode, const LookupOptions options,
-  //                   DirectoryEntry *entry);
   bool LookupPath(const PathString &path, const LookupOptions options,
                   DirectoryEntry *entry);
   bool LookupPath(const std::string &path, const LookupOptions options,

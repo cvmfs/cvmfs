@@ -251,10 +251,10 @@ LoadError ClientCatalogManager::LoadCatalogCas(
 
 void ClientCatalogManager::UnloadCatalog(const Catalog *catalog) {
   LogCvmfs(kLogCache, kLogDebug, "unloading catalog %s",
-           catalog->path().c_str());
+           catalog->mountpoint().c_str());
 
   map<PathString, shash::Any>::iterator iter =
-    mounted_catalogs_.find(catalog->path());
+    mounted_catalogs_.find(catalog->mountpoint());
   assert(iter != mounted_catalogs_.end());
   fetcher_->cache_mgr()->quota_mgr()->Unpin(iter->second);
   mounted_catalogs_.erase(iter);
