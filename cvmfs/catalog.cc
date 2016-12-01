@@ -828,16 +828,14 @@ void Catalog::FixTransitionPoint(const shash::Md5 &md5path,
   if (!HasParent())
     return;
 
-  // Normal nested catalog
   if (dirent->IsNestedCatalogRoot()) {
+    // Normal nested catalog
     DirectoryEntry parent_dirent;
     const bool retval = parent_->LookupMd5Path(md5path, &parent_dirent);
     assert(retval);
     dirent->set_inode(parent_dirent.inode());
-  }
-
-  // Bind mountpoint
-  if (md5path == kMd5PathEmpty) {
+  } else if (md5path == kMd5PathEmpty) {
+    // Bind mountpoint
     DirectoryEntry parent_dirent;
     const bool retval = parent_->LookupPath(mountpoint_, &parent_dirent);
     assert(retval);
