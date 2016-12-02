@@ -1,7 +1,7 @@
 %%%-------------------------------------------------------------------
 %%% This file is part of the CernVM File System.
 %%%
-%%% @doc cvmfs_lease_handler
+%%% @doc cvmfs_leases_handler - request handler for the "leases" resource
 %%%
 %%% @end
 %%%-------------------------------------------------------------------
@@ -10,12 +10,40 @@
 
 -export([init/2]).
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Handles requests for the /api/leases resource
+%%
+%% @end
+%%--------------------------------------------------------------------
+%%--------------------------------------------------------------------
+%% @doc
+%% A "GET" request to /api/leases returns 405 - method not allowed
+%% @end
+%%--------------------------------------------------------------------
 init(Req0 = #{method := <<"GET">>}, State) ->
     Req1 = cowboy_req:reply(405,
                            #{<<"content-type">> => <<"application/plain-text">>},
                            <<"">>,
                            Req0),
     {ok, Req1, State};
+%%--------------------------------------------------------------------
+%% @doc
+%% A "POST" request to /api/leases, which can return either 200 OK
+%% or in 400 - Bad Request
+%%
+%% The body of the request should be a JSON payload containing the
+%% "user" and "path" fields
+%%
+%% The body of the reply, for a valid request contains the fields:
+%% "status" - either "ok", "path_busy" or "error"
+%% "session_token" - if status is "ok", this is the session token that
+%%                   should be used for all subsequent requests
+%% "time_remaining" - if status is "path_busy", this represents the
+%%                    time remaining on the current active lease
+%% "reason" - if status is "error", this is a description of the error.
+%% @end
+%%--------------------------------------------------------------------
 init(Req0 = #{method := <<"POST">>}, State) ->
     {ok, Data, Req1} = cvmfs_fe_util:read_body(Req0),
     {Status, Reply, Req2} = case jsx:decode(Data, [return_maps]) of
@@ -30,6 +58,18 @@ init(Req0 = #{method := <<"POST">>}, State) ->
                             jsx:encode(Reply),
                             Req2),
     {ok, ReqF, State};
+%%--------------------------------------------------------------------
+%% @doc
+%% A "DELETE" request to /api/leases/<TOKEN>, which returns 200 OK,
+%%
+%% The body of the reply, for a valid request contains the fields:
+%% "status" - either "ok", or "error"
+%% "reason" - if status is "error", this is a description of the error.
+%%
+%% Making a "DELETE" request to /api/leases (omitting the TOKEN), returns
+%% 400 - Bad Request
+%% @end
+%%--------------------------------------------------------------------
 init(Req0 = #{method := <<"DELETE">>}, State) ->
     case cowboy_req:binding(id, Req0) of
         undefined ->
@@ -54,6 +94,9 @@ init(Req0 = #{method := <<"DELETE">>}, State) ->
                                     Req0),
             {ok, Req1, State}
     end.
+
+
+%% Private functions
 
 
 p_new_lease(User, Path) ->
