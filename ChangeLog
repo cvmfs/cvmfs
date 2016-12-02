@@ -1,4 +1,7 @@
 2.4.0:
+  * Use -Os compiler flag
+  * Use libcurl 7.51.0
+  * Use sqlite 3.15.2
   * Add CVMFS_VIRTUAL_DIR server parameter (CVM-1062)
   * Add catalog support for hidden files and bind mountpoints
   * Add CVMFS_IGNORE_SPECIAL_FILES server parameter
