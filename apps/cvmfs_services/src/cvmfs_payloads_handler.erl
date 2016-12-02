@@ -23,10 +23,14 @@
 %% @end
 %%--------------------------------------------------------------------
 init(Req0 = #{method := <<"GET">>}, State) ->
+    {URI, T0} = cvmfs_fe_util:tick(Req0, micro_seconds),
+
     Req1 = cowboy_req:reply(405,
                            #{<<"content-type">> => <<"application/plain-text">>},
                            <<"">>,
                            Req0),
+
+    cvmfs_fe_util:tock(URI, T0, micro_seconds),
     {ok, Req1, State};
 %% @doc
 %% A "POST" request to /api/payloads, which can return either 200 OK
@@ -41,6 +45,8 @@ init(Req0 = #{method := <<"GET">>}, State) ->
 %% @end
 %%--------------------------------------------------------------------
 init(Req0 = #{method := <<"POST">>}, State) ->
+    {URI, T0} = cvmfs_fe_util:tick(Req0, micro_seconds),
+
     {ok, Data, Req1} = cvmfs_fe_util:read_body(Req0),
     {Status, Reply, Req2} = case jsx:decode(Data, [return_maps]) of
                                 #{<<"user">> := User,
@@ -57,6 +63,8 @@ init(Req0 = #{method := <<"POST">>}, State) ->
                             #{<<"content-type">> => <<"application/json">>},
                             jsx:encode(Reply),
                             Req2),
+
+    cvmfs_fe_util:tock(URI, T0, micro_seconds),
     {ok, ReqF, State}.
 
 

@@ -19,6 +19,8 @@
 %% @end
 %%--------------------------------------------------------------------
 init(Req0, State) ->
+    {URI, T0} = cvmfs_fe_util:tick(Req0, micro_seconds),
+
     Banner = <<"You are in an open field on the west side of a white house with a boarded front door.">>,
     API = #{<<"banner">> => Banner,
             <<"resources">> => [<<"users">>, <<"repos">>, <<"leases">>, <<"payloads">>]},
@@ -26,5 +28,7 @@ init(Req0, State) ->
                            #{<<"content-type">> => <<"text/plain">>},
                            jsx:encode(API),
                            Req0),
+
+    cvmfs_fe_util:tock(URI, T0, micro_seconds),
     {ok, Req, State}.
 
