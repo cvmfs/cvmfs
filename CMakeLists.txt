@@ -276,7 +276,27 @@ include (FindPythonModule)
 #
 # flags in CMAKE_C**_FLAGS are always passed to the compiler
 #
-set (CVMFS_BASE_C_FLAGS "-Os -g -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fvisibility=hidden -Wall")
+set (CVMFS_OPT_FLAGS "-Os")
+if (CMAKE_COMPILER_IS_GNUCC)
+  message (STATUS "checking gcc version...")
+  execute_process (
+    COMMAND ${CMAKE_C_COMPILER} -v
+    OUTPUT_VARIABLE CVMFS_GCC_VERSION
+    ERROR_VARIABLE  CVMFS_GCC_VERSION
+  )
+  STRING(REGEX REPLACE ".*([0-9]+)\\.[0-9]+\\.[0-9]+.*" "\\1" CVMFS_GCC_MAJOR "${CVMFS_GCC_VERSION}")
+  STRING(REGEX REPLACE ".*[0-9]+\\.([0-9]+)\\.[0-9]+.*" "\\1" CVMFS_GCC_MINOR "${CVMFS_GCC_VERSION}")
+  if (${CVMFS_GCC_MAJOR} LESS 4)
+    message (FATAL_ERROR "GCC < 4.1 unsupported")
+  endif (${CVMFS_GCC_MAJOR} LESS 4)
+  if (${CVMFS_GCC_MAJOR} EQUAL 4)
+    if (${CVMFS_GCC_MINOR} LESS 2)
+      set (CVMFS_OPT_FLAGS "-O1")
+    endif (${CVMFS_GCC_MINOR} LESS 2)
+  endif (${CVMFS_GCC_MAJOR} EQUAL 4)
+endif (CMAKE_COMPILER_IS_GNUCC)
+message (STATUS "using compiler opt flag ${CVMFS_OPT_FLAGS}")
+set (CVMFS_BASE_C_FLAGS "${CVMFS_OPT_FLAGS} -g -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fvisibility=hidden -Wall")
 set (CVMFS_BASE_CXX_FLAGS "${CVMFS_BASE_C_FLAGS} -fno-exceptions")
 if (NOT USING_CLANG)
   set (CVMFS_BASE_C_FLAGS "${CVMFS_BASE_C_FLAGS} -fno-optimize-sibling-calls")
