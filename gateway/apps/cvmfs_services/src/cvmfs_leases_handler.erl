@@ -1,7 +1,7 @@
 %%%-------------------------------------------------------------------
 %%% This file is part of the CernVM File System.
 %%%
-%%% @doc cvmfs_lease_handler
+%%% @doc cvmfs_leases_handler - request handler for the "leases" resource
 %%%
 %%% @end
 %%%-------------------------------------------------------------------
@@ -10,64 +10,107 @@
 
 -export([init/2]).
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Handles requests for the /api/leases resource
+%%
+%% @end
+%%--------------------------------------------------------------------
+%%--------------------------------------------------------------------
+%% @doc
+%% A "GET" request to /api/leases returns 405 - method not allowed
+%% @end
+%%--------------------------------------------------------------------
 init(Req0 = #{method := <<"GET">>}, State) ->
+    {URI, T0} = cvmfs_fe_util:tick(Req0, micro_seconds),
+
     Req1 = cowboy_req:reply(405,
-                           #{<<"content-type">> => <<"application/json">>},
-                           jsx:encode(#{}),
+                           #{<<"content-type">> => <<"application/plain-text">>},
+                           <<"">>,
                            Req0),
+
+    cvmfs_fe_util:tock(URI, T0, micro_seconds),
     {ok, Req1, State};
-init(Req0 = #{method := <<"PUT">>}, State) ->
-    {Status, Reply, Req2} = case p_read_body(Req0) of
-                                {ok, Data, Req1} ->
-                                    case jsx:decode(Data, [return_maps]) of
-                                        #{<<"user">> := User, <<"path">> := Path} ->
-                                            Rep = p_new_lease(User, Path),
-                                            {200, Rep, Req1};
-                                        _ ->
-                                            {400, #{}, Req1}
-                                    end;
+%%--------------------------------------------------------------------
+%% @doc
+%% A "POST" request to /api/leases, which can return either 200 OK
+%% or in 400 - Bad Request
+%%
+%% The body of the request should be a JSON payload containing the
+%% "user" and "path" fields
+%%
+%% The body of the reply, for a valid request contains the fields:
+%% "status" - either "ok", "path_busy" or "error"
+%% "session_token" - if status is "ok", this is the session token that
+%%                   should be used for all subsequent requests
+%% "time_remaining" - if status is "path_busy", this represents the
+%%                    time remaining on the current active lease
+%% "reason" - if status is "error", this is a description of the error.
+%% @end
+%%--------------------------------------------------------------------
+init(Req0 = #{method := <<"POST">>}, State) ->
+    {URI, T0} = cvmfs_fe_util:tick(Req0, micro_seconds),
+
+    {ok, Data, Req1} = cvmfs_fe_util:read_body(Req0),
+    {Status, Reply, Req2} = case jsx:decode(Data, [return_maps]) of
+                                #{<<"user">> := User, <<"path">> := Path} ->
+                                    Rep = p_new_lease(User, Path),
+                                    {200, Rep, Req1};
                                 _ ->
-                                    {400, #{}, Req0}
+                                    {400, #{}, Req1}
                             end,
     ReqF = cowboy_req:reply(Status,
                             #{<<"content-type">> => <<"application/json">>},
                             jsx:encode(Reply),
                             Req2),
+
+    cvmfs_fe_util:tock(URI, T0, micro_seconds),
     {ok, ReqF, State};
+%%--------------------------------------------------------------------
+%% @doc
+%% A "DELETE" request to /api/leases/<TOKEN>, which returns 200 OK,
+%%
+%% The body of the reply, for a valid request contains the fields:
+%% "status" - either "ok", or "error"
+%% "reason" - if status is "error", this is a description of the error.
+%%
+%% Making a "DELETE" request to /api/leases (omitting the TOKEN), returns
+%% 400 - Bad Request
+%% @end
+%%--------------------------------------------------------------------
 init(Req0 = #{method := <<"DELETE">>}, State) ->
-    case cowboy_req:binding(id, Req0) of
-        undefined ->
-            Reply = #{<<"status">> => <<"error">>,
-                      <<"reason">> => <<"BAD Request. Missing token. Call /api/leases/<TOKEN>">>},
-            Req1 = cowboy_req:reply(400,
-                                    #{<<"content-type">> => <<"application/json">>},
-                                    jsx:encode(Reply),
-                                    Req0),
-            {ok, Req1, State};
-        Token ->
-            Reply = case cvmfs_be:end_lease(Token) of
-                        ok ->
-                            #{<<"status">> => <<"ok">>};
-                        {error, invalid_macaroon} ->
-                            #{<<"status">> => <<"error">>,
-                              <<"reason">> => <<"invalid_token">>}
-                    end,
-            Req1 = cowboy_req:reply(200,
-                                    #{<<"content-type">> => <<"application/json">>},
-                                    jsx:encode(Reply),
-                                    Req0),
-            {ok, Req1, State}
-    end.
+    {URI, T0} = cvmfs_fe_util:tick(Req0, micro_seconds),
+
+    {ok, ReqF, State} = case cowboy_req:binding(id, Req0) of
+                            undefined ->
+                                Reply = #{<<"status">> => <<"error">>,
+                                          <<"reason">> => <<"Missing token. Call /api/leases/<TOKEN>">>},
+                                Req1 = cowboy_req:reply(400,
+                                                        #{<<"content-type">> => <<"application/json">>},
+                                                        jsx:encode(Reply),
+                                                        Req0),
+                                    {ok, Req1, State};
+                            Token ->
+                                Reply = case cvmfs_be:end_lease(Token) of
+                                            ok ->
+                                                #{<<"status">> => <<"ok">>};
+                                            {error, invalid_macaroon} ->
+                                                #{<<"status">> => <<"error">>,
+                                                  <<"reason">> => <<"invalid_token">>}
+                                        end,
+                                Req1 = cowboy_req:reply(200,
+                                                        #{<<"content-type">> => <<"application/json">>},
+                                                        jsx:encode(Reply),
+                                                        Req0),
+                                {ok, Req1, State}
+                        end,
+
+    cvmfs_fe_util:tock(URI, T0, micro_seconds),
+    {ok, ReqF, State}.
 
 
-%%% Private functions
-p_read_body(Req) ->
-    case cowboy_req:has_body(Req) of
-        true ->
-            cowboy_req:read_body(Req);
-        false ->
-            {}
-    end.
+%% Private functions
+
 
 p_new_lease(User, Path) ->
     case cvmfs_be:new_lease(User, Path) of
