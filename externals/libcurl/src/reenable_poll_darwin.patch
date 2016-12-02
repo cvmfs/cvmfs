@@ -1,0 +1,11 @@
+--- configure.original	2016-12-01 16:30:17.381179761 +0100
++++ configure	2016-12-01 16:30:25.354513436 +0100
+@@ -35824,7 +35824,7 @@
+   tst_allow_poll="unknown"
+   #
+   case $host_os in
+-    darwin*|interix*)
++    interix*)
+                                           curl_disallow_poll="yes"
+       tst_compi_poll="no"
+       ;;
