@@ -15,7 +15,7 @@
 %% API
 -export([start_link/1
         ,new_lease/2, end_lease/1
-        ,submit_payload/4]).
+        ,submit_payload/3]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -92,17 +92,15 @@ end_lease(LeaseToken) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec submit_payload(User, LeaseToken, Payload, Final) ->
+-spec submit_payload(User, LeaseToken, Payload) ->
                             submit_payload_result()
                                 when User :: binary(),
                                      LeaseToken :: binary(),
-                                     Payload :: binary(),
-                                     Final :: boolean().
-submit_payload(User, LeaseToken, Payload, Final) ->
+                                     Payload :: binary().
+submit_payload(User, LeaseToken, Payload) ->
     gen_server:call(?MODULE, {be_req, submit_payload, {User,
                                                        LeaseToken,
-                                                       Payload,
-                                                       Final}}).
+                                                       Payload}}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -141,10 +139,10 @@ handle_call({be_req, end_lease, LeaseToken}, _From, State) ->
     Reply = p_end_lease(LeaseToken),
     lager:info("Request received: {end_lease, ~p} -> Reply: ~p", [LeaseToken, Reply]),
     {reply, Reply, State};
-handle_call({be_req, submit_payload, {User, LeaseToken, Payload, Final}}, _From, State) ->
-    Reply = p_submit_payload(User, LeaseToken, Payload, Final),
-    lager:info("Request received: {submit_payload, {~p, ~p, ~p, ~p}} -> Reply: ~p",
-               [User, LeaseToken, Payload, Final, Reply]),
+handle_call({be_req, submit_payload, {User, LeaseToken, Payload}}, _From, State) ->
+    Reply = p_submit_payload(User, LeaseToken, Payload),
+    lager:info("Request received: {submit_payload, {~p, ~p, ~p}} -> Reply: ~p",
+               [User, LeaseToken, Payload, Reply]),
     {reply, Reply, State}.
 
 %%--------------------------------------------------------------------
@@ -233,24 +231,16 @@ p_end_lease(LeaseToken) ->
             {error, invalid_macaroon}
     end.
 
--spec p_submit_payload(User, LeaseToken, Payload, Final) ->
+-spec p_submit_payload(User, LeaseToken, Payload) ->
                               submit_payload_result()
                                   when User :: binary(),
                                        LeaseToken :: binary(),
-                                       Payload :: binary(),
-                                       Final :: boolean().
-p_submit_payload(User, LeaseToken, Payload, Final) ->
+                                       Payload :: binary().
+p_submit_payload(User, LeaseToken, Payload) ->
     case p_check_payload(User, LeaseToken, Payload) of
-        {ok, Public} ->
+        {ok, _Public} ->
             %% TODO: submit payload to GW
-
-            case Final of
-                true ->
-                    cvmfs_lease:end_lease(Public),
-                    {ok, payload_added, lease_ended};
-                false ->
-                    {ok, payload_added}
-            end;
+            {ok, payload_added};
         {error, {unverified_caveat, <<"time < ", _/binary>>}} ->
             {error, lease_expired};
         {error, {unverified_caveat, <<"user = ", _/binary>>}} ->

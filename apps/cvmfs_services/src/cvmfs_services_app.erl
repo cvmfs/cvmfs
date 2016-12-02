@@ -23,7 +23,7 @@ start(_StartType, _StartArgs) ->
                    maps:from_list(VarList);
                {ok, RepoConfigMap} ->
                    RepoConfigMap;
-               _ ->
+               undefined ->
                    #{repos => [], acl => []}
            end,
     {ok, Services} = application:get_env(enabled_services),
