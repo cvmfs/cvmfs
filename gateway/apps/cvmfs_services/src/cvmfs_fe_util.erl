@@ -8,7 +8,9 @@
 
 -module(cvmfs_fe_util).
 
--export([read_body/1]).
+-compile([{parse_transform, lager_transform}]).
+
+-export([read_body/1, tick/2, tock/3]).
 
 read_body(Req0) ->
     read_body_rec(Req0, <<"">>).
@@ -23,3 +25,11 @@ read_body_rec(Req0, Acc) ->
             read_body_rec(Req1, <<Data:DataSize/binary,Acc/binary>>)
     end.
 
+tick(Req, Unit) ->
+    T = erlang:monotonic_time(Unit),
+    URI = cowboy_req:uri(Req),
+    {URI, T}.
+
+tock(URI, T0, Unit) ->
+    T1 = erlang:monotonic_time(Unit),
+    lager:info("HTTP request received: ~p ; time to process = ~p usec", [URI, T1 - T0]).

@@ -18,10 +18,14 @@
 %% @end
 %%--------------------------------------------------------------------
 init(Req0, State) ->
+    {URI, T0} = cvmfs_fe_util:tick(Req0, micro_seconds),
+
     Users = cvmfs_auth:get_users(),
     Req = cowboy_req:reply(200,
                            #{<<"content-type">> => <<"application/json">>},
                            jsx:encode(#{<<"users">> => Users}),
                            Req0),
+
+    cvmfs_fe_util:tock(URI, T0, micro_seconds),
     {ok, Req, State}.
 

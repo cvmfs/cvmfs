@@ -22,10 +22,14 @@
 %% @end
 %%--------------------------------------------------------------------
 init(Req0 = #{method := <<"GET">>}, State) ->
+    {URI, T0} = cvmfs_fe_util:tick(Req0, micro_seconds),
+
     Req1 = cowboy_req:reply(405,
                            #{<<"content-type">> => <<"application/plain-text">>},
                            <<"">>,
                            Req0),
+
+    cvmfs_fe_util:tock(URI, T0, micro_seconds),
     {ok, Req1, State};
 %%--------------------------------------------------------------------
 %% @doc
@@ -45,6 +49,8 @@ init(Req0 = #{method := <<"GET">>}, State) ->
 %% @end
 %%--------------------------------------------------------------------
 init(Req0 = #{method := <<"POST">>}, State) ->
+    {URI, T0} = cvmfs_fe_util:tick(Req0, micro_seconds),
+
     {ok, Data, Req1} = cvmfs_fe_util:read_body(Req0),
     {Status, Reply, Req2} = case jsx:decode(Data, [return_maps]) of
                                 #{<<"user">> := User, <<"path">> := Path} ->
@@ -57,6 +63,8 @@ init(Req0 = #{method := <<"POST">>}, State) ->
                             #{<<"content-type">> => <<"application/json">>},
                             jsx:encode(Reply),
                             Req2),
+
+    cvmfs_fe_util:tock(URI, T0, micro_seconds),
     {ok, ReqF, State};
 %%--------------------------------------------------------------------
 %% @doc
@@ -71,29 +79,34 @@ init(Req0 = #{method := <<"POST">>}, State) ->
 %% @end
 %%--------------------------------------------------------------------
 init(Req0 = #{method := <<"DELETE">>}, State) ->
-    case cowboy_req:binding(id, Req0) of
-        undefined ->
-            Reply = #{<<"status">> => <<"error">>,
-                      <<"reason">> => <<"BAD Request. Missing token. Call /api/leases/<TOKEN>">>},
-            Req1 = cowboy_req:reply(400,
-                                    #{<<"content-type">> => <<"application/json">>},
-                                    jsx:encode(Reply),
-                                    Req0),
-            {ok, Req1, State};
-        Token ->
-            Reply = case cvmfs_be:end_lease(Token) of
-                        ok ->
-                            #{<<"status">> => <<"ok">>};
-                        {error, invalid_macaroon} ->
-                            #{<<"status">> => <<"error">>,
-                              <<"reason">> => <<"invalid_token">>}
-                    end,
-            Req1 = cowboy_req:reply(200,
-                                    #{<<"content-type">> => <<"application/json">>},
-                                    jsx:encode(Reply),
-                                    Req0),
-            {ok, Req1, State}
-    end.
+    {URI, T0} = cvmfs_fe_util:tick(Req0, micro_seconds),
+
+    {ok, ReqF, State} = case cowboy_req:binding(id, Req0) of
+                            undefined ->
+                                Reply = #{<<"status">> => <<"error">>,
+                                          <<"reason">> => <<"Missing token. Call /api/leases/<TOKEN>">>},
+                                Req1 = cowboy_req:reply(400,
+                                                        #{<<"content-type">> => <<"application/json">>},
+                                                        jsx:encode(Reply),
+                                                        Req0),
+                                    {ok, Req1, State};
+                            Token ->
+                                Reply = case cvmfs_be:end_lease(Token) of
+                                            ok ->
+                                                #{<<"status">> => <<"ok">>};
+                                            {error, invalid_macaroon} ->
+                                                #{<<"status">> => <<"error">>,
+                                                  <<"reason">> => <<"invalid_token">>}
+                                        end,
+                                Req1 = cowboy_req:reply(200,
+                                                        #{<<"content-type">> => <<"application/json">>},
+                                                        jsx:encode(Reply),
+                                                        Req0),
+                                {ok, Req1, State}
+                        end,
+
+    cvmfs_fe_util:tock(URI, T0, micro_seconds),
+    {ok, ReqF, State}.
 
 
 %% Private functions
