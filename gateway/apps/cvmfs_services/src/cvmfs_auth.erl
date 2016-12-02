@@ -244,11 +244,11 @@ p_get_user_paths(User) ->
                                                     Repo <- Repos,
                                                     #repo{path = Path} <- mnesia:read(repo, Repo)]}
                               end,
-                         {atomic, Result} = mnesia:sync_transaction(T2),
+                         {atomic, Result} = mnesia:transaction(T2),
                          Result
                  end
          end,
-    {atomic, Result} = mnesia:sync_transaction(T1),
+    {atomic, Result} = mnesia:transaction(T1),
     Result.
 
 
@@ -275,7 +275,7 @@ p_get_users() ->
     T = fun() ->
                 mnesia:foldl(fun(#acl{u_id = User}, Acc) -> [User | Acc] end, [], acl)
         end,
-    {atomic, Result} = mnesia:sync_transaction(T),
+    {atomic, Result} = mnesia:transaction(T),
     Result.
 
 
@@ -302,7 +302,7 @@ p_get_repos() ->
     T = fun() ->
                 mnesia:foldl(fun(#repo{r_id = Repo}, Acc) -> [Repo | Acc] end, [], repo)
         end,
-    {atomic, Result} = mnesia:sync_transaction(T),
+    {atomic, Result} = mnesia:transaction(T),
     Result.
 
 

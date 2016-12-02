@@ -329,7 +329,7 @@ p_get_leases() ->
     T = fun() ->
                 mnesia:foldl(fun(Lease, Acc) -> [Lease | Acc] end, [], lease)
         end,
-    {atomic, Result} = mnesia:sync_transaction(T),
+    {atomic, Result} = mnesia:transaction(T),
     Result.
 
 
