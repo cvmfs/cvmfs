@@ -18,11 +18,14 @@ def do_request(url, method, body):
         pass
 
 def create_and_delete_session():
-    rep1 = do_request('/api/leases', 'POST', {'user' : 'user1', 'path' : '/path/to/repo/1'})
-    print 'New session: ', rep1
-    token = rep1['session_token']
-    rep2 = do_request('/api/leases/' + token, 'DELETE', {})
-    print 'End session: ', rep2
+    try:
+        rep1 = do_request('/api/leases', 'POST', {'user' : 'user1', 'path' : '/path/to/repo/1'})
+        print 'New session: ', rep1
+        token = rep1['session_token']
+        rep2 = do_request('/api/leases/' + token, 'DELETE', {})
+        print 'End session: ', rep2
+    except Exception:
+        pass
 
 def main():
     base_res = '/api/'
