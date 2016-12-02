@@ -159,7 +159,7 @@ normal_payload_submission(Config) ->
     % Submit payload
     Payload = <<"IAMAPAYLOAD">>,
     RequestBody2 = jsx:encode(#{<<"user">> => <<"user1">>, <<"session_token">> => Token,
-                                <<"payload">> => Payload, <<"final">> => <<"false">>}),
+                                <<"payload">> => Payload}),
     RequestHeaders2 = p_make_headers(RequestBody2),
     {ok, ReplyBody2} = p_post(conn_pid(Config), "/api/payloads", RequestHeaders2, RequestBody2),
     #{<<"status">> := <<"ok">>} = jsx:decode(ReplyBody2, [return_maps]),

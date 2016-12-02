@@ -33,7 +33,7 @@ init(Req0 = #{method := <<"GET">>}, State) ->
 %% or in 400 - Bad Request
 %%
 %% The body of the request should be a JSON payload containing the
-%% "user", "session_token", "payload" and "final" fields
+%% "user", "session_token" and "payload" fields
 %%
 %% The body of the reply, for a valid request contains the fields:
 %% "status" - either "ok", "error"
@@ -45,12 +45,10 @@ init(Req0 = #{method := <<"POST">>}, State) ->
     {Status, Reply, Req2} = case jsx:decode(Data, [return_maps]) of
                                 #{<<"user">> := User,
                                   <<"session_token">> := Token,
-                                  <<"payload">> := Payload,
-                                  <<"final">> := Final} ->
+                                  <<"payload">> := Payload} ->
                                     Rep = p_submit_payload(User,
                                                            Token,
-                                                           Payload,
-                                                           binary_to_atom(Final, latin1)),
+                                                           Payload),
                                     {200, Rep, Req1};
                                 _ ->
                                     {400, #{}, Req1}
@@ -65,11 +63,9 @@ init(Req0 = #{method := <<"POST">>}, State) ->
 %% Private functions
 
 
-p_submit_payload(User, Token, Payload, Final) ->
-    case cvmfs_be:submit_payload(User, Token, Payload, Final) of
+p_submit_payload(User, Token, Payload) ->
+    case cvmfs_be:submit_payload(User, Token, Payload) of
         {ok, payload_added} ->
-            #{<<"status">> => <<"ok">>};
-        {ok, payload_added, lease_ended} ->
             #{<<"status">> => <<"ok">>};
         {error, Reason} ->
             #{<<"status">> => <<"error">>, <<"reason">> => atom_to_binary(Reason, latin1)}
