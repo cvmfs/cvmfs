@@ -18,7 +18,7 @@ def do_request(url, method, body):
         pass
 
 def create_and_delete_session():
-    rep1 = do_request('/api/leases', 'POST', {'userr' : 'user1', 'path' : '/path/to/repo/1'})
+    rep1 = do_request('/api/leases', 'POST', {'user' : 'user1', 'path' : '/path/to/repo/1'})
     print 'New session: ', rep1
     token = rep1['session_token']
     rep2 = do_request('/api/leases/' + token, 'DELETE', {})
@@ -37,9 +37,9 @@ def main():
 
     create_and_delete_session()
 
-    # for (u, m, b) in url_resp:
-    #     rep = do_request(u, m, b)
-    #     print rep
+    for (u, m, b) in url_resp:
+        rep = do_request(u, m, b)
+        print rep
 
 
 if __name__ == '__main__':
