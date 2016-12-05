@@ -15,6 +15,7 @@
 #include <cassert>
 #include <map>
 #include <queue>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -237,7 +238,8 @@ bool CommandCheck::InspectReflog(
  */
 bool CommandCheck::Find(const catalog::Catalog *catalog,
                         const PathString &path,
-                        catalog::DeltaCounters *computed_counters)
+                        catalog::DeltaCounters *computed_counters,
+                        set<PathString> *bind_mountpoints)
 {
   catalog::DirectoryEntryList entries;
   catalog::DirectoryEntry this_directory;
@@ -276,7 +278,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
 
     // Catalog markers should indicate nested catalogs
     if (entries[i].name() == NameString(string(".cvmfscatalog"))) {
-      if (catalog->path() != path) {
+      if (catalog->mountpoint() != path) {
         LogCvmfs(kLogCvmfs, kLogStderr,
                  "found abandoned nested catalog marker at %s",
                  full_path.c_str());
@@ -345,12 +347,16 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
                  full_path.c_str());
         retval = false;
       }
-      if (entries[i].IsNestedCatalogMountpoint()) {
+      if (entries[i].IsNestedCatalogMountpoint() ||
+          entries[i].IsBindMountpoint())
+      {
         // Find transition point
-        computed_counters->self.nested_catalogs++;
+        if (entries[i].IsNestedCatalogMountpoint())
+          computed_counters->self.nested_catalogs++;
         shash::Any tmp;
         uint64_t tmp2;
-        if (!catalog->FindNested(full_path, &tmp, &tmp2)) {
+        PathString mountpoint(full_path);
+        if (!catalog->FindNested(mountpoint, &tmp, &tmp2)) {
           LogCvmfs(kLogCvmfs, kLogStderr, "nested catalog at %s not registered",
                    full_path.c_str());
           retval = false;
@@ -365,9 +371,19 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
                    full_path.c_str());
           retval = false;
         }
+
+        if (entries[i].IsBindMountpoint()) {
+          bind_mountpoints->insert(full_path);
+          if (entries[i].IsNestedCatalogMountpoint()) {
+            LogCvmfs(kLogCvmfs, kLogStderr,
+                     "bind mountpoint and nested mountpoint mutually exclusive"
+                     " at %s.", full_path.c_str());
+            retval = false;
+          }
+        }
       } else {
         // Recurse
-        if (!Find(catalog, full_path, computed_counters))
+        if (!Find(catalog, full_path, computed_counters, bind_mountpoints))
           retval = false;
       }
     } else if (entries[i].IsLink()) {
@@ -468,7 +484,9 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
   }  // Loop through entries
 
   // Check if nested catalog marker has been found
-  if (!path.IsEmpty() && (path == catalog->path()) && !found_nested_marker) {
+  if (!path.IsEmpty() && (path == catalog->mountpoint()) &&
+      !found_nested_marker)
+  {
     LogCvmfs(kLogCvmfs, kLogStderr, "nested catalog without marker at %s",
              path.c_str());
     retval = false;
@@ -664,7 +682,9 @@ bool CommandCheck::InspectTree(const string                  &path,
   }
 
   // Traverse the catalog
-  if (!Find(catalog, PathString(path.data(), path.length()), computed_counters))
+  set<PathString> bind_mountpoints;
+  if (!Find(catalog, PathString(path.data(), path.length()),
+            computed_counters, &bind_mountpoints))
   {
     retval = false;
   }
@@ -682,26 +702,52 @@ bool CommandCheck::InspectTree(const string                  &path,
   // Recurse into nested catalogs
   const catalog::Catalog::NestedCatalogList &nested_catalogs =
     catalog->ListNestedCatalogs();
-  if (nested_catalogs.size() !=
+  const catalog::Catalog::NestedCatalogList own_nested_catalogs =
+    catalog->ListOwnNestedCatalogs();
+  if (own_nested_catalogs.size() !=
       static_cast<uint64_t>(computed_counters->self.nested_catalogs))
   {
     LogCvmfs(kLogCvmfs, kLogStderr, "number of nested catalogs does not match;"
              " expected %lu, got %lu", computed_counters->self.nested_catalogs,
-             nested_catalogs.size());
+             own_nested_catalogs.size());
     retval = false;
   }
+  set<PathString> nested_catalog_paths;
   for (catalog::Catalog::NestedCatalogList::const_iterator i =
        nested_catalogs.begin(), iEnd = nested_catalogs.end(); i != iEnd; ++i)
   {
+    nested_catalog_paths.insert(i->mountpoint);
+  }
+  if (nested_catalog_paths.size() != nested_catalogs.size()) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "duplicates among nested catalogs and bind mountpoints");
+    retval = false;
+  }
+
+  for (catalog::Catalog::NestedCatalogList::const_iterator i =
+       nested_catalogs.begin(), iEnd = nested_catalogs.end(); i != iEnd; ++i)
+  {
+    if (bind_mountpoints.find(i->mountpoint) != bind_mountpoints.end()) {
+      catalog::DirectoryEntry bind_mountpoint;
+      PathString mountpoint("/" + i->mountpoint.ToString().substr(1));
+      if (!catalog->LookupPath(mountpoint, &bind_mountpoint)) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "failed to lookup bind mountpoint %s",
+                 mountpoint.c_str());
+        retval = false;
+      }
+      LogCvmfs(kLogCvmfs, kLogDebug, "skipping bind mountpoint %s",
+               i->mountpoint.c_str());
+      continue;
+    }
     catalog::DirectoryEntry nested_transition_point;
-    if (!catalog->LookupPath(i->path, &nested_transition_point)) {
+    if (!catalog->LookupPath(i->mountpoint, &nested_transition_point)) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to lookup transition point %s",
-               i->path.c_str());
+               i->mountpoint.c_str());
       retval = false;
     } else {
       catalog::DeltaCounters nested_counters;
       const bool is_nested = true;
-      if (!InspectTree(i->path.ToString(), i->hash, i->size, is_nested,
+      if (!InspectTree(i->mountpoint.ToString(), i->hash, i->size, is_nested,
                        &nested_transition_point, &nested_counters))
         retval = false;
       nested_counters.PopulateToParent(computed_counters);

@@ -38,6 +38,7 @@ class T_Catalog : public ::testing::Test {
     AddEntry(writable_root_catalog, "foo", "", S_IFREG,
              "988881adc9fc3655077dc2d4d757d480b5ea0e11", "", true);
     writable_root_catalog->AddFileChunk("/foo", file_chunk);
+    AddEntry(writable_root_catalog, "hidden", "", S_IFDIR, "", "", false, true);
     AddEntry(writable_root_catalog, "dir", "", S_IFDIR, "");
     AddEntry(writable_root_catalog, "dir", "/dir", S_IFDIR, "");
     AddEntry(writable_root_catalog, "folder", "/dir", S_IFDIR, "");
@@ -100,7 +101,8 @@ class T_Catalog : public ::testing::Test {
                 unsigned mode,  // S_IFREG, S_IFDIR
                 string checksum,
                 string symlink = "",
-                bool   is_chunked_file = false) {
+                bool   is_chunked_file = false,
+                bool   is_hidden       = false) {
     catalog::DirectoryEntryTestFactory::Metadata metadata;
     metadata.name       = name;
     metadata.mode       = mode | S_IRWXU;  // file permissions/mode
@@ -112,6 +114,7 @@ class T_Catalog : public ::testing::Test {
     metadata.linkcount  = 1;
     metadata.has_xattrs = false;
     metadata.checksum   = shash::MkFromHexPtr(shash::HexPtr(checksum));
+    metadata.is_hidden  = is_hidden;
     string complete_name = parent_path + "/" + name;
     DirectoryEntry de(DirectoryEntryTestFactory::Make(metadata));
     XattrList xattrlist;
@@ -135,6 +138,62 @@ class T_Catalog : public ::testing::Test {
 };
 
 
+TEST_F(T_Catalog, NormalizePath) {
+  catalog::Catalog c1(PathString(""), shash::Any(), NULL, false);
+  EXPECT_TRUE(c1.is_regular_mountpoint_);
+  EXPECT_EQ(shash::Md5(shash::AsciiPtr("")),
+            c1.NormalizePath(PathString("")));
+  EXPECT_EQ(PathString(""), c1.NormalizePath2(PathString("")));
+  EXPECT_EQ(shash::Md5(shash::AsciiPtr("/foo/bar")),
+            c1.NormalizePath(PathString("/foo/bar")));
+  EXPECT_EQ(PathString("/foo/bar"), c1.NormalizePath2(PathString("/foo/bar")));
+
+  catalog::Catalog c2(PathString("/.cvmfs"), shash::Any(), NULL, false);
+  EXPECT_FALSE(c2.is_regular_mountpoint_);
+  EXPECT_EQ(PathString(""), c2.root_prefix_);
+  EXPECT_EQ(shash::Md5(shash::AsciiPtr("")),
+            c2.NormalizePath(PathString("/.cvmfs")));
+  EXPECT_EQ(PathString(""), c2.NormalizePath2(PathString("/.cvmfs")));
+  EXPECT_EQ(shash::Md5(shash::AsciiPtr("/foo/bar")),
+            c2.NormalizePath(PathString("/.cvmfs/foo/bar")));
+  EXPECT_EQ(PathString("/foo/bar"),
+            c2.NormalizePath2(PathString("/.cvmfs/foo/bar")));
+
+  catalog::Catalog c3(PathString("/.cvmfs/nested"), shash::Any(), NULL, false);
+  EXPECT_FALSE(c3.is_regular_mountpoint_);
+  c3.root_prefix_ = PathString("/nested");
+  EXPECT_EQ(shash::Md5(shash::AsciiPtr("/nested")),
+            c3.NormalizePath(PathString("/.cvmfs/nested")));
+  EXPECT_EQ(PathString("/nested"),
+            c3.NormalizePath2(PathString("/.cvmfs/nested")));
+  EXPECT_EQ(shash::Md5(shash::AsciiPtr("/nested/foo/bar")),
+            c3.NormalizePath(PathString("/.cvmfs/nested/foo/bar")));
+  EXPECT_EQ(PathString("/nested/foo/bar"),
+            c3.NormalizePath2(PathString("/.cvmfs/nested/foo/bar")));
+}
+
+
+TEST_F(T_Catalog, PlantPath) {
+  catalog::Catalog c1(PathString(""), shash::Any(), NULL, false);
+  EXPECT_TRUE(c1.is_regular_mountpoint_);
+  EXPECT_EQ(PathString(""), c1.PlantPath(PathString("")));
+  EXPECT_EQ(PathString("/foo/bar"), c1.PlantPath(PathString("/foo/bar")));
+
+  catalog::Catalog c2(PathString("/.cvmfs"), shash::Any(), NULL, false);
+  EXPECT_EQ(PathString(""), c2.root_prefix_);
+  EXPECT_FALSE(c2.is_regular_mountpoint_);
+  EXPECT_EQ(PathString("/.cvmfs"), c2.PlantPath(PathString("")));
+  EXPECT_EQ(PathString("/.cvmfs/nested"), c2.PlantPath(PathString("/nested")));
+
+  catalog::Catalog c3(PathString("/.cvmfs/nested"), shash::Any(), NULL, false);
+  EXPECT_FALSE(c3.is_regular_mountpoint_);
+  c3.root_prefix_ = PathString("/nested");
+  EXPECT_EQ(PathString("/.cvmfs/nested"), c3.PlantPath(PathString("/nested")));
+  EXPECT_EQ(PathString("/.cvmfs/nested/foo/bar"),
+            c3.PlantPath(PathString("/nested/foo/bar")));
+}
+
+
 TEST_F(T_Catalog, Attach) {
   catalog = catalog::Catalog::AttachFreely("",
                                            catalog_db_root,
@@ -153,8 +212,8 @@ TEST_F(T_Catalog, Attach) {
   EXPECT_EQ(shash::Any(), catalog->GetPreviousRevision());
   EXPECT_EQ(catalog_db_root, catalog->database_path());
   EXPECT_NE(0u, catalog->GetTTL());
-  EXPECT_EQ(7u, catalog->GetNumEntries());
-  EXPECT_EQ(7u, catalog->max_row_id());
+  EXPECT_EQ(8u, catalog->GetNumEntries());
+  EXPECT_EQ(8u, catalog->max_row_id());
 
   EXPECT_FALSE(catalog->OwnsDatabaseFile());
   catalog->TakeDatabaseFileOwnership();
@@ -201,6 +260,7 @@ TEST_F(T_Catalog, Lookup) {
   catalog = new Catalog(PathString(""), shash::Any(), NULL);
   PathString fake_path("/fakepath/fakefile");
   PathString path("/dir/dir");
+  PathString hidden_path("/hidden");
   PathString link_path("/dir/dir/link");
   DirectoryEntry dirent;
   shash::Md5 md5_hash;
@@ -217,6 +277,8 @@ TEST_F(T_Catalog, Lookup) {
   EXPECT_FALSE(catalog->LookupPath(fake_path, &dirent));
   EXPECT_TRUE(catalog->LookupPath(path, &dirent));
   EXPECT_TRUE(dirent.IsDirectory());
+  EXPECT_FALSE(dirent.IsHidden());
+  EXPECT_FALSE(dirent.IsBindMountpoint());
   EXPECT_TRUE(dirent.symlink().IsEmpty());
   EXPECT_FALSE(dirent.IsChunkedFile());
   EXPECT_FALSE(dirent.IsLink());
@@ -236,6 +298,9 @@ TEST_F(T_Catalog, Lookup) {
   LinkString file;
   EXPECT_TRUE(catalog->LookupRawSymlink(link_path, &file));
   EXPECT_EQ("/foo", file.ToString());
+
+  EXPECT_TRUE(catalog->LookupPath(hidden_path, &dirent));
+  EXPECT_TRUE(dirent.IsHidden());
 }
 
 TEST_F(T_Catalog, Listing) {
@@ -243,6 +308,7 @@ TEST_F(T_Catalog, Listing) {
   DirectoryEntryList dir_entry_list;
   PathString fake_path("/fakepath/fakefile");
   PathString path("/dir/dir");
+  PathString root_path("");
   catalog = catalog::Catalog::AttachFreely("",
                                            catalog_db_root,
                                            shash::Any(),
@@ -269,7 +335,7 @@ TEST_F(T_Catalog, Listing) {
 
   Catalog::NestedCatalogList nc_list = catalog->ListNestedCatalogs();
   EXPECT_EQ(1u, nc_list.size());
-  EXPECT_EQ(PathString("/dir/folder"), nc_list.at(0).path);
+  EXPECT_EQ(PathString("/dir/folder"), nc_list.at(0).mountpoint);
 
   FileChunkList file_chunk_list;
   EXPECT_TRUE(catalog->ListPathChunks(PathString("/foo"),
@@ -281,6 +347,22 @@ TEST_F(T_Catalog, Listing) {
   EXPECT_TRUE(chunk_dir_entry.IsChunkedFile());
   EXPECT_EQ(0u, file_chunk_list.AtPtr(0)->size());
   EXPECT_EQ(0u, file_chunk_list.AtPtr(0)->offset());
+
+  EXPECT_TRUE(catalog->ListingPath(root_path, &dir_entry_list));
+  EXPECT_FALSE(dir_entry_list.empty());
+  bool hidden_found = false;
+  for (unsigned i = 0; i < dir_entry_list.size(); ++i) {
+    if (dir_entry_list[i].name() == NameString("hidden")) {
+      hidden_found = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(hidden_found);
+  StatEntryList root_stat_entry_list;
+  EXPECT_TRUE(catalog->ListingPathStat(root_path, &root_stat_entry_list));
+  EXPECT_FALSE(root_stat_entry_list.IsEmpty());
+  for (unsigned i = 0; i < root_stat_entry_list.size(); ++i)
+    EXPECT_NE(NameString("hidden"), root_stat_entry_list.At(i).name);
 }
 
 TEST_F(T_Catalog, Chunks) {

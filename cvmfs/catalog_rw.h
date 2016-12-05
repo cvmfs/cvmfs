@@ -36,6 +36,7 @@ class WritableCatalogManager;
 class WritableCatalog : public Catalog {
   friend class WritableCatalogManager;
   friend class swissknife::CommandMigrate;  // needed for catalog migrations
+  friend class VirtualCatalog;  // needed for /.cvmfs creation
 
  public:
   WritableCatalog(const std::string &path,
@@ -82,12 +83,16 @@ class WritableCatalog : public Catalog {
                            Catalog *attached_reference,
                            const shash::Any content_hash,
                            const uint64_t size);
+  void InsertBindMountpoint(const std::string &mountpoint,
+                            const shash::Any content_hash,
+                            const uint64_t size);
   void UpdateNestedCatalog(const std::string   &path,
                            const shash::Any    &hash,
                            const uint64_t       size,
                            const DeltaCounters &child_counters);
   void RemoveNestedCatalog(const std::string &mountpoint,
                            Catalog **attached_reference);
+  void RemoveBindMountpoint(const std::string &mountpoint);
 
   void UpdateLastModified();
   void IncrementRevision();

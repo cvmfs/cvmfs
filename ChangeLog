@@ -1,4 +1,10 @@
 2.4.0:
+  * Use -Os compiler flag
+  * Use libcurl 7.51.0
+  * Use sqlite 3.15.2
+  * Add CVMFS_VIRTUAL_DIR server parameter (CVM-1062)
+  * Add catalog support for hidden files and bind mountpoints
+  * Add CVMFS_IGNORE_SPECIAL_FILES server parameter
   * Ignore special files with a warning on publish (CVM-1106)
   * Add support for Debian 8 (CVM-1104)
   * Add support for pluggable, external cache managers (CVM-1054)
@@ -16,6 +22,8 @@
   * Fix handling of file:// url in CVMFS_SERVER_URL
 
 2.3.3:
+  * Fix comment in default.conf (CVM-1105)
+  * Fix history file leak on auto tag removal
   * Fix crash when 'cvmfs_talk cleanup rate' is called without argument
   * Fixes for macOS 10.12 Sierra (CVM-1084)
 

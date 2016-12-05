@@ -60,7 +60,7 @@ Vagrant.configure(2) do |config|
 
   config.vm.define "cernvm4" do |cvm|
     cvm.vm.box = "cernvm4"
-    cvm.vm.box_url = "http://cernvm.cern.ch/releases/ucernvm-images.2.6-9.cernvm.x86_64/ucernvm-sl7.2.6-9.cernvm.x86_64.box"
+    cvm.vm.box_url = "http://cernvm.cern.ch/releases/ucernvm-images.2.7-7.cernvm.x86_64/ucernvm-sl7.2.7-7.cernvm.x86_64.box"
 
     cvm.vm.boot_timeout = 1200 # CernVM might load stuff over a slow network
                                   # and need a lot of time on first boot up

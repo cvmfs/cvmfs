@@ -1463,10 +1463,38 @@ cvmfs_server_tag() {
   trap "close_transaction $name 0" EXIT HUP INT TERM
   open_transaction $name || die "Failed to open transaction for tag manipulation"
 
+  local log_level=
+  [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-z $CVMFS_LOG_LEVEL"
+  local new_manifest="${CVMFS_SPOOL_DIR}/tmp/manifest"
+  local sync_command_virtual_dir="$(__swissknife_cmd dbg) sync \
+      -u /cvmfs/$name                                    \
+      -s ${CVMFS_SPOOL_DIR}/scratch/current              \
+      -c ${CVMFS_SPOOL_DIR}/rdonly                       \
+      -t ${CVMFS_SPOOL_DIR}/tmp                          \
+      -b $base_hash                                      \
+      -r $CVMFS_UPSTREAM_STORAGE                         \
+      -w $CVMFS_STRATUM0                                 \
+      -o ${new_manifest}~                                \
+      -e $hash_algorithm                                 \
+      -Z ${CVMFS_COMPRESSION_ALGORITHM-default}          \
+      -C /etc/cvmfs/repositories.d/${name}/trusted_certs \
+      -N $name                                           \
+      -K $CVMFS_PUBLIC_KEY                               \
+      $(get_follow_http_redirects_flag) $log_level -S snapshots"
+  local tag_command_undo_tags="$(__swissknife_cmd dbg) tag_edit \
+      -r $CVMFS_UPSTREAM_STORAGE                        \
+      -w $CVMFS_STRATUM0                                \
+      -t ${CVMFS_SPOOL_DIR}/tmp                         \
+      -m ${new_manifest}~                               \
+      -p /etc/cvmfs/keys/${name}.pub                    \
+      -f $name                                          \
+      -e $hash_algorithm                                \
+      $(get_follow_http_redirects_flag)                 \
+      -x"
+
   # adds (or moves) a tag in the database
   if [ $action_add -eq 1 ]; then
-    local new_manifest="${CVMFS_SPOOL_DIR}/tmp/manifest"
-    local tag_create_command="$(__swissknife_cmd dbg) tag_create \
+    local tag_create_command="$(__swissknife_cmd dbg) tag_edit   \
       -w $CVMFS_STRATUM0                                         \
       -t ${CVMFS_SPOOL_DIR}/tmp                                  \
       -p /etc/cvmfs/keys/${name}.pub                             \
@@ -1482,12 +1510,13 @@ cvmfs_server_tag() {
       tag_create_command="$tag_create_command -c $add_tag_channel"
     fi
     if [ ! -z "$add_tag_description" ]; then
-      tag_create_command="$tag_create_command -d \"$add_tag_description\""
+      tag_create_command="$tag_create_command -D \"$add_tag_description\""
     fi
     if [ ! -z "$add_tag_root_hash" ]; then
       tag_create_command="$tag_create_command -h $add_tag_root_hash"
     fi
     $user_shell "$tag_create_command" || exit 1
+    cp "$new_manifest" "${new_manifest}~"
     sign_manifest $name $new_manifest || die "Failed to sign repo"
   fi
 
@@ -1504,8 +1533,7 @@ cvmfs_server_tag() {
       fi
     fi
 
-    local new_manifest="${CVMFS_SPOOL_DIR}/tmp/manifest"
-    $user_shell "$(__swissknife_cmd dbg) tag_remove      \
+    $user_shell "$(__swissknife_cmd dbg) tag_edit        \
       -w $CVMFS_STRATUM0                                 \
       -t ${CVMFS_SPOOL_DIR}/tmp                          \
       -p /etc/cvmfs/keys/${name}.pub                     \
@@ -1516,8 +1544,19 @@ cvmfs_server_tag() {
       -b $base_hash                                      \
       -e $hash_algorithm                                 \
       -d '$tag_names'" || die "Did not remove anything"
+    cp "$new_manifest" "${new_manifest}~"
     sign_manifest $name $new_manifest || die "Failed to sign repo"
   fi
+
+  if [ "x${CVMFS_VIRTUAL_DIR}" = "xtrue" ]; then
+    $user_shell "$sync_command_virtual_dir" || die "Failed to create virtual catalog"
+    local trunk_hash=$(grep "^C" ${new_manifest}~ | tr -d C)
+    tag_command_undo_tags="$tag_command_undo_tags -b $trunk_hash"
+    $user_shell "$tag_command_undo_tags" || die "Failed to set trunk hash"
+    sign_manifest $name ${new_manifest}~ || die "Failed to sign repo"
+    set_ro_root_hash $name $trunk_hash   || die "Root hash update failed"
+  fi
+  rm -f ${new_manifest}~
 }
 
 
@@ -2348,7 +2387,7 @@ EOF
     #  same time
     fulllog=/var/log/cvmfs/snapshots.log
     log=/tmp/cvmfs_snapshots.$$.log
-    trap "rm -f $log" 0
+    trap "rm -f $log" EXIT HUP INT TERM
     (echo; echo "Logging in $log at `date`") >>$fulllog
   fi
 

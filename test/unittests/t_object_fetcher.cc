@@ -816,7 +816,7 @@ TYPED_TEST(T_ObjectFetcher, FetchCatalogSlow) {
   EXPECT_EQ(TypeParam::kFailOk, retval);
   ASSERT_NE(static_cast<typename TypeParam::CatalogTN*>(NULL), catalog);
 
-  EXPECT_EQ("",                            catalog->path().ToString());
+  EXPECT_EQ("",                            catalog->mountpoint().ToString());
   EXPECT_EQ(TestFixture::catalog_revision, catalog->revision());
 
   if (TestFixture::NeedsFilesystemSandbox()) {
@@ -834,7 +834,7 @@ TYPED_TEST(T_ObjectFetcher, FetchCatalogSlow) {
   EXPECT_EQ(TypeParam::kFailOk, retval2);
   ASSERT_TRUE(catalog_ptr.IsValid());
 
-  EXPECT_EQ("",                            catalog_ptr->path().ToString());
+  EXPECT_EQ("", catalog_ptr->mountpoint().ToString());
   EXPECT_EQ(TestFixture::catalog_revision, catalog_ptr->revision());
 
   if (TestFixture::NeedsFilesystemSandbox()) {

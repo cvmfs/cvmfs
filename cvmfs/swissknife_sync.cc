@@ -34,6 +34,7 @@
 
 #include "catalog_mgr_ro.h"
 #include "catalog_mgr_rw.h"
+#include "catalog_virtual.h"
 #include "download.h"
 #include "logging.h"
 #include "manifest.h"
@@ -526,6 +527,15 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (args.find('F') != args.end()) params.authz_file = *args.find('F')->second;
   if (args.find('k') != args.end()) params.include_xattrs = true;
   if (args.find('Y') != args.end()) params.external_data = true;
+  if (args.find('S') != args.end()) {
+    bool retval = catalog::VirtualCatalog::ParseActions(
+      *args.find('S')->second, &params.virtual_dir_actions);
+    if (!retval) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "invalid virtual catalog options: %s",
+               args.find('S')->second->c_str());
+      return 1;
+    }
+  }
   if (args.find('z') != args.end()) {
     unsigned log_level =
     1 << (kLogLevel0 + String2Uint64(*args.find('z')->second));
@@ -582,6 +592,10 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     params.ttl_seconds = String2Uint64(*args.find('T')->second);
   }
 
+  if (args.find('g') != args.end()) {
+    params.ignore_special_files = true;
+  }
+
   if (!CheckParams(params)) return 2;
 
   // Start spooler
@@ -620,9 +634,13 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   }
 
   UniquePtr<manifest::Manifest> manifest;
-  manifest = this->FetchRemoteManifest(params.stratum0,
-                                       params.repo_name,
-                                       params.base_hash);
+  if (params.virtual_dir_actions != catalog::VirtualCatalog::kActionNone) {
+    manifest = this->OpenLocalManifest(params.manifest_path);
+  } else {
+    manifest = this->FetchRemoteManifest(params.stratum0,
+                                         params.repo_name,
+                                         params.base_hash);
+  }
   if (!manifest) {
     return 3;
   }
@@ -638,30 +656,39 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   catalog_manager.Init();
 
   publish::SyncMediator mediator(&catalog_manager, &params);
-  publish::SyncUnion *sync;
-  if (params.union_fs_type == "overlayfs") {
-    sync = new publish::SyncUnionOverlayfs(&mediator,
-                                           params.dir_rdonly,
-                                           params.dir_union,
-                                           params.dir_scratch);
-  } else if (params.union_fs_type == "aufs") {
-    sync = new publish::SyncUnionAufs(&mediator,
-                                      params.dir_rdonly,
-                                      params.dir_union,
-                                      params.dir_scratch);
+
+  // Either real catalogs or virtual catalog
+  if (params.virtual_dir_actions == catalog::VirtualCatalog::kActionNone) {
+    publish::SyncUnion *sync;
+    if (params.union_fs_type == "overlayfs") {
+      sync = new publish::SyncUnionOverlayfs(&mediator,
+                                             params.dir_rdonly,
+                                             params.dir_union,
+                                             params.dir_scratch);
+    } else if (params.union_fs_type == "aufs") {
+      sync = new publish::SyncUnionAufs(&mediator,
+                                        params.dir_rdonly,
+                                        params.dir_union,
+                                        params.dir_scratch);
+    } else {
+      LogCvmfs(kLogCvmfs, kLogStderr, "unknown union file system: %s",
+               params.union_fs_type.c_str());
+      return 3;
+    }
+
+    if (!sync->Initialize()) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Initialization of the synchronisation "
+                                      "engine failed");
+      return 4;
+    }
+
+    sync->Traverse();
   } else {
-    LogCvmfs(kLogCvmfs, kLogStderr, "unknown union file system: %s",
-             params.union_fs_type.c_str());
-    return 3;
+    assert(!manifest->history().IsNull());
+    catalog::VirtualCatalog virtual_catalog(
+      manifest.weak_ref(), download_manager(), &catalog_manager, &params);
+    virtual_catalog.Generate(params.virtual_dir_actions);
   }
-
-  if (!sync->Initialize()) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Initialization of the synchronisation "
-                                    "engine failed");
-    return 4;
-  }
-
-  sync->Traverse();
 
   if (params.ttl_seconds > 0) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Setting repository TTL to %" PRIu64 " s",

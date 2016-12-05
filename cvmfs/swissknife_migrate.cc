@@ -11,6 +11,7 @@
 
 #include "catalog_rw.h"
 #include "catalog_sql.h"
+#include "catalog_virtual.h"
 #include "logging.h"
 
 using namespace std;  // NOLINT
@@ -367,7 +368,7 @@ void CommandMigrate::CatalogCallback(
 
   hash_string = data.catalog_hash.ToString();
 
-  path = data.catalog->path().ToString();
+  path = data.catalog->mountpoint().ToString();
   if (path.empty()) {
     path = "/";
     root_catalog_ = data.catalog;
@@ -744,7 +745,7 @@ bool CommandMigrate::AbstractMigrationWorker<DerivedT>::CleanupNestedCatalogs(
  * both the catalog management and migration classes get updated.
  */
 const float    CommandMigrate::MigrationWorker_20x::kSchema         = 2.5;
-const unsigned CommandMigrate::MigrationWorker_20x::kSchemaRevision = 3;
+const unsigned CommandMigrate::MigrationWorker_20x::kSchemaRevision = 4;
 
 
 template<class DerivedT>
@@ -1335,7 +1336,7 @@ bool CommandMigrate::MigrationWorker_20x::RemoveDanglingNestedMountpoints(
   const NestedCatalogList::const_iterator iend = nested_clgs.end();
   NestedCatalogMap nested_catalog_path_hashes;
   for (; i != iend; ++i) {
-    const PathString &path = i->path;
+    const PathString &path = i->mountpoint;
     const shash::Md5  hash(path.GetChars(), path.GetLength());
     nested_catalog_path_hashes[hash] = *i;
   }
@@ -1358,9 +1359,9 @@ bool CommandMigrate::MigrationWorker_20x::RemoveDanglingNestedMountpoints(
     const NestedCatalogMap::const_iterator nested_catalog =
                                      nested_catalog_path_hashes.find(path_hash);
     if (nested_catalog != nested_catalog_path_hashes.end()) {
-      LogCvmfs(kLogCatalog, kLogStderr, "WARNING: found a non-empty nested "
-                                        "catalog mountpoint under '%s'",
-                                        nested_catalog->second.path.c_str());
+      LogCvmfs(kLogCatalog, kLogStderr,
+               "WARNING: found a non-empty nested catalog mountpoint under "
+               "'%s'", nested_catalog->second.mountpoint.c_str());
       continue;
     }
 
@@ -1741,6 +1742,13 @@ bool CommandMigrate::ChownMigrationWorker::ApplyPersonaMappings(
                                                    PendingCatalog *data) const {
   assert(data->old_catalog != NULL);
   assert(data->new_catalog == NULL);
+
+  if (data->old_catalog->mountpoint() ==
+      PathString("/" + string(catalog::VirtualCatalog::kVirtualPath)))
+  {
+    // skipping virtual catalog
+    return true;
+  }
 
   const catalog::CatalogDatabase &db =
                                      GetWritable(data->old_catalog)->database();

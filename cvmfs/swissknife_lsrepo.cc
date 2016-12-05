@@ -97,7 +97,7 @@ void CommandListCatalogs::CatalogCallback(
     clg_entries = StringifyInt(data.catalog->GetNumEntries()) + " ";
   }
 
-  path = data.catalog->path().ToString();
+  path = data.catalog->mountpoint().ToString();
   if (path.empty())
     path = "/";
 
