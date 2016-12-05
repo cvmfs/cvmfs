@@ -55,6 +55,25 @@ check_parameter_count_for_multiple_repositories() {
 }
 
 
+# checks if the right number of arguments was provided
+# if the wrong number was provided it will kill the script after printing the
+# usage text and an error message
+#
+# @param expected_parameter_count   number of expected parameters
+# @param provided_parameter_count   number of provided parameters
+check_parameter_count() {
+  local expected_parameter_count=$1
+  local provided_parameter_count=$2
+
+  if [ $provided_parameter_count -lt $expected_parameter_count ]; then
+    usage "Too few arguments provided"
+  fi
+  if [ $provided_parameter_count -gt $expected_parameter_count ]; then
+    usage "Too many arguments provided"
+  fi
+}
+
+
 # guesses a list of repository names based on file system wildcards
 #
 # @param ...    all repository hints provided by the user of the script
@@ -594,120 +613,258 @@ generate_lsof_report_for_mountpoint() {
 }
 
 
-# prints some help information optionally followed by an error message
-# afterwards it aborts the script
+# puts all configuration files in place that are need for a stratum0 repository
 #
-# @param errormsg   an optional error message that is printed after the
-#                   actual usage text
-usage() {
-  errormsg=$1
+# @param name        the name of the repository
+# @param upstream    the upstream definition of the future repository
+# @param stratum0    the URL of the stratum0 http entry point
+# @param cvmfs_user  the owning user of the repository
+create_config_files_for_new_repository() {
+  local name=$1
+  local upstream=$2
+  local stratum0=$3
+  local cvmfs_user=$4
+  local unionfs=$5
+  local hash_algo=$6
+  local autotagging=$7
+  local garbage_collectable=$8
+  local configure_apache=$9
+  local compression_alg=${10}
+  local external_data=${11}
+  local voms_authz=${12}
+  local auto_tag_timespan="${13}"
 
-  echo "\
-CernVM-FS Server Tool $(cvmfs_version_string)
+  # other configurations
+  local spool_dir="/var/spool/cvmfs/${name}"
+  local scratch_dir="${spool_dir}/scratch/current"
+  local rdonly_dir="${spool_dir}/rdonly"
+  local temp_dir="${spool_dir}/tmp"
+  local cache_dir="${spool_dir}/cache"
+  local repo_cfg_dir="/etc/cvmfs/repositories.d/${name}"
+  local server_conf="${repo_cfg_dir}/server.conf"
+  local client_conf="${repo_cfg_dir}/client.conf"
 
-Usage: cvmfs_server COMMAND [options] <parameters>
+  mkdir -p $repo_cfg_dir
+  cat > $server_conf << EOF
+# Created by cvmfs_server.
+CVMFS_CREATOR_VERSION=$(cvmfs_version_string)
+CVMFS_REPOSITORY_NAME=$name
+CVMFS_REPOSITORY_TYPE=stratum0
+CVMFS_USER=$cvmfs_user
+CVMFS_UNION_DIR=/cvmfs/$name
+CVMFS_SPOOL_DIR=$spool_dir
+CVMFS_STRATUM0=$stratum0
+CVMFS_UPSTREAM_STORAGE=$upstream
+CVMFS_USE_FILE_CHUNKING=$CVMFS_DEFAULT_USE_FILE_CHUNKING
+CVMFS_MIN_CHUNK_SIZE=$CVMFS_DEFAULT_MIN_CHUNK_SIZE
+CVMFS_AVG_CHUNK_SIZE=$CVMFS_DEFAULT_AVG_CHUNK_SIZE
+CVMFS_MAX_CHUNK_SIZE=$CVMFS_DEFAULT_MAX_CHUNK_SIZE
+CVMFS_CATALOG_ENTRY_WARN_THRESHOLD=$CVMFS_DEFAULT_CATALOG_ENTRY_WARN_THRESHOLD
+CVMFS_UNION_FS_TYPE=$unionfs
+CVMFS_HASH_ALGORITHM=$hash_algo
+CVMFS_COMPRESSION_ALGORITHM=$compression_alg
+CVMFS_EXTERNAL_DATA=$external_data
+CVMFS_AUTO_TAG=$autotagging
+CVMFS_AUTO_TAG_TIMESPAN="$auto_tag_timespan"
+CVMFS_GARBAGE_COLLECTION=$garbage_collectable
+CVMFS_AUTO_REPAIR_MOUNTPOINT=true
+CVMFS_AUTOCATALOGS=false
+CVMFS_ASYNC_SCRATCH_CLEANUP=true
+EOF
 
-Supported Commands:
-  mkfs            [-w stratum0 url] [-u upstream storage] [-o owner]
-                  [-m replicable] [-f union filesystem type] [-s S3 config file]
-                  [-g disable auto tags] [-G Set timespan for auto tags]
-                  [-a hash algorithm (default: SHA-1)]
-                  [-z enable garbage collection] [-v volatile content]
-                  [-Z compression algorithm (default: zlib)]
-                  [-k path to existing keychain] [-p no apache config]
-                  [-V VOMS authorization] [-X (external data)]
-                  <fully qualified repository name>
-                  Creates a new repository with a given name
-  add-replica     [-u stratum1 upstream storage] [-o owner] [-w stratum1 url]
-                  [-a silence apache warning] [-z enable garbage collection]
-                  [-n alias name] [-s S3 config file] [-p no apache config]
-                  <stratum 0 url> <public key>
-                  Creates a Stratum 1 replica of a Stratum 0 repository
-  import          [-w stratum0 url] [-o owner] [-u upstream storage]
-                  [-l import legacy repo (2.0.x)] [-s show migration statistics]
-                  [-f union filesystem type] [-c file ownership (UID:GID)]
-                  [-k path to keys] [-g chown backend] [-r recreate whitelist]
-                  [-p no apache config] [-t recreate repo key and certificate]
-                  <fully qualified repository name>
-                  Imports an old CernVM-FS repository into a fresh repo
-  publish         [-p pause for tweaks] [-n manual revision number] [-v verbose]
-                  [-a tag name] [-c tag channel] [-m tag description]
-                  [-X (force external data) | -N (force native data)]
-                  [-Z compression algorithm] [-F authz info file]
-                  [-f use force remount if necessary]
-                  <fully qualified name>
-                  Make a new repository snapshot
-  gc              [-r number of revisions to preserve]
-                  [-t time stamp after which revisions are reseved]
-                  [-l (print deleted objects)] [-L log of deleted objects]
-                  [-f (force)] [-d (dry run)]
-                  <fully qualified repository name>
-                  Remove unreferenced data from garbage collectable repository
-  rmfs            [-p(reserve) repo data and keys] [-f don't ask again]
-                  <fully qualified name>
-                  Remove the repository
-  abort           [-f don't ask again]
-                  <fully qualified name>
-                  Abort transaction and return to the state before
-  rollback        [-t tag] [-f don't ask again]
-                  <fully qualified name>
-                  Re-publishes the given tag as the new latest revision.
-                  All snapshots between trunk and the target tag become
-                  inaccessible.  Without a tag name, trunk-previous is used.
-  resign          <fully qualified name>
-                  Re-sign the 30 day whitelist
-  list-catalogs   [-s catalog sizes] [-e catalog entry counts]
-                  [-h catalog hashes] [-x machine readable]
-                  <fully qualified name>
-                  Print a full list of all nested catalogs of a repository
-  info            <fully qualified name>
-                  Print summary about the repository
-  tag             Create and manage named snapshots
-                  [-a create tag <name>] [-c channel] [-m message] [-h hash]
-                  [-r remove tag <name>] [-f don't ask again]
-                  [-i inspect tag <name>] [-x machine readable]
-                  [-l list tags] [-x machine readable]
-                  <fully qualified name>
-                  Print named tags (snapshots) of the repository
-  check           [-c disable data chunk existence check]
-                  [-i check data integrity] (may take some time)]
-                  [-t tag (check given tag instead of trunk)]
-                  [-s path to nested catalog subtree to check]
-                  <fully qualified name>
-                  Checks if the repository is sane
-  transaction     <fully qualified name>
-                  Start to edit a repository
-  snapshot        [-t fail if other snapshot is in progress]
-                  <fully qualified name>
-                  Synchronize a Stratum 1 replica with the Stratum 0 source
-  snapshot -a     [-s use separate logs in /var/log/cvmfs for each repository]
-                  [-n do not warn if /etc/logrotate.d/cvmfs does not exist]
-                  [-i skip repositories that have not run initial snapshot]
-                  Do snapshot on all active replica repositories
-  mount           [-a | <fully qualified name>]
-                  Mount repositories in /cvmfs, for instance after reboot
-  migrate         <fully qualified name>
-                  Migrates a repository to the current version of CernVM-FS
-  list            List available repositories
-  update-geodb    [-l update lazily based on CVMFS_UPDATEGEO* variables]
-                  Updates the geo-IP database
-  update-info     [-p no apache config] [-e don't edit /info/meta]
-                  Open meta info JSON file for editing
-  update-repoinfo [-f path to JSON file]
-                  <fully qualified name>
-                  Open repository meta info JSON file for editing
-"
+  if [ x"$voms_authz" != x"" ]; then
+    echo "CVMFS_VOMS_AUTHZ=$voms_authz" >> $server_conf
+    echo "CVMFS_CATALOG_ALT_PATHS=true" >> $server_conf
+  fi
+
+  # append GC specific configuration
+  if [ x"$garbage_collectable" = x"true" ]; then
+    cat >> $server_conf << EOF
+CVMFS_AUTO_GC=true
+EOF
+  fi
+
+  if [ $configure_apache -eq 1 ] && is_local_upstream $upstream; then
+    local repository_dir=$(get_upstream_config $upstream)
+    # make sure that the config file does not exist, yet
+    remove_apache_config_file "$(get_apache_conf_filename $name)" || true
+    create_apache_config_for_endpoint $name $repository_dir
+    create_apache_config_for_global_info
+  fi
+
+  cat > $client_conf << EOF
+# Created by cvmfs_server.  Don't touch.
+CVMFS_CACHE_BASE=$cache_dir
+CVMFS_RELOAD_SOCKETS=$cache_dir
+CVMFS_QUOTA_LIMIT=4000
+CVMFS_MOUNT_DIR=/cvmfs
+CVMFS_SERVER_URL=$stratum0
+CVMFS_HTTP_PROXY=DIRECT
+CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${name}.pub
+CVMFS_TRUSTED_CERTS=${repo_cfg_dir}/trusted_certs
+CVMFS_CHECK_PERMISSIONS=yes
+CVMFS_IGNORE_SIGNATURE=no
+CVMFS_AUTO_UPDATE=no
+CVMFS_NFS_SOURCE=no
+CVMFS_HIDE_MAGIC_XATTRS=yes
+CVMFS_FOLLOW_REDIRECTS=yes
+CVMFS_SERVER_CACHE_MODE=yes
+EOF
+}
 
 
-  if [ x"$errormsg" != x ]; then
-    echo "\
-________________________________________________________________________
+create_spool_area_for_new_repository() {
+  local name=$1
 
-NOTE: $errormsg
-"
-    exit 3
-  else
-    exit 2
+  # gather repository information from configuration file
+  load_repo_config $name
+  local spool_dir=$CVMFS_SPOOL_DIR
+  local current_scratch_dir="${spool_dir}/scratch/current"
+  local wastebin_scratch_dir="${spool_dir}/scratch/wastebin"
+  local rdonly_dir="${spool_dir}/rdonly"
+  local temp_dir="${spool_dir}/tmp"
+  local cache_dir="${spool_dir}/cache"
+  local ofs_workdir="${spool_dir}/ofs_workdir"
+
+  mkdir -p /cvmfs/$name          \
+           $current_scratch_dir  \
+           $wastebin_scratch_dir \
+           $rdonly_dir           \
+           $temp_dir             \
+           $cache_dir || return 1
+  if [ x"$CVMFS_UNION_FS_TYPE" = x"overlayfs" ]; then
+    mkdir -p $ofs_workdir || return 2
+  fi
+  chown -R $CVMFS_USER /cvmfs/$name/ $spool_dir/
+}
+
+
+remove_spool_area() {
+  local name=$1
+  load_repo_config $name
+  [ x"$CVMFS_SPOOL_DIR" != x"" ] || return 0
+  rm -fR "$CVMFS_SPOOL_DIR"      || return 1
+  if [ -d /cvmfs/$name ]; then
+    rmdir /cvmfs/$name           || return 2
   fi
 }
+
+
+create_global_info_skeleton() {
+  local info_path="$(get_global_info_path)"
+  local info_v1_path="$(get_global_info_v1_path)"
+
+  mkdir -p $info_path                               || return 1
+  mkdir -p $info_v1_path                            || return 2
+  set_selinux_httpd_context_if_needed $info_path    || return 3
+  set_selinux_httpd_context_if_needed $info_v1_path || return 4
+
+  _check_info_file "repositories" || echo "{}" | _write_info_file "repositories"
+  _check_info_file "meta" || _write_info_file "meta" << EOF
+{
+  "administrator" : "Your Name",
+  "email"         : "you@organisation.org",
+  "organisation"  : "Your Organisation",
+
+  "custom" : {
+    "_comment" : "Put arbitrary structured data here"
+  }
+}
+EOF
+}
+
+
+create_repository_skeleton() {
+  local directory=$1
+  local user=$2
+
+  echo -n "Creating repository skeleton in ${directory}..."
+  mkdir -p ${directory}/data
+  local i=0
+  while [ $i -lt 256 ]
+  do
+    mkdir -p ${directory}/data/$(printf "%02x" $i)
+    i=$(($i+1))
+  done
+  mkdir -p ${directory}/data/txn
+  if [ x$(id -un) != x$user ]; then
+    chown -R $user ${directory}/
+  fi
+  set_selinux_httpd_context_if_needed $directory
+  echo "done"
+}
+
+
+create_repository_storage() {
+  local name=$1
+  local storage_dir
+  load_repo_config $name
+  storage_dir=$(get_upstream_config $CVMFS_UPSTREAM_STORAGE)
+  create_repository_skeleton $storage_dir $CVMFS_USER > /dev/null
+}
+
+
+create_repometa_skeleton() {
+  local json_file="$1"
+  cat > "$json_file" << EOF
+{
+  "administrator" : "Your Name",
+  "email"         : "you@organisation.org",
+  "organisation"  : "Your Organisation",
+  "description"   : "Repository content",
+  "recommended-stratum1s" : [ "stratum1 url", "stratum1 url" ],
+
+  "custom" : {
+    "_comment" : "Put arbitrary structured data here"
+  }
+}
+EOF
+}
+
+
+setup_and_mount_new_repository() {
+  local name=$1
+  local http_timeout=15
+
+  # get repository information
+  load_repo_config $name
+  local rdonly_dir="${CVMFS_SPOOL_DIR}/rdonly"
+  local scratch_dir="${CVMFS_SPOOL_DIR}/scratch/current"
+  local ofs_workdir="${CVMFS_SPOOL_DIR}/ofs_workdir"
+
+  local selinux_context=""
+  if [ x"$CVMFS_UNION_FS_TYPE" = x"overlayfs" ]; then
+    echo -n "(overlayfs) "
+    cat >> /etc/fstab << EOF
+cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf:${CVMFS_SPOOL_DIR}/client.local,cvmfs_suid,noauto 0 0 # added by CernVM-FS for $name
+overlay_$name /cvmfs/$name overlay upperdir=${scratch_dir},lowerdir=${rdonly_dir},workdir=$ofs_workdir,noauto,ro 0 0 # added by CernVM-FS for $name
+EOF
+  else
+    echo -n "(aufs) "
+    if has_selinux && try_mount_remount_cycle_aufs; then
+      selinux_context=",context=\"system_u:object_r:default_t:s0\""
+    fi
+    cat >> /etc/fstab << EOF
+cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf:${CVMFS_SPOOL_DIR}/client.local,cvmfs_suid,noauto 0 0 # added by CernVM-FS for $name
+aufs_$name /cvmfs/$name aufs br=${scratch_dir}=rw:${rdonly_dir}=rr,udba=none,noauto,ro$selinux_context 0 0 # added by CernVM-FS for $name
+EOF
+  fi
+  local user_shell="$(get_user_shell $name)"
+  $user_shell "touch ${CVMFS_SPOOL_DIR}/client.local"
+
+  # avoid racing against apache
+  local waiting=0
+  while ! curl -sIf ${CVMFS_STRATUM0}/.cvmfspublished > /dev/null && \
+        [ $http_timeout -gt 0 ]; do
+    [ $waiting -eq 1 ] || echo -n "waiting for apache... "
+    waiting=1
+    http_timeout=$(( $http_timeout - 1 ))
+    sleep 1
+  done
+  [ $http_timeout -gt 0 ] || return 1
+
+  mount $rdonly_dir > /dev/null || return 1
+  mount /cvmfs/$name
+}
+
 

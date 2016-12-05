@@ -23,6 +23,7 @@ source "server/cvmfs_server_compat.sh"
 source "server/cvmfs_server_transaction.sh"
 source "server/cvmfs_server_abort.sh"
 source "server/cvmfs_server_publish.sh"
+source "server/cvmfs_server_mkfs.sh"
 source "server/cvmfs_server_coda.sh"
 
 

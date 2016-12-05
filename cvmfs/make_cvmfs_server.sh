@@ -33,8 +33,9 @@ COMPONENTS="\
     server/cvmfs_server_transaction.sh
     server/cvmfs_server_abort.sh
     server/cvmfs_server_publish.sh
+    server/cvmfs_server_mkfs.sh
     server/cvmfs_server_coda.sh
-    " 
+    "
 
 # Includes COMPONENTS in OUTPUT_FILE
 for c in $COMPONENTS ; do

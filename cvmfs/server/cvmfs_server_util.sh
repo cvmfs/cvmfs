@@ -7,6 +7,73 @@
 #
 
 
+mangle_local_cvmfs_url() {
+  local repo_name=$1
+  echo "http://localhost/cvmfs/${repo_name}"
+}
+
+
+mangle_s3_cvmfs_url() {
+  local repo_name=$1
+  local s3_url="$2"
+  [ $(echo -n "$s3_url" | tail -c1) = "/" ] || s3_url="${s3_url}/"
+  echo "${s3_url}${repo_name}"
+}
+
+
+make_upstream() {
+  local type_name=$1
+  local tmp_dir=$2
+  local config_string=$3
+  echo "$type_name,$tmp_dir,$config_string"
+}
+
+
+make_s3_upstream() {
+  local repo_name=$1
+  local s3_config=$2
+  make_upstream "S3" "/var/spool/cvmfs/${repo_name}/tmp" "${repo_name}@${s3_config}"
+}
+
+
+make_local_upstream() {
+  local repo_name=$1
+  local repo_storage="${DEFAULT_LOCAL_STORAGE}/${repo_name}"
+  make_upstream "local" "${repo_storage}/data/txn" "$repo_storage"
+}
+
+
+# checks if the aufs kernel module is present
+# or if aufs is compiled in
+# @return   0 if the aufs kernel module is loaded
+check_aufs() {
+  $MODPROBE_BIN -q aufs || test -d /sys/fs/aufs
+}
+
+
+# checks if the overlayfs kernel module is present
+# or if overlayfs is compiled in
+# @return   0 if the overlayfs kernel module is loaded
+check_overlayfs() {
+  $MODPROBE_BIN -q overlay || test -d /sys/module/overlay
+}
+
+
+# check if at least one of the supported union file systems is available
+# currently AUFS get preference over OverlayFS if both are available
+#
+# @return   0 if at least one was found (name through stdout); abort otherwise
+get_available_union_fs() {
+  if check_aufs; then
+    echo "aufs"
+  elif check_overlayfs; then
+    echo "overlayfs"
+  else
+    die "neither AUFS nor OverlayFS detected on the system!"
+  fi
+}
+
+
 __swissknife_cmd() {
   local might_be_debugging="$1"
   if [ ! -z $might_be_debugging ]; then
@@ -367,5 +434,341 @@ is_cwd_on_path() {
   fi
 
   return 1
+}
+
+
+check_upstream_validity() {
+  local upstream=$1
+  local silent=0
+  if [ $# -gt 1 ]; then
+    silent=1;
+  fi
+
+  # checks if $upstream contains _exactly three_ comma separated data fields
+  if echo $upstream | grep -q "^[^,]*,[^,]*,[^,]*$"; then
+    return 0
+  fi
+
+  if [ $silent -ne 1 ]; then
+    usage "The given upstream definition (-u) is invalid. Should look like:
+      <spooler type> , <tmp directory> , <spooler configuration>"
+  fi
+  return 1
+}
+
+
+# ensure that the installed overlayfs is viable for CernVM-FS. Namely, it must
+# be part of the upstream kernel (since 3.18) and recent enough (kernel 4.2)
+# Note: More details are in CVM-835.
+# @return  0 if overlayfs is installed and viable
+check_overlayfs_version() {
+  [ -z "$CVMFS_DONT_CHECK_OVERLAYFS_VERSION" ] || return 0
+  local krnl_version=$(uname -r | grep -oe '^[0-9]\+\.[0-9]\+.[0-9]\+')
+  compare_versions "$krnl_version" -ge "4.2.0"
+}
+
+
+# checks if cvmfs2 client is installed
+#
+# @return  0 if cvmfs2 client is installed
+check_cvmfs2_client() {
+  [ -x /usr/bin/cvmfs2 ]
+}
+
+
+# lowers restrictions of hardlink creation if needed
+# allows AUFS to properly whiteout files without root privileges
+# Note: this function requires a privileged user
+lower_hardlink_restrictions() {
+  if [ -f /proc/sys/kernel/yama/protected_nonaccess_hardlinks ] && \
+     [ $(cat /proc/sys/kernel/yama/protected_nonaccess_hardlinks) -ne 0 ]; then
+    # disable hardlink restrictions at runtime
+    sysctl -w kernel.yama.protected_nonaccess_hardlinks=0 > /dev/null 2>&1 || return 1
+
+    # change sysctl.conf to make the change persist reboots
+    cat >> /etc/sysctl.conf << EOF
+
+# added by CVMFS to allow proper whiteout of files in AUFS
+# when creating or altering repositories on this machine.
+kernel.yama.protected_nonaccess_hardlinks=0
+EOF
+    echo "Note: permanently disabled kernel option: kernel.yama.protected_nonaccess_hardlinks"
+  fi
+
+  return 0
+}
+
+
+_setcap_if_needed() {
+  local binary_path="$1"
+  local capability="$2"
+  [ -x $binary_path ]                                || return 0
+  $GETCAP_BIN "$binary_path" | grep -q "$capability" && return 0
+  $SETCAP_BIN "${capability}+p" "$binary_path"
+}
+
+
+# grants CAP_SYS_ADMIN to cvmfs_swissknife if it is necessary
+# Note: OverlayFS uses trusted extended attributes that are not readable by a
+#       normal unprivileged process
+ensure_swissknife_suid() {
+  local unionfs="$1"
+  local sk_bin="/usr/bin/$CVMFS_SERVER_SWISSKNIFE"
+  local sk_dbg_bin="/usr/bin/${CVMFS_SERVER_SWISSKNIFE}_debug"
+  local cap="cap_sys_admin"
+
+  # check if we need CAP_SYS_ADMIN for cvmfs_swissknife...
+  is_root || die "need to be root for granting CAP_SYS_ADMIN to $sk_bin"
+  [ x"$unionfs" = x"overlayfs" ] || return 0
+
+  # ... yes, obviously we need CAP_SYS_ADMIN for cvmfs_swissknife
+  _setcap_if_needed "$sk_bin"     "$cap" || return 1
+  _setcap_if_needed "$sk_dbg_bin" "$cap" || return 2
+}
+
+
+find_sbin() {
+  local bin_name="$1"
+  local bin_path=""
+  for d in /sbin /usr/sbin /usr/local/sbin /bin /usr/bin /usr/local/bin; do
+    bin_path="${d}/${bin_name}"
+    if [ -x "$bin_path" ]; then
+      echo "$bin_path"
+      return 0
+    fi
+  done
+  return 1
+}
+
+
+is_redhat() {
+  [ -f /etc/redhat-release ]
+}
+
+
+# whenever you print the version string you should use this function since
+# a repository created before CernVM-FS 2.1.7 cannot be fingerprinted
+# correctly...
+# @param version_string  the plain version string
+mangle_version_string() {
+  local version_string=$1
+  if [ x"$version_string" = x"2.1.6" ]; then
+    echo "2.1.6 or lower"
+  else
+    echo $version_string
+  fi
+}
+
+
+# checks if a user exists in the system
+#
+# @param user   the name of the user to be checked
+# @return       0 if user was found
+check_user() {
+  local user=$1
+  id $user > /dev/null 2>&1
+}
+
+
+get_cvmfs_owner() {
+  local name=$1
+  local owner=$2
+  local cvmfs_owner
+
+  if [ "x$owner" = "x" ]; then
+    read -p "Owner of $name [$(whoami)]: " cvmfs_owner
+    [ x"$cvmfs_owner" = x ] && cvmfs_owner=$(whoami)
+  else
+    cvmfs_owner=$owner
+  fi
+  check_user $cvmfs_user || return 1
+  echo $cvmfs_owner
+}
+
+
+is_s3_upstream() {
+  local upstream=$1
+  check_upstream_type $upstream "s3"
+}
+
+get_upstream_config() {
+  local upstream=$1
+  echo "$upstream" | cut -d, -f3-
+}
+
+
+has_selinux() {
+  [ -x $SESTATUS_BIN   ] && \
+  [ -x $GETENFORCE_BIN ] && \
+  $GETENFORCE_BIN | grep -qi "enforc" || return 1
+}
+
+
+set_selinux_httpd_context_if_needed() {
+  local directory="$1"
+  if has_selinux; then
+    chcon -Rv --type=httpd_sys_content_t ${directory}/ > /dev/null
+  fi
+}
+
+
+_cleanup_tmrc() {
+  local tmpdir=$1
+  umount ${tmpdir}/c > /dev/null 2>&1 || umount -l > /dev/null 2>&1
+  rm -fR ${tmpdir}   > /dev/null 2>&1
+}
+
+
+# for some reason `mount -o remount,(ro|rw) /cvmfs/$name` does not work on older
+# platforms if we set the SELinux context=... parameter in /etc/fstab
+# this dry-runs the whole mount, remount, unmount cycle to find out if it works
+# correctly (aufs version)
+# @returns  0 if the whole cycle worked as expected
+try_mount_remount_cycle_aufs() {
+  local tmpdir
+  tmpdir=$(mktemp -d)
+  mkdir ${tmpdir}/a ${tmpdir}/b ${tmpdir}/c
+  mount -t aufs \
+    -o br=${tmpdir}/a=ro:${tmpdir}/b=rw,ro,context=system_u:object_r:default_t:s0 \
+    try_remount_aufs ${tmpdir}/c  > /dev/null 2>&1 || return 1
+  mount -o remount,rw ${tmpdir}/c > /dev/null 2>&1 || { _cleanup_tmrc $tmpdir; return 2; }
+  mount -o remount,ro ${tmpdir}/c > /dev/null 2>&1 || { _cleanup_tmrc $tmpdir; return 3; }
+  _cleanup_tmrc $tmpdir
+  return 0
+}
+
+
+print_new_repository_notice() {
+  local name=$1
+  local cvmfs_user=$2
+
+  echo "\
+
+Before you can install anything, call \`cvmfs_server transaction\`
+to enable write access on your repository. Then install your
+software in /cvmfs/$name as user $cvmfs_user.
+Once you're happy, publish using \`cvmfs_server publish\`
+
+For client configuration, have a look at 'cvmfs_server info'
+
+If you go for production, backup you software signing keys in /etc/cvmfs/keys/!"
+}
+
+
+# prints some help information optionally followed by an error message
+# afterwards it aborts the script
+#
+# @param errormsg   an optional error message that is printed after the
+#                   actual usage text
+usage() {
+  errormsg=$1
+
+  echo "\
+CernVM-FS Server Tool $(cvmfs_version_string)
+
+Usage: cvmfs_server COMMAND [options] <parameters>
+
+Supported Commands:
+  mkfs            [-w stratum0 url] [-u upstream storage] [-o owner]
+                  [-m replicable] [-f union filesystem type] [-s S3 config file]
+                  [-g disable auto tags] [-G Set timespan for auto tags]
+                  [-a hash algorithm (default: SHA-1)]
+                  [-z enable garbage collection] [-v volatile content]
+                  [-Z compression algorithm (default: zlib)]
+                  [-k path to existing keychain] [-p no apache config]
+                  [-V VOMS authorization] [-X (external data)]
+                  <fully qualified repository name>
+                  Creates a new repository with a given name
+  add-replica     [-u stratum1 upstream storage] [-o owner] [-w stratum1 url]
+                  [-a silence apache warning] [-z enable garbage collection]
+                  [-n alias name] [-s S3 config file] [-p no apache config]
+                  <stratum 0 url> <public key>
+                  Creates a Stratum 1 replica of a Stratum 0 repository
+  import          [-w stratum0 url] [-o owner] [-u upstream storage]
+                  [-l import legacy repo (2.0.x)] [-s show migration statistics]
+                  [-f union filesystem type] [-c file ownership (UID:GID)]
+                  [-k path to keys] [-g chown backend] [-r recreate whitelist]
+                  [-p no apache config] [-t recreate repo key and certificate]
+                  <fully qualified repository name>
+                  Imports an old CernVM-FS repository into a fresh repo
+  publish         [-p pause for tweaks] [-n manual revision number] [-v verbose]
+                  [-a tag name] [-c tag channel] [-m tag description]
+                  [-X (force external data) | -N (force native data)]
+                  [-Z compression algorithm] [-F authz info file]
+                  [-f use force remount if necessary]
+                  <fully qualified name>
+                  Make a new repository snapshot
+  gc              [-r number of revisions to preserve]
+                  [-t time stamp after which revisions are reseved]
+                  [-l (print deleted objects)] [-L log of deleted objects]
+                  [-f (force)] [-d (dry run)]
+                  <fully qualified repository name>
+                  Remove unreferenced data from garbage collectable repository
+  rmfs            [-p(reserve) repo data and keys] [-f don't ask again]
+                  <fully qualified name>
+                  Remove the repository
+  abort           [-f don't ask again]
+                  <fully qualified name>
+                  Abort transaction and return to the state before
+  rollback        [-t tag] [-f don't ask again]
+                  <fully qualified name>
+                  Re-publishes the given tag as the new latest revision.
+                  All snapshots between trunk and the target tag become
+                  inaccessible.  Without a tag name, trunk-previous is used.
+  resign          <fully qualified name>
+                  Re-sign the 30 day whitelist
+  list-catalogs   [-s catalog sizes] [-e catalog entry counts]
+                  [-h catalog hashes] [-x machine readable]
+                  <fully qualified name>
+                  Print a full list of all nested catalogs of a repository
+  info            <fully qualified name>
+                  Print summary about the repository
+  tag             Create and manage named snapshots
+                  [-a create tag <name>] [-c channel] [-m message] [-h hash]
+                  [-r remove tag <name>] [-f don't ask again]
+                  [-i inspect tag <name>] [-x machine readable]
+                  [-l list tags] [-x machine readable]
+                  <fully qualified name>
+                  Print named tags (snapshots) of the repository
+  check           [-c disable data chunk existence check]
+                  [-i check data integrity] (may take some time)]
+                  [-t tag (check given tag instead of trunk)]
+                  [-s path to nested catalog subtree to check]
+                  <fully qualified name>
+                  Checks if the repository is sane
+  transaction     <fully qualified name>
+                  Start to edit a repository
+  snapshot        [-t fail if other snapshot is in progress]
+                  <fully qualified name>
+                  Synchronize a Stratum 1 replica with the Stratum 0 source
+  snapshot -a     [-s use separate logs in /var/log/cvmfs for each repository]
+                  [-n do not warn if /etc/logrotate.d/cvmfs does not exist]
+                  [-i skip repositories that have not run initial snapshot]
+                  Do snapshot on all active replica repositories
+  mount           [-a | <fully qualified name>]
+                  Mount repositories in /cvmfs, for instance after reboot
+  migrate         <fully qualified name>
+                  Migrates a repository to the current version of CernVM-FS
+  list            List available repositories
+  update-geodb    [-l update lazily based on CVMFS_UPDATEGEO* variables]
+                  Updates the geo-IP database
+  update-info     [-p no apache config] [-e don't edit /info/meta]
+                  Open meta info JSON file for editing
+  update-repoinfo [-f path to JSON file]
+                  <fully qualified name>
+                  Open repository meta info JSON file for editing
+"
+
+
+  if [ x"$errormsg" != x ]; then
+    echo "\
+________________________________________________________________________
+
+NOTE: $errormsg
+"
+    exit 3
+  else
+    exit 2
+  fi
 }
 
