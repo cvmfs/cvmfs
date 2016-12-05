@@ -418,6 +418,7 @@ class DownloadManager {
   bool CanRetry(const JobInfo *info);
   void Backoff(JobInfo *info);
   void SetNocache(JobInfo *info);
+  void SetRegularCache(JobInfo *info);
   bool VerifyAndFinalize(const int curl_error, JobInfo *info);
   void InitHeaders();
   void FiniHeaders();
