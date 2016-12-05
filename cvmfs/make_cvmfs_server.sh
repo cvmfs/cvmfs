@@ -24,6 +24,7 @@ echo '
 COMPONENTS="\
     server/cvmfs_server_prelude.sh
     server/cvmfs_server_util.sh
+    server/cvmfs_server_apache.sh
     server/cvmfs_server_common.sh
     server/cvmfs_server_health_check.sh
     server/cvmfs_server_compat.sh

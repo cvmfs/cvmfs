@@ -10,6 +10,7 @@
 # The following files should be sourced in this order and before the other files
 source "server/cvmfs_server_prelude.sh"
 source "server/cvmfs_server_util.sh"
+source "server/cvmfs_server_apache.sh"
 source "server/cvmfs_server_common.sh"
 source "server/cvmfs_server_health_check.sh"
 source "server/cvmfs_server_compat.sh"
