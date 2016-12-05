@@ -314,17 +314,6 @@ cvmfs_server_publish() {
 }
 
 
-# get the path of the file that contains the content hash of the reference log
-#
-# @param name  the name of the repository to be checked
-# @return      the full path name
-get_reflog_checksum() {
-  local name=$1
-
-  echo "/var/spool/cvmfs/${name}/reflog.chksum"
-}
-
-
 has_file_descriptors_on_mount_point() {
   local name=$1
   local mountpoint="/cvmfs/${name}"

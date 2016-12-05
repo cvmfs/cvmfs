@@ -33,7 +33,27 @@ COMPONENTS="\
     server/cvmfs_server_transaction.sh
     server/cvmfs_server_abort.sh
     server/cvmfs_server_publish.sh
+    server/cvmfs_server_import.sh
     server/cvmfs_server_mkfs.sh
+    server/cvmfs_server_add_replica.sh
+    server/cvmfs_server_rmfs.sh
+    server/cvmfs_server_resign.sh
+    server/cvmfs_server_list_catalogs.sh
+    server/cvmfs_server_info.sh
+    server/cvmfs_server_tag.sh
+    server/cvmfs_server_deprecated.sh
+    server/cvmfs_server_check.sh
+    server/cvmfs_server_list.sh
+    server/cvmfs_server_rollback.sh
+    server/cvmfs_server_gc.sh
+    server/cvmfs_server_snapshot.sh
+    server/cvmfs_server_migrate.sh
+    server/cvmfs_server_chown.sh
+    server/cvmfs_server_eliminate_hardlinks.sh
+    server/cvmfs_server_update_info.sh
+    server/cvmfs_server_mount.sh
+    server/cvmfs_server_skeleton.sh
+    server/cvmfs_server_fix_permissions.sh
     server/cvmfs_server_coda.sh
     "
 

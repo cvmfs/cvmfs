@@ -655,6 +655,249 @@ If you go for production, backup you software signing keys in /etc/cvmfs/keys/!"
 }
 
 
+get_fd_modes() {
+  local path=$1
+  $LSOF_BIN -Fan 2>/dev/null | grep -B1 -e "^n$path" | grep -e '^a.*'
+}
+
+# gets the number of open read-only file descriptors beneath a given path
+#
+# @param path  the path to look at for open read-only fds
+# @return      the number of open read-only file descriptors
+count_rd_only_fds() {
+  local path=$1
+  local cnt=0
+  for line in $(get_fd_modes $path); do
+    if echo "$line" | grep -qe '^\ar\?$';  then cnt=$(( $cnt + 1 )); fi
+  done
+  echo $cnt
+}
+
+# find the partition name for a given file path
+#
+# @param   path  the path to the file to be checked
+# @return  the name of the partition that path resides on
+get_partition_for_path() {
+  local path="$1"
+  df --portability "$path" | tail -n1 | awk '{print $1}'
+}
+
+
+# checks if a given repository is replicable
+#
+# @param name   the repository name or URL to be checked
+# @return       0 if it is a stratum0 repository and replicable
+is_master_replica() {
+  local name=$1
+  local is_master_replica
+
+  if [ $(echo $name | cut --bytes=1-7) = "http://" ]; then
+    is_master_replica=$(get_repo_info_from_url $name -m -L)
+  else
+    load_repo_config $name
+    is_stratum0 $name || return 1
+    is_master_replica=$(get_repo_info -m)
+  fi
+
+  [ "x$is_master_replica" = "xtrue" ]
+}
+
+
+# get the path of the file that contains the content hash of the reference log
+#
+# @param name  the name of the repository to be checked
+# @return      the full path name
+get_reflog_checksum() {
+  local name=$1
+
+  echo "/var/spool/cvmfs/${name}/reflog.chksum"
+}
+
+
+# checks if a the reflog checksum is present in the spool directory
+#
+# @param name  the name of the repository to be checked
+# @return      0 if the reflog checksum is available
+has_reflog_checksum() {
+  local name=$1
+
+  [ -f $(get_reflog_checksum $name) ]
+}
+
+
+# Find the service binary (or detect systemd)
+minpidof() {
+  $PIDOF_BIN $1 | tr " " "\n" | sort --numeric-sort | head -n1
+}
+
+
+is_systemd() {
+  [ x"$SERVICE_BIN" = x"false" ]
+}
+
+
+# this strips both the attached signature block and the certificate hash from
+# an already signed manifest file and prints the result to stdout
+strip_manifest_signature() {
+  local signed_manifest="$1"
+  # print lines starting with a capital letter (except X for the certificate)
+  # and stop as soon as we find the signature delimiter '--'
+  awk '/^[A-WY-Z]/ {print $0}; /--/ {exit}' $signed_manifest
+}
+
+
+_update_geodb_days_since_update() {
+  local timestamp=$(date +%s)
+  local dbdir=$CVMFS_UPDATEGEO_DIR
+  local db_mtime=$(stat --format='%Y' ${dbdir}/${CVMFS_UPDATEGEO_DAT})
+  local db_mtime6=$(stat --format='%Y' ${dbdir}/${CVMFS_UPDATEGEO_DAT6})
+  if [ "$db_mtime6" -lt "$db_mtime" ]; then
+    # take the older of the two
+    db_mtime=$db_mtime6
+  fi
+  local days_since_update=$(( ( $timestamp - $db_mtime ) / 86400 ))
+  echo "$days_since_update"
+}
+
+_update_geodb_lazy_install_slot() {
+  [ "`date +%w`" -eq "$CVMFS_UPDATEGEO_DAY"  ] && \
+  [ "`date +%k`" -ge "$CVMFS_UPDATEGEO_HOUR" ]
+}
+
+_to_syslog_for_geoip() {
+  to_syslog "(GeoIP) $1"
+}
+
+_update_geodb_install_1() {
+  local retcode=0
+  local urlbase="$1"
+  local datname="$2"
+  local dburl="${urlbase}/${datname}.gz"
+  local dbfile="${CVMFS_UPDATEGEO_DIR}/${datname}"
+  local download_target=${dbfile}.gz
+  local unzip_target=${dbfile}.new
+
+  _to_syslog_for_geoip "started update from $dburl"
+
+  # downloading the GeoIP database file
+  if ! curl -sS                  \
+            --fail               \
+            --connect-timeout 10 \
+            --max-time 60        \
+            "$dburl" > $download_target 2>/dev/null; then
+    echo "failed to download $dburl" >&2
+    _to_syslog_for_geoip "failed to download from $dburl"
+    rm -f $download_target
+    return 1
+  fi
+
+  # unzipping the GeoIP database file
+  if ! zcat $download_target > $unzip_target 2>/dev/null; then
+    echo "failed to unzip $download_target to $unzip_target" >&2
+    _to_syslog_for_geoip "failed to unzip $download_target to $unzip_target"
+    rm -f $download_target $unzip_target
+    return 2
+  fi
+
+  # get rid of the zipped GeoIP database
+  rm -f $download_target
+
+  # atomically installing the GeoIP database
+  if ! mv -f $unzip_target $dbfile; then
+    echo "failed to install $dbfile" >&2
+    _to_syslog_for_geoip "failed to install $dbfile"
+    rm -f $unzip_target
+    return 3
+  fi
+
+  _to_syslog_for_geoip "successfully updated from $dburl"
+
+  return 0
+}
+
+_update_geodb_install() {
+  _update_geodb_install_1 $CVMFS_UPDATEGEO_URLBASE $CVMFS_UPDATEGEO_DAT && \
+    _update_geodb_install_1 $CVMFS_UPDATEGEO_URLBASE6 $CVMFS_UPDATEGEO_DAT6
+}
+
+_update_geodb() {
+  local dbdir=$CVMFS_UPDATEGEO_DIR
+  local dbfile=$dbdir/$CVMFS_UPDATEGEO_DAT
+  local dbfile6=$dbdir/$CVMFS_UPDATEGEO_DAT6
+  local lazy=false
+  local retcode=0
+
+  # parameter handling
+  OPTIND=1
+  while getopts "l" option; do
+    case $option in
+      l)
+        lazy=true
+      ;;
+      ?)
+        shift $(($OPTIND-2))
+        usage "Command update-geodb: Unrecognized option: $1"
+      ;;
+    esac
+  done
+
+  # sanity checks
+  [ -w "$dbdir"  ]   || { echo "Directory '$dbdir' doesn't exist or is not writable by $(whoami)" >&2; return 1; }
+  [ ! -f "$dbfile" ] || [ -w "$dbfile" ] || { echo "GeoIP database '$dbfile' is not writable by $(whoami)" >&2; return 2; }
+  [ ! -f "$dbfile6" ] || [ -w "$dbfile6" ] || { echo "GeoIP database '$dbfile6' is not writable by $(whoami)" >&2; return 2; }
+
+  # check if an update/installation needs to be done
+  if [ ! -f "$dbfile" ] || [ ! -f "$dbfile6" ]; then
+    echo -n "Installing GeoIP Database... "
+  elif ! $lazy; then
+    echo -n "Updating GeoIP Database... "
+  else
+    local days_old=$(_update_geodb_days_since_update)
+    if [ $days_old -gt $CVMFS_UPDATEGEO_MAXDAYS ]; then
+      echo -n "GeoIP Database is very old. Updating... "
+    elif [ $days_old -gt $CVMFS_UPDATEGEO_MINDAYS ]; then
+      if _update_geodb_lazy_install_slot; then
+        echo -n "GeoIP Database is expired. Updating... "
+      else
+        echo "GeoIP Database is expired, but waiting for install time slot."
+        return 0
+      fi
+    else
+      echo "GeoIP Database is up to date ($days_old days old). Nothing to do."
+      return 0
+    fi
+  fi
+
+  # at this point the database needs to be installed or updated
+  _update_geodb_install && echo "done" || { echo "fail"; return 3; }
+}
+
+cvmfs_server_update_geodb() {
+  _update_geodb $@
+}
+
+
+# checks if the given command name is a supported command of cvmfs_server
+#
+# @param subcommand   the subcommand to be called
+# @return   0 if the command was recognized
+is_subcommand() {
+  local subcommand="$1"
+  local supported_commands="mkfs add-replica import publish rollback rmfs alterfs    \
+    resign list info tag list-tags lstags check transaction abort snapshot           \
+    skeleton migrate list-catalogs update-geodb gc catalog-chown eliminate-hardlinks \
+    update-info update-repoinfo mount fix-permissions"
+
+  for possible_command in $supported_commands; do
+    if [ x"$possible_command" = x"$subcommand" ]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+
 # prints some help information optionally followed by an error message
 # afterwards it aborts the script
 #

@@ -868,3 +868,196 @@ EOF
 }
 
 
+# checks if the (corresponding) stratum 0 is garbage collectable
+#
+# @param name  the name of the stratum1/stratum0 repository to be checked
+# @return      0 if it is garbage collectable
+is_stratum0_garbage_collectable() {
+  local name=$1
+  load_repo_config $name
+  [ x"$(get_repo_info_from_url $CVMFS_STRATUM0 -g)" = x"yes" ]
+}
+
+
+# checks if a manifest ist present
+#
+# @param name  the name of the repository to be checked
+# @return      0 if it is empty
+is_empty_repository() {
+  local name=$1
+  local url=""
+  load_repo_config $name
+  is_stratum0 $name && url="$CVMFS_STRATUM0" || url="$CVMFS_STRATUM1"
+  [ x"$(get_repo_info_from_url "$url" -e)" = x"yes" ]
+}
+
+# checks if a repository contains a reference log that is necessary to run
+# garbage collections
+#
+# @param name  the name of the repository to be checked
+# @return      0 if it contains a reference log
+has_reference_log() {
+  local name=$1
+  local url=""
+  load_repo_config $name
+  is_stratum0 $name && url="$CVMFS_STRATUM0" || url="$CVMFS_STRATUM1"
+  [ x"$(get_repo_info_from_url "$url" -o)" = x"true" ]
+}
+
+
+# get the configured (or default) timespan for an automatic garbage
+# collection run.
+#
+# @param name  the name of the repository to be checked
+# @return      the configured CVMFS_AUTO_GC_TIMESPAN or default (3 days ago)
+#              as a timestamp threshold (unix timestamp)
+#              Note: in case of a malformed timespan it might print an error to
+#                     stderr and return a non-zero code
+get_auto_garbage_collection_timespan() {
+  local name=$1
+  local timespan="3 days ago"
+
+  load_repo_config $name
+  if [ ! -z "$CVMFS_AUTO_GC_TIMESPAN" ]; then
+    timespan="$CVMFS_AUTO_GC_TIMESPAN"
+  fi
+
+  if ! date --date "$timespan" +%s 2>/dev/null; then
+    echo "Failed to parse CVMFS_AUTO_GC_TIMESPAN: '$timespan'" >&2
+    return 1
+  fi
+}
+
+
+# mangles the repository name into a fully qualified repository name
+# if there was no repository name given and there is only one repository present
+# in the system, it automatically returns the name of this one.
+#
+# @param repository_name  the name of the repository to work on (might be empty)
+# @return                 echoes a suitable repository name
+get_or_guess_repository_name() {
+  local repository_name=$1
+
+  if [ "x$repository_name" = "x" ]; then
+    echo $(get_repository_name $(ls /etc/cvmfs/repositories.d))
+  else
+    echo $(get_repository_name $repository_name)
+  fi
+}
+
+
+# looks for traces of CernVM-FS 2.0.x which is incompatible with CernVM-FS 2.1.x
+# and interferes with each other
+foreclose_legacy_cvmfs() {
+  local found_something=0
+
+  if [ -f /etc/cvmfs/server.conf ] || [ -f /etc/cvmfs/replica.conf ]; then
+    echo "found legacy configuration files in /etc/cvmfs" 1>&2
+    found_something=1
+  fi
+
+  if which cvmfs-sync     > /dev/null 2>&1 || \
+     which cvmfs_scrub    > /dev/null 2>&1 || \
+     which cvmfs_snapshot > /dev/null 2>&1 || \
+     which cvmfs_zpipe    > /dev/null 2>&1 || \
+     which cvmfs_pull     > /dev/null 2>&1 || \
+     which cvmfs_unsign   > /dev/null 2>&1; then
+    echo "found legacy CernVM-FS executables" 1>&2
+    found_something=1
+  fi
+
+  if [ -f /lib/modules/*/extra/cvmfsflt/cvmfsflt.ko ]; then
+    echo "found CernVM-FS 2.0.x kernel module" 1>&2
+    found_something=1
+  fi
+
+  if [ $found_something -ne 0 ]; then
+    echo "found traces of CernVM-FS 2.0.x! You should remove them before proceeding!"
+    exit 1
+  fi
+
+  return $found_something
+}
+
+
+# get the configured timespan for removing old auto-generated tags.
+#
+# @param name  the name of the repository to be checked
+# @return      the configured CVMFS_AUTO_TAG_TIMESPAN or 0 (forever)
+#              as a timestamp threshold (unix timestamp)
+#              Note: in case of a malformed timespan it might print an error to
+#                     stderr and return a non-zero code
+get_auto_tags_timespan() {
+  local repository_name=$1
+
+  load_repo_config $repository_name
+  local timespan="$CVMFS_AUTO_TAG_TIMESPAN"
+  if [ -z "$timespan" ]; then
+    echo "0"
+    return 0
+  fi
+
+  if ! date --date "$timespan" +%s 2>/dev/null; then
+    echo "Failed to parse CVMFS_AUTO_TAG_TIMESPAN: '$timespan'" >&2
+    return 1
+  fi
+  return 0
+}
+
+
+unmount_and_teardown_repository() {
+  local name=$1
+  load_repo_config $name
+  sed -i -e "/added by CernVM-FS for ${name}/d" /etc/fstab
+  local rw_mnt="/cvmfs/$name"
+  local rdonly_mnt="${CVMFS_SPOOL_DIR}/rdonly"
+  is_mounted "$rw_mnt"     && ( umount $rw_mnt     || return 1; )
+  is_mounted "$rdonly_mnt" && ( umount $rdonly_mnt || return 2; )
+  return 0
+}
+
+
+_run_catalog_migration() {
+  local name="$1"
+  local migration_command="$2"
+
+  load_repo_config $name
+
+  # more sanity checks
+  is_stratum0 $name       || die "This is not a stratum 0 repository"
+  is_root                 || die "Permission denied: Only root can do that"
+  is_in_transaction $name && die "Repository is already in a transaction"
+  health_check -r $name
+
+  # all following commands need an open repository transaction and are supposed
+  # to commit or abort it after performing the catalog migration.
+  echo "Opening repository transaction"
+  trap "close_transaction $name 0" EXIT HUP INT TERM
+  open_transaction $name || die "Failed to open repository transaction"
+
+  # run the catalog migration operation (must run as root!)
+  echo "Starting catalog migration"
+  local tmp_dir=${CVMFS_SPOOL_DIR}/tmp
+  local manifest=${tmp_dir}/manifest
+  migration_command="${migration_command} -t $tmp_dir -o $manifest"
+  sh -c "$migration_command" || die "Fail (executed command: $migration_command)"
+
+  # check if the catalog migration created a new revision
+  if [ ! -f $manifest ]; then
+    echo "Catalog migration finished without any changes"
+    return 0
+  fi
+
+  # finalizing transaction
+  local trunk_hash=$(grep "^C" $manifest | tr -d C)
+  echo "Flushing file system buffers"
+  sync
+
+  # committing newly created revision
+  echo "Signing new manifest"
+  chown $CVMFS_USER $manifest        || die "chmod of new manifest failed";
+  sign_manifest $name $manifest      || die "Signing failed";
+  set_ro_root_hash $name $trunk_hash || die "Root hash update failed";
+}
+
+
