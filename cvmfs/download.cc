@@ -1147,6 +1147,20 @@ void DownloadManager::SetNocache(JobInfo *info) {
 
 
 /**
+ * Reverse operation of SetNocache. Makes sure that "no-cache" header
+ * disappears from the list of headers to let proxies work normally.
+ */
+void DownloadManager::SetRegularCache(JobInfo *info) {
+  if (info->nocache == false)
+    return;
+  header_lists_->CutHeader("Pragma: no-cache", &(info->headers));
+  header_lists_->CutHeader("Cache-Control: no-cache", &(info->headers));
+  curl_easy_setopt(info->curl_handle, CURLOPT_HTTPHEADER, info->headers);
+  info->nocache = false;
+}
+
+
+/**
  * Checks the result of a curl download and implements the failure logic, such
  * as changing the proxy server.  Takes care of cleanup.
  *
