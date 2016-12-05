@@ -40,7 +40,6 @@ CVMFS_TEST_SERVER_CACHE="$custom_cache_dir"                                   \
 CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
 ./run.sh $SERVER_TEST_LOGFILE -o ${SERVER_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
                               -x src/518-hardlinkstresstest                   \
-                                 src/523-corruptchunkfailover                 \
                                  src/524-corruptmanifestfailover              \
                                  src/585-xattrs                               \
                                  src/600-securecvmfs                          \

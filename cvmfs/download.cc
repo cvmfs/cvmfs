@@ -1275,8 +1275,17 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
   bool same_url_retry = CanRetry(info);
   if (info->error_code != kFailOk) {
     pthread_mutex_lock(lock_options_);
-    if ((info->error_code) == kFailBadData && !info->nocache)
-      try_again = true;
+    if (info->error_code == kFailBadData) {
+      if (!info->nocache) {
+        try_again = true;
+      } else {
+        // Make it a host failure
+        LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
+                 "data corruption with no-cache header, try another host");
+
+        info->error_code = kFailHostHttp;
+      }
+    }
     if ( same_url_retry || (
          ( (info->error_code == kFailHostResolve) ||
            (info->error_code == kFailHostConnection) ||
@@ -1365,6 +1374,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       shash::Init(info->hash_context);
     if (info->compressed)
       zlib::DecompressInit(&info->zstream);
+    SetRegularCache(info);
 
     // Failure handling
     bool switch_proxy = false;
