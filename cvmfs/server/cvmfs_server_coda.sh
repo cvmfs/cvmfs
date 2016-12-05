@@ -378,43 +378,6 @@ migrate_legacy_dirtab() {
 }
 
 
-# sends wsgi configuration to stdout
-#
-# @param name        the name of the repository
-# @param with_wsgi   if not set, this function is a NOOP
-cat_wsgi_config() {
-  local name=$1
-  local with_wsgi="$2"
-
-  [ x"$with_wsgi" != x"" ] || return 0
-  echo "# Enable api functions
-WSGIPythonPath /usr/share/cvmfs-server/webapi
-Alias /cvmfs/$name/api /var/www/wsgi-scripts/cvmfs-api.wsgi/$name
-
-<Directory /var/www/wsgi-scripts>
-    Options ExecCGI
-    SetHandler wsgi-script
-    Order allow,deny
-    Allow from all
-</Directory>
-"
-}
-
-
-remove_config_files() {
-  local name=$1
-  load_repo_config $name
-
-  local apache_conf_file_name="$(get_apache_conf_filename $name)"
-  if is_local_upstream $CVMFS_UPSTREAM_STORAGE &&
-     has_apache_config_file "$apache_conf_file_name"; then
-    remove_apache_config_file "$apache_conf_file_name"
-    reload_apache > /dev/null
-  fi
-  rm -rf /etc/cvmfs/repositories.d/$name
-}
-
-
 unmount_and_teardown_repository() {
   local name=$1
   load_repo_config $name
