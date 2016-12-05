@@ -1139,7 +1139,7 @@ cvmfs_umount() {
     umount $m 2>/dev/null
     if [ $? -ne 0 ]; then
       RETVAL=1
-      if [ "x$silent" != "x" ]; then
+      if [ "x$silent" = "x" ]; then
         echo "Failed!"
         $fuser -m -a -v $m
       fi
