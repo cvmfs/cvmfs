@@ -155,15 +155,8 @@ is_subcommand() {
 }
 
 
-# figure out apache config file mode
-#
-# @return   apache config mode (stdout) (see globals below)
 APACHE_CONF_MODE_CONFD=1     # *.conf goes to ${APACHE_CONF}/conf.d
 APACHE_CONF_MODE_CONFAVAIL=2 # *.conf goes to ${APACHE_CONF}/conf-available
-get_apache_conf_mode() {
-  [ -d /etc/${APACHE_CONF}/conf-available ] && echo $APACHE_CONF_MODE_CONFAVAIL \
-                                            || echo $APACHE_CONF_MODE_CONFD
-}
 
 
 get_fd_modes() {
@@ -407,57 +400,6 @@ Alias /cvmfs/$name/api /var/www/wsgi-scripts/cvmfs-api.wsgi/$name
 "
 }
 
-
-# creates a standard Apache configuration file for a repository
-#
-# @param name         the name of the endpoint to be served
-# @param storage_dir  the storage location of the data
-# @param with_wsgi    whether or not to enable WSGI api functions
-create_apache_config_for_endpoint() {
-  local name=$1
-  local storage_dir=$2
-  local with_wsgi="$3"
-
-  create_apache_config_file "$(get_apache_conf_filename $name)" << EOF
-# Created by cvmfs_server.  Don't touch.
-$(cat_wsgi_config $name $with_wsgi)
-
-KeepAlive On
-AddType application/json .json
-# Translation URL to real pathname
-Alias /cvmfs/${name} ${storage_dir}
-<Directory "${storage_dir}">
-    Options -MultiViews
-    AllowOverride Limit
-    $(get_compatible_apache_allow_from_all_config)
-
-    EnableMMAP Off
-    EnableSendFile Off
-
-    <FilesMatch "^\.cvmfs">
-        ForceType application/x-cvmfs
-    </FilesMatch>
-
-    Header unset Last-Modified
-    FileETag None
-
-    ExpiresActive On
-    ExpiresDefault "access plus 3 days"
-    ExpiresByType application/x-cvmfs "access plus 2 minutes"
-    ExpiresByType application/json    "access plus 2 minutes"
-</Directory>
-EOF
-}
-
-has_apache_config_for_global_info() {
-  has_apache_config_file $(get_apache_conf_filename "info")
-}
-
-create_apache_config_for_global_info() {
-  ! has_apache_config_for_global_info || return 0
-  local storage_dir="${DEFAULT_LOCAL_STORAGE}/info"
-  create_apache_config_for_endpoint "info" "$storage_dir"
-}
 
 remove_config_files() {
   local name=$1
