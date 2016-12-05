@@ -642,6 +642,30 @@ void HeaderLists::AppendHeader(curl_slist *slist, const char *header) {
 }
 
 
+/**
+ * Ensures that a certain header string is _not_ part of slist on return.
+ * Note that if the first header element matches, the returned slist points
+ * to a different value.
+ */
+void HeaderLists::CutHeader(const char *header, curl_slist **slist) {
+  assert(slist);
+  curl_slist head;
+  head.next = *slist;
+  curl_slist *prev = &head;
+  curl_slist *rover = *slist;
+  while (rover) {
+    if (strcmp(rover->data, header) == 0) {
+      prev->next = rover->next;
+      Put(rover);
+      rover = prev;
+    }
+    prev = rover;
+    rover = rover->next;
+  }
+  *slist = head.next;
+}
+
+
 void HeaderLists::PutList(curl_slist *slist) {
   while (slist) {
     curl_slist *next = slist->next;
