@@ -463,7 +463,7 @@ check_upstream_validity() {
 # @return  0 if overlayfs is installed and viable
 check_overlayfs_version() {
   [ -z "$CVMFS_DONT_CHECK_OVERLAYFS_VERSION" ] || return 0
-  local krnl_version=$(uname -r | grep -oe '^[0-9]\+\.[0-9]\+.[0-9]\+')
+  local krnl_version=$(cvmfs_sys_uname)
   compare_versions "$krnl_version" -ge "4.2.0"
 }
 

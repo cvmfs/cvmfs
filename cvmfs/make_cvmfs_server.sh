@@ -26,6 +26,7 @@ echo '
 
 # List the components that make up the resulting file
 COMPONENTS="\
+    server/cvmfs_server_sys.sh
     server/cvmfs_server_prelude.sh
     server/cvmfs_server_util.sh
     server/cvmfs_server_ssl.sh
