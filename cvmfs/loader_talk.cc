@@ -141,7 +141,7 @@ int MainReload(const std::string &socket_path, const bool stop_and_go) {
   (void) read(socket_fd, &result, sizeof(result));
   if (result != kFailOk) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Reload FAILED! "
-             "CernVM-FS mountpoints unusuable.");
+             "CernVM-FS mountpoints unusuable. [%d, %d]", retval, result);
   }
 
   return result;
