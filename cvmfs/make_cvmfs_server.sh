@@ -6,8 +6,12 @@
 
 # Create the `cvmfs_server` script
 
-
-OUTPUT_FILE="cvmfs_server"
+if [ "x$1" != "x" ]; then
+    OUTPUT_FILE="$1"
+else
+    echo "Missing parameter. Call ./make_cvmfs_server.sh <OUTPUT_FILE>"
+    exit 1
+fi
 
 # Make an fresh OUTPUT_FILE to begin
 echo '
