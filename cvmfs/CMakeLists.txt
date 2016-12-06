@@ -772,6 +772,17 @@ if (BUILD_PRELOADER)
   )
 endif (BUILD_PRELOADER)
 
+
+#
+# Generate the "cvmfs_server" script using "make_cvmfs_server.sh"
+#
+add_custom_target (
+  cvmfs_server
+  ALL
+  COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR} && ./make_cvmfs_server.sh ${CMAKE_CURRENT_BINARY_DIR}/cvmfs_server
+  COMMENT "Generating the cvmfs_server script"
+  )
+
 #
 # installation
 #
@@ -846,7 +857,7 @@ if (BUILD_SERVER)
   endif (BUILD_SERVER_DEBUG)
 
   install (
-    FILES      cvmfs_server
+    FILES      ${${PROJECT_NAME}_BINARY_DIR}/cvmfs/cvmfs_server
     DESTINATION    bin
     PERMISSIONS    OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
   )
