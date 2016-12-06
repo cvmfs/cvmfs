@@ -1,0 +1,22 @@
+
+cvmfs_test_name="Check listing repositories in cvmfs_config"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  cvmfs_mount sft.cern.ch || return 1
+  ls /cvmfs/sft.cern.ch || return 2
+  local num_status=$(cvmfs_config status | wc -l)
+  if [ $num_status -lt 1 ]; then
+    return 3
+  fi
+
+  cd /usr/bin || return 10
+  num_status=$(cvmfs_config status | wc -l)
+  if [ $num_status -lt 1 ]; then
+    return 11
+  fi
+
+  return 0
+}
+
