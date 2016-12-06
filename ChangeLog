@@ -22,6 +22,7 @@
   * Fix handling of file:// url in CVMFS_SERVER_URL
 
 2.3.3:
+  * Fix cvmfs_config on EL7 if working directory is /usr/bin (CVM-1118)
   * Perform host failover on corrupted data (CVM-478)
   * Fix cvmfs_config umount failure output
   * Fix comment in default.conf (CVM-1105)
