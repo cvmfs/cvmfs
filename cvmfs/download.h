@@ -270,6 +270,7 @@ class HeaderLists {
   curl_slist *GetList(const char *header);
   curl_slist *DuplicateList(curl_slist *slist);
   void AppendHeader(curl_slist *slist, const char *header);
+  void CutHeader(const char *header, curl_slist **slist);
   void PutList(curl_slist *slist);
   std::string Print(curl_slist *slist);
 
@@ -422,6 +423,7 @@ class DownloadManager {
   bool CanRetry(const JobInfo *info);
   void Backoff(JobInfo *info);
   void SetNocache(JobInfo *info);
+  void SetRegularCache(JobInfo *info);
   bool VerifyAndFinalize(const int curl_error, JobInfo *info);
   void InitHeaders();
   void FiniHeaders();

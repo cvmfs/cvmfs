@@ -50,4 +50,35 @@ TEST_F(T_HeaderLists, Intrinsics) {
   delete header_lists;
 }
 
+
+TEST_F(T_HeaderLists, CutHeader) {
+  curl_slist *headers = NULL;
+  header_lists->CutHeader("Cut: Me", &headers);
+  EXPECT_EQ(NULL, headers);
+
+  headers = header_lists->GetList("Cut: Me");
+  header_lists->CutHeader("Cut: Me", &headers);
+  EXPECT_EQ(NULL, headers);
+
+  headers = header_lists->GetList("Cut: Me");
+  header_lists->CutHeader("Cut: Me", &headers);
+  EXPECT_EQ(NULL, headers);
+
+  headers = header_lists->GetList("Key: Value");
+  header_lists->AppendHeader(headers, "Cut: Me");
+  header_lists->AppendHeader(headers, "Key: Value");
+  header_lists->AppendHeader(headers, "Cut: Me");
+  header_lists->AppendHeader(headers, "Key: Value");
+  header_lists->CutHeader("Cut: Me", &headers);
+  EXPECT_EQ("Key: Value\nKey: Value\nKey: Value\n",
+            header_lists->Print(headers));
+  header_lists->PutList(headers);
+
+  headers = header_lists->GetList("Key: Value");
+  header_lists->AppendHeader(headers, "A: Nother");
+  header_lists->CutHeader("Cut: Me", &headers);
+  EXPECT_EQ("Key: Value\nA: Nother\n", header_lists->Print(headers));
+  header_lists->PutList(headers);
+}
+
 }  // namespace download
