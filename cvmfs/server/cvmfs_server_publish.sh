@@ -209,16 +209,28 @@ cvmfs_server_publish() {
     if [ "x${CVMFS_VOMS_AUTHZ}" != x ]; then
       sync_command="$sync_command -V"
     fi
-    local tag_command="$(__swissknife_cmd dbg) tag_create \
-      -r $upstream                                        \
-      -w $stratum0                                        \
-      -t ${spool_dir}/tmp                                 \
-      -m $manifest                                        \
-      -p /etc/cvmfs/keys/${name}.pub                      \
-      -f $name                                            \
-      -b $base_hash                                       \
-      -e $hash_algorithm                                  \
-      $(get_follow_http_redirects_flag)                   \
+    if [ "x$CVMFS_IGNORE_SPECIAL_FILES" = "xtrue" ]; then
+      sync_command="$sync_command -g"
+    fi
+    local sync_command_virtual_dir=
+    if [ "x${CVMFS_VIRTUAL_DIR}" = "xtrue" ]; then
+      sync_command_virtual_dir="$sync_command -S snapshots"
+    else
+      if [ -d /cvmfs/$name/.cvmfs ]; then
+        sync_command_virtual_dir="$sync_command -S remove"
+      fi
+    fi
+
+    local tag_command="$(__swissknife_cmd dbg) tag_edit \
+      -r $upstream                                      \
+      -w $stratum0                                      \
+      -t ${spool_dir}/tmp                               \
+      -m $manifest                                      \
+      -p /etc/cvmfs/keys/${name}.pub                    \
+      -f $name                                          \
+      -b $base_hash                                     \
+      -e $hash_algorithm                                \
+      $(get_follow_http_redirects_flag)                 \
       -x" # -x enables magic undo tag handling
     if [ ! -z "$tag_name" ]; then
       tag_command="$tag_command -a $tag_name"
@@ -227,12 +239,12 @@ cvmfs_server_publish() {
       tag_command="$tag_command -c $tag_channel"
     fi
     if [ ! -z "$tag_description" ]; then
-      tag_command="$tag_command -d \"$tag_description\""
+      tag_command="$tag_command -D \"$tag_description\""
     fi
 
     local tag_cleanup_command=
     if [ ! -z "$auto_tag_cleanup_list" ]; then
-      tag_cleanup_command="$(__swissknife_cmd dbg) tag_remove \
+      tag_cleanup_command="$(__swissknife_cmd dbg) tag_edit \
         -r $upstream                                        \
         -w $stratum0                                        \
         -t ${spool_dir}/tmp                                 \
@@ -263,11 +275,21 @@ cvmfs_server_publish() {
     if [ ! -z "$tag_cleanup_command" ]; then
       echo "Removing outdated automatically generated tags for $name..."
       $user_shell "$tag_cleanup_command" || { publish_failed $name; die "Removing tags failed\n\nExecuted Command:\n$tag_cleanup_command";  }
+      # write intermediate history hash to reflog
+      sign_manifest $name $manifest "" true
     fi
 
     # add a tag for the new revision
     echo "Tagging $name"
     $user_shell "$tag_command" || { publish_failed $name; die "Tagging failed\n\nExecuted Command:\n$tag_command";  }
+
+    if [ "x$sync_command_virtual_dir" != "x" ]; then
+      # write intermediate catalog hash and history to reflog
+      sign_manifest $name $manifest "" true
+      $user_shell "$sync_command_virtual_dir" || { publish_failed $name; die "Editing .cvmfs failed\n\nExecuted Command:\n$sync_command_virtual_dir";  }
+      local trunk_hash=$(grep "^C" $manifest | tr -d C)
+      $user_shell "$tag_command_undo_tags" || { publish_failed $name; die "Creating undo tags\n\nExecuted Command:\n$tag_command_undo_tags";  }
+    fi
 
     # finalizing transaction
     echo "Flushing file system buffers"

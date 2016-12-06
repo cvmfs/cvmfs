@@ -440,6 +440,10 @@ sign_manifest() {
   local name=$1
   local unsigned_manifest=$2
   local metainfo_file=$3
+  local return_early=
+  if [ "x$4" = "xtrue" ]; then
+    return_early="-e"
+  fi
 
   load_repo_config $name
   local user_shell="$(get_user_shell $name)"
@@ -451,7 +455,7 @@ sign_manifest() {
           -u $CVMFS_STRATUM0                   \
           -m $unsigned_manifest                \
           -t ${CVMFS_SPOOL_DIR}/tmp            \
-          -r $CVMFS_UPSTREAM_STORAGE"
+          -r $CVMFS_UPSTREAM_STORAGE $return_early"
 
   if [ x"$metainfo_file" != x"" ]; then
     sign_command="$sign_command -M $metainfo_file"
