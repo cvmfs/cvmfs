@@ -1349,7 +1349,9 @@ waitfor() {
 
 
 list_mounts() {
-  mount -t $fuse_fs_type | grep "^cvmfs2[[:space:]]"
+  # Matches lines that begin with cvmfs2 or /usr/bin/cvmfs2 (/bin/cvmfs2,
+  # /usr/local/bin/cvmfs2)
+  mount -t $fuse_fs_type | grep "^\(/[^[:space:]]*/\)\?cvmfs2[[:space:]]"
 }
 
 
