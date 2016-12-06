@@ -22,6 +22,7 @@
   * Fix handling of file:// url in CVMFS_SERVER_URL
 
 2.3.3:
+  * Fix cvmfs_config umount failure output
   * Fix comment in default.conf (CVM-1105)
   * Fix history file leak on auto tag removal
   * Fix crash when 'cvmfs_talk cleanup rate' is called without argument
