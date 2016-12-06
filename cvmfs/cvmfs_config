@@ -1349,9 +1349,7 @@ waitfor() {
 
 
 list_mounts() {
-  # Fix for CernVM: /cvmfs is a bind mountpoint from /mnt/.rw/cvmfs
-  mount -t $fuse_fs_type | grep "^cvmfs2[[:space:]]" \
-    | grep -v "[[:space:]]/mnt/.rw/cvmfs/"
+  mount -t $fuse_fs_type | grep "^cvmfs2[[:space:]]"
 }
 
 
