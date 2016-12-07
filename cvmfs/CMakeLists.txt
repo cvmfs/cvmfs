@@ -182,6 +182,11 @@ set (CVMFS_CACHE_NULL_SOURCES
   cache_plugin/cvmfs_cache_null.cc
 )
 
+set (CVMFS_CACHE_RAM_SOURCES
+  cache_plugin/libcvmfs_cache.h
+  cache_plugin/cvmfs_cache_ram.cc
+)
+
 set (CVMFS_FSCK_SOURCES
   atomic.h
   compression.cc compression.h
@@ -541,6 +546,12 @@ if (BUILD_LIBCVMFS_CACHE)
                         ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a
                         ${OPENSSL_LIBRARIES} ${RT_LIBRARY} pthread)
   add_dependencies (cvmfs_cache_null libcvmfs_cache)
+
+  add_executable(cvmfs_cache_ram ${CVMFS_CACHE_RAM_SOURCES})
+  target_link_libraries(cvmfs_cache_ram
+                        ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a
+                        ${OPENSSL_LIBRARIES} ${RT_LIBRARY} pthread)
+  add_dependencies (cvmfs_cache_ram libcvmfs_cache)
 endif (BUILD_LIBCVMFS_CACHE)
 
 
