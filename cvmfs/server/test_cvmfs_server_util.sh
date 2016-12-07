@@ -8,18 +8,56 @@
 
 . ./cvmfs_server_util.sh
 
-### check_overlayfs_version
+print_check() {
+    echo "Got: $1 Expected: $2"
+}
 
-mock_kernel_version="4.2.0"
+### Testing check_overlayfs_version
+
 cvmfs_sys_uname() {
     echo $mock_kernel_version
 }
 
-res=$(check_overlayfs_version; echo $?)
-printf "Kernel version: %s; Calling check_overlayfs_version: %s\n" $mock_kernel_version $res
+# check_overlayfs_version will call cvmfs_sys_is_redhat
+cvmfs_sys_is_redhat() {
+    return $mock_is_redhat
+}
 
-mock_kernel_version="4.1.1"
+mock_kernel_version="4.2.0"
+mock_is_redhat=0 # true
+printf "Kernel version: %s; RedHat: %s\n" $mock_kernel_version $mock_is_redhat
+print_check $(check_overlayfs_version; echo $?) 0
 
-res=$(check_overlayfs_version; echo $?)
-printf "Kernel version: %s; Calling check_overlayfs_version: %s\n" $mock_kernel_version $res
+mock_kernel_version="4.2.0-100"
+printf "Kernel version: %s; RedHat: %s\n" $mock_kernel_version $mock_is_redhat
+print_check $(check_overlayfs_version; echo $?) 0
+
+mock_kernel_version="3.10.0-493"
+printf "Kernel version: %s; RedHat: %s\n" $mock_kernel_version $mock_is_redhat
+print_check $(check_overlayfs_version; echo $?) 0
+
+mock_kernel_version="3.10.0-999"
+printf "Kernel version: %s; RedHat: %s\n" $mock_kernel_version $mock_is_redhat
+print_check $(check_overlayfs_version; echo $?) 0
+
+mock_kernel_version="3.10.0-492"
+printf "Kernel version: %s; RedHat: %s\n" $mock_kernel_version $mock_is_redhat
+print_check $(check_overlayfs_version; echo $?) 1
+
+mock_kernel_version="3.10.0"
+printf "Kernel version: %s; RedHat: %s\n" $mock_kernel_version $mock_is_redhat
+print_check $(check_overlayfs_version; echo $?) 1
+
+mock_kernel_version="3.10.0-493"
+mock_is_redhat=1 # False
+printf "Kernel version: %s; RedHat: %s\n" $mock_kernel_version $mock_is_redhat
+print_check $(check_overlayfs_version; echo $?) 1
+
+mock_kernel_version="3.10.0-492"
+printf "Kernel version: %s; RedHat: %s\n" $mock_kernel_version $mock_is_redhat
+print_check $(check_overlayfs_version; echo $?) 1
+
+mock_kernel_version="3.10.0"
+printf "Kernel version: %s; RedHat: %s\n" $mock_kernel_version $mock_is_redhat
+print_check $(check_overlayfs_version; echo $?) 1
 

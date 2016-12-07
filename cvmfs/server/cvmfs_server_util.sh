@@ -464,7 +464,13 @@ check_upstream_validity() {
 check_overlayfs_version() {
   [ -z "$CVMFS_DONT_CHECK_OVERLAYFS_VERSION" ] || return 0
   local krnl_version=$(cvmfs_sys_uname)
-  compare_versions "$krnl_version" -ge "4.2.0"
+  if compare_versions "$krnl_version" -ge "4.2.0" ; then
+      return 0
+  elif cvmfs_sys_is_redhat && $(compare_versions "$krnl_version" -ge "3.10.0-493") ; then
+      return 0
+  else
+      return 1
+  fi
 }
 
 
