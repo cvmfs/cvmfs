@@ -8,8 +8,9 @@
 # cvmfs_server script should interact with the underlying system only through the functions
 # defined here. This allows simple(r) unit testing of the "cvmfs_server" script
 
+# Returns the major.minor.patch-build kernel version string
 cvmfs_sys_uname() {
-    uname -r | grep -oe '^[0-9]\+\.[0-9]\+.[0-9]\+'
+    uname -r | grep -oe '^[0-9]\+\.[0-9]\+.[0-9]\+-*[0-9]*'
 }
 
 cvmfs_sys_is_regular_file() {
