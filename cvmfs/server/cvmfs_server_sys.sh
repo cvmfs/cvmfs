@@ -12,3 +12,8 @@ cvmfs_sys_uname() {
     uname -r | grep -oe '^[0-9]\+\.[0-9]\+.[0-9]\+'
 }
 
+cvmfs_sys_is_regular_file() {
+    [ -f $1 ]
+    echo $?
+}
+

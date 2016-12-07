@@ -189,11 +189,11 @@ cvmfs_server_import() {
 
   # check whitelist expiry date
   if [ $recreate_whitelist -eq 0 ]; then
-    [ -f "${storage_location}/.cvmfswhitelist" ] || die "didn't find ${storage_location}/.cvmfswhitelist"
+    cvmfs_sys_is_regular_file "${storage_location}/.cvmfswhitelist" || die "didn't find ${storage_location}/.cvmfswhitelist"
     local expiry=$(get_expiry_from_string "$(cat "${storage_location}/.cvmfswhitelist")")
     [ $expiry -gt 0 ] || die "Repository whitelist expired (use -r maybe?)"
   else
-    [ -f ${keys_location}/${master_key} ] || die "no master key found for whitelist recreation"
+    cvmfs_sys_is_regular_file ${keys_location}/${master_key} || die "no master key found for whitelist recreation"
   fi
 
   # set up desaster cleanup
@@ -221,7 +221,7 @@ cvmfs_server_import() {
 
   # import the old repository security keys
   echo -n "Importing the given key files... "
-  if [ -f ${keys_location}/${master_key} ]; then
+  if cvmfs_sys_is_regular_file ${keys_location}/${master_key} ; then
     keys="$keys $master_key"
   fi
   import_keychain $name "$keys_location" $cvmfs_user "$keys" > /dev/null || die "fail!"
@@ -234,7 +234,7 @@ cvmfs_server_import() {
   echo "done"
 
   # create reflog checksum
-  if [ -f ${storage_location}/.cvmfsreflog ]; then
+  if cvmfs_sys_is_regular_file ${storage_location}/.cvmfsreflog ; then
     echo -n "Re-creating reflog content hash... "
     local reflog_hash=$(cat ${storage_location}/.cvmfsreflog | cvmfs_swissknife hash -a sha1)
     echo -n $reflog_hash > "${CVMFS_SPOOL_DIR}/reflog.chksum"
@@ -315,7 +315,7 @@ cvmfs_server_import() {
   echo "done"
 
   # the .cvmfsdirtab semantics might need an update
-  if [ $is_legacy -ne 0 ] && [ -f /cvmfs/${name}/.cvmfsdirtab ]; then
+  if [ $is_legacy -ne 0 ] && cvmfs_sys_is_regular_file /cvmfs/${name}/.cvmfsdirtab ; then
     echo -n "Migrating .cvmfsdirtab... "
     migrate_legacy_dirtab $name || die "fail!"
     echo "done"

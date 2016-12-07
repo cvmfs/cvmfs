@@ -51,7 +51,7 @@ The required package is called ${APACHE_WSGI_MODPKG}."
   if is_redhat; then
     case "`cat /etc/redhat-release`" in
       *"release 5."*)
-        if [ -f /etc/httpd/conf.d/wsgi.conf ]; then
+        if cvmfs_sys_is_regular_file /etc/httpd/conf.d/wsgi.conf ; then
           # older el5 epel versions didn't automatically enable it
           echo "To enable the module, see instructions in /etc/httpd/conf.d/wsgi.conf"
         else
@@ -192,7 +192,7 @@ has_apache_config_file() {
   local file_name=$1
   local conf_path
   conf_path="$(get_apache_conf_path)/${file_name}"
-  [ -f $conf_path ]
+  cvmfs_sys_is_regular_file $conf_path
 }
 
 

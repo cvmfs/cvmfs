@@ -122,7 +122,7 @@ check_autofs_on_cvmfs() {
 # @return       0 if it is a stratum 0 repository
 is_stratum0() {
   local name=$1
-  ! [ -f /etc/cvmfs/repositories.d/$name/replica.conf ]
+  ! cvmfs_sys_is_regular_file /etc/cvmfs/repositories.d/$name/replica.conf
 }
 
 
@@ -266,7 +266,7 @@ __is_valid_lock() {
   local ignore_stale="$2"
 
   local lock_file="${path}.lock"
-  [ -f $lock_file ]      || return 1 # lock doesn't exist
+  cvmfs_sys_is_regular_file $lock_file || return 1 # lock doesn't exist
   [ -z "$ignore_stale" ] || return 0 # lock is there (skip the stale test)
 
   local stale_pid=$(cat $lock_file 2>/dev/null)
@@ -480,7 +480,7 @@ check_cvmfs2_client() {
 # allows AUFS to properly whiteout files without root privileges
 # Note: this function requires a privileged user
 lower_hardlink_restrictions() {
-  if [ -f /proc/sys/kernel/yama/protected_nonaccess_hardlinks ] && \
+  if cvmfs_sys_is_regular_file /proc/sys/kernel/yama/protected_nonaccess_hardlinks && \
      [ $(cat /proc/sys/kernel/yama/protected_nonaccess_hardlinks) -ne 0 ]; then
     # disable hardlink restrictions at runtime
     sysctl -w kernel.yama.protected_nonaccess_hardlinks=0 > /dev/null 2>&1 || return 1
@@ -542,7 +542,7 @@ find_sbin() {
 
 
 is_redhat() {
-  [ -f /etc/redhat-release ]
+  cvmfs_sys_is_regular_file /etc/redhat-release
 }
 
 
@@ -721,7 +721,7 @@ get_reflog_checksum() {
 has_reflog_checksum() {
   local name=$1
 
-  [ -f $(get_reflog_checksum $name) ]
+  cvmfs_sys_is_regular_file $(get_reflog_checksum $name)
 }
 
 

@@ -165,7 +165,7 @@ _migrate_2_1_15() {
   fi
   # else apache is currently stopped, add-replica may have been run with -a
 
-  if [ -f "$conf_file" ]; then
+  if cvmfs_sys_is_regular_file "$conf_file" ; then
     echo "--> updating $conf_file"
     (echo "# Created by cvmfs_server.  Don't touch."
      cat_wsgi_config $name
@@ -241,7 +241,7 @@ _migrate_2_1_20() {
     fi
   fi
 
-  if is_local_upstream $CVMFS_UPSTREAM_STORAGE && [ -f "$apache_conf" ]; then
+  if is_local_upstream $CVMFS_UPSTREAM_STORAGE && cvmfs_sys_is_regular_file "$apache_conf" ; then
     echo "--> updating apache config ($(basename $apache_conf))"
     local storage_dir=$(get_upstream_config $CVMFS_UPSTREAM_STORAGE)
     local wsgi=""
