@@ -541,11 +541,6 @@ find_sbin() {
 }
 
 
-is_redhat() {
-  cvmfs_sys_is_regular_file /etc/redhat-release
-}
-
-
 # whenever you print the version string you should use this function since
 # a repository created before CernVM-FS 2.1.7 cannot be fingerprinted
 # correctly...

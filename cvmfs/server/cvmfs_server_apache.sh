@@ -48,7 +48,7 @@ check_wsgi_module() {
 
   echo "The apache wsgi module must be installed and enabled.
 The required package is called ${APACHE_WSGI_MODPKG}."
-  if is_redhat; then
+  if cvmfs_sys_is_redhat; then
     case "`cat /etc/redhat-release`" in
       *"release 5."*)
         if cvmfs_sys_is_regular_file /etc/httpd/conf.d/wsgi.conf ; then

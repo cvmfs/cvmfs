@@ -13,12 +13,19 @@ cvmfs_sys_uname() {
     uname -r | grep -oe '^[0-9]\+\.[0-9]\+.[0-9]\+-*[0-9]*'
 }
 
+
 cvmfs_sys_is_regular_file() {
     [ -f $1 ]
     echo $?
 }
 
+
 cvmfs_sys_file_is_executable() {
     [ -x $1 ]
     echo $?
+}
+
+
+cvmfs_sys_is_redhat() {
+  cvmfs_sys_is_regular_file /etc/redhat-release
 }
