@@ -17,3 +17,7 @@ cvmfs_sys_is_regular_file() {
     echo $?
 }
 
+cvmfs_sys_file_is_executable() {
+    [ -x $1 ]
+    echo $?
+}

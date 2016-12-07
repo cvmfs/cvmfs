@@ -472,7 +472,7 @@ check_overlayfs_version() {
 #
 # @return  0 if cvmfs2 client is installed
 check_cvmfs2_client() {
-  [ -x /usr/bin/cvmfs2 ]
+  cvmfs_sys_file_is_executable /usr/bin/cvmfs2
 }
 
 
@@ -502,7 +502,7 @@ EOF
 _setcap_if_needed() {
   local binary_path="$1"
   local capability="$2"
-  [ -x $binary_path ]                                || return 0
+  cvmfs_sys_file_is_executable $binary_path                                || return 0
   $GETCAP_BIN "$binary_path" | grep -q "$capability" && return 0
   $SETCAP_BIN "${capability}+p" "$binary_path"
 }
@@ -532,7 +532,7 @@ find_sbin() {
   local bin_path=""
   for d in /sbin /usr/sbin /usr/local/sbin /bin /usr/bin /usr/local/bin; do
     bin_path="${d}/${bin_name}"
-    if [ -x "$bin_path" ]; then
+    if cvmfs_sys_file_is_executable "$bin_path" ; then
       echo "$bin_path"
       return 0
     fi
@@ -598,8 +598,8 @@ get_upstream_config() {
 
 
 has_selinux() {
-  [ -x $SESTATUS_BIN   ] && \
-  [ -x $GETENFORCE_BIN ] && \
+  cvmfs_sys_file_is_executable $SESTATUS_BIN && \
+  cvmfs_sys_file_is_executable $GETENFORCE_BIN && \
   $GETENFORCE_BIN | grep -qi "enforc" || return 1
 }
 

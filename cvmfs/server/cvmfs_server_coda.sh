@@ -69,11 +69,11 @@ fi
 
 SERVICE_BIN="false"
 if ! $PIDOF_BIN systemd > /dev/null 2>&1 || [ $(minpidof systemd) -ne 1 ]; then
-  if [ -x /sbin/service ]; then
+  if cvmfs_sys_file_is_executable /sbin/service ; then
     SERVICE_BIN="/sbin/service"
-  elif [ -x /usr/sbin/service ]; then
+  elif cvmfs_sys_file_is_executable /usr/sbin/service ; then
     SERVICE_BIN="/usr/sbin/service" # Ubuntu
-  elif [ -x /sbin/rc-service ]; then
+  elif cvmfs_sys_file_is_executable /sbin/rc-service ; then
     SERVICE_BIN="/sbin/rc-service" # OpenRC
   else
     die "Neither systemd nor service binary detected"
@@ -83,7 +83,7 @@ fi
 # Check if `runuser` is available on this system
 # Note: at least Ubuntu in older versions doesn't provide this command
 HAS_RUNUSER=0
-if [ -x "$RUNUSER_BIN" ]; then
+if cvmfs_sys_file_is_executable "$RUNUSER_BIN" ; then
   HAS_RUNUSER=1
 fi
 
