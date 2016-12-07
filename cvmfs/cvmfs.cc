@@ -85,7 +85,7 @@
 #include "history_sqlite.h"
 #include "loader.h"
 #include "logging.h"
-#include "lru.h"
+#include "lru_md.h"
 #include "manifest_fetch.h"
 #include "monitor.h"
 #include "mountpoint.h"

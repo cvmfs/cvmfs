@@ -38,7 +38,6 @@
 #include "glue_buffer.h"
 #include "loader.h"
 #include "logging.h"
-#include "lru.h"
 #include "monitor.h"
 #include "mountpoint.h"
 #include "nfs_maps.h"

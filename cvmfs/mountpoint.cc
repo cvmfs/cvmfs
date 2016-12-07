@@ -48,7 +48,7 @@
 #include "history.h"
 #include "history_sqlite.h"
 #include "logging.h"
-#include "lru.h"
+#include "lru_md.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
 #ifdef CVMFS_NFS_SUPPORT

@@ -68,7 +68,7 @@ set (CVMFS_CLIENT_SOURCES
   kvstore.h kvstore.cc
   loader.h
   logging.cc logging.h logging_internal.h
-  lru.h
+  lru.h lru_md.h
   malloc_arena.cc malloc_arena.h
   malloc_heap.cc malloc_heap.h
   manifest.cc manifest.h
@@ -183,8 +183,22 @@ set (CVMFS_CACHE_NULL_SOURCES
 )
 
 set (CVMFS_CACHE_RAM_SOURCES
+  atomic.h
   cache_plugin/libcvmfs_cache.h
   cache_plugin/cvmfs_cache_ram.cc
+  logging.cc logging.h logging_internal.h
+  lru.h
+  malloc_heap.cc malloc_heap.h
+  murmur.h
+  platform.h platform_linux.h platform_osx.h
+  prng.h
+  smallhash.h
+  smalloc.h
+  statistics.h statistics.cc
+  util_concurrency.cc util_concurrency.h util_concurrency_impl.h
+  util/async.h
+  util/single_copy.h
+  util/string.cc util/string.h
 )
 
 set (CVMFS_FSCK_SOURCES
