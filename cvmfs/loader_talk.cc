@@ -133,7 +133,7 @@ int MainReload(const std::string &socket_path, const bool stop_and_go) {
   }
   if (retval != 1) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Reload CRASHED! "
-             "CernVM-FS mountpoints unusuable.");
+             "CernVM-FS mountpoints unusable.");
     return 101;
   }
 
@@ -141,7 +141,7 @@ int MainReload(const std::string &socket_path, const bool stop_and_go) {
   (void) read(socket_fd, &result, sizeof(result));
   if (result != kFailOk) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Reload FAILED! "
-             "CernVM-FS mountpoints unusuable.");
+             "CernVM-FS mountpoints unusable.");
   }
 
   return result;
