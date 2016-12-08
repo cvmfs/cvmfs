@@ -14,7 +14,7 @@ cvmfs_sys_uname() {
 }
 
 
-cvmfs_sys_is_regular_file() {
+cvmfs_sys_file_is_regular() {
     [ -f $1 ]
     echo $?
 }
@@ -27,7 +27,7 @@ cvmfs_sys_file_is_executable() {
 
 
 cvmfs_sys_is_redhat() {
-  cvmfs_sys_is_regular_file /etc/redhat-release
+  cvmfs_sys_file_is_regular /etc/redhat-release
 }
 
 

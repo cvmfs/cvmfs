@@ -35,7 +35,7 @@ _write_info_file() {
 
 _check_info_file() {
   local info_file="${1}.json"
-  cvmfs_sys_is_regular_file "$(get_global_info_v1_path)/${info_file}"
+  cvmfs_sys_file_is_regular "$(get_global_info_v1_path)/${info_file}"
 }
 
 

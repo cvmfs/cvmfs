@@ -268,7 +268,7 @@ cvmfs_server_publish() {
     # synchronize the repository
     publish_starting $name
     $user_shell "$sync_command" || { publish_failed $name; die "Synchronization failed\n\nExecuted Command:\n$sync_command";   }
-    cvmfs_sys_is_regular_file $manifest            || { publish_failed $name; die "Manifest creation failed\n\nExecuted Command:\n$sync_command"; }
+    cvmfs_sys_file_is_regular $manifest            || { publish_failed $name; die "Manifest creation failed\n\nExecuted Command:\n$sync_command"; }
     local trunk_hash=$(grep "^C" $manifest | tr -d C)
 
     # Remove outdated automatically created tags

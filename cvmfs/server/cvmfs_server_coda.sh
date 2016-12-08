@@ -31,7 +31,7 @@ abort_after_hook() { :; }
 publish_before_hook() { :; }
 publish_after_hook() { :; }
 
-cvmfs_sys_is_regular_file /etc/cvmfs/cvmfs_server_hooks.sh && . /etc/cvmfs/cvmfs_server_hooks.sh
+cvmfs_sys_file_is_regular /etc/cvmfs/cvmfs_server_hooks.sh && . /etc/cvmfs/cvmfs_server_hooks.sh
 
 # Path to some useful sbin utilities
 LSOF_BIN="$(find_sbin       lsof)"       || true
@@ -106,7 +106,7 @@ CVMFS_SERVER_SWISSKNIFE_DEBUG=$CVMFS_SERVER_SWISSKNIFE
 
 # enable the debug mode?
 if [ $CVMFS_SERVER_DEBUG -ne 0 ]; then
-  if cvmfs_sys_is_regular_file /usr/bin/cvmfs_swissknife_debug ; then
+  if cvmfs_sys_file_is_regular /usr/bin/cvmfs_swissknife_debug ; then
     case $CVMFS_SERVER_DEBUG in
       1)
         # in case something breaks we are provided with a GDB prompt.
