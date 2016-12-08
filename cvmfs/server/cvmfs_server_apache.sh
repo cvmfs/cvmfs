@@ -48,10 +48,10 @@ check_wsgi_module() {
 
   echo "The apache wsgi module must be installed and enabled.
 The required package is called ${APACHE_WSGI_MODPKG}."
-  if is_redhat; then
+  if cvmfs_sys_is_redhat; then
     case "`cat /etc/redhat-release`" in
       *"release 5."*)
-        if [ -f /etc/httpd/conf.d/wsgi.conf ]; then
+        if cvmfs_sys_file_is_regular /etc/httpd/conf.d/wsgi.conf ; then
           # older el5 epel versions didn't automatically enable it
           echo "To enable the module, see instructions in /etc/httpd/conf.d/wsgi.conf"
         else
@@ -192,7 +192,7 @@ has_apache_config_file() {
   local file_name=$1
   local conf_path
   conf_path="$(get_apache_conf_path)/${file_name}"
-  [ -f $conf_path ]
+  cvmfs_sys_file_is_regular $conf_path
 }
 
 

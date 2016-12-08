@@ -31,7 +31,7 @@ abort_after_hook() { :; }
 publish_before_hook() { :; }
 publish_after_hook() { :; }
 
-[ -f /etc/cvmfs/cvmfs_server_hooks.sh ] && . /etc/cvmfs/cvmfs_server_hooks.sh
+cvmfs_sys_file_is_regular /etc/cvmfs/cvmfs_server_hooks.sh && . /etc/cvmfs/cvmfs_server_hooks.sh
 
 # Path to some useful sbin utilities
 LSOF_BIN="$(find_sbin       lsof)"       || true
@@ -69,11 +69,11 @@ fi
 
 SERVICE_BIN="false"
 if ! $PIDOF_BIN systemd > /dev/null 2>&1 || [ $(minpidof systemd) -ne 1 ]; then
-  if [ -x /sbin/service ]; then
+  if cvmfs_sys_file_is_executable /sbin/service ; then
     SERVICE_BIN="/sbin/service"
-  elif [ -x /usr/sbin/service ]; then
+  elif cvmfs_sys_file_is_executable /usr/sbin/service ; then
     SERVICE_BIN="/usr/sbin/service" # Ubuntu
-  elif [ -x /sbin/rc-service ]; then
+  elif cvmfs_sys_file_is_executable /sbin/rc-service ; then
     SERVICE_BIN="/sbin/rc-service" # OpenRC
   else
     die "Neither systemd nor service binary detected"
@@ -83,7 +83,7 @@ fi
 # Check if `runuser` is available on this system
 # Note: at least Ubuntu in older versions doesn't provide this command
 HAS_RUNUSER=0
-if [ -x "$RUNUSER_BIN" ]; then
+if cvmfs_sys_file_is_executable "$RUNUSER_BIN" ; then
   HAS_RUNUSER=1
 fi
 
@@ -106,7 +106,7 @@ CVMFS_SERVER_SWISSKNIFE_DEBUG=$CVMFS_SERVER_SWISSKNIFE
 
 # enable the debug mode?
 if [ $CVMFS_SERVER_DEBUG -ne 0 ]; then
-  if [ -f /usr/bin/cvmfs_swissknife_debug ]; then
+  if cvmfs_sys_file_is_regular /usr/bin/cvmfs_swissknife_debug ; then
     case $CVMFS_SERVER_DEBUG in
       1)
         # in case something breaks we are provided with a GDB prompt.

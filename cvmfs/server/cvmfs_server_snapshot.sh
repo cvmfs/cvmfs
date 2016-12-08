@@ -270,7 +270,7 @@ EOF
     if is_local_upstream $upstream; then
       local storage_dir=$(get_upstream_config $upstream)
       local snapshot_file=$storage_dir/.cvmfs_last_snapshot
-      if [ -f $snapshot_file ]; then
+      if cvmfs_sys_file_is_regular $snapshot_file ; then
         snapshot_time="$(stat --format='%Y' $snapshot_file)"
       elif [ $skip_noninitial -eq 1 ]; then
         continue

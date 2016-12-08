@@ -122,7 +122,7 @@ check_autofs_on_cvmfs() {
 # @return       0 if it is a stratum 0 repository
 is_stratum0() {
   local name=$1
-  ! [ -f /etc/cvmfs/repositories.d/$name/replica.conf ]
+  ! cvmfs_sys_file_is_regular /etc/cvmfs/repositories.d/$name/replica.conf
 }
 
 
@@ -266,7 +266,7 @@ __is_valid_lock() {
   local ignore_stale="$2"
 
   local lock_file="${path}.lock"
-  [ -f $lock_file ]      || return 1 # lock doesn't exist
+  cvmfs_sys_file_is_regular $lock_file || return 1 # lock doesn't exist
   [ -z "$ignore_stale" ] || return 0 # lock is there (skip the stale test)
 
   local stale_pid=$(cat $lock_file 2>/dev/null)
@@ -463,8 +463,14 @@ check_upstream_validity() {
 # @return  0 if overlayfs is installed and viable
 check_overlayfs_version() {
   [ -z "$CVMFS_DONT_CHECK_OVERLAYFS_VERSION" ] || return 0
-  local krnl_version=$(uname -r | grep -oe '^[0-9]\+\.[0-9]\+.[0-9]\+')
-  compare_versions "$krnl_version" -ge "4.2.0"
+  local krnl_version=$(cvmfs_sys_uname)
+  if compare_versions "$krnl_version" -ge "4.2.0" ; then
+      return 0
+  elif cvmfs_sys_is_redhat && $(compare_versions "$krnl_version" -ge "3.10.0-493") ; then
+      return 0
+  else
+      return 1
+  fi
 }
 
 
@@ -472,7 +478,7 @@ check_overlayfs_version() {
 #
 # @return  0 if cvmfs2 client is installed
 check_cvmfs2_client() {
-  [ -x /usr/bin/cvmfs2 ]
+  cvmfs_sys_file_is_executable /usr/bin/cvmfs2
 }
 
 
@@ -480,7 +486,7 @@ check_cvmfs2_client() {
 # allows AUFS to properly whiteout files without root privileges
 # Note: this function requires a privileged user
 lower_hardlink_restrictions() {
-  if [ -f /proc/sys/kernel/yama/protected_nonaccess_hardlinks ] && \
+  if cvmfs_sys_file_is_regular /proc/sys/kernel/yama/protected_nonaccess_hardlinks && \
      [ $(cat /proc/sys/kernel/yama/protected_nonaccess_hardlinks) -ne 0 ]; then
     # disable hardlink restrictions at runtime
     sysctl -w kernel.yama.protected_nonaccess_hardlinks=0 > /dev/null 2>&1 || return 1
@@ -502,7 +508,7 @@ EOF
 _setcap_if_needed() {
   local binary_path="$1"
   local capability="$2"
-  [ -x $binary_path ]                                || return 0
+  cvmfs_sys_file_is_executable $binary_path                                || return 0
   $GETCAP_BIN "$binary_path" | grep -q "$capability" && return 0
   $SETCAP_BIN "${capability}+p" "$binary_path"
 }
@@ -532,17 +538,12 @@ find_sbin() {
   local bin_path=""
   for d in /sbin /usr/sbin /usr/local/sbin /bin /usr/bin /usr/local/bin; do
     bin_path="${d}/${bin_name}"
-    if [ -x "$bin_path" ]; then
+    if cvmfs_sys_file_is_executable "$bin_path" ; then
       echo "$bin_path"
       return 0
     fi
   done
   return 1
-}
-
-
-is_redhat() {
-  [ -f /etc/redhat-release ]
 }
 
 
@@ -598,8 +599,8 @@ get_upstream_config() {
 
 
 has_selinux() {
-  [ -x $SESTATUS_BIN   ] && \
-  [ -x $GETENFORCE_BIN ] && \
+  cvmfs_sys_file_is_executable $SESTATUS_BIN && \
+  cvmfs_sys_file_is_executable $GETENFORCE_BIN && \
   $GETENFORCE_BIN | grep -qi "enforc" || return 1
 }
 
@@ -721,7 +722,7 @@ get_reflog_checksum() {
 has_reflog_checksum() {
   local name=$1
 
-  [ -f $(get_reflog_checksum $name) ]
+  cvmfs_sys_file_is_regular $(get_reflog_checksum $name)
 }
 
 

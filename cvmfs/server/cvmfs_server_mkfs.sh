@@ -219,7 +219,7 @@ cvmfs_server_mkfs() {
   local keys="${name}.masterkey ${name}.key ${name}.crt ${name}.pub"
   local keys_are_there=0
   for k in $keys; do
-    if [ -f "${keys_location}/${k}" ]; then
+    if cvmfs_sys_file_is_regular "${keys_location}/${k}"; then
       keys_are_there=1
       break
     fi

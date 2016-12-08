@@ -955,7 +955,7 @@ get_or_guess_repository_name() {
 foreclose_legacy_cvmfs() {
   local found_something=0
 
-  if [ -f /etc/cvmfs/server.conf ] || [ -f /etc/cvmfs/replica.conf ]; then
+  if cvmfs_sys_file_is_regular /etc/cvmfs/server.conf || cvmfs_sys_file_is_regular /etc/cvmfs/replica.conf ; then
     echo "found legacy configuration files in /etc/cvmfs" 1>&2
     found_something=1
   fi
@@ -970,7 +970,7 @@ foreclose_legacy_cvmfs() {
     found_something=1
   fi
 
-  if [ -f /lib/modules/*/extra/cvmfsflt/cvmfsflt.ko ]; then
+  if cvmfs_sys_file_is_regular /lib/modules/*/extra/cvmfsflt/cvmfsflt.ko ; then
     echo "found CernVM-FS 2.0.x kernel module" 1>&2
     found_something=1
   fi

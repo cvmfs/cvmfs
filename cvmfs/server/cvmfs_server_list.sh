@@ -16,7 +16,7 @@ cvmfs_server_list() {
     if [ "x$repository" = "x/etc/cvmfs/repositories.d/*" ]; then
       return 0
     fi
-    if [ -f $repository ]; then
+    if cvmfs_sys_file_is_regular $repository ; then
       echo "Warning: unexpected file '$repository' in directory /etc/cvmfs/repositories.d/"
       continue
     fi
