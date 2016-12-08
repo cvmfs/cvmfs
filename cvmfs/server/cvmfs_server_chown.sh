@@ -38,7 +38,7 @@ cvmfs_server_catalog_chown() {
 
   # sanity checks
   [ x"$uid_map" != x"" ] && cvmfs_sys_file_is_regular $uid_map || die "UID map file not found (-u)"
-  [ x"$gid_map" != x"" ] && cvmfs_sys_file_eixsts $gid_map || die "GID map file not found (-g)"
+  [ x"$gid_map" != x"" ] && cvmfs_sys_file_is_regular $gid_map || die "GID map file not found (-g)"
 
   load_repo_config $name
 
