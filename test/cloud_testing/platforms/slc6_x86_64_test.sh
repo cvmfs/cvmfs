@@ -78,57 +78,58 @@ CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
                               || retval=1
 
 
-echo -n "starting FakeS3 service... "
-s3_retval=0
-fakes3_pid=$(start_fakes3 $FAKE_S3_LOGFILE) || { s3_retval=1; retval=1; echo "fail"; }
-echo "done ($fakes3_pid)"
+# echo -n "starting FakeS3 service... "
+# s3_retval=0
+# fakes3_pid=$(start_fakes3 $FAKE_S3_LOGFILE) || { s3_retval=1; retval=1; echo "fail"; }
+# echo "done ($fakes3_pid)"
 
-if [ $s3_retval -eq 0 ]; then
-  echo "running CernVM-FS server test cases against FakeS3..."
-  CVMFS_TEST_S3_CONFIG=$FAKE_S3_CONFIG                                      \
-  CVMFS_TEST_HTTP_BASE=$FAKE_S3_URL                                         \
-  CVMFS_TEST_SERVER_CACHE='/srv/cache'                                      \
-  CVMFS_TEST_CLASS_NAME=S3ServerIntegrationTests                            \
-  ./run.sh $TEST_S3_LOGFILE -o ${TEST_S3_LOGFILE}${XUNIT_OUTPUT_SUFFIX}     \
-                            -x src/518-hardlinkstresstest                   \
-                               src/519-importlegacyrepo                     \
-                               src/522-missingchunkfailover                 \
-                               src/524-corruptmanifestfailover              \
-                               src/525-bigrepo                              \
-                               src/528-recreatespoolarea                    \
-                               src/530-recreatespoolarea_defaultkey         \
-                               src/537-symlinkedbackend                     \
-                               src/538-symlinkedstratum1backend             \
-                               src/542-storagescrubbing                     \
-                               src/543-storagescrubbing_scriptable          \
-                               src/550-livemigration                        \
-                               src/563-garbagecollectlegacy                 \
-                               src/568-migratecorruptrepo                   \
-                               src/571-localbackendumask                    \
-                               src/572-proxyfailover                        \
-                               src/583-httpredirects                        \
-                               src/585-xattrs                               \
-                               src/591-importrepo                           \
-                               src/594-backendoverwrite                     \
-                               src/595-geoipdbupdate                        \
-                               src/600-securecvmfs                          \
-                               src/605-resurrectancientcatalog              \
-                               src/607-noapache                             \
-                               src/608-infofile                             \
-                               src/610-altpath                              \
-                               src/614-geoservice                           \
-                               src/622-gracefulrmfs                         \
-                               src/626-cacheexpiry                          \
-                               src/700-overlayfsvalidation                  \
-                               --                                           \
-                               src/5*                                       \
-                               src/6*                                       \
-                               src/7*                                       \
-                               || retval=1
+# if [ $s3_retval -eq 0 ]; then
+#   echo "running CernVM-FS server test cases against FakeS3..."
+#   CVMFS_TEST_S3_CONFIG=$FAKE_S3_CONFIG                                      \
+#   CVMFS_TEST_HTTP_BASE=$FAKE_S3_URL                                         \
+#   CVMFS_TEST_SERVER_CACHE='/srv/cache'                                      \
+#   CVMFS_TEST_CLASS_NAME=S3ServerIntegrationTests                            \
+#   ./run.sh $TEST_S3_LOGFILE -o ${TEST_S3_LOGFILE}${XUNIT_OUTPUT_SUFFIX}     \
+#                             -x src/518-hardlinkstresstest                   \
+#                                src/519-importlegacyrepo                     \
+#                                src/522-missingchunkfailover                 \
+#                                src/523-corruptchunkfailover                 \
+#                                src/524-corruptmanifestfailover              \
+#                                src/525-bigrepo                              \
+#                                src/528-recreatespoolarea                    \
+#                                src/530-recreatespoolarea_defaultkey         \
+#                                src/537-symlinkedbackend                     \
+#                                src/538-symlinkedstratum1backend             \
+#                                src/542-storagescrubbing                     \
+#                                src/543-storagescrubbing_scriptable          \
+#                                src/550-livemigration                        \
+#                                src/563-garbagecollectlegacy                 \
+#                                src/568-migratecorruptrepo                   \
+#                                src/571-localbackendumask                    \
+#                                src/572-proxyfailover                        \
+#                                src/583-httpredirects                        \
+#                                src/585-xattrs                               \
+#                                src/591-importrepo                           \
+#                                src/594-backendoverwrite                     \
+#                                src/595-geoipdbupdate                        \
+#                                src/600-securecvmfs                          \
+#                                src/605-resurrectancientcatalog              \
+#                                src/607-noapache                             \
+#                                src/608-infofile                             \
+#                                src/610-altpath                              \
+#                                src/614-geoservice                           \
+#                                src/622-gracefulrmfs                         \
+#                                src/626-cacheexpiry                          \
+#                                src/700-overlayfsvalidation                  \
+#                                --                                           \
+#                                src/5*                                       \
+#                                src/6*                                       \
+#                                src/7*                                       \
+#                                || retval=1
 
-  echo -n "killing FakeS3... "
-  sudo kill -2 $fakes3_pid && echo "done" || echo "fail"
-fi
+#   echo -n "killing FakeS3... "
+#   sudo kill -2 $fakes3_pid && echo "done" || echo "fail"
+# fi
 
 
 echo "running CernVM-FS migration test cases..."
