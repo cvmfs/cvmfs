@@ -66,6 +66,7 @@ enum cvmcache_capabilities {
   CVMCACHE_CAP_ALL         = 31
 };
 
+#define CVMCACHE_SIZE_UNKNOWN (uint64_t(-1))
 
 struct cvmcache_hash {
   unsigned char digest[20];
