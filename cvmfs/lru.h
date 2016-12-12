@@ -595,6 +595,23 @@ class LruCache : SingleCopy {
 
 
   /**
+   * Updates object and moves back to the end of the list.  The object must be
+   * present.
+   */
+  virtual void Update(const Key &key) {
+    Lock();
+    // Is not called from the client, only from the cache plugin
+    assert(!pause_);
+    CacheEntry entry;
+    bool retval = DoLookup(key, &entry);
+    assert(retval);
+    perf::Inc(counters_.n_update);
+    Touch(entry);
+    Unlock();
+  }
+
+
+  /**
    * Changes the value of an entry in the LRU cache without updating the LRU
    * order.
    */
