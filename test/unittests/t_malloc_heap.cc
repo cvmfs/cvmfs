@@ -212,3 +212,25 @@ TEST_F(T_MallocHeap, HasSpaceFor) {
   M.Compact();
   EXPECT_TRUE(M.HasSpaceFor(elem_size));
 }
+
+
+TEST_F(T_MallocHeap, Expand) {
+  IntMap int_map;
+  MallocHeap M(kSmallArena,
+               int_map.MakeCallback(&IntMap::OnBlockMove, &int_map));
+  unsigned i = 0;
+  void *ptr = M.Allocate(8, &i, sizeof(i));
+  EXPECT_TRUE(ptr != NULL);
+
+  void *ptr2 = M.Expand(ptr, 8);
+  EXPECT_TRUE(ptr2 != NULL);
+  EXPECT_NE(ptr, ptr2);
+  EXPECT_EQ(0, memcmp(ptr, ptr2, 8));
+
+  void *ptr3 = M.Expand(ptr2, 16);
+  EXPECT_TRUE(ptr3 != NULL);
+  EXPECT_NE(ptr2, ptr3);
+  EXPECT_EQ(0, memcmp(ptr2, ptr3, 8));
+
+  EXPECT_DEATH(M.Expand(ptr, 4), ".*");
+}

@@ -49,6 +49,7 @@ class MallocHeap {
   ~MallocHeap();
 
   void *Allocate(uint64_t size, void *header, unsigned header_size);
+  void *Expand(void *block, uint64_t new_size);
   void MarkFree(void *block);
   uint64_t GetSize(void *block);
   void Compact();
