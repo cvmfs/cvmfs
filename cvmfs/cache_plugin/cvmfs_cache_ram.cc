@@ -1,8 +1,7 @@
 /**
  * This file is part of the CernVM File System.
  *
- * A demo external cache plugin.  All data is stored in std::string.  Feature-
- * complete but quite inefficient.
+ * A cache plugin that stores all data in memory.
  */
 
 #define __STDC_FORMAT_MACROS
@@ -12,64 +11,126 @@
 #include <stdint.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <cassert>
 #include <cstdio>
 #include <cstring>
-#include <ctime>
-#include <map>
 #include <string>
 #include <vector>
 
-#include "libcvmfs_cache.h"
+#include "cache_plugin/libcvmfs_cache.h"
+#include "lru.h"
+#include "malloc_heap.h"
+#include "platform.h"
+#include "smallhash.h"
 
 using namespace std;  // NOLINT
 
-struct Object {
+/**
+ * Header of the data pieces in the cache.  After the object header, the
+ * zero-terminated description and the object data follows.
+ */
+struct ObjectHeader {
+  ObjectHeader() {
+    memset(&id, 0, sizeof(id));
+    size_data = 0;
+    size_desc = 0;
+    refcnt = 0;
+    type = CVMCACHE_OBJECT_REGULAR;
+  }
+
+  char *GetDescription() {
+    return reinterpret_cast<char *>(this) + sizeof(ObjectHeader);
+  }
+
+  void SetDescription(char *description) {
+    if (description == NULL)
+      return;
+    memcpy(reinterpret_cast<char *>(this) + sizeof(ObjectHeader),
+           description, strlen(description) + 1);
+  }
+
+  unsigned char *GetData() {
+    if (size_desc == 0)
+      return NULL;
+    return reinterpret_cast<unsigned char *>(this) +
+           sizeof(ObjectHeader) + size_desc;
+  }
+
   struct cvmcache_hash id;
-  string data;
+  uint32_t size_data;
+  uint32_t size_desc;
+  // During a transaction, neg_nbytes_written is used to track the number of
+  // already written bytes.  On commit, refcnt is set to 1.
+  union {
+    int32_t refcnt;
+    int32_t neg_nbytes_written;
+  };
   cvmcache_object_type type;
-  int32_t refcnt;
-  string description;
 };
 
-struct TxnInfo {
-  struct cvmcache_hash id;
-  Object partial_object;
-};
 
 struct Listing {
   Listing() : pos(0) { }
-  cvmcache_object_type type;
   uint64_t pos;
-  vector<Object> *elems;
+  vector<struct cvmcache_object_info> elems;
 };
+
 
 struct ComparableHash {
   ComparableHash() { }
   explicit ComparableHash(const struct cvmcache_hash &h) : hash(h) { }
-  struct cvmcache_hash hash;
+  bool operator ==(const ComparableHash &other) const {
+    return cvmcache_hash_cmp(const_cast<cvmcache_hash *>(&(this->hash)),
+                             const_cast<cvmcache_hash *>(&(other.hash))) == 0;
+  }
   bool operator <(const ComparableHash &other) const {
     return cvmcache_hash_cmp(const_cast<cvmcache_hash *>(&(this->hash)),
                              const_cast<cvmcache_hash *>(&(other.hash))) < 0;
   }
+  bool operator >(const ComparableHash &other) const {
+    return cvmcache_hash_cmp(const_cast<cvmcache_hash *>(&(this->hash)),
+                             const_cast<cvmcache_hash *>(&(other.hash))) > 0;
+  }
+
+  struct cvmcache_hash hash;
 };
 
-map<uint64_t, TxnInfo> transactions;
-map<ComparableHash, Object> storage;
-map<uint64_t, Listing> listings;
+
+uint64_t g_max_objects;
+perf::Statistics *g_statistics;
+lru::LruCache<ComparableHash, ObjectHeader *> *g_objects_all;
+lru::LruCache<ComparableHash, ObjectHeader *> *g_objects_volatile;
+SmallHashDynamic<uint64_t, ObjectHeader *> *g_transactions;
+SmallHashDynamic<uint64_t, Listing *> *g_listings;
+MallocHeap *g_storage;
+struct cvmcache_info *g_cache_info;
 
 struct cvmcache_context *ctx;
 
+
+static void TryFreeSpace(uint64_t bytes_required);
+
+
 static int ram_chrefcnt(struct cvmcache_hash *id, int32_t change_by) {
   ComparableHash h(*id);
-  if (storage.find(h) == storage.end())
+  ObjectHeader *object;
+  if (!g_objects_all->Lookup(h, &object))
     return CVMCACHE_STATUS_NOENTRY;
 
-  Object obj = storage[h];
-  obj.refcnt += change_by;
-  if (obj.refcnt < 0)
+  if (object->type == CVMCACHE_OBJECT_VOLATILE)
+    g_objects_volatile->Update(h);
+
+  if (change_by == 0)
+    return CVMCACHE_STATUS_OK;
+  if ((object->refcnt + change_by) < 0)
     return CVMCACHE_STATUS_BADCOUNT;
-  storage[h] = obj;
+
+  if (object->refcnt == 0)
+    g_cache_info->pinned_bytes += object->size_data;
+  object->refcnt += change_by;
+  if (object->refcnt == 0)
+    g_cache_info->pinned_bytes -= object->size_data;
   return CVMCACHE_STATUS_OK;
 }
 
@@ -79,14 +140,14 @@ static int ram_obj_info(
   struct cvmcache_object_info *info)
 {
   ComparableHash h(*id);
-  if (storage.find(h) == storage.end())
+  ObjectHeader *object;
+  if (!g_objects_all->Lookup(h, &object, false))
     return CVMCACHE_STATUS_NOENTRY;
 
-  Object obj = storage[h];
-  info->size = obj.data.length();
-  info->type = obj.type;
-  info->pinned = obj.refcnt > 0;
-  info->description = strdup(obj.description.c_str());
+  info->size = object->size_data;
+  info->type = object->type;
+  info->pinned = object->refcnt > 0;
+  info->description = strdup(object->GetDescription());
   return CVMCACHE_STATUS_OK;
 }
 
@@ -97,12 +158,14 @@ static int ram_pread(struct cvmcache_hash *id,
                     unsigned char *buffer)
 {
   ComparableHash h(*id);
-  string data = storage[h].data;
-  if (offset > data.length())
+  ObjectHeader *object;
+  bool retval = g_objects_all->Lookup(h, &object, false);
+  assert(retval);
+  if (offset > object->size_data)
     return CVMCACHE_STATUS_OUTOFBOUNDS;
   unsigned nbytes =
-    std::min(*size, static_cast<uint32_t>(data.length() - offset));
-  memcpy(buffer, data.data() + offset, nbytes);
+    std::min(*size, static_cast<uint32_t>(object->size_data - offset));
+  memcpy(buffer, object->GetData() + offset, nbytes);
   *size = nbytes;
   return CVMCACHE_STATUS_OK;
 }
@@ -113,16 +176,30 @@ static int ram_start_txn(
   uint64_t txn_id,
   struct cvmcache_object_info *info)
 {
-  Object partial_object;
-  partial_object.id = *id;
-  partial_object.type = info->type;
-  partial_object.refcnt = 1;
-  if (info->description != NULL)
-    partial_object.description = string(info->description);
-  TxnInfo txn;
-  txn.id = *id;
-  txn.partial_object = partial_object;
-  transactions[txn_id] = txn;
+  ObjectHeader object_header;
+  object_header.id = *id;
+  if (info->size != CVMCACHE_SIZE_UNKNOWN)
+    object_header.size_data = info->size;
+  else
+    object_header.size_data = 4096;
+  char *description = NULL;
+  if (info->description != 0) {
+    description = strdupa(info->description);
+    object_header.size_desc = strlen(info->description) + 1;
+  }
+  object_header.refcnt = 1;
+  object_header.type = info->type;
+
+  uint32_t total_size = sizeof(object_header) +
+                        object_header.size_desc + object_header.size_data;
+  TryFreeSpace(total_size);
+  ObjectHeader *allocd_object = reinterpret_cast<ObjectHeader *>(
+    g_storage->Allocate(total_size, &object_header, sizeof(object_header)));
+  if (allocd_object == NULL)
+    return CVMCACHE_STATUS_NOSPACE;
+
+  allocd_object->SetDescription(description);
+  g_transactions->Insert(txn_id, allocd_object);
   return CVMCACHE_STATUS_OK;
 }
 
@@ -132,133 +209,181 @@ static int ram_write_txn(
   unsigned char *buffer,
   uint32_t size)
 {
-  TxnInfo txn = transactions[txn_id];
-  txn.partial_object.data += string(reinterpret_cast<char *>(buffer), size);
-  transactions[txn_id] = txn;
+  ObjectHeader *txn_object;
+  int retval = g_transactions->Lookup(txn_id, &txn_object);
+  assert(retval);
+  assert(size > 0);
+
+  if (txn_object->neg_nbytes_written > 0)
+    txn_object->neg_nbytes_written = 0;
+  if ((size - txn_object->neg_nbytes_written) > txn_object->size_data) {
+    uint32_t new_size = std::max(
+      size - txn_object->neg_nbytes_written,
+      uint32_t(txn_object->size_data * 0.25));
+    TryFreeSpace(new_size);
+    txn_object = reinterpret_cast<ObjectHeader *>(
+      g_storage->Expand(txn_object, new_size));
+    if (txn_object == NULL)
+      return CVMCACHE_STATUS_NOSPACE;
+    g_transactions->Insert(txn_id, txn_object);
+  }
+
+  memcpy(txn_object->GetData() - txn_object->neg_nbytes_written, buffer, size);
+  txn_object->neg_nbytes_written -= size;
   return CVMCACHE_STATUS_OK;
 }
 
 
 static int ram_commit_txn(uint64_t txn_id) {
-  TxnInfo txn = transactions[txn_id];
-  ComparableHash h(txn.id);
-  storage[h] = txn.partial_object;
+  ObjectHeader *txn_object;
+  int retval = g_transactions->Lookup(txn_id, &txn_object);
+  assert(retval);
+  TryFreeSpace(0);
+  if (g_objects_all->IsFull())
+    return CVMCACHE_STATUS_NOSPACE;
+
+  g_transactions->Erase(txn_id);
+  txn_object->size_data = -(txn_object->neg_nbytes_written);
+  txn_object->refcnt = 1;
+  g_cache_info->used_bytes += txn_object->size_data;
+  g_cache_info->pinned_bytes += txn_object->size_data;
+  ComparableHash h(txn_object->id);
+  g_objects_all->Insert(h, txn_object);
+  if (txn_object->type == CVMCACHE_OBJECT_VOLATILE) {
+    assert(!g_objects_volatile->IsFull());
+    g_objects_volatile->Insert(h, txn_object);
+  }
   return CVMCACHE_STATUS_OK;
 }
+
 
 static int ram_abort_txn(uint64_t txn_id) {
-  transactions.erase(txn_id);
+  ObjectHeader *txn_object;
+  int retval = g_transactions->Lookup(txn_id, &txn_object);
+  assert(retval);
+  g_storage->MarkFree(txn_object);
+  g_transactions->Erase(txn_id);
   return CVMCACHE_STATUS_OK;
 }
+
 
 static int ram_info(struct cvmcache_info *info) {
-  info->size_bytes = uint64_t(-1);
-  info->used_bytes = info->pinned_bytes = 0;
-  for (map<ComparableHash, Object>::const_iterator i = storage.begin(),
-       i_end = storage.end(); i != i_end; ++i)
-  {
-    info->used_bytes += i->second.data.length();
-    if (i->second.refcnt > 0)
-      info->pinned_bytes += i->second.data.length();
-  }
-  info->no_shrink = 0;
+  *info = *g_cache_info;
   return CVMCACHE_STATUS_OK;
 }
 
+
 static int ram_shrink(uint64_t shrink_to, uint64_t *used) {
-  struct cvmcache_info info;
-  ram_info(&info);
-  *used = info.used_bytes;
-  if (info.used_bytes <= shrink_to)
+  *used = g_cache_info->used_bytes;
+  if (g_cache_info->used_bytes <= shrink_to)
     return CVMCACHE_STATUS_OK;
 
-  // Volatile objects
-  for (map<ComparableHash, Object>::iterator i = storage.begin(),
-       i_end = storage.end(); i != i_end; )
-  {
-    if ((i->second.refcnt > 0) || (i->second.type != CVMCACHE_OBJECT_VOLATILE))
-    {
-      ++i;
-      continue;
-    }
-    unsigned length = i->second.data.length();
-    map<ComparableHash, Object>::iterator delete_me = i++;
-    storage.erase(delete_me);
-    info.used_bytes -= length;
-    if (info.used_bytes <= shrink_to) {
-      *used = info.used_bytes;
-      return CVMCACHE_STATUS_OK;
-    }
-  }
-  // All other objects
-  for (map<ComparableHash, Object>::iterator i = storage.begin(),
-       i_end = storage.end(); i != i_end; )
-  {
-    if (i->second.refcnt > 0) {
-      ++i;
-      continue;
-    }
-    unsigned length = i->second.data.length();
-    map<ComparableHash, Object>::iterator delete_me = i++;
-    storage.erase(delete_me);
-    info.used_bytes -= length;
-    if (info.used_bytes <= shrink_to) {
-      *used = info.used_bytes;
-      return CVMCACHE_STATUS_OK;
-    }
-  }
+  ComparableHash h;
+  ObjectHeader *object;
 
-  *used = info.used_bytes;
-  return CVMCACHE_STATUS_PARTIAL;
+  g_objects_volatile->FilterBegin();
+  while (g_objects_volatile->FilterNext()) {
+    g_objects_volatile->FilterGet(&h, &object);
+    if (object->refcnt != 0)
+      continue;
+    g_cache_info->used_bytes -= object->size_data;
+    g_storage->MarkFree(object);
+    g_objects_volatile->FilterDelete();
+    g_objects_all->Forget(h);
+    if (g_cache_info->used_bytes <= shrink_to)
+      break;
+  }
+  g_objects_volatile->FilterEnd();
+
+  g_objects_all->FilterBegin();
+  while ((g_cache_info->used_bytes > shrink_to) &&
+         g_objects_all->FilterNext())
+  {
+    g_objects_all->FilterGet(&h, &object);
+    if (object->refcnt != 0)
+      continue;
+    assert(object->type != CVMCACHE_OBJECT_VOLATILE);
+    g_cache_info->used_bytes -= object->size_data;
+    g_storage->MarkFree(object);
+    g_objects_all->FilterDelete();
+  }
+  g_objects_all->FilterEnd();
+
+  g_storage->Compact();
+  g_cache_info->no_shrink++;
+  *used = g_cache_info->used_bytes;
+  return (*used <= shrink_to) ? CVMCACHE_STATUS_OK : CVMCACHE_STATUS_PARTIAL;
 }
+
 
 static int ram_listing_begin(
   uint64_t lst_id,
   enum cvmcache_object_type type)
 {
-  Listing lst;
-  lst.type = type;
-  lst.elems = new vector<Object>();
-  for (map<ComparableHash, Object>::const_iterator i = storage.begin(),
-       i_end = storage.end(); i != i_end; ++i)
-  {
-    lst.elems->push_back(i->second);
+  Listing *lst = new Listing();
+  g_objects_all->FilterBegin();
+  while (g_objects_all->FilterNext()) {
+    ComparableHash h;
+    ObjectHeader *object;
+    g_objects_all->FilterGet(&h, &object);
+    if (object->type != type)
+      continue;
+
+    struct cvmcache_object_info item;
+    item.id = h.hash;
+    item.size = object->size_data;
+    item.type = type;
+    item.pinned = object->refcnt != 0;
+    item.description = (object->size_desc > 0)
+                       ? strdup(object->GetDescription())
+                       : NULL;
+    lst->elems.push_back(item);
   }
-  listings[lst_id] = lst;
+  g_objects_all->FilterEnd();
+
+  g_listings->Insert(lst_id, lst);
   return CVMCACHE_STATUS_OK;
 }
+
 
 static int ram_listing_next(
   int64_t listing_id,
   struct cvmcache_object_info *item)
 {
-  Listing lst = listings[listing_id];
-  do {
-    if (lst.pos >= lst.elems->size())
-      return CVMCACHE_STATUS_OUTOFBOUNDS;
-
-    vector<Object> *elems = lst.elems;
-    if ((*elems)[lst.pos].type == lst.type) {
-      item->id = (*elems)[lst.pos].id;
-      item->size = (*elems)[lst.pos].data.length();
-      item->type = (*elems)[lst.pos].type;
-      item->pinned = (*elems)[lst.pos].refcnt > 0;
-      item->description = (*elems)[lst.pos].description.empty()
-                          ? NULL
-                          : strdup((*elems)[lst.pos].description.c_str());
-      break;
-    }
-    lst.pos++;
-  } while (true);
-  lst.pos++;
-  listings[listing_id] = lst;
+  Listing *lst;
+  bool retval = g_listings->Lookup(listing_id, &lst);
+  assert(retval);
+  if (lst->pos >= lst->elems.size())
+    return CVMCACHE_STATUS_OUTOFBOUNDS;
+  *item = lst->elems[lst->pos];
+  lst->pos++;
   return CVMCACHE_STATUS_OK;
 }
 
+
 static int ram_listing_end(int64_t listing_id) {
-  delete listings[listing_id].elems;
-  listings.erase(listing_id);
+  Listing *lst;
+  bool retval = g_listings->Lookup(listing_id, &lst);
+  assert(retval);
+
+  for (unsigned i = 0; i < lst->elems.size(); ++i) {
+    free(lst->elems[i].description);
+  }
+  delete lst;
+  g_listings->Erase(listing_id);
   return CVMCACHE_STATUS_OK;
+}
+
+
+static void TryFreeSpace(uint64_t bytes_required) {
+  if (!g_objects_all->IsFull() && g_storage->HasSpaceFor(bytes_required))
+    return;
+
+  uint64_t shrink_to = std::min(
+    g_storage->capacity() - (bytes_required + 8),
+    uint64_t(g_storage->used_bytes() * 0.75));
+  uint64_t used;
+  ram_shrink(shrink_to, &used);
 }
 
 static void Usage(const char *progname) {
