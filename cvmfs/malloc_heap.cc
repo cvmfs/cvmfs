@@ -76,6 +76,11 @@ void MallocHeap::Compact() {
 }
 
 
+bool MallocHeap::HasSpaceFor(uint64_t nbytes) {
+  return RoundUp8(gauge_ + nbytes + sizeof(Tag)) <= capacity_;
+}
+
+
 void MallocHeap::MarkFree(void *block) {
   Tag *tag = reinterpret_cast<Tag *>(block) - 1;
   assert(tag->size > 0);
