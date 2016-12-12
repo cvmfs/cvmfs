@@ -143,6 +143,7 @@ static int null_commit_txn(uint64_t txn_id) {
   TxnInfo txn = transactions[txn_id];
   ComparableHash h(txn.id);
   storage[h] = txn.partial_object;
+  transactions.erase(txn_id);
   return CVMCACHE_STATUS_OK;
 }
 
