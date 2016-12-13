@@ -209,9 +209,9 @@ TEST_F(T_CachePlugin, TransactionAbort) {
   HashString(content, &id);
   void *txn = alloca(cache_mgr_->SizeOfTxn());
   EXPECT_EQ(0, cache_mgr_->StartTxn(id, content.length(), txn));
-  EXPECT_EQ(0, cache_mgr_->Reset(txn));
-  EXPECT_EQ(2, cache_mgr_->Write(content.data(), 2, txn));
-  EXPECT_EQ(0, cache_mgr_->Reset(txn));
+  //EXPECT_EQ(0, cache_mgr_->Reset(txn));
+  //EXPECT_EQ(2, cache_mgr_->Write(content.data(), 2, txn));
+  //EXPECT_EQ(0, cache_mgr_->Reset(txn));
   EXPECT_EQ(3, cache_mgr_->Write(content.data(), 3, txn));
   EXPECT_EQ(0, cache_mgr_->CommitTxn(txn));
 
@@ -240,6 +240,30 @@ TEST_F(T_CachePlugin, CommitHandover) {
   EXPECT_EQ(content, string(char_buffer, content.length()));
   EXPECT_EQ(0, cache_mgr_->CommitTxn(txn));
   EXPECT_EQ(0, cache_mgr_->Close(fd));
+
+  unsigned char *buf;
+  uint64_t size;
+  EXPECT_TRUE(cache_mgr_->Open2Mem(id, "test", &buf, &size));
+  EXPECT_EQ(content, string(reinterpret_cast<char *>(buf), size));
+  free(buf);
+}
+
+
+TEST_F(T_CachePlugin, CommitConcurrent) {
+  shash::Any id(shash::kSha1);
+  string content = "concurrent";
+  HashString(content, &id);
+
+  void *txn1 = alloca(cache_mgr_->SizeOfTxn());
+  void *txn2 = alloca(cache_mgr_->SizeOfTxn());
+  EXPECT_EQ(0, cache_mgr_->StartTxn(id, content.length(), txn1));
+  EXPECT_EQ(0, cache_mgr_->StartTxn(id, content.length(), txn2));
+  EXPECT_EQ(static_cast<int>(content.length()),
+            cache_mgr_->Write(content.data(), content.length(), txn1));
+  EXPECT_EQ(static_cast<int>(content.length()),
+            cache_mgr_->Write(content.data(), content.length(), txn2));
+  EXPECT_EQ(0, cache_mgr_->CommitTxn(txn1));
+  EXPECT_EQ(0, cache_mgr_->CommitTxn(txn2));
 
   unsigned char *buf;
   uint64_t size;
@@ -279,17 +303,21 @@ TEST_F(T_CachePlugin, Shrink) {
     return;
   }
 
+  // TODO(jblomer): do it with open transaction
   EXPECT_TRUE(quota_mgr_->Cleanup(0));
   EXPECT_TRUE(quota_mgr_->Cleanup(0));
   shash::Any id_vol(shash::kSha1);
   shash::Any id_reg(shash::kSha1);
   shash::Any id_clg(shash::kSha1);
+  shash::Any id_txn(shash::kSha1);
   string str_vol = "volatile";
   string str_reg = "regular";
   string str_clg = "catalog";
+  string str_txn = "transaction";
   HashString(str_vol, &id_vol);
   HashString(str_reg, &id_reg);
   HashString(str_clg, &id_clg);
+  HashString(str_txn, &id_txn);
   unsigned char *dat_vol = const_cast<unsigned char *>(
     reinterpret_cast<const unsigned char *>(str_vol.data()));
   unsigned char *dat_reg = const_cast<unsigned char *>(
@@ -299,6 +327,11 @@ TEST_F(T_CachePlugin, Shrink) {
   EXPECT_TRUE(cache_mgr_->CommitFromMem(id_vol, dat_vol, str_vol.length(), ""));
   EXPECT_TRUE(cache_mgr_->CommitFromMem(id_reg, dat_reg, str_reg.length(), ""));
   EXPECT_TRUE(cache_mgr_->CommitFromMem(id_clg, dat_clg, str_clg.length(), ""));
+  void *txn = alloca(cache_mgr_->SizeOfTxn());
+  EXPECT_EQ(0, cache_mgr_->StartTxn(id_txn, str_txn.length(), txn));
+  EXPECT_EQ(static_cast<int>(str_txn.length()),
+            cache_mgr_->Write(str_txn.data(), str_txn.length(), txn));
+
   EXPECT_EQ(str_vol.length() + str_reg.length() + str_clg.length(),
             quota_mgr_->GetSize());
   int fd_clg = cache_mgr_->Open(CacheManager::Bless(id_clg));
@@ -313,6 +346,13 @@ TEST_F(T_CachePlugin, Shrink) {
   EXPECT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::Bless(id_vol)));
   EXPECT_TRUE(quota_mgr_->Cleanup(0));
   EXPECT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::Bless(id_clg)));
+
+  EXPECT_EQ(0, cache_mgr_->CommitTxn(txn));
+  unsigned char *buf;
+  uint64_t size;
+  EXPECT_TRUE(cache_mgr_->Open2Mem(id_txn, "test", &buf, &size));
+  EXPECT_EQ(str_txn, string(reinterpret_cast<char *>(buf), size));
+  free(buf);
 }
 
 
