@@ -122,6 +122,8 @@ static inline uint32_t hasher_any(const ComparableHash &key) {
 }  // anonymous namespace
 
 
+struct cvmcache_context *ctx;
+
 /**
  * Singleton
  */
@@ -161,11 +163,18 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
     if ((object->refcnt + change_by) < 0)
       return CVMCACHE_STATUS_BADCOUNT;
 
-    if (object->refcnt == 0)
+    if (object->refcnt == 0) {
       Me()->cache_info_.pinned_bytes += object->size_data;
+      if (!Me()->in_danger_zone_ && Me()->IsInDangerZone()) {
+        Me()->in_danger_zone_ = true;
+        cvmcache_ask_detach(ctx);
+      }
+    }
     object->refcnt += change_by;
-    if (object->refcnt == 0)
+    if (object->refcnt == 0) {
       Me()->cache_info_.pinned_bytes -= object->size_data;
+      Me()->in_danger_zone_ = Me()->IsInDangerZone();
+    }
     return CVMCACHE_STATUS_OK;
   }
 
@@ -432,12 +441,15 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
   static const double kShrinkFactor;  //  = 0.75;
   static const double kObjectExpandFactor;  // = 0.25;
   static const double kSlotFraction;  // = 0.04;
+  static const double kDangerZoneThreshold;  // = 0.7
 
   static PluginRamCache *instance_;
   static PluginRamCache *Me() {
     return instance_;
   }
   explicit PluginRamCache(uint64_t mem_size) {
+    in_danger_zone_ = false;
+
     uint64_t heap_size = RoundUp8(
       std::max(kMinSize, uint64_t(mem_size * (1.0 - kSlotFraction))));
     memset(&cache_info_, 0, sizeof(cache_info_));
@@ -506,6 +518,11 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
     }
   }
 
+  bool IsInDangerZone() {
+    return double(cache_info_.pinned_bytes) / double(cache_info_.size_bytes) >
+           kDangerZoneThreshold;
+  }
+
 
   struct cvmcache_info cache_info_;
   perf::Statistics statistics_;
@@ -514,6 +531,7 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
   lru::LruCache<ComparableHash, ObjectHeader *> *objects_all_;
   lru::LruCache<ComparableHash, ObjectHeader *> *objects_volatile_;
   MallocHeap *storage_;
+  bool in_danger_zone_;
 };  // class PluginRamCache
 
 PluginRamCache *PluginRamCache::instance_ = NULL;
@@ -521,6 +539,7 @@ const uint64_t PluginRamCache::kMinSize = 100 * 1024 * 1024;
 const double PluginRamCache::kShrinkFactor = 0.75;
 const double PluginRamCache::kObjectExpandFactor = 0.25;
 const double PluginRamCache::kSlotFraction = 0.04;
+const double PluginRamCache::kDangerZoneThreshold = 0.7;
 
 
 static void Usage(const char *progname) {
@@ -570,7 +589,6 @@ int main(int argc, char **argv) {
   callbacks.cvmcache_listing_end = plugin->ram_listing_end;
   callbacks.capabilities = CVMCACHE_CAP_ALL;
 
-  struct cvmcache_context *ctx;
   ctx = cvmcache_init(&callbacks);
   int retval = cvmcache_listen(ctx, locator);
   assert(retval);
