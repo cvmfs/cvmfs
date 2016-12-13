@@ -16,9 +16,8 @@
 #include "hash.h"
 #include "murmur.h"
 #include "smallhash.h"
-#include "util/single_copy.h"
 
-class CachePlugin : SingleCopy {
+class CachePlugin {
  public:
   static const unsigned kPbProtocolVersion = 1;
   static const uint64_t kSizeUnknown;
