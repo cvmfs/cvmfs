@@ -231,7 +231,7 @@ bool CachePlugin::HandleRequest(int fd_con) {
   bool retval = transport.RecvFrame(&frame_recv);
   if (!retval) {
     LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
-             "failed to reveive request from connection (%d)", errno);
+             "failed to receive request from connection (%d)", errno);
     return false;
   }
 
