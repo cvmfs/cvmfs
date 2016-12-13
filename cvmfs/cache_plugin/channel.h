@@ -7,6 +7,7 @@
 #include <pthread.h>
 #include <stdint.h>
 
+#include <map>
 #include <set>
 #include <string>
 
@@ -117,7 +118,8 @@ class CachePlugin {
   }
 
   bool HandleRequest(int fd_con);
-  void HandleHandshake(CacheTransport *transport);
+  void HandleHandshake(cvmfs::MsgHandshake *msg_req,
+                       CacheTransport *transport);
   void HandleRefcount(cvmfs::MsgRefcountReq *msg_req,
                       CacheTransport *transport);
   void HandleObjectInfo(cvmfs::MsgObjectInfoReq *msg_req,
@@ -134,6 +136,10 @@ class CachePlugin {
   void HandleList(cvmfs::MsgListReq *msg_req, CacheTransport *transport);
   void SendDetachRequests();
 
+  void LogSessionError(uint64_t session_id,
+                       cvmfs::EnumStatus status,
+                       const std::string &msg);
+
   uint64_t capabilities_;
   int fd_socket_;
   bool running_;
@@ -145,6 +151,7 @@ class CachePlugin {
   atomic_int64 next_lst_id_;
   SmallHashDynamic<UniqueRequest, uint64_t> txn_ids_;
   std::set<int> connections_;
+  std::map<uint64_t, std::string> sessions_;
   pthread_t thread_io_;
   int pipe_ctrl_[2];
 };  // class CachePlugin

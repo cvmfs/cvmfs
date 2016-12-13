@@ -27,7 +27,7 @@ class T_CachePlugin : public ::testing::Test {
   virtual void SetUp() {
     int fd_client = Connect();
     ASSERT_GE(fd_client, 0);
-    cache_mgr_ = ExternalCacheManager::Create(fd_client, nfiles);
+    cache_mgr_ = ExternalCacheManager::Create(fd_client, nfiles, "test");
     ASSERT_TRUE(cache_mgr_ != NULL);
     quota_mgr_ = ExternalQuotaManager::Create(cache_mgr_);
     ASSERT_TRUE(cache_mgr_ != NULL);
@@ -69,7 +69,7 @@ TEST_F(T_CachePlugin, Connection) {
   int fd_second = Connect();
   ASSERT_GE(fd_second, 0);
   ExternalCacheManager *cache_mgr_second =
-    ExternalCacheManager::Create(fd_second, nfiles);
+    ExternalCacheManager::Create(fd_second, nfiles, "test 2nd");
   ASSERT_TRUE(cache_mgr_second != NULL);
   EXPECT_GE(cache_mgr_second->session_id(), 0);
 

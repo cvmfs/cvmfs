@@ -222,7 +222,7 @@ bool FileSystem::CreateCache() {
         boot_status_ = loader::kFailCacheDir;
         return false;
       }
-      cache_mgr_ = ExternalCacheManager::Create(fd_client, nfiles);
+      cache_mgr_ = ExternalCacheManager::Create(fd_client, nfiles, name_);
       assert(cache_mgr_ != NULL);
       break;
     }

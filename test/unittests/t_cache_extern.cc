@@ -204,7 +204,7 @@ class T_ExternalCacheManager : public ::testing::Test {
 
     fd_client = ConnectSocket(socket_path_);
     ASSERT_GE(fd_client, 0);
-    cache_mgr_ = ExternalCacheManager::Create(fd_client, nfiles);
+    cache_mgr_ = ExternalCacheManager::Create(fd_client, nfiles, "test");
     ASSERT_TRUE(cache_mgr_ != NULL);
     quota_mgr_ = ExternalQuotaManager::Create(cache_mgr_);
     ASSERT_TRUE(cache_mgr_ != NULL);

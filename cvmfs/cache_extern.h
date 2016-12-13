@@ -27,7 +27,9 @@ class ExternalCacheManager : public CacheManager {
  public:
   static const unsigned kPbProtocolVersion = 1;
 
-  static ExternalCacheManager *Create(int fd_connection, unsigned max_open_fds);
+  static ExternalCacheManager *Create(int fd_connection,
+                                      unsigned max_open_fds,
+                                      const std::string &ident);
   virtual ~ExternalCacheManager();
 
   virtual CacheManagerIds id() { return kExternalCacheManager; }

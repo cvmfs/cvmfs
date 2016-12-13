@@ -169,7 +169,8 @@ int ExternalCacheManager::CommitTxn(void *txn) {
 
 ExternalCacheManager *ExternalCacheManager::Create(
   int fd_connection,
-  unsigned max_open_fds)
+  unsigned max_open_fds,
+  const string &ident)
 {
   UniquePtr<ExternalCacheManager> cache_mgr(
     new ExternalCacheManager(fd_connection, max_open_fds));
@@ -177,6 +178,7 @@ ExternalCacheManager *ExternalCacheManager::Create(
 
   cvmfs::MsgHandshake msg_handshake;
   msg_handshake.set_protocol_version(kPbProtocolVersion);
+  msg_handshake.set_name(ident);
   CacheTransport::Frame frame_send(&msg_handshake);
   cache_mgr->transport_.SendFrame(&frame_send);
 
