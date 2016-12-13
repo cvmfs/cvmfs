@@ -27,6 +27,8 @@ RamCacheManager::RamCacheManager(
   perf::Statistics *statistics)
   : max_size_(max_size)
   , fd_table_(max_entries, ReadOnlyHandle())
+  // TODO(jblomer): the number of slots in the kv-stores should _not_ be the
+  // number of open files.
   , regular_entries_(max_entries,
                      "RamCache.regular",
                      alloc,
