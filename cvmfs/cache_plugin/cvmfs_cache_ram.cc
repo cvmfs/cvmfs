@@ -1,7 +1,7 @@
 /**
  * This file is part of the CernVM File System.
  *
- * A cache plugin that stores all data in memory.
+ * A cache plugin that stores all data in a fixed-size memory chunk.
  */
 
 #define __STDC_FORMAT_MACROS
@@ -64,11 +64,24 @@ struct ObjectHeader {
            sizeof(ObjectHeader) + size_desc;
   }
 
+  /**
+   * Set during a running transaction so that we know where do look for pointers
+   * when the memory block gets compacted.  Once committed, this is
+   * uint64_t(-1).
+   */
   uint64_t txn_id;
+  /**
+   * Can be zero.
+   */
   uint32_t size_data;
+  /**
+   * String length + 1 (null terminated) or null if the description is NULL.
+   */
   uint32_t size_desc;
-  // During a transaction, neg_nbytes_written is used to track the number of
-  // already written bytes.  On commit, refcnt is set to 1.
+  /**
+   * During a transaction, neg_nbytes_written is used to track the number of
+   * already written bytes.  On commit, refcnt is set to 1.
+   */
   union {
     int32_t refcnt;
     int32_t neg_nbytes_written;
@@ -78,6 +91,10 @@ struct ObjectHeader {
 };
 
 
+/**
+ * Listings are generated and cached during the entire life time of a listing
+ * id.  Not very memory efficient but we don't optimize for listings.
+ */
 struct Listing {
   Listing() : pos(0) { }
   uint64_t pos;
@@ -85,6 +102,9 @@ struct Listing {
 };
 
 
+/**
+ * Allows us to use a cvmcache_hash in (hash) maps.
+ */
 struct ComparableHash {
   ComparableHash() { }
   explicit ComparableHash(const struct cvmcache_hash &h) : hash(h) { }
@@ -122,10 +142,14 @@ static inline uint32_t hasher_any(const ComparableHash &key) {
 }  // anonymous namespace
 
 
+/**
+ * Used in the PluginRamCache when detaching nested catalogs.
+ */
 struct cvmcache_context *ctx;
 
+
 /**
- * Singleton
+ * Implements all the cache plugin callbacks.  Singelton.
  */
 class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
  public:
@@ -254,6 +278,7 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
     unsigned char *buffer,
     uint32_t size)
   {
+    LogCvmfs(kLogCvmfs, kLogDebug, "writine %lu", size);
     ObjectHeader *txn_object;
     int retval = Me()->transactions_.Lookup(txn_id, &txn_object);
     assert(retval);
@@ -274,6 +299,7 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
         Me()->storage_->Expand(txn_object, new_size));
       if (txn_object == NULL)
         return CVMCACHE_STATUS_NOSPACE;
+      txn_object->size_data = new_size;
       Me()->transactions_.Insert(txn_id, txn_object);
     }
 
@@ -342,39 +368,7 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
     if (*used <= shrink_to)
       return CVMCACHE_STATUS_OK;
 
-    ComparableHash h;
-    ObjectHeader *object;
-
-    Me()->objects_volatile_->FilterBegin();
-    while (Me()->objects_volatile_->FilterNext()) {
-      Me()->objects_volatile_->FilterGet(&h, &object);
-      if (object->refcnt != 0)
-        continue;
-      Me()->cache_info_.used_bytes -= object->size_data;
-      Me()->storage_->MarkFree(object);
-      Me()->objects_volatile_->FilterDelete();
-      Me()->objects_all_->Forget(h);
-      if (Me()->cache_info_.used_bytes <= shrink_to)
-        break;
-    }
-    Me()->objects_volatile_->FilterEnd();
-
-    Me()->objects_all_->FilterBegin();
-    while ((Me()->cache_info_.used_bytes > shrink_to) &&
-           Me()->objects_all_->FilterNext())
-    {
-      Me()->objects_all_->FilterGet(&h, &object);
-      if (object->refcnt != 0)
-        continue;
-      assert(object->type != CVMCACHE_OBJECT_VOLATILE);
-      Me()->cache_info_.used_bytes -= object->size_data;
-      Me()->storage_->MarkFree(object);
-      Me()->objects_all_->FilterDelete();
-    }
-    Me()->objects_all_->FilterEnd();
-
-    Me()->storage_->Compact();
-    Me()->cache_info_.no_shrink++;
+    Me()->DoShrink(shrink_to);
     *used = Me()->cache_info_.used_bytes;
     return (*used <= shrink_to) ? CVMCACHE_STATUS_OK : CVMCACHE_STATUS_PARTIAL;
   }
@@ -439,7 +433,7 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
  private:
   static const uint64_t kMinSize;  // 100 * 1024 * 1024;
   static const double kShrinkFactor;  //  = 0.75;
-  static const double kObjectExpandFactor;  // = 0.25;
+  static const double kObjectExpandFactor;  // = 1.5;
   static const double kSlotFraction;  // = 0.04;
   static const double kDangerZoneThreshold;  // = 0.7
 
@@ -488,6 +482,10 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
       "objects_volatile");
   }
 
+  /**
+   * Returns true if memory compaction took place and pointers might have been
+   * invalidated.
+   */
   bool TryFreeSpace(uint64_t bytes_required) {
     if (!objects_all_->IsFull() && storage_->HasSpaceFor(bytes_required))
       return false;
@@ -495,8 +493,7 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
     uint64_t shrink_to = std::min(
       storage_->capacity() - (bytes_required + 8),
       uint64_t(storage_->used_bytes() * kShrinkFactor));
-    uint64_t used;
-    ram_shrink(shrink_to, &used);
+    DoShrink(shrink_to);
     return true;
   }
 
@@ -518,6 +515,40 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
     }
   }
 
+  void DoShrink(uint64_t shrink_to) {
+    ComparableHash h;
+    ObjectHeader *object;
+
+    objects_volatile_->FilterBegin();
+    while (objects_volatile_->FilterNext()) {
+      objects_volatile_->FilterGet(&h, &object);
+      if (object->refcnt != 0)
+        continue;
+      cache_info_.used_bytes -= object->size_data;
+      storage_->MarkFree(object);
+      objects_volatile_->FilterDelete();
+      objects_all_->Forget(h);
+      if (cache_info_.used_bytes <= shrink_to)
+        break;
+    }
+    objects_volatile_->FilterEnd();
+
+    objects_all_->FilterBegin();
+    while ((cache_info_.used_bytes > shrink_to) && objects_all_->FilterNext()) {
+      objects_all_->FilterGet(&h, &object);
+      if (object->refcnt != 0)
+        continue;
+      assert(object->type != CVMCACHE_OBJECT_VOLATILE);
+      cache_info_.used_bytes -= object->size_data;
+      storage_->MarkFree(object);
+      objects_all_->FilterDelete();
+    }
+    objects_all_->FilterEnd();
+
+    storage_->Compact();
+    cache_info_.no_shrink++;
+  }
+
   bool IsInDangerZone() {
     return double(cache_info_.pinned_bytes) / double(cache_info_.size_bytes) >
            kDangerZoneThreshold;
@@ -537,7 +568,7 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
 PluginRamCache *PluginRamCache::instance_ = NULL;
 const uint64_t PluginRamCache::kMinSize = 100 * 1024 * 1024;
 const double PluginRamCache::kShrinkFactor = 0.75;
-const double PluginRamCache::kObjectExpandFactor = 0.25;
+const double PluginRamCache::kObjectExpandFactor = 1.5;
 const double PluginRamCache::kSlotFraction = 0.04;
 const double PluginRamCache::kDangerZoneThreshold = 0.7;
 
