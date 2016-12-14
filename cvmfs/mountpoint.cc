@@ -199,30 +199,15 @@ bool FileSystem::CreateCache() {
         return false;
       }
 
-      vector<string> tokens = SplitString(optarg, '=');
-      int fd_client = -1;
-      if (tokens[0] == "unix") {
-        fd_client = ConnectSocket(tokens[1]);
-      } else if (tokens[0] == "tcp") {
-        vector<string> tcp_address = SplitString(tokens[1], ':');
-        if (tcp_address.size() != 2) {
-          boot_error_ = "Invalid locator: " + optarg;
-          boot_status_ = loader::kFailCacheDir;
-          return false;
-        }
-        fd_client =
-          ConnectTcpEndpoint(tcp_address[0], String2Uint64(tcp_address[1]));
-      } else {
-        boot_error_ = "Invalid locator: " + optarg;
+      UniquePtr<ExternalCacheManager::PluginHandle> plugin_handle(
+        ExternalCacheManager::CreatePlugin(optarg, vector<string>()));
+      if (!plugin_handle->IsValid()) {
+        boot_error_ = plugin_handle->error_msg();
         boot_status_ = loader::kFailCacheDir;
         return false;
       }
-      if (fd_client < 0) {
-        boot_error_ = "Failed to connect to external cache manager";
-        boot_status_ = loader::kFailCacheDir;
-        return false;
-      }
-      cache_mgr_ = ExternalCacheManager::Create(fd_client, nfiles, name_);
+      cache_mgr_ = ExternalCacheManager::Create(
+        plugin_handle->fd_connection(), nfiles, name_);
       assert(cache_mgr_ != NULL);
       break;
     }

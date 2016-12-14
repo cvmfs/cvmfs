@@ -27,6 +27,7 @@
 #endif
 #include "util/pointer.h"
 #include "util/posix.h"
+#include "util/string.h"
 #include "util_concurrency.h"
 
 using namespace std;  // NOLINT
@@ -167,6 +168,27 @@ int ExternalCacheManager::CommitTxn(void *txn) {
 }
 
 
+int ExternalCacheManager::ConnectLocator(const std::string &locator) {
+  vector<string> tokens = SplitString(locator, '=');
+  int result = -1;
+  if (tokens[0] == "unix") {
+    result = ConnectSocket(tokens[1]);
+  } else if (tokens[0] == "tcp") {
+    vector<string> tcp_address = SplitString(tokens[1], ':');
+    if (tcp_address.size() != 2)
+      return -EINVAL;
+    result = ConnectTcpEndpoint(tcp_address[0], String2Uint64(tcp_address[1]));
+  } else {
+    return -EINVAL;
+  }
+  if (result < 0)
+    return -EIO;
+  LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
+           "connected to cache plugin at %s", locator.c_str());
+  return result;
+}
+
+
 ExternalCacheManager *ExternalCacheManager::Create(
   int fd_connection,
   unsigned max_open_fds,
@@ -208,6 +230,27 @@ ExternalCacheManager *ExternalCacheManager::Create(
     return NULL;
   }
   return cache_mgr.Release();
+}
+
+
+/**
+ * Tries to connect to the plugin at locator, or, if it doesn't exist, spawns
+ * a new plugin using cmdline.  Two processes could try to spawn the plugin at
+ * the same time.  In this case, the plugin should indicate to the client to
+ * retry connecting.
+ */
+ExternalCacheManager::PluginHandle *ExternalCacheManager::CreatePlugin(
+  const std::string &locator,
+  const std::vector<std::string> &cmd_line)
+{
+  UniquePtr<PluginHandle> plugin_handle(new PluginHandle());
+  plugin_handle->fd_connection_ = ConnectLocator(locator);
+  if (plugin_handle->fd_connection_ == -EINVAL) {
+    plugin_handle->error_msg_ = "Invalid locator: " + locator;
+  } else if (plugin_handle->fd_connection_ == -EIO) {
+    plugin_handle->error_msg_ = "Failed to connect to external cache manager";
+  }
+  return plugin_handle.Release();
 }
 
 
