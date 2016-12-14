@@ -14,13 +14,13 @@ namespace swissknife {
 class CommandInfo : public Command {
  public:
   ~CommandInfo() { }
-  std::string GetName() { return "info"; }
-  std::string GetDescription() {
+  virtual std::string GetName() const { return "info"; }
+  virtual std::string GetDescription() const {
     return "CernVM File System repository information retrieval\n"
       "This command reads the content of a .cvmfspublished file and exposes it "
       "to the user.";
   }
-  ParameterList GetParams();
+  ParameterList GetParams() const;
   int Main(const ArgumentList &args);
 
  protected:
@@ -30,9 +30,9 @@ class CommandInfo : public Command {
 class CommandVersion : public Command {
  public:
   ~CommandVersion() { }
-  std::string GetName()        { return "version";                         }
-  std::string GetDescription() { return "Prints the version of CernVM-FS"; }
-  ParameterList GetParams()    { return ParameterList();                   }
+  virtual std::string GetName()        const { return "version";                         }
+  virtual std::string GetDescription() const { return "Prints the version of CernVM-FS"; }
+  ParameterList GetParams() const { return ParameterList();                   }
   int Main(const ArgumentList &args);
 };
 

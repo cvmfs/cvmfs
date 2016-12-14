@@ -20,11 +20,11 @@ namespace swissknife {
 class CommandSign : public Command {
  public:
   ~CommandSign() { }
-  std::string GetName() { return "sign"; }
-  std::string GetDescription() {
+  virtual std::string GetName() const { return "sign"; }
+  virtual std::string GetDescription() const {
     return "Adds a signature to the repository manifest.";
   }
-  ParameterList GetParams() {
+  virtual ParameterList GetParams() const {
     ParameterList r;
     r.push_back(Parameter::Mandatory('m', "manifest file"));
     r.push_back(Parameter::Mandatory('u', "repository URL"));

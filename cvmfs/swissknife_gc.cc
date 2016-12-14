@@ -27,7 +27,7 @@ typedef GarbageCollectorAux<ReadonlyCatalogTraversal, HashFilter> GCAux;
 typedef GC::Configuration GcConfig;
 
 
-ParameterList CommandGc::GetParams() {
+ParameterList CommandGc::GetParams() const {
   ParameterList r;
   r.push_back(Parameter::Mandatory('r', "repository url"));
   r.push_back(Parameter::Mandatory('u', "spooler definition string"));

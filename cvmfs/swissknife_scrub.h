@@ -74,13 +74,13 @@ class CommandScrub : public Command {
  public:
   CommandScrub();
   ~CommandScrub();
-  std::string GetName() { return "scrub"; }
-  std::string GetDescription() {
+  virtual std::string GetName() const { return "scrub"; }
+  virtual std::string GetDescription() const {
     return "CernVM File System repository file storage checker. Finds silent "
            "disk corruptions by recomputing all file content checksums in the "
            "backend file storage.";
   }
-  ParameterList GetParams();
+  virtual ParameterList GetParams() const;
   int Main(const ArgumentList &args);
 
 

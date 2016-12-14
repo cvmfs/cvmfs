@@ -58,7 +58,7 @@ class RootChainWalker {
 };
 
 
-ParameterList CommandReconstructReflog::GetParams() {
+ParameterList CommandReconstructReflog::GetParams() const {
   ParameterList r;
   r.push_back(Parameter::Mandatory('r', "repository url"));
   r.push_back(Parameter::Mandatory('u', "spooler definition string"));

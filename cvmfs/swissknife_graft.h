@@ -20,11 +20,11 @@ namespace swissknife {
 class CommandGraft : public Command {
  public:
   ~CommandGraft() { }
-  std::string GetName() { return "graft"; }
-  std::string GetDescription() {
+  virtual std::string GetName() const { return "graft"; }
+  virtual std::string GetDescription() const {
     return "Creates a graft file for publishing in CVMFS.";
   }
-  ParameterList GetParams() {
+  virtual ParameterList GetParams() const {
     ParameterList r;
     r.push_back(Parameter::Mandatory('i', "Input file to process "
                                        "('-' for reading from stdin)"));

@@ -59,8 +59,6 @@ class CommandTag : public Command {
   };
 
 
-  void InsertCommonParameters(ParameterList *parameters);
-
   Environment* InitializeEnvironment(const ArgumentList &args,
                                      const bool read_write);
   bool CloseAndPublishHistory(Environment *environment);
@@ -107,12 +105,12 @@ class CommandTag : public Command {
  */
 class CommandEditTag : public CommandTag {
  public:
-  std::string GetName() { return "tag_edit"; }
-  std::string GetDescription() {
+  virtual std::string GetName() const { return "tag_edit"; }
+  virtual std::string GetDescription() const {
     return "Create a tag and/or remove tags.";
   }
 
-  ParameterList GetParams();
+  virtual ParameterList GetParams() const;
   int Main(const ArgumentList &args);
 
  protected:
@@ -136,12 +134,12 @@ class CommandEditTag : public CommandTag {
 
 class CommandListTags : public CommandTag {
  public:
-  std::string GetName() { return "tag_list"; }
-  std::string GetDescription() {
+  virtual std::string GetName() const { return "tag_list"; }
+  virtual std::string GetDescription() const {
     return "List tags in the tag database.";
   }
 
-  ParameterList GetParams();
+  virtual ParameterList GetParams() const;
   int Main(const ArgumentList &args);
 
  protected:
@@ -155,12 +153,12 @@ class CommandListTags : public CommandTag {
 
 class CommandInfoTag : public CommandTag {
  public:
-  std::string GetName() { return "tag_info"; }
-  std::string GetDescription() {
+  virtual std::string GetName() const { return "tag_info"; }
+  virtual std::string GetDescription() const {
     return "Obtain detailed information about a tag.";
   }
 
-  ParameterList GetParams();
+  virtual ParameterList GetParams() const;
   int Main(const ArgumentList &args);
 
  protected:
@@ -174,12 +172,12 @@ class CommandInfoTag : public CommandTag {
 
 class CommandRollbackTag : public CommandTag {
  public:
-  std::string GetName() { return "tag_rollback"; }
-  std::string GetDescription() {
+  virtual std::string GetName() const { return "tag_rollback"; }
+  virtual std::string GetDescription() const {
     return "Rollback repository to a given tag.";
   }
 
-  ParameterList GetParams();
+  virtual ParameterList GetParams() const;
   int Main(const ArgumentList &args);
 
  protected:
@@ -192,12 +190,12 @@ class CommandRollbackTag : public CommandTag {
 
 class CommandEmptyRecycleBin : public CommandTag {
  public:
-  std::string GetName() { return "tag_empty_bin"; }
-  std::string GetDescription() {
+  virtual std::string GetName() const { return "tag_empty_bin"; }
+  virtual std::string GetDescription() const {
     return "Empty the internal recycle bin of the history database.";
   }
 
-  ParameterList GetParams();
+  virtual ParameterList GetParams() const;
   int Main(const ArgumentList &args);
 };
 

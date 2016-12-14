@@ -22,13 +22,13 @@ class CommandListCatalogs : public Command {
  public:
   CommandListCatalogs();
   ~CommandListCatalogs() { }
-  std::string GetName() { return "lsrepo"; }
-  std::string GetDescription() {
+  virtual std::string GetName() const { return "lsrepo"; }
+  virtual std::string GetDescription() const {
     return "CernVM File System Repository Traversal\n"
       "This command lists the nested catalog tree that builds up a "
       "cvmfs repository structure.";
   }
-  ParameterList GetParams();
+  virtual ParameterList GetParams() const;
 
   int Main(const ArgumentList &args);
 

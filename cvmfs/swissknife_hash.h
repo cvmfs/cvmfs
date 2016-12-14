@@ -14,11 +14,11 @@ namespace swissknife {
 class CommandHash : public Command {
  public:
   ~CommandHash() { }
-  std::string GetName() { return "hash"; }
-  std::string GetDescription() {
+  virtual std::string GetName() const { return "hash"; }
+  virtual std::string GetDescription() const {
     return "Hashes stdin and prints out the result on stdout.";
   }
-  ParameterList GetParams() {
+  virtual ParameterList GetParams() const {
     ParameterList r;
     r.push_back(Parameter::Mandatory('a', "hash algorithm"));
     r.push_back(Parameter::Switch('f', "print in fingerprint representation"));

@@ -15,11 +15,11 @@ namespace swissknife {
 class CommandGc : public Command {
  public:
   ~CommandGc() { }
-  std::string GetName() { return "gc"; }
-  std::string GetDescription() {
+  virtual std::string GetName() const { return "gc"; }
+  virtual std::string GetDescription() const {
     return "Garbage Collect a CernVM-FS repository.";
   }
-  ParameterList GetParams();
+  virtual ParameterList GetParams() const;
   int Main(const ArgumentList &args);
 };
 

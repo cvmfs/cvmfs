@@ -14,17 +14,17 @@ namespace swissknife {
 class CommandZpipe : public Command {
  public:
   ~CommandZpipe() { }
-  std::string GetName() { return "zpipe"; }
-  std::string GetDescription() {
+  virtual std::string GetName() const { return "zpipe"; }
+  virtual std::string GetDescription() const {
     return "Compresses or decompresses a file using the DEFLATE algorithm.\n"
       "Input comes on stdin, output goes to stdout.";
   }
-  ParameterList GetParams() {
+  virtual ParameterList GetParams() const {
     ParameterList r;
     r.push_back(Parameter::Switch('d', "decompress file"));
     return r;
   }
-  int Main(const ArgumentList &args);
+  virtual int Main(const ArgumentList &args);
 };
 
 }  // namespace swissknife
