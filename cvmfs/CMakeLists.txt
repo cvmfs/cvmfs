@@ -280,6 +280,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   swissknife_sign.cc swissknife_sign.h
   swissknife_sync.cc swissknife_sync.h
   swissknife_zpipe.cc swissknife_zpipe.h
+  swissknife_lease.cc
   sync_item.cc sync_item.h
   sync_mediator.cc sync_mediator.h
   sync_union.cc sync_union.h
