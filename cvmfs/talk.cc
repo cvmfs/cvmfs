@@ -553,7 +553,7 @@ void *TalkManager::MainResponder(void *data) {
         StringifyInt(file_system->cache_mgr()->quota_mgr()->GetPid()) + "\n";
       talk_mgr->Answer(con_fd, pid_str);
     } else if (line == "pid watchdog") {
-      const string pid_str = StringifyInt(monitor::GetPid()) + "\n";
+      const string pid_str = StringifyInt(Watchdog::GetPid()) + "\n";
       talk_mgr->Answer(con_fd, pid_str);
     } else if (line == "parameters") {
       talk_mgr->Answer(con_fd, file_system->options_mgr()->Dump());

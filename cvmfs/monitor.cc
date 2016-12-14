@@ -27,14 +27,13 @@
 #include <time.h>
 #include <unistd.h>
 
-#include <map>
-#include <string>
-#include <vector>
-
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <map>
+#include <string>
+#include <vector>
 
 #include "cvmfs.h"
 #include "logging.h"
@@ -42,224 +41,28 @@
 #include "smalloc.h"
 #include "util/posix.h"
 
-using namespace std;  // NOLINT
-
 // Used for address offset calculation
 #ifndef CVMFS_LIBCVMFS
 extern loader::CvmfsExports *g_cvmfs_exports;
 #endif
 
-namespace monitor {
+using namespace std;  // NOLINT
 
-/**
- * Minmum threshold for the maximum number of open files
- */
-const unsigned kMinOpenFiles = 8192;
-const unsigned kSignalHandlerStacksize = 2*1024*1024;  /**< 2 MB */
-#ifndef CVMFS_LIBCVMFS
-const unsigned kMaxBacktrace = 64;  /**< reported stracktrace depth */
-#endif
+Watchdog *Watchdog::instance_ = NULL;
 
 
-string *cache_dir_ = NULL;
-string *process_name_ = NULL;
-string *exe_path_ = NULL;
-bool spawned_ = false;
-Pipe *pipe_watchdog_ = NULL;
-platform_spinlock lock_handler_;
-stack_t sighandler_stack_;
-pid_t watchdog_pid_ = 0;
-void (*on_crash_)(void) = NULL;
-
-typedef std::map<int, struct sigaction> SigactionMap;
-SigactionMap old_signal_handlers_;
-
-struct CrashData {
-  int   signal;
-  int   sys_errno;
-  pid_t pid;
-};
-
-struct ControlFlow {
-  enum Flags {  // TODO(rmeusel): C++11 (type safe enum)
-    kProduceStacktrace = 0,
-    kQuit,
-    kUnknown,
-  };
-};
-
-
-pid_t GetPid() {
-  if (!spawned_) {
-    return cvmfs::pid_;
-  }
-
-  return watchdog_pid_;
+Watchdog *Watchdog::Create(const string &crash_dump_path) {
+  assert(instance_ == NULL);
+  instance_ = new Watchdog(crash_dump_path);
+  return instance_;
 }
-
-
-/**
- * Sets the signal handlers of the current process according to the ones
- * defined in the given SigactionMap.
- *
- * @param signal_handlers  a map of SIGNAL -> struct sigaction
- * @return                 a SigactionMap containing the old handlers
- */
-static SigactionMap SetSignalHandlers(const SigactionMap &signal_handlers) {
-  SigactionMap old_signal_handlers;
-  SigactionMap::const_iterator i     = signal_handlers.begin();
-  SigactionMap::const_iterator iend  = signal_handlers.end();
-  for (; i != iend; ++i) {
-    struct sigaction old_signal_handler;
-    if (sigaction(i->first, &i->second, &old_signal_handler) != 0) {
-      abort();
-    }
-    old_signal_handlers[i->first] = old_signal_handler;
-  }
-
-  return old_signal_handlers;
-}
-
-
-/**
- * Signal handler for signals that indicate a cvmfs crash.
- * Sends debug information to watchdog.
- */
-static void SendTrace(int sig,
-                      siginfo_t *siginfo __attribute__((unused)),
-                      void *context)
-{
-  int send_errno = errno;
-  if (platform_spinlock_trylock(&lock_handler_) != 0) {
-    // Concurrent call, wait for the first one to exit the process
-    while (true) {}
-  }
-
-  // Set the original signal handler for the raised signal in
-  // SIGQUIT (watchdog process will raise SIGQUIT)
-  (void) sigaction(SIGQUIT, &old_signal_handlers_[sig], NULL);
-
-  // Inform the watchdog that CernVM-FS crashed
-  if (!pipe_watchdog_->Write(ControlFlow::kProduceStacktrace)) {
-    _exit(1);
-  }
-
-  // Send crash information to the watchdog
-  CrashData crash_data;
-  crash_data.signal     = sig;
-  crash_data.sys_errno  = send_errno;
-  crash_data.pid        = getpid();
-  if (!pipe_watchdog_->Write(crash_data)) {
-    _exit(1);
-  }
-
-  // Do not die before the stack trace was generated
-  // kill -SIGQUIT <pid> will finish this
-  int counter = 0;
-  while (true) {
-    SafeSleepMs(100);
-    // quit anyway after 30 seconds
-    if (++counter == 300) {
-      LogCvmfs(kLogCvmfs, kLogSyslogErr, "stack trace generation failed");
-      // Last attempt to log something useful
-#ifndef CVMFS_LIBCVMFS
-      LogCvmfs(kLogCvmfs, kLogSyslogErr, "Signal %d, errno %d",
-               sig, send_errno);
-      void *addr[kMaxBacktrace];
-      // Note: this doesn't work due to the signal stack on OS X (it works on
-      // Linux).  Since anyway lldb is supposed to produce the backtrace, we
-      // consider it more important to protect cvmfs against stack overflows.
-      int num_addr = backtrace(addr, kMaxBacktrace);
-      char **symbols = backtrace_symbols(addr, num_addr);
-      string backtrace = "Backtrace (" + StringifyInt(num_addr) +
-                         " symbols):\n";
-      for (int i = 0; i < num_addr; ++i)
-        backtrace += string(symbols[i]) + "\n";
-      LogCvmfs(kLogCvmfs, kLogSyslogErr, "%s", backtrace.c_str());
-      LogCvmfs(kLogCvmfs, kLogSyslogErr, "address of g_cvmfs_exports: %p",
-               &g_cvmfs_exports);
-#endif
-
-      _exit(1);
-    }
-  }
-
-  _exit(1);
-}
-
-
-/**
- * Log a string to syslog and into $cachedir/stacktrace.
- * We expect ideally nothing to be logged, so that file is created on demand.
- */
-static void LogEmergency(string msg) {
-  char ctime_buffer[32];
-
-  FILE *fp = fopen((*cache_dir_ + "/stacktrace." + *process_name_).c_str(),
-                   "a");
-  if (fp) {
-    time_t now = time(NULL);
-    msg += "\nTimestamp: " + string(ctime_r(&now, ctime_buffer));
-    if (fwrite(&msg[0], 1, msg.length(), fp) != msg.length())
-      msg += " (failed to report into log file in cache directory)";
-    fclose(fp);
-  } else {
-    msg += " (failed to open log file in cache directory)";
-  }
-  LogCvmfs(kLogMonitor, kLogSyslogErr, "%s", msg.c_str());
-}
-
-
-/**
- * reads from the file descriptor until the specific gdb prompt
- * is reached or the pipe gets broken
- *
- * @param fd_pipe  the file descriptor of the pipe to be read
- * @return         the data read from the pipe
- */
-static string ReadUntilGdbPrompt(int fd_pipe) {
-#ifdef __APPLE__
-  static const string gdb_prompt = "(lldb)";
-#else
-  static const string gdb_prompt = "\n(gdb) ";
-#endif
-
-  string        result;
-  char          mini_buffer;
-  int           chars_io;
-  unsigned int  ring_buffer_pos = 0;
-
-  // read from stdout of gdb until gdb prompt occures --> (gdb)
-  while (1) {
-    chars_io = read(fd_pipe, &mini_buffer, 1);
-
-    // in case something goes wrong...
-    if (chars_io <= 0) break;
-
-    result += mini_buffer;
-
-    // find the gdb_promt in the stdout data
-    if (mini_buffer == gdb_prompt[ring_buffer_pos]) {
-      ++ring_buffer_pos;
-      if (ring_buffer_pos == gdb_prompt.size()) {
-        break;
-      }
-    } else {
-      ring_buffer_pos = 0;
-    }
-  }
-
-  return result;
-}
-
 
 
 /**
  * Uses an external shell and gdb to create a full stack trace of the dying
- * cvmfs client. The same shell is used to force-quit the client afterwards.
+ * process. The same shell is used to force-quit the client afterwards.
  */
-static string GenerateStackTrace(const string &exe_path,
-                                 const pid_t   pid) {
+string Watchdog::GenerateStackTrace(const string &exe_path, pid_t pid) {
   int retval;
   string result = "";
 
@@ -269,11 +72,11 @@ static string GenerateStackTrace(const string &exe_path,
     result += "failed to re-gain root permissions... still give it a try\n";
   }
 
-  // run gdb and attach to the dying cvmfs2 process
+  // run gdb and attach to the dying process
   int fd_stdin;
   int fd_stdout;
   int fd_stderr;
-  vector<string> argv;  // TODO(jblomer): C++11 initializer list...
+  vector<string> argv;
 #ifndef __APPLE__
   argv.push_back("-q");
   argv.push_back("-n");
@@ -346,10 +149,93 @@ static string GenerateStackTrace(const string &exe_path,
 }
 
 
+pid_t Watchdog::GetPid() {
+  if (instance_ != NULL) {
+    if (!instance_->spawned_)
+      return getpid();
+    else
+      return instance_->watchdog_pid_;
+  }
+  return getpid();
+}
+
+
+/**
+ * Log a string to syslog and into the crash dump file.
+ * We expect ideally nothing to be logged, so that file is created on demand.
+ */
+void Watchdog::LogEmergency(string msg) {
+  char ctime_buffer[32];
+
+  if (!crash_dump_path_.empty()) {
+    FILE *fp = fopen(crash_dump_path_.c_str(), "a");
+    if (fp) {
+      time_t now = time(NULL);
+      msg += "\nTimestamp: " + string(ctime_r(&now, ctime_buffer));
+      if (fwrite(&msg[0], 1, msg.length(), fp) != msg.length())
+        msg += " (failed to report into crash dump file "
+               + crash_dump_path_ + ")";
+      fclose(fp);
+    } else {
+      msg += " (failed to open crash dump file " + crash_dump_path_ + ")";
+    }
+  }
+  LogCvmfs(kLogMonitor, kLogSyslogErr, "%s", msg.c_str());
+}
+
+
+/**
+ * Reads from the file descriptor until the specific gdb prompt is reached or
+ * the pipe gets broken.
+ *
+ * @param fd_pipe  the file descriptor of the pipe to be read
+ * @return         the data read from the pipe
+ */
+string Watchdog::ReadUntilGdbPrompt(int fd_pipe) {
+#ifdef __APPLE__
+  static const string gdb_prompt = "(lldb)";
+#else
+  static const string gdb_prompt = "\n(gdb) ";
+#endif
+
+  string        result;
+  char          mini_buffer;
+  int           chars_io;
+  unsigned int  ring_buffer_pos = 0;
+
+  // read from stdout of gdb until gdb prompt occures --> (gdb)
+  while (1) {
+    chars_io = read(fd_pipe, &mini_buffer, 1);
+
+    // in case something goes wrong...
+    if (chars_io <= 0) break;
+
+    result += mini_buffer;
+
+    // find the gdb_promt in the stdout data
+    if (mini_buffer == gdb_prompt[ring_buffer_pos]) {
+      ++ring_buffer_pos;
+      if (ring_buffer_pos == gdb_prompt.size()) {
+        break;
+      }
+    } else {
+      ring_buffer_pos = 0;
+    }
+  }
+
+  return result;
+}
+
+
+void Watchdog::RegisterOnCrash(void (*CleanupOnCrash)(void)) {
+  on_crash_ = CleanupOnCrash;
+}
+
+
 /**
  * Generates useful information from the backtrace log in the pipe.
  */
-static string ReportStacktrace() {
+string Watchdog::ReportStacktrace() {
   // Re-activate µSyslog, if necessary
   SetLogMicroSyslog(GetLogMicroSyslog());
 
@@ -363,11 +249,11 @@ static string ReportStacktrace() {
   debug += ", errno: "   + StringifyInt(crash_data.sys_errno);
   debug += ", version: " + string(VERSION);
   debug += ", PID: "     + StringifyInt(crash_data.pid) + "\n";
-  debug += "Executable path: " + *exe_path_ + "\n";
+  debug += "Executable path: " + exe_path_ + "\n";
 
-  debug += GenerateStackTrace(*exe_path_, crash_data.pid);
+  debug += GenerateStackTrace(exe_path_, crash_data.pid);
 
-  // Give the dying cvmfs client the finishing stroke
+  // Give the dying process the finishing stroke
   if (kill(crash_data.pid, SIGKILL) != 0) {
     debug += "Failed to kill cvmfs client! (";
     switch (errno) {
@@ -390,89 +276,95 @@ static string ReportStacktrace() {
 }
 
 
-/**
- * Listens on the pipe and logs the stacktrace or quits silently.
- */
-static void Watchdog() {
-  signal(SIGPIPE, SIG_IGN);
-  ControlFlow::Flags control_flow;
+void Watchdog::SendTrace(int sig, siginfo_t *siginfo,void *context) {
+  int send_errno = errno;
+  if (platform_spinlock_trylock(&Me()->lock_handler_) != 0) {
+    // Concurrent call, wait for the first one to exit the process
+    while (true) {}
+  }
 
-  if (!pipe_watchdog_->Read(&control_flow)) {
-    // Re-activate µSyslog, if necessary
-    SetLogMicroSyslog(GetLogMicroSyslog());
-    LogEmergency("unexpected termination (" + StringifyInt(control_flow) + ")");
-    if (on_crash_) on_crash_();
-  } else {
-    switch (control_flow) {
-      case ControlFlow::kProduceStacktrace:
-        LogEmergency(ReportStacktrace());
-        if (on_crash_) on_crash_();
-        break;
+  // Set the original signal handler for the raised signal in
+  // SIGQUIT (watchdog process will raise SIGQUIT)
+  (void) sigaction(SIGQUIT, &(Me()->old_signal_handlers_[sig]), NULL);
 
-      case ControlFlow::kQuit:
-        break;
+  // Inform the watchdog that CernVM-FS crashed
+  if (!Me()->pipe_watchdog_->Write(ControlFlow::kProduceStacktrace)) {
+    _exit(1);
+  }
 
-      default:
-        // Re-activate µSyslog, if necessary
-        SetLogMicroSyslog(GetLogMicroSyslog());
-        LogEmergency("unexpected error");
-        break;
+  // Send crash information to the watchdog
+  CrashData crash_data;
+  crash_data.signal     = sig;
+  crash_data.sys_errno  = send_errno;
+  crash_data.pid        = getpid();
+  if (!Me()->pipe_watchdog_->Write(crash_data)) {
+    _exit(1);
+  }
+
+  // Do not die before the stack trace was generated
+  // kill -SIGQUIT <pid> will finish this
+  int counter = 0;
+  while (true) {
+    SafeSleepMs(100);
+    // quit anyway after 30 seconds
+    if (++counter == 300) {
+      LogCvmfs(kLogCvmfs, kLogSyslogErr, "stack trace generation failed");
+      // Last attempt to log something useful
+#ifndef CVMFS_LIBCVMFS
+      LogCvmfs(kLogCvmfs, kLogSyslogErr, "Signal %d, errno %d",
+               sig, send_errno);
+      void *addr[kMaxBacktrace];
+      // Note: this doesn't work due to the signal stack on OS X (it works on
+      // Linux).  Since anyway lldb is supposed to produce the backtrace, we
+      // consider it more important to protect cvmfs against stack overflows.
+      int num_addr = backtrace(addr, kMaxBacktrace);
+      char **symbols = backtrace_symbols(addr, num_addr);
+      string backtrace = "Backtrace (" + StringifyInt(num_addr) +
+                         " symbols):\n";
+      for (int i = 0; i < num_addr; ++i)
+        backtrace += string(symbols[i]) + "\n";
+      LogCvmfs(kLogCvmfs, kLogSyslogErr, "%s", backtrace.c_str());
+      LogCvmfs(kLogCvmfs, kLogSyslogErr, "address of g_cvmfs_exports: %p",
+               &g_cvmfs_exports);
+#endif
+
+      _exit(1);
     }
   }
 
-  close(pipe_watchdog_->read_end);
+  _exit(1);
 }
 
-
-bool Init(const string &cache_dir, const std::string &process_name,
-          const bool check_max_open_files)
-{
-  monitor::cache_dir_ = new string(cache_dir);
-  monitor::process_name_ = new string(process_name);
-  monitor::exe_path_ = new string(platform_getexepath());
-  if (platform_spinlock_init(&lock_handler_, 0) != 0) return false;
-
-  return true;
-}
-
-
-void Fini() {
-  on_crash_ = NULL;
-
-  // Reset signal handlers
-  if (spawned_) {
-    signal(SIGQUIT, SIG_DFL);
-    signal(SIGILL, SIG_DFL);
-    signal(SIGABRT, SIG_DFL);
-    signal(SIGFPE, SIG_DFL);
-    signal(SIGSEGV, SIG_DFL);
-    signal(SIGBUS, SIG_DFL);
-    signal(SIGPIPE, SIG_DFL);
-    signal(SIGXFSZ, SIG_DFL);
-    free(sighandler_stack_.ss_sp);
-    sighandler_stack_.ss_size = 0;
-  }
-
-  if (spawned_) {
-    pipe_watchdog_->Write(ControlFlow::kQuit);
-    close(pipe_watchdog_->write_end);
-  }
-  delete pipe_watchdog_;
-  delete process_name_;
-  delete cache_dir_;
-  delete exe_path_;
-  pipe_watchdog_ = NULL;
-  process_name_ = NULL;
-  cache_dir_ = NULL;
-  exe_path_ = NULL;
-  platform_spinlock_destroy(&lock_handler_);
-  LogCvmfs(kLogMonitor, kLogDebug, "monitor stopped");
-}
 
 /**
- * Fork watchdog.
+ * Sets the signal handlers of the current process according to the ones
+ * defined in the given SigactionMap.
+ *
+ * @param signal_handlers  a map of SIGNAL -> struct sigaction
+ * @return                 a SigactionMap containing the old handlers
  */
-void Spawn() {
+Watchdog::SigactionMap Watchdog::SetSignalHandlers(
+  const SigactionMap &signal_handlers)
+{
+  SigactionMap old_signal_handlers;
+  SigactionMap::const_iterator i     = signal_handlers.begin();
+  SigactionMap::const_iterator iend  = signal_handlers.end();
+  for (; i != iend; ++i) {
+    struct sigaction old_signal_handler;
+    if (sigaction(i->first, &i->second, &old_signal_handler) != 0) {
+      abort();
+    }
+    old_signal_handlers[i->first] = old_signal_handler;
+  }
+
+  return old_signal_handlers;
+}
+
+
+/**
+ * Fork the watchdog process.
+ */
+void Watchdog::Spawn() {
   Pipe pipe_pid;
   pipe_watchdog_ = new Pipe();
 
@@ -505,7 +397,7 @@ void Spawn() {
           }
           // SetLogMicroSyslog(usyslog_save);  // no-op if usyslog not used
           SetLogDebugFile(debuglog_save);  // no-op if debug log not used
-          Watchdog();
+          Supervise();
           exit(0);
         }
         default:
@@ -526,7 +418,7 @@ void Spawn() {
   if (!platform_allow_ptrace(watchdog_pid_)) {
     LogCvmfs(kLogMonitor, kLogSyslogWarn,
              "failed to allow ptrace() for watchdog (PID: %d). "
-             "Post crash stacktrace of the CernVM-FS client might not work",
+             "Post crash stacktrace might not work",
              watchdog_pid_);
   }
 
@@ -560,10 +452,79 @@ void Spawn() {
 }
 
 
-void RegisterOnCrash(void (*CleanupOnCrash)(void)) {
-  on_crash_ = CleanupOnCrash;
+void Watchdog::Supervise() {
+  signal(SIGPIPE, SIG_IGN);
+  ControlFlow::Flags control_flow;
+
+  if (!pipe_watchdog_->Read(&control_flow)) {
+    // Re-activate µSyslog, if necessary
+    SetLogMicroSyslog(GetLogMicroSyslog());
+    LogEmergency("unexpected termination (" + StringifyInt(control_flow) + ")");
+    if (on_crash_) on_crash_();
+  } else {
+    switch (control_flow) {
+      case ControlFlow::kProduceStacktrace:
+        LogEmergency(ReportStacktrace());
+        if (on_crash_) on_crash_();
+        break;
+
+      case ControlFlow::kQuit:
+        break;
+
+      default:
+        // Re-activate µSyslog, if necessary
+        SetLogMicroSyslog(GetLogMicroSyslog());
+        LogEmergency("unexpected error");
+        break;
+    }
+  }
+
+  close(pipe_watchdog_->read_end);
 }
 
+
+Watchdog::Watchdog(const string &crash_dump_path)
+  : spawned_(false)
+  , crash_dump_path_(crash_dump_path)
+  , exe_path_(string(platform_getexepath()))
+  , watchdog_pid_(0)
+  , pipe_watchdog_(NULL)
+  , on_crash_(NULL)
+{
+  int retval = platform_spinlock_init(&lock_handler_, 0);
+  assert(retval == 0);
+  memset(&sighandler_stack_, 0, sizeof(sighandler_stack_));
+}
+
+
+Watchdog::~Watchdog() {
+  if (spawned_) {
+    // Reset signal handlers
+    signal(SIGQUIT, SIG_DFL);
+    signal(SIGILL, SIG_DFL);
+    signal(SIGABRT, SIG_DFL);
+    signal(SIGFPE, SIG_DFL);
+    signal(SIGSEGV, SIG_DFL);
+    signal(SIGBUS, SIG_DFL);
+    signal(SIGPIPE, SIG_DFL);
+    signal(SIGXFSZ, SIG_DFL);
+    free(sighandler_stack_.ss_sp);
+    sighandler_stack_.ss_size = 0;
+
+    pipe_watchdog_->Write(ControlFlow::kQuit);
+    close(pipe_watchdog_->write_end);
+  }
+
+  platform_spinlock_destroy(&lock_handler_);
+  LogCvmfs(kLogMonitor, kLogDebug, "monitor stopped");
+  instance_ = NULL;
+}
+
+
+
+namespace monitor {
+
+const unsigned kMinOpenFiles = 8192;
 
 unsigned GetMaxOpenFiles() {
   static unsigned max_open_files;

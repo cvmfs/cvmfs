@@ -116,6 +116,7 @@ const unsigned kReloadSafetyMargin = 500;  // in milliseconds
 FileSystem *file_system_ = NULL;
 MountPoint *mount_point_ = NULL;
 TalkManager *talk_mgr_ = NULL;
+Watchdog *watchdog_ = NULL;
 
 /**
  * Stores the initial catalog revision (in order to detect overflows) and
@@ -1883,7 +1884,6 @@ void UnregisterQuotaListener() {
 }  // namespace cvmfs
 
 
-bool g_monitor_ready = false;
 string *g_boot_error = NULL;
 
 __attribute__((visibility("default")))
@@ -1983,11 +1983,12 @@ static int Init(const loader::LoaderExports *loader_exports) {
 
   // Monitor, check for maximum number of open files
   if (cvmfs::UseWatchdog()) {
-    if (!monitor::Init(".", loader_exports->repository_name, true)) {
+    cvmfs::watchdog_ = Watchdog::Create("./stacktrace." +
+                                        loader_exports->repository_name);
+    if (cvmfs::watchdog_ == NULL) {
       *g_boot_error = "failed to initialize watchdog.";
       return loader::kFailMonitor;
     }
-    g_monitor_ready = true;
   }
   cvmfs::max_open_files_ = monitor::GetMaxOpenFiles();
 
@@ -2025,9 +2026,9 @@ static void Spawn() {
   // First thing: fork off the watchdog while we still have a single-threaded
   // well-defined state
   cvmfs::pid_ = getpid();
-  if (cvmfs::UseWatchdog() && g_monitor_ready) {
-    monitor::RegisterOnCrash(auto_umount::UmountOnCrash);
-    monitor::Spawn();
+  if (cvmfs::watchdog_) {
+    cvmfs::watchdog_->RegisterOnCrash(auto_umount::UmountOnCrash);
+    cvmfs::watchdog_->Spawn();
   }
 
   // Setup catalog reload alarm (_after_ forking into daemon mode)
@@ -2125,7 +2126,8 @@ static void Fini() {
   cvmfs::file_system_ = NULL;
   cvmfs::options_mgr_ = NULL;
 
-  if (g_monitor_ready) monitor::Fini();
+  delete cvmfs::watchdog_;
+  cvmfs::watchdog_ = NULL;
 
   delete g_boot_error;
   g_boot_error = NULL;

@@ -10,14 +10,14 @@
 #include "monitor.h"
 
 int main(int argc, char **argv) {
-  bool retval = monitor::Init("/tmp", "cvmfs_unittests", false);
-  assert(retval);
-  // monitor::Spawn();
+  Watchdog *watchdog = Watchdog::Create("/tmp/stacktrace.cvmfs_unittests");
+  assert(watchdog != NULL);
+  // watchdog->Spawn();
   CvmfsEnvironment* env = new CvmfsEnvironment(argc, argv);
   ::testing::InitGoogleTest(&argc, argv);
   ::testing::FLAGS_gtest_death_test_style = "threadsafe";
   ::testing::AddGlobalTestEnvironment(env);
   int result = RUN_ALL_TESTS();
-  monitor::Fini();
+  delete watchdog;
   return result;
 }
