@@ -171,6 +171,15 @@ void cvmcache_terminate(struct cvmcache_context *ctx);
 
 uint32_t cvmcache_max_object_size(struct cvmcache_context *ctx);
 
+/**
+ * Can be used at to spawn a second process that superwises the cache plugin.
+ * The watchdog can use gdb/lldb to generate stack traces.  Must be closed by
+ * a call to cvmcache_close_watchdog(), otherwise the main process will be
+ * reported has having died unexpectedly.
+ */
+void cvmcache_spawn_watchdog(const char *crash_dump_file);
+void cvmcache_terminate_watchdog();
+
 
 // Options parsing from libcvmfs without legacy support
 

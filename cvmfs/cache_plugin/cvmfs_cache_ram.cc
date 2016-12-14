@@ -602,6 +602,7 @@ int main(int argc, char **argv) {
     return 1;
   }
 
+  cvmcache_spawn_watchdog(NULL);
   PluginRamCache *plugin = PluginRamCache::Create(mem_size);
 
   struct cvmcache_callbacks callbacks;
@@ -643,5 +644,6 @@ int main(int argc, char **argv) {
   cvmcache_options_free(mem_size);
   cvmcache_options_free(locator);
   cvmcache_options_fini(options);
+  cvmcache_terminate_watchdog();
   return 0;
 }

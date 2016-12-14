@@ -16,6 +16,7 @@
 
 #include "cache_plugin/channel.h"
 #include "hash.h"
+#include "monitor.h"
 #include "util/pointer.h"
 
 using namespace std;  // NOLINT
@@ -228,6 +229,8 @@ class ForwardCachePlugin : public CachePlugin {
   struct cvmcache_callbacks callbacks_;
 };
 
+Watchdog *g_watchdog = NULL;
+
 }  // anonymous namespace
 
 
@@ -278,4 +281,19 @@ void cvmcache_terminate(struct cvmcache_context *ctx) {
 
 uint32_t cvmcache_max_object_size(struct cvmcache_context *ctx) {
   return ctx->plugin->max_object_size();
+}
+
+void cvmcache_spawn_watchdog(const char *crash_dump_file) {
+  if (g_watchdog != NULL)
+    return;
+  g_watchdog = Watchdog::Create((crash_dump_file != NULL)
+                                ? string(crash_dump_file)
+                                : "");
+  assert(g_watchdog != NULL);
+  g_watchdog->Spawn();
+}
+
+void cvmcache_terminate_watchdog() {
+  delete g_watchdog;
+  g_watchdog = NULL;
 }

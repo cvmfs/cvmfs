@@ -35,11 +35,14 @@
 #include <string>
 #include <vector>
 
+#ifndef CVMFS_LIBCVMFS
 #include "cvmfs.h"
+#endif
 #include "logging.h"
 #include "platform.h"
 #include "smalloc.h"
 #include "util/posix.h"
+#include "util/string.h"
 
 // Used for address offset calculation
 #ifndef CVMFS_LIBCVMFS

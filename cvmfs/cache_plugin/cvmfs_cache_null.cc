@@ -285,6 +285,8 @@ int main(int argc, char **argv) {
     return 1;
   }
 
+  cvmcache_spawn_watchdog(NULL);
+
   struct cvmcache_callbacks callbacks;
   memset(&callbacks, 0, sizeof(callbacks));
   callbacks.cvmcache_chrefcnt = null_chrefcnt;
@@ -323,5 +325,6 @@ int main(int argc, char **argv) {
   printf("  ... good bye\n");
   cvmcache_options_free(locator);
   cvmcache_options_fini(options);
+  cvmcache_terminate_watchdog();
   return 0;
 }

@@ -162,6 +162,7 @@ set (LIBCVMFS_CACHE_SOURCES
   hash.h hash.cc
   logging.cc logging.h logging_internal.h
   murmur.h
+  monitor.cc monitor.h
   options.h options.cc
   platform.h platform_linux.h platform_osx.h
   prng.h

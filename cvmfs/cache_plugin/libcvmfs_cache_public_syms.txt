@@ -12,6 +12,8 @@ cvmcache_process_requests
 cvmcache_ask_detach
 cvmcache_terminate
 cvmcache_max_object_size
+cvmcache_spawn_watchdog
+cvmcache_terminate_watchdog
 cvmcache_options_init
 cvmcache_options_fini
 cvmcache_options_set
