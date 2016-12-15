@@ -22,7 +22,7 @@ clean_work_dir() {
 }
 
 check_status() {
-    echo $(( $1 != $2 ))
+    echo $(( $1 || 0 ))
 }
 
 # 1. Delete files in the lower read-only branch of the union fs
@@ -44,7 +44,7 @@ delete_file_in_lower_branch() {
     # Cleaning up
     clean_work_dir
 
-    return $(check_status $status 1)
+    return $(check_status $status)
 }
 
 # 2. Open file paths in /proc/\$PID/fd
@@ -63,10 +63,10 @@ check_file_path() {
     local status=$?
 
     # Cleaning up
-    kill -9 $tail_pid
+    kill $tail_pid
     clean_work_dir
 
-    return $(check_status $status 0)
+    return $(check_status $status)
 }
 
 # 3. Delete directories in the lower read-only branch of the union fs
@@ -85,7 +85,7 @@ delete_dir_in_lower_branch () {
     # Cleaning up
     clean_work_dir
 
-    return $(check_status $status 0)
+    return $(check_status $status)
 }
 
 # 4. Clear suid or sgid bits during writes on overlayfs
@@ -114,7 +114,7 @@ clear_suid_sgid_during_write () {
     # Cleaning up
     clean_work_dir
 
-    return $(check_status $(( $status1 && $status2 )) 0)
+    return $(check_status $(( $status1 && $status2 )))
 }
 
 cvmfs_run_test() {
@@ -129,6 +129,6 @@ cvmfs_run_test() {
     clear_suid_sgid_during_write
     local status4=$?
 
-    return $(check_status $(( $status1 || $status2 || $status3 || $status4 )) 0)
+    return $(check_status $(( $status1 || $status2 || $status3 || $status4 )))
 }
 
