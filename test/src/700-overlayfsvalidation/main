@@ -63,7 +63,7 @@ check_file_path() {
     local status=$?
 
     # Cleaning up
-    kill $tail_pid
+    kill -9 $tail_pid
     clean_work_dir
 
     return $(check_status $status)
@@ -128,6 +128,11 @@ cvmfs_run_test() {
     local status3=$?
     clear_suid_sgid_during_write
     local status4=$?
+
+    echo "Check deleting files in the lower read-only branch of the union fs: Status $status1"
+    echo "Check open file paths in /proc/$PID/fd: Status $status2"
+    echo "Check deleting directories in the lower read-only branch of the union fs: Status $status3"
+    echo "Check suid or sgid bits during writes on overlayfs: Status $status4"
 
     return $(check_status $(( $status1 || $status2 || $status3 || $status4 )))
 }
