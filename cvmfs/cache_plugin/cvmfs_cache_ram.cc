@@ -27,8 +27,8 @@
 #include "platform.h"
 #include "smallhash.h"
 #include "smalloc.h"
-#include "util_concurrency.h"
 #include "util/string.h"
+#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 
@@ -552,7 +552,8 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
   }
 
   bool IsInDangerZone() {
-    return double(cache_info_.pinned_bytes) / double(cache_info_.size_bytes) >
+    return (static_cast<double>(cache_info_.pinned_bytes) /
+            static_cast<double>(cache_info_.size_bytes)) >
            kDangerZoneThreshold;
   }
 

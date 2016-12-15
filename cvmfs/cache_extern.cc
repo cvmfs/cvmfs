@@ -16,6 +16,7 @@
 #ifdef __APPLE__
 #include <cstdlib>
 #endif
+#include <map>
 #include <new>
 #include <set>
 #include <string>

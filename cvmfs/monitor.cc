@@ -279,7 +279,7 @@ string Watchdog::ReportStacktrace() {
 }
 
 
-void Watchdog::SendTrace(int sig, siginfo_t *siginfo,void *context) {
+void Watchdog::SendTrace(int sig, siginfo_t *siginfo, void *context) {
   int send_errno = errno;
   if (platform_spinlock_trylock(&Me()->lock_handler_) != 0) {
     // Concurrent call, wait for the first one to exit the process

@@ -209,9 +209,9 @@ TEST_F(T_CachePlugin, TransactionAbort) {
   HashString(content, &id);
   void *txn = alloca(cache_mgr_->SizeOfTxn());
   EXPECT_EQ(0, cache_mgr_->StartTxn(id, content.length(), txn));
-  //EXPECT_EQ(0, cache_mgr_->Reset(txn));
-  //EXPECT_EQ(2, cache_mgr_->Write(content.data(), 2, txn));
-  //EXPECT_EQ(0, cache_mgr_->Reset(txn));
+  EXPECT_EQ(0, cache_mgr_->Reset(txn));
+  EXPECT_EQ(2, cache_mgr_->Write(content.data(), 2, txn));
+  EXPECT_EQ(0, cache_mgr_->Reset(txn));
   EXPECT_EQ(3, cache_mgr_->Write(content.data(), 3, txn));
   EXPECT_EQ(0, cache_mgr_->CommitTxn(txn));
 
