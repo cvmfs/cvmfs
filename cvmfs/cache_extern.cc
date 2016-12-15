@@ -246,8 +246,14 @@ ExternalCacheManager::PluginHandle *ExternalCacheManager::CreatePlugin(
   const std::vector<std::string> &cmd_line)
 {
   UniquePtr<PluginHandle> plugin_handle(new PluginHandle());
+  unsigned num_attempts = 0;
   bool try_again = false;
   do {
+    num_attempts++;
+    if (num_attempts > 2) {
+      // Prevent violate busy loops
+      SafeSleepMs(1000);
+    }
     plugin_handle->fd_connection_ = ConnectLocator(locator);
     if (plugin_handle->IsValid()) {
       break;

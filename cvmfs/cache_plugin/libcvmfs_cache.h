@@ -121,11 +121,14 @@ struct cvmcache_callbacks {
                         uint64_t offset,
                         uint32_t *size,
                         unsigned char *buffer);
+  /**
+   * The same object might be uploaded concurrently by multiple users.
+   */
   int (*cvmcache_start_txn)(struct cvmcache_hash *id,
                             uint64_t txn_id,
                             struct cvmcache_object_info *info);
   /**
-   * A full block is appended expect possibly for the file's last block
+   * A full block is appended except possibly for the file's last block
    */
   int (*cvmcache_write_txn)(uint64_t txn_id,
                             unsigned char *buffer,
@@ -151,7 +154,14 @@ struct cvmcache_callbacks {
   int capabilities;
 };
 
+/**
+ * Should be called before any other cvmcache_... function.
+ */
 void cvmcache_init_global();
+/**
+ * Deletes global state, afterwards no further calls to cvmcache_... functions
+ * should take place.
+ */
 void cvmcache_cleanup_global();
 /**
  * True if the plugin was started from a cvmfs mountpoint and thus will
@@ -197,7 +207,7 @@ void cvmcache_spawn_watchdog(const char *crash_dump_file);
 void cvmcache_terminate_watchdog();
 
 
-// Options parsing from libcvmfs without legacy support
+// Options parsing from libcvmfs without "libcvmfs legacy" support
 
 cvmcache_option_map *cvmcache_options_init();
 /**

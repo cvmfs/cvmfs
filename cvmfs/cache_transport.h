@@ -50,6 +50,7 @@ class CacheTransport {
    */
   static const char *kEnvReadyNotifyFd;  // __CVMFS_CACHE_EXTERNAL_PIPE_READY__
   static const char kReadyNotification = 'C';
+  static const char kFailureNotification = 'F';
   /**
    * Version of the wire protocol.  The effective protocol version is negotiated
    * through the handshake.

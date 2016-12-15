@@ -307,7 +307,10 @@ int main(int argc, char **argv) {
 
   ctx = cvmcache_init(&callbacks);
   int retval = cvmcache_listen(ctx, locator);
-  assert(retval);
+  if (!retval) {
+    fprintf(stderr, "failed to listen on %s\n", locator);
+    return 1;
+  }
   printf("Listening for cvmfs clients on %s\n", locator);
   printf("NOTE: this process needs to run as user cvmfs\n\n");
 

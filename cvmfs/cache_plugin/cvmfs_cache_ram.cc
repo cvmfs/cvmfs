@@ -463,7 +463,7 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
                          (2.0 * slot_size));
     const unsigned mask_64 = ~((1 << 6) - 1);
 
-    LogCvmfs(kLogCvmfs, kLogStdout, "allocating %" PRIu64 "MB of memory "
+    LogCvmfs(kLogCvmfs, kLogStdout, "Allocating %" PRIu64 "MB of memory "
              "for up to %" PRIu64 " objects",
              heap_size / (1024 * 1024), num_slots & mask_64);
 
@@ -584,6 +584,8 @@ int main(int argc, char **argv) {
     return 1;
   }
 
+  cvmcache_init_global();
+
   cvmcache_option_map *options = cvmcache_options_init();
   if (cvmcache_options_parse(options, argv[1]) != 0) {
     printf("cannot parse options file %s\n", argv[1]);
@@ -623,27 +625,35 @@ int main(int argc, char **argv) {
 
   ctx = cvmcache_init(&callbacks);
   int retval = cvmcache_listen(ctx, locator);
-  assert(retval);
+  if (!retval) {
+    fprintf(stderr, "failed to listen on %s\n", locator);
+    return 1;
+  }
   printf("Listening for cvmfs clients on %s\n", locator);
   printf("NOTE: this process needs to run as user cvmfs\n\n");
-  printf("Press <R ENTER> to ask clients to release nested catalogs\n");
-  printf("Press <Ctrl+D> to quit\n");
+
 
   cvmcache_process_requests(ctx, 0);
-  while (true) {
-    char buf;
-    retval = read(fileno(stdin), &buf, 1);
-    if (retval != 1)
-      break;
-    if (buf == 'R') {
-      printf("  ... asking clients to release nested catalogs\n");
-      cvmcache_ask_detach(ctx);
+  if (!cvmcache_is_supervised()) {
+    printf("Press <Ctrl+D> to quit\n");
+    while (true) {
+      char buf;
+      retval = read(fileno(stdin), &buf, 1);
+      if (retval != 1)
+        break;
     }
+    cvmcache_terminate(ctx);
+  } else {
+    LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
+             "CernVM-FS RAM cache plugin started in supervised mode");
   }
+
+  cvmcache_wait_for(ctx);
   printf("  ... good bye\n");
   cvmcache_options_free(mem_size);
   cvmcache_options_free(locator);
   cvmcache_options_fini(options);
   cvmcache_terminate_watchdog();
+  cvmcache_cleanup_global();
   return 0;
 }

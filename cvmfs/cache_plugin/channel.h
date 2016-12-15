@@ -139,12 +139,15 @@ class CachePlugin {
   void HandleList(cvmfs::MsgListReq *msg_req, CacheTransport *transport);
   void SendDetachRequests();
 
+  void NotifySupervisor(char signal);
+
   void LogSessionError(uint64_t session_id,
                        cvmfs::EnumStatus status,
                        const std::string &msg);
 
   uint64_t capabilities_;
   int fd_socket_;
+  int fd_socket_lock_;
   atomic_int32 running_;
   unsigned num_workers_;
   unsigned max_object_size_;

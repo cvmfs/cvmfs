@@ -37,6 +37,7 @@ void CachePlugin::AskToDetach() {
 CachePlugin::CachePlugin(uint64_t capabilities)
   : capabilities_(capabilities)
   , fd_socket_(-1)
+  , fd_socket_lock_(-1)
   , running_(0)
   , num_workers_(0)
   , max_object_size_(kDefaultMaxObjectSize)
@@ -56,6 +57,8 @@ CachePlugin::~CachePlugin() {
   ClosePipe(pipe_ctrl_);
   if (fd_socket_ >= 0)
     close(fd_socket_);
+  if (fd_socket_lock_ >= 0)
+    UnlockFile(fd_socket_lock_);
 }
 
 
@@ -460,23 +463,45 @@ bool CachePlugin::IsRunning() {
 bool CachePlugin::Listen(const string &locator) {
   vector<string> tokens = SplitString(locator, '=');
   if (tokens[0] == "unix") {
+    string lock_path = tokens[1] + ".lock";
+    int fd_socket_lock_ = TryLockFile(lock_path);
+    if (fd_socket_lock_ == -1) {
+      LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
+               "failed to acquire lock file %s (%d)", lock_path.c_str(), errno);
+      NotifySupervisor(CacheTransport::kFailureNotification);
+      return false;
+    } else if (fd_socket_lock_ == -2) {
+      // Another plugin process probably started in the meantime
+      NotifySupervisor(CacheTransport::kReadyNotification);
+      return false;
+    }
+    assert(fd_socket_lock_ >= 0);
     fd_socket_ = MakeSocket(tokens[1], 0600);
   } else if (tokens[0] == "tcp") {
     vector<string> tcp_address = SplitString(tokens[1], ':');
     if (tcp_address.size() != 2) {
       LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
                "invalid locator: %s", locator.c_str());
-      abort();
+      NotifySupervisor(CacheTransport::kFailureNotification);
+      return false;
     }
     fd_socket_ = MakeTcpEndpoint(tcp_address[0], String2Uint64(tcp_address[1]));
   } else {
     LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
              "unknown endpoint in locator: %s", locator.c_str());
-    abort();
+    NotifySupervisor(CacheTransport::kFailureNotification);
+    return false;
   }
+
   if (fd_socket_ < 0) {
-    LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
-             "failed to create endpoint %s (%d)", locator.c_str(), errno);
+    if (errno == EADDRINUSE) {
+      // Another plugin process probably started in the meantime
+      NotifySupervisor(CacheTransport::kReadyNotification);
+    } else {
+      LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
+               "failed to create endpoint %s (%d)", locator.c_str(), errno);
+      NotifySupervisor(CacheTransport::kFailureNotification);
+    }
     return false;
   }
   int retval = listen(fd_socket_, 32);
@@ -519,7 +544,8 @@ void *CachePlugin::MainProcessRequests(void *data) {
   watch_socket.events = POLLIN | POLLPRI;
   watch_fds.push_back(watch_socket);
 
-  while (true) {
+  bool terminated = false;
+  while (!terminated) {
     for (unsigned i = 0; i < watch_fds.size(); ++i)
       watch_fds[i].revents = 0;
     int retval = poll(&watch_fds[0], watch_fds.size(), -1);
@@ -567,14 +593,26 @@ void *CachePlugin::MainProcessRequests(void *data) {
     }
 
     // New request
-    for (unsigned i = 2; i < watch_fds.size(); ++i) {
+    for (unsigned i = 2; i < watch_fds.size(); ) {
       if (watch_fds[i].revents) {
         bool proceed = cache_plugin->HandleRequest(watch_fds[i].fd);
         if (!proceed) {
           close(watch_fds[i].fd);
-          watch_fds.erase(watch_fds.begin() + i);
           cache_plugin->connections_.erase(watch_fds[i].fd);
+          watch_fds.erase(watch_fds.begin() + i);
+          if ((getenv(CacheTransport::kEnvReadyNotifyFd) != NULL) &&
+              (cache_plugin->connections_.empty()))
+          {
+            LogCvmfs(kLogCache, kLogSyslog,
+                     "stopping cache plugin, no more active clients");
+            terminated = true;
+            break;
+          }
+        } else {
+          i++;
         }
+      } else {
+        i++;
       }
     }
   }
@@ -589,18 +627,23 @@ void *CachePlugin::MainProcessRequests(void *data) {
 }
 
 
+/**
+ * Used during startup to synchronize with the cvmfs client.
+ */
+void CachePlugin::NotifySupervisor(char signal) {
+  char *pipe_ready = getenv(CacheTransport::kEnvReadyNotifyFd);
+  if (pipe_ready == NULL)
+    return;
+  int fd_pipe_ready = String2Int64(pipe_ready);
+  WritePipe(fd_pipe_ready, &signal, 1);
+}
+
+
 void CachePlugin::ProcessRequests(unsigned num_workers) {
   num_workers_ = num_workers;
-  char *pipe_ready = getenv(CacheTransport::kEnvReadyNotifyFd);
-  if (pipe_ready != NULL) {
-    // started from cvmfs client
-    int fd_pipe_ready = String2Int64(pipe_ready);
-    char signal_ready = CacheTransport::kReadyNotification;
-    WritePipe(fd_pipe_ready, &signal_ready, 1);
-  }
-
   int retval = pthread_create(&thread_io_, NULL, MainProcessRequests, this);
   assert(retval == 0);
+  NotifySupervisor(CacheTransport::kReadyNotification);
   atomic_cas32(&running_, 0, 1);
 }
 
