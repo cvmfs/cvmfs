@@ -391,7 +391,7 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
 
   // TODO(jblomer) transaction
   LogCvmfs(kLogQuota, kLogSyslog,
-           "cleanup cache until %lu KB are free", leave_size/1024);
+           "clean up cache until at most %lu KB is used", leave_size/1024);
   LogCvmfs(kLogQuota, kLogDebug, "gauge %" PRIu64, gauge_);
   cleanup_recorder_.Tick();
 
