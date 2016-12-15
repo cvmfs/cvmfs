@@ -287,9 +287,11 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
     if (txn_object->neg_nbytes_written > 0)
       txn_object->neg_nbytes_written = 0;
     if ((size - txn_object->neg_nbytes_written) > txn_object->size_data) {
+      uint32_t current_size = Me()->storage_->GetSize(txn_object);
+      uint32_t header_size = current_size - txn_object->size_data;
       uint32_t new_size = std::max(
-        size - txn_object->neg_nbytes_written,
-        uint32_t(txn_object->size_data * kObjectExpandFactor));
+        header_size + size - txn_object->neg_nbytes_written,
+        uint32_t(current_size * kObjectExpandFactor));
       bool did_compact = Me()->TryFreeSpace(new_size);
       if (did_compact) {
         retval = Me()->transactions_.Lookup(txn_id, &txn_object);
@@ -299,7 +301,7 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
         Me()->storage_->Expand(txn_object, new_size));
       if (txn_object == NULL)
         return CVMCACHE_STATUS_NOSPACE;
-      txn_object->size_data = new_size;
+      txn_object->size_data = new_size - header_size;
       Me()->transactions_.Insert(txn_id, txn_object);
     }
 
