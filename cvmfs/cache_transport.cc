@@ -22,6 +22,9 @@
 
 using namespace std;  // NOLINT
 
+const char *CacheTransport::kEnvReadyNotifyFd =
+  "__CVMFS_CACHE_EXTERNAL_PIPE_READY__";
+
 /**
  * Called on the sender side to wrap a message into a MsgRpc message for wire
  * transfer.

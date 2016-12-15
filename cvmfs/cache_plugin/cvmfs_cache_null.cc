@@ -273,6 +273,8 @@ int main(int argc, char **argv) {
     return 1;
   }
 
+  cvmcache_init_global();
+
   cvmcache_option_map *options = cvmcache_options_init();
   if (cvmcache_options_parse(options, argv[1]) != 0) {
     printf("cannot parse options file %s\n", argv[1]);
@@ -308,23 +310,32 @@ int main(int argc, char **argv) {
   assert(retval);
   printf("Listening for cvmfs clients on %s\n", locator);
   printf("NOTE: this process needs to run as user cvmfs\n\n");
-  printf("Press <R ENTER> to ask clients to release nested catalogs\n");
-  printf("Press <Ctrl+D> to quit\n");
 
+  // Starts the I/O processing thread
   cvmcache_process_requests(ctx, 0);
-  while (true) {
-    char buf;
-    retval = read(fileno(stdin), &buf, 1);
-    if (retval != 1)
-      break;
-    if (buf == 'R') {
-      printf("  ... asking clients to release nested catalogs\n");
-      cvmcache_ask_detach(ctx);
+
+  if (!cvmcache_is_supervised()) {
+    printf("Press <R ENTER> to ask clients to release nested catalogs\n");
+    printf("Press <Ctrl+D> to quit\n");
+    while (true) {
+      char buf;
+      int retval = read(fileno(stdin), &buf, 1);
+      if (retval != 1)
+        break;
+      if (buf == 'R') {
+        printf("  ... asking clients to release nested catalogs\n");
+        cvmcache_ask_detach(ctx);
+      }
     }
+    cvmcache_terminate(ctx);
   }
+
+  cvmcache_wait_for(ctx);
   printf("  ... good bye\n");
+
   cvmcache_options_free(locator);
   cvmcache_options_fini(options);
   cvmcache_terminate_watchdog();
+  cvmcache_cleanup_global();
   return 0;
 }

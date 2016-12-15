@@ -37,7 +37,7 @@ void CachePlugin::AskToDetach() {
 CachePlugin::CachePlugin(uint64_t capabilities)
   : capabilities_(capabilities)
   , fd_socket_(-1)
-  , running_(false)
+  , running_(0)
   , num_workers_(0)
   , max_object_size_(kDefaultMaxObjectSize)
 {
@@ -52,11 +52,7 @@ CachePlugin::CachePlugin(uint64_t capabilities)
 
 
 CachePlugin::~CachePlugin() {
-  if (running_) {
-    char terminate = kSignalTerminate;
-    WritePipe(pipe_ctrl_[1], &terminate, 1);
-    pthread_join(thread_io_, NULL);
-  }
+  Terminate();
   ClosePipe(pipe_ctrl_);
   if (fd_socket_ >= 0)
     close(fd_socket_);
@@ -456,6 +452,11 @@ void CachePlugin::HandleStore(
 }
 
 
+bool CachePlugin::IsRunning() {
+  return atomic_read32(&running_) != 0;
+}
+
+
 bool CachePlugin::Listen(const string &locator) {
   vector<string> tokens = SplitString(locator, '=');
   if (tokens[0] == "unix") {
@@ -590,9 +591,17 @@ void *CachePlugin::MainProcessRequests(void *data) {
 
 void CachePlugin::ProcessRequests(unsigned num_workers) {
   num_workers_ = num_workers;
+  char *pipe_ready = getenv(CacheTransport::kEnvReadyNotifyFd);
+  if (pipe_ready != NULL) {
+    // started from cvmfs client
+    int fd_pipe_ready = String2Int64(pipe_ready);
+    char signal_ready = CacheTransport::kReadyNotification;
+    WritePipe(fd_pipe_ready, &signal_ready, 1);
+  }
+
   int retval = pthread_create(&thread_io_, NULL, MainProcessRequests, this);
   assert(retval == 0);
-  running_ = true;
+  atomic_cas32(&running_, 0, 1);
 }
 
 
@@ -607,4 +616,21 @@ void CachePlugin::SendDetachRequests() {
     CacheTransport::Frame frame_send(&msg_detach);
     transport.SendFrame(&frame_send);
   }
+}
+
+
+void CachePlugin::Terminate() {
+  if (IsRunning()) {
+    char terminate = kSignalTerminate;
+    WritePipe(pipe_ctrl_[1], &terminate, 1);
+    pthread_join(thread_io_, NULL);
+    atomic_cas32(&running_, 1, 0);
+  }
+}
+
+
+void CachePlugin::WaitFor() {
+  if (!IsRunning())
+    return;
+  pthread_join(thread_io_, NULL);
 }

@@ -193,6 +193,9 @@ bool FileSystem::CreateCache() {
       unsigned nfiles = 1024;
       if (options_mgr_->GetValue("CVMFS_NFILES", &optarg))
         nfiles = String2Uint64(optarg);
+      vector<string> cmd_line;
+      if (options_mgr_->GetValue("CVMFS_CACHE_EXTERNAL_CMDLINE", &optarg))
+        cmd_line = SplitString(optarg, ',');
       if (!options_mgr_->GetValue("CVMFS_CACHE_EXTERNAL_LOCATOR", &optarg)) {
         boot_error_ = "CVMFS_CACHE_EXTERNAL_LOCATOR missing";
         boot_status_ = loader::kFailCacheDir;
@@ -200,7 +203,7 @@ bool FileSystem::CreateCache() {
       }
 
       UniquePtr<ExternalCacheManager::PluginHandle> plugin_handle(
-        ExternalCacheManager::CreatePlugin(optarg, vector<string>()));
+        ExternalCacheManager::CreatePlugin(optarg, cmd_line));
       if (!plugin_handle->IsValid()) {
         boot_error_ = plugin_handle->error_msg();
         boot_status_ = loader::kFailCacheDir;

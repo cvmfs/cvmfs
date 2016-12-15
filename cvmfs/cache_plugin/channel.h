@@ -47,6 +47,9 @@ class CachePlugin {
   bool Listen(const std::string &locator);
   virtual ~CachePlugin();
   void ProcessRequests(unsigned num_workers);
+  bool IsRunning();
+  void Terminate();
+  void WaitFor();
   void AskToDetach();
 
   unsigned max_object_size() const { return max_object_size_; }
@@ -142,7 +145,7 @@ class CachePlugin {
 
   uint64_t capabilities_;
   int fd_socket_;
-  bool running_;
+  atomic_int32 running_;
   unsigned num_workers_;
   unsigned max_object_size_;
   std::string name_;

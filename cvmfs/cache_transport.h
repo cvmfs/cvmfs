@@ -45,6 +45,12 @@ inline const char *CacheTransportCode2Ascii(const cvmfs::EnumStatus code) {
 class CacheTransport {
  public:
   /**
+   * When this environment variable is set, the plugin will notify a cvmfs
+   * client once it is ready to accept connections.
+   */
+  static const char *kEnvReadyNotifyFd;  // __CVMFS_CACHE_EXTERNAL_PIPE_READY__
+  static const char kReadyNotification = 'C';
+  /**
    * Version of the wire protocol.  The effective protocol version is negotiated
    * through the handshake.
    */

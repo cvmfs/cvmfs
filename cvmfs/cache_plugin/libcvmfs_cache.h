@@ -151,6 +151,14 @@ struct cvmcache_callbacks {
   int capabilities;
 };
 
+void cvmcache_init_global();
+void cvmcache_cleanup_global();
+/**
+ * True if the plugin was started from a cvmfs mountpoint and thus will
+ * terminate by itself when the last mount point disconnects.
+ */
+int cvmcache_is_supervised();
+
 struct cvmcache_context *cvmcache_init(struct cvmcache_callbacks *callbacks);
 /**
  * The locator is either a UNIX domain socket (unix=/path/to/socket) or a
@@ -167,12 +175,20 @@ void cvmcache_process_requests(struct cvmcache_context *ctx, unsigned nworkers);
  * objects in the cache become unpinned.
  */
 void cvmcache_ask_detach(struct cvmcache_context *ctx);
+/**
+ * Stops the processing thread.
+ */
 void cvmcache_terminate(struct cvmcache_context *ctx);
-
+/**
+ * Blocks until the processing thread finishes.  Can either happen due to a call
+ * to cvmcache_terminate or -- when the plugin is started from cvmfs -- when
+ * the last repository is unmounted.  Invalidates the context object.
+ */
+void cvmcache_wait_for(struct cvmcache_context *ctx);
 uint32_t cvmcache_max_object_size(struct cvmcache_context *ctx);
 
 /**
- * Can be used at to spawn a second process that superwises the cache plugin.
+ * Can be used to spawn a second process that superwises the cache plugin.
  * The watchdog can use gdb/lldb to generate stack traces.  Must be closed by
  * a call to cvmcache_close_watchdog(), otherwise the main process will be
  * reported has having died unexpectedly.

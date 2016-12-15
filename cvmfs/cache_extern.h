@@ -248,6 +248,7 @@ class ExternalCacheManager : public CacheManager {
 
   static void *MainRead(void *data);
   static int ConnectLocator(const std::string &locator);
+  static bool SpawnPlugin(const std::vector<std::string> &cmd_line);
 
   explicit ExternalCacheManager(int fd_connection, unsigned max_open_fds);
   int64_t NextRequestId() { return atomic_xadd64(&next_request_id_, 1); }
