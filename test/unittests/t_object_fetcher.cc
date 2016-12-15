@@ -973,7 +973,7 @@ TYPED_TEST(T_ObjectFetcher, LoadBrokenDatabaseObjectsSlow) {
   typename TypeParam::Failures retval;
   const typename TypeParam::Failures expected_error =
     TestFixture::IsHttpObjectFetcher()
-      ? TypeParam::kFailBadData
+      ? TypeParam::kFailNetwork
       : TestFixture::IsLocalObjectFetcher()
           ? TypeParam::kFailDecompression
           : TestFixture::IsMockObjectFetcher()
