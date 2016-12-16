@@ -5,6 +5,7 @@
 #include "cache_extern.h"
 
 #include <errno.h>
+#include <fcntl.h>
 #include <inttypes.h>
 #include <stdint.h>
 #include <sys/socket.h>
@@ -15,7 +16,9 @@
 #ifdef __APPLE__
 #include <cstdlib>
 #endif
+#include <map>
 #include <new>
+#include <set>
 #include <string>
 
 #include "atomic.h"
@@ -27,6 +30,7 @@
 #endif
 #include "util/pointer.h"
 #include "util/posix.h"
+#include "util/string.h"
 #include "util_concurrency.h"
 
 using namespace std;  // NOLINT
@@ -167,9 +171,31 @@ int ExternalCacheManager::CommitTxn(void *txn) {
 }
 
 
+int ExternalCacheManager::ConnectLocator(const std::string &locator) {
+  vector<string> tokens = SplitString(locator, '=');
+  int result = -1;
+  if (tokens[0] == "unix") {
+    result = ConnectSocket(tokens[1]);
+  } else if (tokens[0] == "tcp") {
+    vector<string> tcp_address = SplitString(tokens[1], ':');
+    if (tcp_address.size() != 2)
+      return -EINVAL;
+    result = ConnectTcpEndpoint(tcp_address[0], String2Uint64(tcp_address[1]));
+  } else {
+    return -EINVAL;
+  }
+  if (result < 0)
+    return -EIO;
+  LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
+           "connected to cache plugin at %s", locator.c_str());
+  return result;
+}
+
+
 ExternalCacheManager *ExternalCacheManager::Create(
   int fd_connection,
-  unsigned max_open_fds)
+  unsigned max_open_fds,
+  const string &ident)
 {
   UniquePtr<ExternalCacheManager> cache_mgr(
     new ExternalCacheManager(fd_connection, max_open_fds));
@@ -177,6 +203,7 @@ ExternalCacheManager *ExternalCacheManager::Create(
 
   cvmfs::MsgHandshake msg_handshake;
   msg_handshake.set_protocol_version(kPbProtocolVersion);
+  msg_handshake.set_name(ident);
   CacheTransport::Frame frame_send(&msg_handshake);
   cache_mgr->transport_.SendFrame(&frame_send);
 
@@ -206,6 +233,41 @@ ExternalCacheManager *ExternalCacheManager::Create(
     return NULL;
   }
   return cache_mgr.Release();
+}
+
+
+/**
+ * Tries to connect to the plugin at locator, or, if it doesn't exist, spawns
+ * a new plugin using cmdline.  Two processes could try to spawn the plugin at
+ * the same time.  In this case, the plugin should indicate to the client to
+ * retry connecting.
+ */
+ExternalCacheManager::PluginHandle *ExternalCacheManager::CreatePlugin(
+  const std::string &locator,
+  const std::vector<std::string> &cmd_line)
+{
+  UniquePtr<PluginHandle> plugin_handle(new PluginHandle());
+  unsigned num_attempts = 0;
+  bool try_again = false;
+  do {
+    num_attempts++;
+    if (num_attempts > 2) {
+      // Prevent violate busy loops
+      SafeSleepMs(1000);
+    }
+    plugin_handle->fd_connection_ = ConnectLocator(locator);
+    if (plugin_handle->IsValid()) {
+      break;
+    } else if (plugin_handle->fd_connection_ == -EINVAL) {
+      plugin_handle->error_msg_ = "Invalid locator: " + locator;
+    } else {
+      plugin_handle->error_msg_ = "Failed to connect to external cache manager";
+    }
+
+    try_again = SpawnPlugin(cmd_line);
+  } while (try_again);
+
+  return plugin_handle.Release();
 }
 
 
@@ -543,6 +605,69 @@ void ExternalCacheManager::Spawn() {
   int retval = pthread_create(&thread_read_, NULL, MainRead, this);
   assert(retval == 0);
   spawned_ = true;
+}
+
+
+/**
+ * Returns true if the plugin could be spawned or was spawned by another
+ * process.
+ */
+bool ExternalCacheManager::SpawnPlugin(const vector<string> &cmd_line) {
+  if (cmd_line.empty())
+    return false;
+
+  int pipe_ready[2];
+  MakePipe(pipe_ready);
+  set<int> preserve_filedes;
+  preserve_filedes.insert(pipe_ready[1]);
+
+  int fd_null_read = open("/dev/null", O_RDONLY);
+  int fd_null_write = open("/dev/null", O_WRONLY);
+  assert((fd_null_read >= 0) && (fd_null_write >= 0));
+  map<int, int> map_fildes;
+  map_fildes[fd_null_read] = 0;
+  map_fildes[fd_null_write] = 1;
+  map_fildes[fd_null_write] = 2;
+
+  pid_t child_pid;
+  int retval = setenv(CacheTransport::kEnvReadyNotifyFd,
+                      StringifyInt(pipe_ready[1]).c_str(), 1);
+  assert(retval == 0);
+  retval = ManagedExec(cmd_line,
+                       preserve_filedes,
+                       map_fildes,
+                       false,  // drop_credentials
+                       true,   // double fork
+                       &child_pid);
+  unsetenv(CacheTransport::kEnvReadyNotifyFd);
+  close(fd_null_read);
+  close(fd_null_write);
+  if (!retval) {
+    LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
+             "failed to start cache plugin '%s'",
+             JoinStrings(cmd_line, " ").c_str());
+    ClosePipe(pipe_ready);
+    return false;
+  }
+
+  LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
+           "started cache plugin '%s' (pid %d), waiting for it to become ready",
+           JoinStrings(cmd_line, " ").c_str(), child_pid);
+  close(pipe_ready[1]);
+  char buf;
+  if (read(pipe_ready[0], &buf, 1) != 1) {
+    close(pipe_ready[0]);
+    LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
+             "cache plugin did not start properly");
+    return false;
+  }
+  close(pipe_ready[0]);
+
+  if (buf == CacheTransport::kReadyNotification)
+    return true;
+  LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
+           "cache plugin failed to create an endpoint");
+  return false;
 }
 
 

@@ -48,7 +48,7 @@
 #include "history.h"
 #include "history_sqlite.h"
 #include "logging.h"
-#include "lru.h"
+#include "lru_md.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
 #ifdef CVMFS_NFS_SUPPORT
@@ -193,36 +193,24 @@ bool FileSystem::CreateCache() {
       unsigned nfiles = 1024;
       if (options_mgr_->GetValue("CVMFS_NFILES", &optarg))
         nfiles = String2Uint64(optarg);
+      vector<string> cmd_line;
+      if (options_mgr_->GetValue("CVMFS_CACHE_EXTERNAL_CMDLINE", &optarg))
+        cmd_line = SplitString(optarg, ',');
       if (!options_mgr_->GetValue("CVMFS_CACHE_EXTERNAL_LOCATOR", &optarg)) {
         boot_error_ = "CVMFS_CACHE_EXTERNAL_LOCATOR missing";
         boot_status_ = loader::kFailCacheDir;
         return false;
       }
 
-      vector<string> tokens = SplitString(optarg, '=');
-      int fd_client = -1;
-      if (tokens[0] == "unix") {
-        fd_client = ConnectSocket(tokens[1]);
-      } else if (tokens[0] == "tcp") {
-        vector<string> tcp_address = SplitString(tokens[1], ':');
-        if (tcp_address.size() != 2) {
-          boot_error_ = "Invalid locator: " + optarg;
-          boot_status_ = loader::kFailCacheDir;
-          return false;
-        }
-        fd_client =
-          ConnectTcpEndpoint(tcp_address[0], String2Uint64(tcp_address[1]));
-      } else {
-        boot_error_ = "Invalid locator: " + optarg;
+      UniquePtr<ExternalCacheManager::PluginHandle> plugin_handle(
+        ExternalCacheManager::CreatePlugin(optarg, cmd_line));
+      if (!plugin_handle->IsValid()) {
+        boot_error_ = plugin_handle->error_msg();
         boot_status_ = loader::kFailCacheDir;
         return false;
       }
-      if (fd_client < 0) {
-        boot_error_ = "Failed to connect to external cache manager";
-        boot_status_ = loader::kFailCacheDir;
-        return false;
-      }
-      cache_mgr_ = ExternalCacheManager::Create(fd_client, nfiles);
+      cache_mgr_ = ExternalCacheManager::Create(
+        plugin_handle->fd_connection(), nfiles, name_);
       assert(cache_mgr_ != NULL);
       break;
     }

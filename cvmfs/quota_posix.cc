@@ -51,6 +51,7 @@
 #include "platform.h"
 #include "smalloc.h"
 #include "statistics.h"
+#include "util/pointer.h"
 #include "util/posix.h"
 #include "util_concurrency.h"
 
@@ -917,9 +918,9 @@ int PosixQuotaManager::MainCacheManager(int argc, char **argv) {
   LogCvmfs(kLogQuota, kLogDebug, "starting quota manager");
   int retval;
 
-  retval = monitor::Init(".", "cachemgr", false);
-  assert(retval);
-  monitor::Spawn();
+  UniquePtr<Watchdog> watchdog(Watchdog::Create("./stacktrace.cachemgr"));
+  assert(watchdog.IsValid());
+  watchdog->Spawn();
 
   PosixQuotaManager shared_manager(0, 0, "");
   shared_manager.shared_ = true;
@@ -1039,8 +1040,6 @@ int PosixQuotaManager::MainCacheManager(int argc, char **argv) {
     sqlite3_free(sqlite3_temp_directory);
     sqlite3_temp_directory = NULL;
   }
-
-  monitor::Fini();
 
   return 0;
 }

@@ -15,6 +15,8 @@
 #include "lru.h"
 #include "malloc_heap.h"
 #include "statistics.h"
+#include "util/async.h"
+#include "util/single_copy.h"
 
 using namespace std;  // NOLINT
 
@@ -25,9 +27,7 @@ using namespace std;  // NOLINT
  * the allocations.
  */
 struct AllocHeader {
-  AllocHeader()
-  : version(0)
-  , id() {}
+  AllocHeader() : version(0), id() { }
   uint8_t version;
   shash::Any id;
 };
@@ -63,7 +63,7 @@ struct MemoryBuffer {
  * can attempt to reduce its size by removing the least recently used
  * entries without any outstanding references.
  */
-class MemoryKvStore :SingleCopy, public Callbackable<MallocHeap::BlockPtr> {
+class MemoryKvStore : SingleCopy, public Callbackable<MallocHeap::BlockPtr> {
  public:
   enum MemoryAllocator {
     kMallocLibc,

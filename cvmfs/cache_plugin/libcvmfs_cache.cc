@@ -15,7 +15,9 @@
 #include <string>
 
 #include "cache_plugin/channel.h"
+#include "cache_transport.h"
 #include "hash.h"
+#include "monitor.h"
 #include "util/pointer.h"
 
 using namespace std;  // NOLINT
@@ -228,6 +230,8 @@ class ForwardCachePlugin : public CachePlugin {
   struct cvmcache_callbacks callbacks_;
 };
 
+Watchdog *g_watchdog = NULL;
+
 }  // anonymous namespace
 
 
@@ -254,6 +258,14 @@ char *cvmcache_hash_print(struct cvmcache_hash *h) {
 }
 
 
+void cvmcache_init_global() { }
+
+
+void cvmcache_cleanup_global() { }
+
+int cvmcache_is_supervised() {
+  return getenv(CacheTransport::kEnvReadyNotifyFd) != NULL;
+}
 
 struct cvmcache_context *cvmcache_init(struct cvmcache_callbacks *callbacks) {
   return new cvmcache_context(new ForwardCachePlugin(callbacks));
@@ -272,10 +284,30 @@ void cvmcache_ask_detach(struct cvmcache_context *ctx) {
   ctx->plugin->AskToDetach();
 }
 
-void cvmcache_terminate(struct cvmcache_context *ctx) {
+void cvmcache_wait_for(struct cvmcache_context *ctx) {
+  ctx->plugin->WaitFor();
   delete ctx;
+}
+
+void cvmcache_terminate(struct cvmcache_context *ctx) {
+  ctx->plugin->Terminate();
 }
 
 uint32_t cvmcache_max_object_size(struct cvmcache_context *ctx) {
   return ctx->plugin->max_object_size();
+}
+
+void cvmcache_spawn_watchdog(const char *crash_dump_file) {
+  if (g_watchdog != NULL)
+    return;
+  g_watchdog = Watchdog::Create((crash_dump_file != NULL)
+                                ? string(crash_dump_file)
+                                : "");
+  assert(g_watchdog != NULL);
+  g_watchdog->Spawn();
+}
+
+void cvmcache_terminate_watchdog() {
+  delete g_watchdog;
+  g_watchdog = NULL;
 }

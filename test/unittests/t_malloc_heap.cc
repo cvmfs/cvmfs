@@ -15,6 +15,7 @@
 #include "malloc_heap.h"
 #include "murmur.h"
 #include "prng.h"
+#include "smalloc.h"
 #include "util/async.h"
 
 using namespace std;  // NOLINT
@@ -32,10 +33,6 @@ class T_MallocHeap : public ::testing::Test {
 
   static uint32_t MemChecksum(void *p, uint32_t size) {
     return MurmurHash2(p, size, 0x07387a4f);
-  }
-
-  static inline uint32_t RoundUp8(const uint32_t size) {
-    return (size + 7) & ~7;
   }
 
   void FillRandomly(void *ptr, unsigned nbytes, Prng *prng) {
@@ -188,4 +185,52 @@ TEST_F(T_MallocHeap, Fill) {
   }
   ptr = M.Allocate(4096, &num_elems, sizeof(num_elems));
   EXPECT_EQ(NULL, ptr);
+}
+
+
+TEST_F(T_MallocHeap, HasSpaceFor) {
+  IntMap int_map;
+  MallocHeap M(kSmallArena,
+               int_map.MakeCallback(&IntMap::OnBlockMove, &int_map));
+  EXPECT_TRUE(M.HasSpaceFor(1));
+  EXPECT_FALSE(M.HasSpaceFor(kSmallArena));
+  EXPECT_TRUE(M.HasSpaceFor(kSmallArena - 8));
+
+  unsigned elem_size = 4096 - 8;
+  unsigned num_elems = kSmallArena / 4096;
+
+  for (unsigned i = 0; i < num_elems; ++i) {
+    EXPECT_TRUE(M.HasSpaceFor(elem_size));
+    void *ptr = M.Allocate(elem_size, &i, sizeof(i));
+    EXPECT_TRUE(ptr != NULL);
+    int_map.mem_digest[i] = IntMap::Info(ptr, 0);
+  }
+  EXPECT_FALSE(M.HasSpaceFor(elem_size));
+
+  M.MarkFree(int_map.mem_digest[0].ptr);
+  EXPECT_FALSE(M.HasSpaceFor(elem_size));
+  M.Compact();
+  EXPECT_TRUE(M.HasSpaceFor(elem_size));
+}
+
+
+TEST_F(T_MallocHeap, Expand) {
+  IntMap int_map;
+  MallocHeap M(kSmallArena,
+               int_map.MakeCallback(&IntMap::OnBlockMove, &int_map));
+  unsigned i = 0;
+  void *ptr = M.Allocate(8, &i, sizeof(i));
+  EXPECT_TRUE(ptr != NULL);
+
+  void *ptr2 = M.Expand(ptr, 8);
+  EXPECT_TRUE(ptr2 != NULL);
+  EXPECT_NE(ptr, ptr2);
+  EXPECT_EQ(0, memcmp(ptr, ptr2, 8));
+
+  void *ptr3 = M.Expand(ptr2, 16);
+  EXPECT_TRUE(ptr3 != NULL);
+  EXPECT_NE(ptr2, ptr3);
+  EXPECT_EQ(0, memcmp(ptr2, ptr3, 8));
+
+  EXPECT_DEATH(M.Expand(ptr, 4), ".*");
 }

@@ -19,6 +19,16 @@
 
 using namespace std;  // NOLINT
 
+namespace {
+
+static inline uint32_t hasher_any(const shash::Any &key) {
+  // We'll just do the same thing as hasher_md5, since every hash is at
+  // least as large.
+  return (uint32_t) *(reinterpret_cast<const uint32_t *>(key.digest) + 1);
+}
+
+}  // anonymous namespace
+
 const double MemoryKvStore::kCompactThreshold = 0.8;
 
 
@@ -32,7 +42,7 @@ MemoryKvStore::MemoryKvStore(
   , used_bytes_(0)
   , entry_count_(0)
   , max_entries_(cache_entries)
-  , entries_(cache_entries, shash::Any(), lru::hasher_any,
+  , entries_(cache_entries, shash::Any(), hasher_any,
       statistics, name)
   , heap_(NULL)
   , counters_(statistics, name + ".lru")

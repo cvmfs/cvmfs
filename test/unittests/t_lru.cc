@@ -81,6 +81,35 @@ TEST(T_LruCache, UpdateValue) {
 }
 
 
+TEST(T_LruCache, UpdateOnly) {
+  perf::Statistics statistics;
+  LruCache<int, std::string> cache(cache_size, -1, hasher_int,
+      &statistics, name);
+
+  EXPECT_TRUE(cache.Insert(1, "one"));
+  EXPECT_TRUE(cache.Insert(2, "two"));
+
+  int key;
+  std::string value;
+  cache.FilterBegin();
+  EXPECT_TRUE(cache.FilterNext());
+  cache.FilterGet(&key, &value);
+  EXPECT_EQ(1, key);
+  cache.FilterEnd();
+
+  cache.Update(1);
+  cache.FilterBegin();
+  EXPECT_TRUE(cache.FilterNext());
+  cache.FilterGet(&key, &value);
+  EXPECT_EQ(2, key);
+  cache.FilterEnd();
+
+  EXPECT_DEATH(cache.Update(3), ".*");
+  cache.Pause();
+  EXPECT_DEATH(cache.Update(1), ".*");
+}
+
+
 TEST(T_LruCache, Drop) {
   perf::Statistics statistics;
   LruCache<int, std::string> cache(cache_size, -1, hasher_int,
