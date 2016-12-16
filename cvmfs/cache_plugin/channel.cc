@@ -464,7 +464,7 @@ bool CachePlugin::Listen(const string &locator) {
   vector<string> tokens = SplitString(locator, '=');
   if (tokens[0] == "unix") {
     string lock_path = tokens[1] + ".lock";
-    int fd_socket_lock_ = TryLockFile(lock_path);
+    fd_socket_lock_ = TryLockFile(lock_path);
     if (fd_socket_lock_ == -1) {
       LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
                "failed to acquire lock file %s (%d)", lock_path.c_str(), errno);
@@ -473,6 +473,10 @@ bool CachePlugin::Listen(const string &locator) {
     } else if (fd_socket_lock_ == -2) {
       // Another plugin process probably started in the meantime
       NotifySupervisor(CacheTransport::kReadyNotification);
+      if (getenv(CacheTransport::kEnvReadyNotifyFd) == NULL) {
+        LogCvmfs(kLogCache, kLogSyslogErr | kLogStderr,
+                 "failed to lock on %s, file is busy", lock_path.c_str());
+      }
       return false;
     }
     assert(fd_socket_lock_ >= 0);
