@@ -303,7 +303,6 @@ TEST_F(T_CachePlugin, Shrink) {
     return;
   }
 
-  // TODO(jblomer): do it with open transaction
   EXPECT_TRUE(quota_mgr_->Cleanup(0));
   EXPECT_TRUE(quota_mgr_->Cleanup(0));
   shash::Any id_vol(shash::kSha1);
