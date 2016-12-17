@@ -21,7 +21,7 @@ yum -y install libuuid-devel gcc gcc-c++ glibc-common cmake fuse fuse-devel  \
                selinux-policy-devel hardlink selinux-policy-targeted         \
                python-devel initscripts bash coreutils grep sed sudo psmisc  \
                curl attr httpd libcap-devel mod_wsgi rpm-build java wget     \
-               voms-devel
+               voms-devel python-pip libXrandr libXt libXmu kernel-devel
 
 # install convenience packages for development
 yum -y install git tig iftop htop jq rubygems rubygem-bundler ruby-devel \
