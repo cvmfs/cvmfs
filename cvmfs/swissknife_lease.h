@@ -27,13 +27,13 @@ public:
         repo_service_url(""),
         action(""),
         user_name(""),
-        lease_path("")
+        lease_fqdn("")
     {}
 
     std::string repo_service_url;
     std::string action;
     std::string user_name;
-    std::string lease_path;
+    std::string lease_fqdn;
   };
 };
 
