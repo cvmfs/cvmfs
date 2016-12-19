@@ -62,8 +62,8 @@ bool MakeAcquireRequest(const std::string& user_name,
 }
 
 bool MakeDeleteRequest(const std::string& session_token,
-                     const std::string& repo_service_url,
-                     CurlBuffer& buffer) {
+                       const std::string& repo_service_url,
+                       CurlBuffer& buffer) {
   CURLcode ret = static_cast<CURLcode>(0);
 
   CURL* h_curl = PrepareCurl("DELETE");

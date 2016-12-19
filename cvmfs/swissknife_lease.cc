@@ -23,26 +23,26 @@ bool CheckParams(const swissknife::CommandLease::Parameters& p) {
 namespace swissknife {
 
 enum LeaseError {
-  LEASE_SUCCESS = 0,
-  LEASE_UNUSED = 1,
-  LEASE_PARAM_ERROR = 2,
-  LEASE_CURL_INIT_ERROR = 3,
-  LEASE_FILE_OPEN_ERROR = 4,
+  LEASE_SUCCESS           = 0,
+  LEASE_UNUSED            = 1,
+  LEASE_PARAM_ERROR       = 2,
+  LEASE_CURL_INIT_ERROR   = 3,
+  LEASE_FILE_OPEN_ERROR   = 4,
   LEASE_FILE_DELETE_ERROR = 5,
-  LEASE_PARSE_ERROR = 6,
-  LEASE_CURL_REQ_ERROR = 7,
+  LEASE_PARSE_ERROR       = 6,
+  LEASE_CURL_REQ_ERROR    = 7,
 };
 
 CommandLease::~CommandLease() {
 }
 
 ParameterList CommandLease::GetParams() const {
-    ParameterList r;
-    r.push_back(Parameter::Mandatory('u', "repo service url"));
-    r.push_back(Parameter::Mandatory('a', "action (acquire or drop)"));
-    r.push_back(Parameter::Mandatory('n', "user name"));
-    r.push_back(Parameter::Mandatory('p', "lease path"));
-    return r;
+  ParameterList r;
+  r.push_back(Parameter::Mandatory('u', "repo service url"));
+  r.push_back(Parameter::Mandatory('a', "action (acquire or drop)"));
+  r.push_back(Parameter::Mandatory('n', "user name"));
+  r.push_back(Parameter::Mandatory('p', "lease path"));
+  return r;
 }
 
 int CommandLease::Main(const ArgumentList& args) {
