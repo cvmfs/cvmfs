@@ -171,8 +171,17 @@ void BashOptionsManager::ParsePath(const string &config_file,
   }
   if (!fconfig) {
     if (external && !DirectoryExists(config_path)) {
+      string repo_required;
+      if (GetValue("CVMFS_CONFIG_REPO_REQUIRED", &repo_required) &&
+        IsOn(repo_required)) {
+          LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+               "required configuration repository directory does not exist: %s",
+               config_path.c_str());
+          exit(1);
+      }
+
       LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
-               "external location for configuration files does not exist: %s",
+               "configuration repository directory does not exist: %s",
                config_path.c_str());
     }
     return;
