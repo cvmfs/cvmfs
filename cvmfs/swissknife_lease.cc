@@ -22,6 +22,17 @@ bool CheckParams(const swissknife::CommandLease::Parameters& p) {
 
 namespace swissknife {
 
+enum LeaseError {
+  LEASE_SUCCESS = 0,
+  LEASE_UNUSED = 1,
+  LEASE_PARAM_ERROR = 2,
+  LEASE_CURL_INIT_ERROR = 3,
+  LEASE_FILE_OPEN_ERROR = 4,
+  LEASE_FILE_DELETE_ERROR = 5,
+  LEASE_PARSE_ERROR = 6,
+  LEASE_CURL_REQ_ERROR = 7,
+};
+
 CommandLease::~CommandLease() {
 }
 
@@ -43,15 +54,15 @@ int CommandLease::Main(const ArgumentList& args) {
   params.lease_fqdn = *(args.find('p')->second);
 
   if (!CheckParams(params)) {
-    return 2;
+    return LEASE_PARAM_ERROR;
   }
 
   // Initialize curl
   if (curl_global_init(CURL_GLOBAL_ALL)) {
-    return 3;
+    return LEASE_CURL_INIT_ERROR;
   }
 
-  int ret = 0;
+  LeaseError ret = LEASE_SUCCESS;
   if (params.action == "acquire") {
     CurlBuffer buffer;
     if (MakeAcquireRequest(params.user_name, params.lease_fqdn, params.repo_service_url, buffer)) {
@@ -65,13 +76,13 @@ int CommandLease::Main(const ArgumentList& args) {
           token_file << session_token;
         } else {
           LogCvmfs(kLogCvmfs, kLogStderr, "Error opening file: %s", std::strerror(errno));
-          ret = 4;
+          ret = LEASE_FILE_OPEN_ERROR;
         }
       } else {
-        ret = 5;
+        ret = LEASE_PARSE_ERROR;
       }
     } else {
-      ret = 6;
+      ret = LEASE_CURL_REQ_ERROR;
     }
   } else if (params.action == "drop") {
     // Try to read session token from repository scratch directory
@@ -91,21 +102,21 @@ int CommandLease::Main(const ArgumentList& args) {
           success = true;
         } else {
           LogCvmfs(kLogCvmfs, kLogStderr, "Could not drop active lease");
-          ret = 7;
+          ret = LEASE_PARSE_ERROR;
         }
       } else {
         LogCvmfs(kLogCvmfs, kLogStderr, "Error making DELETE request");
-        ret = 8;
+        ret = LEASE_CURL_REQ_ERROR;
       }
     } else {
       LogCvmfs(kLogCvmfs, kLogStderr, "Error reading session token from file");
-      ret = 9;
+      ret = LEASE_FILE_OPEN_ERROR;
     }
 
     token_file.close();
     if (success && std::remove(token_file_name.c_str())) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Error deleting session token file");
-      ret = 10;
+      ret = LEASE_FILE_DELETE_ERROR;
     }
   }
 

@@ -80,7 +80,6 @@ bool MakeDeleteRequest(const std::string& session_token,
     curl_easy_cleanup(h_curl);
     h_curl = NULL;
 
-    std::cout << "CURL ret: " << ret << std::endl;
     return ! ret;
   }
 
