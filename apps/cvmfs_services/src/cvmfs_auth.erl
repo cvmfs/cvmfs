@@ -28,7 +28,7 @@
 %% Records used as table entries
 
 -record(repo, { r_id :: binary() % repo identifier
-              , path :: binary() % the path of the repository
+              , fqdn :: binary() % the fqdn of the repository
               }).
 
 %% u_id - user identifier
@@ -81,9 +81,9 @@ get_users() ->
     gen_server:call(?MODULE, {auth_req, get_users}).
 
 
--spec add_repo(Repo :: binary(), Path :: binary()) -> ok.
-add_repo(Repo, Path) ->
-    gen_server:call(?MODULE, {auth_req, add_repo, {Repo, Path}}).
+-spec add_repo(Repo :: binary(), Fqdn :: binary()) -> ok.
+add_repo(Repo, Fqdn) ->
+    gen_server:call(?MODULE, {auth_req, add_repo, {Repo, Fqdn}}).
 
 
 -spec remove_repo(Repo :: binary()) -> ok.
@@ -151,7 +151,7 @@ init({RepoList, ACL}) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_call({auth_req, user_perms, User}, _From, State) ->
-    Reply = p_get_user_paths(User),
+    Reply = p_get_user_fqdns(User),
     lager:info("Request received: {user_perms, ~p} -> Reply: ~p", [User, Reply]),
     {reply, Reply, State};
 handle_call({auth_req, add_user, {User, Repos}}, _From, State) ->
@@ -166,9 +166,9 @@ handle_call({auth_req, get_users}, _From, State) ->
     Reply = p_get_users(),
     lager:info("Request received: {get_users} -> Reply: ~p", [Reply]),
     {reply, Reply, State};
-handle_call({auth_req, add_repo, {Repo, Path}}, _From, State) ->
-    Reply = p_add_repo(Repo, Path),
-    lager:info("Request received: {add_repo, {~p, ~p}} -> Reply: ~p", [Repo, Path, Reply]),
+handle_call({auth_req, add_repo, {Repo, Fqdn}}, _From, State) ->
+    Reply = p_add_repo(Repo, Fqdn),
+    lager:info("Request received: {add_repo, {~p, ~p}} -> Reply: ~p", [Repo, Fqdn, Reply]),
     {reply, Reply, State};
 handle_call({auth_req, remove_repo, Repo}, _From, State) ->
     Reply = p_remove_repo(Repo),
@@ -230,19 +230,19 @@ code_change(OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
--spec p_get_user_paths(User) -> {ok, Paths} | {error, invalid_user}
+-spec p_get_user_fqdns(User) -> {ok, Fqdns} | {error, invalid_user}
                                     when User :: binary(),
-                                         Paths :: [binary()].
-p_get_user_paths(User) ->
+                                         Fqdns :: [binary()].
+p_get_user_fqdns(User) ->
     T1 = fun() ->
                  case mnesia:read(acl, User) of
                      [] ->
                          {error, invalid_user};
                      AclEntries ->
                          T2 = fun() ->
-                                      {ok, [Path || #acl{r_ids = Repos} <- AclEntries,
+                                      {ok, [Fqdn || #acl{r_ids = Repos} <- AclEntries,
                                                     Repo <- Repos,
-                                                    #repo{path = Path} <- mnesia:read(repo, Repo)]}
+                                                    #repo{fqdn = Fqdn} <- mnesia:read(repo, Repo)]}
                               end,
                          {atomic, Result} = mnesia:transaction(T2),
                          Result
@@ -279,10 +279,10 @@ p_get_users() ->
     Result.
 
 
--spec p_add_repo(Repo :: binary(), Path :: binary()) -> ok.
-p_add_repo(Repo, Path) ->
+-spec p_add_repo(Repo :: binary(), Fqdn :: binary()) -> ok.
+p_add_repo(Repo, Fqdn) ->
     T = fun() ->
-                mnesia:write(#repo{r_id = Repo, path = Path})
+                mnesia:write(#repo{r_id = Repo, fqdn = Fqdn})
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
@@ -316,11 +316,11 @@ p_populate_acl(ACL) ->
     Result.
 
 
--spec p_populate_repos(RepoList :: [{Repo :: binary(), Path :: binary()}]) -> boolean().
+-spec p_populate_repos(RepoList :: [{Repo :: binary(), Fqdn :: binary()}]) -> boolean().
 p_populate_repos(RepoList) ->
     T = fun() ->
                 lists:all(fun(V) -> V =:= ok end,
-                          [mnesia:write(#repo{r_id = Repo, path = Path}) || {Repo, Path} <- RepoList])
+                          [mnesia:write(#repo{r_id = Repo, fqdn = Fqdn}) || {Repo, Fqdn} <- RepoList])
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.

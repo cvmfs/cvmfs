@@ -111,7 +111,7 @@ check_leases(Config) ->
 
 
 create_and_delete_session(Config) ->
-    RequestBody = jsx:encode(#{<<"user">> => <<"user1">>, <<"path">> => <<"/path/to/repo/1">>}),
+    RequestBody = jsx:encode(#{<<"user">> => <<"user1">>, <<"path">> => <<"repo1.domain1.org">>}),
     RequestHeaders = p_make_headers(RequestBody),
     {ok, ReplyBody1} = p_post(conn_pid(Config), "/api/leases", RequestHeaders, RequestBody),
     #{<<"session_token">> := Token} = jsx:decode(ReplyBody1, [return_maps]),
@@ -121,7 +121,7 @@ create_and_delete_session(Config) ->
 
 create_invalid_leases(Config) ->
     RequestReplies = [
-                      {<<"bad_user">>, <<"/path/to/repo/1">>, <<"invalid_user">>},
+                      {<<"bad_user">>, <<"repo1.domain1.org">>, <<"invalid_user">>},
                       {<<"user1">>, <<"bad_path">>, <<"invalid_path">>}
                      ],
     Check = fun({User, Path, Reason}) ->
@@ -135,7 +135,7 @@ create_invalid_leases(Config) ->
 
 
 create_session_when_already_created(Config) ->
-    RequestBody = jsx:encode(#{<<"user">> => <<"user1">>, <<"path">> => <<"/path/to/repo/1">>}),
+    RequestBody = jsx:encode(#{<<"user">> => <<"user1">>, <<"path">> => <<"repo1.domain1.org">>}),
     RequestHeaders = p_make_headers(RequestBody),
     {ok, ReplyBody1} = p_post(conn_pid(Config), "/api/leases", RequestHeaders, RequestBody),
     #{<<"session_token">> := _Token} = jsx:decode(ReplyBody1, [return_maps]),
@@ -151,7 +151,7 @@ end_invalid_session(Config) ->
 
 normal_payload_submission(Config) ->
     % Create new lease
-    RequestBody1 = jsx:encode(#{<<"user">> => <<"user1">>, <<"path">> => <<"/path/to/repo/1">>}),
+    RequestBody1 = jsx:encode(#{<<"user">> => <<"user1">>, <<"path">> => <<"repo1.domain1.org">>}),
     RequestHeaders1 = p_make_headers(RequestBody1),
     {ok, ReplyBody1} = p_post(conn_pid(Config), "/api/leases", RequestHeaders1, RequestBody1),
     #{<<"session_token">> := Token} = jsx:decode(ReplyBody1, [return_maps]),
