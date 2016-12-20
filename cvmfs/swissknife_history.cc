@@ -27,7 +27,7 @@ const std::string CommandTag::kPreviousHeadTagDescription =
   "default undo target";
 
 
-void CommandTag::InsertCommonParameters(ParameterList *r) {
+static void InsertCommonParameters(ParameterList *r) {
   r->push_back(Parameter::Mandatory('w', "repository directory / url"));
   r->push_back(Parameter::Mandatory('t', "temporary scratch directory"));
   r->push_back(Parameter::Optional('p', "public key of the repository"));
@@ -456,7 +456,7 @@ bool CommandTag::IsUndoTagName(const std::string &tag_name) const {
 //------------------------------------------------------------------------------
 
 
-ParameterList CommandEditTag::GetParams() {
+ParameterList CommandEditTag::GetParams() const {
   ParameterList r;
   InsertCommonParameters(&r);
 
@@ -769,7 +769,7 @@ int CommandEditTag::RemoveTags(const ArgumentList &args, Environment *env) {
 //------------------------------------------------------------------------------
 
 
-ParameterList CommandListTags::GetParams() {
+ParameterList CommandListTags::GetParams() const {
   ParameterList r;
   InsertCommonParameters(&r);
   r.push_back(Parameter::Switch('x', "machine readable output"));
@@ -882,7 +882,7 @@ int CommandListTags::Main(const ArgumentList &args) {
 //------------------------------------------------------------------------------
 
 
-ParameterList CommandInfoTag::GetParams() {
+ParameterList CommandInfoTag::GetParams() const {
   ParameterList r;
   InsertCommonParameters(&r);
 
@@ -961,7 +961,7 @@ int CommandInfoTag::Main(const ArgumentList &args) {
 //------------------------------------------------------------------------------
 
 
-ParameterList CommandRollbackTag::GetParams() {
+ParameterList CommandRollbackTag::GetParams() const {
   ParameterList r;
   InsertCommonParameters(&r);
 
@@ -1104,7 +1104,7 @@ void CommandRollbackTag::PrintDeletedTagList(const TagList &tags) const {
 //------------------------------------------------------------------------------
 
 
-ParameterList CommandEmptyRecycleBin::GetParams() {
+ParameterList CommandEmptyRecycleBin::GetParams() const {
   ParameterList r;
   InsertCommonParameters(&r);
   return r;

@@ -275,12 +275,12 @@ class CommandMigrate : public Command {
  public:
   CommandMigrate();
   ~CommandMigrate() { }
-  std::string GetName() { return "migrate"; }
-  std::string GetDescription() {
+  virtual std::string GetName() const { return "migrate"; }
+  virtual std::string GetDescription() const {
     return "CernVM-FS catalog repository migration \n"
       "This command migrates the whole catalog structure of a given repository";
   }
-  ParameterList GetParams();
+  virtual ParameterList GetParams() const;
 
   int Main(const ArgumentList &args);
 

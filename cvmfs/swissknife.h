@@ -76,9 +76,9 @@ class Command {
  public:
   Command() { }
   virtual ~Command();
-  virtual std::string GetName() = 0;
-  virtual std::string GetDescription() = 0;
-  virtual ParameterList GetParams() = 0;
+  virtual std::string GetName() const = 0;
+  virtual std::string GetDescription() const = 0;
+  virtual ParameterList GetParams() const = 0;
   virtual int Main(const ArgumentList &args) = 0;
 
  protected:

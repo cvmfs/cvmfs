@@ -15,6 +15,7 @@
 #include "swissknife_hash.h"
 #include "swissknife_history.h"
 #include "swissknife_info.h"
+#include "swissknife_lease.h"
 #include "swissknife_letter.h"
 #include "swissknife_lsrepo.h"
 #include "swissknife_migrate.h"
@@ -92,6 +93,7 @@ int main(int argc, char **argv) {
   command_list.push_back(new swissknife::CommandScrub());
   command_list.push_back(new swissknife::CommandGc());
   command_list.push_back(new swissknife::CommandReconstructReflog());
+  command_list.push_back(new swissknife::CommandLease());
 
   if (argc < 2) {
     Usage();

@@ -85,7 +85,7 @@ tbb::task* CommandScrub::StoredFileScrubbingTask::execute() {
 
 
 
-swissknife::ParameterList CommandScrub::GetParams() {
+swissknife::ParameterList CommandScrub::GetParams() const {
   swissknife::ParameterList r;
   r.push_back(Parameter::Mandatory('r', "repository directory"));
   r.push_back(Parameter::Switch('m', "machine readable output"));

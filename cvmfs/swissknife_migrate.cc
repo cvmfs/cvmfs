@@ -32,7 +32,7 @@ CommandMigrate::CommandMigrate() :
 }
 
 
-ParameterList CommandMigrate::GetParams() {
+ParameterList CommandMigrate::GetParams() const {
   ParameterList r;
   r.push_back(Parameter::Mandatory('v',
     "migration base version ( 2.0.x | 2.1.7 | chown | hardlink )"));

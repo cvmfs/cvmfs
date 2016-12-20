@@ -22,11 +22,11 @@ namespace swissknife {
 class CommandPull : public Command {
  public:
   ~CommandPull() { }
-  std::string GetName() { return "pull"; }
-  std::string GetDescription() {
+  virtual std::string GetName() const { return "pull"; }
+  virtual std::string GetDescription() const {
     return "Makes a Stratum 1 replica of a Stratum 0 repository.";
   }
-  ParameterList GetParams() {
+  virtual ParameterList GetParams() const {
     ParameterList r;
     r.push_back(Parameter::Mandatory('u', "repository url"));
     r.push_back(Parameter::Mandatory('m', "repository name"));
