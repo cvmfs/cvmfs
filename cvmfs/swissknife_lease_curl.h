@@ -5,9 +5,9 @@
 #ifndef CVMFS_SWISSKNIFE_LEASE_CURL_H_
 #define CVMFS_SWISSKNIFE_LEASE_CURL_H_
 
-#include "curl/curl.h"
-
 #include <string>
+
+#include "curl/curl.h"
 
 struct CurlBuffer {
   std::string data;
@@ -20,10 +20,10 @@ CURL* PrepareCurl(const char* method);
 bool MakeAcquireRequest(const std::string& user_name,
                           const std::string& lease_fqdn,
                           const std::string& repo_service_url,
-                          CurlBuffer& buffer);
+                          CurlBuffer* buffer);
 
 bool MakeDeleteRequest(const std::string& session_token,
                          const std::string& repo_service_url,
-                         CurlBuffer& buffer);
+                         CurlBuffer* buffer);
 
 #endif  // CVMFS_SWISSKNIFE_LEASE_CURL_H_

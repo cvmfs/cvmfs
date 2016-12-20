@@ -12,11 +12,13 @@
 namespace swissknife {
 
 class CommandLease : public Command {
-public:
+ public:
   virtual ~CommandLease();
 
   virtual std::string GetName() const { return "lease"; }
-  virtual std::string GetDescription() const { return "Acquire a lease on a repository sub-path"; }
+  virtual std::string GetDescription() const {
+    return "Acquire a lease on a repository sub-path";
+  }
 
   virtual ParameterList GetParams() const;
 
@@ -37,6 +39,6 @@ public:
   };
 };
 
-}
+}  // namespace swissknife
 
 #endif  // CVMFS_SWISSKNIFE_LEASE_H_

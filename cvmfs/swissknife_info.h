@@ -30,9 +30,15 @@ class CommandInfo : public Command {
 class CommandVersion : public Command {
  public:
   ~CommandVersion() { }
-  virtual std::string GetName()        const { return "version";                         }
-  virtual std::string GetDescription() const { return "Prints the version of CernVM-FS"; }
-  ParameterList GetParams() const { return ParameterList();                   }
+  virtual std::string GetName()        const {
+    return "version";
+  }
+  virtual std::string GetDescription() const {
+    return "Prints the version of CernVM-FS";
+  }
+  ParameterList GetParams() const {
+    return ParameterList();
+  }
   int Main(const ArgumentList &args);
 };
 

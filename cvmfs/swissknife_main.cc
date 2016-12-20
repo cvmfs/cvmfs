@@ -15,6 +15,7 @@
 #include "swissknife_hash.h"
 #include "swissknife_history.h"
 #include "swissknife_info.h"
+#include "swissknife_lease.h"
 #include "swissknife_letter.h"
 #include "swissknife_lsrepo.h"
 #include "swissknife_migrate.h"
@@ -24,7 +25,6 @@
 #include "swissknife_sign.h"
 #include "swissknife_sync.h"
 #include "swissknife_zpipe.h"
-#include "swissknife_lease.h"
 
 
 using namespace std;  // NOLINT
