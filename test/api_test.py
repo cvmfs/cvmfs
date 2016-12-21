@@ -19,7 +19,7 @@ def do_request(url, method, body):
 
 def create_and_delete_session():
     try:
-        rep1 = do_request('/api/leases', 'POST', {'user' : 'user1', 'path' : '/path/to/repo/1'})
+        rep1 = do_request('/api/leases', 'POST', {'user' : 'user1', 'path' : 'repo1.domain1.org'})
         print 'New session: ', rep1
         token = rep1['session_token']
         rep2 = do_request('/api/leases/' + token, 'DELETE', {})
@@ -33,10 +33,10 @@ def main():
                 (base_res + 'users', 'GET', {}),
                 (base_res + 'repos', 'GET', {}),
                 (base_res + 'leases', 'GET', {}),
-                (base_res + 'leases', 'POST', {'user' : 'user1', 'path' : '/path/to/repo/1'}),
-                (base_res + 'leases', 'POST', {'user' : 'bad_user', 'path' : '/path/to/repo/1'}),
+                (base_res + 'leases', 'POST', {'user' : 'user1', 'path' : 'repo1.domain1.org'}),
+                (base_res + 'leases', 'POST', {'user' : 'bad_user', 'path' : 'repo1.domain1.org'}),
                 (base_res + 'leases', 'POST', {'user' : 'user1', 'path' : '/bad/path'}),
-                (base_res + 'leases', 'POST', {'user' : 'user1', 'path' : '/path/to/repo/1'})]
+                (base_res + 'leases', 'POST', {'user' : 'user1', 'path' : 'repo1.domain1.org'})]
 
     create_and_delete_session()
 
