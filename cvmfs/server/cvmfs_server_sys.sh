@@ -16,13 +16,11 @@ cvmfs_sys_uname() {
 
 cvmfs_sys_file_is_regular() {
     [ -f $1 ]
-    echo $?
 }
 
 
 cvmfs_sys_file_is_executable() {
     [ -x $1 ]
-    echo $?
 }
 
 
