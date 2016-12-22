@@ -9,21 +9,21 @@ create_fake_lock() {
 
   load_repo_config $name
 
-  echo "creating ${CVMFS_SPOOL_DIR}/is_snapshotting.lock with PID $pid"
-  echo "$pid" > ${CVMFS_SPOOL_DIR}/is_snapshotting.lock
+  echo "creating ${CVMFS_SPOOL_DIR}/is_updating.lock with PID $pid"
+  echo "$pid" > ${CVMFS_SPOOL_DIR}/is_updating.lock
 }
 
 remove_fake_lock() {
   local name=$1
   load_repo_config $name
-  echo "removing ${CVMFS_SPOOL_DIR}/is_snapshotting.lock"
-  rm -f ${CVMFS_SPOOL_DIR}/is_snapshotting.lock
+  echo "removing ${CVMFS_SPOOL_DIR}/is_updating.lock"
+  rm -f ${CVMFS_SPOOL_DIR}/is_updating.lock
 }
 
 check_lock() {
   local name=$1
   load_repo_config $name
-  [ -f ${CVMFS_SPOOL_DIR}/is_snapshotting.lock ]
+  [ -f ${CVMFS_SPOOL_DIR}/is_updating.lock ]
 }
 
 run_background_op() {
@@ -110,7 +110,7 @@ cvmfs_run_test() {
   local snapshot_log_1="snapshot_1.log"
   run_background_op snapshot $replica_name $snapshot_log_1 15 || return 2
 
-  echo "*** {1} check if the snapshotting lock is there"
+  echo "*** {1} check if the lock is there"
   check_lock $replica_name || return 3
 
   echo "*** {1} check log file for proper error message"
@@ -120,11 +120,11 @@ cvmfs_run_test() {
   local snapshot_log_2="snapshot_2.log"
   run_background_op snapshot $replica_name $snapshot_log_2 15 -t || return 5
 
-  echo "*** {1} check if the snapshotting lock is there"
+  echo "*** {1} check if the lock is there"
   check_lock $replica_name || return 6
 
   echo "*** {1} check log file for proper error message"
-  cat $snapshot_log_2 | grep 'another snapshot.*in progress.*abort' || return 7
+  cat $snapshot_log_2 | grep 'another .*in progress.*abort' || return 7
 
   echo "*** {1} remove faked lock"
   remove_fake_lock $replica_name || return 8
@@ -135,7 +135,7 @@ cvmfs_run_test() {
   local snapshot_log_3="snapshot_3.log"
   run_background_op snapshot $replica_name $snapshot_log_3 120 || return 9
 
-  echo "*** {2} check if the snapshotting lock is gone"
+  echo "*** {2} check if the lock is gone"
   check_lock $replica_name && return 10
 
   echo "*** {2} check the log file for proper manifest upload"
@@ -192,21 +192,21 @@ cvmfs_run_test() {
   local snapshot_log_4="snapshot_4.log"
   run_background_op snapshot $replica_name $snapshot_log_4 30 && return 17
 
-  echo "*** {4} check if the snapshotting lock is there"
+  echo "*** {4} check if the lock is there"
   check_lock $replica_name || return 18
 
   echo "*** {4} check error message"
-  cat $snapshot_log_4 | grep 'waiting .* snapshot .* finish' || return 19
+  cat $snapshot_log_4 | grep 'waiting for .* finish' || return 19
 
   echo "*** {4} try to snapshot (without waiting)"
   local snapshot_log_5="snapshot_5.log"
   run_background_op snapshot $replica_name $snapshot_log_5 30 -t || return 20
 
-  echo "*** {4} check if the snapshotting lock is there"
+  echo "*** {4} check if the lock is there"
   check_lock $replica_name || return 21
 
   echo "*** {4} check log file for proper error message"
-  cat $snapshot_log_2 | grep 'another snapshot.*in progress.*abort' || return 22
+  cat $snapshot_log_2 | grep 'another .*in progress.*abort' || return 22
 
   echo "*** {4} remove the fake log"
   remove_fake_lock $replica_name || return 23
@@ -221,20 +221,20 @@ cvmfs_run_test() {
   echo "*** {5} sleep for one second"
   sleep 1
 
-  echo "*** {5} check if the snapshotting lock is there"
+  echo "*** {5} check if the lock is there"
   check_lock $replica_name || return 25
 
   echo "*** {5} run a second snapshot concurrently (should abort immediately)"
   local snapshot_log_7="snapshot_7.log"
   run_background_op snapshot $replica_name $snapshot_log_7 15 -t || return 26
 
-  echo "*** {5} check if the snapshotting lock is there"
+  echo "*** {5} check if the lock is there"
   check_lock $replica_name || return 27
 
   echo "*** {5} check if the first snapshot is still running (we missed the race otherwise)"
   kill -0 $pid6 || return 28
 
-  echo "*** {5} check if the snapshotting lock is there"
+  echo "*** {5} check if the lock is there"
   check_lock  $replica_name || return 29
 
   echo "*** {5} run a second snapshot concurrently (should wait and later do the snapshot)"
@@ -249,7 +249,7 @@ cvmfs_run_test() {
     return 31
   fi
 
-  echo "*** {5} check if the snapshotting lock is gone"
+  echo "*** {5} check if the lock is gone"
   check_lock $replica_name && return 32
 
   echo "*** {5} check the log files"
@@ -261,8 +261,8 @@ cvmfs_run_test() {
   [ $revisions_snapshotted_by_6 -eq 6 ]                             || return 33
   [ $revisions_snapshotted_by_7 -eq 0 ]                             || return 34
   cat $snapshot_log_6 | grep 'Uploading manifest'                   || return 35
-  cat $snapshot_log_7 | grep 'another snapshot.*in progress.*abort' || return 36
-  cat $snapshot_log_8 | grep 'waiting.*snapshot to finish'          || return 37
+  cat $snapshot_log_7 | grep 'another .*in progress.*abort'         || return 36
+  cat $snapshot_log_8 | grep 'waiting for .* finish'                || return 37
   cat $snapshot_log_8 | grep 'Uploading manifest'                   || return 38
 
   # ============================================================================
