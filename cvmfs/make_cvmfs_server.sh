@@ -13,8 +13,8 @@ else
     exit 1
 fi
 
-# Make an fresh OUTPUT_FILE to begin
-echo '
+# Make a fresh OUTPUT_FILE to begin
+cat > $OUTPUT_FILE <<!EOF!
 #!/bin/sh
 #
 # This file is part of the CernVM File System
@@ -22,7 +22,7 @@ echo '
 # on a Stratum 0/1 server
 
 
-' > $OUTPUT_FILE
+!EOF!
 
 # List the components that make up the resulting file
 COMPONENTS="\
