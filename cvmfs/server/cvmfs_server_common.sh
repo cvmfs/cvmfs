@@ -268,6 +268,8 @@ get_repo_info() {
 is_in_transaction() {
   local name=$1
   load_repo_config $name
+  # ignore if the lock is "stale" because the process starting
+  #  transactions goes away
   check_lock ${CVMFS_SPOOL_DIR}/in_transaction ignore_stale
 }
 
@@ -279,7 +281,7 @@ is_in_transaction() {
 is_publishing() {
   local name=$1
   load_repo_config $name
-  check_lock ${CVMFS_SPOOL_DIR}/is_publishing ignore_stale
+  check_lock ${CVMFS_SPOOL_DIR}/is_publishing
 }
 
 
@@ -480,6 +482,8 @@ open_transaction() {
   local tx_lock="${CVMFS_SPOOL_DIR}/in_transaction"
 
   is_stratum0 $name                    || die "Cannot open transaction on Stratum1"
+  # ignore if lock is "stale" because the process that created it 
+  #  goes away
   acquire_lock "$tx_lock" ignore_stale || die "Failed to create transaction lock"
   run_suid_helper open $name           || die "Failed to make /cvmfs/$name writable"
 
