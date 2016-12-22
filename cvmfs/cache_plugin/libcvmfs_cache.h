@@ -66,6 +66,7 @@ enum cvmcache_capabilities {
   CVMCACHE_CAP_ALL         = 31
 };
 
+#define CVMCACHE_SIZE_UNKNOWN (uint64_t(-1))
 
 struct cvmcache_hash {
   unsigned char digest[20];
@@ -120,11 +121,14 @@ struct cvmcache_callbacks {
                         uint64_t offset,
                         uint32_t *size,
                         unsigned char *buffer);
+  /**
+   * The same object might be uploaded concurrently by multiple users.
+   */
   int (*cvmcache_start_txn)(struct cvmcache_hash *id,
                             uint64_t txn_id,
                             struct cvmcache_object_info *info);
   /**
-   * A full block is appended expect possibly for the file's last block
+   * A full block is appended except possibly for the file's last block
    */
   int (*cvmcache_write_txn)(uint64_t txn_id,
                             unsigned char *buffer,
@@ -150,6 +154,21 @@ struct cvmcache_callbacks {
   int capabilities;
 };
 
+/**
+ * Should be called before any other cvmcache_... function.
+ */
+void cvmcache_init_global();
+/**
+ * Deletes global state, afterwards no further calls to cvmcache_... functions
+ * should take place.
+ */
+void cvmcache_cleanup_global();
+/**
+ * True if the plugin was started from a cvmfs mountpoint and thus will
+ * terminate by itself when the last mount point disconnects.
+ */
+int cvmcache_is_supervised();
+
 struct cvmcache_context *cvmcache_init(struct cvmcache_callbacks *callbacks);
 /**
  * The locator is either a UNIX domain socket (unix=/path/to/socket) or a
@@ -166,12 +185,29 @@ void cvmcache_process_requests(struct cvmcache_context *ctx, unsigned nworkers);
  * objects in the cache become unpinned.
  */
 void cvmcache_ask_detach(struct cvmcache_context *ctx);
+/**
+ * Stops the processing thread.
+ */
 void cvmcache_terminate(struct cvmcache_context *ctx);
-
+/**
+ * Blocks until the processing thread finishes.  Can either happen due to a call
+ * to cvmcache_terminate or -- when the plugin is started from cvmfs -- when
+ * the last repository is unmounted.  Invalidates the context object.
+ */
+void cvmcache_wait_for(struct cvmcache_context *ctx);
 uint32_t cvmcache_max_object_size(struct cvmcache_context *ctx);
 
+/**
+ * Can be used to spawn a second process that superwises the cache plugin.
+ * The watchdog can use gdb/lldb to generate stack traces.  Must be closed by
+ * a call to cvmcache_close_watchdog(), otherwise the main process will be
+ * reported has having died unexpectedly.
+ */
+void cvmcache_spawn_watchdog(const char *crash_dump_file);
+void cvmcache_terminate_watchdog();
 
-// Options parsing from libcvmfs without legacy support
+
+// Options parsing from libcvmfs without "libcvmfs legacy" support
 
 cvmcache_option_map *cvmcache_options_init();
 /**

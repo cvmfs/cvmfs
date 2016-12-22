@@ -18,12 +18,12 @@ namespace swissknife {
 
 class CommandReconstructReflog : public Command {
  public:
-  std::string GetName() { return "reconstruct_reflog"; }
-  std::string GetDescription() {
+  virtual std::string GetName() const { return "reconstruct_reflog"; }
+  virtual std::string GetDescription() const {
     return "Bootstraps a Reference Log from Catalog and History chains. This "
            "is used for both legacy repository migration and repairs.";
   }
-  ParameterList GetParams();
+  virtual ParameterList GetParams() const;
   int Main(const ArgumentList &args);
 
  protected:

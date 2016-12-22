@@ -31,7 +31,8 @@ option optimize_for = LITE_RUNTIME;
 // Unrecognized enum constants are mapped to the first enum constant by the
 // protobuf deserialization.
 
-// Then enum definitions are mirrored in libcvmfs.h
+// Then enum definitions are mirrored in libcvmfs.h.  Error messages for the
+// codes are defined in cache_transport.h.
 
 enum EnumStatus {
   STATUS_UNKNOWN     = 0;

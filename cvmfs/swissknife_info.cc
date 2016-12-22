@@ -42,7 +42,7 @@ bool CommandInfo::Exists(const string &repository, const string &file) const {
   }
 }
 
-ParameterList CommandInfo::GetParams() {
+ParameterList CommandInfo::GetParams() const {
   swissknife::ParameterList r;
   r.push_back(Parameter::Mandatory('r', "repository directory / url"));
   r.push_back(Parameter::Optional('u', "repository mount point"));

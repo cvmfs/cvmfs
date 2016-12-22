@@ -27,13 +27,13 @@ class CommandCheck : public Command {
     : check_chunks_(false)
     , is_remote_(false) {}
   ~CommandCheck() { }
-  std::string GetName() { return "check"; }
-  std::string GetDescription() {
+  virtual std::string GetName() const { return "check"; }
+  virtual std::string GetDescription() const {
     return "CernVM File System repository sanity checker\n"
       "This command checks the consisteny of the file catalogs of a "
         "cvmfs repository.";
   }
-  ParameterList GetParams() {
+  virtual ParameterList GetParams() const {
     ParameterList r;
     r.push_back(Parameter::Mandatory('r', "repository directory / url"));
     r.push_back(Parameter::Optional('n', "check specific repository tag"));

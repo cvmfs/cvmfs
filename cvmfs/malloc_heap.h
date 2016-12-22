@@ -26,7 +26,7 @@
  * Note that during a Compact() not even reading from any of the pointers is
  * allowed!
  *
- * MallocHeap is used  by the in-memory object cache.  The header is the
+ * MallocHeap is used by the in-memory object cache.  The header is the
  * object's content hash, so the cache manager can identify any block in its
  * hash table and move the pointers when MallocHeap runs a garbage collection.
  *
@@ -49,6 +49,7 @@ class MallocHeap {
   ~MallocHeap();
 
   void *Allocate(uint64_t size, void *header, unsigned header_size);
+  void *Expand(void *block, uint64_t new_size);
   void MarkFree(void *block);
   uint64_t GetSize(void *block);
   void Compact();
@@ -56,9 +57,11 @@ class MallocHeap {
   inline uint64_t num_blocks() { return num_blocks_; }
   inline uint64_t used_bytes() { return gauge_; }
   inline uint64_t stored_bytes() { return stored_; }
+  inline uint64_t capacity() { return capacity_; }
   inline double utilization() {
     return static_cast<double>(stored_) / static_cast<double>(gauge_);
   }
+  bool HasSpaceFor(uint64_t nbytes);
 
  private:
   /**

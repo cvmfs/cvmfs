@@ -37,7 +37,8 @@ void CachePlugin::AskToDetach() {
 CachePlugin::CachePlugin(uint64_t capabilities)
   : capabilities_(capabilities)
   , fd_socket_(-1)
-  , running_(false)
+  , fd_socket_lock_(-1)
+  , running_(0)
   , num_workers_(0)
   , max_object_size_(kDefaultMaxObjectSize)
 {
@@ -52,18 +53,26 @@ CachePlugin::CachePlugin(uint64_t capabilities)
 
 
 CachePlugin::~CachePlugin() {
-  if (running_) {
-    char terminate = kSignalTerminate;
-    WritePipe(pipe_ctrl_[1], &terminate, 1);
-    pthread_join(thread_io_, NULL);
-  }
+  Terminate();
   ClosePipe(pipe_ctrl_);
   if (fd_socket_ >= 0)
     close(fd_socket_);
+  if (fd_socket_lock_ >= 0)
+    UnlockFile(fd_socket_lock_);
 }
 
 
-void CachePlugin::HandleHandshake(CacheTransport *transport) {
+void CachePlugin::HandleHandshake(
+  cvmfs::MsgHandshake *msg_req,
+  CacheTransport *transport)
+{
+  uint64_t session_id = NextSessionId();
+  if (msg_req->has_name()) {
+    sessions_[session_id] = msg_req->name();
+  } else {
+    sessions_[session_id] =
+      "anonymous client (" + StringifyInt(session_id) + ")";
+  }
   cvmfs::MsgHandshakeAck msg_ack;
   CacheTransport::Frame frame_send(&msg_ack);
 
@@ -71,7 +80,7 @@ void CachePlugin::HandleHandshake(CacheTransport *transport) {
   msg_ack.set_name(name_);
   msg_ack.set_protocol_version(kPbProtocolVersion);
   msg_ack.set_max_object_size(max_object_size_);
-  msg_ack.set_session_id(NextSessionId());
+  msg_ack.set_session_id(session_id);
   msg_ack.set_capabilities(capabilities_);
   transport->SendFrame(&frame_send);
 }
@@ -87,6 +96,10 @@ void CachePlugin::HandleInfo(
   msg_reply.set_req_id(msg_req->req_id());
   Info info;
   cvmfs::EnumStatus status = GetInfo(&info);
+  if (status != cvmfs::STATUS_OK) {
+    LogSessionError(msg_req->session_id(), status,
+                    "failed to query cache status");
+  }
   msg_reply.set_size_bytes(info.size_bytes);
   msg_reply.set_used_bytes(info.used_bytes);
   msg_reply.set_pinned_bytes(info.pinned_bytes);
@@ -113,6 +126,8 @@ void CachePlugin::HandleList(
     listing_id = NextLstId();
     status = ListingBegin(listing_id, msg_req->object_type());
     if (status != cvmfs::STATUS_OK) {
+      LogSessionError(msg_req->session_id(), status,
+                      "failed to start enumeration of objects");
       msg_reply.set_status(status);
       transport->SendFrame(&frame_send);
       return;
@@ -141,6 +156,9 @@ void CachePlugin::HandleList(
   } else {
     msg_reply.set_is_last_part(false);
   }
+  if (status != cvmfs::STATUS_OK) {
+    LogSessionError(msg_req->session_id(), status, "failed enumerate objects");
+  }
   msg_reply.set_status(status);
   transport->SendFrame(&frame_send);
 }
@@ -157,6 +175,8 @@ void CachePlugin::HandleObjectInfo(
   shash::Any object_id;
   bool retval = transport->ParseMsgHash(msg_req->object_id(), &object_id);
   if (!retval) {
+    LogSessionError(msg_req->session_id(), cvmfs::STATUS_MALFORMED,
+                    "malformed hash received from client");
     msg_reply.set_status(cvmfs::STATUS_MALFORMED);
   } else {
     ObjectInfo info;
@@ -165,6 +185,9 @@ void CachePlugin::HandleObjectInfo(
     if (status == cvmfs::STATUS_OK) {
       msg_reply.set_object_type(info.object_type);
       msg_reply.set_size(info.size);
+    } else if (status != cvmfs::STATUS_NOENTRY) {
+      LogSessionError(msg_req->session_id(), status,
+                      "failed retrieving object details");
     }
   }
   transport->SendFrame(&frame_send);
@@ -182,6 +205,8 @@ void CachePlugin::HandleRead(
   shash::Any object_id;
   bool retval = transport->ParseMsgHash(msg_req->object_id(), &object_id);
   if (!retval || (msg_req->size() > max_object_size_)) {
+    LogSessionError(msg_req->session_id(), cvmfs::STATUS_MALFORMED,
+                    "malformed hash received from client");
     msg_reply.set_status(cvmfs::STATUS_MALFORMED);
     transport->SendFrame(&frame_send);
     return;
@@ -194,8 +219,12 @@ void CachePlugin::HandleRead(
 #endif
   cvmfs::EnumStatus status = Pread(object_id, msg_req->offset(), &size, buffer);
   msg_reply.set_status(status);
-  if (status == cvmfs::STATUS_OK)
+  if (status == cvmfs::STATUS_OK) {
     frame_send.set_attachment(buffer, size);
+  } else {
+    LogSessionError(msg_req->session_id(), status,
+                    "failed to read from object");
+  }
   transport->SendFrame(&frame_send);
 #ifdef __APPLE__
   free(buffer);
@@ -214,10 +243,16 @@ void CachePlugin::HandleRefcount(
   shash::Any object_id;
   bool retval = transport->ParseMsgHash(msg_req->object_id(), &object_id);
   if (!retval) {
+    LogSessionError(msg_req->session_id(), cvmfs::STATUS_MALFORMED,
+                    "malformed hash received from client");
     msg_reply.set_status(cvmfs::STATUS_MALFORMED);
   } else {
     cvmfs::EnumStatus status = ChangeRefcount(object_id, msg_req->change_by());
     msg_reply.set_status(status);
+    if ((status != cvmfs::STATUS_OK) && (status != cvmfs::STATUS_NOENTRY)) {
+      LogSessionError(msg_req->session_id(), status,
+                      "failed to open/close object");
+    }
   }
   transport->SendFrame(&frame_send);
 }
@@ -231,15 +266,19 @@ bool CachePlugin::HandleRequest(int fd_con) {
   bool retval = transport.RecvFrame(&frame_recv);
   if (!retval) {
     LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
-             "failed to reveive request from connection (%d)", errno);
+             "failed to receive request from connection (%d)", errno);
     return false;
   }
 
   google::protobuf::MessageLite *msg_typed = frame_recv.GetMsgTyped();
 
   if (msg_typed->GetTypeName() == "cvmfs.MsgHandshake") {
-    HandleHandshake(&transport);
+    cvmfs::MsgHandshake *msg_req =
+      reinterpret_cast<cvmfs::MsgHandshake *>(msg_typed);
+    HandleHandshake(msg_req, &transport);
   } else if (msg_typed->GetTypeName() == "cvmfs.MsgQuit") {
+    cvmfs::MsgQuit *msg_req = reinterpret_cast<cvmfs::MsgQuit *>(msg_typed);
+    sessions_.erase(msg_req->session_id());
     return false;
   } else if (msg_typed->GetTypeName() == "cvmfs.MsgRefcountReq") {
     cvmfs::MsgRefcountReq *msg_req =
@@ -296,6 +335,9 @@ void CachePlugin::HandleShrink(
   cvmfs::EnumStatus status = Shrink(msg_req->shrink_to(), &used_bytes);
   msg_reply.set_used_bytes(used_bytes);
   msg_reply.set_status(status);
+  if ((status != cvmfs::STATUS_OK) && (status != cvmfs::STATUS_PARTIAL)) {
+    LogSessionError(msg_req->session_id(), status, "failed to cleanup cache");
+  }
   transport->SendFrame(&frame_send);
 }
 
@@ -312,10 +354,16 @@ void CachePlugin::HandleStoreAbort(
   UniqueRequest uniq_req(msg_req->session_id(), msg_req->req_id());
   bool retval = txn_ids_.Lookup(uniq_req, &txn_id);
   if (!retval) {
+    LogSessionError(msg_req->session_id(), cvmfs::STATUS_MALFORMED,
+                    "malformed transaction id received from client");
     msg_reply.set_status(cvmfs::STATUS_MALFORMED);
   } else {
     cvmfs::EnumStatus status = AbortTxn(txn_id);
     msg_reply.set_status(status);
+    if (status != cvmfs::STATUS_OK) {
+      LogSessionError(msg_req->session_id(), status,
+                      "failed to abort transaction");
+    }
     txn_ids_.Erase(uniq_req);
   }
   transport->SendFrame(&frame_send);
@@ -337,6 +385,8 @@ void CachePlugin::HandleStore(
        (frame->att_size() > max_object_size_) ||
        ((frame->att_size() < max_object_size_) && !msg_req->last_part()) )
   {
+    LogSessionError(msg_req->session_id(), cvmfs::STATUS_MALFORMED,
+                    "malformed hash or bad object size received from client");
     msg_reply.set_status(cvmfs::STATUS_MALFORMED);
     transport->SendFrame(&frame_send);
     return;
@@ -347,8 +397,8 @@ void CachePlugin::HandleStore(
   cvmfs::EnumStatus status = cvmfs::STATUS_OK;
   if (msg_req->part_nr() == 1) {
     if (txn_ids_.Contains(uniq_req)) {
-      LogCvmfs(kLogCache, kLogSyslogWarn | kLogDebug,
-               "invalid attempt to restart running transaction");
+      LogSessionError(msg_req->session_id(), cvmfs::STATUS_MALFORMED,
+                      "invalid attempt to restart running transaction");
       msg_reply.set_status(cvmfs::STATUS_MALFORMED);
       transport->SendFrame(&frame_send);
       return;
@@ -361,6 +411,8 @@ void CachePlugin::HandleStore(
     if (msg_req->has_description()) {info.description = msg_req->description();}
     status = StartTxn(object_id, txn_id, info);
     if (status != cvmfs::STATUS_OK) {
+      LogSessionError(msg_req->session_id(), status,
+                      "failed to start transaction");
       msg_reply.set_status(status);
       transport->SendFrame(&frame_send);
       return;
@@ -369,7 +421,8 @@ void CachePlugin::HandleStore(
   } else {
     retval = txn_ids_.Lookup(uniq_req, &txn_id);
     if (!retval) {
-      LogCvmfs(kLogCache, kLogSyslogWarn | kLogDebug, "transaction not found");
+      LogSessionError(msg_req->session_id(), cvmfs::STATUS_MALFORMED,
+                      "invalid transaction received from client");
       msg_reply.set_status(cvmfs::STATUS_MALFORMED);
       transport->SendFrame(&frame_send);
       return;
@@ -382,6 +435,7 @@ void CachePlugin::HandleStore(
                       reinterpret_cast<unsigned char *>(frame->attachment()),
                       frame->att_size());
     if (status != cvmfs::STATUS_OK) {
+      LogSessionError(msg_req->session_id(), status, "failure writing object");
       msg_reply.set_status(status);
       transport->SendFrame(&frame_send);
       return;
@@ -390,6 +444,10 @@ void CachePlugin::HandleStore(
 
   if (msg_req->last_part()) {
     status = CommitTxn(txn_id);
+    if (status != cvmfs::STATUS_OK) {
+      LogSessionError(msg_req->session_id(), status,
+                      "failure committing object");
+    }
     txn_ids_.Erase(uniq_req);
   }
   msg_reply.set_status(status);
@@ -397,32 +455,80 @@ void CachePlugin::HandleStore(
 }
 
 
+bool CachePlugin::IsRunning() {
+  return atomic_read32(&running_) != 0;
+}
+
+
 bool CachePlugin::Listen(const string &locator) {
   vector<string> tokens = SplitString(locator, '=');
   if (tokens[0] == "unix") {
+    string lock_path = tokens[1] + ".lock";
+    fd_socket_lock_ = TryLockFile(lock_path);
+    if (fd_socket_lock_ == -1) {
+      LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
+               "failed to acquire lock file %s (%d)", lock_path.c_str(), errno);
+      NotifySupervisor(CacheTransport::kFailureNotification);
+      return false;
+    } else if (fd_socket_lock_ == -2) {
+      // Another plugin process probably started in the meantime
+      NotifySupervisor(CacheTransport::kReadyNotification);
+      if (getenv(CacheTransport::kEnvReadyNotifyFd) == NULL) {
+        LogCvmfs(kLogCache, kLogSyslogErr | kLogStderr,
+                 "failed to lock on %s, file is busy", lock_path.c_str());
+      }
+      return false;
+    }
+    assert(fd_socket_lock_ >= 0);
     fd_socket_ = MakeSocket(tokens[1], 0600);
   } else if (tokens[0] == "tcp") {
     vector<string> tcp_address = SplitString(tokens[1], ':');
     if (tcp_address.size() != 2) {
       LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
                "invalid locator: %s", locator.c_str());
-      abort();
+      NotifySupervisor(CacheTransport::kFailureNotification);
+      return false;
     }
     fd_socket_ = MakeTcpEndpoint(tcp_address[0], String2Uint64(tcp_address[1]));
   } else {
     LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
              "unknown endpoint in locator: %s", locator.c_str());
-    abort();
+    NotifySupervisor(CacheTransport::kFailureNotification);
+    return false;
   }
+
   if (fd_socket_ < 0) {
-    LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
-             "failed to create endpoint %s (%d)", locator.c_str(), errno);
+    if (errno == EADDRINUSE) {
+      // Another plugin process probably started in the meantime
+      NotifySupervisor(CacheTransport::kReadyNotification);
+    } else {
+      LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
+               "failed to create endpoint %s (%d)", locator.c_str(), errno);
+      NotifySupervisor(CacheTransport::kFailureNotification);
+    }
     return false;
   }
   int retval = listen(fd_socket_, 32);
   assert(retval == 0);
 
   return true;
+}
+
+
+void CachePlugin::LogSessionError(
+  uint64_t session_id,
+  cvmfs::EnumStatus status,
+  const std::string &msg)
+{
+  string session_str("unidentified client (" + StringifyInt(session_id) + ")");
+  map<uint64_t, string>::const_iterator iter = sessions_.find(session_id);
+  if (iter != sessions_.end()) {
+    session_str = iter->second;
+  }
+  LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
+           "session '%s': %s (%d - %s)",
+           session_str.c_str(), msg.c_str(), status,
+           CacheTransportCode2Ascii(status));
 }
 
 
@@ -442,7 +548,8 @@ void *CachePlugin::MainProcessRequests(void *data) {
   watch_socket.events = POLLIN | POLLPRI;
   watch_fds.push_back(watch_socket);
 
-  while (true) {
+  bool terminated = false;
+  while (!terminated) {
     for (unsigned i = 0; i < watch_fds.size(); ++i)
       watch_fds[i].revents = 0;
     int retval = poll(&watch_fds[0], watch_fds.size(), -1);
@@ -490,14 +597,26 @@ void *CachePlugin::MainProcessRequests(void *data) {
     }
 
     // New request
-    for (unsigned i = 2; i < watch_fds.size(); ++i) {
+    for (unsigned i = 2; i < watch_fds.size(); ) {
       if (watch_fds[i].revents) {
         bool proceed = cache_plugin->HandleRequest(watch_fds[i].fd);
         if (!proceed) {
           close(watch_fds[i].fd);
-          watch_fds.erase(watch_fds.begin() + i);
           cache_plugin->connections_.erase(watch_fds[i].fd);
+          watch_fds.erase(watch_fds.begin() + i);
+          if ((getenv(CacheTransport::kEnvReadyNotifyFd) != NULL) &&
+              (cache_plugin->connections_.empty()))
+          {
+            LogCvmfs(kLogCache, kLogSyslog,
+                     "stopping cache plugin, no more active clients");
+            terminated = true;
+            break;
+          }
+        } else {
+          i++;
         }
+      } else {
+        i++;
       }
     }
   }
@@ -512,11 +631,24 @@ void *CachePlugin::MainProcessRequests(void *data) {
 }
 
 
+/**
+ * Used during startup to synchronize with the cvmfs client.
+ */
+void CachePlugin::NotifySupervisor(char signal) {
+  char *pipe_ready = getenv(CacheTransport::kEnvReadyNotifyFd);
+  if (pipe_ready == NULL)
+    return;
+  int fd_pipe_ready = String2Int64(pipe_ready);
+  WritePipe(fd_pipe_ready, &signal, 1);
+}
+
+
 void CachePlugin::ProcessRequests(unsigned num_workers) {
   num_workers_ = num_workers;
   int retval = pthread_create(&thread_io_, NULL, MainProcessRequests, this);
   assert(retval == 0);
-  running_ = true;
+  NotifySupervisor(CacheTransport::kReadyNotification);
+  atomic_cas32(&running_, 0, 1);
 }
 
 
@@ -531,4 +663,21 @@ void CachePlugin::SendDetachRequests() {
     CacheTransport::Frame frame_send(&msg_detach);
     transport.SendFrame(&frame_send);
   }
+}
+
+
+void CachePlugin::Terminate() {
+  if (IsRunning()) {
+    char terminate = kSignalTerminate;
+    WritePipe(pipe_ctrl_[1], &terminate, 1);
+    pthread_join(thread_io_, NULL);
+    atomic_cas32(&running_, 1, 0);
+  }
+}
+
+
+void CachePlugin::WaitFor() {
+  if (!IsRunning())
+    return;
+  pthread_join(thread_io_, NULL);
 }

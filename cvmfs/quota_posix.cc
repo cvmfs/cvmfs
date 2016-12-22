@@ -51,6 +51,7 @@
 #include "platform.h"
 #include "smalloc.h"
 #include "statistics.h"
+#include "util/pointer.h"
 #include "util/posix.h"
 #include "util_concurrency.h"
 
@@ -391,7 +392,7 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
 
   // TODO(jblomer) transaction
   LogCvmfs(kLogQuota, kLogSyslog,
-           "cleanup cache until %lu KB are free", leave_size/1024);
+           "clean up cache until at most %lu KB is used", leave_size/1024);
   LogCvmfs(kLogQuota, kLogDebug, "gauge %" PRIu64, gauge_);
   cleanup_recorder_.Tick();
 
@@ -917,9 +918,9 @@ int PosixQuotaManager::MainCacheManager(int argc, char **argv) {
   LogCvmfs(kLogQuota, kLogDebug, "starting quota manager");
   int retval;
 
-  retval = monitor::Init(".", "cachemgr", false);
-  assert(retval);
-  monitor::Spawn();
+  UniquePtr<Watchdog> watchdog(Watchdog::Create("./stacktrace.cachemgr"));
+  assert(watchdog.IsValid());
+  watchdog->Spawn();
 
   PosixQuotaManager shared_manager(0, 0, "");
   shared_manager.shared_ = true;
@@ -1039,8 +1040,6 @@ int PosixQuotaManager::MainCacheManager(int argc, char **argv) {
     sqlite3_free(sqlite3_temp_directory);
     sqlite3_temp_directory = NULL;
   }
-
-  monitor::Fini();
 
   return 0;
 }

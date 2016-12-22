@@ -65,7 +65,7 @@ inline const char *Code2Ascii(const Failures error) {
   texts[6] = "cannot run FUSE event loop";
   texts[7] = "failed to load shared library";
   texts[8] = "incompatible library version";
-  texts[9] = "cache directory problem";
+  texts[9] = "cache directory/plugin problem";
   texts[10] = "peering problem";
   texts[11] = "NFS maps init failure";
   texts[12] = "quota init failure";

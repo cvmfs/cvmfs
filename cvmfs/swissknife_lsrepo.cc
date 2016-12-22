@@ -14,7 +14,7 @@ CommandListCatalogs::CommandListCatalogs() :
   print_entries_(false) {}
 
 
-ParameterList CommandListCatalogs::GetParams() {
+ParameterList CommandListCatalogs::GetParams() const {
   ParameterList r;
   r.push_back(Parameter::Mandatory(
               'r', "repository URL (absolute local path or remote URL)"));

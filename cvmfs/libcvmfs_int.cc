@@ -59,7 +59,7 @@
 #include "hash.h"
 #include "libcvmfs.h"
 #include "logging.h"
-#include "lru.h"
+#include "lru_md.h"
 #include "murmur.h"
 #include "platform.h"
 #include "quota.h"

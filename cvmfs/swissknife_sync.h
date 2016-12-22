@@ -94,11 +94,11 @@ namespace swissknife {
 class CommandCreate : public Command {
  public:
   ~CommandCreate() { }
-  std::string GetName() { return "create"; }
-  std::string GetDescription() {
+  virtual std::string GetName() const { return "create"; }
+  virtual std::string GetDescription() const {
     return "Bootstraps a fresh repository.";
   }
-  ParameterList GetParams() {
+  virtual ParameterList GetParams() const {
     ParameterList r;
     r.push_back(Parameter::Mandatory('o', "manifest output file"));
     r.push_back(Parameter::Mandatory('t', "directory for temporary storage"));
@@ -123,11 +123,11 @@ class CommandCreate : public Command {
 class CommandUpload : public Command {
  public:
   ~CommandUpload() { }
-  std::string GetName() { return "upload"; }
-  std::string GetDescription() {
+  virtual std::string GetName() const { return "upload"; }
+  virtual std::string GetDescription() const {
     return "Uploads a local file to the repository.";
   }
-  ParameterList GetParams() {
+  virtual ParameterList GetParams() const {
     ParameterList r;
     r.push_back(Parameter::Mandatory('i', "local file"));
     r.push_back(Parameter::Mandatory('o', "destination path"));
@@ -142,11 +142,11 @@ class CommandUpload : public Command {
 class CommandPeek : public Command {
  public:
   ~CommandPeek() { }
-  std::string GetName() { return "peek"; }
-  std::string GetDescription() {
+  virtual std::string GetName() const { return "peek"; }
+  virtual std::string GetDescription() const {
     return "Checks whether a file exists in the repository.";
   }
-  ParameterList GetParams() {
+  virtual ParameterList GetParams() const {
     ParameterList r;
     r.push_back(Parameter::Mandatory('d', "destination path"));
     r.push_back(Parameter::Mandatory('r', "spooler definition"));
@@ -159,11 +159,11 @@ class CommandPeek : public Command {
 class CommandRemove : public Command {
  public:
   ~CommandRemove() { }
-  std::string GetName() { return "remove"; }
-  std::string GetDescription() {
+  virtual std::string GetName() const { return "remove"; }
+  virtual std::string GetDescription() const {
     return "Removes a file in the repository storage.";
   }
-  ParameterList GetParams() {
+  virtual ParameterList GetParams() const {
     ParameterList r;
     r.push_back(Parameter::Mandatory('o', "path to file"));
     r.push_back(Parameter::Mandatory('r', "spooler definition"));
@@ -177,11 +177,11 @@ class CommandApplyDirtab : public Command {
  public:
   CommandApplyDirtab() : verbose_(false) { }
   ~CommandApplyDirtab() { }
-  std::string GetName() { return "dirtab"; }
-  std::string GetDescription() {
+  virtual std::string GetName() const { return "dirtab"; }
+  virtual std::string GetDescription() const {
     return "Parses the dirtab file and produces nested catalog markers.";
   }
-  ParameterList GetParams() {
+  virtual ParameterList GetParams() const {
     ParameterList r;
     r.push_back(Parameter::Mandatory('d', "path to dirtab file"));
     r.push_back(Parameter::Mandatory('u', "union volume"));
@@ -217,11 +217,11 @@ class CommandApplyDirtab : public Command {
 class CommandSync : public Command {
  public:
   ~CommandSync() { }
-  std::string GetName() { return "sync"; }
-  std::string GetDescription() {
+  virtual std::string GetName() const { return "sync"; }
+  virtual std::string GetDescription() const {
     return "Pushes changes from scratch area back to the repository.";
   }
-  ParameterList GetParams() {
+  virtual ParameterList GetParams() const {
     ParameterList r;
     r.push_back(Parameter::Mandatory('b', "base hash"));
     r.push_back(Parameter::Mandatory('c', "r/o volume"));

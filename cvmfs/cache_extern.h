@@ -19,15 +19,42 @@
 #include "fd_table.h"
 #include "hash.h"
 #include "quota.h"
+#include "util/single_copy.h"
 #include "util_concurrency.h"
+
 
 class ExternalCacheManager : public CacheManager {
   friend class ExternalQuotaManager;
 
  public:
   static const unsigned kPbProtocolVersion = 1;
+  /**
+   * Used for race-free startup of an external cache plugin.
+   */
+  class PluginHandle {
+    friend class ExternalCacheManager;
+   public:
+    PluginHandle() : fd_connection_(-1) { }
+    bool IsValid() const { return fd_connection_ >= 0; }
+    int fd_connection() const { return fd_connection_; }
+    std::string error_msg() const { return error_msg_; }
 
-  static ExternalCacheManager *Create(int fd_connection, unsigned max_open_fds);
+   private:
+    /**
+     * The connected file descriptor to pass to Create()
+     */
+    int fd_connection_;
+
+    std::string error_msg_;
+  };
+
+  static PluginHandle *CreatePlugin(
+    const std::string &locator,
+    const std::vector<std::string> &cmd_line);
+
+  static ExternalCacheManager *Create(int fd_connection,
+                                      unsigned max_open_fds,
+                                      const std::string &ident);
   virtual ~ExternalCacheManager();
 
   virtual CacheManagerIds id() { return kExternalCacheManager; }
@@ -220,6 +247,8 @@ class ExternalCacheManager : public CacheManager {
   };
 
   static void *MainRead(void *data);
+  static int ConnectLocator(const std::string &locator);
+  static bool SpawnPlugin(const std::vector<std::string> &cmd_line);
 
   explicit ExternalCacheManager(int fd_connection, unsigned max_open_fds);
   int64_t NextRequestId() { return atomic_xadd64(&next_request_id_, 1); }
