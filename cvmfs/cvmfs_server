@@ -329,7 +329,7 @@ Supported Commands:
                   <fully qualified name>
                   Make a new repository snapshot
   gc              [-r number of revisions to preserve]
-                  [-t time stamp after which revisions are reserved]
+                  [-t time stamp after which revisions are preserved]
                   [-l (print deleted objects)] [-L log of deleted objects]
                   [-f (force)] [-d (dry run)]
                   <fully qualified repository name>
@@ -1291,7 +1291,7 @@ close_transaction() {
   to_syslog_for_repo $name "closed transaction $fallback_msg $async_msg"
 }
 
-# checks if a repository is currently runing a publish procedure
+# checks if a repository is currently running a publish procedure
 #
 # @param name  the repository name to be checked
 # @return      0 if a publishing procedure is running
@@ -1328,6 +1328,68 @@ publish_succeeded() {
   trap - EXIT HUP INT TERM
   release_lock $pub_lock
   to_syslog_for_repo $name "successfully published revision $(get_repo_info -v)"
+}
+
+
+# Release an update lock
+#
+# @param name             the repository to release
+
+release_update_lock() {
+  local name=$1
+
+  load_repo_config $name
+  release_lock ${CVMFS_SPOOL_DIR}/is_updating || echo "Warning: failed to release updating lock"
+}
+
+# Acquire an update lock for a repository.  Always pair with a call to
+#   release_update_lock if returns successful.
+# 
+# @param name               the repository to lock
+# @param update_type        update type such as snapshot or gc
+# @param abort_on_conflict  0 to wait for lock, 1 to abort if already acquired.
+#                           Default 0.  Always aborts if initial snapshot is
+#                           in progress.
+# @return                   0 if lock successfully acquired
+
+acquire_update_lock()
+{
+  local name=$1
+  local update_type=$2
+  local abort_on_conflict=${3:-0}
+
+  load_repo_config $name
+  local update_lock=${CVMFS_SPOOL_DIR}/is_updating
+
+  # check for other updates in progress
+  if ! acquire_lock $update_lock ignore_stale; then
+    if [ $abort_on_conflict -eq 1 ]; then
+      echo "another update is in progress... aborting"
+      to_syslog_for_repo $name "did not $update_type (another update in progress)"
+      return 1
+    fi
+
+    local user_shell="$(get_user_shell $name)"
+    local initial_snapshot=0
+    if $user_shell "$(__swissknife_cmd) peek -d .cvmfs_last_snapshot -r $CVMFS_UPSTREAM_STORAGE" | grep -v -q "available"; then
+      initial_snapshot=1
+    fi
+
+    if [ $initial_snapshot -eq 1 ]; then
+      echo "an initial snapshot is in progress... aborting"
+      to_syslog_for_repo $name "did not $update_type (initial snapshot in progress)"
+      return 1
+    fi
+
+    echo "waiting for another update to finish..."
+    if ! wait_and_acquire_lock $update_lock; then
+      echo "failed to acquire update lock"
+      to_syslog_for_repo $name "did not $update_type (locking issues)"
+      return 1
+    fi
+  fi
+
+  # The lock is now acquired
 }
 
 
@@ -5263,10 +5325,15 @@ cvmfs_server_gc() {
     if is_stratum0 $name; then
       base_hash="$(get_mounted_root_hash $name)"
       manifest="${CVMFS_SPOOL_DIR}/tmp/manifest"
+    fi
 
-      if [ $dry_run -eq 0 ]; then
+    if [ $dry_run -eq 0 ]; then
+      if is_stratum0 $name; then
         trap "close_transaction $name 0" EXIT HUP INT TERM
         open_transaction $name || die "Failed to open transaction for garbage collection"
+      else
+        acquire_update_lock $name gc || die "Failed to acquire update lock for garbage collection"
+        trap "release_update_lock $name" EXIT HUP INT TERM
       fi
     fi
 
@@ -5290,17 +5357,23 @@ cvmfs_server_gc() {
              "$reconstruct_this_reflog" \
              $additional_switches || die "Fail ($?)!"
 
-    # sign the result
-    if is_stratum0 $name && [ $dry_run -eq 0 ]; then
-      echo "Signing Repository Manifest"
-      if ! sign_manifest $name $manifest; then
-        to_syslog_for_repo $name "failed to sign manifest after manual garbage collection"
-        die "Fail!"
-      fi
+    if [ $dry_run -eq 0 ]; then
+      # sign the result
+      if is_stratum0 $name; then
+        echo "Signing Repository Manifest"
+        if ! sign_manifest $name $manifest; then
+          to_syslog_for_repo $name "failed to sign manifest after manual garbage collection"
+          die "Fail!"
+        fi
 
-      # close the transaction
-      trap - EXIT HUP INT TERM
-      close_transaction $name 0
+        # close the transaction
+        trap - EXIT HUP INT TERM
+        close_transaction $name 0
+      else
+        # release the update lock
+        trap - EXIT HUP INT TERM
+        release_update_lock $name
+      fi
     fi
 
     to_syslog_for_repo $name "successfully finished manual garbage collection"
@@ -5414,7 +5487,8 @@ __snapshot_cleanup() {
   $user_shell "$(__swissknife_cmd) remove     \
                  -r ${CVMFS_UPSTREAM_STORAGE} \
                  -o .cvmfs_is_snapshotting"       || echo "Warning: failed to remove .cvmfs_is_snapshotting"
-  release_lock ${CVMFS_SPOOL_DIR}/is_snapshotting || echo "Warning: failed to release snapshotting lock"
+
+  release_update_lock $alias_name
 }
 
 __snapshot_succeeded() {
@@ -5462,7 +5536,6 @@ __do_snapshot() {
     public_key=$CVMFS_PUBLIC_KEY
     timeout=$CVMFS_HTTP_TIMEOUT
     retries=$CVMFS_HTTP_RETRIES
-    snapshot_lock=${spool_dir}/is_snapshotting
 
     # more sanity checks
     is_owner_or_root $alias_name || { echo "Permission denied: Repository $alias_name is owned by $user"; retcode=1; continue; }
@@ -5478,12 +5551,22 @@ __do_snapshot() {
     fi
 
     # do it!
-    local user_shell="$(get_user_shell $alias_name)"
 
     if is_local_upstream $upstream; then
         # try to update the geodb, but continue if it doesn't work
         _update_geodb -l || true
     fi
+
+    if ! acquire_update_lock $alias_name snapshot $abort_on_conflict; then
+      retcode=1
+      continue
+    fi
+
+    local user_shell="$(get_user_shell $alias_name)"
+
+    # here the lock is acquired and needs to be cleared in case of abort
+    trap "__snapshot_failed $alias_name" EXIT HUP INT TERM
+    to_syslog_for_repo $alias_name "started snapshotting from $stratum0"
 
     local initial_snapshot=0
     local initial_snapshot_flag=""
@@ -5491,35 +5574,6 @@ __do_snapshot() {
       initial_snapshot=1
       initial_snapshot_flag="-i"
     fi
-
-    # check for other snapshots in progress
-    if ! acquire_lock $snapshot_lock; then
-      if [ $abort_on_conflict -eq 1 ]; then
-        echo "another snapshot is in progress... aborting"
-        to_syslog_for_repo $alias_name "did not snapshot (another snapshot in progress)"
-        retcode=1
-        continue
-      fi
-
-      if [ $initial_snapshot -eq 1 ]; then
-        echo "an initial snapshot is in progress... aborting"
-        to_syslog_for_repo $alias_name "did not snapshot (another initial snapshot in progress)"
-        retcode=1
-        continue
-      fi
-
-      echo "waiting for another snapshot to finish..."
-      if ! wait_and_acquire_lock $snapshot_lock; then
-        echo "failed to acquire snapshot lock"
-        to_syslog_for_repo $alias_name "did not snapshot (locking issues)"
-        retcode=1
-        continue
-      fi
-    fi
-
-    # here the lock is already acquired and needs to be cleared in case of abort
-    trap "__snapshot_failed $alias_name" EXIT HUP INT TERM
-    to_syslog_for_repo $alias_name "started snapshotting from $stratum0"
 
     local log_level=
     [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-l $CVMFS_LOG_LEVEL"
