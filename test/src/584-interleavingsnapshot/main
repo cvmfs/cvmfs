@@ -26,20 +26,21 @@ check_lock() {
   [ -f ${CVMFS_SPOOL_DIR}/is_updating.lock ]
 }
 
-run_background_snapshot() {
-  local name=$1
-  local logfile=$2
-  local max_waiting_time=$3
-  shift 3
-  local snapshot_params="$*"
+run_background_op() {
+  local op=$1
+  local name=$2
+  local logfile=$3
+  local max_waiting_time=$4
+  shift 4
+  local op_params="$*"
 
-  local snapshot_command="cvmfs_server snapshot $snapshot_params $name"
+  local op_command="cvmfs_server $op $op_params $name"
   local pid=0
 
-  echo "running \`${snapshot_command}\`"
-  pid=$(run_background_service $logfile "$snapshot_command") || return $?
+  echo "running \`${op_command}\`"
+  pid=$(run_background_service $logfile "$op_command") || return $?
 
-  echo -n "waiting for snapshot (PID: $pid) for $max_waiting_time seconds... "
+  echo -n "waiting for $op (PID: $pid) for $max_waiting_time seconds... "
   local timeout=$max_waiting_time
   while kill -0 $pid > /dev/null 2>&1 && [ $timeout -gt 0 ]; do
     sleep 1
@@ -48,9 +49,9 @@ run_background_snapshot() {
   echo "done (waited $(( $max_waiting_time - $timeout )) seconds)"
 
   if ! kill -0 $pid > /dev/null 2>&1; then
-    echo "snapshot has terminated"
+    echo "$op has terminated"
   else
-    echo -n "snapshot is still running - aborting it... "
+    echo -n "$op is still running - aborting it... "
     kill -9 $pid && echo "done" || echo "fail"
     return 1
   fi
@@ -82,8 +83,11 @@ cvmfs_run_test() {
   local scratch_dir=$(pwd)
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
 
-  echo "*** {0} create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
-  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO || return $?
+  echo "*** {0} create a fresh garbage-collectable repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -z || return $?
+
+  echo "*** {0} disable auto garbage collection in $CVMFS_TEST_REPO"
+  sudo sed -i 's/CVMFS_AUTO_GC=.*/CVMFS_AUTO_GC=no/' /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf || return $?
 
   echo "*** {0} install a desaster cleanup function"
   trap cleanup EXIT HUP INT TERM || return $?
@@ -104,7 +108,7 @@ cvmfs_run_test() {
 
   echo "*** {1} create an initial snapshot (should immediately fail)"
   local snapshot_log_1="snapshot_1.log"
-  run_background_snapshot $replica_name $snapshot_log_1 15 || return 2
+  run_background_op snapshot $replica_name $snapshot_log_1 15 || return 2
 
   echo "*** {1} check if the lock is there"
   check_lock $replica_name || return 3
@@ -114,7 +118,7 @@ cvmfs_run_test() {
 
   echo "*** {1} create an initial snapshot without waiting (should immediately fail)"
   local snapshot_log_2="snapshot_2.log"
-  run_background_snapshot $replica_name $snapshot_log_2 15 -t || return 5
+  run_background_op snapshot $replica_name $snapshot_log_2 15 -t || return 5
 
   echo "*** {1} check if the lock is there"
   check_lock $replica_name || return 6
@@ -129,13 +133,18 @@ cvmfs_run_test() {
 
   echo "*** {2} create an initial snapshot (should work)"
   local snapshot_log_3="snapshot_3.log"
-  run_background_snapshot $replica_name $snapshot_log_3 120 || return 9
+  run_background_op snapshot $replica_name $snapshot_log_3 120 || return 9
 
   echo "*** {2} check if the lock is gone"
   check_lock $replica_name && return 10
 
   echo "*** {2} check the log file for proper manifest upload"
   cat $snapshot_log_3 | grep 'Uploading manifest' || return 11
+
+  echo "*** {2) save snapshot data for later"
+  load_repo_config $replica_name
+  cp ${CVMFS_SPOOL_DIR}/reflog.chksum . || return $?
+  cp -r /srv/cvmfs/$replica_name . || return $?
 
   # ============================================================================
 
@@ -181,7 +190,7 @@ cvmfs_run_test() {
 
   echo "*** {4} try to snapshot (should hang forever)"
   local snapshot_log_4="snapshot_4.log"
-  run_background_snapshot $replica_name $snapshot_log_4 30 && return 17
+  run_background_op snapshot $replica_name $snapshot_log_4 30 && return 17
 
   echo "*** {4} check if the lock is there"
   check_lock $replica_name || return 18
@@ -191,7 +200,7 @@ cvmfs_run_test() {
 
   echo "*** {4} try to snapshot (without waiting)"
   local snapshot_log_5="snapshot_5.log"
-  run_background_snapshot $replica_name $snapshot_log_5 30 -t || return 20
+  run_background_op snapshot $replica_name $snapshot_log_5 30 -t || return 20
 
   echo "*** {4} check if the lock is there"
   check_lock $replica_name || return 21
@@ -217,7 +226,7 @@ cvmfs_run_test() {
 
   echo "*** {5} run a second snapshot concurrently (should abort immediately)"
   local snapshot_log_7="snapshot_7.log"
-  run_background_snapshot $replica_name $snapshot_log_7 15 -t || return 26
+  run_background_op snapshot $replica_name $snapshot_log_7 15 -t || return 26
 
   echo "*** {5} check if the lock is there"
   check_lock $replica_name || return 27
@@ -230,7 +239,7 @@ cvmfs_run_test() {
 
   echo "*** {5} run a second snapshot concurrently (should wait and later do the snapshot)"
   local snapshot_log_8="snapshot_8.log"
-  run_background_snapshot $replica_name $snapshot_log_8 800 || return 30
+  run_background_op snapshot $replica_name $snapshot_log_8 800 || return 30
 
   echo "*** {5} check if the first snapshot is gone (kill it otherwise)"
   if kill -0 $pid6 > /dev/null 2>&1; then
@@ -263,13 +272,86 @@ cvmfs_run_test() {
 
   echo "*** {6} create a snapshot (should work - despite the stale lock)"
   local snapshot_log_9="snapshot_9.log"
-  run_background_snapshot $replica_name $snapshot_log_9 300 || return 40
+  run_background_op snapshot $replica_name $snapshot_log_9 300 || return 40
 
   echo "*** {6} check if the lock is gone"
   check_lock $replica_name && return 41
 
   echo "*** {6} check the log file"
   cat $snapshot_log_9 | grep 'Uploading manifest' || return 42
+
+  # ============================================================================
+
+  echo "*** {7) restore early snapshot data so snapshot will take a while"
+  cp reflog.chksum ${CVMFS_SPOOL_DIR} || return 43
+  rm -rf /srv/cvmfs/$replica_name/data || return 44
+  cp -r $replica_name/.??* $replica_name/data /srv/cvmfs/$replica_name || return 45
+
+  echo "*** {7} try to snapshot (in the background)"
+  local snapshot_log_10="snapshot_10.log"
+  local pid10=$(run_background_service $snapshot_log_10 "cvmfs_server snapshot $replica_name") || return 46
+  echo "running with PID: $pid10"
+
+  echo "*** {7} sleep for one second"
+  sleep 1
+
+  echo "*** {7} check if the lock is there"
+  check_lock  $replica_name || return 47
+
+  echo "*** {7} run a gc concurrently (should wait and later do the gc)"
+  local gc_log_1="gc_1.log"
+  run_background_op gc $replica_name $gc_log_1 800 -f || return 48
+
+  echo "*** {7} check if the snapshot is gone (kill it otherwise)"
+  if kill -0 $pid10 > /dev/null 2>&1; then
+    echo -n "PID $pid10 is still around - killing it... "
+    kill -9 $pid10
+    echo "done"
+    return 49
+  fi
+
+  echo "*** {7} now run another gc (in the background, slowing down output)"
+  # Need to wait while reading a lot of output, or the gc will finish too
+  # fast, so add both cvmfs server and shell debugging.  It will begin right
+  # away because of the pipe buffer.  Needs more than 64kb of output to work,
+  # which is the size of the pipe buffer.
+  # It's a hack, but I couldn't think of another way to get a gc to run
+  # long enough to test overlap.
+  local gc_log_2="gc_2.log"
+  cat >do_gc.sh <<!EOF!
+#!/bin/sh
+export CVMFS_SERVER_DEBUG=3
+sh -x cvmfs_server gc -f -r 0 -l $replica_name 2>&1|(sleep 5;cat)
+!EOF!
+  chmod +x do_gc.sh
+  local pid2=$(run_background_service $gc_log_2 ./do_gc.sh) || return 54
+  echo "running with PID: $pid2"
+
+  echo "*** {7} sleep for one second"
+  sleep 1
+
+  echo "*** {7} check if the lock is there"
+  check_lock  $replica_name || return 55
+
+  echo "*** {7} run a snapshot concurrently (should wait and later do the snapshot)"
+  local snapshot_log_11="snapshot_11.log"
+  run_background_op snapshot $replica_name $snapshot_log_11 800 || return 56
+
+  echo "*** {7} check if the gc is gone (kill it otherwise)"
+  if kill -0 $pid2 > /dev/null 2>&1; then
+    echo -n "PID $pid2 is still around - killing it... "
+    # don't use -9 because there may be children we want to kill
+    kill $pid2
+    echo "done"
+    return 57
+  fi
+
+  echo "*** {7} check the log files"
+
+  cat $gc_log_1        | grep 'waiting for .* finish'               || return 58
+  cat $gc_log_1        | grep 'Running Garbage Collection'          || return 59
+  cat $snapshot_log_11 | grep 'waiting for .* finish'               || return 60
+  cat $snapshot_log_11 | grep 'Uploading manifest'                  || return 61
 
   return 0
 }
