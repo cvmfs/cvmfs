@@ -45,7 +45,8 @@ cvmfs_run_test() {
   echo "found"
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
-  create_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+  # make it garbage-collectable
+  create_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER "" -z || return $?
   local url="$(get_repo_url $CVMFS_TEST_REPO)"
   local xcvmfs="application/x-cvmfs"
   local xcvmfs_maxage=120     # 2 minutes
@@ -79,6 +80,21 @@ cvmfs_run_test() {
   [ $(get_epoch "3 days  1 hour") -gt $(get_expiry_time $rurl) ] || return 15
   [ $(get_max_age $rurl)          -eq $default_maxage          ] || return 16
 
+  echo "do a garbage collection on $CVMFS_TEST_REPO"
+  cvmfs_server gc -f $CVMFS_TEST_REPO || return 17
+
+  echo "check HTTP headers for .cvmfs_last_gc"
+  local gurl="${url}/.cvmfs_last_gc"
+  [ $(get_epoch "1 minutes") -lt $(get_expiry_time $gurl) ] || return 18
+  [ $(get_epoch "3 minutes") -gt $(get_expiry_time $gurl) ] || return 19
+  [ $(get_max_age $gurl)     -eq $xcvmfs_maxage           ] || return 20
+  [ x"$(get_header $gurl "Content-Type")" = x"$xcvmfs"    ] || return 21
+
+  echo "check timestamp in .cvmfs_last_gc"
+  local last_gc="$(curl -s $gurl)"
+  [ $(get_epoch "1 minute ago") -le $(get_epoch "$last_gc") ] || return 22
+  [ $(get_epoch "now")          -ge $(get_epoch "$last_gc") ] || return 23
+
   # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
   echo "install a desaster cleanup function"
@@ -91,10 +107,10 @@ cvmfs_run_test() {
   create_stratum1 $replica_name                          \
                   $CVMFS_TEST_USER                       \
                   $CVMFS_STRATUM0                        \
-                  /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub || return 30
+                  /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub -z || return 30
   url=$(get_repo_url $replica_name)
 
-  echo "do a snapshot"
+  echo "do a snapshot including auto-gc"
   cvmfs_server snapshot $replica_name || return 31
 
   echo "check HTTP headers for .cvmfspublished"
@@ -124,6 +140,23 @@ cvmfs_run_test() {
   [ $(get_epoch "3 days  1 hour") -gt $(get_expiry_time $rurl) ] || return 45
   [ $(get_max_age $rurl)          -eq $default_maxage          ] || return 46
 
+  echo "check HTTP headers for .cvmfs_last_gc"
+  local gurl="${url}/.cvmfs_last_gc"
+  [ $(get_epoch "1 minutes") -lt $(get_expiry_time $gurl) ] || return 47
+  [ $(get_epoch "3 minutes") -gt $(get_expiry_time $gurl) ] || return 48
+  [ $(get_max_age $gurl)     -eq $xcvmfs_maxage           ] || return 49
+  [ x"$(get_header $gurl "Content-Type")" = x"$xcvmfs"    ] || return 50
+
+  echo "check timestamp in .cvmfs_last_snapshot"
+  local last_gc="$(curl -s $surl)"
+  [ $(get_epoch "1 minute ago") -le $(get_epoch "$last_gc") ] || return 51
+  [ $(get_epoch "now")          -ge $(get_epoch "$last_gc") ] || return 52
+
+  echo "check timestamp in .cvmfs_last_gc"
+  local last_snap="$(curl -s $gurl)"
+  [ $(get_epoch "1 minute ago") -le $(get_epoch "$last_snap") ] || return 53
+  [ $(get_epoch "now")          -ge $(get_epoch "$last_snap") ] || return 54
+
   # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
   url=$(get_repo_url info)
@@ -132,17 +165,17 @@ cvmfs_run_test() {
 
   echo "check HTTP headers for /cvmfs/info/v1/repositories.json"
   local irurl="${url}/v1/repositories.json"
-  [ $(get_epoch "1 minutes") -lt $(get_expiry_time $irurl) ] || return 47
-  [ $(get_epoch "3 minutes") -gt $(get_expiry_time $irurl) ] || return 48
-  [ $(get_max_age $irurl)    -eq $jsonmaxage               ] || return 49
-  [ x"$(get_header $irurl "Content-Type")" = x"$jsontype"  ] || return 50
+  [ $(get_epoch "1 minutes") -lt $(get_expiry_time $irurl) ] || return 60
+  [ $(get_epoch "3 minutes") -gt $(get_expiry_time $irurl) ] || return 61
+  [ $(get_max_age $irurl)    -eq $jsonmaxage               ] || return 62
+  [ x"$(get_header $irurl "Content-Type")" = x"$jsontype"  ] || return 63
 
   echo "check HTTP headers for /cvmfs/info/v1/meta.json"
   local imurl="${url}/v1/meta.json"
-  [ $(get_epoch "1 minutes") -lt $(get_expiry_time $imurl) ] || return 51
-  [ $(get_epoch "3 minutes") -gt $(get_expiry_time $imurl) ] || return 52
-  [ $(get_max_age $imurl)    -eq $jsonmaxage               ] || return 53
-  [ x"$(get_header $imurl "Content-Type")" = x"$jsontype"  ] || return 54
+  [ $(get_epoch "1 minutes") -lt $(get_expiry_time $imurl) ] || return 74
+  [ $(get_epoch "3 minutes") -gt $(get_expiry_time $imurl) ] || return 75
+  [ $(get_max_age $imurl)    -eq $jsonmaxage               ] || return 76
+  [ x"$(get_header $imurl "Content-Type")" = x"$jsontype"  ] || return 77
 
   return 0
 }
