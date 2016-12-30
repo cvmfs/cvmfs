@@ -2276,6 +2276,28 @@ filter_auto_tags() {
 }
 
 
+# upload a timestamp file for the given action
+#
+# @param name       the name of the repository to upload a timestamp to
+# @param action     the action that the timestamp is for
+#
+upload_timestamp_file()
+{
+  local name="$1"
+  local action="$2"
+
+  load_repo_config $name
+  local user_shell="$(get_user_shell $name)"
+
+  local action_tmp="${CVMFS_SPOOL_DIR}/tmp/last_$action"
+  $user_shell "date --utc > $action_tmp"
+  $user_shell "$(__swissknife_cmd) upload -r ${CVMFS_UPSTREAM_STORAGE} \
+    -i $action_tmp                                                     \
+    -o .cvmfs_last_$action"
+  $user_shell "rm -f $action_tmp"
+}
+
+
 migrate_legacy_dirtab() {
   local name=$1
   local dirtab_path="/cvmfs/${name}/.cvmfsdirtab"
@@ -5397,6 +5419,7 @@ __run_gc() {
     fi
   fi
 
+  [ $dry_run -ne 0 ] || upload_timestamp_file $name gc
   [ $dry_run -ne 0 ] || to_syslog_for_repo $name "successfully finished garbage collection"
 
   return 0
@@ -5557,12 +5580,7 @@ __do_snapshot() {
         -a $retries $with_history $with_reflog         \
            $initial_snapshot_flag $timestamp_threshold $log_level"
 
-    local last_snapshot_tmp="${spool_dir}/tmp/last_snapshot"
-    $user_shell "date --utc > $last_snapshot_tmp"
-    $user_shell "$(__swissknife_cmd) upload -r ${upstream} \
-      -i $last_snapshot_tmp                                \
-      -o .cvmfs_last_snapshot"
-    $user_shell "rm -f $last_snapshot_tmp"
+    upload_timestamp_file $alias_name snapshot
 
     # run the automatic garbage collection (if configured)
     if has_auto_garbage_collection_enabled $alias_name; then
