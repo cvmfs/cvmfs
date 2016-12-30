@@ -1064,4 +1064,23 @@ _run_catalog_migration() {
   set_ro_root_hash $name $trunk_hash || die "Root hash update failed";
 }
 
+# upload a timestamp file for the given action
+#
+# @param name       the name of the repository to upload a timestamp to
+# @param action     the action that the timestamp is for
+#
+upload_timestamp_file()
+{
+  local name="$1"
+  local action="$2"
 
+  load_repo_config $name
+  local user_shell="$(get_user_shell $name)"
+
+  local action_tmp="${CVMFS_SPOOL_DIR}/tmp/last_$action"
+  $user_shell "date --utc > $action_tmp"
+  $user_shell "$(__swissknife_cmd) upload -r ${CVMFS_UPSTREAM_STORAGE} \
+    -i $action_tmp                                                     \
+    -o .cvmfs_last_$action"
+  $user_shell "rm -f $action_tmp"
+}
