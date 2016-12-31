@@ -21,8 +21,7 @@ if (NOT MACOSX)
                                                   ${TBB_DEBUG_LIBRARY_DIRS}/${TBBMALLOC_LIBRARY_DEBUG}.2)
 endif (NOT MACOSX)
 
-list (GET TBB_LIBRARIES 0 TBB_MAIN_LIB)
-register_external_lib (libtbb ${TBB_BUILD_LOCATION} ${TBB_MAIN_LIB})
+register_external_lib (libtbb ${TBB_BUILD_LOCATION} "${TBB_LIBRARIES}")
 
 install (
   FILES          ${TBB_LIBRARIES} ${TBB_DEBUG_LIBRARIES}

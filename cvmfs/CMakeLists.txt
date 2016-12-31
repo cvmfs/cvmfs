@@ -107,6 +107,43 @@ set (CVMFS_CLIENT_SOURCES
   xattr.cc xattr.h
 )
 
+set (CVMFS_SERVER_SOURCES
+    server/cvmfs_server_sys.sh
+    server/cvmfs_server_prelude.sh
+    server/cvmfs_server_util.sh
+    server/cvmfs_server_ssl.sh
+    server/cvmfs_server_apache.sh
+    server/cvmfs_server_json.sh
+    server/cvmfs_server_common.sh
+    server/cvmfs_server_health_check.sh
+    server/cvmfs_server_compat.sh
+    server/cvmfs_server_transaction.sh
+    server/cvmfs_server_abort.sh
+    server/cvmfs_server_publish.sh
+    server/cvmfs_server_import.sh
+    server/cvmfs_server_mkfs.sh
+    server/cvmfs_server_add_replica.sh
+    server/cvmfs_server_rmfs.sh
+    server/cvmfs_server_resign.sh
+    server/cvmfs_server_list_catalogs.sh
+    server/cvmfs_server_info.sh
+    server/cvmfs_server_tag.sh
+    server/cvmfs_server_deprecated.sh
+    server/cvmfs_server_check.sh
+    server/cvmfs_server_list.sh
+    server/cvmfs_server_rollback.sh
+    server/cvmfs_server_gc.sh
+    server/cvmfs_server_snapshot.sh
+    server/cvmfs_server_migrate.sh
+    server/cvmfs_server_chown.sh
+    server/cvmfs_server_eliminate_hardlinks.sh
+    server/cvmfs_server_update_info.sh
+    server/cvmfs_server_mount.sh
+    server/cvmfs_server_skeleton.sh
+    server/cvmfs_server_fix_permissions.sh
+    server/cvmfs_server_coda.sh
+)
+
 set_source_files_properties(cache.pb.cc cache.pb.h
                             PROPERTIES GENERATED true)
 
@@ -805,12 +842,13 @@ endif (BUILD_PRELOADER)
 #
 # Generate the "cvmfs_server" script using "make_cvmfs_server.sh"
 #
-add_custom_target (
-  cvmfs_server
-  ALL
+add_custom_command (
+  OUTPUT cvmfs_server
   COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR} && ./make_cvmfs_server.sh ${CMAKE_CURRENT_BINARY_DIR}/cvmfs_server
+  DEPENDS ${CVMFS_SERVER_SOURCES}
   COMMENT "Generating the cvmfs_server script"
   )
+add_custom_target (cvmfs_server_build ALL DEPENDS cvmfs_server)
 
 #
 # installation
