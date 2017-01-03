@@ -359,7 +359,7 @@ cvmfs_server_snapshot() {
 
     # get repository names
     check_parameter_count_for_multiple_repositories $#
-    alias_names=$(get_or_guess_multiple_repository_names $@)
+    alias_names=$(get_or_guess_multiple_repository_names "$@")
     check_multiple_repository_existence "$alias_names"
 
     __do_snapshot "$alias_names" $abort_on_conflict
