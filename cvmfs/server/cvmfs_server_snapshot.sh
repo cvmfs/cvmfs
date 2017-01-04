@@ -253,13 +253,12 @@ EOF
     # get repository information
     local repodir="${replica%/*}"
     repo="${repodir##*/}"
-    unset CVMFS_REPLICA_ACTIVE # remove previous setting, default is yes
-    load_repo_config $repo
 
-    if [ "$CVMFS_REPLICA_ACTIVE" = "no" ]; then
+    if is_inactive_replica $repo; then
       continue
     fi
 
+    load_repo_config $repo
     local upstream=$CVMFS_UPSTREAM_STORAGE
     local snapshot_time=0
     if is_local_upstream $upstream; then
