@@ -141,7 +141,7 @@ void BashOptionsManager::ParsePath(const string &config_file,
           LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
                "required configuration repository directory does not exist: %s",
                config_path.c_str());
-          exit(1);
+          abort();
       }
 
       LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
