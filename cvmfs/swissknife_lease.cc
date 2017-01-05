@@ -77,7 +77,7 @@ int CommandLease::Main(const ArgumentList& args) {
       if (ParseAcquireReply(buffer, &session_token)) {
         // Save session token to /var/spool/cvmfs/<REPO_NAME>
         // TODO(radu): Is there a special way to access the scratch directory?
-        std::string token_file_name = "/var/spool/cvmfs/" +
+        const std::string token_file_name = "/var/spool/cvmfs/" +
             params.lease_fqdn + "/session_token";
         std::ofstream token_file(token_file_name.c_str(), std::ios_base::out);
         if (token_file.is_open()) {
