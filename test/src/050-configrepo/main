@@ -3,9 +3,12 @@ cvmfs_test_name="Fetch configuration from config repository"
 
 CVMFS_TEST_050_CONF_FILE=
 CVMFS_TEST_050_CONF_EDIT=
+CVMFS_TEST_050_UMOUNT=
 cleanup() {
   [ -z $CVMFS_TEST_050_CONF_FILE ] || sudo rm -f $CVMFS_TEST_050_CONF_FILE
   [ -z $CVMFS_TEST_050_CONF_EDIT ] || sudo sed -i -e "s,CVMFS_MOUNT_DIR=$PWD,CVMFS_MOUNT_DIR=/cvmfs," /etc/cvmfs/default.conf
+  [ -z $CVMFS_TEST_050_UMOUNT ]    || sudo umount $CVMFS_TEST_050_UMOUNT
+
 }
 
 cvmfs_run_test() {
@@ -103,12 +106,11 @@ cvmfs_run_test() {
   cvmfs_mount grid.cern.ch
   mkdir grid.cern.ch
   sudo mount -t cvmfs grid.cern.ch $PWD/grid.cern.ch || return 21
+  CVMFS_TEST_050_UMOUNT=$PWD/grid.cern.ch
 
   sudo cvmfs_talk -i grid.cern.ch parameters | grep EXTERNAL_DOMAIN_PARAMETER  || return 22
   sudo cvmfs_talk -i grid.cern.ch parameters | grep EXTERNAL_REPO_PARAMETER    || return 23
   sudo cvmfs_talk -i grid.cern.ch parameters | grep EXTERNAL_DEFAULT_PARAMETER || return 24
-
-  sudo umount $PWD/grid.cern.ch || return 25
 
   return 0
 }
