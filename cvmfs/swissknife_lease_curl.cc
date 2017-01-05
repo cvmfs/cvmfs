@@ -6,7 +6,7 @@
 
 #include <iostream>
 
-size_t RecvCB(void *buffer, size_t size, size_t nmemb, void *userp) {
+size_t RecvCB(void* buffer, size_t size, size_t nmemb, void* userp) {
   CurlBuffer* my_buffer = static_cast<CurlBuffer*>(userp);
 
   if (size * nmemb < 1) {
@@ -39,31 +39,29 @@ bool MakeAcquireRequest(const std::string& user_name,
   CURLcode ret = static_cast<CURLcode>(0);
 
   CURL* h_curl = PrepareCurl("POST");
-  if (h_curl) {
-    // Prepare payload
-    std::string payload = "{\"user\" : \"" + user_name +
-        "\", \"path\" : \"" + lease_fqdn + "\"}";
-
-    // Make request to acquire lease from repo services
-    curl_easy_setopt(h_curl,
-                     CURLOPT_URL,
-                     (repo_service_url + "/api/leases").c_str());
-    curl_easy_setopt(h_curl,
-                     CURLOPT_POSTFIELDSIZE_LARGE,
-                     static_cast<curl_off_t>(payload.length()));
-    curl_easy_setopt(h_curl, CURLOPT_POSTFIELDS, payload.c_str());
-    curl_easy_setopt(h_curl, CURLOPT_WRITEFUNCTION, RecvCB);
-    curl_easy_setopt(h_curl, CURLOPT_WRITEDATA, buffer);
-
-    ret = curl_easy_perform(h_curl);
-
-    curl_easy_cleanup(h_curl);
-    h_curl = NULL;
-
-    return !ret;
+  if (!h_curl) {
+    return false;
   }
 
-  return false;
+  // Prepare payload
+  const std::string payload =
+      "{\"user\" : \"" + user_name + "\", \"path\" : \"" + lease_fqdn + "\"}";
+
+  // Make request to acquire lease from repo services
+  curl_easy_setopt(h_curl, CURLOPT_URL,
+                   (repo_service_url + "/api/leases").c_str());
+  curl_easy_setopt(h_curl, CURLOPT_POSTFIELDSIZE_LARGE,
+                   static_cast<curl_off_t>(payload.length()));
+  curl_easy_setopt(h_curl, CURLOPT_POSTFIELDS, payload.c_str());
+  curl_easy_setopt(h_curl, CURLOPT_WRITEFUNCTION, RecvCB);
+  curl_easy_setopt(h_curl, CURLOPT_WRITEDATA, buffer);
+
+  ret = curl_easy_perform(h_curl);
+
+  curl_easy_cleanup(h_curl);
+  h_curl = NULL;
+
+  return !ret;
 }
 
 bool MakeDeleteRequest(const std::string& session_token,
@@ -72,28 +70,21 @@ bool MakeDeleteRequest(const std::string& session_token,
   CURLcode ret = static_cast<CURLcode>(0);
 
   CURL* h_curl = PrepareCurl("DELETE");
-  if (h_curl) {
-    curl_easy_setopt(h_curl,
-                     CURLOPT_URL,
-                     (repo_service_url +
-                      "/api/leases/" +
-                      session_token).c_str());
-    curl_easy_setopt(h_curl,
-                     CURLOPT_POSTFIELDSIZE_LARGE,
-                     static_cast<curl_off_t>(0));
-    curl_easy_setopt(h_curl, CURLOPT_POSTFIELDS, 0);
-    curl_easy_setopt(h_curl, CURLOPT_WRITEFUNCTION, RecvCB);
-    curl_easy_setopt(h_curl, CURLOPT_WRITEDATA, buffer);
-
-    ret = curl_easy_perform(h_curl);
-
-    curl_easy_cleanup(h_curl);
-    h_curl = NULL;
-
-    return !ret;
+  if (!h_curl) {
+    return false;
   }
+  curl_easy_setopt(h_curl, CURLOPT_URL,
+                   (repo_service_url + "/api/leases/" + session_token).c_str());
+  curl_easy_setopt(h_curl, CURLOPT_POSTFIELDSIZE_LARGE,
+                   static_cast<curl_off_t>(0));
+  curl_easy_setopt(h_curl, CURLOPT_POSTFIELDS, 0);
+  curl_easy_setopt(h_curl, CURLOPT_WRITEFUNCTION, RecvCB);
+  curl_easy_setopt(h_curl, CURLOPT_WRITEDATA, buffer);
 
-  return false;
+  ret = curl_easy_perform(h_curl);
+
+  curl_easy_cleanup(h_curl);
+  h_curl = NULL;
+
+  return !ret;
 }
-
-
