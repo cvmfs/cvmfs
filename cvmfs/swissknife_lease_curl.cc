@@ -21,7 +21,7 @@ size_t RecvCB(void* buffer, size_t size, size_t nmemb, void* userp) {
 }
 
 CURL* PrepareCurl(const char* method) {
-  const std::string user_agent_string = "cvmfs/" + VERSION;
+  const char* user_agent_string = "cvmfs/" VERSION;
 
   CURL* h_curl = curl_easy_init();
 
