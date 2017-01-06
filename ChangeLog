@@ -22,6 +22,7 @@
   * Fix handling of file:// url in CVMFS_SERVER_URL
 
 2.3.3:
+  * Add cvmfs_talk external host switch (CVM-1126)
   * Fix misleading cache cleanup log message (CVM-1128)
   * Fix cvmfs_config on EL7 if working directory is /usr/bin (CVM-1118)
   * Perform host failover on corrupted data (CVM-478)
