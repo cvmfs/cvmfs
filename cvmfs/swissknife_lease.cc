@@ -4,6 +4,7 @@
 
 #include "swissknife_lease.h"
 
+#include <algorithm>
 #include <fstream>
 #include <sstream>
 
@@ -27,18 +28,17 @@ bool CheckParams(const swissknife::CommandLease::Parameters& p) {
 namespace swissknife {
 
 enum LeaseError {
-  kLeaseSuccess           = 0,
-  kLeaseUnused            = 1,
-  kLeaseParamError        = 2,
-  kLeaseCurlInitError     = 3,
-  kLeaseFileOpenError     = 4,
-  kLeaseFileDeleteError   = 5,
-  kLeaseParseError        = 6,
-  kLeaseCurlReqError      = 7,
+  kLeaseSuccess = 0,
+  kLeaseUnused = 1,
+  kLeaseParamError = 2,
+  kLeaseCurlInitError = 3,
+  kLeaseFileOpenError = 4,
+  kLeaseFileDeleteError = 5,
+  kLeaseParseError = 6,
+  kLeaseCurlReqError = 7,
 };
 
-CommandLease::~CommandLease() {
-}
+CommandLease::~CommandLease() {}
 
 ParameterList CommandLease::GetParams() const {
   ParameterList r;
@@ -55,7 +55,16 @@ int CommandLease::Main(const ArgumentList& args) {
   params.repo_service_url = *(args.find('u')->second);
   params.action = *(args.find('a')->second);
   params.user_name = *(args.find('n')->second);
-  params.lease_fqdn = *(args.find('p')->second);
+
+  const std::string lease_full_path = *(args.find('p')->second);
+  size_t delimiter_position = lease_full_path.find_first_of('/');
+  if (delimiter_position != std::string::npos) {
+    params.lease_fqdn = lease_full_path.substr(0, delimiter_position);
+    params.lease_subpath = lease_full_path.substr(delimiter_position);
+  } else {
+    params.lease_fqdn = lease_full_path;
+    params.lease_subpath = "";
+  }
 
   if (!CheckParams(params)) {
     return kLeaseParamError;
@@ -69,23 +78,23 @@ int CommandLease::Main(const ArgumentList& args) {
   LeaseError ret = kLeaseSuccess;
   if (params.action == "acquire") {
     CurlBuffer buffer;
-    if (MakeAcquireRequest(params.user_name,
-                           params.lease_fqdn,
-                           params.repo_service_url,
-                           &buffer)) {
+    if (MakeAcquireRequest(params.user_name, params.lease_fqdn,
+                           params.repo_service_url, &buffer)) {
       std::string session_token;
       if (ParseAcquireReply(buffer, &session_token)) {
-        // Save session token to /var/spool/cvmfs/<REPO_NAME>
+        // Save session token to
+        // /var/spool/cvmfs/<REPO_NAME>/session_token_<SUBPATH>
         // TODO(radu): Is there a special way to access the scratch directory?
+        std::string suffix(params.lease_subpath);
+        std::replace(suffix.begin(), suffix.end(), '/', '_');
         const std::string token_file_name = "/var/spool/cvmfs/" +
-            params.lease_fqdn + "/session_token";
+                                            params.lease_fqdn +
+                                            "/session_token_" + suffix;
         std::ofstream token_file(token_file_name.c_str(), std::ios_base::out);
         if (token_file.is_open()) {
           token_file << session_token;
         } else {
-          LogCvmfs(kLogCvmfs,
-                   kLogStderr,
-                   "Error opening file: %s",
+          LogCvmfs(kLogCvmfs, kLogStderr, "Error opening file: %s",
                    std::strerror(errno));
           ret = kLeaseFileOpenError;
         }
@@ -98,17 +107,17 @@ int CommandLease::Main(const ArgumentList& args) {
   } else if (params.action == "drop") {
     // Try to read session token from repository scratch directory
     std::string session_token;
-    std::string token_file_name = "/var/spool/cvmfs/" +
-        params.lease_fqdn + "/session_token";
+    std::string suffix(params.lease_subpath);
+    std::replace(suffix.begin(), suffix.end(), '/', '_');
+    std::string token_file_name =
+        "/var/spool/cvmfs/" + params.lease_fqdn + "/session_token_" + suffix;
     std::ifstream token_file(token_file_name.c_str(), std::ios_base::in);
     bool success = false;
     if (token_file.is_open()) {
       std::stringstream sstr;
       sstr << token_file.rdbuf();
       session_token = sstr.str();
-      LogCvmfs(kLogCvmfs,
-               kLogStderr,
-               "Read session token from file: %s",
+      LogCvmfs(kLogCvmfs, kLogStderr, "Read session token from file: %s",
                session_token.c_str());
 
       CurlBuffer buffer;

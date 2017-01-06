@@ -25,17 +25,14 @@ class CommandLease : public Command {
   virtual int Main(const ArgumentList &args);
 
   struct Parameters {
-    Parameters() :
-        repo_service_url(""),
-        action(""),
-        user_name(""),
-        lease_fqdn("")
-    {}
+    Parameters()
+        : repo_service_url(""), action(""), user_name(""), lease_fqdn("") {}
 
     std::string repo_service_url;
     std::string action;
     std::string user_name;
     std::string lease_fqdn;
+    std::string lease_subpath;
   };
 };
 
