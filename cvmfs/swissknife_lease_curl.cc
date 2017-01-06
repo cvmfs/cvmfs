@@ -50,8 +50,9 @@ bool MakeAcquireRequest(const std::string& user_name,
       "{\"user\" : \"" + user_name + "\", \"path\" : \"" + lease_fqdn + "\"}";
 
   // Make request to acquire lease from repo services
-  curl_easy_setopt(h_curl, CURLOPT_URL,
-                   (repo_service_url + "/api/leases").c_str());
+  curl_easy_setopt(
+      h_curl, CURLOPT_URL,
+      (repo_service_url + REPO_SERVICES_API_ROOT + "/leases").c_str());
   curl_easy_setopt(h_curl, CURLOPT_POSTFIELDSIZE_LARGE,
                    static_cast<curl_off_t>(payload.length()));
   curl_easy_setopt(h_curl, CURLOPT_POSTFIELDS, payload.c_str());
@@ -75,8 +76,10 @@ bool MakeDeleteRequest(const std::string& session_token,
   if (!h_curl) {
     return false;
   }
-  curl_easy_setopt(h_curl, CURLOPT_URL,
-                   (repo_service_url + "/api/leases/" + session_token).c_str());
+  curl_easy_setopt(
+      h_curl, CURLOPT_URL,
+      (repo_service_url + REPO_SERVICES_API_ROOT + "/leases/" + session_token)
+          .c_str());
   curl_easy_setopt(h_curl, CURLOPT_POSTFIELDSIZE_LARGE,
                    static_cast<curl_off_t>(0));
   curl_easy_setopt(h_curl, CURLOPT_POSTFIELDS, 0);
