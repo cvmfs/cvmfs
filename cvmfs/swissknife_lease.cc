@@ -81,7 +81,7 @@ int CommandLease::Main(const ArgumentList& args) {
     if (MakeAcquireRequest(params.user_name, params.lease_fqdn,
                            params.repo_service_url, &buffer)) {
       std::string session_token;
-      if (ParseAcquireReply(buffer, &session_token)) {
+      if (buffer.data.size() > 0 && ParseAcquireReply(buffer, &session_token)) {
         // Save session token to
         // /var/spool/cvmfs/<REPO_NAME>/session_token_<SUBPATH>
         // TODO(radu): Is there a special way to access the scratch directory?
@@ -122,7 +122,7 @@ int CommandLease::Main(const ArgumentList& args) {
 
       CurlBuffer buffer;
       if (MakeDeleteRequest(session_token, params.repo_service_url, &buffer)) {
-        if (ParseDropReply(buffer)) {
+        if (buffer.data.size() > 0 && ParseDropReply(buffer)) {
           success = true;
         } else {
           LogCvmfs(kLogCvmfs, kLogStderr, "Could not drop active lease");
