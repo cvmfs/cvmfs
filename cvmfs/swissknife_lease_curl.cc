@@ -4,8 +4,6 @@
 
 #include "swissknife_lease_curl.h"
 
-#include <iostream>
-
 #include "cvmfs_config.h"
 
 size_t RecvCB(void* buffer, size_t size, size_t nmemb, void* userp) {
