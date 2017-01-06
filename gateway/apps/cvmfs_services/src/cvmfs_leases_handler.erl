@@ -84,7 +84,7 @@ init(Req0 = #{method := <<"DELETE">>}, State) ->
     {ok, ReqF, State} = case cowboy_req:binding(id, Req0) of
                             undefined ->
                                 Reply = #{<<"status">> => <<"error">>,
-                                          <<"reason">> => <<"Missing token. Call /api/leases/<TOKEN>">>},
+                                          <<"reason">> => <<"Missing token. Call /api/v1/leases/<TOKEN>">>},
                                 Req1 = cowboy_req:reply(400,
                                                         #{<<"content-type">> => <<"application/json">>},
                                                         jsx:encode(Reply),

@@ -10,6 +10,8 @@
 
 -export([start_link/0]).
 
+-define(API_ROOT, "/api/v1").
+
 %%--------------------------------------------------------------------
 %% @doc
 %% Starts the front-end HTTP listener process.
@@ -21,11 +23,11 @@ start_link() ->
     %% to a set of handler modules. The handler modules implement the init/2 callback
     %% required by Cowboy
     Dispatch = cowboy_router:compile([{'_', [
-                                             {"/api", cvmfs_root_handler, []},
-                                             {"/api/users/[:id]", cvmfs_users_handler, []},
-                                             {"/api/repos/[:id]", cvmfs_repos_handler, []},
-                                             {"/api/leases/[:id]", cvmfs_leases_handler, []},
-                                             {"/api/payloads/[:id]", cvmfs_payloads_handler, []}
+                                             {?API_ROOT, cvmfs_root_handler, []},
+                                             {?API_ROOT ++ "/users/[:id]", cvmfs_users_handler, []},
+                                             {?API_ROOT ++ "/repos/[:id]", cvmfs_repos_handler, []},
+                                             {?API_ROOT ++ "/leases/[:id]", cvmfs_leases_handler, []},
+                                             {?API_ROOT ++ "/payloads/[:id]", cvmfs_payloads_handler, []}
                                             ]}]),
     %% Start the HTTP listener process configured with the routing table
     %% TODO: Port and other parameters should not be hard-coded and should moved to
@@ -33,3 +35,4 @@ start_link() ->
     cowboy:start_clear(cvmfs_fe, 100,
                        [{port, 8080}],
                        #{env => #{dispatch => Dispatch}}).
+
