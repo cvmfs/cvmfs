@@ -201,20 +201,24 @@ cvmfs_run_test() {
 
   echo "test cvmfs_talk external commands"
   local test_dom="example.com"
-  local test_host="http://$test_dom:80"
+  local test_dom2="cern.ch"
+  local test_hosts="http://$test_dom:80;http://$test_dom2:80"
   local test_proxy="http://$test_dom:3128"
   local test_pipe="${cvmfs_cache}/cvmfs_io.$CVMFS_TEST_REPO"
 
   echo "test external host set"
-  sudo cvmfs_talk -p $test_pipe external host set "$test_host"         || return 80
+  sudo cvmfs_talk -p $test_pipe external host set "$test_hosts"        || return 80
   echo "test external host info"
   sudo cvmfs_talk -p $test_pipe external host info                     || return 81
   sudo cvmfs_talk -p $test_pipe external host info | grep "$test_dom"  || return 82
+  echo "test external host switch"
+  sudo cvmfs_talk -p $test_pipe external host switch                   || return 83
+  sudo cvmfs_talk -p $test_pipe external host info | grep "Active.*$test_dom2"  || return 84
   echo "test external proxy set"
-  sudo cvmfs_talk -p $test_pipe external proxy set "$test_proxy"       || return 83
+  sudo cvmfs_talk -p $test_pipe external proxy set "$test_proxy"       || return 85
   echo "test external proxy info"
-  sudo cvmfs_talk -p $test_pipe external proxy info                    || return 84
-  sudo cvmfs_talk -p $test_pipe external proxy info | grep "$test_dom" || return 85
+  sudo cvmfs_talk -p $test_pipe external proxy info                    || return 86
+  sudo cvmfs_talk -p $test_pipe external proxy info | grep "$test_dom" || return 87
 
   return 0
 }
