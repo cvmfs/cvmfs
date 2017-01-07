@@ -117,7 +117,7 @@ int CommandLease::Main(const ArgumentList& args) {
       if (MakeDeleteRequest(session_token, params.repo_service_url, &buffer)) {
         if (buffer.data.size() > 0 && ParseDropReply(buffer)) {
           std::fclose(token_file);
-          if (std::remove(token_file_name.c_str())) {
+          if (unlink(token_file_name.c_str())) {
             LogCvmfs(kLogCvmfs, kLogStderr,
                      "Error deleting session token file");
             ret = kLeaseFileDeleteError;
