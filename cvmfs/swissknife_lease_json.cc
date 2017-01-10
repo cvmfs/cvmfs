@@ -11,8 +11,12 @@
 #include "logging.h"
 
 bool ParseAcquireReply(const CurlBuffer &buffer, std::string *session_token) {
+  if (buffer.data.size() == 0 || session_token == NULL) {
+    return false;
+  }
+
   const UniquePtr<JsonDocument> reply(JsonDocument::Create(buffer.data));
-  if (!reply->IsValid()) {
+  if (!reply || !reply->IsValid()) {
     return false;
   }
 
@@ -53,8 +57,12 @@ bool ParseAcquireReply(const CurlBuffer &buffer, std::string *session_token) {
 }
 
 bool ParseDropReply(const CurlBuffer &buffer) {
+  if (buffer.data.size() == 0) {
+    return false;
+  }
+
   const UniquePtr<const JsonDocument> reply(JsonDocument::Create(buffer.data));
-  if (!reply->IsValid()) {
+  if (!reply || !reply->IsValid()) {
     return false;
   }
 
