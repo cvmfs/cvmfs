@@ -84,6 +84,7 @@ set(CVMFS_UNITTEST_FILES
   t_sqlite_database.cc
   t_sqlitemem.cc
   t_statistics.cc
+  t_swissknife_lease.cc
   t_synchronizing_counter.cc
   t_test_utils.cc
   t_tracer.cc
@@ -199,6 +200,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/swissknife_assistant.cc ${CVMFS_SOURCE_DIR}/swissknife_assistant.h
   ${CVMFS_SOURCE_DIR}/swissknife_history.cc ${CVMFS_SOURCE_DIR}/swissknife_history.h
   ${CVMFS_SOURCE_DIR}/swissknife_sync.h
+  ${CVMFS_SOURCE_DIR}/swissknife_lease_json.cc
   ${CVMFS_SOURCE_DIR}/tracer.cc ${CVMFS_SOURCE_DIR}/tracer.h
   ${CVMFS_SOURCE_DIR}/uid_map.h
   ${CVMFS_SOURCE_DIR}/upload.cc ${CVMFS_SOURCE_DIR}/upload.h
