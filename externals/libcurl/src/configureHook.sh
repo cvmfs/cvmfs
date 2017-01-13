@@ -8,7 +8,7 @@ cd $cdir
 
 sh configure CPPFLAGS="$CPPFLAGS -I${PWD}/${cares_location} -D_FILE_OFFSET_BITS=64" \
   LDFLAGS="$LDFLAGS -L${PWD}/${cares_location}/.libs -rdynamic" \
-  CFLAGS="$CFLAGS $CVMFS_BASE_C_FLAGS -fvisibility=hidden -fPIC" \
+  CFLAGS="$CFLAGS $CVMFS_EXTERNAL_C_FLAGS -fPIC" \
   $CVMFS_ZLIB --enable-warnings \
   --enable-ares \
   --disable-shared \
