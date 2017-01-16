@@ -10,5 +10,5 @@ fi
 
 make clean
 export CUSTOM_SUFFIX=_cvmfs;                                     \
-export CXXFLAGS="$CVMFS_EXTERNAL_CXX_FLAGS -Wformat $TBB_WORKAROUND_CXX_FLAGS";  \
+export CXXFLAGS="$(echo $CVMFS_BASE_CXX_FLAGS | sed s/-fvisibility=hidden//) -Wformat $TBB_WORKAROUND_CXX_FLAGS";  \
 make

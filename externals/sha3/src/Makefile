@@ -29,7 +29,7 @@ OBJECT_FILES = KeccakF-1600-$(ARCH).o \
   KeccakSponge.o \
   SnP-FBWL-default.o
 
-CFLAGS = $(CVMFS_EXTERNAL_C_FLAGS) -I. -I$(ARCH) -fPIC
+CFLAGS = $(CVMFS_BASE_C_FLAGS) -I. -I$(ARCH) -fPIC
 
 libsha3.a: $(OBJECT_FILES)
 	ar cru libsha3.a $(OBJECT_FILES)

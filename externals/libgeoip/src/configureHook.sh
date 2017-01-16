@@ -1,3 +1,3 @@
 #!/bin/sh
 
-sh configure CFLAGS="$CVMFS_EXTERNAL_CXX_FLAGS -fPIC" --with-pic
+sh configure CFLAGS="$(echo $CVMFS_BASE_CXX_FLAGS | sed s/-fvisibility=hidden//) -fPIC" --with-pic

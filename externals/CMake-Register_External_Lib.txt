@@ -1,7 +1,7 @@
 # include guard
 if (NOT REG_EXT_LIB)
 	set (REG_EXT_LIB 1)
-
+	
 	#
 	#    EXTERNAL LIBRARY COMPILATION WORKFLOW:
 	#
@@ -26,24 +26,24 @@ if (NOT REG_EXT_LIB)
 	# 4. the build system finds out about needed external libraries
 	#    and invokes their makeHook shellscript to start the build of
 	#    this external dependency
-
-
+	
+	
 
 	# this custom macro registers an external library for building
-	#
+	#	
 	# first it executes the configureHook.sh script of the library to do some
 	# configuration work (this is done while configuring the CMake stuff)
 	#
 	# also it registers a custom target which main targets can depend
 	# upon in order to control the external library to build while building
 	macro (register_external_lib NAME LOCATION ) # OUTPUTFILE is an additional optional parameter
-
+	
 		if (${ARGC} EQUAL 3) # some libraries may not have an output file... they are only configured
-
+		
 			# create a build hook (invoked while compiling)
 			add_custom_command (
 				OUTPUT				${ARGV2}
-				COMMAND				env CVMFS_EXTERNAL_C_FLAGS=${CVMFS_EXTERNAL_C_FLAGS} CVMFS_EXTERNAL_CXX_FLAGS=${CVMFS_EXTERNAL_CXX_FLAGS} sh
+				COMMAND				env CVMFS_BASE_C_FLAGS=${CVMFS_BASE_C_FLAGS} CVMFS_BASE_CXX_FLAGS=${CVMFS_BASE_CXX_FLAGS} sh
 				ARGS				${LOCATION}/makeHook.sh
 				WORKING_DIRECTORY		${LOCATION}
 				COMMENT				"Building ${NAME}..."
@@ -55,7 +55,7 @@ if (NOT REG_EXT_LIB)
 		if (NOT EXISTS ${LOCATION}/.external_is_configured)
 			message (STATUS "configuring external library: ${NAME} ...")
 			execute_process (
-				COMMAND			env CVMFS_EXTERNAL_C_FLAGS=${CVMFS_EXTERNAL_C_FLAGS} CVMFS_EXTERNAL_CXX_FLAGS=${CVMFS_EXTERNAL_CXX_FLAGS} sh ${LOCATION}/configureHook.sh
+				COMMAND			env CVMFS_BASE_C_FLAGS=${CVMFS_BASE_C_FLAGS} CVMFS_BASE_CXX_FLAGS=${CVMFS_BASE_CXX_FLAGS} sh ${LOCATION}/configureHook.sh
 				WORKING_DIRECTORY	${LOCATION}
 				RESULT_VARIABLE		RETVAL
 			)
@@ -66,5 +66,5 @@ if (NOT REG_EXT_LIB)
 		endif (NOT EXISTS ${LOCATION}/.external_is_configured)
 
 	endmacro (register_external_lib)
-
+	
 endif (NOT REG_EXT_LIB)
