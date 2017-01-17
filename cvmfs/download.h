@@ -30,7 +30,8 @@
 namespace download {
 
 /**
- * Possible return values.
+ * Possible return values.  Adjust ObjectFetcher error handling if new network
+ * error conditions are added.
  */
 enum Failures {
   kFailOk = 0,
