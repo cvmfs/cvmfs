@@ -488,27 +488,29 @@ cvmfs_chksetup() {
           echo "Error: $cache_dir is not writable by $CVMFS_USER"
           num_errors=$(($num_errors+1))
         fi
-        if [ "x$CVMFS_ALIEN_CACHE" != "x" ]; then
-          for i in {0..255}
-            do
-              local chunk_dir; chunk_dir="${CVMFS_ALIEN_CACHE}/`printf \"%.2x\n\" $i`"
-                if [ ! -d $chunk_dir ]; then
-                  echo "Error: chunk directory $chunk_dir missing in alien cache."
-                  num_errors=$(($num_errors+1))
-                fi
-            done
-        else
-          if [ "$(ls -A $cache_dir)" ]; then
+        if  [ "x$CVMFS_CACHE_PRIMARY" = "x" -o  "x$CVMFS_CACHE_PRIMARY" = "xposix" ]; then
+          if [ "x$CVMFS_ALIEN_CACHE" != "x" ]; then
             for i in {0..255}
               do
-                local chunk_dir; chunk_dir="$cache_dir/`printf \"%.2x\n\" $i`"
+                local chunk_dir; chunk_dir="${CVMFS_ALIEN_CACHE}/`printf   \"%.2x\n\" $i`"
                   if [ ! -d $chunk_dir ]; then
-                    echo "Error: chunk directory $chunk_dir missing.  Is tmpwatch interfering?"
+                    echo "Error: chunk directory $chunk_dir missing in alien   cache."
                     num_errors=$(($num_errors+1))
                   fi
               done
+          else
+            if [ "$(ls -A $cache_dir)" ]; then
+              for i in {0..255}
+                do
+                  local chunk_dir; chunk_dir="$cache_dir/`printf \"%.2x\n\" $i`"
+                    if [ ! -d $chunk_dir ]; then
+                      echo "Error: chunk directory $chunk_dir missing.  Is   tmpwatch interfering?"
+                      num_errors=$(($num_errors+1))
+                    fi
+                done
+            fi
           fi
-        fi
+        fi  # POSIX cache
       fi
 
       # Check readability of config files
