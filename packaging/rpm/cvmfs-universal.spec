@@ -375,6 +375,7 @@ fi
 /usr/libexec/cvmfs/auto.cvmfs
 /usr/libexec/cvmfs/authz/cvmfs_allow_helper
 /usr/libexec/cvmfs/authz/cvmfs_deny_helper
+/usr/libexec/cvmfs/cache/cvmfs_cache_ram
 %{_sysconfdir}/auto.cvmfs
 %{_sysconfdir}/cvmfs/config.sh
 %if 0%{?selinux_cvmfs}
@@ -396,7 +397,9 @@ fi
 %files devel
 %defattr(-,root,root)
 %{_libdir}/libcvmfs.a
+%{_libdir}/libcvmfs_cache.a
 %{_includedir}/libcvmfs.h
+%{_includedir}/libcvmfs_cache.h
 %doc COPYING AUTHORS README ChangeLog
 
 %files server

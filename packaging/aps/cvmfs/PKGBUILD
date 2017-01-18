@@ -88,7 +88,8 @@ _remove_server() {
 _remove_devel() {
   local pkgdir="$1"
 
-  rm -f "$pkgdir/usr/lib/libcvmfs.a" "$pkgdir/usr/include/libcvmfs.h"
+  rm -f "$pkgdir/usr/lib/libcvmfs.a" "$pkgdir/usr/include/libcvmfs.h" \
+    "$pkgdir/usr/lib/libcvmfs_cache.a" "$pkgdir/usr/include/libcvmfs_cache.h"
   rmdir "$pkgdir/usr/include"
 }
 
