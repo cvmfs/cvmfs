@@ -1,4 +1,7 @@
 2.3.3:
+  * Fix build on RHEL7.3 (CVM-1153)
+  * Increse robustness when fetching reflog and checksum (CVM-1114, CVM-1124)
+  * Add cvmfs_talk external host switch (CVM-1126)
   * Fix misleading cache cleanup log message (CVM-1128)
   * Fix cvmfs_config on EL7 if working directory is /usr/bin (CVM-1118)
   * Perform host failover on corrupted data (CVM-478)

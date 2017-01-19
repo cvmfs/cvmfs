@@ -10,6 +10,7 @@
 #include <cassert>
 
 #include "util/posix.h"
+#include "util/string.h"
 
 namespace manifest {
 
@@ -47,10 +48,10 @@ shash::Any Reflog::ReadChecksum(const std::string &path) {
   int fd = open(path.c_str(), O_RDONLY);
   assert(fd >= 0);
   std::string hex_hash;
-  bool retval = SafeReadToString(fd, &hex_hash);
+  bool retval = GetLineFd(fd, &hex_hash);
   assert(retval);
   close(fd);
-  return shash::MkFromHexPtr(shash::HexPtr(hex_hash));
+  return shash::MkFromHexPtr(shash::HexPtr(Trim(hex_hash)));
 }
 
 

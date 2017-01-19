@@ -317,6 +317,9 @@ static void *MainTalk(void *data __attribute__((unused))) {
           Answer(con_fd, "OK\n");
         else
           Answer(con_fd, "Failed\n");
+      } else if (line == "external host switch") {
+        cvmfs::external_download_manager_->SwitchHost();
+        Answer(con_fd, "OK\n");
       } else if (line == "host switch") {
         cvmfs::download_manager_->SwitchHost();
         Answer(con_fd, "OK\n");
