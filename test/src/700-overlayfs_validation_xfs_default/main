@@ -1,5 +1,5 @@
 
-cvmfs_test_name="OverlayFS Validation"
+cvmfs_test_name="OverlayFS Validation XFS (default)"
 cvmfs_test_autofs_on_startup=false
 
 set_up_work_dir() {
