@@ -114,6 +114,8 @@ class Command {
   perf::Statistics*            statistics() { return &statistics_; }
 
  private:
+  static const unsigned kDownloadTimeout = 20;  // 20 seconds
+  static const unsigned kDownloadRetries = 1;   // 2 attempts in total
   UniquePtr<download::DownloadManager>    download_manager_;
   UniquePtr<signature::SignatureManager>  signature_manager_;
   perf::Statistics                        statistics_;

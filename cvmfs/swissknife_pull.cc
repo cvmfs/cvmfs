@@ -609,7 +609,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     LogCvmfs(kLogCvmfs, kLogStdout, "%s\n", proxy_str.c_str());
   }
   download_manager()->SetTimeout(timeout, timeout);
-  download_manager()->SetRetryParameters(retries, timeout, 3*timeout);
+  download_manager()->SetRetryParameters(retries, 500, 2000);
   download_manager()->Spawn();
 
   // init the download helper
@@ -835,6 +835,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
       string reflog_path = reflog->database_file();
       delete reflog;
       manifest::Reflog::HashDatabase(reflog_path, &reflog_hash);
+      WaitForStorage();  // Reduce the duration of reflog /wo checksum
       spooler->UploadReflog(reflog_path);
       spooler->WaitForUpload();
       if (spooler->GetNumberOfErrors()) {

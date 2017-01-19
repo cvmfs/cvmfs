@@ -53,6 +53,7 @@ sub usage {
   print "                         groups (not including fallback proxies)  \n";
   print "  proxy fallback <list>  sets a new list of fallback proxies      \n";
   print "  external host info     gets info about external host chain      \n";
+  print "  external host switch   switches to the next external host       \n";
   print "  external host set                                               \n";
   print "       <host list>       sets external host chain                 \n";
   print "  external proxy info    gets info about external proxy groups    \n";
