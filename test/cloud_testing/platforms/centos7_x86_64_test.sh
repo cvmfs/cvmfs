@@ -43,6 +43,23 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                               || retval=1
 
 
+echo "running CernVM-FS server test cases..."
+CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
+CVMFS_TEST_UNIONFS=overlayfs                                                  \
+./run.sh $SERVER_TEST_LOGFILE -o ${SERVER_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+                              -x src/518-hardlinkstresstest                   \
+                                 src/524-corruptmanifestfailover              \
+                                 src/585-xattrs                               \
+                                 src/600-securecvmfs                          \
+                                 src/602-libcvmfs                             \
+                                 src/628-pythonwrappedcvmfsserver             \
+                                 --                                           \
+                                 src/5*                                       \
+                                 src/6*                                       \
+                                 src/7*                                       \
+                              || retval=1
+
+
 echo "running CernVM-FS migration test cases..."
 CVMFS_TEST_CLASS_NAME=MigrationTests                                              \
 ./run.sh $MIGRATIONTEST_LOGFILE -o ${MIGRATIONTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \

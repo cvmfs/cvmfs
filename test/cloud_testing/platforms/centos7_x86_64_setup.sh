@@ -8,6 +8,19 @@ script_location=$(dirname $(readlink --canonicalize $0))
 echo "enabling epel yum repository..."
 install_from_repo epel-release
 
+# Create an ext4 partition to use for /var/spool/cvmfs
+# Create a 32GB file...
+sudo dd if=/dev/zero of=$HOME/ext4_volume bs=1 count=0 seek=5GB || die "fail (dd if=/dev/zero of=$HOME/ext4_volume bs=1 count=0 seek=5GB)"
+# format it with ext4...
+sudo yes | sudo mkfs -t ext4 $HOME/ext4_volume || die "fail (yes | sudo mkfs -t ext4 $HOME/ext4_volume)"
+# and mount it
+sudo mkdir /media/ext4_volume || die "fail (mkdir /media/ext4_volume)"
+sudo mount -o loop $HOME/ext4_volume /media/ext4_volume || die "fail (mount -o loop $HOME/ext4_volume /media/ext4_volume)"
+
+# Symlink the new ext4 volume into /var/spool/cvmfs and continue
+sudo rm -r /var/spool/cvmfs || die "fail (rm -r /var/spool/cvmfs)"
+sudo ln -s /media/ext4_volume /var/spool/cvmfs || die "fail (ln -s /media/ext4_volume /var/spool/cvmfs)"
+
 # install CernVM-FS RPM packages
 echo "installing RPM packages... "
 install_rpm "$CONFIG_PACKAGES"
