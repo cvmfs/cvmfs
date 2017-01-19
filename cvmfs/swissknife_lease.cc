@@ -5,6 +5,7 @@
 #include "swissknife_lease.h"
 
 #include <algorithm>
+#include <vector>
 
 #include "swissknife_lease_curl.h"
 #include "swissknife_lease_json.h"
