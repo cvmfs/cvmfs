@@ -56,14 +56,13 @@ int CommandLease::Main(const ArgumentList& args) {
   params.user_name = *(args.find('n')->second);
 
   const std::string lease_full_path = *(args.find('p')->second);
-  size_t delimiter_position = lease_full_path.find_first_of('/');
-  if (delimiter_position != std::string::npos) {
-    params.lease_fqdn = lease_full_path.substr(0, delimiter_position);
-    params.lease_subpath = lease_full_path.substr(delimiter_position);
-  } else {
-    params.lease_fqdn = lease_full_path;
-    params.lease_subpath = "";
-  }
+  std::vector<std::string> tokens = SplitString(lease_full_path, '/');
+  params.lease_fqdn = tokens.front();
+
+  // Remove the fqdn from the list of tokens and join them with "_" to make the
+  // token file suffix
+  tokens.erase(tokens.begin());
+  params.token_file_suffix = JoinStrings(tokens, "_");
 
   if (!CheckParams(params)) {
     return kLeaseParamError;
@@ -84,11 +83,9 @@ int CommandLease::Main(const ArgumentList& args) {
         // Save session token to
         // /var/spool/cvmfs/<REPO_NAME>/session_token_<SUBPATH>
         // TODO(radu): Is there a special way to access the scratch directory?
-        std::string suffix(params.lease_subpath);
-        std::replace(suffix.begin(), suffix.end(), '/', '_');
-        const std::string token_file_name = "/var/spool/cvmfs/" +
-                                            params.lease_fqdn +
-                                            "/session_token_" + suffix;
+        const std::string token_file_name =
+            "/var/spool/cvmfs/" + params.lease_fqdn + "/session_token_" +
+            params.token_file_suffix;
         if (!SafeWriteToFile(session_token, token_file_name, 0600)) {
           LogCvmfs(kLogCvmfs, kLogStderr, "Error opening file: %s",
                    std::strerror(errno));
@@ -103,10 +100,8 @@ int CommandLease::Main(const ArgumentList& args) {
   } else if (params.action == "drop") {
     // Try to read session token from repository scratch directory
     std::string session_token;
-    std::string suffix(params.lease_subpath);
-    std::replace(suffix.begin(), suffix.end(), '/', '_');
-    std::string token_file_name =
-        "/var/spool/cvmfs/" + params.lease_fqdn + "/session_token_" + suffix;
+    std::string token_file_name = "/var/spool/cvmfs/" + params.lease_fqdn +
+                                  "/session_token_" + params.token_file_suffix;
     FILE* token_file = std::fopen(token_file_name.c_str(), "r");
     if (token_file) {
       GetLineFile(token_file, &session_token);
