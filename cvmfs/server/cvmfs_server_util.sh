@@ -463,13 +463,14 @@ check_upstream_validity() {
 # @return  0 if overlayfs is installed and viable
 check_overlayfs_version() {
   [ -z "$CVMFS_DONT_CHECK_OVERLAYFS_VERSION" ] || return 0
+  local scratch_fstype=$(df -T /var/spool/cvmfs | tail -1 | awk {'print $2'})
   local krnl_version=$(cvmfs_sys_uname)
   if compare_versions "$krnl_version" -ge "4.2.0" ; then
-      return 0
-  elif cvmfs_sys_is_redhat && $(compare_versions "$krnl_version" -ge "3.10.0-493") ; then
-      return 0
+    return 0
+  elif cvmfs_sys_is_redhat && $(compare_versions "$krnl_version" -ge "3.10.0-493") && [ "x$scratch_fstype" = "xext4" ] ; then
+    return 0
   else
-      return 1
+    return 1
   fi
 }
 
