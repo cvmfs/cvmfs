@@ -1,4 +1,5 @@
 2.3.3:
+  * Don not ignore stale locks when publishing (CVM-1146)
   * Add CVMFS_CONFIG_REPO_REQUIRED option (CVM-1111)
   * Accept OverlayFS/ext4 on RHEL >= 7.3 (CVM-835)
   * Fix build on RHEL7.3 (CVM-1153)
