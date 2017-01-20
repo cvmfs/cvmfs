@@ -3,9 +3,12 @@ cvmfs_test_name="Fetch configuration from config repository"
 
 CVMFS_TEST_050_CONF_FILE=
 CVMFS_TEST_050_CONF_EDIT=
+CVMFS_TEST_050_UMOUNT=
 cleanup() {
   [ -z $CVMFS_TEST_050_CONF_FILE ] || sudo rm -f $CVMFS_TEST_050_CONF_FILE
   [ -z $CVMFS_TEST_050_CONF_EDIT ] || sudo sed -i -e "s,CVMFS_MOUNT_DIR=$PWD,CVMFS_MOUNT_DIR=/cvmfs," /etc/cvmfs/default.conf
+  [ -z $CVMFS_TEST_050_UMOUNT ]    || sudo umount $CVMFS_TEST_050_UMOUNT
+
 }
 
 cvmfs_run_test() {
@@ -71,7 +74,13 @@ cvmfs_run_test() {
   cvmfs_mount grid.cern.ch  || return 12
   mount | grep grid.cern.ch || return 13
 
-  cvmfs_umount grid.cern.ch || return 20
+  cvmfs_umount grid.cern.ch || return 14
+
+  echo "now try it with CVMFS_CONFIG_REPO_REQUIRED=yes"
+  echo "CVMFS_CONFIG_REPO_REQUIRED=yes" | sudo tee -a $defaultconf || return 1
+  cvmfs_mount grid.cern.ch  && return 19
+  mount | grep grid.cern.ch && return 20
+
   mkdir -p "$(pwd)/cvmfs-config.cern.ch/etc/cvmfs/domain.d"
   mkdir -p "$(pwd)/cvmfs-config.cern.ch/etc/cvmfs/config.d"
   echo "EXTERNAL_DOMAIN_PARAMETER=foo"  > "$(pwd)/cvmfs-config.cern.ch/etc/cvmfs/domain.d/cern.ch.conf"
@@ -79,7 +88,10 @@ cvmfs_run_test() {
   echo "EXTERNAL_DEFAULT_PARAMETER=baz" > "$(pwd)/cvmfs-config.cern.ch/etc/cvmfs/default.conf"
 
   echo "set 'cvmfs-config.cern.ch' as the global config repo"
-  echo "CVMFS_CONFIG_REPOSITORY=cvmfs-config.cern.ch" | sudo tee $defaultconf || return 1
+  sudo sed -i -e "s,\(CVMFS_CONFIG_REPOSITORY=\).*,\1cvmfs-config.cern.ch," $defaultconf || return 1
+  echo "=== $defaultconf ==="
+  cat $defaultconf
+  echo "===================="
 
   echo "change global configuration"
   sudo sed -i -e "s,CVMFS_MOUNT_DIR=/cvmfs,CVMFS_MOUNT_DIR=$PWD," /etc/cvmfs/default.conf || return $?
@@ -89,8 +101,12 @@ cvmfs_run_test() {
 
   CVMFS_TEST_050_CONF_EDIT=1
 
+  # because of the different CVMFS_MOUNT_DIR, this cvmfs_mount fails,
+  #  but call it anyway to set up the config
   cvmfs_mount grid.cern.ch
-  ls /cvmfs/grid.cern.ch || return 21
+  mkdir grid
+  sudo mount -t cvmfs grid.cern.ch $PWD/grid || return 21
+  CVMFS_TEST_050_UMOUNT=$PWD/grid
 
   sudo cvmfs_talk -i grid.cern.ch parameters | grep EXTERNAL_DOMAIN_PARAMETER  || return 22
   sudo cvmfs_talk -i grid.cern.ch parameters | grep EXTERNAL_REPO_PARAMETER    || return 23
