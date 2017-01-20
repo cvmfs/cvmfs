@@ -20,15 +20,17 @@ set_up_work_dir() {
     # preparation
     echo "$fs_type $mkfs_args - Creating overlay fs"
     mkdir -p $read_only $read_write $work_dir $union
-    echo "foobar" > $read_only/foobar
     sudo mount -o loop $test_volume $read_only
+    sudo mkdir $read_only/foo
+    sudo sh -c "echo \"bar\" > $read_only/foo/bar"
     sudo mount -t overlay -o rw,lowerdir=$read_only,upperdir=$read_write,workdir=$work_dir test_ofs $union
 }
 
 clean_work_dir() {
+    echo "$@ - Cleaning up workdir"
     sudo umount -f test_ofs
     sudo umount -f $read_only
-    sudo rm -fr $root_dir
+    sudo rm -fr $root_dir/*
 }
 
 check_status() {
@@ -42,30 +44,26 @@ delete_file_in_lower_branch() {
     set_up_work_dir $@
 
     echo "$@ - Delete file from read-only layer"
-    rm -f $union/foobar
+    rm -f $union/foo/bar
 
-    # ls produces obviously bogus output
+    # ls produces obviously bogus output (a non-zero return code here, makes the test case fail)
     ls -lisa $union
     local status1=$?
 
-    # cat encounters ENOENT as expected
-    cat $union/foobar
-    local status2=$?
-
     # Cleaning up
-    clean_work_dir
+    clean_work_dir $@
 
-    return $(check_status $(($status1 || $status2)))
+    return $(check_status $status1)
 }
 
 # 2. Open file paths in /proc/\$PID/fd
 check_file_path() {
-    printf "\n$@ - Check open file paths in /proc/\$PID/fd\n"
+    echo "$@ - Check open file paths in /proc/\$PID/fd"
 
     set_up_work_dir $@
 
     # open a file on OverlayFS
-    tail -f $union/foobar &
+    tail -f $union/foo/bar &
     tail_pid=$!
 
     # ls produces obviously bogus output
@@ -75,7 +73,7 @@ check_file_path() {
 
     # Cleaning up
     kill -9 $tail_pid
-    clean_work_dir
+    clean_work_dir $@
 
     return $(check_status $status)
 }
@@ -94,7 +92,7 @@ delete_dir_in_lower_branch () {
     local status=$?
 
     # Cleaning up
-    clean_work_dir
+    clean_work_dir $@
 
     return $(check_status $status)
 }
@@ -123,7 +121,7 @@ clear_suid_sgid_during_write () {
     wait $pid
 
     # Cleaning up
-    clean_work_dir
+    clean_work_dir $@
 
     return $(check_status $(( $status1 && $status2 )))
 }
