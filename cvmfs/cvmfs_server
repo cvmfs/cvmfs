@@ -1154,7 +1154,7 @@ __is_valid_lock() {
   [ -z "$ignore_stale" ] || return 0 # lock is there (skip the stale test)
 
   local stale_pid=$(cat $lock_file 2>/dev/null)
-  [ $stale_pid -gt 0 ]     && \
+  [ -n "$stale_pid" ] && [ $stale_pid -gt 0 ]     && \
   kill -0 $stale_pid 2>/dev/null
 }
 
@@ -1218,6 +1218,8 @@ run_suid_helper() {
 is_in_transaction() {
   local name=$1
   load_repo_config $name
+  # ignore if the lock is "stale" because the process starting
+  #  transactions goes away
   check_lock ${CVMFS_SPOOL_DIR}/in_transaction ignore_stale
 }
 
@@ -1227,6 +1229,8 @@ open_transaction() {
   local tx_lock="${CVMFS_SPOOL_DIR}/in_transaction"
 
   is_stratum0 $name                    || die "Cannot open transaction on Stratum1"
+  # ignore if lock is "stale" because the process that created it 
+  #  goes away
   acquire_lock "$tx_lock" ignore_stale || die "Failed to create transaction lock"
   run_suid_helper open $name           || die "Failed to make /cvmfs/$name writable"
 
@@ -1305,14 +1309,14 @@ close_transaction() {
 is_publishing() {
   local name=$1
   load_repo_config $name
-  check_lock ${CVMFS_SPOOL_DIR}/is_publishing ignore_stale
+  check_lock ${CVMFS_SPOOL_DIR}/is_publishing
 }
 
 publish_starting() {
   local name=$1
   load_repo_config $name
   local pub_lock="${CVMFS_SPOOL_DIR}/is_publishing"
-  acquire_lock "$pub_lock" ignore_stale || die "Failed to acquire publishing lock"
+  acquire_lock "$pub_lock" || die "Failed to acquire publishing lock"
   trap "publish_failed $name" EXIT HUP INT TERM
   run_suid_helper lock $name
   to_syslog_for_repo $name "started publishing"
