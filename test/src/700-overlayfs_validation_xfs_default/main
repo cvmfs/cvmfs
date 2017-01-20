@@ -1,17 +1,20 @@
 
-cvmfs_test_name="OverlayFS Validation XFS (default)"
+cvmfs_test_name="OverlayFS Validation"
 cvmfs_test_autofs_on_startup=false
 
 set_up_work_dir() {
+    fs_type=$1
+    mkfs_args=$2
+
     root_dir=$(pwd)
     read_only=$root_dir/read_only
     read_write=$root_dir/read_write
     work_dir=$root_dir/work_dir
     union=$root_dir/union
 
-    test_volume=$(pwd)/xfs_volume_test_700
+    test_volume=$(pwd)/test_vol
     sudo dd if=/dev/zero of=$test_volume bs=1 count=0 seek=2GB
-    sudo mkfs.xfs $test_volume
+    sudo yes | sudo mkfs.$fs_type $fs_args $test_volume
 
     # preparation
     echo "Creating overlay fs"
@@ -33,11 +36,11 @@ check_status() {
 
 # 1. Delete files in the lower read-only branch of the union fs
 delete_file_in_lower_branch() {
-    echo "Check deleting files in the lower read-only branch of the union fs"
+    echo "$1 - Check deleting files in the lower read-only branch of the union fs"
 
-    set_up_work_dir
+    set_up_work_dir $1 $2
 
-    echo "Delete file from read-only layer"
+    echo "$1 - Delete file from read-only layer"
     rm -f $union/foobar
 
     # ls produces obviously bogus output
@@ -55,16 +58,16 @@ delete_file_in_lower_branch() {
 
 # 2. Open file paths in /proc/\$PID/fd
 check_file_path() {
-    printf "\nCheck open file paths in /proc/\$PID/fd\n"
+    printf "\n$1 - Check open file paths in /proc/\$PID/fd\n"
 
-    set_up_work_dir
+    set_up_work_dir $1 $2
 
     # open a file on OverlayFS
     tail -f $union/foobar &
     tail_pid=$!
 
     # ls produces obviously bogus output
-    echo "Check /proc/\$PID/fd"
+    echo "$1 - Check /proc/\$PID/fd"
     ls -lisa /proc/$tail_pid/fd
     local status=$(($? == 0)) // A non zero status is expected after the last command
 
@@ -77,9 +80,9 @@ check_file_path() {
 
 # 3. Delete directories in the lower read-only branch of the union fs
 delete_dir_in_lower_branch () {
-    echo "Check deleting directories in the lower read-only branch of the union fs"
+    echo "$1 - Check deleting directories in the lower read-only branch of the union fs"
 
-    set_up_work_dir
+    set_up_work_dir $1 $2
 
     # reproduction
     rm -fR $union/foo
@@ -96,11 +99,11 @@ delete_dir_in_lower_branch () {
 
 # 4. Clear suid or sgid bits during writes on overlayfs
 clear_suid_sgid_during_write () {
-    echo "Check suid or sgid bits during writes on overlayfs"
+    echo "$1 - Check suid or sgid bits during writes on overlayfs"
 
-    set_up_work_dir
+    set_up_work_dir $1 $2
 
-    echo "  Clear suid during write"
+    echo "$1 -  Clear suid during write"
     touch $work_dir/test.file
     chmod u+s $work_dir/test.file
     dd if=/dev/zero of=$work_dir/test.file bs=1M count=1024 &
@@ -109,7 +112,7 @@ clear_suid_sgid_during_write () {
     local status1=$?
     wait $pid
 
-    echo "  Clear sgid during write"
+    echo "$1 -  Clear sgid during write"
     chmod g+s $work_dir/test.file
     dd if=/dev/zero of=$work_dir/test.file bs=1M count=1024 &
     pid=$!
@@ -123,16 +126,14 @@ clear_suid_sgid_during_write () {
     return $(check_status $(( $status1 && $status2 )))
 }
 
-cvmfs_run_test() {
-    trap clean_work_dir EXIT HUP INT TERM || return $?
-
-    delete_file_in_lower_branch
+run_test_cases() {
+    delete_file_in_lower_branch $1 $2
     local status1=$?
-    check_file_path
+    check_file_path $1 $2
     local status2=$?
-    delete_dir_in_lower_branch
+    delete_dir_in_lower_branch $1 $2
     local status3=$?
-    clear_suid_sgid_during_write
+    clear_suid_sgid_during_write $1 $2
     local status4=$?
 
     echo "Check deleting files in the lower read-only branch of the union fs: Status $status1"
@@ -141,5 +142,20 @@ cvmfs_run_test() {
     echo "Check suid or sgid bits during writes on overlayfs: Status $status4"
 
     return $(check_status $(( $status1 || $status2 || $status3 || $status4 )))
+}
+
+cvmfs_run_test() {
+    trap clean_work_dir EXIT HUP INT TERM || return $?
+
+    run_test_cases "xfs" ""
+    local status_xfs1=$?
+
+    run_test_cases "xfs" "-n ftype=1"
+    local status_xfs2=$?
+
+    run_test_cases "ext4" ""
+    local status_ext4=$?
+
+    return $(check_status $(( $status_xfs1 || $status_xfs2 || $status_ext4 )))
 }
 
