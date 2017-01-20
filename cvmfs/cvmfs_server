@@ -330,10 +330,11 @@ Supported Commands:
                   Make a new repository snapshot
   gc              [-r number of revisions to preserve]
                   [-t time stamp after which revisions are reserved]
-                  [-l (print deleted objects)] [-L log of deleted objects]
-                  [-f (force)] [-d (dry run)]
-                  <fully qualified repository name>
-                  Remove unreferenced data from garbage collectable repository
+                  [-l print deleted objects] [-L log of deleted objects]
+                  [-f force] [-d dry run]
+                  [-a collect all garbage-collectable repos, log to gc.log |
+                    <fully qualified name> ]
+                  Remove unreferenced data from garbage-collectable repository
   rmfs            [-p(reserve) repo data and keys] [-f don't ask again]
                   <fully qualified name>
                   Remove the repository
@@ -993,6 +994,18 @@ is_stratum1() {
 }
 
 
+# checks if a repository is a replica flagged as being inactive
+#
+# @param name  the name of the repository to be checked
+# @return      0 if it is an inactive replica
+is_inactive_replica() {
+  local name=$1
+  unset CVMFS_REPLICA_ACTIVE # remove previous setting, default is yes
+  load_repo_config $name
+  is_stratum1 $name && [ x"$CVMFS_REPLICA_ACTIVE" = x"no" ]
+}
+
+
 # Parse redirects configuration into redirect flag.
 # Assumes that config is loaded already, i.e. load_repo_config().
 get_follow_http_redirects_flag() {
@@ -1524,7 +1537,7 @@ get_or_guess_multiple_repository_names() {
     return 0;
   fi
 
-  for input_pattern in $@; do
+  for input_pattern in "$@"; do
     local names="$(ls --directory $repo_dir/$input_pattern 2>/dev/null)"
     if [ x"$names" = x"" ]; then
       repo_names="$repo_names $input_pattern"
@@ -2284,6 +2297,28 @@ filter_auto_tags() {
   done)"
   # Trim old_tags
   echo $old_tags
+}
+
+
+# upload a timestamp file for the given action
+#
+# @param name       the name of the repository to upload a timestamp to
+# @param action     the action that the timestamp is for
+#
+upload_timestamp_file()
+{
+  local name="$1"
+  local action="$2"
+
+  load_repo_config $name
+  local user_shell="$(get_user_shell $name)"
+
+  local action_tmp="${CVMFS_SPOOL_DIR}/tmp/last_$action"
+  $user_shell "date --utc > $action_tmp"
+  $user_shell "$(__swissknife_cmd) upload -r ${CVMFS_UPSTREAM_STORAGE} \
+    -i $action_tmp                                                     \
+    -o .cvmfs_last_$action"
+  $user_shell "rm -f $action_tmp"
 }
 
 
@@ -3954,7 +3989,7 @@ cvmfs_server_rmfs() {
   # get repository names
   shift $(($OPTIND-1))
   check_parameter_count_for_multiple_repositories $#
-  names=$(get_or_guess_multiple_repository_names $@)
+  names=$(get_or_guess_multiple_repository_names "$@")
   check_multiple_repository_existence "$names"
 
   for name in $names; do
@@ -4041,7 +4076,7 @@ cvmfs_server_resign() {
 
   # get repository names
   check_parameter_count_for_multiple_repositories $#
-  names=$(get_or_guess_multiple_repository_names $@)
+  names=$(get_or_guess_multiple_repository_names "$@")
   check_multiple_repository_existence "$names"
 
   # sanity checks
@@ -4579,7 +4614,7 @@ cvmfs_server_transaction() {
   # get repository names
   shift $(($OPTIND-1))
   check_parameter_count_for_multiple_repositories $#
-  names=$(get_or_guess_multiple_repository_names $@)
+  names=$(get_or_guess_multiple_repository_names "$@")
   check_multiple_repository_existence "$names"
 
   # sanity checks
@@ -4648,7 +4683,7 @@ cvmfs_server_abort() {
   # get repository names
   shift $(($OPTIND-1))
   check_parameter_count_for_multiple_repositories $#
-  names=$(get_or_guess_multiple_repository_names $@)
+  names=$(get_or_guess_multiple_repository_names "$@")
   check_multiple_repository_existence "$names"
 
   for name in $names; do
@@ -4775,7 +4810,7 @@ cvmfs_server_publish() {
   # get repository names
   shift $(($OPTIND-1))
   check_parameter_count_for_multiple_repositories $#
-  names=$(get_or_guess_multiple_repository_names $@)
+  names=$(get_or_guess_multiple_repository_names "$@")
   check_multiple_repository_existence "$names"
 
   # sanity checks
@@ -5142,12 +5177,13 @@ cvmfs_server_gc() {
   local preserve_timestamp=0
   local timestamp_threshold=""
   local force=0
+  local all_collectable=0
   local deletion_log=""
   local reconstruct_reflog="0"
 
   # optional parameter handling
   OPTIND=1
-  while getopts "ldr:t:fL:" option
+  while getopts "ldr:t:faL:" option
   do
     case $option in
       l)
@@ -5165,6 +5201,9 @@ cvmfs_server_gc() {
       f)
         force=1
       ;;
+      a)
+        all_collectable=1
+      ;;
       L)
         deletion_log="$OPTARG"
       ;;
@@ -5177,13 +5216,31 @@ cvmfs_server_gc() {
   shift $(($OPTIND-1))
 
   # get repository names
+  if [ $all_collectable -ne 0 ] && [ -z "$@" ]; then
+    set -- '*'
+  fi
   check_parameter_count_for_multiple_repositories $#
-  names=$(get_or_guess_multiple_repository_names $@)
+  names=$(get_or_guess_multiple_repository_names "$@")
   check_multiple_repository_existence "$names"
 
   # parse timestamp (if given)
   if [ ! -z "$timestamp_threshold"  ]; then
     preserve_timestamp="$(date --date "$timestamp_threshold" +%s 2>/dev/null)" || die "Cannot parse time stamp '$timestamp_threshold'"
+  fi
+
+  if [ $all_collectable -ne 0 ]; then
+    # reduce the names to those that are collectable
+    local collectable_names
+    for name in $names; do
+      if ! is_inactive_replica $name && is_garbage_collectable $name; then
+        collectable_names="$collectable_names $name"
+      fi
+    done
+    # the echo gets rid of the leading blank
+    names="`echo $collectable_names`"
+    if [ -z "$names" ]; then
+      die "There are no active garbage-collectable repositories"
+    fi
   fi
 
   [ $preserve_revisions -ge 0 ] && [ $preserve_timestamp -gt 0 ] && die "Please specify either timestamp OR revision thresholds (-r and -t are mutual exclusive)"
@@ -5208,23 +5265,25 @@ cvmfs_server_gc() {
     echo "YOU ARE ABOUT TO DELETE DATA! Are you sure you want to do the following:"
   fi
 
-  local dry_run_msg="no"
-  if [ $dry_run -eq 1 ]; then dry_run_msg="yes"; fi
+  if [ $force -eq 0 ] || [ $all_collectable -eq 0 ]; then
+    local dry_run_msg="no"
+    if [ $dry_run -eq 1 ]; then dry_run_msg="yes"; fi
 
-  local reflog_reconstruct_msg="no"
-  if [ $reconstruct_reflog -eq 1 ]; then reflog_reconstruct_msg="yes"; fi
+    local reflog_reconstruct_msg="no"
+    if [ $reconstruct_reflog -eq 1 ]; then reflog_reconstruct_msg="yes"; fi
 
-  echo "Affected Repositories:         $names"
-  echo "Dry Run (no actual deletion):  $dry_run_msg"
-  echo "Needs Reflog reconstruction:   $reflog_reconstruct_msg"
-  if [ $preserve_revisions -ge 0 ]; then
-    echo "Preserved Legacy Revisions:    $preserve_revisions"
-  fi
-  if [ $preserve_timestamp -gt 0 ]; then
-    echo "Preserve Revisions newer than: $(date -d@$preserve_timestamp +'%x %X')"
-  fi
-  if [ $preserve_revisions -le 0 ] && [ $preserve_timestamp -le 0 ]; then
-    echo "Only the latest revision will be preserved."
+    echo "Affected Repositories:         $names"
+    echo "Dry Run (no actual deletion):  $dry_run_msg"
+    echo "Needs Reflog reconstruction:   $reflog_reconstruct_msg"
+    if [ $preserve_revisions -ge 0 ]; then
+      echo "Preserved Legacy Revisions:    $preserve_revisions"
+    fi
+    if [ $preserve_timestamp -gt 0 ]; then
+      echo "Preserve Revisions newer than: $(date -d@$preserve_timestamp +'%x %X')"
+    fi
+    if [ $preserve_revisions -le 0 ] && [ $preserve_timestamp -le 0 ]; then
+      echo "Only the latest revision will be preserved."
+    fi
   fi
 
   if [ $force -eq 0 ]; then
@@ -5236,6 +5295,56 @@ cvmfs_server_gc() {
   fi
 
   for name in $names; do
+
+    if [ $all_collectable -eq 0 ]; then
+      __do_gc_cmd "$name"                       \
+                  "$dry_run"                    \
+                  "$list_deleted_objects"       \
+                  "$preserve_revisions"         \
+                  "$preserve_timestamps"        \
+                  "$deletion_log"
+    else
+      local log=/var/log/cvmfs/gc.log
+
+      (
+      echo
+      echo "Starting $name at `date`"
+      # Work around the errexit (that is, set -e) misfeature of being
+      #  disabled whenever the exit code is to be checked.
+      # See https://lists.gnu.org/archive/html/bug-bash/2012-12/msg00093.html
+      set +e
+      (set -e
+      __do_gc_cmd "$name"                       \
+                  "$dry_run"                    \
+                  "$list_deleted_objects"       \
+                  "$preserve_revisions"         \
+                  "$preserve_timestamps"        \
+                  "$deletion_log"
+      )
+      if [ $? != 0 ]; then
+        echo "ERROR from cvmfs_server gc!" >&2
+      fi
+      echo "Finished $name at `date`"
+      ) >> $log 2>&1
+
+      # Always return success because this is used from cron and we
+      #  don't want cron sending an email every time something fails.
+      # Errors will be in the log.
+    fi
+  done
+}
+
+# this is used when gc is invoked from the cvmfs_server command line
+__do_gc_cmd()
+{
+  local name="$1"
+  local dry_run="$2"
+  local list_deleted_objects="$3"
+  local preserve_revisions="$4"
+  local preserve_timestamps="$5"
+  local deletion_log="$6"
+
+  # leave extra layer of indent for now to better show diff with previous
 
     load_repo_config $name
 
@@ -5281,8 +5390,6 @@ cvmfs_server_gc() {
       fi
     fi
 
-    to_syslog_for_repo $name "started manual garbage collection"
-
     local reconstruct_this_reflog=0
     if ! has_reference_log $name; then
       reconstruct_this_reflog=1
@@ -5305,7 +5412,7 @@ cvmfs_server_gc() {
     if is_stratum0 $name && [ $dry_run -eq 0 ]; then
       echo "Signing Repository Manifest"
       if ! sign_manifest $name $manifest; then
-        to_syslog_for_repo $name "failed to sign manifest after manual garbage collection"
+        to_syslog_for_repo $name "failed to sign manifest after garbage collection"
         die "Fail!"
       fi
 
@@ -5313,12 +5420,10 @@ cvmfs_server_gc() {
       trap - EXIT HUP INT TERM
       close_transaction $name 0
     fi
-
-    to_syslog_for_repo $name "successfully finished manual garbage collection"
-
-  done
 }
 
+# this is used for both auto-gc (after publish or snapshot) and non-auto-gc
+#   (when invoked from the cvmfs_server command line)
 __run_gc() {
   local name="$1"
   local repository_url="$2"
@@ -5408,6 +5513,7 @@ __run_gc() {
     fi
   fi
 
+  [ $dry_run -ne 0 ] || upload_timestamp_file $name gc
   [ $dry_run -ne 0 ] || to_syslog_for_repo $name "successfully finished garbage collection"
 
   return 0
@@ -5568,12 +5674,7 @@ __do_snapshot() {
         -a $retries $with_history $with_reflog         \
            $initial_snapshot_flag $timestamp_threshold $log_level"
 
-    local last_snapshot_tmp="${spool_dir}/tmp/last_snapshot"
-    $user_shell "date --utc > $last_snapshot_tmp"
-    $user_shell "$(__swissknife_cmd) upload -r ${upstream} \
-      -i $last_snapshot_tmp                                \
-      -o .cvmfs_last_snapshot"
-    $user_shell "rm -f $last_snapshot_tmp"
+    upload_timestamp_file $alias_name snapshot
 
     # run the automatic garbage collection (if configured)
     if has_auto_garbage_collection_enabled $alias_name; then
@@ -5665,13 +5766,12 @@ EOF
     # get repository information
     local repodir="${replica%/*}"
     repo="${repodir##*/}"
-    unset CVMFS_REPLICA_ACTIVE # remove previous setting, default is yes
-    load_repo_config $repo
 
-    if [ "$CVMFS_REPLICA_ACTIVE" = "no" ]; then
+    if is_inactive_replica $repo; then
       continue
     fi
 
+    load_repo_config $repo
     local upstream=$CVMFS_UPSTREAM_STORAGE
     local snapshot_time=0
     if is_local_upstream $upstream; then
@@ -5766,7 +5866,7 @@ cvmfs_server_snapshot() {
 
     # get repository names
     check_parameter_count_for_multiple_repositories $#
-    alias_names=$(get_or_guess_multiple_repository_names $@)
+    alias_names=$(get_or_guess_multiple_repository_names "$@")
     check_multiple_repository_existence "$alias_names"
 
     __do_snapshot "$alias_names" $abort_on_conflict
@@ -6069,7 +6169,7 @@ cvmfs_server_migrate() {
 
   # get repository names
   check_parameter_count_for_multiple_repositories $#
-  names=$(get_or_guess_multiple_repository_names $@)
+  names=$(get_or_guess_multiple_repository_names "$@")
   check_multiple_repository_existence "$names"
 
   # sanity checks
@@ -6476,7 +6576,7 @@ cvmfs_server_mount() {
   else
     # get repository name
     check_parameter_count_for_multiple_repositories $#
-    names=$(get_or_guess_multiple_repository_names $@)
+    names=$(get_or_guess_multiple_repository_names "$@")
     check_multiple_repository_existence "$names"
   fi
 
@@ -6569,19 +6669,10 @@ fi
 subcommand=$1
 shift
 if is_subcommand $subcommand; then
-  # parse the command line arguments (keep quotation marks)
-  args=""
-  while [ $# -gt 0 ]; do
-    if echo "$1" | grep -q "[[:space:]]"; then
-      args="$args \"$1\""
-    else
-      args="$args $1"
-    fi
-    shift 1
-  done
-
   # replace a dash (-) by an underscore (_) and call the requested sub-command
-  eval "cvmfs_server_$(echo $subcommand | sed 's/-/_/g') $args"
+  # preserve spaces and quotes in the parameters: the eval removes the
+  #   single quotes here, leaving "$@" for usual shell substitution
+  eval "cvmfs_server_$(echo $subcommand | sed 's/-/_/g')" '"$@"'
 else
   usage "Unrecognized command: $subcommand"
 fi
