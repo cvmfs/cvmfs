@@ -863,6 +863,22 @@ if (BUILD_LIBCVMFS)
   )
 endif (BUILD_LIBCVMFS)
 
+if (BUILD_LIBCVMFS_CACHE)
+  install (
+    FILES      ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a
+    DESTINATION    ${CMAKE_INSTALL_LIBDIR}
+  )
+  install (
+    FILES                   cache_plugin/libcvmfs_cache.h
+    DESTINATION             include
+  )
+  install (
+    TARGETS      cvmfs_cache_ram
+    RUNTIME
+    DESTINATION  ${CVMFS_LIBEXEC_DIR}/cache
+  )
+endif (BUILD_LIBCVMFS_CACHE)
+
 if (BUILD_SERVER)
   install (
     TARGETS     cvmfs_swissknife

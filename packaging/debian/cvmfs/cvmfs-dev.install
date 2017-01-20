@@ -1,2 +1,4 @@
 usr/include/libcvmfs.h
+usr/include/libcvmfs_cache.h
 usr/lib/libcvmfs.a
+usr/lib/libcvmfs_cache.a

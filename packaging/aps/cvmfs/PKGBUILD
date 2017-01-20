@@ -22,6 +22,7 @@ build() {
   cmake -DBUILD_SERVER=yes \
     -DBUILD_SERVER_DEBUG=yes \
     -DBUILD_LIBCVMFS=yes \
+    -BUILD_LIBCVMFS_CACHE=yes \
     -DBUILD_UNITTESTS=yes \
     -DINSTALL_UNITTESTS=yes
   make -j $(nproc)
@@ -88,7 +89,8 @@ _remove_server() {
 _remove_devel() {
   local pkgdir="$1"
 
-  rm -f "$pkgdir/usr/lib/libcvmfs.a" "$pkgdir/usr/include/libcvmfs.h"
+  rm -f "$pkgdir/usr/lib/libcvmfs.a" "$pkgdir/usr/include/libcvmfs.h" \
+    "$pkgdir/usr/lib/libcvmfs_cache.a" "$pkgdir/usr/include/libcvmfs_cache.h"
   rmdir "$pkgdir/usr/include"
 }
 
