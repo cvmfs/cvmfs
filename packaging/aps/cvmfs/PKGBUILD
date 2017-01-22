@@ -22,7 +22,7 @@ build() {
   cmake -DBUILD_SERVER=yes \
     -DBUILD_SERVER_DEBUG=yes \
     -DBUILD_LIBCVMFS=yes \
-    -BUILD_LIBCVMFS_CACHE=yes \
+    -DBUILD_LIBCVMFS_CACHE=yes \
     -DBUILD_UNITTESTS=yes \
     -DINSTALL_UNITTESTS=yes
   make -j $(nproc)
