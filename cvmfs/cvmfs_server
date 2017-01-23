@@ -1586,7 +1586,7 @@ get_or_guess_multiple_repository_names() {
     return 0;
   fi
 
-  for input_pattern in $@; do
+  for input_pattern in "$@"; do
     local names="$(ls --directory $repo_dir/$input_pattern 2>/dev/null)"
     if [ x"$names" = x"" ]; then
       repo_names="$repo_names $input_pattern"
@@ -4016,7 +4016,7 @@ cvmfs_server_rmfs() {
   # get repository names
   shift $(($OPTIND-1))
   check_parameter_count_for_multiple_repositories $#
-  names=$(get_or_guess_multiple_repository_names $@)
+  names=$(get_or_guess_multiple_repository_names "$@")
   check_multiple_repository_existence "$names"
 
   for name in $names; do
@@ -4103,7 +4103,7 @@ cvmfs_server_resign() {
 
   # get repository names
   check_parameter_count_for_multiple_repositories $#
-  names=$(get_or_guess_multiple_repository_names $@)
+  names=$(get_or_guess_multiple_repository_names "$@")
   check_multiple_repository_existence "$names"
 
   # sanity checks
@@ -4641,7 +4641,7 @@ cvmfs_server_transaction() {
   # get repository names
   shift $(($OPTIND-1))
   check_parameter_count_for_multiple_repositories $#
-  names=$(get_or_guess_multiple_repository_names $@)
+  names=$(get_or_guess_multiple_repository_names "$@")
   check_multiple_repository_existence "$names"
 
   # sanity checks
@@ -4710,7 +4710,7 @@ cvmfs_server_abort() {
   # get repository names
   shift $(($OPTIND-1))
   check_parameter_count_for_multiple_repositories $#
-  names=$(get_or_guess_multiple_repository_names $@)
+  names=$(get_or_guess_multiple_repository_names "$@")
   check_multiple_repository_existence "$names"
 
   for name in $names; do
@@ -4837,7 +4837,7 @@ cvmfs_server_publish() {
   # get repository names
   shift $(($OPTIND-1))
   check_parameter_count_for_multiple_repositories $#
-  names=$(get_or_guess_multiple_repository_names $@)
+  names=$(get_or_guess_multiple_repository_names "$@")
   check_multiple_repository_existence "$names"
 
   # sanity checks
@@ -5240,7 +5240,7 @@ cvmfs_server_gc() {
 
   # get repository names
   check_parameter_count_for_multiple_repositories $#
-  names=$(get_or_guess_multiple_repository_names $@)
+  names=$(get_or_guess_multiple_repository_names "$@")
   check_multiple_repository_existence "$names"
 
   # parse timestamp (if given)
@@ -5820,7 +5820,7 @@ cvmfs_server_snapshot() {
 
     # get repository names
     check_parameter_count_for_multiple_repositories $#
-    alias_names=$(get_or_guess_multiple_repository_names $@)
+    alias_names=$(get_or_guess_multiple_repository_names "$@")
     check_multiple_repository_existence "$alias_names"
 
     __do_snapshot "$alias_names" $abort_on_conflict
@@ -6123,7 +6123,7 @@ cvmfs_server_migrate() {
 
   # get repository names
   check_parameter_count_for_multiple_repositories $#
-  names=$(get_or_guess_multiple_repository_names $@)
+  names=$(get_or_guess_multiple_repository_names "$@")
   check_multiple_repository_existence "$names"
 
   # sanity checks
@@ -6530,7 +6530,7 @@ cvmfs_server_mount() {
   else
     # get repository name
     check_parameter_count_for_multiple_repositories $#
-    names=$(get_or_guess_multiple_repository_names $@)
+    names=$(get_or_guess_multiple_repository_names "$@")
     check_multiple_repository_existence "$names"
   fi
 
@@ -6623,19 +6623,10 @@ fi
 subcommand=$1
 shift
 if is_subcommand $subcommand; then
-  # parse the command line arguments (keep quotation marks)
-  args=""
-  while [ $# -gt 0 ]; do
-    if echo "$1" | grep -q "[[:space:]]"; then
-      args="$args \"$1\""
-    else
-      args="$args $1"
-    fi
-    shift 1
-  done
-
   # replace a dash (-) by an underscore (_) and call the requested sub-command
-  eval "cvmfs_server_$(echo $subcommand | sed 's/-/_/g') $args"
+  # preserve spaces and quotes in the parameters: the eval removes the
+  #   single quotes here, leaving "$@" for usual shell substitution
+  eval "cvmfs_server_$(echo $subcommand | sed 's/-/_/g')" '"$@"'
 else
   usage "Unrecognized command: $subcommand"
 fi
