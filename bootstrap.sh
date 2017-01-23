@@ -107,7 +107,7 @@ replace_in_external() {
 
 mkdir -p $externals_build_dir
 
-if [[ "$OSTYPE" == "darwin"* ]]; then
+if [[ x"$(uname)" == x"Darwin" ]]; then
     do_extract  "ssl"          "libressl-${SSL_VERSION}.tar.gz"
 fi
 do_extract  "c-ares"       "c-ares-${CARES_VERSION}.tar.gz"
