@@ -88,7 +88,7 @@ get_or_guess_multiple_repository_names() {
     return 0;
   fi
 
-  for input_pattern in $@; do
+  for input_pattern in "$@"; do
     local names="$(ls --directory $repo_dir/$input_pattern 2>/dev/null)"
     if [ x"$names" = x"" ]; then
       repo_names="$repo_names $input_pattern"

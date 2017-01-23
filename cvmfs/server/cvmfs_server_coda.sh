@@ -148,19 +148,10 @@ fi
 subcommand=$1
 shift
 if is_subcommand $subcommand; then
-  # parse the command line arguments (keep quotation marks)
-  args=""
-  while [ $# -gt 0 ]; do
-    if echo "$1" | grep -q "[[:space:]]"; then
-      args="$args \"$1\""
-    else
-      args="$args $1"
-    fi
-    shift 1
-  done
-
   # replace a dash (-) by an underscore (_) and call the requested sub-command
-  eval "cvmfs_server_$(echo $subcommand | sed 's/-/_/g') $args"
+  # preserve spaces and quotes in the parameters: the eval removes the
+  #   single quotes here, leaving "$@" for usual shell substitution
+  eval "cvmfs_server_$(echo $subcommand | sed 's/-/_/g')" '"$@"'
 else
   usage "Unrecognized command: $subcommand"
 fi

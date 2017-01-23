@@ -300,7 +300,7 @@ cvmfs_server_migrate() {
 
   # get repository names
   check_parameter_count_for_multiple_repositories $#
-  names=$(get_or_guess_multiple_repository_names $@)
+  names=$(get_or_guess_multiple_repository_names "$@")
   check_multiple_repository_existence "$names"
 
   # sanity checks

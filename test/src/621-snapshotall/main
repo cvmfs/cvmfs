@@ -62,5 +62,18 @@ cvmfs_run_test() {
   echo "checking if replica 3 detected an error"
   curl -f -sI "$(get_repo_url ${replica_name}-3)/.cvmfs_last_snapshot" && return 12
 
+  echo "restoring replica 3's download URL"
+  sudo $SHELL -c "sed -i 's,Bogus,,' /etc/cvmfs/repositories.d/${replica_name}-3/server.conf"
+
+  echo 'checking snapshot wildcard "*-?"'
+  # make sure wildcard expansion does not happen in current working dir
+  touch "afilewithadash-1"
+  sudo cvmfs_server snapshot "*-?" || return 13
+
+  echo "checking that replicas 2 & 3 worked this time"
+  # the wildcard does not look at CVMFS_REPLICA_ACTIVE
+  curl -f -sI "$(get_repo_url ${replica_name}-2)/.cvmfspublished" || return 14
+  curl -f -sI "$(get_repo_url ${replica_name}-3)/.cvmfs_last_snapshot" || return 15
+
   return 0
 }
