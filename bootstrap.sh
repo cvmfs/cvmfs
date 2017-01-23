@@ -107,18 +107,20 @@ replace_in_external() {
 
 mkdir -p $externals_build_dir
 
-do_extract  "ssl"     "libressl-${SSL_VERSION}.tar.gz"
-do_extract  "c-ares"      "c-ares-${CARES_VERSION}.tar.gz"
-do_extract  "libcurl"     "curl-${CURL_VERSION}.tar.gz"
-do_extract  "pacparser"   "pacparser-${PACPARSER_VERSION}.tar.gz"
-do_extract  "zlib"        "zlib-${ZLIB_VERSION}.tar.gz"
-do_extract  "sparsehash"  "sparsehash-${SPARSEHASH_VERSION}.tar.gz"
-do_extract  "leveldb"     "leveldb-${LEVELDB_VERSION}.tar.gz"
-do_extract  "googletest"  "gtest-${GOOGLETEST_VERSION}.tar.gz"
-do_extract  "libgeoip"    "GeoIP-${LIBGEOIP_VERSION}.tar.gz"
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    do_extract  "ssl"          "libressl-${SSL_VERSION}.tar.gz"
+fi
+do_extract  "c-ares"       "c-ares-${CARES_VERSION}.tar.gz"
+do_extract  "libcurl"      "curl-${CURL_VERSION}.tar.gz"
+do_extract  "pacparser"    "pacparser-${PACPARSER_VERSION}.tar.gz"
+do_extract  "zlib"         "zlib-${ZLIB_VERSION}.tar.gz"
+do_extract  "sparsehash"   "sparsehash-${SPARSEHASH_VERSION}.tar.gz"
+do_extract  "leveldb"      "leveldb-${LEVELDB_VERSION}.tar.gz"
+do_extract  "googletest"   "gtest-${GOOGLETEST_VERSION}.tar.gz"
+do_extract  "libgeoip"     "GeoIP-${LIBGEOIP_VERSION}.tar.gz"
 do_extract  "python-geoip" "GeoIP-${PYTHON_GEOIP_VERSION}.tar.gz"
-do_extract  "tbb"         "tbb-${TBB_VERSION}.tar.gz"
-do_extract  "protobuf"    "protobuf-${PROTOBUF_VERSION}.tar.bz2"
+do_extract  "tbb"          "tbb-${TBB_VERSION}.tar.gz"
+do_extract  "protobuf"     "protobuf-${PROTOBUF_VERSION}.tar.bz2"
 
 do_copy     "googlebench"
 do_copy     "sqlite3"

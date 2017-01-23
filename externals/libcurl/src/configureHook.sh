@@ -6,10 +6,14 @@ cd $cares_location
 sh makeHook.sh
 cd $cdir
 
-ssl_location="$(pwd)/../build_ssl"
-cd $ssl_location
-sh makeHook.sh
-cd $cdir
+curl_ssl_config="--with-ssl"
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    ssl_location="$(pwd)/../build_ssl"
+    cd $ssl_location
+    sh makeHook.sh
+    cd $cdir
+    curl_ssl_config="--with-ssl=${ssl_location}/ssl_install"
+fi
 
 sh configure CPPFLAGS="$CPPFLAGS -I${PWD}/${cares_location} -D_FILE_OFFSET_BITS=64" \
   LDFLAGS="$LDFLAGS -L${PWD}/${cares_location}/.libs -rdynamic" \
@@ -44,7 +48,7 @@ sh configure CPPFLAGS="$CPPFLAGS -I${PWD}/${cares_location} -D_FILE_OFFSET_BITS=
   --disable-tls-srp \
   --disable-ntlm-wb \
   --disable-unix-sockets \
-  --with-ssl=${ssl_location}/ssl_install \
+  --with-ssl=${curl_ssl_config} \
   --without-winssl \
   --without-darwinssl \
   --without-gnutls \
