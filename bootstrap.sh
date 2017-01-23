@@ -2,6 +2,7 @@
 
 set -e
 
+SSL_VERSION=2.4.4
 CARES_VERSION=1.12.0
 CURL_VERSION=7.51.0
 PACPARSER_VERSION=1.3.5
@@ -106,6 +107,7 @@ replace_in_external() {
 
 mkdir -p $externals_build_dir
 
+do_extract  "ssl"     "libressl-${SSL_VERSION}.tar.gz"
 do_extract  "c-ares"      "c-ares-${CARES_VERSION}.tar.gz"
 do_extract  "libcurl"     "curl-${CURL_VERSION}.tar.gz"
 do_extract  "pacparser"   "pacparser-${PACPARSER_VERSION}.tar.gz"

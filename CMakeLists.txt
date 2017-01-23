@@ -199,7 +199,6 @@ option (INSTALL_UNITTESTS_DEBUG "Install the unit test debug binary"            
 option (INSTALL_MOUNT_SCRIPTS   "Install CernVM-FS mount tools in /etc and /sbin (/usr/bin)"       ON)
 option (INSTALL_PUBLIC_KEYS     "Install public key chain for CERN, EGI, and OSG"                  ON)
 option (INSTALL_BASH_COMPLETION "Install bash completion rules for cvmfs* commands in /etc"        ON)
-option (LIBRESSL_BUILTIN        "Don't use system SSL"                                             ON)
 option (SQLITE3_BUILTIN         "Don't use system SQLite3"                                         ON)
 option (LIBCURL_BUILTIN         "Don't use system libcurl"                                         ON)
 option (PACPARSER_BUILTIN       "Don't use system installation of pacparser"                       ON)
@@ -230,7 +229,7 @@ endif (BUILD_ALL)
 #
 set (EXTERNALS_LIB_LOCATION       "${CMAKE_SOURCE_DIR}/externals")
 set (EXTERNALS_BUILD_LOCATION     "${CMAKE_BINARY_DIR}/externals")
-set (LIBRESSL_BUILTIN_LOCATION    "${EXTERNALS_BUILD_LOCATION}/build_libressl")
+set (SSL_BUILTIN_LOCATION         "${EXTERNALS_BUILD_LOCATION}/build_ssl")
 set (SQLITE3_BUILTIN_LOCATION     "${EXTERNALS_BUILD_LOCATION}/build_sqlite3")
 set (CARES_BUILTIN_LOCATION       "${EXTERNALS_BUILD_LOCATION}/build_c-ares")
 set (LIBCURL_BUILTIN_LOCATION     "${EXTERNALS_BUILD_LOCATION}/build_libcurl")
@@ -411,9 +410,14 @@ endif (NOT MACOSX)
 
 # Required libraries depending on build target
 
-# All target require OpenSSL, gtest, vjson
-find_package (OpenSSL REQUIRED)
-set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${OPENSSL_INCLUDE_DIR})
+# Use builtin SSL, otherwise use the system OpenSSL
+if (MACOSX)
+    include (${SSL_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
+    set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${SSL_BUILTIN_LOCATION}/include)
+else (MACOSX)
+    find_package (OpenSSL REQUIRED)
+    set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${OPENSSL_INCLUDE_DIR})
+endif(MACOSX)
 
 if (GOOGLETEST_BUILTIN)
   include (${GOOGLETEST_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
