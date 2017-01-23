@@ -1552,8 +1552,6 @@ check_dev_fuse() {
       charDevice=/dev/fuse ;;
 
     Darwin )
-      #load osxfuse kernel extension
-      /Library/Filesystems/osxfusefs.fs/Support/load_osxfusefs
       charDevice=/dev/osxfuse0 ;;
 
     * )
