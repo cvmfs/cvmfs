@@ -1,4 +1,5 @@
 2.3.3:
+  * Fix selecting repositories by wildcard in cvmfs_server (CVM-1151)
   * Prevent GC from running at the same time as snapshot (CVM-1108)
   * Don not ignore stale locks when publishing (CVM-1146)
   * Add CVMFS_CONFIG_REPO_REQUIRED option (CVM-1111)
