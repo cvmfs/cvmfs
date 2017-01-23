@@ -18,7 +18,8 @@ __snapshot_cleanup() {
   $user_shell "$(__swissknife_cmd) remove     \
                  -r ${CVMFS_UPSTREAM_STORAGE} \
                  -o .cvmfs_is_snapshotting"       || echo "Warning: failed to remove .cvmfs_is_snapshotting"
-  release_lock ${CVMFS_SPOOL_DIR}/is_snapshotting || echo "Warning: failed to release snapshotting lock"
+
+  release_update_lock $alias_name
 }
 
 __snapshot_succeeded() {
@@ -66,7 +67,6 @@ __do_snapshot() {
     public_key=$CVMFS_PUBLIC_KEY
     timeout=$CVMFS_HTTP_TIMEOUT
     retries=$CVMFS_HTTP_RETRIES
-    snapshot_lock=${spool_dir}/is_snapshotting
 
     # more sanity checks
     is_owner_or_root $alias_name || { echo "Permission denied: Repository $alias_name is owned by $user"; retcode=1; continue; }
@@ -82,12 +82,22 @@ __do_snapshot() {
     fi
 
     # do it!
-    local user_shell="$(get_user_shell $alias_name)"
 
     if is_local_upstream $upstream; then
         # try to update the geodb, but continue if it doesn't work
         _update_geodb -l || true
     fi
+
+    if ! acquire_update_lock $alias_name snapshot $abort_on_conflict; then
+      retcode=1
+      continue
+    fi
+
+    local user_shell="$(get_user_shell $alias_name)"
+
+    # here the lock is acquired and needs to be cleared in case of abort
+    trap "__snapshot_failed $alias_name" EXIT HUP INT TERM
+    to_syslog_for_repo $alias_name "started snapshotting from $stratum0"
 
     local initial_snapshot=0
     local initial_snapshot_flag=""
@@ -95,35 +105,6 @@ __do_snapshot() {
       initial_snapshot=1
       initial_snapshot_flag="-i"
     fi
-
-    # check for other snapshots in progress
-    if ! acquire_lock $snapshot_lock; then
-      if [ $abort_on_conflict -eq 1 ]; then
-        echo "another snapshot is in progress... aborting"
-        to_syslog_for_repo $alias_name "did not snapshot (another snapshot in progress)"
-        retcode=1
-        continue
-      fi
-
-      if [ $initial_snapshot -eq 1 ]; then
-        echo "an initial snapshot is in progress... aborting"
-        to_syslog_for_repo $alias_name "did not snapshot (another initial snapshot in progress)"
-        retcode=1
-        continue
-      fi
-
-      echo "waiting for another snapshot to finish..."
-      if ! wait_and_acquire_lock $snapshot_lock; then
-        echo "failed to acquire snapshot lock"
-        to_syslog_for_repo $alias_name "did not snapshot (locking issues)"
-        retcode=1
-        continue
-      fi
-    fi
-
-    # here the lock is already acquired and needs to be cleared in case of abort
-    trap "__snapshot_failed $alias_name" EXIT HUP INT TERM
-    to_syslog_for_repo $alias_name "started snapshotting from $stratum0"
 
     local log_level=
     [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-l $CVMFS_LOG_LEVEL"
