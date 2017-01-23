@@ -48,7 +48,7 @@ sh configure CPPFLAGS="$CPPFLAGS -I${PWD}/${cares_location} -D_FILE_OFFSET_BITS=
   --disable-tls-srp \
   --disable-ntlm-wb \
   --disable-unix-sockets \
-  --with-ssl=${curl_ssl_config} \
+  ${curl_ssl_config} \
   --without-winssl \
   --without-darwinssl \
   --without-gnutls \
