@@ -171,55 +171,10 @@ else (MACOSX)
   set(LIBFUSE fuse)
 endif(MACOSX)
 
-
 #
-# provide some options to the user
+# include file with user-defined options
 #
-option (BUILD_CVMFS             "Build the CernVM-FS FUSE module"                                  ON)
-if (MACOSX)
-  option (BUILD_LIBCVMFS        "Build the CernVM-FS client library"                               OFF)
-  option (BUILD_LIBCVMFS_CACHE  "Build the cache plugin library"                                   OFF)
-  option (BUILD_SERVER          "Build writer's end programs"                                      OFF)
-else (MACOSX)
-  option (BUILD_LIBCVMFS        "Build the CernVM-FS client library"                               ON)
-  option (BUILD_LIBCVMFS_CACHE  "Build the cache plugin library"                                   ON)
-  option (BUILD_SERVER          "Build writer's end programs"                                      ON)
-endif(MACOSX)
-option (BUILD_PRELOADER         "Build the alien cache pre-loader"                                 OFF)
-option (BUILD_OCTOPUS           "Build the octopus REST server"                                    OFF)
-option (BUILD_SERVER_DEBUG      "Build writer's end programs with debug symbols and debug outputs" OFF)
-option (BUILD_UNITTESTS         "Build the CernVM-FS unit test set"                                OFF)
-option (BUILD_UNITTESTS_DEBUG   "Build the CernVM-FS unit test set with verbose output and -g"     OFF)
-option (BUILD_UBENCHMARKS       "Build the CernVM-FS micro benchmarks"                             OFF)
-option (BUILD_DOCUMENTATION     "Build the CerVM-FS documentation using Doxygen"                   OFF)
-option (BUILD_COVERAGE          "Compile to collect code coverage reports"                         OFF)
-option (BUILD_ALL               "Build client, server, lib, preload, octopus, unit tests"          OFF)
-option (INSTALL_UNITTESTS       "Install the unit test binary (mainly for packaging)"              OFF)
-option (INSTALL_UNITTESTS_DEBUG "Install the unit test debug binary"                               OFF)
-option (INSTALL_MOUNT_SCRIPTS   "Install CernVM-FS mount tools in /etc and /sbin (/usr/bin)"       ON)
-option (INSTALL_PUBLIC_KEYS     "Install public key chain for CERN, EGI, and OSG"                  ON)
-option (INSTALL_BASH_COMPLETION "Install bash completion rules for cvmfs* commands in /etc"        ON)
-option (SQLITE3_BUILTIN         "Don't use system SQLite3"                                         ON)
-option (LIBCURL_BUILTIN         "Don't use system libcurl"                                         ON)
-option (PACPARSER_BUILTIN       "Don't use system installation of pacparser"                       ON)
-option (ZLIB_BUILTIN            "Don't use system zlib"                                            ON)
-option (SPARSEHASH_BUILTIN      "Don't use system installation of google sparse hash"              ON)
-option (LEVELDB_BUILTIN         "Don't use system leveldb"                                         ON)
-option (GOOGLETEST_BUILTIN      "Don't use system installation of google test"                     ON)
-option (GEOIP_BUILTIN           "Don't use system GeoIP library and python-GeoIP"                  ON)
-option (TBB_PRIVATE_LIB         "Compile our own TBB shared libraries"                             ON)
-
-if (BUILD_ALL)
-  set (BUILD_CVMFS ON)
-  set (BUILD_UNITTESTS ON)
-  if (!MACOSX)
-    set (BUILD_SERVER ON)
-    set (BUILD_LIBCVMFS ON)
-    set (BUILD_LIBCVMFS_CACHE ON)
-    set (BUILD_PRELOADER ON)
-    set (BUILD_OCTOPUS ON)
-  endif (!MACOSX)
-endif (BUILD_ALL)
+include (options.cmake)
 
 #
 # define where to find the external dependencies
@@ -228,24 +183,8 @@ endif (BUILD_ALL)
 # in the given directory, in order to configure and compile them properly
 #
 set (EXTERNALS_LIB_LOCATION       "${CMAKE_SOURCE_DIR}/externals")
-set (EXTERNALS_BUILD_LOCATION     "${CMAKE_BINARY_DIR}/externals")
-set (SSL_BUILTIN_LOCATION         "${EXTERNALS_BUILD_LOCATION}/build_ssl")
-set (SQLITE3_BUILTIN_LOCATION     "${EXTERNALS_BUILD_LOCATION}/build_sqlite3")
-set (CARES_BUILTIN_LOCATION       "${EXTERNALS_BUILD_LOCATION}/build_c-ares")
-set (LIBCURL_BUILTIN_LOCATION     "${EXTERNALS_BUILD_LOCATION}/build_libcurl")
-set (PACPARSER_BUILTIN_LOCATION   "${EXTERNALS_BUILD_LOCATION}/build_pacparser")
-set (ZLIB_BUILTIN_LOCATION        "${EXTERNALS_BUILD_LOCATION}/build_zlib")
-set (SPARSEHASH_BUILTIN_LOCATION  "${EXTERNALS_BUILD_LOCATION}/build_sparsehash")
-set (LEVELDB_BUILTIN_LOCATION     "${EXTERNALS_BUILD_LOCATION}/build_leveldb")
-set (VJSON_BUILTIN_LOCATION       "${EXTERNALS_BUILD_LOCATION}/build_vjson")
-set (SHA2_BUILTIN_LOCATION        "${EXTERNALS_BUILD_LOCATION}/build_sha2")
-set (SHA3_BUILTIN_LOCATION        "${EXTERNALS_BUILD_LOCATION}/build_sha3")
-set (GOOGLETEST_BUILTIN_LOCATION  "${EXTERNALS_BUILD_LOCATION}/build_googletest")
-set (PROTOBUF_BUILTIN_LOCATION    "${EXTERNALS_BUILD_LOCATION}/build_protobuf")
-set (GOOGLEBENCH_BUILTIN_LOCATION "${EXTERNALS_BUILD_LOCATION}/build_googlebench")
-set (LIBGEOIP_BUILTIN_LOCATION    "${EXTERNALS_BUILD_LOCATION}/build_libgeoip")
-set (PYTHON_GEOIP_BUILTIN_LOCATION "${EXTERNALS_BUILD_LOCATION}/build_python-geoip")
-set (TBB_BUILD_LOCATION           "${EXTERNALS_BUILD_LOCATION}/build_tbb")
+set (EXTERNALS_BUILD_LOCATION     "${CMAKE_SOURCE_DIR}/externals_build")
+set (EXTERNALS_INSTALL_LOCATION)  "${CMAKE_SOURCE_DIR}/externals_install")
 
 # create the directory for controlled out of source building of external stuff
 file (MAKE_DIRECTORY ${EXTERNALS_BUILD_LOCATION})
@@ -253,18 +192,19 @@ file (MAKE_DIRECTORY ${EXTERNALS_BUILD_LOCATION})
 #
 # run the bootstrap shellscript (not needed in the distributed version of the source)
 #
-
-if (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
-  message (STATUS "running bootstrap.sh ...")
-  execute_process (
-    COMMAND           sh ${CMAKE_SOURCE_DIR}/bootstrap.sh ${EXTERNALS_BUILD_LOCATION}
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    RESULT_VARIABLE   BOOTSTRAPPING_RESULT
-  )
-  if (BOOTSTRAPPING_RESULT GREATER 0)
-    message (FATAL_ERROR "bootstrapping failed")
-  endif (BOOTSTRAPPING_RESULT GREATER 0)
-endif (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
+if (BUILD_EXTERNALS)
+  if (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
+    message (STATUS "running bootstrap.sh ...")
+    execute_process (
+      COMMAND           sh ${CMAKE_SOURCE_DIR}/bootstrap.sh ${EXTERNALS_BUILD_LOCATION}
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+      RESULT_VARIABLE   BOOTSTRAPPING_RESULT
+    )
+    if (BOOTSTRAPPING_RESULT GREATER 0)
+      message (FATAL_ERROR "bootstrapping failed")
+    endif (BOOTSTRAPPING_RESULT GREATER 0)
+  endif (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
+endif(BUILD_EXTERNALS)
 
 #
 # include some common functionality
@@ -277,47 +217,7 @@ include (FindPythonModule)
 #
 # flags in CMAKE_C**_FLAGS are always passed to the compiler
 #
-set (CVMFS_OPT_FLAGS "-Os")
-if (CMAKE_COMPILER_IS_GNUCC)
-  message (STATUS "checking gcc version...")
-  execute_process (
-    COMMAND ${CMAKE_C_COMPILER} -v
-    OUTPUT_VARIABLE CVMFS_GCC_VERSION
-    ERROR_VARIABLE  CVMFS_GCC_VERSION
-  )
-  STRING(REGEX REPLACE ".*([0-9]+)\\.[0-9]+\\.[0-9]+.*" "\\1" CVMFS_GCC_MAJOR "${CVMFS_GCC_VERSION}")
-  STRING(REGEX REPLACE ".*[0-9]+\\.([0-9]+)\\.[0-9]+.*" "\\1" CVMFS_GCC_MINOR "${CVMFS_GCC_VERSION}")
-  if (${CVMFS_GCC_MAJOR} LESS 4)
-    message (FATAL_ERROR "GCC < 4.1 unsupported")
-  endif (${CVMFS_GCC_MAJOR} LESS 4)
-  if (${CVMFS_GCC_MAJOR} EQUAL 4)
-    if (${CVMFS_GCC_MINOR} LESS 2)
-      set (CVMFS_OPT_FLAGS "-O1")
-    endif (${CVMFS_GCC_MINOR} LESS 2)
-  endif (${CVMFS_GCC_MAJOR} EQUAL 4)
-endif (CMAKE_COMPILER_IS_GNUCC)
-message (STATUS "using compiler opt flag ${CVMFS_OPT_FLAGS}")
-set (CVMFS_BASE_C_FLAGS "${CVMFS_OPT_FLAGS} -g -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fvisibility=hidden -Wall")
-set (CVMFS_BASE_CXX_FLAGS "${CVMFS_BASE_C_FLAGS} -fno-exceptions")
-if (NOT USING_CLANG)
-  set (CVMFS_BASE_C_FLAGS "${CVMFS_BASE_C_FLAGS} -fno-optimize-sibling-calls")
-  set (CVMFS_BASE_CXX_FLAGS "${CVMFS_BASE_CXX_FLAGS} -fno-optimize-sibling-calls")
-endif (NOT USING_CLANG)
-if (ARM AND NOT IS_64_BIT)
-  #
-  # Fix TBB on the Raspberry Pi
-  #
-  set (CVMFS_BASE_CXX_FLAGS "${CVMFS_BASE_CXX_FLAGS} -DTBB_USE_GCC_BUILTINS=1 -D__TBB_64BIT_ATOMICS=0")
-endif (ARM AND NOT IS_64_BIT)
-set (CVMFS_BASE_DEFINES "-D_REENTRANT -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES")
-
-set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CVMFS_BASE_C_FLAGS} ${CVMFS_BASE_DEFINES}")
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CVMFS_BASE_CXX_FLAGS} ${CVMFS_BASE_DEFINES}")
-
-if (NOT ARM AND NOT IS_64_BIT)
-  set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=i686")
-  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=i686")
-endif (NOT ARM AND NOT IS_64_BIT)
+include (compiler)
 
 if (BUILD_COVERAGE AND NOT USING_CLANG)
   set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fprofile-arcs -ftest-coverage")
