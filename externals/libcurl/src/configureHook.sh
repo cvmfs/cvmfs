@@ -7,7 +7,7 @@ sh makeHook.sh
 cd $cdir
 
 curl_ssl_config="--with-ssl"
-if [[ x"$(uname)" == x"Darwin" ]]; then
+if [ x"$(uname)" = x"Darwin" ]; then
     ssl_location="$(pwd)/../build_ssl"
     cd $ssl_location
     sh makeHook.sh
