@@ -513,6 +513,10 @@ least CernVM-FS $creator to manipulate this repository."
   #   2.2.0-1+ -> 2.3.0-1
   #     -> new scratch directory layout (which also effects /etc/fstab)
   #
+  #   2.3.0-1+ --> 2.3.3-1
+  #     -> update global JSON info if repo was migrated from 2.1.20 or before
+  #        (CVM-1159)
+  #
   # Note: I tried to make this code as verbose as possible
   #
   if [ "$creator" = "2.1.6" ] && version_greater_or_equal "2.1.7"; then
@@ -558,6 +562,16 @@ least CernVM-FS $creator to manipulate this repository."
      [ "$creator" = "2.2.2-1" ] || [ "$creator" = "2.2.3-1" ] && \
      is_stratum0 $name; then
     if version_greater_or_equal "2.3.0"; then
+      _repo_is_incompatible "$creator" $nokill
+      return $?
+    fi
+  fi
+
+  if [ "$creator" = "2.2.0-1" ] || [ "$creator" = "2.2.1-1" ] || \
+     [ "$creator" = "2.2.2-1" ] || [ "$creator" = "2.2.3-1" ] || \
+     [ "$creator" = "2.3.0-1" ] || [ "$creator" = "2.3.1-1" ] || \
+     [ "$creator" = "2.3.2-1" ]; then
+    if version_greater_or_equal "2.3.3"; then
       _repo_is_incompatible "$creator" $nokill
       return $?
     fi
@@ -1229,7 +1243,7 @@ open_transaction() {
   local tx_lock="${CVMFS_SPOOL_DIR}/in_transaction"
 
   is_stratum0 $name                    || die "Cannot open transaction on Stratum1"
-  # ignore if lock is "stale" because the process that created it 
+  # ignore if lock is "stale" because the process that created it
   #  goes away
   acquire_lock "$tx_lock" ignore_stale || die "Failed to create transaction lock"
   run_suid_helper open $name           || die "Failed to make /cvmfs/$name writable"
@@ -1355,7 +1369,7 @@ release_update_lock() {
 
 # Acquire an update lock for a repository.  Always pair with a call to
 #   release_update_lock if returns successful.
-# 
+#
 # @param name               the repository to lock
 # @param update_type        update type such as snapshot or gc
 # @param abort_on_conflict  0 to wait for lock, 1 to abort if already acquired.
@@ -6090,6 +6104,8 @@ _migrate_2_2() {
   [ ! -z $CVMFS_USER          ] || die "\$CVMFS_USER is not set"
   [ ! -z $CVMFS_UNION_FS_TYPE ] || die "\$CVMFS_UNION_FS_TYPE is not set"
 
+  echo "Migrating repository '$name' from CernVM-FS $(mangle_version_string $CVMFS_CREATOR_VERSION) to $(mangle_version_string $destination_version)"
+
   echo "--> umount repository"
   run_suid_helper rw_umount $name
 
@@ -6112,6 +6128,35 @@ _migrate_2_2() {
 
   echo "--> ensure binary permission settings"
   ensure_swissknife_suid $CVMFS_UNION_FS_TYPE
+
+  # update repository information
+  load_repo_config $name
+}
+
+_migrate_2_3_0() {
+  local name=$1
+  local destination_version="2.3.3-1"
+  local server_conf="/etc/cvmfs/repositories.d/${name}/server.conf"
+
+  load_repo_config $name
+  echo "Migrating repository '$name' from CernVM-FS $(mangle_version_string $CVMFS_CREATOR_VERSION) to $(mangle_version_string $destination_version)"
+
+  if ! has_global_info_path; then
+    echo "--> create info resource (please update server info with 'cvmfs_server update-info')"
+    create_global_info_skeleton || die "fail"
+  fi
+
+  if ! has_apache_config_for_global_info; then
+    echo "--> create Apache configuration for info resource"
+    create_apache_config_for_global_info || die "fail (create apache config)"
+    reload_apache > /dev/null            || die "fail (reload apache)"
+  fi
+
+  echo "--> update global JSON information"
+  update_global_repository_info || die "fail"
+
+  echo "--> updating server.conf"
+  sed -i -e "s/^\(CVMFS_CREATOR_VERSION\)=.*/\1=$destination_version/" $server_conf
 
   # update repository information
   load_repo_config $name
@@ -6153,6 +6198,7 @@ cvmfs_server_migrate() {
     # do the migrations...
     if [ x"$creator" = x"2.1.6" ]; then
       _migrate_2_1_6 $name
+      creator="$(repository_creator_version $name)"
     fi
 
     if [ x"$creator" = x"2.1.7" -o  \
@@ -6165,6 +6211,7 @@ cvmfs_server_migrate() {
          x"$creator" = x"2.1.14" ];
     then
       _migrate_2_1_7 $name
+      creator="$(repository_creator_version $name)"
     fi
 
     if [ x"$creator" = x"2.1.15" -o   \
@@ -6176,6 +6223,7 @@ cvmfs_server_migrate() {
          is_local_upstream $CVMFS_UPSTREAM_STORAGE;
     then
       _migrate_2_1_15 $name
+      creator="$(repository_creator_version $name)"
     fi
 
     if [ x"$creator" = x"2.1.15" -o \
@@ -6187,6 +6235,7 @@ cvmfs_server_migrate() {
          x"$creator" = x"2.2.0-0" ];
     then
       _migrate_2_1_20 $name
+      creator="$(repository_creator_version $name)"
     fi
 
     if [ x"$creator" = x"2.2.0-1" -o   \
@@ -6196,6 +6245,18 @@ cvmfs_server_migrate() {
          is_stratum0 $name;
     then
       _migrate_2_2 $name
+      creator="$(repository_creator_version $name)"
+    fi
+
+    if [ x"$creator" = x"2.2.0-1" -o   \
+         x"$creator" = x"2.2.1-1" -o   \
+         x"$creator" = x"2.2.2-1" -o   \
+         x"$creator" = x"2.2.3-1" -o   \
+         x"$creator" = x"2.3.0-1" -o   \
+         x"$creator" = x"2.3.1-1" -o   \
+         x"$creator" = x"2.3.2-1" ]; then
+      _migrate_2_3_0 $name
+      creator="$(repository_creator_version $name)"
     fi
 
   done
