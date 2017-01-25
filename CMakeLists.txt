@@ -133,36 +133,6 @@ else (NOT DEFINED SYSCONF_INSTALL_DIR)
 endif (NOT DEFINED SYSCONF_INSTALL_DIR)
 
 #
-# Workaround for Debian packaging debhelper trying to pass -D_FORTIFY_SOURCE=2
-# through CPPFLAGS that is not officially supported by CMake. Hence, debhelper
-# appends CPPFLAGS to CFLAGS which breaks the build of the c-ares external.
-# This filters out flags that scares c-ares's ./configure script.
-#
-set (TMP_C_FLAGS "${CFLAGS} ${CMAKE_C_FLAGS}")
-set (CFLAGS        "") # this should better be `unset()` but CMake 2.6.2 doesn't
-set (ENV{CFLAGS}   "") # support it. Should be changed as soon as SLES 11 brings
-set (CMAKE_C_FLAGS "") # an update for CMake or we drop support for the platform
-set (LDFLAGS $ENV{LDFLAGS})
-separate_arguments (TMP_C_FLAGS)
-foreach (CMPLR_FLAG ${TMP_C_FLAGS})
-  if (${CMPLR_FLAG} MATCHES ^-[DIU].*)
-    message ("Moving ${CMPLR_FLAG} from CFLAGS into CPPFLAGS")
-    set (CPPFLAGS "${CPPFLAGS} ${CMPLR_FLAG}")
-  elseif (${CMPLR_FLAG} MATCHES ^-[Ll].*)
-    message ("Moving ${CMPLR_FLAG} from CFLAGS into LDFLAGS")
-    set (LDFLAGS "${LDFLAGS} ${CMPLR_FLAG}")
-    set (CMAKE_LD_FLAGS "${CMAKE_LD_FLAGS} ${CMPLR_FLAG}")
-  else (${CMPLR_FLAG} MATCHES ^-[DUILl].*)
-    set (CFLAGS "${CFLAGS} ${CMPLR_FLAG}")
-  endif (${CMPLR_FLAG} MATCHES ^-[DIU].*)
-endforeach (CMPLR_FLAG)
-set (ENV{CPPFLAGS}   "${CPPFLAGS}")
-set (CMAKE_C_FLAGS   "${CFLAGS}")
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CPPFLAGS}")
-set (ENV{CFLAGS}     "${CFLAGS}")
-set (ENV{LDFLAGS}    "${LDFLAGS}")
-
-#
 # set name of fuse library (-losxfuse for osxfuse)
 #
 if (MACOSX)
