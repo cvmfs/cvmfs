@@ -62,6 +62,7 @@ sh configure CPPFLAGS="$CPPFLAGS -I${PWD}/${cares_location} -D_FILE_OFFSET_BITS=
   --without-libpsl \
   --without-libssh2 \
   --without-libmetalink \
+  --without-libidn \
   --without-libidn2 \
   --without-winidn \
   --without-librtmp \
