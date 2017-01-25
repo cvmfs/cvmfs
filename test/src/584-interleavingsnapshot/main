@@ -321,7 +321,7 @@ cvmfs_run_test() {
   cat >do_gc.sh <<!EOF!
 #!/bin/sh
 export CVMFS_SERVER_DEBUG=3
-sh -x cvmfs_server gc -f -r 0 -l $replica_name 2>&1|(sleep 5;cat)
+sh -x cvmfs_server gc -f -r 0 -l $replica_name 2>&1|(sleep 20;cat)
 !EOF!
   chmod +x do_gc.sh
   local pid2=$(run_background_service $gc_log_2 ./do_gc.sh) || return 54
@@ -331,7 +331,7 @@ sh -x cvmfs_server gc -f -r 0 -l $replica_name 2>&1|(sleep 5;cat)
   sleep 1
 
   echo "*** {7} check if the lock is there"
-  check_lock  $replica_name || return 55
+  check_lock $replica_name || return 55
 
   echo "*** {7} run a snapshot concurrently (should wait and later do the snapshot)"
   local snapshot_log_11="snapshot_11.log"
