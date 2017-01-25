@@ -90,7 +90,7 @@ cvmfs_run_test() {
   . ${script_location}/../../common/migration_tests/common.sh
 
   local src_dir='/cvmfs/sft.cern.ch/lcg/external/experimental'
-  local xxl_files_dir='/cvmfs/cernvm-prod.cern.ch'
+  local xxl_files_dir='/cvmfs/cernvm-prod.cern.ch/cvm3'
   local tar_log1="tar_1.log"
   local tar_log2="tar_2.log"
   local tar_log3="tar_3.log"
