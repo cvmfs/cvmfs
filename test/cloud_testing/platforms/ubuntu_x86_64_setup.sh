@@ -25,6 +25,7 @@ echo "done"
 # update package manager cache
 echo -n "updating package manager cache... "
 sudo apt-get update > /dev/null || die "fail (apt-get update)"
+sudo apt-get -y upgrade > /dev/null || die "fail (apt-get upgrade)"
 echo "done"
 
 # install package dependency resolve program
