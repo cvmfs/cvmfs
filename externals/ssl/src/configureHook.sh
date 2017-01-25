@@ -3,4 +3,4 @@
 cdir=$(pwd)
 ssl_install_dir=${cdir}/ssl_install
 mkdir build && cd build
-cmake -D CMAKE_INSTALL_PREFIX=$ssl_install_dir ../
+cmake -D CMAKE_INSTALL_PREFIX=$EXTERNALS_INSTALL_LOCATION ../
