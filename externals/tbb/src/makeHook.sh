@@ -12,3 +12,9 @@ make clean
 export CUSTOM_SUFFIX=_cvmfs;                                     \
 export CXXFLAGS="$(echo $CVMFS_BASE_CXX_FLAGS | sed s/-fvisibility=hidden//) -Wformat $TBB_WORKAROUND_CXX_FLAGS";  \
 make
+
+# Install
+cp -rv include/serial $EXTERNALS_INSTALL_LOCATION/include/
+cp -rv include/tbb $EXTERNALS_INSTALL_LOCATION/include/
+cp -rv build_debug/libtbb*.so* $EXTERNALS_INSTALL_LOCATION/lib/
+cp -rv build_release/libtbb*.so* $EXTERNALS_INSTALL_LOCATION/lib/

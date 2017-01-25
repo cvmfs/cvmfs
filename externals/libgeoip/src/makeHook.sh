@@ -2,4 +2,5 @@
 
 make clean
 make
-rm -f libGeoIP/.libs/*.so*
+#rm -f libGeoIP/.libs/*.so*
+make install

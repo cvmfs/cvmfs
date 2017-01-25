@@ -1,3 +1,3 @@
 #!/bin/sh
 
-sh configure --static
+sh configure --static --prefix=$EXTERNALS_INSTALL_LOCATION

@@ -1,7 +1,7 @@
 #!/bin/sh
 
 set -e
-LIBGEOIP="$PWD/../build_libgeoip/libGeoIP"
+LIBGEOIP="$EXTERNALS_BUILD_LOCATION/build_libgeoip/libGeoIP"
 rm -rf build
 CFLAGS="-I$LIBGEOIP" LDFLAGS="-L$LIBGEOIP/.libs" python setup.py build
 mkdir -p .tmp
@@ -16,5 +16,5 @@ elif [ -d .tmp/*.egg ]; then
   # on arch linux the shared object is called GeoIP.<system tag>.so
   cp .tmp/*.egg/GeoIP*.so .tmp
 fi
-cp .tmp/GeoIP*.so dist/GeoIP.so
+cp .tmp/GeoIP*.so $EXTERNALS_INSTALL_LOCATION/lib
 rm -rf .tmp
