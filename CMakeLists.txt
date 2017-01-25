@@ -144,7 +144,14 @@ endif(MACOSX)
 #
 # include file with user-defined options
 #
-include (options.cmake)
+include (cvmfs_options)
+
+#
+# set some default flags
+#
+# flags in CMAKE_C**_FLAGS are always passed to the compiler
+#
+include (cvmfs_compiler)
 
 #
 # define where to find the external dependencies
@@ -154,7 +161,7 @@ include (options.cmake)
 #
 set (EXTERNALS_LIB_LOCATION       "${CMAKE_SOURCE_DIR}/externals")
 set (EXTERNALS_BUILD_LOCATION     "${CMAKE_SOURCE_DIR}/externals_build")
-set (EXTERNALS_INSTALL_LOCATION)  "${CMAKE_SOURCE_DIR}/externals_install")
+set (EXTERNALS_INSTALL_LOCATION   "${CMAKE_SOURCE_DIR}/externals_install")
 
 # create the directory for controlled out of source building of external stuff
 file (MAKE_DIRECTORY ${EXTERNALS_BUILD_LOCATION})
