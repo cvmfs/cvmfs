@@ -76,6 +76,7 @@ class Reflog {
   bool OwnsDatabaseFile() const {
     return database_.IsValid() && database_->OwnsFile();
   }
+  bool Vacuum() { return database_->Vacuum(); }
 
   std::string fqrn() const;
   std::string database_file() const;

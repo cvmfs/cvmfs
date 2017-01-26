@@ -1,6 +1,16 @@
 cvmfs_test_name="Prevent Interleaving Publish Operations"
 cvmfs_test_autofs_on_startup=false
 
+create_fake_lock() {
+  local name=$1
+  local pid=${2:-$$} # use our own PID by default to fool the stale lock check
+
+  load_repo_config $name
+
+  echo "creating ${CVMFS_SPOOL_DIR}/is_publishing.lock with PID $pid"
+  echo "$pid" > ${CVMFS_SPOOL_DIR}/is_publishing.lock
+}
+
 
 cvmfs_run_test() {
   logfile=$1
@@ -68,8 +78,17 @@ cvmfs_run_test() {
   echo "create a new transaction"
   start_transaction $CVMFS_TEST_REPO || return $?
 
+  echo "place a fake lock that is live"
+  create_fake_lock $CVMFS_TEST_REPO || return $?
+
+  echo "attempt to publish (which should fail)"
+  publish_repo $CVMFS_TEST_REPO && return 8
+
+  echo "place a fake lock that is stale"
+  create_fake_lock $CVMFS_TEST_REPO 3282168345613 || return $?
+
   echo "republish to see if a second round still works"
-  publish_repo $CVMFS_TEST_REPO || return 4
+  publish_repo $CVMFS_TEST_REPO || return 9
 
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?

@@ -96,9 +96,11 @@ CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
                                  src/608-infofile                             \
                                  src/609-metainfofile                         \
                                  src/628-pythonwrappedcvmfsserver             \
+				 src/700-overlayfs_validation                 \
                                  --                                           \
                                  src/5*                                       \
                                  src/6*                                       \
+                                 src/7*                                       \
                               || retval=1
 
 

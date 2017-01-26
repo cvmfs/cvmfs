@@ -19,7 +19,7 @@ cvmfs_run_test() {
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -G "bla" && return 10
 
   echo "*** create a repo $CVMFS_TEST_REPO with correct auto tag timespan"
-  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO '-G "3 days ago"' || return 20
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -G "3 days ago" || return 20
 
   local auto_tags_1=$(count_auto_tags $CVMFS_TEST_REPO)
 

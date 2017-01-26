@@ -1,6 +1,6 @@
 #!/bin/sh
 
 make clean
-make
+make libcares.la
 strip -S .libs/libcares.a
 
