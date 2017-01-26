@@ -53,6 +53,7 @@ sh configure CPPFLAGS="$CPPFLAGS -D_FILE_OFFSET_BITS=64" \
   --without-libpsl \
   --without-libssh2 \
   --without-libmetalink \
+  --without-libidn \
   --without-libidn2 \
   --without-winidn \
   --without-librtmp \

@@ -18,7 +18,8 @@ sudo mkdir /media/ext4_volume || die "fail (mkdir /media/ext4_volume)"
 sudo mount -o loop $HOME/ext4_volume /media/ext4_volume || die "fail (mount -o loop $HOME/ext4_volume /media/ext4_volume)"
 
 # Symlink the new ext4 volume into /var/spool/cvmfs and continue
-sudo rm -r /var/spool/cvmfs || die "fail (rm -r /var/spool/cvmfs)"
+sudo rm -rf /var/spool/cvmfs || die "fail (rm -rf /var/spool/cvmfs)"
+sudo mkdir -p /var/spool/cvmfs || die "fail (mkdir -p /var/spool/cvmfs)"
 sudo ln -s /media/ext4_volume /var/spool/cvmfs || die "fail (ln -s /media/ext4_volume /var/spool/cvmfs)"
 
 # install CernVM-FS RPM packages
