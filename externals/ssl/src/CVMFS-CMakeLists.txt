@@ -1,0 +1,5 @@
+include ("${EXTERNALS_LIB_LOCATION}/CMake-Register_External_Lib.txt")
+
+set (SSL_ARCHIVE "${SSL_BUILTIN_LOCATION}/ssl_install/lib/libssl.a;${SSL_BUILTIN_LOCATION}/ssl_install/lib/libcrypto.a")
+
+register_external_lib (libssl ${SSL_BUILTIN_LOCATION} ${SSL_ARCHIVE})

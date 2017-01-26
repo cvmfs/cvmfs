@@ -6,6 +6,15 @@ cd $cares_location
 sh makeHook.sh
 cd $cdir
 
+curl_ssl_config="--with-ssl"
+if [ x"$(uname)" = x"Darwin" ]; then
+    ssl_location="$(pwd)/../build_ssl"
+    cd $ssl_location
+    sh makeHook.sh
+    cd $cdir
+    curl_ssl_config="--with-ssl=${ssl_location}/ssl_install"
+fi
+
 sh configure CPPFLAGS="$CPPFLAGS -I${PWD}/${cares_location} -D_FILE_OFFSET_BITS=64" \
   LDFLAGS="$LDFLAGS -L${PWD}/${cares_location}/.libs -rdynamic" \
   CFLAGS="$CFLAGS $CVMFS_BASE_C_FLAGS -fvisibility=hidden -fPIC" \
@@ -39,7 +48,7 @@ sh configure CPPFLAGS="$CPPFLAGS -I${PWD}/${cares_location} -D_FILE_OFFSET_BITS=
   --disable-tls-srp \
   --disable-ntlm-wb \
   --disable-unix-sockets \
-  --with-ssl \
+  ${curl_ssl_config} \
   --without-winssl \
   --without-darwinssl \
   --without-gnutls \
@@ -53,6 +62,7 @@ sh configure CPPFLAGS="$CPPFLAGS -I${PWD}/${cares_location} -D_FILE_OFFSET_BITS=
   --without-libpsl \
   --without-libssh2 \
   --without-libmetalink \
+  --without-libidn \
   --without-libidn2 \
   --without-winidn \
   --without-librtmp \

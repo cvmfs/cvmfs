@@ -44,6 +44,9 @@ bool Command::InitDownloadManager(const bool     follow_redirects,
   assert(download_manager_);
   download_manager_->Init(max_pool_handles, use_system_proxy, statistics());
 
+  download_manager_->SetTimeout(kDownloadTimeout, kDownloadTimeout);
+  download_manager_->SetRetryParameters(kDownloadRetries, 500, 2000);
+
   if (follow_redirects) {
     download_manager_->EnableRedirects();
   }

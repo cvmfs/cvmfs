@@ -607,7 +607,6 @@ create_repo() {
   local uid=$2
   local debug_log=$3
   shift $(min $# 3)
-  local extra_options="$*"
 
   echo "Shutting down autofs for the cvmfs mounts"
   autofs_switch off || return 100
@@ -617,12 +616,7 @@ create_repo() {
     destroy_repo $repo || return 101
   fi
 
-  echo -n "Creating new repository $repo "
-  if [ x"$extra_options" != x"" ]; then
-    echo "(with extra options $extra_options) ..."
-  else
-    echo "..."
-  fi
+  echo -n "Creating new repository $repo (with extra options "$@") ..."
   local s3_config=""
   local stratum0=""
   local unionfs=""
@@ -643,7 +637,7 @@ create_repo() {
                             $s3_config                \
                             $stratum0                 \
                             $unionfs                  \
-                            $extra_options $repo || return 102
+                            "$@" $repo || return 102
 
   local client_conf="/etc/cvmfs/repositories.d/${repo}/client.conf"
   apply_server_cache_config $repo || return 103
@@ -660,9 +654,8 @@ create_empty_repo() {
   local uid=$2
   local debug_log=$3
   shift $(min $# 3)
-  local extra_options="$*"
 
-  create_repo $repo $uid $debug_log "$extra_options" || return 101
+  create_repo $repo $uid $debug_log "$@" || return 101
 
   sudo cvmfs_server transaction $repo || return 102
   rm -f /cvmfs/$repo/new_repository
@@ -1103,29 +1096,18 @@ publish_repo() {
   local repo=$1
   shift 1
 
-  # parse the command line arguments (keep quotation marks)
-  local args="-v"
-  while [ $# -gt 0 ]; do
-    if echo "$1" | grep -q "[[:space:]]"; then
-      args="$args \"$1\""
-    else
-      args="$args $1"
-    fi
-    shift 1
-  done
-
   # enable the debug mode?
   # in debug mode we redirect output directly to the interactive shell,
   # overriding any redirections to logfiles or whatever... We want to hack!
   case $CVMFS_TEST_SRVDEBUG in
     fail)
-      cvmfs_server publish -d $args $repo > /dev/tty 2>&1 || return 100
+      cvmfs_server publish -dv "$@" $repo > /dev/tty 2>&1 || return 100
     ;;
     startup)
-      cvmfs_server publish -D $args $repo > /dev/tty 2>&1 || return 100
+      cvmfs_server publish -Dv "$@" $repo > /dev/tty 2>&1 || return 100
     ;;
     *)
-      cvmfs_server publish $args $repo || return 100
+      cvmfs_server publish -v "$@" $repo || return 100
     ;;
   esac
 

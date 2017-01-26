@@ -5,12 +5,12 @@ cvmfs_run_test() {
   logfile=$1
 
   cvmfs_mount "atlas.cern.ch,atlas-condb.cern.ch" \
-    "CVMFS_QUOTA_LIMIT=750" || return 1
+    "CVMFS_QUOTA_LIMIT=750" "CVMFS_CACHE_EXTERNAL_SIZE=750" || return 1
 
   find /cvmfs/atlas-condb.cern.ch -type f -size +100M -size -200M | head -n 64 | \
     xargs file > /dev/null || return 1
 
-  turnover=$(sudo cvmfs_talk -i atlas_condb.cern.ch cleanup rate 120)
+  turnover=$(sudo cvmfs_talk -i atlas-condb.cern.ch cleanup rate 120)
   echo "number of cleanup in the last 2 hours: $turnover"
   if [[ turnover -le 0 ]]; then
     return 2

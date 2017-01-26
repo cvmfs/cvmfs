@@ -13,6 +13,7 @@ usr/bin/cvmfs_config
 usr/libexec/cvmfs/auto.cvmfs
 usr/libexec/cvmfs/authz/cvmfs_allow_helper
 usr/libexec/cvmfs/authz/cvmfs_deny_helper
+usr/libexec/cvmfs/cache/cvmfs_cache_ram
 etc/auto.cvmfs
 sbin/mount.cvmfs
 etc/cvmfs/config.sh

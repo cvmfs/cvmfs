@@ -4,9 +4,9 @@
 
 #include "swissknife_lease_curl.h"
 
-#include <iostream>
+#include "cvmfs_config.h"
 
-size_t RecvCB(void *buffer, size_t size, size_t nmemb, void *userp) {
+size_t RecvCB(void* buffer, size_t size, size_t nmemb, void* userp) {
   CurlBuffer* my_buffer = static_cast<CurlBuffer*>(userp);
 
   if (size * nmemb < 1) {
@@ -19,11 +19,13 @@ size_t RecvCB(void *buffer, size_t size, size_t nmemb, void *userp) {
 }
 
 CURL* PrepareCurl(const char* method) {
+  const char* user_agent_string = "cvmfs/" VERSION;
+
   CURL* h_curl = curl_easy_init();
 
   if (h_curl) {
     curl_easy_setopt(h_curl, CURLOPT_NOPROGRESS, 1L);
-    curl_easy_setopt(h_curl, CURLOPT_USERAGENT, "curl/7.47.0");
+    curl_easy_setopt(h_curl, CURLOPT_USERAGENT, user_agent_string);
     curl_easy_setopt(h_curl, CURLOPT_MAXREDIRS, 50L);
     curl_easy_setopt(h_curl, CURLOPT_CUSTOMREQUEST, method);
     curl_easy_setopt(h_curl, CURLOPT_TCP_KEEPALIVE, 1L);
@@ -39,31 +41,30 @@ bool MakeAcquireRequest(const std::string& user_name,
   CURLcode ret = static_cast<CURLcode>(0);
 
   CURL* h_curl = PrepareCurl("POST");
-  if (h_curl) {
-    // Prepare payload
-    std::string payload = "{\"user\" : \"" + user_name +
-        "\", \"path\" : \"" + lease_fqdn + "\"}";
-
-    // Make request to acquire lease from repo services
-    curl_easy_setopt(h_curl,
-                     CURLOPT_URL,
-                     (repo_service_url + "/api/leases").c_str());
-    curl_easy_setopt(h_curl,
-                     CURLOPT_POSTFIELDSIZE_LARGE,
-                     static_cast<curl_off_t>(payload.length()));
-    curl_easy_setopt(h_curl, CURLOPT_POSTFIELDS, payload.c_str());
-    curl_easy_setopt(h_curl, CURLOPT_WRITEFUNCTION, RecvCB);
-    curl_easy_setopt(h_curl, CURLOPT_WRITEDATA, buffer);
-
-    ret = curl_easy_perform(h_curl);
-
-    curl_easy_cleanup(h_curl);
-    h_curl = NULL;
-
-    return !ret;
+  if (!h_curl) {
+    return false;
   }
 
-  return false;
+  // Prepare payload
+  const std::string payload =
+      "{\"user\" : \"" + user_name + "\", \"path\" : \"" + lease_fqdn + "\"}";
+
+  // Make request to acquire lease from repo services
+  curl_easy_setopt(
+      h_curl, CURLOPT_URL,
+      (repo_service_url + REPO_SERVICES_API_ROOT + "/leases").c_str());
+  curl_easy_setopt(h_curl, CURLOPT_POSTFIELDSIZE_LARGE,
+                   static_cast<curl_off_t>(payload.length()));
+  curl_easy_setopt(h_curl, CURLOPT_POSTFIELDS, payload.c_str());
+  curl_easy_setopt(h_curl, CURLOPT_WRITEFUNCTION, RecvCB);
+  curl_easy_setopt(h_curl, CURLOPT_WRITEDATA, buffer);
+
+  ret = curl_easy_perform(h_curl);
+
+  curl_easy_cleanup(h_curl);
+  h_curl = NULL;
+
+  return !ret;
 }
 
 bool MakeDeleteRequest(const std::string& session_token,
@@ -72,28 +73,23 @@ bool MakeDeleteRequest(const std::string& session_token,
   CURLcode ret = static_cast<CURLcode>(0);
 
   CURL* h_curl = PrepareCurl("DELETE");
-  if (h_curl) {
-    curl_easy_setopt(h_curl,
-                     CURLOPT_URL,
-                     (repo_service_url +
-                      "/api/leases/" +
-                      session_token).c_str());
-    curl_easy_setopt(h_curl,
-                     CURLOPT_POSTFIELDSIZE_LARGE,
-                     static_cast<curl_off_t>(0));
-    curl_easy_setopt(h_curl, CURLOPT_POSTFIELDS, 0);
-    curl_easy_setopt(h_curl, CURLOPT_WRITEFUNCTION, RecvCB);
-    curl_easy_setopt(h_curl, CURLOPT_WRITEDATA, buffer);
-
-    ret = curl_easy_perform(h_curl);
-
-    curl_easy_cleanup(h_curl);
-    h_curl = NULL;
-
-    return !ret;
+  if (!h_curl) {
+    return false;
   }
+  curl_easy_setopt(
+      h_curl, CURLOPT_URL,
+      (repo_service_url + REPO_SERVICES_API_ROOT + "/leases/" + session_token)
+          .c_str());
+  curl_easy_setopt(h_curl, CURLOPT_POSTFIELDSIZE_LARGE,
+                   static_cast<curl_off_t>(0));
+  curl_easy_setopt(h_curl, CURLOPT_POSTFIELDS, 0);
+  curl_easy_setopt(h_curl, CURLOPT_WRITEFUNCTION, RecvCB);
+  curl_easy_setopt(h_curl, CURLOPT_WRITEDATA, buffer);
 
-  return false;
+  ret = curl_easy_perform(h_curl);
+
+  curl_easy_cleanup(h_curl);
+  h_curl = NULL;
+
+  return !ret;
 }
-
-

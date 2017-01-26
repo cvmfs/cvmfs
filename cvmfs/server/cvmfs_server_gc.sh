@@ -224,10 +224,15 @@ __do_gc_cmd()
     if is_stratum0 $name; then
       base_hash="$(get_mounted_root_hash $name)"
       manifest="${CVMFS_SPOOL_DIR}/tmp/manifest"
+    fi
 
-      if [ $dry_run -eq 0 ]; then
+    if [ $dry_run -eq 0 ]; then
+      if is_stratum0 $name; then
         trap "close_transaction $name 0" EXIT HUP INT TERM
         open_transaction $name || die "Failed to open transaction for garbage collection"
+      else
+        acquire_update_lock $name gc || die "Failed to acquire update lock for garbage collection"
+        trap "release_update_lock $name" EXIT HUP INT TERM
       fi
     fi
 
@@ -249,17 +254,23 @@ __do_gc_cmd()
              "$reconstruct_this_reflog" \
              $additional_switches || die "Fail ($?)!"
 
-    # sign the result
-    if is_stratum0 $name && [ $dry_run -eq 0 ]; then
-      echo "Signing Repository Manifest"
-      if ! sign_manifest $name $manifest; then
-        to_syslog_for_repo $name "failed to sign manifest after garbage collection"
-        die "Fail!"
-      fi
+    if [ $dry_run -eq 0 ]; then
+      # sign the result
+      if is_stratum0 $name; then
+        echo "Signing Repository Manifest"
+        if ! sign_manifest $name $manifest; then
+          to_syslog_for_repo $name "failed to sign manifest after manual garbage collection"
+          die "Fail!"
+        fi
 
-      # close the transaction
-      trap - EXIT HUP INT TERM
-      close_transaction $name 0
+        # close the transaction
+        trap - EXIT HUP INT TERM
+        close_transaction $name 0
+      else
+        # release the update lock
+        trap - EXIT HUP INT TERM
+        release_update_lock $name
+      fi
     fi
 }
 
