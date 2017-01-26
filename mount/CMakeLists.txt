@@ -1,14 +1,10 @@
 set (CVMFS_SOURCE_DIR "${CMAKE_SOURCE_DIR}/cvmfs")
 set (CVMFS_MOUNT_SOURCES
-  ${CVMFS_SOURCE_DIR}/logging.cc ${CVMFS_SOURCE_DIR}/logging.h ${CVMFS_SOURCE_DIR}/logging_internal.h
-  ${CVMFS_SOURCE_DIR}/options.cc ${CVMFS_SOURCE_DIR}/options.h
-  ${CVMFS_SOURCE_DIR}/platform.h ${CVMFS_SOURCE_DIR}/platform_linux.h ${CVMFS_SOURCE_DIR}/platform_osx.h
-  ${CVMFS_SOURCE_DIR}/sanitizer.cc ${CVMFS_SOURCE_DIR}/sanitizer.h
-  ${CVMFS_SOURCE_DIR}/smalloc.h
-  ${CVMFS_SOURCE_DIR}/util/pointer.h
-  ${CVMFS_SOURCE_DIR}/util/posix.cc ${CVMFS_SOURCE_DIR}/util/posix.h
-  ${CVMFS_SOURCE_DIR}/util/single_copy.h
-  ${CVMFS_SOURCE_DIR}/util/string.cc ${CVMFS_SOURCE_DIR}/util/string.h
+  ${CVMFS_SOURCE_DIR}/logging.cc
+  ${CVMFS_SOURCE_DIR}/options.cc
+  ${CVMFS_SOURCE_DIR}/sanitizer.cc
+  ${CVMFS_SOURCE_DIR}/util/posix.cc
+  ${CVMFS_SOURCE_DIR}/util/string.cc
   mount.cvmfs.cc
 )
 
