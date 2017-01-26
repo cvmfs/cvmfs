@@ -193,6 +193,9 @@ int CommandGc::Main(const ArgumentList &args) {
   }
 
   reflog->CommitTransaction();
+  // Has to be outside the transaction
+  success = reflog->Vacuum();
+  assert(success);
   reflog->DropDatabaseFileOwnership();
   const std::string reflog_db = reflog->database_file();
   reflog.Destroy();
