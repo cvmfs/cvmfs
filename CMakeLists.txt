@@ -160,8 +160,6 @@ set (EXTERNALS_LIB_LOCATION       "${CMAKE_SOURCE_DIR}/externals")
 set (EXTERNALS_BUILD_LOCATION     "${CMAKE_SOURCE_DIR}/externals_build")
 set (EXTERNALS_INSTALL_LOCATION   "${CMAKE_SOURCE_DIR}/externals_install")
 
-# create the directory for controlled out of source building of external stuff
-file (MAKE_DIRECTORY ${EXTERNALS_BUILD_LOCATION})
 
 #
 # run the bootstrap shellscript (not needed in the distributed version of the source)
