@@ -1929,16 +1929,17 @@ create_whitelist() {
 
   local whitelist
   whitelist=${temp_dir}/whitelist.$name
+  local hash_algorithm="${CVMFS_HASH_ALGORITHM-sha1}"
 
   echo -n "Signing 30 day whitelist with master key... "
   echo `date -u "+%Y%m%d%H%M%S"` > ${whitelist}.unsigned
   echo "E`date -u --date='+30 days' "+%Y%m%d%H%M%S"`" >> ${whitelist}.unsigned
   echo "N$name" >> ${whitelist}.unsigned
   openssl x509 -in /etc/cvmfs/keys/${name}.crt -outform der | \
-    __swissknife hash -a $CVMFS_HASH_ALGORITHM -f >> ${whitelist}.unsigned
+    __swissknife hash -a $hash_algorithm -f >> ${whitelist}.unsigned
 
   local hash;
-  hash="`cat ${whitelist}.unsigned | __swissknife hash -a $CVMFS_HASH_ALGORITHM`"
+  hash="`cat ${whitelist}.unsigned | __swissknife hash -a $hash_algorithm`"
   echo "--" >> ${whitelist}.unsigned
   echo $hash >> ${whitelist}.unsigned
   echo -n $hash > ${whitelist}.hash
