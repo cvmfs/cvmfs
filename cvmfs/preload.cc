@@ -64,26 +64,26 @@ const char gCernIt1PublicKey[] =
   "yQIDAQAB\n"
   "-----END PUBLIC KEY-----\n";
 
-const char gCernIt2PublicKey[] =
+const char gCernIt4PublicKey[] =
   "-----BEGIN PUBLIC KEY-----\n"
-  "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAkX6+mj6/X5yLV9uHt56l\n"
-  "ZK1uLMueEULUhSCRrLj+9qz3EBMsANCjzfdabllKqWX/6qIfqppKVBwScF38aRnC\n"
-  "vhlVGYtDgiqM1tfa1tA6BF7HUZQ1R1lU01tP0iYGhNTlTfY+fMAZDeerGDckT8cl\n"
-  "NAQuICFUKy6w6aar8Sf3mpUC/hXVD2QUESmFgQ0SZhhW3eIB1xEoRxW0ieO6AidF\n"
-  "qxmAxrB4H4+7i9O+B7Wf0VJQLSzP5bvIzx7xoqs3aUlnuzGFOaI8zypMvSvycSUb\n"
-  "xhLsYbTgnlqSI/SPehMeQeEirhhKPaA+TsVSvxuqCJNoQ/wPBEG0HR+XkTsO9/sH\n"
-  "FQIDAQAB\n"
+  "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzlAraXimfJP5ie0KtDAE\n"
+  "rNUU5d9bzst+kqfhnb0U0OUtmCIbsueaDlbMmTdRSHMr+T0jI8i9CZxJwtxDqll+\n"
+  "UuB3Li2hYBhk0tYTy29JJYvofVULvrw1kMSLKyTWnV30/MHjYxhLHoZWfdepTjVg\n"
+  "lM0rP58K10wR3Z/AaaikOcy4z6P/MHs9ES1jdZqEBQEmmzKw5nf7pfU2QuVWJrKP\n"
+  "wZ9XeYDzipVbMc1zaLEK0slE+bm2ge/Myvuj/rpYKT+6qzbasQg62abGFuOrjgKI\n"
+  "X4/BVnilkhUfH6ssRKw4yehlKG1M5KJje2+y+iVvLbfoaw3g1Sjrf4p3Gq+ul7AC\n"
+  "PwIDAQAB\n"
   "-----END PUBLIC KEY-----\n";
 
-const char gCernIt3PublicKey[] =
+const char gCernIt5PublicKey[] =
   "-----BEGIN PUBLIC KEY-----\n"
-  "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAosLXrVkA4p6IjQj6rUNM\n"
-  "odr9oWB1nL3tWPKyPhS7mqAg+J4EW9m4ka/98PXi6jS/b1i/QLP9oGXlxJpugT1E\n"
-  "jaKh/I0tY7Cvf19mX3uoyS4omWRqZqopQdeLOvuqiCip23YyO3lK4Yzkq1E58JGi\n"
-  "WLGe5UJ8kY8Bko79dGNsHsU01pAaI0QN/fSmwhHQqfpMv62cAkqB9GSilRalxf3+\n"
-  "mDtJhYBdaDKbB5+QDqh40HcH838H+GcQLXxdT5ogdchjeldZJzsTwEhRq3yDcYr3\n"
-  "ie6ocWVLchQx9CKpxPufRTEpuo3BPMqdTxhZJZWPG27I/FSWnUmd0auirFY51Rw6\n"
-  "9wIDAQAB\n"
+  "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqFzLLZAg2xmHJLbbq0+N\n"
+  "eYtjRDghUK5mYhARndnC3skFVowDTiqJVc9dIDX5zuxQ9HyC0iKM1HbvN64IH/Uf\n"
+  "qoXLyZLiXbFwpg6BtEJxwhijdZCiCC5PC//Bb7zSFIVZvWjndujr6ejaY6kx3+jI\n"
+  "sU1HSJ66pqorj+D1fbZCziLcWbS1GzceZ7aTYYPUdGZF1CgjBK5uKrEAoBsPgjWo\n"
+  "+YOEkjskY7swfhUzkCe0YyMyAaS0gsWgYrY2ebrpauFFqKxveKWjDVBTGcwDhiBX\n"
+  "60inUgD6CJXhUpvGHfU8V7Bv6l7dmyzhq/Bk2kRC92TIvxfaHRmS7nuknUY0hW6t\n"
+  "2QIDAQAB\n"
   "-----END PUBLIC KEY-----\n";
 
 
@@ -179,8 +179,8 @@ int main(int argc, char *argv[]) {
   string cern_pk_base_path = *args['x'];
   string cern_pk_path      = cern_pk_base_path + "/cern.ch.pub";
   string cern_pk_it1_path  = cern_pk_base_path + "/cern-it1.cern.ch.pub";
-  string cern_pk_it2_path  = cern_pk_base_path + "/cern-it2.cern.ch.pub";
-  string cern_pk_it3_path  = cern_pk_base_path + "/cern-it3.cern.ch.pub";
+  string cern_pk_it4_path  = cern_pk_base_path + "/cern-it4.cern.ch.pub";
+  string cern_pk_it5_path  = cern_pk_base_path + "/cern-it5.cern.ch.pub";
   bool keys_created = false;
   if (args.find('k') == args.end()) {
     keys_created = true;
@@ -190,16 +190,16 @@ int main(int argc, char *argv[]) {
       reinterpret_cast<const unsigned char*>(gCernIt1PublicKey),
       sizeof(gCernIt1PublicKey), cern_pk_it1_path));
     assert(CopyMem2Path(
-      reinterpret_cast<const unsigned char*>(gCernIt2PublicKey),
-      sizeof(gCernIt2PublicKey), cern_pk_it2_path));
+      reinterpret_cast<const unsigned char*>(gCernIt4PublicKey),
+      sizeof(gCernIt4PublicKey), cern_pk_it4_path));
     assert(CopyMem2Path(
-      reinterpret_cast<const unsigned char*>(gCernIt3PublicKey),
-      sizeof(gCernIt3PublicKey), cern_pk_it3_path));
+      reinterpret_cast<const unsigned char*>(gCernIt5PublicKey),
+      sizeof(gCernIt5PublicKey), cern_pk_it5_path));
     char path_separator = ':';
     args['k'] = new string(cern_pk_path     + path_separator +
                            cern_pk_it1_path + path_separator +
-                           cern_pk_it2_path + path_separator +
-                           cern_pk_it3_path);
+                           cern_pk_it4_path + path_separator +
+                           cern_pk_it5_path);
   }
 
   // now launch swissknife_pull
@@ -231,8 +231,8 @@ int main(int argc, char *argv[]) {
   if (keys_created) {
     unlink(cern_pk_path.c_str());
     unlink(cern_pk_it1_path.c_str());
-    unlink(cern_pk_it2_path.c_str());
-    unlink(cern_pk_it3_path.c_str());
+    unlink(cern_pk_it4_path.c_str());
+    unlink(cern_pk_it5_path.c_str());
   }
 
   return retval;

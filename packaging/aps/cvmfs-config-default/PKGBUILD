@@ -7,8 +7,8 @@ pkgdesc='Default configuration and public keys to access CernVM-FS repositories'
 arch=('any')
 url='https://cernvm.cern.ch'
 license=('BSD')
-source=('cern.ch.pub' 'cern-it1.cern.ch.pub' 'cern-it2.cern.ch.pub'
-        'cern-it3.cern.ch.pub' 'egi.eu.pub' 'opensciencegrid.org.pub'
+source=('cern.ch.pub' 'cern-it1.cern.ch.pub' 'cern-it4.cern.ch.pub'
+        'cern-it5.cern.ch.pub' 'egi.eu.pub' 'opensciencegrid.org.pub'
         'cern.ch.conf' 'egi.eu.conf' 'opensciencegrid.org.conf' '50-cern.conf'
         '60-egi.conf' 'atlas-nightlies.cern.ch.conf' 'cms.cern.ch.conf'
         'grid.cern.ch.conf')
