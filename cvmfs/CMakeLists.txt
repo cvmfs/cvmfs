@@ -104,6 +104,7 @@ set (CVMFS2_SOURCES
 set (LIBCVMFS_SOURCES
   ${CVMFS_CLIENT_SOURCES}
 
+  fetch.cc
   libcvmfs.cc
   libcvmfs_int.cc
   libcvmfs_legacy.cc
@@ -334,53 +335,6 @@ if (BUILD_CVMFS)
   add_library (cvmfs_fuse SHARED ${CVMFS2_SOURCES})
   add_executable (cvmfs_fsck ${CVMFS_FSCK_SOURCES})
 
-  if (LIBFUSE_BUILTIN)
-    add_dependencies (cvmfs_fuse_debug libfuse) # here it does not matter if libfuse or osxfuse
-    add_dependencies (cvmfs_fuse libfuse)       # at this point only the appropriate one is defined
-  endif (LIBFUSE_BUILTIN)
-
-  if (LIBCURL_BUILTIN)
-    add_dependencies (cvmfs_fuse_debug libcares libcurl)
-    add_dependencies (cvmfs_fuse libcares libcurl)
-  endif (LIBCURL_BUILTIN)
-
-  if (PACPARSER_BUILTIN)
-    add_dependencies (cvmfs_fuse_debug libpacparser)
-    add_dependencies (cvmfs_fuse libpacparser)
-  endif (PACPARSER_BUILTIN)
-
-  if (SQLITE3_BUILTIN)
-    add_dependencies (cvmfs_fuse_debug sqlite3)
-    add_dependencies (cvmfs_fuse sqlite3)
-  endif (SQLITE3_BUILTIN)
-
-  if (ZLIB_BUILTIN)
-    add_dependencies (cvmfs_fuse_debug zlib)
-    add_dependencies (cvmfs_fuse zlib)
-    add_dependencies (cvmfs_fsck zlib)
-  endif (ZLIB_BUILTIN)
-
-  if (SPARSEHASH_BUILTIN)
-    add_dependencies (cvmfs_fuse_debug sparsehash)
-    add_dependencies (cvmfs_fuse sparsehash)
-  endif (SPARSEHASH_BUILTIN)
-
-  if (LEVELDB_BUILTIN)
-    add_dependencies (cvmfs_fuse_debug libleveldb)
-    add_dependencies (cvmfs_fuse libleveldb)
-  endif (LEVELDB_BUILTIN)
-
-  add_dependencies (cvmfs_fuse_debug libsha3)
-  add_dependencies (cvmfs_fuse libsha3)
-  add_dependencies (cvmfs2 libsha3)
-  add_dependencies (cvmfs_fsck libsha3)
-
-  add_dependencies (cvmfs_fuse_debug libvjson)
-  add_dependencies (cvmfs_fuse libvjson)
-
-  add_dependencies (cvmfs_fuse_debug protobuf)
-  add_dependencies (cvmfs_fuse protobuf)
-
   # set some properties
   set (CVMFS_LOADER_LD_FLAGS "${CVMFS_LOADER_LD_FLAGS} -ldl -lm")
   set_target_properties (cvmfs2 PROPERTIES COMPILE_FLAGS "${CVMFS_LOADER_CFLAGS}" LINK_FLAGS "${CVMFS_LOADER_LD_FLAGS}")
@@ -391,179 +345,132 @@ if (BUILD_CVMFS)
   set_target_properties (cvmfs_fuse PROPERTIES VERSION ${CernVM-FS_VERSION_STRING})
   set_target_properties (cvmfs_fuse_debug PROPERTIES VERSION ${CernVM-FS_VERSION_STRING})
 
-  # link the stuff (*_LIBRARIES are dynamic link libraries *_archive are static link libraries ... one of them will be empty for each dependency)
-  set (CVMFS_FUSE_LINK_LIBRARIES ${SQLITE3_LIBRARY} ${CARES_LIBRARIES}
-         ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE} ${PACPARSER_LIBRARIES}
-         ${LEVELDB_LIBRARIES} ${OPENSSL_LIBRARIES} ${FUSE_LIBRARIES}
-         ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${ZLIB_LIBRARIES}
-         ${PACPARSER_ARCHIVE} ${LEVELDB_ARCHIVE} ${CARES_ARCHIVE}
-         ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${UUID_LIBRARIES}
-         ${SHA3_ARCHIVE} ${VJSON_ARCHIVE} ${PROTOBUF_ARCHIVE} pthread dl)
+  set (CVMFS_FUSE_LINK_LIBRARIES "")
+  if (MACOSX)
+    list(APPEND CVMFS_FUSE_LINK_LIBRARIES ${OSXFUSE_LIBRARIES})
+  else(MACOSX)
+    list(APPEND CVMFS_FUSE_LINK_LIBRARIES ${FUSE_LIBRARIES})
+  endif(MACOSX)
+
+  list(APPEND CVMFS_FUSE_LINK_LIBRARIES ${CURL_LIBRARIES}
+                                        ${CARES_LIBRARIES}
+                                        ${OPENSSL_LIBRARIES}
+                                        ${PACPARSER_LIBRARIES}
+                                        ${SQLITE3_LIBRARY}
+                                        ${ZLIB_LIBRARIES}
+                                        ${SPARSEHASH_LIBRARIES}
+                                        ${LEVELDB_LIBRARIES}
+                                        ${SHA3_LIBRARIES}
+                                        ${SHA2_LIBRARIES}
+                                        ${PROTOBUF_LIBRARIES}
+                                        ${VJSON_LIBRARIES}
+                                        ${RT_LIBRARY}
+                                        ${UUID_LIBRARIES}
+                                        pthread dl)
 
   target_link_libraries (cvmfs2 ${CVMFS_LOADER_LIBS} ${OPENSSL_LIBRARIES}
                                 ${LIBFUSE} ${RT_LIBRARY} ${UUID_LIBRARIES}
-                                ${SHA3_ARCHIVE} pthread dl)
+                                ${SHA3_LIBRARIES} pthread dl)
   target_link_libraries (cvmfs_fuse_debug ${CVMFS2_DEBUG_LIBS} ${CVMFS_FUSE_LINK_LIBRARIES})
   target_link_libraries (cvmfs_fuse       ${CVMFS2_LIBS} ${CVMFS_FUSE_LINK_LIBRARIES})
   target_link_libraries (cvmfs_fsck       ${CVMFS_FSCK_LIBS} ${ZLIB_LIBRARIES}
-                                          ${OPENSSL_LIBRARIES} ${ZLIB_ARCHIVE}
-                                          ${SHA3_ARCHIVE} ${RT_LIBRARY} pthread)
+                                          ${OPENSSL_LIBRARIES} ${ZLIB_LIBRARIES}
+                                          ${SHA3_LIBRARIES} ${RT_LIBRARY} pthread)
 
 
   set (CVMFS_ALLOW_HELPER_SOURCES
     authz/helper_allow.cc
-    authz/helper_log.h authz/helper_log.cc
-    authz/helper_util.h authz/helper_util.cc
+    authz/helper_log.cc
+    authz/helper_util.cc
   )
   add_executable (cvmfs_allow_helper ${CVMFS_ALLOW_HELPER_SOURCES})
-  add_dependencies (cvmfs_allow_helper libvjson)
-  target_link_libraries (cvmfs_allow_helper ${VJSON_ARCHIVE})
+  target_link_libraries (cvmfs_allow_helper ${VJSON_LIBRARIES})
 
   set (CVMFS_DENY_HELPER_SOURCES
     authz/helper_deny.cc
-    authz/helper_log.h authz/helper_log.cc
-    authz/helper_util.h authz/helper_util.cc
+    authz/helper_log.cc
+    authz/helper_util.cc
   )
   add_executable (cvmfs_deny_helper ${CVMFS_DENY_HELPER_SOURCES})
-  add_dependencies (cvmfs_deny_helper libvjson)
-  target_link_libraries (cvmfs_deny_helper ${VJSON_ARCHIVE})
+  target_link_libraries (cvmfs_deny_helper ${VJSON_LIBRARIES})
 endif (BUILD_CVMFS)
 
 
 if (BUILD_LIBCVMFS_CACHE)
-  # libcvmfs_cache_only.a is a static lib of cvmfs without externals
-  # libcvmfs_cache.a includes the externals as well
-  add_library (cvmfs_cache_only STATIC ${LIBCVMFS_CACHE_SOURCES})
-  set (LIBCVMFS_CACHE_LIBS ${LIBCVMFS_CACHE_LIBS} ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache_only.a)
-  add_dependencies (cvmfs_cache_only libsha3)
-  add_dependencies (cvmfs_cache_only protobuf)
-  set (LIBCVMFS_CACHE_LIBS ${SHA3_ARCHIVE} ${PROTOBUF_ARCHIVE}
-                           ${LIBCVMFS_CACHE_LIBS})
-  set_target_properties (cvmfs_cache_only PROPERTIES COMPILE_FLAGS
+  add_library (cvmfs_cache STATIC ${LIBCVMFS_CACHE_SOURCES})
+  set (LIBCVMFS_CACHE_LIBS ${SHA3_LIBRARIES} ${PROTOBUF_LIBRARIES} ${LIBCVMFS_CACHE_LIBS})
+  set_target_properties (cvmfs_cache PROPERTIES COMPILE_FLAGS
                          "${LIBCVMFS_CACHE_CFLAGS}")
-  if (NOT MACOSX)
-    # We do not (yet) have a recipe for localizing private symbols
-    # in Mac OS X, so skip that step on Mac
-    set (LIBCVMFS_CACHE_PUBLIC_SYMS "-public" "${CMAKE_CURRENT_SOURCE_DIR}/cache_plugin/libcvmfs_cache_public_syms.txt")
-  endif (NOT MACOSX)
+  # if (NOT MACOSX)
+  #   # We do not (yet) have a recipe for localizing private symbols
+  #   # in Mac OS X, so skip that step on Mac
+  #   set (LIBCVMFS_CACHE_PUBLIC_SYMS "-public" "${CMAKE_CURRENT_SOURCE_DIR}/cache_plugin/libcvmfs_cache_public_syms.txt")
+  # endif (NOT MACOSX)
 
-  add_custom_command(
-    OUTPUT libcvmfs_cache.a
-    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/combine_libs ${LIBCVMFS_CACHE_PUBLIC_SYMS} libcvmfs_cache.a ${LIBCVMFS_CACHE_LIBS}
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    DEPENDS ${LIBCVMFS_CACHE_LIBS}
-  )
+  #target_link_libraries(cvmfs_cache ${LIBCVMFS_CACHE_LIBS} ${LIBCVMFS_CACHE_PUBLIC_SYMS})
+  target_link_libraries(cvmfs_cache ${LIBCVMFS_CACHE_LIBS})
 
-  # dummy target to cause merged libcvmfs_cache to be produced
-  add_custom_target (libcvmfs_cache ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a)
-  add_dependencies (libcvmfs_cache cvmfs_cache_only)
 
   add_executable(cvmfs_cache_null ${CVMFS_CACHE_NULL_SOURCES})
   target_link_libraries(cvmfs_cache_null
-                        ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a
+                        cvmfs_cache
                         ${OPENSSL_LIBRARIES} ${RT_LIBRARY} pthread)
-  add_dependencies (cvmfs_cache_null libcvmfs_cache)
 
   add_executable(cvmfs_cache_ram ${CVMFS_CACHE_RAM_SOURCES})
   target_link_libraries(cvmfs_cache_ram
-                        ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a
+                        cvmfs_cache
                         ${OPENSSL_LIBRARIES} ${RT_LIBRARY} pthread)
-  add_dependencies (cvmfs_cache_ram libcvmfs_cache)
 endif (BUILD_LIBCVMFS_CACHE)
 
 
 if (BUILD_LIBCVMFS)
-  # libcvmfs_only.a is a static lib of cvmfs without externals
-  # libcvmfs.a includes the externals as well
-  add_library (cvmfs_only STATIC ${LIBCVMFS_SOURCES})
-  set (LIBCVMFS_LIBS ${LIBCVMFS_LIBS} ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_only.a)
+  add_library (cvmfs STATIC ${LIBCVMFS_SOURCES})
 
-  if (LIBCURL_BUILTIN)
-    add_dependencies (cvmfs_only libcares libcurl)
-    set (LIBCVMFS_LIBS ${CARES_ARCHIVE} ${LIBCVMFS_LIBS} )
-    set (LIBCVMFS_LIBS ${LIBCURL_ARCHIVE} ${LIBCVMFS_LIBS} )
-  endif (LIBCURL_BUILTIN)
+  set (LIBCVMFS_LIBS ${CARES_LIBRARIES} ${LIBCURL_LIBRARIES}
+                     ${PACPARSER_LIBRARIES} ${SQLITE3_LIBRARY}
+                     ${ZLIB_LIBRARIES} ${SPARSEHASH_LIBRARIES}
+                     ${SHA3_LIBRARIES} ${VJSON_LIBRARIES}
+                     ${PROTOBUF_LIBRARIES})
 
-  if (PACPARSER_BUILTIN)
-    add_dependencies (cvmfs_only libpacparser)
-    set (LIBCVMFS_LIBS ${PACPARSER_ARCHIVE} ${LIBCVMFS_LIBS} )
-  endif (PACPARSER_BUILTIN)
+  set_target_properties (cvmfs PROPERTIES COMPILE_FLAGS "${LIBCVMFS_CFLAGS}")
 
-  if (SQLITE3_BUILTIN)
-    add_dependencies (cvmfs_only sqlite3)
-    set (LIBCVMFS_LIBS ${SQLITE3_ARCHIVE}  ${LIBCVMFS_LIBS} )
-  endif (SQLITE3_BUILTIN)
+  # if (NOT MACOSX)
+  #   # We do not (yet) have a recipe for localizing private symbols
+  #   # in Mac OS X, so skip that step on Mac
+  #   set (LIBCVMFS_PUBLIC_SYMS "-public" "${CMAKE_CURRENT_SOURCE_DIR}/libcvmfs_public_syms.txt")
+  # endif (NOT MACOSX)
 
-  if (ZLIB_BUILTIN)
-    add_dependencies (cvmfs_only zlib)
-    set (LIBCVMFS_LIBS ${ZLIB_ARCHIVE} ${LIBCVMFS_LIBS} )
-  endif (ZLIB_BUILTIN)
-
-  if (SPARSEHASH_BUILTIN)
-    add_dependencies (cvmfs_only sparsehash)
-  endif (SPARSEHASH_BUILTIN)
-
-  add_dependencies (cvmfs_only libsha3)
-  add_dependencies (cvmfs_only libvjson)
-  add_dependencies (cvmfs_only protobuf)
-  set (LIBCVMFS_LIBS ${SHA3_ARCHIVE} ${VJSON_ARCHIVE} ${PROTOBUF_ARCHIVE}
-                     ${LIBCVMFS_LIBS})
-
-  set_target_properties (cvmfs_only PROPERTIES COMPILE_FLAGS "${LIBCVMFS_CFLAGS}")
-
-  if (NOT MACOSX)
-    # We do not (yet) have a recipe for localizing private symbols
-    # in Mac OS X, so skip that step on Mac
-    set (LIBCVMFS_PUBLIC_SYMS "-public" "${CMAKE_CURRENT_SOURCE_DIR}/libcvmfs_public_syms.txt")
-  endif (NOT MACOSX)
-
-  add_custom_command(
-    OUTPUT libcvmfs.a
-    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/combine_libs ${LIBCVMFS_PUBLIC_SYMS} libcvmfs.a ${LIBCVMFS_LIBS}
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    DEPENDS ${LIBCVMFS_LIBS}
-  )
-
-  # dummy target to cause merged libcvmfs to be produced
-  add_custom_target (libcvmfs ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a)
-  add_dependencies (libcvmfs cvmfs_only)
+  #target_link_libraries(cvmfs ${LIBCVMFS_LIBS} ${LIBCVMFS_PUBLIC_SYMS})
+  target_link_libraries(cvmfs ${LIBCVMFS_LIBS})
 
   add_executable( test_libcvmfs ${TEST_LIBCVMFS_SOURCES} )
-  target_link_libraries(test_libcvmfs ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a
-                        ${SQLITE3_LIBRARY} ${CARES_LIBRARIES} ${CURL_LIBRARIES}
+  target_link_libraries(test_libcvmfs cvmfs
+                        ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${CARES_LIBRARIES}
                         ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES}
                         ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl )
-  add_dependencies (test_libcvmfs libcvmfs)
-endif (BUILD_LIBCVMFS)
-
+endif(BUILD_LIBCVMFS)                        
 
 if (BUILD_OCTOPUS)
   set (CVMFS_OCTOPUS_SOURCES
-    encrypt.cc encrypt.h
-    hash.cc hash.h
-    json_document.cc json_document.h
-    logging.cc logging.h logging_internal.h
-    pathspec/pathspec.cc pathspec/pathspec.h
-    pathspec/pathspec_pattern.cc pathspec/pathspec_pattern.h
-    platform.h platform_linux.h platform_osx.h
-	  sanitizer.cc sanitizer.h
-    smalloc.h
-    util/pointer.h
-    util/posix.cc util/posix.h
-    util/single_copy.h
-    util/string.cc util/string.h
-    uuid.cc uuid.h
-		webapi/fcgi.cc webapi/fcgi.h
-    webapi/macaroon.cc webapi/macaroon.h
+    encrypt.cc
+    hash.cc
+    json_document.cc
+    logging.cc
+    pathspec/pathspec.cc
+    pathspec/pathspec_pattern.cc
+	  sanitizer.cc
+    util/posix.cc
+    util/string.cc
+    uuid.cc
+		webapi/fcgi.cc
+    webapi/macaroon.cc
     webapi/octopus.cc
-    webapi/uri_map.cc webapi/uri_map.h
+    webapi/uri_map.cc
   )
 
   add_executable (cvmfs_octopus.fcgi ${CVMFS_OCTOPUS_SOURCES})
-  add_dependencies (cvmfs_octopus.fcgi libsha2)
-  add_dependencies (cvmfs_octopus.fcgi libvjson)
   target_link_libraries(cvmfs_octopus.fcgi
-                        ${SHA3_ARCHIVE} ${VJSON_ARCHIVE} ${OPENSSL_LIBRARIES}
+                        ${SHA3_LIBRARIES} ${SHA2_LIBRARIES} ${VJSON_LIBRARIES} ${OPENSSL_LIBRARIES}
                         ${RT_LIBRARY} ${UUID_LIBRARIES} pthread)
 endif (BUILD_OCTOPUS)
 
@@ -573,62 +480,18 @@ if (BUILD_SERVER)
   add_executable (cvmfs_swissknife ${CVMFS_SWISSKNIFE_SOURCES})
   add_executable (cvmfs_suid_helper ${CVMFS_SUID_HELPER_SOURCES})
 
-  if (GEOIP_BUILTIN)
-    add_custom_target (geoip ALL)
-    add_dependencies (python-geoip libgeoip)
-    add_dependencies (geoip python-geoip)
-  endif (GEOIP_BUILTIN)
-
-  add_dependencies (cvmfs_swissknife libvjson)
-
-  if (LIBCURL_BUILTIN)
-    add_dependencies (cvmfs_swissknife libcares libcurl)
-  endif (LIBCURL_BUILTIN)
-
-  if (SQLITE3_BUILTIN)
-    add_dependencies (cvmfs_swissknife sqlite3)
-  endif (SQLITE3_BUILTIN)
-
-  if (ZLIB_BUILTIN)
-    add_dependencies (cvmfs_swissknife zlib)
-  endif (ZLIB_BUILTIN)
-
-  if (TBB_PRIVATE_LIB)
-    add_dependencies (cvmfs_swissknife libtbb)
-  endif (TBB_PRIVATE_LIB)
-
-  add_dependencies (cvmfs_swissknife libsha3)
-
   set_target_properties (cvmfs_swissknife PROPERTIES COMPILE_FLAGS "${CVMFS_SWISSKNIFE_CFLAGS}" LINK_FLAGS "${CVMFS_SWISSKNIFE_LD_FLAGS}")
 
   # link the stuff (*_LIBRARIES are dynamic link libraries)
-  target_link_libraries (cvmfs_swissknife  ${CVMFS_SWISSKNIFE_LIBS}
-                         ${SQLITE3_LIBRARY}  ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE}
-                         ${CARES_LIBRARIES} ${CARES_ARCHIVE} ${TBB_LIBRARIES}
-                         ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} ${OPENSSL_LIBRARIES}
-                         ${SQLITE3_ARCHIVE} ${RT_LIBRARY} ${VJSON_ARCHIVE}
-                         ${SHA3_ARCHIVE} ${CAP_LIBRARIES} pthread dl)
+  target_link_libraries (cvmfs_swissknife
+                         ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${CURL_LIBRARIES}
+                         ${CARES_LIBRARIES} ${TBB_LIBRARIES}
+                         ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES}
+                         ${RT_LIBRARY} ${VJSON_LIBRARIES}
+                         ${SHA3_LIBRARIES} ${CAP_LIBRARIES} pthread dl)
 
   if (BUILD_SERVER_DEBUG)
     add_executable (cvmfs_swissknife_debug ${CVMFS_SWISSKNIFE_DEBUG_SOURCES})
-
-    if (LIBCURL_BUILTIN)
-      add_dependencies (cvmfs_swissknife_debug libcares libcurl)
-    endif (LIBCURL_BUILTIN)
-
-    if (SQLITE3_BUILTIN)
-      add_dependencies (cvmfs_swissknife_debug sqlite3)
-    endif (SQLITE3_BUILTIN)
-
-    if (ZLIB_BUILTIN)
-      add_dependencies (cvmfs_swissknife_debug zlib)
-    endif (ZLIB_BUILTIN)
-
-    if (TBB_PRIVATE_LIB)
-      add_dependencies (cvmfs_swissknife_debug libtbb)
-    endif (TBB_PRIVATE_LIB)
-
-    add_dependencies (cvmfs_swissknife_debug libsha3)
 
     set_target_properties (cvmfs_swissknife_debug PROPERTIES COMPILE_FLAGS "${CVMFS_SWISSKNIFE_DEBUG_CFLAGS}" LINK_FLAGS "${CVMFS_SWISSKNIFE_DEBUG_LD_FLAGS}")
 
@@ -637,55 +500,23 @@ if (BUILD_SERVER)
       message (WARNING "Debug libraries of TBB were not found. Using the release versions instead.")
       set (TBB_DEBUG_LIBRARIES ${TBB_LIBRARIES})
     endif (NOT TBB_DEBUG_LIBRARIES)
-    target_link_libraries (cvmfs_swissknife_debug  ${CVMFS_SWISSKNIFE_LIBS}
-                           ${SQLITE3_LIBRARY}  ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE}
-                           ${CARES_LIBRARIES} ${CARES_ARCHIVE} ${TBB_DEBUG_LIBRARIES}
-                           ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} ${OPENSSL_LIBRARIES}
-                           ${SQLITE3_ARCHIVE} ${RT_LIBRARY} ${VJSON_ARCHIVE}
-                           ${SHA3_ARCHIVE} ${CAP_LIBRARIES} pthread dl)
+    target_link_libraries (cvmfs_swissknife_debug
+                           ${SQLITE3_LIBRARY}  ${CURL_LIBRARIES}
+                           ${CARES_LIBRARIES} ${TBB_DEBUG_LIBRARIES}
+                           ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES}
+                           ${RT_LIBRARY} ${VJSON_LIBRARIES}
+                           ${SHA3_LIBRARIES} ${CAP_LIBRARIES} pthread dl)
   endif (BUILD_SERVER_DEBUG)
 endif (BUILD_SERVER)
 
 if (BUILD_PRELOADER)
   add_executable (cvmfs_preload_bin ${CVMFS_PRELOADER_SOURCES})
 
-  if (LIBCURL_BUILTIN)
-    add_dependencies (cvmfs_preload_bin libcares libcurl)
-    set (PRELOADER_LIBS ${CARES_ARCHIVE} ${PRELOADER_LIBS} )
-    set (PRELOADER_LIBS ${LIBCURL_ARCHIVE} ${PRELOADER_LIBS} )
-  endif (LIBCURL_BUILTIN)
-
-  if (PACPARSER_BUILTIN)
-    add_dependencies (cvmfs_preload_bin libpacparser)
-    set (PRELOADER_LIBS ${PACPARSER_ARCHIVE} ${PRELOADER_LIBS} )
-  endif (PACPARSER_BUILTIN)
-
-  if (SQLITE3_BUILTIN)
-    add_dependencies (cvmfs_preload_bin sqlite3)
-    set (PRELOADER_LIBS ${SQLITE3_ARCHIVE}  ${PRELOADER_LIBS} )
-  endif (SQLITE3_BUILTIN)
-
-  if (ZLIB_BUILTIN)
-    add_dependencies (cvmfs_preload_bin zlib)
-    set (PRELOADER_LIBS ${ZLIB_ARCHIVE} ${PRELOADER_LIBS} )
-  endif (ZLIB_BUILTIN)
-
-  if (SPARSEHASH_BUILTIN)
-    add_dependencies (cvmfs_preload_bin sparsehash)
-  endif (SPARSEHASH_BUILTIN)
-
-  if (TBB_PRIVATE_LIB)
-    add_dependencies (cvmfs_preload_bin libtbb)
-  endif (TBB_PRIVATE_LIB)
-
-  add_dependencies (cvmfs_preload_bin libsha3)
-  add_dependencies (cvmfs_preload_bin libvjson)
-
   target_link_libraries(cvmfs_preload_bin ${SQLITE3_LIBRARY} ${CARES_LIBRARIES}
-                        ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE} ${ZLIB_LIBRARIES}
-                        ${OPENSSL_LIBRARIES} ${CARES_ARCHIVE} ${SQLITE3_ARCHIVE}
-                        ${ZLIB_ARCHIVE} ${TBB_LIBRARIES} ${RT_LIBRARY}
-                        ${UUID_LIBRARIES} ${VJSON_ARCHIVE} ${SHA3_ARCHIVE}
+                        ${CURL_LIBRARIES} ${ZLIB_LIBRARIES}
+                        ${OPENSSL_LIBRARIES} ${CARES_LIBRARIS}
+                        ${TBB_LIBRARIES} ${RT_LIBRARY}
+                        ${UUID_LIBRARIES} ${VJSON_LIBRARIES} ${SHA3_LIBRARIES}
                         pthread dl)
 endif (BUILD_PRELOADER)
 
@@ -753,7 +584,7 @@ endif (BUILD_CVMFS)
 
 if (BUILD_LIBCVMFS)
   install (
-    FILES      ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a
+    TARGETS cvmfs
     DESTINATION    ${CMAKE_INSTALL_LIBDIR}
   )
   install (
@@ -764,7 +595,7 @@ endif (BUILD_LIBCVMFS)
 
 if (BUILD_LIBCVMFS_CACHE)
   install (
-    FILES      ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a
+    TARGETS      cvmfs_cache
     DESTINATION    ${CMAKE_INSTALL_LIBDIR}
   )
   install (
