@@ -91,6 +91,7 @@ set (CVMFS2_DEBUG_SOURCES
   auto_umount.cc
   compat.cc
   cvmfs.cc
+  fetch.cc
   nfs_maps.cc
   nfs_shared_maps.cc
   quota_listener.cc
