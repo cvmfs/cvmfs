@@ -411,7 +411,7 @@ if (BUILD_LIBCVMFS_CACHE)
 
   add_custom_command(
       OUTPUT libcvmfs_cache.a
-      COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/combine_libs ${LIBCVMFS_CACHE_PUBLIC_SYMS} libcvmfs_cache.a ${LIBCVMFS_CACHE_LIBS} 
+      COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/combine_libs ${LIBCVMFS_CACHE_PUBLIC_SYMS} libcvmfs_cache.a ${LIBCVMFS_CACHE_LIBS}
       WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
       DEPENDS ${LIBCVMFS_CACHE_LIBS}
     )
@@ -463,11 +463,12 @@ if (BUILD_LIBCVMFS)
   add_dependencies (libcvmfs cvmfs_only)
 
   add_executable( test_libcvmfs ${TEST_LIBCVMFS_SOURCES} )
-  target_link_libraries(test_libcvmfs cvmfs
+  target_link_libraries(test_libcvmfs
+                        ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a
                         ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${CARES_LIBRARIES}
                         ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES}
                         ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl )
-endif(BUILD_LIBCVMFS)                        
+endif(BUILD_LIBCVMFS)
 
 if (BUILD_OCTOPUS)
   set (CVMFS_OCTOPUS_SOURCES
@@ -603,7 +604,7 @@ endif (BUILD_CVMFS)
 
 if (BUILD_LIBCVMFS)
   install (
-    TARGETS cvmfs
+    FILES ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a
     DESTINATION    ${CMAKE_INSTALL_LIBDIR}
   )
   install (
