@@ -73,7 +73,7 @@ CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
                               -x src/518-hardlinkstresstest                   \
                                  src/524-corruptmanifestfailover              \
                                  src/585-xattrs                               \
-                                 src/700-overlayfsvalidation                  \
+                                 src/700-overlayfs_validation                 \
                                  --                                           \
                                  src/5*                                       \
                                  src/6*                                       \
