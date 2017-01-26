@@ -11,6 +11,7 @@ cvmfs_run_test() {
   RETVAL=0
 
   pid_before=$(sudo cvmfs_talk -i atlas.cern.ch pid)
+  echo "*** pid of atlas.cern.ch fuse module (before stressing): $pid_before"
 
   pids_du=
   for d in /cvmfs/atlas.cern.ch/repo/sw/software/*; do
@@ -20,15 +21,21 @@ cvmfs_run_test() {
       nohup du -ch --max-depth 3 $d/ >/dev/null 2>&1 &
     fi
     pids_du="$! $pids_du"
+    echo "*** started new recursive listing on $d"
   done
+  echo "*** letting listings work for 20 minutes"
   sleep 1200
 
   pid_after=$(sudo cvmfs_talk -i atlas.cern.ch pid)
+  echo "*** pid of atlas.cern.ch fuse module (after stressing): $pid_after"
   if [ x"$pid_before" != x"$pid_after" ]; then
-    echo "PID mismatch: pid before $pid_before, pid after $pid_after"
+    echo "*** PID mismatch: pid before $pid_before, pid after $pid_after"
+    echo "*** cat stacktrace file ($(date))"
+    cat "$(get_cvmfs_cachedir atlas.cern.ch)/stacktrace.atlas.cern.ch"
     RETVAL=2
   fi
 
+  echo "*** killing recursive listing processes"
   sudo kill -9 $pids_du
   wait $pids_du
 
