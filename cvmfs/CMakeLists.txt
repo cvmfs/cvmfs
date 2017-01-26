@@ -363,7 +363,7 @@ if (BUILD_CVMFS)
                                         ${LEVELDB_LIBRARIES}
                                         ${SHA3_LIBRARIES}
                                         ${SHA2_LIBRARIES}
-                                        ${PROTOBUF_LIBRARIES}
+                                        ${PROTOBUF_LIBRARY}
                                         ${VJSON_LIBRARIES}
                                         ${RT_LIBRARY}
                                         ${UUID_LIBRARIES}
@@ -398,51 +398,69 @@ endif (BUILD_CVMFS)
 
 
 if (BUILD_LIBCVMFS_CACHE)
-  add_library (cvmfs_cache STATIC ${LIBCVMFS_CACHE_SOURCES})
-  set (LIBCVMFS_CACHE_LIBS ${SHA3_LIBRARIES} ${PROTOBUF_LIBRARIES} ${LIBCVMFS_CACHE_LIBS})
-  set_target_properties (cvmfs_cache PROPERTIES COMPILE_FLAGS
+  add_library (cvmfs_cache_only STATIC ${LIBCVMFS_CACHE_SOURCES})
+  set (LIBCVMFS_CACHE_LIBS ${SHA3_LIBRARIES} ${PROTOBUF_LIBRARY} ${LIBCVMFS_CACHE_LIBS} ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache_only.a)
+  set_target_properties (cvmfs_cache_only PROPERTIES COMPILE_FLAGS
                          "${LIBCVMFS_CACHE_CFLAGS}")
-  # if (NOT MACOSX)
-  #   # We do not (yet) have a recipe for localizing private symbols
-  #   # in Mac OS X, so skip that step on Mac
-  #   set (LIBCVMFS_CACHE_PUBLIC_SYMS "-public" "${CMAKE_CURRENT_SOURCE_DIR}/cache_plugin/libcvmfs_cache_public_syms.txt")
-  # endif (NOT MACOSX)
+  target_link_libraries(cvmfs_cache_only ${LIBCVMFS_CACHE_LIBS})
+  if (NOT MACOSX)
+    # We do not (yet) have a recipe for localizing private symbols
+    # in Mac OS X, so skip that step on Mac
+    #set (LIBCVMFS_CACHE_PUBLIC_SYMS "-public" "${CMAKE_CURRENT_SOURCE_DIR}/cache_plugin/libcvmfs_cache_public_syms.txt")
+  endif (NOT MACOSX)
 
-  #target_link_libraries(cvmfs_cache ${LIBCVMFS_CACHE_LIBS} ${LIBCVMFS_CACHE_PUBLIC_SYMS})
-  target_link_libraries(cvmfs_cache ${LIBCVMFS_CACHE_LIBS})
+  add_custom_command(
+      OUTPUT libcvmfs_cache.a
+      COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/combine_libs ${LIBCVMFS_CACHE_PUBLIC_SYMS} libcvmfs_cache.a ${LIBCVMFS_CACHE_LIBS} 
+      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+      DEPENDS ${LIBCVMFS_CACHE_LIBS}
+    )
+
+  # dummy target to cause merged libcvmfs_cache to be produced
+  add_custom_target (libcvmfs_cache ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a)
+  add_dependencies (libcvmfs_cache cvmfs_cache_only)
 
 
   add_executable(cvmfs_cache_null ${CVMFS_CACHE_NULL_SOURCES})
   target_link_libraries(cvmfs_cache_null
-                        cvmfs_cache
+                        ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a
                         ${OPENSSL_LIBRARIES} ${RT_LIBRARY} pthread)
 
   add_executable(cvmfs_cache_ram ${CVMFS_CACHE_RAM_SOURCES})
   target_link_libraries(cvmfs_cache_ram
-                        cvmfs_cache
+                        ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a
                         ${OPENSSL_LIBRARIES} ${RT_LIBRARY} pthread)
 endif (BUILD_LIBCVMFS_CACHE)
 
 
 if (BUILD_LIBCVMFS)
-  add_library (cvmfs STATIC ${LIBCVMFS_SOURCES})
+  add_library (cvmfs_only STATIC ${LIBCVMFS_SOURCES})
 
   set (LIBCVMFS_LIBS ${CARES_LIBRARIES} ${LIBCURL_LIBRARIES}
                      ${PACPARSER_LIBRARIES} ${SQLITE3_LIBRARY}
                      ${ZLIB_LIBRARIES} ${SPARSEHASH_LIBRARIES}
                      ${SHA3_LIBRARIES} ${VJSON_LIBRARIES}
-                     ${PROTOBUF_LIBRARIES})
+                     ${PROTOBUF_LIBRARY} ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_only.a)
 
-  set_target_properties (cvmfs PROPERTIES COMPILE_FLAGS "${LIBCVMFS_CFLAGS}")
+  set_target_properties (cvmfs_only PROPERTIES COMPILE_FLAGS "${LIBCVMFS_CFLAGS}")
+  target_link_libraries(cvmfs_only ${LIBCVMFS_LIBS})
 
-  # if (NOT MACOSX)
-  #   # We do not (yet) have a recipe for localizing private symbols
-  #   # in Mac OS X, so skip that step on Mac
-  #   set (LIBCVMFS_PUBLIC_SYMS "-public" "${CMAKE_CURRENT_SOURCE_DIR}/libcvmfs_public_syms.txt")
-  # endif (NOT MACOSX)
+  if (NOT MACOSX)
+    # We do not (yet) have a recipe for localizing private symbols
+    # in Mac OS X, so skip that step on Mac
+    set (LIBCVMFS_PUBLIC_SYMS "-public" "${CMAKE_CURRENT_SOURCE_DIR}/libcvmfs_public_syms.txt")
+  endif (NOT MACOSX)
 
-  #target_link_libraries(cvmfs ${LIBCVMFS_LIBS} ${LIBCVMFS_PUBLIC_SYMS})
-  target_link_libraries(cvmfs ${LIBCVMFS_LIBS})
+  add_custom_command(
+      OUTPUT libcvmfs.a
+      COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/combine_libs ${LIBCVMFS_PUBLIC_SYMS} libcvmfs.a ${LIBCVMFS_LIBS}
+      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+      DEPENDS ${LIBCVMFS_LIBS}
+  )
+
+  # dummy target to cause merged libcvmfs to be produced
+  add_custom_target (libcvmfs ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a)
+  add_dependencies (libcvmfs cvmfs_only)
 
   add_executable( test_libcvmfs ${TEST_LIBCVMFS_SOURCES} )
   target_link_libraries(test_libcvmfs cvmfs
@@ -596,7 +614,7 @@ endif (BUILD_LIBCVMFS)
 
 if (BUILD_LIBCVMFS_CACHE)
   install (
-    TARGETS      cvmfs_cache
+    FILES          ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a
     DESTINATION    ${CMAKE_INSTALL_LIBDIR}
   )
   install (
