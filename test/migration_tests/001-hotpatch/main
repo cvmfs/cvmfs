@@ -35,15 +35,17 @@ checksum_large_files() {
   local pid1=
   local pid2=
   local pid3=
-  (sudo find $dir -type f -size +4M -exec sha1sum {} \; | cut -d' ' -f1 > $result_file) &
+  (sudo find $dir -type f -size +4M -exec sha1sum {} \; > ${result_file}.t1) &
   pid1=$!
-  (sudo find $dir -type f -size +4M -exec sha1sum {} \; | cut -d' ' -f1 > $result_file) &
+  (sudo find $dir -type f -size +4M -exec sha1sum {} \; > ${result_file}.t2) &
   pid2=$!
-  (sudo find $dir -type f -size +4M -exec sha1sum {} \; | cut -d' ' -f1 > $result_file) &
+  (sudo find $dir -type f -size +4M -exec sha1sum {} \; > ${result_file}.t3) &
   pid3=$!
   wait $pid1
   wait $pid2
   wait $pid3
+  cat ${result_file}.t* > $result_file
+  rm ${result_file}.t*
 }
 
 
