@@ -23,6 +23,8 @@
   * Fix handling of file:// url in CVMFS_SERVER_URL
 
 2.3.3:
+  * Fix 'cvmfs_server resign' if CVMFS_HASH_ALGORITHM is unset (CVM-1013)
+  * Compact reflog after garbage collection (CVM-1162)
   * Fix migration of server info JSON files (CVM-1159)
   * Fix selecting repositories by wildcard in cvmfs_server (CVM-1151)
   * Prevent GC from running at the same time as snapshot (CVM-1108)
@@ -30,7 +32,7 @@
   * Add CVMFS_CONFIG_REPO_REQUIRED option (CVM-1111)
   * Accept OverlayFS/ext4 on RHEL >= 7.3 (CVM-835)
   * Fix build on RHEL7.3 (CVM-1153)
-  * Increse robustness when fetching reflog and checksum (CVM-1114, CVM-1124)
+  * Increase robustness when fetching reflog and checksum (CVM-1114, CVM-1124)
   * Add cvmfs_talk external host switch (CVM-1126)
   * Fix misleading cache cleanup log message (CVM-1128)
   * Fix cvmfs_config on EL7 if working directory is /usr/bin (CVM-1118)
