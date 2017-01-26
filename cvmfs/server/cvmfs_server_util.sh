@@ -270,7 +270,7 @@ __is_valid_lock() {
   [ -z "$ignore_stale" ] || return 0 # lock is there (skip the stale test)
 
   local stale_pid=$(cat $lock_file 2>/dev/null)
-  [ $stale_pid -gt 0 ]     && \
+  [ -n "$stale_pid" ] && [ $stale_pid -gt 0 ]     && \
   kill -0 $stale_pid 2>/dev/null
 }
 
@@ -943,7 +943,7 @@ Supported Commands:
                   <fully qualified name>
                   Make a new repository snapshot
   gc              [-r number of revisions to preserve]
-                  [-t time stamp after which revisions are reseved]
+                  [-t time stamp after which revisions are preserved]
                   [-l (print deleted objects)] [-L log of deleted objects]
                   [-f (force)] [-d (dry run)]
                   <fully qualified repository name>

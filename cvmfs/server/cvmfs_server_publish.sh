@@ -72,7 +72,7 @@ cvmfs_server_publish() {
   # get repository names
   shift $(($OPTIND-1))
   check_parameter_count_for_multiple_repositories $#
-  names=$(get_or_guess_multiple_repository_names $@)
+  names=$(get_or_guess_multiple_repository_names "$@")
   check_multiple_repository_existence "$names"
 
   # sanity checks
@@ -387,7 +387,7 @@ publish_starting() {
   local name=$1
   load_repo_config $name
   local pub_lock="${CVMFS_SPOOL_DIR}/is_publishing"
-  acquire_lock "$pub_lock" ignore_stale || die "Failed to acquire publishing lock"
+  acquire_lock "$pub_lock" || die "Failed to acquire publishing lock"
   trap "publish_failed $name" EXIT HUP INT TERM
   run_suid_helper lock $name
   to_syslog_for_repo $name "started publishing"

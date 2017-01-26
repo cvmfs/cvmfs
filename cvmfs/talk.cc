@@ -341,6 +341,9 @@ void *TalkManager::MainResponder(void *data) {
         talk_mgr->Answer(con_fd, "OK\n");
       else
         talk_mgr->Answer(con_fd, "Failed\n");
+    } else if (line == "external host switch") {
+      mount_point->external_download_mgr()->SwitchHost();
+      talk_mgr->Answer(con_fd, "OK\n");
     } else if (line == "host switch") {
       mount_point->download_mgr()->SwitchHost();
       talk_mgr->Answer(con_fd, "OK\n");

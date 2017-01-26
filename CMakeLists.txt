@@ -229,6 +229,7 @@ endif (BUILD_ALL)
 #
 set (EXTERNALS_LIB_LOCATION       "${CMAKE_SOURCE_DIR}/externals")
 set (EXTERNALS_BUILD_LOCATION     "${CMAKE_BINARY_DIR}/externals")
+set (SSL_BUILTIN_LOCATION         "${EXTERNALS_BUILD_LOCATION}/build_ssl")
 set (SQLITE3_BUILTIN_LOCATION     "${EXTERNALS_BUILD_LOCATION}/build_sqlite3")
 set (CARES_BUILTIN_LOCATION       "${EXTERNALS_BUILD_LOCATION}/build_c-ares")
 set (LIBCURL_BUILTIN_LOCATION     "${EXTERNALS_BUILD_LOCATION}/build_libcurl")
@@ -409,9 +410,15 @@ endif (NOT MACOSX)
 
 # Required libraries depending on build target
 
-# All target require OpenSSL, gtest, vjson
-find_package (OpenSSL REQUIRED)
-set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${OPENSSL_INCLUDE_DIR})
+# Use builtin SSL, otherwise use the system OpenSSL
+if (MACOSX)
+    include (${SSL_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
+    set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${SSL_BUILTIN_LOCATION}/include)
+    set (OPENSSL_LIBRARIES ${SSL_ARCHIVE})
+else (MACOSX)
+    find_package (OpenSSL REQUIRED)
+    set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${OPENSSL_INCLUDE_DIR})
+endif(MACOSX)
 
 if (GOOGLETEST_BUILTIN)
   include (${GOOGLETEST_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)

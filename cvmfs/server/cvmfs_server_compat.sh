@@ -73,6 +73,10 @@ least CernVM-FS $creator to manipulate this repository."
   #   2.2.0-1+ -> 2.3.0-1
   #     -> new scratch directory layout (which also effects /etc/fstab)
   #
+  #   2.3.0-1+ --> 2.3.3-1
+  #     -> update global JSON info if repo was migrated from 2.1.20 or before
+  #        (CVM-1159)
+  #
   # Note: I tried to make this code as verbose as possible
   #
   if [ "$creator" = "2.1.6" ] && version_greater_or_equal "2.1.7"; then
@@ -123,7 +127,15 @@ least CernVM-FS $creator to manipulate this repository."
     fi
   fi
 
+  if [ "$creator" = "2.2.0-1" ] || [ "$creator" = "2.2.1-1" ] || \
+     [ "$creator" = "2.2.2-1" ] || [ "$creator" = "2.2.3-1" ] || \
+     [ "$creator" = "2.3.0-1" ] || [ "$creator" = "2.3.1-1" ] || \
+     [ "$creator" = "2.3.2-1" ]; then
+    if version_greater_or_equal "2.3.3"; then
+      _repo_is_incompatible "$creator" $nokill
+      return $?
+    fi
+  fi
+
   return 0
 }
-
-

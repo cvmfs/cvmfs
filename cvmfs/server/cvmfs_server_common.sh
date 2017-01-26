@@ -88,7 +88,7 @@ get_or_guess_multiple_repository_names() {
     return 0;
   fi
 
-  for input_pattern in $@; do
+  for input_pattern in "$@"; do
     local names="$(ls --directory $repo_dir/$input_pattern 2>/dev/null)"
     if [ x"$names" = x"" ]; then
       repo_names="$repo_names $input_pattern"
@@ -268,18 +268,20 @@ get_repo_info() {
 is_in_transaction() {
   local name=$1
   load_repo_config $name
+  # ignore if the lock is "stale" because the process starting
+  #  transactions goes away
   check_lock ${CVMFS_SPOOL_DIR}/in_transaction ignore_stale
 }
 
 
-# checks if a repository is currently runing a publish procedure
+# checks if a repository is currently running a publish procedure
 #
 # @param name  the repository name to be checked
 # @return      0 if a publishing procedure is running
 is_publishing() {
   local name=$1
   load_repo_config $name
-  check_lock ${CVMFS_SPOOL_DIR}/is_publishing ignore_stale
+  check_lock ${CVMFS_SPOOL_DIR}/is_publishing
 }
 
 
@@ -480,6 +482,8 @@ open_transaction() {
   local tx_lock="${CVMFS_SPOOL_DIR}/in_transaction"
 
   is_stratum0 $name                    || die "Cannot open transaction on Stratum1"
+  # ignore if lock is "stale" because the process that created it 
+  #  goes away
   acquire_lock "$tx_lock" ignore_stale || die "Failed to create transaction lock"
   run_suid_helper open $name           || die "Failed to make /cvmfs/$name writable"
 
@@ -550,6 +554,68 @@ close_transaction() {
   local fallback_msg=""
   [ $use_fd_fallback -eq 0 ] || fallback_msg="(using force)"
   to_syslog_for_repo $name "closed transaction $fallback_msg $async_msg"
+}
+
+
+# Release an update lock
+#
+# @param name             the repository to release
+
+release_update_lock() {
+  local name=$1
+
+  load_repo_config $name
+  release_lock ${CVMFS_SPOOL_DIR}/is_updating || echo "Warning: failed to release updating lock"
+}
+
+# Acquire an update lock for a repository.  Always pair with a call to
+#   release_update_lock if returns successful.
+# 
+# @param name               the repository to lock
+# @param update_type        update type such as snapshot or gc
+# @param abort_on_conflict  0 to wait for lock, 1 to abort if already acquired.
+#                           Default 0.  Always aborts if initial snapshot is
+#                           in progress.
+# @return                   0 if lock successfully acquired
+
+acquire_update_lock()
+{
+  local name=$1
+  local update_type=$2
+  local abort_on_conflict=${3:-0}
+
+  load_repo_config $name
+  local update_lock=${CVMFS_SPOOL_DIR}/is_updating
+
+  # check for other updates in progress
+  if ! acquire_lock $update_lock ignore_stale; then
+    if [ $abort_on_conflict -eq 1 ]; then
+      echo "another update is in progress... aborting"
+      to_syslog_for_repo $name "did not $update_type (another update in progress)"
+      return 1
+    fi
+
+    local user_shell="$(get_user_shell $name)"
+    local initial_snapshot=0
+    if $user_shell "$(__swissknife_cmd) peek -d .cvmfs_last_snapshot -r $CVMFS_UPSTREAM_STORAGE" | grep -v -q "available"; then
+      initial_snapshot=1
+    fi
+
+    if [ $initial_snapshot -eq 1 ]; then
+      echo "an initial snapshot is in progress... aborting"
+      to_syslog_for_repo $name "did not $update_type (initial snapshot in progress)"
+      return 1
+    fi
+
+    echo "waiting for another update to finish..."
+    if ! wait_and_acquire_lock $update_lock; then
+      echo "failed to acquire update lock"
+      to_syslog_for_repo $name "did not $update_type (locking issues)"
+      return 1
+    fi
+  fi
+
+  # The lock is now acquired
 }
 
 

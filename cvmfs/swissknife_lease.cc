@@ -4,13 +4,14 @@
 
 #include "swissknife_lease.h"
 
-#include <fstream>
-#include <sstream>
+#include <algorithm>
+#include <vector>
 
 #include "swissknife_lease_curl.h"
 #include "swissknife_lease_json.h"
 
 #include "logging.h"
+#include "util/string.h"
 
 namespace {
 
@@ -27,18 +28,17 @@ bool CheckParams(const swissknife::CommandLease::Parameters& p) {
 namespace swissknife {
 
 enum LeaseError {
-  LEASE_SUCCESS           = 0,
-  LEASE_UNUSED            = 1,
-  LEASE_PARAM_ERROR       = 2,
-  LEASE_CURL_INIT_ERROR   = 3,
-  LEASE_FILE_OPEN_ERROR   = 4,
-  LEASE_FILE_DELETE_ERROR = 5,
-  LEASE_PARSE_ERROR       = 6,
-  LEASE_CURL_REQ_ERROR    = 7,
+  kLeaseSuccess = 0,
+  kLeaseUnused = 1,
+  kLeaseParamError = 2,
+  kLeaseCurlInitError = 3,
+  kLeaseFileOpenError = 4,
+  kLeaseFileDeleteError = 5,
+  kLeaseParseError = 6,
+  kLeaseCurlReqError = 7,
 };
 
-CommandLease::~CommandLease() {
-}
+CommandLease::~CommandLease() {}
 
 ParameterList CommandLease::GetParams() const {
   ParameterList r;
@@ -55,83 +55,80 @@ int CommandLease::Main(const ArgumentList& args) {
   params.repo_service_url = *(args.find('u')->second);
   params.action = *(args.find('a')->second);
   params.user_name = *(args.find('n')->second);
-  params.lease_fqdn = *(args.find('p')->second);
+
+  const std::string lease_full_path = *(args.find('p')->second);
+  std::vector<std::string> tokens = SplitString(lease_full_path, '/');
+  params.lease_fqdn = tokens.front();
+
+  // Remove the fqdn from the list of tokens and join them with "_" to make the
+  // token file suffix
+  tokens.erase(tokens.begin());
+  params.token_file_suffix = JoinStrings(tokens, "_");
 
   if (!CheckParams(params)) {
-    return LEASE_PARAM_ERROR;
+    return kLeaseParamError;
   }
 
   // Initialize curl
   if (curl_global_init(CURL_GLOBAL_ALL)) {
-    return LEASE_CURL_INIT_ERROR;
+    return kLeaseCurlInitError;
   }
 
-  LeaseError ret = LEASE_SUCCESS;
+  LeaseError ret = kLeaseSuccess;
   if (params.action == "acquire") {
     CurlBuffer buffer;
-    if (MakeAcquireRequest(params.user_name,
-                           params.lease_fqdn,
-                           params.repo_service_url,
-                           &buffer)) {
+    if (MakeAcquireRequest(params.user_name, params.lease_fqdn,
+                           params.repo_service_url, &buffer)) {
       std::string session_token;
-      if (ParseAcquireReply(buffer, &session_token)) {
-        // Save session token to /var/spool/cvmfs/<REPO_NAME>
+      if (buffer.data.size() > 0 && ParseAcquireReply(buffer, &session_token)) {
+        // Save session token to
+        // /var/spool/cvmfs/<REPO_NAME>/session_token_<SUBPATH>
         // TODO(radu): Is there a special way to access the scratch directory?
-        std::string token_file_name = "/var/spool/cvmfs/" +
-            params.lease_fqdn + "/session_token";
-        std::ofstream token_file(token_file_name.c_str(), std::ios_base::out);
-        if (token_file.is_open()) {
-          token_file << session_token;
-        } else {
-          LogCvmfs(kLogCvmfs,
-                   kLogStderr,
-                   "Error opening file: %s",
+        const std::string token_file_name =
+            "/var/spool/cvmfs/" + params.lease_fqdn + "/session_token_" +
+            params.token_file_suffix;
+        if (!SafeWriteToFile(session_token, token_file_name, 0600)) {
+          LogCvmfs(kLogCvmfs, kLogStderr, "Error opening file: %s",
                    std::strerror(errno));
-          ret = LEASE_FILE_OPEN_ERROR;
+          ret = kLeaseFileOpenError;
         }
       } else {
-        ret = LEASE_PARSE_ERROR;
+        ret = kLeaseParseError;
       }
     } else {
-      ret = LEASE_CURL_REQ_ERROR;
+      ret = kLeaseCurlReqError;
     }
   } else if (params.action == "drop") {
     // Try to read session token from repository scratch directory
     std::string session_token;
-    std::string token_file_name = "/var/spool/cvmfs/" +
-        params.lease_fqdn + "/session_token";
-    std::ifstream token_file(token_file_name.c_str(), std::ios_base::in);
-    bool success = false;
-    if (token_file.is_open()) {
-      std::stringstream sstr;
-      sstr << token_file.rdbuf();
-      session_token = sstr.str();
-      LogCvmfs(kLogCvmfs,
-               kLogStderr,
-               "Read session token from file: %s",
+    std::string token_file_name = "/var/spool/cvmfs/" + params.lease_fqdn +
+                                  "/session_token_" + params.token_file_suffix;
+    FILE* token_file = std::fopen(token_file_name.c_str(), "r");
+    if (token_file) {
+      GetLineFile(token_file, &session_token);
+      LogCvmfs(kLogCvmfs, kLogStderr, "Read session token from file: %s",
                session_token.c_str());
 
       CurlBuffer buffer;
       if (MakeDeleteRequest(session_token, params.repo_service_url, &buffer)) {
-        if (ParseDropReply(buffer)) {
-          success = true;
+        if (buffer.data.size() > 0 && ParseDropReply(buffer)) {
+          std::fclose(token_file);
+          if (unlink(token_file_name.c_str())) {
+            LogCvmfs(kLogCvmfs, kLogStderr,
+                     "Error deleting session token file");
+            ret = kLeaseFileDeleteError;
+          }
         } else {
           LogCvmfs(kLogCvmfs, kLogStderr, "Could not drop active lease");
-          ret = LEASE_PARSE_ERROR;
+          ret = kLeaseParseError;
         }
       } else {
         LogCvmfs(kLogCvmfs, kLogStderr, "Error making DELETE request");
-        ret = LEASE_CURL_REQ_ERROR;
+        ret = kLeaseCurlReqError;
       }
     } else {
       LogCvmfs(kLogCvmfs, kLogStderr, "Error reading session token from file");
-      ret = LEASE_FILE_OPEN_ERROR;
-    }
-
-    token_file.close();
-    if (success && std::remove(token_file_name.c_str())) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Error deleting session token file");
-      ret = LEASE_FILE_DELETE_ERROR;
+      ret = kLeaseFileOpenError;
     }
   }
 
