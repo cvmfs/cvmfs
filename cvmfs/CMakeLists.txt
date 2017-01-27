@@ -202,6 +202,11 @@ set (CVMFS_CACHE_RAM_SOURCES
   util/string.cc util/string.h
 )
 
+set (CVMFS_CACHE_CHIRP_SOURCES
+  cache_plugin/libcvmfs_cache.h
+  cache_plugin/cvmfs_cache_chirp.c
+)
+
 set (CVMFS_FSCK_SOURCES
   atomic.h
   compression.cc compression.h
@@ -570,6 +575,16 @@ if (BUILD_LIBCVMFS_CACHE)
                         ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a
                         ${OPENSSL_LIBRARIES} ${RT_LIBRARY} pthread)
   add_dependencies (cvmfs_cache_ram libcvmfs_cache)
+
+  if (BUILD_CCTOOLS)
+    add_executable(cvmfs_cache_chirp ${CVMFS_CACHE_CHIRP_SOURCES})
+    target_link_libraries(cvmfs_cache_chirp
+                          ${CHIRP_ARCHIVE} ${DTTOOLS_ARCHIVE}
+                          ${UUID_LIBRARIES}
+                          ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a
+                          ${OPENSSL_LIBRARIES} ${RT_LIBRARY} stdc++ pthread m)
+    add_dependencies (cvmfs_cache_chirp libchirp libdttools libcvmfs_cache)
+  endif (BUILD_CCTOOLS)
 endif (BUILD_LIBCVMFS_CACHE)
 
 
