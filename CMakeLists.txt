@@ -157,9 +157,11 @@ include (cvmfs_compiler)
 # define where to find the external dependencies
 #
 set (EXTERNALS_LIB_LOCATION       "${CMAKE_SOURCE_DIR}/externals")
-set (EXTERNALS_BUILD_LOCATION     "${CMAKE_SOURCE_DIR}/externals_build")
-set (EXTERNALS_INSTALL_LOCATION   "${CMAKE_SOURCE_DIR}/externals_install")
-
+if (NOT EXTERNALS_PREFIX)
+    set(EXTERNALS_PREFIX ${CMAKE_SOURCE_DIR})
+endif(NOT EXTERNALS_PREFIX)
+set (EXTERNALS_BUILD_LOCATION     "${EXTERNALS_PREFIX}/externals_build")
+set (EXTERNALS_INSTALL_LOCATION   "${EXTERNALS_PREFIX}/externals_install")
 
 #
 # run the bootstrap shellscript (not needed in the distributed version of the source)
@@ -322,7 +324,7 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR
 
   find_package (CURL REQUIRED)
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${CURL_INCLUDE_DIRS})
-  
+
   if (CURL_INCLUDE_DIRS)
     find_program(CURL_CONFIG_EXEC NAMES curl-config)
     if (CURL_CONFIG_EXEC)
@@ -344,7 +346,7 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR
 
   find_package(leveldb)
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${LEVELDB_INCLUDE_DIR})
-  
+
   find_package (UUID REQUIRED)
 endif (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR
        BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG OR BUILD_PRELOADER)
