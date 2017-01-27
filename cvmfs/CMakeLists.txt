@@ -419,17 +419,19 @@ if (BUILD_LIBCVMFS_CACHE)
   # dummy target to cause merged libcvmfs_cache to be produced
   add_custom_target (libcvmfs_cache ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a)
   add_dependencies (libcvmfs_cache cvmfs_cache_only)
-
+  
 
   add_executable(cvmfs_cache_null ${CVMFS_CACHE_NULL_SOURCES})
   target_link_libraries(cvmfs_cache_null
                         ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a
                         ${OPENSSL_LIBRARIES} ${RT_LIBRARY} pthread)
+  add_dependencies(cvmfs_cache_null libcvmfs_cache)
 
   add_executable(cvmfs_cache_ram ${CVMFS_CACHE_RAM_SOURCES})
   target_link_libraries(cvmfs_cache_ram
                         ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a
                         ${OPENSSL_LIBRARIES} ${RT_LIBRARY} pthread)
+  add_dependencies(cvmfs_cache_ram libcvmfs_cache)
 endif (BUILD_LIBCVMFS_CACHE)
 
 
@@ -463,6 +465,7 @@ if (BUILD_LIBCVMFS)
   add_dependencies (libcvmfs cvmfs_only)
 
   add_executable( test_libcvmfs ${TEST_LIBCVMFS_SOURCES} )
+  add_dependencies(test_libcvmfs libcvmfs)
   target_link_libraries(test_libcvmfs
                         ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a
                         ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${CARES_LIBRARIES}
