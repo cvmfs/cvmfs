@@ -178,6 +178,9 @@ if (BUILTIN_EXTERNALS)
     if (BUILD_UBENCHMARKS)
       set(ENV{BUILD_UBENCHMARKS} "true")
     endif(BUILD_UBENCHMARKS)
+    if (BUILD_SERVER OR BUILD_SERVER_DEBUG)
+      set(ENV{BUILD_SERVER} "true")
+    endif (BUILD_SERVER OR BUILD_SERVER_DEBUG)
 
     message (STATUS "running bootstrap.sh ...")
     execute_process (
@@ -196,6 +199,7 @@ if (BUILTIN_EXTERNALS)
     set(ENV{CVMFS_BASE_C_FLAGS} "")
     set(ENV{CVMFS_BASE_CXX_FLAGS} "")
     set(ENV{BUILD_UBENCHMARKS} "")
+    set(ENV{BUILD_SERVER} "")
   endif (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
 
   # In the case of built-in external libraries, we need to set CMAKE_PREFIX_PATH to
@@ -404,10 +408,12 @@ if (BUILD_SERVER OR BUILD_SERVER_DEBUG)
 
   if (BUILTIN_EXTERNALS)
     set(libgeoip_names libGeoIP.a GeoIP)
-  endif(BUILTIN_EXTERNALS)
+    #set(ENV{PYTHONPATH} ${EXTERNALS_INSTALL_LOCATION}/lib)
+    find_library(PY_GEOIP_LIBRARY GeoIP.so ${EXTERNALS_INSTALL_LOCATION}/lib)
+  else (BUILTIN_EXTERNALS)
+    find_python_module (GeoIP REQUIRED)
+  endif (BUILTIN_EXTERNALS)
   find_package (LibGeoIP REQUIRED)
-  set(ENV{PYTHONPATH} ${EXTERNALS_INSTALL_LOCATION}/lib)
-  find_python_module (GeoIP REQUIRED)
 endif (BUILD_SERVER OR BUILD_SERVER_DEBUG)
 
 

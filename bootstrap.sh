@@ -181,14 +181,16 @@ build_lib() {
         do_build "googletest"
       ;;
     libgeoip)
-      do_extract "libgeoip" "GeoIP-${LIBGEOIP_VERSION}.tar.gz"
-      replace_in_external "libgeoip" "config.guess.latest" "config.guess"
-      replace_in_external "libgeoip" "config.sub.latest" "config.sub"
-      do_build "libgeoip"
+      if [ x"BUILD_SERVER" != x"" ]; then
+        do_extract "libgeoip" "GeoIP-${LIBGEOIP_VERSION}.tar.gz"
+        replace_in_external "libgeoip" "config.guess.latest" "config.guess"
+        replace_in_external "libgeoip" "config.sub.latest" "config.sub"
+        do_build "libgeoip"
 
-      rm -rf $externals_build_dir/build_python-geoip
-      do_extract "python-geoip" "GeoIP-${PYTHON_GEOIP_VERSION}.tar.gz"
-      do_build "python-geoip"
+        rm -rf $externals_build_dir/build_python-geoip
+        do_extract "python-geoip" "GeoIP-${PYTHON_GEOIP_VERSION}.tar.gz"
+        do_build "python-geoip"
+      fi
       ;;
     tbb)
       do_extract "tbb"          "tbb-${TBB_VERSION}.tar.gz"
@@ -228,6 +230,7 @@ build_lib() {
       echo "Unknown library name. Exiting."
       exit 1
   esac
+  echo $l >> $externals_install_dir/.bootstrapDone
 }
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -259,7 +262,6 @@ fi
 
 for l in $missing_libs; do
   build_lib $l
-  echo $l >> $externals_install_dir/.bootstrapDone
 done
 
 ## Done!
