@@ -1,9 +1,0 @@
-include ("${EXTERNALS_LIB_LOCATION}/CMake-Register_External_Lib.txt")
-
-set (PROTOBUF_ARCHIVE "${PROTOBUF_BUILTIN_LOCATION}/src/.libs/libprotobuf-lite.a")
-set (PROTOBUF_C "${PROTOBUF_BUILTIN_LOCATION}/src/protoc")
-
-register_external_lib (protobuf ${PROTOBUF_BUILTIN_LOCATION} ${PROTOBUF_ARCHIVE})
-
-set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -I${PROTOBUF_BUILTIN_LOCATION}/src")
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I${PROTOBUF_BUILTIN_LOCATION}/src")
