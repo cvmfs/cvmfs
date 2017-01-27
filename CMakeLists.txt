@@ -173,6 +173,10 @@ if (BUILTIN_EXTERNALS)
     set(ENV{CVMFS_BASE_C_FLAGS} ${CVMFS_BASE_C_FLAGS})
     set(ENV{CVMFS_BASE_CXX_FLAGS} ${CVMFS_BASE_CXX_FLAGS})
 
+    if (BUILD_UBENCHMARKS)
+      set(ENV{BUILD_UBENCHMARKS} "true")
+    endif(BUILD_UBENCHMARKS)
+
     message (STATUS "running bootstrap.sh ...")
     execute_process (
       COMMAND           sh ${CMAKE_SOURCE_DIR}/bootstrap.sh
@@ -189,6 +193,7 @@ if (BUILTIN_EXTERNALS)
     set(ENV{EXTERNALS_INSTALL_LOCATION} "")
     set(ENV{CVMFS_BASE_C_FLAGS} "")
     set(ENV{CVMFS_BASE_CXX_FLAGS} "")
+    set(ENV{BUILD_UBENCHMARKS} "")
   endif (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
 
   # In the case of built-in external libraries, we need to set CMAKE_PREFIX_PATH to

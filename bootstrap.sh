@@ -27,6 +27,7 @@ if [ x"$EXTERNALS_INSTALL_LOCATION" = x"" ]; then
   echo "Bootstrap - Missing environment variable: EXTERNALS_INSTALL_LOCATION"
  exit 1;
 fi
+
 echo "Bootstrap - Externals lib location: $EXTERNALS_LIB_LOCATION"
 echo "Bootstrap - Externals build location: $EXTERNALS_BUILD_LOCATION"
 echo "Bootstrap - Externals install location: $EXTERNALS_INSTALL_LOCATION"
@@ -174,10 +175,10 @@ build_lib() {
       do_build "leveldb"
       ;;
     googletest)
-      do_extract "googletest"   "gtest-${GOOGLETEST_VERSION}.tar.gz"
-      replace_in_external "googletest"  "config.guess.latest" "build-aux/config.guess"
-      replace_in_external "googletest"  "config.sub.latest" "build-aux/config.sub"
-      do_build "googletest"
+        do_extract "googletest"   "gtest-${GOOGLETEST_VERSION}.tar.gz"
+        replace_in_external "googletest"  "config.guess.latest" "build-aux/config.guess"
+        replace_in_external "googletest"  "config.sub.latest" "build-aux/config.sub"
+        do_build "googletest"
       ;;
     libgeoip)
       do_extract "libgeoip" "GeoIP-${LIBGEOIP_VERSION}.tar.gz"
@@ -201,8 +202,10 @@ build_lib() {
       do_build "protobuf"
       ;;
     googlebench)
-      do_copy "googlebench"
-      do_build "googlebench"
+      if [ x"$BUILD_UBENCHMARKS" != x"" ]; then
+        do_copy "googlebench"
+        do_build "googlebench"
+      fi
       ;;
     sqlite3)
       do_copy "sqlite3"
