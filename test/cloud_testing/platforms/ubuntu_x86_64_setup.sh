@@ -25,7 +25,11 @@ echo "done"
 # update package manager cache
 echo -n "updating package manager cache... "
 sudo apt-get update > /dev/null || die "fail (apt-get update)"
-sudo apt-get -y upgrade > /dev/null || die "fail (apt-get upgrade)"
+echo "done"
+
+# install latest version of libc to make sure it has the symbols from the build machine
+echo -n "updating libc6... "
+install_from_repo libc6 || die "fail (libc6)"
 echo "done"
 
 # install package dependency resolve program
