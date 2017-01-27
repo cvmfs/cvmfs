@@ -2355,8 +2355,6 @@ filter_auto_tags() {
   local old_tags="$(echo "$auto_tags" | while read tag_name timestamp; do
     if [ "$timestamp" -lt "$auto_tags_timespan" ]; then
       echo -n "$tag_name "
-    else
-      break
     fi
   done)"
   # Trim old_tags
