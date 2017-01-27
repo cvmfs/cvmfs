@@ -7,8 +7,13 @@ cvmfs_run_test() {
   cvmfs_mount lhcb.cern.ch,atlas.cern.ch,atlas-condb.cern.ch,cms.cern.ch || return 1
 
   . /cvmfs/lhcb.cern.ch/etc/login.sh || return 2
-  . SetupProject.sh Brunel || return 3
-  gaudirun.py ${BRUNELSYSROOT}/tests/options/testBrunel.py || return 4
+  local latest_brunel="$(lb-run -l Brunel | head -n 1 | awk '{print $1}')"
+  echo "*** Latest Brunel version: $latest_brunel"
+  local brunel_sys_root="$(lb-run Brunel $latest_brunel \
+    bash --norc -c 'echo $BRUNELSYSROOT')"
+  echo "*** brunel_sys_root is $brunel_sys_root"
+  lb-run Brunel $latest_brunel \
+    gaudirun.py ${brunel_sys_root}/tests/options/testBrunel.py || return 4
   check_memory lhcb.cern.ch 75000
 
   export ATL_LOCAL_ROOT=/cvmfs/atlas.cern.ch/repo

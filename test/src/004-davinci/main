@@ -4,15 +4,17 @@ cvmfs_test_name="Setup Davinci"
 cvmfs_run_test() {
   logfile=$1
 
-  cvmfs_mount lhcb || 1
+  cvmfs_mount lhcb || return 1
 
   . /cvmfs/lhcb.cern.ch/etc/login.sh || return 1
-  ( time SetupProject.sh Davinci ) || return 2
+  local latest_davinci="$(lb-run -l DaVinci | head -n 1 | awk '{print $1}')"
+  echo "*** Latest DaVinci version: $latest_davinci"
+  ( time lb-run DaVinci $latest_davinci /bin/true ) || return 2
   sync
   sudo sh -c "echo 3 > /proc/sys/vm/drop_caches" || return 3
 
   start_time=$(date -u +%s)
-  ( time SetupProject.sh Davinci ) || return 4
+  ( time lb-run DaVinci $latest_davinci /bin/true ) || return 4
   end_time=`date -u +%s`
   check_time $start_time $end_time 180
 
@@ -28,7 +30,7 @@ cvmfs_run_test() {
   echo "All catalogs: $all_catalogs"
   sudo cvmfs_talk -i lhcb.cern.ch internal affairs || return 9
 
-  check_memory lhcb.cern.ch 75000
+  check_memory lhcb.cern.ch 50000
 
   return 0
 }

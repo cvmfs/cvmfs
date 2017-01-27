@@ -4,7 +4,9 @@ cvmfs_test_name="Recursive listing"
 cvmfs_run_test() {
   logfile=$1
 
-  cvmfs_mount sft.cern.ch "CVMFS_MAX_RETRIES=3" || return 1
+  cvmfs_mount sft.cern.ch "CVMFS_MAX_RETRIES=3" \
+    "CVMFS_AUTO_UPDATE=false" \
+    || return 1
 
   # this used to be --max-depth=3 instead of -d 3, but it had to be changed for compatibility with
   if running_on_osx; then
