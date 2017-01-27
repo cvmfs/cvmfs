@@ -224,6 +224,7 @@ class FileSystem : SingleCopy, public BootFactory {
   bool CreateCache();
   bool SetupQuotaMgmt();
   bool SetupNfsMaps();
+  void SetupUuid();
 
   bool CheckCacheMode();
   void DetermineCacheMode();

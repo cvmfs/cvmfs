@@ -147,6 +147,9 @@ FileSystem *FileSystem::Create(const FileSystem::FileSystemInfo &fs_info) {
 
   if (!file_system->CreateCache())
     return file_system.Release();
+  file_system->SetupUuid();
+  if (!file_system->SetupNfsMaps())
+    return file_system.Release();
   bool retval = sqlite::RegisterVfsRdOnly(
     file_system->cache_mgr_,
     file_system->statistics_,
@@ -297,30 +300,6 @@ bool FileSystem::CreateCache() {
   if (cache_mode_ & FileSystem::kCacheManaged) {
     if (!SetupQuotaMgmt())
       return false;
-  }
-
-  if (!SetupNfsMaps())
-    return false;
-
-  // Create or load from cache, used as id by the download manager when the
-  // proxy template is replaced
-  switch (cache_mgr_type_) {
-    case kPosixCacheManager:
-    case kTieredCacheManager:
-      uuid_cache_ = cvmfs::Uuid::Create(cache_dir_ + "/uuid");
-      break;
-    case kRamCacheManager:
-    case kExternalCacheManager:
-      uuid_cache_ = cvmfs::Uuid::Create("");
-      break;
-    case kUnknownCacheManager:
-      abort();
-  }
-  if (uuid_cache_ == NULL) {
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
-             "failed to load/store %s/uuid", cache_dir_.c_str());
-    uuid_cache_ = cvmfs::Uuid::Create("");
-    assert(uuid_cache_ != NULL);
   }
 
   return true;
@@ -827,6 +806,30 @@ bool FileSystem::SetupWorkspace() {
     return false;
 
   return true;
+}
+
+
+void FileSystem::SetupUuid() {
+  // Create or load from cache, used as id by the download manager when the
+  // proxy template is replaced
+  switch (cache_mgr_type_) {
+    case kPosixCacheManager:
+    case kTieredCacheManager:
+      uuid_cache_ = cvmfs::Uuid::Create(cache_dir_ + "/uuid");
+      break;
+    case kRamCacheManager:
+    case kExternalCacheManager:
+      uuid_cache_ = cvmfs::Uuid::Create("");
+      break;
+    case kUnknownCacheManager:
+      abort();
+  }
+  if (uuid_cache_ == NULL) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+             "failed to load/store %s/uuid", cache_dir_.c_str());
+    uuid_cache_ = cvmfs::Uuid::Create("");
+    assert(uuid_cache_ != NULL);
+  }
 }
 
 
