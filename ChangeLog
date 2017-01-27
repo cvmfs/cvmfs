@@ -1,4 +1,5 @@
 2.3.3:
+  * Fix potential deadlock when uploading catalogs (CVM-1165)
   * Fix 'cvmfs_server resign' if CVMFS_HASH_ALGORITHM is unset (CVM-1013)
   * Compact reflog after garbage collection (CVM-1162)
   * Fix migration of server info JSON files (CVM-1159)
