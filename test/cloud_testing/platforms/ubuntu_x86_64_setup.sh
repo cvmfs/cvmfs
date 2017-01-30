@@ -28,8 +28,9 @@ sudo apt-get update > /dev/null || die "fail (apt-get update)"
 echo "done"
 
 # install latest version of libc to make sure it has the symbols from the build machine
-echo -n "updating libc6... "
+echo -n "updating libc6, libstdc++6... "
 install_from_repo libc6 || die "fail (libc6)"
+install_from_repo libstdc++6 || die "fail (libstdc++6)"
 echo "done"
 
 # install package dependency resolve program
