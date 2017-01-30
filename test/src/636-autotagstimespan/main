@@ -31,6 +31,8 @@ cvmfs_run_test() {
 
   echo "*** check that auto-removal deletes the right tags"
   set_auto_tag_timespan $CVMFS_TEST_REPO "$(date)" || return 40
+  echo "*** auto tag deadline should appear in server.conf"
+  sudo cat /etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/server.conf
   sleep 5
   start_transaction $CVMFS_TEST_REPO || return $?
   publish_repo $CVMFS_TEST_REPO || return $?
