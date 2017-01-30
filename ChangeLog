@@ -23,6 +23,7 @@
   * Fix handling of file:// url in CVMFS_SERVER_URL
 
 2.3.3:
+  * Add .cvmfs_status file (CVM-1107)
   * Fix potential deadlock when uploading catalogs (CVM-1165)
   * Fix 'cvmfs_server resign' if CVMFS_HASH_ALGORITHM is unset (CVM-1013)
   * Compact reflog after garbage collection (CVM-1162)
