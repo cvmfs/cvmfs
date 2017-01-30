@@ -535,10 +535,8 @@ endif (BUILD_SERVER)
 if (BUILD_PRELOADER)
   add_executable (cvmfs_preload_bin ${CVMFS_PRELOADER_SOURCES})
 
-  target_link_libraries(cvmfs_preload_bin ${SQLITE3_LIBRARY} ${CARES_LIBRARIES}
-                        ${CURL_LIBRARIES} ${ZLIB_LIBRARIES}
-                        ${OPENSSL_LIBRARIES} ${CARES_LIBRARIS}
-                        ${TBB_LIBRARIES} ${RT_LIBRARY}
+  target_link_libraries(cvmfs_preload_bin ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${CARES_LIBRARIES} ${ZLIB_LIBRARIES}
+                        ${OPENSSL_LIBRARIES} ${CARES_LIBRARIS} ${TBB_LIBRARIES} ${RT_LIBRARY}
                         ${UUID_LIBRARIES} ${VJSON_LIBRARIES} ${SHA3_LIBRARIES}
                         pthread dl)
 endif (BUILD_PRELOADER)
