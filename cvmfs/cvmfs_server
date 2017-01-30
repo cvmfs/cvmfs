@@ -1480,6 +1480,8 @@ try_mount_remount_cycle_aufs() {
 
 
 # download a given file from the backend storage
+# @param name  the name of the repository to download from
+# @param url   the url to download from
 # @param noproxy  (optional)
 get_item() {
   local name="$1"
@@ -1492,6 +1494,27 @@ get_item() {
     unset http_proxy && curl $(get_follow_http_redirects_flag) "$url" 2>/dev/null
   else
     curl $(get_follow_http_redirects_flag) "$url" 2>/dev/null
+  fi
+}
+
+
+# read an item from local or backend repository storage to stdout
+# @param name  the name of the repository to download from
+# @param item  the name of the item to download
+# if the file does not exist, there will be no output and the
+#  return will be an error code
+read_repo_item() {
+  local name="$1"
+  local item="$2"
+
+  load_repo_config $name
+
+  if is_local_upstream $CVMFS_UPSTREAM_STORAGE; then
+    cat $(get_upstream_config $upstream)/"$item" 2>/dev/null
+  elif is_stratum0 $name; then
+    get_item $name $CVMFS_STRATUM0/"$item" noproxy
+  else
+    get_item $name $CVMFS_STRATUM1/"$item" noproxy
   fi
 }
 
@@ -2364,28 +2387,6 @@ filter_auto_tags() {
 }
 
 
-# upload a timestamp file for the given action
-#
-# @param name       the name of the repository to upload a timestamp to
-# @param action     the action that the timestamp is for
-#
-upload_timestamp_file()
-{
-  local name="$1"
-  local action="$2"
-
-  load_repo_config $name
-  local user_shell="$(get_user_shell $name)"
-
-  local action_tmp="${CVMFS_SPOOL_DIR}/tmp/last_$action"
-  $user_shell "date --utc > $action_tmp"
-  $user_shell "$(__swissknife_cmd) upload -r ${CVMFS_UPSTREAM_STORAGE} \
-    -i $action_tmp                                                     \
-    -o .cvmfs_last_$action"
-  $user_shell "rm -f $action_tmp"
-}
-
-
 migrate_legacy_dirtab() {
   local name=$1
   local dirtab_path="/cvmfs/${name}/.cvmfsdirtab"
@@ -2953,24 +2954,29 @@ get_editor() {
 }
 
 
+has_jq() {
+  which jq > /dev/null 2>&1
+}
+
+
 check_jq() {
-  local has_jq=1
-  if ! which jq > /dev/null 2>&1; then
-    has_jq=0
+  local hasjq=1
+  if ! has_jq; then
+    hasjq=0
     echo 1>&2
     echo "Warning: Didn't find 'jq' on your system. It is your responsibility" 1>&2
     echo "         to produce a valid JSON file." 1>&2
     echo 1>&2
     read -p "  Press any key to continue..." nirvana
   fi
-  echo $has_jq
+  echo $hasjq
 }
 
 
 validate_json() {
   local json_file="$1"
 
-  if ! which jq > /dev/null 2>&1; then
+  if ! has_jq; then
     return 0 # no jq -> assume JSON is valid
   fi
 
@@ -3008,6 +3014,39 @@ edit_json_until_valid() {
 
   return $retval
 }
+
+
+# This updates a variable in the repository status .cvmfs_status.json
+# It assumes that it is running under a repository lock.
+# @param name      the name of the repository to update
+# @param variable  the status variable to update
+# @param value     the value to set the variable to
+update_repo_status() {
+  if ! has_jq; then
+    # silently do nothing if there is no jq
+    return
+  fi
+
+  local name="$1"
+  local variable="$2"
+  local value="$3"
+
+  local old_status="$(read_repo_item $name .cvmfs_status.json)"
+  if [ -z "$old_status" ]; then
+    old_status="{}"
+  fi
+
+  load_repo_config $name
+  local user_shell="$(get_user_shell $name)"
+
+  local jq_tmp="${CVMFS_SPOOL_DIR}/tmp/status.json"
+  echo "$old_status" | jq ".$variable=\"$value\"" | $user_shell "cat > $jq_tmp"
+  $user_shell "$(__swissknife_cmd) upload -r ${CVMFS_UPSTREAM_STORAGE} \
+    -i $jq_tmp                                                     \
+    -o .cvmfs_status.json"
+  $user_shell "rm -f $jq_tmp"
+}
+
 
 create_repometa_skeleton() {
   local json_file="$1"
@@ -5518,7 +5557,7 @@ __run_gc() {
     fi
   fi
 
-  [ $dry_run -ne 0 ] || upload_timestamp_file $name gc
+  [ $dry_run -ne 0 ] || update_repo_status $name last_gc "`date --utc`"
   [ $dry_run -ne 0 ] || to_syslog_for_repo $name "successfully finished garbage collection"
 
   return 0
@@ -5660,7 +5699,15 @@ __do_snapshot() {
         -a $retries $with_history $with_reflog         \
            $initial_snapshot_flag $timestamp_threshold $log_level"
 
-    upload_timestamp_file $alias_name snapshot
+    update_repo_status $alias_name last_snapshot "`date --utc`"
+
+    # this part is deprecated but keep for now for backward compatibility
+    local last_snapshot_tmp="${spool_dir}/tmp/last_snapshot"
+    $user_shell "date --utc > $last_snapshot_tmp"
+    $user_shell "$(__swissknife_cmd) upload -r ${upstream} \
+      -i $last_snapshot_tmp                                \
+      -o .cvmfs_last_snapshot"
+    $user_shell "rm -f $last_snapshot_tmp"
 
     # run the automatic garbage collection (if configured)
     if has_auto_garbage_collection_enabled $alias_name; then
