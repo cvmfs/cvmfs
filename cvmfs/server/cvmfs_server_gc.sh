@@ -295,6 +295,7 @@ __run_gc() {
     fi
   fi
 
+  [ $dry_run -ne 0 ] || update_repo_status $name last_gc "`date --utc`"
   [ $dry_run -ne 0 ] || to_syslog_for_repo $name "successfully finished garbage collection"
 
   return 0

@@ -142,6 +142,9 @@ __do_snapshot() {
         -a $retries $with_history $with_reflog         \
            $initial_snapshot_flag $timestamp_threshold $log_level"
 
+    update_repo_status $alias_name last_snapshot "`date --utc`"
+
+    # this part is deprecated but keep for now for backward compatibility
     local last_snapshot_tmp="${spool_dir}/tmp/last_snapshot"
     $user_shell "date --utc > $last_snapshot_tmp"
     $user_shell "$(__swissknife_cmd) upload -r ${upstream} \

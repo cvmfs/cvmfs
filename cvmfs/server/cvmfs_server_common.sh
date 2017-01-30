@@ -332,6 +332,8 @@ has_auto_garbage_collection_enabled() {
 
 
 # download a given file from the backend storage
+# @param name  the name of the repository to download from
+# @param url   the url to download from
 # @param noproxy  (optional)
 get_item() {
   local name="$1"
@@ -347,6 +349,25 @@ get_item() {
   fi
 }
 
+# read an item from local or backend repository storage to stdout
+# @param name  the name of the repository to download from
+# @param item  the name of the item to download
+# if the file does not exist, there will be no output and the
+#  return will be an error code
+read_repo_item() {
+  local name="$1"
+  local item="$2"
+
+  load_repo_config $name
+
+  if is_local_upstream $CVMFS_UPSTREAM_STORAGE; then
+    cat $(get_upstream_config $upstream)/"$item" 2>/dev/null
+  elif is_stratum0 $name; then
+    get_item $name $CVMFS_STRATUM0/"$item" noproxy
+  else
+    get_item $name $CVMFS_STRATUM1/"$item" noproxy
+  fi
+}
 
 # Parse redirects configuration into redirect flag.
 # Assumes that config is loaded already, i.e. load_repo_config().
