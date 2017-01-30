@@ -215,7 +215,15 @@ cvmfs_run_test() {
 
   echo "*** {5} try to snapshot (in the background)"
   local snapshot_log_6="snapshot_6.log"
-  local pid6=$(run_background_service $snapshot_log_6 "cvmfs_server snapshot $replica_name") || return 24
+  # Need to wait while reading a lot of output. Needs more than 64kb of output
+  # to work, which is the size of the pipe buffer.
+  cat >do_snapshot_6.sh <<!EOF!
+#!/bin/sh
+export CVMFS_SERVER_DEBUG=3
+sh -x /usr/bin/cvmfs_server snapshot $replica_name 2>&1|(sleep 20;cat)
+!EOF!
+  chmod +x do_snapshot_6.sh
+  local pid6=$(run_background_service $snapshot_log_6 ./do_snapshot_6.sh) || return 24
   echo "running with PID: $pid6"
 
   echo "*** {5} sleep for one second"
@@ -321,7 +329,7 @@ cvmfs_run_test() {
   cat >do_gc.sh <<!EOF!
 #!/bin/sh
 export CVMFS_SERVER_DEBUG=3
-sh -x cvmfs_server gc -f -r 0 -l $replica_name 2>&1|(sleep 20;cat)
+sh -x /usr/bin/cvmfs_server gc -f -r 0 -l $replica_name 2>&1|(sleep 20;cat)
 !EOF!
   chmod +x do_gc.sh
   local pid2=$(run_background_service $gc_log_2 ./do_gc.sh) || return 54
