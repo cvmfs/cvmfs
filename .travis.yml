@@ -3,9 +3,6 @@ language: cpp
 
 os:
   - linux
-  - osx
-
-osx_image: xcode7.1
 
 compiler:
   - gcc
