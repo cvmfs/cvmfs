@@ -142,7 +142,15 @@ __do_snapshot() {
         -a $retries $with_history $with_reflog         \
            $initial_snapshot_flag $timestamp_threshold $log_level"
 
-    upload_timestamp_file $alias_name snapshot
+    update_repo_status $alias_name last_snapshot "`date --utc`"
+
+    # this part is deprecated but keep for now for backward compatibility
+    local last_snapshot_tmp="${spool_dir}/tmp/last_snapshot"
+    $user_shell "date --utc > $last_snapshot_tmp"
+    $user_shell "$(__swissknife_cmd) upload -r ${upstream} \
+      -i $last_snapshot_tmp                                \
+      -o .cvmfs_last_snapshot"
+    $user_shell "rm -f $last_snapshot_tmp"
 
     # run the automatic garbage collection (if configured)
     if has_auto_garbage_collection_enabled $alias_name; then
