@@ -88,7 +88,7 @@ cvmfs_run_test() {
   sudo $SHELL -c "sed -i 's,^\(CVMFS_STRATUM0=.*\),\1Bogus,' /etc/cvmfs/repositories.d/${replica_name}-3/server.conf"
 
   echo "remove evidence of initial repo gc"
-  has_jq || rm /srv/cvmfs/$CVMFS_TEST_REPO/.cvmfs_status.json || return 20
+  ! has_jq || rm /srv/cvmfs/$CVMFS_TEST_REPO/.cvmfs_status.json || return 20
 
   echo "running cvmfs_server gc -a"
   cvmfs_server gc -af || return 21
