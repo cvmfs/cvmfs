@@ -497,7 +497,7 @@ void *TalkManager::MainResponder(void *data) {
       result += "\nDrainout Mode: " + StringifyBool(drainout_mode) + "\n";
       result += "Maintenance Mode: " + StringifyBool(maintenance_mode) + "\n";
 
-      if (file_system->cache_mode() & FileSystem::kCacheNfs) {
+      if (file_system->IsNfsSource()) {
         result += "\nNFS Map Statistics:\n";
         result += nfs_maps::GetStatistics();
       }
