@@ -1137,7 +1137,8 @@ bool MountPoint::CreateDownloadManagers() {
   string optarg;
   download_mgr_ = new download::DownloadManager();
   const bool use_system_proxy = false;
-  download_mgr_->Init(kDefaultNumConnections, use_system_proxy, statistics_);
+  download_mgr_->Init(kDefaultNumConnections, use_system_proxy,
+                      perf::StatisticsTemplate("download", statistics_));
   download_mgr_->SetCredentialsAttachment(authz_attachment_);
 
   if (options_mgr_->GetValue("CVMFS_SERVER_URL", &optarg)) {
@@ -1183,15 +1184,14 @@ void MountPoint::CreateFetchers() {
     file_system_->cache_mgr(),
     download_mgr_,
     backoff_throttle_,
-    statistics_);
+    perf::StatisticsTemplate("fetch", statistics_));
 
   const bool is_external_data = true;
   external_fetcher_ = new cvmfs::Fetcher(
     file_system_->cache_mgr(),
     external_download_mgr_,
     backoff_throttle_,
-    statistics_,
-    "fetch-external",
+    perf::StatisticsTemplate("fetch-external", statistics_),
     is_external_data);
 }
 
@@ -1574,7 +1574,8 @@ void MountPoint::SetupDnsTuning(download::DownloadManager *manager) {
 bool MountPoint::SetupExternalDownloadMgr() {
   string optarg;
   external_download_mgr_ =
-    download_mgr_->Clone(statistics_, "download-external");
+    download_mgr_->Clone(perf::StatisticsTemplate("download-external",
+      statistics_));
 
   unsigned timeout;
   unsigned timeout_direct;
