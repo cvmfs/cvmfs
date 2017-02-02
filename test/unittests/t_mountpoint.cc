@@ -12,6 +12,7 @@
 #include <string>
 
 #include "cache_posix.h"
+#include "cache_tiered.h"
 #include "catalog_mgr_client.h"
 #include "catalog_mgr_rw.h"
 #include "compression.h"
@@ -319,7 +320,7 @@ TEST_F(T_MountPoint, CheckInstanceName) {
   ASSERT_TRUE(fs != NULL);
 
   EXPECT_TRUE(fs->CheckInstanceName("ceph"));
-  EXPECT_TRUE(fs->CheckInstanceName("cephCache01"));
+  EXPECT_TRUE(fs->CheckInstanceName("cephCache_01"));
   EXPECT_FALSE(fs->CheckInstanceName("ceph cache 01"));
   EXPECT_FALSE(fs->CheckInstanceName("aNameThatIsLongerThanItShouldBe"));
   delete fs;
@@ -374,6 +375,68 @@ TEST_F(T_MountPoint, TriageCacheMgr) {
     UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
     EXPECT_EQ(loader::kFailOk, fs->boot_status());
     EXPECT_EQ("default", fs->cache_mgr_instance());
+  }
+}
+
+
+TEST_F(T_MountPoint, RamCacheMgr) {
+  options_mgr_.SetValue("CVMFS_CACHE_PRIMARY", "ram");
+  options_mgr_.SetValue("CVMFS_CACHE_ram_TYPE", "ram");
+  {
+    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    EXPECT_EQ(loader::kFailOk, fs->boot_status());
+    EXPECT_EQ("ram", fs->cache_mgr_instance());
+    EXPECT_EQ(kRamCacheManager, fs->cache_mgr()->id());
+  }
+  options_mgr_.SetValue("CVMFS_CACHE_ram_MALLOC", "unknown");
+  {
+    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    EXPECT_EQ(loader::kFailOptions, fs->boot_status());
+  }
+  options_mgr_.SetValue("CVMFS_CACHE_ram_MALLOC", "libc");
+  {
+    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    EXPECT_EQ(loader::kFailOk, fs->boot_status());
+  }
+}
+
+
+TEST_F(T_MountPoint, TieredCacheMgr) {
+  options_mgr_.SetValue("CVMFS_CACHE_PRIMARY", "tiered");
+  options_mgr_.SetValue("CVMFS_CACHE_tiered_TYPE", "tiered");
+  {
+    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    EXPECT_EQ(loader::kFailOptions, fs->boot_status());
+  }
+  options_mgr_.SetValue("CVMFS_CACHE_tiered_UPPER", "ram_upper");
+  options_mgr_.SetValue("CVMFS_CACHE_ram_upper_TYPE", "ram");
+  {
+    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    EXPECT_EQ(loader::kFailOptions, fs->boot_status());
+  }
+  options_mgr_.SetValue("CVMFS_CACHE_tiered_LOWER", "posix_lower");
+  options_mgr_.SetValue("CVMFS_CACHE_posix_lower_TYPE", "posix");
+  options_mgr_.SetValue("CVMFS_CACHE_posix_lower_BASE", tmp_path_);
+  options_mgr_.SetValue("CVMFS_CACHE_posix_lower_SHARED", "false");
+  options_mgr_.SetValue("CVMFS_CACHE_posix_lower_QUOTA_LIMIT", "0");
+  {
+    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    EXPECT_EQ(loader::kFailOk, fs->boot_status());
+    EXPECT_EQ("tiered", fs->cache_mgr_instance());
+    EXPECT_EQ(kTieredCacheManager, fs->cache_mgr()->id());
+    EXPECT_EQ(kRamCacheManager, reinterpret_cast<TieredCacheManager *>(
+      fs->cache_mgr())->upper_->id());
+    EXPECT_EQ(kPosixCacheManager, reinterpret_cast<TieredCacheManager *>(
+      fs->cache_mgr())->lower_->id());
+  }
+
+  options_mgr_.SetValue("CVMFS_CACHE_tiered_LOWER", "ram_lower");
+  options_mgr_.SetValue("CVMFS_CACHE_ram_lower_TYPE", "ram");
+  {
+    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    EXPECT_EQ(loader::kFailOk, fs->boot_status());
+    EXPECT_EQ("tiered", fs->cache_mgr_instance());
+    EXPECT_EQ(kTieredCacheManager, fs->cache_mgr()->id());
   }
 }
 

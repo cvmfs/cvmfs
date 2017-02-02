@@ -16,9 +16,11 @@ class T_TieredCacheManager : public ::testing::Test {
  protected:
   virtual void SetUp() {
     upper_cache_ =
-      new RamCacheManager(1024, 128, MemoryKvStore::kMallocLibc, &stats_upper_);
+      new RamCacheManager(1024, 128, MemoryKvStore::kMallocLibc,
+                          perf::StatisticsTemplate("test", &stats_upper_));
     lower_cache_ =
-      new RamCacheManager(1024, 128, MemoryKvStore::kMallocLibc, &stats_lower_);
+      new RamCacheManager(1024, 128, MemoryKvStore::kMallocLibc,
+                          perf::StatisticsTemplate("test", &stats_lower_));
     tiered_cache_ = TieredCacheManager::Create(upper_cache_, lower_cache_);
     buf_ = 'x';
     hash_one_.digest[1] = 1;

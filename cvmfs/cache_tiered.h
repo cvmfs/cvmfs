@@ -10,6 +10,7 @@
 #include <string>
 
 #include "cache.h"
+#include "gtest/gtest_prod.h"
 
 /**
  * Cache manager implementation that provides a hierarchical cache.
@@ -23,6 +24,8 @@
  * The quota manager is only applied to the upper cache.
  */
 class TieredCacheManager : public CacheManager {
+  FRIEND_TEST(T_MountPoint, TieredCacheMgr);
+
  public:
   virtual CacheManagerIds id() { return kTieredCacheManager; }
 

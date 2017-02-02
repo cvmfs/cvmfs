@@ -84,10 +84,10 @@ const char *FileSystem::kDefaultCacheMgrInstance = "default";
 bool FileSystem::CheckInstanceName(const std::string &instance) {
   if (instance.length() > 24)
     return false;
-  sanitizer::AlphaNumSanitizer instance_sanitizer;
+  sanitizer::CacheInstanceSanitizer instance_sanitizer;
   if (!instance_sanitizer.IsValid(instance)) {
     boot_error_ = "invalid instance name (" + instance + "), " +
-                  "only characters a-z, A-Z, 0-9 are allowed";
+                  "only characters a-z, A-Z, 0-9, _ are allowed";
     boot_status_ = loader::kFailCacheDir;
     return false;
   }
@@ -626,7 +626,7 @@ CacheManager *FileSystem::SetupRamCacheMgr(const string &instance) {
         sz_cache_bytes,
         nfiles,
         alloc,
-        statistics_);
+        perf::StatisticsTemplate("cache." + instance, statistics_));
   if (cache_mgr == NULL) {
     boot_error_ = "failed to create ram cache manager for " + instance;
     boot_status_ = loader::kFailCacheDir;
