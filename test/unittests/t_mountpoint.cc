@@ -438,6 +438,12 @@ TEST_F(T_MountPoint, TieredCacheMgr) {
     EXPECT_EQ("tiered", fs->cache_mgr_instance());
     EXPECT_EQ(kTieredCacheManager, fs->cache_mgr()->id());
   }
+
+  options_mgr_.SetValue("CVMFS_CACHE_tiered_LOWER", "tiered");
+  {
+    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    EXPECT_EQ(loader::kFailCacheDir, fs->boot_status());
+  }
 }
 
 

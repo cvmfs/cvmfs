@@ -11,6 +11,7 @@
 #include <unistd.h>
 
 #include <ctime>
+#include <set>
 #include <string>
 
 #include "cache.h"
@@ -306,6 +307,11 @@ class FileSystem : SingleCopy, public BootFactory {
    * is specified.
    */
   std::string cache_mgr_instance_;
+  /**
+   * Keep track of all the cache instances to detect circular definitions with
+   * the tiered cache.
+   */
+  std::set<std::string> constructed_instances_;
   std::string nfs_maps_dir_;
   /**
    * Combination of kNfs... flags

@@ -495,6 +495,13 @@ void FileSystem::ResetErrorCounters() {
  * Can be recursive for the tiered cache manager.
  */
 CacheManager *FileSystem::SetupCacheMgr(const string &instance) {
+  if (constructed_instances_.find(instance) != constructed_instances_.end()) {
+    boot_error_ = "circular cache definition: " + instance;
+    boot_status_ = loader::kFailCacheDir;
+    return NULL;
+  }
+  constructed_instances_.insert(instance);
+
   LogCvmfs(kLogCvmfs, kLogDebug, "setting up cache manager instance %s",
            instance.c_str());
   string instance_type;
@@ -515,7 +522,7 @@ CacheManager *FileSystem::SetupCacheMgr(const string &instance) {
   } else {
     boot_error_ = "invalid cache manager type: " + instance_type;
     boot_status_ = loader::kFailCacheDir;
-    return false;
+    return NULL;
   }
 }
 
@@ -658,6 +665,8 @@ CacheManager *FileSystem::SetupTieredCacheMgr(const string &instance) {
     return NULL;
   }
   UniquePtr<CacheManager> lower(SetupCacheMgr(optarg));
+  if (!lower.IsValid())
+    return NULL;
 
   CacheManager *tiered =
     TieredCacheManager::Create(upper.Release(), lower.Release());
