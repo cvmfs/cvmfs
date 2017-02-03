@@ -447,6 +447,44 @@ TEST_F(T_MountPoint, TieredCacheMgr) {
 }
 
 
+TEST_F(T_MountPoint, TieredComplex) {
+  options_mgr_.SetValue("CVMFS_CACHE_PRIMARY", "tiered");
+  options_mgr_.SetValue("CVMFS_CACHE_tiered_TYPE", "tiered");
+  options_mgr_.SetValue("CVMFS_CACHE_tiered_UPPER", "tiered_upper");
+  options_mgr_.SetValue("CVMFS_CACHE_tiered_upper_TYPE", "tiered");
+  options_mgr_.SetValue("CVMFS_CACHE_tiered_upper_UPPER", "uu_ram");
+  options_mgr_.SetValue("CVMFS_CACHE_tiered_upper_LOWER", "ul_ram");
+  options_mgr_.SetValue("CVMFS_CACHE_uu_ram_TYPE", "ram");
+  options_mgr_.SetValue("CVMFS_CACHE_ul_ram_TYPE", "ram");
+  options_mgr_.SetValue("CVMFS_CACHE_tiered_LOWER", "tiered_lower");
+  options_mgr_.SetValue("CVMFS_CACHE_tiered_lower_TYPE", "tiered");
+  options_mgr_.SetValue("CVMFS_CACHE_tiered_lower_UPPER", "lu_posix");
+  options_mgr_.SetValue("CVMFS_CACHE_tiered_lower_LOWER", "ll_posix");
+  options_mgr_.SetValue("CVMFS_CACHE_lu_posix_TYPE", "posix");
+  options_mgr_.SetValue("CVMFS_CACHE_lu_posix_BASE", tmp_path_ + "/lu");
+  options_mgr_.SetValue("CVMFS_CACHE_lu_posix_SHARED", "false");
+  options_mgr_.SetValue("CVMFS_CACHE_lu_posix_QUOTA_LIMIT", "0");
+  options_mgr_.SetValue("CVMFS_CACHE_ll_posix_TYPE", "posix");
+  options_mgr_.SetValue("CVMFS_CACHE_ll_posix_BASE", tmp_path_ + "/ll");
+  options_mgr_.SetValue("CVMFS_CACHE_ll_posix_SHARED", "false");
+  options_mgr_.SetValue("CVMFS_CACHE_ll_posix_QUOTA_LIMIT", "0");
+  {
+    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    EXPECT_EQ(loader::kFailOk, fs->boot_status()) << fs->boot_error();
+    EXPECT_EQ("tiered", fs->cache_mgr_instance());
+    EXPECT_EQ(kTieredCacheManager, fs->cache_mgr()->id());
+    TieredCacheManager *upper = reinterpret_cast<TieredCacheManager *>(
+      reinterpret_cast<TieredCacheManager *>(fs->cache_mgr())->upper_);
+    TieredCacheManager *lower = reinterpret_cast<TieredCacheManager *>(
+      reinterpret_cast<TieredCacheManager *>(fs->cache_mgr())->lower_);
+    EXPECT_EQ(kRamCacheManager, upper->upper_->id());
+    EXPECT_EQ(kRamCacheManager, upper->lower_->id());
+    EXPECT_EQ(kPosixCacheManager, lower->upper_->id());
+    EXPECT_EQ(kPosixCacheManager, lower->lower_->id());
+  }
+}
+
+
 TEST_F(T_MountPoint, CacheSettings) {
   options_mgr_.SetValue("CVMFS_ALIEN_CACHE", tmp_path_ + "/alien");
   options_mgr_.SetValue("CVMFS_QUOTA_LIMIT", "-1");

@@ -25,6 +25,7 @@
  */
 class TieredCacheManager : public CacheManager {
   FRIEND_TEST(T_MountPoint, TieredCacheMgr);
+  FRIEND_TEST(T_MountPoint, TieredComplex);
 
  public:
   virtual CacheManagerIds id() { return kTieredCacheManager; }

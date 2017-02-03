@@ -520,7 +520,8 @@ CacheManager *FileSystem::SetupCacheMgr(const string &instance) {
   } else if (instance_type == "external") {
     return SetupExternalCacheMgr(instance);
   } else {
-    boot_error_ = "invalid cache manager type: " + instance_type;
+    boot_error_ = "invalid cache manager type for '" + instance +  "':" +
+      instance_type;
     boot_status_ = loader::kFailCacheDir;
     return NULL;
   }
