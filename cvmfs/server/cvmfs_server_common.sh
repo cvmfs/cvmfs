@@ -503,7 +503,7 @@ open_transaction() {
   local tx_lock="${CVMFS_SPOOL_DIR}/in_transaction"
 
   is_stratum0 $name                    || die "Cannot open transaction on Stratum1"
-  # ignore if lock is "stale" because the process that created it 
+  # ignore if lock is "stale" because the process that created it
   #  goes away
   acquire_lock "$tx_lock" ignore_stale || die "Failed to create transaction lock"
   run_suid_helper open $name           || die "Failed to make /cvmfs/$name writable"
@@ -560,10 +560,15 @@ close_transaction() {
   local async_msg=""
   if [ x"$CVMFS_ASYNC_SCRATCH_CLEANUP" != x"false" ]; then
     tmpdir=$(mktemp -d "${wastebin_scratch_dir}/waste.XXXXXX")
-    mv $current_scratch_dir $tmpdir
-    mkdir -p $current_scratch_dir && chown $CVMFS_USER $current_scratch_dir
-    async_msg="(asynchronous scratch cleanup)"
-    run_suid_helper clear_scratch_async $name
+    if mv $current_scratch_dir $tmpdir; then
+      mkdir -p $current_scratch_dir && chown $CVMFS_USER $current_scratch_dir
+      async_msg="(asynchronous scratch cleanup)"
+      run_suid_helper clear_scratch_async $name
+    else
+      to_syslog_for_repo $name \
+        "asynchronous cleanup failed, doing synchronous cleanup"
+      run_suid_helper clear_scratch $name
+    fi
   else
     run_suid_helper clear_scratch $name
   fi
@@ -591,7 +596,7 @@ release_update_lock() {
 
 # Acquire an update lock for a repository.  Always pair with a call to
 #   release_update_lock if returns successful.
-# 
+#
 # @param name               the repository to lock
 # @param update_type        update type such as snapshot or gc
 # @param abort_on_conflict  0 to wait for lock, 1 to abort if already acquired.
