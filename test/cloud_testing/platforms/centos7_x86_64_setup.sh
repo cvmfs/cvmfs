@@ -4,6 +4,12 @@
 script_location=$(dirname $(readlink --canonicalize $0))
 . ${script_location}/common_setup.sh
 
+# # Place the overlay directories on ftype=1 16GB xfs partition
+# sudo dd if=/dev/zero of=/xfs-backend bs=$((1024*1024)) count=$((16*1024))
+# sudo mkfs.xfs -n ftype=1 /xfs-backend
+# sudo mkdir -p /var/spool/cvmfs
+# sudo mount /xfs-backend /var/spool/cvmfs
+
 # Place the overlay directories on 16GB ext4 partition
 sudo dd if=/dev/zero of=/ext4-backend bs=$((1024*1024)) count=$((16*1024))
 sudo yes | sudo mkfs.ext4 /ext4-backend
