@@ -1298,10 +1298,17 @@ close_transaction() {
   local async_msg=""
   if [ x"$CVMFS_ASYNC_SCRATCH_CLEANUP" != x"false" ]; then
     tmpdir=$(mktemp -d "${wastebin_scratch_dir}/waste.XXXXXX")
-    mv $current_scratch_dir $tmpdir
-    mkdir -p $current_scratch_dir && chown $CVMFS_USER $current_scratch_dir
-    async_msg="(asynchronous scratch cleanup)"
-    run_suid_helper clear_scratch_async $name
+    # Some AUFS versions return "Device or resource busy" when there are still
+    # open file descriptors on the r/w branch (union mount point)
+    if mv $current_scratch_dir $tmpdir; then
+      mkdir -p $current_scratch_dir && chown $CVMFS_USER $current_scratch_dir
+      async_msg="(asynchronous scratch cleanup)"
+      run_suid_helper clear_scratch_async $name
+    else
+      to_syslog_for_repo $name \
+        "asynchronous cleanup failed, doing synchronous cleanup"
+      run_suid_helper clear_scratch $name
+    fi
   else
     run_suid_helper clear_scratch $name
   fi
