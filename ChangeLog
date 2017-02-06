@@ -1,4 +1,5 @@
 2.3.3:
+  * Fix asynchronous cleanup with open file descriptors on some aufs versions
   * Add .cvmfs_status file (CVM-1107)
   * Fix potential deadlock when uploading catalogs (CVM-1165)
   * Fix 'cvmfs_server resign' if CVMFS_HASH_ALGORITHM is unset (CVM-1013)
@@ -8,7 +9,7 @@
   * Prevent GC from running at the same time as snapshot (CVM-1108)
   * Don not ignore stale locks when publishing (CVM-1146)
   * Add CVMFS_CONFIG_REPO_REQUIRED option (CVM-1111)
-  * Accept OverlayFS/ext4 on RHEL >= 7.3 (CVM-835)
+  * Accept OverlayFS / ext4 or xfs ftype=1 on RHEL >= 7.3 (CVM-835)
   * Fix build on RHEL7.3 (CVM-1153)
   * Increase robustness when fetching reflog and checksum (CVM-1114, CVM-1124)
   * Add cvmfs_talk external host switch (CVM-1126)
