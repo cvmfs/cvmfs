@@ -715,34 +715,15 @@ bool FileSystem::SetupCwd() {
     return true;
   }
 
-  // Libcvmfs: change to cache directory (not workspace) if requested,
-  // otherwise don't touch current working directory.  We also need to create
-  // the cache directory.  This has to happen before we setup the crash guard
-  // or any other file where we remember the path.
-  // TODO(jblomer): can this be simplified?
-  /*string optarg;
-  if (options_mgr_->GetValue("CVMFS_CWD_CACHE", &optarg) &&
-      options_mgr_->IsOn(optarg))
-  {
-    const int mode = (cache_mode_ & kCacheAlien) ? 0770 : 0700;
-    if (!MkdirDeep(cache_dir_, mode, false)) {
-      boot_error_ = "cannot create cache directory " + cache_dir_;
-      boot_status_ = loader::kFailCacheDir;
-      return false;
-    }
-    if (workspace_ == cache_dir_) {
-      workspace_ = ".";
-    } else {
-      workspace_ = GetAbsolutePath(workspace_);
-    }
-    int retval = chdir(cache_dir_.c_str());
-    if (retval != 0) {
-      boot_error_ = "cache directory " + cache_dir_ + " is unavailable";
-      boot_status_ = loader::kFailCacheDir;
-      return false;
-    }
-    cache_dir_ = ".";
-  }*/
+  // Note: as of version 2.4 support for CVMFS_CWD_CACHE is dropped due to
+  // disproportionate large complexity to configure correctly.  This affects
+  // only libcvmfs, mostly the legacy part.
+  // string optarg;
+  // if (options_mgr_->GetValue("CVMFS_CWD_CACHE", &optarg) &&
+  //    options_mgr_->IsOn(optarg))
+  // {
+  //  ...
+  // }
   return true;
 }
 
