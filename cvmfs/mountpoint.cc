@@ -580,7 +580,7 @@ CacheManager *FileSystem::SetupPosixCacheMgr(const string &instance) {
     boot_error_ = "Failed to setup posix cache '" + instance + "' in " +
                   settings.cache_path + ": " + strerror(errno);
     boot_status_ = loader::kFailCacheDir;
-    return false;
+    return NULL;
   }
 
   // Sentinel file for future use
@@ -590,7 +590,7 @@ CacheManager *FileSystem::SetupPosixCacheMgr(const string &instance) {
 
   if (settings.is_managed) {
     if (!SetupPosixQuotaMgr(settings, cache_mgr))
-      return false;
+      return NULL;
   }
   return cache_mgr.Release();
 }
