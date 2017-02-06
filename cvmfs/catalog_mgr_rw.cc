@@ -853,10 +853,11 @@ void WritableCatalogManager::FinalizeCatalog(WritableCatalog *catalog,
 
 void WritableCatalogManager::ScheduleCatalogProcessing(
                                                      WritableCatalog *catalog) {
-  MutexLockGuard guard(catalog_processing_lock_);
-
-  // register catalog object for WritableCatalogManager::CatalogUploadCallback
-  catalog_processing_map_[catalog->database_path()] = catalog;
+  {
+    MutexLockGuard guard(catalog_processing_lock_);
+    // register catalog object for WritableCatalogManager::CatalogUploadCallback
+    catalog_processing_map_[catalog->database_path()] = catalog;
+  }
   spooler_->ProcessCatalog(catalog->database_path());
 }
 

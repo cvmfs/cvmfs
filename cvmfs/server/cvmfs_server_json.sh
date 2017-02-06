@@ -127,17 +127,21 @@ get_editor() {
 }
 
 
+has_jq() {
+  which jq > /dev/null 2>&1
+}
+
 check_jq() {
-  local has_jq=1
-  if ! which jq > /dev/null 2>&1; then
-    has_jq=0
+  local hasjq=1
+  if ! has_jq; then
+    hasjq=0
     echo 1>&2
     echo "Warning: Didn't find 'jq' on your system. It is your responsibility" 1>&2
     echo "         to produce a valid JSON file." 1>&2
     echo 1>&2
     read -p "  Press any key to continue..." nirvana
   fi
-  echo $has_jq
+  echo $hasjq
 }
 
 
@@ -183,3 +187,33 @@ edit_json_until_valid() {
   return $retval
 }
 
+# This updates a variable in the repository status file .cvmfs_status.json
+# It assumes that it is running under a repository lock
+# @param name      the name of the repository to update
+# @param variable  the status variable to update
+# @param value     the value to set the variable to
+update_repo_status() {
+  if ! has_jq; then
+    # silently do nothing if there is no jq
+    return
+  fi
+
+  local name="$1"
+  local variable="$2"
+  local value="$3"
+
+  local old_status="$(read_repo_item $name .cvmfs_status.json)"
+  if [ -z "$old_status" ]; then
+    old_status="{}"
+  fi
+
+  load_repo_config $name
+  local user_shell="$(get_user_shell $name)"
+
+  local jq_tmp="${CVMFS_SPOOL_DIR}/tmp/status.json"
+  echo "$old_status" | jq ".$variable=\"$value\"" | $user_shell "cat > $jq_tmp"
+  $user_shell "$(__swissknife_cmd) upload -r ${CVMFS_UPSTREAM_STORAGE} \
+    -i $jq_tmp                                                     \
+    -o .cvmfs_status.json"
+  $user_shell "rm -f $jq_tmp"
+}
