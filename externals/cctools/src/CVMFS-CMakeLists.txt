@@ -1,0 +1,10 @@
+include ("${EXTERNALS_LIB_LOCATION}/CMake-Register_External_Lib.txt")
+
+set (CHIRP_ARCHIVE "${CCTOOLS_BUILTIN_LOCATION}/build/lib/libchirp.a")
+set (DTTOOLS_ARCHIVE "${CCTOOLS_BUILTIN_LOCATION}/build/lib/libdttools.a")
+
+register_external_lib (libchirp ${CCTOOLS_BUILTIN_LOCATION} ${CHIRP_ARCHIVE})
+register_external_lib (libdttools ${CCTOOLS_BUILTIN_LOCATION} ${DTTOOLS_ARCHIVE})
+
+set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -I${CCTOOLS_BUILTIN_LOCATION}/build/include")
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I${CCTOOLS_BUILTIN_LOCATION}/build/include")

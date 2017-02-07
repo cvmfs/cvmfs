@@ -193,6 +193,7 @@ option (BUILD_UNITTESTS_DEBUG   "Build the CernVM-FS unit test set with verbose 
 option (BUILD_UBENCHMARKS       "Build the CernVM-FS micro benchmarks"                             OFF)
 option (BUILD_DOCUMENTATION     "Build the CerVM-FS documentation using Doxygen"                   OFF)
 option (BUILD_COVERAGE          "Compile to collect code coverage reports"                         OFF)
+option (BUILD_CCTOOLS           "Build CCTools integration"                                        OFF)
 option (BUILD_ALL               "Build client, server, lib, preload, octopus, unit tests"          OFF)
 option (INSTALL_UNITTESTS       "Install the unit test binary (mainly for packaging)"              OFF)
 option (INSTALL_UNITTESTS_DEBUG "Install the unit test debug binary"                               OFF)
@@ -245,6 +246,7 @@ set (PROTOBUF_BUILTIN_LOCATION    "${EXTERNALS_BUILD_LOCATION}/build_protobuf")
 set (GOOGLEBENCH_BUILTIN_LOCATION "${EXTERNALS_BUILD_LOCATION}/build_googlebench")
 set (LIBGEOIP_BUILTIN_LOCATION    "${EXTERNALS_BUILD_LOCATION}/build_libgeoip")
 set (PYTHON_GEOIP_BUILTIN_LOCATION "${EXTERNALS_BUILD_LOCATION}/build_python-geoip")
+set (CCTOOLS_BUILTIN_LOCATION     "${EXTERNALS_BUILD_LOCATION}/build_cctools")
 set (TBB_BUILD_LOCATION           "${EXTERNALS_BUILD_LOCATION}/build_tbb")
 
 # create the directory for controlled out of source building of external stuff
@@ -579,6 +581,11 @@ if (BUILD_UBENCHMARKS)
   include (${GOOGLEBENCH_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GOOGLEBENCH_BUILTIN_LOCATION}/include)
 endif (BUILD_UBENCHMARKS)
+
+if (BUILD_CCTOOLS)
+  include (${CCTOOLS_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
+  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${CCTOOLS_BUILTIN_LOCATION}/build/include)
+endif (BUILD_CCTOOLS)
 
 include_directories (${INCLUDE_DIRECTORIES})
 
