@@ -1,4 +1,5 @@
 2.3.3:
+  * Fix parsing of nested catalogs in dirtab for cvmfs_preload
   * Fix asynchronous cleanup with open file descriptors on some aufs versions
   * Add .cvmfs_status file (CVM-1107)
   * Fix potential deadlock when uploading catalogs (CVM-1165)
