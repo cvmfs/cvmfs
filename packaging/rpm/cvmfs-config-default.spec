@@ -1,7 +1,7 @@
 Summary: CernVM File System Default Configuration and Public Keys
 Name: cvmfs-config-default
-Version: 1.2
-Release: 2
+Version: 1.3
+Release: 1
 Source0: cern.ch.pub
 Source1: cern-it1.cern.ch.pub
 Source2: cern-it2.cern.ch.pub
@@ -75,6 +75,10 @@ done
 %config %{_sysconfdir}/cvmfs/config.d/*
 
 %changelog
+* Fri Dec 30 2016 Dave Dykstra <dwd@fnal.gov> - 1.3-1
+- Add port 8000 to the cern.ch stratum 1s, and change the name of the
+  Tiawan stratum 1 from cvmfs02 to cvmfsrep.
+
 * Fri May 22 2015 Dave Dykstra <dwd@fnal.gov> - 1.2-2
 - Change Obsoletes/Conflicts on cvmfs-keys and cvmfs-init-scripts to
   Obsoletes/Provides with specific version numbers, according to Fedora
