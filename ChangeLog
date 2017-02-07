@@ -33,7 +33,7 @@
   * Prevent GC from running at the same time as snapshot (CVM-1108)
   * Don not ignore stale locks when publishing (CVM-1146)
   * Add CVMFS_CONFIG_REPO_REQUIRED option (CVM-1111)
-  * Accept OverlayFS / ext4 or xfs ftype=1 on RHEL >= 7.3 (CVM-835)
+  * Accept OverlayFS / ext4 on RHEL >= 7.3 (CVM-835)
   * Fix build on RHEL7.3 (CVM-1153)
   * Increase robustness when fetching reflog and checksum (CVM-1114, CVM-1124)
   * Add cvmfs_talk external host switch (CVM-1126)
