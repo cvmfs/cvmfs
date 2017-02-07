@@ -2,6 +2,7 @@
  * This file is part of the CernVM File System.
  */
 
+#include <cstdio>
 #include <string>
 
 #include "path_filters/relaxed_path_filter.h"
@@ -52,6 +53,13 @@ bool RelaxedPathFilter::IsOpposing(const std::string &path) const {
 
 bool RelaxedPathFilter::Parse(const std::string &dirtab) {
   return Dirtab::Parse(dirtab) & exact_dirtab_.Parse(dirtab);
+}
+
+bool RelaxedPathFilter::Parse(FILE *dirtab_file) {
+  bool result = Dirtab::Parse(dirtab_file);
+  rewind(dirtab_file);
+  result &= exact_dirtab_.Parse(dirtab_file);
+  return result;
 }
 
 

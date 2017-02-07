@@ -37,6 +37,7 @@ class RelaxedPathFilter : public Dirtab {
  public:
   static RelaxedPathFilter* Create(const std::string &dirtab_path);
   virtual bool Parse(const std::string &dirtab);
+  virtual bool Parse(FILE *dirtab_file);
   virtual bool IsMatching(const std::string &path) const;
   virtual bool IsOpposing(const std::string &path) const;
 
