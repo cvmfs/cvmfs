@@ -54,6 +54,13 @@ bool RelaxedPathFilter::Parse(const std::string &dirtab) {
   return Dirtab::Parse(dirtab) & exact_dirtab_.Parse(dirtab);
 }
 
+bool RelaxedPathFilter::Parse(FILE *dirtab_file) {
+  bool result = Dirtab::Parse(dirtab_file);
+  rewind(dirtab_file);
+  result &= exact_dirtab_.Parse(dirtab_file);
+  return result;
+}
+
 
 bool RelaxedPathFilter::ParsePathspec(const std::string &pathspec_str,
                                       bool negation) {

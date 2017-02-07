@@ -96,6 +96,7 @@ class Dirtab {
    * @return        true on successful parsing
    */
   virtual bool Parse(const std::string &dirtab);
+  virtual bool Parse(FILE *dirtab_file);
 
   /**
    * Matches a given path string against this Dirtab. The path is considered a
@@ -130,7 +131,6 @@ class Dirtab {
    * Fill a Dirtab from a given .cvmfsdirtab file path.
    */
   bool Open(const std::string &dirtab_path);
-  bool Parse(FILE *dirtab_file);
   bool ParseLine(const std::string &line);
   virtual bool ParsePathspec(const std::string &pathspec_str, bool negation);
   void AddRule(const Rule &rule);
