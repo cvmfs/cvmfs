@@ -7,6 +7,7 @@
 #include <string>
 
 #include "path_filters/relaxed_path_filter.h"
+#include "util/posix.h"
 
 class T_RelaxedPathFilter : public ::testing::Test {
  protected:
@@ -46,6 +47,7 @@ TEST_F(T_RelaxedPathFilter, RelaxedPathFilter) {
 TEST_F(T_RelaxedPathFilter, RelaxedPathFilterSubtrees) {
   path_filter.Parse("# positive\n"
                     "/software/releases\n"
+                    "/repo/sw/ASG\n"
                     "# negatives\n"
                     "! /software/releases/misc\n"
                     "! /software/releases/experimental/misc\n");
@@ -56,6 +58,8 @@ TEST_F(T_RelaxedPathFilter, RelaxedPathFilterSubtrees) {
   EXPECT_TRUE(path_filter.IsMatching("/software/releases"));
   EXPECT_TRUE(path_filter.IsMatching("/software/releases/v1"));
   EXPECT_TRUE(path_filter.IsMatching("/software/releases/experimental"));
+  EXPECT_TRUE(path_filter.IsMatching("/repo/sw/ASG"));
+  EXPECT_TRUE(path_filter.IsMatching("/repo/sw/ASG/AnalysisTop"));
 
   EXPECT_FALSE(path_filter.IsMatching("/software/apps"));
   EXPECT_FALSE(path_filter.IsMatching("/software/releases/misc"));
@@ -79,4 +83,24 @@ TEST_F(T_RelaxedPathFilter, RelaxedPathFilterTrailingSlash) {
   EXPECT_TRUE(path_filter.IsMatching("/usr/bin/bash"));
   EXPECT_FALSE(path_filter.IsMatching("/usr/misc"));
   EXPECT_FALSE(path_filter.IsMatching("/usr/bin/root.exe"));
+}
+
+
+TEST_F(T_RelaxedPathFilter, Parsing) {
+  std::string filter = "/sw/repo/ASG\n";
+  std::string filter_path;
+  FILE *f = CreateTempFile("./cvmfs-filter", 0600, "w", &filter_path);
+  ASSERT_TRUE(f != NULL);
+  fwrite(filter.data(), filter.size(), 1, f);
+  fclose(f);
+  catalog::RelaxedPathFilter *pf_from_file =
+    catalog::RelaxedPathFilter::Create(filter_path);
+
+  EXPECT_TRUE(pf_from_file->IsValid());
+  EXPECT_TRUE(pf_from_file->IsMatching("/sw/repo/ASG"));
+  EXPECT_TRUE(pf_from_file->IsMatching("/sw/repo/ASG/AnalysisTop"));
+  EXPECT_FALSE(pf_from_file->IsMatching("/usr/bin"));
+
+  delete pf_from_file;
+  unlink(filter_path.c_str());
 }
