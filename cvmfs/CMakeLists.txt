@@ -4,114 +4,80 @@
 #
 
 set (CVMFS_LOADER_SOURCES
-  atomic.h
-  fence.h
-  fs_traversal.h
-  globals.cc globals.h
-  hash.cc hash.h
-  loader.cc loader.h
-  loader_talk.cc loader_talk.h
-  logging.cc logging.h logging_internal.h
-  options.cc options.h
-  platform.h platform_linux.h platform_osx.h
-  prng.h
-  sanitizer.cc sanitizer.h
-  shortstring.h
-  smalloc.h
-  statistics.cc statistics.h
-  util/pointer.h
-  util/posix.cc util/posix.h
-  util/single_copy.h
-  util/string.cc util/string.h
+  globals.cc
+  hash.cc
+  loader.cc
+  loader_talk.cc
+  logging.cc
+  options.cc
+  sanitizer.cc
+  statistics.cc
+  util/posix.cc
+  util/string.cc
 )
 
 set (CVMFS_CLIENT_SOURCES
-  atomic.h
-  authz/authz.h authz/authz.cc
-  authz/authz_curl.h authz/authz_curl.cc
-  authz/authz_fetch.h authz/authz_fetch.cc
-  authz/authz_session.h authz/authz_session.cc
-  backoff.cc backoff.h
-  bigvector.h
-  cache.cc cache.h
-  cache.pb.cc cache.pb.h
-  cache_extern.cc cache_extern.h
-  cache_posix.cc cache_posix.h
-  cache_ram.cc cache_ram.h
-  cache_tiered.cc cache_tiered.h
-  cache_transport.cc cache_transport.h
-  catalog.cc catalog.h
-  catalog_counters.cc catalog_counters.h catalog_counters_impl.h
-  catalog_mgr.h catalog_mgr_impl.h
-  catalog_mgr_client.cc catalog_mgr_client.h
-  catalog_sql.cc catalog_sql.h
-  clientctx.cc clientctx.h
-  compression.cc compression.h
-  directory_entry.cc directory_entry.h
-  dns.cc dns.h
-  download.cc download.h
-  duplex_cares.h
-  duplex_curl.h
-  duplex_sqlite3.h
-  duplex_zlib.h
-  fd_table.h
-  fetch.cc fetch.h
-  file_chunk.cc file_chunk.h
-  fs_traversal.h
-  globals.cc globals.h
-  glue_buffer.cc glue_buffer.h
-  hash.cc hash.h
-  history.h
-  history_sql.cc history_sql.h
-  history_sqlite.cc history_sqlite.h
-  json_document.cc json_document.h
-  kvstore.h kvstore.cc
-  loader.h
-  logging.cc logging.h logging_internal.h
-  lru.h lru_md.h
-  malloc_arena.cc malloc_arena.h
-  malloc_heap.cc malloc_heap.h
-  manifest.cc manifest.h
-  manifest_fetch.cc manifest_fetch.h
-  monitor.cc monitor.h
-  mountpoint.cc mountpoint.h
-  murmur.h
-  options.cc options.h
-  platform.h platform_linux.h platform_osx.h
-  prng.h
-  quota.cc quota.h
-  quota_posix.cc quota_posix.h
-  sanitizer.cc sanitizer.h
-  shortstring.h
-  signature.cc signature.h
-  sink.h
-  smallhash.h
-  smalloc.h
-  sql.cc sql.h sql_impl.h
-  sqlitemem.cc sqlitemem.h
-  sqlitevfs.cc sqlitevfs.h
-  statistics.cc statistics.h
-  tracer.cc tracer.h
-  uid_map.h
-  uuid.cc uuid.h
-  util/algorithm.cc util/algorithm.h
-  util/file_guard.h
-  util/plugin.h
-  util/pointer.h
-  util/posix.cc util/posix.h
-  util/single_copy.h
-  util/string.cc util/string.h
-  util_concurrency.cc util_concurrency.h util_concurrency_impl.h
-  whitelist.cc whitelist.h
-  wpad.cc wpad.h
-  xattr.cc xattr.h
+  authz/authz.cc
+  authz/authz_curl.cc
+  authz/authz_fetch.cc
+  authz/authz_session.cc
+  backoff.cc
+  cache.cc
+  cache.pb.cc
+  cache_extern.cc
+  cache_posix.cc
+  cache_ram.cc
+  cache_tiered.cc
+  cache_transport.cc
+  catalog.cc
+  catalog_counters.cc
+  catalog_mgr_client.cc
+  catalog_sql.cc
+  clientctx.cc
+  compression.cc
+  directory_entry.cc
+  dns.cc
+  download.cc
+  file_chunk.cc
+  globals.cc
+  glue_buffer.cc
+  hash.cc
+  history_sql.cc
+  history_sqlite.cc
+  json_document.cc
+  kvstore.cc
+  logging.cc
+  malloc_arena.cc
+  malloc_heap.cc
+  manifest.cc
+  manifest_fetch.cc
+  monitor.cc
+  mountpoint.cc
+  options.cc
+  quota.cc
+  quota_posix.cc
+  sanitizer.cc
+  signature.cc
+  sql.cc
+  sqlitemem.cc
+  sqlitevfs.cc
+  statistics.cc
+  tracer.cc
+  uuid.cc
+  util/algorithm.cc
+  util/posix.cc
+  util/string.cc
+  util_concurrency.cc
+  whitelist.cc
+  wpad.cc
+  xattr.cc
 )
 
 set_source_files_properties(cache.pb.cc cache.pb.h
                             PROPERTIES GENERATED true)
 
 add_custom_command(OUTPUT cache.pb.cc cache.pb.h
-                   COMMAND ${PROTOBUF_C} --cpp_out=.
+                   COMMAND ${PROTOBUF_PROTOC_EXECUTABLE} --cpp_out=.
                            ${CMAKE_CURRENT_SOURCE_DIR}/cache.proto
                            -I${CMAKE_CURRENT_SOURCE_DIR}
                    DEPENDS ${PROTOBUF_ARCHIVE}
@@ -122,14 +88,14 @@ add_custom_command(OUTPUT cache.pb.cc cache.pb.h
 set (CVMFS2_DEBUG_SOURCES
   ${CVMFS_CLIENT_SOURCES}
 
-  auto_umount.cc auto_umount.h
-  compat.cc compat.h
-  cvmfs.cc cvmfs.h
-  fence.h
-  nfs_maps.cc nfs_maps.h
-  nfs_shared_maps.cc nfs_shared_maps.h
-  quota_listener.cc quota_listener.h
-  talk.cc talk.h
+  auto_umount.cc
+  compat.cc
+  cvmfs.cc
+  fetch.cc
+  nfs_maps.cc
+  nfs_shared_maps.cc
+  quota_listener.cc
+  talk.cc
 )
 
 set (CVMFS2_SOURCES
@@ -139,192 +105,138 @@ set (CVMFS2_SOURCES
 set (LIBCVMFS_SOURCES
   ${CVMFS_CLIENT_SOURCES}
 
-  libcvmfs.cc libcvmfs.h
-  libcvmfs_int.cc libcvmfs_int.h
+  fetch.cc
+  libcvmfs.cc
+  libcvmfs_int.cc
   libcvmfs_legacy.cc
   libcvmfs_options.cc
 )
 
 set (TEST_LIBCVMFS_SOURCES
-  libcvmfs.h
   test_libcvmfs.cc
 )
 
 set (LIBCVMFS_CACHE_SOURCES
-  atomic.h
-  cache.h
-  cache.pb.cc cache.pb.h
-  cache_plugin/libcvmfs_cache.cc cache_plugin/libcvmfs_cache.h
+  cache.pb.cc
+  cache_plugin/libcvmfs_cache.cc
   cache_plugin/libcvmfs_cache_options.cc
-  cache_plugin/channel.cc cache_plugin/channel.h
-  cache_transport.cc cache_transport.h
-  fs_traversal.h
-  hash.h hash.cc
-  logging.cc logging.h logging_internal.h
-  murmur.h
-  monitor.cc monitor.h
-  options.h options.cc
-  platform.h platform_linux.h platform_osx.h
-  prng.h
-  sanitizer.cc sanitizer.h
-  shortstring.h
-  smallhash.h
-  smalloc.h
-  util/async.h
-  util/pointer.h
-  util/posix.cc util/posix.h
-  util/single_copy.h
-  util/string.cc util/string.h
-  util_concurrency.cc util_concurrency.h util_concurrency_impl.h
+  cache_plugin/channel.cc
+  cache_transport.cc
+  hash.cc
+  logging.cc
+  monitor.cc
+  options.cc
+  sanitizer.cc
+  util/posix.cc
+  util/string.cc
+  util_concurrency.cc
 )
 
 set (CVMFS_CACHE_NULL_SOURCES
-  cache_plugin/libcvmfs_cache.h
   cache_plugin/cvmfs_cache_null.cc
 )
 
 set (CVMFS_CACHE_RAM_SOURCES
-  atomic.h
-  cache_plugin/libcvmfs_cache.h
   cache_plugin/cvmfs_cache_ram.cc
-  logging.cc logging.h logging_internal.h
-  lru.h
-  malloc_heap.cc malloc_heap.h
-  murmur.h
-  platform.h platform_linux.h platform_osx.h
-  prng.h
-  smallhash.h
-  smalloc.h
-  statistics.h statistics.cc
-  util_concurrency.cc util_concurrency.h util_concurrency_impl.h
-  util/async.h
-  util/single_copy.h
-  util/string.cc util/string.h
+  logging.cc
+  malloc_heap.cc
+  statistics.cc
+  util_concurrency.cc
+  util/string.cc
 )
 
 set (CVMFS_FSCK_SOURCES
-  atomic.h
-  compression.cc compression.h
+  compression.cc
   cvmfs_fsck.cc
-  duplex_zlib.h
-  hash.cc hash.h
-  logging.cc logging.h logging_internal.h
-  platform.h platform_linux.h platform_osx.h
-  prng.h
-  smalloc.h
-  statistics.cc statistics.h
-  util/plugin.h
-  util/pointer.h
-  util/posix.cc util/posix.h
-  util/single_copy.h
-  util/string.cc util/string.h
+  hash.cc
+  logging.cc
+  statistics.cc
+  util/posix.cc
+  util/string.cc
 )
 
 
 set (CVMFS_SWISSKNIFE_SOURCES
-  atomic.h
-  catalog.cc catalog.h
-  catalog_balancer.h catalog_balancer_impl.h
-  catalog_counters.cc catalog_counters.h catalog_counters_impl.h
-  catalog_mgr.h catalog_mgr_impl.h
-  catalog_mgr_ro.cc catalog_mgr_ro.h
-  catalog_mgr_rw.cc catalog_mgr_rw.h
-  catalog_sql.cc catalog_sql.h
-  catalog_traversal.h
-  catalog_rw.cc catalog_rw.h
-  catalog_virtual.cc catalog_virtual.h
-  clientctx.cc clientctx.h
-  compression.cc compression.h
-  directory_entry.cc directory_entry.h
-  dns.cc dns.h
-  download.cc download.h
-  duplex_cares.h
-  duplex_curl.h
-  duplex_sqlite3.h
-  duplex_zlib.h
-  file_chunk.cc file_chunk.h
-  file_processing/async_reader.cc file_processing/async_reader.h file_processing/async_reader_impl.h
-  file_processing/char_buffer.h
-  file_processing/chunk.cc file_processing/chunk.h
-  file_processing/chunk_detector.cc file_processing/chunk_detector.h
-  file_processing/file.cc file_processing/file.h
-  file_processing/file_processor.cc file_processing/file_processor.h
-  file_processing/io_dispatcher.cc file_processing/io_dispatcher.h
-  file_processing/processor.cc file_processing/processor.h
-  fs_traversal.h
-  globals.cc globals.h
-  hash.cc hash.h
-  history.h
-  history_sql.cc history_sql.h
-  history_sqlite.cc history_sqlite.h
-  json_document.cc json_document.h
-  letter.cc letter.h
-  logging.cc logging.h logging_internal.h
-  malloc_arena.cc malloc_arena.h
-  manifest.cc manifest.h
-  manifest_fetch.cc manifest_fetch.h
-  object_fetcher.h
-  options.cc options.h
-  pack.cc pack.h
-  path_filters/dirtab.cc path_filters/dirtab.h
-  path_filters/relaxed_path_filter.cc path_filters/relaxed_path_filter.h
-  pathspec/pathspec.cc pathspec/pathspec.h
-  pathspec/pathspec_pattern.cc pathspec/pathspec_pattern.h
-  platform.h platform_linux.h platform_osx.h
-  prng.h
-  reflog.cc reflog.h
-  reflog_sql.cc reflog_sql.h
-  s3fanout.cc s3fanout.h
-  sanitizer.cc sanitizer.h
-  shortstring.h
-  signature.cc signature.h
-  smalloc.h
-  sql.cc sql.h sql_impl.h
-  sqlitemem.cc sqlitemem.h
-  statistics.cc statistics.h
-  swissknife.cc swissknife.h
-  swissknife_assistant.cc swissknife_assistant.h
-  swissknife_check.cc swissknife_check.h
-  swissknife_gc.cc swissknife_gc.h
-  swissknife_graft.cc swissknife_graft.h
-  swissknife_hash.cc swissknife_hash.h
-  swissknife_history.cc swissknife_history.h
-  swissknife_info.cc swissknife_info.h
-  swissknife_letter.cc swissknife_letter.h
-  swissknife_lsrepo.cc swissknife_lsrepo.h
+  catalog.cc
+  catalog_counters.cc
+  catalog_mgr_ro.cc
+  catalog_mgr_rw.cc
+  catalog_sql.cc
+  catalog_rw.cc
+  catalog_virtual.cc
+  clientctx.cc
+  compression.cc
+  directory_entry.cc
+  dns.cc
+  download.cc
+  file_chunk.cc
+  file_processing/async_reader.cc
+  file_processing/chunk.cc
+  file_processing/chunk_detector.cc
+  file_processing/file.cc
+  file_processing/file_processor.cc
+  file_processing/io_dispatcher.cc
+  file_processing/processor.cc
+  globals.cc
+  hash.cc
+  history_sql.cc
+  history_sqlite.cc
+  json_document.cc
+  letter.cc
+  logging.cc
+  malloc_arena.cc
+  manifest.cc
+  manifest_fetch.cc
+  options.cc
+  pack.cc
+  path_filters/dirtab.cc
+  path_filters/relaxed_path_filter.cc
+  pathspec/pathspec.cc
+  pathspec/pathspec_pattern.cc
+  reflog.cc
+  reflog_sql.cc
+  s3fanout.cc
+  sanitizer.cc
+  signature.cc
+  sql.cc
+  sqlitemem.cc
+  statistics.cc
+  swissknife.cc
+  swissknife_assistant.cc
+  swissknife_check.cc
+  swissknife_gc.cc
+  swissknife_graft.cc
+  swissknife_hash.cc
+  swissknife_history.cc
+  swissknife_info.cc
+  swissknife_letter.cc
+  swissknife_lsrepo.cc
   swissknife_main.cc
-  swissknife_migrate.cc swissknife_migrate.h
-  swissknife_pull.cc swissknife_pull.h
-  swissknife_reflog.cc swissknife_reflog.h
-  swissknife_scrub.cc swissknife_scrub.h
-  swissknife_sign.cc swissknife_sign.h
-  swissknife_sync.cc swissknife_sync.h
-  swissknife_zpipe.cc swissknife_zpipe.h
+  swissknife_migrate.cc
+  swissknife_pull.cc
+  swissknife_reflog.cc
+  swissknife_scrub.cc
+  swissknife_sign.cc
+  swissknife_sync.cc
+  swissknife_zpipe.cc
   swissknife_lease.cc
   swissknife_lease_curl.cc
   swissknife_lease_json.cc
-  sync_item.cc sync_item.h
-  sync_mediator.cc sync_mediator.h
-  sync_union.cc sync_union.h
-  uid_map.h
-  upload.cc upload.h
-  upload_facility.cc upload_facility.h
-  upload_local.cc upload_local.h
-  upload_s3.cc upload_s3.h
-  upload_spooler_definition.cc upload_spooler_definition.h
-  upload_spooler_result.h
-  util/algorithm.cc util/algorithm.h
-  util/async.h
-  util/file_guard.h
-  util/mmap_file.cc util/mmap_file.h
-  util/plugin.h
-  util/pointer.h
-  util/posix.cc util/posix.h
-  util/single_copy.h
-  util/string.cc util/string.h
-  util_concurrency.cc util_concurrency.h util_concurrency_impl.h
-  whitelist.cc whitelist.h
-  xattr.cc xattr.h
+  sync_item.cc
+  sync_mediator.cc
+  sync_union.cc
+  upload.cc
+  upload_facility.cc
+  upload_local.cc
+  upload_s3.cc
+  upload_spooler_definition.cc
+  util/algorithm.cc
+  util/mmap_file.cc
+  util/posix.cc
+  util/string.cc
+  util_concurrency.cc
+  whitelist.cc
+  xattr.cc
 )
 
 set (CVMFS_SWISSKNIFE_DEBUG_SOURCES
@@ -332,70 +244,59 @@ set (CVMFS_SWISSKNIFE_DEBUG_SOURCES
 )
 
 set (CVMFS_SUID_HELPER_SOURCES
-  cvmfs_suid_helper.cc
-  platform.h platform_linux.h platform_osx.h
-  sanitizer.cc sanitizer.h
+  cvmfs_suid_helper.cc sanitizer.cc
 )
 
 set (CVMFS_PRELOADER_SOURCES
-  atomic.h
-  catalog.cc catalog.h
-  catalog_sql.cc catalog_sql.h
-  compression.cc compression.h
-  dns.cc dns.h
-  download.cc download.h
-  duplex_cares.h
-  duplex_curl.h
-  duplex_sqlite3.h
-  file_processing/async_reader.cc file_processing/async_reader.h file_processing/async_reader_impl.h
-  file_processing/char_buffer.h
-  file_processing/chunk.cc file_processing/chunk.h
-  file_processing/chunk_detector.cc file_processing/chunk_detector.h
-  file_processing/file.cc file_processing/file.h
-  file_processing/file_processor.cc file_processing/file_processor.h
-  file_processing/io_dispatcher.cc file_processing/io_dispatcher.h
-  file_processing/processor.cc file_processing/processor.h
-  globals.cc globals.h
-  hash.cc hash.h
-  history_sql.cc history_sql.h
-  history_sqlite.cc history_sqlite.h
-  logging.cc logging.h logging_internal.h
-  malloc_arena.cc malloc_arena.h
-  manifest.cc manifest.h
-  manifest_fetch.cc manifest_fetch.h
-  options.cc options.h
-  path_filters/dirtab.cc path_filters/dirtab.h
-  path_filters/relaxed_path_filter.cc path_filters/relaxed_path_filter.h
-  pathspec/pathspec.cc pathspec/pathspec.h
-  pathspec/pathspec_pattern.cc pathspec/pathspec_pattern.h
+  catalog.cc
+  catalog_sql.cc
+  compression.cc
+  dns.cc
+  download.cc
+  file_processing/async_reader.cc
+  file_processing/chunk.cc
+  file_processing/chunk_detector.cc
+  file_processing/file.cc
+  file_processing/file_processor.cc
+  file_processing/io_dispatcher.cc
+  file_processing/processor.cc
+  globals.cc
+  hash.cc
+  history_sql.cc
+  history_sqlite.cc
+  logging.cc
+  malloc_arena.cc
+  manifest.cc
+  manifest_fetch.cc
+  options.cc
+  path_filters/dirtab.cc
+  path_filters/relaxed_path_filter.cc
+  pathspec/pathspec.cc
+  pathspec/pathspec_pattern.cc
   preload.cc
-  reflog.cc reflog.h
-  reflog_sql.cc reflog_sql.h
-  s3fanout.cc s3fanout.h
-  sanitizer.cc sanitizer.h
-  signature.cc signature.h
-  smalloc.h
-  sql.cc sql.h sql_impl.h
-  sqlitemem.cc sqlitemem.h
-  statistics.cc statistics.h
-  swissknife.cc swissknife.h
-  swissknife_pull.cc swissknife_pull.h
-  upload.cc upload.h
-  upload_facility.cc upload_facility.h
-  upload_local.cc upload_local.h
-  upload_s3.cc upload_s3.h
-  upload_spooler_definition.cc upload_spooler_definition.h
-  util/algorithm.cc util/algorithm.h
-  util/buffer.h
-  util/mmap_file.cc util/mmap_file.h
-  util/pointer.h
-  util/posix.cc util/posix.h
-  util/single_copy.h
-  util/string.cc util/string.h
-  util_concurrency.cc util_concurrency.h
-  uuid.cc uuid.h
-  whitelist.cc whitelist.h
-  xattr.cc xattr.h
+  reflog.cc
+  reflog_sql.cc
+  s3fanout.cc
+  sanitizer.cc
+  signature.cc
+  sql.cc
+  sqlitemem.cc
+  statistics.cc
+  swissknife.cc
+  swissknife_pull.cc
+  upload.cc
+  upload_facility.cc
+  upload_local.cc
+  upload_s3.cc
+  upload_spooler_definition.cc
+  util/algorithm.cc
+  util/mmap_file.cc
+  util/posix.cc
+  util/string.cc
+  util_concurrency.cc
+  uuid.cc
+  whitelist.cc
+  xattr.cc
 )
 
 
@@ -435,53 +336,6 @@ if (BUILD_CVMFS)
   add_library (cvmfs_fuse SHARED ${CVMFS2_SOURCES})
   add_executable (cvmfs_fsck ${CVMFS_FSCK_SOURCES})
 
-  if (LIBFUSE_BUILTIN)
-    add_dependencies (cvmfs_fuse_debug libfuse) # here it does not matter if libfuse or osxfuse
-    add_dependencies (cvmfs_fuse libfuse)       # at this point only the appropriate one is defined
-  endif (LIBFUSE_BUILTIN)
-
-  if (LIBCURL_BUILTIN)
-    add_dependencies (cvmfs_fuse_debug libcares libcurl)
-    add_dependencies (cvmfs_fuse libcares libcurl)
-  endif (LIBCURL_BUILTIN)
-
-  if (PACPARSER_BUILTIN)
-    add_dependencies (cvmfs_fuse_debug libpacparser)
-    add_dependencies (cvmfs_fuse libpacparser)
-  endif (PACPARSER_BUILTIN)
-
-  if (SQLITE3_BUILTIN)
-    add_dependencies (cvmfs_fuse_debug sqlite3)
-    add_dependencies (cvmfs_fuse sqlite3)
-  endif (SQLITE3_BUILTIN)
-
-  if (ZLIB_BUILTIN)
-    add_dependencies (cvmfs_fuse_debug zlib)
-    add_dependencies (cvmfs_fuse zlib)
-    add_dependencies (cvmfs_fsck zlib)
-  endif (ZLIB_BUILTIN)
-
-  if (SPARSEHASH_BUILTIN)
-    add_dependencies (cvmfs_fuse_debug sparsehash)
-    add_dependencies (cvmfs_fuse sparsehash)
-  endif (SPARSEHASH_BUILTIN)
-
-  if (LEVELDB_BUILTIN)
-    add_dependencies (cvmfs_fuse_debug libleveldb)
-    add_dependencies (cvmfs_fuse libleveldb)
-  endif (LEVELDB_BUILTIN)
-
-  add_dependencies (cvmfs_fuse_debug libsha3)
-  add_dependencies (cvmfs_fuse libsha3)
-  add_dependencies (cvmfs2 libsha3)
-  add_dependencies (cvmfs_fsck libsha3)
-
-  add_dependencies (cvmfs_fuse_debug libvjson)
-  add_dependencies (cvmfs_fuse libvjson)
-
-  add_dependencies (cvmfs_fuse_debug protobuf)
-  add_dependencies (cvmfs_fuse protobuf)
-
   # set some properties
   set (CVMFS_LOADER_LD_FLAGS "${CVMFS_LOADER_LD_FLAGS} -ldl -lm")
   set_target_properties (cvmfs2 PROPERTIES COMPILE_FLAGS "${CVMFS_LOADER_CFLAGS}" LINK_FLAGS "${CVMFS_LOADER_LD_FLAGS}")
@@ -492,125 +346,106 @@ if (BUILD_CVMFS)
   set_target_properties (cvmfs_fuse PROPERTIES VERSION ${CernVM-FS_VERSION_STRING})
   set_target_properties (cvmfs_fuse_debug PROPERTIES VERSION ${CernVM-FS_VERSION_STRING})
 
-  # link the stuff (*_LIBRARIES are dynamic link libraries *_archive are static link libraries ... one of them will be empty for each dependency)
-  set (CVMFS_FUSE_LINK_LIBRARIES ${SQLITE3_LIBRARY} ${CARES_LIBRARIES}
-         ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE} ${PACPARSER_LIBRARIES}
-         ${LEVELDB_LIBRARIES} ${OPENSSL_LIBRARIES} ${FUSE_LIBRARIES}
-         ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${ZLIB_LIBRARIES}
-         ${PACPARSER_ARCHIVE} ${LEVELDB_ARCHIVE} ${CARES_ARCHIVE}
-         ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${UUID_LIBRARIES}
-         ${SHA3_ARCHIVE} ${VJSON_ARCHIVE} ${PROTOBUF_ARCHIVE} pthread dl)
+  set (CVMFS_FUSE_LINK_LIBRARIES "")
+  if (MACOSX)
+    list(APPEND CVMFS_FUSE_LINK_LIBRARIES ${OSXFUSE_LIBRARIES})
+  else(MACOSX)
+    list(APPEND CVMFS_FUSE_LINK_LIBRARIES ${FUSE_LIBRARIES})
+  endif(MACOSX)
+
+  list(APPEND CVMFS_FUSE_LINK_LIBRARIES ${CURL_LIBRARIES}
+                                        ${CARES_LIBRARIES}
+                                        ${OPENSSL_LIBRARIES}
+                                        ${PACPARSER_LIBRARIES}
+                                        ${SQLITE3_LIBRARY}
+                                        ${ZLIB_LIBRARIES}
+                                        ${SPARSEHASH_LIBRARIES}
+                                        ${LEVELDB_LIBRARIES}
+                                        ${SHA3_LIBRARIES}
+                                        ${SHA2_LIBRARIES}
+                                        ${PROTOBUF_LIBRARY}
+                                        ${VJSON_LIBRARIES}
+                                        ${RT_LIBRARY}
+                                        ${UUID_LIBRARIES}
+                                        pthread dl)
 
   target_link_libraries (cvmfs2 ${CVMFS_LOADER_LIBS} ${OPENSSL_LIBRARIES}
                                 ${LIBFUSE} ${RT_LIBRARY} ${UUID_LIBRARIES}
-                                ${SHA3_ARCHIVE} pthread dl)
+                                ${SHA3_LIBRARIES} pthread dl)
   target_link_libraries (cvmfs_fuse_debug ${CVMFS2_DEBUG_LIBS} ${CVMFS_FUSE_LINK_LIBRARIES})
   target_link_libraries (cvmfs_fuse       ${CVMFS2_LIBS} ${CVMFS_FUSE_LINK_LIBRARIES})
   target_link_libraries (cvmfs_fsck       ${CVMFS_FSCK_LIBS} ${ZLIB_LIBRARIES}
-                                          ${OPENSSL_LIBRARIES} ${ZLIB_ARCHIVE}
-                                          ${SHA3_ARCHIVE} ${RT_LIBRARY} pthread)
+                                          ${OPENSSL_LIBRARIES} ${ZLIB_LIBRARIES}
+                                          ${SHA3_LIBRARIES} ${RT_LIBRARY} pthread)
 
 
   set (CVMFS_ALLOW_HELPER_SOURCES
     authz/helper_allow.cc
-    authz/helper_log.h authz/helper_log.cc
-    authz/helper_util.h authz/helper_util.cc
+    authz/helper_log.cc
+    authz/helper_util.cc
   )
   add_executable (cvmfs_allow_helper ${CVMFS_ALLOW_HELPER_SOURCES})
-  add_dependencies (cvmfs_allow_helper libvjson)
-  target_link_libraries (cvmfs_allow_helper ${VJSON_ARCHIVE})
+  target_link_libraries (cvmfs_allow_helper ${VJSON_LIBRARIES})
 
   set (CVMFS_DENY_HELPER_SOURCES
     authz/helper_deny.cc
-    authz/helper_log.h authz/helper_log.cc
-    authz/helper_util.h authz/helper_util.cc
+    authz/helper_log.cc
+    authz/helper_util.cc
   )
   add_executable (cvmfs_deny_helper ${CVMFS_DENY_HELPER_SOURCES})
-  add_dependencies (cvmfs_deny_helper libvjson)
-  target_link_libraries (cvmfs_deny_helper ${VJSON_ARCHIVE})
+  target_link_libraries (cvmfs_deny_helper ${VJSON_LIBRARIES})
 endif (BUILD_CVMFS)
 
 
 if (BUILD_LIBCVMFS_CACHE)
-  # libcvmfs_cache_only.a is a static lib of cvmfs without externals
-  # libcvmfs_cache.a includes the externals as well
   add_library (cvmfs_cache_only STATIC ${LIBCVMFS_CACHE_SOURCES})
-  set (LIBCVMFS_CACHE_LIBS ${LIBCVMFS_CACHE_LIBS} ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache_only.a)
-  add_dependencies (cvmfs_cache_only libsha3)
-  add_dependencies (cvmfs_cache_only protobuf)
-  set (LIBCVMFS_CACHE_LIBS ${SHA3_ARCHIVE} ${PROTOBUF_ARCHIVE}
-                           ${LIBCVMFS_CACHE_LIBS})
+  set (LIBCVMFS_CACHE_LIBS ${SHA3_LIBRARIES} ${PROTOBUF_LIBRARY} ${LIBCVMFS_CACHE_LIBS} ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache_only.a)
   set_target_properties (cvmfs_cache_only PROPERTIES COMPILE_FLAGS
                          "${LIBCVMFS_CACHE_CFLAGS}")
+  target_link_libraries(cvmfs_cache_only ${LIBCVMFS_CACHE_LIBS})
   if (NOT MACOSX)
     # We do not (yet) have a recipe for localizing private symbols
     # in Mac OS X, so skip that step on Mac
-    set (LIBCVMFS_CACHE_PUBLIC_SYMS "-public" "${CMAKE_CURRENT_SOURCE_DIR}/cache_plugin/libcvmfs_cache_public_syms.txt")
+    #set (LIBCVMFS_CACHE_PUBLIC_SYMS "-public" "${CMAKE_CURRENT_SOURCE_DIR}/cache_plugin/libcvmfs_cache_public_syms.txt")
   endif (NOT MACOSX)
 
   add_custom_command(
-    OUTPUT libcvmfs_cache.a
-    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/combine_libs ${LIBCVMFS_CACHE_PUBLIC_SYMS} libcvmfs_cache.a ${LIBCVMFS_CACHE_LIBS}
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    DEPENDS ${LIBCVMFS_CACHE_LIBS}
-  )
+      OUTPUT libcvmfs_cache.a
+      COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/combine_libs ${LIBCVMFS_CACHE_PUBLIC_SYMS} libcvmfs_cache.a ${LIBCVMFS_CACHE_LIBS}
+      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+      DEPENDS ${LIBCVMFS_CACHE_LIBS}
+    )
 
   # dummy target to cause merged libcvmfs_cache to be produced
   add_custom_target (libcvmfs_cache ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a)
   add_dependencies (libcvmfs_cache cvmfs_cache_only)
+  
 
   add_executable(cvmfs_cache_null ${CVMFS_CACHE_NULL_SOURCES})
   target_link_libraries(cvmfs_cache_null
                         ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a
                         ${OPENSSL_LIBRARIES} ${RT_LIBRARY} pthread)
-  add_dependencies (cvmfs_cache_null libcvmfs_cache)
+  add_dependencies(cvmfs_cache_null libcvmfs_cache)
 
   add_executable(cvmfs_cache_ram ${CVMFS_CACHE_RAM_SOURCES})
   target_link_libraries(cvmfs_cache_ram
                         ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a
                         ${OPENSSL_LIBRARIES} ${RT_LIBRARY} pthread)
-  add_dependencies (cvmfs_cache_ram libcvmfs_cache)
+  add_dependencies(cvmfs_cache_ram libcvmfs_cache)
 endif (BUILD_LIBCVMFS_CACHE)
 
 
 if (BUILD_LIBCVMFS)
-  # libcvmfs_only.a is a static lib of cvmfs without externals
-  # libcvmfs.a includes the externals as well
   add_library (cvmfs_only STATIC ${LIBCVMFS_SOURCES})
-  set (LIBCVMFS_LIBS ${LIBCVMFS_LIBS} ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_only.a)
 
-  if (LIBCURL_BUILTIN)
-    add_dependencies (cvmfs_only libcares libcurl)
-    set (LIBCVMFS_LIBS ${CARES_ARCHIVE} ${LIBCVMFS_LIBS} )
-    set (LIBCVMFS_LIBS ${LIBCURL_ARCHIVE} ${LIBCVMFS_LIBS} )
-  endif (LIBCURL_BUILTIN)
-
-  if (PACPARSER_BUILTIN)
-    add_dependencies (cvmfs_only libpacparser)
-    set (LIBCVMFS_LIBS ${PACPARSER_ARCHIVE} ${LIBCVMFS_LIBS} )
-  endif (PACPARSER_BUILTIN)
-
-  if (SQLITE3_BUILTIN)
-    add_dependencies (cvmfs_only sqlite3)
-    set (LIBCVMFS_LIBS ${SQLITE3_ARCHIVE}  ${LIBCVMFS_LIBS} )
-  endif (SQLITE3_BUILTIN)
-
-  if (ZLIB_BUILTIN)
-    add_dependencies (cvmfs_only zlib)
-    set (LIBCVMFS_LIBS ${ZLIB_ARCHIVE} ${LIBCVMFS_LIBS} )
-  endif (ZLIB_BUILTIN)
-
-  if (SPARSEHASH_BUILTIN)
-    add_dependencies (cvmfs_only sparsehash)
-  endif (SPARSEHASH_BUILTIN)
-
-  add_dependencies (cvmfs_only libsha3)
-  add_dependencies (cvmfs_only libvjson)
-  add_dependencies (cvmfs_only protobuf)
-  set (LIBCVMFS_LIBS ${SHA3_ARCHIVE} ${VJSON_ARCHIVE} ${PROTOBUF_ARCHIVE}
-                     ${LIBCVMFS_LIBS})
+  set (LIBCVMFS_LIBS ${CARES_LIBRARIES} ${LIBCURL_LIBRARIES}
+                     ${PACPARSER_LIBRARIES} ${SQLITE3_LIBRARY}
+                     ${ZLIB_LIBRARIES} ${SPARSEHASH_LIBRARIES}
+                     ${SHA3_LIBRARIES} ${VJSON_LIBRARIES}
+                     ${PROTOBUF_LIBRARY} ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_only.a)
 
   set_target_properties (cvmfs_only PROPERTIES COMPILE_FLAGS "${LIBCVMFS_CFLAGS}")
+  target_link_libraries(cvmfs_only ${LIBCVMFS_LIBS})
 
   if (NOT MACOSX)
     # We do not (yet) have a recipe for localizing private symbols
@@ -619,10 +454,10 @@ if (BUILD_LIBCVMFS)
   endif (NOT MACOSX)
 
   add_custom_command(
-    OUTPUT libcvmfs.a
-    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/combine_libs ${LIBCVMFS_PUBLIC_SYMS} libcvmfs.a ${LIBCVMFS_LIBS}
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    DEPENDS ${LIBCVMFS_LIBS}
+      OUTPUT libcvmfs.a
+      COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/combine_libs ${LIBCVMFS_PUBLIC_SYMS} libcvmfs.a ${LIBCVMFS_LIBS}
+      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+      DEPENDS ${LIBCVMFS_LIBS}
   )
 
   # dummy target to cause merged libcvmfs to be produced
@@ -630,41 +465,35 @@ if (BUILD_LIBCVMFS)
   add_dependencies (libcvmfs cvmfs_only)
 
   add_executable( test_libcvmfs ${TEST_LIBCVMFS_SOURCES} )
-  target_link_libraries(test_libcvmfs ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a
-                        ${SQLITE3_LIBRARY} ${CARES_LIBRARIES} ${CURL_LIBRARIES}
+  add_dependencies(test_libcvmfs libcvmfs)
+  target_link_libraries(test_libcvmfs
+                        ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a
+                        ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${CARES_LIBRARIES}
                         ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES}
                         ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl )
-  add_dependencies (test_libcvmfs libcvmfs)
-endif (BUILD_LIBCVMFS)
-
+endif(BUILD_LIBCVMFS)
 
 if (BUILD_OCTOPUS)
   set (CVMFS_OCTOPUS_SOURCES
-    encrypt.cc encrypt.h
-    hash.cc hash.h
-    json_document.cc json_document.h
-    logging.cc logging.h logging_internal.h
-    pathspec/pathspec.cc pathspec/pathspec.h
-    pathspec/pathspec_pattern.cc pathspec/pathspec_pattern.h
-    platform.h platform_linux.h platform_osx.h
-	  sanitizer.cc sanitizer.h
-    smalloc.h
-    util/pointer.h
-    util/posix.cc util/posix.h
-    util/single_copy.h
-    util/string.cc util/string.h
-    uuid.cc uuid.h
-		webapi/fcgi.cc webapi/fcgi.h
-    webapi/macaroon.cc webapi/macaroon.h
+    encrypt.cc
+    hash.cc
+    json_document.cc
+    logging.cc
+    pathspec/pathspec.cc
+    pathspec/pathspec_pattern.cc
+	  sanitizer.cc
+    util/posix.cc
+    util/string.cc
+    uuid.cc
+		webapi/fcgi.cc
+    webapi/macaroon.cc
     webapi/octopus.cc
-    webapi/uri_map.cc webapi/uri_map.h
+    webapi/uri_map.cc
   )
 
   add_executable (cvmfs_octopus.fcgi ${CVMFS_OCTOPUS_SOURCES})
-  add_dependencies (cvmfs_octopus.fcgi libsha2)
-  add_dependencies (cvmfs_octopus.fcgi libvjson)
   target_link_libraries(cvmfs_octopus.fcgi
-                        ${SHA3_ARCHIVE} ${VJSON_ARCHIVE} ${OPENSSL_LIBRARIES}
+                        ${SHA3_LIBRARIES} ${SHA2_LIBRARIES} ${VJSON_LIBRARIES} ${OPENSSL_LIBRARIES}
                         ${RT_LIBRARY} ${UUID_LIBRARIES} pthread)
 endif (BUILD_OCTOPUS)
 
@@ -674,62 +503,18 @@ if (BUILD_SERVER)
   add_executable (cvmfs_swissknife ${CVMFS_SWISSKNIFE_SOURCES})
   add_executable (cvmfs_suid_helper ${CVMFS_SUID_HELPER_SOURCES})
 
-  if (GEOIP_BUILTIN)
-    add_custom_target (geoip ALL)
-    add_dependencies (python-geoip libgeoip)
-    add_dependencies (geoip python-geoip)
-  endif (GEOIP_BUILTIN)
-
-  add_dependencies (cvmfs_swissknife libvjson)
-
-  if (LIBCURL_BUILTIN)
-    add_dependencies (cvmfs_swissknife libcares libcurl)
-  endif (LIBCURL_BUILTIN)
-
-  if (SQLITE3_BUILTIN)
-    add_dependencies (cvmfs_swissknife sqlite3)
-  endif (SQLITE3_BUILTIN)
-
-  if (ZLIB_BUILTIN)
-    add_dependencies (cvmfs_swissknife zlib)
-  endif (ZLIB_BUILTIN)
-
-  if (TBB_PRIVATE_LIB)
-    add_dependencies (cvmfs_swissknife libtbb)
-  endif (TBB_PRIVATE_LIB)
-
-  add_dependencies (cvmfs_swissknife libsha3)
-
   set_target_properties (cvmfs_swissknife PROPERTIES COMPILE_FLAGS "${CVMFS_SWISSKNIFE_CFLAGS}" LINK_FLAGS "${CVMFS_SWISSKNIFE_LD_FLAGS}")
 
   # link the stuff (*_LIBRARIES are dynamic link libraries)
-  target_link_libraries (cvmfs_swissknife  ${CVMFS_SWISSKNIFE_LIBS}
-                         ${SQLITE3_LIBRARY}  ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE}
-                         ${CARES_LIBRARIES} ${CARES_ARCHIVE} ${TBB_LIBRARIES}
-                         ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} ${OPENSSL_LIBRARIES}
-                         ${SQLITE3_ARCHIVE} ${RT_LIBRARY} ${VJSON_ARCHIVE}
-                         ${SHA3_ARCHIVE} ${CAP_LIBRARIES} pthread dl)
+  target_link_libraries (cvmfs_swissknife
+                         ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${CURL_LIBRARIES}
+                         ${CARES_LIBRARIES} ${TBB_LIBRARIES}
+                         ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES}
+                         ${RT_LIBRARY} ${VJSON_LIBRARIES}
+                         ${SHA3_LIBRARIES} ${CAP_LIBRARIES} pthread dl)
 
   if (BUILD_SERVER_DEBUG)
     add_executable (cvmfs_swissknife_debug ${CVMFS_SWISSKNIFE_DEBUG_SOURCES})
-
-    if (LIBCURL_BUILTIN)
-      add_dependencies (cvmfs_swissknife_debug libcares libcurl)
-    endif (LIBCURL_BUILTIN)
-
-    if (SQLITE3_BUILTIN)
-      add_dependencies (cvmfs_swissknife_debug sqlite3)
-    endif (SQLITE3_BUILTIN)
-
-    if (ZLIB_BUILTIN)
-      add_dependencies (cvmfs_swissknife_debug zlib)
-    endif (ZLIB_BUILTIN)
-
-    if (TBB_PRIVATE_LIB)
-      add_dependencies (cvmfs_swissknife_debug libtbb)
-    endif (TBB_PRIVATE_LIB)
-
-    add_dependencies (cvmfs_swissknife_debug libsha3)
 
     set_target_properties (cvmfs_swissknife_debug PROPERTIES COMPILE_FLAGS "${CVMFS_SWISSKNIFE_DEBUG_CFLAGS}" LINK_FLAGS "${CVMFS_SWISSKNIFE_DEBUG_LD_FLAGS}")
 
@@ -738,55 +523,21 @@ if (BUILD_SERVER)
       message (WARNING "Debug libraries of TBB were not found. Using the release versions instead.")
       set (TBB_DEBUG_LIBRARIES ${TBB_LIBRARIES})
     endif (NOT TBB_DEBUG_LIBRARIES)
-    target_link_libraries (cvmfs_swissknife_debug  ${CVMFS_SWISSKNIFE_LIBS}
-                           ${SQLITE3_LIBRARY}  ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE}
-                           ${CARES_LIBRARIES} ${CARES_ARCHIVE} ${TBB_DEBUG_LIBRARIES}
-                           ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} ${OPENSSL_LIBRARIES}
-                           ${SQLITE3_ARCHIVE} ${RT_LIBRARY} ${VJSON_ARCHIVE}
-                           ${SHA3_ARCHIVE} ${CAP_LIBRARIES} pthread dl)
+    target_link_libraries (cvmfs_swissknife_debug
+                           ${SQLITE3_LIBRARY}  ${CURL_LIBRARIES}
+                           ${CARES_LIBRARIES} ${TBB_DEBUG_LIBRARIES}
+                           ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES}
+                           ${RT_LIBRARY} ${VJSON_LIBRARIES}
+                           ${SHA3_LIBRARIES} ${CAP_LIBRARIES} pthread dl)
   endif (BUILD_SERVER_DEBUG)
 endif (BUILD_SERVER)
 
 if (BUILD_PRELOADER)
   add_executable (cvmfs_preload_bin ${CVMFS_PRELOADER_SOURCES})
 
-  if (LIBCURL_BUILTIN)
-    add_dependencies (cvmfs_preload_bin libcares libcurl)
-    set (PRELOADER_LIBS ${CARES_ARCHIVE} ${PRELOADER_LIBS} )
-    set (PRELOADER_LIBS ${LIBCURL_ARCHIVE} ${PRELOADER_LIBS} )
-  endif (LIBCURL_BUILTIN)
-
-  if (PACPARSER_BUILTIN)
-    add_dependencies (cvmfs_preload_bin libpacparser)
-    set (PRELOADER_LIBS ${PACPARSER_ARCHIVE} ${PRELOADER_LIBS} )
-  endif (PACPARSER_BUILTIN)
-
-  if (SQLITE3_BUILTIN)
-    add_dependencies (cvmfs_preload_bin sqlite3)
-    set (PRELOADER_LIBS ${SQLITE3_ARCHIVE}  ${PRELOADER_LIBS} )
-  endif (SQLITE3_BUILTIN)
-
-  if (ZLIB_BUILTIN)
-    add_dependencies (cvmfs_preload_bin zlib)
-    set (PRELOADER_LIBS ${ZLIB_ARCHIVE} ${PRELOADER_LIBS} )
-  endif (ZLIB_BUILTIN)
-
-  if (SPARSEHASH_BUILTIN)
-    add_dependencies (cvmfs_preload_bin sparsehash)
-  endif (SPARSEHASH_BUILTIN)
-
-  if (TBB_PRIVATE_LIB)
-    add_dependencies (cvmfs_preload_bin libtbb)
-  endif (TBB_PRIVATE_LIB)
-
-  add_dependencies (cvmfs_preload_bin libsha3)
-  add_dependencies (cvmfs_preload_bin libvjson)
-
-  target_link_libraries(cvmfs_preload_bin ${SQLITE3_LIBRARY} ${CARES_LIBRARIES}
-                        ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE} ${ZLIB_LIBRARIES}
-                        ${OPENSSL_LIBRARIES} ${CARES_ARCHIVE} ${SQLITE3_ARCHIVE}
-                        ${ZLIB_ARCHIVE} ${TBB_LIBRARIES} ${RT_LIBRARY}
-                        ${UUID_LIBRARIES} ${VJSON_ARCHIVE} ${SHA3_ARCHIVE}
+  target_link_libraries(cvmfs_preload_bin ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${CARES_LIBRARIES} ${ZLIB_LIBRARIES}
+                        ${OPENSSL_LIBRARIES} ${CARES_LIBRARIS} ${TBB_LIBRARIES} ${RT_LIBRARY}
+                        ${UUID_LIBRARIES} ${VJSON_LIBRARIES} ${SHA3_LIBRARIES}
                         pthread dl)
 endif (BUILD_PRELOADER)
 
@@ -854,7 +605,7 @@ endif (BUILD_CVMFS)
 
 if (BUILD_LIBCVMFS)
   install (
-    FILES      ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a
+    FILES ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a
     DESTINATION    ${CMAKE_INSTALL_LIBDIR}
   )
   install (
@@ -865,7 +616,7 @@ endif (BUILD_LIBCVMFS)
 
 if (BUILD_LIBCVMFS_CACHE)
   install (
-    FILES      ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a
+    FILES          ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a
     DESTINATION    ${CMAKE_INSTALL_LIBDIR}
   )
   install (

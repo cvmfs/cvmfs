@@ -14,8 +14,8 @@ set(CVMFS_UNITTEST_FILES
   main.cc
 
   # test utility functions
-  env.cc env.h
-  testutil.cc testutil.h
+  env.cc
+  testutil.cc
 
   t_async_reader.cc
   t_atomic.cc
@@ -110,43 +110,33 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_UNITTEST_FILES}
 
   # test dependencies
-  ${CVMFS_SOURCE_DIR}/atomic.h
-  ${CVMFS_SOURCE_DIR}/authz/authz.cc ${CVMFS_SOURCE_DIR}/authz/authz.h
-  ${CVMFS_SOURCE_DIR}/authz/authz_curl.cc ${CVMFS_SOURCE_DIR}/authz/authz_curl.h
-  ${CVMFS_SOURCE_DIR}/authz/authz_fetch.cc ${CVMFS_SOURCE_DIR}/authz/authz_fetch.h
-  ${CVMFS_SOURCE_DIR}/authz/authz_session.cc ${CVMFS_SOURCE_DIR}/authz/authz_session.h
-  ${CVMFS_SOURCE_DIR}/backoff.cc ${CVMFS_SOURCE_DIR}/backoff.h
-  ${CVMFS_SOURCE_DIR}/bigvector.h
-  ${CVMFS_SOURCE_DIR}/cache.cc ${CVMFS_SOURCE_DIR}/cache.h
-  ${CVMFS_SOURCE_DIR}/cache_extern.cc ${CVMFS_SOURCE_DIR}/cache_extern.h
-  ${CVMFS_SOURCE_DIR}/cache_posix.cc ${CVMFS_SOURCE_DIR}/cache_posix.h
-  ${CVMFS_SOURCE_DIR}/cache_plugin/channel.cc ${CVMFS_SOURCE_DIR}/cache_plugin/channel.h
-  ${CVMFS_SOURCE_DIR}/cache_ram.cc ${CVMFS_SOURCE_DIR}/cache_ram.h
-  ${CVMFS_SOURCE_DIR}/cache_tiered.cc ${CVMFS_SOURCE_DIR}/cache_tiered.h
-  ${CVMFS_SOURCE_DIR}/cache_transport.cc ${CVMFS_SOURCE_DIR}/cache_transport.h
+  ${CVMFS_SOURCE_DIR}/authz/authz.cc
+  ${CVMFS_SOURCE_DIR}/authz/authz_curl.cc
+  ${CVMFS_SOURCE_DIR}/authz/authz_fetch.cc
+  ${CVMFS_SOURCE_DIR}/authz/authz_session.cc
+  ${CVMFS_SOURCE_DIR}/backoff.cc
+  ${CVMFS_SOURCE_DIR}/cache.cc
+  ${CVMFS_SOURCE_DIR}/cache_extern.cc
+  ${CVMFS_SOURCE_DIR}/cache_posix.cc
+  ${CVMFS_SOURCE_DIR}/cache_plugin/channel.cc
+  ${CVMFS_SOURCE_DIR}/cache_ram.cc
+  ${CVMFS_SOURCE_DIR}/cache_tiered.cc
+  ${CVMFS_SOURCE_DIR}/cache_transport.cc
   ${CVMFS_SOURCE_DIR}/catalog.cc
-  ${CVMFS_SOURCE_DIR}/catalog_counters.cc ${CVMFS_SOURCE_DIR}/catalog_counters.h
-  ${CVMFS_SOURCE_DIR}/catalog_mgr.h
-  ${CVMFS_SOURCE_DIR}/catalog_mgr_client.cc ${CVMFS_SOURCE_DIR}/catalog_mgr_client.h
-  ${CVMFS_SOURCE_DIR}/catalog_mgr_impl.h
-  ${CVMFS_SOURCE_DIR}/catalog_mgr_ro.cc ${CVMFS_SOURCE_DIR}/catalog_mgr_ro.h
-  ${CVMFS_SOURCE_DIR}/catalog_mgr_rw.cc ${CVMFS_SOURCE_DIR}/catalog_mgr_rw.h
-  ${CVMFS_SOURCE_DIR}/catalog_sql.cc ${CVMFS_SOURCE_DIR}/catalog_sql.h
-  ${CVMFS_SOURCE_DIR}/catalog_rw.cc ${CVMFS_SOURCE_DIR}/catalog_rw.h
-  ${CVMFS_SOURCE_DIR}/catalog_virtual.cc ${CVMFS_SOURCE_DIR}/catalog_virtual.h
-  ${CVMFS_SOURCE_DIR}/clientctx.cc ${CVMFS_SOURCE_DIR}/clientctx.h
-  ${CVMFS_SOURCE_DIR}/compression.cc ${CVMFS_SOURCE_DIR}/compression.h
-  ${CVMFS_SOURCE_DIR}/dns.cc ${CVMFS_SOURCE_DIR}/dns.h
-  ${CVMFS_SOURCE_DIR}/download.cc ${CVMFS_SOURCE_DIR}/download.h
-  ${CVMFS_SOURCE_DIR}/duplex_cares.h
-  ${CVMFS_SOURCE_DIR}/duplex_curl.h
-  ${CVMFS_SOURCE_DIR}/duplex_sqlite3.h
-  ${CVMFS_SOURCE_DIR}/duplex_zlib.h
-  ${CVMFS_SOURCE_DIR}/encrypt.cc ${CVMFS_SOURCE_DIR}/encrypt.h
-  ${CVMFS_SOURCE_DIR}/fd_table.h
-  ${CVMFS_SOURCE_DIR}/fence.h
-  ${CVMFS_SOURCE_DIR}/fetch.cc ${CVMFS_SOURCE_DIR}/fetch.h
-  ${CVMFS_SOURCE_DIR}/file_chunk.cc ${CVMFS_SOURCE_DIR}/file_chunk.h
+  ${CVMFS_SOURCE_DIR}/catalog_counters.cc
+  ${CVMFS_SOURCE_DIR}/catalog_mgr_client.cc
+  ${CVMFS_SOURCE_DIR}/catalog_mgr_ro.cc
+  ${CVMFS_SOURCE_DIR}/catalog_mgr_rw.cc
+  ${CVMFS_SOURCE_DIR}/catalog_sql.cc
+  ${CVMFS_SOURCE_DIR}/catalog_rw.cc
+  ${CVMFS_SOURCE_DIR}/catalog_virtual.cc
+  ${CVMFS_SOURCE_DIR}/clientctx.cc
+  ${CVMFS_SOURCE_DIR}/compression.cc
+  ${CVMFS_SOURCE_DIR}/dns.cc
+  ${CVMFS_SOURCE_DIR}/download.cc
+  ${CVMFS_SOURCE_DIR}/encrypt.cc
+  ${CVMFS_SOURCE_DIR}/fetch.cc
+  ${CVMFS_SOURCE_DIR}/file_chunk.cc
   ${CVMFS_SOURCE_DIR}/file_processing/async_reader.cc
   ${CVMFS_SOURCE_DIR}/file_processing/chunk.cc
   ${CVMFS_SOURCE_DIR}/file_processing/chunk_detector.cc
@@ -154,79 +144,64 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/file_processing/file_processor.cc
   ${CVMFS_SOURCE_DIR}/file_processing/io_dispatcher.cc
   ${CVMFS_SOURCE_DIR}/file_processing/processor.cc
-  ${CVMFS_SOURCE_DIR}/globals.cc ${CVMFS_SOURCE_DIR}/globals.h
-  ${CVMFS_SOURCE_DIR}/glue_buffer.cc ${CVMFS_SOURCE_DIR}/glue_buffer.h
-  ${CVMFS_SOURCE_DIR}/hash.cc ${CVMFS_SOURCE_DIR}/hash.h
+  ${CVMFS_SOURCE_DIR}/globals.cc
+  ${CVMFS_SOURCE_DIR}/glue_buffer.cc
+  ${CVMFS_SOURCE_DIR}/hash.cc
   ${CVMFS_SOURCE_DIR}/history_sql.cc
   ${CVMFS_SOURCE_DIR}/history_sqlite.cc
-  ${CVMFS_SOURCE_DIR}/json_document.cc ${CVMFS_SOURCE_DIR}/json_document.h
-  ${CVMFS_SOURCE_DIR}/kvstore.cc ${CVMFS_SOURCE_DIR}/kvstore.h
-  ${CVMFS_SOURCE_DIR}/libcvmfs.cc ${CVMFS_SOURCE_DIR}/libcvmfs.h
-  ${CVMFS_SOURCE_DIR}/libcvmfs_int.cc ${CVMFS_SOURCE_DIR}/libcvmfs_int.h
+  ${CVMFS_SOURCE_DIR}/json_document.cc
+  ${CVMFS_SOURCE_DIR}/kvstore.cc
+  ${CVMFS_SOURCE_DIR}/libcvmfs.cc
+  ${CVMFS_SOURCE_DIR}/libcvmfs_int.cc
   ${CVMFS_SOURCE_DIR}/libcvmfs_legacy.cc
   ${CVMFS_SOURCE_DIR}/libcvmfs_options.cc
-  ${CVMFS_SOURCE_DIR}/logging.cc ${CVMFS_SOURCE_DIR}/logging.h ${CVMFS_SOURCE_DIR}/logging_internal.h
-  ${CVMFS_SOURCE_DIR}/malloc_arena.cc ${CVMFS_SOURCE_DIR}/malloc_arena.h
-  ${CVMFS_SOURCE_DIR}/malloc_heap.cc ${CVMFS_SOURCE_DIR}/malloc_heap.h
-  ${CVMFS_SOURCE_DIR}/manifest.cc ${CVMFS_SOURCE_DIR}/manifest.h
-  ${CVMFS_SOURCE_DIR}/manifest_fetch.cc ${CVMFS_SOURCE_DIR}/manifest_fetch.h
-  ${CVMFS_SOURCE_DIR}/monitor.cc ${CVMFS_SOURCE_DIR}/monitor.h
-  ${CVMFS_SOURCE_DIR}/mountpoint.cc ${CVMFS_SOURCE_DIR}/mountpoint.h
-  ${CVMFS_SOURCE_DIR}/murmur.h
-  ${CVMFS_SOURCE_DIR}/options.cc ${CVMFS_SOURCE_DIR}/options.h
-  ${CVMFS_SOURCE_DIR}/pack.cc ${CVMFS_SOURCE_DIR}/pack.h
-  ${CVMFS_SOURCE_DIR}/path_filters/dirtab.cc ${CVMFS_SOURCE_DIR}/path_filters/dirtab.h
-  ${CVMFS_SOURCE_DIR}/path_filters/relaxed_path_filter.cc ${CVMFS_SOURCE_DIR}/path_filters/relaxed_path_filter.h
-  ${CVMFS_SOURCE_DIR}/pathspec/pathspec.cc ${CVMFS_SOURCE_DIR}/pathspec/pathspec.h
-  ${CVMFS_SOURCE_DIR}/pathspec/pathspec_pattern.cc ${CVMFS_SOURCE_DIR}/pathspec/pathspec_pattern.h
-  ${CVMFS_SOURCE_DIR}/platform.h ${CVMFS_SOURCE_DIR}/platform_linux.h ${CVMFS_SOURCE_DIR}/platform_osx.h
-  ${CVMFS_SOURCE_DIR}/prng.h
-  ${CVMFS_SOURCE_DIR}/quota.cc ${CVMFS_SOURCE_DIR}/quota.h
-  ${CVMFS_SOURCE_DIR}/quota_posix.cc ${CVMFS_SOURCE_DIR}/quota_posix.h
-  ${CVMFS_SOURCE_DIR}/reflog.cc ${CVMFS_SOURCE_DIR}/reflog.h
-  ${CVMFS_SOURCE_DIR}/reflog_sql.cc ${CVMFS_SOURCE_DIR}/reflog_sql.h
+  ${CVMFS_SOURCE_DIR}/logging.cc
+  ${CVMFS_SOURCE_DIR}/malloc_arena.cc
+  ${CVMFS_SOURCE_DIR}/malloc_heap.cc
+  ${CVMFS_SOURCE_DIR}/manifest.cc
+  ${CVMFS_SOURCE_DIR}/manifest_fetch.cc
+  ${CVMFS_SOURCE_DIR}/monitor.cc
+  ${CVMFS_SOURCE_DIR}/mountpoint.cc
+  ${CVMFS_SOURCE_DIR}/options.cc
+  ${CVMFS_SOURCE_DIR}/pack.cc
+  ${CVMFS_SOURCE_DIR}/path_filters/dirtab.cc
+  ${CVMFS_SOURCE_DIR}/path_filters/relaxed_path_filter.cc
+  ${CVMFS_SOURCE_DIR}/pathspec/pathspec.cc
+  ${CVMFS_SOURCE_DIR}/pathspec/pathspec_pattern.cc
+  ${CVMFS_SOURCE_DIR}/quota.cc
+  ${CVMFS_SOURCE_DIR}/quota_posix.cc
+  ${CVMFS_SOURCE_DIR}/reflog.cc
+  ${CVMFS_SOURCE_DIR}/reflog_sql.cc
   ${CVMFS_SOURCE_DIR}/s3fanout.cc
-  ${CVMFS_SOURCE_DIR}/sanitizer.cc ${CVMFS_SOURCE_DIR}/sanitizer.h
-  ${CVMFS_SOURCE_DIR}/shortstring.h
+  ${CVMFS_SOURCE_DIR}/sanitizer.cc
   ${CVMFS_SOURCE_DIR}/signature.cc
-  ${CVMFS_SOURCE_DIR}/sink.h
-  ${CVMFS_SOURCE_DIR}/smallhash.h
-  ${CVMFS_SOURCE_DIR}/smalloc.h
   ${CVMFS_SOURCE_DIR}/sql.cc
-  ${CVMFS_SOURCE_DIR}/sqlitemem.cc ${CVMFS_SOURCE_DIR}/sqlitemem.h
-  ${CVMFS_SOURCE_DIR}/sqlitevfs.cc ${CVMFS_SOURCE_DIR}/sqlitevfs.h
-  ${CVMFS_SOURCE_DIR}/statistics.cc ${CVMFS_SOURCE_DIR}/statistics.h
-  ${CVMFS_SOURCE_DIR}/swissknife.cc ${CVMFS_SOURCE_DIR}/swissknife.h
-  ${CVMFS_SOURCE_DIR}/swissknife_assistant.cc ${CVMFS_SOURCE_DIR}/swissknife_assistant.h
-  ${CVMFS_SOURCE_DIR}/swissknife_history.cc ${CVMFS_SOURCE_DIR}/swissknife_history.h
-  ${CVMFS_SOURCE_DIR}/swissknife_sync.h
+  ${CVMFS_SOURCE_DIR}/sqlitemem.cc
+  ${CVMFS_SOURCE_DIR}/sqlitevfs.cc
+  ${CVMFS_SOURCE_DIR}/statistics.cc
+  ${CVMFS_SOURCE_DIR}/swissknife.cc
+  ${CVMFS_SOURCE_DIR}/swissknife_assistant.cc
+  ${CVMFS_SOURCE_DIR}/swissknife_history.cc
   ${CVMFS_SOURCE_DIR}/swissknife_lease_json.cc
-  ${CVMFS_SOURCE_DIR}/tracer.cc ${CVMFS_SOURCE_DIR}/tracer.h
-  ${CVMFS_SOURCE_DIR}/uid_map.h
-  ${CVMFS_SOURCE_DIR}/upload.cc ${CVMFS_SOURCE_DIR}/upload.h
+  ${CVMFS_SOURCE_DIR}/tracer.cc
+  ${CVMFS_SOURCE_DIR}/upload.cc
   ${CVMFS_SOURCE_DIR}/upload_facility.cc
   ${CVMFS_SOURCE_DIR}/upload_local.cc
   ${CVMFS_SOURCE_DIR}/upload_s3.cc
   ${CVMFS_SOURCE_DIR}/upload_spooler_definition.cc
-  ${CVMFS_SOURCE_DIR}/util/algorithm.cc ${CVMFS_SOURCE_DIR}/util/algorithm.h
-  ${CVMFS_SOURCE_DIR}/util/async.h
-  ${CVMFS_SOURCE_DIR}/util/buffer.h
-  ${CVMFS_SOURCE_DIR}/util/file_guard.h
-  ${CVMFS_SOURCE_DIR}/util/mmap_file.cc ${CVMFS_SOURCE_DIR}/util/mmap_file.h
-  ${CVMFS_SOURCE_DIR}/util/pointer.h
-  ${CVMFS_SOURCE_DIR}/util/posix.cc ${CVMFS_SOURCE_DIR}/util/posix.h
-  ${CVMFS_SOURCE_DIR}/util/single_copy.h
-  ${CVMFS_SOURCE_DIR}/util/string.cc ${CVMFS_SOURCE_DIR}/util/string.h
-  ${CVMFS_SOURCE_DIR}/util_concurrency.cc ${CVMFS_SOURCE_DIR}/util_concurrency.h ${CVMFS_SOURCE_DIR}/util_concurrency_impl.h
-  ${CVMFS_SOURCE_DIR}/uuid.cc ${CVMFS_SOURCE_DIR}/uuid.h
-	${CVMFS_SOURCE_DIR}/webapi/fcgi.cc ${CVMFS_SOURCE_DIR}/webapi/fcgi.h
-  ${CVMFS_SOURCE_DIR}/webapi/macaroon.cc ${CVMFS_SOURCE_DIR}/webapi/macaroon.h
-	${CVMFS_SOURCE_DIR}/webapi/uri_map.cc ${CVMFS_SOURCE_DIR}/webapi/uri_map.h
+  ${CVMFS_SOURCE_DIR}/util/algorithm.cc
+  ${CVMFS_SOURCE_DIR}/util/mmap_file.cc
+  ${CVMFS_SOURCE_DIR}/util/posix.cc
+  ${CVMFS_SOURCE_DIR}/util/string.cc
+  ${CVMFS_SOURCE_DIR}/util_concurrency.cc
+  ${CVMFS_SOURCE_DIR}/uuid.cc
+	${CVMFS_SOURCE_DIR}/webapi/fcgi.cc
+  ${CVMFS_SOURCE_DIR}/webapi/macaroon.cc
+	${CVMFS_SOURCE_DIR}/webapi/uri_map.cc
   ${CVMFS_SOURCE_DIR}/whitelist.cc
-  ${CVMFS_SOURCE_DIR}/wpad.cc ${CVMFS_SOURCE_DIR}/wpad.h
-  ${CVMFS_SOURCE_DIR}/xattr.cc ${CVMFS_SOURCE_DIR}/xattr.h
+  ${CVMFS_SOURCE_DIR}/wpad.cc
+  ${CVMFS_SOURCE_DIR}/xattr.cc
   cache.pb.cc
-  cache.pb.h
 )
 
 set (CVMFS_UNITTEST_DEBUG_SOURCES ${CVMFS_UNITTEST_SOURCES})
@@ -235,37 +210,29 @@ set_source_files_properties(cache.pb.cc cache.pb.h
                             PROPERTIES GENERATED true)
 
 add_custom_command(OUTPUT cache.pb.cc cache.pb.h
-                   COMMAND ${PROTOBUF_C} --cpp_out=.
+                   COMMAND ${PROTOBUF_PROTOC_EXECUTABLE} --cpp_out=.
                            ${CVMFS_SOURCE_DIR}/cache.proto
                            -I${CVMFS_SOURCE_DIR}
-                   DEPENDS ${PROTOBUF_ARCHIVE}
+                   DEPENDS ${PROTOBUF_LIBRARY}
                            ${CVMFS_SOURCE_DIR}/cache.proto
                    COMMENT "Generating protobuf sources")
 
 
 set (CVMFS_TEST_CACHE_SOURCES
-  cache.pb.cc cache.pb.h
-  cache_plugin/globals.h
+  cache.pb.cc
   cache_plugin/main.cc
   cache_plugin/t_cache_plugin.cc
 
-  ${CVMFS_SOURCE_DIR}/atomic.h
-  ${CVMFS_SOURCE_DIR}/cache.cc ${CVMFS_SOURCE_DIR}/cache.h
-  ${CVMFS_SOURCE_DIR}/cache_extern.cc ${CVMFS_SOURCE_DIR}/cache_extern.h
-  ${CVMFS_SOURCE_DIR}/cache_transport.cc ${CVMFS_SOURCE_DIR}/cache_transport.h
-  ${CVMFS_SOURCE_DIR}/compression.cc ${CVMFS_SOURCE_DIR}/compression.h
-  ${CVMFS_SOURCE_DIR}/fd_table.h
-  ${CVMFS_SOURCE_DIR}/hash.cc ${CVMFS_SOURCE_DIR}/hash.h
-  ${CVMFS_SOURCE_DIR}/logging.cc ${CVMFS_SOURCE_DIR}/logging.h ${CVMFS_SOURCE_DIR}/logging_internal.h
-  ${CVMFS_SOURCE_DIR}/prng.h
-  ${CVMFS_SOURCE_DIR}/quota.cc ${CVMFS_SOURCE_DIR}/quota.h
-  ${CVMFS_SOURCE_DIR}/smalloc.h
-  ${CVMFS_SOURCE_DIR}/util/async.h
-  ${CVMFS_SOURCE_DIR}/util/pointer.h
-  ${CVMFS_SOURCE_DIR}/util/posix.cc ${CVMFS_SOURCE_DIR}/util/posix.h
-  ${CVMFS_SOURCE_DIR}/util/single_copy.h
-  ${CVMFS_SOURCE_DIR}/util/string.cc ${CVMFS_SOURCE_DIR}/util/string.h
-  ${CVMFS_SOURCE_DIR}/util_concurrency.cc ${CVMFS_SOURCE_DIR}/util_concurrency.h
+  ${CVMFS_SOURCE_DIR}/cache.cc
+  ${CVMFS_SOURCE_DIR}/cache_extern.cc
+  ${CVMFS_SOURCE_DIR}/cache_transport.cc
+  ${CVMFS_SOURCE_DIR}/compression.cc
+  ${CVMFS_SOURCE_DIR}/hash.cc
+  ${CVMFS_SOURCE_DIR}/logging.cc
+  ${CVMFS_SOURCE_DIR}/quota.cc
+  ${CVMFS_SOURCE_DIR}/util/posix.cc
+  ${CVMFS_SOURCE_DIR}/util/string.cc
+  ${CVMFS_SOURCE_DIR}/util_concurrency.cc
 )
 
 #
@@ -292,78 +259,14 @@ endif (BUILD_UNITTESTS)
 if (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
   if (BUILD_LIBCVMFS_CACHE)
     add_executable (${PROJECT_TEST_CACHE_NAME} ${CVMFS_TEST_CACHE_SOURCES})
-    add_dependencies (${PROJECT_TEST_CACHE_NAME} googletest)
-    add_dependencies (${PROJECT_TEST_CACHE_NAME} protobuf)
-    add_dependencies (${PROJECT_TEST_CACHE_NAME} libsha3)
   endif (BUILD_LIBCVMFS_CACHE)
 endif (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
 
-add_dependencies (${PROJECT_TEST_NAME} googletest)
-add_dependencies (${PROJECT_TEST_NAME} libvjson)
-add_dependencies (${PROJECT_TEST_NAME} sparsehash)
-add_dependencies (${PROJECT_TEST_NAME} libsha3)
-add_dependencies (${PROJECT_TEST_NAME} protobuf)
 add_test (NAME ${PROJECT_TEST_NAME} COMMAND ${PROJECT_TEST_NAME} --gtest_filter=-*Slow)
 add_dependencies (check ${PROJECT_TEST_NAME})
 
 if (BUILD_UNITTESTS_DEBUG)
   add_executable (${PROJECT_TEST_DEBUG_NAME} ${CVMFS_UNITTEST_DEBUG_SOURCES})
-  add_dependencies (${PROJECT_TEST_DEBUG_NAME} googletest)
-  add_dependencies (${PROJECT_TEST_DEBUG_NAME} libvjson)
-  add_dependencies (${PROJECT_TEST_DEBUG_NAME} protobuf)
-endif (BUILD_UNITTESTS_DEBUG)
-
-#
-# add optional dependencies
-#
-if (BUILD_UNITTESTS)
-  if (LIBCURL_BUILTIN)
-    add_dependencies (${PROJECT_TEST_NAME} libcares libcurl)
-  endif (LIBCURL_BUILTIN)
-
-  if (SQLITE3_BUILTIN)
-    add_dependencies (${PROJECT_TEST_NAME} sqlite3)
-  endif (SQLITE3_BUILTIN)
-
-  if (ZLIB_BUILTIN)
-    add_dependencies (${PROJECT_TEST_NAME} zlib)
-  endif (ZLIB_BUILTIN)
-
-  if (PACPARSER_BUILTIN)
-    add_dependencies (${PROJECT_TEST_NAME} libpacparser)
-  endif (PACPARSER_BUILTIN)
-
-  if (TBB_PRIVATE_LIB)
-    add_dependencies (${PROJECT_TEST_NAME} libtbb)
-  endif (TBB_PRIVATE_LIB)
-
-  add_dependencies (${PROJECT_TEST_NAME} libsha3)
-  add_dependencies (${PROJECT_TEST_NAME} libvjson)
-endif (BUILD_UNITTESTS)
-
-if (BUILD_UNITTESTS_DEBUG)
-  if (LIBCURL_BUILTIN)
-    add_dependencies (${PROJECT_TEST_DEBUG_NAME} libcares libcurl)
-  endif (LIBCURL_BUILTIN)
-
-  if (SQLITE3_BUILTIN)
-    add_dependencies (${PROJECT_TEST_DEBUG_NAME} sqlite3)
-  endif (SQLITE3_BUILTIN)
-
-  if (ZLIB_BUILTIN)
-    add_dependencies (${PROJECT_TEST_DEBUG_NAME} zlib)
-  endif (ZLIB_BUILTIN)
-
-  if (PACPARSER_BUILTIN)
-    add_dependencies (${PROJECT_TEST_DEBUG_NAME} libpacparser)
-  endif (PACPARSER_BUILTIN)
-
-  if (TBB_PRIVATE_LIB)
-    add_dependencies (${PROJECT_TEST_DEBUG_NAME} libtbb)
-  endif (TBB_PRIVATE_LIB)
-
-  add_dependencies (${PROJECT_TEST_DEBUG_NAME} libsha3)
-  add_dependencies (${PROJECT_TEST_DEBUG_NAME} libvjson)
 endif (BUILD_UNITTESTS_DEBUG)
 
 #
@@ -383,12 +286,12 @@ endif (BUILD_LIBCVMFS_CACHE)
 #
 # link the stuff (*_LIBRARIES are dynamic link libraries)
 #
-set (UNITTEST_LINK_LIBRARIES ${GTEST_LIBRARIES} ${GOOGLETEST_ARCHIVE} ${OPENSSL_LIBRARIES} ${CURL_LIBRARIES}
-                             ${LIBCURL_ARCHIVE} ${CARES_LIBRARIES} ${CARES_ARCHIVE} ${OPENSSL_LIBRARIES}
-                             ${SQLITE3_LIBRARY} ${SQLITE3_ARCHIVE} ${TBB_LIBRARIES}
-                             ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${UUID_LIBRARIES}
-                             ${SHA3_ARCHIVE} ${PACPARSER_LIBRARIES} ${PACPARSER_ARCHIVE}
-                             ${VJSON_ARCHIVE} ${PROTOBUF_ARCHIVE} pthread dl)
+set (UNITTEST_LINK_LIBRARIES ${GTEST_LIBRARIES} ${OPENSSL_LIBRARIES} ${CURL_LIBRARIES}
+                             ${CARES_LIBRARIES} ${OPENSSL_LIBRARIES}
+                             ${SQLITE3_LIBRARY} ${TBB_LIBRARIES}
+                             ${ZLIB_LIBRARIES} ${RT_LIBRARY} ${UUID_LIBRARIES}
+                             ${PACPARSER_LIBRARIES} ${SHA3_LIBRARIES}
+                             ${VJSON_LIBRARIES} ${PROTOBUF_LIBRARIES} pthread dl)
 
 target_link_libraries (${PROJECT_TEST_NAME} ${UNITTEST_LINK_LIBRARIES})
 
@@ -397,13 +300,10 @@ if (BUILD_UNITTESTS_DEBUG)
 endif (BUILD_UNITTESTS_DEBUG)
 
 if (BUILD_LIBCVMFS_CACHE)
-  if (ZLIB_BUILTIN)
-    add_dependencies (${PROJECT_TEST_CACHE_NAME} zlib)
-  endif (ZLIB_BUILTIN)
   target_link_libraries (${PROJECT_TEST_CACHE_NAME}
-                         ${GTEST_LIBRARIES} ${GOOGLETEST_ARCHIVE}
-                         ${OPENSSL_LIBRARIES} ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE}
-                         ${RT_LIBRARY} ${SHA3_ARCHIVE} ${PROTOBUF_ARCHIVE}
+                         ${GTEST_LIBRARIES}
+                         ${OPENSSL_LIBRARIES} ${ZLIB_LIBRARIES}
+                         ${RT_LIBRARY} ${SHA3_LIBRARIES} ${PROTOBUF_LIBRARIES}
                          pthread)
 endif (BUILD_LIBCVMFS_CACHE)
 

@@ -24,3 +24,8 @@ echo "finished creating static link library for libpacparser"
 echo "stripping debug symbols for libpacparser..."
 strip -S libpacparser.a
 echo "finished building libpacparser.a"
+
+# Install
+cd ../../
+cp -v src/*.h $EXTERNALS_INSTALL_LOCATION/include/
+cp -v $static_result_dir/libpacparser.a $EXTERNALS_INSTALL_LOCATION/lib/

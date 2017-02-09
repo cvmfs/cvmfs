@@ -58,8 +58,8 @@ if (WIN32)
     # has em64t/vc8 em64t/vc9
     # has ia32/vc7.1 ia32/vc8 ia32/vc9
     set(_TBB_DEFAULT_INSTALL_DIR "C:/Program Files/Intel/TBB" "C:/Program Files (x86)/Intel/TBB")
-    set(_TBB_LIB_NAME "tbb")
-    set(_TBB_LIB_MALLOC_NAME "${_TBB_LIB_NAME}malloc")
+    set(_TBB_LIB_NAME "tbb${TBB_LIB_SUFFIX}")
+    set(_TBB_LIB_MALLOC_NAME "tbbmalloc${TBB_LIB_SUFFIX}")
     set(_TBB_LIB_DEBUG_NAME "${_TBB_LIB_NAME}_debug")
     set(_TBB_LIB_MALLOC_DEBUG_NAME "${_TBB_LIB_MALLOC_NAME}_debug")
     if (MSVC71)
@@ -83,8 +83,8 @@ if (UNIX)
         # MAC
         set(_TBB_DEFAULT_INSTALL_DIR "/Library/Frameworks/Intel_TBB.framework/Versions")
         # libs: libtbb.dylib, libtbbmalloc.dylib, *_debug
-        set(_TBB_LIB_NAME "tbb")
-        set(_TBB_LIB_MALLOC_NAME "${_TBB_LIB_NAME}malloc")
+        set(_TBB_LIB_NAME "tbb${TBB_LIB_SUFFIX}")
+        set(_TBB_LIB_MALLOC_NAME "tbbmalloc${TBB_LIB_SUFFIX}")
         set(_TBB_LIB_DEBUG_NAME "${_TBB_LIB_NAME}_debug")
         set(_TBB_LIB_MALLOC_DEBUG_NAME "${_TBB_LIB_MALLOC_NAME}_debug")
         # default flavor on apple: ia32/cc4.0.1_os10.4.9
@@ -103,8 +103,8 @@ if (UNIX)
     else (APPLE)
         # LINUX
         set(_TBB_DEFAULT_INSTALL_DIR "/opt/intel/tbb" "/usr/local/include" "/usr/include")
-        set(_TBB_LIB_NAME "tbb")
-        set(_TBB_LIB_MALLOC_NAME "${_TBB_LIB_NAME}malloc")
+        set(_TBB_LIB_NAME "tbb${TBB_LIB_SUFFIX}")
+        set(_TBB_LIB_MALLOC_NAME "tbbmalloc${TBB_LIB_SUFFIX}")
         set(_TBB_LIB_DEBUG_NAME "${_TBB_LIB_NAME}_debug")
         set(_TBB_LIB_MALLOC_DEBUG_NAME "${_TBB_LIB_MALLOC_NAME}_debug")
         # has em64t/cc3.2.3_libc2.3.2_kernel2.4.21 em64t/cc3.3.3_libc2.3.3_kernel2.6.5 em64t/cc3.4.3_libc2.3.4_kernel2.6.9 em64t/cc4.1.0_libc2.4_kernel2.6.16.21

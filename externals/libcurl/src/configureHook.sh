@@ -1,25 +1,16 @@
 #!/bin/sh
 
-cdir=$(pwd)
-cares_location="../build_c-ares"
-cd $cares_location
-sh makeHook.sh
-cd $cdir
-
 curl_ssl_config="--with-ssl"
 if [ x"$(uname)" = x"Darwin" ]; then
-    ssl_location="$(pwd)/../build_ssl"
-    cd $ssl_location
-    sh makeHook.sh
-    cd $cdir
-    curl_ssl_config="--with-ssl=${ssl_location}/ssl_install"
+    curl_ssl_config="--with-ssl=$EXTERNALS_INSTALL_LOCATION"
 fi
 
-sh configure CPPFLAGS="$CPPFLAGS -I${PWD}/${cares_location} -D_FILE_OFFSET_BITS=64" \
-  LDFLAGS="$LDFLAGS -L${PWD}/${cares_location}/.libs -rdynamic" \
+sh configure CPPFLAGS="$CPPFLAGS -D_FILE_OFFSET_BITS=64" \
+  LDFLAGS="$LDFLAGS -rdynamic" \
   CFLAGS="$CFLAGS $CVMFS_BASE_C_FLAGS -fvisibility=hidden -fPIC" \
   $CVMFS_ZLIB --enable-warnings \
-  --enable-ares \
+  --prefix=$EXTERNALS_INSTALL_LOCATION \
+  --enable-ares=$EXTERNALS_INSTALL_LOCATION \
   --disable-shared \
   --enable-static \
   --disable-ftp \

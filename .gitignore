@@ -26,6 +26,8 @@ RemoteSystemsTempFiles/
 # Externals
 externals/build_*/
 externals/.decompressionDone
+externals_build
+externals_install
 
 # CMake stuff
 cvmfs_config.h

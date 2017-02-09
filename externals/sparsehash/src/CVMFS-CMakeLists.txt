@@ -1,6 +1,0 @@
-include ("${EXTERNALS_LIB_LOCATION}/CMake-Register_External_Lib.txt")
-
-register_external_lib (sparsehash ${SPARSEHASH_BUILTIN_LOCATION} ${SPARSEHASH_BUILTIN_LOCATION}/src/google/sparsehash/sparseconfig.h)
-
-set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -I${SPARSEHASH_BUILTIN_LOCATION}/src -D_BUILT_IN_SPARSEHASH")
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I${SPARSEHASH_BUILTIN_LOCATION}/src -D_BUILT_IN_SPARSEHASH")
