@@ -1,4 +1,6 @@
 2.4.0:
+  * Update stratum 1 default configuration (CVM-1147)
+  * Update cern.ch master keys
   * Use built-in LibreSSL on macOS (CVM-1112)
   * Use -Os compiler flag
   * Use libcurl 7.51.0
