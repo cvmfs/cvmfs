@@ -1,11 +1,11 @@
 Summary: CernVM File System Default Configuration and Public Keys
 Name: cvmfs-config-default
-Version: 1.2
-Release: 2
+Version: 1.3
+Release: 1
 Source0: cern.ch.pub
 Source1: cern-it1.cern.ch.pub
-Source2: cern-it2.cern.ch.pub
-Source3: cern-it3.cern.ch.pub
+Source2: cern-it4.cern.ch.pub
+Source3: cern-it5.cern.ch.pub
 Source4: egi.eu.pub
 Source5: opensciencegrid.org.pub
 Source6: cern.ch.conf
@@ -75,6 +75,10 @@ done
 %config %{_sysconfdir}/cvmfs/config.d/*
 
 %changelog
+* Wed Jan 18 2017 Jakob Blomer <jblomer@cern.ch> - 1.3-1
+- Update cern.ch master keys
+- Disable ASGC Stratum 1
+
 * Fri May 22 2015 Dave Dykstra <dwd@fnal.gov> - 1.2-2
 - Change Obsoletes/Conflicts on cvmfs-keys and cvmfs-init-scripts to
   Obsoletes/Provides with specific version numbers, according to Fedora
