@@ -29,8 +29,8 @@ cp ${CVMFS_SOURCE_LOCATION}/packaging/rpm/cvmfs-config-none.spec    ${CVMFS_RESU
 
 cp ${CVMFS_SOURCE_LOCATION}/mount/keys/cern.ch.pub                  ${CVMFS_RESULT_LOCATION}/SOURCES
 cp ${CVMFS_SOURCE_LOCATION}/mount/keys/cern-it1.cern.ch.pub         ${CVMFS_RESULT_LOCATION}/SOURCES
-cp ${CVMFS_SOURCE_LOCATION}/mount/keys/cern-it2.cern.ch.pub         ${CVMFS_RESULT_LOCATION}/SOURCES
-cp ${CVMFS_SOURCE_LOCATION}/mount/keys/cern-it3.cern.ch.pub         ${CVMFS_RESULT_LOCATION}/SOURCES
+cp ${CVMFS_SOURCE_LOCATION}/mount/keys/cern-it4.cern.ch.pub         ${CVMFS_RESULT_LOCATION}/SOURCES
+cp ${CVMFS_SOURCE_LOCATION}/mount/keys/cern-it5.cern.ch.pub         ${CVMFS_RESULT_LOCATION}/SOURCES
 cp ${CVMFS_SOURCE_LOCATION}/mount/keys/egi.eu.pub                   ${CVMFS_RESULT_LOCATION}/SOURCES
 cp ${CVMFS_SOURCE_LOCATION}/mount/keys/opensciencegrid.org.pub      ${CVMFS_RESULT_LOCATION}/SOURCES
 cp ${CVMFS_SOURCE_LOCATION}/mount/domain.d/cern.ch.conf             ${CVMFS_RESULT_LOCATION}/SOURCES
