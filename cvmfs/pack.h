@@ -18,7 +18,6 @@
 #include "util/single_copy.h"
 #include "util_concurrency.h"
 
-
 /**
  * Multiple content-addressable objects in a single BLOB.  A (serialized)
  * ObjectPack has a header, an index containing all the objects and their
@@ -43,9 +42,10 @@ class ObjectPack : SingleCopy {
   struct Bucket;
 
  public:
-  typedef Bucket * BucketHandle;
+  typedef Bucket *BucketHandle;
 
-  static const uint64_t kDefaultLimit = 200*1024*1024;  // 200MB
+  static const uint64_t kDefaultLimit = 200 * 1024 * 1024;  // 200MB
+
   /**
    * Limit the maximum number of objects to avoid very large headers.  Assuming
    * Sha256 (71 bytes hex) + 9 bytes for the file sizes, a header with 100,000
@@ -76,9 +76,9 @@ class ObjectPack : SingleCopy {
   struct Bucket : SingleCopy {
     static const unsigned kInitialSize = 128;
 
-     Bucket();
-     ~Bucket();
-     void Add(const void *buf, const uint64_t buf_size);
+    Bucket();
+    ~Bucket();
+    void Add(const void *buf, const uint64_t buf_size);
 
     unsigned char *content;
     uint64_t size;
@@ -110,7 +110,6 @@ class ObjectPack : SingleCopy {
    */
   std::vector<BucketHandle> buckets_;
 };
-
 
 /**
  * Serializes ObjectPacks.  It can also serialize a single large file as an
@@ -162,7 +161,6 @@ class ObjectPackProducer {
   std::string header_;
 };
 
-
 /**
  * Data structures required for the ObjectPackConsumer.  BuildEvent is a
  * template parameter for the Observable base class of ObjectPack and hence
@@ -171,16 +169,9 @@ class ObjectPackProducer {
 class ObjectPackConsumerBase {
  public:
   struct BuildEvent {
-    BuildEvent(
-      const shash::Any &id,
-      uint64_t size,
-      unsigned buf_size,
-      const void *buf)
-      : id(id)
-      , size(size)
-      , buf_size(buf_size)
-      , buf(buf)
-    { }
+    BuildEvent(const shash::Any &id, uint64_t size, unsigned buf_size,
+               const void *buf)
+        : id(id), size(size), buf_size(buf_size), buf(buf) {}
 
     shash::Any id;
     uint64_t size;
@@ -198,7 +189,6 @@ class ObjectPackConsumerBase {
   };
 };
 
-
 /**
  * Deserializes an ObjectPack created by ObjectPackProducer.  For every object
  * it calls all listeners with a BuildEvent parameter at least once for every
@@ -206,13 +196,12 @@ class ObjectPackConsumerBase {
  * verify the incoming data, this is up to the listeners handling the data.
  * The ObjectPackConsumer will verify the header digest, however.
  */
-class ObjectPackConsumer : public ObjectPackConsumerBase
-                         , public Observable<ObjectPackConsumerBase::BuildEvent>
-{
+class ObjectPackConsumer
+    : public ObjectPackConsumerBase,
+      public Observable<ObjectPackConsumerBase::BuildEvent> {
  public:
-  explicit ObjectPackConsumer(
-    const shash::Any &expected_digest,
-    const unsigned expected_header_size);
+  explicit ObjectPackConsumer(const shash::Any &expected_digest,
+                              const unsigned expected_header_size);
   BuildState ConsumeNext(const unsigned buf_size, const unsigned char *buf);
 
  private:
@@ -223,9 +212,7 @@ class ObjectPackConsumer : public ObjectPackConsumerBase
 
   struct IndexEntry {
     IndexEntry(const shash::Any &id, const uint64_t size)
-      : id(id)
-      , size(size)
-      { }
+        : id(id), size(size) {}
     shash::Any id;
     uint64_t size;
   };
