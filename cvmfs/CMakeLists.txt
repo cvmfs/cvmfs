@@ -227,6 +227,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   sync_union.cc
   upload.cc
   upload_facility.cc
+  upload_http.cc
   upload_local.cc
   upload_s3.cc
   upload_spooler_definition.cc
