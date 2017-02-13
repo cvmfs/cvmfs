@@ -66,6 +66,7 @@ enum LogSource {
   kLogUnionFs,
   kLogPathspec,
   kLogUploadS3,
+  kLogUploadHttp,
   kLogS3Fanout,
   kLogGc,
   kLogDns,
@@ -75,7 +76,7 @@ enum LogSource {
 };
 
 const int kLogVerboseMsg = kLogStdout | kLogShowSource | kLogVerbose;
-const int kLogWarning    = kLogStdout | kLogShowSource | kLogNormal;
+const int kLogWarning = kLogStdout | kLogShowSource | kLogNormal;
 
 void SetLogSyslogLevel(const int level);
 int GetLogSyslogLevel();

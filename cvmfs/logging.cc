@@ -37,7 +37,7 @@ namespace CVMFS_NAMESPACE_GUARD {
 
 namespace {
 
-const unsigned kMicroSyslogMax = 500*1024;  // rotate after 500kB
+const unsigned kMicroSyslogMax = 500 * 1024;  // rotate after 500kB
 
 pthread_mutex_t lock_stdout = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t lock_stderr = PTHREAD_MUTEX_INITIALIZER;
@@ -46,12 +46,16 @@ pthread_mutex_t lock_debug = PTHREAD_MUTEX_INITIALIZER;
 FILE *file_debug = NULL;
 string *path_debug = NULL;
 #endif
-const char *module_names[] = { "unknown", "cache", "catalog", "sql", "cvmfs",
-  "hash", "download", "compress", "quota", "talk", "monitor", "lru",
-  "fuse stub", "signature", "fs traversal", "catalog traversal",
-  "nfs maps", "publish", "spooler", "concurrency", "utility", "glue buffer",
-  "history", "unionfs", "pathspec", "upload s3", "s3fanout", "gc", "dns",
-  "authz", "reflog", "kvstore" };
+const char *module_names[] = {
+    "unknown",   "cache",       "catalog",      "sql",
+    "cvmfs",     "hash",        "download",     "compress",
+    "quota",     "talk",        "monitor",      "lru",
+    "fuse stub", "signature",   "fs traversal", "catalog traversal",
+    "nfs maps",  "publish",     "spooler",      "concurrency",
+    "utility",   "glue buffer", "history",      "unionfs",
+    "pathspec",  "upload s3",   "upload http",  "s3fanout",
+    "gc",        "dns",         "authz",        "reflog",
+    "kvstore"};
 int syslog_facility = LOG_USER;
 int syslog_level = LOG_NOTICE;
 char *syslog_prefix = NULL;
@@ -67,7 +71,6 @@ static void (*alt_log_func)(const LogSource source, const int mask,
                             const char *msg) = NULL;
 
 }  // namespace
-
 
 /**
  * Sets the level that is used for all messages to the syslog facility.
@@ -89,7 +92,6 @@ void SetLogSyslogLevel(const int level) {
   }
 }
 
-
 int GetLogSyslogLevel() {
   switch (syslog_level) {
     case LOG_DEBUG:
@@ -100,7 +102,6 @@ int GetLogSyslogLevel() {
       return 3;
   }
 }
-
 
 /**
  * Sets the syslog facility to one of local0 .. local7.
@@ -137,7 +138,6 @@ void SetLogSyslogFacility(const int local_facility) {
   }
 }
 
-
 int GetLogSyslogFacility() {
   switch (syslog_facility) {
     case LOG_LOCAL0:
@@ -156,37 +156,32 @@ int GetLogSyslogFacility() {
       return 6;
     case LOG_LOCAL7:
       return 7;
-   default:
+    default:
       return -1;
   }
 }
-
 
 /**
  * The syslog prefix is used to distinguish multiple repositories in
  * /var/log/messages
  */
 void SetLogSyslogPrefix(const std::string &prefix) {
-  if (syslog_prefix)
-    free(syslog_prefix);
+  if (syslog_prefix) free(syslog_prefix);
 
   if (prefix == "") {
     syslog_prefix = NULL;
   } else {
     unsigned len = prefix.length() + 1;
     syslog_prefix = static_cast<char *>(smalloc(len));
-    syslog_prefix[len-1] = '\0';
+    syslog_prefix[len - 1] = '\0';
     memcpy(syslog_prefix, &prefix[0], prefix.length());
   }
 }
 
-
 /**
  * Set the minimum verbosity level.  By default kLogNormal.
  */
-void SetLogVerbosity(const LogLevels min_level) {
-  min_log_level = min_level;
-}
+void SetLogVerbosity(const LogLevels min_level) { min_log_level = min_level; }
 
 /**
  * "Micro-Syslog" write kLogSyslog messages into filename.  It rotates this
@@ -228,20 +223,16 @@ void SetLogMicroSyslog(const std::string &filename) {
   pthread_mutex_unlock(&lock_usyslock);
 }
 
-
 std::string GetLogMicroSyslog() {
   pthread_mutex_lock(&lock_usyslock);
   string result;
-  if (usyslog_dest)
-    result = *usyslog_dest;
+  if (usyslog_dest) result = *usyslog_dest;
   pthread_mutex_unlock(&lock_usyslock);
   return result;
 }
 
-
 static void LogMicroSyslog(const std::string &message) {
-  if (message.size() == 0)
-    return;
+  if (message.size() == 0) return;
 
   pthread_mutex_lock(&lock_usyslock);
   if (usyslog_fd < 0) {
@@ -272,8 +263,7 @@ static void LogMicroSyslog(const std::string &message) {
     do {
       num_bytes = read(usyslog_fd, buf, 4096);
       assert(num_bytes >= 0);
-      if (num_bytes == 0)
-        break;
+      if (num_bytes == 0) break;
       int written = write(usyslog_fd1, buf, num_bytes);
       assert(written == num_bytes);
     } while (num_bytes == 4096);
@@ -289,7 +279,6 @@ static void LogMicroSyslog(const std::string &message) {
   }
   pthread_mutex_unlock(&lock_usyslock);
 }
-
 
 /**
  * Changes the debug log file from stderr. No effect if DEBUGMSG is undefined.
@@ -318,29 +307,26 @@ void SetLogDebugFile(const string &filename) {
   if ((fd < 0) || ((file_debug = fdopen(fd, "a")) == NULL)) {
     fprintf(stderr, "could not open debug log file %s (%d), aborting\n",
             filename.c_str(), errno);
-    syslog(syslog_facility | LOG_ERR, "could not open debug log file %s (%d), "
-           "aborting\n", filename.c_str(), errno);
+    syslog(syslog_facility | LOG_ERR,
+           "could not open debug log file %s (%d), "
+           "aborting\n",
+           filename.c_str(), errno);
     abort();
   }
   delete path_debug;
   path_debug = new string(filename);
 }
 
-
 string GetLogDebugFile() {
-  if (path_debug)
-    return *path_debug;
+  if (path_debug) return *path_debug;
   return "";
 }
 #endif
 
-
 void SetAltLogFunc(void (*fn)(const LogSource source, const int mask,
-                              const char *msg))
-{
+                              const char *msg)) {
   alt_log_func = fn;
 }
-
 
 /**
  * Logs a message to one or multiple facilities specified by mask.
@@ -354,13 +340,11 @@ void LogCvmfs(const LogSource source, const int mask, const char *format, ...) {
   char *msg = NULL;
   va_list variadic_list;
 
-  // Log level check, no flag set in mask means kLogNormal
+// Log level check, no flag set in mask means kLogNormal
 #ifndef DEBUGMSG
-  int log_level = mask & ((2*kLogNone - 1) ^ (kLogLevel0 - 1));
-  if (!log_level)
-    log_level = kLogNormal;
-  if (log_level < min_log_level)
-    return;
+  int log_level = mask & ((2 * kLogNone - 1) ^ (kLogLevel0 - 1));
+  if (!log_level) log_level = kLogNormal;
+  if (log_level < min_log_level) return;
 #endif
 
   // Format the message string
@@ -379,8 +363,7 @@ void LogCvmfs(const LogSource source, const int mask, const char *format, ...) {
     pthread_mutex_lock(&lock_debug);
 
     // Set the file pointer for debuging to stderr, if necessary
-    if (file_debug == NULL)
-      file_debug = stderr;
+    if (file_debug == NULL) file_debug = stderr;
 
     // Get timestamp
     time_t rawtime;
@@ -390,9 +373,9 @@ void LogCvmfs(const LogSource source, const int mask, const char *format, ...) {
 
     if (file_debug == stderr) pthread_mutex_lock(&lock_stderr);
     fprintf(file_debug, "(%s) %s    [%02d-%02d-%04d %02d:%02d:%02d %s]\n",
-            module_names[source], msg,
-            (now.tm_mon)+1, now.tm_mday, (now.tm_year)+1900, now.tm_hour,
-            now.tm_min, now.tm_sec, now.tm_zone);
+            module_names[source], msg, (now.tm_mon) + 1, now.tm_mday,
+            (now.tm_year) + 1900, now.tm_hour, now.tm_min, now.tm_sec,
+            now.tm_zone);
     fflush(file_debug);
     if (file_debug == stderr) pthread_mutex_unlock(&lock_stderr);
 
@@ -402,22 +385,18 @@ void LogCvmfs(const LogSource source, const int mask, const char *format, ...) {
 
   if (mask & kLogStdout) {
     pthread_mutex_lock(&lock_stdout);
-    if (mask & kLogShowSource)
-      printf("(%s) ", module_names[source]);
+    if (mask & kLogShowSource) printf("(%s) ", module_names[source]);
     printf("%s", msg);
-    if (!(mask & kLogNoLinebreak))
-      printf("\n");
+    if (!(mask & kLogNoLinebreak)) printf("\n");
     fflush(stdout);
     pthread_mutex_unlock(&lock_stdout);
   }
 
   if (mask & kLogStderr) {
     pthread_mutex_lock(&lock_stderr);
-    if (mask & kLogShowSource)
-      fprintf(stderr, "(%s) ", module_names[source]);
+    if (mask & kLogShowSource) fprintf(stderr, "(%s) ", module_names[source]);
     fprintf(stderr, "%s", msg);
-    if (!(mask & kLogNoLinebreak))
-      fprintf(stderr, "\n");
+    if (!(mask & kLogNoLinebreak)) fprintf(stderr, "\n");
     fflush(stderr);
     pthread_mutex_unlock(&lock_stderr);
   }
@@ -425,8 +404,7 @@ void LogCvmfs(const LogSource source, const int mask, const char *format, ...) {
   if (mask & (kLogSyslog | kLogSyslogWarn | kLogSyslogErr)) {
     if (usyslog_dest) {
       string fmt_msg(msg);
-      if (syslog_prefix)
-        fmt_msg = "(" + string(syslog_prefix) + ") " + fmt_msg;
+      if (syslog_prefix) fmt_msg = "(" + string(syslog_prefix) + ") " + fmt_msg;
       time_t rawtime;
       time(&rawtime);
       char fmt_time[26];
@@ -439,8 +417,7 @@ void LogCvmfs(const LogSource source, const int mask, const char *format, ...) {
       if (mask & kLogSyslogWarn) level = LOG_WARNING;
       if (mask & kLogSyslogErr) level = LOG_ERR;
       if (syslog_prefix) {
-        syslog(syslog_facility | level, "(%s) %s",
-               syslog_prefix, msg);
+        syslog(syslog_facility | level, "(%s) %s", syslog_prefix, msg);
       } else {
         syslog(syslog_facility | level, "%s", msg);
       }
@@ -450,11 +427,9 @@ void LogCvmfs(const LogSource source, const int mask, const char *format, ...) {
   free(msg);
 }
 
-
 void PrintError(const string &message) {
   LogCvmfs(kLogCvmfs, kLogStderr, "[ERROR] %s", message.c_str());
 }
-
 
 void PrintWarning(const string &message) {
   LogCvmfs(kLogCvmfs, kLogStderr, "[WARNING] %s", message.c_str());
