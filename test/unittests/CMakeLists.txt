@@ -92,6 +92,7 @@ set(CVMFS_UNITTEST_FILES
   t_unique_ptr.cc
   t_upload_facility.cc
   t_uploaders.cc
+  t_http_uploader.cc
   t_uri_map.cc
   t_util.cc
   t_util_concurrency.cc
@@ -187,6 +188,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/upload.cc
   ${CVMFS_SOURCE_DIR}/upload_facility.cc
   ${CVMFS_SOURCE_DIR}/upload_local.cc
+  ${CVMFS_SOURCE_DIR}/upload_http.cc
   ${CVMFS_SOURCE_DIR}/upload_s3.cc
   ${CVMFS_SOURCE_DIR}/upload_spooler_definition.cc
   ${CVMFS_SOURCE_DIR}/util/algorithm.cc
