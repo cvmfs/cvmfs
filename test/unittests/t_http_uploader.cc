@@ -4,6 +4,7 @@
 
 #include <gtest/gtest.h>
 
+#include <upload.h>
 #include <upload_http.h>
 #include <upload_spooler_definition.h>
 
@@ -13,6 +14,12 @@ class T_HttpUploaderConfig : public ::testing::Test {
   virtual void SetUp() {}
 
   upload::HttpUploader::Config config;
+};
+
+class T_HttpUploader : public ::testing::Test {
+ protected:
+  T_HttpUploader() {}
+  virtual void SetUp() {}
 };
 
 TEST_F(T_HttpUploaderConfig, ParseSpoolerDefinitionBadArgs) {
@@ -52,4 +59,20 @@ TEST_F(T_HttpUploaderConfig, ParseSpoolerDefinitionEmptyApiPath) {
       "http,/local/temp/dir,http://my.repo.address:8080", shash::kSha1);
   EXPECT_TRUE(
       upload::HttpUploader::ParseSpoolerDefinition(definition, &config));
+}
+
+TEST_F(T_HttpUploader, Construct) {
+  upload::SpoolerDefinition definition(
+      "http,/local/temp/dir,http://my.repo.address:8080/api/v1", shash::kSha1);
+
+  upload::HttpUploader uploader(definition);
+  uploader.Initialize();
+  uploader.TearDown();
+}
+
+TEST_F(T_HttpUploader, ConstructThroughSpooler) {
+  upload::SpoolerDefinition definition(
+      "http,/local/temp/dir,http://my.repo.address:8080/api/v1", shash::kSha1);
+  upload::Spooler* spooler = upload::Spooler::Construct(definition);
+  delete spooler;
 }
