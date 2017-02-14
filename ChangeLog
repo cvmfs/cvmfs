@@ -1,4 +1,6 @@
 2.4.0:
+  * Fix mount helper if repository name resolves to local path (CVM-1160)
+  * Make cvmfs_server catalog-chown command public (CVM-1077)
   * Update stratum 1 default configuration (CVM-1147)
   * Update cern.ch master keys
   * Use built-in LibreSSL on macOS (CVM-1112)

@@ -284,11 +284,12 @@ int main(int argc, char **argv) {
   }
 
   string device = argv[optind];
-  // For Ubuntu 8.04 automounter
-  if (HasPrefix(device, "/cvmfs/", false))
-    device = device.substr(7);
+  // Some mount versions expand the given device to a full path.  Thus ignore
+  // everything before the last slash (/)/
+  if (HasPrefix(device, "/", false))
+    device = GetFileName(device);
   sanitizer::RepositorySanitizer repository_sanitizer;
-  if (!repository_sanitizer.IsValid(device)) {
+  if (device.empty() || !repository_sanitizer.IsValid(device)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Invalid repository: %s", device.c_str());
     return 1;
   }
