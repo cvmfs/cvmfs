@@ -1,0 +1,36 @@
+
+cvmfs_test_name="Mount a repository that is also a path"
+# See CVM-1160
+
+CVMFS_TEST072_MOUNTPOINT=
+
+cleanup() {
+  if [ "x$CVMFS_TEST072_MOUNTPOINT" != "x" ]; then
+    if ! running_on_osx; then
+      sudo fusermount -u $CVMFS_TEST072_MOUNTPOINT
+    else
+      sudo umount -f $CVMFS_TEST072_MOUNTPOINT
+    fi
+    sudo rmdir $CVMFS_TEST072_MOUNTPOINT
+  fi
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  local fqrn="atlas.cern.ch"
+
+  # create a mount point and a cache directory
+  mkdir mnt || return 1
+  mkdir cache || return 2
+  mkdir $fqrn || return 3  # Makes mount expand the device to full path
+
+  # mount the private repository
+  sudo mount -t cvmfs $fqrn $(pwd)/mnt || return 10
+  CVMFS_TEST072_MOUNTPOINT="$(pwd)/mnt"
+  trap cleanup EXIT HUP INT TERM
+  ls mnt || return 11
+
+  return 0
+}
+
