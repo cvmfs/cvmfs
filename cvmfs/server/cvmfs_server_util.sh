@@ -994,7 +994,7 @@ Supported Commands:
                   Mount repositories in /cvmfs, for instance after reboot
   migrate         <fully qualified name>
                   Migrates a repository to the current version of CernVM-FS
-  chown           <-u uid map file> <-g gid map file> <fully qualified name>
+  catalog-chown   <-u uid map file> <-g gid map file> <fully qualified name>
                   Bulk change of the ownership ids in CernVM-FS catalogs
   list            List available repositories
   update-geodb    [-l update lazily based on CVMFS_UPDATEGEO* variables]
