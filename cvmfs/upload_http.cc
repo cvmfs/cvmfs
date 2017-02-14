@@ -7,16 +7,12 @@
 #include "util/string.h"
 
 namespace {
-void HTTPLog(const char* format_string, ...) {
-  va_list argp;
-  LogCvmfs(kLogUploadHttp, kLogStderr, format_string, argp);
-}
 
 void LogBadConfig(const std::string& config) {
-  HTTPLog(
-      "Failed to parse spooler configuration string '%s'.\n"
-      "Provide: http://<repository_address>:<port>/<api_path>",
-      config.c_str());
+  LogCvmfs(kLogUploadHttp, kLogStderr,
+           "Failed to parse spooler configuration string '%s'.\n"
+           "Provide: http://<repository_address>:<port>/<api_path>",
+           config.c_str());
 }
 }
 
@@ -31,13 +27,13 @@ HttpUploader::HttpUploader(const SpoolerDefinition& spooler_definition)
     abort();
   }
 
-  HTTPLog(
-      "HTTP uploader configuration:\n"
-      "  Repository address: %s\n"
-      "  Port: %d\n"
-      "  API path: %s\n",
-      config_.repository_address.c_str(), config_.port,
-      config_.api_path.c_str());
+  LogCvmfs(kLogUploadHttp, kLogStderr,
+           "HTTP uploader configuration:\n"
+           "  Repository address: %s\n"
+           "  Port: %d\n"
+           "  API path: %s\n",
+           config_.repository_address.c_str(), config_.port,
+           config_.api_path.c_str());
 }
 
 bool HttpUploader::WillHandle(const SpoolerDefinition& spooler_definition) {
@@ -68,7 +64,7 @@ bool HttpUploader::ParseSpoolerDefinition(
     const SpoolerDefinition& spooler_definition, HttpUploader::Config* config) {
   const std::string& config_string = spooler_definition.spooler_configuration;
   if (!config) {
-    HTTPLog("\"config\" argument is NULL");
+    LogCvmfs(kLogUploadHttp, kLogStderr, "\"config\" argument is NULL");
     return false;
   }
 
@@ -97,7 +93,8 @@ bool HttpUploader::ParseSpoolerDefinition(
     LogBadConfig(config_string);
   }
   if (port > std::numeric_limits<uint16_t>::max()) {
-    HTTPLog("Invalid port number in spooler configuration");
+    LogCvmfs(kLogUploadHttp, kLogStderr,
+             "Invalid port number in spooler configuration");
     return false;
   }
   config->port = port;

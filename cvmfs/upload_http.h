@@ -14,6 +14,7 @@ namespace upload {
 class HttpUploader : public AbstractUploader {
  public:
   struct Config {
+    Config() : repository_address(), port(0), api_path() {}
     std::string repository_address;
     uint16_t port;
     std::string api_path;
