@@ -7,6 +7,7 @@
 #include <upload.h>
 #include <upload_http.h>
 #include <upload_spooler_definition.h>
+#include <util/pointer.h>
 
 class T_HttpUploaderConfig : public ::testing::Test {
  protected:
@@ -73,6 +74,6 @@ TEST_F(T_HttpUploader, Construct) {
 TEST_F(T_HttpUploader, ConstructThroughSpooler) {
   upload::SpoolerDefinition definition(
       "http,/local/temp/dir,http://my.repo.address:8080/api/v1", shash::kSha1);
-  upload::Spooler* spooler = upload::Spooler::Construct(definition);
-  delete spooler;
+  UniquePtr<upload::Spooler> spooler(upload::Spooler::Construct(definition));
+  EXPECT_TRUE(spooler.IsValid());
 }
