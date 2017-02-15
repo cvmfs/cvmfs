@@ -18,6 +18,9 @@ void LogBadConfig(const std::string& config) {
 
 namespace upload {
 
+HttpStreamHandle::HttpStreamHandle(const CallbackTN* commit_callback)
+    : UploadStreamHandle(commit_callback) {}
+
 HttpUploader::HttpUploader(const SpoolerDefinition& spooler_definition)
     : AbstractUploader(spooler_definition), config_() {
   assert(spooler_definition.IsValid() &&
@@ -26,6 +29,8 @@ HttpUploader::HttpUploader(const SpoolerDefinition& spooler_definition)
   if (!ParseSpoolerDefinition(spooler_definition, &config_)) {
     abort();
   }
+
+  atomic_init32(&num_errors_);
 
   LogCvmfs(kLogUploadHttp, kLogStderr,
            "HTTP uploader configuration:\n"
@@ -60,7 +65,9 @@ bool HttpUploader::PlaceBootstrappingShortcut(
   return false;
 }
 
-unsigned int HttpUploader::GetNumberOfErrors() const { return 0; }
+unsigned int HttpUploader::GetNumberOfErrors() const {
+  return atomic_read32(&num_errors_);
+}
 
 bool HttpUploader::ParseSpoolerDefinition(
     const SpoolerDefinition& spooler_definition, HttpUploader::Config* config) {
@@ -117,5 +124,7 @@ void HttpUploader::StreamedUpload(UploadStreamHandle* /*handle*/,
 
 void HttpUploader::FinalizeStreamedUpload(UploadStreamHandle* /*handle*/,
                                           const shash::Any& /*content_hash*/) {}
+
+void HttpUploader::BumpErrors() const { atomic_inc32(&num_errors_); }
 
 }  // namespace upload

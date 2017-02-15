@@ -7,9 +7,14 @@
 
 #include <string>
 
-#include "upload_facility.h"
+#include <atomic.h>
+#include <upload_facility.h>
 
 namespace upload {
+
+struct HttpStreamHandle : public UploadStreamHandle {
+  HttpStreamHandle(const CallbackTN* commit_callback);
+};
 
 class HttpUploader : public AbstractUploader {
  public:
@@ -53,7 +58,11 @@ class HttpUploader : public AbstractUploader {
                                       const shash::Any& content_hash);
 
  private:
+  void BumpErrors() const;
+
   Config config_;
+
+  mutable atomic_int32 num_errors_;
 };
 
 }  // namespace upload
