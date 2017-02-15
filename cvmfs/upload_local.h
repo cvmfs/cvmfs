@@ -16,14 +16,13 @@
 namespace upload {
 
 struct LocalStreamHandle : public UploadStreamHandle {
-  LocalStreamHandle(const CallbackTN   *commit_callback,
-                    const int           tmp_fd,
-                    const std::string  &tmp_path) :
-    UploadStreamHandle(commit_callback),
-    file_descriptor(tmp_fd),
-    temporary_path(tmp_path) {}
+  LocalStreamHandle(const CallbackTN *commit_callback, const int tmp_fd,
+                    const std::string &tmp_path)
+      : UploadStreamHandle(commit_callback),
+        file_descriptor(tmp_fd),
+        temporary_path(tmp_path) {}
 
-  const int         file_descriptor;
+  const int file_descriptor;
   const std::string temporary_path;
 };
 
@@ -36,13 +35,13 @@ struct LocalStreamHandle : public UploadStreamHandle {
 class LocalUploader : public AbstractUploader {
  private:
   static const mode_t default_backend_file_mode_ = 0666;
-         const mode_t backend_file_mode_;
+  const mode_t backend_file_mode_;
 
  public:
   explicit LocalUploader(const SpoolerDefinition &spooler_definition);
   static bool WillHandle(const SpoolerDefinition &spooler_definition);
 
-  inline std::string name() const { return "Local"; }
+  virtual std::string name() const { return "Local"; }
 
   /**
    * Upload() is not done concurrently in the current implementation of the
@@ -51,20 +50,18 @@ class LocalUploader : public AbstractUploader {
    * This method calls NotifyListeners and invokes a callback for all
    * registered listeners (see the Observable template for details).
    */
-  void FileUpload(const std::string  &local_path,
-                  const std::string  &remote_path,
-                  const CallbackTN   *callback = NULL);
+  void FileUpload(const std::string &local_path, const std::string &remote_path,
+                  const CallbackTN *callback = NULL);
 
-  UploadStreamHandle* InitStreamedUpload(const CallbackTN *callback = NULL);
-  void StreamedUpload(UploadStreamHandle  *handle,
-                      CharBuffer          *buffer,
-                      const CallbackTN    *callback = NULL);
-  void FinalizeStreamedUpload(UploadStreamHandle  *handle,
-                              const shash::Any    &content_hash);
+  UploadStreamHandle *InitStreamedUpload(const CallbackTN *callback = NULL);
+  void StreamedUpload(UploadStreamHandle *handle, CharBuffer *buffer,
+                      const CallbackTN *callback = NULL);
+  void FinalizeStreamedUpload(UploadStreamHandle *handle,
+                              const shash::Any &content_hash);
 
   bool Remove(const std::string &file_to_delete);
 
-  bool Peek(const std::string& path) const;
+  bool Peek(const std::string &path) const;
 
   bool PlaceBootstrappingShortcut(const shash::Any &object) const;
 
@@ -75,15 +72,14 @@ class LocalUploader : public AbstractUploader {
   unsigned int GetNumberOfErrors() const;
 
  protected:
-  int Move(const std::string &local_path,
-           const std::string &remote_path) const;
+  int Move(const std::string &local_path, const std::string &remote_path) const;
 
  private:
   // state information
-  const std::string    upstream_path_;
-  const std::string    temporary_path_;
-  mutable atomic_int32 copy_errors_;   //!< counts the number of occured
-                                       //!< errors in Upload()
+  const std::string upstream_path_;
+  const std::string temporary_path_;
+  mutable atomic_int32 copy_errors_;  //!< counts the number of occured
+                                      //!< errors in Upload()
 };
 
 }  // namespace upload
