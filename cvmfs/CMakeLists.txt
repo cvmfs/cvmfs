@@ -420,7 +420,7 @@ if (BUILD_LIBCVMFS_CACHE)
   # dummy target to cause merged libcvmfs_cache to be produced
   add_custom_target (libcvmfs_cache ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a)
   add_dependencies (libcvmfs_cache cvmfs_cache_only)
-  
+
 
   add_executable(cvmfs_cache_null ${CVMFS_CACHE_NULL_SOURCES})
   target_link_libraries(cvmfs_cache_null
@@ -709,7 +709,15 @@ if (BUILD_SERVER)
 
   install(
     CODE  "FILE(MAKE_DIRECTORY \$ENV{DESTDIR}/var/lib/cvmfs-server/geo)"
-  )
+    )
+
+  # If we built the third-party libraries ourselves, we should also install the TBB libraries
+  if (BUILTIN_EXTERNALS)
+    install(
+      FILES ${TBB_LIBRARIES}
+      DESTINATION ${CMAKE_INSTALL_LIBDIR}
+      )
+  endif (BUILTIN_EXTERNALS)
 
 endif (BUILD_SERVER)
 
