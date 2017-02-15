@@ -29,6 +29,7 @@ Spooler::~Spooler() {
   }
 }
 
+std::string Spooler::backend_name() const { return uploader_->name(); }
 
 bool Spooler::Initialize() {
   // configure the uploader environment
@@ -49,12 +50,10 @@ bool Spooler::Initialize() {
   return true;
 }
 
-
 void Spooler::Process(const std::string &local_path,
-                      const bool         allow_chunking) {
+                      const bool allow_chunking) {
   file_processor_->Process(local_path, allow_chunking);
 }
-
 
 void Spooler::ProcessCatalog(const std::string &local_path) {
   file_processor_->Process(local_path, false, shash::kSuffixCatalog);

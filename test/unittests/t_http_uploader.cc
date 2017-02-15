@@ -76,4 +76,5 @@ TEST_F(T_HttpUploader, ConstructThroughSpooler) {
       "http,/local/temp/dir,http://my.repo.address:8080/api/v1", shash::kSha1);
   UniquePtr<upload::Spooler> spooler(upload::Spooler::Construct(definition));
   EXPECT_TRUE(spooler.IsValid());
+  EXPECT_EQ(spooler->backend_name(), "HTTP");
 }

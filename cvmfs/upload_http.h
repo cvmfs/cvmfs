@@ -25,6 +25,8 @@ class HttpUploader : public AbstractUploader {
 
   virtual ~HttpUploader();
 
+  virtual std::string name() const;
+
   virtual UploadStreamHandle* InitStreamedUpload(
       const CallbackTN* callback = NULL);
 

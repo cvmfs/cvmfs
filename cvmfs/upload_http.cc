@@ -42,6 +42,8 @@ bool HttpUploader::WillHandle(const SpoolerDefinition& spooler_definition) {
 
 HttpUploader::~HttpUploader() {}
 
+std::string HttpUploader::name() const { return "HTTP"; }
+
 UploadStreamHandle* HttpUploader::InitStreamedUpload(
     const CallbackTN* /*callback*/) {
   return reinterpret_cast<UploadStreamHandle*>(NULL);
