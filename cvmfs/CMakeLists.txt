@@ -307,10 +307,13 @@ set (CVMFS_STRATUM_AGENT_SOURCES
   letter.cc
   logging.cc
   options.cc
+  pathspec/pathspec.cc
+  pathspec/pathspec_pattern.cc
   sanitizer.cc
   signature.cc
   statistics.cc
   stratum_agent/stratum_agent.cc
+  stratum_agent/uri_map.cc
   util/algorithm.cc
   util/posix.cc
   util/string.cc
