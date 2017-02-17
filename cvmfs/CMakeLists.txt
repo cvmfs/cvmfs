@@ -299,6 +299,17 @@ set (CVMFS_PRELOADER_SOURCES
   xattr.cc
 )
 
+set (CVMFS_STRATUM_AGENT_SOURCES
+  compression.cc
+  hash.cc
+  letter.cc
+  logging.cc
+  signature.cc
+  stratum_agent/stratum_agent.cc
+  util/posix.cc
+  util/string.cc
+)
+
 
 #
 # configure some compiler flags for proper build
@@ -502,6 +513,7 @@ if (BUILD_SERVER)
   # create targets with corresponding sources and static link libraries
   add_executable (cvmfs_swissknife ${CVMFS_SWISSKNIFE_SOURCES})
   add_executable (cvmfs_suid_helper ${CVMFS_SUID_HELPER_SOURCES})
+  add_executable (cvmfs_stratum_agent ${CVMFS_STRATUM_AGENT_SOURCES})
 
   set_target_properties (cvmfs_swissknife PROPERTIES COMPILE_FLAGS "${CVMFS_SWISSKNIFE_CFLAGS}" LINK_FLAGS "${CVMFS_SWISSKNIFE_LD_FLAGS}")
 
@@ -512,6 +524,11 @@ if (BUILD_SERVER)
                          ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES}
                          ${RT_LIBRARY} ${VJSON_LIBRARIES}
                          ${SHA3_LIBRARIES} ${CAP_LIBRARIES} pthread dl)
+
+  target_link_libraries(cvmfs_stratum_agent
+                        ${SHA3_LIBRARIES} ${SHA2_LIBRARIES} ${ZLIB_LIBRARIES}
+                        ${MONGOOSE_LIBRARIES} ${OPENSSL_LIBRARIES}
+                        ${RT_LIBRARY} pthread dl)
 
   if (BUILD_SERVER_DEBUG)
     add_executable (cvmfs_swissknife_debug ${CVMFS_SWISSKNIFE_DEBUG_SOURCES})
