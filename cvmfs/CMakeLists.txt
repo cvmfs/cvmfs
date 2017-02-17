@@ -301,11 +301,17 @@ set (CVMFS_PRELOADER_SOURCES
 
 set (CVMFS_STRATUM_AGENT_SOURCES
   compression.cc
+  dns.cc
+  download.cc
   hash.cc
   letter.cc
   logging.cc
+  options.cc
+  sanitizer.cc
   signature.cc
+  statistics.cc
   stratum_agent/stratum_agent.cc
+  util/algorithm.cc
   util/posix.cc
   util/string.cc
 )
@@ -519,13 +525,14 @@ if (BUILD_SERVER)
 
   # link the stuff (*_LIBRARIES are dynamic link libraries)
   target_link_libraries (cvmfs_swissknife
-                         ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${CURL_LIBRARIES}
+                         ${SQLITE3_LIBRARY} ${CURL_LIBRARIES}
                          ${CARES_LIBRARIES} ${TBB_LIBRARIES}
                          ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES}
                          ${RT_LIBRARY} ${VJSON_LIBRARIES}
                          ${SHA3_LIBRARIES} ${CAP_LIBRARIES} pthread dl)
 
   target_link_libraries(cvmfs_stratum_agent
+                        ${CURL_LIBRARIES} ${CARES_LIBRARIES}
                         ${SHA3_LIBRARIES} ${SHA2_LIBRARIES} ${ZLIB_LIBRARIES}
                         ${MONGOOSE_LIBRARIES} ${OPENSSL_LIBRARIES}
                         ${RT_LIBRARY} pthread dl)

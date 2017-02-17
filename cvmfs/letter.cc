@@ -24,7 +24,6 @@ Letter::Letter(const string &fqrn,
   text_(text),
   signature_manager_(signature_manager)
 {
-  //printf("CONSTRUCT %p\n%s\n", this, text_.c_str());
 }
 
 
@@ -67,13 +66,11 @@ Failures Letter::Verify(uint64_t max_age, string *msg, string *cert) {
   cert->clear();
   bool retval;
 
-  //printf("VERIFY %p\n%s\n", this, text_.c_str());
   string dec;
   retval = Debase64(text_, &dec);
 
   if (!retval)
     return kFailBadBase64;
-  //printf("HALLO2\n");
 
   // Cut envelope and signature
   unsigned env_pos = 0;
