@@ -769,6 +769,35 @@ vector<string> FindFiles(const string &dir, const string &suffix) {
 
 
 /**
+ * Finds all direct subdirectories under parent_dir (except ., ..).  Used,
+ * for instance, to parse /etc/cvmfs/repositories.d/<reponoame>
+ */
+vector<string> FindDirectories(const string &parent_dir) {
+  vector<string> result;
+  DIR *dirp = opendir(parent_dir.c_str());
+  if (!dirp)
+    return result;
+
+  platform_dirent64 *dirent;
+  while ((dirent = platform_readdir(dirp))) {
+    const string name(dirent->d_name);
+    if ((name == ".") || (name == ".."))
+      continue;
+    const string path = parent_dir + "/" + name;
+
+    platform_stat64 info;
+    int retval = platform_stat(path.c_str(), &info);
+    if (retval != 0)
+      continue;
+    if (S_ISDIR(info.st_mode))
+      result.push_back(path);
+  }
+  closedir(dirp);
+  sort(result.begin(), result.end());
+  return result;
+}
+
+/**
  * Name -> UID from passwd database
  */
 bool GetUidOf(const std::string &username, uid_t *uid, gid_t *main_gid) {

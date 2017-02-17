@@ -924,6 +924,37 @@ TEST_F(T_Util, FindFiles) {
   EXPECT_EQ(sandbox + "/" + files[1], result[1]);
 }
 
+
+TEST_F(T_Util, FindDirectories) {
+  string parent = sandbox + "/test-find-directories";
+  ASSERT_TRUE(MkdirDeep(parent, 0700));
+
+  vector<string> result = FindDirectories(parent);
+  EXPECT_TRUE(result.empty());
+
+  ASSERT_TRUE(MkdirDeep(parent + "/dir1/sub", 0700));
+  ASSERT_TRUE(MkdirDeep(parent + "/dir2", 0700));
+  result = FindDirectories(parent);
+  ASSERT_EQ(2U, result.size());
+  EXPECT_EQ(parent + "/dir1", result[0]);
+  EXPECT_EQ(parent + "/dir2", result[1]);
+
+  string temp_file = CreateTempPath(parent + "/tempfile", 0600);
+  EXPECT_FALSE(temp_file.empty());
+  result = FindDirectories(parent);
+  ASSERT_EQ(2U, result.size());
+  EXPECT_EQ(parent + "/dir1", result[0]);
+  EXPECT_EQ(parent + "/dir2", result[1]);
+
+  EXPECT_TRUE(SymlinkForced(parent + "/dir1", parent + "/dirX"));
+  result = FindDirectories(parent);
+  ASSERT_EQ(3U, result.size());
+  EXPECT_EQ(parent + "/dir1", result[0]);
+  EXPECT_EQ(parent + "/dir2", result[1]);
+  EXPECT_EQ(parent + "/dirX", result[2]);
+}
+
+
 TEST_F(T_Util, GetUmask) {
   unsigned test_umask = 0755;
   mode_t original_mask = umask(test_umask);
