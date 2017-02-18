@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "download.h"
+#include "json.h"
 #include "letter.h"
 #include "logging.h"
 #include "mongoose.h"
@@ -16,15 +17,10 @@
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
+#include "uuid.h"
+#include "whitelist.h"
 
 using namespace std;
-
-struct {
-  string fqrn;
-  signature::SignatureManager *signature_mgr;
-  string cmd;
-} user_data;
-
 
 /**
  * Everything that's needed to verify requests for a single repository
@@ -39,6 +35,7 @@ struct RepositoryConfig : SingleCopy {
     delete statistics;
   }
   string fqrn;
+  string stratum0_url;
   download::DownloadManager *download_mgr;
   signature::SignatureManager *signature_mgr;
   OptionsManager *options_mgr;
@@ -48,7 +45,11 @@ struct RepositoryConfig : SingleCopy {
 map<string, RepositoryConfig *> g_repositories;
 UriMap g_uri_map;
 
-void ReadConfiguration() {
+
+/**
+ * Parse /etc/cvmfs/repositories.d/<fqrn>/.conf and search for stratum 1s
+ */
+static void ReadConfiguration() {
   vector<string> repo_config_dirs =
     FindDirectories("/etc/cvmfs/repositories.d");
   for (unsigned i = 0; i < repo_config_dirs.size(); ++i) {
@@ -85,6 +86,7 @@ void ReadConfiguration() {
       download_mgr->SetRetryParameters(String2Uint64(optarg), 1000, 2000);
     RepositoryConfig *config = new RepositoryConfig();
     options_mgr->GetValue("CVMFS_REPOSITORY_NAME", &(config->fqrn));
+    options_mgr->GetValue("CVMFS_STRATUM0", &(config->stratum0_url));
     config->signature_mgr = signature_mgr.Release();
     config->download_mgr = download_mgr.Release();
     config->options_mgr = options_mgr.Release();
@@ -100,19 +102,58 @@ void ReadConfiguration() {
 }
 
 
+/**
+ * New replication job
+ */
 class UriHandlerReplicate : public UriHandler {
  public:
-  explicit UriHandlerReplicate(const string &name) : name_(name) { }
+  explicit UriHandlerReplicate(RepositoryConfig *config) : config_(config) { }
   virtual void OnRequest(const struct mg_request_info *req_info,
                          struct mg_connection *conn)
   {
-    WebReply::Send(WebReply::k200, "I handle this", conn);
-    LogCvmfs(kLogCvmfs, kLogStdout, "I handle %s", name_.c_str());
+    char post_data[kMaxPostData];  post_data[0] = '\0';
+    unsigned post_data_len = mg_read(conn, post_data, sizeof(post_data) - 1);
+    post_data[post_data_len] = '\0';
+    // Trim trailing newline
+    if (post_data_len && (post_data[post_data_len - 1] == '\n'))
+      post_data[post_data_len - 1] = '\0';
+
+    // Verify letter
+    string message;
+    string cert;
+    letter::Letter letter(config_->fqrn, post_data, config_->signature_mgr);
+    letter::Failures retval_lt = letter.Verify(kTimeoutLetter, &message, &cert);
+    if (retval_lt != letter::kFailOk) {
+      WebReply::Send(WebReply::k400, MkJsonError(letter::Code2Ascii(retval_lt)),
+                     conn);
+      return;
+    }
+    whitelist::Whitelist whitelist(config_->fqrn, config_->download_mgr,
+                                   config_->signature_mgr);
+    whitelist::Failures retval_wl = whitelist.Load(config_->stratum0_url);
+    if (retval_wl == whitelist::kFailOk)
+      retval_wl = whitelist.VerifyLoadedCertificate();
+    if (retval_wl != whitelist::kFailOk) {
+      WebReply::Send(WebReply::k400,
+                     MkJsonError(whitelist::Code2Ascii(retval_wl)), conn);
+      return;
+    }
+
+    string uuid = cvmfs::Uuid::CreateOneTime();
+    WebReply::Send(WebReply::k200, "{\"job_id\":\"" + uuid + "\"}", conn);
   }
 
  private:
-  string name_;
+  static const unsigned kMaxPostData = 32 * 1024;  // 32kB
+  static const unsigned kTimeoutLetter = 180;  // 3 minutes
+
+  string MkJsonError(const string &msg) {
+    return "{\"error\": \"" + msg + "\"}";
+  }
+
+  RepositoryConfig *config_;
 };
+
 
 // This function will be called by mongoose on every new request.
 static int begin_request_handler(struct mg_connection *conn) {
@@ -129,68 +170,7 @@ static int begin_request_handler(struct mg_connection *conn) {
 
   handler->OnRequest(request_info, conn);
   return 1;
-
-  /*char content[10000];
-
-  char post_data[10000];
-  post_data[0] = '\0';
-  int post_data_len;
-  post_data_len = mg_read(conn, post_data, sizeof(post_data));
-  // TODO: trim final newline
-  post_data[post_data_len-1] = '\0';
-  letter::Failures retval_ltr;
-
-  //printf("POST DATA %s\n", post_data);
-
-  string message;
-  string cert;
-  letter::Letter letter(user_data.fqrn, post_data, user_data.signature_mgr);
-  //printf("LETTER IS %p\nTEXT %s\n", &letter, letter.text().c_str());
-  retval_ltr = letter.Verify(10, &message, &cert);
-  string dec;
-  Debase64(message, &dec);
-
-  int stdin, stdout, stderr;
-  Shell(&stdin, &stdout, &stderr);
-  string cmd = user_data.cmd + ";exit \n";
-  write(stdin, cmd.data(), cmd.length());
-  string out;
-  char c;
-  mg_printf(conn,
-            "HTTP/1.1 200 OK\r\n"
-            "Content-Type: text/plain\r\n\r\n");
-  while (read(stdout, &c, 1) == 1) {
-    if (c == '\n') {
-      mg_printf(conn, "%s\n", out.c_str());
-      out.clear();
-    } else {
-      out.push_back(c);
-    }
-  }
-
-  // Prepare the message we're going to send
-  //int content_length = snprintf(content, sizeof(content),
-  //                              "Hello from mongoose! type: %s, letter %s "
-  //                              "code %d, length %d\n",
-  //                              request_info->request_method,
-  //                              dec.c_str(),
-  //                              retval_ltr,
-  //                              post_data_len);
-
-
-
-  // Send HTTP reply to the client
-  //mg_printf(conn,
-  //          "HTTP/1.1 200 OK\r\n"
-  //          "Content-Type: text/plain\r\n"
-  //          "Content-Length: %d\r\n"        // Always set Content-Length
-  //          "\r\n"
-  //          "%s",
-  //          content_length, content);
-
-  */
 }
-
 
 
 int main(int argc, char **argv) {
@@ -201,7 +181,7 @@ int main(int argc, char **argv) {
     string fqrn = i->second->fqrn;
     g_uri_map.Register(WebRequest("/cvmfs/" + fqrn + "/api/v1/replicate/new",
                                   WebRequest::kPost),
-                       new UriHandlerReplicate(fqrn));
+                       new UriHandlerReplicate(i->second));
   }
 
   struct mg_context *ctx;
@@ -216,7 +196,6 @@ int main(int argc, char **argv) {
 
   // Start the web server.
   ctx = mg_start(&callbacks, NULL, options);
-  printf("CONTEXT IS NOW %p\n", ctx);
 
   // Wait until user hits "enter". Server is running in separate thread.
   // Navigating to http://localhost:8080 will invoke begin_request_handler().

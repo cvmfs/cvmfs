@@ -317,6 +317,8 @@ set (CVMFS_STRATUM_AGENT_SOURCES
   util/algorithm.cc
   util/posix.cc
   util/string.cc
+  uuid.cc
+  whitelist.cc
 )
 
 
@@ -538,6 +540,7 @@ if (BUILD_SERVER)
                         ${CURL_LIBRARIES} ${CARES_LIBRARIES}
                         ${SHA3_LIBRARIES} ${SHA2_LIBRARIES} ${ZLIB_LIBRARIES}
                         ${MONGOOSE_LIBRARIES} ${OPENSSL_LIBRARIES}
+                        ${UUID_LIBRARIES} ${VJSON_LIBRARIES}
                         ${RT_LIBRARY} pthread dl)
 
   if (BUILD_SERVER_DEBUG)

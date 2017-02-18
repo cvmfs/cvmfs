@@ -46,6 +46,7 @@ class WebReply {
  public:
   enum Code {
     k200,
+    k400,
     k404,
     k405
   };
