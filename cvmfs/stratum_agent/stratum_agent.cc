@@ -106,11 +106,7 @@ class UriHandlerReplicate : public UriHandler {
   virtual void OnRequest(const struct mg_request_info *req_info,
                          struct mg_connection *conn)
   {
-    mg_printf(conn,
-              "HTTP/1.1 200 OK\r\n"
-              "Content-Type: text/plain\r\n"
-              "\r\n"
-              "I handle this\r\n");
+    WebReply::Send(WebReply::k200, "I handle this", conn);
     LogCvmfs(kLogCvmfs, kLogStdout, "I handle %s", name_.c_str());
   }
 
@@ -121,20 +117,17 @@ class UriHandlerReplicate : public UriHandler {
 // This function will be called by mongoose on every new request.
 static int begin_request_handler(struct mg_connection *conn) {
   const struct mg_request_info *request_info = mg_get_request_info(conn);
-  string uri = request_info->uri;
-  UriHandler *handler = g_uri_map.Route(uri);
+  WebRequest request(request_info);
+  UriHandler *handler = g_uri_map.Route(request);
   if (handler == NULL) {
-    mg_printf(conn,
-             "HTTP/1.1 404 Not Found\r\n"
-             "Content-Type: text/plain\r\n"
-             "\r\n"
-             "Invalid URI");
+    if (g_uri_map.IsKnownUri(request.uri()))
+      WebReply::Send(WebReply::k405, "", conn);
+    else
+      WebReply::Send(WebReply::k404, "", conn);
     return 1;
   }
 
   handler->OnRequest(request_info, conn);
-  // Returning non-zero tells mongoose that our function has replied to
-  // the client, and mongoose should not send client any more data.*/
   return 1;
 
   /*char content[10000];
@@ -206,7 +199,8 @@ int main(int argc, char **argv) {
        g_repositories.begin(), i_end = g_repositories.end(); i != i_end; ++i)
   {
     string fqrn = i->second->fqrn;
-    g_uri_map.Register("/cvmfs/" + fqrn + "/api/v1/replicate",
+    g_uri_map.Register(WebRequest("/cvmfs/" + fqrn + "/api/v1/replicate/new",
+                                  WebRequest::kPost),
                        new UriHandlerReplicate(fqrn));
   }
 

@@ -9,40 +9,68 @@
 
 using namespace std;  // NOLINT
 
-WebRequest::WebRequest() : verb_(kUnknown) { }
-
-WebRequest *WebRequest::Create(struct mg_request_info *req) {
-  WebRequest *request = new WebRequest();
+WebRequest::WebRequest(const struct mg_request_info *req) {
   string method = req->request_method;
   if (method == "GET")
-    request->verb_ = WebRequest::kGet;
+    verb_ = WebRequest::kGet;
   else if (method == "PUT")
-    request->verb_ = WebRequest::kPut;
+    verb_ = WebRequest::kPut;
   else if (method == "POST")
-    request->verb_ = WebRequest::kPost;
+    verb_ = WebRequest::kPost;
   else if (method == "DELETE")
-    request->verb_ = WebRequest::kDelete;
+    verb_ = WebRequest::kDelete;
   else
-    request->verb_ = WebRequest::kUnknown;
-  request->uri_ = req->uri;
-  return request;
+    verb_ = WebRequest::kUnknown;
+  uri_ = req->uri;
 }
 
 
 //------------------------------------------------------------------------------
 
 
-void UriMap::Register(const string &uri_spec, UriHandler *handler) {
-  Pathspec path_spec(uri_spec);
-  assert(path_spec.IsValid() && path_spec.IsAbsolute());
-  rules_.push_back(Match(path_spec, handler));
+void WebReply::Send(Code code, const string &msg, struct mg_connection *conn) {
+  string header;
+  switch (code) {
+    case k200: header = "HTTP/1.1 200 OK\r\n"; break;
+    case k404: header = "HTTP/1.1 404 Not Found\r\n"; break;
+    case k405: header = "HTTP/1.1 405 Method Not Allowed\r\n"; break;
+    default: assert(false);
+  }
+  mg_printf(conn,
+            "%s"
+            "Content-Type: text/plain\r\n"
+            "Content-Length: %lu\r\n"
+            "\r\n"
+            "%s", header.c_str(), msg.length(), msg.c_str());
 }
 
 
-UriHandler *UriMap::Route(const std::string &uri) {
+//------------------------------------------------------------------------------
+
+
+void UriMap::Register(const WebRequest &request, UriHandler *handler) {
+  Pathspec path_spec(request.uri());
+  assert(path_spec.IsValid() && path_spec.IsAbsolute());
+  rules_.push_back(Match(path_spec, request.verb(), handler));
+}
+
+
+UriHandler *UriMap::Route(const WebRequest &request) {
   for (unsigned i = 0; i < rules_.size(); ++i) {
-    if (rules_[i].uri_spec.IsPrefixMatching(uri))
+    if ( (rules_[i].uri_spec.IsPrefixMatching(request.uri())) &&
+         (rules_[i].verb == request.verb()) )
+    {
       return rules_[i].handler;
+    }
   }
   return NULL;
+}
+
+
+bool UriMap::IsKnownUri(const std::string &uri) {
+  for (unsigned i = 0; i < rules_.size(); ++i) {
+    if (rules_[i].uri_spec.IsPrefixMatching(uri))
+      return true;
+  }
+  return false;
 }

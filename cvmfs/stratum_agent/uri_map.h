@@ -28,16 +28,30 @@ class WebRequest {
     kUnknown,
   };
 
-  static WebRequest *Create(struct mg_request_info *req);
+  explicit WebRequest(const struct mg_request_info *req);
+  WebRequest(const std::string &uri, Verb verb) : verb_(verb), uri_(uri) { }
 
   Verb verb() const { return verb_; }
   std::string uri() const { return uri_; }
 
  private:
-  WebRequest();
+  WebRequest() : verb_(kUnknown) { }
 
   Verb verb_;
   std::string uri_;
+};
+
+
+class WebReply {
+ public:
+  enum Code {
+    k200,
+    k404,
+    k405
+  };
+
+  static void Send(Code code, const std::string &msg,
+                   struct mg_connection *conn);
 };
 
 
@@ -59,13 +73,16 @@ class UriHandler {
  */
 class UriMap {
  public:
-  void Register(const std::string &uri_spec, UriHandler *handler);
-  UriHandler *Route(const std::string &uri);
+  void Register(const WebRequest &request, UriHandler *handler);
+  UriHandler *Route(const WebRequest &request);
+  bool IsKnownUri(const std::string &uri);
 
  private:
   struct Match {
-    Match(const Pathspec &s, UriHandler *h) : uri_spec(s), handler(h) { }
+    Match(const Pathspec &p, const WebRequest::Verb v, UriHandler *h)
+      : uri_spec(p), verb(v), handler(h) { }
     Pathspec uri_spec;
+    WebRequest::Verb verb;
     UriHandler *handler;
   };
 
