@@ -24,7 +24,8 @@
          create_invalid_leases/1,
          create_session_when_already_created/1,
          end_invalid_session/1,
-         normal_payload_submission/1]).
+         normal_payload_submission/1,
+         payload_submission_with_wrong_hash/1]).
 
 -define(API_ROOT, "/api/v1").
 
@@ -42,7 +43,8 @@ groups() ->
                    create_invalid_leases,
                    create_session_when_already_created,
                    end_invalid_session]},
-     {payloads, [], [normal_payload_submission]}
+     {payloads, [], [normal_payload_submission,
+                     payload_submission_with_wrong_hash]}
     ].
 
 
@@ -159,10 +161,34 @@ normal_payload_submission(Config) ->
 
     % Submit payload
     Payload = <<"IAMAPAYLOAD">>,
-    SubmitUrl = ?API_ROOT ++ "/payloads?user=user1&session_token=" ++ binary_to_list(Token),
+    Hash = crypto:hash(sha, Payload),
+    SubmitUrl = ?API_ROOT ++ "/payloads?user=user1&session_token=" ++ binary_to_list(Token)
+        ++ "&hash=" ++ base64:encode(Hash),
     RequestHeaders2 = p_make_headers(Payload, binary),
     {ok, ReplyBody2} = p_post(conn_pid(Config), SubmitUrl, RequestHeaders2, Payload),
     #{<<"status">> := <<"ok">>} = jsx:decode(ReplyBody2, [return_maps]),
+
+    % End lease
+    {ok, ReplyBody3} = p_delete(conn_pid(Config), ?API_ROOT ++ "/leases/" ++ binary_to_list(Token)),
+    #{<<"status">> := <<"ok">>} = jsx:decode(ReplyBody3, [return_maps]).
+
+
+payload_submission_with_wrong_hash(Config) ->
+    % Create new lease
+    ReqUrl = ?API_ROOT ++ "/leases" ++ "?user=user1&path=repo1.domain1.org",
+    RequestHeaders1 = p_make_headers(<<"">>, json),
+    {ok, ReplyBody1} = p_post(conn_pid(Config), ReqUrl, RequestHeaders1),
+    #{<<"session_token">> := Token} = jsx:decode(ReplyBody1, [return_maps]),
+
+    % Submit payload
+    Payload = <<"IAMAPAYLOAD">>,
+    Hash = "NOTTHERIGHTHASH",
+    SubmitUrl = ?API_ROOT ++ "/payloads?user=user1&session_token=" ++ binary_to_list(Token)
+        ++ "&hash=" ++ base64:encode(Hash),
+    RequestHeaders2 = p_make_headers(Payload, binary),
+    {ok, ReplyBody2} = p_post(conn_pid(Config), SubmitUrl, RequestHeaders2, Payload),
+    #{<<"status">> := <<"error">>,
+      <<"reason">> := <<"invalid_payload_hash">>} = jsx:decode(ReplyBody2, [return_maps]),
 
     % End lease
     {ok, ReplyBody3} = p_delete(conn_pid(Config), ?API_ROOT ++ "/leases/" ++ binary_to_list(Token)),
