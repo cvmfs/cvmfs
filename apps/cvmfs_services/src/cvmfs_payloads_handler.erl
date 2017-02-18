@@ -36,8 +36,8 @@ init(Req0 = #{method := <<"GET">>}, State) ->
 %% A "POST" request to /api/payloads, which can return either 200 OK
 %% or in 400 - Bad Request
 %%
-%% The body of the request should be a JSON payload containing the
-%% "user", "session_token" and "payload" fields
+%% The use and session_token parameters should be passed in the query string,
+%% while the payload should be passed in the request body.
 %%
 %% The body of the reply, for a valid request contains the fields:
 %% "status" - either "ok", "error"
@@ -47,17 +47,13 @@ init(Req0 = #{method := <<"GET">>}, State) ->
 init(Req0 = #{method := <<"POST">>}, State) ->
     {URI, T0} = cvmfs_fe_util:tick(Req0, micro_seconds),
 
-    {ok, Data, Req1} = cvmfs_fe_util:read_body(Req0),
-    {Status, Reply, Req2} = case jsx:decode(Data, [return_maps]) of
-                                #{<<"user">> := User,
-                                  <<"session_token">> := Token,
-                                  <<"payload">> := Payload} ->
-                                    Rep = p_submit_payload(User,
-                                                           Token,
-                                                           Payload),
+    {Status, Reply, Req2} = case cowboy_req:match_qs([user, session_token], Req0) of
+                                #{user := User, session_token := Token} ->
+                                    {ok, Payload, Req1} = cvmfs_fe_util:read_body(Req0),
+                                    Rep = p_submit_payload(User, Token, Payload),
                                     {200, Rep, Req1};
                                 _ ->
-                                    {400, #{}, Req1}
+                                    {400, #{}, Req0}
                             end,
     ReqF = cowboy_req:reply(Status,
                             #{<<"content-type">> => <<"application/json">>},

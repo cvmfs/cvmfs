@@ -151,21 +151,20 @@ end_invalid_session(Config) ->
 
 
 normal_payload_submission(Config) ->
-                                                % Create new lease
+    % Create new lease
     ReqUrl = ?API_ROOT ++ "/leases" ++ "?user=user1&path=repo1.domain1.org",
     RequestHeaders1 = p_make_headers(<<"">>, json),
     {ok, ReplyBody1} = p_post(conn_pid(Config), ReqUrl, RequestHeaders1),
     #{<<"session_token">> := Token} = jsx:decode(ReplyBody1, [return_maps]),
 
-                                                % Submit payload
+    % Submit payload
     Payload = <<"IAMAPAYLOAD">>,
-    RequestBody2 = jsx:encode(#{<<"user">> => <<"user1">>, <<"session_token">> => Token,
-                                <<"payload">> => Payload}),
-    RequestHeaders2 = p_make_headers(RequestBody2, json),
-    {ok, ReplyBody2} = p_post(conn_pid(Config), ?API_ROOT ++ "/payloads", RequestHeaders2, RequestBody2),
+    SubmitUrl = ?API_ROOT ++ "/payloads?user=user1&session_token=" ++ binary_to_list(Token),
+    RequestHeaders2 = p_make_headers(Payload, binary),
+    {ok, ReplyBody2} = p_post(conn_pid(Config), SubmitUrl, RequestHeaders2, Payload),
     #{<<"status">> := <<"ok">>} = jsx:decode(ReplyBody2, [return_maps]),
 
-                                                % End lease
+    % End lease
     {ok, ReplyBody3} = p_delete(conn_pid(Config), ?API_ROOT ++ "/leases/" ++ binary_to_list(Token)),
     #{<<"status">> := <<"ok">>} = jsx:decode(ReplyBody3, [return_maps]).
 
@@ -212,12 +211,12 @@ p_delete(ConnPid, Path) ->
 p_make_headers(<<"">>, json) ->
     [{<<"content-type">>, <<"application/json">>},
      {<<"content-length">>, integer_to_binary(0)}];
-p_make_headers(<<"">>, bin) ->
+p_make_headers(<<"">>, binary) ->
     [{<<"content-type">>, <<"application/octet-stream">>},
      {<<"content-length">>, integer_to_binary(0)}];
 p_make_headers(Body, json) ->
     [{<<"content-type">>, <<"application/json">>},
      {<<"content-length">>, integer_to_binary(size(Body))}];
-p_make_headers(Body, bin) ->
+p_make_headers(Body, binary) ->
     [{<<"content-type">>, <<"application/octet-stream">>},
      {<<"content-length">>, integer_to_binary(size(Body))}].
