@@ -48,7 +48,8 @@ class WebReply {
     k200,
     k400,
     k404,
-    k405
+    k405,
+    k500
   };
 
   static void Send(Code code, const std::string &msg,

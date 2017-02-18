@@ -35,6 +35,7 @@ void WebReply::Send(Code code, const string &msg, struct mg_connection *conn) {
     case k400: header = "HTTP/1.1 400 Bad Request\r\n"; break;
     case k404: header = "HTTP/1.1 404 Not Found\r\n"; break;
     case k405: header = "HTTP/1.1 405 Method Not Allowed\r\n"; break;
+    case k500: header = "HTTP/1.1 500 Internal Server Error\r\n"; break;
     default: assert(false);
   }
   mg_printf(conn,

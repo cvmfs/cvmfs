@@ -1,3 +1,8 @@
+/**
+ * This file is part of the CernVM File System.
+ */
+
+#include <pthread.h>
 #include <unistd.h>
 
 #include <cstdio>
@@ -12,6 +17,7 @@
 #include "logging.h"
 #include "mongoose.h"
 #include "options.h"
+#include "platform.h"
 #include "signature.h"
 #include "stratum_agent/uri_map.h"
 #include "util/pointer.h"
@@ -34,6 +40,7 @@ struct RepositoryConfig : SingleCopy {
     delete options_mgr;
     delete statistics;
   }
+  string alias;
   string fqrn;
   string stratum0_url;
   download::DownloadManager *download_mgr;
@@ -42,7 +49,29 @@ struct RepositoryConfig : SingleCopy {
   perf::Statistics *statistics;
 };
 
+
+struct Job : SingleCopy {
+  Job() : fd_stdin(-1), fd_stdout(-1), fd_stderr(-1),
+          status(kStatusLimbo), exit_code(-1),
+          birth(platform_monotonic_time()) { }
+  enum Status {
+    kStatusLimbo,
+    kStatusRunning,
+    kStatusFinished
+  };
+  int fd_stdin;
+  int fd_stdout;
+  int fd_stderr;
+  string stdout;
+  string stderr;
+  Status status;
+  int exit_code;
+  pthread_t thread_job;
+  uint64_t birth;
+};
+
 map<string, RepositoryConfig *> g_repositories;
+map<string, Job *> g_jobs;
 UriMap g_uri_map;
 
 
@@ -85,6 +114,7 @@ static void ReadConfiguration() {
     if (options_mgr->GetValue("CVMFS_HTTP_RETRIES", &optarg))
       download_mgr->SetRetryParameters(String2Uint64(optarg), 1000, 2000);
     RepositoryConfig *config = new RepositoryConfig();
+    config->alias = name;
     options_mgr->GetValue("CVMFS_REPOSITORY_NAME", &(config->fqrn));
     options_mgr->GetValue("CVMFS_STRATUM0", &(config->stratum0_url));
     config->signature_mgr = signature_mgr.Release();
@@ -139,7 +169,24 @@ class UriHandlerReplicate : public UriHandler {
       return;
     }
 
+    UniquePtr<Job> job(new Job());
+    string exe = "/usr/bin/cvmfs_server";
+    vector<string> argv;
+    argv.push_back("snapshot");
+    argv.push_back(config_->alias);
+    bool retval_b = ExecuteBinary(
+      &job->fd_stdin, &job->fd_stdout, &job->fd_stderr, exe, argv, true);
+    if (!retval_b) {
+      WebReply::Send(WebReply::k500,
+                     MkJsonError("could not spawn snapshot process"), conn);
+      return;
+    }
+    int retval_i = pthread_create(&job->thread_job, NULL, MainJobMgr, job);
+    if (retval_i == 0) {
+      job->status = Job::kStatusRunning;
+    }
     string uuid = cvmfs::Uuid::CreateOneTime();
+    g_jobs[uuid] = job.Release();
     WebReply::Send(WebReply::k200, "{\"job_id\":\"" + uuid + "\"}", conn);
   }
 
@@ -147,11 +194,38 @@ class UriHandlerReplicate : public UriHandler {
   static const unsigned kMaxPostData = 32 * 1024;  // 32kB
   static const unsigned kTimeoutLetter = 180;  // 3 minutes
 
+  static void *MainJobMgr(void *data) {
+    Job *job = reinterpret_cast<Job *>(data);
+    char c;
+    while (read(job->fd_stdout, &c, 1) == 1) {
+      job->stdout.push_back(c);
+    }
+    return NULL;
+  }
+
   string MkJsonError(const string &msg) {
     return "{\"error\": \"" + msg + "\"}";
   }
 
   RepositoryConfig *config_;
+};
+
+
+class UriHandlerJob : public UriHandler {
+ public:
+  virtual void OnRequest(const struct mg_request_info *req_info,
+                         struct mg_connection *conn)
+  {
+    string what = GetFileName(req_info->uri);
+    string job_id = GetFileName(GetParentPath(req_info->uri));
+    map<string, Job *>::const_iterator iter = g_jobs.find(job_id);
+    if (iter == g_jobs.end()) {
+      WebReply::Send(WebReply::k404, "{\"error\":\"no such job\"}", conn);
+      return;
+    }
+    Job *job = iter->second;
+    WebReply::Send(WebReply::k200, job->stdout, conn);
+  }
 };
 
 
@@ -179,6 +253,9 @@ int main(int argc, char **argv) {
        g_repositories.begin(), i_end = g_repositories.end(); i != i_end; ++i)
   {
     string fqrn = i->second->fqrn;
+    g_uri_map.Register(WebRequest(
+      "/cvmfs/" + fqrn + "/api/v1/replicate/*/stdout", WebRequest::kGet),
+      new UriHandlerJob());
     g_uri_map.Register(WebRequest("/cvmfs/" + fqrn + "/api/v1/replicate/new",
                                   WebRequest::kPost),
                        new UriHandlerReplicate(i->second));
