@@ -36,8 +36,7 @@ init(Req0 = #{method := <<"GET">>}, State) ->
 %% A "POST" request to /api/leases, which can return either 200 OK
 %% or in 400 - Bad Request
 %%
-%% The body of the request should be a JSON payload containing the
-%% "user" and "path" fields
+%% The "user" and "path" fields have to be specified in the query string
 %%
 %% The body of the reply, for a valid request contains the fields:
 %% "status" - either "ok", "path_busy" or "error"
@@ -51,18 +50,17 @@ init(Req0 = #{method := <<"GET">>}, State) ->
 init(Req0 = #{method := <<"POST">>}, State) ->
     {URI, T0} = cvmfs_fe_util:tick(Req0, micro_seconds),
 
-    {ok, Data, Req1} = cvmfs_fe_util:read_body(Req0),
-    {Status, Reply, Req2} = case jsx:decode(Data, [return_maps]) of
-                                #{<<"user">> := User, <<"path">> := Path} ->
+    {Status, Reply, Req1} = case cowboy_req:match_qs([user, path], Req0) of
+                                #{user := User, path := Path} ->
                                     Rep = p_new_lease(User, Path),
-                                    {200, Rep, Req1};
+                                    {200, Rep, Req0};
                                 _ ->
-                                    {400, #{}, Req1}
+                                    {400, #{}, Req0}
                             end,
     ReqF = cowboy_req:reply(Status,
                             #{<<"content-type">> => <<"application/json">>},
                             jsx:encode(Reply),
-                            Req2),
+                            Req1),
 
     cvmfs_fe_util:tock(URI, T0, micro_seconds),
     {ok, ReqF, State};

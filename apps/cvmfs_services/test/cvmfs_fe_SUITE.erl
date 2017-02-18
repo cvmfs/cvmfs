@@ -112,9 +112,9 @@ check_leases(Config) ->
 
 
 create_and_delete_session(Config) ->
-    RequestBody = jsx:encode(#{<<"user">> => <<"user1">>, <<"path">> => <<"repo1.domain1.org">>}),
-    RequestHeaders = p_make_headers(RequestBody),
-    {ok, ReplyBody1} = p_post(conn_pid(Config), ?API_ROOT ++ "/leases", RequestHeaders, RequestBody),
+    ReqUrl = ?API_ROOT ++ "/leases?user=user1&path=repo1.domain1.org",
+    RequestHeaders = p_make_headers(<<"">>, json),
+    {ok, ReplyBody1} = p_post(conn_pid(Config), ReqUrl, RequestHeaders),
     #{<<"session_token">> := Token} = jsx:decode(ReplyBody1, [return_maps]),
     {ok, ReplyBody2} = p_delete(conn_pid(Config), ?API_ROOT ++ "/leases/" ++ binary_to_list(Token)),
     #{<<"status">> := <<"ok">>} = jsx:decode(ReplyBody2, [return_maps]).
@@ -122,25 +122,25 @@ create_and_delete_session(Config) ->
 
 create_invalid_leases(Config) ->
     RequestReplies = [
-                      {<<"bad_user">>, <<"repo1.domain1.org">>, <<"invalid_user">>},
-                      {<<"user1">>, <<"bad_path">>, <<"invalid_path">>}
+                      {"bad_user", "repo1.domain1.org", <<"invalid_user">>},
+                      {"user1", "bad_path", <<"invalid_path">>}
                      ],
     Check = fun({User, Path, Reason}) ->
-                     RequestBody = jsx:encode(#{<<"user">> => User, <<"path">> => Path}),
-                     RequestHeaders = p_make_headers(RequestBody),
-                     {ok, ReplyBody} = p_post(conn_pid(Config), ?API_ROOT ++ "/leases", RequestHeaders, RequestBody),
-                     #{<<"status">> := <<"error">>,
-                       <<"reason">> := Reason} = jsx:decode(ReplyBody, [return_maps])
-             end,
+                    ReqUrl = ?API_ROOT ++ "/leases?user=" ++ User ++ "&path=" ++ Path,
+                    RequestHeaders = p_make_headers(<<"">>, json),
+                    {ok, ReplyBody} = p_post(conn_pid(Config), ReqUrl, RequestHeaders),
+                    #{<<"status">> := <<"error">>,
+                      <<"reason">> := Reason} = jsx:decode(ReplyBody, [return_maps])
+            end,
     lists:foreach(Check, RequestReplies).
 
 
 create_session_when_already_created(Config) ->
-    RequestBody = jsx:encode(#{<<"user">> => <<"user1">>, <<"path">> => <<"repo1.domain1.org">>}),
-    RequestHeaders = p_make_headers(RequestBody),
-    {ok, ReplyBody1} = p_post(conn_pid(Config), ?API_ROOT ++ "/leases", RequestHeaders, RequestBody),
+    ReqUrl = ?API_ROOT ++ "/leases?user=user1&path=repo1.domain1.org",
+    RequestHeaders = p_make_headers(<<"">>, json),
+    {ok, ReplyBody1} = p_post(conn_pid(Config), ReqUrl, RequestHeaders),
     #{<<"session_token">> := _Token} = jsx:decode(ReplyBody1, [return_maps]),
-    {ok, ReplyBody2} = p_post(conn_pid(Config), ?API_ROOT ++ "/leases", RequestHeaders, RequestBody),
+    {ok, ReplyBody2} = p_post(conn_pid(Config), ReqUrl, RequestHeaders),
     #{<<"status">> := <<"path_busy">>} = jsx:decode(ReplyBody2, [return_maps]).
 
 
@@ -151,21 +151,21 @@ end_invalid_session(Config) ->
 
 
 normal_payload_submission(Config) ->
-    % Create new lease
-    RequestBody1 = jsx:encode(#{<<"user">> => <<"user1">>, <<"path">> => <<"repo1.domain1.org">>}),
-    RequestHeaders1 = p_make_headers(RequestBody1),
-    {ok, ReplyBody1} = p_post(conn_pid(Config), ?API_ROOT ++ "/leases", RequestHeaders1, RequestBody1),
+                                                % Create new lease
+    ReqUrl = ?API_ROOT ++ "/leases" ++ "?user=user1&path=repo1.domain1.org",
+    RequestHeaders1 = p_make_headers(<<"">>, json),
+    {ok, ReplyBody1} = p_post(conn_pid(Config), ReqUrl, RequestHeaders1),
     #{<<"session_token">> := Token} = jsx:decode(ReplyBody1, [return_maps]),
 
-    % Submit payload
+                                                % Submit payload
     Payload = <<"IAMAPAYLOAD">>,
     RequestBody2 = jsx:encode(#{<<"user">> => <<"user1">>, <<"session_token">> => Token,
                                 <<"payload">> => Payload}),
-    RequestHeaders2 = p_make_headers(RequestBody2),
+    RequestHeaders2 = p_make_headers(RequestBody2, json),
     {ok, ReplyBody2} = p_post(conn_pid(Config), ?API_ROOT ++ "/payloads", RequestHeaders2, RequestBody2),
     #{<<"status">> := <<"ok">>} = jsx:decode(ReplyBody2, [return_maps]),
 
-    % End lease
+                                                % End lease
     {ok, ReplyBody3} = p_delete(conn_pid(Config), ?API_ROOT ++ "/leases/" ++ binary_to_list(Token)),
     #{<<"status">> := <<"ok">>} = jsx:decode(ReplyBody3, [return_maps]).
 
@@ -186,12 +186,17 @@ p_wait(ConnPid, StreamRef) ->
 
 
 -spec p_get(Config, Path) -> {ok, Body} | {error, Reason}
-                                  when Config :: [{atom(), term()}],
-                                       Path :: string(),
-                                       Body :: binary(),
-                                       Reason :: term().
+                                 when Config :: [{atom(), term()}],
+                                      Path :: string(),
+                                      Body :: binary(),
+                                      Reason :: term().
 p_get(ConnPid, Path) ->
     p_wait(ConnPid, gun:get(ConnPid, Path)).
+
+
+p_post(ConnPid, Path, Headers) ->
+    StreamRef = gun:post(ConnPid, Path, Headers),
+    p_wait(ConnPid, StreamRef).
 
 
 p_post(ConnPid, Path, Headers, Body) ->
@@ -204,6 +209,15 @@ p_delete(ConnPid, Path) ->
     p_wait(ConnPid, gun:delete(ConnPid, Path)).
 
 
-p_make_headers(Body) ->
+p_make_headers(<<"">>, json) ->
     [{<<"content-type">>, <<"application/json">>},
+     {<<"content-length">>, integer_to_binary(0)}];
+p_make_headers(<<"">>, bin) ->
+    [{<<"content-type">>, <<"application/octet-stream">>},
+     {<<"content-length">>, integer_to_binary(0)}];
+p_make_headers(Body, json) ->
+    [{<<"content-type">>, <<"application/json">>},
+     {<<"content-length">>, integer_to_binary(size(Body))}];
+p_make_headers(Body, bin) ->
+    [{<<"content-type">>, <<"application/octet-stream">>},
      {<<"content-length">>, integer_to_binary(size(Body))}].
