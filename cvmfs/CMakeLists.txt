@@ -714,7 +714,7 @@ if (BUILD_SERVER)
   # If we built the third-party libraries ourselves, we should also install the TBB libraries
   if (BUILTIN_EXTERNALS)
     install(
-      FILES ${TBB_LIBRARIES}
+      FILES ${EXTERNALS_INSTALL_LOCATION}/lib/libtbb_cvmfs.so.2 ${EXTERNALS_INSTALL_LOCATION}/lib/libtbbmalloc_cvmfs.so.2
       DESTINATION ${CMAKE_INSTALL_LIBDIR}
       )
   endif (BUILTIN_EXTERNALS)

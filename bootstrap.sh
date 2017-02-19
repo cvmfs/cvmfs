@@ -143,7 +143,7 @@ build_lib() {
 
       rm -rf $externals_build_dir/build_c-ares
       do_extract "c-ares" "c-ares-${CARES_VERSION}.tar.gz"
-      do_build "c-ares"      
+      do_build "c-ares"
 
       do_extract "libcurl" "curl-${CURL_VERSION}.tar.gz"
       patch_external "libcurl" "reenable_poll_darwin.patch"
@@ -193,11 +193,13 @@ build_lib() {
       fi
       ;;
     tbb)
-      do_extract "tbb"          "tbb-${TBB_VERSION}.tar.gz"
-      patch_external "tbb"         "custom_library_suffix.patch"        \
-                                  "symlink_to_build_directories.patch" \
-                                  "32bit_mock.patch"
-      do_build "tbb"
+      if [ x"BUILD_SERVER" != x"" ]; then
+        do_extract "tbb"          "tbb-${TBB_VERSION}.tar.gz"
+        patch_external "tbb"         "custom_library_suffix.patch"        \
+                                    "symlink_to_build_directories.patch" \
+                                    "32bit_mock.patch"
+        do_build "tbb"
+      fi
       ;;
     protobuf)
       do_extract "protobuf"     "protobuf-${PROTOBUF_VERSION}.tar.bz2"
