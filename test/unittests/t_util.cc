@@ -1325,6 +1325,30 @@ TEST_F(T_Util, WaitForSignal) {
   UnBlockSignal(SIGUSR1);
 }
 
+
+TEST_F(T_Util, WaitForPid) {
+  ASSERT_DEATH(WaitForPid(0), ".*");
+  ASSERT_DEATH(WaitForPid(getpid()), ".*");
+
+  pid_t pid = fork();
+  switch (pid) {
+    case -1: ASSERT_TRUE(false);
+    case 0: while (true) { }
+    default:
+      kill(pid, SIGTERM);
+      EXPECT_EQ(-1, WaitForPid(pid));
+  }
+
+  pid = fork();
+  switch (pid) {
+    case -1: ASSERT_TRUE(false);
+    case 0: exit(0);
+    default:
+      EXPECT_EQ(0, WaitForPid(pid));
+  }
+}
+
+
 TEST_F(T_Util, Daemonize) {
   int pid;
   int statloc;

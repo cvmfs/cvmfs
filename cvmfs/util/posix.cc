@@ -918,6 +918,28 @@ void WaitForSignal(int signum) {
 
 
 /**
+ * Returns -1 of the child crashed or the exit code otherwise
+ */
+int WaitForPid(pid_t pid) {
+  assert(pid > 0);
+  int statloc;
+  while (true) {
+    pid_t retval = waitpid(pid, &statloc, 0);
+    if (retval == -1) {
+      if (errno == EINTR)
+        continue;
+      assert(false);
+    }
+    assert(retval == pid);
+    break;
+  }
+  if (WIFEXITED(statloc))
+    return WEXITSTATUS(statloc);
+  return -1;
+}
+
+
+/**
  * Makes a daemon.  The daemon() call is deprecated on OS X
  */
 void Daemonize() {
