@@ -53,20 +53,29 @@ cvmfs_server_transaction() {
     load_repo_config $name
     spool_dir=$CVMFS_SPOOL_DIR
     stratum0=$CVMFS_STRATUM0
+    upstream_storage=$CVMFS_UPSTREAM_STORAGE
+    upstream_type=$(get_upstream_type $upstream_storage)
     user=$CVMFS_USER
 
     # more sanity checks
     is_owner_or_root $name || { echo "Permission denied: Repository $name is owned by $user"; retcode=1; continue; }
     check_repository_compatibility $name
     if [ $force -eq 0 ]; then
-      is_in_transaction $name && { echo "Repository $name is already in a transaction"; retcode=1; continue; }
+        is_in_transaction $name && { echo "Repository $name is already in a transaction"; retcode=1; continue; }
     fi
     check_expiry $name $stratum0 || { echo "Repository whitelist for $name is expired!"; retcode=1; continue; }
     [ $(get_expiry $name $stratum0) -le $(( 12 * 60 * 60 )) ] && { echo "Warning: Repository whitelist stays valid for less than 12 hours!"; }
 
     # do it!
     transaction_before_hook $name
-    open_transaction        $name
+    # If the upstream storage type is http (publication leases are managed by an instance of the CVMFS repo services,
+    # the cvmfs_swissknife lease command needs to be used to acquire a new lease
+    if [ x"$upstream_type" = xhttp ]; then
+        repo_services_url=$(echo $upstream_storage | cut -d',' -f3)
+        __swissknife lease -a acquire -u $repo_services_url -n $user -p $name || { echo "Could not acquire a new lease for repository $name"; retcode=1; continue; }
+    fi
+    open_transaction $name $
+
     transaction_after_hook  $name
 
   done
