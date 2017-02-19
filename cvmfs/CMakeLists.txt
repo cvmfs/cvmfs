@@ -197,6 +197,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   reflog_sql.cc
   s3fanout.cc
   sanitizer.cc
+  session_context.cc
   signature.cc
   sql.cc
   sqlitemem.cc
