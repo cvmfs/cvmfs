@@ -4,6 +4,9 @@
 
 #include "upload_http.h"
 
+#include <limits>
+#include <vector>
+
 #include "util/string.h"
 
 namespace {
@@ -21,8 +24,12 @@ namespace upload {
 HttpStreamHandle::HttpStreamHandle(const CallbackTN* commit_callback)
     : UploadStreamHandle(commit_callback) {}
 
+bool HttpUploader::WillHandle(const SpoolerDefinition& spooler_definition) {
+  return spooler_definition.driver_type == SpoolerDefinition::HTTP;
+}
+
 HttpUploader::HttpUploader(const SpoolerDefinition& spooler_definition)
-    : AbstractUploader(spooler_definition), config_() {
+    : AbstractUploader(spooler_definition), config_(), session_context_() {
   assert(spooler_definition.IsValid() &&
          spooler_definition.driver_type == SpoolerDefinition::HTTP);
 
@@ -41,11 +48,18 @@ HttpUploader::HttpUploader(const SpoolerDefinition& spooler_definition)
            config_.api_path.c_str());
 }
 
-bool HttpUploader::WillHandle(const SpoolerDefinition& spooler_definition) {
-  return spooler_definition.driver_type == SpoolerDefinition::HTTP;
+HttpUploader::~HttpUploader() {}
+
+bool HttpUploader::Initialize() {
+  bool ret = AbstractUploader::Initialize();
+  session_context_ = new SessionContext();
+
+  return ret && session_context_.IsValid();
 }
 
-HttpUploader::~HttpUploader() {}
+bool HttpUploader::FinalizeSession() {
+  return session_context_->FinalizeSession();
+}
 
 std::string HttpUploader::name() const { return "HTTP"; }
 

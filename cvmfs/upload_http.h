@@ -5,15 +5,17 @@
 #ifndef CVMFS_UPLOAD_HTTP_H_
 #define CVMFS_UPLOAD_HTTP_H_
 
+#include <atomic.h>
+
 #include <string>
 
-#include <atomic.h>
-#include <upload_facility.h>
+#include "session_context.h"
+#include "upload_facility.h"
 
 namespace upload {
 
 struct HttpStreamHandle : public UploadStreamHandle {
-  HttpStreamHandle(const CallbackTN* commit_callback);
+  explicit HttpStreamHandle(const CallbackTN* commit_callback);
 };
 
 class HttpUploader : public AbstractUploader {
@@ -25,10 +27,15 @@ class HttpUploader : public AbstractUploader {
     std::string api_path;
   };
 
-  explicit HttpUploader(const SpoolerDefinition& spooler_definition);
   static bool WillHandle(const SpoolerDefinition& spooler_definition);
 
+  explicit HttpUploader(const SpoolerDefinition& spooler_definition);
+
   virtual ~HttpUploader();
+
+  virtual bool Initialize();
+
+  virtual bool FinalizeSession();
 
   virtual std::string name() const;
 
@@ -61,7 +68,7 @@ class HttpUploader : public AbstractUploader {
   void BumpErrors() const;
 
   Config config_;
-
+  UniquePtr<SessionContext> session_context_;
   mutable atomic_int32 num_errors_;
 };
 

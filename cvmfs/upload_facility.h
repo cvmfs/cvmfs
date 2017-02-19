@@ -123,6 +123,12 @@ class AbstractUploader
   virtual bool Initialize();
 
   /**
+   * Called during Spooler::WaitForUpload(), to ensure that the upload has
+   * finished. By default it is a noop and returns true;
+   */
+  virtual bool FinalizeSession();
+
+  /**
    * This must be called right before the destruction of the AbstractUploader!
    * You are _not_ supposed to overwrite this method in your concrete Uploader.
    * Please do all your cleanup work in your destructor, but keep in mind that
