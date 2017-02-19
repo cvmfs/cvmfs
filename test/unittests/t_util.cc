@@ -1633,6 +1633,18 @@ TEST_F(T_Util, Debase64) {
   EXPECT_EQ(original, decoded);
 }
 
+
+TEST_F(T_Util, Tail) {
+  EXPECT_EQ("", Tail("", 0));
+  EXPECT_EQ("", Tail("", 1));
+  EXPECT_EQ("", Tail("abc", 0));
+  EXPECT_EQ("abc", Tail("abc", 1));
+  EXPECT_EQ("abc\n", Tail("abc\n", 1));
+  EXPECT_EQ("abc\n", Tail("abc\n", 2));
+  EXPECT_EQ("b\nc\n", Tail("a\nb\nc\n", 2));
+}
+
+
 TEST_F(T_Util, MemoryMappedFile) {
   string filepath = CreateFileWithContent("mappedfile.txt",
       "some dummy content\n");
