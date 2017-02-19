@@ -920,7 +920,7 @@ void WaitForSignal(int signum) {
 /**
  * Returns -1 of the child crashed or the exit code otherwise
  */
-int WaitForPid(pid_t pid) {
+int WaitForChild(pid_t pid) {
   assert(pid > 0);
   int statloc;
   while (true) {

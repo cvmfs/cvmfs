@@ -2,6 +2,7 @@
  * This file is part of the CernVM File System.
  */
 
+#include <poll.h>
 #include <pthread.h>
 #include <unistd.h>
 
@@ -53,11 +54,11 @@ struct RepositoryConfig : SingleCopy {
 struct Job : SingleCopy {
   Job() : fd_stdin(-1), fd_stdout(-1), fd_stderr(-1),
           status(kStatusLimbo), exit_code(-1),
-          birth(platform_monotonic_time()) { }
+          birth(platform_monotonic_time()), death(0), pid(0) { }
   enum Status {
     kStatusLimbo,
     kStatusRunning,
-    kStatusFinished
+    kStatusDone
   };
   int fd_stdin;
   int fd_stdout;
@@ -68,6 +69,8 @@ struct Job : SingleCopy {
   int exit_code;
   pthread_t thread_job;
   uint64_t birth;
+  uint64_t death;
+  pid_t pid;
 };
 
 map<string, RepositoryConfig *> g_repositories;
@@ -175,7 +178,8 @@ class UriHandlerReplicate : public UriHandler {
     argv.push_back("snapshot");
     argv.push_back(config_->alias);
     bool retval_b = ExecuteBinary(
-      &job->fd_stdin, &job->fd_stdout, &job->fd_stderr, exe, argv, true);
+      &job->fd_stdin, &job->fd_stdout, &job->fd_stderr,
+      exe, argv, false, &job->pid);
     if (!retval_b) {
       WebReply::Send(WebReply::k500,
                      MkJsonError("could not spawn snapshot process"), conn);
@@ -184,6 +188,10 @@ class UriHandlerReplicate : public UriHandler {
     int retval_i = pthread_create(&job->thread_job, NULL, MainJobMgr, job);
     if (retval_i == 0) {
       job->status = Job::kStatusRunning;
+    } else {
+      close(job->fd_stdin);
+      close(job->fd_stdout);
+      close(job->fd_stderr);
     }
     string uuid = cvmfs::Uuid::CreateOneTime();
     g_jobs[uuid] = job.Release();
@@ -196,10 +204,43 @@ class UriHandlerReplicate : public UriHandler {
 
   static void *MainJobMgr(void *data) {
     Job *job = reinterpret_cast<Job *>(data);
-    char c;
-    while (read(job->fd_stdout, &c, 1) == 1) {
-      job->stdout.push_back(c);
+    Block2Nonblock(job->fd_stdout);
+    Block2Nonblock(job->fd_stderr);
+    char buf_stdout[kPageSize];
+    char buf_stderr[kPageSize];
+    struct pollfd watch_fds[2];
+    watch_fds[0].fd = job->fd_stdout;
+    watch_fds[1].fd = job->fd_stderr;
+    watch_fds[0].events = watch_fds[1].events = POLLIN | POLLPRI | POLLHUP;
+    watch_fds[0].revents = watch_fds[1].revents = 0;
+    bool terminate = false;
+    while (!terminate) {
+      int retval = poll(watch_fds, 2, -1);
+      if (retval < 0)
+        continue;
+      if (watch_fds[0].revents) {
+        watch_fds[0].revents = 0;
+        int nbytes = read(watch_fds[0].fd, buf_stdout, kPageSize);
+        if ((nbytes <= 0) && (errno != EINTR))
+          terminate = true;
+        if (nbytes > 0)
+          job->stdout += string(buf_stdout, nbytes);
+      }
+      if (watch_fds[1].revents) {
+        watch_fds[1].revents = 0;
+        int nbytes = read(watch_fds[1].fd, buf_stderr, kPageSize);
+        if ((nbytes <= 0) && (errno != EINTR))
+          terminate = true;
+        if (nbytes > 0)
+          job->stderr += string(buf_stderr, nbytes);
+      }
     }
+    close(job->fd_stdin);
+    close(job->fd_stdout);
+    close(job->fd_stderr);
+    job->exit_code = WaitForChild(job->pid);
+    job->death = platform_monotonic_time();
+    job->status = Job::kStatusDone;
     return NULL;
   }
 
@@ -224,7 +265,27 @@ class UriHandlerJob : public UriHandler {
       return;
     }
     Job *job = iter->second;
-    WebReply::Send(WebReply::k200, job->stdout, conn);
+    if (what == "stdout") {
+      WebReply::Send(WebReply::k200, job->stdout, conn);
+    } else if (what == "stderr") {
+      WebReply::Send(WebReply::k200, job->stderr, conn);
+    } else if (what == "status") {
+      string reply = "{\"status\":";
+      switch (job->status) {
+        case Job::kStatusLimbo: reply += "\"limbo\""; break;
+        case Job::kStatusRunning: reply += "\"running\""; break;
+        case Job::kStatusDone: reply += "\"done\""; break;
+        default: assert(false);
+      }
+      if (job->status == Job::kStatusDone) {
+        reply += ",\"exit_code\":" + StringifyInt(job->exit_code);
+        reply += ",\"duration\":" + StringifyInt(job->death - job->birth);
+      }
+      reply += "}";
+      WebReply::Send(WebReply::k200, reply, conn);
+    } else {
+      WebReply::Send(WebReply::k404, "{\"error\":\"internal error\"}", conn);
+    }
   }
 };
 
@@ -256,6 +317,12 @@ int main(int argc, char **argv) {
     g_uri_map.Register(WebRequest(
       "/cvmfs/" + fqrn + "/api/v1/replicate/*/stdout", WebRequest::kGet),
       new UriHandlerJob());
+    g_uri_map.Register(WebRequest(
+      "/cvmfs/" + fqrn + "/api/v1/replicate/*/stderr", WebRequest::kGet),
+      new UriHandlerJob());
+    g_uri_map.Register(WebRequest(
+      "/cvmfs/" + fqrn + "/api/v1/replicate/*/status", WebRequest::kGet),
+      new UriHandlerJob());
     g_uri_map.Register(WebRequest("/cvmfs/" + fqrn + "/api/v1/replicate/new",
                                   WebRequest::kPost),
                        new UriHandlerReplicate(i->second));
@@ -273,6 +340,9 @@ int main(int argc, char **argv) {
 
   // Start the web server.
   ctx = mg_start(&callbacks, NULL, options);
+  // That's safe, our mongoose webserver doesn't spawn anything
+  // There is a race here, TODO: patch in mongoose source code
+  signal(SIGCHLD, SIG_DFL);
 
   // Wait until user hits "enter". Server is running in separate thread.
   // Navigating to http://localhost:8080 will invoke begin_request_handler().

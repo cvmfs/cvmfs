@@ -95,7 +95,7 @@ int SetLimitNoFile(unsigned limit_nofile);
 
 void BlockSignal(int signum);
 void WaitForSignal(int signum);
-int WaitForPid(pid_t pid);
+int WaitForChild(pid_t pid);
 void Daemonize();
 bool Shell(int *pipe_stdin, int *pipe_stdout, int *pipe_stderr);
 bool ExecuteBinary(int *fd_stdin,

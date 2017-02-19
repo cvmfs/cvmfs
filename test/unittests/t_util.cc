@@ -1326,9 +1326,9 @@ TEST_F(T_Util, WaitForSignal) {
 }
 
 
-TEST_F(T_Util, WaitForPid) {
-  ASSERT_DEATH(WaitForPid(0), ".*");
-  ASSERT_DEATH(WaitForPid(getpid()), ".*");
+TEST_F(T_Util, WaitForChild) {
+  ASSERT_DEATH(WaitForChild(0), ".*");
+  ASSERT_DEATH(WaitForChild(getpid()), ".*");
 
   pid_t pid = fork();
   switch (pid) {
@@ -1336,15 +1336,39 @@ TEST_F(T_Util, WaitForPid) {
     case 0: while (true) { }
     default:
       kill(pid, SIGTERM);
-      EXPECT_EQ(-1, WaitForPid(pid));
+      EXPECT_EQ(-1, WaitForChild(pid));
   }
 
   pid = fork();
   switch (pid) {
     case -1: ASSERT_TRUE(false);
-    case 0: exit(0);
+    case 0: _exit(0);
     default:
-      EXPECT_EQ(0, WaitForPid(pid));
+      EXPECT_EQ(0, WaitForChild(pid));
+  }
+
+  pid = fork();
+  switch (pid) {
+    case -1: ASSERT_TRUE(false);
+    case 0: _exit(1);
+    default:
+      EXPECT_EQ(1, WaitForChild(pid));
+  }
+
+  pid = fork();
+  switch (pid) {
+    case -1: ASSERT_TRUE(false);
+    case 0: {
+      int max_fd = sysconf(_SC_OPEN_MAX);
+      for (int fd = 0; fd < max_fd; fd++)
+        close(fd);
+      char *argv[1];
+      argv[0] = NULL;
+      execvp("/bin/true", argv);
+      exit(1);
+    }
+    default:
+      EXPECT_EQ(0, WaitForChild(pid));
   }
 }
 
