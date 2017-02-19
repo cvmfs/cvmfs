@@ -20,7 +20,7 @@ size_t RecvCB(void* buffer, size_t size, size_t nmemb, void* userp);
 CURL* PrepareCurl(const char* method);
 
 bool MakeAcquireRequest(const std::string& user_name,
-                        const std::string& lease_fqdn,
+                        const std::string& repo_path,
                         const std::string& repo_service_url,
                         CurlBuffer* buffer);
 

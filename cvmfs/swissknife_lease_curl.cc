@@ -35,7 +35,7 @@ CURL* PrepareCurl(const char* method) {
 }
 
 bool MakeAcquireRequest(const std::string& user_name,
-                        const std::string& lease_fqdn,
+                        const std::string& repo_path,
                         const std::string& repo_service_url,
                         CurlBuffer* buffer) {
   CURLcode ret = static_cast<CURLcode>(0);
@@ -48,7 +48,7 @@ bool MakeAcquireRequest(const std::string& user_name,
   // Make request to acquire lease from repo services
   curl_easy_setopt(h_curl, CURLOPT_URL,
                    (repo_service_url + REPO_SERVICES_API_ROOT +
-                    "/leases?user=" + user_name + "&path=" + lease_fqdn)
+                    "/leases?user=" + user_name + "&path=" + repo_path)
                        .c_str());
   curl_easy_setopt(h_curl, CURLOPT_POSTFIELDSIZE_LARGE,
                    static_cast<curl_off_t>(0));
