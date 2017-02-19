@@ -201,9 +201,10 @@ code_change(_OldVsn, State, _Extra) ->
 p_new_lease(User, Path) ->
     % Check if user is registered with the cvmfs_auth service and
     % which paths he is allowed to modify
+    [Fqdn | _]  = binary:split(Path, <<"/">>),
     case cvmfs_auth:get_user_permissions(User) of
         {ok, Paths} ->
-            case lists:member(Path, Paths) of
+            case lists:member(Fqdn, Paths) of
                 false ->
                     {error, invalid_path};
                 true ->
