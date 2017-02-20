@@ -59,7 +59,7 @@ get_user_permissions(User) ->
     gen_server:call(?MODULE, {auth_req, user_perms, User}).
 
 
--spec add_user(User :: binary(), Repos :: binary()) -> ok.
+-spec add_user(User :: binary(), Repos :: [binary()])-> ok.
 add_user(User, Repos) ->
     gen_server:call(?MODULE, {auth_req, add_user, {User, Repos}}).
 
