@@ -24,6 +24,59 @@ namespace upload {
 HttpStreamHandle::HttpStreamHandle(const CallbackTN* commit_callback)
     : UploadStreamHandle(commit_callback) {}
 
+bool HttpUploader::ParseSpoolerDefinition(
+    const SpoolerDefinition& spooler_definition, HttpUploader::Config* config) {
+  const std::string& config_string = spooler_definition.spooler_configuration;
+  if (!config) {
+    LogCvmfs(kLogUploadHttp, kLogStderr, "\"config\" argument is NULL");
+    return false;
+  }
+
+  if (spooler_definition.user_name == "") {
+    LogCvmfs(kLogUploadHttp, kLogStderr,
+             "Missing user_name parameter in spooler definition");
+    return false;
+  }
+  config->user_name = spooler_definition.user_name;
+  config->repository_subpath = spooler_definition.repository_subpath;
+
+  if (!HasPrefix(config_string, "http", false)) {
+    LogBadConfig(config_string);
+    return false;
+  }
+
+  const std::vector<std::string> tokens1 = SplitString(config_string, ':');
+  if (tokens1.size() != 3) {
+    LogBadConfig(config_string);
+    return false;
+  }
+
+  // Repo address, e.g. http://my.repo.address
+  config->repository_address = tokens1[0] + ":" + tokens1[1];
+
+  std::vector<std::string> tokens2 = SplitString(tokens1[2], '/');
+  if (tokens2.size() < 1) {
+    LogBadConfig(config_string);
+    return false;
+  }
+
+  uint64_t port;
+  if (!String2Uint64Parse(tokens2[0], &port)) {
+    LogBadConfig(config_string);
+  }
+  if (port > std::numeric_limits<uint16_t>::max()) {
+    LogCvmfs(kLogUploadHttp, kLogStderr,
+             "Invalid port number in spooler definition");
+    return false;
+  }
+  config->port = port;
+
+  tokens2.erase(tokens2.begin());
+  config->api_path = JoinStrings(tokens2, "/");
+
+  return true;
+}
+
 bool HttpUploader::WillHandle(const SpoolerDefinition& spooler_definition) {
   return spooler_definition.driver_type == SpoolerDefinition::HTTP;
 }
@@ -41,9 +94,12 @@ HttpUploader::HttpUploader(const SpoolerDefinition& spooler_definition)
 
   LogCvmfs(kLogUploadHttp, kLogStderr,
            "HTTP uploader configuration:\n"
+           "  User name: %s\n"
+           "  Repo subpath: %s\n"
            "  Repository address: %s\n"
            "  Port: %d\n"
            "  API path: %s\n",
+           config_.user_name.c_str(), config_.repository_subpath.c_str(),
            config_.repository_address.c_str(), config_.port,
            config_.api_path.c_str());
 }
@@ -81,51 +137,6 @@ bool HttpUploader::PlaceBootstrappingShortcut(
 
 unsigned int HttpUploader::GetNumberOfErrors() const {
   return atomic_read32(&num_errors_);
-}
-
-bool HttpUploader::ParseSpoolerDefinition(
-    const SpoolerDefinition& spooler_definition, HttpUploader::Config* config) {
-  const std::string& config_string = spooler_definition.spooler_configuration;
-  if (!config) {
-    LogCvmfs(kLogUploadHttp, kLogStderr, "\"config\" argument is NULL");
-    return false;
-  }
-
-  if (!HasPrefix(config_string, "http", false)) {
-    LogBadConfig(config_string);
-    return false;
-  }
-
-  const std::vector<std::string> tokens1 = SplitString(config_string, ':');
-  if (tokens1.size() != 3) {
-    LogBadConfig(config_string);
-    return false;
-  }
-
-  // Repo address, e.g. http://my.repo.address
-  config->repository_address = tokens1[0] + ":" + tokens1[1];
-
-  std::vector<std::string> tokens2 = SplitString(tokens1[2], '/');
-  if (tokens2.size() < 1) {
-    LogBadConfig(config_string);
-    return false;
-  }
-
-  uint64_t port;
-  if (!String2Uint64Parse(tokens2[0], &port)) {
-    LogBadConfig(config_string);
-  }
-  if (port > std::numeric_limits<uint16_t>::max()) {
-    LogCvmfs(kLogUploadHttp, kLogStderr,
-             "Invalid port number in spooler configuration");
-    return false;
-  }
-  config->port = port;
-
-  tokens2.erase(tokens2.begin());
-  config->api_path = JoinStrings(tokens2, "/");
-
-  return true;
 }
 
 void HttpUploader::FileUpload(const std::string& /*local_path*/,

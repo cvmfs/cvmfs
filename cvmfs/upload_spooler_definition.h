@@ -32,13 +32,15 @@ struct SpoolerDefinition {
    *                            preted by the constructor
    */
   explicit SpoolerDefinition(
-      const std::string &definition_string,
+      const std::string& definition_string,
       const shash::Algorithms hash_algorithm,
       const zlib::Algorithms compression_algorithm = zlib::kZlibDefault,
       const bool use_file_chunking = false,
       const size_t min_file_chunk_size = 0,
       const size_t avg_file_chunk_size = 0,
-      const size_t max_file_chunk_size = 0);
+      const size_t max_file_chunk_size = 0, const std::string& user_name = "",
+      const std::string& repository_subpath = "");
+
   bool IsValid() const { return valid_; }
 
   /**
@@ -50,10 +52,11 @@ struct SpoolerDefinition {
 
   DriverType driver_type;      //!< the type of the spooler driver
   std::string temporary_path;  //!< scratch space for the FileProcessor
-                               /**
-                                * A driver specific spooler configuration string (interpreted by the concrete
-                                * spooler)
-                                */
+
+  /**
+  * A driver specific spooler configuration string (interpreted by the concrete
+  * spooler)
+  */
   std::string spooler_configuration;
 
   shash::Algorithms hash_algorithm;
@@ -65,6 +68,11 @@ struct SpoolerDefinition {
 
   const unsigned int number_of_threads;
   unsigned int number_of_concurrent_uploads;
+
+  // The user_name and repository_subpath parameters are only used for the HTTP
+  // driver
+  std::string user_name;
+  std::string repository_subpath;
 
   bool valid_;
 };

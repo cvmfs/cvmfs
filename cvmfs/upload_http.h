@@ -21,11 +21,29 @@ struct HttpStreamHandle : public UploadStreamHandle {
 class HttpUploader : public AbstractUploader {
  public:
   struct Config {
-    Config() : repository_address(), port(0), api_path() {}
+    Config()
+        : user_name(),
+          repository_subpath(),
+          repository_address(),
+          api_path(),
+          port(0) {}
+    Config(const std::string& user_name, const std::string& repo_subpath,
+           const std::string& repository_address, const std::string& api_path,
+           const uint16_t port)
+        : user_name(user_name),
+          repository_subpath(repo_subpath),
+          repository_address(repository_address),
+          api_path(api_path),
+          port(port) {}
+    std::string user_name;
+    std::string repository_subpath;
     std::string repository_address;
-    uint16_t port;
     std::string api_path;
+    uint16_t port;
   };
+
+  static bool ParseSpoolerDefinition(
+      const SpoolerDefinition& spooler_definition, Config* config);
 
   static bool WillHandle(const SpoolerDefinition& spooler_definition);
 
@@ -49,9 +67,6 @@ class HttpUploader : public AbstractUploader {
   virtual bool PlaceBootstrappingShortcut(const shash::Any& object) const;
 
   virtual unsigned int GetNumberOfErrors() const;
-
-  static bool ParseSpoolerDefinition(
-      const SpoolerDefinition& spooler_definition, Config* config);
 
  protected:
   virtual void FileUpload(const std::string& local_path,
