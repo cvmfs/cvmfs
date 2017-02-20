@@ -83,7 +83,7 @@ cvmfs_server_transaction() {
     # If the upstream storage type is http (publication leases are managed by an instance of the CVMFS repo services,
     # the cvmfs_swissknife lease command needs to be used to acquire a new lease
     if [ x"$upstream_type" = xhttp ]; then
-        repo_services_url=$(echo $upstream_storage | cut -d',' -f3)
+        local repo_services_url=$(echo $upstream_storage | cut -d',' -f3)
         __swissknife lease -a acquire -u $repo_services_url -n $user -p $name"/"$subpath || { echo "Could not acquire a new lease for repository $name"; retcode=1; continue; }
     fi
     open_transaction $name $
