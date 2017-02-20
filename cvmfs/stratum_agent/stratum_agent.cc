@@ -29,6 +29,10 @@
 
 using namespace std;
 
+// Keep finished jobs for 3 hours
+const unsigned kJobRetentionDuration = 3 * 3600;
+const unsigned kCleanupInterval = 60;  // Scan job table every minute
+
 /**
  * Everything that's needed to verify requests for a single repository
  */
@@ -76,6 +80,10 @@ struct Job : SingleCopy {
 map<string, RepositoryConfig *> g_repositories;
 map<string, Job *> g_jobs;
 UriMap g_uri_map;
+/**
+ * Used to control the main thread from signals
+ */
+int g_pipe_ctrl[2];
 
 
 /**
@@ -269,6 +277,8 @@ class UriHandlerJob : public UriHandler {
       WebReply::Send(WebReply::k200, job->stdout, conn);
     } else if (what == "stderr") {
       WebReply::Send(WebReply::k200, job->stderr, conn);
+    } else if (what == "tail") {
+      WebReply::Send(WebReply::k200, Tail(job->stdout, 4), conn);
     } else if (what == "status") {
       string reply = "{\"status\":";
       switch (job->status) {
@@ -308,6 +318,22 @@ static int begin_request_handler(struct mg_connection *conn) {
 }
 
 
+void SignalCleanup(int signal) {
+  char c = 'C';
+  WritePipe(g_pipe_ctrl[1], &c, 1);
+}
+
+void SignalExit(int signal) {
+  char c = 'T';
+  WritePipe(g_pipe_ctrl[1], &c, 1);
+}
+
+void SignalReload(int signal) {
+  char c = 'R';
+  WritePipe(g_pipe_ctrl[1], &c, 1);
+}
+
+
 int main(int argc, char **argv) {
   ReadConfiguration();
   for (map<string, RepositoryConfig *>::const_iterator i =
@@ -319,6 +345,9 @@ int main(int argc, char **argv) {
       new UriHandlerJob());
     g_uri_map.Register(WebRequest(
       "/cvmfs/" + fqrn + "/api/v1/replicate/*/stderr", WebRequest::kGet),
+      new UriHandlerJob());
+    g_uri_map.Register(WebRequest(
+      "/cvmfs/" + fqrn + "/api/v1/replicate/*/tail", WebRequest::kGet),
       new UriHandlerJob());
     g_uri_map.Register(WebRequest(
       "/cvmfs/" + fqrn + "/api/v1/replicate/*/status", WebRequest::kGet),
@@ -344,10 +373,39 @@ int main(int argc, char **argv) {
   // There is a race here, TODO: patch in mongoose source code
   signal(SIGCHLD, SIG_DFL);
 
-  // Wait until user hits "enter". Server is running in separate thread.
-  // Navigating to http://localhost:8080 will invoke begin_request_handler().
-  while (true)
-    getchar();
+  MakePipe(g_pipe_ctrl);
+  signal(SIGHUP, SignalReload);
+  signal(SIGTERM, SignalExit);
+  signal(SIGINT, SignalExit);
+  signal(SIGALRM, SignalCleanup);
+  alarm(kCleanupInterval);
+  char ctrl;
+  do {
+    ReadPipe(g_pipe_ctrl[0], &ctrl, 1);
+    if (ctrl == 'C') {
+      // Cleanup job table
+      for (map<string, Job *>::iterator i = g_jobs.begin(),
+           i_end = g_jobs.end(); i != i_end; )
+      {
+        if ( (i->second->status == Job::kStatusDone) &&
+             ((platform_monotonic_time() - i->second->death) >
+               kJobRetentionDuration) )
+        {
+          map<string, Job *>::iterator delete_me = i++;
+          pthread_join(delete_me->second->thread_job, NULL);
+          delete delete_me->second;
+          g_jobs.erase(delete_me);
+        } else {
+          ++i;
+        }
+      }
+      alarm(kCleanupInterval);
+    }
+    if (ctrl == 'R') {
+      LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslog, "reloading configuration");
+    }
+  } while (ctrl != 'T');
+  LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslog, "stopping stratum agent");
 
   // Stop the server.
   mg_stop(ctx);
