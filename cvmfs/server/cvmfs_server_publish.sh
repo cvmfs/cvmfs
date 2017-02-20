@@ -1,6 +1,7 @@
 cvmfs_server_publish() {
   local names
   local user
+  local exact=0
   local spool_dir
   local stratum0
   local upstream
@@ -22,7 +23,7 @@ cvmfs_server_publish() {
 
   # optional parameter handling
   OPTIND=1
-  while getopts "F:NXZ:pa:c:m:vn:f" option
+  while getopts "F:NXZ:pa:c:m:vn:fe" option
   do
     case $option in
       p)
@@ -58,6 +59,9 @@ cvmfs_server_publish() {
       f)
         open_fd_dialog=0
       ;;
+      e)
+        exact=1
+      ;;
       ?)
         shift $(($OPTIND-2))
         usage "Command publish: Unrecognized option: $1"
@@ -69,11 +73,15 @@ cvmfs_server_publish() {
     usage "Command publish: -N and -X are mutually exclusive"
   fi
 
-  # get repository names
   shift $(($OPTIND-1))
   check_parameter_count_for_multiple_repositories $#
-  names=$(get_or_guess_multiple_repository_names "$@")
-  check_multiple_repository_existence "$names"
+  # get repository names
+  if [ $exact -eq 0]; then
+    names=$(get_or_guess_multiple_repository_names "$@")
+    check_multiple_repository_existence "$names"
+  else
+    names=$@
+  fi
 
   # sanity checks
   if [ ! -z "$tag_name" ]; then
@@ -82,6 +90,10 @@ cvmfs_server_publish() {
   fi
 
   for name in $names; do
+
+    # Check if the repo name contains a subpath for locking, e.g. repo.cern.ch/sub/path/for/locking
+    local subpath=$(echo $name | cut -d'/' -f2- -s)
+    name=$(echo $name | cut -d'/' -f1)
 
     # sanity checks
     is_stratum0 $name   || die "This is not a stratum 0 repository"
@@ -95,6 +107,7 @@ cvmfs_server_publish() {
     scratch_dir="${spool_dir}/scratch/current"
     stratum0=$CVMFS_STRATUM0
     upstream=$CVMFS_UPSTREAM_STORAGE
+    local upstream_type=$(get_upstream_type $upstream_storage)
     hash_algorithm="${CVMFS_HASH_ALGORITHM-sha1}"
     compression_alg="${CVMFS_COMPRESSION_ALGORITHM-default}"
     if [ x"$force_compression_algorithm" != "x" ]; then
@@ -154,22 +167,30 @@ cvmfs_server_publish() {
 
     local trusted_certs="/etc/cvmfs/repositories.d/${name}/trusted_certs"
     local sync_command="$(__swissknife_cmd dbg) sync \
-      -u /cvmfs/$name                                \
-      -s ${scratch_dir}                              \
-      -c ${spool_dir}/rdonly                         \
-      -t ${spool_dir}/tmp                            \
-      -b $base_hash                                  \
-      -r ${upstream}                                 \
-      -w $stratum0                                   \
-      -o $manifest                                   \
-      -e $hash_algorithm                             \
-      -Z $compression_alg                            \
-      -C $trusted_certs                              \
-      -N $name                                       \
-      -K $CVMFS_PUBLIC_KEY                           \
-      $(get_follow_http_redirects_flag)              \
-      $authz_file                                    \
-      $log_level $tweaks_option $external_option $verbosity"
+        -u /cvmfs/$name                                \
+        -s ${scratch_dir}                              \
+        -c ${spool_dir}/rdonly                         \
+        -t ${spool_dir}/tmp                            \
+        -b $base_hash                                  \
+        -r ${upstream}                                 \
+        -w $stratum0                                   \
+        -o $manifest                                   \
+        -e $hash_algorithm                             \
+        -Z $compression_alg                            \
+        -C $trusted_certs                              \
+        -N $name                                       \
+        -K $CVMFS_PUBLIC_KEY                           \
+        $(get_follow_http_redirects_flag)              \
+        $authz_file                                    \
+        $log_level $tweaks_option $external_option $verbosity"
+
+    # If the upstream type is HTTP, we need to pass additional parameters
+    # to the `cvmfs_swissknife sync` command: the username and the
+    # subpath of the active lease
+    if [ x"$upstream_type" = xhttp ]; then
+      local repo_services_url=$(echo $upstream_storage | cut -d',' -f3)
+      sync_command="$sync_command -U $user -P $name/$subpath"
+    fi
     if [ "x$CVMFS_UNION_FS_TYPE" != "x" ]; then
       sync_command="$sync_command -f $CVMFS_UNION_FS_TYPE"
     fi
