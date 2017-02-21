@@ -42,10 +42,10 @@ class HttpUploader : public AbstractUploader {
     uint16_t port;
   };
 
+  static bool WillHandle(const SpoolerDefinition& spooler_definition);
+
   static bool ParseSpoolerDefinition(
       const SpoolerDefinition& spooler_definition, Config* config);
-
-  static bool WillHandle(const SpoolerDefinition& spooler_definition);
 
   explicit HttpUploader(const SpoolerDefinition& spooler_definition);
 
@@ -56,9 +56,6 @@ class HttpUploader : public AbstractUploader {
   virtual bool FinalizeSession();
 
   virtual std::string name() const;
-
-  virtual UploadStreamHandle* InitStreamedUpload(
-      const CallbackTN* callback = NULL);
 
   virtual bool Remove(const std::string& file_to_delete);
 
@@ -72,6 +69,9 @@ class HttpUploader : public AbstractUploader {
   virtual void FileUpload(const std::string& local_path,
                           const std::string& remote_path,
                           const CallbackTN* callback = NULL);
+
+  virtual UploadStreamHandle* InitStreamedUpload(
+      const CallbackTN* callback = NULL);
 
   virtual void StreamedUpload(UploadStreamHandle* handle, CharBuffer* buffer,
                               const CallbackTN* callback);

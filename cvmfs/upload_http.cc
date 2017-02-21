@@ -24,6 +24,10 @@ namespace upload {
 HttpStreamHandle::HttpStreamHandle(const CallbackTN* commit_callback)
     : UploadStreamHandle(commit_callback) {}
 
+bool HttpUploader::WillHandle(const SpoolerDefinition& spooler_definition) {
+  return spooler_definition.driver_type == SpoolerDefinition::HTTP;
+}
+
 bool HttpUploader::ParseSpoolerDefinition(
     const SpoolerDefinition& spooler_definition, HttpUploader::Config* config) {
   const std::string& config_string = spooler_definition.spooler_configuration;
@@ -77,10 +81,6 @@ bool HttpUploader::ParseSpoolerDefinition(
   return true;
 }
 
-bool HttpUploader::WillHandle(const SpoolerDefinition& spooler_definition) {
-  return spooler_definition.driver_type == SpoolerDefinition::HTTP;
-}
-
 HttpUploader::HttpUploader(const SpoolerDefinition& spooler_definition)
     : AbstractUploader(spooler_definition), config_(), session_context_() {
   assert(spooler_definition.IsValid() &&
@@ -119,11 +119,6 @@ bool HttpUploader::FinalizeSession() {
 
 std::string HttpUploader::name() const { return "HTTP"; }
 
-UploadStreamHandle* HttpUploader::InitStreamedUpload(
-    const CallbackTN* /*callback*/) {
-  return reinterpret_cast<UploadStreamHandle*>(NULL);
-}
-
 bool HttpUploader::Remove(const std::string& /*file_to_delete*/) {
   return false;
 }
@@ -142,6 +137,11 @@ unsigned int HttpUploader::GetNumberOfErrors() const {
 void HttpUploader::FileUpload(const std::string& /*local_path*/,
                               const std::string& /*remote_path*/,
                               const CallbackTN* /*callback*/) {}
+
+UploadStreamHandle* HttpUploader::InitStreamedUpload(
+    const CallbackTN* /*callback*/) {
+  return reinterpret_cast<UploadStreamHandle*>(NULL);
+}
 
 void HttpUploader::StreamedUpload(UploadStreamHandle* /*handle*/,
                                   CharBuffer* /*buffer*/,
