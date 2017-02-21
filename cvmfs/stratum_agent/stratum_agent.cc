@@ -130,6 +130,7 @@ struct Job : SingleCopy {
 
 class UriHandlerReplicate;
 class UriHandlerJob;
+class UriHandlerInfo;
 
 /**
  * Handler for requests to start a new snapshot run.
@@ -139,6 +140,7 @@ UriHandlerReplicate *g_handler_replicate;
  * Handler to query jobs from the job table.
  */
 UriHandlerJob *g_handler_job;
+UriHandlerInfo *g_handler_info;
 /**
  * Routes URIs to handlers.
  */
@@ -424,6 +426,24 @@ class UriHandlerJob : public UriHandler {
 
 
 /**
+ * Handler to query service information at /cvmfs/<repo>/api/v1/replicate/info
+ */
+class UriHandlerInfo : public UriHandler {
+ public:
+  virtual ~UriHandlerInfo() { }
+
+  virtual void OnRequest(const struct mg_request_info *req_info,
+                         struct mg_connection *conn)
+  {
+    string version = StringifyInt(kVersionMajor) + "." +
+                     StringifyInt(kVersionMinor) + "." +
+                     StringifyInt(kVersionPatch);
+    WebReply::Send(WebReply::k200, "{\"version\":\"" + version + "\"}", conn);
+  }
+};
+
+
+/**
  * Create the REST API from configuration
  */
 static void GenerateUriMap() {
@@ -447,6 +467,9 @@ static void GenerateUriMap() {
     g_uri_map.Register(WebRequest("/cvmfs/" + fqrn + "/api/v1/replicate/new",
                                   WebRequest::kPost),
                        g_handler_replicate);
+    g_uri_map.Register(WebRequest(
+      "/cvmfs/" + fqrn + "/api/v1/replicate/info", WebRequest::kGet),
+      g_handler_info);
   }
 }
 
@@ -588,6 +611,7 @@ int main(int argc, char **argv) {
 
   g_handler_job = new UriHandlerJob();
   g_handler_replicate = new UriHandlerReplicate();
+  g_handler_info = new UriHandlerInfo();
   ReadConfigurations();
   GenerateUriMap();
 
@@ -654,6 +678,7 @@ int main(int argc, char **argv) {
   ClearConfigurations();
   delete g_handler_job;
   delete g_handler_replicate;
+  delete g_handler_info;
 
   SwitchCredentials(original_uid, original_gid, true);
   UnlockFile(fd_pid_file);
