@@ -414,7 +414,7 @@ class UriHandlerJob : public UriHandler {
         reply += ",\"exit_code\":" + StringifyInt(job->exit_code);
         reply += ",\"duration\":" + StringifyInt(job->death - job->birth);
         reply += ",\"finish_timestamp\":\"" +
-                  StringifyTime(job->finish_timestamp, true) + " UTC\"";
+                  StringifyTime(job->finish_timestamp, false) + " UTC\"";
       }
       reply += "}";
       WebReply::Send(WebReply::k200, reply, conn);
