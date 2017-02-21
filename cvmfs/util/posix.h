@@ -80,6 +80,7 @@ std::string CreateTempDir(const std::string &path_prefix);
 std::string GetCurrentWorkingDirectory();
 int TryLockFile(const std::string &path);
 int LockFile(const std::string &path);
+int WritePidFile(const std::string &path);
 void UnlockFile(const int filedes);
 bool RemoveTree(const std::string &path);
 std::vector<std::string> FindFiles(const std::string &dir,

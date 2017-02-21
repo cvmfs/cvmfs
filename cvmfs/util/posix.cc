@@ -596,6 +596,42 @@ int TryLockFile(const std::string &path) {
 
 
 /**
+ * Tries to write the process id in a /var/run/progname.pid like file.  Returns
+ * the same as TryLockFile.
+ *
+ * \return file descriptor, -1 on error, -2 if it would block
+ */
+int WritePidFile(const std::string &path) {
+  const int fd = open(path.c_str(), O_CREAT | O_RDWR, 0600);
+  if (fd < 0)
+    return -1;
+  if (flock(fd, LOCK_EX | LOCK_NB) != 0) {
+    close(fd);
+    if (errno != EWOULDBLOCK)
+      return -1;
+    return -2;
+  }
+
+  // Don't leak the file descriptor to exec'd children
+  int flags = fcntl(fd, F_GETFD);
+  assert(flags != -1);
+  flags |= FD_CLOEXEC;
+  flags = fcntl(fd, F_SETFD, flags);
+  assert(flags != -1);
+
+  char buf[64];
+  snprintf(buf, 64, "%ld\n", static_cast<long>(getpid()));
+  bool retval =
+    (ftruncate(fd, 0) == 0) && SafeWrite(fd, buf, strlen(buf));
+  if (!retval) {
+    UnlockFile(fd);
+    return -1;
+  }
+  return fd;
+}
+
+
+/**
  * Locks file path, blocks if file is already locked.  Creates path if required.
  *
  * \return file descriptor, -1 on error

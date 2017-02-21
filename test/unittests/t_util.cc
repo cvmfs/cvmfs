@@ -828,6 +828,28 @@ TEST_F(T_Util, TryLockFile) {
   close(fd);
 }
 
+
+TEST_F(T_Util, WritePidFile) {
+  string filename = sandbox + "/pid";
+  int fd;
+
+  EXPECT_EQ(-1, WritePidFile("/fakepath/fakefile.txt"));
+  fd = WritePidFile(filename);
+  EXPECT_GE(fd, 0);
+  EXPECT_EQ(-2, WritePidFile(filename));
+  UnlockFile(fd);
+  fd = WritePidFile(filename);
+  EXPECT_GE(fd, 0);
+  FILE *f = fopen(filename.c_str(), "r");
+  EXPECT_TRUE(f != NULL);
+  string pid_str;
+  EXPECT_TRUE(GetLineFile(f, &pid_str));
+  EXPECT_EQ(getpid(), String2Int64(pid_str));
+  fclose(f);
+  UnlockFile(fd);
+}
+
+
 TEST_F(T_Util, LockFile) {
   string filename = sandbox + "/lockfile.txt";
   int retval;
