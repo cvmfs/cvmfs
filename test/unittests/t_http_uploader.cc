@@ -12,7 +12,6 @@
 class T_HttpUploaderConfig : public ::testing::Test {
  protected:
   T_HttpUploaderConfig() : config() {}
-  virtual void SetUp() {}
 
   upload::HttpUploader::Config config;
 };
@@ -20,7 +19,6 @@ class T_HttpUploaderConfig : public ::testing::Test {
 class T_HttpUploader : public ::testing::Test {
  protected:
   T_HttpUploader() {}
-  virtual void SetUp() {}
 };
 
 TEST_F(T_HttpUploaderConfig, ParseSpoolerDefinitionBadArgs) {
