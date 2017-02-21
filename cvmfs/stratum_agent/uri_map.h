@@ -78,6 +78,7 @@ class UriMap {
   void Register(const WebRequest &request, UriHandler *handler);
   UriHandler *Route(const WebRequest &request);
   bool IsKnownUri(const std::string &uri);
+  void Clear();
 
  private:
   struct Match {

@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "download.h"
+#include "fence.h"
 #include "json.h"
 #include "letter.h"
 #include "logging.h"
@@ -24,6 +25,7 @@
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
+#include "util_concurrency.h"
 #include "uuid.h"
 #include "whitelist.h"
 
@@ -40,6 +42,8 @@ struct RepositoryConfig : SingleCopy {
   RepositoryConfig()
     : download_mgr(NULL), signature_mgr(NULL), options_mgr(NULL) { }
   ~RepositoryConfig() {
+    if (download_mgr) download_mgr->Fini();
+    if (signature_mgr) signature_mgr->Fini();
     delete download_mgr;
     delete signature_mgr;
     delete options_mgr;
@@ -77,9 +81,16 @@ struct Job : SingleCopy {
   pid_t pid;
 };
 
-map<string, RepositoryConfig *> g_repositories;
-map<string, Job *> g_jobs;
+class UriHandlerReplicate;
+class UriHandlerJob;
+
+UriHandlerReplicate *g_handler_replicate;
+UriHandlerJob *g_handler_job;
 UriMap g_uri_map;
+map<string, RepositoryConfig *> g_configurations;
+Fence g_fence_configurations;
+map<string, Job *> g_jobs;
+pthread_mutex_t g_lock_jobs = PTHREAD_MUTEX_INITIALIZER;
 /**
  * Used to control the main thread from signals
  */
@@ -89,7 +100,7 @@ int g_pipe_ctrl[2];
 /**
  * Parse /etc/cvmfs/repositories.d/<fqrn>/.conf and search for stratum 1s
  */
-static void ReadConfiguration() {
+static void ReadConfigurations() {
   vector<string> repo_config_dirs =
     FindDirectories("/etc/cvmfs/repositories.d");
   for (unsigned i = 0; i < repo_config_dirs.size(); ++i) {
@@ -132,11 +143,11 @@ static void ReadConfiguration() {
     config->download_mgr = download_mgr.Release();
     config->options_mgr = options_mgr.Release();
     config->statistics = statistics.Release();
-    g_repositories[name] = config;
+    g_configurations[config->fqrn] = config;
     LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslog,
              "watching %s (fqrn: %s)", name.c_str(), config->fqrn.c_str());
   }
-  if (g_repositories.empty()) {
+  if (g_configurations.empty()) {
     LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslogWarn,
              "Warning: no stratum 1 repositories found");
   }
@@ -148,10 +159,12 @@ static void ReadConfiguration() {
  */
 class UriHandlerReplicate : public UriHandler {
  public:
-  explicit UriHandlerReplicate(RepositoryConfig *config) : config_(config) { }
   virtual void OnRequest(const struct mg_request_info *req_info,
                          struct mg_connection *conn)
   {
+    vector<string> uri_tokens = SplitString(req_info->uri, '/');
+    // strip api/v1/replicate/new
+    string fqrn = uri_tokens[uri_tokens.size() - 5];
     char post_data[kMaxPostData];  post_data[0] = '\0';
     unsigned post_data_len = mg_read(conn, post_data, sizeof(post_data) - 1);
     post_data[post_data_len] = '\0';
@@ -159,19 +172,23 @@ class UriHandlerReplicate : public UriHandler {
     if (post_data_len && (post_data[post_data_len - 1] == '\n'))
       post_data[post_data_len - 1] = '\0';
 
+    FenceGuard guard_configurations(&g_fence_configurations);
+    RepositoryConfig *config = g_configurations[fqrn];
+    assert(fqrn == config->fqrn);
+
     // Verify letter
     string message;
     string cert;
-    letter::Letter letter(config_->fqrn, post_data, config_->signature_mgr);
+    letter::Letter letter(config->fqrn, post_data, config->signature_mgr);
     letter::Failures retval_lt = letter.Verify(kTimeoutLetter, &message, &cert);
     if (retval_lt != letter::kFailOk) {
       WebReply::Send(WebReply::k400, MkJsonError(letter::Code2Ascii(retval_lt)),
                      conn);
       return;
     }
-    whitelist::Whitelist whitelist(config_->fqrn, config_->download_mgr,
-                                   config_->signature_mgr);
-    whitelist::Failures retval_wl = whitelist.Load(config_->stratum0_url);
+    whitelist::Whitelist whitelist(config->fqrn, config->download_mgr,
+                                   config->signature_mgr);
+    whitelist::Failures retval_wl = whitelist.Load(config->stratum0_url);
     if (retval_wl == whitelist::kFailOk)
       retval_wl = whitelist.VerifyLoadedCertificate();
     if (retval_wl != whitelist::kFailOk) {
@@ -184,7 +201,7 @@ class UriHandlerReplicate : public UriHandler {
     string exe = "/usr/bin/cvmfs_server";
     vector<string> argv;
     argv.push_back("snapshot");
-    argv.push_back(config_->alias);
+    argv.push_back(config->alias);
     bool retval_b = ExecuteBinary(
       &job->fd_stdin, &job->fd_stdout, &job->fd_stderr,
       exe, argv, false, &job->pid);
@@ -194,15 +211,15 @@ class UriHandlerReplicate : public UriHandler {
       return;
     }
     int retval_i = pthread_create(&job->thread_job, NULL, MainJobMgr, job);
-    if (retval_i == 0) {
-      job->status = Job::kStatusRunning;
-    } else {
-      close(job->fd_stdin);
-      close(job->fd_stdout);
-      close(job->fd_stderr);
-    }
+    assert(retval_i == 0);
+    retval_i = pthread_detach(job->thread_job);
+    assert(retval_i == 0);
+    job->status = Job::kStatusRunning;
     string uuid = cvmfs::Uuid::CreateOneTime();
-    g_jobs[uuid] = job.Release();
+    {
+      MutexLockGuard guard_jobs(&g_lock_jobs);
+      g_jobs[uuid] = job.Release();
+    }
     WebReply::Send(WebReply::k200, "{\"job_id\":\"" + uuid + "\"}", conn);
   }
 
@@ -243,9 +260,9 @@ class UriHandlerReplicate : public UriHandler {
           job->stderr += string(buf_stderr, nbytes);
       }
     }
-    close(job->fd_stdin);
-    close(job->fd_stdout);
-    close(job->fd_stderr);
+    close(job->fd_stdin);  job->fd_stdin = -1;
+    close(job->fd_stdout);  job->fd_stdout = -1;
+    close(job->fd_stderr);  job->fd_stderr = -1;
     job->exit_code = WaitForChild(job->pid);
     job->death = platform_monotonic_time();
     job->status = Job::kStatusDone;
@@ -255,8 +272,6 @@ class UriHandlerReplicate : public UriHandler {
   string MkJsonError(const string &msg) {
     return "{\"error\": \"" + msg + "\"}";
   }
-
-  RepositoryConfig *config_;
 };
 
 
@@ -267,6 +282,8 @@ class UriHandlerJob : public UriHandler {
   {
     string what = GetFileName(req_info->uri);
     string job_id = GetFileName(GetParentPath(req_info->uri));
+
+    MutexLockGuard guard_jobs(&g_lock_jobs);
     map<string, Job *>::const_iterator iter = g_jobs.find(job_id);
     if (iter == g_jobs.end()) {
       WebReply::Send(WebReply::k404, "{\"error\":\"no such job\"}", conn);
@@ -298,6 +315,42 @@ class UriHandlerJob : public UriHandler {
     }
   }
 };
+
+
+static void GenerateUriMap() {
+  for (map<string, RepositoryConfig *>::const_iterator i =
+       g_configurations.begin(), i_end = g_configurations.end();
+       i != i_end; ++i)
+  {
+    string fqrn = i->second->fqrn;
+    g_uri_map.Register(WebRequest(
+      "/cvmfs/" + fqrn + "/api/v1/replicate/*/stdout", WebRequest::kGet),
+      g_handler_job);
+    g_uri_map.Register(WebRequest(
+      "/cvmfs/" + fqrn + "/api/v1/replicate/*/stderr", WebRequest::kGet),
+      g_handler_job);
+    g_uri_map.Register(WebRequest(
+      "/cvmfs/" + fqrn + "/api/v1/replicate/*/tail", WebRequest::kGet),
+      g_handler_job);
+    g_uri_map.Register(WebRequest(
+      "/cvmfs/" + fqrn + "/api/v1/replicate/*/status", WebRequest::kGet),
+      g_handler_job);
+    g_uri_map.Register(WebRequest("/cvmfs/" + fqrn + "/api/v1/replicate/new",
+                                  WebRequest::kPost),
+                       g_handler_replicate);
+  }
+}
+
+
+static void ClearConfigurations() {
+  for (map<string, RepositoryConfig *>::const_iterator i =
+       g_configurations.begin(), i_end = g_configurations.end();
+       i != i_end; ++i)
+  {
+    delete i->second;
+  }
+  g_configurations.clear();
+}
 
 
 // This function will be called by mongoose on every new request.
@@ -335,27 +388,10 @@ void SignalReload(int signal) {
 
 
 int main(int argc, char **argv) {
-  ReadConfiguration();
-  for (map<string, RepositoryConfig *>::const_iterator i =
-       g_repositories.begin(), i_end = g_repositories.end(); i != i_end; ++i)
-  {
-    string fqrn = i->second->fqrn;
-    g_uri_map.Register(WebRequest(
-      "/cvmfs/" + fqrn + "/api/v1/replicate/*/stdout", WebRequest::kGet),
-      new UriHandlerJob());
-    g_uri_map.Register(WebRequest(
-      "/cvmfs/" + fqrn + "/api/v1/replicate/*/stderr", WebRequest::kGet),
-      new UriHandlerJob());
-    g_uri_map.Register(WebRequest(
-      "/cvmfs/" + fqrn + "/api/v1/replicate/*/tail", WebRequest::kGet),
-      new UriHandlerJob());
-    g_uri_map.Register(WebRequest(
-      "/cvmfs/" + fqrn + "/api/v1/replicate/*/status", WebRequest::kGet),
-      new UriHandlerJob());
-    g_uri_map.Register(WebRequest("/cvmfs/" + fqrn + "/api/v1/replicate/new",
-                                  WebRequest::kPost),
-                       new UriHandlerReplicate(i->second));
-  }
+  g_handler_job = new UriHandlerJob();
+  g_handler_replicate = new UriHandlerReplicate();
+  ReadConfigurations();
+  GenerateUriMap();
 
   struct mg_context *ctx;
   struct mg_callbacks callbacks;
@@ -383,6 +419,7 @@ int main(int argc, char **argv) {
   do {
     ReadPipe(g_pipe_ctrl[0], &ctrl, 1);
     if (ctrl == 'C') {
+      MutexLockGuard guard_jobs(&g_lock_jobs);
       // Cleanup job table
       for (map<string, Job *>::iterator i = g_jobs.begin(),
            i_end = g_jobs.end(); i != i_end; )
@@ -392,7 +429,6 @@ int main(int argc, char **argv) {
                kJobRetentionDuration) )
         {
           map<string, Job *>::iterator delete_me = i++;
-          pthread_join(delete_me->second->thread_job, NULL);
           delete delete_me->second;
           g_jobs.erase(delete_me);
         } else {
@@ -403,12 +439,20 @@ int main(int argc, char **argv) {
     }
     if (ctrl == 'R') {
       LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslog, "reloading configuration");
+      g_fence_configurations.Drain();
+      ClearConfigurations();
+      ReadConfigurations();
+      GenerateUriMap();
+      g_fence_configurations.Open();
     }
   } while (ctrl != 'T');
   LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslog, "stopping stratum agent");
 
   // Stop the server.
   mg_stop(ctx);
+  ClearConfigurations();
+  delete g_handler_job;
+  delete g_handler_replicate;
 
   return 0;
 }

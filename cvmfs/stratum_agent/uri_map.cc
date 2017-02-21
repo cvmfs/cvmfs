@@ -50,6 +50,10 @@ void WebReply::Send(Code code, const string &msg, struct mg_connection *conn) {
 //------------------------------------------------------------------------------
 
 
+void UriMap::Clear() {
+  rules_.clear();
+}
+
 void UriMap::Register(const WebRequest &request, UriHandler *handler) {
   Pathspec path_spec(request.uri());
   assert(path_spec.IsValid() && path_spec.IsAbsolute());

@@ -317,6 +317,7 @@ set (CVMFS_STRATUM_AGENT_SOURCES
   util/algorithm.cc
   util/posix.cc
   util/string.cc
+  util_concurrency.cc
   uuid.cc
   whitelist.cc
 )
