@@ -176,6 +176,11 @@ static void ReadConfigurations() {
       continue;
     }
     options_mgr->ParsePath(repo_config_dirs[i] + "/replica.conf", false);
+    if (options_mgr->GetValue("CVMFS_STRATUM_AGENT", &optarg) &&
+        !options_mgr->IsOn(optarg))
+    {
+      continue;
+    }
 
     UniquePtr<signature::SignatureManager>
       signature_mgr(new signature::SignatureManager());
