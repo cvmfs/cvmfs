@@ -1,13 +1,31 @@
 /**
  * This file is part of the CernVM File System.
+ *
+ * The stratum agent runs on stratum 1 servers and provides a web service to
+ * release manager machines.  Release manager machines can send signed messages
+ * to the stratum agent to trigger a replication run ('cvmfs_server snapshot').
+ *
+ * The service offers the following API
+ *   - /cvmfs/<repo name>/api/v1/replicate/new (POST):
+ *     create new snapshot run.  Returns JSON with the job id
+ *   - /cvmfs/<repo name>/api/v1/replicate/<job id>/
+ *       {status,stdout,stderr,tail} (GET):
+ *     Retrieve information about running and finished jobs.  The status is
+ *     JSON encoded.  Finished jobs are cleaned up after a while.
+ *
+ * TODO(jblomer): add support for synchronized application of a new revision.
+ * In this case, the snapshot would run but the new manifest would only be
+ * applied on another signal.
  */
 
 #include <poll.h>
 #include <pthread.h>
 #include <unistd.h>
 
+#include <cassert>
 #include <cstdio>
 #include <cstring>
+#include <ctime>
 #include <map>
 #include <string>
 #include <vector>
@@ -31,9 +49,19 @@
 
 using namespace std;
 
+// Upon successful testing, it might adopt the mainline cvmfs version
+const unsigned kVersionMajor = 1;
+const unsigned kVersionMinor = 0;
+const unsigned kVersionPatch = 0;
+
+const char *kDefaultPidFile = "/var/run/cvmfs_stratum_agent.pid";
+// Mongoose takes the port as string in its options array
+const char *kDefaultPort = "7999";
+const char *kDefaultNumThreads = "2";
 // Keep finished jobs for 3 hours
 const unsigned kJobRetentionDuration = 3 * 3600;
 const unsigned kCleanupInterval = 60;  // Scan job table every minute
+
 
 /**
  * Everything that's needed to verify requests for a single repository
@@ -49,7 +77,7 @@ struct RepositoryConfig : SingleCopy {
     delete options_mgr;
     delete statistics;
   }
-  string alias;
+  string alias;  // stratum 1s can have an alias different from the fqrn
   string fqrn;
   string stratum0_url;
   download::DownloadManager *download_mgr;
@@ -59,15 +87,28 @@ struct RepositoryConfig : SingleCopy {
 };
 
 
+/**
+ * Catures a run of 'cvmfs_server snapshot <reponame>'
+ */
 struct Job : SingleCopy {
   Job() : fd_stdin(-1), fd_stdout(-1), fd_stderr(-1),
           status(kStatusLimbo), exit_code(-1),
-          birth(platform_monotonic_time()), death(0), pid(0) { }
+          birth(platform_monotonic_time()), death(0), finish_timestamp(0),
+          pid(0)
+  {
+    int retval = pthread_mutex_init(&lock, NULL);
+    assert(retval == 0);
+  }
+  ~Job() {
+    pthread_mutex_destroy(&lock);
+  }
   enum Status {
     kStatusLimbo,
     kStatusRunning,
     kStatusDone
   };
+  string id;
+  string alias;  // Usually the fqrn
   int fd_stdin;
   int fd_stdout;
   int fd_stderr;
@@ -78,21 +119,41 @@ struct Job : SingleCopy {
   pthread_t thread_job;
   uint64_t birth;
   uint64_t death;
+  time_t finish_timestamp;
   pid_t pid;
+  pthread_mutex_t lock;
 };
 
 class UriHandlerReplicate;
 class UriHandlerJob;
 
+/**
+ * Handler for requests to start a new snapshot run.
+ */
 UriHandlerReplicate *g_handler_replicate;
+/**
+ * Handler to query jobs from the job table.
+ */
 UriHandlerJob *g_handler_job;
+/**
+ * Routes URIs to handlers.
+ */
 UriMap g_uri_map;
+/**
+ * Maps fqrn to manager classes constructed from the configuration in /etc.
+ */
 map<string, RepositoryConfig *> g_configurations;
+/**
+ * Prevents handlers to run while the configuration is updated
+ */
 Fence g_fence_configurations;
+/**
+ * Table of jobs, maps the job id to job information.
+ */
 map<string, Job *> g_jobs;
 pthread_mutex_t g_lock_jobs = PTHREAD_MUTEX_INITIALIZER;
 /**
- * Used to control the main thread from signals
+ * Used to control the main thread from signals.
  */
 int g_pipe_ctrl[2];
 
@@ -144,8 +205,8 @@ static void ReadConfigurations() {
     config->options_mgr = options_mgr.Release();
     config->statistics = statistics.Release();
     g_configurations[config->fqrn] = config;
-    LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslog,
-             "watching %s (fqrn: %s)", name.c_str(), config->fqrn.c_str());
+    LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslog, "watching %s",
+             config->fqrn.c_str());
   }
   if (g_configurations.empty()) {
     LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslogWarn,
@@ -155,10 +216,12 @@ static void ReadConfigurations() {
 
 
 /**
- * New replication job
+ * New replication job.  Responds on /cvmfs/<repo>/api/v1/replicate/new
  */
 class UriHandlerReplicate : public UriHandler {
  public:
+  virtual ~UriHandlerReplicate() { }
+
   virtual void OnRequest(const struct mg_request_info *req_info,
                          struct mg_connection *conn)
   {
@@ -210,12 +273,15 @@ class UriHandlerReplicate : public UriHandler {
                      MkJsonError("could not spawn snapshot process"), conn);
       return;
     }
+    job->status = Job::kStatusRunning;
+    string uuid = cvmfs::Uuid::CreateOneTime();
+    job->id = uuid;
+    job->alias = config->alias;
+
     int retval_i = pthread_create(&job->thread_job, NULL, MainJobMgr, job);
     assert(retval_i == 0);
     retval_i = pthread_detach(job->thread_job);
     assert(retval_i == 0);
-    job->status = Job::kStatusRunning;
-    string uuid = cvmfs::Uuid::CreateOneTime();
     {
       MutexLockGuard guard_jobs(&g_lock_jobs);
       g_jobs[uuid] = job.Release();
@@ -227,8 +293,14 @@ class UriHandlerReplicate : public UriHandler {
   static const unsigned kMaxPostData = 32 * 1024;  // 32kB
   static const unsigned kTimeoutLetter = 180;  // 3 minutes
 
+  // Polls stdout/stderr of running jobs
   static void *MainJobMgr(void *data) {
     Job *job = reinterpret_cast<Job *>(data);
+    string job_id = job->id;
+    string alias = job->alias;
+
+    LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslog,
+             "(%s) starting replication job %s", alias.c_str(), job_id.c_str());
     Block2Nonblock(job->fd_stdout);
     Block2Nonblock(job->fd_stderr);
     char buf_stdout[kPageSize];
@@ -248,24 +320,36 @@ class UriHandlerReplicate : public UriHandler {
         int nbytes = read(watch_fds[0].fd, buf_stdout, kPageSize);
         if ((nbytes <= 0) && (errno != EINTR))
           terminate = true;
-        if (nbytes > 0)
+        if (nbytes > 0) {
+          MutexLockGuard guard_job(&job->lock);
           job->stdout += string(buf_stdout, nbytes);
+        }
       }
       if (watch_fds[1].revents) {
         watch_fds[1].revents = 0;
         int nbytes = read(watch_fds[1].fd, buf_stderr, kPageSize);
         if ((nbytes <= 0) && (errno != EINTR))
           terminate = true;
-        if (nbytes > 0)
+        if (nbytes > 0) {
+          MutexLockGuard guard_job(&job->lock);
           job->stderr += string(buf_stderr, nbytes);
+        }
       }
     }
-    close(job->fd_stdin);  job->fd_stdin = -1;
-    close(job->fd_stdout);  job->fd_stdout = -1;
-    close(job->fd_stderr);  job->fd_stderr = -1;
-    job->exit_code = WaitForChild(job->pid);
-    job->death = platform_monotonic_time();
-    job->status = Job::kStatusDone;
+
+    {
+      MutexLockGuard guard_job(&job->lock);
+      close(job->fd_stdin);  job->fd_stdin = -1;
+      close(job->fd_stdout);  job->fd_stdout = -1;
+      close(job->fd_stderr);  job->fd_stderr = -1;
+      job->exit_code = WaitForChild(job->pid);
+      job->death = platform_monotonic_time();
+      job->finish_timestamp = time(NULL);
+      job->status = Job::kStatusDone;
+      job_id = job->id;
+    }
+    LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslog,
+             "(%s) finished replication job %s", alias.c_str(), job_id.c_str());
     return NULL;
   }
 
@@ -275,8 +359,14 @@ class UriHandlerReplicate : public UriHandler {
 };
 
 
+/**
+ * Handler to query job information under
+ * /cvmfs/<repo>/api/v1/replicate/<jobid>/{stdout,stderr,tail,status}
+ */
 class UriHandlerJob : public UriHandler {
  public:
+  virtual ~UriHandlerJob() { }
+
   virtual void OnRequest(const struct mg_request_info *req_info,
                          struct mg_connection *conn)
   {
@@ -290,6 +380,7 @@ class UriHandlerJob : public UriHandler {
       return;
     }
     Job *job = iter->second;
+    MutexLockGuard guard_this_job(&job->lock);
     if (what == "stdout") {
       WebReply::Send(WebReply::k200, job->stdout, conn);
     } else if (what == "stderr") {
@@ -317,6 +408,9 @@ class UriHandlerJob : public UriHandler {
 };
 
 
+/**
+ * Create the REST API from configuration
+ */
 static void GenerateUriMap() {
   for (map<string, RepositoryConfig *>::const_iterator i =
        g_configurations.begin(), i_end = g_configurations.end();
@@ -353,8 +447,10 @@ static void ClearConfigurations() {
 }
 
 
-// This function will be called by mongoose on every new request.
-static int begin_request_handler(struct mg_connection *conn) {
+/**
+ * Embedded web server's request callbacks
+ */
+static int MongooseOnRequest(struct mg_connection *conn) {
   const struct mg_request_info *request_info = mg_get_request_info(conn);
   WebRequest request(request_info);
   UriHandler *handler = g_uri_map.Route(request);
@@ -371,6 +467,7 @@ static int begin_request_handler(struct mg_connection *conn) {
 }
 
 
+// Signals write to a pipe on which the main thread is listening
 void SignalCleanup(int signal) {
   char c = 'C';
   WritePipe(g_pipe_ctrl[1], &c, 1);
@@ -387,24 +484,63 @@ void SignalReload(int signal) {
 }
 
 
+
+void Usage(const char *progname) {
+  LogCvmfs(kLogCvmfs, kLogStdout, "%s version %u.%u.%u\n"
+           "Provides a REST service to release manager machines to let them "
+           "trigger repository replication\n"
+           "\n"
+           "Usage: %s [-f(oreground)] [-p port (default: %s)]\n"
+           "          [-P pid file (default: %s)]",
+           progname, kVersionMajor, kVersionMinor, kVersionPatch,
+           progname, kDefaultPort, kDefaultPidFile);
+}
+
+
 int main(int argc, char **argv) {
+  const char *port = kDefaultPort;
+  const char *pid_file = kDefaultPidFile;
+  bool foreground = false;
+
+  int c;
+  while ((c = getopt(argc, argv, "hvfp:P:")) != -1) {
+    switch (c) {
+      case 'f':
+        foreground = true;
+        break;
+      case 'p':
+        port = optarg;
+        break;
+      case 'P':
+        pid_file = optarg;
+      case 'v':
+        break;
+      case 'h':
+        Usage(argv[0]);
+        return 0;
+      default:
+        Usage(argv[0]);
+        return 1;
+    }
+  }
+
   g_handler_job = new UriHandlerJob();
   g_handler_replicate = new UriHandlerReplicate();
   ReadConfigurations();
   GenerateUriMap();
 
+  // Start the embedded web server
   struct mg_context *ctx;
   struct mg_callbacks callbacks;
-
-  // List of options. Last element must be NULL.
-  const char *options[] = {"num_threads", "2", "listening_ports", "8080", NULL};
-
-  // Prepare callbacks structure. We have only one callback, the rest are NULL.
   memset(&callbacks, 0, sizeof(callbacks));
-  callbacks.begin_request = begin_request_handler;
+  callbacks.begin_request = MongooseOnRequest;
 
-  // Start the web server.
-  ctx = mg_start(&callbacks, NULL, options);
+  // List of Mongoose options. Last element must be NULL.
+  const char *mg_options[] =
+    {"num_threads", kDefaultNumThreads, "listening_ports", port, NULL};
+  LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslog,
+           "starting CernVM-FS stratum agent on port %s", port);
+  ctx = mg_start(&callbacks, NULL, mg_options);
   // That's safe, our mongoose webserver doesn't spawn anything
   // There is a race here, TODO: patch in mongoose source code
   signal(SIGCHLD, SIG_DFL);
@@ -446,9 +582,9 @@ int main(int argc, char **argv) {
       g_fence_configurations.Open();
     }
   } while (ctrl != 'T');
-  LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslog, "stopping stratum agent");
+  LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslog,
+           "stopping CernVM-FS stratum agent");
 
-  // Stop the server.
   mg_stop(ctx);
   ClearConfigurations();
   delete g_handler_job;
