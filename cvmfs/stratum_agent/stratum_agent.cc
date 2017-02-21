@@ -515,7 +515,7 @@ void Usage(const char *progname) {
            "trigger repository replication\n"
            "\n"
            "Usage: %s [-f(oreground)] [-p port (default: %s)]\n"
-           "          [-P pid file (default: %s)] [-u uid:gid]",
+           "          [-P pid file (default: %s)] [-u username]",
            progname, kVersionMajor, kVersionMinor, kVersionPatch,
            progname, kDefaultPort, kDefaultPidFile);
 }
@@ -543,13 +543,12 @@ int main(int argc, char **argv) {
         break;
       case 'u': {
         persona = optarg;
-        vector<string> tokens = SplitString(persona, ':');
-        if (tokens.size() != 2) {
-          Usage(argv[0]);
+        bool retval = GetUidOf(persona, &drop_to_uid, &drop_to_gid);
+        if (!retval) {
+          LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+                   "cannot find user %s", persona.c_str());
           return 1;
         }
-        drop_to_uid = String2Uint64(tokens[0]);
-        drop_to_gid = String2Uint64(tokens[1]);
         break;
       }
       case 'v':
@@ -565,22 +564,26 @@ int main(int argc, char **argv) {
 
   if (!foreground)
     Daemonize();
-  string pid_str = StringifyInt(getpid());
-  bool retval = SafeWriteToFile(pid_str, pid_file, 0600);
-  if (!retval) {
+  int fd_pid_file = WritePidFile(pid_file);
+  if (fd_pid_file < 0) {
+    string reason;
+    if (fd_pid_file == -2)
+      reason = " (another daemon is already running)";
     LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslogErr,
-             "failed to write pid file %s", pid_file);
+             "failed to write pid file %s%s", pid_file, reason.c_str());
     return 1;
   }
   if (!persona.empty()) {
     original_uid = geteuid();
     original_gid = getegid();
-    retval = SwitchCredentials(drop_to_uid, drop_to_gid, true);
+    bool retval = SwitchCredentials(drop_to_uid, drop_to_gid, true);
     if (!retval) {
       LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslogErr,
                "failed to drop credentials to %u:%u", drop_to_uid, drop_to_gid);
       return 1;
     }
+    LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslog,
+             "using credentials %u:%u", drop_to_uid, drop_to_gid);
   }
 
   g_handler_job = new UriHandlerJob();
@@ -653,6 +656,7 @@ int main(int argc, char **argv) {
   delete g_handler_replicate;
 
   SwitchCredentials(original_uid, original_gid, true);
+  UnlockFile(fd_pid_file);
   unlink(pid_file);
 
   return 0;
