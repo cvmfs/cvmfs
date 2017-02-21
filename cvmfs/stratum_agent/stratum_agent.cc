@@ -18,6 +18,7 @@
  * applied on another signal.
  */
 
+#include <arpa/inet.h>
 #include <poll.h>
 #include <pthread.h>
 #include <unistd.h>
@@ -91,7 +92,7 @@ struct RepositoryConfig : SingleCopy {
  * Catures a run of 'cvmfs_server snapshot <reponame>'
  */
 struct Job : SingleCopy {
-  Job() : fd_stdin(-1), fd_stdout(-1), fd_stderr(-1),
+  Job() : remote_ip(0), fd_stdin(-1), fd_stdout(-1), fd_stderr(-1),
           status(kStatusLimbo), exit_code(-1),
           birth(platform_monotonic_time()), death(0), finish_timestamp(0),
           pid(0)
@@ -107,8 +108,11 @@ struct Job : SingleCopy {
     kStatusRunning,
     kStatusDone
   };
+
   string id;
   string alias;  // Usually the fqrn
+  long remote_ip;
+
   int fd_stdin;
   int fd_stdout;
   int fd_stderr;
@@ -282,6 +286,7 @@ class UriHandlerReplicate : public UriHandler {
     string uuid = cvmfs::Uuid::CreateOneTime();
     job->id = uuid;
     job->alias = config->alias;
+    job->remote_ip = req_info->remote_ip;
 
     int retval_i = pthread_create(&job->thread_job, NULL, MainJobMgr, job);
     assert(retval_i == 0);
@@ -303,9 +308,12 @@ class UriHandlerReplicate : public UriHandler {
     Job *job = reinterpret_cast<Job *>(data);
     string job_id = job->id;
     string alias = job->alias;
+    char ipv4_buf[INET_ADDRSTRLEN];
 
     LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslog,
-             "(%s) starting replication job %s", alias.c_str(), job_id.c_str());
+             "(%s) starting replication job %s from %s",
+             alias.c_str(), job_id.c_str(),
+             inet_ntop(AF_INET, &job->remote_ip, ipv4_buf, INET_ADDRSTRLEN));
     Block2Nonblock(job->fd_stdout);
     Block2Nonblock(job->fd_stderr);
     char buf_stdout[kPageSize];
@@ -472,6 +480,15 @@ static int MongooseOnRequest(struct mg_connection *conn) {
 }
 
 
+/**
+ * Redirect Mongoose's logging to LogCvmfs
+ */
+static int MongooseOnLog(const struct mg_connection *, const char *message) {
+  LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslog, "(web server) %s", message);
+  return 1;
+}
+
+
 // Signals write to a pipe on which the main thread is listening
 void SignalCleanup(int signal) {
   char c = 'C';
@@ -539,6 +556,7 @@ int main(int argc, char **argv) {
   struct mg_callbacks callbacks;
   memset(&callbacks, 0, sizeof(callbacks));
   callbacks.begin_request = MongooseOnRequest;
+  callbacks.log_message = MongooseOnLog;
 
   // List of Mongoose options. Last element must be NULL.
   const char *mg_options[] =
@@ -546,8 +564,13 @@ int main(int argc, char **argv) {
   LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslog,
            "starting CernVM-FS stratum agent on port %s", port);
   ctx = mg_start(&callbacks, NULL, mg_options);
+  if (ctx == NULL) {
+    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+             "failed to start web server");
+    return 1;
+  }
   // That's safe, our mongoose webserver doesn't spawn anything
-  // There is a race here, TODO: patch in mongoose source code
+  // There is a race here, TODO(jblomer): patch in mongoose source code
   signal(SIGCHLD, SIG_DFL);
 
   MakePipe(g_pipe_ctrl);
