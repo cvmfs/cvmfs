@@ -18,7 +18,6 @@
 #include "util/single_copy.h"
 #include "util_concurrency.h"
 
-
 /**
  * Multiple content-addressable objects in a single BLOB.  A (serialized)
  * ObjectPack has a header, an index containing all the objects and their
@@ -34,7 +33,6 @@
  * replication.
  */
 class ObjectPack : SingleCopy {
-  friend class ObjectPackProducer;
   FRIEND_TEST(T_Pack, Bucket);
   FRIEND_TEST(T_Pack, ObjectPack);
   FRIEND_TEST(T_Pack, ObjectPackTransfer);
@@ -43,9 +41,10 @@ class ObjectPack : SingleCopy {
   struct Bucket;
 
  public:
-  typedef Bucket * BucketHandle;
+  typedef Bucket *BucketHandle;
 
-  static const uint64_t kDefaultLimit = 200*1024*1024;  // 200MB
+  static const uint64_t kDefaultLimit = 200 * 1024 * 1024;  // 200MB
+
   /**
    * Limit the maximum number of objects to avoid very large headers.  Assuming
    * Sha256 (71 bytes hex) + 9 bytes for the file sizes, a header with 100,000
@@ -53,20 +52,27 @@ class ObjectPack : SingleCopy {
    */
   static const uint64_t kMaxObjects = 100000;
 
-  ObjectPack();
-  explicit ObjectPack(const uint64_t limit);
+  explicit ObjectPack(const uint64_t limit = kDefaultLimit);
   ~ObjectPack();
 
-  BucketHandle OpenBucket();
-  void AddToBucket(const void *buf, const uint64_t size,
-                   const BucketHandle handle);
+  static void AddToBucket(const void *buf, const uint64_t size,
+                          const BucketHandle handle);
+
+  BucketHandle NewBucket();
 
   bool CommitBucket(const shash::Any &id, const BucketHandle handle);
   void DiscardBucket(const BucketHandle handle);
   void TransferBucket(const BucketHandle handle, ObjectPack *other);
 
+  unsigned char *BucketContent(size_t idx) const;
+  uint64_t BucketSize(size_t idx) const;
+  const shash::Any &BucketId(size_t idx) const;
+
   uint64_t size() const { return size_; }
-  unsigned GetNoObjects() const { return buckets_.size(); }
+
+  // This returns the number of objects in the pack (equal to the number of
+  // committed buckets)
+  size_t GetNoObjects() const { return buckets_.size(); }
 
  private:
   /**
@@ -76,9 +82,9 @@ class ObjectPack : SingleCopy {
   struct Bucket : SingleCopy {
     static const unsigned kInitialSize = 128;
 
-     Bucket();
-     ~Bucket();
-     void Add(const void *buf, const uint64_t buf_size);
+    Bucket();
+    ~Bucket();
+    void Add(const void *buf, const uint64_t buf_size);
 
     unsigned char *content;
     uint64_t size;
@@ -110,7 +116,6 @@ class ObjectPack : SingleCopy {
    */
   std::vector<BucketHandle> buckets_;
 };
-
 
 /**
  * Serializes ObjectPacks.  It can also serialize a single large file as an
@@ -149,19 +154,18 @@ class ObjectPackProducer {
   /**
    * Keeps track of the current index in pack_->buckets_
    */
-  unsigned idx_;
+  size_t idx_;
 
   /**
    * Keeps track of the current position in pack_->buckets_[idx_]
    */
-  unsigned pos_in_bucket_;
+  size_t pos_in_bucket_;
 
   /**
    * The header is created in the constructor.
    */
   std::string header_;
 };
-
 
 /**
  * Data structures required for the ObjectPackConsumer.  BuildEvent is a
@@ -171,16 +175,9 @@ class ObjectPackProducer {
 class ObjectPackConsumerBase {
  public:
   struct BuildEvent {
-    BuildEvent(
-      const shash::Any &id,
-      uint64_t size,
-      unsigned buf_size,
-      const void *buf)
-      : id(id)
-      , size(size)
-      , buf_size(buf_size)
-      , buf(buf)
-    { }
+    BuildEvent(const shash::Any &id, uint64_t size, unsigned buf_size,
+               const void *buf)
+        : id(id), size(size), buf_size(buf_size), buf(buf) {}
 
     shash::Any id;
     uint64_t size;
@@ -198,7 +195,6 @@ class ObjectPackConsumerBase {
   };
 };
 
-
 /**
  * Deserializes an ObjectPack created by ObjectPackProducer.  For every object
  * it calls all listeners with a BuildEvent parameter at least once for every
@@ -206,13 +202,12 @@ class ObjectPackConsumerBase {
  * verify the incoming data, this is up to the listeners handling the data.
  * The ObjectPackConsumer will verify the header digest, however.
  */
-class ObjectPackConsumer : public ObjectPackConsumerBase
-                         , public Observable<ObjectPackConsumerBase::BuildEvent>
-{
+class ObjectPackConsumer
+    : public ObjectPackConsumerBase,
+      public Observable<ObjectPackConsumerBase::BuildEvent> {
  public:
-  explicit ObjectPackConsumer(
-    const shash::Any &expected_digest,
-    const unsigned expected_header_size);
+  explicit ObjectPackConsumer(const shash::Any &expected_digest,
+                              const unsigned expected_header_size);
   BuildState ConsumeNext(const unsigned buf_size, const unsigned char *buf);
 
  private:
@@ -223,9 +218,7 @@ class ObjectPackConsumer : public ObjectPackConsumerBase
 
   struct IndexEntry {
     IndexEntry(const shash::Any &id, const uint64_t size)
-      : id(id)
-      , size(size)
-      { }
+        : id(id), size(size) {}
     shash::Any id;
     uint64_t size;
   };
