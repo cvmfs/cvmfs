@@ -231,6 +231,7 @@ build_lib() {
       ;;
     mongoose)
       do_extract "mongoose" "mongoose-${MONGOOSE_VERSION}.tar.gz"
+      patch_external "mongoose" "keep_sigchld.patch"
       do_build "mongoose"
       ;;
     *)

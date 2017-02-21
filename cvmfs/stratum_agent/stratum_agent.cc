@@ -606,9 +606,6 @@ int main(int argc, char **argv) {
              "failed to start web server");
     return 1;
   }
-  // That's safe, our mongoose webserver doesn't spawn anything
-  // There is a race here, TODO(jblomer): patch in mongoose source code
-  signal(SIGCHLD, SIG_DFL);
 
   MakePipe(g_pipe_ctrl);
   signal(SIGHUP, SignalReload);
