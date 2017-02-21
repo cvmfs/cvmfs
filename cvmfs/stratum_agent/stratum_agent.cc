@@ -546,6 +546,16 @@ int main(int argc, char **argv) {
     }
   }
 
+  if (!foreground)
+    Daemonize();
+  string pid_str = StringifyInt(getpid());
+  bool retval = SafeWriteToFile(pid_str, pid_file, 0600);
+  if (!retval) {
+    LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslogErr,
+             "failed to write pid file %s", pid_file);
+    return 1;
+  }
+
   g_handler_job = new UriHandlerJob();
   g_handler_replicate = new UriHandlerReplicate();
   ReadConfigurations();
@@ -617,6 +627,7 @@ int main(int argc, char **argv) {
   ClearConfigurations();
   delete g_handler_job;
   delete g_handler_replicate;
+  unlink(pid_file);
 
   return 0;
 }
