@@ -286,7 +286,7 @@ class UriHandlerReplicate : public UriHandler {
     string uuid = cvmfs::Uuid::CreateOneTime();
     job->id = uuid;
     job->alias = config->alias;
-    job->remote_ip = req_info->remote_ip;
+    job->remote_ip = ntohl(req_info->remote_ip);
 
     int retval_i = pthread_create(&job->thread_job, NULL, MainJobMgr, job);
     assert(retval_i == 0);
@@ -411,6 +411,8 @@ class UriHandlerJob : public UriHandler {
       if (job->status == Job::kStatusDone) {
         reply += ",\"exit_code\":" + StringifyInt(job->exit_code);
         reply += ",\"duration\":" + StringifyInt(job->death - job->birth);
+        reply += ",\"finish_timestamp\":\"" +
+                  StringifyTime(job->finish_timestamp, true) + " UTC\"";
       }
       reply += "}";
       WebReply::Send(WebReply::k200, reply, conn);
@@ -513,7 +515,7 @@ void Usage(const char *progname) {
            "trigger repository replication\n"
            "\n"
            "Usage: %s [-f(oreground)] [-p port (default: %s)]\n"
-           "          [-P pid file (default: %s)]",
+           "          [-P pid file (default: %s)] [-u uid:gid]",
            progname, kVersionMajor, kVersionMinor, kVersionPatch,
            progname, kDefaultPort, kDefaultPidFile);
 }
@@ -523,9 +525,12 @@ int main(int argc, char **argv) {
   const char *port = kDefaultPort;
   const char *pid_file = kDefaultPidFile;
   bool foreground = false;
+  string persona;
+  uid_t original_uid = 0, drop_to_uid = 0;
+  gid_t original_gid = 0, drop_to_gid = 0;
 
   int c;
-  while ((c = getopt(argc, argv, "hvfp:P:")) != -1) {
+  while ((c = getopt(argc, argv, "hvfp:P:u:")) != -1) {
     switch (c) {
       case 'f':
         foreground = true;
@@ -535,6 +540,18 @@ int main(int argc, char **argv) {
         break;
       case 'P':
         pid_file = optarg;
+        break;
+      case 'u': {
+        persona = optarg;
+        vector<string> tokens = SplitString(persona, ':');
+        if (tokens.size() != 2) {
+          Usage(argv[0]);
+          return 1;
+        }
+        drop_to_uid = String2Uint64(tokens[0]);
+        drop_to_gid = String2Uint64(tokens[1]);
+        break;
+      }
       case 'v':
         break;
       case 'h':
@@ -554,6 +571,16 @@ int main(int argc, char **argv) {
     LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslogErr,
              "failed to write pid file %s", pid_file);
     return 1;
+  }
+  if (!persona.empty()) {
+    original_uid = geteuid();
+    original_gid = getegid();
+    retval = SwitchCredentials(drop_to_uid, drop_to_gid, true);
+    if (!retval) {
+      LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslogErr,
+               "failed to drop credentials to %u:%u", drop_to_uid, drop_to_gid);
+      return 1;
+    }
   }
 
   g_handler_job = new UriHandlerJob();
@@ -627,6 +654,8 @@ int main(int argc, char **argv) {
   ClearConfigurations();
   delete g_handler_job;
   delete g_handler_replicate;
+
+  SwitchCredentials(original_uid, original_gid, true);
   unlink(pid_file);
 
   return 0;
