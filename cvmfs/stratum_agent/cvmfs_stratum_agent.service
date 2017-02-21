@@ -1,0 +1,12 @@
+[Unit]
+Description=CernVM-FS agent for triggered replication on Stratum 1s
+After=syslog.target network.target
+
+[Service]
+Type=forking
+EnvironmentFile=-/etc/sysconfig/cvmfs_stratum_agent
+ExecStart=/usr/bin/cvmfs_stratum_agent $OPTIONS
+ExecReload=/bin/kill -HUP $MAINPID
+
+[Install]
+WantedBy=multi-user.target
