@@ -43,6 +43,15 @@ class ObjectPack : SingleCopy {
  public:
   typedef Bucket *BucketHandle;
 
+  /**
+   * This is used to identify the content type of different buckets. Initially,
+   * the contents of a bucket are identified as kEmpty. When committing a
+   * bucket, this is set to either kNamed - if the bucket holds the contents of
+   * a named file - or kCas - if the bucket holds the contents of a content
+   * addressable buffer.
+   */
+  enum BucketContentType { kEmpty, kNamed, kCas };
+
   static const uint64_t kDefaultLimit = 200 * 1024 * 1024;  // 200MB
 
   /**
@@ -60,7 +69,9 @@ class ObjectPack : SingleCopy {
 
   BucketHandle NewBucket();
 
-  bool CommitBucket(const shash::Any &id, const BucketHandle handle);
+  bool CommitBucket(const BucketContentType type, const shash::Any &id,
+                    const BucketHandle handle, const std::string &name = "");
+
   void DiscardBucket(const BucketHandle handle);
   void TransferBucket(const BucketHandle handle, ObjectPack *other);
 
@@ -90,6 +101,8 @@ class ObjectPack : SingleCopy {
     uint64_t size;
     uint64_t capacity;
     shash::Any id;
+    BucketContentType content_type;
+    std::string name;
   };
 
   void InitLock();

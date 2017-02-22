@@ -19,7 +19,9 @@ using namespace std;  // NOLINT
 ObjectPack::Bucket::Bucket()
     : content(reinterpret_cast<unsigned char *>(smalloc(kInitialSize))),
       size(0),
-      capacity(kInitialSize) {}
+      capacity(kInitialSize),
+      content_type(kEmpty),
+      name() {}
 
 void ObjectPack::Bucket::Add(const void *buf, const uint64_t buf_size) {
   if (buf_size == 0) return;
@@ -68,9 +70,16 @@ ObjectPack::BucketHandle ObjectPack::NewBucket() {
 /**
  * Can only fail due to insufficient remaining space in the ObjectPack.
  */
-bool ObjectPack::CommitBucket(const shash::Any &id,
-                              const ObjectPack::BucketHandle handle) {
+bool ObjectPack::CommitBucket(const BucketContentType type,
+                              const shash::Any &id,
+                              const ObjectPack::BucketHandle handle,
+                              const std::string &name) {
   handle->id = id;
+
+  handle->content_type = type;
+  if (type == kNamed) {
+    handle->name = name;
+  }
 
   MutexLockGuard mutex_guard(lock_);
   if (buckets_.size() >= kMaxObjects) return false;
@@ -257,7 +266,8 @@ ObjectPackConsumerBase::BuildState ObjectPackConsumer::ConsumeNext(
 
   if (pos_ < expected_header_size_) return kStateContinue;
 
-  // This condition can only be true once through the lifetime of the Consumer.
+  // This condition can only be true once through the lifetime of the
+  // Consumer.
   if (nbytes_header && (pos_ == expected_header_size_)) {
     shash::Any digest(expected_digest_.algorithm);
     shash::HashString(raw_header_, &digest);
@@ -287,7 +297,8 @@ ObjectPackConsumerBase::BuildState ObjectPackConsumer::ConsumeNext(
 }
 
 /**
- * Informs listeners for small complete objects.  For large objects, buffers the
+ * Informs listeners for small complete objects.  For large objects, buffers
+ * the
  * input into reasonably sized chunks.  buf can contain both a chunk of data
  * that needs to be added to the consumer's accumulator and a bunch of
  * complete small objects.  We use the accumulator only if necessary to avoid

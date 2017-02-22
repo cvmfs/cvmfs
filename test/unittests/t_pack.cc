@@ -64,9 +64,12 @@ class T_Pack : public ::testing::Test {
     ObjectPack::AddToBucket(buf, 4096, handle_one);
     buf[0] = '1';
     ObjectPack::AddToBucket(buf, 1, handle_three);
-    EXPECT_TRUE(pack_of_three_.CommitBucket(hash_null_, handle_one));
-    EXPECT_TRUE(pack_of_three_.CommitBucket(hash_partial_, handle_two));
-    EXPECT_TRUE(pack_of_three_.CommitBucket(hash_null_, handle_three));
+    EXPECT_TRUE(
+        pack_of_three_.CommitBucket(ObjectPack::kCas, hash_null_, handle_one));
+    EXPECT_TRUE(pack_of_three_.CommitBucket(ObjectPack::kCas, hash_partial_,
+                                            handle_two));
+    EXPECT_TRUE(pack_of_three_.CommitBucket(ObjectPack::kCas, hash_null_,
+                                            handle_three));
   }
 
   virtual void TearDown() {
@@ -90,7 +93,7 @@ class T_Pack : public ::testing::Test {
       shash::Any obj_digest(shash::kMd5);
       shash::HashMem(obj_buf, size, &obj_digest);
       handle->Add(obj_buf, size);
-      has_space = pack_.CommitBucket(obj_digest, handle);
+      has_space = pack_.CommitBucket(ObjectPack::kCas, obj_digest, handle);
     } while (has_space);
     free(obj_buf);
 
@@ -154,7 +157,8 @@ TEST_F(T_Pack, ObjectPack) {
   ObjectPack::AddToBucket(&buf, 1, handle_one);
   ObjectPack::AddToBucket(&buf, 1, handle_one);
 
-  EXPECT_TRUE(pack_.CommitBucket(shash::Any(hash_null_), handle_one));
+  EXPECT_TRUE(
+      pack_.CommitBucket(ObjectPack::kCas, shash::Any(hash_null_), handle_one));
   EXPECT_EQ(1U, pack_.open_buckets_.size());
   ASSERT_EQ(1U, pack_.buckets_.size());
   EXPECT_EQ(2U, pack_.buckets_[0]->size);
@@ -164,7 +168,8 @@ TEST_F(T_Pack, ObjectPack) {
   EXPECT_EQ(2U, pack_.open_buckets_.size());
   EXPECT_EQ(1U, pack_.buckets_.size());
   ObjectPack::AddToBucket(&buf, 1, handle_three);
-  EXPECT_TRUE(pack_.CommitBucket(shash::Any(hash_null_), handle_three));
+  EXPECT_TRUE(pack_.CommitBucket(ObjectPack::kCas, shash::Any(hash_null_),
+                                 handle_three));
   EXPECT_EQ(1U, pack_.open_buckets_.size());
   ASSERT_EQ(2U, pack_.buckets_.size());
   EXPECT_EQ(2U, pack_.buckets_[0]->size);
@@ -183,17 +188,20 @@ TEST_F(T_Pack, ObjectPackOverflow) {
   ObjectPack::BucketHandle handle_one = small_pack.NewBucket();
   char buf = '0';
   ObjectPack::AddToBucket(&buf, 1, handle_one);
-  EXPECT_TRUE(small_pack.CommitBucket(shash::Any(hash_null_), handle_one));
+  EXPECT_TRUE(small_pack.CommitBucket(ObjectPack::kCas, shash::Any(hash_null_),
+                                      handle_one));
 
   ObjectPack::BucketHandle handle_two = small_pack.NewBucket();
   ObjectPack::AddToBucket(&buf, 1, handle_two);
   ObjectPack::AddToBucket(&buf, 1, handle_two);
-  EXPECT_FALSE(small_pack.CommitBucket(shash::Any(hash_null_), handle_two));
+  EXPECT_FALSE(small_pack.CommitBucket(ObjectPack::kCas, shash::Any(hash_null_),
+                                       handle_two));
   small_pack.DiscardBucket(handle_two);
 
   ObjectPack::BucketHandle handle_three = small_pack.NewBucket();
   ObjectPack::AddToBucket(&buf, 1, handle_three);
-  EXPECT_TRUE(small_pack.CommitBucket(shash::Any(hash_null_), handle_three));
+  EXPECT_TRUE(small_pack.CommitBucket(ObjectPack::kCas, shash::Any(hash_null_),
+                                      handle_three));
 
   // Fail due to too many objects
   ObjectPack::BucketHandle *handles;
@@ -201,11 +209,11 @@ TEST_F(T_Pack, ObjectPackOverflow) {
       (ObjectPack::kMaxObjects + 1) * sizeof(ObjectPack::BucketHandle)));
   for (unsigned i = 0; i < ObjectPack::kMaxObjects; ++i) {
     handles[i] = pack_.NewBucket();
-    EXPECT_TRUE(pack_.CommitBucket(hash_null_, handles[i]));
+    EXPECT_TRUE(pack_.CommitBucket(ObjectPack::kCas, hash_null_, handles[i]));
   }
   handles[ObjectPack::kMaxObjects] = pack_.NewBucket();
-  EXPECT_FALSE(
-      pack_.CommitBucket(hash_null_, handles[ObjectPack::kMaxObjects]));
+  EXPECT_FALSE(pack_.CommitBucket(ObjectPack::kCas, hash_null_,
+                                  handles[ObjectPack::kMaxObjects]));
   pack_.DiscardBucket(handles[ObjectPack::kMaxObjects]);
   free(handles);
 }
