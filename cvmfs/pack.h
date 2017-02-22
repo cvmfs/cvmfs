@@ -131,6 +131,32 @@ class ObjectPack : SingleCopy {
 };
 
 /**
+ * Data structures required for the ObjectPack serialization.  Event is a
+ * template parameter for the Observable base class of ObjectPack and hence
+ * moved into this base class.
+ */
+namespace ObjectPackBuild {
+struct Event {
+  Event(const shash::Any &id, uint64_t size, unsigned buf_size, const void *buf)
+      : id(id), size(size), buf_size(buf_size), buf(buf) {}
+
+  shash::Any id;
+  uint64_t size;
+  unsigned buf_size;
+  const void *buf;
+};
+
+enum State {
+  kStateContinue = 0,
+  kStateDone,
+  kStateCorrupt,
+  kStateBadFormat,
+  kStateHeaderTooBig,
+  kStateTrailingBytes,
+};
+}
+
+/**
  * Serializes ObjectPacks.  It can also serialize a single large file as an
  * "object pack", which otherwise would need special treatment.
  *
@@ -143,7 +169,8 @@ class ObjectPack : SingleCopy {
 class ObjectPackProducer {
  public:
   explicit ObjectPackProducer(ObjectPack *pack);
-  ObjectPackProducer(const shash::Any &id, FILE *big_file);
+  ObjectPackProducer(const shash::Any &id, FILE *big_file,
+                     const std::string &file_name = "");
   unsigned ProduceNext(const unsigned buf_size, unsigned char *buf);
   void GetDigest(shash::Any *hash);
   unsigned GetHeaderSize() { return header_.size(); }
@@ -181,47 +208,18 @@ class ObjectPackProducer {
 };
 
 /**
- * Data structures required for the ObjectPackConsumer.  BuildEvent is a
- * template parameter for the Observable base class of ObjectPack and hence
- * moved into this base class.
- */
-class ObjectPackConsumerBase {
- public:
-  struct BuildEvent {
-    BuildEvent(const shash::Any &id, uint64_t size, unsigned buf_size,
-               const void *buf)
-        : id(id), size(size), buf_size(buf_size), buf(buf) {}
-
-    shash::Any id;
-    uint64_t size;
-    unsigned buf_size;
-    const void *buf;
-  };
-
-  enum BuildState {
-    kStateContinue = 0,
-    kStateDone,
-    kStateCorrupt,
-    kStateBadFormat,
-    kStateHeaderTooBig,
-    kStateTrailingBytes,
-  };
-};
-
-/**
  * Deserializes an ObjectPack created by ObjectPackProducer.  For every object
- * it calls all listeners with a BuildEvent parameter at least once for every
+ * it calls all listeners with a Event parameter at least once for every
  * object.  For large objects, it calls the listeners multiple times.  It won't
  * verify the incoming data, this is up to the listeners handling the data.
  * The ObjectPackConsumer will verify the header digest, however.
  */
-class ObjectPackConsumer
-    : public ObjectPackConsumerBase,
-      public Observable<ObjectPackConsumerBase::BuildEvent> {
+class ObjectPackConsumer : public Observable<ObjectPackBuild::Event> {
  public:
   explicit ObjectPackConsumer(const shash::Any &expected_digest,
                               const unsigned expected_header_size);
-  BuildState ConsumeNext(const unsigned buf_size, const unsigned char *buf);
+  ObjectPackBuild::State ConsumeNext(const unsigned buf_size,
+                                     const unsigned char *buf);
 
  private:
   /**
@@ -237,7 +235,8 @@ class ObjectPackConsumer
   };
 
   bool ParseHeader();
-  BuildState ConsumePayload(const unsigned buf_size, const unsigned char *buf);
+  ObjectPackBuild::State ConsumePayload(const unsigned buf_size,
+                                        const unsigned char *buf);
 
   shash::Any expected_digest_;
   unsigned expected_header_size_;
@@ -272,7 +271,7 @@ class ObjectPackConsumer
    * The state starts in kStateContinue and makes exactly one transition into
    * one of the other states as more bytes are consumed.
    */
-  BuildState state_;
+  ObjectPackBuild::State state_;
 
   /**
    * Temporary store for the incomplete header.  Once completely consumed, the

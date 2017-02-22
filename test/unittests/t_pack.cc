@@ -21,7 +21,7 @@ class ConsumerCallbacks {
   ConsumerCallbacks()
       : total_size(0), total_objects(0), this_size(0), verify_errors(0) {}
 
-  void OnEvent(const ObjectPackConsumer::BuildEvent &event) {
+  void OnEvent(const ObjectPackBuild::Event &event) {
     total_size += event.buf_size;
     this_size += event.buf_size;
     if (this_size == event.size) {
@@ -118,7 +118,7 @@ class T_Pack : public ::testing::Test {
     } while (nspace == nwritten);
     free(transfer_buf);
 
-    EXPECT_EQ(ObjectPackConsumer::kStateDone, consumer.ConsumeNext(0, NULL));
+    EXPECT_EQ(ObjectPackBuild::kStateDone, consumer.ConsumeNext(0, NULL));
     EXPECT_EQ(pack_.GetNoObjects(), callbacks.total_objects);
     EXPECT_EQ(pack_.size(), callbacks.total_size);
   }
@@ -282,7 +282,7 @@ TEST_F(T_Pack, ProducerEmpty) {
 }
 
 TEST_F(T_Pack, ProducerFile) {
-  ObjectPackProducer producer(hash_null_, ffoo_);
+  ObjectPackProducer producer(hash_null_, ffoo_, "the_file_name");
   const string expected_result = "V1\nS" + StringifyInt(foo_content_.size()) +
                                  "\nN1\n--\n" + hash_null_.ToString(true) +
                                  " " + StringifyInt(foo_content_.size()) +
@@ -293,7 +293,7 @@ TEST_F(T_Pack, ProducerFile) {
   EXPECT_EQ(expected_result.size(), nbytes);
   EXPECT_EQ(expected_result, string(reinterpret_cast<char *>(buf), nbytes));
 
-  ObjectPackProducer producer_two(hash_null_, ffoo_);
+  ObjectPackProducer producer_two(hash_null_, ffoo_, "another_file_name");
   unsigned pos = 0;
   do {
     nbytes = producer_two.ProduceNext(1, buf + pos);
@@ -314,7 +314,7 @@ TEST_F(T_Pack, Consumer) {
   consumer.RegisterListener(&ConsumerCallbacks::OnEvent, &callbacks);
   unsigned char buf[8192];
   unsigned nbytes = producer.ProduceNext(8192, buf);
-  EXPECT_EQ(ObjectPackConsumer::kStateDone, consumer.ConsumeNext(nbytes, buf));
+  EXPECT_EQ(ObjectPackBuild::kStateDone, consumer.ConsumeNext(nbytes, buf));
   EXPECT_EQ(3U, callbacks.total_objects);
   EXPECT_EQ(pack_of_three_.size(), callbacks.total_size);
 
@@ -322,7 +322,7 @@ TEST_F(T_Pack, Consumer) {
   ObjectPackConsumer consumer_two(digest, producer.GetHeaderSize());
   consumer_two.RegisterListener(&ConsumerCallbacks::OnEvent, &callbacks);
   for (unsigned i = 0; i < nbytes; ++i) consumer_two.ConsumeNext(1, buf + i);
-  EXPECT_EQ(ObjectPackConsumer::kStateDone, consumer_two.ConsumeNext(0, NULL));
+  EXPECT_EQ(ObjectPackBuild::kStateDone, consumer_two.ConsumeNext(0, NULL));
   EXPECT_EQ(3U, callbacks.total_objects);
   EXPECT_EQ(pack_of_three_.size(), callbacks.total_size);
 }
@@ -337,13 +337,13 @@ TEST_F(T_Pack, ConsumerEmpty) {
   consumer.RegisterListener(&ConsumerCallbacks::OnEvent, &callbacks);
   unsigned char buf[4096];
   unsigned nbytes = producer.ProduceNext(4096, buf);
-  EXPECT_EQ(ObjectPackConsumer::kStateDone, consumer.ConsumeNext(nbytes, buf));
+  EXPECT_EQ(ObjectPackBuild::kStateDone, consumer.ConsumeNext(nbytes, buf));
   EXPECT_EQ(0U, callbacks.total_objects);
   EXPECT_EQ(0U, callbacks.total_size);
 
   ObjectPackConsumer consumer_two(digest, producer.GetHeaderSize());
   for (unsigned i = 0; i < nbytes; ++i) consumer_two.ConsumeNext(1, buf + i);
-  EXPECT_EQ(ObjectPackConsumer::kStateDone, consumer_two.ConsumeNext(0, NULL));
+  EXPECT_EQ(ObjectPackBuild::kStateDone, consumer_two.ConsumeNext(0, NULL));
 }
 
 TEST_F(T_Pack, RealWorld) { RealWorld(); }

@@ -158,8 +158,12 @@ ObjectPackProducer::ObjectPackProducer(ObjectPack *pack)
   }
 }
 
-ObjectPackProducer::ObjectPackProducer(const shash::Any &id, FILE *big_file)
+ObjectPackProducer::ObjectPackProducer(const shash::Any &id, FILE *big_file,
+                                       const std::string & /*file_name*/)
     : pack_(NULL), big_file_(big_file), pos_(0), idx_(0), pos_in_bucket_(0) {
+  // If the we want to store the file as type kName, the "file_name" parameter
+  // should not be empty
+
   int fd = fileno(big_file_);
   assert(fd >= 0);
   platform_stat64 info;
@@ -232,11 +236,11 @@ ObjectPackConsumer::ObjectPackConsumer(const shash::Any &expected_digest,
       idx_(0),
       pos_in_object_(0),
       pos_in_accu_(0),
-      state_(kStateContinue),
+      state_(ObjectPackBuild::kStateContinue),
       size_(0) {
   // Upper limit of 100B per entry
   if (expected_header_size > (100 * ObjectPack::kMaxObjects)) {
-    state_ = kStateHeaderTooBig;
+    state_ = ObjectPackBuild::kStateHeaderTooBig;
     return;
   }
 
@@ -247,14 +251,14 @@ ObjectPackConsumer::ObjectPackConsumer(const shash::Any &expected_digest,
  * At the end of the function, pos_ will have progressed by buf_size (unless
  * the buffer contains trailing garbage bytes.
  */
-ObjectPackConsumerBase::BuildState ObjectPackConsumer::ConsumeNext(
+ObjectPackBuild::State ObjectPackConsumer::ConsumeNext(
     const unsigned buf_size, const unsigned char *buf) {
   if (buf_size == 0) return state_;
-  if (state_ == kStateDone) {
-    state_ = kStateTrailingBytes;
+  if (state_ == ObjectPackBuild::kStateDone) {
+    state_ = ObjectPackBuild::kStateTrailingBytes;
     return state_;
   }
-  if (state_ != kStateContinue) return state_;
+  if (state_ != ObjectPackBuild::kStateContinue) return state_;
 
   const unsigned remaining_in_header =
       (pos_ < expected_header_size_) ? (expected_header_size_ - pos_) : 0;
@@ -264,7 +268,7 @@ ObjectPackConsumerBase::BuildState ObjectPackConsumer::ConsumeNext(
     pos_ += nbytes_header;
   }
 
-  if (pos_ < expected_header_size_) return kStateContinue;
+  if (pos_ < expected_header_size_) return ObjectPackBuild::kStateContinue;
 
   // This condition can only be true once through the lifetime of the
   // Consumer.
@@ -272,12 +276,12 @@ ObjectPackConsumerBase::BuildState ObjectPackConsumer::ConsumeNext(
     shash::Any digest(expected_digest_.algorithm);
     shash::HashString(raw_header_, &digest);
     if (digest != expected_digest_) {
-      state_ = kStateCorrupt;
+      state_ = ObjectPackBuild::kStateCorrupt;
       return state_;
     } else {
       bool retval = ParseHeader();
       if (!retval) {
-        state_ = kStateBadFormat;
+        state_ = ObjectPackBuild::kStateBadFormat;
         return state_;
       }
       // We don't need the raw string anymore
@@ -286,7 +290,7 @@ ObjectPackConsumerBase::BuildState ObjectPackConsumer::ConsumeNext(
 
     // Empty pack?
     if ((buf_size == nbytes_header) && (index_.size() == 0)) {
-      state_ = kStateDone;
+      state_ = ObjectPackBuild::kStateDone;
       return state_;
     }
   }
@@ -304,7 +308,7 @@ ObjectPackConsumerBase::BuildState ObjectPackConsumer::ConsumeNext(
  * complete small objects.  We use the accumulator only if necessary to avoid
  * unnecessary memory copies.
  */
-ObjectPackConsumerBase::BuildState ObjectPackConsumer::ConsumePayload(
+ObjectPackBuild::State ObjectPackConsumer::ConsumePayload(
     const unsigned buf_size, const unsigned char *buf) {
   uint64_t pos_in_buf = 0;
   while ((pos_in_buf < buf_size) && (idx_ < index_.size())) {
@@ -324,13 +328,13 @@ ObjectPackConsumerBase::BuildState ObjectPackConsumer::ConsumePayload(
       memcpy(accumulator_ + pos_in_accu_, buf + pos_in_buf, nbytes);
       pos_in_accu_ += nbytes;
       if ((pos_in_accu_ == kAccuSize) || (nbytes == remaining_in_object)) {
-        NotifyListeners(BuildEvent(index_[idx_].id, index_[idx_].size,
-                                   pos_in_accu_, accumulator_));
+        NotifyListeners(ObjectPackBuild::Event(
+            index_[idx_].id, index_[idx_].size, pos_in_accu_, accumulator_));
         pos_in_accu_ = 0;
       }
     } else {  // directly trigger listeners using buf
-      NotifyListeners(BuildEvent(index_[idx_].id, index_[idx_].size, nbytes,
-                                 buf + pos_in_buf));
+      NotifyListeners(ObjectPackBuild::Event(index_[idx_].id, index_[idx_].size,
+                                             nbytes, buf + pos_in_buf));
     }
 
     pos_in_buf += nbytes;
@@ -344,9 +348,10 @@ ObjectPackConsumerBase::BuildState ObjectPackConsumer::ConsumePayload(
   pos_ += buf_size;
 
   if (idx_ == index_.size())
-    state_ = (pos_in_buf == buf_size) ? kStateDone : kStateTrailingBytes;
+    state_ = (pos_in_buf == buf_size) ? ObjectPackBuild::kStateDone
+                                      : ObjectPackBuild::kStateTrailingBytes;
   else
-    state_ = kStateContinue;
+    state_ = ObjectPackBuild::kStateContinue;
   return state_;
 }
 
