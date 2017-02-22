@@ -28,24 +28,24 @@ void InitializeHeader(const int version, const int num_objects,
   }
 }
 
-void AppendItemToHeader(ObjectPack::BucketContentType item_type,
-                        const std::string &hash_str, const size_t offset,
-                        const std::string &item_name, std::string *header) {
+void AppendItemToHeader(ObjectPack::BucketContentType object_type,
+                        const std::string &hash_str, const size_t object_size,
+                        const std::string &object_name, std::string *header) {
   // If the item type is kName, the "item_name" parameter should not be empty
-  assert((item_type == ObjectPack::kCas) ||
-         ((item_type == ObjectPack::kNamed) && (!item_name.empty())));
+  assert((object_type == ObjectPack::kCas) ||
+         ((object_type == ObjectPack::kNamed) && (!object_name.empty())));
   std::string line_prefix = "";
   std::string line_suffix = "";
-  if (item_type == ObjectPack::kNamed) {
+  if (object_type == ObjectPack::kNamed) {
     line_prefix = "N ";
-    line_suffix = std::string(" ") + Base64Url(item_name);
-  } else if (item_type == ObjectPack::kCas) {
+    line_suffix = std::string(" ") + Base64Url(object_name);
+  } else if (object_type == ObjectPack::kCas) {
     line_prefix = "C ";
   } else {  // item_type == kEmpty
     return;
   }
   if (header) {
-    *header += line_prefix + hash_str + " " + StringifyInt(offset) +
+    *header += line_prefix + hash_str + " " + StringifyInt(object_size) +
                line_suffix + "\n";
   }
 }

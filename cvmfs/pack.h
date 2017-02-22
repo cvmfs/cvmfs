@@ -162,9 +162,14 @@ enum State {
  *
  * The serialized format has a global, human readable header which has lines of
  * character keys and string values (like the cvmfs manifest) follwed by a "--"
- * separator line followed by the index of objects.  This index is a list of
- * hash digest (hex) and object size (decimal) tuples, separated by line
- * breaks.
+ * separator line followed by the index of objects. The index contains one line
+ * for each item in the pack. Each line contains the following space-separated
+ * tokens:
+ * 1. object type identifier ('N' for named files, 'C' for CAS blobs)
+ * 2. hash digest (hex)
+ * 3. object size (decimal)
+ * 4. object name - base64 encoding of the object name (optional - only if the
+ *                  object type is 'N')
  */
 class ObjectPackProducer {
  public:
