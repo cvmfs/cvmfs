@@ -154,7 +154,7 @@ enum State {
   kStateHeaderTooBig,
   kStateTrailingBytes,
 };
-}
+}  // namespace ObjectPackBuild
 
 /**
  * Serializes ObjectPacks.  It can also serialize a single large file as an

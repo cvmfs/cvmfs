@@ -16,6 +16,41 @@
 
 using namespace std;  // NOLINT
 
+namespace {  // some private utility functions used by ObjectPackProducer
+
+void InitializeHeader(const int version, const int num_objects,
+                      const size_t pack_size, std::string *header) {
+  if (header) {
+    *header = "V" + StringifyInt(version) + "\n";
+    *header += "S" + StringifyInt(pack_size) + "\n";
+    *header += "N" + StringifyInt(num_objects) + "\n";
+    *header += "--\n";
+  }
+}
+
+void AppendItemToHeader(ObjectPack::BucketContentType item_type,
+                        const std::string &hash_str, const size_t offset,
+                        const std::string &item_name, std::string *header) {
+  // If the item type is kName, the "item_name" parameter should not be empty
+  assert((item_type == ObjectPack::kCas) ||
+         ((item_type == ObjectPack::kNamed) && (!item_name.empty())));
+  std::string line_prefix = "";
+  std::string line_suffix = "";
+  if (item_type == ObjectPack::kNamed) {
+    line_prefix = "N ";
+    line_suffix = std::string(" ") + Base64Url(item_name);
+  } else if (item_type == ObjectPack::kCas) {
+    line_prefix = "C ";
+  } else {  // item_type == kEmpty
+    return;
+  }
+  if (header) {
+    *header += line_prefix + hash_str + " " + StringifyInt(offset) +
+               line_suffix + "\n";
+  }
+}
+}  // namespace
+
 ObjectPack::Bucket::Bucket()
     : content(reinterpret_cast<unsigned char *>(smalloc(kInitialSize))),
       size(0),
@@ -144,40 +179,27 @@ ObjectPackProducer::ObjectPackProducer(ObjectPack *pack)
   // rough guess, most likely a little too much
   header_.reserve(30 + N * (2 * shash::kMaxDigestSize + 5));
 
-  header_ = "V1\n";
-  header_ += "S" + StringifyInt(pack->size()) + "\n";
-  header_ += "N" + StringifyInt(N) + "\n";
-  header_ += "--\n";
+  InitializeHeader(2, N, pack->size(), &header_);
 
-  const bool with_suffix = true;
   for (unsigned i = 0; i < N; ++i) {
-    header_ += pack->BucketId(i).ToString(with_suffix);
-    header_ += " ";
-    header_ += StringifyInt(pack->BucketSize(i));
-    header_ += "\n";
+    AppendItemToHeader(ObjectPack::kCas, pack->BucketId(i).ToString(true),
+                       pack->BucketSize(i), "", &header_);
   }
 }
 
 ObjectPackProducer::ObjectPackProducer(const shash::Any &id, FILE *big_file,
-                                       const std::string & /*file_name*/)
+                                       const std::string &file_name)
     : pack_(NULL), big_file_(big_file), pos_(0), idx_(0), pos_in_bucket_(0) {
-  // If the we want to store the file as type kName, the "file_name" parameter
-  // should not be empty
-
   int fd = fileno(big_file_);
   assert(fd >= 0);
   platform_stat64 info;
   int retval = platform_fstat(fd, &info);
   assert(retval == 0);
-  string str_size = StringifyInt(info.st_size);
 
-  header_ = "V1\n";
-  header_ += "S" + str_size + "\n";
-  header_ += "N1\n";
-  header_ += "--\n";
+  InitializeHeader(2, 1, info.st_size, &header_);
 
-  const bool with_suffix = true;
-  header_ += id.ToString(with_suffix) + " " + str_size + "\n";
+  AppendItemToHeader(ObjectPack::kNamed, id.ToString(true), info.st_size,
+                     file_name, &header_);
 
   rewind(big_file);
 }
