@@ -39,7 +39,7 @@ class GC_MockUploader : public AbstractMockUploader<GC_MockUploader> {
   }
 
   void FinalizeStreamedUpload(upload::UploadStreamHandle *abstract_handle,
-                              const shash::Any            content_hash) {
+                              const shash::Any           &content_hash) {
     assert(AbstractMockUploader<GC_MockUploader>::not_implemented);
   }
 
