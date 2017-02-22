@@ -7,6 +7,7 @@ Type=forking
 EnvironmentFile=-/etc/sysconfig/cvmfs_stratum_agent
 ExecStart=/usr/bin/cvmfs_stratum_agent $OPTIONS
 ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
 
 [Install]
 WantedBy=multi-user.target
