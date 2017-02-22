@@ -1,4 +1,5 @@
 2.4.0:
+  * Support for instance based cache configuration (CVM-1053)
   * Fix mount helper if repository name resolves to local path (CVM-1160)
   * Make cvmfs_server catalog-chown command public (CVM-1077)
   * Update stratum 1 default configuration (CVM-1147)
