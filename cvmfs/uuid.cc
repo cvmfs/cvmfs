@@ -13,6 +13,7 @@
 #include <cstring>
 
 #include "util/pointer.h"
+#include "util/posix.h"
 #include "util/string.h"
 
 using namespace std;  // NOLINT
@@ -31,13 +32,21 @@ Uuid *Uuid::Create(const string &store_path) {
     // Create and store
     uuid->MkUuid();
     string uuid_str = uuid->uuid();
-    f = fopen(store_path.c_str(), "w");
-    if (!f)
+    string path_tmp;
+    FILE *f_tmp = CreateTempFile(store_path + "_tmp",
+      S_IWUSR | S_IWGRP | S_IRUSR | S_IRGRP | S_IROTH, "w", &path_tmp);
+    if (!f_tmp)
       return NULL;
-    int written = fprintf(f, "%s\n", uuid_str.c_str());
-    fclose(f);
-    if (written != static_cast<int>(uuid_str.length() + 1))
+    int written = fprintf(f_tmp, "%s\n", uuid_str.c_str());
+    fclose(f_tmp);
+    if (written != static_cast<int>(uuid_str.length() + 1)) {
+      unlink(path_tmp.c_str());
       return NULL;
+    }
+    if (rename(path_tmp.c_str(), store_path.c_str()) != 0) {
+      unlink(path_tmp.c_str());
+      return NULL;
+    }
     return uuid.Release();
   }
 

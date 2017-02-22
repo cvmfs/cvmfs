@@ -70,8 +70,7 @@ class Fetcher : SingleCopy {
   Fetcher(CacheManager *cache_mgr,
           download::DownloadManager *download_mgr,
           BackoffThrottle *backoff_throttle,
-          perf::Statistics *statistics,
-          const std::string &name = "fetch",
+          perf::StatisticsTemplate statistics,
           bool external_data = false);
   ~Fetcher();
   // TODO(jblomer): reduce number of arguments

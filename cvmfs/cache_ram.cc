@@ -13,33 +13,37 @@
 #include "kvstore.h"
 #include "logging.h"
 #include "util/posix.h"
+#include "util/string.h"
 #include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 
 const shash::Any RamCacheManager::kInvalidHandle;
 
+string RamCacheManager::Describe() {
+  return "Internal in-memory cache manager (size " +
+         StringifyInt(max_size_ / (1024 * 1024)) + "MB)\n";
+}
+
 
 RamCacheManager::RamCacheManager(
   uint64_t max_size,
   unsigned max_entries,
   MemoryKvStore::MemoryAllocator alloc,
-  perf::Statistics *statistics)
+  perf::StatisticsTemplate statistics)
   : max_size_(max_size)
   , fd_table_(max_entries, ReadOnlyHandle())
   // TODO(jblomer): the number of slots in the kv-stores should _not_ be the
   // number of open files.
   , regular_entries_(max_entries,
-                     "RamCache.regular",
                      alloc,
                      max_size,
-                     statistics)
+                     perf::StatisticsTemplate("kv.regular", statistics))
   , volatile_entries_(max_entries,
-                      "RamCache.volatile",
                       alloc,
                       max_size,
-                      statistics)
-  , counters_(statistics, "RamCache")
+                      perf::StatisticsTemplate("kv.volatile", statistics))
+  , counters_(statistics)
 {
   int retval = pthread_rwlock_init(&rwlock_, NULL);
   assert(retval == 0);

@@ -62,51 +62,52 @@ class RamCacheManager : public CacheManager {
     perf::Counter *n_full;
     perf::Counter *n_realloc;
 
-    Counters(perf::Statistics *statistics, const std::string &name) {
-      n_getsize = statistics->Register(name + ".n_getsize",
-        "Number of GetSize calls for " + name);
-      n_close = statistics->Register(name + ".n_close",
-        "Number of Close calls for " + name);
-      n_pread = statistics->Register(name + ".n_pread",
-        "Number of Pread calls for " + name);
-      n_dup = statistics->Register(name + ".n_dup",
-        "Number of Dup calls for " + name);
-      n_readahead = statistics->Register(name + ".n_readahead",
-        "Number of ReadAhead calls for " + name);
-      n_starttxn = statistics->Register(name + ".n_starttxn",
-        "Number of StartTxn calls for " + name);
-      n_write = statistics->Register(name + ".n_write",
-        "Number of Write calls for " + name);
-      n_reset = statistics->Register(name + ".n_reset",
-        "Number of Reset calls for " + name);
-      n_aborttxn = statistics->Register(name + ".n_aborttxn",
-        "Number of AbortTxn calls for " + name);
-      n_committxn = statistics->Register(name + ".n_committxn",
-        "Number of Commit calls for " + name);
-      n_enfile = statistics->Register(name + ".n_enfile",
-        "Number of times " + name + " reached the limit on handles");
-      n_openregular = statistics->Register(name + ".n_openregular",
-        "Number of opens from the regular cache for " + name);
-      n_openvolatile = statistics->Register(name + ".n_openvolatile",
-        "Number of opens from the volatile cache for " + name);
-      n_openmiss = statistics->Register(name + ".n_openmiss",
-        "Number of missed opens for " + name);
-      n_realloc = statistics->Register(name + ".n_realloc",
-        "Number of reallocs for " + name);
-      n_overrun = statistics->Register(name + ".n_overrun",
-        "Number of cache limit overruns for " + name);
-      n_full = statistics->Register(name + ".n_full",
-        "Number of overruns that could not be resolved for " + name);
+    explicit Counters(perf::StatisticsTemplate statistics) {
+      n_getsize = statistics.RegisterTemplated("n_getsize",
+        "Number of GetSize calls");
+      n_close = statistics.RegisterTemplated("n_close",
+        "Number of Close calls");
+      n_pread = statistics.RegisterTemplated("n_pread",
+        "Number of Pread calls");
+      n_dup = statistics.RegisterTemplated("n_dup",
+        "Number of Dup calls");
+      n_readahead = statistics.RegisterTemplated("n_readahead",
+        "Number of ReadAhead calls");
+      n_starttxn = statistics.RegisterTemplated("n_starttxn",
+        "Number of StartTxn calls");
+      n_write = statistics.RegisterTemplated("n_write",
+        "Number of Write calls");
+      n_reset = statistics.RegisterTemplated("n_reset",
+        "Number of Reset calls");
+      n_aborttxn = statistics.RegisterTemplated("n_aborttxn",
+        "Number of AbortTxn calls");
+      n_committxn = statistics.RegisterTemplated("n_committxn",
+        "Number of Commit calls");
+      n_enfile = statistics.RegisterTemplated("n_enfile",
+        "Number of times the limit on handles was reached");
+      n_openregular = statistics.RegisterTemplated("n_openregular",
+        "Number of opens from the regular cache");
+      n_openvolatile = statistics.RegisterTemplated("n_openvolatile",
+        "Number of opens from the volatile cache");
+      n_openmiss = statistics.RegisterTemplated("n_openmiss",
+        "Number of missed opens");
+      n_realloc = statistics.RegisterTemplated("n_realloc",
+        "Number of reallocs");
+      n_overrun = statistics.RegisterTemplated("n_overrun",
+        "Number of cache limit overruns");
+      n_full = statistics.RegisterTemplated("n_full",
+        "Number of overruns that could not be resolved");
     }
   };
 
   virtual CacheManagerIds id() { return kRamCacheManager; }
+  virtual std::string Describe();
 
   RamCacheManager(
     uint64_t max_size,
     unsigned max_entries,
     MemoryKvStore::MemoryAllocator alloc,
-    perf::Statistics *statistics);
+    perf::StatisticsTemplate statistics);
 
   virtual ~RamCacheManager();
 

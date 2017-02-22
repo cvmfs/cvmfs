@@ -11,6 +11,8 @@
 
 #include <string>
 
+#include "cache_posix.h"
+#include "cache_tiered.h"
 #include "catalog_mgr_client.h"
 #include "catalog_mgr_rw.h"
 #include "compression.h"
@@ -299,6 +301,190 @@ TEST_F(T_MountPoint, CreateBasic) {
 }
 
 
+TEST_F(T_MountPoint, MkCacheParm) {
+  FileSystem *file_system = FileSystem::Create(fs_info_);
+  ASSERT_TRUE(file_system != NULL);
+
+  file_system->cache_mgr_instance_ = "ceph";
+  EXPECT_EQ("CVMFS_CACHE_ceph_TYPE",
+            file_system->MkCacheParm("CVMFS_CACHE_TYPE", "ceph"));
+  file_system->cache_mgr_instance_ = file_system->kDefaultCacheMgrInstance;
+  EXPECT_EQ("CVMFS_CACHE_TYPE",
+            file_system->MkCacheParm("CVMFS_CACHE_TYPE", "default"));
+  delete file_system;
+}
+
+
+TEST_F(T_MountPoint, CheckInstanceName) {
+  FileSystem *fs = FileSystem::Create(fs_info_);
+  ASSERT_TRUE(fs != NULL);
+
+  EXPECT_TRUE(fs->CheckInstanceName("ceph"));
+  EXPECT_TRUE(fs->CheckInstanceName("cephCache_01"));
+  EXPECT_FALSE(fs->CheckInstanceName("ceph cache 01"));
+  EXPECT_FALSE(fs->CheckInstanceName("aNameThatIsLongerThanItShouldBe"));
+  delete fs;
+}
+
+
+TEST_F(T_MountPoint, CheckPosixCacheSettings) {
+  FileSystem *fs = FileSystem::Create(fs_info_);
+  ASSERT_TRUE(fs != NULL);
+
+  FileSystem::PosixCacheSettings settings;
+  EXPECT_TRUE(fs->CheckPosixCacheSettings(settings));
+  settings.is_alien = true;
+  EXPECT_TRUE(fs->CheckPosixCacheSettings(settings));
+  settings.is_shared = true;
+  EXPECT_FALSE(fs->CheckPosixCacheSettings(settings));
+  settings.is_shared = false;
+  settings.is_managed = true;
+  EXPECT_FALSE(fs->CheckPosixCacheSettings(settings));
+  settings.is_alien = false;
+  settings.is_shared = true;
+  EXPECT_TRUE(fs->CheckPosixCacheSettings(settings));
+  fs->type_ = FileSystem::kFsLibrary;
+  EXPECT_FALSE(fs->CheckPosixCacheSettings(settings));
+  fs->type_ = FileSystem::kFsFuse;
+  settings.cache_base_defined = true;
+  EXPECT_TRUE(fs->CheckPosixCacheSettings(settings));
+  settings.cache_dir_defined = true;
+  EXPECT_FALSE(fs->CheckPosixCacheSettings(settings));
+  delete fs;
+}
+
+
+TEST_F(T_MountPoint, TriageCacheMgr) {
+  {
+    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    EXPECT_EQ(loader::kFailOk, fs->boot_status());
+    EXPECT_EQ("default", fs->cache_mgr_instance());
+  }
+  options_mgr_.SetValue("CVMFS_CACHE_PRIMARY", "string with spaces");
+  {
+    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    EXPECT_EQ(loader::kFailCacheDir, fs->boot_status());
+  }
+  options_mgr_.SetValue("CVMFS_CACHE_PRIMARY", "foo");
+  {
+    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    EXPECT_EQ(loader::kFailCacheDir, fs->boot_status());
+  }
+  options_mgr_.SetValue("CVMFS_CACHE_PRIMARY", "default");
+  {
+    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    EXPECT_EQ(loader::kFailOk, fs->boot_status());
+    EXPECT_EQ("default", fs->cache_mgr_instance());
+  }
+}
+
+
+TEST_F(T_MountPoint, RamCacheMgr) {
+  options_mgr_.SetValue("CVMFS_CACHE_PRIMARY", "ram");
+  options_mgr_.SetValue("CVMFS_CACHE_ram_TYPE", "ram");
+  {
+    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    EXPECT_EQ(loader::kFailOk, fs->boot_status());
+    EXPECT_EQ("ram", fs->cache_mgr_instance());
+    EXPECT_EQ(kRamCacheManager, fs->cache_mgr()->id());
+  }
+  options_mgr_.SetValue("CVMFS_CACHE_ram_MALLOC", "unknown");
+  {
+    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    EXPECT_EQ(loader::kFailOptions, fs->boot_status());
+  }
+  options_mgr_.SetValue("CVMFS_CACHE_ram_MALLOC", "libc");
+  {
+    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    EXPECT_EQ(loader::kFailOk, fs->boot_status());
+  }
+}
+
+
+TEST_F(T_MountPoint, TieredCacheMgr) {
+  options_mgr_.SetValue("CVMFS_CACHE_PRIMARY", "tiered");
+  options_mgr_.SetValue("CVMFS_CACHE_tiered_TYPE", "tiered");
+  {
+    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    EXPECT_EQ(loader::kFailOptions, fs->boot_status());
+  }
+  options_mgr_.SetValue("CVMFS_CACHE_tiered_UPPER", "ram_upper");
+  options_mgr_.SetValue("CVMFS_CACHE_ram_upper_TYPE", "ram");
+  {
+    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    EXPECT_EQ(loader::kFailOptions, fs->boot_status());
+  }
+  options_mgr_.SetValue("CVMFS_CACHE_tiered_LOWER", "posix_lower");
+  options_mgr_.SetValue("CVMFS_CACHE_posix_lower_TYPE", "posix");
+  options_mgr_.SetValue("CVMFS_CACHE_posix_lower_BASE", tmp_path_);
+  options_mgr_.SetValue("CVMFS_CACHE_posix_lower_SHARED", "false");
+  options_mgr_.SetValue("CVMFS_CACHE_posix_lower_QUOTA_LIMIT", "0");
+  {
+    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    EXPECT_EQ(loader::kFailOk, fs->boot_status());
+    EXPECT_EQ("tiered", fs->cache_mgr_instance());
+    EXPECT_EQ(kTieredCacheManager, fs->cache_mgr()->id());
+    EXPECT_EQ(kRamCacheManager, reinterpret_cast<TieredCacheManager *>(
+      fs->cache_mgr())->upper_->id());
+    EXPECT_EQ(kPosixCacheManager, reinterpret_cast<TieredCacheManager *>(
+      fs->cache_mgr())->lower_->id());
+  }
+
+  options_mgr_.SetValue("CVMFS_CACHE_tiered_LOWER", "ram_lower");
+  options_mgr_.SetValue("CVMFS_CACHE_ram_lower_TYPE", "ram");
+  {
+    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    EXPECT_EQ(loader::kFailOk, fs->boot_status());
+    EXPECT_EQ("tiered", fs->cache_mgr_instance());
+    EXPECT_EQ(kTieredCacheManager, fs->cache_mgr()->id());
+  }
+
+  options_mgr_.SetValue("CVMFS_CACHE_tiered_LOWER", "tiered");
+  {
+    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    EXPECT_EQ(loader::kFailCacheDir, fs->boot_status());
+  }
+}
+
+
+TEST_F(T_MountPoint, TieredComplex) {
+  options_mgr_.SetValue("CVMFS_CACHE_PRIMARY", "tiered");
+  options_mgr_.SetValue("CVMFS_CACHE_tiered_TYPE", "tiered");
+  options_mgr_.SetValue("CVMFS_CACHE_tiered_UPPER", "tiered_upper");
+  options_mgr_.SetValue("CVMFS_CACHE_tiered_upper_TYPE", "tiered");
+  options_mgr_.SetValue("CVMFS_CACHE_tiered_upper_UPPER", "uu_ram");
+  options_mgr_.SetValue("CVMFS_CACHE_tiered_upper_LOWER", "ul_ram");
+  options_mgr_.SetValue("CVMFS_CACHE_uu_ram_TYPE", "ram");
+  options_mgr_.SetValue("CVMFS_CACHE_ul_ram_TYPE", "ram");
+  options_mgr_.SetValue("CVMFS_CACHE_tiered_LOWER", "tiered_lower");
+  options_mgr_.SetValue("CVMFS_CACHE_tiered_lower_TYPE", "tiered");
+  options_mgr_.SetValue("CVMFS_CACHE_tiered_lower_UPPER", "lu_posix");
+  options_mgr_.SetValue("CVMFS_CACHE_tiered_lower_LOWER", "ll_posix");
+  options_mgr_.SetValue("CVMFS_CACHE_lu_posix_TYPE", "posix");
+  options_mgr_.SetValue("CVMFS_CACHE_lu_posix_BASE", tmp_path_ + "/lu");
+  options_mgr_.SetValue("CVMFS_CACHE_lu_posix_SHARED", "false");
+  options_mgr_.SetValue("CVMFS_CACHE_lu_posix_QUOTA_LIMIT", "0");
+  options_mgr_.SetValue("CVMFS_CACHE_ll_posix_TYPE", "posix");
+  options_mgr_.SetValue("CVMFS_CACHE_ll_posix_BASE", tmp_path_ + "/ll");
+  options_mgr_.SetValue("CVMFS_CACHE_ll_posix_SHARED", "false");
+  options_mgr_.SetValue("CVMFS_CACHE_ll_posix_QUOTA_LIMIT", "0");
+  {
+    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    EXPECT_EQ(loader::kFailOk, fs->boot_status()) << fs->boot_error();
+    EXPECT_EQ("tiered", fs->cache_mgr_instance());
+    EXPECT_EQ(kTieredCacheManager, fs->cache_mgr()->id());
+    TieredCacheManager *upper = reinterpret_cast<TieredCacheManager *>(
+      reinterpret_cast<TieredCacheManager *>(fs->cache_mgr())->upper_);
+    TieredCacheManager *lower = reinterpret_cast<TieredCacheManager *>(
+      reinterpret_cast<TieredCacheManager *>(fs->cache_mgr())->lower_);
+    EXPECT_EQ(kRamCacheManager, upper->upper_->id());
+    EXPECT_EQ(kRamCacheManager, upper->lower_->id());
+    EXPECT_EQ(kPosixCacheManager, lower->upper_->id());
+    EXPECT_EQ(kPosixCacheManager, lower->lower_->id());
+  }
+}
+
+
 TEST_F(T_MountPoint, CacheSettings) {
   options_mgr_.SetValue("CVMFS_ALIEN_CACHE", tmp_path_ + "/alien");
   options_mgr_.SetValue("CVMFS_QUOTA_LIMIT", "-1");
@@ -335,7 +521,9 @@ TEST_F(T_MountPoint, CacheSettings) {
     UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
     EXPECT_EQ(loader::kFailOk, fs->boot_status());
     EXPECT_EQ(tmp_path_ + "/unit-test", fs->workspace());
-    EXPECT_EQ(tmp_path_ + "/alien", fs->cache_dir());
+    EXPECT_EQ(tmp_path_ + "/alien",
+              reinterpret_cast<PosixCacheManager *>(
+                fs->cache_mgr())->cache_path());
   }
 
   fs_info_.type = FileSystem::kFsFuse;
@@ -343,7 +531,9 @@ TEST_F(T_MountPoint, CacheSettings) {
     UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
     EXPECT_EQ(loader::kFailOk, fs->boot_status());
     EXPECT_EQ(".", fs->workspace());
-    EXPECT_EQ(tmp_path_ + "/alien", fs->cache_dir());
+    EXPECT_EQ(tmp_path_ + "/alien",
+              reinterpret_cast<PosixCacheManager *>(
+                fs->cache_mgr())->cache_path());
   }
 
   RemoveTree(tmp_path_ + "/unit-test");
@@ -353,11 +543,12 @@ TEST_F(T_MountPoint, CacheSettings) {
   {
     UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
     EXPECT_EQ(loader::kFailOk, fs->boot_status());
-    EXPECT_TRUE(fs->cache_mode() & FileSystem::kCacheNfs);
-    EXPECT_TRUE(fs->cache_mode() & FileSystem::kCacheNfsHa);
-    EXPECT_EQ(".", fs->cache_dir());
+    EXPECT_TRUE(fs->IsNfsSource());
+    EXPECT_TRUE(fs->IsHaNfsSource());
+    EXPECT_EQ(".", reinterpret_cast<PosixCacheManager *>(
+      fs->cache_mgr())->cache_path());
     EXPECT_EQ(".", fs->workspace());
-    EXPECT_EQ(tmp_path_ + "/nfs", fs->nfs_maps_dir());
+    EXPECT_EQ(tmp_path_ + "/nfs", fs->nfs_maps_dir_);
   }
 
   options_mgr_.SetValue("CVMFS_CACHE_DIR", tmp_path_ + "/cachedir_direct");

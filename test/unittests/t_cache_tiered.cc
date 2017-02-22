@@ -16,9 +16,11 @@ class T_TieredCacheManager : public ::testing::Test {
  protected:
   virtual void SetUp() {
     upper_cache_ =
-      new RamCacheManager(1024, 128, MemoryKvStore::kMallocLibc, &stats_upper_);
+      new RamCacheManager(1024, 128, MemoryKvStore::kMallocLibc,
+                          perf::StatisticsTemplate("test", &stats_upper_));
     lower_cache_ =
-      new RamCacheManager(1024, 128, MemoryKvStore::kMallocLibc, &stats_lower_);
+      new RamCacheManager(1024, 128, MemoryKvStore::kMallocLibc,
+                          perf::StatisticsTemplate("test", &stats_lower_));
     tiered_cache_ = TieredCacheManager::Create(upper_cache_, lower_cache_);
     buf_ = 'x';
     hash_one_.digest[1] = 1;
@@ -61,7 +63,7 @@ TEST_F(T_TieredCacheManager, CopyUp) {
   int fd = tiered_cache_->Open(CacheManager::Bless(
     hash_one_, CacheManager::kTypeVolatile));
   EXPECT_GE(fd, 0);
-  EXPECT_EQ(1, stats_upper_.Lookup("RamCache.n_openvolatile")->Get());
+  EXPECT_EQ(1, stats_upper_.Lookup("test.n_openvolatile")->Get());
 
   int fd_upper = upper_cache_->Open(CacheManager::Bless(hash_one_));
   EXPECT_GE(fd_upper, 0);

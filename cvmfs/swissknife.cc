@@ -42,7 +42,8 @@ bool Command::InitDownloadManager(const bool     follow_redirects,
 
   download_manager_ = new download::DownloadManager();
   assert(download_manager_);
-  download_manager_->Init(max_pool_handles, use_system_proxy, statistics());
+  download_manager_->Init(max_pool_handles, use_system_proxy,
+                          perf::StatisticsTemplate("download", statistics()));
 
   download_manager_->SetTimeout(kDownloadTimeout, kDownloadTimeout);
   download_manager_->SetRetryParameters(kDownloadRetries, 500, 2000);
