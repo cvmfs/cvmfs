@@ -202,7 +202,7 @@ static void ReadConfigurations() {
     UniquePtr<perf::Statistics> statistics(new perf::Statistics());
     UniquePtr<download::DownloadManager>
       download_mgr(new download::DownloadManager());
-    download_mgr->Init(4, false, statistics);
+    download_mgr->Init(4, false, perf::StatisticsTemplate("agent", statistics));
     if (options_mgr->GetValue("CVMFS_HTTP_TIMEOUT", &optarg))
       download_mgr->SetTimeout(String2Uint64(optarg), String2Uint64(optarg));
     if (options_mgr->GetValue("CVMFS_HTTP_RETRIES", &optarg))
