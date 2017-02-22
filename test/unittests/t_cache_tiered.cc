@@ -63,7 +63,7 @@ TEST_F(T_TieredCacheManager, CopyUp) {
   int fd = tiered_cache_->Open(CacheManager::Bless(
     hash_one_, CacheManager::kTypeVolatile));
   EXPECT_GE(fd, 0);
-  EXPECT_EQ(1, stats_upper_.Lookup("RamCache.n_openvolatile")->Get());
+  EXPECT_EQ(1, stats_upper_.Lookup("test.n_openvolatile")->Get());
 
   int fd_upper = upper_cache_->Open(CacheManager::Bless(hash_one_));
   EXPECT_GE(fd_upper, 0);
