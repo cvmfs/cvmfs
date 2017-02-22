@@ -235,8 +235,8 @@ TEST_F(T_Pack, ObjectPackTransfer) {
 TEST_F(T_Pack, Produce) {
   ObjectPackProducer producer(&pack_of_three_);
   const string expected_result =
-      "V1\nS4097\nN3\n--\n" + hash_null_.ToString(true) + " 4096\n" +
-      hash_partial_.ToString(true) + " 0\n" + hash_null_.ToString(true) +
+      "V2\nS4097\nN3\n--\nC " + hash_null_.ToString(true) + " 4096\nC " +
+      hash_partial_.ToString(true) + " 0\nC " + hash_null_.ToString(true) +
       " 1\n" + string(4096, '\0') + string(1, '1');
 
   unsigned char out_buf[8192];
@@ -257,7 +257,7 @@ TEST_F(T_Pack, Produce) {
 
 TEST_F(T_Pack, ProducerEmpty) {
   ObjectPackProducer producer(&pack_);
-  const string expected_result = "V1\nS0\nN0\n--\n";
+  const string expected_result = "V2\nS0\nN0\n--\n";
   EXPECT_EQ(12U, producer.GetHeaderSize());
   shash::Any digest(shash::kSha1);
   producer.GetDigest(&digest);
@@ -282,18 +282,19 @@ TEST_F(T_Pack, ProducerEmpty) {
 }
 
 TEST_F(T_Pack, ProducerFile) {
-  ObjectPackProducer producer(hash_null_, ffoo_, "the_file_name");
-  const string expected_result = "V1\nS" + StringifyInt(foo_content_.size()) +
-                                 "\nN1\n--\n" + hash_null_.ToString(true) +
-                                 " " + StringifyInt(foo_content_.size()) +
-                                 "\n" + foo_content_;
+  const std::string file_name = "the_file_name";
+  ObjectPackProducer producer(hash_null_, ffoo_, file_name);
+  const string expected_result = "V2\nS" + StringifyInt(foo_content_.size()) +
+                                 "\nN1\n--\nN " + hash_null_.ToString(true) +
+                                 " " + StringifyInt(foo_content_.size()) + " " +
+                                 Base64Url(file_name) + "\n" + foo_content_;
 
   unsigned char buf[4096];
   unsigned nbytes = producer.ProduceNext(4096, buf);
   EXPECT_EQ(expected_result.size(), nbytes);
   EXPECT_EQ(expected_result, string(reinterpret_cast<char *>(buf), nbytes));
 
-  ObjectPackProducer producer_two(hash_null_, ffoo_, "another_file_name");
+  ObjectPackProducer producer_two(hash_null_, ffoo_, file_name);
   unsigned pos = 0;
   do {
     nbytes = producer_two.ProduceNext(1, buf + pos);
