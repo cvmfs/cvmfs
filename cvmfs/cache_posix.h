@@ -60,6 +60,7 @@ class PosixCacheManager : public CacheManager {
   static const uint64_t kBigFile;
 
   virtual CacheManagerIds id() { return kPosixCacheManager; }
+  virtual std::string Describe();
 
   static PosixCacheManager *Create(const std::string &cache_path,
                                    const bool alien_cache,

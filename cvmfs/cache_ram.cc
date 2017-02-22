@@ -13,11 +13,17 @@
 #include "kvstore.h"
 #include "logging.h"
 #include "util/posix.h"
+#include "util/string.h"
 #include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 
 const shash::Any RamCacheManager::kInvalidHandle;
+
+string RamCacheManager::Describe() {
+  return "Internal in-memory cache manager (size " +
+         StringifyInt(max_size_ / (1024 * 1024)) + "MB)\n";
+}
 
 
 RamCacheManager::RamCacheManager(

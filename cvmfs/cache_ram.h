@@ -101,6 +101,7 @@ class RamCacheManager : public CacheManager {
   };
 
   virtual CacheManagerIds id() { return kRamCacheManager; }
+  virtual std::string Describe();
 
   RamCacheManager(
     uint64_t max_size,

@@ -29,6 +29,7 @@ class TieredCacheManager : public CacheManager {
 
  public:
   virtual CacheManagerIds id() { return kTieredCacheManager; }
+  virtual std::string Describe();
 
   static CacheManager *Create(CacheManager *upper_cache,
                               CacheManager *lower_cache)

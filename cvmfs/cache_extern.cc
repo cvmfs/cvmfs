@@ -282,6 +282,11 @@ void ExternalCacheManager::CtrlTxn(
 }
 
 
+string ExternalCacheManager::Describe() {
+  return "External cache manager\n";
+}
+
+
 int ExternalCacheManager::DoOpen(const shash::Any &id) {
   int fd = -1;
   {

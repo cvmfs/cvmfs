@@ -124,6 +124,7 @@ class BuggyCacheManager : public CacheManager {
     atomic_init32(&continue_ctrltxn);
   }
   virtual CacheManagerIds id() { return kUnknownCacheManager; }
+  virtual std::string Describe() { return "test\n"; }
   virtual bool AcquireQuotaManager(QuotaManager *qm) { return false; }
   virtual int Open(const BlessedObject &object) {
     if (!allow_open) {

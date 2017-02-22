@@ -280,6 +280,11 @@ void PosixCacheManager::CtrlTxn(
 }
 
 
+string PosixCacheManager::Describe() {
+  return "Posix cache manager (cache directory: " + cache_path_ + ")\n";
+}
+
+
 int PosixCacheManager::Dup(int fd) {
   int new_fd = dup(fd);
   if (new_fd < 0)

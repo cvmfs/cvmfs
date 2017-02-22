@@ -58,6 +58,7 @@ class ExternalCacheManager : public CacheManager {
   virtual ~ExternalCacheManager();
 
   virtual CacheManagerIds id() { return kExternalCacheManager; }
+  virtual std::string Describe();
   virtual bool AcquireQuotaManager(QuotaManager *quota_mgr);
 
   virtual int Open(const BlessedObject &object);
