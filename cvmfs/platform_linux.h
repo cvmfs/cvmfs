@@ -339,7 +339,8 @@ inline uint64_t platform_monotonic_time() {
 }
 
 inline uint64_t platform_memsize() {
-  return sysconf(_SC_PHYS_PAGES) * sysconf(_SC_PAGE_SIZE);
+  return static_cast<uint64_t>(sysconf(_SC_PHYS_PAGES)) *
+         static_cast<uint64_t>(sysconf(_SC_PAGE_SIZE));
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD
