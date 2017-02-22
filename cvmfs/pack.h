@@ -137,13 +137,21 @@ class ObjectPack : SingleCopy {
  */
 namespace ObjectPackBuild {
 struct Event {
-  Event(const shash::Any &id, uint64_t size, unsigned buf_size, const void *buf)
-      : id(id), size(size), buf_size(buf_size), buf(buf) {}
+  Event(const shash::Any &id, uint64_t size, unsigned buf_size, const void *buf,
+        ObjectPack::BucketContentType type, const std::string &name)
+      : id(id),
+        size(size),
+        buf_size(buf_size),
+        buf(buf),
+        object_type(type),
+        object_name(name) {}
 
   shash::Any id;
   uint64_t size;
   unsigned buf_size;
   const void *buf;
+  ObjectPack::BucketContentType object_type;
+  std::string object_name;
 };
 
 enum State {
@@ -233,13 +241,19 @@ class ObjectPackConsumer : public Observable<ObjectPackBuild::Event> {
   static const unsigned kAccuSize = 128 * 1024;
 
   struct IndexEntry {
-    IndexEntry(const shash::Any &id, const uint64_t size)
-        : id(id), size(size) {}
+    IndexEntry() : id(), size(), entry_type(), entry_name() {}
+    IndexEntry(const shash::Any &id, const uint64_t size,
+               ObjectPack::BucketContentType type, const std::string &name)
+        : id(id), size(size), entry_type(type), entry_name(name) {}
     shash::Any id;
     uint64_t size;
+    ObjectPack::BucketContentType entry_type;
+    std::string entry_name;
   };
 
   bool ParseHeader();
+  bool ParseItem(const std::string &line, IndexEntry *entry, size_t *sum_size);
+
   ObjectPackBuild::State ConsumePayload(const unsigned buf_size,
                                         const unsigned char *buf);
 

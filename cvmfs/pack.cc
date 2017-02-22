@@ -49,6 +49,7 @@ void AppendItemToHeader(ObjectPack::BucketContentType object_type,
                line_suffix + "\n";
   }
 }
+
 }  // namespace
 
 ObjectPack::Bucket::Bucket()
@@ -351,12 +352,14 @@ ObjectPackBuild::State ObjectPackConsumer::ConsumePayload(
       pos_in_accu_ += nbytes;
       if ((pos_in_accu_ == kAccuSize) || (nbytes == remaining_in_object)) {
         NotifyListeners(ObjectPackBuild::Event(
-            index_[idx_].id, index_[idx_].size, pos_in_accu_, accumulator_));
+            index_[idx_].id, index_[idx_].size, pos_in_accu_, accumulator_,
+            index_[idx_].entry_type, index_[idx_].entry_name));
         pos_in_accu_ = 0;
       }
     } else {  // directly trigger listeners using buf
-      NotifyListeners(ObjectPackBuild::Event(index_[idx_].id, index_[idx_].size,
-                                             nbytes, buf + pos_in_buf));
+      NotifyListeners(ObjectPackBuild::Event(
+          index_[idx_].id, index_[idx_].size, nbytes, buf + pos_in_buf,
+          index_[idx_].entry_type, index_[idx_].entry_name));
     }
 
     pos_in_buf += nbytes;
@@ -383,14 +386,14 @@ bool ObjectPackConsumer::ParseHeader() {
       reinterpret_cast<const unsigned char *>(raw_header_.data());
   ParseKeyvalMem(data, raw_header_.size(), &header);
   if (header.find('V') == header.end()) return false;
-  if (header['V'] != "1") return false;
+  if (header['V'] != "2") return false;
   size_ = String2Uint64(header['S']);
   unsigned nobjects = String2Uint64(header['N']);
 
   if (nobjects == 0) return true;
 
   // Build the object index
-  size_t separator_idx = raw_header_.find("--\n");
+  const size_t separator_idx = raw_header_.find("--\n");
   if (separator_idx == string::npos) return false;
   unsigned index_idx = separator_idx + 3;
   if (index_idx >= raw_header_.size()) return false;
@@ -402,22 +405,57 @@ bool ObjectPackConsumer::ParseHeader() {
         GetLineMem(raw_header_.data() + index_idx, remaining_in_header);
     if (line == "") break;
 
-    // We could use SplitString but we can have many lines so we do something
-    // more efficient here
-    separator_idx = line.find_first_of(' ');
-    if ((separator_idx == 0) || (separator_idx == string::npos) ||
-        (separator_idx == (line.size() - 1))) {
-      return false;
+    IndexEntry entry;
+    if (!ParseItem(line, &entry, &sum_size)) {
+      break;
     }
-    uint64_t size = String2Uint64(line.substr(separator_idx + 1));
-    sum_size += size;
-    const IndexEntry index_entry(shash::MkFromSuffixedHexPtr(shash::HexPtr(
-                                     line.substr(0, separator_idx))),
-                                 size);
-    index_.push_back(index_entry);
 
+    index_.push_back(entry);
     index_idx += line.size() + 1;
   } while (index_idx < raw_header_.size());
 
   return (nobjects == index_.size()) && (size_ == sum_size);
+}
+
+bool ObjectPackConsumer::ParseItem(const std::string &line,
+                                   ObjectPackConsumer::IndexEntry *entry,
+                                   size_t *sum_size) {
+  if (!entry || !sum_size) {
+    return false;
+  }
+
+  const std::string type_identifier(1, line[0]);
+  if (type_identifier == "C") {  // CAS blob
+    const ObjectPack::BucketContentType entry_type = ObjectPack::kCas;
+
+    // We could use SplitString but we can have many lines so we do something
+    // more efficient here
+    const size_t separator_idx = line.find(' ', 2);
+    if ((separator_idx == 0) || (separator_idx == string::npos) ||
+        (separator_idx == (line.size() - 1))) {
+      return false;
+    }
+
+    uint64_t size = String2Uint64(line.substr(separator_idx + 1));
+    *sum_size += size;
+
+    entry->id = shash::MkFromSuffixedHexPtr(
+        shash::HexPtr(line.substr(2, separator_idx)));
+    entry->size = size;
+    entry->entry_type = entry_type;
+    entry->entry_name = "";
+  } else if (type_identifier == "N") {  // Named file
+    // const ObjectPack::BucketContentType entry_type = ObjectPack::kNamed;
+
+    const size_t separator_idx = line.find(' ', 2);
+    if ((separator_idx == 0) || (separator_idx == string::npos) ||
+        (separator_idx == (line.size() - 1))) {
+      return false;
+    }
+
+  } else {  // Error
+    return false;
+  }
+
+  return true;
 }
