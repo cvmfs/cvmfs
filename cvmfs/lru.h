@@ -75,7 +75,7 @@ struct Counters {
   perf::Counter *n_drop;
   perf::Counter *sz_allocated;
 
-  Counters(perf::StatisticsTemplate statistics) {
+  explicit Counters(perf::StatisticsTemplate statistics) {
     sz_size = statistics.RegisterTemplated("sz_size", "Total size");
     num_collisions = 0;
     max_collisions = 0;

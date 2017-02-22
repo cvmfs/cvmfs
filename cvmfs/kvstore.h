@@ -85,7 +85,7 @@ class MemoryKvStore : SingleCopy, public Callbackable<MallocHeap::BlockPtr> {
     perf::Counter *sz_deleted;
     perf::Counter *sz_shrunk;
 
-    Counters(perf::StatisticsTemplate statistics) {
+    explicit Counters(perf::StatisticsTemplate statistics) {
       sz_size = statistics.RegisterTemplated("sz_size", "Total size");
       n_getsize = statistics.RegisterTemplated("n_getsize",
         "Number of GetSize calls");

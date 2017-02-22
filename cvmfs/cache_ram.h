@@ -62,7 +62,7 @@ class RamCacheManager : public CacheManager {
     perf::Counter *n_full;
     perf::Counter *n_realloc;
 
-    Counters(perf::StatisticsTemplate statistics) {
+    explicit Counters(perf::StatisticsTemplate statistics) {
       n_getsize = statistics.RegisterTemplated("n_getsize",
         "Number of GetSize calls");
       n_close = statistics.RegisterTemplated("n_close",

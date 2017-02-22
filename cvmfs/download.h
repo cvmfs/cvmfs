@@ -96,7 +96,7 @@ struct Counters {
   perf::Counter *n_proxy_failover;
   perf::Counter *n_host_failover;
 
-  Counters(perf::StatisticsTemplate statistics) {
+  explicit Counters(perf::StatisticsTemplate statistics) {
     sz_transferred_bytes = statistics.RegisterTemplated("sz_transferred_bytes",
         "Number of transferred bytes");
     sz_transfer_time = statistics.RegisterTemplated("sz_transfer_time",
