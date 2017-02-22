@@ -347,6 +347,23 @@ TEST_F(T_Pack, ConsumerEmpty) {
   EXPECT_EQ(ObjectPackBuild::kStateDone, consumer_two.ConsumeNext(0, NULL));
 }
 
+TEST_F(T_Pack, ConsumerOfProducerFromFile) {
+  const std::string file_name = "the_file_name";
+  ObjectPackProducer producer(hash_null_, ffoo_, file_name);
+  shash::Any digest(shash::kShake128);
+  producer.GetDigest(&digest);
+  ObjectPackConsumer consumer(digest, producer.GetHeaderSize());
+
+  ConsumerCallbacks callbacks;
+  consumer.RegisterListener(&ConsumerCallbacks::OnEvent, &callbacks);
+
+  unsigned char buf[8192];
+  unsigned nbytes = producer.ProduceNext(8192, buf);
+  EXPECT_EQ(ObjectPackBuild::kStateDone, consumer.ConsumeNext(nbytes, buf));
+  EXPECT_EQ(1U, callbacks.total_objects);
+  EXPECT_EQ(foo_content_.size(), callbacks.total_size);
+}
+
 TEST_F(T_Pack, RealWorld) { RealWorld(); }
 
 TEST_F(T_Pack, RealWorldSlow) {
