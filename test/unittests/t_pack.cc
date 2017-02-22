@@ -61,9 +61,9 @@ class T_Pack : public ::testing::Test {
     ObjectPack::BucketHandle handle_one = pack_of_three_.NewBucket();
     ObjectPack::BucketHandle handle_two = pack_of_three_.NewBucket();
     ObjectPack::BucketHandle handle_three = pack_of_three_.NewBucket();
-    pack_of_three_.AddToBucket(buf, 4096, handle_one);
+    ObjectPack::AddToBucket(buf, 4096, handle_one);
     buf[0] = '1';
-    pack_of_three_.AddToBucket(buf, 1, handle_three);
+    ObjectPack::AddToBucket(buf, 1, handle_three);
     EXPECT_TRUE(pack_of_three_.CommitBucket(hash_null_, handle_one));
     EXPECT_TRUE(pack_of_three_.CommitBucket(hash_partial_, handle_two));
     EXPECT_TRUE(pack_of_three_.CommitBucket(hash_null_, handle_three));
@@ -151,8 +151,8 @@ TEST_F(T_Pack, ObjectPack) {
   EXPECT_EQ(0U, pack_.size_);
 
   char buf = '0';
-  pack_.AddToBucket(&buf, 1, handle_one);
-  pack_.AddToBucket(&buf, 1, handle_one);
+  ObjectPack::AddToBucket(&buf, 1, handle_one);
+  ObjectPack::AddToBucket(&buf, 1, handle_one);
 
   EXPECT_TRUE(pack_.CommitBucket(shash::Any(hash_null_), handle_one));
   EXPECT_EQ(1U, pack_.open_buckets_.size());
@@ -163,7 +163,7 @@ TEST_F(T_Pack, ObjectPack) {
   ObjectPack::BucketHandle handle_three = pack_.NewBucket();
   EXPECT_EQ(2U, pack_.open_buckets_.size());
   EXPECT_EQ(1U, pack_.buckets_.size());
-  pack_.AddToBucket(&buf, 1, handle_three);
+  ObjectPack::AddToBucket(&buf, 1, handle_three);
   EXPECT_TRUE(pack_.CommitBucket(shash::Any(hash_null_), handle_three));
   EXPECT_EQ(1U, pack_.open_buckets_.size());
   ASSERT_EQ(2U, pack_.buckets_.size());
@@ -171,7 +171,7 @@ TEST_F(T_Pack, ObjectPack) {
   EXPECT_EQ(1U, pack_.buckets_[1]->size);
   EXPECT_EQ(3U, pack_.size_);
 
-  pack_.AddToBucket(&buf, 1, handle_two);
+  ObjectPack::AddToBucket(&buf, 1, handle_two);
   pack_.DiscardBucket(handle_two);
   EXPECT_EQ(0U, pack_.open_buckets_.size());
   EXPECT_EQ(2U, pack_.buckets_.size());
@@ -182,17 +182,17 @@ TEST_F(T_Pack, ObjectPackOverflow) {
 
   ObjectPack::BucketHandle handle_one = small_pack.NewBucket();
   char buf = '0';
-  small_pack.AddToBucket(&buf, 1, handle_one);
+  ObjectPack::AddToBucket(&buf, 1, handle_one);
   EXPECT_TRUE(small_pack.CommitBucket(shash::Any(hash_null_), handle_one));
 
   ObjectPack::BucketHandle handle_two = small_pack.NewBucket();
-  small_pack.AddToBucket(&buf, 1, handle_two);
-  small_pack.AddToBucket(&buf, 1, handle_two);
+  ObjectPack::AddToBucket(&buf, 1, handle_two);
+  ObjectPack::AddToBucket(&buf, 1, handle_two);
   EXPECT_FALSE(small_pack.CommitBucket(shash::Any(hash_null_), handle_two));
   small_pack.DiscardBucket(handle_two);
 
   ObjectPack::BucketHandle handle_three = small_pack.NewBucket();
-  small_pack.AddToBucket(&buf, 1, handle_three);
+  ObjectPack::AddToBucket(&buf, 1, handle_three);
   EXPECT_TRUE(small_pack.CommitBucket(shash::Any(hash_null_), handle_three));
 
   // Fail due to too many objects
