@@ -445,14 +445,35 @@ bool ObjectPackConsumer::ParseItem(const std::string &line,
     entry->entry_type = entry_type;
     entry->entry_name = "";
   } else if (type_identifier == "N") {  // Named file
-    // const ObjectPack::BucketContentType entry_type = ObjectPack::kNamed;
+    const ObjectPack::BucketContentType entry_type = ObjectPack::kNamed;
 
-    const size_t separator_idx = line.find(' ', 2);
-    if ((separator_idx == 0) || (separator_idx == string::npos) ||
-        (separator_idx == (line.size() - 1))) {
+    // First separator, before the size field
+    const size_t separator1 = line.find(' ', 2);
+    if ((separator1 == 0) || (separator1 == string::npos) ||
+        (separator1 == (line.size() - 1))) {
       return false;
     }
 
+    // Second separator, before the name field
+    const size_t separator2 = line.find(' ', separator1 + 1);
+    if ((separator1 == 0) || (separator1 == string::npos) ||
+        (separator1 == (line.size() - 1))) {
+      return false;
+    }
+
+    uint64_t size = String2Uint64(line.substr(separator1 + 1, separator2));
+
+    std::string name;
+    if (!Debase64(line.substr(separator2 + 1), &name)) {
+      return false;
+    }
+
+    *sum_size += size;
+    entry->id =
+        shash::MkFromSuffixedHexPtr(shash::HexPtr(line.substr(2, separator1)));
+    entry->size = size;
+    entry->entry_type = entry_type;
+    entry->entry_name = name;
   } else {  // Error
     return false;
   }
