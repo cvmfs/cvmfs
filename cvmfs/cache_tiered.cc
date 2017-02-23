@@ -85,8 +85,11 @@ int TieredCacheManager::StartTxn(const shash::Any &id, uint64_t size, void *txn)
   }
 
   void *txn2 = static_cast<char *>(txn) + upper_->SizeOfTxn();
-  int lower_result = lower_->StartTxn(id, size, txn2);
-  if (lower_result < 0) {
+  int lower_result = lower_readonly_ ? upper_result : lower_->StartTxn(id, size, txn2);
+  if (lower_result == -EROFS) {
+    lower_readonly_ = true;
+    lower_result = upper_result;
+  } else if (lower_result < 0) {
     upper_->AbortTxn(txn);
   }
   return lower_result;
