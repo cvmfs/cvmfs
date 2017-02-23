@@ -36,12 +36,15 @@ void AppendItemToHeader(ObjectPack::BucketContentType object_type,
          ((object_type == ObjectPack::kNamed) && (!object_name.empty())));
   std::string line_prefix = "";
   std::string line_suffix = "";
-  if (object_type == ObjectPack::kNamed) {
+  switch (object_type) {
+  case ObjectPack::kNamed:
     line_prefix = "N ";
     line_suffix = std::string(" ") + Base64Url(object_name);
-  } else if (object_type == ObjectPack::kCas) {
+    break;
+  case ObjectPack::kCas:
     line_prefix = "C ";
-  } else {  // item_type == kEmpty
+    break;
+  default:
     return;
   }
   if (header) {
