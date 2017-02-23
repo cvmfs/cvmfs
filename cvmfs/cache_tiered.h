@@ -63,6 +63,8 @@ class TieredCacheManager : public CacheManager {
   virtual int CommitTxn(void *txn);
   virtual void Spawn();
 
+  void SetLowerReadOnly() {lower_readonly_ = true;}
+
  private:
   static const unsigned kCopyBufferSize = 64 * 1024;  // 64kB
 
@@ -70,11 +72,13 @@ class TieredCacheManager : public CacheManager {
   TieredCacheManager(CacheManager *upper_cache,
                      CacheManager *lower_cache)
     : upper_(upper_cache),
-      lower_(lower_cache)
+      lower_(lower_cache),
+      lower_readonly_(false)
   { }
 
   CacheManager *upper_;
   CacheManager *lower_;
+  bool lower_readonly_;
 };  // class TieredCacheManager
 
 #endif  // CVMFS_CACHE_TIERED_H_
