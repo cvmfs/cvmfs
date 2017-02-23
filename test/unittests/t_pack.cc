@@ -16,13 +16,12 @@
 
 using namespace std;  // NOLINT
 
-
 class ConsumerCallbacks {
  public:
   ConsumerCallbacks()
-    : total_size(0), total_objects(0), this_size(0), verify_errors(0) { }
+      : total_size(0), total_objects(0), this_size(0), verify_errors(0) {}
 
-  void OnEvent(const ObjectPackConsumer::BuildEvent &event) {
+  void OnEvent(const ObjectPackBuild::Event &event) {
     total_size += event.buf_size;
     this_size += event.buf_size;
     if (this_size == event.size) {
@@ -36,13 +35,11 @@ class ConsumerCallbacks {
     verify_errors = 0;
   }
 
-
   uint64_t total_size;
   uint64_t total_objects;
   uint64_t this_size;
   unsigned verify_errors;
 };
-
 
 class T_Pack : public ::testing::Test {
  protected:
@@ -61,15 +58,18 @@ class T_Pack : public ::testing::Test {
 
     unsigned char buf[4096];
     memset(buf, 0, 4096);
-    ObjectPack::BucketHandle handle_one = pack_of_three_.OpenBucket();
-    ObjectPack::BucketHandle handle_two = pack_of_three_.OpenBucket();
-    ObjectPack::BucketHandle handle_three = pack_of_three_.OpenBucket();
-    pack_of_three_.AddToBucket(buf, 4096, handle_one);
+    ObjectPack::BucketHandle handle_one = pack_of_three_.NewBucket();
+    ObjectPack::BucketHandle handle_two = pack_of_three_.NewBucket();
+    ObjectPack::BucketHandle handle_three = pack_of_three_.NewBucket();
+    ObjectPack::AddToBucket(buf, 4096, handle_one);
     buf[0] = '1';
-    pack_of_three_.AddToBucket(buf, 1, handle_three);
-    EXPECT_TRUE(pack_of_three_.CommitBucket(hash_null_, handle_one));
-    EXPECT_TRUE(pack_of_three_.CommitBucket(hash_partial_, handle_two));
-    EXPECT_TRUE(pack_of_three_.CommitBucket(hash_null_, handle_three));
+    ObjectPack::AddToBucket(buf, 1, handle_three);
+    EXPECT_TRUE(
+        pack_of_three_.CommitBucket(ObjectPack::kCas, hash_null_, handle_one));
+    EXPECT_TRUE(pack_of_three_.CommitBucket(ObjectPack::kCas, hash_partial_,
+                                            handle_two));
+    EXPECT_TRUE(pack_of_three_.CommitBucket(ObjectPack::kCas, hash_null_,
+                                            handle_three));
   }
 
   virtual void TearDown() {
@@ -79,22 +79,21 @@ class T_Pack : public ::testing::Test {
 
   void RealWorld() {
     const unsigned kMaxObject = 4 * 1024 * 1024;  // 4MB
-    const unsigned kBufSize = 1 * 1024 * 1024;  // 1MB
+    const unsigned kBufSize = 1 * 1024 * 1024;    // 1MB
     Prng prng;
     prng.InitLocaltime();
     unsigned char *obj_buf =
-      reinterpret_cast<unsigned char *>(smalloc(kMaxObject));
-    for (unsigned i = 0; i < kMaxObject; ++i)
-      obj_buf[i] = prng.Next(256);
+        reinterpret_cast<unsigned char *>(smalloc(kMaxObject));
+    for (unsigned i = 0; i < kMaxObject; ++i) obj_buf[i] = prng.Next(256);
 
     bool has_space = true;
     do {
-      ObjectPack::BucketHandle handle = pack_.OpenBucket();
-      uint64_t size = prng.Next(kMaxObject +1);
+      ObjectPack::BucketHandle handle = pack_.NewBucket();
+      uint64_t size = prng.Next(kMaxObject + 1);
       shash::Any obj_digest(shash::kMd5);
       shash::HashMem(obj_buf, size, &obj_digest);
-      pack_.AddToBucket(obj_buf, size, handle);
-      has_space = pack_.CommitBucket(obj_digest, handle);
+      handle->Add(obj_buf, size);
+      has_space = pack_.CommitBucket(ObjectPack::kCas, obj_digest, handle);
     } while (has_space);
     free(obj_buf);
 
@@ -109,7 +108,7 @@ class T_Pack : public ::testing::Test {
     // TODO(jblomer) Verify objects
     consumer.RegisterListener(&ConsumerCallbacks::OnEvent, &callbacks);
     unsigned char *transfer_buf =
-      reinterpret_cast<unsigned char *>(smalloc(kBufSize));
+        reinterpret_cast<unsigned char *>(smalloc(kBufSize));
     unsigned nspace;
     unsigned nwritten;
     do {
@@ -119,7 +118,7 @@ class T_Pack : public ::testing::Test {
     } while (nspace == nwritten);
     free(transfer_buf);
 
-    EXPECT_EQ(ObjectPackConsumer::kStateDone, consumer.ConsumeNext(0, NULL));
+    EXPECT_EQ(ObjectPackBuild::kStateDone, consumer.ConsumeNext(0, NULL));
     EXPECT_EQ(pack_.GetNoObjects(), callbacks.total_objects);
     EXPECT_EQ(pack_.size(), callbacks.total_size);
   }
@@ -132,7 +131,6 @@ class T_Pack : public ::testing::Test {
   FILE *ffoo_;
   string foo_content_;
 };
-
 
 TEST_F(T_Pack, Bucket) {
   ObjectPack::Bucket bucket;
@@ -148,80 +146,82 @@ TEST_F(T_Pack, Bucket) {
   EXPECT_EQ(1153U, bucket.size);
 }
 
-
 TEST_F(T_Pack, ObjectPack) {
-  ObjectPack::BucketHandle handle_one = pack_.OpenBucket();
-  ObjectPack::BucketHandle handle_two = pack_.OpenBucket();
+  ObjectPack::BucketHandle handle_one = pack_.NewBucket();
+  ObjectPack::BucketHandle handle_two = pack_.NewBucket();
   EXPECT_EQ(2U, pack_.open_buckets_.size());
   EXPECT_EQ(0U, pack_.buckets_.size());
   EXPECT_EQ(0U, pack_.size_);
 
   char buf = '0';
-  pack_.AddToBucket(&buf, 1, handle_one);
-  pack_.AddToBucket(&buf, 1, handle_one);
+  ObjectPack::AddToBucket(&buf, 1, handle_one);
+  ObjectPack::AddToBucket(&buf, 1, handle_one);
 
-  EXPECT_TRUE(pack_.CommitBucket(shash::Any(hash_null_), handle_one));
+  EXPECT_TRUE(
+      pack_.CommitBucket(ObjectPack::kCas, shash::Any(hash_null_), handle_one));
   EXPECT_EQ(1U, pack_.open_buckets_.size());
   ASSERT_EQ(1U, pack_.buckets_.size());
   EXPECT_EQ(2U, pack_.buckets_[0]->size);
   EXPECT_EQ(2U, pack_.size_);
 
-  ObjectPack::BucketHandle handle_three = pack_.OpenBucket();
+  ObjectPack::BucketHandle handle_three = pack_.NewBucket();
   EXPECT_EQ(2U, pack_.open_buckets_.size());
   EXPECT_EQ(1U, pack_.buckets_.size());
-  pack_.AddToBucket(&buf, 1, handle_three);
-  EXPECT_TRUE(pack_.CommitBucket(shash::Any(hash_null_), handle_three));
+  ObjectPack::AddToBucket(&buf, 1, handle_three);
+  EXPECT_TRUE(pack_.CommitBucket(ObjectPack::kCas, shash::Any(hash_null_),
+                                 handle_three));
   EXPECT_EQ(1U, pack_.open_buckets_.size());
   ASSERT_EQ(2U, pack_.buckets_.size());
   EXPECT_EQ(2U, pack_.buckets_[0]->size);
   EXPECT_EQ(1U, pack_.buckets_[1]->size);
   EXPECT_EQ(3U, pack_.size_);
 
-  pack_.AddToBucket(&buf, 1, handle_two);
+  ObjectPack::AddToBucket(&buf, 1, handle_two);
   pack_.DiscardBucket(handle_two);
   EXPECT_EQ(0U, pack_.open_buckets_.size());
   EXPECT_EQ(2U, pack_.buckets_.size());
 }
 
-
 TEST_F(T_Pack, ObjectPackOverflow) {
   ObjectPack small_pack(2);
 
-  ObjectPack::BucketHandle handle_one = small_pack.OpenBucket();
+  ObjectPack::BucketHandle handle_one = small_pack.NewBucket();
   char buf = '0';
-  small_pack.AddToBucket(&buf, 1, handle_one);
-  EXPECT_TRUE(small_pack.CommitBucket(shash::Any(hash_null_), handle_one));
+  ObjectPack::AddToBucket(&buf, 1, handle_one);
+  EXPECT_TRUE(small_pack.CommitBucket(ObjectPack::kCas, shash::Any(hash_null_),
+                                      handle_one));
 
-  ObjectPack::BucketHandle handle_two = small_pack.OpenBucket();
-  small_pack.AddToBucket(&buf, 1, handle_two);
-  small_pack.AddToBucket(&buf, 1, handle_two);
-  EXPECT_FALSE(small_pack.CommitBucket(shash::Any(hash_null_), handle_two));
+  ObjectPack::BucketHandle handle_two = small_pack.NewBucket();
+  ObjectPack::AddToBucket(&buf, 1, handle_two);
+  ObjectPack::AddToBucket(&buf, 1, handle_two);
+  EXPECT_FALSE(small_pack.CommitBucket(ObjectPack::kCas, shash::Any(hash_null_),
+                                       handle_two));
   small_pack.DiscardBucket(handle_two);
 
-  ObjectPack::BucketHandle handle_three = small_pack.OpenBucket();
-  small_pack.AddToBucket(&buf, 1, handle_three);
-  EXPECT_TRUE(small_pack.CommitBucket(shash::Any(hash_null_), handle_three));
+  ObjectPack::BucketHandle handle_three = small_pack.NewBucket();
+  ObjectPack::AddToBucket(&buf, 1, handle_three);
+  EXPECT_TRUE(small_pack.CommitBucket(ObjectPack::kCas, shash::Any(hash_null_),
+                                      handle_three));
 
   // Fail due to too many objects
   ObjectPack::BucketHandle *handles;
-  handles = reinterpret_cast<ObjectPack::BucketHandle *>(
-    smalloc((ObjectPack::kMaxObjects + 1) * sizeof(ObjectPack::BucketHandle)));
+  handles = reinterpret_cast<ObjectPack::BucketHandle *>(smalloc(
+      (ObjectPack::kMaxObjects + 1) * sizeof(ObjectPack::BucketHandle)));
   for (unsigned i = 0; i < ObjectPack::kMaxObjects; ++i) {
-    handles[i] = pack_.OpenBucket();
-    EXPECT_TRUE(pack_.CommitBucket(hash_null_, handles[i]));
+    handles[i] = pack_.NewBucket();
+    EXPECT_TRUE(pack_.CommitBucket(ObjectPack::kCas, hash_null_, handles[i]));
   }
-  handles[ObjectPack::kMaxObjects] = pack_.OpenBucket();
-  EXPECT_FALSE(pack_.CommitBucket(hash_null_,
-               handles[ObjectPack::kMaxObjects]));
+  handles[ObjectPack::kMaxObjects] = pack_.NewBucket();
+  EXPECT_FALSE(pack_.CommitBucket(ObjectPack::kCas, hash_null_,
+                                  handles[ObjectPack::kMaxObjects]));
   pack_.DiscardBucket(handles[ObjectPack::kMaxObjects]);
   free(handles);
 }
 
-
 TEST_F(T_Pack, ObjectPackTransfer) {
   ObjectPack other_pack;
 
-  ObjectPack::BucketHandle handle = pack_.OpenBucket();
+  ObjectPack::BucketHandle handle = pack_.NewBucket();
   EXPECT_EQ(1U, pack_.open_buckets_.size());
   EXPECT_EQ(0U, pack_.buckets_.size());
 
@@ -232,14 +232,12 @@ TEST_F(T_Pack, ObjectPackTransfer) {
   EXPECT_EQ(0U, other_pack.buckets_.size());
 }
 
-
 TEST_F(T_Pack, Produce) {
   ObjectPackProducer producer(&pack_of_three_);
-  const string expected_result = "V1\nS4097\nN3\n--\n" +
-    hash_null_.ToString(true) + " 4096\n" +
-    hash_partial_.ToString(true) + " 0\n" +
-    hash_null_.ToString(true) + " 1\n" +
-    string(4096, '\0') + string(1, '1');
+  const string expected_result =
+      "V2\nS4097\nN3\n--\nC " + hash_null_.ToString(true) + " 4096\nC " +
+      hash_partial_.ToString(true) + " 0\nC " + hash_null_.ToString(true) +
+      " 1\n" + string(4096, '\0') + string(1, '1');
 
   unsigned char out_buf[8192];
   unsigned nbytes = producer.ProduceNext(8192, out_buf);
@@ -257,10 +255,9 @@ TEST_F(T_Pack, Produce) {
   EXPECT_EQ(expected_result, string(reinterpret_cast<char *>(out_buf), pos));
 }
 
-
 TEST_F(T_Pack, ProducerEmpty) {
   ObjectPackProducer producer(&pack_);
-  const string expected_result = "V1\nS0\nN0\n--\n";
+  const string expected_result = "V2\nS0\nN0\n--\n";
   EXPECT_EQ(12U, producer.GetHeaderSize());
   shash::Any digest(shash::kSha1);
   producer.GetDigest(&digest);
@@ -284,20 +281,20 @@ TEST_F(T_Pack, ProducerEmpty) {
   EXPECT_EQ(expected_result, string(reinterpret_cast<char *>(buf), pos));
 }
 
-
 TEST_F(T_Pack, ProducerFile) {
-  ObjectPackProducer producer(hash_null_, ffoo_);
-  const string expected_result =
-    "V1\nS" + StringifyInt(foo_content_.size()) + "\nN1\n--\n" +
-    hash_null_.ToString(true) + " " + StringifyInt(foo_content_.size()) + "\n" +
-    foo_content_;
+  const std::string file_name = "the_file_name";
+  ObjectPackProducer producer(hash_null_, ffoo_, file_name);
+  const string expected_result = "V2\nS" + StringifyInt(foo_content_.size()) +
+                                 "\nN1\n--\nN " + hash_null_.ToString(true) +
+                                 " " + StringifyInt(foo_content_.size()) + " " +
+                                 Base64Url(file_name) + "\n" + foo_content_;
 
   unsigned char buf[4096];
   unsigned nbytes = producer.ProduceNext(4096, buf);
   EXPECT_EQ(expected_result.size(), nbytes);
   EXPECT_EQ(expected_result, string(reinterpret_cast<char *>(buf), nbytes));
 
-  ObjectPackProducer producer_two(hash_null_, ffoo_);
+  ObjectPackProducer producer_two(hash_null_, ffoo_, file_name);
   unsigned pos = 0;
   do {
     nbytes = producer_two.ProduceNext(1, buf + pos);
@@ -307,7 +304,6 @@ TEST_F(T_Pack, ProducerFile) {
   EXPECT_EQ(expected_result.size(), pos);
   EXPECT_EQ(expected_result, string(reinterpret_cast<char *>(buf), pos));
 }
-
 
 TEST_F(T_Pack, Consumer) {
   shash::Any digest(shash::kShake128);
@@ -319,20 +315,18 @@ TEST_F(T_Pack, Consumer) {
   consumer.RegisterListener(&ConsumerCallbacks::OnEvent, &callbacks);
   unsigned char buf[8192];
   unsigned nbytes = producer.ProduceNext(8192, buf);
-  EXPECT_EQ(ObjectPackConsumer::kStateDone, consumer.ConsumeNext(nbytes, buf));
+  EXPECT_EQ(ObjectPackBuild::kStateDone, consumer.ConsumeNext(nbytes, buf));
   EXPECT_EQ(3U, callbacks.total_objects);
   EXPECT_EQ(pack_of_three_.size(), callbacks.total_size);
 
   callbacks.Reset();
   ObjectPackConsumer consumer_two(digest, producer.GetHeaderSize());
   consumer_two.RegisterListener(&ConsumerCallbacks::OnEvent, &callbacks);
-  for (unsigned i = 0; i < nbytes; ++i)
-    consumer_two.ConsumeNext(1, buf + i);
-  EXPECT_EQ(ObjectPackConsumer::kStateDone, consumer_two.ConsumeNext(0, NULL));
+  for (unsigned i = 0; i < nbytes; ++i) consumer_two.ConsumeNext(1, buf + i);
+  EXPECT_EQ(ObjectPackBuild::kStateDone, consumer_two.ConsumeNext(0, NULL));
   EXPECT_EQ(3U, callbacks.total_objects);
   EXPECT_EQ(pack_of_three_.size(), callbacks.total_size);
 }
-
 
 TEST_F(T_Pack, ConsumerEmpty) {
   shash::Any digest(shash::kShake128);
@@ -344,23 +338,34 @@ TEST_F(T_Pack, ConsumerEmpty) {
   consumer.RegisterListener(&ConsumerCallbacks::OnEvent, &callbacks);
   unsigned char buf[4096];
   unsigned nbytes = producer.ProduceNext(4096, buf);
-  EXPECT_EQ(ObjectPackConsumer::kStateDone, consumer.ConsumeNext(nbytes, buf));
+  EXPECT_EQ(ObjectPackBuild::kStateDone, consumer.ConsumeNext(nbytes, buf));
   EXPECT_EQ(0U, callbacks.total_objects);
   EXPECT_EQ(0U, callbacks.total_size);
 
   ObjectPackConsumer consumer_two(digest, producer.GetHeaderSize());
-  for (unsigned i = 0; i < nbytes; ++i)
-    consumer_two.ConsumeNext(1, buf + i);
-  EXPECT_EQ(ObjectPackConsumer::kStateDone, consumer_two.ConsumeNext(0, NULL));
+  for (unsigned i = 0; i < nbytes; ++i) consumer_two.ConsumeNext(1, buf + i);
+  EXPECT_EQ(ObjectPackBuild::kStateDone, consumer_two.ConsumeNext(0, NULL));
 }
 
+TEST_F(T_Pack, ConsumerOfProducerFromFile) {
+  const std::string file_name = "the_file_name";
+  ObjectPackProducer producer(hash_null_, ffoo_, file_name);
+  shash::Any digest(shash::kShake128);
+  producer.GetDigest(&digest);
+  ObjectPackConsumer consumer(digest, producer.GetHeaderSize());
 
-TEST_F(T_Pack, RealWorld) {
-  RealWorld();
+  ConsumerCallbacks callbacks;
+  consumer.RegisterListener(&ConsumerCallbacks::OnEvent, &callbacks);
+
+  unsigned char buf[8192];
+  unsigned nbytes = producer.ProduceNext(8192, buf);
+  EXPECT_EQ(ObjectPackBuild::kStateDone, consumer.ConsumeNext(nbytes, buf));
+  EXPECT_EQ(1U, callbacks.total_objects);
+  EXPECT_EQ(foo_content_.size(), callbacks.total_size);
 }
 
+TEST_F(T_Pack, RealWorld) { RealWorld(); }
 
 TEST_F(T_Pack, RealWorldSlow) {
-  for (unsigned i = 0; i < 64; ++i)
-    RealWorld();
+  for (unsigned i = 0; i < 64; ++i) RealWorld();
 }
