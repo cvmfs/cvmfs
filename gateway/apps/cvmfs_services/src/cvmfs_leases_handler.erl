@@ -50,17 +50,18 @@ init(Req0 = #{method := <<"GET">>}, State) ->
 init(Req0 = #{method := <<"POST">>}, State) ->
     {URI, T0} = cvmfs_fe_util:tick(Req0, micro_seconds),
 
-    {Status, Reply, Req1} = case cowboy_req:match_qs([user, path], Req0) of
-                                #{user := User, path := Path} ->
+    {ok, Data, Req1} = cvmfs_fe_util:read_body(Req0),
+    {Status, Reply, Req2} = case jsx:decode(Data, [return_maps]) of
+                                #{<<"user">> := User, <<"path">> := Path} ->
                                     Rep = p_new_lease(User, Path),
-                                    {200, Rep, Req0};
+                                    {200, Rep, Req1};
                                 _ ->
-                                    {400, #{}, Req0}
+                                    {400, #{}, Req1}
                             end,
     ReqF = cowboy_req:reply(Status,
                             #{<<"content-type">> => <<"application/json">>},
                             jsx:encode(Reply),
-                            Req1),
+                            Req2),
 
     cvmfs_fe_util:tock(URI, T0, micro_seconds),
     {ok, ReqF, State};
