@@ -23,6 +23,7 @@ sub usage {
   print "\n";
   print "Commands:                                                         \n";
   print "  tracebuffer flush      flushes the trace buffer to disk         \n";
+  print "  cache instance         describes the active cache manager       \n";
   print "  cache size             gets current size of file cache          \n";
   print "  cache list             gets files in cache                      \n";
   print "  cache list pinned      gets pinned file catalogs in cache       \n";

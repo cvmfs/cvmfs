@@ -23,10 +23,9 @@ class T_MemoryKvStore : public ::testing::Test {
  public:
   T_MemoryKvStore()
     : store_(cache_size,
-             "T_MemoryKvStore",
              MemoryKvStore::kMallocLibc,
              128*malloc_size,
-             &statistics_)
+             perf::StatisticsTemplate("test", &statistics_))
     , m1_(shash::AsciiPtr("!"))
     , a1_(m1_.algorithm, m1_.digest, m1_.suffix)
     , m2_(shash::AsciiPtr("i"))

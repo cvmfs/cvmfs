@@ -74,27 +74,48 @@ using namespace std;  // NOLINT
 
 bool FileSystem::g_alive = false;
 const char *FileSystem::kDefaultCacheBase = "/var/lib/cvmfs";
+const char *FileSystem::kDefaultCacheMgrInstance = "default";
+
+
+/**
+ * A cache instance name is part of a bash parameter and can only contain
+ * certain characters.
+ */
+bool FileSystem::CheckInstanceName(const std::string &instance) {
+  if (instance.length() > 24)
+    return false;
+  sanitizer::CacheInstanceSanitizer instance_sanitizer;
+  if (!instance_sanitizer.IsValid(instance)) {
+    boot_error_ = "invalid instance name (" + instance + "), " +
+                  "only characters a-z, A-Z, 0-9, _ are allowed";
+    boot_status_ = loader::kFailCacheDir;
+    return false;
+  }
+  return true;
+}
 
 
 /**
  * Not all possible combinations of cache flags / modes are valid.
  */
-bool FileSystem::CheckCacheMode() {
-  if ((cache_mode_ & kCacheAlien) && (cache_mode_ & kCacheShared)) {
+bool FileSystem::CheckPosixCacheSettings(
+  const FileSystem::PosixCacheSettings &settings)
+{
+  if (settings.is_alien && settings.is_shared) {
     boot_error_ = "Failure: shared local disk cache and alien cache mutually "
-                  "exclusive. Turn off shared local disk cache.";
+                  "exclusive. Please turn off shared local disk cache.";
     boot_status_ = loader::kFailOptions;
     return false;
   }
-  if ((cache_mode_ & kCacheAlien) && (cache_mode_ & kCacheManaged)) {
+  if (settings.is_alien && settings.is_managed) {
     boot_error_ = "Failure: quota management and alien cache mutually "
-                  "exclusive. Turn off quota limit.";
+                  "exclusive. Please turn off quota limit.";
     boot_status_ = loader::kFailOptions;
     return false;
   }
 
   if (type_ == kFsLibrary) {
-    if (cache_mode_ & (kCacheShared | kCacheNfs | kCacheManaged)) {
+    if (settings.is_shared || settings.is_managed) {
       boot_error_ = "Failure: libcvmfs supports only unmanaged exclusive cache "
                     "or alien cache.";
       boot_status_ = loader::kFailOptions;
@@ -102,9 +123,7 @@ bool FileSystem::CheckCacheMode() {
     }
   }
 
-  if (options_mgr_->IsDefined("CVMFS_CACHE_BASE") &&
-      options_mgr_->IsDefined("CVMFS_CACHE_DIR"))
-  {
+  if (settings.cache_base_defined && settings.cache_dir_defined) {
     boot_error_ =
       "'CVMFS_CACHE_BASE' and 'CVMFS_CACHE_DIR' are mutually exclusive";
     boot_status_ = loader::kFailOptions;
@@ -129,11 +148,8 @@ FileSystem *FileSystem::Create(const FileSystem::FileSystemInfo &fs_info) {
 
   file_system->CreateStatistics();
   file_system->SetupSqlite();
-
-  file_system->DetermineCacheMode();
-  if (!file_system->CheckCacheMode())
+  if (!file_system->DetermineNfsMode())
     return file_system.Release();
-  file_system->DetermineCacheDirs();
   if (!file_system->SetupWorkspace())
     return file_system.Release();
 
@@ -145,7 +161,10 @@ FileSystem *FileSystem::Create(const FileSystem::FileSystemInfo &fs_info) {
            "%s",
            file_system->workspace_.c_str());
 
-  if (!file_system->CreateCache())
+  if (!file_system->TriageCacheMgr())
+    return file_system.Release();
+  file_system->SetupUuid();
+  if (!file_system->SetupNfsMaps())
     return file_system.Release();
   bool retval = sqlite::RegisterVfsRdOnly(
     file_system->cache_mgr_,
@@ -158,172 +177,6 @@ FileSystem *FileSystem::Create(const FileSystem::FileSystemInfo &fs_info) {
 
   file_system->boot_status_ = loader::kFailOk;
   return file_system.Release();
-}
-
-
-/**
- * Initialize the cache directory and start the quota manager.
- */
-bool FileSystem::CreateCache() {
-  string optarg;
-  uint64_t nfiles;
-  uint64_t cache_bytes;
-  MemoryKvStore::MemoryAllocator alloc = MemoryKvStore::kMallocHeap;
-  CacheManager *second_cache_mgr = NULL;
-  CacheManager *tiered_cache_mgr = NULL;
-
-  cache_mgr_type_ = kPosixCacheManager;
-  if (options_mgr_->GetValue("CVMFS_CACHE_PRIMARY", &optarg)) {
-    LogCvmfs(kLogCache, kLogDebug, "requested cache type %s", optarg.c_str());
-    if (optarg == "posix") {
-      cache_mgr_type_ = kPosixCacheManager;
-    } else if (optarg == "ram") {
-      cache_mgr_type_ = kRamCacheManager;
-    } else if (optarg == "tiered") {
-      cache_mgr_type_ = kTieredCacheManager;
-    } else if (optarg == "external") {
-      cache_mgr_type_ = kExternalCacheManager;
-    } else {
-      cache_mgr_type_ = kUnknownCacheManager;
-    }
-  }
-
-  switch (cache_mgr_type_) {
-    case kExternalCacheManager: {
-      unsigned nfiles = 1024;
-      if (options_mgr_->GetValue("CVMFS_NFILES", &optarg))
-        nfiles = String2Uint64(optarg);
-      vector<string> cmd_line;
-      if (options_mgr_->GetValue("CVMFS_CACHE_EXTERNAL_CMDLINE", &optarg))
-        cmd_line = SplitString(optarg, ',');
-      if (!options_mgr_->GetValue("CVMFS_CACHE_EXTERNAL_LOCATOR", &optarg)) {
-        boot_error_ = "CVMFS_CACHE_EXTERNAL_LOCATOR missing";
-        boot_status_ = loader::kFailCacheDir;
-        return false;
-      }
-
-      UniquePtr<ExternalCacheManager::PluginHandle> plugin_handle(
-        ExternalCacheManager::CreatePlugin(optarg, cmd_line));
-      if (!plugin_handle->IsValid()) {
-        boot_error_ = plugin_handle->error_msg();
-        boot_status_ = loader::kFailCacheDir;
-        return false;
-      }
-      cache_mgr_ = ExternalCacheManager::Create(
-        plugin_handle->fd_connection(), nfiles, name_);
-      assert(cache_mgr_ != NULL);
-      break;
-    }
-    case kPosixCacheManager:
-    case kTieredCacheManager:
-      cache_mgr_ = PosixCacheManager::Create(
-                     cache_dir_,
-                     cache_mode_ & FileSystem::kCacheAlien,
-                     cache_mode_ & FileSystem::kCacheNoRename);
-      if (cache_mgr_ == NULL) {
-        boot_error_ = "Failed to setup cache in " + cache_dir_ + ": " +
-                      strerror(errno);
-        boot_status_ = loader::kFailCacheDir;
-        return false;
-      }
-      if (cache_mgr_type_ == kPosixCacheManager)
-        break;
-
-      second_cache_mgr = PosixCacheManager::Create(
-                           second_cache_dir_,
-                           second_cache_mode_ & FileSystem::kCacheAlien,
-                           second_cache_mode_ & FileSystem::kCacheNoRename);
-        if (second_cache_mgr == NULL) {
-          boot_error_ = "Failed to setup secondary cache in " +
-                        second_cache_dir_ + ": " + strerror(errno);
-          boot_status_ = loader::kFailCacheDir;
-          return false;
-        }
-
-      tiered_cache_mgr =
-        TieredCacheManager::Create(cache_mgr_, second_cache_mgr);
-      if (tiered_cache_mgr == NULL) {
-        boot_error_ = "Failed to setup tiered cache manager.";
-        boot_status_ = loader::kFailCacheDir;
-        return false;
-      }
-      cache_mgr_ = tiered_cache_mgr;
-      break;
-
-    case kRamCacheManager:
-      if (options_mgr_->GetValue("CVMFS_NFILES", &optarg)) {
-        nfiles = String2Uint64(optarg);
-      } else {
-        nfiles = 8192;
-      }
-      if (options_mgr_->GetValue("CVMFS_CACHE_RAM_SIZE", &optarg)) {
-        if (HasSuffix(optarg, "%", false)) {
-          cache_bytes = platform_memsize() * String2Uint64(optarg)/100;
-        } else {
-          cache_bytes = String2Uint64(optarg)*1024*1024;
-        }
-      } else {
-        cache_bytes = platform_memsize() >> 5;  // ~3%
-      }
-      if (options_mgr_->GetValue("CVMFS_CACHE_RAM_MALLOC", &optarg)) {
-        if (optarg == "libc") {
-          alloc = MemoryKvStore::kMallocLibc;
-        } else if (optarg == "heap") {
-          alloc = MemoryKvStore::kMallocHeap;
-        } else {
-          boot_error_ = "Failure: unknown malloc";
-          boot_status_ = loader::kFailOptions;
-          return false;
-        }
-      }
-      cache_bytes = RoundUp8(max((uint64_t) 200*1024*1024, cache_bytes));
-      cache_mgr_ = new RamCacheManager(
-        cache_bytes,
-        nfiles,
-        alloc,
-        statistics_);
-      break;
-
-    case kUnknownCacheManager:
-      boot_error_ = "Failure: unknown primary cache";
-      boot_status_ = loader::kFailOptions;
-      return false;
-  }
-
-  // Sentinel file for future use
-  const bool ignore_failure = IsAlienCache();  // Might be a read-only cache
-  CreateFile(cache_dir_ + "/.cvmfscache", 0600, ignore_failure);
-
-  if (cache_mode_ & FileSystem::kCacheManaged) {
-    if (!SetupQuotaMgmt())
-      return false;
-  }
-
-  if (!SetupNfsMaps())
-    return false;
-
-  // Create or load from cache, used as id by the download manager when the
-  // proxy template is replaced
-  switch (cache_mgr_type_) {
-    case kPosixCacheManager:
-    case kTieredCacheManager:
-      uuid_cache_ = cvmfs::Uuid::Create(cache_dir_ + "/uuid");
-      break;
-    case kRamCacheManager:
-    case kExternalCacheManager:
-      uuid_cache_ = cvmfs::Uuid::Create("");
-      break;
-    case kUnknownCacheManager:
-      abort();
-  }
-  if (uuid_cache_ == NULL) {
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
-             "failed to load/store %s/uuid", cache_dir_.c_str());
-    uuid_cache_ = cvmfs::Uuid::Create("");
-    assert(uuid_cache_ != NULL);
-  }
-
-  return true;
 }
 
 
@@ -363,83 +216,91 @@ void FileSystem::CreateStatistics() {
 
 
 /**
- * Depending on the cache mode and other parameters, figure out the actual
- * path to the cache directory and set the workspace directory along the way.
+ * Figure out mode of operation and cache directory.  Checking options for
+ * sanity is in a separate method.
  */
-void FileSystem::DetermineCacheDirs() {
+FileSystem::PosixCacheSettings FileSystem::DeterminePosixCacheSettings(
+  const string &instance
+) {
   string optarg;
+  PosixCacheSettings settings;
 
-  cache_dir_ = kDefaultCacheBase;
-  if (options_mgr_->GetValue("CVMFS_CACHE_BASE", &optarg))
-    cache_dir_ = MakeCanonicalPath(optarg);
-  if (options_mgr_->GetValue("CVMFS_SECOND_CACHE_DIR", &optarg))
-    second_cache_dir_ = MakeCanonicalPath(optarg);
-
-  if (cache_mode_ & kCacheShared) {
-    cache_dir_ += "/shared";
-  } else {
-    cache_dir_ += "/" + name_;
+  if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_SHARED", instance),
+                             &optarg)
+      && options_mgr_->IsOn(optarg))
+  {
+    settings.is_shared = true;
   }
-  if (second_cache_mode_ & kCacheShared) {
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogStderr,
-             "Secondary cache cannot be shared.");
+  if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_SERVER_MODE", instance),
+                             &optarg)
+      && options_mgr_->IsOn(optarg))
+  {
+    settings.avoid_rename = true;
+  }
+
+  if (type_ == kFsFuse)
+    settings.quota_limit = kDefaultQuotaLimit;
+  if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_QUOTA_LIMIT", instance),
+                             &optarg))
+  {
+    settings.quota_limit = String2Int64(optarg) * 1024 * 1024;
+  }
+  if (settings.quota_limit > 0)
+    settings.is_managed = true;
+
+  settings.cache_path = kDefaultCacheBase;
+  if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_BASE", instance),
+                             &optarg))
+  {
+    settings.cache_path = MakeCanonicalPath(optarg);
+    settings.cache_base_defined = true;
+  }
+  if (settings.is_shared) {
+    settings.cache_path += "/shared";
+  } else {
+    settings.cache_path += "/" + name_;
   }
 
   // CheckCacheMode makes sure that CVMFS_CACHE_DIR and CVMFS_CACHE_BASE are
   // not set at the same time.
-  if (options_mgr_->GetValue("CVMFS_CACHE_DIR", &optarg))
-    cache_dir_ = optarg;
+  if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_DIR", instance),
+                             &optarg))
+  {
+    settings.cache_dir_defined = true;
+    settings.cache_path = optarg;
+  }
+  if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_ALIEN", instance),
+                             &optarg))
+  {
+    settings.is_alien = true;
+    settings.cache_path = optarg;
+  }
+  if (settings.cache_path == workspace_fullpath_)
+    settings.cache_path = ".";
 
-  workspace_ = cache_dir_;
-  // Used by libcvmfs
-  if (options_mgr_->GetValue("CVMFS_WORKSPACE", &optarg))
-    workspace_ = optarg;
-
-  if (options_mgr_->GetValue("CVMFS_ALIEN_CACHE", &optarg))
-    cache_dir_ = optarg;
-
-  nfs_maps_dir_ = workspace_;
-  if (options_mgr_->GetValue("CVMFS_NFS_SHARED", &optarg))
-    nfs_maps_dir_ = optarg;
+  return settings;
 }
 
 
-void FileSystem::DetermineCacheMode() {
+bool FileSystem::DetermineNfsMode() {
   string optarg;
-
-  if (options_mgr_->GetValue("CVMFS_SHARED_CACHE", &optarg) &&
-      options_mgr_->IsOn(optarg))
-  {
-    cache_mode_ = kCacheShared;
-  } else {
-    cache_mode_ = kCacheExclusive;
-  }
-
-  if (options_mgr_->GetValue("CVMFS_ALIEN_CACHE", &optarg)) {
-    cache_mode_ |= kCacheAlien;
-  }
 
   if (options_mgr_->GetValue("CVMFS_NFS_SOURCE", &optarg) &&
       options_mgr_->IsOn(optarg))
   {
-    cache_mode_ |= kCacheNfs;
+    nfs_mode_ |= kNfsMaps;
     if (options_mgr_->GetValue("CVMFS_NFS_SHARED", &optarg)) {
-      cache_mode_ |= kCacheNfsHa;
+      nfs_mode_ |= kNfsMapsHa;
+      nfs_maps_dir_ = optarg;
     }
   }
-  if (options_mgr_->GetValue("CVMFS_SERVER_CACHE_MODE", &optarg) &&
-      options_mgr_->IsOn(optarg))
-  {
-    cache_mode_ |= kCacheNoRename;
+
+  if ((type_ == kFsLibrary) && (nfs_mode_ != kNfsNone)) {
+    boot_error_ = "Failure: libcvmfs does not support NFS export.";
+    boot_status_ = loader::kFailOptions;
+    return false;
   }
-
-  if (options_mgr_->GetValue("CVMFS_QUOTA_LIMIT", &optarg))
-    quota_limit_ = String2Int64(optarg) * 1024 * 1024;
-  if (quota_limit_ > 0)
-    cache_mode_ |= kCacheManaged;
-
-  if (options_mgr_->IsDefined("CVMFS_SECOND_CACHE_DIR"))
-    second_cache_mode_ = kCacheAlien | kCacheNoRename;
+  return true;
 }
 
 
@@ -464,14 +325,11 @@ FileSystem::FileSystem(const FileSystem::FileSystemInfo &fs_info)
   , statistics_(NULL)
   , fd_workspace_lock_(-1)
   , found_previous_crash_(false)
-  , cache_mode_(0)
-  , second_cache_mode_(0)
-  , quota_limit_((fs_info.type == kFsLibrary) ? 0 : kDefaultQuotaLimit)
+  , nfs_mode_(kNfsNone)
   , cache_mgr_(NULL)
   , uuid_cache_(NULL)
   , has_nfs_maps_(false)
   , has_custom_sqlitevfs_(false)
-  , cache_mgr_type_(kUnknownCacheManager)
 {
   assert(!g_alive);
   g_alive = true;
@@ -479,8 +337,10 @@ FileSystem::FileSystem(const FileSystem::FileSystemInfo &fs_info)
   g_gid = getegid();
 
   string optarg;
-  if (options_mgr_->GetValue("CVMFS_SERVER_CACHE_MODE", &optarg) &&
-      options_mgr_->IsOn(optarg))
+  if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_SERVER_CACHE",
+                                         kDefaultCacheMgrInstance),
+                             &optarg)
+      && options_mgr_->IsOn(optarg))
   {
     g_raw_symlinks = true;
   }
@@ -586,8 +446,238 @@ void FileSystem::LogSqliteError(
 }
 
 
+/**
+ * Creates the cache parameter for a specific instance of the cache.  Injects
+ * the instance name such that CVMFS_CACHE_FOO_BAR becomes
+ * CVMFS_CACHE_<INSTANCE>_FOO_BAR
+ */
+string FileSystem::MkCacheParm(
+  const string &generic_parameter,
+  const string &instance)
+{
+  assert(HasPrefix(generic_parameter, "CVMFS_CACHE_", false));
+
+  if (instance == kDefaultCacheMgrInstance) {
+    // Compatibility parameter names
+    if ((generic_parameter == "CVMFS_CACHE_SHARED") &&
+        !options_mgr_->IsDefined(generic_parameter))
+    {
+      return "CVMFS_SHARED_CACHE";
+    }
+    if ((generic_parameter == "CVMFS_CACHE_ALIEN") &&
+        !options_mgr_->IsDefined(generic_parameter))
+    {
+      return "CVMFS_ALIEN_CACHE";
+    }
+    if ((generic_parameter == "CVMFS_CACHE_SERVER_MODE") &&
+        !options_mgr_->IsDefined(generic_parameter))
+    {
+      return "CVMFS_SERVER_CACHE_MODE";
+    }
+    if ((generic_parameter == "CVMFS_CACHE_QUOTA_LIMIT") &&
+        !options_mgr_->IsDefined(generic_parameter))
+    {
+      return "CVMFS_QUOTA_LIMIT";
+    }
+    return generic_parameter;
+  }
+
+  return "CVMFS_CACHE_" + instance + "_" + generic_parameter.substr(12);
+}
+
+
 void FileSystem::ResetErrorCounters() {
   n_io_error_->Set(0);
+}
+
+
+/**
+ * Can be recursive for the tiered cache manager.
+ */
+CacheManager *FileSystem::SetupCacheMgr(const string &instance) {
+  if (constructed_instances_.find(instance) != constructed_instances_.end()) {
+    boot_error_ = "circular cache definition: " + instance;
+    boot_status_ = loader::kFailCacheDir;
+    return NULL;
+  }
+  constructed_instances_.insert(instance);
+
+  LogCvmfs(kLogCvmfs, kLogDebug, "setting up cache manager instance %s",
+           instance.c_str());
+  string instance_type;
+  if (instance == kDefaultCacheMgrInstance) {
+    instance_type = "posix";
+  } else {
+    options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_TYPE", instance),
+                           &instance_type);
+  }
+  if (instance_type == "posix") {
+    return SetupPosixCacheMgr(instance);
+  } else if (instance_type == "ram") {
+    return SetupRamCacheMgr(instance);
+  } else if (instance_type == "tiered") {
+    return SetupTieredCacheMgr(instance);
+  } else if (instance_type == "external") {
+    return SetupExternalCacheMgr(instance);
+  } else {
+    boot_error_ = "invalid cache manager type for '" + instance +  "':" +
+      instance_type;
+    boot_status_ = loader::kFailCacheDir;
+    return NULL;
+  }
+}
+
+
+CacheManager *FileSystem::SetupExternalCacheMgr(const string &instance) {
+  string optarg;
+  unsigned nfiles = kDefaultNfiles;
+  if (options_mgr_->GetValue("CVMFS_NFILES", &optarg))
+    nfiles = String2Uint64(optarg);
+  vector<string> cmd_line;
+  if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_CMDLINE", instance),
+      &optarg))
+  {
+    cmd_line = SplitString(optarg, ',');
+  }
+
+  if (!options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_LOCATOR", instance),
+      &optarg))
+  {
+    boot_error_ = MkCacheParm("CVMFS_CACHE_LOCATOR", instance) + " missing";
+    boot_status_ = loader::kFailCacheDir;
+    return NULL;
+  }
+
+  UniquePtr<ExternalCacheManager::PluginHandle> plugin_handle(
+    ExternalCacheManager::CreatePlugin(optarg, cmd_line));
+  if (!plugin_handle->IsValid()) {
+    boot_error_ = plugin_handle->error_msg();
+    boot_status_ = loader::kFailCacheDir;
+    return NULL;
+  }
+  ExternalCacheManager *cache_mgr = ExternalCacheManager::Create(
+    plugin_handle->fd_connection(), nfiles, name_ + ":" + instance);
+  if (cache_mgr == NULL) {
+    boot_error_ = "failed to create external cache manager for " + instance;
+    boot_status_ = loader::kFailCacheDir;
+    return NULL;
+  }
+  cache_mgr->AcquireQuotaManager(ExternalQuotaManager::Create(cache_mgr));
+  return cache_mgr;
+}
+
+
+CacheManager *FileSystem::SetupPosixCacheMgr(const string &instance) {
+  PosixCacheSettings settings = DeterminePosixCacheSettings(instance);
+  if (!CheckPosixCacheSettings(settings))
+    return NULL;
+
+  UniquePtr<PosixCacheManager> cache_mgr(PosixCacheManager::Create(
+    settings.cache_path,
+    settings.is_alien,
+    settings.avoid_rename));
+  if (!cache_mgr.IsValid()) {
+    boot_error_ = "Failed to setup posix cache '" + instance + "' in " +
+                  settings.cache_path + ": " + strerror(errno);
+    boot_status_ = loader::kFailCacheDir;
+    return NULL;
+  }
+
+  // Sentinel file for future use
+  // Might be a read-only cache
+  const bool ignore_failure = settings.is_alien;
+  CreateFile(settings.cache_path + "/.cvmfscache", 0600, ignore_failure);
+
+  if (settings.is_managed) {
+    if (!SetupPosixQuotaMgr(settings, cache_mgr))
+      return NULL;
+  }
+  return cache_mgr.Release();
+}
+
+
+CacheManager *FileSystem::SetupRamCacheMgr(const string &instance) {
+  string optarg;
+  unsigned nfiles = kDefaultNfiles;
+  if (options_mgr_->GetValue("CVMFS_NFILES", &optarg)) {
+    nfiles = String2Uint64(optarg);
+  }
+  uint64_t sz_cache_bytes;
+  if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_SIZE", instance),
+                             &optarg))
+  {
+    if (HasSuffix(optarg, "%", false)) {
+      sz_cache_bytes = platform_memsize() * String2Uint64(optarg)/100;
+    } else {
+      sz_cache_bytes = String2Uint64(optarg) * 1024 * 1024;
+    }
+  } else {
+    sz_cache_bytes = platform_memsize() >> 5;  // ~3%
+  }
+  MemoryKvStore::MemoryAllocator alloc = MemoryKvStore::kMallocHeap;
+  if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_MALLOC", instance),
+                             &optarg))
+  {
+    if (optarg == "libc") {
+      alloc = MemoryKvStore::kMallocLibc;
+    } else if (optarg == "heap") {
+      alloc = MemoryKvStore::kMallocHeap;
+    } else {
+      boot_error_ = "Failure: unknown malloc " +
+                    MkCacheParm("CVMFS_CACHE_MALLOC", instance) + "=" + optarg;
+      boot_status_ = loader::kFailOptions;
+      return NULL;
+    }
+  }
+  sz_cache_bytes = RoundUp8(std::max(static_cast<uint64_t>(200 * 1024 * 1024),
+                                     sz_cache_bytes));
+  RamCacheManager *cache_mgr = new RamCacheManager(
+        sz_cache_bytes,
+        nfiles,
+        alloc,
+        perf::StatisticsTemplate("cache." + instance, statistics_));
+  if (cache_mgr == NULL) {
+    boot_error_ = "failed to create ram cache manager for " + instance;
+    boot_status_ = loader::kFailCacheDir;
+    return NULL;
+  }
+  cache_mgr->AcquireQuotaManager(new NoopQuotaManager());
+  return cache_mgr;
+}
+
+
+CacheManager *FileSystem::SetupTieredCacheMgr(const string &instance) {
+  string optarg;
+  if (!options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_UPPER", instance),
+                              &optarg))
+  {
+    boot_error_ = MkCacheParm("CVMFS_CACHE_UPPER", instance) + " missing";
+    boot_status_ = loader::kFailOptions;
+    return NULL;
+  }
+  UniquePtr<CacheManager> upper(SetupCacheMgr(optarg));
+  if (!upper.IsValid())
+    return NULL;
+
+  if (!options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_LOWER", instance),
+                              &optarg))
+  {
+    boot_error_ = MkCacheParm("CVMFS_CACHE_LOWER", instance) + " missing";
+    boot_status_ = loader::kFailOptions;
+    return NULL;
+  }
+  UniquePtr<CacheManager> lower(SetupCacheMgr(optarg));
+  if (!lower.IsValid())
+    return NULL;
+
+  CacheManager *tiered =
+    TieredCacheManager::Create(upper.Release(), lower.Release());
+  if (tiered == NULL) {
+    boot_error_ = "Failed to setup tiered cache manager " + instance;
+    boot_status_ = loader::kFailCacheDir;
+    return NULL;
+  }
+  return tiered;
 }
 
 
@@ -597,11 +687,8 @@ bool FileSystem::SetupCrashGuard() {
   int retval = platform_stat(path_crash_guard_.c_str(), &info);
   if (retval == 0) {
     found_previous_crash_ = true;
-    string msg = "looks like cvmfs has been crashed previously";
-    if (cache_mode_ & kCacheManaged) {
-      msg += ", rebuilding cache database";
-    }
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn, "%s", msg.c_str());
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+             "looks like cvmfs has been crashed previously");
   }
   retval = open(path_crash_guard_.c_str(), O_RDONLY | O_CREAT, 0600);
   if (retval < 0) {
@@ -625,40 +712,19 @@ bool FileSystem::SetupCwd() {
       boot_status_ = loader::kFailCacheDir;
       return false;
     }
-    if (workspace_ == cache_dir_)
-      cache_dir_ = ".";
     workspace_ = ".";
     return true;
   }
 
-  // Libcvmfs: change to cache directory (not workspace) if requested,
-  // otherwise don't touch current working directory.  We also need to create
-  // the cache directory.  This has to happen before we setup the crash guard
-  // or any other file where we remember the path.
-  // TODO(jblomer): can this be simplified?
-  string optarg;
-  if (options_mgr_->GetValue("CVMFS_CWD_CACHE", &optarg) &&
-      options_mgr_->IsOn(optarg))
-  {
-    const int mode = (cache_mode_ & kCacheAlien) ? 0770 : 0700;
-    if (!MkdirDeep(cache_dir_, mode, false)) {
-      boot_error_ = "cannot create cache directory " + cache_dir_;
-      boot_status_ = loader::kFailCacheDir;
-      return false;
-    }
-    if (workspace_ == cache_dir_) {
-      workspace_ = ".";
-    } else {
-      workspace_ = GetAbsolutePath(workspace_);
-    }
-    int retval = chdir(cache_dir_.c_str());
-    if (retval != 0) {
-      boot_error_ = "cache directory " + cache_dir_ + " is unavailable";
-      boot_status_ = loader::kFailCacheDir;
-      return false;
-    }
-    cache_dir_ = ".";
-  }
+  // Note: as of version 2.4 support for CVMFS_CWD_CACHE is dropped due to
+  // disproportionate large complexity to configure correctly.  This affects
+  // only libcvmfs, mostly the legacy part.
+  // string optarg;
+  // if (options_mgr_->GetValue("CVMFS_CWD_CACHE", &optarg) &&
+  //    options_mgr_->IsOn(optarg))
+  // {
+  //  ...
+  // }
   return true;
 }
 
@@ -683,23 +749,42 @@ void FileSystem::SetupLogging() {
 
 bool FileSystem::SetupNfsMaps() {
 #ifdef CVMFS_NFS_SUPPORT
-  string no_nfs_sentinel = cache_dir_ + "/no_nfs_maps." + name_;
+  if (!IsHaNfsSource())
+    nfs_maps_dir_ = workspace_;
 
-  if (!IsNfsSource()) {
-    const bool ignore_failure = IsAlienCache();  // Might be a read-only cache
-    CreateFile(no_nfs_sentinel, 0600, ignore_failure);
+  string no_nfs_sentinel;
+  if (cache_mgr_->id() == kPosixCacheManager) {
+    PosixCacheManager *posix_cache_mgr =
+        reinterpret_cast<PosixCacheManager *>(cache_mgr_);
+    no_nfs_sentinel = posix_cache_mgr->cache_path() + "/no_nfs_maps." + name_;
+    if (!IsNfsSource()) {
+      // Might be a read-only cache
+      const bool ignore_failure = posix_cache_mgr->alien_cache();
+      CreateFile(no_nfs_sentinel, 0600, ignore_failure);
+      return true;
+    }
+  } else {
+    if (IsNfsSource()) {
+      boot_error_ = "NFS source only works with POSIX cache manager.";
+      boot_status_ = loader::kFailNfsMaps;
+      return false;
+    }
     return true;
   }
 
-  // nfs maps need to be protected by workspace lock
-  assert(cache_dir_ == workspace_);
-
-  if (FileExists(no_nfs_sentinel)) {
+  assert(cache_mgr_->id() == kPosixCacheManager);
+  assert(IsNfsSource());
+  if (!no_nfs_sentinel.empty() && FileExists(no_nfs_sentinel)) {
     boot_error_ = "Cache was used without NFS maps before. "
                   "It has to be wiped out.";
     boot_status_ = loader::kFailNfsMaps;
     return false;
   }
+
+  // nfs maps need to be protected by workspace lock
+  PosixCacheManager *posix_cache_mgr =
+        reinterpret_cast<PosixCacheManager *>(cache_mgr_);
+  assert(posix_cache_mgr->cache_path() == workspace_);
 
   string inode_cache_dir = nfs_maps_dir_ + "/nfs_maps." + name_;
   if (!MkdirDeep(inode_cache_dir, 0700)) {
@@ -713,7 +798,7 @@ bool FileSystem::SetupNfsMaps() {
     nfs_maps::Init(inode_cache_dir,
                    catalog::ClientCatalogManager::kInodeOffset + 1,
                    found_previous_crash_,
-                   cache_mode_ & FileSystem::kCacheNfsHa);
+                   IsHaNfsSource());
   if (!retval) {
     boot_error_ = "Failed to initialize NFS maps";
     boot_status_ = loader::kFailNfsMaps;
@@ -727,26 +812,19 @@ bool FileSystem::SetupNfsMaps() {
 }
 
 
-bool FileSystem::SetupQuotaMgmt() {
-  if (cache_mgr_type_ == kRamCacheManager) {
-    cache_mgr_->AcquireQuotaManager(new NoopQuotaManager());
-    return true;
-  }
-  if (cache_mgr_type_ == kExternalCacheManager) {
-    cache_mgr_->AcquireQuotaManager(ExternalQuotaManager::Create(
-      reinterpret_cast<ExternalCacheManager *>(cache_mgr_)));
-    return true;
-  }
-
-  assert(quota_limit_ >= 0);
-  int64_t quota_threshold = quota_limit_ / 2;
+bool FileSystem::SetupPosixQuotaMgr(
+  const FileSystem::PosixCacheSettings &settings,
+  CacheManager *cache_mgr
+) {
+  assert(settings.quota_limit >= 0);
+  int64_t quota_threshold = settings.quota_limit / 2;
   PosixQuotaManager *quota_mgr;
 
-  if (cache_mode_ & FileSystem::kCacheShared) {
+  if (settings.is_shared) {
     quota_mgr = PosixQuotaManager::CreateShared(
                   exe_path_,
-                  cache_dir_,
-                  quota_limit_,
+                  settings.cache_path,
+                  settings.quota_limit,
                   quota_threshold,
                   foreground_);
     if (quota_mgr == NULL) {
@@ -756,10 +834,10 @@ bool FileSystem::SetupQuotaMgmt() {
     }
   } else {
     // Cache database should to be protected by workspace lock
-    assert(workspace_ == cache_dir_);
+    assert(workspace_ == settings.cache_path);
     quota_mgr = PosixQuotaManager::Create(
-                  cache_dir_,
-                  quota_limit_,
+                  settings.cache_path,
+                  settings.quota_limit,
                   quota_threshold,
                   found_previous_crash_);
     if (quota_mgr == NULL) {
@@ -782,7 +860,7 @@ bool FileSystem::SetupQuotaMgmt() {
     }
   }
 
-  int retval = cache_mgr_->AcquireQuotaManager(quota_mgr);
+  int retval = cache_mgr->AcquireQuotaManager(quota_mgr);
   assert(retval);
   LogCvmfs(kLogCvmfs, kLogDebug,
            "CernVM-FS: quota initialized, current size %luMB",
@@ -809,10 +887,37 @@ void FileSystem::SetupSqlite() {
 
 
 bool FileSystem::SetupWorkspace() {
+  string optarg;
+  // This is very similar to "determine cache dir".  It's for backward
+  // compatibility with classic cache configuration where there was no
+  // distinction between workspace and cache.
+  // Complicated cache configurations should explicitly set CVMFS_WORKSPACE.
+  workspace_ = kDefaultCacheBase;
+  if (options_mgr_->GetValue("CVMFS_CACHE_BASE", &optarg))
+    workspace_ = MakeCanonicalPath(optarg);
+  if (options_mgr_->GetValue("CVMFS_SHARED_CACHE", &optarg) &&
+      options_mgr_->IsOn(optarg))
+  {
+    workspace_ += "/shared";
+  } else {
+    workspace_ += "/" + name_;
+  }
+  if (options_mgr_->GetValue("CVMFS_CACHE_DIR", &optarg)) {
+    if (options_mgr_->IsDefined("CVMFS_CACHE_BASE")) {
+      boot_error_ =
+        "'CVMFS_CACHE_BASE' and 'CVMFS_CACHE_DIR' are mutually exclusive";
+      boot_status_ = loader::kFailOptions;
+      return false;
+    }
+    workspace_ = optarg;
+  }
+  if (options_mgr_->GetValue("CVMFS_WORKSPACE", &optarg))
+    workspace_ = optarg;
+  workspace_fullpath_ = workspace_;
+
   // If workspace and alien cache are the same directory, we need to open
   // permission now to 0770 to avoid a race when fixing it later
-  const int mode = ((cache_mode_ & kCacheAlien) && (workspace_ == cache_dir_)) ?
-                   0770 : 0700;
+  const int mode = 0770;
   if (!MkdirDeep(workspace_, mode, false)) {
     boot_error_ = "cannot create workspace directory " + workspace_;
     boot_status_ = loader::kFailCacheDir;
@@ -830,6 +935,17 @@ bool FileSystem::SetupWorkspace() {
 }
 
 
+void FileSystem::SetupUuid() {
+  uuid_cache_ = cvmfs::Uuid::Create(workspace_ + "/uuid");
+  if (uuid_cache_ == NULL) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+             "failed to load/store %s/uuid", workspace_.c_str());
+    uuid_cache_ = cvmfs::Uuid::Create("");
+    assert(uuid_cache_ != NULL);
+  }
+}
+
+
 /**
  * Required by CernVM: the fuse module needs to free r/w file descriptor to the
  * cache in order to properly unravel the file system stack on shutdown.
@@ -844,6 +960,22 @@ void FileSystem::TearDown2ReadOnly() {
   unlink(path_crash_guard_.c_str());
   LogCvmfs(kLogCache, kLogSyslog, "switch to read-only cache mode");
   SetLogMicroSyslog("");
+}
+
+
+bool FileSystem::TriageCacheMgr() {
+  cache_mgr_instance_ = kDefaultCacheMgrInstance;
+  string instance;
+  if (options_mgr_->GetValue("CVMFS_CACHE_PRIMARY", &instance) &&
+      !instance.empty())
+  {
+    if (!CheckInstanceName(instance))
+      return false;
+    cache_mgr_instance_ = instance;
+  }
+
+  cache_mgr_ = SetupCacheMgr(cache_mgr_instance_);
+  return cache_mgr_ != NULL;
 }
 
 
@@ -997,7 +1129,8 @@ bool MountPoint::CreateDownloadManagers() {
   string optarg;
   download_mgr_ = new download::DownloadManager();
   const bool use_system_proxy = false;
-  download_mgr_->Init(kDefaultNumConnections, use_system_proxy, statistics_);
+  download_mgr_->Init(kDefaultNumConnections, use_system_proxy,
+                      perf::StatisticsTemplate("download", statistics_));
   download_mgr_->SetCredentialsAttachment(authz_attachment_);
 
   if (options_mgr_->GetValue("CVMFS_SERVER_URL", &optarg)) {
@@ -1043,15 +1176,14 @@ void MountPoint::CreateFetchers() {
     file_system_->cache_mgr(),
     download_mgr_,
     backoff_throttle_,
-    statistics_);
+    perf::StatisticsTemplate("fetch", statistics_));
 
   const bool is_external_data = true;
   external_fetcher_ = new cvmfs::Fetcher(
     file_system_->cache_mgr(),
     external_download_mgr_,
     backoff_throttle_,
-    statistics_,
-    "fetch-external",
+    perf::StatisticsTemplate("fetch-external", statistics_),
     is_external_data);
 }
 
@@ -1434,7 +1566,8 @@ void MountPoint::SetupDnsTuning(download::DownloadManager *manager) {
 bool MountPoint::SetupExternalDownloadMgr() {
   string optarg;
   external_download_mgr_ =
-    download_mgr_->Clone(statistics_, "download-external");
+    download_mgr_->Clone(perf::StatisticsTemplate("download-external",
+      statistics_));
 
   unsigned timeout;
   unsigned timeout_direct;

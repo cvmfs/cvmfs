@@ -146,6 +146,11 @@ class CacheManager : SingleCopy {
   }
 
   virtual CacheManagerIds id() = 0;
+  /**
+   * Return a human readable description of the cache instance.  Used in
+   * cvmfs_talk.
+   */
+  virtual std::string Describe() = 0;
 
   virtual bool AcquireQuotaManager(QuotaManager *quota_mgr) = 0;
 

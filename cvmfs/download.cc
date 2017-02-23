@@ -1544,8 +1544,7 @@ void DownloadManager::FiniHeaders() {
 
 void DownloadManager::Init(const unsigned max_pool_handles,
                            const bool use_system_proxy,
-                           perf::Statistics *statistics,
-                           const string &name)
+                           perf::StatisticsTemplate statistics)
 {
   atomic_init32(&multi_threaded_);
   int retval = curl_global_init(CURL_GLOBAL_ALL);
@@ -1564,7 +1563,7 @@ void DownloadManager::Init(const unsigned max_pool_handles,
   opt_host_chain_current_ = 0;
   opt_ip_preference_ = dns::kIpPreferSystem;
 
-  counters_ = new Counters(statistics, name);
+  counters_ = new Counters(statistics);
 
   user_agent_ = NULL;
   InitHeaders();
@@ -2683,12 +2682,9 @@ void DownloadManager::EnableRedirects() {
  * Creates a copy of the existing download manager.  Must only be called in
  * single-threaded stage because it calls curl_global_init().
  */
-DownloadManager *DownloadManager::Clone(
-  perf::Statistics *statistics,
-  const string &name)
-{
+DownloadManager *DownloadManager::Clone(perf::StatisticsTemplate statistics) {
   DownloadManager *clone = new DownloadManager();
-  clone->Init(pool_max_handles_, use_system_proxy_, statistics, name);
+  clone->Init(pool_max_handles_, use_system_proxy_, statistics);
   if (resolver_) {
     clone->SetDnsParameters(resolver_->retries(), resolver_->timeout_ms());
     clone->SetMaxIpaddrPerProxy(resolver_->throttle());

@@ -90,6 +90,36 @@ class Statistics {
 
 
 /**
+ * Allows multiple instance of the same class to use the same Statistics
+ * instance.  The "name_major" part is used to contruct counter names in the
+ * form name_major.<provided name>
+ */
+class StatisticsTemplate {
+ public:
+  StatisticsTemplate(const std::string &name_major, Statistics *statistics)
+    : name_major_(name_major), statistics_(statistics)
+  { }
+  StatisticsTemplate(const std::string &name_sub,
+                     const StatisticsTemplate &statistics)
+    : name_major_(statistics.name_major_ + "." + name_sub)
+    , statistics_(statistics.statistics_)
+  { }
+
+  Counter *RegisterTemplated(const std::string &name_minor,
+                             const std::string &desc)
+  {
+    return statistics_->Register(name_major_ + "." + name_minor, desc);
+  }
+
+  Statistics *statistics() { return statistics_; }
+
+ private:
+  std::string name_major_;
+  Statistics *statistics_;
+};
+
+
+/**
  * Keeps track of events over time.  Can be used to query the number of events
  * between now and a point in time in the past.  The time range should be
  * smaller than capacity_s seconds.  Uses a monotonic clock.  Not thread-safe.

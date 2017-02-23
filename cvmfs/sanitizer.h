@@ -61,6 +61,12 @@ class UuidSanitizer : public InputSanitizer {
 };
 
 
+class CacheInstanceSanitizer : public InputSanitizer {
+ public:
+  CacheInstanceSanitizer() : InputSanitizer("az AZ 09 _") { }
+};
+
+
 class RepositorySanitizer : public InputSanitizer {
  public:
   RepositorySanitizer() : InputSanitizer("az AZ 09 - _ .") { }

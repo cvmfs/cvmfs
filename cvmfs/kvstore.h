@@ -85,41 +85,36 @@ class MemoryKvStore : SingleCopy, public Callbackable<MallocHeap::BlockPtr> {
     perf::Counter *sz_deleted;
     perf::Counter *sz_shrunk;
 
-    Counters(perf::Statistics *statistics, const std::string &name) {
-      sz_size = statistics->Register(name + ".sz_size", "Size for " + name);
-      n_getsize = statistics->Register(name + ".n_getsize",
-        "Number of GetSize calls for " + name);
-      n_getrefcount = statistics->Register(name + ".n_getrefcount",
-        "Number of GetRefcount calls for " + name);
-      n_incref = statistics->Register(name + ".n_incref",
-        "Number of IncRef calls for " + name);
-      n_unref = statistics->Register(name + ".n_unref",
-        "Number of Unref calls for " + name);
-      n_read = statistics->Register(name + ".n_read",
-        "Number of Read calls for " + name);
-      n_commit = statistics->Register(name + ".n_commit",
-        "Number of Commit calls for " + name);
-      n_delete = statistics->Register(name + ".n_delete",
-        "Number of Delete calls for " + name);
-      n_shrinkto = statistics->Register(name + ".n_shrinkto",
-        "Number of ShrinkTo calls for " + name);
-      sz_read = statistics->Register(name + ".sz_read",
-        "Bytes read for " + name);
-      sz_committed = statistics->Register(name + ".sz_committed",
-        "Bytes committed for " + name);
-      sz_deleted = statistics->Register(name + ".sz_deleted",
-        "Bytes deleted for " + name);
-      sz_shrunk = statistics->Register(name + ".sz_shrunk",
-        "Bytes shrunk for " + name);
+    explicit Counters(perf::StatisticsTemplate statistics) {
+      sz_size = statistics.RegisterTemplated("sz_size", "Total size");
+      n_getsize = statistics.RegisterTemplated("n_getsize",
+        "Number of GetSize calls");
+      n_getrefcount = statistics.RegisterTemplated("n_getrefcount",
+        "Number of GetRefcount calls");
+      n_incref = statistics.RegisterTemplated("n_incref",
+        "Number of IncRef calls");
+      n_unref = statistics.RegisterTemplated("n_unref",
+        "Number of Unref calls");
+      n_read = statistics.RegisterTemplated("n_read", "Number of Read calls");
+      n_commit = statistics.RegisterTemplated("n_commit",
+        "Number of Commit calls");
+      n_delete = statistics.RegisterTemplated("n_delete",
+        "Number of Delete calls");
+      n_shrinkto = statistics.RegisterTemplated("n_shrinkto",
+        "Number of ShrinkTo calls");
+      sz_read = statistics.RegisterTemplated("sz_read", "Bytes read");
+      sz_committed = statistics.RegisterTemplated("sz_committed",
+        "Bytes committed");
+      sz_deleted = statistics.RegisterTemplated("sz_deleted", "Bytes deleted");
+      sz_shrunk = statistics.RegisterTemplated("sz_shrunk", "Bytes shrunk");
     }
   };
 
   MemoryKvStore(
     unsigned int cache_entries,
-    const string &name,
     MemoryAllocator alloc,
     unsigned alloc_size,
-    perf::Statistics *statistics);
+    perf::StatisticsTemplate statistics);
 
   ~MemoryKvStore();
 

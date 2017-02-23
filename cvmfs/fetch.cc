@@ -194,8 +194,7 @@ Fetcher::Fetcher(
   CacheManager *cache_mgr,
   download::DownloadManager *download_mgr,
   BackoffThrottle *backoff_throttle,
-  perf::Statistics *statistics,
-  const std::string &name,
+  perf::StatisticsTemplate statistics,
   bool external)
   : external_(external)
   , lock_queues_download_(NULL)
@@ -215,7 +214,7 @@ Fetcher::Fetcher(
     smalloc(sizeof(pthread_mutex_t)));
   retval = pthread_mutex_init(lock_tls_blocks_, NULL);
   assert(retval == 0);
-  n_downloads = statistics->Register(name + ".n_downloads",
+  n_downloads = statistics.RegisterTemplated("n_downloads",
     "overall number of downloaded files (incl. catalogs, chunks)");
 }
 

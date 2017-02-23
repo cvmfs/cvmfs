@@ -252,13 +252,11 @@ inline const char* platform_getexepath() {
  * sysconf() is broken on OSX
  */
 inline uint64_t platform_memsize() {
-  int mib[2];
-  int ramsize;
+  int mib[] = {CTL_HW, HW_MEMSIZE};
+  int64_t ramsize;
   int rc;
   size_t len;
 
-  mib[0] = CTL_HW;
-  mib[1] = HW_MEMSIZE;
   len = sizeof(ramsize);
   rc = sysctl(mib, 2, &ramsize, &len, NULL, 0);
   assert(rc == 0);

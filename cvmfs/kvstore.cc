@@ -34,18 +34,17 @@ const double MemoryKvStore::kCompactThreshold = 0.8;
 
 MemoryKvStore::MemoryKvStore(
   unsigned int cache_entries,
-  const string &name,
   MemoryAllocator alloc,
   unsigned alloc_size,
-  perf::Statistics *statistics)
+  perf::StatisticsTemplate statistics)
   : allocator_(alloc)
   , used_bytes_(0)
   , entry_count_(0)
   , max_entries_(cache_entries)
   , entries_(cache_entries, shash::Any(), hasher_any,
-      statistics, name)
+             perf::StatisticsTemplate("lru", statistics))
   , heap_(NULL)
-  , counters_(statistics, name + ".lru")
+  , counters_(statistics)
 {
   int retval = pthread_rwlock_init(&rwlock_, NULL);
   assert(retval == 0);

@@ -346,7 +346,8 @@ class T_ObjectFetcher : public ::testing::Test {
   }
 
   void InitializeExternalManagers() {
-    download_manager_.Init(1, true, &statistics_);
+    download_manager_.Init(1, true,
+      perf::StatisticsTemplate("test", &statistics_));
     signature_manager_.Init();
     ASSERT_TRUE(signature_manager_.LoadPublicRsaKeys(public_key_path));
   }

@@ -25,7 +25,7 @@ class T_RamCacheManager : public ::testing::Test {
     : ramcache_(4*alloc_size,
                 cache_size,
                 MemoryKvStore::kMallocLibc,
-                &statistics_) {
+                perf::StatisticsTemplate("test", &statistics_)) {
     a_.digest[1] = 1;
   }
 

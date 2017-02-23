@@ -75,29 +75,24 @@ struct Counters {
   perf::Counter *n_drop;
   perf::Counter *sz_allocated;
 
-  Counters(perf::Statistics *statistics, const std::string &name) {
-    sz_size = statistics->Register(name + ".sz_size", "Size for " + name);
+  explicit Counters(perf::StatisticsTemplate statistics) {
+    sz_size = statistics.RegisterTemplated("sz_size", "Total size");
     num_collisions = 0;
     max_collisions = 0;
-    n_hit = statistics->Register(name + ".n_hit", "Number of hits for " + name);
-    n_miss = statistics->Register(name + ".n_miss",
-        "Number of misses for " + name);
-    n_insert = statistics->Register(name + ".n_insert",
-        "Number of inserts for " + name);
-    n_insert_negative = statistics->Register(name + ".n_insert_negative",
-        "Number of negative inserts for " + name);
-    n_update = statistics->Register(name + ".n_update",
-        "Number of updates for " + name);
-    n_update_value = statistics->Register(name + ".n_update_value",
-        "Number of value changes for " + name);
-    n_replace = statistics->Register(name + ".n_replace",
-        "Number of replaces for " + name);
-    n_forget = statistics->Register(name + ".n_forget",
-        "Number of forgets for " + name);
-    n_drop = statistics->Register(name + ".n_drop",
-        "Number of drops for " + name);
-    sz_allocated = statistics->Register(name + ".sz_allocated",
-        "Number of allocated bytes for " + name);
+    n_hit = statistics.RegisterTemplated("n_hit", "Number of hits");
+    n_miss = statistics.RegisterTemplated("n_miss", "Number of misses");
+    n_insert = statistics.RegisterTemplated("n_insert", "Number of inserts");
+    n_insert_negative = statistics.RegisterTemplated("n_insert_negative",
+        "Number of negative inserts");
+    n_update = statistics.RegisterTemplated("n_update",
+        "Number of updates");
+    n_update_value = statistics.RegisterTemplated("n_update_value",
+        "Number of value changes");
+    n_replace = statistics.RegisterTemplated("n_replace", "Number of replaces");
+    n_forget = statistics.RegisterTemplated("n_forget", "Number of forgets");
+    n_drop = statistics.RegisterTemplated("n_drop", "Number of drops");
+    sz_allocated = statistics.RegisterTemplated("sz_allocated",
+        "Number of allocated bytes ");
   }
 };
 
@@ -514,9 +509,8 @@ class LruCache : SingleCopy {
   LruCache(const unsigned   cache_size,
            const Key       &empty_key,
            uint32_t (*hasher)(const Key &key),
-           perf::Statistics *statistics,
-           const std::string &name) :
-    counters_(statistics, name),
+           perf::StatisticsTemplate statistics) :
+    counters_(statistics),
     pause_(false),
     cache_gauge_(0),
     cache_size_(cache_size),

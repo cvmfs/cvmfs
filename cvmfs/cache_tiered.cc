@@ -11,6 +11,14 @@
 
 #include "platform.h"
 
+
+std::string TieredCacheManager::Describe() {
+  return "Tiered Cache\n"
+    "  - upper layer: " + upper_->Describe() + "\n"
+    "  - lower layer: " + lower_->Describe() + "\n";
+}
+
+
 int TieredCacheManager::Open(const BlessedObject &object) {
   int fd = upper_->Open(object);
   if ((fd >= 0) || (fd != -ENOENT)) {return fd;}
