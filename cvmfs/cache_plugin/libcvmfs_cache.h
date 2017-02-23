@@ -8,7 +8,7 @@
 
 // Revision Changelog
 // 1 --> 2:
-//   - Add CVMCACHE_CAP_WRITE capability, adj other capability constants
+//   - Add CVMCACHE_CAP_WRITE capability, adjust other capability constants
 #define LIBCVMFS_CACHE_REVISION 2
 
 #include <stdint.h>
