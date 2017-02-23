@@ -7,7 +7,9 @@
 #define CVMFS_CACHE_PLUGIN_LIBCVMFS_CACHE_H_
 
 // Revision Changelog
-#define LIBCVMFS_CACHE_REVISION 1
+// 1 --> 2:
+//   - Add CVMCACHE_CAP_WRITE capability, adj other capability constants
+#define LIBCVMFS_CACHE_REVISION 2
 
 #include <stdint.h>
 
@@ -56,14 +58,16 @@ enum cvmcache_object_type {
 // Mirrors cvmfs::EnumCapability protobuf definition
 enum cvmcache_capabilities {
   CVMCACHE_CAP_NONE        = 0,
+  // A read-only cache needs to be pre-populated by other means
+  CVMCACHE_CAP_WRITE       = 1,
   // Proper refcounting is implemented; for lower tier caches, this capability
   // can be unset and reference counting can simply beomce file existence check
-  CVMCACHE_CAP_REFCOUNT    = 1,
-  CVMCACHE_CAP_SHRINK      = 2,   // clients can ask the cache to shrink
-  CVMCACHE_CAP_INFO        = 4,   // cache plugin knows about its fill level
-  CVMCACHE_CAP_SHRINK_RATE = 8,   // cache knows number of cleanup operations
-  CVMCACHE_CAP_LIST        = 16,  // cache can return a list of objects
-  CVMCACHE_CAP_ALL         = 31
+  CVMCACHE_CAP_REFCOUNT    = 2,
+  CVMCACHE_CAP_SHRINK      = 4,   // clients can ask the cache to shrink
+  CVMCACHE_CAP_INFO        = 8,   // cache plugin knows about its fill level
+  CVMCACHE_CAP_SHRINK_RATE = 16,   // cache knows number of cleanup operations
+  CVMCACHE_CAP_LIST        = 32,  // cache can return a list of objects
+  CVMCACHE_CAP_ALL         = 63
 };
 
 #define CVMCACHE_SIZE_UNKNOWN (uint64_t(-1))

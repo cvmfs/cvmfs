@@ -27,8 +27,7 @@ int TieredCacheManager::Open(const BlessedObject &object) {
   int fd2 = lower_->Open(object);
   if (fd2 < 0) {return fd;}  // NOTE: use error code from upper.
 
-  // Lower cache hit; upper cache miss.  Copy object into the
-  // upper cache.
+  // Lower cache hit; upper cache miss.  Copy object into the upper cache.
   int64_t size = lower_->GetSize(fd2);
   if (size < 0) {
     lower_->Close(fd2);
@@ -81,7 +80,7 @@ int TieredCacheManager::Open(const BlessedObject &object) {
 int TieredCacheManager::StartTxn(const shash::Any &id, uint64_t size, void *txn)
 {
   int upper_result = upper_->StartTxn(id, size, txn);
-  if (upper_result < 0) {
+  if (lower_readonly_ || (upper_result < 0)) {
     return upper_result;
   }
 
@@ -112,14 +111,16 @@ void TieredCacheManager::CtrlTxn(
   void *txn)
 {
   upper_->CtrlTxn(object_info, flags, txn);
-  void *txn2 = static_cast<char*>(txn) + upper_->SizeOfTxn();
-  lower_->CtrlTxn(object_info, flags, txn2);
+  if (!lower_readonly_) {
+    void *txn2 = static_cast<char*>(txn) + upper_->SizeOfTxn();
+    lower_->CtrlTxn(object_info, flags, txn2);
+  }
 }
 
 
 int64_t TieredCacheManager::Write(const void *buf, uint64_t size, void *txn) {
   int upper_result = upper_->Write(buf, size, txn);
-  if (upper_result < 0) { return upper_result; }
+  if (lower_readonly_ || (upper_result < 0)) { return upper_result; }
 
   void *txn2 = static_cast<char*>(txn) + upper_->SizeOfTxn();
   return lower_->Write(buf, size, txn2);
@@ -129,8 +130,11 @@ int64_t TieredCacheManager::Write(const void *buf, uint64_t size, void *txn) {
 int TieredCacheManager::Reset(void *txn) {
   int upper_result = upper_->Reset(txn);
 
-  void *txn2 = static_cast<char*>(txn) + upper_->SizeOfTxn();
-  int lower_result = lower_->Reset(txn2);
+  int lower_result = upper_result;
+  if (!lower_readonly_) {
+    void *txn2 = static_cast<char*>(txn) + upper_->SizeOfTxn();
+    lower_result = lower_->Reset(txn2);
+  }
 
   return (upper_result < 0) ? upper_result : lower_result;
 }
@@ -139,8 +143,11 @@ int TieredCacheManager::Reset(void *txn) {
 int TieredCacheManager::AbortTxn(void *txn) {
   int upper_result = upper_->AbortTxn(txn);
 
-  void *txn2 = static_cast<char*>(txn) + upper_->SizeOfTxn();
-  int lower_result = lower_->AbortTxn(txn2);
+  int lower_result = upper_result;
+  if (!lower_readonly_) {
+    void *txn2 = static_cast<char*>(txn) + upper_->SizeOfTxn();
+    lower_result = lower_->AbortTxn(txn2);
+  }
 
   return (upper_result < 0) ? upper_result : lower_result;
 }
@@ -149,8 +156,11 @@ int TieredCacheManager::AbortTxn(void *txn) {
 int TieredCacheManager::CommitTxn(void *txn) {
   int upper_result = upper_->CommitTxn(txn);
 
-  void *txn2 = static_cast<char*>(txn) + upper_->SizeOfTxn();
-  int lower_result = lower_->CommitTxn(txn2);
+  int lower_result = upper_result;
+  if (!lower_readonly_) {
+    void *txn2 = static_cast<char*>(txn) + upper_->SizeOfTxn();
+    lower_result = lower_->CommitTxn(txn2);
+  }
 
   return (upper_result < 0) ? upper_result : lower_result;
 }

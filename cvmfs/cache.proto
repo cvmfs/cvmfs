@@ -69,14 +69,16 @@ enum EnumObjectType {
 
 enum EnumCapabilities {
   CAP_NONE        = 0;
+  // A read-only cache needs to be pre-populated by other means
+  CAP_WRITE       = 1;
   // Proper refcounting is implemented; for lower tier caches, this capability
   // can be unset and reference counting can simply beomce file existence check
-  CAP_REFCOUNT    = 1;
-  CAP_SHRINK      = 2;   // clients can ask the cache to shrink
-  CAP_INFO        = 4;   // cache plugin knows about its size and fill level
-  CAP_SHRINK_RATE = 8;   // cache knows number of cleanup operations
-  CAP_LIST        = 16;  // cache can return a list of objects
-  CAP_ALL         = 31;
+  CAP_REFCOUNT    = 2;
+  CAP_SHRINK      = 4;   // clients can ask the cache to shrink
+  CAP_INFO        = 8;   // cache plugin knows about its size and fill level
+  CAP_SHRINK_RATE = 16;   // cache knows number of cleanup operations
+  CAP_LIST        = 32;  // cache can return a list of objects
+  CAP_ALL         = 63;
 }
 
 

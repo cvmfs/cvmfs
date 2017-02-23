@@ -5,6 +5,7 @@ cvmfs_run_test() {
   logfile=$1
 
   local second_cache_dir="$(get_cvmfs_cachedir atlas.cern.ch)/second"
+  local ro_cache_dir="$(get_cvmfs_cachedir atlas.cern.ch)/readonly"
 
   echo "*** mount with tiered cached"
   cvmfs_mount atlas.cern.ch \
@@ -58,6 +59,25 @@ cvmfs_run_test() {
   num_caches=$(sudo cvmfs_talk -i atlas.cern.ch cache instance | wc -l)
   [ "x$num_caches" = "x3" ] || return 52
   sudo cvmfs_talk -i atlas.cern.ch cache instance | grep "memory" || return 53
+
+  echo "*** Read-only lower layer branch"
+  cvmfs_umount atlas.cern.ch || return 60
+  cvmfs_mount atlas.cern.ch \
+    "CVMFS_CACHE_PRIMARY=custom" \
+    "CVMFS_CACHE_custom_TYPE=tiered" \
+    "CVMFS_CACHE_custom_UPPER=default" \
+    "CVMFS_CACHE_custom_LOWER=lower" \
+    "CVMFS_CACHE_custom_LOWER_READONLY=true" \
+    "CVMFS_CACHE_lower_TYPE=posix" \
+    "CVMFS_CACHE_lower_DIR=$ro_cache_dir" \
+    "CVMFS_CACHE_lower_QUOTA_LIMIT=-1" || return 61
+  ls /cvmfs/atlas.cern.ch || return 62
+  md5sum $test_file || return 63
+  local n_files_in_lower=$(sudo find $ro_cache_dir -mindepth 2 -type f | wc -l)
+  if [ "x$n_files_in_lower" != "x0" ]; then
+    sudo find $ro_cache_dir -type f
+    return 64
+  fi
 
   return 0
 }
