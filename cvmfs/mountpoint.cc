@@ -834,7 +834,13 @@ bool FileSystem::SetupPosixQuotaMgr(
     }
   } else {
     // Cache database should to be protected by workspace lock
-    assert(workspace_ == settings.cache_path);
+    if (workspace_ != settings.cache_path) {
+      // Can happen for a tiered POSIX cache
+      boot_error_ = "Cannot start managed cache in " + settings.cache_path +
+                    ", which is not protected by workspace in " + workspace_;
+      boot_status_ = loader::kFailQuota;
+      return false;
+    }
     quota_mgr = PosixQuotaManager::Create(
                   settings.cache_path,
                   settings.quota_limit,

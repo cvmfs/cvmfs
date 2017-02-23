@@ -32,10 +32,9 @@ class TieredCacheManager : public CacheManager {
   virtual std::string Describe();
 
   static CacheManager *Create(CacheManager *upper_cache,
-                              CacheManager *lower_cache)
-  { return new TieredCacheManager(upper_cache, lower_cache); }
+                              CacheManager *lower_cache);
 
-  virtual ~TieredCacheManager() { delete upper_; delete lower_; }
+  virtual ~TieredCacheManager();
   virtual bool AcquireQuotaManager(QuotaManager *quota_mgr) {
     bool result = upper_->AcquireQuotaManager(quota_mgr);
     quota_mgr_ = upper_->quota_mgr();
@@ -69,9 +68,7 @@ class TieredCacheManager : public CacheManager {
   // NOTE: TieredCacheManager takes ownership of both caches passed.
   TieredCacheManager(CacheManager *upper_cache,
                      CacheManager *lower_cache)
-    : upper_(upper_cache),
-      lower_(lower_cache)
-  { }
+    : upper_(upper_cache), lower_(lower_cache) { }
 
   CacheManager *upper_;
   CacheManager *lower_;

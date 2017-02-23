@@ -10,12 +10,13 @@
 #include <vector>
 
 #include "platform.h"
+#include "quota.h"
 
 
 std::string TieredCacheManager::Describe() {
   return "Tiered Cache\n"
-    "  - upper layer: " + upper_->Describe() + "\n"
-    "  - lower layer: " + lower_->Describe() + "\n";
+    "  - upper layer: " + upper_->Describe() +
+    "  - lower layer: " + lower_->Describe();
 }
 
 
@@ -93,6 +94,18 @@ int TieredCacheManager::StartTxn(const shash::Any &id, uint64_t size, void *txn)
 }
 
 
+CacheManager *TieredCacheManager::Create(
+  CacheManager *upper_cache,
+  CacheManager *lower_cache)
+{
+  TieredCacheManager *cache_mgr =
+    new TieredCacheManager(upper_cache, lower_cache);
+  delete cache_mgr->quota_mgr_;
+  cache_mgr->quota_mgr_ = upper_cache->quota_mgr();
+  return cache_mgr;
+}
+
+
 void TieredCacheManager::CtrlTxn(
   const ObjectInfo &object_info,
   const int flags,
@@ -146,4 +159,11 @@ int TieredCacheManager::CommitTxn(void *txn) {
 void TieredCacheManager::Spawn() {
   upper_->Spawn();
   lower_->Spawn();
+}
+
+
+TieredCacheManager::~TieredCacheManager() {
+  quota_mgr_ = NULL;  // gets deleted by upper
+  delete upper_;
+  delete lower_;
 }
