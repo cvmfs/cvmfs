@@ -70,14 +70,16 @@ class T_Fetcher : public ::testing::Test {
     ASSERT_TRUE(cache_mgr_ != NULL);
 
     download_mgr_ = new download::DownloadManager();
-    download_mgr_->Init(8, false, /* use_system_proxy */ &statistics_);
+    download_mgr_->Init(8, false, /* use_system_proxy */
+      perf::StatisticsTemplate("test", &statistics_));
     download_mgr_->SetHostChain("file://" + tmp_path_);
 
     fetcher_ = new Fetcher(
-      cache_mgr_, download_mgr_, &backoff_throttle_, &statistics_);
+      cache_mgr_, download_mgr_, &backoff_throttle_,
+      perf::StatisticsTemplate("fetch", &statistics_));
     external_fetcher_ = new Fetcher(
-      cache_mgr_, download_mgr_, &backoff_throttle_, &statistics_,
-      "fetch-external", true);
+      cache_mgr_, download_mgr_, &backoff_throttle_,
+      perf::StatisticsTemplate("fetch-external", &statistics_), true);
   }
 
   virtual void TearDown() {
@@ -122,6 +124,7 @@ class BuggyCacheManager : public CacheManager {
     atomic_init32(&continue_ctrltxn);
   }
   virtual CacheManagerIds id() { return kUnknownCacheManager; }
+  virtual std::string Describe() { return "test\n"; }
   virtual bool AcquireQuotaManager(QuotaManager *qm) { return false; }
   virtual int Open(const BlessedObject &object) {
     if (!allow_open) {
@@ -323,7 +326,8 @@ TEST_F(T_Fetcher, FetchTransactionFailures) {
   // OpenFromTxn fails
   perf::Statistics statistics;
   BuggyCacheManager bcm;
-  Fetcher f(&bcm, download_mgr_, &backoff_throttle_, &statistics);
+  Fetcher f(&bcm, download_mgr_, &backoff_throttle_,
+    perf::StatisticsTemplate("fetch", &statistics));
   EXPECT_EQ(-EBADF,
     f.Fetch(hash_catalog_, CacheManager::kSizeUnknown, "cat",
             zlib::kZlibDefault, CacheManager::kTypeCatalog));
@@ -386,7 +390,8 @@ TEST_F(T_Fetcher, FetchCollapse) {
   perf::Statistics statistics;
   BuggyCacheManager bcm;
   bcm.open_2nd_try = true;
-  Fetcher f(&bcm, download_mgr_, &backoff_throttle_, &statistics);
+  Fetcher f(&bcm, download_mgr_, &backoff_throttle_,
+    perf::StatisticsTemplate("fetch", &statistics));
   int fd = f.Fetch(hash_catalog_, CacheManager::kSizeUnknown, "cat",
                    zlib::kZlibDefault, CacheManager::kTypeCatalog);
   EXPECT_GE(fd, 0);

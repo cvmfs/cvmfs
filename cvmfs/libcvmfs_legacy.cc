@@ -407,9 +407,11 @@ SimpleOptionsParser *cvmfs_options_init_legacy(char const *legacy_options) {
   if (!global_opts.alien_cachedir.empty()) {
     options_mgr->SetValue("CVMFS_ALIEN_CACHE", global_opts.alien_cachedir);
   }
-  if (global_opts.change_to_cache_directory) {
-    options_mgr->SetValue("CVMFS_CWD_CACHE", "on");
-  }
+  // Note: as of version 2.4 CVMFS_CWD_CACHE support was dropped due to
+  // disproportional large complexity in the FileSystem class
+  // if (global_opts.change_to_cache_directory) {
+  //  options_mgr->SetValue("CVMFS_CWD_CACHE", "on");
+  // }
   options_mgr->SetValue("CVMFS_SYSLOG_LEVEL",
                         StringifyInt(global_opts.log_syslog_level));
   if (!global_opts.log_prefix.empty()) {

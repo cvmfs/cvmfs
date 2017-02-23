@@ -23,7 +23,7 @@ const std::string name = "lru_cache";
 TEST(T_LruCache, Initialize) {
   perf::Statistics statistics;
   LruCache<int, std::string> cache(cache_size, -1, hasher_int,
-      &statistics, name);
+      perf::StatisticsTemplate(name, &statistics));
   EXPECT_TRUE(cache.IsEmpty());
   EXPECT_FALSE(cache.IsFull());
 }
@@ -32,7 +32,7 @@ TEST(T_LruCache, Initialize) {
 TEST(T_LruCache, Insert) {
   perf::Statistics statistics;
   LruCache<int, std::string> cache(cache_size, -1, hasher_int,
-      &statistics, name);
+      perf::StatisticsTemplate(name, &statistics));
   EXPECT_TRUE(cache.IsEmpty());
   EXPECT_FALSE(cache.IsFull());
 
@@ -54,7 +54,7 @@ TEST(T_LruCache, Insert) {
 TEST(T_LruCache, UpdateValue) {
   perf::Statistics statistics;
   LruCache<int, std::string> cache(cache_size, -1, hasher_int,
-      &statistics, name);
+      perf::StatisticsTemplate(name, &statistics));
 
   EXPECT_TRUE(cache.Insert(1, "one"));
   EXPECT_TRUE(cache.Insert(2, "two"));
@@ -84,7 +84,7 @@ TEST(T_LruCache, UpdateValue) {
 TEST(T_LruCache, UpdateOnly) {
   perf::Statistics statistics;
   LruCache<int, std::string> cache(cache_size, -1, hasher_int,
-      &statistics, name);
+      perf::StatisticsTemplate(name, &statistics));
 
   EXPECT_TRUE(cache.Insert(1, "one"));
   EXPECT_TRUE(cache.Insert(2, "two"));
@@ -113,7 +113,7 @@ TEST(T_LruCache, UpdateOnly) {
 TEST(T_LruCache, Drop) {
   perf::Statistics statistics;
   LruCache<int, std::string> cache(cache_size, -1, hasher_int,
-      &statistics, name);
+      perf::StatisticsTemplate(name, &statistics));
   EXPECT_TRUE(cache.IsEmpty());
   EXPECT_FALSE(cache.IsFull());
 
@@ -165,7 +165,7 @@ TEST(T_LruCache, Drop) {
 TEST(T_LruCache, Lookup) {
   perf::Statistics statistics;
   LruCache<int, std::string> cache(cache_size, -1, hasher_int,
-      &statistics, name);
+      perf::StatisticsTemplate(name, &statistics));
   EXPECT_TRUE(cache.IsEmpty());
   EXPECT_FALSE(cache.IsFull());
 
@@ -228,7 +228,7 @@ TEST(T_LruCache, Lookup) {
 TEST(T_LruCache, Update) {
   perf::Statistics statistics;
   LruCache<int, std::string> cache(cache_size, -1, hasher_int,
-      &statistics, name);
+      perf::StatisticsTemplate(name, &statistics));
   EXPECT_TRUE(cache.IsEmpty());
   EXPECT_FALSE(cache.IsFull());
 
@@ -293,7 +293,7 @@ TEST(T_LruCache, Update) {
 TEST(T_LruCache, Forget) {
   perf::Statistics statistics;
   LruCache<int, std::string> cache(cache_size, -1, hasher_int,
-      &statistics, name);
+      perf::StatisticsTemplate(name, &statistics));
   EXPECT_TRUE(cache.IsEmpty());
   EXPECT_FALSE(cache.IsFull());
 
@@ -360,7 +360,7 @@ TEST(T_LruCache, Forget) {
 TEST(T_LruCache, FillCompletely) {
   perf::Statistics statistics;
   LruCache<int, std::string> cache(cache_size, -1, hasher_int,
-      &statistics, name);
+      perf::StatisticsTemplate(name, &statistics));
   EXPECT_TRUE(cache.IsEmpty());
   EXPECT_FALSE(cache.IsFull());
 
@@ -389,7 +389,7 @@ TEST(T_LruCache, FillCompletely) {
 TEST(T_LruCache, LeastRecentlyUsedReplacementSlow) {
   perf::Statistics statistics;
   LruCache<int, std::string> cache(cache_size, -1, hasher_int,
-      &statistics, name);
+      perf::StatisticsTemplate(name, &statistics));
   EXPECT_TRUE(cache.IsEmpty());
   EXPECT_FALSE(cache.IsFull());
 
@@ -456,7 +456,7 @@ TEST(T_LruCache, LeastRecentlyUsedReplacementSlow) {
 TEST(T_LruCache, PauseAndResume) {
   perf::Statistics statistics;
   LruCache<int, std::string> cache(cache_size, -1, hasher_int,
-      &statistics, name);
+      perf::StatisticsTemplate(name, &statistics));
   EXPECT_TRUE(cache.IsEmpty());
   EXPECT_FALSE(cache.IsFull());
 

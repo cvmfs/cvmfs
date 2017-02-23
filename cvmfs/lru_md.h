@@ -44,7 +44,8 @@ class InodeCache : public LruCache<fuse_ino_t, catalog::DirectoryEntry>
  public:
   explicit InodeCache(unsigned int cache_size, perf::Statistics *statistics) :
     LruCache<fuse_ino_t, catalog::DirectoryEntry>(
-      cache_size, fuse_ino_t(-1), hasher_inode, statistics, "inode_cache")
+      cache_size, fuse_ino_t(-1), hasher_inode,
+      perf::StatisticsTemplate("inode_cache", statistics))
   {
   }
 
@@ -77,7 +78,7 @@ class PathCache : public LruCache<fuse_ino_t, PathString> {
  public:
   explicit PathCache(unsigned int cache_size, perf::Statistics *statistics) :
     LruCache<fuse_ino_t, PathString>(cache_size, fuse_ino_t(-1), hasher_inode,
-        statistics, "path_cache")
+      perf::StatisticsTemplate("path_cache", statistics))
   {
   }
 
@@ -112,8 +113,8 @@ class Md5PathCache :
  public:
   explicit Md5PathCache(unsigned int cache_size, perf::Statistics *statistics) :
     LruCache<shash::Md5, catalog::DirectoryEntry>(
-      cache_size, shash::Md5(shash::AsciiPtr("!")), hasher_md5, statistics,
-      "md5_path_cache")
+      cache_size, shash::Md5(shash::AsciiPtr("!")), hasher_md5,
+      perf::StatisticsTemplate("md5_path_cache", statistics))
   {
     dirent_negative_ = catalog::DirectoryEntry(catalog::kDirentNegative);
   }

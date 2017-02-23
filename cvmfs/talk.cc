@@ -197,6 +197,8 @@ void *TalkManager::MainResponder(void *data) {
           StringifyInt(size_pinned) + " Bytes)\n";
         talk_mgr->Answer(con_fd, size_str);
       }
+    } else if (line == "cache instance") {
+      talk_mgr->Answer(con_fd, file_system->cache_mgr()->Describe());
     } else if (line == "cache list") {
       QuotaManager *quota_mgr = file_system->cache_mgr()->quota_mgr();
       if (!quota_mgr->HasCapability(QuotaManager::kCapList)) {
@@ -497,7 +499,7 @@ void *TalkManager::MainResponder(void *data) {
       result += "\nDrainout Mode: " + StringifyBool(drainout_mode) + "\n";
       result += "Maintenance Mode: " + StringifyBool(maintenance_mode) + "\n";
 
-      if (file_system->cache_mode() & FileSystem::kCacheNfs) {
+      if (file_system->IsNfsSource()) {
         result += "\nNFS Map Statistics:\n";
         result += nfs_maps::GetStatistics();
       }

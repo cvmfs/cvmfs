@@ -14,7 +14,7 @@
 
 #include "platform.h"
 
-class Pipe;
+struct Pipe;
 
 /**
  * This class can fork a watchdog process that listens on a pipe and prints a

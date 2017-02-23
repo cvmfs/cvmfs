@@ -231,6 +231,7 @@ class TestCacheManager : public CacheManager {
     quota_mgr_ = new TestQuotaManager();
   }
   virtual CacheManagerIds id() { return kUnknownCacheManager; }
+  virtual std::string Describe() { return "test\n"; }
   virtual bool AcquireQuotaManager(QuotaManager *qm) { return false; }
   virtual int Open(const BlessedObject &object) {
     return open("/dev/null", O_RDONLY);

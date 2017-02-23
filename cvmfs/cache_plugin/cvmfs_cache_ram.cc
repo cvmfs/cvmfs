@@ -474,14 +474,12 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
       num_slots & mask_64,
       ComparableHash(hash_empty),
       hasher_any,
-      &statistics_,
-      "objects_all");
+      perf::StatisticsTemplate("objects_all", &statistics_));
     objects_volatile_ = new lru::LruCache<ComparableHash, ObjectHeader *>(
       num_slots & mask_64,
       ComparableHash(hash_empty),
       hasher_any,
-      &statistics_,
-      "objects_volatile");
+      perf::StatisticsTemplate("objects_volatile", &statistics_));
   }
 
   /**

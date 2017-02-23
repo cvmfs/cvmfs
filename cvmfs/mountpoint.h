@@ -11,9 +11,11 @@
 #include <unistd.h>
 
 #include <ctime>
+#include <set>
 #include <string>
 
 #include "cache.h"
+#include "gtest/gtest_prod.h"
 #include "hash.h"
 #include "loader.h"
 #include "util/pointer.h"
@@ -85,6 +87,11 @@ class BootFactory {
  * object and one MountPoint object.
  */
 class FileSystem : SingleCopy, public BootFactory {
+  FRIEND_TEST(T_MountPoint, MkCacheParm);
+  FRIEND_TEST(T_MountPoint, CacheSettings);
+  FRIEND_TEST(T_MountPoint, CheckInstanceName);
+  FRIEND_TEST(T_MountPoint, CheckPosixCacheSettings);
+
  public:
   enum Type {
     kFsFuse = 0,
@@ -137,46 +144,28 @@ class FileSystem : SingleCopy, public BootFactory {
   };
 
   /**
-   * Local hard disk cache, no shared quota manager.
+   * No NFS maps.
    */
-  static const unsigned kCacheExclusive  = 0x01;
+  static const unsigned kNfsNone = 0x00;
   /**
-   * Connect to the quota manager process for a shared local hard disk cache.
+   * Normal NFS maps by leveldb
    */
-  static const unsigned kCacheShared     = 0x02;
+  static const unsigned kNfsMaps = 0x01;
   /**
-   * Unmanaged cache (no cleanup), cache directory writable
-   * for owner uid _and_ gid
+   * NFS maps maintained by sqlite so that they can reside on an NFS mount
    */
-  static const unsigned kCacheAlien      = 0x04;
-  /**
-   * Whether to use a quota manager or not.
-   */
-  static const unsigned kCacheManaged    = 0x08;
-  /**
-   * Use NFS maps to persistently map paths to inodes.
-   */
-  static const unsigned kCacheNfs        = 0x10;
-  /**
-   * Store NFS maps on an NFS volume.
-   */
-  static const unsigned kCacheNfsHa      = 0x20;
-  /**
-   * Avoid rename() calls in the cache directory (replaced by link+unlink)
-   */
-  static const unsigned kCacheNoRename   = 0x40;
+  static const unsigned kNfsMapsHa = 0x02;
 
   static FileSystem *Create(const FileSystemInfo &fs_info);
   ~FileSystem();
 
-  bool IsNfsSource() { return cache_mode_ & kCacheNfs; }
-  bool IsAlienCache() { return cache_mode_ & kCacheAlien; }
+  bool IsNfsSource() { return nfs_mode_ & kNfsMaps; }
+  bool IsHaNfsSource() { return nfs_mode_ & kNfsMapsHa; }
   void ResetErrorCounters();
   void TearDown2ReadOnly();
 
-  std::string cache_dir() { return cache_dir_; }
   CacheManager *cache_mgr() { return cache_mgr_; }
-  int cache_mode() { return cache_mode_; }
+  std::string cache_mgr_instance() { return cache_mgr_instance_; }
   std::string exe_path() { return exe_path_; }
   bool found_previous_crash() { return found_previous_crash_; }
   perf::Counter *n_fs_dir_open() { return n_fs_dir_open_; }
@@ -188,13 +177,9 @@ class FileSystem : SingleCopy, public BootFactory {
   perf::Counter *n_fs_readlink() { return n_fs_readlink_; }
   perf::Counter *n_fs_stat() { return n_fs_stat_; }
   perf::Counter *n_io_error() { return n_io_error_; }
-  std::string nfs_maps_dir() { return nfs_maps_dir_; }
   perf::Counter *no_open_dirs() { return no_open_dirs_; }
   perf::Counter *no_open_files() { return no_open_files_; }
   OptionsManager *options_mgr() { return options_mgr_; }
-  int64_t quota_limit() { return quota_limit_; }
-  std::string second_cache_dir() { return second_cache_dir_; }
-  int second_cache_mode() { return cache_mode_; }
   perf::Statistics *statistics() { return statistics_; }
   Type type() { return type_; }
   cvmfs::Uuid *uuid_cache() { return uuid_cache_; }
@@ -207,6 +192,28 @@ class FileSystem : SingleCopy, public BootFactory {
   static bool g_alive;
   static const char *kDefaultCacheBase;  // /var/lib/cvmfs
   static const unsigned kDefaultQuotaLimit = 1024 * 1024 * 1024;  // 1GB
+  static const unsigned kDefaultNfiles = 8192;  // if CVMFS_NFILES is unset
+  static const char *kDefaultCacheMgrInstance;  // "default"
+
+  struct PosixCacheSettings {
+    PosixCacheSettings() :
+      is_shared(false), is_alien(false), is_managed(false),
+      avoid_rename(false), cache_base_defined(false), cache_dir_defined(false),
+      quota_limit(0)
+      { }
+    bool is_shared;
+    bool is_alien;
+    bool is_managed;
+    bool avoid_rename;
+    bool cache_base_defined;
+    bool cache_dir_defined;
+    /**
+     * Soft limit in bytes for the cache.  The quota manager removes half the
+     * cache when the limit is exceeded.
+     */
+    int64_t quota_limit;
+    std::string cache_path;
+  };
 
   static void LogSqliteError(void *user_data __attribute__((unused)),
                              int sqlite_extended_error,
@@ -217,18 +224,27 @@ class FileSystem : SingleCopy, public BootFactory {
   void SetupLogging();
   void CreateStatistics();
   void SetupSqlite();
+  bool DetermineNfsMode();
   bool SetupWorkspace();
   bool SetupCwd();
   bool LockWorkspace();
   bool SetupCrashGuard();
-  bool CreateCache();
-  bool SetupQuotaMgmt();
   bool SetupNfsMaps();
+  void SetupUuid();
 
-  bool CheckCacheMode();
-  void DetermineCacheMode();
-  void DetermineCacheDirs();
-  void DetermineMountpoint();
+  std::string MkCacheParm(const std::string &generic_parameter,
+                          const std::string &instance);
+  bool CheckInstanceName(const std::string &instance);
+  bool TriageCacheMgr();
+  CacheManager *SetupCacheMgr(const std::string &instance);
+  CacheManager *SetupPosixCacheMgr(const std::string &instance);
+  CacheManager *SetupRamCacheMgr(const std::string &instance);
+  CacheManager *SetupTieredCacheMgr(const std::string &instance);
+  CacheManager *SetupExternalCacheMgr(const std::string &instance);
+  PosixCacheSettings DeterminePosixCacheSettings(const std::string &instance);
+  bool CheckPosixCacheSettings(const PosixCacheSettings &settings);
+  bool SetupPosixQuotaMgr(const PosixCacheSettings &settings,
+                          CacheManager *cache_mgr);
 
   // See FileSystemInfo for the following fields
   std::string name_;
@@ -261,6 +277,12 @@ class FileSystem : SingleCopy, public BootFactory {
    * FileSystem instances if their name is different.
    */
   std::string workspace_;
+  /**
+   * During setup, the fuse module changes its working directory to workspace.
+   * Afterwards, workspace_ is ".".  Store the original one in
+   * workspace_fullpath_
+   */
+  std::string workspace_fullpath_;
   int fd_workspace_lock_;
   std::string path_workspace_lock_;
 
@@ -280,22 +302,21 @@ class FileSystem : SingleCopy, public BootFactory {
    * location.
    */
   std::string mountpoint_;
-  std::string cache_dir_;
-  std::string second_cache_dir_;
+  /**
+   * The user-provided name of the parimay cache manager or 'default' if none
+   * is specified.
+   */
+  std::string cache_mgr_instance_;
+  /**
+   * Keep track of all the cache instances to detect circular definitions with
+   * the tiered cache.
+   */
+  std::set<std::string> constructed_instances_;
   std::string nfs_maps_dir_;
   /**
-   * Combination of kCache... flags
+   * Combination of kNfs... flags
    */
-  int cache_mode_;
-  /**
-   * The lower cache tier currently can only be
-   */
-  int second_cache_mode_;
-  /**
-   * Soft limit in bytes for the cache.  The quota manager removes half the
-   * cache when the limit is exceeded.
-   */
-  int64_t quota_limit_;
+  unsigned nfs_mode_;
   CacheManager *cache_mgr_;
   /**
    * Persistent for the cache directory + name combination.  It is used in the
@@ -312,11 +333,6 @@ class FileSystem : SingleCopy, public BootFactory {
    * down.
    */
   bool has_custom_sqlitevfs_;
-
-  /**
-   * Indicates which type of cache to use
-   */
-  CacheManagerIds cache_mgr_type_;
 };
 
 

@@ -25,7 +25,7 @@ class T_Download : public ::testing::Test {
  protected:
   virtual void SetUp() {
     download_mgr.Init(8, false, /* use_system_proxy */
-        &statistics);
+      perf::StatisticsTemplate("test", &statistics));
     ffoo = CreateTemporaryFile(&foo_path);
     assert(ffoo);
     foo_url = "file://" + foo_path;
@@ -98,7 +98,8 @@ TEST_F(T_Download, File) {
 
 
 TEST_F(T_Download, Clone) {
-  DownloadManager *download_mgr_cloned = download_mgr.Clone(&statistics, "x");
+  DownloadManager *download_mgr_cloned = download_mgr.Clone(
+    perf::StatisticsTemplate("x", &statistics));
 
   string dest_path;
   FILE *fdest = CreateTemporaryFile(&dest_path);
@@ -119,7 +120,7 @@ TEST_F(T_Download, Clone) {
 
   // Don't crash
   DownloadManager *dm = new DownloadManager();
-  download_mgr_cloned = dm->Clone(&statistics, "y");
+  download_mgr_cloned = dm->Clone(perf::StatisticsTemplate("y", &statistics));
   delete dm;
   delete download_mgr_cloned;
 }
@@ -132,7 +133,8 @@ TEST_F(T_Download, Multiple) {
   UnlinkGuard unlink_guard(dest_path);
 
   DownloadManager second_mgr;
-  second_mgr.Init(8, false, /* use_system_proxy */ &statistics, "second");
+  second_mgr.Init(8, false, /* use_system_proxy */
+    perf::StatisticsTemplate("second", &statistics));
 
   JobInfo info(&foo_url, false /* compressed */, false /* probe hosts */,
                fdest,  NULL);

@@ -33,7 +33,6 @@
  * replication.
  */
 class ObjectPack : SingleCopy {
-  friend class ObjectPackProducer;
   FRIEND_TEST(T_Pack, Bucket);
   FRIEND_TEST(T_Pack, ObjectPack);
   FRIEND_TEST(T_Pack, ObjectPackTransfer);
@@ -44,6 +43,15 @@ class ObjectPack : SingleCopy {
  public:
   typedef Bucket *BucketHandle;
 
+  /**
+   * This is used to identify the content type of different buckets. Initially,
+   * the contents of a bucket are identified as kEmpty. When committing a
+   * bucket, this is set to either kNamed - if the bucket holds the contents of
+   * a named file - or kCas - if the bucket holds the contents of a content
+   * addressable buffer.
+   */
+  enum BucketContentType { kEmpty, kNamed, kCas };
+
   static const uint64_t kDefaultLimit = 200 * 1024 * 1024;  // 200MB
 
   /**
@@ -53,20 +61,29 @@ class ObjectPack : SingleCopy {
    */
   static const uint64_t kMaxObjects = 100000;
 
-  ObjectPack();
-  explicit ObjectPack(const uint64_t limit);
+  explicit ObjectPack(const uint64_t limit = kDefaultLimit);
   ~ObjectPack();
 
-  BucketHandle OpenBucket();
-  void AddToBucket(const void *buf, const uint64_t size,
-                   const BucketHandle handle);
+  static void AddToBucket(const void *buf, const uint64_t size,
+                          const BucketHandle handle);
 
-  bool CommitBucket(const shash::Any &id, const BucketHandle handle);
+  BucketHandle NewBucket();
+
+  bool CommitBucket(const BucketContentType type, const shash::Any &id,
+                    const BucketHandle handle, const std::string &name = "");
+
   void DiscardBucket(const BucketHandle handle);
   void TransferBucket(const BucketHandle handle, ObjectPack *other);
 
+  unsigned char *BucketContent(size_t idx) const;
+  uint64_t BucketSize(size_t idx) const;
+  const shash::Any &BucketId(size_t idx) const;
+
   uint64_t size() const { return size_; }
-  unsigned GetNoObjects() const { return buckets_.size(); }
+
+  // This returns the number of objects in the pack (equal to the number of
+  // committed buckets)
+  size_t GetNoObjects() const { return buckets_.size(); }
 
  private:
   /**
@@ -84,6 +101,8 @@ class ObjectPack : SingleCopy {
     uint64_t size;
     uint64_t capacity;
     shash::Any id;
+    BucketContentType content_type;
+    std::string name;
   };
 
   void InitLock();
@@ -112,19 +131,59 @@ class ObjectPack : SingleCopy {
 };
 
 /**
+ * Data structures required for the ObjectPack serialization.  Event is a
+ * template parameter for the Observable base class of ObjectPack and hence
+ * moved into this base class.
+ */
+namespace ObjectPackBuild {
+struct Event {
+  Event(const shash::Any &id, uint64_t size, unsigned buf_size, const void *buf,
+        ObjectPack::BucketContentType type, const std::string &name)
+      : id(id),
+        size(size),
+        buf_size(buf_size),
+        buf(buf),
+        object_type(type),
+        object_name(name) {}
+
+  shash::Any id;
+  uint64_t size;
+  unsigned buf_size;
+  const void *buf;
+  ObjectPack::BucketContentType object_type;
+  std::string object_name;
+};
+
+enum State {
+  kStateContinue = 0,
+  kStateDone,
+  kStateCorrupt,
+  kStateBadFormat,
+  kStateHeaderTooBig,
+  kStateTrailingBytes,
+};
+}  // namespace ObjectPackBuild
+
+/**
  * Serializes ObjectPacks.  It can also serialize a single large file as an
  * "object pack", which otherwise would need special treatment.
  *
  * The serialized format has a global, human readable header which has lines of
  * character keys and string values (like the cvmfs manifest) follwed by a "--"
- * separator line followed by the index of objects.  This index is a list of
- * hash digest (hex) and object size (decimal) tuples, separated by line
- * breaks.
+ * separator line followed by the index of objects. The index contains one line
+ * for each item in the pack. Each line contains the following space-separated
+ * tokens:
+ * 1. object type identifier ('N' for named files, 'C' for CAS blobs)
+ * 2. hash digest (hex)
+ * 3. object size (decimal)
+ * 4. object name - base64 encoding of the object name (optional - only if the
+ *                  object type is 'N')
  */
 class ObjectPackProducer {
  public:
   explicit ObjectPackProducer(ObjectPack *pack);
-  ObjectPackProducer(const shash::Any &id, FILE *big_file);
+  ObjectPackProducer(const shash::Any &id, FILE *big_file,
+                     const std::string &file_name = "");
   unsigned ProduceNext(const unsigned buf_size, unsigned char *buf);
   void GetDigest(shash::Any *hash);
   unsigned GetHeaderSize() { return header_.size(); }
@@ -148,12 +207,12 @@ class ObjectPackProducer {
   /**
    * Keeps track of the current index in pack_->buckets_
    */
-  unsigned idx_;
+  size_t idx_;
 
   /**
    * Keeps track of the current position in pack_->buckets_[idx_]
    */
-  unsigned pos_in_bucket_;
+  size_t pos_in_bucket_;
 
   /**
    * The header is created in the constructor.
@@ -162,47 +221,18 @@ class ObjectPackProducer {
 };
 
 /**
- * Data structures required for the ObjectPackConsumer.  BuildEvent is a
- * template parameter for the Observable base class of ObjectPack and hence
- * moved into this base class.
- */
-class ObjectPackConsumerBase {
- public:
-  struct BuildEvent {
-    BuildEvent(const shash::Any &id, uint64_t size, unsigned buf_size,
-               const void *buf)
-        : id(id), size(size), buf_size(buf_size), buf(buf) {}
-
-    shash::Any id;
-    uint64_t size;
-    unsigned buf_size;
-    const void *buf;
-  };
-
-  enum BuildState {
-    kStateContinue = 0,
-    kStateDone,
-    kStateCorrupt,
-    kStateBadFormat,
-    kStateHeaderTooBig,
-    kStateTrailingBytes,
-  };
-};
-
-/**
  * Deserializes an ObjectPack created by ObjectPackProducer.  For every object
- * it calls all listeners with a BuildEvent parameter at least once for every
+ * it calls all listeners with a Event parameter at least once for every
  * object.  For large objects, it calls the listeners multiple times.  It won't
  * verify the incoming data, this is up to the listeners handling the data.
  * The ObjectPackConsumer will verify the header digest, however.
  */
-class ObjectPackConsumer
-    : public ObjectPackConsumerBase,
-      public Observable<ObjectPackConsumerBase::BuildEvent> {
+class ObjectPackConsumer : public Observable<ObjectPackBuild::Event> {
  public:
   explicit ObjectPackConsumer(const shash::Any &expected_digest,
                               const unsigned expected_header_size);
-  BuildState ConsumeNext(const unsigned buf_size, const unsigned char *buf);
+  ObjectPackBuild::State ConsumeNext(const unsigned buf_size,
+                                     const unsigned char *buf);
 
  private:
   /**
@@ -211,14 +241,22 @@ class ObjectPackConsumer
   static const unsigned kAccuSize = 128 * 1024;
 
   struct IndexEntry {
-    IndexEntry(const shash::Any &id, const uint64_t size)
-        : id(id), size(size) {}
+    IndexEntry() : id(), size(), entry_type(), entry_name() {}
+    IndexEntry(const shash::Any &id, const uint64_t size,
+               ObjectPack::BucketContentType type, const std::string &name)
+        : id(id), size(size), entry_type(type), entry_name(name) {}
     shash::Any id;
     uint64_t size;
+    ObjectPack::BucketContentType entry_type;
+    std::string entry_name;
   };
 
   bool ParseHeader();
-  BuildState ConsumePayload(const unsigned buf_size, const unsigned char *buf);
+  bool ParseItem(const std::string &line, IndexEntry *entry,
+                 uint64_t *sum_size);
+
+  ObjectPackBuild::State ConsumePayload(const unsigned buf_size,
+                                        const unsigned char *buf);
 
   shash::Any expected_digest_;
   unsigned expected_header_size_;
@@ -253,7 +291,7 @@ class ObjectPackConsumer
    * The state starts in kStateContinue and makes exactly one transition into
    * one of the other states as more bytes are consumed.
    */
-  BuildState state_;
+  ObjectPackBuild::State state_;
 
   /**
    * Temporary store for the incomplete header.  Once completely consumed, the

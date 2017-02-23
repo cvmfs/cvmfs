@@ -16,10 +16,51 @@
 
 using namespace std;  // NOLINT
 
+namespace {  // some private utility functions used by ObjectPackProducer
+
+void InitializeHeader(const int version, const int num_objects,
+                      const size_t pack_size, std::string *header) {
+  if (header) {
+    *header = "V" + StringifyInt(version) + "\n";
+    *header += "S" + StringifyInt(pack_size) + "\n";
+    *header += "N" + StringifyInt(num_objects) + "\n";
+    *header += "--\n";
+  }
+}
+
+void AppendItemToHeader(ObjectPack::BucketContentType object_type,
+                        const std::string &hash_str, const size_t object_size,
+                        const std::string &object_name, std::string *header) {
+  // If the item type is kName, the "item_name" parameter should not be empty
+  assert((object_type == ObjectPack::kCas) ||
+         ((object_type == ObjectPack::kNamed) && (!object_name.empty())));
+  std::string line_prefix = "";
+  std::string line_suffix = "";
+  switch (object_type) {
+    case ObjectPack::kNamed:
+      line_prefix = "N ";
+      line_suffix = std::string(" ") + Base64Url(object_name);
+      break;
+    case ObjectPack::kCas:
+      line_prefix = "C ";
+      break;
+    default:
+      return;
+  }
+  if (header) {
+    *header += line_prefix + hash_str + " " + StringifyInt(object_size) +
+               line_suffix + "\n";
+  }
+}
+
+}  // namespace
+
 ObjectPack::Bucket::Bucket()
     : content(reinterpret_cast<unsigned char *>(smalloc(kInitialSize))),
       size(0),
-      capacity(kInitialSize) {}
+      capacity(kInitialSize),
+      content_type(kEmpty),
+      name() {}
 
 void ObjectPack::Bucket::Add(const void *buf, const uint64_t buf_size) {
   if (buf_size == 0) return;
@@ -36,17 +77,48 @@ ObjectPack::Bucket::~Bucket() { free(content); }
 
 //------------------------------------------------------------------------------
 
+ObjectPack::ObjectPack(const uint64_t limit) : limit_(limit), size_(0) {
+  InitLock();
+}
+
+ObjectPack::~ObjectPack() {
+  for (std::set<BucketHandle>::const_iterator i = open_buckets_.begin(),
+                                              iEnd = open_buckets_.end();
+       i != iEnd; ++i) {
+    delete *i;
+  }
+
+  for (unsigned i = 0; i < buckets_.size(); ++i) delete buckets_[i];
+  pthread_mutex_destroy(lock_);
+  free(lock_);
+}
+
 void ObjectPack::AddToBucket(const void *buf, const uint64_t size,
                              const ObjectPack::BucketHandle handle) {
   handle->Add(buf, size);
 }
 
+ObjectPack::BucketHandle ObjectPack::NewBucket() {
+  BucketHandle handle = new Bucket();
+
+  MutexLockGuard mutex_guard(lock_);
+  open_buckets_.insert(handle);
+  return handle;
+}
+
 /**
  * Can only fail due to insufficient remaining space in the ObjectPack.
  */
-bool ObjectPack::CommitBucket(const shash::Any &id,
-                              const ObjectPack::BucketHandle handle) {
+bool ObjectPack::CommitBucket(const BucketContentType type,
+                              const shash::Any &id,
+                              const ObjectPack::BucketHandle handle,
+                              const std::string &name) {
   handle->id = id;
+
+  handle->content_type = type;
+  if (type == kNamed) {
+    handle->name = name;
+  }
 
   MutexLockGuard mutex_guard(lock_);
   if (buckets_.size() >= kMaxObjects) return false;
@@ -69,32 +141,6 @@ void ObjectPack::InitLock() {
   assert(retval == 0);
 }
 
-ObjectPack::ObjectPack() : limit_(kDefaultLimit), size_(0) { InitLock(); }
-
-ObjectPack::ObjectPack(const uint64_t limit) : limit_(limit), size_(0) {
-  InitLock();
-}
-
-ObjectPack::~ObjectPack() {
-  for (std::set<BucketHandle>::const_iterator i = open_buckets_.begin(),
-                                              iEnd = open_buckets_.end();
-       i != iEnd; ++i) {
-    delete *i;
-  }
-
-  for (unsigned i = 0; i < buckets_.size(); ++i) delete buckets_[i];
-  pthread_mutex_destroy(lock_);
-  free(lock_);
-}
-
-ObjectPack::BucketHandle ObjectPack::OpenBucket() {
-  BucketHandle handle = new Bucket();
-
-  MutexLockGuard mutex_guard(lock_);
-  open_buckets_.insert(handle);
-  return handle;
-}
-
 /**
  * If a commit failed, an open Bucket can be transferred to another ObjectPack
  * with more space.
@@ -104,6 +150,21 @@ void ObjectPack::TransferBucket(const ObjectPack::BucketHandle handle,
   MutexLockGuard mutex_guard(lock_);
   open_buckets_.erase(handle);
   other->open_buckets_.insert(handle);
+}
+
+unsigned char *ObjectPack::BucketContent(size_t idx) const {
+  assert(idx < buckets_.size());
+  return buckets_[idx]->content;
+}
+
+uint64_t ObjectPack::BucketSize(size_t idx) const {
+  assert(idx < buckets_.size());
+  return buckets_[idx]->size;
+}
+
+const shash::Any &ObjectPack::BucketId(size_t idx) const {
+  assert(idx < buckets_.size());
+  return buckets_[idx]->id;
 }
 
 //------------------------------------------------------------------------------
@@ -118,40 +179,31 @@ void ObjectPackProducer::GetDigest(shash::Any *hash) {
 
 ObjectPackProducer::ObjectPackProducer(ObjectPack *pack)
     : pack_(pack), big_file_(NULL), pos_(0), idx_(0), pos_in_bucket_(0) {
-  unsigned N = pack->buckets_.size();
+  unsigned N = pack->GetNoObjects();
   // rough guess, most likely a little too much
   header_.reserve(30 + N * (2 * shash::kMaxDigestSize + 5));
 
-  header_ = "V1\n";
-  header_ += "S" + StringifyInt(pack->size_) + "\n";
-  header_ += "N" + StringifyInt(N) + "\n";
-  header_ += "--\n";
+  InitializeHeader(2, N, pack->size(), &header_);
 
-  const bool with_suffix = true;
   for (unsigned i = 0; i < N; ++i) {
-    header_ += pack->buckets_[i]->id.ToString(with_suffix);
-    header_ += " ";
-    header_ += StringifyInt(pack->buckets_[i]->size);
-    header_ += "\n";
+    AppendItemToHeader(ObjectPack::kCas, pack->BucketId(i).ToString(true),
+                       pack->BucketSize(i), "", &header_);
   }
 }
 
-ObjectPackProducer::ObjectPackProducer(const shash::Any &id, FILE *big_file)
+ObjectPackProducer::ObjectPackProducer(const shash::Any &id, FILE *big_file,
+                                       const std::string &file_name)
     : pack_(NULL), big_file_(big_file), pos_(0), idx_(0), pos_in_bucket_(0) {
   int fd = fileno(big_file_);
   assert(fd >= 0);
   platform_stat64 info;
   int retval = platform_fstat(fd, &info);
   assert(retval == 0);
-  string str_size = StringifyInt(info.st_size);
 
-  header_ = "V1\n";
-  header_ += "S" + str_size + "\n";
-  header_ += "N1\n";
-  header_ += "--\n";
+  InitializeHeader(2, 1, info.st_size, &header_);
 
-  const bool with_suffix = true;
-  header_ += id.ToString(with_suffix) + " " + str_size + "\n";
+  AppendItemToHeader(ObjectPack::kNamed, id.ToString(true), info.st_size,
+                     file_name, &header_);
 
   rewind(big_file);
 }
@@ -178,14 +230,14 @@ unsigned ObjectPackProducer::ProduceNext(const unsigned buf_size,
     size_t nbytes = fread(buf + nbytes_header, 1, remaining_in_buf, big_file_);
     nbytes_payload = nbytes;
     pos_ += nbytes_payload;
-  } else if (idx_ < pack_->buckets_.size()) {
+  } else if (idx_ < pack_->GetNoObjects()) {
     // Copy a few buckets more
-    while ((remaining_in_buf) > 0 && (idx_ < pack_->buckets_.size())) {
+    while ((remaining_in_buf) > 0 && (idx_ < pack_->GetNoObjects())) {
       const unsigned remaining_in_bucket =
-          pack_->buckets_[idx_]->size - pos_in_bucket_;
+          pack_->BucketSize(idx_) - pos_in_bucket_;
       const unsigned nbytes = std::min(remaining_in_buf, remaining_in_bucket);
       memcpy(buf + nbytes_header + nbytes_payload,
-             pack_->buckets_[idx_]->content + pos_in_bucket_, nbytes);
+             pack_->BucketContent(idx_) + pos_in_bucket_, nbytes);
 
       pos_in_bucket_ += nbytes;
       nbytes_payload += nbytes;
@@ -210,11 +262,11 @@ ObjectPackConsumer::ObjectPackConsumer(const shash::Any &expected_digest,
       idx_(0),
       pos_in_object_(0),
       pos_in_accu_(0),
-      state_(kStateContinue),
+      state_(ObjectPackBuild::kStateContinue),
       size_(0) {
   // Upper limit of 100B per entry
   if (expected_header_size > (100 * ObjectPack::kMaxObjects)) {
-    state_ = kStateHeaderTooBig;
+    state_ = ObjectPackBuild::kStateHeaderTooBig;
     return;
   }
 
@@ -225,14 +277,14 @@ ObjectPackConsumer::ObjectPackConsumer(const shash::Any &expected_digest,
  * At the end of the function, pos_ will have progressed by buf_size (unless
  * the buffer contains trailing garbage bytes.
  */
-ObjectPackConsumerBase::BuildState ObjectPackConsumer::ConsumeNext(
+ObjectPackBuild::State ObjectPackConsumer::ConsumeNext(
     const unsigned buf_size, const unsigned char *buf) {
   if (buf_size == 0) return state_;
-  if (state_ == kStateDone) {
-    state_ = kStateTrailingBytes;
+  if (state_ == ObjectPackBuild::kStateDone) {
+    state_ = ObjectPackBuild::kStateTrailingBytes;
     return state_;
   }
-  if (state_ != kStateContinue) return state_;
+  if (state_ != ObjectPackBuild::kStateContinue) return state_;
 
   const unsigned remaining_in_header =
       (pos_ < expected_header_size_) ? (expected_header_size_ - pos_) : 0;
@@ -242,19 +294,20 @@ ObjectPackConsumerBase::BuildState ObjectPackConsumer::ConsumeNext(
     pos_ += nbytes_header;
   }
 
-  if (pos_ < expected_header_size_) return kStateContinue;
+  if (pos_ < expected_header_size_) return ObjectPackBuild::kStateContinue;
 
-  // This condition can only be true once through the lifetime of the Consumer.
+  // This condition can only be true once through the lifetime of the
+  // Consumer.
   if (nbytes_header && (pos_ == expected_header_size_)) {
     shash::Any digest(expected_digest_.algorithm);
     shash::HashString(raw_header_, &digest);
     if (digest != expected_digest_) {
-      state_ = kStateCorrupt;
+      state_ = ObjectPackBuild::kStateCorrupt;
       return state_;
     } else {
       bool retval = ParseHeader();
       if (!retval) {
-        state_ = kStateBadFormat;
+        state_ = ObjectPackBuild::kStateBadFormat;
         return state_;
       }
       // We don't need the raw string anymore
@@ -263,7 +316,7 @@ ObjectPackConsumerBase::BuildState ObjectPackConsumer::ConsumeNext(
 
     // Empty pack?
     if ((buf_size == nbytes_header) && (index_.size() == 0)) {
-      state_ = kStateDone;
+      state_ = ObjectPackBuild::kStateDone;
       return state_;
     }
   }
@@ -274,13 +327,14 @@ ObjectPackConsumerBase::BuildState ObjectPackConsumer::ConsumeNext(
 }
 
 /**
- * Informs listeners for small complete objects.  For large objects, buffers the
+ * Informs listeners for small complete objects.  For large objects, buffers
+ * the
  * input into reasonably sized chunks.  buf can contain both a chunk of data
  * that needs to be added to the consumer's accumulator and a bunch of
  * complete small objects.  We use the accumulator only if necessary to avoid
  * unnecessary memory copies.
  */
-ObjectPackConsumerBase::BuildState ObjectPackConsumer::ConsumePayload(
+ObjectPackBuild::State ObjectPackConsumer::ConsumePayload(
     const unsigned buf_size, const unsigned char *buf) {
   uint64_t pos_in_buf = 0;
   while ((pos_in_buf < buf_size) && (idx_ < index_.size())) {
@@ -300,13 +354,15 @@ ObjectPackConsumerBase::BuildState ObjectPackConsumer::ConsumePayload(
       memcpy(accumulator_ + pos_in_accu_, buf + pos_in_buf, nbytes);
       pos_in_accu_ += nbytes;
       if ((pos_in_accu_ == kAccuSize) || (nbytes == remaining_in_object)) {
-        NotifyListeners(BuildEvent(index_[idx_].id, index_[idx_].size,
-                                   pos_in_accu_, accumulator_));
+        NotifyListeners(ObjectPackBuild::Event(
+            index_[idx_].id, index_[idx_].size, pos_in_accu_, accumulator_,
+            index_[idx_].entry_type, index_[idx_].entry_name));
         pos_in_accu_ = 0;
       }
     } else {  // directly trigger listeners using buf
-      NotifyListeners(BuildEvent(index_[idx_].id, index_[idx_].size, nbytes,
-                                 buf + pos_in_buf));
+      NotifyListeners(ObjectPackBuild::Event(
+          index_[idx_].id, index_[idx_].size, nbytes, buf + pos_in_buf,
+          index_[idx_].entry_type, index_[idx_].entry_name));
     }
 
     pos_in_buf += nbytes;
@@ -320,9 +376,10 @@ ObjectPackConsumerBase::BuildState ObjectPackConsumer::ConsumePayload(
   pos_ += buf_size;
 
   if (idx_ == index_.size())
-    state_ = (pos_in_buf == buf_size) ? kStateDone : kStateTrailingBytes;
+    state_ = (pos_in_buf == buf_size) ? ObjectPackBuild::kStateDone
+                                      : ObjectPackBuild::kStateTrailingBytes;
   else
-    state_ = kStateContinue;
+    state_ = ObjectPackBuild::kStateContinue;
   return state_;
 }
 
@@ -332,14 +389,14 @@ bool ObjectPackConsumer::ParseHeader() {
       reinterpret_cast<const unsigned char *>(raw_header_.data());
   ParseKeyvalMem(data, raw_header_.size(), &header);
   if (header.find('V') == header.end()) return false;
-  if (header['V'] != "1") return false;
+  if (header['V'] != "2") return false;
   size_ = String2Uint64(header['S']);
   unsigned nobjects = String2Uint64(header['N']);
 
   if (nobjects == 0) return true;
 
   // Build the object index
-  size_t separator_idx = raw_header_.find("--\n");
+  const size_t separator_idx = raw_header_.find("--\n");
   if (separator_idx == string::npos) return false;
   unsigned index_idx = separator_idx + 3;
   if (index_idx >= raw_header_.size()) return false;
@@ -351,22 +408,78 @@ bool ObjectPackConsumer::ParseHeader() {
         GetLineMem(raw_header_.data() + index_idx, remaining_in_header);
     if (line == "") break;
 
-    // We could use SplitString but we can have many lines so we do something
-    // more efficient here
-    separator_idx = line.find_first_of(' ');
-    if ((separator_idx == 0) || (separator_idx == string::npos) ||
-        (separator_idx == (line.size() - 1))) {
-      return false;
+    IndexEntry entry;
+    if (!ParseItem(line, &entry, &sum_size)) {
+      break;
     }
-    uint64_t size = String2Uint64(line.substr(separator_idx + 1));
-    sum_size += size;
-    const IndexEntry index_entry(shash::MkFromSuffixedHexPtr(shash::HexPtr(
-                                     line.substr(0, separator_idx))),
-                                 size);
-    index_.push_back(index_entry);
 
+    index_.push_back(entry);
     index_idx += line.size() + 1;
   } while (index_idx < raw_header_.size());
 
   return (nobjects == index_.size()) && (size_ == sum_size);
+}
+
+bool ObjectPackConsumer::ParseItem(const std::string &line,
+                                   ObjectPackConsumer::IndexEntry *entry,
+                                   uint64_t *sum_size) {
+  if (!entry || !sum_size) {
+    return false;
+  }
+
+  const std::string type_identifier(1, line[0]);
+  if (type_identifier == "C") {  // CAS blob
+    const ObjectPack::BucketContentType entry_type = ObjectPack::kCas;
+
+    // We could use SplitString but we can have many lines so we do something
+    // more efficient here
+    const size_t separator_idx = line.find(' ', 2);
+    if ((separator_idx == 0) || (separator_idx == string::npos) ||
+        (separator_idx == (line.size() - 1))) {
+      return false;
+    }
+
+    uint64_t size = String2Uint64(line.substr(separator_idx + 1));
+    *sum_size += size;
+
+    entry->id = shash::MkFromSuffixedHexPtr(
+        shash::HexPtr(line.substr(2, separator_idx)));
+    entry->size = size;
+    entry->entry_type = entry_type;
+    entry->entry_name = "";
+  } else if (type_identifier == "N") {  // Named file
+    const ObjectPack::BucketContentType entry_type = ObjectPack::kNamed;
+
+    // First separator, before the size field
+    const size_t separator1 = line.find(' ', 2);
+    if ((separator1 == 0) || (separator1 == string::npos) ||
+        (separator1 == (line.size() - 1))) {
+      return false;
+    }
+
+    // Second separator, before the name field
+    const size_t separator2 = line.find(' ', separator1 + 1);
+    if ((separator1 == 0) || (separator1 == string::npos) ||
+        (separator1 == (line.size() - 1))) {
+      return false;
+    }
+
+    uint64_t size = String2Uint64(line.substr(separator1 + 1, separator2));
+
+    std::string name;
+    if (!Debase64(line.substr(separator2 + 1), &name)) {
+      return false;
+    }
+
+    *sum_size += size;
+    entry->id =
+        shash::MkFromSuffixedHexPtr(shash::HexPtr(line.substr(2, separator1)));
+    entry->size = size;
+    entry->entry_type = entry_type;
+    entry->entry_name = name;
+  } else {  // Error
+    return false;
+  }
+
+  return true;
 }

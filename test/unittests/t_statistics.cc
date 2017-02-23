@@ -80,6 +80,21 @@ TEST(T_Statistics, Fork) {
 }
 
 
+TEST(T_Statistics, StatisticsTemplate) {
+  Statistics statistics;
+  StatisticsTemplate stat_template1("template1", &statistics);
+  StatisticsTemplate stat_template2("template2", &statistics);
+  StatisticsTemplate stat_sub("sub", stat_template1);
+
+  Counter *cnt1 = stat_template1.RegisterTemplated("value", "a test counter");
+  Counter *cnt2 = stat_template2.RegisterTemplated("value", "a test counter");
+  Counter *cnt_sub = stat_sub.RegisterTemplated("value", "test");
+  EXPECT_EQ(cnt1, statistics.Lookup("template1.value"));
+  EXPECT_EQ(cnt2, statistics.Lookup("template2.value"));
+  EXPECT_EQ(cnt_sub, statistics.Lookup("template1.sub.value"));
+}
+
+
 TEST(T_Statistics, RecorderConstruct) {
   Recorder recorder(5, 10);
   EXPECT_EQ(10U, recorder.capacity_s());
