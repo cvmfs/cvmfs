@@ -422,7 +422,7 @@ bool ObjectPackConsumer::ParseHeader() {
 
 bool ObjectPackConsumer::ParseItem(const std::string &line,
                                    ObjectPackConsumer::IndexEntry *entry,
-                                   size_t *sum_size) {
+                                   uint64_t *sum_size) {
   if (!entry || !sum_size) {
     return false;
   }

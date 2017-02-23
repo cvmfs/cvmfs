@@ -252,7 +252,7 @@ class ObjectPackConsumer : public Observable<ObjectPackBuild::Event> {
   };
 
   bool ParseHeader();
-  bool ParseItem(const std::string &line, IndexEntry *entry, size_t *sum_size);
+  bool ParseItem(const std::string &line, IndexEntry *entry, uint64_t *sum_size);
 
   ObjectPackBuild::State ConsumePayload(const unsigned buf_size,
                                         const unsigned char *buf);
