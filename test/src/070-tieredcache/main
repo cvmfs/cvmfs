@@ -5,32 +5,79 @@ cvmfs_run_test() {
   logfile=$1
 
   local second_cache_dir="$(get_cvmfs_cachedir atlas.cern.ch)/second"
+  local ro_cache_dir="$(get_cvmfs_cachedir atlas.cern.ch)/readonly"
 
   echo "*** mount with tiered cached"
   cvmfs_mount atlas.cern.ch \
-    "CVMFS_CACHE_PRIMARY=tiered" \
-    "CVMFS_SECOND_CACHE_DIR=$second_cache_dir" || return 1
+    "CVMFS_CACHE_PRIMARY=custom" \
+    "CVMFS_CACHE_custom_TYPE=tiered" \
+    "CVMFS_CACHE_custom_UPPER=default" \
+    "CVMFS_CACHE_custom_LOWER=lower" \
+    "CVMFS_CACHE_lower_TYPE=posix" \
+    "CVMFS_CACHE_lower_DIR=$second_cache_dir" \
+    "CVMFS_CACHE_lower_QUOTA_LIMIT=-1" || return 1
   ls /cvmfs/atlas.cern.ch || return 2
+
+  echo "*** verifying that we have a tiered cache manager"
+  local num_caches=$(sudo cvmfs_talk -i atlas.cern.ch cache instance | wc -l)
+  [ "x$num_caches" = "x3" ] || return 10
 
   echo "*** stage file in both caches"
   local test_file=/cvmfs/atlas.cern.ch/.cvmfsdirtab
-  md5sum $test_file || return 10
+  md5sum $test_file || return 20
   local checksum_1="$(md5sum $test_file)"
 
   echo "*** remove file from upper layer"
-  sudo cvmfs_talk -i atlas.cern.ch cleanup 0
-  cvmfs_umount atlas.cern.ch
+  sudo cvmfs_talk -i atlas.cern.ch cleanup 0 || return 30
+  cvmfs_umount atlas.cern.ch || return 31
 
   echo "*** remount without network and trigger copyup"
   cvmfs_mount atlas.cern.ch \
-    "CVMFS_CACHE_PRIMARY=tiered" \
-    "CVMFS_SECOND_CACHE_DIR=$(get_cvmfs_cachedir)/second" \
-    "CVMFS_HTTP_PROXY=http://no-such-proxy.cern.ch:1234" || return 22
-  sudo cvmfs_talk -i atlas.cern.ch cache list | grep cvmfsdirtab && return 21
-  md5sum $test_file || return 22
-  sudo cvmfs_talk -i atlas.cern.ch cache list | grep cvmfsdirtab || return 23
+    "CVMFS_CACHE_PRIMARY=custom" \
+    "CVMFS_CACHE_custom_TYPE=tiered" \
+    "CVMFS_CACHE_custom_UPPER=default" \
+    "CVMFS_CACHE_custom_LOWER=lower" \
+    "CVMFS_CACHE_lower_TYPE=posix" \
+    "CVMFS_CACHE_lower_DIR=$second_cache_dir" \
+    "CVMFS_CACHE_lower_QUOTA_LIMIT=-1" \
+    "CVMFS_HTTP_PROXY=http://no-such-proxy.cern.ch:1234" || return 40
+  sudo cvmfs_talk -i atlas.cern.ch cache list | grep cvmfsdirtab && return 41
+  md5sum $test_file || return 42
+  sudo cvmfs_talk -i atlas.cern.ch cache list | grep cvmfsdirtab || return 43
   local checksum_2="$(md5sum $test_file)"
-  [ "$checksum_1" = "$checksum_2" ] || return 24
+  [ "$checksum_1" = "$checksum_2" ] || return 44
+
+  echo "*** Alternative configuration: RAMCache on top of regular one"
+  cvmfs_umount atlas.cern.ch || return 50
+  cvmfs_mount atlas.cern.ch \
+    "CVMFS_CACHE_PRIMARY=custom" \
+    "CVMFS_CACHE_custom_TYPE=tiered" \
+    "CVMFS_CACHE_custom_UPPER=ram_upper" \
+    "CVMFS_CACHE_ram_upper_TYPE=ram" \
+    "CVMFS_CACHE_custom_LOWER=default" || return 51
+  md5sum $test_file || return 52
+  num_caches=$(sudo cvmfs_talk -i atlas.cern.ch cache instance | wc -l)
+  [ "x$num_caches" = "x3" ] || return 52
+  sudo cvmfs_talk -i atlas.cern.ch cache instance | grep "memory" || return 53
+
+  echo "*** Read-only lower layer branch"
+  cvmfs_umount atlas.cern.ch || return 60
+  cvmfs_mount atlas.cern.ch \
+    "CVMFS_CACHE_PRIMARY=custom" \
+    "CVMFS_CACHE_custom_TYPE=tiered" \
+    "CVMFS_CACHE_custom_UPPER=default" \
+    "CVMFS_CACHE_custom_LOWER=lower" \
+    "CVMFS_CACHE_custom_LOWER_READONLY=true" \
+    "CVMFS_CACHE_lower_TYPE=posix" \
+    "CVMFS_CACHE_lower_DIR=$ro_cache_dir" \
+    "CVMFS_CACHE_lower_QUOTA_LIMIT=-1" || return 61
+  ls /cvmfs/atlas.cern.ch || return 62
+  md5sum $test_file || return 63
+  local n_files_in_lower=$(sudo find $ro_cache_dir -mindepth 2 -type f | wc -l)
+  if [ "x$n_files_in_lower" != "x0" ]; then
+    sudo find $ro_cache_dir -type f
+    return 64
+  fi
 
   return 0
 }

@@ -327,7 +327,7 @@ ExternalCacheManager::ExternalCacheManager(
   , max_object_size_(0)
   , spawned_(false)
   , terminated_(false)
-  , capabilities_(cvmfs::CAP_ALL)
+  , capabilities_(cvmfs::CAP_NONE)
 {
   int retval = pthread_rwlock_init(&rwlock_fd_table_, NULL);
   assert(retval == 0);
@@ -681,6 +681,9 @@ int ExternalCacheManager::StartTxn(
   uint64_t size,
   void *txn)
 {
+  if (!(capabilities_ & cvmfs::CAP_WRITE))
+    return -EROFS;
+
   Transaction *transaction = new (txn) Transaction(id);
   transaction->expected_size = size;
   transaction->transaction_id = NextRequestId();

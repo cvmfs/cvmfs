@@ -59,10 +59,12 @@ class ForwardCachePlugin : public CachePlugin {
     assert(callbacks->cvmcache_chrefcnt != NULL);
     assert(callbacks->cvmcache_obj_info != NULL);
     assert(callbacks->cvmcache_pread != NULL);
-    assert(callbacks->cvmcache_start_txn != NULL);
-    assert(callbacks->cvmcache_write_txn != NULL);
-    assert(callbacks->cvmcache_commit_txn != NULL);
-    assert(callbacks->cvmcache_abort_txn != NULL);
+    if (callbacks->capabilities & CVMCACHE_CAP_WRITE) {
+      assert(callbacks->cvmcache_start_txn != NULL);
+      assert(callbacks->cvmcache_write_txn != NULL);
+      assert(callbacks->cvmcache_commit_txn != NULL);
+      assert(callbacks->cvmcache_abort_txn != NULL);
+    }
     if (callbacks->capabilities & CVMCACHE_CAP_INFO)
       assert(callbacks->cvmcache_info != NULL);
     if (callbacks->capabilities & CVMCACHE_CAP_SHRINK_RATE)
@@ -122,6 +124,9 @@ class ForwardCachePlugin : public CachePlugin {
     const uint64_t txn_id,
     const ObjectInfo &info)
   {
+    if (!(callbacks_.capabilities & CVMCACHE_CAP_WRITE))
+      return cvmfs::STATUS_NOSUPPORT;
+
     struct cvmcache_hash c_hash = Cpphash2Chash(id);
     cvmcache_object_info c_info;
     memset(&c_info, 0, sizeof(c_info));
@@ -142,16 +147,25 @@ class ForwardCachePlugin : public CachePlugin {
     unsigned char *buffer,
     uint32_t size)
   {
+    if (!(callbacks_.capabilities & CVMCACHE_CAP_WRITE))
+      return cvmfs::STATUS_NOSUPPORT;
+
     int result = callbacks_.cvmcache_write_txn(txn_id, buffer, size);
     return static_cast<cvmfs::EnumStatus>(result);
   }
 
   virtual cvmfs::EnumStatus CommitTxn(const uint64_t txn_id) {
+    if (!(callbacks_.capabilities & CVMCACHE_CAP_WRITE))
+      return cvmfs::STATUS_NOSUPPORT;
+
     int result = callbacks_.cvmcache_commit_txn(txn_id);
     return static_cast<cvmfs::EnumStatus>(result);
   }
 
   virtual cvmfs::EnumStatus AbortTxn(const uint64_t txn_id) {
+    if (!(callbacks_.capabilities & CVMCACHE_CAP_WRITE))
+      return cvmfs::STATUS_NOSUPPORT;
+
     int result = callbacks_.cvmcache_abort_txn(txn_id);
     return static_cast<cvmfs::EnumStatus>(result);
   }
