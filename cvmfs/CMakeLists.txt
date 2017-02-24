@@ -685,13 +685,12 @@ if (BUILD_SERVER)
     )
   endif (BUILD_OCTOPUS)
 
-  if (GEOIP_BUILTIN)
-    install(
-      FILES      ${PYTHON_GEOIP_BUILTIN_LOCATION}/dist/GeoIP.so
-      DESTINATION    "/usr/share/cvmfs-server/webapi"
-      PERMISSIONS    OWNER_READ GROUP_READ WORLD_READ
-    )
-  endif (GEOIP_BUILTIN)
+  install(
+    FILES
+    ${EXTERNALS_INSTALL_LOCATION}/lib/GeoIP.so
+    DESTINATION    "/usr/share/cvmfs-server/webapi"
+    PERMISSIONS    OWNER_READ GROUP_READ WORLD_READ
+  )
 
   install(
     FILES      webapi/cvmfs_api.py webapi/cvmfs_geo.py
