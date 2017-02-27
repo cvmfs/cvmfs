@@ -685,13 +685,12 @@ if (BUILD_SERVER)
     )
   endif (BUILD_OCTOPUS)
 
-  if (GEOIP_BUILTIN)
-    install(
-      FILES      ${PYTHON_GEOIP_BUILTIN_LOCATION}/dist/GeoIP.so
-      DESTINATION    "/usr/share/cvmfs-server/webapi"
-      PERMISSIONS    OWNER_READ GROUP_READ WORLD_READ
-    )
-  endif (GEOIP_BUILTIN)
+  install(
+    FILES
+    ${EXTERNALS_INSTALL_LOCATION}/lib/GeoIP.so
+    DESTINATION    "/usr/share/cvmfs-server/webapi"
+    PERMISSIONS    OWNER_READ GROUP_READ WORLD_READ
+  )
 
   install(
     FILES      webapi/cvmfs_api.py webapi/cvmfs_geo.py
@@ -713,7 +712,15 @@ if (BUILD_SERVER)
   # If we built the third-party libraries ourselves, we should also install the TBB libraries
   if (BUILTIN_EXTERNALS)
     install(
-      FILES ${EXTERNALS_INSTALL_LOCATION}/lib/libtbb_cvmfs.so.2 ${EXTERNALS_INSTALL_LOCATION}/lib/libtbbmalloc_cvmfs.so.2
+      FILES
+      ${EXTERNALS_INSTALL_LOCATION}/lib/libtbb_cvmfs.so
+      ${EXTERNALS_INSTALL_LOCATION}/lib/libtbb_cvmfs_debug.so
+      ${EXTERNALS_INSTALL_LOCATION}/lib/libtbb_cvmfs.so.2
+      ${EXTERNALS_INSTALL_LOCATION}/lib/libtbb_cvmfs_debug.so.2
+      ${EXTERNALS_INSTALL_LOCATION}/lib/libtbbmalloc_cvmfs.so
+      ${EXTERNALS_INSTALL_LOCATION}/lib/libtbbmalloc_cvmfs_debug.so
+      ${EXTERNALS_INSTALL_LOCATION}/lib/libtbbmalloc_cvmfs.so.2
+      ${EXTERNALS_INSTALL_LOCATION}/lib/libtbbmalloc_cvmfs_debug.so.2
       DESTINATION ${CMAKE_INSTALL_LIBDIR}
       )
   endif (BUILTIN_EXTERNALS)
