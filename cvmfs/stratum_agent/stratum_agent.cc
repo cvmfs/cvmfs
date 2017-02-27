@@ -48,7 +48,7 @@
 #include "uuid.h"
 #include "whitelist.h"
 
-using namespace std;
+using namespace std;  // NOLINT
 
 // Upon successful testing, it might adopt the mainline cvmfs version
 const unsigned kVersionMajor = 1;
@@ -111,7 +111,8 @@ struct Job : SingleCopy {
 
   string id;
   string alias;  // Usually the fqrn
-  long remote_ip;
+  // long type imposed by Mongoose
+  long remote_ip;  // NOLINT
 
   int fd_stdin;
   int fd_stdout;

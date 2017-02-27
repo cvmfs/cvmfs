@@ -13,10 +13,12 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <grp.h>
+#include <inttypes.h>
 #include <netinet/in.h>
 #include <pthread.h>
 #include <pwd.h>
 #include <signal.h>
+#include <stdint.h>
 #include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -620,7 +622,8 @@ int WritePidFile(const std::string &path) {
   assert(flags != -1);
 
   char buf[64];
-  snprintf(buf, 64, "%ld\n", static_cast<long>(getpid()));
+
+  snprintf(buf, sizeof(buf), "%" PRId64 "\n", static_cast<uint64_t>(getpid()));
   bool retval =
     (ftruncate(fd, 0) == 0) && SafeWrite(fd, buf, strlen(buf));
   if (!retval) {
