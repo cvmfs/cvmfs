@@ -15,7 +15,7 @@
 %% API
 -export([start_link/1
         ,new_lease/2, end_lease/1
-        ,submit_payload/3]).
+        ,submit_payload/2]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -92,14 +92,12 @@ end_lease(LeaseToken) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec submit_payload(User, LeaseToken, Payload) ->
+-spec submit_payload(LeaseToken, Payload) ->
                             submit_payload_result()
-                                when User :: binary(),
-                                     LeaseToken :: binary(),
+                                when LeaseToken :: binary(),
                                      Payload :: binary().
-submit_payload(User, LeaseToken, Payload) ->
-    gen_server:call(?MODULE, {be_req, submit_payload, {User,
-                                                       LeaseToken,
+submit_payload(LeaseToken, Payload) ->
+    gen_server:call(?MODULE, {be_req, submit_payload, {LeaseToken,
                                                        Payload}}).
 
 %%%===================================================================
@@ -139,10 +137,10 @@ handle_call({be_req, end_lease, LeaseToken}, _From, State) ->
     Reply = p_end_lease(LeaseToken),
     lager:info("Request received: {end_lease, ~p} -> Reply: ~p", [LeaseToken, Reply]),
     {reply, Reply, State};
-handle_call({be_req, submit_payload, {User, LeaseToken, Payload}}, _From, State) ->
-    Reply = p_submit_payload(User, LeaseToken, Payload),
-    lager:info("Request received: {submit_payload, {~p, ~p, ~p}} -> Reply: ~p",
-               [User, LeaseToken, Payload, Reply]),
+handle_call({be_req, submit_payload, {LeaseToken, Payload}}, _From, State) ->
+    Reply = p_submit_payload(LeaseToken, Payload),
+    lager:info("Request received: {submit_payload, {~p, ~p}} -> Reply: ~p",
+               [LeaseToken, Payload, Reply]),
     {reply, Reply, State}.
 
 %%--------------------------------------------------------------------
@@ -232,20 +230,17 @@ p_end_lease(LeaseToken) ->
             {error, invalid_macaroon}
     end.
 
--spec p_submit_payload(User, LeaseToken, Payload) ->
+-spec p_submit_payload(LeaseToken, Payload) ->
                               submit_payload_result()
-                                  when User :: binary(),
-                                       LeaseToken :: binary(),
+                                  when LeaseToken :: binary(),
                                        Payload :: binary().
-p_submit_payload(User, LeaseToken, Payload) ->
-    case p_check_payload(User, LeaseToken, Payload) of
+p_submit_payload(LeaseToken, Payload) ->
+    case p_check_payload(LeaseToken, Payload) of
         {ok, _Public} ->
             %% TODO: submit payload to GW
             {ok, payload_added};
         {error, {unverified_caveat, <<"time < ", _/binary>>}} ->
             {error, lease_expired};
-        {error, {unverified_caveat, <<"user = ", _/binary>>}} ->
-            {error, invalid_user};
         {error, Reason} ->
             {error, Reason}
     end.
@@ -262,29 +257,27 @@ p_generate_token(User, Path) ->
     Public = <<User/binary,Path/binary>>,
     Location = <<"">>, %% Location isn't used
     M = macaroon:create(Location, Secret, Public),
-    M1 = macaroon:add_first_party_caveat(M, "user = " ++ User),
 
     {ok, MaxLeaseTime} = application:get_env(cvmfs_services, max_lease_time),
     Time = erlang:system_time(milli_seconds) + MaxLeaseTime,
 
-    M2 = macaroon:add_first_party_caveat(M1,
+    M1 = macaroon:add_first_party_caveat(M,
                                          "time < " ++ erlang:integer_to_binary(Time)),
 
     %%M3 = macaroon:add_first_party_caveat(M2, "path = " ++ Path),
 
-    {ok, Token} = macaroon:serialize(M2),
+    {ok, Token} = macaroon:serialize(M1),
     {Public, Secret, Token}.
 
 
--spec p_check_payload(User, LeaseToken, Payload) ->
+-spec p_check_payload(LeaseToken, Payload) ->
                              {ok, Public} | {error, invalid_macaroon |
                                              {unverified_caveat, Caveat}}
-                                 when User :: binary(),
-                                      LeaseToken :: binary(),
+                                 when LeaseToken :: binary(),
                                       Payload :: binary(),
                                       Public :: binary(),
                                       Caveat :: binary().
-p_check_payload(User, LeaseToken, _Payload) ->
+p_check_payload(LeaseToken, _Payload) ->
     % Here we should perform all sanity checks on the request
     % Verify lease token (check user, check time-stamp, extract path).
     case  macaroon:deserialize(LeaseToken) of
@@ -292,11 +285,6 @@ p_check_payload(User, LeaseToken, _Payload) ->
             Public = macaroon:identifier(M),
             case cvmfs_lease:check_lease(Public) of
                 {ok, Secret} ->
-                    CheckUser = fun(<<"user = ", U/binary>>) ->
-                                        U =:= User;
-                                   (_) ->
-                                        false
-                                end,
                     CheckTime = fun(<<"time < ", Exp/binary>>) ->
                                         erlang:binary_to_integer(Exp)
                                             > erlang:system_time(milli_seconds);
@@ -308,11 +296,10 @@ p_check_payload(User, LeaseToken, _Payload) ->
                     %%              end,
 
                     V = macaroon_verifier:create(),
-                    V1 = macaroon_verifier:satisfy_general(V, CheckUser),
-                    V2 = macaroon_verifier:satisfy_general(V1, CheckTime),
+                    V1 = macaroon_verifier:satisfy_general(V, CheckTime),
                     %% V3 = macaroon_verifier:satisfy_general(V2, CheckPaths),
 
-                    case macaroon_verifier:verify(V2, M, Secret) of
+                    case macaroon_verifier:verify(V1, M, Secret) of
                         ok ->
                             {ok, Public};
                         {error, Reason} ->

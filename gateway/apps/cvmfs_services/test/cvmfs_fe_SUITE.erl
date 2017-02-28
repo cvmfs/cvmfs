@@ -169,8 +169,7 @@ normal_payload_submission(Config) ->
     % Submit payload
     Payload = <<"IAMAPAYLOAD">>,
     Hash = crypto:hash(sha, Payload),
-    RequestBody2 = jsx:encode(#{<<"user">> => <<"user1">>,
-                                <<"session_token">> => Token,
+    RequestBody2 = jsx:encode(#{<<"session_token">> => Token,
                                 <<"hash">> => base64:encode(Hash),
                                 <<"payload">> => Payload}),
     RequestHeaders2 = p_make_headers(RequestBody2),
@@ -192,7 +191,7 @@ payload_submission_with_wrong_hash(Config) ->
     % Submit payload
     Payload = <<"IAMAPAYLOAD">>,
     Hash = "NOTTHERIGHTHASH",
-    RequestBody2 = jsx:encode(#{<<"user">> => <<"user1">>, <<"session_token">> => Token,
+    RequestBody2 = jsx:encode(#{<<"session_token">> => Token,
                                 <<"hash">> => base64:encode(Hash), <<"payload">> => Payload}),
     RequestHeaders2 = p_make_headers(RequestBody2),
     {ok, ReplyBody2} = p_post(conn_pid(Config), ?API_ROOT ++ "/payloads", RequestHeaders2, RequestBody2),

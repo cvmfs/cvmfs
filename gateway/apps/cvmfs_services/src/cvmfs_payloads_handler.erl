@@ -36,8 +36,8 @@ init(Req0 = #{method := <<"GET">>}, State) ->
 %% A "POST" request to /api/payloads, which can return either 200 OK
 %% or in 400 - Bad Request
 %%
-%% The body of the request should be a JSON payload containing the "user",
-%% "session_token" and "payload" and "hash" fields.
+%% The body of the request should be a JSON payload containing the
+%% "session_token", "payload" and "hash" fields.
 %%
 %% The body of the reply, for a valid request contains the fields:
 %% "status" - either "ok", "error"
@@ -49,11 +49,10 @@ init(Req0 = #{method := <<"POST">>}, State) ->
 
     {ok, Data, Req1} = cvmfs_fe_util:read_body(Req0),
     {Status, Reply, Req2} = case jsx:decode(Data, [return_maps]) of
-                                #{<<"user">> := User,
-                                  <<"session_token">> := Token,
+                                #{<<"session_token">> := Token,
                                   <<"payload">> := Payload,
                                   <<"hash">> := Hash} ->
-                                    Rep = p_submit_payload(User, Token, Payload, Hash),
+                                    Rep = p_submit_payload(Token, Payload, Hash),
                                     {200, Rep, Req1};
                                 _ ->
                                     {400, #{}, Req0}
@@ -70,11 +69,11 @@ init(Req0 = #{method := <<"POST">>}, State) ->
 %% Private functions
 
 
-p_submit_payload(User, Token, Payload, Hash) ->
+p_submit_payload(Token, Payload, Hash) ->
     HashBinary = base64:decode(Hash),
     case crypto:hash(sha, Payload) of
         HashBinary ->
-            case cvmfs_be:submit_payload(User, Token, Payload) of
+            case cvmfs_be:submit_payload(Token, Payload) of
                 {ok, payload_added} ->
                     #{<<"status">> => <<"ok">>};
                 {error, Reason} ->
