@@ -188,7 +188,6 @@ cvmfs_server_publish() {
     # to the `cvmfs_swissknife sync` command: the username and the
     # subpath of the active lease
     if [ x"$upstream_type" = xhttp ]; then
-      local repo_services_url=$(echo $upstream_storage | cut -d',' -f3)
       sync_command="$sync_command -U $user -P $name/$subpath"
     fi
     if [ "x$CVMFS_UNION_FS_TYPE" != "x" ]; then
