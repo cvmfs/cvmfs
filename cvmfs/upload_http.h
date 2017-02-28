@@ -22,20 +22,14 @@ class HttpUploader : public AbstractUploader {
  public:
   struct Config {
     Config()
-        : user_name(),
-          repository_subpath(),
-          repository_address(),
-          api_path(),
-          port(0) {}
-    Config(const std::string& user_name, const std::string& repo_subpath,
+        : repository_subpath(), repository_address(), api_path(), port(0) {}
+    Config(const std::string& repo_subpath,
            const std::string& repository_address, const std::string& api_path,
            const uint16_t port)
-        : user_name(user_name),
-          repository_subpath(repo_subpath),
+        : repository_subpath(repo_subpath),
           repository_address(repository_address),
           api_path(api_path),
           port(port) {}
-    std::string user_name;
     std::string repository_subpath;
     std::string repository_address;
     std::string api_path;

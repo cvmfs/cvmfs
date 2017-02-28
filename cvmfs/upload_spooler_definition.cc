@@ -17,8 +17,7 @@ SpoolerDefinition::SpoolerDefinition(
     const shash::Algorithms hash_algorithm,
     const zlib::Algorithms compression_algorithm, const bool use_file_chunking,
     const size_t min_file_chunk_size, const size_t avg_file_chunk_size,
-    const size_t max_file_chunk_size, const std::string& user_name,
-    const std::string& repo_subpath)
+    const size_t max_file_chunk_size, const std::string& repo_subpath)
     : driver_type(Unknown),
       hash_algorithm(hash_algorithm),
       compression_alg(compression_algorithm),
@@ -28,7 +27,6 @@ SpoolerDefinition::SpoolerDefinition(
       max_file_chunk_size(max_file_chunk_size),
       number_of_threads(tbb::task_scheduler_init::default_num_threads()),
       number_of_concurrent_uploads(number_of_threads * 100),
-      user_name(user_name),
       repository_subpath(repo_subpath),
       valid_(false) {
   // check if given file chunking values are sane

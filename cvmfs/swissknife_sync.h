@@ -45,7 +45,6 @@ struct SyncParameters {
         is_balanced(false),
         max_weight(kDefaultMaxWeight),
         min_weight(kDefaultMinWeight),
-        user_name(),
         repository_subpath() {}
 
   upload::Spooler *spooler;
@@ -86,7 +85,6 @@ struct SyncParameters {
   unsigned min_weight;
 
   // Parameters for when upstream type is HTTP
-  std::string user_name;
   std::string repository_subpath;
 };
 
@@ -275,7 +273,6 @@ class CommandSync : public Command {
                                   "authenticated repos"));
     r.push_back(Parameter::Switch('Y', "enable external data"));
 
-    r.push_back(Parameter::Optional('U', "user name"));
     r.push_back(Parameter::Optional('P', "repo subpath"));
 
     return r;

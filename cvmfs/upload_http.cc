@@ -14,7 +14,7 @@ namespace {
 void LogBadConfig(const std::string& config) {
   LogCvmfs(kLogUploadHttp, kLogStderr,
            "Failed to parse spooler configuration string '%s'.\n"
-           "Provide: http://<repository_address>:<port>/<api_path>",
+           "Provide: http://<repository_services_address>:<port>/<api_path>",
            config.c_str());
 }
 }
@@ -36,12 +36,6 @@ bool HttpUploader::ParseSpoolerDefinition(
     return false;
   }
 
-  if (spooler_definition.user_name == "") {
-    LogCvmfs(kLogUploadHttp, kLogStderr,
-             "Missing user_name parameter in spooler definition");
-    return false;
-  }
-  config->user_name = spooler_definition.user_name;
   config->repository_subpath = spooler_definition.repository_subpath;
 
   if (!HasPrefix(config_string, "http", false)) {
@@ -94,12 +88,11 @@ HttpUploader::HttpUploader(const SpoolerDefinition& spooler_definition)
 
   LogCvmfs(kLogUploadHttp, kLogStderr,
            "HTTP uploader configuration:\n"
-           "  User name: %s\n"
            "  Repo subpath: %s\n"
            "  Repository address: %s\n"
            "  Port: %d\n"
            "  API path: %s\n",
-           config_.user_name.c_str(), config_.repository_subpath.c_str(),
+           config_.repository_subpath.c_str(),
            config_.repository_address.c_str(), config_.port,
            config_.api_path.c_str());
 }

@@ -38,7 +38,7 @@ struct SpoolerDefinition {
       const bool use_file_chunking = false,
       const size_t min_file_chunk_size = 0,
       const size_t avg_file_chunk_size = 0,
-      const size_t max_file_chunk_size = 0, const std::string& user_name = "",
+      const size_t max_file_chunk_size = 0,
       const std::string& repository_subpath = "");
 
   bool IsValid() const { return valid_; }
@@ -71,7 +71,6 @@ struct SpoolerDefinition {
 
   // The user_name and repository_subpath parameters are only used for the HTTP
   // driver
-  std::string user_name;
   std::string repository_subpath;
 
   bool valid_;
