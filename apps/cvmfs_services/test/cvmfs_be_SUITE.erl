@@ -30,8 +30,7 @@
 
 -export([lease_success/1
         ,submission_with_invalid_token_fails/1
-        ,submission_with_expired_token_fails/1
-        ,submission_with_different_user_name/1]).
+        ,submission_with_expired_token_fails/1]).
 
 
 %% Tests description
@@ -54,8 +53,7 @@ groups() ->
                      ,end_lease_invalid_macaroon]}
     ,{submit_payload, [], [lease_success
                           ,submission_with_invalid_token_fails
-                          ,submission_with_expired_token_fails
-                          ,submission_with_different_user_name]}
+                          ,submission_with_expired_token_fails]}
     ,{properties, [], [api_qc]}].
 
 %% Set up and tear down
@@ -149,19 +147,18 @@ lease_success(_Config) ->
     Payload = <<"placeholder_for_a_real_payload">>,
     {ok, Token} = cvmfs_be:new_lease(User, Path),
     % Followup with a payload submission
-    {ok, payload_added} = cvmfs_be:submit_payload(User, Token, Payload),
+    {ok, payload_added} = cvmfs_be:submit_payload(Token, Payload),
     % Submit final payload and end the lease
-    {ok, payload_added} = cvmfs_be:submit_payload(User, Token, Payload),
+    {ok, payload_added} = cvmfs_be:submit_payload(Token, Payload),
     ok = cvmfs_be:end_lease(Token),
     % After the lease has been closed, the token should be rejected
-    {error, invalid_lease} = cvmfs_be:submit_payload(User, Token, Payload).
+    {error, invalid_lease} = cvmfs_be:submit_payload(Token, Payload).
 
 % Attempt to submit a payload without first obtaining a token
 submission_with_invalid_token_fails(_Config) ->
-    {User, _} = valid_user_and_path(),
     Token = <<"invalid_token">>,
     Payload = <<"placeholder">>,
-    {error, invalid_macaroon} = cvmfs_be:submit_payload(User, Token, Payload).
+    {error, invalid_macaroon} = cvmfs_be:submit_payload(Token, Payload).
 
 % Start a valid lease, make submission after the token has expired
 submission_with_expired_token_fails(Config) ->
@@ -169,14 +166,7 @@ submission_with_expired_token_fails(Config) ->
     Payload = <<"placeholder">>,
     {ok, Token} = cvmfs_be:new_lease(User, Path),
     ct:sleep(?config(max_lease_time, Config)),
-    {error, lease_expired} = cvmfs_be:submit_payload(User, Token, Payload).
-
-submission_with_different_user_name(_Config) ->
-    {VUser, VPath} = valid_user_and_path(),
-    {IUser, _} = invalid_user_and_path(VUser, VPath),
-    Payload = <<"placeholder">>,
-    {ok, Token} = cvmfs_be:new_lease(VUser, VPath),
-    {error, invalid_user} = cvmfs_be:submit_payload(IUser, Token, Payload).
+    {error, lease_expired} = cvmfs_be:submit_payload(Token, Payload).
 
 
 %% Properties
