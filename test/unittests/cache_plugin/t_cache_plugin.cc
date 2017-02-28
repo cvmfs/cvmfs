@@ -1,5 +1,8 @@
 /**
  * This file is part of the CernVM File System.
+ *
+ * Black box unit test for external cache managers.  The external cache manager
+ * must be writable, otherwise it cannot be tested with this suite.
  */
 
 #include <gtest/gtest.h>

@@ -35,8 +35,9 @@ class MockCachePlugin : public CachePlugin {
   static const unsigned kMockCacheSize;
   static const unsigned kMockListingNitems;
 
-  explicit MockCachePlugin(const string &socket_path)
-    : CachePlugin(cvmfs::CAP_ALL)
+  MockCachePlugin(const string &socket_path, bool read_only)
+    : CachePlugin(read_only ? (cvmfs::CAP_ALL & ~cvmfs::CAP_WRITE)
+                            : cvmfs::CAP_ALL)
   {
     bool retval = Listen("unix=" + socket_path);
     assert(retval);
@@ -200,7 +201,7 @@ class T_ExternalCacheManager : public ::testing::Test {
  protected:
   virtual void SetUp() {
     socket_path_ = "cvmfs_cache_plugin.socket";
-    mock_plugin_ = new MockCachePlugin(socket_path_);
+    mock_plugin_ = new MockCachePlugin(socket_path_, false);
 
     fd_client = ConnectSocket(socket_path_);
     ASSERT_GE(fd_client, 0);
@@ -257,6 +258,36 @@ TEST_F(T_ExternalCacheManager, OpenClose) {
   EXPECT_EQ(-EINVAL,
             cache_mgr_->Open(CacheManager::Bless(mock_plugin_->known_object)));
   mock_plugin_->next_status = -1;
+}
+
+
+TEST_F(T_ExternalCacheManager, ReadOnly) {
+  // Re-initialize as read-only
+  delete cache_mgr_;
+  unlink(socket_path_.c_str());
+  delete mock_plugin_;
+  mock_plugin_ = new MockCachePlugin(socket_path_, true);
+  fd_client = ConnectSocket(socket_path_);
+  ASSERT_GE(fd_client, 0);
+  cache_mgr_ = ExternalCacheManager::Create(fd_client, nfiles, "test");
+  ASSERT_TRUE(cache_mgr_ != NULL);
+  quota_mgr_ = ExternalQuotaManager::Create(cache_mgr_);
+  ASSERT_TRUE(cache_mgr_ != NULL);
+  cache_mgr_->AcquireQuotaManager(quota_mgr_);
+  EXPECT_GE(cache_mgr_->session_id(), 0);
+
+  int fd = cache_mgr_->Open(CacheManager::Bless(mock_plugin_->known_object));
+  EXPECT_GE(fd, 0);
+  EXPECT_EQ(0, cache_mgr_->Close(fd));
+
+  shash::Any id(shash::kSha1);
+  string content = "foo";
+  HashString(content, &id);
+  void *txn = alloca(cache_mgr_->SizeOfTxn());
+  EXPECT_EQ(-EROFS, cache_mgr_->StartTxn(id, content.length(), txn));
+  unsigned char *data = const_cast<unsigned char *>(
+    reinterpret_cast<const unsigned char *>(content.data()));
+  EXPECT_FALSE(cache_mgr_->CommitFromMem(id, data, content.length(), "test"));
 }
 
 
