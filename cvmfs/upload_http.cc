@@ -76,14 +76,18 @@ HttpUploader::HttpUploader(const SpoolerDefinition& spooler_definition)
 HttpUploader::~HttpUploader() {}
 
 bool HttpUploader::Initialize() {
-  bool ret = AbstractUploader::Initialize();
-  session_context_ = new SessionContext();
-
-  return ret && session_context_.IsValid();
+  if (!AbstractUploader::Initialize()) {
+    return false;
+  }
+  std::string session_token;
+  if (!ReadSessionTokenFile(config_.session_token_file, &session_token)) {
+    return false;
+  }
+  return session_context_.Initialize(config_.api_url, session_token);
 }
 
 bool HttpUploader::FinalizeSession() {
-  return session_context_->FinalizeSession();
+  return session_context_.FinalizeSession();
 }
 
 std::string HttpUploader::name() const { return "HTTP"; }
@@ -118,6 +122,23 @@ void HttpUploader::StreamedUpload(UploadStreamHandle* /*handle*/,
 
 void HttpUploader::FinalizeStreamedUpload(UploadStreamHandle* /*handle*/,
                                           const shash::Any& /*content_hash*/) {}
+
+bool HttpUploader::ReadSessionTokenFile(const std::string& token_file_name,
+                                        std::string* token) {
+  if (!token) {
+    return false;
+  }
+
+  FILE* token_file = std::fopen(token_file_name.c_str(), "r");
+  if (!token_file) {
+    LogCvmfs(kLogUploadHttp, kLogStderr,
+             "HTTP Uploader - Could not open session token "
+             "file. Aborting.");
+    return false;
+  }
+
+  return GetLineFile(token_file, token);
+}
 
 void HttpUploader::BumpErrors() const { atomic_inc32(&num_errors_); }
 

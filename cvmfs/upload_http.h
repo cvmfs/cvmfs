@@ -65,11 +65,15 @@ class HttpUploader : public AbstractUploader {
   virtual void FinalizeStreamedUpload(UploadStreamHandle* handle,
                                       const shash::Any& content_hash);
 
+ protected:
+  virtual bool ReadSessionTokenFile(const std::string& token_file_name,
+                                    std::string* token);
+
  private:
   void BumpErrors() const;
 
   Config config_;
-  UniquePtr<SessionContext> session_context_;
+  SessionContext session_context_;
   mutable atomic_int32 num_errors_;
 };
 
