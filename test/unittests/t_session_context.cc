@@ -8,4 +8,8 @@
 
 class T_SessionContext : public ::testing::Test {};
 
-TEST_F(T_SessionContext, Dummy) { upload::SessionContext ctx; }
+TEST_F(T_SessionContext, Dummy) {
+  upload::SessionContext ctx;
+  EXPECT_TRUE(ctx.Initialize("http://my.repo.address:8080/api/v1",
+                             "/path/to/the/session_file"));
+}
