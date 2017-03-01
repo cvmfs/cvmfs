@@ -718,7 +718,7 @@ TEST_F(T_GarbageCollector, UnreachableNestedCatalog) {
   MockCatalog::s_deleted_objects = &deleted_catalogs;
 
   history::History *history = MockHistory::Get(MockHistory::root_hash);
-  ;
+
   ASSERT_NE(static_cast<history::History *>(NULL), history);
   ASSERT_TRUE(history->Remove("Revision2"));  // remove all named snapshots to
   ASSERT_TRUE(history->Remove("Revision4"));  // allow to delete every catalog
@@ -1037,7 +1037,7 @@ TEST_F(T_GarbageCollector, KeepRevisionsBasedOnTimestamp) {
   // -
 
   history::History *history = MockHistory::Get(MockHistory::root_hash);
-  ;
+
   ASSERT_NE(static_cast<history::History *>(NULL), history);
   ASSERT_TRUE(history->Remove("Revision4"));  // make Revision4 deletable
 
@@ -1100,7 +1100,7 @@ TEST_F(T_GarbageCollector, KeepOnlyFutureRevisions) {
 
   // remove all named snapshots (GC can potentially delete everything)
   history::History *history = MockHistory::Get(MockHistory::root_hash);
-  ;
+
   ASSERT_NE(static_cast<history::History *>(NULL), history);
   ASSERT_TRUE(history->Remove("Revision2"));
   ASSERT_TRUE(history->Remove("Revision4"));
