@@ -9,8 +9,6 @@
 
 #include "curl/curl.h"
 
-#define REPO_SERVICES_API_ROOT "/api/v1"
-
 struct CurlBuffer {
   std::string data;
 };
