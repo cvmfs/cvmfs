@@ -24,14 +24,15 @@ class T_HttpUploader : public ::testing::Test {
 TEST_F(T_HttpUploaderConfig, ParseSpoolerDefinitionBadArgs) {
   upload::SpoolerDefinition definition(
       "http,/local/temp/dir,http://my.repo.address:8080/api/v1", shash::kSha1,
-      zlib::kZlibDefault, false, 0, 0, 0, "/some/subpath");
+      zlib::kZlibDefault, false, 0, 0, 0,
+      "/var/spool/cvmfs/test.cern.ch/session_token_some_path");
   EXPECT_FALSE(upload::HttpUploader::ParseSpoolerDefinition(definition, NULL));
 }
 
 TEST_F(T_HttpUploaderConfig, ParseSpoolerDefinitionBadConfigString) {
-  upload::SpoolerDefinition definition("local,/local/temp/dir,/local/repo/dir",
-                                       shash::kSha1, zlib::kZlibDefault, false,
-                                       0, 0, 0, "/some/subpath");
+  upload::SpoolerDefinition definition(
+      "local,/local/temp/dir,/local/repo/dir", shash::kSha1, zlib::kZlibDefault,
+      false, 0, 0, 0, "/var/spool/cvmfs/test.cern.ch/session_token_some_path");
 
   EXPECT_FALSE(
       upload::HttpUploader::ParseSpoolerDefinition(definition, &config));
@@ -40,37 +41,31 @@ TEST_F(T_HttpUploaderConfig, ParseSpoolerDefinitionBadConfigString) {
 TEST_F(T_HttpUploaderConfig, ParseSpoolerDefinitionGoodConfigString) {
   upload::SpoolerDefinition definition(
       "http,/local/temp/dir,http://my.repo.address:8080/api/v1", shash::kSha1,
-      zlib::kZlibDefault, false, 0, 0, 0, "/some/subpath");
+      zlib::kZlibDefault, false, 0, 0, 0,
+      "/var/spool/cvmfs/test.cern.ch/session_token_some_path");
 
   EXPECT_TRUE(
       upload::HttpUploader::ParseSpoolerDefinition(definition, &config));
 
-  EXPECT_EQ(config.repository_subpath, "/some/subpath");
-  EXPECT_EQ(config.repository_address, "http://my.repo.address");
-  EXPECT_EQ(config.port, 8080);
-  EXPECT_EQ(config.api_path, "api/v1");
+  EXPECT_EQ(config.api_url, "http://my.repo.address:8080/api/v1");
+  EXPECT_EQ(config.session_token_file,
+            "/var/spool/cvmfs/test.cern.ch/session_token_some_path");
 }
 
-TEST_F(T_HttpUploaderConfig, ParseSpoolerDefinitionInvalidPortNumber) {
+TEST_F(T_HttpUploaderConfig, ParseSpoolerDefinitionNoSessionTokenFile) {
   upload::SpoolerDefinition definition(
-      "http,/local/temp/dir,http://my.repo.address:1000000/api/v1",
-      shash::kSha1, zlib::kZlibDefault, false, 0, 0, 0, "/some/subpath");
+      "http,/local/temp/dir,http://my.repo.address:8080/api/v1", shash::kSha1,
+      zlib::kZlibDefault, false, 0, 0, 0);
+
   EXPECT_FALSE(
-      upload::HttpUploader::ParseSpoolerDefinition(definition, &config));
-}
-
-TEST_F(T_HttpUploaderConfig, ParseSpoolerDefinitionEmptyApiPath) {
-  upload::SpoolerDefinition definition(
-      "http,/local/temp/dir,http://my.repo.address:8080", shash::kSha1,
-      zlib::kZlibDefault, false, 0, 0, 0, "/some/subpath");
-  EXPECT_TRUE(
       upload::HttpUploader::ParseSpoolerDefinition(definition, &config));
 }
 
 TEST_F(T_HttpUploader, Construct) {
   upload::SpoolerDefinition definition(
       "http,/local/temp/dir,http://my.repo.address:8080/api/v1", shash::kSha1,
-      zlib::kZlibDefault, false, 0, 0, 0, "/some/subpath");
+      zlib::kZlibDefault, false, 0, 0, 0,
+      "/var/spool/cvmfs/test.cern.ch/session_token_some_path");
   upload::HttpUploader uploader(definition);
   uploader.Initialize();
   uploader.TearDown();
@@ -79,7 +74,8 @@ TEST_F(T_HttpUploader, Construct) {
 TEST_F(T_HttpUploader, ConstructThroughSpooler) {
   upload::SpoolerDefinition definition(
       "http,/local/temp/dir,http://my.repo.address:8080/api/v1", shash::kSha1,
-      zlib::kZlibDefault, false, 0, 0, 0, "/some/subpath");
+      zlib::kZlibDefault, false, 0, 0, 0,
+      "/var/spool/cvmfs/test.cern.ch/session_token_some_path");
   UniquePtr<upload::Spooler> spooler(upload::Spooler::Construct(definition));
   EXPECT_TRUE(spooler.IsValid());
   EXPECT_EQ(spooler->backend_name(), "HTTP");

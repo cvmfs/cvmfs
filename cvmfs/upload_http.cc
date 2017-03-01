@@ -14,7 +14,7 @@ namespace {
 void LogBadConfig(const std::string& config) {
   LogCvmfs(kLogUploadHttp, kLogStderr,
            "Failed to parse spooler configuration string '%s'.\n"
-           "Provide: http://<repository_services_address>:<port>/<api_path>",
+           "Provide: http://<repository_services_url>:<port>[/<api_root>]",
            config.c_str());
 }
 }
@@ -36,41 +36,21 @@ bool HttpUploader::ParseSpoolerDefinition(
     return false;
   }
 
-  config->repository_subpath = spooler_definition.repository_subpath;
-
-  if (!HasPrefix(config_string, "http", false)) {
-    LogBadConfig(config_string);
+  if (spooler_definition.session_token_file.empty()) {
+    LogCvmfs(kLogUploadHttp, kLogStderr,
+             "Failed to configure HTTP uploader. "
+             "Missing session token file.\n");
     return false;
   }
+  config->session_token_file = spooler_definition.session_token_file;
 
-  const std::vector<std::string> tokens1 = SplitString(config_string, ':');
-  if (tokens1.size() != 3) {
+  if (!HasPrefix(config_string, "http", false) || config_string.length() <= 7) {
     LogBadConfig(config_string);
     return false;
   }
 
   // Repo address, e.g. http://my.repo.address
-  config->repository_address = tokens1[0] + ":" + tokens1[1];
-
-  std::vector<std::string> tokens2 = SplitString(tokens1[2], '/');
-  if (tokens2.size() < 1) {
-    LogBadConfig(config_string);
-    return false;
-  }
-
-  uint64_t port;
-  if (!String2Uint64Parse(tokens2[0], &port)) {
-    LogBadConfig(config_string);
-  }
-  if (port > std::numeric_limits<uint16_t>::max()) {
-    LogCvmfs(kLogUploadHttp, kLogStderr,
-             "Invalid port number in spooler definition");
-    return false;
-  }
-  config->port = port;
-
-  tokens2.erase(tokens2.begin());
-  config->api_path = JoinStrings(tokens2, "/");
+  config->api_url = config_string;
 
   return true;
 }
@@ -88,13 +68,9 @@ HttpUploader::HttpUploader(const SpoolerDefinition& spooler_definition)
 
   LogCvmfs(kLogUploadHttp, kLogStderr,
            "HTTP uploader configuration:\n"
-           "  Repo subpath: %s\n"
-           "  Repository address: %s\n"
-           "  Port: %d\n"
-           "  API path: %s\n",
-           config_.repository_subpath.c_str(),
-           config_.repository_address.c_str(), config_.port,
-           config_.api_path.c_str());
+           "  API URL: %s\n"
+           "  Session token file: %s\n",
+           config_.api_url.c_str(), config_.session_token_file.c_str());
 }
 
 HttpUploader::~HttpUploader() {}

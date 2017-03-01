@@ -39,7 +39,7 @@ struct SpoolerDefinition {
       const size_t min_file_chunk_size = 0,
       const size_t avg_file_chunk_size = 0,
       const size_t max_file_chunk_size = 0,
-      const std::string& repository_subpath = "");
+      const std::string& session_token_file = "");
 
   bool IsValid() const { return valid_; }
 
@@ -69,9 +69,8 @@ struct SpoolerDefinition {
   const unsigned int number_of_threads;
   unsigned int number_of_concurrent_uploads;
 
-  // The user_name and repository_subpath parameters are only used for the HTTP
-  // driver
-  std::string repository_subpath;
+  // The session_token_file parameter is only used for the HTTP driver
+  std::string session_token_file;
 
   bool valid_;
 };

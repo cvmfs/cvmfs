@@ -21,19 +21,11 @@ struct HttpStreamHandle : public UploadStreamHandle {
 class HttpUploader : public AbstractUploader {
  public:
   struct Config {
-    Config()
-        : repository_subpath(), repository_address(), api_path(), port(0) {}
-    Config(const std::string& repo_subpath,
-           const std::string& repository_address, const std::string& api_path,
-           const uint16_t port)
-        : repository_subpath(repo_subpath),
-          repository_address(repository_address),
-          api_path(api_path),
-          port(port) {}
-    std::string repository_subpath;
-    std::string repository_address;
-    std::string api_path;
-    uint16_t port;
+    Config() : session_token_file(), api_url() {}
+    Config(const std::string& session_token_file, const std::string& api_url)
+        : session_token_file(session_token_file), api_url(api_url) {}
+    std::string session_token_file;
+    std::string api_url;
   };
 
   static bool WillHandle(const SpoolerDefinition& spooler_definition);

@@ -88,7 +88,7 @@ bool swissknife::CommandSync::CheckParams(const SyncParameters &p) {
   }
 
   if (HasPrefix(p.spooler_definition, "http", false)) {
-    if (p.repository_subpath.empty()) {
+    if (p.session_token_file.empty()) {
       PrintError(
           "Repository subpath parameter has to be provided "
           "when upstream type is HTTP.");
@@ -589,7 +589,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   }
 
   if (args.find('P') != args.end()) {
-    params.repository_subpath = *args.find('P')->second;
+    params.session_token_file = *args.find('P')->second;
   }
 
   if (!CheckParams(params)) return 2;
@@ -599,7 +599,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
       params.spooler_definition, hash_algorithm, params.compression_alg,
       params.use_file_chunking, params.min_file_chunk_size,
       params.avg_file_chunk_size, params.max_file_chunk_size,
-      params.repository_subpath);
+      params.session_token_file);
   if (params.max_concurrent_write_jobs > 0) {
     spooler_definition.number_of_concurrent_uploads =
         params.max_concurrent_write_jobs;

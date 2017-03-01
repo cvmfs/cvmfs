@@ -45,7 +45,7 @@ struct SyncParameters {
         is_balanced(false),
         max_weight(kDefaultMaxWeight),
         min_weight(kDefaultMinWeight),
-        repository_subpath() {}
+        session_token_file() {}
 
   upload::Spooler *spooler;
   std::string repo_name;
@@ -85,7 +85,7 @@ struct SyncParameters {
   unsigned min_weight;
 
   // Parameters for when upstream type is HTTP
-  std::string repository_subpath;
+  std::string session_token_file;
 };
 
 namespace catalog {
@@ -273,7 +273,7 @@ class CommandSync : public Command {
                                   "authenticated repos"));
     r.push_back(Parameter::Switch('Y', "enable external data"));
 
-    r.push_back(Parameter::Optional('P', "repo subpath"));
+    r.push_back(Parameter::Optional('P', "session_token_file"));
 
     return r;
   }
