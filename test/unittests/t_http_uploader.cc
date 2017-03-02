@@ -6,15 +6,15 @@
 
 #include <cstdlib>
 
-#include <upload.h>
-#include <upload_http.h>
-#include <upload_spooler_definition.h>
-#include <util/pointer.h>
-#include <util/posix.h>
+#include "upload.h"
+#include "upload_http.h"
+#include "upload_spooler_definition.h"
+#include "util/pointer.h"
+#include "util/posix.h"
 
 class HttpUploaderMocked : public upload::HttpUploader {
  public:
-  HttpUploaderMocked(const upload::SpoolerDefinition& definition)
+  explicit HttpUploaderMocked(const upload::SpoolerDefinition& definition)
       : upload::HttpUploader(definition) {}
 
  protected:
