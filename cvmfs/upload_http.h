@@ -9,13 +9,17 @@
 
 #include <string>
 
+#include "pack.h"
 #include "session_context.h"
 #include "upload_facility.h"
 
 namespace upload {
 
 struct HttpStreamHandle : public UploadStreamHandle {
-  explicit HttpStreamHandle(const CallbackTN* commit_callback);
+  HttpStreamHandle(const CallbackTN* commit_callback,
+                   ObjectPack::BucketHandle bkt);
+
+  ObjectPack::BucketHandle bucket;
 };
 
 class HttpUploader : public AbstractUploader {

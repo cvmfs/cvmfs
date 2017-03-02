@@ -5,14 +5,12 @@
 #ifndef CVMFS_SESSION_CONTEXT_H_
 #define CVMFS_SESSION_CONTEXT_H_
 
-#include <map>
 #include <string>
+#include <vector>
 
 #include "pack.h"
 
 namespace upload {
-
-struct HttpStreamHandle;
 
 /**
  * This class implements a context for a single publish operation
@@ -28,20 +26,34 @@ struct HttpStreamHandle;
  */
 class SessionContext {
  public:
-  SessionContext() : api_url_(), session_token_() {}
+  SessionContext()
+      : api_url_(),
+        session_token_(),
+        drop_lease_(true),
+        active_handles_(),
+        current_pack_(NULL),
+        mtx_() {}
   ~SessionContext();
 
   bool Initialize(const std::string& api_url, const std::string& session_token,
                   bool drop_lease = true);
   bool FinalizeSession();
 
+  bool DispatchCurrent();
+
+  ObjectPack::BucketHandle NewBucket();
+
+  ObjectPack* current_pack() { return current_pack_; }
+
  private:
   std::string api_url_;
   std::string session_token_;
   bool drop_lease_;
 
-  std::map<HttpStreamHandle*, ObjectPack::BucketHandle> active_handles_;
-  std::vector<ObjectPack> packs_;
+  std::vector<ObjectPack::BucketHandle> active_handles_;
+  ObjectPack* current_pack_;
+
+  pthread_mutex_t mtx_;
 };
 
 }  // namespace upload

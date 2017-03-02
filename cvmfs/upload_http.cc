@@ -7,6 +7,7 @@
 #include <limits>
 #include <vector>
 
+#include "file_processing/char_buffer.h"
 #include "util/string.h"
 
 namespace {
@@ -21,8 +22,9 @@ void LogBadConfig(const std::string& config) {
 
 namespace upload {
 
-HttpStreamHandle::HttpStreamHandle(const CallbackTN* commit_callback)
-    : UploadStreamHandle(commit_callback) {}
+HttpStreamHandle::HttpStreamHandle(const CallbackTN* commit_callback,
+                                   ObjectPack::BucketHandle bkt)
+    : UploadStreamHandle(commit_callback), bucket(bkt) {}
 
 bool HttpUploader::WillHandle(const SpoolerDefinition& spooler_definition) {
   return spooler_definition.driver_type == SpoolerDefinition::HTTP;
@@ -112,16 +114,68 @@ void HttpUploader::FileUpload(const std::string& /*local_path*/,
                               const CallbackTN* /*callback*/) {}
 
 UploadStreamHandle* HttpUploader::InitStreamedUpload(
-    const CallbackTN* /*callback*/) {
-  return reinterpret_cast<UploadStreamHandle*>(NULL);
+    const CallbackTN* callback) {
+  return new HttpStreamHandle(callback, session_context_.NewBucket());
 }
 
-void HttpUploader::StreamedUpload(UploadStreamHandle* /*handle*/,
-                                  CharBuffer* /*buffer*/,
-                                  const CallbackTN* /*callback*/) {}
+void HttpUploader::StreamedUpload(UploadStreamHandle* handle,
+                                  CharBuffer* buffer,
+                                  const CallbackTN* callback) {
+  if (!buffer->IsInitialized()) {
+    LogCvmfs(kLogUploadHttp, kLogStderr,
+             "Streamed upload - input buffer is not initialized");
+    Respond(callback, UploaderResults(1, buffer));
+    return;
+  }
 
-void HttpUploader::FinalizeStreamedUpload(UploadStreamHandle* /*handle*/,
-                                          const shash::Any& /*content_hash*/) {}
+  HttpStreamHandle* hd = dynamic_cast<HttpStreamHandle*>(handle);
+  if (!hd) {
+    LogCvmfs(kLogUploadHttp, kLogStderr,
+             "Streamed upload - incompatible upload handle");
+    Respond(callback, UploaderResults(2, buffer));
+    return;
+  }
+
+  ObjectPack::AddToBucket(buffer->ptr(), buffer->used_bytes(), hd->bucket);
+
+  Respond(callback, UploaderResults(0, buffer));
+}
+
+void HttpUploader::FinalizeStreamedUpload(UploadStreamHandle* handle,
+                                          const shash::Any& content_hash) {
+  HttpStreamHandle* hd = dynamic_cast<HttpStreamHandle*>(handle);
+  if (!hd) {
+    LogCvmfs(kLogUploadHttp, kLogStderr,
+             "Finalize streamed upload - incompatible upload handle");
+    Respond(handle->commit_callback, UploaderResults(2));
+    return;
+  }
+
+  ObjectPack* pack = session_context_.current_pack();
+  if (!pack) {
+    LogCvmfs(kLogUploadHttp, kLogStderr,
+             "Finalize streamed upload - session context does not contain "
+             "any active upload buckets");
+    Respond(handle->commit_callback, UploaderResults(3));
+    return;
+  }
+
+  if (!pack->CommitBucket(ObjectPack::kCas, content_hash, hd->bucket, "")) {
+    LogCvmfs(kLogUploadHttp, kLogStderr,
+             "Finalize streamed upload - could not commit bucket");
+    Respond(handle->commit_callback, UploaderResults(4));
+    return;
+  }
+
+  if (!session_context_.DispatchCurrent()) {
+    LogCvmfs(kLogUploadHttp, kLogStderr,
+             "Finalize streamed upload - could not dispatch current payload");
+    Respond(handle->commit_callback, UploaderResults(5));
+    return;
+  }
+
+  Respond(handle->commit_callback, UploaderResults(0));
+}
 
 bool HttpUploader::ReadSessionTokenFile(const std::string& token_file_name,
                                         std::string* token) {
