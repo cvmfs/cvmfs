@@ -151,26 +151,11 @@ void HttpUploader::FinalizeStreamedUpload(UploadStreamHandle* handle,
     return;
   }
 
-  ObjectPack* pack = session_context_.current_pack();
-  if (!pack) {
-    LogCvmfs(kLogUploadHttp, kLogStderr,
-             "Finalize streamed upload - session context does not contain "
-             "any active upload buckets");
-    Respond(handle->commit_callback, UploaderResults(3));
-    return;
-  }
-
-  if (!pack->CommitBucket(ObjectPack::kCas, content_hash, hd->bucket, "")) {
+  if (!session_context_.CommitBucket(ObjectPack::kCas, content_hash, hd->bucket,
+                                     "")) {
     LogCvmfs(kLogUploadHttp, kLogStderr,
              "Finalize streamed upload - could not commit bucket");
     Respond(handle->commit_callback, UploaderResults(4));
-    return;
-  }
-
-  if (!session_context_.DispatchCurrent()) {
-    LogCvmfs(kLogUploadHttp, kLogStderr,
-             "Finalize streamed upload - could not dispatch current payload");
-    Respond(handle->commit_callback, UploaderResults(5));
     return;
   }
 

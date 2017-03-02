@@ -26,26 +26,49 @@ namespace upload {
  */
 class SessionContext {
  public:
+  struct Stats {
+    Stats()
+        : buckets_created(0u),
+          buckets_committed(0u),
+          objects_dispatched(0u),
+          bytes_committed(0u),
+          bytes_dispatched(0u) {}
+
+    uint64_t buckets_created;
+    uint64_t buckets_committed;
+    uint64_t objects_dispatched;
+    uint64_t bytes_committed;
+    uint64_t bytes_dispatched;
+  };
+
   SessionContext()
       : api_url_(),
         session_token_(),
         drop_lease_(true),
         active_handles_(),
         current_pack_(NULL),
-        mtx_() {}
-  ~SessionContext();
+        mtx_(),
+        stats_() {}
+
+  virtual ~SessionContext();
 
   bool Initialize(const std::string& api_url, const std::string& session_token,
                   bool drop_lease = true);
   bool FinalizeSession();
 
-  bool DispatchCurrent();
-
   ObjectPack::BucketHandle NewBucket();
 
-  ObjectPack* current_pack() { return current_pack_; }
+  bool CommitBucket(const ObjectPack::BucketContentType type,
+                    const shash::Any& id, const ObjectPack::BucketHandle handle,
+                    const std::string& name = "");
+
+  Stats stats() const { return stats_; }
 
  private:
+  ObjectPack* CurrentPack();
+
+  void DispatchIfNeeded();
+
   std::string api_url_;
   std::string session_token_;
   bool drop_lease_;
@@ -54,6 +77,8 @@ class SessionContext {
   ObjectPack* current_pack_;
 
   pthread_mutex_t mtx_;
+
+  Stats stats_;
 };
 
 }  // namespace upload
