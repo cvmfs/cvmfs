@@ -6,9 +6,9 @@
 #define CVMFS_SESSION_CONTEXT_H_
 
 #include <string>
-#include <vector>
 
 #include "pack.h"
+#include "util_concurrency.h"
 
 namespace upload {
 
@@ -24,37 +24,32 @@ namespace upload {
  * and uploaders are initialized and should last until the call to
  * Spooler::WaitForUpload().
  */
-class SessionContext {
+class SessionContextBase {
  public:
   struct Stats {
     Stats()
         : buckets_created(0u),
           buckets_committed(0u),
           objects_dispatched(0u),
+          jobs_finished(0u),
           bytes_committed(0u),
           bytes_dispatched(0u) {}
 
     uint64_t buckets_created;
     uint64_t buckets_committed;
     uint64_t objects_dispatched;
+    uint64_t jobs_finished;
     uint64_t bytes_committed;
     uint64_t bytes_dispatched;
   };
 
-  SessionContext()
-      : api_url_(),
-        session_token_(),
-        drop_lease_(true),
-        active_handles_(),
-        current_pack_(NULL),
-        mtx_(),
-        stats_() {}
+  SessionContextBase();
 
-  virtual ~SessionContext();
+  virtual ~SessionContextBase();
 
   bool Initialize(const std::string& api_url, const std::string& session_token,
                   bool drop_lease = true);
-  bool FinalizeSession();
+  bool Finalize();
 
   ObjectPack::BucketHandle NewBucket();
 
@@ -64,21 +59,40 @@ class SessionContext {
 
   Stats stats() const { return stats_; }
 
+  void Dispatch();
+
+ protected:
+  virtual bool InitializeDerived();
+  virtual bool FinalizeDerived();
+  virtual Future<bool>* DispatchObjectPack(ObjectPack* pack) = 0;
+
  private:
   ObjectPack* CurrentPack();
-
-  void DispatchIfNeeded();
 
   std::string api_url_;
   std::string session_token_;
   bool drop_lease_;
 
-  std::vector<ObjectPack::BucketHandle> active_handles_;
+  ObjectPack::BucketHandle active_handle_;
   ObjectPack* current_pack_;
 
   pthread_mutex_t mtx_;
 
+  FifoChannel<Future<bool>*> upload_results_;
+
   Stats stats_;
+};
+
+class SessionContext : public SessionContextBase {
+ public:
+  SessionContext();
+
+ protected:
+  virtual Future<bool>* DispatchObjectPack(ObjectPack* pack);
+
+ private:
+  struct UploadJob;
+  FifoChannel<UploadJob*> upload_jobs_;
 };
 
 }  // namespace upload

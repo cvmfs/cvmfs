@@ -88,9 +88,7 @@ bool HttpUploader::Initialize() {
   return session_context_.Initialize(config_.api_url, session_token);
 }
 
-bool HttpUploader::FinalizeSession() {
-  return session_context_.FinalizeSession();
-}
+bool HttpUploader::FinalizeSession() { return session_context_.Finalize(); }
 
 std::string HttpUploader::name() const { return "HTTP"; }
 
