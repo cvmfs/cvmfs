@@ -28,6 +28,9 @@
   * Fix small memory leak during remount of root catalog
   * Fix handling of file:// url in CVMFS_SERVER_URL
 
+2.3.4:
+  * Work around CentOS 7 bug in autofs systemd unit (CVM-1200)
+
 2.3.3:
   * Fix parsing of nested catalogs in dirtab for cvmfs_preload
   * Fix asynchronous cleanup with open file descriptors on some aufs versions
