@@ -554,6 +554,28 @@ bool Debase64(const string &data, string *decoded) {
 }
 
 
+/**
+ * Assumes that source is terminated by a newline
+ */
+string Tail(const string &source, unsigned num_lines) {
+  if (source.empty() || (num_lines == 0))
+    return "";
+
+  unsigned l = source.length();
+  int i = l-1;
+  for (; i >= 0; --i) {
+    char c = source.data()[i];
+    if (c == '\n') {
+      if (num_lines == 0) {
+        return source.substr(i + 1);
+      }
+      num_lines--;
+    }
+  }
+  return source;
+}
+
+
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD
 #endif

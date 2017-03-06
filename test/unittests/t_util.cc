@@ -828,6 +828,28 @@ TEST_F(T_Util, TryLockFile) {
   close(fd);
 }
 
+
+TEST_F(T_Util, WritePidFile) {
+  string filename = sandbox + "/pid";
+  int fd;
+
+  EXPECT_EQ(-1, WritePidFile("/fakepath/fakefile.txt"));
+  fd = WritePidFile(filename);
+  EXPECT_GE(fd, 0);
+  EXPECT_EQ(-2, WritePidFile(filename));
+  UnlockFile(fd);
+  fd = WritePidFile(filename);
+  EXPECT_GE(fd, 0);
+  FILE *f = fopen(filename.c_str(), "r");
+  EXPECT_TRUE(f != NULL);
+  string pid_str;
+  EXPECT_TRUE(GetLineFile(f, &pid_str));
+  EXPECT_EQ(getpid(), String2Int64(pid_str));
+  fclose(f);
+  UnlockFile(fd);
+}
+
+
 TEST_F(T_Util, LockFile) {
   string filename = sandbox + "/lockfile.txt";
   int retval;
@@ -923,6 +945,37 @@ TEST_F(T_Util, FindFiles) {
   EXPECT_EQ(sandbox + "/" + files[0], result[0]);
   EXPECT_EQ(sandbox + "/" + files[1], result[1]);
 }
+
+
+TEST_F(T_Util, FindDirectories) {
+  string parent = sandbox + "/test-find-directories";
+  ASSERT_TRUE(MkdirDeep(parent, 0700));
+
+  vector<string> result = FindDirectories(parent);
+  EXPECT_TRUE(result.empty());
+
+  ASSERT_TRUE(MkdirDeep(parent + "/dir1/sub", 0700));
+  ASSERT_TRUE(MkdirDeep(parent + "/dir2", 0700));
+  result = FindDirectories(parent);
+  ASSERT_EQ(2U, result.size());
+  EXPECT_EQ(parent + "/dir1", result[0]);
+  EXPECT_EQ(parent + "/dir2", result[1]);
+
+  string temp_file = CreateTempPath(parent + "/tempfile", 0600);
+  EXPECT_FALSE(temp_file.empty());
+  result = FindDirectories(parent);
+  ASSERT_EQ(2U, result.size());
+  EXPECT_EQ(parent + "/dir1", result[0]);
+  EXPECT_EQ(parent + "/dir2", result[1]);
+
+  EXPECT_TRUE(SymlinkForced(parent + "/dir1", parent + "/dirX"));
+  result = FindDirectories(parent);
+  ASSERT_EQ(3U, result.size());
+  EXPECT_EQ(parent + "/dir1", result[0]);
+  EXPECT_EQ(parent + "/dir2", result[1]);
+  EXPECT_EQ(parent + "/dirX", result[2]);
+}
+
 
 TEST_F(T_Util, GetUmask) {
   unsigned test_umask = 0755;
@@ -1294,6 +1347,54 @@ TEST_F(T_Util, WaitForSignal) {
   UnBlockSignal(SIGUSR1);
 }
 
+
+TEST_F(T_Util, WaitForChild) {
+  ASSERT_DEATH(WaitForChild(0), ".*");
+  ASSERT_DEATH(WaitForChild(getpid()), ".*");
+
+  pid_t pid = fork();
+  switch (pid) {
+    case -1: ASSERT_TRUE(false);
+    case 0: while (true) { }
+    default:
+      kill(pid, SIGTERM);
+      EXPECT_EQ(-1, WaitForChild(pid));
+  }
+
+  pid = fork();
+  switch (pid) {
+    case -1: ASSERT_TRUE(false);
+    case 0: _exit(0);
+    default:
+      EXPECT_EQ(0, WaitForChild(pid));
+  }
+
+  pid = fork();
+  switch (pid) {
+    case -1: ASSERT_TRUE(false);
+    case 0: _exit(1);
+    default:
+      EXPECT_EQ(1, WaitForChild(pid));
+  }
+
+  pid = fork();
+  switch (pid) {
+    case -1: ASSERT_TRUE(false);
+    case 0: {
+      int max_fd = sysconf(_SC_OPEN_MAX);
+      for (int fd = 0; fd < max_fd; fd++)
+        close(fd);
+      char *argv[1];
+      argv[0] = NULL;
+      execvp("/bin/true", argv);
+      exit(1);
+    }
+    default:
+      EXPECT_EQ(0, WaitForChild(pid));
+  }
+}
+
+
 TEST_F(T_Util, Daemonize) {
   int pid;
   int statloc;
@@ -1553,6 +1654,18 @@ TEST_F(T_Util, Debase64) {
   EXPECT_TRUE(Debase64(b64, &decoded));
   EXPECT_EQ(original, decoded);
 }
+
+
+TEST_F(T_Util, Tail) {
+  EXPECT_EQ("", Tail("", 0));
+  EXPECT_EQ("", Tail("", 1));
+  EXPECT_EQ("", Tail("abc", 0));
+  EXPECT_EQ("abc", Tail("abc", 1));
+  EXPECT_EQ("abc\n", Tail("abc\n", 1));
+  EXPECT_EQ("abc\n", Tail("abc\n", 2));
+  EXPECT_EQ("b\nc\n", Tail("a\nb\nc\n", 2));
+}
+
 
 TEST_F(T_Util, MemoryMappedFile) {
   string filepath = CreateFileWithContent("mappedfile.txt",

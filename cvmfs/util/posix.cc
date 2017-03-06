@@ -13,10 +13,12 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <grp.h>
+#include <inttypes.h>
 #include <netinet/in.h>
 #include <pthread.h>
 #include <pwd.h>
 #include <signal.h>
+#include <stdint.h>
 #include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -596,6 +598,43 @@ int TryLockFile(const std::string &path) {
 
 
 /**
+ * Tries to write the process id in a /var/run/progname.pid like file.  Returns
+ * the same as TryLockFile.
+ *
+ * \return file descriptor, -1 on error, -2 if it would block
+ */
+int WritePidFile(const std::string &path) {
+  const int fd = open(path.c_str(), O_CREAT | O_RDWR, 0600);
+  if (fd < 0)
+    return -1;
+  if (flock(fd, LOCK_EX | LOCK_NB) != 0) {
+    close(fd);
+    if (errno != EWOULDBLOCK)
+      return -1;
+    return -2;
+  }
+
+  // Don't leak the file descriptor to exec'd children
+  int flags = fcntl(fd, F_GETFD);
+  assert(flags != -1);
+  flags |= FD_CLOEXEC;
+  flags = fcntl(fd, F_SETFD, flags);
+  assert(flags != -1);
+
+  char buf[64];
+
+  snprintf(buf, sizeof(buf), "%" PRId64 "\n", static_cast<uint64_t>(getpid()));
+  bool retval =
+    (ftruncate(fd, 0) == 0) && SafeWrite(fd, buf, strlen(buf));
+  if (!retval) {
+    UnlockFile(fd);
+    return -1;
+  }
+  return fd;
+}
+
+
+/**
  * Locks file path, blocks if file is already locked.  Creates path if required.
  *
  * \return file descriptor, -1 on error
@@ -769,6 +808,35 @@ vector<string> FindFiles(const string &dir, const string &suffix) {
 
 
 /**
+ * Finds all direct subdirectories under parent_dir (except ., ..).  Used,
+ * for instance, to parse /etc/cvmfs/repositories.d/<reponoame>
+ */
+vector<string> FindDirectories(const string &parent_dir) {
+  vector<string> result;
+  DIR *dirp = opendir(parent_dir.c_str());
+  if (!dirp)
+    return result;
+
+  platform_dirent64 *dirent;
+  while ((dirent = platform_readdir(dirp))) {
+    const string name(dirent->d_name);
+    if ((name == ".") || (name == ".."))
+      continue;
+    const string path = parent_dir + "/" + name;
+
+    platform_stat64 info;
+    int retval = platform_stat(path.c_str(), &info);
+    if (retval != 0)
+      continue;
+    if (S_ISDIR(info.st_mode))
+      result.push_back(path);
+  }
+  closedir(dirp);
+  sort(result.begin(), result.end());
+  return result;
+}
+
+/**
  * Name -> UID from passwd database
  */
 bool GetUidOf(const std::string &username, uid_t *uid, gid_t *main_gid) {
@@ -885,6 +953,28 @@ void WaitForSignal(int signum) {
     retval = platform_sigwait(signum);
   } while ((retval != signum) && (errno == EINTR));
   assert(retval == signum);
+}
+
+
+/**
+ * Returns -1 of the child crashed or the exit code otherwise
+ */
+int WaitForChild(pid_t pid) {
+  assert(pid > 0);
+  int statloc;
+  while (true) {
+    pid_t retval = waitpid(pid, &statloc, 0);
+    if (retval == -1) {
+      if (errno == EINTR)
+        continue;
+      assert(false);
+    }
+    assert(retval == pid);
+    break;
+  }
+  if (WIFEXITED(statloc))
+    return WEXITSTATUS(statloc);
+  return -1;
 }
 
 

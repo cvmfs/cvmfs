@@ -55,6 +55,7 @@ std::string Trim(const std::string &raw);
 std::string ToUpper(const std::string &mixed_case);
 std::string ReplaceAll(const std::string &haystack, const std::string &needle,
                        const std::string &replace_by);
+std::string Tail(const std::string &source, unsigned num_lines);
 
 std::string Base64(const std::string &data);
 std::string Base64Url(const std::string &data);

@@ -14,6 +14,7 @@ TBB_VERSION=4.4-5
 LIBGEOIP_VERSION=1.6.0
 PYTHON_GEOIP_VERSION=1.3.1
 PROTOBUF_VERSION=2.6.1
+MONGOOSE_VERSION=3.8
 
 if [ x"$EXTERNALS_LIB_LOCATION" = x"" ]; then
   echo "Bootstrap - Missing environment variable: EXTERNALS_LIB_LOCATION"
@@ -228,6 +229,11 @@ build_lib() {
       do_copy "sha3"
       do_build "sha3"
       ;;
+    mongoose)
+      do_extract "mongoose" "mongoose-${MONGOOSE_VERSION}.tar.gz"
+      patch_external "mongoose" "keep_sigchld.patch"
+      do_build "mongoose"
+      ;;
     *)
       echo "Unknown library name. Exiting."
       exit 1
@@ -238,7 +244,7 @@ build_lib() {
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 # Build a list of libs that need to be built
-missing_libs="libcurl pacparser zlib sparsehash leveldb googletest libgeoip tbb protobuf googlebench sqlite3 vjson sha2 sha3"
+missing_libs="libcurl pacparser zlib sparsehash leveldb googletest libgeoip tbb protobuf googlebench sqlite3 vjson sha2 sha3 mongoose"
 
 if [ -f $externals_install_dir/.bootstrapDone ]; then
   existing_libs=$(cat $externals_install_dir/.bootstrapDone)

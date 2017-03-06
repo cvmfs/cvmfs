@@ -47,6 +47,7 @@ class Letter {
          signature::SignatureManager *signature_manager);
   std::string Sign(const shash::Algorithms hash_algorithm);
   Failures Verify(uint64_t max_age, std::string *msg, std::string *cert);
+  std::string text() const { return text_; }
 
  private:
   std::string fqrn_;
