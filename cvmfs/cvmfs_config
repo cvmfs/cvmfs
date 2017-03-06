@@ -376,6 +376,15 @@ cvmfs_chksetup() {
       echo "Error: /etc/auto.cvmfs is not executable"
       num_errors=$(($num_errors+1))
     fi
+
+    # Check autofs' kill mode when systemd managed
+    if [ -e /usr/bin/systemctl ]; then
+      if ! /usr/bin/systemctl show -p KillMode autofs.service | grep -q process;
+      then
+        echo "Warning: autofs kill mode is not 'process', busy CernVM-FS mount points are likely to be forcefully killed when autofs is restarted"
+        num_warnings=$(($num_warnings+1))
+      fi
+    fi
   fi
 
   # Check that cvmfs user exists
@@ -1257,7 +1266,7 @@ cvmfs_bugreport() {
                  'cat /etc/auto.master' 'cat /etc/autofs/auto.master' 'cat /etc/sysconfig/autofs' \
                  'cat /etc/default/autofs' 'cat /etc/conf.d/autofs' 'journalctl -almu autofs.service' \
                  'cat /etc/fstab' 'cat /etc/exports' 'cat /proc/mounts' 'cat /proc/cpuinfo' \
-                 'cat /etc/hosts' 'free -m' )
+                 'cat /etc/hosts' 'free -m' 'systemctl show autofs.service')
       ;;
 
     Darwin )
@@ -1683,6 +1692,20 @@ configure_autofs() {
         num_errors=$(($num_errors+1))
         AUTOMASTER=/dev/null
       fi
+      # Fix 'systemctl restart autofs' on CentOS 7 (CVM-1200)
+      if [ -e /usr/bin/systemctl ]; then
+        if /usr/bin/systemctl show -p KillMode autofs.service | \
+           grep -q control-group;
+        then
+          mkdir -p /etc/systemd/system/autofs.service.d
+          cat > /etc/systemd/system/autofs.service.d/cvmfs-autosetup.conf << EOF
+[Service]
+KillMode=process
+EOF
+          /usr/bin/systemctl daemon-reload
+        fi
+      fi
+
       sed -i "/^\/mnt\/cvmfs \/etc\/auto.cvmfs/d" $AUTOMASTER # Still needed or needs to be adjusted?
       local cvmfs_map="$CVMFS_MOUNT_DIR /etc/auto.cvmfs"
       if ! grep -q "^$cvmfs_map" $AUTOMASTER; then
