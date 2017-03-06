@@ -345,11 +345,11 @@ fi
 
 %postun
 if [ $1 -eq 0 ]; then
-   #sed -i "/^\/mnt\/cvmfs \/etc\/auto.cvmfs/d" /etc/auto.master
    [ -f /var/lock/subsys/autofs ] && /sbin/service autofs reload >/dev/null
    if [ -e /etc/fuse.conf ]; then
      sed -i "/added by CernVM-FS/d" /etc/fuse.conf
    fi
+   rm -f /etc/systemd/system/autofs.service.d/cvmfs-autosetup.conf
 fi
 
 %if 0%{?selinux_cvmfs}
@@ -426,6 +426,8 @@ fi
 %doc COPYING AUTHORS README ChangeLog
 
 %changelog
+* Mon Mar 06 2017 Jakob Blomer <jblomer@cern.ch> - 2.3.4
+- Remove systemd bugfix configuration file if necessary
 * Mon Aug 22 2016 Jakob Blomer <jblomer@cern.ch> - 2.3.1
 - Reset cvmfs_swissknife capability if overlayfs is used
 * Wed Aug 10 2016 Dave Dykstra <dwd@fnal.gov> - 2.3.1
