@@ -1386,7 +1386,11 @@ TEST_F(T_Util, WaitForChild) {
         close(fd);
       char *argv[1];
       argv[0] = NULL;
+#ifdef __APPLE__
+      execvp("/usr/bin/true", argv);
+#else
       execvp("/bin/true", argv);
+#endif
       exit(1);
     }
     default:
