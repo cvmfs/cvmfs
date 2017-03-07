@@ -81,6 +81,7 @@ set(CVMFS_UNITTEST_FILES
   t_shash.cc
   t_smallhash.cc
   t_smalloc.cc
+  t_smart_ptr.cc
   t_sqlite_database.cc
   t_sqlitemem.cc
   t_statistics.cc
