@@ -12,10 +12,10 @@
 #include "util/pointer.h"
 #include "util/posix.h"
 
-class HttpUploaderMocked : public upload::HttpUploader {
+class GatewayUploaderMocked : public upload::GatewayUploader {
  public:
-  explicit HttpUploaderMocked(const upload::SpoolerDefinition& definition)
-      : upload::HttpUploader(definition) {}
+  explicit GatewayUploaderMocked(const upload::SpoolerDefinition& definition)
+      : upload::GatewayUploader(definition) {}
 
  protected:
   virtual bool ReadSessionTokenFile(const std::string& /*token_file_name*/,
@@ -29,75 +29,67 @@ class HttpUploaderMocked : public upload::HttpUploader {
   }
 };
 
-class T_HttpUploaderConfig : public ::testing::Test {
+class T_GatewayUploaderConfig : public ::testing::Test {
  protected:
-  T_HttpUploaderConfig() : config() {}
+  T_GatewayUploaderConfig() : config() {}
 
-  upload::HttpUploader::Config config;
+  upload::GatewayUploader::Config config;
   std::string token_file_name;
 };
 
-class T_HttpUploader : public ::testing::Test {
+class T_GatewayUploader : public ::testing::Test {
  protected:
-  T_HttpUploader() {}
+  T_GatewayUploader() {}
 };
 
-TEST_F(T_HttpUploaderConfig, ParseSpoolerDefinitionBadArgs) {
+TEST_F(T_GatewayUploaderConfig, ParseSpoolerDefinitionBadArgs) {
   upload::SpoolerDefinition definition(
-      "http,/local/temp/dir,http://my.repo.address:8080/api/v1", shash::kSha1,
+      "gw,/local/temp/dir,http://my.repo.address:8080/api/v1", shash::kSha1,
       zlib::kZlibDefault, false, 0, 0, 0,
       "/var/spool/cvmfs/test.cern.ch/session_token_some_path");
-  EXPECT_FALSE(upload::HttpUploader::ParseSpoolerDefinition(definition, NULL));
-}
-
-TEST_F(T_HttpUploaderConfig, ParseSpoolerDefinitionBadConfigString) {
-  upload::SpoolerDefinition definition(
-      "local,/local/temp/dir,/local/repo/dir", shash::kSha1, zlib::kZlibDefault,
-      false, 0, 0, 0, "/var/spool/cvmfs/test.cern.ch/session_token_some_path");
-
   EXPECT_FALSE(
-      upload::HttpUploader::ParseSpoolerDefinition(definition, &config));
+      upload::GatewayUploader::ParseSpoolerDefinition(definition, NULL));
 }
 
-TEST_F(T_HttpUploaderConfig, ParseSpoolerDefinitionGoodConfigString) {
+TEST_F(T_GatewayUploaderConfig, ParseSpoolerDefinitionGoodConfigString) {
   upload::SpoolerDefinition definition(
-      "http,/local/temp/dir,http://my.repo.address:8080/api/v1", shash::kSha1,
+      "gw,/local/temp/dir,http://my.repo.address:8080/api/v1", shash::kSha1,
       zlib::kZlibDefault, false, 0, 0, 0,
       "/var/spool/cvmfs/test.cern.ch/session_token_some_path");
 
   EXPECT_TRUE(
-      upload::HttpUploader::ParseSpoolerDefinition(definition, &config));
+      upload::GatewayUploader::ParseSpoolerDefinition(definition, &config));
 
   EXPECT_EQ(config.api_url, "http://my.repo.address:8080/api/v1");
   EXPECT_EQ(config.session_token_file,
             "/var/spool/cvmfs/test.cern.ch/session_token_some_path");
 }
 
-TEST_F(T_HttpUploaderConfig, ParseSpoolerDefinitionNoSessionTokenFile) {
+TEST_F(T_GatewayUploaderConfig, ParseSpoolerDefinitionNoSessionTokenFile) {
   upload::SpoolerDefinition definition(
-      "http,/local/temp/dir,http://my.repo.address:8080/api/v1", shash::kSha1,
+      "gw,/local/temp/dir,http://my.repo.address:8080/api/v1", shash::kSha1,
       zlib::kZlibDefault, false, 0, 0, 0);
 
   EXPECT_FALSE(
-      upload::HttpUploader::ParseSpoolerDefinition(definition, &config));
+      upload::GatewayUploader::ParseSpoolerDefinition(definition, &config));
 }
 
-TEST_F(T_HttpUploader, Construct) {
+TEST_F(T_GatewayUploader, Construct) {
   upload::SpoolerDefinition definition(
-      "http,/local/temp/dir,http://my.repo.address:8080/api/v1", shash::kSha1,
+      "gw,/local/temp/dir,http://my.repo.address:8080/api/v1", shash::kSha1,
       zlib::kZlibDefault, false, 0, 0, 0,
       "/var/spool/cvmfs/test.cern.ch/session_token_some_path");
-  HttpUploaderMocked uploader(definition);
+  GatewayUploaderMocked uploader(definition);
   EXPECT_TRUE(uploader.Initialize());
   uploader.TearDown();
 }
 
 /*
 // This test needs to be disabled, since the Spooler class isn't aware of
-// HttpUploaderMocked at this point
-TEST_F(T_HttpUploader, ConstructThroughSpooler) {
+// GatewayUploaderMocked at this point
+TEST_F(T_GatewayUploader, ConstructThroughSpooler) {
   upload::SpoolerDefinition definition(
-      "http,/local/temp/dir,http://my.repo.address:8080/api/v1", shash::kSha1,
+      "gw,/local/temp/dir,http://my.repo.address:8080/api/v1", shash::kSha1,
       zlib::kZlibDefault, false, 0, 0, 0,
       "/var/spool/cvmfs/test.cern.ch/session_token_some_path");
   UniquePtr<upload::Spooler> spooler(upload::Spooler::Construct(definition));

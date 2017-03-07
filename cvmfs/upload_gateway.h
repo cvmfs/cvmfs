@@ -15,14 +15,14 @@
 
 namespace upload {
 
-struct HttpStreamHandle : public UploadStreamHandle {
-  HttpStreamHandle(const CallbackTN* commit_callback,
-                   ObjectPack::BucketHandle bkt);
+struct GatewayStreamHandle : public UploadStreamHandle {
+  GatewayStreamHandle(const CallbackTN* commit_callback,
+                      ObjectPack::BucketHandle bkt);
 
   ObjectPack::BucketHandle bucket;
 };
 
-class HttpUploader : public AbstractUploader {
+class GatewayUploader : public AbstractUploader {
  public:
   struct Config {
     Config() : session_token_file(), api_url() {}
@@ -37,9 +37,9 @@ class HttpUploader : public AbstractUploader {
   static bool ParseSpoolerDefinition(
       const SpoolerDefinition& spooler_definition, Config* config);
 
-  explicit HttpUploader(const SpoolerDefinition& spooler_definition);
+  explicit GatewayUploader(const SpoolerDefinition& spooler_definition);
 
-  virtual ~HttpUploader();
+  virtual ~GatewayUploader();
 
   virtual bool Initialize();
 

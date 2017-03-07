@@ -187,7 +187,7 @@ cvmfs_server_publish() {
     # If the upstream type is HTTP, we need to pass additional parameters
     # to the `cvmfs_swissknife sync` command: the username and the
     # subpath of the active lease
-    if [ x"$upstream_type" = xhttp ]; then
+    if [ x"$upstream_type" = xgw ]; then
       sync_command="$sync_command -P /var/spool/cvmfs/$name/session_token_$subpath"
     fi
     if [ "x$CVMFS_UNION_FS_TYPE" != "x" ]; then

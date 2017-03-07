@@ -15,7 +15,7 @@ namespace upload {
 void AbstractUploader::RegisterPlugins() {
   RegisterPlugin<LocalUploader>();
   RegisterPlugin<S3Uploader>();
-  RegisterPlugin<HttpUploader>();
+  RegisterPlugin<GatewayUploader>();
 }
 
 AbstractUploader::AbstractUploader(const SpoolerDefinition &spooler_definition)

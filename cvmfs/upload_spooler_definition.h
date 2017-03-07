@@ -20,7 +20,7 @@ namespace upload {
  *      to define a local spooler with upstream path /srv/cvmfs/dev.cern.ch
  */
 struct SpoolerDefinition {
-  enum DriverType { S3, Local, HTTP, Mock, Unknown };
+  enum DriverType { S3, Local, Gateway, Mock, Unknown };
 
   /**
    * Reads a given definition_string as described above and interprets

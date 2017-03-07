@@ -88,7 +88,7 @@ cvmfs_server_abort() {
     abort_before_hook $name
     # If the upstream storage type is http (publication leases are managed by an instance of the CVMFS repo services,
     # the cvmfs_swissknife lease command needs to be used to drop the active lease
-    if [ x"$upstream_type" = xhttp ]; then
+    if [ x"$upstream_type" = xgw ]; then
         local repo_services_url=$(echo $upstream_storage | cut -d',' -f3)
         __swissknife lease -a drop -u $repo_services_url -n $user -p $name"/"$subpath || { echo "Could not drop active lease or lease does not exist for repository $name"; retcode=1; continue; }
     fi

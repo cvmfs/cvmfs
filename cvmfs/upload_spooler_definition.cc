@@ -48,8 +48,8 @@ SpoolerDefinition::SpoolerDefinition(
     driver_type = Local;
   } else if (upstream[0] == "S3") {
     driver_type = S3;
-  } else if (upstream[0] == "http") {
-    driver_type = HTTP;
+  } else if (upstream[0] == "gw") {
+    driver_type = Gateway;
   } else if (upstream[0] == "mock") {
     driver_type = Mock;  // for unit testing purpose only!
   } else {

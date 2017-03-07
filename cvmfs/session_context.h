@@ -19,7 +19,7 @@ namespace upload {
  * is supposed to live at least until the payload has been submitted
  * to the repo services.
  *
- * It is the HttpUploader concrete class which handles the creation and
+ * It is the GatewayUploader concrete class which handles the creation and
  * destruction of the SessionContext. A session should begin when the spooler
  * and uploaders are initialized and should last until the call to
  * Spooler::WaitForUpload().
