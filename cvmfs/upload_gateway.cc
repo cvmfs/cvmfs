@@ -2,7 +2,7 @@
  * This file is part of the CernVM File System.
  */
 
-#include "upload_http.h"
+#include "upload_gateway.h"
 
 #include <limits>
 #include <vector>

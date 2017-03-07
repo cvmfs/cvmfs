@@ -6,7 +6,7 @@
 
 #include <cassert>
 
-#include "upload_http.h"
+#include "upload_gateway.h"
 #include "upload_local.h"
 #include "upload_s3.h"
 
