@@ -290,6 +290,8 @@ else (NOT MACOSX)
 endif (NOT MACOSX)
 
 # Required libraries depending on build target
+find_package (Boost REQUIRED)
+set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${BOOST_INCLUDE_DIR})
 
 find_package (OpenSSL REQUIRED)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${OPENSSL_INCLUDE_DIR})
