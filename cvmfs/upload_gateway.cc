@@ -93,9 +93,40 @@ unsigned int GatewayUploader::GetNumberOfErrors() const {
   return atomic_read32(&num_errors_);
 }
 
-void GatewayUploader::FileUpload(const std::string& /*local_path*/,
-                                 const std::string& /*remote_path*/,
-                                 const CallbackTN* /*callback*/) {}
+void GatewayUploader::FileUpload(const std::string& local_path,
+                                 const std::string& remote_path,
+                                 const CallbackTN* callback) {
+  UniquePtr<GatewayStreamHandle> handle(
+      new GatewayStreamHandle(callback, session_context_.NewBucket()));
+
+  FILE* local_file = fopen(local_path.c_str(), "rb");
+  if (!local_file) {
+    LogCvmfs(kLogUploadGateway, kLogStderr,
+             "File upload - could not open local file.");
+    Respond(callback, UploaderResults(1, local_path));
+    return;
+  }
+
+  std::vector<char> buf(1024);
+  size_t read_bytes = 0;
+  do {
+    read_bytes = fread(&buf[0], buf.size(), 1, local_file);
+    ObjectPack::AddToBucket(&buf[0], buf.size(), handle->bucket);
+  } while (read_bytes == buf.size());
+  fclose(local_file);
+
+  shash::Any content_hash(shash::kSha1);
+  shash::HashFile(local_path, &content_hash);
+  if (!session_context_.CommitBucket(ObjectPack::kNamed, content_hash,
+                                     handle->bucket, remote_path)) {
+    LogCvmfs(kLogUploadGateway, kLogStderr,
+             "File upload - could not commit bucket");
+    Respond(handle->commit_callback, UploaderResults(2, local_path));
+    return;
+  }
+
+  Respond(callback, UploaderResults(0, local_path));
+}
 
 UploadStreamHandle* GatewayUploader::InitStreamedUpload(
     const CallbackTN* callback) {
