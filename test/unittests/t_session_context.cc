@@ -45,8 +45,7 @@ TEST_F(T_SessionContext, BasicLifeCycle) {
   ObjectPack::AddToBucket(buffer, 4096, hd);
 
   shash::Any hash(shash::kSha1);
-  EXPECT_TRUE(ctx.CommitBucket(ObjectPack::kCas, hash, hd));
-  ctx.Dispatch();
+  EXPECT_TRUE(ctx.CommitBucket(ObjectPack::kCas, hash, hd, "", true));
   stats = ctx.stats();
   EXPECT_EQ(stats.buckets_committed, 1u);
   EXPECT_EQ(stats.bytes_committed, 4096u);

@@ -48,22 +48,26 @@ class SessionContextBase {
   virtual ~SessionContextBase();
 
   bool Initialize(const std::string& api_url, const std::string& session_token,
-                  bool drop_lease = true);
+                  bool drop_lease = true,
+                  uint64_t max_pack_size = ObjectPack::kDefaultLimit);
   bool Finalize();
 
   ObjectPack::BucketHandle NewBucket();
 
   bool CommitBucket(const ObjectPack::BucketContentType type,
                     const shash::Any& id, const ObjectPack::BucketHandle handle,
-                    const std::string& name = "");
+                    const std::string& name = "",
+                    const bool force_dispatch = false);
 
   Stats stats() const { return stats_; }
 
-  void Dispatch();
-
  protected:
   virtual bool InitializeDerived();
+
   virtual bool FinalizeDerived();
+
+  virtual bool DropLease();
+
   virtual Future<bool>* DispatchObjectPack(ObjectPack* pack) = 0;
 
  private:
@@ -73,7 +77,8 @@ class SessionContextBase {
   std::string session_token_;
   bool drop_lease_;
 
-  ObjectPack::BucketHandle active_handle_;
+  uint64_t max_pack_size_;
+
   ObjectPack* current_pack_;
 
   pthread_mutex_t mtx_;
