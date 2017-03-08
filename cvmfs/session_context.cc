@@ -28,7 +28,7 @@ bool SessionContextBase::Initialize(const std::string& api_url,
   if (pthread_mutexattr_init(&attr) ||
       pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE) ||
       pthread_mutex_init(&mtx_, &attr) || pthread_mutexattr_destroy(&attr)) {
-    LogCvmfs(kLogUploadHttp, kLogStderr,
+    LogCvmfs(kLogUploadGateway, kLogStderr,
              "Could not initialize SessionContext lock.");
     return false;
   }
@@ -48,7 +48,7 @@ bool SessionContextBase::Initialize(const std::string& api_url,
     // Ensure that the upload job and result queues are empty
     if (!upload_results_.IsEmpty()) {
       LogCvmfs(
-          kLogUploadHttp, kLogStderr,
+          kLogUploadGateway, kLogStderr,
           "Could not initialize SessionContext - Upload queues are not empty.");
       ret = false;
     }
@@ -56,7 +56,7 @@ bool SessionContextBase::Initialize(const std::string& api_url,
     // Ensure that there are not open object packs
     if (current_pack_) {
       LogCvmfs(
-          kLogUploadHttp, kLogStderr,
+          kLogUploadGateway, kLogStderr,
           "Could not initialize SessionContext - Existing open object packs.");
       ret = false;
     }
@@ -73,7 +73,7 @@ bool SessionContextBase::Finalize() {
     MutexLockGuard lock(mtx_);
 
     if (drop_lease_ && !DropLease()) {
-      LogCvmfs(kLogUploadHttp, kLogStderr,
+      LogCvmfs(kLogUploadGateway, kLogStderr,
                "SessionContext finalization - Could not drop active lease");
     }
 

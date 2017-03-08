@@ -25,12 +25,12 @@ bool GatewayUploader::ParseSpoolerDefinition(
     GatewayUploader::Config* config) {
   const std::string& config_string = spooler_definition.spooler_configuration;
   if (!config) {
-    LogCvmfs(kLogUploadHttp, kLogStderr, "\"config\" argument is NULL");
+    LogCvmfs(kLogUploadGateway, kLogStderr, "\"config\" argument is NULL");
     return false;
   }
 
   if (spooler_definition.session_token_file.empty()) {
-    LogCvmfs(kLogUploadHttp, kLogStderr,
+    LogCvmfs(kLogUploadGateway, kLogStderr,
              "Failed to configure HTTP uploader. "
              "Missing session token file.\n");
     return false;
@@ -54,7 +54,7 @@ GatewayUploader::GatewayUploader(const SpoolerDefinition& spooler_definition)
 
   atomic_init32(&num_errors_);
 
-  LogCvmfs(kLogUploadHttp, kLogStderr,
+  LogCvmfs(kLogUploadGateway, kLogStderr,
            "HTTP uploader configuration:\n"
            "  API URL: %s\n"
            "  Session token file: %s\n",
@@ -106,7 +106,7 @@ void GatewayUploader::StreamedUpload(UploadStreamHandle* handle,
                                      CharBuffer* buffer,
                                      const CallbackTN* callback) {
   if (!buffer->IsInitialized()) {
-    LogCvmfs(kLogUploadHttp, kLogStderr,
+    LogCvmfs(kLogUploadGateway, kLogStderr,
              "Streamed upload - input buffer is not initialized");
     Respond(callback, UploaderResults(1, buffer));
     return;
@@ -114,7 +114,7 @@ void GatewayUploader::StreamedUpload(UploadStreamHandle* handle,
 
   GatewayStreamHandle* hd = dynamic_cast<GatewayStreamHandle*>(handle);
   if (!hd) {
-    LogCvmfs(kLogUploadHttp, kLogStderr,
+    LogCvmfs(kLogUploadGateway, kLogStderr,
              "Streamed upload - incompatible upload handle");
     Respond(callback, UploaderResults(2, buffer));
     return;
@@ -129,7 +129,7 @@ void GatewayUploader::FinalizeStreamedUpload(UploadStreamHandle* handle,
                                              const shash::Any& content_hash) {
   GatewayStreamHandle* hd = dynamic_cast<GatewayStreamHandle*>(handle);
   if (!hd) {
-    LogCvmfs(kLogUploadHttp, kLogStderr,
+    LogCvmfs(kLogUploadGateway, kLogStderr,
              "Finalize streamed upload - incompatible upload handle");
     Respond(handle->commit_callback, UploaderResults(2));
     return;
@@ -137,7 +137,7 @@ void GatewayUploader::FinalizeStreamedUpload(UploadStreamHandle* handle,
 
   if (!session_context_.CommitBucket(ObjectPack::kCas, content_hash, hd->bucket,
                                      "")) {
-    LogCvmfs(kLogUploadHttp, kLogStderr,
+    LogCvmfs(kLogUploadGateway, kLogStderr,
              "Finalize streamed upload - could not commit bucket");
     Respond(handle->commit_callback, UploaderResults(4));
     return;
@@ -154,7 +154,7 @@ bool GatewayUploader::ReadSessionTokenFile(const std::string& token_file_name,
 
   FILE* token_file = std::fopen(token_file_name.c_str(), "r");
   if (!token_file) {
-    LogCvmfs(kLogUploadHttp, kLogStderr,
+    LogCvmfs(kLogUploadGateway, kLogStderr,
              "HTTP Uploader - Could not open session token "
              "file. Aborting.");
     return false;
