@@ -9,7 +9,7 @@
 using namespace upload;
 
 class SessionContextMocked : public SessionContext {
-  virtual Future<bool>* DispatchObjectPack(ObjectPack* pack) {
+  virtual Future<bool>* DispatchObjectPack(const ObjectPack* pack) {
     delete pack;  // Discard object pack
 
     // Just return a completed future saying everything is "fine" (TM)

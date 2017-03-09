@@ -138,7 +138,7 @@ ObjectPack* SessionContextBase::CurrentPack() {
 }
 
 struct SessionContext::UploadJob {
-  ObjectPack* pack;
+  const ObjectPack* pack;
   Future<bool>* result;
 };
 

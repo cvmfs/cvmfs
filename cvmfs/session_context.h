@@ -62,13 +62,13 @@ class SessionContextBase {
   Stats stats() const { return stats_; }
 
  protected:
-  virtual bool InitializeDerived();
+  virtual bool InitializeDerived() = 0;
 
-  virtual bool FinalizeDerived();
+  virtual bool FinalizeDerived() = 0;
 
-  virtual bool DropLease();
+  virtual bool DropLease() = 0;
 
-  virtual Future<bool>* DispatchObjectPack(ObjectPack* pack) = 0;
+  virtual Future<bool>* DispatchObjectPack(const ObjectPack* pack) = 0;
 
  private:
   ObjectPack* CurrentPack();
@@ -93,11 +93,25 @@ class SessionContext : public SessionContextBase {
   SessionContext();
 
  protected:
-  virtual Future<bool>* DispatchObjectPack(ObjectPack* pack);
+  struct UploadJob;
+
+  virtual bool InitializeDerived();
+
+  virtual bool FinalizeDerived();
+
+  virtual bool DropLease();
+
+  virtual Future<bool>* DispatchObjectPack(const ObjectPack* pack);
+
+  virtual bool DoUpload(const UploadJob* job);
 
  private:
-  struct UploadJob;
+  static void* UploadLoop(void*);
+
   FifoChannel<UploadJob*> upload_jobs_;
+
+  atomic_int32 worker_terminate_;
+  pthread_t worker_;
 };
 
 }  // namespace upload
