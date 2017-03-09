@@ -77,7 +77,7 @@ class GatewayUploader : public AbstractUploader {
   void BumpErrors() const;
 
   Config config_;
-  SessionContext session_context_;
+  SessionContext* session_context_;
   mutable atomic_int32 num_errors_;
 };
 

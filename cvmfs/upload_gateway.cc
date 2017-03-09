@@ -44,7 +44,9 @@ bool GatewayUploader::ParseSpoolerDefinition(
 }
 
 GatewayUploader::GatewayUploader(const SpoolerDefinition& spooler_definition)
-    : AbstractUploader(spooler_definition), config_(), session_context_() {
+    : AbstractUploader(spooler_definition),
+      config_(),
+      session_context_(new SessionContext()) {
   assert(spooler_definition.IsValid() &&
          spooler_definition.driver_type == SpoolerDefinition::Gateway);
 
@@ -61,7 +63,11 @@ GatewayUploader::GatewayUploader(const SpoolerDefinition& spooler_definition)
            config_.api_url.c_str(), config_.session_token_file.c_str());
 }
 
-GatewayUploader::~GatewayUploader() {}
+GatewayUploader::~GatewayUploader() {
+  if (session_context_) {
+    delete session_context_;
+  }
+}
 
 bool GatewayUploader::Initialize() {
   if (!AbstractUploader::Initialize()) {
@@ -71,10 +77,10 @@ bool GatewayUploader::Initialize() {
   if (!ReadSessionTokenFile(config_.session_token_file, &session_token)) {
     return false;
   }
-  return session_context_.Initialize(config_.api_url, session_token);
+  return session_context_->Initialize(config_.api_url, session_token);
 }
 
-bool GatewayUploader::FinalizeSession() { return session_context_.Finalize(); }
+bool GatewayUploader::FinalizeSession() { return session_context_->Finalize(); }
 
 std::string GatewayUploader::name() const { return "HTTP"; }
 
@@ -97,7 +103,7 @@ void GatewayUploader::FileUpload(const std::string& local_path,
                                  const std::string& remote_path,
                                  const CallbackTN* callback) {
   UniquePtr<GatewayStreamHandle> handle(
-      new GatewayStreamHandle(callback, session_context_.NewBucket()));
+      new GatewayStreamHandle(callback, session_context_->NewBucket()));
 
   FILE* local_file = fopen(local_path.c_str(), "rb");
   if (!local_file) {
@@ -117,8 +123,8 @@ void GatewayUploader::FileUpload(const std::string& local_path,
 
   shash::Any content_hash(shash::kSha1);
   shash::HashFile(local_path, &content_hash);
-  if (!session_context_.CommitBucket(ObjectPack::kNamed, content_hash,
-                                     handle->bucket, remote_path)) {
+  if (!session_context_->CommitBucket(ObjectPack::kNamed, content_hash,
+                                      handle->bucket, remote_path)) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
              "File upload - could not commit bucket");
     Respond(handle->commit_callback, UploaderResults(2, local_path));
@@ -130,7 +136,7 @@ void GatewayUploader::FileUpload(const std::string& local_path,
 
 UploadStreamHandle* GatewayUploader::InitStreamedUpload(
     const CallbackTN* callback) {
-  return new GatewayStreamHandle(callback, session_context_.NewBucket());
+  return new GatewayStreamHandle(callback, session_context_->NewBucket());
 }
 
 void GatewayUploader::StreamedUpload(UploadStreamHandle* handle,
@@ -166,8 +172,8 @@ void GatewayUploader::FinalizeStreamedUpload(UploadStreamHandle* handle,
     return;
   }
 
-  if (!session_context_.CommitBucket(ObjectPack::kCas, content_hash, hd->bucket,
-                                     "")) {
+  if (!session_context_->CommitBucket(ObjectPack::kCas, content_hash,
+                                      hd->bucket, "")) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
              "Finalize streamed upload - could not commit bucket");
     Respond(handle->commit_callback, UploaderResults(4));
