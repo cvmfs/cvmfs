@@ -9,13 +9,11 @@
 using namespace upload;
 
 class SessionContextMocked : public SessionContext {
-  virtual Future<bool>* DispatchObjectPack(const ObjectPack* pack) {
-    delete pack;  // Discard object pack
-
-    // Just return a completed future saying everything is "fine" (TM)
-    Future<bool>* future = new Future<bool>();
-    future->Set(true);
-    return future;
+  virtual bool DoUpload(const UploadJob* job) {
+    job->result->Set(true);
+    delete job->pack;
+    delete job;
+    return true;
   }
 };
 

@@ -37,8 +37,8 @@ class SessionContextBase {
 
     uint64_t buckets_created;
     uint64_t buckets_committed;
-    uint64_t objects_dispatched;
-    uint64_t jobs_finished;
+    atomic_int64 objects_dispatched;
+    int64_t jobs_finished;
     uint64_t bytes_committed;
     uint64_t bytes_dispatched;
   };
@@ -70,6 +70,12 @@ class SessionContextBase {
 
   virtual Future<bool>* DispatchObjectPack(const ObjectPack* pack) = 0;
 
+  int64_t NumJobsSubmitted() {
+    return atomic_read64(&stats_.objects_dispatched);
+  }
+
+  FifoChannel<Future<bool>*> upload_results_;
+
  private:
   ObjectPack* CurrentPack();
 
@@ -83,8 +89,6 @@ class SessionContextBase {
 
   pthread_mutex_t mtx_;
 
-  FifoChannel<Future<bool>*> upload_results_;
-
   Stats stats_;
 };
 
@@ -93,7 +97,10 @@ class SessionContext : public SessionContextBase {
   SessionContext();
 
  protected:
-  struct UploadJob;
+  struct UploadJob {
+    const ObjectPack* pack;
+    Future<bool>* result;
+  };
 
   virtual bool InitializeDerived();
 
@@ -107,6 +114,8 @@ class SessionContext : public SessionContextBase {
 
  private:
   static void* UploadLoop(void*);
+
+  bool ShouldTerminate();
 
   FifoChannel<UploadJob*> upload_jobs_;
 

@@ -7,13 +7,13 @@
 namespace upload {
 
 SessionContextBase::SessionContextBase()
-    : api_url_(),
+    : upload_results_(1000, 1000),
+      api_url_(),
       session_token_(),
       drop_lease_(true),
       max_pack_size_(ObjectPack::kDefaultLimit),
       current_pack_(NULL),
       mtx_(),
-      upload_results_(1000, 1000),
       stats_() {}
 
 SessionContextBase::~SessionContextBase() {}
@@ -78,7 +78,7 @@ bool SessionContextBase::Finalize() {
     }
 
     while (!upload_results_.IsEmpty() ||
-           (stats_.jobs_finished < stats_.objects_dispatched)) {
+           (stats_.jobs_finished < NumJobsSubmitted())) {
       Future<bool>* future = upload_results_.Dequeue();
       results = future->Get() && results;
       delete future;
@@ -120,7 +120,7 @@ bool SessionContextBase::CommitBucket(const ObjectPack::BucketContentType type,
 
     upload_results_.Enqueue(DispatchObjectPack(CurrentPack()));
 
-    stats_.objects_dispatched++;
+    atomic_inc64(&stats_.objects_dispatched);
     stats_.bytes_dispatched += CurrentPack()->size();
     current_pack_ = new_pack;
 
@@ -137,35 +137,61 @@ ObjectPack* SessionContextBase::CurrentPack() {
   return current_pack_;
 }
 
-struct SessionContext::UploadJob {
-  const ObjectPack* pack;
-  Future<bool>* result;
-};
-
-bool SessionContextBase::InitializeDerived() {
-  MutexLockGuard lock(mtx_);
-  return true;
-}
-
-bool SessionContextBase::FinalizeDerived() {
-  MutexLockGuard lock(mtx_);
-  return true;
-}
-
-bool SessionContextBase::DropLease() {
-  MutexLockGuard lock(mtx_);
-  return true;
-}
-
 SessionContext::SessionContext()
     : SessionContextBase(), upload_jobs_(1000, 900) {}
 
-Future<bool>* SessionContext::DispatchObjectPack(ObjectPack* pack) {
+bool SessionContext::InitializeDerived() {
+  // Start worker thread
+  atomic_init32(&worker_terminate_);
+  atomic_write32(&worker_terminate_, 0);
+  int retval =
+      pthread_create(&worker_, NULL, UploadLoop, reinterpret_cast<void*>(this));
+
+  return !retval;
+}
+
+bool SessionContext::FinalizeDerived() {
+  atomic_write32(&worker_terminate_, 1);
+
+  pthread_join(worker_, NULL);
+
+  return true;
+}
+
+bool SessionContext::DropLease() { return true; }
+
+Future<bool>* SessionContext::DispatchObjectPack(const ObjectPack* pack) {
   UploadJob* job = new UploadJob;
   job->pack = pack;
   job->result = new Future<bool>();
   upload_jobs_.Enqueue(job);
   return job->result;
+}
+
+bool SessionContext::DoUpload(const SessionContext::UploadJob* /*job*/) {
+  return true;
+}
+
+void* SessionContext::UploadLoop(void* data) {
+  SessionContext* ctx = reinterpret_cast<SessionContext*>(data);
+  LogCvmfs(kLogUploadGateway, kLogStderr,
+           "Upload session context - worker started with context @%ld", data);
+
+  atomic_int64 jobs_processed;
+  atomic_init64(&jobs_processed);
+  while (!ctx->ShouldTerminate()) {
+      while (jobs_processed < ctx->NumJobsSubmitted()) {
+        UploadJob* job = ctx->upload_jobs_.Dequeue();
+        ctx->DoUpload(job);
+        jobs_processed++;
+      }
+  }
+
+  return NULL;
+}
+
+bool SessionContext::ShouldTerminate() {
+  return atomic_read32(&worker_terminate_);
 }
 
 }  // namespace upload
