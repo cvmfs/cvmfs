@@ -6189,7 +6189,7 @@ _migrate_2_2() {
 
   echo "--> updating /etc/fstab"
   local comment="added by CernVM-FS for ${name}"
-  sed -i -e "s~^\(.*\)\(${scratch_dir}\)\(.*${comment}\)$~\1\2/current\3~" /etc/fstab
+  sed -i -e "s~^\(.*\)\(${scratch_dir}\)\(.*${comment}\)\s*$~\1\2/current\3~" /etc/fstab
 
   echo "--> remount repository"
   run_suid_helper rw_mount $name
