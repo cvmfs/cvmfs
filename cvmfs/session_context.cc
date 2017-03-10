@@ -72,17 +72,17 @@ bool SessionContextBase::Finalize() {
   {
     MutexLockGuard lock(mtx_);
 
-    if (drop_lease_ && !DropLease()) {
-      LogCvmfs(kLogUploadGateway, kLogStderr,
-               "SessionContext finalization - Could not drop active lease");
-    }
-
     while (!upload_results_.IsEmpty() ||
            (stats_.jobs_finished < NumJobsSubmitted())) {
       Future<bool>* future = upload_results_.Dequeue();
       results = future->Get() && results;
       delete future;
       stats_.jobs_finished++;
+    }
+
+    if (drop_lease_ && !DropLease()) {
+      LogCvmfs(kLogUploadGateway, kLogStderr,
+               "SessionContext finalization - Could not drop active lease");
     }
 
     results = FinalizeDerived() &&
