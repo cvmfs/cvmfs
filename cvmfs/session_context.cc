@@ -12,8 +12,7 @@ SessionContextBase::SessionContextBase()
       session_token_(),
       drop_lease_(true),
       max_pack_size_(ObjectPack::kDefaultLimit),
-      current_pack_(NULL),
-      stats_() {}
+      current_pack_(NULL) {}
 
 SessionContextBase::~SessionContextBase() {}
 
@@ -39,8 +38,9 @@ bool SessionContextBase::Initialize(const std::string& api_url,
   drop_lease_ = drop_lease;
   max_pack_size_ = max_pack_size;
 
-  // Reset internal counters
-  stats_ = Stats();
+  atomic_init64(&objects_dispatched_);
+  bytes_committed_ = 0u;
+  bytes_dispatched_ = 0u;
 
   // Ensure that the upload job and result queues are empty
   if (!upload_results_.IsEmpty()) {
@@ -68,20 +68,20 @@ bool SessionContextBase::Finalize() {
     MutexLockGuard lock(current_pack_mtx_);
 
     if (current_pack_ && current_pack_->GetNoObjects() > 0) {
-      atomic_inc64(&stats_.objects_dispatched);
-      stats_.bytes_dispatched += current_pack_->size();
+      atomic_inc64(&objects_dispatched_);
+      bytes_dispatched_ += current_pack_->size();
       DispatchObjectPack(current_pack_);
       current_pack_ = NULL;
     }
   }
 
   bool results = true;
-  while (!upload_results_.IsEmpty() ||
-         (stats_.jobs_finished < NumJobsSubmitted())) {
+  int64_t jobs_finished = 0;
+  while (!upload_results_.IsEmpty() || (jobs_finished < NumJobsSubmitted())) {
     Future<bool>* future = upload_results_.Dequeue();
     results = future->Get() && results;
     delete future;
-    stats_.jobs_finished++;
+    jobs_finished++;
   }
 
   if (drop_lease_ && !DropLease()) {
@@ -89,8 +89,8 @@ bool SessionContextBase::Finalize() {
              "SessionContext finalization - Could not drop active lease");
   }
 
-  results = FinalizeDerived() &&
-            (stats_.bytes_committed == stats_.bytes_dispatched) && results;
+  results =
+      FinalizeDerived() && (bytes_committed_ == bytes_dispatched_) && results;
 
   pthread_mutex_destroy(&current_pack_mtx_);
   return results;
@@ -98,8 +98,10 @@ bool SessionContextBase::Finalize() {
 
 ObjectPack::BucketHandle SessionContextBase::NewBucket() {
   MutexLockGuard lock(current_pack_mtx_);
-  ObjectPack::BucketHandle hd = CurrentPack()->NewBucket();
-  stats_.buckets_created++;
+  if (!current_pack_) {
+    current_pack_ = new ObjectPack(max_pack_size_);
+  }
+  ObjectPack::BucketHandle hd = current_pack_->NewBucket();
   return hd;
 }
 
@@ -110,20 +112,25 @@ bool SessionContextBase::CommitBucket(const ObjectPack::BucketContentType type,
                                       const bool force_dispatch) {
   MutexLockGuard lock(current_pack_mtx_);
 
-  uint64_t size0 = CurrentPack()->size();
-  bool committed = CurrentPack()->CommitBucket(type, id, handle, name);
+  if (!current_pack_) {
+    LogCvmfs(kLogUploadGateway, kLogStderr,
+             "Error: Called SessionBaseContext::CommitBucket without a valid ");
+    return false;
+  }
+
+  uint64_t size0 = current_pack_->size();
+  bool committed = current_pack_->CommitBucket(type, id, handle, name);
 
   if (committed) {  // Current pack is still not full
-    uint64_t size1 = CurrentPack()->size();
-    stats_.buckets_committed++;
-    stats_.bytes_committed += size1 - size0;
+    uint64_t size1 = current_pack_->size();
+    bytes_committed_ += size1 - size0;
     if (force_dispatch) {
       Dispatch();
       current_pack_ = NULL;
     }
   } else {  // Current pack is full and can be dispatched
     ObjectPack* new_pack = new ObjectPack(max_pack_size_);
-    CurrentPack()->TransferBucket(handle, new_pack);
+    current_pack_->TransferBucket(handle, new_pack);
 
     Dispatch();
     current_pack_ = new_pack;
@@ -134,24 +141,20 @@ bool SessionContextBase::CommitBucket(const ObjectPack::BucketContentType type,
   return true;
 }
 
-SessionContextBase::Stats SessionContextBase::stats() const { return stats_; }
-
 int64_t SessionContextBase::NumJobsSubmitted() const {
-  return atomic_read64(&stats_.objects_dispatched);
-}
-
-ObjectPack* SessionContextBase::CurrentPack() {
-  MutexLockGuard lock(current_pack_mtx_);
-  if (!current_pack_) {
-    current_pack_ = new ObjectPack(max_pack_size_);
-  }
-  return current_pack_;
+  return atomic_read64(&objects_dispatched_);
 }
 
 void SessionContextBase::Dispatch() {
-  atomic_inc64(&stats_.objects_dispatched);
-  stats_.bytes_dispatched += CurrentPack()->size();
-  upload_results_.Enqueue(DispatchObjectPack(CurrentPack()));
+  MutexLockGuard lock(current_pack_mtx_);
+
+  if (!current_pack_) {
+    return;
+  }
+
+  atomic_inc64(&objects_dispatched_);
+  bytes_dispatched_ += current_pack_->size();
+  upload_results_.Enqueue(DispatchObjectPack(current_pack_));
 }
 
 SessionContext::SessionContext()

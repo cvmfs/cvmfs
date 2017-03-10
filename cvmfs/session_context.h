@@ -26,23 +26,6 @@ namespace upload {
  */
 class SessionContextBase {
  public:
-  struct Stats {
-    Stats()
-        : buckets_created(0u),
-          buckets_committed(0u),
-          objects_dispatched(0u),
-          jobs_finished(0u),
-          bytes_committed(0u),
-          bytes_dispatched(0u) {}
-
-    uint64_t buckets_created;
-    uint64_t buckets_committed;
-    atomic_int64 objects_dispatched;
-    int64_t jobs_finished;
-    uint64_t bytes_committed;
-    uint64_t bytes_dispatched;
-  };
-
   SessionContextBase();
 
   virtual ~SessionContextBase();
@@ -59,8 +42,6 @@ class SessionContextBase {
                     const std::string& name = "",
                     const bool force_dispatch = false);
 
-  Stats stats() const;
-
  protected:
   virtual bool InitializeDerived() = 0;
 
@@ -75,8 +56,6 @@ class SessionContextBase {
   FifoChannel<Future<bool>*> upload_results_;
 
  private:
-  ObjectPack* CurrentPack();
-
   void Dispatch();
 
   std::string api_url_;
@@ -88,7 +67,9 @@ class SessionContextBase {
   ObjectPack* current_pack_;
   pthread_mutex_t current_pack_mtx_;
 
-  mutable Stats stats_;
+  mutable atomic_int64 objects_dispatched_;
+  uint64_t bytes_committed_;
+  uint64_t bytes_dispatched_;
 };
 
 class SessionContext : public SessionContextBase {

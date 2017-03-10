@@ -17,8 +17,6 @@ class SessionContextMocked : public SessionContext {
   }
 };
 
-typedef SessionContext::Stats Stats;
-
 class T_SessionContext : public ::testing::Test {};
 
 TEST_F(T_SessionContext, BasicLifeCycle) {
@@ -26,17 +24,7 @@ TEST_F(T_SessionContext, BasicLifeCycle) {
   EXPECT_TRUE(ctx.Initialize("http://my.repo.address:8080/api/v1",
                              "/path/to/the/session_file"));
 
-  Stats stats = ctx.stats();
-
-  EXPECT_EQ(stats.buckets_created, 0u);
-  EXPECT_EQ(stats.buckets_committed, 0u);
-  EXPECT_EQ(stats.objects_dispatched, 0u);
-  EXPECT_EQ(stats.bytes_committed, 0u);
-  EXPECT_EQ(stats.bytes_dispatched, 0u);
-
   ObjectPack::BucketHandle hd = ctx.NewBucket();
-  stats = ctx.stats();
-  EXPECT_EQ(stats.buckets_created, 1u);
 
   unsigned char buffer[4096];
   memset(buffer, 0, 4096);
@@ -44,11 +32,5 @@ TEST_F(T_SessionContext, BasicLifeCycle) {
 
   shash::Any hash(shash::kSha1);
   EXPECT_TRUE(ctx.CommitBucket(ObjectPack::kCas, hash, hd, "", true));
-  stats = ctx.stats();
-  EXPECT_EQ(stats.buckets_committed, 1u);
-  EXPECT_EQ(stats.bytes_committed, 4096u);
-  EXPECT_EQ(stats.objects_dispatched, 1u);
-  EXPECT_EQ(stats.bytes_dispatched, 4096u);
-
   EXPECT_TRUE(ctx.Finalize());
 }
