@@ -13,7 +13,6 @@ SessionContextBase::SessionContextBase()
       drop_lease_(true),
       max_pack_size_(ObjectPack::kDefaultLimit),
       current_pack_(NULL),
-      mtx_(),
       stats_() {}
 
 SessionContextBase::~SessionContextBase() {}
@@ -27,50 +26,46 @@ bool SessionContextBase::Initialize(const std::string& api_url,
   pthread_mutexattr_t attr;
   if (pthread_mutexattr_init(&attr) ||
       pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE) ||
-      pthread_mutex_init(&mtx_, &attr) || pthread_mutexattr_destroy(&attr)) {
+      pthread_mutex_init(&current_pack_mtx_, &attr) ||
+      pthread_mutexattr_destroy(&attr)) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
              "Could not initialize SessionContext lock.");
     return false;
   }
 
-  {
-    MutexLockGuard lock(mtx_);
+  // Set upstream URL and session token
+  api_url_ = api_url;
+  session_token_ = session_token;
+  drop_lease_ = drop_lease;
+  max_pack_size_ = max_pack_size;
 
-    // Set upstream URL and session token
-    api_url_ = api_url;
-    session_token_ = session_token;
-    drop_lease_ = drop_lease;
-    max_pack_size_ = max_pack_size;
+  // Reset internal counters
+  stats_ = Stats();
 
-    // Reset internal counters
-    stats_ = Stats();
-
-    // Ensure that the upload job and result queues are empty
-    if (!upload_results_.IsEmpty()) {
-      LogCvmfs(
-          kLogUploadGateway, kLogStderr,
-          "Could not initialize SessionContext - Upload queues are not empty.");
-      ret = false;
-    }
-
-    // Ensure that there are not open object packs
-    if (current_pack_) {
-      LogCvmfs(
-          kLogUploadGateway, kLogStderr,
-          "Could not initialize SessionContext - Existing open object packs.");
-      ret = false;
-    }
-
-    ret = InitializeDerived() && ret;
+  // Ensure that the upload job and result queues are empty
+  if (!upload_results_.IsEmpty()) {
+    LogCvmfs(
+        kLogUploadGateway, kLogStderr,
+        "Could not initialize SessionContext - Upload queues are not empty.");
+    ret = false;
   }
+
+  // Ensure that there are not open object packs
+  if (current_pack_) {
+    LogCvmfs(
+        kLogUploadGateway, kLogStderr,
+        "Could not initialize SessionContext - Existing open object packs.");
+    ret = false;
+  }
+
+  ret = InitializeDerived() && ret;
 
   return ret;
 }
 
 bool SessionContextBase::Finalize() {
-  bool results = true;
   {
-    MutexLockGuard lock(mtx_);
+    MutexLockGuard lock(current_pack_mtx_);
 
     if (current_pack_ && current_pack_->GetNoObjects() > 0) {
       atomic_inc64(&stats_.objects_dispatched);
@@ -78,30 +73,31 @@ bool SessionContextBase::Finalize() {
       DispatchObjectPack(current_pack_);
       current_pack_ = NULL;
     }
-
-    while (!upload_results_.IsEmpty() ||
-           (stats_.jobs_finished < NumJobsSubmitted())) {
-      Future<bool>* future = upload_results_.Dequeue();
-      results = future->Get() && results;
-      delete future;
-      stats_.jobs_finished++;
-    }
-
-    if (drop_lease_ && !DropLease()) {
-      LogCvmfs(kLogUploadGateway, kLogStderr,
-               "SessionContext finalization - Could not drop active lease");
-    }
-
-    results = FinalizeDerived() &&
-              (stats_.bytes_committed == stats_.bytes_dispatched) && results;
   }
 
-  pthread_mutex_destroy(&mtx_);
+  bool results = true;
+  while (!upload_results_.IsEmpty() ||
+         (stats_.jobs_finished < NumJobsSubmitted())) {
+    Future<bool>* future = upload_results_.Dequeue();
+    results = future->Get() && results;
+    delete future;
+    stats_.jobs_finished++;
+  }
+
+  if (drop_lease_ && !DropLease()) {
+    LogCvmfs(kLogUploadGateway, kLogStderr,
+             "SessionContext finalization - Could not drop active lease");
+  }
+
+  results = FinalizeDerived() &&
+            (stats_.bytes_committed == stats_.bytes_dispatched) && results;
+
+  pthread_mutex_destroy(&current_pack_mtx_);
   return results;
 }
 
 ObjectPack::BucketHandle SessionContextBase::NewBucket() {
-  MutexLockGuard lock(mtx_);
+  MutexLockGuard lock(current_pack_mtx_);
   ObjectPack::BucketHandle hd = CurrentPack()->NewBucket();
   stats_.buckets_created++;
   return hd;
@@ -112,7 +108,7 @@ bool SessionContextBase::CommitBucket(const ObjectPack::BucketContentType type,
                                       const ObjectPack::BucketHandle handle,
                                       const std::string& name,
                                       const bool force_dispatch) {
-  MutexLockGuard lock(mtx_);
+  MutexLockGuard lock(current_pack_mtx_);
 
   uint64_t size0 = CurrentPack()->size();
   bool committed = CurrentPack()->CommitBucket(type, id, handle, name);
@@ -138,8 +134,14 @@ bool SessionContextBase::CommitBucket(const ObjectPack::BucketContentType type,
   return true;
 }
 
+SessionContextBase::Stats SessionContextBase::stats() const { return stats_; }
+
+int64_t SessionContextBase::NumJobsSubmitted() const {
+  return atomic_read64(&stats_.objects_dispatched);
+}
+
 ObjectPack* SessionContextBase::CurrentPack() {
-  MutexLockGuard lock(mtx_);
+  MutexLockGuard lock(current_pack_mtx_);
   if (!current_pack_) {
     current_pack_ = new ObjectPack(max_pack_size_);
   }
@@ -192,8 +194,7 @@ void* SessionContext::UploadLoop(void* data) {
   LogCvmfs(kLogUploadGateway, kLogStderr,
            "Upload session context - worker started with context @%ld", data);
 
-  atomic_int64 jobs_processed;
-  atomic_init64(&jobs_processed);
+  int64_t jobs_processed = 0;
   while (!ctx->ShouldTerminate()) {
     while (jobs_processed < ctx->NumJobsSubmitted()) {
       UploadJob* job = ctx->upload_jobs_.Dequeue();

@@ -59,7 +59,7 @@ class SessionContextBase {
                     const std::string& name = "",
                     const bool force_dispatch = false);
 
-  Stats stats() const { return stats_; }
+  Stats stats() const;
 
  protected:
   virtual bool InitializeDerived() = 0;
@@ -70,9 +70,7 @@ class SessionContextBase {
 
   virtual Future<bool>* DispatchObjectPack(const ObjectPack* pack) = 0;
 
-  int64_t NumJobsSubmitted() {
-    return atomic_read64(&stats_.objects_dispatched);
-  }
+  int64_t NumJobsSubmitted() const;
 
   FifoChannel<Future<bool>*> upload_results_;
 
@@ -88,10 +86,9 @@ class SessionContextBase {
   uint64_t max_pack_size_;
 
   ObjectPack* current_pack_;
+  pthread_mutex_t current_pack_mtx_;
 
-  pthread_mutex_t mtx_;
-
-  Stats stats_;
+  mutable Stats stats_;
 };
 
 class SessionContext : public SessionContextBase {
