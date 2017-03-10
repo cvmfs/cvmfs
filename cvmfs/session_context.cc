@@ -180,11 +180,11 @@ void* SessionContext::UploadLoop(void* data) {
   atomic_int64 jobs_processed;
   atomic_init64(&jobs_processed);
   while (!ctx->ShouldTerminate()) {
-      while (jobs_processed < ctx->NumJobsSubmitted()) {
-        UploadJob* job = ctx->upload_jobs_.Dequeue();
-        ctx->DoUpload(job);
-        jobs_processed++;
-      }
+    while (jobs_processed < ctx->NumJobsSubmitted()) {
+      UploadJob* job = ctx->upload_jobs_.Dequeue();
+      ctx->DoUpload(job);
+      jobs_processed++;
+    }
   }
 
   return NULL;
