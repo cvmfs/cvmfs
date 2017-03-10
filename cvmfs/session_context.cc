@@ -72,6 +72,13 @@ bool SessionContextBase::Finalize() {
   {
     MutexLockGuard lock(mtx_);
 
+    if (current_pack_ && current_pack_->GetNoObjects() > 0) {
+      atomic_inc64(&stats_.objects_dispatched);
+      stats_.bytes_dispatched += current_pack_->size();
+      DispatchObjectPack(current_pack_);
+      current_pack_ = NULL;
+    }
+
     while (!upload_results_.IsEmpty() ||
            (stats_.jobs_finished < NumJobsSubmitted())) {
       Future<bool>* future = upload_results_.Dequeue();
@@ -110,22 +117,24 @@ bool SessionContextBase::CommitBucket(const ObjectPack::BucketContentType type,
   uint64_t size0 = CurrentPack()->size();
   bool committed = CurrentPack()->CommitBucket(type, id, handle, name);
 
-  if (committed && !force_dispatch) {  // Current pack is still not full
+  if (committed) {  // Current pack is still not full
     uint64_t size1 = CurrentPack()->size();
     stats_.buckets_committed++;
     stats_.bytes_committed += size1 - size0;
+    if (force_dispatch) {
+      Dispatch();
+      current_pack_ = NULL;
+    }
   } else {  // Current pack is full and can be dispatched
     ObjectPack* new_pack = new ObjectPack(max_pack_size_);
     CurrentPack()->TransferBucket(handle, new_pack);
 
-    upload_results_.Enqueue(DispatchObjectPack(CurrentPack()));
-
-    atomic_inc64(&stats_.objects_dispatched);
-    stats_.bytes_dispatched += CurrentPack()->size();
+    Dispatch();
     current_pack_ = new_pack;
 
     CommitBucket(type, id, handle, name, false);
   }
+
   return true;
 }
 
@@ -135,6 +144,12 @@ ObjectPack* SessionContextBase::CurrentPack() {
     current_pack_ = new ObjectPack(max_pack_size_);
   }
   return current_pack_;
+}
+
+void SessionContextBase::Dispatch() {
+  atomic_inc64(&stats_.objects_dispatched);
+  stats_.bytes_dispatched += CurrentPack()->size();
+  upload_results_.Enqueue(DispatchObjectPack(CurrentPack()));
 }
 
 SessionContext::SessionContext()

@@ -79,6 +79,8 @@ class SessionContextBase {
  private:
   ObjectPack* CurrentPack();
 
+  void Dispatch();
+
   std::string api_url_;
   std::string session_token_;
   bool drop_lease_;
