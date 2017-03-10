@@ -4,6 +4,8 @@
 
 #include "session_context.h"
 
+#include <algorithm>
+
 namespace upload {
 
 SessionContextBase::SessionContextBase()
@@ -12,7 +14,9 @@ SessionContextBase::SessionContextBase()
       session_token_(),
       drop_lease_(true),
       max_pack_size_(ObjectPack::kDefaultLimit),
-      current_pack_(NULL) {}
+      active_handles_(),
+      current_pack_(NULL),
+      current_pack_mtx_() {}
 
 SessionContextBase::~SessionContextBase() {}
 
@@ -64,13 +68,12 @@ bool SessionContextBase::Initialize(const std::string& api_url,
 }
 
 bool SessionContextBase::Finalize() {
+  assert(active_handles_.empty());
   {
     MutexLockGuard lock(current_pack_mtx_);
 
     if (current_pack_ && current_pack_->GetNoObjects() > 0) {
-      atomic_inc64(&objects_dispatched_);
-      bytes_dispatched_ += current_pack_->size();
-      DispatchObjectPack(current_pack_);
+      Dispatch();
       current_pack_ = NULL;
     }
   }
@@ -102,6 +105,7 @@ ObjectPack::BucketHandle SessionContextBase::NewBucket() {
     current_pack_ = new ObjectPack(max_pack_size_);
   }
   ObjectPack::BucketHandle hd = current_pack_->NewBucket();
+  active_handles_.push_back(hd);
   return hd;
 }
 
@@ -114,7 +118,8 @@ bool SessionContextBase::CommitBucket(const ObjectPack::BucketContentType type,
 
   if (!current_pack_) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
-             "Error: Called SessionBaseContext::CommitBucket without a valid ");
+             "Error: Called SessionBaseContext::CommitBucket without an open "
+             "ObjectPack.");
     return false;
   }
 
@@ -122,6 +127,9 @@ bool SessionContextBase::CommitBucket(const ObjectPack::BucketContentType type,
   bool committed = current_pack_->CommitBucket(type, id, handle, name);
 
   if (committed) {  // Current pack is still not full
+    active_handles_.erase(
+        std::remove(active_handles_.begin(), active_handles_.end(), handle),
+        active_handles_.end());
     uint64_t size1 = current_pack_->size();
     bytes_committed_ += size1 - size0;
     if (force_dispatch) {
@@ -130,7 +138,9 @@ bool SessionContextBase::CommitBucket(const ObjectPack::BucketContentType type,
     }
   } else {  // Current pack is full and can be dispatched
     ObjectPack* new_pack = new ObjectPack(max_pack_size_);
-    current_pack_->TransferBucket(handle, new_pack);
+    for (size_t i = 0u; i < active_handles_.size(); ++i) {
+      current_pack_->TransferBucket(active_handles_[i], new_pack);
+    }
 
     Dispatch();
     current_pack_ = new_pack;
@@ -194,14 +204,15 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* /*job*/) {
 
 void* SessionContext::UploadLoop(void* data) {
   SessionContext* ctx = reinterpret_cast<SessionContext*>(data);
-  LogCvmfs(kLogUploadGateway, kLogStderr,
-           "Upload session context - worker started with context @%ld", data);
 
   int64_t jobs_processed = 0;
   while (!ctx->ShouldTerminate()) {
     while (jobs_processed < ctx->NumJobsSubmitted()) {
       UploadJob* job = ctx->upload_jobs_.Dequeue();
       ctx->DoUpload(job);
+      delete job->pack;
+      delete job;
+      job->result->Set(true);
       jobs_processed++;
     }
   }

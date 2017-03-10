@@ -64,6 +64,8 @@ class SessionContextBase {
 
   uint64_t max_pack_size_;
 
+  std::vector<ObjectPack::BucketHandle> active_handles_;
+
   ObjectPack* current_pack_;
   pthread_mutex_t current_pack_mtx_;
 
