@@ -778,9 +778,15 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from trunk catalog at /");
   retval = Pull(ensemble.manifest->catalog_hash(), "");
   pull_history = false;
+  if (!historic_tags.empty()) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "Checking tagged snapshots...");
+  }
   for (TagVector::const_iterator i    = historic_tags.begin(),
                                  iend = historic_tags.end();
-       i != iend; ++i) {
+       i != iend; ++i)
+  {
+    if (Peek(i->root_hash))
+      continue;
     LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from %s repository tag",
              i->name.c_str());
     apply_timestamp_threshold = false;
@@ -863,6 +869,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
       StoreBuffer(ensemble.raw_manifest_buf, ensemble.raw_manifest_size,
                   ".cvmfspublished", false);
     }
+    LogCvmfs(kLogCvmfs, kLogStdout, "Serving revision %u",
+             ensemble.manifest->revision());
   }
 
   WaitForStorage();
