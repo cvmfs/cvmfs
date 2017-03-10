@@ -29,6 +29,9 @@
   * Fix handling of file:// url in CVMFS_SERVER_URL
 
 2.3.4:
+  * Fix snapshot logging for large tag lists (CVM-1021)
+  * Fix auto tag cleanup for very long tag lists (CVM-1198)
+  * Fix stratum 0 /etc/fstab migration from versions < 2.1.20 (CVM-1182)
   * Work around CentOS 7 bug in autofs systemd unit (CVM-1200)
 
 2.3.3:
