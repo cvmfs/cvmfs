@@ -109,6 +109,7 @@ void GatewayUploader::FileUpload(const std::string& local_path,
   if (!local_file) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
              "File upload - could not open local file.");
+    BumpErrors();
     Respond(callback, UploaderResults(1, local_path));
     return;
   }
@@ -127,6 +128,7 @@ void GatewayUploader::FileUpload(const std::string& local_path,
                                       handle->bucket, remote_path)) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
              "File upload - could not commit bucket");
+    BumpErrors();
     Respond(handle->commit_callback, UploaderResults(2, local_path));
     return;
   }
@@ -145,6 +147,7 @@ void GatewayUploader::StreamedUpload(UploadStreamHandle* handle,
   if (!buffer->IsInitialized()) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
              "Streamed upload - input buffer is not initialized");
+    BumpErrors();
     Respond(callback, UploaderResults(1, buffer));
     return;
   }
@@ -153,6 +156,7 @@ void GatewayUploader::StreamedUpload(UploadStreamHandle* handle,
   if (!hd) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
              "Streamed upload - incompatible upload handle");
+    BumpErrors();
     Respond(callback, UploaderResults(2, buffer));
     return;
   }
@@ -168,6 +172,7 @@ void GatewayUploader::FinalizeStreamedUpload(UploadStreamHandle* handle,
   if (!hd) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
              "Finalize streamed upload - incompatible upload handle");
+    BumpErrors();
     Respond(handle->commit_callback, UploaderResults(2));
     return;
   }
@@ -176,6 +181,7 @@ void GatewayUploader::FinalizeStreamedUpload(UploadStreamHandle* handle,
                                       hd->bucket, "")) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
              "Finalize streamed upload - could not commit bucket");
+    BumpErrors();
     Respond(handle->commit_callback, UploaderResults(4));
     return;
   }
