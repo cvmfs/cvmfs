@@ -32,6 +32,7 @@ SessionContextBase::SessionContextBase()
       api_url_(),
       session_token_(),
       drop_lease_(true),
+      queue_flushed_(10, 10),
       max_pack_size_(ObjectPack::kDefaultLimit),
       active_handles_(),
       current_pack_(NULL),
@@ -72,6 +73,8 @@ bool SessionContextBase::Initialize(const std::string& api_url,
         "Could not initialize SessionContext - Upload queues are not empty.");
     ret = false;
   }
+
+  queue_flushed_.Drop();
 
   // Ensure that there are not open object packs
   if (current_pack_) {
@@ -116,6 +119,12 @@ bool SessionContextBase::Finalize() {
 
   pthread_mutex_destroy(&current_pack_mtx_);
   return results;
+}
+
+void SessionContextBase::WaitForUpload() {
+  if (!upload_results_.IsEmpty()) {
+    queue_flushed_.Dequeue();
+  }
 }
 
 ObjectPack::BucketHandle SessionContextBase::NewBucket() {
@@ -222,7 +231,8 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
   ObjectPackProducer serializer(job->pack);
 
   // Serialize the object pack into a JSON object
-  // TODO: Extremely inefficient, next step is to rewrite this with streaming in
+  // TODO: Extremely inefficient, next step is to rewrite this with streaming
+  // in
   // mind when the wire protocol is implemented (CVM-1193)
   std::vector<unsigned char> payload(0);
   std::vector<unsigned char> buffer(4096);
@@ -286,6 +296,7 @@ void* SessionContext::UploadLoop(void* data) {
       delete job;
       jobs_processed++;
     }
+    ctx->queue_flushed_.Enqueue(true);
   }
 
   return NULL;

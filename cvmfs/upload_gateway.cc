@@ -82,6 +82,10 @@ bool GatewayUploader::Initialize() {
 
 bool GatewayUploader::FinalizeSession() { return session_context_->Finalize(); }
 
+void GatewayUploader::WaitForUpload() const {
+  session_context_->WaitForUpload();
+}
+
 std::string GatewayUploader::name() const { return "HTTP"; }
 
 bool GatewayUploader::Remove(const std::string& /*file_to_delete*/) {

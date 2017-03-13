@@ -141,7 +141,7 @@ namespace upload {
  */
 class Spooler : public Observable<SpoolerResult> {
  public:
-  static Spooler* Construct(const SpoolerDefinition &spooler_definition);
+  static Spooler *Construct(const SpoolerDefinition &spooler_definition);
   virtual ~Spooler();
 
   /**
@@ -161,8 +161,7 @@ class Spooler : public Observable<SpoolerResult> {
    * @param remote_path   the destination of the file to be copied in the
    *                      backend storage
    */
-  void Upload(const std::string &local_path,
-              const std::string &remote_path);
+  void Upload(const std::string &local_path, const std::string &remote_path);
 
   /**
    * Convenience wrapper to upload the Manifest file into the backend storage
@@ -170,7 +169,6 @@ class Spooler : public Observable<SpoolerResult> {
    * @param local_path  the location of the (signed) manifest to be uploaded
    */
   void UploadManifest(const std::string &local_path);
-
 
   /**
    * Convenience wrapper to upload a Reflog database into the backend storage
@@ -196,8 +194,7 @@ class Spooler : public Observable<SpoolerResult> {
    * @param allow_chunking  (optional) controls if this file should be cut in
    *                        chunks or uploaded at once
    */
-  void Process(const std::string &local_path,
-               const bool         allow_chunking = true);
+  void Process(const std::string &local_path, const bool allow_chunking = true);
 
   /**
    * Convenience wrapper to process a catalog file. Please always use this
@@ -207,7 +204,6 @@ class Spooler : public Observable<SpoolerResult> {
    */
   void ProcessCatalog(const std::string &local_path);
 
-
   /**
    * Convenience wrapper to process a history database file. This sets the
    * processing parameters (like chunking and hash suffixes) accordingly.
@@ -215,7 +211,6 @@ class Spooler : public Observable<SpoolerResult> {
    * @param local_path  the location of the history database file
    */
   void ProcessHistory(const std::string &local_path);
-
 
   /**
    * Convenience wrapper to process a certificate file. This sets the
@@ -231,7 +226,6 @@ class Spooler : public Observable<SpoolerResult> {
    * @param local_path  the location of the meta info file
    */
   void ProcessMetainfo(const std::string &local_path);
-
 
   /**
    * Deletes the given file from the repository backend storage. This is done
@@ -269,6 +263,8 @@ class Spooler : public Observable<SpoolerResult> {
    */
   void WaitForUpload() const;
 
+  void FinalizeSession() const;
+
   /**
    * Checks how many of the already processed jobs have failed.
    *
@@ -279,7 +275,6 @@ class Spooler : public Observable<SpoolerResult> {
   shash::Algorithms GetHashAlgorithm() const {
     return spooler_definition_.hash_algorithm;
   }
-
 
  protected:
   /**
@@ -324,16 +319,16 @@ class Spooler : public Observable<SpoolerResult> {
    * @return   the spooler definition that was initially given to any Spooler
    *           constructor.
    */
-  inline const SpoolerDefinition& spooler_definition() const {
+  inline const SpoolerDefinition &spooler_definition() const {
     return spooler_definition_;
   }
 
  private:
   // Status Information
-  const SpoolerDefinition      spooler_definition_;
+  const SpoolerDefinition spooler_definition_;
 
-  UniquePtr<FileProcessor>     file_processor_;
-  UniquePtr<AbstractUploader>  uploader_;
+  UniquePtr<FileProcessor> file_processor_;
+  UniquePtr<AbstractUploader> uploader_;
 };
 
 }  // namespace upload

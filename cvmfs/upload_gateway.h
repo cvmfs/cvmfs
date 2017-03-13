@@ -45,6 +45,8 @@ class GatewayUploader : public AbstractUploader {
 
   virtual bool FinalizeSession();
 
+  virtual void WaitForUpload() const;
+
   virtual std::string name() const;
 
   virtual bool Remove(const std::string& file_to_delete);

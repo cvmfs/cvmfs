@@ -715,6 +715,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   LogCvmfs(kLogCvmfs, kLogStdout, "Exporting repository manifest");
   params.spooler->WaitForUpload();
   spooler_catalogs->WaitForUpload();
+  params.spooler->FinalizeSession();
+  spooler_catalogs->FinalizeSession();
   delete params.spooler;
 
   if (!manifest->Export(params.manifest_path)) {

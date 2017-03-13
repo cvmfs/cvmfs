@@ -109,9 +109,10 @@ void Spooler::UploadingCallback(const UploaderResults &data) {
 
 void Spooler::WaitForUpload() const {
   uploader_->WaitForUpload();
-  uploader_->FinalizeSession();
   file_processor_->WaitForProcessing();
 }
+
+void Spooler::FinalizeSession() const { uploader_->FinalizeSession(); }
 
 unsigned int Spooler::GetNumberOfErrors() const {
   return uploader_->GetNumberOfErrors();

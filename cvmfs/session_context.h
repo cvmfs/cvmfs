@@ -35,6 +35,8 @@ class SessionContextBase {
                   uint64_t max_pack_size = ObjectPack::kDefaultLimit);
   bool Finalize();
 
+  void WaitForUpload();
+
   ObjectPack::BucketHandle NewBucket();
 
   bool CommitBucket(const ObjectPack::BucketContentType type,
@@ -58,6 +60,8 @@ class SessionContextBase {
   std::string api_url_;
   std::string session_token_;
   bool drop_lease_;
+
+  FifoChannel<bool> queue_flushed_;
 
  private:
   void Dispatch();
