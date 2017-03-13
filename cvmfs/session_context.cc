@@ -281,9 +281,9 @@ void* SessionContext::UploadLoop(void* data) {
     while (jobs_processed < ctx->NumJobsSubmitted()) {
       UploadJob* job = ctx->upload_jobs_.Dequeue();
       ctx->DoUpload(job);
+      job->result->Set(true);
       delete job->pack;
       delete job;
-      job->result->Set(true);
       jobs_processed++;
     }
   }
