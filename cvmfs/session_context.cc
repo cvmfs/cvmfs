@@ -7,7 +7,6 @@
 #include <algorithm>
 
 #include "curl/curl.h"
-
 #include "cvmfs_config.h"
 #include "util/string.h"
 
@@ -32,7 +31,7 @@ SessionContextBase::SessionContextBase()
       api_url_(),
       session_token_(),
       drop_lease_(true),
-      queue_flushed_(10, 10),
+      queue_was_flushed_(1, 1),
       max_pack_size_(ObjectPack::kDefaultLimit),
       active_handles_(),
       current_pack_(NULL),
@@ -67,14 +66,10 @@ bool SessionContextBase::Initialize(const std::string& api_url,
   bytes_dispatched_ = 0u;
 
   // Ensure that the upload job and result queues are empty
-  if (!upload_results_.IsEmpty()) {
-    LogCvmfs(
-        kLogUploadGateway, kLogStderr,
-        "Could not initialize SessionContext - Upload queues are not empty.");
-    ret = false;
-  }
+  upload_results_.Drop();
 
-  queue_flushed_.Drop();
+  queue_was_flushed_.Drop();
+  queue_was_flushed_.Enqueue(true);
 
   // Ensure that there are not open object packs
   if (current_pack_) {
@@ -123,7 +118,7 @@ bool SessionContextBase::Finalize() {
 
 void SessionContextBase::WaitForUpload() {
   if (!upload_results_.IsEmpty()) {
-    queue_flushed_.Dequeue();
+    queue_was_flushed_.Dequeue();
   }
 }
 
@@ -202,6 +197,9 @@ bool SessionContext::InitializeDerived() {
   // Start worker thread
   atomic_init32(&worker_terminate_);
   atomic_write32(&worker_terminate_, 0);
+
+  upload_jobs_.Drop();
+
   int retval =
       pthread_create(&worker_, NULL, UploadLoop, reinterpret_cast<void*>(this));
 
@@ -296,7 +294,9 @@ void* SessionContext::UploadLoop(void* data) {
       delete job;
       jobs_processed++;
     }
-    ctx->queue_flushed_.Enqueue(true);
+    if (ctx->queue_was_flushed_.IsEmpty()) {
+      ctx->queue_was_flushed_.Enqueue(true);
+    }
   }
 
   return NULL;

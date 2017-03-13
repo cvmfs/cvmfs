@@ -61,7 +61,7 @@ class SessionContextBase {
   std::string session_token_;
   bool drop_lease_;
 
-  FifoChannel<bool> queue_flushed_;
+  FifoChannel<bool> queue_was_flushed_;
 
  private:
   void Dispatch();
