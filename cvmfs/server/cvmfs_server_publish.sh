@@ -76,7 +76,7 @@ cvmfs_server_publish() {
   shift $(($OPTIND-1))
   check_parameter_count_for_multiple_repositories $#
   # get repository names
-  if [ $exact -eq 0]; then
+  if [ $exact -eq 0 ]; then
     names=$(get_or_guess_multiple_repository_names "$@")
     check_multiple_repository_existence "$names"
   else
@@ -107,7 +107,7 @@ cvmfs_server_publish() {
     scratch_dir="${spool_dir}/scratch/current"
     stratum0=$CVMFS_STRATUM0
     upstream=$CVMFS_UPSTREAM_STORAGE
-    local upstream_type=$(get_upstream_type $upstream_storage)
+    upstream_type=$(get_upstream_type $upstream)
     hash_algorithm="${CVMFS_HASH_ALGORITHM-sha1}"
     compression_alg="${CVMFS_COMPRESSION_ALGORITHM-default}"
     if [ x"$force_compression_algorithm" != "x" ]; then
@@ -184,7 +184,7 @@ cvmfs_server_publish() {
         $authz_file                                    \
         $log_level $tweaks_option $external_option $verbosity"
 
-    # If the upstream type is HTTP, we need to pass additional parameters
+    # If the upstream type is "gw", we need to pass additional parameters
     # to the `cvmfs_swissknife sync` command: the username and the
     # subpath of the active lease
     if [ x"$upstream_type" = xgw ]; then
