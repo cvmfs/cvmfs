@@ -242,7 +242,7 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
   const std::string json_body = "{\"session_token\" : \"" + session_token_ +
                                 "\", \"hash\" : \"" +
                                 payload_hash_digest_base64 +
-                                "\", \"payload\" : \"" + payload_base64 + "\"{";
+                                "\", \"payload\" : \"" + payload_base64 + "\"}";
 
   // Prepare the Curl POST request
   CURL* h_curl = curl_easy_init();
