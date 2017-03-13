@@ -6,6 +6,25 @@
 
 #include <algorithm>
 
+#include "curl/curl.h"
+
+#include "cvmfs_config.h"
+#include "util/string.h"
+
+namespace {
+size_t RecvCB(void* buffer, size_t size, size_t nmemb, void* userp) {
+  std::string* my_buffer = static_cast<std::string*>(userp);
+
+  if (size * nmemb < 1) {
+    return 0;
+  }
+
+  *my_buffer = static_cast<char*>(buffer);
+
+  return my_buffer->size();
+}
+}
+
 namespace upload {
 
 SessionContextBase::SessionContextBase()
@@ -190,7 +209,7 @@ bool SessionContext::FinalizeDerived() {
 
 bool SessionContext::DropLease() { return true; }
 
-Future<bool>* SessionContext::DispatchObjectPack(const ObjectPack* pack) {
+Future<bool>* SessionContext::DispatchObjectPack(ObjectPack* pack) {
   UploadJob* job = new UploadJob;
   job->pack = pack;
   job->result = new Future<bool>();
@@ -198,8 +217,60 @@ Future<bool>* SessionContext::DispatchObjectPack(const ObjectPack* pack) {
   return job->result;
 }
 
-bool SessionContext::DoUpload(const SessionContext::UploadJob* /*job*/) {
-  return true;
+bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
+  // Set up the object pack serializer
+  ObjectPackProducer serializer(job->pack);
+
+  // Serialize the object pack into a JSON object
+  // TODO: Extremely inefficient, next step is to rewrite this with streaming in
+  // mind when the wire protocol is implemented (CVM-1193)
+  std::vector<unsigned char> payload(0);
+  std::vector<unsigned char> buffer(4096);
+  unsigned nbytes = 0;
+  do {
+    nbytes = serializer.ProduceNext(buffer.size(), &buffer[0]);
+    std::copy(buffer.begin(), buffer.begin() + nbytes,
+              std::back_inserter(payload));
+  } while (nbytes > 0);
+  const std::string payload_base64 =
+      Base64(std::string(reinterpret_cast<char*>(&payload[0]), payload.size()));
+  shash::Any payload_hash(shash::kSha1);
+  HashString(payload_base64, &payload_hash);
+  const std::string payload_hash_digest = payload_hash.ToString(false);
+  const std::string payload_hash_digest_base64 = Base64(payload_hash_digest);
+
+  const std::string json_body = "{\"session_token\" : \"" + session_token_ +
+                                "\", \"hash\" : \"" +
+                                payload_hash_digest_base64 +
+                                "\", \"payload\" : \"" + payload_base64 + "\"{";
+
+  // Prepare the Curl POST request
+  CURL* h_curl = curl_easy_init();
+
+  if (!h_curl) {
+    return false;
+  }
+
+  std::string reply;
+  curl_easy_setopt(h_curl, CURLOPT_NOPROGRESS, 1L);
+  curl_easy_setopt(h_curl, CURLOPT_USERAGENT, "cvmfs/" VERSION);
+  curl_easy_setopt(h_curl, CURLOPT_MAXREDIRS, 50L);
+  curl_easy_setopt(h_curl, CURLOPT_CUSTOMREQUEST, "POST");
+  curl_easy_setopt(h_curl, CURLOPT_TCP_KEEPALIVE, 1L);
+  curl_easy_setopt(h_curl, CURLOPT_URL, (api_url_ + "/payloads").c_str());
+  curl_easy_setopt(h_curl, CURLOPT_POSTFIELDSIZE_LARGE,
+                   static_cast<curl_off_t>(json_body.length()));
+  curl_easy_setopt(h_curl, CURLOPT_POSTFIELDS, json_body.c_str());
+  curl_easy_setopt(h_curl, CURLOPT_WRITEFUNCTION, RecvCB);
+  curl_easy_setopt(h_curl, CURLOPT_WRITEDATA, &reply);
+
+  // Perform the Curl POST request
+  CURLcode ret = curl_easy_perform(h_curl);
+
+  curl_easy_cleanup(h_curl);
+  h_curl = NULL;
+
+  return !ret;
 }
 
 void* SessionContext::UploadLoop(void* data) {

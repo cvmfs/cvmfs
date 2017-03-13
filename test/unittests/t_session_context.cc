@@ -16,7 +16,7 @@ class SessionContextMocked : public SessionContext {
   int num_jobs_finished_;
 
  protected:
-  virtual Future<bool>* DispatchObjectPack(const ObjectPack* pack) {
+  virtual Future<bool>* DispatchObjectPack(ObjectPack* pack) {
     Future<bool>* ret = SessionContext::DispatchObjectPack(pack);
     num_jobs_dispatched_++;
     return ret;

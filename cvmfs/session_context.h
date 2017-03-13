@@ -49,18 +49,18 @@ class SessionContextBase {
 
   virtual bool DropLease() = 0;
 
-  virtual Future<bool>* DispatchObjectPack(const ObjectPack* pack) = 0;
+  virtual Future<bool>* DispatchObjectPack(ObjectPack* pack) = 0;
 
   int64_t NumJobsSubmitted() const;
 
   FifoChannel<Future<bool>*> upload_results_;
 
- private:
-  void Dispatch();
-
   std::string api_url_;
   std::string session_token_;
   bool drop_lease_;
+
+ private:
+  void Dispatch();
 
   uint64_t max_pack_size_;
 
@@ -80,7 +80,7 @@ class SessionContext : public SessionContextBase {
 
  protected:
   struct UploadJob {
-    const ObjectPack* pack;
+    ObjectPack* pack;
     Future<bool>* result;
   };
 
@@ -90,7 +90,7 @@ class SessionContext : public SessionContextBase {
 
   virtual bool DropLease();
 
-  virtual Future<bool>* DispatchObjectPack(const ObjectPack* pack);
+  virtual Future<bool>* DispatchObjectPack(ObjectPack* pack);
 
   virtual bool DoUpload(const UploadJob* job);
 
