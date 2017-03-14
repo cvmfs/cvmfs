@@ -271,6 +271,7 @@ set (CVMFS_PRELOADER_SOURCES
   manifest.cc
   manifest_fetch.cc
   options.cc
+  pack.cc
   path_filters/dirtab.cc
   path_filters/relaxed_path_filter.cc
   pathspec/pathspec.cc
@@ -280,6 +281,7 @@ set (CVMFS_PRELOADER_SOURCES
   reflog_sql.cc
   s3fanout.cc
   sanitizer.cc
+  session_context.cc
   signature.cc
   sql.cc
   sqlitemem.cc
@@ -288,6 +290,7 @@ set (CVMFS_PRELOADER_SOURCES
   swissknife_pull.cc
   upload.cc
   upload_facility.cc
+  upload_gateway.cc
   upload_local.cc
   upload_s3.cc
   upload_spooler_definition.cc
