@@ -39,7 +39,7 @@ class CommandCheck : public Command {
     r.push_back(Parameter::Optional('t', "temp directory (default: /tmp)"));
     r.push_back(Parameter::Optional('l', "log level (0-4, default: 2)"));
     r.push_back(Parameter::Optional('s', "check subtree (nested catalog)"));
-    r.push_back(Parameter::Optional('k', "public key of the repository"));
+    r.push_back(Parameter::Optional('k', "public key of the repository / dir"));
     r.push_back(Parameter::Optional('z', "trusted certificates"));
     r.push_back(Parameter::Optional('N', "name of the repository"));
     r.push_back(Parameter::Optional('R', "path to reflog.chksum file"));

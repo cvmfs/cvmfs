@@ -31,7 +31,7 @@ class CommandPull : public Command {
     r.push_back(Parameter::Mandatory('u', "repository url"));
     r.push_back(Parameter::Mandatory('m', "repository name"));
     r.push_back(Parameter::Mandatory('r', "spooler definition"));
-    r.push_back(Parameter::Mandatory('k', "repository master key(s)"));
+    r.push_back(Parameter::Mandatory('k', "repository master key(s) / dir"));
     r.push_back(Parameter::Optional('y', "trusted certificate directories"));
     r.push_back(Parameter::Mandatory('x', "directory for temporary files"));
     r.push_back(Parameter::Optional('R', "path to reflog.chksum file"));

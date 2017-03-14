@@ -750,6 +750,8 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   }
   if (args.find('k') != args.end())
     pubkey_path = *args.find('k')->second;
+  if (DirectoryExists(pubkey_path))
+    pubkey_path = JoinStrings(FindFiles(pubkey_path, ".pub"), ":");
   if (args.find('z') != args.end())
     trusted_certs = *args.find('z')->second;
   if (args.find('N') != args.end())
