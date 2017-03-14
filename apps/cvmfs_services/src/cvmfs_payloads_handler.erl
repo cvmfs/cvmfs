@@ -45,7 +45,7 @@ init(Req0 = #{method := <<"GET">>}, State) ->
 %% @end
 %%--------------------------------------------------------------------
 init(Req0 = #{method := <<"POST">>}, State) ->
-    {URI, T0} = cvmfs_fe_util:tick(Req0, micro_seconds),
+    {_, T0} = cvmfs_fe_util:tick(Req0, micro_seconds),
 
     {ok, Data, Req1} = cvmfs_fe_util:read_body(Req0),
     {Status, Reply, Req2} = case jsx:decode(Data, [return_maps]) of
@@ -61,7 +61,7 @@ init(Req0 = #{method := <<"POST">>}, State) ->
                             jsx:encode(Reply),
                             Req2),
 
-    cvmfs_fe_util:tock(URI, T0, micro_seconds),
+    cvmfs_fe_util:tock(<<"payload_not_shown">>, T0, micro_seconds),
     {ok, ReqF, State}.
 
 
