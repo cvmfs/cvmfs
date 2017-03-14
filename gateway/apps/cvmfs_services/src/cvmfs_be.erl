@@ -140,7 +140,7 @@ handle_call({be_req, end_lease, LeaseToken}, _From, State) ->
 handle_call({be_req, submit_payload, {LeaseToken, Payload}}, _From, State) ->
     Reply = p_submit_payload(LeaseToken, Payload),
     lager:info("Request received: {submit_payload, {~p, ~p}} -> Reply: ~p",
-               [LeaseToken, Payload, Reply]),
+               [LeaseToken, <<"payload_not_shown">>, Reply]),
     {reply, Reply, State}.
 
 %%--------------------------------------------------------------------
