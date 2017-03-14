@@ -2,8 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef CVMFS_UPLOAD_HTTP_H_
-#define CVMFS_UPLOAD_HTTP_H_
+#ifndef CVMFS_UPLOAD_GATEWAY_H_
+#define CVMFS_UPLOAD_GATEWAY_H_
 
 #include <atomic.h>
 
@@ -85,4 +85,4 @@ class GatewayUploader : public AbstractUploader {
 
 }  // namespace upload
 
-#endif  // CVMFS_UPLOAD_HTTP_H_
+#endif  // CVMFS_UPLOAD_GATEWAY_H_

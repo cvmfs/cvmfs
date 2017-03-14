@@ -6,9 +6,7 @@
 
 #include <session_context.h>
 
-using namespace upload;
-
-class SessionContextMocked : public SessionContext {
+class SessionContextMocked : public upload::SessionContext {
  public:
   SessionContextMocked() : num_jobs_dispatched_(0), num_jobs_finished_(0) {}
 

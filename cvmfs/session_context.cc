@@ -22,7 +22,7 @@ size_t RecvCB(void* buffer, size_t size, size_t nmemb, void* userp) {
 
   return my_buffer->size();
 }
-}
+}  // namespace
 
 namespace upload {
 
@@ -229,9 +229,8 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
   ObjectPackProducer serializer(job->pack);
 
   // Serialize the object pack into a JSON object
-  // TODO: Extremely inefficient, next step is to rewrite this with streaming
-  // in
-  // mind when the wire protocol is implemented (CVM-1193)
+  // TODO(radu): Extremely inefficient, next step is to rewrite this with
+  // streaming in mind when the wire protocol is implemented (CVM-1193)
   std::vector<unsigned char> payload(0);
   std::vector<unsigned char> buffer(4096);
   unsigned nbytes = 0;

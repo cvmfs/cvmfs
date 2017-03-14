@@ -6,6 +6,7 @@
 #define CVMFS_SESSION_CONTEXT_H_
 
 #include <string>
+#include <vector>
 
 #include "pack.h"
 #include "util_concurrency.h"
@@ -99,7 +100,7 @@ class SessionContext : public SessionContextBase {
   virtual bool DoUpload(const UploadJob* job);
 
  private:
-  static void* UploadLoop(void*);
+  static void* UploadLoop(void* data);
 
   bool ShouldTerminate();
 
