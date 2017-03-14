@@ -242,14 +242,8 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
   } while (nbytes > 0);
   const std::string payload_base64 =
       Base64(std::string(reinterpret_cast<char*>(&payload[0]), payload.size()));
-  shash::Any payload_hash(shash::kSha1);
-  HashString(payload_base64, &payload_hash);
-  const std::string payload_hash_digest = payload_hash.ToString(false);
-  const std::string payload_hash_digest_base64 = Base64(payload_hash_digest);
 
   const std::string json_body = "{\"session_token\" : \"" + session_token_ +
-                                "\", \"hash\" : \"" +
-                                payload_hash_digest_base64 +
                                 "\", \"payload\" : \"" + payload_base64 + "\"}";
 
   // Prepare the Curl POST request
@@ -275,10 +269,12 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
   // Perform the Curl POST request
   CURLcode ret = curl_easy_perform(h_curl);
 
+  const bool ok = (reply == "{\"status\":\"ok\"}");
+
   curl_easy_cleanup(h_curl);
   h_curl = NULL;
 
-  return !ret;
+  return ok && !ret;
 }
 
 void* SessionContext::UploadLoop(void* data) {
