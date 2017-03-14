@@ -301,6 +301,29 @@ set (CVMFS_PRELOADER_SOURCES
   xattr.cc
 )
 
+set (CVMFS_STRATUM_AGENT_SOURCES
+  compression.cc
+  dns.cc
+  download.cc
+  hash.cc
+  letter.cc
+  logging.cc
+  options.cc
+  pathspec/pathspec.cc
+  pathspec/pathspec_pattern.cc
+  sanitizer.cc
+  signature.cc
+  statistics.cc
+  stratum_agent/stratum_agent.cc
+  stratum_agent/uri_map.cc
+  util/algorithm.cc
+  util/posix.cc
+  util/string.cc
+  util_concurrency.cc
+  uuid.cc
+  whitelist.cc
+)
+
 
 #
 # configure some compiler flags for proper build
@@ -504,16 +527,24 @@ if (BUILD_SERVER)
   # create targets with corresponding sources and static link libraries
   add_executable (cvmfs_swissknife ${CVMFS_SWISSKNIFE_SOURCES})
   add_executable (cvmfs_suid_helper ${CVMFS_SUID_HELPER_SOURCES})
+  add_executable (cvmfs_stratum_agent ${CVMFS_STRATUM_AGENT_SOURCES})
 
   set_target_properties (cvmfs_swissknife PROPERTIES COMPILE_FLAGS "${CVMFS_SWISSKNIFE_CFLAGS}" LINK_FLAGS "${CVMFS_SWISSKNIFE_LD_FLAGS}")
 
   # link the stuff (*_LIBRARIES are dynamic link libraries)
   target_link_libraries (cvmfs_swissknife
-                         ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${CURL_LIBRARIES}
+                         ${SQLITE3_LIBRARY} ${CURL_LIBRARIES}
                          ${CARES_LIBRARIES} ${TBB_LIBRARIES}
                          ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES}
                          ${RT_LIBRARY} ${VJSON_LIBRARIES}
                          ${SHA3_LIBRARIES} ${CAP_LIBRARIES} pthread dl)
+
+  target_link_libraries(cvmfs_stratum_agent
+                        ${CURL_LIBRARIES} ${CARES_LIBRARIES}
+                        ${SHA3_LIBRARIES} ${SHA2_LIBRARIES} ${ZLIB_LIBRARIES}
+                        ${MONGOOSE_LIBRARIES} ${OPENSSL_LIBRARIES}
+                        ${UUID_LIBRARIES} ${VJSON_LIBRARIES}
+                        ${RT_LIBRARY} pthread dl)
 
   if (BUILD_SERVER_DEBUG)
     add_executable (cvmfs_swissknife_debug ${CVMFS_SWISSKNIFE_DEBUG_SOURCES})

@@ -68,6 +68,7 @@ Failures Letter::Verify(uint64_t max_age, string *msg, string *cert) {
 
   string dec;
   retval = Debase64(text_, &dec);
+
   if (!retval)
     return kFailBadBase64;
 

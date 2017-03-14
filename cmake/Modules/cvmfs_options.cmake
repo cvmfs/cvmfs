@@ -27,9 +27,9 @@ option (INSTALL_MOUNT_SCRIPTS   "Install CernVM-FS mount tools in /etc and /sbin
 option (INSTALL_PUBLIC_KEYS     "Install public key chain for CERN, EGI, and OSG"                  ON)
 option (INSTALL_BASH_COMPLETION "Install bash completion rules for cvmfs* commands in /etc"        ON)
 
-# By default, all the external third-party libraries are built and installed in 
+# By default, all the external third-party libraries are built and installed in
 # ${CMAKE_SOURCE_DIR}/externals_install. If this variable is set to OFF, these
-# libraries are picked up from the system 
+# libraries are picked up from the system
 option (BUILTIN_EXTERNALS       "Use built-in versions of all third-party libraries"               ON)
 
 if (BUILD_ALL)

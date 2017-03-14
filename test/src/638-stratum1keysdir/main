@@ -1,0 +1,49 @@
+cvmfs_test_name="Use keys directory on stratum 1"
+cvmfs_test_autofs_on_startup=false
+
+CVMFS_TEST638_REPLICA_ALIAS=
+
+cleanup() {
+  if [ "x$CVMFS_TEST638_REPLICA_ALIAS" != "x" ]; then
+    sudo cvmfs_server rmfs -f $CVMFS_TEST638_REPLICA_ALIAS > /dev/null 2>&1
+  fi
+}
+
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  local scratch_dir=$(pwd)
+
+  echo "*** create a garbage collectable repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER 'NO' -z || return $?
+
+  echo "*** check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  CVMFS_TEST638_REPLICA_ALIAS="$(get_stratum1_name $CVMFS_TEST_REPO)"
+  trap cleanup EXIT HUP INT TERM
+  echo "*** create Stratum1 repository on the same machine"
+  load_repo_config $CVMFS_TEST_REPO
+  create_stratum1 $CVMFS_TEST638_REPLICA_ALIAS           \
+                  $CVMFS_TEST_USER                       \
+                  $CVMFS_STRATUM0                        \
+                  /etc/cvmfs/keys || return 10
+
+  echo "*** create a snapshot of the repository"
+  sudo cvmfs_server snapshot $CVMFS_TEST638_REPLICA_ALIAS || return 11
+
+  echo "*** check repository health"
+  cvmfs_server check $CVMFS_TEST638_REPLICA_ALIAS || return 20
+
+  echo "*** list catalog structure"
+  cvmfs_server list-catalogs $CVMFS_TEST638_REPLICA_ALIAS || return 30
+
+  echo "*** garbage-collect an empty repository"
+  cvmfs_server gc -f $CVMFS_TEST638_REPLICA_ALIAS || return 40
+
+  return 0
+}

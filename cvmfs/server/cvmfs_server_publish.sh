@@ -268,21 +268,6 @@ cvmfs_server_publish() {
       tag_command="$tag_command -D \"$tag_description\""
     fi
 
-    local tag_cleanup_command=
-    if [ ! -z "$auto_tag_cleanup_list" ]; then
-      tag_cleanup_command="$(__swissknife_cmd dbg) tag_edit \
-        -r $upstream                                        \
-        -w $stratum0                                        \
-        -t ${spool_dir}/tmp                                 \
-        -m $manifest                                        \
-        -p /etc/cvmfs/keys/${name}.pub                      \
-        -f $name                                            \
-        -b $base_hash                                       \
-        -e $hash_algorithm                                  \
-        $(get_follow_http_redirects_flag)                   \
-        -d \"$auto_tag_cleanup_list\""
-    fi
-
     # ---> do it! (from here on we are changing things)
     publish_before_hook $name
     $user_shell "$dirtab_command" || die "Failed to apply .cvmfsdirtab"
@@ -303,9 +288,35 @@ cvmfs_server_publish() {
     fi
 
     # Remove outdated automatically created tags
-    if [ ! -z "$tag_cleanup_command" ]; then
+    local tag_remove_cmd_file=
+    if [ ! -z "$auto_tag_cleanup_list" ]; then
+      local tag_list_file=$(mktemp)
+      echo $auto_tag_cleanup_list | xargs -n100 echo > $tag_list_file
+      tag_remove_cmd_file=$(mktemp)
+      cat $tag_list_file | while read; do
+        local tag_cleanup_command="$(__swissknife_cmd dbg) tag_edit \
+          -r $upstream                                        \
+          -w $stratum0                                        \
+          -t ${spool_dir}/tmp                                 \
+          -m $manifest                                        \
+          -p /etc/cvmfs/keys/${name}.pub                      \
+          -f $name                                            \
+          -b $base_hash                                       \
+          -e $hash_algorithm                                  \
+          $(get_follow_http_redirects_flag)                   \
+          -d \\\"$REPLY\\\""
+        echo $user_shell \"${tag_cleanup_command}\" >> $tag_remove_cmd_file
+      done
+      rm -f $tag_list_file
+    fi
+
+    if [ ! -z "$tag_remove_cmd_file" ]; then
       echo "Removing outdated automatically generated tags for $name..."
-      $user_shell "$tag_cleanup_command" || { publish_failed $name; die "Removing tags failed\n\nExecuted Command:\n$tag_cleanup_command";  }
+      /bin/sh $tag_remove_cmd_file || \
+        { rm -f $tag_remove_cmd_file; publish_failed $name; \
+          die "Removing tags failed\n\nExecuted Command:\n/bin/sh \
+          $tag_remove_cmd_file"; }
+      rm -f $tag_remove_cmd_file
       # write intermediate history hash to reflog
       sign_manifest $name $manifest "" true
     fi

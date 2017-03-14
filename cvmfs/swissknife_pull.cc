@@ -36,6 +36,8 @@
 #include "signature.h"
 #include "smalloc.h"
 #include "upload.h"
+#include "util/posix.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 
@@ -516,7 +518,9 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   } else {
     spooler_definition_str = *args.find('r')->second;
   }
-  const string master_keys = *args.find('k')->second;
+  string master_keys = *args.find('k')->second;
+  if (DirectoryExists(master_keys))
+    master_keys = JoinStrings(FindFiles(master_keys, ".pub"), ":");
   const string repository_name = *args.find('m')->second;
   string trusted_certs;
   if (args.find('y') != args.end())
@@ -778,9 +782,15 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from trunk catalog at /");
   retval = Pull(ensemble.manifest->catalog_hash(), "");
   pull_history = false;
+  if (!historic_tags.empty()) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "Checking tagged snapshots...");
+  }
   for (TagVector::const_iterator i    = historic_tags.begin(),
                                  iend = historic_tags.end();
-       i != iend; ++i) {
+       i != iend; ++i)
+  {
+    if (Peek(i->root_hash))
+      continue;
     LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from %s repository tag",
              i->name.c_str());
     apply_timestamp_threshold = false;
@@ -863,6 +873,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
       StoreBuffer(ensemble.raw_manifest_buf, ensemble.raw_manifest_size,
                   ".cvmfspublished", false);
     }
+    LogCvmfs(kLogCvmfs, kLogStdout, "Serving revision %u",
+             ensemble.manifest->revision());
   }
 
   WaitForStorage();

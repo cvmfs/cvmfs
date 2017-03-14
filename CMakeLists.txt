@@ -396,8 +396,10 @@ if (BUILD_SERVER OR BUILD_SERVER_DEBUG OR BUILD_PRELOADER OR
 endif (BUILD_SERVER OR BUILD_SERVER_DEBUG OR BUILD_PRELOADER OR
        BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
 
-# Server only: python/geoip, unzip, libcap
+# Server only: python/geoip, unzip, libcap, mongoose
 if (BUILD_SERVER OR BUILD_SERVER_DEBUG)
+  find_package(Mongoose REQUIRED)
+  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${MONGOOSE_INCLUDE_DIRS})
   find_package(PythonLibs REQUIRED)
   find_package(LibCAP REQUIRED)
   find_program(UNZIP_EXE NAMES unzip)

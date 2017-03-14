@@ -80,10 +80,12 @@ std::string CreateTempDir(const std::string &path_prefix);
 std::string GetCurrentWorkingDirectory();
 int TryLockFile(const std::string &path);
 int LockFile(const std::string &path);
+int WritePidFile(const std::string &path);
 void UnlockFile(const int filedes);
 bool RemoveTree(const std::string &path);
 std::vector<std::string> FindFiles(const std::string &dir,
                                    const std::string &suffix);
+std::vector<std::string> FindDirectories(const std::string &parent_dir);
 
 bool GetUidOf(const std::string &username, uid_t *uid, gid_t *main_gid);
 bool GetGidOf(const std::string &groupname, gid_t *gid);
@@ -94,6 +96,7 @@ int SetLimitNoFile(unsigned limit_nofile);
 
 void BlockSignal(int signum);
 void WaitForSignal(int signum);
+int WaitForChild(pid_t pid);
 void Daemonize();
 bool Shell(int *pipe_stdin, int *pipe_stdout, int *pipe_stderr);
 bool ExecuteBinary(int *fd_stdin,
