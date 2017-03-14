@@ -87,11 +87,11 @@ bool swissknife::CommandSync::CheckParams(const SyncParameters &p) {
     return false;
   }
 
-  if (HasPrefix(p.spooler_definition, "http", false)) {
+  if (HasPrefix(p.spooler_definition, "gw", false)) {
     if (p.session_token_file.empty()) {
       PrintError(
-          "Repository subpath parameter has to be provided "
-          "when upstream type is HTTP.");
+          "Session token file has to be provided "
+          "when upstream type is gw.");
       return false;
     }
   }
