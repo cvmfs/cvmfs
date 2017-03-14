@@ -16,6 +16,8 @@
 #include "manifest.h"
 #include "reflog.h"
 #include "upload_facility.h"
+#include "util/posix.h"
+#include "util/string.h"
 
 namespace swissknife {
 
@@ -35,7 +37,7 @@ ParameterList CommandGc::GetParams() {
   r.push_back(Parameter::Mandatory('R', "path to reflog.chksum file"));
   r.push_back(Parameter::Optional('h', "conserve <h> revisions"));
   r.push_back(Parameter::Optional('z', "conserve revisions younger than <z>"));
-  r.push_back(Parameter::Optional('k', "repository master key(s)"));
+  r.push_back(Parameter::Optional('k', "repository master key(s) / dir"));
   r.push_back(Parameter::Optional('t', "temporary directory"));
   r.push_back(Parameter::Optional('L', "path to deletion log file"));
   r.push_back(Parameter::Switch('d', "dry run"));
@@ -55,8 +57,10 @@ int CommandGc::Main(const ArgumentList &args) {
   const time_t timestamp  = (args.count('z') > 0)
     ? static_cast<time_t>(String2Int64(*args.find('z')->second))
     : GcConfig::kNoTimestamp;
-  const std::string &repo_keys = (args.count('k') > 0) ?
+  std::string repo_keys = (args.count('k') > 0) ?
     *args.find('k')->second : "";
+  if (DirectoryExists(repo_keys))
+    repo_keys = JoinStrings(FindFiles(repo_keys, ".pub"), ":");
   const bool dry_run = (args.count('d') > 0);
   const bool list_condemned_objects = (args.count('l') > 0);
   const std::string temp_directory = (args.count('t') > 0) ?

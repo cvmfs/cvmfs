@@ -5,7 +5,11 @@
 #include "cvmfs_config.h"
 #include "swissknife_lsrepo.h"
 
+#include <string>
+
 #include "logging.h"
+#include "util/posix.h"
+#include "util/string.h"
 
 namespace swissknife {
 
@@ -19,7 +23,7 @@ ParameterList CommandListCatalogs::GetParams() {
   r.push_back(Parameter::Mandatory(
               'r', "repository URL (absolute local path or remote URL)"));
   r.push_back(Parameter::Optional('n', "fully qualified repository name"));
-  r.push_back(Parameter::Optional('k', "repository master key(s)"));
+  r.push_back(Parameter::Optional('k', "repository master key(s) / dir"));
   r.push_back(Parameter::Optional('l', "temporary directory"));
   r.push_back(Parameter::Switch('t', "print tree structure of catalogs"));
   r.push_back(Parameter::Switch('d', "print digest for each catalog"));
@@ -38,8 +42,10 @@ int CommandListCatalogs::Main(const ArgumentList &args) {
   const std::string &repo_url  = *args.find('r')->second;
   const std::string &repo_name =
     (args.count('n') > 0) ? *args.find('n')->second : "";
-  const std::string &repo_keys =
+  std::string repo_keys =
     (args.count('k') > 0) ? *args.find('k')->second : "";
+  if (DirectoryExists(repo_keys))
+    repo_keys = JoinStrings(FindFiles(repo_keys, ".pub"), ":");
   const std::string &tmp_dir   =
     (args.count('l') > 0) ? *args.find('l')->second : "/tmp";
 
