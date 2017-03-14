@@ -5,11 +5,11 @@
 #include "cvmfs_config.h"
 #include "swissknife_lsrepo.h"
 
+#include <string>
+
 #include "logging.h"
 #include "util/posix.h"
 #include "util/string.h"
-
-#include <string>
 
 namespace swissknife {
 
