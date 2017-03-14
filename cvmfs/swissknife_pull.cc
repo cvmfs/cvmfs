@@ -36,6 +36,8 @@
 #include "signature.h"
 #include "smalloc.h"
 #include "upload.h"
+#include "util/posix.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 
@@ -516,7 +518,9 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   } else {
     spooler_definition_str = *args.find('r')->second;
   }
-  const string master_keys = *args.find('k')->second;
+  string master_keys = *args.find('k')->second;
+  if (DirectoryExists(master_keys))
+    master_keys = JoinStrings(FindFiles(master_keys, ".pub"), ":");
   const string repository_name = *args.find('m')->second;
   string trusted_certs;
   if (args.find('y') != args.end())
