@@ -50,9 +50,8 @@ init(Req0 = #{method := <<"POST">>}, State) ->
     {ok, Data, Req1} = cvmfs_fe_util:read_body(Req0),
     {Status, Reply, Req2} = case jsx:decode(Data, [return_maps]) of
                                 #{<<"session_token">> := Token,
-                                  <<"payload">> := Payload,
-                                  <<"hash">> := Hash} ->
-                                    Rep = p_submit_payload(Token, Payload, Hash),
+                                  <<"payload">> := Payload} ->
+                                    Rep = p_submit_payload(Token, Payload),
                                     {200, Rep, Req1};
                                 _ ->
                                     {400, #{}, Req0}
@@ -69,18 +68,11 @@ init(Req0 = #{method := <<"POST">>}, State) ->
 %% Private functions
 
 
-p_submit_payload(Token, Payload, Hash) ->
-    HashBinary = base64:decode(Hash),
-    case crypto:hash(sha, Payload) of
-        HashBinary ->
-            case cvmfs_be:submit_payload(Token, Payload) of
-                {ok, payload_added} ->
-                    #{<<"status">> => <<"ok">>};
-                {error, Reason} ->
-                    #{<<"status">> => <<"error">>, <<"reason">> => atom_to_binary(Reason, latin1)}
-            end;
-        _ ->
-            #{<<"status">> => <<"error">>, <<"reason">> => <<"invalid_payload_hash">>}
+p_submit_payload(Token, Payload) ->
+    case cvmfs_be:submit_payload(Token, Payload) of
+        {ok, payload_added} ->
+            #{<<"status">> => <<"ok">>};
+        {error, Reason} ->
+            #{<<"status">> => <<"error">>, <<"reason">> => atom_to_binary(Reason, latin1)}
     end.
-
 
