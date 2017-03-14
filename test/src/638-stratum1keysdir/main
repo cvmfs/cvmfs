@@ -5,7 +5,7 @@ CVMFS_TEST638_REPLICA_ALIAS=
 
 cleanup() {
   if [ "x$CVMFS_TEST638_REPLICA_ALIAS" != "x" ]; then
-    sudo cvmfs_server rmfs -f $replica_name > /dev/null 2>&1
+    sudo cvmfs_server rmfs -f $CVMFS_TEST638_REPLICA_ALIAS > /dev/null 2>&1
   fi
 }
 
