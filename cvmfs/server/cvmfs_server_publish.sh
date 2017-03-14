@@ -297,6 +297,11 @@ cvmfs_server_publish() {
     cvmfs_sys_file_is_regular $manifest            || { publish_failed $name; die "Manifest creation failed\n\nExecuted Command:\n$sync_command"; }
     local trunk_hash=$(grep "^C" $manifest | tr -d C)
 
+    if [ x"$upstream_type" = xgw ]; then
+        echo "We need to stop here until the repository gateway functionality is fully implemented"
+        return 0
+    fi
+
     # Remove outdated automatically created tags
     if [ ! -z "$tag_cleanup_command" ]; then
       echo "Removing outdated automatically generated tags for $name..."
