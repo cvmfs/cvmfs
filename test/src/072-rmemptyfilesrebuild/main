@@ -1,0 +1,62 @@
+
+cvmfs_test_name="Remove empty corrupted files on cache rebuild"
+
+cleanup() {
+  cvmfs_enable_config_repository
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  local repo="atlas.cern.ch"
+
+  echo "*** make sure that only a single repo uses the shared cache"
+  cvmfs_disable_config_repository || return $?
+  trap cleanup HUP EXIT TERM INT || return $?
+
+  cvmfs_mount ${repo} || return 1
+
+  local cache_dir=$(get_cvmfs_cachedir ${repo})
+  cat /cvmfs/${repo}/.cvmfsdirtab || return 2
+  cache_list=$(sudo cvmfs_talk -i ${repo} cache list)
+  if echo $cache_list | grep -q "automatic rebuild"; then
+    echo "$cache_list"
+    return 3
+  fi
+
+  echo "*** truncate .cvmfsdirtab"
+  local file_hash="$(get_xattr hash /cvmfs/${repo}/.cvmfsdirtab)"
+  local file_in_cache="${cache_dir}/$(echo $file_hash | head -c2)/$(echo $file_hash | tail -c +3)"
+  sudo ls -lah $file_in_cache || return 10
+  sudo truncate -s 0 $file_in_cache || return 11
+  sudo ls -lah $file_in_cache || return 12
+  sudo test -s $file_in_cache && return 13
+
+  echo "*** kill cvmfs cache manager process"
+  local cvmfs_pid=$(sudo cvmfs_talk -i ${repo} pid cachemgr)
+  sudo kill -9 $cvmfs_pid
+
+  echo "*** let stale helper unmount the repository"
+  sleep 10
+
+  echo "*** remount repository"
+  cvmfs_mount ${repo} || return 20
+  local cache_list=$(sudo cvmfs_talk -i ${repo} cache list)
+  local cache_list_size=$(echo $cache_list | wc -l)
+  if [ $cache_list_size -eq 0 ]; then
+    return 21
+  fi
+  if echo $cache_list | grep -v -q "automatic rebuild"; then
+    echo "$cache_list"
+    return 22
+  fi
+
+  echo "*** check that dirtab is not empty"
+  cat /cvmfs/${repo}/.cvmfsdirtab || return 30
+  local dirtab_size=$(cat /cvmfs/${repo}/.cvmfsdirtab | wc -l)
+  if [ $dirtab_size -eq 0 ]; then
+    return 31
+  fi
+
+  return 0
+}
