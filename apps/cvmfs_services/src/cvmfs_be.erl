@@ -199,8 +199,8 @@ code_change(_OldVsn, State, _Extra) ->
 p_new_lease(KeyId, Path) ->
     % Check if user is registered with the cvmfs_auth service and
     % which paths he is allowed to modify
-    [Fqdn | _]  = binary:split(Path, <<"/">>),
-    case cvmfs_auth:check_keyid_for_repo(KeyId, Fqdn) of
+    [Repo | _]  = binary:split(Path, <<"/">>),
+    case cvmfs_auth:check_keyid_for_repo(KeyId, Repo) of
         {ok, true} ->
             {Public, Secret, Token} = p_generate_token(KeyId, Path),
             case cvmfs_lease:request_lease(KeyId, Path, Public, Secret) of
