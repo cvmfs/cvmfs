@@ -1664,9 +1664,17 @@ bool PosixQuotaManager::RebuildDatabase() {
       goto build_return;
     }
     while ((d = platform_readdir(dirp)) != NULL) {
-      if (stat((path + "/" + string(d->d_name)).c_str(), &info) == 0) {
+      string file_path = path + "/" + string(d->d_name);
+      if (stat(file_path.c_str(), &info) == 0) {
         if (!S_ISREG(info.st_mode))
           continue;
+        if (info.st_size == 0) {
+          LogCvmfs(kLogQuota, kLogSyslog | kLogDebug,
+                   "removing empty file %s during automatic cache db rebuild",
+                   file_path.c_str());
+          unlink(file_path.c_str());
+          continue;
+        }
 
         string hash = string(hex) + string(d->d_name);
         sqlite3_bind_text(stmt_insert, 1, hash.data(), hash.length(),
@@ -1681,8 +1689,7 @@ bool PosixQuotaManager::RebuildDatabase() {
 
         gauge_ += info.st_size;
       } else {
-        LogCvmfs(kLogQuota, kLogDebug, "could not stat %s/%s",
-                 path.c_str(), d->d_name);
+        LogCvmfs(kLogQuota, kLogDebug, "could not stat %s", file_path.c_str());
       }
     }
     closedir(dirp);
