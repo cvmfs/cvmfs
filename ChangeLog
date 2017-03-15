@@ -29,6 +29,8 @@
   * Fix handling of file:// url in CVMFS_SERVER_URL
 
 2.3.4:
+  * Unlink empty files during cache db rebuild (CVM-1113)
+  * Fix gathering 'rawlink' extended attribute
   * Allow for keys directory used with stratum 1 repositories (CVM-985)
   * Fix snapshot logging for large tag lists (CVM-1021)
   * Fix auto tag cleanup for very long tag lists (CVM-1198)
