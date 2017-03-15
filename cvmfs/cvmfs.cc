@@ -1435,6 +1435,8 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   XattrList xattrs;
 
   PathString path;
+  retval = GetPathForInode(ino, &path);
+  assert(retval);
   if (d.IsLink()) {
     catalog::LookupOptions lookup_options = static_cast<catalog::LookupOptions>(
       catalog::kLookupSole | catalog::kLookupRawSymlink);
@@ -1442,9 +1444,6 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     retval = catalog_mgr->LookupPath(path, lookup_options, &raw_symlink);
     assert(retval);
     d.set_symlink(raw_symlink.symlink());
-  } else {
-    retval = GetPathForInode(ino, &path);
-    assert(retval);
   }
   if (d.HasXattrs()) {
     retval = catalog_mgr->LookupXattrs(path, &xattrs);
