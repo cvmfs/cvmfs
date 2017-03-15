@@ -13,12 +13,11 @@
 
 -export([all/0, groups/0, init_per_suite/1, end_per_suite/1, init_per_testcase/2, end_per_testcase/2]).
 -export([add_repo/1, remove_repo/1
-        ,add_user/1, remove_user/1
-        ,list_repos/1, list_users/1
-        ,valid_username_valid_paths/1
-        ,valid_username_invalid_paths/1
-        ,valid_username_no_paths/1
-        ,invalid_username_error/1]).
+        ,add_key/1, remove_key/1
+        ,list_repos/1
+        ,valid_keyid_valid_paths/1
+        ,invalid_keyid_error/1
+        ,valid_keyid_invalid_paths/1]).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -27,16 +26,15 @@
 all() ->
     [{group, queries}
     ,{group, repo_operations}
-    ,{group, user_operations}].
+    ,{group, key_operations}].
 
 groups() ->
     [{queries, [parallel], [list_repos
-                   ,valid_username_valid_paths
-                   ,valid_username_invalid_paths
-                   ,valid_username_no_paths
-                   ,invalid_username_error]}
+                           ,valid_keyid_valid_paths
+                           ,invalid_keyid_error
+                           ,valid_keyid_invalid_paths]}
     ,{repo_operations, [], [add_repo, remove_repo]}
-    ,{user_operations, [], [add_user, remove_user]}].
+    ,{key_operations, [], [add_key, remove_key]}].
 
 
 %% Set up, tear down
@@ -48,10 +46,10 @@ init_per_suite(Config) ->
 
     ok = application:load(cvmfs_services),
     ok = ct:require(repos),
-    ok = ct:require(acl),
+    ok = ct:require(keys),
     ok = application:set_env(cvmfs_services, enabled_services, [cvmfs_auth]),
     ok = application:set_env(cvmfs_services, repo_config, #{repos => ct:get_config(repos)
-                                                           ,acl => ct:get_config(acl)}),
+                                                           ,keys => ct:get_config(keys)}),
     {ok, _} = application:ensure_all_started(cvmfs_services),
     Config.
 
@@ -72,42 +70,29 @@ end_per_testcase(_TestCase, _Config) ->
 
 list_repos(_Config) ->
     Repos1 = lists:sort(cvmfs_auth:get_repos()),
-    Repos2 = lists:sort(lists:foldl(fun({N, _}, Acc) -> [N | Acc] end, [], ct:get_config(repos))),
+    Repos2 = lists:sort(lists:foldl(fun({N, _, _}, Acc) -> [N | Acc] end, [], ct:get_config(repos))),
     Repos1 = Repos2.
 
-list_users(_Config) ->
-    Users1 = lists:sort(cvmfs_auth:get_users()),
-    Users2 = lists:sort(lists:foldl(fun({U, _}, Acc) -> [U | Acc] end, [], ct:get_config(acl))),
-    Users1 = Users2.
+valid_keyid_valid_paths(_Config) ->
+    {ok, true} = cvmfs_auth:check_keyid_for_repo(<<"key1">>, <<"repo1">>).
 
-valid_username_valid_paths(_Config) ->
-    {ok, P1} = cvmfs_auth:get_user_permissions(<<"user1">>),
-    Paths1 = lists:sort(P1),
-    Paths2 = lists:sort(lists:foldl(fun({_, P}, Acc) -> [P | Acc] end, [], ct:get_config(repos))),
-    Paths1 = Paths2.
+invalid_keyid_error(_Config) ->
+    {ok, false} = cvmfs_auth:check_keyid_for_repo(<<"key2">>, <<"repo1">>).
 
-valid_username_invalid_paths(_Config) ->
-    {ok, []} = cvmfs_auth:get_user_permissions(<<"user2">>).
-
-valid_username_no_paths(_Config) ->
-    {ok, []} = cvmfs_auth:get_user_permissions(<<"user3">>).
-
-invalid_username_error(_Config) ->
-    {error, invalid_user} = cvmfs_auth:get_user_permissions(<<"not_a_username">>).
+valid_keyid_invalid_paths(_Config) ->
+    {error, invalid_repo} = cvmfs_auth:check_keyid_for_repo(<<"key1">>, <<"bad_repo">>).
 
 add_repo(_Config) ->
-    ok = cvmfs_auth:add_repo(<<"new_repo">>, <<"/new/repo/path">>),
+    ok = cvmfs_auth:add_repo(<<"new_repo">>, <<"/new/repo/path">>, [<<"key">>]),
     true = lists:member(<<"new_repo">>, cvmfs_auth:get_repos()).
 
 remove_repo(_Config) ->
     cvmfs_auth:remove_repo(<<"repo3">>),
     false = lists:member(<<"repo3">>, cvmfs_auth:get_repos()).
 
-add_user(_Config) ->
-    ok = cvmfs_auth:add_user(<<"new_user">>, [<<"repo1">>]),
-    true = lists:member(<<"new_user">>, cvmfs_auth:get_users()).
+add_key(_Config) ->
+    ok = cvmfs_auth:add_key(<<"new_key">>, <<"secret">>).
 
-remove_user(_Config) ->
-    cvmfs_auth:remove_user(<<"user3">>),
-    false = lists:member(<<"user3">>, cvmfs_auth:get_users()).
+remove_key(_Config) ->
+    ok = cvmfs_auth:remove_key(<<"key3">>).
 
