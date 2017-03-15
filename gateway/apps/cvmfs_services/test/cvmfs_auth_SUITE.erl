@@ -70,21 +70,21 @@ end_per_testcase(_TestCase, _Config) ->
 
 list_repos(_Config) ->
     Repos1 = lists:sort(cvmfs_auth:get_repos()),
-    Repos2 = lists:sort(lists:foldl(fun({N, _, _}, Acc) -> [N | Acc] end, [], ct:get_config(repos))),
+    Repos2 = lists:sort(lists:foldl(fun({N, _}, Acc) -> [N | Acc] end, [], ct:get_config(repos))),
     Repos1 = Repos2.
 
 valid_keyid_valid_paths(_Config) ->
-    {ok, true} = cvmfs_auth:check_keyid_for_repo(<<"key1">>, <<"repo1">>).
+    {ok, true} = cvmfs_auth:check_keyid_for_repo(<<"key1">>, <<"repo1.domain1.org">>).
 
 invalid_keyid_error(_Config) ->
-    {ok, false} = cvmfs_auth:check_keyid_for_repo(<<"key2">>, <<"repo1">>).
+    {ok, false} = cvmfs_auth:check_keyid_for_repo(<<"key2">>, <<"repo1.domain1.org">>).
 
 valid_keyid_invalid_paths(_Config) ->
     {error, invalid_repo} = cvmfs_auth:check_keyid_for_repo(<<"key1">>, <<"bad_repo">>).
 
 add_repo(_Config) ->
-    ok = cvmfs_auth:add_repo(<<"new_repo">>, <<"/new/repo/path">>, [<<"key">>]),
-    true = lists:member(<<"new_repo">>, cvmfs_auth:get_repos()).
+    ok = cvmfs_auth:add_repo(<<"/new/repo/path">>, [<<"key">>]),
+    true = lists:member(<<"/new/repo/path">>, cvmfs_auth:get_repos()).
 
 remove_repo(_Config) ->
     cvmfs_auth:remove_repo(<<"repo3">>),
