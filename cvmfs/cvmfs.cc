@@ -1549,6 +1549,8 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   }
   if (d.IsLink()) {
     PathString path;
+    retval = GetPathForInode(ino, &path);
+    assert(retval);
     catalog::LookupOptions lookup_options = static_cast<catalog::LookupOptions>(
       catalog::kLookupSole | catalog::kLookupRawSymlink);
     catalog::DirectoryEntry raw_symlink;
