@@ -24,13 +24,13 @@ start(_StartType, _StartArgs) ->
                {ok, RepoConfigMap} ->
                    RepoConfigMap;
                undefined ->
-                   #{repos => [], acl => []}
+                   #{repos => [], keys => []}
            end,
     {ok, Services} = application:get_env(enabled_services),
 
     cvmfs_services_sup:start_link({Services,
                                    maps:get(repos, Vars),
-                                   maps:get(acl, Vars)}).
+                                   maps:get(keys, Vars)}).
 
 %%--------------------------------------------------------------------
 stop(_State) ->
