@@ -209,6 +209,8 @@ p_new_lease(KeyId, Path) ->
                 {busy, TimeRemaining} ->
                     {path_busy, TimeRemaining}
             end;
+        {ok, false} ->
+            {error, invalid_key};
         Error ->
             Error
     end.

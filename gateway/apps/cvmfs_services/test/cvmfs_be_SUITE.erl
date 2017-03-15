@@ -104,13 +104,13 @@ valid_key_busy_path(_Config) ->
     ok = cvmfs_be:end_lease(Token).
 % Invalid key and valid path should be rejected
 invalid_key_valid_path(_Config) ->
-    {ok, false} = cvmfs_be:new_lease(<<"key2">>, <<"repo1.domain1.org">>).
+    {error, invalid_key} = cvmfs_be:new_lease(<<"key2">>, <<"repo1.domain1.org">>).
 % Valid key and invalid path should be rejected
 valid_key_invalid_path(_Config) ->
-    {error, invalid_repo} = cvmfs_be:new_lease(<<"key1">>, <<"repo1.domain1.com">>).
+    {error, invalid_path} = cvmfs_be:new_lease(<<"key1">>, <<"repo1.domain1.com">>).
 % Invalid key and invalid path should be rejected with {error, invalid_key}
 invalid_key_invalid_path(_Config) ->
-    {error, invalid_repo} = cvmfs_be:new_lease(<<"key2">>, <<"repo1.domain1.com">>).
+    {error, invalid_path} = cvmfs_be:new_lease(<<"key2">>, <<"repo1.domain1.com">>).
 
 % End lease
 % End valid lease

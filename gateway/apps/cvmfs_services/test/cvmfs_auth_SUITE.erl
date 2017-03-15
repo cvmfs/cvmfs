@@ -80,7 +80,7 @@ invalid_keyid_error(_Config) ->
     {ok, false} = cvmfs_auth:check_keyid_for_repo(<<"key2">>, <<"repo1.domain1.org">>).
 
 valid_keyid_invalid_paths(_Config) ->
-    {error, invalid_repo} = cvmfs_auth:check_keyid_for_repo(<<"key1">>, <<"bad_repo">>).
+    {error, invalid_path} = cvmfs_auth:check_keyid_for_repo(<<"key1">>, <<"bad_repo">>).
 
 add_repo(_Config) ->
     ok = cvmfs_auth:add_repo(<<"/new/repo/path">>, [<<"key">>]),

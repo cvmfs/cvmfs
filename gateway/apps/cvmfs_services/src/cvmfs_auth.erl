@@ -55,7 +55,7 @@ start_link(Args) ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, Args, []).
 
 
--spec check_keyid_for_repo(KeyId, Repo) -> {ok, Allowed} | {error, invalid_repo}
+-spec check_keyid_for_repo(KeyId, Repo) -> {ok, Allowed} | {error, invalid_path}
                                         when KeyId :: binary(),
                                              Repo :: binary(),
                                              Allowed :: boolean().
@@ -218,7 +218,7 @@ code_change(OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
--spec p_check_keyid_for_repo(KeyId, Repo) -> {ok, Allowed} | {error, invalid_repo}
+-spec p_check_keyid_for_repo(KeyId, Repo) -> {ok, Allowed} | {error, invalid_path}
                                    when KeyId :: binary(),
                                         Repo :: binary(),
                                         Allowed :: boolean().
@@ -228,7 +228,7 @@ p_check_keyid_for_repo(KeyId, Repo) ->
                      [#repo{key_ids = KeyIds} | _] ->
                          {ok, lists:member(KeyId, KeyIds)};
                      _ ->
-                         {error, invalid_repo}
+                         {error, invalid_path}
                  end
          end,
     {atomic, Result} = mnesia:transaction(T1),
