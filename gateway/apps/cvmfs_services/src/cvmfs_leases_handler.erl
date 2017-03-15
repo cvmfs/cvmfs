@@ -36,7 +36,7 @@ init(Req0 = #{method := <<"GET">>}, State) ->
 %% A "POST" request to /api/leases, which can return either 200 OK
 %% or in 400 - Bad Request
 %%
-%% The "user" and "path" fields have to be specified in the query string
+%% The "key_id" and "path" fields have to be specified in the query string
 %%
 %% The body of the reply, for a valid request contains the fields:
 %% "status" - either "ok", "path_busy" or "error"
@@ -52,8 +52,8 @@ init(Req0 = #{method := <<"POST">>}, State) ->
 
     {ok, Data, Req1} = cvmfs_fe_util:read_body(Req0),
     {Status, Reply, Req2} = case jsx:decode(Data, [return_maps]) of
-                                #{<<"user">> := User, <<"path">> := Path} ->
-                                    Rep = p_new_lease(User, Path),
+                                #{<<"key_id">> := KeyId, <<"path">> := Path} ->
+                                    Rep = p_new_lease(KeyId, Path),
                                     {200, Rep, Req1};
                                 _ ->
                                     {400, #{}, Req1}
@@ -111,8 +111,8 @@ init(Req0 = #{method := <<"DELETE">>}, State) ->
 %% Private functions
 
 
-p_new_lease(User, Path) ->
-    case cvmfs_be:new_lease(User, Path) of
+p_new_lease(KeyId, Path) ->
+    case cvmfs_be:new_lease(KeyId, Path) of
         {ok, Token} ->
             #{<<"status">> => <<"ok">>, <<"session_token">> => Token};
         {path_busy, Time} ->
