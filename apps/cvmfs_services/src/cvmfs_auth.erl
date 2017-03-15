@@ -17,7 +17,7 @@
 -export([start_link/1
         ,check_keyid_for_repo/2
         ,add_key/2, remove_key/1
-        ,add_repo/3, remove_repo/1, get_repos/0]).
+        ,add_repo/2, remove_repo/1, get_repos/0]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -28,10 +28,8 @@
 %% Records
 
 -record(repo, {
-          % repo identifier
-          r_id :: binary(),
-          % the fqdn of the repository
-          fqdn :: binary(),
+          % the FQDN of the repository
+          name :: binary(),
           % public id of the keys registered to modify this repo
           key_ids :: [binary()]}).
 
@@ -75,9 +73,9 @@ remove_key(KeyId) ->
     gen_server:call(?MODULE, {auth_req, remove_key, KeyId}).
 
 
--spec add_repo(Repo :: binary(), Fqdn :: binary(), KeyIds :: [binary()]) -> ok.
-add_repo(Repo, Fqdn, KeyIds) ->
-    gen_server:call(?MODULE, {auth_req, add_repo, {Repo, Fqdn, KeyIds}}).
+-spec add_repo(Repo :: binary(), KeyIds :: [binary()]) -> ok.
+add_repo(Repo, KeyIds) ->
+    gen_server:call(?MODULE, {auth_req, add_repo, {Repo, KeyIds}}).
 
 
 -spec remove_repo(Repo :: binary()) -> ok.
@@ -156,9 +154,9 @@ handle_call({auth_req, remove_key, Key}, _From, State) ->
     Reply = p_remove_key(Key),
     lager:info("Request received: {remove_key, ~p} -> Reply: ~p", [Key, Reply]),
     {reply, Reply, State};
-handle_call({auth_req, add_repo, {Repo, Fqdn, KeyIds}}, _From, State) ->
-    Reply = p_add_repo(Repo, Fqdn, KeyIds),
-    lager:info("Request received: {add_repo, {~p, ~p, ~p}} -> Reply: ~p", [Repo, Fqdn, KeyIds, Reply]),
+handle_call({auth_req, add_repo, {Repo, KeyIds}}, _From, State) ->
+    Reply = p_add_repo(Repo, KeyIds),
+    lager:info("Request received: {add_repo, {~p, ~p}} -> Reply: ~p", [Repo, KeyIds, Reply]),
     {reply, Reply, State};
 handle_call({auth_req, remove_repo, Repo}, _From, State) ->
     Reply = p_remove_repo(Repo),
@@ -255,10 +253,10 @@ p_remove_key(Key) ->
     Result.
 
 
--spec p_add_repo(Repo :: binary(), Fqdn :: binary(), KeyIds :: [binary()]) -> ok.
-p_add_repo(Repo, Fqdn, KeyIds) ->
+-spec p_add_repo(Repo :: binary(), KeyIds :: [binary()]) -> ok.
+p_add_repo(Repo, KeyIds) ->
     T = fun() ->
-                mnesia:write(#repo{r_id = Repo, fqdn = Fqdn, key_ids = KeyIds})
+                mnesia:write(#repo{name = Repo, key_ids = KeyIds})
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
@@ -276,7 +274,7 @@ p_remove_repo(Repo) ->
 -spec p_get_repos() -> Repos :: [binary()].
 p_get_repos() ->
     T = fun() ->
-                mnesia:foldl(fun(#repo{r_id = Repo}, Acc) -> [Repo | Acc] end, [], repo)
+                mnesia:foldl(fun(#repo{name = Repo}, Acc) -> [Repo | Acc] end, [], repo)
         end,
     {atomic, Result} = mnesia:transaction(T),
     Result.
@@ -296,7 +294,7 @@ p_populate_keys(Keys) ->
 p_populate_repos(RepoList) ->
     T = fun() ->
                 lists:all(fun(V) -> V =:= ok end,
-                          [mnesia:write(#repo{r_id = Repo, fqdn = Fqdn, key_ids = KeyIds}) || {Repo, Fqdn, KeyIds} <- RepoList])
+                          [mnesia:write(#repo{name = Repo, key_ids = KeyIds}) || {Repo, KeyIds} <- RepoList])
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
