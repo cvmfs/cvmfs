@@ -24,7 +24,6 @@ start_link() ->
     %% required by Cowboy
     Dispatch = cowboy_router:compile([{'_', [
                                              {?API_ROOT, cvmfs_root_handler, []},
-                                             {?API_ROOT ++ "/users/[:id]", cvmfs_users_handler, []},
                                              {?API_ROOT ++ "/repos/[:id]", cvmfs_repos_handler, []},
                                              {?API_ROOT ++ "/leases/[:id]", cvmfs_leases_handler, []},
                                              {?API_ROOT ++ "/payloads/[:id]", cvmfs_payloads_handler, []}
