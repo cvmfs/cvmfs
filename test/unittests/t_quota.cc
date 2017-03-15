@@ -476,8 +476,9 @@ TEST_F(T_QuotaManager, RebuildDatabase) {
     PosixQuotaManager::Create(tmp_path_, limit_, threshold_, true);
   ASSERT_TRUE(quota_mgr_ != NULL);
   quota_mgr_->Spawn();
+  // The empty file was removed during rebuild
   EXPECT_EQ(1U, quota_mgr_->GetSize());
-  EXPECT_EQ("unknown (automatic rebuild)\nunknown (automatic rebuild)\n",
+  EXPECT_EQ("unknown (automatic rebuild)\n",
             PrintStringVector(quota_mgr_->List()));
 }
 
