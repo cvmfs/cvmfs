@@ -126,7 +126,7 @@ void GatewayUploader::FileUpload(const std::string& local_path,
   } while (read_bytes == buf.size());
   fclose(local_file);
 
-  shash::Any content_hash(shash::kSha1);
+  shash::Any content_hash(spooler_definition().hash_algorithm);
   shash::HashFile(local_path, &content_hash);
   if (!session_context_->CommitBucket(ObjectPack::kNamed, content_hash,
                                       handle->bucket, remote_path)) {
