@@ -41,9 +41,9 @@
 #include "path_filters/dirtab.h"
 #include "platform.h"
 #include "reflog.h"
-#include "string.h"
 #include "sync_mediator.h"
 #include "sync_union.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 
