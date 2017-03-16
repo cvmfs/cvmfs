@@ -58,14 +58,16 @@ run_background_op() {
 }
 
 count_fetched_catalogs() {
-  local replication_log_file="$1"
+  # This routine does not work anymore as of 2.3.4
+  :
+  #local replication_log_file="$1"
 
   # figure out where replication starts to process repository tags
   # we do not want to count in that part of the log
-  local cutmark=$(cat $replication_log_file | grep -n "repository tag" | head -n 1 | cut -f1 -d:)
+  #local cutmark=$(cat $replication_log_file | grep -n "repository tag" | head -n 1 | cut -f1 -d:)
 
   # count the number of times the pulling decided to fetch chunks
-  cat $replication_log_file | head -n $cutmark | grep 'Processing chunks' | wc -l
+  #cat $replication_log_file | head -n $cutmark | grep 'Processing chunks' | wc -l
 }
 
 
@@ -262,12 +264,14 @@ sh -x /usr/bin/cvmfs_server snapshot $replica_name 2>&1|(sleep 20;cat)
 
   echo "*** {5} check the log files"
   echo "        (6 should have snapshotted, 7 should have aborted, 8 should have waited and later snapshotted)"
-  local revisions_snapshotted_by_6=$(count_fetched_catalogs $snapshot_log_6)
-  local revisions_snapshotted_by_7=$(count_fetched_catalogs $snapshot_log_7)
-  echo "--> Number 6 snapshotted $revisions_snapshotted_by_6 revisions"
-  echo "--> Number 7 snapshotted $revisions_snapshotted_by_7 revisions"
-  [ $revisions_snapshotted_by_6 -eq 6 ]                             || return 33
-  [ $revisions_snapshotted_by_7 -eq 0 ]                             || return 34
+  # The number of snapshotted revisions is not present in the log anymore since
+  # 2.3.4
+  # local revisions_snapshotted_by_6=$(count_fetched_catalogs $snapshot_log_6)
+  # local revisions_snapshotted_by_7=$(count_fetched_catalogs $snapshot_log_7)
+  # echo "--> Number 6 snapshotted $revisions_snapshotted_by_6 revisions"
+  # echo "--> Number 7 snapshotted $revisions_snapshotted_by_7 revisions"
+  # [ $revisions_snapshotted_by_6 -eq 6 ]                             || return 33
+  # [ $revisions_snapshotted_by_7 -eq 0 ]                             || return 34
   cat $snapshot_log_6 | grep 'Uploading manifest'                   || return 35
   cat $snapshot_log_7 | grep 'another .*in progress.*abort'         || return 36
   cat $snapshot_log_8 | grep 'waiting for .* finish'                || return 37
