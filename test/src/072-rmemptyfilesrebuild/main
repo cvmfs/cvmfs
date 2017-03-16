@@ -28,7 +28,7 @@ cvmfs_run_test() {
   local file_hash="$(get_xattr hash /cvmfs/${repo}/.cvmfsdirtab)"
   local file_in_cache="${cache_dir}/$(echo $file_hash | head -c2)/$(echo $file_hash | tail -c +3)"
   sudo ls -lah $file_in_cache || return 10
-  sudo truncate -s 0 $file_in_cache || return 11
+  cat /dev/null | sudo tee $file_in_cache || return 11
   sudo ls -lah $file_in_cache || return 12
   sudo test -s $file_in_cache && return 13
 
