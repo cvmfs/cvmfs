@@ -283,8 +283,21 @@ p_get_repos() ->
 -spec p_populate_keys(Keys :: [{KeyId :: binary, Secret :: binary()}]) -> boolean().
 p_populate_keys(Keys) ->
     T = fun() ->
-                lists:all(fun(V) -> V =:= ok end,
-                          [mnesia:write(#key{key_id = KeyId, secret = Secret}) || {KeyId, Secret} <- Keys])
+                lists:foreach(fun({KeyId, S}) ->
+                                      Secret = case S of
+                                                   {file, Path} ->
+                                                       {ok, SecStr} = file:read_file(Path),
+                                                       %% Remove trailing "\n" if needed
+                                                       KeySize = byte_size(SecStr) - 1,
+                                                       <<Key:KeySize/binary,_/binary>> = SecStr,
+                                                       Key;
+                                                   Str when is_binary(Str) ->
+                                                       Str
+                                               end,
+                                      mnesia:write(#key{key_id = KeyId, secret = Secret})
+                              end,
+                              Keys),
+                true
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
