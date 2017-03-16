@@ -35,7 +35,7 @@ CURL* PrepareCurl(const char* method) {
 }
 
 bool MakeAcquireRequest(const std::string& user_name,
-                        const std::string& lease_fqdn,
+                        const std::string& repo_path,
                         const std::string& repo_service_url,
                         CurlBuffer* buffer) {
   CURLcode ret = static_cast<CURLcode>(0);
@@ -47,12 +47,10 @@ bool MakeAcquireRequest(const std::string& user_name,
 
   // Prepare payload
   const std::string payload =
-      "{\"user\" : \"" + user_name + "\", \"path\" : \"" + lease_fqdn + "\"}";
+      "{\"user\" : \"" + user_name + "\", \"path\" : \"" + repo_path + "\"}";
 
   // Make request to acquire lease from repo services
-  curl_easy_setopt(
-      h_curl, CURLOPT_URL,
-      (repo_service_url + REPO_SERVICES_API_ROOT + "/leases").c_str());
+  curl_easy_setopt(h_curl, CURLOPT_URL, (repo_service_url + "/leases").c_str());
   curl_easy_setopt(h_curl, CURLOPT_POSTFIELDSIZE_LARGE,
                    static_cast<curl_off_t>(payload.length()));
   curl_easy_setopt(h_curl, CURLOPT_POSTFIELDS, payload.c_str());
@@ -76,10 +74,8 @@ bool MakeDeleteRequest(const std::string& session_token,
   if (!h_curl) {
     return false;
   }
-  curl_easy_setopt(
-      h_curl, CURLOPT_URL,
-      (repo_service_url + REPO_SERVICES_API_ROOT + "/leases/" + session_token)
-          .c_str());
+  curl_easy_setopt(h_curl, CURLOPT_URL,
+                   (repo_service_url + "/leases/" + session_token).c_str());
   curl_easy_setopt(h_curl, CURLOPT_POSTFIELDSIZE_LARGE,
                    static_cast<curl_off_t>(0));
   curl_easy_setopt(h_curl, CURLOPT_POSTFIELDS, 0);

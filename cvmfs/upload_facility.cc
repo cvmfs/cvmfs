@@ -6,6 +6,7 @@
 
 #include <cassert>
 
+#include "upload_gateway.h"
 #include "upload_local.h"
 #include "upload_s3.h"
 
@@ -14,21 +15,19 @@ namespace upload {
 void AbstractUploader::RegisterPlugins() {
   RegisterPlugin<LocalUploader>();
   RegisterPlugin<S3Uploader>();
+  RegisterPlugin<GatewayUploader>();
 }
 
-
-AbstractUploader::AbstractUploader(const SpoolerDefinition& spooler_definition)
-  : spooler_definition_(spooler_definition)
-  , torn_down_(false)
-  , jobs_in_flight_(spooler_definition.number_of_concurrent_uploads) { }
-
+AbstractUploader::AbstractUploader(const SpoolerDefinition &spooler_definition)
+    : spooler_definition_(spooler_definition),
+      torn_down_(false),
+      jobs_in_flight_(spooler_definition.number_of_concurrent_uploads) {}
 
 bool AbstractUploader::Initialize() {
   // late initialization of the writer_thread_ field. This is necessary, since
   // AbstractUploader::WriteThread is pure virtual and relies on a concrete sub-
   // class being initialized before the writer_thread_ starts running
-  tbb::tbb_thread thread(&ThreadProxy<AbstractUploader>,
-                          this,
+  tbb::tbb_thread thread(&ThreadProxy<AbstractUploader>, this,
                          &AbstractUploader::WriteThread);
 
   // tbb::tbb_thread assignment operator 'moves' the thread handle so _does not_
@@ -43,10 +42,11 @@ bool AbstractUploader::Initialize() {
   return thread_started_executing_.Get();
 }
 
+bool AbstractUploader::FinalizeSession() { return true; }
 
 int AbstractUploader::CreateAndOpenTemporaryChunkFile(std::string *path) const {
-  const std::string tmp_path = CreateTempPath(
-    spooler_definition_.temporary_path + "/" + "chunk", 0644);
+  const std::string tmp_path =
+      CreateTempPath(spooler_definition_.temporary_path + "/" + "chunk", 0644);
   if (tmp_path.empty()) {
     LogCvmfs(kLogSpooler, kLogStderr,
              "Failed to create temp file for upload of file chunk (errno: %d).",
@@ -58,7 +58,8 @@ int AbstractUploader::CreateAndOpenTemporaryChunkFile(std::string *path) const {
   if (tmp_fd < 0) {
     LogCvmfs(kLogSpooler, kLogStderr,
              "Failed to open temp file '%s' for upload of file chunk "
-             "(errno: %d)", tmp_path.c_str(), errno);
+             "(errno: %d)",
+             tmp_path.c_str(), errno);
     unlink(tmp_path.c_str());
   } else {
     *path = tmp_path;
@@ -67,21 +68,18 @@ int AbstractUploader::CreateAndOpenTemporaryChunkFile(std::string *path) const {
   return tmp_fd;
 }
 
-
 void AbstractUploader::WorkerThread() {
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "Uploader WorkerThread started.");
-  while (PerformJob() != JobStatus::kTerminate) {}
+  while (PerformJob() != JobStatus::kTerminate) {
+  }
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "Uploader WorkerThread exited.");
 }
 
-
 AbstractUploader::JobStatus::State AbstractUploader::DispatchJob(
-                                                         const UploadJob &job) {
+    const UploadJob &job) {
   switch (job.type) {
     case UploadJob::Upload:
-      StreamedUpload(job.stream_handle,
-                     job.buffer,
-                     job.callback);
+      StreamedUpload(job.stream_handle, job.buffer, job.callback);
       return JobStatus::kOk;
 
     case UploadJob::Commit:
@@ -98,7 +96,6 @@ AbstractUploader::JobStatus::State AbstractUploader::DispatchJob(
   }
 }
 
-
 void AbstractUploader::TearDown() {
   assert(!torn_down_);
   upload_queue_.push(UploadJob());  // Termination signal
@@ -106,9 +103,6 @@ void AbstractUploader::TearDown() {
   torn_down_ = true;
 }
 
-
-void AbstractUploader::WaitForUpload() const {
-  jobs_in_flight_.WaitForZero();
-}
+void AbstractUploader::WaitForUpload() const { jobs_in_flight_.WaitForZero(); }
 
 }  // namespace upload

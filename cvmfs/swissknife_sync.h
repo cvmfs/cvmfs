@@ -16,72 +16,76 @@ struct SyncParameters {
   static const unsigned kDefaultMaxWeight = 100000;
   static const unsigned kDefaultMinWeight = 1000;
   static const uint64_t kDefaultEntryWarnThreshold = 500000;
-  static const size_t kDefaultMinFileChunkSize = 4*1024*1024;
-  static const size_t kDefaultAvgFileChunkSize = 8*1024*1024;
-  static const size_t kDefaultMaxFileChunkSize = 16*1024*1024;
+  static const size_t kDefaultMinFileChunkSize = 4 * 1024 * 1024;
+  static const size_t kDefaultAvgFileChunkSize = 8 * 1024 * 1024;
+  static const size_t kDefaultMaxFileChunkSize = 16 * 1024 * 1024;
 
-  SyncParameters() :
-    spooler(NULL),
-    union_fs_type("aufs"),
-    print_changeset(false),
-    dry_run(false),
-    mucatalogs(false),
-    use_file_chunking(false),
-    ignore_xdir_hardlinks(false),
-    stop_for_catalog_tweaks(false),
-    include_xattrs(false),
-    external_data(false),
-    voms_authz(false),
-    virtual_dir_actions(0),
-    ignore_special_files(false),
-    compression_alg(zlib::kZlibDefault),
-    catalog_entry_warn_threshold(kDefaultEntryWarnThreshold),
-    min_file_chunk_size(kDefaultMinFileChunkSize),
-    avg_file_chunk_size(kDefaultAvgFileChunkSize),
-    max_file_chunk_size(kDefaultMaxFileChunkSize),
-    manual_revision(0),
-    ttl_seconds(0),
-    max_concurrent_write_jobs(0),
-    is_balanced(false),
-    max_weight(kDefaultMaxWeight),
-    min_weight(kDefaultMinWeight) {}
+  SyncParameters()
+      : spooler(NULL),
+        union_fs_type("aufs"),
+        print_changeset(false),
+        dry_run(false),
+        mucatalogs(false),
+        use_file_chunking(false),
+        ignore_xdir_hardlinks(false),
+        stop_for_catalog_tweaks(false),
+        include_xattrs(false),
+        external_data(false),
+        voms_authz(false),
+        virtual_dir_actions(0),
+        ignore_special_files(false),
+        compression_alg(zlib::kZlibDefault),
+        catalog_entry_warn_threshold(kDefaultEntryWarnThreshold),
+        min_file_chunk_size(kDefaultMinFileChunkSize),
+        avg_file_chunk_size(kDefaultAvgFileChunkSize),
+        max_file_chunk_size(kDefaultMaxFileChunkSize),
+        manual_revision(0),
+        ttl_seconds(0),
+        max_concurrent_write_jobs(0),
+        is_balanced(false),
+        max_weight(kDefaultMaxWeight),
+        min_weight(kDefaultMinWeight),
+        session_token_file() {}
 
   upload::Spooler *spooler;
-  std::string      repo_name;
-  std::string      dir_union;
-  std::string      dir_scratch;
-  std::string      dir_rdonly;
-  std::string      dir_temp;
-  shash::Any       base_hash;
-  std::string      stratum0;
-  std::string      manifest_path;
-  std::string      spooler_definition;
-  std::string      union_fs_type;
-  std::string      public_keys;
-  std::string      trusted_certs;
-  std::string      authz_file;
-  bool             print_changeset;
-  bool             dry_run;
-  bool             mucatalogs;
-  bool             use_file_chunking;
-  bool             ignore_xdir_hardlinks;
-  bool             stop_for_catalog_tweaks;
-  bool             include_xattrs;
-  bool             external_data;
-  bool             voms_authz;
-  unsigned         virtual_dir_actions;  // bit field
-  bool             ignore_special_files;
+  std::string repo_name;
+  std::string dir_union;
+  std::string dir_scratch;
+  std::string dir_rdonly;
+  std::string dir_temp;
+  shash::Any base_hash;
+  std::string stratum0;
+  std::string manifest_path;
+  std::string spooler_definition;
+  std::string union_fs_type;
+  std::string public_keys;
+  std::string trusted_certs;
+  std::string authz_file;
+  bool print_changeset;
+  bool dry_run;
+  bool mucatalogs;
+  bool use_file_chunking;
+  bool ignore_xdir_hardlinks;
+  bool stop_for_catalog_tweaks;
+  bool include_xattrs;
+  bool external_data;
+  bool voms_authz;
+  unsigned virtual_dir_actions;  // bit field
+  bool ignore_special_files;
   zlib::Algorithms compression_alg;
-  uint64_t         catalog_entry_warn_threshold;
-  size_t           min_file_chunk_size;
-  size_t           avg_file_chunk_size;
-  size_t           max_file_chunk_size;
-  uint64_t         manual_revision;
-  uint64_t         ttl_seconds;
-  uint64_t         max_concurrent_write_jobs;
-  bool             is_balanced;
-  unsigned         max_weight;
-  unsigned         min_weight;
+  uint64_t catalog_entry_warn_threshold;
+  size_t min_file_chunk_size;
+  size_t avg_file_chunk_size;
+  size_t max_file_chunk_size;
+  uint64_t manual_revision;
+  uint64_t ttl_seconds;
+  uint64_t max_concurrent_write_jobs;
+  bool is_balanced;
+  unsigned max_weight;
+  unsigned min_weight;
+
+  // Parameters for when upstream type is HTTP
+  std::string session_token_file;
 };
 
 namespace catalog {
@@ -93,7 +97,7 @@ namespace swissknife {
 
 class CommandCreate : public Command {
  public:
-  ~CommandCreate() { }
+  ~CommandCreate() {}
   virtual std::string GetName() const { return "create"; }
   virtual std::string GetDescription() const {
     return "Bootstraps a fresh repository.";
@@ -107,22 +111,23 @@ class CommandCreate : public Command {
     r.push_back(Parameter::Mandatory('R', "path to reflog.chksum file"));
     r.push_back(Parameter::Optional('l', "log level (0-4, default: 2)"));
     r.push_back(Parameter::Optional('a', "hash algorithm (default: SHA-1)"));
-    r.push_back(Parameter::Optional('V', "VOMS authz requirement "
-                                         "(default: none)"));
+    r.push_back(Parameter::Optional('V',
+                                    "VOMS authz requirement "
+                                    "(default: none)"));
     r.push_back(Parameter::Switch('v', "repository containing volatile files"));
-    r.push_back(Parameter::Switch(
-      'z', "mark new repository as garbage collectable"));
-    r.push_back(Parameter::Optional('V', "VOMS authz requirement "
-                                         "(default: none)"));
+    r.push_back(
+        Parameter::Switch('z', "mark new repository as garbage collectable"));
+    r.push_back(Parameter::Optional('V',
+                                    "VOMS authz requirement "
+                                    "(default: none)"));
     return r;
   }
   int Main(const ArgumentList &args);
 };
 
-
 class CommandUpload : public Command {
  public:
-  ~CommandUpload() { }
+  ~CommandUpload() {}
   virtual std::string GetName() const { return "upload"; }
   virtual std::string GetDescription() const {
     return "Uploads a local file to the repository.";
@@ -138,10 +143,9 @@ class CommandUpload : public Command {
   int Main(const ArgumentList &args);
 };
 
-
 class CommandPeek : public Command {
  public:
-  ~CommandPeek() { }
+  ~CommandPeek() {}
   virtual std::string GetName() const { return "peek"; }
   virtual std::string GetDescription() const {
     return "Checks whether a file exists in the repository.";
@@ -155,10 +159,9 @@ class CommandPeek : public Command {
   int Main(const ArgumentList &args);
 };
 
-
 class CommandRemove : public Command {
  public:
-  ~CommandRemove() { }
+  ~CommandRemove() {}
   virtual std::string GetName() const { return "remove"; }
   virtual std::string GetDescription() const {
     return "Removes a file in the repository storage.";
@@ -172,11 +175,10 @@ class CommandRemove : public Command {
   int Main(const ArgumentList &args);
 };
 
-
 class CommandApplyDirtab : public Command {
  public:
-  CommandApplyDirtab() : verbose_(false) { }
-  ~CommandApplyDirtab() { }
+  CommandApplyDirtab() : verbose_(false) {}
+  ~CommandApplyDirtab() {}
   virtual std::string GetName() const { return "dirtab"; }
   virtual std::string GetDescription() const {
     return "Parses the dirtab file and produces nested catalog markers.";
@@ -196,27 +198,25 @@ class CommandApplyDirtab : public Command {
 
  protected:
   void DetermineNestedCatalogCandidates(
-    const catalog::Dirtab &dirtab,
-    catalog::SimpleCatalogManager *catalog_manager,
-    std::vector<std::string> *nested_catalog_candidates);
+      const catalog::Dirtab &dirtab,
+      catalog::SimpleCatalogManager *catalog_manager,
+      std::vector<std::string> *nested_catalog_candidates);
   void FilterCandidatesFromGlobResult(
-                     const catalog::Dirtab &dirtab,
-                     char **paths, const size_t npaths,
-                     catalog::SimpleCatalogManager  *catalog_manager,
-                     std::vector<std::string>       *nested_catalog_candidates);
+      const catalog::Dirtab &dirtab, char **paths, const size_t npaths,
+      catalog::SimpleCatalogManager *catalog_manager,
+      std::vector<std::string> *nested_catalog_candidates);
   bool CreateCatalogMarkers(
-    const std::vector<std::string> &new_nested_catalogs);
+      const std::vector<std::string> &new_nested_catalogs);
 
  private:
   std::string union_dir_;
   std::string scratch_dir_;
-  bool        verbose_;
+  bool verbose_;
 };
-
 
 class CommandSync : public Command {
  public:
-  ~CommandSync() { }
+  ~CommandSync() {}
   virtual std::string GetName() const { return "sync"; }
   virtual std::string GetDescription() const {
     return "Pushes changes from scratch area back to the repository.";
@@ -248,13 +248,16 @@ class CommandSync : public Command {
     r.push_back(Parameter::Optional('M', "minimum weight of the autocatalogs"));
     r.push_back(Parameter::Optional('T', "Root catalog TTL in seconds"));
     r.push_back(Parameter::Optional('X', "maximum weight of the autocatalogs"));
-    r.push_back(Parameter::Optional('Z', "compression algorithm "
-                                         "(default: zlib)"));
-    r.push_back(Parameter::Optional('S', "virtual directory options "
-                                         "[snapshots, remove]"));
+    r.push_back(Parameter::Optional('Z',
+                                    "compression algorithm "
+                                    "(default: zlib)"));
+    r.push_back(Parameter::Optional('S',
+                                    "virtual directory options "
+                                    "[snapshots, remove]"));
 
-    r.push_back(Parameter::Switch('d', "pause publishing to allow for catalog "
-                                       "tweaks"));
+    r.push_back(Parameter::Switch('d',
+                                  "pause publishing to allow for catalog "
+                                  "tweaks"));
     r.push_back(Parameter::Switch('i', "ignore x-directory hardlinks"));
     r.push_back(Parameter::Switch('g', "ignore special files"));
     r.push_back(Parameter::Switch('k', "include extended attributes"));
@@ -265,9 +268,13 @@ class CommandSync : public Command {
     r.push_back(Parameter::Switch('y', "dry run"));
     r.push_back(Parameter::Switch('A', "autocatalog enabled/disabled"));
     r.push_back(Parameter::Switch('L', "enable HTTP redirects"));
-    r.push_back(Parameter::Switch('V', "Publish format compatible with "
-                                       "authenticated repos"));
+    r.push_back(Parameter::Switch('V',
+                                  "Publish format compatible with "
+                                  "authenticated repos"));
     r.push_back(Parameter::Switch('Y', "enable external data"));
+
+    r.push_back(Parameter::Optional('P', "session_token_file"));
+
     return r;
   }
   int Main(const ArgumentList &args);

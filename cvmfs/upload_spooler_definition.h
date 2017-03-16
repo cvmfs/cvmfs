@@ -20,12 +20,7 @@ namespace upload {
  *      to define a local spooler with upstream path /srv/cvmfs/dev.cern.ch
  */
 struct SpoolerDefinition {
-  enum DriverType {
-    S3,
-    Local,
-    Mock,
-    Unknown
-  };
+  enum DriverType { S3, Local, Gateway, Mock, Unknown };
 
   /**
    * Reads a given definition_string as described above and interprets
@@ -37,13 +32,15 @@ struct SpoolerDefinition {
    *                            preted by the constructor
    */
   explicit SpoolerDefinition(
-    const std::string       &definition_string,
-    const shash::Algorithms  hash_algorithm,
-    const zlib::Algorithms   compression_algorithm = zlib::kZlibDefault,
-    const bool               use_file_chunking   = false,
-    const size_t             min_file_chunk_size = 0,
-    const size_t             avg_file_chunk_size = 0,
-    const size_t             max_file_chunk_size = 0);
+      const std::string& definition_string,
+      const shash::Algorithms hash_algorithm,
+      const zlib::Algorithms compression_algorithm = zlib::kZlibDefault,
+      const bool use_file_chunking = false,
+      const size_t min_file_chunk_size = 0,
+      const size_t avg_file_chunk_size = 0,
+      const size_t max_file_chunk_size = 0,
+      const std::string& session_token_file = "");
+
   bool IsValid() const { return valid_; }
 
   /**
@@ -53,23 +50,27 @@ struct SpoolerDefinition {
    */
   SpoolerDefinition Dup2DefaultCompression() const;
 
-  DriverType  driver_type;            //!< the type of the spooler driver
-  std::string temporary_path;         //!< scratch space for the FileProcessor
+  DriverType driver_type;      //!< the type of the spooler driver
+  std::string temporary_path;  //!< scratch space for the FileProcessor
+
   /**
-   * A driver specific spooler configuration string (interpreted by the concrete
-   * spooler)
-   */
+  * A driver specific spooler configuration string (interpreted by the concrete
+  * spooler)
+  */
   std::string spooler_configuration;
 
-  shash::Algorithms  hash_algorithm;
-  zlib::Algorithms   compression_alg;
-  bool               use_file_chunking;
-  size_t             min_file_chunk_size;
-  size_t             avg_file_chunk_size;
-  size_t             max_file_chunk_size;
+  shash::Algorithms hash_algorithm;
+  zlib::Algorithms compression_alg;
+  bool use_file_chunking;
+  size_t min_file_chunk_size;
+  size_t avg_file_chunk_size;
+  size_t max_file_chunk_size;
 
   const unsigned int number_of_threads;
-  unsigned int       number_of_concurrent_uploads;
+  unsigned int number_of_concurrent_uploads;
+
+  // The session_token_file parameter is only used for the HTTP driver
+  std::string session_token_file;
 
   bool valid_;
 };

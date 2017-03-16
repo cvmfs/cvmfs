@@ -15,17 +15,15 @@
 namespace upload {
 
 struct S3StreamHandle : public UploadStreamHandle {
-    S3StreamHandle(const CallbackTN   *commit_callback,
-                   const int           tmp_fd,
-                   const std::string  &tmp_path) :
-    UploadStreamHandle(commit_callback),
-    file_descriptor(tmp_fd),
-    temporary_path(tmp_path) {}
+  S3StreamHandle(const CallbackTN *commit_callback, const int tmp_fd,
+                 const std::string &tmp_path)
+      : UploadStreamHandle(commit_callback),
+        file_descriptor(tmp_fd),
+        temporary_path(tmp_path) {}
 
-  const int         file_descriptor;
+  const int file_descriptor;
   const std::string temporary_path;
 };
-
 
 /**
  * The S3Spooler implements the AbstractSpooler interface to push files
@@ -39,7 +37,7 @@ class S3Uploader : public AbstractUploader {
   virtual ~S3Uploader();
   static bool WillHandle(const SpoolerDefinition &spooler_definition);
 
-  inline std::string name() const { return "S3"; }
+  virtual std::string name() const { return "S3"; }
 
   /**
    * Upload() is not done concurrently in the current implementation of the
@@ -48,19 +46,17 @@ class S3Uploader : public AbstractUploader {
    * This method calls NotifyListeners and invokes a callback for all
    * registered listeners (see the Observable template for details).
    */
-  void FileUpload(const std::string  &local_path,
-                  const std::string  &remote_path,
-                  const CallbackTN   *callback = NULL);
+  void FileUpload(const std::string &local_path, const std::string &remote_path,
+                  const CallbackTN *callback = NULL);
 
-  UploadStreamHandle* InitStreamedUpload(const CallbackTN *callback = NULL);
-  void StreamedUpload(UploadStreamHandle  *handle,
-                      CharBuffer          *buffer,
-                      const CallbackTN    *callback = NULL);
-  void FinalizeStreamedUpload(UploadStreamHandle  *handle,
-                              const shash::Any    &content_hash);
+  UploadStreamHandle *InitStreamedUpload(const CallbackTN *callback = NULL);
+  void StreamedUpload(UploadStreamHandle *handle, CharBuffer *buffer,
+                      const CallbackTN *callback = NULL);
+  void FinalizeStreamedUpload(UploadStreamHandle *handle,
+                              const shash::Any &content_hash);
 
   bool Remove(const std::string &file_to_delete);
-  bool Peek(const std::string& path) const;
+  bool Peek(const std::string &path) const;
   bool PlaceBootstrappingShortcut(const shash::Any &object) const;
 
   /**
@@ -76,14 +72,12 @@ class S3Uploader : public AbstractUploader {
   bool ParseSpoolerDefinition(const SpoolerDefinition &spooler_definition);
   bool UploadJobInfo(s3fanout::JobInfo *info);
 
-  int GetKeysAndBucket(const std::string  &filename,
-                       std::string        *access_key,
-                       std::string        *secret_key,
-                       std::string        *bucket_name) const;
+  int GetKeysAndBucket(const std::string &filename, std::string *access_key,
+                       std::string *secret_key, std::string *bucket_name) const;
   std::string GetBucketName(unsigned int use_bucket) const;
   int SelectBucket(const std::string &rem_filename) const;
   int GetKeyIndex(unsigned int use_bucket) const;
-  s3fanout::JobInfo *CreateJobInfo(const std::string& path) const;
+  s3fanout::JobInfo *CreateJobInfo(const std::string &path) const;
 
   s3fanout::S3FanoutManager s3fanout_mgr_;
   // state information
@@ -91,13 +85,13 @@ class S3Uploader : public AbstractUploader {
   std::string full_host_name_;
   std::string host_name_;
   std::string bucket_body_name_;
-  int         number_of_buckets_;
-  int         max_num_parallel_uploads_;
+  int number_of_buckets_;
+  int max_num_parallel_uploads_;
   std::vector<std::pair<std::string, std::string> > keys_;
 
-  const std::string    temporary_path_;
-  mutable atomic_int32 copy_errors_;   // counts the number of occured
-                                       // errors in Upload()
+  const std::string temporary_path_;
+  mutable atomic_int32 copy_errors_;  // counts the number of occured
+                                      // errors in Upload()
 };
 
 }  // namespace upload

@@ -21,39 +21,33 @@ namespace upload {
 class CharBuffer;
 
 struct UploaderResults {
-  enum Type {
-    kFileUpload,
-    kBufferUpload,
-    kChunkCommit
-  };
+  enum Type { kFileUpload, kBufferUpload, kChunkCommit };
 
-  UploaderResults(const int return_code, const std::string &local_path) :
-    type(kFileUpload),
-    return_code(return_code),
-    local_path(local_path),
-    buffer(NULL) {}
+  UploaderResults(const int return_code, const std::string &local_path)
+      : type(kFileUpload),
+        return_code(return_code),
+        local_path(local_path),
+        buffer(NULL) {}
 
-  UploaderResults(const int return_code, CharBuffer *buffer) :
-    type(kBufferUpload),
-    return_code(return_code),
-    local_path(""),
-    buffer(buffer) {}
+  UploaderResults(const int return_code, CharBuffer *buffer)
+      : type(kBufferUpload),
+        return_code(return_code),
+        local_path(""),
+        buffer(buffer) {}
 
-  explicit UploaderResults(const int return_code) :
-    type(kChunkCommit),
-    return_code(return_code),
-    local_path(""),
-    buffer(NULL) {}
+  explicit UploaderResults(const int return_code)
+      : type(kChunkCommit),
+        return_code(return_code),
+        local_path(""),
+        buffer(NULL) {}
 
-  const Type         type;
-  const int          return_code;
-  const std::string  local_path;
-  CharBuffer        *buffer;
+  const Type type;
+  const int return_code;
+  const std::string local_path;
+  CharBuffer *buffer;
 };
 
-
 struct UploadStreamHandle;
-
 
 /**
  * Abstract base class for all backend upload facilities
@@ -67,56 +61,57 @@ struct UploadStreamHandle;
  *       finished upload jobs to ALL listeners instead of only the owner of the
  *       specific job.
  */
-class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
-                                                        SpoolerDefinition>,
-                         public Callbackable<UploaderResults> {
+class AbstractUploader
+    : public PolymorphicConstruction<AbstractUploader, SpoolerDefinition>,
+      public Callbackable<UploaderResults> {
  protected:
-  typedef Callbackable<UploaderResults>::CallbackTN* CallbackPtr;
+  typedef Callbackable<UploaderResults>::CallbackTN *CallbackPtr;
 
   struct UploadJob {
-    enum Type {
-      Upload,
-      Commit,
-      Terminate
-    };
+    enum Type { Upload, Commit, Terminate };
 
-    UploadJob(UploadStreamHandle  *handle,
-              CharBuffer          *buffer,
-              const CallbackTN    *callback = NULL) :
-      type(Upload), stream_handle(handle), buffer(buffer), callback(callback) {}
+    UploadJob(UploadStreamHandle *handle, CharBuffer *buffer,
+              const CallbackTN *callback = NULL)
+        : type(Upload),
+          stream_handle(handle),
+          buffer(buffer),
+          callback(callback) {}
 
-    UploadJob(UploadStreamHandle  *handle,
-              const shash::Any    &content_hash) :
-      type(Commit), stream_handle(handle), buffer(NULL), callback(NULL),
-      content_hash(content_hash) {}
+    UploadJob(UploadStreamHandle *handle, const shash::Any &content_hash)
+        : type(Commit),
+          stream_handle(handle),
+          buffer(NULL),
+          callback(NULL),
+          content_hash(content_hash) {}
 
-    UploadJob() :
-      type(Terminate), stream_handle(NULL), buffer(NULL), callback(NULL) {}
+    UploadJob()
+        : type(Terminate), stream_handle(NULL), buffer(NULL), callback(NULL) {}
 
-    Type                 type;
-    UploadStreamHandle  *stream_handle;
+    Type type;
+    UploadStreamHandle *stream_handle;
 
     // type=Upload specific fields
-    CharBuffer          *buffer;
-    const CallbackTN    *callback;
+    CharBuffer *buffer;
+    const CallbackTN *callback;
 
     // type=Commit specific fields
-    shash::Any           content_hash;
+    shash::Any content_hash;
   };
 
  public:
   struct JobStatus {
-    enum State {
-      kOk,
-      kTerminate,
-      kNoJobs
-    };
+    enum State { kOk, kTerminate, kNoJobs };
   };
 
  public:
   virtual ~AbstractUploader() {
     assert(torn_down_ && "Call AbstractUploader::TearDown() before dtor!");
   }
+
+  /*
+   * A string identifying the uploader type
+   */
+  virtual std::string name() const = 0;
 
   /**
    * This is called right after the constructor of AbstractUploader or/and its
@@ -126,6 +121,12 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    * @return   true on successful initialization
    */
   virtual bool Initialize();
+
+  /**
+   * Called during Spooler::WaitForUpload(), to ensure that the upload has
+   * finished. By default it is a noop and returns true;
+   */
+  virtual bool FinalizeSession();
 
   /**
    * This must be called right before the destruction of the AbstractUploader!
@@ -144,13 +145,11 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    * @param remote_path  desired path for the file in the backend storage
    * @param callback     (optional) gets notified when the upload was finished
    */
-  void Upload(const std::string  &local_path,
-              const std::string  &remote_path,
-              const CallbackTN   *callback = NULL) {
+  void Upload(const std::string &local_path, const std::string &remote_path,
+              const CallbackTN *callback = NULL) {
     ++jobs_in_flight_;
     FileUpload(local_path, remote_path, callback);
   }
-
 
   /**
    * This method is called before the first data Block of a streamed upload is
@@ -163,9 +162,8 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    *                   cular streamed upload is committed.
    * @return           a pointer to the initialized UploadStreamHandle
    */
-  virtual UploadStreamHandle* InitStreamedUpload(
-                                       const CallbackTN   *callback = NULL) = 0;
-
+  virtual UploadStreamHandle *InitStreamedUpload(
+      const CallbackTN *callback = NULL) = 0;
 
   /**
    * This method schedules a CharBuffer to be uploaded in the context of the
@@ -184,13 +182,11 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    * @param callback  (optional) callback object to be invoked once the given
    *                  upload is finished (see AbstractUploader::Respond())
    */
-  void ScheduleUpload(UploadStreamHandle  *handle,
-                      CharBuffer          *buffer,
-                      const CallbackTN    *callback = NULL) {
+  void ScheduleUpload(UploadStreamHandle *handle, CharBuffer *buffer,
+                      const CallbackTN *callback = NULL) {
     ++jobs_in_flight_;
     upload_queue_.push(UploadJob(handle, buffer, callback));
   }
-
 
   /**
    * This method schedules a commit job as soon as all data Blocks of a streamed
@@ -203,12 +199,11 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    * @param handle        Pointer to a previously acquired UploadStreamHandle
    * @param content_hash  the content hash of the full uploaded data Chunk
    */
-  void ScheduleCommit(UploadStreamHandle   *handle,
-                      const shash::Any     &content_hash) {
+  void ScheduleCommit(UploadStreamHandle *handle,
+                      const shash::Any &content_hash) {
     ++jobs_in_flight_;
     upload_queue_.push(UploadJob(handle, content_hash));
   }
-
 
   /**
    * Removes a file from the backend storage. This might be done synchronously.
@@ -225,7 +220,6 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    */
   virtual bool Remove(const std::string &file_to_delete) = 0;
 
-
   /**
    * Overloaded Remove method used to remove a object based on its content hash.
    *
@@ -237,7 +231,6 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
     return Remove("data/" + hash_to_delete.MakePath());
   }
 
-
   /**
    * Checks if a file is already present in the backend storage. This might be a
    * synchronous operation.
@@ -246,7 +239,6 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    * @return      true if the file was found in the backend storage
    */
   virtual bool Peek(const std::string &path) const = 0;
-
 
   /**
    * Creates a top-level shortcut to the given data object. This is particularly
@@ -257,7 +249,6 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    * @return        true on success
    */
   virtual bool PlaceBootstrappingShortcut(const shash::Any &object) const = 0;
-
 
   /**
    * Waits until the current upload queue is empty.
@@ -271,9 +262,8 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
   virtual unsigned int GetNumberOfErrors() const = 0;
   static void RegisterPlugins();
 
-
  protected:
-  explicit AbstractUploader(const SpoolerDefinition& spooler_definition);
+  explicit AbstractUploader(const SpoolerDefinition &spooler_definition);
 
   /**
    * Implementation of plain file upload
@@ -283,9 +273,9 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    * @param remote_path  destination to be written in the backend
    * @param callback     callback to be called on completion
    */
-  virtual void FileUpload(const std::string  &local_path,
-                          const std::string  &remote_path,
-                          const CallbackTN   *callback = NULL) = 0;
+  virtual void FileUpload(const std::string &local_path,
+                          const std::string &remote_path,
+                          const CallbackTN *callback = NULL) = 0;
 
   /**
    * Implementation of a streamed upload step. See public interface for details.
@@ -295,9 +285,8 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    * @param buffer     the CharBuffer to be uploaded to the stream
    * @param callback   callback to be called on completion
    */
-  virtual void StreamedUpload(UploadStreamHandle  *handle,
-                              CharBuffer          *buffer,
-                              const CallbackTN    *callback) = 0;
+  virtual void StreamedUpload(UploadStreamHandle *handle, CharBuffer *buffer,
+                              const CallbackTN *callback) = 0;
 
   /**
    * Implemetation of streamed upload commit
@@ -306,8 +295,8 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    * @param handle        decendant of UploadStreamHandle specifying the stream
    * @param content_hash  the computed content hash of the streamed object
    */
-  virtual void FinalizeStreamedUpload(UploadStreamHandle  *handle,
-                                      const shash::Any    &content_hash) = 0;
+  virtual void FinalizeStreamedUpload(UploadStreamHandle *handle,
+                                      const shash::Any &content_hash) = 0;
 
   /**
    * This notifies the callback that is associated to a finishing job. Please
@@ -318,8 +307,8 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    *       Therefore you must not call Respond() twice or use the callback later
    *       by any means!
    */
-  void Respond(const CallbackTN       *callback,
-               const UploaderResults  &result) const {
+  void Respond(const CallbackTN *callback,
+               const UploaderResults &result) const {
     if (callback != NULL) {
       (*callback)(result);
       delete callback;
@@ -327,7 +316,6 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
 
     --jobs_in_flight_;
   }
-
 
   /**
    * Performs a job from the job queue.
@@ -345,7 +333,6 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
     return DispatchJob(job);
   }
 
-
   /**
    * Tries to perform a job from the job queue. If there is no work in the job
    * queue, it will _not_ wait but immediately return with '::kNoJobs'.
@@ -358,11 +345,8 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
   JobStatus::State TryToPerformJob() {
     UploadJob job;
     const bool got_job = upload_queue_.try_pop(job);
-    return (got_job)
-      ? DispatchJob(job)
-      : JobStatus::kNoJobs;
+    return (got_job) ? DispatchJob(job) : JobStatus::kNoJobs;
   }
-
 
   /**
    * Creates a temporary file in the backend storage's temporary location
@@ -374,7 +358,6 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    */
   int CreateAndOpenTemporaryChunkFile(std::string *path) const;
 
-
   /**
    * This virtual function is called once the AbstractUploader has started its
    * dedicated writer thread. Overwrite this method to implement your own event
@@ -384,7 +367,6 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    */
   virtual void WorkerThread();
 
-
   /**
    * This is the entry point into the worker thread.
    */
@@ -393,29 +375,26 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
     this->WorkerThread();
   }
 
-  const SpoolerDefinition& spooler_definition() const {
+  const SpoolerDefinition &spooler_definition() const {
     return spooler_definition_;
   }
 
-  const SynchronizingCounter<int32_t>& jobs_in_flight() const {
+  const SynchronizingCounter<int32_t> &jobs_in_flight() const {
     return jobs_in_flight_;
   }
-
 
  private:
   JobStatus::State DispatchJob(const UploadJob &job);
 
  private:
-  const SpoolerDefinition                   spooler_definition_;
-  tbb::concurrent_bounded_queue<UploadJob>  upload_queue_;
-  tbb::tbb_thread                           writer_thread_;
-  bool                                      torn_down_;
+  const SpoolerDefinition spooler_definition_;
+  tbb::concurrent_bounded_queue<UploadJob> upload_queue_;
+  tbb::tbb_thread writer_thread_;
+  bool torn_down_;
 
-  mutable SynchronizingCounter<int32_t>     jobs_in_flight_;
-  Future<bool>                              thread_started_executing_;
+  mutable SynchronizingCounter<int32_t> jobs_in_flight_;
+  Future<bool> thread_started_executing_;
 };
-
-
 
 /**
  * Each implementation of AbstractUploader must provide its own derivate of the
@@ -427,8 +406,8 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
 struct UploadStreamHandle {
   typedef AbstractUploader::CallbackTN CallbackTN;
 
-  explicit UploadStreamHandle(const CallbackTN *commit_callback) :
-    commit_callback(commit_callback) {}
+  explicit UploadStreamHandle(const CallbackTN *commit_callback)
+      : commit_callback(commit_callback) {}
   virtual ~UploadStreamHandle() {}
 
   const CallbackTN *commit_callback;

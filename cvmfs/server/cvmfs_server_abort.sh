@@ -1,19 +1,30 @@
+#
+# This file is part of the CernVM File System
+# This script takes care of creating, removing, and maintaining repositories
+# on a Stratum 0/1 server
+#
+# Implementation of the "cvmfs_server abort command"
+
 cvmfs_server_abort() {
   local names
   local user
   local spool_dir
+  local exact=0
   local force=0
   local open_fd_dialog=1
   local retcode=0
 
   # optional parameter handling
   OPTIND=1
-  while getopts "f" option
+  while getopts "fe" option
   do
     case $option in
       f)
         force=1
         open_fd_dialog=0
+      ;;
+      e) # Need this mode if passing repository subpaths: cvmfs_server transaction myrepo.cern.ch/some/subpath
+        exact=1
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -22,13 +33,21 @@ cvmfs_server_abort() {
     esac
   done
 
-  # get repository names
   shift $(($OPTIND-1))
   check_parameter_count_for_multiple_repositories $#
-  names=$(get_or_guess_multiple_repository_names "$@")
-  check_multiple_repository_existence "$names"
+  # get repository names
+  if [ $exact -eq 0 ]; then
+      names=$(get_or_guess_multiple_repository_names "$@")
+      check_multiple_repository_existence "$names"
+  else
+      names=$@
+  fi
 
   for name in $names; do
+
+    # Check if the repo name contains a subpath for locking, e.g. repo.cern.ch/sub/path/for/locking
+    local subpath=$(echo $name | cut -d'/' -f2- -s)
+    name=$(echo $name | cut -d'/' -f1)
 
     # sanity checks
     is_stratum0 $name   || { echo "Repository $name is not a stratum 0 repository"; retcode=1; continue; }
@@ -38,6 +57,8 @@ cvmfs_server_abort() {
     load_repo_config $name
     user=$CVMFS_USER
     spool_dir=$CVMFS_SPOOL_DIR
+    local upstream_storage=$CVMFS_UPSTREAM_STORAGE
+    local upstream_type=$(get_upstream_type $upstream_storage)
 
     # more sanity checks
     is_owner_or_root $name || { echo "Permission denied: Repository $name is owned by $user"; retcode=1; continue; }
@@ -65,7 +86,14 @@ cvmfs_server_abort() {
     to_syslog_for_repo $name "aborting transaction"
 
     abort_before_hook $name
+    # If the upstream storage type is http (publication leases are managed by an instance of the CVMFS repo services,
+    # the cvmfs_swissknife lease command needs to be used to drop the active lease
+    if [ x"$upstream_type" = xgw ]; then
+        local repo_services_url=$(echo $upstream_storage | cut -d',' -f3)
+        __swissknife lease -a drop -u $repo_services_url -n $user -p $name"/"$subpath || { echo "Could not drop active lease or lease does not exist for repository $name"; retcode=1; continue; }
+    fi
     close_transaction $name $use_fd_fallback
+
     abort_after_hook $name
 
   done

@@ -26,12 +26,12 @@ class CommandLease : public Command {
 
   struct Parameters {
     Parameters()
-        : repo_service_url(""), action(""), user_name(""), lease_fqdn("") {}
+        : repo_service_url(""), action(""), user_name(""), lease_path("") {}
 
     std::string repo_service_url;
     std::string action;
     std::string user_name;
-    std::string lease_fqdn;
+    std::string lease_path;
     std::string token_file_suffix;
   };
 };
