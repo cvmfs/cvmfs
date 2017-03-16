@@ -293,7 +293,7 @@ cvmfs_server_publish() {
       local tag_list_file=$(mktemp)
       echo $auto_tag_cleanup_list | xargs -n100 echo > $tag_list_file
       tag_remove_cmd_file=$(mktemp)
-      cat $tag_list_file | while read; do
+      cat $tag_list_file | while read REPLY; do
         local tag_cleanup_command="$(__swissknife_cmd dbg) tag_edit \
           -r $upstream                                        \
           -w $stratum0                                        \

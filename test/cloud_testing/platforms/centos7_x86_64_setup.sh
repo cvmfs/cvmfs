@@ -57,6 +57,13 @@ install_from_repo trickle
 # install ruby gem for FakeS3
 install_ruby_gem fakes3
 
+# building preloader
+install_from_repo cmake
+install_from_repo zlib-devel
+install_from_repo libattr-devel
+install_from_repo openssl-devel
+install_from_repo libuuid-devel
+
 # increase open file descriptor limits
 echo -n "increasing ulimit -n ... "
 set_nofile_limit 65536 || die "fail"
