@@ -13,6 +13,7 @@
 
 cvmfs_server_transaction() {
   local names
+  local key_id
   local spool_dir
   local stratum0
   local exact=0
@@ -68,6 +69,7 @@ cvmfs_server_transaction() {
     local upstream_storage=$CVMFS_UPSTREAM_STORAGE
     local upstream_type=$(get_upstream_type $upstream_storage)
     user=$CVMFS_USER
+    key_id=$CVMFS_KEY_ID
 
     # more sanity checks
     is_owner_or_root $name || { echo "Permission denied: Repository $name is owned by $user"; retcode=1; continue; }
@@ -84,7 +86,7 @@ cvmfs_server_transaction() {
     # the cvmfs_swissknife lease command needs to be used to acquire a new lease
     if [ x"$upstream_type" = xgw ]; then
         local repo_services_url=$(echo $upstream_storage | cut -d',' -f3)
-        __swissknife lease -a acquire -u $repo_services_url -n $user -p $name"/"$subpath || { echo "Could not acquire a new lease for repository $name"; retcode=1; continue; }
+        __swissknife lease -a acquire -u $repo_services_url -k $key_id -p $name"/"$subpath || { echo "Could not acquire a new lease for repository $name"; retcode=1; continue; }
     fi
     open_transaction $name $
 

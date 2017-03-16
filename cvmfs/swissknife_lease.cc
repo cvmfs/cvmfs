@@ -44,7 +44,7 @@ ParameterList CommandLease::GetParams() const {
   ParameterList r;
   r.push_back(Parameter::Mandatory('u', "repo service url"));
   r.push_back(Parameter::Mandatory('a', "action (acquire or drop)"));
-  r.push_back(Parameter::Mandatory('n', "user name"));
+  r.push_back(Parameter::Mandatory('k', "key id"));
   r.push_back(Parameter::Mandatory('p', "lease path"));
   return r;
 }
@@ -54,7 +54,7 @@ int CommandLease::Main(const ArgumentList& args) {
 
   params.repo_service_url = *(args.find('u')->second);
   params.action = *(args.find('a')->second);
-  params.user_name = *(args.find('n')->second);
+  params.key_id = *(args.find('k')->second);
 
   params.lease_path = *(args.find('p')->second);
   std::vector<std::string> tokens = SplitString(params.lease_path, '/');
@@ -77,7 +77,7 @@ int CommandLease::Main(const ArgumentList& args) {
   LeaseError ret = kLeaseSuccess;
   if (params.action == "acquire") {
     CurlBuffer buffer;
-    if (MakeAcquireRequest(params.user_name, params.lease_path,
+    if (MakeAcquireRequest(params.key_id, params.lease_path,
                            params.repo_service_url, &buffer)) {
       std::string session_token;
       if (buffer.data.size() > 0 && ParseAcquireReply(buffer, &session_token)) {
