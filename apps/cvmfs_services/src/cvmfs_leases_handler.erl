@@ -82,6 +82,10 @@ init(Req0 = #{method := <<"POST">>}, State) ->
 %% A "DELETE" request to /api/leases/<TOKEN>/<KEY_ID>, which returns
 %% 200 OK.
 %%
+%% The request needs the "authorization" field in the header, containing
+%% the HMAC of the <KEY_ID> field (computed with the secret key associated
+%% with <KEY_ID>).
+%
 %% The body of the reply, for a valid request contains the fields:
 %% "status" - either "ok", or "error"
 %% "reason" - if status is "error", this is a description of the error.
