@@ -111,7 +111,11 @@ create_and_delete_session(Config) ->
     RequestHeaders = p_make_headers(RequestBody, HMAC, BodySize),
     {ok, ReplyBody1} = p_post(conn_pid(Config), ?API_ROOT ++ "/leases", RequestHeaders, RequestBody),
     #{<<"session_token">> := Token} = jsx:decode(ReplyBody1, [return_maps]),
-    {ok, ReplyBody2} = p_delete(conn_pid(Config), ?API_ROOT ++ "/leases/" ++ binary_to_list(Token)),
+
+    HMAC2 = p_make_hmac(<<"key1">>, Config),
+    RequestHeaders2 = p_make_headers_hmac(HMAC2),
+    {ok, ReplyBody2} = p_delete(conn_pid(Config), ?API_ROOT ++ "/leases/" ++ binary_to_list(Token)
+                                ++ "/key1", RequestHeaders2),
     #{<<"status">> := <<"ok">>} = jsx:decode(ReplyBody2, [return_maps]).
 
 
@@ -146,12 +150,17 @@ create_session_when_already_created(Config) ->
     #{<<"status">> := <<"path_busy">>} = jsx:decode(ReplyBody2, [return_maps]),
 
     % End lease
-    {ok, ReplyBody3} = p_delete(conn_pid(Config), ?API_ROOT ++ "/leases/" ++ binary_to_list(Token)),
+    HMAC3 = p_make_hmac(<<"key1">>, Config),
+    RequestHeaders3 = p_make_headers_hmac(HMAC3),
+    {ok, ReplyBody3} = p_delete(conn_pid(Config), ?API_ROOT ++ "/leases/" ++ binary_to_list(Token) ++ "/key1",
+                               RequestHeaders3),
     #{<<"status">> := <<"ok">>} = jsx:decode(ReplyBody3, [return_maps]).
 
 
 end_invalid_session(Config) ->
-    {ok, Body} = p_delete(conn_pid(Config), ?API_ROOT ++ "/leases/NOT_A_PROPER_SESSION_TOKEN"),
+    HMAC = p_make_hmac(<<"key1">>, Config),
+    RequestHeaders = p_make_headers_hmac(HMAC),
+    {ok, Body} = p_delete(conn_pid(Config), ?API_ROOT ++ "/leases/NOT_A_PROPER_SESSION_TOKEN/key1", RequestHeaders),
     #{<<"status">> := <<"error">>,
       <<"reason">> := <<"invalid_token">>} = jsx:decode(Body, [return_maps]).
 
@@ -176,7 +185,10 @@ normal_payload_submission(Config) ->
     #{<<"status">> := <<"ok">>} = jsx:decode(ReplyBody2, [return_maps]),
 
     % End lease
-    {ok, ReplyBody3} = p_delete(conn_pid(Config), ?API_ROOT ++ "/leases/" ++ binary_to_list(Token)),
+    HMAC3 = p_make_hmac(<<"key1">>, Config),
+    RequestHeaders3 = p_make_headers_hmac(HMAC3),
+    {ok, ReplyBody3} = p_delete(conn_pid(Config), ?API_ROOT ++ "/leases/" ++ binary_to_list(Token) ++ "/key1",
+                               RequestHeaders3),
     #{<<"status">> := <<"ok">>} = jsx:decode(ReplyBody3, [return_maps]).
 
 
@@ -210,8 +222,8 @@ p_post(ConnPid, Path, Headers, Body) ->
     p_wait(ConnPid, StreamRef).
 
 
-p_delete(ConnPid, Path) ->
-    p_wait(ConnPid, gun:delete(ConnPid, Path)).
+p_delete(ConnPid, Path, Headers) ->
+    p_wait(ConnPid, gun:delete(ConnPid, Path, Headers)).
 
 
 p_make_hmac(Body, Config) ->
@@ -224,3 +236,6 @@ p_make_headers(Body, HMAC, MessageSize) ->
      {<<"content-length">>, integer_to_binary(size(Body))},
      {<<"authorization">>, HMAC},
      {<<"message-size">>, integer_to_binary(MessageSize)}].
+
+p_make_headers_hmac(HMAC) ->
+    [{<<"authorization">>, HMAC}].
