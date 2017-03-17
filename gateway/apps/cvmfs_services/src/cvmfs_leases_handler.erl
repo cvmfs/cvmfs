@@ -50,10 +50,18 @@ init(Req0 = #{method := <<"GET">>}, State) ->
 init(Req0 = #{method := <<"POST">>}, State) ->
     {URI, T0} = cvmfs_fe_util:tick(Req0, micro_seconds),
 
+    #{headers := #{<<"authorization">> := ClientHMAC, <<"message-size">> := MessageSizeBin}} = Req0,
     {ok, Data, Req1} = cvmfs_fe_util:read_body(Req0),
-    {Status, Reply, Req2} = case jsx:decode(Data, [return_maps]) of
+    MessageSize = binary_to_integer(MessageSizeBin),
+    <<JSONMessage:MessageSize/binary,_/binary>> = Data,
+    {Status, Reply, Req2} = case jsx:decode(JSONMessage, [return_maps]) of
                                 #{<<"key_id">> := KeyId, <<"path">> := Path} ->
-                                    Rep = p_new_lease(KeyId, Path),
+                                    case p_check_hmac(JSONMessage, KeyId, ClientHMAC) of
+                                        true ->
+                                            Rep = p_new_lease(KeyId, Path);
+                                        false ->
+                                            Rep = #{<<"status">> => <<"error">>, <<"reason">> => <<"invalid_hmac">>}
+                                    end,
                                     {200, Rep, Req1};
                                 _ ->
                                     {400, #{}, Req1}
@@ -109,6 +117,9 @@ init(Req0 = #{method := <<"DELETE">>}, State) ->
 
 
 %% Private functions
+
+p_check_hmac(JSONMessage, KeyId, ClientHMAC) ->
+    cvmfs_auth:check_hmac(JSONMessage, KeyId, ClientHMAC).
 
 
 p_new_lease(KeyId, Path) ->
