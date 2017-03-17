@@ -17,7 +17,8 @@
 -export([start_link/1
         ,check_keyid_for_repo/2
         ,add_key/2, remove_key/1
-        ,add_repo/2, remove_repo/1, get_repos/0]).
+        ,add_repo/2, remove_repo/1, get_repos/0
+        ,check_hmac/3]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -94,6 +95,16 @@ remove_repo(Repo) ->
 get_repos() ->
     gen_server:call(?MODULE, {auth_req, get_repos}).
 
+
+-spec check_hmac(Message, KeyId, HMAC) -> boolean()
+                                              when Message :: binary(),
+                                                   KeyId :: binary(),
+                                                   HMAC :: binary().
+check_hmac(Message, KeyId, HMAC) ->
+    gen_server:call(?MODULE, {auth_req, check_hmac, {Message, KeyId, HMAC}}).
+
+
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -165,7 +176,12 @@ handle_call({auth_req, remove_repo, Repo}, _From, State) ->
 handle_call({auth_req, get_repos}, _From, State) ->
     Reply = p_get_repos(),
     lager:info("Request received: {get_repos} -> Reply: ~p", [Reply]),
+    {reply, Reply, State};
+handle_call({auth_req, check_hmac, {Message, KeyId, HMAC}}, _From, State) ->
+    Reply = p_check_hmac(Message, KeyId, HMAC),
+    lager:info("Request received: {check_hmac, ~p, ~p, ~p} -> Reply: ~p", [Message, KeyId, HMAC, Reply]),
     {reply, Reply, State}.
+
 
 %%--------------------------------------------------------------------
 %% @private
@@ -278,6 +294,25 @@ p_get_repos() ->
         end,
     {atomic, Result} = mnesia:transaction(T),
     Result.
+
+
+-spec p_check_hmac(Message :: binary(), KeyId :: binary(), HMAC :: binary()) -> boolean().
+p_check_hmac(Message, KeyId, HMAC) ->
+    T = fun() ->
+                case mnesia:read(key, KeyId) of
+                    [#key{key_id = KeyId, secret = Secret} | _] ->
+                        {ok, Secret};
+                    _ ->
+                        error
+                end
+        end,
+    {atomic, Result} = mnesia:transaction(T),
+    case Result of
+        {ok, Secret} ->
+            HMAC =:= base64:encode(crypto:hmac(sha, Secret, Message));
+        _ ->
+            false
+    end.
 
 
 -spec p_populate_keys(Keys :: [{KeyId :: binary, Secret :: binary()}]) -> boolean().
