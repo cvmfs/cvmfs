@@ -36,7 +36,10 @@ init(Req0 = #{method := <<"GET">>}, State) ->
 %% A "POST" request to /api/leases, which can return either 200 OK
 %% or in 400 - Bad Request
 %%
-%% The "key_id" and "path" fields have to be specified in the query string
+%% The request body is a JSON object with the "key_id" and "path" fields
+%% The request needs two specific fields in the header:
+%%   "authorization" - HMAC of the request body (the JSON object)
+%%   "message-size" - the size of the JSON object
 %%
 %% The body of the reply, for a valid request contains the fields:
 %% "status" - either "ok", "path_busy" or "error"
@@ -60,7 +63,8 @@ init(Req0 = #{method := <<"POST">>}, State) ->
                                         true ->
                                             Rep = p_new_lease(KeyId, Path);
                                         false ->
-                                            Rep = #{<<"status">> => <<"error">>, <<"reason">> => <<"invalid_hmac">>}
+                                            Rep = #{<<"status">> => <<"error">>,
+                                                    <<"reason">> => <<"invalid_hmac">>}
                                     end,
                                     {200, Rep, Req1};
                                 _ ->
