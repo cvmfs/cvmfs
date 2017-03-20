@@ -23,7 +23,8 @@
          create_invalid_leases/1,
          create_session_when_already_created/1,
          end_invalid_session/1,
-         normal_payload_submission/1]).
+         normal_payload_submission/1,
+         payload_submission_with_invalid_hmac/1]).
 
 -define(API_ROOT, "/api/v1").
 
@@ -41,7 +42,8 @@ groups() ->
                    create_invalid_leases,
                    create_session_when_already_created,
                    end_invalid_session]},
-     {payloads, [], [normal_payload_submission]}
+     {payloads, [], [normal_payload_submission,
+                     payload_submission_with_invalid_hmac]}
     ].
 
 
@@ -179,6 +181,33 @@ normal_payload_submission(Config) ->
     RequestHeaders2 = p_make_headers(RequestBody2, <<"key1">>, MessageHMAC, MessageSize),
     {ok, ReplyBody2} = p_post(conn_pid(Config), ?API_ROOT ++ "/payloads", RequestHeaders2, RequestBody2),
     #{<<"status">> := <<"ok">>} = jsx:decode(ReplyBody2, [return_maps]),
+
+    % End lease
+    HMAC3 = p_make_hmac(<<"key1">>, Config),
+    RequestHeaders3 = p_make_headers(<<"key1">>, HMAC3),
+    {ok, ReplyBody3} = p_delete(conn_pid(Config), ?API_ROOT ++ "/leases/" ++ binary_to_list(Token),
+                               RequestHeaders3),
+    #{<<"status">> := <<"ok">>} = jsx:decode(ReplyBody3, [return_maps]).
+
+
+payload_submission_with_invalid_hmac(Config) ->
+    % Create new lease
+    RequestBody1 = jsx:encode(#{<<"path">> => <<"repo1.domain1.org">>}),
+    HMAC1 = p_make_hmac(RequestBody1, Config),
+    RequestHeaders1 = p_make_headers(RequestBody1, <<"key1">>, HMAC1),
+    {ok, ReplyBody1} = p_post(conn_pid(Config), ?API_ROOT ++ "/leases", RequestHeaders1, RequestBody1),
+    #{<<"session_token">> := Token} = jsx:decode(ReplyBody1, [return_maps]),
+
+    % Submit payload
+    Payload = <<"IAMAPAYLOAD">>,
+    JSONMessage = jsx:encode(#{<<"session_token">> => Token}),
+    RequestBody2 = <<JSONMessage/binary,Payload/binary>>,
+    MessageSize = size(JSONMessage),
+    MessageHMAC = p_make_hmac(<<"SOME_RUBBISH">>, Config),
+    RequestHeaders2 = p_make_headers(RequestBody2, <<"key1">>, MessageHMAC, MessageSize),
+    {ok, ReplyBody2} = p_post(conn_pid(Config), ?API_ROOT ++ "/payloads", RequestHeaders2, RequestBody2),
+    #{<<"status">> := <<"error">>,
+      <<"reason">> := <<"invalid_hmac">>} = jsx:decode(ReplyBody2, [return_maps]),
 
     % End lease
     HMAC3 = p_make_hmac(<<"key1">>, Config),
