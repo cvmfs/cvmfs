@@ -58,12 +58,12 @@ init(Req0 = #{method := <<"POST">>}, State) ->
     {ok, Data, Req1} = cvmfs_fe_util:read_body(Req0),
     {Status, Reply, Req2} = case jsx:decode(Data, [return_maps]) of
                                 #{<<"path">> := Path} ->
-                                    case p_check_hmac(Data, KeyId, ClientHMAC) of
+                                    Rep = case p_check_hmac(Data, KeyId, ClientHMAC) of
                                         true ->
-                                            Rep = p_new_lease(KeyId, Path);
+                                            p_new_lease(KeyId, Path);
                                         false ->
-                                            Rep = #{<<"status">> => <<"error">>,
-                                                    <<"reason">> => <<"invalid_hmac">>}
+                                            #{<<"status">> => <<"error">>,
+                                              <<"reason">> => <<"invalid_hmac">>}
                                     end,
                                     {200, Rep, Req1};
                                 _ ->

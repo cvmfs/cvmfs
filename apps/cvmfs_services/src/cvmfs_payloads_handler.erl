@@ -37,7 +37,11 @@ init(Req0 = #{method := <<"GET">>}, State) ->
 %% or in 400 - Bad Request
 %%
 %% The body of the request should be a JSON payload containing the
-%% "session_token", "payload" and "hash" fields.
+%% "session_token" and "payload" fields.
+%% The request needs two specific fields in the header:
+%%   "authorization" - KeyId and HMAC of the request body (the JSON object)
+%%                     The KeyId and HMAC should be separated by a space
+%%   "message-size" - the size of the JSON object
 %%
 %% The body of the reply, for a valid request contains the fields:
 %% "status" - either "ok", "error"
@@ -47,11 +51,20 @@ init(Req0 = #{method := <<"GET">>}, State) ->
 init(Req0 = #{method := <<"POST">>}, State) ->
     {_, T0} = cvmfs_fe_util:tick(Req0, micro_seconds),
 
+    #{headers := #{<<"authorization">> := Auth, <<"message-size">> := MessageSizeBin}} = Req0,
+    [KeyId, ClientHMAC] = binary:split(Auth, <<" ">>),
+    MessageSize = binary_to_integer(MessageSizeBin),
     {ok, Data, Req1} = cvmfs_fe_util:read_body(Req0),
-    {Status, Reply, Req2} = case jsx:decode(Data, [return_maps]) of
-                                #{<<"session_token">> := Token,
-                                  <<"payload">> := Payload} ->
-                                    Rep = p_submit_payload(Token, Payload),
+    <<JSONMessage:MessageSize/binary,Payload/binary>> = Data,
+    {Status, Reply, Req2} = case jsx:decode(JSONMessage, [return_maps]) of
+                                #{<<"session_token">> := Token} ->
+                                    Rep = case cvmfs_auth:check_hmac(JSONMessage, KeyId, ClientHMAC) of
+                                              true ->
+                                                  p_submit_payload(Token, Payload);
+                                              false ->
+                                                  #{<<"status">> => <<"error">>,
+                                                    <<"reason">> => <<"invalid_hmac">>}
+                                    end,
                                     {200, Rep, Req1};
                                 _ ->
                                     {400, #{}, Req0}
