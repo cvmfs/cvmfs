@@ -37,10 +37,9 @@ init(Req0 = #{method := <<"GET">>}, State) ->
 %% or in 400 - Bad Request
 %%
 %% The request body is a JSON object with the "path" field
-%% The request needs two specific fields in the header:
+%% The request needs the "authorization" field in the header:
 %%   "authorization" - KeyId and HMAC of the request body (the JSON object)
 %%                     The KeyId and HMAC should be separated by a space
-%%   "message-size" - the size of the JSON object
 %%
 %% The body of the reply, for a valid request contains the fields:
 %% "status" - either "ok", "path_busy" or "error"
@@ -54,14 +53,12 @@ init(Req0 = #{method := <<"GET">>}, State) ->
 init(Req0 = #{method := <<"POST">>}, State) ->
     {URI, T0} = cvmfs_fe_util:tick(Req0, micro_seconds),
 
-    #{headers := #{<<"authorization">> := Auth, <<"message-size">> := MessageSizeBin}} = Req0,
+    #{headers := #{<<"authorization">> := Auth}} = Req0,
     [KeyId, ClientHMAC] = binary:split(Auth, <<" ">>),
     {ok, Data, Req1} = cvmfs_fe_util:read_body(Req0),
-    MessageSize = binary_to_integer(MessageSizeBin),
-    <<JSONMessage:MessageSize/binary,_/binary>> = Data,
-    {Status, Reply, Req2} = case jsx:decode(JSONMessage, [return_maps]) of
+    {Status, Reply, Req2} = case jsx:decode(Data, [return_maps]) of
                                 #{<<"path">> := Path} ->
-                                    case p_check_hmac(JSONMessage, KeyId, ClientHMAC) of
+                                    case p_check_hmac(Data, KeyId, ClientHMAC) of
                                         true ->
                                             Rep = p_new_lease(KeyId, Path);
                                         false ->
