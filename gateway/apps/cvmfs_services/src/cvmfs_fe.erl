@@ -25,7 +25,7 @@ start_link() ->
     Dispatch = cowboy_router:compile([{'_', [
                                              {?API_ROOT, cvmfs_root_handler, []},
                                              {?API_ROOT ++ "/repos/[:id]", cvmfs_repos_handler, []},
-                                             {?API_ROOT ++ "/leases/[:token_id]/[:key_id]", cvmfs_leases_handler, []},
+                                             {?API_ROOT ++ "/leases/[:token_id]", cvmfs_leases_handler, []},
                                              {?API_ROOT ++ "/payloads/[:id]", cvmfs_payloads_handler, []}
                                             ]}]),
     %% Start the HTTP listener process configured with the routing table
