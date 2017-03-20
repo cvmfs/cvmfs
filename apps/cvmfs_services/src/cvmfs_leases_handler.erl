@@ -108,10 +108,10 @@ init(Req0 = #{method := <<"DELETE">>}, State) ->
                                                         jsx:encode(Reply),
                                                         Req0),
                                 {ok, Req1, State};
-                            TokenId ->
-                                Reply = case p_check_hmac(KeyId, KeyId, ClientHMAC) of
+                            Token ->
+                                Reply = case p_check_hmac(Token, KeyId, ClientHMAC) of
                                             true ->
-                                                case cvmfs_be:end_lease(TokenId) of
+                                                case cvmfs_be:end_lease(Token) of
                                                     ok ->
                                                         #{<<"status">> => <<"ok">>};
                                                     {error, invalid_macaroon} ->

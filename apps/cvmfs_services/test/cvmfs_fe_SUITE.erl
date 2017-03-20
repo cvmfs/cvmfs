@@ -113,7 +113,7 @@ create_and_delete_session(Config) ->
     {ok, ReplyBody1} = p_post(conn_pid(Config), ?API_ROOT ++ "/leases", RequestHeaders, RequestBody),
     #{<<"session_token">> := Token} = jsx:decode(ReplyBody1, [return_maps]),
 
-    HMAC2 = p_make_hmac(<<"key1">>, Config),
+    HMAC2 = p_make_hmac(Token, Config),
     RequestHeaders2 = p_make_headers(<<"key1">>, HMAC2),
     {ok, ReplyBody2} = p_delete(conn_pid(Config), ?API_ROOT ++ "/leases/" ++ binary_to_list(Token),
                                 RequestHeaders2),
@@ -149,7 +149,7 @@ create_session_when_already_created(Config) ->
     #{<<"status">> := <<"path_busy">>} = jsx:decode(ReplyBody2, [return_maps]),
 
     % End lease
-    HMAC3 = p_make_hmac(<<"key1">>, Config),
+    HMAC3 = p_make_hmac(Token, Config),
     RequestHeaders3 = p_make_headers(<<"key1">>, HMAC3),
     {ok, ReplyBody3} = p_delete(conn_pid(Config), ?API_ROOT ++ "/leases/" ++ binary_to_list(Token),
                                RequestHeaders3),
@@ -157,9 +157,10 @@ create_session_when_already_created(Config) ->
 
 
 end_invalid_session(Config) ->
-    HMAC = p_make_hmac(<<"key1">>, Config),
+    Token = <<"NOT_A_PROPER_SESSION_TOKEN">>,
+    HMAC = p_make_hmac(Token, Config),
     RequestHeaders = p_make_headers(<<"key1">>, HMAC),
-    {ok, Body} = p_delete(conn_pid(Config), ?API_ROOT ++ "/leases/NOT_A_PROPER_SESSION_TOKEN", RequestHeaders),
+    {ok, Body} = p_delete(conn_pid(Config), ?API_ROOT ++ "/leases/" ++ binary_to_list(Token), RequestHeaders),
     #{<<"status">> := <<"error">>,
       <<"reason">> := <<"invalid_token">>} = jsx:decode(Body, [return_maps]).
 
@@ -183,7 +184,7 @@ normal_payload_submission(Config) ->
     #{<<"status">> := <<"ok">>} = jsx:decode(ReplyBody2, [return_maps]),
 
     % End lease
-    HMAC3 = p_make_hmac(<<"key1">>, Config),
+    HMAC3 = p_make_hmac(Token, Config),
     RequestHeaders3 = p_make_headers(<<"key1">>, HMAC3),
     {ok, ReplyBody3} = p_delete(conn_pid(Config), ?API_ROOT ++ "/leases/" ++ binary_to_list(Token),
                                RequestHeaders3),
@@ -210,7 +211,7 @@ payload_submission_with_invalid_hmac(Config) ->
       <<"reason">> := <<"invalid_hmac">>} = jsx:decode(ReplyBody2, [return_maps]),
 
     % End lease
-    HMAC3 = p_make_hmac(<<"key1">>, Config),
+    HMAC3 = p_make_hmac(Token, Config),
     RequestHeaders3 = p_make_headers(<<"key1">>, HMAC3),
     {ok, ReplyBody3} = p_delete(conn_pid(Config), ?API_ROOT ++ "/leases/" ++ binary_to_list(Token),
                                RequestHeaders3),
