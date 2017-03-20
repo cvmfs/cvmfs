@@ -36,8 +36,10 @@ init(Req0 = #{method := <<"GET">>}, State) ->
 %% A "POST" request to /api/payloads, which can return either 200 OK
 %% or in 400 - Bad Request
 %%
-%% The body of the request should be a JSON payload containing the
-%% "session_token" and "payload" fields.
+%% The body of the request should be a JSON message containing the
+%% "session_token" field. Directly after the JSON message, representing the
+%% remainder of the request body, there is the payload (serialized ObjectPack
+%% produced by the CVMFS server tools)
 %% The request needs two specific fields in the header:
 %%   "authorization" - KeyId and HMAC of the request body (the JSON object)
 %%                     The KeyId and HMAC should be separated by a space
