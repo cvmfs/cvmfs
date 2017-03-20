@@ -32,6 +32,7 @@ class SessionContextBase {
   virtual ~SessionContextBase();
 
   bool Initialize(const std::string& api_url, const std::string& session_token,
+                  const std::string& key_id, const std::string& secret,
                   bool drop_lease = true,
                   uint64_t max_pack_size = ObjectPack::kDefaultLimit);
   bool Finalize();
@@ -60,6 +61,8 @@ class SessionContextBase {
 
   std::string api_url_;
   std::string session_token_;
+  std::string key_id_;
+  std::string secret_;
   bool drop_lease_;
 
   FifoChannel<bool> queue_was_flushed_;

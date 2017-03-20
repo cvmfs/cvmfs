@@ -30,6 +30,8 @@ SessionContextBase::SessionContextBase()
     : upload_results_(1000, 1000),
       api_url_(),
       session_token_(),
+      key_id_(),
+      secret_(),
       drop_lease_(true),
       queue_was_flushed_(1, 1),
       max_pack_size_(ObjectPack::kDefaultLimit),
@@ -41,7 +43,9 @@ SessionContextBase::~SessionContextBase() {}
 
 bool SessionContextBase::Initialize(const std::string& api_url,
                                     const std::string& session_token,
-                                    bool drop_lease, uint64_t max_pack_size) {
+                                    const std::string& key_id,
+                                    const std::string& secret, bool drop_lease,
+                                    uint64_t max_pack_size) {
   bool ret = true;
 
   // Initialize session context lock
@@ -58,6 +62,8 @@ bool SessionContextBase::Initialize(const std::string& api_url,
   // Set upstream URL and session token
   api_url_ = api_url;
   session_token_ = session_token;
+  key_id_ = key_id;
+  secret_ = secret;
   drop_lease_ = drop_lease;
   max_pack_size_ = max_pack_size;
 
@@ -228,9 +234,14 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
   // Set up the object pack serializer
   ObjectPackProducer serializer(job->pack);
 
-  // Serialize the object pack into a JSON object
-  // TODO(radu): Extremely inefficient, next step is to rewrite this with
-  // streaming in mind when the wire protocol is implemented (CVM-1193)
+  const std::string json_body =
+      "{\"session_token\" : \"" + session_token_ + "\"}";
+
+  // Compute HMAC
+  shash::Any hmac(shash::kSha1);
+  shash::HmacString(secret_, json_body, &hmac);
+
+  // TODO(radu): The copying is inefficient; Use CURLOPT_READFUNCTION
   std::vector<unsigned char> payload(0);
   std::vector<unsigned char> buffer(4096);
   unsigned nbytes = 0;
@@ -239,11 +250,9 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
     std::copy(buffer.begin(), buffer.begin() + nbytes,
               std::back_inserter(payload));
   } while (nbytes > 0);
-  const std::string payload_base64 =
+  const std::string payload_text =
+      json_body +
       Base64(std::string(reinterpret_cast<char*>(&payload[0]), payload.size()));
-
-  const std::string json_body = "{\"session_token\" : \"" + session_token_ +
-                                "\", \"payload\" : \"" + payload_base64 + "\"}";
 
   // Prepare the Curl POST request
   CURL* h_curl = curl_easy_init();
@@ -251,6 +260,15 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
   if (!h_curl) {
     return false;
   }
+
+  // Set HTTP headers (Authorization and Message-Size)
+  std::string header_str = std::string("Authorization: ") + key_id_ + " " +
+                           Base64(hmac.ToString(false));
+  struct curl_slist* auth_header = NULL;
+  auth_header = curl_slist_append(auth_header, header_str.c_str());
+  header_str = std::string("Message-Size: ") + StringifyInt(json_body.size());
+  auth_header = curl_slist_append(auth_header, header_str.c_str());
+  curl_easy_setopt(h_curl, CURLOPT_HTTPHEADER, auth_header);
 
   std::string reply;
   curl_easy_setopt(h_curl, CURLOPT_NOPROGRESS, 1L);
@@ -260,8 +278,8 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
   curl_easy_setopt(h_curl, CURLOPT_TCP_KEEPALIVE, 1L);
   curl_easy_setopt(h_curl, CURLOPT_URL, (api_url_ + "/payloads").c_str());
   curl_easy_setopt(h_curl, CURLOPT_POSTFIELDSIZE_LARGE,
-                   static_cast<curl_off_t>(json_body.length()));
-  curl_easy_setopt(h_curl, CURLOPT_POSTFIELDS, json_body.c_str());
+                   static_cast<curl_off_t>(payload_text.length()));
+  curl_easy_setopt(h_curl, CURLOPT_POSTFIELDS, payload_text.c_str());
   curl_easy_setopt(h_curl, CURLOPT_WRITEFUNCTION, RecvCB);
   curl_easy_setopt(h_curl, CURLOPT_WRITEDATA, &reply);
 
