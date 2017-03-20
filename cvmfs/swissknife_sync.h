@@ -45,7 +45,8 @@ struct SyncParameters {
         is_balanced(false),
         max_weight(kDefaultMaxWeight),
         min_weight(kDefaultMinWeight),
-        session_token_file() {}
+        session_token_file(),
+        key_file() {}
 
   upload::Spooler *spooler;
   std::string repo_name;
@@ -86,6 +87,7 @@ struct SyncParameters {
 
   // Parameters for when upstream type is HTTP
   std::string session_token_file;
+  std::string key_file;
 };
 
 namespace catalog {
@@ -274,6 +276,7 @@ class CommandSync : public Command {
     r.push_back(Parameter::Switch('Y', "enable external data"));
 
     r.push_back(Parameter::Optional('P', "session_token_file"));
+    r.push_back(Parameter::Optional('H', "key file for HTTP API"));
 
     return r;
   }
