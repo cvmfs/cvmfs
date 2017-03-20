@@ -164,7 +164,7 @@ end_invalid_session(Config) ->
 
 normal_payload_submission(Config) ->
     % Create new lease
-    RequestBody1 = jsx:encode(#{<<"key_id">> => <<"key1">>, <<"path">> => <<"repo1.domain1.org">>}),
+    RequestBody1 = jsx:encode(#{<<"path">> => <<"repo1.domain1.org">>}),
     HMAC1 = p_make_hmac(RequestBody1, Config),
     RequestHeaders1 = p_make_headers(RequestBody1, <<"key1">>, HMAC1),
     {ok, ReplyBody1} = p_post(conn_pid(Config), ?API_ROOT ++ "/leases", RequestHeaders1, RequestBody1),
@@ -172,11 +172,11 @@ normal_payload_submission(Config) ->
 
     % Submit payload
     Payload = <<"IAMAPAYLOAD">>,
-    RequestBody2 = jsx:encode(#{<<"session_token">> => Token,
-                                <<"payload">> => Payload}),
-    BodySize2 = size(RequestBody2),
-    HMAC2 = p_make_hmac(RequestBody2, Config),
-    RequestHeaders2 = p_make_headers(RequestBody2, <<"key1">>, HMAC2, BodySize2),
+    JSONMessage = jsx:encode(#{<<"session_token">> => Token}),
+    RequestBody2 = <<JSONMessage/binary,Payload/binary>>,
+    MessageSize = size(JSONMessage),
+    MessageHMAC = p_make_hmac(JSONMessage, Config),
+    RequestHeaders2 = p_make_headers(RequestBody2, <<"key1">>, MessageHMAC, MessageSize),
     {ok, ReplyBody2} = p_post(conn_pid(Config), ?API_ROOT ++ "/payloads", RequestHeaders2, RequestBody2),
     #{<<"status">> := <<"ok">>} = jsx:decode(ReplyBody2, [return_maps]),
 
