@@ -25,10 +25,14 @@ struct GatewayStreamHandle : public UploadStreamHandle {
 class GatewayUploader : public AbstractUploader {
  public:
   struct Config {
-    Config() : session_token_file(), api_url() {}
-    Config(const std::string& session_token_file, const std::string& api_url)
-        : session_token_file(session_token_file), api_url(api_url) {}
+    Config() : session_token_file(), key_file(), api_url() {}
+    Config(const std::string& session_token_file, const std::string& key_file,
+           const std::string& api_url)
+        : session_token_file(session_token_file),
+          key_file(key_file),
+          api_url(api_url) {}
     std::string session_token_file;
+    std::string key_file;
     std::string api_url;
   };
 
@@ -74,6 +78,9 @@ class GatewayUploader : public AbstractUploader {
  protected:
   virtual bool ReadSessionTokenFile(const std::string& token_file_name,
                                     std::string* token);
+
+  virtual bool ReadKey(const std::string& key_file, std::string* key_id,
+                       std::string* secret);
 
  private:
   void BumpErrors() const;

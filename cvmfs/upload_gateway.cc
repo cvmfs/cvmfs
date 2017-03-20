@@ -37,6 +37,14 @@ bool GatewayUploader::ParseSpoolerDefinition(
   }
   config->session_token_file = spooler_definition.session_token_file;
 
+  if (spooler_definition.key_file.empty()) {
+    LogCvmfs(kLogUploadGateway, kLogStderr,
+             "Failed to configure HTTP uploader. "
+             "Missing HTTP API key file.\n");
+    return false;
+  }
+  config->key_file = spooler_definition.key_file;
+
   // Repo address, e.g. http://my.repo.address
   config->api_url = config_string;
 
@@ -77,7 +85,15 @@ bool GatewayUploader::Initialize() {
   if (!ReadSessionTokenFile(config_.session_token_file, &session_token)) {
     return false;
   }
-  return session_context_->Initialize(config_.api_url, session_token);
+
+  std::string key_id;
+  std::string secret;
+  if (!ReadKey(config_.key_file, &key_id, &secret)) {
+    return false;
+  }
+
+  return session_context_->Initialize(config_.api_url, session_token, key_id,
+                                      secret);
 }
 
 bool GatewayUploader::FinalizeSession() { return session_context_->Finalize(); }
@@ -208,6 +224,24 @@ bool GatewayUploader::ReadSessionTokenFile(const std::string& token_file_name,
   }
 
   return GetLineFile(token_file, token);
+}
+
+bool GatewayUploader::ReadKey(const std::string& key_file, std::string* key_id,
+                              std::string* secret) {
+  FILE* key_file_fd = std::fopen(key_file.c_str(), "r");
+  if (!key_file_fd) {
+    return false;
+  }
+
+  if (!(key_id && secret)) {
+    return false;
+  }
+
+  GetLineFile(key_file_fd, key_id);
+  GetLineFile(key_file_fd, secret);
+  fclose(key_file_fd);
+
+  return true;
 }
 
 void GatewayUploader::BumpErrors() const { atomic_inc32(&num_errors_); }

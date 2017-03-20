@@ -39,7 +39,8 @@ struct SpoolerDefinition {
       const size_t min_file_chunk_size = 0,
       const size_t avg_file_chunk_size = 0,
       const size_t max_file_chunk_size = 0,
-      const std::string& session_token_file = "");
+      const std::string& session_token_file = "",
+      const std::string& key_file = "");
 
   bool IsValid() const { return valid_; }
 
@@ -71,6 +72,7 @@ struct SpoolerDefinition {
 
   // The session_token_file parameter is only used for the HTTP driver
   std::string session_token_file;
+  std::string key_file;
 
   bool valid_;
 };

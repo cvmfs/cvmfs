@@ -27,6 +27,16 @@ class GatewayUploaderMocked : public upload::GatewayUploader {
     *token = "ThisIsAFakeToken";
     return true;
   }
+  virtual bool ReadKey(const std::string& /*key_file_name*/,
+                       std::string* key_id, std::string* secret) {
+    if (!(key_id && secret)) {
+      return false;
+    }
+
+    *key_id = "fake_id";
+    *secret = "fake_secret";
+    return true;
+  }
 };
 
 class T_GatewayUploaderConfig : public ::testing::Test {
@@ -46,7 +56,7 @@ TEST_F(T_GatewayUploaderConfig, ParseSpoolerDefinitionBadArgs) {
   upload::SpoolerDefinition definition(
       "gw,/local/temp/dir,http://my.repo.address:8080/api/v1", shash::kSha1,
       zlib::kZlibDefault, false, 0, 0, 0,
-      "/var/spool/cvmfs/test.cern.ch/session_token_some_path");
+      "/var/spool/cvmfs/test.cern.ch/session_token_some_path", "some_key_file");
   EXPECT_FALSE(
       upload::GatewayUploader::ParseSpoolerDefinition(definition, NULL));
 }
@@ -55,7 +65,7 @@ TEST_F(T_GatewayUploaderConfig, ParseSpoolerDefinitionGoodConfigString) {
   upload::SpoolerDefinition definition(
       "gw,/local/temp/dir,http://my.repo.address:8080/api/v1", shash::kSha1,
       zlib::kZlibDefault, false, 0, 0, 0,
-      "/var/spool/cvmfs/test.cern.ch/session_token_some_path");
+      "/var/spool/cvmfs/test.cern.ch/session_token_some_path", "some_key_file");
 
   EXPECT_TRUE(
       upload::GatewayUploader::ParseSpoolerDefinition(definition, &config));
@@ -78,7 +88,7 @@ TEST_F(T_GatewayUploader, Construct) {
   upload::SpoolerDefinition definition(
       "gw,/local/temp/dir,http://my.repo.address:8080/api/v1", shash::kSha1,
       zlib::kZlibDefault, false, 0, 0, 0,
-      "/var/spool/cvmfs/test.cern.ch/session_token_some_path");
+      "/var/spool/cvmfs/test.cern.ch/session_token_some_path", "some_key_file");
   GatewayUploaderMocked uploader(definition);
   EXPECT_TRUE(uploader.Initialize());
   EXPECT_TRUE(uploader.FinalizeSession());
