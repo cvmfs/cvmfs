@@ -309,7 +309,9 @@ p_check_hmac(Message, KeyId, HMAC) ->
     {atomic, Result} = mnesia:transaction(T),
     case Result of
         {ok, Secret} ->
-            HMAC =:= base64:encode(crypto:hmac(sha, Secret, Message));
+            ComputedHMAC = cvmfs_auth_util:compute_hmac(Secret, Message),
+            lager:info("HMAC: ~p Computed HMAC: ~p", [HMAC, ComputedHMAC]),
+            HMAC =:= ComputedHMAC;
         _ ->
             false
     end.
