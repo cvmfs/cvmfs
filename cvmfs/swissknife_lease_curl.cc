@@ -38,23 +38,11 @@ CURL* PrepareCurl(const char* method) {
   return h_curl;
 }
 
-bool MakeAcquireRequest(const std::string& key_file,
+bool MakeAcquireRequest(const std::string& key_id, const std::string& secret,
                         const std::string& repo_path,
                         const std::string& repo_service_url,
                         CurlBuffer* buffer) {
   CURLcode ret = static_cast<CURLcode>(0);
-
-  // Prepare payload
-  FILE* key_file_fd = std::fopen(key_file.c_str(), "r");
-  if (!key_file_fd) {
-    return false;
-  }
-
-  std::string key_id;
-  std::string secret;
-  GetLineFile(key_file_fd, &key_id);
-  GetLineFile(key_file_fd, &secret);
-  fclose(key_file_fd);
 
   CURL* h_curl = PrepareCurl("POST");
   if (!h_curl) {
@@ -88,22 +76,11 @@ bool MakeAcquireRequest(const std::string& key_file,
   return !ret;
 }
 
-bool MakeDeleteRequest(const std::string& key_file,
+bool MakeDeleteRequest(const std::string& key_id, const std::string& secret,
                        const std::string& session_token,
                        const std::string& repo_service_url,
                        CurlBuffer* buffer) {
   CURLcode ret = static_cast<CURLcode>(0);
-
-  FILE* key_file_fd = std::fopen(key_file.c_str(), "r");
-  if (!key_file_fd) {
-    return false;
-  }
-
-  std::string key_id;
-  std::string secret;
-  GetLineFile(key_file_fd, &key_id);
-  GetLineFile(key_file_fd, &secret);
-  fclose(key_file_fd);
 
   CURL* h_curl = PrepareCurl("DELETE");
   if (!h_curl) {

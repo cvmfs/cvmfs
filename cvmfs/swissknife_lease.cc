@@ -23,6 +23,24 @@ bool CheckParams(const swissknife::CommandLease::Parameters& p) {
   return true;
 }
 
+bool ReadKeys(const std::string& key_file_name, std::string* key_id,
+              std::string* secret) {
+  if (!(key_id && secret)) {
+    return false;
+  }
+
+  FILE* key_file_fd = std::fopen(key_file_name.c_str(), "r");
+  if (!key_file_fd) {
+    return false;
+  }
+
+  GetLineFile(key_file_fd, key_id);
+  GetLineFile(key_file_fd, secret);
+  fclose(key_file_fd);
+
+  return true;
+}
+
 }  // namespace
 
 namespace swissknife {
@@ -74,10 +92,18 @@ int CommandLease::Main(const ArgumentList& args) {
     return kLeaseCurlInitError;
   }
 
+  std::string key_id;
+  std::string secret;
+  if (!ReadKeys(params.key_file, &key_id, &secret)) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Error reading key file %s.",
+             params.key_file.c_str());
+    return 1;
+  }
+
   LeaseError ret = kLeaseSuccess;
   if (params.action == "acquire") {
     CurlBuffer buffer;
-    if (MakeAcquireRequest(params.key_file, params.lease_path,
+    if (MakeAcquireRequest(key_id, secret, params.lease_path,
                            params.repo_service_url, &buffer)) {
       std::string session_token;
       if (buffer.data.size() > 0 && ParseAcquireReply(buffer, &session_token)) {
@@ -110,7 +136,7 @@ int CommandLease::Main(const ArgumentList& args) {
                session_token.c_str());
 
       CurlBuffer buffer;
-      if (MakeDeleteRequest(params.key_file, session_token,
+      if (MakeDeleteRequest(key_id, secret, session_token,
                             params.repo_service_url, &buffer)) {
         if (buffer.data.size() > 0 && ParseDropReply(buffer)) {
           std::fclose(token_file);
