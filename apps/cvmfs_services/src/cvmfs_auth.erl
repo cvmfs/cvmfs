@@ -15,9 +15,10 @@
 
 %% API
 -export([start_link/1
-        ,get_user_permissions/1
-        ,add_user/2, remove_user/1, get_users/0
-        ,add_repo/2, remove_repo/1, get_repos/0]).
+        ,check_keyid_for_repo/2
+        ,add_key/2, remove_key/1
+        ,add_repo/2, remove_repo/1, get_repos/0
+        ,check_hmac/3]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -25,15 +26,18 @@
 
 -define(SERVER, ?MODULE).
 
-%% Records used as table entries
+%% Records
 
--record(repo, { r_id :: binary() % repo identifier
-              , fqdn :: binary() % the fqdn of the repository
-              }).
+-record(repo, {
+          % the FQDN of the repository
+          name :: binary(),
+          % public id of the keys registered to modify this repo
+          key_ids :: [binary()]}).
 
-%% u_id - user identifier
-%% r_ids - identifiers of repos to which user can make changes
--record(acl, {u_id :: binary(), r_ids :: [binary()]}).
+-record(key, {
+          key_id :: binary(),
+          secret :: binary()}).
+
 
 %%%===================================================================
 %%% API
@@ -52,38 +56,27 @@ start_link(Args) ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, Args, []).
 
 
--spec get_user_permissions(User) -> {ok, Permissions} | {error, invalid_user}
-                                        when User :: binary(),
-                                             Permissions :: [binary()].
-get_user_permissions(User) ->
-    gen_server:call(?MODULE, {auth_req, user_perms, User}).
+-spec check_keyid_for_repo(KeyId, Repo) -> {ok, Allowed} | {error, invalid_path}
+                                        when KeyId :: binary(),
+                                             Repo :: binary(),
+                                             Allowed :: boolean().
+check_keyid_for_repo(KeyId, Repo) ->
+    gen_server:call(?MODULE, {auth_req, check_keyid_for_repo, {KeyId, Repo}}).
 
 
--spec add_user(User :: binary(), Repos :: [binary()])-> ok.
-add_user(User, Repos) ->
-    gen_server:call(?MODULE, {auth_req, add_user, {User, Repos}}).
+-spec add_key(KeyId :: binary(), Secret :: binary())-> ok.
+add_key(KeyId, Secret) ->
+    gen_server:call(?MODULE, {auth_req, add_key, {KeyId, Secret}}).
 
 
--spec remove_user(User :: binary()) -> ok.
-remove_user(User) ->
-    gen_server:call(?MODULE, {auth_req, remove_user, User}).
+-spec remove_key(KeyId :: binary()) -> ok.
+remove_key(KeyId) ->
+    gen_server:call(?MODULE, {auth_req, remove_key, KeyId}).
 
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Returns a list of all usernames in the `acl` table.
-%% Potentially expensive!
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec get_users() -> Users :: [binary()].
-get_users() ->
-    gen_server:call(?MODULE, {auth_req, get_users}).
-
-
--spec add_repo(Repo :: binary(), Fqdn :: binary()) -> ok.
-add_repo(Repo, Fqdn) ->
-    gen_server:call(?MODULE, {auth_req, add_repo, {Repo, Fqdn}}).
+-spec add_repo(Repo :: binary(), KeyIds :: [binary()]) -> ok.
+add_repo(Repo, KeyIds) ->
+    gen_server:call(?MODULE, {auth_req, add_repo, {Repo, KeyIds}}).
 
 
 -spec remove_repo(Repo :: binary()) -> ok.
@@ -102,6 +95,16 @@ remove_repo(Repo) ->
 get_repos() ->
     gen_server:call(?MODULE, {auth_req, get_repos}).
 
+
+-spec check_hmac(Message, KeyId, HMAC) -> boolean()
+                                              when Message :: binary(),
+                                                   KeyId :: binary(),
+                                                   HMAC :: binary().
+check_hmac(Message, KeyId, HMAC) ->
+    gen_server:call(?MODULE, {auth_req, check_hmac, {Message, KeyId, HMAC}}).
+
+
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -113,11 +116,11 @@ get_repos() ->
 %%
 %% Arguments:
 %%   RepoList - list of managed repositories
-%%   ACL - access control list ([{username, [repo_name]}])
+%%   Keys - key list ( [{keyid, secret}] )
 %%
 %% @end
 %%--------------------------------------------------------------------
-init({RepoList, ACL}) ->
+init({RepoList, Keys}) ->
     {ok, MnesiaSchemaLocation} = application:get_env(mnesia, schema_location),
     AllNodes = [node() | nodes()],
     CopyMode = case MnesiaSchemaLocation of
@@ -133,12 +136,12 @@ init({RepoList, ACL}) ->
     p_populate_repos(RepoList),
     lager:info("Repository list initialized."),
 
-    mnesia:create_table(acl, [CopyMode
+    mnesia:create_table(key, [CopyMode
                              ,{type, set}
-                             ,{attributes, record_info(fields, acl)}]),
-    ok = mnesia:wait_for_tables([acl], 10000),
-    p_populate_acl(ACL),
-    lager:info("Access control list initialized."),
+                             ,{attributes, record_info(fields, key)}]),
+    ok = mnesia:wait_for_tables([key], 10000),
+    p_populate_keys(Keys),
+    lager:info("Key list initialized."),
 
     lager:info("Auth module initialized."),
     {ok, []}.
@@ -150,25 +153,21 @@ init({RepoList, ACL}) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-handle_call({auth_req, user_perms, User}, _From, State) ->
-    Reply = p_get_user_fqdns(User),
-    lager:info("Request received: {user_perms, ~p} -> Reply: ~p", [User, Reply]),
+handle_call({auth_req, check_keyid_for_repo, {KeyId, Repo}}, _From, State) ->
+    Reply = p_check_keyid_for_repo(KeyId, Repo),
+    lager:info("Request received: {check_keyid_for_repo, {~p, ~p}} -> Reply: ~p", [KeyId, Repo, Reply]),
     {reply, Reply, State};
-handle_call({auth_req, add_user, {User, Repos}}, _From, State) ->
-    Reply = p_add_user(User, Repos),
-    lager:info("Request received: {add_user, {~p, ~p}} -> Reply: ~p", [User, Repos, Reply]),
+handle_call({auth_req, add_key, {KeyId, Secret}}, _From, State) ->
+    Reply = p_add_key(KeyId, Secret),
+    lager:info("Request received: {add_key, {~p}} -> Reply: ~p", [KeyId, Reply]),
     {reply, Reply, State};
-handle_call({auth_req, remove_user, User}, _From, State) ->
-    Reply = p_remove_user(User),
-    lager:info("Request received: {remove_user, ~p} -> Reply: ~p", [User, Reply]),
+handle_call({auth_req, remove_key, Key}, _From, State) ->
+    Reply = p_remove_key(Key),
+    lager:info("Request received: {remove_key, ~p} -> Reply: ~p", [Key, Reply]),
     {reply, Reply, State};
-handle_call({auth_req, get_users}, _From, State) ->
-    Reply = p_get_users(),
-    lager:info("Request received: {get_users} -> Reply: ~p", [Reply]),
-    {reply, Reply, State};
-handle_call({auth_req, add_repo, {Repo, Fqdn}}, _From, State) ->
-    Reply = p_add_repo(Repo, Fqdn),
-    lager:info("Request received: {add_repo, {~p, ~p}} -> Reply: ~p", [Repo, Fqdn, Reply]),
+handle_call({auth_req, add_repo, {Repo, KeyIds}}, _From, State) ->
+    Reply = p_add_repo(Repo, KeyIds),
+    lager:info("Request received: {add_repo, {~p, ~p}} -> Reply: ~p", [Repo, KeyIds, Reply]),
     {reply, Reply, State};
 handle_call({auth_req, remove_repo, Repo}, _From, State) ->
     Reply = p_remove_repo(Repo),
@@ -177,7 +176,12 @@ handle_call({auth_req, remove_repo, Repo}, _From, State) ->
 handle_call({auth_req, get_repos}, _From, State) ->
     Reply = p_get_repos(),
     lager:info("Request received: {get_repos} -> Reply: ~p", [Reply]),
+    {reply, Reply, State};
+handle_call({auth_req, check_hmac, {Message, KeyId, HMAC}}, _From, State) ->
+    Reply = p_check_hmac(Message, KeyId, HMAC),
+    lager:info("Request received: {check_hmac, ~p, ~p, ~p} -> Reply: ~p", [Message, KeyId, HMAC, Reply]),
     {reply, Reply, State}.
+
 
 %%--------------------------------------------------------------------
 %% @private
@@ -230,59 +234,45 @@ code_change(OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
--spec p_get_user_fqdns(User) -> {ok, Fqdns} | {error, invalid_user}
-                                    when User :: binary(),
-                                         Fqdns :: [binary()].
-p_get_user_fqdns(User) ->
+-spec p_check_keyid_for_repo(KeyId, Repo) -> {ok, Allowed} | {error, invalid_path}
+                                   when KeyId :: binary(),
+                                        Repo :: binary(),
+                                        Allowed :: boolean().
+p_check_keyid_for_repo(KeyId, Repo) ->
     T1 = fun() ->
-                 case mnesia:read(acl, User) of
-                     [] ->
-                         {error, invalid_user};
-                     AclEntries ->
-                         T2 = fun() ->
-                                      {ok, [Fqdn || #acl{r_ids = Repos} <- AclEntries,
-                                                    Repo <- Repos,
-                                                    #repo{fqdn = Fqdn} <- mnesia:read(repo, Repo)]}
-                              end,
-                         {atomic, Result} = mnesia:transaction(T2),
-                         Result
+                 case mnesia:read(repo, Repo) of
+                     [#repo{key_ids = KeyIds} | _] ->
+                         {ok, lists:member(KeyId, KeyIds)};
+                     _ ->
+                         {error, invalid_path}
                  end
          end,
     {atomic, Result} = mnesia:transaction(T1),
     Result.
 
 
--spec p_add_user(User :: binary(), Repos :: [binary()]) -> ok.
-p_add_user(User, Repos) ->
+-spec p_add_key(KeyId :: binary(), Secret :: binary()) -> ok.
+p_add_key(KeyId, Secret) ->
     T = fun() ->
-                mnesia:write(#acl{u_id = User, r_ids = Repos})
+                mnesia:write(#key{key_id = KeyId, secret = Secret})
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
 
--spec p_remove_user(User :: binary()) -> ok.
-p_remove_user(User) ->
+-spec p_remove_key(Key :: binary()) -> ok.
+p_remove_key(Key) ->
     T = fun() ->
-                mnesia:delete({acl, User})
+                mnesia:delete({key, Key})
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
 
--spec p_get_users() -> Users :: [binary()].
-p_get_users() ->
+-spec p_add_repo(Repo :: binary(), KeyIds :: [binary()]) -> ok.
+p_add_repo(Repo, KeyIds) ->
     T = fun() ->
-                mnesia:foldl(fun(#acl{u_id = User}, Acc) -> [User | Acc] end, [], acl)
-        end,
-    {atomic, Result} = mnesia:transaction(T),
-    Result.
-
-
--spec p_add_repo(Repo :: binary(), Fqdn :: binary()) -> ok.
-p_add_repo(Repo, Fqdn) ->
-    T = fun() ->
-                mnesia:write(#repo{r_id = Repo, fqdn = Fqdn})
+                mnesia:write(#repo{name = Repo, key_ids = KeyIds})
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
@@ -300,17 +290,49 @@ p_remove_repo(Repo) ->
 -spec p_get_repos() -> Repos :: [binary()].
 p_get_repos() ->
     T = fun() ->
-                mnesia:foldl(fun(#repo{r_id = Repo}, Acc) -> [Repo | Acc] end, [], repo)
+                mnesia:foldl(fun(#repo{name = Repo}, Acc) -> [Repo | Acc] end, [], repo)
         end,
     {atomic, Result} = mnesia:transaction(T),
     Result.
 
 
--spec p_populate_acl(ACL :: [{User :: binary, Repos :: [binary()]}]) -> boolean().
-p_populate_acl(ACL) ->
+-spec p_check_hmac(Message :: binary(), KeyId :: binary(), HMAC :: binary()) -> boolean().
+p_check_hmac(Message, KeyId, HMAC) ->
     T = fun() ->
-                lists:all(fun(V) -> V =:= ok end,
-                          [mnesia:write(#acl{u_id = User, r_ids = RepoList}) || {User, RepoList} <- ACL])
+                case mnesia:read(key, KeyId) of
+                    [#key{key_id = KeyId, secret = Secret} | _] ->
+                        {ok, Secret};
+                    _ ->
+                        error
+                end
+        end,
+    {atomic, Result} = mnesia:transaction(T),
+    case Result of
+        {ok, Secret} ->
+            HMAC =:= base64:encode(crypto:hmac(sha, Secret, Message));
+        _ ->
+            false
+    end.
+
+
+-spec p_populate_keys(Keys :: [{KeyId :: binary, Secret :: binary()}]) -> boolean().
+p_populate_keys(Keys) ->
+    T = fun() ->
+                lists:foreach(fun({KeyId, S}) ->
+                                      Secret = case S of
+                                                   {file, Path} ->
+                                                       {ok, SecStr} = file:read_file(Path),
+                                                       %% Remove trailing "\n" if needed
+                                                       KeySize = byte_size(SecStr) - 1,
+                                                       <<Key:KeySize/binary,_/binary>> = SecStr,
+                                                       Key;
+                                                   Str when is_binary(Str) ->
+                                                       Str
+                                               end,
+                                      mnesia:write(#key{key_id = KeyId, secret = Secret})
+                              end,
+                              Keys),
+                true
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
@@ -320,7 +342,7 @@ p_populate_acl(ACL) ->
 p_populate_repos(RepoList) ->
     T = fun() ->
                 lists:all(fun(V) -> V =:= ok end,
-                          [mnesia:write(#repo{r_id = Repo, fqdn = Fqdn}) || {Repo, Fqdn} <- RepoList])
+                          [mnesia:write(#repo{name = Repo, key_ids = KeyIds}) || {Repo, KeyIds} <- RepoList])
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.

@@ -27,13 +27,13 @@
 %%% Type specifications
 %%%===================================================================
 -type new_lease_result() :: {ok, LeaseToken :: binary()} |
-                            {error, invalid_user} |
+                            {error, invalid_key} |
                             {error, invalid_path} |
                             {path_busy, TimeRemaining :: binary()}.
 -type submission_error() :: {error,
                              lease_expired |
                              invalid_lease |
-                             invalid_user |
+                             invalid_key |
                              invalid_macaroon}.
 -type submit_payload_result() :: {ok, payload_added} |
                                  {ok, payload_added, lease_ended} |
@@ -58,19 +58,19 @@ start_link(_) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Requests the initiation of a new lease where User will modify
-%% Path. Either returns error messages if user is invalid or the user
-%% is not allowed to modify the path, or returns a lease token.
+%% Requests the initiation of a new lease where KeyId will be used to
+%% modify Path. Either returns error messages if user is invalid or
+%% the user is not allowed to modify the path, or returns a lease token.
 %%
 %% The lease token is needed for making any other request.
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec new_lease(User, Path) -> new_lease_result()
-                                   when User :: binary(),
-                                        Path :: binary().
-new_lease(User, Path) ->
-    gen_server:call(?MODULE, {be_req, new_lease, {User, Path}}).
+-spec new_lease(KeyId, Path) -> new_lease_result()
+                                    when KeyId :: binary(),
+                                         Path :: binary().
+new_lease(KeyId, Path) ->
+    gen_server:call(?MODULE, {be_req, new_lease, {KeyId, Path}}).
 
 
 %%--------------------------------------------------------------------
@@ -122,15 +122,15 @@ init([]) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-handle_call({be_req, new_lease, {User, Path}}, _From, State) ->
-    case p_new_lease(User, Path) of
+handle_call({be_req, new_lease, {KeyId, Path}}, _From, State) ->
+    case p_new_lease(KeyId, Path) of
         {ok, LeaseToken} ->
             lager:info("Request received: {new_lease, {~p, ~p}} -> Reply: ~p",
-                       [User, Path, LeaseToken]),
+                       [KeyId, Path, LeaseToken]),
             {reply, {ok, LeaseToken}, State};
         Other ->
             lager:info("Request received: {new_lease, {~p, ~p}} -> Reply: ~p",
-                       [User, Path, Other]),
+                       [KeyId, Path, Other]),
             {reply, Other, State}
     end;
 handle_call({be_req, end_lease, LeaseToken}, _From, State) ->
@@ -193,27 +193,24 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
--spec p_new_lease(User, Path) -> new_lease_result()
-                                     when User :: binary(),
-                                          Path :: binary().
-p_new_lease(User, Path) ->
+-spec p_new_lease(KeyId, Path) -> new_lease_result()
+                                      when KeyId :: binary(),
+                                           Path :: binary().
+p_new_lease(KeyId, Path) ->
     % Check if user is registered with the cvmfs_auth service and
     % which paths he is allowed to modify
-    [Fqdn | _]  = binary:split(Path, <<"/">>),
-    case cvmfs_auth:get_user_permissions(User) of
-        {ok, Paths} ->
-            case lists:member(Fqdn, Paths) of
-                false ->
-                    {error, invalid_path};
-                true ->
-                    {Public, Secret, Token} = p_generate_token(User, Path),
-                    case cvmfs_lease:request_lease(User, Path, Public, Secret) of
-                        ok ->
-                            {ok, Token};
-                        {busy, TimeRemaining} ->
-                            {path_busy, TimeRemaining}
-                    end
+    [Repo | _]  = binary:split(Path, <<"/">>),
+    case cvmfs_auth:check_keyid_for_repo(KeyId, Repo) of
+        {ok, true} ->
+            {Public, Secret, Token} = p_generate_token(KeyId, Path),
+            case cvmfs_lease:request_lease(KeyId, Path, Public, Secret) of
+                ok ->
+                    {ok, Token};
+                {busy, TimeRemaining} ->
+                    {path_busy, TimeRemaining}
             end;
+        {ok, false} ->
+            {error, invalid_key};
         Error ->
             Error
     end.
@@ -246,15 +243,15 @@ p_submit_payload(LeaseToken, Payload) ->
     end.
 
 
--spec p_generate_token(User, Path) -> {Token, Public, Secret}
-                                          when User :: binary(),
-                                               Path :: binary(),
-                                               Token :: binary(),
-                                               Public :: binary(),
-                                               Secret :: binary().
-p_generate_token(User, Path) ->
+-spec p_generate_token(KeyId, Path) -> {Token, Public, Secret}
+                                           when KeyId :: binary(),
+                                                Path :: binary(),
+                                                Token :: binary(),
+                                                Public :: binary(),
+                                                Secret :: binary().
+p_generate_token(KeyId, Path) ->
     Secret = enacl_p:randombytes(macaroon:suggested_secret_length()),
-    Public = <<User/binary,Path/binary>>,
+    Public = <<KeyId/binary,Path/binary>>,
     Location = <<"">>, %% Location isn't used
     M = macaroon:create(Location, Secret, Public),
 
