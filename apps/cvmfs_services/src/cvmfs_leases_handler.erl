@@ -36,9 +36,10 @@ init(Req0 = #{method := <<"GET">>}, State) ->
 %% A "POST" request to /api/leases, which can return either 200 OK
 %% or in 400 - Bad Request
 %%
-%% The request body is a JSON object with the "key_id" and "path" fields
+%% The request body is a JSON object with the "path" field
 %% The request needs two specific fields in the header:
-%%   "authorization" - HMAC of the request body (the JSON object)
+%%   "authorization" - KeyId and HMAC of the request body (the JSON object)
+%%                     The KeyId and HMAC should be separated by a space
 %%   "message-size" - the size of the JSON object
 %%
 %% The body of the reply, for a valid request contains the fields:
@@ -53,12 +54,13 @@ init(Req0 = #{method := <<"GET">>}, State) ->
 init(Req0 = #{method := <<"POST">>}, State) ->
     {URI, T0} = cvmfs_fe_util:tick(Req0, micro_seconds),
 
-    #{headers := #{<<"authorization">> := ClientHMAC, <<"message-size">> := MessageSizeBin}} = Req0,
+    #{headers := #{<<"authorization">> := Auth, <<"message-size">> := MessageSizeBin}} = Req0,
+    [KeyId, ClientHMAC] = binary:split(Auth, <<" ">>),
     {ok, Data, Req1} = cvmfs_fe_util:read_body(Req0),
     MessageSize = binary_to_integer(MessageSizeBin),
     <<JSONMessage:MessageSize/binary,_/binary>> = Data,
     {Status, Reply, Req2} = case jsx:decode(JSONMessage, [return_maps]) of
-                                #{<<"key_id">> := KeyId, <<"path">> := Path} ->
+                                #{<<"path">> := Path} ->
                                     case p_check_hmac(JSONMessage, KeyId, ClientHMAC) of
                                         true ->
                                             Rep = p_new_lease(KeyId, Path);
@@ -79,12 +81,12 @@ init(Req0 = #{method := <<"POST">>}, State) ->
     {ok, ReqF, State};
 %%--------------------------------------------------------------------
 %% @doc
-%% A "DELETE" request to /api/leases/<TOKEN>/<KEY_ID>, which returns
+%% A "DELETE" request to /api/leases/<TOKEN>, which returns
 %% 200 OK.
 %%
 %% The request needs the "authorization" field in the header, containing
-%% the HMAC of the <KEY_ID> field (computed with the secret key associated
-%% with <KEY_ID>).
+%% the KeyId and the HMAC of the KeyId (computed with the secret key associated
+%% with KeyId).
 %
 %% The body of the reply, for a valid request contains the fields:
 %% "status" - either "ok", or "error"
@@ -98,46 +100,36 @@ init(Req0 = #{method := <<"POST">>}, State) ->
 init(Req0 = #{method := <<"DELETE">>}, State) ->
     {URI, T0} = cvmfs_fe_util:tick(Req0, micro_seconds),
 
-    #{headers := #{<<"authorization">> := ClientHMAC}} = Req0,
+    #{headers := #{<<"authorization">> := Auth}} = Req0,
+    [KeyId, ClientHMAC] = binary:split(Auth, <<" ">>),
     {ok, ReqF, State} = case cowboy_req:binding(token_id, Req0) of
                             undefined ->
                                 Reply = #{<<"status">> => <<"error">>,
-                                          <<"reason">> => <<"Missing token. Call /api/v1/leases/<TOKEN>/<KEY_ID>">>},
+                                          <<"reason">> => <<"Missing token. Call /api/v1/leases/<TOKEN>">>},
                                 Req1 = cowboy_req:reply(400,
                                                         #{<<"content-type">> => <<"application/json">>},
                                                         jsx:encode(Reply),
                                                         Req0),
                                 {ok, Req1, State};
                             TokenId ->
-                                case cowboy_req:binding(key_id, Req0) of
-                                    undefined ->
-                                        Reply = #{<<"status">> => <<"error">>,
-                                                  <<"reason">> => <<"Missing key_id. Call /api/v1/leases/<TOKEN>/<KEY_ID>">>},
-                                        Req1 = cowboy_req:reply(400,
-                                                                #{<<"content-type">> => <<"application/json">>},
-                                                                jsx:encode(Reply),
-                                                                Req0),
-                                        {ok, Req1, State};
-                                    KeyId ->
-                                        Reply = case p_check_hmac(KeyId, KeyId, ClientHMAC) of
-                                                    true ->
-                                                        case cvmfs_be:end_lease(TokenId) of
-                                                            ok ->
-                                                                #{<<"status">> => <<"ok">>};
-                                                            {error, invalid_macaroon} ->
-                                                                #{<<"status">> => <<"error">>,
-                                                                  <<"reason">> => <<"invalid_token">>}
-                                                        end;
-                                                    false ->
+                                Reply = case p_check_hmac(KeyId, KeyId, ClientHMAC) of
+                                            true ->
+                                                case cvmfs_be:end_lease(TokenId) of
+                                                    ok ->
+                                                        #{<<"status">> => <<"ok">>};
+                                                    {error, invalid_macaroon} ->
                                                         #{<<"status">> => <<"error">>,
-                                                          <<"reason">> => <<"invalid_hmac">>}
-                                                end,
-                                        Req1 = cowboy_req:reply(200,
-                                                                #{<<"content-type">> => <<"application/json">>},
-                                                                jsx:encode(Reply),
-                                                                Req0),
-                                        {ok, Req1, State}
-                                end
+                                                          <<"reason">> => <<"invalid_token">>}
+                                                end;
+                                            false ->
+                                                #{<<"status">> => <<"error">>,
+                                                  <<"reason">> => <<"invalid_hmac">>}
+                                        end,
+                                Req1 = cowboy_req:reply(200,
+                                                        #{<<"content-type">> => <<"application/json">>},
+                                                        jsx:encode(Reply),
+                                                        Req0),
+                                {ok, Req1, State}
                         end,
 
     cvmfs_fe_util:tock(URI, T0, micro_seconds),
