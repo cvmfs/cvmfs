@@ -6,6 +6,10 @@
 
 #include "cvmfs_config.h"
 
+#include "hash.h"
+#include "logging.h"
+#include "util/string.h"
+
 size_t RecvCB(void* buffer, size_t size, size_t nmemb, void* userp) {
   CurlBuffer* my_buffer = static_cast<CurlBuffer*>(userp);
 
@@ -34,19 +38,39 @@ CURL* PrepareCurl(const char* method) {
   return h_curl;
 }
 
-bool MakeAcquireRequest(const std::string& key_id, const std::string& repo_path,
+bool MakeAcquireRequest(const std::string& key_file,
+                        const std::string& repo_path,
                         const std::string& repo_service_url,
                         CurlBuffer* buffer) {
   CURLcode ret = static_cast<CURLcode>(0);
+
+  // Prepare payload
+  FILE* key_file_fd = std::fopen(key_file.c_str(), "r");
+  if (!key_file_fd) {
+    return false;
+  }
+
+  std::string key_id;
+  std::string secret;
+  GetLineFile(key_file_fd, &key_id);
+  GetLineFile(key_file_fd, &secret);
+  fclose(key_file_fd);
 
   CURL* h_curl = PrepareCurl("POST");
   if (!h_curl) {
     return false;
   }
 
-  // Prepare payload
-  const std::string payload =
-      "{\"key_id\" : \"" + key_id + "\", \"path\" : \"" + repo_path + "\"}";
+  const std::string payload = "{\"path\" : \"" + repo_path + "\"}";
+
+  shash::Any hmac(shash::kSha1);
+  shash::HmacString(secret, payload, &hmac);
+
+  const std::string header_str = std::string("Authorization: ") + key_id + " " +
+                                 Base64(hmac.ToString(false));
+  struct curl_slist* auth_header = NULL;
+  auth_header = curl_slist_append(auth_header, header_str.c_str());
+  curl_easy_setopt(h_curl, CURLOPT_HTTPHEADER, auth_header);
 
   // Make request to acquire lease from repo services
   curl_easy_setopt(h_curl, CURLOPT_URL, (repo_service_url + "/leases").c_str());
@@ -64,15 +88,37 @@ bool MakeAcquireRequest(const std::string& key_id, const std::string& repo_path,
   return !ret;
 }
 
-bool MakeDeleteRequest(const std::string& session_token,
+bool MakeDeleteRequest(const std::string& key_file,
+                       const std::string& session_token,
                        const std::string& repo_service_url,
                        CurlBuffer* buffer) {
   CURLcode ret = static_cast<CURLcode>(0);
+
+  FILE* key_file_fd = std::fopen(key_file.c_str(), "r");
+  if (!key_file_fd) {
+    return false;
+  }
+
+  std::string key_id;
+  std::string secret;
+  GetLineFile(key_file_fd, &key_id);
+  GetLineFile(key_file_fd, &secret);
+  fclose(key_file_fd);
 
   CURL* h_curl = PrepareCurl("DELETE");
   if (!h_curl) {
     return false;
   }
+
+  shash::Any hmac(shash::kSha1);
+  shash::HmacString(secret, session_token, &hmac);
+
+  const std::string header_str = std::string("Authorization: ") + key_id + " " +
+                                 Base64(hmac.ToString(false));
+  struct curl_slist* auth_header = NULL;
+  auth_header = curl_slist_append(auth_header, header_str.c_str());
+  curl_easy_setopt(h_curl, CURLOPT_HTTPHEADER, auth_header);
+
   curl_easy_setopt(h_curl, CURLOPT_URL,
                    (repo_service_url + "/leases/" + session_token).c_str());
   curl_easy_setopt(h_curl, CURLOPT_POSTFIELDSIZE_LARGE,
