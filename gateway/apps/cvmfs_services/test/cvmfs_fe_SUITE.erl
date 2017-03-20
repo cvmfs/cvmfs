@@ -254,16 +254,18 @@ p_delete(ConnPid, Path, Headers) ->
 
 p_make_hmac(Body, Config) ->
     {_, Secret} = lists:keyfind(<<"key1">>, 1, ?config(keys, Config)),
-    base64:encode(crypto:hmac(sha, Secret, Body)).
+    cvmfs_auth_util:compute_hmac(Secret, Body).
 
 
 p_make_headers(KeyId, HMAC) ->
     [{<<"authorization">>, <<KeyId/binary, <<" ">>/binary, HMAC/binary>>}].
 
+
 p_make_headers(Body, KeyId, HMAC) ->
     [{<<"content-type">>, <<"application/json">>},
      {<<"content-length">>, integer_to_binary(size(Body))},
      {<<"authorization">>, <<KeyId/binary, <<" ">>/binary, HMAC/binary>>}].
+
 
 p_make_headers(Body, KeyId, HMAC, MessageSize) ->
     [{<<"content-type">>, <<"application/json">>},
