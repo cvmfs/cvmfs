@@ -60,7 +60,7 @@ init(Req0 = #{method := <<"POST">>}, State) ->
     <<JSONMessage:MessageSize/binary,Payload/binary>> = Data,
     {Status, Reply, Req2} = case jsx:decode(JSONMessage, [return_maps]) of
                                 #{<<"session_token">> := Token} ->
-                                    Rep = case cvmfs_auth:check_hmac(JSONMessage, KeyId, ClientHMAC) of
+                                    Rep = case cvmfs_be:check_hmac(JSONMessage, KeyId, ClientHMAC) of
                                               true ->
                                                   p_submit_payload(Token, Payload);
                                               false ->

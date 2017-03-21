@@ -136,7 +136,7 @@ init(Req0 = #{method := <<"DELETE">>}, State) ->
 %% Private functions
 
 p_check_hmac(JSONMessage, KeyId, ClientHMAC) ->
-    cvmfs_auth:check_hmac(JSONMessage, KeyId, ClientHMAC).
+    cvmfs_be:check_hmac(JSONMessage, KeyId, ClientHMAC).
 
 
 p_new_lease(KeyId, Path) ->

@@ -17,6 +17,9 @@
         ,new_lease/2, end_lease/1
         ,submit_payload/2]).
 
+-export([get_repos/0
+        ,check_hmac/3]).
+
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
@@ -100,6 +103,20 @@ submit_payload(LeaseToken, Payload) ->
     gen_server:call(?MODULE, {be_req, submit_payload, {LeaseToken,
                                                        Payload}}).
 
+
+-spec get_repos() -> [binary()].
+get_repos() ->
+    gen_server:call(?MODULE, {be_req, get_repos}).
+
+
+-spec check_hmac(Message, KeyId, HMAC) -> boolean()
+                                              when Message :: binary(),
+                                                   KeyId :: binary(),
+                                                   HMAC :: binary().
+check_hmac(Message, KeyId, HMAC) ->
+    gen_server:call(?MODULE, {be_req, check_hmac, {Message, KeyId, HMAC}}).
+
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -141,7 +158,19 @@ handle_call({be_req, submit_payload, {LeaseToken, Payload}}, _From, State) ->
     Reply = p_submit_payload(LeaseToken, Payload),
     lager:info("Request received: {submit_payload, {~p, ~p}} -> Reply: ~p",
                [LeaseToken, <<"payload_not_shown">>, Reply]),
+    {reply, Reply, State};
+handle_call({be_req, get_repos}, _From, State) ->
+    Reply = p_get_repos(),
+    lager:info("Request received: {get_repos} -> Reply: ~p",
+               [Reply]),
+    {reply, Reply, State};
+handle_call({be_req, check_hmac, {Message, KeyId, HMAC}}, _From, State) ->
+    Reply = p_check_hmac(Message, KeyId, HMAC),
+    lager:info("Request received: {check_hmac, {~p, ~p, ~p}} -> Reply: ~p",
+               [Message, KeyId, HMAC, Reply]),
     {reply, Reply, State}.
+
+
 
 %%--------------------------------------------------------------------
 %% @private
@@ -308,3 +337,16 @@ p_check_payload(LeaseToken, _Payload) ->
         _ ->
             {error, invalid_macaroon}
     end.
+
+
+-spec p_get_repos() -> [binary()].
+p_get_repos() ->
+    cvmfs_auth:get_repos().
+
+
+-spec p_check_hmac(Message, KeyId, HMAC) -> boolean()
+                                                when Message :: binary(),
+                                                     KeyId :: binary(),
+                                                     HMAC :: binary().
+p_check_hmac(Message, KeyId, HMAC) ->
+    cvmfs_auth:check_hmac(Message, KeyId, HMAC).
