@@ -99,7 +99,7 @@ init(Req0 = #{method := <<"DELETE">>}, State) ->
 
     #{headers := #{<<"authorization">> := Auth}} = Req0,
     [KeyId, ClientHMAC] = binary:split(Auth, <<" ">>),
-    {ok, ReqF, State} = case cowboy_req:binding(token_id, Req0) of
+    {ok, ReqF, State} = case cowboy_req:binding(token, Req0) of
                             undefined ->
                                 Reply = #{<<"status">> => <<"error">>,
                                           <<"reason">> => <<"Missing token. Call /api/v1/leases/<TOKEN>">>},
