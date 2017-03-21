@@ -30,6 +30,6 @@ init(Req0, State) ->
                            jsx:encode(API),
                            Req0),
 
-    cvmfs_fe_util:tock(Uid, URI, T0, micro_seconds),
+    cvmfs_fe_util:tock(Uid, <<"GET">>, URI, T0, micro_seconds),
     {ok, Req, State}.
 

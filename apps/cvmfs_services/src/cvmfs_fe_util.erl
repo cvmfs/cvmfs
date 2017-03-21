@@ -10,7 +10,7 @@
 
 -compile([{parse_transform, lager_transform}]).
 
--export([read_body/1, tick/2, tock/4]).
+-export([read_body/1, tick/2, tock/5]).
 
 
 read_body(Req0) ->
@@ -34,7 +34,8 @@ tick(Req, Unit) ->
     {URI, T}.
 
 
-tock(Uid, URI, T0, Unit) ->
+tock(Uid, Method, URI, T0, Unit) ->
     T1 = erlang:monotonic_time(Unit),
-    lager:info("HTTP request received; Uid: ~p;  URI: ~p; Time to process = ~p usec", [Uid, URI, T1 - T0]).
+    lager:info("HTTP request received; Uid: ~p; Method: ~p; URI: ~p; Time to process = ~p usec",
+               [Uid, Method, URI, T1 - T0]).
 
