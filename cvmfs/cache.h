@@ -194,13 +194,44 @@ class CacheManager : SingleCopy {
 
   QuotaManager *quota_mgr() { return quota_mgr_; }
 
+  // Rescue the open file table during reload of the fuse module.  For the
+  // POSIX cache, nothing needs to be done because the table is keep in the
+  // kernel for the process.  Other cache managers need to do it manually.
+  void *SaveState(const int fd_progress);
+  void RestoreState(const int fd_progress, void *state);
+  void FreeState(const int fd_progress, void *state);
+
  protected:
   CacheManager();
+
+  // Unless overwritten, Saving/Restoring states will crash the Fuse module
+  virtual void *DoSaveState() { return NULL; }
+  virtual bool DoRestoreState(void *data) { return false; }
+  virtual bool DoFreeState(void *data) { return false; }
 
   /**
    * Never NULL but defaults to NoopQuotaManager.
    */
   QuotaManager *quota_mgr_;
+
+ private:
+  static const unsigned kStateVersion = 0;
+
+  /**
+   * Wraps around the concrete cache manager's state block in memory.  The
+   * state pointer is used in DoSaveState, DoRestoreState, DoFreeState.
+   */
+  struct State : SingleCopy {
+    State()
+      : version(kStateVersion)
+      , manager_type(kUnknownCacheManager)
+      , concrete_state(NULL)
+    { }
+
+    unsigned version;
+    CacheManagerIds manager_type;
+    void *concrete_state;
+  };
 };  // class CacheManager
 
 #endif  // CVMFS_CACHE_H_

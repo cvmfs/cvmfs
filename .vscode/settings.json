@@ -3,6 +3,9 @@
     "C_Cpp.clang_format_formatOnSave": true,
     "editor.formatOnSave": true,
     "clang-format.style": "Google",
-    "files.associations": {}
-}
+    "files.associations": {
+      "random": "cpp",
+      "array": "cpp"
+    }
+  }
 

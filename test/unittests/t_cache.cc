@@ -229,8 +229,10 @@ class TestCacheManager : public CacheManager {
   TestCacheManager() {
     delete quota_mgr_;
     quota_mgr_ = new TestQuotaManager();
+    state = NULL;
+    type = kUnknownCacheManager;
   }
-  virtual CacheManagerIds id() { return kUnknownCacheManager; }
+  virtual CacheManagerIds id() { return type; }
   virtual std::string Describe() { return "test\n"; }
   virtual bool AcquireQuotaManager(QuotaManager *qm) { return false; }
   virtual int Open(const BlessedObject &object) {
@@ -263,6 +265,13 @@ class TestCacheManager : public CacheManager {
     return 0;
   }
   virtual void Spawn() { }
+
+  virtual void *DoSaveState() { return state; }
+  virtual bool DoRestoreState(void *data) { return data == this; }
+  virtual bool DoFreeState(void *data) { return data == this; }
+
+  void *state;
+  CacheManagerIds type;
 };
 
 
@@ -873,4 +882,23 @@ TEST_F(T_CacheManager, WriteCompare) {
   EXPECT_EQ(N, cache_mgr_->Pread(fd, receive_buf, N, 0));
   EXPECT_EQ(0, memcmp(large_buf, receive_buf, N));
   cache_mgr_->Close(fd);
+}
+
+
+TEST_F(T_CacheManager, SaveState) {
+  TestCacheManager test_cache;
+  int fd_progress = open("/dev/null", O_WRONLY);
+  ASSERT_DEATH(test_cache.SaveState(fd_progress), ".*");
+  test_cache.state = &test_cache;
+  void *data = test_cache.SaveState(fd_progress);
+  EXPECT_TRUE(data != NULL);
+  // should not crash
+  test_cache.RestoreState(fd_progress, data);
+  test_cache.type = kPosixCacheManager;
+  ASSERT_DEATH(test_cache.RestoreState(fd_progress, data), ".*");
+  ASSERT_DEATH(test_cache.FreeState(fd_progress, data), ".*");
+  test_cache.type = kUnknownCacheManager;
+  // should not crash
+  test_cache.FreeState(fd_progress, data);
+  close(fd_progress);
 }
