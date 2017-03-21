@@ -23,13 +23,14 @@
 %%--------------------------------------------------------------------
 init(Req0 = #{method := <<"GET">>}, State) ->
     {URI, T0} = cvmfs_fe_util:tick(Req0, micro_seconds),
+    Uid = cvmfs_be:unique_id(),
 
     Req1 = cowboy_req:reply(405,
                            #{<<"content-type">> => <<"application/plain-text">>},
                            <<"">>,
                            Req0),
 
-    cvmfs_fe_util:tock(URI, T0, micro_seconds),
+    cvmfs_fe_util:tock(Uid, URI, T0, micro_seconds),
     {ok, Req1, State};
 %%--------------------------------------------------------------------
 %% @doc
@@ -59,9 +60,9 @@ init(Req0 = #{method := <<"POST">>}, State) ->
     {ok, Data, Req1} = cvmfs_fe_util:read_body(Req0),
     {Status, Reply, Req2} = case jsx:decode(Data, [return_maps]) of
                                 #{<<"path">> := Path} ->
-                                    Rep = case p_check_hmac(Data, KeyId, ClientHMAC) of
+                                    Rep = case p_check_hmac(Uid, Data, KeyId, ClientHMAC) of
                                         true ->
-                                            p_new_lease(KeyId, Path);
+                                            p_new_lease(Uid, KeyId, Path);
                                         false ->
                                             #{<<"status">> => <<"error">>,
                                               <<"reason">> => <<"invalid_hmac">>}
@@ -111,9 +112,9 @@ init(Req0 = #{method := <<"DELETE">>}, State) ->
                                                         Req0),
                                 {ok, Req1, State};
                             Token ->
-                                Reply = case p_check_hmac(Token, KeyId, ClientHMAC) of
+                                Reply = case p_check_hmac(Uid, Token, KeyId, ClientHMAC) of
                                             true ->
-                                                case cvmfs_be:end_lease(Token) of
+                                                case cvmfs_be:end_lease(Uid, Token) of
                                                     ok ->
                                                         #{<<"status">> => <<"ok">>};
                                                     {error, invalid_macaroon} ->
@@ -137,12 +138,12 @@ init(Req0 = #{method := <<"DELETE">>}, State) ->
 
 %% Private functions
 
-p_check_hmac(JSONMessage, KeyId, ClientHMAC) ->
-    cvmfs_be:check_hmac(JSONMessage, KeyId, ClientHMAC).
+p_check_hmac(Uid, JSONMessage, KeyId, ClientHMAC) ->
+    cvmfs_be:check_hmac(Uid, JSONMessage, KeyId, ClientHMAC).
 
 
-p_new_lease(KeyId, Path) ->
-    case cvmfs_be:new_lease(KeyId, Path) of
+p_new_lease(Uid, KeyId, Path) ->
+    case cvmfs_be:new_lease(Uid, KeyId, Path) of
         {ok, Token} ->
             #{<<"status">> => <<"ok">>, <<"session_token">> => Token};
         {path_busy, Time} ->

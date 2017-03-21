@@ -14,11 +14,11 @@
 
 %% API
 -export([start_link/1
-        ,new_lease/2, end_lease/1
-        ,submit_payload/2]).
+        ,new_lease/3, end_lease/2
+        ,submit_payload/3]).
 
--export([get_repos/0
-        ,check_hmac/3
+-export([get_repos/1
+        ,check_hmac/4
         ,unique_id/0]).
 
 %% gen_server callbacks
@@ -70,11 +70,12 @@ start_link(_) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec new_lease(KeyId, Path) -> new_lease_result()
-                                    when KeyId :: binary(),
-                                         Path :: binary().
-new_lease(KeyId, Path) ->
-    gen_server:call(?MODULE, {be_req, new_lease, {KeyId, Path}}).
+-spec new_lease(Uid, KeyId, Path) -> new_lease_result()
+                                         when Uid :: binary(),
+                                              KeyId :: binary(),
+                                              Path :: binary().
+new_lease(Uid, KeyId, Path) ->
+    gen_server:call(?MODULE, {be_req, new_lease, {Uid, KeyId, Path}}).
 
 
 %%--------------------------------------------------------------------
@@ -84,10 +85,11 @@ new_lease(KeyId, Path) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec end_lease(LeaseToken) -> ok | {error, invalid_macaroon}
-                                   when LeaseToken :: binary().
-end_lease(LeaseToken) ->
-    gen_server:call(?MODULE, {be_req, end_lease, LeaseToken}).
+-spec end_lease(Uid, LeaseToken) -> ok | {error, invalid_macaroon}
+                                        when Uid ::binary(),
+                                             LeaseToken :: binary().
+end_lease(Uid, LeaseToken) ->
+    gen_server:call(?MODULE, {be_req, end_lease, {Uid, LeaseToken}}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -96,26 +98,28 @@ end_lease(LeaseToken) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec submit_payload(LeaseToken, Payload) ->
+-spec submit_payload(Uid, LeaseToken, Payload) ->
                             submit_payload_result()
-                                when LeaseToken :: binary(),
+                                when Uid :: binary(),
+                                     LeaseToken :: binary(),
                                      Payload :: binary().
-submit_payload(LeaseToken, Payload) ->
-    gen_server:call(?MODULE, {be_req, submit_payload, {LeaseToken,
+submit_payload(Uid, LeaseToken, Payload) ->
+    gen_server:call(?MODULE, {be_req, submit_payload, {Uid, LeaseToken,
                                                        Payload}}).
 
 
--spec get_repos() -> [binary()].
-get_repos() ->
-    gen_server:call(?MODULE, {be_req, get_repos}).
+-spec get_repos(Uid :: binary()) -> [binary()].
+get_repos(Uid) ->
+    gen_server:call(?MODULE, {be_req, get_repos, Uid}).
 
 
--spec check_hmac(Message, KeyId, HMAC) -> boolean()
-                                              when Message :: binary(),
-                                                   KeyId :: binary(),
-                                                   HMAC :: binary().
-check_hmac(Message, KeyId, HMAC) ->
-    gen_server:call(?MODULE, {be_req, check_hmac, {Message, KeyId, HMAC}}).
+-spec check_hmac(Uid, Message, KeyId, HMAC) -> boolean()
+                                                   when Uid :: binary(),
+                                                        Message :: binary(),
+                                                        KeyId :: binary(),
+                                                        HMAC :: binary().
+check_hmac(Uid, Message, KeyId, HMAC) ->
+    gen_server:call(?MODULE, {be_req, check_hmac, {Uid, Message, KeyId, HMAC}}).
 
 
 -spec unique_id() -> binary().
@@ -146,35 +150,36 @@ init([]) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-handle_call({be_req, new_lease, {KeyId, Path}}, _From, State) ->
+handle_call({be_req, new_lease, {Uid, KeyId, Path}}, _From, State) ->
     case p_new_lease(KeyId, Path) of
         {ok, LeaseToken} ->
-            lager:info("Request received: {new_lease, {~p, ~p}} -> Reply: ~p",
-                       [KeyId, Path, LeaseToken]),
+            lager:info("Request received: Uid: ~p - {new_lease, {~p, ~p}} -> Reply: ~p",
+                       [Uid, KeyId, Path, LeaseToken]),
             {reply, {ok, LeaseToken}, State};
         Other ->
-            lager:info("Request received: {new_lease, {~p, ~p}} -> Reply: ~p",
-                       [KeyId, Path, Other]),
+            lager:info("Request received: Uid: ~p - {new_lease, {~p, ~p}} -> Reply: ~p",
+                       [Uid, KeyId, Path, Other]),
             {reply, Other, State}
     end;
-handle_call({be_req, end_lease, LeaseToken}, _From, State) ->
+handle_call({be_req, end_lease, {Uid, LeaseToken}}, _From, State) ->
     Reply = p_end_lease(LeaseToken),
-    lager:info("Request received: {end_lease, ~p} -> Reply: ~p", [LeaseToken, Reply]),
+    lager:info("Request received: Uid: ~p - {end_lease, ~p} -> Reply: ~p",
+               [Uid, LeaseToken, Reply]),
     {reply, Reply, State};
-handle_call({be_req, submit_payload, {LeaseToken, Payload}}, _From, State) ->
+handle_call({be_req, submit_payload, {Uid, LeaseToken, Payload}}, _From, State) ->
     Reply = p_submit_payload(LeaseToken, Payload),
-    lager:info("Request received: {submit_payload, {~p, ~p}} -> Reply: ~p",
-               [LeaseToken, <<"payload_not_shown">>, Reply]),
+    lager:info("Request received: Uid: ~p - {submit_payload, {~p, ~p}} -> Reply: ~p",
+               [Uid, LeaseToken, <<"payload_not_shown">>, Reply]),
     {reply, Reply, State};
-handle_call({be_req, get_repos}, _From, State) ->
+handle_call({be_req, get_repos, Uid}, _From, State) ->
     Reply = p_get_repos(),
-    lager:info("Request received: {get_repos} -> Reply: ~p",
-               [Reply]),
+    lager:info("Request received: Uid: ~p - {get_repos} -> Reply: ~p",
+               [Uid, Reply]),
     {reply, Reply, State};
-handle_call({be_req, check_hmac, {Message, KeyId, HMAC}}, _From, State) ->
+handle_call({be_req, check_hmac, {Uid, Message, KeyId, HMAC}}, _From, State) ->
     Reply = p_check_hmac(Message, KeyId, HMAC),
-    lager:info("Request received: {check_hmac, {~p, ~p, ~p}} -> Reply: ~p",
-               [Message, KeyId, HMAC, Reply]),
+    lager:info("Request received: Uid: ~p - {check_hmac, {~p, ~p, ~p}} -> Reply: ~p",
+               [Uid, Message, KeyId, HMAC, Reply]),
     {reply, Reply, State};
 handle_call({be_req, unique_id}, _From, State) ->
     Reply = p_unique_id(),
