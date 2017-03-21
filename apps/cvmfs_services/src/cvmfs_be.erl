@@ -369,4 +369,4 @@ p_check_hmac(Message, KeyId, HMAC) ->
 
 -spec p_unique_id() -> binary().
 p_unique_id() ->
-    uuid:get_v4_urandom().
+    base64:encode(uuid:get_v4_urandom()).
