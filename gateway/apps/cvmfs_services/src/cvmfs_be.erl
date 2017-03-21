@@ -18,7 +18,8 @@
         ,submit_payload/2]).
 
 -export([get_repos/0
-        ,check_hmac/3]).
+        ,check_hmac/3
+        ,unique_id/0]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -117,6 +118,11 @@ check_hmac(Message, KeyId, HMAC) ->
     gen_server:call(?MODULE, {be_req, check_hmac, {Message, KeyId, HMAC}}).
 
 
+-spec unique_id() -> binary().
+unique_id() ->
+    gen_server:call(?MODULE, {be_req, unique_id}).
+
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -130,6 +136,7 @@ check_hmac(Message, KeyId, HMAC) ->
 %%--------------------------------------------------------------------
 init([]) ->
     process_flag(trap_exit, true),
+    ok = quickrand:seed(),
     {ok, #{}}.
 
 %%--------------------------------------------------------------------
@@ -168,8 +175,11 @@ handle_call({be_req, check_hmac, {Message, KeyId, HMAC}}, _From, State) ->
     Reply = p_check_hmac(Message, KeyId, HMAC),
     lager:info("Request received: {check_hmac, {~p, ~p, ~p}} -> Reply: ~p",
                [Message, KeyId, HMAC, Reply]),
+    {reply, Reply, State};
+handle_call({be_req, unique_id}, _From, State) ->
+    Reply = p_unique_id(),
+    lager:info("Request received: {unique_id} -> Reply: ~p", [Reply]),
     {reply, Reply, State}.
-
 
 
 %%--------------------------------------------------------------------
@@ -350,3 +360,8 @@ p_get_repos() ->
                                                      HMAC :: binary().
 p_check_hmac(Message, KeyId, HMAC) ->
     cvmfs_auth:check_hmac(Message, KeyId, HMAC).
+
+
+-spec p_unique_id() -> binary().
+p_unique_id() ->
+    uuid:get_v4_urandom().

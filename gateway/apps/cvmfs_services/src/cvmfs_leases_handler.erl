@@ -52,6 +52,7 @@ init(Req0 = #{method := <<"GET">>}, State) ->
 %%--------------------------------------------------------------------
 init(Req0 = #{method := <<"POST">>}, State) ->
     {URI, T0} = cvmfs_fe_util:tick(Req0, micro_seconds),
+    Uid = cvmfs_be:unique_id(),
 
     #{headers := #{<<"authorization">> := Auth}} = Req0,
     [KeyId, ClientHMAC] = binary:split(Auth, <<" ">>),
@@ -74,7 +75,7 @@ init(Req0 = #{method := <<"POST">>}, State) ->
                             jsx:encode(Reply),
                             Req2),
 
-    cvmfs_fe_util:tock(URI, T0, micro_seconds),
+    cvmfs_fe_util:tock(Uid, URI, T0, micro_seconds),
     {ok, ReqF, State};
 %%--------------------------------------------------------------------
 %% @doc
@@ -96,6 +97,7 @@ init(Req0 = #{method := <<"POST">>}, State) ->
 %%--------------------------------------------------------------------
 init(Req0 = #{method := <<"DELETE">>}, State) ->
     {URI, T0} = cvmfs_fe_util:tick(Req0, micro_seconds),
+    Uid = cvmfs_be:unique_id(),
 
     #{headers := #{<<"authorization">> := Auth}} = Req0,
     [KeyId, ClientHMAC] = binary:split(Auth, <<" ">>),
@@ -129,7 +131,7 @@ init(Req0 = #{method := <<"DELETE">>}, State) ->
                                 {ok, Req1, State}
                         end,
 
-    cvmfs_fe_util:tock(URI, T0, micro_seconds),
+    cvmfs_fe_util:tock(Uid, URI, T0, micro_seconds),
     {ok, ReqF, State}.
 
 
