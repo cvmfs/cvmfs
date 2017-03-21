@@ -104,7 +104,7 @@ cvmfs_server_publish() {
     # get repository information
     load_repo_config $name
     user=$CVMFS_USER
-    key_file=$CVMFS_KEY
+    key_file=$CVMFS_GATEWAY_KEY
     spool_dir=$CVMFS_SPOOL_DIR
     scratch_dir="${spool_dir}/scratch/current"
     stratum0=$CVMFS_STRATUM0

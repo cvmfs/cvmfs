@@ -69,7 +69,7 @@ cvmfs_server_transaction() {
     local upstream_storage=$CVMFS_UPSTREAM_STORAGE
     local upstream_type=$(get_upstream_type $upstream_storage)
     user=$CVMFS_USER
-    key_file=$CVMFS_KEY
+    key_file=$CVMFS_GATEWAY_KEY
 
     # more sanity checks
     is_owner_or_root $name || { echo "Permission denied: Repository $name is owned by $user"; retcode=1; continue; }
