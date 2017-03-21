@@ -63,7 +63,8 @@ def submit_payload():
         print
 
         payload = 'THIS_IS_A_PAYLOAD'
-        body = json.dumps({'session_token' : token})
+        digest = base64.b64encode('THIS_IS_THE_DIGEST_OF_THE_PAYLOAD')
+        body = json.dumps({'session_token' : token, 'payload_digest' : digest})
         body_hmac = compute_hmac('secret1', body)
         headers = {'Content-type' : 'application/json',
                    'authorization' : 'key1 ' + body_hmac,
