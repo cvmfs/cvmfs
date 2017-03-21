@@ -99,6 +99,7 @@ enum StateId {
   kStateOpenChunksV2,       // >= 2.1.20
   kStateOpenChunksV3,       // >= 2.2.0
   kStateOpenChunksV4,       // >= 2.2.3
+  kStateOpenFiles           // >= 2.4
 
   // Note: kStateOpenFilesXXX was renamed to kStateOpenChunksXXX as of 2.4
 };

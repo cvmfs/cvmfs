@@ -2219,6 +2219,13 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
   state_inode_generation->state = saved_inode_generation;
   saved_states->push_back(state_inode_generation);
 
+  SendMsg2Socket(fd_progress, msg_progress);
+  loader::SavedState *state_cache_mgr = new loader::SavedState();
+  state_cache_mgr->state_id = loader::kStateOpenFiles;
+  state_cache_mgr->state =
+    cvmfs::file_system_->cache_mgr()->SaveState(fd_progress);
+  saved_states->push_back(state_cache_mgr);
+
   msg_progress = "Saving open files counter\n";
   SendMsg2Socket(fd_progress, msg_progress);
   uint32_t *saved_num_fd =
@@ -2355,6 +2362,11 @@ static bool RestoreState(const int fd_progress,
         saved_states[i]->state)));
       SendMsg2Socket(fd_progress, " done\n");
     }
+
+    if (saved_states[i]->state_id == loader::kStateOpenFiles) {
+      cvmfs::file_system_->cache_mgr()->RestoreState(
+        fd_progress, saved_states[i]->state);
+    }
   }
   if (cvmfs::mount_point_->inode_annotation()) {
     uint64_t saved_generation = cvmfs::inode_generation_info_.inode_generation;
@@ -2419,6 +2431,10 @@ static void FreeSavedState(const int fd_progress,
         SendMsg2Socket(fd_progress, "Releasing saved inode generation info\n");
         delete static_cast<cvmfs::InodeGenerationInfo *>(
           saved_states[i]->state);
+        break;
+      case loader::kStateOpenFiles:
+        cvmfs::file_system_->cache_mgr()->FreeState(
+          fd_progress, saved_states[i]->state);
         break;
       case loader::kStateOpenFilesCounter:
         SendMsg2Socket(fd_progress, "Releasing open files counter\n");
