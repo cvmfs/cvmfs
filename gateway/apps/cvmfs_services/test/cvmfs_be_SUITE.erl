@@ -33,6 +33,9 @@
         ,submission_with_expired_token_fails/1]).
 
 
+-define(TEST_UID, <<"TEST_UID">>).
+
+
 %% Tests description
 
 all() ->
@@ -95,39 +98,39 @@ end_per_testcase(_TestCase, _Config) ->
 % New lease
 % Valid key and valid path should be accepted
 valid_key_valid_path(_Config) ->
-    {ok, Token} = cvmfs_be:new_lease(<<"key1">>, <<"repo1.domain1.org">>),
-    ok = cvmfs_be:end_lease(Token).
+    {ok, Token} = cvmfs_be:new_lease(?TEST_UID, <<"key1">>, <<"repo1.domain1.org">>),
+    ok = cvmfs_be:end_lease(?TEST_UID, Token).
 % Valid key and busy path should be rejected with remaining time
 valid_key_busy_path(_Config) ->
-    {ok, Token} = cvmfs_be:new_lease(<<"key1">>, <<"repo1.domain1.org">>),
-    {path_busy, _} = cvmfs_be:new_lease(<<"key1">>, <<"repo1.domain1.org">>),
-    ok = cvmfs_be:end_lease(Token).
+    {ok, Token} = cvmfs_be:new_lease(?TEST_UID, <<"key1">>, <<"repo1.domain1.org">>),
+    {path_busy, _} = cvmfs_be:new_lease(?TEST_UID, <<"key1">>, <<"repo1.domain1.org">>),
+    ok = cvmfs_be:end_lease(?TEST_UID, Token).
 % Invalid key and valid path should be rejected
 invalid_key_valid_path(_Config) ->
-    {error, invalid_key} = cvmfs_be:new_lease(<<"key2">>, <<"repo1.domain1.org">>).
+    {error, invalid_key} = cvmfs_be:new_lease(?TEST_UID, <<"key2">>, <<"repo1.domain1.org">>).
 % Valid key and invalid path should be rejected
 valid_key_invalid_path(_Config) ->
-    {error, invalid_path} = cvmfs_be:new_lease(<<"key1">>, <<"repo1.domain1.com">>).
+    {error, invalid_path} = cvmfs_be:new_lease(?TEST_UID, <<"key1">>, <<"repo1.domain1.com">>).
 % Invalid key and invalid path should be rejected with {error, invalid_key}
 invalid_key_invalid_path(_Config) ->
-    {error, invalid_path} = cvmfs_be:new_lease(<<"key2">>, <<"repo1.domain1.com">>).
+    {error, invalid_path} = cvmfs_be:new_lease(?TEST_UID, <<"key2">>, <<"repo1.domain1.com">>).
 
 % End lease
 % End valid lease
 end_valid_lease(_Config) ->
-    {ok, Token} = cvmfs_be:new_lease(<<"key1">>, <<"repo1.domain1.org">>),
-    ok = cvmfs_be:end_lease(Token).
+    {ok, Token} = cvmfs_be:new_lease(?TEST_UID, <<"key1">>, <<"repo1.domain1.org">>),
+    ok = cvmfs_be:end_lease(?TEST_UID, Token).
 
 % End invalid lease
 end_invalid_lease(_Config) ->
-    {ok, Token} = cvmfs_be:new_lease(<<"key1">>, <<"repo1.domain1.org">>),
-    ok = cvmfs_be:end_lease(Token),
-    ok = cvmfs_be:end_lease(Token).
+    {ok, Token} = cvmfs_be:new_lease(?TEST_UID, <<"key1">>, <<"repo1.domain1.org">>),
+    ok = cvmfs_be:end_lease(?TEST_UID, Token),
+    ok = cvmfs_be:end_lease(?TEST_UID, Token).
 
 % End lease invalid macaroon
 end_lease_invalid_macaroon(_Config) ->
     Token = <<"fake_token">>,
-    {error, invalid_macaroon} = cvmfs_be:end_lease(Token).
+    {error, invalid_macaroon} = cvmfs_be:end_lease(?TEST_UID, Token).
 
 % Submit payload
 % Normal lease check
@@ -135,28 +138,28 @@ lease_success(_Config) ->
     % Start with a valid key and path and receive a valid lease token
     {Key, Path} = {<<"key1">>, <<"repo1.domain1.org">>},
     Payload = <<"placeholder_for_a_real_payload">>,
-    {ok, Token} = cvmfs_be:new_lease(Key, Path),
+    {ok, Token} = cvmfs_be:new_lease(?TEST_UID, Key, Path),
     % Followup with a payload submission
-    {ok, payload_added} = cvmfs_be:submit_payload(Token, Payload),
+    {ok, payload_added} = cvmfs_be:submit_payload(?TEST_UID, Token, Payload),
     % Submit final payload and end the lease
-    {ok, payload_added} = cvmfs_be:submit_payload(Token, Payload),
-    ok = cvmfs_be:end_lease(Token),
+    {ok, payload_added} = cvmfs_be:submit_payload(?TEST_UID, Token, Payload),
+    ok = cvmfs_be:end_lease(?TEST_UID, Token),
     % After the lease has been closed, the token should be rejected
-    {error, invalid_lease} = cvmfs_be:submit_payload(Token, Payload).
+    {error, invalid_lease} = cvmfs_be:submit_payload(?TEST_UID, Token, Payload).
 
 % Attempt to submit a payload without first obtaining a token
 submission_with_invalid_token_fails(_Config) ->
     Token = <<"invalid_token">>,
     Payload = <<"placeholder">>,
-    {error, invalid_macaroon} = cvmfs_be:submit_payload(Token, Payload).
+    {error, invalid_macaroon} = cvmfs_be:submit_payload(?TEST_UID, Token, Payload).
 
 % Start a valid lease, make submission after the token has expired
 submission_with_expired_token_fails(Config) ->
     {Key, Path} = {<<"key1">>, <<"repo1.domain1.org">>},
     Payload = <<"placeholder">>,
-    {ok, Token} = cvmfs_be:new_lease(Key, Path),
+    {ok, Token} = cvmfs_be:new_lease(?TEST_UID, Key, Path),
     ct:sleep(?config(max_lease_time, Config)),
-    {error, lease_expired} = cvmfs_be:submit_payload(Token, Payload).
+    {error, lease_expired} = cvmfs_be:submit_payload(?TEST_UID, Token, Payload).
 
 
 %% Properties

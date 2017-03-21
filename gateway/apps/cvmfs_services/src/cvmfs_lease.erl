@@ -142,6 +142,8 @@ init(_) ->
                                ,{index, [public]}]),
     ok = mnesia:wait_for_tables([lease], 10000),
     lager:info("Lease table initialized"),
+
+    lager:info("Lease module initialized."),
     {ok, {}}.
 
 %%--------------------------------------------------------------------
@@ -153,28 +155,18 @@ init(_) ->
 %%--------------------------------------------------------------------
 handle_call({lease_req, new_lease, {User, Path, Public, Secret}}, _From, State) ->
     Reply = p_new_lease(User, Path, Public, Secret, State),
-    lager:info("Request received: {new_lease, ~p} -> Reply: ~p"
-              ,[{User, Path}, Reply]),
     {reply, Reply, State};
 handle_call({lease_req, end_lease, Public}, _From, State) ->
     Reply = p_end_lease(Public),
-    lager:info("Request received: {end_lease, ~p} -> Reply: ~p"
-              ,[Public, Reply]),
     {reply, Reply, State};
 handle_call({lease_req, check_lease, Public}, _From, State) ->
     Reply = p_check_lease(Public),
-    lager:info("Request received: {check_lease, ~p} -> Reply: ~p"
-              ,[Public, Reply]),
     {reply, Reply, State};
 handle_call({lease_req, get_leases}, _From, State) ->
     Reply = p_get_leases(),
-    lager:info("Request received: {get_leases} -> Reply: ~p"
-              ,[Reply]),
     {reply, Reply, State};
 handle_call({lease_req, clear_leases}, _From, State) ->
     Reply = p_clear_leases(),
-    lager:info("Request received: {clear_leases} -> Reply: ~p"
-              ,[Reply]),
     {reply, Reply, State};
 handle_call(_Request, _From, State) ->
     Reply = ok,
