@@ -24,13 +24,14 @@
 %%--------------------------------------------------------------------
 init(Req0 = #{method := <<"GET">>}, State) ->
     {URI, T0} = cvmfs_fe_util:tick(Req0, micro_seconds),
+    Uid = cvmfs_be:unique_id(),
 
     Req1 = cowboy_req:reply(405,
                            #{<<"content-type">> => <<"application/plain-text">>},
                            <<"">>,
                            Req0),
 
-    cvmfs_fe_util:tock(URI, T0, micro_seconds),
+    cvmfs_fe_util:tock(Uid, <<"GET">>, URI, T0, micro_seconds),
     {ok, Req1, State};
 %% @doc
 %% A "POST" request to /api/payloads, which can return either 200 OK
@@ -51,7 +52,8 @@ init(Req0 = #{method := <<"GET">>}, State) ->
 %% @end
 %%--------------------------------------------------------------------
 init(Req0 = #{method := <<"POST">>}, State) ->
-    {_, T0} = cvmfs_fe_util:tick(Req0, micro_seconds),
+    {URI, T0} = cvmfs_fe_util:tick(Req0, micro_seconds),
+    Uid = cvmfs_be:unique_id(),
 
     #{headers := #{<<"authorization">> := Auth, <<"message-size">> := MessageSizeBin}} = Req0,
     [KeyId, ClientHMAC] = binary:split(Auth, <<" ">>),
@@ -60,9 +62,9 @@ init(Req0 = #{method := <<"POST">>}, State) ->
     <<JSONMessage:MessageSize/binary,Payload/binary>> = Data,
     {Status, Reply, Req2} = case jsx:decode(JSONMessage, [return_maps]) of
                                 #{<<"session_token">> := Token} ->
-                                    Rep = case cvmfs_auth:check_hmac(JSONMessage, KeyId, ClientHMAC) of
+                                    Rep = case cvmfs_be:check_hmac(Uid, JSONMessage, KeyId, ClientHMAC) of
                                               true ->
-                                                  p_submit_payload(Token, Payload);
+                                                  p_submit_payload(Uid, Token, Payload);
                                               false ->
                                                   #{<<"status">> => <<"error">>,
                                                     <<"reason">> => <<"invalid_hmac">>}
@@ -76,15 +78,15 @@ init(Req0 = #{method := <<"POST">>}, State) ->
                             jsx:encode(Reply),
                             Req2),
 
-    cvmfs_fe_util:tock(<<"payload_not_shown">>, T0, micro_seconds),
+    cvmfs_fe_util:tock(Uid, <<"POST">>, URI, T0, micro_seconds),
     {ok, ReqF, State}.
 
 
 %% Private functions
 
 
-p_submit_payload(Token, Payload) ->
-    case cvmfs_be:submit_payload(Token, Payload) of
+p_submit_payload(Uid, Token, Payload) ->
+    case cvmfs_be:submit_payload(Uid, Token, Payload) of
         {ok, payload_added} ->
             #{<<"status">> => <<"ok">>};
         {error, Reason} ->

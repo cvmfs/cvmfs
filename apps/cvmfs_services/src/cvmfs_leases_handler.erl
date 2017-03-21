@@ -23,13 +23,14 @@
 %%--------------------------------------------------------------------
 init(Req0 = #{method := <<"GET">>}, State) ->
     {URI, T0} = cvmfs_fe_util:tick(Req0, micro_seconds),
+    Uid = cvmfs_be:unique_id(),
 
     Req1 = cowboy_req:reply(405,
                            #{<<"content-type">> => <<"application/plain-text">>},
                            <<"">>,
                            Req0),
 
-    cvmfs_fe_util:tock(URI, T0, micro_seconds),
+    cvmfs_fe_util:tock(Uid, <<"GET">>, URI, T0, micro_seconds),
     {ok, Req1, State};
 %%--------------------------------------------------------------------
 %% @doc
@@ -52,15 +53,16 @@ init(Req0 = #{method := <<"GET">>}, State) ->
 %%--------------------------------------------------------------------
 init(Req0 = #{method := <<"POST">>}, State) ->
     {URI, T0} = cvmfs_fe_util:tick(Req0, micro_seconds),
+    Uid = cvmfs_be:unique_id(),
 
     #{headers := #{<<"authorization">> := Auth}} = Req0,
     [KeyId, ClientHMAC] = binary:split(Auth, <<" ">>),
     {ok, Data, Req1} = cvmfs_fe_util:read_body(Req0),
     {Status, Reply, Req2} = case jsx:decode(Data, [return_maps]) of
                                 #{<<"path">> := Path} ->
-                                    Rep = case p_check_hmac(Data, KeyId, ClientHMAC) of
+                                    Rep = case p_check_hmac(Uid, Data, KeyId, ClientHMAC) of
                                         true ->
-                                            p_new_lease(KeyId, Path);
+                                            p_new_lease(Uid, KeyId, Path);
                                         false ->
                                             #{<<"status">> => <<"error">>,
                                               <<"reason">> => <<"invalid_hmac">>}
@@ -74,7 +76,7 @@ init(Req0 = #{method := <<"POST">>}, State) ->
                             jsx:encode(Reply),
                             Req2),
 
-    cvmfs_fe_util:tock(URI, T0, micro_seconds),
+    cvmfs_fe_util:tock(Uid, <<"POST">>, URI, T0, micro_seconds),
     {ok, ReqF, State};
 %%--------------------------------------------------------------------
 %% @doc
@@ -96,10 +98,11 @@ init(Req0 = #{method := <<"POST">>}, State) ->
 %%--------------------------------------------------------------------
 init(Req0 = #{method := <<"DELETE">>}, State) ->
     {URI, T0} = cvmfs_fe_util:tick(Req0, micro_seconds),
+    Uid = cvmfs_be:unique_id(),
 
     #{headers := #{<<"authorization">> := Auth}} = Req0,
     [KeyId, ClientHMAC] = binary:split(Auth, <<" ">>),
-    {ok, ReqF, State} = case cowboy_req:binding(token_id, Req0) of
+    {ok, ReqF, State} = case cowboy_req:binding(token, Req0) of
                             undefined ->
                                 Reply = #{<<"status">> => <<"error">>,
                                           <<"reason">> => <<"Missing token. Call /api/v1/leases/<TOKEN>">>},
@@ -109,9 +112,9 @@ init(Req0 = #{method := <<"DELETE">>}, State) ->
                                                         Req0),
                                 {ok, Req1, State};
                             Token ->
-                                Reply = case p_check_hmac(Token, KeyId, ClientHMAC) of
+                                Reply = case p_check_hmac(Uid, Token, KeyId, ClientHMAC) of
                                             true ->
-                                                case cvmfs_be:end_lease(Token) of
+                                                case cvmfs_be:end_lease(Uid, Token) of
                                                     ok ->
                                                         #{<<"status">> => <<"ok">>};
                                                     {error, invalid_macaroon} ->
@@ -129,18 +132,18 @@ init(Req0 = #{method := <<"DELETE">>}, State) ->
                                 {ok, Req1, State}
                         end,
 
-    cvmfs_fe_util:tock(URI, T0, micro_seconds),
+    cvmfs_fe_util:tock(Uid, <<"DELETE">>, URI, T0, micro_seconds),
     {ok, ReqF, State}.
 
 
 %% Private functions
 
-p_check_hmac(JSONMessage, KeyId, ClientHMAC) ->
-    cvmfs_auth:check_hmac(JSONMessage, KeyId, ClientHMAC).
+p_check_hmac(Uid, JSONMessage, KeyId, ClientHMAC) ->
+    cvmfs_be:check_hmac(Uid, JSONMessage, KeyId, ClientHMAC).
 
 
-p_new_lease(KeyId, Path) ->
-    case cvmfs_be:new_lease(KeyId, Path) of
+p_new_lease(Uid, KeyId, Path) ->
+    case cvmfs_be:new_lease(Uid, KeyId, Path) of
         {ok, Token} ->
             #{<<"status">> => <<"ok">>, <<"session_token">> => Token};
         {path_busy, Time} ->

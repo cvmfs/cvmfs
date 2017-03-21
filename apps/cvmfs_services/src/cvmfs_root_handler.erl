@@ -20,6 +20,7 @@
 %%--------------------------------------------------------------------
 init(Req0, State) ->
     {URI, T0} = cvmfs_fe_util:tick(Req0, micro_seconds),
+    Uid = cvmfs_be:unique_id(),
 
     Banner = <<"You are in an open field on the west side of a white house with a boarded front door.">>,
     API = #{<<"banner">> => Banner,
@@ -29,6 +30,6 @@ init(Req0, State) ->
                            jsx:encode(API),
                            Req0),
 
-    cvmfs_fe_util:tock(URI, T0, micro_seconds),
+    cvmfs_fe_util:tock(Uid, <<"GET">>, URI, T0, micro_seconds),
     {ok, Req, State}.
 

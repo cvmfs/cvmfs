@@ -22,13 +22,17 @@
   {git,"https://github.com/kzemek/macaroons.git",
        {ref,"9d2fef9f37e6b96a68aaaa81c0e5272d61a8b3b0"}},
   0},
+ {<<"quickrand">>,{pkg,<<"quickrand">>,<<"1.6.0">>},1},
  {<<"ranch">>,
   {git,"https://github.com/ninenines/ranch",
        {ref,"a5d2efcde9a34ad38ab89a26d98ea5335e88625a"}},
-  1}]}.
+  1},
+ {<<"uuid">>,{pkg,<<"uuid_erl">>,<<"1.6.0">>},0}]}.
 [
 {pkg_hash,[
  {<<"goldrush">>, <<"2024BA375CEEA47E27EA70E14D2C483B2D8610101B4E852EF7F89163CDB6E649">>},
  {<<"jsx">>, <<"749BEC6D205C694AE1786D62CEA6CC45A390437E24835FD16D12D74F07097727">>},
- {<<"lager">>, <<"EEF4E18B39E4195D37606D9088EA05BF1B745986CF8EC84F01D332456FE88D17">>}]}
+ {<<"lager">>, <<"EEF4E18B39E4195D37606D9088EA05BF1B745986CF8EC84F01D332456FE88D17">>},
+ {<<"quickrand">>, <<"33A277A639C442D77AB5C1EEA4641A49E3F034FD13658BB57E192A6E083FE77D">>},
+ {<<"uuid">>, <<"1BA81515EEB37EEB7F1563B658E30CDF18BCAF1FD6A390BBF3838461753E69D8">>}]}
 ].
