@@ -138,28 +138,31 @@ lease_success(_Config) ->
     % Start with a valid key and path and receive a valid lease token
     {Key, Path} = {<<"key1">>, <<"repo1.domain1.org">>},
     Payload = <<"placeholder_for_a_real_payload">>,
+    Digest = base64:encode(<<"placeholder_for_the_digest_of_the_payload">>),
     {ok, Token} = cvmfs_be:new_lease(?TEST_UID, Key, Path),
     % Followup with a payload submission
-    {ok, payload_added} = cvmfs_be:submit_payload(?TEST_UID, Token, Payload),
+    {ok, payload_added} = cvmfs_be:submit_payload(?TEST_UID, Token, Payload, Digest),
     % Submit final payload and end the lease
-    {ok, payload_added} = cvmfs_be:submit_payload(?TEST_UID, Token, Payload),
+    {ok, payload_added} = cvmfs_be:submit_payload(?TEST_UID, Token, Payload, Digest),
     ok = cvmfs_be:end_lease(?TEST_UID, Token),
     % After the lease has been closed, the token should be rejected
-    {error, invalid_lease} = cvmfs_be:submit_payload(?TEST_UID, Token, Payload).
+    {error, invalid_lease} = cvmfs_be:submit_payload(?TEST_UID, Token, Payload, Digest).
 
 % Attempt to submit a payload without first obtaining a token
 submission_with_invalid_token_fails(_Config) ->
     Token = <<"invalid_token">>,
     Payload = <<"placeholder">>,
-    {error, invalid_macaroon} = cvmfs_be:submit_payload(?TEST_UID, Token, Payload).
+    Digest = base64:encode(<<"placeholder_for_the_digest_of_the_payload">>),
+    {error, invalid_macaroon} = cvmfs_be:submit_payload(?TEST_UID, Token, Payload, Digest).
 
 % Start a valid lease, make submission after the token has expired
 submission_with_expired_token_fails(Config) ->
     {Key, Path} = {<<"key1">>, <<"repo1.domain1.org">>},
     Payload = <<"placeholder">>,
+    Digest = base64:encode(<<"placeholder_for_the_digest_of_the_payload">>),
     {ok, Token} = cvmfs_be:new_lease(?TEST_UID, Key, Path),
     ct:sleep(?config(max_lease_time, Config)),
-    {error, lease_expired} = cvmfs_be:submit_payload(?TEST_UID, Token, Payload).
+    {error, lease_expired} = cvmfs_be:submit_payload(?TEST_UID, Token, Payload, Digest).
 
 
 %% Properties

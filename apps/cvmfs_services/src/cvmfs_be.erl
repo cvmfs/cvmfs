@@ -15,7 +15,7 @@
 %% API
 -export([start_link/1
         ,new_lease/3, end_lease/2
-        ,submit_payload/3]).
+        ,submit_payload/4]).
 
 -export([get_repos/1
         ,check_hmac/4
@@ -98,14 +98,15 @@ end_lease(Uid, LeaseToken) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec submit_payload(Uid, LeaseToken, Payload) ->
+-spec submit_payload(Uid, LeaseToken, Payload, Digest) ->
                             submit_payload_result()
                                 when Uid :: binary(),
                                      LeaseToken :: binary(),
-                                     Payload :: binary().
-submit_payload(Uid, LeaseToken, Payload) ->
+                                     Payload :: binary(),
+                                     Digest :: binary().
+submit_payload(Uid, LeaseToken, Payload, Digest) ->
     gen_server:call(?MODULE, {be_req, submit_payload, {Uid, LeaseToken,
-                                                       Payload}}).
+                                                       Payload, Digest}}).
 
 
 -spec get_repos(Uid :: binary()) -> [binary()].
@@ -166,10 +167,11 @@ handle_call({be_req, end_lease, {Uid, LeaseToken}}, _From, State) ->
     lager:info("Backend request: Uid: ~p - {end_lease, ~p} -> Reply: ~p",
                [Uid, LeaseToken, Reply]),
     {reply, Reply, State};
-handle_call({be_req, submit_payload, {Uid, LeaseToken, Payload}}, _From, State) ->
-    Reply = p_submit_payload(LeaseToken, Payload),
-    lager:info("Backend request: Uid: ~p - {submit_payload, {~p, ~p}} -> Reply: ~p",
-               [Uid, LeaseToken, <<"payload_not_shown">>, Reply]),
+handle_call({be_req, submit_payload,
+             {Uid, LeaseToken, Payload, Digest}}, _From, State) ->
+    Reply = p_submit_payload(LeaseToken, Payload, Digest),
+    lager:info("Backend request: Uid: ~p - {submit_payload, {~p, ~p, ~p}} -> Reply: ~p",
+               [Uid, LeaseToken, <<"payload_not_shown">>, Digest, Reply]),
     {reply, Reply, State};
 handle_call({be_req, get_repos, Uid}, _From, State) ->
     Reply = p_get_repos(),
@@ -271,12 +273,13 @@ p_end_lease(LeaseToken) ->
             {error, invalid_macaroon}
     end.
 
--spec p_submit_payload(LeaseToken, Payload) ->
+-spec p_submit_payload(LeaseToken, Payload, Digest) ->
                               submit_payload_result()
                                   when LeaseToken :: binary(),
-                                       Payload :: binary().
-p_submit_payload(LeaseToken, Payload) ->
-    case p_check_payload(LeaseToken, Payload) of
+                                       Payload :: binary(),
+                                       Digest :: binary().
+p_submit_payload(LeaseToken, Payload, Digest) ->
+    case p_check_payload(LeaseToken, Payload, Digest) of
         {ok, _Public} ->
             %% TODO: submit payload to GW
             {ok, payload_added};
@@ -311,14 +314,15 @@ p_generate_token(KeyId, Path) ->
     {Public, Secret, Token}.
 
 
--spec p_check_payload(LeaseToken, Payload) ->
+-spec p_check_payload(LeaseToken, Payload, Digest) ->
                              {ok, Public} | {error, invalid_macaroon |
                                              {unverified_caveat, Caveat}}
                                  when LeaseToken :: binary(),
                                       Payload :: binary(),
+                                      Digest :: binary(),
                                       Public :: binary(),
                                       Caveat :: binary().
-p_check_payload(LeaseToken, _Payload) ->
+p_check_payload(LeaseToken, _Payload, _Digest) ->
     % Here we should perform all sanity checks on the request
     % Verify lease token (check user, check time-stamp, extract path).
     case  macaroon:deserialize(LeaseToken) of
