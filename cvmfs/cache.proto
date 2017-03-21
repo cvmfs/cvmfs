@@ -78,7 +78,7 @@ enum EnumCapabilities {
   CAP_INFO        = 8;   // cache plugin knows about its size and fill level
   CAP_SHRINK_RATE = 16;   // cache knows number of cleanup operations
   CAP_LIST        = 32;  // cache can return a list of objects
-  CAP_ALL         = 63;
+  CAP_ALL_V1      = 63;
 }
 
 

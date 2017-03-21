@@ -67,7 +67,7 @@ enum cvmcache_capabilities {
   CVMCACHE_CAP_INFO        = 8,   // cache plugin knows about its fill level
   CVMCACHE_CAP_SHRINK_RATE = 16,   // cache knows number of cleanup operations
   CVMCACHE_CAP_LIST        = 32,  // cache can return a list of objects
-  CVMCACHE_CAP_ALL         = 63
+  CVMCACHE_CAP_ALL_V1      = 63
 };
 
 #define CVMCACHE_SIZE_UNKNOWN (uint64_t(-1))

@@ -303,7 +303,7 @@ int main(int argc, char **argv) {
   callbacks.cvmcache_listing_begin = null_listing_begin;
   callbacks.cvmcache_listing_next = null_listing_next;
   callbacks.cvmcache_listing_end = null_listing_end;
-  callbacks.capabilities = CVMCACHE_CAP_ALL;
+  callbacks.capabilities = CVMCACHE_CAP_ALL_V1;
 
   ctx = cvmcache_init(&callbacks);
   int retval = cvmcache_listen(ctx, locator);

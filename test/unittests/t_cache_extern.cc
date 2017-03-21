@@ -36,8 +36,8 @@ class MockCachePlugin : public CachePlugin {
   static const unsigned kMockListingNitems;
 
   MockCachePlugin(const string &socket_path, bool read_only)
-    : CachePlugin(read_only ? (cvmfs::CAP_ALL & ~cvmfs::CAP_WRITE)
-                            : cvmfs::CAP_ALL)
+    : CachePlugin(read_only ? (cvmfs::CAP_ALL_V1 & ~cvmfs::CAP_WRITE)
+                            : cvmfs::CAP_ALL_V1)
   {
     bool retval = Listen("unix=" + socket_path);
     assert(retval);
