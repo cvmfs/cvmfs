@@ -30,7 +30,7 @@ init(Req0 = #{method := <<"GET">>}, State) ->
                            <<"">>,
                            Req0),
 
-    cvmfs_fe_util:tock(Uid, URI, T0, micro_seconds),
+    cvmfs_fe_util:tock(Uid, <<"GET">>, URI, T0, micro_seconds),
     {ok, Req1, State};
 %%--------------------------------------------------------------------
 %% @doc
@@ -76,7 +76,7 @@ init(Req0 = #{method := <<"POST">>}, State) ->
                             jsx:encode(Reply),
                             Req2),
 
-    cvmfs_fe_util:tock(Uid, URI, T0, micro_seconds),
+    cvmfs_fe_util:tock(Uid, <<"POST">>, URI, T0, micro_seconds),
     {ok, ReqF, State};
 %%--------------------------------------------------------------------
 %% @doc
@@ -132,7 +132,7 @@ init(Req0 = #{method := <<"DELETE">>}, State) ->
                                 {ok, Req1, State}
                         end,
 
-    cvmfs_fe_util:tock(Uid, URI, T0, micro_seconds),
+    cvmfs_fe_util:tock(Uid, <<"DELETE">>, URI, T0, micro_seconds),
     {ok, ReqF, State}.
 
 

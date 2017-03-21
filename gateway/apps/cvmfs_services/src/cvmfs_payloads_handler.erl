@@ -31,7 +31,7 @@ init(Req0 = #{method := <<"GET">>}, State) ->
                            <<"">>,
                            Req0),
 
-    cvmfs_fe_util:tock(Uid, URI, T0, micro_seconds),
+    cvmfs_fe_util:tock(Uid, <<"GET">>, URI, T0, micro_seconds),
     {ok, Req1, State};
 %% @doc
 %% A "POST" request to /api/payloads, which can return either 200 OK
@@ -52,7 +52,7 @@ init(Req0 = #{method := <<"GET">>}, State) ->
 %% @end
 %%--------------------------------------------------------------------
 init(Req0 = #{method := <<"POST">>}, State) ->
-    {_, T0} = cvmfs_fe_util:tick(Req0, micro_seconds),
+    {URI, T0} = cvmfs_fe_util:tick(Req0, micro_seconds),
     Uid = cvmfs_be:unique_id(),
 
     #{headers := #{<<"authorization">> := Auth, <<"message-size">> := MessageSizeBin}} = Req0,
@@ -78,7 +78,7 @@ init(Req0 = #{method := <<"POST">>}, State) ->
                             jsx:encode(Reply),
                             Req2),
 
-    cvmfs_fe_util:tock(Uid, Uid, T0, micro_seconds),
+    cvmfs_fe_util:tock(Uid, <<"POST">>, URI, T0, micro_seconds),
     {ok, ReqF, State}.
 
 
