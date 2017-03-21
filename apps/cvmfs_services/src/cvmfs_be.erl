@@ -153,37 +153,37 @@ init([]) ->
 handle_call({be_req, new_lease, {Uid, KeyId, Path}}, _From, State) ->
     case p_new_lease(KeyId, Path) of
         {ok, LeaseToken} ->
-            lager:info("Request received: Uid: ~p - {new_lease, {~p, ~p}} -> Reply: ~p",
+            lager:info("Backend request: Uid: ~p - {new_lease, {~p, ~p}} -> Reply: ~p",
                        [Uid, KeyId, Path, LeaseToken]),
             {reply, {ok, LeaseToken}, State};
         Other ->
-            lager:info("Request received: Uid: ~p - {new_lease, {~p, ~p}} -> Reply: ~p",
+            lager:info("Backend request: Uid: ~p - {new_lease, {~p, ~p}} -> Reply: ~p",
                        [Uid, KeyId, Path, Other]),
             {reply, Other, State}
     end;
 handle_call({be_req, end_lease, {Uid, LeaseToken}}, _From, State) ->
     Reply = p_end_lease(LeaseToken),
-    lager:info("Request received: Uid: ~p - {end_lease, ~p} -> Reply: ~p",
+    lager:info("Backend request: Uid: ~p - {end_lease, ~p} -> Reply: ~p",
                [Uid, LeaseToken, Reply]),
     {reply, Reply, State};
 handle_call({be_req, submit_payload, {Uid, LeaseToken, Payload}}, _From, State) ->
     Reply = p_submit_payload(LeaseToken, Payload),
-    lager:info("Request received: Uid: ~p - {submit_payload, {~p, ~p}} -> Reply: ~p",
+    lager:info("Backend request: Uid: ~p - {submit_payload, {~p, ~p}} -> Reply: ~p",
                [Uid, LeaseToken, <<"payload_not_shown">>, Reply]),
     {reply, Reply, State};
 handle_call({be_req, get_repos, Uid}, _From, State) ->
     Reply = p_get_repos(),
-    lager:info("Request received: Uid: ~p - {get_repos} -> Reply: ~p",
+    lager:info("Backend request: Uid: ~p - {get_repos} -> Reply: ~p",
                [Uid, Reply]),
     {reply, Reply, State};
 handle_call({be_req, check_hmac, {Uid, Message, KeyId, HMAC}}, _From, State) ->
     Reply = p_check_hmac(Message, KeyId, HMAC),
-    lager:info("Request received: Uid: ~p - {check_hmac, {~p, ~p, ~p}} -> Reply: ~p",
+    lager:info("Backend request: Uid: ~p - {check_hmac, {~p, ~p, ~p}} -> Reply: ~p",
                [Uid, Message, KeyId, HMAC, Reply]),
     {reply, Reply, State};
 handle_call({be_req, unique_id}, _From, State) ->
     Reply = p_unique_id(),
-    lager:info("Request received: {unique_id} -> Reply: ~p", [Reply]),
+    lager:info("Backend request: {unique_id} -> Reply: ~p", [Reply]),
     {reply, Reply, State}.
 
 
