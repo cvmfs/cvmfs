@@ -10,7 +10,7 @@
 
 -compile([{parse_transform, lager_transform}]).
 
--export([read_body/1, tick/2, tock/5]).
+-export([read_body/1, tick/4, tock/5]).
 
 
 read_body(Req0) ->
@@ -28,14 +28,15 @@ read_body_rec(Req0, Acc) ->
     end.
 
 
-tick(Req, Unit) ->
+tick(Uid, Method, Req, Unit) ->
     T = erlang:monotonic_time(Unit),
     URI = cowboy_req:uri(Req),
+    lager:info("HTTP request received; Uid: ~p; Method: ~p; URI: ~p", [Uid, Method, URI]),
     {URI, T}.
 
 
 tock(Uid, Method, URI, T0, Unit) ->
     T1 = erlang:monotonic_time(Unit),
-    lager:info("HTTP request received; Uid: ~p; Method: ~p; URI: ~p; Time to process = ~p usec",
+    lager:info("HTTP request handled; Uid: ~p; Method: ~p; URI: ~p; Time to process = ~p usec",
                [Uid, Method, URI, T1 - T0]).
 

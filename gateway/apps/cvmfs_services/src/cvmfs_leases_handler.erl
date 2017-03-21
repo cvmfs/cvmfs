@@ -22,8 +22,8 @@
 %% @end
 %%--------------------------------------------------------------------
 init(Req0 = #{method := <<"GET">>}, State) ->
-    {URI, T0} = cvmfs_fe_util:tick(Req0, micro_seconds),
     Uid = cvmfs_be:unique_id(),
+    {URI, T0} = cvmfs_fe_util:tick(Uid, <<"GET">>, Req0, micro_seconds),
 
     Req1 = cowboy_req:reply(405,
                            #{<<"content-type">> => <<"application/plain-text">>},
@@ -52,8 +52,8 @@ init(Req0 = #{method := <<"GET">>}, State) ->
 %% @end
 %%--------------------------------------------------------------------
 init(Req0 = #{method := <<"POST">>}, State) ->
-    {URI, T0} = cvmfs_fe_util:tick(Req0, micro_seconds),
     Uid = cvmfs_be:unique_id(),
+    {URI, T0} = cvmfs_fe_util:tick(Uid, <<"POST">>, Req0, micro_seconds),
 
     #{headers := #{<<"authorization">> := Auth}} = Req0,
     [KeyId, ClientHMAC] = binary:split(Auth, <<" ">>),
@@ -97,8 +97,8 @@ init(Req0 = #{method := <<"POST">>}, State) ->
 %% @end
 %%--------------------------------------------------------------------
 init(Req0 = #{method := <<"DELETE">>}, State) ->
-    {URI, T0} = cvmfs_fe_util:tick(Req0, micro_seconds),
     Uid = cvmfs_be:unique_id(),
+    {URI, T0} = cvmfs_fe_util:tick(Uid, <<"DELETE">>, Req0, micro_seconds),
 
     #{headers := #{<<"authorization">> := Auth}} = Req0,
     [KeyId, ClientHMAC] = binary:split(Auth, <<" ">>),
