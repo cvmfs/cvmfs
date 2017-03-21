@@ -234,8 +234,11 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
   // Set up the object pack serializer
   ObjectPackProducer serializer(job->pack);
 
-  const std::string json_body =
-      "{\"session_token\" : \"" + session_token_ + "\"}";
+  shash::Any payload_digest(shash::kSha1);
+  serializer.GetDigest(&payload_digest);
+  const std::string json_body = "{\"session_token\" : \"" + session_token_ +
+                                "\", \"payload_digest\" : \"" +
+                                Base64(payload_digest.ToString(false)) + "\"}";
 
   // Compute HMAC
   shash::Any hmac(shash::kSha1);
