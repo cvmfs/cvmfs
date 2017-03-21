@@ -52,6 +52,7 @@ init(Req0 = #{method := <<"GET">>}, State) ->
 %%--------------------------------------------------------------------
 init(Req0 = #{method := <<"POST">>}, State) ->
     {_, T0} = cvmfs_fe_util:tick(Req0, micro_seconds),
+    Uid = cvmfs_be:unique_id(),
 
     #{headers := #{<<"authorization">> := Auth, <<"message-size">> := MessageSizeBin}} = Req0,
     [KeyId, ClientHMAC] = binary:split(Auth, <<" ">>),
@@ -76,7 +77,7 @@ init(Req0 = #{method := <<"POST">>}, State) ->
                             jsx:encode(Reply),
                             Req2),
 
-    cvmfs_fe_util:tock(<<"payload_not_shown">>, T0, micro_seconds),
+    cvmfs_fe_util:tock(Uid, Uid, T0, micro_seconds),
     {ok, ReqF, State}.
 
 

@@ -19,6 +19,7 @@
 %%--------------------------------------------------------------------
 init(Req0, State) ->
     {URI, T0} = cvmfs_fe_util:tick(Req0, micro_seconds),
+    Uid = cvmfs_be:unique_id(),
 
     Repos = cvmfs_be:get_repos(),
     Req = cowboy_req:reply(200,
@@ -26,6 +27,6 @@ init(Req0, State) ->
                            jsx:encode(#{<<"repos">> => Repos}),
                            Req0),
 
-    cvmfs_fe_util:tock(URI, T0, micro_seconds),
+    cvmfs_fe_util:tock(Uid, URI, T0, micro_seconds),
     {ok, Req, State}.
 
