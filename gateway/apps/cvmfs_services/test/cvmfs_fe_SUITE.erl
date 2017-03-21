@@ -175,7 +175,9 @@ normal_payload_submission(Config) ->
 
     % Submit payload
     Payload = <<"IAMAPAYLOAD">>,
-    JSONMessage = jsx:encode(#{<<"session_token">> => Token}),
+    Digest = base64:encode(<<"FAKE PAYLOAD DIGEST">>),
+    JSONMessage = jsx:encode(#{<<"session_token">> => Token,
+                               <<"payload_digest">> => Digest}),
     RequestBody2 = <<JSONMessage/binary,Payload/binary>>,
     MessageSize = size(JSONMessage),
     MessageHMAC = p_make_hmac(JSONMessage, Config),
@@ -201,7 +203,9 @@ payload_submission_with_invalid_hmac(Config) ->
 
     % Submit payload
     Payload = <<"IAMAPAYLOAD">>,
-    JSONMessage = jsx:encode(#{<<"session_token">> => Token}),
+    Digest = base64:encode(<<"FAKE PAYLOAD DIGEST">>),
+    JSONMessage = jsx:encode(#{<<"session_token">> => Token
+                              ,<<"payload_digest">> => Digest}),
     RequestBody2 = <<JSONMessage/binary,Payload/binary>>,
     MessageSize = size(JSONMessage),
     MessageHMAC = p_make_hmac(<<"SOME_RUBBISH">>, Config),
