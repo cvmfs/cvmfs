@@ -285,6 +285,32 @@ string PosixCacheManager::Describe() {
 }
 
 
+/**
+ * Nothing to do, the kernel keeps the state of open file descriptors.  Return
+ * a dummy memory location.
+ */
+void *PosixCacheManager::DoSaveState() {
+  char *c = reinterpret_cast<char *>(smalloc(1));
+  *c = '\0';
+  return c;
+}
+
+
+bool PosixCacheManager::DoRestoreState(void *data) {
+  assert(data);
+  char *c = reinterpret_cast<char *>(data);
+  assert(*c == '\0');
+  return true;
+}
+
+
+bool PosixCacheManager::DoFreeState(void *data) {
+  free(data);
+  return true;
+}
+
+
+
 int PosixCacheManager::Dup(int fd) {
   int new_fd = dup(fd);
   if (new_fd < 0)

@@ -99,12 +99,16 @@ bool CacheManager::CommitFromMem(
 
 void CacheManager::FreeState(const int fd_progress, void *data) {
   State *state = reinterpret_cast<State *>(data);
-  SendMsg2Socket(fd_progress, "Releasing saved open files table\n");
+  if (fd_progress >= 0)
+    SendMsg2Socket(fd_progress, "Releasing saved open files table\n");
   assert(state->version == kStateVersion);
   assert(state->manager_type == id());
   bool result = DoFreeState(state->concrete_state);
   if (!result) {
-    SendMsg2Socket(fd_progress, "   *** Releasing open files table failed!\n");
+    if (fd_progress >= 0) {
+      SendMsg2Socket(fd_progress,
+                     "   *** Releasing open files table failed!\n");
+    }
     abort();
   }
   delete state;
@@ -189,21 +193,24 @@ int CacheManager::OpenPinned(
 
 void CacheManager::RestoreState(const int fd_progress, void *data) {
   State *state = reinterpret_cast<State *>(data);
-  SendMsg2Socket(fd_progress, "Restoring open files table... ");
+  if (fd_progress >= 0)
+    SendMsg2Socket(fd_progress, "Restoring open files table... ");
   if (state->version != kStateVersion) {
-    SendMsg2Socket(fd_progress, "unsupported state version!\n");
+    if (fd_progress >= 0)
+      SendMsg2Socket(fd_progress, "unsupported state version!\n");
     abort();
   }
   if (state->manager_type != id()) {
-    SendMsg2Socket(fd_progress, "switching cache manager unsupported!\n");
+    if (fd_progress >= 0)
+      SendMsg2Socket(fd_progress, "switching cache manager unsupported!\n");
     abort();
   }
   bool result = DoRestoreState(state->concrete_state);
   if (!result) {
-    SendMsg2Socket(fd_progress, "FAILED!\n");
+    if (fd_progress >= 0) SendMsg2Socket(fd_progress, "FAILED!\n");
     abort();
   }
-  SendMsg2Socket(fd_progress, "done\n");
+  if (fd_progress >= 0) SendMsg2Socket(fd_progress, "done\n");
 }
 
 
@@ -211,13 +218,16 @@ void CacheManager::RestoreState(const int fd_progress, void *data) {
  * The actual work is done in the concrete cache managers.
  */
 void *CacheManager::SaveState(const int fd_progress) {
-  SendMsg2Socket(fd_progress, "Saving open files table\n");
+  if (fd_progress >= 0)
+    SendMsg2Socket(fd_progress, "Saving open files table\n");
   State *state = new State();
   state->manager_type = id();
   state->concrete_state = DoSaveState();
   if (state->concrete_state == NULL) {
-    SendMsg2Socket(fd_progress,
-                   "  *** This cache manager does not support saving state!\n");
+    if (fd_progress >= 0) {
+      SendMsg2Socket(fd_progress,
+        "  *** This cache manager does not support saving state!\n");
+    }
     abort();
   }
   return state;

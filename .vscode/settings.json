@@ -5,7 +5,21 @@
     "clang-format.style": "Google",
     "files.associations": {
       "random": "cpp",
-      "array": "cpp"
+      "array": "cpp",
+      "dense_hash_map": "cpp",
+      "dense_hash_set": "cpp",
+      "sparse_hash_map": "cpp",
+      "sparse_hash_set": "cpp",
+      "sparsetable": "cpp",
+      "*.ipp": "cpp",
+      "hash_map": "cpp",
+      "hash_set": "cpp",
+      "*.tcc": "cpp",
+      "deque": "cpp",
+      "string": "cpp",
+      "vector": "cpp",
+      "slist": "cpp",
+      "regex": "cpp"
     }
   }
 

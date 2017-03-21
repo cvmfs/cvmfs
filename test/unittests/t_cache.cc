@@ -888,6 +888,7 @@ TEST_F(T_CacheManager, WriteCompare) {
 TEST_F(T_CacheManager, SaveState) {
   TestCacheManager test_cache;
   int fd_progress = open("/dev/null", O_WRONLY);
+  ASSERT_GE(fd_progress, 0);
   ASSERT_DEATH(test_cache.SaveState(fd_progress), ".*");
   test_cache.state = &test_cache;
   void *data = test_cache.SaveState(fd_progress);
@@ -900,5 +901,11 @@ TEST_F(T_CacheManager, SaveState) {
   test_cache.type = kUnknownCacheManager;
   // should not crash
   test_cache.FreeState(fd_progress, data);
+
+  // Again, should not crash
+  data = cache_mgr_->SaveState(fd_progress);
+  cache_mgr_->RestoreState(fd_progress, data);
+  cache_mgr_->FreeState(fd_progress, data);
+
   close(fd_progress);
 }

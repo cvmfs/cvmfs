@@ -91,6 +91,11 @@ class ExternalCacheManager : public CacheManager {
   uint32_t max_object_size() const { return max_object_size_; }
   uint64_t capabilities() const { return capabilities_; }
 
+ protected:
+  virtual void *DoSaveState();
+  virtual bool DoRestoreState(void *data);
+  virtual bool DoFreeState(void *data);
+
  private:
   /**
    * The null hash (hashed output is all null bytes) serves as a marker for an

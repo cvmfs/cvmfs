@@ -20,6 +20,31 @@ std::string TieredCacheManager::Describe() {
 }
 
 
+bool TieredCacheManager::DoFreeState(void *data) {
+  SavedState *state = reinterpret_cast<SavedState *>(data);
+  upper_->FreeState(-1, state->state_upper);
+  lower_->FreeState(-1, state->state_lower);
+  delete state;
+  return true;
+}
+
+
+bool TieredCacheManager::DoRestoreState(void *data) {
+  SavedState *state = reinterpret_cast<SavedState *>(data);
+  upper_->RestoreState(-1, state->state_upper);
+  lower_->RestoreState(-1, state->state_lower);
+  return true;
+}
+
+
+void *TieredCacheManager::DoSaveState() {
+  SavedState *state = new SavedState();
+  state->state_upper = upper_->SaveState(-1);
+  state->state_lower = lower_->SaveState(-1);
+  return state;
+}
+
+
 int TieredCacheManager::Open(const BlessedObject &object) {
   int fd = upper_->Open(object);
   if ((fd >= 0) || (fd != -ENOENT)) {return fd;}

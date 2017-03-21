@@ -287,6 +287,14 @@ string ExternalCacheManager::Describe() {
 }
 
 
+bool ExternalCacheManager::DoFreeState(void *data) {
+  FdTable<ReadOnlyHandle> *fd_table =
+    reinterpret_cast<FdTable<ReadOnlyHandle> *>(data);
+  delete fd_table;
+  return true;
+}
+
+
 int ExternalCacheManager::DoOpen(const shash::Any &id) {
   int fd = -1;
   {
@@ -307,6 +315,19 @@ int ExternalCacheManager::DoOpen(const shash::Any &id) {
   int retval = fd_table_.CloseFd(fd);
   assert(retval == 0);
   return status_refcnt;
+}
+
+
+bool ExternalCacheManager::DoRestoreState(void *data) {
+  FdTable<ReadOnlyHandle> *other =
+    reinterpret_cast<FdTable<ReadOnlyHandle> *>(data);
+  fd_table_.AssignFrom(*other);
+  return true;
+}
+
+
+void *ExternalCacheManager::DoSaveState() {
+  return fd_table_.Clone();
 }
 
 
