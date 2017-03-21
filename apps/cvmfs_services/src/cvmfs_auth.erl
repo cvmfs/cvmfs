@@ -143,7 +143,6 @@ init({RepoList, Keys}) ->
     p_populate_keys(Keys),
     lager:info("Key list initialized."),
 
-    lager:info("Auth module initialized."),
     {ok, []}.
 
 %%--------------------------------------------------------------------
@@ -155,31 +154,24 @@ init({RepoList, Keys}) ->
 %%--------------------------------------------------------------------
 handle_call({auth_req, check_keyid_for_repo, {KeyId, Repo}}, _From, State) ->
     Reply = p_check_keyid_for_repo(KeyId, Repo),
-    lager:info("Request received: {check_keyid_for_repo, {~p, ~p}} -> Reply: ~p", [KeyId, Repo, Reply]),
     {reply, Reply, State};
 handle_call({auth_req, add_key, {KeyId, Secret}}, _From, State) ->
     Reply = p_add_key(KeyId, Secret),
-    lager:info("Request received: {add_key, {~p}} -> Reply: ~p", [KeyId, Reply]),
     {reply, Reply, State};
 handle_call({auth_req, remove_key, Key}, _From, State) ->
     Reply = p_remove_key(Key),
-    lager:info("Request received: {remove_key, ~p} -> Reply: ~p", [Key, Reply]),
     {reply, Reply, State};
 handle_call({auth_req, add_repo, {Repo, KeyIds}}, _From, State) ->
     Reply = p_add_repo(Repo, KeyIds),
-    lager:info("Request received: {add_repo, {~p, ~p}} -> Reply: ~p", [Repo, KeyIds, Reply]),
     {reply, Reply, State};
 handle_call({auth_req, remove_repo, Repo}, _From, State) ->
     Reply = p_remove_repo(Repo),
-    lager:info("Request received: {remove_repo, ~p} -> Reply: ~p", [Repo, Reply]),
     {reply, Reply, State};
 handle_call({auth_req, get_repos}, _From, State) ->
     Reply = p_get_repos(),
-    lager:info("Request received: {get_repos} -> Reply: ~p", [Reply]),
     {reply, Reply, State};
 handle_call({auth_req, check_hmac, {Message, KeyId, HMAC}}, _From, State) ->
     Reply = p_check_hmac(Message, KeyId, HMAC),
-    lager:info("Request received: {check_hmac, ~p, ~p, ~p} -> Reply: ~p", [Message, KeyId, HMAC, Reply]),
     {reply, Reply, State}.
 
 
@@ -309,9 +301,7 @@ p_check_hmac(Message, KeyId, HMAC) ->
     {atomic, Result} = mnesia:transaction(T),
     case Result of
         {ok, Secret} ->
-            ComputedHMAC = cvmfs_auth_util:compute_hmac(Secret, Message),
-            lager:info("HMAC: ~p Computed HMAC: ~p", [HMAC, ComputedHMAC]),
-            HMAC =:= ComputedHMAC;
+            HMAC =:= cvmfs_auth_util:compute_hmac(Secret, Message);
         _ ->
             false
     end.
