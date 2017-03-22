@@ -263,6 +263,7 @@ set (CVMFS_PRELOADER_SOURCES
   file_processing/file_processor.cc
   file_processing/io_dispatcher.cc
   file_processing/processor.cc
+  gateway_util.cc
   globals.cc
   hash.cc
   history_sql.cc

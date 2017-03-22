@@ -8,6 +8,7 @@
 
 #include "curl/curl.h"
 #include "cvmfs_config.h"
+#include "gateway_util.h"
 #include "util/string.h"
 
 namespace {
@@ -236,9 +237,10 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
 
   shash::Any payload_digest(shash::kSha1);
   serializer.GetDigest(&payload_digest);
-  const std::string json_body = "{\"session_token\" : \"" + session_token_ +
-                                "\", \"payload_digest\" : \"" +
-                                Base64(payload_digest.ToString(false)) + "\"}";
+  const std::string json_body =
+      "{\"session_token\" : \"" + session_token_ +
+      "\", \"payload_digest\" : \"" + Base64(payload_digest.ToString(false)) +
+      "\", \"api_version\" : \"" + StringifyInt(gateway::APIVersion()) + "\"}";
 
   // Compute HMAC
   shash::Any hmac(shash::kSha1);

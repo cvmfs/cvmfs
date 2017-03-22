@@ -4,10 +4,14 @@
 
 #include "gateway_util.h"
 
+#include <vector>
+
 #include "logging.h"
 #include "util/string.h"
 
 namespace gateway {
+
+int APIVersion() { return 1; }
 
 bool ReadKeys(const std::string& key_file_name, std::string* key_id,
               std::string* secret) {
@@ -40,4 +44,5 @@ bool ReadKeys(const std::string& key_file_name, std::string* key_id,
 
   return true;
 }
-}
+
+}  // namespace gateway
