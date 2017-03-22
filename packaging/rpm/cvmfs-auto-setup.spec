@@ -1,7 +1,7 @@
 Summary: CernVM File System Auto System Setup
 Name: cvmfs-auto-setup
 Version: 1.5
-Release: 1
+Release: 2
 #Source0: %{name}-%{version}.tar.gz
 BuildArch: noarch
 Requires: cvmfs >= 2.1
