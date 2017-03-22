@@ -6,6 +6,7 @@
 
 #include "cvmfs_config.h"
 
+#include "gateway_util.h"
 #include "hash.h"
 #include "logging.h"
 #include "util/string.h"
@@ -49,7 +50,9 @@ bool MakeAcquireRequest(const std::string& key_id, const std::string& secret,
     return false;
   }
 
-  const std::string payload = "{\"path\" : \"" + repo_path + "\"}";
+  const std::string payload = "{\"path\" : \"" + repo_path +
+                              "\", \"api_version\" : \"" +
+                              StringifyInt(gateway::APIVersion()) + "\"}";
 
   shash::Any hmac(shash::kSha1);
   shash::HmacString(secret, payload, &hmac);

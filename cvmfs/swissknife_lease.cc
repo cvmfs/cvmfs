@@ -7,10 +7,10 @@
 #include <algorithm>
 #include <vector>
 
+#include "gateway_util.h"
+#include "logging.h"
 #include "swissknife_lease_curl.h"
 #include "swissknife_lease_json.h"
-
-#include "logging.h"
 #include "util/string.h"
 
 namespace {
@@ -19,24 +19,6 @@ bool CheckParams(const swissknife::CommandLease::Parameters& p) {
   if (p.action != "acquire" && p.action != "drop") {
     return false;
   }
-
-  return true;
-}
-
-bool ReadKeys(const std::string& key_file_name, std::string* key_id,
-              std::string* secret) {
-  if (!(key_id && secret)) {
-    return false;
-  }
-
-  FILE* key_file_fd = std::fopen(key_file_name.c_str(), "r");
-  if (!key_file_fd) {
-    return false;
-  }
-
-  GetLineFile(key_file_fd, key_id);
-  GetLineFile(key_file_fd, secret);
-  fclose(key_file_fd);
 
   return true;
 }
@@ -94,7 +76,7 @@ int CommandLease::Main(const ArgumentList& args) {
 
   std::string key_id;
   std::string secret;
-  if (!ReadKeys(params.key_file, &key_id, &secret)) {
+  if (!gateway::ReadKeys(params.key_file, &key_id, &secret)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Error reading key file %s.",
              params.key_file.c_str());
     return 1;
