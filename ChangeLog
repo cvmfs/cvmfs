@@ -1,4 +1,5 @@
 2.3.5:
+  * Lep RPM drop patch configuration for CVM-1200 where necessary
 
 2.3.4:
   * Unlink empty files during cache db rebuild (CVM-1113)
