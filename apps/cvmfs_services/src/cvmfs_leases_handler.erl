@@ -59,10 +59,10 @@ init(Req0 = #{method := <<"POST">>}, State) ->
     [KeyId, ClientHMAC] = binary:split(Auth, <<" ">>),
     {ok, Data, Req1} = cvmfs_fe_util:read_body(Req0),
     {Status, Reply, Req2} = case jsx:decode(Data, [return_maps]) of
-                                #{<<"path">> := Path} ->
+                                #{<<"path">> := Path, <<"api_version">> := ClientApiVersion} ->
                                     Rep = case p_check_hmac(Uid, Data, KeyId, ClientHMAC) of
                                         true ->
-                                            p_new_lease(Uid, KeyId, Path);
+                                            p_new_lease(Uid, KeyId, Path, binary_to_integer(ClientApiVersion));
                                         false ->
                                             #{<<"status">> => <<"error">>,
                                               <<"reason">> => <<"invalid_hmac">>}
@@ -142,10 +142,13 @@ p_check_hmac(Uid, JSONMessage, KeyId, ClientHMAC) ->
     cvmfs_be:check_hmac(Uid, JSONMessage, KeyId, ClientHMAC).
 
 
-p_new_lease(Uid, KeyId, Path) ->
+p_new_lease(Uid, KeyId, Path, ClientApiVersion) ->
     case cvmfs_be:new_lease(Uid, KeyId, Path) of
         {ok, Token} ->
-            #{<<"status">> => <<"ok">>, <<"session_token">> => Token};
+            #{<<"status">> => <<"ok">>,
+              <<"session_token">> => Token,
+              <<"max_api_version">> => integer_to_binary(erlang:min(cvmfs_fe:api_version(),
+                                                                    ClientApiVersion))};
         {path_busy, Time} ->
             #{<<"status">> => <<"path_busy">>, <<"time_remaining">> => Time};
         {error, Reason} ->

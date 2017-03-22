@@ -107,7 +107,8 @@ check_leases(Config) ->
 
 
 create_and_delete_session(Config) ->
-    RequestBody = jsx:encode(#{<<"path">> => <<"repo1.domain1.org">>}),
+    RequestBody = jsx:encode(#{<<"path">> => <<"repo1.domain1.org">>,
+                               <<"api_version">> => integer_to_binary(cvmfs_fe:api_version())}),
     HMAC = p_make_hmac(RequestBody, Config),
     RequestHeaders = p_make_headers(RequestBody, <<"key1">>, HMAC),
     {ok, ReplyBody1} = p_post(conn_pid(Config), ?API_ROOT ++ "/leases", RequestHeaders, RequestBody),
@@ -126,7 +127,8 @@ create_invalid_leases(Config) ->
                       {<<"key1">>, <<"bad_path">>, <<"invalid_path">>}
                      ],
     Check = fun({KeyId, Path, Reason}) ->
-                    RequestBody = jsx:encode(#{<<"path">> => Path}),
+                    RequestBody = jsx:encode(#{<<"path">> => Path,
+                                               <<"api_version">> => integer_to_binary(cvmfs_fe:api_version())}),
                     HMAC = p_make_hmac(RequestBody, Config),
                     RequestHeaders = p_make_headers(RequestBody, KeyId, HMAC),
                     {ok, ReplyBody} = p_post(conn_pid(Config), ?API_ROOT ++ "/leases", RequestHeaders, RequestBody),
@@ -138,7 +140,8 @@ create_invalid_leases(Config) ->
 
 create_session_when_already_created(Config) ->
     % Create new lease
-    RequestBody = jsx:encode(#{<<"path">> => <<"repo1.domain1.org">>}),
+    RequestBody = jsx:encode(#{<<"path">> => <<"repo1.domain1.org">>,
+                               <<"api_version">> => integer_to_binary(cvmfs_fe:api_version())}),
     HMAC = p_make_hmac(RequestBody, Config),
     RequestHeaders = p_make_headers(RequestBody, <<"key1">>, HMAC),
     {ok, ReplyBody1} = p_post(conn_pid(Config), ?API_ROOT ++ "/leases", RequestHeaders, RequestBody),
@@ -167,7 +170,8 @@ end_invalid_session(Config) ->
 
 normal_payload_submission(Config) ->
     % Create new lease
-    RequestBody1 = jsx:encode(#{<<"path">> => <<"repo1.domain1.org">>}),
+    RequestBody1 = jsx:encode(#{<<"path">> => <<"repo1.domain1.org">>,
+                                <<"api_version">> => integer_to_binary(cvmfs_fe:api_version())}),
     HMAC1 = p_make_hmac(RequestBody1, Config),
     RequestHeaders1 = p_make_headers(RequestBody1, <<"key1">>, HMAC1),
     {ok, ReplyBody1} = p_post(conn_pid(Config), ?API_ROOT ++ "/leases", RequestHeaders1, RequestBody1),
@@ -177,7 +181,8 @@ normal_payload_submission(Config) ->
     Payload = <<"IAMAPAYLOAD">>,
     Digest = base64:encode(<<"FAKE PAYLOAD DIGEST">>),
     JSONMessage = jsx:encode(#{<<"session_token">> => Token,
-                               <<"payload_digest">> => Digest}),
+                               <<"payload_digest">> => Digest,
+                               <<"api_version">> => integer_to_binary(cvmfs_fe:api_version())}),
     RequestBody2 = <<JSONMessage/binary,Payload/binary>>,
     MessageSize = size(JSONMessage),
     MessageHMAC = p_make_hmac(JSONMessage, Config),
@@ -195,7 +200,8 @@ normal_payload_submission(Config) ->
 
 payload_submission_with_invalid_hmac(Config) ->
     % Create new lease
-    RequestBody1 = jsx:encode(#{<<"path">> => <<"repo1.domain1.org">>}),
+    RequestBody1 = jsx:encode(#{<<"path">> => <<"repo1.domain1.org">>,
+                                <<"api_version">> => integer_to_binary(cvmfs_fe:api_version())}),
     HMAC1 = p_make_hmac(RequestBody1, Config),
     RequestHeaders1 = p_make_headers(RequestBody1, <<"key1">>, HMAC1),
     {ok, ReplyBody1} = p_post(conn_pid(Config), ?API_ROOT ++ "/leases", RequestHeaders1, RequestBody1),
@@ -205,7 +211,8 @@ payload_submission_with_invalid_hmac(Config) ->
     Payload = <<"IAMAPAYLOAD">>,
     Digest = base64:encode(<<"FAKE PAYLOAD DIGEST">>),
     JSONMessage = jsx:encode(#{<<"session_token">> => Token
-                              ,<<"payload_digest">> => Digest}),
+                              ,<<"payload_digest">> => Digest
+                              ,<<"api_version">> => integer_to_binary(cvmfs_fe:api_version())}),
     RequestBody2 = <<JSONMessage/binary,Payload/binary>>,
     MessageSize = size(JSONMessage),
     MessageHMAC = p_make_hmac(<<"SOME_RUBBISH">>, Config),

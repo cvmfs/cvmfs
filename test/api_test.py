@@ -31,7 +31,7 @@ def create_and_delete_session():
     print 'Create and delete a session'
     print
     try:
-        body = json.dumps({'path' : 'repo1.domain1.org'})
+        body = json.dumps({'path' : 'repo1.domain1.org', 'api_version' : '1'})
         body_hmac = compute_hmac('secret1', body)
         headers = {'Content-type' : 'application/json', 'authorization' : 'key1 ' + body_hmac}
         print 'Request - body: ' + body + ', hmac:' + body_hmac
@@ -53,7 +53,7 @@ def submit_payload():
     print 'Submit a payload in a new session'
     print
     try:
-        body = json.dumps({'path' : 'repo1.domain1.org'})
+        body = json.dumps({'path' : 'repo1.domain1.org', 'api_version' : '1'})
         body_hmac = compute_hmac('secret1', body)
         headers = {'Content-type' : 'application/json', 'authorization' : 'key1 ' + body_hmac}
         print 'Request - body: ' + body + ', hmac:' + body_hmac

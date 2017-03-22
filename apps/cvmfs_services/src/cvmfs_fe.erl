@@ -8,9 +8,10 @@
 
 -module(cvmfs_fe).
 
--export([start_link/0]).
+-export([start_link/0, api_version/0]).
 
--define(API_ROOT, "/api/v1").
+-define(API_VERSION, 1).
+-define(API_ROOT, "/api/v" ++ integer_to_list(?API_VERSION)).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -35,3 +36,7 @@ start_link() ->
                        [{port, 8080}],
                        #{env => #{dispatch => Dispatch}}).
 
+
+-spec api_version() -> integer().
+api_version() ->
+    ?API_VERSION.
