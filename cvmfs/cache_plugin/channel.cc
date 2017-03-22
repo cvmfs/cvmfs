@@ -41,6 +41,7 @@ CachePlugin::CachePlugin(uint64_t capabilities)
   , running_(0)
   , num_workers_(0)
   , max_object_size_(kDefaultMaxObjectSize)
+  , num_inlimbo_clients_(0)
 {
   atomic_init64(&next_session_id_);
   atomic_init64(&next_txn_id_);
@@ -106,6 +107,24 @@ void CachePlugin::HandleInfo(
   msg_reply.set_no_shrink(info.no_shrink);
   msg_reply.set_status(status);
   transport->SendFrame(&frame_send);
+}
+
+
+void CachePlugin::HandleIoctl(cvmfs::MsgIoctl *msg_req) {
+  if (!msg_req->has_conncnt_change_by())
+    return;
+  int32_t conncnt_change_by = msg_req->conncnt_change_by();
+  if ((num_inlimbo_clients_ + conncnt_change_by) < 0) {
+    LogSessionError(msg_req->session_id(), cvmfs::STATUS_MALFORMED,
+                    "invalid request to drop connection counter below zero");
+    return;
+  }
+  if (conncnt_change_by > 0) {
+    LogSessionInfo(msg_req->session_id(), "lock session beyond lifetime");
+  } else {
+    LogSessionInfo(msg_req->session_id(), "release session lock");
+  }
+  num_inlimbo_clients_ += conncnt_change_by;
 }
 
 
@@ -280,6 +299,8 @@ bool CachePlugin::HandleRequest(int fd_con) {
     cvmfs::MsgQuit *msg_req = reinterpret_cast<cvmfs::MsgQuit *>(msg_typed);
     sessions_.erase(msg_req->session_id());
     return false;
+  } else if (msg_typed->GetTypeName() == "cvmfs.MsgIoctl") {
+    HandleIoctl(reinterpret_cast<cvmfs::MsgIoctl *>(msg_typed));
   } else if (msg_typed->GetTypeName() == "cvmfs.MsgRefcountReq") {
     cvmfs::MsgRefcountReq *msg_req =
       reinterpret_cast<cvmfs::MsgRefcountReq *>(msg_typed);
@@ -515,6 +536,17 @@ bool CachePlugin::Listen(const string &locator) {
 }
 
 
+void CachePlugin::LogSessionInfo(uint64_t session_id, const string &msg) {
+  string session_str("unidentified client (" + StringifyInt(session_id) + ")");
+  map<uint64_t, string>::const_iterator iter = sessions_.find(session_id);
+  if (iter != sessions_.end()) {
+    session_str = iter->second;
+  }
+  LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
+           "session '%s': %s", session_str.c_str(), msg.c_str());
+}
+
+
 void CachePlugin::LogSessionError(
   uint64_t session_id,
   cvmfs::EnumStatus status,
@@ -604,8 +636,9 @@ void *CachePlugin::MainProcessRequests(void *data) {
           close(watch_fds[i].fd);
           cache_plugin->connections_.erase(watch_fds[i].fd);
           watch_fds.erase(watch_fds.begin() + i);
-          if ((getenv(CacheTransport::kEnvReadyNotifyFd) != NULL) &&
-              (cache_plugin->connections_.empty()))
+          if ( (getenv(CacheTransport::kEnvReadyNotifyFd) != NULL) &&
+               (cache_plugin->connections_.empty()) &&
+               (cache_plugin->num_inlimbo_clients_ == 0) )
           {
             LogCvmfs(kLogCache, kLogSyslog,
                      "stopping cache plugin, no more active clients");

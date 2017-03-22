@@ -135,8 +135,16 @@ message MsgHandshakeAck {
 message MsgQuit {
   // The connection identifier from the handshake acknowledgement
   required uint64 session_id = 1;
-  // The client can express its interest to reconnect soon (e.g. during reload)
-  optional bool temporary    = 2;
+}
+
+// Send from the client to the plugin to steer the connection handling
+message MsgIoctl {
+  required uint64 session_id = 1;
+  // When there are no more open connections, the cache plugin can shutdown
+  // itself.  During client reloads, this is unwanted.  Before the reload, the
+  // client tells the plugin to artifically increase the connection counter.
+  // Once reloading has finished, the connection counter is decreased again.
+  optional sint32 conncnt_change_by  = 2;
 }
 
 
@@ -324,5 +332,7 @@ message MsgRpc {
     MsgListReply msg_list_reply              = 24;
 
     MsgDetach msg_detach                     = 25;
+
+    MsgIoctl msg_ioctl                       = 26;
   }
 }

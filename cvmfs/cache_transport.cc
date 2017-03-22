@@ -120,6 +120,7 @@ void CacheTransport::Frame::Release() {
   msg_rpc_.release_msg_handshake();
   msg_rpc_.release_msg_handshake_ack();
   msg_rpc_.release_msg_quit();
+  msg_rpc_.release_msg_ioctl();
   msg_rpc_.release_msg_info_req();
   msg_rpc_.release_msg_info_reply();
   msg_rpc_.release_msg_shrink_req();
@@ -151,6 +152,9 @@ void CacheTransport::Frame::WrapMsg() {
   } else if (msg_typed_->GetTypeName() == "cvmfs.MsgQuit") {
     msg_rpc_.set_allocated_msg_quit(
       reinterpret_cast<cvmfs::MsgQuit *>(msg_typed_));
+  } else if (msg_typed_->GetTypeName() == "cvmfs.MsgIoctl") {
+    msg_rpc_.set_allocated_msg_ioctl(
+      reinterpret_cast<cvmfs::MsgIoctl *>(msg_typed_));
   } else if (msg_typed_->GetTypeName() == "cvmfs.MsgRefcountReq") {
     msg_rpc_.set_allocated_msg_refcount_req(
       reinterpret_cast<cvmfs::MsgRefcountReq *>(msg_typed_));
@@ -212,6 +216,8 @@ void CacheTransport::Frame::UnwrapMsg() {
     msg_typed_ = msg_rpc_.mutable_msg_handshake_ack();
   } else if (msg_rpc_.has_msg_quit()) {
     msg_typed_ = msg_rpc_.mutable_msg_quit();
+  } else if (msg_rpc_.has_msg_ioctl()) {
+    msg_typed_ = msg_rpc_.mutable_msg_ioctl();
   } else if (msg_rpc_.has_msg_refcount_req()) {
     msg_typed_ = msg_rpc_.mutable_msg_refcount_req();
   } else if (msg_rpc_.has_msg_refcount_reply()) {
