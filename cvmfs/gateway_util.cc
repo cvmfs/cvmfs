@@ -31,7 +31,7 @@ bool ReadKeys(const std::string& key_file_name, std::string* key_id,
   fclose(key_file_fd);
 
   std::vector<std::string> tokens = SplitString(line, ' ');
-  if (tokens.size() != 3) {
+  if (tokens.size() < 2) {
     return false;
   }
 
