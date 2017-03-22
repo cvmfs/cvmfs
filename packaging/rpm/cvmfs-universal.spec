@@ -1,6 +1,7 @@
 
 %{?suse_version:%define dist .suse%suse_version}
 %if 0%{?suse_version} == 1315
+%define sle12 1
 %define dist .sle12
 %endif
 %if 0%{?el6} || 0%{?el7} || 0%{?fedora}
@@ -14,6 +15,11 @@
     %define el4 1
     %define dist .el4
   %endif
+%endif
+
+# List of platforms that require systemd/autofs fix as described in CVM-1200
+%if 0%{?el7} || 0%{?fedora} || 0%{?sle12}
+%define systemd_autofs_patch 1
 %endif
 
 %define __strip /bin/true
@@ -310,6 +316,16 @@ popd
 /usr/sbin/hardlink -cv $RPM_BUILD_ROOT%{_datadir}/selinux
 %endif
 
+%if 0%{?systemd_autofs_patch}
+mkdir -p $RPM_BUILD_ROOT/usr/lib/systemd/system/autofs.service.d
+cat << EOF > $RPM_BUILD_ROOT/usr/lib/systemd/system/autofs.service.d/50-cvmfs.conf
+# Addresses distribution bug in autofs configuration
+# See CVM-1200 under https://sft.its.cern.ch/jira/browse/CVM-1200
+[Service]
+KillMode=process
+EOF
+%endif
+
 %clean
 rm -rf $RPM_BUILD_ROOT
 
@@ -324,6 +340,9 @@ done
 restorecon -R /var/lib/cvmfs
 %endif
 /sbin/ldconfig
+%if 0%{?systemd_autofs_patch}
+/usr/bin/systemctl daemon-reload
+%endif
 if [ -d /var/run/cvmfs ]; then
   /usr/bin/cvmfs_config reload
 fi
@@ -380,6 +399,9 @@ fi
 %{_datadir}/selinux/strict/cvmfs.pp
 %{_datadir}/selinux/targeted/cvmfs.pp
 %endif
+%if 0%{?systemd_autofs_patch}
+/usr/lib/systemd/system/autofs.service.d/50-cvmfs.conf
+%endif
 /sbin/mount.cvmfs
 %dir %{_sysconfdir}/cvmfs/config.d
 %dir %{_sysconfdir}/cvmfs/domain.d
@@ -426,6 +448,8 @@ fi
 %doc COPYING AUTHORS README ChangeLog
 
 %changelog
+* Wed Mar 22 2017 Jakob Blomer <jblomer@cern.ch> - 2.3.5
+- Drop systemd patch configuration for autofs where necessary
 * Mon Mar 06 2017 Jakob Blomer <jblomer@cern.ch> - 2.3.4
 - Remove systemd bugfix configuration file if necessary
 * Mon Aug 22 2016 Jakob Blomer <jblomer@cern.ch> - 2.3.1
