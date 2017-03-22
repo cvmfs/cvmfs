@@ -57,7 +57,7 @@ cvmfs_server_abort() {
     # get repository information
     load_repo_config $name
     user=$CVMFS_USER
-    key_file=$CVMFS_GATEWAY_KEY
+    key_file=$CVMFS_GATEWAY_KEYS
     spool_dir=$CVMFS_SPOOL_DIR
     local upstream_storage=$CVMFS_UPSTREAM_STORAGE
     local upstream_type=$(get_upstream_type $upstream_storage)
