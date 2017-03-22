@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "file_processing/char_buffer.h"
+#include "gateway_util.h"
 #include "util/string.h"
 
 namespace upload {
@@ -228,20 +229,7 @@ bool GatewayUploader::ReadSessionTokenFile(const std::string& token_file_name,
 
 bool GatewayUploader::ReadKey(const std::string& key_file, std::string* key_id,
                               std::string* secret) {
-  FILE* key_file_fd = std::fopen(key_file.c_str(), "r");
-  if (!key_file_fd) {
-    return false;
-  }
-
-  if (!(key_id && secret)) {
-    return false;
-  }
-
-  GetLineFile(key_file_fd, key_id);
-  GetLineFile(key_file_fd, secret);
-  fclose(key_file_fd);
-
-  return true;
+  return gateway::ReadKeys(key_file, key_id, secret);
 }
 
 void GatewayUploader::BumpErrors() const { atomic_inc32(&num_errors_); }

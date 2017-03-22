@@ -146,6 +146,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/file_processing/file_processor.cc
   ${CVMFS_SOURCE_DIR}/file_processing/io_dispatcher.cc
   ${CVMFS_SOURCE_DIR}/file_processing/processor.cc
+  ${CVMFS_SOURCE_DIR}/gateway_util.cc
   ${CVMFS_SOURCE_DIR}/globals.cc
   ${CVMFS_SOURCE_DIR}/glue_buffer.cc
   ${CVMFS_SOURCE_DIR}/hash.cc
