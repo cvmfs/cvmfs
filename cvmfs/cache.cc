@@ -17,6 +17,7 @@
 #include "hash.h"
 #include "quota.h"
 #include "smalloc.h"
+#include "util/posix.h"
 
 using namespace std;  // NOLINT
 
@@ -96,6 +97,24 @@ bool CacheManager::CommitFromMem(
 }
 
 
+void CacheManager::FreeState(const int fd_progress, void *data) {
+  State *state = reinterpret_cast<State *>(data);
+  if (fd_progress >= 0)
+    SendMsg2Socket(fd_progress, "Releasing saved open files table\n");
+  assert(state->version == kStateVersion);
+  assert(state->manager_type == id());
+  bool result = DoFreeState(state->concrete_state);
+  if (!result) {
+    if (fd_progress >= 0) {
+      SendMsg2Socket(fd_progress,
+                     "   *** Releasing open files table failed!\n");
+    }
+    abort();
+  }
+  delete state;
+}
+
+
 /**
  * Tries to open a file and copies its contents into a newly malloc'd
  * memory area.  User of the function has to free buffer (if successful).
@@ -169,4 +188,47 @@ int CacheManager::OpenPinned(
     }
   }
   return fd;
+}
+
+
+void CacheManager::RestoreState(const int fd_progress, void *data) {
+  State *state = reinterpret_cast<State *>(data);
+  if (fd_progress >= 0)
+    SendMsg2Socket(fd_progress, "Restoring open files table... ");
+  if (state->version != kStateVersion) {
+    if (fd_progress >= 0)
+      SendMsg2Socket(fd_progress, "unsupported state version!\n");
+    abort();
+  }
+  if (state->manager_type != id()) {
+    if (fd_progress >= 0)
+      SendMsg2Socket(fd_progress, "switching cache manager unsupported!\n");
+    abort();
+  }
+  bool result = DoRestoreState(state->concrete_state);
+  if (!result) {
+    if (fd_progress >= 0) SendMsg2Socket(fd_progress, "FAILED!\n");
+    abort();
+  }
+  if (fd_progress >= 0) SendMsg2Socket(fd_progress, "done\n");
+}
+
+
+/**
+ * The actual work is done in the concrete cache managers.
+ */
+void *CacheManager::SaveState(const int fd_progress) {
+  if (fd_progress >= 0)
+    SendMsg2Socket(fd_progress, "Saving open files table\n");
+  State *state = new State();
+  state->manager_type = id();
+  state->concrete_state = DoSaveState();
+  if (state->concrete_state == NULL) {
+    if (fd_progress >= 0) {
+      SendMsg2Socket(fd_progress,
+        "  *** This cache manager does not support saving state!\n");
+    }
+    abort();
+  }
+  return state;
 }

@@ -43,6 +43,35 @@ class FdTable : SingleCopy {
   }
 
   /**
+   * Used to restore the state.
+   */
+  void AssignFrom(const FdTable<HandleT> &other) {
+    invalid_handle_ = other.invalid_handle_;
+    fd_pivot_ = other.fd_pivot_;
+    fd_index_.resize(other.fd_index_.size());
+    open_fds_.resize(other.open_fds_.size(), FdWrapper(invalid_handle_, 0));
+    for (unsigned i = 0; i < fd_index_.size(); ++i) {
+      fd_index_[i] = other.fd_index_[i];
+      open_fds_[i] = other.open_fds_[i];
+    }
+  }
+
+  /**
+   * Used to save the state.
+   */
+  FdTable<HandleT> *Clone() {
+    FdTable<HandleT> *result =
+      new FdTable<HandleT>(open_fds_.size(), invalid_handle_);
+    result->fd_pivot_ = fd_pivot_;
+    for (unsigned i = 0; i < fd_index_.size(); ++i) {
+      result->fd_index_[i] = fd_index_[i];
+      result->open_fds_[i] = open_fds_[i];
+    }
+    return result;
+  }
+
+
+  /**
    * Registeres fd with a currently unused number.  If the table is full,
    * returns -ENFILE;
    */

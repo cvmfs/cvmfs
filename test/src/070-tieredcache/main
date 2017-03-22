@@ -33,6 +33,7 @@ cvmfs_run_test() {
 
   echo "*** remount without network and trigger copyup"
   cvmfs_mount atlas.cern.ch \
+    "CVMFS_KCACHE_TIMEOUT=5" \
     "CVMFS_CACHE_PRIMARY=custom" \
     "CVMFS_CACHE_custom_TYPE=tiered" \
     "CVMFS_CACHE_custom_UPPER=default" \
@@ -46,6 +47,10 @@ cvmfs_run_test() {
   sudo cvmfs_talk -i atlas.cern.ch cache list | grep cvmfsdirtab || return 43
   local checksum_2="$(md5sum $test_file)"
   [ "$checksum_1" = "$checksum_2" ] || return 44
+
+  echo "*** reloading fuse module"
+  sudo cvmfs_config reload atlas.cern.ch || return 45
+  cat $test_file || return 46
 
   echo "*** Alternative configuration: RAMCache on top of regular one"
   cvmfs_umount atlas.cern.ch || return 50

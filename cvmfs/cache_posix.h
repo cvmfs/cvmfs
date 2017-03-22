@@ -93,6 +93,11 @@ class PosixCacheManager : public CacheManager {
   bool alien_cache() { return alien_cache_; }
   std::string cache_path() { return cache_path_; }
 
+ protected:
+  virtual void *DoSaveState();
+  virtual bool DoRestoreState(void *data);
+  virtual bool DoFreeState(void *data);
+
  private:
   struct Transaction {
     Transaction(const shash::Any &id, const std::string &final_path)

@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #include <alloca.h>
+#include <fcntl.h>
 #include <pthread.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -36,8 +37,8 @@ class MockCachePlugin : public CachePlugin {
   static const unsigned kMockListingNitems;
 
   MockCachePlugin(const string &socket_path, bool read_only)
-    : CachePlugin(read_only ? (cvmfs::CAP_ALL & ~cvmfs::CAP_WRITE)
-                            : cvmfs::CAP_ALL)
+    : CachePlugin(read_only ? (cvmfs::CAP_ALL_V1 & ~cvmfs::CAP_WRITE)
+                            : cvmfs::CAP_ALL_V1)
   {
     bool retval = Listen("unix=" + socket_path);
     assert(retval);
@@ -582,4 +583,32 @@ TEST_F(T_ExternalCacheManager, MultiThreaded) {
   }
 
   free(large_buffer);
+}
+
+
+TEST_F(T_ExternalCacheManager, SaveState) {
+  // Should not crash
+  void *data = cache_mgr_->SaveState(-1);
+  cache_mgr_->RestoreState(-1, data);
+  cache_mgr_->FreeState(-1, data);
+
+  // Now with a new cache manager
+  int fd = cache_mgr_->Open(CacheManager::Bless(mock_plugin_->known_object));
+  EXPECT_GE(fd, 0);
+  data = cache_mgr_->SaveState(-1);
+  delete cache_mgr_;
+  fd_client = ConnectSocket(socket_path_);
+  ASSERT_GE(fd_client, 0);
+  cache_mgr_ = ExternalCacheManager::Create(fd_client, nfiles, "test");
+  ASSERT_TRUE(cache_mgr_ != NULL);
+  quota_mgr_ = ExternalQuotaManager::Create(cache_mgr_);
+  ASSERT_TRUE(cache_mgr_ != NULL);
+  cache_mgr_->AcquireQuotaManager(quota_mgr_);
+  cache_mgr_->RestoreState(-1, data);
+  cache_mgr_->FreeState(-1, data);
+  char buffer[64];
+  int64_t len = cache_mgr_->Pread(fd, buffer, 64, 0);
+  EXPECT_EQ(static_cast<int>(mock_plugin_->known_object_content.length()), len);
+  EXPECT_EQ(mock_plugin_->known_object_content, string(buffer, len));
+  EXPECT_EQ(0, cache_mgr_->Close(fd));
 }

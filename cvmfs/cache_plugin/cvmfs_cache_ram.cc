@@ -622,7 +622,7 @@ int main(int argc, char **argv) {
   callbacks.cvmcache_listing_begin = plugin->ram_listing_begin;
   callbacks.cvmcache_listing_next = plugin->ram_listing_next;
   callbacks.cvmcache_listing_end = plugin->ram_listing_end;
-  callbacks.capabilities = CVMCACHE_CAP_ALL;
+  callbacks.capabilities = CVMCACHE_CAP_ALL_V1;
 
   ctx = cvmcache_init(&callbacks);
   int retval = cvmcache_listen(ctx, locator);

@@ -137,6 +137,7 @@ class CachePlugin {
   void HandleInfo(cvmfs::MsgInfoReq *msg_req, CacheTransport *transport);
   void HandleShrink(cvmfs::MsgShrinkReq *msg_req, CacheTransport *transport);
   void HandleList(cvmfs::MsgListReq *msg_req, CacheTransport *transport);
+  void HandleIoctl(cvmfs::MsgIoctl *msg_req);
   void SendDetachRequests();
 
   void NotifySupervisor(char signal);
@@ -144,6 +145,7 @@ class CachePlugin {
   void LogSessionError(uint64_t session_id,
                        cvmfs::EnumStatus status,
                        const std::string &msg);
+  void LogSessionInfo(uint64_t session_id, const std::string &msg);
 
   uint64_t capabilities_;
   int fd_socket_;
@@ -151,6 +153,11 @@ class CachePlugin {
   atomic_int32 running_;
   unsigned num_workers_;
   unsigned max_object_size_;
+  /**
+   * Number of clients undergoing a reload, i.e. they promise to come back
+   * and open a new connection soon.
+   */
+  uint64_t num_inlimbo_clients_;
   std::string name_;
   atomic_int64 next_session_id_;
   atomic_int64 next_txn_id_;

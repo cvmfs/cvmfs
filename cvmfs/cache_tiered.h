@@ -63,8 +63,19 @@ class TieredCacheManager : public CacheManager {
   virtual int CommitTxn(void *txn);
   virtual void Spawn();
 
+ protected:
+  virtual void *DoSaveState();
+  virtual bool DoRestoreState(void *data);
+  virtual bool DoFreeState(void *data);
+
  private:
   static const unsigned kCopyBufferSize = 64 * 1024;  // 64kB
+
+  struct SavedState {
+    SavedState() : state_upper(NULL), state_lower(NULL) { }
+    void *state_upper;
+    void *state_lower;
+  };
 
   // NOTE: TieredCacheManager takes ownership of both caches passed.
   TieredCacheManager(CacheManager *upper_cache,

@@ -89,16 +89,19 @@ inline const char *Code2Ascii(const Failures error) {
 enum StateId {
   kStateUnknown = 0,
   kStateOpenDirs,           // >= 2.1.4
-  kStateOpenFiles,          // >= 2.1.4, used as of 2.1.15
+  kStateOpenChunks,         // >= 2.1.4, used as of 2.1.15
   kStateGlueBuffer,         // >= 2.1.9
   kStateInodeGeneration,    // >= 2.1.9
   kStateOpenFilesCounter,   // >= 2.1.9
   kStateGlueBufferV2,       // >= 2.1.10
   kStateGlueBufferV3,       // >= 2.1.15
   kStateGlueBufferV4,       // >= 2.1.20
-  kStateOpenFilesV2,        // >= 2.1.20
-  kStateOpenFilesV3,        // >= 2.2.0
-  kStateOpenFilesV4,        // >= 2.2.3
+  kStateOpenChunksV2,       // >= 2.1.20
+  kStateOpenChunksV3,       // >= 2.2.0
+  kStateOpenChunksV4,       // >= 2.2.3
+  kStateOpenFiles           // >= 2.4
+
+  // Note: kStateOpenFilesXXX was renamed to kStateOpenChunksXXX as of 2.4
 };
 
 
