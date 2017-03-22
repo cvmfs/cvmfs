@@ -28,6 +28,8 @@
   * Fix small memory leak during remount of root catalog
   * Fix handling of file:// url in CVMFS_SERVER_URL
 
+2.3.5:
+
 2.3.4:
   * Unlink empty files during cache db rebuild (CVM-1113)
   * Fix gathering 'rawlink' extended attribute
