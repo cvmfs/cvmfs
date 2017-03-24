@@ -79,6 +79,7 @@
 #include "fence.h"
 #include "fetch.h"
 #include "file_chunk.h"
+#include "fuse_evict.h"
 #include "globals.h"
 #include "glue_buffer.h"
 #include "hash.h"
@@ -117,6 +118,7 @@ FileSystem *file_system_ = NULL;
 MountPoint *mount_point_ = NULL;
 TalkManager *talk_mgr_ = NULL;
 Watchdog *watchdog_ = NULL;
+FuseInvalidator *fuse_invalidator_ = NULL;
 
 /**
  * Stores the initial catalog revision (in order to detect overflows) and
@@ -1980,6 +1982,9 @@ static int Init(const loader::LoaderExports *loader_exports) {
   LogCvmfs(kLogCvmfs, kLogDebug, "fuse inode size is %d bits",
            sizeof(fuse_ino_t) * 8);
 
+  cvmfs::fuse_invalidator_ =
+    new FuseInvalidator(cvmfs::mount_point_->inode_tracker());
+
   // Monitor, check for maximum number of open files
   if (cvmfs::UseWatchdog()) {
     cvmfs::watchdog_ = Watchdog::Create("./stacktrace." +
@@ -2035,6 +2040,7 @@ static void Spawn() {
   atomic_init32(&cvmfs::drainout_mode_);
   atomic_init32(&cvmfs::reload_critical_section_);
   atomic_init32(&cvmfs::catalogs_expired_);
+  cvmfs::fuse_invalidator_->Spawn();
   if (!cvmfs::mount_point_->fixed_catalog()) {
     MakePipe(cvmfs::pipe_remount_trigger_);
 
@@ -2102,6 +2108,10 @@ static void Fini() {
 
   delete cvmfs::talk_mgr_;
   cvmfs::talk_mgr_ = NULL;
+
+  // The invalidator has a reference to the inode tracker
+  delete cvmfs::fuse_invalidator_;
+  cvmfs::fuse_invalidator_ = NULL;
 
   // The unpin listener requires the catalog, so this must be unregistered
   // before the catalog manager is removed

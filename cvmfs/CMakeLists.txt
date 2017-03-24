@@ -38,6 +38,7 @@ set (CVMFS_CLIENT_SOURCES
   directory_entry.cc
   dns.cc
   download.cc
+  fetch.cc
   file_chunk.cc
   globals.cc
   glue_buffer.cc
@@ -91,7 +92,7 @@ set (CVMFS2_DEBUG_SOURCES
   auto_umount.cc
   compat.cc
   cvmfs.cc
-  fetch.cc
+  fuse_evict.cc
   nfs_maps.cc
   nfs_shared_maps.cc
   quota_listener.cc
@@ -105,7 +106,6 @@ set (CVMFS2_SOURCES
 set (LIBCVMFS_SOURCES
   ${CVMFS_CLIENT_SOURCES}
 
-  fetch.cc
   libcvmfs.cc
   libcvmfs_int.cc
   libcvmfs_legacy.cc
