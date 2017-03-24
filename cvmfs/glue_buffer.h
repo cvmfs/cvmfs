@@ -8,7 +8,6 @@
  * functions.
  */
 
-#include <google/sparse_hash_map>
 #include <pthread.h>
 #include <sched.h>
 #include <stdint.h>
@@ -166,6 +165,15 @@ class StringHeap : public SingleCopy {
 
 class PathStore {
  public:
+  /**
+   * Used to enumerate all paths
+   */
+  struct Cursor {
+    Cursor() : idx(0) { }
+    uint32_t idx;
+  };
+
+
   PathStore() {
     map_.Init(16, shash::Md5(shash::AsciiPtr("!")), hasher_md5);
     string_heap_ = new StringHeap();
@@ -256,6 +264,25 @@ class PathStore {
     string_heap_ = new StringHeap();
   }
 
+  Cursor BeginEnumerate() {
+    return Cursor();
+  }
+
+  bool Next(Cursor *cursor, shash::Md5 *parent, StringRef *name) {
+    shash::Md5 empty_key = map_.empty_key();
+    while (cursor->idx < map_.capacity()) {
+      if (map_.keys()[cursor->idx] == empty_key) {
+        cursor->idx++;
+        continue;
+      }
+      *parent = map_.values()[cursor->idx].parent;
+      *name = map_.values()[cursor->idx].name;
+      cursor->idx++;
+      return true;
+    }
+    return false;
+  }
+
  private:
   struct PathInfo {
     PathInfo() {
@@ -287,10 +314,17 @@ class PathMap {
     return found;
   }
 
-  uint64_t LookupInode(const PathString &path) {
+  uint64_t LookupInodeByPath(const PathString &path) {
     uint64_t inode;
     bool found = map_.Lookup(shash::Md5(path.GetChars(), path.GetLength()),
                              &inode);
+    if (found) return inode;
+    return 0;
+  }
+
+  uint64_t LookupInodeByMd5Path(const shash::Md5 &md5path) {
+    uint64_t inode;
+    bool found = map_.Lookup(md5path, &inode);
     if (found) return inode;
     return 0;
   }
@@ -316,6 +350,9 @@ class PathMap {
     map_.Clear();
     path_store_.Clear();
   }
+
+  // For enumerating
+  PathStore *path_store() { return &path_store_; }
 
  private:
   SmallHashDynamic<shash::Md5, uint64_t> map_;
@@ -401,6 +438,14 @@ class InodeReferences {
  */
 class InodeTracker {
  public:
+  /**
+   * Used to actively evict all known paths from kernel caches
+   */
+  struct Cursor {
+    explicit Cursor(const PathStore::Cursor &c) : csr_paths(c) { }
+    PathStore::Cursor csr_paths;
+  };
+
   // Cannot be moved to the statistics manager because it has to survive
   // reloads.  Added manually in the fuse module initialization and in talk.cc.
   struct Statistics {
@@ -487,12 +532,35 @@ class InodeTracker {
 
   uint64_t FindInode(const PathString &path) {
     Lock();
-    uint64_t inode = path_map_.LookupInode(path);
+    uint64_t inode = path_map_.LookupInodeByPath(path);
     Unlock();
     atomic_inc64(&statistics_.num_hits_inode);
     return inode;
   }
 
+  Cursor BeginEnumerate() {
+    Lock();
+    return Cursor(path_map_.path_store()->BeginEnumerate());
+  }
+
+  bool Next(Cursor *cursor, uint64_t *inode_parent, NameString *name) {
+    shash::Md5 parent_md5;
+    StringRef name_ref;
+    bool result = path_map_.path_store()->Next(
+      &(cursor->csr_paths), &parent_md5, &name_ref);
+    if (!result)
+      return false;
+    if (parent_md5.IsNull())
+      *inode_parent = 0;
+    else
+      *inode_parent = path_map_.LookupInodeByMd5Path(parent_md5);
+    name->Assign(name_ref.data(), name_ref.length());
+    return true;
+  }
+
+  void EndEnumerate(Cursor *cursor) {
+    Unlock();
+  }
 
  private:
   static const unsigned kVersion = 4;
@@ -514,7 +582,7 @@ class InodeTracker {
   InodeMap inode_map_;
   InodeReferences inode_references_;
   Statistics statistics_;
-};
+};  // class InodeTracker
 
 
 }  // namespace glue
