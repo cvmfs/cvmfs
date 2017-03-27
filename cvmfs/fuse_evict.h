@@ -5,10 +5,11 @@
 #ifndef CVMFS_FUSE_EVICT_H_
 #define CVMFS_FUSE_EVICT_H_
 
-#include <fuse/fuse_lowlevel.h>
 #include <pthread.h>
 
 #include "atomic.h"
+#include "duplex_fuse.h"
+#include "gtest/gtest_prod.h"
 #include "util/single_copy.h"
 
 namespace glue {
@@ -25,6 +26,10 @@ class InodeTracker;
  * avoid a deadlock in the fuse callbacks (see Fuse documenatation).
  */
 class FuseInvalidator : SingleCopy {
+  FRIEND_TEST(T_FuseInvalidator, StartStop);
+  FRIEND_TEST(T_FuseInvalidator, InvalidateTimeout);
+  FRIEND_TEST(T_FuseInvalidator, InvalidateOps);
+
  public:
   /**
    * Used to track the progress of an "invalidation" request.  The invalidator
@@ -59,16 +64,16 @@ class FuseInvalidator : SingleCopy {
   /**
    * Add one second to the caller-provided timeout to be on the safe side.
    */
-  static const unsigned kTimeoutSafetyMarginSec = 1;
+  static const unsigned kTimeoutSafetyMarginSec;  // = 1;
   /**
    * If caches are drained out by timeout, set a polling interval.
    */
-  static const unsigned kCheckTimeoutFreqMs = 100;
+  static const unsigned kCheckTimeoutFreqMs;  // = 100;
   /**
    * If caches are actively drained out, check every so many operations if the
    * caches are anyway drained out by timeout.
    */
-  static const unsigned kCheckTimeoutFreqOps = 256;
+  static const unsigned kCheckTimeoutFreqOps;  // = 256
 
   static void *MainInvalidator(void *data);
 

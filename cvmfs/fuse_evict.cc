@@ -23,7 +23,7 @@
 using namespace std;  // NOLINT
 
 FuseInvalidator::Handle::Handle(unsigned timeout_s)
-  : timeout_s_(timeout_s)
+  : timeout_s_((timeout_s == 0) ? 0 : (timeout_s + kTimeoutSafetyMarginSec))
 {
   status_ = reinterpret_cast<atomic_int32 *>(smalloc(sizeof(atomic_int32)));
   atomic_init32(status_);
@@ -43,6 +43,11 @@ void FuseInvalidator::Handle::WaitFor() {
 //------------------------------------------------------------------------------
 
 
+const unsigned FuseInvalidator::kTimeoutSafetyMarginSec = 1;
+const unsigned FuseInvalidator::kCheckTimeoutFreqMs = 100;
+const unsigned FuseInvalidator::kCheckTimeoutFreqOps = 256;
+
+
 FuseInvalidator::FuseInvalidator(
   glue::InodeTracker *inode_tracker,
   struct fuse_chan **fuse_channel)
@@ -60,6 +65,7 @@ FuseInvalidator::~FuseInvalidator() {
   if (spawned_) {
     char c = 'Q';
     WritePipe(pipe_ctrl_[1], &c, 1);
+    pthread_join(thread_invalidator_, NULL);
   }
   ClosePipe(pipe_ctrl_);
 }
@@ -89,12 +95,11 @@ void *FuseInvalidator::MainInvalidator(void *data) {
     LogCvmfs(kLogCvmfs, kLogDebug, "invalidating kernel caches, timeout %u",
              handle->timeout_s_);
 
-    uint64_t deadline =
-      platform_monotonic_time() + handle->timeout_s_ + kTimeoutSafetyMarginSec;
+    uint64_t deadline = platform_monotonic_time() + handle->timeout_s_;
 
     // Fallback: drainout by timeout
     if (invalidator->fuse_channel_ == NULL) {
-      while (platform_monotonic_time() <= deadline) {
+      while (platform_monotonic_time() < deadline) {
         SafeSleepMs(kCheckTimeoutFreqMs);
         if (atomic_read32(&invalidator->terminated_) == 1) {
           LogCvmfs(kLogCvmfs, kLogDebug,
