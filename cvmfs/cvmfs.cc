@@ -255,6 +255,9 @@ static void AlarmReload(int signal __attribute__((unused)),
  * If there is a new catalog version, switches to drainout mode.
  * lookup or getattr will take care of actual remounting once the caches are
  * drained out.
+ *
+ * RemountCheck() makes sure that there is only ever one caller at the same
+ * time in this function.
  */
 catalog::LoadError RemountStart() {
   catalog::LoadError retval = mount_point_->catalog_mgr()->Remount(true);
@@ -336,26 +339,27 @@ static void RemountFinish() {
  * Runs at the beginning of lookup, checks if a previously started remount needs
  * to be finished or starts a new remount if the TTL timer has been fired.
  */
-static void RemountCheck() {
+void RemountCheck(const bool forced = false) {
   if (atomic_read32(&maintenance_mode_) == 1)
     return;
   RemountFinish();
 
   if (atomic_cas32(&catalogs_expired_, 1, 0)) {
+    // No one else can be in this branch until alarm() is called again
     LogCvmfs(kLogCvmfs, kLogDebug, "catalog TTL expired, reload");
     catalog::LoadError retval = RemountStart();
     if ((retval == catalog::kLoadFail) || (retval == catalog::kLoadNoSpace)) {
       LogCvmfs(kLogCvmfs, kLogDebug, "reload failed (%s), "
                                      "applying short term TTL",
                catalog::Code2Ascii(retval));
-      alarm(MountPoint::kShortTermTTL);
       catalogs_valid_until_ = time(NULL) + MountPoint::kShortTermTTL;
+      alarm(MountPoint::kShortTermTTL);
     } else if (retval == catalog::kLoadUp2Date) {
       LogCvmfs(kLogCvmfs, kLogDebug,
                "catalog up to date, applying effective TTL");
       unsigned effective_ttl = mount_point_->GetEffectiveTtlSec();
-      alarm(effective_ttl);
       catalogs_valid_until_ = time(NULL) + effective_ttl;
+      alarm(effective_ttl);
     }
   }
 }

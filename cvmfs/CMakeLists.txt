@@ -93,6 +93,7 @@ set (CVMFS2_DEBUG_SOURCES
   compat.cc
   cvmfs.cc
   fuse_evict.cc
+  fuse_remount.cc
   nfs_maps.cc
   nfs_shared_maps.cc
   quota_listener.cc
