@@ -76,6 +76,7 @@ class FuseInvalidator : SingleCopy {
   static const unsigned kCheckTimeoutFreqOps;  // = 256
 
   static void *MainInvalidator(void *data);
+  static bool HasFuseNotifyInval();
 
   glue::InodeTracker *inode_tracker_;
   struct fuse_chan **fuse_channel_;

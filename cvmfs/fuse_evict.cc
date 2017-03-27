@@ -48,6 +48,21 @@ const unsigned FuseInvalidator::kCheckTimeoutFreqMs = 100;
 const unsigned FuseInvalidator::kCheckTimeoutFreqOps = 256;
 
 
+bool FuseInvalidator::HasFuseNotifyInval() {
+  /**
+   * Technically, also libfuse 2.8 has support.  Libfuse 2.8 comes with EL6,
+   * which had bugs reported related to the fuse_notify_inval_...() functions.
+   * Since just waiting for the timeout works perfectly fine, there is no reason
+   * to optimize for forced cache eviction too aggressively.
+   *
+   * TODO(jblomer): could we have libfuse 2.9 or higher with a very old kernel
+   * that doesn't support active invalidation?  How old does the kernel need
+   * to be?  Probably that situation is never triggered in practice.
+   */
+  return FUSE_VERSION >= 29;
+}
+
+
 FuseInvalidator::FuseInvalidator(
   glue::InodeTracker *inode_tracker,
   struct fuse_chan **fuse_channel)
@@ -98,7 +113,7 @@ void *FuseInvalidator::MainInvalidator(void *data) {
     uint64_t deadline = platform_monotonic_time() + handle->timeout_s_;
 
     // Fallback: drainout by timeout
-    if (invalidator->fuse_channel_ == NULL) {
+    if ((invalidator->fuse_channel_ == NULL) || !HasFuseNotifyInval()) {
       while (platform_monotonic_time() < deadline) {
         SafeSleepMs(kCheckTimeoutFreqMs);
         if (atomic_read32(&invalidator->terminated_) == 1) {

@@ -7,6 +7,7 @@
 
 #ifdef CVMFS_LIBCVMFS
 // Unit tests
+#define FUSE_VERSION 29
 #define FUSE_ROOT_ID 1
 extern "C" {
 struct fuse_chan {};
