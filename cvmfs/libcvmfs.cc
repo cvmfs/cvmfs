@@ -379,9 +379,6 @@ char *cvmfs_statistics_format(cvmfs_context *ctx) {
 
 
 int cvmfs_remount(LibContext *ctx) {
-  catalog::LoadError retval = ctx->RemountStart();
-  if (retval == catalog::kLoadNew || retval == catalog::kLoadUp2Date) {
-    return 0;
-  }
+  // not implemented
   return -1;
 }
