@@ -818,6 +818,9 @@ int main(int argc, char *argv[]) {
   delete options_manager;
   options_manager = NULL;
 
+  struct fuse_chan *channel;
+  loader_exports_->fuse_channel = &channel;
+
   // Load and initialize cvmfs library
   LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
            "CernVM-FS: loading Fuse module... ");
@@ -855,7 +858,6 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  struct fuse_chan *channel;
   channel = fuse_mount(mount_point_->c_str(), mount_options);
   if (!channel) {
     LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,

@@ -1982,8 +1982,11 @@ static int Init(const loader::LoaderExports *loader_exports) {
   LogCvmfs(kLogCvmfs, kLogDebug, "fuse inode size is %d bits",
            sizeof(fuse_ino_t) * 8);
 
+  struct fuse_chan **channel = NULL;
+  if (loader_exports->version >= 4)
+    channel = loader_exports->fuse_channel;
   cvmfs::fuse_invalidator_ =
-    new FuseInvalidator(cvmfs::mount_point_->inode_tracker());
+    new FuseInvalidator(cvmfs::mount_point_->inode_tracker(), channel);
 
   // Monitor, check for maximum number of open files
   if (cvmfs::UseWatchdog()) {
