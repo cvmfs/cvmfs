@@ -262,7 +262,7 @@ void FuseRemounter::TryFinish() {
   mountpoint_->path_cache()->Resume();
   mountpoint_->md5path_cache()->Resume();
 
-  atomic_xadd32(&drainout_mode_, 2);  // 2 --> 0, end of drainout mode
+  atomic_xadd32(&drainout_mode_, -2);  // 2 --> 0, end of drainout mode
 
   if ((retval == catalog::kLoadFail) || (retval == catalog::kLoadNoSpace) ||
       mountpoint_->catalog_mgr()->offline_mode())
