@@ -35,7 +35,7 @@ FuseRemounter::Status FuseRemounter::Check() {
 
   // At this point, we can be here from explicit triggering through talk.cc
   // or from the regular trigger by the trigger thread
-  LogCvmfs(kLogCvmfs, kLogDebug, "catalog TTL expired, reload");
+  LogCvmfs(kLogCvmfs, kLogDebug, "catalog TTL expired, remount");
   catalog::LoadError retval = mountpoint_->catalog_mgr()->Remount(true);
   switch (retval) {
     case catalog::kLoadNew:
@@ -126,30 +126,30 @@ void *FuseRemounter::MainRemountTrigger(void *data) {
   FuseRemounter *remounter = reinterpret_cast<FuseRemounter *>(data);
   LogCvmfs(kLogCvmfs, kLogDebug, "starting remount trigger");
   char c;
-  int timeout = -1;
+  int timeout_ms = -1;
   uint64_t deadline = 0;
   struct pollfd watch_ctrl;
   watch_ctrl.fd = remounter->pipe_remount_trigger_[0];
   watch_ctrl.events = POLLIN | POLLPRI;
   while (true) {
     watch_ctrl.revents = 0;
-    int retval = poll(&watch_ctrl, 1, timeout);
+    int retval = poll(&watch_ctrl, 1, timeout_ms);
     if (retval < 0) {
       if (errno == EINTR) {
-        if (timeout >= 0) {
+        if (timeout_ms >= 0) {
           uint64_t now = platform_monotonic_time();
-          timeout = (now > deadline) ? 0 : (deadline - now);
+          timeout_ms = (now > deadline) ? 0 : (deadline - now) * 1000;
         }
         continue;
       }
-      LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
+      LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
                "remount trigger connection failure (%d)", errno);
       abort();
     }
 
     if (retval == 0) {
       remounter->Check();
-      timeout = -1;
+      timeout_ms = -1;
       continue;
     }
 
@@ -159,8 +159,8 @@ void *FuseRemounter::MainRemountTrigger(void *data) {
     if (c == 'Q')
       break;
     assert(c == 'T');
-    ReadPipe(remounter->pipe_remount_trigger_[0], &timeout, sizeof(int));
-    deadline = platform_monotonic_time() + timeout;
+    ReadPipe(remounter->pipe_remount_trigger_[0], &timeout_ms, sizeof(int));
+    deadline = platform_monotonic_time() + timeout_ms / 1000;
   }
   LogCvmfs(kLogCvmfs, kLogDebug, "stopping remount trigger");
   return NULL;
@@ -169,6 +169,7 @@ void *FuseRemounter::MainRemountTrigger(void *data) {
 
 void FuseRemounter::SetAlarm(int timeout) {
   assert(HasRemountTrigger());
+  timeout *= 1000;  // timeout given in ms
   const unsigned buf_size = 1 + sizeof(int);
   char buf[buf_size];
   buf[0] = 'T';
@@ -180,6 +181,7 @@ void FuseRemounter::SetAlarm(int timeout) {
 void FuseRemounter::Spawn() {
   invalidator_->Spawn();
   if (!mountpoint_->fixed_catalog()) {
+    MakePipe(pipe_remount_trigger_);
     int retval = pthread_create(
       &thread_remount_trigger_, NULL, MainRemountTrigger, this);
     assert(retval == 0);

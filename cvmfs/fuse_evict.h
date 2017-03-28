@@ -31,6 +31,8 @@ class FuseInvalidator : SingleCopy {
   FRIEND_TEST(T_FuseInvalidator, InvalidateOps);
 
  public:
+  static bool HasFuseNotifyInval();
+
   /**
    * Used to track the progress of an "invalidation" request.  The invalidator
    * will evict cache entries for a duration given by the timeout.  For very
@@ -77,7 +79,6 @@ class FuseInvalidator : SingleCopy {
   static const unsigned kCheckTimeoutFreqOps;  // = 256
 
   static void *MainInvalidator(void *data);
-  static bool HasFuseNotifyInval();
 
   glue::InodeTracker *inode_tracker_;
   struct fuse_chan **fuse_channel_;

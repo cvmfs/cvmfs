@@ -55,7 +55,6 @@
 
 #include <algorithm>
 #include <cassert>
-#include <csignal>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -79,8 +78,8 @@
 #include "fence.h"
 #include "fetch.h"
 #include "file_chunk.h"
-#include "fuse_evict.h"
 #include "fuse_inode_gen.h"
+#include "fuse_remount.h"
 #include "globals.h"
 #include "glue_buffer.h"
 #include "hash.h"
@@ -113,16 +112,13 @@ using namespace std;  // NOLINT
 
 namespace cvmfs {
 
-const unsigned kReloadSafetyMargin = 500;  // in milliseconds
-
 FileSystem *file_system_ = NULL;
 MountPoint *mount_point_ = NULL;
 TalkManager *talk_mgr_ = NULL;
 Watchdog *watchdog_ = NULL;
-FuseInvalidator *fuse_invalidator_ = NULL;
-
-
+FuseRemounter *fuse_remounter_ = NULL;
 InodeGenerationInfo inode_generation_info_;
+
 
 /**
  * For cvmfs_opendir / cvmfs_readdir
@@ -146,16 +142,6 @@ quota::ListenerHandle *watchdog_listener_ = NULL;
 quota::ListenerHandle *unpin_listener_ = NULL;
 
 
-/**
- * in maintenance mode, cache timeout is 0 and catalogs are not reloaded
- */
-atomic_int32 maintenance_mode_;
-atomic_int32 catalogs_expired_;
-atomic_int32 drainout_mode_;
-atomic_int32 reload_critical_section_;
-time_t drainout_deadline_;
-time_t catalogs_valid_until_;
-
 typedef google::dense_hash_map<uint64_t, DirectoryListing,
                                hash_murmur<uint64_t> >
         DirectoryHandles;
@@ -169,35 +155,17 @@ unsigned max_open_files_; /**< maximum allowed number of open files */
  */
 const int kNumReservedFd = 512;
 
-/**
- * Ensures that within a callback all operations take place on the same
- * catalog revision.
- */
-Fence *fence_remount_;
-
-
-/**
- * The thread that triggers the reload of the root catalog is informed through
- * this pipe by the alarm signal handler when the TTL expires.
- */
-int pipe_remount_trigger_[2];
-
-/**
- * Triggers `RemountCheck()` when the repository TTL expires.
- */
-pthread_t *thread_remount_trigger_ = NULL;
-
 
 static inline double GetKcacheTimeout() {
-  if (atomic_read32(&drainout_mode_) || atomic_read32(&maintenance_mode_))
+  if (!fuse_remounter_->IsCaching())
     return 0.0;
   return mount_point_->kcache_timeout_sec();
 }
 
 
 void GetReloadStatus(bool *drainout_mode, bool *maintenance_mode) {
-  *drainout_mode = atomic_read32(&drainout_mode_);
-  *maintenance_mode = atomic_read32(&maintenance_mode_);
+  *drainout_mode = fuse_remounter_->IsInDrainoutMode();
+  *maintenance_mode = fuse_remounter_->IsInMaintenanceMode();
 }
 
 
@@ -223,18 +191,6 @@ std::string PrintInodeGeneration() {
 }
 
 
-static void AlarmReload(int signal __attribute__((unused)),
-                        siginfo_t *siginfo __attribute__((unused)),
-                        void *context __attribute__((unused)))
-{
-  atomic_cas32(&catalogs_expired_, 0, 1);
-  if (pipe_remount_trigger_[1] >= 0) {
-    char c = 'T';
-    WritePipe(pipe_remount_trigger_[1], &c, 1);
-  }
-}
-
-
 /**
  * If there is a new catalog version, switches to drainout mode.
  * lookup or getattr will take care of actual remounting once the caches are
@@ -248,74 +204,8 @@ catalog::LoadError RemountStart() {
   if (retval == catalog::kLoadNew) {
     LogCvmfs(kLogCvmfs, kLogDebug,
              "new catalog revision available, draining out meta-data caches");
-    unsigned safety_margin = kReloadSafetyMargin/1000;
-    if (safety_margin == 0)
-      safety_margin = 1;
-    drainout_deadline_ =
-      time(NULL) +
-      static_cast<int>(mount_point_->kcache_timeout_sec()) +
-      safety_margin;
-    atomic_cas32(&drainout_mode_, 0, 1);
   }
   return retval;
-}
-
-
-/**
- * If the caches are drained out, a new catalog revision is applied and
- * kernel caches are activated again.
- */
-static void RemountFinish() {
-  if (!atomic_cas32(&reload_critical_section_, 0, 1))
-    return;
-  if (!atomic_read32(&drainout_mode_)) {
-    atomic_cas32(&reload_critical_section_, 1, 0);
-    return;
-  }
-
-  if (time(NULL) > drainout_deadline_) {
-    LogCvmfs(kLogCvmfs, kLogDebug, "caches drained out, applying new catalog");
-
-    // No new inserts into caches
-    mount_point_->inode_cache()->Pause();
-    mount_point_->path_cache()->Pause();
-    mount_point_->md5path_cache()->Pause();
-    mount_point_->inode_cache()->Drop();
-    mount_point_->path_cache()->Drop();
-    mount_point_->md5path_cache()->Drop();
-
-    // Ensure that all Fuse callbacks left the catalog query code
-    fence_remount_->Drain();
-    catalog::LoadError retval = mount_point_->catalog_mgr()->Remount(false);
-    if (mount_point_->inode_annotation()) {
-      inode_generation_info_.inode_generation =
-        mount_point_->inode_annotation()->GetGeneration();
-    }
-    mount_point_->ReEvaluateAuthz();
-    fence_remount_->Open();
-
-    mount_point_->inode_cache()->Resume();
-    mount_point_->path_cache()->Resume();
-    mount_point_->md5path_cache()->Resume();
-
-    atomic_cas32(&drainout_mode_, 1, 0);
-    if ((retval == catalog::kLoadFail) || (retval == catalog::kLoadNoSpace) ||
-        mount_point_->catalog_mgr()->offline_mode())
-    {
-      LogCvmfs(kLogCvmfs, kLogDebug, "reload/finish failed, "
-               "applying short term TTL");
-      alarm(MountPoint::kShortTermTTL);
-      catalogs_valid_until_ = time(NULL) + MountPoint::kShortTermTTL;
-    } else {
-      LogCvmfs(kLogCvmfs, kLogSyslog, "switched to catalog revision %d",
-               mount_point_->catalog_mgr()->GetRevision());
-      unsigned effective_ttl = mount_point_->GetEffectiveTtlSec();
-      alarm(effective_ttl);
-      catalogs_valid_until_ = time(NULL) + effective_ttl;
-    }
-  }
-
-  atomic_cas32(&reload_critical_section_, 1, 0);
 }
 
 
@@ -324,28 +214,7 @@ static void RemountFinish() {
  * to be finished or starts a new remount if the TTL timer has been fired.
  */
 void RemountCheck(const bool forced = false) {
-  if (atomic_read32(&maintenance_mode_) == 1)
-    return;
-  RemountFinish();
 
-  if (atomic_cas32(&catalogs_expired_, 1, 0)) {
-    // No one else can be in this branch until alarm() is called again
-    LogCvmfs(kLogCvmfs, kLogDebug, "catalog TTL expired, reload");
-    catalog::LoadError retval = RemountStart();
-    if ((retval == catalog::kLoadFail) || (retval == catalog::kLoadNoSpace)) {
-      LogCvmfs(kLogCvmfs, kLogDebug, "reload failed (%s), "
-                                     "applying short term TTL",
-               catalog::Code2Ascii(retval));
-      catalogs_valid_until_ = time(NULL) + MountPoint::kShortTermTTL;
-      alarm(MountPoint::kShortTermTTL);
-    } else if (retval == catalog::kLoadUp2Date) {
-      LogCvmfs(kLogCvmfs, kLogDebug,
-               "catalog up to date, applying effective TTL");
-      unsigned effective_ttl = mount_point_->GetEffectiveTtlSec();
-      catalogs_valid_until_ = time(NULL) + effective_ttl;
-      alarm(effective_ttl);
-    }
-  }
 }
 
 
@@ -360,29 +229,6 @@ static bool CheckVoms(const fuse_ctx &fctx) {
     return true;
 
   return mount_point_->authz_session_mgr()->IsMemberOf(fctx.pid, mreq);
-}
-
-// TODO(jblomer): the remount functions need to move into a separate entity
-/**
- * Gets triggered by the alarm timer to start `RemountCheck()`.  This can't
- * be called from the alarm timer because of missing signal safety.
- */
-static void *MainRemountTrigger(void *data) {
-  char c;
-  LogCvmfs(kLogCvmfs, kLogDebug, "starting remount trigger");
-  while (true) {
-    ReadPipe(pipe_remount_trigger_[0], &c, 1);
-    if (c == 'Q')
-      break;
-
-    // We don't need to call this if we are already draining the caches
-    if (!atomic_read32(&drainout_mode_)) {
-      LogCvmfs(kLogCvmfs, kLogDebug, "trigger remount of idle mount point");
-      RemountCheck();
-    }
-  }
-  LogCvmfs(kLogCvmfs, kLogDebug, "stopping remount trigger");
-  return NULL;
 }
 
 
@@ -530,7 +376,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
   ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
   RemountCheck();
 
-  fence_remount_->Enter();
+  fuse_remounter_->fence()->Enter();
   catalog::ClientCatalogManager *catalog_mgr = mount_point_->catalog_mgr();
 
   parent = catalog_mgr->MangleInode(parent);
@@ -592,21 +438,21 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
  lookup_reply_positive:
   if (!file_system_->IsNfsSource())
     mount_point_->inode_tracker()->VfsGet(dirent.inode(), path);
-  fence_remount_->Leave();
+  fuse_remounter_->fence()->Leave();
   result.ino = dirent.inode();
   result.attr = dirent.GetStatStructure();
   fuse_reply_entry(req, &result);
   return;
 
  lookup_reply_negative:
-  fence_remount_->Leave();
+  fuse_remounter_->fence()->Leave();
   perf::Inc(file_system_->n_fs_lookup_negative());
   result.ino = 0;
   fuse_reply_entry(req, &result);
   return;
 
  lookup_reply_error:
-  fence_remount_->Leave();
+  fuse_remounter_->fence()->Leave();
   fuse_reply_err(req, EIO);
 }
 
@@ -627,7 +473,7 @@ static void cvmfs_forget(
     return;
   }
 
-  fence_remount_->Enter();
+  fuse_remounter_->fence()->Enter();
   ino = mount_point_->catalog_mgr()->MangleInode(ino);
   // This has been seen to deadlock on the debug log mutex on SL5.  Problem of
   // old kernel/fuse?
@@ -635,7 +481,7 @@ static void cvmfs_forget(
            uint64_t(ino), nlookup);
   if (!file_system_->IsNfsSource())
     mount_point_->inode_tracker()->VfsPut(ino, nlookup);
-  fence_remount_->Leave();
+  fuse_remounter_->fence()->Leave();
   fuse_reply_none(req);
 }
 
@@ -665,20 +511,20 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
   ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
   RemountCheck();
 
-  fence_remount_->Enter();
+  fuse_remounter_->fence()->Enter();
   ino = mount_point_->catalog_mgr()->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_getattr (stat) for inode: %" PRIu64,
            uint64_t(ino));
 
   if (!CheckVoms(*fuse_ctx)) {
-    fence_remount_->Leave();
+    fuse_remounter_->fence()->Leave();
     fuse_reply_err(req, EACCES);
     return;
   }
 
   catalog::DirectoryEntry dirent;
   const bool found = GetDirentForInode(ino, &dirent);
-  fence_remount_->Leave();
+  fuse_remounter_->fence()->Leave();
 
   if (!found) {
     ReplyNegative(dirent, req);
@@ -699,14 +545,14 @@ static void cvmfs_readlink(fuse_req_t req, fuse_ino_t ino) {
   const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
   ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
 
-  fence_remount_->Enter();
+  fuse_remounter_->fence()->Enter();
   ino = mount_point_->catalog_mgr()->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_readlink on inode: %" PRIu64,
            uint64_t(ino));
 
   catalog::DirectoryEntry dirent;
   const bool found = GetDirentForInode(ino, &dirent);
-  fence_remount_->Leave();
+  fuse_remounter_->fence()->Leave();
 
   if (!found) {
     ReplyNegative(dirent, req);
@@ -756,14 +602,14 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
   RemountCheck();
 
-  fence_remount_->Enter();
+  fuse_remounter_->fence()->Enter();
   catalog::ClientCatalogManager *catalog_mgr = mount_point_->catalog_mgr();
   ino = catalog_mgr->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_opendir on inode: %" PRIu64,
            uint64_t(ino));
 
   if (!CheckVoms(*fuse_ctx)) {
-    fence_remount_->Leave();
+    fuse_remounter_->fence()->Leave();
     fuse_reply_err(req, EACCES);
     return;
   }
@@ -772,19 +618,19 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   catalog::DirectoryEntry d;
   bool found = GetPathForInode(ino, &path);
   if (!found) {
-    fence_remount_->Leave();
+    fuse_remounter_->fence()->Leave();
     fuse_reply_err(req, ENOENT);
     return;
   }
   found = GetDirentForInode(ino, &d);
 
   if (!found) {
-    fence_remount_->Leave();
+    fuse_remounter_->fence()->Leave();
     ReplyNegative(d, req);
     return;
   }
   if (!d.IsDirectory()) {
-    fence_remount_->Leave();
+    fuse_remounter_->fence()->Leave();
     fuse_reply_err(req, ENOTDIR);
     return;
   }
@@ -814,7 +660,7 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   bool retval = catalog_mgr->ListingStat(path, &listing_from_catalog);
 
   if (!retval) {
-    fence_remount_->Leave();
+    fuse_remounter_->fence()->Leave();
     fuse_listing.Clear();  // Buffer is shared, empty manually
     fuse_reply_err(req, EIO);
     return;
@@ -839,7 +685,7 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
     AddToDirListing(req, listing_from_catalog.AtPtr(i)->name.c_str(),
                     &fixed_info, &fuse_listing);
   }
-  fence_remount_->Leave();
+  fuse_remounter_->fence()->Leave();
 
   DirectoryListing stream_listing;
   stream_listing.size = fuse_listing.size();
@@ -952,7 +798,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
 {
   const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
   ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
-  fence_remount_->Enter();
+  fuse_remounter_->fence()->Enter();
   catalog::ClientCatalogManager *catalog_mgr = mount_point_->catalog_mgr();
   ino = catalog_mgr->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_open on inode: %" PRIu64,
@@ -964,19 +810,19 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
 
   bool found = GetPathForInode(ino, &path);
   if (!found) {
-    fence_remount_->Leave();
+    fuse_remounter_->fence()->Leave();
     fuse_reply_err(req, ENOENT);
     return;
   }
   found = GetDirentForInode(ino, &dirent);
   if (!found) {
-    fence_remount_->Leave();
+    fuse_remounter_->fence()->Leave();
     ReplyNegative(dirent, req);
     return;
   }
 
   if (!CheckVoms(*fuse_ctx)) {
-    fence_remount_->Leave();
+    fuse_remounter_->fence()->Leave();
     fuse_reply_err(req, EACCES);
     return;
   }
@@ -989,13 +835,13 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   // }
 #ifdef __APPLE__
   if ((fi->flags & O_SHLOCK) || (fi->flags & O_EXLOCK)) {
-    fence_remount_->Leave();
+    fuse_remounter_->fence()->Leave();
     fuse_reply_err(req, EOPNOTSUPP);
     return;
   }
 #endif
   if (fi->flags & O_EXCL) {
-    fence_remount_->Leave();
+    fuse_remounter_->fence()->Leave();
     fuse_reply_err(req, EEXIST);
     return;
   }
@@ -1003,7 +849,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   perf::Inc(file_system_->n_fs_open());  // Count actual open / fetch operations
 
   if (!dirent.IsChunkedFile()) {
-    fence_remount_->Leave();
+    fuse_remounter_->fence()->Leave();
   } else {
     LogCvmfs(kLogCvmfs, kLogDebug,
              "chunked file %s opened (download delayed to read() call)",
@@ -1013,7 +859,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
         (static_cast<int>(max_open_files_))-kNumReservedFd)
     {
       perf::Dec(file_system_->no_open_files());
-      fence_remount_->Leave();
+      fuse_remounter_->fence()->Leave();
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "open file descriptor limit exceeded");
       fuse_reply_err(req, EMFILE);
       return;
@@ -1022,7 +868,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     // Figure out unique inode from annotated catalog
     catalog::DirectoryEntry dirent_origin;
     if (!catalog_mgr->LookupPath(path, catalog::kLookupSole, &dirent_origin)) {
-      fence_remount_->Leave();
+      fuse_remounter_->fence()->Leave();
       LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
                "chunked file %s vanished unexpectedly", path.c_str());
       fuse_reply_err(req, ENOENT);
@@ -1041,13 +887,13 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
                                        chunks.weak_ref()) ||
           chunks->IsEmpty())
       {
-        fence_remount_->Leave();
+        fuse_remounter_->fence()->Leave();
         LogCvmfs(kLogCvmfs, kLogDebug| kLogSyslogErr, "file %s is marked as "
                  "'chunked', but no chunks found.", path.c_str());
         fuse_reply_err(req, EIO);
         return;
       }
-      fence_remount_->Leave();
+      fuse_remounter_->fence()->Leave();
 
       chunk_tables->Lock();
       // Check again to avoid race
@@ -1065,7 +911,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
         chunk_tables->inode2references.Insert(unique_inode, refctr+1);
       }
     } else {
-      fence_remount_->Leave();
+      fuse_remounter_->fence()->Leave();
       uint32_t refctr;
       bool retval =
         chunk_tables->inode2references.Lookup(unique_inode, &refctr);
@@ -1383,12 +1229,12 @@ static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
   info.f_bfree = info.f_bavail = available;
 
   // Inodes / entries
-  fence_remount_->Enter();
+  fuse_remounter_->fence()->Enter();
   uint64_t all_inodes = mount_point_->catalog_mgr()->all_inodes();
   uint64_t loaded_inode = mount_point_->catalog_mgr()->loaded_inodes();
   info.f_files = all_inodes;
   info.f_ffree = info.f_favail = all_inodes - loaded_inode;
-  fence_remount_->Leave();
+  fuse_remounter_->fence()->Leave();
 
   fuse_reply_statfs(req, &info);
 }
@@ -1405,7 +1251,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
   ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
 
-  fence_remount_->Enter();
+  fuse_remounter_->fence()->Enter();
   catalog::ClientCatalogManager *catalog_mgr = mount_point_->catalog_mgr();
   ino = catalog_mgr->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug,
@@ -1413,7 +1259,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
            uint64_t(ino), name);
 
   if (!CheckVoms(*fuse_ctx)) {
-    fence_remount_->Leave();
+    fuse_remounter_->fence()->Leave();
     fuse_reply_err(req, EACCES);
     return;
   }
@@ -1439,7 +1285,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     retval = catalog_mgr->LookupXattrs(path, &xattrs);
     assert(retval);
   }
-  fence_remount_->Leave();
+  fuse_remounter_->fence()->Leave();
 
   if (!found) {
     ReplyNegative(d, req);
@@ -1500,11 +1346,14 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   } else if (attr == "user.tag") {
     attribute_value = mount_point_->repository_tag();
   } else if (attr == "user.expires") {
-    if (catalogs_valid_until_ == MountPoint::kIndefiniteDeadline) {
+    if (fuse_remounter_->catalogs_valid_until() ==
+        MountPoint::kIndefiniteDeadline)
+    {
       attribute_value = "never (fixed root catalog)";
     } else {
       time_t now = time(NULL);
-      attribute_value = StringifyInt((catalogs_valid_until_-now)/60);
+      attribute_value = StringifyInt(
+        (fuse_remounter_->catalogs_valid_until() - now) / 60);
     }
   } else if (attr == "user.maxfd") {
     attribute_value = StringifyInt(max_open_files_ - kNumReservedFd);
@@ -1665,7 +1514,7 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
   const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
   ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
 
-  fence_remount_->Enter();
+  fuse_remounter_->fence()->Enter();
   catalog::ClientCatalogManager *catalog_mgr = mount_point_->catalog_mgr();
   ino = catalog_mgr->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug,
@@ -1682,7 +1531,7 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
     retval = catalog_mgr->LookupXattrs(path, &xattrs);
     assert(retval);
   }
-  fence_remount_->Leave();
+  fuse_remounter_->fence()->Leave();
 
   if (!found) {
     ReplyNegative(d, req);
@@ -1736,9 +1585,9 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
 
 bool Evict(const string &path) {
   catalog::DirectoryEntry dirent;
-  fence_remount_->Enter();
+  fuse_remounter_->fence()->Enter();
   const bool found = GetDirentForPath(PathString(path), &dirent);
-  fence_remount_->Leave();
+  fuse_remounter_->fence()->Leave();
 
   if (!found || !dirent.IsRegular())
     return false;
@@ -1749,20 +1598,20 @@ bool Evict(const string &path) {
 
 bool Pin(const string &path) {
   catalog::DirectoryEntry dirent;
-  fence_remount_->Enter();
+  fuse_remounter_->fence()->Enter();
   const bool found = GetDirentForPath(PathString(path), &dirent);
   if (!found || !dirent.IsRegular()) {
-    fence_remount_->Leave();
+    fuse_remounter_->fence()->Leave();
     return false;
   }
 
   if (!dirent.IsChunkedFile()) {
-    fence_remount_->Leave();
+    fuse_remounter_->fence()->Leave();
   } else {
     FileChunkList chunks;
     mount_point_->catalog_mgr()->ListFileChunks(
       PathString(path), dirent.hash_algorithm(), &chunks);
-    fence_remount_->Leave();
+    fuse_remounter_->fence()->Leave();
     for (unsigned i = 0; i < chunks.size(); ++i) {
       bool retval =
         file_system_->cache_mgr()->quota_mgr()->Pin(
@@ -1970,11 +1819,18 @@ static int Init(const loader::LoaderExports *loader_exports) {
   LogCvmfs(kLogCvmfs, kLogDebug, "fuse inode size is %d bits",
            sizeof(fuse_ino_t) * 8);
 
+  cvmfs::inode_generation_info_.initial_revision =
+    cvmfs::mount_point_->catalog_mgr()->GetRevision();
+  cvmfs::inode_generation_info_.inode_generation =
+    cvmfs::mount_point_->inode_annotation()->GetGeneration();
+  LogCvmfs(kLogCvmfs, kLogDebug, "root inode is %" PRIu64,
+           uint64_t(cvmfs::mount_point_->catalog_mgr()->GetRootInode()));
+
   struct fuse_chan **channel = NULL;
   if (loader_exports->version >= 4)
     channel = loader_exports->fuse_channel;
-  cvmfs::fuse_invalidator_ =
-    new FuseInvalidator(cvmfs::mount_point_->inode_tracker(), channel);
+  cvmfs::fuse_remounter_ = new FuseRemounter(
+    cvmfs::mount_point_, &cvmfs::inode_generation_info_, channel);
 
   // Monitor, check for maximum number of open files
   if (cvmfs::UseWatchdog()) {
@@ -1997,15 +1853,6 @@ static int Init(const loader::LoaderExports *loader_exports) {
     return loader::kFailTalk;
   }
 
-  cvmfs::inode_generation_info_.initial_revision =
-    cvmfs::mount_point_->catalog_mgr()->GetRevision();
-  cvmfs::inode_generation_info_.inode_generation =
-    cvmfs::mount_point_->inode_annotation()->GetGeneration();
-  LogCvmfs(kLogCvmfs, kLogDebug, "root inode is %" PRIu64,
-           uint64_t(cvmfs::mount_point_->catalog_mgr()->GetRootInode()));
-
-  cvmfs::pipe_remount_trigger_[0] = cvmfs::pipe_remount_trigger_[1] = -1;
-  cvmfs::fence_remount_ = new Fence();
   auto_umount::SetMountpoint(loader_exports->mount_point);
 
   return loader::kFailOk;
@@ -2016,8 +1863,6 @@ static int Init(const loader::LoaderExports *loader_exports) {
  * Things that have to be executed after fork() / daemon()
  */
 static void Spawn() {
-  int retval;
-
   // First thing: fork off the watchdog while we still have a single-threaded
   // well-defined state
   cvmfs::pid_ = getpid();
@@ -2026,35 +1871,7 @@ static void Spawn() {
     cvmfs::watchdog_->Spawn();
   }
 
-  // Setup catalog reload alarm (_after_ forking into daemon mode)
-  atomic_init32(&cvmfs::maintenance_mode_);
-  atomic_init32(&cvmfs::drainout_mode_);
-  atomic_init32(&cvmfs::reload_critical_section_);
-  atomic_init32(&cvmfs::catalogs_expired_);
-  cvmfs::fuse_invalidator_->Spawn();
-  if (!cvmfs::mount_point_->fixed_catalog()) {
-    MakePipe(cvmfs::pipe_remount_trigger_);
-
-    struct sigaction sa;
-    memset(&sa, 0, sizeof(sa));
-    sa.sa_sigaction = cvmfs::AlarmReload;
-    sa.sa_flags = SA_RESTART | SA_SIGINFO;
-    sigfillset(&sa.sa_mask);
-    retval = sigaction(SIGALRM, &sa, NULL);
-    assert(retval == 0);
-    unsigned ttl = cvmfs::mount_point_->catalog_mgr()->offline_mode() ?
-      MountPoint::kShortTermTTL : cvmfs::mount_point_->GetEffectiveTtlSec();
-    alarm(ttl);
-    cvmfs::catalogs_valid_until_ = time(NULL) + ttl;
-
-    cvmfs::thread_remount_trigger_ = reinterpret_cast<pthread_t *>(
-      smalloc(sizeof(pthread_t)));
-    retval = pthread_create(cvmfs::thread_remount_trigger_, NULL,
-                            cvmfs::MainRemountTrigger, NULL);
-    assert(retval == 0);
-  } else {
-    cvmfs::catalogs_valid_until_ = MountPoint::kIndefiniteDeadline;
-  }
+  cvmfs::fuse_remounter_->Spawn();
 
   cvmfs::mount_point_->download_mgr()->Spawn();
   cvmfs::mount_point_->external_download_mgr()->Spawn();
@@ -2086,23 +1903,12 @@ static string GetErrorMsg() {
 
 
 static void Fini() {
-  signal(SIGALRM, SIG_IGN);
-  if (cvmfs::thread_remount_trigger_) {
-    char quit = 'Q';
-    WritePipe(cvmfs::pipe_remount_trigger_[1], &quit, 1);
-    pthread_join(*cvmfs::thread_remount_trigger_, NULL);
-    free(cvmfs::thread_remount_trigger_);
-    cvmfs::thread_remount_trigger_ = NULL;
-    ClosePipe(cvmfs::pipe_remount_trigger_);
-    cvmfs::pipe_remount_trigger_[0] = cvmfs::pipe_remount_trigger_[1] = -1;
-  }
-
   delete cvmfs::talk_mgr_;
   cvmfs::talk_mgr_ = NULL;
 
-  // The invalidator has a reference to the inode tracker
-  delete cvmfs::fuse_invalidator_;
-  cvmfs::fuse_invalidator_ = NULL;
+  // The remonter has a reference to the mount point and the inode generation
+  delete cvmfs::fuse_remounter_;
+  cvmfs::fuse_remounter_ = NULL;
 
   // The unpin listener requires the catalog, so this must be unregistered
   // before the catalog manager is removed
@@ -2115,12 +1921,10 @@ static void Fini() {
     cvmfs::watchdog_listener_ = NULL;
   }
 
-  delete cvmfs::fence_remount_;
   delete cvmfs::directory_handles_;
   delete cvmfs::mount_point_;
   delete cvmfs::file_system_;
   delete cvmfs::options_mgr_;
-  cvmfs::fence_remount_ = NULL;
   cvmfs::directory_handles_ = NULL;
   cvmfs::mount_point_ = NULL;
   cvmfs::file_system_ = NULL;
@@ -2148,16 +1952,14 @@ static int AltProcessFlavor(int argc, char **argv) {
 
 static bool MaintenanceMode(const int fd_progress) {
   SendMsg2Socket(fd_progress, "Entering maintenance mode\n");
-  signal(SIGALRM, SIG_IGN);
-  atomic_cas32(&cvmfs::maintenance_mode_, 0, 1);
-  string msg_progress =
-    "Draining out kernel caches (" +
-    StringifyInt(static_cast<int>(cvmfs::mount_point_->kcache_timeout_sec())) +
-    "s)\n";
+  string msg_progress = "Draining out kernel caches (";
+  if (FuseInvalidator::HasFuseNotifyInval())
+    msg_progress += "up to ";
+  msg_progress += StringifyInt(static_cast<int>(
+                               cvmfs::mount_point_->kcache_timeout_sec())) +
+                  "s)\n";
   SendMsg2Socket(fd_progress, msg_progress);
-  SafeSleepMs(static_cast<int>(
-              cvmfs::mount_point_->kcache_timeout_sec() * 1000 +
-                cvmfs::kReloadSafetyMargin));
+  cvmfs::fuse_remounter_->EnterMaintenanceMode();
   return true;
 }
 
