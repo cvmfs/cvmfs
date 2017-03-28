@@ -34,17 +34,23 @@ class MountPoint;
  */
 class FuseRemounter : SingleCopy {
  public:
+  enum Status {
+    kStatusUp2Date = 0,
+    kStatusDraining,
+    kStatusMaintenance,
+    kStatusFailGeneral,
+    kStatusFailNoSpace,
+  };
+
   explicit FuseRemounter(MountPoint *mountpoint,
                          cvmfs::InodeGenerationInfo *inode_generation_info,
                          struct fuse_chan **fuse_channel);
   ~FuseRemounter();
   void Spawn();
 
-  void Check();
-
-  bool IsInDrainoutMode() { return atomic_read32(&drainout_mode_) == 2; }
-  bool IsInMaintenanceMode() { return atomic_read32(&maintenance_mode_) == 1; }
-  bool IsCatalogsExpired() { return atomic_read32(&catalogs_expired_) == 1; }
+  Status Check();
+  void TryFinish();
+  void EnterMaintenanceMode();
 
   Fence *fence() { return fence_; }
   time_t catalog_valid_until() { return catalogs_valid_until_; }
@@ -52,16 +58,15 @@ class FuseRemounter : SingleCopy {
  private:
   static void *MainRemountTrigger(void *data);
 
-  void Finish();
-
   bool HasRemountTrigger() { return pipe_remount_trigger_[0] >= 0; }
   void SetAlarm(int timeout);
-  void SetCatalogsExpired() { atomic_cas32(&catalogs_expired_, 0, 1); }
+
   bool EnterCriticalSection()  {
     return atomic_cas32(&critical_section_, 0, 1);
   }
   void LeaveCriticalSection() { atomic_dec32(&critical_section_); /* 1 -> 0 */ }
-  void SetMaintenanceMode();
+  bool IsInDrainoutMode() { return atomic_read32(&drainout_mode_) == 2; }
+  bool IsInMaintenanceMode() { return atomic_read32(&maintenance_mode_) == 1; }
 
   bool spawned_;
   MountPoint *mountpoint_;  ///< Not owned
@@ -76,6 +81,11 @@ class FuseRemounter : SingleCopy {
    * catalog revision.
    */
   Fence *fence_;
+  /**
+   * This fence makes sure that Check() and TryFinish() have been left after
+   * the maintenance mode flag was set.
+   */
+  Fence fence_maintenance_;
   pthread_t thread_remount_trigger_;
   /**
    * The thread that triggers the reload of the root catalog is informed through
@@ -104,12 +114,6 @@ class FuseRemounter : SingleCopy {
    * Maintenance mode is entered when the fuse module gets reloaded.
    */
   atomic_int32 maintenance_mode_;
-  /**
-   * This flag is set by the alarm timer (or by a forced check) to indicate that
-   * the root catalog TTL is expired, hence cvmfs should check upstream for an
-   * updated copy.
-   */
-  atomic_int32 catalogs_expired_;
   /**
    * Only one thread must perform the actual remount (stopping user-level
    * caches, loading new catalog, etc.).  This is used to protect Finish() from
