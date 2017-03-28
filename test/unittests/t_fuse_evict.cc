@@ -85,11 +85,11 @@ TEST_F(T_FuseInvalidator, InvalidateOps) {
             fuse_lowlevel_notify_inval_entry_cnt);
 
   invalidator_->terminated_ = 1;
-  FuseInvalidator::Handle handle3(1000000);
-  EXPECT_FALSE(handle3.IsDone());
-  invalidator_->InvalidateDentries(&handle3);
-  handle3.WaitFor();
-  EXPECT_TRUE(handle3.IsDone());
+  handle2.Reset();
+  EXPECT_FALSE(handle2.IsDone());
+  invalidator_->InvalidateDentries(&handle2);
+  handle2.WaitFor();
+  EXPECT_TRUE(handle2.IsDone());
   EXPECT_EQ((2 * FuseInvalidator::kCheckTimeoutFreqOps) + 1024,
             fuse_lowlevel_notify_inval_entry_cnt);
 }

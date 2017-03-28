@@ -21,6 +21,7 @@ static int __attribute__((used)) fuse_lowlevel_notify_inval_entry(
 }
 }
 #else
+#define FUSE_USE_VERSION 26
 #include <fuse/fuse_lowlevel.h>
 #endif
 
