@@ -2,8 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef CVMFS_INODE_GEN_H_
-#define CVMFS_INODE_GEN_H_
+#ifndef CVMFS_FUSE_INODE_GEN_H_
+#define CVMFS_FUSE_INODE_GEN_H_
 
 #include <stdint.h>
 
@@ -30,4 +30,4 @@ struct InodeGenerationInfo {
 
 }  // namespace cvmfs
 
-#endif  // CVMFS_INODE_GEN_H_
+#endif  // CVMFS_FUSE_INODE_GEN_H_

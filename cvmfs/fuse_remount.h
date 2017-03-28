@@ -22,10 +22,12 @@ class MountPoint;
 
 /**
  * Orchestrates an orderly remount of a new snapshot revision in the Fuse
- * module.  Remounting always happens as a result of calling Check().  The
- * Check() method is either called from a fuse callback function or from
- * the remount trigger thread as a result of an alarm signal (to remount even
- * when cvmfs is idle).
+ * module.  Remounting always happens as a result of calling Check() followed
+ * by a call to TryFinish().  The Check() method is either called from the
+ * remount trigger or from the TalkManager.  The TryFinish() method is either
+ * called from a fuse callback function or from CheckSynchronously().  If a new
+ * root file catalog is available online and the kernel caches got flushed, the
+ * actual heavy-lifting of applying the new catalog takes place in TryFinish();
  *
  * Remounting is inherently asynchronous because the kernel caches need to be
  * flushed.  We do this through the FuseInvalidator.  Once the FuseInvalidor
@@ -78,7 +80,7 @@ class FuseRemounter : SingleCopy {
   cvmfs::InodeGenerationInfo *inode_generation_info_;  ///< Not owned
   FuseInvalidator *invalidator_;
   /**
-   * Used to query when the kernel cache invalidation is done.
+   * Used to query whether the kernel cache invalidation is done.
    */
   FuseInvalidator::Handle invalidator_handle_;
   /**
@@ -93,8 +95,8 @@ class FuseRemounter : SingleCopy {
   Fence fence_maintenance_;
   pthread_t thread_remount_trigger_;
   /**
-   * The thread that triggers the reload of the root catalog is informed through
-   * this pipe by the alarm signal handler when the TTL expires.
+   * The thread that triggers the reload of the root catalog is controlled
+   * through this pipe.
    */
   int pipe_remount_trigger_[2];
   /**
@@ -107,7 +109,7 @@ class FuseRemounter : SingleCopy {
    * In drainout mode, the fuse module sets the timeout of meta data replys to
    * zero.  If supported by Fuse, the FuseInvalidator will evict all active
    * entries from the kernel cache.  Drainout mode is left only once the new
-   * root catalog is active (after Finish()).
+   * root catalog is active (after TryFinish()).
    *
    * Moving into drainout mode is a two-steps procedure.  Going from zero to one
    * the handle of the FuseInvalidator is prepared, from one to two is the
@@ -121,8 +123,8 @@ class FuseRemounter : SingleCopy {
   atomic_int32 maintenance_mode_;
   /**
    * Only one thread must perform the actual remount (stopping user-level
-   * caches, loading new catalog, etc.).  This is used to protect Finish() from
-   * concurrent execution.
+   * caches, loading new catalog, etc.).  This is used to protect TyrFinish()
+   * from concurrent execution.
    */
   atomic_int32 critical_section_;
 };  // class FuseRemounter

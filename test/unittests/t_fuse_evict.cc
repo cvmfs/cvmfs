@@ -19,7 +19,7 @@ class T_FuseInvalidator : public ::testing::Test {
     invalidator_->Spawn();
   }
 
-  virtual void TearDown () {
+  virtual void TearDown() {
     delete invalidator_;
   }
 

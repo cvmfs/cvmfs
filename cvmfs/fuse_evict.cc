@@ -13,8 +13,8 @@
 #include <cassert>
 #include <cstdlib>
 
-#include "logging.h"
 #include "glue_buffer.h"
+#include "logging.h"
 #include "platform.h"
 #include "shortstring.h"
 #include "smalloc.h"
@@ -66,9 +66,9 @@ bool FuseInvalidator::HasFuseNotifyInval() {
 FuseInvalidator::FuseInvalidator(
   glue::InodeTracker *inode_tracker,
   struct fuse_chan **fuse_channel)
- : inode_tracker_(inode_tracker)
- , fuse_channel_(fuse_channel)
- , spawned_(false)
+  : inode_tracker_(inode_tracker)
+  , fuse_channel_(fuse_channel)
+  , spawned_(false)
 {
   MakePipe(pipe_ctrl_);
   atomic_init32(&terminated_);
@@ -139,8 +139,7 @@ void *FuseInvalidator::MainInvalidator(void *data) {
         *invalidator->fuse_channel_,
         inode,
         name.GetChars(),
-        name.GetLength()
-      );
+        name.GetLength());
       LogCvmfs(kLogCvmfs, kLogDebug, "evicting <%" PRIu64 ">/%s",
                inode, name.c_str());
 
