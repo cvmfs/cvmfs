@@ -80,6 +80,7 @@
 #include "fetch.h"
 #include "file_chunk.h"
 #include "fuse_evict.h"
+#include "fuse_inode_gen.h"
 #include "globals.h"
 #include "glue_buffer.h"
 #include "hash.h"
@@ -120,24 +121,7 @@ TalkManager *talk_mgr_ = NULL;
 Watchdog *watchdog_ = NULL;
 FuseInvalidator *fuse_invalidator_ = NULL;
 
-/**
- * Stores the initial catalog revision (in order to detect overflows) and
- * the incarnation (number of reloads) of the Fuse module
- */
-struct InodeGenerationInfo {
-  InodeGenerationInfo() {
-    version = 2;
-    initial_revision = 0;
-    incarnation = 0;
-    overflow_counter = 0;
-    inode_generation = 0;
-  }
-  unsigned version;
-  uint64_t initial_revision;
-  uint32_t incarnation;
-  uint32_t overflow_counter;  // not used any more
-  uint64_t inode_generation;
-};
+
 InodeGenerationInfo inode_generation_info_;
 
 /**

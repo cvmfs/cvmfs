@@ -19,7 +19,10 @@
       "string": "cpp",
       "vector": "cpp",
       "slist": "cpp",
-      "regex": "cpp"
+      "regex": "cpp",
+      "condition_variable": "cpp",
+      "future": "cpp",
+      "cassert": "cpp"
     }
   }
 

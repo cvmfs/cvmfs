@@ -5,4 +5,242 @@
 #include "cvmfs_config.h"
 #include "fuse_remount.h"
 
+#include <errno.h>
+#include <poll.h>
+
+#include <cassert>
+#include <cstring>
+
+#include "catalog_mgr_client.h"
+#include "fuse_inode_gen.h"
+#include "logging.h"
+#include "lru_md.h"
+#include "mountpoint.h"
+#include "platform.h"
+#include "util/posix.h"
+
 using namespace std;  // NOLINT
+
+
+/**
+ * Runs at the beginning of Fuse lookups, or triggered by the trigger thread,
+ * from triggered from cvmfs_talk.  Checks if a previously started remount needs
+ * to be finished or starts a new remount if the TTL timer was fired.
+ */
+void FuseRemounter::Check() {
+  if (IsInMaintenanceMode())
+    return;
+  Finish();
+
+  if (!atomic_cas32(&catalogs_expired_, 1, 0))
+    return;
+
+  // At this point, we can be here from explicit triggering through talk.cc
+  // or from the regular trigger from the trigger thread or from fuse callbacks
+  LogCvmfs(kLogCvmfs, kLogDebug, "catalog TTL expired, reload");
+  catalog::LoadError retval = mountpoint_->catalog_mgr()->Remount(true);
+  switch (retval) {
+    case catalog::kLoadNew:
+      if (atomic_cas32(&drainout_mode_, 0, 1)) {
+        LogCvmfs(kLogCvmfs, kLogDebug,
+                 "new catalog revision available, "
+                 "draining out meta-data caches");
+        invalidator_handle_.Reset();
+        invalidator_->InvalidateDentries(&invalidator_handle_);
+        atomic_inc32(&drainout_mode_);
+        // drainout_mode_ == 2, IsInDrainoutMode is now 'true'
+      } else {
+        LogCvmfs(kLogCvmfs, kLogDebug, "already in drainout mode, leaving");
+      }
+      break;
+    case catalog::kLoadFail:
+    case catalog::kLoadNoSpace:
+      LogCvmfs(kLogCvmfs, kLogDebug,
+               "reload failed (%s), applying short term TTL",
+               catalog::Code2Ascii(retval));
+      catalogs_valid_until_ = time(NULL) + MountPoint::kShortTermTTL;
+      SetAlarm(MountPoint::kShortTermTTL);
+      break;
+    case catalog::kLoadUp2Date:
+      LogCvmfs(kLogCvmfs, kLogDebug,
+               "catalog up to date, applying effective TTL");
+      catalogs_valid_until_ = time(NULL) + mountpoint_->GetEffectiveTtlSec();
+      SetAlarm(mountpoint_->GetEffectiveTtlSec());
+      break;
+    default:
+      assert(false);
+  }
+}
+
+
+void FuseRemounter::Finish() {
+  if (!EnterCriticalSection())
+    return;
+  if (!IsInDrainoutMode()) {
+    LeaveCriticalSection();
+    return;
+  }
+
+  // No one else is in this code path and we have a valid FuseInvalidator handle
+
+  if (!invalidator_handle_.IsDone()) {
+    LeaveCriticalSection();
+    return;
+  }
+  LogCvmfs(kLogCvmfs, kLogDebug, "caches drained out, applying new catalog");
+
+  // No new inserts into caches
+  mountpoint_->inode_cache()->Pause();
+  mountpoint_->path_cache()->Pause();
+  mountpoint_->md5path_cache()->Pause();
+  mountpoint_->inode_cache()->Drop();
+  mountpoint_->path_cache()->Drop();
+  mountpoint_->md5path_cache()->Drop();
+
+  // Ensure that all Fuse callbacks left the catalog query code
+  fence_->Drain();
+  catalog::LoadError retval = mountpoint_->catalog_mgr()->Remount(false);
+  if (mountpoint_->inode_annotation()) {
+    inode_generation_info_->inode_generation =
+      mountpoint_->inode_annotation()->GetGeneration();
+  }
+  mountpoint_->ReEvaluateAuthz();
+  fence_->Open();
+
+  mountpoint_->inode_cache()->Resume();
+  mountpoint_->path_cache()->Resume();
+  mountpoint_->md5path_cache()->Resume();
+
+  atomic_xadd32(&drainout_mode_, 2);  // 2 --> 0, end of drainout mode
+
+  if ((retval == catalog::kLoadFail) || (retval == catalog::kLoadNoSpace) ||
+      mountpoint_->catalog_mgr()->offline_mode())
+  {
+    LogCvmfs(kLogCvmfs, kLogDebug, "reload/finish failed, use short term TTL");
+    catalogs_valid_until_ = time(NULL) + MountPoint::kShortTermTTL;
+    SetAlarm(MountPoint::kShortTermTTL);
+  } else {
+    LogCvmfs(kLogCvmfs, kLogSyslog, "switched to catalog revision %d",
+             mountpoint_->catalog_mgr()->GetRevision());
+    catalogs_valid_until_ = time(NULL) + mountpoint_->GetEffectiveTtlSec();
+    SetAlarm(mountpoint_->GetEffectiveTtlSec());
+  }
+
+  LeaveCriticalSection();
+}
+
+
+FuseRemounter::FuseRemounter(
+  MountPoint *mountpoint,
+  cvmfs::InodeGenerationInfo *inode_generation_info,
+  struct fuse_chan **fuse_channel)
+  : spawned_(false)
+  , mountpoint_(mountpoint)
+  , inode_generation_info_(inode_generation_info)
+  , invalidator_(new FuseInvalidator(mountpoint->inode_tracker(), fuse_channel))
+  , invalidator_handle_(mountpoint->kcache_timeout_sec())
+  , fence_(new Fence())
+  , catalogs_valid_until_(MountPoint::kIndefiniteDeadline)
+{
+  pipe_remount_trigger_[0] = pipe_remount_trigger_[1] = -1;
+  atomic_init32(&drainout_mode_);
+  atomic_init32(&maintenance_mode_);
+  atomic_init32(&catalogs_expired_);
+  atomic_init32(&critical_section_);
+}
+
+
+FuseRemounter::~FuseRemounter() {
+  signal(SIGALRM, SIG_IGN);
+  delete invalidator_;
+  if (HasRemountTrigger()) {
+    char quit = 'Q';
+    WritePipe(pipe_remount_trigger_[1], &quit, 1);
+    pthread_join(thread_remount_trigger_, NULL);
+    ClosePipe(pipe_remount_trigger_);
+  }
+  delete fence_;
+}
+
+
+/**
+ * Triggers the Check() method when the catalog TTL expires.  Works essenatially
+ * as an alarm() timer.
+ */
+void *FuseRemounter::MainRemountTrigger(void *data) {
+  FuseRemounter *remounter = reinterpret_cast<FuseRemounter *>(data);
+  LogCvmfs(kLogCvmfs, kLogDebug, "starting remount trigger");
+  char c;
+  int timeout = -1;
+  uint64_t deadline = 0;
+  struct pollfd watch_ctrl;
+  watch_ctrl.fd = remounter->pipe_remount_trigger_[0];
+  watch_ctrl.events = POLLIN | POLLPRI;
+  while (true) {
+    watch_ctrl.revents = 0;
+    int retval = poll(&watch_ctrl, 1, timeout);
+    if (retval < 0) {
+      if (errno == EINTR) {
+        if (timeout >= 0) {
+          uint64_t now = platform_monotonic_time();
+          timeout = (now > deadline) ? 0 : (deadline - now);
+        }
+        continue;
+      }
+      LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
+               "remount trigger connection failure (%d)", errno);
+      abort();
+    }
+
+    if (retval == 0) {
+      // Timeout
+      remounter->SetCatalogsExpired();
+      // Possibly called at the same time from a fuse callback
+      remounter->Check();
+      timeout = -1;
+      continue;
+    }
+
+    assert(watch_ctrl.revents != 0);
+
+    ReadPipe(remounter->pipe_remount_trigger_[0], &c, 1);
+    if (c == 'Q')
+      break;
+    assert(c == 'T');
+    ReadPipe(remounter->pipe_remount_trigger_[0], &timeout, sizeof(int));
+    deadline = platform_monotonic_time() + timeout;
+  }
+  LogCvmfs(kLogCvmfs, kLogDebug, "stopping remount trigger");
+  return NULL;
+}
+
+
+void FuseRemounter::SetAlarm(int timeout) {
+  assert(HasRemountTrigger());
+  const unsigned buf_size = 1 + sizeof(int);
+  char buf[buf_size];
+  buf[0] = 'T';
+  memcpy(&buf[1], &timeout, sizeof(timeout));
+  WritePipe(pipe_remount_trigger_[1], buf, buf_size);
+}
+
+
+void FuseRemounter::SetMaintenanceMode() {
+  atomic_cas32(&maintenance_mode_, 0, 1);
+}
+
+
+void FuseRemounter::Spawn() {
+  invalidator_->Spawn();
+  if (!mountpoint_->fixed_catalog()) {
+    int retval = pthread_create(
+      &thread_remount_trigger_, NULL, MainRemountTrigger, this);
+    assert(retval == 0);
+
+    unsigned ttl = mountpoint_->catalog_mgr()->offline_mode() ?
+      MountPoint::kShortTermTTL : mountpoint_->GetEffectiveTtlSec();
+    catalogs_valid_until_ = time(NULL) + ttl;
+    SetAlarm(ttl);
+  }
+  spawned_ = true;
+}
