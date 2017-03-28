@@ -16,7 +16,7 @@
 #include "util/single_copy.h"
 
 namespace cvmfs {
-class InodeGenerationInfo;
+struct InodeGenerationInfo;
 }
 class MountPoint;
 

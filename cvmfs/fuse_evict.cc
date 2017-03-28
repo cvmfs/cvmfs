@@ -36,7 +36,7 @@ FuseInvalidator::Handle::~Handle() {
 
 
 void FuseInvalidator::Handle::WaitFor() {
-  while (!IsDone()) SafeSleepMs(100);
+  while (!IsDone()) SafeSleepMs(FuseInvalidator::kCheckTimeoutFreqMs);
 }
 
 
