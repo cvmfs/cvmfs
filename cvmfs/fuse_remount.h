@@ -100,8 +100,9 @@ class FuseRemounter : SingleCopy {
    */
   int pipe_remount_trigger_[2];
   /**
-   * Stores when the alarm signal fires next time.  Can be
-   * MountPoint::kIndefiniteDeadline if a fixed root catalog is used
+   * Stores the deadline after which the remount trigger will look again for
+   * an updated version.  Can be MountPoint::kIndefiniteDeadline if a fixed root
+   * catalog is used.  Only for information purposes ('expires' xattr).
    * TODO(jblomer): access to this field should be locked
    */
   time_t catalogs_valid_until_;
