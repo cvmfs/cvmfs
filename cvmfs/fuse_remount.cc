@@ -12,6 +12,7 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "backoff.h"
 #include "catalog_mgr_client.h"
 #include "fuse_inode_gen.h"
 #include "logging.h"
@@ -68,6 +69,26 @@ FuseRemounter::Status FuseRemounter::Check() {
       return kStatusUp2Date;
     default:
       abort();
+  }
+}
+
+
+/**
+ * Used from the talk module.  Continously calls 'check' until it returns with
+ * "up to date" or a failure.
+ */
+FuseRemounter::Status FuseRemounter::CheckSynchronously() {
+  BackoffThrottle throttle;
+  while (true) {
+    Status status = Check();
+    switch (status) {
+      case kStatusDraining:
+        TryFinish();
+        break;
+      default:
+        return status;
+    }
+    throttle.Throttle();
   }
 }
 

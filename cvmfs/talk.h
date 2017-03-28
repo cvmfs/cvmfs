@@ -15,6 +15,7 @@
 namespace download {
 class DownloadManager;
 }
+class FuseRemounter;
 class MountPoint;
 class OptionsManager;
 
@@ -26,7 +27,8 @@ class OptionsManager;
 class TalkManager : SingleCopy {
  public:
   static TalkManager *Create(const std::string &socket_path,
-                             MountPoint *mount_point);
+                             MountPoint *mount_point,
+                             FuseRemounter *remounter);
   ~TalkManager();
 
   void Spawn();
@@ -37,7 +39,9 @@ class TalkManager : SingleCopy {
    */
   static const unsigned kMaxCommandSize = 512;
 
-  TalkManager(const std::string &socket_path, MountPoint *mount_point);
+  TalkManager(const std::string &socket_path,
+              MountPoint *mount_point,
+              FuseRemounter *remounter);
   static void *MainResponder(void *data);
   void Answer(int con_fd, const std::string &msg);
   void AnswerStringList(int con_fd, const std::vector<std::string> &list);
@@ -47,6 +51,7 @@ class TalkManager : SingleCopy {
   std::string socket_path_;
   int socket_fd_;
   MountPoint *mount_point_;
+  FuseRemounter *remounter_;
   pthread_t thread_talk_;
   bool spawned_;
 };

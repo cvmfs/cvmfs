@@ -35,6 +35,7 @@
 #include "cvmfs.h"
 #include "download.h"
 #include "duplex_sqlite3.h"
+#include "fuse_remount.h"
 #include "glue_buffer.h"
 #include "loader.h"
 #include "logging.h"
@@ -69,10 +70,11 @@ void TalkManager::AnswerStringList(int con_fd, const vector<string> &list) {
 
 TalkManager *TalkManager::Create(
   const string &socket_path,
-  MountPoint *mount_point)
+  MountPoint *mount_point,
+  FuseRemounter *remounter)
 {
   UniquePtr<TalkManager>
-    talk_manager(new TalkManager(socket_path, mount_point));
+    talk_manager(new TalkManager(socket_path, mount_point, remounter));
 
   talk_manager->socket_fd_ = MakeSocket(socket_path, 0660);
   if (talk_manager->socket_fd_ == -1)
@@ -148,6 +150,7 @@ void *TalkManager::MainResponder(void *data) {
   TalkManager *talk_mgr = reinterpret_cast<TalkManager *>(data);
   MountPoint *mount_point = talk_mgr->mount_point_;
   FileSystem *file_system = mount_point->file_system();
+  FuseRemounter *remounter = talk_mgr->remounter_;
   LogCvmfs(kLogTalk, kLogDebug, "talk thread started");
 
   struct sockaddr_un remote;
@@ -279,20 +282,27 @@ void *TalkManager::MainResponder(void *data) {
       }
     } else if (line == "mountpoint") {
       talk_mgr->Answer(con_fd, cvmfs::loader_exports_->mount_point + "\n");
-    } else if (line == "remount") {
-      catalog::LoadError result = cvmfs::RemountStart();
-      switch (result) {
-        case catalog::kLoadFail:
+    } else if (line.substr(0, 7) == "remount") {
+      FuseRemounter::Status status;
+      if (line == "remount sync")
+        status = remounter->CheckSynchronously();
+      else
+        status = remounter->Check();
+      switch (status) {
+        case FuseRemounter::kStatusFailGeneral:
           talk_mgr->Answer(con_fd, "Failed\n");
           break;
-        case catalog::kLoadNoSpace:
+        case FuseRemounter::kStatusFailNoSpace:
           talk_mgr->Answer(con_fd, "Failed (no space)\n");
           break;
-        case catalog::kLoadUp2Date:
+        case FuseRemounter::kStatusUp2Date:
           talk_mgr->Answer(con_fd, "Catalog up to date\n");
           break;
-        case catalog::kLoadNew:
+        case FuseRemounter::kStatusDraining:
           talk_mgr->Answer(con_fd, "New revision applied\n");
+          break;
+        case FuseRemounter::kStatusMaintenance:
+          talk_mgr->Answer(con_fd, "In maintenance mode\n");
           break;
         default:
           talk_mgr->Answer(con_fd, "internal error\n");
@@ -600,10 +610,14 @@ void *TalkManager::MainResponder(void *data) {
 }
 
 
-TalkManager::TalkManager(const string &socket_path, MountPoint *mount_point)
+TalkManager::TalkManager(
+  const string &socket_path,
+  MountPoint *mount_point,
+  FuseRemounter *remounter)
   : socket_path_(socket_path)
   , socket_fd_(-1)
   , mount_point_(mount_point)
+  , remounter_(remounter)
   , spawned_(false)
 { }
 

@@ -49,6 +49,7 @@ class FuseRemounter : SingleCopy {
   void Spawn();
 
   Status Check();
+  Status CheckSynchronously();
   void TryFinish();
   void EnterMaintenanceMode();
   bool IsCaching() {

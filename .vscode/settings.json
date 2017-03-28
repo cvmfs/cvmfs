@@ -22,7 +22,8 @@
       "regex": "cpp",
       "condition_variable": "cpp",
       "future": "cpp",
-      "cassert": "cpp"
+      "cassert": "cpp",
+      "functional": "cpp"
     }
   }
 
