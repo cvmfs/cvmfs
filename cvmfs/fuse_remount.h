@@ -75,7 +75,6 @@ class FuseRemounter : SingleCopy {
   }
   void LeaveCriticalSection() { atomic_dec32(&critical_section_); /* 1 -> 0 */ }
 
-  bool spawned_;
   MountPoint *mountpoint_;  ///< Not owned
   cvmfs::InodeGenerationInfo *inode_generation_info_;  ///< Not owned
   FuseInvalidator *invalidator_;

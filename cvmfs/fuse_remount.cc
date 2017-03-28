@@ -25,22 +25,20 @@ using namespace std;  // NOLINT
 
 
 /**
- * Runs at the beginning of Fuse lookups, or triggered by the trigger thread,
- * or triggered from cvmfs_talk.  Checks if a previously started remount needs
- * to be finished or starts a new remount if the TTL timer was fired.
+ * Executed by the trigger thread, or triggered from cvmfs_talk.  Moves into
+ * drainout mode if a new catalog is available online.
  */
 FuseRemounter::Status FuseRemounter::Check() {
   FenceGuard fence_guard(&fence_maintenance_);
   if (IsInMaintenanceMode())
     return kStatusMaintenance;
 
-  // At this point, we can be here from explicit triggering through talk.cc
-  // or from the regular trigger by the trigger thread
   LogCvmfs(kLogCvmfs, kLogDebug, "catalog TTL expired, remount");
   catalog::LoadError retval = mountpoint_->catalog_mgr()->Remount(true);
   switch (retval) {
     case catalog::kLoadNew:
       if (atomic_cas32(&drainout_mode_, 0, 1)) {
+        // As of this point, fuse callbacks return zero as cache timeout
         LogCvmfs(kLogCvmfs, kLogDebug,
                  "new catalog revision available, "
                  "draining out meta-data caches");
@@ -74,7 +72,7 @@ FuseRemounter::Status FuseRemounter::Check() {
 
 
 /**
- * Used from the talk module.  Continously calls 'check' until it returns with
+ * Used from the TalkManager.  Continously calls 'check' until it returns with
  * "up to date" or a failure.
  */
 FuseRemounter::Status FuseRemounter::CheckSynchronously() {
@@ -112,8 +110,7 @@ FuseRemounter::FuseRemounter(
   MountPoint *mountpoint,
   cvmfs::InodeGenerationInfo *inode_generation_info,
   struct fuse_chan **fuse_channel)
-  : spawned_(false)
-  , mountpoint_(mountpoint)
+  : mountpoint_(mountpoint)
   , inode_generation_info_(inode_generation_info)
   , invalidator_(new FuseInvalidator(mountpoint->inode_tracker(), fuse_channel))
   , invalidator_handle_(mountpoint->kcache_timeout_sec())
@@ -128,13 +125,13 @@ FuseRemounter::FuseRemounter(
 
 
 FuseRemounter::~FuseRemounter() {
-  delete invalidator_;
   if (HasRemountTrigger()) {
     char quit = 'Q';
     WritePipe(pipe_remount_trigger_[1], &quit, 1);
     pthread_join(thread_remount_trigger_, NULL);
     ClosePipe(pipe_remount_trigger_);
   }
+  delete invalidator_;
   delete fence_;
 }
 
@@ -212,14 +209,14 @@ void FuseRemounter::Spawn() {
     catalogs_valid_until_ = time(NULL) + ttl;
     SetAlarm(ttl);
   }
-  spawned_ = true;
 }
 
 
 /**
  * Applies a previously started remount operation.  This is called from the
- * fuse callbacks.  Usually, the method quits immediately except when a new
- * catalog is available and the kernel caches are flushed.
+ * fuse callbacks or from CheckSynchronously().  Usually, the method quits
+ * immediately except when a new catalog is available and the kernel caches are
+ * flushed.
  */
 void FuseRemounter::TryFinish() {
   FenceGuard fence_guard(&fence_maintenance_);
