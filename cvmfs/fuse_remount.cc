@@ -92,8 +92,8 @@ FuseRemounter::Status FuseRemounter::CheckSynchronously() {
 
 
 void FuseRemounter::EnterMaintenanceMode() {
-  atomic_cas32(&maintenance_mode_, 0, 1);
   fence_maintenance_.Drain();
+  atomic_cas32(&maintenance_mode_, 0, 1);
   fence_maintenance_.Open();
 
   // All running Check() and TryFinish() methods returned.  Both methods now
