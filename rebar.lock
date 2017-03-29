@@ -5,11 +5,11 @@
   1},
  {<<"cowboy">>,
   {git,"https://github.com/ninenines/cowboy.git",
-       {ref,"7b248e5163fd852d6defe967318da849433dadb1"}},
+       {ref,"d8cdd9bd15e76dca3014f6f76c0ab6666b1dbda3"}},
   0},
  {<<"cowlib">>,
   {git,"https://github.com/ninenines/cowlib",
-       {ref,"8e6d0f462850a90bd8a60995f52027839288d038"}},
+       {ref,"07cde7c6def6eeed0174b270229e7d5175673d87"}},
   1},
  {<<"enacl_p">>,
   {git,"https://github.com/kzemek/enacl_p.git",
@@ -22,10 +22,11 @@
   {git,"https://github.com/kzemek/macaroons.git",
        {ref,"9d2fef9f37e6b96a68aaaa81c0e5272d61a8b3b0"}},
   0},
+ {<<"poolboy">>,{pkg,<<"poolboy">>,<<"1.5.1">>},0},
  {<<"quickrand">>,{pkg,<<"quickrand">>,<<"1.6.0">>},1},
  {<<"ranch">>,
   {git,"https://github.com/ninenines/ranch",
-       {ref,"a5d2efcde9a34ad38ab89a26d98ea5335e88625a"}},
+       {ref,"40809cd2b257a8a53bcb5588ecaa88cc5381ff5c"}},
   1},
  {<<"uuid">>,{pkg,<<"uuid_erl">>,<<"1.6.0">>},0}]}.
 [
@@ -33,6 +34,7 @@
  {<<"goldrush">>, <<"2024BA375CEEA47E27EA70E14D2C483B2D8610101B4E852EF7F89163CDB6E649">>},
  {<<"jsx">>, <<"749BEC6D205C694AE1786D62CEA6CC45A390437E24835FD16D12D74F07097727">>},
  {<<"lager">>, <<"EEF4E18B39E4195D37606D9088EA05BF1B745986CF8EC84F01D332456FE88D17">>},
+ {<<"poolboy">>, <<"6B46163901CFD0A1B43D692657ED9D7E599853B3B21B95AE5AE0A777CF9B6CA8">>},
  {<<"quickrand">>, <<"33A277A639C442D77AB5C1EEA4641A49E3F034FD13658BB57E192A6E083FE77D">>},
  {<<"uuid">>, <<"1BA81515EEB37EEB7F1563B658E30CDF18BCAF1FD6A390BBF3838461753E69D8">>}]}
 ].
