@@ -1157,7 +1157,10 @@ bool MountPoint::CreateDownloadManagers() {
   string proxies;
   if (options_mgr_->GetValue("CVMFS_HTTP_PROXY", &optarg))
     proxies = optarg;
-  proxies = download::ResolveProxyDescription(proxies, download_mgr_);
+  proxies = download::ResolveProxyDescription(
+    proxies,
+    file_system_->workspace() + "/proxies" + GetUniqFileSuffix(),
+    download_mgr_);
   if (proxies == "") {
     boot_error_ = "failed to discover HTTP proxy servers";
     boot_status_ = loader::kFailWpad;
@@ -1418,6 +1421,15 @@ unsigned MountPoint::GetMaxTtlMn() {
 }
 
 
+/**
+ * Files in the workspace from different file systems / mountpoints need to
+ * have different names.  Used, for example, for caching proxy settings.
+ */
+string MountPoint::GetUniqFileSuffix() {
+  return "." + file_system_->name() + "-" + fqrn_;
+}
+
+
 MountPoint::MountPoint(
   const string &fqrn,
   FileSystem *file_system,
@@ -1595,7 +1607,10 @@ bool MountPoint::SetupExternalDownloadMgr() {
 
   string proxies = "DIRECT";
   if (options_mgr_->GetValue("CVMFS_EXTERNAL_HTTP_PROXY", &optarg)) {
-    proxies = download::ResolveProxyDescription(optarg, external_download_mgr_);
+    proxies = download::ResolveProxyDescription(
+      optarg,
+      file_system_->workspace() + "/proxies-external" + GetUniqFileSuffix(),
+      external_download_mgr_);
     if (proxies == "") {
       boot_error_ = "failed to discover external HTTP proxy servers";
       boot_status_ = loader::kFailWpad;

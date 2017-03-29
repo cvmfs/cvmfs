@@ -404,7 +404,7 @@ void *TalkManager::MainResponder(void *data) {
       } else {
         string proxies = line.substr(10);
         proxies =
-          download::ResolveProxyDescription(proxies,
+          download::ResolveProxyDescription(proxies, "",
                                             mount_point->download_mgr());
         if (proxies == "") {
             talk_mgr->Answer(con_fd, "Failed, no valid proxies\n");

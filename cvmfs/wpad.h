@@ -21,6 +21,7 @@ std::string AutoProxy(DownloadManager *download_manager);
  * Uses AutoProxy to replace any "auto" proxy by the proxies from the PAC file
  */
 std::string ResolveProxyDescription(const std::string &cvmfs_proxies,
+                                    const std::string &path_fallback_cache,
                                     DownloadManager *download_manager);
 
 int MainResolveProxyDescription(int argc, char **argv);
