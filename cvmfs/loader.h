@@ -145,10 +145,11 @@ typedef std::vector<LoadEvent *> EventList;
  *
  * CernVM-FS 2.1.8 --> Version 2
  * CernVM-FS 2.2.0 --> Version 3
+ * CernVM-FS 2.4.0 --> Version 4
  */
 struct LoaderExports {
   LoaderExports() :
-    version(3),
+    version(4),
     size(sizeof(LoaderExports)), boot_time(0), foreground(false),
     disable_watchdog(false), simple_options_parsing(false) {}
 
@@ -174,6 +175,9 @@ struct LoaderExports {
 
   // added with CernVM-FS 2.2.0 (LoaderExports Version: 3)
   bool simple_options_parsing;
+
+  // added with CernVM-FS 2.4.0 (LoaderExports Version: 4)
+  struct fuse_chan **fuse_channel;
 };
 
 

@@ -104,8 +104,6 @@ class LibContext : SingleCopy {
   int64_t Pread(int fd, void *buf, uint64_t size, uint64_t off);
   int Close(int fd);
 
-  catalog::LoadError RemountStart();
-
   MountPoint *mount_point() { return mount_point_; }
   void set_options_mgr(OptionsManager *value) { options_mgr_ = value; }
 
