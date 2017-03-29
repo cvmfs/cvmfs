@@ -26,11 +26,18 @@ start(_StartType, _StartArgs) ->
                undefined ->
                    #{repos => [], keys => []}
            end,
+    ReceiverPoolConfig = case application:get_env(receiver_config) of
+                             {ok, PoolConfig} ->
+                                 PoolConfig;
+                             undefined ->
+                                 []
+                         end,
     {ok, Services} = application:get_env(enabled_services),
 
     cvmfs_services_sup:start_link({Services,
                                    maps:get(repos, Vars),
-                                   maps:get(keys, Vars)}).
+                                   maps:get(keys, Vars),
+                                   ReceiverPoolConfig}).
 
 %%--------------------------------------------------------------------
 stop(_State) ->

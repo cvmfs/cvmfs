@@ -62,6 +62,7 @@ init_per_suite(Config) ->
     ok = application:set_env(cvmfs_services, enabled_services, [cvmfs_auth, cvmfs_lease, cvmfs_be, cvmfs_fe]),
     ok = application:set_env(cvmfs_services, repo_config, #{repos => ct:get_config(repos)
                                                            ,keys => ct:get_config(keys)}),
+    ok = application:set_env(cvmfs_services, receiver_config, [{size, 1}, {max_overflow, 0}]),
     MaxLeaseTime = 200, % milliseconds
     ok = application:set_env(cvmfs_services, max_lease_time, MaxLeaseTime),
 
@@ -182,6 +183,7 @@ normal_payload_submission(Config) ->
     Digest = base64:encode(<<"FAKE PAYLOAD DIGEST">>),
     JSONMessage = jsx:encode(#{<<"session_token">> => Token,
                                <<"payload_digest">> => Digest,
+                               <<"header_size">> => <<"1">>,
                                <<"api_version">> => integer_to_binary(cvmfs_fe:api_version())}),
     RequestBody2 = <<JSONMessage/binary,Payload/binary>>,
     MessageSize = size(JSONMessage),
@@ -212,6 +214,7 @@ payload_submission_with_invalid_hmac(Config) ->
     Digest = base64:encode(<<"FAKE PAYLOAD DIGEST">>),
     JSONMessage = jsx:encode(#{<<"session_token">> => Token
                               ,<<"payload_digest">> => Digest
+                              ,<<"header_size">> => <<"1">>
                               ,<<"api_version">> => integer_to_binary(cvmfs_fe:api_version())}),
     RequestBody2 = <<JSONMessage/binary,Payload/binary>>,
     MessageSize = size(JSONMessage),
