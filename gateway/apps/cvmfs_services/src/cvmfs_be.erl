@@ -15,7 +15,7 @@
 %% API
 -export([start_link/1
         ,new_lease/3, end_lease/2
-        ,submit_payload/4]).
+        ,submit_payload/2]).
 
 -export([get_repos/1
         ,check_hmac/4
@@ -25,7 +25,6 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
--define(SERVER, ?MODULE).
 
 %%%===================================================================
 %%% Type specifications
@@ -42,6 +41,10 @@
 -type submit_payload_result() :: {ok, payload_added} |
                                  {ok, payload_added, lease_ended} |
                                  submission_error().
+-type payload_submission_data() :: {LeaseToken :: binary()
+                                   ,Payload :: binary()
+                                   ,Digest :: binary()
+                                   ,HeaderSize :: integer()}.
 
 
 %%%===================================================================
@@ -58,7 +61,7 @@
                               when Args :: term(), Pid :: pid(),
                                    Error :: {already_start, pid()} | term().
 start_link(_) ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -98,15 +101,12 @@ end_lease(Uid, LeaseToken) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec submit_payload(Uid, LeaseToken, Payload, Digest) ->
+-spec submit_payload(Uid, SubmissionData) ->
                             submit_payload_result()
                                 when Uid :: binary(),
-                                     LeaseToken :: binary(),
-                                     Payload :: binary(),
-                                     Digest :: binary().
-submit_payload(Uid, LeaseToken, Payload, Digest) ->
-    gen_server:call(?MODULE, {be_req, submit_payload, {Uid, LeaseToken,
-                                                       Payload, Digest}}).
+                                     SubmissionData :: payload_submission_data().
+submit_payload(Uid, SubmissionData) ->
+    gen_server:call(?MODULE, {be_req, submit_payload, {Uid, SubmissionData}}).
 
 
 -spec get_repos(Uid :: binary()) -> [binary()].
@@ -167,11 +167,11 @@ handle_call({be_req, end_lease, {Uid, LeaseToken}}, _From, State) ->
     lager:info("Backend request: Uid: ~p - {end_lease, ~p} -> Reply: ~p",
                [Uid, LeaseToken, Reply]),
     {reply, Reply, State};
-handle_call({be_req, submit_payload,
-             {Uid, LeaseToken, Payload, Digest}}, _From, State) ->
-    Reply = p_submit_payload(LeaseToken, Payload, Digest),
-    lager:info("Backend request: Uid: ~p - {submit_payload, {~p, ~p, ~p}} -> Reply: ~p",
-               [Uid, LeaseToken, <<"payload_not_shown">>, Digest, Reply]),
+handle_call({be_req, submit_payload, {Uid, SubmissionData}}, _From, State) ->
+    Reply = p_submit_payload(SubmissionData),
+    {LeaseToken, _Payload, Digest, HeaderSize} = SubmissionData,
+    lager:info("Backend request: Uid: ~p - {submit_payload, {~p, ~p, ~p, ~p}} -> Reply: ~p",
+               [Uid, LeaseToken, <<"payload_not_shown">>, Digest, HeaderSize, Reply]),
     {reply, Reply, State};
 handle_call({be_req, get_repos, Uid}, _From, State) ->
     Reply = p_get_repos(),
@@ -273,13 +273,11 @@ p_end_lease(LeaseToken) ->
             {error, invalid_macaroon}
     end.
 
--spec p_submit_payload(LeaseToken, Payload, Digest) ->
+-spec p_submit_payload(SubmissionData) ->
                               submit_payload_result()
-                                  when LeaseToken :: binary(),
-                                       Payload :: binary(),
-                                       Digest :: binary().
-p_submit_payload(LeaseToken, Payload, Digest) ->
-    case p_check_payload(LeaseToken, Payload, Digest) of
+                                  when SubmissionData :: payload_submission_data().
+p_submit_payload({LeaseToken, Payload, Digest, HeaderSize}) ->
+    case p_check_payload(LeaseToken, Payload, Digest, HeaderSize) of
         {ok, _Public} ->
             %% TODO: submit payload to GW
             {ok, payload_added};
@@ -314,15 +312,16 @@ p_generate_token(KeyId, Path) ->
     {Public, Secret, Token}.
 
 
--spec p_check_payload(LeaseToken, Payload, Digest) ->
+-spec p_check_payload(LeaseToken, Payload, Digest, HeaderSize) ->
                              {ok, Public} | {error, invalid_macaroon |
                                              {unverified_caveat, Caveat}}
                                  when LeaseToken :: binary(),
                                       Payload :: binary(),
                                       Digest :: binary(),
+                                      HeaderSize :: integer(),
                                       Public :: binary(),
                                       Caveat :: binary().
-p_check_payload(LeaseToken, _Payload, _Digest) ->
+p_check_payload(LeaseToken, _Payload, _Digest, _HeaderSize) ->
     % Here we should perform all sanity checks on the request
     % Verify lease token (check user, check time-stamp, extract path).
     case  macaroon:deserialize(LeaseToken) of
