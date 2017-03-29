@@ -1,4 +1,5 @@
 2.4.0:
+  * Use active eviction of kernel caches with libfuse >= 2.9 (CVM-1041)
   * Add external and internal in-memory cache manager (CVM-1044)
   * Add tiered cache manager (CVM-1050, CVM-1183)
   * Support for instance based cache configuration (CVM-1053)
