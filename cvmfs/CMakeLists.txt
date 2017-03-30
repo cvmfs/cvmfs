@@ -330,6 +330,16 @@ set (CVMFS_STRATUM_AGENT_SOURCES
 )
 
 
+if(BUILD_RECEIVER)
+  set (CVMFS_RECEIVER_SOURCES
+    receiver/receiver.cc
+    logging.cc
+    )
+
+  add_executable(cvmfs_receiver ${CVMFS_RECEIVER_SOURCES})
+endif(BUILD_RECEIVER)
+
+
 #
 # configure some compiler flags for proper build
 #
@@ -667,6 +677,14 @@ if (BUILD_LIBCVMFS_CACHE)
     DESTINATION  ${CVMFS_LIBEXEC_DIR}/cache
   )
 endif (BUILD_LIBCVMFS_CACHE)
+
+if (BUILD_RECEIVER)
+  install (
+    TARGETS cvmfs_receiver
+    RUNTIME
+    DESTINATION bin
+    )
+endif(BUILD_RECEIVER)
 
 if (BUILD_SERVER)
   install (
