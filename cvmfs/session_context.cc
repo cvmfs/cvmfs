@@ -240,6 +240,7 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
   const std::string json_body =
       "{\"session_token\" : \"" + session_token_ +
       "\", \"payload_digest\" : \"" + Base64(payload_digest.ToString(false)) +
+      "\", \"header_size\" : \"" + StringifyInt(serializer.GetHeaderSize()) +
       "\", \"api_version\" : \"" + StringifyInt(gateway::APIVersion()) + "\"}";
 
   // Compute HMAC
