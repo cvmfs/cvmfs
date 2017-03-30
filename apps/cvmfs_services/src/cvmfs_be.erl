@@ -33,18 +33,6 @@
                             {error, invalid_key} |
                             {error, invalid_path} |
                             {path_busy, TimeRemaining :: binary()}.
--type submission_error() :: {error,
-                             lease_expired |
-                             invalid_lease |
-                             invalid_key |
-                             invalid_macaroon}.
--type submit_payload_result() :: {ok, payload_added} |
-                                 {ok, payload_added, lease_ended} |
-                                 submission_error().
--type payload_submission_data() :: {LeaseToken :: binary()
-                                   ,Payload :: binary()
-                                   ,Digest :: binary()
-                                   ,HeaderSize :: integer()}.
 
 
 %%%===================================================================
@@ -102,9 +90,9 @@ end_lease(Uid, LeaseToken) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec submit_payload(Uid, SubmissionData) ->
-                            submit_payload_result()
+                            cvmfs_receiver:submit_payload_result()
                                 when Uid :: binary(),
-                                     SubmissionData :: payload_submission_data().
+                                     SubmissionData :: cvmfs_receiver:payload_submission_data().
 submit_payload(Uid, SubmissionData) ->
     gen_server:call(?MODULE, {be_req, submit_payload, {Uid, SubmissionData}}).
 
@@ -248,7 +236,10 @@ p_new_lease(KeyId, Path) ->
     [Repo | _]  = binary:split(Path, <<"/">>),
     case cvmfs_auth:check_keyid_for_repo(KeyId, Repo) of
         {ok, true} ->
-            {Public, Secret, Token} = p_generate_token(KeyId, Path),
+            {ok, MaxLeaseTime} = application:get_env(cvmfs_services, max_lease_time),
+            {Public, Secret, Token} = cvmfs_receiver:generate_token(KeyId,
+                                                                    Path,
+                                                                    MaxLeaseTime),
             case cvmfs_lease:request_lease(KeyId, Path, Public, Secret) of
                 ok ->
                     {ok, Token};
@@ -265,96 +256,30 @@ p_new_lease(KeyId, Path) ->
 -spec p_end_lease(LeaseToken) -> ok | {error, invalid_macaroon}
                                      when LeaseToken :: binary().
 p_end_lease(LeaseToken) ->
-    case macaroon:deserialize(LeaseToken) of
-        {ok, M} ->
-            Public = macaroon:identifier(M),
-            cvmfs_lease:end_lease(Public);
-        _ ->
-            {error, invalid_macaroon}
-    end.
-
--spec p_submit_payload(SubmissionData) ->
-                              submit_payload_result()
-                                  when SubmissionData :: payload_submission_data().
-p_submit_payload({LeaseToken, Payload, Digest, HeaderSize}) ->
-    case p_check_payload(LeaseToken, Payload, Digest, HeaderSize) of
-        {ok, _Public} ->
-            %% TODO: submit payload to GW
-            {ok, payload_added};
-        {error, {unverified_caveat, <<"time < ", _/binary>>}} ->
-            {error, lease_expired};
-        {error, Reason} ->
-            {error, Reason}
-    end.
+    Result = case cvmfs_receiver:get_token_id(LeaseToken) of
+                 {ok, Public} ->
+                     cvmfs_lease:end_lease(Public);
+                 _ ->
+                     {error, invalid_macaroon}
+             end,
+    Result.
 
 
--spec p_generate_token(KeyId, Path) -> {Token, Public, Secret}
-                                           when KeyId :: binary(),
-                                                Path :: binary(),
-                                                Token :: binary(),
-                                                Public :: binary(),
-                                                Secret :: binary().
-p_generate_token(KeyId, Path) ->
-    Secret = enacl_p:randombytes(macaroon:suggested_secret_length()),
-    Public = <<KeyId/binary,Path/binary>>,
-    Location = <<"">>, %% Location isn't used
-    M = macaroon:create(Location, Secret, Public),
-
-    {ok, MaxLeaseTime} = application:get_env(cvmfs_services, max_lease_time),
-    Time = erlang:system_time(milli_seconds) + MaxLeaseTime,
-
-    M1 = macaroon:add_first_party_caveat(M,
-                                         "time < " ++ erlang:integer_to_binary(Time)),
-
-    %%M3 = macaroon:add_first_party_caveat(M2, "path = " ++ Path),
-
-    {ok, Token} = macaroon:serialize(M1),
-    {Public, Secret, Token}.
-
-
--spec p_check_payload(LeaseToken, Payload, Digest, HeaderSize) ->
-                             {ok, Public} | {error, invalid_macaroon |
-                                             {unverified_caveat, Caveat}}
-                                 when LeaseToken :: binary(),
-                                      Payload :: binary(),
-                                      Digest :: binary(),
-                                      HeaderSize :: integer(),
-                                      Public :: binary(),
-                                      Caveat :: binary().
-p_check_payload(LeaseToken, _Payload, _Digest, _HeaderSize) ->
-    % Here we should perform all sanity checks on the request
-    % Verify lease token (check user, check time-stamp, extract path).
-    case  macaroon:deserialize(LeaseToken) of
-        {ok, M} ->
-            Public = macaroon:identifier(M),
+-spec p_submit_payload(SubmissionData) -> cvmfs_receiver:submit_payload_result()
+                                  when SubmissionData :: cvmfs_receiver:payload_submission_data().
+p_submit_payload({LeaseToken, _, _, _} = SubmissionData) ->
+    Result = case cvmfs_receiver:get_token_id(LeaseToken) of
+        {ok, Public} ->
             case cvmfs_lease:check_lease(Public) of
                 {ok, Secret} ->
-                    CheckTime = fun(<<"time < ", Exp/binary>>) ->
-                                        erlang:binary_to_integer(Exp)
-                                            > erlang:system_time(milli_seconds);
-                                   (_) ->
-                                        false
-                                end,
-                    %% CheckPaths = fun(_) ->
-                    %%                      true
-                    %%              end,
-
-                    V = macaroon_verifier:create(),
-                    V1 = macaroon_verifier:satisfy_general(V, CheckTime),
-                    %% V3 = macaroon_verifier:satisfy_general(V2, CheckPaths),
-
-                    case macaroon_verifier:verify(V1, M, Secret) of
-                        ok ->
-                            {ok, Public};
-                        {error, Reason} ->
-                            {error, Reason}
-                    end;
+                    cvmfs_receiver:submit_payload(SubmissionData, Secret);
                 {error, Reason} ->
                     {error, Reason}
             end;
-        _ ->
-            {error, invalid_macaroon}
-    end.
+        {error, Reason} ->
+            {error, Reason}
+             end,
+    Result.
 
 
 -spec p_get_repos() -> [binary()].
