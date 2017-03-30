@@ -26,6 +26,11 @@
          terminate/2, code_change/3]).
 
 
+%% Constants
+% Timeout of asychronous request handling == 30min
+-define(ASYNC_TIMEOUT, 1000 * 60 * 30).
+
+
 %%%===================================================================
 %%% Type specifications
 %%%===================================================================
@@ -82,6 +87,7 @@ new_lease(Uid, KeyId, Path) ->
 end_lease(Uid, LeaseToken) ->
     gen_server:call(?MODULE, {be_req, end_lease, {Uid, LeaseToken}}).
 
+
 %%--------------------------------------------------------------------
 %% @doc
 %% Submit a new payload
@@ -137,44 +143,79 @@ init([]) ->
 %% @doc
 %% Handling call messages
 %%
+%% Note on asynchronicity:
+%%
+%% As part of each request, the frontend (cvmfs_fe) calls into the
+%% backend (cvmfs_be), which then calls into different submodules.
+%% Each backend API call will be made from different processes,
+%% since Cowboy spawns a new process for each request. To avoid
+%% blocking the gen_server, in the handle_call callback, we always
+%% return {noreply, State}, to block the calling process and
+%% dispatch the actual request handling to a new subprocess, which
+%% will later complete the request using gen_server:reply.
+%%
 %% @end
 %%--------------------------------------------------------------------
-handle_call({be_req, new_lease, {Uid, KeyId, Path}}, _From, State) ->
-    case p_new_lease(KeyId, Path) of
-        {ok, LeaseToken} ->
-            lager:info("Backend request: Uid: ~p - {new_lease, {~p, ~p}} -> Reply: ~p",
-                       [Uid, KeyId, Path, LeaseToken]),
-            {reply, {ok, LeaseToken}, State};
-        Other ->
-            lager:info("Backend request: Uid: ~p - {new_lease, {~p, ~p}} -> Reply: ~p",
-                       [Uid, KeyId, Path, Other]),
-            {reply, Other, State}
-    end;
-handle_call({be_req, end_lease, {Uid, LeaseToken}}, _From, State) ->
-    Reply = p_end_lease(LeaseToken),
-    lager:info("Backend request: Uid: ~p - {end_lease, ~p} -> Reply: ~p",
-               [Uid, LeaseToken, Reply]),
-    {reply, Reply, State};
-handle_call({be_req, submit_payload, {Uid, SubmissionData}}, _From, State) ->
-    Reply = p_submit_payload(SubmissionData),
-    {LeaseToken, _Payload, Digest, HeaderSize} = SubmissionData,
-    lager:info("Backend request: Uid: ~p - {submit_payload, {~p, ~p, ~p, ~p}} -> Reply: ~p",
-               [Uid, LeaseToken, <<"payload_not_shown">>, Digest, HeaderSize, Reply]),
-    {reply, Reply, State};
-handle_call({be_req, get_repos, Uid}, _From, State) ->
-    Reply = p_get_repos(),
-    lager:info("Backend request: Uid: ~p - {get_repos} -> Reply: ~p",
-               [Uid, Reply]),
-    {reply, Reply, State};
-handle_call({be_req, check_hmac, {Uid, Message, KeyId, HMAC}}, _From, State) ->
-    Reply = p_check_hmac(Message, KeyId, HMAC),
-    lager:info("Backend request: Uid: ~p - {check_hmac, {~p, ~p, ~p}} -> Reply: ~p",
-               [Uid, Message, KeyId, HMAC, Reply]),
-    {reply, Reply, State};
-handle_call({be_req, unique_id}, _From, State) ->
-    Reply = p_unique_id(),
-    lager:info("Backend request: {unique_id} -> Reply: ~p", [Reply]),
-    {reply, Reply, State}.
+handle_call({be_req, new_lease, {Uid, KeyId, Path}}, From, State) ->
+    Task = fun() ->
+                   case p_new_lease(KeyId, Path) of
+                       {ok, LeaseToken} ->
+                           lager:info("Backend request: Uid: ~p - {new_lease, {~p, ~p}} -> Reply: ~p",
+                                      [Uid, KeyId, Path, LeaseToken]),
+                           gen_server:reply(From, {ok, LeaseToken});
+                       Other ->
+                           lager:info("Backend request: Uid: ~p - {new_lease, {~p, ~p}} -> Reply: ~p",
+                                      [Uid, KeyId, Path, Other]),
+                           gen_server:reply(From, Other)
+                   end
+           end,
+    spawn_link(Task),
+    {noreply, State, ?ASYNC_TIMEOUT};
+handle_call({be_req, end_lease, {Uid, LeaseToken}}, From, State) ->
+    Task = fun() ->
+                   Reply = p_end_lease(LeaseToken),
+                   lager:info("Backend request: Uid: ~p - {end_lease, ~p} -> Reply: ~p",
+                              [Uid, LeaseToken, Reply]),
+                   gen_server:reply(From, Reply)
+           end,
+    spawn_link(Task),
+    {noreply, State, ?ASYNC_TIMEOUT};
+handle_call({be_req, submit_payload, {Uid, SubmissionData}}, From, State) ->
+    Task = fun() ->
+                   Reply = p_submit_payload(SubmissionData),
+                   {LeaseToken, _Payload, Digest, HeaderSize} = SubmissionData,
+                   lager:info("Backend request: Uid: ~p - {submit_payload, {~p, ~p, ~p, ~p}} -> Reply: ~p",
+                              [Uid, LeaseToken, <<"payload_not_shown">>, Digest, HeaderSize, Reply]),
+                   gen_server:reply(From, Reply)
+           end,
+    spawn_link(Task),
+    {noreply, State, ?ASYNC_TIMEOUT};
+handle_call({be_req, get_repos, Uid}, From, State) ->
+    Task = fun() ->
+                   Reply = p_get_repos(),
+                   lager:info("Backend request: Uid: ~p - {get_repos} -> Reply: ~p",
+                              [Uid, Reply]),
+                   gen_server:reply(From, Reply)
+              end,
+    spawn_link(Task),
+    {noreply, State, ?ASYNC_TIMEOUT};
+handle_call({be_req, check_hmac, {Uid, Message, KeyId, HMAC}}, From, State) ->
+    Task = fun() ->
+                   Reply = p_check_hmac(Message, KeyId, HMAC),
+                   lager:info("Backend request: Uid: ~p - {check_hmac, {~p, ~p, ~p}} -> Reply: ~p",
+                              [Uid, Message, KeyId, HMAC, Reply]),
+                   gen_server:reply(From, Reply)
+           end,
+    spawn_link(Task),
+    {noreply, State, ?ASYNC_TIMEOUT};
+handle_call({be_req, unique_id}, From, State) ->
+    Task = fun() ->
+                   Reply = p_unique_id(),
+                   lager:info("Backend request: {unique_id} -> Reply: ~p", [Reply]),
+                   gen_server:reply(From,Reply)
+           end,
+    spawn_link(Task),
+    {noreply, State, ?ASYNC_TIMEOUT}.
 
 
 %%--------------------------------------------------------------------
@@ -195,6 +236,9 @@ handle_cast(Msg, State) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+handle_info({'EXIT', Pid, normal}, State) ->
+    lager:info("Task ~p finished", [Pid]),
+    {noreply, State};
 handle_info(Info, State) ->
     lager:warning("Unknown message received: ~p", [Info]),
     {noreply, State}.
