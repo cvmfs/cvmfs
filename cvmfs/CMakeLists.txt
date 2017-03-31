@@ -332,6 +332,7 @@ set (CVMFS_STRATUM_AGENT_SOURCES
 
 if(BUILD_RECEIVER)
   set (CVMFS_RECEIVER_SOURCES
+    receiver/reactor.cc
     receiver/receiver.cc
     logging.cc
     )

@@ -9,10 +9,12 @@
 #include "../logging.h"
 #include "../swissknife.h"
 
+#include "reactor.h"
+
 swissknife::ParameterList MakeParameterList() {
   swissknife::ParameterList params;
-  params.push_back(
-      swissknife::Parameter::Mandatory('a', "Address of the gateway service"));
+  // params.push_back(swissknife::Parameter::Mandatory('a', "Address of the
+  // gateway service"));
 
   return params;
 }
@@ -71,6 +73,13 @@ bool ReadCmdLineArguments(int argc, char** argv,
 int main(int argc, char** argv) {
   swissknife::ArgumentList arguments;
   if (!ReadCmdLineArguments(argc, argv, MakeParameterList(), &arguments)) {
+    return 1;
+  }
+
+  receiver::Reactor reactor(3, 4);
+
+  if (!reactor.run()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Error running CVMFS Receiver event loop");
     return 1;
   }
 
