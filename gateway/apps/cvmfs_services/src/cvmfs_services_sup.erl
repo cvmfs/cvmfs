@@ -30,7 +30,7 @@ start_link(Args) ->
 %%====================================================================
 
 %% Child :: {Id,StartFunc,Restart,Shutdown,Type,Modules}
-init({EnabledWorkers, Repos, Keys, PoolConfig}) ->
+init({EnabledWorkers, Repos, Keys, PoolConfig, WorkerConfig}) ->
     SupervisorSpecs = #{strategy => one_for_all,
                         intensity => 5,
                         period => 5},
@@ -61,7 +61,7 @@ init({EnabledWorkers, Repos, Keys, PoolConfig}) ->
                     shutdown => 2000,
                     type => supervisor,
                     modules => [cvmfs_fe]},
-      cvmfs_receiver_pool => poolboy:child_spec(cvmfs_receiver_pool, ReceiverPoolConfig, [])
+      cvmfs_receiver_pool => poolboy:child_spec(cvmfs_receiver_pool, ReceiverPoolConfig, WorkerConfig)
      },
     {ok, {SupervisorSpecs, lists:foldr(fun(W, Acc) -> [maps:get(W, WorkerSpecs) | Acc] end,
                                        [],
