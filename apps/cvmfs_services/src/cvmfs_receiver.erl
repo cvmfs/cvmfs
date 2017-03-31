@@ -104,10 +104,23 @@ submit_payload(SubmissionData, Secret) ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init(_Args) ->
+init(Args) ->
     process_flag(trap_exit, true),
     lager:info("CVMFS Receiver initialized at PID ~p.", [self()]),
-    {ok, #{}}.
+
+    #{executable_path := Exec} = Args,
+
+    WorkerPort = open_port({spawn_executable, Exec}, [stream,
+                                                      binary,
+                                                      nouse_stdio,
+                                                      exit_status]),
+
+    WorkerPort ! {self(), {command, <<"q">>}},
+    receive
+        {WorkerPort, {data, Data}} ->
+            lager:info("Received data: ~p", [Data])
+    end,
+    {ok, #{worker => WorkerPort}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -164,6 +177,12 @@ handle_cast(Msg, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_info({Port, {exit_status, Status}}, State) ->
+    lager:info("Worker process ~p exited with status: ~p", [Port, Status]),
+    {noreply, State};
+handle_info({'EXIT', Port, Reason}, State) ->
+    lager:info("Port ~p exited with reason: ~p", [Port, Reason]),
+    {noreply, State};
 handle_info(Info, State) ->
     lager:warning("Unknown message received: ~p", [Info]),
     {noreply, State}.
@@ -179,7 +198,9 @@ handle_info(Info, State) ->
 %% @spec terminate(Reason, State) -> void()
 %% @end
 %%--------------------------------------------------------------------
-terminate(Reason, _State) ->
+terminate(Reason, State) ->
+    #{worker := WorkerPort} = State,
+    port_close(WorkerPort),
     lager:info("Terminating with reason: ~p", [Reason]),
     ok.
 
