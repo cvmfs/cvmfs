@@ -10,5 +10,5 @@
                    {repo_config, {file, "./config/repo.config"}},
                    {max_lease_time, 10000},  % max lease time in milliseconds
                    {receiver_config, [{size, 3}, {max_overflow, 1}]},
-                   {receiver_worker_config, [{executable_path, "/usr/bin/cvmfs_receiver"}]}]}
+                   {receiver_worker_config, [{executable_path, "/tmp/cvmfs_receiver"}]}]}
 ].

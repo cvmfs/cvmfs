@@ -110,7 +110,9 @@ init(Args) ->
 
     #{executable_path := Exec} = Args,
 
-    WorkerPort = open_port({spawn_executable, Exec}, [stream,
+    WorkerArgs = ["-i", integer_to_list(3), "-o", integer_to_list(4)],
+    WorkerPort = open_port({spawn_executable, Exec}, [{args, WorkerArgs},
+                                                      stream,
                                                       binary,
                                                       nouse_stdio,
                                                       exit_status]),
