@@ -13,8 +13,8 @@
 
 swissknife::ParameterList MakeParameterList() {
   swissknife::ParameterList params;
-  // params.push_back(swissknife::Parameter::Mandatory('a', "Address of the
-  // gateway service"));
+  params.push_back(swissknife::Parameter::Optional('i', "File descriptor to use for input"));
+  params.push_back(swissknife::Parameter::Optional('o', "File descriptor to use for output"));
 
   return params;
 }
@@ -76,7 +76,15 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  receiver::Reactor reactor(3, 4);
+  int fdin = 0;
+  int fdout = 1;
+  if (arguments.find('i') != arguments.end()) {
+    fdin = std::atoi(arguments.find('i')->second->c_str());
+  }
+  if (arguments.find('o') != arguments.end()) {
+    fdout = std::atoi(arguments.find('o')->second->c_str());
+  }
+  receiver::Reactor reactor(fdin, fdout);
 
   if (!reactor.run()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Error running CVMFS Receiver event loop");
