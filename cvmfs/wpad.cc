@@ -5,6 +5,8 @@
 #include "cvmfs_config.h"
 #include "wpad.h"
 
+#include <fcntl.h>
+
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
@@ -16,6 +18,7 @@
 #include "logging.h"
 #include "pacparser.h"
 #include "statistics.h"
+#include "util/posix.h"
 #include "util/string.h"
 
 using namespace std;  // NOLINT
@@ -199,18 +202,51 @@ string AutoProxy(DownloadManager *download_manager) {
 }
 
 
-string ResolveProxyDescription(const string &cvmfs_proxies,
-                               DownloadManager *download_manager)
+string ResolveProxyDescription(
+  const string &cvmfs_proxies,
+  const std::string &path_fallback_cache,
+  DownloadManager *download_manager)
 {
   if ((cvmfs_proxies == "") || (cvmfs_proxies.find("auto") == string::npos))
     return cvmfs_proxies;
 
+  bool use_cache = false;
   vector<string> lb_groups = SplitString(cvmfs_proxies, ';');
   for (unsigned i = 0; i < lb_groups.size(); ++i) {
-    if (lb_groups[i] == "auto")
-      lb_groups[i] = AutoProxy(download_manager);
+    if (lb_groups[i] != "auto")
+      continue;
+
+    lb_groups[i] = AutoProxy(download_manager);
+    if (lb_groups[i].empty())
+      use_cache = true;
   }
-  return JoinStrings(lb_groups, ";");
+
+  string discovered_proxies = JoinStrings(lb_groups, ";");
+
+  if (!path_fallback_cache.empty()) {
+    if (use_cache) {
+      string cached_proxies;
+      int fd = open(path_fallback_cache.c_str(), O_RDONLY);
+      bool retval = (fd >= 0) && SafeReadToString(fd, &cached_proxies);
+      close(fd);
+      if (retval) {
+        LogCvmfs(kLogDownload, kLogSyslog | kLogDebug,
+                 "using cached proxy settings from %s",
+                 path_fallback_cache.c_str());
+        return cached_proxies;
+      }
+    } else {
+      bool retval =
+        SafeWriteToFile(discovered_proxies, path_fallback_cache, 0660);
+      if (!retval) {
+        LogCvmfs(kLogDownload, kLogSyslogWarn | kLogDebug,
+                 "failed to write proxy settings into %s",
+                 path_fallback_cache.c_str());
+      }
+    }
+  }
+
+  return discovered_proxies;
 }
 
 
@@ -240,7 +276,7 @@ int MainResolveProxyDescription(int argc, char **argv) {
   DownloadManager download_manager;
   download_manager.Init(1, false, perf::StatisticsTemplate("pac", &statistics));
   download_manager.SetHostChain(host_list);
-  string resolved_proxies = ResolveProxyDescription(proxy_configuration,
+  string resolved_proxies = ResolveProxyDescription(proxy_configuration, "",
                                                     &download_manager);
   download_manager.Fini();
 

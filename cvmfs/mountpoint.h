@@ -177,6 +177,7 @@ class FileSystem : SingleCopy, public BootFactory {
   perf::Counter *n_fs_readlink() { return n_fs_readlink_; }
   perf::Counter *n_fs_stat() { return n_fs_stat_; }
   perf::Counter *n_io_error() { return n_io_error_; }
+  std::string name() { return name_; }
   perf::Counter *no_open_dirs() { return no_open_dirs_; }
   perf::Counter *no_open_files() { return no_open_files_; }
   OptionsManager *options_mgr() { return options_mgr_; }
@@ -468,6 +469,7 @@ class MountPoint : SingleCopy, public BootFactory {
   bool DetermineRootHash(shash::Any *root_hash);
   bool FetchHistory(std::string *history_path);
   std::string ReplaceHosts(std::string hosts);
+  std::string GetUniqFileSuffix();
 
   std::string fqrn_;
   cvmfs::Uuid *uuid_;
