@@ -23,6 +23,15 @@
          terminate/2, code_change/3]).
 
 
+%% Request types (enum receiver::Request) from "cvmfs.git/cvmfs/receiver/reactor.h"
+-define(kQuit,0).
+-define(kEcho,1).
+-define(kGenerateToken,2).
+-define(kGetTokenId,3).
+-define(kSubmitPayload,4).
+-define(kError,5).
+
+
 %%%===================================================================
 %%% Type specifications
 %%%===================================================================
@@ -106,7 +115,7 @@ submit_payload(SubmissionData, Secret) ->
 %%--------------------------------------------------------------------
 init(Args) ->
     process_flag(trap_exit, true),
-    lager:info("CVMFS Receiver initialized at PID ~p.", [self()]),
+    lager:info("CVMFS receiver initialized at PID ~p.", [self()]),
 
     #{executable_path := Exec} = Args,
 
@@ -117,11 +126,11 @@ init(Args) ->
                                                       nouse_stdio,
                                                       exit_status]),
 
-    WorkerPort ! {self(), {command, <<"q">>}},
-    receive
-        {WorkerPort, {data, Data}} ->
-            lager:info("Received data: ~p", [Data])
-    end,
+    %% Send a kEcho request to the worker
+    lager:info("Sending kEcho request to worker process."),
+    p_write_request(WorkerPort, ?kEcho, <<"Ping">>),
+    {Size, Msg} = p_read_reply(WorkerPort),
+    lager:info("Received kEcho reply from worker: size: ~p, msg: ~p", [Size, Msg]),
     {ok, #{worker => WorkerPort}}.
 
 %%--------------------------------------------------------------------
@@ -202,6 +211,10 @@ handle_info(Info, State) ->
 %%--------------------------------------------------------------------
 terminate(Reason, State) ->
     #{worker := WorkerPort} = State,
+
+    %% Send the kQuit request to the worker
+    lager:info("Sending kQuit request to worker process."),
+    p_write_request(WorkerPort, ?kQuit, <<"">>),
     port_close(WorkerPort),
     lager:info("Terminating with reason: ~p", [Reason]),
     ok.
@@ -287,4 +300,15 @@ p_submit_payload({LeaseToken, _Payload, _Digest, _HeaderSize}, Secret) ->
             {error, lease_expired};
         {error, Reason} ->
             {error, Reason}
+    end.
+
+p_write_request(Port, Request, Msg) ->
+    Size = size(Msg),
+    Buffer = <<Request:32/integer-signed-little,Size:32/integer-signed-little,Msg/binary>>,
+    Port ! {self(), {command, Buffer}}.
+
+p_read_reply(Port) ->
+    receive
+        {Port, {data, <<Size:32/integer-signed-little,Msg/binary>>}} ->
+            {Size, Msg}
     end.
