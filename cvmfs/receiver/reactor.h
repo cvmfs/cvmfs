@@ -6,15 +6,34 @@
 #define CVMFS_RECEIVER_REACTOR_H_
 
 #include <cstdlib>
+#include <string>
 
 namespace receiver {
 
+enum Request {
+  kQuit = 0,
+  kEcho,
+  kGenerateToken,
+  kGetTokenId,
+  kSubmitPayload,
+  kError
+};
+
 class Reactor {
  public:
+  static Request ReadRequest(int fd, std::string* data);
+  static bool WriteRequest(int fd, Request req, const std::string& data);
+
+  static bool ReadReply(int fd, std::string* data);
+  static bool WriteReply(int fd, const std::string& data);
+
   Reactor(int fdin, int fdout);
-  ~Reactor();
+  virtual ~Reactor();
 
   bool run();
+
+ protected:
+  virtual bool HandleRequest(int fdout, Request req, const std::string& data);
 
  private:
   int fdin_;
