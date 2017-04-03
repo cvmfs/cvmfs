@@ -40,12 +40,12 @@ class PosixQuotaManager : public QuotaManager {
   FRIEND_TEST(T_QuotaManager, MakeReturnPipe);
 
  public:
-  static PosixQuotaManager *Create(const std::string &cache_dir,
+  static PosixQuotaManager *Create(const std::string &cache_workspace,
     const uint64_t limit, const uint64_t cleanup_threshold,
     const bool rebuild_database);
   static PosixQuotaManager *CreateShared(
     const std::string &exe_path,
-    const std::string &cache_dir,
+    const std::string &cache_workspace,
     const uint64_t limit,
     const uint64_t cleanup_threshold,
     bool foreground);
@@ -228,8 +228,11 @@ class PosixQuotaManager : public QuotaManager {
   void GetSharedStatus(uint64_t *gauge, uint64_t *pinned);
   void GetLimits(uint64_t *limit, uint64_t *cleanup_threshold);
 
+  static void ParseDirectories(const std::string cache_workspace,
+                               std::string *cache_dir,
+                               std::string *workspace_dir);
   PosixQuotaManager(const uint64_t limit, const uint64_t cleanup_threshold,
-                    const std::string &cache_dir);
+                    const std::string &cache_workspace);
 
   /**
    * Indicates if the cache manager is a shared process or a thread within the
@@ -273,6 +276,13 @@ class PosixQuotaManager : public QuotaManager {
    * Should match the directory given to the cache manager.
    */
   std::string cache_dir_;
+
+  /**
+   * Directory for the database lock (shared manager) and the pipes (also
+   * shared manager).  Usually the same as cache_dir_.  Can be different if
+   * CVMFS_WORKSPACE or CVMFS_CACHE_WORKSPACE is set.
+   */
+  std::string workspace_dir_;
 
   /**
    * Pinned content hashes and their size.
