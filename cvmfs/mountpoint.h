@@ -214,6 +214,11 @@ class FileSystem : SingleCopy, public BootFactory {
      */
     int64_t quota_limit;
     std::string cache_path;
+    /**
+     * Different from cache_path only if CVMFS_WORKSPACE or
+     * CVMFS_CACHE_WORKSPACE is set.
+     */
+    std::string workspace;
   };
 
   static void LogSqliteError(void *user_data __attribute__((unused)),

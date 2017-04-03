@@ -279,6 +279,37 @@ TEST_F(T_QuotaManager, CloseDatabase) {
 }
 
 
+TEST_F(T_QuotaManager, Workspace) {
+  // Test if separation of workspace and cache directory works
+  string workspace = "./cvmfs_ut_quota_workspace";
+  string cache_workspace = tmp_path_ + ":" + workspace;
+  ASSERT_TRUE(MkdirDeep(workspace, 0700));
+  vector<string> dir_entries = FindFiles(workspace, "");
+  // Only ., ..
+  EXPECT_EQ(2U, dir_entries.size());
+  delete quota_mgr_;
+  quota_mgr_ =
+    PosixQuotaManager::Create(cache_workspace, limit_, threshold_, false);
+  quota_mgr_->Spawn();
+  EXPECT_GE(dir_entries.size(), 2U);
+
+  shash::Any hash_null(shash::kSha1);
+  shash::Any hash_rnd(shash::kSha1);
+  hash_rnd.Randomize();
+  quota_mgr_->Insert(hash_null, 1, "/a");
+  EXPECT_TRUE(quota_mgr_->Pin(hash_rnd, 1, "/b", false));
+
+  delete quota_mgr_;
+  quota_mgr_ =
+    PosixQuotaManager::Create(cache_workspace, limit_, threshold_, false);
+  ASSERT_TRUE(quota_mgr_ != NULL);
+  quota_mgr_->Spawn();
+  vector<string> content = quota_mgr_->List();
+  sort(content.begin(), content.end());
+  EXPECT_EQ("/a\n/b\n", PrintStringVector(content));
+}
+
+
 TEST_F(T_QuotaManager, Contains) {
   shash::Any hash_null(shash::kSha1);
   shash::Any hash_rnd(shash::kSha1);
