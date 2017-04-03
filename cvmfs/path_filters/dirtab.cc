@@ -88,7 +88,7 @@ bool Dirtab::ParseLine(const std::string &line) {
   }
 
   // extract and parse pathspec
-  std::string pathspec_str(itr, iend);
+  std::string pathspec_str(Trim(std::string(itr, iend)));
   return this->ParsePathspec(pathspec_str, negation);
 }
 

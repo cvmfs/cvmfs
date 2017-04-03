@@ -1,0 +1,52 @@
+
+cvmfs_test_name="Trim white spaces in .cvmfsdirtab"
+cvmfs_test_autofs_on_startup=false
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "*** creating directory structure"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  mkdir -p /cvmfs/$CVMFS_TEST_REPO/x86_64/v1 /cvmfs/$CVMFS_TEST_REPO/x86_64/v2 \
+    /cvmfs/$CVMFS_TEST_REPO/aarch64/v1 /cvmfs/$CVMFS_TEST_REPO/aarch64/v2 \
+    || return 10
+  cat << EOF > /cvmfs/$CVMFS_TEST_REPO/.cvmfsdirtab
+/x86_64
+/aarch64
+/x86_64/*
+/aarch64/*
+EOF
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "*** check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "*** check for a sample catalog"
+  if [ ! -f /cvmfs/$CVMFS_TEST_REPO/aarch64/v2/.cvmfscatalog ]; then
+    return 20
+  fi
+
+  echo "*** add entries with white spaces to dirtab"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  mkdir -p /cvmfs/$CVMFS_TEST_REPO/ppc64/v1 /cvmfs/$CVMFS_TEST_REPO/ppc64/v2 \
+    || return 30
+  echo "  /ppc64" >> /cvmfs/$CVMFS_TEST_REPO/.cvmfsdirtab || return 31
+  echo "/ppc64/v1  " >> /cvmfs/$CVMFS_TEST_REPO/.cvmfsdirtab || return 32
+  echo "  /ppc64/*  " >> /cvmfs/$CVMFS_TEST_REPO/.cvmfsdirtab || return 33
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "*** check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "*** check for another sample catalog"
+  if [ ! -f /cvmfs/$CVMFS_TEST_REPO/ppc64/v2/.cvmfscatalog ]; then
+    return 35
+  fi
+
+  return 0
+}
+

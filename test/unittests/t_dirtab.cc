@@ -49,8 +49,8 @@ TEST_F(T_Dirtab, ParseBlankLines) {
 
 TEST_F(T_Dirtab, ParseSimpleRules) {
   dirtab.Parse("/lib/rule/*\n"
-               "/lib/elur\n"
-               "/lib/rule/??\n");
+               " /lib/elur\n"
+               "/lib/rule/?? \n");
 
   EXPECT_TRUE(dirtab.IsValid());
   EXPECT_EQ(3u, dirtab.RuleCount());
