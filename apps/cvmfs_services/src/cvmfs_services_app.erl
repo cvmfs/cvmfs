@@ -26,12 +26,18 @@ start(_StartType, _StartArgs) ->
                undefined ->
                    #{repos => [], keys => []}
            end,
-    ReceiverPoolConfig = case application:get_env(receiver_config) of
+    ReceiverPoolConfig1 = case application:get_env(receiver_config) of
                              {ok, PoolConfig} ->
                                  PoolConfig;
                              undefined ->
                                  []
                          end,
+    ReceiverPoolConfig2 = case lists:keyfind(worker_module, 1, ReceiverPoolConfig1) of
+                              false ->
+                                  [{worker_module, cvmfs_receiver} | ReceiverPoolConfig1];
+                              _ ->
+                                  ReceiverPoolConfig1
+                          end,
     ReceiverWorkerConfig = case application:get_env(receiver_worker_config) of
                                {ok, WorkerConfig} ->
                                    maps:from_list(WorkerConfig);
@@ -43,7 +49,7 @@ start(_StartType, _StartArgs) ->
     cvmfs_services_sup:start_link({Services,
                                    maps:get(repos, Vars),
                                    maps:get(keys, Vars),
-                                   ReceiverPoolConfig,
+                                   ReceiverPoolConfig2,
                                    ReceiverWorkerConfig}).
 
 %%--------------------------------------------------------------------

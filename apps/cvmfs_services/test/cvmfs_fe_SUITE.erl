@@ -66,7 +66,9 @@ init_per_suite(Config) ->
                                                                 cvmfs_receiver_pool]),
     ok = application:set_env(cvmfs_services, repo_config, #{repos => ct:get_config(repos)
                                                            ,keys => ct:get_config(keys)}),
-    ok = application:set_env(cvmfs_services, receiver_config, [{size, 1}, {max_overflow, 0}]),
+    ok = application:set_env(cvmfs_services, receiver_config, [{size, 1},
+                                                               {max_overflow, 0},
+                                                               {worker_module, cvmfs_test_receiver}]),
     MaxLeaseTime = 200, % milliseconds
     ok = application:set_env(cvmfs_services, max_lease_time, MaxLeaseTime),
 

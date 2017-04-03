@@ -34,8 +34,7 @@ init({EnabledWorkers, Repos, Keys, PoolConfig, WorkerConfig}) ->
     SupervisorSpecs = #{strategy => one_for_all,
                         intensity => 5,
                         period => 5},
-    ReceiverPoolConfig = lists:append(PoolConfig, [{name, {local, cvmfs_receiver_pool}},
-                                                   {worker_module, cvmfs_receiver}]),
+    ReceiverPoolConfig = [{name, {local, cvmfs_receiver_pool}} | PoolConfig],
     WorkerSpecs = #{
       cvmfs_auth => #{id => cvmfs_auth,
                       start => {cvmfs_auth, start_link, [{Repos, Keys}]},

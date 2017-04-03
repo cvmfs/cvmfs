@@ -1,12 +1,12 @@
 %%%-------------------------------------------------------------------
 %%% This file is part of the CernVM File System.
 %%%
-%%% @doc cvmfs_receiver
+%%% @doc cvmfs_test_receiver
 %%%
 %%% @end
 %%%-------------------------------------------------------------------
 
--module(cvmfs_receiver).
+-module(cvmfs_test_receiver).
 
 -compile([{parse_transform, lager_transform}]).
 
@@ -104,25 +104,11 @@ submit_payload(SubmissionData, Secret) ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init(Args) ->
+init(_Args) ->
     process_flag(trap_exit, true),
-    lager:info("CVMFS Receiver initialized at PID ~p.", [self()]),
+    lager:info("CVMFS Test Receiver initialized at PID ~p.", [self()]),
 
-    #{executable_path := Exec} = Args,
-
-    WorkerArgs = ["-i", integer_to_list(3), "-o", integer_to_list(4)],
-    WorkerPort = open_port({spawn_executable, Exec}, [{args, WorkerArgs},
-                                                      stream,
-                                                      binary,
-                                                      nouse_stdio,
-                                                      exit_status]),
-
-    WorkerPort ! {self(), {command, <<"q">>}},
-    receive
-        {WorkerPort, {data, Data}} ->
-            lager:info("Received data: ~p", [Data])
-    end,
-    {ok, #{worker => WorkerPort}}.
+    {ok, #{}}.
 
 %%--------------------------------------------------------------------
 %% @private
