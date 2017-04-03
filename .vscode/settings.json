@@ -23,7 +23,8 @@
       "condition_variable": "cpp",
       "future": "cpp",
       "cassert": "cpp",
-      "functional": "cpp"
+      "functional": "cpp",
+      "mutex": "cpp"
     }
   }
 

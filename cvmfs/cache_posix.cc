@@ -260,6 +260,7 @@ PosixCacheManager *PosixCacheManager::Create(
       return NULL;
   }
 
+  // TODO(jblomer): we might not need to look anymore for cvmfs 2.0 relicts
   if (FileExists(cache_path + "/cvmfscatalog.cache")) {
     LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
              "Not mounting on cvmfs 2.0.X cache");
