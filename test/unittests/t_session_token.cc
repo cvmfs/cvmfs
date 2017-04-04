@@ -15,7 +15,7 @@ TEST_F(T_SessionToken, GenerateBasic) {
   std::string public_token_id;
   std::string token_secret;
   ASSERT_EQ(
-      generate_session_token("some_key_id", "some_path", 1, &session_token,
+      generate_session_token("some_key_id", "some_path", 10, &session_token,
                              &public_token_id, &token_secret),
       0);
   ASSERT_FALSE(session_token.empty());
@@ -24,7 +24,7 @@ TEST_F(T_SessionToken, GenerateBasic) {
 }
 
 TEST_F(T_SessionToken, GenerateWithInvalidParameters) {
-  ASSERT_EQ(generate_session_token("key_id", "some_path", 1, NULL, NULL, NULL),
+  ASSERT_EQ(generate_session_token("key_id", "some_path", 10, NULL, NULL, NULL),
             1);
 }
 
@@ -33,10 +33,38 @@ TEST_F(T_SessionToken, GetTokenId) {
   std::string public_token_id;
   std::string token_secret;
   ASSERT_EQ(
-      generate_session_token("some_key_id", "some_path", 1, &session_token,
+      generate_session_token("some_key_id", "some_path", 10, &session_token,
                              &public_token_id, &token_secret),
       0);
   std::string recovered_token_id;
   ASSERT_EQ(get_token_public_id(session_token, &recovered_token_id), 0);
   ASSERT_EQ(public_token_id, recovered_token_id);
+}
+
+TEST_F(T_SessionToken, CheckTokenSuccess) {
+  std::string session_token;
+  std::string public_token_id;
+  std::string token_secret;
+  ASSERT_EQ(
+      generate_session_token("some_key_id", "some_path", 10, &session_token,
+                             &public_token_id, &token_secret),
+      0);
+
+  std::string path;
+  ASSERT_EQ(check_token(session_token, token_secret, &path), 0);
+}
+
+TEST_F(T_SessionToken, CheckExpiredTokenSlow) {
+  std::string session_token;
+  std::string public_token_id;
+  std::string token_secret;
+  ASSERT_EQ(
+      generate_session_token("some_key_id", "some_path", 0, &session_token,
+                             &public_token_id, &token_secret),
+      0);
+
+  sleep(1);
+
+  std::string path;
+  ASSERT_NE(check_token(session_token, token_secret, &path), 0);
 }
