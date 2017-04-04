@@ -17,7 +17,8 @@ int generate_session_token(const std::string& key_id, const std::string& path,
 
 int get_token_public_id(const std::string& token, std::string* public_id);
 
-int check_token(const std::string& token, const std::string& secret);
+int check_token(const std::string& token, const std::string& secret,
+                std::string* lease_path);
 
 }  // namespace receiver
 

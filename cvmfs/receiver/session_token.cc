@@ -18,7 +18,7 @@ namespace receiver {
 
 /**
  * Generate a session token from a public key_id, a path argument and a max
- * lease time.
+ * lease time (given in seconds).
  *
  * The session token encodes a lease valid for "path" until now() +
  * max_lease_time.
@@ -101,7 +101,66 @@ int get_token_public_id(const std::string& token, std::string* public_id) {
 /*
  * Check the validity of a session token using the associated secret
  */
-int check_token(const std::string& /*token*/, const std::string& /*secret*/) {
+int check_token(const std::string& token, const std::string& secret,
+                std::string* lease_path) {
+  if (!lease_path) {
+    return 1;
+  }
+
+  UniquePtr<JsonDocument> token_json(JsonDocument::Create(token));
+  if (!token_json.IsValid()) {
+    return 2;
+  }
+
+  const JSON* token_id =
+      JsonDocument::SearchInObject(token_json->root(), "token_id", JSON_STRING);
+  const JSON* blob =
+      JsonDocument::SearchInObject(token_json->root(), "blob", JSON_STRING);
+  if (token_id == NULL || blob == NULL) {
+    return 3;
+  }
+
+  std::string debased64_secret;
+  if (!Debase64(secret, &debased64_secret)) {
+    return 4;
+  }
+  UniquePtr<cipher::Key> key(cipher::Key::CreateFromString(debased64_secret));
+  if (!key.IsValid()) {
+    return 5;
+  }
+
+  std::string encrypted_body;
+  if (!Debase64(blob->string_value, &encrypted_body)) {
+    return 6;
+  }
+
+  std::string body;
+  if (!cipher::Cipher::Decrypt(encrypted_body, *key, &body)) {
+    return 7;
+  }
+
+  UniquePtr<JsonDocument> body_json(JsonDocument::Create(body));
+  if (!token_json.IsValid()) {
+    return 8;
+  }
+
+  const JSON* path =
+      JsonDocument::SearchInObject(body_json->root(), "path", JSON_STRING);
+  const JSON* expiry =
+      JsonDocument::SearchInObject(body_json->root(), "expiry", JSON_STRING);
+  if (path == NULL || expiry == NULL) {
+    return 9;
+  }
+
+  // TODO(radu): can we still use monotonic time if the process restarts?
+  uint64_t expiry_time = String2Uint64(expiry->string_value);
+  const uint64_t current_time = platform_monotonic_time();
+  if (current_time > expiry_time) {
+    return 10;
+  }
+
+  *lease_path = path->string_value;
+
   return 0;
 }
 
