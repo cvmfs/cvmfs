@@ -334,13 +334,18 @@ if(BUILD_RECEIVER)
   set (CVMFS_RECEIVER_SOURCES
     receiver/reactor.cc
     receiver/receiver.cc
+    receiver/session_token.cc
+    encrypt.cc
+    hash.cc
     json_document.cc
     logging.cc
+    util/posix.cc
     util/string.cc
+    uuid.cc
     )
 
   add_executable(cvmfs_receiver ${CVMFS_RECEIVER_SOURCES})
-  target_link_libraries(cvmfs_receiver ${VJSON_LIBRARIES})
+  target_link_libraries(cvmfs_receiver ${SHA3_LIBRARIES} ${VJSON_LIBRARIES} ${OPENSSL_LIBRARIES} ${UUID_LIBRARIES} pthread)
 endif(BUILD_RECEIVER)
 
 

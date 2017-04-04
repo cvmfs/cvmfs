@@ -175,6 +175,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/quota.cc
   ${CVMFS_SOURCE_DIR}/quota_posix.cc
   ${CVMFS_SOURCE_DIR}/receiver/reactor.cc
+  ${CVMFS_SOURCE_DIR}/receiver/session_token.cc
   ${CVMFS_SOURCE_DIR}/reflog.cc
   ${CVMFS_SOURCE_DIR}/reflog_sql.cc
   ${CVMFS_SOURCE_DIR}/s3fanout.cc
