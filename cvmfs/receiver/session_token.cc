@@ -6,6 +6,7 @@
 
 #include "session_token.h"
 
+#include "../logging.h"
 #include "encrypt.h"
 #include "json.h"
 #include "json_document.h"
@@ -24,23 +25,27 @@ namespace receiver {
  *
  * Returns the session token, the (public) token_id and the token secret.
  */
-bool generate_session_token(const std::string& key_id, const std::string& path,
-                            uint64_t max_lease_time, std::string* session_token,
-                            std::string* public_token_id,
-                            std::string* token_secret) {
+int generate_session_token(const std::string& key_id, const std::string& path,
+                           uint64_t max_lease_time, std::string* session_token,
+                           std::string* public_token_id,
+                           std::string* token_secret) {
   if (session_token == NULL || public_token_id == NULL ||
       token_secret == NULL) {
-    return false;
+    return 1;
+  }
+
+  if (key_id.empty() && path.empty()) {
+    return 2;
   }
 
   UniquePtr<cipher::Key> secret(cipher::Key::CreateRandomly(32));
   if (!secret.IsValid()) {
-    return false;
+    return 3;
   }
 
   UniquePtr<cipher::Cipher> cipher(cipher::Cipher::Create(cipher::kAes256Cbc));
   if (!cipher.IsValid()) {
-    return false;
+    return 4;
   }
 
   *public_token_id = key_id + path;
@@ -48,7 +53,7 @@ bool generate_session_token(const std::string& key_id, const std::string& path,
 
   const uint64_t current_time = platform_monotonic_time();
   if (std::numeric_limits<uint64_t>::max() - max_lease_time < current_time) {
-    return false;
+    return 5;
   }
 
   const std::string expiry(StringifyUint(current_time + max_lease_time));
@@ -57,26 +62,26 @@ bool generate_session_token(const std::string& key_id, const std::string& path,
   if (!cipher->Encrypt(
           "{\"path\" : \"" + path + "\", \"expiry\" : \"" + expiry + "\"}",
           *secret, &encrypted_body)) {
-    return false;
+    return 6;
   }
 
   *session_token = "{\"token_id\" : \"" + *public_token_id +
-                   "\", \"blob\" : \"" + encrypted_body + "\"}";
+                   "\", \"blob\" : \"" + Base64(encrypted_body) + "\"}";
 
-  return true;
+  return 0;
 }
 
 /**
  * Obtain the public_id from a session token
  */
-bool get_token_public_id(const std::string& token, std::string* public_id) {
+int get_token_public_id(const std::string& token, std::string* public_id) {
   if (public_id == NULL) {
-    return false;
+    return 1;
   }
 
   UniquePtr<JsonDocument> token_json(JsonDocument::Create(token));
   if (!token_json.IsValid()) {
-    return false;
+    return 2;
   }
 
   const JSON* token_id =
@@ -85,19 +90,19 @@ bool get_token_public_id(const std::string& token, std::string* public_id) {
       JsonDocument::SearchInObject(token_json->root(), "blob", JSON_STRING);
 
   if (token_id == NULL || blob == NULL) {
-    return false;
+    return 3;
   }
 
   *public_id = token_id->string_value;
 
-  return true;
+  return 0;
 }
 
 /*
  * Check the validity of a session token using the associated secret
  */
-bool check_token(const std::string& /*token*/, const std::string& /*secret*/) {
-  return true;
+int check_token(const std::string& /*token*/, const std::string& /*secret*/) {
+  return 0;
 }
 
 }  // namespace receiver
