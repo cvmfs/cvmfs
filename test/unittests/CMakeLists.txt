@@ -80,6 +80,7 @@ set(CVMFS_UNITTEST_FILES
   t_relaxed_path_filter.cc
   t_sanitizer.cc
   t_session_context.cc
+  t_session_token.cc
   t_shash.cc
   t_smallhash.cc
   t_smalloc.cc
