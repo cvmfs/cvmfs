@@ -31,6 +31,9 @@
 -define(kSubmitPayload,4).
 -define(kError,5).
 
+%% Worker comm timeout
+-define(WORKER_REPLY_TIMEOUT, 3000).
+
 
 %%%===================================================================
 %%% Type specifications
@@ -129,7 +132,7 @@ init(Args) ->
     %% Send a kEcho request to the worker
     lager:info("Sending kEcho request to worker process."),
     p_write_request(WorkerPort, ?kEcho, <<"Ping">>),
-    {Size, Msg} = p_read_reply(WorkerPort),
+    {ok, {Size, Msg}} = p_read_reply(WorkerPort),
     lager:info("Received kEcho reply from worker: size: ~p, msg: ~p", [Size, Msg]),
     {ok, #{worker => WorkerPort}}.
 
@@ -310,5 +313,8 @@ p_write_request(Port, Request, Msg) ->
 p_read_reply(Port) ->
     receive
         {Port, {data, <<Size:32/integer-signed-little,Msg/binary>>}} ->
-            {Size, Msg}
+            {ok, {Size, Msg}}
+    after
+        ?WORKER_REPLY_TIMEOUT ->
+            {error, worker_timeout}
     end.
