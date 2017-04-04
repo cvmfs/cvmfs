@@ -118,7 +118,7 @@ bool Reactor::run() {
     req = ReadRequest(fdin_, &msg_body);
     if (!HandleRequest(fdout_, req, msg_body)) {
       LogCvmfs(kLogCvmfs, kLogStderr,
-               "Reaction: could not handle request. Exiting");
+               "Reactor: could not handle request. Exiting");
       abort();
     }
   } while (req != kQuit);
@@ -130,6 +130,7 @@ bool Reactor::HandleRequest(int fdout, Request req, const std::string& data) {
   bool ok = true;
   switch (req) {
     case kQuit:
+      ok = WriteReply(fdout, "ok");
       break;
     case kEcho:
       ok = WriteReply(fdout, data);
