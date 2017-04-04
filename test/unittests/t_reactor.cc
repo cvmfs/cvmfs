@@ -8,7 +8,7 @@
 #include "receiver/reactor.h"
 #include "util_concurrency.h"
 
-using namespace receiver;
+using namespace receiver;  // NOLINT
 
 class MockedReactor : public Reactor {
   MockedReactor(int fdin, int fdout) : Reactor(fdin, fdout) {}

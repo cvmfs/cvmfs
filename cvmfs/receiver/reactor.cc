@@ -16,7 +16,7 @@
 namespace receiver {
 
 receiver::Request Reactor::ReadRequest(int fd, std::string* data) {
-  using namespace receiver;
+  using namespace receiver;  // NOLINT
 
   // First, read the command identifier
   int32_t req_id = 0;

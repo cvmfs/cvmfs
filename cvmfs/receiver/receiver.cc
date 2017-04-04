@@ -13,9 +13,10 @@
 
 swissknife::ParameterList MakeParameterList() {
   swissknife::ParameterList params;
-  params.push_back(swissknife::Parameter::Optional('i', "File descriptor to use for input"));
-  params.push_back(swissknife::Parameter::Optional('o', "File descriptor to use for output"));
-
+  params.push_back(
+      swissknife::Parameter::Optional('i', "File descriptor to use for input"));
+  params.push_back(swissknife::Parameter::Optional(
+      'o', "File descriptor to use for output"));
   return params;
 }
 
