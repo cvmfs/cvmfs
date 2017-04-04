@@ -5,7 +5,6 @@
 #ifndef CVMFS_UTIL_STRING_H_
 #define CVMFS_UTIL_STRING_H_
 
-
 #include <stdint.h>
 #include <sys/time.h>
 
@@ -14,14 +13,13 @@
 #include <string>
 #include <vector>
 
-
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
-
 std::string StringifyBool(const bool value);
 std::string StringifyInt(const int64_t value);
+std::string StringifyUint(const uint64_t value);
 std::string StringifyByteAsHex(const unsigned char value);
 std::string StringifyDouble(const double value);
 std::string StringifyTime(const time_t seconds, const bool utc);
@@ -38,8 +36,7 @@ bool HasPrefix(const std::string &str, const std::string &prefix,
 bool HasSuffix(const std::string &str, const std::string &suffix,
                const bool ignore_case);
 
-std::vector<std::string> SplitString(const std::string &str,
-                                     const char delim,
+std::vector<std::string> SplitString(const std::string &str, const char delim,
                                      const unsigned max_chunks = 0);
 std::string JoinStrings(const std::vector<std::string> &strings,
                         const std::string &joint);
@@ -60,7 +57,6 @@ std::string Tail(const std::string &source, unsigned num_lines);
 std::string Base64(const std::string &data);
 std::string Base64Url(const std::string &data);
 bool Debase64(const std::string &data, std::string *decoded);
-
 
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD
