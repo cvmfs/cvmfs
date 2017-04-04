@@ -218,6 +218,7 @@ terminate(Reason, State) ->
     %% Send the kQuit request to the worker
     lager:info("Sending kQuit request to worker process."),
     p_write_request(WorkerPort, ?kQuit, <<"">>),
+    {ok, {2, <<"ok">>}} = p_read_reply(WorkerPort),
     port_close(WorkerPort),
     lager:info("Terminating with reason: ~p", [Reason]),
     ok.
