@@ -264,9 +264,7 @@ int swissknife::CommandApplyDirtab::Main(const ArgumentList &args) {
   // check if there is a dirtab file
   if (!FileExists(dirtab_file)) {
     LogCvmfs(kLogCatalog, kLogVerboseMsg,
-             "Didn't find a dirtab at '%s'. "
-             "Skipping...",
-             dirtab_file.c_str());
+             "Didn't find a dirtab at '%s'. Skipping...", dirtab_file.c_str());
     return 0;
   }
 

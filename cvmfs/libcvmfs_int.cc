@@ -542,8 +542,3 @@ int LibContext::Close(int fd) {
   }
   return 0;
 }
-
-
-catalog::LoadError cvmfs_context::RemountStart() {
-  return catalog::kLoadNew;
-}

@@ -1,4 +1,9 @@
 2.4.0:
+  * Possibility to split cache dir and workspace, add CVMFS(_CACHE)_WORKSPACE
+  * Trim trailing whitespaces from .cvmfsdirtab entries (CVM-1061)
+  * Cache proxy settings in workspace directory (CVM-1156)
+  * Use active eviction of kernel caches with libfuse >= 2.9 (CVM-1041)
+  * Add external and internal in-memory cache manager (CVM-1044)
   * Add tiered cache manager (CVM-1050, CVM-1183)
   * Support for instance based cache configuration (CVM-1053)
   * Fix mount helper if repository name resolves to local path (CVM-1160)
@@ -10,7 +15,7 @@
   * Use libcurl 7.51.0
   * Use sqlite 3.15.2
   * Add CVMFS_VIRTUAL_DIR server parameter (CVM-1062)
-  * Add catalog support for hidden files and bind mountpoints
+  * Add catalog support for hidden files and bind mountpoint
   * Add CVMFS_IGNORE_SPECIAL_FILES server parameter
   * Ignore special files with a warning on publish (CVM-1106)
   * Add support for Debian 8 (CVM-1104)
@@ -29,7 +34,7 @@
   * Fix handling of file:// url in CVMFS_SERVER_URL
 
 2.3.5:
-  * Lep RPM drop patch configuration for CVM-1200 where necessary
+  * Let RPM drop patch configuration for CVM-1200 where necessary
 
 2.3.4:
   * Unlink empty files during cache db rebuild (CVM-1113)

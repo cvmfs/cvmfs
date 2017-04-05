@@ -19,7 +19,6 @@ extern pid_t pid_;
 
 bool Evict(const std::string &path);
 bool Pin(const std::string &path);
-catalog::LoadError RemountStart();
 void GetReloadStatus(bool *drainout_mode, bool *maintenance_mode);
 std::string PrintInodeGeneration();
 void UnregisterQuotaListener();

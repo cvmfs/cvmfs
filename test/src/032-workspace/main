@@ -1,0 +1,40 @@
+
+cvmfs_test_name="CVMFS_WORKSPACE"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  local cache_dir=$(get_cvmfs_cachedir grid.cern.ch)
+  local workspace="$(dirname $cache_dir)/workspace"
+  echo "*** cache directory is $cache_dir"
+  echo "*** workspace is $workspace"
+
+  echo "*** start clean, even without cvmfs-config repository"
+  cvmfs_clean || return 50
+
+  cvmfs_mount grid.cern.ch "CVMFS_WORKSPACE=$workspace" || return 3
+  cat /cvmfs/grid.cern.ch/README || return 4
+  cvmfs_mount atlas.cern.ch "CVMFS_WORKSPACE=$workspace" || return 5
+  cat /cvmfs/atlas.cern.ch/.cvmfsdirtab || return 6
+
+  sudo cvmfs_talk -p $workspace/cvmfs_io.atlas.cern.ch cache list || return 10
+
+  local num_lock_files=$(sudo find $cache_dir -name 'lock*' | wc -l)
+  local num_pipe_files=$(sudo find $cache_dir -name 'pipe*' | wc -l)
+  if [ $num_lock_files -ne 0 ]; then
+    sudo ls $cache_dir
+    return 20
+  fi
+  if [ $num_pipe_files -ne 0 ]; then
+    sudo ls $cache_dir
+    return 21
+  fi
+  num_lock_files=$(sudo find $workspace -name 'lock*' | wc -l)
+  if [ $num_lock_files -eq 0 ]; then
+    sudo ls $workspace
+    return 22
+  fi
+
+  return 0
+}
+

@@ -53,6 +53,7 @@
 #include "statistics.h"
 #include "util/pointer.h"
 #include "util/posix.h"
+#include "util/string.h"
 #include "util_concurrency.h"
 
 using namespace std;  // NOLINT
@@ -63,8 +64,9 @@ int PosixQuotaManager::BindReturnPipe(int pipe_wronly) {
     return pipe_wronly;
 
   // Connect writer's end
-  int result = open((cache_dir_ + "/pipe" + StringifyInt(pipe_wronly)).c_str(),
-                    O_WRONLY | O_NONBLOCK);
+  int result =
+    open((workspace_dir_ + "/pipe" + StringifyInt(pipe_wronly)).c_str(),
+         O_WRONLY | O_NONBLOCK);
   if (result >= 0) {
     Nonblock2Block(result);
   } else {
@@ -87,14 +89,14 @@ void PosixQuotaManager::CheckHighPinWatermark() {
 
 
 void PosixQuotaManager::CleanupPipes() {
-  DIR *dirp = opendir(cache_dir_.c_str());
+  DIR *dirp = opendir(workspace_dir_.c_str());
   assert(dirp != NULL);
 
   platform_dirent64 *dent;
   bool found_leftovers = false;
   while ((dent = platform_readdir(dirp)) != NULL) {
     const string name = dent->d_name;
-    const string path = cache_dir_ + "/" + name;
+    const string path = workspace_dir_ + "/" + name;
     platform_stat64 info;
     int retval = platform_stat(path.c_str(), &info);
     if (retval != 0)
@@ -198,7 +200,7 @@ bool PosixQuotaManager::Contains(const string &hash_str) {
 
 
 PosixQuotaManager *PosixQuotaManager::Create(
-  const string &cache_dir,
+  const string &cache_workspace,
   const uint64_t limit,
   const uint64_t cleanup_threshold,
   const bool rebuild_database)
@@ -210,7 +212,7 @@ PosixQuotaManager *PosixQuotaManager::Create(
   }
 
   PosixQuotaManager *quota_manager =
-    new PosixQuotaManager(limit, cleanup_threshold, cache_dir);
+    new PosixQuotaManager(limit, cleanup_threshold, cache_workspace);
 
   // Initialize cache catalog
   if (!quota_manager->InitDatabase(rebuild_database)) {
@@ -230,26 +232,30 @@ PosixQuotaManager *PosixQuotaManager::Create(
  */
 PosixQuotaManager *PosixQuotaManager::CreateShared(
   const std::string &exe_path,
-  const std::string &cache_dir,
+  const std::string &cache_workspace,
   const uint64_t limit,
   const uint64_t cleanup_threshold,
   bool foreground)
 {
+  string cache_dir;
+  string workspace_dir;
+  ParseDirectories(cache_workspace, &cache_dir, &workspace_dir);
+
   // Create lock file: only one fuse client at a time
-  const int fd_lockfile = LockFile(cache_dir + "/lock_cachemgr");
+  const int fd_lockfile = LockFile(workspace_dir + "/lock_cachemgr");
   if (fd_lockfile < 0) {
     LogCvmfs(kLogQuota, kLogDebug, "could not open lock file %s (%d)",
-             (cache_dir + "/lock_cachemgr").c_str(), errno);
+             (workspace_dir + "/lock_cachemgr").c_str(), errno);
     return NULL;
   }
 
   PosixQuotaManager *quota_mgr =
-    new PosixQuotaManager(limit, cleanup_threshold, cache_dir);
+    new PosixQuotaManager(limit, cleanup_threshold, cache_workspace);
   quota_mgr->shared_ = true;
   quota_mgr->spawned_ = true;
 
   // Try to connect to pipe
-  const string fifo_path = cache_dir + "/cachemgr";
+  const string fifo_path = workspace_dir + "/cachemgr";
   LogCvmfs(kLogQuota, kLogDebug, "trying to connect to existing pipe");
   quota_mgr->pipe_lru_[1] = open(fifo_path.c_str(), O_WRONLY | O_NONBLOCK);
   if (quota_mgr->pipe_lru_[1] >= 0) {
@@ -261,7 +267,7 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
     LogCvmfs(kLogQuota, kLogDebug,
              "received limit %" PRIu64 ", threshold %" PRIu64,
              quota_mgr->limit_, quota_mgr->cleanup_threshold_);
-    if (FileExists(cache_dir + "/cachemgr.protocol")) {
+    if (FileExists(workspace_dir + "/cachemgr.protocol")) {
       quota_mgr->protocol_revision_ = quota_mgr->GetProtocolRevision();
       LogCvmfs(kLogQuota, kLogDebug, "connected protocol revision %u",
                quota_mgr->protocol_revision_);
@@ -273,10 +279,10 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
   const int connect_error = errno;
 
   // Lock file: let existing cache manager finish first
-  const int fd_lockfile_fifo = LockFile(cache_dir + "/lock_cachemgr.fifo");
+  const int fd_lockfile_fifo = LockFile(workspace_dir + "/lock_cachemgr.fifo");
   if (fd_lockfile_fifo < 0) {
     LogCvmfs(kLogQuota, kLogDebug, "could not open lock file %s (%d)",
-             (cache_dir + "/lock_cachemgr.fifo").c_str(), errno);
+             (workspace_dir + "/lock_cachemgr.fifo").c_str(), errno);
     UnlockFile(fd_lockfile);
     delete quota_mgr;
     return NULL;
@@ -307,7 +313,7 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
   vector<string> command_line;
   command_line.push_back(exe_path);
   command_line.push_back("__cachemgr__");
-  command_line.push_back(cache_dir);
+  command_line.push_back(cache_workspace);
   command_line.push_back(StringifyInt(pipe_boot[1]));
   command_line.push_back(StringifyInt(pipe_handshake[0]));
   command_line.push_back(StringifyInt(limit));
@@ -674,7 +680,7 @@ bool PosixQuotaManager::InitDatabase(const bool rebuild_database) {
   string sql;
   sqlite3_stmt *stmt;
 
-  fd_lock_cachedb_ = LockFile(cache_dir_ + "/lock_cachedb");
+  fd_lock_cachedb_ = LockFile(workspace_dir_ + "/lock_cachedb");
   if (fd_lock_cachedb_ < 0) {
     LogCvmfs(kLogQuota, kLogDebug, "failed to create cachedb lock");
     return false;
@@ -928,7 +934,9 @@ int PosixQuotaManager::MainCacheManager(int argc, char **argv) {
   shared_manager.pinned_ = 0;
 
   // Process command line arguments
-  shared_manager.cache_dir_ = string(argv[2]);
+  ParseDirectories(string(argv[2]),
+                   &shared_manager.cache_dir_,
+                   &shared_manager.workspace_dir_);
   int pipe_boot = String2Int64(argv[3]);
   int pipe_handshake = String2Int64(argv[4]);
   shared_manager.limit_ = String2Int64(argv[5]);
@@ -950,11 +958,11 @@ int PosixQuotaManager::MainCacheManager(int argc, char **argv) {
 
   // Initialize pipe, open non-blocking as cvmfs is not yet connected
   const int fd_lockfile_fifo =
-    LockFile(shared_manager.cache_dir_ + "/lock_cachemgr.fifo");
+    LockFile(shared_manager.workspace_dir_ + "/lock_cachemgr.fifo");
   if (fd_lockfile_fifo < 0) {
     LogCvmfs(kLogQuota, kLogDebug | kLogSyslogErr, "could not open lock file "
              "%s (%d)",
-             (shared_manager.cache_dir_ + "/lock_cachemgr.fifo").c_str(),
+             (shared_manager.workspace_dir_ + "/lock_cachemgr.fifo").c_str(),
              errno);
     return 1;
   }
@@ -970,7 +978,7 @@ int PosixQuotaManager::MainCacheManager(int argc, char **argv) {
   close(retval);
 
   // Redirect SQlite temp directory to cache (global variable)
-  const string tmp_dir = shared_manager.cache_dir_;
+  const string tmp_dir = shared_manager.workspace_dir_;
   sqlite3_temp_directory =
     static_cast<char *>(sqlite3_malloc(tmp_dir.length() + 1));
   snprintf(sqlite3_temp_directory, tmp_dir.length() + 1, "%s", tmp_dir.c_str());
@@ -987,7 +995,7 @@ int PosixQuotaManager::MainCacheManager(int argc, char **argv) {
   // to the client that the cache manager is from times before the protocol
   // was versioned.
   const string protocol_revision_path =
-    shared_manager.cache_dir_ + "/cachemgr.protocol";
+    shared_manager.workspace_dir_ + "/cachemgr.protocol";
   retval = open(protocol_revision_path.c_str(), O_WRONLY | O_CREAT, 0600);
   if (retval < 0) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
@@ -1005,7 +1013,7 @@ int PosixQuotaManager::MainCacheManager(int argc, char **argv) {
     return 1;
   }
 
-  const string fifo_path = shared_manager.cache_dir_ + "/cachemgr";
+  const string fifo_path = shared_manager.workspace_dir_ + "/cachemgr";
   shared_manager.pipe_lru_[0] = open(fifo_path.c_str(), O_RDONLY | O_NONBLOCK);
   if (shared_manager.pipe_lru_[0] < 0) {
     LogCvmfs(kLogQuota, kLogDebug, "failed to listen on FIFO %s (%d)",
@@ -1371,17 +1379,37 @@ void PosixQuotaManager::MakeReturnPipe(int pipe[2]) {
   int i = 0;
   int retval;
   do {
-    retval = mkfifo((cache_dir_ + "/pipe" + StringifyInt(i)).c_str(), 0600);
+    retval = mkfifo((workspace_dir_ + "/pipe" + StringifyInt(i)).c_str(), 0600);
     pipe[1] = i;
     i++;
   } while ((retval == -1) && (errno == EEXIST));
   assert(retval == 0);
 
   // Connect reader's end
-  pipe[0] = open((cache_dir_ + "/pipe" + StringifyInt(pipe[1])).c_str(),
+  pipe[0] = open((workspace_dir_ + "/pipe" + StringifyInt(pipe[1])).c_str(),
                  O_RDONLY | O_NONBLOCK);
   assert(pipe[0] >= 0);
   Nonblock2Block(pipe[0]);
+}
+
+
+void PosixQuotaManager::ParseDirectories(
+  const std::string cache_workspace,
+  std::string *cache_dir,
+  std::string *workspace_dir)
+{
+  vector<string> dir_tokens(SplitString(cache_workspace, ':'));
+  switch (dir_tokens.size()) {
+    case 1:
+      *cache_dir = *workspace_dir = dir_tokens[0];
+      break;
+    case 2:
+      *cache_dir = dir_tokens[0];
+      *workspace_dir = dir_tokens[1];
+      break;
+    default:
+      abort();
+  }
 }
 
 
@@ -1461,7 +1489,7 @@ bool PosixQuotaManager::Pin(
 PosixQuotaManager::PosixQuotaManager(
   const uint64_t limit,
   const uint64_t cleanup_threshold,
-  const string &cache_dir)
+  const string &cache_workspace)
   : shared_(false)
   , spawned_(false)
   , limit_(limit)
@@ -1469,7 +1497,8 @@ PosixQuotaManager::PosixQuotaManager(
   , gauge_(0)
   , pinned_(0)
   , seq_(0)
-  , cache_dir_(cache_dir)
+  , cache_dir_()  // initialized in body
+  , workspace_dir_()  // initialized in body
   , fd_lock_cachedb_(-1)
   , async_delete_(true)
   , database_(NULL)
@@ -1487,6 +1516,7 @@ PosixQuotaManager::PosixQuotaManager(
   , stmt_list_volatile_(NULL)
   , initialized_(false)
 {
+  ParseDirectories(cache_workspace, &cache_dir_, &workspace_dir_);
   pipe_lru_[0] = pipe_lru_[1] = -1;
   cleanup_recorder_.AddRecorder(1, 90);  // last 1.5 min with second resolution
   // last 1.5 h with minute resolution
@@ -1836,7 +1866,7 @@ void PosixQuotaManager::UnbindReturnPipe(int pipe_wronly) {
 
 void PosixQuotaManager::UnlinkReturnPipe(int pipe_wronly) {
   if (shared_)
-    unlink((cache_dir_ + "/pipe" + StringifyInt(pipe_wronly)).c_str());
+    unlink((workspace_dir_ + "/pipe" + StringifyInt(pipe_wronly)).c_str());
 }
 
 

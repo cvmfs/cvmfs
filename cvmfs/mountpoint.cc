@@ -275,8 +275,20 @@ FileSystem::PosixCacheSettings FileSystem::DeterminePosixCacheSettings(
     settings.is_alien = true;
     settings.cache_path = optarg;
   }
+  // We already changed the cwd to the workspace
   if (settings.cache_path == workspace_fullpath_)
     settings.cache_path = ".";
+
+  // The cache workspace usually is the cache directory, unless explicitly
+  // set otherwise
+  settings.workspace = settings.cache_path;
+  if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_WORKSPACE", instance),
+                             &optarg) ||
+      options_mgr_->GetValue("CVMFS_WORKSPACE", &optarg))
+  {
+    // Used for the shared quota manager
+    settings.workspace = optarg;
+  }
 
   return settings;
 }
@@ -820,12 +832,19 @@ bool FileSystem::SetupPosixQuotaMgr(
 ) {
   assert(settings.quota_limit >= 0);
   int64_t quota_threshold = settings.quota_limit / 2;
+  string cache_workspace = settings.cache_path;
+  if (settings.cache_path != settings.workspace) {
+    LogCvmfs(kLogQuota, kLogDebug | kLogSyslog,
+             "using workspace %s to protect cache database in %s",
+             settings.workspace.c_str(), settings.cache_path.c_str());
+    cache_workspace += ":" + settings.workspace;
+  }
   PosixQuotaManager *quota_mgr;
 
   if (settings.is_shared) {
     quota_mgr = PosixQuotaManager::CreateShared(
                   exe_path_,
-                  settings.cache_path,
+                  cache_workspace,
                   settings.quota_limit,
                   quota_threshold,
                   foreground_);
@@ -835,16 +854,8 @@ bool FileSystem::SetupPosixQuotaMgr(
       return false;
     }
   } else {
-    // Cache database should to be protected by workspace lock
-    if (workspace_ != settings.cache_path) {
-      // Can happen for a tiered POSIX cache
-      boot_error_ = "Cannot start managed cache in " + settings.cache_path +
-                    ", which is not protected by workspace in " + workspace_;
-      boot_status_ = loader::kFailQuota;
-      return false;
-    }
     quota_mgr = PosixQuotaManager::Create(
-                  settings.cache_path,
+                  cache_workspace,
                   settings.quota_limit,
                   quota_threshold,
                   found_previous_crash_);
@@ -1157,7 +1168,10 @@ bool MountPoint::CreateDownloadManagers() {
   string proxies;
   if (options_mgr_->GetValue("CVMFS_HTTP_PROXY", &optarg))
     proxies = optarg;
-  proxies = download::ResolveProxyDescription(proxies, download_mgr_);
+  proxies = download::ResolveProxyDescription(
+    proxies,
+    file_system_->workspace() + "/proxies" + GetUniqFileSuffix(),
+    download_mgr_);
   if (proxies == "") {
     boot_error_ = "failed to discover HTTP proxy servers";
     boot_status_ = loader::kFailWpad;
@@ -1418,6 +1432,15 @@ unsigned MountPoint::GetMaxTtlMn() {
 }
 
 
+/**
+ * Files in the workspace from different file systems / mountpoints need to
+ * have different names.  Used, for example, for caching proxy settings.
+ */
+string MountPoint::GetUniqFileSuffix() {
+  return "." + file_system_->name() + "-" + fqrn_;
+}
+
+
 MountPoint::MountPoint(
   const string &fqrn,
   FileSystem *file_system,
@@ -1595,7 +1618,10 @@ bool MountPoint::SetupExternalDownloadMgr() {
 
   string proxies = "DIRECT";
   if (options_mgr_->GetValue("CVMFS_EXTERNAL_HTTP_PROXY", &optarg)) {
-    proxies = download::ResolveProxyDescription(optarg, external_download_mgr_);
+    proxies = download::ResolveProxyDescription(
+      optarg,
+      file_system_->workspace() + "/proxies-external" + GetUniqFileSuffix(),
+      external_download_mgr_);
     if (proxies == "") {
       boot_error_ = "failed to discover external HTTP proxy servers";
       boot_status_ = loader::kFailWpad;
