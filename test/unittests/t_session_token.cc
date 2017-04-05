@@ -52,6 +52,7 @@ TEST_F(T_SessionToken, CheckTokenSuccess) {
 
   std::string path;
   ASSERT_EQ(check_token(session_token, token_secret, &path), 0);
+  ASSERT_EQ(path, "some_path");
 }
 
 TEST_F(T_SessionToken, CheckExpiredTokenSlow) {
