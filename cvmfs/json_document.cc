@@ -14,15 +14,31 @@
 
 using namespace std;  // NOLINT
 
+bool ToJsonString(const json_string_input &input, std::string *output) {
+  if (!output) {
+    return false;
+  }
+
+  output->clear();
+  *output = "{";
+  for (size_t i = 0u; i < input.size(); ++i) {
+    *output +=
+        std::string("\"") + input[i].first + "\":\"" + input[i].second + "\"";
+    if (i < input.size() - 1) {
+      *output += ',';
+    }
+  }
+  *output += std::string("}");
+
+  return true;
+}
 
 JsonDocument *JsonDocument::Create(const string &text) {
   UniquePtr<JsonDocument> json(new JsonDocument());
   bool retval = json->Parse(text);
-  if (!retval)
-    return NULL;
+  if (!retval) return NULL;
   return json.Release();
 }
-
 
 string JsonDocument::EscapeString(const string &input) {
   string escaped;
@@ -42,19 +58,12 @@ string JsonDocument::EscapeString(const string &input) {
   return escaped;
 }
 
-
-JsonDocument::JsonDocument() :
-  allocator_(kDefaultBlockSize),
-  root_(NULL),
-  raw_text_(NULL)
-{ }
-
+JsonDocument::JsonDocument()
+    : allocator_(kDefaultBlockSize), root_(NULL), raw_text_(NULL) {}
 
 JsonDocument::~JsonDocument() {
-  if (raw_text_)
-    free(raw_text_);
+  if (raw_text_) free(raw_text_);
 }
-
 
 /**
  * Parses a JSON string in text.
@@ -69,14 +78,11 @@ bool JsonDocument::Parse(const string &text) {
   // name and string values from JSON nodes just point into it.
   raw_text_ = strdup(text.c_str());
 
-  char *error_pos  = 0;
+  char *error_pos = 0;
   char *error_desc = 0;
-  int   error_line = 0;
-  JSON *root = json_parse(raw_text_,
-                          &error_pos,
-                          &error_desc,
-                          &error_line,
-                          &allocator_);
+  int error_line = 0;
+  JSON *root =
+      json_parse(raw_text_, &error_pos, &error_desc, &error_line, &allocator_);
 
   // check if the json string was parsed successfully
   if (!root) {
@@ -89,7 +95,6 @@ bool JsonDocument::Parse(const string &text) {
   root_ = root;
   return true;
 }
-
 
 string JsonDocument::PrintArray(JSON *first_child, PrintOptions print_options) {
   string result = "[";
@@ -115,7 +120,6 @@ string JsonDocument::PrintArray(JSON *first_child, PrintOptions print_options) {
   return result + "]";
 }
 
-
 /**
  * JSON string in a canonical format:
  *   - No whitespaces
@@ -124,15 +128,13 @@ string JsonDocument::PrintArray(JSON *first_child, PrintOptions print_options) {
  * Can be used as a canonical representation to sign or encrypt a JSON text.
  */
 string JsonDocument::PrintCanonical() {
-  if (!root_)
-    return "";
+  if (!root_) return "";
   PrintOptions print_options;
   return PrintObject(root_->first_child, print_options);
 }
 
-
-string JsonDocument::PrintObject(JSON *first_child, PrintOptions print_options)
-{
+string JsonDocument::PrintObject(JSON *first_child,
+                                 PrintOptions print_options) {
   string result = "{";
   if (print_options.with_whitespace) {
     result += "\n";
@@ -156,29 +158,24 @@ string JsonDocument::PrintObject(JSON *first_child, PrintOptions print_options)
   return result + "}";
 }
 
-
 /**
  * JSON string for humans.
  */
 string JsonDocument::PrintPretty() {
-  if (!root_)
-    return "";
+  if (!root_) return "";
   PrintOptions print_options;
   print_options.with_whitespace = true;
   return PrintObject(root_->first_child, print_options);
 }
 
-
 std::string JsonDocument::PrintValue(JSON *value, PrintOptions print_options) {
   assert(value);
 
   string result;
-  for (unsigned i = 0; i < print_options.num_indent; ++i)
-    result.push_back(' ');
+  for (unsigned i = 0; i < print_options.num_indent; ++i) result.push_back(' ');
   if (value->name) {
     result += "\"" + EscapeString(value->name) + "\":";
-    if (print_options.with_whitespace)
-      result += " ";
+    if (print_options.with_whitespace) result += " ";
   }
   switch (value->type) {
     case JSON_NULL:
@@ -208,14 +205,9 @@ std::string JsonDocument::PrintValue(JSON *value, PrintOptions print_options) {
   return result;
 }
 
-
-JSON *JsonDocument::SearchInObject(
-  const JSON *json_object,
-  const string &name,
-  const json_type type)
-{
-  if (!json_object || (json_object->type != JSON_OBJECT))
-    return NULL;
+JSON *JsonDocument::SearchInObject(const JSON *json_object, const string &name,
+                                   const json_type type) {
+  if (!json_object || (json_object->type != JSON_OBJECT)) return NULL;
 
   JSON *walker = json_object->first_child;
   while (walker != NULL) {
