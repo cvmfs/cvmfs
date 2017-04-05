@@ -15,6 +15,7 @@ enum Request {
   kEcho,
   kGenerateToken,
   kGetTokenId,
+  kCheckToken,
   kSubmitPayload,
   kError
 };

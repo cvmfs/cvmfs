@@ -5,14 +5,18 @@
 #include <gtest/gtest.h>
 
 #include <logging.h>
+#include "json_document.h"
 #include "receiver/reactor.h"
+#include "util/pointer.h"
 #include "util_concurrency.h"
 
 using namespace receiver;  // NOLINT
 
 class MockedReactor : public Reactor {
+ public:
   MockedReactor(int fdin, int fdout) : Reactor(fdin, fdout) {}
 
+ protected:
   virtual bool HandleRequest(int fdout, Request req, const std::string& data) {
     return Reactor::HandleRequest(fdout, req, data);
   }
@@ -53,7 +57,7 @@ class T_Reactor : public ::testing::Test {
 
     ctx->ready.Enqueue(true);
 
-    Reactor reactor(ctx->fds[0], ctx->fds[1]);
+    MockedReactor reactor(ctx->fds[0], ctx->fds[1]);
     reactor.run();
 
     close(ctx->fds[0]);
@@ -69,6 +73,9 @@ class T_Reactor : public ::testing::Test {
 
 TEST_F(T_Reactor, kQuit) {
   ASSERT_TRUE(Reactor::WriteRequest(to_reactor_[1], kQuit, ""));
+  std::string reply;
+  ASSERT_TRUE(Reactor::ReadReply(from_reactor_[0], &reply));
+  ASSERT_EQ(reply, "ok");
 }
 
 TEST_F(T_Reactor, kEcho_kQuit) {
@@ -79,4 +86,30 @@ TEST_F(T_Reactor, kEcho_kQuit) {
   ASSERT_EQ(reply, "Hey");
 
   ASSERT_TRUE(Reactor::WriteRequest(to_reactor_[1], kQuit, ""));
+
+  ASSERT_TRUE(Reactor::ReadReply(from_reactor_[0], &reply));
+  ASSERT_EQ(reply, "ok");
+}
+
+TEST_F(T_Reactor, kGenerateToken_kQuit) {
+  json_string_input req_input;
+  req_input.push_back(std::make_pair("key_id", "some_key"));
+  req_input.push_back(std::make_pair("path", "some_path"));
+  req_input.push_back(std::make_pair("max_lease_time", "10"));
+
+  std::string req_data;
+  ToJsonString(req_input, &req_data);
+
+  ASSERT_TRUE(Reactor::WriteRequest(to_reactor_[1], kGenerateToken, req_data));
+
+  std::string reply;
+  ASSERT_TRUE(Reactor::ReadReply(from_reactor_[0], &reply));
+
+  UniquePtr<JsonDocument> json_reply(JsonDocument::Create(reply));
+  ASSERT_TRUE(json_reply.IsValid());
+
+  ASSERT_TRUE(Reactor::WriteRequest(to_reactor_[1], kQuit, ""));
+  reply.clear();
+  ASSERT_TRUE(Reactor::ReadReply(from_reactor_[0], &reply));
+  ASSERT_EQ(reply, "ok");
 }

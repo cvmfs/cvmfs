@@ -65,8 +65,8 @@ int generate_session_token(const std::string& key_id, const std::string& path,
     return 6;
   }
 
-  *session_token = "{\"token_id\" : \"" + *public_token_id +
-                   "\", \"blob\" : \"" + Base64(encrypted_body) + "\"}";
+  *session_token = Base64("{\"token_id\" : \"" + *public_token_id +
+                          "\", \"blob\" : \"" + Base64(encrypted_body) + "\"}");
 
   return 0;
 }
@@ -79,9 +79,14 @@ int get_token_public_id(const std::string& token, std::string* public_id) {
     return 1;
   }
 
-  UniquePtr<JsonDocument> token_json(JsonDocument::Create(token));
-  if (!token_json.IsValid()) {
+  std::string debased64_token;
+  if (!Debase64(token, &debased64_token)) {
     return 2;
+  }
+
+  UniquePtr<JsonDocument> token_json(JsonDocument::Create(debased64_token));
+  if (!token_json.IsValid()) {
+    return 3;
   }
 
   const JSON* token_id =
@@ -90,7 +95,7 @@ int get_token_public_id(const std::string& token, std::string* public_id) {
       JsonDocument::SearchInObject(token_json->root(), "blob", JSON_STRING);
 
   if (token_id == NULL || blob == NULL) {
-    return 3;
+    return 4;
   }
 
   *public_id = token_id->string_value;
@@ -107,7 +112,12 @@ int check_token(const std::string& token, const std::string& secret,
     return 1;
   }
 
-  UniquePtr<JsonDocument> token_json(JsonDocument::Create(token));
+  std::string debased64_token;
+  if (!Debase64(token, &debased64_token)) {
+    return 2;
+  }
+
+  UniquePtr<JsonDocument> token_json(JsonDocument::Create(debased64_token));
   if (!token_json.IsValid()) {
     return 2;
   }

@@ -8,10 +8,98 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <utility>
 #include <vector>
 
 #include "../json_document.h"
 #include "../logging.h"
+#include "session_token.h"
+#include "util/pointer.h"
+#include "util/string.h"
+
+namespace {
+
+int HandleGenerateToken(const std::string& req, std::string* reply) {
+  if (reply == NULL) {
+    return 1;
+  }
+
+  UniquePtr<JsonDocument> req_json(JsonDocument::Create(req));
+  if (!req_json.IsValid()) {
+    return 2;
+  }
+
+  const JSON* key_id =
+      JsonDocument::SearchInObject(req_json->root(), "key_id", JSON_STRING);
+  const JSON* path =
+      JsonDocument::SearchInObject(req_json->root(), "path", JSON_STRING);
+  const JSON* max_lease_time = JsonDocument::SearchInObject(
+      req_json->root(), "max_lease_time", JSON_STRING);
+
+  if (key_id == NULL || path == NULL || max_lease_time == NULL) {
+    return 3;
+  }
+
+  std::string session_token;
+  std::string public_token_id;
+  std::string token_secret;
+
+  if (receiver::generate_session_token(
+          key_id->string_value, path->string_value,
+          String2Uint64(max_lease_time->string_value), &session_token,
+          &public_token_id, &token_secret)) {
+    return 4;
+  }
+
+  json_string_input input;
+  input.push_back(std::make_pair("token", session_token.c_str()));
+  input.push_back(std::make_pair("id", public_token_id.c_str()));
+  input.push_back(std::make_pair("secret", token_secret.c_str()));
+
+  ToJsonString(input, reply);
+
+  return 0;
+}
+
+int HandleGetTokenId(const std::string& req, std::string* reply) {
+  if (reply == NULL) {
+    return 1;
+  }
+
+  if (receiver::get_token_public_id(req, reply)) {
+    return 2;
+  }
+
+  return 0;
+}
+
+int HandleCheckToken(const std::string& req, std::string* reply) {
+  if (reply == NULL) {
+    return 1;
+  }
+
+  UniquePtr<JsonDocument> req_json(JsonDocument::Create(req));
+  if (!req_json.IsValid()) {
+    return 2;
+  }
+
+  const JSON* token =
+      JsonDocument::SearchInObject(req_json->root(), "token", JSON_STRING);
+  const JSON* secret =
+      JsonDocument::SearchInObject(req_json->root(), "secret", JSON_STRING);
+
+  if (token == NULL || secret == NULL) {
+    return 3;
+  }
+
+  if (receiver::check_token(token->string_value, secret->string_value, reply)) {
+    return 4;
+  }
+
+  return 0;
+}
+
+}  // namespace
 
 namespace receiver {
 
@@ -43,7 +131,7 @@ receiver::Request Reactor::ReadRequest(int fd, std::string* data) {
       return kError;
     }
 
-    *data = std::string(&buffer[0]);
+    *data = std::string(&buffer[0], msg_size);
     return static_cast<Request>(req_id);
   }
 
@@ -84,7 +172,7 @@ bool Reactor::ReadReply(int fd, std::string* data) {
     return false;
   }
 
-  *data = std::string(&buffer[0]);
+  *data = std::string(&buffer[0], msg_size);
 
   return true;
 }
@@ -111,15 +199,15 @@ Reactor::Reactor(int fdin, int fdout) : fdin_(fdin), fdout_(fdout) {}
 Reactor::~Reactor() {}
 
 bool Reactor::run() {
-  // Testing: Just echo the character.
   std::string msg_body;
   Request req = kQuit;
   do {
+    msg_body.clear();
     req = ReadRequest(fdin_, &msg_body);
     if (!HandleRequest(fdout_, req, msg_body)) {
       LogCvmfs(kLogCvmfs, kLogStderr,
                "Reactor: could not handle request. Exiting");
-      abort();
+      return false;
     }
   } while (req != kQuit);
 
@@ -128,6 +216,7 @@ bool Reactor::run() {
 
 bool Reactor::HandleRequest(int fdout, Request req, const std::string& data) {
   bool ok = true;
+  std::string reply;
   switch (req) {
     case kQuit:
       ok = WriteReply(fdout, "ok");
@@ -136,8 +225,22 @@ bool Reactor::HandleRequest(int fdout, Request req, const std::string& data) {
       ok = WriteReply(fdout, data);
       break;
     case kGenerateToken:
+      ok = (HandleGenerateToken(data, &reply) == 0);
+      if (ok) {
+        ok = WriteReply(fdout, reply);
+      }
       break;
     case kGetTokenId:
+      ok = (HandleGetTokenId(data, &reply) == 0);
+      if (ok) {
+        ok = WriteReply(fdout, reply);
+      }
+      break;
+    case kCheckToken:
+      ok = (HandleCheckToken(data, &reply) == 0);
+      if (ok) {
+        ok = WriteReply(fdout, reply);
+      }
       break;
     case kSubmitPayload:
       break;
