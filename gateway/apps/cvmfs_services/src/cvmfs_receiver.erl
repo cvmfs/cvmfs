@@ -28,8 +28,9 @@
 -define(kEcho,1).
 -define(kGenerateToken,2).
 -define(kGetTokenId,3).
--define(kSubmitPayload,4).
--define(kError,5).
+-define(kCheckToken,4).
+-define(kSubmitPayload,5).
+-define(kError,6).
 
 %% Worker comm timeout
 -define(WORKER_REPLY_TIMEOUT, 3000).
