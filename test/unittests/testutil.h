@@ -457,6 +457,8 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
                     const catalog::OwnerMap *gid_map) { }
   bool IsInitialized() const { return initialized_; }
   MockCatalog* FindSubtree(const PathString &path);
+  bool FindNested(const PathString &mountpoint,
+                   shash::Any *hash, uint64_t *size) const;
   uint64_t GetTTL() const { return 0; }
   bool LookupRawSymlink(const PathString &path,
                                 LinkString *raw_symlink) const { return false; }

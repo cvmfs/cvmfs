@@ -78,7 +78,10 @@ class T_CatalogManager : public ::testing::Test {
     string catalog_path_str = "/dir/dir/dir";
     PathString catalog_path(catalog_path_str.c_str(),
                             catalog_path_str.length());
-    MockCatalog *new_catalog = new MockCatalog("/dir/dir/dir", shash::Any(),
+    hash = shash::Any(shash::kSha1,
+                      reinterpret_cast<const unsigned char*>(hashes[5]),
+                      suffix);
+    MockCatalog *new_catalog = new MockCatalog("/dir/dir/dir", hash,
                                                4096, 1, 0, false,
                                                root_catalog, NULL);
     ASSERT_NE(static_cast<MockCatalog*>(NULL), new_catalog);
@@ -126,7 +129,8 @@ const char *T_CatalogManager::hashes[] = {
      "26ab0db90d72e28ad0ba1e22ee510510000000",
      "6d7fce9fee471194aa8b5b6e47267f03000000",
      "48a24b70a0b376535542b996af517398000000",
-     "1dcca23355272056f04fe8bf20edfce0000000"
+     "1dcca23355272056f04fe8bf20edfce0000000",
+     "11111111111111111111111111111111111111"
 };
 
 
@@ -220,6 +224,15 @@ TEST_F(T_CatalogManager, Listing) {
   EXPECT_TRUE(catalog_mgr_.Listing("/dir/dir/dir/dir/dir", &del));
   EXPECT_EQ(1u, del.size());
   EXPECT_EQ(3, catalog_mgr_.GetNumCatalogs());
+
+  EXPECT_EQ(shash::Any(),
+    catalog_mgr_.GetNestedCatalogHash(PathString("/file1")));
+  EXPECT_EQ(shash::Any(),
+    catalog_mgr_.GetNestedCatalogHash(PathString("/file1")));
+  shash::Any hash_nested = shash::Any(shash::kSha1,
+    reinterpret_cast<const unsigned char*>(hashes[5]), 'C');
+  EXPECT_EQ(hash_nested,
+    catalog_mgr_.GetNestedCatalogHash(PathString("/dir/dir/dir")));
 }
 
 TEST_F(T_CatalogManager, LongListing) {

@@ -168,6 +168,27 @@ void AbstractCatalogManager<CatalogT>::DetachNested() {
 
 
 /**
+ * Returns the NULL hash if the nested catalog is not found.
+ */
+template <class CatalogT>
+shash::Any AbstractCatalogManager<CatalogT>::GetNestedCatalogHash(
+  const PathString &mountpoint)
+{
+  assert(!mountpoint.IsEmpty());
+  CatalogT *catalog = FindCatalog(mountpoint);
+  assert(catalog != NULL);
+  if (catalog->mountpoint() == mountpoint) {
+    catalog = catalog->parent();
+    assert(catalog != NULL);
+  }
+  shash::Any result;
+  uint64_t size;
+  catalog->FindNested(mountpoint, &result, &size);
+  return result;
+}
+
+
+/**
  * Perform a lookup for a specific DirectoryEntry in the catalogs.
  * @param path      the path to find in the catalogs
  * @param options   whether to perform another lookup to get the parent entry,

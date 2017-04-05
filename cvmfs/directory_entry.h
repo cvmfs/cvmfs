@@ -24,7 +24,6 @@
 namespace publish {
 class SyncItem;
 }
-
 namespace swissknife {
 class CommandMigrate;
 }
@@ -69,7 +68,8 @@ class DirectoryEntryBase {
   static const inode_t kInvalidInode = 0;
 
   /**
-   * Used in the swissknife in for sanity checks and catalog migration.
+   * Used in the swissknife for sanity checks and catalog migration.  If
+   * anything is added, also adjust PrintDifferences in swissknife::CommandDiff.
    */
   struct Difference {
     static const unsigned int kIdentical                    = 0x000;

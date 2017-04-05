@@ -173,6 +173,8 @@ class AbstractCatalogManager : public SingleCopy {
                       FileChunkList *chunks);
   void SetOwnerMaps(const OwnerMap &uid_map, const OwnerMap &gid_map);
 
+  shash::Any GetNestedCatalogHash(const PathString &mountpoint);
+
   Statistics statistics() const { return statistics_; }
   uint64_t inode_gauge() {
     ReadLock(); uint64_t r = inode_gauge_; Unlock(); return r;

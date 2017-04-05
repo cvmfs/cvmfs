@@ -5,48 +5,292 @@
 #include "cvmfs_config.h"
 #include "swissknife_diff.h"
 
+#include <algorithm>
 #include <cassert>
 #include <string>
 
+#include "catalog_mgr_ro.h"
 #include "download.h"
+#include "history.h"
+#include "statistics.h"
+#include "swissknife_assistant.h"
 #include "util/pointer.h"
 #include "util/posix.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 
 namespace swissknife {
 
-/**
- * Checks if the given path looks like a remote path
- */
-static bool IsRemote(const string &repository) {
-  return repository.substr(0, 7) == "http://";
+
+CommandDiff::~CommandDiff() {
+  delete catalog_mgr_from_;
+  delete catalog_mgr_to_;
 }
+
 
 ParameterList CommandDiff::GetParams() const {
   swissknife::ParameterList r;
   r.push_back(Parameter::Mandatory('r', "repository directory / url"));
   r.push_back(Parameter::Mandatory('n', "repository name"));
+  r.push_back(Parameter::Mandatory('k', "public key of the repository / dir"));
+  r.push_back(Parameter::Mandatory('t', "directory for temporary files"));
+  r.push_back(Parameter::Optional('s', "'from' tag name"));
+  r.push_back(Parameter::Optional('e', "'to' tag name"));
+  r.push_back(Parameter::Switch('m', "machine readable output"));
   r.push_back(Parameter::Switch('L', "follow HTTP redirects"));
   return r;
 }
 
 
+void CommandDiff::AppendFirstEntry(catalog::DirectoryEntryList *entry_list) {
+  catalog::DirectoryEntry empty_entry;
+  entry_list->push_back(empty_entry);
+}
+
+
+void CommandDiff::AppendLastEntry(catalog::DirectoryEntryList *entry_list) {
+  assert(!entry_list->empty());
+  catalog::DirectoryEntry last_entry;
+  last_entry.set_inode(kLastInode);
+  entry_list->push_back(last_entry);
+}
+
+
+bool CommandDiff::IsSmaller(
+  const catalog::DirectoryEntry &a,
+  const catalog::DirectoryEntry &b)
+{
+  bool a_is_first = (a.inode() == catalog::DirectoryEntryBase::kInvalidInode);
+  bool a_is_last = (a.inode() == kLastInode);
+  bool b_is_first = (b.inode() == catalog::DirectoryEntryBase::kInvalidInode);
+  bool b_is_last = (b.inode() == kLastInode);
+
+  if (a_is_last || b_is_first)
+    return false;
+  if (a_is_first)
+    return !b_is_first;
+  if (b_is_last)
+    return !a_is_last;
+  return a.name() < b.name();
+}
+
+
+
+void CommandDiff::FindDiff(const PathString &base_path) {
+  bool retval;
+  catalog::DirectoryEntryList listing_from;
+  catalog::DirectoryEntryList listing_to;
+  AppendFirstEntry(&listing_from);
+  AppendFirstEntry(&listing_to);
+  retval = catalog_mgr_from_->Listing(base_path, &listing_from);
+  assert(retval);
+  retval = catalog_mgr_to_->Listing(base_path, &listing_to);
+  assert(retval);
+  sort(listing_from.begin(), listing_from.end(), IsSmaller);
+  sort(listing_to.begin(), listing_to.end(), IsSmaller);
+  AppendLastEntry(&listing_from);
+  AppendLastEntry(&listing_to);
+
+  unsigned i_from = 0, size_from = listing_from.size();
+  unsigned i_to = 0, size_to = listing_to.size();
+  while ((i_from < size_from) || (i_to < size_to)) {
+    catalog::DirectoryEntry entry_from = listing_from[i_from];
+    catalog::DirectoryEntry entry_to = listing_to[i_to];
+
+    PathString path_from(base_path);
+    path_from.Append("/", 1);
+    path_from.Append(entry_from.name().GetChars(),
+                     entry_from.name().GetLength());
+    PathString path_to(base_path);
+    path_to.Append("/", 1);
+    path_to.Append(entry_to.name().GetChars(), entry_to.name().GetLength());
+
+    if (IsSmaller(entry_to, entry_from)) {
+      i_to++;
+      ReportAddition(path_to, entry_to);
+      continue;
+    } else if (IsSmaller(entry_from, entry_to)) {
+      i_from++;
+      ReportRemoval(path_from, entry_from);
+      continue;
+    }
+
+    assert(path_from == path_to);
+    i_from++;
+    i_to++;
+    ReportModification(path_from, entry_from, entry_to);
+    if (!entry_from.IsDirectory() || !entry_to.IsDirectory())
+      continue;
+
+    // Recursion
+    catalog::DirectoryEntryBase::Differences diff =
+      entry_from.CompareTo(entry_to);
+    if ((diff == catalog::DirectoryEntryBase::Difference::kIdentical) &&
+        entry_from.IsNestedCatalogMountpoint())
+    {
+      // Early recursion stop if nested catalogs are identical
+      shash::Any id_nested_from, id_nested_to;
+      id_nested_from = catalog_mgr_from_->GetNestedCatalogHash(path_from);
+      id_nested_to = catalog_mgr_to_->GetNestedCatalogHash(path_to);
+      assert(!id_nested_from.IsNull() && !id_nested_to.IsNull());
+      if (id_nested_from == id_nested_to)
+        continue;
+    }
+    FindDiff(path_from);
+  }
+}
+
+
+string CommandDiff::PrintEntryType(const catalog::DirectoryEntry &entry) {
+  if (entry.IsRegular())
+    return machine_readable_ ? "F" : "file";
+  else if (entry.IsLink())
+    return machine_readable_ ? "S" : "symlink";
+  else if (entry.IsDirectory())
+    return machine_readable_ ? "D" : "directory";
+  else
+    return machine_readable_ ? "U" : "unknown";
+}
+
+
+string CommandDiff::PrintDifferences(
+  catalog::DirectoryEntryBase::Differences diff)
+{
+  vector<string> result_list;
+  if (diff & catalog::DirectoryEntryBase::Difference::kName)
+    result_list.push_back(machine_readable_ ? "N" : "name");
+  if (diff & catalog::DirectoryEntryBase::Difference::kLinkcount)
+    result_list.push_back(machine_readable_ ? "I" : "link-count");
+  if (diff & catalog::DirectoryEntryBase::Difference::kSize)
+    result_list.push_back(machine_readable_ ? "S" : "size");
+  if (diff & catalog::DirectoryEntryBase::Difference::kMode)
+    result_list.push_back(machine_readable_ ? "M" : "mode");
+  if (diff & catalog::DirectoryEntryBase::Difference::kMtime)
+    result_list.push_back(machine_readable_ ? "T" : "timestamp");
+  if (diff & catalog::DirectoryEntryBase::Difference::kSymlink)
+    result_list.push_back(machine_readable_ ? "L" : "symlink-target");
+  if (diff & catalog::DirectoryEntryBase::Difference::kChecksum)
+    result_list.push_back(machine_readable_ ? "C" : "content");
+  if (diff & catalog::DirectoryEntryBase::Difference::kHardlinkGroup)
+    result_list.push_back(machine_readable_ ? "G" : "hardlink-group");
+  if (diff &
+      catalog::DirectoryEntryBase::Difference::kNestedCatalogTransitionFlags)
+  {
+    result_list.push_back(machine_readable_ ? "N" : "nested-catalog");
+  }
+  if (diff & catalog::DirectoryEntryBase::Difference::kChunkedFileFlag)
+    result_list.push_back(machine_readable_ ? "P" : "chunked-file");
+  if (diff & catalog::DirectoryEntryBase::Difference::kHasXattrsFlag)
+    result_list.push_back(machine_readable_ ? "X" : "xattrs");
+  if (diff & catalog::DirectoryEntryBase::Difference::kExternalFileFlag)
+    result_list.push_back(machine_readable_ ? "E" : "external-file");
+  if (diff & catalog::DirectoryEntryBase::Difference::kBindMountpointFlag)
+    result_list.push_back(machine_readable_ ? "B" : "bind-mountpoint");
+  if (diff & catalog::DirectoryEntryBase::Difference::kHiddenFlag)
+    result_list.push_back(machine_readable_ ? "H" : "hidden");
+
+  return machine_readable_ ? JoinStrings(result_list, "") :
+                             JoinStrings(result_list, ", ");
+}
+
+
+void CommandDiff::ReportAddition(
+  const PathString &path,
+  const catalog::DirectoryEntry &entry)
+{
+  string operation = machine_readable_ ? "A" : "add";
+  LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s",
+           operation.c_str(), PrintEntryType(entry).c_str(), path.c_str());
+}
+
+
+void CommandDiff::ReportRemoval(
+  const PathString &path,
+  const catalog::DirectoryEntry &entry)
+{
+  string operation = machine_readable_ ? "R" : "remove";
+  LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s",
+           operation.c_str(), PrintEntryType(entry).c_str(), path.c_str());
+}
+
+
+void CommandDiff::ReportModification(
+  const PathString &path,
+  const catalog::DirectoryEntry &entry_from,
+  const catalog::DirectoryEntry &entry_to)
+{
+  catalog::DirectoryEntryBase::Differences diff =
+    entry_from.CompareTo(entry_to);
+  if (diff == catalog::DirectoryEntryBase::Difference::kIdentical)
+    return;
+
+  string operation = machine_readable_ ? "M" : "modify";
+  LogCvmfs(kLogCvmfs, kLogStdout, "%s [%s] %s",
+           operation.c_str(), PrintDifferences(diff).c_str(), path.c_str());
+}
+
+
 int swissknife::CommandDiff::Main(const swissknife::ArgumentList &args) {
   const string fqrn = MakeCanonicalPath(*args.find('n')->second);
+  const string tmp_dir = MakeCanonicalPath(*args.find('t')->second);
   const string repository = MakeCanonicalPath(*args.find('r')->second);
-  if (IsRemote(repository)) {
-    const bool follow_redirects = args.count('L') > 0;
-    if (!this->InitDownloadManager(follow_redirects)) {
-      return 1;
-    }
-  }
+  machine_readable_ = args.count('m') > 0;
+  const bool follow_redirects = args.count('L') > 0;
+  string pubkey_path = *args.find('k')->second;
+  if (DirectoryExists(pubkey_path))
+    pubkey_path = JoinStrings(FindFiles(pubkey_path, ".pub"), ":");
+  string tagname_from = "trunk-previous";
+  string tagname_to = "trunk";
+  if (args.count('s') > 0)
+    tagname_from = *args.find('s')->second;
+  if (args.count('e') > 0)
+    tagname_to = *args.find('e')->second;
 
-  InitVerifyingSignatureManager("/etc/cvmfs/keys/cern.ch/cern.ch.pub");
-
+  bool retval = this->InitDownloadManager(follow_redirects);
+  assert(retval);
+  InitVerifyingSignatureManager(pubkey_path);
   UniquePtr<manifest::Manifest> manifest(FetchRemoteManifest(repository, fqrn));
   assert(manifest.IsValid());
-  printf("%s\n", manifest->catalog_hash().ToString().c_str());
+
+  Assistant assistant(download_manager(), manifest, repository, tmp_dir);
+  UniquePtr<history::History> history(
+    assistant.GetHistory(Assistant::kOpenReadOnly));
+  assert(history.IsValid());
+  history::History::Tag tag_from;
+  history::History::Tag tag_to;
+  retval = history->GetByName(tagname_from, &tag_from);
+  if (!retval) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "unknown tag: s", tagname_from.c_str());
+    return 1;
+  }
+  retval = history->GetByName(tagname_to, &tag_to);
+  if (!retval) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "unknown tag: s", tagname_to.c_str());
+    return 1;
+  }
+
+  perf::Statistics statistics_from;
+  catalog_mgr_from_ = new catalog::SimpleCatalogManager(
+    tag_from.root_hash,
+    repository,
+    tmp_dir,
+    download_manager(),
+    &statistics_from,
+    true /* manage catalog files */);
+  catalog_mgr_from_->Init();
+
+  perf::Statistics statistics_to;
+  catalog_mgr_to_ = new catalog::SimpleCatalogManager(
+    tag_to.root_hash,
+    repository,
+    tmp_dir,
+    download_manager(),
+    &statistics_to,
+    true /* manage catalog files */);
+  catalog_mgr_to_->Init();
+
+  FindDiff(PathString(""));
 
   return 0;
 }
