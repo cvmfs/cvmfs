@@ -72,13 +72,6 @@ class T_Reactor : public ::testing::Test {
   int from_reactor_[2];
 };
 
-TEST_F(T_Reactor, kQuit) {
-  ASSERT_TRUE(Reactor::WriteRequest(to_reactor_[1], kQuit, ""));
-  std::string reply;
-  ASSERT_TRUE(Reactor::ReadReply(from_reactor_[0], &reply));
-  ASSERT_EQ(reply, "ok");
-}
-
 TEST_F(T_Reactor, kEcho_kQuit) {
   ASSERT_TRUE(Reactor::WriteRequest(to_reactor_[1], kEcho, "Hey"));
 
