@@ -155,9 +155,9 @@ int Reactor::HandleGenerateToken(const std::string& req, std::string* reply) {
   std::string public_token_id;
   std::string token_secret;
 
-  if (receiver::generate_session_token(
-          key_id->string_value, path->string_value, max_lease_time->int_value,
-          &session_token, &public_token_id, &token_secret)) {
+  if (receiver::GenerateSessionToken(key_id->string_value, path->string_value,
+                                     max_lease_time->int_value, &session_token,
+                                     &public_token_id, &token_secret)) {
     return 4;
   }
 
@@ -178,7 +178,7 @@ int Reactor::HandleGetTokenId(const std::string& req, std::string* reply) {
 
   std::string token_id;
   json_string_input input;
-  if (receiver::get_token_public_id(req, &token_id)) {
+  if (receiver::GetTokenPublicId(req, &token_id)) {
     input.push_back(std::make_pair("status", "error"));
     input.push_back(std::make_pair("reason", "invalid_token"));
   } else {
@@ -212,7 +212,7 @@ int Reactor::HandleCheckToken(const std::string& req, std::string* reply) {
   std::string path;
   json_string_input input;
   int ret =
-      receiver::check_token(token->string_value, secret->string_value, &path);
+      receiver::CheckToken(token->string_value, secret->string_value, &path);
   if (ret == 10) {
     // Expired token
     input.push_back(std::make_pair("status", "error"));

@@ -10,15 +10,15 @@
 
 namespace receiver {
 
-int generate_session_token(const std::string& key_id, const std::string& path,
-                           uint64_t max_lease_time, std::string* session_token,
-                           std::string* public_token_id,
-                           std::string* token_secret);
+int GenerateSessionToken(const std::string& key_id, const std::string& path,
+                         uint64_t max_lease_time, std::string* session_token,
+                         std::string* public_token_id,
+                         std::string* token_secret);
 
-int get_token_public_id(const std::string& token, std::string* public_id);
+int GetTokenPublicId(const std::string& token, std::string* public_id);
 
-int check_token(const std::string& token, const std::string& secret,
-                std::string* lease_path);
+int CheckToken(const std::string& token, const std::string& secret,
+               std::string* lease_path);
 
 }  // namespace receiver
 

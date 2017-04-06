@@ -25,10 +25,10 @@ namespace receiver {
  *
  * Returns the session token, the (public) token_id and the token secret.
  */
-int generate_session_token(const std::string& key_id, const std::string& path,
-                           uint64_t max_lease_time, std::string* session_token,
-                           std::string* public_token_id,
-                           std::string* token_secret) {
+int GenerateSessionToken(const std::string& key_id, const std::string& path,
+                         uint64_t max_lease_time, std::string* session_token,
+                         std::string* public_token_id,
+                         std::string* token_secret) {
   if (session_token == NULL || public_token_id == NULL ||
       token_secret == NULL) {
     return 1;
@@ -74,7 +74,7 @@ int generate_session_token(const std::string& key_id, const std::string& path,
 /**
  * Obtain the public_id from a session token
  */
-int get_token_public_id(const std::string& token, std::string* public_id) {
+int GetTokenPublicId(const std::string& token, std::string* public_id) {
   if (public_id == NULL) {
     return 1;
   }
@@ -106,8 +106,8 @@ int get_token_public_id(const std::string& token, std::string* public_id) {
 /*
  * Check the validity of a session token using the associated secret
  */
-int check_token(const std::string& token, const std::string& secret,
-                std::string* lease_path) {
+int CheckToken(const std::string& token, const std::string& secret,
+               std::string* lease_path) {
   if (!lease_path) {
     return 1;
   }
