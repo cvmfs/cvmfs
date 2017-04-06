@@ -196,6 +196,7 @@ class AbstractCatalogManager : public SingleCopy {
     return inode_annotation_ ?
       inode_annotation_->Annotate(kInodeOffset + 1) : kInodeOffset + 1;
   }
+  inline CatalogT* GetRootCatalog() const { return catalogs_.front(); }
   /**
    * Inodes are ambiquitous under some circumstances, to prevent problems
    * they must be passed through this method first
@@ -245,7 +246,6 @@ class AbstractCatalogManager : public SingleCopy {
   bool IsAttached(const PathString &root_path,
                   CatalogT **attached_catalog) const;
 
-  inline CatalogT* GetRootCatalog() const { return catalogs_.front(); }
   CatalogT *FindCatalog(const PathString &path) const;
 
   inline void ReadLock() const {

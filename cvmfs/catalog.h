@@ -238,7 +238,7 @@ class Catalog : SingleCopy {
   virtual void InitPreparedStatements();
   void FinalizePreparedStatements();
 
-  Counters& GetCounters() { return counters_; }
+  Counters& GetWritableCounters() { return counters_; }
 
   inline const CatalogDatabase &database() const { return *database_; }
   inline       CatalogDatabase &database()       { return *database_; }
