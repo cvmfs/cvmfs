@@ -8,6 +8,7 @@
 #include <stdint.h>
 
 #include "directory_entry.h"
+#include "history.h"
 #include "shortstring.h"
 #include "swissknife.h"
 
@@ -38,13 +39,10 @@ class CommandDiff : public Command {
   static bool IsSmaller(const catalog::DirectoryEntry &a,
                         const catalog::DirectoryEntry &b);
 
-  catalog::SimpleCatalogManager *catalog_mgr_from_;
-  catalog::SimpleCatalogManager *catalog_mgr_to_;
-  bool machine_readable_;
-
   std::string PrintEntryType(const catalog::DirectoryEntry &entry);
   std::string PrintDifferences(catalog::DirectoryEntryBase::Differences diff);
 
+  void ReportHeader();
   void ReportAddition(const PathString &path,
                       const catalog::DirectoryEntry &entry);
   void ReportRemoval(const PathString &path,
@@ -52,10 +50,17 @@ class CommandDiff : public Command {
   void ReportModification(const PathString &path,
                           const catalog::DirectoryEntry &entry_from,
                           const catalog::DirectoryEntry &entry_to);
+  void ReportStats();
 
   void AppendFirstEntry(catalog::DirectoryEntryList *entry_list);
   void AppendLastEntry(catalog::DirectoryEntryList *entry_list);
   void FindDiff(const PathString &base_path);
+
+  catalog::SimpleCatalogManager *catalog_mgr_from_;
+  catalog::SimpleCatalogManager *catalog_mgr_to_;
+  history::History::Tag tag_from_;
+  history::History::Tag tag_to_;
+  bool machine_readable_;
 };  // class CommandDiff
 
 }  // namespace swissknife
