@@ -18,114 +18,9 @@
 #include "util/pointer.h"
 #include "util/string.h"
 
-namespace {
-
-int HandleGenerateToken(const std::string& req, std::string* reply) {
-  if (reply == NULL) {
-    return 1;
-  }
-
-  UniquePtr<JsonDocument> req_json(JsonDocument::Create(req));
-  if (!req_json.IsValid()) {
-    return 2;
-  }
-
-  const JSON* key_id =
-      JsonDocument::SearchInObject(req_json->root(), "key_id", JSON_STRING);
-  const JSON* path =
-      JsonDocument::SearchInObject(req_json->root(), "path", JSON_STRING);
-  const JSON* max_lease_time = JsonDocument::SearchInObject(
-      req_json->root(), "max_lease_time", JSON_INT);
-
-  if (key_id == NULL || path == NULL || max_lease_time == NULL) {
-    return 3;
-  }
-
-  std::string session_token;
-  std::string public_token_id;
-  std::string token_secret;
-
-  if (receiver::generate_session_token(
-          key_id->string_value, path->string_value, max_lease_time->int_value,
-          &session_token, &public_token_id, &token_secret)) {
-    return 4;
-  }
-
-  json_string_input input;
-  input.push_back(std::make_pair("token", session_token.c_str()));
-  input.push_back(std::make_pair("id", public_token_id.c_str()));
-  input.push_back(std::make_pair("secret", token_secret.c_str()));
-
-  ToJsonString(input, reply);
-
-  return 0;
-}
-
-int HandleGetTokenId(const std::string& req, std::string* reply) {
-  if (reply == NULL) {
-    return 1;
-  }
-
-  std::string token_id;
-  json_string_input input;
-  if (receiver::get_token_public_id(req, &token_id)) {
-    input.push_back(std::make_pair("status", "error"));
-    input.push_back(std::make_pair("reason", "invalid_token"));
-  } else {
-    input.push_back(std::make_pair("status", "ok"));
-    input.push_back(std::make_pair("id", token_id.c_str()));
-  }
-
-  ToJsonString(input, reply);
-  return 0;
-}
-
-int HandleCheckToken(const std::string& req, std::string* reply) {
-  if (reply == NULL) {
-    return 1;
-  }
-
-  UniquePtr<JsonDocument> req_json(JsonDocument::Create(req));
-  if (!req_json.IsValid()) {
-    return 2;
-  }
-
-  const JSON* token =
-      JsonDocument::SearchInObject(req_json->root(), "token", JSON_STRING);
-  const JSON* secret =
-      JsonDocument::SearchInObject(req_json->root(), "secret", JSON_STRING);
-
-  if (token == NULL || secret == NULL) {
-    return 3;
-  }
-
-  std::string path;
-  json_string_input input;
-  int ret =
-      receiver::check_token(token->string_value, secret->string_value, &path);
-  if (ret == 10) {
-    // Expired token
-    input.push_back(std::make_pair("status", "error"));
-    input.push_back(std::make_pair("reason", "expired_token"));
-  } else if (ret > 0) {
-    // Invalid token
-    input.push_back(std::make_pair("status", "error"));
-    input.push_back(std::make_pair("reason", "invalid_token"));
-  } else {
-    // All ok
-    input.push_back(std::make_pair("status", "ok"));
-    input.push_back(std::make_pair("path", path.c_str()));
-  }
-
-  ToJsonString(input, reply);
-  return 0;
-}
-
-}  // namespace
-
 namespace receiver {
 
-receiver::Request Reactor::ReadRequest(int fd, std::string* data) {
+Reactor::Request Reactor::ReadRequest(int fd, std::string* data) {
   using namespace receiver;  // NOLINT
 
   // First, read the command identifier
@@ -160,8 +55,7 @@ receiver::Request Reactor::ReadRequest(int fd, std::string* data) {
   return kQuit;
 }
 
-bool Reactor::WriteRequest(int fd, receiver::Request req,
-                           const std::string& data) {
+bool Reactor::WriteRequest(int fd, Request req, const std::string& data) {
   const int32_t msg_size = data.size();
   const int32_t total_size = 8 + data.size();  // req + msg_size + data
 
@@ -236,6 +130,112 @@ bool Reactor::run() {
   return true;
 }
 
+int Reactor::HandleGenerateToken(const std::string& req, std::string* reply) {
+  if (reply == NULL) {
+    return 1;
+  }
+
+  UniquePtr<JsonDocument> req_json(JsonDocument::Create(req));
+  if (!req_json.IsValid()) {
+    return 2;
+  }
+
+  const JSON* key_id =
+      JsonDocument::SearchInObject(req_json->root(), "key_id", JSON_STRING);
+  const JSON* path =
+      JsonDocument::SearchInObject(req_json->root(), "path", JSON_STRING);
+  const JSON* max_lease_time = JsonDocument::SearchInObject(
+      req_json->root(), "max_lease_time", JSON_INT);
+
+  if (key_id == NULL || path == NULL || max_lease_time == NULL) {
+    return 3;
+  }
+
+  std::string session_token;
+  std::string public_token_id;
+  std::string token_secret;
+
+  if (receiver::generate_session_token(
+          key_id->string_value, path->string_value, max_lease_time->int_value,
+          &session_token, &public_token_id, &token_secret)) {
+    return 4;
+  }
+
+  json_string_input input;
+  input.push_back(std::make_pair("token", session_token.c_str()));
+  input.push_back(std::make_pair("id", public_token_id.c_str()));
+  input.push_back(std::make_pair("secret", token_secret.c_str()));
+
+  ToJsonString(input, reply);
+
+  return 0;
+}
+
+int Reactor::HandleGetTokenId(const std::string& req, std::string* reply) {
+  if (reply == NULL) {
+    return 1;
+  }
+
+  std::string token_id;
+  json_string_input input;
+  if (receiver::get_token_public_id(req, &token_id)) {
+    input.push_back(std::make_pair("status", "error"));
+    input.push_back(std::make_pair("reason", "invalid_token"));
+  } else {
+    input.push_back(std::make_pair("status", "ok"));
+    input.push_back(std::make_pair("id", token_id.c_str()));
+  }
+
+  ToJsonString(input, reply);
+  return 0;
+}
+
+int Reactor::HandleCheckToken(const std::string& req, std::string* reply) {
+  if (reply == NULL) {
+    return 1;
+  }
+
+  UniquePtr<JsonDocument> req_json(JsonDocument::Create(req));
+  if (!req_json.IsValid()) {
+    return 2;
+  }
+
+  const JSON* token =
+      JsonDocument::SearchInObject(req_json->root(), "token", JSON_STRING);
+  const JSON* secret =
+      JsonDocument::SearchInObject(req_json->root(), "secret", JSON_STRING);
+
+  if (token == NULL || secret == NULL) {
+    return 3;
+  }
+
+  std::string path;
+  json_string_input input;
+  int ret =
+      receiver::check_token(token->string_value, secret->string_value, &path);
+  if (ret == 10) {
+    // Expired token
+    input.push_back(std::make_pair("status", "error"));
+    input.push_back(std::make_pair("reason", "expired_token"));
+  } else if (ret > 0) {
+    // Invalid token
+    input.push_back(std::make_pair("status", "error"));
+    input.push_back(std::make_pair("reason", "invalid_token"));
+  } else {
+    // All ok
+    input.push_back(std::make_pair("status", "ok"));
+    input.push_back(std::make_pair("path", path.c_str()));
+  }
+
+  ToJsonString(input, reply);
+  return 0;
+}
+
+int Reactor::HandleSubmitPayload(const std::string& /*req*/,
+                                 std::string* /*reply*/) {
+  return 0;
+}
+
 bool Reactor::HandleRequest(int fdout, Request req, const std::string& data) {
   bool ok = true;
   std::string reply;
@@ -247,24 +247,21 @@ bool Reactor::HandleRequest(int fdout, Request req, const std::string& data) {
       ok = WriteReply(fdout, data);
       break;
     case kGenerateToken:
-      ok = (HandleGenerateToken(data, &reply) == 0);
-      if (ok) {
-        ok = WriteReply(fdout, reply);
-      }
+      ok &= (HandleGenerateToken(data, &reply) == 0);
+      ok &= WriteReply(fdout, reply);
       break;
     case kGetTokenId:
-      ok = (HandleGetTokenId(data, &reply) == 0);
-      if (ok) {
-        ok = WriteReply(fdout, reply);
-      }
+      ok &= (HandleGetTokenId(data, &reply) == 0);
+      ok &= WriteReply(fdout, reply);
       break;
     case kCheckToken:
-      ok = (HandleCheckToken(data, &reply) == 0);
-      if (ok) {
-        ok = WriteReply(fdout, reply);
-      }
+      ok &= (HandleCheckToken(data, &reply) == 0);
+      ok &= WriteReply(fdout, reply);
       break;
     case kSubmitPayload:
+      // if (HandleSubmitPayload(data, &reply) == 0) {
+      // ok = WriteReply(fdout, reply);
+      //}
       break;
     case kError:
       LogCvmfs(kLogCvmfs, kLogStderr, "Reactor: unknown command received.");

@@ -16,11 +16,6 @@ using namespace receiver;  // NOLINT
 class MockedReactor : public Reactor {
  public:
   MockedReactor(int fdin, int fdout) : Reactor(fdin, fdout) {}
-
- protected:
-  virtual bool HandleRequest(int fdout, Request req, const std::string& data) {
-    return Reactor::HandleRequest(fdout, req, data);
-  }
 };
 
 class T_Reactor : public ::testing::Test {
@@ -73,29 +68,24 @@ class T_Reactor : public ::testing::Test {
 };
 
 TEST_F(T_Reactor, kEcho_kQuit) {
-  ASSERT_TRUE(Reactor::WriteRequest(to_reactor_[1], kEcho, "Hey"));
+  ASSERT_TRUE(Reactor::WriteRequest(to_reactor_[1], Reactor::kEcho, "Hey"));
 
   std::string reply;
   ASSERT_TRUE(Reactor::ReadReply(from_reactor_[0], &reply));
   ASSERT_EQ(reply, "Hey");
 
-  ASSERT_TRUE(Reactor::WriteRequest(to_reactor_[1], kQuit, ""));
+  ASSERT_TRUE(Reactor::WriteRequest(to_reactor_[1], Reactor::kQuit, ""));
 
   ASSERT_TRUE(Reactor::ReadReply(from_reactor_[0], &reply));
   ASSERT_EQ(reply, "ok");
 }
 
 TEST_F(T_Reactor, kGenerateToken_kQuit) {
-  // Generate token
-  json_string_input req_input;
-  req_input.push_back(std::make_pair("key_id", "some_key"));
-  req_input.push_back(std::make_pair("path", "some_path"));
-  req_input.push_back(std::make_pair("max_lease_time", "10"));
+  const std::string req_data =
+      "{\"key_id\":\"some_key\",\"path\":\"some_path\",\"max_lease_time\":10}";
 
-  std::string req_data;
-  ToJsonString(req_input, &req_data);
-
-  ASSERT_TRUE(Reactor::WriteRequest(to_reactor_[1], kGenerateToken, req_data));
+  ASSERT_TRUE(
+      Reactor::WriteRequest(to_reactor_[1], Reactor::kGenerateToken, req_data));
 
   std::string reply;
   ASSERT_TRUE(Reactor::ReadReply(from_reactor_[0], &reply));
@@ -104,7 +94,7 @@ TEST_F(T_Reactor, kGenerateToken_kQuit) {
   ASSERT_TRUE(json_reply.IsValid());
 
   // Send kQuit request
-  ASSERT_TRUE(Reactor::WriteRequest(to_reactor_[1], kQuit, ""));
+  ASSERT_TRUE(Reactor::WriteRequest(to_reactor_[1], Reactor::kQuit, ""));
   reply.clear();
   ASSERT_TRUE(Reactor::ReadReply(from_reactor_[0], &reply));
   ASSERT_EQ(reply, "ok");
@@ -113,18 +103,13 @@ TEST_F(T_Reactor, kGenerateToken_kQuit) {
 TEST_F(T_Reactor, FullCycle) {
   const std::string key_id = "some_key";
   const std::string path = "some_path";
-  const std::string max_lease_time = "10";
+
+  const std::string req_data = "{\"key_id\":\"" + key_id + "\",\"path\":\"" +
+                               path + "\",\"max_lease_time\":10}";
 
   // Generate token
-  json_string_input req_input;
-  req_input.push_back(std::make_pair("key_id", &key_id[0]));
-  req_input.push_back(std::make_pair("path", &path[0]));
-  req_input.push_back(std::make_pair("max_lease_time", &max_lease_time[0]));
-
-  std::string req_data;
-  ToJsonString(req_input, &req_data);
-
-  ASSERT_TRUE(Reactor::WriteRequest(to_reactor_[1], kGenerateToken, req_data));
+  ASSERT_TRUE(
+      Reactor::WriteRequest(to_reactor_[1], Reactor::kGenerateToken, req_data));
 
   std::string reply;
   ASSERT_TRUE(Reactor::ReadReply(from_reactor_[0], &reply));
@@ -152,7 +137,8 @@ TEST_F(T_Reactor, FullCycle) {
   }
 
   // Get the public_id from the token
-  ASSERT_TRUE(Reactor::WriteRequest(to_reactor_[1], kGetTokenId, token));
+  ASSERT_TRUE(
+      Reactor::WriteRequest(to_reactor_[1], Reactor::kGetTokenId, token));
 
   reply.clear();
   ASSERT_TRUE(Reactor::ReadReply(from_reactor_[0], &reply));
@@ -174,7 +160,8 @@ TEST_F(T_Reactor, FullCycle) {
 
   std::string request;
   ASSERT_TRUE(ToJsonString(request_terms, &request));
-  ASSERT_TRUE(Reactor::WriteRequest(to_reactor_[1], kCheckToken, request));
+  ASSERT_TRUE(
+      Reactor::WriteRequest(to_reactor_[1], Reactor::kCheckToken, request));
 
   reply.clear();
   ASSERT_TRUE(Reactor::ReadReply(from_reactor_[0], &reply));
@@ -190,7 +177,7 @@ TEST_F(T_Reactor, FullCycle) {
   }
 
   // Send kQuit request
-  ASSERT_TRUE(Reactor::WriteRequest(to_reactor_[1], kQuit, ""));
+  ASSERT_TRUE(Reactor::WriteRequest(to_reactor_[1], Reactor::kQuit, ""));
   reply.clear();
   ASSERT_TRUE(Reactor::ReadReply(from_reactor_[0], &reply));
   ASSERT_EQ(reply, "ok");

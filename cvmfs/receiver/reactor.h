@@ -10,18 +10,18 @@
 
 namespace receiver {
 
-enum Request {
-  kQuit = 0,
-  kEcho,
-  kGenerateToken,
-  kGetTokenId,
-  kCheckToken,
-  kSubmitPayload,
-  kError
-};
-
 class Reactor {
  public:
+  enum Request {
+    kQuit = 0,
+    kEcho,
+    kGenerateToken,
+    kGetTokenId,
+    kCheckToken,
+    kSubmitPayload,
+    kError
+  };
+
   static Request ReadRequest(int fd, std::string* data);
   static bool WriteRequest(int fd, Request req, const std::string& data);
 
@@ -34,9 +34,14 @@ class Reactor {
   bool run();
 
  protected:
-  virtual bool HandleRequest(int fdout, Request req, const std::string& data);
+  virtual int HandleGenerateToken(const std::string& req, std::string* reply);
+  virtual int HandleGetTokenId(const std::string& req, std::string* reply);
+  virtual int HandleCheckToken(const std::string& req, std::string* reply);
+  virtual int HandleSubmitPayload(const std::string& req, std::string* reply);
 
  private:
+  bool HandleRequest(int fdout, Request req, const std::string& data);
+
   int fdin_;
   int fdout_;
 };
