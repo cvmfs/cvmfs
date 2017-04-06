@@ -37,10 +37,11 @@ class Reactor {
   virtual int HandleGenerateToken(const std::string& req, std::string* reply);
   virtual int HandleGetTokenId(const std::string& req, std::string* reply);
   virtual int HandleCheckToken(const std::string& req, std::string* reply);
-  virtual int HandleSubmitPayload(const std::string& req, std::string* reply);
+  virtual int HandleSubmitPayload(int fdin, const std::string& req,
+                                  std::string* reply);
 
  private:
-  bool HandleRequest(int fdout, Request req, const std::string& data);
+  bool HandleRequest(Request req, const std::string& data);
 
   int fdin_;
   int fdout_;

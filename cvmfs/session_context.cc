@@ -248,6 +248,7 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
   shash::HmacString(secret_, json_body, &hmac);
 
   // TODO(radu): The copying is inefficient; Use CURLOPT_READFUNCTION
+  //             How to deal with the base64 encoding of the payload?
   std::vector<unsigned char> payload(0);
   std::vector<unsigned char> buffer(4096);
   unsigned nbytes = 0;

@@ -120,7 +120,7 @@ bool Reactor::run() {
   do {
     msg_body.clear();
     req = ReadRequest(fdin_, &msg_body);
-    if (!HandleRequest(fdout_, req, msg_body)) {
+    if (!HandleRequest(req, msg_body)) {
       LogCvmfs(kLogCvmfs, kLogStderr,
                "Reactor: could not handle request. Exiting");
       return false;
@@ -231,36 +231,59 @@ int Reactor::HandleCheckToken(const std::string& req, std::string* reply) {
   return 0;
 }
 
-int Reactor::HandleSubmitPayload(const std::string& /*req*/,
-                                 std::string* /*reply*/) {
+// This is a special handler. We need to continue reading the payload from the
+// fdin_
+int Reactor::HandleSubmitPayload(int fdin, const std::string& req,
+                                 std::string* reply) {
+  if (!reply) {
+    return 1;
+  }
+
+  // Extract the Path (used for verification), Digest and DigestSize from the
+  // request JSON.
+  UniquePtr<JsonDocument> req_json(JsonDocument::Create(req));
+  if (!req_json.IsValid()) {
+    return 2;
+  }
+
+  const JSON* path_json =
+      JsonDocument::SearchInObject(req_json->root(), "path", JSON_STRING);
+  const JSON* digest_json =
+      JsonDocument::SearchInObject(req_json->root(), "digest", JSON_STRING);
+  const JSON* he
+
+      if (token == NULL || secret == NULL) {
+    return 3;
+  }
+
   return 0;
 }
 
-bool Reactor::HandleRequest(int fdout, Request req, const std::string& data) {
+bool Reactor::HandleRequest(Request req, const std::string& data) {
   bool ok = true;
   std::string reply;
   switch (req) {
     case kQuit:
-      ok = WriteReply(fdout, "ok");
+      ok = WriteReply(fdout_, "ok");
       break;
     case kEcho:
-      ok = WriteReply(fdout, data);
+      ok = WriteReply(fdout_, data);
       break;
     case kGenerateToken:
       ok &= (HandleGenerateToken(data, &reply) == 0);
-      ok &= WriteReply(fdout, reply);
+      ok &= WriteReply(fdout_, reply);
       break;
     case kGetTokenId:
       ok &= (HandleGetTokenId(data, &reply) == 0);
-      ok &= WriteReply(fdout, reply);
+      ok &= WriteReply(fdout_, reply);
       break;
     case kCheckToken:
       ok &= (HandleCheckToken(data, &reply) == 0);
-      ok &= WriteReply(fdout, reply);
+      ok &= WriteReply(fdout_, reply);
       break;
     case kSubmitPayload:
-      // if (HandleSubmitPayload(data, &reply) == 0) {
-      // ok = WriteReply(fdout, reply);
+      // ok &= HandleSubmitPayload(data, &reply) == 0);
+      // ok &= WriteReply(fdout, reply);
       //}
       break;
     case kError:
