@@ -311,7 +311,7 @@ p_end_lease(LeaseToken) ->
 
 -spec p_submit_payload(SubmissionData) -> cvmfs_receiver:submit_payload_result()
                                   when SubmissionData :: cvmfs_receiver:payload_submission_data().
-p_submit_payload({LeaseToken, _, _, _} = SubmissionData) ->
+p_submit_payload({LeaseToken, _Payload, _Digest, _HeaderSize} = SubmissionData) ->
     Result = case cvmfs_receiver:get_token_id(LeaseToken) of
         {ok, Public} ->
             case cvmfs_lease:check_lease(Public) of
