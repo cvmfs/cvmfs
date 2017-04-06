@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "../json_document.h"
+
 #include "../logging.h"
 #include "session_token.h"
 #include "util/pointer.h"
@@ -34,7 +35,7 @@ int HandleGenerateToken(const std::string& req, std::string* reply) {
   const JSON* path =
       JsonDocument::SearchInObject(req_json->root(), "path", JSON_STRING);
   const JSON* max_lease_time = JsonDocument::SearchInObject(
-      req_json->root(), "max_lease_time", JSON_STRING);
+      req_json->root(), "max_lease_time", JSON_INT);
 
   if (key_id == NULL || path == NULL || max_lease_time == NULL) {
     return 3;
@@ -45,9 +46,8 @@ int HandleGenerateToken(const std::string& req, std::string* reply) {
   std::string token_secret;
 
   if (receiver::generate_session_token(
-          key_id->string_value, path->string_value,
-          String2Uint64(max_lease_time->string_value), &session_token,
-          &public_token_id, &token_secret)) {
+          key_id->string_value, path->string_value, max_lease_time->int_value,
+          &session_token, &public_token_id, &token_secret)) {
     return 4;
   }
 
@@ -66,10 +66,17 @@ int HandleGetTokenId(const std::string& req, std::string* reply) {
     return 1;
   }
 
-  if (receiver::get_token_public_id(req, reply)) {
-    return 2;
+  std::string token_id;
+  json_string_input input;
+  if (receiver::get_token_public_id(req, &token_id)) {
+    input.push_back(std::make_pair("status", "error"));
+    input.push_back(std::make_pair("reason", "invalid_token"));
+  } else {
+    input.push_back(std::make_pair("status", "ok"));
+    input.push_back(std::make_pair("id", token_id.c_str()));
   }
 
+  ToJsonString(input, reply);
   return 0;
 }
 
@@ -92,10 +99,25 @@ int HandleCheckToken(const std::string& req, std::string* reply) {
     return 3;
   }
 
-  if (receiver::check_token(token->string_value, secret->string_value, reply)) {
-    return 4;
+  std::string path;
+  json_string_input input;
+  int ret =
+      receiver::check_token(token->string_value, secret->string_value, &path);
+  if (ret == 10) {
+    // Expired token
+    input.push_back(std::make_pair("status", "error"));
+    input.push_back(std::make_pair("reason", "expired_token"));
+  } else if (ret > 0) {
+    // Invalid token
+    input.push_back(std::make_pair("status", "error"));
+    input.push_back(std::make_pair("reason", "invalid_token"));
+  } else {
+    // All ok
+    input.push_back(std::make_pair("status", "ok"));
+    input.push_back(std::make_pair("path", path.c_str()));
   }
 
+  ToJsonString(input, reply);
   return 0;
 }
 

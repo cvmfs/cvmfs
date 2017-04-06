@@ -129,31 +129,43 @@ TEST_F(T_Reactor, FullCycle) {
   std::string reply;
   ASSERT_TRUE(Reactor::ReadReply(from_reactor_[0], &reply));
 
-  UniquePtr<JsonDocument> json_reply(JsonDocument::Create(reply));
-  ASSERT_TRUE(json_reply.IsValid());
+  std::string token, public_id, secret;
+  {
+    UniquePtr<JsonDocument> json_reply(JsonDocument::Create(reply));
+    ASSERT_TRUE(json_reply.IsValid());
 
-  // Extract the token, public_id and secret from the reply
-  const JSON* token_json =
-      JsonDocument::SearchInObject(json_reply->root(), "token", JSON_STRING);
-  ASSERT_TRUE(token_json);
-  std::string token = token_json->string_value;
+    // Extract the token, public_id and secret from the reply
+    const JSON* token_json =
+        JsonDocument::SearchInObject(json_reply->root(), "token", JSON_STRING);
+    ASSERT_TRUE(token_json);
+    token = token_json->string_value;
 
-  const JSON* public_id_json =
-      JsonDocument::SearchInObject(json_reply->root(), "id", JSON_STRING);
-  ASSERT_TRUE(public_id_json);
-  std::string public_id = public_id_json->string_value;
+    const JSON* public_id_json =
+        JsonDocument::SearchInObject(json_reply->root(), "id", JSON_STRING);
+    ASSERT_TRUE(public_id_json);
+    public_id = public_id_json->string_value;
 
-  const JSON* secret_json =
-      JsonDocument::SearchInObject(json_reply->root(), "secret", JSON_STRING);
-  ASSERT_TRUE(secret_json);
-  std::string secret = secret_json->string_value;
+    const JSON* secret_json =
+        JsonDocument::SearchInObject(json_reply->root(), "secret", JSON_STRING);
+    ASSERT_TRUE(secret_json);
+    secret = secret_json->string_value;
+  }
 
   // Get the public_id from the token
   ASSERT_TRUE(Reactor::WriteRequest(to_reactor_[1], kGetTokenId, token));
 
   reply.clear();
   ASSERT_TRUE(Reactor::ReadReply(from_reactor_[0], &reply));
-  ASSERT_EQ(reply, public_id);
+  {
+    UniquePtr<JsonDocument> json_reply(JsonDocument::Create(reply));
+    ASSERT_TRUE(json_reply.IsValid());
+
+    // Extract the token, public_id and secret from the reply
+    const JSON* id_json =
+        JsonDocument::SearchInObject(json_reply->root(), "id", JSON_STRING);
+    ASSERT_TRUE(id_json);
+    ASSERT_EQ(id_json->string_value, public_id);
+  }
 
   // Check the token validity
   json_string_input request_terms;
@@ -166,7 +178,16 @@ TEST_F(T_Reactor, FullCycle) {
 
   reply.clear();
   ASSERT_TRUE(Reactor::ReadReply(from_reactor_[0], &reply));
-  ASSERT_EQ(reply, path);
+  {
+    UniquePtr<JsonDocument> json_reply(JsonDocument::Create(reply));
+    ASSERT_TRUE(json_reply.IsValid());
+
+    // Extract the token, public_id and secret from the reply
+    const JSON* path_json =
+        JsonDocument::SearchInObject(json_reply->root(), "path", JSON_STRING);
+    ASSERT_TRUE(path_json);
+    ASSERT_EQ(path_json->string_value, path);
+  }
 
   // Send kQuit request
   ASSERT_TRUE(Reactor::WriteRequest(to_reactor_[1], kQuit, ""));
