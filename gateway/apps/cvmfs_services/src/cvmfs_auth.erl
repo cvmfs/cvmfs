@@ -32,11 +32,13 @@
           % the FQDN of the repository
           name :: binary(),
           % public id of the keys registered to modify this repo
-          key_ids :: [binary()]}).
+          key_ids :: [binary()]
+         }).
 
 -record(key, {
           key_id :: binary(),
-          secret :: binary()}).
+          secret :: binary()
+         }).
 
 
 %%%===================================================================
