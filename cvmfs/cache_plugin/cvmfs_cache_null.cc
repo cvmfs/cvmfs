@@ -280,9 +280,9 @@ int main(int argc, char **argv) {
     printf("cannot parse options file %s\n", argv[1]);
     return 1;
   }
-  char *locator = cvmcache_options_get(options, "CVMFS_CACHE_EXTERNAL_LOCATOR");
+  char *locator = cvmcache_options_get(options, "CVMFS_CACHE_PLUGIN_LOCATOR");
   if (locator == NULL) {
-    printf("CVMFS_CACHE_EXTERNAL_LOCATOR missing\n");
+    printf("CVMFS_CACHE_PLUGIN_LOCATOR missing\n");
     cvmcache_options_fini(options);
     return 1;
   }
