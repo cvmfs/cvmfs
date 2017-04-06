@@ -43,7 +43,8 @@
                              lease_expired |
                              invalid_lease |
                              invalid_key |
-                             invalid_macaroon}.
+                             invalid_macaroon |
+                             worker_timeout}.
 -type submit_payload_result() :: {ok, payload_added} |
                                  {ok, payload_added, lease_ended} |
                                  submission_error().
@@ -152,17 +153,20 @@ init(Args) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_call({worker_req, generate_token, {KeyId, Path, MaxLeaseTime}}, _From, State) ->
-    Reply = p_generate_token(KeyId, Path, MaxLeaseTime),
+    #{worker := WorkerPort} = State,
+    Reply = p_generate_token(KeyId, Path, MaxLeaseTime, WorkerPort),
     lager:info("Worker ~p request: {generate_token, {~p, ~p, ~p}} -> Reply: ~p",
                [self(), KeyId, Path, MaxLeaseTime, Reply]),
     {reply, Reply, State};
 handle_call({worker_req, get_token_id, Token}, _From, State) ->
-    Reply = p_get_token_id(Token),
+    #{worker := WorkerPort} = State,
+    Reply = p_get_token_id(Token, WorkerPort),
     lager:info("Worker ~p request: {get_token_id, ~p} -> Reply: ~p",
                [self(), Token, Reply]),
     {reply, Reply, State};
 handle_call({worker_req, submit_payload, {SubmissionData, Secret}}, _From, State) ->
-    Reply = p_submit_payload(SubmissionData, Secret),
+    #{worker := WorkerPort} = State,
+    Reply = p_submit_payload(SubmissionData, Secret, WorkerPort),
     lager:info("Worker ~p request: {submit_payload, {~p, ~p}} -> Reply: ~p",
                [self(), SubmissionData, Secret, Reply]),
     {reply, Reply, State}.
@@ -240,72 +244,68 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
--spec p_generate_token(KeyId, Path, MaxLeaseTime) -> {Token, Public, Secret}
-                                                         when KeyId :: binary(),
-                                                              Path :: binary(),
-                                                              MaxLeaseTime :: integer(),
-                                                              Token :: binary(),
-                                                              Public :: binary(),
-                                                              Secret :: binary().
-p_generate_token(KeyId, Path, MaxLeaseTime) ->
-    Secret = enacl_p:randombytes(macaroon:suggested_secret_length()),
-    Public = <<KeyId/binary,Path/binary>>,
-    Location = <<"">>, %% Location isn't used
-    M = macaroon:create(Location, Secret, Public),
-
-    Time = erlang:system_time(milli_seconds) + MaxLeaseTime,
-
-    M1 = macaroon:add_first_party_caveat(M,
-                                         "time < " ++ erlang:integer_to_binary(Time)),
-
-    M2 = macaroon:add_first_party_caveat(M1, "path = " ++ Path),
-
-    {ok, Token} = macaroon:serialize(M2),
+-spec p_generate_token(KeyId, Path, MaxLeaseTime, WorkerPort)
+                      -> {Token, Public, Secret}
+                             when KeyId :: binary(),
+                                  Path :: binary(),
+                                  MaxLeaseTime :: integer(),
+                                  WorkerPort :: port(),
+                                  Token :: binary(),
+                                  Public :: binary(),
+                                  Secret :: binary().
+p_generate_token(KeyId, Path, MaxLeaseTime, WorkerPort) ->
+    ReqBody = jsx:encode(#{<<"key_id">> => KeyId, <<"path">> => Path,
+                          <<"max_lease_time">> => MaxLeaseTime}),
+    p_write_request(WorkerPort, ?kGenerateToken, ReqBody),
+    {ok, {_Size, ReplyBody}} = p_read_reply(WorkerPort),
+    #{<<"token">> := Token, <<"id">> := Public, <<"secret">> := Secret}
+        = jsx:decode(ReplyBody, [return_maps]),
     {Public, Secret, Token}.
 
 
--spec p_get_token_id(Token) -> {ok, PublicId} | {error, invalid_macaroon}
-                                   when Token :: binary(),
-                                        PublicId :: binary().
-p_get_token_id(Token) ->
-    case macaroon:deserialize(Token) of
-        {ok, M} ->
-            {ok, macaroon:identifier(M)};
-        _ ->
+-spec p_get_token_id(Token, WorkerPort)
+                    -> {ok, PublicId} | {error, invalid_macaroon}
+                           when Token :: binary(),
+                                WorkerPort :: port(),
+                                PublicId :: binary().
+p_get_token_id(Token, WorkerPort) ->
+    p_write_request(WorkerPort, ?kGetTokenId, Token),
+    case p_read_reply(WorkerPort) of
+        {ok, {_, Reply}} ->
+            case jsx:decode(Reply, [return_maps]) of
+                #{<<"status">> := <<"ok">>, <<"id">> := PublicId} ->
+                    {ok, PublicId};
+                #{<<"status">> := <<"error">>, <<"reason">> := _Reason} ->
+                    {error, invalid_macaroon}
+            end;
+        {error, _} ->
             {error, invalid_macaroon}
     end.
 
 
--spec p_submit_payload(SubmissionData, Secret) -> submit_payload_result()
+-spec p_submit_payload(SubmissionData, Secret, WorkerPort) -> submit_payload_result()
                                                     when SubmissionData :: payload_submission_data(),
-                                                         Secret :: binary().
-p_submit_payload({LeaseToken, _Payload, _Digest, _HeaderSize}, Secret) ->
-    CheckTime = fun(<<"time < ", Exp/binary>>) ->
-                        erlang:binary_to_integer(Exp)
-                            > erlang:system_time(milli_seconds);
-                   (_) ->
-                        false
-                end,
-    CheckPaths = fun(<<"path = ", _Path/binary>>) ->
-                         true;
-                    (_) ->
-                         false
-                 end,
-
-    V = macaroon_verifier:create(),
-    V1 = macaroon_verifier:satisfy_general(V, CheckTime),
-    V2 = macaroon_verifier:satisfy_general(V1, CheckPaths),
-
-    {ok, M} = macaroon:deserialize(LeaseToken),
-    case macaroon_verifier:verify(V2, M, Secret) of
-        ok ->
-            %% TODO: submit payload to GW
-            {ok, payload_added};
-        {error, {unverified_caveat, <<"time < ", _/binary>>}} ->
-            {error, lease_expired};
-        {error, Reason} ->
-            {error, Reason}
+                                                         Secret :: binary(),
+                                                         WorkerPort :: port().
+p_submit_payload({LeaseToken, _Payload, _Digest, _HeaderSize}, Secret, WorkerPort) ->
+    ReqBody = jsx:encode(#{<<"token">> => LeaseToken, <<"secret">> => Secret}),
+    p_write_request(WorkerPort, ?kCheckToken, ReqBody),
+    case p_read_reply(WorkerPort) of
+        {ok, {_, Reply}} ->
+            case jsx:decode(Reply, [return_maps]) of
+                #{<<"status">> := <<"ok">>, <<"path">> := Path} ->
+                    lager:info("TODO: Submit payload for path ~p", [Path]),
+                    {ok, payload_added};
+                #{<<"status">> := <<"error">>, <<"reason">> := <<"expired_token">>} ->
+                    {error, lease_expired};
+                #{<<"status">> := <<"error">>, <<"reason">> := <<"invalid_token">>} ->
+                    {error, invalid_lease}
+            end;
+        {error, worker_timeout} ->
+            lager:error("Timeout reached waiting for reply from worker ~p", [WorkerPort]),
+            {error, worker_timeout}
     end.
+
 
 p_write_request(Port, Request, Msg) ->
     Size = size(Msg),
