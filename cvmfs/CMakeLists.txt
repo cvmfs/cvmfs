@@ -333,6 +333,7 @@ set (CVMFS_STRATUM_AGENT_SOURCES
 
 if(BUILD_RECEIVER)
   set (CVMFS_RECEIVER_SOURCES
+    receiver/payload_processor.cc
     receiver/reactor.cc
     receiver/receiver.cc
     receiver/session_token.cc
@@ -340,6 +341,7 @@ if(BUILD_RECEIVER)
     hash.cc
     json_document.cc
     logging.cc
+    pack.cc
     util/posix.cc
     util/string.cc
     uuid.cc

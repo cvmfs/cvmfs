@@ -12,8 +12,8 @@
 #include <vector>
 
 #include "../json_document.h"
-
 #include "../logging.h"
+#include "payload_processor.h"
 #include "session_token.h"
 #include "util/pointer.h"
 #include "util/string.h"
@@ -155,9 +155,9 @@ int Reactor::HandleGenerateToken(const std::string& req, std::string* reply) {
   std::string public_token_id;
   std::string token_secret;
 
-  if (receiver::GenerateSessionToken(key_id->string_value, path->string_value,
-                                     max_lease_time->int_value, &session_token,
-                                     &public_token_id, &token_secret)) {
+  if (GenerateSessionToken(key_id->string_value, path->string_value,
+                           max_lease_time->int_value, &session_token,
+                           &public_token_id, &token_secret)) {
     return 4;
   }
 
@@ -178,7 +178,7 @@ int Reactor::HandleGetTokenId(const std::string& req, std::string* reply) {
 
   std::string token_id;
   json_string_input input;
-  if (receiver::GetTokenPublicId(req, &token_id)) {
+  if (GetTokenPublicId(req, &token_id)) {
     input.push_back(std::make_pair("status", "error"));
     input.push_back(std::make_pair("reason", "invalid_token"));
   } else {
@@ -211,8 +211,7 @@ int Reactor::HandleCheckToken(const std::string& req, std::string* reply) {
 
   std::string path;
   json_string_input input;
-  int ret =
-      receiver::CheckToken(token->string_value, secret->string_value, &path);
+  int ret = CheckToken(token->string_value, secret->string_value, &path);
   if (ret == 10) {
     // Expired token
     input.push_back(std::make_pair("status", "error"));
@@ -250,11 +249,39 @@ int Reactor::HandleSubmitPayload(int fdin, const std::string& req,
       JsonDocument::SearchInObject(req_json->root(), "path", JSON_STRING);
   const JSON* digest_json =
       JsonDocument::SearchInObject(req_json->root(), "digest", JSON_STRING);
-  const JSON* he
+  const JSON* header_size_json =
+      JsonDocument::SearchInObject(req_json->root(), "header_size", JSON_INT);
 
-      if (token == NULL || secret == NULL) {
+  if (path_json == NULL || digest_json == NULL || header_size_json) {
     return 3;
   }
+
+  PayloadProcessor proc;
+  json_string_input reply_input;
+  PayloadProcessor::Result res =
+      proc.Process(fdin, digest_json->string_value, path_json->string_value,
+                   header_size_json->int_value);
+
+  switch (res) {
+    case PayloadProcessor::kPathViolation:
+      reply_input.push_back(std::make_pair("status", "error"));
+      reply_input.push_back(std::make_pair("reason", "path_violation"));
+      break;
+    case PayloadProcessor::kOtherError:
+      reply_input.push_back(std::make_pair("status", "error"));
+      reply_input.push_back(std::make_pair("reason", "other_error"));
+      break;
+    case PayloadProcessor::kSuccess:
+      reply_input.push_back(std::make_pair("status", "ok"));
+      break;
+    default:
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "Unknown value of PayloadProcessor::Result encountered.");
+      abort();
+      break;
+  }
+
+  ToJsonString(reply_input, reply);
 
   return 0;
 }
@@ -282,9 +309,8 @@ bool Reactor::HandleRequest(Request req, const std::string& data) {
       ok &= WriteReply(fdout_, reply);
       break;
     case kSubmitPayload:
-      // ok &= HandleSubmitPayload(data, &reply) == 0);
-      // ok &= WriteReply(fdout, reply);
-      //}
+      ok &= (HandleSubmitPayload(fdin_, data, &reply) == 0);
+      ok &= WriteReply(fdout_, reply);
       break;
     case kError:
       LogCvmfs(kLogCvmfs, kLogStderr, "Reactor: unknown command received.");
