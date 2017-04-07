@@ -72,6 +72,7 @@ set(CVMFS_UNITTEST_FILES
   t_options.cc
   t_pack.cc
   t_pathspec.cc
+  t_payload_processor.cc
   t_pipe.cc
   t_platforms.cc
   t_polymorphic_construction.cc
@@ -178,6 +179,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/pathspec/pathspec_pattern.cc
   ${CVMFS_SOURCE_DIR}/quota.cc
   ${CVMFS_SOURCE_DIR}/quota_posix.cc
+  ${CVMFS_SOURCE_DIR}/receiver/payload_processor.cc
   ${CVMFS_SOURCE_DIR}/receiver/reactor.cc
   ${CVMFS_SOURCE_DIR}/receiver/session_token.cc
   ${CVMFS_SOURCE_DIR}/reflog.cc
