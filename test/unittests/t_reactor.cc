@@ -20,19 +20,17 @@ class MockedReactor : public Reactor {
 
 class T_Reactor : public ::testing::Test {
  protected:
+  T_Reactor() : ready_(1, 1) {}
+
   virtual void SetUp() {
     ASSERT_NE(pipe(to_reactor_), -1);
     ASSERT_NE(pipe(from_reactor_), -1);
 
-    Context ctx;
-    ctx.fds[0] = to_reactor_[0];
-    ctx.fds[1] = from_reactor_[1];
-
     ASSERT_EQ(pthread_create(&thread_, NULL, T_Reactor::ReactorFunction,
-                             static_cast<void*>(&ctx)),
+                             static_cast<void*>(this)),
               0);
 
-    ASSERT_EQ(ctx.ready.Dequeue(), true);
+    ASSERT_EQ(ready_.Dequeue(), true);
   }
 
   virtual void TearDown() {
@@ -41,27 +39,21 @@ class T_Reactor : public ::testing::Test {
     close(from_reactor_[0]);
   }
 
-  struct Context {
-    Context() : fds(), ready(1, 1) {}
-
-    int fds[2];
-    FifoChannel<bool> ready;
-  };
-
   static void* ReactorFunction(void* data) {
-    Context* ctx = static_cast<Context*>(data);
+    T_Reactor* ctx = static_cast<T_Reactor*>(data);
 
-    ctx->ready.Enqueue(true);
+    ctx->ready_.Enqueue(true);
 
-    MockedReactor reactor(ctx->fds[0], ctx->fds[1]);
+    MockedReactor reactor(ctx->to_reactor_[0], ctx->from_reactor_[1]);
     reactor.run();
 
-    close(ctx->fds[0]);
-    close(ctx->fds[1]);
+    close(ctx->to_reactor_[0]);
+    close(ctx->from_reactor_[1]);
 
     return NULL;
   }
 
+  FifoChannel<bool> ready_;
   pthread_t thread_;
   int to_reactor_[2];
   int from_reactor_[2];
