@@ -44,7 +44,9 @@
                              invalid_lease |
                              invalid_key |
                              invalid_macaroon |
-                             worker_timeout}.
+                             worker_timeout |
+                             path_violation |
+                             other_error}.
 -type submit_payload_result() :: {ok, payload_added} |
                                  {ok, payload_added, lease_ended} |
                                  submission_error().
@@ -291,8 +293,8 @@ p_submit_payload({LeaseToken, _Payload, _Digest, _HeaderSize}, Secret, WorkerPor
     ReqBody = jsx:encode(#{<<"token">> => LeaseToken, <<"secret">> => Secret}),
     p_write_request(WorkerPort, ?kCheckToken, ReqBody),
     case p_read_reply(WorkerPort) of
-        {ok, {_, Reply}} ->
-            case jsx:decode(Reply, [return_maps]) of
+        {ok, {_, TokenCheckReply}} ->
+            case jsx:decode(TokenCheckReply, [return_maps]) of
                 #{<<"status">> := <<"ok">>, <<"path">> := Path} ->
                     lager:info("TODO: Submit payload for path ~p", [Path]),
                     {ok, payload_added};
