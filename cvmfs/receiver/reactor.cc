@@ -122,7 +122,7 @@ bool Reactor::run() {
     req = ReadRequest(fdin_, &msg_body);
     if (!HandleRequest(req, msg_body)) {
       LogCvmfs(kLogCvmfs, kLogStderr,
-               "Reactor: could not handle request. Exiting");
+               "Reactor: could not handle request %d. Exiting", req);
       return false;
     }
   } while (req != kQuit);
@@ -252,7 +252,7 @@ int Reactor::HandleSubmitPayload(int fdin, const std::string& req,
   const JSON* header_size_json =
       JsonDocument::SearchInObject(req_json->root(), "header_size", JSON_INT);
 
-  if (path_json == NULL || digest_json == NULL || header_size_json) {
+  if (path_json == NULL || digest_json == NULL || header_size_json == NULL) {
     return 3;
   }
 
