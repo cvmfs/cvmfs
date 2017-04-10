@@ -1,4 +1,5 @@
 2.4.0:
+  * Add cvmfs_server diff command (CVM-1070)
   * Possibility to split cache dir and workspace, add CVMFS(_CACHE)_WORKSPACE
   * Trim trailing whitespaces from .cvmfsdirtab entries (CVM-1061)
   * Cache proxy settings in workspace directory (CVM-1156)
