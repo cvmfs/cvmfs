@@ -38,12 +38,12 @@ CommandDiff::~CommandDiff() {
 
 ParameterList CommandDiff::GetParams() const {
   swissknife::ParameterList r;
-  r.push_back(Parameter::Mandatory('r', "repository directory / url"));
+  r.push_back(Parameter::Mandatory('r', "repository url"));
   r.push_back(Parameter::Mandatory('n', "repository name"));
   r.push_back(Parameter::Mandatory('k', "public key of the repository / dir"));
   r.push_back(Parameter::Mandatory('t', "directory for temporary files"));
   r.push_back(Parameter::Optional('s', "'from' tag name"));
-  r.push_back(Parameter::Optional('e', "'to' tag name"));
+  r.push_back(Parameter::Optional('d', "'to' tag name"));
   r.push_back(Parameter::Switch('m', "machine readable output"));
   r.push_back(Parameter::Switch('h', "show header"));
   r.push_back(Parameter::Switch('L', "follow HTTP redirects"));
@@ -321,8 +321,8 @@ int swissknife::CommandDiff::Main(const swissknife::ArgumentList &args) {
   string tagname_to = "trunk";
   if (args.count('s') > 0)
     tagname_from = *args.find('s')->second;
-  if (args.count('e') > 0)
-    tagname_to = *args.find('e')->second;
+  if (args.count('d') > 0)
+    tagname_to = *args.find('d')->second;
 
   bool retval = this->InitDownloadManager(follow_redirects);
   assert(retval);

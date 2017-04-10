@@ -887,8 +887,8 @@ is_subcommand() {
   local subcommand="$1"
   local supported_commands="mkfs add-replica import publish rollback rmfs alterfs    \
     resign list info tag list-tags lstags check transaction abort snapshot           \
-    skeleton migrate list-catalogs update-geodb gc catalog-chown eliminate-hardlinks \
-    update-info update-repoinfo mount fix-permissions"
+    skeleton migrate list-catalogs diff update-geodb gc catalog-chown \
+    eliminate-hardlinks update-info update-repoinfo mount fix-permissions"
 
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
@@ -966,6 +966,10 @@ Supported Commands:
                   [-h catalog hashes] [-x machine readable]
                   <fully qualified name>
                   Print a full list of all nested catalogs of a repository
+  diff            [-m(achine readable)] [-h(eader line)]
+                  [-s <source tag>] [-d <destination tag>]
+                  <fully qualified name>
+                  Show change set between two snapshots (default: last publish)
   info            <fully qualified name>
                   Print summary about the repository
   tag             Create and manage named snapshots
