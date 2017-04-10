@@ -10,6 +10,7 @@
 #include "swissknife.h"
 
 #include "swissknife_check.h"
+#include "swissknife_diff.h"
 #include "swissknife_gc.h"
 #include "swissknife_graft.h"
 #include "swissknife_hash.h"
@@ -83,6 +84,7 @@ int main(int argc, char **argv) {
   command_list.push_back(new swissknife::CommandLetter());
   command_list.push_back(new swissknife::CommandCheck());
   command_list.push_back(new swissknife::CommandListCatalogs());
+  command_list.push_back(new swissknife::CommandDiff());
   command_list.push_back(new swissknife::CommandPull());
   command_list.push_back(new swissknife::CommandZpipe());
   command_list.push_back(new swissknife::CommandGraft());

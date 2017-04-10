@@ -327,6 +327,23 @@ MockCatalog* MockCatalog::FindSubtree(const PathString &path) {
   return NULL;
 }
 
+
+bool MockCatalog::FindNested(
+  const PathString &mountpoint,
+  shash::Any *hash,
+  uint64_t *size) const
+{
+  for (unsigned i = 0; i < children_.size(); ++i) {
+    if (children_[i].mountpoint == mountpoint) {
+      *hash = children_[i].hash;
+      *size = children_[i].size;
+      return true;
+    }
+  }
+  return false;
+}
+
+
 bool MockCatalog::LookupPath(const PathString &path,
                 catalog::DirectoryEntry *dirent) const {
   shash::Md5 md5_path(path.GetChars(), path.GetLength());

@@ -632,7 +632,7 @@ void WritableCatalog::MergeIntoParent() {
 
   // Fix counters in parent
   delta_counters_.PopulateToParent(&parent->delta_counters_);
-  Counters &counters = GetCounters();
+  Counters &counters = GetWritableCounters();
   counters.ApplyDelta(delta_counters_);
   counters.MergeIntoParent(&parent->delta_counters_);
 

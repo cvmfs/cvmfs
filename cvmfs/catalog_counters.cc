@@ -71,4 +71,14 @@ Counters_t Counters::GetAllEntries() const {
   return GetSelfEntries() + GetSubtreeEntries();
 }
 
+
+DeltaCounters Counters::Diff(const Counters &from, const Counters &to) {
+  DeltaCounters result;
+  result.self.Add(to.self);
+  result.subtree.Add(to.subtree);
+  result.self.Subtract(from.self);
+  result.subtree.Subtract(from.subtree);
+  return result;
+}
+
 }  // namespace catalog

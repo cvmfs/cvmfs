@@ -140,6 +140,8 @@ class DeltaCounters : public TreeCountersBase<DeltaCounters_t> {
 typedef uint64_t Counters_t;
 class Counters : public TreeCountersBase<Counters_t> {
  public:
+  static DeltaCounters Diff(const Counters &from, const Counters &to);
+
   void ApplyDelta(const DeltaCounters &delta);
   void AddAsSubtree(DeltaCounters *delta) const;
   void MergeIntoParent(DeltaCounters *parent_delta) const;
