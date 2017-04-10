@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cassert>
 #include <string>
+#include <vector>
 
 #include "catalog.h"
 #include "catalog_counters.h"

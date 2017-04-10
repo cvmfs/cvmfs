@@ -7,6 +7,8 @@
 
 #include <stdint.h>
 
+#include <string>
+
 #include "directory_entry.h"
 #include "history.h"
 #include "shortstring.h"
