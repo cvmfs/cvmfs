@@ -244,7 +244,7 @@ void CommandDiff::ReportModification(
     return;
 
   string type_from = PrintEntryType(entry_from);
-  string type_to = PrintEntryType(entry_from);
+  string type_to = PrintEntryType(entry_to);
   string type = type_from;
   if (type_from != type_to) {
     type += machine_readable_ ? type_to : ("->" + type_to);
@@ -273,20 +273,24 @@ void CommandDiff::ReportStats() {
   string type_symlink = machine_readable_ ? "S" : "# symlinks):";
   string type_directory = machine_readable_ ? "D" : "# directories):";
   string type_catalog = machine_readable_ ? "N" : "# catalogs):";
-  LogCvmfs(kLogCvmfs, kLogStdout, "%s%s %" PRIu64,
-           operation.c_str(), type_file.c_str(),
-           counters_diff.self.regular_files +
-             counters_diff.subtree.regular_files);
-  LogCvmfs(kLogCvmfs, kLogStdout, "%s%s %" PRIu64,
-           operation.c_str(), type_symlink.c_str(),
-           counters_diff.self.symlinks + counters_diff.subtree.symlinks);
-  LogCvmfs(kLogCvmfs, kLogStdout, "%s%s %" PRIu64,
-           operation.c_str(), type_directory.c_str(),
-           counters_diff.self.directories + counters_diff.subtree.directories);
-  LogCvmfs(kLogCvmfs, kLogStdout, "%s%s %" PRIu64,
-           operation.c_str(), type_catalog.c_str(),
-           counters_diff.self.nested_catalogs +
-             counters_diff.subtree.nested_catalogs);
+  int64_t diff_file = counters_diff.self.regular_files +
+                      counters_diff.subtree.regular_files;
+  int64_t diff_symlink = counters_diff.self.symlinks +
+                         counters_diff.subtree.symlinks;
+  int64_t diff_catalog = counters_diff.self.nested_catalogs +
+                         counters_diff.subtree.nested_catalogs;
+  // Nested catalogs make internally two directory entries
+  int64_t diff_directory = counters_diff.self.directories +
+                           counters_diff.subtree.directories -
+                           diff_catalog;
+  LogCvmfs(kLogCvmfs, kLogStdout, "%s%s %" PRId64,
+           operation.c_str(), type_file.c_str(), diff_file);
+  LogCvmfs(kLogCvmfs, kLogStdout, "%s%s %" PRId64,
+           operation.c_str(), type_symlink.c_str(), diff_symlink);
+  LogCvmfs(kLogCvmfs, kLogStdout, "%s%s %" PRId64,
+           operation.c_str(), type_directory.c_str(), diff_directory);
+  LogCvmfs(kLogCvmfs, kLogStdout, "%s%s %" PRId64,
+           operation.c_str(), type_catalog.c_str(), diff_catalog);
 }
 
 
