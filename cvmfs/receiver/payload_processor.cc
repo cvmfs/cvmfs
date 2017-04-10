@@ -7,22 +7,7 @@
 #include "unistd.h"
 
 #include "../logging.h"
-#include "pack.h"
 #include "util/string.h"
-
-namespace {
-
-class ConsumerCallback {
- public:
-  ConsumerCallback() {}
-
-  void OnEvent(const ObjectPackBuild::Event& event) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Callback - Received: %d bytes",
-             event.buf_size);
-  }
-};
-
-}  // namespace
 
 namespace receiver {
 
@@ -41,8 +26,7 @@ PayloadProcessor::Result PayloadProcessor::Process(
   // Set up object pack deserialization
   shash::Any digest = shash::MkFromHexPtr(shash::HexPtr(header_digest));
   ObjectPackConsumer deserializer(digest, header_size);
-  ConsumerCallback cb;
-  deserializer.RegisterListener(&ConsumerCallback::OnEvent, &cb);
+  deserializer.RegisterListener(&PayloadProcessor::ConsumerEventCallback, this);
 
   int nb = 0;
   ObjectPackBuild::State consumer_state = ObjectPackBuild::kStateContinue;
@@ -61,6 +45,12 @@ PayloadProcessor::Result PayloadProcessor::Process(
   } while (nb > 0 && consumer_state != ObjectPackBuild::kStateDone);
 
   return kSuccess;
+}
+
+void PayloadProcessor::ConsumerEventCallback(
+    const ObjectPackBuild::Event& event) {
+  LogCvmfs(kLogCvmfs, kLogStderr, "Callback - Received: %d bytes",
+           event.buf_size);
 }
 
 }  // namespace receiver

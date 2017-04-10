@@ -11,6 +11,18 @@
 
 using namespace receiver;  // NOLINT
 
+class MockPayloadProcessor : public PayloadProcessor {
+ public:
+  MockPayloadProcessor() : num_files_received_(0) {}
+  virtual ~MockPayloadProcessor() {}
+
+  virtual void ConsumerEventCallback(const ObjectPackBuild::Event& /*event*/) {
+    num_files_received_++;
+  }
+
+  int num_files_received_;
+};
+
 class T_PayloadProcessor : public ::testing::Test {
  protected:
   T_PayloadProcessor()
@@ -80,8 +92,10 @@ class T_PayloadProcessor : public ::testing::Test {
 };
 
 TEST_F(T_PayloadProcessor, Basic) {
-  PayloadProcessor proc;
+  MockPayloadProcessor proc;
+  ASSERT_EQ(proc.num_files_received_, 0);
   ASSERT_EQ(proc.Process(read_fd_, Base64(digest_.ToString(false)), "some_path",
                          serializer_->GetHeaderSize()),
             PayloadProcessor::kSuccess);
+  ASSERT_EQ(proc.num_files_received_, 1);
 }

@@ -8,6 +8,8 @@
 #include <stdint.h>
 #include <string>
 
+#include "pack.h"
+
 namespace receiver {
 
 class PayloadProcessor {
@@ -19,6 +21,8 @@ class PayloadProcessor {
 
   Result Process(int fdin, const std::string& digest_base64,
                  const std::string& path, uint64_t header_size);
+
+  virtual void ConsumerEventCallback(const ObjectPackBuild::Event& event);
 };
 
 }  // namespace receiver
