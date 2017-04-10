@@ -158,7 +158,6 @@ set (CVMFS_FSCK_SOURCES
 
 
 set (CVMFS_SWISSKNIFE_SOURCES
-<<<<<<< HEAD
   catalog.cc
   catalog_counters.cc
   catalog_mgr_ro.cc
