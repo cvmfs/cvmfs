@@ -6,6 +6,7 @@
 
 #include <logging.h>
 #include "json_document.h"
+#include "pack.h"
 #include "receiver/reactor.h"
 #include "util/pointer.h"
 #include "util/string.h"
@@ -166,6 +167,47 @@ TEST_F(T_Reactor, FullCycle) {
         JsonDocument::SearchInObject(json_reply->root(), "path", JSON_STRING);
     ASSERT_TRUE(path_json);
     ASSERT_EQ(path_json->string_value, path);
+  }
+
+  // Submit a payload
+  {
+    // Prepare an object pack and send it through the pipe
+    ObjectPack pack;
+    ObjectPack::BucketHandle hd = pack.NewBucket();
+
+    std::vector<char> buffer(4096, 0);
+    ObjectPack::AddToBucket(&buffer[0], 4096, hd);
+    shash::Any buffer_hash(shash::kSha1);
+    ASSERT_TRUE(pack.CommitBucket(ObjectPack::kCas, buffer_hash, hd));
+
+    ObjectPackProducer serializer(&pack);
+
+    shash::Any digest(shash::kSha1);
+    serializer.GetDigest(&digest);
+
+    const std::string request = "{\"path\":\"some_path\",\"digest\":\"" +
+                                Base64(digest.ToString(false)) +
+                                "\",\"header_size\":" +
+                                StringifyInt(serializer.GetHeaderSize()) + "}";
+
+    std::vector<unsigned char> payload(0);
+    std::vector<unsigned char> buf(4096);
+    unsigned nbytes = 0;
+    do {
+      nbytes = serializer.ProduceNext(buf.size(), &buf[0]);
+      std::copy(buf.begin(), buf.begin() + nbytes, std::back_inserter(payload));
+    } while (nbytes > 0);
+
+    ASSERT_TRUE(Reactor::WriteRequest(to_reactor_[1], Reactor::kSubmitPayload,
+                                      request));
+
+    std::string payload_base64 = Base64(
+        std::string(reinterpret_cast<char*>(&payload[0]), payload.size()));
+    int nb = write(to_reactor_[1], &payload_base64[0], payload_base64.size());
+    ASSERT_EQ(static_cast<size_t>(nb), payload_base64.size());
+
+    std::string reply;
+    ASSERT_TRUE(Reactor::ReadReply(from_reactor_[0], &reply));
   }
 
   // Send kQuit request
