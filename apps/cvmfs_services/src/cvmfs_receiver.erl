@@ -166,11 +166,11 @@ handle_call({worker_req, get_token_id, Token}, _From, State) ->
     lager:info("Worker ~p request: {get_token_id, ~p} -> Reply: ~p",
                [self(), Token, Reply]),
     {reply, Reply, State};
-handle_call({worker_req, submit_payload, {SubmissionData, Secret}}, _From, State) ->
+handle_call({worker_req, submit_payload, {{Token, _, Digest, HeaderSize} = SubmissionData, Secret}}, _From, State) ->
     #{worker := WorkerPort} = State,
     Reply = p_submit_payload(SubmissionData, Secret, WorkerPort),
-    lager:info("Worker ~p request: {submit_payload, {~p, ~p}} -> Reply: ~p",
-               [self(), SubmissionData, Secret, Reply]),
+    lager:info("Worker ~p request: {submit_payload, {{~p, PAYLOAD_NOT_SHOWN, ~p, ~p} ~p}} -> Reply: ~p",
+               [self(), Token, Digest, HeaderSize, Secret, Reply]),
     {reply, Reply, State}.
 
 
