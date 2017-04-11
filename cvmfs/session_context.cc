@@ -257,7 +257,8 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
               std::back_inserter(payload));
   } while (nbytes > 0);
   const std::string payload_text =
-      json_msg + reinterpret_cast<char*>(&payload[0]);
+      json_msg +
+      std::string(reinterpret_cast<char*>(&payload[0]), payload.size());
 
   // Prepare the Curl POST request
   CURL* h_curl = curl_easy_init();
