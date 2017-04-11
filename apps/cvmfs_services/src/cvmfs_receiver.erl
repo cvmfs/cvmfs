@@ -289,15 +289,30 @@ p_get_token_id(Token, WorkerPort) ->
                                                     when SubmissionData :: payload_submission_data(),
                                                          Secret :: binary(),
                                                          WorkerPort :: port().
-p_submit_payload({LeaseToken, _Payload, _Digest, _HeaderSize}, Secret, WorkerPort) ->
-    ReqBody = jsx:encode(#{<<"token">> => LeaseToken, <<"secret">> => Secret}),
-    p_write_request(WorkerPort, ?kCheckToken, ReqBody),
+p_submit_payload({LeaseToken, Payload, Digest, HeaderSize}, Secret, WorkerPort) ->
+    Req1 = jsx:encode(#{<<"token">> => LeaseToken, <<"secret">> => Secret}),
+    p_write_request(WorkerPort, ?kCheckToken, Req1),
     case p_read_reply(WorkerPort) of
-        {ok, {_, TokenCheckReply}} ->
-            case jsx:decode(TokenCheckReply, [return_maps]) of
+        {ok, {_, Reply1}} ->
+            case jsx:decode(Reply1, [return_maps]) of
                 #{<<"status">> := <<"ok">>, <<"path">> := Path} ->
-                    lager:info("TODO: Submit payload for path ~p", [Path]),
-                    {ok, payload_added};
+                    Req2 = jsx:encode(#{<<"path">> => Path,
+                                        <<"digest">> => Digest,
+                                        <<"header_size">> => HeaderSize}),
+                    p_write_request(WorkerPort, ?kSubmitPayload, Req2, Payload),
+                    case p_read_reply(WorkerPort) of
+                        {ok, {_, Reply2}} ->
+                            case jsx:decode(Reply2, [return_maps]) of
+                                #{<<"status">> := <<"ok">>} ->
+                                    {ok, payload_added};
+                                #{<<"status">> := <<"error">>, <<"reason">> := <<"path_violation">>} ->
+                                    {error, path_violation};
+                                #{<<"status">> := <<"error">>, <<"reason">> := <<"other_error">>} ->
+                                    {error, other_error}
+                            end;
+                        {error, worker_timeout} ->
+                            {error, worker_timeout}
+                    end;
                 #{<<"status">> := <<"error">>, <<"reason">> := <<"expired_token">>} ->
                     {error, lease_expired};
                 #{<<"status">> := <<"error">>, <<"reason">> := <<"invalid_token">>} ->
@@ -313,6 +328,12 @@ p_write_request(Port, Request, Msg) ->
     Size = size(Msg),
     Buffer = <<Request:32/integer-signed-little,Size:32/integer-signed-little,Msg/binary>>,
     Port ! {self(), {command, Buffer}}.
+
+p_write_request(Port, Request, Msg, Payload) ->
+    Size = size(Msg),
+    Buffer = <<Request:32/integer-signed-little,Size:32/integer-signed-little,Msg/binary>>,
+    Port ! {self(), {command, Buffer}},
+    Port ! {self(), {command, Payload}}.
 
 p_read_reply(Port) ->
     receive
