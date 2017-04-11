@@ -237,7 +237,7 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
 
   shash::Any payload_digest(shash::kSha1);
   serializer.GetDigest(&payload_digest);
-  const std::string json_body =
+  const std::string json_msg =
       "{\"session_token\" : \"" + session_token_ +
       "\", \"payload_digest\" : \"" + Base64(payload_digest.ToString(false)) +
       "\", \"header_size\" : \"" + StringifyInt(serializer.GetHeaderSize()) +
@@ -245,10 +245,9 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
 
   // Compute HMAC
   shash::Any hmac(shash::kSha1);
-  shash::HmacString(secret_, json_body, &hmac);
+  shash::HmacString(secret_, json_msg, &hmac);
 
   // TODO(radu): The copying is inefficient; Use CURLOPT_READFUNCTION
-  //             How to deal with the base64 encoding of the payload?
   std::vector<unsigned char> payload(0);
   std::vector<unsigned char> buffer(4096);
   unsigned nbytes = 0;
@@ -258,8 +257,7 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
               std::back_inserter(payload));
   } while (nbytes > 0);
   const std::string payload_text =
-      json_body +
-      Base64(std::string(reinterpret_cast<char*>(&payload[0]), payload.size()));
+      json_msg + reinterpret_cast<char*>(&payload[0]);
 
   // Prepare the Curl POST request
   CURL* h_curl = curl_easy_init();
@@ -273,7 +271,7 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
                            Base64(hmac.ToString(false));
   struct curl_slist* auth_header = NULL;
   auth_header = curl_slist_append(auth_header, header_str.c_str());
-  header_str = std::string("Message-Size: ") + StringifyInt(json_body.size());
+  header_str = std::string("Message-Size: ") + StringifyInt(json_msg.size());
   auth_header = curl_slist_append(auth_header, header_str.c_str());
   curl_easy_setopt(h_curl, CURLOPT_HTTPHEADER, auth_header);
 

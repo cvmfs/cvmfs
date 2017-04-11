@@ -201,10 +201,8 @@ TEST_F(T_Reactor, FullCycle) {
     ASSERT_TRUE(Reactor::WriteRequest(to_reactor_[1], Reactor::kSubmitPayload,
                                       request));
 
-    std::string payload_base64 = Base64(
-        std::string(reinterpret_cast<char*>(&payload[0]), payload.size()));
-    int nb = write(to_reactor_[1], &payload_base64[0], payload_base64.size());
-    ASSERT_EQ(static_cast<size_t>(nb), payload_base64.size());
+    int nb = write(to_reactor_[1], &payload[0], payload.size());
+    ASSERT_EQ(static_cast<size_t>(nb), payload.size());
 
     std::string reply;
     ASSERT_TRUE(Reactor::ReadReply(from_reactor_[0], &reply));
