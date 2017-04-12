@@ -49,8 +49,24 @@ PayloadProcessor::Result PayloadProcessor::Process(
 
 void PayloadProcessor::ConsumerEventCallback(
     const ObjectPackBuild::Event& event) {
-  LogCvmfs(kLogCvmfs, kLogStderr, "Callback - Received: %d bytes",
-           event.buf_size);
+  const std::string path = event.id.MakePath();
+  if (event.object_type == ObjectPack::kCas) {
+    // CAS Blob
+    LogCvmfs(
+        kLogCvmfs, kLogStderr,
+        "Event received: kCas, path: %s, size: %ld, buf_size: %d, buf: %lu\n",
+        path.c_str(), event.size, event.buf_size, event.buf);
+  } else if (event.object_type == ObjectPack::kNamed) {
+    // Named file
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "Event received: kNamed, path: %s, size: %ld, buf_size: %d, buf: "
+             "%lu, object_name: %s\n",
+             path.c_str(), event.size, event.buf_size, event.buf,
+             event.object_name.c_str());
+  } else {
+    // kEmpty - this is an error.
+    LogCvmfs(kLogCvmfs, kLogStderr, "Event received with unknown object.");
+  }
 }
 
 }  // namespace receiver
