@@ -427,33 +427,42 @@ bool ObjectPackConsumer::ParseItem(const std::string &line,
     return false;
   }
 
-  const std::string type_identifier(1, line[0]);
-  if (type_identifier == "C") {  // CAS blob
+  if (line[0] == 'C') {  // CAS blob
     const ObjectPack::BucketContentType entry_type = ObjectPack::kCas;
 
     // We could use SplitString but we can have many lines so we do something
     // more efficient here
-    const size_t separator_idx = line.find(' ', 2);
-    if ((separator_idx == 0) || (separator_idx == string::npos) ||
-        (separator_idx == (line.size() - 1))) {
+    const size_t separator = line.find(' ', 2);
+    if ((separator == string::npos) || (separator == (line.size() - 1))) {
       return false;
     }
 
-    uint64_t size = String2Uint64(line.substr(separator_idx + 1));
+    uint64_t size = String2Uint64(line.substr(separator + 1));
     *sum_size += size;
 
-    entry->id = shash::MkFromSuffixedHexPtr(
-        shash::HexPtr(line.substr(2, separator_idx)));
+    // Warning do not construct a HexPtr with an rvalue!
+    // The constructor takes the address of its argument.
+    const std::string hash_string = line.substr(2, separator - 2);
+    shash::HexPtr hex_ptr(hash_string);
+    if (!hex_ptr.IsValid()) {
+      return false;
+    }
+
+    entry->id = shash::MkFromSuffixedHexPtr(hex_ptr);
+
+    if (entry->id.IsNull()) {
+      return false;
+    }
+
     entry->size = size;
     entry->entry_type = entry_type;
     entry->entry_name = "";
-  } else if (type_identifier == "N") {  // Named file
+  } else if (line[0] == 'N') {  // Named file
     const ObjectPack::BucketContentType entry_type = ObjectPack::kNamed;
 
     // First separator, before the size field
     const size_t separator1 = line.find(' ', 2);
-    if ((separator1 == 0) || (separator1 == string::npos) ||
-        (separator1 == (line.size() - 1))) {
+    if ((separator1 == string::npos) || (separator1 == (line.size() - 1))) {
       return false;
     }
 
@@ -464,7 +473,8 @@ bool ObjectPackConsumer::ParseItem(const std::string &line,
       return false;
     }
 
-    uint64_t size = String2Uint64(line.substr(separator1 + 1, separator2));
+    uint64_t size =
+        String2Uint64(line.substr(separator1 + 1, separator2 - separator1 - 1));
 
     std::string name;
     if (!Debase64(line.substr(separator2 + 1), &name)) {
@@ -472,8 +482,21 @@ bool ObjectPackConsumer::ParseItem(const std::string &line,
     }
 
     *sum_size += size;
-    entry->id =
-        shash::MkFromSuffixedHexPtr(shash::HexPtr(line.substr(2, separator1)));
+
+    // Warning do not construct a HexPtr with an rvalue!
+    // The constructor takes the address of its argument.
+    const std::string hash_string = line.substr(2, separator1 - 2);
+    shash::HexPtr hex_ptr(hash_string);
+    if (!hex_ptr.IsValid()) {
+      return false;
+    }
+
+    if (entry->id.IsNull()) {
+      return false;
+    }
+
+    entry->id = shash::MkFromSuffixedHexPtr(hex_ptr);
+
     entry->size = size;
     entry->entry_type = entry_type;
     entry->entry_name = name;
