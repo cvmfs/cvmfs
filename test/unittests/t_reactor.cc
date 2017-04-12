@@ -175,9 +175,10 @@ TEST_F(T_Reactor, FullCycle) {
     ObjectPack pack;
     ObjectPack::BucketHandle hd = pack.NewBucket();
 
-    std::vector<char> buffer(4096, 0);
+    std::vector<uint8_t> buffer(4096, 0);
     ObjectPack::AddToBucket(&buffer[0], 4096, hd);
     shash::Any buffer_hash(shash::kSha1);
+    shash::HashMem(&buffer[0], buffer.size(), &buffer_hash);
     ASSERT_TRUE(pack.CommitBucket(ObjectPack::kCas, buffer_hash, hd));
 
     ObjectPackProducer serializer(&pack);

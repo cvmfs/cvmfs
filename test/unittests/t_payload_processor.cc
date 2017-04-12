@@ -36,9 +36,10 @@ class T_PayloadProcessor : public ::testing::Test {
     // Prepare an object pack and send it through the pipe
     ObjectPack::BucketHandle hd = pack_.NewBucket();
 
-    std::vector<char> buffer(4096, 0);
+    std::vector<uint8_t> buffer(4096, 0);
     ObjectPack::AddToBucket(&buffer[0], 4096, hd);
     shash::Any buffer_hash(shash::kSha1);
+    shash::HashMem(&buffer[0], buffer.size(), &buffer_hash);
     ASSERT_TRUE(pack_.CommitBucket(ObjectPack::kCas, buffer_hash, hd));
 
     serializer_ = new ObjectPackProducer(&pack_);
