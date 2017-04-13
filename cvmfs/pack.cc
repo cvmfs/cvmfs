@@ -444,9 +444,6 @@ bool ObjectPackConsumer::ParseItem(const std::string &line,
     // The constructor takes the address of its argument.
     const std::string hash_string = line.substr(2, separator - 2);
     shash::HexPtr hex_ptr(hash_string);
-    if (!hex_ptr.IsValid()) {
-      return false;
-    }
 
     entry->id = shash::MkFromSuffixedHexPtr(hex_ptr);
 
