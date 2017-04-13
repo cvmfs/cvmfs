@@ -5,7 +5,8 @@
 #include "payload_processor.h"
 
 #include <fcntl.h>
-#include "unistd.h"
+#include <unistd.h>
+#include <vector>
 
 #include "../logging.h"
 #include "util/posix.h"

@@ -6,6 +6,7 @@
 #define CVMFS_JSON_DOCUMENT_H_
 
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "json.h"
