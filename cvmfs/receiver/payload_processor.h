@@ -23,6 +23,15 @@ class PayloadProcessor {
                  const std::string& path, uint64_t header_size);
 
   virtual void ConsumerEventCallback(const ObjectPackBuild::Event& event);
+
+  int GetNumErrors() const { return num_errors_; }
+
+ protected:
+  virtual int WriteFile(int fd, const void* const buf, size_t buf_size);
+
+ private:
+  std::string current_repo_;
+  int num_errors_;
 };
 
 }  // namespace receiver
