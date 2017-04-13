@@ -256,11 +256,11 @@ int Reactor::HandleSubmitPayload(int fdin, const std::string& req,
     return 3;
   }
 
-  PayloadProcessor proc;
+  UniquePtr<PayloadProcessor> proc(MakePayloadProcessor());
   json_string_input reply_input;
   PayloadProcessor::Result res =
-      proc.Process(fdin, digest_json->string_value, path_json->string_value,
-                   header_size_json->int_value);
+      proc->Process(fdin, digest_json->string_value, path_json->string_value,
+                    header_size_json->int_value);
 
   switch (res) {
     case PayloadProcessor::kPathViolation:
@@ -284,6 +284,10 @@ int Reactor::HandleSubmitPayload(int fdin, const std::string& req,
   ToJsonString(reply_input, reply);
 
   return 0;
+}
+
+PayloadProcessor* Reactor::MakePayloadProcessor() {
+  return new PayloadProcessor();
 }
 
 bool Reactor::HandleRequest(Request req, const std::string& data) {

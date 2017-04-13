@@ -10,6 +10,8 @@
 
 namespace receiver {
 
+class PayloadProcessor;
+
 class Reactor {
  public:
   enum Request {
@@ -39,6 +41,8 @@ class Reactor {
   virtual int HandleCheckToken(const std::string& req, std::string* reply);
   virtual int HandleSubmitPayload(int fdin, const std::string& req,
                                   std::string* reply);
+
+  virtual PayloadProcessor* MakePayloadProcessor();
 
  private:
   bool HandleRequest(Request req, const std::string& data);
