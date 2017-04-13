@@ -7,6 +7,7 @@
 #include <logging.h>
 #include "json_document.h"
 #include "pack.h"
+#include "receiver/payload_processor.h"
 #include "receiver/reactor.h"
 #include "util/pointer.h"
 #include "util/string.h"
@@ -14,9 +15,26 @@
 
 using namespace receiver;  // NOLINT
 
+class MockedPayloadProcessor : public PayloadProcessor {
+ public:
+  MockedPayloadProcessor() {}
+
+ protected:
+  virtual int WriteFile(int /*fd*/, const void* const /*buf*/,
+                        size_t buf_size) {
+    // NO OP
+    return buf_size;
+  }
+};
+
 class MockedReactor : public Reactor {
  public:
   MockedReactor(int fdin, int fdout) : Reactor(fdin, fdout) {}
+
+ protected:
+  PayloadProcessor* MakePayloadProcessor() {
+    return new MockedPayloadProcessor();
+  }
 };
 
 class T_Reactor : public ::testing::Test {
