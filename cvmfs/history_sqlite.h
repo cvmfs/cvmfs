@@ -150,8 +150,6 @@ class SqliteHistory : public History {
   template <class SqlListingT>
   bool RunListing(std::vector<Tag> *list, SqlListingT *sql) const;
 
-  bool KeepHashReference(const Tag &tag);
-
  private:
   UniquePtr<HistoryDatabase>        database_;
 
@@ -165,10 +163,8 @@ class SqliteHistory : public History {
   UniquePtr<SqlGetHashes>           get_hashes_;
   UniquePtr<SqlRollbackTag>         rollback_tag_;
   UniquePtr<SqlListRollbackTags>    list_rollback_tags_;
-  UniquePtr<SqlRecycleBinInsert>    recycle_insert_;
   UniquePtr<SqlRecycleBinList>      recycle_list_;
   UniquePtr<SqlRecycleBinFlush>     recycle_empty_;
-  UniquePtr<SqlRecycleBinRollback>  recycle_rollback_;
 };
 
 }  // namespace history

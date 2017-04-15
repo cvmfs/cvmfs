@@ -12,12 +12,15 @@ namespace history {
 
 const float    HistoryDatabase::kLatestSchema          = 1.0;
 const float    HistoryDatabase::kLatestSupportedSchema = 1.0;
-const unsigned HistoryDatabase::kLatestSchemaRevision  = 2;
+const unsigned HistoryDatabase::kLatestSchemaRevision  = 3;
 
 /**
  * Database Schema ChangeLog:
  *
  * Schema Version 1.0
+ *   -> Revision 3: deprecate (flush) table 'recycle_bin'
+ *                  add table 'branches'
+ *                  add column 'branch' to table rags
  *   -> Revision 2: add table 'recycle_bin'
  *   -> Revision 1: add field 'size'
  *
@@ -33,7 +36,8 @@ bool HistoryDatabase::CreateEmptyDatabase() {
   assert(read_write());
 
   return CreateTagsTable() &&
-         CreateRecycleBinTable();
+         CreateRecycleBinTable() &&
+         CreateBranchesTable();
 }
 
 
@@ -51,6 +55,14 @@ bool HistoryDatabase::CreateRecycleBinTable() {
   return sqlite::Sql(sqlite_db(),
     "CREATE TABLE recycle_bin (hash TEXT, flags INTEGER, "
     "  CONSTRAINT pk_hash PRIMARY KEY (hash))").Execute();
+}
+
+
+bool HistoryDatabase::CreateBranchesTable() {
+  assert(read_write());
+  return sqlite::Sql(sqlite_db(),
+    "CREATE TABLE branches (branch TEXT, parent TEXT, "
+    "  CONSTRAINT pk_branch PRIMARY KEY (branch))").Execute();
 }
 
 
@@ -85,7 +97,8 @@ bool HistoryDatabase::LiveSchemaUpgradeIfNecessary() {
            kLatestSchema, kLatestSchemaRevision);
 
   const bool success = UpgradeSchemaRevision_10_1() &&
-                       UpgradeSchemaRevision_10_2();
+                       UpgradeSchemaRevision_10_2() &&
+                       UpgradeSchemaRevision_10_3();
 
   return success && StoreSchemaRevision();
 }
@@ -118,6 +131,40 @@ bool HistoryDatabase::UpgradeSchemaRevision_10_2() {
   }
 
   set_schema_revision(2);
+  return true;
+}
+
+
+bool HistoryDatabase::UpgradeSchemaRevision_10_3() {
+  if (schema_revision() > 2) {
+    return true;
+  }
+
+  if (!CreateBranchesTable()) {
+    LogCvmfs(kLogHistory, kLogStderr, "failed to create branches table");
+    return false;
+  }
+
+  sqlite::Sql sql_upgrade(sqlite_db(), "ALTER TABLE tags ADD branch TEXT;");
+  if (!sql_upgrade.Execute()) {
+    LogCvmfs(kLogHistory, kLogStderr, "failed to upgrade tags table");
+    return false;
+  }
+
+  sqlite::Sql sql_fill(sqlite_db(), "UPDATE tags SET branch = '';");
+  if (!sql_fill.Execute()) {
+    LogCvmfs(kLogHistory, kLogStderr, "failed to set branch default value");
+    return false;
+  }
+
+  // We keep the table in the schema for backwards compatibility
+  sqlite::Sql sql_flush(sqlite_db(), "DELETE FROM recycle_bin; VACUUM;");
+  if (!sql_flush.Execute()) {
+    LogCvmfs(kLogHistory, kLogStderr, "failed to flush recycle bin table");
+    return false;
+  }
+
+  set_schema_revision(3);
   return true;
 }
 
@@ -296,25 +343,6 @@ bool SqlRecycleBin::CheckSchema(const HistoryDatabase *database) const {
 //------------------------------------------------------------------------------
 
 
-SqlRecycleBinInsert::SqlRecycleBinInsert(const HistoryDatabase *database) {
-  assert(CheckSchema(database));
-  DeferredInit(database->sqlite_db(),
-               "INSERT OR IGNORE INTO recycle_bin (hash, flags) "
-               "VALUES (:hash, :flags)");
-}
-
-
-bool SqlRecycleBinInsert::BindTag(const History::Tag &condemned_tag) {
-  const unsigned int flags = SqlRecycleBin::kFlagCatalog;
-  return
-    BindTextTransient(1, condemned_tag.root_hash.ToString()) &&
-    BindInt64(2, flags);
-}
-
-
-//------------------------------------------------------------------------------
-
-
 SqlRecycleBinList::SqlRecycleBinList(const HistoryDatabase *database) {
   assert(CheckSchema(database));
   DeferredInit(database->sqlite_db(), "SELECT hash, flags FROM recycle_bin;");
@@ -338,23 +366,6 @@ shash::Any SqlRecycleBinList::RetrieveHash() {
 SqlRecycleBinFlush::SqlRecycleBinFlush(const HistoryDatabase *database) {
   assert(CheckSchema(database));
   DeferredInit(database->sqlite_db(), "DELETE FROM recycle_bin;");
-}
-
-
-//------------------------------------------------------------------------------
-
-
-SqlRecycleBinRollback::SqlRecycleBinRollback(const HistoryDatabase *database) {
-  assert(CheckSchema(database));
-  const bool success = Init(database->sqlite_db(),
-                            "INSERT OR IGNORE INTO recycle_bin (hash, flags) "
-                            "SELECT hash, :flags "
-                            "FROM tags WHERE " + rollback_condition + ";");
-  assert(success);
-}
-
-bool SqlRecycleBinRollback::BindFlags() {
-  return BindInt64(1, SqlRecycleBin::kFlagCatalog);
 }
 
 

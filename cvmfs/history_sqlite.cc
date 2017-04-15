@@ -118,9 +118,7 @@ void SqliteHistory::PrepareQueries() {
     insert_tag_         = new SqlInsertTag          (database_.weak_ref());
     remove_tag_         = new SqlRemoveTag          (database_.weak_ref());
     rollback_tag_       = new SqlRollbackTag        (database_.weak_ref());
-    recycle_insert_     = new SqlRecycleBinInsert   (database_.weak_ref());
     recycle_empty_      = new SqlRecycleBinFlush    (database_.weak_ref());
-    recycle_rollback_   = new SqlRecycleBinRollback (database_.weak_ref());
   }
 }
 
@@ -186,8 +184,7 @@ bool SqliteHistory::Remove(const std::string &name) {
     return true;
   }
 
-  return KeepHashReference(condemned_tag) &&
-         remove_tag_->BindName(name)      &&
+  return remove_tag_->BindName(name)      &&
          remove_tag_->Execute()           &&
          remove_tag_->Reset();
 }
@@ -254,16 +251,6 @@ bool SqliteHistory::RunListing(std::vector<Tag> *list, SqlListingT *sql) const {
 }
 
 
-bool SqliteHistory::KeepHashReference(const Tag &tag) {
-  assert(database_);
-  assert(recycle_insert_.IsValid());
-
-  return recycle_insert_->BindTag(tag) &&
-         recycle_insert_->Execute()    &&
-         recycle_insert_->Reset();
-}
-
-
 bool SqliteHistory::ListRecycleBin(std::vector<shash::Any> *hashes) const {
   assert(database_);
 
@@ -293,7 +280,6 @@ bool SqliteHistory::EmptyRecycleBin() {
 bool SqliteHistory::Rollback(const Tag &updated_target_tag) {
   assert(database_);
   assert(IsWritable());
-  assert(recycle_rollback_.IsValid());
   assert(rollback_tag_.IsValid());
 
   Tag old_target_tag;
@@ -313,16 +299,6 @@ bool SqliteHistory::Rollback(const Tag &updated_target_tag) {
   // sanity checks
   assert(old_target_tag.channel     == updated_target_tag.channel);
   assert(old_target_tag.description == updated_target_tag.description);
-
-  // insert the hashes pointed to by the tags to be deleted into the recycle bin
-  success = recycle_rollback_->BindTargetTag(old_target_tag) &&
-            recycle_rollback_->BindFlags()                   &&
-            recycle_rollback_->Execute()                     &&
-            recycle_rollback_->Reset();
-  if (!success) {
-    LogCvmfs(kLogHistory, kLogDebug, "failed to update the recycle bin");
-    return false;
-  }
 
   // rollback the history to the target tag
   // (essentially removing all intermediate tags + the old target tag)

@@ -600,7 +600,6 @@ bool MockHistory::Remove(const std::string &name) {
     return true;
   }
 
-  recycle_bin_.insert(tag.root_hash);
   return tags_.erase(name) == 1;
 }
 

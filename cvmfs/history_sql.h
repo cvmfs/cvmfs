@@ -45,9 +45,11 @@ class HistoryDatabase : public sqlite::Database<HistoryDatabase> {
  private:
   bool CreateTagsTable();
   bool CreateRecycleBinTable();
+  bool CreateBranchesTable();
 
   bool UpgradeSchemaRevision_10_1();
   bool UpgradeSchemaRevision_10_2();
+  bool UpgradeSchemaRevision_10_3();
 };
 
 
@@ -223,13 +225,6 @@ class SqlRecycleBin : public SqlHistory {
 };
 
 
-class SqlRecycleBinInsert : public SqlRecycleBin {
- public:
-  explicit SqlRecycleBinInsert(const HistoryDatabase *database);
-  bool BindTag(const History::Tag &condemned_tag);
-};
-
-
 class SqlRecycleBinList : public SqlRecycleBin {
  public:
   explicit SqlRecycleBinList(const HistoryDatabase *database);
@@ -240,18 +235,6 @@ class SqlRecycleBinList : public SqlRecycleBin {
 class SqlRecycleBinFlush : public SqlRecycleBin {
  public:
   explicit SqlRecycleBinFlush(const HistoryDatabase *database);
-};
-
-
-/**
- * Shadows all hashes that are going to be deleted by the history rollback into
- * the recycle bin.
- * See: SqlRollback::BindTargetTag()
- */
-class SqlRecycleBinRollback : public SqlRollback<SqlRecycleBin, 1> {
- public:
-  explicit SqlRecycleBinRollback(const HistoryDatabase *database);
-  bool BindFlags();
 };
 
 }  // namespace history

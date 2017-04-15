@@ -23,9 +23,11 @@ class T_History : public ::testing::Test {
 
   static const std::string history_v1_r0;
   static const std::string history_v1_r1;
+  static const std::string history_v1_r2;
 
   static const std::string history_v1_r0_path;
   static const std::string history_v1_r1_path;
+  static const std::string history_v1_r2_path;
 
   typedef std::vector<History::Tag>            TagVector;
   typedef std::map<std::string, MockHistory*>  MockHistoryMap;
@@ -216,6 +218,7 @@ class T_History : public ::testing::Test {
   void PrepareLegacyHistoryDBs() const {
     UnpackHistory(history_v1_r0, history_v1_r0_path);
     UnpackHistory(history_v1_r1, history_v1_r1_path);
+    UnpackHistory(history_v1_r2, history_v1_r2_path);
   }
 
   void UnpackHistory(const std::string &base64, const std::string &dest) const {
@@ -318,6 +321,10 @@ const std::string T_History<HistoryT>::history_v1_r1_path =
   string(T_History<HistoryT>::sandbox) + "/history_v1_r1";
 
 template <class HistoryT>
+const std::string T_History<HistoryT>::history_v1_r2_path =
+  string(T_History<HistoryT>::sandbox) + "/history_v1_r2";
+
+template <class HistoryT>
 const std::string T_History<HistoryT>::history_v1_r0 =
   "eJztlb1v00AUwM8+N00QnVBkul0main9cBxBUJeayqoiSgHHAx1QdLEv8Sn+qn2uqJjKH8HM/4SQ"
   "mJnpwgALA3dOkVMkBAsClfvp3tO7p3vn92T7vdHTQ8oImqZ5jBmygAYUBewhBABocFkBNSoXbWmv"
@@ -343,6 +350,22 @@ const std::string T_History<HistoryT>::history_v1_r1 =
   "BvVMx3Isz2IbTeZQ5hGTsapBTcOxTIcQ5jhmbZ0yF2z+KAgzF1zgPCSPSML9WNwY7Q6S/f8Fwfds"
   "KigouHXMga6MH2BqCSrTA5W8/wE+IfgKF9mjoKDgf2QOoHzfO0ojj9I1ytJojfrzKizPcuqzHule"
   "/5UYdxVYmB8qjbWqvP8BzhGcwze4/NdFFBQU/BVKUFbkcQDzsKz8cgao07AwPdT9BBspCA8=";
+
+template <class HistoryT>
+const std::string T_History<HistoryT>::history_v1_r2 =
+  "eJztl79P20AUx8++kAQEaqU0shiQDiEEFpDiOI5jVaqaUpci6K+QIahF1mFfiIXjBNtBBYaWTl36"
+  "B6BuFWP7T7RD924dOvQP6IJUtWPvElCSSgikTqD7yHc+v/g9f5917y5efbriRgRVG0EdR0gFMSAI"
+  "4A5CAIy9AwAkQJfYSTtFAOdCY2RGro/APyAuHAF4H34Wn8Mx4UicPN+Xc8rLgYQ0MSEcmBHe8EhA"
+  "7F3bI9aG6/cM4wsls1g2Ubl4d8VEPT+g6RoOa6hsVsqzqOrhzRAtPSqbi2ZpFiG08PjRarlUpBbU"
+  "3LLadz4pLT0sltbQsrnW8ZVlLR6XliYE4PoOeRFue3TGWLgVNdrXVs/DLKXnInFwGyakdFp4bbWF"
+  "R/TZrMX6pDILmvZxnZxo7JEbkB03dBt+r+LIrRMapt7sGu0a9n3idQ0OCe3AbUbMtRMpdPfI2Xm3"
+  "NfTlzfTI8lQsLt1Kn5U387IU1g/sCwlpfFw4KLYTbQaNJgkil4TdkdiXdNeOprfI7onIHey1Tt9C"
+  "v8Ce+/tkUl9ZVsW4tDh+lsquq6V0x5BOqySbWyO0QfgFwGP4nZ44HM7l4waE6anqduBjz7VJxiaB"
+  "n7FrKRHOXAvtGqlj63QtzQ4LcDTVMSqZ+SHA6v8bgL/hT3ricDhXgRScEf4pfXEQjg52bEmYFthy"
+  "Adn+L8IygO9px+Fw/pvlw7mktC7GkpOxKGj5W2o2W9AcXDA0HeeMqobzzvwGxrqKFZzLzhNNy+m6"
+  "YjvJ/crxzbd2KwiIH6EHZvEerLwCzw5nkzKLpnaizTVZPTdaYY7YBa2KFVXXHUM3NIPGdHS9kC/Y"
+  "+ZyS13RbLRiqoST3KsdTnxxSxS0vQi3fadCPrmCTRCw62/9F+APAX7TjcDhXixSUxf51Y/jDEJQ6"
+  "tuGPbP8X4FdADw6Hc+mZeWPA9cGL/jlg+z+vfw7nqjAH18WLVn/M+As4JUu/";
 
 
 typedef ::testing::Types<history::SqliteHistory, MockHistory> HistoryTypes;
@@ -589,7 +612,7 @@ TYPED_TEST(T_History, RemoveNonExistentTag) {
 }
 
 
-TYPED_TEST(T_History, RemoveMultipleTagsSlow) {
+TYPED_TEST(T_History, RemoveMultipleTags) {
   typedef typename TestFixture::TagVector            TagVector;
   typedef typename TagVector::const_iterator         TagVectorItr;
   typedef typename TagVector::const_reverse_iterator TagVectorRevItr;
@@ -1119,105 +1142,8 @@ TYPED_TEST(T_History, ListTagsAffectedByRollback) {
 }
 
 
-TYPED_TEST(T_History, RecycleBinForRemovedTags) {
-  const std::string hp = TestFixture::GetHistoryFilename();
-  History *history1 = TestFixture::CreateHistory(hp);
-  ASSERT_NE(static_cast<History*>(NULL), history1);
-  EXPECT_EQ(TestFixture::fqrn, history1->fqrn());
-
-  ASSERT_TRUE(history1->BeginTransaction());
-  History::Tag dummy_foo;
-  dummy_foo.name      = "foo";
-  dummy_foo.root_hash =
-    shash::MkFromHexPtr(
-      shash::HexPtr("5207a527a4fee2d655c67415aa1979f1d2753f96"),
-      shash::kSuffixCatalog);
-  dummy_foo.revision  = 1;
-  dummy_foo.channel   = History::kChannelTest;
-  ASSERT_TRUE(history1->Insert(dummy_foo));
-
-  History::Tag dummy_bar;
-  dummy_bar.name      = "bar";
-  dummy_bar.root_hash =
-    shash::MkFromHexPtr(
-      shash::HexPtr("19552496e1e5c63aefaf5d4e05a8c248a1d82663"),
-      shash::kSuffixCatalog);
-  dummy_bar.revision  = 2;
-  dummy_bar.channel   = History::kChannelProd;
-  ASSERT_TRUE(history1->Insert(dummy_bar));
-
-  History::Tag dummy_baz;
-  dummy_baz.name      = "baz";
-  dummy_baz.root_hash =
-    shash::MkFromHexPtr(
-      shash::HexPtr("400b66c2002e89629dd098918677e818e3688011"),
-      shash::kSuffixCatalog);
-  dummy_baz.revision  = 3;
-  dummy_baz.channel   = History::kChannelTest;
-  ASSERT_TRUE(history1->Insert(dummy_baz));
-  EXPECT_TRUE(history1->CommitTransaction());
-
-  EXPECT_EQ(3u, history1->GetNumberOfTags());
-
-  std::vector<shash::Any> hashes;
-  ASSERT_TRUE(history1->ListRecycleBin(&hashes));
-  EXPECT_EQ(0u, hashes.size());
-  hashes.clear();
-
-  TestFixture::CloseHistory(history1);
-
-  History *history2 = TestFixture::OpenHistory(hp);
-  EXPECT_EQ(3u, history2->GetNumberOfTags());
-
-  ASSERT_TRUE(history2->ListRecycleBin(&hashes));
-  EXPECT_EQ(0u, hashes.size());
-  hashes.clear();
-
-  TestFixture::CloseHistory(history2);
-
-  History *history3 = TestFixture::OpenWritableHistory(hp);
-
-  ASSERT_TRUE(history3->BeginTransaction());
-
-  EXPECT_TRUE(history3->Remove("unobtainium"));
-  EXPECT_EQ(3u, history3->GetNumberOfTags());
-  ASSERT_TRUE(history3->ListRecycleBin(&hashes));
-  EXPECT_EQ(0u, hashes.size());
-  hashes.clear();
-
-  EXPECT_TRUE(history3->Remove("bar"));
-  EXPECT_EQ(2u, history3->GetNumberOfTags());
-  ASSERT_TRUE(history3->ListRecycleBin(&hashes));
-  EXPECT_EQ(1u, hashes.size());
-  EXPECT_EQ(hashes[0], dummy_bar.root_hash);
-  hashes.clear();
-
-  EXPECT_TRUE(history3->Remove("not_here"));
-  EXPECT_EQ(2u, history3->GetNumberOfTags());
-  ASSERT_TRUE(history3->ListRecycleBin(&hashes));
-  EXPECT_EQ(1u, hashes.size());
-  hashes.clear();
-
-  EXPECT_TRUE(history3->Remove("foo"));
-  EXPECT_EQ(1u, history3->GetNumberOfTags());
-  ASSERT_TRUE(history3->ListRecycleBin(&hashes));
-  EXPECT_EQ(2u, hashes.size());
-  if (hashes[0] == dummy_bar.root_hash) {
-    EXPECT_EQ(hashes[0], dummy_bar.root_hash);
-    EXPECT_EQ(hashes[1], dummy_foo.root_hash);
-  } else {
-    EXPECT_EQ(hashes[0], dummy_foo.root_hash);
-    EXPECT_EQ(hashes[1], dummy_bar.root_hash);
-  }
-  hashes.clear();
-
-  ASSERT_TRUE(history3->CommitTransaction());
-
-  TestFixture::CloseHistory(history3);
-}
-
-
 TYPED_TEST(T_History, EmptyRecycleBin) {
+  // Test that recycle bin is not used anymore
   const std::string hp = TestFixture::GetHistoryFilename();
   History *history1 = TestFixture::CreateHistory(hp);
   ASSERT_NE(static_cast<History*>(NULL), history1);
@@ -1233,80 +1159,18 @@ TYPED_TEST(T_History, EmptyRecycleBin) {
   dummy_foo.revision  = 1;
   dummy_foo.channel   = History::kChannelTest;
   ASSERT_TRUE(history1->Insert(dummy_foo));
-
-  History::Tag dummy_bar;
-  dummy_bar.name      = "bar";
-  dummy_bar.root_hash =
-    shash::MkFromHexPtr(
-      shash::HexPtr("19552496e1e5c63aefaf5d4e05a8c248a1d82663"),
-      shash::kSuffixCatalog);
-  dummy_bar.revision  = 2;
-  dummy_bar.channel   = History::kChannelTest;
-  ASSERT_TRUE(history1->Insert(dummy_bar));
-
-  History::Tag dummy_baz;
-  dummy_baz.name      = "baz";
-  dummy_baz.root_hash =
-    shash::MkFromHexPtr(
-      shash::HexPtr("400b66c2002e89629dd098918677e818e3688011"),
-      shash::kSuffixCatalog);
-  dummy_baz.revision  = 3;
-  dummy_baz.channel   = History::kChannelTest;
-  ASSERT_TRUE(history1->Insert(dummy_baz));
-  EXPECT_TRUE(history1->CommitTransaction());
-
-  EXPECT_EQ(3u, history1->GetNumberOfTags());
+  EXPECT_EQ(1u, history1->GetNumberOfTags());
 
   std::vector<shash::Any> hashes;
   ASSERT_TRUE(history1->ListRecycleBin(&hashes));
   EXPECT_EQ(0u, hashes.size());
-  hashes.clear();
+
+  EXPECT_TRUE(history1->EmptyRecycleBin());
+  EXPECT_EQ(1u, history1->GetNumberOfTags());
+  ASSERT_TRUE(history1->ListRecycleBin(&hashes));
+  EXPECT_EQ(0u, hashes.size());
 
   TestFixture::CloseHistory(history1);
-
-  History *history2 = TestFixture::OpenWritableHistory(hp);
-  ASSERT_NE(static_cast<History*>(NULL), history2);
-  EXPECT_EQ(3u, history2->GetNumberOfTags());
-
-  ASSERT_TRUE(history2->ListRecycleBin(&hashes));
-  EXPECT_EQ(0u, hashes.size());
-  hashes.clear();
-
-  ASSERT_TRUE(history2->BeginTransaction());
-
-  EXPECT_TRUE(history2->Remove("foo"));
-  EXPECT_TRUE(history2->Remove("bar"));
-  EXPECT_TRUE(history2->Remove("unobtainium"));
-
-  EXPECT_EQ(1u, history2->GetNumberOfTags());
-  ASSERT_TRUE(history2->ListRecycleBin(&hashes));
-  EXPECT_EQ(2u, hashes.size());
-  hashes.clear();
-
-  EXPECT_TRUE(history2->EmptyRecycleBin());
-  EXPECT_EQ(1u, history2->GetNumberOfTags());
-  ASSERT_TRUE(history2->ListRecycleBin(&hashes));
-  EXPECT_EQ(0u, hashes.size());
-  hashes.clear();
-
-  ASSERT_TRUE(history2->CommitTransaction());
-
-  TestFixture::CloseHistory(history2);
-
-  History *history3 = TestFixture::OpenWritableHistory(hp);
-  ASSERT_NE(static_cast<History*>(NULL), history3);
-
-  ASSERT_TRUE(history3->ListRecycleBin(&hashes));
-  EXPECT_EQ(0u, hashes.size());
-  hashes.clear();
-
-  EXPECT_TRUE(history3->EmptyRecycleBin());
-  EXPECT_EQ(1u, history3->GetNumberOfTags());
-  ASSERT_TRUE(history3->ListRecycleBin(&hashes));
-  EXPECT_EQ(0u, hashes.size());
-  hashes.clear();
-
-  TestFixture::CloseHistory(history3);
 }
 
 
@@ -1353,7 +1217,6 @@ TYPED_TEST(T_History, RollbackAndRecycleBin) {
   std::vector<shash::Any> hashes;
   ASSERT_TRUE(history1->ListRecycleBin(&hashes));
   EXPECT_EQ(0u, hashes.size());
-  hashes.clear();
 
   TestFixture::CloseHistory(history1);
 
@@ -1376,108 +1239,8 @@ TYPED_TEST(T_History, RollbackAndRecycleBin) {
   EXPECT_TRUE(history2->Rollback(rollback_target));
 
   ASSERT_TRUE(history2->ListRecycleBin(&hashes));
-  EXPECT_EQ(3u, hashes.size());
-
-  std::vector<shash::Any>::const_iterator i    = hashes.begin();
-  std::vector<shash::Any>::const_iterator iend = hashes.end();
-  for (; i != iend; ++i) {
-    shash::Any found_hash;
-    if (*i == dummy_foo.root_hash) found_hash = dummy_foo.root_hash;
-    if (*i == dummy_bar.root_hash) found_hash = dummy_bar.root_hash;
-    if (*i == dummy_baz.root_hash) found_hash = dummy_baz.root_hash;
-    EXPECT_FALSE(found_hash.IsNull());
-    EXPECT_EQ(shash::kSuffixCatalog, found_hash.suffix);
-  }
-  hashes.clear();
-
-  ASSERT_TRUE(history2->CommitTransaction());
-
-  TestFixture::CloseHistory(history2);
-}
-
-
-TYPED_TEST(T_History, RecycleBinWithHeterogeneousHashes) {
-  const std::string hp = TestFixture::GetHistoryFilename();
-  History *history1 = TestFixture::CreateHistory(hp);
-  ASSERT_NE(static_cast<History*>(NULL), history1);
-  EXPECT_EQ(TestFixture::fqrn, history1->fqrn());
-
-  ASSERT_TRUE(history1->BeginTransaction());
-  History::Tag dummy_foo;
-  shash::Any root_hash_sha(shash::kSha1); root_hash_sha.Randomize(1337);
-  dummy_foo.name      = "foo";
-  dummy_foo.root_hash = root_hash_sha;
-  dummy_foo.revision  = 1;
-  dummy_foo.channel   = History::kChannelTest;
-  ASSERT_TRUE(history1->Insert(dummy_foo));
-
-  History::Tag dummy_bar;
-  shash::Any root_hash_rmd(shash::kRmd160); root_hash_rmd.Randomize(42);
-  dummy_bar.name      = "bar";
-  dummy_bar.root_hash = root_hash_rmd;
-  dummy_bar.revision  = 2;
-  dummy_bar.channel   = History::kChannelTest;
-  ASSERT_TRUE(history1->Insert(dummy_bar));
-
-  History::Tag dummy_baz;
-  shash::Any root_hash_suf(shash::kSha1);
-  root_hash_suf.Randomize(9);
-  root_hash_suf.suffix = shash::kSuffixCatalog;
-  dummy_baz.name = "baz";
-  dummy_baz.root_hash = root_hash_suf;
-  dummy_baz.revision = 3;
-  dummy_baz.channel = History::kChannelTest;
-  ASSERT_TRUE(history1->Insert(dummy_baz));
-  EXPECT_TRUE(history1->CommitTransaction());
-
-  EXPECT_EQ(3u, history1->GetNumberOfTags());
-
-  std::vector<shash::Any> hashes;
-  ASSERT_TRUE(history1->ListRecycleBin(&hashes));
+  // Recycle bin is not used anymore
   EXPECT_EQ(0u, hashes.size());
-  hashes.clear();
-
-  TestFixture::CloseHistory(history1);
-
-  History *history2 = TestFixture::OpenWritableHistory(hp);
-  EXPECT_EQ(3u, history2->GetNumberOfTags());
-
-  ASSERT_TRUE(history2->ListRecycleBin(&hashes));
-  EXPECT_EQ(0u, hashes.size());
-  hashes.clear();
-
-  ASSERT_TRUE(history2->BeginTransaction());
-
-  EXPECT_TRUE(history2->Remove("foo"));
-  EXPECT_TRUE(history2->Remove("unobtainium"));
-
-  EXPECT_EQ(2u, history2->GetNumberOfTags());
-  ASSERT_TRUE(history2->ListRecycleBin(&hashes));
-  EXPECT_EQ(1u, hashes.size());
-  EXPECT_EQ(dummy_foo.root_hash, hashes[0]);
-  hashes.clear();
-
-  ASSERT_TRUE(history2->EmptyRecycleBin());
-
-  EXPECT_TRUE(history2->Remove("bar"));
-  EXPECT_TRUE(history2->Remove("unobtainium"));
-
-  EXPECT_EQ(1u, history2->GetNumberOfTags());
-  ASSERT_TRUE(history2->ListRecycleBin(&hashes));
-  EXPECT_EQ(1u, hashes.size());
-  EXPECT_EQ(dummy_bar.root_hash, hashes[0]);
-  hashes.clear();
-
-  ASSERT_TRUE(history2->EmptyRecycleBin());
-
-  EXPECT_TRUE(history2->Remove("baz"));
-  EXPECT_TRUE(history2->Remove("unobtainium"));
-
-  EXPECT_EQ(0u, history2->GetNumberOfTags());
-  ASSERT_TRUE(history2->ListRecycleBin(&hashes));
-  EXPECT_EQ(1u, hashes.size());
-  EXPECT_EQ(dummy_baz.root_hash, hashes[0]);
-  hashes.clear();
 
   ASSERT_TRUE(history2->CommitTransaction());
 
@@ -1554,7 +1317,45 @@ TYPED_TEST(T_History, ReadLegacyVersion1Revision1) {
 }
 
 
-TYPED_TEST(T_History, UpgradeAndWriteLegacyVersion1Revision0Slow) {
+TYPED_TEST(T_History, ReadLegacyVersion1Revision2) {
+  if (TestFixture::IsMocked()) {
+    // this is only valid for the production code...
+    // the mocked history does not deal with legacy formats
+    return;
+  }
+
+  History *history = TestFixture::OpenHistory(TestFixture::history_v1_r2_path);
+  ASSERT_NE(static_cast<History*>(NULL), history);
+
+  EXPECT_EQ("alice.cern.ch", history->fqrn());
+  EXPECT_TRUE(history->Exists("trunk"));
+  EXPECT_TRUE(history->Exists("trunk-previous"));
+
+  History::Tag trunk_p;
+  ASSERT_TRUE(history->GetByName("trunk-previous", &trunk_p));
+  EXPECT_EQ("trunk-previous",                              trunk_p.name);
+  EXPECT_EQ(h("4ec85fa1377d97959baad77868c641657c389391"), trunk_p.root_hash);
+  EXPECT_EQ(56131584u,                                     trunk_p.size);
+  EXPECT_EQ(2170u,                                         trunk_p.revision);
+  EXPECT_EQ(1492264898,                                    trunk_p.timestamp);
+  EXPECT_EQ(History::kChannelTrunk,                        trunk_p.channel);
+
+  std::vector<History::Tag> tags;
+  ASSERT_TRUE(history->List(&tags));
+  EXPECT_EQ(2u, tags.size());
+  EXPECT_TRUE((tags[0].name == "trunk" && tags[1].name == "trunk-previous") ||
+              (tags[1].name == "trunk" && tags[0].name == "trunk-previous"));
+
+  std::vector<shash::Any> recycled_hashes;
+  EXPECT_TRUE(history->ListRecycleBin(&recycled_hashes));
+  EXPECT_EQ(1u, recycled_hashes.size());
+  EXPECT_EQ(h("4ec85fa1377d97959baad77868c641657c389391"), recycled_hashes[0]);
+
+  TestFixture::CloseHistory(history);
+}
+
+
+TYPED_TEST(T_History, UpgradeAndWriteLegacyVersion1Revision0) {
   if (TestFixture::IsMocked()) {
     // this is only valid for the production code...
     // the mocked history does not deal with legacy formats
@@ -1581,19 +1382,14 @@ TYPED_TEST(T_History, UpgradeAndWriteLegacyVersion1Revision0Slow) {
   EXPECT_EQ(1u, history->GetNumberOfTags());
 
   ASSERT_TRUE(history->ListRecycleBin(&recycled_hashes));
-  EXPECT_EQ(1u, recycled_hashes.size());
-  EXPECT_EQ(dummy.root_hash, recycled_hashes[0]);
-
-  ASSERT_TRUE(history->EmptyRecycleBin());
-
-  ASSERT_TRUE(history->ListRecycleBin(&recycled_hashes));
   EXPECT_EQ(0u, recycled_hashes.size());
+  EXPECT_TRUE(history->EmptyRecycleBin());
 
   TestFixture::CloseHistory(history);
 }
 
 
-TYPED_TEST(T_History, UpgradeAndWriteLegacyVersion1Revision1Slow) {
+TYPED_TEST(T_History, UpgradeAndWriteLegacyVersion1Revision1) {
   if (TestFixture::IsMocked()) {
     // this is only valid for the production code...
     // the mocked history does not deal with legacy formats
@@ -1620,13 +1416,40 @@ TYPED_TEST(T_History, UpgradeAndWriteLegacyVersion1Revision1Slow) {
   EXPECT_EQ(2u, history->GetNumberOfTags());
 
   ASSERT_TRUE(history->ListRecycleBin(&recycled_hashes));
-  EXPECT_EQ(1u, recycled_hashes.size());
-  EXPECT_EQ(dummy.root_hash, recycled_hashes[0]);
-
-  ASSERT_TRUE(history->EmptyRecycleBin());
-
-  ASSERT_TRUE(history->ListRecycleBin(&recycled_hashes));
   EXPECT_EQ(0u, recycled_hashes.size());
+  EXPECT_TRUE(history->EmptyRecycleBin());
+
+  TestFixture::CloseHistory(history);
+}
+
+
+TYPED_TEST(T_History, UpgradeAndWriteLegacyVersion1Revision2) {
+  if (TestFixture::IsMocked()) {
+    // this is only valid for the production code...
+    // the mocked history does not deal with legacy formats
+    return;
+  }
+
+  History *history = TestFixture::OpenWritableHistory(
+                                               TestFixture::history_v1_r2_path);
+  ASSERT_NE(static_cast<History*>(NULL), history);
+
+  const History::Tag dummy = TestFixture::GetDummyTag();
+  ASSERT_TRUE(history->Insert(dummy));
+  EXPECT_EQ(3u, history->GetNumberOfTags());
+
+  History::Tag tag;
+  ASSERT_TRUE(history->GetByName(dummy.name, &tag));
+  TestFixture::CompareTags(dummy, tag);
+
+  ASSERT_TRUE(history->Remove(dummy.name));
+  EXPECT_EQ(2u, history->GetNumberOfTags());
+
+  std::vector<shash::Any> recycled_hashes;
+  ASSERT_TRUE(history->ListRecycleBin(&recycled_hashes));
+  // Flushed by schema migration
+  EXPECT_EQ(0u, recycled_hashes.size());
+  EXPECT_TRUE(history->EmptyRecycleBin());
 
   TestFixture::CloseHistory(history);
 }
