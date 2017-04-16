@@ -49,8 +49,9 @@ class History {
   /**
    * The Tag structure contains information about one specific named snap-
    * shot stored in the history database. Tags can be retrieved from this
-   * history class both by 'name' and by 'date'. Naturally, tags can also
-   * be saved into the History using this struct as a container.
+   * history class both by 'name' and by 'date'. By 'date' branches only look
+   * in the default branch.  Naturally, tags can also be saved into the History
+   * using this struct as a container.
    */
   struct Tag {
     Tag() :
@@ -58,9 +59,9 @@ class History {
 
     Tag(const std::string &n, const shash::Any &h, const uint64_t s,
         const unsigned r, const time_t t, const UpdateChannel c,
-        const std::string &d) :
+        const std::string &d, const std::string &b) :
       name(n), root_hash(h), size(s), revision(r), timestamp(t), channel(c),
-      description(d) {}
+      description(d), branch(b) {}
 
     inline const char* GetChannelName() const {
       switch (channel) {
@@ -73,15 +74,20 @@ class History {
     }
 
     bool operator ==(const Tag &other) const {
-      return this->revision == other.revision;
+      return (this->branch == other.branch) &&
+             (this->revision == other.revision);
     }
 
     bool operator <(const Tag &other) const {
-      return this->revision < other.revision;
+      if (this->timestamp == other.timestamp)
+        return this->revision < other.revision;
+      return this->timestamp < other.timestamp;
     }
 
     bool operator >(const Tag &other) const {
-      return this->revision > other.revision;
+      if (this->timestamp == other.timestamp)
+        return this->revision > other.revision;
+      return this->timestamp > other.timestamp;
     }
 
     std::string    name;
@@ -91,7 +97,12 @@ class History {
     time_t         timestamp;
     UpdateChannel  channel;
     std::string    description;
-  };
+    /**
+     * The default branch is the empty string.
+     */
+    std::string    branch;
+  };  // struct Tag
+
 
  public:
   virtual ~History() { }
@@ -128,12 +139,25 @@ class History {
   virtual bool List(std::vector<Tag> *tags) const                    = 0;
   virtual bool Tips(std::vector<Tag> *channel_tips) const            = 0;
 
+  virtual bool GetBranchHead(const std::string &branch, Tag *tag) const = 0;
+  virtual bool InsertBranch(const std::string &parent,
+                            const std::string &branch) = 0;
+  /**
+   * When removing tags, branches can become abandonded. Remove abandoned
+   * branches and redirect the parent pointer of their child branches.
+   */
+  virtual bool PruneBranches() = 0;
+
+  /**
+   * The recycle bin operations are deprecated, only emptying and listing are
+   * preserved for migration and testing.
+   */
   virtual bool ListRecycleBin(std::vector<shash::Any> *hashes) const = 0;
   virtual bool EmptyRecycleBin()                                     = 0;
 
   /**
    * Rolls back the history to the provided target tag and deletes all tags
-   * of the containing channel in between.
+   * of the containing channel in between.  Works on the default branch only.
    *
    * Note: this assumes that the provided target tag was already updated with
    *       the republished root catalog information.
@@ -158,8 +182,7 @@ class History {
 
   /**
    * Provides a list of all referenced catalog hashes in this History.
-   * The hashes will be ordered by their associated revision number in
-   * acending order.
+   * The hashes will be ordered by their timestamp in acending order.
    *
    * @param hashes  pointer to the result vector to be filled
    */

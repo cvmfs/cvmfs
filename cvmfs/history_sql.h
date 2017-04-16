@@ -113,6 +113,7 @@ class SqlRetrieveTag : public MixinT {
                            MixinT::RetrieveInt64(4));
     result.description = MixinT::RetrieveString(5);
     result.size        = MixinT::RetrieveInt64(6);
+    result.branch      = MixinT::RetrieveString(7);
     return result;
   }
 };

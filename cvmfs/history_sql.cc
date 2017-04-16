@@ -46,7 +46,8 @@ bool HistoryDatabase::CreateTagsTable() {
   return sqlite::Sql(sqlite_db(),
     "CREATE TABLE tags (name TEXT, hash TEXT, revision INTEGER, "
     "  timestamp INTEGER, channel INTEGER, description TEXT, size INTEGER, "
-    "  CONSTRAINT pk_tags PRIMARY KEY (name))").Execute();
+    "  branch TEXT, CONSTRAINT pk_tags PRIMARY KEY (name)); "
+    "CREATE INDEX idx_tags_branch ON tags (branch);").Execute();
 }
 
 
@@ -60,9 +61,19 @@ bool HistoryDatabase::CreateRecycleBinTable() {
 
 bool HistoryDatabase::CreateBranchesTable() {
   assert(read_write());
-  return sqlite::Sql(sqlite_db(),
+
+  sqlite::Sql sql_create(sqlite_db(),
     "CREATE TABLE branches (branch TEXT, parent TEXT, "
-    "  CONSTRAINT pk_branch PRIMARY KEY (branch))").Execute();
+    "  CONSTRAINT pk_branch PRIMARY KEY (branch)); "
+    "CREATE INDEX idx_branches_parent ON branches (parent);");
+  bool retval = sql_create.Execute();
+  if (!retval)
+    return false;
+
+  sqlite::Sql sql_init(sqlite_db(),
+    "INSERT INTO branches (branch, parent) VALUES ('', NULL);");
+  retval = sql_init.Execute();
+  return retval;
 }
 
 
@@ -145,7 +156,9 @@ bool HistoryDatabase::UpgradeSchemaRevision_10_3() {
     return false;
   }
 
-  sqlite::Sql sql_upgrade(sqlite_db(), "ALTER TABLE tags ADD branch TEXT;");
+  sqlite::Sql sql_upgrade(sqlite_db(),
+    "ALTER TABLE tags ADD branch TEXT; "
+    "CREATE INDEX idx_tags_branch ON tags (branch);");
   if (!sql_upgrade.Execute()) {
     LogCvmfs(kLogHistory, kLogStderr, "failed to upgrade tags table");
     return false;
@@ -171,14 +184,18 @@ bool HistoryDatabase::UpgradeSchemaRevision_10_3() {
 
 //------------------------------------------------------------------------------
 
-#define DB_FIELDS_V1R0  "name, hash, revision, timestamp, channel, description"
+#define DB_FIELDS_V1R0  "name, hash, revision, timestamp, channel, " \
+                        "description, 0, ''"
 #define DB_FIELDS_V1R1  "name, hash, revision, timestamp, channel, " \
-                        "description,  size"
+                        "description, size, ''"
+#define DB_FIELDS_V1R3  "name, hash, revision, timestamp, channel, " \
+                        "description, size, branch"
 #define DB_PLACEHOLDERS ":name, :hash, :revision, :timestamp, :channel, " \
-                        ":description, :size"
+                        ":description, :size, :branch"
 #define ROLLBACK_COND   "(revision > :target_rev  OR " \
-                        " name     = :target_name)   " \
-                        "AND channel  = :target_chan "
+                        " name = :target_name) " \
+                        "AND channel = :target_chan " \
+                        "AND branch = ''"
 
 #define MAKE_STATEMENT(STMT_TMPL, REV)       \
 static const std::string REV =               \
@@ -191,7 +208,8 @@ static const std::string REV =               \
 
 #define MAKE_STATEMENTS(STMT_TMPL) \
   MAKE_STATEMENT(STMT_TMPL, V1R0); \
-  MAKE_STATEMENT(STMT_TMPL, V1R1)
+  MAKE_STATEMENT(STMT_TMPL, V1R1); \
+  MAKE_STATEMENT(STMT_TMPL, V1R3)
 
 #define DEFERRED_INIT(DB, REV) \
   DeferredInit((DB)->sqlite_db(), (REV).c_str())
@@ -200,8 +218,10 @@ static const std::string REV =               \
   if ((DB)->IsEqualSchema((DB)->schema_version(), 1.0f) && \
       (DB)->schema_revision() == 0) {                      \
     DEFERRED_INIT((DB), V1R0);                             \
-  } else {                                                 \
+  } else if ((DB)->schema_revision() < 3) {                \
     DEFERRED_INIT((DB), V1R1);                             \
+  } else {                                                 \
+    DEFERRED_INIT((DB), V1R3);                             \
   }
 
 SqlInsertTag::SqlInsertTag(const HistoryDatabase *database) {
@@ -218,7 +238,8 @@ bool SqlInsertTag::BindTag(const History::Tag &tag) {
     BindInt64(4, tag.timestamp) &&
     BindInt64(5, tag.channel) &&
     BindText(6, tag.description) &&
-    BindInt64(7, tag.size);
+    BindInt64(7, tag.size) &&
+    BindText(8, tag.branch);
 }
 
 
@@ -238,7 +259,7 @@ bool SqlRemoveTag::BindName(const std::string &name) {
 
 
 SqlFindTag::SqlFindTag(const HistoryDatabase *database) {
-  MAKE_STATEMENTS("SELECT @DB_FIELDS@ FROM tags WHERE name = :name LIMIT 1;");
+  MAKE_STATEMENTS("SELECT @DB_FIELDS@ FROM tags WHERE name = :name;");
   DEFERRED_INITS(database);
 }
 
@@ -257,7 +278,7 @@ SqlFindTagByDate::SqlFindTagByDate(const HistoryDatabase *database) {
   // and picks the first tag                         |  LIMIT 1
   // that is older than the given timestamp          |  WHICH timestamp <= :ts
   MAKE_STATEMENTS("SELECT @DB_FIELDS@ FROM tags "
-                  "WHERE timestamp <= :timestamp "
+                  "WHERE (branch = '') AND (timestamp <= :timestamp) "
                   "ORDER BY revision DESC LIMIT 1;");
   DEFERRED_INITS(database);
 }
@@ -285,7 +306,8 @@ unsigned SqlCountTags::RetrieveCount() const {
 
 
 SqlListTags::SqlListTags(const HistoryDatabase *database) {
-  MAKE_STATEMENTS("SELECT @DB_FIELDS@ FROM tags ORDER BY revision DESC;");
+  MAKE_STATEMENTS(
+    "SELECT @DB_FIELDS@ FROM tags ORDER BY timestamp, revision DESC;");
   DEFERRED_INITS(database);
 }
 
@@ -296,13 +318,14 @@ SqlListTags::SqlListTags(const HistoryDatabase *database) {
 SqlGetChannelTips::SqlGetChannelTips(const HistoryDatabase *database) {
   MAKE_STATEMENTS("SELECT @DB_FIELDS@, MAX(revision) AS max_rev "
                   "FROM tags "
+                  "WHERE branch = '' "
                   "GROUP BY channel;");
   DEFERRED_INITS(database);
 }
 
 SqlGetHashes::SqlGetHashes(const HistoryDatabase *database) {
   DeferredInit(database->sqlite_db(), "SELECT DISTINCT hash FROM tags "
-                                      "ORDER BY revision ASC");
+                                      "ORDER BY timestamp, revision ASC");
 }
 
 shash::Any SqlGetHashes::RetrieveHash() const {

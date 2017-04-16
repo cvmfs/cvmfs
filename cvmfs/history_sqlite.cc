@@ -251,6 +251,21 @@ bool SqliteHistory::RunListing(std::vector<Tag> *list, SqlListingT *sql) const {
 }
 
 
+bool SqliteHistory::GetBranchHead(const string &branch, Tag *tag) const {
+  return false;
+}
+
+
+bool SqliteHistory::InsertBranch(const string &parent, const string &branch) {
+  return false;
+}
+
+
+bool SqliteHistory::PruneBranches() {
+  return false;
+}
+
+
 bool SqliteHistory::ListRecycleBin(std::vector<shash::Any> *hashes) const {
   assert(database_);
 

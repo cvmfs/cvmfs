@@ -95,6 +95,11 @@ class SqliteHistory : public History {
   bool List(std::vector<Tag> *tags) const;
   bool Tips(std::vector<Tag> *channel_tips) const;
 
+  virtual bool GetBranchHead(const std::string &branch, Tag *tag) const;
+  virtual bool InsertBranch(const std::string &parent,
+                            const std::string &branch);
+  virtual bool PruneBranches();
+
   bool ListRecycleBin(std::vector<shash::Any> *hashes) const;
   bool EmptyRecycleBin();
 

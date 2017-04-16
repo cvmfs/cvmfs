@@ -653,6 +653,18 @@ bool MockHistory::Tips(std::vector<Tag> *channel_tips) const {
   return true;
 }
 
+bool MockHistory::GetBranchHead(const string &branch, Tag *tag) const {
+  return false;
+}
+
+bool MockHistory::InsertBranch(const string &parent, const string &branch) {
+  return false;
+}
+
+bool MockHistory::PruneBranches() {
+  return false;
+}
+
 bool MockHistory::ListRecycleBin(std::vector<shash::Any> *hashes) const {
   hashes->clear();
   hashes->insert(hashes->end(), recycle_bin_.begin(), recycle_bin_.end());
