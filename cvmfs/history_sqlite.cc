@@ -121,6 +121,7 @@ void SqliteHistory::PrepareQueries() {
     rollback_tag_       = new SqlRollbackTag        (database_.weak_ref());
     recycle_empty_      = new SqlRecycleBinFlush    (database_.weak_ref());
     insert_branch_      = new SqlInsertBranch       (database_.weak_ref());
+    find_branch_head_   = new SqlFindBranchHead     (database_.weak_ref());
   }
 }
 
@@ -254,7 +255,19 @@ bool SqliteHistory::RunListing(std::vector<Tag> *list, SqlListingT *sql) const {
 
 
 bool SqliteHistory::GetBranchHead(const string &branch_name, Tag *tag) const {
-  return false;
+  assert(database_);
+  assert(find_branch_head_.IsValid());
+  assert(tag != NULL);
+
+  if (!find_branch_head_->BindBranchName(branch_name) ||
+      !find_branch_head_->FetchRow())
+  {
+    find_branch_head_->Reset();
+    return false;
+  }
+
+  *tag = find_branch_head_->RetrieveTag();
+  return find_branch_head_->Reset();
 }
 
 

@@ -1294,6 +1294,65 @@ TYPED_TEST(T_History, AddBranches) {
 }
 
 
+TYPED_TEST(T_History, InsertBranchedTags) {
+  const std::string hp = TestFixture::GetHistoryFilename();
+  History *history1 = TestFixture::CreateHistory(hp);
+  ASSERT_NE(static_cast<History*>(NULL), history1);
+  EXPECT_TRUE(history1->InsertBranch(History::Branch("br1", "")));
+
+  EXPECT_TRUE(history1->BeginTransaction());
+  History::Tag tag_foo;
+  tag_foo.name = "foo";
+  tag_foo.root_hash =
+    shash::MkFromHexPtr(
+      shash::HexPtr("5207a527a4fee2d655c67415aa1979f1d2753f96"),
+      shash::kSuffixCatalog);
+  tag_foo.revision = 1;
+  tag_foo.channel = History::kChannelTest;
+  EXPECT_TRUE(history1->Insert(tag_foo));
+
+  History::Tag tag_bar;
+  tag_bar.name = "bar";
+  tag_bar.root_hash =
+    shash::MkFromHexPtr(
+      shash::HexPtr("19552496e1e5c63aefaf5d4e05a8c248a1d82663"),
+      shash::kSuffixCatalog);
+  tag_bar.revision = 2;
+  tag_bar.channel = History::kChannelTest;
+  tag_bar.branch = "br1";
+  EXPECT_TRUE(history1->Insert(tag_bar));
+
+  History::Tag tag_invalid;
+  tag_invalid.name = "invalid";
+  tag_invalid.root_hash =
+    shash::MkFromHexPtr(
+      shash::HexPtr("19552496e1e5c63aefaf5d4e05a8c248a1d82663"),
+      shash::kSuffixCatalog);
+  tag_invalid.revision = 2;
+  tag_invalid.channel = History::kChannelTest;
+  tag_invalid.branch = "brX";
+  EXPECT_FALSE(history1->Insert(tag_invalid));
+
+  EXPECT_TRUE(history1->CommitTransaction());
+  TestFixture::CloseHistory(history1);
+
+  History *history2 = TestFixture::OpenWritableHistory(hp);
+  EXPECT_EQ(2u, history2->GetNumberOfTags());
+  History::Tag tag_received;
+  EXPECT_TRUE(history2->GetByName("foo", &tag_received));
+  EXPECT_EQ("", tag_received.branch);
+  EXPECT_TRUE(history2->GetByName("bar", &tag_received));
+  EXPECT_EQ("br1", tag_received.branch);
+
+  EXPECT_TRUE(history2->GetBranchHead("", &tag_received));
+  EXPECT_EQ(1U, tag_received.revision);
+  EXPECT_TRUE(history2->GetBranchHead("br1", &tag_received));
+  EXPECT_EQ(2U, tag_received.revision);
+  EXPECT_FALSE(history2->GetBranchHead("brX", &tag_received));
+  TestFixture::CloseHistory(history2);
+}
+
+
 TYPED_TEST(T_History, ReadLegacyVersion1Revision0) {
   if (TestFixture::IsMocked()) {
     // this is only valid for the production code...

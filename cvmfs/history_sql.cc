@@ -35,6 +35,10 @@ const std::string HistoryDatabase::kFqrnKey = "fqrn";
 bool HistoryDatabase::CreateEmptyDatabase() {
   assert(read_write());
 
+  sqlite::Sql sql_foreign_keys(sqlite_db(), "PRAGMA foreign_keys = ON;");
+  if (!sql_foreign_keys.Execute())
+    return false;
+
   return CreateBranchesTable() &&
          CreateTagsTable() &&
          CreateRecycleBinTable();
@@ -100,6 +104,9 @@ bool HistoryDatabase::LiveSchemaUpgradeIfNecessary() {
   assert(read_write());
   assert(IsEqualSchema(schema_version(), 1.0));
 
+  sqlite::Sql sql_foreign_keys(sqlite_db(), "PRAGMA foreign_keys = ON;");
+  if (!sql_foreign_keys.Execute())
+    return false;
   if (schema_revision() == kLatestSchemaRevision) {
     return true;
   }
@@ -286,6 +293,23 @@ SqlFindTagByDate::SqlFindTagByDate(const HistoryDatabase *database) {
 
 bool SqlFindTagByDate::BindTimestamp(const time_t timestamp) {
   return BindInt64(1, timestamp);
+}
+
+
+//------------------------------------------------------------------------------
+
+
+SqlFindBranchHead::SqlFindBranchHead(const HistoryDatabase *database) {
+  // One of the tags with the highest revision on a given branch
+  // Doesn't work on older database revisions
+  MAKE_STATEMENTS("SELECT @DB_FIELDS@ FROM tags "
+                  "WHERE (branch = :branch) "
+                  "ORDER BY revision DESC LIMIT 1;");
+  DEFERRED_INITS(database);
+}
+
+bool SqlFindBranchHead::BindBranchName(const std::string &branch_name) {
+  return BindText(1, branch_name);
 }
 
 

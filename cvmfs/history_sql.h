@@ -150,6 +150,13 @@ class SqlFindTagByDate : public SqlRetrieveTag<SqlHistory> {
 };
 
 
+class SqlFindBranchHead : public SqlRetrieveTag<SqlHistory> {
+ public:
+  explicit SqlFindBranchHead(const HistoryDatabase *database);
+  bool BindBranchName(const std::string &branch_name);
+};
+
+
 class SqlCountTags : public SqlHistory {
  public:
   explicit SqlCountTags(const HistoryDatabase *database);

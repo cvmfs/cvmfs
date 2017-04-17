@@ -590,6 +590,17 @@ bool MockHistory::Insert(const Tag &tag) {
   if (Exists(tag.name)) {
     return false;
   }
+  bool found_branch = false;
+  for (BranchMap::const_iterator i = branches_.begin();
+       i != branches_.end(); ++i)
+  {
+    if (i->first == tag.branch) {
+      found_branch = true;
+      break;
+    }
+  }
+  if (!found_branch)
+    return false;
 
   tags_[tag.name] = tag;
   return true;
@@ -655,7 +666,18 @@ bool MockHistory::Tips(std::vector<Tag> *channel_tips) const {
 }
 
 bool MockHistory::GetBranchHead(const string &branch_name, Tag *tag) const {
-  return false;
+  std::vector<Tag> all_tags;
+  GetTags(&all_tags);
+  int max_rev = -1;
+  for (unsigned i = 0; i < all_tags.size(); ++i) {
+    if (all_tags[i].branch != branch_name)
+      continue;
+    if (static_cast<int>(all_tags[i].revision) > max_rev) {
+      *tag = all_tags[i];
+      max_rev = all_tags[i].revision;
+    }
+  }
+  return max_rev > 0;
 }
 
 bool MockHistory::InsertBranch(const Branch &branch) {

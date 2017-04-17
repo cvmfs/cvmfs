@@ -170,6 +170,7 @@ class SqliteHistory : public History {
   UniquePtr<SqlListRollbackTags>    list_rollback_tags_;
   UniquePtr<SqlListBranches>        list_branches_;
   UniquePtr<SqlInsertBranch>        insert_branch_;
+  UniquePtr<SqlFindBranchHead>      find_branch_head_;
   UniquePtr<SqlRecycleBinList>      recycle_list_;
   UniquePtr<SqlRecycleBinFlush>     recycle_empty_;
 };
