@@ -665,6 +665,10 @@ bool MockHistory::PruneBranches() {
   return false;
 }
 
+bool MockHistory::ListBranches(vector<Branch> *branches) const {
+  return false;
+}
+
 bool MockHistory::ListRecycleBin(std::vector<shash::Any> *hashes) const {
   hashes->clear();
   hashes->insert(hashes->end(), recycle_bin_.begin(), recycle_bin_.end());

@@ -176,6 +176,13 @@ class SqlGetHashes : public SqlHistory {
 };
 
 
+class SqlListBranches : public SqlHistory {
+  public:
+    explicit SqlListBranches(const HistoryDatabase *database);
+    History::Branch RetrieveBranch() const;
+};
+
+
 /**
  * Mixin to inject the rollback condition definition and the BindTargetTag()
  * method into other subclasses.

@@ -357,6 +357,25 @@ SqlListRollbackTags::SqlListRollbackTags(const HistoryDatabase *database) {
 //------------------------------------------------------------------------------
 
 
+SqlListBranches::SqlListBranches(const HistoryDatabase *database) {
+  if (database->schema_revision() < 3)
+    DeferredInit(database->sqlite_db(), "SELECT '', NULL;");
+  else
+    DeferredInit(database->sqlite_db(), "SELECT branch, parent FROM branches;");
+}
+
+
+History::Branch SqlListBranches::RetrieveBranch() const {
+  std::string branch = RetrieveString(0);
+  std::string parent =
+    (RetrieveType(1) == SQLITE_NULL) ? "" : RetrieveString(1);
+  return History::Branch(branch, parent);
+}
+
+
+//------------------------------------------------------------------------------
+
+
 bool SqlRecycleBin::CheckSchema(const HistoryDatabase *database) const {
   return (database->IsEqualSchema(database->schema_version(), 1.0)) &&
          (database->schema_revision() >= 2);

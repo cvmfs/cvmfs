@@ -99,6 +99,7 @@ class SqliteHistory : public History {
   virtual bool InsertBranch(const std::string &parent,
                             const std::string &branch);
   virtual bool PruneBranches();
+  virtual bool ListBranches(std::vector<Branch> *branches) const;
 
   bool ListRecycleBin(std::vector<shash::Any> *hashes) const;
   bool EmptyRecycleBin();
@@ -168,6 +169,7 @@ class SqliteHistory : public History {
   UniquePtr<SqlGetHashes>           get_hashes_;
   UniquePtr<SqlRollbackTag>         rollback_tag_;
   UniquePtr<SqlListRollbackTags>    list_rollback_tags_;
+  UniquePtr<SqlListBranches>        list_branches_;
   UniquePtr<SqlRecycleBinList>      recycle_list_;
   UniquePtr<SqlRecycleBinFlush>     recycle_empty_;
 };

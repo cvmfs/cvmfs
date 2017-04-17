@@ -46,6 +46,18 @@ class History {
     kChannelProd = 64,
   };
 
+  struct Branch {
+    Branch() { }
+    Branch(const std::string &b, const std::string &p) : branch(b), parent(p) {}
+    std::string branch;
+    std::string parent;
+
+    bool operator ==(const Branch &other) const {
+      return (this->branch == other.branch) &&
+             (this->parent == other.parent);
+    }
+  };
+
   /**
    * The Tag structure contains information about one specific named snap-
    * shot stored in the history database. Tags can be retrieved from this
@@ -147,6 +159,7 @@ class History {
    * branches and redirect the parent pointer of their child branches.
    */
   virtual bool PruneBranches() = 0;
+  virtual bool ListBranches(std::vector<Branch> *branches) const = 0;
 
   /**
    * The recycle bin operations are deprecated, only emptying and listing are

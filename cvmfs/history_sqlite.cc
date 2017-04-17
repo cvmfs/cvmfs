@@ -109,6 +109,7 @@ void SqliteHistory::PrepareQueries() {
   channel_tips_       = new SqlGetChannelTips   (database_.weak_ref());
   get_hashes_         = new SqlGetHashes        (database_.weak_ref());
   list_rollback_tags_ = new SqlListRollbackTags (database_.weak_ref());
+  list_branches_      = new SqlListBranches     (database_.weak_ref());
 
   if (database_->ContainsRecycleBin()) {
     recycle_list_ = new SqlRecycleBinList(database_.weak_ref());
@@ -263,6 +264,15 @@ bool SqliteHistory::InsertBranch(const string &parent, const string &branch) {
 
 bool SqliteHistory::PruneBranches() {
   return false;
+}
+
+
+bool SqliteHistory::ListBranches(vector<Branch> *branches) const {
+  while (list_branches_->FetchRow()) {
+    branches->push_back(list_branches_->RetrieveBranch());
+  }
+
+  return list_branches_->Reset();
 }
 
 

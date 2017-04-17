@@ -1263,7 +1263,7 @@ TYPED_TEST(T_History, ReadLegacyVersion1Revision0) {
   EXPECT_EQ("config-egi.egi.eu", history->fqrn());
   EXPECT_TRUE(history->Exists("trunk"));
 
-  /*History::Tag trunk;
+  History::Tag trunk;
   ASSERT_TRUE(history->GetByName("trunk", &trunk));
   EXPECT_EQ("trunk",                                       trunk.name);
   EXPECT_EQ(h("d13c98b4b48cedacda328eea4a30826333312c17"), trunk.root_hash);
@@ -1278,7 +1278,12 @@ TYPED_TEST(T_History, ReadLegacyVersion1Revision0) {
   EXPECT_EQ(1u, tags.size());
 
   std::vector<shash::Any> recycled_hashes;
-  EXPECT_FALSE(history->ListRecycleBin(&recycled_hashes));*/
+  EXPECT_FALSE(history->ListRecycleBin(&recycled_hashes));
+
+  std::vector<History::Branch> branches;
+  EXPECT_TRUE(history->ListBranches(&branches));
+  EXPECT_EQ(1U, branches.size());
+  EXPECT_EQ(History::Branch("", ""), branches[0]);
 
   TestFixture::CloseHistory(history);
 }
@@ -1316,6 +1321,11 @@ TYPED_TEST(T_History, ReadLegacyVersion1Revision1) {
 
   std::vector<shash::Any> recycled_hashes;
   EXPECT_FALSE(history->ListRecycleBin(&recycled_hashes));
+
+  std::vector<History::Branch> branches;
+  EXPECT_TRUE(history->ListBranches(&branches));
+  EXPECT_EQ(1U, branches.size());
+  EXPECT_EQ(History::Branch("", ""), branches[0]);
 
   TestFixture::CloseHistory(history);
 }
@@ -1355,6 +1365,11 @@ TYPED_TEST(T_History, ReadLegacyVersion1Revision2) {
   EXPECT_TRUE(history->ListRecycleBin(&recycled_hashes));
   EXPECT_EQ(1u, recycled_hashes.size());
   EXPECT_EQ(h("4ec85fa1377d97959baad77868c641657c389391"), recycled_hashes[0]);
+
+  std::vector<History::Branch> branches;
+  EXPECT_TRUE(history->ListBranches(&branches));
+  EXPECT_EQ(1U, branches.size());
+  EXPECT_EQ(History::Branch("", ""), branches[0]);
 
   TestFixture::CloseHistory(history);
 }
@@ -1455,6 +1470,11 @@ TYPED_TEST(T_History, UpgradeAndWriteLegacyVersion1Revision2) {
   // Flushed by schema migration
   EXPECT_EQ(0u, recycled_hashes.size());
   EXPECT_TRUE(history->EmptyRecycleBin());
+
+  std::vector<History::Branch> branches;
+  EXPECT_TRUE(history->ListBranches(&branches));
+  EXPECT_EQ(1U, branches.size());
+  EXPECT_EQ(History::Branch("", ""), branches[0]);
 
   TestFixture::CloseHistory(history);
 }

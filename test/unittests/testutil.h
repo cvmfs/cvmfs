@@ -697,6 +697,7 @@ class MockHistory : public history::History,
   bool GetBranchHead(const std::string &branch, Tag *tag) const;
   bool InsertBranch(const std::string &parent, const std::string &branch);
   bool PruneBranches();
+  bool ListBranches(std::vector<Branch> *branches) const;
 
   bool ListRecycleBin(std::vector<shash::Any> *hashes) const;
   bool EmptyRecycleBin();
