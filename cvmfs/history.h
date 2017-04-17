@@ -56,6 +56,11 @@ class History {
       return (this->branch == other.branch) &&
              (this->parent == other.parent);
     }
+
+    // Used for sorting in unit tests
+    bool operator <(const Branch &other) const {
+      return (this->branch < other.branch);
+    }
   };
 
   /**
@@ -151,9 +156,9 @@ class History {
   virtual bool List(std::vector<Tag> *tags) const                    = 0;
   virtual bool Tips(std::vector<Tag> *channel_tips) const            = 0;
 
-  virtual bool GetBranchHead(const std::string &branch, Tag *tag) const = 0;
-  virtual bool InsertBranch(const std::string &parent,
-                            const std::string &branch) = 0;
+  virtual bool GetBranchHead(const std::string &branch_name, Tag *tag)
+    const = 0;
+  virtual bool InsertBranch(const Branch &branch) = 0;
   /**
    * When removing tags, branches can become abandonded. Remove abandoned
    * branches and redirect the parent pointer of their child branches.

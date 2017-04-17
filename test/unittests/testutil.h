@@ -650,6 +650,7 @@ class MockHistory : public history::History,
                     public MockObjectStorage<MockHistory> {
  public:
   typedef std::map<std::string, history::History::Tag> TagMap;
+  typedef std::map<std::string, std::string>           BranchMap;
   typedef std::set<shash::Any>                         HashSet;
 
   static const std::string rhs;
@@ -694,8 +695,8 @@ class MockHistory : public history::History,
   bool List(std::vector<Tag> *tags) const;
   bool Tips(std::vector<Tag> *channel_tips) const;
 
-  bool GetBranchHead(const std::string &branch, Tag *tag) const;
-  bool InsertBranch(const std::string &parent, const std::string &branch);
+  bool GetBranchHead(const std::string &branch_name, Tag *tag) const;
+  bool InsertBranch(const Branch &branch);
   bool PruneBranches();
   bool ListBranches(std::vector<Branch> *branches) const;
 
@@ -777,6 +778,7 @@ class MockHistory : public history::History,
 
  private:
   TagMap      tags_;
+  BranchMap   branches_;
   HashSet     recycle_bin_;
   bool        writable_;
   shash::Any  previous_revision_;

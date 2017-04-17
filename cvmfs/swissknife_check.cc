@@ -260,32 +260,10 @@ bool CommandCheck::InspectHistory(history::History *history) {
   }
 
   if (used_branches.size() != branches.size()) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "mismatch in the number of branches");
+    LogCvmfs(kLogCvmfs, kLogStderr, "unused, dangling branches stored");
     result = false;
   }
 
-  for (unsigned i = 0; i < branches.size(); ++i) {
-    if (used_branches.find(branches[i].branch) == used_branches.end()) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "abandoned branch %s",
-               branches[i].branch.c_str());
-      result = false;
-    }
-    if (branches[i].branch == "") {
-      if (branches[i].parent != "") {
-        LogCvmfs(kLogCvmfs, kLogStderr,
-                 "invalid predecessor of default branch");
-        result = false;
-      }
-    } else {
-      if ((branches[i].branch == branches[i].parent) ||
-          (used_branches.find(branches[i].parent) == used_branches.end()))
-      {
-        LogCvmfs(kLogCvmfs, kLogStderr, "invalid predecessor of branch %s",
-                 branches[i].branch.c_str());
-        result = false;
-      }
-    }
-  }
   return result;
 }
 

@@ -549,6 +549,7 @@ MockHistory::MockHistory(const bool          writable,
         : writable_(writable)
         , owns_database_file_(false) {
   set_fqrn(fqrn);
+  branches_[""] = "";
   ++MockHistory::instances;
 }
 
@@ -653,12 +654,24 @@ bool MockHistory::Tips(std::vector<Tag> *channel_tips) const {
   return true;
 }
 
-bool MockHistory::GetBranchHead(const string &branch, Tag *tag) const {
+bool MockHistory::GetBranchHead(const string &branch_name, Tag *tag) const {
   return false;
 }
 
-bool MockHistory::InsertBranch(const string &parent, const string &branch) {
-  return false;
+bool MockHistory::InsertBranch(const Branch &branch) {
+  bool found_parent = false;
+  for (BranchMap::const_iterator i = branches_.begin();
+       i != branches_.end(); ++i)
+  {
+    if (i->first == branch.branch)
+      return false;
+    if (i->first == branch.parent)
+      found_parent = true;
+  }
+  if (!found_parent)
+    return false;
+  branches_[branch.branch] = branch.parent;
+  return true;
 }
 
 bool MockHistory::PruneBranches() {
@@ -666,7 +679,12 @@ bool MockHistory::PruneBranches() {
 }
 
 bool MockHistory::ListBranches(vector<Branch> *branches) const {
-  return false;
+  for (BranchMap::const_iterator i = branches_.begin();
+       i != branches_.end(); ++i)
+  {
+    branches->push_back(Branch(i->first, i->second));
+  }
+  return true;
 }
 
 bool MockHistory::ListRecycleBin(std::vector<shash::Any> *hashes) const {

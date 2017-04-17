@@ -183,6 +183,13 @@ class SqlListBranches : public SqlHistory {
 };
 
 
+class SqlInsertBranch : public SqlHistory {
+  public:
+    explicit SqlInsertBranch(const HistoryDatabase *database);
+    bool BindBranch(const History::Branch &branch);
+};
+
+
 /**
  * Mixin to inject the rollback condition definition and the BindTargetTag()
  * method into other subclasses.

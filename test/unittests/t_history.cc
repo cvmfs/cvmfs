@@ -4,6 +4,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <map>
 #include <string>
 
@@ -1245,6 +1246,49 @@ TYPED_TEST(T_History, RollbackAndRecycleBin) {
   EXPECT_EQ(0u, hashes.size());
 
   ASSERT_TRUE(history2->CommitTransaction());
+
+  TestFixture::CloseHistory(history2);
+}
+
+
+TYPED_TEST(T_History, AddBranches) {
+  const std::string hp = TestFixture::GetHistoryFilename();
+  History *history1 = TestFixture::CreateHistory(hp);
+  ASSERT_NE(static_cast<History*>(NULL), history1);
+
+  std::vector<History::Branch> branches;
+  EXPECT_TRUE(history1->ListBranches(&branches));
+  EXPECT_EQ(1U, branches.size());
+  EXPECT_EQ(History::Branch("", ""), branches[0]);
+
+  EXPECT_TRUE(history1->BeginTransaction());
+
+  vector<History::Branch> new_branches;
+  new_branches.push_back(History::Branch("br1", ""));
+  new_branches.push_back(History::Branch("br1_1", "br1"));
+  new_branches.push_back(History::Branch("br1_1_1", "br1_1"));
+  new_branches.push_back(History::Branch("br1_2", "br1"));
+  new_branches.push_back(History::Branch("br2", ""));
+
+  for (unsigned i = 0; i < new_branches.size(); ++i)
+    EXPECT_TRUE(history1->InsertBranch(new_branches[i]));
+
+  EXPECT_FALSE(history1->InsertBranch(History::Branch("br1", "")));
+  EXPECT_FALSE(history1->InsertBranch(History::Branch("brX", "X")));
+
+  EXPECT_TRUE(history1->CommitTransaction());
+  TestFixture::CloseHistory(history1);
+
+  History *history2 = TestFixture::OpenHistory(hp);
+
+  branches.clear();
+  new_branches.push_back(History::Branch("", ""));
+  EXPECT_TRUE(history2->ListBranches(&branches));
+  std::sort(branches.begin(), branches.end());
+  std::sort(new_branches.begin(), new_branches.end());
+  EXPECT_EQ(branches.size(), new_branches.size());
+  for (unsigned i = 0; i < new_branches.size(); ++i)
+    EXPECT_EQ(branches[i], new_branches[i]);
 
   TestFixture::CloseHistory(history2);
 }

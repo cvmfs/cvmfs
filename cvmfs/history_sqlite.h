@@ -95,9 +95,8 @@ class SqliteHistory : public History {
   bool List(std::vector<Tag> *tags) const;
   bool Tips(std::vector<Tag> *channel_tips) const;
 
-  virtual bool GetBranchHead(const std::string &branch, Tag *tag) const;
-  virtual bool InsertBranch(const std::string &parent,
-                            const std::string &branch);
+  virtual bool GetBranchHead(const std::string &branch_name, Tag *tag) const;
+  virtual bool InsertBranch(const Branch &branch);
   virtual bool PruneBranches();
   virtual bool ListBranches(std::vector<Branch> *branches) const;
 
@@ -170,6 +169,7 @@ class SqliteHistory : public History {
   UniquePtr<SqlRollbackTag>         rollback_tag_;
   UniquePtr<SqlListRollbackTags>    list_rollback_tags_;
   UniquePtr<SqlListBranches>        list_branches_;
+  UniquePtr<SqlInsertBranch>        insert_branch_;
   UniquePtr<SqlRecycleBinList>      recycle_list_;
   UniquePtr<SqlRecycleBinFlush>     recycle_empty_;
 };

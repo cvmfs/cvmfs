@@ -35,9 +35,9 @@ const std::string HistoryDatabase::kFqrnKey = "fqrn";
 bool HistoryDatabase::CreateEmptyDatabase() {
   assert(read_write());
 
-  return CreateTagsTable() &&
-         CreateRecycleBinTable() &&
-         CreateBranchesTable();
+  return CreateBranchesTable() &&
+         CreateTagsTable() &&
+         CreateRecycleBinTable();
 }
 
 
@@ -46,8 +46,8 @@ bool HistoryDatabase::CreateTagsTable() {
   return sqlite::Sql(sqlite_db(),
     "CREATE TABLE tags (name TEXT, hash TEXT, revision INTEGER, "
     "  timestamp INTEGER, channel INTEGER, description TEXT, size INTEGER, "
-    "  branch TEXT, CONSTRAINT pk_tags PRIMARY KEY (name)); "
-    "CREATE INDEX idx_tags_branch ON tags (branch);").Execute();
+    "  branch TEXT, CONSTRAINT pk_tags PRIMARY KEY (name), "
+    "  FOREIGN KEY (branch) REFERENCES branches (branch));").Execute();
 }
 
 
@@ -64,8 +64,10 @@ bool HistoryDatabase::CreateBranchesTable() {
 
   sqlite::Sql sql_create(sqlite_db(),
     "CREATE TABLE branches (branch TEXT, parent TEXT, "
-    "  CONSTRAINT pk_branch PRIMARY KEY (branch)); "
-    "CREATE INDEX idx_branches_parent ON branches (parent);");
+    "  CONSTRAINT pk_branch PRIMARY KEY (branch), "
+    "  FOREIGN KEY (parent) REFERENCES branches (branch), "
+    "  CHECK ((branch <> '') OR (parent IS NULL)), "
+    "  CHECK ((branch = '') OR (parent IS NOT NULL)));");
   bool retval = sql_create.Execute();
   if (!retval)
     return false;
@@ -157,8 +159,7 @@ bool HistoryDatabase::UpgradeSchemaRevision_10_3() {
   }
 
   sqlite::Sql sql_upgrade(sqlite_db(),
-    "ALTER TABLE tags ADD branch TEXT; "
-    "CREATE INDEX idx_tags_branch ON tags (branch);");
+    "ALTER TABLE tags ADD branch TEXT REFERENCES branches (branch);");
   if (!sql_upgrade.Execute()) {
     LogCvmfs(kLogHistory, kLogStderr, "failed to upgrade tags table");
     return false;
@@ -370,6 +371,22 @@ History::Branch SqlListBranches::RetrieveBranch() const {
   std::string parent =
     (RetrieveType(1) == SQLITE_NULL) ? "" : RetrieveString(1);
   return History::Branch(branch, parent);
+}
+
+
+//------------------------------------------------------------------------------
+
+
+SqlInsertBranch::SqlInsertBranch(const HistoryDatabase *database) {
+  DeferredInit(database->sqlite_db(),
+    "INSERT INTO branches (branch, parent) VALUES (:branch, :parent);");
+}
+
+
+bool SqlInsertBranch::BindBranch(const History::Branch &branch) {
+  return
+    BindText(1, branch.branch) &&
+    BindText(2, branch.parent);
 }
 
 
