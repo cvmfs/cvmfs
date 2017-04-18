@@ -286,8 +286,9 @@ bool SqliteHistory::PruneBranches() {
   // parent of the abandoned branch.  This has to be repeated until the fix
   // point is reached.  It always works because we never delete the root branch
   sqlite::Sql sql_fix_parent_pointers(database_->sqlite_db(),
-    "INSERT OR REPLACE INTO branches (branch, parent) "
-    "SELECT branches.branch, abandoned_parent FROM branches "
+    "INSERT OR REPLACE INTO branches (branch, parent, initial_revision) "
+    "SELECT branches.branch, abandoned_parent, branches.initial_revision "
+    "  FROM branches "
     "  INNER JOIN (SELECT DISTINCT branches.branch AS abandoned_branch, "
     "              branches.parent AS abandoned_parent FROM branches "
     "              LEFT OUTER JOIN tags ON (branches.branch=tags.branch)"

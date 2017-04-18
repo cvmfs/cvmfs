@@ -184,16 +184,16 @@ class SqlGetHashes : public SqlHistory {
 
 
 class SqlListBranches : public SqlHistory {
-  public:
-    explicit SqlListBranches(const HistoryDatabase *database);
-    History::Branch RetrieveBranch() const;
+ public:
+  explicit SqlListBranches(const HistoryDatabase *database);
+  History::Branch RetrieveBranch() const;
 };
 
 
 class SqlInsertBranch : public SqlHistory {
-  public:
-    explicit SqlInsertBranch(const HistoryDatabase *database);
-    bool BindBranch(const History::Branch &branch);
+ public:
+  explicit SqlInsertBranch(const HistoryDatabase *database);
+  bool BindBranch(const History::Branch &branch);
 };
 
 

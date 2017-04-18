@@ -549,7 +549,7 @@ MockHistory::MockHistory(const bool          writable,
         : writable_(writable)
         , owns_database_file_(false) {
   set_fqrn(fqrn);
-  branches_[""] = "";
+  branches_[""] = History::Branch("", "", 0);
   ++MockHistory::instances;
 }
 
@@ -692,7 +692,7 @@ bool MockHistory::InsertBranch(const Branch &branch) {
   }
   if (!found_parent)
     return false;
-  branches_[branch.branch] = branch.parent;
+  branches_[branch.branch] = branch;
   return true;
 }
 
@@ -704,7 +704,8 @@ bool MockHistory::ListBranches(vector<Branch> *branches) const {
   for (BranchMap::const_iterator i = branches_.begin();
        i != branches_.end(); ++i)
   {
-    branches->push_back(Branch(i->first, i->second));
+    branches->push_back(Branch(
+      i->first, i->second.parent, i->second.initial_revision));
   }
   return true;
 }

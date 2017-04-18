@@ -47,14 +47,17 @@ class History {
   };
 
   struct Branch {
-    Branch() { }
-    Branch(const std::string &b, const std::string &p) : branch(b), parent(p) {}
+    Branch() : initial_revision(0) { }
+    Branch(const std::string &b, const std::string &p, unsigned r)
+      : branch(b), parent(p), initial_revision(r) { }
     std::string branch;
     std::string parent;
+    unsigned initial_revision;
 
     bool operator ==(const Branch &other) const {
       return (this->branch == other.branch) &&
-             (this->parent == other.parent);
+             (this->parent == other.parent) &&
+             (this->initial_revision == other.initial_revision);
     }
 
     // Used for sorting in unit tests

@@ -492,6 +492,7 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
   bool OwnsDatabaseFile() const    { return owns_database_file_;  }
 
   unsigned int GetRevision()     const { return revision_;      }
+  std::string  GetBranch()       const { return "";             }
   uint64_t     GetLastModified() const { return last_modified_; }
 
   shash::Any GetPreviousRevision() const {
@@ -650,8 +651,8 @@ class MockHistory : public history::History,
                     public MockObjectStorage<MockHistory> {
  public:
   typedef std::map<std::string, history::History::Tag> TagMap;
-  typedef std::map<std::string, std::string>           BranchMap;
-  typedef std::set<shash::Any>                         HashSet;
+  typedef std::map<std::string, history::History::Branch> BranchMap;
+  typedef std::set<shash::Any> HashSet;
 
   static const std::string rhs;
   static const shash::Any  root_hash;

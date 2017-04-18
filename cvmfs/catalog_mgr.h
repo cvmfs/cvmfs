@@ -181,6 +181,7 @@ class AbstractCatalogManager : public SingleCopy {
   }
   bool volatile_flag() const { return volatile_flag_; }
   uint64_t GetRevision() const;
+  std::string GetBranch() const;
   uint64_t GetTTL() const;
   bool GetVOMSAuthz(std::string *authz) const;
   int GetNumCatalogs() const;
@@ -274,6 +275,7 @@ class AbstractCatalogManager : public SingleCopy {
   int inode_watermark_status_;  /**< 0: OK, 1: > 32bit */
   uint64_t inode_gauge_;  /**< highest issued inode */
   uint64_t revision_cache_;
+  std::string branch_cache_;
   /**
    * Not protected by a read lock because it can only change when the root
    * catalog is exchanged (during big global lock of the file system).

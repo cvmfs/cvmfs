@@ -67,7 +67,7 @@ bool HistoryDatabase::CreateBranchesTable() {
   assert(read_write());
 
   sqlite::Sql sql_create(sqlite_db(),
-    "CREATE TABLE branches (branch TEXT, parent TEXT, initial_revision INTEGER"
+    "CREATE TABLE branches (branch TEXT, parent TEXT, initial_revision INTEGER,"
     "  CONSTRAINT pk_branch PRIMARY KEY (branch), "
     "  FOREIGN KEY (parent) REFERENCES branches (branch), "
     "  CHECK ((branch <> '') OR (parent IS NULL)), "
@@ -385,9 +385,10 @@ SqlListRollbackTags::SqlListRollbackTags(const HistoryDatabase *database) {
 
 SqlListBranches::SqlListBranches(const HistoryDatabase *database) {
   if (database->schema_revision() < 3)
-    DeferredInit(database->sqlite_db(), "SELECT '', NULL;");
+    DeferredInit(database->sqlite_db(), "SELECT '', NULL, 0;");
   else
-    DeferredInit(database->sqlite_db(), "SELECT branch, parent FROM branches;");
+    DeferredInit(database->sqlite_db(),
+      "SELECT branch, parent, initial_revision FROM branches;");
 }
 
 
@@ -395,7 +396,8 @@ History::Branch SqlListBranches::RetrieveBranch() const {
   std::string branch = RetrieveString(0);
   std::string parent =
     (RetrieveType(1) == SQLITE_NULL) ? "" : RetrieveString(1);
-  return History::Branch(branch, parent);
+  unsigned initial_revision = RetrieveInt64(2);
+  return History::Branch(branch, parent, initial_revision);
 }
 
 
@@ -404,14 +406,16 @@ History::Branch SqlListBranches::RetrieveBranch() const {
 
 SqlInsertBranch::SqlInsertBranch(const HistoryDatabase *database) {
   DeferredInit(database->sqlite_db(),
-    "INSERT INTO branches (branch, parent) VALUES (:branch, :parent);");
+    "INSERT INTO branches (branch, parent, initial_revision) "
+    "VALUES (:branch, :parent, :initial_revision);");
 }
 
 
 bool SqlInsertBranch::BindBranch(const History::Branch &branch) {
   return
     BindText(1, branch.branch) &&
-    BindText(2, branch.parent);
+    BindText(2, branch.parent) &&
+    BindInt64(3, branch.initial_revision);
 }
 
 

@@ -255,6 +255,7 @@ bool CommandCheck::InspectHistory(history::History *history) {
 
   bool result = true;
 
+  map<string, unsigned> initial_revisions;
   sanitizer::BranchSanitizer sanitizer;
   for (unsigned i = 0; i < branches.size(); ++i) {
     if (!sanitizer.IsValid(branches[i].branch)) {
@@ -262,12 +263,26 @@ bool CommandCheck::InspectHistory(history::History *history) {
                branches[i].branch.c_str());
       result = false;
     }
+    initial_revisions[branches[i].branch] = branches[i].initial_revision;
   }
 
   set<string> used_branches;  // all branches referenced in tag db
   // TODO(jblomer): same root hash implies same size and revision
   for (unsigned i = 0; i < tags.size(); ++i) {
     used_branches.insert(tags[i].branch);
+    map<string, unsigned>::const_iterator iter =
+      initial_revisions.find(tags[i].branch);
+    if (iter == initial_revisions.end()) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "invalid branch %s in tag %s",
+               tags[i].branch.c_str(), tags[i].name.c_str());
+      result = false;
+    } else {
+      if (tags[i].revision < iter->second) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "invalid revision %u of tag %s",
+               tags[i].revision, tags[i].name.c_str());
+        result = false;
+      }
+    }
   }
 
   if (used_branches.size() != branches.size()) {

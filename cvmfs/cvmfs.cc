@@ -1314,6 +1314,8 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   } else if (attr == "user.revision") {
     const uint64_t revision = catalog_mgr->GetRevision();
     attribute_value = StringifyInt(revision);
+  } else if (attr == "user.branch") {
+    attribute_value = catalog_mgr->GetBranch();
   } else if (attr == "user.root_hash") {
     attribute_value = catalog_mgr->GetRootHash().ToString();
   } else if (attr == "user.tag") {
@@ -1516,7 +1518,7 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
     "user.host\0user.proxy\0user.uptime\0user.nclg\0user.nopen\0"
     "user.ndownload\0user.timeout\0user.timeout_direct\0user.rx\0user.speed\0"
     "user.fqrn\0user.ndiropen\0user.inode_max\0user.tag\0user.host_list\0"
-    "user.external_host\0user.external_timeout\0user.pubkeys\0";
+    "user.external_host\0user.external_timeout\0user.pubkeys\0user.branch\0";
   string attribute_list;
   if (mount_point_->hide_magic_xattrs()) {
     LogCvmfs(kLogCvmfs, kLogDebug, "Hiding extended attributes");

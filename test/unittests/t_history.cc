@@ -1259,22 +1259,22 @@ TYPED_TEST(T_History, AddBranches) {
   std::vector<History::Branch> branches;
   EXPECT_TRUE(history1->ListBranches(&branches));
   EXPECT_EQ(1U, branches.size());
-  EXPECT_EQ(History::Branch("", ""), branches[0]);
+  EXPECT_EQ(History::Branch("", "", 0), branches[0]);
 
   EXPECT_TRUE(history1->BeginTransaction());
 
   vector<History::Branch> new_branches;
-  new_branches.push_back(History::Branch("br1", ""));
-  new_branches.push_back(History::Branch("br1_1", "br1"));
-  new_branches.push_back(History::Branch("br1_1_1", "br1_1"));
-  new_branches.push_back(History::Branch("br1_2", "br1"));
-  new_branches.push_back(History::Branch("br2", ""));
+  new_branches.push_back(History::Branch("br1", "", 1));
+  new_branches.push_back(History::Branch("br1_1", "br1", 2));
+  new_branches.push_back(History::Branch("br1_1_1", "br1_1", 3));
+  new_branches.push_back(History::Branch("br1_2", "br1", 2));
+  new_branches.push_back(History::Branch("br2", "", 1));
 
   for (unsigned i = 0; i < new_branches.size(); ++i)
     EXPECT_TRUE(history1->InsertBranch(new_branches[i]));
 
-  EXPECT_FALSE(history1->InsertBranch(History::Branch("br1", "")));
-  EXPECT_FALSE(history1->InsertBranch(History::Branch("brX", "X")));
+  EXPECT_FALSE(history1->InsertBranch(History::Branch("br1", "", 1)));
+  EXPECT_FALSE(history1->InsertBranch(History::Branch("brX", "X", 1)));
 
   EXPECT_TRUE(history1->CommitTransaction());
   TestFixture::CloseHistory(history1);
@@ -1282,7 +1282,7 @@ TYPED_TEST(T_History, AddBranches) {
   History *history2 = TestFixture::OpenHistory(hp);
 
   branches.clear();
-  new_branches.push_back(History::Branch("", ""));
+  new_branches.push_back(History::Branch("", "", 0));
   EXPECT_TRUE(history2->ListBranches(&branches));
   std::sort(branches.begin(), branches.end());
   std::sort(new_branches.begin(), new_branches.end());
@@ -1298,7 +1298,7 @@ TYPED_TEST(T_History, InsertBranchedTags) {
   const std::string hp = TestFixture::GetHistoryFilename();
   History *history1 = TestFixture::CreateHistory(hp);
   ASSERT_NE(static_cast<History*>(NULL), history1);
-  EXPECT_TRUE(history1->InsertBranch(History::Branch("br1", "")));
+  EXPECT_TRUE(history1->InsertBranch(History::Branch("br1", "", 2)));
 
   EXPECT_TRUE(history1->BeginTransaction());
   History::Tag tag_foo;
@@ -1362,16 +1362,16 @@ TYPED_TEST(T_History, PruneBranches) {
   History *history1 = TestFixture::CreateHistory(hp);
   ASSERT_NE(static_cast<History*>(NULL), history1);
 
-  EXPECT_TRUE(history1->InsertBranch(History::Branch("br1", "")));
-  EXPECT_TRUE(history1->InsertBranch(History::Branch("br2", "")));
-  EXPECT_TRUE(history1->InsertBranch(History::Branch("br3", "")));
-  EXPECT_TRUE(history1->InsertBranch(History::Branch("br4", "")));
-  EXPECT_TRUE(history1->InsertBranch(History::Branch("br1_1", "br1")));
-  EXPECT_TRUE(history1->InsertBranch(History::Branch("br1_1_1", "br1_1")));
-  EXPECT_TRUE(history1->InsertBranch(History::Branch("br2_1", "br2")));
-  EXPECT_TRUE(history1->InsertBranch(History::Branch("br2_1_1", "br2_1")));
-  EXPECT_TRUE(history1->InsertBranch(History::Branch("br3_1", "br3")));
-  EXPECT_TRUE(history1->InsertBranch(History::Branch("br3_1_1", "br3_1")));
+  EXPECT_TRUE(history1->InsertBranch(History::Branch("br1", "", 1)));
+  EXPECT_TRUE(history1->InsertBranch(History::Branch("br2", "", 2)));
+  EXPECT_TRUE(history1->InsertBranch(History::Branch("br3", "", 1)));
+  EXPECT_TRUE(history1->InsertBranch(History::Branch("br4", "", 1)));
+  EXPECT_TRUE(history1->InsertBranch(History::Branch("br1_1", "br1", 2)));
+  EXPECT_TRUE(history1->InsertBranch(History::Branch("br1_1_1", "br1_1", 3)));
+  EXPECT_TRUE(history1->InsertBranch(History::Branch("br2_1", "br2", 3)));
+  EXPECT_TRUE(history1->InsertBranch(History::Branch("br2_1_1", "br2_1", 4)));
+  EXPECT_TRUE(history1->InsertBranch(History::Branch("br3_1", "br3", 2)));
+  EXPECT_TRUE(history1->InsertBranch(History::Branch("br3_1_1", "br3_1", 3)));
 
   EXPECT_TRUE(history1->BeginTransaction());
   History::Tag tag_foo;
@@ -1424,10 +1424,10 @@ TYPED_TEST(T_History, PruneBranches) {
   EXPECT_TRUE(history1->ListBranches(&branches));
   std::sort(branches.begin(), branches.end());
   EXPECT_EQ(4U, branches.size());
-  EXPECT_EQ(History::Branch("", ""), branches[0]);
-  EXPECT_EQ(History::Branch("br2", ""), branches[1]);
-  EXPECT_EQ(History::Branch("br3", ""), branches[2]);
-  EXPECT_EQ(History::Branch("br3_1_1", "br3"), branches[3]);
+  EXPECT_EQ(History::Branch("", "", 0), branches[0]);
+  EXPECT_EQ(History::Branch("br2", "", 2), branches[1]);
+  EXPECT_EQ(History::Branch("br3", "", 1), branches[2]);
+  EXPECT_EQ(History::Branch("br3_1_1", "br3", 3), branches[3]);
   TestFixture::CloseHistory(history1);
 }
 
@@ -1465,7 +1465,7 @@ TYPED_TEST(T_History, ReadLegacyVersion1Revision0) {
   std::vector<History::Branch> branches;
   EXPECT_TRUE(history->ListBranches(&branches));
   EXPECT_EQ(1U, branches.size());
-  EXPECT_EQ(History::Branch("", ""), branches[0]);
+  EXPECT_EQ(History::Branch("", "", 0), branches[0]);
 
   TestFixture::CloseHistory(history);
 }
@@ -1507,7 +1507,7 @@ TYPED_TEST(T_History, ReadLegacyVersion1Revision1) {
   std::vector<History::Branch> branches;
   EXPECT_TRUE(history->ListBranches(&branches));
   EXPECT_EQ(1U, branches.size());
-  EXPECT_EQ(History::Branch("", ""), branches[0]);
+  EXPECT_EQ(History::Branch("", "", 0), branches[0]);
 
   TestFixture::CloseHistory(history);
 }
@@ -1551,7 +1551,7 @@ TYPED_TEST(T_History, ReadLegacyVersion1Revision2) {
   std::vector<History::Branch> branches;
   EXPECT_TRUE(history->ListBranches(&branches));
   EXPECT_EQ(1U, branches.size());
-  EXPECT_EQ(History::Branch("", ""), branches[0]);
+  EXPECT_EQ(History::Branch("", "", 0), branches[0]);
 
   TestFixture::CloseHistory(history);
 }
@@ -1656,7 +1656,7 @@ TYPED_TEST(T_History, UpgradeAndWriteLegacyVersion1Revision2) {
   std::vector<History::Branch> branches;
   EXPECT_TRUE(history->ListBranches(&branches));
   EXPECT_EQ(1U, branches.size());
-  EXPECT_EQ(History::Branch("", ""), branches[0]);
+  EXPECT_EQ(History::Branch("", "", 0), branches[0]);
 
   TestFixture::CloseHistory(history);
 }
