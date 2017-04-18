@@ -574,6 +574,10 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     params.manual_revision = String2Uint64(*args.find('v')->second);
   }
 
+  if (args.find('B') != args.end()) {
+    params.branch_name = String2Uint64(*args.find('B')->second);
+  }
+
   if (args.find('q') != args.end()) {
     params.max_concurrent_write_jobs = String2Uint64(*args.find('q')->second);
   }

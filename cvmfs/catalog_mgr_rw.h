@@ -130,6 +130,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
   bool SetVOMSAuthz(const std::string &voms_authz);
   bool Commit(const bool           stop_for_tweaks,
               const uint64_t       manual_revision,
+              const std::string   &branch_name,
               manifest::Manifest  *manifest);
 
   void Balance() {

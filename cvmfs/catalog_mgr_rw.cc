@@ -128,7 +128,8 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
         !new_clg_db->InsertInitialValues(root_path,
                                          volatile_content,
                                          voms_authz,
-                                         root_entry))
+                                         root_entry) ||
+        !new_clg_db->SetProperty("branch", ""))
     {
       LogCvmfs(kLogCatalog, kLogStderr, "creation of catalog '%s' failed",
                file_path.c_str());
@@ -697,10 +698,13 @@ bool WritableCatalogManager::SetVOMSAuthz(const std::string &voms_authz) {
 
 bool WritableCatalogManager::Commit(const bool           stop_for_tweaks,
                                     const uint64_t       manual_revision,
+                                    const std::string   &branch_name,
                                     manifest::Manifest  *manifest) {
   WritableCatalog *root_catalog =
     reinterpret_cast<WritableCatalog *>(GetRootCatalog());
   root_catalog->SetDirty();
+
+  root_catalog->SetBranch(branch_name);
 
   // set root catalog revision to manually provided number if available
   if (manual_revision > 0) {
