@@ -709,6 +709,7 @@ class MockHistory : public history::History,
 
   bool GetHashes(std::vector<shash::Any> *hashes) const;
 
+  bool Vacuum() { return true; }
   void TakeDatabaseFileOwnership() { owns_database_file_ = true;  }
   void DropDatabaseFileOwnership() { owns_database_file_ = false; }
   bool OwnsDatabaseFile() const    { return owns_database_file_;  }

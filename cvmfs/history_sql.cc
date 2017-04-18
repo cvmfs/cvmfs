@@ -67,7 +67,7 @@ bool HistoryDatabase::CreateBranchesTable() {
   assert(read_write());
 
   sqlite::Sql sql_create(sqlite_db(),
-    "CREATE TABLE branches (branch TEXT, parent TEXT, "
+    "CREATE TABLE branches (branch TEXT, parent TEXT, initial_revision INTEGER"
     "  CONSTRAINT pk_branch PRIMARY KEY (branch), "
     "  FOREIGN KEY (parent) REFERENCES branches (branch), "
     "  CHECK ((branch <> '') OR (parent IS NULL)), "
@@ -77,7 +77,8 @@ bool HistoryDatabase::CreateBranchesTable() {
     return false;
 
   sqlite::Sql sql_init(sqlite_db(),
-    "INSERT INTO branches (branch, parent) VALUES ('', NULL);");
+    "INSERT INTO branches (branch, parent, initial_revision) "
+    "VALUES ('', NULL, 0);");
   retval = sql_init.Execute();
   return retval;
 }
@@ -332,7 +333,7 @@ unsigned SqlCountTags::RetrieveCount() const {
 
 SqlListTags::SqlListTags(const HistoryDatabase *database) {
   MAKE_STATEMENTS(
-    "SELECT @DB_FIELDS@ FROM tags ORDER BY timestamp, revision DESC;");
+    "SELECT @DB_FIELDS@ FROM tags ORDER BY timestamp DESC, revision DESC;");
   DEFERRED_INITS(database);
 }
 

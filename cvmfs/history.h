@@ -211,6 +211,8 @@ class History {
   virtual void DropDatabaseFileOwnership() = 0;
   virtual bool OwnsDatabaseFile() const    = 0;
 
+  virtual bool Vacuum() = 0;
+
   const std::string& fqrn() const { return fqrn_; }
 
  protected:

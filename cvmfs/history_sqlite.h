@@ -78,6 +78,8 @@ class SqliteHistory : public History {
    */
   bool CommitTransaction() const;
 
+  virtual bool Vacuum() { return database_->Vacuum(); }
+
   /**
    * Sets the internal pointer to the previous revision of this History file.
    * Note: This must be handled by the user code.

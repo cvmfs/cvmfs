@@ -112,10 +112,8 @@ CommandTag::Environment *CommandTag::InitializeEnvironment(
 
   // create new environment
   // Note: We use this encapsulation because we cannot be sure that the
-  // Command
-  //       object gets deleted properly. With the Environment object at
-  //       hand
-  //       we have full control and can make heavy and safe use of RAII
+  // Command object gets deleted properly. With the Environment object at
+  // hand we have full control and can make heavy and safe use of RAII
   UniquePtr<Environment> env(new Environment(repository_url, tmp_path));
   env->manifest_path.Set(manifest_path);
   env->history_path.Set(CreateTempPath(tmp_path + "/history", 0600));
@@ -132,8 +130,7 @@ CommandTag::Environment *CommandTag::InitializeEnvironment(
     return NULL;
   }
 
-  // open the (yet unsigned) manifest file if it is there, otherwise load
-  // the
+  // open the (yet unsigned) manifest file if it is there, otherwise load the
   // latest manifest from the server
   env->manifest =
       (FileExists(env->manifest_path.path()))
@@ -222,8 +219,7 @@ bool CommandTag::CloseAndPublishHistory(Environment *env) {
     return false;
   }
 
-  // disable the unlink guard in order to keep the newly exported manifest
-  // file
+  // disable the unlink guard in order to keep the newly exported manifest file
   env->manifest_path.Disable();
   LogCvmfs(kLogCvmfs, kLogVerboseMsg,
            "exported manifest (%d) with new "
@@ -232,6 +228,7 @@ bool CommandTag::CloseAndPublishHistory(Environment *env) {
 
   return true;
 }
+
 
 bool CommandTag::UploadCatalogAndUpdateManifest(
     CommandTag::Environment *env, catalog::WritableCatalog *catalog) {
@@ -409,9 +406,11 @@ catalog::Catalog *CommandTag::GetCatalog(const std::string &repository_url,
 
 void CommandTag::PrintTagMachineReadable(
     const history::History::Tag &tag) const {
-  LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %d %d %d %s %s", tag.name.c_str(),
+  LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %d %d %d %s %s %s", tag.name.c_str(),
            tag.root_hash.ToString().c_str(), tag.size, tag.revision,
-           tag.timestamp, tag.GetChannelName(), tag.description.c_str());
+           tag.timestamp, tag.GetChannelName(),
+           (tag.branch == "") ? "(default)" : tag.branch.c_str(),
+           tag.description.c_str());
 }
 
 std::string CommandTag::AddPadding(const std::string &str, const size_t padding,
@@ -511,8 +510,7 @@ int CommandEditTag::AddNewTag(const ArgumentList &args, Environment *env) {
     return 1;
   }
 
-  // open the catalog to be tagged (to check for existance and for meta
-  // info)
+  // open the catalog to be tagged (to check for existance and for meta info)
   const UnlinkGuard catalog_path(
       CreateTempPath(env->tmp_path + "/catalog", 0600));
   const bool catalog_read_write = false;
@@ -533,19 +531,18 @@ int CommandEditTag::AddNewTag(const ArgumentList &args, Environment *env) {
     return 1;
   }
 
-  // create a template for the new tag to be created, moved or used as undo
-  // tag
+  // create a template for the new tag to be created, moved or used as undo tag
   history::History::Tag tag_template;
   tag_template.name = "<template>";
   tag_template.root_hash = root_hash;
   tag_template.size = GetFileSize(catalog_path.path());
   tag_template.revision = catalog->GetRevision();
   tag_template.timestamp = catalog->GetLastModified();
+  tag_template.branch = catalog->GetBranch();
   tag_template.channel = tag_channel;
   tag_template.description = tag_description;
 
-  // manipulate the tag database by creating a new tag or moving an existing
-  // one
+  // manipulate the tag database by creating a new tag or moving an existing one
   if (!tag_name.empty()) {
     tag_template.name = tag_name;
     const bool user_provided_hash = (!root_hash_string.empty());
@@ -578,8 +575,7 @@ shash::Any CommandEditTag::GetTagRootHash(
                                     shash::kSuffixCatalog);
     if (root_hash.IsNull()) {
       LogCvmfs(kLogCvmfs, kLogStderr,
-               "failed to read provided catalog "
-               "hash '%s'",
+               "failed to read provided catalog hash '%s'",
                root_hash_string.c_str());
     }
   }
@@ -600,8 +596,7 @@ bool CommandEditTag::ManipulateTag(Environment *env,
   // tag does exist already, now we need to see if we can move it
   if (!user_provided_hash) {
     LogCvmfs(kLogCvmfs, kLogStderr,
-             "a tag with the name '%s' already "
-             "exists. Do you want to move it? "
+             "a tag with the name '%s' already exists. Do you want to move it? "
              "(-h <root hash>)",
              tag_name.c_str());
     return false;
@@ -612,7 +607,8 @@ bool CommandEditTag::ManipulateTag(Environment *env,
 }
 
 bool CommandEditTag::MoveTag(Environment *env,
-                             const history::History::Tag &tag_template) {
+                             const history::History::Tag &tag_template)
+{
   const std::string &tag_name = tag_template.name;
   history::History::Tag new_tag = tag_template;
 
@@ -642,6 +638,7 @@ bool CommandEditTag::MoveTag(Environment *env,
   if (new_tag.description.empty()) {
     new_tag.description = old_tag.description;
   }
+  new_tag.branch = old_tag.branch;
 
   // remove the old tag from the database
   if (!env->history->Remove(tag_name)) {
@@ -649,6 +646,12 @@ bool CommandEditTag::MoveTag(Environment *env,
              tag_name.c_str());
     return false;
   }
+  if (!env->history->PruneBranches()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "could not prune unused branches");
+    return false;
+  }
+  bool retval = env->history->Vacuum();
+  assert(retval);
 
   LogCvmfs(kLogCvmfs, kLogStdout, "moving tag '%s' from '%s' to '%s'",
            tag_name.c_str(), old_tag.root_hash.ToString().c_str(),
@@ -681,8 +684,7 @@ int CommandEditTag::RemoveTags(const ArgumentList &args, Environment *env) {
   for (; i != iend; ++i) {
     if (IsUndoTagName(*i)) {
       LogCvmfs(kLogCvmfs, kLogStderr,
-               "undo tags are handled internally and "
-               "cannot be deleted");
+               "undo tags are handled internally and cannot be deleted");
       return 1;
     }
   }
@@ -721,12 +723,21 @@ int CommandEditTag::RemoveTags(const ArgumentList &args, Environment *env) {
       return 1;
     }
   }
+  bool retval = env->history->PruneBranches();
+  if (!retval) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "failed to prune unused branches from history");
+    return 1;
+  }
   env->history->CommitTransaction();
+  retval = env->history->Vacuum();
+  assert(retval);
 
   return 0;
 }
 
 //------------------------------------------------------------------------------
+
 
 ParameterList CommandListTags::GetParams() const {
   ParameterList r;
@@ -742,6 +753,7 @@ void CommandListTags::PrintHumanReadableList(
   const std::string rev_label = "Revision";
   const std::string chan_label = "Channel";
   const std::string time_label = "Timestamp";
+  const std::string branch_label = "Branch";
   const std::string desc_label = "Description";
 
   // figure out the maximal lengths of the fields in the lists
@@ -751,49 +763,58 @@ void CommandListTags::PrintHumanReadableList(
   size_t max_rev_len = rev_label.size();
   size_t max_chan_len = chan_label.size();
   size_t max_time_len = desc_label.size();
+  size_t max_branch_len = branch_label.size();
   for (; i != iend; ++i) {
     max_name_len = std::max(max_name_len, i->name.size());
     max_rev_len = std::max(max_rev_len, StringifyInt(i->revision).size());
     max_chan_len = std::max(max_chan_len, strlen(i->GetChannelName()));
     max_time_len =
         std::max(max_time_len, StringifyTime(i->timestamp, true).size());
+    max_branch_len = std::max(max_branch_len, i->branch.size());
   }
 
   // print the list header
-  LogCvmfs(kLogCvmfs, kLogStdout, "%s \u2502 %s \u2502 %s \u2502 %s \u2502 %s",
+  LogCvmfs(kLogCvmfs, kLogStdout,
+           "%s \u2502 %s \u2502 %s \u2502 %s \u2502 %s \u2502 %s",
            AddPadding(name_label, max_name_len).c_str(),
            AddPadding(rev_label, max_rev_len).c_str(),
            AddPadding(chan_label, max_chan_len).c_str(),
-           AddPadding(time_label, max_time_len).c_str(), desc_label.c_str());
+           AddPadding(time_label, max_time_len).c_str(),
+           AddPadding(branch_label, max_branch_len).c_str(),
+           desc_label.c_str());
   LogCvmfs(kLogCvmfs, kLogStdout,
            "%s\u2500\u253C\u2500%s\u2500\u253C\u2500%s"
-           "\u2500\u253C\u2500%s\u2500\u253C\u2500%s",
+           "\u2500\u253C\u2500%s\u2500\u253C\u2500%s\u2500\u253C\u2500%s",
            AddPadding("", max_name_len, false, "\u2500").c_str(),
            AddPadding("", max_rev_len, false, "\u2500").c_str(),
            AddPadding("", max_chan_len, false, "\u2500").c_str(),
            AddPadding("", max_time_len, false, "\u2500").c_str(),
+           AddPadding("", max_branch_len, false, "\u2500").c_str(),
            AddPadding("", desc_label.size() + 1, false, "\u2500").c_str());
 
   // print the rows of the list
   i = tags.rbegin();
   for (; i != iend; ++i) {
     LogCvmfs(
-        kLogCvmfs, kLogStdout, "%s \u2502 %s \u2502 %s \u2502 %s \u2502 %s",
+        kLogCvmfs, kLogStdout,
+        "%s \u2502 %s \u2502 %s \u2502 %s \u2502 %s \u2502 %s",
         AddPadding(i->name, max_name_len).c_str(),
         AddPadding(StringifyInt(i->revision), max_rev_len, true).c_str(),
         AddPadding(i->GetChannelName(), max_chan_len).c_str(),
         AddPadding(StringifyTime(i->timestamp, true), max_time_len).c_str(),
+        AddPadding(i->branch, max_branch_len).c_str(),
         i->description.c_str());
   }
 
   // print the list footer
   LogCvmfs(kLogCvmfs, kLogStdout,
            "%s\u2500\u2534\u2500%s\u2500\u2534\u2500%s"
-           "\u2500\u2534\u2500%s\u2500\u2534\u2500%s",
+           "\u2500\u2534\u2500%s\u2500\u2534\u2500%s\u2500\u2534\u2500%s",
            AddPadding("", max_name_len, false, "\u2500").c_str(),
            AddPadding("", max_rev_len, false, "\u2500").c_str(),
            AddPadding("", max_chan_len, false, "\u2500").c_str(),
            AddPadding("", max_time_len, false, "\u2500").c_str(),
+           AddPadding("", max_branch_len, false, "\u2500").c_str(),
            AddPadding("", desc_label.size() + 1, false, "\u2500").c_str());
 
   // print the number of tags listed
@@ -869,13 +890,16 @@ void CommandInfoTag::PrintHumanReadableInfo(
            "Revision:     %d\n"
            "Channel:      %s\n"
            "Timestamp:    %s\n"
+           "Branch:       %s\n"
            "Root Hash:    %s\n"
            "Catalog Size: %s\n"
            "%s",
            tag.name.c_str(), tag.revision, tag.GetChannelName(),
            StringifyTime(tag.timestamp, true /* utc */).c_str(),
+           tag.branch.c_str(),
            tag.root_hash.ToString().c_str(),
-           HumanReadableFilesize(tag.size).c_str(), tag.description.c_str());
+           HumanReadableFilesize(tag.size).c_str(),
+           tag.description.c_str());
 }
 
 int CommandInfoTag::Main(const ArgumentList &args) {
@@ -944,13 +968,17 @@ int CommandRollbackTag::Main(const ArgumentList &args) {
     }
     return 1;
   }
+  if (target_tag.branch != "") {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "rollback is only supported on the default branch");
+    return 1;
+  }
 
   // list the tags that will be deleted
   TagList affected_tags;
   if (!env->history->ListTagsAffectedByRollback(tag_name, &affected_tags)) {
     LogCvmfs(kLogCvmfs, kLogStderr,
-             "failed to list condemned tags prior to "
-             "rollback to '%s'",
+             "failed to list condemned tags prior to rollback to '%s'",
              tag_name.c_str());
     return 1;
   }
@@ -1013,6 +1041,8 @@ int CommandRollbackTag::Main(const ArgumentList &args) {
              updated_target_tag.name.c_str());
     return 1;
   }
+  bool retval = env->history->Vacuum();
+  assert(retval);
 
   // set the magic undo tags
   if (!UpdateUndoTags(env.weak_ref(), updated_target_tag, undo_rollback)) {

@@ -27,6 +27,7 @@
 #include "logging.h"
 #include "manifest.h"
 #include "reflog.h"
+#include "sanitizer.h"
 #include "shortstring.h"
 #include "util/pointer.h"
 #include "util/posix.h"
@@ -253,6 +254,16 @@ bool CommandCheck::InspectHistory(history::History *history) {
   }
 
   bool result = true;
+
+  sanitizer::BranchSanitizer sanitizer;
+  for (unsigned i = 0; i < branches.size(); ++i) {
+    if (!sanitizer.IsValid(branches[i].branch)) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "invalid branch name: %s",
+               branches[i].branch.c_str());
+      result = false;
+    }
+  }
+
   set<string> used_branches;  // all branches referenced in tag db
   // TODO(jblomer): same root hash implies same size and revision
   for (unsigned i = 0; i < tags.size(); ++i) {
