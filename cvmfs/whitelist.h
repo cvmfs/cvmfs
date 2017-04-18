@@ -40,7 +40,6 @@ enum Failures {
   kFailBadPkcs7,
   kFailBadCaChain,
   kFailNotListed,
-  kFailBlacklisted,
 
   kFailNumEntries
 };
@@ -62,8 +61,7 @@ inline const char *Code2Ascii(const Failures error) {
   texts[11] = "invalid whitelist (pkcs7)";
   texts[12] = "failed to verify CA chain";
   texts[13] = "certificate not on whitelist";
-  texts[14] = "certificate blacklisted";
-  texts[15] = "no text";
+  texts[14] = "no text";
   return texts[error];
 }
 

@@ -169,6 +169,9 @@ LoadError ClientCatalogManager::LoadCatalog(
     LogCvmfs(kLogCache, kLogDebug, "failed to fetch manifest (%d - %s)",
              manifest_failure, manifest::Code2Ascii(manifest_failure));
 
+    if (manifest_failure == manifest::kFailBlacklisted) {
+      return catalog::kLoadBlacklisted;
+    }
     if (catalog_path) {
       LoadError error =
         LoadCatalogCas(cache_hash, cvmfs_path, "", catalog_path);
