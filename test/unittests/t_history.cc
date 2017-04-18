@@ -1353,6 +1353,85 @@ TYPED_TEST(T_History, InsertBranchedTags) {
 }
 
 
+TYPED_TEST(T_History, PruneBranches) {
+  if (TestFixture::IsMocked()) {
+    // No point in reimplementing the SQL queries for the mock class
+    return;
+  }
+  const std::string hp = TestFixture::GetHistoryFilename();
+  History *history1 = TestFixture::CreateHistory(hp);
+  ASSERT_NE(static_cast<History*>(NULL), history1);
+
+  EXPECT_TRUE(history1->InsertBranch(History::Branch("br1", "")));
+  EXPECT_TRUE(history1->InsertBranch(History::Branch("br2", "")));
+  EXPECT_TRUE(history1->InsertBranch(History::Branch("br3", "")));
+  EXPECT_TRUE(history1->InsertBranch(History::Branch("br4", "")));
+  EXPECT_TRUE(history1->InsertBranch(History::Branch("br1_1", "br1")));
+  EXPECT_TRUE(history1->InsertBranch(History::Branch("br1_1_1", "br1_1")));
+  EXPECT_TRUE(history1->InsertBranch(History::Branch("br2_1", "br2")));
+  EXPECT_TRUE(history1->InsertBranch(History::Branch("br2_1_1", "br2_1")));
+  EXPECT_TRUE(history1->InsertBranch(History::Branch("br3_1", "br3")));
+  EXPECT_TRUE(history1->InsertBranch(History::Branch("br3_1_1", "br3_1")));
+
+  EXPECT_TRUE(history1->BeginTransaction());
+  History::Tag tag_foo;
+  tag_foo.name = "foo";
+  tag_foo.root_hash =
+    shash::MkFromHexPtr(
+      shash::HexPtr("0000000000000000000000000000000000000001"),
+      shash::kSuffixCatalog);
+  tag_foo.revision = 1;
+  tag_foo.channel = History::kChannelTest;
+  EXPECT_TRUE(history1->Insert(tag_foo));
+
+  History::Tag tag_bar;
+  tag_bar.name = "bar";
+  tag_bar.root_hash =
+    shash::MkFromHexPtr(
+      shash::HexPtr("0000000000000000000000000000000000000002"),
+      shash::kSuffixCatalog);
+  tag_bar.revision = 2;
+  tag_bar.channel = History::kChannelTest;
+  tag_bar.branch = "br2";
+  EXPECT_TRUE(history1->Insert(tag_bar));
+
+  History::Tag tag_baz;
+  tag_baz.name = "baz";
+  tag_baz.root_hash =
+    shash::MkFromHexPtr(
+      shash::HexPtr("0000000000000000000000000000000000000003"),
+      shash::kSuffixCatalog);
+  tag_baz.revision = 2;
+  tag_baz.channel = History::kChannelTest;
+  tag_baz.branch = "br3";
+  EXPECT_TRUE(history1->Insert(tag_baz));
+
+  History::Tag tag_baz_deep;
+  tag_baz_deep.name = "baz_deep";
+  tag_baz_deep.root_hash =
+    shash::MkFromHexPtr(
+      shash::HexPtr("0000000000000000000000000000000000000004"),
+      shash::kSuffixCatalog);
+  tag_baz_deep.revision = 3;
+  tag_baz_deep.channel = History::kChannelTest;
+  tag_baz_deep.branch = "br3_1_1";
+  EXPECT_TRUE(history1->Insert(tag_baz_deep));
+
+  EXPECT_TRUE(history1->PruneBranches());
+  EXPECT_TRUE(history1->CommitTransaction());
+
+  std::vector<History::Branch> branches;
+  EXPECT_TRUE(history1->ListBranches(&branches));
+  std::sort(branches.begin(), branches.end());
+  EXPECT_EQ(4U, branches.size());
+  EXPECT_EQ(History::Branch("", ""), branches[0]);
+  EXPECT_EQ(History::Branch("br2", ""), branches[1]);
+  EXPECT_EQ(History::Branch("br3", ""), branches[2]);
+  EXPECT_EQ(History::Branch("br3_1_1", "br3"), branches[3]);
+  TestFixture::CloseHistory(history1);
+}
+
+
 TYPED_TEST(T_History, ReadLegacyVersion1Revision0) {
   if (TestFixture::IsMocked()) {
     // this is only valid for the production code...

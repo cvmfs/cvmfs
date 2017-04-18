@@ -282,7 +282,50 @@ bool SqliteHistory::InsertBranch(const Branch &branch) {
 
 
 bool SqliteHistory::PruneBranches() {
-  return false;
+  // Parent pointers might point to abandoned branches.  Redirect them to the
+  // parent of the abandoned branch.  This has to be repeated until the fix
+  // point is reached.  It always works because we never delete the root branch
+  sqlite::Sql sql_fix_parent_pointers(database_->sqlite_db(),
+    "INSERT OR REPLACE INTO branches (branch, parent) "
+    "SELECT branches.branch, abandoned_parent FROM branches "
+    "  INNER JOIN (SELECT DISTINCT branches.branch AS abandoned_branch, "
+    "              branches.parent AS abandoned_parent FROM branches "
+    "              LEFT OUTER JOIN tags ON (branches.branch=tags.branch)"
+    "              WHERE tags.branch IS NULL) "
+    "  ON (branches.parent=abandoned_branch);");
+  // Detect if fix point is reached
+  sqlite::Sql sql_remaining_rows(database_->sqlite_db(),
+    "SELECT count(*) FROM branches "
+    "INNER JOIN "
+    "  (SELECT DISTINCT branches.branch AS abandoned_branch FROM branches "
+    "   LEFT OUTER JOIN tags ON (branches.branch=tags.branch) "
+    "   WHERE tags.branch IS NULL) "
+    "ON (branches.parent=abandoned_branch);");
+
+  bool retval;
+  do {
+    retval = sql_remaining_rows.FetchRow();
+    if (!retval)
+      return false;
+    int64_t count = sql_remaining_rows.RetrieveInt64(0);
+    assert(count >= 0);
+    if (count == 0)
+      break;
+    retval = sql_remaining_rows.Reset();
+    assert(retval);
+
+    retval = sql_fix_parent_pointers.Execute();
+    if (!retval)
+      return false;
+    retval = sql_fix_parent_pointers.Reset();
+    assert(retval);
+  } while (true);
+
+  sqlite::Sql sql_remove_branches(database_->sqlite_db(),
+    "DELETE FROM branches "
+    "WHERE branch NOT IN (SELECT DISTINCT branch FROM tags);");
+  retval = sql_remove_branches.Execute();
+  return retval;
 }
 
 
