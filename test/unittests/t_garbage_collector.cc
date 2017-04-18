@@ -382,6 +382,8 @@ class T_GarbageCollector : public ::testing::Test {
     MockHistory::RegisterObject(MockHistory::root_hash, history);
 
     history->BeginTransaction();
+    ASSERT_TRUE(history->InsertBranch(history::History::Branch(
+                                      "other-branch", "", 4)));
     ASSERT_TRUE(history->Insert(history::History::Tag(
         "Revision2", c[mp(2, "00")]->hash(), 1337, 2, t(27, 11, 1987),
         history::History::kChannelProd, "this is rev 2", "")));
