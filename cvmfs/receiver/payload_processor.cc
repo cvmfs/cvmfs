@@ -69,6 +69,7 @@ void PayloadProcessor::ConsumerEventCallback(
     // kEmpty - this is an error.
     LogCvmfs(kLogCvmfs, kLogStderr, "Event received with unknown object.");
     num_errors_++;
+    return;
   }
 
   const std::string hash_string = event.id.ToString(true);
@@ -80,14 +81,31 @@ void PayloadProcessor::ConsumerEventCallback(
     // list to the caller, to be used in a later call to rebuild catalogs
   } else {
     // Normal file
-    const std::string dest = "/srv/cvmfs/" + current_repo_ + "/data/" + path;
-    const std::string dest_dir = GetParentPath(dest);
 
-    int fdout = open(dest.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0600);
+    // Create a temporary path
+    const std::string tmp_path = CreateTempPath("/tmp/object_packs", 0666);
+    if (tmp_path.empty()) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Unable to create temporary path.");
+      num_errors_++;
+      return;
+    }
+
+    int fdout = open(tmp_path.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0600);
     int nb = WriteFile(fdout, event.buf, event.buf_size);
     if (static_cast<unsigned int>(nb) != event.buf_size) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Unable to write %s", dest.c_str());
+      LogCvmfs(kLogCvmfs, kLogStderr, "Unable to write %s", tmp_path.c_str());
       num_errors_++;
+      RemoveTree(tmp_path);
+      return;
+    }
+
+    // Atomically move to final destination
+    const std::string dest = "/srv/cvmfs/" + current_repo_ + "/data/" + path;
+    if (rename(tmp_path.c_str(), dest.c_str())) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "Unable to move file to final destination: %s", dest.c_str());
+      num_errors_++;
+      return;
     }
   }
 }
