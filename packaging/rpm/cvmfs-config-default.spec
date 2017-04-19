@@ -1,6 +1,6 @@
 Summary: CernVM File System Default Configuration and Public Keys
 Name: cvmfs-config-default
-Version: 1.3
+Version: 1.4
 Release: 1
 Source0: cern.ch.pub
 Source1: cern-it1.cern.ch.pub
@@ -75,6 +75,9 @@ done
 %config %{_sysconfdir}/cvmfs/config.d/*
 
 %changelog
+* Wed Apr 19 2017 Jakob Blomer <jblomer@cern.ch> - 1.4-1
+- Adjust atlas-nightlies.cern.ch Stratum 1
+
 * Wed Jan 18 2017 Jakob Blomer <jblomer@cern.ch> - 1.3-1
 - Update cern.ch master keys
 - Disable ASGC Stratum 1
