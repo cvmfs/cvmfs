@@ -5,17 +5,18 @@
 #include "reactor.h"
 
 #include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
+#include <cstdlib>
+#include <cstring>
 #include <utility>
 #include <vector>
 
-#include "../json_document.h"
-#include "../logging.h"
+#include "json_document.h"
+#include "logging.h"
 #include "payload_processor.h"
 #include "session_token.h"
 #include "util/pointer.h"
+#include "util/posix.h"
 #include "util/string.h"
 
 namespace receiver {
@@ -25,7 +26,7 @@ Reactor::Request Reactor::ReadRequest(int fd, std::string* data) {
 
   // First, read the command identifier
   int32_t req_id = 0;
-  int nb = read(fd, &req_id, 4);
+  int nb = SafeRead(fd, &req_id, 4);
 
   if (nb != 4) {
     return kError;
@@ -33,7 +34,7 @@ Reactor::Request Reactor::ReadRequest(int fd, std::string* data) {
 
   // Then, read message size
   int32_t msg_size = 0;
-  nb = read(fd, &msg_size, 4);
+  nb = SafeRead(fd, &msg_size, 4);
 
   if (req_id == kError || nb != 4) {
     return kError;
@@ -42,7 +43,7 @@ Reactor::Request Reactor::ReadRequest(int fd, std::string* data) {
   // Finally read the message body
   if (msg_size > 0) {
     std::vector<char> buffer(msg_size);
-    nb = read(fd, &buffer[0], msg_size);
+    nb = SafeRead(fd, &buffer[0], msg_size);
 
     if (nb != msg_size) {
       return kError;
@@ -68,21 +69,21 @@ bool Reactor::WriteRequest(int fd, Request req, const std::string& data) {
     memcpy(&buffer[8], &data[0], data.size());
   }
 
-  int nb = write(fd, &buffer[0], total_size);
+  int nb = SafeWrite(fd, &buffer[0], total_size);
 
   return nb == total_size;
 }
 
 bool Reactor::ReadReply(int fd, std::string* data) {
   int32_t msg_size(0);
-  int nb = read(fd, &msg_size, 4);
+  int nb = SafeRead(fd, &msg_size, 4);
 
   if (nb != 4) {
     return false;
   }
 
   std::vector<char> buffer(msg_size);
-  nb = read(fd, &buffer[0], msg_size);
+  nb = SafeRead(fd, &buffer[0], msg_size);
 
   if (nb != msg_size) {
     return false;
@@ -105,7 +106,7 @@ bool Reactor::WriteReply(int fd, const std::string& data) {
     memcpy(&buffer[4], &data[0], data.size());
   }
 
-  int nb = write(fd, &buffer[0], total_size);
+  int nb = SafeWrite(fd, &buffer[0], total_size);
 
   return nb == total_size;
 }
@@ -114,7 +115,7 @@ Reactor::Reactor(int fdin, int fdout) : fdin_(fdin), fdout_(fdout) {}
 
 Reactor::~Reactor() {}
 
-bool Reactor::run() {
+bool Reactor::Run() {
   std::string msg_body;
   Request req = kQuit;
   do {

@@ -87,7 +87,7 @@ int main(int argc, char** argv) {
   }
   receiver::Reactor reactor(fdin, fdout);
 
-  if (!reactor.run()) {
+  if (!reactor.Run()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Error running CVMFS Receiver event loop");
     return 1;
   }

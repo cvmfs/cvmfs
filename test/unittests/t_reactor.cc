@@ -68,7 +68,7 @@ class T_Reactor : public ::testing::Test {
     ctx->ready_.Enqueue(true);
 
     MockedReactor reactor(ctx->to_reactor_[0], ctx->from_reactor_[1]);
-    reactor.run();
+    reactor.Run();
 
     close(ctx->to_reactor_[0]);
     close(ctx->from_reactor_[1]);

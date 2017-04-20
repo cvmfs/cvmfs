@@ -12,6 +12,14 @@ namespace receiver {
 
 class PayloadProcessor;
 
+/**
+ * This is the main event loop of the `cvmfs_receiver` program.
+ *
+ * It implements a synchronous protocol, reading JSON requests from the fdin_
+ * file descriptor and writing JSON responses to fdout_. It handles the framing
+ * of the protocol and the dispatching of the different types of events to
+ * specific handler methods.
+ */
 class Reactor {
  public:
   enum Request {
@@ -33,9 +41,11 @@ class Reactor {
   Reactor(int fdin, int fdout);
   virtual ~Reactor();
 
-  bool run();
+  bool Run();
 
  protected:
+  // NOTE: These methods are virtual such that they can be mocked for the
+  // purpose of unit testing
   virtual int HandleGenerateToken(const std::string& req, std::string* reply);
   virtual int HandleGetTokenId(const std::string& req, std::string* reply);
   virtual int HandleCheckToken(const std::string& req, std::string* reply);
