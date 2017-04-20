@@ -38,7 +38,7 @@ class PayloadProcessor {
  protected:
   // NOTE: These methods are made virtual such that they can be mocked for
   //       the purpose of unit testing
-  virtual int WriteFile(int fd, const void* const buf, size_t buf_size);
+  virtual bool WriteFile(int fd, const void* const buf, size_t buf_size);
   virtual int RenameFile(const std::string& old_name,
                          const std::string& new_name);
 

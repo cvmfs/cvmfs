@@ -91,8 +91,7 @@ void PayloadProcessor::ConsumerEventCallback(
     }
 
     int fdout = open(tmp_path.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0600);
-    int nb = WriteFile(fdout, event.buf, event.buf_size);
-    if (static_cast<unsigned int>(nb) != event.buf_size) {
+    if (!WriteFile(fdout, event.buf, event.buf_size)) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Unable to write %s", tmp_path.c_str());
       num_errors_++;
       unlink(tmp_path.c_str());
@@ -116,8 +115,8 @@ void PayloadProcessor::ConsumerEventCallback(
   }
 }
 
-int PayloadProcessor::WriteFile(int fd, const void* const buf,
-                                size_t buf_size) {
+bool PayloadProcessor::WriteFile(int fd, const void* const buf,
+                                 size_t buf_size) {
   return SafeWrite(fd, buf, buf_size);
 }
 

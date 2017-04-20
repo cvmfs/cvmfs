@@ -20,10 +20,10 @@ class MockedPayloadProcessor : public PayloadProcessor {
   MockedPayloadProcessor() {}
 
  protected:
-  virtual int WriteFile(int /*fd*/, const void* const /*buf*/,
-                        size_t buf_size) {
+  virtual bool WriteFile(int /*fd*/, const void* const /*buf*/,
+                         size_t /*buf_size*/) {
     // NO OP
-    return buf_size;
+    return true;
   }
   virtual int RenameFile(const std::string& /*old_name*/,
                          const std::string& /*new_name*/) {

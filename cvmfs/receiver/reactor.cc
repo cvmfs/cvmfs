@@ -69,9 +69,7 @@ bool Reactor::WriteRequest(int fd, Request req, const std::string& data) {
     memcpy(&buffer[8], &data[0], data.size());
   }
 
-  int nb = SafeWrite(fd, &buffer[0], total_size);
-
-  return nb == total_size;
+  return SafeWrite(fd, &buffer[0], total_size);
 }
 
 bool Reactor::ReadReply(int fd, std::string* data) {
@@ -106,9 +104,7 @@ bool Reactor::WriteReply(int fd, const std::string& data) {
     memcpy(&buffer[4], &data[0], data.size());
   }
 
-  int nb = SafeWrite(fd, &buffer[0], total_size);
-
-  return nb == total_size;
+  return SafeWrite(fd, &buffer[0], total_size);
 }
 
 Reactor::Reactor(int fdin, int fdout) : fdin_(fdin), fdout_(fdout) {}
