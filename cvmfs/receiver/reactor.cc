@@ -161,7 +161,7 @@ int Reactor::HandleGenerateToken(const std::string& req, std::string* reply) {
     return 4;
   }
 
-  json_string_input input;
+  JsonStringInput input;
   input.push_back(std::make_pair("token", session_token.c_str()));
   input.push_back(std::make_pair("id", public_token_id.c_str()));
   input.push_back(std::make_pair("secret", token_secret.c_str()));
@@ -177,7 +177,7 @@ int Reactor::HandleGetTokenId(const std::string& req, std::string* reply) {
   }
 
   std::string token_id;
-  json_string_input input;
+  JsonStringInput input;
   if (GetTokenPublicId(req, &token_id)) {
     input.push_back(std::make_pair("status", "error"));
     input.push_back(std::make_pair("reason", "invalid_token"));
@@ -210,7 +210,7 @@ int Reactor::HandleCheckToken(const std::string& req, std::string* reply) {
   }
 
   std::string path;
-  json_string_input input;
+  JsonStringInput input;
   int ret = CheckToken(token->string_value, secret->string_value, &path);
   if (ret == 10) {
     // Expired token
@@ -257,7 +257,7 @@ int Reactor::HandleSubmitPayload(int fdin, const std::string& req,
   }
 
   UniquePtr<PayloadProcessor> proc(MakePayloadProcessor());
-  json_string_input reply_input;
+  JsonStringInput reply_input;
   PayloadProcessor::Result res =
       proc->Process(fdin, digest_json->string_value, path_json->string_value,
                     header_size_json->int_value);

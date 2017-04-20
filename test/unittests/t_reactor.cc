@@ -170,7 +170,7 @@ TEST_F(T_Reactor, FullCycle) {
   }
 
   // Check the token validity
-  json_string_input request_terms;
+  JsonStringInput request_terms;
   request_terms.push_back(std::make_pair("token", &token[0]));
   request_terms.push_back(std::make_pair("secret", &secret[0]));
 

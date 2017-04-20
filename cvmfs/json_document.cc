@@ -14,7 +14,7 @@
 
 using namespace std;  // NOLINT
 
-bool ToJsonString(const json_string_input &input, std::string *output) {
+bool ToJsonString(const JsonStringInput &input, std::string *output) {
   if (!output) {
     return false;
   }
