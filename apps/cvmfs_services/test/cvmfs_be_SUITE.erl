@@ -68,9 +68,15 @@ init_per_suite(Config) ->
     ok = application:load(cvmfs_services),
     ok = ct:require(repos),
     ok = ct:require(keys),
-    ok = application:set_env(cvmfs_services, enabled_services, [cvmfs_auth, cvmfs_lease, cvmfs_be]),
+    ok = application:set_env(cvmfs_services, enabled_services, [cvmfs_auth,
+                                                                cvmfs_lease,
+                                                                cvmfs_be,
+                                                                cvmfs_receiver_pool]),
     ok = application:set_env(cvmfs_services, repo_config, #{repos => ct:get_config(repos)
                                                            ,keys => ct:get_config(keys)}),
+    ok = application:set_env(cvmfs_services, receiver_config, [{size, 1},
+                                                               {max_overflow, 0},
+                                                               {worker_module, cvmfs_test_receiver}]),
 
     MaxLeaseTime = 50, % milliseconds
     ok = application:set_env(cvmfs_services, max_lease_time, MaxLeaseTime),
@@ -141,19 +147,19 @@ lease_success(_Config) ->
     Digest = base64:encode(<<"placeholder_for_the_digest_of_the_payload">>),
     {ok, Token} = cvmfs_be:new_lease(?TEST_UID, Key, Path),
     % Followup with a payload submission
-    {ok, payload_added} = cvmfs_be:submit_payload(?TEST_UID, Token, Payload, Digest),
+    {ok, payload_added} = cvmfs_be:submit_payload(?TEST_UID, {Token, Payload, Digest, 1}),
     % Submit final payload and end the lease
-    {ok, payload_added} = cvmfs_be:submit_payload(?TEST_UID, Token, Payload, Digest),
+    {ok, payload_added} = cvmfs_be:submit_payload(?TEST_UID, {Token, Payload, Digest, 1}),
     ok = cvmfs_be:end_lease(?TEST_UID, Token),
     % After the lease has been closed, the token should be rejected
-    {error, invalid_lease} = cvmfs_be:submit_payload(?TEST_UID, Token, Payload, Digest).
+    {error, invalid_lease} = cvmfs_be:submit_payload(?TEST_UID, {Token, Payload, Digest, 1}).
 
 % Attempt to submit a payload without first obtaining a token
 submission_with_invalid_token_fails(_Config) ->
     Token = <<"invalid_token">>,
     Payload = <<"placeholder">>,
     Digest = base64:encode(<<"placeholder_for_the_digest_of_the_payload">>),
-    {error, invalid_macaroon} = cvmfs_be:submit_payload(?TEST_UID, Token, Payload, Digest).
+    {error, invalid_macaroon} = cvmfs_be:submit_payload(?TEST_UID, {Token, Payload, Digest, 1}).
 
 % Start a valid lease, make submission after the token has expired
 submission_with_expired_token_fails(Config) ->
@@ -162,7 +168,7 @@ submission_with_expired_token_fails(Config) ->
     Digest = base64:encode(<<"placeholder_for_the_digest_of_the_payload">>),
     {ok, Token} = cvmfs_be:new_lease(?TEST_UID, Key, Path),
     ct:sleep(?config(max_lease_time, Config)),
-    {error, lease_expired} = cvmfs_be:submit_payload(?TEST_UID, Token, Payload, Digest).
+    {error, lease_expired} = cvmfs_be:submit_payload(?TEST_UID, {Token, Payload, Digest, 1}).
 
 
 %% Properties
