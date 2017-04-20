@@ -27,27 +27,27 @@ namespace receiver {
  *
  * Returns the session token, the (public) token_id and the token secret.
  */
-int GenerateSessionToken(const std::string& key_id, const std::string& path,
-                         uint64_t max_lease_time, std::string* session_token,
-                         std::string* public_token_id,
-                         std::string* token_secret) {
+bool GenerateSessionToken(const std::string& key_id, const std::string& path,
+                          uint64_t max_lease_time, std::string* session_token,
+                          std::string* public_token_id,
+                          std::string* token_secret) {
   if (session_token == NULL || public_token_id == NULL ||
       token_secret == NULL) {
-    return 1;
+    return false;
   }
 
   if (key_id.empty() && path.empty()) {
-    return 2;
+    return false;
   }
 
   UniquePtr<cipher::Key> secret(cipher::Key::CreateRandomly(32));
   if (!secret.IsValid()) {
-    return 3;
+    return false;
   }
 
   UniquePtr<cipher::Cipher> cipher(cipher::Cipher::Create(cipher::kAes256Cbc));
   if (!cipher.IsValid()) {
-    return 4;
+    return false;
   }
 
   *public_token_id = key_id + path;
@@ -55,7 +55,7 @@ int GenerateSessionToken(const std::string& key_id, const std::string& path,
 
   const uint64_t current_time = platform_monotonic_time();
   if (std::numeric_limits<uint64_t>::max() - max_lease_time < current_time) {
-    return 5;
+    return false;
   }
 
   const std::string expiry(StringifyUint(current_time + max_lease_time));
@@ -64,31 +64,32 @@ int GenerateSessionToken(const std::string& key_id, const std::string& path,
   if (!cipher->Encrypt(
           "{\"path\" : \"" + path + "\", \"expiry\" : \"" + expiry + "\"}",
           *secret, &encrypted_body)) {
-    return 6;
+    return false;
   }
 
   *session_token = Base64("{\"token_id\" : \"" + *public_token_id +
                           "\", \"blob\" : \"" + Base64(encrypted_body) + "\"}");
 
-  return 0;
+  return true;
 }
 
 /**
  * Obtain the public_id from a session token
  */
-int GetTokenPublicId(const std::string& token, std::string* public_id) {
+
+bool GetTokenPublicId(const std::string& token, std::string* public_id) {
   if (public_id == NULL) {
-    return 1;
+    return false;
   }
 
   std::string debased64_token;
   if (!Debase64(token, &debased64_token)) {
-    return 2;
+    return false;
   }
 
   UniquePtr<JsonDocument> token_json(JsonDocument::Create(debased64_token));
   if (!token_json.IsValid()) {
-    return 3;
+    return false;
   }
 
   const JSON* token_id =
@@ -97,31 +98,31 @@ int GetTokenPublicId(const std::string& token, std::string* public_id) {
       JsonDocument::SearchInObject(token_json->root(), "blob", JSON_STRING);
 
   if (token_id == NULL || blob == NULL) {
-    return 4;
+    return false;
   }
 
   *public_id = token_id->string_value;
 
-  return 0;
+  return true;
 }
 
 /*
  * Check the validity of a session token using the associated secret
  */
-int CheckToken(const std::string& token, const std::string& secret,
-               std::string* lease_path) {
+TokenCheckResult CheckToken(const std::string& token, const std::string& secret,
+                            std::string* lease_path) {
   if (!lease_path) {
-    return 1;
+    return kInvalid;
   }
 
   std::string debased64_token;
   if (!Debase64(token, &debased64_token)) {
-    return 2;
+    return kInvalid;
   }
 
   UniquePtr<JsonDocument> token_json(JsonDocument::Create(debased64_token));
   if (!token_json.IsValid()) {
-    return 2;
+    return kInvalid;
   }
 
   const JSON* token_id =
@@ -129,31 +130,31 @@ int CheckToken(const std::string& token, const std::string& secret,
   const JSON* blob =
       JsonDocument::SearchInObject(token_json->root(), "blob", JSON_STRING);
   if (token_id == NULL || blob == NULL) {
-    return 3;
+    return kInvalid;
   }
 
   std::string debased64_secret;
   if (!Debase64(secret, &debased64_secret)) {
-    return 4;
+    return kInvalid;
   }
   UniquePtr<cipher::Key> key(cipher::Key::CreateFromString(debased64_secret));
   if (!key.IsValid()) {
-    return 5;
+    return kInvalid;
   }
 
   std::string encrypted_body;
   if (!Debase64(blob->string_value, &encrypted_body)) {
-    return 6;
+    return kInvalid;
   }
 
   std::string body;
   if (!cipher::Cipher::Decrypt(encrypted_body, *key, &body)) {
-    return 7;
+    return kInvalid;
   }
 
   UniquePtr<JsonDocument> body_json(JsonDocument::Create(body));
   if (!token_json.IsValid()) {
-    return 8;
+    return kInvalid;
   }
 
   const JSON* path =
@@ -161,19 +162,19 @@ int CheckToken(const std::string& token, const std::string& secret,
   const JSON* expiry =
       JsonDocument::SearchInObject(body_json->root(), "expiry", JSON_STRING);
   if (path == NULL || expiry == NULL) {
-    return 9;
+    return kInvalid;
   }
 
   // TODO(radu): can we still use monotonic time if the process restarts?
   uint64_t expiry_time = String2Uint64(expiry->string_value);
   const uint64_t current_time = platform_monotonic_time();
   if (current_time > expiry_time) {
-    return 10;
+    return kExpired;
   }
 
   *lease_path = path->string_value;
 
-  return 0;
+  return kValid;
 }
 
 }  // namespace receiver

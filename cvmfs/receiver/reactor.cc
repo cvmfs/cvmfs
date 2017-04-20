@@ -127,14 +127,14 @@ bool Reactor::Run() {
   return true;
 }
 
-int Reactor::HandleGenerateToken(const std::string& req, std::string* reply) {
+bool Reactor::HandleGenerateToken(const std::string& req, std::string* reply) {
   if (reply == NULL) {
-    return 1;
+    return false;
   }
 
   UniquePtr<JsonDocument> req_json(JsonDocument::Create(req));
   if (!req_json.IsValid()) {
-    return 2;
+    return false;
   }
 
   const JSON* key_id =
@@ -145,17 +145,17 @@ int Reactor::HandleGenerateToken(const std::string& req, std::string* reply) {
       req_json->root(), "max_lease_time", JSON_INT);
 
   if (key_id == NULL || path == NULL || max_lease_time == NULL) {
-    return 3;
+    return false;
   }
 
   std::string session_token;
   std::string public_token_id;
   std::string token_secret;
 
-  if (GenerateSessionToken(key_id->string_value, path->string_value,
-                           max_lease_time->int_value, &session_token,
-                           &public_token_id, &token_secret)) {
-    return 4;
+  if (!GenerateSessionToken(key_id->string_value, path->string_value,
+                            max_lease_time->int_value, &session_token,
+                            &public_token_id, &token_secret)) {
+    return false;
   }
 
   JsonStringInput input;
@@ -165,17 +165,17 @@ int Reactor::HandleGenerateToken(const std::string& req, std::string* reply) {
 
   ToJsonString(input, reply);
 
-  return 0;
+  return true;
 }
 
-int Reactor::HandleGetTokenId(const std::string& req, std::string* reply) {
+bool Reactor::HandleGetTokenId(const std::string& req, std::string* reply) {
   if (reply == NULL) {
-    return 1;
+    return false;
   }
 
   std::string token_id;
   JsonStringInput input;
-  if (GetTokenPublicId(req, &token_id)) {
+  if (!GetTokenPublicId(req, &token_id)) {
     input.push_back(std::make_pair("status", "error"));
     input.push_back(std::make_pair("reason", "invalid_token"));
   } else {
@@ -184,17 +184,17 @@ int Reactor::HandleGetTokenId(const std::string& req, std::string* reply) {
   }
 
   ToJsonString(input, reply);
-  return 0;
+  return true;
 }
 
-int Reactor::HandleCheckToken(const std::string& req, std::string* reply) {
+bool Reactor::HandleCheckToken(const std::string& req, std::string* reply) {
   if (reply == NULL) {
-    return 1;
+    return false;
   }
 
   UniquePtr<JsonDocument> req_json(JsonDocument::Create(req));
   if (!req_json.IsValid()) {
-    return 2;
+    return false;
   }
 
   const JSON* token =
@@ -203,43 +203,53 @@ int Reactor::HandleCheckToken(const std::string& req, std::string* reply) {
       JsonDocument::SearchInObject(req_json->root(), "secret", JSON_STRING);
 
   if (token == NULL || secret == NULL) {
-    return 3;
+    return false;
   }
 
   std::string path;
   JsonStringInput input;
-  int ret = CheckToken(token->string_value, secret->string_value, &path);
-  if (ret == 10) {
-    // Expired token
-    input.push_back(std::make_pair("status", "error"));
-    input.push_back(std::make_pair("reason", "expired_token"));
-  } else if (ret > 0) {
-    // Invalid token
-    input.push_back(std::make_pair("status", "error"));
-    input.push_back(std::make_pair("reason", "invalid_token"));
-  } else {
-    // All ok
-    input.push_back(std::make_pair("status", "ok"));
-    input.push_back(std::make_pair("path", path.c_str()));
+  TokenCheckResult ret =
+      CheckToken(token->string_value, secret->string_value, &path);
+  switch (ret) {
+    case kExpired:
+      // Expired token
+      input.push_back(std::make_pair("status", "error"));
+      input.push_back(std::make_pair("reason", "expired_token"));
+      break;
+    case kInvalid:
+      // Invalid token
+      input.push_back(std::make_pair("status", "error"));
+      input.push_back(std::make_pair("reason", "invalid_token"));
+      break;
+    case kValid:
+      // All ok
+      input.push_back(std::make_pair("status", "ok"));
+      input.push_back(std::make_pair("path", path.c_str()));
+      break;
+    default:
+      // Should not be reached
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "Reactor::HandleCheckToken - Unknown value received. Exiting.");
+      abort();
   }
 
   ToJsonString(input, reply);
-  return 0;
+  return true;
 }
 
 // This is a special handler. We need to continue reading the payload from the
 // fdin_
-int Reactor::HandleSubmitPayload(int fdin, const std::string& req,
-                                 std::string* reply) {
+bool Reactor::HandleSubmitPayload(int fdin, const std::string& req,
+                                  std::string* reply) {
   if (!reply) {
-    return 1;
+    return false;
   }
 
   // Extract the Path (used for verification), Digest and DigestSize from the
   // request JSON.
   UniquePtr<JsonDocument> req_json(JsonDocument::Create(req));
   if (!req_json.IsValid()) {
-    return 2;
+    return false;
   }
 
   const JSON* path_json =
@@ -250,7 +260,7 @@ int Reactor::HandleSubmitPayload(int fdin, const std::string& req,
       JsonDocument::SearchInObject(req_json->root(), "header_size", JSON_INT);
 
   if (path_json == NULL || digest_json == NULL || header_size_json == NULL) {
-    return 3;
+    return false;
   }
 
   UniquePtr<PayloadProcessor> proc(MakePayloadProcessor());
@@ -280,7 +290,7 @@ int Reactor::HandleSubmitPayload(int fdin, const std::string& req,
 
   ToJsonString(reply_input, reply);
 
-  return 0;
+  return true;
 }
 
 PayloadProcessor* Reactor::MakePayloadProcessor() {
@@ -298,19 +308,19 @@ bool Reactor::HandleRequest(Request req, const std::string& data) {
       ok = WriteReply(fdout_, data);
       break;
     case kGenerateToken:
-      ok &= (HandleGenerateToken(data, &reply) == 0);
+      ok &= HandleGenerateToken(data, &reply);
       ok &= WriteReply(fdout_, reply);
       break;
     case kGetTokenId:
-      ok &= (HandleGetTokenId(data, &reply) == 0);
+      ok &= HandleGetTokenId(data, &reply);
       ok &= WriteReply(fdout_, reply);
       break;
     case kCheckToken:
-      ok &= (HandleCheckToken(data, &reply) == 0);
+      ok &= HandleCheckToken(data, &reply);
       ok &= WriteReply(fdout_, reply);
       break;
     case kSubmitPayload:
-      ok &= (HandleSubmitPayload(fdin_, data, &reply) == 0);
+      ok &= HandleSubmitPayload(fdin_, data, &reply);
       ok &= WriteReply(fdout_, reply);
       break;
     case kError:
