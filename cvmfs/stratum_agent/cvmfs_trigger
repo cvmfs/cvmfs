@@ -82,6 +82,8 @@ my $color_running = 'cyan';
 my $color_fail = 'red';
 my $color_success = 'green';
 
+my $retcode = 0;
+
 # Trigger replication jobs
 my $last_ypos = 0;
 foreach my $endpoint (keys %{$url_db{'endpoints'}}) {
@@ -123,6 +125,7 @@ foreach my $endpoint (keys %{$url_db{'endpoints'}}) {
   my $response = $ua->simple_request($request);
 
   if (not $response->is_success) {
+    $retcode = 1;
     $url_db{'endpoints'}{$endpoint}{'status'} = 'stuck';
     $url_db{'endpoints'}{$endpoint}{'stderr'} =
       "cannot trigger replication at $endpoint:\n" .
@@ -167,6 +170,7 @@ while (1) {
         $container->set_color_bfg($color_success);
         $container->set_color_tfg($color_success);
       } else {
+        $retcode = 1;
         $textviewer->set_color_fg($color_fail);
         $container->set_color_bfg($color_fail);
         $container->set_color_tfg($color_fail);
@@ -188,4 +192,4 @@ foreach my $endpoint (keys %{$url_db{'endpoints'}}) {
   print("$name: $status\n\r");
 }
 
-exit 0;
+exit $retcode;
