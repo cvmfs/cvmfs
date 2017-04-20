@@ -446,11 +446,6 @@ bool ObjectPackConsumer::ParseItem(const std::string &line,
     shash::HexPtr hex_ptr(hash_string);
 
     entry->id = shash::MkFromSuffixedHexPtr(hex_ptr);
-
-    if (entry->id.IsNull()) {
-      return false;
-    }
-
     entry->size = size;
     entry->entry_type = entry_type;
     entry->entry_name = "";
@@ -484,16 +479,8 @@ bool ObjectPackConsumer::ParseItem(const std::string &line,
     // The constructor takes the address of its argument.
     const std::string hash_string = line.substr(2, separator1 - 2);
     shash::HexPtr hex_ptr(hash_string);
-    if (!hex_ptr.IsValid()) {
-      return false;
-    }
-
-    if (entry->id.IsNull()) {
-      return false;
-    }
 
     entry->id = shash::MkFromSuffixedHexPtr(hex_ptr);
-
     entry->size = size;
     entry->entry_type = entry_type;
     entry->entry_name = name;
