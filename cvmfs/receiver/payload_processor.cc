@@ -8,7 +8,7 @@
 #include <unistd.h>
 #include <vector>
 
-#include "../logging.h"
+#include "logging.h"
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -95,24 +95,35 @@ void PayloadProcessor::ConsumerEventCallback(
     if (static_cast<unsigned int>(nb) != event.buf_size) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Unable to write %s", tmp_path.c_str());
       num_errors_++;
-      RemoveTree(tmp_path);
+      unlink(tmp_path.c_str());
+      close(fdout);
       return;
     }
 
     // Atomically move to final destination
+    // TODO(radu): It would be nice to hook this into the spooler/uploader
+    // components, allowing, for instance to upload from the gateway to S3
     const std::string dest = "/srv/cvmfs/" + current_repo_ + "/data/" + path;
-    if (rename(tmp_path.c_str(), dest.c_str())) {
+    if (RenameFile(tmp_path.c_str(), dest.c_str())) {
       LogCvmfs(kLogCvmfs, kLogStderr,
                "Unable to move file to final destination: %s", dest.c_str());
       num_errors_++;
+      close(fdout);
       return;
     }
+
+    close(fdout);
   }
 }
 
 int PayloadProcessor::WriteFile(int fd, const void* const buf,
                                 size_t buf_size) {
-  return write(fd, buf, buf_size);
+  return SafeWrite(fd, buf, buf_size);
+}
+
+int PayloadProcessor::RenameFile(const std::string& old_name,
+                                 const std::string& new_name) {
+  return rename(old_name.c_str(), new_name.c_str());
 }
 
 }  // namespace receiver

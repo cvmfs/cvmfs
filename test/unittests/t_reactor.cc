@@ -25,6 +25,11 @@ class MockedPayloadProcessor : public PayloadProcessor {
     // NO OP
     return buf_size;
   }
+  virtual int RenameFile(const std::string& /*old_name*/,
+                         const std::string& /*new_name*/) {
+    // NO OP
+    return 0;
+  }
 };
 
 class MockedReactor : public Reactor {
