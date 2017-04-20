@@ -348,7 +348,7 @@ if(BUILD_RECEIVER)
     )
 
   add_executable(cvmfs_receiver ${CVMFS_RECEIVER_SOURCES})
-  target_link_libraries(cvmfs_receiver ${SHA3_LIBRARIES} ${VJSON_LIBRARIES} ${OPENSSL_LIBRARIES} ${UUID_LIBRARIES} pthread)
+  target_link_libraries(cvmfs_receiver ${SHA3_LIBRARIES} ${VJSON_LIBRARIES} ${OPENSSL_LIBRARIES} ${UUID_LIBRARIES} ${RT_LIBRARY} pthread)
 endif(BUILD_RECEIVER)
 
 
