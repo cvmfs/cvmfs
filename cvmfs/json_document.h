@@ -6,11 +6,16 @@
 #define CVMFS_JSON_DOCUMENT_H_
 
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "json.h"
 #include "util/single_copy.h"
 
 typedef struct json_value JSON;
+typedef std::vector<std::pair<const char *, const char *> > JsonStringInput;
+
+bool ToJsonString(const JsonStringInput &input, std::string *output);
 
 class JsonDocument : SingleCopy {
  public:
@@ -20,19 +25,18 @@ class JsonDocument : SingleCopy {
   std::string PrintCanonical();
   std::string PrintPretty();
 
-  inline const JSON* root() const { return root_; }
+  inline const JSON *root() const { return root_; }
   inline bool IsValid() const { return root_ != NULL; }
 
   static std::string EscapeString(const std::string &input);
-  static JSON *SearchInObject(const JSON *json_object,
-                              const std::string &name,
+  static JSON *SearchInObject(const JSON *json_object, const std::string &name,
                               const json_type type);
 
  private:
   static const unsigned kDefaultBlockSize = 2048;  // 2kB
 
   struct PrintOptions {
-    PrintOptions() : with_whitespace(false), num_indent(0) { }
+    PrintOptions() : with_whitespace(false), num_indent(0) {}
     bool with_whitespace;
     unsigned num_indent;
   };
@@ -43,9 +47,9 @@ class JsonDocument : SingleCopy {
   std::string PrintArray(JSON *first_child, PrintOptions print_options);
   std::string PrintObject(JSON *first_child, PrintOptions print_options);
 
-  block_allocator  allocator_;
-  JSON            *root_;
-  char            *raw_text_;
+  block_allocator allocator_;
+  JSON *root_;
+  char *raw_text_;
 };
 
 #endif  // CVMFS_JSON_DOCUMENT_H_

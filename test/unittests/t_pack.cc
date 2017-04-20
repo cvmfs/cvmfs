@@ -41,6 +41,17 @@ class ConsumerCallbacks {
   unsigned verify_errors;
 };
 
+class PreserveContentCallbacks {
+ public:
+  PreserveContentCallbacks() : hash_string_recovered_() {}
+
+  void OnEvent(const ObjectPackBuild::Event &event) {
+    hash_string_recovered_ = event.id.ToString(true);
+  }
+
+  std::string hash_string_recovered_;
+};
+
 class T_Pack : public ::testing::Test {
  protected:
   virtual void SetUp() {
@@ -130,6 +141,9 @@ class T_Pack : public ::testing::Test {
   string foo_path_;
   FILE *ffoo_;
   string foo_content_;
+
+ public:
+  string hash_string_saved_;
 };
 
 TEST_F(T_Pack, Bucket) {
@@ -368,4 +382,31 @@ TEST_F(T_Pack, RealWorld) { RealWorld(); }
 
 TEST_F(T_Pack, RealWorldSlow) {
   for (unsigned i = 0; i < 64; ++i) RealWorld();
+}
+
+TEST_F(T_Pack, PreserveContentHash) {
+  shash::Any content_hash(shash::kSha1);
+  std::vector<uint8_t> buffer(4096, 6);
+  shash::HashMem(&buffer[0], buffer.size(), &content_hash);
+
+  hash_string_saved_ = content_hash.ToString(true);
+
+  ObjectPack pack;
+  ObjectPack::BucketHandle hd = pack.NewBucket();
+  ObjectPack::AddToBucket(&buffer[0], buffer.size(), hd);
+  pack.CommitBucket(ObjectPack::kCas, content_hash, hd, "");
+
+  ObjectPackProducer serializer(&pack);
+
+  shash::Any digest(shash::kSha1);
+  serializer.GetDigest(&digest);
+  ObjectPackConsumer deserializer(digest, serializer.GetHeaderSize());
+
+  PreserveContentCallbacks cb;
+  deserializer.RegisterListener(&PreserveContentCallbacks::OnEvent, &cb);
+
+  unsigned char buf[8192];
+  unsigned nbytes = serializer.ProduceNext(8192, buf);
+  EXPECT_EQ(ObjectPackBuild::kStateDone, deserializer.ConsumeNext(nbytes, buf));
+  EXPECT_EQ(hash_string_saved_, cb.hash_string_recovered_);
 }

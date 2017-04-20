@@ -33,8 +33,8 @@ TEST_F(T_SessionContext, BasicLifeCycle) {
   EXPECT_TRUE(ctx.Initialize("http://my.repo.address:8080/api/v1",
                              "/path/to/the/session_file", "some_key_id",
                              "some_secret"));
-  EXPECT_EQ(ctx.num_jobs_dispatched_, 0);
-  EXPECT_EQ(ctx.num_jobs_finished_, 0);
+  EXPECT_EQ(0, ctx.num_jobs_dispatched_);
+  EXPECT_EQ(0, ctx.num_jobs_finished_);
 
   ObjectPack::BucketHandle hd = ctx.NewBucket();
 
@@ -44,10 +44,10 @@ TEST_F(T_SessionContext, BasicLifeCycle) {
 
   shash::Any hash(shash::kSha1);
   EXPECT_TRUE(ctx.CommitBucket(ObjectPack::kCas, hash, hd, "", true));
-  EXPECT_EQ(ctx.num_jobs_dispatched_, 1);
+  EXPECT_EQ(1, ctx.num_jobs_dispatched_);
 
   EXPECT_TRUE(ctx.Finalize());
-  EXPECT_EQ(ctx.num_jobs_finished_, 1);
+  EXPECT_EQ(1, ctx.num_jobs_finished_);
 }
 
 TEST_F(T_SessionContext, MultipleFiles) {
@@ -55,8 +55,8 @@ TEST_F(T_SessionContext, MultipleFiles) {
   EXPECT_TRUE(ctx.Initialize("http://my.repo.address:8080/api/v1",
                              "/path/to/the/session_file", "some_key_id",
                              "some_secret", false, 20000));
-  EXPECT_EQ(ctx.num_jobs_dispatched_, 0);
-  EXPECT_EQ(ctx.num_jobs_finished_, 0);
+  EXPECT_EQ(0, ctx.num_jobs_dispatched_);
+  EXPECT_EQ(0, ctx.num_jobs_finished_);
 
   for (int i = 0; i < 10; ++i) {
     ObjectPack::BucketHandle hd = ctx.NewBucket();
@@ -68,10 +68,10 @@ TEST_F(T_SessionContext, MultipleFiles) {
     shash::Any hash(shash::kSha1);
     EXPECT_TRUE(ctx.CommitBucket(ObjectPack::kCas, hash, hd, ""));
   }
-  EXPECT_EQ(ctx.num_jobs_dispatched_, 2);
+  EXPECT_EQ(2, ctx.num_jobs_dispatched_);
 
   EXPECT_TRUE(ctx.Finalize());
-  EXPECT_EQ(ctx.num_jobs_finished_, 3);
+  EXPECT_EQ(3, ctx.num_jobs_finished_);
 }
 
 TEST_F(T_SessionContext, MultipleFilesForcedDispatchLast) {
@@ -79,8 +79,8 @@ TEST_F(T_SessionContext, MultipleFilesForcedDispatchLast) {
   EXPECT_TRUE(ctx.Initialize("http://my.repo.address:8080/api/v1",
                              "/path/to/the/session_file", "some_key_id",
                              "some_secret", false, 20000));
-  EXPECT_EQ(ctx.num_jobs_dispatched_, 0);
-  EXPECT_EQ(ctx.num_jobs_finished_, 0);
+  EXPECT_EQ(0, ctx.num_jobs_dispatched_);
+  EXPECT_EQ(0, ctx.num_jobs_finished_);
 
   for (int i = 0; i < 10; ++i) {
     ObjectPack::BucketHandle hd = ctx.NewBucket();
@@ -93,10 +93,10 @@ TEST_F(T_SessionContext, MultipleFilesForcedDispatchLast) {
     const bool dispatch = i == 9;
     EXPECT_TRUE(ctx.CommitBucket(ObjectPack::kCas, hash, hd, "", dispatch));
   }
-  EXPECT_EQ(ctx.num_jobs_dispatched_, 3);
+  EXPECT_EQ(3, ctx.num_jobs_dispatched_);
 
   EXPECT_TRUE(ctx.Finalize());
-  EXPECT_EQ(ctx.num_jobs_finished_, 3);
+  EXPECT_EQ(3, ctx.num_jobs_finished_);
 }
 
 TEST_F(T_SessionContext, MultipleFilesForcedDispatchEach) {
@@ -104,8 +104,8 @@ TEST_F(T_SessionContext, MultipleFilesForcedDispatchEach) {
   EXPECT_TRUE(ctx.Initialize("http://my.repo.address:8080/api/v1",
                              "/path/to/the/session_file", "some_key_id",
                              "some_secret", false, 20000));
-  EXPECT_EQ(ctx.num_jobs_dispatched_, 0);
-  EXPECT_EQ(ctx.num_jobs_finished_, 0);
+  EXPECT_EQ(0, ctx.num_jobs_dispatched_);
+  EXPECT_EQ(0, ctx.num_jobs_finished_);
 
   for (int i = 0; i < 10; ++i) {
     ObjectPack::BucketHandle hd = ctx.NewBucket();
@@ -117,10 +117,10 @@ TEST_F(T_SessionContext, MultipleFilesForcedDispatchEach) {
     shash::Any hash(shash::kSha1);
     EXPECT_TRUE(ctx.CommitBucket(ObjectPack::kCas, hash, hd, "", true));
   }
-  EXPECT_EQ(ctx.num_jobs_dispatched_, 10);
+  EXPECT_EQ(10, ctx.num_jobs_dispatched_);
 
   EXPECT_TRUE(ctx.Finalize());
-  EXPECT_EQ(ctx.num_jobs_finished_, 10);
+  EXPECT_EQ(10, ctx.num_jobs_finished_);
 }
 
 TEST_F(T_SessionContext, FirstAddAllThenCommit) {
@@ -128,8 +128,8 @@ TEST_F(T_SessionContext, FirstAddAllThenCommit) {
   EXPECT_TRUE(ctx.Initialize("http://my.repo.address:8080/api/v1",
                              "/path/to/the/session_file", "some_key_id",
                              "some_secret", false, 20000));
-  EXPECT_EQ(ctx.num_jobs_dispatched_, 0);
-  EXPECT_EQ(ctx.num_jobs_finished_, 0);
+  EXPECT_EQ(0, ctx.num_jobs_dispatched_);
+  EXPECT_EQ(0, ctx.num_jobs_finished_);
 
   std::vector<ObjectPack::BucketHandle> hds(0);
   for (int i = 0; i < 10; ++i) {
@@ -146,6 +146,6 @@ TEST_F(T_SessionContext, FirstAddAllThenCommit) {
   }
 
   EXPECT_TRUE(ctx.Finalize());
-  EXPECT_EQ(ctx.num_jobs_dispatched_, 3);
-  EXPECT_EQ(ctx.num_jobs_finished_, 3);
+  EXPECT_EQ(3, ctx.num_jobs_dispatched_);
+  EXPECT_EQ(3, ctx.num_jobs_finished_);
 }

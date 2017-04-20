@@ -332,6 +332,27 @@ set (CVMFS_STRATUM_AGENT_SOURCES
 )
 
 
+if(BUILD_RECEIVER)
+  set (CVMFS_RECEIVER_SOURCES
+    receiver/payload_processor.cc
+    receiver/reactor.cc
+    receiver/receiver.cc
+    receiver/session_token.cc
+    encrypt.cc
+    hash.cc
+    json_document.cc
+    logging.cc
+    pack.cc
+    util/posix.cc
+    util/string.cc
+    uuid.cc
+    )
+
+  add_executable(cvmfs_receiver ${CVMFS_RECEIVER_SOURCES})
+  target_link_libraries(cvmfs_receiver ${SHA3_LIBRARIES} ${VJSON_LIBRARIES} ${OPENSSL_LIBRARIES} ${UUID_LIBRARIES} ${RT_LIBRARY} pthread)
+endif(BUILD_RECEIVER)
+
+
 #
 # configure some compiler flags for proper build
 #
@@ -669,6 +690,14 @@ if (BUILD_LIBCVMFS_CACHE)
     DESTINATION  ${CVMFS_LIBEXEC_DIR}/cache
   )
 endif (BUILD_LIBCVMFS_CACHE)
+
+if (BUILD_RECEIVER)
+  install (
+    TARGETS cvmfs_receiver
+    RUNTIME
+    DESTINATION bin
+    )
+endif(BUILD_RECEIVER)
 
 if (BUILD_SERVER)
   install (
