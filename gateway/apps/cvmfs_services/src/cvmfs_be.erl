@@ -15,7 +15,7 @@
 %% API
 -export([start_link/1
         ,new_lease/3, end_lease/2
-        ,submit_payload/4]).
+        ,submit_payload/2]).
 
 -export([get_repos/1
         ,check_hmac/4
@@ -25,7 +25,11 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
--define(SERVER, ?MODULE).
+
+%% Constants
+% Timeout of asychronous request handling == 30min
+-define(ASYNC_TIMEOUT, 1000 * 60 * 30).
+
 
 %%%===================================================================
 %%% Type specifications
@@ -34,14 +38,6 @@
                             {error, invalid_key} |
                             {error, invalid_path} |
                             {path_busy, TimeRemaining :: binary()}.
--type submission_error() :: {error,
-                             lease_expired |
-                             invalid_lease |
-                             invalid_key |
-                             invalid_macaroon}.
--type submit_payload_result() :: {ok, payload_added} |
-                                 {ok, payload_added, lease_ended} |
-                                 submission_error().
 
 
 %%%===================================================================
@@ -58,7 +54,7 @@
                               when Args :: term(), Pid :: pid(),
                                    Error :: {already_start, pid()} | term().
 start_link(_) ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -91,6 +87,7 @@ new_lease(Uid, KeyId, Path) ->
 end_lease(Uid, LeaseToken) ->
     gen_server:call(?MODULE, {be_req, end_lease, {Uid, LeaseToken}}).
 
+
 %%--------------------------------------------------------------------
 %% @doc
 %% Submit a new payload
@@ -98,15 +95,12 @@ end_lease(Uid, LeaseToken) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec submit_payload(Uid, LeaseToken, Payload, Digest) ->
-                            submit_payload_result()
+-spec submit_payload(Uid, SubmissionData) ->
+                            cvmfs_receiver:submit_payload_result()
                                 when Uid :: binary(),
-                                     LeaseToken :: binary(),
-                                     Payload :: binary(),
-                                     Digest :: binary().
-submit_payload(Uid, LeaseToken, Payload, Digest) ->
-    gen_server:call(?MODULE, {be_req, submit_payload, {Uid, LeaseToken,
-                                                       Payload, Digest}}).
+                                     SubmissionData :: cvmfs_receiver:payload_submission_data().
+submit_payload(Uid, SubmissionData) ->
+    gen_server:call(?MODULE, {be_req, submit_payload, {Uid, SubmissionData}}).
 
 
 -spec get_repos(Uid :: binary()) -> [binary()].
@@ -149,44 +143,79 @@ init([]) ->
 %% @doc
 %% Handling call messages
 %%
+%% Note on asynchronicity:
+%%
+%% As part of each request, the frontend (cvmfs_fe) calls into the
+%% backend (cvmfs_be), which then calls into different submodules.
+%% Each backend API call will be made from different processes,
+%% since Cowboy spawns a new process for each request. To avoid
+%% blocking the gen_server, in the handle_call callback, we always
+%% return {noreply, State}, to block the calling process and
+%% dispatch the actual request handling to a new subprocess, which
+%% will later complete the request using gen_server:reply.
+%%
 %% @end
 %%--------------------------------------------------------------------
-handle_call({be_req, new_lease, {Uid, KeyId, Path}}, _From, State) ->
-    case p_new_lease(KeyId, Path) of
-        {ok, LeaseToken} ->
-            lager:info("Backend request: Uid: ~p - {new_lease, {~p, ~p}} -> Reply: ~p",
-                       [Uid, KeyId, Path, LeaseToken]),
-            {reply, {ok, LeaseToken}, State};
-        Other ->
-            lager:info("Backend request: Uid: ~p - {new_lease, {~p, ~p}} -> Reply: ~p",
-                       [Uid, KeyId, Path, Other]),
-            {reply, Other, State}
-    end;
-handle_call({be_req, end_lease, {Uid, LeaseToken}}, _From, State) ->
-    Reply = p_end_lease(LeaseToken),
-    lager:info("Backend request: Uid: ~p - {end_lease, ~p} -> Reply: ~p",
-               [Uid, LeaseToken, Reply]),
-    {reply, Reply, State};
-handle_call({be_req, submit_payload,
-             {Uid, LeaseToken, Payload, Digest}}, _From, State) ->
-    Reply = p_submit_payload(LeaseToken, Payload, Digest),
-    lager:info("Backend request: Uid: ~p - {submit_payload, {~p, ~p, ~p}} -> Reply: ~p",
-               [Uid, LeaseToken, <<"payload_not_shown">>, Digest, Reply]),
-    {reply, Reply, State};
-handle_call({be_req, get_repos, Uid}, _From, State) ->
-    Reply = p_get_repos(),
-    lager:info("Backend request: Uid: ~p - {get_repos} -> Reply: ~p",
-               [Uid, Reply]),
-    {reply, Reply, State};
-handle_call({be_req, check_hmac, {Uid, Message, KeyId, HMAC}}, _From, State) ->
-    Reply = p_check_hmac(Message, KeyId, HMAC),
-    lager:info("Backend request: Uid: ~p - {check_hmac, {~p, ~p, ~p}} -> Reply: ~p",
-               [Uid, Message, KeyId, HMAC, Reply]),
-    {reply, Reply, State};
-handle_call({be_req, unique_id}, _From, State) ->
-    Reply = p_unique_id(),
-    lager:info("Backend request: {unique_id} -> Reply: ~p", [Reply]),
-    {reply, Reply, State}.
+handle_call({be_req, new_lease, {Uid, KeyId, Path}}, From, State) ->
+    Task = fun() ->
+                   case p_new_lease(KeyId, Path) of
+                       {ok, LeaseToken} ->
+                           lager:info("Backend request: Uid: ~p - {new_lease, {~p, ~p}} -> Reply: ~p",
+                                      [Uid, KeyId, Path, LeaseToken]),
+                           gen_server:reply(From, {ok, LeaseToken});
+                       Other ->
+                           lager:info("Backend request: Uid: ~p - {new_lease, {~p, ~p}} -> Reply: ~p",
+                                      [Uid, KeyId, Path, Other]),
+                           gen_server:reply(From, Other)
+                   end
+           end,
+    spawn_link(Task),
+    {noreply, State, ?ASYNC_TIMEOUT};
+handle_call({be_req, end_lease, {Uid, LeaseToken}}, From, State) ->
+    Task = fun() ->
+                   Reply = p_end_lease(LeaseToken),
+                   lager:info("Backend request: Uid: ~p - {end_lease, ~p} -> Reply: ~p",
+                              [Uid, LeaseToken, Reply]),
+                   gen_server:reply(From, Reply)
+           end,
+    spawn_link(Task),
+    {noreply, State, ?ASYNC_TIMEOUT};
+handle_call({be_req, submit_payload, {Uid, SubmissionData}}, From, State) ->
+    Task = fun() ->
+                   Reply = p_submit_payload(SubmissionData),
+                   {LeaseToken, _Payload, Digest, HeaderSize} = SubmissionData,
+                   lager:info("Backend request: Uid: ~p - {submit_payload, {~p, ~p, ~p, ~p}} -> Reply: ~p",
+                              [Uid, LeaseToken, <<"payload_not_shown">>, Digest, HeaderSize, Reply]),
+                   gen_server:reply(From, Reply)
+           end,
+    spawn_link(Task),
+    {noreply, State, ?ASYNC_TIMEOUT};
+handle_call({be_req, get_repos, Uid}, From, State) ->
+    Task = fun() ->
+                   Reply = p_get_repos(),
+                   lager:info("Backend request: Uid: ~p - {get_repos} -> Reply: ~p",
+                              [Uid, Reply]),
+                   gen_server:reply(From, Reply)
+              end,
+    spawn_link(Task),
+    {noreply, State, ?ASYNC_TIMEOUT};
+handle_call({be_req, check_hmac, {Uid, Message, KeyId, HMAC}}, From, State) ->
+    Task = fun() ->
+                   Reply = p_check_hmac(Message, KeyId, HMAC),
+                   lager:info("Backend request: Uid: ~p - {check_hmac, {~p, ~p, ~p}} -> Reply: ~p",
+                              [Uid, Message, KeyId, HMAC, Reply]),
+                   gen_server:reply(From, Reply)
+           end,
+    spawn_link(Task),
+    {noreply, State, ?ASYNC_TIMEOUT};
+handle_call({be_req, unique_id}, From, State) ->
+    Task = fun() ->
+                   Reply = p_unique_id(),
+                   lager:info("Backend request: {unique_id} -> Reply: ~p", [Reply]),
+                   gen_server:reply(From,Reply)
+           end,
+    spawn_link(Task),
+    {noreply, State, ?ASYNC_TIMEOUT}.
 
 
 %%--------------------------------------------------------------------
@@ -207,6 +236,9 @@ handle_cast(Msg, State) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+handle_info({'EXIT', Pid, normal}, State) ->
+    lager:info("Task ~p finished", [Pid]),
+    {noreply, State};
 handle_info(Info, State) ->
     lager:warning("Unknown message received: ~p", [Info]),
     {noreply, State}.
@@ -248,7 +280,10 @@ p_new_lease(KeyId, Path) ->
     [Repo | _]  = binary:split(Path, <<"/">>),
     case cvmfs_auth:check_keyid_for_repo(KeyId, Repo) of
         {ok, true} ->
-            {Public, Secret, Token} = p_generate_token(KeyId, Path),
+            {ok, MaxLeaseTime} = application:get_env(cvmfs_services, max_lease_time),
+            {Public, Secret, Token} = cvmfs_receiver:generate_token(KeyId,
+                                                                    Path,
+                                                                    MaxLeaseTime),
             case cvmfs_lease:request_lease(KeyId, Path, Public, Secret) of
                 ok ->
                     {ok, Token};
@@ -265,97 +300,30 @@ p_new_lease(KeyId, Path) ->
 -spec p_end_lease(LeaseToken) -> ok | {error, invalid_macaroon}
                                      when LeaseToken :: binary().
 p_end_lease(LeaseToken) ->
-    case macaroon:deserialize(LeaseToken) of
-        {ok, M} ->
-            Public = macaroon:identifier(M),
-            cvmfs_lease:end_lease(Public);
-        _ ->
-            {error, invalid_macaroon}
-    end.
-
--spec p_submit_payload(LeaseToken, Payload, Digest) ->
-                              submit_payload_result()
-                                  when LeaseToken :: binary(),
-                                       Payload :: binary(),
-                                       Digest :: binary().
-p_submit_payload(LeaseToken, Payload, Digest) ->
-    case p_check_payload(LeaseToken, Payload, Digest) of
-        {ok, _Public} ->
-            %% TODO: submit payload to GW
-            {ok, payload_added};
-        {error, {unverified_caveat, <<"time < ", _/binary>>}} ->
-            {error, lease_expired};
-        {error, Reason} ->
-            {error, Reason}
-    end.
+    Result = case cvmfs_receiver:get_token_id(LeaseToken) of
+                 {ok, Public} ->
+                     cvmfs_lease:end_lease(Public);
+                 _ ->
+                     {error, invalid_macaroon}
+             end,
+    Result.
 
 
--spec p_generate_token(KeyId, Path) -> {Token, Public, Secret}
-                                           when KeyId :: binary(),
-                                                Path :: binary(),
-                                                Token :: binary(),
-                                                Public :: binary(),
-                                                Secret :: binary().
-p_generate_token(KeyId, Path) ->
-    Secret = enacl_p:randombytes(macaroon:suggested_secret_length()),
-    Public = <<KeyId/binary,Path/binary>>,
-    Location = <<"">>, %% Location isn't used
-    M = macaroon:create(Location, Secret, Public),
-
-    {ok, MaxLeaseTime} = application:get_env(cvmfs_services, max_lease_time),
-    Time = erlang:system_time(milli_seconds) + MaxLeaseTime,
-
-    M1 = macaroon:add_first_party_caveat(M,
-                                         "time < " ++ erlang:integer_to_binary(Time)),
-
-    %%M3 = macaroon:add_first_party_caveat(M2, "path = " ++ Path),
-
-    {ok, Token} = macaroon:serialize(M1),
-    {Public, Secret, Token}.
-
-
--spec p_check_payload(LeaseToken, Payload, Digest) ->
-                             {ok, Public} | {error, invalid_macaroon |
-                                             {unverified_caveat, Caveat}}
-                                 when LeaseToken :: binary(),
-                                      Payload :: binary(),
-                                      Digest :: binary(),
-                                      Public :: binary(),
-                                      Caveat :: binary().
-p_check_payload(LeaseToken, _Payload, _Digest) ->
-    % Here we should perform all sanity checks on the request
-    % Verify lease token (check user, check time-stamp, extract path).
-    case  macaroon:deserialize(LeaseToken) of
-        {ok, M} ->
-            Public = macaroon:identifier(M),
+-spec p_submit_payload(SubmissionData) -> cvmfs_receiver:submit_payload_result()
+                                  when SubmissionData :: cvmfs_receiver:payload_submission_data().
+p_submit_payload({LeaseToken, _Payload, _Digest, _HeaderSize} = SubmissionData) ->
+    Result = case cvmfs_receiver:get_token_id(LeaseToken) of
+        {ok, Public} ->
             case cvmfs_lease:check_lease(Public) of
                 {ok, Secret} ->
-                    CheckTime = fun(<<"time < ", Exp/binary>>) ->
-                                        erlang:binary_to_integer(Exp)
-                                            > erlang:system_time(milli_seconds);
-                                   (_) ->
-                                        false
-                                end,
-                    %% CheckPaths = fun(_) ->
-                    %%                      true
-                    %%              end,
-
-                    V = macaroon_verifier:create(),
-                    V1 = macaroon_verifier:satisfy_general(V, CheckTime),
-                    %% V3 = macaroon_verifier:satisfy_general(V2, CheckPaths),
-
-                    case macaroon_verifier:verify(V1, M, Secret) of
-                        ok ->
-                            {ok, Public};
-                        {error, Reason} ->
-                            {error, Reason}
-                    end;
+                    cvmfs_receiver:submit_payload(SubmissionData, Secret);
                 {error, Reason} ->
                     {error, Reason}
             end;
-        _ ->
-            {error, invalid_macaroon}
-    end.
+        {error, Reason} ->
+            {error, Reason}
+             end,
+    Result.
 
 
 -spec p_get_repos() -> [binary()].

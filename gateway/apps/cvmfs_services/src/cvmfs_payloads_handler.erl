@@ -63,13 +63,15 @@ init(Req0 = #{method := <<"POST">>}, State) ->
     {Status, Reply, Req2} = case jsx:decode(JSONMessage, [return_maps]) of
                                 #{<<"session_token">> := Token
                                  ,<<"payload_digest">> := PayloadDigest
+                                 ,<<"header_size">> := HeaderSize
                                  ,<<"api_version">> := ClientApiVersion} ->
                                     Rep = case cvmfs_be:check_hmac(Uid, JSONMessage, KeyId, ClientHMAC) of
                                               true ->
                                                   p_submit_payload(Uid,
-                                                                   Token,
-                                                                   Payload,
-                                                                   PayloadDigest,
+                                                                   {Token,
+                                                                    Payload,
+                                                                    PayloadDigest,
+                                                                    binary_to_integer(HeaderSize)},
                                                                    ClientApiVersion);
                                               false ->
                                                   #{<<"status">> => <<"error">>,
@@ -91,8 +93,8 @@ init(Req0 = #{method := <<"POST">>}, State) ->
 %% Private functions
 
 
-p_submit_payload(Uid, Token, Payload, PayloadDigest, _ClientApiVersion) ->
-    case cvmfs_be:submit_payload(Uid, Token, Payload, PayloadDigest) of
+p_submit_payload(Uid, SubmissionData, _ClientApiVersion) ->
+    case cvmfs_be:submit_payload(Uid, SubmissionData) of
         {ok, payload_added} ->
             #{<<"status">> => <<"ok">>};
         {error, Reason} ->
