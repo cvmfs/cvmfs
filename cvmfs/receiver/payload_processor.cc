@@ -91,6 +91,12 @@ void PayloadProcessor::ConsumerEventCallback(
     }
 
     int fdout = open(tmp_path.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0600);
+    if (fdout == -1) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "Unable to open temporary output file: %s", tmp_path.c_str());
+      return;
+    }
+
     if (!WriteFile(fdout, event.buf, event.buf_size)) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Unable to write %s", tmp_path.c_str());
       num_errors_++;
@@ -98,6 +104,7 @@ void PayloadProcessor::ConsumerEventCallback(
       close(fdout);
       return;
     }
+    close(fdout);
 
     // Atomically move to final destination
     // TODO(radu): It would be nice to hook this into the spooler/uploader
@@ -107,11 +114,8 @@ void PayloadProcessor::ConsumerEventCallback(
       LogCvmfs(kLogCvmfs, kLogStderr,
                "Unable to move file to final destination: %s", dest.c_str());
       num_errors_++;
-      close(fdout);
       return;
     }
-
-    close(fdout);
   }
 }
 
