@@ -24,7 +24,9 @@
       "future": "cpp",
       "cassert": "cpp",
       "functional": "cpp",
-      "mutex": "cpp"
+      "mutex": "cpp",
+      "unordered_map": "cpp",
+      "initializer_list": "cpp"
     }
   }
 
