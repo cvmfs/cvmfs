@@ -47,18 +47,17 @@ class T_Reactor : public ::testing::Test {
   T_Reactor() : ready_(1, 1) {}
 
   virtual void SetUp() {
-    ASSERT_NE(pipe(to_reactor_), -1);
-    ASSERT_NE(pipe(from_reactor_), -1);
+    ASSERT_NE(-1, pipe(to_reactor_));
+    ASSERT_NE(-1, pipe(from_reactor_));
 
-    ASSERT_EQ(pthread_create(&thread_, NULL, T_Reactor::ReactorFunction,
-                             static_cast<void*>(this)),
-              0);
+    ASSERT_EQ(0, pthread_create(&thread_, NULL, T_Reactor::ReactorFunction,
+                                static_cast<void*>(this)));
 
-    ASSERT_EQ(ready_.Dequeue(), true);
+    ASSERT_EQ(true, ready_.Dequeue());
   }
 
   virtual void TearDown() {
-    ASSERT_EQ(pthread_join(thread_, NULL), 0);
+    ASSERT_EQ(0, pthread_join(thread_, NULL));
     close(to_reactor_[1]);
     close(from_reactor_[0]);
   }
@@ -88,12 +87,12 @@ TEST_F(T_Reactor, kEcho_kQuit) {
 
   std::string reply;
   ASSERT_TRUE(Reactor::ReadReply(from_reactor_[0], &reply));
-  ASSERT_EQ(reply, "Hey");
+  ASSERT_EQ("Hey", reply);
 
   ASSERT_TRUE(Reactor::WriteRequest(to_reactor_[1], Reactor::kQuit, ""));
 
   ASSERT_TRUE(Reactor::ReadReply(from_reactor_[0], &reply));
-  ASSERT_EQ(reply, "ok");
+  ASSERT_EQ("ok", reply);
 }
 
 TEST_F(T_Reactor, kGenerateToken_kQuit) {
@@ -113,7 +112,7 @@ TEST_F(T_Reactor, kGenerateToken_kQuit) {
   ASSERT_TRUE(Reactor::WriteRequest(to_reactor_[1], Reactor::kQuit, ""));
   reply.clear();
   ASSERT_TRUE(Reactor::ReadReply(from_reactor_[0], &reply));
-  ASSERT_EQ(reply, "ok");
+  ASSERT_EQ("ok", reply);
 }
 
 TEST_F(T_Reactor, FullCycle) {
@@ -166,7 +165,7 @@ TEST_F(T_Reactor, FullCycle) {
     const JSON* id_json =
         JsonDocument::SearchInObject(json_reply->root(), "id", JSON_STRING);
     ASSERT_TRUE(id_json);
-    ASSERT_EQ(id_json->string_value, public_id);
+    ASSERT_EQ(public_id, id_json->string_value);
   }
 
   // Check the token validity
@@ -189,7 +188,7 @@ TEST_F(T_Reactor, FullCycle) {
     const JSON* path_json =
         JsonDocument::SearchInObject(json_reply->root(), "path", JSON_STRING);
     ASSERT_TRUE(path_json);
-    ASSERT_EQ(path_json->string_value, path);
+    ASSERT_EQ(path, path_json->string_value);
   }
 
   // Submit a payload
@@ -226,7 +225,7 @@ TEST_F(T_Reactor, FullCycle) {
                                       request));
 
     int nb = write(to_reactor_[1], &payload[0], payload.size());
-    ASSERT_EQ(static_cast<size_t>(nb), payload.size());
+    ASSERT_EQ(payload.size(), static_cast<size_t>(nb));
 
     std::string reply;
     ASSERT_TRUE(Reactor::ReadReply(from_reactor_[0], &reply));
@@ -236,5 +235,5 @@ TEST_F(T_Reactor, FullCycle) {
   ASSERT_TRUE(Reactor::WriteRequest(to_reactor_[1], Reactor::kQuit, ""));
   reply.clear();
   ASSERT_TRUE(Reactor::ReadReply(from_reactor_[0], &reply));
-  ASSERT_EQ(reply, "ok");
+  ASSERT_EQ("ok", reply);
 }

@@ -30,7 +30,7 @@ class T_PayloadProcessor : public ::testing::Test {
 
   virtual void SetUp() {
     int fds[2];
-    ASSERT_NE(pipe(fds), -1);
+    ASSERT_NE(-1, pipe(fds));
     read_fd_ = fds[0];
 
     // Prepare an object pack and send it through the pipe
@@ -50,15 +50,14 @@ class T_PayloadProcessor : public ::testing::Test {
 
     write_fd_ = fds[1];
 
-    ASSERT_EQ(pthread_create(&thread_, NULL, T_PayloadProcessor::Worker,
-                             static_cast<void*>(this)),
-              0);
+    ASSERT_EQ(0, pthread_create(&thread_, NULL, T_PayloadProcessor::Worker,
+                                static_cast<void*>(this)));
 
-    ASSERT_EQ(ready_.Dequeue(), true);
+    ASSERT_EQ(true, ready_.Dequeue());
   }
 
   virtual void TearDown() {
-    ASSERT_EQ(pthread_join(thread_, NULL), 0);
+    ASSERT_EQ(0, pthread_join(thread_, NULL));
 
     close(read_fd_);
 
@@ -94,9 +93,9 @@ class T_PayloadProcessor : public ::testing::Test {
 
 TEST_F(T_PayloadProcessor, Basic) {
   MockPayloadProcessor proc;
-  ASSERT_EQ(proc.num_files_received_, 0);
-  ASSERT_EQ(proc.Process(read_fd_, Base64(digest_.ToString(false)), "some_path",
-                         serializer_->GetHeaderSize()),
-            PayloadProcessor::kSuccess);
-  ASSERT_EQ(proc.num_files_received_, 1);
+  ASSERT_EQ(0, proc.num_files_received_);
+  ASSERT_EQ(PayloadProcessor::kSuccess,
+            proc.Process(read_fd_, Base64(digest_.ToString(false)), "some_path",
+                         serializer_->GetHeaderSize()));
+  ASSERT_EQ(1, proc.num_files_received_);
 }
