@@ -301,11 +301,19 @@ p_new_lease(KeyId, Path) ->
 -spec p_end_lease(LeaseToken, Commit) -> ok | {error, invalid_macaroon}
                                              when LeaseToken :: binary(),
                                                   Commit :: boolean().
-p_end_lease(LeaseToken, _Commit) ->
+p_end_lease(LeaseToken, Commit) ->
     Result = case cvmfs_receiver:get_token_id(LeaseToken) of
                  {ok, Public} ->
-                     %% TODO: If Commit is true, the commit operation needs to be triggered here,
-                     %%       before ending the active lease
+                     case Commit of
+                         true ->
+                             %% TODO: If Commit is true, the commit operation needs to be triggered here,
+                             %%       before ending the active lease. The lease path needs to be retrieved
+                             %%       from cvmfs_lease
+                             lager:info("Commiting session changes!"),
+                             cvmfs_receiver:commit();
+                         false ->
+                             ok
+                     end,
                      cvmfs_lease:end_lease(Public);
                  _ ->
                      {error, invalid_macaroon}
