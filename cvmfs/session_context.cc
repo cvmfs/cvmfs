@@ -9,6 +9,7 @@
 #include "curl/curl.h"
 #include "cvmfs_config.h"
 #include "gateway_util.h"
+#include "swissknife_lease_curl.h"
 #include "util/string.h"
 
 namespace {
@@ -217,7 +218,11 @@ bool SessionContext::FinalizeDerived() {
   return true;
 }
 
-bool SessionContext::Commit() { return true; }
+bool SessionContext::Commit() {
+  CurlBuffer buffer;
+  return MakeEndRequest("POST", key_id_, secret_, session_token_, api_url_,
+                        &buffer);
+}
 
 Future<bool>* SessionContext::DispatchObjectPack(ObjectPack* pack) {
   UploadJob* job = new UploadJob;
