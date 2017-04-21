@@ -33,7 +33,6 @@ class SessionContextBase {
 
   bool Initialize(const std::string& api_url, const std::string& session_token,
                   const std::string& key_id, const std::string& secret,
-                  bool drop_lease = true,
                   uint64_t max_pack_size = ObjectPack::kDefaultLimit);
   bool Finalize();
 
@@ -51,8 +50,6 @@ class SessionContextBase {
 
   virtual bool FinalizeDerived() = 0;
 
-  virtual bool DropLease() = 0;
-
   virtual Future<bool>* DispatchObjectPack(ObjectPack* pack) = 0;
 
   int64_t NumJobsSubmitted() const;
@@ -63,7 +60,6 @@ class SessionContextBase {
   std::string session_token_;
   std::string key_id_;
   std::string secret_;
-  bool drop_lease_;
 
   FifoChannel<bool> queue_was_flushed_;
 
@@ -95,8 +91,6 @@ class SessionContext : public SessionContextBase {
   virtual bool InitializeDerived();
 
   virtual bool FinalizeDerived();
-
-  virtual bool DropLease();
 
   virtual Future<bool>* DispatchObjectPack(ObjectPack* pack);
 

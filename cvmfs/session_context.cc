@@ -33,7 +33,6 @@ SessionContextBase::SessionContextBase()
       session_token_(),
       key_id_(),
       secret_(),
-      drop_lease_(true),
       queue_was_flushed_(1, 1),
       max_pack_size_(ObjectPack::kDefaultLimit),
       active_handles_(),
@@ -45,7 +44,7 @@ SessionContextBase::~SessionContextBase() {}
 bool SessionContextBase::Initialize(const std::string& api_url,
                                     const std::string& session_token,
                                     const std::string& key_id,
-                                    const std::string& secret, bool drop_lease,
+                                    const std::string& secret,
                                     uint64_t max_pack_size) {
   bool ret = true;
 
@@ -65,7 +64,6 @@ bool SessionContextBase::Initialize(const std::string& api_url,
   session_token_ = session_token;
   key_id_ = key_id;
   secret_ = secret;
-  drop_lease_ = drop_lease;
   max_pack_size_ = max_pack_size;
 
   atomic_init64(&objects_dispatched_);
@@ -109,11 +107,6 @@ bool SessionContextBase::Finalize() {
     results = future->Get() && results;
     delete future;
     jobs_finished++;
-  }
-
-  if (drop_lease_ && !DropLease()) {
-    LogCvmfs(kLogUploadGateway, kLogStderr,
-             "SessionContext finalization - Could not drop active lease");
   }
 
   results =
@@ -220,8 +213,6 @@ bool SessionContext::FinalizeDerived() {
 
   return true;
 }
-
-bool SessionContext::DropLease() { return true; }
 
 Future<bool>* SessionContext::DispatchObjectPack(ObjectPack* pack) {
   UploadJob* job = new UploadJob;
