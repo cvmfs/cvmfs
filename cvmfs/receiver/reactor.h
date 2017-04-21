@@ -29,6 +29,7 @@ class Reactor {
     kGetTokenId,
     kCheckToken,
     kSubmitPayload,
+    kCommit,
     kError
   };
 
@@ -51,6 +52,7 @@ class Reactor {
   virtual bool HandleCheckToken(const std::string& req, std::string* reply);
   virtual bool HandleSubmitPayload(int fdin, const std::string& req,
                                    std::string* reply);
+  virtual bool HandleCommit(const std::string& req, std::string* reply);
 
   virtual PayloadProcessor* MakePayloadProcessor();
 

@@ -293,6 +293,30 @@ bool Reactor::HandleSubmitPayload(int fdin, const std::string& req,
   return true;
 }
 
+bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
+  if (!reply) {
+    return false;
+  }
+
+  // Extract the Path from the request JSON.
+  UniquePtr<JsonDocument> req_json(JsonDocument::Create(req));
+  if (!req_json.IsValid()) {
+    return false;
+  }
+
+  // const JSON* path_json =
+  // JsonDocument::SearchInObject(req_json->root(), "path", JSON_STRING);
+
+  // Here we use the path to commit the changes!
+
+  JsonStringInput reply_input;
+  reply_input.push_back(std::make_pair("status", "ok"));
+
+  ToJsonString(reply_input, reply);
+
+  return true;
+}
+
 PayloadProcessor* Reactor::MakePayloadProcessor() {
   return new PayloadProcessor();
 }
@@ -321,6 +345,10 @@ bool Reactor::HandleRequest(Request req, const std::string& data) {
       break;
     case kSubmitPayload:
       ok &= HandleSubmitPayload(fdin_, data, &reply);
+      ok &= WriteReply(fdout_, reply);
+      break;
+    case kCommit:
+      ok &= HandleCommit(data, &reply);
       ok &= WriteReply(fdout_, reply);
       break;
     case kError:
