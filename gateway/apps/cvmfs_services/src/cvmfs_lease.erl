@@ -18,7 +18,7 @@
 %% API
 -export([start_link/1
         ,request_lease/4, end_lease/1
-        ,check_lease/1
+        ,check_lease/1, get_lease_path/1
         ,get_leases/0, clear_leases/0]).
 
 %% gen_server callbacks
@@ -41,7 +41,7 @@
 %%% Type specifications
 %%%===================================================================
 -type new_lease_result() :: ok | {busy, TimeRemaining :: binary()}.
--type lease_check_result() :: {ok, Secret :: binary()} |
+-type lease_check_result() :: {ok, Value :: binary()} |
                               {error, invalid_lease | lease_expired}.
 
 %%%===================================================================
@@ -94,6 +94,19 @@ end_lease(Public) ->
                                  when Public :: binary().
 check_lease(Public) ->
     gen_server:call(?MODULE, {lease_req, check_lease, Public}).
+
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Return the path of a lease identified by its public id
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec get_lease_path(Public) -> lease_check_result()
+                                    when Public :: binary().
+get_lease_path(Public) ->
+    gen_server:call(?MODULE, {lease_req, get_lease_path, Public}).
+
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -161,6 +174,9 @@ handle_call({lease_req, end_lease, Public}, _From, State) ->
     {reply, Reply, State};
 handle_call({lease_req, check_lease, Public}, _From, State) ->
     Reply = p_check_lease(Public),
+    {reply, Reply, State};
+handle_call({lease_req, get_lease_path, Public}, _From, State) ->
+    Reply = p_get_lease_path(Public),
     {reply, Reply, State};
 handle_call({lease_req, get_leases}, _From, State) ->
     Reply = p_get_leases(),
@@ -289,6 +305,36 @@ p_check_lease(Public) ->
                         case RemainingTime > 0 of
                             true ->
                                 {ok, Secret};
+                            false ->
+                                mnesia:delete({lease, Path}),
+                                {error, lease_expired}
+                        end
+                end
+        end,
+    {atomic, Result} = mnesia:sync_transaction(T),
+    Result.
+
+
+-spec p_get_lease_path(Public) -> lease_check_result()
+                                      when Public :: binary().
+p_get_lease_path(Public) ->
+    {ok, MaxLeaseTime} = application:get_env(cvmfs_services, max_lease_time),
+
+    MS = ets:fun2ms(fun(#lease{public = P} = Lease) when P =:= Public ->
+                            Lease
+                    end),
+
+    T = fun() ->
+                CurrentTime = erlang:system_time(milli_seconds),
+
+                case mnesia:select(lease, MS) of
+                    [] ->
+                        {error, invalid_lease};
+                    [#lease{path = Path, time = Time} | _]  ->
+                        RemainingTime = MaxLeaseTime - (CurrentTime - Time),
+                        case RemainingTime > 0 of
+                            true ->
+                                {ok, Path};
                             false ->
                                 mnesia:delete({lease, Path}),
                                 {error, lease_expired}
