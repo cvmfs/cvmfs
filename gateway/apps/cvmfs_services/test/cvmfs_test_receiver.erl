@@ -14,9 +14,10 @@
 
 %% API
 -export([start_link/1,
-        generate_token/3,
-        get_token_id/1,
-        submit_payload/2]).
+         generate_token/3,
+         get_token_id/1,
+         submit_payload/2,
+         commit/0]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -89,6 +90,14 @@ submit_payload(SubmissionData, Secret) ->
     Result.
 
 
+-spec commit() -> ok | {error, other_error | worker_timeout}.
+commit() ->
+    WorkerPid = poolboy:checkout(cvmfs_receiver_pool),
+    Result = gen_server:call(WorkerPid, {worker_req, commit}),
+    poolboy:checkin(cvmfs_receiver_pool, WorkerPid),
+    Result.
+
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -138,6 +147,10 @@ handle_call({worker_req, submit_payload, {SubmissionData, Secret}}, _From, State
     Reply = p_submit_payload(SubmissionData, Secret),
     lager:info("Worker ~p request: {submit_payload, {~p, ~p}} -> Reply: ~p",
                [self(), SubmissionData, Secret, Reply]),
+    {reply, Reply, State};
+handle_call({worker_req, commit}, _From, State) ->
+    Reply = p_commit(),
+    lager:info("Worker ~p request: {commit} -> Reply: ~p", [self(), Reply]),
     {reply, Reply, State}.
 
 
@@ -274,3 +287,9 @@ p_submit_payload({LeaseToken, _Payload, _Digest, _HeaderSize}, Secret) ->
         {error, Reason} ->
             {error, Reason}
     end.
+
+
+-spec p_commit() -> ok | {error, other_error | worker_timeout}.
+p_commit() ->
+    ok.
+
