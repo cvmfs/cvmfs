@@ -52,7 +52,7 @@ init(Req0 = #{method := <<"POST">>}, State) ->
             p_handle_commit_lease(Req0, State, Uid)
     end,
 
-    cvmfs_fe_util:tock(Uid, <<"DELETE">>, URI, T0, micro_seconds),
+    cvmfs_fe_util:tock(Uid, <<"POST">>, URI, T0, micro_seconds),
     {ok, ReqF, State};
 %%--------------------------------------------------------------------
 %% @doc
