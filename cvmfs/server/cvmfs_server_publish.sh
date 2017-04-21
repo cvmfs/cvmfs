@@ -285,6 +285,9 @@ cvmfs_server_publish() {
     local trunk_hash=$(grep "^C" $manifest | tr -d C)
 
     if [ x"$upstream_type" = xgw ]; then
+        close_transaction  $name $use_fd_fallback
+        publish_after_hook $name
+        publish_succeeded $name
         echo "We need to stop here until the repository gateway functionality is fully implemented"
         return 0
     fi
