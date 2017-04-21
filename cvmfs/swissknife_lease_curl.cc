@@ -11,6 +11,24 @@
 #include "logging.h"
 #include "util/string.h"
 
+namespace {
+
+CURL* PrepareCurl(const std::string& method) {
+  const char* user_agent_string = "cvmfs/" VERSION;
+
+  CURL* h_curl = curl_easy_init();
+
+  if (h_curl) {
+    curl_easy_setopt(h_curl, CURLOPT_NOPROGRESS, 1L);
+    curl_easy_setopt(h_curl, CURLOPT_USERAGENT, user_agent_string);
+    curl_easy_setopt(h_curl, CURLOPT_MAXREDIRS, 50L);
+    curl_easy_setopt(h_curl, CURLOPT_CUSTOMREQUEST, method.c_str());
+    curl_easy_setopt(h_curl, CURLOPT_TCP_KEEPALIVE, 1L);
+  }
+
+  return h_curl;
+}
+
 size_t RecvCB(void* buffer, size_t size, size_t nmemb, void* userp) {
   CurlBuffer* my_buffer = static_cast<CurlBuffer*>(userp);
 
@@ -23,21 +41,7 @@ size_t RecvCB(void* buffer, size_t size, size_t nmemb, void* userp) {
   return my_buffer->data.size();
 }
 
-CURL* PrepareCurl(const char* method) {
-  const char* user_agent_string = "cvmfs/" VERSION;
-
-  CURL* h_curl = curl_easy_init();
-
-  if (h_curl) {
-    curl_easy_setopt(h_curl, CURLOPT_NOPROGRESS, 1L);
-    curl_easy_setopt(h_curl, CURLOPT_USERAGENT, user_agent_string);
-    curl_easy_setopt(h_curl, CURLOPT_MAXREDIRS, 50L);
-    curl_easy_setopt(h_curl, CURLOPT_CUSTOMREQUEST, method);
-    curl_easy_setopt(h_curl, CURLOPT_TCP_KEEPALIVE, 1L);
-  }
-
-  return h_curl;
-}
+}  // namespace
 
 bool MakeAcquireRequest(const std::string& key_id, const std::string& secret,
                         const std::string& repo_path,
@@ -79,13 +83,12 @@ bool MakeAcquireRequest(const std::string& key_id, const std::string& secret,
   return !ret;
 }
 
-bool MakeDeleteRequest(const std::string& key_id, const std::string& secret,
-                       const std::string& session_token,
-                       const std::string& repo_service_url,
-                       CurlBuffer* buffer) {
+bool MakeEndRequest(const std::string& method, const std::string& key_id,
+                    const std::string& secret, const std::string& session_token,
+                    const std::string& repo_service_url, CurlBuffer* buffer) {
   CURLcode ret = static_cast<CURLcode>(0);
 
-  CURL* h_curl = PrepareCurl("DELETE");
+  CURL* h_curl = PrepareCurl(method);
   if (!h_curl) {
     return false;
   }

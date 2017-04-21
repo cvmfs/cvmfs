@@ -1,6 +1,6 @@
 /**
  * This file is part of the CernVM File System.
- */
+xs */
 
 #ifndef CVMFS_SWISSKNIFE_LEASE_CURL_H_
 #define CVMFS_SWISSKNIFE_LEASE_CURL_H_
@@ -13,17 +13,13 @@ struct CurlBuffer {
   std::string data;
 };
 
-size_t RecvCB(void* buffer, size_t size, size_t nmemb, void* userp);
-
-CURL* PrepareCurl(const char* method);
-
 bool MakeAcquireRequest(const std::string& key_id, const std::string& secret,
                         const std::string& repo_path,
                         const std::string& repo_service_url,
                         CurlBuffer* buffer);
 
-bool MakeDeleteRequest(const std::string& key_id, const std::string& secret,
-                       const std::string& session_token,
-                       const std::string& repo_service_url, CurlBuffer* buffer);
+bool MakeEndRequest(const std::string& method, const std::string& key_id,
+                    const std::string& secret, const std::string& session_token,
+                    const std::string& repo_service_url, CurlBuffer* buffer);
 
 #endif  // CVMFS_SWISSKNIFE_LEASE_CURL_H_
