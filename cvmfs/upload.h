@@ -263,7 +263,7 @@ class Spooler : public Observable<SpoolerResult> {
    */
   void WaitForUpload() const;
 
-  void FinalizeSession() const;
+  void FinalizeSession(bool commit) const;
 
   /**
    * Checks how many of the already processed jobs have failed.

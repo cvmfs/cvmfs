@@ -42,7 +42,7 @@ bool AbstractUploader::Initialize() {
   return thread_started_executing_.Get();
 }
 
-bool AbstractUploader::FinalizeSession() { return true; }
+bool AbstractUploader::FinalizeSession(bool /*commit*/) { return true; }
 
 int AbstractUploader::CreateAndOpenTemporaryChunkFile(std::string *path) const {
   const std::string tmp_path =

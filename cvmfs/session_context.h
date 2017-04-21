@@ -34,7 +34,7 @@ class SessionContextBase {
   bool Initialize(const std::string& api_url, const std::string& session_token,
                   const std::string& key_id, const std::string& secret,
                   uint64_t max_pack_size = ObjectPack::kDefaultLimit);
-  bool Finalize();
+  bool Finalize(bool commit);
 
   void WaitForUpload();
 
@@ -49,6 +49,8 @@ class SessionContextBase {
   virtual bool InitializeDerived() = 0;
 
   virtual bool FinalizeDerived() = 0;
+
+  virtual bool Commit() = 0;
 
   virtual Future<bool>* DispatchObjectPack(ObjectPack* pack) = 0;
 
@@ -91,6 +93,8 @@ class SessionContext : public SessionContextBase {
   virtual bool InitializeDerived();
 
   virtual bool FinalizeDerived();
+
+  virtual bool Commit();
 
   virtual Future<bool>* DispatchObjectPack(ObjectPack* pack);
 

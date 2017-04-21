@@ -97,7 +97,9 @@ bool GatewayUploader::Initialize() {
                                       secret);
 }
 
-bool GatewayUploader::FinalizeSession() { return session_context_->Finalize(); }
+bool GatewayUploader::FinalizeSession(bool commit) {
+  return session_context_->Finalize(commit);
+}
 
 void GatewayUploader::WaitForUpload() const {
   session_context_->WaitForUpload();

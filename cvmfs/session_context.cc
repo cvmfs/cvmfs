@@ -89,7 +89,7 @@ bool SessionContextBase::Initialize(const std::string& api_url,
   return ret;
 }
 
-bool SessionContextBase::Finalize() {
+bool SessionContextBase::Finalize(bool commit) {
   assert(active_handles_.empty());
   {
     MutexLockGuard lock(current_pack_mtx_);
@@ -109,8 +109,11 @@ bool SessionContextBase::Finalize() {
     jobs_finished++;
   }
 
-  results =
-      FinalizeDerived() && (bytes_committed_ == bytes_dispatched_) && results;
+  if (commit) {
+    results &= Commit();
+  }
+
+  results &= FinalizeDerived() && (bytes_committed_ == bytes_dispatched_);
 
   pthread_mutex_destroy(&current_pack_mtx_);
   return results;
@@ -213,6 +216,8 @@ bool SessionContext::FinalizeDerived() {
 
   return true;
 }
+
+bool SessionContext::Commit() { return true; }
 
 Future<bool>* SessionContext::DispatchObjectPack(ObjectPack* pack) {
   UploadJob* job = new UploadJob;

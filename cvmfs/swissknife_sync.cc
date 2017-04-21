@@ -717,8 +717,10 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   LogCvmfs(kLogCvmfs, kLogStdout, "Exporting repository manifest");
   params.spooler->WaitForUpload();
   spooler_catalogs->WaitForUpload();
-  params.spooler->FinalizeSession();
-  spooler_catalogs->FinalizeSession();
+  params.spooler->FinalizeSession(false);
+  // We call FinalizeSession(true) this time, to also trigger the commit
+  // operation on the gateway machine (if the upstream is of type "gw").
+  spooler_catalogs->FinalizeSession(true);
   delete params.spooler;
 
   if (!manifest->Export(params.manifest_path)) {

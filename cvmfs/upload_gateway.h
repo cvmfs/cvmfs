@@ -47,7 +47,7 @@ class GatewayUploader : public AbstractUploader {
 
   virtual bool Initialize();
 
-  virtual bool FinalizeSession();
+  virtual bool FinalizeSession(bool commit);
 
   virtual void WaitForUpload() const;
 

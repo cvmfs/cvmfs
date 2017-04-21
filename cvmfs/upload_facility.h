@@ -124,9 +124,11 @@ class AbstractUploader
 
   /**
    * Called during Spooler::WaitForUpload(), to ensure that the upload has
-   * finished. By default it is a noop and returns true;
+   * finished. If commit == true, then a Commit request is also sent, to apply
+   * all the the changes accumulated during the session.
+   * By default it is a noop and returns true;
    */
-  virtual bool FinalizeSession();
+  virtual bool FinalizeSession(bool commit);
 
   /**
    * This must be called right before the destruction of the AbstractUploader!
