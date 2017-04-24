@@ -10,6 +10,7 @@
 
 namespace receiver {
 
+class CommitProcessor;
 class PayloadProcessor;
 
 /**
@@ -55,6 +56,7 @@ class Reactor {
   virtual bool HandleCommit(const std::string& req, std::string* reply);
 
   virtual PayloadProcessor* MakePayloadProcessor();
+  virtual CommitProcessor* MakeCommitProcessor();
 
  private:
   bool HandleRequest(Request req, const std::string& data);

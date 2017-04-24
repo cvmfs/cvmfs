@@ -11,6 +11,7 @@
 #include <utility>
 #include <vector>
 
+#include "commit_processor.h"
 #include "json_document.h"
 #include "logging.h"
 #include "payload_processor.h"
@@ -304,13 +305,27 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
     return false;
   }
 
-  // const JSON* path_json =
-  // JsonDocument::SearchInObject(req_json->root(), "path", JSON_STRING);
+  const JSON* path_json =
+      JsonDocument::SearchInObject(req_json->root(), "path", JSON_STRING);
 
   // Here we use the path to commit the changes!
-
+  UniquePtr<CommitProcessor> proc(MakeCommitProcessor());
   JsonStringInput reply_input;
-  reply_input.push_back(std::make_pair("status", "ok"));
+  CommitProcessor::Result res = proc->Process(path_json->string_value);
+
+  switch (res) {
+    case CommitProcessor::kSuccess:
+      reply_input.push_back(std::make_pair("status", "ok"));
+      break;
+    case CommitProcessor::kPathViolation:
+      reply_input.push_back(std::make_pair("status", "error"));
+      reply_input.push_back(std::make_pair("reason", "path_violation"));
+    default:
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "Unknown value of CommitProcessor::Result encountered.");
+      abort();
+      break;
+  }
 
   ToJsonString(reply_input, reply);
 
@@ -319,6 +334,10 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
 
 PayloadProcessor* Reactor::MakePayloadProcessor() {
   return new PayloadProcessor();
+}
+
+CommitProcessor* Reactor::MakeCommitProcessor() {
+  return new CommitProcessor();
 }
 
 bool Reactor::HandleRequest(Request req, const std::string& data) {
