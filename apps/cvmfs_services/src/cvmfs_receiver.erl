@@ -14,9 +14,10 @@
 
 %% API
 -export([start_link/1,
-        generate_token/3,
-        get_token_id/1,
-        submit_payload/2]).
+         generate_token/3,
+         get_token_id/1,
+         submit_payload/2,
+         commit/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -30,7 +31,8 @@
 -define(kGetTokenId,3).
 -define(kCheckToken,4).
 -define(kSubmitPayload,5).
--define(kError,6).
+-define(kCommit,6).
+-define(kError,7).
 
 %% Worker comm timeout
 -define(WORKER_REPLY_TIMEOUT, 3000).
@@ -105,6 +107,15 @@ submit_payload(SubmissionData, Secret) ->
     Result.
 
 
+-spec commit(Path) -> ok | {error, other_error | worker_timeout}
+                          when Path :: binary().
+commit(Path) ->
+    WorkerPid = poolboy:checkout(cvmfs_receiver_pool),
+    Result = gen_server:call(WorkerPid, {worker_req, commit, Path}),
+    poolboy:checkin(cvmfs_receiver_pool, WorkerPid),
+    Result.
+
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -171,6 +182,11 @@ handle_call({worker_req, submit_payload, {{Token, _, Digest, HeaderSize} = Submi
     Reply = p_submit_payload(SubmissionData, Secret, WorkerPort),
     lager:info("Worker ~p request: {submit_payload, {{~p, PAYLOAD_NOT_SHOWN, ~p, ~p} ~p}} -> Reply: ~p",
                [self(), Token, Digest, HeaderSize, Secret, Reply]),
+    {reply, Reply, State};
+handle_call({worker_req, commit, Path}, _From, State) ->
+    #{worker := WorkerPort} = State,
+    Reply = p_commit(WorkerPort, Path),
+    lager:info("Worker ~p request: {commit} -> Reply: ~p", [self(), Reply]),
     {reply, Reply, State}.
 
 
@@ -320,6 +336,25 @@ p_submit_payload({LeaseToken, Payload, Digest, HeaderSize}, Secret, WorkerPort) 
             end;
         {error, worker_timeout} ->
             lager:error("Timeout reached waiting for reply from worker ~p", [WorkerPort]),
+            {error, worker_timeout}
+    end.
+
+
+-spec p_commit(WorkerPort, Path) -> ok | {error, other_error | worker_timeout}
+                                        when WorkerPort :: port(),
+                                             Path :: binary().
+p_commit(WorkerPort, Path) ->
+    Req1 = jsx:encode(#{<<"path">> => Path}),
+    p_write_request(WorkerPort, ?kCommit, Req1),
+    case p_read_reply(WorkerPort) of
+        {ok, {_, Reply1}} ->
+            case jsx:decode(Reply1, [return_maps]) of
+                #{<<"status">> := <<"ok">>} ->
+                    ok;
+                _ ->
+                    {error, other_error}
+            end;
+        {error, worker_timeout} ->
             {error, worker_timeout}
     end.
 
