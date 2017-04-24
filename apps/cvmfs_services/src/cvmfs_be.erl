@@ -308,7 +308,6 @@ p_end_lease(LeaseToken, Commit) ->
                          true ->
                              case cvmfs_lease:get_lease_path(Public) of
                                  {ok, Path} ->
-                                     lager:info("Commiting session changes!"),
                                      cvmfs_receiver:commit(Path);
                                   ErrorReason ->
                                      ErrorReason
