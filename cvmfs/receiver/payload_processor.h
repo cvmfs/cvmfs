@@ -13,7 +13,7 @@
 namespace receiver {
 
 /**
- * This class is used by in the `cvmfs_receiver` tool, on repository gateway
+ * This class is used in the `cvmfs_receiver` tool, on repository gateway
  * machines. The receiver::Reactor class, implementing the event loop of the
  * `cvmfs_receiver` tool, dispatches the handling of the kSubmitPayload events
  * to this class.
