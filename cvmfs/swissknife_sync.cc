@@ -281,7 +281,7 @@ int swissknife::CommandApplyDirtab::Main(const ArgumentList &args) {
   // initialize catalog infrastructure
   const bool auto_manage_catalog_files = true;
   const bool follow_redirects = (args.count('L') > 0);
-  if (!this->InitDownloadManager(follow_redirects)) {
+  if (!InitDownloadManager(follow_redirects)) {
     return 1;
   }
   catalog::SimpleCatalogManager catalog_manager(
@@ -617,21 +617,21 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (!spooler_catalogs.IsValid()) return 3;
 
   const bool follow_redirects = (args.count('L') > 0);
-  if (!this->InitDownloadManager(follow_redirects)) {
+  if (!InitDownloadManager(follow_redirects)) {
     return 3;
   }
 
-  if (!this->InitVerifyingSignatureManager(params.public_keys,
-                                           params.trusted_certs)) {
+  if (!InitVerifyingSignatureManager(params.public_keys,
+                                     params.trusted_certs)) {
     return 3;
   }
 
   UniquePtr<manifest::Manifest> manifest;
   if (params.virtual_dir_actions != catalog::VirtualCatalog::kActionNone) {
-    manifest = this->OpenLocalManifest(params.manifest_path);
+    manifest = OpenLocalManifest(params.manifest_path);
   } else {
-    manifest = this->FetchRemoteManifest(params.stratum0, params.repo_name,
-                                         params.base_hash);
+    manifest = FetchRemoteManifest(params.stratum0, params.repo_name,
+                                   params.base_hash);
   }
   if (!manifest) {
     return 3;
