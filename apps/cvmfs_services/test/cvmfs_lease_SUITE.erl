@@ -131,7 +131,7 @@ check_lease_valid(_Config) ->
     Public = <<"public">>,
     Secret = <<"secret">>,
     ok = cvmfs_lease:request_lease(U, P, Public, Secret),
-    {ok, Secret} = cvmfs_lease:check_lease(Public).
+    {ok, Secret} = cvmfs_lease:get_lease_secret(Public).
 
 check_lease_expired(_Config) ->
     U = <<"user">>,
@@ -141,12 +141,11 @@ check_lease_expired(_Config) ->
     ok = cvmfs_lease:request_lease(U, P, Public, Secret),
     SleepTime = 1500,
     ct:sleep(SleepTime),
-    {error, lease_expired} = cvmfs_lease:check_lease(Public).
+    {error, lease_expired} = cvmfs_lease:get_lease_secret(Public).
 
 check_invalid_lease(_Config) ->
     Public = <<"public">>,
-    {error, invalid_lease} = cvmfs_lease:check_lease(Public).
-
+    {error, invalid_lease} = cvmfs_lease:get_lease_secret(Public).
 
 get_lease_path_valid(_Config) ->
     U = <<"user">>,
@@ -155,7 +154,6 @@ get_lease_path_valid(_Config) ->
     Secret = <<"secret">>,
     ok = cvmfs_lease:request_lease(U, P, Public, Secret),
     {ok, <<"path">>} = cvmfs_lease:get_lease_path(Public).
-
 
 get_lease_path_expired(_Config) ->
     U = <<"user">>,
@@ -166,7 +164,6 @@ get_lease_path_expired(_Config) ->
     SleepTime = 1500,
     ct:sleep(SleepTime),
     {error, lease_expired} = cvmfs_lease:get_lease_path(Public).
-
 
 get_lease_path_invalid(_Config) ->
     U = <<"user">>,
