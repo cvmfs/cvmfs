@@ -179,6 +179,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/pathspec/pathspec_pattern.cc
   ${CVMFS_SOURCE_DIR}/quota.cc
   ${CVMFS_SOURCE_DIR}/quota_posix.cc
+  ${CVMFS_SOURCE_DIR}/receiver/commit_processor.cc
   ${CVMFS_SOURCE_DIR}/receiver/payload_processor.cc
   ${CVMFS_SOURCE_DIR}/receiver/reactor.cc
   ${CVMFS_SOURCE_DIR}/receiver/session_token.cc
