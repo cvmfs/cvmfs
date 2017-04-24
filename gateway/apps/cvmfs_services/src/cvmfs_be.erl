@@ -14,7 +14,7 @@
 
 %% API
 -export([start_link/1
-        ,new_lease/3, end_lease/2
+        ,new_lease/3, end_lease/3
         ,submit_payload/2]).
 
 -export([get_repos/1
@@ -81,11 +81,12 @@ new_lease(Uid, KeyId, Path) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec end_lease(Uid, LeaseToken) -> ok | {error, invalid_macaroon}
-                                        when Uid ::binary(),
-                                             LeaseToken :: binary().
-end_lease(Uid, LeaseToken) ->
-    gen_server:call(?MODULE, {be_req, end_lease, {Uid, LeaseToken}}).
+-spec end_lease(Uid, LeaseToken, Commit) -> ok | {error, invalid_macaroon}
+                                        when Uid :: binary(),
+                                             LeaseToken :: binary(),
+                                             Commit :: boolean().
+end_lease(Uid, LeaseToken, Commit) ->
+    gen_server:call(?MODULE, {be_req, end_lease, {Uid, LeaseToken, Commit}}).
 
 
 %%--------------------------------------------------------------------
@@ -171,11 +172,11 @@ handle_call({be_req, new_lease, {Uid, KeyId, Path}}, From, State) ->
            end,
     spawn_link(Task),
     {noreply, State, ?ASYNC_TIMEOUT};
-handle_call({be_req, end_lease, {Uid, LeaseToken}}, From, State) ->
+handle_call({be_req, end_lease, {Uid, LeaseToken, Commit}}, From, State) ->
     Task = fun() ->
-                   Reply = p_end_lease(LeaseToken),
-                   lager:info("Backend request: Uid: ~p - {end_lease, ~p} -> Reply: ~p",
-                              [Uid, LeaseToken, Reply]),
+                   Reply = p_end_lease(LeaseToken, Commit),
+                   lager:info("Backend request: Uid: ~p - {end_lease, ~p, ~p} -> Reply: ~p",
+                              [Uid, LeaseToken, Commit, Reply]),
                    gen_server:reply(From, Reply)
            end,
     spawn_link(Task),
@@ -297,11 +298,24 @@ p_new_lease(KeyId, Path) ->
     end.
 
 
--spec p_end_lease(LeaseToken) -> ok | {error, invalid_macaroon}
-                                     when LeaseToken :: binary().
-p_end_lease(LeaseToken) ->
+-spec p_end_lease(LeaseToken, Commit) -> ok | {error, invalid_macaroon} | cvmfs_lease:lease_get_value()
+                                             when LeaseToken :: binary(),
+                                                  Commit :: boolean().
+p_end_lease(LeaseToken, Commit) ->
     Result = case cvmfs_receiver:get_token_id(LeaseToken) of
                  {ok, Public} ->
+                     case Commit of
+                         true ->
+                             case cvmfs_lease:get_lease_path(Public) of
+                                 {ok, Path} ->
+                                     lager:info("Commiting session changes!"),
+                                     cvmfs_receiver:commit(Path);
+                                  ErrorReason ->
+                                     ErrorReason
+                             end;
+                         false ->
+                             ok
+                     end,
                      cvmfs_lease:end_lease(Public);
                  _ ->
                      {error, invalid_macaroon}
@@ -314,7 +328,7 @@ p_end_lease(LeaseToken) ->
 p_submit_payload({LeaseToken, _Payload, _Digest, _HeaderSize} = SubmissionData) ->
     Result = case cvmfs_receiver:get_token_id(LeaseToken) of
         {ok, Public} ->
-            case cvmfs_lease:check_lease(Public) of
+            case cvmfs_lease:get_lease_secret(Public) of
                 {ok, Secret} ->
                     cvmfs_receiver:submit_payload(SubmissionData, Secret);
                 {error, Reason} ->

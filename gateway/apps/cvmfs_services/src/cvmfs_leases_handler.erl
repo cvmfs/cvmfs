@@ -34,47 +34,23 @@ init(Req0 = #{method := <<"GET">>}, State) ->
     {ok, Req1, State};
 %%--------------------------------------------------------------------
 %% @doc
-%% A "POST" request to /api/leases, which can return either 200 OK
+%% A "POST" request to /api/leases/[<TOKEN>], which can return either 200 OK
 %% or in 400 - Bad Request
 %%
-%% The request body is a JSON object with the "path" field
-%% The request needs the "authorization" field in the header:
-%%   "authorization" - KeyId and HMAC of the request body (the JSON object)
-%%                     The KeyId and HMAC should be separated by a space
-%%
-%% The body of the reply, for a valid request contains the fields:
-%% "status" - either "ok", "path_busy" or "error"
-%% "session_token" - if status is "ok", this is the session token that
-%%                   should be used for all subsequent requests
-%% "time_remaining" - if status is "path_busy", this represents the
-%%                    time remaining on the current active lease
-%% "reason" - if status is "error", this is a description of the error.
+%% This function only dispatches the work to another function, based on the
+%% binding used for the request.
 %% @end
 %%--------------------------------------------------------------------
 init(Req0 = #{method := <<"POST">>}, State) ->
     Uid = cvmfs_be:unique_id(),
     {URI, T0} = cvmfs_fe_util:tick(Uid, <<"POST">>, Req0, micro_seconds),
 
-    #{headers := #{<<"authorization">> := Auth}} = Req0,
-    [KeyId, ClientHMAC] = binary:split(Auth, <<" ">>),
-    {ok, Data, Req1} = cvmfs_fe_util:read_body(Req0),
-    {Status, Reply, Req2} = case jsx:decode(Data, [return_maps]) of
-                                #{<<"path">> := Path, <<"api_version">> := ClientApiVersion} ->
-                                    Rep = case p_check_hmac(Uid, Data, KeyId, ClientHMAC) of
-                                        true ->
-                                            p_new_lease(Uid, KeyId, Path, binary_to_integer(ClientApiVersion));
-                                        false ->
-                                            #{<<"status">> => <<"error">>,
-                                              <<"reason">> => <<"invalid_hmac">>}
-                                    end,
-                                    {200, Rep, Req1};
-                                _ ->
-                                    {400, #{}, Req1}
-                            end,
-    ReqF = cowboy_req:reply(Status,
-                            #{<<"content-type">> => <<"application/json">>},
-                            jsx:encode(Reply),
-                            Req2),
+    {ok, ReqF, State} = case cowboy_req:binding(token, Req0) of
+        undefined ->
+            p_handle_new_lease(Req0, State, Uid);
+        _Token ->
+            p_handle_commit_lease(Req0, State, Uid)
+    end,
 
     cvmfs_fe_util:tock(Uid, <<"POST">>, URI, T0, micro_seconds),
     {ok, ReqF, State};
@@ -114,7 +90,7 @@ init(Req0 = #{method := <<"DELETE">>}, State) ->
                             Token ->
                                 Reply = case p_check_hmac(Uid, Token, KeyId, ClientHMAC) of
                                             true ->
-                                                case cvmfs_be:end_lease(Uid, Token) of
+                                                case cvmfs_be:end_lease(Uid, Token, false) of
                                                     ok ->
                                                         #{<<"status">> => <<"ok">>};
                                                     {error, invalid_macaroon} ->
@@ -137,6 +113,103 @@ init(Req0 = #{method := <<"DELETE">>}, State) ->
 
 
 %% Private functions
+
+%%--------------------------------------------------------------------
+%% @doc
+%% A "POST" request to /api/leases, which can return either 200 OK
+%% or in 400 - Bad Request
+%%
+%% The request body is a JSON object with the "path" field
+%% The request needs the "authorization" field in the header:
+%%   "authorization" - KeyId and HMAC of the request body (the JSON object)
+%%                     The KeyId and HMAC should be separated by a space
+%%
+%% The body of the reply, for a valid request contains the fields:
+%% "status" - either "ok", "path_busy" or "error"
+%% "session_token" - if status is "ok", this is the session token that
+%%                   should be used for all subsequent requests
+%% "time_remaining" - if status is "path_busy", this represents the
+%%                    time remaining on the current active lease
+%% "reason" - if status is "error", this is a description of the error.
+%% @end
+%%--------------------------------------------------------------------
+p_handle_new_lease(Req0, State, Uid) ->
+    #{headers := #{<<"authorization">> := Auth}} = Req0,
+    [KeyId, ClientHMAC] = binary:split(Auth, <<" ">>),
+    {ok, Data, Req1} = cvmfs_fe_util:read_body(Req0),
+    {Status, Reply, Req2} = case jsx:decode(Data, [return_maps]) of
+                                #{<<"path">> := Path, <<"api_version">> := ClientApiVersion} ->
+                                    Rep = case p_check_hmac(Uid, Data, KeyId, ClientHMAC) of
+                                        true ->
+                                            p_new_lease(Uid, KeyId, Path, binary_to_integer(ClientApiVersion));
+                                        false ->
+                                            #{<<"status">> => <<"error">>,
+                                              <<"reason">> => <<"invalid_hmac">>}
+                                    end,
+                                    {200, Rep, Req1};
+                                _ ->
+                                    {400, #{}, Req1}
+                            end,
+    ReqF = cowboy_req:reply(Status,
+                            #{<<"content-type">> => <<"application/json">>},
+                            jsx:encode(Reply),
+                            Req2),
+
+    {ok, ReqF, State}.
+
+
+%%--------------------------------------------------------------------
+%% @doc
+%% A "POST" request to /api/leases/<TOKEN>, which returns
+%% 200 OK or 400 - Bad Request
+%%
+%% This requests represents a "Commit" command for the lease associated
+%% with <TOKEN>. If successful, the changes made during this lease are
+%% applied and reflected in the new state of the repository.
+%%
+%% The request needs the "authorization" field in the header, containing
+%% the KeyId and the HMAC of the KeyId (computed with the secret key associated
+%% with KeyId).
+%
+%% The body of the reply, for a valid request contains the fields:
+%% "status" - either "ok", or "error"
+%% "reason" - if status is "error", this is a description of the error.
+%%
+%% @end
+%%--------------------------------------------------------------------
+p_handle_commit_lease(Req0, State, Uid) ->
+    #{headers := #{<<"authorization">> := Auth}} = Req0,
+    [KeyId, ClientHMAC] = binary:split(Auth, <<" ">>),
+    case cowboy_req:binding(token, Req0) of
+        undefined ->
+            Reply = #{<<"status">> => <<"error">>,
+                      <<"reason">> => <<"Missing token. Call /api/v1/leases/<TOKEN>">>},
+            Req1 = cowboy_req:reply(400,
+                                    #{<<"content-type">> => <<"application/json">>},
+                                    jsx:encode(Reply),
+                                    Req0),
+            {ok, Req1, State};
+        Token ->
+            Reply = case p_check_hmac(Uid, Token, KeyId, ClientHMAC) of
+                        true ->
+                            case cvmfs_be:end_lease(Uid, Token, true) of
+                                ok ->
+                                    #{<<"status">> => <<"ok">>};
+                                {error, invalid_macaroon} ->
+                                    #{<<"status">> => <<"error">>,
+                                      <<"reason">> => <<"invalid_token">>}
+                            end;
+                        false ->
+                            #{<<"status">> => <<"error">>,
+                              <<"reason">> => <<"invalid_hmac">>}
+                    end,
+            Req1 = cowboy_req:reply(200,
+                                    #{<<"content-type">> => <<"application/json">>},
+                                    jsx:encode(Reply),
+                                    Req0),
+            {ok, Req1, State}
+    end.
+
 
 p_check_hmac(Uid, JSONMessage, KeyId, ClientHMAC) ->
     cvmfs_be:check_hmac(Uid, JSONMessage, KeyId, ClientHMAC).
