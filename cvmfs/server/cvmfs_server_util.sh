@@ -887,7 +887,7 @@ is_subcommand() {
   local subcommand="$1"
   local supported_commands="mkfs add-replica import publish rollback rmfs alterfs    \
     resign list info tag list-tags lstags check transaction abort snapshot           \
-    skeleton migrate list-catalogs diff update-geodb gc catalog-chown \
+    skeleton migrate list-catalogs diff checkout update-geodb gc catalog-chown \
     eliminate-hardlinks update-info update-repoinfo mount fix-permissions"
 
   for possible_command in $supported_commands; do
@@ -979,6 +979,8 @@ Supported Commands:
                   [-l list tags] [-x machine readable]
                   <fully qualified name>
                   Print named tags (snapshots) of the repository
+  checkout        [-t <tag name>] [-b <branch name>]
+                  <fully qualified name>
   check           [-c disable data chunk existence check]
                   [-i check data integrity] (may take some time)]
                   [-t tag (check given tag instead of trunk)]

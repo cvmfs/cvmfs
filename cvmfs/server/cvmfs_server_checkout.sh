@@ -9,30 +9,25 @@
 # - cvmfs_server_util.sh
 # - cvmfs_server_common.sh
 
-cvmfs_server_diff() {
+cvmfs_server_checkout() {
   local name
-  local param_list
+  local branch_name
+  local tag_name
 
   # optional parameter handling
   OPTIND=1
-  while getopts "mhs:d:" option
+  while getopts "b:t:" option
   do
     case $option in
-      m)
-        param_list="$param_list -m"
+      b)
+        branch_name="$OPTARG"
       ;;
       h)
-        param_list="$param_list -h"
-      ;;
-      s)
-        param_list="$param_list -s $OPTARG"
-      ;;
-      d)
-        param_list="$param_list -d $OPTARG"
+        tag_name="$OPTARG"
       ;;
       ?)
         shift $(($OPTIND-2))
-        usage "Command diff: Unrecognized option: $1"
+        usage "Command checkout: Unrecognized option: $1"
       ;;
     esac
   done
@@ -57,13 +52,6 @@ cvmfs_server_diff() {
 
   # do it!
   local user_shell="$(get_user_shell $name)"
-  local diff_cmd
-  diff_cmd="$(__swissknife_cmd dbg) diff               \
-                     -r $CVMFS_STRATUM0                \
-                     -n $CVMFS_REPOSITORY_NAME         \
-                     -k $CVMFS_PUBLIC_KEY              \
-                     -t ${CVMFS_SPOOL_DIR}/tmp         \
-                     $(get_follow_http_redirects_flag) \
-                     $param_list"
-  $user_shell "$diff_cmd"
+  local checkout_cmd="ls"
+  $user_shell "$checkout_cmd"
 }
