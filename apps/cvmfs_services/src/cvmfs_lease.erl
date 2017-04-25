@@ -28,7 +28,7 @@
 -define(SERVER, ?MODULE).
 
 -record(lease, { path   :: binary()   % subpath which is locked
-               , u_id   :: binary()   % user identifier
+               , key_id   :: binary()   % user identifier
                , public :: binary()   % public string used for token generation
                , secret :: binary()   % secret used for token generation
                , time   :: integer()  % timestamp (time when lease acquired)
@@ -66,13 +66,13 @@ start_link(_) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec request_lease(User, Path, Public, Secret) -> new_lease_result()
-                                                       when User :: binary(),
+-spec request_lease(KeyId, Path, Public, Secret) -> new_lease_result()
+                                                       when KeyId :: binary(),
                                                             Path :: binary(),
                                                             Public :: binary(),
                                                             Secret :: binary().
-request_lease(User, Path, Public, Secret) ->
-    gen_server:call(?MODULE, {lease_req, new_lease, {User, Path, Public, Secret}}).
+request_lease(KeyId, Path, Public, Secret) ->
+    gen_server:call(?MODULE, {lease_req, new_lease, {KeyId, Path, Public, Secret}}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -166,8 +166,8 @@ init(_) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-handle_call({lease_req, new_lease, {User, Path, Public, Secret}}, _From, State) ->
-    Reply = p_new_lease(User, Path, Public, Secret, State),
+handle_call({lease_req, new_lease, {KeyId, Path, Public, Secret}}, _From, State) ->
+    Reply = p_new_lease(KeyId, Path, Public, Secret, State),
     {reply, Reply, State};
 handle_call({lease_req, end_lease, Public}, _From, State) ->
     Reply = p_end_lease(Public),
@@ -249,13 +249,13 @@ code_change(OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
--spec p_new_lease(User, Path, Public, Secret, State) -> new_lease_result()
-                                                            when User :: binary(),
+-spec p_new_lease(KeyId, Path, Public, Secret, State) -> new_lease_result()
+                                                            when KeyId :: binary(),
                                                                  Path :: binary(),
                                                                  Public :: binary(),
                                                                  Secret :: binary(),
                                                                  State :: map().
-p_new_lease(User, Path, Public, Secret, _State) ->
+p_new_lease(KeyId, Path, Public, Secret, _State) ->
     {ok, MaxLeaseTime} = application:get_env(cvmfs_services, max_lease_time),
 
     %% Match statement that selects all rows with a given repo,
@@ -284,11 +284,11 @@ p_new_lease(User, Path, Public, Secret, _State) ->
                             %% The old lease is expired. Delete it and insert the new one
                             false ->
                                 mnesia:delete({lease, Path}),
-                                p_write_row(User, Path, Public, Secret)
+                                p_write_row(KeyId, Path, Public, Secret)
                         end;
                     %% No overlapping paths were found; just insert the new entry
                     _ ->
-                        p_write_row(User, Path, Public, Secret)
+                        p_write_row(KeyId, Path, Public, Secret)
                 end
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
@@ -358,14 +358,14 @@ p_clear_leases() ->
     Result.
 
 
--spec p_write_row(User, Path, Public, Secret) -> ok
-                                                     when User :: binary(),
+-spec p_write_row(KeyId, Path, Public, Secret) -> ok
+                                                     when KeyId :: binary(),
                                                           Path :: binary(),
                                                           Public :: binary(),
                                                           Secret :: binary().
-p_write_row(User, Path, Public, Secret) ->
+p_write_row(KeyId, Path, Public, Secret) ->
     mnesia:write(#lease{path = Path,
-                        u_id = User,
+                        key_id = KeyId,
                         public = Public,
                         secret = Secret,
                         time = erlang:system_time(milli_seconds)}).
