@@ -38,7 +38,7 @@
 %%%===================================================================
 %%% Type specifications
 %%%===================================================================
--type new_lease_result() :: ok | {busy, TimeRemaining :: binary()}.
+-type new_lease_result() :: ok | {busy, TimeRemaining :: integer()}.
 -type lease_get_result() :: {ok, Lease :: lease()} |
                               {error, invalid_lease | lease_expired}.
 -type lease_get_value() :: {ok, Value :: binary()} |

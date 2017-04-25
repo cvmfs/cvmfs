@@ -339,7 +339,7 @@ p_submit_payload({LeaseToken, _Payload, _Digest, _HeaderSize} = SubmissionData) 
     Result.
 
 
--spec p_get_repos() -> [binary()].
+-spec p_get_repos() -> Repos :: [binary()].
 p_get_repos() ->
     cvmfs_auth:get_repos().
 
