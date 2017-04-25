@@ -329,15 +329,15 @@ p_end_lease(LeaseToken, Commit) ->
                                   when SubmissionData :: cvmfs_receiver:payload_submission_data().
 p_submit_payload({LeaseToken, _Payload, _Digest, _HeaderSize} = SubmissionData) ->
     Result = case cvmfs_receiver:get_token_id(LeaseToken) of
-        {ok, Public} ->
-            case cvmfs_lease:get_lease_secret(Public) of
-                {ok, Secret} ->
-                    cvmfs_receiver:submit_payload(SubmissionData, Secret);
-                {error, Reason} ->
-                    {error, Reason}
-            end;
-        {error, Reason} ->
-            {error, Reason}
+                 {ok, Public} ->
+                     case cvmfs_lease:get_lease_secret(Public) of
+                         {ok, Secret} ->
+                             cvmfs_receiver:submit_payload(SubmissionData, Secret);
+                         {error, Reason} ->
+                             {error, Reason}
+                     end;
+                 {error, Reason} ->
+                     {error, Reason}
              end,
     Result.
 
