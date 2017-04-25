@@ -1428,6 +1428,10 @@ TYPED_TEST(T_History, PruneBranches) {
   EXPECT_EQ(History::Branch("br2", "", 2), branches[1]);
   EXPECT_EQ(History::Branch("br3", "", 1), branches[2]);
   EXPECT_EQ(History::Branch("br3_1_1", "br3", 3), branches[3]);
+
+  EXPECT_TRUE(history1->ExistsBranch(""));
+  EXPECT_TRUE(history1->ExistsBranch("br2"));
+  EXPECT_FALSE(history1->ExistsBranch("xyz"));
   TestFixture::CloseHistory(history1);
 }
 

@@ -161,6 +161,7 @@ class History {
 
   virtual bool GetBranchHead(const std::string &branch_name, Tag *tag)
     const = 0;
+  virtual bool ExistsBranch(const std::string &branch_name) const = 0;
   virtual bool InsertBranch(const Branch &branch) = 0;
   /**
    * When removing tags, branches can become abandonded. Remove abandoned

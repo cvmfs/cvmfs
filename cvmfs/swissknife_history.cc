@@ -547,6 +547,28 @@ int CommandEditTag::AddNewTag(const ArgumentList &args, Environment *env) {
     tag_template.name = tag_name;
     const bool user_provided_hash = (!root_hash_string.empty());
 
+    if (!env->history->ExistsBranch(tag_template.branch)) {
+      shash::Any previous_hash = catalog->GetPreviousRevision();
+      const UnlinkGuard catalog_path(
+        CreateTempPath(env->tmp_path + "/previous_catalog", 0600));
+      const UniquePtr<catalog::Catalog> previous_catalog(GetCatalog(
+        env->repository_url,
+        previous_hash,
+        catalog_path.path(),
+        false /* read_write */));
+      assert(previous_catalog);
+
+      history::History::Branch branch(
+        tag_template.branch,
+        previous_catalog->GetBranch(),
+        tag_template.revision);
+      if (!env->history->InsertBranch(branch)) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "cannot insert branch '%s'",
+                 tag_template.branch.c_str());
+        return 1;
+      }
+    }
+
     if (!ManipulateTag(env, tag_template, user_provided_hash)) {
       return 1;
     }

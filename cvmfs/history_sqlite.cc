@@ -271,6 +271,18 @@ bool SqliteHistory::GetBranchHead(const string &branch_name, Tag *tag) const {
 }
 
 
+bool SqliteHistory::ExistsBranch(const string &branch_name) const {
+  vector<Branch> branches;
+  if (!ListBranches(&branches))
+    return false;
+  for (unsigned i = 0; i < branches.size(); ++i) {
+    if (branches[i].branch == branch_name)
+      return true;
+  }
+  return false;
+}
+
+
 bool SqliteHistory::InsertBranch(const Branch &branch) {
   assert(database_);
   assert(insert_branch_.IsValid());

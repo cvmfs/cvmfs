@@ -58,6 +58,9 @@ Below is an overview over the contents of the sub-directories found here:
                    rdonly/. Usually this should contain a CVMFS_ROOT_HASH with
                    the root catalog hash of the latest published revision.
 
+-> checkout        If a specific branch/tag is checked out, contains the
+                   corresponding information.
+
 -> reflog.chksum   The secure content hash of the .cvmfsreflog file. The reflog
                    is created for new repositories and it can be reconstructed
                    from an existing repository if necessary. Exists on stratum 0

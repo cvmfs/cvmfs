@@ -710,6 +710,16 @@ bool MockHistory::ListBranches(vector<Branch> *branches) const {
   return true;
 }
 
+bool MockHistory::ExistsBranch(const std::string &branch_name) const {
+  for (BranchMap::const_iterator i = branches_.begin();
+       i != branches_.end(); ++i)
+  {
+    if (i->first == branch_name)
+      return true;
+  }
+  return false;
+}
+
 bool MockHistory::ListRecycleBin(std::vector<shash::Any> *hashes) const {
   hashes->clear();
   hashes->insert(hashes->end(), recycle_bin_.begin(), recycle_bin_.end());

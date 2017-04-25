@@ -98,6 +98,7 @@ class SqliteHistory : public History {
   bool Tips(std::vector<Tag> *channel_tips) const;
 
   virtual bool GetBranchHead(const std::string &branch_name, Tag *tag) const;
+  virtual bool ExistsBranch(const std::string &branch_name) const;
   virtual bool InsertBranch(const Branch &branch);
   virtual bool PruneBranches();
   virtual bool ListBranches(std::vector<Branch> *branches) const;

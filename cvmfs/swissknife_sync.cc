@@ -575,7 +575,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   }
 
   if (args.find('B') != args.end()) {
-    params.branch_name = String2Uint64(*args.find('B')->second);
+    params.branch_name = *args.find('B')->second;
   }
 
   if (args.find('q') != args.end()) {
@@ -631,7 +631,12 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   }
 
   UniquePtr<manifest::Manifest> manifest;
-  if (params.virtual_dir_actions != catalog::VirtualCatalog::kActionNone) {
+  if (!params.branch_name.empty()) {
+    // Throw-away manifeset
+    manifest = new manifest::Manifest(shash::Any(), 0, "");
+  } else if (params.virtual_dir_actions !=
+             catalog::VirtualCatalog::kActionNone)
+  {
     manifest = this->OpenLocalManifest(params.manifest_path);
   } else {
     manifest = this->FetchRemoteManifest(params.stratum0, params.repo_name,

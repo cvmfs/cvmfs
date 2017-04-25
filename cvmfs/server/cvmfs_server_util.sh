@@ -211,12 +211,14 @@ __hc_print_status_report() {
   local name="$1"
   local rdonly_broken=$2
   local rdonly_outdated=$3
-  local rw_broken=$4
-  local rw_should_be_rdonly=$5
-  local rw_should_be_rw=$6
+  local rdonly_wronghash=$4
+  local rw_broken=$5
+  local rw_should_be_rdonly=$6
+  local rw_should_be_rw=$7
 
   [ $rdonly_broken       -eq 0 ] || echo "${CVMFS_SPOOL_DIR}/rdonly is not mounted properly."                   >&2
   [ $rdonly_outdated     -eq 0 ] || echo "$name is not based on the newest published revision"                  >&2
+  [ $rdonly_wronghash    -eq 0 ] || echo "$name is not based on the checked out revision"                       >&2
   [ $rw_broken           -eq 0 ] || echo "/cvmfs/$name is not mounted properly."                                >&2
   [ $rw_should_be_rdonly -eq 0 ] || echo "$name is not in a transaction but /cvmfs/$name is mounted read/write" >&2
   [ $rw_should_be_rw     -eq 0 ] || echo "$name is in a transaction but /cvmfs/$name is not mounted read/write" >&2
