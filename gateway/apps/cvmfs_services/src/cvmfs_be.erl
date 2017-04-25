@@ -308,7 +308,10 @@ p_end_lease(LeaseToken, Commit) ->
                          true ->
                              case cvmfs_lease:get_lease_path(Public) of
                                  {ok, Path} ->
-                                     cvmfs_receiver:commit(Path);
+                                     CatalogLeaseId = p_request_wait_catalog_lease(Path),
+                                     CommitResult = cvmfs_receiver:commit(Path),
+                                     cvmfs_lease:end_lease(CatalogLeaseId),
+                                     CommitResult;
                                   ErrorReason ->
                                      ErrorReason
                              end;
@@ -355,3 +358,22 @@ p_check_hmac(Message, KeyId, HMAC) ->
 -spec p_unique_id() -> binary().
 p_unique_id() ->
     base64:encode(uuid:get_v4_urandom()).
+
+
+-spec p_request_wait_catalog_lease(Path :: binary()) -> LeaseId :: binary().
+p_request_wait_catalog_lease(Path) ->
+    [RepoName | _] = binary:split(Path, <<"/">>),
+    %% First, acquire a lease for the __CATALOG__ virtual subpath of the repo.
+    %% This, ensures exclusive access to the repo for making changes to the
+    %% catalogs. We use empty strings for the KeyId and Secret fields
+    VirtualLeasePath = <<RepoName/binary, "__CATALOG__">>,
+    VirtualLeaseId = <<RepoName/binary, "VIRTUAL_LEASE_ID">>,
+    case cvmfs_lease:request_lease(<<"">>, VirtualLeasePath, VirtualLeaseId, <<"">>) of
+        ok ->
+            VirtualLeaseId;
+        {busy, TimeRemaining} ->
+            timer:sleep(TimeRemaining + 5),
+            p_request_wait_catalog_lease(Path)
+    end.
+
+
