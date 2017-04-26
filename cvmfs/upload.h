@@ -263,7 +263,7 @@ class Spooler : public Observable<SpoolerResult> {
    */
   void WaitForUpload() const;
 
-  void FinalizeSession(bool commit) const;
+  void FinalizeSession(bool commit, const std::string &catalog_path = "") const;
 
   /**
    * Checks how many of the already processed jobs have failed.

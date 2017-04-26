@@ -718,6 +718,11 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   params.spooler->WaitForUpload();
   spooler_catalogs->WaitForUpload();
   params.spooler->FinalizeSession(false);
+
+  // Get the path of the root catalog (to be transmitted to the gateway)
+  const std::string root_catalog_path = manifest->MakeCatalogPath();
+  LogCvmfs(kLogCvmfs, kLogStdout, "Root catalog path: %s",
+           root_catalog_path.c_str());
   // We call FinalizeSession(true) this time, to also trigger the commit
   // operation on the gateway machine (if the upstream is of type "gw").
   spooler_catalogs->FinalizeSession(true);

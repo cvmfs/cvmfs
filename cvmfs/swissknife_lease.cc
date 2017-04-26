@@ -119,7 +119,7 @@ int CommandLease::Main(const ArgumentList& args) {
 
       CurlBuffer buffer;
       if (MakeEndRequest("DELETE", key_id, secret, session_token,
-                         params.repo_service_url, &buffer)) {
+                         params.repo_service_url, "", &buffer)) {
         if (buffer.data.size() > 0 && ParseDropReply(buffer)) {
           std::fclose(token_file);
           if (unlink(token_file_name.c_str())) {

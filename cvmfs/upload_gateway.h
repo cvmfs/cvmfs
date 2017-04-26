@@ -47,7 +47,8 @@ class GatewayUploader : public AbstractUploader {
 
   virtual bool Initialize();
 
-  virtual bool FinalizeSession(bool commit);
+  virtual bool FinalizeSession(bool commit,
+                               const std::string& catalog_path = "");
 
   virtual void WaitForUpload() const;
 

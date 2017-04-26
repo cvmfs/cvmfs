@@ -90,7 +90,8 @@ bool SessionContextBase::Initialize(const std::string& api_url,
   return ret;
 }
 
-bool SessionContextBase::Finalize(bool commit) {
+bool SessionContextBase::Finalize(bool commit,
+                                  const std::string& catalog_path) {
   assert(active_handles_.empty());
   {
     MutexLockGuard lock(current_pack_mtx_);
@@ -111,7 +112,7 @@ bool SessionContextBase::Finalize(bool commit) {
   }
 
   if (commit) {
-    results &= Commit();
+    results &= Commit(catalog_path);
   }
 
   results &= FinalizeDerived() && (bytes_committed_ == bytes_dispatched_);
@@ -218,10 +219,10 @@ bool SessionContext::FinalizeDerived() {
   return true;
 }
 
-bool SessionContext::Commit() {
+bool SessionContext::Commit(const std::string& catalog_path) {
   CurlBuffer buffer;
   return MakeEndRequest("POST", key_id_, secret_, session_token_, api_url_,
-                        &buffer);
+                        catalog_path, &buffer);
 }
 
 Future<bool>* SessionContext::DispatchObjectPack(ObjectPack* pack) {

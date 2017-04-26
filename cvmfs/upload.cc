@@ -112,8 +112,9 @@ void Spooler::WaitForUpload() const {
   file_processor_->WaitForProcessing();
 }
 
-void Spooler::FinalizeSession(bool commit) const {
-  uploader_->FinalizeSession(commit);
+void Spooler::FinalizeSession(bool commit,
+                              const std::string &catalog_path) const {
+  uploader_->FinalizeSession(commit, catalog_path);
 }
 
 unsigned int Spooler::GetNumberOfErrors() const {

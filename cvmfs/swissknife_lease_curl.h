@@ -20,6 +20,7 @@ bool MakeAcquireRequest(const std::string& key_id, const std::string& secret,
 
 bool MakeEndRequest(const std::string& method, const std::string& key_id,
                     const std::string& secret, const std::string& session_token,
-                    const std::string& repo_service_url, CurlBuffer* buffer);
+                    const std::string& repo_service_url,
+                    const std::string& request_payload, CurlBuffer* reply);
 
 #endif  // CVMFS_SWISSKNIFE_LEASE_CURL_H_
