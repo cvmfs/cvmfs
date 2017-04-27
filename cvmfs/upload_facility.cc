@@ -43,7 +43,8 @@ bool AbstractUploader::Initialize() {
 }
 
 bool AbstractUploader::FinalizeSession(bool /*commit*/,
-                                       const std::string & /*catalog_path*/) {
+                                       const std::string & /*old_catalog*/,
+                                       const std::string & /*new_catalog*/) {
   return true;
 }
 

@@ -9,6 +9,7 @@
 #include "curl/curl.h"
 #include "cvmfs_config.h"
 #include "gateway_util.h"
+#include "json_document.h"
 #include "swissknife_lease_curl.h"
 #include "util/string.h"
 
@@ -90,8 +91,8 @@ bool SessionContextBase::Initialize(const std::string& api_url,
   return ret;
 }
 
-bool SessionContextBase::Finalize(bool commit,
-                                  const std::string& catalog_path) {
+bool SessionContextBase::Finalize(bool commit, const std::string& old_catalog,
+                                  const std::string& new_catalog) {
   assert(active_handles_.empty());
   {
     MutexLockGuard lock(current_pack_mtx_);
@@ -112,7 +113,10 @@ bool SessionContextBase::Finalize(bool commit,
   }
 
   if (commit) {
-    results &= Commit(catalog_path);
+    if (old_catalog.empty() || new_catalog.empty()) {
+      return false;
+    }
+    results &= Commit(old_catalog, new_catalog);
   }
 
   results &= FinalizeDerived() && (bytes_committed_ == bytes_dispatched_);
@@ -219,10 +223,16 @@ bool SessionContext::FinalizeDerived() {
   return true;
 }
 
-bool SessionContext::Commit(const std::string& catalog_path) {
+bool SessionContext::Commit(const std::string& old_catalog,
+                            const std::string& new_catalog) {
+  std::string request;
+  JsonStringInput request_input;
+  request_input.push_back(std::make_pair("old_catalog", old_catalog.c_str()));
+  request_input.push_back(std::make_pair("new_catalog", new_catalog.c_str()));
+  ToJsonString(request_input, &request);
   CurlBuffer buffer;
   return MakeEndRequest("POST", key_id_, secret_, session_token_, api_url_,
-                        catalog_path, &buffer);
+                        request, &buffer);
 }
 
 Future<bool>* SessionContext::DispatchObjectPack(ObjectPack* pack) {

@@ -105,9 +105,15 @@ bool MakeEndRequest(const std::string& method, const std::string& key_id,
 
   curl_easy_setopt(h_curl, CURLOPT_URL,
                    (repo_service_url + "/leases/" + session_token).c_str());
-  curl_easy_setopt(h_curl, CURLOPT_POSTFIELDSIZE_LARGE,
-                   static_cast<curl_off_t>(request_payload.length()));
-  curl_easy_setopt(h_curl, CURLOPT_POSTFIELDS, request_payload.c_str());
+  if (request_payload != "") {
+    curl_easy_setopt(h_curl, CURLOPT_POSTFIELDSIZE_LARGE,
+                     static_cast<curl_off_t>(request_payload.length()));
+    curl_easy_setopt(h_curl, CURLOPT_POSTFIELDS, request_payload.c_str());
+  } else {
+    curl_easy_setopt(h_curl, CURLOPT_POSTFIELDSIZE_LARGE,
+                     static_cast<curl_off_t>(0));
+    curl_easy_setopt(h_curl, CURLOPT_POSTFIELDS, NULL);
+  }
   curl_easy_setopt(h_curl, CURLOPT_WRITEFUNCTION, RecvCB);
   curl_easy_setopt(h_curl, CURLOPT_WRITEDATA, reply);
 

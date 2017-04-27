@@ -719,13 +719,25 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   spooler_catalogs->WaitForUpload();
   params.spooler->FinalizeSession(false);
 
-  // Get the path of the root catalog (to be transmitted to the gateway)
-  const std::string root_catalog_path = manifest->MakeCatalogPath();
-  LogCvmfs(kLogCvmfs, kLogStdout, "Root catalog path: %s",
-           root_catalog_path.c_str());
   // We call FinalizeSession(true) this time, to also trigger the commit
   // operation on the gateway machine (if the upstream is of type "gw").
-  spooler_catalogs->FinalizeSession(true);
+
+  // Get the path of the new root catalog
+  const std::string new_root_catalog = manifest->MakeCatalogPath();
+
+  // Get the path of the existing root catalog
+  const std::string manifest_path =
+      std::string("/srv/cvmfs/") + params.repo_name + "/.cvmfspublished";
+  UniquePtr<manifest::Manifest> existing_manifest(
+      manifest::Manifest::LoadFile(manifest_path));
+  const std::string old_root_catalog = existing_manifest->MakeCatalogPath();
+
+  LogCvmfs(kLogCvmfs, kLogStdout, "Old root catalog: %s",
+           old_root_catalog.c_str());
+  LogCvmfs(kLogCvmfs, kLogStdout, "New root catalog: %s",
+           new_root_catalog.c_str());
+
+  spooler_catalogs->FinalizeSession(true, old_root_catalog, new_root_catalog);
   delete params.spooler;
 
   if (!manifest->Export(params.manifest_path)) {

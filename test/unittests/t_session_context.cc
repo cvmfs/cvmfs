@@ -20,7 +20,10 @@ class SessionContextMocked : public upload::SessionContext {
     return ret;
   }
 
-  virtual bool Commit(const std::string& /*catalog_path*/) { return true; }
+  virtual bool Commit(const std::string& /*old_catalog*/,
+                      const std::string& /*new_catalog*/) {
+    return true;
+  }
 
   virtual bool DoUpload(const UploadJob* /*job*/) {
     num_jobs_finished_++;
@@ -48,7 +51,8 @@ TEST_F(T_SessionContext, BasicLifeCycle) {
   EXPECT_TRUE(ctx.CommitBucket(ObjectPack::kCas, hash, hd, "", true));
   EXPECT_EQ(1, ctx.num_jobs_dispatched_);
 
-  EXPECT_TRUE(ctx.Finalize(true, "fake/catalog_path"));
+  EXPECT_TRUE(
+      ctx.Finalize(true, "fake/old_catalog_path", "fake/new_catalog_path"));
   EXPECT_EQ(1, ctx.num_jobs_finished_);
 }
 
@@ -72,7 +76,8 @@ TEST_F(T_SessionContext, MultipleFiles) {
   }
   EXPECT_EQ(2, ctx.num_jobs_dispatched_);
 
-  EXPECT_TRUE(ctx.Finalize(true, "fake/catalog_path"));
+  EXPECT_TRUE(
+      ctx.Finalize(true, "fake/old_catalog_path", "fake/new_catalog_path"));
   EXPECT_EQ(3, ctx.num_jobs_finished_);
 }
 
@@ -97,7 +102,8 @@ TEST_F(T_SessionContext, MultipleFilesForcedDispatchLast) {
   }
   EXPECT_EQ(3, ctx.num_jobs_dispatched_);
 
-  EXPECT_TRUE(ctx.Finalize(true, "fake/catalog_path"));
+  EXPECT_TRUE(
+      ctx.Finalize(true, "fake/old_catalog_path", "fake/new_catalog_path"));
   EXPECT_EQ(3, ctx.num_jobs_finished_);
 }
 
@@ -121,7 +127,8 @@ TEST_F(T_SessionContext, MultipleFilesForcedDispatchEach) {
   }
   EXPECT_EQ(10, ctx.num_jobs_dispatched_);
 
-  EXPECT_TRUE(ctx.Finalize(true, "fake/catalog_path"));
+  EXPECT_TRUE(
+      ctx.Finalize(true, "fake/old_catalog_path", "fake/new_catalog_path"));
   EXPECT_EQ(10, ctx.num_jobs_finished_);
 }
 
@@ -147,7 +154,8 @@ TEST_F(T_SessionContext, FirstAddAllThenCommit) {
     EXPECT_TRUE(ctx.CommitBucket(ObjectPack::kCas, hash, hds[i], ""));
   }
 
-  EXPECT_TRUE(ctx.Finalize(true, "fake/catalog_path"));
+  EXPECT_TRUE(
+      ctx.Finalize(true, "fake/old_catalog_path", "fake/new_catalog_path"));
   EXPECT_EQ(3, ctx.num_jobs_dispatched_);
   EXPECT_EQ(3, ctx.num_jobs_finished_);
 }
