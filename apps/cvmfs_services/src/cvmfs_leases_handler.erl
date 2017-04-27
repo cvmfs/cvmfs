@@ -190,24 +190,32 @@ p_handle_commit_lease(Req0, State, Uid) ->
                                     Req0),
             {ok, Req1, State};
         Token ->
-            Reply = case p_check_hmac(Uid, Token, KeyId, ClientHMAC) of
-                        true ->
-                            case cvmfs_be:end_lease(Uid, Token, true) of
-                                ok ->
-                                    #{<<"status">> => <<"ok">>};
-                                {error, invalid_macaroon} ->
+            {ok, Data, Req1} = cvmfs_fe_util:read_body(Req0),
+            Reply = case jsx:decode(Data, [return_maps]) of
+                        #{<<"old_catalog">> := OldCatalogPath,
+                          <<"new_catalog">> := NewCatalogPath} ->
+                            case p_check_hmac(Uid, Token, KeyId, ClientHMAC) of
+                                true ->
+                                    case cvmfs_be:end_lease(Uid, Token, {OldCatalogPath,
+                                                                         NewCatalogPath}) of
+                                        ok ->
+                                            #{<<"status">> => <<"ok">>};
+                                        {error, invalid_macaroon} ->
+                                            #{<<"status">> => <<"error">>,
+                                              <<"reason">> => <<"invalid_token">>}
+                                    end;
+                                false ->
                                     #{<<"status">> => <<"error">>,
-                                      <<"reason">> => <<"invalid_token">>}
+                                      <<"reason">> => <<"invalid_hmac">>}
                             end;
-                        false ->
-                            #{<<"status">> => <<"error">>,
-                              <<"reason">> => <<"invalid_hmac">>}
+                        _ ->
+                            #{}
                     end,
-            Req1 = cowboy_req:reply(200,
+            ReqF = cowboy_req:reply(200,
                                     #{<<"content-type">> => <<"application/json">>},
                                     jsx:encode(Reply),
-                                    Req0),
-            {ok, Req1, State}
+                                    Req1),
+            {ok, ReqF, State}
     end.
 
 

@@ -17,7 +17,7 @@
          generate_token/3,
          get_token_id/1,
          submit_payload/2,
-         commit/1]).
+         commit/3]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -82,7 +82,7 @@ start_link(Args) ->
                                                             Secret :: binary().
 generate_token(KeyId, Path, MaxLeaseTime) ->
     WorkerPid = poolboy:checkout(cvmfs_receiver_pool),
-    Result = gen_server:call(WorkerPid, {worker_req, generate_token, {KeyId, Path, MaxLeaseTime}}),
+    Result = gen_server:call(WorkerPid, {worker_req, generate_token, KeyId, Path, MaxLeaseTime}),
     poolboy:checkin(cvmfs_receiver_pool, WorkerPid),
     Result.
 
@@ -102,16 +102,18 @@ get_token_id(Token) ->
                                                          Secret :: binary().
 submit_payload(SubmissionData, Secret) ->
     WorkerPid = poolboy:checkout(cvmfs_receiver_pool),
-    Result = gen_server:call(WorkerPid, {worker_req, submit_payload, {SubmissionData, Secret}}),
+    Result = gen_server:call(WorkerPid, {worker_req, submit_payload, SubmissionData, Secret}),
     poolboy:checkin(cvmfs_receiver_pool, WorkerPid),
     Result.
 
 
--spec commit(Path) -> ok | {error, other_error | worker_timeout}
-                          when Path :: binary().
-commit(Path) ->
+-spec commit(LeasePath, OldCatalogPath, NewCatalogPath) -> ok | {error, other_error | worker_timeout}
+                                            when LeasePath :: binary(),
+                                                 OldCatalogPath :: binary(),
+                                                 NewCatalogPath :: binary().
+commit(LeasePath, OldCatalogPath, NewCatalogPath) ->
     WorkerPid = poolboy:checkout(cvmfs_receiver_pool),
-    Result = gen_server:call(WorkerPid, {worker_req, commit, Path}),
+    Result = gen_server:call(WorkerPid, {worker_req, commit, LeasePath, OldCatalogPath, NewCatalogPath}),
     poolboy:checkin(cvmfs_receiver_pool, WorkerPid),
     Result.
 
@@ -165,7 +167,7 @@ init(Args) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call({worker_req, generate_token, {KeyId, Path, MaxLeaseTime}}, _From, State) ->
+handle_call({worker_req, generate_token, KeyId, Path, MaxLeaseTime}, _From, State) ->
     #{worker := WorkerPort} = State,
     Reply = p_generate_token(KeyId, Path, MaxLeaseTime, WorkerPort),
     lager:info("Worker ~p request: {generate_token, {~p, ~p, ~p}} -> Reply: ~p",
@@ -177,16 +179,17 @@ handle_call({worker_req, get_token_id, Token}, _From, State) ->
     lager:info("Worker ~p request: {get_token_id, ~p} -> Reply: ~p",
                [self(), Token, Reply]),
     {reply, Reply, State};
-handle_call({worker_req, submit_payload, {{Token, _, Digest, HeaderSize} = SubmissionData, Secret}}, _From, State) ->
+handle_call({worker_req, submit_payload, {Token, _, Digest, HeaderSize} = SubmissionData, Secret}, _From, State) ->
     #{worker := WorkerPort} = State,
     Reply = p_submit_payload(SubmissionData, Secret, WorkerPort),
     lager:info("Worker ~p request: {submit_payload, {{~p, PAYLOAD_NOT_SHOWN, ~p, ~p} ~p}} -> Reply: ~p",
                [self(), Token, Digest, HeaderSize, Secret, Reply]),
     {reply, Reply, State};
-handle_call({worker_req, commit, Path}, _From, State) ->
+handle_call({worker_req, commit, LeasePath, OldCatalogPath, NewCatalogPath}, _From, State) ->
     #{worker := WorkerPort} = State,
-    Reply = p_commit(WorkerPort, Path),
-    lager:info("Worker ~p request: {commit} -> Reply: ~p", [self(), Reply]),
+    Reply = p_commit(WorkerPort, LeasePath, OldCatalogPath, NewCatalogPath),
+    lager:info("Worker ~p request: {commit, ~p, ~p, ~p} -> Reply: ~p",
+               [self(), LeasePath, OldCatalogPath, NewCatalogPath, Reply]),
     {reply, Reply, State}.
 
 
@@ -239,7 +242,6 @@ terminate(Reason, State) ->
     #{worker := WorkerPort} = State,
 
     %% Send the kQuit request to the worker
-    lager:info("Sending kQuit request to worker process."),
     p_write_request(WorkerPort, ?kQuit, <<"">>),
     {ok, {2, <<"ok">>}} = p_read_reply(WorkerPort),
     port_close(WorkerPort),
@@ -340,11 +342,16 @@ p_submit_payload({LeaseToken, Payload, Digest, HeaderSize}, Secret, WorkerPort) 
     end.
 
 
--spec p_commit(WorkerPort, Path) -> ok | {error, other_error | worker_timeout}
+-spec p_commit(WorkerPort, LeasePath, OldCatalogPath, NewCatalogPath)
+              -> ok | {error, other_error | worker_timeout}
                                         when WorkerPort :: port(),
-                                             Path :: binary().
-p_commit(WorkerPort, Path) ->
-    Req1 = jsx:encode(#{<<"path">> => Path}),
+                                             LeasePath :: binary(),
+                                             OldCatalogPath :: binary(),
+                                             NewCatalogPath :: binary().
+p_commit(WorkerPort, LeasePath, OldCatalogPath, NewCatalogPath) ->
+    Req1 = jsx:encode(#{<<"lease_path">> => LeasePath,
+                        <<"old_catalog">> => OldCatalogPath,
+                        <<"new_catalog">> => NewCatalogPath}),
     p_write_request(WorkerPort, ?kCommit, Req1),
     case p_read_reply(WorkerPort) of
         {ok, {_, Reply1}} ->

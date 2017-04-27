@@ -71,7 +71,7 @@ start_link(_) ->
                                               KeyId :: binary(),
                                               Path :: binary().
 new_lease(Uid, KeyId, Path) ->
-    gen_server:call(?MODULE, {be_req, new_lease, {Uid, KeyId, Path}}).
+    gen_server:call(?MODULE, {be_req, new_lease, Uid, KeyId, Path}).
 
 
 %%--------------------------------------------------------------------
@@ -81,12 +81,15 @@ new_lease(Uid, KeyId, Path) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec end_lease(Uid, LeaseToken, Commit) -> ok | {error, invalid_macaroon}
+-spec end_lease(Uid, LeaseToken, CatalogPaths | false)
+               -> ok | {error, invalid_macaroon}
                                         when Uid :: binary(),
                                              LeaseToken :: binary(),
-                                             Commit :: boolean().
-end_lease(Uid, LeaseToken, Commit) ->
-    gen_server:call(?MODULE, {be_req, end_lease, {Uid, LeaseToken, Commit}}).
+                                             CatalogPaths :: {binary(), binary()}.
+end_lease(Uid, LeaseToken, false) ->
+    gen_server:call(?MODULE, {be_req, end_lease, Uid, LeaseToken});
+end_lease(Uid, LeaseToken, {OldCatalogPath, NewCatalogPath}) ->
+    gen_server:call(?MODULE, {be_req, end_lease, Uid, LeaseToken, OldCatalogPath, NewCatalogPath}).
 
 
 %%--------------------------------------------------------------------
@@ -101,7 +104,7 @@ end_lease(Uid, LeaseToken, Commit) ->
                                 when Uid :: binary(),
                                      SubmissionData :: cvmfs_receiver:payload_submission_data().
 submit_payload(Uid, SubmissionData) ->
-    gen_server:call(?MODULE, {be_req, submit_payload, {Uid, SubmissionData}}).
+    gen_server:call(?MODULE, {be_req, submit_payload, Uid, SubmissionData}).
 
 
 -spec get_repos(Uid :: binary()) -> [binary()].
@@ -115,7 +118,7 @@ get_repos(Uid) ->
                                                         KeyId :: binary(),
                                                         HMAC :: binary().
 check_hmac(Uid, Message, KeyId, HMAC) ->
-    gen_server:call(?MODULE, {be_req, check_hmac, {Uid, Message, KeyId, HMAC}}).
+    gen_server:call(?MODULE, {be_req, check_hmac, Uid, Message, KeyId, HMAC}).
 
 
 -spec unique_id() -> binary().
@@ -157,7 +160,7 @@ init([]) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-handle_call({be_req, new_lease, {Uid, KeyId, Path}}, From, State) ->
+handle_call({be_req, new_lease, Uid, KeyId, Path}, From, State) ->
     Task = fun() ->
                    case p_new_lease(KeyId, Path) of
                        {ok, LeaseToken} ->
@@ -172,16 +175,25 @@ handle_call({be_req, new_lease, {Uid, KeyId, Path}}, From, State) ->
            end,
     spawn_link(Task),
     {noreply, State, ?ASYNC_TIMEOUT};
-handle_call({be_req, end_lease, {Uid, LeaseToken, Commit}}, From, State) ->
+handle_call({be_req, end_lease, Uid, LeaseToken}, From, State) ->
     Task = fun() ->
-                   Reply = p_end_lease(LeaseToken, Commit),
-                   lager:info("Backend request: Uid: ~p - {end_lease, ~p, ~p} -> Reply: ~p",
-                              [Uid, LeaseToken, Commit, Reply]),
+                   Reply = p_end_lease(LeaseToken, false),
+                   lager:info("Backend request: Uid: ~p - {end_lease, ~p} -> Reply: ~p",
+                              [Uid, LeaseToken, Reply]),
                    gen_server:reply(From, Reply)
            end,
     spawn_link(Task),
     {noreply, State, ?ASYNC_TIMEOUT};
-handle_call({be_req, submit_payload, {Uid, SubmissionData}}, From, State) ->
+handle_call({be_req, end_lease, Uid, LeaseToken, OldCatalogPath, NewCatalogPath}, From, State) ->
+    Task = fun() ->
+                   Reply = p_end_lease(LeaseToken, {OldCatalogPath, NewCatalogPath}),
+                   lager:info("Backend request: Uid: ~p - {end_lease, ~p, ~p, ~p} -> Reply: ~p",
+                              [Uid, LeaseToken, OldCatalogPath, NewCatalogPath, Reply]),
+                   gen_server:reply(From, Reply)
+           end,
+    spawn_link(Task),
+    {noreply, State, ?ASYNC_TIMEOUT};
+handle_call({be_req, submit_payload, Uid, SubmissionData}, From, State) ->
     Task = fun() ->
                    Reply = p_submit_payload(SubmissionData),
                    {LeaseToken, _Payload, Digest, HeaderSize} = SubmissionData,
@@ -200,7 +212,7 @@ handle_call({be_req, get_repos, Uid}, From, State) ->
               end,
     spawn_link(Task),
     {noreply, State, ?ASYNC_TIMEOUT};
-handle_call({be_req, check_hmac, {Uid, Message, KeyId, HMAC}}, From, State) ->
+handle_call({be_req, check_hmac, Uid, Message, KeyId, HMAC}, From, State) ->
     Task = fun() ->
                    Reply = p_check_hmac(Message, KeyId, HMAC),
                    lager:info("Backend request: Uid: ~p - {check_hmac, {~p, ~p, ~p}} -> Reply: ~p",
@@ -298,25 +310,31 @@ p_new_lease(KeyId, Path) ->
     end.
 
 
--spec p_end_lease(LeaseToken, Commit) -> ok | {error, invalid_macaroon} | cvmfs_lease:lease_get_value()
+-spec p_end_lease(LeaseToken, CatalogPaths) -> ok | {error, invalid_macaroon} | cvmfs_lease:lease_get_value()
                                              when LeaseToken :: binary(),
-                                                  Commit :: boolean().
-p_end_lease(LeaseToken, Commit) ->
+                                                  CatalogPaths :: false | {binary(), binary()}.
+p_end_lease(LeaseToken, false) ->
     Result = case cvmfs_receiver:get_token_id(LeaseToken) of
                  {ok, Public} ->
-                     case Commit of
-                         true ->
-                             case cvmfs_lease:get_lease_path(Public) of
-                                 {ok, Path} ->
-                                     CatalogLeaseId = p_request_wait_catalog_lease(Path),
-                                     CommitResult = cvmfs_receiver:commit(Path),
-                                     cvmfs_lease:end_lease(CatalogLeaseId),
-                                     CommitResult;
-                                  ErrorReason ->
-                                     ErrorReason
-                             end;
-                         false ->
-                             ok
+                     cvmfs_lease:end_lease(Public);
+                 _ ->
+                     {error, invalid_macaroon}
+             end,
+    Result;
+p_end_lease(LeaseToken, {OldCatalogPath, NewCatalogPath}) when is_binary(OldCatalogPath),
+                                                               is_binary(NewCatalogPath) ->
+    Result = case cvmfs_receiver:get_token_id(LeaseToken) of
+                 {ok, Public} ->
+                     case cvmfs_lease:get_lease_path(Public) of
+                         {ok, LeasePath} ->
+                             CatalogLeaseId = p_request_wait_catalog_lease(LeasePath),
+                             CommitResult = cvmfs_receiver:commit(LeasePath,
+                                                                  OldCatalogPath,
+                                                                  NewCatalogPath),
+                             cvmfs_lease:end_lease(CatalogLeaseId),
+                             CommitResult;
+                         ErrorReason ->
+                             ErrorReason
                      end,
                      cvmfs_lease:end_lease(Public);
                  _ ->
