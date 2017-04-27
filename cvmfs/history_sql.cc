@@ -20,7 +20,7 @@ const unsigned HistoryDatabase::kLatestSchemaRevision  = 3;
  * Schema Version 1.0
  *   -> Revision 3: deprecate (flush) table 'recycle_bin'
  *                  add table 'branches'
- *                  add column 'branch' to table rags
+ *                  add column 'branch' to table tags
  *   -> Revision 2: add table 'recycle_bin'
  *   -> Revision 1: add field 'size'
  *
