@@ -24,7 +24,11 @@
     "future": "cpp",
     "cassert": "cpp",
     "functional": "cpp",
-    "mutex": "cpp"
+    "mutex": "cpp",
+    "bitset": "cpp",
+    "memory": "cpp",
+    "system_error": "cpp",
+    "thread": "cpp"
   },
   "python.linting.pylintEnabled": false,
   "python.formatting.provider": "yapf"

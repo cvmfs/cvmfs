@@ -14,6 +14,7 @@ cvmfs_server_checkout() {
   local branch_name
   local tag_name
   local tag_hash
+  local branch_head
 
   # optional parameter handling
   OPTIND=1
@@ -54,27 +55,37 @@ cvmfs_server_checkout() {
   trap "close_transaction $name 0" EXIT HUP INT TERM
   open_transaction $name || die "Failed to open transaction for checkout"
 
+  if [ "x$branch_name" != "x" ]; then
+    is_valid_branch_name "$branch_name" || die "invalid branch name: $branch_name"
+    branch_head=$(get_head_of $name "$branch_name")
+  fi
+
   if [ "x$tag_name" = "x" ]; then
     if [ "x$branch_name" = "x" ]; then
+      # Reset to trunk
       set_ro_root_hash $name "$(get_published_root_hash $name)" || die "failed to update root hash"
       rm -f /var/spool/cvmfs/${name}/checkout
       echo "Reset to trunk on default branch"
       return 0
     fi
-    local head=$(get_head_of $name $branch_name)
-    [ "x$head" != "x" ] || die "branch $branch_name does not exist"
-    $tag_name=$(echo $head | cut -d" " -f1)
-    $tag_hash=$(echo $head | cut -d" " -f2)
-  fi
-  if [ "x$tag_hash" = "x" ]; then
-    tag_hash=$(get_tag_hash $name $tag_name)
+    # Checkout head of existing branch
+    [ "x$branch_head" != "x" ] || die "branch $branch_name does not exist"
+    tag_name=$(echo $branch_head | cut -d" " -f1)
+    tag_hash=$(echo $branch_head | cut -d" " -f2)
+  else
+    # checkout into new branch
+    [ "x$branch_name" = "x" ] && die "missing branch name"
+    [ "x$branch_head" != "x" ] && die "branch $branch_name already exists"
+    tag_hash=$(get_tag_hash $name "$tag_name")
     [ "x$tag_hash" != "x" ] || die "tag $tag_name does not exist"
   fi
-  [ "x$branch_name" != "x" ] || branch_name="(default)"
+
   set_ro_root_hash $name $tag_hash || die "failed to update root hash"
   echo "$tag_name $tag_hash $branch_name" > /var/spool/cvmfs/${name}/checkout
   if [ x"$(whoami)" = x"$CVMFS_USER" ]; then
     chown $CVMFS_USER /var/spool/cvmfs/${name}/checkout
   fi
-  echo "Checked out tag $tag_name ($tag_hash) on branch $branch_name"
+  local report_branch="on branch"
+  [ "x$branch_head" = "x" ] && report_branch="onto new branch"
+  echo "Checked out tag $tag_name ($tag_hash) $report_branch $branch_name"
 }

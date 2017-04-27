@@ -58,6 +58,7 @@ COMPONENTS="\
     server/cvmfs_server_chown.sh
     server/cvmfs_server_eliminate_hardlinks.sh
     server/cvmfs_server_update_info.sh
+    server/cvmfs_server_update_repoinfo.sh
     server/cvmfs_server_mount.sh
     server/cvmfs_server_skeleton.sh
     server/cvmfs_server_fix_permissions.sh

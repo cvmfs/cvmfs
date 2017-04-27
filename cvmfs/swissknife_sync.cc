@@ -638,6 +638,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
              catalog::VirtualCatalog::kActionNone)
   {
     manifest = this->OpenLocalManifest(params.manifest_path);
+    params.base_hash = manifest->catalog_hash();
   } else {
     manifest = this->FetchRemoteManifest(params.stratum0, params.repo_name,
                                          params.base_hash);

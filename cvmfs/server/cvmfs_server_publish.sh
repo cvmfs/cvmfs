@@ -244,9 +244,6 @@ cvmfs_server_publish() {
     if [ "x$CVMFS_IGNORE_SPECIAL_FILES" = "xtrue" ]; then
       sync_command="$sync_command -g"
     fi
-    if is_checked_out $name; then
-      sync_command="$sync_command -B $(get_checked_out_branch $name)"
-    fi
     local sync_command_virtual_dir=
     if [ "x${CVMFS_VIRTUAL_DIR}" = "xtrue" ]; then
       sync_command_virtual_dir="$sync_command -S snapshots"
@@ -254,6 +251,10 @@ cvmfs_server_publish() {
       if [ -d /cvmfs/$name/.cvmfs ]; then
         sync_command_virtual_dir="$sync_command -S remove"
       fi
+    fi
+    # Must be after the virtual-dir command is constructed
+    if is_checked_out $name; then
+      sync_command="$sync_command -B $(get_checked_out_branch $name)"
     fi
 
     local tag_command="$(__swissknife_cmd dbg) tag_edit \
@@ -392,12 +393,9 @@ cvmfs_server_publish() {
       __run_gc $name       \
                $stratum0   \
                $dry_run    \
-               $manifest   \
-               $trunk_hash \
                ""          \
                "0"         \
                -z $gc_timespan      || { local err=$?; publish_failed $name; die "Garbage collection failed ($err)"; }
-      sign_manifest $name $manifest || { publish_failed $name; die "Signing failed"; }
     fi
 
     # check again for open file descriptors (potential race condition)

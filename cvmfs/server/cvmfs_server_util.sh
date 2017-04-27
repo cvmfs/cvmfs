@@ -174,6 +174,17 @@ is_mounted() {
 }
 
 
+# only certain characters are allowed in branch names
+#
+# @param branch_name the name to test
+is_valid_branch_name() {
+  local branch_name="$1"
+
+  local clean_name=${branch_name//[^a-zA-Z0-9_@\.\/\-]/}
+  [ "x$clean_name" = "x$branch_name" ]
+}
+
+
 run_suid_helper() {
   env -i /usr/bin/cvmfs_suid_helper $@
 }
