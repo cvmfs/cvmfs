@@ -90,7 +90,7 @@ init(Req0 = #{method := <<"DELETE">>}, State) ->
                             Token ->
                                 Reply = case p_check_hmac(Uid, Token, KeyId, ClientHMAC) of
                                             true ->
-                                                case cvmfs_be:end_lease(Uid, Token, false) of
+                                                case cvmfs_be:cancel_lease(Uid, Token) of
                                                     ok ->
                                                         #{<<"status">> => <<"ok">>};
                                                     {error, invalid_macaroon} ->
@@ -196,8 +196,8 @@ p_handle_commit_lease(Req0, State, Uid) ->
                           <<"new_catalog">> := NewCatalogPath} ->
                             case p_check_hmac(Uid, Token, KeyId, ClientHMAC) of
                                 true ->
-                                    case cvmfs_be:end_lease(Uid, Token, {OldCatalogPath,
-                                                                         NewCatalogPath}) of
+                                    case cvmfs_be:commit_lease(Uid, Token, {OldCatalogPath,
+                                                                            NewCatalogPath}) of
                                         ok ->
                                             #{<<"status">> => <<"ok">>};
                                         {error, invalid_macaroon} ->
