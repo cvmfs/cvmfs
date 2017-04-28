@@ -192,12 +192,12 @@ p_handle_commit_lease(Req0, State, Uid) ->
         Token ->
             {ok, Data, Req1} = cvmfs_fe_util:read_body(Req0),
             Reply = case jsx:decode(Data, [return_maps]) of
-                        #{<<"old_catalog">> := OldCatalogPath,
-                          <<"new_catalog">> := NewCatalogPath} ->
+                        #{<<"old_root_hash">> := OldRootHash,
+                          <<"new_root_hash">> := NewRootHash} ->
                             case p_check_hmac(Uid, Token, KeyId, ClientHMAC) of
                                 true ->
-                                    case cvmfs_be:commit_lease(Uid, Token, {OldCatalogPath,
-                                                                            NewCatalogPath}) of
+                                    case cvmfs_be:commit_lease(Uid, Token, {OldRootHash,
+                                                                            NewRootHash}) of
                                         ok ->
                                             #{<<"status">> => <<"ok">>};
                                         {error, invalid_macaroon} ->
