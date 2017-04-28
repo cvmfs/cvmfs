@@ -107,13 +107,13 @@ submit_payload(SubmissionData, Secret) ->
     Result.
 
 
--spec commit(LeasePath, OldCatalogPath, NewCatalogPath) -> ok | {error, other_error | worker_timeout}
+-spec commit(LeasePath, OldRootHash, NewRootHash) -> ok | {error, other_error | worker_timeout}
                                             when LeasePath :: binary(),
-                                                 OldCatalogPath :: binary(),
-                                                 NewCatalogPath :: binary().
-commit(LeasePath, OldCatalogPath, NewCatalogPath) ->
+                                                 OldRootHash :: binary(),
+                                                 NewRootHash :: binary().
+commit(LeasePath, OldRootHash, NewRootHash) ->
     WorkerPid = poolboy:checkout(cvmfs_receiver_pool),
-    Result = gen_server:call(WorkerPid, {worker_req, commit, LeasePath, OldCatalogPath, NewCatalogPath}),
+    Result = gen_server:call(WorkerPid, {worker_req, commit, LeasePath, OldRootHash, NewRootHash}),
     poolboy:checkin(cvmfs_receiver_pool, WorkerPid),
     Result.
 
@@ -185,11 +185,11 @@ handle_call({worker_req, submit_payload, {Token, _, Digest, HeaderSize} = Submis
     lager:info("Worker ~p request: {submit_payload, {{~p, PAYLOAD_NOT_SHOWN, ~p, ~p} ~p}} -> Reply: ~p",
                [self(), Token, Digest, HeaderSize, Secret, Reply]),
     {reply, Reply, State};
-handle_call({worker_req, commit, LeasePath, OldCatalogPath, NewCatalogPath}, _From, State) ->
+handle_call({worker_req, commit, LeasePath, OldRootHash, NewRootHash}, _From, State) ->
     #{worker := WorkerPort} = State,
-    Reply = p_commit(WorkerPort, LeasePath, OldCatalogPath, NewCatalogPath),
+    Reply = p_commit(WorkerPort, LeasePath, OldRootHash, NewRootHash),
     lager:info("Worker ~p request: {commit, ~p, ~p, ~p} -> Reply: ~p",
-               [self(), LeasePath, OldCatalogPath, NewCatalogPath, Reply]),
+               [self(), LeasePath, OldRootHash, NewRootHash, Reply]),
     {reply, Reply, State}.
 
 
@@ -342,16 +342,16 @@ p_submit_payload({LeaseToken, Payload, Digest, HeaderSize}, Secret, WorkerPort) 
     end.
 
 
--spec p_commit(WorkerPort, LeasePath, OldCatalogPath, NewCatalogPath)
+-spec p_commit(WorkerPort, LeasePath, OldRootHash, NewRootHash)
               -> ok | {error, other_error | worker_timeout}
                                         when WorkerPort :: port(),
                                              LeasePath :: binary(),
-                                             OldCatalogPath :: binary(),
-                                             NewCatalogPath :: binary().
-p_commit(WorkerPort, LeasePath, OldCatalogPath, NewCatalogPath) ->
+                                             OldRootHash :: binary(),
+                                             NewRootHash :: binary().
+p_commit(WorkerPort, LeasePath, OldRootHash, NewRootHash) ->
     Req1 = jsx:encode(#{<<"lease_path">> => LeasePath,
-                        <<"old_catalog">> => OldCatalogPath,
-                        <<"new_catalog">> => NewCatalogPath}),
+                        <<"old_root_hash">> => OldRootHash,
+                        <<"new_root_hash">> => NewRootHash}),
     p_write_request(WorkerPort, ?kCommit, Req1),
     case p_read_reply(WorkerPort) of
         {ok, {_, Reply1}} ->

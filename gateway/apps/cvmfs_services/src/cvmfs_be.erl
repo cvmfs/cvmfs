@@ -95,12 +95,12 @@ cancel_lease(Uid, LeaseToken) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec commit_lease(Uid, LeaseToken, CatalogPaths) -> ok | {error, invalid_macaroon}
+-spec commit_lease(Uid, LeaseToken, RootHashes) -> ok | {error, invalid_macaroon}
                                         when Uid :: binary(),
                                              LeaseToken :: binary(),
-                                             CatalogPaths :: {binary(), binary()}.
-commit_lease(Uid, LeaseToken, {OldCatalogPath, NewCatalogPath}) ->
-    gen_server:call(?MODULE, {be_req, commit_lease, Uid, LeaseToken, OldCatalogPath, NewCatalogPath}).
+                                             RootHashes :: {binary(), binary()}.
+commit_lease(Uid, LeaseToken, {OldRootHash, NewRootHash}) ->
+    gen_server:call(?MODULE, {be_req, commit_lease, Uid, LeaseToken, OldRootHash, NewRootHash}).
 
 
 %%--------------------------------------------------------------------
@@ -195,11 +195,11 @@ handle_call({be_req, cancel_lease, Uid, LeaseToken}, From, State) ->
            end,
     spawn_link(Task),
     {noreply, State, ?ASYNC_TIMEOUT};
-handle_call({be_req, commit_lease, Uid, LeaseToken, OldCatalogPath, NewCatalogPath}, From, State) ->
+handle_call({be_req, commit_lease, Uid, LeaseToken, OldRootHash, NewRootHash}, From, State) ->
     Task = fun() ->
-                   Reply = p_commit_lease(LeaseToken, {OldCatalogPath, NewCatalogPath}),
+                   Reply = p_commit_lease(LeaseToken, {OldRootHash, NewRootHash}),
                    lager:info("Backend request: Uid: ~p - {end_lease, ~p, ~p, ~p} -> Reply: ~p",
-                              [Uid, LeaseToken, OldCatalogPath, NewCatalogPath, Reply]),
+                              [Uid, LeaseToken, OldRootHash, NewRootHash, Reply]),
                    gen_server:reply(From, Reply)
            end,
     spawn_link(Task),
@@ -333,19 +333,19 @@ p_cancel_lease(LeaseToken) ->
     Result.
 
 
--spec p_commit_lease(LeaseToken, CatalogPaths) -> ok | {error, invalid_macaroon} | cvmfs_lease:lease_get_value()
+-spec p_commit_lease(LeaseToken, RootHashes) -> ok | {error, invalid_macaroon} | cvmfs_lease:lease_get_value()
                                                       when LeaseToken :: binary(),
-                                                           CatalogPaths :: false | {binary(), binary()}.
-p_commit_lease(LeaseToken, {OldCatalogPath, NewCatalogPath}) when is_binary(OldCatalogPath),
-                                                                  is_binary(NewCatalogPath) ->
+                                                           RootHashes :: false | {binary(), binary()}.
+p_commit_lease(LeaseToken, {OldRootHash, NewRootHash}) when is_binary(OldRootHash),
+                                                                  is_binary(NewRootHash) ->
     Result = case cvmfs_receiver:get_token_id(LeaseToken) of
                  {ok, Public} ->
                      case cvmfs_lease:get_lease_path(Public) of
                          {ok, LeasePath} ->
                              CatalogLeaseId = p_request_wait_catalog_lease(LeasePath),
                              CommitResult = cvmfs_receiver:commit(LeasePath,
-                                                                  OldCatalogPath,
-                                                                  NewCatalogPath),
+                                                                  OldRootHash,
+                                                                  NewRootHash),
                              cvmfs_lease:end_lease(CatalogLeaseId),
                              CommitResult;
                          ErrorReason ->

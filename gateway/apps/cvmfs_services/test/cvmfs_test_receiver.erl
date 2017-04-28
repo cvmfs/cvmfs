@@ -90,11 +90,11 @@ submit_payload(SubmissionData, Secret) ->
     Result.
 
 
--spec commit(LeasePath :: binary(), OldCatalogPath :: binary(), NewCatalogPath :: binary())
+-spec commit(LeasePath :: binary(), OldRootHash :: binary(), NewRootHash :: binary())
             -> ok | {error, other_error | worker_timeout}.
-commit(LeasePath, OldCatalogPath, NewCatalogPath) ->
+commit(LeasePath, OldRootHash, NewRootHash) ->
     WorkerPid = poolboy:checkout(cvmfs_receiver_pool),
-    Result = gen_server:call(WorkerPid, {worker_req, commit, LeasePath, OldCatalogPath, NewCatalogPath}),
+    Result = gen_server:call(WorkerPid, {worker_req, commit, LeasePath, OldRootHash, NewRootHash}),
     poolboy:checkin(cvmfs_receiver_pool, WorkerPid),
     Result.
 
@@ -149,10 +149,10 @@ handle_call({worker_req, submit_payload, SubmissionData, Secret}, _From, State) 
     lager:info("Worker ~p request: {submit_payload, {~p, ~p}} -> Reply: ~p",
                [self(), SubmissionData, Secret, Reply]),
     {reply, Reply, State};
-handle_call({worker_req, commit, LeasePath, OldCatalogPath, NewCatalogPath}, _From, State) ->
-    Reply = p_commit(LeasePath, OldCatalogPath, NewCatalogPath),
+handle_call({worker_req, commit, LeasePath, OldRootHash, NewRootHash}, _From, State) ->
+    Reply = p_commit(LeasePath, OldRootHash, NewRootHash),
     lager:info("Worker ~p request: {commit, ~p, ~p, ~p} -> Reply: ~p",
-               [self(), LeasePath, OldCatalogPath, NewCatalogPath, Reply]),
+               [self(), LeasePath, OldRootHash, NewRootHash, Reply]),
     {reply, Reply, State}.
 
 
@@ -291,10 +291,8 @@ p_submit_payload({LeaseToken, _Payload, _Digest, _HeaderSize}, Secret) ->
     end.
 
 
--spec p_commit(LeasePath :: binary(),
-               OldCatalogPath :: binary(),
-               NewCatalogPath :: binary())
+-spec p_commit(LeasePath :: binary(), OldRootHash :: binary(), NewRootHash :: binary())
               -> ok | {error, other_error | worker_timeout}.
-p_commit(_Path, _OldCatalogPath, _NewCatalogPath) ->
+p_commit(_Path, _OldRootHash, _NewRootHash) ->
     ok.
 
