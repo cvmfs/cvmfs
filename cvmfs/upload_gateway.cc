@@ -98,9 +98,9 @@ bool GatewayUploader::Initialize() {
 }
 
 bool GatewayUploader::FinalizeSession(bool commit,
-                                      const std::string& old_catalog,
-                                      const std::string& new_catalog) {
-  return session_context_->Finalize(commit, old_catalog, new_catalog);
+                                      const std::string& old_root_hash,
+                                      const std::string& new_root_hash) {
+  return session_context_->Finalize(commit, old_root_hash, new_root_hash);
 }
 
 void GatewayUploader::WaitForUpload() const {

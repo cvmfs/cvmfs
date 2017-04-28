@@ -91,8 +91,8 @@ bool SessionContextBase::Initialize(const std::string& api_url,
   return ret;
 }
 
-bool SessionContextBase::Finalize(bool commit, const std::string& old_catalog,
-                                  const std::string& new_catalog) {
+bool SessionContextBase::Finalize(bool commit, const std::string& old_root_hash,
+                                  const std::string& new_root_hash) {
   assert(active_handles_.empty());
   {
     MutexLockGuard lock(current_pack_mtx_);
@@ -113,10 +113,10 @@ bool SessionContextBase::Finalize(bool commit, const std::string& old_catalog,
   }
 
   if (commit) {
-    if (old_catalog.empty() || new_catalog.empty()) {
+    if (old_root_hash.empty() || new_root_hash.empty()) {
       return false;
     }
-    results &= Commit(old_catalog, new_catalog);
+    results &= Commit(old_root_hash, new_root_hash);
   }
 
   results &= FinalizeDerived() && (bytes_committed_ == bytes_dispatched_);
@@ -223,12 +223,14 @@ bool SessionContext::FinalizeDerived() {
   return true;
 }
 
-bool SessionContext::Commit(const std::string& old_catalog,
-                            const std::string& new_catalog) {
+bool SessionContext::Commit(const std::string& old_root_hash,
+                            const std::string& new_root_hash) {
   std::string request;
   JsonStringInput request_input;
-  request_input.push_back(std::make_pair("old_catalog", old_catalog.c_str()));
-  request_input.push_back(std::make_pair("new_catalog", new_catalog.c_str()));
+  request_input.push_back(
+      std::make_pair("old_root_hash", old_root_hash.c_str()));
+  request_input.push_back(
+      std::make_pair("new_root_hash", new_root_hash.c_str()));
   ToJsonString(request_input, &request);
   CurlBuffer buffer;
   return MakeEndRequest("POST", key_id_, secret_, session_token_, api_url_,

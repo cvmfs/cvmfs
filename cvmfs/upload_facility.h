@@ -129,8 +129,8 @@ class AbstractUploader
    * represents the path of the root catalog with the changes.
    * By default it is a noop and returns true;
    */
-  virtual bool FinalizeSession(bool commit, const std::string &old_catalog,
-                               const std::string &new_catalog);
+  virtual bool FinalizeSession(bool commit, const std::string &old_root_hash,
+                               const std::string &new_root_hash);
 
   /**
    * This must be called right before the destruction of the AbstractUploader!

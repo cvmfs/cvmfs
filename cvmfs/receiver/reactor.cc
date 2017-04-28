@@ -307,22 +307,22 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
 
   const JSON* lease_path_json =
       JsonDocument::SearchInObject(req_json->root(), "lease_path", JSON_STRING);
-  const JSON* old_catalog_path_json = JsonDocument::SearchInObject(
-      req_json->root(), "old_catalog", JSON_STRING);
-  const JSON* new_catalog_path_json = JsonDocument::SearchInObject(
-      req_json->root(), "new_catalog", JSON_STRING);
+  const JSON* old_root_hash_json = JsonDocument::SearchInObject(
+      req_json->root(), "old_root_hash", JSON_STRING);
+  const JSON* new_root_hash_json = JsonDocument::SearchInObject(
+      req_json->root(), "new_root_hash", JSON_STRING);
 
-  if (lease_path_json == NULL || old_catalog_path_json == NULL ||
-      new_catalog_path_json == NULL)
+  if (lease_path_json == NULL || old_root_hash_json == NULL ||
+      new_root_hash_json == NULL)
     return false;
 
   // Here we use the path to commit the changes!
   UniquePtr<CommitProcessor> proc(MakeCommitProcessor());
-  JsonStringInput reply_input;
-  CommitProcessor::Result res = proc->Process(
-      lease_path_json->string_value, old_catalog_path_json->string_value,
-      new_catalog_path_json->string_value);
+  CommitProcessor::Result res = proc->Process(lease_path_json->string_value,
+                                              old_root_hash_json->string_value,
+                                              new_root_hash_json->string_value);
 
+  JsonStringInput reply_input;
   switch (res) {
     case CommitProcessor::kSuccess:
       reply_input.push_back(std::make_pair("status", "ok"));

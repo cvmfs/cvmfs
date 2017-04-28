@@ -723,16 +723,17 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   // operation on the gateway machine (if the upstream is of type "gw").
 
   // Get the path of the new root catalog
-  const std::string new_root_catalog = manifest->MakeCatalogPath();
+  const std::string new_root_hash = manifest->catalog_hash().ToString(true);
 
   // Get the path of the existing root catalog
   const std::string manifest_path =
       std::string("/srv/cvmfs/") + params.repo_name + "/.cvmfspublished";
   UniquePtr<manifest::Manifest> existing_manifest(
       manifest::Manifest::LoadFile(manifest_path));
-  const std::string old_root_catalog = existing_manifest->MakeCatalogPath();
+  const std::string old_root_hash =
+      existing_manifest->catalog_hash().ToString(true);
 
-  spooler_catalogs->FinalizeSession(true, old_root_catalog, new_root_catalog);
+  spooler_catalogs->FinalizeSession(true, old_root_hash, new_root_hash);
   delete params.spooler;
 
   if (!manifest->Export(params.manifest_path)) {
