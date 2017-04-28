@@ -732,11 +732,6 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
       manifest::Manifest::LoadFile(manifest_path));
   const std::string old_root_catalog = existing_manifest->MakeCatalogPath();
 
-  LogCvmfs(kLogCvmfs, kLogStdout, "Old root catalog: %s",
-           old_root_catalog.c_str());
-  LogCvmfs(kLogCvmfs, kLogStdout, "New root catalog: %s",
-           new_root_catalog.c_str());
-
   spooler_catalogs->FinalizeSession(true, old_root_catalog, new_root_catalog);
   delete params.spooler;
 
