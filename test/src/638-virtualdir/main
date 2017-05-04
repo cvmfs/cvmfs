@@ -189,17 +189,17 @@ cvmfs_run_test() {
   cvmfs_server tag -a tag_rover -h $tag_x_hash $CVMFS_TEST_REPO || return 90
   tree /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots || return 91
   ls /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/tag_rover/file-in-tagx || return 92
-  cvmfs_server tag -r tag_y -f $CVMFS_TEST_REPO || return 93
+  cvmfs_server tag -r tag_z -f $CVMFS_TEST_REPO || return 93
   tree /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots || return 94
-  ls /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/tag_y && return 95
+  ls /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/tag_z && return 95
   check_repository $CVMFS_TEST_REPO -i || return 96
 
   echo "--- (13) test moving tags"
-  local tag_z_hash=$(cvmfs_server tag -lx $CVMFS_TEST_REPO | grep -i tag_z | \
+  local tag_y_hash=$(cvmfs_server tag -lx $CVMFS_TEST_REPO | grep -i tag_y | \
                      awk '{print $2}')
-  cvmfs_server tag -a tag_rover -h $tag_z_hash $CVMFS_TEST_REPO || return 100
+  cvmfs_server tag -a tag_rover -h $tag_y_hash $CVMFS_TEST_REPO || return 100
   tree /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots || return 101
-  ls /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/tag_rover/file-in-tagz || return 102
+  ls /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/tag_rover/file-in-tagy || return 102
   check_repository $CVMFS_TEST_REPO -i || return 103
 
   echo "--- (14) removal of virtual catalog"
