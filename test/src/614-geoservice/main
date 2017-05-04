@@ -12,7 +12,9 @@ cvmfs_getaddr() {
   ip $1 -o addr show scope global|awk '{split($4,a,"/");print a[1];exit}'
 }
 
-# check the results from an ordering of 3 servers
+# Check the results from an ordering of 3 servers.
+# When coming from *.cern.ch or *.fnal.gov, ihe reqorder should have the
+#  ordering of cern, fnal, and ihep.
 cvmfs_check_georesult() {
   local result=$1
   local from=$2
@@ -23,16 +25,16 @@ cvmfs_check_georesult() {
   if [[ "$from" == *.cern.ch ]] || [[ "$from" == *.fnal.gov ]]; then
     local cern
     local fnal
-    local asgc
+    local ihep
     local n=1
     for site in ${reqorder//,/ }; do
       eval $site=$n
       let n+=1
     done
     if [[ "$from" == *.cern.ch ]]; then
-      expectorder=$cern,$fnal,$asgc
+      expectorder=$cern,$fnal,$ihep
     elif [[ "$from" == *.fnal.gov ]]; then
-      expectorder=$fnal,$cern,$asgc
+      expectorder=$fnal,$cern,$ihep
     fi
   else
     # not testing at CERN or FNAL, so any order will do unless there's
@@ -51,6 +53,19 @@ cvmfs_check_georesult() {
   [[ $result == $expectorder ]] || return 2
 }
 
+# Check the results from an ordering of 3 servers, a separator, and a
+#  fallback proxy.  The separator (number 4) should always be last, and
+#  the fallback proxy (number 5) should always be second to last. 
+cvmfs_check_geosepresult() {
+  local result=$1
+  local from=$2
+  local reqorder=$3
+  if [[ "$result" != *,*,*,5,4 ]]; then
+    echo "  \"$result\" does not end in ',5,4'"
+    return 3
+  fi
+  cvmfs_check_georesult "${result/,5,4/}" $from $reqorder
+}
 
 cvmfs_run_test() {
   logfile=$1
@@ -90,9 +105,12 @@ cvmfs_run_test() {
 
   local me="`uname -n`"
   local api="cvmfs/$replica_name/api/v1.0/geo"
+  local sep="+PXYSEP+"
   local fnal=cvmfs.fnal.gov
   local cern=cvmfs-stratum-one.cern.ch
-  local asgc=cvmfs02.grid.sinica.edu.tw
+  local ihep=cvmfs-stratum-one.ihep.ac.cn
+  local fnalbp=cvmfsbproxy.fnal.gov
+  local cernbp=cvmfsbproxy.cern.ch
   local ipv6=ipv6.cybernode.com  # has only ipv6 address
   local other=google.com # has both ipv4 and ipv6.  if multiple addresses,
                          #  should resolve to same or close-by geolocation.
@@ -102,23 +120,23 @@ cvmfs_run_test() {
   #   of error some useful output will show but not too much
 
   echo "checking x-forwarded-for IPv4"
-  result="`curl -s -H "x-forwarded-for: $ipv4addr" http://localhost/$api/x/$fnal,$cern,$asgc|head -5`"
-  cvmfs_check_georesult "$result" $me fnal,cern,asgc || return 5
+  result="`curl -s -H "x-forwarded-for: $ipv4addr" http://localhost/$api/x/$fnal,$cern,$ihep|head -5`"
+  cvmfs_check_georesult "$result" $me fnal,cern,ihep || return 5
 
   if [ -n "$ipv6addr" ]; then
     echo "checking x-forwarded-for IPv6"
-    result="`curl -s -H "x-forwarded-for: $ipv6addr" http://localhost/$api/x/$asgc,$fnal,$cern|head -5`"
-    cvmfs_check_georesult "$result" $me asgc,fnal,cern || return 6
+    result="`curl -s -H "x-forwarded-for: $ipv6addr" http://localhost/$api/x/$ihep,$fnal,$cern|head -5`"
+    cvmfs_check_georesult "$result" $me ihep,fnal,cern || return 6
   fi
 
   echo "checking direct IPv4"
-  result="`curl -s http://$ipv4addr/$api/x/$cern,$asgc,$fnal|head -5`"
-  cvmfs_check_georesult "$result" $me cern,asgc,fnal || return 7
+  result="`curl -s http://$ipv4addr/$api/x/$cern,$ihep,$fnal|head -5`"
+  cvmfs_check_georesult "$result" $me cern,ihep,fnal || return 7
 
   if [ -n "$ipv6addr" ]; then
     echo "checking direct IPv6"
-    result="`curl -s -g http://[$ipv6addr]/$api/x/$fnal,$asgc,$cern|head -5`"
-    cvmfs_check_georesult "$result" $me fnal,asgc,cern || return 8
+    result="`curl -s -g http://[$ipv6addr]/$api/x/$fnal,$ihep,$cern|head -5`"
+    cvmfs_check_georesult "$result" $me fnal,ihep,cern || return 8
   fi
 
   echo "checking IPv6-only server"
@@ -132,6 +150,14 @@ cvmfs_run_test() {
   echo "checking proxy name IPv6"
   result="`curl -s http://localhost/$api/$ipv6/$ipv6,$fnal,$other|head -5`"
   cvmfs_check_georesult "$result" $ipv6 $ipv6,$fnal,$other || return 11
+
+  echo "checking ordering from CERN fallback proxy"
+  result="`curl -s http://localhost/$api/$fnalbp/$fnal,$ihep,$cern,$sep,$cernbp|head -5`"
+  cvmfs_check_geosepresult "$result" $cernbp fnal,ihep,cern || return 12
+
+  echo "checking ordering from FNAL fallback proxy"
+  result="`curl -s http://localhost/$api/$other/$cern,$fnal,$ihep,$sep,$fnalbp|head -5`"
+  cvmfs_check_geosepresult "$result" $fnalbp cern,fnal,ihep || return 13
 
   return 0
 }
