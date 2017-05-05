@@ -95,7 +95,7 @@ cancel_lease(Uid, LeaseToken) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec commit_lease(Uid, LeaseToken, RootHashes) -> ok | {error, invalid_macaroon}
+-spec commit_lease(Uid, LeaseToken, RootHashes) -> ok | {error, invalid_macaroon | merge_error | io_error }
                                         when Uid :: binary(),
                                              LeaseToken :: binary(),
                                              RootHashes :: {binary(), binary()}.
@@ -333,7 +333,7 @@ p_cancel_lease(LeaseToken) ->
     Result.
 
 
--spec p_commit_lease(LeaseToken, RootHashes) -> ok | {error, invalid_macaroon} | cvmfs_lease:lease_get_value()
+-spec p_commit_lease(LeaseToken, RootHashes) -> ok | {error, invalid_macaroon | merge_error | io_error} | cvmfs_lease:lease_get_value()
                                                       when LeaseToken :: binary(),
                                                            RootHashes :: false | {binary(), binary()}.
 p_commit_lease(LeaseToken, {OldRootHash, NewRootHash}) when is_binary(OldRootHash),

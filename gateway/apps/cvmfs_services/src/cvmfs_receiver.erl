@@ -107,7 +107,7 @@ submit_payload(SubmissionData, Secret) ->
     Result.
 
 
--spec commit(LeasePath, OldRootHash, NewRootHash) -> ok | {error, other_error | worker_timeout}
+-spec commit(LeasePath, OldRootHash, NewRootHash) -> ok | {error, merge_error | io_error | worker_timeout}
                                             when LeasePath :: binary(),
                                                  OldRootHash :: binary(),
                                                  NewRootHash :: binary().
@@ -343,7 +343,7 @@ p_submit_payload({LeaseToken, Payload, Digest, HeaderSize}, Secret, WorkerPort) 
 
 
 -spec p_commit(WorkerPort, LeasePath, OldRootHash, NewRootHash)
-              -> ok | {error, other_error | worker_timeout}
+              -> ok | {error, merge_error | io_error | worker_timeout}
                                         when WorkerPort :: port(),
                                              LeasePath :: binary(),
                                              OldRootHash :: binary(),
@@ -358,8 +358,10 @@ p_commit(WorkerPort, LeasePath, OldRootHash, NewRootHash) ->
             case jsx:decode(Reply1, [return_maps]) of
                 #{<<"status">> := <<"ok">>} ->
                     ok;
-                _ ->
-                    {error, other_error}
+                #{<<"status">> := <<"error">>, <<"reason">> := <<"merge_error">>} ->
+                    {error, merge_error};
+                #{<<"status">> := <<"error">>, <<"reason">> := <<"io_error">>} ->
+                    {error, io_error}
             end;
         {error, worker_timeout} ->
             {error, worker_timeout}

@@ -202,7 +202,13 @@ p_handle_commit_lease(Req0, State, Uid) ->
                                             #{<<"status">> => <<"ok">>};
                                         {error, invalid_macaroon} ->
                                             #{<<"status">> => <<"error">>,
-                                              <<"reason">> => <<"invalid_token">>}
+                                              <<"reason">> => <<"invalid_token">>};
+                                        {error, merge_error} ->
+                                            #{<<"status">> => <<"error">>,
+                                              <<"reason">> => <<"merge_error">>};
+                                        {error, io_error} ->
+                                            #{<<"status">> => <<"error">>,
+                                              <<"reason">> => <<"io_error">>}
                                     end;
                                 false ->
                                     #{<<"status">> => <<"error">>,

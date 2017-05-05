@@ -91,7 +91,7 @@ submit_payload(SubmissionData, Secret) ->
 
 
 -spec commit(LeasePath :: binary(), OldRootHash :: binary(), NewRootHash :: binary())
-            -> ok | {error, other_error | worker_timeout}.
+            -> ok | {error, merge_error | io_error | worker_timeout}.
 commit(LeasePath, OldRootHash, NewRootHash) ->
     WorkerPid = poolboy:checkout(cvmfs_receiver_pool),
     Result = gen_server:call(WorkerPid, {worker_req, commit, LeasePath, OldRootHash, NewRootHash}),
@@ -292,7 +292,7 @@ p_submit_payload({LeaseToken, _Payload, _Digest, _HeaderSize}, Secret) ->
 
 
 -spec p_commit(LeasePath :: binary(), OldRootHash :: binary(), NewRootHash :: binary())
-              -> ok | {error, other_error | worker_timeout}.
+              -> ok | {error, merge_error | io_error | worker_timeout}.
 p_commit(_Path, _OldRootHash, _NewRootHash) ->
     ok.
 
