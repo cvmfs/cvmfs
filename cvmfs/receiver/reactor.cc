@@ -327,10 +327,13 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
     case CommitProcessor::kSuccess:
       reply_input.push_back(std::make_pair("status", "ok"));
       break;
-    case CommitProcessor::kPathViolation:
+    case CommitProcessor::kMergeError:
       reply_input.push_back(std::make_pair("status", "error"));
-      reply_input.push_back(std::make_pair("reason", "path_violation"));
+      reply_input.push_back(std::make_pair("reason", "merge_error"));
       break;
+    case CommitProcessor::kIoError:
+      reply_input.push_back(std::make_pair("status", "error"));
+      reply_input.push_back(std::make_pair("reason", "io_error"));
     default:
       LogCvmfs(kLogCvmfs, kLogStderr,
                "Unknown value of CommitProcessor::Result encountered.");
