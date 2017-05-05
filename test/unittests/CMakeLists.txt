@@ -141,6 +141,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/compression.cc
   ${CVMFS_SOURCE_DIR}/dns.cc
   ${CVMFS_SOURCE_DIR}/download.cc
+  ${CVMFS_SOURCE_DIR}/directory_entry.cc
   ${CVMFS_SOURCE_DIR}/encrypt.cc
   ${CVMFS_SOURCE_DIR}/fetch.cc
   ${CVMFS_SOURCE_DIR}/file_chunk.cc
@@ -179,6 +180,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/pathspec/pathspec_pattern.cc
   ${CVMFS_SOURCE_DIR}/quota.cc
   ${CVMFS_SOURCE_DIR}/quota_posix.cc
+  ${CVMFS_SOURCE_DIR}/receiver/catalog_merge_tool.cc
   ${CVMFS_SOURCE_DIR}/receiver/commit_processor.cc
   ${CVMFS_SOURCE_DIR}/receiver/payload_processor.cc
   ${CVMFS_SOURCE_DIR}/receiver/reactor.cc

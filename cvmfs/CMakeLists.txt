@@ -334,23 +334,44 @@ set (CVMFS_STRATUM_AGENT_SOURCES
 
 if(BUILD_RECEIVER)
   set (CVMFS_RECEIVER_SOURCES
+    receiver/catalog_merge_tool.cc
     receiver/commit_processor.cc
     receiver/payload_processor.cc
     receiver/reactor.cc
     receiver/receiver.cc
     receiver/session_token.cc
+    catalog.cc
+    catalog_sql.cc
+    catalog_mgr_ro.cc
+    compression.cc
+    directory_entry.cc
+    dns.cc
+    download.cc
     encrypt.cc
+    globals.cc
     hash.cc
     json_document.cc
     logging.cc
+    malloc_arena.cc
+    manifest.cc
     pack.cc
+    sanitizer.cc
+    statistics.cc
+    sql.cc
+    sqlitemem.cc
+    util/algorithm.cc
     util/posix.cc
     util/string.cc
     uuid.cc
+    xattr.cc
     )
 
   add_executable(cvmfs_receiver ${CVMFS_RECEIVER_SOURCES})
-  target_link_libraries(cvmfs_receiver ${SHA3_LIBRARIES} ${VJSON_LIBRARIES} ${OPENSSL_LIBRARIES} ${UUID_LIBRARIES} ${RT_LIBRARY} pthread)
+  target_link_libraries(cvmfs_receiver ${CURL_LIBRARIES} ${CARES_LIBRARIES} ${SHA3_LIBRARIES} ${SQLITE3_LIBRARY} ${VJSON_LIBRARIES} ${OPENSSL_LIBRARIES} ${UUID_LIBRARIES} ${ZLIB_LIBRARIES} ${RT_LIBRARY} pthread dl)
+
+  set (CVMFS_RECEIVER_CFLAGS "${CMAKE_CXX_FLAGS} -D_FILE_OFFSET_BITS=64 -fexceptions")
+  set_target_properties (cvmfs_receiver PROPERTIES COMPILE_FLAGS "${CVMFS_RECEIVER_CFLAGS}")
+
 endif(BUILD_RECEIVER)
 
 
