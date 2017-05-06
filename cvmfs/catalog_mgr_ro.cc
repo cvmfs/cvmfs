@@ -31,21 +31,12 @@ LoadError SimpleCatalogManager::LoadCatalog(const PathString &mountpoint,
   if (local_only_) {
     *catalog_path = CreateTempPath(dir_temp_ + "/catalog", 0666);
     if (zlib::DecompressPath2Path(url, *catalog_path)) {
-      LogCvmfs(kLogCatalog, kLogStderr,
-               "SimpleCatalogManager:: DecompressPath2Path: %s -> %s",
-               url.c_str(), catalog_path->c_str());
-
-      shash::Any new_hash(hash.algorithm);
-      if (!shash::HashFile(*catalog_path, &new_hash)) {
+      catalog_hash->algorithm = base_hash_.algorithm;
+      if (!shash::HashFile(*catalog_path, catalog_hash)) {
         LogCvmfs(kLogCatalog, kLogStderr,
                  "Could not hash decompressed catalog");
         assert(false);
       }
-
-      LogCvmfs(kLogCatalog, kLogStderr, "SimpleCatalogManager:: HashFile: %s",
-               catalog_hash->ToString(true).c_str());
-
-      *catalog_hash = new_hash;
       return kLoadNew;
     }
     LogCvmfs(kLogCatalog, kLogStderr,
