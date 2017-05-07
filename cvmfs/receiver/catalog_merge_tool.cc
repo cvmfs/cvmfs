@@ -50,8 +50,10 @@ CatalogMergeTool::CatalogMergeTool(const std::string& repo_name,
                                    const std::string& old_root_hash,
                                    const std::string& new_root_hash,
                                    const std::string& base_root_hash,
-                                   const std::string& temp_dir_prefix)
-    : CatalogDiffTool(repo_name, old_root_hash, new_root_hash, temp_dir_prefix),
+                                   const std::string& temp_dir_prefix,
+                                   download::DownloadManager* download_manager)
+    : CatalogDiffTool(repo_name, old_root_hash, new_root_hash, temp_dir_prefix,
+                      download_manager),
       base_root_hash_(base_root_hash) {}
 
 CatalogMergeTool::~CatalogMergeTool() {}

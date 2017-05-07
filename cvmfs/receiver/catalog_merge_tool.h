@@ -11,6 +11,10 @@
 #include "catalog_diff_tool.h"
 #include "util/pointer.h"
 
+namespace download {
+class DownloadManager;
+}
+
 namespace shash {
 class Any;
 }
@@ -23,7 +27,8 @@ class CatalogMergeTool : public CatalogDiffTool {
                    const std::string& old_root_hash,
                    const std::string& new_root_hash,
                    const std::string& base_root_hash,
-                   const std::string& temp_dir_prefix);
+                   const std::string& temp_dir_prefix,
+                   download::DownloadManager* download_manager);
   virtual ~CatalogMergeTool();
 
   bool Run(shash::Any* resulting_root_hash);

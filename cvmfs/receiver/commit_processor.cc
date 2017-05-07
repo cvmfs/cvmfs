@@ -57,7 +57,7 @@ CommitProcessor::Result CommitProcessor::Process(
 
   CatalogMergeTool merge_tool(repo_name, old_root_hash_str, new_root_hash_str,
                               manifest->catalog_hash().ToString(true),
-                              "/tmp/cvmfs_receiver_merge");
+                              "/tmp/cvmfs_receiver_merge", NULL);
 
   shash::Any resulting_root_hash;
   if (!merge_tool.Run(&resulting_root_hash)) {

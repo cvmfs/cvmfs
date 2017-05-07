@@ -11,12 +11,17 @@
 #include "statistics.h"
 #include "util/pointer.h"
 
+namespace download {
+class DownloadManager;
+}
+
 class CatalogDiffTool {
  public:
   CatalogDiffTool(const std::string& repo_name,
                   const std::string& old_root_hash,
                   const std::string& new_root_hash,
-                  const std::string& temp_dir_prefix);
+                  const std::string& temp_dir_prefix,
+                  download::DownloadManager* download_manager = NULL);
   virtual ~CatalogDiffTool();
 
  protected:
@@ -36,6 +41,8 @@ class CatalogDiffTool {
   std::string old_root_hash_;
   std::string new_root_hash_;
   std::string temp_dir_prefix_;
+
+  download::DownloadManager* download_manager_;
 
   perf::Statistics stats_old_;
   perf::Statistics stats_new_;

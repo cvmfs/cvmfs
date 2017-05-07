@@ -5,6 +5,7 @@
 #include "catalog_diff_tool.h"
 
 #include "catalog.h"
+#include "download.h"
 #include "hash.h"
 #include "logging.h"
 #include "util/posix.h"
@@ -37,13 +38,13 @@ bool IsSmaller(const catalog::DirectoryEntry& a,
   return a.name() < b.name();
 }
 
-catalog::SimpleCatalogManager* OpenCatalogManager(const std::string& repo_path,
-                                                  const std::string& temp_dir,
-                                                  const std::string& root_hash,
-                                                  perf::Statistics* stats) {
+catalog::SimpleCatalogManager* OpenCatalogManager(
+    const std::string& repo_path, const std::string& temp_dir,
+    const std::string& root_hash, download::DownloadManager* download_manager,
+    perf::Statistics* stats) {
   shash::Any hash(shash::MkFromSuffixedHexPtr(shash::HexPtr(root_hash)));
   catalog::SimpleCatalogManager* mgr = new catalog::SimpleCatalogManager(
-      hash, repo_path, temp_dir, NULL, stats, true);
+      hash, repo_path, temp_dir, download_manager, stats, true);
   mgr->Init();
 
   return mgr;
@@ -54,11 +55,13 @@ catalog::SimpleCatalogManager* OpenCatalogManager(const std::string& repo_path,
 CatalogDiffTool::CatalogDiffTool(const std::string& repo_name,
                                  const std::string& old_root_hash,
                                  const std::string& new_root_hash,
-                                 const std::string& temp_dir_prefix)
+                                 const std::string& temp_dir_prefix,
+                                 download::DownloadManager* download_manager)
     : repo_path_("/srv/cvmfs/" + repo_name),
       old_root_hash_(old_root_hash),
       new_root_hash_(new_root_hash),
       temp_dir_prefix_(temp_dir_prefix),
+      download_manager_(download_manager),
       old_catalog_mgr_(),
       new_catalog_mgr_() {}
 
@@ -69,12 +72,12 @@ bool CatalogDiffTool::Run() {
   const std::string temp_dir = CreateTempDir(temp_dir_prefix_);
 
   // Old catalog from release manager machine (before lease)
-  old_catalog_mgr_ =
-      OpenCatalogManager(repo_path_, temp_dir, old_root_hash_, &stats_old_);
+  old_catalog_mgr_ = OpenCatalogManager(repo_path_, temp_dir, old_root_hash_,
+                                        download_manager_, &stats_old_);
 
   // New catalog from release manager machine (before lease)
-  new_catalog_mgr_ =
-      OpenCatalogManager(repo_path_, temp_dir, new_root_hash_, &stats_new_);
+  new_catalog_mgr_ = OpenCatalogManager(repo_path_, temp_dir, new_root_hash_,
+                                        download_manager_, &stats_new_);
 
   if (!old_catalog_mgr_.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Could not open old catalog");
