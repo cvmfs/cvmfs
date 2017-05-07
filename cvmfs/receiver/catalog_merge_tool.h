@@ -5,8 +5,6 @@
 #ifndef CVMFS_RECEIVER_CATALOG_MERGE_TOOL_H_
 #define CVMFS_RECEIVER_CATALOG_MERGE_TOOL_H_
 
-#include <google/sparse_hash_map>
-
 #include <string>
 
 #include "catalog_mgr_ro.h"
@@ -25,17 +23,40 @@ class CatalogMergeTool {
                    const std::string& old_root_hash,
                    const std::string& new_root_hash,
                    const std::string& base_root_hash);
-  ~CatalogMergeTool();
+  virtual ~CatalogMergeTool();
 
   bool Merge(shash::Any* resulting_root_hash);
 
-  bool MergeRec(const PathString& path);
+ protected:
+  virtual void ReportAddition(const PathString& path,
+                              const catalog::DirectoryEntry& entry);
+  virtual void ReportRemoval(const PathString& path,
+                             const catalog::DirectoryEntry& entry);
+  virtual void ReportModification(const PathString& path,
+                                  const catalog::DirectoryEntry& old_entry,
+                                  const catalog::DirectoryEntry& new_entry);
 
  private:
-  typedef google::sparse_hash_map<PathString, catalog::DirectoryEntry*>
-      DirEntryMap;
+  struct ChangeItem {
+    enum ChangeType { kAddition, kRemoval, kModification };
+    ChangeItem(ChangeType type, const PathString& path,
+               const catalog::DirectoryEntry& entry1);
+    ChangeItem(ChangeType type, const PathString& path,
+               const catalog::DirectoryEntry& entry1,
+               const catalog::DirectoryEntry& entry2);
+    ChangeItem(const ChangeItem& other);
+    ~ChangeItem();
 
-  std::string repo_name_;
+    ChangeType type_;
+    PathString path_;
+    const catalog::DirectoryEntry* entry1_;
+    const catalog::DirectoryEntry* entry2_;
+  };
+  typedef std::vector<ChangeItem> ChangeList;
+
+  void MergeRec(const PathString& path);
+
+  std::string repo_path_;
   std::string old_root_hash_;
   std::string new_root_hash_;
   std::string base_root_hash_;
@@ -47,9 +68,7 @@ class CatalogMergeTool {
   UniquePtr<catalog::SimpleCatalogManager> old_catalog_mgr_;
   UniquePtr<catalog::SimpleCatalogManager> new_catalog_mgr_;
 
-  DirEntryMap old_entries_;
-
-  FILE* debug_file_;
+  ChangeList changes_;
 };
 
 }  // namespace receiver
