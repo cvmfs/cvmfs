@@ -6,9 +6,9 @@
 #define CVMFS_RECEIVER_CATALOG_MERGE_TOOL_H_
 
 #include <string>
+#include <vector>
 
-#include "catalog_mgr_ro.h"
-#include "statistics.h"
+#include "catalog_diff_tool.h"
 #include "util/pointer.h"
 
 namespace shash {
@@ -17,15 +17,16 @@ class Any;
 
 namespace receiver {
 
-class CatalogMergeTool {
+class CatalogMergeTool : public CatalogDiffTool {
  public:
   CatalogMergeTool(const std::string& repo_name,
                    const std::string& old_root_hash,
                    const std::string& new_root_hash,
-                   const std::string& base_root_hash);
+                   const std::string& base_root_hash,
+                   const std::string& temp_dir_prefix);
   virtual ~CatalogMergeTool();
 
-  bool Merge(shash::Any* resulting_root_hash);
+  bool Run(shash::Any* resulting_root_hash);
 
  protected:
   virtual void ReportAddition(const PathString& path,
@@ -54,19 +55,7 @@ class CatalogMergeTool {
   };
   typedef std::vector<ChangeItem> ChangeList;
 
-  void MergeRec(const PathString& path);
-
-  std::string repo_path_;
-  std::string old_root_hash_;
-  std::string new_root_hash_;
   std::string base_root_hash_;
-
-  perf::Statistics stats_;
-  perf::Statistics stats_old_;
-  perf::Statistics stats_new_;
-
-  UniquePtr<catalog::SimpleCatalogManager> old_catalog_mgr_;
-  UniquePtr<catalog::SimpleCatalogManager> new_catalog_mgr_;
 
   ChangeList changes_;
 };

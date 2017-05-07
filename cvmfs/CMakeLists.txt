@@ -341,6 +341,7 @@ if(BUILD_RECEIVER)
     receiver/receiver.cc
     receiver/session_token.cc
     catalog.cc
+    catalog_diff_tool.cc
     catalog_sql.cc
     catalog_mgr_ro.cc
     compression.cc
