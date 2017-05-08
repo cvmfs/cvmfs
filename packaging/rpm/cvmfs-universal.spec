@@ -163,6 +163,7 @@ Requires: httpd
 Requires: libcap
 Requires: lsof
 Requires: rsync
+Requires: usbutils
 %if 0%{?el6} || 0%{?el7} || 0%{?fedora} || 0%{?suse_version} >= 1300
 Requires: jq
 %endif
