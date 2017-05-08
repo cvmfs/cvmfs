@@ -355,8 +355,11 @@ if(BUILD_RECEIVER)
     logging.cc
     malloc_arena.cc
     manifest.cc
+    manifest_fetch.cc
     pack.cc
     sanitizer.cc
+    server_tool.cc
+    signature.cc
     statistics.cc
     sql.cc
     sqlitemem.cc
@@ -364,6 +367,7 @@ if(BUILD_RECEIVER)
     util/posix.cc
     util/string.cc
     uuid.cc
+    whitelist.cc
     xattr.cc
     )
 
