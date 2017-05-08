@@ -7,6 +7,9 @@
 
 #include <string>
 
+#include "server_tool.h"
+#include "util/pointer.h"
+
 namespace receiver {
 
 /**
@@ -33,6 +36,7 @@ class CommitProcessor {
   int GetNumErrors() const { return num_errors_; }
 
  private:
+  ServerTool server_tool_;
   int num_errors_;
 };
 

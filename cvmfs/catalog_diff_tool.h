@@ -21,7 +21,7 @@ class CatalogDiffTool {
                   const std::string& old_root_hash,
                   const std::string& new_root_hash,
                   const std::string& temp_dir_prefix,
-                  download::DownloadManager* download_manager = NULL);
+                  download::DownloadManager* download_manager);
   virtual ~CatalogDiffTool();
 
  protected:
