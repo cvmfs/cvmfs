@@ -160,8 +160,6 @@ __do_snapshot() {
                "$stratum1"   \
                "$dry_run"    \
                ""            \
-               ""            \
-               ""            \
                "0"           \
                -z $gc_timespan || die "Garbage collection failed ($?)"
     fi

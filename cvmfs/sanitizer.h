@@ -79,6 +79,13 @@ class AuthzSchemaSanitizer : public InputSanitizer {
 };
 
 
+// Also update is_valid_branch in cvmfs_server
+class BranchSanitizer : public InputSanitizer {
+ public:
+  BranchSanitizer() : InputSanitizer("az AZ 09 - _ . @ /") { }
+};
+
+
 class IntegerSanitizer : public InputSanitizer {
  public:
   IntegerSanitizer() : InputSanitizer("09") { }

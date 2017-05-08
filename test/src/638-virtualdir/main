@@ -83,9 +83,11 @@ cvmfs_run_test() {
   echo "--- (3) enable virtual directory"
   echo "CVMFS_VIRTUAL_DIR=true" | sudo tee -a /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf
   start_transaction $CVMFS_TEST_REPO || return $?
+  touch /cvmfs/$CVMFS_TEST_REPO/dont_forget_me || return 20
   publish_repo $CVMFS_TEST_REPO || return $?
-  ls -lah /cvmfs/$CVMFS_TEST_REPO/.cvmfs || return 20
-  check_repository $CVMFS_TEST_REPO -i  || return 21
+  ls -lah /cvmfs/$CVMFS_TEST_REPO/.cvmfs || return 21
+  ls -lah /cvmfs/$CVMFS_TEST_REPO/dont_forget_me || return 22
+  check_repository $CVMFS_TEST_REPO -i  || return 23
 
   echo "--- (4) check that edits of .cvmfs are still forbidden"
   check_no_modify_virtualdir || return $?
@@ -111,7 +113,7 @@ cvmfs_run_test() {
     sudo tee -a /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf
   start_transaction $CVMFS_TEST_REPO || return $?
   publish_repo $CVMFS_TEST_REPO || return $?
-  CVMFS_SERVER_DEBUG=3 cvmfs_server gc -f $CVMFS_TEST_REPO 2>&1 | tee gc-s0.log || return 40
+  CVMFS_SERVER_DEBUG=3 cvmfs_server gc -lf $CVMFS_TEST_REPO 2>&1 | tee gc-s0.log || return 40
   grep "found root prefix /.cvmfs " gc-s0.log || return 41
   grep "/.cvmfs/snapshots" gc-s0.log && return 42
   check_repository $CVMFS_TEST_REPO -i || return 43
@@ -128,7 +130,7 @@ cvmfs_run_test() {
   grep "Replicating from catalog at /.cvmfs" snapshot.log || return 52
   grep "Replicating from catalog at /.cvmfs/" snapshot.log && return 53
   check_repository $CVMFS_TEST638_REPLICA_NAME -i || return 54
-  CVMFS_SERVER_DEBUG=3 cvmfs_server gc -f $CVMFS_TEST638_REPLICA_NAME 2>&1 | tee gc-s1.log || return 55
+  CVMFS_SERVER_DEBUG=3 cvmfs_server gc -lf $CVMFS_TEST638_REPLICA_NAME 2>&1 | tee gc-s1.log || return 55
   grep "found root prefix /.cvmfs " gc-s1.log || return 56
   grep "/.cvmfs/snapshots" gc-s1.log && return 57
   check_repository $CVMFS_TEST638_REPLICA_NAME -i || return 58
@@ -187,17 +189,17 @@ cvmfs_run_test() {
   cvmfs_server tag -a tag_rover -h $tag_x_hash $CVMFS_TEST_REPO || return 90
   tree /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots || return 91
   ls /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/tag_rover/file-in-tagx || return 92
-  cvmfs_server tag -r tag_y -f $CVMFS_TEST_REPO || return 93
+  cvmfs_server tag -r tag_z -f $CVMFS_TEST_REPO || return 93
   tree /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots || return 94
-  ls /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/tag_y && return 95
+  ls /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/tag_z && return 95
   check_repository $CVMFS_TEST_REPO -i || return 96
 
   echo "--- (13) test moving tags"
-  local tag_z_hash=$(cvmfs_server tag -lx $CVMFS_TEST_REPO | grep -i tag_z | \
+  local tag_y_hash=$(cvmfs_server tag -lx $CVMFS_TEST_REPO | grep -i tag_y | \
                      awk '{print $2}')
-  cvmfs_server tag -a tag_rover -h $tag_z_hash $CVMFS_TEST_REPO || return 100
+  cvmfs_server tag -a tag_rover -h $tag_y_hash $CVMFS_TEST_REPO || return 100
   tree /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots || return 101
-  ls /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/tag_rover/file-in-tagz || return 102
+  ls /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/tag_rover/file-in-tagy || return 102
   check_repository $CVMFS_TEST_REPO -i || return 103
 
   echo "--- (14) removal of virtual catalog"

@@ -109,6 +109,7 @@ void SqliteHistory::PrepareQueries() {
   channel_tips_       = new SqlGetChannelTips   (database_.weak_ref());
   get_hashes_         = new SqlGetHashes        (database_.weak_ref());
   list_rollback_tags_ = new SqlListRollbackTags (database_.weak_ref());
+  list_branches_      = new SqlListBranches     (database_.weak_ref());
 
   if (database_->ContainsRecycleBin()) {
     recycle_list_ = new SqlRecycleBinList(database_.weak_ref());
@@ -118,9 +119,9 @@ void SqliteHistory::PrepareQueries() {
     insert_tag_         = new SqlInsertTag          (database_.weak_ref());
     remove_tag_         = new SqlRemoveTag          (database_.weak_ref());
     rollback_tag_       = new SqlRollbackTag        (database_.weak_ref());
-    recycle_insert_     = new SqlRecycleBinInsert   (database_.weak_ref());
     recycle_empty_      = new SqlRecycleBinFlush    (database_.weak_ref());
-    recycle_rollback_   = new SqlRecycleBinRollback (database_.weak_ref());
+    insert_branch_      = new SqlInsertBranch       (database_.weak_ref());
+    find_branch_head_   = new SqlFindBranchHead     (database_.weak_ref());
   }
 }
 
@@ -186,8 +187,7 @@ bool SqliteHistory::Remove(const std::string &name) {
     return true;
   }
 
-  return KeepHashReference(condemned_tag) &&
-         remove_tag_->BindName(name)      &&
+  return remove_tag_->BindName(name)      &&
          remove_tag_->Execute()           &&
          remove_tag_->Reset();
 }
@@ -254,13 +254,100 @@ bool SqliteHistory::RunListing(std::vector<Tag> *list, SqlListingT *sql) const {
 }
 
 
-bool SqliteHistory::KeepHashReference(const Tag &tag) {
+bool SqliteHistory::GetBranchHead(const string &branch_name, Tag *tag) const {
   assert(database_);
-  assert(recycle_insert_.IsValid());
+  assert(find_branch_head_.IsValid());
+  assert(tag != NULL);
 
-  return recycle_insert_->BindTag(tag) &&
-         recycle_insert_->Execute()    &&
-         recycle_insert_->Reset();
+  if (!find_branch_head_->BindBranchName(branch_name) ||
+      !find_branch_head_->FetchRow())
+  {
+    find_branch_head_->Reset();
+    return false;
+  }
+
+  *tag = find_branch_head_->RetrieveTag();
+  return find_branch_head_->Reset();
+}
+
+
+bool SqliteHistory::ExistsBranch(const string &branch_name) const {
+  vector<Branch> branches;
+  if (!ListBranches(&branches))
+    return false;
+  for (unsigned i = 0; i < branches.size(); ++i) {
+    if (branches[i].branch == branch_name)
+      return true;
+  }
+  return false;
+}
+
+
+bool SqliteHistory::InsertBranch(const Branch &branch) {
+  assert(database_);
+  assert(insert_branch_.IsValid());
+
+  return insert_branch_->BindBranch(branch) &&
+         insert_branch_->Execute()    &&
+         insert_branch_->Reset();
+}
+
+
+bool SqliteHistory::PruneBranches() {
+  // Parent pointers might point to abandoned branches.  Redirect them to the
+  // parent of the abandoned branch.  This has to be repeated until the fix
+  // point is reached.  It always works because we never delete the root branch
+  sqlite::Sql sql_fix_parent_pointers(database_->sqlite_db(),
+    "INSERT OR REPLACE INTO branches (branch, parent, initial_revision) "
+    "SELECT branches.branch, abandoned_parent, branches.initial_revision "
+    "  FROM branches "
+    "  INNER JOIN (SELECT DISTINCT branches.branch AS abandoned_branch, "
+    "              branches.parent AS abandoned_parent FROM branches "
+    "              LEFT OUTER JOIN tags ON (branches.branch=tags.branch)"
+    "              WHERE tags.branch IS NULL) "
+    "  ON (branches.parent=abandoned_branch);");
+  // Detect if fix point is reached
+  sqlite::Sql sql_remaining_rows(database_->sqlite_db(),
+    "SELECT count(*) FROM branches "
+    "INNER JOIN "
+    "  (SELECT DISTINCT branches.branch AS abandoned_branch FROM branches "
+    "   LEFT OUTER JOIN tags ON (branches.branch=tags.branch) "
+    "   WHERE tags.branch IS NULL) "
+    "ON (branches.parent=abandoned_branch);");
+
+  bool retval;
+  do {
+    retval = sql_remaining_rows.FetchRow();
+    if (!retval)
+      return false;
+    int64_t count = sql_remaining_rows.RetrieveInt64(0);
+    assert(count >= 0);
+    if (count == 0)
+      break;
+    retval = sql_remaining_rows.Reset();
+    assert(retval);
+
+    retval = sql_fix_parent_pointers.Execute();
+    if (!retval)
+      return false;
+    retval = sql_fix_parent_pointers.Reset();
+    assert(retval);
+  } while (true);
+
+  sqlite::Sql sql_remove_branches(database_->sqlite_db(),
+    "DELETE FROM branches "
+    "WHERE branch NOT IN (SELECT DISTINCT branch FROM tags);");
+  retval = sql_remove_branches.Execute();
+  return retval;
+}
+
+
+bool SqliteHistory::ListBranches(vector<Branch> *branches) const {
+  while (list_branches_->FetchRow()) {
+    branches->push_back(list_branches_->RetrieveBranch());
+  }
+
+  return list_branches_->Reset();
 }
 
 
@@ -293,7 +380,6 @@ bool SqliteHistory::EmptyRecycleBin() {
 bool SqliteHistory::Rollback(const Tag &updated_target_tag) {
   assert(database_);
   assert(IsWritable());
-  assert(recycle_rollback_.IsValid());
   assert(rollback_tag_.IsValid());
 
   Tag old_target_tag;
@@ -313,16 +399,6 @@ bool SqliteHistory::Rollback(const Tag &updated_target_tag) {
   // sanity checks
   assert(old_target_tag.channel     == updated_target_tag.channel);
   assert(old_target_tag.description == updated_target_tag.description);
-
-  // insert the hashes pointed to by the tags to be deleted into the recycle bin
-  success = recycle_rollback_->BindTargetTag(old_target_tag) &&
-            recycle_rollback_->BindFlags()                   &&
-            recycle_rollback_->Execute()                     &&
-            recycle_rollback_->Reset();
-  if (!success) {
-    LogCvmfs(kLogHistory, kLogDebug, "failed to update the recycle bin");
-    return false;
-  }
 
   // rollback the history to the target tag
   // (essentially removing all intermediate tags + the old target tag)

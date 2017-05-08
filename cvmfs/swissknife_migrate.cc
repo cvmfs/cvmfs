@@ -12,6 +12,7 @@
 #include "catalog_rw.h"
 #include "catalog_sql.h"
 #include "catalog_virtual.h"
+#include "hash.h"
 #include "logging.h"
 
 using namespace std;  // NOLINT
@@ -47,6 +48,7 @@ ParameterList CommandMigrate::GetParams() const {
   r.push_back(Parameter::Optional('g',
     "group id to be used for this repository"));
   r.push_back(Parameter::Optional('n', "fully qualified repository name"));
+  r.push_back(Parameter::Optional('h', "root hash (other than trunk)"));
   r.push_back(Parameter::Optional('k', "repository master key(s)"));
   r.push_back(Parameter::Optional('i', "UID map for chown"));
   r.push_back(Parameter::Optional('j', "GID map for chown"));
@@ -83,6 +85,7 @@ static void Error(const std::string                     &message,
 
 
 int CommandMigrate::Main(const ArgumentList &args) {
+  shash::Any manual_root_hash;
   const std::string &migration_base     = *args.find('v')->second;
   const std::string &repo_url           = *args.find('r')->second;
   const std::string &spooler            = *args.find('u')->second;
@@ -109,6 +112,10 @@ int CommandMigrate::Main(const ArgumentList &args) {
   const bool fix_transition_points      = (args.count('f') > 0);
   const bool analyze_file_linkcounts    = (args.count('l') == 0);
   const bool collect_catalog_statistics = (args.count('s') > 0);
+  if (args.count('h') > 0) {
+    manual_root_hash = shash::MkFromHexPtr(shash::HexPtr(
+      *args.find('h')->second), shash::kSuffixCatalog);
+  }
 
   // We might need a lot of file descriptors
   if (!RaiseFileDescriptorLimit()) {
@@ -153,11 +160,11 @@ int CommandMigrate::Main(const ArgumentList &args) {
                           download_manager(),
                           signature_manager());
 
-    loading_successful = LoadCatalogs(&fetcher);
+    loading_successful = LoadCatalogs(manual_root_hash, &fetcher);
   } else {
     typedef LocalObjectFetcher<catalog::WritableCatalog> ObjectFetcher;
     ObjectFetcher fetcher(repo_url, tmp_dir);
-    loading_successful = LoadCatalogs(&fetcher);
+    loading_successful = LoadCatalogs(manual_root_hash, &fetcher);
   }
   catalog_loading_stopwatch_.Stop();
 

@@ -46,6 +46,7 @@ COMPONENTS="\
     server/cvmfs_server_list_catalogs.sh
     server/cvmfs_server_diff.sh
     server/cvmfs_server_info.sh
+    server/cvmfs_server_checkout.sh
     server/cvmfs_server_tag.sh
     server/cvmfs_server_deprecated.sh
     server/cvmfs_server_check.sh
@@ -57,6 +58,7 @@ COMPONENTS="\
     server/cvmfs_server_chown.sh
     server/cvmfs_server_eliminate_hardlinks.sh
     server/cvmfs_server_update_info.sh
+    server/cvmfs_server_update_repoinfo.sh
     server/cvmfs_server_mount.sh
     server/cvmfs_server_skeleton.sh
     server/cvmfs_server_fix_permissions.sh

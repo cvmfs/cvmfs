@@ -15,6 +15,9 @@
 namespace download {
 class DownloadManager;
 }
+namespace history {
+class History;
+}
 namespace manifest {
 class Manifest;
 }
@@ -69,6 +72,7 @@ class CommandCheck : public Command {
   std::string FetchPath(const std::string &path);
   bool InspectReflog(const shash::Any &reflog_hash,
                      manifest::Manifest *manifest);
+  bool InspectHistory(history::History *history);
   bool Find(const catalog::Catalog *catalog,
             const PathString &path,
             catalog::DeltaCounters *computed_counters,

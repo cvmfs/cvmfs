@@ -41,6 +41,7 @@ cvmfs_server_catalog_chown() {
   [ x"$gid_map" != x"" ] && cvmfs_sys_file_is_regular $gid_map || die "GID map file not found (-g)"
 
   load_repo_config $name
+  is_checked_out $name && die "command is not supported while checked out onto a branch"
 
   local migrate_command="$(__swissknife_cmd dbg) migrate     \
                               -v 'chown'                     \

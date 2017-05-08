@@ -18,6 +18,11 @@ cvmfs_sys_file_is_executable() {
 }
 
 
+cvmfs_sys_file_is_empty() {
+    [ ! -s $1 ]
+}
+
+
 cvmfs_sys_is_redhat() {
   cvmfs_sys_file_is_regular /etc/redhat-release
 }
