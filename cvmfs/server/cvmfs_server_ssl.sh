@@ -83,7 +83,7 @@ create_whitelist() {
   if [ $usemasterkeycard -eq 1 ]; then
     masterkeycard_sign ${whitelist}.hash ${whitelist}.signature
   else
-    openssl rsautl -inkey /etc/cvmfs/keys/${name}.masterkey -sign -in ${whitelist}.hash -out ${whitelist}.signature
+    openssl rsautl -inkey $masterkey -sign -in ${whitelist}.hash -out ${whitelist}.signature
   fi
   cat ${whitelist}.unsigned ${whitelist}.signature > $whitelist
   chown $user $whitelist

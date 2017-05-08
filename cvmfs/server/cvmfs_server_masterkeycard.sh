@@ -11,10 +11,6 @@
 # - cvmfs_server_common.sh
 # - cvmfs_server_resign.sh
 
-make_sure_only_one_masterkeycard_action() {
-  [ -z "$1" ] || die "Only one masterkeycard action option allowed"
-}
-
 # Check if a masterkeycard is available to be used
 # If not, the reason is sent to stdout and false is returned,
 # otherwise there's nothing to stdout and true is returned
@@ -109,11 +105,11 @@ cvmfs_server_masterkeycard() {
   do
     case $option in
       a|k|s|d|r|c)
-        make_sure_only_one_masterkeycard_action "$action"
+        [ -z "$action" ] || die "Only one masterkeycard action option allowed"
         action=$option
       ;;
       f)
-        # force skipping prompts for dangerous actions
+        # force skipping the prompts for dangerous actions
         force=1
       ;;
       ?)
