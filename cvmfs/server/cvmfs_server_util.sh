@@ -888,7 +888,8 @@ is_subcommand() {
   local supported_commands="mkfs add-replica import publish rollback rmfs alterfs    \
     resign list info tag list-tags lstags check transaction abort snapshot           \
     skeleton migrate list-catalogs diff update-geodb gc catalog-chown \
-    eliminate-hardlinks update-info update-repoinfo mount fix-permissions"
+    eliminate-hardlinks update-info update-repoinfo mount fix-permissions \
+    masterkeycard"
 
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
@@ -921,6 +922,7 @@ Supported Commands:
                   [-z enable garbage collection] [-v volatile content]
                   [-Z compression algorithm (default: zlib)]
                   [-k path to existing keychain] [-p no apache config]
+                  [-R require masterkeycard key ]
                   [-V VOMS authorization] [-X (external data)]
                   <fully qualified repository name>
                   Creates a new repository with a given name
@@ -934,6 +936,7 @@ Supported Commands:
                   [-f union filesystem type] [-c file ownership (UID:GID)]
                   [-k path to keys] [-g chown backend] [-r recreate whitelist]
                   [-p no apache config] [-t recreate repo key and certificate]
+                  [ -R recreate whitelist and require masterkeycard ]
                   <fully qualified repository name>
                   Imports an old CernVM-FS repository into a fresh repo
   publish         [-p pause for tweaks] [-n manual revision number] [-v verbose]
@@ -962,6 +965,15 @@ Supported Commands:
                   inaccessible.  Without a tag name, trunk-previous is used.
   resign          <fully qualified name>
                   Re-sign the 30 day whitelist
+  masterkeycard   -a Checks if a smartcard is available
+                  -k Checks whether a key is stored in a card
+                  -r Reads pub key from a card to stdout
+                  [ -f don't ask again ] -s <fully qualified name>
+                     Stores masterkey and pub key of a repository into a card
+                  [ -f don't ask again ] -d
+                     Deletes a masterkey's certificate (pub key) from a card
+                  [ -f don't ask again ] -c <fully qualified name or wildcard>
+                     Converts given repositories to use card for whitelist
   list-catalogs   [-s catalog sizes] [-e catalog entry counts]
                   [-h catalog hashes] [-x machine readable]
                   <fully qualified name>
