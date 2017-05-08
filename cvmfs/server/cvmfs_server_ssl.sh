@@ -6,20 +6,26 @@
 # Functionality related to SSL
 
 # This file depends on fuctions implemented in the following files:
+# - cvmfs_server_sys.sh
 # - cvmfs_server_util.sh
+# - cvmfs_server_masterkeycard.sh
 
 create_master_key() {
   local name=$1
   local user=$2
 
-  master_key="/etc/cvmfs/keys/$name.masterkey"
-  master_pub="/etc/cvmfs/keys/$name.pub"
-
-  openssl genrsa -out $master_key 2048 > /dev/null 2>&1
-  openssl rsa -in $master_key -pubout -out $master_pub > /dev/null 2>&1
-  chmod 400 $master_key
+  local master_pub="/etc/cvmfs/keys/$name.pub"
+  if masterkeycard_cert_available >/dev/null; then
+    masterkeycard_read_pubkey >$master_pub
+  else
+    local master_key="/etc/cvmfs/keys/$name.masterkey"
+    openssl genrsa -out $master_key 2048 > /dev/null 2>&1
+    openssl rsa -in $master_key -pubout -out $master_pub > /dev/null 2>&1
+    chmod 400 $master_key
+    chown $user $master_key
+  fi
   chmod 444 $master_pub
-  chown $user $master_key $master_pub
+  chown $user $master_pub
 }
 
 
@@ -47,12 +53,22 @@ create_whitelist() {
   local user=$2
   local spooler_definition=$3
   local temp_dir=$4
+  local masterkey
+  local usemasterkeycard=0
 
   local whitelist
   whitelist=${temp_dir}/whitelist.$name
   local hash_algorithm="${CVMFS_HASH_ALGORITHM-sha1}"
 
-  echo -n "Signing 30 day whitelist with master key... "
+  masterkey=/etc/cvmfs/keys/${name}.masterkey
+  if cvmfs_sys_file_is_regular $masterkey; then
+    echo -n "Signing 30 day whitelist with master key... "
+  elif masterkeycard_cert_available >/dev/null; then
+    usemasterkeycard=1
+    echo -n "Signing 30 day whitelist with masterkeycard... "
+  else
+    die "Neither masterkey nor masterkeycard is available to sign whitelist!"
+  fi
   echo `date -u "+%Y%m%d%H%M%S"` > ${whitelist}.unsigned
   echo "E`date -u --date='+30 days' "+%Y%m%d%H%M%S"`" >> ${whitelist}.unsigned
   echo "N$name" >> ${whitelist}.unsigned
@@ -64,7 +80,11 @@ create_whitelist() {
   echo "--" >> ${whitelist}.unsigned
   echo $hash >> ${whitelist}.unsigned
   echo -n $hash > ${whitelist}.hash
-  openssl rsautl -inkey /etc/cvmfs/keys/${name}.masterkey -sign -in ${whitelist}.hash -out ${whitelist}.signature
+  if [ $usemasterkeycard -eq 1 ]; then
+    masterkeycard_sign ${whitelist}.hash ${whitelist}.signature
+  else
+    openssl rsautl -inkey /etc/cvmfs/keys/${name}.masterkey -sign -in ${whitelist}.hash -out ${whitelist}.signature
+  fi
   cat ${whitelist}.unsigned ${whitelist}.signature > $whitelist
   chown $user $whitelist
 
