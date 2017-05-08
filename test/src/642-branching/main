@@ -92,8 +92,6 @@ EOF
   cvmfs_server checkout -b b_fix_version1 $CVMFS_TEST_REPO || return 40
   cvmfs_server list | grep $CVMFS_TEST_REPO | grep "checked out" \
     | grep v1-fix01 || return 41
-  local xattr=$(get_xattr branch /var/spool/cvmfs/${CVMFS_TEST_REPO}/rdonly)
-  [ "x$xattr" = "xb_fix_version1" ] || return 48;
   start_transaction $CVMFS_TEST_REPO || return $?
   touch /cvmfs/$CVMFS_TEST_REPO/version1-fix01-coda01
   publish_repo $CVMFS_TEST_REPO -a v1-fix01-coda01 || return 42

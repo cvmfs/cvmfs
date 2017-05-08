@@ -517,13 +517,6 @@ uint64_t Catalog::GetRevision() const {
   return result;
 }
 
-string Catalog::GetBranch() const {
-  pthread_mutex_lock(lock_);
-  const string result =
-    database().GetPropertyDefault<std::string>("branch", "");
-  pthread_mutex_unlock(lock_);
-  return result;
-}
 
 uint64_t Catalog::GetLastModified() const {
   const std::string prop_name = "last_modified";

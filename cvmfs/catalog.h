@@ -161,7 +161,6 @@ class Catalog : SingleCopy {
 
   uint64_t GetTTL() const;
   uint64_t GetRevision() const;
-  std::string GetBranch() const;
   bool GetVOMSAuthz(std::string *authz) const;
   uint64_t GetLastModified() const;
   uint64_t GetNumEntries() const;

@@ -574,9 +574,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     params.manual_revision = String2Uint64(*args.find('v')->second);
   }
 
-  if (args.find('B') != args.end()) {
-    params.branch_name = *args.find('B')->second;
-  }
+  params.branched_catalog = args.find('B') != args.end();
 
   if (args.find('q') != args.end()) {
     params.max_concurrent_write_jobs = String2Uint64(*args.find('q')->second);
@@ -631,8 +629,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   }
 
   UniquePtr<manifest::Manifest> manifest;
-  if (!params.branch_name.empty()) {
-    // Throw-away manifeset
+  if (params.branched_catalog) {
+    // Throw-away manifest
     manifest = new manifest::Manifest(shash::Any(), 0, "");
   } else if (params.virtual_dir_actions !=
              catalog::VirtualCatalog::kActionNone)

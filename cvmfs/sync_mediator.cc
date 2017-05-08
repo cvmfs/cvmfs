@@ -280,7 +280,6 @@ bool SyncMediator::Commit(manifest::Manifest *manifest) {
   catalog_manager_->PrecalculateListings();
   return catalog_manager_->Commit(params_->stop_for_catalog_tweaks,
                                   params_->manual_revision,
-                                  params_->branch_name,
                                   manifest);
 }
 

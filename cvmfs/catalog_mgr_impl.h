@@ -449,15 +449,6 @@ uint64_t AbstractCatalogManager<CatalogT>::GetRevision() const {
 
 
 template <class CatalogT>
-std::string AbstractCatalogManager<CatalogT>::GetBranch() const {
-  ReadLock();
-  const std::string branch = branch_cache_;
-  Unlock();
-  return branch_cache_;
-}
-
-
-template <class CatalogT>
 bool AbstractCatalogManager<CatalogT>::GetVOMSAuthz(std::string *authz) const {
   ReadLock();
   const bool has_authz = has_authz_cache_;
@@ -705,7 +696,6 @@ bool AbstractCatalogManager<CatalogT>::AttachCatalog(const string &db_path,
   // The revision of the catalog tree is given by the root catalog revision
   if (catalogs_.empty()) {
     revision_cache_ = new_catalog->GetRevision();
-    branch_cache_ = new_catalog->GetBranch();
     has_authz_cache_ = new_catalog->GetVOMSAuthz(&authz_cache_);
     volatile_flag_ = new_catalog->volatile_flag();
   }

@@ -439,6 +439,8 @@ ParameterList CommandEditTag::GetParams() const {
   r.push_back(Parameter::Optional('d', "space separated tags to be deleted"));
   r.push_back(Parameter::Optional('a', "name of the new tag"));
   r.push_back(Parameter::Optional('D', "description of the tag"));
+  r.push_back(Parameter::Optional('B', "branch of the new tag"));
+  r.push_back(Parameter::Optional('P', "predecessor branch"));
   r.push_back(Parameter::Optional('h', "root hash of the new tag"));
   r.push_back(Parameter::Optional('c', "channel of the new tag"));
   r.push_back(Parameter::Switch('x', "maintain undo tags"));
@@ -490,6 +492,10 @@ int CommandEditTag::AddNewTag(const ArgumentList &args, Environment *env) {
   const bool undo_tags = (args.find('x') != args.end());
   const std::string root_hash_string =
       (args.find('h') != args.end()) ? *args.find('h')->second : "";
+  const std::string branch_name =
+    (args.find('B') != args.end()) ? *args.find('B')->second : "";
+  const std::string previous_branch_name =
+    (args.find('P') != args.end()) ? *args.find('P')->second : "";
 
   if (tag_name.find(" ") != std::string::npos) {
     LogCvmfs(kLogCvmfs, kLogStderr, "tag names must not contain spaces");
@@ -538,7 +544,7 @@ int CommandEditTag::AddNewTag(const ArgumentList &args, Environment *env) {
   tag_template.size = GetFileSize(catalog_path.path());
   tag_template.revision = catalog->GetRevision();
   tag_template.timestamp = catalog->GetLastModified();
-  tag_template.branch = catalog->GetBranch();
+  tag_template.branch = branch_name;
   tag_template.channel = tag_channel;
   tag_template.description = tag_description;
 
@@ -548,19 +554,9 @@ int CommandEditTag::AddNewTag(const ArgumentList &args, Environment *env) {
     const bool user_provided_hash = (!root_hash_string.empty());
 
     if (!env->history->ExistsBranch(tag_template.branch)) {
-      shash::Any previous_hash = catalog->GetPreviousRevision();
-      const UnlinkGuard catalog_path(
-        CreateTempPath(env->tmp_path + "/previous_catalog", 0600));
-      const UniquePtr<catalog::Catalog> previous_catalog(GetCatalog(
-        env->repository_url,
-        previous_hash,
-        catalog_path.path(),
-        false /* read_write */));
-      assert(previous_catalog);
-
       history::History::Branch branch(
         tag_template.branch,
-        previous_catalog->GetBranch(),
+        previous_branch_name,
         tag_template.revision);
       if (!env->history->InsertBranch(branch)) {
         LogCvmfs(kLogCvmfs, kLogStderr, "cannot insert branch '%s'",

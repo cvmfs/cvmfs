@@ -79,9 +79,10 @@ cvmfs_server_checkout() {
     tag_hash=$(get_tag_hash $name "$tag_name")
     [ "x$tag_hash" != "x" ] || die "tag $tag_name does not exist"
   fi
+  local tag_branch=$(get_tag_branch $name "$tag_name")
 
   set_ro_root_hash $name $tag_hash || die "failed to update root hash"
-  echo "$tag_name $tag_hash $branch_name" > /var/spool/cvmfs/${name}/checkout
+  echo "$tag_name $tag_hash $branch_name $tag_branch" > /var/spool/cvmfs/${name}/checkout
   if [ x"$(whoami)" = x"$CVMFS_USER" ]; then
     chown $CVMFS_USER /var/spool/cvmfs/${name}/checkout
   fi

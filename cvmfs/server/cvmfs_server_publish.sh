@@ -254,7 +254,7 @@ cvmfs_server_publish() {
     fi
     # Must be after the virtual-dir command is constructed
     if is_checked_out $name; then
-      sync_command="$sync_command -B $(get_checked_out_branch $name)"
+      sync_command="$sync_command -B"
     fi
 
     local tag_command="$(__swissknife_cmd dbg) tag_edit \
@@ -269,6 +269,11 @@ cvmfs_server_publish() {
     if ! is_checked_out $name; then
       # enables magic undo tag handling
       tag_command="$tag_command -x"
+    else
+      tag_command="$tag_command -B $(get_checked_out_branch $name)"
+      if [ "x$(get_checked_out_previous_branch $name)" != "x" ]; then
+        tag_command="$tag_command -P $(get_checked_out_previous_branch $name)"
+      fi
     fi
     # If the upstream type is "gw", we need to pass additional parameters
     # to the `cvmfs_swissknife sync` command: the username and the

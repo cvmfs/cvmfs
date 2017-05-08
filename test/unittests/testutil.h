@@ -492,7 +492,6 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
   bool OwnsDatabaseFile() const    { return owns_database_file_;  }
 
   unsigned int GetRevision()     const { return revision_;      }
-  std::string  GetBranch()       const { return "";             }
   uint64_t     GetLastModified() const { return last_modified_; }
 
   shash::Any GetPreviousRevision() const {

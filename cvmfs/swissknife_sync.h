@@ -34,6 +34,7 @@ struct SyncParameters {
         voms_authz(false),
         virtual_dir_actions(0),
         ignore_special_files(false),
+        branched_catalog(false),
         compression_alg(zlib::kZlibDefault),
         catalog_entry_warn_threshold(kDefaultEntryWarnThreshold),
         min_file_chunk_size(kDefaultMinFileChunkSize),
@@ -73,13 +74,13 @@ struct SyncParameters {
   bool voms_authz;
   unsigned virtual_dir_actions;  // bit field
   bool ignore_special_files;
+  bool branched_catalog;
   zlib::Algorithms compression_alg;
   uint64_t catalog_entry_warn_threshold;
   size_t min_file_chunk_size;
   size_t avg_file_chunk_size;
   size_t max_file_chunk_size;
   uint64_t manual_revision;
-  std::string branch_name;
   uint64_t ttl_seconds;
   uint64_t max_concurrent_write_jobs;
   bool is_balanced;
@@ -245,7 +246,6 @@ class CommandSync : public Command {
     r.push_back(Parameter::Optional('l', "minimal file chunk size in bytes"));
     r.push_back(Parameter::Optional('q', "number of concurrent write jobs"));
     r.push_back(Parameter::Optional('v', "manual revision number"));
-    r.push_back(Parameter::Optional('B', "branch name"));
     r.push_back(Parameter::Optional('z', "log level (0-4, default: 2)"));
     r.push_back(Parameter::Optional('C', "trusted certificates"));
     r.push_back(Parameter::Optional('F', "Authz file listing (default: none)"));
@@ -276,6 +276,7 @@ class CommandSync : public Command {
                                   "Publish format compatible with "
                                   "authenticated repos"));
     r.push_back(Parameter::Switch('Y', "enable external data"));
+    r.push_back(Parameter::Switch('B', "branched catalog (no manifest)"));
 
     r.push_back(Parameter::Optional('P', "session_token_file"));
     r.push_back(Parameter::Optional('H', "key file for HTTP API"));

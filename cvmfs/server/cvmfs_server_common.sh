@@ -211,6 +211,30 @@ get_tag_hash() {
 }
 
 
+# gets the branch associated to a tag name
+#
+# @param repository_name   the name of the repository to be checked
+# @param tag               the tag name to be checked
+# @return                  branch name
+get_tag_branch() {
+  local repository_name="$1"
+  local tag="$2"
+
+  load_repo_config $repository_name
+  local branch=$(__swissknife tag_info        \
+    -w $CVMFS_STRATUM0                        \
+    -t ${CVMFS_SPOOL_DIR}/tmp                 \
+    -p /etc/cvmfs/keys/${repository_name}.pub \
+    -f $repository_name                       \
+    $(get_follow_http_redirects_flag) -x      \
+    -n "$tag" 2>/dev/null | cut -d" " -f7)
+  if [ "x$branch" = "x(default)" ]; then
+    branch=
+  fi
+  echo "$branch"
+}
+
+
 # checks if a given tag already exists in the repository's history database
 #
 # @param repository_name   the name of the repository to be checked
@@ -371,6 +395,17 @@ get_checked_out_branch() {
   local name=$1
   load_repo_config $name
   cat /var/spool/cvmfs/${name}/checkout | cut -d" " -f3
+}
+
+
+# parses the checkout file
+#
+# @param name  the repository name to be checked
+# @return      0 if checked out
+get_checked_out_previous_branch() {
+  local name=$1
+  load_repo_config $name
+  cat /var/spool/cvmfs/${name}/checkout | cut -d" " -f4
 }
 
 
