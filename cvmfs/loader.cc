@@ -543,6 +543,8 @@ Failures Reload(const int fd_progress, const bool stop_and_go) {
 using namespace loader;  // NOLINT(build/namespaces)
 
 // Making OpenSSL (libcrypto) thread-safe
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+
 pthread_mutex_t *gLibcryptoLocks;
 
 static void CallbackLibcryptoLock(int mode, int type,
@@ -564,7 +566,10 @@ static unsigned long CallbackLibcryptoThreadId() {  // NOLINT(runtime/int)
   return platform_gettid();
 }
 
+#endif
+
 static void SetupLibcryptoMt() {
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
   gLibcryptoLocks = static_cast<pthread_mutex_t *>(OPENSSL_malloc(
     CRYPTO_num_locks() * sizeof(pthread_mutex_t)));
   for (int i = 0; i < CRYPTO_num_locks(); ++i) {
@@ -574,14 +579,17 @@ static void SetupLibcryptoMt() {
 
   CRYPTO_set_id_callback(CallbackLibcryptoThreadId);
   CRYPTO_set_locking_callback(CallbackLibcryptoLock);
+#endif
 }
 
 static void CleanupLibcryptoMt(void) {
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
   CRYPTO_set_locking_callback(NULL);
   for (int i = 0; i < CRYPTO_num_locks(); ++i)
     pthread_mutex_destroy(&(gLibcryptoLocks[i]));
 
   OPENSSL_free(gLibcryptoLocks);
+#endif
 }
 
 
