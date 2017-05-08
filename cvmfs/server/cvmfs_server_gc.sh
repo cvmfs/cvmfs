@@ -142,16 +142,6 @@ cvmfs_server_gc() {
     [ $preserve_revisions   -ge 0 ] && additional_switches="$additional_switches -h $preserve_revisions"
     [ $preserve_timestamp   -gt 0 ] && additional_switches="$additional_switches -z $preserve_timestamp"
 
-    # retrieve the base hash of the repository to be editied
-    local base_hash=""
-    local manifest=""
-
-    # gather extra information for a stratum0 repository and open a transaction
-    if is_stratum0 $name; then
-      base_hash="$(get_mounted_root_hash $name)"
-      manifest="${CVMFS_SPOOL_DIR}/tmp/manifest"
-    fi
-
     if [ $dry_run -eq 0 ]; then
       if is_stratum0 $name; then
         trap "close_transaction $name 0" EXIT HUP INT TERM
@@ -176,8 +166,6 @@ cvmfs_server_gc() {
     __run_gc "$name"                    \
              "$repository_url"          \
              "$dry_run"                 \
-             "$manifest"                \
-             "$base_hash"               \
              "$deletion_log"            \
              "$reconstruct_this_reflog" \
              $additional_switches || die "Fail ($?)!"
@@ -185,12 +173,6 @@ cvmfs_server_gc() {
     if [ $dry_run -eq 0 ]; then
       # sign the result
       if is_stratum0 $name; then
-        echo "Signing Repository Manifest"
-        if ! sign_manifest $name $manifest; then
-          to_syslog_for_repo $name "failed to sign manifest after manual garbage collection"
-          die "Fail!"
-        fi
-
         # close the transaction
         trap - EXIT HUP INT TERM
         close_transaction $name 0
@@ -210,11 +192,9 @@ __run_gc() {
   local name="$1"
   local repository_url="$2"
   local dry_run="$3"
-  local manifest="$4"
-  local base_hash="$5"
-  local deletion_log="$6"
-  local reconstruct_reflog="$7"
-  shift 7
+  local deletion_log="$4"
+  local reconstruct_reflog="$5"
+  shift 5
   local additional_switches="$*"
 
   load_repo_config $name
@@ -226,11 +206,6 @@ __run_gc() {
     is_in_transaction $name || is_stratum1 $name || return 3
   else
     [ $reconstruct_reflog -eq 0 ] || return 8
-  fi
-
-  if is_stratum0 $name; then
-    [ x"$manifest"  != x"" ] || return 4
-    [ x"$base_hash" != x"" ] || return 5
   fi
 
   if ! has_reference_log $name && [ $reconstruct_reflog -eq 0 ]; then
@@ -276,23 +251,6 @@ __run_gc() {
   if ! $user_shell "$gc_command"; then
     [ $dry_run -ne 0 ] || to_syslog_for_repo $name "failed to garbage collect"
     return 6
-  fi
-
-  local hash_algorithm="${CVMFS_HASH_ALGORITHM-sha1}"
-  if is_stratum0 $name && [ $dry_run -eq 0 ]; then
-    tag_command="$(__swissknife_cmd dbg) tag_empty_bin \
-      -r $CVMFS_UPSTREAM_STORAGE                       \
-      -w $CVMFS_STRATUM0                               \
-      -t ${CVMFS_SPOOL_DIR}/tmp                        \
-      -m $manifest                                     \
-      -p /etc/cvmfs/keys/${name}.pub                   \
-      -f $name                                         \
-      -b $base_hash                                    \
-      -e $hash_algorithm"
-    if ! $user_shell "$tag_command"; then
-      to_syslog_for_repo $name "failed to update history after garbage collection"
-      return 7
-    fi
   fi
 
   [ $dry_run -ne 0 ] || update_repo_status $name last_gc "`date --utc`"

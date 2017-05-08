@@ -315,6 +315,11 @@ void WritableCatalog::SetRevision(const uint64_t new_revision) {
 }
 
 
+void WritableCatalog::SetBranch(const std::string &branch_name) {
+  database().SetProperty("branch", branch_name);
+}
+
+
 void WritableCatalog::SetTTL(const uint64_t new_ttl) {
   database().SetProperty("TTL", new_ttl);
 }

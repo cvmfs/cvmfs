@@ -1,0 +1,177 @@
+cvmfs_test_name="Branching off tags"
+cvmfs_test_autofs_on_startup=false
+
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  local scratch_dir=$(pwd)
+
+  echo "*** (0) create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -g -z || return $?
+  echo "CVMFS_VIRTUAL_DIR=true" | sudo tee -a /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf
+  start_transaction $CVMFS_TEST_REPO || return $?
+  mkdir /cvmfs/$CVMFS_TEST_REPO/x86_64 || return 1
+  mkdir /cvmfs/$CVMFS_TEST_REPO/aarch64 || return 1
+  cat << EOF > /cvmfs/$CVMFS_TEST_REPO/.cvmfsdirtab
+/x86_64
+/aarch64
+EOF
+  publish_repo $CVMFS_TEST_REPO -a init || return 3
+  ls -lah /cvmfs/$CVMFS_TEST_REPO/.cvmfs || return 4
+  ls -lah /cvmfs/$CVMFS_TEST_REPO/aarch64/.cvmfscatalog || return 5
+
+  echo "*** (0) create a few tags"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  touch /cvmfs/$CVMFS_TEST_REPO/version1 || return 6
+  publish_repo $CVMFS_TEST_REPO -a v1 || return 6
+  start_transaction $CVMFS_TEST_REPO || return $?
+  touch /cvmfs/$CVMFS_TEST_REPO/version2 || return 6
+  publish_repo $CVMFS_TEST_REPO -a v2 || return 6
+  ls -lah /cvmfs/$CVMFS_TEST_REPO/version1 || return 6
+  ls -lah /cvmfs/$CVMFS_TEST_REPO/version2 || return 6
+  ls -lah /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/v1 || return 6
+  ls -lah /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/v2 || return 6
+  cvmfs_server list | grep $CVMFS_TEST_REPO | grep "checked out" && return 7
+  cvmfs_server tag -l $CVMFS_TEST_REPO
+
+  echo "*** (1) check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "*** (2) checkout and transaction"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  cvmfs_server checkout -b fix-version1 -t v1 $CVMFS_TEST_REPO && return 70
+  abort_transaction $CVMFS_TEST_REPO || return $?
+  cvmfs_server checkout -b fix-version1 -t v1 $CVMFS_TEST_REPO || return 71
+  start_transaction $CVMFS_TEST_REPO || return $?
+  cvmfs_server list | grep $CVMFS_TEST_REPO | grep "checked out" || return 72
+  abort_transaction $CVMFS_TEST_REPO || return $?
+  cvmfs_server list | grep $CVMFS_TEST_REPO | grep "checked out" || return 73
+  cvmfs_server checkout $CVMFS_TEST_REPO || return 74
+  cvmfs_server list | grep $CVMFS_TEST_REPO | grep "checked out" && return 75
+
+  echo "*** (2) checking out and fixing version 1"
+  cvmfs_server checkout -b b_fix_version1 -t v1 $CVMFS_TEST_REPO || return 10
+  cvmfs_server list | grep $CVMFS_TEST_REPO | grep "checked out" || return 11
+  ls -lah /cvmfs/$CVMFS_TEST_REPO/version2 && return 12
+  start_transaction $CVMFS_TEST_REPO || return $?
+  touch /cvmfs/$CVMFS_TEST_REPO/version1-fix01 || return 13
+  mkdir /cvmfs/$CVMFS_TEST_REPO/version1-nested || return 13
+  touch /cvmfs/$CVMFS_TEST_REPO/version1-nested/.cvmfscatalog || return 13
+  publish_repo $CVMFS_TEST_REPO && return 14  # requires tag name
+  publish_repo $CVMFS_TEST_REPO -a v1-fix01 || return 15
+  ls -lah /cvmfs/$CVMFS_TEST_REPO/version2 || return 16  # back to default branch?
+  ls -lah /cvmfs/$CVMFS_TEST_REPO/version1-fix01 && return 17
+  ls -lah /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/v1-fix01/version1-fix01 || return 18
+  cvmfs_server tag -lx $CVMFS_TEST_REPO | grep b_fix_version1 || return 19
+  check_repository $CVMFS_TEST_REPO -i || return $?
+  cvmfs_server tag -l $CVMFS_TEST_REPO
+
+  echo "*** (3) jump between checkouts, abort checkout"
+  cvmfs_server checkout -t v1 -b X $CVMFS_TEST_REPO || return 20
+  cvmfs_server list | grep $CVMFS_TEST_REPO | grep "checked out" || return 21
+  ls -lah /cvmfs/$CVMFS_TEST_REPO/version2 && return 22
+  cvmfs_server checkout -t v1-fix01 -b X $CVMFS_TEST_REPO || return 23
+  ls -lah /cvmfs/$CVMFS_TEST_REPO/version1-fix01 || return 24
+  cvmfs_server checkout $CVMFS_TEST_REPO || return 25
+  cvmfs_server list | grep $CVMFS_TEST_REPO | grep "checked out" && return 26
+  ls -lah /cvmfs/$CVMFS_TEST_REPO/version2 || return 27
+
+  echo "*** (4) invalid branch / tag name in checkout"
+  cvmfs_server checkout -t xzy -b X $CVMFS_TEST_REPO && return 30
+  cvmfs_server checkout -t "v1 with spaces" $CVMFS_TEST_REPO && return 31
+  cvmfs_server checkout -b "unknownbranch" $CVMFS_TEST_REPO && return 32
+  cvmfs_server checkout -t v1 -b b_fix_version1 $CVMFS_TEST_REPO && return 33
+  cvmfs_server checkout -t v1 -b "new branch with spaces" $CVMFS_TEST_REPO && return 34
+  cvmfs_server checkout -t v1 -b "aZ-@1.0/foo_bar" $CVMFS_TEST_REPO || return 35
+  cvmfs_server list | grep $CVMFS_TEST_REPO | grep "checked out" || return 36
+  cvmfs_server checkout $CVMFS_TEST_REPO || return 37
+
+  echo "*** (5) checkout head on branch"
+  cvmfs_server checkout -b b_fix_version1 $CVMFS_TEST_REPO || return 40
+  cvmfs_server list | grep $CVMFS_TEST_REPO | grep "checked out" \
+    | grep v1-fix01 || return 41
+  start_transaction $CVMFS_TEST_REPO || return $?
+  touch /cvmfs/$CVMFS_TEST_REPO/version1-fix01-coda01
+  publish_repo $CVMFS_TEST_REPO -a v1-fix01-coda01 || return 42
+  cvmfs_server checkout -b b_fix_version1 $CVMFS_TEST_REPO || return 43
+  cvmfs_server list | grep $CVMFS_TEST_REPO | grep "checked out" \
+    | grep v1-fix01-coda01 || return 44
+  start_transaction $CVMFS_TEST_REPO || return $?
+  touch /cvmfs/$CVMFS_TEST_REPO/version1-fix01-coda02
+  publish_repo $CVMFS_TEST_REPO -a v1-fix01-coda02 || return 45
+  local count_tags_on_branch=$(cvmfs_server tag -lx $CVMFS_TEST_REPO | \
+    grep b_fix_version1 | wc -l)
+  [ $count_tags_on_branch -ne 3 ] && return 46
+  ls -lah /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/v1-fix01-coda02/version1-fix01-coda02 \
+    || return 47
+  cvmfs_server tag -l $CVMFS_TEST_REPO
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "*** (6) create sub branch"
+  cvmfs_server checkout -b b_fix_version1-coda01 -t v1-fix01-coda01 $CVMFS_TEST_REPO \
+    || return 50
+  start_transaction $CVMFS_TEST_REPO || return $?
+  touch /cvmfs/$CVMFS_TEST_REPO/version1-fix01-coda01-fix01
+  publish_repo $CVMFS_TEST_REPO -a v1-fix01-coda01-fix01 || return 51
+  ls -lah /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/v1-fix01-coda01-fix01/version1-fix01-coda01-fix01 \
+    || return 52
+  local count_branches=$(cvmfs_server tag -lx $CVMFS_TEST_REPO | cut -d" " -f7 \
+    | sort -u | wc -l)
+  [ $count_branches -ne 3 ] && return 53
+  cvmfs_server tag -l $CVMFS_TEST_REPO
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "*** (7) other server commands under checkout"
+  cvmfs_server checkout -b b_fix_version1 $CVMFS_TEST_REPO || return 80
+  cvmfs_server tag -l $CVMFS_TEST_REPO || return 81
+  cvmfs_server tag -i trunk $CVMFS_TEST_REPO || return 82
+  check_repository $CVMFS_TEST_REPO -i || return 83
+  cvmfs_server diff $CVMFS_TEST_REPO || return 84
+  cvmfs_server list-catalogs $CVMFS_TEST_REPO | grep version1-nested || return 85
+  cvmfs_server info $CVMFS_TEST_REPO || return 86
+  cvmfs_server gc -r0 -f $CVMFS_TEST_REPO || return 87
+  local json_file="test_json_file.json"
+  cat > $json_file << EOF
+{
+  "administrator" : "Admin",
+  "email"         : "dont.send.me.spam@cern.ch",
+  "organisation"  : "CERN",
+  "description"   : "This is just a test repository"
+}
+EOF
+  cvmfs_server update-repoinfo -f $json_file $CVMFS_TEST_REPO || return 88
+
+  rollback_repo $CVMFS_TEST_REPO trunk-previous && return 89
+  cvmfs_server tag -f -r v1 $CVMFS_TEST_REPO && return 90
+  sudo cvmfs_server eliminate-hardlinks -f $CVMFS_TEST_REPO && return 91
+  touch uid_map
+  touch gid_map
+  sudo cvmfs_server catalog-chown -u uid_map -g gid_map $CVMFS_TEST_REPO && return 92
+  cvmfs_server checkout $CVMFS_TEST_REPO
+  ls -lah /cvmfs/$CVMFS_TEST_REPO/version2 || return 93
+  find /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots -type f -exec cat {} \; \
+    || return 94
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "*** (8) remove and recreate branch"
+  cvmfs_server tag -lx $CVMFS_TEST_REPO | cut -d" " -f7 | grep '^b_fix_version1$' \
+    || return 60
+  cvmfs_server tag -r "v1-fix01 v1-fix01-coda01 v1-fix01-coda02" -f $CVMFS_TEST_REPO \
+    || return 61
+  cvmfs_server tag -lx $CVMFS_TEST_REPO | cut -d" " -f7 | grep '^b_fix_version1$' \
+    && return 62
+  cvmfs_server checkout -b b_fix_version1 -t init $CVMFS_TEST_REPO || return 63
+  cvmfs_server list | grep $CVMFS_TEST_REPO | grep "checked out" || return 64
+  start_transaction $CVMFS_TEST_REPO || return $?
+  touch /cvmfs/$CVMFS_TEST_REPO/init-fix01 || return 65
+  publish_repo $CVMFS_TEST_REPO -a init-fix01 || return 66
+  ls -lah /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/init-fix01/init-fix01 || return 67
+  cvmfs_server tag -lx $CVMFS_TEST_REPO | cut -d" " -f7 | grep '^b_fix_version1$' \
+    || return 68
+  check_repository $CVMFS_TEST_REPO -i || return $?
+  cvmfs_server tag -l $CVMFS_TEST_REPO
+
+  return 0
+}

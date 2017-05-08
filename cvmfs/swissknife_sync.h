@@ -34,6 +34,7 @@ struct SyncParameters {
         voms_authz(false),
         virtual_dir_actions(0),
         ignore_special_files(false),
+        branched_catalog(false),
         compression_alg(zlib::kZlibDefault),
         catalog_entry_warn_threshold(kDefaultEntryWarnThreshold),
         min_file_chunk_size(kDefaultMinFileChunkSize),
@@ -73,6 +74,7 @@ struct SyncParameters {
   bool voms_authz;
   unsigned virtual_dir_actions;  // bit field
   bool ignore_special_files;
+  bool branched_catalog;
   zlib::Algorithms compression_alg;
   uint64_t catalog_entry_warn_threshold;
   size_t min_file_chunk_size;
@@ -274,6 +276,7 @@ class CommandSync : public Command {
                                   "Publish format compatible with "
                                   "authenticated repos"));
     r.push_back(Parameter::Switch('Y', "enable external data"));
+    r.push_back(Parameter::Switch('B', "branched catalog (no manifest)"));
 
     r.push_back(Parameter::Optional('P', "session_token_file"));
     r.push_back(Parameter::Optional('H', "key file for HTTP API"));

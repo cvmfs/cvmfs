@@ -49,6 +49,7 @@ cvmfs_server_rollback() {
   check_repository_existence $name || die "The repository $name does not exist"
   is_stratum0 $name                || die "This is not a stratum 0 repository"
   is_publishing $name              && die "Repository $name is currently being published"
+  is_checked_out $name             && die "Can't rollback when checked out on a branch"
   health_check -r $name
 
   # get repository information
