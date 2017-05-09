@@ -1,4 +1,5 @@
 2.4.0:
+  * Use rsync "perishable" feature instead of list-catalogs (CVM-1199)
   * Add cvmfs_server checkout command and support for branches (CVM-1197)
   * Add cvmfs_server diff command (CVM-1070)
   * Possibility to split cache dir and workspace, add CVMFS(_CACHE)_WORKSPACE
