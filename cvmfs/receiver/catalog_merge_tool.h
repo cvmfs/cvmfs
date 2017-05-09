@@ -9,7 +9,12 @@
 #include <vector>
 
 #include "catalog_diff_tool.h"
+#include "catalog_mgr_rw.h"
 #include "util/pointer.h"
+
+namespace catalog {
+class WritableCatalogManager;
+}
 
 namespace download {
 class DownloadManager;
@@ -60,7 +65,14 @@ class CatalogMergeTool : public CatalogDiffTool {
   };
   typedef std::vector<ChangeItem> ChangeList;
 
-  std::string base_root_hash_;
+  std::string repo_path_;
+  std::string temp_dir_prefix_;
+
+  shash::Any base_root_hash_;
+
+  download::DownloadManager* download_manager_;
+
+  UniquePtr<catalog::WritableCatalogManager> output_catalog_mgr_;
 
   ChangeList changes_;
 };
