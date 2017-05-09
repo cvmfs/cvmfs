@@ -40,6 +40,7 @@
 #include <vector>
 
 #include "atomic.h"
+#include "duplex_ssl.h"
 #include "fence.h"
 #include "loader_talk.h"
 #include "logging.h"
@@ -543,7 +544,7 @@ Failures Reload(const int fd_progress, const bool stop_and_go) {
 using namespace loader;  // NOLINT(build/namespaces)
 
 // Making OpenSSL (libcrypto) thread-safe
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#ifndef OPENSSL_API_INTERFACE_V11
 
 pthread_mutex_t *gLibcryptoLocks;
 
@@ -569,7 +570,7 @@ static unsigned long CallbackLibcryptoThreadId() {  // NOLINT(runtime/int)
 #endif
 
 static void SetupLibcryptoMt() {
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#ifndef OPENSSL_API_INTERFACE_V11
   gLibcryptoLocks = static_cast<pthread_mutex_t *>(OPENSSL_malloc(
     CRYPTO_num_locks() * sizeof(pthread_mutex_t)));
   for (int i = 0; i < CRYPTO_num_locks(); ++i) {
@@ -583,7 +584,7 @@ static void SetupLibcryptoMt() {
 }
 
 static void CleanupLibcryptoMt(void) {
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#ifndef OPENSSL_API_INTERFACE_V11
   CRYPTO_set_locking_callback(NULL);
   for (int i = 0; i < CRYPTO_num_locks(); ++i)
     pthread_mutex_destroy(&(gLibcryptoLocks[i]));
