@@ -15,6 +15,7 @@
 #include <cstring>
 #include <ctime>
 
+#include "duplex_ssl.h"
 #include "hash.h"
 #include "platform.h"
 #include "smalloc.h"
@@ -225,12 +226,12 @@ string CipherAes256Cbc::DoDecrypt(const string &ciphertext, const Key &key) {
     smalloc(kBlockSize + ciphertext.size() - kIvSize));
   int plaintext_len;
   int tail_len;
-#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
+#ifdef OPENSSL_API_INTERFACE_V11
+  EVP_CIPHER_CTX *ctx_ptr = EVP_CIPHER_CTX_new();
+#else
   EVP_CIPHER_CTX ctx;
   EVP_CIPHER_CTX_init(&ctx);
   EVP_CIPHER_CTX *ctx_ptr = &ctx;
-#else
-  EVP_CIPHER_CTX *ctx_ptr = EVP_CIPHER_CTX_new();
 #endif
   retval = EVP_DecryptInit_ex(ctx_ptr, EVP_aes_256_cbc(), NULL, key.data(), iv);
   assert(retval == 1);
@@ -241,20 +242,20 @@ string CipherAes256Cbc::DoDecrypt(const string &ciphertext, const Key &key) {
              ciphertext.length() - kIvSize);
   if (retval != 1) {
     free(plaintext);
-#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
+#ifdef OPENSSL_API_INTERFACE_V11
+    EVP_CIPHER_CTX_free(ctx_ptr);
+#else
     retval = EVP_CIPHER_CTX_cleanup(&ctx);
     assert(retval == 1);
-#else
-    EVP_CIPHER_CTX_free(ctx_ptr);
 #endif
     return "";
   }
   retval = EVP_DecryptFinal_ex(ctx_ptr, plaintext + plaintext_len, &tail_len);
-#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
+#ifdef OPENSSL_API_INTERFACE_V11
+  EVP_CIPHER_CTX_free(ctx_ptr);
+#else
   int retval_2 = EVP_CIPHER_CTX_cleanup(&ctx);
   assert(retval_2 == 1);
-#else
-  EVP_CIPHER_CTX_free(ctx_ptr);
 #endif
   if (retval != 1) {
     free(plaintext);
@@ -287,12 +288,12 @@ string CipherAes256Cbc::DoEncrypt(const string &plaintext, const Key &key) {
   memcpy(ciphertext, iv, kIvSize);
   int cipher_len = 0;
   int tail_len = 0;
-#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
+#ifdef OPENSSL_API_INTERFACE_V11
+  EVP_CIPHER_CTX *ctx_ptr = EVP_CIPHER_CTX_new();
+#else
   EVP_CIPHER_CTX ctx;
   EVP_CIPHER_CTX_init(&ctx);
   EVP_CIPHER_CTX *ctx_ptr = &ctx;
-#else
-  EVP_CIPHER_CTX *ctx_ptr = EVP_CIPHER_CTX_new();
 #endif
   retval = EVP_EncryptInit_ex(ctx_ptr, EVP_aes_256_cbc(), NULL, key.data(), iv);
   assert(retval == 1);
@@ -307,11 +308,11 @@ string CipherAes256Cbc::DoEncrypt(const string &plaintext, const Key &key) {
   retval = EVP_EncryptFinal_ex(ctx_ptr, ciphertext + kIvSize + cipher_len,
                                &tail_len);
   assert(retval == 1);
-#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
+#ifdef OPENSSL_API_INTERFACE_V11
+  EVP_CIPHER_CTX_free(ctx_ptr);
+#else
   retval = EVP_CIPHER_CTX_cleanup(&ctx);
   assert(retval == 1);
-#else
-  EVP_CIPHER_CTX_free(ctx_ptr);
 #endif
 
   cipher_len += tail_len;

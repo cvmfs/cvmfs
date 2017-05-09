@@ -12,6 +12,7 @@
 
 #include "authz/authz_session.h"
 #include "duplex_curl.h"
+#include "duplex_ssl.h"
 #include "logging.h"
 #include "util/pointer.h"
 #include "util_concurrency.h"
@@ -161,21 +162,21 @@ bool AuthzAttachment::ConfigureCurlHandle(
     X509_INFO *xi = sk_X509_INFO_shift(sk);
     if (xi == NULL) {continue;}
     if (xi->x509 != NULL) {
-#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
-      CRYPTO_add(&xi->x509->references, 1, CRYPTO_LOCK_X509);
-#else
+#ifdef OPENSSL_API_INTERFACE_V11
       retval = X509_up_ref(xi->x509);
       assert(retval == 1);
+#else
+      CRYPTO_add(&xi->x509->references, 1, CRYPTO_LOCK_X509);
 #endif
       sk_X509_push(certstack, xi->x509);
     }
     if ((xi->x_pkey != NULL) && (xi->x_pkey->dec_pkey != NULL)) {
       parm->pkey = xi->x_pkey->dec_pkey;
-#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
-      CRYPTO_add(&parm->pkey->references, 1, CRYPTO_LOCK_EVP_PKEY);
-#else
+#ifdef OPENSSL_API_INTERFACE_V11
       retval = EVP_PKEY_up_ref(parm->pkey);
       assert(retval == 1);
+#else
+      CRYPTO_add(&parm->pkey->references, 1, CRYPTO_LOCK_EVP_PKEY);
 #endif
     }
     X509_INFO_free(xi);
