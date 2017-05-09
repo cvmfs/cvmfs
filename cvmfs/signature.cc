@@ -561,7 +561,7 @@ bool SignatureManager::Sign(const unsigned char *buffer,
   }
 
   bool result = false;
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
   EVP_MD_CTX ctx;
   EVP_MD_CTX_init(&ctx);
   EVP_MD_CTX *ctx_ptr = &ctx;
@@ -577,7 +577,7 @@ bool SignatureManager::Sign(const unsigned char *buffer,
   {
     result = true;
   }
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
   EVP_MD_CTX_cleanup(&ctx);
 #else
   EVP_MD_CTX_free(ctx_ptr);
@@ -605,7 +605,7 @@ bool SignatureManager::Verify(const unsigned char *buffer,
   if (!certificate_) return false;
 
   bool result = false;
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
   EVP_MD_CTX ctx;
   EVP_MD_CTX_init(&ctx);
   EVP_MD_CTX *ctx_ptr = &ctx;
@@ -629,7 +629,7 @@ bool SignatureManager::Verify(const unsigned char *buffer,
   }
   if (pubkey != NULL)
     EVP_PKEY_free(pubkey);
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
   EVP_MD_CTX_cleanup(&ctx);
 #else
   EVP_MD_CTX_free(ctx_ptr);
@@ -828,7 +828,7 @@ bool SignatureManager::VerifyPkcs7(const unsigned char *buffer,
           continue;
 
         const char *name_ptr = reinterpret_cast<const char *>(
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
           ASN1_STRING_data(this_name->d.uniformResourceIdentifier));
 #else
           ASN1_STRING_get0_data(this_name->d.uniformResourceIdentifier));

@@ -161,7 +161,7 @@ bool AuthzAttachment::ConfigureCurlHandle(
     X509_INFO *xi = sk_X509_INFO_shift(sk);
     if (xi == NULL) {continue;}
     if (xi->x509 != NULL) {
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
       CRYPTO_add(&xi->x509->references, 1, CRYPTO_LOCK_X509);
 #else
       retval = X509_up_ref(xi->x509);
@@ -171,7 +171,7 @@ bool AuthzAttachment::ConfigureCurlHandle(
     }
     if ((xi->x_pkey != NULL) && (xi->x_pkey->dec_pkey != NULL)) {
       parm->pkey = xi->x_pkey->dec_pkey;
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
       CRYPTO_add(&parm->pkey->references, 1, CRYPTO_LOCK_EVP_PKEY);
 #else
       retval = EVP_PKEY_up_ref(parm->pkey);
