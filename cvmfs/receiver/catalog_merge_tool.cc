@@ -121,6 +121,16 @@ CatalogMergeTool::ChangeItem::ChangeItem(ChangeType type,
 CatalogMergeTool::ChangeItem::ChangeItem(ChangeType type,
                                          const PathString& path,
                                          const catalog::DirectoryEntry& entry1,
+                                         const XattrList& xattrs)
+    : type_(type),
+      path_(path),
+      entry1_(new catalog::DirectoryEntry(entry1)),
+      entry2_(NULL),
+      xattrs_(new XattrList(xattrs)) {}
+
+CatalogMergeTool::ChangeItem::ChangeItem(ChangeType type,
+                                         const PathString& path,
+                                         const catalog::DirectoryEntry& entry1,
                                          const catalog::DirectoryEntry& entry2)
     : type_(type),
       path_(path),
@@ -194,13 +204,16 @@ bool CatalogMergeTool::Run(shash::Any* /*resulting_root_hash*/) {
       params.entry_warn_thresh, &stats, params.use_autocatalogs,
       params.max_weight, params.min_weight);
 
+  ret &= InsertChangesIntoOutputCatalog();
+
   std::fclose(debug_file);
   return ret;
 }
 
 void CatalogMergeTool::ReportAddition(const PathString& path,
-                                      const catalog::DirectoryEntry& entry) {
-  changes_.push_back(ChangeItem(ChangeItem::kAddition, path, entry));
+                                      const catalog::DirectoryEntry& entry,
+                                      const XattrList& xattrs) {
+  changes_.push_back(ChangeItem(ChangeItem::kAddition, path, entry, xattrs));
 }
 
 void CatalogMergeTool::ReportRemoval(const PathString& path,
@@ -215,4 +228,30 @@ void CatalogMergeTool::ReportModification(
       ChangeItem(ChangeItem::kModification, path, entry1, entry2));
 }
 
+bool CatalogMergeTool::InsertChangesIntoOutputCatalog() {
+  for (size_t i = 0; i < changes_.size(); ++i) {
+    ChangeItem change = changes_[i];
+    switch (change.type_) {
+      case ChangeItem::kAddition:
+        if (change.entry1_->IsDirectory()) {
+          output_catalog_mgr_->AddDirectory(*change.entry1_, "");
+        } else if (change.entry1_->IsRegular() || change.entry1_->IsLink()) {
+          const catalog::DirectoryEntryBase* base_entry =
+              static_cast<const catalog::DirectoryEntryBase*>(change.entry1_);
+          output_catalog_mgr_->AddFile(*base_entry, *change.xattrs_, "");
+        }
+        break;
+      case ChangeItem::kRemoval:
+        break;
+      case ChangeItem::kModification:
+        break;
+      default:
+        LogCvmfs(kLogCvmfs, kLogStderr,
+                 "What should not be representable presented itself. Exiting.");
+        break;
+    }
+  }
+
+  return true;
+}
 }  // namespace receiver

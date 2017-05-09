@@ -27,7 +27,8 @@ class CatalogDiffTool {
  protected:
   bool Run();
   virtual void ReportAddition(const PathString& path,
-                              const catalog::DirectoryEntry& entry) = 0;
+                              const catalog::DirectoryEntry& entry,
+                              const XattrList& xattrs) = 0;
   virtual void ReportRemoval(const PathString& path,
                              const catalog::DirectoryEntry& entry) = 0;
   virtual void ReportModification(const PathString& path,

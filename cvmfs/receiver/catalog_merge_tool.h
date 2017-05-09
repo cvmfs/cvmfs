@@ -40,7 +40,8 @@ class CatalogMergeTool : public CatalogDiffTool {
 
  protected:
   virtual void ReportAddition(const PathString& path,
-                              const catalog::DirectoryEntry& entry);
+                              const catalog::DirectoryEntry& entry,
+                              const XattrList& xattrs);
   virtual void ReportRemoval(const PathString& path,
                              const catalog::DirectoryEntry& entry);
   virtual void ReportModification(const PathString& path,
@@ -53,6 +54,8 @@ class CatalogMergeTool : public CatalogDiffTool {
     ChangeItem(ChangeType type, const PathString& path,
                const catalog::DirectoryEntry& entry1);
     ChangeItem(ChangeType type, const PathString& path,
+               const catalog::DirectoryEntry& entry1, const XattrList& xattrs);
+    ChangeItem(ChangeType type, const PathString& path,
                const catalog::DirectoryEntry& entry1,
                const catalog::DirectoryEntry& entry2);
     ChangeItem(const ChangeItem& other);
@@ -62,8 +65,11 @@ class CatalogMergeTool : public CatalogDiffTool {
     PathString path_;
     const catalog::DirectoryEntry* entry1_;
     const catalog::DirectoryEntry* entry2_;
+    const XattrList* xattrs_;
   };
   typedef std::vector<ChangeItem> ChangeList;
+
+  bool InsertChangesIntoOutputCatalog();
 
   std::string repo_path_;
   std::string temp_dir_prefix_;

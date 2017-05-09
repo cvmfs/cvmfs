@@ -124,7 +124,11 @@ void CatalogDiffTool::DiffRec(const PathString& path) {
 
     if (IsSmaller(new_entry, old_entry)) {
       i_to++;
-      ReportAddition(new_path, new_entry);
+      XattrList xattrs;
+      if (new_entry.HasXattrs()) {
+        new_catalog_mgr_->LookupXattrs(new_path, &xattrs);
+      }
+      ReportAddition(new_path, new_entry, xattrs);
       continue;
     } else if (IsSmaller(old_entry, new_entry)) {
       i_from++;
