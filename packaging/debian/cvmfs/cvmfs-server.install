@@ -6,6 +6,7 @@ usr/lib/libtbb_cvmfs_debug.so
 usr/lib/libtbbmalloc_cvmfs_debug.so
 usr/lib/libtbb_cvmfs_debug.so.2
 usr/lib/libtbbmalloc_cvmfs_debug.so.2
+usr/bin/cvmfs_receiver
 usr/bin/cvmfs_swissknife
 usr/bin/cvmfs_swissknife_debug
 usr/bin/cvmfs_suid_helper
