@@ -23,7 +23,7 @@ namespace receiver {
 
 class CatalogMergeTool : public CatalogDiffTool {
  public:
-  CatalogMergeTool(const std::string& repo_name,
+  CatalogMergeTool(const std::string& repo_path,
                    const std::string& old_root_hash,
                    const std::string& new_root_hash,
                    const std::string& base_root_hash,

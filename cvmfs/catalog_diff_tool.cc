@@ -52,12 +52,12 @@ catalog::SimpleCatalogManager* OpenCatalogManager(
 
 }  // namespace
 
-CatalogDiffTool::CatalogDiffTool(const std::string& repo_name,
+CatalogDiffTool::CatalogDiffTool(const std::string& repo_path,
                                  const std::string& old_root_hash,
                                  const std::string& new_root_hash,
                                  const std::string& temp_dir_prefix,
                                  download::DownloadManager* download_manager)
-    : repo_path_("/srv/cvmfs/" + repo_name),
+    : repo_path_(repo_path),
       old_root_hash_(old_root_hash),
       new_root_hash_(new_root_hash),
       temp_dir_prefix_(temp_dir_prefix),
@@ -69,15 +69,16 @@ CatalogDiffTool::~CatalogDiffTool() {}
 
 bool CatalogDiffTool::Run() {
   // Create a temp directory
-  const std::string temp_dir = CreateTempDir(temp_dir_prefix_);
+  const std::string temp_dir_old = CreateTempDir(temp_dir_prefix_);
+  const std::string temp_dir_new = CreateTempDir(temp_dir_prefix_);
 
   // Old catalog from release manager machine (before lease)
-  old_catalog_mgr_ = OpenCatalogManager(repo_path_, temp_dir, old_root_hash_,
-                                        download_manager_, &stats_old_);
+  old_catalog_mgr_ = OpenCatalogManager(
+      repo_path_, temp_dir_old, old_root_hash_, download_manager_, &stats_old_);
 
   // New catalog from release manager machine (before lease)
-  new_catalog_mgr_ = OpenCatalogManager(repo_path_, temp_dir, new_root_hash_,
-                                        download_manager_, &stats_new_);
+  new_catalog_mgr_ = OpenCatalogManager(
+      repo_path_, temp_dir_new, new_root_hash_, download_manager_, &stats_new_);
 
   if (!old_catalog_mgr_.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Could not open old catalog");
@@ -91,7 +92,8 @@ bool CatalogDiffTool::Run() {
 
   DiffRec(PathString(""));
 
-  RemoveTree(temp_dir);
+  RemoveTree(temp_dir_old);
+  RemoveTree(temp_dir_new);
 
   return true;
 }

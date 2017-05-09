@@ -17,7 +17,7 @@ class DownloadManager;
 
 class CatalogDiffTool {
  public:
-  CatalogDiffTool(const std::string& repo_name,
+  CatalogDiffTool(const std::string& repo_path,
                   const std::string& old_root_hash,
                   const std::string& new_root_hash,
                   const std::string& temp_dir_prefix,

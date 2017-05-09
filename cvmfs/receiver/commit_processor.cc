@@ -44,8 +44,9 @@ CommitProcessor::Result CommitProcessor::Process(
     const std::string& new_root_hash_str) {
   const std::vector<std::string> lease_path_tokens =
       SplitString(lease_path, '/');
+
   const std::string repo_name = lease_path_tokens.front();
-  const std::string stratum0 = "/srv/cvmfs/" + repo_name;
+  const std::string stratum0 = "file:///srv/cvmfs/" + repo_name;
 
   if (!server_tool_.InitDownloadManager(true)) {
     return kIoError;
@@ -58,10 +59,6 @@ CommitProcessor::Result CommitProcessor::Process(
     return kIoError;
   }
 
-  server_tool_.download_manager()->Init(
-      1, false,
-      perf::StatisticsTemplate("download", server_tool_.statistics()));
-
   shash::Any manifest_base_hash;
   UniquePtr<manifest::Manifest> manifest(server_tool_.FetchRemoteManifest(
       stratum0, repo_name, manifest_base_hash));
@@ -72,15 +69,7 @@ CommitProcessor::Result CommitProcessor::Process(
     return kIoError;
   }
 
-  const unsigned download_timeout = 20;     // seconds
-  const unsigned num_download_retries = 1;  // 2 attempts in total
-  server_tool_.download_manager()->SetTimeout(download_timeout,
-                                              download_timeout);
-  server_tool_.download_manager()->SetRetryParameters(num_download_retries, 500,
-                                                      2000);
-  server_tool_.download_manager()->EnableRedirects();
-
-  CatalogMergeTool merge_tool(repo_name, old_root_hash_str, new_root_hash_str,
+  CatalogMergeTool merge_tool(stratum0, old_root_hash_str, new_root_hash_str,
                               manifest->catalog_hash().ToString(true),
                               "/tmp/cvmfs_receiver_merge",
                               server_tool_.download_manager());
