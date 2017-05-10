@@ -315,6 +315,7 @@ bool CatalogMergeTool::InsertChangesIntoOutputCatalog() {
 
         LogCvmfs(kLogCvmfs, kLogStderr,
                  "What should not be representable presented itself. Exiting.");
+        abort();
         break;
     }
   }
