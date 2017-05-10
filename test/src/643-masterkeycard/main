@@ -25,6 +25,11 @@ cvmfs_run_test() {
   echo "check if the device & system pass all masterkeycard available tests"
   cvmfs_server masterkeycard -a || return 10
 
+  if cvmfs_server masterkeycard -k; then
+    echo "deleting existing certificate from masterkeycard"
+    sudo cvmfs_server masterkeycard -df || return 11
+  fi
+
   echo "create two fresh repositories with user $CVMFS_TEST_USER"
   create_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER       || return $?
   TEST_643_EXTRA_REPO=$CVMFS_TEST_REPO_MORE
@@ -36,13 +41,13 @@ cvmfs_run_test() {
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
   echo "storing the masterkey of repo $CVMFS_TEST_REPO"
-  sudo cvmfs_server masterkeycard -fs $CVMFS_TEST_REPO || return 11
+  sudo cvmfs_server masterkeycard -s $CVMFS_TEST_REPO  || return 12
 
   echo "checking that a key is available"
-  cvmfs_server masterkeycard -k                        || return 12
+  cvmfs_server masterkeycard -k                        || return 13
 
   echo "checking that the pub key can be read back and matches"
-  cvmfs_server masterkeycard -r | cmp - /etc/cvmfs/keys/$CVMFS_TEST_REPO.pub || return 13
+  cvmfs_server masterkeycard -r | cmp - /etc/cvmfs/keys/$CVMFS_TEST_REPO.pub || return 14
 
   echo "converting both repos to use the masterkeycard"
   sudo cvmfs_server masterkeycard -fc $CVMFS_TEST_REPO $CVMFS_TEST_REPO_MORE || return 20
@@ -80,7 +85,7 @@ cvmfs_run_test() {
   local lines
   lines="`sudo cvmfs_server resign $CVMFS_TEST_REPO $CVMFS_TEST_REPO_MORE`" || return 70
   echo "$lines"
-  [ `echo "$lines"|wc -l` -eq 2 ]                          || return 71
+  [ `echo "$lines"|grep masterkeycard|wc -l` -eq 2 ]       || return 71
 
   echo "remove the cert and verify that -k thinks it is gone"
   sudo cvmfs_server masterkeycard -df                      || return 80
