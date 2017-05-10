@@ -1,4 +1,4 @@
-cvmfs_test_name="cvmfs_server snapshot -a"
+cvmfs_test_name="cvmfs_server snapshot -a and gc -a"
 cvmfs_test_autofs_on_startup=false
 
 CVMFS_TEST_621_REPLICA_NAMES=
@@ -11,6 +11,10 @@ cleanup() {
   fi
 }
 
+has_jq() {
+  which jq >/dev/null 2>&1
+}
+
 cvmfs_run_test() {
   logfile=$1
 
@@ -18,8 +22,8 @@ cvmfs_run_test() {
   which curl > /dev/null 2>&1 || { echo "fail"; return 1; }
   echo "done"
 
-  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
-  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+  echo "create a fresh gc-able repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -z || return $?
 
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -45,8 +49,13 @@ cvmfs_run_test() {
   echo "corrupting third replica's download URL"
   sudo $SHELL -c "sed -i 's,^\(CVMFS_STRATUM0=.*\),\1Bogus,' /etc/cvmfs/repositories.d/${replica_name}-3/server.conf"
 
+  echo "making /var/log/cvmfs user-writable"
+  sudo chown $CVMFS_TEST_USER /var/log/cvmfs
+  echo "Removing old snapshots.log and gc.log"
+  rm -f /var/log/cvmfs/snapshots.log /var/log/cvmfs/gc.log
+
   echo "running cvmfs_server snapshot -a"
-  sudo cvmfs_server snapshot -an || return 5
+  cvmfs_server snapshot -an || return 5
 
   echo "download manifests of stratum 0 and replica 1 and 4"
   curl -so mr1 "$(get_repo_url ${replica_name}-1)/.cvmfspublished" || return 6
@@ -68,12 +77,34 @@ cvmfs_run_test() {
   echo 'checking snapshot wildcard "*-?"'
   # make sure wildcard expansion does not happen in current working dir
   touch "afilewithadash-1"
-  sudo cvmfs_server snapshot "*-?" || return 13
+  cvmfs_server snapshot "*-?" || return 13
 
   echo "checking that replicas 2 & 3 worked this time"
   # the wildcard does not look at CVMFS_REPLICA_ACTIVE
   curl -f -sI "$(get_repo_url ${replica_name}-2)/.cvmfspublished" || return 14
   curl -f -sI "$(get_repo_url ${replica_name}-3)/.cvmfs_last_snapshot" || return 15
+
+  echo "corrupting third replica's download URL again"
+  sudo $SHELL -c "sed -i 's,^\(CVMFS_STRATUM0=.*\),\1Bogus,' /etc/cvmfs/repositories.d/${replica_name}-3/server.conf"
+
+  echo "remove evidence of initial repo gc"
+  ! has_jq || rm /srv/cvmfs/$CVMFS_TEST_REPO/.cvmfs_status.json || return 20
+
+  echo "running cvmfs_server gc -a"
+  cvmfs_server gc -af || return 21
+
+  if ! has_jq; then
+    return 0
+  fi
+
+  echo "checking if gc worked on test repo and replicas 1 and 4"
+  curl -f -s "$(get_repo_url $CVMFS_TEST_REPO)/.cvmfs_status.json"|grep last_gc  || return 22
+  curl -f -s "$(get_repo_url ${replica_name}-1)/.cvmfs_status.json"|grep last_gc || return 23
+  curl -f -s "$(get_repo_url ${replica_name}-4)/.cvmfs_status.json"|grep last_gc || return 24
+
+  echo "verifying gc did not work on replicas 2 and 3"
+  curl -f -s "$(get_repo_url ${replica_name}-2)/.cvmfs_status.json"|grep last_gc && return 25
+  curl -f -s "$(get_repo_url ${replica_name}-3)/.cvmfs_status.json"|grep last_gc && return 26
 
   return 0
 }

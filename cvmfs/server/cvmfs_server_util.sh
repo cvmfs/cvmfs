@@ -961,10 +961,11 @@ Supported Commands:
                   Make a new repository snapshot
   gc              [-r number of revisions to preserve]
                   [-t time stamp after which revisions are preserved]
-                  [-l (print deleted objects)] [-L log of deleted objects]
-                  [-f (force)] [-d (dry run)]
-                  <fully qualified repository name>
-                  Remove unreferenced data from garbage collectable repository
+                  [-l print deleted objects] [-L log of deleted objects]
+                  [-f force] [-d dry run]
+                  [-a collect all garbage-collectable repos, log to gc.log |
+                    <fully qualified name> ]
+                  Remove unreferenced data from garbage-collectable repository
   rmfs            [-p(reserve) repo data and keys] [-f don't ask again]
                   <fully qualified name>
                   Remove the repository

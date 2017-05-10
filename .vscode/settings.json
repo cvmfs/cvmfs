@@ -31,6 +31,7 @@
     "thread": "cpp"
   },
   "python.linting.pylintEnabled": false,
-  "python.formatting.provider": "yapf"
+  "python.formatting.provider": "yapf",
+  "git.ignoreLimitWarning": true
 }
 

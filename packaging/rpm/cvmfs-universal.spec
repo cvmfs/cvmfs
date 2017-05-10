@@ -425,6 +425,7 @@ fi
 
 %files server
 %defattr(-,root,root)
+%{_bindir}/cvmfs_receiver
 %{_bindir}/cvmfs_swissknife
 %{_bindir}/cvmfs_swissknife_debug
 %{_bindir}/cvmfs_suid_helper
@@ -452,6 +453,8 @@ fi
 %doc COPYING AUTHORS README ChangeLog
 
 %changelog
+* Tue May 09 2017 Dave Dykstra <dwd@fnal.gov> - 2.4.0
+- Add cvmfs_receiver
 * Wed Mar 22 2017 Jakob Blomer <jblomer@cern.ch> - 2.4.0
 - Update upstream package
 * Wed Mar 22 2017 Jakob Blomer <jblomer@cern.ch> - 2.3.5
