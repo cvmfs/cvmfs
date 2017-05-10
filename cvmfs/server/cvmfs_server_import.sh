@@ -202,7 +202,7 @@ cvmfs_server_import() {
     local reason
     reason="`masterkeycard_cert_available`" || die "masterkeycard not available to create whitelist: $reason"
   elif ! cvmfs_sys_file_is_regular ${keys_location}/${master_key}; then
-    masterkeycard_cert_available >/dev/null || die "Neither masterkey nor masterkeycard found to recreate whitelist"
+    masterkeycard_cert_available >/dev/null || die "Neither masterkey nor masterkeycard found for recreating whitelist"
   fi
 
   # set up desaster cleanup
@@ -339,7 +339,7 @@ cvmfs_server_import() {
 
   # reset trap and finish
   trap - EXIT HUP INT QUIT TERM
-  print_new_repository_notice $name $cvmfs_user
+  print_new_repository_notice $name $cvmfs_user 1
 
   # print warning if OverlayFS is used for repository management
   if [ x"$CVMFS_UNION_FS_TYPE" = x"overlayfs" ]; then

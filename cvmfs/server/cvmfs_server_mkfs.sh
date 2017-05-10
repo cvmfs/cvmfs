@@ -225,7 +225,9 @@ cvmfs_server_mkfs() {
   if [ $require_masterkeycard -eq 1 ]; then
     local reason
     reason="`masterkeycard_cert_available`" || die "masterkeycard not available: $reason"
-  elif ! masterkeycard_cert_available >/dev/null; then
+  elif masterkeycard_cert_available >/dev/null; then
+    require_masterkeycard=1
+  else
     keys="${name}.masterkey $keys"
   fi
   local keys_are_there=0
@@ -362,7 +364,7 @@ cvmfs_server_mkfs() {
   echo -n "Updating global JSON information... "
   update_global_repository_info && echo "done" || echo "fail"
 
-  print_new_repository_notice $name $cvmfs_user
+  print_new_repository_notice $name $cvmfs_user $require_masterkeycard
 }
 
 

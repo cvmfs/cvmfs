@@ -656,6 +656,7 @@ try_mount_remount_cycle_aufs() {
 print_new_repository_notice() {
   local name=$1
   local cvmfs_user=$2
+  local skip_backup_notice=$3
 
   echo "\
 
@@ -664,9 +665,12 @@ to enable write access on your repository. Then install your
 software in /cvmfs/$name as user $cvmfs_user.
 Once you're happy, publish using \`cvmfs_server publish\`
 
-For client configuration, have a look at 'cvmfs_server info'
+For client configuration, have a look at 'cvmfs_server info'"
+  if [ $skip_backup_notice -eq 0 ]; then
+    echo "\
 
-If you go for production, backup you software signing keys in /etc/cvmfs/keys/!"
+If you go for production, backup your masterkey from /etc/cvmfs/keys/!"
+  fi
 }
 
 
