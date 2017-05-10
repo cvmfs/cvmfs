@@ -65,6 +65,13 @@ masterkeycard_read_pubkey() {
 
 masterkeycard_store() {
   local masterkey=$1
+  # Note that these commands will fail if the management (mgm) key has been
+  #   changed, but if a user is advanced enough to know that they can always
+  #   run these commands by hand with the new mgm key for the rare case of
+  #   storing a masterkey.
+  #   Changing the management key is not required to keep a stored key from
+  #   being used by an attacker who gains physical custody; changing the PIN
+  #   and PUK can do that.
   yubico-piv-tool -s 9c -i $masterkey -a import-key
   openssl req -new -subj '/O=o/CN=cn' -x509 -days 36500 -key $masterkey | \
     yubico-piv-tool -s 9c -a import-cert
