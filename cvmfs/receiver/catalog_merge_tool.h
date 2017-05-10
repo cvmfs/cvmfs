@@ -63,9 +63,9 @@ class CatalogMergeTool : public CatalogDiffTool {
 
     ChangeType type_;
     PathString path_;
+    XattrList xattrs_;
     const catalog::DirectoryEntry* entry1_;
     const catalog::DirectoryEntry* entry2_;
-    const XattrList* xattrs_;
   };
   typedef std::vector<ChangeItem> ChangeList;
 

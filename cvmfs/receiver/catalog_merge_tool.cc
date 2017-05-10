@@ -13,6 +13,19 @@
 
 namespace {
 
+FILE* s_debug_file;
+
+PathString MakeRelative(const PathString& path) {
+  std::string rel_path;
+  std::string abs_path = path.ToString();
+  if (abs_path[0] == '/') {
+    rel_path = abs_path.substr(1);
+  } else {
+    rel_path = abs_path;
+  }
+  return PathString(rel_path);
+}
+
 struct Params {
   std::string spooler_configuration;
   shash::Algorithms hash_alg;
@@ -115,6 +128,7 @@ CatalogMergeTool::ChangeItem::ChangeItem(ChangeType type,
                                          const catalog::DirectoryEntry& entry1)
     : type_(type),
       path_(path),
+      xattrs_(),
       entry1_(new catalog::DirectoryEntry(entry1)),
       entry2_(NULL) {}
 
@@ -124,9 +138,9 @@ CatalogMergeTool::ChangeItem::ChangeItem(ChangeType type,
                                          const XattrList& xattrs)
     : type_(type),
       path_(path),
+      xattrs_(xattrs),
       entry1_(new catalog::DirectoryEntry(entry1)),
-      entry2_(NULL),
-      xattrs_(new XattrList(xattrs)) {}
+      entry2_(NULL) {}
 
 CatalogMergeTool::ChangeItem::ChangeItem(ChangeType type,
                                          const PathString& path,
@@ -134,12 +148,14 @@ CatalogMergeTool::ChangeItem::ChangeItem(ChangeType type,
                                          const catalog::DirectoryEntry& entry2)
     : type_(type),
       path_(path),
+      xattrs_(),
       entry1_(new catalog::DirectoryEntry(entry1)),
       entry2_(new catalog::DirectoryEntry(entry2)) {}
 
 CatalogMergeTool::ChangeItem::ChangeItem(const ChangeItem& other)
     : type_(other.type_),
       path_(other.path_),
+      xattrs_(other.xattrs_),
       entry1_(new catalog::DirectoryEntry(*(other.entry1_))),
       entry2_(other.entry2_ ? new catalog::DirectoryEntry(*(other.entry2_))
                             : NULL) {}
@@ -172,18 +188,21 @@ CatalogMergeTool::CatalogMergeTool(const std::string& repo_path,
 CatalogMergeTool::~CatalogMergeTool() {}
 
 bool CatalogMergeTool::Run(shash::Any* /*resulting_root_hash*/) {
+  s_debug_file = std::fopen("/home/radu/debug.log", "w");
+
   bool ret = CatalogDiffTool::Run();
 
-  FILE* debug_file = std::fopen("/home/radu/debug.log", "w");
   for (size_t i = 0; i < changes_.size(); ++i) {
     const ChangeItem& change = changes_[i];
-    fprintf(debug_file, "Change - type: %d, path: %s, entry1.name: %s",
-            change.type_, change.path_.c_str(), change.entry1_->name().c_str());
+    fprintf(s_debug_file,
+            "Change - type: %d, path: %s, xattrs: %d, entry1.name: %s",
+            change.type_, change.path_.c_str(), change.xattrs_.IsEmpty(),
+            change.entry1_->name().c_str());
     if (change.entry2_) {
-      fprintf(debug_file, ", entry2.name: %s\n",
+      fprintf(s_debug_file, ", entry2.name: %s\n",
               change.entry2_->name().c_str());
     } else {
-      fprintf(debug_file, "\n");
+      fprintf(s_debug_file, "\n");
     }
   }
 
@@ -200,52 +219,100 @@ bool CatalogMergeTool::Run(shash::Any* /*resulting_root_hash*/) {
   perf::Statistics stats;
   const std::string temp_dir = CreateTempDir(temp_dir_prefix_);
   output_catalog_mgr_ = new catalog::WritableCatalogManager(
-      base_root_hash_, repo_path_, temp_dir_prefix_, spooler, download_manager_,
+      base_root_hash_, repo_path_, temp_dir, spooler, download_manager_,
       params.entry_warn_thresh, &stats, params.use_autocatalogs,
       params.max_weight, params.min_weight);
+  output_catalog_mgr_->Init();
 
   ret &= InsertChangesIntoOutputCatalog();
 
-  std::fclose(debug_file);
+  std::fclose(s_debug_file);
   return ret;
 }
 
 void CatalogMergeTool::ReportAddition(const PathString& path,
                                       const catalog::DirectoryEntry& entry,
                                       const XattrList& xattrs) {
-  changes_.push_back(ChangeItem(ChangeItem::kAddition, path, entry, xattrs));
+  changes_.push_back(
+      ChangeItem(ChangeItem::kAddition, MakeRelative(path), entry, xattrs));
 }
 
 void CatalogMergeTool::ReportRemoval(const PathString& path,
                                      const catalog::DirectoryEntry& entry) {
-  changes_.push_back(ChangeItem(ChangeItem::kRemoval, path, entry));
+  changes_.push_back(
+      ChangeItem(ChangeItem::kRemoval, MakeRelative(path), entry));
 }
 
 void CatalogMergeTool::ReportModification(
     const PathString& path, const catalog::DirectoryEntry& entry1,
     const catalog::DirectoryEntry& entry2) {
-  changes_.push_back(
-      ChangeItem(ChangeItem::kModification, path, entry1, entry2));
+  changes_.push_back(ChangeItem(ChangeItem::kModification, MakeRelative(path),
+                                entry1, entry2));
 }
 
 bool CatalogMergeTool::InsertChangesIntoOutputCatalog() {
   for (size_t i = 0; i < changes_.size(); ++i) {
     ChangeItem change = changes_[i];
+    std::string parent_path = GetParentPath(change.path_).c_str();
     switch (change.type_) {
       case ChangeItem::kAddition:
+
         if (change.entry1_->IsDirectory()) {
-          output_catalog_mgr_->AddDirectory(*change.entry1_, "");
+          output_catalog_mgr_->AddDirectory(*change.entry1_, parent_path);
         } else if (change.entry1_->IsRegular() || change.entry1_->IsLink()) {
           const catalog::DirectoryEntryBase* base_entry =
               static_cast<const catalog::DirectoryEntryBase*>(change.entry1_);
-          output_catalog_mgr_->AddFile(*base_entry, *change.xattrs_, "");
+          output_catalog_mgr_->AddFile(*base_entry, change.xattrs_,
+                                       parent_path);
         }
         break;
+
       case ChangeItem::kRemoval:
+
+        if (change.entry1_->IsDirectory()) {
+          output_catalog_mgr_->RemoveDirectory(change.path_.c_str());
+        } else if (change.entry1_->IsRegular() || change.entry1_->IsLink()) {
+          output_catalog_mgr_->RemoveFile(change.path_.c_str());
+        }
         break;
+
       case ChangeItem::kModification:
+
+        if (change.entry1_->IsDirectory() && change.entry2_->IsDirectory()) {
+          // From directory to directory
+          const catalog::DirectoryEntryBase* base_entry =
+              static_cast<const catalog::DirectoryEntryBase*>(change.entry2_);
+          output_catalog_mgr_->TouchDirectory(*base_entry,
+                                              change.path_.c_str());
+
+        } else if ((change.entry1_->IsRegular() || change.entry1_->IsLink()) &&
+                   change.entry2_->IsDirectory()) {
+          // From file to directory
+          output_catalog_mgr_->RemoveFile(change.path_.c_str());
+          output_catalog_mgr_->AddDirectory(*change.entry2_, parent_path);
+
+        } else if (change.entry1_->IsDirectory() &&
+                   (change.entry2_->IsRegular() || change.entry2_->IsLink())) {
+          // From directory to file
+          const catalog::DirectoryEntryBase* base_entry =
+              static_cast<const catalog::DirectoryEntryBase*>(change.entry2_);
+          output_catalog_mgr_->RemoveDirectory(change.path_.c_str());
+          output_catalog_mgr_->AddFile(*base_entry, change.xattrs_,
+                                       parent_path);
+
+        } else if ((change.entry1_->IsRegular() || change.entry1_->IsLink()) &&
+                   (change.entry2_->IsRegular() || change.entry2_->IsLink())) {
+          // From file to file
+          const catalog::DirectoryEntryBase* base_entry =
+              static_cast<const catalog::DirectoryEntryBase*>(change.entry2_);
+          output_catalog_mgr_->RemoveFile(change.path_.c_str());
+          output_catalog_mgr_->AddFile(*base_entry, change.xattrs_,
+                                       parent_path);
+        }
         break;
+
       default:
+
         LogCvmfs(kLogCvmfs, kLogStderr,
                  "What should not be representable presented itself. Exiting.");
         break;
