@@ -637,6 +637,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     return 3;
   }
 
+  const std::string old_root_hash = manifest->catalog_hash().ToString(true);
+
   catalog::WritableCatalogManager catalog_manager(
       params.base_hash, params.stratum0, params.dir_temp, spooler_catalogs,
       download_manager(), params.catalog_entry_warn_threshold, statistics(),
@@ -724,14 +726,6 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 
   // Get the path of the new root catalog
   const std::string new_root_hash = manifest->catalog_hash().ToString(true);
-
-  // Get the path of the existing root catalog
-  const std::string manifest_path =
-      std::string("/srv/cvmfs/") + params.repo_name + "/.cvmfspublished";
-  UniquePtr<manifest::Manifest> existing_manifest(
-      manifest::Manifest::LoadFile(manifest_path));
-  const std::string old_root_hash =
-      existing_manifest->catalog_hash().ToString(true);
 
   spooler_catalogs->FinalizeSession(true, old_root_hash, new_root_hash);
   delete params.spooler;
