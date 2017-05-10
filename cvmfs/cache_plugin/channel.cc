@@ -114,7 +114,7 @@ void CachePlugin::HandleIoctl(cvmfs::MsgIoctl *msg_req) {
   if (!msg_req->has_conncnt_change_by())
     return;
   int32_t conncnt_change_by = msg_req->conncnt_change_by();
-  if ((num_inlimbo_clients_ + conncnt_change_by) < 0) {
+  if ((static_cast<int32_t>(num_inlimbo_clients_) + conncnt_change_by) < 0) {
     LogSessionError(msg_req->session_id(), cvmfs::STATUS_MALFORMED,
                     "invalid request to drop connection counter below zero");
     return;
