@@ -194,6 +194,11 @@ cvmfs_server_masterkeycard() {
       fi
 
       masterkeycard_delete
+      echo
+      echo "IMPORTANT NOTE: this did not delete the masterkey, only the certificate,"
+      echo "  so the card should still be kept physically secure.  The masterkey can"
+      echo "  still be made usable by storing a certificate made from the corresponding"
+      echo "  pub key. To destroy the masterkey, save an unimportant key in its place."
     ;;
     r)
       # read the pub key from the card to stdout
