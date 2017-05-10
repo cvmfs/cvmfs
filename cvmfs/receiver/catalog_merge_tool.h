@@ -20,6 +20,10 @@ namespace download {
 class DownloadManager;
 }
 
+namespace manifest {
+class Manifest;
+}
+
 namespace shash {
 class Any;
 }
@@ -31,12 +35,12 @@ class CatalogMergeTool : public CatalogDiffTool {
   CatalogMergeTool(const std::string& repo_path,
                    const std::string& old_root_hash,
                    const std::string& new_root_hash,
-                   const std::string& base_root_hash,
                    const std::string& temp_dir_prefix,
-                   download::DownloadManager* download_manager);
+                   download::DownloadManager* download_manager,
+                   manifest::Manifest* manifest);
   virtual ~CatalogMergeTool();
 
-  bool Run(shash::Any* resulting_root_hash);
+  bool Run(std::string* new_manifest_path);
 
  protected:
   virtual void ReportAddition(const PathString& path,
@@ -70,13 +74,14 @@ class CatalogMergeTool : public CatalogDiffTool {
   typedef std::vector<ChangeItem> ChangeList;
 
   bool InsertChangesIntoOutputCatalog();
+  bool CreateNewManifest(std::string* new_manifest_path);
 
   std::string repo_path_;
   std::string temp_dir_prefix_;
 
-  shash::Any base_root_hash_;
-
   download::DownloadManager* download_manager_;
+
+  manifest::Manifest* manifest_;
 
   UniquePtr<catalog::WritableCatalogManager> output_catalog_mgr_;
 

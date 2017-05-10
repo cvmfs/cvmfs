@@ -7,13 +7,12 @@
 #include "catalog.h"
 #include "hash.h"
 #include "logging.h"
+#include "manifest.h"
 #include "options.h"
 #include "upload.h"
 #include "util/posix.h"
 
 namespace {
-
-FILE* s_debug_file;
 
 PathString MakeRelative(const PathString& path) {
   std::string rel_path;
@@ -174,37 +173,20 @@ CatalogMergeTool::ChangeItem::~ChangeItem() {
 CatalogMergeTool::CatalogMergeTool(const std::string& repo_path,
                                    const std::string& old_root_hash,
                                    const std::string& new_root_hash,
-                                   const std::string& base_root_hash,
                                    const std::string& temp_dir_prefix,
-                                   download::DownloadManager* download_manager)
+                                   download::DownloadManager* download_manager,
+                                   manifest::Manifest* manifest)
     : CatalogDiffTool(repo_path, old_root_hash, new_root_hash, temp_dir_prefix,
                       download_manager),
       repo_path_(repo_path),
       temp_dir_prefix_(temp_dir_prefix),
-      base_root_hash_(
-          shash::MkFromSuffixedHexPtr(shash::HexPtr(base_root_hash))),
-      download_manager_(download_manager) {}
+      download_manager_(download_manager),
+      manifest_(manifest) {}
 
 CatalogMergeTool::~CatalogMergeTool() {}
 
-bool CatalogMergeTool::Run(shash::Any* /*resulting_root_hash*/) {
-  s_debug_file = std::fopen("/home/radu/debug.log", "w");
-
+bool CatalogMergeTool::Run(std::string* new_manifest_path) {
   bool ret = CatalogDiffTool::Run();
-
-  for (size_t i = 0; i < changes_.size(); ++i) {
-    const ChangeItem& change = changes_[i];
-    fprintf(s_debug_file,
-            "Change - type: %d, path: %s, xattrs: %d, entry1.name: %s",
-            change.type_, change.path_.c_str(), change.xattrs_.IsEmpty(),
-            change.entry1_->name().c_str());
-    if (change.entry2_) {
-      fprintf(s_debug_file, ", entry2.name: %s\n",
-              change.entry2_->name().c_str());
-    } else {
-      fprintf(s_debug_file, "\n");
-    }
-  }
 
   Params params;
   if (!GetParamsFromFile(repo_path_, &params)) {
@@ -219,14 +201,15 @@ bool CatalogMergeTool::Run(shash::Any* /*resulting_root_hash*/) {
   perf::Statistics stats;
   const std::string temp_dir = CreateTempDir(temp_dir_prefix_);
   output_catalog_mgr_ = new catalog::WritableCatalogManager(
-      base_root_hash_, repo_path_, temp_dir, spooler, download_manager_,
-      params.entry_warn_thresh, &stats, params.use_autocatalogs,
-      params.max_weight, params.min_weight);
+      manifest_->catalog_hash(), repo_path_, temp_dir, spooler,
+      download_manager_, params.entry_warn_thresh, &stats,
+      params.use_autocatalogs, params.max_weight, params.min_weight);
   output_catalog_mgr_->Init();
 
   ret &= InsertChangesIntoOutputCatalog();
 
-  std::fclose(s_debug_file);
+  ret &= CreateNewManifest(new_manifest_path);
+
   return ret;
 }
 
@@ -322,4 +305,25 @@ bool CatalogMergeTool::InsertChangesIntoOutputCatalog() {
 
   return true;
 }
+
+bool CatalogMergeTool::CreateNewManifest(std::string* new_manifest_path) {
+  if (!output_catalog_mgr_->Commit(false, 0, manifest_)) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "CatalogMergeTool - Could not commit output catalog");
+    return false;
+  }
+
+  const std::string temp_dir = CreateTempDir(temp_dir_prefix_);
+  const std::string new_path = temp_dir + "/new_manifest";
+
+  if (!manifest_->Export(new_path)) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "CatalogMergeTool - Could not export new manifest");
+  }
+
+  *new_manifest_path = new_path;
+
+  return true;
+}
+
 }  // namespace receiver

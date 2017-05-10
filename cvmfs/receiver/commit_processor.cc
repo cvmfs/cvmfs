@@ -70,12 +70,12 @@ CommitProcessor::Result CommitProcessor::Process(
   }
 
   CatalogMergeTool merge_tool(stratum0, old_root_hash_str, new_root_hash_str,
-                              manifest->catalog_hash().ToString(true),
                               "/tmp/cvmfs_receiver_merge",
-                              server_tool_.download_manager());
+                              server_tool_.download_manager(),
+                              manifest.weak_ref());
 
-  shash::Any resulting_root_hash;
-  if (!merge_tool.Run(&resulting_root_hash)) {
+  std::string new_manifest_path;
+  if (!merge_tool.Run(&new_manifest_path)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Catalog merge failed");
     return kMergeError;
   }
