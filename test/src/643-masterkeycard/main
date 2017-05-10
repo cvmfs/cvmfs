@@ -1,0 +1,90 @@
+cvmfs_test_name="masterkeycard"
+cvmfs_test_autofs_on_startup=false
+
+cleanup() {
+  # leave the card empty so it won't affect other tests
+  if cvmfs_server masterkeycard -k; then
+    echo "deleting certificate from masterkeycard"
+    sudo cvmfs_server masterkeycard -df
+  fi
+
+  echo "removing $CVMFS_TEST_REPO_MORE"
+  destroy_repo $CVMFS_TEST_REPO_MORE
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  echo "checking if Yubikey available"
+  if ! lsusb|grep -q Yubikey; then
+    echo "WARNING: no USB Yubikey available, skipping tests"
+    CVMFS_GENERAL_WARNING_FLAG=1
+    return 0
+  fi
+
+  echo "check if the device & system pass all masterkeycard available tests"
+  cvmfs_server masterkeycard -a || return 10
+
+  echo "create two fresh repositories with user $CVMFS_TEST_USER"
+  create_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER       || return $?
+  TEST_643_EXTRA_REPO=$CVMFS_TEST_REPO_MORE
+  create_repo $CVMFS_TEST_REPO_MORE $CVMFS_TEST_USER  || return $?
+
+  echo "install a cleanup function"
+  trap cleanup EXIT HUP INT TERM || return $?
+
+  # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  echo "storing the masterkey of repo $CVMFS_TEST_REPO"
+  sudo cvmfs_server masterkeycard -fs $CVMFS_TEST_REPO || return 11
+
+  echo "checking that a key is available"
+  cvmfs_server masterkeycard -k                        || return 12
+
+  echo "checking that the pub key can be read back and matches"
+  cvmfs_server masterkeycard -r | cmp - /etc/cvmfs/keys/$CVMFS_TEST_REPO.pub || return 13
+
+  echo "converting both repos to use the masterkeycard"
+  sudo cvmfs_server masterkeycard -fc $CVMFS_TEST_REPO $CVMFS_TEST_REPO_MORE || return 20
+
+  echo "making sure both repos have no masterkey file and the same pub key"
+  [ ! -f /etc/cvmfs/keys/$CVMFS_TEST_REPO.masterkey ]      || return 21
+  [ ! -f /etc/cvmfs/keys/$CVMFS_TEST_REPO_MORE.masterkey ] || return 22
+  cmp /etc/cvmfs/keys/$CVMFS_TEST_REPO.pub /etc/cvmfs/keys/$CVMFS_TEST_REPO_MORE.pub || return 23
+
+  echo "recreating repo with -R to make sure still using masterkeycard"
+  destroy_repo $CVMFS_TEST_REPO_MORE                       || return 30
+  create_repo $CVMFS_TEST_REPO_MORE $CVMFS_TEST_USER "" -R || return 31
+  [ ! -f /etc/cvmfs/keys/$CVMFS_TEST_REPO_MORE.masterkey ] || return 32
+  cmp /etc/cvmfs/keys/$CVMFS_TEST_REPO.pub /etc/cvmfs/keys/$CVMFS_TEST_REPO_MORE.pub || return 33
+
+  echo "and again without -R"
+  destroy_repo $CVMFS_TEST_REPO_MORE                       || return 40
+  create_repo $CVMFS_TEST_REPO_MORE $CVMFS_TEST_USER       || return 41
+  [ ! -f /etc/cvmfs/keys/$CVMFS_TEST_REPO_MORE.masterkey ] || return 42
+  cmp /etc/cvmfs/keys/$CVMFS_TEST_REPO.pub /etc/cvmfs/keys/$CVMFS_TEST_REPO_MORE.pub || return 43
+
+  echo "removing and importing repo with -R"
+  destroy_repo $CVMFS_TEST_REPO_MORE -p                    || return 50
+  import_repo $CVMFS_TEST_REPO_MORE $CVMFS_TEST_USER "" -R || return 51
+  [ ! -f /etc/cvmfs/keys/$CVMFS_TEST_REPO_MORE.masterkey ] || return 52
+  cmp /etc/cvmfs/keys/$CVMFS_TEST_REPO.pub /etc/cvmfs/keys/$CVMFS_TEST_REPO_MORE.pub || return 53
+
+  echo "and again without -R"
+  destroy_repo $CVMFS_TEST_REPO_MORE -p                    || return 60
+  import_repo $CVMFS_TEST_REPO_MORE $CVMFS_TEST_USER       || return 61
+  [ ! -f /etc/cvmfs/keys/$CVMFS_TEST_REPO_MORE.masterkey ] || return 62
+  cmp /etc/cvmfs/keys/$CVMFS_TEST_REPO.pub /etc/cvmfs/keys/$CVMFS_TEST_REPO_MORE.pub || return 63
+
+  echo "check that resign uses masterkeycard for both repos"
+  local lines
+  lines="`sudo cvmfs_server resign $CVMFS_TEST_REPO $CVMFS_TEST_REPO_MORE`" || return 70
+  echo "$lines"
+  [ `echo "$lines"|wc -l` -eq 2 ]                          || return 71
+
+  echo "remove the cert and verify that -k thinks it is gone"
+  sudo cvmfs_server masterkeycard -df                      || return 80
+  cvmfs_server masterkeycard -k                            && return 81
+
+  return 0
+}
