@@ -153,21 +153,9 @@ cvmfs_server_masterkeycard() {
       echo masterkeycard key is available
     ;;
     s)
-      # store the masterkey from the given repository into the card
-
-      # sanity checks
-      check_repository_existence "$name" || die "Repository $name does not exist"
-      is_stratum0 $name || die "Repository $name is not a stratum 0 repository"
-      health_check $name  || die "Repository $name is not healthy"
-
-      reason="`masterkeycard_available`" || die "$reason"
-
-      # get repository information
-      load_repo_config $name
-
-      # check if repository is compatible to the installed CernVM-FS version
-      check_repository_compatibility $name
-
+      # Store the masterkey from the given repository into the card.
+      # Does not need to be a fully created repo, the masterkey just has
+      #  to exist.
       masterkey="/etc/cvmfs/keys/${name}.masterkey"
 
       cvmfs_sys_file_is_regular $masterkey || die "$masterkey not found"
