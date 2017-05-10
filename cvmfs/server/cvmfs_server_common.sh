@@ -428,6 +428,18 @@ is_owner_or_root() {
 }
 
 
+# checks if a repository is a replica flagged as being inactive
+#
+# @param name  the name of the repository to be checked
+# @return      0 if it is an inactive replica
+is_inactive_replica() {
+  local name=$1
+  unset CVMFS_REPLICA_ACTIVE # remove previous setting, default is yes
+  load_repo_config $name
+  is_stratum1 $name && [ x"$CVMFS_REPLICA_ACTIVE" = x"no" ]
+}
+
+
 # checks if a repository is flagged as being garbage collectable
 # (this is a safe guard to avoid mistakenly deleting data in production repos)
 #
