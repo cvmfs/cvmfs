@@ -18,12 +18,13 @@ cvmfs_server_gc() {
   local preserve_timestamp=0
   local timestamp_threshold=""
   local force=0
+  local all_collectable=0
   local deletion_log=""
   local reconstruct_reflog="0"
 
   # optional parameter handling
   OPTIND=1
-  while getopts "ldr:t:fL:" option
+  while getopts "ldr:t:faL:" option
   do
     case $option in
       l)
@@ -41,6 +42,9 @@ cvmfs_server_gc() {
       f)
         force=1
       ;;
+      a)
+        all_collectable=1
+      ;;
       L)
         deletion_log="$OPTARG"
       ;;
@@ -53,9 +57,27 @@ cvmfs_server_gc() {
   shift $(($OPTIND-1))
 
   # get repository names
+  if [ $all_collectable -ne 0 ] && [ -z "$@" ]; then
+    set -- '*'
+  fi
   check_parameter_count_for_multiple_repositories $#
   names=$(get_or_guess_multiple_repository_names "$@")
   check_multiple_repository_existence "$names"
+
+  if [ $all_collectable -ne 0 ]; then
+    # reduce the names to those that are collectable
+    local collectable_names
+    for name in $names; do
+      if ! is_inactive_replica $name && is_garbage_collectable $name; then
+        collectable_names="$collectable_names $name"
+      fi
+    done
+    # the echo gets rid of the leading blank
+    names="`echo $collectable_names`"
+    if [ -z "$names" ]; then
+      die "There are no active garbage-collectable repositories"
+    fi
+  fi
 
   # parse timestamp (if given)
   if [ ! -z "$timestamp_threshold"  ]; then
@@ -84,23 +106,25 @@ cvmfs_server_gc() {
     echo "YOU ARE ABOUT TO DELETE DATA! Are you sure you want to do the following:"
   fi
 
-  local dry_run_msg="no"
-  if [ $dry_run -eq 1 ]; then dry_run_msg="yes"; fi
+  if [ $force -eq 0 ] || [ $all_collectable -eq 0 ]; then
+    local dry_run_msg="no"
+    if [ $dry_run -eq 1 ]; then dry_run_msg="yes"; fi
 
-  local reflog_reconstruct_msg="no"
-  if [ $reconstruct_reflog -eq 1 ]; then reflog_reconstruct_msg="yes"; fi
+    local reflog_reconstruct_msg="no"
+    if [ $reconstruct_reflog -eq 1 ]; then reflog_reconstruct_msg="yes"; fi
 
-  echo "Affected Repositories:         $names"
-  echo "Dry Run (no actual deletion):  $dry_run_msg"
-  echo "Needs Reflog reconstruction:   $reflog_reconstruct_msg"
-  if [ $preserve_revisions -ge 0 ]; then
-    echo "Preserved Legacy Revisions:    $preserve_revisions"
-  fi
-  if [ $preserve_timestamp -gt 0 ]; then
-    echo "Preserve Revisions newer than: $(date -d@$preserve_timestamp +'%x %X')"
-  fi
-  if [ $preserve_revisions -le 0 ] && [ $preserve_timestamp -le 0 ]; then
-    echo "Only the latest revision will be preserved."
+    echo "Affected Repositories:         $names"
+    echo "Dry Run (no actual deletion):  $dry_run_msg"
+    echo "Needs Reflog reconstruction:   $reflog_reconstruct_msg"
+    if [ $preserve_revisions -ge 0 ]; then
+      echo "Preserved Legacy Revisions:    $preserve_revisions"
+    fi
+    if [ $preserve_timestamp -gt 0 ]; then
+      echo "Preserve Revisions newer than: $(date -d@$preserve_timestamp +'%x %X')"
+    fi
+    if [ $preserve_revisions -le 0 ] && [ $preserve_timestamp -le 0 ]; then
+      echo "Only the latest revision will be preserved."
+    fi
   fi
 
   if [ $force -eq 0 ]; then
@@ -112,6 +136,56 @@ cvmfs_server_gc() {
   fi
 
   for name in $names; do
+
+    if [ $all_collectable -eq 0 ]; then
+      __do_gc_cmd "$name"                       \
+                  "$dry_run"                    \
+                  "$list_deleted_objects"       \
+                  "$preserve_revisions"         \
+                  "$preserve_timestamps"        \
+                  "$deletion_log"
+    else
+      local log=/var/log/cvmfs/gc.log
+
+      (
+      echo
+      echo "Starting $name at `date`"
+      # Work around the errexit (that is, set -e) misfeature of being
+      #  disabled whenever the exit code is to be checked.
+      # See https://lists.gnu.org/archive/html/bug-bash/2012-12/msg00093.html
+      set +e
+      (set -e
+      __do_gc_cmd "$name"                       \
+                  "$dry_run"                    \
+                  "$list_deleted_objects"       \
+                  "$preserve_revisions"         \
+                  "$preserve_timestamps"        \
+                  "$deletion_log"
+      )
+      if [ $? != 0 ]; then
+        echo "ERROR from cvmfs_server gc!" >&2
+      fi
+      echo "Finished $name at `date`"
+      ) >> $log 2>&1
+
+      # Always return success because this is used from cron and we
+      #  don't want cron sending an email every time something fails.
+      # Errors will be in the log.
+    fi
+  done
+}
+
+# this is used when gc is invoked from the cvmfs_server command line
+__do_gc_cmd()
+{
+  local name="$1"
+  local dry_run="$2"
+  local list_deleted_objects="$3"
+  local preserve_revisions="$4"
+  local preserve_timestamps="$5"
+  local deletion_log="$6"
+
+  # leave extra layer of indent for now to better show diff with previous
 
     load_repo_config $name
 
@@ -152,8 +226,6 @@ cvmfs_server_gc() {
       fi
     fi
 
-    to_syslog_for_repo $name "started manual garbage collection"
-
     local reconstruct_this_reflog=0
     if ! has_reference_log $name; then
       reconstruct_this_reflog=1
@@ -182,12 +254,10 @@ cvmfs_server_gc() {
         release_update_lock $name
       fi
     fi
-
-    to_syslog_for_repo $name "successfully finished manual garbage collection"
-
-  done
 }
 
+# this is used for both auto-gc (after publish or snapshot) and non-auto-gc
+#   (when invoked from the cvmfs_server command line)
 __run_gc() {
   local name="$1"
   local repository_url="$2"
