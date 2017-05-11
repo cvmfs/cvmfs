@@ -12,10 +12,12 @@
 #include "logging.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
+#include "params.h"
 #include "signing_tool.h"
 #include "statistics.h"
 #include "util/algorithm.h"
 #include "util/pointer.h"
+#include "util/posix.h"
 #include "util/string.h"
 
 namespace receiver {
@@ -49,19 +51,21 @@ CommitProcessor::Result CommitProcessor::Process(
   const std::string repo_name = lease_path_tokens.front();
   const std::string stratum0 = "file:///srv/cvmfs/" + repo_name;
 
-  if (!server_tool_.InitDownloadManager(true)) {
+  UniquePtr<ServerTool> server_tool(new ServerTool());
+
+  if (!server_tool->InitDownloadManager(true)) {
     return kIoError;
   }
 
   const std::string public_key = "/etc/cvmfs/keys/" + repo_name + ".pub";
   const std::string trusted_certs =
       "/etc/cvmfs/repositories.d/" + repo_name + "/trusted_certs";
-  if (!server_tool_.InitVerifyingSignatureManager(public_key, trusted_certs)) {
+  if (!server_tool->InitVerifyingSignatureManager(public_key, trusted_certs)) {
     return kIoError;
   }
 
   shash::Any manifest_base_hash;
-  UniquePtr<manifest::Manifest> manifest(server_tool_.FetchRemoteManifest(
+  UniquePtr<manifest::Manifest> manifest(server_tool->FetchRemoteManifest(
       stratum0, repo_name, manifest_base_hash));
 
   // Current catalog from the gateway machine
@@ -70,18 +74,39 @@ CommitProcessor::Result CommitProcessor::Process(
     return kIoError;
   }
 
+  const std::string temp_dir_prefix = "/tmp/cvmfs_receiver_merge";
+
   CatalogMergeTool merge_tool(stratum0, old_root_hash_str, new_root_hash_str,
-                              "/tmp/cvmfs_receiver_merge",
-                              server_tool_.download_manager(),
+                              temp_dir_prefix, server_tool->download_manager(),
                               manifest.weak_ref());
 
+  Params params;
+  if (!GetParamsFromFile(repo_name, &params)) {
+    return kIoError;
+  }
+
   std::string new_manifest_path;
-  if (!merge_tool.Run(&new_manifest_path)) {
+  if (!merge_tool.Run(params, &new_manifest_path)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Catalog merge failed");
     return kMergeError;
   }
 
-  SigningTool signing_tool(&server_tool_);
+  const std::string temp_dir = CreateTempDir(temp_dir_prefix);
+  const std::string certificate = "/etc/cvmfs/keys/" + repo_name + ".crt";
+  const std::string private_key = "/etc/cvmfs/keys/" + repo_name + ".key";
+
+  // We need to re-initialize the ServerTool component for signing
+  server_tool.Destroy();
+  server_tool = new ServerTool();
+
+  SigningTool signing_tool(server_tool.weak_ref());
+  if (!signing_tool.Run(new_manifest_path, stratum0,
+                        params.spooler_configuration, temp_dir, certificate,
+                        private_key, repo_name, "", "",
+                        "/var/spool/cvmfs/" + repo_name + "/reflog.chksum")) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Error signing manifest");
+    return kIoError;
+  }
 
   return kSuccess;
 }

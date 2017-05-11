@@ -139,7 +139,9 @@ void CatalogMergeTool::ReportModification(
 bool CatalogMergeTool::InsertChangesIntoOutputCatalog() {
   for (size_t i = 0; i < changes_.size(); ++i) {
     ChangeItem change = changes_[i];
-    std::string parent_path = GetParentPath(change.path_).c_str();
+    const std::string parent_path = std::strchr(change.path_.c_str(), '/')
+                                        ? GetParentPath(change.path_).c_str()
+                                        : "";
     switch (change.type_) {
       case ChangeItem::kAddition:
 
