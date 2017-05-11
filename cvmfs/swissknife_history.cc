@@ -484,7 +484,7 @@ int CommandEditTag::AddNewTag(const ArgumentList &args, Environment *env) {
   const std::string tag_name =
       (args.find('a') != args.end()) ? *args.find('a')->second : "";
   const std::string tag_description =
-      (args.find('d') != args.end()) ? *args.find('d')->second : "";
+      (args.find('D') != args.end()) ? *args.find('D')->second : "";
   const TagChannel tag_channel =
       (args.find('c') != args.end())
           ? static_cast<TagChannel>(String2Uint64(*args.find('c')->second))

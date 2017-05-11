@@ -75,6 +75,7 @@ install_from_repo openssl-devel  || die "fail (installing openssl-devel)"
 # install `cvmfs_preload` build dependencies
 install_from_repo cmake          || die "fail (installing cmake)"
 install_from_repo libattr-devel  || die "fail (installing libattr-devel)"
+install_from_repo python-devel   || die "fail (installing python-devel)"
 
 # install test dependency for 600
 install_from_repo gridsite || die "fail (installing gridsite)"
