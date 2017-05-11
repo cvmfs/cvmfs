@@ -12,6 +12,7 @@
 #include "logging.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
+#include "signing_tool.h"
 #include "statistics.h"
 #include "util/algorithm.h"
 #include "util/pointer.h"
@@ -79,6 +80,8 @@ CommitProcessor::Result CommitProcessor::Process(
     LogCvmfs(kLogCvmfs, kLogStderr, "Catalog merge failed");
     return kMergeError;
   }
+
+  SigningTool signing_tool(&server_tool_);
 
   return kSuccess;
 }

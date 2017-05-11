@@ -7,6 +7,7 @@
 
 #include "download.h"
 #include "manifest_fetch.h"
+#include "reflog.h"
 #include "signature.h"
 #include "statistics.h"
 #include "util/pointer.h"
@@ -14,7 +15,7 @@
 class ServerTool {
  public:
   ServerTool();
-  ~ServerTool();
+  virtual ~ServerTool();
 
   bool InitDownloadManager(const bool follow_redirects,
                            const unsigned max_pool_handles = 1,
@@ -33,6 +34,11 @@ class ServerTool {
       const std::string &repository_url, const std::string &repository_name,
       const shash::Any &base_hash = shash::Any()) const;
 
+  template <class ObjectFetcherT>
+  manifest::Reflog *FetchReflog(ObjectFetcherT *object_fetcher,
+                                const std::string &repo_name,
+                                const shash::Any &reflog_hash);
+
   download::DownloadManager *download_manager() const;
   signature::SignatureManager *signature_manager() const;
   perf::Statistics *statistics() { return &statistics_; }
@@ -44,5 +50,7 @@ class ServerTool {
   UniquePtr<signature::SignatureManager> signature_manager_;
   perf::Statistics statistics_;
 };
+
+#include "server_tool_impl.h"
 
 #endif  // CVMFS_SERVER_TOOL_H_

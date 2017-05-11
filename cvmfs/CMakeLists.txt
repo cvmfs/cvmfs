@@ -369,11 +369,14 @@ if(BUILD_RECEIVER)
     manifest_fetch.cc
     options.cc
     pack.cc
+    reflog.cc
+    reflog_sql.cc
     s3fanout.cc
     sanitizer.cc
     server_tool.cc
     session_context.cc
     signature.cc
+    signing_tool.cc
     statistics.cc
     swissknife_lease_curl.cc
     sql.cc
