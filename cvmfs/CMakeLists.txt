@@ -336,6 +336,7 @@ if(BUILD_RECEIVER)
   set (CVMFS_RECEIVER_SOURCES
     receiver/catalog_merge_tool.cc
     receiver/commit_processor.cc
+    receiver/params.cc
     receiver/payload_processor.cc
     receiver/reactor.cc
     receiver/receiver.cc

@@ -10,6 +10,7 @@
 
 #include "catalog_diff_tool.h"
 #include "catalog_mgr_rw.h"
+#include "params.h"
 #include "util/pointer.h"
 
 namespace catalog {
@@ -40,7 +41,7 @@ class CatalogMergeTool : public CatalogDiffTool {
                    manifest::Manifest* manifest);
   virtual ~CatalogMergeTool();
 
-  bool Run(std::string* new_manifest_path);
+  bool Run(const Params& params, std::string* new_manifest_path);
 
  protected:
   virtual void ReportAddition(const PathString& path,
