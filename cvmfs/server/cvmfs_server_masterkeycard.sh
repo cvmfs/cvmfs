@@ -169,11 +169,14 @@ cvmfs_server_masterkeycard() {
       fi
 
       masterkeycard_store $masterkey
-      echo
-      echo "Now back up $masterkey"
-      echo "to flash drives stored in safe places and use"
-      echo "  cvmfs_server masterkeycard -c $name"
-      echo "to remove the masterkey and convert to use the key in the card."
+
+      if check_repository_existence "$name"; then
+        echo
+        echo "Now back up $masterkey"
+        echo "to flash drives stored in safe places and use"
+        echo "  cvmfs_server masterkeycard -c $name"
+        echo "to remove the masterkey and convert to use the key in the card."
+      fi
     ;;
     d)
       # delete a certificate from the card
