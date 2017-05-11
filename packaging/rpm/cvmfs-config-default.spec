@@ -13,9 +13,8 @@ Source7: egi.eu.conf
 Source8: opensciencegrid.org.conf
 Source9: 50-cern.conf
 Source10: 60-egi.conf
-Source11: atlas-nightlies.cern.ch.conf
-Source12: cms.cern.ch.conf
-Source13: grid.cern.ch.conf
+Source11: cms.cern.ch.conf
+Source12: grid.cern.ch.conf
 BuildArch: noarch
 Group: Applications/System
 License: BSD
@@ -56,7 +55,7 @@ done
 for defaultconf in %{SOURCE9} %{SOURCE10}; do
     install -D -m 444 "${defaultconf}" $RPM_BUILD_ROOT%{_sysconfdir}/cvmfs/default.d
 done
-for conf in %{SOURCE11} %{SOURCE12} %{SOURCE13}; do
+for conf in %{SOURCE11} %{SOURCE12}; do
     install -D -m 444 "${conf}" $RPM_BUILD_ROOT%{_sysconfdir}/cvmfs/config.d
 done
 
@@ -75,8 +74,8 @@ done
 %config %{_sysconfdir}/cvmfs/config.d/*
 
 %changelog
-* Wed Apr 19 2017 Jakob Blomer <jblomer@cern.ch> - 1.4-1
-- Adjust atlas-nightlies.cern.ch Stratum 1
+* Thu May 11 2017 Jakob Blomer <jblomer@cern.ch> - 1.4-1
+- Remove dedicated atlas-nightlies.cern.ch Stratum 1
 
 * Wed Jan 18 2017 Jakob Blomer <jblomer@cern.ch> - 1.3-1
 - Update cern.ch master keys
