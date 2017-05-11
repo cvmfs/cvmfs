@@ -137,6 +137,9 @@ cvmfs_server_masterkeycard() {
     is_root || die "Only root may convert repositories to use the masterkeycard"
     check_parameter_count_for_multiple_repositories $#
     names=$(get_or_guess_multiple_repository_names "$@")
+  elif [ $action = d ]; then
+    is_root || die "Only root may delete from the masterkeycard"
+    check_parameter_count 0 $#
   else
     check_parameter_count 0 $#
   fi
