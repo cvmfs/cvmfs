@@ -173,76 +173,76 @@ cvmfs_run_test() {
   local trunk_tag="trunk"
   local prev_trunk_tag="trunk-previous"
 
-  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  echo "*** {0} create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
   # ============================================================================
 
-  echo "starting transaction to edit repository"
+  echo "*** {1} starting transaction to edit repository"
   start_transaction $CVMFS_TEST_REPO || return $?
 
-  echo "putting some stuff in the new repository"
+  echo "*** {1} putting some stuff in the new repository"
   produce_files_in $repo_dir || return 3
 
-  echo "putting exactly the same stuff in the scratch spaces for comparison"
+  echo "*** {1} putting exactly the same stuff in the scratch spaces for comparison"
   produce_files_in $reference_dir1 || return 4
   produce_files_in $reference_dir2 || return 4
   produce_files_in $reference_dir3 || return 4
   produce_files_in $reference_dir4 || return 4
   produce_files_in $reference_dir5 || return 4
 
-  echo "creating CVMFS snapshot"
+  echo "*** {1} creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO -a $first_tag -m "$first_tag_desc" || return $?
 
-  echo "compare the results of cvmfs to our reference copy"
+  echo "*** {1} compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir1 $CVMFS_TEST_REPO || return $?
 
   # ============================================================================
 
-  echo "init a new transaction to change something in repository $CVMFS_TEST_REPO (1/2)"
+  echo "*** {2} init a new transaction to change something in repository $CVMFS_TEST_REPO (1/2)"
   start_transaction $CVMFS_TEST_REPO || return $?
 
-  echo "change stuff in the repository (1/2)"
+  echo "*** {2} change stuff in the repository (1/2)"
   change_files_1_in $repo_dir || return 7
 
-  echo "change exactly the same stuff in the scratch spaces (1/2)"
+  echo "*** {2} change exactly the same stuff in the scratch spaces (1/2)"
   change_files_1_in $reference_dir2 || return 8
   change_files_1_in $reference_dir3 || return 8
   change_files_1_in $reference_dir4 || return 8
   change_files_1_in $reference_dir5 || return 8
 
-  echo "creating CVMFS snapshot (1/2)"
+  echo "*** {2} creating CVMFS snapshot (1/2)"
   publish_repo $CVMFS_TEST_REPO -a $second_tag -m "$second_tag_desc" || return $?
 
-  echo "compare the changed directories (1/2)"
+  echo "*** {2} compare the changed directories (1/2)"
   compare_directories $repo_dir $reference_dir2 $CVMFS_TEST_REPO || return $?
 
   # ============================================================================
 
-  echo "init a new transaction to change something in repository $CVMFS_TEST_REPO (2/2)"
+  echo "*** {3} init a new transaction to change something in repository $CVMFS_TEST_REPO (2/2)"
   start_transaction $CVMFS_TEST_REPO || return $?
 
-  echo "change stuff in the repository (2/2)"
+  echo "*** {3} change stuff in the repository (2/2)"
   change_files_2_in $repo_dir || return 7
 
-  echo "change exactly the same stuff in the scratch space (2/2)"
+  echo "*** {3} change exactly the same stuff in the scratch space (2/2)"
   change_files_2_in $reference_dir3 || return 8
 
-  echo "creating CVMFS snapshot (2/2)"
+  echo "*** {3} creating CVMFS snapshot (2/2)"
   publish_repo $CVMFS_TEST_REPO -a $third_tag -m "$third_tag_desc1" || return $?
 
-  echo "compare the changed directories (2/2)"
+  echo "*** {3} compare the changed directories (2/2)"
   compare_directories $repo_dir $reference_dir3 $CVMFS_TEST_REPO || return $?
 
   # ============================================================================
 
-  echo "check catalog and data integrity"
+  echo "*** {4} check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
 
-  echo "current tag statistics:"
+  echo "*** {4} current tag statistics:"
   cvmfs_server tag -l $CVMFS_TEST_REPO
 
-  echo "check tag descriptions"
+  echo "*** {4} check tag descriptions"
   if cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep -q "$first_tag"       && \
      cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep -q "$first_tag_desc"  && \
      cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep -q "$second_tag"      && \
@@ -251,32 +251,32 @@ cvmfs_run_test() {
      cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep -q "$third_tag_desc2" && \
      cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep -q "$trunk_tag"       && \
      cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep -q "$prev_trunk_tag"; then
-    echo "all tags and their descriptions found"
+    echo "*** {4} all tags and their descriptions found"
   else
     return 9
   fi
 
   # ============================================================================
 
-  echo "rollback to second tagged revision: $second_tag"
+  echo "*** {5} rollback to second tagged revision: $second_tag"
   cvmfs_server rollback -f -t $second_tag $CVMFS_TEST_REPO || return $?
 
-  echo "compare to reference directory"
+  echo "*** {5} compare to reference directory"
   compare_directories $repo_dir $reference_dir2 $CVMFS_TEST_REPO || return 10
 
-  echo "check catalog and data integrity"
+  echo "*** {5} check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
 
-  echo "current tag statistics:"
+  echo "*** {5} current tag statistics:"
   cvmfs_server tag -l $CVMFS_TEST_REPO
 
-  echo "check tag descriptions"
+  echo "*** {5} check tag descriptions"
   if cvmfs_server tag -l $CVMFS_TEST_REPO | grep -q "$first_tag"       && \
      cvmfs_server tag -l $CVMFS_TEST_REPO | grep -q "$first_tag_desc"  && \
      cvmfs_server tag -l $CVMFS_TEST_REPO | grep -q "$second_tag"      && \
      cvmfs_server tag -l $CVMFS_TEST_REPO | grep -q "$second_tag_desc" && \
      cvmfs_server tag -l $CVMFS_TEST_REPO | grep -q "$trunk_tag"; then
-    echo "all tags and their descriptions found"
+    echo "*** {5} all tags and their descriptions found"
   else
     return 11
   fi
@@ -288,32 +288,32 @@ cvmfs_run_test() {
 
   # ============================================================================
 
-  echo "init a new transaction to change something in repository $CVMFS_TEST_REPO"
+  echo "*** {6} init a new transaction to change something in repository $CVMFS_TEST_REPO"
   start_transaction $CVMFS_TEST_REPO || return $?
 
-  echo "change stuff in the repository"
+  echo "*** {6} change stuff in the repository"
   change_files_3_in $repo_dir || return 13
 
-  echo "change exactly the same stuff in the scratch space"
+  echo "*** {6} change exactly the same stuff in the scratch space"
   change_files_3_in $reference_dir4 || return 14
 
-  echo "creating CVMFS snapshot"
+  echo "*** {6} creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO || return $?
 
-  echo "compare the changed directories"
+  echo "*** {6} compare the changed directories"
   compare_directories $repo_dir $reference_dir4 $CVMFS_TEST_REPO || return $?
 
-  echo "current tag statistics:"
+  echo "*** {6} current tag statistics:"
   cvmfs_server tag -l $CVMFS_TEST_REPO
 
-  echo "check tag descriptions"
+  echo "*** {6} check tag descriptions"
   if cvmfs_server tag -l $CVMFS_TEST_REPO | grep -q "$first_tag"       && \
      cvmfs_server tag -l $CVMFS_TEST_REPO | grep -q "$first_tag_desc"  && \
      cvmfs_server tag -l $CVMFS_TEST_REPO | grep -q "$second_tag"      && \
      cvmfs_server tag -l $CVMFS_TEST_REPO | grep -q "$second_tag_desc" && \
      cvmfs_server tag -l $CVMFS_TEST_REPO | grep -q "$trunk_tag"       && \
      cvmfs_server tag -l $CVMFS_TEST_REPO | grep -q "$prev_trunk_tag"; then
-    echo "all tags and their descriptions found"
+    echo "*** {6} all tags and their descriptions found"
   else
     return 15
   fi
@@ -324,23 +324,23 @@ cvmfs_run_test() {
 
   # ============================================================================
 
-  echo "rollback to first tagged revision: $first_tag"
+  echo "*** {7} rollback to first tagged revision: $first_tag"
   cvmfs_server rollback -f -t $first_tag $CVMFS_TEST_REPO || return $?
 
-  echo "compare to reference directory"
+  echo "*** {7} compare to reference directory"
   compare_directories $repo_dir $reference_dir1 $CVMFS_TEST_REPO || return 17
 
-  echo "check catalog and data integrity"
+  echo "*** {7} check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
 
-  echo "current tag statistics:"
+  echo "*** {7} current tag statistics:"
   cvmfs_server tag -l $CVMFS_TEST_REPO
 
-  echo "check tag descriptions"
+  echo "*** {7} check tag descriptions"
   if cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep -q "$first_tag"      && \
      cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep -q "$first_tag_desc" && \
      cvmfs_server tag -l $CVMFS_TEST_REPO    | grep -q "$trunk_tag"; then
-    echo "all tags and their descriptions found"
+    echo "*** {7} all tags and their descriptions found"
   else
     return 18
   fi
@@ -354,43 +354,43 @@ cvmfs_run_test() {
 
   # ============================================================================
 
-  echo "create a couple of revisions..."
+  echo "*** {8} create a couple of revisions..."
   local iterations=5
   while [ $iterations -gt 0 ]; do
-    echo "init a new transaction in $CVMFS_TEST_REPO"
+    echo "*** {8} init a new transaction in $CVMFS_TEST_REPO"
     start_transaction $CVMFS_TEST_REPO || return $?
 
-    echo "creating CVMFS snapshot"
+    echo "*** {8} creating CVMFS snapshot"
     publish_repo $CVMFS_TEST_REPO || return $?
 
     iterations=$(( $iterations - 1))
   done
 
-  echo "check catalog and data integrity"
+  echo "*** {8} check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
 
   # ============================================================================
 
   local newest_hash=$(sudo cvmfs_server tag -l -x $CVMFS_TEST_REPO | head -n1 | awk '{print $2}')
 
-  echo "moving tag '$first_tag' to hash '$newest_hash'"
+  echo "*** {9} moving tag '$first_tag' to hash '$newest_hash'"
   cvmfs_server tag -a $first_tag -h $newest_hash -m "$first_tag_desc+1" $CVMFS_TEST_REPO || return $?
 
-  echo "compare to reference directory"
+  echo "*** {9} compare to reference directory"
   compare_directories $repo_dir $reference_dir1 $CVMFS_TEST_REPO || return 20
 
-  echo "check catalog and data integrity"
+  echo "*** {9} check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
 
-  echo "current tag statistics:"
+  echo "*** {9} current tag statistics:"
   cvmfs_server tag -l $CVMFS_TEST_REPO
 
-  echo "check tag descriptions"
+  echo "*** {9} check tag descriptions"
   if cvmfs_server tag -l $CVMFS_TEST_REPO | grep -q "$first_tag"        && \
      cvmfs_server tag -l $CVMFS_TEST_REPO | grep -q "$first_tag_desc+1" && \
      cvmfs_server tag -l $CVMFS_TEST_REPO | grep -q "$trunk_tag"        && \
      cvmfs_server tag -l $CVMFS_TEST_REPO | grep -q "$prev_trunk_tag"; then
-    echo "all tags and their descriptions found"
+    echo "*** {9} all tags and their descriptions found"
   else
     return 21
   fi
@@ -403,16 +403,16 @@ cvmfs_run_test() {
 
   # ============================================================================
 
-  echo "remove tag '$first_tag'"
+  echo "*** {10} remove tag '$first_tag'"
   cvmfs_server tag -r $first_tag -f $CVMFS_TEST_REPO || return 23
 
-  echo "current tag statistics:"
+  echo "*** {10} current tag statistics:"
   cvmfs_server tag -l $CVMFS_TEST_REPO
 
-  echo "check tag existence"
+  echo "*** {10} check tag existence"
   if cvmfs_server tag -l $CVMFS_TEST_REPO | grep -q "$trunk_tag"        && \
      cvmfs_server tag -l $CVMFS_TEST_REPO | grep -q "$prev_trunk_tag"; then
-    echo "all tags and their descriptions found"
+    echo "*** {10} all tags and their descriptions found"
   else
     return 24
   fi
@@ -427,28 +427,28 @@ cvmfs_run_test() {
 
   # ============================================================================
 
-  echo "create a new revision to be able to roll back to something"
+  echo "*** {11} create a new revision to be able to roll back to something"
   start_transaction $CVMFS_TEST_REPO || return $?
 
-  echo "deleting everything in the repository"
+  echo "*** {11} deleting everything in the repository"
   change_files_4_in $repo_dir || return 26
 
-  echo "change exactly the same stuff in the scratch space"
+  echo "*** {11} change exactly the same stuff in the scratch space"
   change_files_4_in $reference_dir5 || return 27
 
-  echo "creating CVMFS snapshot"
+  echo "*** {11} creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO || return $?
 
-  echo "compare to reference directory"
+  echo "*** {11} compare to reference directory"
   compare_directories $repo_dir $reference_dir5 $CVMFS_TEST_REPO || return 28
 
-  echo "check catalog and data integrity"
+  echo "*** {11} check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
 
-  echo "current tag statistics:"
+  echo "*** {11} current tag statistics:"
   cvmfs_server tag -l $CVMFS_TEST_REPO
 
-  echo "check tag existence (especially $prev_trunk_tag)"
+  echo "*** {11} check tag existence (especially $prev_trunk_tag)"
   if cvmfs_server tag -l $CVMFS_TEST_REPO | grep -q "$trunk_tag"        && \
      cvmfs_server tag -l $CVMFS_TEST_REPO | grep -q "$prev_trunk_tag"; then
     echo "all tags and their descriptions found"
@@ -464,21 +464,21 @@ cvmfs_run_test() {
     return 30
   fi
 
-  echo "initiate a rollback"
+  echo "*** {11} initiate a rollback"
   cvmfs_server rollback -f $CVMFS_TEST_REPO || return 31
 
-  echo "compare to reference directory"
+  echo "*** {11} compare to reference directory"
   compare_directories $repo_dir $reference_dir1 $CVMFS_TEST_REPO || return 32
 
-  echo "check catalog and data integrity"
+  echo "*** {11} check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
 
-  echo "current tag statistics:"
+  echo "*** {11} current tag statistics:"
   cvmfs_server tag -l $CVMFS_TEST_REPO
 
-  echo "check tag existence (especially $prev_trunk_tag)"
+  echo "*** {11} check tag existence (especially $prev_trunk_tag)"
   if cvmfs_server tag -l $CVMFS_TEST_REPO | grep -q "$trunk_tag"; then
-    echo "all tags and their descriptions found"
+    echo "*** {11} all tags and their descriptions found"
   else
     return 33
   fi
@@ -494,22 +494,22 @@ cvmfs_run_test() {
 
   # ============================================================================
 
-  echo "initiate a rollback (should fail)"
+  echo "*** {12} initiate a rollback (should fail)"
   cvmfs_server rollback -f $CVMFS_TEST_REPO && return 35
 
   # ============================================================================
 
-  echo "open transaction to see if tag removal fails in transaction"
+  echo "*** {13} open transaction to see if tag removal fails in transaction"
   start_transaction $CVMFS_TEST_REPO || return $?
 
   local oldest_tag="$(sudo cvmfs_server tag -l -x $CVMFS_TEST_REPO | tail -n1 | awk '{print $1}')"
-  echo "trying to remove $oldest_tag (should fail)"
+  echo "*** {13} trying to remove $oldest_tag (should fail)"
   cvmfs_server tag -r $oldest_tag -f $CVMFS_TEST_REPO  && return 37
 
-  echo "check if tag is still there"
+  echo "*** {13} check if tag is still there"
   cvmfs_server tag -l $CVMFS_TEST_REPO | grep -q "$oldest_tag" || return 38
 
-  echo "abort transaction"
+  echo "*** {13} abort transaction"
   cvmfs_server abort -f $CVMFS_TEST_REPO || return 39
 
   # ============================================================================
@@ -521,46 +521,46 @@ cvmfs_run_test() {
     remove_flags="-r $tag $remove_flags"
     oldest_tags_list="$tag $oldest_tags_list"
   done
-  echo "removing multiple tags ($oldest_tags_list)"
+  echo "*** {14} removing multiple tags ($oldest_tags_list)"
   cvmfs_server tag $remove_flags -f $CVMFS_TEST_REPO || return 40
 
-  echo "check that trunk is still there"
+  echo "*** {14} check that trunk is still there"
   cvmfs_server tag -l $CVMFS_TEST_REPO | grep -q "$trunk_tag" || return 41
 
-  echo "check that the tags ($oldest_tags_list) are gone"
+  echo "*** {14} check that the tags ($oldest_tags_list) are gone"
   for tag in $oldest_tags; do
     cvmfs_server tag -l $CVMFS_TEST_REPO | grep -q "$tag" && return 42
   done
 
-  echo "check the number of tags"
+  echo "*** {14} check the number of tags"
   [ $(cvmfs_server tag -l -x $CVMFS_TEST_REPO | wc -l) -eq 5 ] || return 43
 
   # ============================================================================
 
-  echo "create a new revision to have an undo point"
+  echo "*** {15} create a new revision to have an undo point"
   start_transaction $CVMFS_TEST_REPO || return $?
   publish_repo $CVMFS_TEST_REPO      || return 44
 
-  echo "check if trunk-previous is there"
+  echo "*** {15} check if trunk-previous is there"
   cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep -q "$prev_trunk_tag" || return 45
 
   # ============================================================================
 
-  echo "open transaction to see if rollback fails in transaction"
+  echo "*** {16} open transaction to see if rollback fails in transaction"
   start_transaction $CVMFS_TEST_REPO || return $?
 
-  echo "try to rollback (should fail)"
+  echo "*** {16} try to rollback (should fail)"
   cvmfs_server rollback -f $CVMFS_TEST_REPO && return 46
 
-  echo "check if tag is still there"
+  echo "*** {16} check if tag is still there"
   cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep -q "$prev_trunk_tag" || return 47
 
-  echo "abort transaction"
+  echo "*** {16} abort transaction"
   cvmfs_server abort -f $CVMFS_TEST_REPO || return 48
 
   # ============================================================================
 
-  echo "delete all auto tags"
+  echo "*** {17} delete all auto tags"
   local auto_tags="$(cvmfs_server tag -lx $CVMFS_TEST_REPO | grep '^generic' | awk '{print $1}')"
   remove_flags=""
   for tag in $auto_tags; do
@@ -568,75 +568,75 @@ cvmfs_run_test() {
   done
   cvmfs_server tag $remove_flags -f $CVMFS_TEST_REPO || return 49
 
-  echo "check if trunk and trunk-previous are there"
+  echo "*** {17} check if trunk and trunk-previous are there"
   cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep -q "$trunk_tag"      || return 50
   cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep -q "$prev_trunk_tag" || return 50
 
-  echo "check the number of tags"
+  echo "*** {17} check the number of tags"
   [ $(cvmfs_server tag -l -x $CVMFS_TEST_REPO | wc -l) -eq 2 ] || return 51
 
   # ============================================================================
 
-  echo "disable auto tagging"
+  echo "*** {18} disable auto tagging"
   local conf_file="/etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/server.conf"
   cat $conf_file | sed 's/^\(CVMFS_AUTO_TAG=\).*$/\1false/' | tee server.conf || return 52
   sudo cp server.conf $conf_file || return 53
 
-  echo "get revision of current trunk tag"
+  echo "*** {18} get revision of current trunk tag"
   local trunk_revision_1="$(cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep '^trunk ' | awk '{print $4}')"
 
-  echo "create a couple of revisions..."
+  echo "*** {18} create a couple of revisions..."
   iterations=5
   while [ $iterations -gt 0 ]; do
-    echo "init a new transaction in $CVMFS_TEST_REPO"
+    echo "*** {18} init a new transaction in $CVMFS_TEST_REPO"
     start_transaction $CVMFS_TEST_REPO || return $?
 
-    echo "creating CVMFS snapshot"
+    echo "*** {18} creating CVMFS snapshot"
     publish_repo $CVMFS_TEST_REPO || return $?
 
     iterations=$(( $iterations - 1))
   done
 
-  echo "check if trunk and trunk-previous are there"
+  echo "*** {18} check if trunk and trunk-previous are there"
   cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep -q "$trunk_tag"      || return 54
   cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep -q "$prev_trunk_tag" || return 54
 
-  echo "check the number of tags"
+  echo "*** {18} check the number of tags"
   [ $(cvmfs_server tag -l -x $CVMFS_TEST_REPO | wc -l) -eq 2 ] || return 55
 
-  echo "get revision of current trunk tag"
+  echo "*** {18} get revision of current trunk tag"
   local trunk_revision_2="$(cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep '^trunk ' | awk '{print $4}')"
 
-  echo "check trunk revision progress"
+  echo "*** {18} check trunk revision progress"
   [ $(( $trunk_revision_1 + 5 )) -eq $trunk_revision_2 ] || return 56
 
   # ============================================================================
 
-  echo "check if we have undo tags"
+  echo "*** {19} check if we have undo tags"
   cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep -q "$trunk_tag"      || return 57
   cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep -q "$prev_trunk_tag" || return 58
 
-  echo "try to delete undo tags (should fail)"
+  echo "*** {19} try to delete undo tags (should fail)"
   cvmfs_server tag -r $trunk_tag -f                    $CVMFS_TEST_REPO && return 59
   cvmfs_server tag -f -r $prev_trunk_tag               $CVMFS_TEST_REPO && return 60
   cvmfs_server tag -r $trunk_tag -r $prev_trunk_tag -f $CVMFS_TEST_REPO && return 61
 
-  echo "check that we still have undo tags"
+  echo "*** {19} check that we still have undo tags"
   cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep -q "$trunk_tag"      || return 62
   cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep -q "$prev_trunk_tag" || return 63
 
   # ============================================================================
 
-  echo "perform an undo-rollback to get rid of $prev_trunk_tag"
+  echo "*** {20} perform an undo-rollback to get rid of $prev_trunk_tag"
   cvmfs_server rollback -f $CVMFS_TEST_REPO || return 64
 
-  echo "check if $prev_trunk_tag is gone"
+  echo "*** {20} check if $prev_trunk_tag is gone"
   cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep -q "$prev_trunk_tag" && return 64
 
-  echo "try to recreate $prev_trunk_tag (should fail)"
+  echo "*** {20} try to recreate $prev_trunk_tag (should fail)"
   cvmfs_server tag -a $prev_trunk_tag $CVMFS_TEST_REPO && return 65
 
-  echo "check if $prev_trunk_tag is still not there"
+  echo "*** {20} check if $prev_trunk_tag is still not there"
   cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep -q "$prev_trunk_tag" && return 66
 
   return 0

@@ -38,12 +38,7 @@ cvmfs_run_test() {
   local num_asetup=$((2*$num_cpus))
 
   # mount atlas repository
-  cvmfs_mount atlas.cern.ch || return 1
-
-  # decrease the kernel cache timeout to safe some time
-  sudo sh -c "echo \"CVMFS_KCACHE_TIMEOUT=5\" >> /etc/cvmfs/default.local" || return 3
-  sudo cvmfs_config umount || return 4
-  sudo cvmfs_config probe  || return 5
+  cvmfs_mount atlas.cern.ch "CVMFS_KCACHE_TIMEOUT=5" "CVMFS_AUTO_UPDATE=false" || return 1
 
   pidsfile=`mktemp` || return 6
 
