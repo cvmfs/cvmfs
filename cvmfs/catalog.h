@@ -215,7 +215,7 @@ class Catalog : SingleCopy {
     return uid;
   }
   uint64_t MapGid(const uint64_t gid) const {
-    if (gid_map_) { return uid_map_->Map(gid); }
+    if (gid_map_) { return gid_map_->Map(gid); }
     return gid;
   }
 
