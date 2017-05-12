@@ -15,6 +15,7 @@
 #include <cstring>
 #include <ctime>
 
+#include "duplex_ssl.h"
 #include "hash.h"
 #include "platform.h"
 #include "smalloc.h"
@@ -213,7 +214,7 @@ bool Cipher::Decrypt(
 
 string CipherAes256Cbc::DoDecrypt(const string &ciphertext, const Key &key) {
   assert(key.size() == kKeySize);
-  int retval, retval_2;
+  int retval;
   if (ciphertext.size() < kIvSize)
     return "";
 
@@ -225,24 +226,37 @@ string CipherAes256Cbc::DoDecrypt(const string &ciphertext, const Key &key) {
     smalloc(kBlockSize + ciphertext.size() - kIvSize));
   int plaintext_len;
   int tail_len;
+#ifdef OPENSSL_API_INTERFACE_V11
+  EVP_CIPHER_CTX *ctx_ptr = EVP_CIPHER_CTX_new();
+#else
   EVP_CIPHER_CTX ctx;
   EVP_CIPHER_CTX_init(&ctx);
-  retval = EVP_DecryptInit_ex(&ctx, EVP_aes_256_cbc(), NULL, key.data(), iv);
+  EVP_CIPHER_CTX *ctx_ptr = &ctx;
+#endif
+  retval = EVP_DecryptInit_ex(ctx_ptr, EVP_aes_256_cbc(), NULL, key.data(), iv);
   assert(retval == 1);
-  retval = EVP_DecryptUpdate(&ctx,
+  retval = EVP_DecryptUpdate(ctx_ptr,
              plaintext, &plaintext_len,
              reinterpret_cast<const unsigned char *>(
                ciphertext.data() + kIvSize),
              ciphertext.length() - kIvSize);
   if (retval != 1) {
     free(plaintext);
+#ifdef OPENSSL_API_INTERFACE_V11
+    EVP_CIPHER_CTX_free(ctx_ptr);
+#else
     retval = EVP_CIPHER_CTX_cleanup(&ctx);
     assert(retval == 1);
+#endif
     return "";
   }
-  retval = EVP_DecryptFinal_ex(&ctx, plaintext + plaintext_len, &tail_len);
-  retval_2 = EVP_CIPHER_CTX_cleanup(&ctx);
+  retval = EVP_DecryptFinal_ex(ctx_ptr, plaintext + plaintext_len, &tail_len);
+#ifdef OPENSSL_API_INTERFACE_V11
+  EVP_CIPHER_CTX_free(ctx_ptr);
+#else
+  int retval_2 = EVP_CIPHER_CTX_cleanup(&ctx);
   assert(retval_2 == 1);
+#endif
   if (retval != 1) {
     free(plaintext);
     return "";
@@ -274,23 +288,32 @@ string CipherAes256Cbc::DoEncrypt(const string &plaintext, const Key &key) {
   memcpy(ciphertext, iv, kIvSize);
   int cipher_len = 0;
   int tail_len = 0;
+#ifdef OPENSSL_API_INTERFACE_V11
+  EVP_CIPHER_CTX *ctx_ptr = EVP_CIPHER_CTX_new();
+#else
   EVP_CIPHER_CTX ctx;
   EVP_CIPHER_CTX_init(&ctx);
-  retval = EVP_EncryptInit_ex(&ctx, EVP_aes_256_cbc(), NULL, key.data(), iv);
+  EVP_CIPHER_CTX *ctx_ptr = &ctx;
+#endif
+  retval = EVP_EncryptInit_ex(ctx_ptr, EVP_aes_256_cbc(), NULL, key.data(), iv);
   assert(retval == 1);
   // Older versions of OpenSSL don't allow empty input buffers
   if (!plaintext.empty()) {
-    retval = EVP_EncryptUpdate(&ctx,
+    retval = EVP_EncryptUpdate(ctx_ptr,
                ciphertext + kIvSize, &cipher_len,
                reinterpret_cast<const unsigned char *>(plaintext.data()),
                plaintext.length());
     assert(retval == 1);
   }
-  retval = EVP_EncryptFinal_ex(&ctx, ciphertext + kIvSize + cipher_len,
+  retval = EVP_EncryptFinal_ex(ctx_ptr, ciphertext + kIvSize + cipher_len,
                                &tail_len);
   assert(retval == 1);
+#ifdef OPENSSL_API_INTERFACE_V11
+  EVP_CIPHER_CTX_free(ctx_ptr);
+#else
   retval = EVP_CIPHER_CTX_cleanup(&ctx);
   assert(retval == 1);
+#endif
 
   cipher_len += tail_len;
   assert(cipher_len > 0);

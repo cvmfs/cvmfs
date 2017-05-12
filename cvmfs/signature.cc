@@ -27,6 +27,7 @@
 #include <vector>
 
 #include "compression.h"
+#include "duplex_ssl.h"
 #include "hash.h"
 #include "logging.h"
 #include "platform.h"
@@ -79,7 +80,7 @@ void SignatureManager::InitX509Store() {
   unsigned long verify_flags =  // NOLINT(runtime/int)
     X509_V_FLAG_CRL_CHECK |
     X509_V_FLAG_CRL_CHECK_ALL;
-#if OPENSSL_VERSION_NUMBER < 0x00908000L
+#ifdef OPENSSL_API_INTERFACE_V09
   X509_STORE_set_flags(x509_store_, verify_flags);
 #else
   int retval;
@@ -561,18 +562,27 @@ bool SignatureManager::Sign(const unsigned char *buffer,
   }
 
   bool result = false;
+#ifdef OPENSSL_API_INTERFACE_V11
+  EVP_MD_CTX *ctx_ptr = EVP_MD_CTX_new();
+#else
   EVP_MD_CTX ctx;
+  EVP_MD_CTX_init(&ctx);
+  EVP_MD_CTX *ctx_ptr = &ctx;
+#endif
 
   *signature = reinterpret_cast<unsigned char *>(
                  smalloc(EVP_PKEY_size(private_key_)));
-  EVP_MD_CTX_init(&ctx);
-  if (EVP_SignInit(&ctx, EVP_sha1()) &&
-      EVP_SignUpdate(&ctx, buffer, buffer_size) &&
-      EVP_SignFinal(&ctx, *signature, signature_size, private_key_))
+  if (EVP_SignInit(ctx_ptr, EVP_sha1()) &&
+      EVP_SignUpdate(ctx_ptr, buffer, buffer_size) &&
+      EVP_SignFinal(ctx_ptr, *signature, signature_size, private_key_))
   {
     result = true;
   }
+#ifdef OPENSSL_API_INTERFACE_V11
+  EVP_MD_CTX_free(ctx_ptr);
+#else
   EVP_MD_CTX_cleanup(&ctx);
+#endif
   if (!result) {
     free(*signature);
     *signature_size = 0;
@@ -596,18 +606,23 @@ bool SignatureManager::Verify(const unsigned char *buffer,
   if (!certificate_) return false;
 
   bool result = false;
+#ifdef OPENSSL_API_INTERFACE_V11
+  EVP_MD_CTX *ctx_ptr = EVP_MD_CTX_new();
+#else
   EVP_MD_CTX ctx;
-
   EVP_MD_CTX_init(&ctx);
+  EVP_MD_CTX *ctx_ptr = &ctx;
+#endif
+
   EVP_PKEY *pubkey = X509_get_pubkey(certificate_);
-  if (EVP_VerifyInit(&ctx, EVP_sha1()) &&
-      EVP_VerifyUpdate(&ctx, buffer, buffer_size) &&
-#if OPENSSL_VERSION_NUMBER < 0x00908000L
-      EVP_VerifyFinal(&ctx,
+  if (EVP_VerifyInit(ctx_ptr, EVP_sha1()) &&
+      EVP_VerifyUpdate(ctx_ptr, buffer, buffer_size) &&
+#ifdef OPENSSL_API_INTERFACE_V09
+      EVP_VerifyFinal(ctx_ptr,
                       const_cast<unsigned char *>(signature), signature_size,
                       pubkey)
 #else
-      EVP_VerifyFinal(&ctx, signature, signature_size, pubkey)
+      EVP_VerifyFinal(ctx_ptr, signature, signature_size, pubkey)
 #endif
     )
   {
@@ -615,7 +630,11 @@ bool SignatureManager::Verify(const unsigned char *buffer,
   }
   if (pubkey != NULL)
     EVP_PKEY_free(pubkey);
+#ifdef OPENSSL_API_INTERFACE_V11
+  EVP_MD_CTX_free(ctx_ptr);
+#else
   EVP_MD_CTX_cleanup(&ctx);
+#endif
 
   return result;
 }
@@ -809,8 +828,12 @@ bool SignatureManager::VerifyPkcs7(const unsigned char *buffer,
         if (this_name->type != GEN_URI)
           continue;
 
-        char *name_ptr = reinterpret_cast<char *>(
+        const char *name_ptr = reinterpret_cast<const char *>(
+#ifdef OPENSSL_API_INTERFACE_V11
+          ASN1_STRING_get0_data(this_name->d.uniformResourceIdentifier));
+#else
           ASN1_STRING_data(this_name->d.uniformResourceIdentifier));
+#endif
         int name_len =
           ASN1_STRING_length(this_name->d.uniformResourceIdentifier);
         if (!name_ptr || (name_len <= 0))

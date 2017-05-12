@@ -10,7 +10,8 @@
 #define FUSE_VERSION 29
 #define FUSE_ROOT_ID 1
 extern "C" {
-struct fuse_chan {};
+// Empty structs have different sizes in C and C++, hence the dummy int
+struct fuse_chan { int dummy; };
 // Defined in t_fuse_evict.cc
 extern unsigned fuse_lowlevel_notify_inval_entry_cnt;
 static int __attribute__((used)) fuse_lowlevel_notify_inval_entry(

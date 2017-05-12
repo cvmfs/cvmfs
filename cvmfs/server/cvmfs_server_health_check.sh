@@ -60,6 +60,7 @@ health_check() {
   local rw_should_be_rdonly=0
   local rw_should_be_rw=0
   local rdonly_outdated=0
+  local rdonly_wronghash=0
 
   load_repo_config $name
 
@@ -69,11 +70,20 @@ health_check() {
   fi
 
   # check mounted read-only cvmfs client
+  local expected_hash=
   if ! is_mounted "${CVMFS_SPOOL_DIR}/rdonly"; then
     rdonly_broken=1
   elif [ x"$(get_mounted_root_hash $name)"      != \
          x"$(get_published_root_hash $name)" ]; then
-    rdonly_outdated=1
+    if ! is_checked_out $name; then
+      expected_hash=$(get_published_root_hash $name)
+      rdonly_outdated=1
+    else
+      expected_hash=$(get_checked_out_hash $name)
+      if [ x"$(get_mounted_root_hash $name)" != x"$expected_hash" ]; then
+        rdonly_wronghash=1
+      fi
+    fi
   fi
 
   # check mounted union file system
@@ -99,6 +109,7 @@ health_check() {
   # did we detect any kind of problem?
   if [ $((   $rdonly_broken       \
            + $rdonly_outdated     \
+           + $rdonly_wronghash    \
            + $rw_broken           \
            + $rw_should_be_rdonly \
            + $rw_should_be_rw )) -eq 0 ]; then
@@ -109,6 +120,7 @@ health_check() {
   if [ $quiet = 0 ]; then
     __hc_print_status_report $name $rdonly_broken       \
                                    $rdonly_outdated     \
+                                   $rdonly_wronghash    \
                                    $rw_broken           \
                                    $rw_should_be_rdonly \
                                    $rw_should_be_rw
@@ -153,7 +165,7 @@ health_check() {
   #      2.1. mount the rw mountpoint as read-only    (rw_broken       --> 0)
   #      2.2. remount the rw mountpoint as read-only  (rw_should_be_ro --> 0)
   #      2.2. remount the rw mountpoint as read-write (rw_should_be_rw --> 0)
-  if [ $rdonly_outdated -eq 1 ]; then
+  if [ $(($rdonly_outdated + $rdonly_wronghash)) -gt 0 ]; then
     if [ $rw_broken -eq 0 ]; then
       __hc_transition $name $quiet "rw_umount"
       rw_broken=1 # ... remount happens downstream
@@ -164,8 +176,9 @@ health_check() {
       rdonly_broken=1 # ... remount happens downstream
     fi
 
-    set_ro_root_hash $name "$(get_published_root_hash $name)" || die "failed to update root hash"
+    set_ro_root_hash $name "$expected_hash" || die "failed to update root hash"
     rdonly_outdated=0 # ... remount will mount the latest revision
+    rdonly_wronghash=0
   fi
 
   if [ $rdonly_broken -eq 1 ]; then

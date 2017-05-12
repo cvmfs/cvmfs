@@ -129,26 +129,36 @@ cvmfs_server_publish() {
     [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || { echo "Open writable file descriptors on $name"; retcode=1; continue; }
     is_cwd_on_path "/cvmfs/$name" && { echo "Current working directory is in /cvmfs/$name.  Please release, e.g. by 'cd \$HOME'."; retcode=1; continue; } || true
     gc_timespan="$(get_auto_garbage_collection_timespan $name)" || { retcode=1; continue; }
-    local revision_number=$(get_repo_info -v)
-    if [ x"$manual_revision" != x"" ] && [ $manual_revision -le $revision_number ]; then
-      echo "Current revision '$revision_number' is ahead of manual revision number '$manual_revision'."
-      retcode=1
-      continue
+    if [ x"$manual_revision" != x"" ]; then
+      local revision_number=$(attr -qg revision /var/spool/cvmfs/${name}/rdonly)
+      if [ $manual_revision -le $revision_number ]; then
+        echo "Current revision '$revision_number' is ahead of manual revision number '$manual_revision'."
+        retcode=1
+        continue
+      fi
     fi
 
-    if [ -z "$tag_name" ] && [ x"$CVMFS_AUTO_TAG" = x"true" ]; then
-      local timestamp=$(date -u "+%Y-%m-%dT%H:%M:%SZ")
-      tag_name="generic-$timestamp"
-      local tag_name_number=1
-      while check_tag_existence $name $tag_name; do
-        tag_name="generic_$tag_name_number-$timestamp"
-        tag_name_number=$(( $tag_name_number + 1 ))
-      done
-      echo "Using auto tag '$tag_name'"
-    fi
+    if is_checked_out $name; then
+      if [ x"$tag_name" = "x" ]; then
+        echo "Publishing a checked out revision requires a tag name"
+        retcode=1
+        continue
+      fi
+    else
+      if [ -z "$tag_name" ] && [ x"$CVMFS_AUTO_TAG" = x"true" ]; then
+        local timestamp=$(date -u "+%Y-%m-%dT%H:%M:%SZ")
+        tag_name="generic-$timestamp"
+        local tag_name_number=1
+        while check_tag_existence $name $tag_name; do
+          tag_name="generic_$tag_name_number-$timestamp"
+          tag_name_number=$(( $tag_name_number + 1 ))
+        done
+        echo "Using auto tag '$tag_name'"
+      fi
 
-    local auto_tag_cleanup_list=
-    auto_tag_cleanup_list="$(filter_auto_tags $name)" || { echo "failed to determine outdated auto tags on $name"; retcode=1; continue; }
+      local auto_tag_cleanup_list=
+      auto_tag_cleanup_list="$(filter_auto_tags $name)" || { echo "failed to determine outdated auto tags on $name"; retcode=1; continue; }
+    fi
 
     # prepare the commands to be used for the publishing later
     local user_shell="$(get_user_shell $name)"
@@ -242,6 +252,10 @@ cvmfs_server_publish() {
         sync_command_virtual_dir="$sync_command -S remove"
       fi
     fi
+    # Must be after the virtual-dir command is constructed
+    if is_checked_out $name; then
+      sync_command="$sync_command -B"
+    fi
 
     local tag_command="$(__swissknife_cmd dbg) tag_edit \
       -r $upstream                                      \
@@ -250,10 +264,17 @@ cvmfs_server_publish() {
       -m $manifest                                      \
       -p /etc/cvmfs/keys/${name}.pub                    \
       -f $name                                          \
-      -b $base_hash                                     \
       -e $hash_algorithm                                \
-      $(get_follow_http_redirects_flag)                 \
-      -x" # -x enables magic undo tag handling
+      $(get_follow_http_redirects_flag)"
+    if ! is_checked_out $name; then
+      # enables magic undo tag handling
+      tag_command="$tag_command -x"
+    else
+      tag_command="$tag_command -B $(get_checked_out_branch $name)"
+      if [ "x$(get_checked_out_previous_branch $name)" != "x" ]; then
+        tag_command="$tag_command -P $(get_checked_out_previous_branch $name)"
+      fi
+    fi
     # If the upstream type is "gw", we need to pass additional parameters
     # to the `cvmfs_swissknife sync` command: the username and the
     # subpath of the active lease
@@ -270,6 +291,17 @@ cvmfs_server_publish() {
       tag_command="$tag_command -D \"$tag_description\""
     fi
 
+    local tag_command_undo_tags="$(__swissknife_cmd dbg) tag_edit \
+      -r $upstream                                                \
+      -w $stratum0                                                \
+      -t ${spool_dir}/tmp                                         \
+      -m $manifest                                                \
+      -p /etc/cvmfs/keys/${name}.pub                              \
+      -f $name                                                    \
+      -e $hash_algorithm                                          \
+      $(get_follow_http_redirects_flag)                           \
+      -x"
+
     # ---> do it! (from here on we are changing things)
     publish_before_hook $name
     $user_shell "$dirtab_command" || die "Failed to apply .cvmfsdirtab"
@@ -282,7 +314,18 @@ cvmfs_server_publish() {
     publish_starting $name
     $user_shell "$sync_command" || { publish_failed $name; die "Synchronization failed\n\nExecuted Command:\n$sync_command";   }
     cvmfs_sys_file_is_regular $manifest            || { publish_failed $name; die "Manifest creation failed\n\nExecuted Command:\n$sync_command"; }
+    local branch_hash=
     local trunk_hash=$(grep "^C" $manifest | tr -d C)
+    if is_checked_out $name; then
+      local branch_hash=$trunk_hash
+      trunk_hash=$(get_published_root_hash $name)
+      tag_command="$tag_command -h $branch_hash"
+      # write intermediate catalog hash to reflog
+      sign_manifest $name $manifest "" true
+      # Replace throw-away manifest with upstream copy
+      get_raw_manifest $name > $manifest
+      cvmfs_sys_file_is_empty $manifest && die "failed to reload manifest"
+    fi
 
     if [ x"$upstream_type" = xgw ]; then
         close_transaction  $name $use_fd_fallback
@@ -346,6 +389,10 @@ cvmfs_server_publish() {
     echo "Signing new manifest"
     sign_manifest $name $manifest      || { publish_failed $name; die "Signing failed"; }
     set_ro_root_hash $name $trunk_hash || { publish_failed $name; die "Root hash update failed"; }
+    if is_checked_out $name; then
+      rm -f /var/spool/cvmfs/${name}/checkout
+      echo "Reset to trunk on default branch"
+    fi
 
     # run the automatic garbage collection (if configured)
     if has_auto_garbage_collection_enabled $name; then
@@ -354,12 +401,9 @@ cvmfs_server_publish() {
       __run_gc $name       \
                $stratum0   \
                $dry_run    \
-               $manifest   \
-               $trunk_hash \
                ""          \
                "0"         \
                -z $gc_timespan      || { local err=$?; publish_failed $name; die "Garbage collection failed ($err)"; }
-      sign_manifest $name $manifest || { publish_failed $name; die "Signing failed"; }
     fi
 
     # check again for open file descriptors (potential race condition)

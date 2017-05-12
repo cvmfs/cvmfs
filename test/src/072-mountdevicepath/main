@@ -19,6 +19,9 @@ cvmfs_run_test() {
   logfile=$1
 
   local fqrn="atlas.cern.ch"
+  echo "*** mounting and unmounting normally to install configuration"
+  cvmfs_mount $fqrn || return 20
+  cvmfs_umount $fqrn || return 21
 
   # create a mount point and a cache directory
   mkdir mnt || return 1
@@ -26,6 +29,7 @@ cvmfs_run_test() {
   mkdir $fqrn || return 3  # Makes mount expand the device to full path
 
   # mount the private repository
+  echo "*** mounting manually"
   sudo mount -t cvmfs $fqrn $(pwd)/mnt || return 10
   CVMFS_TEST072_MOUNTPOINT="$(pwd)/mnt"
   trap cleanup EXIT HUP INT TERM

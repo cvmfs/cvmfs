@@ -174,6 +174,17 @@ is_mounted() {
 }
 
 
+# only certain characters are allowed in branch names
+#
+# @param branch_name the name to test
+is_valid_branch_name() {
+  local branch_name="$1"
+
+  local clean_name=${branch_name//[^a-zA-Z0-9_@\.\/\-]/}
+  [ "x$clean_name" = "x$branch_name" ]
+}
+
+
 run_suid_helper() {
   env -i /usr/bin/cvmfs_suid_helper $@
 }
@@ -211,12 +222,14 @@ __hc_print_status_report() {
   local name="$1"
   local rdonly_broken=$2
   local rdonly_outdated=$3
-  local rw_broken=$4
-  local rw_should_be_rdonly=$5
-  local rw_should_be_rw=$6
+  local rdonly_wronghash=$4
+  local rw_broken=$5
+  local rw_should_be_rdonly=$6
+  local rw_should_be_rw=$7
 
   [ $rdonly_broken       -eq 0 ] || echo "${CVMFS_SPOOL_DIR}/rdonly is not mounted properly."                   >&2
   [ $rdonly_outdated     -eq 0 ] || echo "$name is not based on the newest published revision"                  >&2
+  [ $rdonly_wronghash    -eq 0 ] || echo "$name is not based on the checked out revision"                       >&2
   [ $rw_broken           -eq 0 ] || echo "/cvmfs/$name is not mounted properly."                                >&2
   [ $rw_should_be_rdonly -eq 0 ] || echo "$name is not in a transaction but /cvmfs/$name is mounted read/write" >&2
   [ $rw_should_be_rw     -eq 0 ] || echo "$name is in a transaction but /cvmfs/$name is not mounted read/write" >&2
@@ -887,7 +900,7 @@ is_subcommand() {
   local subcommand="$1"
   local supported_commands="mkfs add-replica import publish rollback rmfs alterfs    \
     resign list info tag list-tags lstags check transaction abort snapshot           \
-    skeleton migrate list-catalogs diff update-geodb gc catalog-chown \
+    skeleton migrate list-catalogs diff checkout update-geodb gc catalog-chown \
     eliminate-hardlinks update-info update-repoinfo mount fix-permissions"
 
   for possible_command in $supported_commands; do
@@ -945,10 +958,11 @@ Supported Commands:
                   Make a new repository snapshot
   gc              [-r number of revisions to preserve]
                   [-t time stamp after which revisions are preserved]
-                  [-l (print deleted objects)] [-L log of deleted objects]
-                  [-f (force)] [-d (dry run)]
-                  <fully qualified repository name>
-                  Remove unreferenced data from garbage collectable repository
+                  [-l print deleted objects] [-L log of deleted objects]
+                  [-f force] [-d dry run]
+                  [-a collect all garbage-collectable repos, log to gc.log |
+                    <fully qualified name> ]
+                  Remove unreferenced data from garbage-collectable repository
   rmfs            [-p(reserve) repo data and keys] [-f don't ask again]
                   <fully qualified name>
                   Remove the repository
@@ -979,6 +993,8 @@ Supported Commands:
                   [-l list tags] [-x machine readable]
                   <fully qualified name>
                   Print named tags (snapshots) of the repository
+  checkout        [-t <tag name>] [-b <branch name>]
+                  <fully qualified name>
   check           [-c disable data chunk existence check]
                   [-i check data integrity] (may take some time)]
                   [-t tag (check given tag instead of trunk)]

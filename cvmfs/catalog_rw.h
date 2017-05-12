@@ -97,6 +97,7 @@ class WritableCatalog : public Catalog {
   void UpdateLastModified();
   void IncrementRevision();
   void SetRevision(const uint64_t new_revision);
+  void SetBranch(const std::string &branch_name);
   void SetPreviousRevision(const shash::Any &hash);
   void SetTTL(const uint64_t new_ttl);
   bool SetVOMSAuthz(const std::string &voms_authz);
