@@ -180,7 +180,7 @@ is_mounted() {
 is_valid_branch_name() {
   local branch_name="$1"
 
-  local clean_name=${branch_name//[^a-zA-Z0-9_@\.\/\-]/}
+  local clean_name=$(echo "$branch_name" | tr -cd a-zA-Z0-9_@./-)
   [ "x$clean_name" = "x$branch_name" ]
 }
 
