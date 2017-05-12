@@ -72,6 +72,7 @@ install_from_repo make                          || die "fail (installing make)"
 install_from_repo sqlite3                       || die "fail (installing sqlite3)"
 install_from_repo linux-image-extra-$(uname -r) || die "fail (installing AUFS)"
 install_from_repo bc                            || die "fail (installing bc)"
+install_from_repo tree                          || die "fail (installing tree)"
 
 # traffic shaping
 install_from_repo trickle || die "fail (installing trickle)"
