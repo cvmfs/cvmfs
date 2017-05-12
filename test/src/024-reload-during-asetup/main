@@ -12,7 +12,7 @@ asetup17X() {
   local pidsfile=$1
   for iterations in 1 2 3 4 5; do
     local i=0
-    for v in /cvmfs/atlas.cern.ch/repo/sw/software/17*; do
+    for v in /cvmfs/atlas.cern.ch/repo/sw/software/x86_64-slc6-gcc48-opt/20*; do
       versions[$i]=`basename $v`
       i=$(($i+1))
     done
@@ -21,8 +21,8 @@ asetup17X() {
     local idx=$(($RANDOM % $num_versions))
     local this_version=${versions[$idx]}
 
-    echo "asetup for version $this_version"
-    sh -c "source /cvmfs/atlas.cern.ch/repo/sw/software/i686-slc5-gcc43-opt/${this_version}/cmtsite/asetup.sh ${this_version},notest --cmtconfig i686-slc5-gcc43-opt"
+    echo "*** asetup for version $this_version"
+    sh -c "source /cvmfs/atlas.cern.ch/repo/sw/software/x86_64-slc6-gcc48-opt/${this_version}/cmtsite/asetup.sh ${this_version},notest --cmtconfig x86_64-slc6-gcc48-opt"
     local retval=$?
     if [ $retval -ne 0 ]; then
       return $retval
@@ -43,25 +43,25 @@ cvmfs_run_test() {
   pidsfile=`mktemp` || return 6
 
   # do some concurrent asetup calls
-  echo "running with $num_asetup parallel tasks"
+  echo "*** running with $num_asetup parallel tasks"
   for i in $(seq 1 $num_asetup); do
     asetup17X $pidsfile &
     echo $! >> $pidsfile
   done
 
-  # reload the catalog every now and than
+  echo "*** reload the catalog every now and than"
   reload_cvmfs &
   reload_pid=$!
 
-  # always kill the detached processes
+  echo "*** trap to kill the detached processes"
   trap "kill -9 $(cat $pidsfile | tr '\n' " ") $reload_pid > /dev/null 2>&1; rm -f $pidsfile; exit" HUP INT TERM
 
-  # wait for the find calls to succeed
+  echo "*** wait for the asetup runs to succeed"
   wait $(cat $pidsfile | tr '\n' " ")
   local retval=$?
   rm -f $pidsfile
 
-  # stop the reload cycle, it seemed to work fine...
+  echo "*** stop the reload cycle, it seemed to work fine..."
   touch stop-reload
   wait $reload_pid
 
@@ -72,7 +72,7 @@ cvmfs_run_test() {
 
   local num_forget=$(sudo cvmfs_talk -i atlas.cern.ch internal affairs | \
     grep ^cvmfs.n_fs_forget | cut -f2 -d\|)
-  echo "Number of forget(): $num_forget"
+  echo "*** number of forget(): $num_forget"
   [ x"$num_forget" != x"" ] || return 11
   if [ $num_forget -gt 50000 ]; then
     return 10
