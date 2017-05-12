@@ -16,7 +16,6 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  src/011-rmemptyfilesrebuild                  \
                                  src/014-corrupt_lru                          \
                                  src/015-rebuild_on_crash                     \
-                                 src/024-reload-during-asetup                 \
                                  src/040-aliencache                           \
                                  src/041-rocache                              \
                                  src/042-cleanuppipes                         \

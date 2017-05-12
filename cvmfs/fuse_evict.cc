@@ -126,22 +126,32 @@ void *FuseInvalidator::MainInvalidator(void *data) {
       continue;
     }
 
-    uint64_t inode;
-    NameString name;
+    // We must not hold a lock when calling fuse_lowlevel_notify_inval_entry.
+    // Therefore, we first copy all the inodes into a temporary data structure.
+    EvictableObject evictable_object;
     glue::InodeTracker::Cursor cursor(
       invalidator->inode_tracker_->BeginEnumerate());
+    while (invalidator->inode_tracker_->Next(
+             &cursor, &evictable_object.inode, &evictable_object.name))
+    {
+      invalidator->evict_list_.PushBack(evictable_object);
+    }
+    invalidator->inode_tracker_->EndEnumerate(&cursor);
+
     unsigned i = 0;
-    while (invalidator->inode_tracker_->Next(&cursor, &inode, &name)) {
-      if (inode == 0)
-        inode = FUSE_ROOT_ID;
+    unsigned N = invalidator->evict_list_.size();
+    while (i < N) {
+      evictable_object = invalidator->evict_list_.At(i);
+      if (evictable_object.inode == 0)
+        evictable_object.inode = FUSE_ROOT_ID;
       // Can return non-zero value if parent entry was already evicted
       fuse_lowlevel_notify_inval_entry(
         *invalidator->fuse_channel_,
-        inode,
-        name.GetChars(),
-        name.GetLength());
+        evictable_object.inode,
+        evictable_object.name.GetChars(),
+        evictable_object.name.GetLength());
       LogCvmfs(kLogCvmfs, kLogDebug, "evicting <%" PRIu64 ">/%s",
-               inode, name.c_str());
+               evictable_object.inode, evictable_object.name.c_str());
 
       if ((++i % kCheckTimeoutFreqOps) == 0) {
         if (platform_monotonic_time() >= deadline) {
@@ -156,8 +166,8 @@ void *FuseInvalidator::MainInvalidator(void *data) {
         }
       }
     }
-    invalidator->inode_tracker_->EndEnumerate(&cursor);
     handle->SetDone();
+    invalidator->evict_list_.Clear();
   }
 
   LogCvmfs(kLogCvmfs, kLogDebug, "stopping dentry invalidator thread");

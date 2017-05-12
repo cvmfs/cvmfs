@@ -6,10 +6,13 @@
 #define CVMFS_FUSE_EVICT_H_
 
 #include <pthread.h>
+#include <stdint.h>
 
 #include "atomic.h"
+#include "bigvector.h"
 #include "duplex_fuse.h"
 #include "gtest/gtest_prod.h"
+#include "shortstring.h"
 #include "util/single_copy.h"
 
 namespace glue {
@@ -78,6 +81,14 @@ class FuseInvalidator : SingleCopy {
    */
   static const unsigned kCheckTimeoutFreqOps;  // = 256
 
+  /**
+   * The information given to fuse_lowlevel_notify_inval_entry
+   */
+  struct EvictableObject {
+    uint64_t inode;
+    NameString name;
+  };
+
   static void *MainInvalidator(void *data);
 
   glue::InodeTracker *inode_tracker_;
@@ -90,6 +101,7 @@ class FuseInvalidator : SingleCopy {
    * thread should be shut down.
    */
   atomic_int32 terminated_;
+  BigVector<EvictableObject> evict_list_;
 };  // class FuseInvalidator
 
 #endif  // CVMFS_FUSE_EVICT_H_

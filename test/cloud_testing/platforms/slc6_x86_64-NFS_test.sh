@@ -31,8 +31,11 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                               -x src/001-chksetup                             \
                                  src/026-tightcache                           \
 				 src/032-workspace                            \
-                                 src/041-rocache                              \
+                                 src/040-aliencache                           \
+				 src/041-rocache                              \
                                  src/043-highinodes                           \
+				 src/068-rocache                              \
+				 src/070-tieredcache                          \
                                  --                                           \
                                  src/0*                                       \
                               || retval=1
