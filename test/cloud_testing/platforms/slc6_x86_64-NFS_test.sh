@@ -35,6 +35,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
 				 src/041-rocache                              \
                                  src/043-highinodes                           \
 				 src/068-rocache                              \
+				 src/070-tieredcache                          \
                                  --                                           \
                                  src/0*                                       \
                               || retval=1
