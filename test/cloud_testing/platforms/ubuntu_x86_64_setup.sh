@@ -79,6 +79,7 @@ install_from_repo trickle || die "fail (installing trickle)"
 # install 'cvmfs_preload' build dependencies
 install_from_repo cmake        || die "fail (installing cmake)"
 install_from_repo libattr1-dev || die "fail (installing libattr1-dev)"
+install_from_repo python-dev   || die "fail (installing python-dev)"
 
 # install 'jq' (on 12.04 this needs the precise-backports repo)
 if [ x"$(lsb_release -cs)" = x"precise" ]; then
