@@ -270,6 +270,7 @@ set (CVMFS_PRELOADER_SOURCES
   hash.cc
   history_sql.cc
   history_sqlite.cc
+  json_document.cc
   logging.cc
   malloc_arena.cc
   manifest.cc
@@ -291,6 +292,7 @@ set (CVMFS_PRELOADER_SOURCES
   sqlitemem.cc
   statistics.cc
   swissknife.cc
+  swissknife_lease_curl.cc
   swissknife_pull.cc
   upload.cc
   upload_facility.cc
