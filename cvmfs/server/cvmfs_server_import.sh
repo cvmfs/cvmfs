@@ -270,8 +270,10 @@ cvmfs_server_import() {
     local manifest_url="${CVMFS_STRATUM0}/.cvmfspublished"
     local unsigned_manifest="${CVMFS_SPOOL_DIR}/tmp/unsigned_manifest"
     create_cert $name $CVMFS_USER                     || die "fail (certificate creation)!"
-    get_item $name $manifest_url | \
-      strip_manifest_signature - > $unsigned_manifest || die "fail (manifest download)!"
+    local old_manifest
+    old_manifest="`get_item $name $manifest_url`"     || die "fail (manifest download)!"
+    echo "$old_manifest" | strip_manifest_signature - > $unsigned_manifest \
+                                                      || die "fail (manifest signature strip)!"
     chown $CVMFS_USER $unsigned_manifest              || die "fail (manifest chown)!"
     sign_manifest $name $unsigned_manifest            || die "fail (manifest resign)!"
     echo "done"
