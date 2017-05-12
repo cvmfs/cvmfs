@@ -199,6 +199,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   reflog_sql.cc
   s3fanout.cc
   sanitizer.cc
+  server_tool.cc
   session_context.cc
   signature.cc
   sql.cc
@@ -286,6 +287,7 @@ set (CVMFS_PRELOADER_SOURCES
   reflog_sql.cc
   s3fanout.cc
   sanitizer.cc
+  server_tool.cc
   session_context.cc
   signature.cc
   sql.cc
