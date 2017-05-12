@@ -5,6 +5,8 @@
 #ifndef CVMFS_SIGNING_TOOL_H_
 #define CVMFS_SIGNING_TOOL_H_
 
+#include <string>
+
 #include "hash.h"
 #include "server_tool.h"
 #include "util_concurrency.h"
@@ -17,7 +19,7 @@ struct SpoolerResult;
 
 class SigningTool {
  public:
-  SigningTool(ServerTool *server_tool);
+  explicit SigningTool(ServerTool *server_tool);
   virtual ~SigningTool();
 
   bool Run(const std::string &manifest_path, const std::string &repo_url,

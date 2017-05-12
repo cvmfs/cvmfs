@@ -5,6 +5,8 @@
 #ifndef CVMFS_SERVER_TOOL_IMPL_H_
 #define CVMFS_SERVER_TOOL_IMPL_H_
 
+#include <string>
+
 template <class ObjectFetcherT>
 manifest::Reflog *ServerTool::FetchReflog(ObjectFetcherT *object_fetcher,
                                           const std::string &repo_name,

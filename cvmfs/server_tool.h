@@ -5,6 +5,8 @@
 #ifndef CVMFS_SERVER_TOOL_H_
 #define CVMFS_SERVER_TOOL_H_
 
+#include <string>
+
 #include "download.h"
 #include "manifest_fetch.h"
 #include "reflog.h"
