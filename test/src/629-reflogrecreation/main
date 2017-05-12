@@ -311,7 +311,7 @@ EOF
 
   echo "*** {7} check hash sanity"
   [ x"$root_hash_8"    = x"$root_hash_6"   ] || return 46
-  [ x"$history_8"     != x"$history_7"     ] || return 47
+  [ x"$history_8"      = x"$history_7"     ] || return 47
   [ x"$meta_info_8"    = x"$meta_info_7"   ] || return 48
   [ x"$certificate_8"  = x"$certificate_7" ] || return 49
 
