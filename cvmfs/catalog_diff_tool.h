@@ -8,6 +8,7 @@
 #include <string>
 
 #include "catalog_mgr_ro.h"
+#include "shortstring.h"
 #include "statistics.h"
 #include "util/pointer.h"
 
@@ -24,8 +25,11 @@ class CatalogDiffTool {
                   download::DownloadManager* download_manager);
   virtual ~CatalogDiffTool();
 
+  bool Init();
+
+  bool Run(const PathString& path);
+
  protected:
-  bool Run();
   virtual void ReportAddition(const PathString& path,
                               const catalog::DirectoryEntry& entry,
                               const XattrList& xattrs) = 0;
@@ -34,6 +38,13 @@ class CatalogDiffTool {
   virtual void ReportModification(const PathString& path,
                                   const catalog::DirectoryEntry& old_entry,
                                   const catalog::DirectoryEntry& new_entry) = 0;
+
+  const catalog::Catalog* GetOldCatalog() const {
+    return old_catalog_mgr_->GetRootCatalog();
+  }
+  const catalog::Catalog* GetNewCatalog() const {
+    return new_catalog_mgr_->GetRootCatalog();
+  }
 
  private:
   void DiffRec(const PathString& path);
@@ -50,6 +61,9 @@ class CatalogDiffTool {
 
   UniquePtr<catalog::SimpleCatalogManager> old_catalog_mgr_;
   UniquePtr<catalog::SimpleCatalogManager> new_catalog_mgr_;
+
+  std::string temp_dir_old_;
+  std::string temp_dir_new_;
 };
 
 #endif  // CVMFS_CATALOG_DIFF_TOOL_H_

@@ -79,6 +79,9 @@ CommitProcessor::Result CommitProcessor::Process(
   CatalogMergeTool merge_tool(stratum0, old_root_hash_str, new_root_hash_str,
                               temp_dir_prefix, server_tool->download_manager(),
                               manifest.weak_ref());
+  if (!merge_tool.Init()) {
+    return kIoError;
+  }
 
   Params params;
   if (!GetParamsFromFile(repo_name, &params)) {

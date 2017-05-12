@@ -160,6 +160,7 @@ set (CVMFS_FSCK_SOURCES
 set (CVMFS_SWISSKNIFE_SOURCES
   catalog.cc
   catalog_counters.cc
+  catalog_diff_tool.cc
   catalog_mgr_ro.cc
   catalog_mgr_rw.cc
   catalog_sql.cc
@@ -209,6 +210,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   swissknife_assistant.cc
   swissknife_check.cc
   swissknife_diff.cc
+  swissknife_diff_tool.cc
   swissknife_gc.cc
   swissknife_graft.cc
   swissknife_hash.cc

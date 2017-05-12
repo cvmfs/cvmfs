@@ -94,7 +94,7 @@ CatalogMergeTool::~CatalogMergeTool() {}
 
 bool CatalogMergeTool::Run(const Params& params,
                            std::string* new_manifest_path) {
-  bool ret = CatalogDiffTool::Run();
+  bool ret = CatalogDiffTool::Run(PathString(""));
 
   upload::SpoolerDefinition definition(
       params.spooler_configuration, params.hash_alg, params.compression_alg,
