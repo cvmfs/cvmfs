@@ -13,13 +13,17 @@ cvmfs_server_resign() {
   local names
   local retcode=0
   local require_repo_config=1
+  local sign_published=0
 
   # parameter handling
   OPTIND=1
-  while getopts "n" option; do
+  while getopts "np" option; do
     case $option in
       n)
         require_repo_config=0
+      ;;
+      p)
+        sign_published=1
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -35,12 +39,13 @@ cvmfs_server_resign() {
   [ $require_repo_config -eq 0 ] || check_multiple_repository_existence "$names"
 
   # sanity checks
-  is_root || die "Only root can resign repositories"
+  [ $sign_published -eq 0 ] || [ $require_repo_config -eq 1 ] || die "Cannot use both -n and -p"
+  [ $sign_published -eq 1 ] || is_root || die "Only root can resign whitelists"
 
   for name in $names; do
 
-    # sanity checks
     if [ $require_repo_config -eq 1 ]; then
+      # sanity checks
       is_stratum0 $name  || { echo "Repository $name is not a stratum 0 repository"; retcode=1; continue; }
       health_check $name || { echo "Repository $name is not healthy"; retcode=1; continue; }
 
@@ -51,9 +56,32 @@ cvmfs_server_resign() {
       check_repository_compatibility $name
 
       # do it!
-      create_whitelist $name $CVMFS_USER \
-          ${CVMFS_UPSTREAM_STORAGE} \
-          ${CVMFS_SPOOL_DIR}/tmp
+      if [ $sign_published -eq 1 ]; then
+        # This is intended to be used when a repository key has been changed
+        # It re-uses everything from an old .cvmfspublished except the
+        #  certificate hash, signature, and timestamp.
+
+        echo -n "Signing .cvmfspublished... "
+        local manifest="${CVMFS_SPOOL_DIR}/tmp/manifest"
+        local manifest_url="${CVMFS_STRATUM0}/.cvmfspublished"
+        local user_shell="$(get_user_shell $name)"
+        # create the temporary manifest file with user permission first
+        #  which will work whether running as the user or root
+        $user_shell "> $manifest"
+        local old_manifest
+        old_manifest="`get_item $name $manifest_url`" || die "fail (manifest download)!"
+        # overwriting will not change the owner
+        echo "$old_manifest" | strip_manifest_signature - > $manifest
+        sign_manifest $name $manifest
+        echo "done"
+
+      else
+
+        create_whitelist $name $CVMFS_USER \
+            ${CVMFS_UPSTREAM_STORAGE} \
+            ${CVMFS_SPOOL_DIR}/tmp
+
+      fi
     else
       # do not require repository configuration, just the whitelist file
       local whitelist_path=${DEFAULT_LOCAL_STORAGE}/$name/.cvmfswhitelist
