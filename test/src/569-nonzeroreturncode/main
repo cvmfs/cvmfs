@@ -61,38 +61,67 @@ cvmfs_run_test() {
   echo "abort transaction"
   abort_transaction $CVMFS_TEST_REPO || return $?
 
-  echo "resign repository"
+  echo "destroy and create repo to get new keys"
+  local repo_key="/etc/cvmfs/keys/${CVMFS_TEST_REPO}.key"
+  local repo_cert="/etc/cvmfs/keys/${CVMFS_TEST_REPO}.crt"
+  cp $repo_key $repo_cert .
+  destroy_repo $CVMFS_TEST_REPO || return $?
+  create_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  local store_dir=/srv/cvmfs/$CVMFS_TEST_REPO
+
+  echo "restore old repo keys"
+  sudo mv `basename $repo_key` $repo_key
+  sudo mv `basename $repo_cert` $repo_cert
+
+  # If we now don't resign whitelist before attempting to publish, the
+  #  publish will actually succeed once.  In any case, at this point
+  #  both resigh for .cvmfswhitelist and resign -p for .cvmfspublished
+  #  are needed before the repo will fully recover.
+  echo "resign whitelist"
   sudo cvmfs_server resign $CVMFS_TEST_REPO || return $?
 
-  echo "resign with broken master key (should fail)"
+  echo "attempt publish with old repo keys (should fail)"
+  start_transaction $CVMFS_TEST_REPO || return 10
+  publish_repo $CVMFS_TEST_REPO && return 11
+
+  echo "resign published"
+  sudo cvmfs_server resign -p $CVMFS_TEST_REPO || return $?
+
+  echo "make sure that a publish now works"
+  publish_repo $CVMFS_TEST_REPO || return 12
+
+  echo "resign whitelist with broken master key (should fail)"
   local master_key="/etc/cvmfs/keys/${CVMFS_TEST_REPO}.masterkey"
   sudo cp $master_key .
-  echo "this is not valid!" | sudo tee $master_key || return 10
-  sudo cvmfs_server resign $CVMFS_TEST_REPO && return 11
+  echo "this is not valid!" | sudo tee $master_key || return 13
+  sudo cvmfs_server resign $CVMFS_TEST_REPO && return 14
 
-  echo "save .cvmfswhitelist and remove repository"
-  local store_dir=/srv/cvmfs/$CVMFS_TEST_REPO
+  echo "save whitelist and remove repository"
   cp $store_dir/.cvmfswhitelist .
   destroy_repo $CVMFS_TEST_REPO || return $?
 
   echo "remove again (should fail)"
-  destroy_repo $CVMFS_TEST_REPO && return 12
+  destroy_repo $CVMFS_TEST_REPO && return 15
 
-  echo "restore masterkey and .cvmfswhitelist and set a trap for cleaning them"
+  echo "restore masterkey and whitelist and set a trap for cleaning them"
   trap "sudo rm -rf $store_dir $master_key" EXIT HUP INT TERM
   sudo mv `basename $master_key` $master_key
   sudo mkdir -p $store_dir
   sudo chown $CVMFS_TEST_USER $store_dir
   mv .cvmfswhitelist $store_dir
 
-  echo "resign .cvmfswhitelist without requiring repo config"
+  echo "resign whitelist without requiring repo config"
   sudo cvmfs_server resign -n $CVMFS_TEST_REPO || return $?
 
-  echo "remove .cvmfswhitelist and masterkey and try to resign again (should fail)"
+  echo "resign published without full repo config (should fail)"
+  sudo cvmfs_server resign -p $CVMFS_TEST_REPO && return 16
+
+  echo "remove whitelist and masterkey and try to resign whitelist again (should fail)"
   sudo rm -rf $store_dir $master_key
   trap - EXIT HUP INT TERM
 
-  sudo cvmfs_server resign -n $CVMFS_TEST_REPO && return 13
+  sudo cvmfs_server resign -n $CVMFS_TEST_REPO && return 17
 
   return 0
 }
