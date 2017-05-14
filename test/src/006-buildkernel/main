@@ -9,7 +9,9 @@ cvmfs_run_test() {
 
   cvmfs_mount sft.cern.ch || return 1
 
-  outdir=${CVMFS_TEST_SCRATCH}/kbuild
+  outdir=/srv/kbuild
+  sudo mkdir -p $outdir
+  sudo chown $CVMFS_TEST_USER $outdir
 
   rm -rf $outdir
   cd /cvmfs/sft.cern.ch/lcg/external/experimental/linux
@@ -22,6 +24,8 @@ cvmfs_run_test() {
   ps aux | grep cvmfs2 | grep sft.cern.ch
   check_memory sft.cern.ch 50000
   cvmfs_config stat -v sft.cern.ch
+
+  rm -rf $outdir
 
   return 0
 }
