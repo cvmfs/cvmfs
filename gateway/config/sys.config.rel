@@ -1,9 +1,7 @@
 [{lager, [{log_root, "log/"}
          ,{crash_log, "crash.log"}
          ,{handlers, [{lager_console_backend, info}
-                     ,{lager_syslog_backend, ["cvmfs", local1, info]}
-                     ,{lager_file_backend, [{file, "error.log"}, {level, error}]}
-                     ,{lager_file_backend, [{file, "info.log"}, {level, info}]}]}]}
+                     ,{lager_syslog_backend, ["cvmfs", local1, info]}]}]}
 
 ,{mnesia, [{dir, "/opt/cvmfs_mnesia"}
           ,{schema_location, disc}]}
