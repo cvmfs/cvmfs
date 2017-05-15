@@ -25,6 +25,6 @@ client. When publishing, the CernVM-FS server tools process new and modified
 data from the union file system's writable branch and transform the data into
 the CernVM-FS storage format.
 
-CernVM-FS is actively used by small and large HEP collaborations. In many cases,
-it replaces package managers and shared software areas on cluster file systems
-as means to distribute the software used to process experiment data.
+CernVM-FS is actively used by small and large scientific collaborations. In many
+cases, it replaces package managers and shared software areas on cluster file 
+systems as means to distribute the software used to process experiment data.
