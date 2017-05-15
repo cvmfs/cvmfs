@@ -86,12 +86,6 @@ if (MACOSX)
   )
 
   install (
-    FILES         config.d/atlas-nightlies.cern.ch.conf
-    DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/config.d"
-    PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
-  )
-
-  install (
     FILES         config.d/cms.cern.ch.conf
     DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/config.d"
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
@@ -239,12 +233,6 @@ else (MACOSX)
 
   install (
     FILES         config.d/grid.cern.ch.conf
-    DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/config.d"
-    PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
-  )
-
-  install (
-    FILES         config.d/atlas-nightlies.cern.ch.conf
     DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/config.d"
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )

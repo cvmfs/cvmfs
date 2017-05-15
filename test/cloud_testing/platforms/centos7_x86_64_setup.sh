@@ -64,6 +64,9 @@ install_from_repo zlib-devel
 install_from_repo libattr-devel
 install_from_repo openssl-devel
 install_from_repo libuuid-devel
+install_from_repo python-devel
+install_from_repo unzip
+install_from_repo bzip2
 
 # increase open file descriptor limits
 echo -n "increasing ulimit -n ... "

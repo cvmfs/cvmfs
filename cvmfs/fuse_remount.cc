@@ -137,7 +137,7 @@ FuseRemounter::~FuseRemounter() {
 
 
 /**
- * Triggers the Check() method when the catalog TTL expires.  Works essenatially
+ * Triggers the Check() method when the catalog TTL expires.  Works essentially
  * as an alarm() timer.
  */
 void *FuseRemounter::MainRemountTrigger(void *data) {

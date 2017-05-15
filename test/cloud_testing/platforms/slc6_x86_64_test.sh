@@ -18,10 +18,7 @@ echo "done"
 # mount additional disk partitions on strategic cvmfs location
 echo -n "mounting new disk partitions into cvmfs specific locations... "
 mount_partition $disk_to_partition$partition_1 /srv             || die "fail (mounting /srv $?)"
-sudo mkdir -p /srv/cvmfs-spool                                  || die "fail (creating /srv/cvmfs-spool)"
-sudo mkdir -p /var/spool/cvmfs                                  || die "fail (creating /var/spool/cvmfs)"
-sudo mount --bind /srv/cvmfs-spool /var/spool/cvmfs             || die "fail (bind mounting /srv/cvmfs-spool to /var/spool/cvmfs)"
-mount_partition $disk_to_partition$partition_2 /var/lib/cvmfs   || die "fail (mounting /var/lib/cvmfs $?)"
+mount_partition $disk_to_partition$partition_2 /var/spool/cvmfs || die "fail (mounting /var/spool/cvmfs $?)"
 echo "done"
 
 # allow apache access to the mounted server file system
