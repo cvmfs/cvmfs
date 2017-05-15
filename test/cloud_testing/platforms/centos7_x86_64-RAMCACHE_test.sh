@@ -21,7 +21,8 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  src/042-cleanuppipes                         \
                                  src/044-unpinonmount                         \
                                  src/057-parallelmakecache                    \
-                                 src/068-rocache                              \
+				 src/064-fsck                                 \
+				 src/068-rocache                              \
                                  src/070-tieredcache                          \
                                  --                                           \
                                  src/0*                                       \

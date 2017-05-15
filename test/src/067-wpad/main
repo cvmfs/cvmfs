@@ -8,12 +8,12 @@ cvmfs_run_test() {
   local wpadex_file="$(pwd)/wpadex"
   cat > $wpad_file << EOF
   function FindProxyForURL(url, host) {
-    return "PROXY http://no-such-proxy.cern.ch:3128"
+    return "PROXY $CVMFS_TEST_PROXY; PROXY http://no-such-proxy.cern.ch:3128"
   }
 EOF
   cat > $wpadex_file << EOF
   function FindProxyForURLEx(url, host) {
-    return "PROXY http://no-such-proxy-ex.cern.ch:3128"
+    return "PROXY $CVMFS_TEST_PROXY; PROXY http://no-such-proxy-ex.cern.ch:3128"
   }
 EOF
   chmod 666 $wpad_file $wpadex_file || return 10
@@ -23,9 +23,9 @@ EOF
 
   cvmfs_mount grid.cern.ch "CVMFS_HTTP_PROXY=auto" \
     "CVMFS_PAC_URLS=file://$wpad_file" || return 20
-  proxy="$(get_xattr proxy /cvmfs/grid.cern.ch)"
-  echo "Proxy is $proxy"
-  if [ x"$proxy" != x"http://no-such-proxy.cern.ch:3128" ]; then
+  local proxies="$(sudo cvmfs_talk -i grid.cern.ch proxy info)"
+  echo "Proxies are $proxies"
+  if ! echo "$proxies" | grep -q "http://no-such-proxy.cern.ch:3128"; then
     return 30
   fi
   cvmfs_umount grid.cern.ch
@@ -33,9 +33,9 @@ EOF
   # Microsoft extensions
   cvmfs_mount grid.cern.ch "CVMFS_HTTP_PROXY=auto" \
     "CVMFS_PAC_URLS=file://$wpadex_file" || return 21
-  proxy="$(get_xattr proxy /cvmfs/grid.cern.ch)"
-  echo "Proxy is $proxy"
-  if [ x"$proxy" != x"http://no-such-proxy-ex.cern.ch:3128" ]; then
+  proxies="$(sudo cvmfs_talk -i grid.cern.ch proxy info)"
+  echo "Proxies are $proxies"
+  if ! echo "$proxies" | grep -q "http://no-such-proxy-ex.cern.ch:3128"; then
     return 31
   fi
 

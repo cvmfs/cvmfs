@@ -30,6 +30,7 @@ echo "done"
 echo "installing additional RPM packages..."
 install_from_repo gcc
 install_from_repo gcc-c++
+install_from_repo wget
 
 # traffic shaping
 install_from_repo trickle

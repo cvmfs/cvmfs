@@ -81,7 +81,7 @@ add_custom_command(OUTPUT cache.pb.cc cache.pb.h
                    COMMAND ${PROTOBUF_PROTOC_EXECUTABLE} --cpp_out=.
                            ${CMAKE_CURRENT_SOURCE_DIR}/cache.proto
                            -I${CMAKE_CURRENT_SOURCE_DIR}
-                   DEPENDS ${PROTOBUF_ARCHIVE}
+                   DEPENDS ${PROTOBUF_PROTOC_EXECUTABLE}
                            ${CMAKE_CURRENT_SOURCE_DIR}/cache.proto
                    COMMENT "Generating protobuf sources")
 
@@ -416,7 +416,7 @@ if (BUILD_CVMFS)
                                         ${LEVELDB_LIBRARIES}
                                         ${SHA3_LIBRARIES}
                                         ${SHA2_LIBRARIES}
-                                        ${PROTOBUF_LIBRARY}
+                                        ${PROTOBUF_LITE_LIBRARY}
                                         ${VJSON_LIBRARIES}
                                         ${RT_LIBRARY}
                                         ${UUID_LIBRARIES}
@@ -452,7 +452,9 @@ endif (BUILD_CVMFS)
 
 if (BUILD_LIBCVMFS_CACHE)
   add_library (cvmfs_cache_only STATIC ${LIBCVMFS_CACHE_SOURCES})
-  set (LIBCVMFS_CACHE_LIBS ${SHA3_LIBRARIES} ${PROTOBUF_LIBRARY} ${LIBCVMFS_CACHE_LIBS} ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache_only.a)
+  set (LIBCVMFS_CACHE_LIBS ${SHA3_LIBRARIES} ${PROTOBUF_LITE_LIBRARY}
+                           ${LIBCVMFS_CACHE_LIBS}
+                           ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache_only.a)
   set_target_properties (cvmfs_cache_only PROPERTIES COMPILE_FLAGS
                          "${LIBCVMFS_CACHE_CFLAGS}")
   target_link_libraries(cvmfs_cache_only ${LIBCVMFS_CACHE_LIBS})
@@ -495,7 +497,8 @@ if (BUILD_LIBCVMFS)
                      ${PACPARSER_LIBRARIES} ${SQLITE3_LIBRARY}
                      ${ZLIB_LIBRARIES} ${SPARSEHASH_LIBRARIES}
                      ${SHA3_LIBRARIES} ${VJSON_LIBRARIES}
-                     ${PROTOBUF_LIBRARY} ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_only.a)
+                     ${PROTOBUF_LITE_LIBRARY}
+                     ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_only.a)
 
   set_target_properties (cvmfs_only PROPERTIES COMPILE_FLAGS "${LIBCVMFS_CFLAGS}")
   target_link_libraries(cvmfs_only ${LIBCVMFS_LIBS})

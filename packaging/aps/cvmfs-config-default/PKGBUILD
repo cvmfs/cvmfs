@@ -10,7 +10,7 @@ license=('BSD')
 source=('cern.ch.pub' 'cern-it1.cern.ch.pub' 'cern-it4.cern.ch.pub'
         'cern-it5.cern.ch.pub' 'egi.eu.pub' 'opensciencegrid.org.pub'
         'cern.ch.conf' 'egi.eu.conf' 'opensciencegrid.org.conf' '50-cern.conf'
-        '60-egi.conf' 'atlas-nightlies.cern.ch.conf' 'cms.cern.ch.conf'
+        '60-egi.conf' 'cms.cern.ch.conf'
         'grid.cern.ch.conf')
 provides=("cvmfs-config=$pkgver-$pkgrel")
 
@@ -43,7 +43,6 @@ package() {
   done
   install -D -m 444 50-cern.conf "$pkgdir/etc/cvmfs/default.d"
   install -D -m 444 60-egi.conf "$pkgdir/etc/cvmfs/default.d"
-  install -D -m 444 atlas-nightlies.cern.ch.conf "$pkgdir/etc/cvmfs/config.d"
   install -D -m 444 cms.cern.ch.conf "$pkgdir/etc/cvmfs/config.d"
   install -D -m 444 grid.cern.ch.conf "$pkgdir/etc/cvmfs/config.d"
 }

@@ -65,7 +65,7 @@ struct ObjectHeader {
   }
 
   /**
-   * Set during a running transaction so that we know where do look for pointers
+   * Set during a running transaction so that we know where to look for pointers
    * when the memory block gets compacted.  Once committed, this is
    * uint64_t(-1).
    */
@@ -189,10 +189,7 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
 
     if (object->refcnt == 0) {
       Me()->cache_info_.pinned_bytes += object->size_data;
-      if (!Me()->in_danger_zone_ && Me()->IsInDangerZone()) {
-        Me()->in_danger_zone_ = true;
-        cvmcache_ask_detach(ctx);
-      }
+      Me()->CheckHighPinWatermark();
     }
     object->refcnt += change_by;
     if (object->refcnt == 0) {
@@ -345,6 +342,7 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
         Me()->objects_volatile_->Insert(h, txn_object);
       }
     }
+    Me()->CheckHighPinWatermark();
     return CVMCACHE_STATUS_OK;
   }
 
@@ -519,6 +517,9 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
     ComparableHash h;
     ObjectHeader *object;
 
+    LogCvmfs(kLogCvmfs, kLogSyslog,
+             "clean up cache until at most %lu KB is used", shrink_to / 1024);
+
     objects_volatile_->FilterBegin();
     while (objects_volatile_->FilterNext()) {
       objects_volatile_->FilterGet(&h, &object);
@@ -547,6 +548,15 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
 
     storage_->Compact();
     cache_info_.no_shrink++;
+  }
+
+  void CheckHighPinWatermark() {
+    if (!Me()->in_danger_zone_ && Me()->IsInDangerZone()) {
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+               "high watermark of pinned files");
+      Me()->in_danger_zone_ = true;
+      cvmcache_ask_detach(ctx);
+    }
   }
 
   bool IsInDangerZone() {

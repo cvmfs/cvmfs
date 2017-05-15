@@ -1051,14 +1051,19 @@ cvmfs_reload() {
     for dir in $cache_directories; do
       echo -n "Wiping out $dir ... "
       if [ -d "$dir" ]; then
-        rm -rf "$dir" && \
-          mkdir -p "$dir" && \
-          chown $CVMFS_USER "$dir"
-        if [ $? -ne 0 ]; then
-          echo "Failed!"
-          RETVAL=1
+        local num_nfs_maps=$(find $dir -maxdepth 1 -type d -name 'nfs_maps.*' | wc -l)
+        if [ $num_nfs_maps -ne 0 ]; then
+          echo "not supported for NFS exported client, leaving directory untouched!"
         else
-          echo "OK"
+          rm -rf "$dir" && \
+            mkdir -p "$dir" && \
+            chown $CVMFS_USER "$dir"
+          if [ $? -ne 0 ]; then
+            echo "Failed!"
+            RETVAL=1
+          else
+            echo "OK"
+          fi
         fi
       else
         echo "OK"
