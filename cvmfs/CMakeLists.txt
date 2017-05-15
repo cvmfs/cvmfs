@@ -203,6 +203,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   server_tool.cc
   session_context.cc
   signature.cc
+  signing_tool.cc
   sql.cc
   sqlitemem.cc
   statistics.cc
