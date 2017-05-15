@@ -84,7 +84,7 @@ create_cvmfs_source_tarball() {
         ${source_directory}/ChangeLog          \
         ${source_directory}/INSTALL            \
         ${source_directory}/NEWS               \
-        ${source_directory}/README             \
+        ${source_directory}/README.md          \
         ${source_directory}/add-ons            \
         ${source_directory}/bootstrap.sh       \
         ${source_directory}/cmake              \
