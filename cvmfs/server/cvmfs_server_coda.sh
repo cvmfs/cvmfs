@@ -83,7 +83,7 @@ fi
 # Check if `runuser` is available on this system
 # Note: at least Ubuntu in older versions doesn't provide this command
 HAS_RUNUSER=0
-if cvmfs_sys_file_is_executable "$RUNUSER_BIN" ; then
+if [ "x$RUNUSER_BIN" != "x" ]; then
   HAS_RUNUSER=1
 fi
 

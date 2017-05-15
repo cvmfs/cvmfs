@@ -34,12 +34,16 @@ class CommandListCatalogs : public Command {
 
  protected:
   template <class ObjectFetcherT>
-  bool Run(ObjectFetcherT *object_fetcher) {
+  bool Run(const shash::Any &manual_root_hash,
+           ObjectFetcherT *object_fetcher)
+  {
     typename CatalogTraversal<ObjectFetcherT>::Parameters params;
     params.object_fetcher = object_fetcher;
     CatalogTraversal<ObjectFetcherT> traversal(params);
     traversal.RegisterListener(&CommandListCatalogs::CatalogCallback, this);
-    return traversal.Traverse();
+    if (manual_root_hash.IsNull())
+      return traversal.Traverse();
+    return traversal.Traverse(manual_root_hash);
   }
 
   void CatalogCallback(const CatalogTraversalData<catalog::Catalog> &data);

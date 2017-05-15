@@ -798,7 +798,12 @@ bool FileSystem::SetupNfsMaps() {
   // nfs maps need to be protected by workspace lock
   PosixCacheManager *posix_cache_mgr =
         reinterpret_cast<PosixCacheManager *>(cache_mgr_);
-  assert(posix_cache_mgr->cache_path() == workspace_);
+  if (posix_cache_mgr->cache_path() != workspace_) {
+    boot_error_ = "Cache directory and workspace must be identical for "
+                  "NFS export";
+    boot_status_ = loader::kFailNfsMaps;
+    return false;
+  }
 
   string inode_cache_dir = nfs_maps_dir_ + "/nfs_maps." + name_;
   if (!MkdirDeep(inode_cache_dir, 0700)) {

@@ -94,7 +94,7 @@ cvmfs_server_check() {
   local with_reflog=
   has_reflog_checksum $name && with_reflog="-R $(get_reflog_checksum $name)"
 
-  echo "Verifying Catalog Integrity of ${name}${subtree_msg}..."
+  echo "Verifying integrity of ${name}${subtree_msg}..."
   local user_shell="$(get_user_shell $name)"
   local check_cmd
   check_cmd="$(__swissknife_cmd dbg) check $tag        \

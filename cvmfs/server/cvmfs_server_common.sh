@@ -191,12 +191,12 @@ repository_creator_version() {
 }
 
 
-# checks if a given tag already exists in the repository's history database
+# gets the catalog root hash associated to a tag name
 #
 # @param repository_name   the name of the repository to be checked
 # @param tag               the tag name to be checked
-# @return                  0 if tag already exists
-check_tag_existence() {
+# @return                  hash value or the empty string
+get_tag_hash() {
   local repository_name="$1"
   local tag="$2"
 
@@ -206,7 +206,66 @@ check_tag_existence() {
     -t ${CVMFS_SPOOL_DIR}/tmp                 \
     -p /etc/cvmfs/keys/${repository_name}.pub \
     -f $repository_name                       \
-    -n "$tag" > /dev/null 2>&1
+    $(get_follow_http_redirects_flag) -x      \
+    -n "$tag" 2>/dev/null | cut -d" " -f2
+}
+
+
+# gets the branch associated to a tag name
+#
+# @param repository_name   the name of the repository to be checked
+# @param tag               the tag name to be checked
+# @return                  branch name
+get_tag_branch() {
+  local repository_name="$1"
+  local tag="$2"
+
+  load_repo_config $repository_name
+  local branch=$(__swissknife tag_info        \
+    -w $CVMFS_STRATUM0                        \
+    -t ${CVMFS_SPOOL_DIR}/tmp                 \
+    -p /etc/cvmfs/keys/${repository_name}.pub \
+    -f $repository_name                       \
+    $(get_follow_http_redirects_flag) -x      \
+    -n "$tag" 2>/dev/null | cut -d" " -f7)
+  if [ "x$branch" = "x(default)" ]; then
+    branch=
+  fi
+  echo "$branch"
+}
+
+
+# checks if a given tag already exists in the repository's history database
+#
+# @param repository_name   the name of the repository to be checked
+# @param tag               the tag name to be checked
+# @return                  0 if tag already exists
+check_tag_existence() {
+  local repository_name="$1"
+  local tag="$2"
+
+  local tag_hash=$(get_tag_hash $repository_name $tag)
+  [ "x$tag_hash" != "x" ]
+}
+
+
+# gets the youngest tag on a given branch
+#
+# @param repository_name   the name of the repository to be checked
+# @param branch            the branch name to be checked
+# @return                  '<tag name> <hash> <branch>'
+get_head_of() {
+  local repository_name="$1"
+  local branch="$2"
+
+  load_repo_config $repository_name
+  __swissknife tag_list                       \
+    -w $CVMFS_STRATUM0                        \
+    -t ${CVMFS_SPOOL_DIR}/tmp                 \
+    -p /etc/cvmfs/keys/${repository_name}.pub \
+    -f $repository_name                       \
+    $(get_follow_http_redirects_flag) -x      \
+    | cut -d" " -f1,2,7 | grep " $branch\$" | head -n 1
 }
 
 
@@ -231,6 +290,17 @@ get_published_root_hash() {
 
   load_repo_config $repository_name
   get_repo_info -c
+}
+
+# retrieves the current manifest without signature
+#
+# @param repository_name   the name of the repository to be checked
+# @return                  echoes the published manufest
+get_raw_manifest() {
+  local repository_name=$1
+
+  load_repo_config $repository_name
+  get_repo_info -R
 }
 
 
@@ -284,6 +354,60 @@ is_publishing() {
   check_lock ${CVMFS_SPOOL_DIR}/is_publishing
 }
 
+# checks if a repository is currently checked out
+#
+# @param name  the repository name to be checked
+# @return      0 if checked out
+is_checked_out() {
+  local name=$1
+  load_repo_config $name
+  [ -f /var/spool/cvmfs/${name}/checkout ]
+}
+
+
+# parses the checkout file
+#
+# @param name  the repository name to be checked
+# @return      0 if checked out
+get_checked_out_tag() {
+  local name=$1
+  load_repo_config $name
+  cat /var/spool/cvmfs/${name}/checkout | cut -d" " -f1
+}
+
+
+# parses the checkout file
+#
+# @param name  the repository name to be checked
+# @return      0 if checked out
+get_checked_out_hash() {
+  local name=$1
+  load_repo_config $name
+  cat /var/spool/cvmfs/${name}/checkout | cut -d" " -f2
+}
+
+
+# parses the checkout file
+#
+# @param name  the repository name to be checked
+# @return      0 if checked out
+get_checked_out_branch() {
+  local name=$1
+  load_repo_config $name
+  cat /var/spool/cvmfs/${name}/checkout | cut -d" " -f3
+}
+
+
+# parses the checkout file
+#
+# @param name  the repository name to be checked
+# @return      0 if checked out
+get_checked_out_previous_branch() {
+  local name=$1
+  load_repo_config $name
+  cat /var/spool/cvmfs/${name}/checkout | cut -d" " -f4
+}
+
 
 # checks if the running user is root
 #
@@ -301,6 +425,18 @@ is_owner_or_root() {
   is_root && return 0
   load_repo_config $name
   [ x"$(whoami)" = x"$CVMFS_USER" ]
+}
+
+
+# checks if a repository is a replica flagged as being inactive
+#
+# @param name  the name of the repository to be checked
+# @return      0 if it is an inactive replica
+is_inactive_replica() {
+  local name=$1
+  unset CVMFS_REPLICA_ACTIVE # remove previous setting, default is yes
+  load_repo_config $name
+  is_stratum1 $name && [ x"$CVMFS_REPLICA_ACTIVE" = x"no" ]
 }
 
 

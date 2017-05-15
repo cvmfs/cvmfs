@@ -45,9 +45,11 @@ class HistoryDatabase : public sqlite::Database<HistoryDatabase> {
  private:
   bool CreateTagsTable();
   bool CreateRecycleBinTable();
+  bool CreateBranchesTable();
 
   bool UpgradeSchemaRevision_10_1();
   bool UpgradeSchemaRevision_10_2();
+  bool UpgradeSchemaRevision_10_3();
 };
 
 
@@ -111,6 +113,7 @@ class SqlRetrieveTag : public MixinT {
                            MixinT::RetrieveInt64(4));
     result.description = MixinT::RetrieveString(5);
     result.size        = MixinT::RetrieveInt64(6);
+    result.branch      = MixinT::RetrieveString(7);
     return result;
   }
 };
@@ -147,6 +150,13 @@ class SqlFindTagByDate : public SqlRetrieveTag<SqlHistory> {
 };
 
 
+class SqlFindBranchHead : public SqlRetrieveTag<SqlHistory> {
+ public:
+  explicit SqlFindBranchHead(const HistoryDatabase *database);
+  bool BindBranchName(const std::string &branch_name);
+};
+
+
 class SqlCountTags : public SqlHistory {
  public:
   explicit SqlCountTags(const HistoryDatabase *database);
@@ -170,6 +180,20 @@ class SqlGetHashes : public SqlHistory {
  public:
   explicit SqlGetHashes(const HistoryDatabase *database);
   shash::Any RetrieveHash() const;
+};
+
+
+class SqlListBranches : public SqlHistory {
+ public:
+  explicit SqlListBranches(const HistoryDatabase *database);
+  History::Branch RetrieveBranch() const;
+};
+
+
+class SqlInsertBranch : public SqlHistory {
+ public:
+  explicit SqlInsertBranch(const HistoryDatabase *database);
+  bool BindBranch(const History::Branch &branch);
 };
 
 
@@ -223,13 +247,6 @@ class SqlRecycleBin : public SqlHistory {
 };
 
 
-class SqlRecycleBinInsert : public SqlRecycleBin {
- public:
-  explicit SqlRecycleBinInsert(const HistoryDatabase *database);
-  bool BindTag(const History::Tag &condemned_tag);
-};
-
-
 class SqlRecycleBinList : public SqlRecycleBin {
  public:
   explicit SqlRecycleBinList(const HistoryDatabase *database);
@@ -240,18 +257,6 @@ class SqlRecycleBinList : public SqlRecycleBin {
 class SqlRecycleBinFlush : public SqlRecycleBin {
  public:
   explicit SqlRecycleBinFlush(const HistoryDatabase *database);
-};
-
-
-/**
- * Shadows all hashes that are going to be deleted by the history rollback into
- * the recycle bin.
- * See: SqlRollback::BindTargetTag()
- */
-class SqlRecycleBinRollback : public SqlRollback<SqlRecycleBin, 1> {
- public:
-  explicit SqlRecycleBinRollback(const HistoryDatabase *database);
-  bool BindFlags();
 };
 
 }  // namespace history

@@ -141,8 +141,14 @@ void VirtualCatalog::GenerateSnapshots() {
   GetSortedTagsFromHistory(&tags_history);
   GetSortedTagsFromCatalog(&tags_catalog);
   // Add artifical end markers to both lists
-  tags_history.push_back(TagId("", shash::Any()));
-  tags_catalog.push_back(TagId("", shash::Any()));
+  string tag_name_end = "";
+  if (!tags_history.empty())
+    tag_name_end = std::max(tag_name_end, tags_history.rbegin()->name);
+  if (!tags_catalog.empty())
+    tag_name_end = std::max(tag_name_end, tags_catalog.rbegin()->name);
+  tag_name_end += "X";
+  tags_history.push_back(TagId(tag_name_end, shash::Any()));
+  tags_catalog.push_back(TagId(tag_name_end, shash::Any()));
 
   // Walk through both sorted lists concurrently and determine change set
   unsigned i_history = 0, i_catalog = 0;
@@ -169,14 +175,14 @@ void VirtualCatalog::GenerateSnapshots() {
     }
 
     // New tag that's missing
-    if ((t_history.name < t_catalog.name) || t_catalog.name.empty()) {
+    if (t_history.name < t_catalog.name) {
       InsertSnapshot(t_history);
       i_history++;
       continue;
     }
 
     // A tag was removed but it is still present in the catalog
-    assert((t_history.name > t_catalog.name) || t_history.name.empty());
+    assert(t_history.name > t_catalog.name);
     RemoveSnapshot(t_catalog);
     i_catalog++;
   }

@@ -32,7 +32,7 @@ cvmfs_server_diff() {
       ;;
       ?)
         shift $(($OPTIND-2))
-        usage "Command list-catalogs: Unrecognized option: $1"
+        usage "Command diff: Unrecognized option: $1"
       ;;
     esac
   done

@@ -517,6 +517,7 @@ uint64_t Catalog::GetRevision() const {
   return result;
 }
 
+
 uint64_t Catalog::GetLastModified() const {
   const std::string prop_name = "last_modified";
   return (database().HasProperty(prop_name))

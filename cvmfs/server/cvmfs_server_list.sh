@@ -68,12 +68,20 @@ cvmfs_server_list() {
       health_info=" - unhealthy"
     fi
 
+    # print the checked out tag and branch
+    local checkout_info=""
+    if is_checked_out $name; then
+      local tag_name=$(get_checked_out_tag $name)
+      local branch_name=$(get_checked_out_branch $name)
+      checkout_info=" [checked out tag '$tag_name' on branch '$branch_name']"
+    fi
+
     # get the storage type of the repository
     local storage_type=""
     storage_type=$(get_upstream_type $CVMFS_UPSTREAM_STORAGE)
 
     # print out repository information list
-    echo "$name ($CVMFS_REPOSITORY_TYPE / $storage_type$transaction_info$whitelist_info$health_info) $stratum1_info $version_info"
+    echo "$name ($CVMFS_REPOSITORY_TYPE / $storage_type$transaction_info$whitelist_info$health_info$checkout_info) $stratum1_info $version_info"
     CVMFS_CREATOR_VERSION=""
   done
 }
