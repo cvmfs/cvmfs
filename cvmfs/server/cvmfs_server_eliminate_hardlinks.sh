@@ -37,6 +37,7 @@ cvmfs_server_eliminate_hardlinks() {
   load_repo_config $name
 
   is_root || die "Permission denied: Only root can do that"
+  is_checked_out $name && die "command is not supported while checked out onto a branch"
 
   if [ $force -ne 1 ]; then
     echo "This will break up all hardlink relationships that are currently"

@@ -27,6 +27,7 @@
 #include "logging.h"
 #include "manifest.h"
 #include "reflog.h"
+#include "sanitizer.h"
 #include "shortstring.h"
 #include "util/pointer.h"
 #include "util/posix.h"
@@ -230,6 +231,66 @@ bool CommandCheck::InspectReflog(
   }
 
   return true;
+}
+
+
+/**
+ * Verifies the logical consistency of the tag database.
+ */
+bool CommandCheck::InspectHistory(history::History *history) {
+  LogCvmfs(kLogCvmfs, kLogStdout, "Inspecting tag database");
+  bool retval;
+  vector<history::History::Tag> tags;
+  retval = history->List(&tags);
+  if (!retval) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to enumerate tags");
+    return false;
+  }
+  vector<history::History::Branch> branches;
+  retval = history->ListBranches(&branches);
+  if (!retval) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to enumerate branches");
+    return false;
+  }
+
+  bool result = true;
+
+  map<string, unsigned> initial_revisions;
+  sanitizer::BranchSanitizer sanitizer;
+  for (unsigned i = 0; i < branches.size(); ++i) {
+    if (!sanitizer.IsValid(branches[i].branch)) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "invalid branch name: %s",
+               branches[i].branch.c_str());
+      result = false;
+    }
+    initial_revisions[branches[i].branch] = branches[i].initial_revision;
+  }
+
+  set<string> used_branches;  // all branches referenced in tag db
+  // TODO(jblomer): same root hash implies same size and revision
+  for (unsigned i = 0; i < tags.size(); ++i) {
+    used_branches.insert(tags[i].branch);
+    map<string, unsigned>::const_iterator iter =
+      initial_revisions.find(tags[i].branch);
+    if (iter == initial_revisions.end()) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "invalid branch %s in tag %s",
+               tags[i].branch.c_str(), tags[i].name.c_str());
+      result = false;
+    } else {
+      if (tags[i].revision < iter->second) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "invalid revision %u of tag %s",
+               tags[i].revision, tags[i].name.c_str());
+        result = false;
+      }
+    }
+  }
+
+  if (used_branches.size() != branches.size()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "unused, dangling branches stored");
+    result = false;
+  }
+
+  return result;
 }
 
 
@@ -838,7 +899,9 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   }
 
   // Load Manifest
-  manifest::Manifest *manifest = NULL;
+  UniquePtr<manifest::Manifest> manifest;
+  bool successful = true;
+
   if (is_remote_) {
     manifest = FetchRemoteManifest(repo_base_path_, repo_name);
   } else {
@@ -850,7 +913,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     manifest = OpenLocalManifest(".cvmfspublished");
   }
 
-  if (!manifest) {
+  if (!manifest.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to load repository manifest");
     return 1;
   }
@@ -860,36 +923,13 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     bool retval = InspectReflog(reflog_hash, manifest);
     if (!retval) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to verify reflog");
-      delete manifest;
       return 1;
     }
   }
 
-  if (manifest->has_alt_catalog_path()) {
-    if (!Exists(manifest->certificate().MakeAlternativePath())) {
-      LogCvmfs(kLogCvmfs, kLogStderr,
-               "failed to find alternative certificate link %s",
-               manifest->certificate().MakeAlternativePath().c_str());
-      delete manifest;
-      return 1;
-    }
-    if (!Exists(manifest->catalog_hash().MakeAlternativePath())) {
-      LogCvmfs(kLogCvmfs, kLogStderr,
-               "failed to find alternative catalog link %s",
-               manifest->catalog_hash().MakeAlternativePath().c_str());
-      delete manifest;
-      return 1;
-    }
-  }
-
-  shash::Any root_hash = manifest->catalog_hash();
-  uint64_t root_size = manifest->catalog_size();
-  if (tag_name != "") {
-    if (manifest->history().IsNull()) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "no history");
-      delete manifest;
-      return 1;
-    }
+  // Load history
+  UniquePtr<history::History> tag_db;
+  if (!manifest->history().IsNull()) {
     string tmp_file;
     if (!is_remote_)
       tmp_file = DecompressPiece(manifest->history());
@@ -898,25 +938,44 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     if (tmp_file == "") {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to load history database %s",
                manifest->history().ToString().c_str());
-      delete manifest;
       return 1;
     }
-    history::History *tag_db = history::SqliteHistory::Open(tmp_file);
-    if (NULL == tag_db) {
+    tag_db = history::SqliteHistory::Open(tmp_file);
+    if (!tag_db.IsValid()) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to open history database %s",
+               manifest->history().ToString().c_str());
+      return 1;
+    }
+    tag_db->TakeDatabaseFileOwnership();
+    successful = InspectHistory(tag_db) && successful;
+  }
+
+  if (manifest->has_alt_catalog_path()) {
+    if (!Exists(manifest->certificate().MakeAlternativePath())) {
       LogCvmfs(kLogCvmfs, kLogStderr,
-               "failed to open history database %s at %s",
-               manifest->history().ToString().c_str(), tmp_file.c_str());
-      delete manifest;
+               "failed to find alternative certificate link %s",
+               manifest->certificate().MakeAlternativePath().c_str());
+      return 1;
+    }
+    if (!Exists(manifest->catalog_hash().MakeAlternativePath())) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "failed to find alternative catalog link %s",
+               manifest->catalog_hash().MakeAlternativePath().c_str());
+      return 1;
+    }
+  }
+
+  shash::Any root_hash = manifest->catalog_hash();
+  uint64_t root_size = manifest->catalog_size();
+  if (tag_name != "") {
+    if (!tag_db.IsValid()) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "no history");
       return 1;
     }
     history::History::Tag tag;
     const bool retval = tag_db->GetByName(tag_name, &tag);
-    delete tag_db;
-    unlink(tmp_file.c_str());
     if (!retval) {
       LogCvmfs(kLogCvmfs, kLogStderr, "no such tag: %s", tag_name.c_str());
-      unlink(tmp_file.c_str());
-      delete manifest;
       return 1;
     }
     root_hash = tag.root_hash;
@@ -931,19 +990,16 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
                                                    &root_size)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "cannot find nested catalog at %s",
              subtree_path.c_str());
-    delete manifest;
     return 1;
   }
 
   catalog::DeltaCounters computed_counters;
-  const bool successful = InspectTree(subtree_path,
-                                      root_hash,
-                                      root_size,
-                                      is_nested_catalog,
-                                      NULL,
-                                      &computed_counters);
-
-  delete manifest;
+  successful = InspectTree(subtree_path,
+                           root_hash,
+                           root_size,
+                           is_nested_catalog,
+                           NULL,
+                           &computed_counters) && successful;
 
   if (!successful) {
     LogCvmfs(kLogCvmfs, kLogStderr, "CATALOG PROBLEMS OR OTHER ERRORS FOUND");

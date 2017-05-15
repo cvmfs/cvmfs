@@ -549,6 +549,7 @@ MockHistory::MockHistory(const bool          writable,
         : writable_(writable)
         , owns_database_file_(false) {
   set_fqrn(fqrn);
+  branches_[""] = History::Branch("", "", 0);
   ++MockHistory::instances;
 }
 
@@ -589,6 +590,17 @@ bool MockHistory::Insert(const Tag &tag) {
   if (Exists(tag.name)) {
     return false;
   }
+  bool found_branch = false;
+  for (BranchMap::const_iterator i = branches_.begin();
+       i != branches_.end(); ++i)
+  {
+    if (i->first == tag.branch) {
+      found_branch = true;
+      break;
+    }
+  }
+  if (!found_branch)
+    return false;
 
   tags_[tag.name] = tag;
   return true;
@@ -600,7 +612,6 @@ bool MockHistory::Remove(const std::string &name) {
     return true;
   }
 
-  recycle_bin_.insert(tag.root_hash);
   return tags_.erase(name) == 1;
 }
 
@@ -652,6 +663,61 @@ bool MockHistory::Tips(std::vector<Tag> *channel_tips) const {
                                                 MockHistory::eq_channel);
   channel_tips->erase(last, channel_tips->end());
   return true;
+}
+
+bool MockHistory::GetBranchHead(const string &branch_name, Tag *tag) const {
+  std::vector<Tag> all_tags;
+  GetTags(&all_tags);
+  int max_rev = -1;
+  for (unsigned i = 0; i < all_tags.size(); ++i) {
+    if (all_tags[i].branch != branch_name)
+      continue;
+    if (static_cast<int>(all_tags[i].revision) > max_rev) {
+      *tag = all_tags[i];
+      max_rev = all_tags[i].revision;
+    }
+  }
+  return max_rev > 0;
+}
+
+bool MockHistory::InsertBranch(const Branch &branch) {
+  bool found_parent = false;
+  for (BranchMap::const_iterator i = branches_.begin();
+       i != branches_.end(); ++i)
+  {
+    if (i->first == branch.branch)
+      return false;
+    if (i->first == branch.parent)
+      found_parent = true;
+  }
+  if (!found_parent)
+    return false;
+  branches_[branch.branch] = branch;
+  return true;
+}
+
+bool MockHistory::PruneBranches() {
+  return false;
+}
+
+bool MockHistory::ListBranches(vector<Branch> *branches) const {
+  for (BranchMap::const_iterator i = branches_.begin();
+       i != branches_.end(); ++i)
+  {
+    branches->push_back(Branch(
+      i->first, i->second.parent, i->second.initial_revision));
+  }
+  return true;
+}
+
+bool MockHistory::ExistsBranch(const std::string &branch_name) const {
+  for (BranchMap::const_iterator i = branches_.begin();
+       i != branches_.end(); ++i)
+  {
+    if (i->first == branch_name)
+      return true;
+  }
+  return false;
 }
 
 bool MockHistory::ListRecycleBin(std::vector<shash::Any> *hashes) const {

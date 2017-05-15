@@ -650,7 +650,8 @@ class MockHistory : public history::History,
                     public MockObjectStorage<MockHistory> {
  public:
   typedef std::map<std::string, history::History::Tag> TagMap;
-  typedef std::set<shash::Any>                         HashSet;
+  typedef std::map<std::string, history::History::Branch> BranchMap;
+  typedef std::set<shash::Any> HashSet;
 
   static const std::string rhs;
   static const shash::Any  root_hash;
@@ -694,6 +695,12 @@ class MockHistory : public history::History,
   bool List(std::vector<Tag> *tags) const;
   bool Tips(std::vector<Tag> *channel_tips) const;
 
+  bool GetBranchHead(const std::string &branch_name, Tag *tag) const;
+  bool InsertBranch(const Branch &branch);
+  bool PruneBranches();
+  bool ListBranches(std::vector<Branch> *branches) const;
+  bool ExistsBranch(const std::string &branch_name) const;
+
   bool ListRecycleBin(std::vector<shash::Any> *hashes) const;
   bool EmptyRecycleBin();
 
@@ -703,6 +710,7 @@ class MockHistory : public history::History,
 
   bool GetHashes(std::vector<shash::Any> *hashes) const;
 
+  bool Vacuum() { return true; }
   void TakeDatabaseFileOwnership() { owns_database_file_ = true;  }
   void DropDatabaseFileOwnership() { owns_database_file_ = false; }
   bool OwnsDatabaseFile() const    { return owns_database_file_;  }
@@ -772,6 +780,7 @@ class MockHistory : public history::History,
 
  private:
   TagMap      tags_;
+  BranchMap   branches_;
   HashSet     recycle_bin_;
   bool        writable_;
   shash::Any  previous_revision_;

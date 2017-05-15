@@ -291,7 +291,9 @@ class CommandMigrate : public Command {
 
  protected:
   template <class ObjectFetcherT>
-  bool LoadCatalogs(ObjectFetcherT *object_fetcher) {
+  bool LoadCatalogs(const shash::Any &manual_root_hash,
+                    ObjectFetcherT *object_fetcher)
+  {
     typename CatalogTraversal<ObjectFetcherT>::Parameters params;
     const bool generate_full_catalog_tree = true;
     params.no_close       = generate_full_catalog_tree;
@@ -299,7 +301,9 @@ class CommandMigrate : public Command {
     CatalogTraversal<ObjectFetcherT> traversal(params);
     traversal.RegisterListener(&CommandMigrate::CatalogCallback, this);
 
-    return traversal.Traverse();
+    if (manual_root_hash.IsNull())
+      return traversal.Traverse();
+    return traversal.Traverse(manual_root_hash);
   }
 
   void CatalogCallback(

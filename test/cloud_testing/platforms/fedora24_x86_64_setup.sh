@@ -40,6 +40,7 @@ install_from_repo python
 install_from_repo nc
 install_from_repo wget
 install_from_repo bc
+install_from_repo tree
 
 # traffic shaping
 install_from_repo trickle

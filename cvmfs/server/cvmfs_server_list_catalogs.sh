@@ -55,6 +55,10 @@ cvmfs_server_list_catalogs() {
   # check if repository is compatible to the installed CernVM-FS version
   check_repository_compatibility $name
 
+  if is_checked_out $name; then
+    param_list="$param_list -h $(get_checked_out_hash $name)"
+  fi
+
   # do it!
   local user_shell="$(get_user_shell $name)"
   local lsrepo_cmd

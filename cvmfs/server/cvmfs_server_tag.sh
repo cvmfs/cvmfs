@@ -98,8 +98,7 @@ cvmfs_server_tag() {
       -t ${CVMFS_SPOOL_DIR}/tmp                              \
       -p /etc/cvmfs/keys/${name}.pub                         \
       -z /etc/cvmfs/repositories.d/${name}/trusted_certs     \
-      -f $name                                               \
-      -b $base_hash"
+      -f $name"
     if [ $machine_readable -ne 0 ]; then
       tag_list_command="$tag_list_command -x"
     fi
@@ -129,6 +128,7 @@ cvmfs_server_tag() {
   [ ! -z "$tag_name" -o ! -z "$tag_names" ] || die "Tag name missing"
   echo "$tag_name" | grep -q -v " "         || die "Spaces are not allowed in tag names"
 
+  is_checked_out $name && die "Cannot modify tags when checked out on another branch"
   is_in_transaction $name && die "Cannot change repository tags while in a transaction"
   trap "close_transaction $name 0" EXIT HUP INT TERM
   open_transaction $name || die "Failed to open transaction for tag manipulation"
