@@ -135,7 +135,7 @@ cvmfs_run_test() {
   echo "Version of testee:        $current_version"
   # FIX ME: We want to test upgrading from more than just one base version
   # previous_version=$(decrement_version $current_version)
-  previous_version="2.2.1"
+  previous_version="2.3.5"
   echo "Version to be downloaded: $previous_version"
   upstream_package_url=$(guess_package_url "cvmfs" ${previous_version}-1)
   echo "Download URL:             $upstream_package_url"

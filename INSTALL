@@ -13,5 +13,5 @@ install, run from the source directory
 In order to build the unit tests in addition, use
 `cmake -DBUILD_UNITTESTS=yes ../`
 
-For more details, please see the [technical report](http://cernvm.cern.ch/portal/filesystem/techinformation).
+For more details, please see the [technical documentation](https://cvmfs.readthedocs.io/en/stable/).
 

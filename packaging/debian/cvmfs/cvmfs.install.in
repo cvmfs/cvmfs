@@ -1,4 +1,4 @@
-usr/share/doc/cvmfs-@CVMFS_VERSION@/README
+usr/share/doc/cvmfs-@CVMFS_VERSION@/README.md
 usr/share/doc/cvmfs-@CVMFS_VERSION@/AUTHORS
 usr/share/doc/cvmfs-@CVMFS_VERSION@/ChangeLog
 usr/share/doc/cvmfs-@CVMFS_VERSION@/COPYING

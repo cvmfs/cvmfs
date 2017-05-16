@@ -452,7 +452,7 @@ endif (BUILD_UBENCHMARKS)
 # Documentation
 #
 install (
-    FILES                   README AUTHORS ChangeLog COPYING
+    FILES                   README.md AUTHORS ChangeLog COPYING
     DESTINATION             share/doc/cvmfs-${CernVM-FS_VERSION_STRING}
     PERMISSIONS             OWNER_WRITE OWNER_READ GROUP_READ WORLD_READ
         )
