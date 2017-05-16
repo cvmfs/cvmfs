@@ -15,6 +15,7 @@ LIBGEOIP_VERSION=1.6.0
 PYTHON_GEOIP_VERSION=1.3.1
 PROTOBUF_VERSION=2.6.1
 MONGOOSE_VERSION=3.8
+BOOST_SMART_PTR_VERSION=1.63.0
 
 if [ x"$EXTERNALS_LIB_LOCATION" = x"" ]; then
   echo "Bootstrap - Missing environment variable: EXTERNALS_LIB_LOCATION"
@@ -234,6 +235,10 @@ build_lib() {
       patch_external "mongoose" "keep_sigchld.patch"
       do_build "mongoose"
       ;;
+    boost_smart_ptr)
+      do_extract "boost_smart_ptr" "boost_smart_ptr-${BOOST_SMART_PTR_VERSION}.tar.bz2"
+      do_build "boost_smart_ptr"
+      ;;
     *)
       echo "Unknown library name. Exiting."
       exit 1
@@ -244,7 +249,7 @@ build_lib() {
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 # Build a list of libs that need to be built
-missing_libs="libcurl pacparser zlib sparsehash leveldb googletest libgeoip tbb protobuf googlebench sqlite3 vjson sha2 sha3 mongoose"
+missing_libs="libcurl pacparser zlib sparsehash leveldb googletest libgeoip tbb protobuf googlebench sqlite3 vjson sha2 sha3 mongoose boost_smart_ptr"
 
 if [ -f $externals_install_dir/.bootstrapDone ]; then
   existing_libs=$(cat $externals_install_dir/.bootstrapDone)
