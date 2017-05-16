@@ -43,8 +43,8 @@ CommitProcessor::~CommitProcessor() {}
  * repository manifest.
  */
 CommitProcessor::Result CommitProcessor::Process(
-    const std::string& lease_path, const std::string& old_root_hash_str,
-    const std::string& new_root_hash_str) {
+    const std::string& lease_path, const shash::Any& old_root_hash_str,
+    const shash::Any& new_root_hash_str) {
   const std::vector<std::string> lease_path_tokens =
       SplitString(lease_path, '/');
 

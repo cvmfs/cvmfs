@@ -40,11 +40,10 @@ bool IsSmaller(const catalog::DirectoryEntry& a,
 
 catalog::SimpleCatalogManager* OpenCatalogManager(
     const std::string& repo_path, const std::string& temp_dir,
-    const std::string& root_hash, download::DownloadManager* download_manager,
+    const shash::Any& root_hash, download::DownloadManager* download_manager,
     perf::Statistics* stats) {
-  shash::Any hash(shash::MkFromSuffixedHexPtr(shash::HexPtr(root_hash)));
   catalog::SimpleCatalogManager* mgr = new catalog::SimpleCatalogManager(
-      hash, repo_path, temp_dir, download_manager, stats, true);
+      root_hash, repo_path, temp_dir, download_manager, stats, true);
   mgr->Init();
 
   return mgr;
@@ -53,8 +52,8 @@ catalog::SimpleCatalogManager* OpenCatalogManager(
 }  // namespace
 
 CatalogDiffTool::CatalogDiffTool(const std::string& repo_path,
-                                 const std::string& old_root_hash,
-                                 const std::string& new_root_hash,
+                                 const shash::Any& old_root_hash,
+                                 const shash::Any& new_root_hash,
                                  const std::string& temp_dir_prefix,
                                  download::DownloadManager* download_manager)
     : repo_path_(repo_path),

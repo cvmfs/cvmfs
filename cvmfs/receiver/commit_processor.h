@@ -29,9 +29,8 @@ class CommitProcessor {
   CommitProcessor();
   virtual ~CommitProcessor();
 
-  Result Process(const std::string& lease_path,
-                 const std::string& old_root_hash,
-                 const std::string& new_root_hash);
+  Result Process(const std::string& lease_path, const shash::Any& old_root_hash,
+                 const shash::Any& new_root_hash);
 
   int GetNumErrors() const { return num_errors_; }
 
