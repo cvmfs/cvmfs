@@ -17,7 +17,7 @@ using namespace receiver;  // NOLINT
 
 class MockedPayloadProcessor : public PayloadProcessor {
  public:
-  MockedPayloadProcessor(const std::string& temp_dir)
+  explicit MockedPayloadProcessor(const std::string& temp_dir)
       : PayloadProcessor(temp_dir) {}
 
  protected:

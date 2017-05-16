@@ -13,7 +13,7 @@ using namespace receiver;  // NOLINT
 
 class MockPayloadProcessor : public PayloadProcessor {
  public:
-  MockPayloadProcessor(const std::string& temp_dir)
+  explicit MockPayloadProcessor(const std::string& temp_dir)
       : PayloadProcessor(temp_dir), num_files_received_(0) {}
   virtual ~MockPayloadProcessor() {}
 
