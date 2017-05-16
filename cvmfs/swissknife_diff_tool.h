@@ -16,8 +16,7 @@ namespace swissknife {
 class DiffTool : public CatalogDiffTool {
  public:
   DiffTool(const std::string &repo_path, const history::History::Tag &old_tag,
-           const history::History::Tag &new_tag,
-           const std::string &temp_dir_prefix,
+           const history::History::Tag &new_tag, const std::string &temp_dir,
            download::DownloadManager *download_manager, bool machine_readable);
 
   virtual ~DiffTool();

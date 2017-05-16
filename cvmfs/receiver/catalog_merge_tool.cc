@@ -67,19 +67,24 @@ CatalogMergeTool::ChangeItem::ChangeItem(const ChangeItem& other)
                             : NULL) {}
 
 CatalogMergeTool::ChangeItem::~ChangeItem() {
-  if (entry1_) {
-    delete entry1_;
-    entry1_ = NULL;
-  }
-  if (entry2_) {
-    delete entry2_;
-    entry2_ = NULL;
-  }
+  delete entry1_;
+  delete entry2_;
+}
+
+CatalogMergeTool::ChangeItem& CatalogMergeTool::ChangeItem::operator=(
+    const ChangeItem& other) {
+  type_ = other.type_;
+  path_ = other.path_;
+  xattrs_ = other.xattrs_;
+  entry1_ = new catalog::DirectoryEntry(*other.entry1_);
+  entry2_ = new catalog::DirectoryEntry(*other.entry2_);
+
+  return *this;
 }
 
 CatalogMergeTool::CatalogMergeTool(const std::string& repo_path,
-                                   const std::string& old_root_hash,
-                                   const std::string& new_root_hash,
+                                   const shash::Any& old_root_hash,
+                                   const shash::Any& new_root_hash,
                                    const std::string& temp_dir_prefix,
                                    download::DownloadManager* download_manager,
                                    manifest::Manifest* manifest)

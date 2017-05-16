@@ -34,8 +34,8 @@ namespace receiver {
 class CatalogMergeTool : public CatalogDiffTool {
  public:
   CatalogMergeTool(const std::string& repo_path,
-                   const std::string& old_root_hash,
-                   const std::string& new_root_hash,
+                   const shash::Any& old_root_hash,
+                   const shash::Any& new_root_hash,
                    const std::string& temp_dir_prefix,
                    download::DownloadManager* download_manager,
                    manifest::Manifest* manifest);
@@ -65,6 +65,8 @@ class CatalogMergeTool : public CatalogDiffTool {
                const catalog::DirectoryEntry& entry2);
     ChangeItem(const ChangeItem& other);
     ~ChangeItem();
+
+    ChangeItem& operator=(const ChangeItem& other);
 
     ChangeType type_;
     PathString path_;

@@ -14,7 +14,8 @@
 
 namespace receiver {
 
-PayloadProcessor::PayloadProcessor() : current_repo_(), num_errors_(0) {}
+PayloadProcessor::PayloadProcessor(const std::string& temp_dir)
+    : current_repo_(), temp_dir_(temp_dir), num_errors_(0) {}
 
 PayloadProcessor::~PayloadProcessor() {}
 
@@ -77,7 +78,8 @@ void PayloadProcessor::ConsumerEventCallback(
   // Normal file
 
   // Create a temporary path
-  const std::string tmp_path = CreateTempPath("/tmp/object_packs", 0666);
+  // TODO(radu): choose a way to inject the temp path into the
+  const std::string tmp_path = CreateTempPath(temp_dir_, 0666);
   if (tmp_path.empty()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Unable to create temporary path.");
     num_errors_++;

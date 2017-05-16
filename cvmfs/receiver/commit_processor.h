@@ -26,16 +26,16 @@ class CommitProcessor {
  public:
   enum Result { kSuccess, kMergeError, kIoError };
 
-  CommitProcessor();
+  explicit CommitProcessor(const std::string& temp_dir);
   virtual ~CommitProcessor();
 
-  Result Process(const std::string& lease_path,
-                 const std::string& old_root_hash,
-                 const std::string& new_root_hash);
+  Result Process(const std::string& lease_path, const shash::Any& old_root_hash,
+                 const shash::Any& new_root_hash);
 
   int GetNumErrors() const { return num_errors_; }
 
  private:
+  std::string temp_dir_;
   int num_errors_;
 };
 
