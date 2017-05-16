@@ -17,7 +17,8 @@ using namespace receiver;  // NOLINT
 
 class MockedPayloadProcessor : public PayloadProcessor {
  public:
-  MockedPayloadProcessor() {}
+  MockedPayloadProcessor(const std::string& temp_dir)
+      : PayloadProcessor(temp_dir) {}
 
  protected:
   virtual bool WriteFile(int /*fd*/, const void* const /*buf*/,
@@ -37,8 +38,8 @@ class MockedReactor : public Reactor {
   MockedReactor(int fdin, int fdout) : Reactor(fdin, fdout) {}
 
  protected:
-  PayloadProcessor* MakePayloadProcessor() {
-    return new MockedPayloadProcessor();
+  PayloadProcessor* MakePayloadProcessor(const std::string& temp_dir) {
+    return new MockedPayloadProcessor(temp_dir);
   }
 };
 

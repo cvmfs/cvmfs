@@ -55,8 +55,8 @@ class Reactor {
                                    std::string* reply);
   virtual bool HandleCommit(const std::string& req, std::string* reply);
 
-  virtual PayloadProcessor* MakePayloadProcessor();
-  virtual CommitProcessor* MakeCommitProcessor();
+  virtual PayloadProcessor* MakePayloadProcessor(const std::string& temp_dir);
+  virtual CommitProcessor* MakeCommitProcessor(const std::string& temp_dir);
 
  private:
   bool HandleRequest(Request req, const std::string& data);

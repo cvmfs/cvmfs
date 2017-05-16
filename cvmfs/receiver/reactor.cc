@@ -264,7 +264,8 @@ bool Reactor::HandleSubmitPayload(int fdin, const std::string& req,
     return false;
   }
 
-  UniquePtr<PayloadProcessor> proc(MakePayloadProcessor());
+  UniquePtr<PayloadProcessor> proc(
+      MakePayloadProcessor("/tmp/cvmfs_receiver_object_packs"));
   JsonStringInput reply_input;
   PayloadProcessor::Result res =
       proc->Process(fdin, digest_json->string_value, path_json->string_value,
@@ -317,7 +318,8 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
     return false;
 
   // Here we use the path to commit the changes!
-  UniquePtr<CommitProcessor> proc(MakeCommitProcessor());
+  UniquePtr<CommitProcessor> proc(
+      MakeCommitProcessor("/tmp/cvmfs_receiver_commit_processor"));
   shash::Any old_root_hash = shash::MkFromSuffixedHexPtr(
       shash::HexPtr(old_root_hash_json->string_value));
   shash::Any new_root_hash = shash::MkFromSuffixedHexPtr(
@@ -350,12 +352,12 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
   return true;
 }
 
-PayloadProcessor* Reactor::MakePayloadProcessor() {
-  return new PayloadProcessor();
+PayloadProcessor* Reactor::MakePayloadProcessor(const std::string& temp_dir) {
+  return new PayloadProcessor(temp_dir);
 }
 
-CommitProcessor* Reactor::MakeCommitProcessor() {
-  return new CommitProcessor();
+CommitProcessor* Reactor::MakeCommitProcessor(const std::string& temp_dir) {
+  return new CommitProcessor(temp_dir);
 }
 
 bool Reactor::HandleRequest(Request req, const std::string& data) {
