@@ -1,6 +1,6 @@
 /**
  * This file is part of the CernVM File System.
-xs */
+ */
 
 #ifndef CVMFS_SWISSKNIFE_LEASE_CURL_H_
 #define CVMFS_SWISSKNIFE_LEASE_CURL_H_
