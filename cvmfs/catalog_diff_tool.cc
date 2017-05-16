@@ -91,9 +91,6 @@ bool CatalogDiffTool::Run() {
 
   DiffRec(PathString(""));
 
-  RemoveTree(temp_dir_old);
-  RemoveTree(temp_dir_new);
-
   return true;
 }
 
