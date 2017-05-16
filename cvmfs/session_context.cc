@@ -169,12 +169,20 @@ bool SessionContextBase::CommitBucket(const ObjectPack::BucketContentType type,
       current_pack_ = NULL;
     }
   } else {  // Current pack is full and can be dispatched
-    ObjectPack* new_pack = new ObjectPack(max_pack_size_);
+    uint64_t new_size = 0;
+    if (handle->capacity > max_pack_size_) {
+      new_size = handle->capacity + 1;
+    } else {
+      new_size = max_pack_size_;
+    }
+    ObjectPack* new_pack = new ObjectPack(new_size);
     for (size_t i = 0u; i < active_handles_.size(); ++i) {
       current_pack_->TransferBucket(active_handles_[i], new_pack);
     }
 
-    Dispatch();
+    if (current_pack_->GetNoObjects() > 0) {
+      Dispatch();
+    }
     current_pack_ = new_pack;
 
     CommitBucket(type, id, handle, name, false);

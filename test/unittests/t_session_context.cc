@@ -51,8 +51,7 @@ TEST_F(T_SessionContext, BasicLifeCycle) {
   EXPECT_TRUE(ctx.CommitBucket(ObjectPack::kCas, hash, hd, "", true));
   EXPECT_EQ(1, ctx.num_jobs_dispatched_);
 
-  EXPECT_TRUE(
-      ctx.Finalize(true, "fake/old_catalog_path", "fake/new_catalog_path"));
+  EXPECT_TRUE(ctx.Finalize(true, "fake/old_root_hash", "fake/new_root_hash"));
   EXPECT_EQ(1, ctx.num_jobs_finished_);
 }
 
@@ -76,8 +75,7 @@ TEST_F(T_SessionContext, MultipleFiles) {
   }
   EXPECT_EQ(2, ctx.num_jobs_dispatched_);
 
-  EXPECT_TRUE(
-      ctx.Finalize(true, "fake/old_catalog_path", "fake/new_catalog_path"));
+  EXPECT_TRUE(ctx.Finalize(true, "fake/old_root_hash", "fake/new_root_hash"));
   EXPECT_EQ(3, ctx.num_jobs_finished_);
 }
 
@@ -102,8 +100,7 @@ TEST_F(T_SessionContext, MultipleFilesForcedDispatchLast) {
   }
   EXPECT_EQ(3, ctx.num_jobs_dispatched_);
 
-  EXPECT_TRUE(
-      ctx.Finalize(true, "fake/old_catalog_path", "fake/new_catalog_path"));
+  EXPECT_TRUE(ctx.Finalize(true, "fake/old_root_hash", "fake/new_root_hash"));
   EXPECT_EQ(3, ctx.num_jobs_finished_);
 }
 
@@ -127,8 +124,7 @@ TEST_F(T_SessionContext, MultipleFilesForcedDispatchEach) {
   }
   EXPECT_EQ(10, ctx.num_jobs_dispatched_);
 
-  EXPECT_TRUE(
-      ctx.Finalize(true, "fake/old_catalog_path", "fake/new_catalog_path"));
+  EXPECT_TRUE(ctx.Finalize(true, "fake/old_root_hash", "fake/new_root_hash"));
   EXPECT_EQ(10, ctx.num_jobs_finished_);
 }
 
@@ -154,8 +150,30 @@ TEST_F(T_SessionContext, FirstAddAllThenCommit) {
     EXPECT_TRUE(ctx.CommitBucket(ObjectPack::kCas, hash, hds[i], ""));
   }
 
-  EXPECT_TRUE(
-      ctx.Finalize(true, "fake/old_catalog_path", "fake/new_catalog_path"));
+  EXPECT_TRUE(ctx.Finalize(true, "fake/old_root_hash", "fake/new_root_hash"));
   EXPECT_EQ(3, ctx.num_jobs_dispatched_);
   EXPECT_EQ(3, ctx.num_jobs_finished_);
+}
+
+TEST_F(T_SessionContext, EncounterFileWhichIsLargerThanExpected) {
+  SessionContextMocked ctx;
+
+  EXPECT_TRUE(ctx.Initialize("http://my.repo.address:8080/api/v1",
+                             "/path/to/the/session_file", "some_key_id",
+                             "some_secret", 4000));
+  EXPECT_EQ(0, ctx.num_jobs_dispatched_);
+  EXPECT_EQ(0, ctx.num_jobs_finished_);
+
+  ObjectPack::BucketHandle hd = ctx.NewBucket();
+
+  unsigned char buffer[4096];
+  memset(buffer, 0, 4096);
+  ObjectPack::AddToBucket(buffer, 4096, hd);
+
+  shash::Any hash(shash::kSha1);
+  EXPECT_TRUE(ctx.CommitBucket(ObjectPack::kCas, hash, hd, "", true));
+
+  EXPECT_TRUE(ctx.Finalize(true, "fake/old_root_hash", "fake/new_root_hash"));
+  EXPECT_EQ(1, ctx.num_jobs_dispatched_);
+  EXPECT_EQ(1, ctx.num_jobs_finished_);
 }
