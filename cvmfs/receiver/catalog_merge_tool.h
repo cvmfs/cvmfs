@@ -66,6 +66,8 @@ class CatalogMergeTool : public CatalogDiffTool {
     ChangeItem(const ChangeItem& other);
     ~ChangeItem();
 
+    ChangeItem& operator=(const ChangeItem& other);
+
     ChangeType type_;
     PathString path_;
     XattrList xattrs_;

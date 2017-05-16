@@ -77,6 +77,17 @@ CatalogMergeTool::ChangeItem::~ChangeItem() {
   }
 }
 
+CatalogMergeTool::ChangeItem& CatalogMergeTool::ChangeItem::operator=(
+    const ChangeItem& other) {
+  type_ = other.type_;
+  path_ = other.path_;
+  xattrs_ = other.xattrs_;
+  entry1_ = new catalog::DirectoryEntry(*other.entry1_);
+  entry2_ = new catalog::DirectoryEntry(*other.entry2_);
+
+  return *this;
+}
+
 CatalogMergeTool::CatalogMergeTool(const std::string& repo_path,
                                    const shash::Any& old_root_hash,
                                    const shash::Any& new_root_hash,
