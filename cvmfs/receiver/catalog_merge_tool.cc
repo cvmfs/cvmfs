@@ -67,14 +67,8 @@ CatalogMergeTool::ChangeItem::ChangeItem(const ChangeItem& other)
                             : NULL) {}
 
 CatalogMergeTool::ChangeItem::~ChangeItem() {
-  if (entry1_) {
-    delete entry1_;
-    entry1_ = NULL;
-  }
-  if (entry2_) {
-    delete entry2_;
-    entry2_ = NULL;
-  }
+  delete entry1_;
+  delete entry2_;
 }
 
 CatalogMergeTool::ChangeItem& CatalogMergeTool::ChangeItem::operator=(
