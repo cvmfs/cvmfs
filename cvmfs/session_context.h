@@ -13,6 +13,15 @@
 
 namespace upload {
 
+struct CurlSendPayload {
+  const std::string* json_message;
+  ObjectPackProducer* pack_serializer;
+  size_t index;
+};
+
+size_t SendCB(void* ptr, size_t size, size_t nmemb, void* userp);
+size_t RecvCB(void* buffer, size_t size, size_t nmemb, void* userp);
+
 /**
  * This class implements a context for a single publish operation
  *
