@@ -2,8 +2,6 @@
  * This file is part of the CernVM File System.
  */
 
-#include "catalog_diff_tool.h"
-
 #include "catalog.h"
 #include "download.h"
 #include "hash.h"
@@ -11,6 +9,7 @@
 #include "util/posix.h"
 
 namespace {
+
 const uint64_t kLastInode = uint64_t(-1);
 
 void AppendFirstEntry(catalog::DirectoryEntryList* entry_list) {
@@ -38,35 +37,10 @@ bool IsSmaller(const catalog::DirectoryEntry& a,
   return a.name() < b.name();
 }
 
-catalog::SimpleCatalogManager* OpenCatalogManager(
-    const std::string& repo_path, const std::string& temp_dir,
-    const shash::Any& root_hash, download::DownloadManager* download_manager,
-    perf::Statistics* stats) {
-  catalog::SimpleCatalogManager* mgr = new catalog::SimpleCatalogManager(
-      root_hash, repo_path, temp_dir, download_manager, stats, true);
-  mgr->Init();
-
-  return mgr;
-}
-
 }  // namespace
 
-CatalogDiffTool::CatalogDiffTool(const std::string& repo_path,
-                                 const shash::Any& old_root_hash,
-                                 const shash::Any& new_root_hash,
-                                 const std::string& temp_dir_prefix,
-                                 download::DownloadManager* download_manager)
-    : repo_path_(repo_path),
-      old_root_hash_(old_root_hash),
-      new_root_hash_(new_root_hash),
-      temp_dir_prefix_(temp_dir_prefix),
-      download_manager_(download_manager),
-      old_catalog_mgr_(),
-      new_catalog_mgr_() {}
-
-CatalogDiffTool::~CatalogDiffTool() {}
-
-bool CatalogDiffTool::Run() {
+template <typename RoCatalogMgr>
+bool CatalogDiffTool<RoCatalogMgr>::Run() {
   // Create a temp directory
   const std::string temp_dir_old = CreateTempDir(temp_dir_prefix_);
   const std::string temp_dir_new = CreateTempDir(temp_dir_prefix_);
@@ -94,7 +68,20 @@ bool CatalogDiffTool::Run() {
   return true;
 }
 
-void CatalogDiffTool::DiffRec(const PathString& path) {
+template <typename RoCatalogMgr>
+RoCatalogMgr* CatalogDiffTool<RoCatalogMgr>::OpenCatalogManager(
+    const std::string& repo_path, const std::string& temp_dir,
+    const shash::Any& root_hash, download::DownloadManager* download_manager,
+    perf::Statistics* stats) {
+  RoCatalogMgr* mgr = new RoCatalogMgr(root_hash, repo_path, temp_dir,
+                                       download_manager, stats, true);
+  mgr->Init();
+
+  return mgr;
+}
+
+template <typename RoCatalogMgr>
+void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
   catalog::DirectoryEntryList old_listing;
   AppendFirstEntry(&old_listing);
   old_catalog_mgr_->Listing(path, &old_listing);

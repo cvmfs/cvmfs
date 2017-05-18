@@ -6,7 +6,10 @@
 
 #include <vector>
 
+#include "catalog_diff_tool.h"
 #include "catalog_merge_tool.h"
+#include "catalog_mgr_ro.h"
+#include "catalog_mgr_rw.h"
 #include "compression.h"
 #include "download.h"
 #include "logging.h"
@@ -75,9 +78,10 @@ CommitProcessor::Result CommitProcessor::Process(
     return kIoError;
   }
 
-  CatalogMergeTool merge_tool(stratum0, old_root_hash_str, new_root_hash_str,
-                              temp_dir_, server_tool->download_manager(),
-                              manifest.weak_ref());
+  CatalogMergeTool<catalog::WritableCatalogManager,
+                   catalog::SimpleCatalogManager>
+      merge_tool(stratum0, old_root_hash_str, new_root_hash_str, temp_dir_,
+                 server_tool->download_manager(), manifest.weak_ref());
 
   Params params;
   if (!GetParamsFromFile(repo_name, &params)) {

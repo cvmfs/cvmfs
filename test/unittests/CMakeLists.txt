@@ -130,7 +130,6 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/cache_tiered.cc
   ${CVMFS_SOURCE_DIR}/cache_transport.cc
   ${CVMFS_SOURCE_DIR}/catalog.cc
-  ${CVMFS_SOURCE_DIR}/catalog_diff_tool.cc
   ${CVMFS_SOURCE_DIR}/catalog_counters.cc
   ${CVMFS_SOURCE_DIR}/catalog_mgr_client.cc
   ${CVMFS_SOURCE_DIR}/catalog_mgr_ro.cc
@@ -181,7 +180,6 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/pathspec/pathspec_pattern.cc
   ${CVMFS_SOURCE_DIR}/quota.cc
   ${CVMFS_SOURCE_DIR}/quota_posix.cc
-  ${CVMFS_SOURCE_DIR}/receiver/catalog_merge_tool.cc
   ${CVMFS_SOURCE_DIR}/receiver/commit_processor.cc
   ${CVMFS_SOURCE_DIR}/receiver/params.cc
   ${CVMFS_SOURCE_DIR}/receiver/payload_processor.cc

@@ -2,8 +2,6 @@
  * This file is part of the CernVM File System.
  */
 
-#include "catalog_merge_tool.h"
-
 #include "catalog.h"
 #include "hash.h"
 #include "logging.h"
@@ -29,36 +27,40 @@ PathString MakeRelative(const PathString& path) {
 
 namespace receiver {
 
-CatalogMergeTool::ChangeItem::ChangeItem(ChangeType type,
-                                         const PathString& path,
-                                         const catalog::DirectoryEntry& entry1)
+template <typename RwCatalogMgr, typename RoCatalogMgr>
+CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ChangeItem::ChangeItem(
+    ChangeType type, const PathString& path,
+    const catalog::DirectoryEntry& entry1)
     : type_(type),
       path_(path),
       xattrs_(),
       entry1_(new catalog::DirectoryEntry(entry1)),
       entry2_(NULL) {}
 
-CatalogMergeTool::ChangeItem::ChangeItem(ChangeType type,
-                                         const PathString& path,
-                                         const catalog::DirectoryEntry& entry1,
-                                         const XattrList& xattrs)
+template <typename RwCatalogMgr, typename RoCatalogMgr>
+CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ChangeItem::ChangeItem(
+    ChangeType type, const PathString& path,
+    const catalog::DirectoryEntry& entry1, const XattrList& xattrs)
     : type_(type),
       path_(path),
       xattrs_(xattrs),
       entry1_(new catalog::DirectoryEntry(entry1)),
       entry2_(NULL) {}
 
-CatalogMergeTool::ChangeItem::ChangeItem(ChangeType type,
-                                         const PathString& path,
-                                         const catalog::DirectoryEntry& entry1,
-                                         const catalog::DirectoryEntry& entry2)
+template <typename RwCatalogMgr, typename RoCatalogMgr>
+CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ChangeItem::ChangeItem(
+    ChangeType type, const PathString& path,
+    const catalog::DirectoryEntry& entry1,
+    const catalog::DirectoryEntry& entry2)
     : type_(type),
       path_(path),
       xattrs_(),
       entry1_(new catalog::DirectoryEntry(entry1)),
       entry2_(new catalog::DirectoryEntry(entry2)) {}
 
-CatalogMergeTool::ChangeItem::ChangeItem(const ChangeItem& other)
+template <typename RwCatalogMgr, typename RoCatalogMgr>
+CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ChangeItem::ChangeItem(
+    const ChangeItem& other)
     : type_(other.type_),
       path_(other.path_),
       xattrs_(other.xattrs_),
@@ -66,12 +68,15 @@ CatalogMergeTool::ChangeItem::ChangeItem(const ChangeItem& other)
       entry2_(other.entry2_ ? new catalog::DirectoryEntry(*(other.entry2_))
                             : NULL) {}
 
-CatalogMergeTool::ChangeItem::~ChangeItem() {
+template <typename RwCatalogMgr, typename RoCatalogMgr>
+CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ChangeItem::~ChangeItem() {
   delete entry1_;
   delete entry2_;
 }
 
-CatalogMergeTool::ChangeItem& CatalogMergeTool::ChangeItem::operator=(
+template <typename RwCatalogMgr, typename RoCatalogMgr>
+typename CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ChangeItem&
+CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ChangeItem::operator=(
     const ChangeItem& other) {
   type_ = other.type_;
   path_ = other.path_;
@@ -82,24 +87,10 @@ CatalogMergeTool::ChangeItem& CatalogMergeTool::ChangeItem::operator=(
   return *this;
 }
 
-CatalogMergeTool::CatalogMergeTool(const std::string& repo_path,
-                                   const shash::Any& old_root_hash,
-                                   const shash::Any& new_root_hash,
-                                   const std::string& temp_dir_prefix,
-                                   download::DownloadManager* download_manager,
-                                   manifest::Manifest* manifest)
-    : CatalogDiffTool(repo_path, old_root_hash, new_root_hash, temp_dir_prefix,
-                      download_manager),
-      repo_path_(repo_path),
-      temp_dir_prefix_(temp_dir_prefix),
-      download_manager_(download_manager),
-      manifest_(manifest) {}
-
-CatalogMergeTool::~CatalogMergeTool() {}
-
-bool CatalogMergeTool::Run(const Params& params,
-                           std::string* new_manifest_path) {
-  bool ret = CatalogDiffTool::Run();
+template <typename RwCatalogMgr, typename RoCatalogMgr>
+bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::Run(
+    const Params& params, std::string* new_manifest_path) {
+  bool ret = CatalogDiffTool<RoCatalogMgr>::Run();
 
   upload::SpoolerDefinition definition(
       params.spooler_configuration, params.hash_alg, params.compression_alg,
@@ -108,7 +99,7 @@ bool CatalogMergeTool::Run(const Params& params,
   UniquePtr<upload::Spooler> spooler(upload::Spooler::Construct(definition));
   perf::Statistics stats;
   const std::string temp_dir = CreateTempDir(temp_dir_prefix_);
-  output_catalog_mgr_ = new catalog::WritableCatalogManager(
+  output_catalog_mgr_ = new RwCatalogMgr(
       manifest_->catalog_hash(), repo_path_, temp_dir, spooler,
       download_manager_, params.entry_warn_thresh, &stats,
       params.use_autocatalogs, params.max_weight, params.min_weight);
@@ -121,27 +112,32 @@ bool CatalogMergeTool::Run(const Params& params,
   return ret;
 }
 
-void CatalogMergeTool::ReportAddition(const PathString& path,
-                                      const catalog::DirectoryEntry& entry,
-                                      const XattrList& xattrs) {
+template <typename RwCatalogMgr, typename RoCatalogMgr>
+void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportAddition(
+    const PathString& path, const catalog::DirectoryEntry& entry,
+    const XattrList& xattrs) {
   changes_.push_back(
       ChangeItem(ChangeItem::kAddition, MakeRelative(path), entry, xattrs));
 }
 
-void CatalogMergeTool::ReportRemoval(const PathString& path,
-                                     const catalog::DirectoryEntry& entry) {
+template <typename RwCatalogMgr, typename RoCatalogMgr>
+void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportRemoval(
+    const PathString& path, const catalog::DirectoryEntry& entry) {
   changes_.push_back(
       ChangeItem(ChangeItem::kRemoval, MakeRelative(path), entry));
 }
 
-void CatalogMergeTool::ReportModification(
+template <typename RwCatalogMgr, typename RoCatalogMgr>
+void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportModification(
     const PathString& path, const catalog::DirectoryEntry& entry1,
     const catalog::DirectoryEntry& entry2) {
   changes_.push_back(ChangeItem(ChangeItem::kModification, MakeRelative(path),
                                 entry1, entry2));
 }
 
-bool CatalogMergeTool::InsertChangesIntoOutputCatalog() {
+template <typename RwCatalogMgr, typename RoCatalogMgr>
+bool CatalogMergeTool<RwCatalogMgr,
+                      RoCatalogMgr>::InsertChangesIntoOutputCatalog() {
   for (size_t i = 0; i < changes_.size(); ++i) {
     ChangeItem change = changes_[i];
     const std::string parent_path = std::strchr(change.path_.c_str(), '/')
@@ -216,7 +212,9 @@ bool CatalogMergeTool::InsertChangesIntoOutputCatalog() {
   return true;
 }
 
-bool CatalogMergeTool::CreateNewManifest(std::string* new_manifest_path) {
+template <typename RwCatalogMgr, typename RoCatalogMgr>
+bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::CreateNewManifest(
+    std::string* new_manifest_path) {
   if (!output_catalog_mgr_->Commit(false, 0, manifest_)) {
     LogCvmfs(kLogCvmfs, kLogStderr,
              "CatalogMergeTool - Could not commit output catalog");
@@ -235,5 +233,4 @@ bool CatalogMergeTool::CreateNewManifest(std::string* new_manifest_path) {
 
   return true;
 }
-
-}  // namespace receiver
+}

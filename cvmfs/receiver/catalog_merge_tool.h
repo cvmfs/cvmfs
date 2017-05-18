@@ -9,7 +9,6 @@
 #include <vector>
 
 #include "catalog_diff_tool.h"
-#include "catalog_mgr_rw.h"
 #include "params.h"
 #include "util/pointer.h"
 
@@ -31,15 +30,22 @@ class Any;
 
 namespace receiver {
 
-class CatalogMergeTool : public CatalogDiffTool {
+template <typename RwCatalogMgr, typename RoCatalogMgr>
+class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
  public:
   CatalogMergeTool(const std::string& repo_path,
                    const shash::Any& old_root_hash,
                    const shash::Any& new_root_hash,
                    const std::string& temp_dir_prefix,
                    download::DownloadManager* download_manager,
-                   manifest::Manifest* manifest);
-  virtual ~CatalogMergeTool();
+                   manifest::Manifest* manifest)
+      : CatalogDiffTool<RoCatalogMgr>(repo_path, old_root_hash, new_root_hash,
+                                      temp_dir_prefix, download_manager),
+        repo_path_(repo_path),
+        temp_dir_prefix_(temp_dir_prefix),
+        download_manager_(download_manager),
+        manifest_(manifest) {}
+  virtual ~CatalogMergeTool() {}
 
   bool Run(const Params& params, std::string* new_manifest_path);
 
@@ -86,11 +92,13 @@ class CatalogMergeTool : public CatalogDiffTool {
 
   manifest::Manifest* manifest_;
 
-  UniquePtr<catalog::WritableCatalogManager> output_catalog_mgr_;
+  UniquePtr<RwCatalogMgr> output_catalog_mgr_;
 
   ChangeList changes_;
 };
 
 }  // namespace receiver
+
+#include "catalog_merge_tool_impl.h"
 
 #endif  // CVMFS_RECEIVER_CATALOG_MERGE_TOOL_H_
