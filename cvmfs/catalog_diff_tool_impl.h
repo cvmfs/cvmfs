@@ -15,20 +15,20 @@
 
 const uint64_t kLastInode = uint64_t(-1);
 
-void AppendFirstEntry(catalog::DirectoryEntryList* entry_list) {
+inline void AppendFirstEntry(catalog::DirectoryEntryList* entry_list) {
   catalog::DirectoryEntry empty_entry;
   entry_list->push_back(empty_entry);
 }
 
-void AppendLastEntry(catalog::DirectoryEntryList* entry_list) {
+inline void AppendLastEntry(catalog::DirectoryEntryList* entry_list) {
   assert(!entry_list->empty());
   catalog::DirectoryEntry last_entry;
   last_entry.set_inode(kLastInode);
   entry_list->push_back(last_entry);
 }
 
-bool IsSmaller(const catalog::DirectoryEntry& a,
-               const catalog::DirectoryEntry& b) {
+inline bool IsSmaller(const catalog::DirectoryEntry& a,
+                      const catalog::DirectoryEntry& b) {
   bool a_is_first = (a.inode() == catalog::DirectoryEntryBase::kInvalidInode);
   bool a_is_last = (a.inode() == kLastInode);
   bool b_is_first = (b.inode() == catalog::DirectoryEntryBase::kInvalidInode);
@@ -42,26 +42,30 @@ bool IsSmaller(const catalog::DirectoryEntry& a,
 
 template <typename RoCatalogMgr>
 bool CatalogDiffTool<RoCatalogMgr>::Run() {
-  // Create a temp directory
-  const std::string temp_dir_old = CreateTempDir(temp_dir_prefix_);
-  const std::string temp_dir_new = CreateTempDir(temp_dir_prefix_);
+  if (needs_setup_) {
+    // Create a temp directory
+    const std::string temp_dir_old = CreateTempDir(temp_dir_prefix_);
+    const std::string temp_dir_new = CreateTempDir(temp_dir_prefix_);
 
-  // Old catalog from release manager machine (before lease)
-  old_catalog_mgr_ = OpenCatalogManager(
-      repo_path_, temp_dir_old, old_root_hash_, download_manager_, &stats_old_);
+    // Old catalog from release manager machine (before lease)
+    old_catalog_mgr_ =
+        OpenCatalogManager(repo_path_, temp_dir_old, old_root_hash_,
+                           download_manager_, &stats_old_);
 
-  // New catalog from release manager machine (before lease)
-  new_catalog_mgr_ = OpenCatalogManager(
-      repo_path_, temp_dir_new, new_root_hash_, download_manager_, &stats_new_);
+    // New catalog from release manager machine (before lease)
+    new_catalog_mgr_ =
+        OpenCatalogManager(repo_path_, temp_dir_new, new_root_hash_,
+                           download_manager_, &stats_new_);
 
-  if (!old_catalog_mgr_.IsValid()) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Could not open old catalog");
-    return false;
-  }
+    if (!old_catalog_mgr_.IsValid()) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Could not open old catalog");
+      return false;
+    }
 
-  if (!new_catalog_mgr_.IsValid()) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Could not open new catalog");
-    return false;
+    if (!new_catalog_mgr_.IsValid()) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Could not open new catalog");
+      return false;
+    }
   }
 
   DiffRec(PathString(""));

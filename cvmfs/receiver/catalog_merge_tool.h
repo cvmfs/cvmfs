@@ -32,6 +32,18 @@ namespace receiver {
 template <typename RwCatalogMgr, typename RoCatalogMgr>
 class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
  public:
+  CatalogMergeTool(RoCatalogMgr* old_catalog_mgr, RoCatalogMgr* new_catalog_mgr,
+                   RwCatalogMgr* output_catalog_mgr,
+                   const std::string& temp_dir_prefix,
+                   manifest::Manifest* manifest)
+      : CatalogDiffTool<RoCatalogMgr>(old_catalog_mgr, new_catalog_mgr),
+        repo_path_(""),
+        temp_dir_prefix_(temp_dir_prefix),
+        download_manager_(NULL),
+        manifest_(manifest),
+        output_catalog_mgr_(output_catalog_mgr),
+        needs_setup_(false) {}
+
   CatalogMergeTool(const std::string& repo_path,
                    const shash::Any& old_root_hash,
                    const shash::Any& new_root_hash,
@@ -43,7 +55,9 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
         repo_path_(repo_path),
         temp_dir_prefix_(temp_dir_prefix),
         download_manager_(download_manager),
-        manifest_(manifest) {}
+        manifest_(manifest),
+        needs_setup_(true) {}
+
   virtual ~CatalogMergeTool() {}
 
   bool Run(const Params& params, std::string* new_manifest_path);
@@ -70,6 +84,8 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
   manifest::Manifest* manifest_;
 
   UniquePtr<RwCatalogMgr> output_catalog_mgr_;
+
+  const bool needs_setup_;
 };
 
 }  // namespace receiver

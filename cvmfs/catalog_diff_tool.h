@@ -19,6 +19,14 @@ class DownloadManager;
 template <typename RoCatalogMgr>
 class CatalogDiffTool {
  public:
+  CatalogDiffTool(RoCatalogMgr* old_catalog_mgr, RoCatalogMgr* new_catalog_mgr)
+      : repo_path_(""),
+        temp_dir_prefix_(""),
+        download_manager_(NULL),
+        old_catalog_mgr_(old_catalog_mgr),
+        new_catalog_mgr_(new_catalog_mgr),
+        needs_setup_(false) {}
+
   CatalogDiffTool(const std::string& repo_path, const shash::Any& old_root_hash,
                   const shash::Any& new_root_hash,
                   const std::string& temp_dir_prefix,
@@ -29,7 +37,9 @@ class CatalogDiffTool {
         temp_dir_prefix_(temp_dir_prefix),
         download_manager_(download_manager),
         old_catalog_mgr_(),
-        new_catalog_mgr_() {}
+        new_catalog_mgr_(),
+        needs_setup_(true) {}
+
   virtual ~CatalogDiffTool() {}
 
  protected:
@@ -65,6 +75,8 @@ class CatalogDiffTool {
 
   UniquePtr<RoCatalogMgr> old_catalog_mgr_;
   UniquePtr<RoCatalogMgr> new_catalog_mgr_;
+
+  const bool needs_setup_;
 };
 
 #include "catalog_diff_tool_impl.h"

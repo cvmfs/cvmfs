@@ -15,7 +15,7 @@
 #include "upload.h"
 #include "util/posix.h"
 
-PathString MakeRelative(const PathString& path) {
+inline PathString MakeRelative(const PathString& path) {
   std::string rel_path;
   std::string abs_path = path.ToString();
   if (abs_path[0] == '/') {
@@ -31,18 +31,21 @@ namespace receiver {
 template <typename RwCatalogMgr, typename RoCatalogMgr>
 bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::Run(
     const Params& params, std::string* new_manifest_path) {
-  upload::SpoolerDefinition definition(
-      params.spooler_configuration, params.hash_alg, params.compression_alg,
-      params.use_file_chunking, params.min_chunk_size, params.avg_chunk_size,
-      params.max_chunk_size, "dummy_token", "dummy_key");
-  UniquePtr<upload::Spooler> spooler(upload::Spooler::Construct(definition));
-  perf::Statistics stats;
-  const std::string temp_dir = CreateTempDir(temp_dir_prefix_);
-  output_catalog_mgr_ = new RwCatalogMgr(
-      manifest_->catalog_hash(), repo_path_, temp_dir, spooler,
-      download_manager_, params.entry_warn_thresh, &stats,
-      params.use_autocatalogs, params.max_weight, params.min_weight);
-  output_catalog_mgr_->Init();
+  UniquePtr<upload::Spooler> spooler;
+  if (needs_setup_) {
+    upload::SpoolerDefinition definition(
+        params.spooler_configuration, params.hash_alg, params.compression_alg,
+        params.use_file_chunking, params.min_chunk_size, params.avg_chunk_size,
+        params.max_chunk_size, "dummy_token", "dummy_key");
+    spooler = upload::Spooler::Construct(definition);
+    perf::Statistics stats;
+    const std::string temp_dir = CreateTempDir(temp_dir_prefix_);
+    output_catalog_mgr_ = new RwCatalogMgr(
+        manifest_->catalog_hash(), repo_path_, temp_dir, spooler,
+        download_manager_, params.entry_warn_thresh, &stats,
+        params.use_autocatalogs, params.max_weight, params.min_weight);
+    output_catalog_mgr_->Init();
+  }
 
   bool ret = CatalogDiffTool<RoCatalogMgr>::Run();
 
