@@ -41,7 +41,8 @@ class CatalogDiffTool {
                              const catalog::DirectoryEntry& entry) = 0;
   virtual void ReportModification(const PathString& path,
                                   const catalog::DirectoryEntry& old_entry,
-                                  const catalog::DirectoryEntry& new_entry) = 0;
+                                  const catalog::DirectoryEntry& new_entry,
+                                  const XattrList& xattrs) = 0;
 
  private:
   RoCatalogMgr* OpenCatalogManager(const std::string& repo_path,

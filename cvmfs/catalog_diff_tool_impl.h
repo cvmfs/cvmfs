@@ -2,13 +2,16 @@
  * This file is part of the CernVM File System.
  */
 
+#ifndef CVMFS_CATALOG_DIFF_TOOL_IMPL_H_
+#define CVMFS_CATALOG_DIFF_TOOL_IMPL_H_
+
+#include <string>
+
 #include "catalog.h"
 #include "download.h"
 #include "hash.h"
 #include "logging.h"
 #include "util/posix.h"
-
-namespace {
 
 const uint64_t kLastInode = uint64_t(-1);
 
@@ -36,8 +39,6 @@ bool IsSmaller(const catalog::DirectoryEntry& a,
   if (b_is_last) return !a_is_last;
   return a.name() < b.name();
 }
-
-}  // namespace
 
 template <typename RoCatalogMgr>
 bool CatalogDiffTool<RoCatalogMgr>::Run() {
@@ -105,12 +106,13 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
     new_path.Append("/", 1);
     new_path.Append(new_entry.name().GetChars(), new_entry.name().GetLength());
 
+    XattrList xattrs;
+    if (new_entry.HasXattrs()) {
+      new_catalog_mgr_->LookupXattrs(new_path, &xattrs);
+    }
+
     if (IsSmaller(new_entry, old_entry)) {
       i_to++;
-      XattrList xattrs;
-      if (new_entry.HasXattrs()) {
-        new_catalog_mgr_->LookupXattrs(new_path, &xattrs);
-      }
       ReportAddition(new_path, new_entry, xattrs);
       continue;
     } else if (IsSmaller(old_entry, new_entry)) {
@@ -123,7 +125,7 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
     i_from++;
     i_to++;
     if (old_entry.CompareTo(new_entry) > 0) {
-      ReportModification(old_path, old_entry, new_entry);
+      ReportModification(old_path, old_entry, new_entry, xattrs);
     }
     if (!old_entry.IsDirectory() || !new_entry.IsDirectory()) continue;
 
@@ -143,3 +145,5 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
     DiffRec(old_path);
   }
 }
+
+#endif  // CVMFS_CATALOG_DIFF_TOOL_IMPL_H_

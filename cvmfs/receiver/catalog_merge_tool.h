@@ -6,7 +6,6 @@
 #define CVMFS_RECEIVER_CATALOG_MERGE_TOOL_H_
 
 #include <string>
-#include <vector>
 
 #include "catalog_diff_tool.h"
 #include "params.h"
@@ -57,32 +56,10 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
                              const catalog::DirectoryEntry& entry);
   virtual void ReportModification(const PathString& path,
                                   const catalog::DirectoryEntry& old_entry,
-                                  const catalog::DirectoryEntry& new_entry);
+                                  const catalog::DirectoryEntry& new_entry,
+                                  const XattrList& xattrs);
 
  private:
-  struct ChangeItem {
-    enum ChangeType { kAddition, kRemoval, kModification };
-    ChangeItem(ChangeType type, const PathString& path,
-               const catalog::DirectoryEntry& entry1);
-    ChangeItem(ChangeType type, const PathString& path,
-               const catalog::DirectoryEntry& entry1, const XattrList& xattrs);
-    ChangeItem(ChangeType type, const PathString& path,
-               const catalog::DirectoryEntry& entry1,
-               const catalog::DirectoryEntry& entry2);
-    ChangeItem(const ChangeItem& other);
-    ~ChangeItem();
-
-    ChangeItem& operator=(const ChangeItem& other);
-
-    ChangeType type_;
-    PathString path_;
-    XattrList xattrs_;
-    const catalog::DirectoryEntry* entry1_;
-    const catalog::DirectoryEntry* entry2_;
-  };
-  typedef std::vector<ChangeItem> ChangeList;
-
-  bool InsertChangesIntoOutputCatalog();
   bool CreateNewManifest(std::string* new_manifest_path);
 
   std::string repo_path_;
@@ -93,8 +70,6 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
   manifest::Manifest* manifest_;
 
   UniquePtr<RwCatalogMgr> output_catalog_mgr_;
-
-  ChangeList changes_;
 };
 
 }  // namespace receiver

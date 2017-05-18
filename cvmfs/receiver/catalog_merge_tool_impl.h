@@ -2,6 +2,11 @@
  * This file is part of the CernVM File System.
  */
 
+#ifndef CVMFS_RECEIVER_CATALOG_MERGE_TOOL_IMPL_H_
+#define CVMFS_RECEIVER_CATALOG_MERGE_TOOL_IMPL_H_
+
+#include <string>
+
 #include "catalog.h"
 #include "hash.h"
 #include "logging.h"
@@ -9,8 +14,6 @@
 #include "options.h"
 #include "upload.h"
 #include "util/posix.h"
-
-namespace {
 
 PathString MakeRelative(const PathString& path) {
   std::string rel_path;
@@ -23,75 +26,11 @@ PathString MakeRelative(const PathString& path) {
   return PathString(rel_path);
 }
 
-}  // namespace
-
 namespace receiver {
-
-template <typename RwCatalogMgr, typename RoCatalogMgr>
-CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ChangeItem::ChangeItem(
-    ChangeType type, const PathString& path,
-    const catalog::DirectoryEntry& entry1)
-    : type_(type),
-      path_(path),
-      xattrs_(),
-      entry1_(new catalog::DirectoryEntry(entry1)),
-      entry2_(NULL) {}
-
-template <typename RwCatalogMgr, typename RoCatalogMgr>
-CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ChangeItem::ChangeItem(
-    ChangeType type, const PathString& path,
-    const catalog::DirectoryEntry& entry1, const XattrList& xattrs)
-    : type_(type),
-      path_(path),
-      xattrs_(xattrs),
-      entry1_(new catalog::DirectoryEntry(entry1)),
-      entry2_(NULL) {}
-
-template <typename RwCatalogMgr, typename RoCatalogMgr>
-CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ChangeItem::ChangeItem(
-    ChangeType type, const PathString& path,
-    const catalog::DirectoryEntry& entry1,
-    const catalog::DirectoryEntry& entry2)
-    : type_(type),
-      path_(path),
-      xattrs_(),
-      entry1_(new catalog::DirectoryEntry(entry1)),
-      entry2_(new catalog::DirectoryEntry(entry2)) {}
-
-template <typename RwCatalogMgr, typename RoCatalogMgr>
-CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ChangeItem::ChangeItem(
-    const ChangeItem& other)
-    : type_(other.type_),
-      path_(other.path_),
-      xattrs_(other.xattrs_),
-      entry1_(new catalog::DirectoryEntry(*(other.entry1_))),
-      entry2_(other.entry2_ ? new catalog::DirectoryEntry(*(other.entry2_))
-                            : NULL) {}
-
-template <typename RwCatalogMgr, typename RoCatalogMgr>
-CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ChangeItem::~ChangeItem() {
-  delete entry1_;
-  delete entry2_;
-}
-
-template <typename RwCatalogMgr, typename RoCatalogMgr>
-typename CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ChangeItem&
-CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ChangeItem::operator=(
-    const ChangeItem& other) {
-  type_ = other.type_;
-  path_ = other.path_;
-  xattrs_ = other.xattrs_;
-  entry1_ = new catalog::DirectoryEntry(*other.entry1_);
-  entry2_ = new catalog::DirectoryEntry(*other.entry2_);
-
-  return *this;
-}
 
 template <typename RwCatalogMgr, typename RoCatalogMgr>
 bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::Run(
     const Params& params, std::string* new_manifest_path) {
-  bool ret = CatalogDiffTool<RoCatalogMgr>::Run();
-
   upload::SpoolerDefinition definition(
       params.spooler_configuration, params.hash_alg, params.compression_alg,
       params.use_file_chunking, params.min_chunk_size, params.avg_chunk_size,
@@ -105,7 +44,7 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::Run(
       params.use_autocatalogs, params.max_weight, params.min_weight);
   output_catalog_mgr_->Init();
 
-  ret &= InsertChangesIntoOutputCatalog();
+  bool ret = CatalogDiffTool<RoCatalogMgr>::Run();
 
   ret &= CreateNewManifest(new_manifest_path);
 
@@ -116,100 +55,67 @@ template <typename RwCatalogMgr, typename RoCatalogMgr>
 void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportAddition(
     const PathString& path, const catalog::DirectoryEntry& entry,
     const XattrList& xattrs) {
-  changes_.push_back(
-      ChangeItem(ChangeItem::kAddition, MakeRelative(path), entry, xattrs));
+  const PathString rel_path = MakeRelative(path);
+
+  const std::string parent_path =
+      std::strchr(rel_path.c_str(), '/') ? GetParentPath(rel_path).c_str() : "";
+
+  if (entry.IsDirectory()) {
+    output_catalog_mgr_->AddDirectory(entry, parent_path);
+  } else if (entry.IsRegular() || entry.IsLink()) {
+    const catalog::DirectoryEntryBase* base_entry =
+        static_cast<const catalog::DirectoryEntryBase*>(&entry);
+    output_catalog_mgr_->AddFile(*base_entry, xattrs, parent_path);
+  }
 }
 
 template <typename RwCatalogMgr, typename RoCatalogMgr>
 void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportRemoval(
     const PathString& path, const catalog::DirectoryEntry& entry) {
-  changes_.push_back(
-      ChangeItem(ChangeItem::kRemoval, MakeRelative(path), entry));
+  const PathString rel_path = MakeRelative(path);
+
+  if (entry.IsDirectory()) {
+    output_catalog_mgr_->RemoveDirectory(rel_path.c_str());
+  } else if (entry.IsRegular() || entry.IsLink()) {
+    output_catalog_mgr_->RemoveFile(rel_path.c_str());
+  }
 }
 
 template <typename RwCatalogMgr, typename RoCatalogMgr>
 void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportModification(
     const PathString& path, const catalog::DirectoryEntry& entry1,
-    const catalog::DirectoryEntry& entry2) {
-  changes_.push_back(ChangeItem(ChangeItem::kModification, MakeRelative(path),
-                                entry1, entry2));
-}
+    const catalog::DirectoryEntry& entry2, const XattrList& xattrs) {
+  const PathString rel_path = MakeRelative(path);
 
-template <typename RwCatalogMgr, typename RoCatalogMgr>
-bool CatalogMergeTool<RwCatalogMgr,
-                      RoCatalogMgr>::InsertChangesIntoOutputCatalog() {
-  for (size_t i = 0; i < changes_.size(); ++i) {
-    ChangeItem change = changes_[i];
-    const std::string parent_path = std::strchr(change.path_.c_str(), '/')
-                                        ? GetParentPath(change.path_).c_str()
-                                        : "";
-    switch (change.type_) {
-      case ChangeItem::kAddition:
+  const std::string parent_path =
+      std::strchr(rel_path.c_str(), '/') ? GetParentPath(rel_path).c_str() : "";
 
-        if (change.entry1_->IsDirectory()) {
-          output_catalog_mgr_->AddDirectory(*change.entry1_, parent_path);
-        } else if (change.entry1_->IsRegular() || change.entry1_->IsLink()) {
-          const catalog::DirectoryEntryBase* base_entry =
-              static_cast<const catalog::DirectoryEntryBase*>(change.entry1_);
-          output_catalog_mgr_->AddFile(*base_entry, change.xattrs_,
-                                       parent_path);
-        }
-        break;
+  if (entry1.IsDirectory() && entry2.IsDirectory()) {
+    // From directory to directory
+    const catalog::DirectoryEntryBase* base_entry =
+        static_cast<const catalog::DirectoryEntryBase*>(&entry2);
+    output_catalog_mgr_->TouchDirectory(*base_entry, rel_path.c_str());
 
-      case ChangeItem::kRemoval:
+  } else if ((entry1.IsRegular() || entry1.IsLink()) && entry2.IsDirectory()) {
+    // From file to directory
+    output_catalog_mgr_->RemoveFile(rel_path.c_str());
+    output_catalog_mgr_->AddDirectory(entry2, parent_path);
 
-        if (change.entry1_->IsDirectory()) {
-          output_catalog_mgr_->RemoveDirectory(change.path_.c_str());
-        } else if (change.entry1_->IsRegular() || change.entry1_->IsLink()) {
-          output_catalog_mgr_->RemoveFile(change.path_.c_str());
-        }
-        break;
+  } else if (entry1.IsDirectory() && (entry2.IsRegular() || entry2.IsLink())) {
+    // From directory to file
+    const catalog::DirectoryEntryBase* base_entry =
+        static_cast<const catalog::DirectoryEntryBase*>(&entry2);
+    output_catalog_mgr_->RemoveDirectory(rel_path.c_str());
+    output_catalog_mgr_->AddFile(*base_entry, xattrs, parent_path);
 
-      case ChangeItem::kModification:
-
-        if (change.entry1_->IsDirectory() && change.entry2_->IsDirectory()) {
-          // From directory to directory
-          const catalog::DirectoryEntryBase* base_entry =
-              static_cast<const catalog::DirectoryEntryBase*>(change.entry2_);
-          output_catalog_mgr_->TouchDirectory(*base_entry,
-                                              change.path_.c_str());
-
-        } else if ((change.entry1_->IsRegular() || change.entry1_->IsLink()) &&
-                   change.entry2_->IsDirectory()) {
-          // From file to directory
-          output_catalog_mgr_->RemoveFile(change.path_.c_str());
-          output_catalog_mgr_->AddDirectory(*change.entry2_, parent_path);
-
-        } else if (change.entry1_->IsDirectory() &&
-                   (change.entry2_->IsRegular() || change.entry2_->IsLink())) {
-          // From directory to file
-          const catalog::DirectoryEntryBase* base_entry =
-              static_cast<const catalog::DirectoryEntryBase*>(change.entry2_);
-          output_catalog_mgr_->RemoveDirectory(change.path_.c_str());
-          output_catalog_mgr_->AddFile(*base_entry, change.xattrs_,
-                                       parent_path);
-
-        } else if ((change.entry1_->IsRegular() || change.entry1_->IsLink()) &&
-                   (change.entry2_->IsRegular() || change.entry2_->IsLink())) {
-          // From file to file
-          const catalog::DirectoryEntryBase* base_entry =
-              static_cast<const catalog::DirectoryEntryBase*>(change.entry2_);
-          output_catalog_mgr_->RemoveFile(change.path_.c_str());
-          output_catalog_mgr_->AddFile(*base_entry, change.xattrs_,
-                                       parent_path);
-        }
-        break;
-
-      default:
-
-        LogCvmfs(kLogCvmfs, kLogStderr,
-                 "What should not be representable presented itself. Exiting.");
-        abort();
-        break;
-    }
+  } else if ((entry1.IsRegular() || entry1.IsLink()) &&
+             (entry2.IsRegular() || entry2.IsLink())) {
+    // From file to file
+    const catalog::DirectoryEntryBase* base_entry =
+        static_cast<const catalog::DirectoryEntryBase*>(&entry2);
+    output_catalog_mgr_->RemoveFile(rel_path.c_str());
+    output_catalog_mgr_->AddFile(*base_entry, xattrs, parent_path);
   }
-
-  return true;
 }
 
 template <typename RwCatalogMgr, typename RoCatalogMgr>
@@ -233,4 +139,7 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::CreateNewManifest(
 
   return true;
 }
-}
+
+}  // namespace receiver
+
+#endif  // CVMFS_RECEIVER_CATALOG_MERGE_TOOL_IMPL_H_
