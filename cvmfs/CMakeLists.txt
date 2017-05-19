@@ -270,6 +270,7 @@ set (CVMFS_PRELOADER_SOURCES
   hash.cc
   history_sql.cc
   history_sqlite.cc
+  json_document.cc
   logging.cc
   malloc_arena.cc
   manifest.cc
@@ -291,6 +292,7 @@ set (CVMFS_PRELOADER_SOURCES
   sqlitemem.cc
   statistics.cc
   swissknife.cc
+  swissknife_lease_curl.cc
   swissknife_pull.cc
   upload.cc
   upload_facility.cc
@@ -334,22 +336,73 @@ set (CVMFS_STRATUM_AGENT_SOURCES
 
 if(BUILD_RECEIVER)
   set (CVMFS_RECEIVER_SOURCES
+    receiver/commit_processor.cc
+    receiver/params.cc
     receiver/payload_processor.cc
     receiver/reactor.cc
     receiver/receiver.cc
     receiver/session_token.cc
+    catalog.cc
+    catalog_rw.cc
+    catalog_counters.cc
+    catalog_sql.cc
+    catalog_mgr_ro.cc
+    catalog_mgr_rw.cc
+    compression.cc
+    directory_entry.cc
+    dns.cc
+    download.cc
     encrypt.cc
+    file_processing/async_reader.cc
+    file_processing/chunk.cc
+    file_processing/chunk_detector.cc
+    file_processing/file.cc
+    file_processing/file_processor.cc
+    file_processing/io_dispatcher.cc
+    file_processing/processor.cc
+    gateway_util.cc
+    globals.cc
     hash.cc
     json_document.cc
     logging.cc
+    malloc_arena.cc
+    manifest.cc
+    manifest_fetch.cc
+    options.cc
     pack.cc
+    reflog.cc
+    reflog_sql.cc
+    s3fanout.cc
+    sanitizer.cc
+    server_tool.cc
+    session_context.cc
+    signature.cc
+    signing_tool.cc
+    statistics.cc
+    swissknife_lease_curl.cc
+    sql.cc
+    sqlitemem.cc
+    upload.cc
+    upload_facility.cc
+    upload_gateway.cc
+    upload_local.cc
+    upload_s3.cc
+    upload_spooler_definition.cc
+    util/algorithm.cc
+    util/mmap_file.cc
     util/posix.cc
     util/string.cc
     uuid.cc
+    whitelist.cc
+    xattr.cc
     )
 
   add_executable(cvmfs_receiver ${CVMFS_RECEIVER_SOURCES})
-  target_link_libraries(cvmfs_receiver ${SHA3_LIBRARIES} ${VJSON_LIBRARIES} ${OPENSSL_LIBRARIES} ${UUID_LIBRARIES} ${RT_LIBRARY} pthread)
+  target_link_libraries(cvmfs_receiver ${CURL_LIBRARIES} ${TBB_LIBRARIES} ${CARES_LIBRARIES} ${SHA3_LIBRARIES} ${SQLITE3_LIBRARY} ${VJSON_LIBRARIES} ${OPENSSL_LIBRARIES} ${UUID_LIBRARIES} ${ZLIB_LIBRARIES} ${RT_LIBRARY} pthread dl)
+
+  set (CVMFS_RECEIVER_CFLAGS "${CMAKE_CXX_FLAGS} -D_FILE_OFFSET_BITS=64 -fexceptions")
+  set_target_properties (cvmfs_receiver PROPERTIES COMPILE_FLAGS "${CVMFS_RECEIVER_CFLAGS}")
+
 endif(BUILD_RECEIVER)
 
 

@@ -112,7 +112,10 @@ void Spooler::WaitForUpload() const {
   file_processor_->WaitForProcessing();
 }
 
-void Spooler::FinalizeSession() const { uploader_->FinalizeSession(); }
+void Spooler::FinalizeSession(bool commit, const std::string &old_root_hash,
+                              const std::string &new_root_hash) const {
+  uploader_->FinalizeSession(commit, old_root_hash, new_root_hash);
+}
 
 unsigned int Spooler::GetNumberOfErrors() const {
   return uploader_->GetNumberOfErrors();

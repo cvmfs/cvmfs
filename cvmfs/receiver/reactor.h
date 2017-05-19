@@ -10,6 +10,7 @@
 
 namespace receiver {
 
+class CommitProcessor;
 class PayloadProcessor;
 
 /**
@@ -29,6 +30,7 @@ class Reactor {
     kGetTokenId,
     kCheckToken,
     kSubmitPayload,
+    kCommit,
     kError
   };
 
@@ -51,8 +53,10 @@ class Reactor {
   virtual bool HandleCheckToken(const std::string& req, std::string* reply);
   virtual bool HandleSubmitPayload(int fdin, const std::string& req,
                                    std::string* reply);
+  virtual bool HandleCommit(const std::string& req, std::string* reply);
 
-  virtual PayloadProcessor* MakePayloadProcessor();
+  virtual PayloadProcessor* MakePayloadProcessor(const std::string& temp_dir);
+  virtual CommitProcessor* MakeCommitProcessor(const std::string& temp_dir);
 
  private:
   bool HandleRequest(Request req, const std::string& data);

@@ -328,7 +328,10 @@ cvmfs_server_publish() {
     fi
 
     if [ x"$upstream_type" = xgw ]; then
-        echo "We need to stop here until the repository gateway functionality is fully implemented"
+        close_transaction  $name $use_fd_fallback
+        publish_after_hook $name
+        publish_succeeded $name
+        echo "Changes submitted to repository gateway"
         return 0
     fi
 

@@ -281,7 +281,7 @@ int swissknife::CommandApplyDirtab::Main(const ArgumentList &args) {
   // initialize catalog infrastructure
   const bool auto_manage_catalog_files = true;
   const bool follow_redirects = (args.count('L') > 0);
-  if (!this->InitDownloadManager(follow_redirects)) {
+  if (!InitDownloadManager(follow_redirects)) {
     return 1;
   }
   catalog::SimpleCatalogManager catalog_manager(
@@ -619,12 +619,12 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (!spooler_catalogs.IsValid()) return 3;
 
   const bool follow_redirects = (args.count('L') > 0);
-  if (!this->InitDownloadManager(follow_redirects)) {
+  if (!InitDownloadManager(follow_redirects)) {
     return 3;
   }
 
-  if (!this->InitVerifyingSignatureManager(params.public_keys,
-                                           params.trusted_certs)) {
+  if (!InitVerifyingSignatureManager(params.public_keys,
+                                     params.trusted_certs)) {
     return 3;
   }
 
@@ -633,17 +633,18 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     // Throw-away manifest
     manifest = new manifest::Manifest(shash::Any(), 0, "");
   } else if (params.virtual_dir_actions !=
-             catalog::VirtualCatalog::kActionNone)
-  {
+             catalog::VirtualCatalog::kActionNone) {
     manifest = this->OpenLocalManifest(params.manifest_path);
     params.base_hash = manifest->catalog_hash();
   } else {
-    manifest = this->FetchRemoteManifest(params.stratum0, params.repo_name,
-                                         params.base_hash);
+    manifest = FetchRemoteManifest(params.stratum0, params.repo_name,
+                                   params.base_hash);
   }
   if (!manifest) {
     return 3;
   }
+
+  const std::string old_root_hash = manifest->catalog_hash().ToString(true);
 
   catalog::WritableCatalogManager catalog_manager(
       params.base_hash, params.stratum0, params.dir_temp, spooler_catalogs,
@@ -725,8 +726,15 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   LogCvmfs(kLogCvmfs, kLogStdout, "Exporting repository manifest");
   params.spooler->WaitForUpload();
   spooler_catalogs->WaitForUpload();
-  params.spooler->FinalizeSession();
-  spooler_catalogs->FinalizeSession();
+  params.spooler->FinalizeSession(false);
+
+  // We call FinalizeSession(true) this time, to also trigger the commit
+  // operation on the gateway machine (if the upstream is of type "gw").
+
+  // Get the path of the new root catalog
+  const std::string new_root_hash = manifest->catalog_hash().ToString(true);
+
+  spooler_catalogs->FinalizeSession(true, old_root_hash, new_root_hash);
   delete params.spooler;
 
   if (!manifest->Export(params.manifest_path)) {
