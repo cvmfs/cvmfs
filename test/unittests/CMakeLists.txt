@@ -33,7 +33,6 @@ set(CVMFS_UNITTEST_FILES
   t_callbacks.cc
   t_catalog.cc
   t_catalog_counters.cc
-  t_catalog_merge_tool.cc
   t_catalog_mgr.cc
   t_catalog_sql.cc
   t_catalog_traversal.cc
