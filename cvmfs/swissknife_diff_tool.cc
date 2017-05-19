@@ -4,6 +4,8 @@
 
 #include "swissknife_diff_tool.h"
 
+#include <inttypes.h>
+
 #include <vector>
 
 #include "directory_entry.h"
