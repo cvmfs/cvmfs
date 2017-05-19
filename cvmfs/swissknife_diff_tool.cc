@@ -4,7 +4,10 @@
 
 #include "swissknife_diff_tool.h"
 
+#define __STDC_FORMAT_MACROS
+
 #include <inttypes.h>
+#include <stdint.h>
 
 #include <vector>
 
