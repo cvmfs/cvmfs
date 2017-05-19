@@ -41,7 +41,7 @@ inline bool IsSmaller(const catalog::DirectoryEntry& a,
 }
 
 template <typename RoCatalogMgr>
-bool CatalogDiffTool<RoCatalogMgr>::Run(const PathString& path) {
+bool CatalogDiffTool<RoCatalogMgr>::Init() {
   if (needs_setup_) {
     // Create a temp directory
     const std::string temp_dir_old = CreateTempDir(temp_dir_prefix_);
@@ -68,6 +68,11 @@ bool CatalogDiffTool<RoCatalogMgr>::Run(const PathString& path) {
     }
   }
 
+  return true;
+}
+
+template <typename RoCatalogMgr>
+bool CatalogDiffTool<RoCatalogMgr>::Run(const PathString& path) {
   DiffRec(path);
 
   return true;

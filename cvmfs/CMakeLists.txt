@@ -160,7 +160,6 @@ set (CVMFS_FSCK_SOURCES
 set (CVMFS_SWISSKNIFE_SOURCES
   catalog.cc
   catalog_counters.cc
-  catalog_diff_tool.cc
   catalog_mgr_ro.cc
   catalog_mgr_rw.cc
   catalog_sql.cc

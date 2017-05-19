@@ -117,7 +117,8 @@ void DiffTool::ReportRemoval(const PathString &path,
 
 void DiffTool::ReportModification(const PathString &path,
                                   const catalog::DirectoryEntry &entry_from,
-                                  const catalog::DirectoryEntry &entry_to) {
+                                  const catalog::DirectoryEntry &entry_to,
+                                  const XattrList & /*xattrs*/) {
   catalog::DirectoryEntryBase::Differences diff =
       entry_from.CompareTo(entry_to);
 
