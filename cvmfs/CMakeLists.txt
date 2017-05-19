@@ -341,7 +341,6 @@ set (CVMFS_STRATUM_AGENT_SOURCES
 
 if(BUILD_RECEIVER)
   set (CVMFS_RECEIVER_SOURCES
-    receiver/catalog_merge_tool.cc
     receiver/commit_processor.cc
     receiver/params.cc
     receiver/payload_processor.cc
@@ -351,7 +350,6 @@ if(BUILD_RECEIVER)
     catalog.cc
     catalog_rw.cc
     catalog_counters.cc
-    catalog_diff_tool.cc
     catalog_sql.cc
     catalog_mgr_ro.cc
     catalog_mgr_rw.cc

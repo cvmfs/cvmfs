@@ -2,7 +2,10 @@
  * This file is part of the CernVM File System.
  */
 
-#include "catalog_diff_tool.h"
+#ifndef CVMFS_CATALOG_DIFF_TOOL_IMPL_H_
+#define CVMFS_CATALOG_DIFF_TOOL_IMPL_H_
+
+#include <string>
 
 #include "catalog.h"
 #include "download.h"
@@ -10,23 +13,22 @@
 #include "logging.h"
 #include "util/posix.h"
 
-namespace {
 const uint64_t kLastInode = uint64_t(-1);
 
-void AppendFirstEntry(catalog::DirectoryEntryList* entry_list) {
+inline void AppendFirstEntry(catalog::DirectoryEntryList* entry_list) {
   catalog::DirectoryEntry empty_entry;
   entry_list->push_back(empty_entry);
 }
 
-void AppendLastEntry(catalog::DirectoryEntryList* entry_list) {
+inline void AppendLastEntry(catalog::DirectoryEntryList* entry_list) {
   assert(!entry_list->empty());
   catalog::DirectoryEntry last_entry;
   last_entry.set_inode(kLastInode);
   entry_list->push_back(last_entry);
 }
 
-bool IsSmaller(const catalog::DirectoryEntry& a,
-               const catalog::DirectoryEntry& b) {
+inline bool IsSmaller(const catalog::DirectoryEntry& a,
+                      const catalog::DirectoryEntry& b) {
   bool a_is_first = (a.inode() == catalog::DirectoryEntryBase::kInvalidInode);
   bool a_is_last = (a.inode() == kLastInode);
   bool b_is_first = (b.inode() == catalog::DirectoryEntryBase::kInvalidInode);
@@ -38,72 +40,53 @@ bool IsSmaller(const catalog::DirectoryEntry& a,
   return a.name() < b.name();
 }
 
-catalog::SimpleCatalogManager* OpenCatalogManager(
-    const std::string& repo_path, const std::string& temp_dir,
-    const shash::Any& root_hash, download::DownloadManager* download_manager,
-    perf::Statistics* stats) {
-  catalog::SimpleCatalogManager* mgr = new catalog::SimpleCatalogManager(
-      root_hash, repo_path, temp_dir, download_manager, stats, true);
-  mgr->Init();
+template <typename RoCatalogMgr>
+bool CatalogDiffTool<RoCatalogMgr>::Run(const PathString& path) {
+  if (needs_setup_) {
+    // Create a temp directory
+    const std::string temp_dir_old = CreateTempDir(temp_dir_prefix_);
+    const std::string temp_dir_new = CreateTempDir(temp_dir_prefix_);
 
-  return mgr;
-}
+    // Old catalog from release manager machine (before lease)
+    old_catalog_mgr_ =
+        OpenCatalogManager(repo_path_, temp_dir_old, old_root_hash_,
+                           download_manager_, &stats_old_);
 
-}  // namespace
+    // New catalog from release manager machine (before lease)
+    new_catalog_mgr_ =
+        OpenCatalogManager(repo_path_, temp_dir_new, new_root_hash_,
+                           download_manager_, &stats_new_);
 
-CatalogDiffTool::CatalogDiffTool(const std::string& repo_path,
-                                 const shash::Any& old_root_hash,
-                                 const shash::Any& new_root_hash,
-                                 const std::string& temp_dir_prefix,
-                                 download::DownloadManager* download_manager)
-    : repo_path_(repo_path),
-      old_root_hash_(old_root_hash),
-      new_root_hash_(new_root_hash),
-      temp_dir_prefix_(temp_dir_prefix),
-      download_manager_(download_manager),
-      old_catalog_mgr_(),
-      new_catalog_mgr_() {}
+    if (!old_catalog_mgr_.IsValid()) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Could not open old catalog");
+      return false;
+    }
 
-CatalogDiffTool::~CatalogDiffTool() {
-  RemoveTree(temp_dir_old_);
-  RemoveTree(temp_dir_new_);
-}
-
-bool CatalogDiffTool::Init() {
-  // Create a temp directory
-  temp_dir_old_ = CreateTempDir(temp_dir_prefix_);
-  temp_dir_new_ = CreateTempDir(temp_dir_prefix_);
-
-  // Old catalog from release manager machine (before lease)
-  old_catalog_mgr_ =
-      OpenCatalogManager(repo_path_, temp_dir_old_, old_root_hash_,
-                         download_manager_, &stats_old_);
-
-  // New catalog from release manager machine (before lease)
-  new_catalog_mgr_ =
-      OpenCatalogManager(repo_path_, temp_dir_new_, new_root_hash_,
-                         download_manager_, &stats_new_);
-
-  if (!old_catalog_mgr_.IsValid()) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Could not open old catalog");
-    return false;
+    if (!new_catalog_mgr_.IsValid()) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Could not open new catalog");
+      return false;
+    }
   }
 
-  if (!new_catalog_mgr_.IsValid()) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Could not open new catalog");
-    return false;
-  }
-
-  return true;
-}
-
-bool CatalogDiffTool::Run(const PathString& path) {
   DiffRec(path);
 
   return true;
 }
 
-void CatalogDiffTool::DiffRec(const PathString& path) {
+template <typename RoCatalogMgr>
+RoCatalogMgr* CatalogDiffTool<RoCatalogMgr>::OpenCatalogManager(
+    const std::string& repo_path, const std::string& temp_dir,
+    const shash::Any& root_hash, download::DownloadManager* download_manager,
+    perf::Statistics* stats) {
+  RoCatalogMgr* mgr = new RoCatalogMgr(root_hash, repo_path, temp_dir,
+                                       download_manager, stats, true);
+  mgr->Init();
+
+  return mgr;
+}
+
+template <typename RoCatalogMgr>
+void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
   catalog::DirectoryEntryList old_listing;
   AppendFirstEntry(&old_listing);
   old_catalog_mgr_->Listing(path, &old_listing);
@@ -127,12 +110,13 @@ void CatalogDiffTool::DiffRec(const PathString& path) {
     new_path.Append("/", 1);
     new_path.Append(new_entry.name().GetChars(), new_entry.name().GetLength());
 
+    XattrList xattrs;
+    if (new_entry.HasXattrs()) {
+      new_catalog_mgr_->LookupXattrs(new_path, &xattrs);
+    }
+
     if (IsSmaller(new_entry, old_entry)) {
       i_to++;
-      XattrList xattrs;
-      if (new_entry.HasXattrs()) {
-        new_catalog_mgr_->LookupXattrs(new_path, &xattrs);
-      }
       ReportAddition(new_path, new_entry, xattrs);
       continue;
     } else if (IsSmaller(old_entry, new_entry)) {
@@ -145,7 +129,7 @@ void CatalogDiffTool::DiffRec(const PathString& path) {
     i_from++;
     i_to++;
     if (old_entry.CompareTo(new_entry) > 0) {
-      ReportModification(old_path, old_entry, new_entry);
+      ReportModification(old_path, old_entry, new_entry, xattrs);
     }
     if (!old_entry.IsDirectory() || !new_entry.IsDirectory()) continue;
 
@@ -165,3 +149,5 @@ void CatalogDiffTool::DiffRec(const PathString& path) {
     DiffRec(old_path);
   }
 }
+
+#endif  // CVMFS_CATALOG_DIFF_TOOL_IMPL_H_

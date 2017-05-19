@@ -6,7 +6,10 @@
 
 #include <vector>
 
+#include "catalog_diff_tool.h"
 #include "catalog_merge_tool.h"
+#include "catalog_mgr_ro.h"
+#include "catalog_mgr_rw.h"
 #include "compression.h"
 #include "download.h"
 #include "logging.h"
@@ -44,8 +47,8 @@ CommitProcessor::~CommitProcessor() {}
  * repository manifest.
  */
 CommitProcessor::Result CommitProcessor::Process(
-    const std::string& lease_path, const shash::Any& old_root_hash_str,
-    const shash::Any& new_root_hash_str) {
+    const std::string& lease_path, const shash::Any& old_root_hash,
+    const shash::Any& new_root_hash) {
   const std::vector<std::string> lease_path_tokens =
       SplitString(lease_path, '/');
 
@@ -75,9 +78,10 @@ CommitProcessor::Result CommitProcessor::Process(
     return kIoError;
   }
 
-  CatalogMergeTool merge_tool(stratum0, old_root_hash_str, new_root_hash_str,
-                              temp_dir_, server_tool->download_manager(),
-                              manifest.weak_ref());
+  CatalogMergeTool<catalog::WritableCatalogManager,
+                   catalog::SimpleCatalogManager>
+      merge_tool(stratum0, old_root_hash, new_root_hash, temp_dir_,
+                 server_tool->download_manager(), manifest.weak_ref());
   if (!merge_tool.Init()) {
     return kIoError;
   }

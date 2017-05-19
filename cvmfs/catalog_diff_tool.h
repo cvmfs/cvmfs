@@ -7,22 +7,41 @@
 
 #include <string>
 
-#include "catalog_mgr_ro.h"
+#include "directory_entry.h"
 #include "shortstring.h"
 #include "statistics.h"
 #include "util/pointer.h"
+#include "xattr.h"
 
 namespace download {
 class DownloadManager;
 }
 
+template <typename RoCatalogMgr>
 class CatalogDiffTool {
  public:
+  CatalogDiffTool(RoCatalogMgr* old_catalog_mgr, RoCatalogMgr* new_catalog_mgr)
+      : repo_path_(""),
+        temp_dir_prefix_(""),
+        download_manager_(NULL),
+        old_catalog_mgr_(old_catalog_mgr),
+        new_catalog_mgr_(new_catalog_mgr),
+        needs_setup_(false) {}
+
   CatalogDiffTool(const std::string& repo_path, const shash::Any& old_root_hash,
                   const shash::Any& new_root_hash,
                   const std::string& temp_dir_prefix,
-                  download::DownloadManager* download_manager);
-  virtual ~CatalogDiffTool();
+                  download::DownloadManager* download_manager)
+      : repo_path_(repo_path),
+        old_root_hash_(old_root_hash),
+        new_root_hash_(new_root_hash),
+        temp_dir_prefix_(temp_dir_prefix),
+        download_manager_(download_manager),
+        old_catalog_mgr_(),
+        new_catalog_mgr_(),
+        needs_setup_(true) {}
+
+  virtual ~CatalogDiffTool() {}
 
   bool Init();
 
@@ -36,7 +55,8 @@ class CatalogDiffTool {
                              const catalog::DirectoryEntry& entry) = 0;
   virtual void ReportModification(const PathString& path,
                                   const catalog::DirectoryEntry& old_entry,
-                                  const catalog::DirectoryEntry& new_entry) = 0;
+                                  const catalog::DirectoryEntry& new_entry,
+                                  const XattrList& xattrs) = 0;
 
   const catalog::Catalog* GetOldCatalog() const {
     return old_catalog_mgr_->GetRootCatalog();
@@ -46,6 +66,12 @@ class CatalogDiffTool {
   }
 
  private:
+  RoCatalogMgr* OpenCatalogManager(const std::string& repo_path,
+                                   const std::string& temp_dir,
+                                   const shash::Any& root_hash,
+                                   download::DownloadManager* download_manager,
+                                   perf::Statistics* stats);
+
   void DiffRec(const PathString& path);
 
   std::string repo_path_;
@@ -58,11 +84,12 @@ class CatalogDiffTool {
   perf::Statistics stats_old_;
   perf::Statistics stats_new_;
 
-  UniquePtr<catalog::SimpleCatalogManager> old_catalog_mgr_;
-  UniquePtr<catalog::SimpleCatalogManager> new_catalog_mgr_;
+  UniquePtr<RoCatalogMgr> old_catalog_mgr_;
+  UniquePtr<RoCatalogMgr> new_catalog_mgr_;
 
-  std::string temp_dir_old_;
-  std::string temp_dir_new_;
+  const bool needs_setup_;
 };
+
+#include "catalog_diff_tool_impl.h"
 
 #endif  // CVMFS_CATALOG_DIFF_TOOL_H_
