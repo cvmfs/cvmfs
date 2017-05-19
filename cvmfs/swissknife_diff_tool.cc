@@ -2,12 +2,13 @@
  * This file is part of the CernVM File System.
  */
 
-#include "swissknife_diff_tool.h"
-
 #define __STDC_FORMAT_MACROS
+
+#include "swissknife_diff_tool.h"
 
 #include <inttypes.h>
 #include <stdint.h>
+#include "cvmfs_config.h"
 
 #include <vector>
 
