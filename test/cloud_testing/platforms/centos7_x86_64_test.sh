@@ -27,7 +27,6 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                               -x src/005-asetup                               \
                                  src/004-davinci                              \
                                  src/007-testjobs                             \
-                                 src/024-reload-during-asetup                 \
                                  --                                           \
                                  src/0*                                       \
                               || retval=1

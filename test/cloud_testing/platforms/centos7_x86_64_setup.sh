@@ -50,6 +50,7 @@ install_from_repo rubygems
 install_from_repo wget
 install_from_repo java-1.8.0-openjdk
 install_from_repo redhat-lsb-core
+install_from_repo tree
 
 # traffic shaping
 install_from_repo trickle
@@ -63,6 +64,9 @@ install_from_repo zlib-devel
 install_from_repo libattr-devel
 install_from_repo openssl-devel
 install_from_repo libuuid-devel
+install_from_repo python-devel
+install_from_repo unzip
+install_from_repo bzip2
 
 # increase open file descriptor limits
 echo -n "increasing ulimit -n ... "

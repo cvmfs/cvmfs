@@ -1,21 +1,30 @@
 [![Build Status](https://travis-ci.org/cvmfs/cvmfs.svg?branch=devel)](https://travis-ci.org/cvmfs/cvmfs) [![Documentation Status](https://readthedocs.org/projects/cvmfs/badge/?version=latest)](http://cvmfs.readthedocs.org/en/latest/?badge=master)
 
-CVMFS is a FUSE module which implements an HTTP read-only filesystem. The idea
-is based on the GROW-FS filesystem, which makes use of Parrot, a component of
-the CCTools package developed at the University of Notre Dame.
+The CernVM-File System (CernVM-FS) provides a scalable, reliable and low-
+maintenance software distribution service. It was developed to assist High
+Energy Physics (HEP) collaborations to deploy software on the worldwide-
+distributed computing infrastructure used to run data processing applications.
+CernVM-FS is implemented as a POSIX read-only file system in user space (a FUSE
+module). Files and directories are hosted on standard web servers and mounted
+in the universal namespace /cvmfs. Internally, CernVM-FS uses content-
+addressable storage and Merkle trees in order to maintain file data and
+meta-data. CernVM-FS uses outgoing HTTP connections only, thereby it avoids
+most of the firewall issues of other network file systems. It transfers data
+and meta-data on demand and verifies data integrity by cryptographic hashes.
 
-CVMFS presents a remote HTTP directory as a local file system, in which the
-client has read access to all available files. On its first access request, a
-file is downloaded and cached locally. All downloaded pieces are verified with
-SHA-1.
+By means of aggressive caching and reduction of latency, CernVM-FS focuses
+specifically on the software use case. Software usually comprises many small
+files that are frequently opened and read as a whole. Furthermore, the software
+use case includes frequent look-ups for files in multiple directories when
+search paths are examined.
 
-To do so, a directory structure is transformed into a CVMFS "repository", a
-form of content-addressable storage.
+Content is published into /cvmfs by means of dedicated "release manager
+machines". The release manager machines provide a writeable CernVM-FS instance
+by means of a union file system (aufs or overlayfs) on top of the read-only
+client. When publishing, the CernVM-FS server tools process new and modified
+data from the union file system's writable branch and transform the data into
+the CernVM-FS storage format.
 
-This preparation of directories is transparent to web servers and web proxies,
-which serve only static content, i.e., arbitrary files. Any HTTP server can do
-the job.
-
-CVMFS was created chiefly for the delivery of experiment software stacks for
-the LHC experiments at CERN; development continues to address the software
-distribution needs of experiments worldwide.
+CernVM-FS is actively used by small and large scientific collaborations. In many
+cases, it replaces package managers and shared software areas on cluster file 
+systems as means to distribute the software used to process experiment data.

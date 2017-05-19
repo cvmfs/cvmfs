@@ -77,7 +77,7 @@ parm_list="CVMFS_USER CVMFS_NFILES CVMFS_CACHE_BASE CVMFS_CACHE_DIR CVMFS_MOUNT_
           CVMFS_CONFIG_REPOSITORY CVMFS_LOW_SPEED_LIMIT CVMFS_FALLBACK_PROXY CVMFS_PROXY_TEMPLATE \
           CVMFS_FOLLOW_REDIRECTS CVMFS_MAX_IPADDR_PER_PROXY CVMFS_ALT_ROOT_PATH \
           CVMFS_IPFAMILY_PREFER CVMFS_DNS_RETRIES CVMFS_DNS_TIMEOUT \
-          CVMFS_AUTHZ_HELPER CVMFS_AUTHZ_SEARCH_PATH"
+          CVMFS_AUTHZ_HELPER CVMFS_AUTHZ_SEARCH_PATH CVMFS_WORKSPACE"
 switch_list="CVMFS_IGNORE_SIGNATURE CVMFS_STRICT_MOUNT CVMFS_SHARED_CACHE \
           CVMFS_NFS_SOURCE CVMFS_NFS_SHARED CVMFS_CHECK_PERMISSIONS CVMFS_AUTO_UPDATE \
           CVMFS_MOUNT_RW CVMFS_SEND_INFO_HEADER CVMFS_USE_GEOAPI CVMFS_CLAIM_OWNERSHIP \
@@ -1051,14 +1051,19 @@ cvmfs_reload() {
     for dir in $cache_directories; do
       echo -n "Wiping out $dir ... "
       if [ -d "$dir" ]; then
-        rm -rf "$dir" && \
-          mkdir -p "$dir" && \
-          chown $CVMFS_USER "$dir"
-        if [ $? -ne 0 ]; then
-          echo "Failed!"
-          RETVAL=1
+        local num_nfs_maps=$(find $dir -maxdepth 1 -type d -name 'nfs_maps.*' | wc -l)
+        if [ $num_nfs_maps -ne 0 ]; then
+          echo "not supported for NFS exported client, leaving directory untouched!"
         else
-          echo "OK"
+          rm -rf "$dir" && \
+            mkdir -p "$dir" && \
+            chown $CVMFS_USER "$dir"
+          if [ $? -ne 0 ]; then
+            echo "Failed!"
+            RETVAL=1
+          else
+            echo "OK"
+          fi
         fi
       else
         echo "OK"

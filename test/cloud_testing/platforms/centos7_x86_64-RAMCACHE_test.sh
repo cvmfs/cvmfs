@@ -16,13 +16,13 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  src/011-rmemptyfilesrebuild                  \
                                  src/014-corrupt_lru                          \
                                  src/015-rebuild_on_crash                     \
-                                 src/024-reload-during-asetup                 \
                                  src/040-aliencache                           \
                                  src/041-rocache                              \
                                  src/042-cleanuppipes                         \
                                  src/044-unpinonmount                         \
                                  src/057-parallelmakecache                    \
-                                 src/068-rocache                              \
+				 src/064-fsck                                 \
+				 src/068-rocache                              \
                                  src/070-tieredcache                          \
                                  --                                           \
                                  src/0*                                       \

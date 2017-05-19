@@ -46,7 +46,7 @@ add_custom_command(OUTPUT cache.pb.cc cache.pb.h
                    COMMAND ${PROTOBUF_PROTOC_EXECUTABLE} --cpp_out=.
                            ${CVMFS_SOURCE_DIR}/cache.proto
                            -I${CVMFS_SOURCE_DIR}
-                   DEPENDS ${PROTOBUF_ARCHIVE}
+                   DEPENDS ${PROTOBUF_PROTOC_EXECUTABLE}
                            ${CVMFS_SOURCE_DIR}/cache.proto
                    COMMENT "Generating protobuf sources")
 
@@ -81,6 +81,6 @@ set_target_properties (${PROJECT_UBENCHMARKS_NAME} PROPERTIES
 set (UBENCHMARKS_LINK_LIBRARIES ${GOOGLEBENCH_LIBRARIES} ${OPENSSL_LIBRARIES}
                                 ${RT_LIBRARY} ${ZLIB_LIBRARIES}
                                 ${RT_LIBRARY} ${SHA3_LIBRARIES}
-                                ${PROTOBUF_LIBRARIES} pthread dl)
+                                ${PROTOBUF_LITE_LIBRARY} pthread dl)
 
 target_link_libraries (${PROJECT_UBENCHMARKS_NAME} ${UBENCHMARKS_LINK_LIBRARIES})

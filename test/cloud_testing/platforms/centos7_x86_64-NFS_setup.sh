@@ -4,57 +4,31 @@
 script_location=$(dirname $(readlink --canonicalize $0))
 . ${script_location}/common_setup.sh
 
-# update packages installed on the system
-echo "updating installed RPM packages..."
-sudo dnf -y update || echo "---- WARNING: dnf reported non-zero status code"
-
 # install CernVM-FS RPM packages
 echo "installing RPM packages... "
 install_rpm "$CONFIG_PACKAGES"
 install_rpm $CLIENT_PACKAGE
-install_rpm $SERVER_PACKAGE
-install_rpm $DEVEL_PACKAGE
+install_rpm $SERVER_PACKAGE  # only needed for tbb shared libs (unit tests)
 install_rpm $UNITTEST_PACKAGE
-
-# installing WSGI apache module
-echo "installing python WSGI module..."
-install_from_repo mod_wsgi || die "fail (installing mod_wsgi)"
-sudo systemctl start httpd || die "fail (starting apache)"
 
 # setup environment
 echo -n "setting up CernVM-FS environment..."
+sudo sh -c "echo CVMFS_NFS_SOURCE=yes > /etc/cvmfs/default.d/90-nfs.conf"
 sudo cvmfs_config setup                          || die "fail (cvmfs_config setup)"
 sudo mkdir -p /var/log/cvmfs-test                || die "fail (mkdir /var/log/cvmfs-test)"
 sudo chown sftnight:sftnight /var/log/cvmfs-test || die "fail (chown /var/log/cvmfs-test)"
+sudo systemctl start autofs                      || die "fail (systemctl start autofs)"
 sudo cvmfs_config chksetup > /dev/null           || die "fail (cvmfs_config chksetup)"
 echo "done"
 
 # install additional stuff (needed for perl testing tools)
 echo "installing additional RPM packages..."
-install_from_repo file
 install_from_repo gcc
 install_from_repo gcc-c++
-install_from_repo rubygems
-install_from_repo java
-install_from_repo python
-install_from_repo nc
 install_from_repo wget
-install_from_repo bc
-install_from_repo tree
 
 # traffic shaping
 install_from_repo trickle
-
-# install build dependencies for `libcvmfs`
-install_from_repo openssl-devel
-install_from_repo libuuid-devel
-
-# install stuff necessary to build `cvmfs_preload`
-install_from_repo cmake
-install_from_repo patch
-install_from_repo libattr-devel
-install_from_repo python-devel
-install_from_repo unzip
 
 # increase open file descriptor limits
 echo -n "increasing ulimit -n ... "

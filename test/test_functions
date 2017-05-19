@@ -479,7 +479,10 @@ has_selinux() {
 get_cvmfs_cachedir() {
   local repository=$1
 
-  local cache_dir=$(cvmfs_config showconfig $repository | grep CVMFS_CACHE_DIR | awk '{print $1}' | cut -d= -f2)
+  local cache_dir=$(cvmfs_config showconfig $repository | grep CVMFS_WORKSPACE | awk '{print $1}' | cut -d= -f2)
+  if [ "x$cache_dir" = "x" ]; then
+    cache_dir=$(cvmfs_config showconfig $repository | grep CVMFS_CACHE_DIR | awk '{print $1}' | cut -d= -f2)
+  fi
   if [ "x$cache_dir" = "x" ]; then
     echo "Failed to figure out cache directory"
     exit 1

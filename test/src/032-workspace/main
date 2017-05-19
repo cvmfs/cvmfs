@@ -1,6 +1,10 @@
 
 cvmfs_test_name="CVMFS_WORKSPACE"
 
+cleanup() {
+  cvmfs_enable_config_repository
+}
+
 cvmfs_run_test() {
   logfile=$1
 
@@ -12,12 +16,14 @@ cvmfs_run_test() {
   echo "*** start clean, even without cvmfs-config repository"
   cvmfs_clean || return 50
 
+  echo "*** disable config repository"
+  cvmfs_disable_config_repository || return $?
+  trap cleanup TERM HUP INT EXIT || return $?
+
   cvmfs_mount grid.cern.ch "CVMFS_WORKSPACE=$workspace" || return 3
   cat /cvmfs/grid.cern.ch/README || return 4
-  cvmfs_mount atlas.cern.ch "CVMFS_WORKSPACE=$workspace" || return 5
-  cat /cvmfs/atlas.cern.ch/.cvmfsdirtab || return 6
 
-  sudo cvmfs_talk -p $workspace/cvmfs_io.atlas.cern.ch cache list || return 10
+  sudo cvmfs_talk -p $workspace/cvmfs_io.grid.cern.ch cache list || return 10
 
   local num_lock_files=$(sudo find $cache_dir -name 'lock*' | wc -l)
   local num_pipe_files=$(sudo find $cache_dir -name 'pipe*' | wc -l)

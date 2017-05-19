@@ -233,7 +233,7 @@ add_custom_command(OUTPUT cache.pb.cc cache.pb.h
                    COMMAND ${PROTOBUF_PROTOC_EXECUTABLE} --cpp_out=.
                            ${CVMFS_SOURCE_DIR}/cache.proto
                            -I${CVMFS_SOURCE_DIR}
-                   DEPENDS ${PROTOBUF_LIBRARY}
+                   DEPENDS ${PROTOBUF_PROTOC_EXECUTABLE}
                            ${CVMFS_SOURCE_DIR}/cache.proto
                    COMMENT "Generating protobuf sources")
 
@@ -311,7 +311,8 @@ set (UNITTEST_LINK_LIBRARIES ${GTEST_LIBRARIES} ${OPENSSL_LIBRARIES} ${CURL_LIBR
                              ${SQLITE3_LIBRARY} ${TBB_LIBRARIES}
                              ${ZLIB_LIBRARIES} ${RT_LIBRARY} ${UUID_LIBRARIES}
                              ${PACPARSER_LIBRARIES} ${SHA3_LIBRARIES}
-                             ${VJSON_LIBRARIES} ${PROTOBUF_LIBRARIES} pthread dl)
+                             ${VJSON_LIBRARIES} ${PROTOBUF_LITE_LIBRARY}
+                             pthread dl)
 
 target_link_libraries (${PROJECT_TEST_NAME} ${UNITTEST_LINK_LIBRARIES})
 
@@ -323,8 +324,8 @@ if (BUILD_LIBCVMFS_CACHE)
   target_link_libraries (${PROJECT_TEST_CACHE_NAME}
                          ${GTEST_LIBRARIES}
                          ${OPENSSL_LIBRARIES} ${ZLIB_LIBRARIES}
-                         ${RT_LIBRARY} ${SHA3_LIBRARIES} ${PROTOBUF_LIBRARIES}
-                         pthread)
+                         ${RT_LIBRARY} ${SHA3_LIBRARIES}
+                         ${PROTOBUF_LITE_LIBRARY} pthread)
 endif (BUILD_LIBCVMFS_CACHE)
 
 
