@@ -77,6 +77,7 @@ install_from_repo gcc           || die "fail (installing gcc)"
 install_from_repo gcc-c++       || die "fail (installing gcc-c++)"
 install_from_repo rubygems      || die "fail (installing rubygems)"
 install_from_repo java          || die "fail (installing java)"
+install_from_repo tree          || die "fail (installing tree)"
 
 # traffic shaping
 install_from_repo trickle || die "fail (installing trickle)"
@@ -88,6 +89,7 @@ install_from_repo libuuid-devel || die "fail (installing libuuid-devel)"
 # install `cvmfs_preload` build dependencies
 install_from_repo cmake         || die "fail (installing cmake)"
 install_from_repo libattr-devel || die "fail (installing libattr-devel)"
+install_from_repo python-devel  || die "fail (installing python-devel)"
 
 # install test dependency for 600
 install_from_repo compat-expat1          || die "fail (installing compat-expat1)"

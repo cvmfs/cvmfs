@@ -176,6 +176,9 @@ void CacheTransport::Frame::WrapMsg() {
   } else if (msg_typed_->GetTypeName() == "cvmfs.MsgStoreReq") {
     msg_rpc_.set_allocated_msg_store_req(
       reinterpret_cast<cvmfs::MsgStoreReq *>(msg_typed_));
+  } else if (msg_typed_->GetTypeName() == "cvmfs.MsgStoreAbortReq") {
+    msg_rpc_.set_allocated_msg_store_abort_req(
+      reinterpret_cast<cvmfs::MsgStoreAbortReq *>(msg_typed_));
   } else if (msg_typed_->GetTypeName() == "cvmfs.MsgStoreReply") {
     msg_rpc_.set_allocated_msg_store_reply(
       reinterpret_cast<cvmfs::MsgStoreReply *>(msg_typed_));
