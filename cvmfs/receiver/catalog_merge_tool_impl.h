@@ -47,7 +47,7 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::Run(
     output_catalog_mgr_->Init();
   }
 
-  bool ret = CatalogDiffTool<RoCatalogMgr>::Run();
+  bool ret = CatalogDiffTool<RoCatalogMgr>::Run(PathString(""));
 
   ret &= CreateNewManifest(new_manifest_path);
 

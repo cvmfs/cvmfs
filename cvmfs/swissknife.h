@@ -13,6 +13,7 @@
 #include "download.h"
 #include "manifest_fetch.h"
 #include "reflog.h"
+#include "server_tool.h"
 #include "signature.h"
 #include "statistics.h"
 
@@ -44,21 +45,18 @@ class Parameter {
   }
 
   char key() const { return key_; }
-  const std::string& description() const { return description_; }
+  const std::string &description() const { return description_; }
   bool optional() const { return optional_; }
   bool mandatory() const { return !optional_; }
   bool switch_only() const { return switch_only_; }
 
  protected:
-  Parameter(const char          key,
-            const std::string  &desc,
-            const bool          opt,
-            const bool          switch_only) :
-    key_(key),
-    description_(desc),
-    optional_(opt),
-    switch_only_(switch_only)
-  {
+  Parameter(const char key, const std::string &desc, const bool opt,
+            const bool switch_only)
+      : key_(key),
+        description_(desc),
+        optional_(opt),
+        switch_only_(switch_only) {
     assert(!switch_only_ || optional_);  // switches are optional by definition
   }
 
@@ -72,57 +70,16 @@ class Parameter {
 typedef std::vector<Parameter> ParameterList;
 typedef std::map<char, std::string *> ArgumentList;
 
-class Command {
+class Command : public ServerTool {
  public:
-  Command() { }
+  Command();
   virtual ~Command();
   virtual std::string GetName() const = 0;
   virtual std::string GetDescription() const = 0;
   virtual ParameterList GetParams() const = 0;
   virtual int Main(const ArgumentList &args) = 0;
-
- protected:
-  bool InitDownloadManager(const bool     follow_redirects,
-                           const unsigned max_pool_handles = 1,
-                           const bool     use_system_proxy = true);
-  bool InitVerifyingSignatureManager(const std::string &pubkey_path,
-                                     const std::string &trusted_certs = "");
-  bool InitSigningSignatureManager(const std::string &certificate_path,
-                                   const std::string &private_key_path,
-                                   const std::string &private_key_password);
-
-  manifest::Manifest* OpenLocalManifest(const std::string path) const;
-  manifest::Failures  FetchRemoteManifestEnsemble(
-                              const std::string &repository_url,
-                              const std::string &repository_name,
-                                    manifest::ManifestEnsemble *ensemble) const;
-  manifest::Manifest* FetchRemoteManifest(
-                             const std::string &repository_url,
-                             const std::string &repository_name,
-                             const shash::Any  &base_hash = shash::Any()) const;
-
-  template <class ObjectFetcherT>
-  manifest::Reflog* FetchReflog(ObjectFetcherT    *object_fetcher,
-                                const std::string &repo_name,
-                                const shash::Any  &reflog_hash);
-
-  manifest::Reflog* CreateEmptyReflog(const std::string &temp_directory,
-                                      const std::string &repo_name);
-
-  download::DownloadManager*   download_manager()  const;
-  signature::SignatureManager* signature_manager() const;
-  perf::Statistics*            statistics() { return &statistics_; }
-
- private:
-  static const unsigned kDownloadTimeout = 20;  // 20 seconds
-  static const unsigned kDownloadRetries = 1;   // 2 attempts in total
-  UniquePtr<download::DownloadManager>    download_manager_;
-  UniquePtr<signature::SignatureManager>  signature_manager_;
-  perf::Statistics                        statistics_;
 };
 
 }  // namespace swissknife
-
-#include "swissknife_impl.h"
 
 #endif  // CVMFS_SWISSKNIFE_H_

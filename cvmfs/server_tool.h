@@ -41,6 +41,9 @@ class ServerTool {
                                 const std::string &repo_name,
                                 const shash::Any &reflog_hash);
 
+  manifest::Reflog *CreateEmptyReflog(const std::string &temp_directory,
+                                      const std::string &repo_name);
+
   download::DownloadManager *download_manager() const;
   signature::SignatureManager *signature_manager() const;
   perf::Statistics *statistics() { return &statistics_; }

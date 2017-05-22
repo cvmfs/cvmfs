@@ -8,6 +8,7 @@
 #include <string>
 
 #include "directory_entry.h"
+#include "shortstring.h"
 #include "statistics.h"
 #include "util/pointer.h"
 #include "xattr.h"
@@ -42,8 +43,11 @@ class CatalogDiffTool {
 
   virtual ~CatalogDiffTool() {}
 
+  bool Init();
+
+  bool Run(const PathString& path);
+
  protected:
-  bool Run();
   virtual void ReportAddition(const PathString& path,
                               const catalog::DirectoryEntry& entry,
                               const XattrList& xattrs) = 0;
@@ -53,6 +57,13 @@ class CatalogDiffTool {
                                   const catalog::DirectoryEntry& old_entry,
                                   const catalog::DirectoryEntry& new_entry,
                                   const XattrList& xattrs) = 0;
+
+  const catalog::Catalog* GetOldCatalog() const {
+    return old_catalog_mgr_->GetRootCatalog();
+  }
+  const catalog::Catalog* GetNewCatalog() const {
+    return new_catalog_mgr_->GetRootCatalog();
+  }
 
  private:
   RoCatalogMgr* OpenCatalogManager(const std::string& repo_path,

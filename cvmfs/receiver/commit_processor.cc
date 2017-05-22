@@ -47,8 +47,8 @@ CommitProcessor::~CommitProcessor() {}
  * repository manifest.
  */
 CommitProcessor::Result CommitProcessor::Process(
-    const std::string& lease_path, const shash::Any& old_root_hash_str,
-    const shash::Any& new_root_hash_str) {
+    const std::string& lease_path, const shash::Any& old_root_hash,
+    const shash::Any& new_root_hash) {
   const std::vector<std::string> lease_path_tokens =
       SplitString(lease_path, '/');
 
@@ -80,8 +80,11 @@ CommitProcessor::Result CommitProcessor::Process(
 
   CatalogMergeTool<catalog::WritableCatalogManager,
                    catalog::SimpleCatalogManager>
-      merge_tool(stratum0, old_root_hash_str, new_root_hash_str, temp_dir_,
+      merge_tool(stratum0, old_root_hash, new_root_hash, temp_dir_,
                  server_tool->download_manager(), manifest.weak_ref());
+  if (!merge_tool.Init()) {
+    return kIoError;
+  }
 
   Params params;
   if (!GetParamsFromFile(repo_name, &params)) {
@@ -103,10 +106,10 @@ CommitProcessor::Result CommitProcessor::Process(
   server_tool = new ServerTool();
 
   SigningTool signing_tool(server_tool.weak_ref());
-  if (!signing_tool.Run(new_manifest_path, stratum0,
-                        params.spooler_configuration, temp_dir, certificate,
-                        private_key, repo_name, "", "",
-                        "/var/spool/cvmfs/" + repo_name + "/reflog.chksum")) {
+  if (signing_tool.Run(new_manifest_path, stratum0,
+                       params.spooler_configuration, temp_dir, certificate,
+                       private_key, repo_name, "", "",
+                       "/var/spool/cvmfs/" + repo_name + "/reflog.chksum")) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Error signing manifest");
     return kIoError;
   }

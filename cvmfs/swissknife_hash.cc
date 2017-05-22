@@ -14,6 +14,7 @@
 #include "hash.h"
 #include "logging.h"
 #include "smalloc.h"
+#include "util/posix.h"
 
 // Hash stdin and print the digest to stdout
 int swissknife::CommandHash::Main(const swissknife::ArgumentList &args) {
@@ -30,8 +31,9 @@ int swissknife::CommandHash::Main(const swissknife::ArgumentList &args) {
     shash::Update(buf, n, context_ptr);
   }
   shash::Final(context_ptr, &hash);
-  LogCvmfs(kLogCvmfs, kLogStdout, "%s", fingerprint ?
-           hash.ToFingerprint().c_str() : hash.ToString().c_str());
+  LogCvmfs(kLogCvmfs, kLogStdout, "%s", fingerprint
+                                            ? hash.ToFingerprint().c_str()
+                                            : hash.ToString().c_str());
 
   return 0;
 }
