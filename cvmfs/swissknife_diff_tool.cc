@@ -23,8 +23,9 @@ DiffTool::DiffTool(const std::string &repo_path,
                    const std::string &temp_dir,
                    download::DownloadManager *download_manager,
                    bool machine_readable)
-    : CatalogDiffTool(repo_path, old_tag.root_hash, new_tag.root_hash, temp_dir,
-                      download_manager),
+    : CatalogDiffTool<catalog::SimpleCatalogManager>(
+          repo_path, old_tag.root_hash, new_tag.root_hash, temp_dir,
+          download_manager),
       old_tag_(old_tag),
       new_tag_(new_tag),
       machine_readable_(machine_readable) {}
