@@ -5,6 +5,7 @@
 #ifndef CVMFS_CATALOG_DIFF_TOOL_IMPL_H_
 #define CVMFS_CATALOG_DIFF_TOOL_IMPL_H_
 
+#include <algorithm>
 #include <string>
 
 #include "catalog.h"
