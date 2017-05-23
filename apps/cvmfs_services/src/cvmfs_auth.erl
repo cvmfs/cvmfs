@@ -312,17 +312,14 @@ p_check_hmac(Message, KeyId, HMAC) ->
 -spec p_populate_keys(Keys :: [{KeyId :: binary, Secret :: binary()}]) -> boolean().
 p_populate_keys(Keys) ->
     T = fun() ->
-                lists:foreach(fun({KeyId, S}) ->
-                                      Secret = case S of
-                                                   {file, Path} ->
-                                                       {ok, SecStr} = file:read_file(Path),
-                                                       %% Remove trailing "\n" if needed
-                                                       KeySize = byte_size(SecStr) - 1,
-                                                       <<Key:KeySize/binary,_/binary>> = SecStr,
-                                                       Key;
-                                                   Str when is_binary(Str) ->
-                                                       Str
-                                               end,
+                lists:foreach(fun({K, V}) ->
+                                      {KeyId, Secret} = case {K, V} of
+                                                            {file, FileName} when is_binary(FileName);
+                                                                                  is_list(FileName) ->
+                                                                p_parse_key_file(FileName);
+                                                            {Id, Val} when is_binary(Id), is_binary(Val) ->
+                                                                {Id, Val}
+                                                        end,
                                       mnesia:write(#key{key_id = KeyId, secret = Secret})
                               end,
                               Keys),
@@ -340,3 +337,12 @@ p_populate_repos(RepoList) ->
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
+
+
+-spec p_parse_key_file(FileName :: [list() | binary()]) -> {KeyId :: binary(), Secret :: binary()}.
+p_parse_key_file(FileName) ->
+    {ok, Body} = file:read_file(FileName),
+    [Line | _] = [L || L <- binary:split(Body, <<"\n">>), L =/= <<>>],
+    [_Type, KeyId, Secret] = binary:split(Line, <<" ">>, [global]),
+    {KeyId, Secret}.
+
