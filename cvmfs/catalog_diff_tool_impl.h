@@ -95,11 +95,13 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
   catalog::DirectoryEntryList old_listing;
   AppendFirstEntry(&old_listing);
   old_catalog_mgr_->Listing(path, &old_listing);
+  sort(old_listing.begin(), old_listing.end(), IsSmaller);
   AppendLastEntry(&old_listing);
 
   catalog::DirectoryEntryList new_listing;
   AppendFirstEntry(&new_listing);
   new_catalog_mgr_->Listing(path, &new_listing);
+  sort(new_listing.begin(), new_listing.end(), IsSmaller);
   AppendLastEntry(&new_listing);
 
   unsigned i_from = 0, size_from = old_listing.size();
