@@ -848,6 +848,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
       WaitForStorage();  // Reduce the duration of reflog /wo checksum
       spooler->UploadReflog(reflog_path);
       spooler->WaitForUpload();
+      unlink(reflog_path.c_str());
       if (spooler->GetNumberOfErrors()) {
         LogCvmfs(kLogCvmfs, kLogStderr, "Failed to upload Reflog (errors: %d)",
                  spooler->GetNumberOfErrors());
