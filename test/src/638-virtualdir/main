@@ -171,6 +171,9 @@ cvmfs_run_test() {
   local num_open_nested=$(sudo cvmfs_talk -p /var/spool/cvmfs/$CVMFS_TEST_REPO/cache/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO \
                           open catalogs | grep nested | wc -l)
   if [ "x$num_open_nested" != "x4" ]; then
+    echo "expected $num_open_nested = 4"
+    sudo cvmfs_talk -p /var/spool/cvmfs/$CVMFS_TEST_REPO/cache/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO \
+                       open catalogs
     return 82
   fi
   sudo cvmfs_talk -p /var/spool/cvmfs/$CVMFS_TEST_REPO/cache/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO \
