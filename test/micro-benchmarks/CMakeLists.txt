@@ -36,7 +36,7 @@ set (CVMFS_UBENCHMARKS_SOURCES
   ${CVMFS_SOURCE_DIR}/util/algorithm.cc
   ${CVMFS_SOURCE_DIR}/util/posix.cc
   ${CVMFS_SOURCE_DIR}/util/string.cc
-  cache.pb.cc
+  cache.pb.cc cache.pb.h
 )
 
 # First .h then .cc is important to avoid races during the build process

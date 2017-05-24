@@ -23,7 +23,7 @@ set (CVMFS_CLIENT_SOURCES
   authz/authz_session.cc
   backoff.cc
   cache.cc
-  cache.pb.cc
+  cache.pb.cc cache.pb.h
   cache_extern.cc
   cache_posix.cc
   cache_ram.cc
@@ -74,6 +74,7 @@ set (CVMFS_CLIENT_SOURCES
   xattr.cc
 )
 
+# First .h then .cc is important to avoid races during the build process
 set_source_files_properties(cache.pb.h cache.pb.cc
                             PROPERTIES GENERATED true)
 
@@ -118,7 +119,7 @@ set (TEST_LIBCVMFS_SOURCES
 )
 
 set (LIBCVMFS_CACHE_SOURCES
-  cache.pb.cc
+  cache.pb.cc cache.pb.h
   cache_plugin/libcvmfs_cache.cc
   cache_plugin/libcvmfs_cache_options.cc
   cache_plugin/channel.cc

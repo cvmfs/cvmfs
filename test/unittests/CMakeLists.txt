@@ -221,7 +221,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/whitelist.cc
   ${CVMFS_SOURCE_DIR}/wpad.cc
   ${CVMFS_SOURCE_DIR}/xattr.cc
-  cache.pb.cc
+  cache.pb.cc cache.pb.h
 )
 
 set (CVMFS_UNITTEST_DEBUG_SOURCES ${CVMFS_UNITTEST_SOURCES})
@@ -240,7 +240,7 @@ add_custom_command(OUTPUT cache.pb.h cache.pb.cc
 
 
 set (CVMFS_TEST_CACHE_SOURCES
-  cache.pb.cc
+  cache.pb.cc cache.pb.h
   cache_plugin/main.cc
   cache_plugin/t_cache_plugin.cc
 
