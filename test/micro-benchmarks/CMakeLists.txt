@@ -39,10 +39,11 @@ set (CVMFS_UBENCHMARKS_SOURCES
   cache.pb.cc
 )
 
-set_source_files_properties(cache.pb.cc cache.pb.h
+# First .h then .cc is important to avoid races during the build process
+set_source_files_properties(cache.pb.h cache.pb.cc
                             PROPERTIES GENERATED true)
 
-add_custom_command(OUTPUT cache.pb.cc cache.pb.h
+add_custom_command(OUTPUT cache.pb.h cache.pb.cc
                    COMMAND ${PROTOBUF_PROTOC_EXECUTABLE} --cpp_out=.
                            ${CVMFS_SOURCE_DIR}/cache.proto
                            -I${CVMFS_SOURCE_DIR}

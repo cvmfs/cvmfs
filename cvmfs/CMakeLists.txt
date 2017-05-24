@@ -74,10 +74,10 @@ set (CVMFS_CLIENT_SOURCES
   xattr.cc
 )
 
-set_source_files_properties(cache.pb.cc cache.pb.h
+set_source_files_properties(cache.pb.h cache.pb.cc
                             PROPERTIES GENERATED true)
 
-add_custom_command(OUTPUT cache.pb.cc cache.pb.h
+add_custom_command(OUTPUT cache.pb.h cache.pb.cc
                    COMMAND ${PROTOBUF_PROTOC_EXECUTABLE} --cpp_out=.
                            ${CMAKE_CURRENT_SOURCE_DIR}/cache.proto
                            -I${CMAKE_CURRENT_SOURCE_DIR}
