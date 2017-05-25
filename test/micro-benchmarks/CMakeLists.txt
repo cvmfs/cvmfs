@@ -36,13 +36,14 @@ set (CVMFS_UBENCHMARKS_SOURCES
   ${CVMFS_SOURCE_DIR}/util/algorithm.cc
   ${CVMFS_SOURCE_DIR}/util/posix.cc
   ${CVMFS_SOURCE_DIR}/util/string.cc
-  cache.pb.cc
+  cache.pb.cc cache.pb.h
 )
 
-set_source_files_properties(cache.pb.cc cache.pb.h
+# First .h then .cc is important to avoid races during the build process
+set_source_files_properties(cache.pb.h cache.pb.cc
                             PROPERTIES GENERATED true)
 
-add_custom_command(OUTPUT cache.pb.cc cache.pb.h
+add_custom_command(OUTPUT cache.pb.h cache.pb.cc
                    COMMAND ${PROTOBUF_PROTOC_EXECUTABLE} --cpp_out=.
                            ${CVMFS_SOURCE_DIR}/cache.proto
                            -I${CVMFS_SOURCE_DIR}

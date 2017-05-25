@@ -298,6 +298,7 @@ cvmfs_server_mkfs() {
   sync
   if is_local_upstream $upstream && [ $configure_apache -eq 1 ]; then
     reload_apache > /dev/null
+    wait_for_apache "${stratum0}/.cvmfswhitelist" || die "fail (Apache configuration)"
   fi
 
   local volatile_opt=

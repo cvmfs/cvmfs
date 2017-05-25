@@ -13,6 +13,7 @@ cvmfs_run_test() {
   sudo rm -rf $outdir
   sudo mkdir -p $outdir
   sudo chown $CVMFS_TEST_USER $outdir
+  outdir="$outdir/build"
 
   cd /cvmfs/sft.cern.ch/lcg/external/experimental/linux
   echo "writing kernel compile output to $build_log"

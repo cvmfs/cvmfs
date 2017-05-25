@@ -221,15 +221,16 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/whitelist.cc
   ${CVMFS_SOURCE_DIR}/wpad.cc
   ${CVMFS_SOURCE_DIR}/xattr.cc
-  cache.pb.cc
+  cache.pb.cc cache.pb.h
 )
 
 set (CVMFS_UNITTEST_DEBUG_SOURCES ${CVMFS_UNITTEST_SOURCES})
 
-set_source_files_properties(cache.pb.cc cache.pb.h
+# First .h then .cc is important to avoid races during the build process
+set_source_files_properties(cache.pb.h cache.pb.cc
                             PROPERTIES GENERATED true)
 
-add_custom_command(OUTPUT cache.pb.cc cache.pb.h
+add_custom_command(OUTPUT cache.pb.h cache.pb.cc
                    COMMAND ${PROTOBUF_PROTOC_EXECUTABLE} --cpp_out=.
                            ${CVMFS_SOURCE_DIR}/cache.proto
                            -I${CVMFS_SOURCE_DIR}
@@ -239,7 +240,7 @@ add_custom_command(OUTPUT cache.pb.cc cache.pb.h
 
 
 set (CVMFS_TEST_CACHE_SOURCES
-  cache.pb.cc
+  cache.pb.cc cache.pb.h
   cache_plugin/main.cc
   cache_plugin/t_cache_plugin.cc
 

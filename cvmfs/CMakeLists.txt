@@ -23,7 +23,7 @@ set (CVMFS_CLIENT_SOURCES
   authz/authz_session.cc
   backoff.cc
   cache.cc
-  cache.pb.cc
+  cache.pb.cc cache.pb.h
   cache_extern.cc
   cache_posix.cc
   cache_ram.cc
@@ -74,10 +74,11 @@ set (CVMFS_CLIENT_SOURCES
   xattr.cc
 )
 
-set_source_files_properties(cache.pb.cc cache.pb.h
+# First .h then .cc is important to avoid races during the build process
+set_source_files_properties(cache.pb.h cache.pb.cc
                             PROPERTIES GENERATED true)
 
-add_custom_command(OUTPUT cache.pb.cc cache.pb.h
+add_custom_command(OUTPUT cache.pb.h cache.pb.cc
                    COMMAND ${PROTOBUF_PROTOC_EXECUTABLE} --cpp_out=.
                            ${CMAKE_CURRENT_SOURCE_DIR}/cache.proto
                            -I${CMAKE_CURRENT_SOURCE_DIR}
@@ -118,7 +119,7 @@ set (TEST_LIBCVMFS_SOURCES
 )
 
 set (LIBCVMFS_CACHE_SOURCES
-  cache.pb.cc
+  cache.pb.cc cache.pb.h
   cache_plugin/libcvmfs_cache.cc
   cache_plugin/libcvmfs_cache_options.cc
   cache_plugin/channel.cc
@@ -540,6 +541,9 @@ if (BUILD_LIBCVMFS_CACHE)
   add_dependencies(cvmfs_cache_null libcvmfs_cache)
 
   add_executable(cvmfs_cache_ram ${CVMFS_CACHE_RAM_SOURCES})
+  set (CVMFS_CACHE_RAM_CFLAGS "${CMAKE_CXX_FLAGS} -DDEBUGMSG")
+  set_target_properties (cvmfs_cache_ram PROPERTIES COMPILE_FLAGS
+                         "${CVMFS_CACHE_RAM_CFLAGS}")
   target_link_libraries(cvmfs_cache_ram
                         ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a
                         ${OPENSSL_LIBRARIES} ${RT_LIBRARY} pthread)
