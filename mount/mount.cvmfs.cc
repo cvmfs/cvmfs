@@ -410,7 +410,8 @@ int main(int argc, char **argv) {
   if (dedicated_cachedir) {
     sysret = chown(cachedir.c_str(), uid_cvmfs, getegid());
     if (sysret != 0) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to transfer ownership of %s to %s",
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "Failed to transfer ownership of %s to %s",
                cachedir.c_str(), cvmfs_user.c_str());
       return 1;
     }
