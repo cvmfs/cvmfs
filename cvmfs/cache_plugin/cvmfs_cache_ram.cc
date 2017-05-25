@@ -188,12 +188,12 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
       return CVMCACHE_STATUS_BADCOUNT;
 
     if (object->refcnt == 0) {
-      Me()->cache_info_.pinned_bytes += object->size_data;
+      Me()->cache_info_.pinned_bytes += Me()->storage_->GetSize(object);
       Me()->CheckHighPinWatermark();
     }
     object->refcnt += change_by;
     if (object->refcnt == 0) {
-      Me()->cache_info_.pinned_bytes -= object->size_data;
+      Me()->cache_info_.pinned_bytes -= Me()->storage_->GetSize(object);
       Me()->in_danger_zone_ = Me()->IsInDangerZone();
     }
     return CVMCACHE_STATUS_OK;
@@ -275,7 +275,6 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
     unsigned char *buffer,
     uint32_t size)
   {
-    LogCvmfs(kLogCvmfs, kLogDebug, "writine %lu", size);
     ObjectHeader *txn_object;
     int retval = Me()->transactions_.Lookup(txn_id, &txn_object);
     assert(retval);
@@ -326,7 +325,8 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
       // increase ref count of existing copy
       Me()->storage_->MarkFree(txn_object);
       if (existing_object->refcnt == 0)
-        Me()->cache_info_.pinned_bytes += existing_object->size_data;
+        Me()->cache_info_.pinned_bytes +=
+          Me()->storage_->GetSize(existing_object);
       existing_object->refcnt++;
     } else {
       txn_object->txn_id = uint64_t(-1);
@@ -334,8 +334,8 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
         txn_object->neg_nbytes_written = 0;
       txn_object->size_data = -(txn_object->neg_nbytes_written);
       txn_object->refcnt = 1;
-      Me()->cache_info_.used_bytes += txn_object->size_data;
-      Me()->cache_info_.pinned_bytes += txn_object->size_data;
+      Me()->cache_info_.used_bytes += Me()->storage_->GetSize(txn_object);
+      Me()->cache_info_.pinned_bytes += Me()->storage_->GetSize(txn_object);
       Me()->objects_all_->Insert(h, txn_object);
       if (txn_object->type == CVMCACHE_OBJECT_VOLATILE) {
         assert(!Me()->objects_volatile_->IsFull());
@@ -463,8 +463,8 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
                          (2.0 * slot_size));
     const unsigned mask_64 = ~((1 << 6) - 1);
 
-    LogCvmfs(kLogCvmfs, kLogStdout, "Allocating %" PRIu64 "MB of memory "
-             "for up to %" PRIu64 " objects",
+    LogCvmfs(kLogCache, kLogDebug | kLogStdout, "Allocating %" PRIu64
+             "MB of memory for up to %" PRIu64 " objects",
              heap_size / (1024 * 1024), num_slots & mask_64);
 
     // Number of cache entries must be a multiple of 64
@@ -488,9 +488,17 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
     if (!objects_all_->IsFull() && storage_->HasSpaceFor(bytes_required))
       return false;
 
+    // Free space occupied due to piecewise catalog storage
+    if (!objects_all_->IsFull()) {
+      LogCvmfs(kLogCache, kLogDebug, "compacting ram cache");
+      storage_->Compact();
+      if (storage_->HasSpaceFor(bytes_required))
+        return true;
+    }
+
     uint64_t shrink_to = std::min(
       storage_->capacity() - (bytes_required + 8),
-      uint64_t(storage_->used_bytes() * kShrinkFactor));
+      uint64_t(storage_->capacity() * kShrinkFactor));
     DoShrink(shrink_to);
     return true;
   }
@@ -513,11 +521,12 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
     }
   }
 
+
   void DoShrink(uint64_t shrink_to) {
     ComparableHash h;
     ObjectHeader *object;
 
-    LogCvmfs(kLogCvmfs, kLogSyslog,
+    LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
              "clean up cache until at most %lu KB is used", shrink_to / 1024);
 
     objects_volatile_->FilterBegin();
@@ -525,7 +534,7 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
       objects_volatile_->FilterGet(&h, &object);
       if (object->refcnt != 0)
         continue;
-      cache_info_.used_bytes -= object->size_data;
+      cache_info_.used_bytes -= storage_->GetSize(object);
       storage_->MarkFree(object);
       objects_volatile_->FilterDelete();
       objects_all_->Forget(h);
@@ -540,7 +549,7 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
       if (object->refcnt != 0)
         continue;
       assert(object->type != CVMCACHE_OBJECT_VOLATILE);
-      cache_info_.used_bytes -= object->size_data;
+      cache_info_.used_bytes -= storage_->GetSize(object);
       storage_->MarkFree(object);
       objects_all_->FilterDelete();
     }
@@ -585,7 +594,7 @@ const double PluginRamCache::kDangerZoneThreshold = 0.7;
 
 
 static void Usage(const char *progname) {
-  printf("%s <config file>\n", progname);
+  LogCvmfs(kLogCache, kLogStdout, "%s <config file>", progname);
 }
 
 
@@ -595,22 +604,30 @@ int main(int argc, char **argv) {
     return 1;
   }
 
+  SetLogDebugFile("/dev/null");
+
   cvmcache_init_global();
 
   cvmcache_option_map *options = cvmcache_options_init();
   if (cvmcache_options_parse(options, argv[1]) != 0) {
-    printf("cannot parse options file %s\n", argv[1]);
+    LogCvmfs(kLogCache, kLogStderr, "cannot parse options file %s", argv[1]);
     return 1;
+  }
+  char *debug_log =
+    cvmcache_options_get(options, "CVMFS_CACHE_PLUGIN_DEBUGLOG");
+  if (debug_log != NULL) {
+    SetLogDebugFile(debug_log);
+    cvmcache_options_free(debug_log);
   }
   char *locator = cvmcache_options_get(options, "CVMFS_CACHE_PLUGIN_LOCATOR");
   if (locator == NULL) {
-    printf("CVMFS_CACHE_PLUGIN_LOCATOR missing\n");
+    LogCvmfs(kLogCache, kLogStderr, "CVMFS_CACHE_PLUGIN_LOCATOR missing");
     cvmcache_options_fini(options);
     return 1;
   }
   char *mem_size = cvmcache_options_get(options, "CVMFS_CACHE_PLUGIN_SIZE");
   if (mem_size == NULL) {
-    printf("CVMFS_CACHE_PLUGIN_SIZE missing\n");
+    LogCvmfs(kLogCache, kLogStderr, "CVMFS_CACHE_PLUGIN_SIZE missing");
     cvmcache_options_fini(options);
     return 1;
   }
@@ -637,16 +654,17 @@ int main(int argc, char **argv) {
   ctx = cvmcache_init(&callbacks);
   int retval = cvmcache_listen(ctx, locator);
   if (!retval) {
-    fprintf(stderr, "failed to listen on %s\n", locator);
+    LogCvmfs(kLogCache, kLogStderr, "failed to listen on %s", locator);
     return 1;
   }
-  printf("Listening for cvmfs clients on %s\n", locator);
-  printf("NOTE: this process needs to run as user cvmfs\n\n");
+  LogCvmfs(kLogCache, kLogStdout, "Listening for cvmfs clients on %s"
+           "NOTE: this process needs to run as user cvmfs\n",
+           locator);
 
 
   cvmcache_process_requests(ctx, 0);
   if (!cvmcache_is_supervised()) {
-    printf("Press <Ctrl+D> to quit\n");
+    LogCvmfs(kLogCache, kLogStdout, "Press <Ctrl+D> to quit\n");
     while (true) {
       char buf;
       retval = read(fileno(stdin), &buf, 1);
@@ -660,7 +678,7 @@ int main(int argc, char **argv) {
   }
 
   cvmcache_wait_for(ctx);
-  printf("  ... good bye\n");
+  LogCvmfs(kLogCache, kLogDebug | kLogStdout, "  ... good bye");
   cvmcache_options_free(mem_size);
   cvmcache_options_free(locator);
   cvmcache_options_fini(options);

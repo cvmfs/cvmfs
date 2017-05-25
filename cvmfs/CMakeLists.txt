@@ -541,6 +541,9 @@ if (BUILD_LIBCVMFS_CACHE)
   add_dependencies(cvmfs_cache_null libcvmfs_cache)
 
   add_executable(cvmfs_cache_ram ${CVMFS_CACHE_RAM_SOURCES})
+  set (CVMFS_CACHE_RAM_CFLAGS "${CMAKE_CXX_FLAGS} -DDEBUGMSG")
+  set_target_properties (cvmfs_cache_ram PROPERTIES COMPILE_FLAGS
+                         "${CVMFS_CACHE_RAM_CFLAGS}")
   target_link_libraries(cvmfs_cache_ram
                         ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a
                         ${OPENSSL_LIBRARIES} ${RT_LIBRARY} pthread)
