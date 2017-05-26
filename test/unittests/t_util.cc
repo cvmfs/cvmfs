@@ -61,9 +61,15 @@ class T_Util : public ::testing::Test {
     }
     sandbox = CreateTempDir(GetCurrentWorkingDirectory() + "/cvmfs_ut_util");
     socket_address = sandbox + "/mysocket";
-    long_path = sandbox +
-        "/path_path_path_path_path_path_path_path_path_path_path_path_path_"
+    string long_dir = sandbox +
+      "/path_path_path_path_path_path_path_path_path_path_path_path_path_"
         "path_path_path_path_path_path_path_path_path_path_path_path_path";
+    int retval = mkdir(long_dir.c_str(), 0700);
+    ASSERT_EQ(0, retval);
+    long_path = long_dir + "/deepsocket";
+    too_long_path = long_dir +
+      "/socket_socket_socket_socket_socket_socket_socket_socket_socket_socket_"
+      "socket_socket_socket_socket_socket_socket_socket_socket";
 
     struct sockaddr_un sock_addr;
     EXPECT_GT(sizeof(sock_addr.sun_path),
@@ -138,6 +144,7 @@ class T_Util : public ::testing::Test {
   string sandbox;
   string socket_address;
   string long_path;
+  string too_long_path;
   string empty;
   string path_with_slash;
   string path_without_slash;
@@ -404,28 +411,39 @@ TEST_F(T_Util, CreateFile) {
 }
 
 TEST_F(T_Util, MakeSocket) {
+  int socket_fd0;
   int socket_fd1;
   int socket_fd2;
 
-  ASSERT_DEATH(MakeSocket(long_path, 0600), ".*");
+  EXPECT_EQ(-1, MakeSocket(too_long_path, 0600));
+  EXPECT_GE(socket_fd0 = MakeSocket(long_path, 0600), 0);
   EXPECT_NE(-1, socket_fd1 = MakeSocket(socket_address, 0777));
   // the second time it should work as well (no socket-already-in-use error)
   EXPECT_NE(-1, socket_fd2 = MakeSocket(socket_address, 0777));
+  close(socket_fd0);
   close(socket_fd1);
   close(socket_fd2);
 }
 
 TEST_F(T_Util, ConnectSocket) {
-  int server_fd = MakeSocket(socket_address, 0777);
-  ASSERT_LT(0, server_fd);
-  listen(server_fd, 1);
-  int client_fd = ConnectSocket(socket_address);
-  ASSERT_NE(-1, client_fd);
+  int server_fd0 = MakeSocket(socket_address, 0777);
+  int server_fd1 = MakeSocket(long_path, 0777);
+  EXPECT_GE(server_fd0, 0);
+  EXPECT_GE(server_fd1, 0);
+  EXPECT_EQ(0, listen(server_fd0, 1));
+  EXPECT_EQ(0, listen(server_fd1, 1));
+  int client_fd0 = ConnectSocket(socket_address);
+  EXPECT_GE(client_fd0, 0);
+  int client_fd1 = ConnectSocket(long_path);
+  EXPECT_GE(client_fd1, 0);
 
-  ASSERT_DEATH(ConnectSocket(long_path), ".*");
-  ASSERT_EQ(-1, ConnectSocket(sandbox + "/fake_socket"));
-  close(client_fd);
-  close(server_fd);
+  close(client_fd0);
+  close(client_fd1);
+  close(server_fd0);
+  close(server_fd1);
+
+  EXPECT_EQ(-1, ConnectSocket(too_long_path));
+  EXPECT_EQ(-1, ConnectSocket(sandbox + "/fake_socket"));
 }
 
 TEST_F(T_Util, MakePipe) {
@@ -929,7 +947,8 @@ TEST_F(T_Util, FindFiles) {
   EXPECT_TRUE(result.empty());
 
   result = FindFiles(sandbox, "");  // find them all
-  EXPECT_EQ(size + 2, result.size());  // FindFiles includes . and ..
+  // FindFiles includes . and .. and the precreated large directory
+  EXPECT_EQ(size + 3, result.size());
   for (unsigned i = 0; i < size; ++i)
     EXPECT_EQ(sandbox + "/" + files[i], result[i + 2]);
 

@@ -192,13 +192,53 @@ void CreateFile(
 
 
 /**
+ * Symlinks /tmp/cvmfs.XYZ/l --> ParentPath(path) to make it shorter
+ */
+static string MakeShortSocketLink(const string &path) {
+  struct sockaddr_un sock_addr;
+  unsigned max_length = sizeof(sock_addr.sun_path);
+
+  string result;
+  string tmp_path = CreateTempDir("/tmp/cvmfs");
+  if (tmp_path.empty())
+    return "";
+  string link = tmp_path + "/l";
+  result = link + "/" + GetFileName(path);
+  if (result.length() >= max_length) {
+    rmdir(tmp_path.c_str());
+    return "";
+  }
+  int retval = symlink(GetParentPath(path).c_str(), link.c_str());
+  if (retval != 0) {
+    rmdir(tmp_path.c_str());
+    return "";
+  }
+  return result;
+}
+
+static void RemoveShortSocketLink(const string &short_path) {
+  string link = GetParentPath(short_path);
+  unlink(link.c_str());
+  rmdir(GetParentPath(link).c_str());
+}
+
+
+/**
  * Creates and binds to a named socket.
  */
 int MakeSocket(const string &path, const int mode) {
+  string short_path(path);
   struct sockaddr_un sock_addr;
-  assert(path.length() < sizeof(sock_addr.sun_path));
+  if (path.length() >= sizeof(sock_addr.sun_path)) {
+    // Socket paths are limited to 108 bytes (on some systems to 92 bytes),
+    // try working around
+    short_path = MakeShortSocketLink(path);
+    if (short_path.empty())
+      return -1;
+  }
   sock_addr.sun_family = AF_UNIX;
-  strncpy(sock_addr.sun_path, path.c_str(), sizeof(sock_addr.sun_path));
+  strncpy(sock_addr.sun_path, short_path.c_str(),
+          sizeof(sock_addr.sun_path));
 
   const int socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
   assert(socket_fd != -1);
@@ -227,10 +267,15 @@ int MakeSocket(const string &path, const int mode) {
     }
   }
 
+  if (short_path != path)
+    RemoveShortSocketLink(short_path);
+
   return socket_fd;
 
  make_socket_failure:
   close(socket_fd);
+  if (short_path != path)
+    RemoveShortSocketLink(short_path);
   return -1;
 }
 
@@ -278,17 +323,28 @@ int MakeTcpEndpoint(const std::string &ipv4_address, int portno) {
  * \return socket file descriptor on success, -1 else
  */
 int ConnectSocket(const string &path) {
+  string short_path(path);
   struct sockaddr_un sock_addr;
-  assert(path.length() < sizeof(sock_addr.sun_path));
+  if (path.length() >= sizeof(sock_addr.sun_path)) {
+    // Socket paths are limited to 108 bytes (on some systems to 92 bytes),
+    // try working around
+    short_path = MakeShortSocketLink(path);
+    if (short_path.empty())
+      return -1;
+  }
   sock_addr.sun_family = AF_UNIX;
-  strncpy(sock_addr.sun_path, path.c_str(), sizeof(sock_addr.sun_path));
+  strncpy(sock_addr.sun_path, short_path.c_str(), sizeof(sock_addr.sun_path));
 
   const int socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
   assert(socket_fd != -1);
 
-  if (connect(socket_fd, (struct sockaddr *)&sock_addr,
-              sizeof(sock_addr.sun_family) + sizeof(sock_addr.sun_path)) < 0)
-  {
+  int retval =
+    connect(socket_fd, (struct sockaddr *)&sock_addr,
+            sizeof(sock_addr.sun_family) + sizeof(sock_addr.sun_path));
+  if (short_path != path)
+    RemoveShortSocketLink(short_path);
+
+  if (retval < 0) {
     // LogCvmfs(kLogCvmfs, kLogStderr, "ERROR %d", errno);
     close(socket_fd);
     return -1;
