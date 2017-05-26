@@ -36,7 +36,19 @@ bool CharRange::InRange(const char c) const {
 //------------------------------------------------------------------------------
 
 
-InputSanitizer::InputSanitizer(const string &whitelist) {
+InputSanitizer::InputSanitizer(const string &whitelist) : max_length_(-1) {
+  InitValidRanges(whitelist);
+}
+
+
+InputSanitizer::InputSanitizer(const string &whitelist, int max_length)
+  : max_length_(max_length)
+{
+  InitValidRanges(whitelist);
+}
+
+
+void InputSanitizer::InitValidRanges(const std::string &whitelist) {
   // Parse the whitelist
   const unsigned length = whitelist.length();
   unsigned pickup_pos = 0;
@@ -64,12 +76,19 @@ bool InputSanitizer::Sanitize(
                           std::string::const_iterator   begin,
                           std::string::const_iterator   end,
                           std::string                  *filtered_output) const {
+  int pos = 0;
   bool is_sane = true;
   for (; begin != end; ++begin) {
-    if (CheckRanges(*begin))
+    if (CheckRanges(*begin)) {
+      if ((max_length_ >= 0) && (pos >= max_length_)) {
+        is_sane = false;
+        break;
+      }
       filtered_output->push_back(*begin);
-    else
+      pos++;
+    } else {
       is_sane = false;
+    }
   }
   return is_sane;
 }
