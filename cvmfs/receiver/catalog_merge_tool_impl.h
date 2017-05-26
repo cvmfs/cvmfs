@@ -32,13 +32,13 @@ template <typename RwCatalogMgr, typename RoCatalogMgr>
 bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::Run(
     const Params& params, std::string* new_manifest_path) {
   UniquePtr<upload::Spooler> spooler;
+  perf::Statistics stats;
   if (needs_setup_) {
     upload::SpoolerDefinition definition(
         params.spooler_configuration, params.hash_alg, params.compression_alg,
         params.use_file_chunking, params.min_chunk_size, params.avg_chunk_size,
         params.max_chunk_size, "dummy_token", "dummy_key");
     spooler = upload::Spooler::Construct(definition);
-    perf::Statistics stats;
     const std::string temp_dir = CreateTempDir(temp_dir_prefix_);
     output_catalog_mgr_ = new RwCatalogMgr(
         manifest_->catalog_hash(), repo_path_, temp_dir, spooler,
@@ -50,6 +50,8 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::Run(
   bool ret = CatalogDiffTool<RoCatalogMgr>::Run(PathString(""));
 
   ret &= CreateNewManifest(new_manifest_path);
+
+  output_catalog_mgr_.Destroy();
 
   return ret;
 }
