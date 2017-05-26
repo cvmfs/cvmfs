@@ -166,6 +166,9 @@ cvmfs_server_mkfs() {
   check_parameter_count 1 $#
   name=$(get_repository_name $1)
 
+  [ $(echo -n "$name" | wc -c) -gt 60 ] && \
+    die "repository name longer than 60 characters"
+
   # default values
   [ x"$unionfs"   = x"" ] && unionfs="$(get_available_union_fs)"
   [ x"$hash_algo" = x"" ] && hash_algo=sha1
