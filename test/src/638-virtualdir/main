@@ -174,6 +174,9 @@ cvmfs_run_test() {
     echo "expected $num_open_nested = 4"
     sudo cvmfs_talk -p /var/spool/cvmfs/$CVMFS_TEST_REPO/cache/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO \
                        open catalogs
+    sudo ls -lah /var/spool/cvmfs/$CVMFS_TEST_REPO/cache/$CVMFS_TEST_REPO/
+    sudo tail /var/log/messages
+    cat /proc/mounts
     return 82
   fi
   sudo cvmfs_talk -p /var/spool/cvmfs/$CVMFS_TEST_REPO/cache/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO \
