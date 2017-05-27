@@ -538,13 +538,15 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
       storage_->MarkFree(object);
       objects_volatile_->FilterDelete();
       objects_all_->Forget(h);
-      if (cache_info_.used_bytes <= shrink_to)
+      if (storage_->compacted_bytes() <= shrink_to)
         break;
     }
     objects_volatile_->FilterEnd();
 
     objects_all_->FilterBegin();
-    while ((cache_info_.used_bytes > shrink_to) && objects_all_->FilterNext()) {
+    while ((storage_->compacted_bytes() > shrink_to) &&
+           objects_all_->FilterNext())
+    {
       objects_all_->FilterGet(&h, &object);
       if (object->refcnt != 0)
         continue;
