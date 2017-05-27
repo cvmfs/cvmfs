@@ -213,9 +213,12 @@ service_request() {
   if is_systemd; then
     if [ "x$request_verb" = "xrestart" ]; then
       # Prevent "service restarted too often" failures
-      sudo systemctl stop $service_name
       sudo systemctl reset-failed $service_name
-      sudo systemctl start $service_name
+      sudo systemctl stop $service_name
+      if ! sudo systemctl start $service_name; then
+        sleep 10
+        sudo systemctl start $service_name
+      fi
     else
       sudo systemctl $request_verb $service_name
     fi
