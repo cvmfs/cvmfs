@@ -226,7 +226,6 @@ set (CVMFS_UNITTEST_SOURCES
 
 set (CVMFS_UNITTEST_DEBUG_SOURCES ${CVMFS_UNITTEST_SOURCES})
 
-# First .h then .cc is important to avoid races during the build process
 set_source_files_properties(cache.pb.h cache.pb.cc
                             PROPERTIES GENERATED true)
 
@@ -237,6 +236,9 @@ add_custom_command(OUTPUT cache.pb.h cache.pb.cc
                    DEPENDS ${PROTOBUF_PROTOC_EXECUTABLE}
                            ${CVMFS_SOURCE_DIR}/cache.proto
                    COMMENT "Generating protobuf sources")
+
+add_custom_target(cache.pb.generated-unittests
+                  DEPENDS cache.pb.h cache.pb.cc)
 
 
 set (CVMFS_TEST_CACHE_SOURCES
@@ -273,6 +275,7 @@ include_directories (${CMAKE_CURRENT_BINARY_DIR} ${INCLUDE_DIRECTORIES})
 
 if (BUILD_UNITTESTS)
   add_executable (${PROJECT_TEST_NAME} ${CVMFS_UNITTEST_SOURCES})
+  add_dependencies (${PROJECT_TEST_NAME} cache.pb.generated-unittests)
 else (BUILD_UNITTESTS)
   add_executable (${PROJECT_TEST_NAME} EXCLUDE_FROM_ALL ${CVMFS_UNITTEST_SOURCES})
 endif (BUILD_UNITTESTS)
@@ -280,6 +283,7 @@ endif (BUILD_UNITTESTS)
 if (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
   if (BUILD_LIBCVMFS_CACHE)
     add_executable (${PROJECT_TEST_CACHE_NAME} ${CVMFS_TEST_CACHE_SOURCES})
+    add_dependencies (${PROJECT_TEST_CACHE_NAME} cache.pb.generated-unittests)
   endif (BUILD_LIBCVMFS_CACHE)
 endif (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
 
@@ -288,6 +292,7 @@ add_dependencies (check ${PROJECT_TEST_NAME})
 
 if (BUILD_UNITTESTS_DEBUG)
   add_executable (${PROJECT_TEST_DEBUG_NAME} ${CVMFS_UNITTEST_DEBUG_SOURCES})
+  add_dependencies (${PROJECT_TEST_DEBUG_NAME} cache.pb.generated-unittests)
 endif (BUILD_UNITTESTS_DEBUG)
 
 #
