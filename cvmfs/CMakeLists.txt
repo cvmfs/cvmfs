@@ -86,6 +86,8 @@ add_custom_command(OUTPUT cache.pb.h cache.pb.cc
                            ${CMAKE_CURRENT_SOURCE_DIR}/cache.proto
                    COMMENT "Generating protobuf sources")
 
+add_custom_target(cache.pb.generated
+                  DEPENDS cache.pb.h cache.pb.cc)
 
 set (CVMFS2_DEBUG_SOURCES
   ${CVMFS_CLIENT_SOURCES}
@@ -445,6 +447,8 @@ if (BUILD_CVMFS)
   add_executable (cvmfs2 ${CVMFS_LOADER_SOURCES})
   add_library (cvmfs_fuse_debug SHARED  ${CVMFS2_DEBUG_SOURCES})
   add_library (cvmfs_fuse SHARED ${CVMFS2_SOURCES})
+  add_dependencies (cvmfs_fuse_debug cache.pb.generated)
+  add_dependencies (cvmfs_fuse cache.pb.generated)
   add_executable (cvmfs_fsck ${CVMFS_FSCK_SOURCES})
 
   # set some properties
@@ -510,6 +514,7 @@ endif (BUILD_CVMFS)
 
 if (BUILD_LIBCVMFS_CACHE)
   add_library (cvmfs_cache_only STATIC ${LIBCVMFS_CACHE_SOURCES})
+  add_dependencies (cvmfs_cache_only cache.pb.generated)
   set (LIBCVMFS_CACHE_LIBS ${SHA3_LIBRARIES} ${PROTOBUF_LITE_LIBRARY}
                            ${LIBCVMFS_CACHE_LIBS}
                            ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache_only.a)
@@ -553,6 +558,7 @@ endif (BUILD_LIBCVMFS_CACHE)
 
 if (BUILD_LIBCVMFS)
   add_library (cvmfs_only STATIC ${LIBCVMFS_SOURCES})
+  add_dependencies (cvmfs_only cache.pb.generated)
 
   set (LIBCVMFS_LIBS ${CARES_LIBRARIES} ${CURL_LIBRARIES}
                      ${PACPARSER_LIBRARIES} ${SQLITE3_LIBRARY}

@@ -51,6 +51,9 @@ add_custom_command(OUTPUT cache.pb.h cache.pb.cc
                            ${CVMFS_SOURCE_DIR}/cache.proto
                    COMMENT "Generating protobuf sources")
 
+add_custom_target(cache.pb.generated-ubenchmarks
+                  DEPENDS cache.pb.h cache.pb.cc)
+
 
 #
 # Compiler and Linker Flags for micro benchmarks
@@ -65,6 +68,7 @@ include_directories (${CMAKE_CURRENT_BINARY_DIR} ${INCLUDE_DIRECTORIES})
 
 if (BUILD_UBENCHMARKS)
   add_executable (${PROJECT_UBENCHMARKS_NAME} ${CVMFS_UBENCHMARKS_SOURCES})
+  add_dependencies (${PROJECT_UBENCHMARKS_NAME} cache.pb.generated-ubenchmarks)
 else (BUILD_UBENCHMARKS)
   add_executable (${PROJECT_UBENCHMARKS_NAME} EXCLUDE_FROM_ALL ${CVMFS_UBENCHMARKS_SOURCES})
 endif (BUILD_UBENCHMARKS)
