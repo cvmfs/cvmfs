@@ -23,11 +23,14 @@ namespace manifest {
  * Downloads and verifies the manifest, the certificate, and the whitelist.
  * If base_url is empty, uses the probe_hosts feature from download manager.
  */
-Failures Fetch(const std::string &base_url, const std::string &repository_name,
-               const uint64_t minimum_timestamp, const shash::Any *base_catalog,
-               signature::SignatureManager *signature_manager,
-               download::DownloadManager *download_manager,
-               ManifestEnsemble *ensemble)
+static Failures DoFetch(
+  const std::string &base_url,
+  const std::string &repository_name,
+  const uint64_t minimum_timestamp,
+  const shash::Any *base_catalog,
+  signature::SignatureManager *signature_manager,
+  download::DownloadManager *download_manager,
+  ManifestEnsemble *ensemble)
 {
   assert(ensemble);
   const bool probe_hosts = base_url == "";
@@ -159,6 +162,33 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
   ensemble->cert_size = 0;
   ensemble->whitelist_size = 0;
   ensemble->whitelist_pkcs7_size = 0;
+  return result;
+}
+
+/**
+ * If the whitelist or the manifest are corrupted, fail-over once to another
+ * stratum 1 if more than a single stratum 1 is known.
+ */
+Failures Fetch(const std::string &base_url, const std::string &repository_name,
+               const uint64_t minimum_timestamp, const shash::Any *base_catalog,
+               signature::SignatureManager *signature_manager,
+               download::DownloadManager *download_manager,
+               ManifestEnsemble *ensemble)
+{
+  Failures result =
+    DoFetch(base_url, repository_name, minimum_timestamp, base_catalog,
+            signature_manager, download_manager, ensemble);
+  if ((result != kFailOk) && (result != kFailLoad) &&
+      (download_manager->num_hosts() > 1))
+  {
+    LogCvmfs(kLogCache, kLogDebug | kLogSyslogWarn,
+             "failed to fetch manifest (%d - %s), trying another stratum 1",
+             result, Code2Ascii(result));
+    download_manager->SwitchHost();
+    result =
+      DoFetch(base_url, repository_name, minimum_timestamp, base_catalog,
+              signature_manager, download_manager, ensemble);
+  }
   return result;
 }
 

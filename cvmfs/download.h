@@ -404,6 +404,11 @@ class DownloadManager {
   void EnablePipelining();
   void EnableRedirects();
 
+  unsigned num_hosts() {
+    if (opt_host_chain_) return opt_host_chain_->size();
+    return 0;
+  }
+
  private:
   static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
                                 void *userp, void *socketp);
