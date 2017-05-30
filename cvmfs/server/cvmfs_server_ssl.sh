@@ -38,8 +38,14 @@ create_cert() {
   local crt; crt="/etc/cvmfs/keys/$name.crt"
 
   # Create self-signed certificate
+  local cn="$name"
+  if [ $(echo -n "$cn" | wc -c) -gt 30 ]; then
+    cn="$(echo -n "$cn" | head -c 30)[...]"
+  fi
+  cn="$cn CernVM-FS Release Managers"
   openssl genrsa -out $key 2048 > /dev/null 2>&1
-  openssl req -new -subj "/C=/ST=/L=/O=/OU=/CN=$name CernVM-FS Release Managers" -key $key -out $csr > /dev/null 2>&1
+  openssl req -new -subj "/C=/ST=/L=/O=/OU=/CN=$cn" \
+    -key $key -out $csr > /dev/null 2>&1
   openssl x509 -req -days 365 -in $csr -signkey $key -out $crt > /dev/null 2>&1
   rm -f $csr
   chmod 444 $crt

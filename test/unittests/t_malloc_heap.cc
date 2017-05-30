@@ -79,6 +79,8 @@ TEST_F(T_MallocHeap, Basic) {
                cb_null.MakeCallback(&CallbackNull::Ignore, &cb_null));
   M.Compact();
 
+  EXPECT_EQ(0U, M.compacted_bytes());
+
   vector<void *> pointers;
 
   const unsigned N = 1000;
@@ -95,12 +97,33 @@ TEST_F(T_MallocHeap, Basic) {
   M.Compact();
   EXPECT_EQ(stored_bytes, M.stored_bytes());
   EXPECT_EQ(used_bytes, M.used_bytes());
+  EXPECT_LE(stored_bytes, M.compacted_bytes());
+  EXPECT_LE(M.compacted_bytes(), used_bytes);
 
   for (unsigned i = 1; i <= N; ++i)
     M.MarkFree(pointers[i-1]);
+  EXPECT_EQ(0U, M.compacted_bytes());
   M.Compact();
   EXPECT_EQ(0U, M.used_bytes());
   EXPECT_EQ(0U, M.stored_bytes());
+}
+
+
+TEST_F(T_MallocHeap, FillToFull) {
+  CallbackNull cb_null;
+  MallocHeap M(kSmallArena,
+               cb_null.MakeCallback(&CallbackNull::Ignore, &cb_null));
+
+  unsigned header = 0;
+  void *p = M.Allocate(7 + sizeof(header), &header, sizeof(header));
+  EXPECT_TRUE(p != NULL);
+
+  unsigned remaining_bytes = M.capacity() - M.compacted_bytes();
+  EXPECT_GT(remaining_bytes, 8 + sizeof(header));
+  p = M.Allocate(remaining_bytes - 7, &header, sizeof(header));
+  EXPECT_EQ(NULL, p);
+  p = M.Allocate(remaining_bytes - 8, &header, sizeof(header));
+  EXPECT_TRUE(p != NULL);
 }
 
 

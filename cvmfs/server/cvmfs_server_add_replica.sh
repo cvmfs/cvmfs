@@ -136,7 +136,7 @@ cvmfs_server_add_replica() {
   mkdir -p /etc/cvmfs/repositories.d/${alias_name}
   cat > /etc/cvmfs/repositories.d/${alias_name}/server.conf << EOF
 # Created by cvmfs_server.
-CVMFS_CREATOR_VERSION=$(cvmfs_version_string)
+CVMFS_CREATOR_VERSION=$(cvmfs_layout_revision)
 CVMFS_REPOSITORY_NAME=$name
 CVMFS_REPOSITORY_TYPE=stratum1
 CVMFS_USER=$cvmfs_user

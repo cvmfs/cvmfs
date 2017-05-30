@@ -22,6 +22,7 @@ cvmfs_run_test() {
 
   cvmfs_umount grid.cern.ch
   sudo cvmfs_config wipecache
+  sudo rm -f $uuid_file  # necessary for NFS mode
   cvmfs_mount grid.cern.ch || return 20
   local uuid_new="$(sudo cat ${uuid_file})"
   echo "$uuid_new"

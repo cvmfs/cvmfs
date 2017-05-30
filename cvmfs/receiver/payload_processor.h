@@ -13,7 +13,7 @@
 namespace receiver {
 
 /**
- * This class is used by in the `cvmfs_receiver` tool, on repository gateway
+ * This class is used in the `cvmfs_receiver` tool, on repository gateway
  * machines. The receiver::Reactor class, implementing the event loop of the
  * `cvmfs_receiver` tool, dispatches the handling of the kSubmitPayload events
  * to this class.
@@ -25,7 +25,7 @@ class PayloadProcessor {
  public:
   enum Result { kSuccess, kPathViolation, kOtherError };
 
-  PayloadProcessor();
+  explicit PayloadProcessor(const std::string& temp_dir_prefix);
   virtual ~PayloadProcessor();
 
   Result Process(int fdin, const std::string& digest_base64,
@@ -44,6 +44,7 @@ class PayloadProcessor {
 
  private:
   std::string current_repo_;
+  std::string temp_dir_;
   int num_errors_;
 };
 

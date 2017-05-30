@@ -30,6 +30,7 @@ class InputSanitizer {
   // whitelist is of the form "az AZ _ - 09"
   // Any other format will abort the program
   explicit InputSanitizer(const std::string &whitelist);
+  InputSanitizer(const std::string &whitelist, int max_length);
   virtual ~InputSanitizer() { }
 
   std::string Filter(const std::string &input) const;
@@ -45,6 +46,9 @@ class InputSanitizer {
   bool CheckRanges(const char chr) const;
 
  private:
+  void InitValidRanges(const std::string &whitelist);
+
+  int max_length_;
   std::vector<CharRange> valid_ranges_;
 };
 
@@ -69,7 +73,7 @@ class CacheInstanceSanitizer : public InputSanitizer {
 
 class RepositorySanitizer : public InputSanitizer {
  public:
-  RepositorySanitizer() : InputSanitizer("az AZ 09 - _ .") { }
+  RepositorySanitizer() : InputSanitizer("az AZ 09 - _ .", 60) { }
 };
 
 

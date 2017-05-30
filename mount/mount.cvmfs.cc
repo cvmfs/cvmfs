@@ -139,9 +139,9 @@ static bool CheckProxy() {
 }
 
 
-static bool CheckConcurrentMount(const string &fqrn, const string &cachedir) {
+static bool CheckConcurrentMount(const string &fqrn, const string &workspace) {
   // Try connecting to cvmfs_io socket
-  int socket_fd = ConnectSocket(cachedir + "/cvmfs_io." + fqrn);
+  int socket_fd = ConnectSocket(workspace + "/cvmfs_io." + fqrn);
   if (socket_fd < 0)
     return true;
 
@@ -159,11 +159,16 @@ static bool CheckConcurrentMount(const string &fqrn, const string &cachedir) {
 
 static bool GetCacheDir(const string &fqrn, string *cachedir) {
   string param;
-  int retval = options_manager_.GetValue("CVMFS_CACHE_BASE", &param);
-  if (!retval) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "CVMFS_CACHE_BASE required");
-    return false;
+  bool retval = options_manager_.GetValue("CVMFS_CACHE_DIR", &param);
+  if (retval) {
+    *cachedir = MakeCanonicalPath(param);
+    return true;
   }
+
+  retval = options_manager_.GetValue("CVMFS_CACHE_BASE", &param);
+  if (!retval)
+    return false;
+
   *cachedir = MakeCanonicalPath(param);
   if (options_manager_.GetValue("CVMFS_SHARED_CACHE", &param) &&
       options_manager_.IsOn(param))
@@ -171,6 +176,24 @@ static bool GetCacheDir(const string &fqrn, string *cachedir) {
     *cachedir = *cachedir + "/shared";
   } else {
     *cachedir = *cachedir + "/" + fqrn;
+  }
+  return true;
+}
+
+
+static bool GetWorkspace(const string &fqrn, string *workspace) {
+  string param;
+  bool retval = options_manager_.GetValue("CVMFS_WORKSPACE", &param);
+  if (retval) {
+    *workspace = MakeCanonicalPath(param);
+    return true;
+  }
+
+  retval = GetCacheDir(fqrn, workspace);
+  if (!retval) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "CVMFS_WORKSPACE or CVMFS_CACHE_[BASE|DIR] required");
+    return false;
   }
   return true;
 }
@@ -301,13 +324,17 @@ int main(int argc, char **argv) {
 
   int retval;
   int sysret;
+  bool dedicated_cachedir = false;
   string cvmfs_user;
   string cachedir;
+  string workspace;
   // Environment checks
   retval = WaitForReload(mountpoint);
   if (!retval) return 1;
-  retval = GetCacheDir(fqrn, &cachedir);
+  retval = GetWorkspace(fqrn, &workspace);
   if (!retval) return 1;
+  retval = GetCacheDir(fqrn, &cachedir);
+  dedicated_cachedir = (retval && (cachedir != workspace));
   retval = GetCvmfsUser(&cvmfs_user);
   if (!retval) return 1;
   retval = CheckFuse();
@@ -324,7 +351,7 @@ int main(int argc, char **argv) {
   int output_flags = kLogStderr;
   if (!mountpoint.empty() && (mountpoint[mountpoint.length()-1] == '\n'))
     output_flags |= kLogNoLinebreak;
-  retval = CheckConcurrentMount(fqrn, cachedir);
+  retval = CheckConcurrentMount(fqrn, workspace);
   if (!retval) {
     if (remount)
       return 0;
@@ -354,23 +381,40 @@ int main(int argc, char **argv) {
   }
   has_fuse_group = GetGidOf("fuse", &gid_fuse);
 
-  // Prepare cache directory
-  retval = MkdirDeep(cachedir, 0755, false);
+  // Prepare workspace and cache directory
+  retval = MkdirDeep(workspace, 0755, false);
   if (!retval) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to create cache directory %s",
-             cachedir.c_str());
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to create workspace %s",
+             workspace.c_str());
     return 1;
+  }
+  if (dedicated_cachedir) {
+    retval = MkdirDeep(cachedir, 0755, false);
+    if (!retval) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to create cache directory %s",
+               cachedir.c_str());
+      return 1;
+    }
   }
   retval = MkdirDeep("/var/run/cvmfs", 0755);
   if (!retval) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed to create socket directory");
     return 1;
   }
-  sysret = chown(cachedir.c_str(), uid_cvmfs, getegid());
+  sysret = chown(workspace.c_str(), uid_cvmfs, getegid());
   if (sysret != 0) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed to transfer ownership of %s to %s",
-             cachedir.c_str(), cvmfs_user.c_str());
+             workspace.c_str(), cvmfs_user.c_str());
     return 1;
+  }
+  if (dedicated_cachedir) {
+    sysret = chown(cachedir.c_str(), uid_cvmfs, getegid());
+    if (sysret != 0) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "Failed to transfer ownership of %s to %s",
+               cachedir.c_str(), cvmfs_user.c_str());
+      return 1;
+    }
   }
   sysret = chown("/var/run/cvmfs", uid_cvmfs, getegid());
   if (sysret != 0) {

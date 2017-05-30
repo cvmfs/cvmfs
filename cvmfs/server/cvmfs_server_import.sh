@@ -240,7 +240,10 @@ cvmfs_server_import() {
   # create storage
   echo -n "Creating CernVM-FS Repository Infrastructure... "
   create_spool_area_for_new_repository $name               || die "fail!"
-  [ $configure_apache -eq 0 ] || reload_apache > /dev/null || die "fail!"
+  if [ $configure_apache -eq 1 ]; then
+    reload_apache > /dev/null || die "fail!"
+    wait_for_apache "${stratum0}/.cvmfswhitelist" || die "fail (Apache configuration)"
+  fi
   echo "done"
 
   # create reflog checksum

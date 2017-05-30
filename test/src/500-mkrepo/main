@@ -1,6 +1,8 @@
 cvmfs_test_name="Populate Repository"
 cvmfs_test_autofs_on_startup=false
 
+CVMFS_TEST500_LONG_REPONAME=
+
 produce_files_in() {
 	local working_dir=$1
 
@@ -19,6 +21,12 @@ produce_files_in() {
 	ln -s clever symlinkToClever
 
 	popdir
+}
+
+cleanup() {
+  if [ "x$CVMFS_TEST500_LONG_REPONAME" != "x" ]; then
+    destroy_repo testrepo.osg-software-2580-el7-cvmfs-stratum-0.novalocal.crt
+  fi
 }
 
 cvmfs_run_test() {
@@ -49,6 +57,17 @@ cvmfs_run_test() {
 
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i  || return $?
+
+  echo "*** Maximum repository name with 60 characters (CVM-1173)"
+  CVMFS_TEST500_LONG_REPONAME=testrepo.osg-software-2580-el7-cvmfs-stratum-0.novalocal.crt
+  trap cleanup TERM HUP INT EXIT
+  create_empty_repo $CVMFS_TEST500_LONG_REPONAME $CVMFS_TEST_USER || return $?
+
+  echo "*** Too long name should not pass"
+  create_empty_repo "X$CVMFS_TEST500_LONG_REPONAME" $CVMFS_TEST_USER && return 10
+
+  destroy_repo $CVMFS_TEST500_LONG_REPONAME || return $?
+  CVMFS_TEST500_LONG_REPONAME=
 
   return 0
 }

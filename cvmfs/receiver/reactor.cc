@@ -11,6 +11,7 @@
 #include <utility>
 #include <vector>
 
+#include "commit_processor.h"
 #include "json_document.h"
 #include "logging.h"
 #include "payload_processor.h"
@@ -263,7 +264,8 @@ bool Reactor::HandleSubmitPayload(int fdin, const std::string& req,
     return false;
   }
 
-  UniquePtr<PayloadProcessor> proc(MakePayloadProcessor());
+  UniquePtr<PayloadProcessor> proc(
+      MakePayloadProcessor("/tmp/cvmfs_receiver_object_packs"));
   JsonStringInput reply_input;
   PayloadProcessor::Result res =
       proc->Process(fdin, digest_json->string_value, path_json->string_value,
@@ -293,8 +295,69 @@ bool Reactor::HandleSubmitPayload(int fdin, const std::string& req,
   return true;
 }
 
-PayloadProcessor* Reactor::MakePayloadProcessor() {
-  return new PayloadProcessor();
+bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
+  if (!reply) {
+    return false;
+  }
+
+  // Extract the Path from the request JSON.
+  UniquePtr<JsonDocument> req_json(JsonDocument::Create(req));
+  if (!req_json.IsValid()) {
+    return false;
+  }
+
+  const JSON* lease_path_json =
+      JsonDocument::SearchInObject(req_json->root(), "lease_path", JSON_STRING);
+  const JSON* old_root_hash_json = JsonDocument::SearchInObject(
+      req_json->root(), "old_root_hash", JSON_STRING);
+  const JSON* new_root_hash_json = JsonDocument::SearchInObject(
+      req_json->root(), "new_root_hash", JSON_STRING);
+
+  if (lease_path_json == NULL || old_root_hash_json == NULL ||
+      new_root_hash_json == NULL)
+    return false;
+
+  // Here we use the path to commit the changes!
+  UniquePtr<CommitProcessor> proc(
+      MakeCommitProcessor("/tmp/cvmfs_receiver_commit_processor"));
+  shash::Any old_root_hash = shash::MkFromSuffixedHexPtr(
+      shash::HexPtr(old_root_hash_json->string_value));
+  shash::Any new_root_hash = shash::MkFromSuffixedHexPtr(
+      shash::HexPtr(new_root_hash_json->string_value));
+  CommitProcessor::Result res = proc->Process(lease_path_json->string_value,
+                                              old_root_hash, new_root_hash);
+
+  JsonStringInput reply_input;
+  switch (res) {
+    case CommitProcessor::kSuccess:
+      reply_input.push_back(std::make_pair("status", "ok"));
+      break;
+    case CommitProcessor::kMergeError:
+      reply_input.push_back(std::make_pair("status", "error"));
+      reply_input.push_back(std::make_pair("reason", "merge_error"));
+      break;
+    case CommitProcessor::kIoError:
+      reply_input.push_back(std::make_pair("status", "error"));
+      reply_input.push_back(std::make_pair("reason", "io_error"));
+      break;
+    default:
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "Unknown value of CommitProcessor::Result encountered.");
+      abort();
+      break;
+  }
+
+  ToJsonString(reply_input, reply);
+
+  return true;
+}
+
+PayloadProcessor* Reactor::MakePayloadProcessor(const std::string& temp_dir) {
+  return new PayloadProcessor(temp_dir);
+}
+
+CommitProcessor* Reactor::MakeCommitProcessor(const std::string& temp_dir) {
+  return new CommitProcessor(temp_dir);
 }
 
 bool Reactor::HandleRequest(Request req, const std::string& data) {
@@ -321,6 +384,10 @@ bool Reactor::HandleRequest(Request req, const std::string& data) {
       break;
     case kSubmitPayload:
       ok &= HandleSubmitPayload(fdin_, data, &reply);
+      ok &= WriteReply(fdout_, reply);
+      break;
+    case kCommit:
+      ok &= HandleCommit(data, &reply);
       ok &= WriteReply(fdout_, reply);
       break;
     case kError:

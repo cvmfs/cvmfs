@@ -53,6 +53,9 @@ install_from_repo libuuid-devel
 install_from_repo cmake
 install_from_repo patch
 install_from_repo libattr-devel
+install_from_repo python-devel
+install_from_repo unzip
+install_from_repo redhat-rpm-config
 
 # increase open file descriptor limits
 echo -n "increasing ulimit -n ... "

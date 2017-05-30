@@ -36,19 +36,23 @@ set (CVMFS_UBENCHMARKS_SOURCES
   ${CVMFS_SOURCE_DIR}/util/algorithm.cc
   ${CVMFS_SOURCE_DIR}/util/posix.cc
   ${CVMFS_SOURCE_DIR}/util/string.cc
-  cache.pb.cc
+  cache.pb.cc cache.pb.h
 )
 
-set_source_files_properties(cache.pb.cc cache.pb.h
+# First .h then .cc is important to avoid races during the build process
+set_source_files_properties(cache.pb.h cache.pb.cc
                             PROPERTIES GENERATED true)
 
-add_custom_command(OUTPUT cache.pb.cc cache.pb.h
+add_custom_command(OUTPUT cache.pb.h cache.pb.cc
                    COMMAND ${PROTOBUF_PROTOC_EXECUTABLE} --cpp_out=.
                            ${CVMFS_SOURCE_DIR}/cache.proto
                            -I${CVMFS_SOURCE_DIR}
-                   DEPENDS ${PROTOBUF_ARCHIVE}
+                   DEPENDS ${PROTOBUF_PROTOC_EXECUTABLE}
                            ${CVMFS_SOURCE_DIR}/cache.proto
                    COMMENT "Generating protobuf sources")
+
+add_custom_target(cache.pb.generated-ubenchmarks
+                  DEPENDS cache.pb.h cache.pb.cc)
 
 
 #
@@ -64,6 +68,7 @@ include_directories (${CMAKE_CURRENT_BINARY_DIR} ${INCLUDE_DIRECTORIES})
 
 if (BUILD_UBENCHMARKS)
   add_executable (${PROJECT_UBENCHMARKS_NAME} ${CVMFS_UBENCHMARKS_SOURCES})
+  add_dependencies (${PROJECT_UBENCHMARKS_NAME} cache.pb.generated-ubenchmarks)
 else (BUILD_UBENCHMARKS)
   add_executable (${PROJECT_UBENCHMARKS_NAME} EXCLUDE_FROM_ALL ${CVMFS_UBENCHMARKS_SOURCES})
 endif (BUILD_UBENCHMARKS)
@@ -81,6 +86,6 @@ set_target_properties (${PROJECT_UBENCHMARKS_NAME} PROPERTIES
 set (UBENCHMARKS_LINK_LIBRARIES ${GOOGLEBENCH_LIBRARIES} ${OPENSSL_LIBRARIES}
                                 ${RT_LIBRARY} ${ZLIB_LIBRARIES}
                                 ${RT_LIBRARY} ${SHA3_LIBRARIES}
-                                ${PROTOBUF_LIBRARIES} pthread dl)
+                                ${PROTOBUF_LITE_LIBRARY} pthread dl)
 
 target_link_libraries (${PROJECT_UBENCHMARKS_NAME} ${UBENCHMARKS_LINK_LIBRARIES})

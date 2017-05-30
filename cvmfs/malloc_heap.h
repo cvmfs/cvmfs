@@ -18,7 +18,7 @@
  * is inefficient.  For the common pattern of doubling a buffer with realloc,
  * twice the final buffer size is required.
  *
- * The allocator is copying and can "garbage collect".  In order to react on the
+ * The allocator is copying and can collect garbage.  In order to react on the
  * move of a block, a callback can be registered that gets called with the new
  * pointer address.  The user of the MallocHeap has to make sure to identify
  * any block based on the first bytes.  Therefore, allocation requires these
@@ -57,6 +57,9 @@ class MallocHeap {
   inline uint64_t num_blocks() { return num_blocks_; }
   inline uint64_t used_bytes() { return gauge_; }
   inline uint64_t stored_bytes() { return stored_; }
+  inline uint64_t compacted_bytes() {
+    return stored_ + num_blocks_ * sizeof(Tag);
+  }
   inline uint64_t capacity() { return capacity_; }
   inline double utilization() {
     return static_cast<double>(stored_) / static_cast<double>(gauge_);
