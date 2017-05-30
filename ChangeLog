@@ -1,4 +1,5 @@
 2.4.0:
+  * Perform fail-over when whitelist or manifest is corrupted (CVM-837)
   * Increase maximum repostory name from ~30 chars to 60 chars (CVM-1173)
   * Add cvmfs_server gc -a option (CVM-1095)
   * Fixes for OpenSSL 1.1 interface changes
