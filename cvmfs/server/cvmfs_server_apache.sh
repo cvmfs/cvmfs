@@ -34,6 +34,27 @@ reload_apache() {
 }
 
 
+# An Apache reload is asynchronous, the new configration is not immediately
+# accessible.  Wait up to 1 minute until a test url can be fetched
+wait_for_apache() {
+  local url="$1"
+
+  local now=$(date +%s)
+  local deadline=$(($now + 60))
+  while [ $now -lt $deadline ]; do
+    if curl -f -I --max-time 10 $(get_follow_http_redirects_flag) "$url" >/dev/null 2>&1; then
+      set +x
+      return 0
+    fi
+    sleep 1
+    now=$(date +%s)
+  done
+
+  # timeout
+  return 1
+}
+
+
 check_apache_module() {
   local module_name="$1"
   ${APACHE_CTL} -M 2>&1 | grep -q "$module_name"

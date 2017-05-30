@@ -26,14 +26,9 @@ cvmfs_server_list() {
     # figure out the schema version of the repository
     local version_info=""
     local creator_version=$(repository_creator_version $name)
-    if ! version_equal $creator_version; then
-      local compatible=""
-      if ! check_repository_compatibility $name "nokill"; then
-        compatible=" INCOMPATIBLE"
-      fi
-      version_info="(created by$compatible CernVM-FS $(mangle_version_string $creator_version))"
-    else
-      version_info=""
+    local version_info=""
+    if ! check_repository_compatibility $name "nokill"; then
+      version_info="(created with INCOMPATIBLE layout revision $(mangle_version_string $creator_version))"
     fi
 
     # collect additional information about aliased stratum1 repos

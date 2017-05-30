@@ -325,6 +325,21 @@ _migrate_2_3_0() {
   load_repo_config $name
 }
 
+_migrate_137() {
+  local name=$1
+  local destination_version="137"
+  local server_conf="/etc/cvmfs/repositories.d/${name}/server.conf"
+
+  load_repo_config $name
+  echo "Migrating repository '$name' from layout revision $(mangle_version_string $CVMFS_CREATOR_VERSION) to revision $(mangle_version_string $destination_version)"
+
+  echo "--> updating server.conf"
+  sed -i -e "s/^\(CVMFS_CREATOR_VERSION\)=.*/\1=$destination_version/" $server_conf
+
+  # update repository information
+  load_repo_config $name
+}
+
 cvmfs_server_migrate() {
   local names
   local retcode=0
@@ -419,6 +434,15 @@ cvmfs_server_migrate() {
          x"$creator" = x"2.3.1-1" -o   \
          x"$creator" = x"2.3.2-1" ]; then
       _migrate_2_3_0 $name
+      creator="$(repository_creator_version $name)"
+    fi
+
+    if [ x"$creator" = x"2.3.3-1" -o   \
+         x"$creator" = x"2.3.4-1" -o   \
+         x"$creator" = x"2.3.5-1" -o   \
+         x"$creator" = x"2.3.6-1" -o   \
+         x"$creator" = x"2.4.0-1" ]; then
+      _migrate_137 $name
       creator="$(repository_creator_version $name)"
     fi
 

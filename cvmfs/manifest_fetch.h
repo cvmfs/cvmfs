@@ -96,6 +96,7 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
                download::DownloadManager *download_manager,
                ManifestEnsemble *ensemble);
 
+
 }  // namespace manifest
 
 #endif  // CVMFS_MANIFEST_FETCH_H_

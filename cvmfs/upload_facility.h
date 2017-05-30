@@ -124,9 +124,13 @@ class AbstractUploader
 
   /**
    * Called during Spooler::WaitForUpload(), to ensure that the upload has
-   * finished. By default it is a noop and returns true;
+   * finished. If commit == true, then a Commit request is also sent, to apply
+   * all the the changes accumulated during the session. "catalog_path"
+   * represents the path of the root catalog with the changes.
+   * By default it is a noop and returns true;
    */
-  virtual bool FinalizeSession();
+  virtual bool FinalizeSession(bool commit, const std::string &old_root_hash,
+                               const std::string &new_root_hash);
 
   /**
    * This must be called right before the destruction of the AbstractUploader!

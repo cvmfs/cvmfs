@@ -11,6 +11,7 @@
 #include "logging.h"
 #include "swissknife_lease_curl.h"
 #include "swissknife_lease_json.h"
+#include "util/posix.h"
 #include "util/string.h"
 
 namespace {
@@ -118,8 +119,8 @@ int CommandLease::Main(const ArgumentList& args) {
                session_token.c_str());
 
       CurlBuffer buffer;
-      if (MakeDeleteRequest(key_id, secret, session_token,
-                            params.repo_service_url, &buffer)) {
+      if (MakeEndRequest("DELETE", key_id, secret, session_token,
+                         params.repo_service_url, "", &buffer)) {
         if (buffer.data.size() > 0 && ParseDropReply(buffer)) {
           std::fclose(token_file);
           if (unlink(token_file_name.c_str())) {

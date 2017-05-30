@@ -1,10 +1,6 @@
 
 cvmfs_test_name="CVMFS_WORKSPACE"
 
-cleanup() {
-  cvmfs_enable_config_repository
-}
-
 cvmfs_run_test() {
   logfile=$1
 
@@ -13,13 +9,10 @@ cvmfs_run_test() {
   echo "*** cache directory is $cache_dir"
   echo "*** workspace is $workspace"
 
-  echo "*** start clean, even without cvmfs-config repository"
-  cvmfs_clean || return 50
+  echo "*** cleaning up existing mount points"
+  cvmfs_clean || return 2
 
-  echo "*** disable config repository"
-  cvmfs_disable_config_repository || return $?
-  trap cleanup TERM HUP INT EXIT || return $?
-
+  echo "*** mount with dedicated workspace"
   cvmfs_mount grid.cern.ch "CVMFS_WORKSPACE=$workspace" || return 3
   cat /cvmfs/grid.cern.ch/README || return 4
 

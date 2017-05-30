@@ -17,6 +17,7 @@
 #include "cache.h"
 #include "cache_transport.h"
 #include "fd_table.h"
+#include "gtest/gtest_prod.h"
 #include "hash.h"
 #include "quota.h"
 #include "util/single_copy.h"
@@ -24,6 +25,7 @@
 
 
 class ExternalCacheManager : public CacheManager {
+  FRIEND_TEST(T_ExternalCacheManager, TransactionAbort);
   friend class ExternalQuotaManager;
 
  public:

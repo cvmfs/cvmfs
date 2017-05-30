@@ -30,6 +30,7 @@
 #ifndef __APPLE__
 #include <sys/statfs.h>
 #endif
+#include <sys/statvfs.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -199,6 +200,32 @@ bool PosixQuotaManager::Contains(const string &hash_str) {
 }
 
 
+void PosixQuotaManager::CheckFreeSpace() {
+  if ((limit_ == 0) || (gauge_ >= limit_))
+    return;
+
+  struct statvfs vfs_info;
+  int retval = statvfs((cache_dir_ + "/cachedb").c_str(), &vfs_info);
+  if (retval != 0) {
+    LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
+             "failed to query %s for free space (%d)",
+             cache_dir_.c_str(), errno);
+    return;
+  }
+  int64_t free_space_byte = vfs_info.f_bavail * vfs_info.f_bsize;
+  LogCvmfs(kLogQuota, kLogDebug, "free space: %" PRId64 " MB",
+           free_space_byte / (1024 * 1024));
+
+  int64_t required_byte = limit_ - gauge_;
+  if (free_space_byte < required_byte) {
+    LogCvmfs(kLogQuota, kLogSyslogWarn,
+             "too little free space on the file system hosting the cache,"
+             " %" PRId64 " MB available",
+             free_space_byte / (1024 * 1024));
+  }
+}
+
+
 PosixQuotaManager *PosixQuotaManager::Create(
   const string &cache_workspace,
   const uint64_t limit,
@@ -219,6 +246,7 @@ PosixQuotaManager *PosixQuotaManager::Create(
     delete quota_manager;
     return NULL;
   }
+  quota_manager->CheckFreeSpace();
   MakePipe(quota_manager->pipe_lru_);
 
   quota_manager->protocol_revision_ = kProtocolRevision;
@@ -990,6 +1018,7 @@ int PosixQuotaManager::MainCacheManager(int argc, char **argv) {
     UnlockFile(fd_lockfile_fifo);
     return 1;
   }
+  shared_manager.CheckFreeSpace();
 
   // Save protocol revision to file.  If the file is not found, it indicates
   // to the client that the cache manager is from times before the protocol
@@ -1745,8 +1774,12 @@ bool PosixQuotaManager::RebuildDatabase() {
     // Might also be a catalog (information is lost)
     sqlite3_bind_int64(stmt_insert, 4, kFileRegular);
 
-    if (sqlite3_step(stmt_insert) != SQLITE_DONE) {
-      LogCvmfs(kLogQuota, kLogDebug, "could not insert into cache catalog");
+    int retval = sqlite3_step(stmt_insert);
+    if (retval != SQLITE_DONE) {
+      // If the file system hosting the cache is full, we'll likely notice here
+      LogCvmfs(kLogQuota, kLogDebug | kLogSyslogErr,
+               "could not insert into cache catalog (%d - %s)",
+               retval, sqlite3_errstr(retval));
       goto build_return;
     }
     sqlite3_reset(stmt_insert);

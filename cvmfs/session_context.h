@@ -13,6 +13,15 @@
 
 namespace upload {
 
+struct CurlSendPayload {
+  const std::string* json_message;
+  ObjectPackProducer* pack_serializer;
+  size_t index;
+};
+
+size_t SendCB(void* ptr, size_t size, size_t nmemb, void* userp);
+size_t RecvCB(void* buffer, size_t size, size_t nmemb, void* userp);
+
 /**
  * This class implements a context for a single publish operation
  *
@@ -33,9 +42,9 @@ class SessionContextBase {
 
   bool Initialize(const std::string& api_url, const std::string& session_token,
                   const std::string& key_id, const std::string& secret,
-                  bool drop_lease = true,
                   uint64_t max_pack_size = ObjectPack::kDefaultLimit);
-  bool Finalize();
+  bool Finalize(bool commit, const std::string& old_root_hash,
+                const std::string& new_root_hash);
 
   void WaitForUpload();
 
@@ -51,7 +60,8 @@ class SessionContextBase {
 
   virtual bool FinalizeDerived() = 0;
 
-  virtual bool DropLease() = 0;
+  virtual bool Commit(const std::string& old_root_hash,
+                      const std::string& new_root_hash) = 0;
 
   virtual Future<bool>* DispatchObjectPack(ObjectPack* pack) = 0;
 
@@ -63,7 +73,6 @@ class SessionContextBase {
   std::string session_token_;
   std::string key_id_;
   std::string secret_;
-  bool drop_lease_;
 
   FifoChannel<bool> queue_was_flushed_;
 
@@ -96,7 +105,8 @@ class SessionContext : public SessionContextBase {
 
   virtual bool FinalizeDerived();
 
-  virtual bool DropLease();
+  virtual bool Commit(const std::string& old_root_hash,
+                      const std::string& new_root_hash);
 
   virtual Future<bool>* DispatchObjectPack(ObjectPack* pack);
 
