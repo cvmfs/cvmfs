@@ -468,7 +468,7 @@ class MountPoint : SingleCopy, public BootFactory {
   void SetupBehavior();
   void SetupDnsTuning(download::DownloadManager *manager);
   void SetupHttpTuning();
-  bool SetupExternalDownloadMgr();
+  bool SetupExternalDownloadMgr(bool dogeosort);
   void SetupInodeAnnotation();
   bool SetupOwnerMaps();
   bool DetermineRootHash(shash::Any *root_hash);
