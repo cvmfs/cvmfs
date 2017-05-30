@@ -20,8 +20,8 @@ _repo_is_incompatible() {
   fi
 
   echo "\
-This repository was created with CernVM-FS $(mangle_version_string $creator).
-You are currently running CernVM-FS $(cvmfs_version_string), which is
+This repository uses the previous layout revision $(mangle_version_string $creator).
+This version of CernVM-FS requires layout revision $(cvmfs_layout_revision), which is
 incompatible to $(mangle_version_string $creator).
 
 Please run \`cvmfs_server migrate\` to update your repository before proceeding."
@@ -37,17 +37,14 @@ check_repository_compatibility() {
   local name="$1"
   local nokill=$2
   local creator=$(repository_creator_version $name)
-  if version_equal "$creator"; then
-    return 0 # trivial case... no update of CernVM-FS taken place
-  fi
 
-  if version_lower_or_equal "$creator"; then
-    if [ $# -gt 0 ]; then
+  if compare_versions $(cvmfs_layout_revision) -lt "$creator"; then
+    if [ $# -gt 1 ]; then
       return 1 # nokill
     fi
-    echo "This repository was created with CernVM-FS $creator which is newer
-than the currently installed version $(cvmfs_version_string). Please install at
-least CernVM-FS $creator to manipulate this repository."
+    echo "This repository uses layout revision $creator which is newer than the
+layout used by the currently installed CernVM-FS ($(cvmfs_layout_revision)).
+Please upgrade CernVM-FS to manipulate this repository."
     exit 1
   fi
 
@@ -76,6 +73,10 @@ least CernVM-FS $creator to manipulate this repository."
   #   2.3.0-1+ --> 2.3.3-1
   #     -> update global JSON info if repo was migrated from 2.1.20 or before
   #        (CVM-1159)
+  #
+  #   2.3.3-1+ --> 137
+  #     -> use an arbitrary server layout revision to decouple the creator
+  #        version from the software version (CVM-1065)
   #
   # Note: I tried to make this code as verbose as possible
   #
@@ -135,6 +136,13 @@ least CernVM-FS $creator to manipulate this repository."
       _repo_is_incompatible "$creator" $nokill
       return $?
     fi
+  fi
+
+  if [ "$creator" = "2.3.3-1" ] || [ "$creator" = "2.3.4-1" ] || \
+     [ "$creator" = "2.3.5-1" ] || [ "$creator" = "2.3.6-1" ] || \
+     [ "$creator" = "2.4.0-1" ]; then
+    _repo_is_incompatible "$creator" $nokill
+    return $?
   fi
 
   return 0

@@ -879,7 +879,7 @@ create_config_files_for_new_repository() {
   mkdir -p $repo_cfg_dir
   cat > $server_conf << EOF
 # Created by cvmfs_server.
-CVMFS_CREATOR_VERSION=$(cvmfs_version_string)
+CVMFS_CREATOR_VERSION=$(cvmfs_layout_revision)
 CVMFS_REPOSITORY_NAME=$name
 CVMFS_REPOSITORY_TYPE=stratum0
 CVMFS_USER=$cvmfs_user
