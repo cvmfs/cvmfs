@@ -211,7 +211,17 @@ service_request() {
   local service_name=$1
   local request_verb=$2
   if is_systemd; then
-    sudo systemctl $request_verb $service_name
+    if [ "x$request_verb" = "xrestart" ]; then
+      # Prevent "service restarted too often" failures
+      sudo systemctl reset-failed $service_name
+      sudo systemctl stop $service_name
+      if ! sudo systemctl start $service_name; then
+        sleep 10
+        sudo systemctl start $service_name
+      fi
+    else
+      sudo systemctl $request_verb $service_name
+    fi
   else
     sudo $SERVICE_BIN $service_name $request_verb
   fi
@@ -479,7 +489,10 @@ has_selinux() {
 get_cvmfs_cachedir() {
   local repository=$1
 
-  local cache_dir=$(cvmfs_config showconfig $repository | grep CVMFS_CACHE_DIR | awk '{print $1}' | cut -d= -f2)
+  local cache_dir=$(cvmfs_config showconfig $repository | grep CVMFS_WORKSPACE | awk '{print $1}' | cut -d= -f2)
+  if [ "x$cache_dir" = "x" ]; then
+    cache_dir=$(cvmfs_config showconfig $repository | grep CVMFS_CACHE_DIR | awk '{print $1}' | cut -d= -f2)
+  fi
   if [ "x$cache_dir" = "x" ]; then
     echo "Failed to figure out cache directory"
     exit 1

@@ -141,6 +141,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/compression.cc
   ${CVMFS_SOURCE_DIR}/dns.cc
   ${CVMFS_SOURCE_DIR}/download.cc
+  ${CVMFS_SOURCE_DIR}/directory_entry.cc
   ${CVMFS_SOURCE_DIR}/encrypt.cc
   ${CVMFS_SOURCE_DIR}/fetch.cc
   ${CVMFS_SOURCE_DIR}/file_chunk.cc
@@ -179,6 +180,8 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/pathspec/pathspec_pattern.cc
   ${CVMFS_SOURCE_DIR}/quota.cc
   ${CVMFS_SOURCE_DIR}/quota_posix.cc
+  ${CVMFS_SOURCE_DIR}/receiver/commit_processor.cc
+  ${CVMFS_SOURCE_DIR}/receiver/params.cc
   ${CVMFS_SOURCE_DIR}/receiver/payload_processor.cc
   ${CVMFS_SOURCE_DIR}/receiver/reactor.cc
   ${CVMFS_SOURCE_DIR}/receiver/session_token.cc
@@ -186,8 +189,10 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/reflog_sql.cc
   ${CVMFS_SOURCE_DIR}/s3fanout.cc
   ${CVMFS_SOURCE_DIR}/sanitizer.cc
+  ${CVMFS_SOURCE_DIR}/server_tool.cc
   ${CVMFS_SOURCE_DIR}/session_context.cc
   ${CVMFS_SOURCE_DIR}/signature.cc
+  ${CVMFS_SOURCE_DIR}/signing_tool.cc
   ${CVMFS_SOURCE_DIR}/sql.cc
   ${CVMFS_SOURCE_DIR}/sqlitemem.cc
   ${CVMFS_SOURCE_DIR}/sqlitevfs.cc
@@ -196,6 +201,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/swissknife_assistant.cc
   ${CVMFS_SOURCE_DIR}/swissknife_history.cc
   ${CVMFS_SOURCE_DIR}/swissknife_lease_json.cc
+  ${CVMFS_SOURCE_DIR}/swissknife_lease_curl.cc
   ${CVMFS_SOURCE_DIR}/tracer.cc
   ${CVMFS_SOURCE_DIR}/upload.cc
   ${CVMFS_SOURCE_DIR}/upload_facility.cc
@@ -215,15 +221,15 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/whitelist.cc
   ${CVMFS_SOURCE_DIR}/wpad.cc
   ${CVMFS_SOURCE_DIR}/xattr.cc
-  cache.pb.cc
+  cache.pb.cc cache.pb.h
 )
 
 set (CVMFS_UNITTEST_DEBUG_SOURCES ${CVMFS_UNITTEST_SOURCES})
 
-set_source_files_properties(cache.pb.cc cache.pb.h
+set_source_files_properties(cache.pb.h cache.pb.cc
                             PROPERTIES GENERATED true)
 
-add_custom_command(OUTPUT cache.pb.cc cache.pb.h
+add_custom_command(OUTPUT cache.pb.h cache.pb.cc
                    COMMAND ${PROTOBUF_PROTOC_EXECUTABLE} --cpp_out=.
                            ${CVMFS_SOURCE_DIR}/cache.proto
                            -I${CVMFS_SOURCE_DIR}
@@ -231,9 +237,12 @@ add_custom_command(OUTPUT cache.pb.cc cache.pb.h
                            ${CVMFS_SOURCE_DIR}/cache.proto
                    COMMENT "Generating protobuf sources")
 
+add_custom_target(cache.pb.generated-unittests
+                  DEPENDS cache.pb.h cache.pb.cc)
+
 
 set (CVMFS_TEST_CACHE_SOURCES
-  cache.pb.cc
+  cache.pb.cc cache.pb.h
   cache_plugin/main.cc
   cache_plugin/t_cache_plugin.cc
 
@@ -266,6 +275,7 @@ include_directories (${CMAKE_CURRENT_BINARY_DIR} ${INCLUDE_DIRECTORIES})
 
 if (BUILD_UNITTESTS)
   add_executable (${PROJECT_TEST_NAME} ${CVMFS_UNITTEST_SOURCES})
+  add_dependencies (${PROJECT_TEST_NAME} cache.pb.generated-unittests)
 else (BUILD_UNITTESTS)
   add_executable (${PROJECT_TEST_NAME} EXCLUDE_FROM_ALL ${CVMFS_UNITTEST_SOURCES})
 endif (BUILD_UNITTESTS)
@@ -273,6 +283,7 @@ endif (BUILD_UNITTESTS)
 if (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
   if (BUILD_LIBCVMFS_CACHE)
     add_executable (${PROJECT_TEST_CACHE_NAME} ${CVMFS_TEST_CACHE_SOURCES})
+    add_dependencies (${PROJECT_TEST_CACHE_NAME} cache.pb.generated-unittests)
   endif (BUILD_LIBCVMFS_CACHE)
 endif (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
 
@@ -281,6 +292,7 @@ add_dependencies (check ${PROJECT_TEST_NAME})
 
 if (BUILD_UNITTESTS_DEBUG)
   add_executable (${PROJECT_TEST_DEBUG_NAME} ${CVMFS_UNITTEST_DEBUG_SOURCES})
+  add_dependencies (${PROJECT_TEST_DEBUG_NAME} cache.pb.generated-unittests)
 endif (BUILD_UNITTESTS_DEBUG)
 
 #

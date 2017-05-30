@@ -404,21 +404,31 @@ TEST_F(T_ExternalCacheManager, Transaction) {
 
 TEST_F(T_ExternalCacheManager, TransactionAbort) {
   shash::Any id(shash::kSha1);
-  string content = "foo";
-  HashString(content, &id);
+  uint64_t write_size = cache_mgr_->max_object_size_ * 4;
+  unsigned char *write_buffer = static_cast<unsigned char *>(
+    smalloc(write_size));
+  memset(write_buffer, kMemMarker, write_size);
+  HashMem(write_buffer, write_size, &id);
+
   void *txn = alloca(cache_mgr_->SizeOfTxn());
-  EXPECT_EQ(0, cache_mgr_->StartTxn(id, content.length(), txn));
+  EXPECT_EQ(0, cache_mgr_->StartTxn(id, write_size, txn));
   EXPECT_EQ(0, cache_mgr_->Reset(txn));
-  EXPECT_EQ(2, cache_mgr_->Write(content.data(), 2, txn));
+  EXPECT_EQ(2, cache_mgr_->Write(write_buffer, 2, txn));
   EXPECT_EQ(0, cache_mgr_->Reset(txn));
-  EXPECT_EQ(3, cache_mgr_->Write(content.data(), 3, txn));
+  EXPECT_EQ(static_cast<int>(write_size / 2),
+            cache_mgr_->Write(write_buffer, write_size/2, txn));
+  EXPECT_EQ(0, cache_mgr_->Reset(txn));
+  EXPECT_EQ(static_cast<int>(write_size),
+            cache_mgr_->Write(write_buffer, write_size, txn));
   EXPECT_EQ(0, cache_mgr_->CommitTxn(txn));
 
-  unsigned char *buf;
-  uint64_t size;
-  EXPECT_TRUE(cache_mgr_->Open2Mem(id, "test", &buf, &size));
-  EXPECT_EQ(content, string(reinterpret_cast<char *>(buf), size));
-  free(buf);
+  uint64_t read_size = write_size;
+  unsigned char *read_buffer = static_cast<unsigned char *>(smalloc(read_size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(id, "test", &read_buffer, &read_size));
+  EXPECT_EQ(read_size, write_size);
+  EXPECT_EQ(0, memcmp(read_buffer, write_buffer, read_size));
+  free(read_buffer);
+  free(write_buffer);
 }
 
 

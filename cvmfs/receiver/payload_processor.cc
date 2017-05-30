@@ -14,7 +14,8 @@
 
 namespace receiver {
 
-PayloadProcessor::PayloadProcessor() : current_repo_(), num_errors_(0) {}
+PayloadProcessor::PayloadProcessor(const std::string& temp_dir)
+    : current_repo_(), temp_dir_(temp_dir), num_errors_(0) {}
 
 PayloadProcessor::~PayloadProcessor() {}
 
@@ -73,49 +74,43 @@ void PayloadProcessor::ConsumerEventCallback(
   }
 
   const std::string hash_string = event.id.ToString(true);
-  const char suffix = hash_string[hash_string.size() - 1];
 
-  if (suffix == 'C') {
-    // Catalog
-    // Extract path names which are updated in this change set and return the
-    // list to the caller, to be used in a later call to rebuild catalogs
-  } else {
-    // Normal file
+  // Normal file
 
-    // Create a temporary path
-    const std::string tmp_path = CreateTempPath("/tmp/object_packs", 0666);
-    if (tmp_path.empty()) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Unable to create temporary path.");
-      num_errors_++;
-      return;
-    }
+  // Create a temporary path
+  // TODO(radu): choose a way to inject the temp path into the
+  const std::string tmp_path = CreateTempPath(temp_dir_, 0666);
+  if (tmp_path.empty()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Unable to create temporary path.");
+    num_errors_++;
+    return;
+  }
 
-    int fdout = open(tmp_path.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0600);
-    if (fdout == -1) {
-      LogCvmfs(kLogCvmfs, kLogStderr,
-               "Unable to open temporary output file: %s", tmp_path.c_str());
-      return;
-    }
+  int fdout = open(tmp_path.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0600);
+  if (fdout == -1) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Unable to open temporary output file: %s",
+             tmp_path.c_str());
+    return;
+  }
 
-    if (!WriteFile(fdout, event.buf, event.buf_size)) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Unable to write %s", tmp_path.c_str());
-      num_errors_++;
-      unlink(tmp_path.c_str());
-      close(fdout);
-      return;
-    }
+  if (!WriteFile(fdout, event.buf, event.buf_size)) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Unable to write %s", tmp_path.c_str());
+    num_errors_++;
+    unlink(tmp_path.c_str());
     close(fdout);
+    return;
+  }
+  close(fdout);
 
-    // Atomically move to final destination
-    // TODO(radu): It would be nice to hook this into the spooler/uploader
-    // components, allowing, for instance to upload from the gateway to S3
-    const std::string dest = "/srv/cvmfs/" + current_repo_ + "/data/" + path;
-    if (RenameFile(tmp_path.c_str(), dest.c_str())) {
-      LogCvmfs(kLogCvmfs, kLogStderr,
-               "Unable to move file to final destination: %s", dest.c_str());
-      num_errors_++;
-      return;
-    }
+  // Atomically move to final destination
+  // TODO(radu): It would be nice to hook this into the spooler/uploader
+  // components, allowing, for instance to upload from the gateway to S3
+  const std::string dest = "/srv/cvmfs/" + current_repo_ + "/data/" + path;
+  if (RenameFile(tmp_path.c_str(), dest.c_str())) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "Unable to move file to final destination: %s", dest.c_str());
+    num_errors_++;
+    return;
   }
 }
 
