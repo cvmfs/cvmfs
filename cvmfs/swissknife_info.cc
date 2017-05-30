@@ -7,8 +7,8 @@
 
 #define __STDC_FORMAT_MACROS
 
-#include "cvmfs_config.h"
 #include "swissknife_info.h"
+#include "cvmfs_config.h"
 
 #include <string>
 
@@ -16,6 +16,7 @@
 #include "hash.h"
 #include "logging.h"
 #include "manifest.h"
+#include "util/posix.h"
 #include "util/string.h"
 
 using namespace std;  // NOLINT
@@ -51,37 +52,39 @@ ParameterList CommandInfo::GetParams() const {
   r.push_back(Parameter::Switch('C', "show mounted root catalog hash"));
   r.push_back(Parameter::Switch('n', "show fully qualified repository name"));
   r.push_back(Parameter::Switch('t', "show time stamp"));
-  r.push_back(Parameter::Switch('m', "check if repository is marked as "
-                                        "replication master copy"));
+  r.push_back(Parameter::Switch('m',
+                                "check if repository is marked as "
+                                "replication master copy"));
   r.push_back(Parameter::Switch('v', "repository revision number"));
-  r.push_back(Parameter::Switch('g', "check if repository is garbage "
-                                        "collectable"));
-  r.push_back(Parameter::Switch('o', "check if the repository maintains a "
-                                     "reference log file"));
+  r.push_back(Parameter::Switch('g',
+                                "check if repository is garbage "
+                                "collectable"));
+  r.push_back(Parameter::Switch('o',
+                                "check if the repository maintains a "
+                                "reference log file"));
   r.push_back(Parameter::Switch('h', "print results in human readable form"));
   r.push_back(Parameter::Switch('L', "follow HTTP redirects"));
-  r.push_back(Parameter::Switch('X', "show whether external data is supported "
-                                        "in the root catalog."));
+  r.push_back(Parameter::Switch('X',
+                                "show whether external data is supported "
+                                "in the root catalog."));
   r.push_back(Parameter::Switch('M', "print repository meta info."));
   r.push_back(Parameter::Switch('R', "print raw manifest."));
   r.push_back(Parameter::Switch('e', "check if the repository is empty"));
   return r;
 }
 
-
 int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
   if (args.find('l') != args.end()) {
     unsigned log_level =
-      1 << (kLogLevel0 + String2Uint64(*args.find('l')->second));
+        1 << (kLogLevel0 + String2Uint64(*args.find('l')->second));
     if (log_level > kLogNone) {
       LogCvmfs(kLogCvmfs, kLogStderr, "invalid log level");
       return 1;
     }
     SetLogVerbosity(static_cast<LogLevels>(log_level));
   }
-  const string mount_point = (args.find('u') != args.end())
-                           ?  *args.find('u')->second
-                           :  "";
+  const string mount_point =
+      (args.find('u') != args.end()) ? *args.find('u')->second : "";
   const string repository = MakeCanonicalPath(*args.find('r')->second);
 
   // sanity check
@@ -101,14 +104,14 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
   const bool human_readable = (args.count('h') > 0);
 
   if (args.count('e') > 0) {
-    string manifest_path = IsRemote(repository) ?
-      ".cvmfspublished" : repository + "/.cvmfspublished";
+    string manifest_path = IsRemote(repository)
+                               ? ".cvmfspublished"
+                               : repository + "/.cvmfspublished";
     bool is_empty = !Exists(repository, manifest_path);
     LogCvmfs(kLogCvmfs, kLogStdout, "%s%s",
              (human_readable) ? "Empty Repository:                " : "",
              StringifyBool(is_empty).c_str());
-    if (is_empty)
-      return 0;
+    if (is_empty) return 0;
   }
 
   // Load manifest file
@@ -130,7 +133,7 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
     char *buffer = download_manifest.destination_mem.data;
     const unsigned length = download_manifest.destination_mem.pos;
     manifest = manifest::Manifest::LoadMem(
-      reinterpret_cast<const unsigned char *>(buffer), length);
+        reinterpret_cast<const unsigned char *>(buffer), length);
     free(download_manifest.destination_mem.data);
   } else {
     if (chdir(repository.c_str()) != 0) {
@@ -159,15 +162,13 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
     assert(!mount_point.empty());
     const std::string root_hash_xattr = "user.root_hash";
     std::string root_hash;
-    const bool success = platform_getxattr(mount_point,
-                                           root_hash_xattr,
-                                           &root_hash);
+    const bool success =
+        platform_getxattr(mount_point, root_hash_xattr, &root_hash);
     if (!success) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "failed to retrieve extended attribute "
-                                      " '%s' from '%s' (errno: %d)",
-                                      root_hash_xattr.c_str(),
-                                      mount_point.c_str(),
-                                      errno);
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "failed to retrieve extended attribute "
+               " '%s' from '%s' (errno: %d)",
+               root_hash_xattr.c_str(), mount_point.c_str(), errno);
       return 1;
     }
     LogCvmfs(kLogCvmfs, kLogStdout, "%s%s",
@@ -180,15 +181,13 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
     assert(!mount_point.empty());
     const std::string external_data_xattr = "user.external_data";
     std::string external_data;
-    const bool success = platform_getxattr(mount_point,
-                                           external_data_xattr,
-                                           &external_data);
+    const bool success =
+        platform_getxattr(mount_point, external_data_xattr, &external_data);
     if (!success) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "failed to retrieve extended attribute "
-                                      " '%s' from '%s' (errno: %d)",
-                                      external_data_xattr.c_str(),
-                                      mount_point.c_str(),
-                                      errno);
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "failed to retrieve extended attribute "
+               " '%s' from '%s' (errno: %d)",
+               external_data_xattr.c_str(), mount_point.c_str(), errno);
       return 1;
     }
     LogCvmfs(kLogCvmfs, kLogStdout, "%s%s",
@@ -252,8 +251,8 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
     if (retval != download::kFailOk) {
       if (human_readable)
         LogCvmfs(kLogCvmfs, kLogStderr,
-                 "failed to download meta info (%d - %s)",
-                 retval, download::Code2Ascii(retval));
+                 "failed to download meta info (%d - %s)", retval,
+                 download::Code2Ascii(retval));
       return 1;
     }
     string info(download_metainfo.destination_mem.data,
@@ -269,9 +268,7 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
   return 0;
 }
 
-
 //------------------------------------------------------------------------------
-
 
 int CommandVersion::Main(const ArgumentList &args) {
   LogCvmfs(kLogCvmfs, kLogStdout, "%s", PACKAGE_VERSION);

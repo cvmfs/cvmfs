@@ -97,7 +97,11 @@ bool GatewayUploader::Initialize() {
                                       secret);
 }
 
-bool GatewayUploader::FinalizeSession() { return session_context_->Finalize(); }
+bool GatewayUploader::FinalizeSession(bool commit,
+                                      const std::string& old_root_hash,
+                                      const std::string& new_root_hash) {
+  return session_context_->Finalize(commit, old_root_hash, new_root_hash);
+}
 
 void GatewayUploader::WaitForUpload() const {
   session_context_->WaitForUpload();

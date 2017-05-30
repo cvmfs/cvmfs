@@ -4,8 +4,8 @@
  * Process a set of input files and create appropriate graft files.
  */
 
-#include "cvmfs_config.h"
 #include "swissknife_graft.h"
+#include "cvmfs_config.h"
 
 #include <fcntl.h>
 #include <unistd.h>
@@ -16,17 +16,13 @@
 #include "fs_traversal.h"
 #include "hash.h"
 #include "platform.h"
+#include "util/posix.h"
 #include "util/string.h"
 
-
-bool
-swissknife::CommandGraft::ChecksumFdWithChunks(
-                                 int fd,
-                                 zlib::Compressor *compressor,
-                                 uint64_t *file_size,
-                                 shash::Any *file_hash,
-                                 std::vector<uint64_t> *chunk_offsets,
-                                 std::vector<shash::Any> *chunk_checksums) {
+bool swissknife::CommandGraft::ChecksumFdWithChunks(
+    int fd, zlib::Compressor *compressor, uint64_t *file_size,
+    shash::Any *file_hash, std::vector<uint64_t> *chunk_offsets,
+    std::vector<shash::Any> *chunk_checksums) {
   if (!compressor || !file_size || !file_hash) {
     return false;
   }
@@ -60,9 +56,11 @@ swissknife::CommandGraft::ChecksumFdWithChunks(
   do {
     bytes_read = read(fd, cur_in_buf + avail_in, in_buf_size);
     if (-1 == bytes_read) {
-      if (errno == EINTR) {continue;}
+      if (errno == EINTR) {
+        continue;
+      }
       LogCvmfs(kLogCvmfs, kLogStderr, "Failure when reading file: %s",
-                                      strerror(errno));
+               strerror(errno));
       return false;
     }
     *file_size += bytes_read;
@@ -73,10 +71,7 @@ swissknife::CommandGraft::ChecksumFdWithChunks(
     // If possible, make progress on deflate.
     unsigned char *cur_out_buf = out_buf;
     size_t avail_out = zlib::kZChunk;
-    compressor->Deflate(flush,
-                        &cur_in_buf,
-                        &avail_in,
-                        &cur_out_buf,
+    compressor->Deflate(flush, &cur_in_buf, &avail_in, &cur_out_buf,
                         &avail_out);
     shash::Update(out_buf, avail_out, file_hash_context);
     if (do_chunk) shash::Update(out_buf, avail_out, chunk_hash_context);
@@ -118,13 +113,14 @@ swissknife::CommandGraft::ChecksumFdWithChunks(
   return true;
 }
 
-
 bool swissknife::CommandGraft::DirCallback(const std::string &relative_path,
                                            const std::string &dir_name) {
-  if (!output_file_.size()) {return true;}
+  if (!output_file_.size()) {
+    return true;
+  }
   std::string full_output_path = output_file_ + "/" +
-                          (relative_path.size() ? relative_path : ".") +
-                          "/" + dir_name;
+                                 (relative_path.size() ? relative_path : ".") +
+                                 "/" + dir_name;
   std::string full_input_path = input_file_ + "/" +
                                 (relative_path.size() ? relative_path : ".") +
                                 "/" + dir_name;
@@ -135,7 +131,6 @@ bool swissknife::CommandGraft::DirCallback(const std::string &relative_path,
   return MkdirDeep(full_output_path, sbuf.st_mode);
 }
 
-
 void swissknife::CommandGraft::FileCallback(const std::string &relative_path,
                                             const std::string &file_name) {
   std::string full_input_path = input_file_ + "/" +
@@ -144,32 +139,33 @@ void swissknife::CommandGraft::FileCallback(const std::string &relative_path,
   std::string full_output_path;
   if (output_file_.size()) {
     full_output_path = output_file_ + "/" +
-                       (relative_path.size() ? relative_path : ".") +
-                       "/" + file_name;
+                       (relative_path.size() ? relative_path : ".") + "/" +
+                       file_name;
   }
   Publish(full_input_path, full_output_path, false, false);
 }
-
 
 int swissknife::CommandGraft::Main(const swissknife::ArgumentList &args) {
   const std::string &input_file = *args.find('i')->second;
   const std::string output_file =
       (args.find('o') == args.end()) ? "" : *(args.find('o')->second);
   verbose_ = args.find('v') != args.end();
-  hash_alg_ = (args.find('a') == args.end()) ?
-              shash::kSha1 : shash::ParseHashAlgorithm(*args.find('a')->second);
-  compression_alg_ = (args.find('Z') == args.end()) ?
-                     zlib::kNoCompression :
-                     zlib::ParseCompressionAlgorithm(*args.find('Z')->second);
+  hash_alg_ = (args.find('a') == args.end())
+                  ? shash::kSha1
+                  : shash::ParseHashAlgorithm(*args.find('a')->second);
+  compression_alg_ =
+      (args.find('Z') == args.end())
+          ? zlib::kNoCompression
+          : zlib::ParseCompressionAlgorithm(*args.find('Z')->second);
 
-  std::string chunk_size = (args.find('c') == args.end()) ?
-                           "32" : *args.find('c')->second;
+  std::string chunk_size =
+      (args.find('c') == args.end()) ? "32" : *args.find('c')->second;
   if (!String2Uint64Parse(chunk_size, &chunk_size_)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Unable to parse chunk size: %s",
-                                    chunk_size.c_str());
+             chunk_size.c_str());
     return 1;
   }
-  chunk_size_ *= 1024*1024;  // Convert to MB.
+  chunk_size_ *= 1024 * 1024;  // Convert to MB.
 
   platform_stat64 sbuf;
   bool output_file_is_dir = output_file.size() &&
@@ -186,9 +182,10 @@ int swissknife::CommandGraft::Main(const swissknife::ArgumentList &args) {
                              S_ISDIR(sbuf.st_mode);
     if (input_file_is_dir) {
       if (!output_file_is_dir && output_file.size()) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "Input (%s) is a directory but output"
-                " (%s) is not\n",
-                input_file.c_str(), output_file.c_str());
+        LogCvmfs(kLogCvmfs, kLogStderr,
+                 "Input (%s) is a directory but output"
+                 " (%s) is not\n",
+                 input_file.c_str(), output_file.c_str());
         return 1;
       }
       if (verbose_) {
@@ -202,7 +199,6 @@ int swissknife::CommandGraft::Main(const swissknife::ArgumentList &args) {
   }
   return Publish(input_file, output_file, output_file_is_dir, true);
 }
-
 
 int swissknife::CommandGraft::Publish(const std::string &input_file,
                                       const std::string &output_file,
@@ -238,16 +234,15 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
   uint64_t processed_size;
   std::vector<uint64_t> chunk_offsets;
   std::vector<shash::Any> chunk_checksums;
-  zlib::Compressor * compressor = zlib::Compressor::Construct(compression_alg_);
+  zlib::Compressor *compressor = zlib::Compressor::Construct(compression_alg_);
 
-  bool retval = ChecksumFdWithChunks(fd,
-                                     compressor,
-                                     &processed_size,
-                                     &file_hash,
-                                     &chunk_offsets,
-                                     &chunk_checksums);
+  bool retval =
+      ChecksumFdWithChunks(fd, compressor, &processed_size, &file_hash,
+                           &chunk_offsets, &chunk_checksums);
 
-  if (!input_file_is_stdin) {close(fd);}
+  if (!input_file_is_stdin) {
+    close(fd);
+  }
   if (!retval) {
     std::string errmsg = "Unable to checksum input file (" + input_file + ")";
     perror(errmsg.c_str());
@@ -260,12 +255,12 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
     std::string graft_fname;
     if (output_file_is_dir) {
       SplitPath(input_file, &dirname, &fname);
-      graft_fname =  output_file + "/.cvmfsgraft-" + fname;
+      graft_fname = output_file + "/.cvmfsgraft-" + fname;
     } else {
       SplitPath(output_file, &dirname, &fname);
       graft_fname = dirname + "/.cvmfsgraft-" + fname;
     }
-    fd = open(graft_fname.c_str(), O_CREAT|O_TRUNC|O_WRONLY, 0644);
+    fd = open(graft_fname.c_str(), O_CREAT | O_TRUNC | O_WRONLY, 0644);
     if (fd < 0) {
       std::string errmsg = "Unable to open graft file (" + graft_fname + ")";
       perror(errmsg.c_str());
@@ -287,12 +282,9 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
       chunk_off_str.push_back(StringifyInt(chunk_offsets[idx]));
       chunk_ck_str.push_back(chunk_checksums[idx].ToStringWithSuffix());
     }
-    graft_contents += "chunk_offsets=" +
-                      JoinStrings(chunk_off_str, ",") +
-                      "\n";
-    graft_contents += "chunk_checksums=" +
-                      JoinStrings(chunk_ck_str, ",") +
-                      "\n";
+    graft_contents += "chunk_offsets=" + JoinStrings(chunk_off_str, ",") + "\n";
+    graft_contents +=
+        "chunk_checksums=" + JoinStrings(chunk_ck_str, ",") + "\n";
   }
   size_t nbytes = graft_contents.size();
   const char *buf = graft_contents.c_str();
@@ -315,7 +307,8 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
   } else {
     output_fname = output_file;
   }
-  fd = open(output_fname.c_str(), O_CREAT|O_TRUNC|O_WRONLY, input_file_mode);
+  fd =
+      open(output_fname.c_str(), O_CREAT | O_TRUNC | O_WRONLY, input_file_mode);
   if (fd < 0) {
     std::string errmsg = "Unable to open output file (" + output_file + ")";
     perror(errmsg.c_str());
@@ -326,14 +319,13 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
   return 0;
 }
 
-
 int swissknife::CommandGraft::Recurse(const std::string &input_file,
                                       const std::string &output_file) {
   output_file_ = output_file;
   input_file_ = input_file;
 
   FileSystemTraversal<CommandGraft> traverser(this, input_file, true);
-  traverser.fn_new_file       = &CommandGraft::FileCallback;
+  traverser.fn_new_file = &CommandGraft::FileCallback;
   traverser.fn_new_dir_prefix = &CommandGraft::DirCallback;
   traverser.Recurse(input_file);
   return 0;

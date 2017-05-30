@@ -132,14 +132,13 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
 
   const upload::SpoolerDefinition sd(spooler_definition, hash_algorithm,
                                      zlib::kZlibDefault);
-  upload::Spooler *spooler = upload::Spooler::Construct(sd);
-  assert(spooler);
+  UniquePtr<upload::Spooler> spooler(upload::Spooler::Construct(sd));
+  assert(spooler.IsValid());
 
-  // TODO(rmeusel): use UniquePtr
-  manifest::Manifest *manifest =
+  UniquePtr<manifest::Manifest> manifest(
       catalog::WritableCatalogManager::CreateRepository(
-          dir_temp, volatile_content, voms_authz, spooler);
-  if (!manifest) {
+          dir_temp, volatile_content, voms_authz, spooler));
+  if (!manifest.IsValid()) {
     PrintError("Failed to create new repository");
     return 1;
   }
@@ -157,7 +156,12 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
   manifest::Reflog::HashDatabase(reflog_path, &reflog_hash);
   spooler->UploadReflog(reflog_path);
   spooler->WaitForUpload();
-  delete spooler;
+  unlink(reflog_path.c_str());
+  if (spooler->GetNumberOfErrors()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to upload reflog");
+    return 4;
+  }
+  assert(!reflog_chksum_path.empty());
   manifest::Reflog::WriteChecksum(reflog_chksum_path, reflog_hash);
 
   // set optional manifest fields
@@ -167,10 +171,8 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
 
   if (!manifest->Export(manifest_path)) {
     PrintError("Failed to create new repository");
-    delete manifest;
     return 5;
   }
-  delete manifest;
 
   return 0;
 }
@@ -281,7 +283,7 @@ int swissknife::CommandApplyDirtab::Main(const ArgumentList &args) {
   // initialize catalog infrastructure
   const bool auto_manage_catalog_files = true;
   const bool follow_redirects = (args.count('L') > 0);
-  if (!this->InitDownloadManager(follow_redirects)) {
+  if (!InitDownloadManager(follow_redirects)) {
     return 1;
   }
   catalog::SimpleCatalogManager catalog_manager(
@@ -619,12 +621,12 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (!spooler_catalogs.IsValid()) return 3;
 
   const bool follow_redirects = (args.count('L') > 0);
-  if (!this->InitDownloadManager(follow_redirects)) {
+  if (!InitDownloadManager(follow_redirects)) {
     return 3;
   }
 
-  if (!this->InitVerifyingSignatureManager(params.public_keys,
-                                           params.trusted_certs)) {
+  if (!InitVerifyingSignatureManager(params.public_keys,
+                                     params.trusted_certs)) {
     return 3;
   }
 
@@ -633,17 +635,18 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     // Throw-away manifest
     manifest = new manifest::Manifest(shash::Any(), 0, "");
   } else if (params.virtual_dir_actions !=
-             catalog::VirtualCatalog::kActionNone)
-  {
+             catalog::VirtualCatalog::kActionNone) {
     manifest = this->OpenLocalManifest(params.manifest_path);
     params.base_hash = manifest->catalog_hash();
   } else {
-    manifest = this->FetchRemoteManifest(params.stratum0, params.repo_name,
-                                         params.base_hash);
+    manifest = FetchRemoteManifest(params.stratum0, params.repo_name,
+                                   params.base_hash);
   }
   if (!manifest) {
     return 3;
   }
+
+  const std::string old_root_hash = manifest->catalog_hash().ToString(true);
 
   catalog::WritableCatalogManager catalog_manager(
       params.base_hash, params.stratum0, params.dir_temp, spooler_catalogs,
@@ -725,8 +728,15 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   LogCvmfs(kLogCvmfs, kLogStdout, "Exporting repository manifest");
   params.spooler->WaitForUpload();
   spooler_catalogs->WaitForUpload();
-  params.spooler->FinalizeSession();
-  spooler_catalogs->FinalizeSession();
+  params.spooler->FinalizeSession(false);
+
+  // We call FinalizeSession(true) this time, to also trigger the commit
+  // operation on the gateway machine (if the upstream is of type "gw").
+
+  // Get the path of the new root catalog
+  const std::string new_root_hash = manifest->catalog_hash().ToString(true);
+
+  spooler_catalogs->FinalizeSession(true, old_root_hash, new_root_hash);
   delete params.spooler;
 
   if (!manifest->Export(params.manifest_path)) {

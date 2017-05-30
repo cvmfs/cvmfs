@@ -1,14 +1,30 @@
-cvmfs_test_name="Data Corruption in Manifest File"
+cvmfs_test_name="Data Corruption in Whitelist or Manifest"
 cvmfs_test_autofs_on_startup=false
 
-# Note: this test is currently supposed to fail because cvmfs does not fail-over
-# on S1 data corruption
+CVMFS_TEST524_MOUNTPOINT=
+CVMFS_TEST524_REPLICA=
 
-desaster_cleanup() {
-  local mnt_point=$1
-  local replica_name=$2
-  sudo umount $mnt_point > /dev/null 2>&1
-  sudo cvmfs_server rmfs -f $replica_name > /dev/null 2>&1
+cleanup() {
+  if [ "x$CVMFS_TEST524_MOUNTPOINT" != "x" ]; then
+    sudo umount $CVMFS_TEST524_MOUNTPOINT > /dev/null 2>&1
+  fi
+  if [ "x$CVMFS_TEST524_REPLICA" != "x" ]; then
+    sudo cvmfs_server rmfs -f $CVMFS_TEST524_REPLICA > /dev/null 2>&1
+  fi
+}
+
+
+remount() {
+  local private_config="$1"
+  local cache_dir="$2"
+
+  sudo umount $CVMFS_TEST524_MOUNTPOINT
+  rm -rf $cache_dir
+  mkdir -p $cache_dir
+  cvmfs2 -d -o config=$private_config $CVMFS_TEST_REPO $CVMFS_TEST524_MOUNTPOINT \
+    >> cvmfs2_output.log 2>&1 || return 1
+
+  return 0
 }
 
 cvmfs_run_test() {
@@ -18,42 +34,59 @@ cvmfs_run_test() {
   local mnt_point="$scratch_dir/mountpoint"
   local cache_dir="$scratch_dir/cache"
 
-  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_filled_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
-  echo "create a replica of the fresh repository"
+  echo "*** setup cleanup trap"
+  trap cleanup EXIT HUP INT TERM
+
+  echo "*** create a replica of the fresh repository"
+  CVMFS_TEST524_REPLICA="$replica_name"
   load_repo_config $CVMFS_TEST_REPO
-  create_stratum1 $replica_name                          \
+  create_stratum1 $CVMFS_TEST524_REPLICA                 \
                   $CVMFS_TEST_USER                       \
                   $CVMFS_STRATUM0                        \
-                  /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub \
-    || { desaster_cleanup $mnt_point $replica_name; return 2; }
+                  /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub || return 2
 
-  echo "create a snapshot of the Stratum1 repository"
-  cvmfs_server snapshot $replica_name || { desaster_cleanup $mnt_point $replica_name; return 3; }
+  echo "*** create a snapshot of the Stratum1 repository"
+  cvmfs_server snapshot $CVMFS_TEST524_REPLICA || return 3
 
-  echo "corrupt the repository manifest in the Stratum0 repository"
-  echo "<html><head>Hotel WiFi</head><body>Please Login</body></html>" > /srv/cvmfs/$CVMFS_TEST_REPO/.cvmfspublished || { desaster_cleanup $mnt_point $replica_name; return 4; }
-
-  echo "mount the repository on a local mountpoint with references to Stratum1 and Stratum0"
-  mkdir $mnt_point $cache_dir || { desaster_cleanup $mnt_point $replica_name; return 5; }
+  echo "*** mount the repository on a local mountpoint with references to Stratum1 and Stratum0"
+  CVMFS_TEST524_MOUNTPOINT="$mnt_point"
+  mkdir -p $CVMFS_TEST524_MOUNTPOINT $cache_dir || return 10
   cat > private.conf << EOF
 CVMFS_CACHE_BASE=$cache_dir
 CVMFS_RELOAD_SOCKETS=$cache_dir
 CVMFS_SERVER_URL="http://127.0.0.1/cvmfs/$CVMFS_TEST_REPO;http://127.0.0.1/cvmfs/$replica_name"
+CVMFS_USE_GEOAPI=no
 CVMFS_HTTP_PROXY=DIRECT
 CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub
 EOF
-  cvmfs2 -d -o config=private.conf $CVMFS_TEST_REPO $mnt_point >> cvmfs2_output.log 2>&1 || { desaster_cleanup $mnt_point $replica_name; return 6; }
+  remount private.conf $cache_dir || return 11
 
-  echo "try to access files in the repository"
+  echo "*** corrupt the repository manifest in the Stratum0 repository and remount"
+  mv /srv/cvmfs/$CVMFS_TEST_REPO/.cvmfspublished \
+    /srv/cvmfs/$CVMFS_TEST_REPO/.cvmfspublished.save || return 12
+  echo "<html><head>Hotel WiFi</head><body>Please Login</body></html>" \
+    > /srv/cvmfs/$CVMFS_TEST_REPO/.cvmfspublished || return 12
+  remount private.conf $cache_dir || return 13
+
+  echo "*** try to access files in the repository"
   for f in $(find $mnt_point -maxdepth 1 -type f); do
-    cat $f || { desaster_cleanup $mnt_point $replica_name; return 7; }
+    cat $f || return 14
   done
 
-  echo "clean up"
-  sudo umount $mnt_point || return 8
-  sudo cvmfs_server rmfs -f $replica_name || return 9
+  echo "*** corrupt the repository whitelist in the Stratum0 repository and remount"
+  mv /srv/cvmfs/$CVMFS_TEST_REPO/.cvmfspublished.save \
+    /srv/cvmfs/$CVMFS_TEST_REPO/.cvmfspublished || return 20
+  echo "<html><head>Hotel WiFi</head><body>Please Login</body></html>" | \
+    sudo tee /srv/cvmfs/$CVMFS_TEST_REPO/.cvmfswhitelist || return 21
+  remount private.conf $cache_dir || return 22
+
+  echo "*** try to access files in the repository"
+  for f in $(find $mnt_point -maxdepth 1 -type f); do
+    cat $f || return 23
+  done
 
   return 0
 }

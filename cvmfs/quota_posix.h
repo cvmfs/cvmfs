@@ -216,6 +216,7 @@ class PosixQuotaManager : public QuotaManager {
   void CloseReturnPipe(int pipe[2]);
   void CleanupPipes();
 
+  void CheckFreeSpace();
   void CheckHighPinWatermark();
   void ProcessCommandBunch(const unsigned num,
                            const LruCommand *commands,

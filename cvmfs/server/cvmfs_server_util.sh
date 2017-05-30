@@ -367,12 +367,14 @@ cvmfs_version_string() {
   echo $(normalize_version $version_string)
 }
 
+# Tracks changes to the organization of files and directories on the release
+# manager machine.  Stored in CVMFS_CREATOR_VERSION.  Started with 137.
+cvmfs_layout_revision() { echo "137"; }
 
 version_major() { echo $1 | cut --delimiter=. --fields=1 | grep -oe '^[0-9]\+'; }
 version_minor() { echo $1 | cut --delimiter=. --fields=2 | grep -oe '^[0-9]\+'; }
 version_patch() { echo $1 | cut --delimiter=. --fields=3 | grep -oe '^[0-9]\+'; }
 version_build() { echo $1 | cut --delimiter=- --fields=2 | grep -oe '^[0-9]\+'; }
-
 
 prepend_zeros() { printf %03d "$1"; }
 

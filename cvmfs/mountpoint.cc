@@ -1192,9 +1192,10 @@ bool MountPoint::CreateDownloadManagers() {
       options_mgr_->IsOn(optarg))
   {
     download_mgr_->ProbeGeo();
+    return SetupExternalDownloadMgr(true);
   }
 
-  return SetupExternalDownloadMgr();
+  return SetupExternalDownloadMgr(false);
 }
 
 
@@ -1599,7 +1600,7 @@ void MountPoint::SetupDnsTuning(download::DownloadManager *manager) {
 }
 
 
-bool MountPoint::SetupExternalDownloadMgr() {
+bool MountPoint::SetupExternalDownloadMgr(bool dogeosort) {
   string optarg;
   external_download_mgr_ =
     download_mgr_->Clone(perf::StatisticsTemplate("download-external",
@@ -1618,7 +1619,12 @@ bool MountPoint::SetupExternalDownloadMgr() {
 
   if (options_mgr_->GetValue("CVMFS_EXTERNAL_URL", &optarg)) {
     external_download_mgr_->SetHostChain(ReplaceHosts(optarg));
-    external_download_mgr_->ProbeGeo();
+    if (dogeosort) {
+      std::vector<std::string> host_chain;
+      external_download_mgr_->GetHostInfo(&host_chain, NULL, NULL);
+      download_mgr_->GeoSortServers(&host_chain);
+      external_download_mgr_->SetHostChain(host_chain);
+    }
   }
 
   string proxies = "DIRECT";

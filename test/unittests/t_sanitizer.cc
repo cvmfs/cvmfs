@@ -94,3 +94,17 @@ TEST_F(T_Sanitizer, Uuid) {
   EXPECT_FALSE(test_sanitizer.IsValid("abcABC-012/+_"));
   EXPECT_FALSE(test_sanitizer.IsValid("abcABCXYZ"));
 }
+
+TEST_F(T_Sanitizer, Length) {
+  sanitizer::InputSanitizer length0_sanitizer("az", 0);
+  EXPECT_TRUE(length0_sanitizer.IsValid(""));
+  EXPECT_FALSE(length0_sanitizer.IsValid("a"));
+  EXPECT_EQ("", length0_sanitizer.Filter("a"));
+
+  sanitizer::InputSanitizer length3_sanitizer("az", 3);
+  EXPECT_TRUE(length3_sanitizer.IsValid(""));
+  EXPECT_TRUE(length3_sanitizer.IsValid("abc"));
+  EXPECT_FALSE(length3_sanitizer.IsValid("abca"));
+  EXPECT_EQ("abc", length3_sanitizer.Filter("aZXbc"));
+  EXPECT_EQ("abc", length3_sanitizer.Filter("aZXbcYa"));
+}

@@ -9,9 +9,47 @@
 #include "curl/curl.h"
 #include "cvmfs_config.h"
 #include "gateway_util.h"
+#include "json_document.h"
+#include "swissknife_lease_curl.h"
 #include "util/string.h"
 
-namespace {
+namespace upload {
+
+size_t SendCB(void* ptr, size_t size, size_t nmemb, void* userp) {
+  CurlSendPayload* payload = static_cast<CurlSendPayload*>(userp);
+
+  size_t max_chunk_size = size * nmemb;
+  if (max_chunk_size < 1) {
+    return 0;
+  }
+
+  size_t current_chunk_size = 0;
+  while (current_chunk_size < max_chunk_size) {
+    if (payload->index < payload->json_message->size()) {
+      // Can add a chunk from the JSON message
+      const size_t read_size =
+          std::min(max_chunk_size - current_chunk_size,
+                   payload->json_message->size() - payload->index);
+      current_chunk_size += read_size;
+      std::memcpy(ptr, payload->json_message->data() + payload->index,
+                  read_size);
+      payload->index += read_size;
+    } else {
+      // Can add a chunk from the payload
+      const size_t max_read_size = max_chunk_size - current_chunk_size;
+      const unsigned nbytes = payload->pack_serializer->ProduceNext(
+          max_read_size, static_cast<unsigned char*>(ptr) + current_chunk_size);
+      current_chunk_size += nbytes;
+
+      if (!nbytes) {
+        break;
+      }
+    }
+  }
+
+  return current_chunk_size;
+}
+
 size_t RecvCB(void* buffer, size_t size, size_t nmemb, void* userp) {
   std::string* my_buffer = static_cast<std::string*>(userp);
 
@@ -23,9 +61,6 @@ size_t RecvCB(void* buffer, size_t size, size_t nmemb, void* userp) {
 
   return my_buffer->size();
 }
-}  // namespace
-
-namespace upload {
 
 SessionContextBase::SessionContextBase()
     : upload_results_(1000, 1000),
@@ -33,7 +68,6 @@ SessionContextBase::SessionContextBase()
       session_token_(),
       key_id_(),
       secret_(),
-      drop_lease_(true),
       queue_was_flushed_(1, 1),
       max_pack_size_(ObjectPack::kDefaultLimit),
       active_handles_(),
@@ -45,7 +79,7 @@ SessionContextBase::~SessionContextBase() {}
 bool SessionContextBase::Initialize(const std::string& api_url,
                                     const std::string& session_token,
                                     const std::string& key_id,
-                                    const std::string& secret, bool drop_lease,
+                                    const std::string& secret,
                                     uint64_t max_pack_size) {
   bool ret = true;
 
@@ -65,7 +99,6 @@ bool SessionContextBase::Initialize(const std::string& api_url,
   session_token_ = session_token;
   key_id_ = key_id;
   secret_ = secret;
-  drop_lease_ = drop_lease;
   max_pack_size_ = max_pack_size;
 
   atomic_init64(&objects_dispatched_);
@@ -91,7 +124,8 @@ bool SessionContextBase::Initialize(const std::string& api_url,
   return ret;
 }
 
-bool SessionContextBase::Finalize() {
+bool SessionContextBase::Finalize(bool commit, const std::string& old_root_hash,
+                                  const std::string& new_root_hash) {
   assert(active_handles_.empty());
   {
     MutexLockGuard lock(current_pack_mtx_);
@@ -111,13 +145,14 @@ bool SessionContextBase::Finalize() {
     jobs_finished++;
   }
 
-  if (drop_lease_ && !DropLease()) {
-    LogCvmfs(kLogUploadGateway, kLogStderr,
-             "SessionContext finalization - Could not drop active lease");
+  if (commit) {
+    if (old_root_hash.empty() || new_root_hash.empty()) {
+      return false;
+    }
+    results &= Commit(old_root_hash, new_root_hash);
   }
 
-  results =
-      FinalizeDerived() && (bytes_committed_ == bytes_dispatched_) && results;
+  results &= FinalizeDerived() && (bytes_committed_ == bytes_dispatched_);
 
   pthread_mutex_destroy(&current_pack_mtx_);
   return results;
@@ -167,12 +202,20 @@ bool SessionContextBase::CommitBucket(const ObjectPack::BucketContentType type,
       current_pack_ = NULL;
     }
   } else {  // Current pack is full and can be dispatched
-    ObjectPack* new_pack = new ObjectPack(max_pack_size_);
+    uint64_t new_size = 0;
+    if (handle->capacity > max_pack_size_) {
+      new_size = handle->capacity + 1;
+    } else {
+      new_size = max_pack_size_;
+    }
+    ObjectPack* new_pack = new ObjectPack(new_size);
     for (size_t i = 0u; i < active_handles_.size(); ++i) {
       current_pack_->TransferBucket(active_handles_[i], new_pack);
     }
 
-    Dispatch();
+    if (current_pack_->GetNoObjects() > 0) {
+      Dispatch();
+    }
     current_pack_ = new_pack;
 
     CommitBucket(type, id, handle, name, false);
@@ -221,7 +264,19 @@ bool SessionContext::FinalizeDerived() {
   return true;
 }
 
-bool SessionContext::DropLease() { return true; }
+bool SessionContext::Commit(const std::string& old_root_hash,
+                            const std::string& new_root_hash) {
+  std::string request;
+  JsonStringInput request_input;
+  request_input.push_back(
+      std::make_pair("old_root_hash", old_root_hash.c_str()));
+  request_input.push_back(
+      std::make_pair("new_root_hash", new_root_hash.c_str()));
+  ToJsonString(request_input, &request);
+  CurlBuffer buffer;
+  return MakeEndRequest("POST", key_id_, secret_, session_token_, api_url_,
+                        request, &buffer);
+}
 
 Future<bool>* SessionContext::DispatchObjectPack(ObjectPack* pack) {
   UploadJob* job = new UploadJob;
@@ -247,18 +302,13 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
   shash::Any hmac(shash::kSha1);
   shash::HmacString(secret_, json_msg, &hmac);
 
-  // TODO(radu): The copying is inefficient; Use CURLOPT_READFUNCTION
-  std::vector<unsigned char> payload(0);
-  std::vector<unsigned char> buffer(4096);
-  unsigned nbytes = 0;
-  do {
-    nbytes = serializer.ProduceNext(buffer.size(), &buffer[0]);
-    std::copy(buffer.begin(), buffer.begin() + nbytes,
-              std::back_inserter(payload));
-  } while (nbytes > 0);
-  const std::string payload_text =
-      json_msg +
-      std::string(reinterpret_cast<char*>(&payload[0]), payload.size());
+  CurlSendPayload payload;
+  payload.json_message = &json_msg;
+  payload.pack_serializer = &serializer;
+  payload.index = 0;
+
+  const size_t payload_size =
+      json_msg.size() + serializer.GetHeaderSize() + job->pack->size();
 
   // Prepare the Curl POST request
   CURL* h_curl = curl_easy_init();
@@ -283,9 +333,11 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
   curl_easy_setopt(h_curl, CURLOPT_CUSTOMREQUEST, "POST");
   curl_easy_setopt(h_curl, CURLOPT_TCP_KEEPALIVE, 1L);
   curl_easy_setopt(h_curl, CURLOPT_URL, (api_url_ + "/payloads").c_str());
+  curl_easy_setopt(h_curl, CURLOPT_POSTFIELDS, NULL);
   curl_easy_setopt(h_curl, CURLOPT_POSTFIELDSIZE_LARGE,
-                   static_cast<curl_off_t>(payload_text.length()));
-  curl_easy_setopt(h_curl, CURLOPT_POSTFIELDS, payload_text.c_str());
+                   static_cast<curl_off_t>(payload_size));
+  curl_easy_setopt(h_curl, CURLOPT_READDATA, &payload);
+  curl_easy_setopt(h_curl, CURLOPT_READFUNCTION, SendCB);
   curl_easy_setopt(h_curl, CURLOPT_WRITEFUNCTION, RecvCB);
   curl_easy_setopt(h_curl, CURLOPT_WRITEDATA, &reply);
 

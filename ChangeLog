@@ -1,4 +1,8 @@
 2.4.0:
+  * Use a repository layout revision as CVMFS_CREATOR_VERSION (CVM-1065)
+  * Improve error reporting when cache hosting file system is full (CVM-1253)
+  * Perform fail-over when whitelist or manifest is corrupted (CVM-837)
+  * Increase maximum repostory name from ~30 chars to 60 chars (CVM-1173)
   * Add cvmfs_server gc -a option (CVM-1095)
   * Fixes for OpenSSL 1.1 interface changes
   * Use rsync "perishable" feature instead of list-catalogs (CVM-1199)
