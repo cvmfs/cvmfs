@@ -19,6 +19,8 @@
 #include "util/posix.h"
 #include "util/string.h"
 
+const std::string swissknife::CommandGraft::kDefaultChunkSizeStr = "24";
+
 bool swissknife::CommandGraft::ChecksumFdWithChunks(
     int fd, zlib::Compressor *compressor, uint64_t *file_size,
     shash::Any *file_hash, std::vector<uint64_t> *chunk_offsets,
@@ -158,8 +160,8 @@ int swissknife::CommandGraft::Main(const swissknife::ArgumentList &args) {
           ? zlib::kNoCompression
           : zlib::ParseCompressionAlgorithm(*args.find('Z')->second);
 
-  std::string chunk_size =
-      (args.find('c') == args.end()) ? "24" : *args.find('c')->second;
+  std::string chunk_size = (args.find('c') == args.end()) ? 
+                            kDefaultChunkSizeStr : *args.find('c')->second;
   if (!String2Uint64Parse(chunk_size, &chunk_size_)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Unable to parse chunk size: %s",
              chunk_size.c_str());
