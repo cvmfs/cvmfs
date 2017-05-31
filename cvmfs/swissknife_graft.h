@@ -32,7 +32,7 @@ class CommandGraft : public Command {
     r.push_back(Parameter::Switch('v', "Verbose output"));
     r.push_back(Parameter::Optional('Z', "Compression algorithm "
                                     "(default: none)"));
-    r.push_back(Parameter::Optional('c', "Chunk size (in MB; default: 32)"));
+    r.push_back(Parameter::Optional('c', "Chunk size (in MB; default: 24)"));
     r.push_back(Parameter::Optional('a', "hash algorithm (default: SHA-1)"));
     return r;
   }
