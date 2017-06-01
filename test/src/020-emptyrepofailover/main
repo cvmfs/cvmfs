@@ -42,7 +42,7 @@ cvmfs_run_test() {
 
   echo "start an HTTP server to serve external files (logging to $http_log)"
   CVMFS_TEST_020_HTTP_PID="$(open_http_server ${scratch_dir}/empty $http_port $http_log)"
-  [ ! -z $CVMFS_TEST_020_HTTP_PID ] || kill -0 $CVMFS_TEST_020_HTTP_PID || { echo "fail"; return 3; }
+  [ ! -z $CVMFS_TEST_020_HTTP_PID ] && kill -0 $CVMFS_TEST_020_HTTP_PID || { echo "fail"; return 3; }
   echo "HTTP server running with PID $CVMFS_TEST_020_HTTP_PID"
 
   echo "try to mount cvmfs"
