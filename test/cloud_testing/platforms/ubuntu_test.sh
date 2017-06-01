@@ -25,13 +25,20 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                               || retval=1
 
 echo "running CernVM-FS server test cases..."
+if [ x"$(lsb_release -cs)" != x"precise" ]; then
+  export CVMFS_TEST_UNIONFS=overlayfs
+else
+  echo "Ubuntu 12.04... using aufs instead of overlayfs"
+fi
 CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
 ./run.sh $SERVER_TEST_LOGFILE -o ${SERVER_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
-                              -x src/585-xattrs                               \
+                              -x src/518-hardlinkstresstest                   \
+                                 src/585-xattrs                               \
                                  src/600-securecvmfs                          \
                                  --                                           \
                                  src/5*                                       \
                                  src/6*                                       \
+				 src/7*
                               || retval=1
 
 
