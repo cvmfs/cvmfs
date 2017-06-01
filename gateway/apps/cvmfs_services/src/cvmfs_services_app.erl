@@ -46,7 +46,16 @@ start(_StartType, _StartArgs) ->
                            end,
     {ok, Services} = application:get_env(enabled_services),
 
-    cvmfs_services_sup:start_link({Services,
+    case lists:member(cvmfs_fe, Services) of
+        true ->
+            {ok, _} = cvmfs_fe:start_link();
+        false ->
+            ok
+    end,
+
+    Services2 = lists:delete(cvmfs_fe, Services),
+
+    cvmfs_services_sup:start_link({Services2,
                                    maps:get(repos, Vars),
                                    maps:get(keys, Vars),
                                    ReceiverPoolConfig2,
