@@ -5,33 +5,46 @@ cvmfs_test_autofs_on_startup=false
 set_up_repository_services() {
     echo "Setting up repository services"
 
-    # Write repo configuration file
+    echo "  Writing configuration files"
     cat <<EOF > /opt/cvmfs_services/etc/repo.config
-{repos, [{<<"test.cern.ch">>, [<<"key1">>]}]}.
+{repos, [{<<"test.repo.org">>, [<<"key1">>]}]}.
 {keys, [{file, "/etc/cvmfs/keys/gateway_key"}]}.
 EOF
 
-    # Write API key
+    echo "  Writing API key file"
     cat <<EOF > /etc/cvmfs/keys/gateway_key
 test key1 secret1
 EOF
 
-    # Create Mnesia schema
+    echo "  Creating Mnesia schema"
     cd /opt/cvmfs_services
     ./scripts/setup.sh
 
-    # Create the CVMFS test repo
-    cvmfs_server mkfs -o `whoami` test.cern.ch
+    echo "  Creating test repo"
+    cvmfs_server mkfs -o `whoami` test.repo.org
+
+    echo "  Modifying test repo configuration"
+    sed -i 's/local,/gw,/' /etc/cvmfs/repositories.d/test.repo.org/server.conf
+    sed -i 's/txn,\/srv\/cvmfs\/test.repo.org/txn,http:\/\/localhost:8080\/api\/v1/g' /etc/cvmfs/repositories.d/test.repo.org/server.conf
+    echo "CVMFS_GATEWAY_KEYS=/etc/cvmfs/keys/gateway_key" >> /etc/cvmfs/repositories.d/test.repo.org/server.conf
+
+    echo "  Starting repository services application"
+    /opt/cvmfs_services/bin/cvmfs_services start
+
+    sleep 1
 }
 
 clean_up() {
     echo "Cleaning up"
 
-    # Remove Mnesia directory
+    echo "  Stopping repository services application"
+    /opt/cvmfs_services/bin/cvmfs_services stop
+
+    echo "  Removing Mnesia directory"
     rm -rf /opt/cvmfs_mnesia
 
-    # Remove CVMFS test repo
-    cvmfs_server rmfs -f test.cern.ch
+    echo "  Removing test repository"
+    cvmfs_server rmfs -f test.repo.org
 }
 
 check_status() {
@@ -42,6 +55,21 @@ transaction_publish_success() {
     set_up_repository_services
 
     echo "Checking transaction + publish"
+
+    echo "  Starting transaction"
+    cvmfs_server transaction -e test.repo.org
+
+    echo "  Writing to file"
+    echo "`date` Hello? Is it me you're looking for?" >> /cvmfs/test.repo.org/lionel.txt
+
+    echo "  Publishing changes"
+    cvmfs_server publish -e test.repo.org
+
+    echo "  Remounting test repository"
+    cvmfs_server mount -a
+
+    echo "  Copy file out of test repository"
+    cp /cvmfs/test.repo.org/lionel.txt /tmp/
 
     clean_up
 }
