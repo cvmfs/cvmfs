@@ -1,0 +1,57 @@
+cvmfs_test_name="Repository services"
+cvmfs_test_autofs_on_startup=false
+
+
+set_up_repository_services() {
+    echo "Setting up repository services"
+
+    # Write repo configuration file
+    cat <<EOF > /opt/cvmfs_services/etc/repo.config
+{repos, [{<<"test.cern.ch">>, [<<"key1">>]}]}.
+{keys, [{file, "/etc/cvmfs/keys/gateway_key"}]}.
+EOF
+
+    # Write API key
+    cat <<EOF > /etc/cvmfs/keys/gateway_key
+test key1 secret1
+EOF
+
+    # Create Mnesia schema
+    cd /opt/cvmfs_services
+    ./scripts/setup.sh
+
+    # Create the CVMFS test repo
+    cvmfs_server mkfs -o `whoami` test.cern.ch
+}
+
+clean_up() {
+    echo "Cleaning up"
+
+    # Remove Mnesia directory
+    rm -rf /opt/cvmfs_mnesia
+
+    # Remove CVMFS test repo
+    cvmfs_server rmfs -f test.cern.ch
+}
+
+check_status() {
+    echo $(( $1 || 0 ))
+}
+
+transaction_publish_success() {
+    set_up_repository_services
+
+    echo "Checking transaction + publish"
+
+    clean_up
+}
+
+cvmfs_run_test() {
+    trap clean_up EXIT HUP INT TERM || return $?
+
+    transaction_publish_success
+    local status=$?
+
+    return $(check_status $status)
+}
+
