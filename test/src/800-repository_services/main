@@ -85,7 +85,7 @@ transaction_publish_success() {
     cvmfs_server mount -a
 
     echo "  Copy the file out of test repository"
-    cp /cvmfs/test.repo.org/test.txt /tmp/
+    cp /cvmfs/test.repo.org/time.txt /tmp/
 
     clean_up
 }
