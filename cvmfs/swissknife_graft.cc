@@ -157,9 +157,9 @@ int swissknife::CommandGraft::Main(const swissknife::ArgumentList &args) {
           ? zlib::kNoCompression
           : zlib::ParseCompressionAlgorithm(*args.find('Z')->second);
 
-  if (args.find('c') == args.end())
+  if (args.find('c') == args.end()) {
     chunk_size_ = kDefaultChunkSize;
-  else {
+  } else {
     std::string chunk_size = *args.find('c')->second;
     if (!String2Uint64Parse(chunk_size, &chunk_size_)) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Unable to parse chunk size: %s",
