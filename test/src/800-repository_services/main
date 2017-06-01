@@ -31,7 +31,23 @@ EOF
     echo "  Starting repository services application"
     /opt/cvmfs_services/bin/cvmfs_services start
 
-    sleep 1
+    # Waiting here is necessary in order to give the cvmfs_services application enough time to boot
+    wait_for_app_start
+}
+
+wait_for_app_start() {
+    local reply=$(/opt/cvmfs_services/bin/cvmfs_services ping | awk {'print $1'})
+    local num_iter=1
+    while [ $reply != "pong" ]; do
+        sleep 1
+        reply=$(/opt/cvmfs_services/bin/cvmfs_services ping | awk {'print $1'})
+        echo "Num iter: $num_iter"
+        num_iter=$((num_iter + 1))
+        if [ $num_iter -eq 10 ]; then
+            break;
+        fi
+    done
+    echo $reply
 }
 
 clean_up() {
@@ -59,8 +75,8 @@ transaction_publish_success() {
     echo "  Starting transaction"
     cvmfs_server transaction -e test.repo.org
 
-    echo "  Writing to file"
-    echo "`date` Hello? Is it me you're looking for?" >> /cvmfs/test.repo.org/lionel.txt
+    echo "  Writing to a file"
+    echo "`date`" >> /cvmfs/test.repo.org/time.txt
 
     echo "  Publishing changes"
     cvmfs_server publish -e test.repo.org
@@ -68,8 +84,8 @@ transaction_publish_success() {
     echo "  Remounting test repository"
     cvmfs_server mount -a
 
-    echo "  Copy file out of test repository"
-    cp /cvmfs/test.repo.org/lionel.txt /tmp/
+    echo "  Copy the file out of test repository"
+    cp /cvmfs/test.repo.org/test.txt /tmp/
 
     clean_up
 }
