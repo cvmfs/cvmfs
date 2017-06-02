@@ -898,13 +898,12 @@ vector<string> FindDirectories(const string &parent_dir) {
 bool GetUidOf(const std::string &username, uid_t *uid, gid_t *main_gid) {
   struct passwd pwd;
   struct passwd *result = NULL;
-#ifdef _SC_GETPW_R_SIZE_MAX
-  int bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
-#else
   int bufsize = 16 * 1024;
-#endif
   char *buf = static_cast<char *>(smalloc(bufsize));
-  getpwnam_r(username.c_str(), &pwd, buf, bufsize, &result);
+  while (getpwnam_r(username.c_str(), &pwd, buf, bufsize, &result) == ERANGE) {
+    bufsize *= 2;
+    buf = static_cast<char *>(srealloc(buf, bufsize));
+  }
   if (result == NULL) {
     free(buf);
     return false;
@@ -922,18 +921,9 @@ bool GetUidOf(const std::string &username, uid_t *uid, gid_t *main_gid) {
 bool GetGidOf(const std::string &groupname, gid_t *gid) {
   struct group grp;
   struct group *result = NULL;
-#ifdef _SC_GETGR_R_SIZE_MAX
-  int bufsize = sysconf(_SC_GETGR_R_SIZE_MAX);
-#else
   int bufsize = 16 * 1024;
-#endif
-
-  if (bufsize == -1)
-    bufsize = 16*1024;
   char *buf = static_cast<char *>(smalloc(bufsize));
   while (getgrnam_r(groupname.c_str(), &grp, buf, bufsize, &result) == ERANGE) {
-    // Buffer was too small.  The EL6 getgrnam_r man page says to
-    // try again with a larger buffer, so try doubling it.
     bufsize *= 2;
     buf = static_cast<char *>(srealloc(buf, bufsize));
   }
