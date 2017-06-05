@@ -620,7 +620,7 @@ bool MakeCacheDirectories(const string &path, const mode_t mode) {
     if (!MkdirDeep(this_path, mode, false))
       return false;
     for (int i = 0; i <= 0xff; i++) {
-      char hex[3];
+      char hex[4];
       snprintf(hex, sizeof(hex), "%02x", i);
       this_path = canonical_path + "/" + string(hex);
       if (!MkdirDeep(this_path, mode, false))
@@ -1353,7 +1353,7 @@ bool SafeWriteV(int fd, struct iovec *iov, unsigned iovcnt) {
       sum_written_blocks += iov[iov_idx].iov_len;
       iov_idx++;
       if (iov_idx == iovcnt) {
-        assert(sum_written_blocks = retval);
+        assert(sum_written_blocks == retval);
         return true;
       }
     }

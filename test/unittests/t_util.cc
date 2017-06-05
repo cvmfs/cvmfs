@@ -829,7 +829,7 @@ TEST_F(T_Util, MakeCacheDirectories) {
   EXPECT_TRUE(DirectoryExists(path + "/txn"));
   EXPECT_TRUE(DirectoryExists(path + "/quarantaine"));
   for (int i = 0; i <= 0xff; i++) {
-    char hex[3];
+    char hex[4];
     snprintf(hex, sizeof(hex), "%02x", i);
     string current_dir = path + "/" + string(hex);
     ASSERT_TRUE(DirectoryExists(current_dir));
