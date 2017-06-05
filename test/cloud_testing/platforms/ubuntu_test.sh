@@ -25,10 +25,11 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                               || retval=1
 
 echo "running CernVM-FS server test cases..."
-if [ x"$(lsb_release -cs)" != x"precise" ]; then
+if [ x"$(lsb_release -cs)" = x"xenial" ]; then
+  echo "Ubuntu 16.04... using overlayfs"
   export CVMFS_TEST_UNIONFS=overlayfs
 else
-  echo "Ubuntu 12.04... using aufs instead of overlayfs"
+  echo "Ubuntu 12.04/14.04... using aufs instead of overlayfs"
 fi
 CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
 ./run.sh $SERVER_TEST_LOGFILE -o ${SERVER_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
