@@ -179,6 +179,11 @@ cvmfs_run_test() {
     sudo ls -lah /var/spool/cvmfs/$CVMFS_TEST_REPO/cache/
     sudo tail /var/log/messages
     cat /proc/mounts
+    cat /etc/fstab
+    cat /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/client.conf
+    sudo cat /var/spool/cvmfs/$CVMFS_TEST_REPO/client.local
+    local client_pid=$(sudo attr -qg pid /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly)
+    sudo ls -lah /proc/$client_pid/fd
     return 82
   fi
   sudo cvmfs_talk -p /var/spool/cvmfs/$CVMFS_TEST_REPO/cache/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO \
