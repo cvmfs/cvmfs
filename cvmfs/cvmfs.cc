@@ -1188,7 +1188,8 @@ static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
   uint64_t available = 0;
   uint64_t size = file_system_->cache_mgr()->quota_mgr()->GetSize();
   uint64_t capacity = file_system_->cache_mgr()->quota_mgr()->GetCapacity();
-  info.f_bsize = 1;
+  // Fuse/OS X doesn't like values < 512
+  info.f_bsize = info.f_frsize = 512;
 
   if (capacity == (uint64_t)(-1)) {
     // Unknown capacity, set capacity = size
@@ -1209,6 +1210,9 @@ static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
   info.f_ffree = info.f_favail = all_inodes - loaded_inode;
   fuse_remounter_->fence()->Leave();
 
+  info.f_blocks /= info.f_bsize;
+  info.f_bfree /= info.f_bsize;
+  info.f_bavail /= info.f_bsize;
   fuse_reply_statfs(req, &info);
 }
 
