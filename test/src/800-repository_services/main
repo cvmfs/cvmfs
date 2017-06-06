@@ -61,16 +61,42 @@ clean_up() {
 
     echo "  Removing test repository"
     cvmfs_server rmfs -f test.repo.org
+
+    echo "  Removing output directories"
+    rm -rvf /tmp/cvmfs_out_{1,2,3}
+
+    echo "  Removing test directories"
+    rm -rf /tmp/cvmfs_receiver_commit_processor*
 }
 
 check_status() {
     echo $(( $1 || 0 ))
 }
 
-transaction_publish_success() {
+compare_file_checksum() {
+    local file_name=$1
+    local target_checksum=$2
+    local checksum=$(md5sum $file_name | cut -d' ' -f1)
+    echo "Checksum of $file_name is $checksum"
+    if [ "$checksum" != "$target_checksum" ]; then
+        echo "Checksum mismatch for $file_name. Expected $target_checksum. Found $checksum"
+        exit 1
+    fi
+}
+
+save_repo_contents() {
+    local dest=$1
+    rm -rf $dest
+    mkdir -p $dest
+    cp -r /cvmfs/test.repo.org/* $dest/
+}
+
+run_transactions() {
     set_up_repository_services
 
     echo "Checking transaction + publish"
+
+    ## Transaction 1
 
     echo "  Starting transaction 1"
     cvmfs_server transaction -e test.repo.org
@@ -88,9 +114,9 @@ transaction_publish_success() {
     cvmfs_server mount -a
 
     echo "  Copy the contents of the repository"
-    rm -rf /tmp/cvmfs_out_1
-    mkdir -p /tmp/cvmfs_out_1/
-    cp -rv /cvmfs/test.repo.org/* /tmp/cvmfs_out_1/
+    save_repo_contents /tmp/cvmfs_out_1
+
+    ## Transaction 2
 
     echo "  Starting transaction 2"
     cvmfs_server transaction -e test.repo.org
@@ -107,9 +133,9 @@ transaction_publish_success() {
     cvmfs_server mount -a
 
     echo "  Copy the contents of the repository"
-    rm -rf /tmp/cvmfs_out_2
-    mkdir -p /tmp/cvmfs_out_2/
-    cp -rv /cvmfs/test.repo.org/* /tmp/cvmfs_out_2/
+    save_repo_contents /tmp/cvmfs_out_2
+
+    ## Transaction 3
 
     echo "  Starting transaction 3"
     cvmfs_server transaction -e test.repo.org
@@ -124,9 +150,17 @@ transaction_publish_success() {
     cvmfs_server mount -a
 
     echo "  Copy the contents of the repository"
-    rm -rf /tmp/cvmfs_out_3
-    mkdir -p /tmp/cvmfs_out_3/
-    cp -rv /cvmfs/test.repo.org/* /tmp/cvmfs_out_3/
+    save_repo_contents /tmp/cvmfs_out_3
+
+    ## Check results
+
+    compare_file_checksum /tmp/cvmfs_out_1/new_file.txt d8e8fca2dc0f896fd7cb4cb0031ba249
+    compare_file_checksum /tmp/cvmfs_out_1/new_repository e5747677debcb10cabe17d87a40e7fa4
+    compare_file_checksum /tmp/cvmfs_out_2/new_repository/another_file.txt d8e8fca2dc0f896fd7cb4cb0031ba249
+    if [ -d /tmp/cvmfs_out_3/new_repository ]; then
+        echo "/cvmfs/test/repo.org/new_repository should have been deleted in transaction 3"
+        exit 1
+    fi
 
     clean_up
 }
@@ -134,7 +168,7 @@ transaction_publish_success() {
 cvmfs_run_test() {
     trap clean_up EXIT HUP INT TERM || return $?
 
-    transaction_publish_success
+    run_transactions
     local status=$?
 
     return $(check_status $status)
