@@ -1,4 +1,4 @@
-[{lager, [{log_root, "log/"}
+[{lager, [{log_root, "/tmp"}
          ,{crash_log, "crash.log"}
          ,{handlers, [{lager_console_backend, info}
                      ,{lager_syslog_backend, ["cvmfs", local1, info]}]}]}
