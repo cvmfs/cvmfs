@@ -72,20 +72,61 @@ transaction_publish_success() {
 
     echo "Checking transaction + publish"
 
-    echo "  Starting transaction"
+    echo "  Starting transaction 1"
     cvmfs_server transaction -e test.repo.org
 
-    echo "  Writing to a file"
-    echo "`date`" >> /cvmfs/test.repo.org/time.txt
+    echo "  Writing to a new file"
+    echo "test" >> /cvmfs/test.repo.org/new_file.txt
 
-    echo "  Publishing changes"
+    echo "  Appending to a file"
+    echo "test" >> /cvmfs/test.repo.org/new_repository
+
+    echo "  Publishing changes 1"
     cvmfs_server publish -e test.repo.org
 
     echo "  Remounting test repository"
     cvmfs_server mount -a
 
-    echo "  Copy the file out of test repository"
-    cp /cvmfs/test.repo.org/time.txt /tmp/
+    echo "  Copy the contents of the repository"
+    rm -rf /tmp/cvmfs_out_1
+    mkdir -p /tmp/cvmfs_out_1/
+    cp -rv /cvmfs/test.repo.org/* /tmp/cvmfs_out_1/
+
+    echo "  Starting transaction 2"
+    cvmfs_server transaction -e test.repo.org
+
+    echo "  Replacing a file with a directory"
+    rm -v /cvmfs/test.repo.org/new_repository
+    mkdir -p /cvmfs/test.repo.org/new_repository
+    echo "test" >> /cvmfs/test.repo.org/new_repository/another_file.txt
+
+    echo "  Publishing changes 2"
+    cvmfs_server publish -e test.repo.org
+
+    echo "  Remounting test repository"
+    cvmfs_server mount -a
+
+    echo "  Copy the contents of the repository"
+    rm -rf /tmp/cvmfs_out_2
+    mkdir -p /tmp/cvmfs_out_2/
+    cp -rv /cvmfs/test.repo.org/* /tmp/cvmfs_out_2/
+
+    echo "  Starting transaction 3"
+    cvmfs_server transaction -e test.repo.org
+
+    echo "  Deleting a directory"
+    rm -rv /cvmfs/test.repo.org/new_repository
+
+    echo "  Publishing changes 3"
+    cvmfs_server publish -e test.repo.org
+
+    echo "  Remounting test repository"
+    cvmfs_server mount -a
+
+    echo "  Copy the contents of the repository"
+    rm -rf /tmp/cvmfs_out_3
+    mkdir -p /tmp/cvmfs_out_3/
+    cp -rv /cvmfs/test.repo.org/* /tmp/cvmfs_out_3/
 
     clean_up
 }
