@@ -6,13 +6,15 @@
 #
 #-------------------------------------------------------------------
 
+set -e
+
 # Setup Mnesia
 echo "Setting up the Mnesia schema"
 bin/cvmfs_services escript scripts/setup_mnesia.escript
 
 # Install syslog configuration file
 echo "Installing the syslog configuration file"
-cp -v scripts/90-cvmfs_services.conf /etc/rsyslog.d/
+sudo cp -v scripts/90-cvmfs_services.conf /etc/rsyslog.d/
 
 echo "  - restarting rsyslog"
-systemctl restart rsyslog
+sudo systemctl restart rsyslog
