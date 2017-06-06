@@ -1690,7 +1690,7 @@ bool PosixQuotaManager::RebuildDatabase() {
   sqlite3_stmt *stmt_insert = NULL;
   int sqlerr;
   int seq = 0;
-  char hex[3];
+  char hex[4];
   struct stat info;
   platform_dirent64 *d;
   DIR *dirp = NULL;

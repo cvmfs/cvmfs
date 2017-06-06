@@ -34,7 +34,7 @@ cvmfs_run_test() {
 
   echo "start an HTTP server to serve external files (logging to $http_log)"
   CVMFS_TEST_624_HTTP_PID="$(open_http_server $external_storage $http_port $http_log)"
-  [ ! -z $CVMFS_TEST_624_HTTP_PID ] || kill -0 $CVMFS_TEST_624_HTTP_PID || { echo "fail"; return 4; }
+  [ ! -z $CVMFS_TEST_624_HTTP_PID ] && kill -0 $CVMFS_TEST_624_HTTP_PID || { echo "fail"; return 4; }
   echo "HTTP server running with PID $CVMFS_TEST_624_HTTP_PID"
 
   echo "configure external data location"
