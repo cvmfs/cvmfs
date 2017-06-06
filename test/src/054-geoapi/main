@@ -15,7 +15,7 @@ cvmfs_run_test() {
   # Make sure that the stratum 1s have large geographical distance
   #   between them.  Use cvmfs.fnal.gov as one of them because it is
   #   a high-availability system.
-  sudo sh -c 'echo "CVMFS_SERVER_URL=\"http://cvmfsrep.grid.sinica.edu.tw:8000/cvmfs/@fqrn@;http://cvmfs-stratum-one.cern.ch/cvmfs/@fqrn@;http://cvmfs.fnal.gov:8000/cvmfs/@fqrn@\"" > /etc/cvmfs/config.d/grid.cern.ch.local' || return 100
+  sudo sh -c 'echo "CVMFS_SERVER_URL=\"http://cvmfs-stratum-one.ihep.ac.cn:8000/cvmfs/@fqrn@;http://cvmfs-stratum-one.cern.ch/cvmfs/@fqrn@;http://cvmfs.fnal.gov:8000/cvmfs/@fqrn@\"" > /etc/cvmfs/config.d/grid.cern.ch.local' || return 100
   sudo sh -c 'echo "CVMFS_HTTP_PROXY=DIRECT" >> /etc/cvmfs/config.d/grid.cern.ch.local' || return 101
   sudo sh -c 'echo "CVMFS_FALLBACK_PROXY=" >> /etc/cvmfs/config.d/grid.cern.ch.local' || return 102
   cvmfs_mount grid.cern.ch || return 1
@@ -36,11 +36,11 @@ cvmfs_run_test() {
   esac
 
   if [ "$country" = "ch" ]; then
-    if [ "$geo_probe" != "http://cvmfs-stratum-one.cern.ch/cvmfs/grid.cern.ch;http://cvmfs.fnal.gov:8000/cvmfs/grid.cern.ch;http://cvmfsrep.grid.sinica.edu.tw:8000/cvmfs/grid.cern.ch" ]; then
+    if [ "$geo_probe" != "http://cvmfs-stratum-one.cern.ch/cvmfs/grid.cern.ch;http://cvmfs.fnal.gov:8000/cvmfs/grid.cern.ch;http://cvmfs-stratum-one.ihep.ac.cn:8000/cvmfs/grid.cern.ch" ]; then
       return 20;
     fi
   elif [ "$country" = "us" ]; then
-    if [ "$geo_probe" != "http://cvmfs.fnal.gov:8000/cvmfs/grid.cern.ch;http://cvmfs-stratum-one.cern.ch/cvmfs/grid.cern.ch;http://cvmfsrep.grid.sinica.edu.tw:8000/cvmfs/grid.cern.ch" ]; then
+    if [ "$geo_probe" != "http://cvmfs.fnal.gov:8000/cvmfs/grid.cern.ch;http://cvmfs-stratum-one.cern.ch/cvmfs/grid.cern.ch;http://cvmfs-stratum-one.ihep.ac.cn:8000/cvmfs/grid.cern.ch" ]; then
       return 21;
     fi
   else
@@ -56,9 +56,7 @@ cvmfs_run_test() {
 
   cvmfs_umount grid.cern.ch
 
-  # change cmsbproxy.fnal.gov:3128 to cvmfsbproxy.fnal.gov:3126 when it
-  #  is in production.  Meanwhile borrow the CMS frontier backup proxy.
-  local us_fbp="http://cmsbproxy.fnal.gov:3128"
+  local us_fbp="http://cvmfsbproxy.fnal.gov:3126"
   local ch_fbp="http://cvmfsbproxy.cern.ch:3126"
   sudo sh -c 'echo "CVMFS_FALLBACK_PROXY=\"'"$ch_fbp;$us_fbp"'\"" >> /etc/cvmfs/config.d/grid.cern.ch.local' || return 301
   cvmfs_mount grid.cern.ch || return 3
