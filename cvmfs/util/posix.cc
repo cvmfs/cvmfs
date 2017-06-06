@@ -896,14 +896,21 @@ vector<string> FindDirectories(const string &parent_dir) {
  * Name -> UID from passwd database
  */
 bool GetUidOf(const std::string &username, uid_t *uid, gid_t *main_gid) {
-  char buf[16*1024];
   struct passwd pwd;
   struct passwd *result = NULL;
-  getpwnam_r(username.c_str(), &pwd, buf, sizeof(buf), &result);
-  if (result == NULL)
+  int bufsize = 16 * 1024;
+  char *buf = static_cast<char *>(smalloc(bufsize));
+  while (getpwnam_r(username.c_str(), &pwd, buf, bufsize, &result) == ERANGE) {
+    bufsize *= 2;
+    buf = static_cast<char *>(srealloc(buf, bufsize));
+  }
+  if (result == NULL) {
+    free(buf);
     return false;
+  }
   *uid = result->pw_uid;
   *main_gid = result->pw_gid;
+  free(buf);
   return true;
 }
 
@@ -912,13 +919,20 @@ bool GetUidOf(const std::string &username, uid_t *uid, gid_t *main_gid) {
  * Name -> GID from groups database
  */
 bool GetGidOf(const std::string &groupname, gid_t *gid) {
-  char buf[16*1024];
   struct group grp;
-  struct group *result;
-  getgrnam_r(groupname.c_str(), &grp, buf, sizeof(buf), &result);
-  if (result == NULL)
+  struct group *result = NULL;
+  int bufsize = 16 * 1024;
+  char *buf = static_cast<char *>(smalloc(bufsize));
+  while (getgrnam_r(groupname.c_str(), &grp, buf, bufsize, &result) == ERANGE) {
+    bufsize *= 2;
+    buf = static_cast<char *>(srealloc(buf, bufsize));
+  }
+  if (result == NULL) {
+    free(buf);
     return false;
+  }
   *gid = result->gr_gid;
+  free(buf);
   return true;
 }
 
