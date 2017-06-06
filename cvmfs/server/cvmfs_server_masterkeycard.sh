@@ -20,7 +20,7 @@ masterkeycard_available() {
   if ! lsusb | grep -q "$pattern"; then
     reason="USB device matching \"$pattern\" not present"
   elif ! which opensc-tool > /dev/null 2>&1; then
-    reason="opensc-tool (from opensc rpm) not found"
+    reason="opensc-tool (from opensc package) not found"
   elif ! which systemctl > /dev/null 2>&1; then
     reason="masterkeycard only supported on systems with systemctl"
   elif ! systemctl is-active --quiet pcscd.socket; then
@@ -30,11 +30,11 @@ masterkeycard_available() {
   elif ! opensc-tool -l | grep -q "$pattern"; then
     reason="opensc-tool -l has no device matching \"$pattern\""
   elif ! which yubico-piv-tool >/dev/null 2>&1; then
-    reason="yubico-piv-tool (from yubico-piv-tool rpm) not found"
+    reason="yubico-piv-tool (from yubico-piv-tool package) not found"
   elif yubico-piv-tool -a status 2>&1 | grep -q "Failed to connect"; then
     reason="yubico-piv-tool failed to connect to device"
   elif ! openssl engine pkcs11 2>/dev/null|grep -q "pkcs11 engine"; then
-    reason="openssl engine pkcs11 (from engine_pkcs11 rpm) not found"
+    reason="openssl engine pkcs11 (from engine_pkcs11 rpm or libengine-pkcs11-openssl deb) not found"
   fi
   if [ -n "$reason" ]; then
     echo "$reason"
@@ -248,7 +248,7 @@ cvmfs_server_masterkeycard() {
         masterkey="/etc/cvmfs/keys/${name}.masterkey"
         if cvmfs_sys_file_is_regular $masterkey; then
           echo "Removing $masterkey and updating pub key"
-          rm -f $masterkey
+          shred -uf $masterkey
         else
           echo "$masterkey already missing, but updating pub key"
         fi
