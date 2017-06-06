@@ -6,27 +6,27 @@ set_up_repository_services() {
     echo "Setting up repository services"
 
     echo "  Writing configuration files"
-    cat <<EOF > /opt/cvmfs_services/etc/repo.config
+    sudo bash -c 'cat <<EOF > /opt/cvmfs_services/etc/repo.config
 {repos, [{<<"test.repo.org">>, [<<"key1">>]}]}.
 {keys, [{file, "/etc/cvmfs/keys/gateway_key"}]}.
-EOF
+EOF'
 
     echo "  Writing API key file"
-    cat <<EOF > /etc/cvmfs/keys/gateway_key
+    sudo bash -c 'cat <<EOF > /etc/cvmfs/keys/gateway_key
 test key1 secret1
-EOF
+EOF'
 
     echo "  Creating Mnesia schema"
     cd /opt/cvmfs_services
     ./scripts/setup.sh
 
     echo "  Creating test repo"
-    cvmfs_server mkfs -o `whoami` test.repo.org
+    sudo cvmfs_server mkfs -o `whoami` test.repo.org
 
     echo "  Modifying test repo configuration"
-    sed -i 's/local,/gw,/' /etc/cvmfs/repositories.d/test.repo.org/server.conf
-    sed -i 's/txn,\/srv\/cvmfs\/test.repo.org/txn,http:\/\/localhost:8080\/api\/v1/g' /etc/cvmfs/repositories.d/test.repo.org/server.conf
-    echo "CVMFS_GATEWAY_KEYS=/etc/cvmfs/keys/gateway_key" >> /etc/cvmfs/repositories.d/test.repo.org/server.conf
+    sudo sed -i 's/local,/gw,/' /etc/cvmfs/repositories.d/test.repo.org/server.conf
+    sudo sed -i 's/txn,\/srv\/cvmfs\/test.repo.org/txn,http:\/\/localhost:8080\/api\/v1/g' /etc/cvmfs/repositories.d/test.repo.org/server.conf
+    sudo bash -c 'echo "CVMFS_GATEWAY_KEYS=/etc/cvmfs/keys/gateway_key" >> /etc/cvmfs/repositories.d/test.repo.org/server.conf'
 
     echo "  Starting repository services application"
     /opt/cvmfs_services/bin/cvmfs_services start
@@ -57,10 +57,10 @@ clean_up() {
     /opt/cvmfs_services/bin/cvmfs_services stop
 
     echo "  Removing Mnesia directory"
-    rm -rf /opt/cvmfs_mnesia
+    rm -rf /opt/cvmfs_mnesia/*
 
     echo "  Removing test repository"
-    cvmfs_server rmfs -f test.repo.org
+    sudo cvmfs_server rmfs -f test.repo.org
 
     echo "  Removing output directories"
     rm -rvf /tmp/cvmfs_out_{1,2,3}
@@ -111,7 +111,7 @@ run_transactions() {
     cvmfs_server publish -e test.repo.org
 
     echo "  Remounting test repository"
-    cvmfs_server mount -a
+    sudo cvmfs_server mount -a
 
     echo "  Copy the contents of the repository"
     save_repo_contents /tmp/cvmfs_out_1
@@ -130,7 +130,7 @@ run_transactions() {
     cvmfs_server publish -e test.repo.org
 
     echo "  Remounting test repository"
-    cvmfs_server mount -a
+    sudo cvmfs_server mount -a
 
     echo "  Copy the contents of the repository"
     save_repo_contents /tmp/cvmfs_out_2
@@ -147,7 +147,7 @@ run_transactions() {
     cvmfs_server publish -e test.repo.org
 
     echo "  Remounting test repository"
-    cvmfs_server mount -a
+    sudo cvmfs_server mount -a
 
     echo "  Copy the contents of the repository"
     save_repo_contents /tmp/cvmfs_out_3
