@@ -1,4 +1,5 @@
 2.4.0:
+  * Add support for Yubikey 4 & NEO to cvmfs-server (CVM-1259)
   * Fix mount helper for very long lines in /etc/group (CVM-1304)
   * Change default graft size from 32M to 24M (CVM-1291) 
   * Fix cache size reporting in 'df' on macOS (CVM-1286)
