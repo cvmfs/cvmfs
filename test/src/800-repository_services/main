@@ -5,6 +5,31 @@ cvmfs_test_autofs_on_startup=false
 set_up_repository_services() {
     echo "Setting up repository services"
 
+    PACKAGE_URL_ROOT=http://ecsft.cern.ch/dist/cvmfs/cvmfs-services/cvmfs_services-$CVMFS_SERVICES_VERSION
+    CVMFS_SERVICES_PACKAGE=""
+    # Choose which package to download and install based on platform
+    if [ -f /etc/lsb-release -a x"$(cat /etc/lsb-release | grep 16.04)" != x"" ]; then
+        CVMFS_SERVICES_PACKAGE=${PACKAGE_URL_ROOT}-ubuntu1604-x86_64.tar.gz
+        echo "Using package: $CVMFS_SERVICES_PACKAGE"
+    elif [ -f /etc/redhat-release ]; then
+        rhver=$(cat redhat-release | cut -d' ' -f3 | cut -d'.' -f1)
+        if [ $((rhver == 6)) -o $((rhver == 7)) ]; then
+            CVMFS_SERVICES_PACKAGE=${PACKAGE_URL_ROOT}-centos${rhver}-x86_64.tar.gz
+        fi
+    fi
+
+    if [ x"$CVMFS_SERVICES_PACKAGE" = x"" ]; then
+        echo "Platform not supported. Exiting"
+        exit 1
+    fi
+
+    echo "  Installing the cvmfs_services application"
+    pushd /tmp
+    curl -o cvmfs_services.tar.gz $CVMFS_SERVICES_PACKAGE
+    sudo rm -rf /opt/cvmfs_services && sudo mkdir -p /opt/cvmfs_services && cd /opt/cvmfs_services
+    sudo tar xzf /tmp/cvmfs_services.tar.gz
+    popd
+
     echo "  Writing configuration files"
     sudo bash -c 'cat <<EOF > /opt/cvmfs_services/etc/repo.config
 {repos, [{<<"test.repo.org">>, [<<"key1">>]}]}.
@@ -17,6 +42,8 @@ test key1 secret1
 EOF'
 
     echo "  Creating Mnesia schema"
+    sudo mkdir -p /opt/cvmfs_mnesia
+    sudo chown `whoami`:`whoami` /opt/cvmfs_mnesia
     cd /opt/cvmfs_services
     ./scripts/setup.sh
 
@@ -57,7 +84,7 @@ clean_up() {
     /opt/cvmfs_services/bin/cvmfs_services stop
 
     echo "  Removing Mnesia directory"
-    rm -rf /opt/cvmfs_mnesia/*
+    rm -rf /opt/cvmfs_mnesia
 
     echo "  Removing test repository"
     sudo cvmfs_server rmfs -f test.repo.org
