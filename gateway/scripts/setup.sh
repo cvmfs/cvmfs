@@ -17,4 +17,10 @@ echo "Installing the syslog configuration file"
 sudo cp -v scripts/90-cvmfs_services.conf /etc/rsyslog.d/
 
 echo "  - restarting rsyslog"
-sudo systemctl restart rsyslog
+
+if [ x"$(which systemctl)" != x"" ]; then
+    sudo systemctl restart rsyslog
+else
+    sudo service rsyslog restart
+fi
+
