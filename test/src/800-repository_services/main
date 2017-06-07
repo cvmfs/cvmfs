@@ -8,7 +8,7 @@ set_up_repository_services() {
     PACKAGE_URL_ROOT=http://ecsft.cern.ch/dist/cvmfs/cvmfs-services/cvmfs_services-$CVMFS_SERVICES_VERSION
     CVMFS_SERVICES_PACKAGE=""
     # Choose which package to download and install based on platform
-    if [ -f /etc/lsb-release -a x"$(cat /etc/lsb-release | grep 16.04)" != x"" ]; then
+    if [ x"$(which lsb_release)" != x"" -a x"$(lsb_release -cs)" = x"xenial" ]; then
         CVMFS_SERVICES_PACKAGE=${PACKAGE_URL_ROOT}-ubuntu1604-x86_64.tar.gz
         echo "Using package: $CVMFS_SERVICES_PACKAGE"
     elif [ -f /etc/redhat-release ]; then
