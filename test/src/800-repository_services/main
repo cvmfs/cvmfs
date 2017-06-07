@@ -8,13 +8,16 @@ set_up_repository_services() {
     PACKAGE_URL_ROOT=http://ecsft.cern.ch/dist/cvmfs/cvmfs-services/cvmfs_services-$CVMFS_SERVICES_VERSION
     CVMFS_SERVICES_PACKAGE=""
     # Choose which package to download and install based on platform
-    if [ x"$(which lsb_release)" != x"" -a x"$(lsb_release -cs)" = x"xenial" ]; then
-        CVMFS_SERVICES_PACKAGE=${PACKAGE_URL_ROOT}-ubuntu1604-x86_64.tar.gz
-        echo "Using package: $CVMFS_SERVICES_PACKAGE"
+    if [ -f /etc/lsb-release ]; then
+        if [ x"$(lsb_release -cs)" = x"xenial" ]; then
+            CVMFS_SERVICES_PACKAGE=${PACKAGE_URL_ROOT}-ubuntu1604-x86_64.tar.gz
+            echo "Using package: $CVMFS_SERVICES_PACKAGE"
+        fi
     elif [ -f /etc/redhat-release ]; then
-        rhver=$(cat redhat-release | cut -d' ' -f3 | cut -d'.' -f1)
+        rhver=$(cat /etc/redhat-release | awk {'print $(NF-1)'} | cut -d'.' -f1)
         if [ $((rhver == 6)) -o $((rhver == 7)) ]; then
             CVMFS_SERVICES_PACKAGE=${PACKAGE_URL_ROOT}-centos${rhver}-x86_64.tar.gz
+            echo "Using package: $CVMFS_SERVICES_PACKAGE"
         fi
     fi
 
@@ -48,7 +51,7 @@ EOF'
     ./scripts/setup.sh
 
     echo "  Creating test repo"
-    sudo cvmfs_server mkfs -o `whoami` test.repo.org
+    sudo -E cvmfs_server mkfs -o `whoami` test.repo.org
 
     echo "  Modifying test repo configuration"
     sudo sed -i 's/local,/gw,/' /etc/cvmfs/repositories.d/test.repo.org/server.conf
@@ -87,7 +90,7 @@ clean_up() {
     rm -rf /opt/cvmfs_mnesia
 
     echo "  Removing test repository"
-    sudo cvmfs_server rmfs -f test.repo.org
+    sudo -E cvmfs_server rmfs -f test.repo.org
 
     echo "  Removing output directories"
     rm -rvf /tmp/cvmfs_out_{1,2,3}
