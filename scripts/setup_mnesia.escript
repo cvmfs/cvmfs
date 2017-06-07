@@ -19,7 +19,7 @@ main(_) ->
         {error, eexist} ->
             io:format("~p exists. Continuing.~n", [CvmfsMnesiaRoot]);
         {error, Reason1} ->
-            io:foramt("Could not create ~p. Reason: ~p.~n", [CvmfsMnesiaRoot, Reason1]),
+            io:format("Could not create ~p. Reason: ~p.~n", [CvmfsMnesiaRoot, Reason1]),
             halt(1)
     end,
     case mnesia:create_schema([node()]) of
