@@ -50,9 +50,9 @@ def distance_on_unit_sphere(lat1, long1, lat2, long2):
 # will return None if the address does not exist in the DB
 def addr_geoinfo(addr):
     if addr.find(':') != -1:
-        return(gi6.record_by_addr_v6(addr))
+        return gi6.record_by_addr_v6(addr)
     else:
-        return(gi.record_by_addr(addr))
+        return gi.record_by_addr(addr)
 
 # Pattern including all allowed characters in addresses.
 # The geoip api functions will further validate, but for paranoia's sake
@@ -60,6 +60,54 @@ def addr_geoinfo(addr):
 #   sure the names are limited to valid hostname characters.
 # Include ':' for IPv6 addresses.
 addr_pattern = re.compile('^[0-9a-zA-Z.:-]*$')
+
+# look up geo info by name.  Try IPv4 first since that DB is
+# better and most servers today are dual stack if they have IPv6
+def name_geoinfo(name):
+    if (len(name) < 256) and addr_pattern.search(name):
+        girinfo = gi.record_by_name(name)
+        if girinfo is None:
+            return gi6.record_by_name_v6(name)
+        return girinfo
+    return None
+
+# geo-sort list of servers relative to gir_rem
+# return list of [onegood, indexes] where
+#   onegood - a boolean saying whether or not there was at least
+#      one valid looked up geolocation from the servers
+#   indexes - list of numbers specifying the order of the N given servers
+#    servers numbered 0 to N-1 from geographically closest to furthest
+#    away compared to gir_rem
+def geosort_servers(gir_rem, servers):
+    idx = 0
+    arcs = []
+    indexes = []
+
+    onegood = False
+    for server in servers:
+        gir_server = name_geoinfo(server)
+
+        if gir_server is None:
+            # put it on the end of the list
+            arc = float("inf")
+        else:
+            onegood = True
+            arc = distance_on_unit_sphere(gir_rem['latitude'],
+                                          gir_rem['longitude'],
+                                          gir_server['latitude'],
+                                          gir_server['longitude'])
+            #print "distance between " + \
+            #    str(gir_rem['latitude']) + ',' + str(gir_rem['longitude']) \
+            #    + " and " + \
+            #    server + ' (' + str(gir_server['latitude']) + ',' + str(gir_server['longitude']) + ')' + \
+            #    " is " + str(arc)
+
+        i = bisect.bisect(arcs, arc)
+        arcs[i:i] = [arc]
+        indexes[i:i] = [idx]
+        idx += 1
+
+    return [onegood, indexes]
 
 # expected geo api URL:  /cvmfs/<repo_name>/api/v<version>/geo/<path_info>
 #   <repo_name> is repository name
@@ -123,46 +171,30 @@ def api(path_info, repo_name, version, start_response, environ):
     if gir_rem is None:
         return cvmfs_api.bad_request(start_response, 'remote addr not found in database')
 
-    idx = 1
-    arcs = []
-    indexes = []
-
-    onegood = False
-    for server in servers:
-        if (len(server) < 256) and addr_pattern.search(server):
-            # try IPv4 first since that DB is better and most servers
-            #    today are dual stack if they have IPv6
-            gir_server = gi.record_by_name(server)
-            if gir_server is None:
-                gir_server = gi6.record_by_name_v6(server)
-        else:
-            gir_server = None
-
-        if gir_server is None:
-            # put it on the end of the list
-            arc = float("inf")
-        else:
-            onegood = True
-            arc = distance_on_unit_sphere(gir_rem['latitude'],
-                                          gir_rem['longitude'],
-                                          gir_server['latitude'],
-                                          gir_server['longitude'])
-            #print "distance between " + \
-            #    rem_addr + ' (' + str(gir_rem['latitude']) + ',' + str(gir_rem['longitude']) + ')' \
-            #    + " and " + \
-            #    server + ' (' + str(gir_server['latitude']) + ',' + str(gir_server['longitude']) + ')' + \
-            #    " is " + str(arc)
-
-        i = bisect.bisect(arcs, arc)
-        arcs[i:i] = [ arc ]
-        indexes[i:i] = [ str(idx) ]
-        idx += 1
+    if '+PXYSEP+' in servers:
+        # first geosort the proxies after the separator and if at least one
+        # is good, sort the hosts before the separator relative to that
+        # proxy rather than the client
+        pxysep = servers.index('+PXYSEP+')
+        onegood, pxyindexes = geosort_servers(gir_rem, servers[pxysep+1:])
+        if onegood:
+            gir_pxy = name_geoinfo(servers[pxysep+1+pxyindexes[0]])
+            if not gir_pxy is None:
+                gir_rem = gir_pxy
+        onegood, hostindexes = geosort_servers(gir_rem, servers[0:pxysep])
+        indexes = hostindexes + list(pxysep+1+i for i in pxyindexes)
+        # Append the index of the separator for backward compatibility,
+        # so the client can always expect the same number of indexes as
+        # the number of elements in the request.
+        indexes.append(pxysep)
+    else:
+        onegood, indexes = geosort_servers(gir_rem, servers)
 
     if not onegood:
         # return a bad request only if all the server names were bad
         return cvmfs_api.bad_request(start_response, 'no server addr found in database')
 
-    response_body = string.join(indexes, ',') + '\n'
+    response_body = string.join((str(i+1) for i in indexes), ',') + '\n'
 
     status = '200 OK'
     response_headers = [('Content-Type', 'text/plain'),

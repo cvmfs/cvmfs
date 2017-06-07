@@ -38,6 +38,7 @@ COMPONENTS="\
     server/cvmfs_server_transaction.sh
     server/cvmfs_server_abort.sh
     server/cvmfs_server_publish.sh
+    server/cvmfs_server_masterkeycard.sh
     server/cvmfs_server_import.sh
     server/cvmfs_server_mkfs.sh
     server/cvmfs_server_add_replica.sh

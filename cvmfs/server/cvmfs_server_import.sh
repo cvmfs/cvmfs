@@ -13,6 +13,7 @@
 # - cvmfs_server_json.sh
 # - cvmfs_server_transaction.sh
 # - cvmfs_server_publish.sh
+# - cvmfs_server_masterkeycard.sh
 
 
 IMPORT_DESASTER_REPO_NAME=""
@@ -64,10 +65,11 @@ cvmfs_server_import() {
   local recreate_whitelist=0
   local configure_apache=1
   local recreate_repo_key=0
+  local require_masterkeycard=0
 
   # parameter handling
   OPTIND=1
-  while getopts "w:o:c:u:k:lsmgf:rpt" option; do
+  while getopts "w:o:c:u:k:lsmgf:rptR" option; do
     case $option in
       w)
         stratum0=$OPTARG
@@ -107,6 +109,10 @@ cvmfs_server_import() {
       ;;
       t)
         recreate_repo_key=1
+      ;;
+      R)
+        recreate_whitelist=1
+        require_masterkeycard=1
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -192,8 +198,11 @@ cvmfs_server_import() {
     cvmfs_sys_file_is_regular "${storage_location}/.cvmfswhitelist" || die "didn't find ${storage_location}/.cvmfswhitelist"
     local expiry=$(get_expiry_from_string "$(cat "${storage_location}/.cvmfswhitelist")")
     [ $expiry -gt 0 ] || die "Repository whitelist expired (use -r maybe?)"
-  else
-    cvmfs_sys_file_is_regular ${keys_location}/${master_key} || die "no master key found for whitelist recreation"
+  elif [ $require_masterkeycard -eq 1 ]; then
+    local reason
+    reason="`masterkeycard_cert_available`" || die "masterkeycard not available to create whitelist: $reason"
+  elif ! cvmfs_sys_file_is_regular ${keys_location}/${master_key}; then
+    masterkeycard_cert_available >/dev/null || die "Neither masterkey nor masterkeycard found for recreating whitelist"
   fi
 
   # set up desaster cleanup
@@ -221,7 +230,8 @@ cvmfs_server_import() {
 
   # import the old repository security keys
   echo -n "Importing the given key files... "
-  if cvmfs_sys_file_is_regular ${keys_location}/${master_key} ; then
+  if [ $require_masterkeycard -eq 0 ] && \
+      cvmfs_sys_file_is_regular ${keys_location}/${master_key} ; then
     keys="$keys $master_key"
   fi
   import_keychain $name "$keys_location" $cvmfs_user "$keys" > /dev/null || die "fail!"
@@ -232,7 +242,6 @@ cvmfs_server_import() {
   create_spool_area_for_new_repository $name               || die "fail!"
   if [ $configure_apache -eq 1 ]; then
     reload_apache > /dev/null || die "fail!"
-    wait_for_apache "${stratum0}/.cvmfswhitelist" || die "fail (Apache configuration)"
   fi
   echo "done"
 
@@ -257,6 +266,11 @@ cvmfs_server_import() {
     echo "done"
   fi
 
+  # Let Apache finish reload (needs to happen after SElinux adjustment)
+  if [ $configure_apache -eq 1 ]; then
+    wait_for_apache "${stratum0}/.cvmfswhitelist" || die "fail (Apache configuration)"
+  fi
+
   # creating a new repository signing key if requested
   if [ $recreate_repo_key -ne 0 ]; then
     echo -n "Creating new repository signing key... "
@@ -272,11 +286,9 @@ cvmfs_server_import() {
 
   # recreate whitelist if requested
   if [ $recreate_whitelist -ne 0 ]; then
-    echo -n "Recreating whitelist... "
     create_whitelist $name $CVMFS_USER               \
                            ${CVMFS_UPSTREAM_STORAGE} \
-                           ${CVMFS_SPOOL_DIR}/tmp > /dev/null || die "fail!"
-    echo "done"
+                           ${CVMFS_SPOOL_DIR}/tmp || die "fail!"
   fi
 
   # migrate old catalogs
@@ -334,7 +346,7 @@ cvmfs_server_import() {
 
   # reset trap and finish
   trap - EXIT HUP INT QUIT TERM
-  print_new_repository_notice $name $cvmfs_user
+  print_new_repository_notice $name $cvmfs_user 1
 
   # print warning if OverlayFS is used for repository management
   if [ x"$CVMFS_UNION_FS_TYPE" = x"overlayfs" ]; then

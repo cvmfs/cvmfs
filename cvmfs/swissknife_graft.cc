@@ -17,7 +17,6 @@
 #include "hash.h"
 #include "platform.h"
 #include "util/posix.h"
-#include "util/string.h"
 
 bool swissknife::CommandGraft::ChecksumFdWithChunks(
     int fd, zlib::Compressor *compressor, uint64_t *file_size,
@@ -158,12 +157,15 @@ int swissknife::CommandGraft::Main(const swissknife::ArgumentList &args) {
           ? zlib::kNoCompression
           : zlib::ParseCompressionAlgorithm(*args.find('Z')->second);
 
-  std::string chunk_size =
-      (args.find('c') == args.end()) ? "32" : *args.find('c')->second;
-  if (!String2Uint64Parse(chunk_size, &chunk_size_)) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Unable to parse chunk size: %s",
-             chunk_size.c_str());
-    return 1;
+  if (args.find('c') == args.end()) {
+    chunk_size_ = kDefaultChunkSize;
+  } else {
+    std::string chunk_size = *args.find('c')->second;
+    if (!String2Uint64Parse(chunk_size, &chunk_size_)) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Unable to parse chunk size: %s",
+               chunk_size.c_str());
+      return 1;
+    }
   }
   chunk_size_ *= 1024 * 1024;  // Convert to MB.
 

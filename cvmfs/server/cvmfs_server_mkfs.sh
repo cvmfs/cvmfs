@@ -13,6 +13,7 @@
 # - cvmfs_server_json.sh
 # - cvmfs_server_transaction.sh
 # - cvmfs_server_publish.sh
+# - cvmfs_server_masterkeycard.sh
 
 cvmfs_server_alterfs() {
   local master_replica=-1
@@ -98,13 +99,14 @@ cvmfs_server_mkfs() {
   local s3_config=""
   local keys_import_location
   local external_data=false
+  local require_masterkeycard=0
 
   local configure_apache=1
   local voms_authz=""
 
   # parameter handling
   OPTIND=1
-  while getopts "Xw:u:o:mf:vgG:a:zs:k:pV:Z:" option; do
+  while getopts "Xw:u:o:mf:vgG:a:zs:k:pRV:Z:" option; do
     case $option in
       X)
         external_data=true
@@ -144,6 +146,9 @@ cvmfs_server_mkfs() {
       ;;
       k)
         keys_import_location=$OPTARG
+      ;;
+      R)
+        require_masterkeycard=1
       ;;
       Z)
         compression_alg=$OPTARG
@@ -219,7 +224,15 @@ cvmfs_server_mkfs() {
   # check if the keychain for the repository to create is already in place
   local keys_location="/etc/cvmfs/keys"
   mkdir -p $keys_location
-  local keys="${name}.masterkey ${name}.key ${name}.crt ${name}.pub"
+  local keys="${name}.key ${name}.crt ${name}.pub"
+  if [ $require_masterkeycard -eq 1 ]; then
+    local reason
+    reason="`masterkeycard_cert_available`" || die "masterkeycard not available: $reason"
+  elif masterkeycard_cert_available >/dev/null; then
+    require_masterkeycard=1
+  else
+    keys="${name}.masterkey $keys"
+  fi
   local keys_are_there=0
   for k in $keys; do
     if cvmfs_sys_file_is_regular "${keys_location}/${k}"; then
@@ -293,8 +306,10 @@ cvmfs_server_mkfs() {
   local rdonly_dir="${CVMFS_SPOOL_DIR}/rdonly"
   local scratch_dir="${CVMFS_SPOOL_DIR}/scratch/current"
 
+  # create the whitelist
+  create_whitelist $name $cvmfs_user $upstream $temp_dir
+
   echo -n "Creating Initial Repository... "
-  create_whitelist $name $cvmfs_user $upstream $temp_dir > /dev/null
   local repoinfo_file=${temp_dir}/new_repoinfo
   touch $repoinfo_file
   create_repometa_skeleton $repoinfo_file
@@ -353,7 +368,7 @@ cvmfs_server_mkfs() {
   echo -n "Updating global JSON information... "
   update_global_repository_info && echo "done" || echo "fail"
 
-  print_new_repository_notice $name $cvmfs_user
+  print_new_repository_notice $name $cvmfs_user $require_masterkeycard
 }
 
 

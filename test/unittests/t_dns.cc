@@ -608,7 +608,7 @@ TEST_F(T_Dns, CaresResolverMany) {
   ExpectResolvedName(hosts[0], "a.root-servers.net",
                      "198.41.0.4", "[2001:503:ba3e::2:30]");
   ExpectResolvedName(hosts[1], "b.root-servers.net",
-                     "192.228.79.201", "[2001:500:84::b]");
+                     "192.228.79.201", "[2001:500:200::b]");
   ExpectResolvedName(hosts[2], "c.root-servers.net",
                      "192.33.4.12", "[2001:500:2::c]");
   ExpectResolvedName(hosts[3], "d.root-servers.net",
@@ -993,7 +993,7 @@ TEST_F(T_Dns, NormalResolverCombinedSlow) {
   ExpectResolvedName(hosts[0], "a.root-servers.net",
                      "198.41.0.4", "[2001:503:ba3e::2:30]");
   ExpectResolvedName(hosts[1], "b.root-servers.net",
-                     "192.228.79.201", "[2001:500:84::b]");
+                     "192.228.79.201", "[2001:500:200::b]");
   EXPECT_EQ(kFailOk, hosts[2].status());
   ExpectResolvedName(hosts[3], "127.0.0.1", "127.0.0.1", "");
   ExpectResolvedName(hosts[4], "[::1]", "", "[::1]");

@@ -971,6 +971,12 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
   }
 
   if (url.find("@proxy@") != string::npos) {
+    // This is used in Geo-API requests (only), to replace a portion of the
+    // URL with the current proxy name for the sake of caching the result.
+    // Replace the @proxy@ either with a passed in "forced" template (which
+    // is set from $CVMFS_PROXY_TEMPLATE) if there is one, or a "direct"
+    // template (which is the uuid) if there's no proxy, or the name of the
+    // proxy.
     string replacement;
     if (proxy_template_forced_ != "") {
       replacement = proxy_template_forced_;
@@ -980,8 +986,6 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
       if (opt_proxy_groups_current_ >= opt_proxy_groups_fallback_) {
         // It doesn't make sense to use the fallback proxies in Geo-API requests
         // since the fallback proxies are supposed to get sorted, too.
-        LogCvmfs(kLogDownload, kLogDebug,
-                 "using direct connection instead of fallback proxy");
         info->proxy = "DIRECT";
         curl_easy_setopt(info->curl_handle, CURLOPT_PROXY, "");
         replacement = proxy_template_direct_;
@@ -2201,6 +2205,16 @@ bool DownloadManager::ProbeGeo() {
   for (unsigned i = 0; i < host_chain.size(); ++i)
     host_names.push_back(dns::ExtractHost(host_chain[i]));
   SortTeam(&host_names, &host_chain);
+  unsigned last_geo_host = host_names.size();
+
+  if ((fallback_group == 0) && (last_geo_host > 1)) {
+    // There are no non-fallback proxies, which means that the client
+    // will always use the fallback proxies.  Add a keyword separator
+    // between the hosts and fallback proxies so the geosorting service
+    // will know to sort the hosts based on the distance from the
+    // closest fallback proxy rather than the distance from the client.
+    host_names.push_back("+PXYSEP+");
+  }
 
   // Add fallback proxy names to the end of the host list
   unsigned first_geo_fallback = host_names.size();
@@ -2209,9 +2223,10 @@ bool DownloadManager::ProbeGeo() {
     // assumption that load-balanced servers are at the same location
     host_names.push_back(proxy_chain[i][0].host.name());
   }
-  // TODO(dwd): fallback proxies should be sorted to for maximum cache reuse.
-  // For WLCG there's no reason to sort fallbacks, they're set by a widely
-  // shared config but that can change in a different context.
+  // TODO(dwd): fallback proxies should be sorted too for maximum
+  // cache reuse.  For WLCG there's no reason to presort fallbacks
+  // because they're set by a widely shared config so they're already
+  // in a fixed order, but that can change in a different context.
 
   std::vector<uint64_t> geo_order;
   bool success = GeoSortServers(&host_names, &geo_order);
@@ -2238,17 +2253,18 @@ bool DownloadManager::ProbeGeo() {
   }
 
   // Copy the host chain and fallback proxies by geo order.  Array indices
-  // in geo_order that are smaller than first_geo_fallback refer to a
-  // stratum 1, the others to a fallback proxy.
+  // in geo_order that are smaller than last_geo_host refer to a stratum 1,
+  // and those indices greater than or equal to first_geo_fallback refer to
+  // a fallback proxy.
   unsigned hosti = 0;
   unsigned proxyi = opt_proxy_groups_fallback_;
   for (unsigned i = 0; i < geo_order.size(); ++i) {
     uint64_t orderval = geo_order[i];
-    if (orderval < (uint64_t) first_geo_fallback) {
+    if (orderval < (uint64_t) last_geo_host) {
       // LogCvmfs(kLogCvmfs, kLogSyslog, "this is orderval %u at host index %u",
       //          orderval, hosti);
       (*opt_host_chain_)[hosti++] = host_chain[orderval];
-    } else {
+    } else if (orderval >= (uint64_t) first_geo_fallback) {
       // LogCvmfs(kLogCvmfs, kLogSyslog,
       //   "this is orderval %u at proxy index %u, using proxy_chain index %u",
       //   orderval, proxyi, fallback_group + orderval - first_geo_fallback);
