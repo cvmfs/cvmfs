@@ -63,8 +63,9 @@ static void RevertToRevision1(catalog::CatalogDatabase *db) {
   ASSERT_TRUE(sqlite::Sql(db->sqlite_db(), "DROP TABLE catalog;").Execute());
   ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
     "ALTER TABLE catalog_r1 RENAME TO catalog;").Execute());
-  if (!indexes_sql.empty())
+  if (!indexes_sql.empty()) {
     ASSERT_TRUE(sqlite::Sql(db->sqlite_db(), indexes_sql).Execute());
+  }
   ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
     "DELETE FROM statistics WHERE counter='self_xattr';").Execute());
   ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
@@ -98,8 +99,9 @@ static void RevertToRevision0(catalog::CatalogDatabase *db) {
     "DROP TABLE nested_catalogs;").Execute());
   ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
     "ALTER TABLE nested_catalogs_r0 RENAME TO nested_catalogs;").Execute());
-  if (!indexes_sql.empty())
+  if (!indexes_sql.empty()) {
     ASSERT_TRUE(sqlite::Sql(db->sqlite_db(), indexes_sql).Execute());
+  }
   ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
     "DELETE FROM properties WHERE key='schema_revision';").Execute());
 }

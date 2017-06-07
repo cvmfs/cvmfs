@@ -242,7 +242,6 @@ cvmfs_server_import() {
   create_spool_area_for_new_repository $name               || die "fail!"
   if [ $configure_apache -eq 1 ]; then
     reload_apache > /dev/null || die "fail!"
-    wait_for_apache "${stratum0}/.cvmfswhitelist" || die "fail (Apache configuration)"
   fi
   echo "done"
 
@@ -265,6 +264,11 @@ cvmfs_server_import() {
     chown -R $cvmfs_user $storage_location || die "fail!"
     set_selinux_httpd_context_if_needed $storage_location || die "fail!"
     echo "done"
+  fi
+
+  # Let Apache finish reload (needs to happen after SElinux adjustment)
+  if [ $configure_apache -eq 1 ]; then
+    wait_for_apache "${stratum0}/.cvmfswhitelist" || die "fail (Apache configuration)"
   fi
 
   # creating a new repository signing key if requested
