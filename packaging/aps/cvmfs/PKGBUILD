@@ -126,7 +126,7 @@ package_cvmfs() {
 package_cvmfs-server() {
   pkgdesc="CernVM-FS tools to maintain Stratum 0/1 repositories"
   makedepends=('cmake' 'unzip')
-  depends=('curl' 'attr' 'openssl' 'apache' 'libcap' 'lsof' 'rsync' 'jq')
+  depends=('curl' 'attr' 'openssl' 'apache' 'libcap' 'lsof' 'rsync' 'jq' 'usbutils')
   optdepends=('mod_wsgi: support for stratum 1 GeoAPI')
   install=cvmfs-server.install
 
