@@ -317,8 +317,7 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
     return false;
 
   // Here we use the path to commit the changes!
-  UniquePtr<CommitProcessor> proc(
-      MakeCommitProcessor("/tmp/cvmfs_receiver_commit_processor"));
+  UniquePtr<CommitProcessor> proc(MakeCommitProcessor());
   shash::Any old_root_hash = shash::MkFromSuffixedHexPtr(
       shash::HexPtr(old_root_hash_json->string_value));
   shash::Any new_root_hash = shash::MkFromSuffixedHexPtr(
@@ -355,8 +354,8 @@ PayloadProcessor* Reactor::MakePayloadProcessor() {
   return new PayloadProcessor();
 }
 
-CommitProcessor* Reactor::MakeCommitProcessor(const std::string& temp_dir) {
-  return new CommitProcessor(temp_dir);
+CommitProcessor* Reactor::MakeCommitProcessor() {
+  return new CommitProcessor();
 }
 
 bool Reactor::HandleRequest(Request req, const std::string& data) {

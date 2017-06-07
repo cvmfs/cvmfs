@@ -26,7 +26,7 @@ class CommitProcessor {
  public:
   enum Result { kSuccess, kMergeError, kIoError };
 
-  explicit CommitProcessor(const std::string& temp_dir);
+  CommitProcessor();
   virtual ~CommitProcessor();
 
   Result Process(const std::string& lease_path, const shash::Any& old_root_hash,
