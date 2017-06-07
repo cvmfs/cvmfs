@@ -17,7 +17,7 @@ using namespace receiver;  // NOLINT
 
 class MockedPayloadProcessor : public PayloadProcessor {
  public:
-  explicit MockedPayloadProcessor() : PayloadProcessor() {}
+  MockedPayloadProcessor() : PayloadProcessor() {}
 
  protected:
   virtual bool WriteFile(int /*fd*/, const void* const /*buf*/,
