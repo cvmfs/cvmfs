@@ -66,6 +66,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
 echo "running CernVM-FS server test cases..."
 CVMFS_TEST_SERVER_CACHE='/srv/cache'                                          \
 CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
+CVMFS_SERVICES_VERSION=0.1.2                                                  \
 ./run.sh $SERVER_TEST_LOGFILE -o ${SERVER_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
                               -x src/518-hardlinkstresstest                   \
                                  src/585-xattrs                               \
@@ -74,6 +75,7 @@ CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
                                  src/5*                                       \
                                  src/6*                                       \
                                  src/7*                                       \
+                                 src/8*                                       \
                               || retval=1
 
 
