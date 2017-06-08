@@ -1,6 +1,6 @@
 #!/usr/bin/env escript
 %% -*- erlang -*-
-%%! -sname cvmfs_services -setcookie cvmfs -mnesia dir '/opt/cvmfs_mnesia'
+%%! -sname cvmfs_services -setcookie cvmfs
 
 %%% -------------------------------------------------------------------
 %%%
@@ -8,20 +8,10 @@
 %%%
 %%% -------------------------------------------------------------------
 
-main(_) ->
-    CvmfsMnesiaRoot = "/opt/cvmfs_mnesia",
-    io:format("Setting up Mnesia~n"),
+main([MnesiaRootDir]) ->
     io:format("Node name: ~p.~n", [node()]),
-    application:load(mnesia),
-    case file:make_dir(CvmfsMnesiaRoot) of
-        ok ->
-            io:format("~p created.~n", [CvmfsMnesiaRoot]);
-        {error, eexist} ->
-            io:format("~p exists. Continuing.~n", [CvmfsMnesiaRoot]);
-        {error, Reason1} ->
-            io:format("Could not create ~p. Reason: ~p.~n", [CvmfsMnesiaRoot, Reason1]),
-            halt(1)
-    end,
+    application:set_env(mnesia, dir, MnesiaRootDir),
+    io:format("Mnesia root dir: ~p.~n", [MnesiaRootDir]),
     case mnesia:create_schema([node()]) of
         ok ->
             io:format("Mnesia schema created.~n");
