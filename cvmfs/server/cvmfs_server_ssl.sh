@@ -59,7 +59,7 @@ create_whitelist() {
   local user=$2
   local spooler_definition=$3
   local temp_dir=$4
-  local expire_days=${5:-30}
+  local expire_days=$5
   local local_recreate=${6:-0}
   local usemasterkeycard=0
   local hash_algorithm
@@ -69,13 +69,19 @@ create_whitelist() {
   whitelist=${temp_dir}/whitelist.$name
 
   local masterkey=/etc/cvmfs/keys/${name}.masterkey
-  if [ $expire_days -gt 30 ]; then
+  if [ -n "$expire_days" ] && [ $expire_days -gt 30 ]; then
     die "Maximum whitelist expiration is 30 days"
   fi
   if cvmfs_sys_file_is_regular $masterkey; then
+    if [ -z "$expire_days" ]; then
+      expire_days=30
+    fi
     echo -n "Signing $expire_days day whitelist with master key... "
   elif masterkeycard_cert_available >/dev/null; then
     usemasterkeycard=1
+    if [ -z "$expire_days" ]; then
+      expire_days=7
+    fi
     echo -n "Signing $expire_days day whitelist with masterkeycard... "
   else
     die "Neither masterkey nor masterkeycard is available to sign whitelist!"
