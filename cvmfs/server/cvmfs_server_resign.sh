@@ -12,13 +12,17 @@
 cvmfs_server_resign() {
   local names
   local retcode=0
+  local expire_days=30
   local require_repo_config=1
   local sign_published=0
 
   # parameter handling
   OPTIND=1
-  while getopts "np" option; do
+  while getopts "d:np" option; do
     case $option in
+      d)
+        expire_days=$OPTARG
+      ;;
       n)
         require_repo_config=0
       ;;
@@ -39,7 +43,8 @@ cvmfs_server_resign() {
   [ $require_repo_config -eq 0 ] || check_multiple_repository_existence "$names"
 
   # sanity checks
-  [ $sign_published -eq 0 ] || [ $require_repo_config -eq 1 ] || die "Cannot use both -n and -p"
+  [ $sign_published -eq 0 ] || [ $expire_days -eq 30 ] || die "Cannot use -d with -p"
+  [ $sign_published -eq 0 ] || [ $require_repo_config -eq 1 ] || die "Cannot use -n with -p"
   [ $sign_published -eq 1 ] || is_root || die "Only root can resign whitelists"
 
   for name in $names; do
@@ -78,8 +83,7 @@ cvmfs_server_resign() {
       else
 
         create_whitelist $name $CVMFS_USER \
-            ${CVMFS_UPSTREAM_STORAGE} \
-            ${CVMFS_SPOOL_DIR}/tmp
+            ${CVMFS_UPSTREAM_STORAGE} ${CVMFS_SPOOL_DIR}/tmp $expire_days
 
       fi
     else
@@ -92,7 +96,7 @@ cvmfs_server_resign() {
       tmpdir="`mktemp -d`"
       trap "rm -rf $tmpdir" EXIT HUP INT TERM
 
-      create_whitelist $name $user "" $tmpdir 1
+      create_whitelist $name $user "" $tmpdir $expire_days 1
 
       rm -rf $tmpdir
       trap - EXIT HUP INT TERM
