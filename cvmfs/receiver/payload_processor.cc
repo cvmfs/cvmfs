@@ -77,8 +77,7 @@ void PayloadProcessor::ConsumerEventCallback(
   // Normal file
 
   // Create a temporary path
-  // TODO(radu): choose a way to inject the temp path into the
-  std::string temp_dir = "/srv/cvmfs/" + current_repo_ + "/data/txt";
+  std::string temp_dir = "/srv/cvmfs/" + current_repo_ + "/data/txn";
   const std::string tmp_path = CreateTempPath(temp_dir, 0666);
   if (tmp_path.empty()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Unable to create temporary path.");
