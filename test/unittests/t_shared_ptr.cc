@@ -8,7 +8,6 @@
 //#include "util/weak_ptr.h"
 #include "util/single_copy.h"
 
-
 class ClassSharedMember {
  public:
   ClassSharedMember(int* counter, int value)
@@ -23,7 +22,7 @@ class ClassSharedMember {
     (*counter_)++;
   }
 
-  int value_use_count() const { return value_.use_count(); }
+  int value_use_count() const { return value_.UseCount(); }
 
  private:
   int* counter_;
@@ -58,7 +57,7 @@ TEST_F(T_SmartPtr, SharedPtr) {
   // Counter should indicated the new instance
   EXPECT_EQ(counter_, 1);
   // The reference should be unique at this point
-  EXPECT_TRUE(shared_data1.unique());
+  EXPECT_TRUE(shared_data1.Unique());
   {
     // Make a new reference to the existing TestData instance
     SharedPtr<TestData> shared_data2 = shared_data1;
@@ -66,13 +65,13 @@ TEST_F(T_SmartPtr, SharedPtr) {
     // TestData instance
     EXPECT_EQ(counter_, 1);
     // The shared_ptr reference is no longer unique...
-    EXPECT_FALSE(shared_data1.unique());
+    EXPECT_FALSE(shared_data1.Unique());
     // And the use count of the shared references is 2
-    EXPECT_EQ(shared_data1.use_count(), 2);
-    EXPECT_EQ(shared_data2.use_count(), 2);
+    EXPECT_EQ(shared_data1.UseCount(), 2);
+    EXPECT_EQ(shared_data2.UseCount(), 2);
   }
   // shared_data2 has been destroyed. The reference is again unique.
-  EXPECT_TRUE(shared_data1.unique());
+  EXPECT_TRUE(shared_data1.Unique());
 }
 
 // Working with classes which contain shared_ptr members

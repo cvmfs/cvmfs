@@ -5,104 +5,218 @@
 #ifndef CVMFS_UTIL_SHARED_POINTER_H_
 #define CVMFS_UTIL_SHARED_POINTER_H_
 
+#include "atomic.h"
+
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
 #endif  // CVMFS_NAMESPACE_GUARD
 
-template<class T> class WeakPtr;
+template <typename T>
+class WeakPtr;
 
-template<class T> class SharedPtr {
+template <typename T>
+class SharedPtr {
+ public:
+  typedef T element_type;
 
-public:
+  SharedPtr() {  // never throws
+    value_ = NULL;
+    count_ = NULL;
+  }
 
-	typedef T element_type;
+  template <class Y>
+  explicit SharedPtr(Y* p) {
+    if (p == value_) {
+      abort();
+    }
+    value_ = static_cast<T*>(p);
+    count_ = new atomic_int64;
+    atomic_write64(count_, 1);
+  }
 
-	SharedPtr(); // never throws
+  ~SharedPtr() {  // never throws
+    if (count_) {
+      atomic_dec64(count_);
+      if (*count_ < 1) {
+        delete value_;
+        delete count_;
+      }
+    }
+  }
 
-	template<class Y> explicit SharedPtr(Y * p);
-	template<class Y, class D> SharedPtr(Y * p, D d);
-	template<class Y, class D, class A> SharedPtr(Y * p, D d, A a);
+  SharedPtr(SharedPtr const& r)
+      : value_(r.value_), count_(r.count_) {  // never throws
+    if (count_) {
+      atomic_inc64(count_);
+    }
+  }
 
-	~SharedPtr(); // never throws
+  template <class Y>
+  SharedPtr(SharedPtr<Y> const& r)
+      : value_(r.value_), count_(r.count_) {  // never throws
+    if (count_) {
+      atomic_inc64(count_);
+    }
+  }
 
-	SharedPtr(SharedPtr const & r); // never throws
-	template<class Y> SharedPtr(SharedPtr<Y> const & r); // never throws
+  template <class Y>
+  explicit SharedPtr(WeakPtr<Y> const& r) : value_(r.get()), count_(r.count_) {
+    if (r.UseCount() == 0) {
+      abort();
+    }
+    atomic_inc64(count_);
+  }
 
-	template<class Y> SharedPtr(SharedPtr<Y> const & r, element_type * p); // never throws
+  SharedPtr& operator=(SharedPtr const& r) {  // never throws
+    value_ = r.value_;
+    count_ = r.count_;
+    if (count_) {
+      atomic_inc64(count_);
+    }
+    return *this;
+  }
 
-	template<class Y> explicit SharedPtr(WeakPtr<Y> const & r);
+  template <class Y>
+  SharedPtr& operator=(SharedPtr<Y> const& r) {  // never throws
+    value_ = r.value_;
+    count_ = r.count_;
+    if (count_) {
+      atomic_inc64(count_);
+    }
+    return *this;
+  }
 
-	SharedPtr & operator=(SharedPtr const & r); // never throws
-	template<class Y> SharedPtr & operator=(SharedPtr<Y> const & r); // never throws
+  void Reset() {  // never throws
+    if (*count_ == 1) {
+      delete value_;
+      delete count_;
+    }
+    value_ = NULL;
+    count_ = NULL;
+  }
 
-	void Reset(); // never throws
+  template <class Y>
+  void Reset(Y* p) {
+    if (*count_ == 1) {
+      delete value_;
+      delete count_;
+    }
+    value_ = static_cast<element_type*>(p);
+    count_ = new atomic_int64;
+    atomic_write64(count_, 1);
+  }
 
-	template<class Y> void Reset(Y * p);
-	template<class Y, class D> void Reset(Y * p, D d);
-	template<class Y, class D, class A> void Reset(Y * p, D d, A a);
+  T& operator*() const {  // never throws
+    return *value_;
+  }
 
-	template<class Y> void Reset(SharedPtr<Y> const & r, element_type * p); // never throws
+  T* operator->() const {  // never throws
+    return value_;
+  }
 
-	T & operator*() const; // never throws; only valid when T is not an array type
-	T * operator->() const; // never throws; only valid when T is not an array type
+  element_type& operator[](std::ptrdiff_t i) const {  // never throws
+    return value_[i];
+  }
 
-	element_type & operator[](std::ptrdiff_t i) const; // never throws; only valid when T is an array type
+  element_type* Get() const {  // never throws
+    return value_;
+  }
 
-	element_type * Get() const; // never throws
+  bool Unique() const {  // never throws
+    return count_ && (*count_ == 1);
+  }
 
-	bool Uunique() const; // never throws
-	long UseCount() const; // never throws
+  long UseCount() const {  // never throws
+    return count_ ? *count_ : -1;
+  }
 
-	explicit operator bool() const; // never throws
+  operator void*() const {  // never throws
+    return static_cast<void*>(value_);
+  }
 
-	void Swap(SharedPtr & b); // never throws
+  void Swap(SharedPtr& b) {  // never throws
+    element_type* v = value_;
+    value_ = b.value_;
+    b.value_ = v;
+    atomic_int64* c = count_;
+    count_ = b.count_;
+    b.count_ = c;
+  }
 
-	template<class Y> bool OwnerBefore(SharedPtr<Y> const & rhs) const; // never throws
-	template<class Y> bool OwnerBefore(WeakPtr<Y> const & rhs) const; // never throws
+ private:
+  element_type* value_;
+  atomic_int64* count_;
 };
 
-template<class T, class U>
-	bool operator==(SharedPtr<T> const & a, SharedPtr<U> const & b); // never throws
+template <class T, class U>
+bool operator==(SharedPtr<T> const& a,
+                SharedPtr<U> const& b) {  // never throws
+  return a.value_ == b.value_;
+}
 
-template<class T, class U>
-	bool operator!=(SharedPtr<T> const & a, SharedPtr<U> const & b); // never throws
+template <class T, class U>
+bool operator!=(SharedPtr<T> const& a,
+                SharedPtr<U> const& b) {  // never throws
+  return a.value_ != b.value_;
+}
 
-template<class T, class U>
-	bool operator<(SharedPtr<T> const & a, SharedPtr<U> const & b); // never throws
+template <class T, class U>
+bool operator<(SharedPtr<T> const& a, SharedPtr<U> const& b) {  // never throws
+  return a.value_ < b.value_;
+}
 
-template<class T>
-	bool operator==(SharedPtr<T> const & p, std::nullptr_t); // never throws
+template <class T>
+bool operator==(SharedPtr<T> const& p, void* q) {  // never throws
+  return p.value_ == q;
+}
 
-template<class T>
-	bool operator==(std::nullptr_t, SharedPtr<T> const & p); // never throws
+template <class T>
+bool operator==(void* q, SharedPtr<T> const& p) {  // never throws
+  return p.value_ == q;
+}
 
-template<class T>
-	bool operator!=(SharedPtr<T> const & p, std::nullptr_t); // never throws
+template <class T>
+bool operator!=(SharedPtr<T> const& p, void* q) {  // never throws
+  return p.value_ != q;
+}
 
-template<class T>
-	bool operator!=(std::nullptr_t, SharedPtr<T> const & p); // never throws
+template <class T>
+bool operator!=(void* q, SharedPtr<T> const& p) {  // never throws
+  return p.value_ != q;
+}
 
-template<class T> void Swap(SharedPtr<T> & a, SharedPtr<T> & b); // never throws
+template <class T>
+void Swap(SharedPtr<T>& a, SharedPtr<T>& b) {  // never throws
+  a.Swap(b);
+}
 
-template<class T> typename SharedPtr<T>::element_type * GetPointer(SharedPtr<T> const & p); // never throws
+template <class T>
+typename SharedPtr<T>::element_type* GetPointer(
+    SharedPtr<T> const& p) {  // never throws
+  return p.value_;
+}
 
-template<class T, class U>
-	SharedPtr<T> StaticPointerCast(SharedPtr<U> const & r); // never throws
+template <class T, class U>
+SharedPtr<T> StaticPointerCast(SharedPtr<U> const& r) {  // never throws
+}
 
-template<class T, class U>
-	SharedPtr<T> ConstPointerCast(SharedPtr<U> const & r); // never throws
+template <class T, class U>
+SharedPtr<T> ConstPointerCast(SharedPtr<U> const& r) {  // never throws
+}
 
-template<class T, class U>
-	SharedPtr<T> DynamicPointerCast(SharedPtr<U> const & r); // never throws
+template <class T, class U>
+SharedPtr<T> DynamicPointerCast(SharedPtr<U> const& r) {  // never throws
+}
 
-template<class T, class U>
-	SharedPtr<T> ReinterpretPointerCast(SharedPtr<U> const & r); // never throws
+template <class T, class U>
+SharedPtr<T> ReinterpretPointerCast(SharedPtr<U> const& r) {  // never throws
+}
 
-template<class E, class T, class Y>
-	std::basic_ostream<E, T> & operator<< (std::basic_ostream<E, T> & os, SharedPtr<Y> const & p);
-
-template<class D, class T>
-	D * GetDeleter(SharedPtr<T> const & p);
+template <class E, class T, class Y>
+std::basic_ostream<E, T>& operator<<(std::basic_ostream<E, T>& os,
+                                     SharedPtr<Y> const& p) {
+  os << *(p.value_);
+  return os;
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD
