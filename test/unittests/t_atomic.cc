@@ -18,11 +18,10 @@ class T_Atomic : public ::testing::Test {
     ASSERT_EQ(0, atomic64_);
   }
 
-
   static void *concurrent_writer32(void *atomic) {
     const int cycles = T_Atomic::concurrent_writer_cycles;
 
-    atomic_int32 *atomic32 = static_cast<atomic_int32*>(atomic);
+    atomic_int32 *atomic32 = static_cast<atomic_int32 *>(atomic);
     for (int i = 0; i < cycles; ++i) {
       if (i % 5 == 0) {
         atomic_dec32(atomic32);
@@ -34,11 +33,10 @@ class T_Atomic : public ::testing::Test {
     return atomic;
   }
 
-
   static void *concurrent_writer64(void *atomic) {
     const int cycles = T_Atomic::concurrent_writer_cycles;
 
-    atomic_int64 *atomic32 = static_cast<atomic_int64*>(atomic);
+    atomic_int64 *atomic32 = static_cast<atomic_int64 *>(atomic);
     for (int i = 0; i < cycles; ++i) {
       if (i % 5 == 0) {
         atomic_dec64(atomic32);
@@ -50,11 +48,10 @@ class T_Atomic : public ::testing::Test {
     return atomic;
   }
 
-
   static void *concurrent_assigner32(void *atomic) {
     const int cycles = T_Atomic::concurrent_writer_cycles;
 
-    atomic_int32 *atomic32 = static_cast<atomic_int32*>(atomic);
+    atomic_int32 *atomic32 = static_cast<atomic_int32 *>(atomic);
     for (int i = 0; i < cycles; ++i) {
       atomic_write32(atomic32, static_cast<int32_t>(i));
     }
@@ -62,18 +59,16 @@ class T_Atomic : public ::testing::Test {
     return atomic;
   }
 
-
   static void *concurrent_assigner64(void *atomic) {
     const int cycles = T_Atomic::concurrent_writer_cycles;
 
-    atomic_int64 *atomic64 = static_cast<atomic_int64*>(atomic);
+    atomic_int64 *atomic64 = static_cast<atomic_int64 *>(atomic);
     for (int i = 0; i < cycles; ++i) {
       atomic_write64(atomic64, static_cast<int64_t>(i));
     }
 
     return atomic;
   }
-
 
  protected:
   atomic_int32 atomic32_;
@@ -83,7 +78,6 @@ class T_Atomic : public ::testing::Test {
   static const int concurrent_writer_result = 600000;
 };
 
-
 TEST_F(T_Atomic, InitialReadAtomicInts) {
   const int32_t i32 = atomic_read32(&atomic32_);
   const int64_t i64 = atomic_read64(&atomic64_);
@@ -91,7 +85,6 @@ TEST_F(T_Atomic, InitialReadAtomicInts) {
   EXPECT_EQ(0, i32);
   EXPECT_EQ(0, i64);
 }
-
 
 TEST_F(T_Atomic, IncrementAtomicInts) {
   const int cycles = 100;
@@ -111,7 +104,6 @@ TEST_F(T_Atomic, IncrementAtomicInts) {
   }
 }
 
-
 TEST_F(T_Atomic, AddToAtomicInts) {
   const int32_t off1 = 1337;
   const int32_t off2 = 42;
@@ -125,7 +117,6 @@ TEST_F(T_Atomic, AddToAtomicInts) {
   EXPECT_EQ(off1, i32);
   EXPECT_EQ(off2, i64);
 }
-
 
 TEST_F(T_Atomic, SubtractFromAtomicInts) {
   const int32_t off1 = 1337;
@@ -143,7 +134,6 @@ TEST_F(T_Atomic, SubtractFromAtomicInts) {
   EXPECT_EQ(off1 - off2, i32);
   EXPECT_EQ(off2 - off1, i64);
 }
-
 
 TEST_F(T_Atomic, DecrementAtomicInts) {
   const int cycles = 100;
@@ -166,7 +156,6 @@ TEST_F(T_Atomic, DecrementAtomicInts) {
   }
 }
 
-
 TEST_F(T_Atomic, CompareAndSetAtomicInts) {
   const int32_t off1 = 31415;
   const int32_t off2 = 2;
@@ -174,17 +163,16 @@ TEST_F(T_Atomic, CompareAndSetAtomicInts) {
 
   atomic_xadd32(&atomic32_, off1);
 
-  const int32_t res1   = atomic_cas32(&atomic32_, off2, off3);
+  const int32_t res1 = atomic_cas32(&atomic32_, off1, off2);
   const int32_t value1 = atomic_read32(&atomic32_);
-  EXPECT_FALSE(res1);
-  EXPECT_EQ(off1, value1);
+  EXPECT_EQ(off1, res1);
+  EXPECT_EQ(off2, value1);
 
-  const int32_t res2   = atomic_cas32(&atomic32_, off1, off3);
+  const int32_t res2 = atomic_cas32(&atomic32_, off2, off3);
   const int32_t value2 = atomic_read32(&atomic32_);
-  EXPECT_TRUE(res2);
+  EXPECT_EQ(off2, res2);
   EXPECT_EQ(off3, value2);
 }
-
 
 TEST_F(T_Atomic, TransactionalAssignment) {
   const int32_t value1 = 1337;
@@ -214,7 +202,6 @@ TEST_F(T_Atomic, TransactionalAssignment) {
   EXPECT_EQ(value6, atomic_read64(&atomic64_));
 }
 
-
 TEST_F(T_Atomic, ConcurrentTransactionalAssignmentsSlow) {
   const int pthreads = 20;
 
@@ -224,10 +211,9 @@ TEST_F(T_Atomic, ConcurrentTransactionalAssignmentsSlow) {
   int pthread_result;
 
   for (int i = 0; i < pthreads; ++i) {
-    pthread_result = pthread_create(&threads32[i],
-                                     NULL,
-                                    &T_Atomic::concurrent_assigner32,
-                                     static_cast<void*>(&atomic32_));
+    pthread_result =
+        pthread_create(&threads32[i], NULL, &T_Atomic::concurrent_assigner32,
+                       static_cast<void *>(&atomic32_));
     ASSERT_EQ(0, pthread_result);
   }
 
@@ -241,10 +227,9 @@ TEST_F(T_Atomic, ConcurrentTransactionalAssignmentsSlow) {
   // ----
 
   for (int i = 0; i < pthreads; ++i) {
-    pthread_result = pthread_create(&threads64[i],
-                                     NULL,
-                                    &T_Atomic::concurrent_assigner64,
-                                     static_cast<void*>(&atomic64_));
+    pthread_result =
+        pthread_create(&threads64[i], NULL, &T_Atomic::concurrent_assigner64,
+                       static_cast<void *>(&atomic64_));
     ASSERT_EQ(0, pthread_result);
   }
 
@@ -256,7 +241,6 @@ TEST_F(T_Atomic, ConcurrentTransactionalAssignmentsSlow) {
   EXPECT_EQ(T_Atomic::concurrent_writer_cycles - 1, result64);
 }
 
-
 TEST_F(T_Atomic, ConcurrentWriteOfAtomicIntsSlow) {
   const int pthreads = 100;
 
@@ -266,10 +250,9 @@ TEST_F(T_Atomic, ConcurrentWriteOfAtomicIntsSlow) {
   int pthread_result;
 
   for (int i = 0; i < pthreads; ++i) {
-    pthread_result = pthread_create(&threads32[i],
-                                     NULL,
-                                    &T_Atomic::concurrent_writer32,
-                                     static_cast<void*>(&atomic32_));
+    pthread_result =
+        pthread_create(&threads32[i], NULL, &T_Atomic::concurrent_writer32,
+                       static_cast<void *>(&atomic32_));
     ASSERT_EQ(0, pthread_result);
   }
 
@@ -281,10 +264,9 @@ TEST_F(T_Atomic, ConcurrentWriteOfAtomicIntsSlow) {
   EXPECT_EQ(T_Atomic::concurrent_writer_result * pthreads, result32);
 
   for (int i = 0; i < pthreads; ++i) {
-    pthread_result = pthread_create(&threads64[i],
-                                     NULL,
-                                    &T_Atomic::concurrent_writer64,
-                                     static_cast<void*>(&atomic64_));
+    pthread_result =
+        pthread_create(&threads64[i], NULL, &T_Atomic::concurrent_writer64,
+                       static_cast<void *>(&atomic64_));
     ASSERT_EQ(0, pthread_result);
   }
 
