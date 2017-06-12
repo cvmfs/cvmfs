@@ -6,6 +6,7 @@
 #define CVMFS_UTIL_SHARED_POINTER_H_
 
 #include "atomic.h"
+#include "util_concurrency.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
@@ -22,6 +23,7 @@ class SharedPtr {
   SharedPtr() {  // never throws
     value_ = NULL;
     count_ = NULL;
+    pthread_mutex_init(&mtx_, NULL);
   }
 
   template <class Y>
@@ -29,17 +31,25 @@ class SharedPtr {
     if (p == value_) {
       abort();
     }
+    pthread_mutex_init(&mtx_, NULL);
     value_ = static_cast<T*>(p);
-    count_ = new atomic_int64;
+    {
+      MutexLockGuard lock(&mtx_);
+      count_ = new atomic_int64;
+    }
     atomic_write64(count_, 1);
   }
 
   ~SharedPtr() {  // never throws
     if (count_) {
       atomic_dec64(count_);
-      if (*count_ < 1) {
-        delete value_;
-        delete count_;
+      if (atomic_read64(count_) == 0) {
+        {
+          MutexLockGuard lock(&mtx_);
+          delete value_;
+          delete count_;
+        }
+        pthread_mutex_destroy(&mtx_);
       }
     }
   }
@@ -87,7 +97,8 @@ class SharedPtr {
   }
 
   void Reset() {  // never throws
-    if (*count_ == 1) {
+    if (atomic_read64(count_) == 1) {
+      MutexLockGuard(&this->mtx_);
       delete value_;
       delete count_;
     }
@@ -98,8 +109,11 @@ class SharedPtr {
   template <class Y>
   void Reset(Y* p) {
     if (*count_ == 1) {
-      delete value_;
-      delete count_;
+      {
+        MutexLockGuard(&this->mtx_);
+        delete value_;
+        delete count_;
+      }
     }
     value_ = static_cast<element_type*>(p);
     count_ = new atomic_int64;
@@ -123,29 +137,21 @@ class SharedPtr {
   }
 
   bool Unique() const {  // never throws
-    return count_ && (*count_ == 1);
+    return count_ && (atomic_read64(count_) == 1);
   }
 
   long UseCount() const {  // never throws
-    return count_ ? *count_ : -1;
+    return count_ ? atomic_read64(count_) : -1;
   }
 
   operator void*() const {  // never throws
     return static_cast<void*>(value_);
   }
 
-  void Swap(SharedPtr& b) {  // never throws
-    element_type* v = value_;
-    value_ = b.value_;
-    b.value_ = v;
-    atomic_int64* c = count_;
-    count_ = b.count_;
-    b.count_ = c;
-  }
-
  private:
   element_type* value_;
   atomic_int64* count_;
+  pthread_mutex_t mtx_;
 };
 
 template <class T, class U>
@@ -186,11 +192,6 @@ bool operator!=(void* q, SharedPtr<T> const& p) {  // never throws
 }
 
 template <class T>
-void Swap(SharedPtr<T>& a, SharedPtr<T>& b) {  // never throws
-  a.Swap(b);
-}
-
-template <class T>
 typename SharedPtr<T>::element_type* GetPointer(
     SharedPtr<T> const& p) {  // never throws
   return p.value_;
@@ -198,18 +199,22 @@ typename SharedPtr<T>::element_type* GetPointer(
 
 template <class T, class U>
 SharedPtr<T> StaticPointerCast(SharedPtr<U> const& r) {  // never throws
+  return SharedPtr<T>(static_cast<T*>(r.value_));
 }
 
 template <class T, class U>
 SharedPtr<T> ConstPointerCast(SharedPtr<U> const& r) {  // never throws
+  return SharedPtr<T>(const_cast<T*>(r.value_));
 }
 
 template <class T, class U>
 SharedPtr<T> DynamicPointerCast(SharedPtr<U> const& r) {  // never throws
+  return SharedPtr<T>(dynamic_cast<T*>(r.value_));
 }
 
 template <class T, class U>
 SharedPtr<T> ReinterpretPointerCast(SharedPtr<U> const& r) {  // never throws
+  return SharedPtr<T>(reinterpret_cast<T*>(r.value_));
 }
 
 template <class E, class T, class Y>
