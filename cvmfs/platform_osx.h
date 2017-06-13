@@ -81,29 +81,39 @@ inline bool platform_umount(const char *mountpoint, const bool lazy) {
     __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
 typedef os_unfair_lock platform_spinlock;
 
-inline int platform_spinlock_init(platform_spinlock *lock, int pshared) {
+inline int platform_spinlock_init(platform_spinlock *lock, int /*pshared*/) {
   *lock = OS_UNFAIR_LOCK_INIT;
   return 0;
 }
 
-inline int platform_spinlock_destroy(platform_spinlock *lock) { return 0; }
+inline int platform_spinlock_destroy(platform_spinlock * /*lock*/) { return 0; }
 
 inline int platform_spinlock_trylock(platform_spinlock *lock) {
   return os_unfair_lock_trylock(lock) ? 0 : -1;
 }
+
+inline void platform_spinlock_unlock(platform_spinlock *lock) {
+  os_unfair_lock_unlock(lock);
+}
+
 #else
 typedef OSSpinLock platform_spinlock;
 
-inline int platform_spinlock_init(platform_spinlock *lock, int pshared) {
+inline int platform_spinlock_init(platform_spinlock *lock, int /*pshared*/) {
   *lock = 0;
   return 0;
 }
 
-inline int platform_spinlock_destroy(platform_spinlock *lock) { return 0; }
+inline int platform_spinlock_destroy(platform_spinlock * /*lock*/) { return 0; }
 
 inline int platform_spinlock_trylock(platform_spinlock *lock) {
-  return (OSSpinLockTry(lock)) ? 0 : -1;
+  return OSSpinLockTry(lock) ? 0 : -1;
 }
+
+inline void platform_spinlock_unlock(platform_spinlock *lock) {
+  OSSpinLockUnlock(lock);
+}
+
 #endif
 
 /**
