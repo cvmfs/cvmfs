@@ -7,6 +7,8 @@
 #ifndef CVMFS_PLATFORM_LINUX_H_
 #define CVMFS_PLATFORM_LINUX_H_
 
+#include <sys/types.h>  // contains ssize_t needed inside <attr/xattr.h>
+#include <sys/xattr.h>
 #include <attr/xattr.h>  // NOLINT(build/include_alpha)
 #include <dirent.h>
 #include <errno.h>
@@ -20,9 +22,7 @@
 #include <sys/prctl.h>
 #include <sys/select.h>
 #include <sys/stat.h>
-#include <sys/types.h>  // contains ssize_t needed inside <attr/xattr.h>
 #include <sys/utsname.h>
-#include <sys/xattr.h>
 #include <unistd.h>
 
 #include <cassert>
