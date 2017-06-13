@@ -25,11 +25,11 @@ class SharedPtr {
 
   template <class Y>
   explicit SharedPtr(Y* p) {
-    if (p == value_) {
+    if (static_cast<element_type*>(p) == value_) {
       abort();
     }
     pthread_mutex_init(&mtx_, NULL);
-    value_ = static_cast<T*>(p);
+    value_ = static_cast<element_type*>(p);
     {
       MutexLockGuard lock(&mtx_);
       count_ = new atomic_int64;
@@ -86,7 +86,8 @@ class SharedPtr {
   }
 
   void Reset() {  // never throws
-    if (atomic_read64(count_) == 1) {
+    atomic_dec64(count_);
+    if (atomic_read64(count_) == 0) {
       MutexLockGuard(&this->mtx_);
       delete value_;
       delete count_;
@@ -97,7 +98,8 @@ class SharedPtr {
 
   template <class Y>
   void Reset(Y* p) {
-    if (*count_ == 1) {
+    atomic_dec64(count_);
+    if (atomic_read64(count_) == 0) {
       {
         MutexLockGuard(&this->mtx_);
         delete value_;
@@ -115,10 +117,6 @@ class SharedPtr {
 
   T* operator->() const {  // never throws
     return value_;
-  }
-
-  element_type& operator[](std::ptrdiff_t i) const {  // never throws
-    return value_[i];
   }
 
   element_type* Get() const {  // never throws
@@ -158,26 +156,6 @@ bool operator!=(SharedPtr<T> const& a,
 template <class T, class U>
 bool operator<(SharedPtr<T> const& a, SharedPtr<U> const& b) {  // never throws
   return a.value_ < b.value_;
-}
-
-template <class T>
-bool operator==(SharedPtr<T> const& p, void* q) {  // never throws
-  return p.value_ == q;
-}
-
-template <class T>
-bool operator==(void* q, SharedPtr<T> const& p) {  // never throws
-  return p.value_ == q;
-}
-
-template <class T>
-bool operator!=(SharedPtr<T> const& p, void* q) {  // never throws
-  return p.value_ != q;
-}
-
-template <class T>
-bool operator!=(void* q, SharedPtr<T> const& p) {  // never throws
-  return p.value_ != q;
 }
 
 template <class T>
