@@ -15,7 +15,7 @@ TEST_F(T_Platform, Spinlock) {
   platform_spinlock lock;
   platform_spinlock_init(&lock, PTHREAD_PROCESS_PRIVATE);
   ASSERT_EQ(0, platform_spinlock_trylock(&lock));
-  ASSERT_EQ(-1, platform_spinlock_trylock(&lock));
+  ASSERT_NE(0, platform_spinlock_trylock(&lock));
   platform_spinlock_unlock(&lock);
   ASSERT_EQ(0, platform_spinlock_trylock(&lock));
 }
