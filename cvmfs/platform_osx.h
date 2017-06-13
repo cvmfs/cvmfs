@@ -12,13 +12,13 @@
 #include <fcntl.h>
 #if defined(__MAC_OS_X_VERSION_MIN_REQUIRED) && \
     __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
-#include <os/lock.h>
+#include <os/lock.h>  // NOLINT
 #else
 #include <libkern/OSAtomic.h>
 #endif  //  defined(__MAC_OS_X_VERSION_MIN_REQUIRED) &&
         //  __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
 #include <mach-o/dyld.h>
-#include <mach/mach.h>
+#include <mach/mach.h>  // NOLINT
 #include <mach/mach_time.h>
 #include <signal.h>
 #include <sys/mount.h>
