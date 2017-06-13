@@ -13,9 +13,6 @@ namespace CVMFS_NAMESPACE_GUARD {
 #endif  // CVMFS_NAMESPACE_GUARD
 
 template <typename T>
-class WeakPtr;
-
-template <typename T>
 class SharedPtr {
  public:
   typedef T element_type;
@@ -67,14 +64,6 @@ class SharedPtr {
     if (count_) {
       atomic_inc64(count_);
     }
-  }
-
-  template <class Y>
-  explicit SharedPtr(WeakPtr<Y> const& r) : value_(r.get()), count_(r.count_) {
-    if (r.UseCount() == 0) {
-      abort();
-    }
-    atomic_inc64(count_);
   }
 
   SharedPtr& operator=(SharedPtr const& r) {  // never throws

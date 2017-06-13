@@ -5,7 +5,6 @@
 #include <gtest/gtest.h>
 
 #include "util/shared_ptr.h"
-//#include "util/weak_ptr.h"
 #include "util/single_copy.h"
 
 class ClassSharedMember {
@@ -39,7 +38,7 @@ class TestData {
   int* val_;
 };
 
-class T_SmartPtr : public ::testing::Test {
+class T_SharedPtr : public ::testing::Test {
  protected:
   // At the beginning of each test case, there should be no living instances of
   // TestData
@@ -51,7 +50,7 @@ class T_SmartPtr : public ::testing::Test {
 };
 
 // Basic usage of shared_ptr
-TEST_F(T_SmartPtr, SharedPtr) {
+TEST_F(T_SharedPtr, SharedPtr) {
   // New instance of TestData managed by shared_ptr
   SharedPtr<TestData> shared_data1(new TestData(&counter_));
   // Counter should indicated the new instance
@@ -75,7 +74,7 @@ TEST_F(T_SmartPtr, SharedPtr) {
 }
 
 // Working with classes which contain shared_ptr members
-TEST_F(T_SmartPtr, SharedPtrMembers) {
+TEST_F(T_SharedPtr, SharedPtrMembers) {
   // Create an instance of ClassSharedMember
   ClassSharedMember data1(&counter_, 1234);
   EXPECT_EQ(counter_, 1);
@@ -92,38 +91,3 @@ TEST_F(T_SmartPtr, SharedPtrMembers) {
   EXPECT_EQ(counter_, 1);
   EXPECT_EQ(data1.value_use_count(), 1);
 }
-
-/*
-// Using WeakPtr
-TEST_F(T_SmartPtr, WeakPtr) {
-  // We create an empty weak_ptr in the outer scope
-  WeakPtr<TestData> weak_ref;
-  {
-    // A new TestData instance in the inner scope, managed by a shared_ptr
-    SharedPtr<TestData> shared_data1(new TestData(&counter_));
-    // Create a weak reference to the shared_data
-    weak_ref = shared_data1;
-    // A weak reference does not take ownership
-    EXPECT_EQ(counter_, 1);
-    // The shared (strong) reference is still unique
-    EXPECT_TRUE(shared_data1.unique());
-    {
-      // We can use the lock() method to transform the weak_ptr into a
-      // shared_ptr
-      SharedPtr<TestData> shared_data2 = weak_ref.lock();
-      // Shared reference is no longer unique
-      EXPECT_FALSE(shared_data1.unique());
-      // Use count was incremented
-      EXPECT_EQ(shared_data1.use_count(), 2);
-      EXPECT_EQ(shared_data2.use_count(), 2);
-    }
-    // shared_data2 was destroyed, the shared reference is unique again
-    EXPECT_TRUE(shared_data1.unique());
-  }
-  // At this point we only have a weak_ptr to the original data, all the strong
-  // shared_ptr references have been destroyed. The lock() method will return an
-  // empty (null) shared_ptr.
-  SharedPtr<TestData> shared_data3 = weak_ref.lock();
-  EXPECT_FALSE(shared_data3);
-}
-*/
