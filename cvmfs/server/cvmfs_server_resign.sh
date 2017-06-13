@@ -12,14 +12,14 @@
 cvmfs_server_resign() {
   local names
   local retcode=0
-  local require_repo_config=1
+  local whitelist_path
 
   # parameter handling
   OPTIND=1
-  while getopts "n" option; do
+  while getopts "w:" option; do
     case $option in
-      n)
-        require_repo_config=0
+      w)
+        whitelist_path=$OPTARG
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -32,7 +32,7 @@ cvmfs_server_resign() {
   shift $(($OPTIND-1))
   check_parameter_count_for_multiple_repositories $#
   names=$(get_or_guess_multiple_repository_names "$@")
-  [ $require_repo_config -eq 0 ] || check_multiple_repository_existence "$names"
+  [ -n "$whitelist_path" ] || check_multiple_repository_existence "$names"
 
   # sanity checks
   is_root || die "Only root can resign repositories"
@@ -40,7 +40,7 @@ cvmfs_server_resign() {
   for name in $names; do
 
     # sanity checks
-    if [ $require_repo_config -eq 1 ]; then
+    if [ -z "$whitelist_path" ]; then
       is_stratum0 $name  || { echo "Repository $name is not a stratum 0 repository"; retcode=1; continue; }
       health_check $name || { echo "Repository $name is not healthy"; retcode=1; continue; }
 
@@ -56,7 +56,6 @@ cvmfs_server_resign() {
           ${CVMFS_SPOOL_DIR}/tmp
     else
       # do not require repository configuration, just the whitelist file
-      local whitelist_path=${DEFAULT_LOCAL_STORAGE}/$name/.cvmfswhitelist
       [ -f $whitelist_path ] || { echo "$whitelist_path does not exist!"; retcode=1; continue; }
 
       local user tmpdir
@@ -64,7 +63,7 @@ cvmfs_server_resign() {
       tmpdir="`mktemp -d`"
       trap "rm -rf $tmpdir" EXIT HUP INT TERM
 
-      create_whitelist $name $user "" $tmpdir 1
+      create_whitelist $name $user "" $tmpdir $whitelist_path
 
       rm -rf $tmpdir
       trap - EXIT HUP INT TERM
