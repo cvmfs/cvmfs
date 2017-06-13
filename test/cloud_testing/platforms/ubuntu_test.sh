@@ -1,4 +1,4 @@
-#!/bin/bash
+
 
 # source the common platform independent functionality and option parsing
 script_location=$(cd "$(dirname "$0")"; pwd)
@@ -27,14 +27,14 @@ fi
 if [ x"$(lsb_release -cs)" = x"trusty" ]; then
   # Ubuntu 14.04
   # aufs, expected failure
-  CVMFS_EXCLUDE="src/700-overlayfs_validation"
+  CVMFS_EXCLUDE="src/700-overlayfs_validation src/800-repository_services"
 
   echo "Ubuntu 14.04... using aufs instead of overlayfs"
 fi
 if [ x"$(lsb_release -cs)" = x"precise" ]; then
   # Ubuntu 12.04
   # aufs, expected failure
-  CVMFS_EXCLUDE="src/700-overlayfs_validation"
+  CVMFS_EXCLUDE="src/700-overlayfs_validation src/800-repository_services"
 
   echo "Ubuntu 12.04... using aufs instead of overlayfs"
 fi
@@ -67,6 +67,7 @@ if [ x"$(uname -m)" = x"x86_64" ]; then
                                    src/5*                                       \
                                    src/6*                                       \
                                    src/7*                                       \
+                                   src/8*                                       \
                                 || retval=1
 fi
 

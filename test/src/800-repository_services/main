@@ -1,0 +1,206 @@
+cvmfs_test_name="Repository services"
+cvmfs_test_autofs_on_startup=false
+
+
+set_up_repository_services() {
+    echo "Setting up repository services"
+
+    PACKAGE_URL_ROOT=http://ecsft.cern.ch/dist/cvmfs/cvmfs-services/cvmfs_services-$CVMFS_SERVICES_VERSION
+    CVMFS_SERVICES_PACKAGE=""
+    # Choose which package to download and install based on platform
+    if [ -f /etc/lsb-release ]; then
+        if [ x"$(lsb_release -cs)" = x"xenial" ]; then
+            CVMFS_SERVICES_PACKAGE=${PACKAGE_URL_ROOT}-ubuntu1604-x86_64.tar.gz
+            echo "Using package: $CVMFS_SERVICES_PACKAGE"
+        fi
+    elif [ -f /etc/redhat-release ]; then
+        rhver=$(cat /etc/redhat-release | awk {'print $(NF-1)'} | cut -d'.' -f1)
+        if [ $((rhver == 6)) -o $((rhver == 7)) ]; then
+            CVMFS_SERVICES_PACKAGE=${PACKAGE_URL_ROOT}-centos${rhver}-x86_64.tar.gz
+            echo "Using package: $CVMFS_SERVICES_PACKAGE"
+        fi
+    fi
+
+    if [ x"$CVMFS_SERVICES_PACKAGE" = x"" ]; then
+        echo "Platform not supported. Exiting"
+        exit 1
+    fi
+
+    echo "  Installing the cvmfs_services application"
+    pushd /tmp
+    curl -o cvmfs_services.tar.gz $CVMFS_SERVICES_PACKAGE
+    sudo rm -rf /opt/cvmfs_services && sudo mkdir -p /opt/cvmfs_services && cd /opt/cvmfs_services
+    sudo tar xzf /tmp/cvmfs_services.tar.gz
+    popd
+
+    echo "  Writing configuration files"
+    sudo bash -c 'cat <<EOF > /opt/cvmfs_services/etc/repo.config
+{repos, [{<<"test.repo.org">>, [<<"key1">>]}]}.
+{keys, [{file, "/etc/cvmfs/keys/gateway_key"}]}.
+EOF'
+
+    echo "  Writing API key file"
+    sudo bash -c 'cat <<EOF > /etc/cvmfs/keys/gateway_key
+test key1 secret1
+EOF'
+
+    echo "  Creating Mnesia schema"
+    sudo mkdir -p /opt/cvmfs_mnesia
+    sudo chown `whoami`:`whoami` /opt/cvmfs_mnesia
+    cd /opt/cvmfs_services
+    ./scripts/setup.sh
+
+    echo "  Creating test repo"
+    sudo -E cvmfs_server mkfs -o `whoami` test.repo.org
+
+    echo "  Modifying test repo configuration"
+    sudo sed -i 's/local,/gw,/' /etc/cvmfs/repositories.d/test.repo.org/server.conf
+    sudo sed -i 's/txn,\/srv\/cvmfs\/test.repo.org/txn,http:\/\/localhost:8080\/api\/v1/g' /etc/cvmfs/repositories.d/test.repo.org/server.conf
+    sudo bash -c 'echo "CVMFS_GATEWAY_KEYS=/etc/cvmfs/keys/gateway_key" >> /etc/cvmfs/repositories.d/test.repo.org/server.conf'
+
+    echo "  Starting repository services application"
+    /opt/cvmfs_services/bin/cvmfs_services start
+
+    # Waiting here is necessary in order to give the cvmfs_services application enough time to boot
+    wait_for_app_start
+}
+
+wait_for_app_start() {
+    local reply=$(/opt/cvmfs_services/bin/cvmfs_services ping | awk {'print $1'})
+    local num_iter=1
+    while [ $reply != "pong" ]; do
+        sleep 1
+        reply=$(/opt/cvmfs_services/bin/cvmfs_services ping | awk {'print $1'})
+        echo "Num iter: $num_iter"
+        num_iter=$((num_iter + 1))
+        if [ $num_iter -eq 10 ]; then
+            break;
+        fi
+    done
+    echo $reply
+}
+
+clean_up() {
+    echo "Cleaning up"
+
+    echo "  Stopping repository services application"
+    /opt/cvmfs_services/bin/cvmfs_services stop
+
+    echo "  Removing Mnesia directory"
+    rm -rf /opt/cvmfs_mnesia
+
+    echo "  Removing test repository"
+    sudo -E cvmfs_server rmfs -f test.repo.org
+
+    echo "  Removing output directories"
+    rm -rvf /tmp/cvmfs_out_{1,2,3}
+
+    echo "  Removing test directories"
+    rm -rf /tmp/cvmfs_receiver_commit_processor*
+}
+
+check_status() {
+    echo $(( $1 || 0 ))
+}
+
+compare_file_checksum() {
+    local file_name=$1
+    local target_checksum=$2
+    local checksum=$(md5sum $file_name | cut -d' ' -f1)
+    echo "Checksum of $file_name is $checksum"
+    if [ "$checksum" != "$target_checksum" ]; then
+        echo "Checksum mismatch for $file_name. Expected $target_checksum. Found $checksum"
+        exit 1
+    fi
+}
+
+save_repo_contents() {
+    local dest=$1
+    rm -rf $dest
+    mkdir -p $dest
+    cp -r /cvmfs/test.repo.org/* $dest/
+}
+
+run_transactions() {
+    set_up_repository_services
+
+    echo "Checking transaction + publish"
+
+    ## Transaction 1
+
+    echo "  Starting transaction 1"
+    cvmfs_server transaction -e test.repo.org
+
+    echo "  Writing to a new file"
+    echo "test" >> /cvmfs/test.repo.org/new_file.txt
+
+    echo "  Appending to a file"
+    echo "test" >> /cvmfs/test.repo.org/new_repository
+
+    echo "  Publishing changes 1"
+    cvmfs_server publish -e test.repo.org
+
+    echo "  Remounting test repository"
+    sudo cvmfs_server mount -a
+
+    echo "  Copy the contents of the repository"
+    save_repo_contents /tmp/cvmfs_out_1
+
+    ## Transaction 2
+
+    echo "  Starting transaction 2"
+    cvmfs_server transaction -e test.repo.org
+
+    echo "  Replacing a file with a directory"
+    rm -v /cvmfs/test.repo.org/new_repository
+    mkdir -p /cvmfs/test.repo.org/new_repository
+    echo "test" >> /cvmfs/test.repo.org/new_repository/another_file.txt
+
+    echo "  Publishing changes 2"
+    cvmfs_server publish -e test.repo.org
+
+    echo "  Remounting test repository"
+    sudo cvmfs_server mount -a
+
+    echo "  Copy the contents of the repository"
+    save_repo_contents /tmp/cvmfs_out_2
+
+    ## Transaction 3
+
+    echo "  Starting transaction 3"
+    cvmfs_server transaction -e test.repo.org
+
+    echo "  Deleting a directory"
+    rm -rv /cvmfs/test.repo.org/new_repository
+
+    echo "  Publishing changes 3"
+    cvmfs_server publish -e test.repo.org
+
+    echo "  Remounting test repository"
+    sudo cvmfs_server mount -a
+
+    echo "  Copy the contents of the repository"
+    save_repo_contents /tmp/cvmfs_out_3
+
+    ## Check results
+
+    compare_file_checksum /tmp/cvmfs_out_1/new_file.txt d8e8fca2dc0f896fd7cb4cb0031ba249
+    compare_file_checksum /tmp/cvmfs_out_1/new_repository e5747677debcb10cabe17d87a40e7fa4
+    compare_file_checksum /tmp/cvmfs_out_2/new_repository/another_file.txt d8e8fca2dc0f896fd7cb4cb0031ba249
+    if [ -d /tmp/cvmfs_out_3/new_repository ]; then
+        echo "/cvmfs/test/repo.org/new_repository should have been deleted in transaction 3"
+        exit 1
+    fi
+
+    clean_up
+}
+
+cvmfs_run_test() {
+    trap clean_up EXIT HUP INT TERM || return $?
+
+    run_transactions
+    local status=$?
+
+    return $(check_status $status)
+}
+
