@@ -2,8 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef CVMFS_UTIL_SHARED_POINTER_H_
-#define CVMFS_UTIL_SHARED_POINTER_H_
+#ifndef CVMFS_UTIL_SHARED_PTR_H_
+#define CVMFS_UTIL_SHARED_PTR_H_
 
 #include "atomic.h"
 #include "util_concurrency.h"
@@ -127,7 +127,7 @@ class SharedPtr {
     return count_ && (atomic_read64(count_) == 1);
   }
 
-  long UseCount() const {  // never throws
+  int64_t UseCount() const {  // never throws
     return count_ ? atomic_read64(count_) : -1;
   }
 
@@ -195,4 +195,4 @@ std::basic_ostream<E, T>& operator<<(std::basic_ostream<E, T>& os,
 }  // namespace CVMFS_NAMESPACE_GUARD
 #endif
 
-#endif  // CVMFS_UTIL_SHARED_POINTER_H_
+#endif  // CVMFS_UTIL_SHARED_PTR_H_
