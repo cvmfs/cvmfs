@@ -6,7 +6,6 @@
 #define CVMFS_UTIL_SHARED_PTR_H_
 
 #include "atomic.h"
-#include "util_concurrency.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
@@ -20,7 +19,6 @@ class SharedPtr {
   SharedPtr() {  // never throws
     value_ = NULL;
     count_ = NULL;
-    pthread_mutex_init(&mtx_, NULL);
   }
 
   template <class Y>
@@ -28,12 +26,8 @@ class SharedPtr {
     if (static_cast<element_type*>(p) == value_) {
       abort();
     }
-    pthread_mutex_init(&mtx_, NULL);
     value_ = static_cast<element_type*>(p);
-    {
-      MutexLockGuard lock(&mtx_);
-      count_ = new atomic_int64;
-    }
+    count_ = new atomic_int64;
     atomic_write64(count_, 1);
   }
 
@@ -41,12 +35,8 @@ class SharedPtr {
     if (count_) {
       atomic_dec64(count_);
       if (atomic_read64(count_) == 0) {
-        {
-          MutexLockGuard lock(&mtx_);
-          delete value_;
-          delete count_;
-        }
-        pthread_mutex_destroy(&mtx_);
+        delete value_;
+        delete count_;
       }
     }
   }
@@ -88,7 +78,6 @@ class SharedPtr {
   void Reset() {  // never throws
     atomic_dec64(count_);
     if (atomic_read64(count_) == 0) {
-      MutexLockGuard(&this->mtx_);
       delete value_;
       delete count_;
     }
@@ -100,11 +89,8 @@ class SharedPtr {
   void Reset(Y* p) {
     atomic_dec64(count_);
     if (atomic_read64(count_) == 0) {
-      {
-        MutexLockGuard(&this->mtx_);
-        delete value_;
-        delete count_;
-      }
+      delete value_;
+      delete count_;
     }
     value_ = static_cast<element_type*>(p);
     count_ = new atomic_int64;
@@ -138,7 +124,6 @@ class SharedPtr {
  private:
   element_type* value_;
   atomic_int64* count_;
-  pthread_mutex_t mtx_;
 };
 
 template <class T, class U>
