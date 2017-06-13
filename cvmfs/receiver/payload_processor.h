@@ -25,7 +25,7 @@ class PayloadProcessor {
  public:
   enum Result { kSuccess, kPathViolation, kOtherError };
 
-  explicit PayloadProcessor(const std::string& temp_dir_prefix);
+  PayloadProcessor();
   virtual ~PayloadProcessor();
 
   Result Process(int fdin, const std::string& digest_base64,
@@ -44,7 +44,6 @@ class PayloadProcessor {
 
  private:
   std::string current_repo_;
-  std::string temp_dir_;
   int num_errors_;
 };
 

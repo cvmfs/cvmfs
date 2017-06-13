@@ -339,8 +339,8 @@ cvmfs_chksetup() {
       echo "Error: fusermount needs to be a suid binary"
       num_errors=$(($num_errors+1))
     fi
-    if ! runas $CVMFS_USER "$fusermount -V" > /dev/null 2>&1; then
-      echo "Error: failed to run $fusermount as user $CVMFS_USER"
+    if ! runascvmfsuser "$fusermount -V" > /dev/null 2>&1; then
+      echo "Error: failed to run $fusermount as cvmfs user"
       num_errors=$(($num_errors+1))
     fi
   fi
@@ -401,17 +401,17 @@ cvmfs_chksetup() {
     fi
   fi
 
-  # Check that /dev/fuse is read/writable from CVMFS_USER
+  # Check that /dev/fuse is read/writable from cvmfs user
   check_dev_fuse
   exit_code=$?
   if [ $exit_code -ne 0 ]; then
     num_errors=$(($num_errors+$exit_code))
   fi
 
-  # Check that /etc/nsswitch.conf is readable from CVMFS_USER
+  # Check that /etc/nsswitch.conf is readable from cvmfs user
   if [ -f /etc/nsswitch.conf ]; then
-    if ! runas $CVMFS_USER "test -r /etc/nsswitch.conf"; then
-      echo "Error: /etc/nsswitch not readable by user $CVMFS_USER"
+    if ! runascvmfsuser "test -r /etc/nsswitch.conf"; then
+      echo "Error: /etc/nsswitch not readable by cvmfs user"
       num_errors=$(($num_errors+1))
     fi
   fi
@@ -478,7 +478,7 @@ cvmfs_chksetup() {
       echo "Error: failed to read configuration for $fqrn"
       num_errors=$(($num_errors+1))
     else
-      # Check that cache directories are read-writable by CVMFS_USER
+      # Check that cache directories are read-writable by cvmfs user
       local cache_dir
       if check_is_on CVMFS_SHARED_CACHE; then
         cache_dir="$CVMFS_CACHE_BASE/shared"
@@ -486,16 +486,16 @@ cvmfs_chksetup() {
         cache_dir="$CVMFS_CACHE_BASE/$fqrn"
       fi
       if [ -d $cache_dir ]; then
-        if ! runas $CVMFS_USER "test -O $cache_dir"; then
-          echo "Error: $cache_dir is not owned by $CVMFS_USER"
+        if ! runascvmfsuser "test -O $cache_dir"; then
+          echo "Error: $cache_dir is not owned by cvmfs user"
           num_errors=$(($num_errors+1))
         fi
-        if ! runas $CVMFS_USER "test -r $cache_dir"; then
-          echo "Error: $cache_dir is not readable by $CVMFS_USER"
+        if ! runascvmfsuser "test -r $cache_dir"; then
+          echo "Error: $cache_dir is not readable by cvmfs user"
           num_errors=$(($num_errors+1))
         fi
-        if ! runas $CVMFS_USER "test -w $cache_dir"; then
-          echo "Error: $cache_dir is not writable by $CVMFS_USER"
+        if ! runascvmfsuser "test -w $cache_dir"; then
+          echo "Error: $cache_dir is not writable by cvmfs user"
           num_errors=$(($num_errors+1))
         fi
         if  [ "x$CVMFS_CACHE_PRIMARY" = "x" -o  "x$CVMFS_CACHE_PRIMARY" = "xposix" ]; then
@@ -530,8 +530,8 @@ cvmfs_chksetup() {
                          /etc/cvmfs/config.d/*.conf /etc/cvmfs/config.d/*.local
       do
         if [ -f $config_file ]; then
-          if ! runas $CVMFS_USER "test -r $config_file"; then
-            echo "Error: $config_file is not readable by $CVMFS_USER"
+          if ! runascvmfsuser "test -r $config_file"; then
+            echo "Error: $config_file is not readable by cvmfs user"
             num_errors=$(($num_errors+1))
           fi
         fi
@@ -542,13 +542,13 @@ cvmfs_chksetup() {
       if [ ! -z $HOST_ALIASES ]; then
         host_file="$HOST_ALIASES"
       fi
-      if ! runas $CVMFS_USER "test -r $host_file"; then
-        echo "Error: $host_file is not readable by $CVMFS_USER"
+      if ! runascvmfsuser "test -r $host_file"; then
+        echo "Error: $host_file is not readable by cvmfs user"
         num_errors=$(($num_errors+1))
       fi
 
       # Check that number of open files is reasonably high
-      if [ $CVMFS_NFILES -lt 8192 ]; then
+      if [ ${CVMFS_NFILES:-0} -lt 8192 ]; then
         echo "Warning: maximum number of open files is low ($CVMFS_NFILES) for $fqrn"
         num_warnings=$(($num_warnings+1))
       fi
@@ -580,8 +580,8 @@ cvmfs_chksetup() {
       fi
 
       # Check quota limit
-      if [ $CVMFS_QUOTA_LIMIT -ne -1 ]; then
-        if [ $CVMFS_QUOTA_LIMIT -lt 1000 ]; then
+      if [ ${CVMFS_QUOTA_LIMIT:-0} -ne -1 ]; then
+        if [ ${CVMFS_QUOTA_LIMIT:-0} -lt 1000 ]; then
           echo "Warning: cache limit for $fqrn is very low (below 1GB)"
           num_warnings=$(($num_warnings+1))
         fi
@@ -605,18 +605,18 @@ cvmfs_chksetup() {
       fi
 
       # Compare quota limit with available space on the file system hosting the cache
-      if [ $CVMFS_QUOTA_LIMIT -ge 0 ]; then
+      if [ ${CVMFS_QUOTA_LIMIT:-0} -ge 0 ]; then
         local cache_dir_parent="$cache_dir"
         while [ ! -d "$cache_dir_parent" ]; do
           cache_dir_parent=$(dirname "$cache_dir_parent")
         done
         local total_kb=$(df -Pk "$cache_dir_parent" | tail -n 1 | awk '{print $2}')
         local total_mb=$(($total_kb/1024))
-        if [ $CVMFS_QUOTA_LIMIT -gt $total_mb ]; then
+        if [ ${CVMFS_QUOTA_LIMIT:-0} -gt $total_mb ]; then
           echo "Error: file system hosting the cache for $fqrn too small (quota: ${CVMFS_QUOTA_LIMIT}M, total space: ${total_mb}M)."
           num_errors=$(($num_errors+1))
         fi
-        if [ $(($CVMFS_QUOTA_LIMIT*115/100)) -gt $total_mb ]; then
+        if [ $((${CVMFS_QUOTA_LIMIT:-0}*115/100)) -gt $total_mb ]; then
           echo "Warning: less than 15% safety margin on file system hosting the cache for $fqrn (quota: ${CVMFS_QUOTA_LIMIT}M, total space: ${total_mb}M)."
           num_warnings=$(($num_warnings+1))
         fi
@@ -1581,12 +1581,12 @@ check_dev_fuse() {
     echo "Error: character device $charDevice does not exist"
     return_code=$(($return_code+1))
   else
-    if ! runas $CVMFS_USER "test -r $charDevice"; then
-      echo "Error: $charDevice is not readable by user $CVMFS_USER"
+    if ! runascvmfsuser "test -r $charDevice"; then
+      echo "Error: $charDevice is not readable by cvmfs user"
       return_code=$(($return_code+1))
     fi
-    if ! runas $CVMFS_USER "test -w $charDevice"; then
-      echo "Error: $charDevice is not writable by user $CVMFS_USER"
+    if ! runascvmfsuser "test -w $charDevice"; then
+      echo "Error: $charDevice is not writable by cvmfs user"
       return_code=$(($return_code+1))
     fi
   fi
@@ -1804,16 +1804,19 @@ check_is_on() {
 }
 
 
-runas() {
-  local user=$1
-  local cmd=$2
+runascvmfsuser() {
+  local cmd=$1
+
+  if [ -z "$CVMFS_USER" ]; then
+    return 1
+  fi
 
   case $sys_arch in
     Linux )
-      su -s /bin/sh $user -c "$cmd" ;;
+      su -s /bin/sh $CVMFS_USER -c "$cmd" ;;
 
     Darwin )
-      sudo -u $user $cmd ;;
+      sudo -u $CVMFS_USER $cmd ;;
   esac
 }
 

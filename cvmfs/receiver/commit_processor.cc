@@ -25,8 +25,7 @@
 
 namespace receiver {
 
-CommitProcessor::CommitProcessor(const std::string& temp_dir)
-    : temp_dir_(temp_dir), num_errors_(0) {}
+CommitProcessor::CommitProcessor() : num_errors_(0) {}
 
 CommitProcessor::~CommitProcessor() {}
 
@@ -78,9 +77,11 @@ CommitProcessor::Result CommitProcessor::Process(
     return kIoError;
   }
 
+  const std::string temp_dir_root = "/srv/cvmfs/" + repo_name + "/data/txn";
+
   CatalogMergeTool<catalog::WritableCatalogManager,
                    catalog::SimpleCatalogManager>
-      merge_tool(stratum0, old_root_hash, new_root_hash, temp_dir_,
+      merge_tool(stratum0, old_root_hash, new_root_hash, temp_dir_root,
                  server_tool->download_manager(), manifest.weak_ref());
   if (!merge_tool.Init()) {
     return kIoError;
@@ -97,7 +98,7 @@ CommitProcessor::Result CommitProcessor::Process(
     return kMergeError;
   }
 
-  const std::string temp_dir = CreateTempDir(temp_dir_);
+  const std::string temp_dir = CreateTempDir(temp_dir_root);
   const std::string certificate = "/etc/cvmfs/keys/" + repo_name + ".crt";
   const std::string private_key = "/etc/cvmfs/keys/" + repo_name + ".key";
 
