@@ -80,13 +80,15 @@ class SharedPtr {
   }
 
   void Reset() {  // never throws
-    atomic_dec64(count_);
-    if (atomic_read64(count_) == 0) {
-      delete value_;
-      delete count_;
+    if (count_) {
+      atomic_dec64(count_);
+      if (atomic_read64(count_) == 0) {
+        delete value_;
+        delete count_;
+      }
+      value_ = NULL;
+      count_ = NULL;
     }
-    value_ = NULL;
-    count_ = NULL;
   }
 
   template <class Y>
