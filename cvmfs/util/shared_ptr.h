@@ -5,6 +5,8 @@
 #ifndef CVMFS_UTIL_SHARED_PTR_H_
 #define CVMFS_UTIL_SHARED_PTR_H_
 
+#include <cstdlib>
+
 #include "atomic.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
@@ -57,6 +59,7 @@ class SharedPtr {
   }
 
   SharedPtr& operator=(SharedPtr const& r) {  // never throws
+    Reset();
     value_ = r.value_;
     count_ = r.count_;
     if (count_) {
@@ -67,6 +70,7 @@ class SharedPtr {
 
   template <class Y>
   SharedPtr& operator=(SharedPtr<Y> const& r) {  // never throws
+    Reset();
     value_ = r.value_;
     count_ = r.count_;
     if (count_) {
@@ -87,11 +91,7 @@ class SharedPtr {
 
   template <class Y>
   void Reset(Y* p) {
-    atomic_dec64(count_);
-    if (atomic_read64(count_) == 0) {
-      delete value_;
-      delete count_;
-    }
+    Reset();
     value_ = static_cast<element_type*>(p);
     count_ = new atomic_int64;
     atomic_write64(count_, 1);
@@ -167,13 +167,6 @@ SharedPtr<T> DynamicPointerCast(SharedPtr<U> const& r) {  // never throws
 template <class T, class U>
 SharedPtr<T> ReinterpretPointerCast(SharedPtr<U> const& r) {  // never throws
   return SharedPtr<T>(reinterpret_cast<T*>(r.value_));
-}
-
-template <class E, class T, class Y>
-std::basic_ostream<E, T>& operator<<(std::basic_ostream<E, T>& os,
-                                     SharedPtr<Y> const& p) {
-  os << *(p.value_);
-  return os;
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD
