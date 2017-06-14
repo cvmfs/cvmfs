@@ -163,14 +163,14 @@ TEST_F(T_Atomic, CompareAndSetAtomicInts) {
 
   atomic_xadd32(&atomic32_, off1);
 
-  const int32_t res1 = atomic_cas32(&atomic32_, off1, off2);
+  const bool res1 = atomic_cas32(&atomic32_, off1, off2);
   const int32_t value1 = atomic_read32(&atomic32_);
-  EXPECT_EQ(off1, res1);
+  EXPECT_TRUE(res1);
   EXPECT_EQ(off2, value1);
 
-  const int32_t res2 = atomic_cas32(&atomic32_, off2, off3);
+  const bool res2 = atomic_cas32(&atomic32_, off2, off3);
   const int32_t value2 = atomic_read32(&atomic32_);
-  EXPECT_EQ(off2, res2);
+  EXPECT_TRUE(res2);
   EXPECT_EQ(off3, value2);
 }
 

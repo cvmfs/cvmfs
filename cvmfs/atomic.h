@@ -73,14 +73,14 @@ atomic_xadd64(atomic_int64 *a, int64_t offset) {
   return __sync_fetch_and_add(a, offset);
 }
 
-static int32_t inline __attribute__((used))
+static bool inline __attribute__((used))
 atomic_cas32(atomic_int32 *a, int32_t cmp, int32_t newval) {
-  return __sync_val_compare_and_swap(a, cmp, newval);
+  return __sync_bool_compare_and_swap(a, cmp, newval);
 }
 
-static int64_t inline __attribute__((used))
+static bool inline __attribute__((used))
 atomic_cas64(atomic_int64 *a, int64_t cmp, int64_t newval) {
-  return __sync_val_compare_and_swap(a, cmp, newval);
+  return __sync_bool_compare_and_swap(a, cmp, newval);
 }
 
 static void inline __attribute__((used)) MemoryFence() {
