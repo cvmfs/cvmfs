@@ -10,10 +10,16 @@
 #include <alloca.h>
 #include <dirent.h>
 #include <fcntl.h>
+#if defined(__MAC_OS_X_VERSION_MIN_REQUIRED) && \
+    __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
+#include <os/lock.h>  // NOLINT
+#else
 #include <libkern/OSAtomic.h>
-#include <mach/mach.h>
-#include <mach/mach_time.h>
+#endif  //  defined(__MAC_OS_X_VERSION_MIN_REQUIRED) &&
+        //  __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
 #include <mach-o/dyld.h>
+#include <mach/mach.h>  // NOLINT
+#include <mach/mach_time.h>
 #include <signal.h>
 #include <sys/mount.h>
 #include <sys/param.h>
@@ -52,7 +58,6 @@ namespace CVMFS_NAMESPACE_GUARD {
 
 #define platform_sighandler_t sig_t
 
-
 inline std::vector<std::string> platform_mountlist() {
   std::vector<std::string> result;
   struct statfs *mntbufp;
@@ -63,38 +68,58 @@ inline std::vector<std::string> platform_mountlist() {
   return result;
 }
 
-
 inline bool platform_umount(const char *mountpoint, const bool lazy) {
   const int flags = lazy ? MNT_FORCE : 0;
   int retval = unmount(mountpoint, flags);
   return retval == 0;
 }
 
-
 /**
  * Spinlocks on OS X are not in pthread but in OS X specific APIs.
  */
+#if defined(__MAC_OS_X_VERSION_MIN_REQUIRED) && \
+    __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
+typedef os_unfair_lock platform_spinlock;
+
+inline int platform_spinlock_init(platform_spinlock *lock, int /*pshared*/) {
+  *lock = OS_UNFAIR_LOCK_INIT;
+  return 0;
+}
+
+inline int platform_spinlock_destroy(platform_spinlock * /*lock*/) { return 0; }
+
+inline int platform_spinlock_trylock(platform_spinlock *lock) {
+  return os_unfair_lock_trylock(lock) ? 0 : -1;
+}
+
+inline void platform_spinlock_unlock(platform_spinlock *lock) {
+  os_unfair_lock_unlock(lock);
+}
+
+#else
 typedef OSSpinLock platform_spinlock;
 
-inline int platform_spinlock_init(platform_spinlock *lock, int pshared) {
+inline int platform_spinlock_init(platform_spinlock *lock, int /*pshared*/) {
   *lock = 0;
   return 0;
 }
 
-inline int platform_spinlock_destroy(platform_spinlock *lock) { return 0; }
+inline int platform_spinlock_destroy(platform_spinlock * /*lock*/) { return 0; }
 
 inline int platform_spinlock_trylock(platform_spinlock *lock) {
-  return (OSSpinLockTry(lock)) ? 0 : -1;
+  return OSSpinLockTry(lock) ? 0 : -1;
 }
 
+inline void platform_spinlock_unlock(platform_spinlock *lock) {
+  OSSpinLockUnlock(lock);
+}
+
+#endif
 
 /**
  * pthread_self() is not necessarily an unsigned long.
  */
-inline thread_port_t platform_gettid() {
-  return mach_thread_self();
-}
-
+inline thread_port_t platform_gettid() { return mach_thread_self(); }
 
 inline int platform_sigwait(const int signum) {
   sigset_t sigset;
@@ -115,7 +140,6 @@ inline bool platform_allow_ptrace(const pid_t pid) {
   // No-op on Mac OS X
   return true;
 }
-
 
 /**
  * File system functions, Mac OS X has 64bit functions by default.
@@ -139,8 +163,7 @@ inline int platform_fstat(int filedes, platform_stat64 *buf) {
 }
 
 inline bool platform_getxattr(const std::string &path, const std::string &name,
-                              std::string *value)
-{
+                              std::string *value) {
   int size = 0;
   void *buffer = NULL;
   int retval;
@@ -163,39 +186,28 @@ inline bool platform_getxattr(const std::string &path, const std::string &name,
   return true;
 }
 
-inline bool platform_setxattr(
-  const std::string &path,
-  const std::string &name,
-  const std::string &value)
-{
-  int retval = setxattr(
-    path.c_str(), name.c_str(), value.c_str(), value.size(), 0, 0);
+inline bool platform_setxattr(const std::string &path, const std::string &name,
+                              const std::string &value) {
+  int retval =
+      setxattr(path.c_str(), name.c_str(), value.c_str(), value.size(), 0, 0);
   return retval == 0;
 }
 
-
-inline ssize_t platform_lgetxattr(
-  const char *path,
-  const char *name,
-  void *value,
-  size_t size
-) {
+inline ssize_t platform_lgetxattr(const char *path, const char *name,
+                                  void *value, size_t size) {
   return getxattr(path, name, value, size, 0 /* position */, XATTR_NOFOLLOW);
 }
-
 
 inline ssize_t platform_llistxattr(const char *path, char *list, size_t size) {
   return listxattr(path, list, size, XATTR_NOFOLLOW);
 }
-
 
 inline void platform_disable_kcache(int filedes) {
   fcntl(filedes, F_RDAHEAD, 0);
   fcntl(filedes, F_NOCACHE, 1);
 }
 
-inline void platform_invalidate_kcache(const int    fd,
-                                       const off_t  offset,
+inline void platform_invalidate_kcache(const int fd, const off_t offset,
                                        const size_t length) {
   // NOOP
   // TODO(rmeusel): implement
@@ -207,8 +219,8 @@ inline int platform_readahead(int filedes) {
 }
 
 inline bool read_line(FILE *f, std::string *line) {
-  char   *buffer_line = NULL;
-  size_t  buffer_size = 0;
+  char *buffer_line = NULL;
+  size_t buffer_size = 0;
   const int res = getline(&buffer_line, &buffer_size, f);
   if (res < 0) {
     free(buffer_line);
@@ -221,7 +233,6 @@ inline bool read_line(FILE *f, std::string *line) {
   return true;
 }
 
-
 inline uint64_t platform_monotonic_time() {
   uint64_t val_abs = mach_absolute_time();
   // Doing the conversion every time is slow but thread-safe
@@ -231,20 +242,19 @@ inline uint64_t platform_monotonic_time() {
   return val_ns * 1e-9;
 }
 
-
 /**
  * strdupa does not exist on OSX
  */
-#define strdupa(s) strcpy(/* NOLINT(runtime/printf) */\
-  reinterpret_cast<char *>(alloca(strlen((s)) + 1)), (s))
-
+#define strdupa(s)                    \
+  strcpy(/* NOLINT(runtime/printf) */ \
+         reinterpret_cast<char *>(alloca(strlen((s)) + 1)), (s))
 
 inline std::string platform_libname(const std::string &base_name) {
   return "lib" + base_name + ".dylib";
 }
 
-inline const char* platform_getexepath() {
-  static const char* path = _dyld_get_image_name(0);
+inline const char *platform_getexepath() {
+  static const char *path = _dyld_get_image_name(0);
   return path;
 }
 
