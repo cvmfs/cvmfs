@@ -60,10 +60,9 @@ create_whitelist() {
   local spooler_definition=$3
   local temp_dir=$4
   local expire_days=$5
-  local local_recreate=${6:-0}
+  local rewrite_path=$6
   local usemasterkeycard=0
   local hash_algorithm
-  local local_repo_storage
 
   local whitelist
   whitelist=${temp_dir}/whitelist.$name
@@ -89,10 +88,9 @@ create_whitelist() {
   echo `date -u "+%Y%m%d%H%M%S"` > ${whitelist}.unsigned
   echo "E`date -u --date="+$expire_days days" "+%Y%m%d%H%M%S"`" >> ${whitelist}.unsigned
   echo "N$name" >> ${whitelist}.unsigned
-  if [ $local_recreate -eq 1 ]; then
-    local_repo_storage="${DEFAULT_LOCAL_STORAGE}/$name"
+  if [ -n "$rewrite_path" ]; then
     local fingerprint
-    fingerprint="`cat -v $local_repo_storage/.cvmfswhitelist | awk '/^N/{getline;print;exit}'`"
+    fingerprint="`cat -v $rewrite_path | awk '/^N/{getline;print;exit}'`"
     echo "$fingerprint" >> ${whitelist}.unsigned
     hash_algorithm="`echo "$fingerprint"|sed -n 's/.*-//p'|tr '[A-Z]' '[a-z]'`"
     hash_algorithm="${hash_algorithm:-sha1}"
@@ -116,11 +114,11 @@ create_whitelist() {
   chown $user $whitelist
 
   rm -f ${whitelist}.unsigned ${whitelist}.signature ${whitelist}.hash
-  if [ $local_recreate -eq 1 ]; then
+  if [ -n "$rewrite_path" ]; then
     # copy first to a new name in case the filesystem is full
-    cp -f $whitelist $local_repo_storage/.cvmfswhitelist.new
-    chown $user $local_repo_storage/.cvmfswhitelist.new
-    mv -f $local_repo_storage/.cvmfswhitelist.new $local_repo_storage/.cvmfswhitelist
+    cp -f $whitelist ${rewrite_path}.new
+    chown $user ${rewrite_path}.new
+    mv -f ${rewrite_path}.new ${rewrite_path}
   else
     __swissknife upload -i $whitelist -o .cvmfswhitelist -r $spooler_definition
   fi
