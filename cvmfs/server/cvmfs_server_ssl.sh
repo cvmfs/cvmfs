@@ -59,14 +59,14 @@ create_whitelist() {
   local user=$2
   local spooler_definition=$3
   local temp_dir=$4
-  local masterkey
+  local rewrite_path=$5
   local usemasterkeycard=0
+  local hash_algorithm
 
   local whitelist
   whitelist=${temp_dir}/whitelist.$name
-  local hash_algorithm="${CVMFS_HASH_ALGORITHM-sha1}"
 
-  masterkey=/etc/cvmfs/keys/${name}.masterkey
+  local masterkey=/etc/cvmfs/keys/${name}.masterkey
   if cvmfs_sys_file_is_regular $masterkey; then
     echo -n "Signing 30 day whitelist with master key... "
   elif masterkeycard_cert_available >/dev/null; then
@@ -78,8 +78,17 @@ create_whitelist() {
   echo `date -u "+%Y%m%d%H%M%S"` > ${whitelist}.unsigned
   echo "E`date -u --date='+30 days' "+%Y%m%d%H%M%S"`" >> ${whitelist}.unsigned
   echo "N$name" >> ${whitelist}.unsigned
-  openssl x509 -in /etc/cvmfs/keys/${name}.crt -outform der | \
-    __swissknife hash -a $hash_algorithm -f >> ${whitelist}.unsigned
+  if [ -n "$rewrite_path" ]; then
+    local fingerprint
+    fingerprint="`cat -v $rewrite_path | awk '/^N/{getline;print;exit}'`"
+    echo "$fingerprint" >> ${whitelist}.unsigned
+    hash_algorithm="`echo "$fingerprint"|sed -n 's/.*-//p'|tr '[A-Z]' '[a-z]'`"
+    hash_algorithm="${hash_algorithm:-sha1}"
+  else
+    hash_algorithm="${CVMFS_HASH_ALGORITHM:-sha1}"
+    openssl x509 -in /etc/cvmfs/keys/${name}.crt -outform der | \
+      __swissknife hash -a $hash_algorithm -f >> ${whitelist}.unsigned
+  fi
 
   local hash;
   hash="`cat ${whitelist}.unsigned | __swissknife hash -a $hash_algorithm`"
@@ -95,7 +104,14 @@ create_whitelist() {
   chown $user $whitelist
 
   rm -f ${whitelist}.unsigned ${whitelist}.signature ${whitelist}.hash
-  __swissknife upload -i $whitelist -o .cvmfswhitelist -r $spooler_definition
+  if [ -n "$rewrite_path" ]; then
+    # copy first to a new name in case the filesystem is full
+    cp -f $whitelist ${rewrite_path}.new
+    chown $user ${rewrite_path}.new
+    mv -f ${rewrite_path}.new ${rewrite_path}
+  else
+    __swissknife upload -i $whitelist -o .cvmfswhitelist -r $spooler_definition
+  fi
   rm -f $whitelist
   echo "done"
 }
