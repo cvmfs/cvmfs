@@ -24,7 +24,7 @@ class Manifest;
 }
 
 namespace shash {
-class Any;
+struct Any;
 }
 
 namespace receiver {

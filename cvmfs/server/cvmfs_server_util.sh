@@ -983,7 +983,7 @@ Supported Commands:
                   Re-publishes the given tag as the new latest revision.
                   All snapshots between trunk and the target tag become
                   inaccessible.  Without a tag name, trunk-previous is used.
-  resign          [ -n do not require repo config ] <fully qualified name>
+  resign          [ -w path to existing whitelist ] <fully qualified name>
                   Re-sign the 30 day whitelist
   resign -p       <fully qualified name>
                   Re-sign .cvmfspublished
