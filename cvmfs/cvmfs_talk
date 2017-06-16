@@ -4,7 +4,7 @@
 # This is a simple query-response mechanism.
 #
 # SYNOPSIS
-# cvmfs_talk [-i instance | -p pipe] <command>
+# cvmfs_talk [-i instance | -p socket] <command>
 #
 # Part of the CernVM File System.
 #
@@ -15,7 +15,7 @@ use Socket;
 use Getopt::Long;
 
 sub usage {
-  print "Usage: $0 [-i instance | -p pipe] <command>                       \n";
+  print "Usage: $0 [-i instance | -p socket] <command>                     \n";
   print "   By default, iteratate through all instances.                   \n";
   print "\n";
   print "Example:                                                          \n";
