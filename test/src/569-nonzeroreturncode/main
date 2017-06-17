@@ -71,28 +71,24 @@ cvmfs_run_test() {
   sudo cvmfs_server resign $CVMFS_TEST_REPO && return 11
 
   echo "save .cvmfswhitelist and remove repository"
-  local store_dir=/srv/cvmfs/$CVMFS_TEST_REPO
-  cp $store_dir/.cvmfswhitelist .
+  cp /srv/cvmfs/$CVMFS_TEST_REPO/.cvmfswhitelist .
   destroy_repo $CVMFS_TEST_REPO || return $?
 
   echo "remove again (should fail)"
   destroy_repo $CVMFS_TEST_REPO && return 12
 
   echo "restore masterkey and .cvmfswhitelist and set a trap for cleaning them"
-  trap "sudo rm -rf $store_dir $master_key" EXIT HUP INT TERM
+  trap "sudo rm -rf $master_key" EXIT HUP INT TERM
   sudo mv `basename $master_key` $master_key
-  sudo mkdir -p $store_dir
-  sudo chown $CVMFS_TEST_USER $store_dir
-  mv .cvmfswhitelist $store_dir
 
   echo "resign .cvmfswhitelist without requiring repo config"
-  sudo cvmfs_server resign -n $CVMFS_TEST_REPO || return $?
+  sudo cvmfs_server resign -w .cvmfswhitelist $CVMFS_TEST_REPO || return $?
 
-  echo "remove .cvmfswhitelist and masterkey and try to resign again (should fail)"
-  sudo rm -rf $store_dir $master_key
+  echo "remove masterkey and try to resign again (should fail)"
+  sudo rm -rf $master_key
   trap - EXIT HUP INT TERM
 
-  sudo cvmfs_server resign -n $CVMFS_TEST_REPO && return 13
+  sudo cvmfs_server resign -w .cvmfswhitelist $CVMFS_TEST_REPO && return 13
 
   return 0
 }
