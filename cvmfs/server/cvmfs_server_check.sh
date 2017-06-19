@@ -95,6 +95,12 @@ cvmfs_server_check() {
   has_reflog_checksum $name && with_reflog="-R $(get_reflog_checksum $name)"
 
   echo "Verifying integrity of ${name}${subtree_msg}..."
+  if is_garbage_collectable $name; then
+    if [ "x$tag" = "x" ]; then
+      echo "Warning: if garbage collection runs in parallel, "
+      echo "         missing data chunks can be falsely reported"
+    fi
+  fi
   local user_shell="$(get_user_shell $name)"
   local check_cmd
   check_cmd="$(__swissknife_cmd dbg) check $tag        \
