@@ -19,10 +19,11 @@ cvmfs_server_check() {
   local check_integrity=0
   local subtree_path=""
   local tag=
+  local repair_reflog=0
 
   # optional parameter handling
   OPTIND=1
-  while getopts "cit:s:" option
+  while getopts "cit:s:r" option
   do
     case $option in
       c)
@@ -36,6 +37,9 @@ cvmfs_server_check() {
       ;;
       s)
         subtree_path="$OPTARG"
+      ;;
+      r)
+        repair_reflog=1
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -91,10 +95,14 @@ cvmfs_server_check() {
     subtree_msg=" (starting at nested catalog '$subtree_path')"
   fi
 
+  echo "Verifying integrity of ${name}${subtree_msg}..."
+  if [ $repair_reflog -eq 1 ]; then
+    __check_repair_reflog $name
+  fi
   local with_reflog=
   has_reflog_checksum $name && with_reflog="-R $(get_reflog_checksum $name)"
 
-  echo "Verifying integrity of ${name}${subtree_msg}..."
+
   local user_shell="$(get_user_shell $name)"
   local check_cmd
   check_cmd="$(__swissknife_cmd dbg) check $tag        \
@@ -111,4 +119,47 @@ cvmfs_server_check() {
   $user_shell "$check_cmd"
 }
 
+# Checks for mismatch between the reflog and the checksum and tries to fix them,
+# either by adjusting the checksum or by removing it.
+__check_repair_reflog() {
+  local name="$1"
+  load_repo_config $name
+  local user_shell="$(get_user_shell $name)"
+
+  local stored_checksum=
+  has_reflog_checksum $name && stored_checksum="$(cat $(get_reflog_checksum $name))"
+
+  local has_reflog=0
+  local computed_checksum=
+  if $user_shell "$(__swissknife_cmd) peek -d .cvmfsreflog -r $CVMFS_UPSTREAM_STORAGE" >/dev/null; then
+    has_reflog=1
+    local url=
+    if is_stratum0 $name; then
+      url="${CVMFS_STRATUM0}/.cvmfsreflog"
+    else
+      url="${CVMFS_STRATUM1}/.cvmfsreflog"
+    fi
+    local rehash_cmd="curl -sS --fail --connect-timeout 10 --max-time 300 $url \
+      | cvmfs_swissknife hash -a ${CVMFS_HASH_ALGORITHM:-sha1}"
+    computed_checksum="$($user_shell "$rehash_cmd")"
+  fi
+
+  if has_reflog_checksum $name; then
+    if [ $has_reflog -eq 0 ]; then
+      $user_shell "rm -f $(get_reflog_checksum $name)"
+      echo "Warning: removed dangling reflog checksum $(get_reflog_checksum $name)"
+    else
+      if [ "x$stored_checksum" != "x$computed_checksum" ]; then
+        $user_shell "echo $computed_checksum > $(get_reflog_checksum $name)"
+        echo "Warning: restored reflog checksum as $computed_checksum (was: $stored_checksum)"
+      fi
+    fi
+  else
+    # No checksum
+    if [ $has_reflog -eq 1 ]; then
+      $user_shell "echo $computed_checksum > $(get_reflog_checksum $name)"
+      echo "Warning: re-created missing reflog checksum as $computed_checksum"
+    fi
+  fi
+}
 

@@ -126,6 +126,25 @@ cvmfs_run_test() {
   check_repository $CVMFS_TEST634_REPLICA_NAME || return 106
   sudo cvmfs_server snapshot $CVMFS_TEST634_REPLICA_NAME || return 107
 
+  echo "*** check repairing reflog problems"
+  rm -f $checksum
+  rm -f $replica_checksum
+  check_repository $CVMFS_TEST_REPO && return 110
+  check_repository $CVMFS_TEST634_REPLICA_NAME && return 110
+  check_repository $CVMFS_TEST_REPO -r || return 111
+  check_repository $CVMFS_TEST634_REPLICA_NAME -r || return 111
+  echo "abc" > $checksum
+  echo "abc" > $replica_checksum
+  check_repository $CVMFS_TEST_REPO && return 112
+  check_repository $CVMFS_TEST634_REPLICA_NAME && return 112
+  check_repository $CVMFS_TEST_REPO -r || return 113
+  check_repository $CVMFS_TEST634_REPLICA_NAME -r || return 113
+  delete_from_backend $CVMFS_TEST_REPO ".cvmfsreflog" || return 114
+  delete_from_backend $CVMFS_TEST634_REPLICA_NAME ".cvmfsreflog" || return 114
+  check_repository $CVMFS_TEST_REPO && return 115
+  check_repository $CVMFS_TEST634_REPLICA_NAME && return 115
+  check_repository $CVMFS_TEST_REPO -r || return 116
+  check_repository $CVMFS_TEST634_REPLICA_NAME -r || return 116
 
   return 0
 }
