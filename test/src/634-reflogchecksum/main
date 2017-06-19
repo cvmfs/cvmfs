@@ -58,6 +58,17 @@ cvmfs_run_test() {
   [ -f $checksum ] || return 55
   check_repository $CVMFS_TEST_REPO || return 56
 
+  echo "*** check missing reflog"
+  delete_from_backend $CVMFS_TEST_REPO ".cvmfsreflog" || return 57
+  check_repository $CVMFS_TEST_REPO && return 58
+  start_transaction $CVMFS_TEST_REPO || return $?
+  publish_repo $CVMFS_TEST_REPO && return 59
+  abort_transaction $CVMFS_TEST_REPO || return $?
+  mv $checksum $checksum.backup
+  cvmfs_server gc -f $CVMFS_TEST_REPO || return 59
+  [ -f $checksum ] || return 59
+  check_repository $CVMFS_TEST_REPO || return 59
+
   echo "*** set stratum 1 cleanup trap"
   CVMFS_TEST634_REPLICA_NAME="$(get_stratum1_name $CVMFS_TEST_REPO)"
   local replica_checksum=/var/spool/cvmfs/${CVMFS_TEST634_REPLICA_NAME}/reflog.chksum
@@ -97,12 +108,24 @@ cvmfs_run_test() {
 
   echo "*** check reflog reconstruction on replica"
   cvmfs_server gc -f $CVMFS_TEST634_REPLICA_NAME || return 90
-  [ -f $checksum ] || return 91
+  [ -f $replica_checksum ] || return 91
   start_transaction $CVMFS_TEST_REPO || return $?
   publish_repo $CVMFS_TEST_REPO || return 92
   sudo cvmfs_server snapshot $CVMFS_TEST634_REPLICA_NAME || return 93
-  [ -f $checksum ] || return 94
+  [ -f $replica_checksum ] || return 94
   check_repository $CVMFS_TEST634_REPLICA_NAME || return 95
+
+  echo "*** check missing reflog on replica"
+  delete_from_backend $CVMFS_TEST634_REPLICA_NAME ".cvmfsreflog" || return 100
+  check_repository $CVMFS_TEST634_REPLICA_NAME && return 101
+  sudo cvmfs_server snapshot $CVMFS_TEST634_REPLICA_NAME && return 102
+  rm -f $replica_checksum
+  [ -f $replica_checksum ] && return 103
+  cvmfs_server gc -f $CVMFS_TEST634_REPLICA_NAME || return 104
+  [ -f $replica_checksum ] || return 105
+  check_repository $CVMFS_TEST634_REPLICA_NAME || return 106
+  sudo cvmfs_server snapshot $CVMFS_TEST634_REPLICA_NAME || return 107
+
 
   return 0
 }

@@ -163,10 +163,16 @@ string CommandCheck::FetchPath(const string &path) {
   if (is_remote_) {
     download::JobInfo download_job(&url, false, false, f, NULL);
     download::Failures retval = download_manager()->Fetch(&download_job);
-    assert(retval == download::kFailOk);
+    if (retval != download::kFailOk) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to read %s", url.c_str());
+      abort();
+    }
   } else {
     bool retval = CopyPath2File(url, f);
-    assert(retval);
+    if (!retval) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to read %s", url.c_str());
+      abort();
+    }
   }
 
   fclose(f);
