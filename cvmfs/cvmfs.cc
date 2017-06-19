@@ -1470,6 +1470,15 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     attribute_value = StringifyInt(
       inode_generation_info_.inode_generation +
       catalog_mgr->inode_gauge());
+  } else if (attr == "user.ncleanup24") {
+    QuotaManager *quota_mgr = file_system_->cache_mgr()->quota_mgr();
+    if (!quota_mgr->HasCapability(QuotaManager::kCapIntrospectCleanupRate)) {
+      attribute_value = StringifyInt(-1);
+    } else {
+      const uint64_t period_s = 24 * 60 * 60;
+      const uint64_t rate = quota_mgr->GetCleanupRate(period_s);
+      attribute_value = StringifyInt(rate);
+    }
   } else {
     if (!xattrs.Get(attr, &attribute_value)) {
       fuse_reply_err(req, ENOATTR);
@@ -1520,7 +1529,8 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
     "user.host\0user.proxy\0user.uptime\0user.nclg\0user.nopen\0"
     "user.ndownload\0user.timeout\0user.timeout_direct\0user.rx\0user.speed\0"
     "user.fqrn\0user.ndiropen\0user.inode_max\0user.tag\0user.host_list\0"
-    "user.external_host\0user.external_timeout\0user.pubkeys\0";
+    "user.external_host\0user.external_timeout\0user.pubkeys\0"
+    "user.ncleanup24\0";
   string attribute_list;
   if (mount_point_->hide_magic_xattrs()) {
     LogCvmfs(kLogCvmfs, kLogDebug, "Hiding extended attributes");
