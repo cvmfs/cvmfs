@@ -1044,6 +1044,8 @@ create_repometa_skeleton() {
   "email"         : "you@organisation.org",
   "organisation"  : "Your Organisation",
   "description"   : "Repository content",
+  "url"           : "Project website",
+  "recommended-stratum0":  "stratum 0 url",
   "recommended-stratum1s" : [ "stratum1 url", "stratum1 url" ],
 
   "custom" : {
