@@ -102,6 +102,12 @@ cvmfs_server_check() {
   local with_reflog=
   has_reflog_checksum $name && with_reflog="-R $(get_reflog_checksum $name)"
 
+  if is_garbage_collectable $name; then
+    if [ "x$tag" = "x" ]; then
+      echo "Warning: if garbage collection runs in parallel, "
+      echo "         missing data chunks can be falsely reported"
+    fi
+  fi
 
   local user_shell="$(get_user_shell $name)"
   local check_cmd
