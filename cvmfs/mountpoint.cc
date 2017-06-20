@@ -689,8 +689,12 @@ CacheManager *FileSystem::SetupTieredCacheMgr(const string &instance) {
     boot_status_ = loader::kFailCacheDir;
     return NULL;
   }
-  if (options_mgr_->IsOn(MkCacheParm("CVMFS_CACHE_LOWER_READONLY", instance)))
+  if (options_mgr_->GetValue(
+        MkCacheParm("CVMFS_CACHE_LOWER_READONLY", instance), &optarg) &&
+      options_mgr_->IsOn(optarg))
+  {
     static_cast<TieredCacheManager*>(tiered)->SetLowerReadOnly();
+  }
   return tiered;
 }
 
