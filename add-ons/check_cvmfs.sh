@@ -1,9 +1,11 @@
 #!/bin/bash
 # CernVM-FS check for Nagios
-# Version 1.9, last modified: 13.02.2015
+# Version 1.10, last modified: 19.06.2017
 # Bugs and comments to Jakob Blomer (jblomer@cern.ch)
 #
 # ChangeLog
+# 1.10 - 19.06.2017
+#    - Check for cleanup rate within the last 24 hours
 # 1.9 - 13.02.2015:
 #    - Use --max-time 3*$connect_timeout option in curl requests
 #    - Add fallback proxies to network checks
@@ -20,7 +22,7 @@
 #    - return immediately if transport endpoint is not connected
 #    - start of ChangeLog
 
-VERSION=1.9
+VERSION=1.10
 
 STATUS_OK=0
 STATUS_WARNING=1     # Check timed out or CernVM-FS resource consumption high or
@@ -87,6 +89,18 @@ get_xattr() {
    if [ $? -ne 0 ]; then
       /bin/echo "SERVICE STATUS: failed to read $XATTR_NAME attribute"
       exit $STATUS_UNKNOWN
+   fi
+}
+
+# Try reading the xattr value from current directory, use the provided default
+# if the attribute is not available
+try_get_xattr() {
+   XATTR_NAME=$1
+   local default="$2"
+
+   XATTR_VALUE=`/usr/bin/attr -q -g $XATTR_NAME . 2>/dev/null`
+   if [ $? -ne 0 ]; then
+      XATTR_VALUE="$default"
    fi
 }
 
@@ -193,6 +207,9 @@ do_check() {
   if [ $OPT_INODE_CHECK -eq 1 ]; then
     get_xattr inode_max; INODE_MAX=$XATTR_VALUE
   fi
+  # The extended attribute was added in cvmfs 2.4.  The -1 value means that
+  # querying for the cleanup rate is not supported
+  try_get_xattr ncleanup24 -1; NCLEANUP24=$XATTR_VALUE
 
   # Network settings;  TODO: currently configured values required
   if [ $OPT_NETWORK_CHECK -eq 1 ]; then
@@ -311,6 +328,12 @@ do_check() {
       append_info "inodes exceed 32bit, some 32bit applications might break"
       RETURN_STATUS=$STATUS_WARNING
     fi
+  fi
+
+  # Check for number of cache cleanups within the last 24 hours
+  if [ $NCLEANUP24 -gt 24 ]; then
+    append_info "frequent cache cleanups, cache might be undersized"
+    RETURN_STATUS=$STATUS_WARNING
   fi
 
   if [ -f "/cvmfs/${REPOSITORY}/.cvmfsdirtab" ]; then

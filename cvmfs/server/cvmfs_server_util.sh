@@ -1021,6 +1021,7 @@ Supported Commands:
                   [-i check data integrity] (may take some time)]
                   [-t tag (check given tag instead of trunk)]
                   [-s path to nested catalog subtree to check]
+                  [-r repair reflog problems]
                   <fully qualified name>
                   Checks if the repository is sane
   transaction     <fully qualified name>
