@@ -2352,3 +2352,89 @@ find_or_build_cvmfs_preload() {
 
   return 1
 }
+
+
+#####################################
+##### CVMFS Repository Services #####
+#####################################
+
+
+# Sets up the CVMFS repository services application
+set_up_repository_services() {
+    echo "Setting up repository services"
+
+    PACKAGE_URL_ROOT=http://ecsft.cern.ch/dist/cvmfs/cvmfs-services/cvmfs_services-$CVMFS_SERVICES_VERSION
+    CVMFS_SERVICES_PACKAGE=""
+    # Choose which package to download and install based on platform
+    if [ -f /etc/lsb-release ]; then
+        if [ x"$(lsb_release -cs)" = x"xenial" ]; then
+            CVMFS_SERVICES_PACKAGE=${PACKAGE_URL_ROOT}-ubuntu1604-x86_64.tar.gz
+            echo "Using package: $CVMFS_SERVICES_PACKAGE"
+        fi
+    elif [ -f /etc/redhat-release ]; then
+        rhver=$(cat /etc/redhat-release | awk {'print $(NF-1)'} | cut -d'.' -f1)
+        if [ $((rhver == 6)) -o $((rhver == 7)) ]; then
+            CVMFS_SERVICES_PACKAGE=${PACKAGE_URL_ROOT}-centos${rhver}-x86_64.tar.gz
+            echo "Using package: $CVMFS_SERVICES_PACKAGE"
+        fi
+    fi
+
+    if [ x"$CVMFS_SERVICES_PACKAGE" = x"" ]; then
+        echo "Platform not supported. Exiting"
+        exit 1
+    fi
+
+    echo "  Installing the cvmfs_services application"
+    pushd /tmp
+    curl -o cvmfs_services.tar.gz $CVMFS_SERVICES_PACKAGE
+    sudo rm -rf /opt/cvmfs_services && sudo mkdir -p /opt/cvmfs_services && cd /opt/cvmfs_services
+    sudo tar xzf /tmp/cvmfs_services.tar.gz
+    popd
+
+    echo "  Writing configuration files"
+    sudo bash -c 'cat <<EOF > /opt/cvmfs_services/etc/repo.config
+{repos, [{<<"test.repo.org">>, [<<"key1">>]}]}.
+{keys, [{file, "/etc/cvmfs/keys/gateway_key"}]}.
+EOF'
+
+    echo "  Writing API key file"
+    sudo bash -c 'cat <<EOF > /etc/cvmfs/keys/gateway_key
+test key1 secret1
+EOF'
+
+    echo "  Creating Mnesia schema"
+    sudo mkdir -p /opt/cvmfs_mnesia
+    sudo chown `whoami`:`whoami` /opt/cvmfs_mnesia
+    cd /opt/cvmfs_services
+    ./scripts/setup.sh
+
+    echo "  Creating test repo"
+    sudo -E cvmfs_server mkfs -o `whoami` test.repo.org
+
+    echo "  Modifying test repo configuration"
+    sudo sed -i 's/local,/gw,/' /etc/cvmfs/repositories.d/test.repo.org/server.conf
+    sudo sed -i 's/txn,\/srv\/cvmfs\/test.repo.org/txn,http:\/\/localhost:8080\/api\/v1/g' /etc/cvmfs/repositories.d/test.repo.org/server.conf
+    sudo bash -c 'echo "CVMFS_GATEWAY_KEYS=/etc/cvmfs/keys/gateway_key" >> /etc/cvmfs/repositories.d/test.repo.org/server.conf'
+
+    echo "  Starting repository services application"
+    /opt/cvmfs_services/bin/cvmfs_services start
+
+    # Waiting here is necessary in order to give the cvmfs_services application enough time to boot
+    wait_for_app_start
+}
+
+wait_for_app_start() {
+    local reply=$(/opt/cvmfs_services/bin/cvmfs_services ping | awk {'print $1'})
+    local num_iter=1
+    while [ $reply != "pong" ]; do
+        sleep 1
+        reply=$(/opt/cvmfs_services/bin/cvmfs_services ping | awk {'print $1'})
+        echo "Num iter: $num_iter"
+        num_iter=$((num_iter + 1))
+        if [ $num_iter -eq 10 ]; then
+            break;
+        fi
+    done
+    echo $reply
+}
+
