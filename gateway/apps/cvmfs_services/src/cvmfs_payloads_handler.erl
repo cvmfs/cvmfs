@@ -7,6 +7,8 @@
 %%% @end
 %%%-------------------------------------------------------------------
 
+-compile([{parse_transform, lager_transform}]).
+
 -module(cvmfs_payloads_handler).
 
 -export([init/2]).
@@ -79,6 +81,7 @@ init(Req0 = #{method := <<"POST">>}, State) ->
                                     end,
                                     {200, Rep, Req1};
                                 _ ->
+                                    lager:error("Could not decode JSON message: ~p", [JSONMessage]),
                                     {400, #{}, Req0}
                             end,
     ReqF = cowboy_req:reply(Status,
