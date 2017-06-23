@@ -1,4 +1,4 @@
-image: radupopescu/erlang-libsodium:19
+image: radupopescu/erlang-libsodium:20.0
 
 stages:
   - test
