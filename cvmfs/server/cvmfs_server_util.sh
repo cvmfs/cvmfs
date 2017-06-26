@@ -473,6 +473,7 @@ check_upstream_validity() {
 
 
 # Ensure that the installed overlayfs is viable for CernVM-FS.
+# Note: More details are in CVM-835.
 # @return  0 if overlayfs is installed and viable
 #          1 if it is not viable, and stdout contains a reason
 # This should probably now be called check_overlayfs_viability except
@@ -496,11 +497,11 @@ check_overlayfs_version() {
     echo "Kernel version $krnl_version too old for overlayfs; at least $required_version required"
     return 1
   fi
-  # if the filesystem name is long df will split output into two lines
-  #  so use tail -n +2 to skip first line and echo to combine them
+  # if the mounted filesystem name is long df will split output into two
+  #  lines, so use tail -n +2 to skip first line and echo to combine them
   local scratch_fstype=$(echo $(df -T /var/spool/cvmfs | tail -n +2) | awk {'print $2'})
   if [ "x$scratch_fstype" != "xext3" ] && [ "x$scratch_fstype" != "xext4" ] ; then
-    echo "overlayfs scratch /var/spool/cvmfs is $scratch_fstype, but ext3 or ext4 required"
+    echo "overlayfs scratch /var/spool/cvmfs is type $scratch_fstype, but ext3 or ext4 required"
     return 1
   fi
   return 0
