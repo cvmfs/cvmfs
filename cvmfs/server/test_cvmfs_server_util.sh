@@ -54,8 +54,9 @@ mock_kernel_version="3.10.0"
 printf "Kernel version: %s; RedHat: %s\n" $mock_kernel_version $mock_is_redhat
 print_check $(check_overlayfs_version >/dev/null; echo $?) 1
 
-mock_kernel_version="3.10.0-493"
 mock_is_redhat=1 # False
+
+mock_kernel_version="3.10.0-493"
 printf "Kernel version: %s; RedHat: %s\n" $mock_kernel_version $mock_is_redhat
 print_check $(check_overlayfs_version >/dev/null; echo $?) 1
 
