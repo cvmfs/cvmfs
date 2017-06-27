@@ -1629,6 +1629,8 @@ bool MountPoint::SetupExternalDownloadMgr(bool dogeosort) {
       download_mgr_->GeoSortServers(&host_chain);
       external_download_mgr_->SetHostChain(host_chain);
     }
+  } else {
+    external_download_mgr_->SetHostChain("");
   }
 
   string proxies = "DIRECT";
