@@ -34,6 +34,13 @@ FuseRemounter::Status FuseRemounter::Check() {
     return kStatusMaintenance;
 
   LogCvmfs(kLogCvmfs, kLogDebug, "catalog TTL expired, remount");
+
+  // First update blacklist info before remounting
+  if (!mountpoint_->CheckBlacklists()) {
+    // it worked at mount time so it isn't fatal here
+    LogCvmfs(kLogCache, kLogDebug, "failure reloading blacklists, ignoring");
+  }
+
   catalog::LoadError retval = mountpoint_->catalog_mgr()->Remount(true);
   switch (retval) {
     case catalog::kLoadNew:
@@ -65,6 +72,10 @@ FuseRemounter::Status FuseRemounter::Check() {
       catalogs_valid_until_ = time(NULL) + mountpoint_->GetEffectiveTtlSec();
       SetAlarm(mountpoint_->GetEffectiveTtlSec());
       return kStatusUp2Date;
+    case catalog::kLoadBlacklisted:
+      LogCvmfs(kLogCatalog, kLogDebug | kLogSyslogErr,
+         "repository certificate blacklisted, exiting");
+      exit(1);
     default:
       abort();
   }
