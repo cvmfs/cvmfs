@@ -402,6 +402,8 @@ class MountPoint : SingleCopy, public BootFactory {
   Tracer *tracer() { return tracer_; }
   cvmfs::Uuid *uuid() { return uuid_; }
 
+  bool CheckBlacklists();
+
   /**
    * Used by hotpatch procedure
    */
@@ -459,7 +461,6 @@ class MountPoint : SingleCopy, public BootFactory {
   void CreateStatistics();
   void CreateAuthz();
   bool CreateSignatureManager();
-  bool CheckBlacklists();
   bool CreateDownloadManagers();
   void CreateFetchers();
   bool CreateCatalogManager();

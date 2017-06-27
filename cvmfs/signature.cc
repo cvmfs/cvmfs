@@ -360,8 +360,17 @@ bool SignatureManager::LoadBlacklist(
 }
 
 
-vector<string> SignatureManager::GetBlacklistedCertificates() {
-  return blacklisted_certificates_;
+bool SignatureManager::CertificateBlacklisted() {
+  for (unsigned i = 0; i < blacklisted_certificates_.size(); ++i) {
+    shash::Any this_hash = MkFromFingerprint(blacklisted_certificates_[i]);
+    if (this_hash.IsNull())
+      continue;
+
+    shash::Algorithms algorithm = this_hash.algorithm;
+    if (this_hash == HashCertificate(algorithm))
+      return true;
+  }
+  return false;
 }
 
 
