@@ -59,18 +59,6 @@ bool Whitelist::IsExpired() const {
 Failures Whitelist::VerifyLoadedCertificate() const {
   assert(status_ == kStAvailable);
 
-  vector<string> blacklist = signature_manager_->GetBlacklistedCertificates();
-  for (unsigned i = 0; i < blacklist.size(); ++i) {
-    shash::Any this_hash =
-      signature::SignatureManager::MkFromFingerprint(blacklist[i]);
-    if (this_hash.IsNull())
-      continue;
-
-    shash::Algorithms algorithm = this_hash.algorithm;
-    if (this_hash == signature_manager_->HashCertificate(algorithm))
-      return kFailBlacklisted;
-  }
-
   for (unsigned i = 0; i < fingerprints_.size(); ++i) {
     shash::Algorithms algorithm = fingerprints_[i].algorithm;
     if (signature_manager_->HashCertificate(algorithm) == fingerprints_[i]) {
