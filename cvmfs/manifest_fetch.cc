@@ -85,10 +85,6 @@ static Failures DoFetch(
     goto cleanup;
   }
 
-  // Quick way out: hash matches base catalog
-  if (base_catalog && (ensemble->manifest->catalog_hash() == *base_catalog))
-    return kFailOk;
-
   // Load certificate
   certificate_hash = ensemble->manifest->certificate();
   ensemble->FetchCertificate(certificate_hash);
@@ -109,6 +105,15 @@ static Failures DoFetch(
     result = kFailBadCertificate;
     goto cleanup;
   }
+
+  if (signature_manager->CertificateBlacklisted()) {
+    result = kFailBlacklisted;
+    goto cleanup;
+  }
+
+  // Quick way out: hash matches base catalog
+  if (base_catalog && (ensemble->manifest->catalog_hash() == *base_catalog))
+    return kFailOk;
 
   // Verify manifest
   retval_b = signature_manager->VerifyLetter(ensemble->raw_manifest_buf,

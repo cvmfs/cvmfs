@@ -35,6 +35,7 @@ enum Failures {
   kFailBadSignature,
   kFailBadWhitelist,
   kFailInvalidCertificate,
+  kFailBlacklisted,
   kFailUnknown,
 
   kFailNumEntries
@@ -52,8 +53,9 @@ inline const char *Code2Ascii(const Failures error) {
   texts[7] = "bad signature, failed to verify repository manifest";
   texts[8] = "bad whitelist";
   texts[9] = "invalid certificate";
-  texts[10] = "unknown error";
-  texts[11] = "no text";
+  texts[10] = "certificate blacklisted";
+  texts[11] = "unknown error";
+  texts[12] = "no text";
   return texts[error];
 }
 
