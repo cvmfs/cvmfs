@@ -39,7 +39,7 @@ cvmfs_server_resign() {
   [ -n "$whitelist_path" ] || check_multiple_repository_existence "$names"
 
   # sanity checks
-  [ $sign_published -eq 0 ] || [ $require_repo_config -eq 1 ] || die "Cannot use both -n and -p"
+  [ $sign_published -eq 0 ] || [ $whitelist_path -eq 1 ] || die "Cannot use both -w and -p"
   [ $sign_published -eq 1 ] || is_root || die "Only root can resign whitelists"
 
   for name in $names; do
