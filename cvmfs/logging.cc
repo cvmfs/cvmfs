@@ -53,9 +53,9 @@ const char *module_names[] = {
     "fuse stub", "signature",   "fs traversal", "catalog traversal",
     "nfs maps",  "publish",     "spooler",      "concurrency",
     "utility",   "glue buffer", "history",      "unionfs",
-    "pathspec",  "upload s3",   "upload http",  "s3fanout",
-    "gc",        "dns",         "authz",        "reflog",
-    "kvstore"};
+    "pathspec",  "receiver",    "upload s3",    "upload http",
+    "s3fanout",  "gc",          "dns",          "authz",
+    "reflog",    "kvstore"};
 int syslog_facility = LOG_USER;
 int syslog_level = LOG_NOTICE;
 char *syslog_prefix = NULL;

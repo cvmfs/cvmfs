@@ -48,6 +48,11 @@ CommitProcessor::~CommitProcessor() {}
 CommitProcessor::Result CommitProcessor::Process(
     const std::string& lease_path, const shash::Any& old_root_hash,
     const shash::Any& new_root_hash) {
+  LogCvmfs(kLogReceiver, kLogDebug | kLogSyslog,
+           "CommitProcessor - committing: %s, old hash: %s, new hash: %s",
+           lease_path.c_str(), old_root_hash.ToString(true).c_str(),
+           new_root_hash.ToString(true).c_str());
+
   const std::vector<std::string> lease_path_tokens =
       SplitString(lease_path, '/');
 
@@ -73,7 +78,7 @@ CommitProcessor::Result CommitProcessor::Process(
 
   // Current catalog from the gateway machine
   if (!manifest.IsValid()) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Could not open repository manifest");
+    LogCvmfs(kLogReceiver, kLogDebug | kLogSyslogErr, "Could not open repository manifest");
     return kIoError;
   }
 
@@ -94,7 +99,7 @@ CommitProcessor::Result CommitProcessor::Process(
 
   std::string new_manifest_path;
   if (!merge_tool.Run(params, &new_manifest_path)) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Catalog merge failed");
+    LogCvmfs(kLogReceiver, kLogDebug | kLogSyslogErr, "Catalog merge failed");
     return kMergeError;
   }
 
@@ -111,7 +116,7 @@ CommitProcessor::Result CommitProcessor::Process(
                        params.spooler_configuration, temp_dir, certificate,
                        private_key, repo_name, "", "",
                        "/var/spool/cvmfs/" + repo_name + "/reflog.chksum")) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Error signing manifest");
+    LogCvmfs(kLogReceiver, kLogDebug | kLogSyslogErr, "Error signing manifest");
     return kIoError;
   }
 
