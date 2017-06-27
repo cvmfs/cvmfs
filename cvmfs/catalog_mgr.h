@@ -49,6 +49,7 @@ enum LoadError {
   kLoadUp2Date,
   kLoadNoSpace,
   kLoadFail,
+  kLoadBlacklisted,
 
   kLoadNumEntries
 };
@@ -59,7 +60,8 @@ inline const char *Code2Ascii(const LoadError error) {
   texts[1] = "catalog was up to date";
   texts[2] = "not enough space to load catalog";
   texts[3] = "failed to load catalog";
-  texts[4] = "no text";
+  texts[4] = "repository certificate blacklisted";
+  texts[5] = "no text";
   return texts[error];
 }
 
