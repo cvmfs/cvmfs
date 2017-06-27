@@ -481,30 +481,32 @@ check_upstream_validity() {
 #   overrides it, CVMFS_DONT_CHECK_OVERLAYFS_VERSION, and changing the
 #   function name would make the variable name not make sense.
 check_overlayfs_version() {
-  [ -z "$CVMFS_DONT_CHECK_OVERLAYFS_VERSION" ] || return 0
   if ! check_overlayfs; then
     echo "overlayfs kernel module missing"
     return 1
   fi
+  [ -z "$CVMFS_DONT_CHECK_OVERLAYFS_VERSION" ] || return 0
   local krnl_version=$(cvmfs_sys_uname)
-  local required_version
+  local required_version="4.2.0"
+  if compare_versions "$krnl_version" -ge "$required_version" ; then
+    return 0
+  fi
   if cvmfs_sys_is_redhat; then
+    # Redhat kernel with backported overlayfs supports limited filesystem types
     required_version="3.10.0-493"
-  else
-    required_version="4.2.0"
+    if compare_versions "$krnl_version" -ge "$required_version" ; then
+      # If the mounted filesystem name is long df will split output into two
+      #  lines, so use tail -n +2 to skip first line and echo to combine them
+      local scratch_fstype=$(echo $(df -T /var/spool/cvmfs | tail -n +2) | awk {'print $2'})
+      if [ "x$scratch_fstype" = "xext3" ] || [ "x$scratch_fstype" = "xext4" ] ; then
+        return 0
+      fi
+      echo "overlayfs scratch /var/spool/cvmfs is type $scratch_fstype, but ext3 or ext4 required"
+      return 1
+    fi
   fi
-  if compare_versions "$krnl_version" -lt "$required_version" ; then
-    echo "Kernel version $krnl_version too old for overlayfs; at least $required_version required"
-    return 1
-  fi
-  # if the mounted filesystem name is long df will split output into two
-  #  lines, so use tail -n +2 to skip first line and echo to combine them
-  local scratch_fstype=$(echo $(df -T /var/spool/cvmfs | tail -n +2) | awk {'print $2'})
-  if [ "x$scratch_fstype" != "xext3" ] && [ "x$scratch_fstype" != "xext4" ] ; then
-    echo "overlayfs scratch /var/spool/cvmfs is type $scratch_fstype, but ext3 or ext4 required"
-    return 1
-  fi
-  return 0
+  echo "Kernel version $krnl_version too old for overlayfs; at least $required_version required"
+  return 1
 }
 
 
