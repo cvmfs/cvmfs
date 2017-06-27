@@ -48,10 +48,10 @@ bool ReadCmdLineArguments(int argc, char** argv,
     }
 
     if (!valid_option) {
-      LogCvmfs(kLogCvmfs, kLogStdout,
+      LogCvmfs(kLogReceiver, kLogStdout,
                "CVMFS gateway services receiver component. Usage:");
       for (size_t i = 0; i < params.size(); ++i) {
-        LogCvmfs(kLogCvmfs, kLogStdout, "  \"%c\" - %s", params[i].key(),
+        LogCvmfs(kLogReceiver, kLogStdout, "  \"%c\" - %s", params[i].key(),
                  params[i].description().c_str());
         return false;
       }
@@ -61,7 +61,7 @@ bool ReadCmdLineArguments(int argc, char** argv,
   for (size_t j = 0; j < params.size(); ++j) {
     if (!params[j].optional()) {
       if (arguments->find(params[j].key()) == arguments->end()) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "parameter -%c missing",
+        LogCvmfs(kLogReceiver, kLogStderr, "parameter -%c missing",
                  params[j].key());
         return false;
       }
@@ -88,7 +88,7 @@ int main(int argc, char** argv) {
   receiver::Reactor reactor(fdin, fdout);
 
   if (!reactor.Run()) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Error running CVMFS Receiver event loop");
+    LogCvmfs(kLogReceiver, kLogDebug | kLogSyslogErr, "Error running CVMFS Receiver event loop");
     return 1;
   }
 
