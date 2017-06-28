@@ -985,6 +985,8 @@ Supported Commands:
                   inaccessible.  Without a tag name, trunk-previous is used.
   resign          [ -w path to existing whitelist ] <fully qualified name>
                   Re-sign the 30 day whitelist
+  resign -p       <fully qualified name>
+                  Re-sign .cvmfspublished
   masterkeycard   -a Checks if a smartcard is available
                   -k Checks whether a key is stored in a card
                   -r Reads pub key from a card to stdout
