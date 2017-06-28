@@ -2,7 +2,7 @@ cvmfs_server_publish() {
   local names
   local user
   local exact=0
-  local key_file
+  local gw_key_file
   local spool_dir
   local stratum0
   local upstream
@@ -104,7 +104,7 @@ cvmfs_server_publish() {
     # get repository information
     load_repo_config $name
     user=$CVMFS_USER
-    key_file=$CVMFS_GATEWAY_KEYS
+    gw_key_file=/etc/cvmfs/keys/${name}.gw
     spool_dir=$CVMFS_SPOOL_DIR
     scratch_dir="${spool_dir}/scratch/current"
     stratum0=$CVMFS_STRATUM0
@@ -200,7 +200,7 @@ cvmfs_server_publish() {
     # to the `cvmfs_swissknife sync` command: the username and the
     # subpath of the active lease
     if [ x"$upstream_type" = xgw ]; then
-      sync_command="$sync_command -P /var/spool/cvmfs/$name/session_token_$subpath -H $key_file"
+      sync_command="$sync_command -P /var/spool/cvmfs/$name/session_token_$subpath -H $gw_key_file"
     fi
     if [ "x$CVMFS_UNION_FS_TYPE" != "x" ]; then
       sync_command="$sync_command -f $CVMFS_UNION_FS_TYPE"
