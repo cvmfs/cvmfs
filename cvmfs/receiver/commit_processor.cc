@@ -78,7 +78,8 @@ CommitProcessor::Result CommitProcessor::Process(
 
   // Current catalog from the gateway machine
   if (!manifest.IsValid()) {
-    LogCvmfs(kLogReceiver, kLogDebug | kLogSyslogErr, "Could not open repository manifest");
+    LogCvmfs(kLogReceiver, kLogDebug | kLogSyslogErr,
+             "Could not open repository manifest");
     return kIoError;
   }
 

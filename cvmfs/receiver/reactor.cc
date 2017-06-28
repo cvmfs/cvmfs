@@ -118,8 +118,9 @@ bool Reactor::Run() {
   do {
     msg_body.clear();
     req = ReadRequest(fdin_, &msg_body);
-      LogCvmfs(kLogReceiver, kLogDebug | kLogSyslog,
-               "Reactor - handling request: %d, body: %s.", req, msg_body.c_str());
+    LogCvmfs(kLogReceiver, kLogDebug | kLogSyslog,
+             "Reactor - handling request: %d, body: %s.", req,
+             msg_body.c_str());
     if (!HandleRequest(req, msg_body)) {
       LogCvmfs(kLogReceiver, kLogDebug | kLogSyslogErr,
                "Reactor: could not handle request %d. Exiting", req);
@@ -391,7 +392,8 @@ bool Reactor::HandleRequest(Request req, const std::string& data) {
       ok &= WriteReply(fdout_, reply);
       break;
     case kError:
-      LogCvmfs(kLogReceiver, kLogDebug | kLogSyslogErr, "Reactor: unknown command received.");
+      LogCvmfs(kLogReceiver, kLogDebug | kLogSyslogErr,
+               "Reactor: unknown command received.");
       ok = false;
       break;
     default:
