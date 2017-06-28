@@ -67,12 +67,14 @@ void PayloadProcessor::ConsumerEventCallback(
     path = event.object_name;
   } else {
     // kEmpty - this is an error.
-    LogCvmfs(kLogReceiver, kLogDebug | kLogSyslogErr, "Event received with unknown object.");
+    LogCvmfs(kLogReceiver, kLogDebug | kLogSyslogErr,
+             "Event received with unknown object.");
     num_errors_++;
     return;
   }
 
-  LogCvmfs(kLogReceiver, kLogDebug | kLogSyslog, "PayloadProcessor - object unpacked: %s", path.c_str());
+  LogCvmfs(kLogReceiver, kLogDebug | kLogSyslog,
+           "PayloadProcessor - object unpacked: %s", path.c_str());
 
   const std::string hash_string = event.id.ToString(true);
 
@@ -82,20 +84,22 @@ void PayloadProcessor::ConsumerEventCallback(
   std::string temp_dir = "/srv/cvmfs/" + current_repo_ + "/data/txn";
   const std::string tmp_path = CreateTempPath(temp_dir, 0666);
   if (tmp_path.empty()) {
-    LogCvmfs(kLogReceiver, kLogDebug | kLogSyslogErr, "Unable to create temporary path.");
+    LogCvmfs(kLogReceiver, kLogDebug | kLogSyslogErr,
+             "Unable to create temporary path.");
     num_errors_++;
     return;
   }
 
   int fdout = open(tmp_path.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0600);
   if (fdout == -1) {
-    LogCvmfs(kLogReceiver, kLogDebug | kLogSyslogErr, "Unable to open temporary output file: %s",
-             tmp_path.c_str());
+    LogCvmfs(kLogReceiver, kLogDebug | kLogSyslogErr,
+             "Unable to open temporary output file: %s", tmp_path.c_str());
     return;
   }
 
   if (!WriteFile(fdout, event.buf, event.buf_size)) {
-    LogCvmfs(kLogReceiver, kLogDebug | kLogSyslogErr, "Unable to write %s", tmp_path.c_str());
+    LogCvmfs(kLogReceiver, kLogDebug | kLogSyslogErr, "Unable to write %s",
+             tmp_path.c_str());
     num_errors_++;
     unlink(tmp_path.c_str());
     close(fdout);
