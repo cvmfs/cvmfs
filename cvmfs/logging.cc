@@ -72,10 +72,10 @@ pthread_mutex_t lock_usyslock = PTHREAD_MUTEX_INITIALIZER;
 const unsigned kMaxCustomlog = 3;
 string *customlog_dests[] = {NULL, NULL, NULL};
 int customlog_fds[] = {-1, -1, -1};
-pthread_mutex_t customlog_locks[] =
-  {PTHREAD_MUTEX_INITIALIZER,
-   PTHREAD_MUTEX_INITIALIZER,
-   PTHREAD_MUTEX_INITIALIZER};
+pthread_mutex_t customlog_locks[] = {
+  PTHREAD_MUTEX_INITIALIZER,
+  PTHREAD_MUTEX_INITIALIZER,
+  PTHREAD_MUTEX_INITIALIZER};
 
 LogLevels min_log_level = kLogNormal;
 static void (*alt_log_func)(const LogSource source, const int mask,
