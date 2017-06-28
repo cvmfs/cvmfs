@@ -41,7 +41,16 @@ apt-get source autofs/stretch
 srcdir=$(find . -mindepth 1 -maxdepth 1 -type d)
 cd $srcdir
 dpkg-checkbuilddeps
-dch --local cernvm "rebuild stretch autofs for recursive mounting support"
+echo "done"
+
+echo -n "adjust package version"
+version=$(head -n 1 debian/changelog | cut -d" " -f2 | tr -d \(\))
+platform="$(lsb_release -si | tr [:upper:] [:lower:])$(lsb_release -sr)"
+version="${version}cernvm1+${platform}"
+export DEBFULLNAME="Jakob Blomer"
+export DEBEMAIL="jblomer@cern.ch"
+dch -v $version "rebuild stretch autofs for recursive mounting support"
+dch -r --distribution $(lsb_release -sc) ""
 echo "done"
 
 debuild -us -uc
