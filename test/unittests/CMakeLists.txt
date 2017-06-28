@@ -62,6 +62,7 @@ set(CVMFS_UNITTEST_FILES
   t_json.cc
   t_kvstore.cc
   t_libcvmfs.cc
+  t_logging.cc
   t_lru.cc
   t_macaroon.cc
   t_malloc_arena.cc
