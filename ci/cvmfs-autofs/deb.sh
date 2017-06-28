@@ -23,7 +23,8 @@ fi
 CVMFS_SOURCE_LOCATION="$1"
 CVMFS_RESULT_LOCATION="$2"
 
-workdir="$CVMFS_SOURCE_LOCATION"
+workdir="$CVMFS_SOURCE_LOCATION/_DEBAUTOFS"
+mkdir -p $workdir
 
 if [ "$(ls -A $workdir 2>/dev/null)" != "" ]; then
   echo "$workdir must be empty"
