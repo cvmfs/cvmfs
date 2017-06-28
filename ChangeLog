@@ -1,4 +1,5 @@
 2.4.0:
+  * Add `cvmfs_server resign -p` command (CVM-1140)
   * Add `cvmfs_server check -r` command to repair reflog checksum (CVM-1240)
   * Add ncleanup24 xattr and Nagios check for cleanup rate (CVM-1097)
   * Add cvmfs_server resign -w for stand-alone whitelist resigning (CVM-1265)
