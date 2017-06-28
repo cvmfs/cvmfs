@@ -3,6 +3,7 @@ Maintainer: Jakob Blomer <jblomer@cern.ch>
 Section: utils
 Priority: extra
 Standards-Version: 3.9.3.1
+Depends: lsb-release
 Build-Depends: debhelper (>= 9), make
 Homepage: http://cernvm.cern.ch/portal/filesystem
 
