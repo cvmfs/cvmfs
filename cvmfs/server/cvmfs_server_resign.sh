@@ -44,7 +44,7 @@ cvmfs_server_resign() {
 
   # sanity checks
   [ $sign_published -eq 0 ] || [ -n "$expire_days" ] || die "Cannot use -d with -p"
-  [ $sign_published -eq 0 ] || [ $whitelist_path -eq 1 ] || die "Cannot use both -w and -p"
+  [ $sign_published -eq 0 ] || [ -z "$whitelist_path" ] || die "Cannot use both -w and -p"
   [ $sign_published -eq 1 ] || is_root || die "Only root can resign whitelists"
 
   for name in $names; do
