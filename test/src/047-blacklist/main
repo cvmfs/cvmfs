@@ -8,28 +8,26 @@ cleanup_blacklist() {
 cvmfs_run_test() {
   logfile=$1
 
-  local cache_dir=$(get_cvmfs_cachedir grid.cern.ch)
+  echo "mount grid.cern.ch"
   cvmfs_mount grid.cern.ch || return 1
-  cvmfs_umount grid.cern.ch || return 2
-  sudo rm -f ${cache_dir}/cvmfschecksum.grid.cern.ch
+  grep -q grid.cern.ch /proc/mounts || return 2
 
   trap cleanup_blacklist EXIT HUP INT TERM
   sudo touch /etc/cvmfs/blacklist
-  cvmfs_mount grid.cern.ch || return 10
-  cvmfs_umount grid.cern.ch || return 11
-  sudo rm -f ${cache_dir}/cvmfschecksum.grid.cern.ch
 
-  sudo sh -c "cat > /etc/cvmfs/blacklist" <<EOF
-A7:D8:2A:0F:30:53:3C:60:4F:B0:3E:59:B6:D7:D1:97:9C:AA:EB:B4
-A0:1A:33:B5:C3:00:D5:D3:8F:C9:4A:4D:D4:A4:51:65:F4:20:A3:5B
-09:D9:09:04:9A:E2:1E:F3:9A:E2:EB:52:90:B6:17:9F:F3:F0:B3:57
-EOF
+  echo "blacklist the grid.cern.ch fingerprint(s)"
+  white="`curl -f -s http://cvmfs-stratum-one.cern.ch/cvmfs/grid.cern.ch/.cvmfswhitelist`" || return 10
 
-  cvmfs_mount grid.cern.ch
-  if [ $? -eq 0 ]; then
-    echo "BLACKLIST NOT EFFECTIVE"
-    return 20
-  fi
+  echo "$white" | cat -v | awk '/^N/{ok=1;next} /^--/{exit} ok==1 {print}'| \
+    sed 's/ .*//' | sudo sh -c "tee /etc/cvmfs/blacklist"
+
+  echo "force remount which should cause blacklisted repo to unmount"
+  sudo cvmfs_talk -i grid.cern.ch remount
+  sleep 2
+  grep grid.cern.ch /proc/mounts && return 20
+
+  echo "attempt another mount which should also fail"
+  cvmfs_mount grid.cern.ch && return 21
 
   return 0
 }
