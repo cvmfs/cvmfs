@@ -637,7 +637,7 @@ CatalogT *AbstractCatalogManager<CatalogT>::MountCatalog(
   shash::Any catalog_hash;
   const LoadError retval =
     LoadCatalog(mountpoint, hash, &catalog_path, &catalog_hash);
-  if ((retval == kLoadFail) || 
+  if ((retval == kLoadFail) ||
       (retval == kLoadNoSpace) ||
       (retval == kLoadBlacklisted)) {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to load catalog '%s' (%d - %s)",
