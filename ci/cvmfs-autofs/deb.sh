@@ -3,9 +3,11 @@
 set -e
 
 #
-# This script is not called by the CI system! It is supposed to be used for
-# package creation debugging and as a blue print for CI configuration.
+# This script builds the stretch autofs package on older distros.
 #
+
+SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
+. ${SCRIPT_LOCATION}/../common.sh
 
 usage() {
   echo "Build the Debian stretch autofs version for older deb based distros"
@@ -15,9 +17,13 @@ usage() {
 
 if [ $# -ne 1 ]; then
   usage
+  exit 1
 fi
 
-workdir=$1
+CVMFS_SOURCE_LOCATION="$1"
+CVMFS_RESULT_LOCATION="$2"
+
+workdir="$CVMFS_SOURCE_LOCATION"
 
 if [ "$(ls -A $workdir 2>/dev/null)" != "" ]; then
   echo "$workdir must be empty"
@@ -38,4 +44,7 @@ dch --local cernvm "rebuild stretch autofs for recursive mounting support"
 echo "done"
 
 debuild -us -uc
-mv ${workdir}/src/autofs_*cernvm* ${workdir}/result
+mv ${workdir}/src/autofs_*cernvm* ${CVMFS_RESULT_LOCATION}/
+
+echo "cleaning up..."
+rm -fR ${CVMFS_SOURCE_LOCATION}/*
