@@ -77,6 +77,9 @@ int main(int argc, char** argv) {
     return 1;
   }
 
+  LogSetCustomFile(0, "/var/log/cvmfs_receiver_out.log");
+  LogSetCustomFile(1, "/var/log/cvmfs_receiver_err.log");
+
   int fdin = 0;
   int fdout = 1;
   if (arguments.find('i') != arguments.end()) {
@@ -88,7 +91,7 @@ int main(int argc, char** argv) {
   receiver::Reactor reactor(fdin, fdout);
 
   if (!reactor.Run()) {
-    LogCvmfs(kLogReceiver, kLogDebug | kLogSyslogErr,
+    LogCvmfs(kLogReceiver, kLogCustom1,
              "Error running CVMFS Receiver event loop");
     return 1;
   }

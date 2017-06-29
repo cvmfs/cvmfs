@@ -44,7 +44,7 @@ PayloadProcessor::Result PayloadProcessor::Process(
     consumer_state = deserializer.ConsumeNext(nb, &buffer[0]);
     if (consumer_state != ObjectPackBuild::kStateContinue &&
         consumer_state != ObjectPackBuild::kStateDone) {
-      LogCvmfs(kLogReceiver, kLogDebug | kLogSyslogErr,
+      LogCvmfs(kLogReceiver, kLogCustom1,
                "Error %d encountered when consuming object pack.",
                consumer_state);
       break;
@@ -67,13 +67,13 @@ void PayloadProcessor::ConsumerEventCallback(
     path = event.object_name;
   } else {
     // kEmpty - this is an error.
-    LogCvmfs(kLogReceiver, kLogDebug | kLogSyslogErr,
+    LogCvmfs(kLogReceiver, kLogCustom1,
              "Event received with unknown object.");
     num_errors_++;
     return;
   }
 
-  LogCvmfs(kLogReceiver, kLogDebug | kLogSyslog,
+  LogCvmfs(kLogReceiver, kLogCustom0,
            "PayloadProcessor - object unpacked: %s", path.c_str());
 
   const std::string hash_string = event.id.ToString(true);
@@ -84,7 +84,7 @@ void PayloadProcessor::ConsumerEventCallback(
   std::string temp_dir = "/srv/cvmfs/" + current_repo_ + "/data/txn";
   const std::string tmp_path = CreateTempPath(temp_dir, 0666);
   if (tmp_path.empty()) {
-    LogCvmfs(kLogReceiver, kLogDebug | kLogSyslogErr,
+    LogCvmfs(kLogReceiver, kLogCustom1,
              "Unable to create temporary path.");
     num_errors_++;
     return;
@@ -92,13 +92,13 @@ void PayloadProcessor::ConsumerEventCallback(
 
   int fdout = open(tmp_path.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0600);
   if (fdout == -1) {
-    LogCvmfs(kLogReceiver, kLogDebug | kLogSyslogErr,
+    LogCvmfs(kLogReceiver, kLogCustom1,
              "Unable to open temporary output file: %s", tmp_path.c_str());
     return;
   }
 
   if (!WriteFile(fdout, event.buf, event.buf_size)) {
-    LogCvmfs(kLogReceiver, kLogDebug | kLogSyslogErr, "Unable to write %s",
+    LogCvmfs(kLogReceiver, kLogCustom1, "Unable to write %s",
              tmp_path.c_str());
     num_errors_++;
     unlink(tmp_path.c_str());
@@ -112,7 +112,7 @@ void PayloadProcessor::ConsumerEventCallback(
   // components, allowing, for instance to upload from the gateway to S3
   const std::string dest = "/srv/cvmfs/" + current_repo_ + "/data/" + path;
   if (RenameFile(tmp_path.c_str(), dest.c_str())) {
-    LogCvmfs(kLogReceiver, kLogDebug | kLogSyslogErr,
+    LogCvmfs(kLogReceiver, kLogCustom1,
              "Unable to move file to final destination: %s", dest.c_str());
     num_errors_++;
     return;
