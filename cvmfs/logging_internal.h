@@ -15,25 +15,28 @@ namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
 enum LogFacilities {
-  kLogDebug = 1,
-  kLogStdout = 2,
-  kLogStderr = 4,
-  kLogSyslog = 8,
-  kLogSyslogWarn = 16,
-  kLogSyslogErr = 32,
+  kLogDebug = 0x01,
+  kLogStdout = 0x02,
+  kLogStderr = 0x04,
+  kLogSyslog = 0x08,
+  kLogSyslogWarn = 0x10,
+  kLogSyslogErr = 0x20,
+  kLogCustom0 = 0x40,
+  kLogCustom1 = 0x80,
+  kLogCustom2 = 0x100,
 };
 
 enum LogFlags {
-  kLogNoLinebreak = 128,
-  kLogShowSource = 256,
+  kLogNoLinebreak = 0x200,
+  kLogShowSource = 0x400,
 };
 
 enum LogLevels {
-  kLogLevel0 = 1024,
-  kLogVerbose = 2048,
-  kLogNormal = 4096,
-  kLogDiscrete = 8192,
-  kLogNone = 16384,
+  kLogLevel0 = 0x800,
+  kLogVerbose = 0x1000,
+  kLogNormal = 0x2000,
+  kLogDiscrete = 0x4000,
+  kLogNone = 0x8000,
 };
 
 /**
@@ -83,10 +86,12 @@ void SetLogSyslogLevel(const int level);
 int GetLogSyslogLevel();
 void SetLogSyslogFacility(const int facility);
 int GetLogSyslogFacility();
+void SetLogCustomFile(unsigned id, const std::string &filename);
 void SetLogMicroSyslog(const std::string &filename);
 std::string GetLogMicroSyslog();
 void SetLogSyslogPrefix(const std::string &prefix);
 void SetLogVerbosity(const LogLevels min_level);
+void LogShutdown();
 
 #ifdef DEBUGMSG
 void SetLogDebugFile(const std::string &filename);

@@ -150,8 +150,8 @@ cvmfs_server_import() {
   [ x"$keys_location" = "x" ] && die "Please provide the location of the repository security keys (-k)"
 
   if [ $unionfs = "overlayfs" ]; then
-    check_overlayfs                 || die "overlayfs kernel module missing"
-    check_overlayfs_version         || die "Your version of OverlayFS is not supported"
+    local msg
+    msg="`check_overlayfs_version`" || die "$msg"
     echo "Warning: CernVM-FS filesystems using overlayfs may not enforce hard link semantics during publishing."
   else
     check_aufs                      || die "aufs kernel module missing"
@@ -277,8 +277,10 @@ cvmfs_server_import() {
     local manifest_url="${CVMFS_STRATUM0}/.cvmfspublished"
     local unsigned_manifest="${CVMFS_SPOOL_DIR}/tmp/unsigned_manifest"
     create_cert $name $CVMFS_USER                     || die "fail (certificate creation)!"
-    get_item $name $manifest_url | \
-      strip_manifest_signature - > $unsigned_manifest || die "fail (manifest download)!"
+    local old_manifest
+    old_manifest="`get_item $name $manifest_url`"     || die "fail (manifest download)!"
+    echo "$old_manifest" | strip_manifest_signature - > $unsigned_manifest \
+                                                      || die "fail (manifest signature strip)!"
     chown $CVMFS_USER $unsigned_manifest              || die "fail (manifest chown)!"
     sign_manifest $name $unsigned_manifest            || die "fail (manifest resign)!"
     echo "done"

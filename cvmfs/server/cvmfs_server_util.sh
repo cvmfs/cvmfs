@@ -472,21 +472,41 @@ check_upstream_validity() {
 }
 
 
-# ensure that the installed overlayfs is viable for CernVM-FS. Namely, it must
-# be part of the upstream kernel (since 3.18) and recent enough (kernel 4.2)
+# Ensure that the installed overlayfs is viable for CernVM-FS.
 # Note: More details are in CVM-835.
 # @return  0 if overlayfs is installed and viable
+#          1 if it is not viable, and stdout contains a reason
+# This should probably now be called check_overlayfs_viability except
+#   that for backward compatiblity we need to keep the variable that
+#   overrides it, CVMFS_DONT_CHECK_OVERLAYFS_VERSION, and changing the
+#   function name would make the variable name not make sense.
 check_overlayfs_version() {
-  [ -z "$CVMFS_DONT_CHECK_OVERLAYFS_VERSION" ] || return 0
-  local scratch_fstype=$(df -T /var/spool/cvmfs | tail -1 | awk {'print $2'})
-  local krnl_version=$(cvmfs_sys_uname)
-  if compare_versions "$krnl_version" -ge "4.2.0" ; then
-      return 0
-  elif cvmfs_sys_is_redhat && $(compare_versions "$krnl_version" -ge "3.10.0-493") && [ "x$scratch_fstype" = "xext4" ] ; then
-      return 0
-  else
-      return 1
+  if ! check_overlayfs; then
+    echo "overlayfs kernel module missing"
+    return 1
   fi
+  [ -z "$CVMFS_DONT_CHECK_OVERLAYFS_VERSION" ] || return 0
+  local krnl_version=$(cvmfs_sys_uname)
+  local required_version="4.2.0"
+  if compare_versions "$krnl_version" -ge "$required_version" ; then
+    return 0
+  fi
+  if cvmfs_sys_is_redhat; then
+    # Redhat kernel with backported overlayfs supports limited filesystem types
+    required_version="3.10.0-493"
+    if compare_versions "$krnl_version" -ge "$required_version" ; then
+      # If the mounted filesystem name is long df will split output into two
+      #  lines, so use tail -n +2 to skip first line and echo to combine them
+      local scratch_fstype=$(echo $(df -T /var/spool/cvmfs | tail -n +2) | awk {'print $2'})
+      if [ "x$scratch_fstype" = "xext3" ] || [ "x$scratch_fstype" = "xext4" ] ; then
+        return 0
+      fi
+      echo "overlayfs scratch /var/spool/cvmfs is type $scratch_fstype, but ext3 or ext4 required"
+      return 1
+    fi
+  fi
+  echo "Kernel version $krnl_version too old for overlayfs; at least $required_version required"
+  return 1
 }
 
 
@@ -985,6 +1005,8 @@ Supported Commands:
                   inaccessible.  Without a tag name, trunk-previous is used.
   resign          [ -w path to existing whitelist ] <fully qualified name>
                   Re-sign the 30 day whitelist
+  resign -p       <fully qualified name>
+                  Re-sign .cvmfspublished
   masterkeycard   -a Checks if a smartcard is available
                   -k Checks whether a key is stored in a card
                   -r Reads pub key from a card to stdout
