@@ -22,14 +22,14 @@ cvmfs_server_rmfs() {
     case $option in
       f)
         force=1
-      ;;
+        ;;
       p)
         preserve_data=1
-      ;;
+        ;;
       ?)
         shift $(($OPTIND-2))
         usage "Command rmfs: Unrecognized option: $1"
-      ;;
+        ;;
     esac
   done
 
@@ -89,30 +89,30 @@ cvmfs_server_rmfs() {
     echo "done"
 
     if [ $preserve_data -eq 0 ] && \
-       is_local_upstream $CVMFS_UPSTREAM_STORAGE; then
-      echo -n "Removing Repository Storage... "
-      local storage_dir="$(get_upstream_config $CVMFS_UPSTREAM_STORAGE)"
-      if [ x"$storage_dir" != x"" ]; then
-        rm -fR "$storage_dir" || die "fail"
-      fi
-      echo "done"
+      is_local_upstream $CVMFS_UPSTREAM_STORAGE; then
+    echo -n "Removing Repository Storage... "
+    local storage_dir="$(get_upstream_config $CVMFS_UPSTREAM_STORAGE)"
+    if [ x"$storage_dir" != x"" ]; then
+      rm -fR "$storage_dir" || die "fail"
     fi
+    echo "done"
+  fi
 
-    if [ $preserve_data -eq 0 ] && \
-       [ "$CVMFS_REPOSITORY_TYPE" = stratum0 ]; then
-      echo -n "Removing Keys and Certificate... "
-      rm -f /etc/cvmfs/keys/$name.masterkey \
-            /etc/cvmfs/keys/$name.pub       \
-            /etc/cvmfs/keys/$name.key       \
-            /etc/cvmfs/keys/$name.crt || die "fail"
-      rm -f /etc/cvmfs/keys/$name.gw
-      echo "done"
-    fi
+  if [ $preserve_data -eq 0 ] && \
+    [ "$CVMFS_REPOSITORY_TYPE" = stratum0 ]; then
+  echo -n "Removing Keys and Certificate... "
+  rm -f /etc/cvmfs/keys/$name.masterkey \
+    /etc/cvmfs/keys/$name.pub       \
+    /etc/cvmfs/keys/$name.key       \
+    /etc/cvmfs/keys/$name.crt || die "fail"
+  rm -f /etc/cvmfs/keys/$name.gw
+  echo "done"
+fi
 
-    echo -n "Updating global JSON information... "
-    update_global_repository_info && echo "done" || echo "fail"
+echo -n "Updating global JSON information... "
+update_global_repository_info && echo "done" || echo "fail"
 
-    echo "CernVM-FS repository $name wiped out!"
+echo "CernVM-FS repository $name wiped out!"
 
   done
 

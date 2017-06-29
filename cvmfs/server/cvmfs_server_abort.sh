@@ -23,14 +23,14 @@ cvmfs_server_abort() {
       f)
         force=1
         open_fd_dialog=0
-      ;;
+        ;;
       e) # Need this mode if passing repository subpaths: cvmfs_server transaction myrepo.cern.ch/some/subpath
         exact=1
-      ;;
+        ;;
       ?)
         shift $(($OPTIND-2))
         usage "Command abort: Unrecognized option: $1"
-      ;;
+        ;;
     esac
   done
 
@@ -38,10 +38,10 @@ cvmfs_server_abort() {
   check_parameter_count_for_multiple_repositories $#
   # get repository names
   if [ $exact -eq 0 ]; then
-      names=$(get_or_guess_multiple_repository_names "$@")
-      check_multiple_repository_existence "$names"
+    names=$(get_or_guess_multiple_repository_names "$@")
+    check_multiple_repository_existence "$names"
   else
-      names=$@
+    names=$@
   fi
 
   for name in $names; do
@@ -91,8 +91,8 @@ cvmfs_server_abort() {
     # If the upstream storage type is http (publication leases are managed by an instance of the CVMFS repo services,
     # the cvmfs_swissknife lease command needs to be used to drop the active lease
     if [ x"$upstream_type" = xgw ]; then
-        local repo_services_url=$(echo $upstream_storage | cut -d',' -f3)
-        __swissknife lease -a drop -u $repo_services_url -k $gw_key_file -p $name"/"$subpath || { echo "Could not drop active lease or lease does not exist for repository $name"; retcode=1; continue; }
+      local repo_services_url=$(echo $upstream_storage | cut -d',' -f3)
+      __swissknife lease -a drop -u $repo_services_url -k $gw_key_file -p $name"/"$subpath || { echo "Could not drop active lease or lease does not exist for repository $name"; retcode=1; continue; }
     fi
     close_transaction $name $use_fd_fallback
 
