@@ -1,4 +1,5 @@
 2.4.0:
+  * Allow ext3 as spool file system on RHEL 7.3 / overlayfs (CVM-1186)
   * Add `cvmfs_server resign -p` command (CVM-1140)
   * Add `cvmfs_server check -r` command to repair reflog checksum (CVM-1240)
   * Add ncleanup24 xattr and Nagios check for cleanup rate (CVM-1097)
