@@ -150,8 +150,8 @@ cvmfs_server_import() {
   [ x"$keys_location" = "x" ] && die "Please provide the location of the repository security keys (-k)"
 
   if [ $unionfs = "overlayfs" ]; then
-    check_overlayfs                 || die "overlayfs kernel module missing"
-    check_overlayfs_version         || die "Your version of OverlayFS is not supported"
+    local msg
+    msg="`check_overlayfs_version`" || die "$msg"
     echo "Warning: CernVM-FS filesystems using overlayfs may not enforce hard link semantics during publishing."
   else
     check_aufs                      || die "aufs kernel module missing"

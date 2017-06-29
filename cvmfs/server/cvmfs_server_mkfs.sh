@@ -201,8 +201,8 @@ cvmfs_server_mkfs() {
   is_root                           || die "Only root can create a new repository"
   check_upstream_validity $upstream
   if [ $unionfs = "overlayfs" ]; then
-    check_overlayfs                 || die "overlayfs kernel module missing"
-    check_overlayfs_version         || die "Your version of OverlayFS is not supported"
+    local msg
+    msg="`check_overlayfs_version`" || die "$msg"
     echo "Warning: CernVM-FS filesystems using overlayfs may not enforce hard link semantics during publishing."
   else
     check_aufs                      || die "aufs kernel module missing"
