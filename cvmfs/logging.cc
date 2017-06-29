@@ -28,12 +28,15 @@
 
 #include "platform.h"
 #include "smalloc.h"
+#include "util/posix.h"
 
 using namespace std;  // NOLINT
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
+
+static void LogCustom(unsigned id, const std::string &message);
 
 namespace {
 
@@ -65,6 +68,14 @@ int usyslog_fd = -1;
 int usyslog_fd1 = -1;
 unsigned usyslog_size = 0;
 pthread_mutex_t lock_usyslock = PTHREAD_MUTEX_INITIALIZER;
+
+const unsigned kMaxCustomlog = 3;
+string *customlog_dests[] = {NULL, NULL, NULL};
+int customlog_fds[] = {-1, -1, -1};
+pthread_mutex_t customlog_locks[] = {
+  PTHREAD_MUTEX_INITIALIZER,
+  PTHREAD_MUTEX_INITIALIZER,
+  PTHREAD_MUTEX_INITIALIZER};
 
 LogLevels min_log_level = kLogNormal;
 static void (*alt_log_func)(const LogSource source, const int mask,
@@ -182,6 +193,7 @@ void SetLogSyslogPrefix(const std::string &prefix) {
  * Set the minimum verbosity level.  By default kLogNormal.
  */
 void SetLogVerbosity(const LogLevels min_level) { min_log_level = min_level; }
+
 
 /**
  * "Micro-Syslog" write kLogSyslog messages into filename.  It rotates this
@@ -328,6 +340,7 @@ void SetAltLogFunc(void (*fn)(const LogSource source, const int mask,
   alt_log_func = fn;
 }
 
+
 /**
  * Logs a message to one or multiple facilities specified by mask.
  * Mask can be extended by a log level in the future, using the higher bits.
@@ -424,6 +437,14 @@ void LogCvmfs(const LogSource source, const int mask, const char *format, ...) {
     }
   }
 
+  if (mask & (kLogCustom0 | kLogCustom1 | kLogCustom2)) {
+    string fmt_msg(msg);
+    if (syslog_prefix) fmt_msg = "(" + string(syslog_prefix) + ") " + fmt_msg;
+    if (mask & kLogCustom0) LogCustom(0, fmt_msg);
+    if (mask & kLogCustom1) LogCustom(1, fmt_msg);
+    if (mask & kLogCustom2) LogCustom(2, fmt_msg);
+  }
+
   free(msg);
 }
 
@@ -434,6 +455,68 @@ void PrintError(const string &message) {
 void PrintWarning(const string &message) {
   LogCvmfs(kLogCvmfs, kLogStderr, "[WARNING] %s", message.c_str());
 }
+
+
+/**
+ * Opens a custom log file
+ */
+void SetLogCustomFile(unsigned id, const std::string &filename) {
+  assert(id < kMaxCustomlog);
+  pthread_mutex_lock(&customlog_locks[id]);
+
+  if (customlog_fds[id] >= 0) {
+    close(customlog_fds[id]);
+    customlog_fds[id] = -1;
+  }
+
+  if (filename.empty()) {
+    delete customlog_dests[id];
+    customlog_dests[id] = NULL;
+    pthread_mutex_unlock(&customlog_locks[id]);
+    return;
+  }
+
+  customlog_fds[id] = open(filename.c_str(), O_RDWR | O_APPEND | O_CREAT, 0600);
+  if (customlog_fds[id] < 0) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+             "could not open log file %s (%d), aborting",
+             filename.c_str(), errno);
+    abort();
+  }
+  delete customlog_dests[id];
+  customlog_dests[id] = new string(filename);
+
+  pthread_mutex_unlock(&customlog_locks[id]);
+}
+
+
+static void LogCustom(unsigned id, const std::string &message) {
+  assert(id < kMaxCustomlog);
+  if (message.size() == 0) return;
+
+  pthread_mutex_lock(&customlog_locks[id]);
+  assert(customlog_fds[id] >= 0);
+
+  bool retval_b = SafeWrite(customlog_fds[id], message.data(), message.size());
+  if (!retval_b) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+             "could not write into log file %s (%d), aborting - lost: %s",
+             customlog_dests[id]->c_str(), errno, message.c_str());
+    abort();
+  }
+  int retval_i = fsync(customlog_fds[id]);
+  assert(retval_i == 0);
+
+  pthread_mutex_unlock(&customlog_locks[id]);
+}
+
+
+void LogShutdown() {
+  SetLogMicroSyslog("");
+  for (unsigned i = 0; i < kMaxCustomlog; ++i)
+    SetLogCustomFile(i, "");
+}
+
 
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD
