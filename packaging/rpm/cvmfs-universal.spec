@@ -450,9 +450,12 @@ fi
 %files unittests
 %defattr(-,root,root)
 %{_bindir}/cvmfs_unittests
+%{_bindir}/cvmfs_test_cache
 %doc COPYING AUTHORS README.md ChangeLog
 
 %changelog
+* Thu Jun 29 2017 Jakob Blomer <jblomer@cern.ch> - 2.4.0
+- Add cvmfs_test_cache to unittests sub package
 * Tue May 09 2017 Dave Dykstra <dwd@fnal.gov> - 2.4.0
 - Add cvmfs_receiver
 * Wed Mar 22 2017 Jakob Blomer <jblomer@cern.ch> - 2.4.0
