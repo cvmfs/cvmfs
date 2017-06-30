@@ -29,44 +29,44 @@ cvmfs_server_publish() {
     case $option in
       p)
         tweaks_option="-d"
-        ;;
+      ;;
       a)
         tag_name="$OPTARG"
-        ;;
+      ;;
       c)
         tag_channel="$OPTARG"
-        ;;
+      ;;
       m)
         tag_description="$OPTARG"
-        ;;
+      ;;
       v)
         verbosity="-x"
-        ;;
+      ;;
       n)
         manual_revision="$OPTARG"
-        ;;
+      ;;
       X)
         force_external=1
-        ;;
+      ;;
       N)
         force_native=1
-        ;;
+      ;;
       Z)
         force_compression_algorithm="$OPTARG"
-        ;;
+      ;;
       F)
         authz_file="-F $OPTARG"
-        ;;
+      ;;
       f)
         open_fd_dialog=0
-        ;;
+      ;;
       e)
         exact=1
-        ;;
+      ;;
       ?)
         shift $(($OPTIND-2))
         usage "Command publish: Unrecognized option: $1"
-        ;;
+      ;;
     esac
   done
 
@@ -179,22 +179,22 @@ cvmfs_server_publish() {
 
     local trusted_certs="/etc/cvmfs/repositories.d/${name}/trusted_certs"
     local sync_command="$(__swissknife_cmd dbg) sync \
-      -u /cvmfs/$name                                \
-      -s ${scratch_dir}                              \
-      -c ${spool_dir}/rdonly                         \
-      -t ${spool_dir}/tmp                            \
-      -b $base_hash                                  \
-      -r ${upstream}                                 \
-      -w $stratum0                                   \
-      -o $manifest                                   \
-      -e $hash_algorithm                             \
-      -Z $compression_alg                            \
-      -C $trusted_certs                              \
-      -N $name                                       \
-      -K $CVMFS_PUBLIC_KEY                           \
-      $(get_follow_http_redirects_flag)              \
-      $authz_file                                    \
-      $log_level $tweaks_option $external_option $verbosity"
+        -u /cvmfs/$name                                \
+        -s ${scratch_dir}                              \
+        -c ${spool_dir}/rdonly                         \
+        -t ${spool_dir}/tmp                            \
+        -b $base_hash                                  \
+        -r ${upstream}                                 \
+        -w $stratum0                                   \
+        -o $manifest                                   \
+        -e $hash_algorithm                             \
+        -Z $compression_alg                            \
+        -C $trusted_certs                              \
+        -N $name                                       \
+        -K $CVMFS_PUBLIC_KEY                           \
+        $(get_follow_http_redirects_flag)              \
+        $authz_file                                    \
+        $log_level $tweaks_option $external_option $verbosity"
 
     # If the upstream type is "gw", we need to pass additional parameters
     # to the `cvmfs_swissknife sync` command: the username and the
@@ -207,9 +207,9 @@ cvmfs_server_publish() {
     fi
     if [ "x$CVMFS_USE_FILE_CHUNKING" = "xtrue" ]; then
       sync_command="$sync_command -p \
-        -l $CVMFS_MIN_CHUNK_SIZE \
-        -a $CVMFS_AVG_CHUNK_SIZE \
-        -h $CVMFS_MAX_CHUNK_SIZE"
+       -l $CVMFS_MIN_CHUNK_SIZE \
+       -a $CVMFS_AVG_CHUNK_SIZE \
+       -h $CVMFS_MAX_CHUNK_SIZE"
     fi
     if [ "x$CVMFS_AUTOCATALOGS" = "xtrue" ]; then
       sync_command="$sync_command -A"
@@ -328,11 +328,11 @@ cvmfs_server_publish() {
     fi
 
     if [ x"$upstream_type" = xgw ]; then
-      close_transaction  $name $use_fd_fallback
-      publish_after_hook $name
-      publish_succeeded $name
-      echo "Changes submitted to repository gateway"
-      return 0
+        close_transaction  $name $use_fd_fallback
+        publish_after_hook $name
+        publish_succeeded $name
+        echo "Changes submitted to repository gateway"
+        return 0
     fi
 
     # Remove outdated automatically created tags
@@ -342,84 +342,84 @@ cvmfs_server_publish() {
       echo $auto_tag_cleanup_list | xargs -n100 echo > $tag_list_file
       tag_remove_cmd_file=$(mktemp)
       cat $tag_list_file | while read REPLY; do
-      local tag_cleanup_command="$(__swissknife_cmd dbg) tag_edit \
-        -r $upstream                                        \
-        -w $stratum0                                        \
-        -t ${spool_dir}/tmp                                 \
-        -m $manifest                                        \
-        -p /etc/cvmfs/keys/${name}.pub                      \
-        -f $name                                            \
-        -b $base_hash                                       \
-        -e $hash_algorithm                                  \
-        $(get_follow_http_redirects_flag)                   \
-        -d \\\"$REPLY\\\""
-      echo $user_shell \"${tag_cleanup_command}\" >> $tag_remove_cmd_file
-    done
-    rm -f $tag_list_file
-  fi
+        local tag_cleanup_command="$(__swissknife_cmd dbg) tag_edit \
+          -r $upstream                                        \
+          -w $stratum0                                        \
+          -t ${spool_dir}/tmp                                 \
+          -m $manifest                                        \
+          -p /etc/cvmfs/keys/${name}.pub                      \
+          -f $name                                            \
+          -b $base_hash                                       \
+          -e $hash_algorithm                                  \
+          $(get_follow_http_redirects_flag)                   \
+          -d \\\"$REPLY\\\""
+        echo $user_shell \"${tag_cleanup_command}\" >> $tag_remove_cmd_file
+      done
+      rm -f $tag_list_file
+    fi
 
-  if [ ! -z "$tag_remove_cmd_file" ]; then
-    echo "Removing outdated automatically generated tags for $name..."
-    /bin/sh $tag_remove_cmd_file || \
-      { rm -f $tag_remove_cmd_file; publish_failed $name; \
-        die "Removing tags failed\n\nExecuted Command:\n/bin/sh \
-        $tag_remove_cmd_file"; }
-    rm -f $tag_remove_cmd_file
-    # write intermediate history hash to reflog
-    sign_manifest $name $manifest "" true
-  fi
+    if [ ! -z "$tag_remove_cmd_file" ]; then
+      echo "Removing outdated automatically generated tags for $name..."
+      /bin/sh $tag_remove_cmd_file || \
+        { rm -f $tag_remove_cmd_file; publish_failed $name; \
+          die "Removing tags failed\n\nExecuted Command:\n/bin/sh \
+          $tag_remove_cmd_file"; }
+      rm -f $tag_remove_cmd_file
+      # write intermediate history hash to reflog
+      sign_manifest $name $manifest "" true
+    fi
 
-  # add a tag for the new revision
-  echo "Tagging $name"
-  $user_shell "$tag_command" || { publish_failed $name; die "Tagging failed\n\nExecuted Command:\n$tag_command";  }
+    # add a tag for the new revision
+    echo "Tagging $name"
+    $user_shell "$tag_command" || { publish_failed $name; die "Tagging failed\n\nExecuted Command:\n$tag_command";  }
 
-  if [ "x$sync_command_virtual_dir" != "x" ]; then
-    # write intermediate catalog hash and history to reflog
-    sign_manifest $name $manifest "" true
-    $user_shell "$sync_command_virtual_dir" || { publish_failed $name; die "Editing .cvmfs failed\n\nExecuted Command:\n$sync_command_virtual_dir";  }
-    local trunk_hash=$(grep "^C" $manifest | tr -d C)
-    $user_shell "$tag_command_undo_tags" || { publish_failed $name; die "Creating undo tags\n\nExecuted Command:\n$tag_command_undo_tags";  }
-  fi
+    if [ "x$sync_command_virtual_dir" != "x" ]; then
+      # write intermediate catalog hash and history to reflog
+      sign_manifest $name $manifest "" true
+      $user_shell "$sync_command_virtual_dir" || { publish_failed $name; die "Editing .cvmfs failed\n\nExecuted Command:\n$sync_command_virtual_dir";  }
+      local trunk_hash=$(grep "^C" $manifest | tr -d C)
+      $user_shell "$tag_command_undo_tags" || { publish_failed $name; die "Creating undo tags\n\nExecuted Command:\n$tag_command_undo_tags";  }
+    fi
 
-  # finalizing transaction
-  echo "Flushing file system buffers"
-  sync
+    # finalizing transaction
+    echo "Flushing file system buffers"
+    sync
 
-  # committing newly created revision
-  echo "Signing new manifest"
-  sign_manifest $name $manifest      || { publish_failed $name; die "Signing failed"; }
-  set_ro_root_hash $name $trunk_hash || { publish_failed $name; die "Root hash update failed"; }
-  if is_checked_out $name; then
-    rm -f /var/spool/cvmfs/${name}/checkout
-    echo "Reset to trunk on default branch"
-  fi
+    # committing newly created revision
+    echo "Signing new manifest"
+    sign_manifest $name $manifest      || { publish_failed $name; die "Signing failed"; }
+    set_ro_root_hash $name $trunk_hash || { publish_failed $name; die "Root hash update failed"; }
+    if is_checked_out $name; then
+      rm -f /var/spool/cvmfs/${name}/checkout
+      echo "Reset to trunk on default branch"
+    fi
 
-  # run the automatic garbage collection (if configured)
-  if has_auto_garbage_collection_enabled $name; then
-    echo "Running automatic garbage collection"
-    local dry_run=0
-    __run_gc $name       \
-      $stratum0   \
-      $dry_run    \
-      ""          \
-      "0"         \
-      -z $gc_timespan      || { local err=$?; publish_failed $name; die "Garbage collection failed ($err)"; }
-  fi
+    # run the automatic garbage collection (if configured)
+    if has_auto_garbage_collection_enabled $name; then
+      echo "Running automatic garbage collection"
+      local dry_run=0
+      __run_gc $name       \
+               $stratum0   \
+               $dry_run    \
+               ""          \
+               "0"         \
+               -z $gc_timespan      || { local err=$?; publish_failed $name; die "Garbage collection failed ($err)"; }
+    fi
 
-  # check again for open file descriptors (potential race condition)
-  if has_file_descriptors_on_mount_point $name && \
-    [ $use_fd_fallback -ne 1 ]; then
-  file_descriptor_warning $name
-  echo "Forcing remount of already committed repository revision"
-  use_fd_fallback=1
-else
-  echo "Remounting newly created repository revision"
-fi
+    # check again for open file descriptors (potential race condition)
+    if has_file_descriptors_on_mount_point $name && \
+       [ $use_fd_fallback -ne 1 ]; then
+      file_descriptor_warning $name
+      echo "Forcing remount of already committed repository revision"
+      use_fd_fallback=1
+    else
+      echo "Remounting newly created repository revision"
+    fi
 
-# remount the repository
-close_transaction  $name $use_fd_fallback
-publish_after_hook $name
-publish_succeeded  $name
+    # remount the repository
+    close_transaction  $name $use_fd_fallback
+    publish_after_hook $name
+    publish_succeeded  $name
 
   done
 
@@ -432,7 +432,7 @@ has_file_descriptors_on_mount_point() {
   local mountpoint="/cvmfs/${name}"
 
   [ $(count_rd_only_fds $mountpoint) -gt 0 ] || \
-    [ $(count_wr_fds      $mountpoint) -gt 0 ]
+  [ $(count_wr_fds      $mountpoint) -gt 0 ]
 }
 
 
@@ -463,12 +463,12 @@ filter_auto_tags() {
   local tag_name=
   local timestamp=
   local old_tags="$(echo "$auto_tags" | while read tag_name timestamp; do
-  if [ "$timestamp" -lt "$auto_tags_timespan" ]; then
-    echo -n "$tag_name "
-  fi
-done)"
-# Trim old_tags
-echo $old_tags
+    if [ "$timestamp" -lt "$auto_tags_timespan" ]; then
+      echo -n "$tag_name "
+    fi
+  done)"
+  # Trim old_tags
+  echo $old_tags
 }
 
 

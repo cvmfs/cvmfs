@@ -27,14 +27,14 @@ cvmfs_server_transaction() {
     case $option in
       f)
         force=1
-        ;;
+      ;;
       e) # Need this mode if passing repository subpaths: cvmfs_server transaction myrepo.cern.ch/some/subpath
         exact=1
-        ;;
+      ;;
       ?)
         shift $(($OPTIND-2))
         usage "Command transaction: Unrecognized option: $1"
-        ;;
+      ;;
     esac
   done
 
@@ -42,10 +42,10 @@ cvmfs_server_transaction() {
   check_parameter_count_for_multiple_repositories $#
   # get repository names
   if [ $exact -eq 0 ]; then
-    names=$(get_or_guess_multiple_repository_names "$@")
-    check_multiple_repository_existence "$names"
+      names=$(get_or_guess_multiple_repository_names "$@")
+      check_multiple_repository_existence "$names"
   else
-    names=$@
+      names=$@
   fi
 
   # sanity checks
@@ -75,7 +75,7 @@ cvmfs_server_transaction() {
     is_owner_or_root $name || { echo "Permission denied: Repository $name is owned by $user"; retcode=1; continue; }
     check_repository_compatibility $name
     if [ $force -eq 0 ]; then
-      is_in_transaction $name && { echo "Repository $name is already in a transaction"; retcode=1; continue; }
+        is_in_transaction $name && { echo "Repository $name is already in a transaction"; retcode=1; continue; }
     fi
     check_expiry $name $stratum0 || { echo "Repository whitelist for $name is expired!"; retcode=1; continue; }
     [ $(get_expiry $name $stratum0) -le $(( 12 * 60 * 60 )) ] && { echo "Warning: Repository whitelist stays valid for less than 12 hours!"; }
@@ -85,8 +85,8 @@ cvmfs_server_transaction() {
     # If the upstream storage type is http (publication leases are managed by an instance of the CVMFS repo services,
     # the cvmfs_swissknife lease command needs to be used to acquire a new lease
     if [ x"$upstream_type" = xgw ]; then
-      local repo_services_url=$(echo $upstream_storage | cut -d',' -f3)
-      __swissknife lease -a acquire -u $repo_services_url -k $gw_key_file -p $name"/"$subpath || { echo "Could not acquire a new lease for repository $name"; retcode=1; continue; }
+        local repo_services_url=$(echo $upstream_storage | cut -d',' -f3)
+        __swissknife lease -a acquire -u $repo_services_url -k $gw_key_file -p $name"/"$subpath || { echo "Could not acquire a new lease for repository $name"; retcode=1; continue; }
     fi
     open_transaction $name $
 

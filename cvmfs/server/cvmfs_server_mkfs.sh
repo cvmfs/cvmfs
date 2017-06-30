@@ -31,11 +31,11 @@ cvmfs_server_alterfs() {
         else
           usage "Command alterfs: parameter -m expects 'on' or 'off'"
         fi
-        ;;
+      ;;
       ?)
         shift $(($OPTIND-2))
         usage "Command alterfs: Unrecognized option: $1"
-        ;;
+      ;;
     esac
   done
 
@@ -110,59 +110,59 @@ cvmfs_server_mkfs() {
     case $option in
       X)
         external_data=true
-        ;;
+      ;;
       w)
         stratum0=$OPTARG
-        ;;
+      ;;
       u)
         upstream=$OPTARG
-        ;;
+      ;;
       o)
         owner=$OPTARG
-        ;;
+      ;;
       m)
         replicable=1
-        ;;
+      ;;
       f)
         unionfs=$OPTARG
-        ;;
+      ;;
       v)
         volatile_content=1
-        ;;
+      ;;
       g)
         autotagging=false
-        ;;
+      ;;
       G)
         auto_tag_timespan="$OPTARG"
-        ;;
+      ;;
       a)
         hash_algo=$OPTARG
-        ;;
+      ;;
       z)
         garbage_collectable=true
-        ;;
+      ;;
       s)
         s3_config=$OPTARG
-        ;;
+      ;;
       k)
         keys_import_location=$OPTARG
-        ;;
+      ;;
       R)
         require_masterkeycard=1
-        ;;
+      ;;
       Z)
         compression_alg=$OPTARG
-        ;;
+      ;;
       p)
         configure_apache=0
-        ;;
+      ;;
       V)
         voms_authz=$OPTARG
-        ;;
+      ;;
       ?)
         shift $(($OPTIND-2))
         usage "Command mkfs: Unrecognized option: $1"
-        ;;
+      ;;
     esac
   done
 
@@ -227,15 +227,15 @@ cvmfs_server_mkfs() {
   local upstream_type=$(get_upstream_type $upstream)
   local keys="${name}.key ${name}.crt ${name}.pub"
   if [ x"$upstream_type" = xgw ]; then
-    keys="$keys ${name}.gw"
+      keys="$keys ${name}.gw"
   fi
   if [ $require_masterkeycard -eq 1 ]; then
-    local reason
-    reason="`masterkeycard_cert_available`" || die "masterkeycard not available: $reason"
+      local reason
+      reason="`masterkeycard_cert_available`" || die "masterkeycard not available: $reason"
   elif masterkeycard_cert_available >/dev/null; then
-    require_masterkeycard=1
+      require_masterkeycard=1
   else
-    keys="${name}.masterkey $keys"
+      keys="${name}.masterkey $keys"
   fi
   local keys_are_there=0
   for k in $keys; do
@@ -247,153 +247,153 @@ cvmfs_server_mkfs() {
   if [ $keys_are_there -eq 1 ]; then
     # just import the keys that are already there if they do not overwrite existing keys
     if [ x"$keys_import_location" != x""               ] && \
-      [ x"$keys_import_location" != x"$keys_location" ]; then
-    die "Importing keys from '$keys_import_location' would overwrite keys in '$keys_location'"
+       [ x"$keys_import_location" != x"$keys_location" ]; then
+      die "Importing keys from '$keys_import_location' would overwrite keys in '$keys_location'"
+    fi
+    keys_import_location=$keys_location
   fi
-  keys_import_location=$keys_location
-fi
 
-# repository owner dialog
-local cvmfs_user=$(get_cvmfs_owner $name $owner)
-check_user $cvmfs_user || die "No user $cvmfs_user"
+  # repository owner dialog
+  local cvmfs_user=$(get_cvmfs_owner $name $owner)
+  check_user $cvmfs_user || die "No user $cvmfs_user"
 
-# GC and auto-tag warning
-if [ x"$autotagging" = x"true" ] && [ x"$auto_tag_timespan" = "x" ] && [ x"$garbage_collectable" = x"true" ]; then
-  echo "Note: Autotagging all revisions impedes garbage collection"
-fi
+  # GC and auto-tag warning
+  if [ x"$autotagging" = x"true" ] && [ x"$auto_tag_timespan" = "x" ] && [ x"$garbage_collectable" = x"true" ]; then
+    echo "Note: Autotagging all revisions impedes garbage collection"
+  fi
 
-# create system-wide configuration
-echo -n "Creating Configuration Files... "
-create_config_files_for_new_repository "$name"                \
-  "$upstream"            \
-  "$stratum0"            \
-  "$cvmfs_user"          \
-  "$unionfs"             \
-  "$hash_algo"           \
-  "$autotagging"         \
-  "$garbage_collectable" \
-  "$configure_apache"    \
-  "$compression_alg"     \
-  "$external_data"       \
-  "$voms_authz"          \
-  "$auto_tag_timespan" || die "fail"
-echo "done"
-
-# create or import security keys and certificates
-if [ x"$keys_import_location" = x"" ]; then
-  echo -n "Creating CernVM-FS Master Key and Self-Signed Certificate... "
-  create_master_key $name $cvmfs_user || die "fail (master key)"
-  create_cert $name $cvmfs_user       || die "fail (certificate)"
+  # create system-wide configuration
+  echo -n "Creating Configuration Files... "
+  create_config_files_for_new_repository "$name"                \
+                                         "$upstream"            \
+                                         "$stratum0"            \
+                                         "$cvmfs_user"          \
+                                         "$unionfs"             \
+                                         "$hash_algo"           \
+                                         "$autotagging"         \
+                                         "$garbage_collectable" \
+                                         "$configure_apache"    \
+                                         "$compression_alg"     \
+                                         "$external_data"       \
+                                         "$voms_authz"          \
+                                         "$auto_tag_timespan" || die "fail"
   echo "done"
-else
-  echo -n "Importing CernVM-FS Master Key and Certificate from '$keys_import_location'... "
-  import_keychain $name "$keys_import_location" $cvmfs_user "$keys" > /dev/null || die "fail!"
+
+  # create or import security keys and certificates
+  if [ x"$keys_import_location" = x"" ]; then
+    echo -n "Creating CernVM-FS Master Key and Self-Signed Certificate... "
+    create_master_key $name $cvmfs_user || die "fail (master key)"
+    create_cert $name $cvmfs_user       || die "fail (certificate)"
+    echo "done"
+  else
+    echo -n "Importing CernVM-FS Master Key and Certificate from '$keys_import_location'... "
+    import_keychain $name "$keys_import_location" $cvmfs_user "$keys" > /dev/null || die "fail!"
+    echo "done"
+  fi
+
+  # create spool area and mountpoints
+  echo -n "Creating CernVM-FS Server Infrastructure... "
+  create_spool_area_for_new_repository $name || die "fail"
   echo "done"
-fi
 
-# create spool area and mountpoints
-echo -n "Creating CernVM-FS Server Infrastructure... "
-create_spool_area_for_new_repository $name || die "fail"
-echo "done"
+  # create storage area
+  if is_local_upstream $upstream; then
+    echo -n "Creating Backend Storage... "
+    create_global_info_skeleton     || die "fail"
+    create_repository_storage $name || die "fail"
+    echo "done"
+  fi
 
-# create storage area
-if is_local_upstream $upstream; then
-  echo -n "Creating Backend Storage... "
-  create_global_info_skeleton     || die "fail"
-  create_repository_storage $name || die "fail"
+  # get information about new repository
+  load_repo_config $name
+  local temp_dir="${CVMFS_SPOOL_DIR}/tmp"
+  local rdonly_dir="${CVMFS_SPOOL_DIR}/rdonly"
+  local scratch_dir="${CVMFS_SPOOL_DIR}/scratch/current"
+
+  # create the whitelist
+  if [ x"$upstream_type" != xgw ]; then
+      create_whitelist $name $cvmfs_user $upstream $temp_dir
+  fi
+
+  echo -n "Creating Initial Repository... "
+  local repoinfo_file=${temp_dir}/new_repoinfo
+  touch $repoinfo_file
+  create_repometa_skeleton $repoinfo_file
+  sync
+  if is_local_upstream $upstream && [ $configure_apache -eq 1 ]; then
+    reload_apache > /dev/null
+    wait_for_apache "${stratum0}/.cvmfswhitelist" || die "fail (Apache configuration)"
+  fi
+
+  local volatile_opt=
+  if [ $volatile_content -eq 1 ]; then
+    volatile_opt="-v"
+    echo -n "(repository flagged volatile)... "
+  fi
+  local user_shell="$(get_user_shell $name)"
+  if [ x"$upstream_type" != xgw ]; then
+      local create_cmd="$(__swissknife_cmd) create  \
+      -t $temp_dir                                \
+      -r $upstream                                \
+      -n $name                                    \
+      -a $hash_algo $volatile_opt                 \
+      -o ${temp_dir}/new_manifest                 \
+      -R $(get_reflog_checksum $name)"
+      if $garbage_collectable; then
+          create_cmd="$create_cmd -z"
+      fi
+      if [ "x$voms_authz" != "x" ]; then
+          echo -n "(repository will be accessible with VOMS credentials $voms_authz)... "
+          create_cmd="$create_cmd -V $voms_authz"
+      fi
+
+      $user_shell "$create_cmd" > /dev/null                       || die "fail! (cannot init repo)"
+      sign_manifest $name ${temp_dir}/new_manifest $repoinfo_file || die "fail! (cannot sign repo)"
+  else
+      local create_cmd="$(__swissknife_cmd) create  \
+      -t $temp_dir                                \
+      -n $name                                    \
+      -a $hash_algo $volatile_opt                 \
+      -o ${temp_dir}/new_manifest"
+
+      if $garbage_collectable; then
+          create_cmd="$create_cmd -z"
+      fi
+      if [ "x$voms_authz" != "x" ]; then
+          echo -n "(repository will be accessible with VOMS credentials $voms_authz)... "
+          create_cmd="$create_cmd -V $voms_authz"
+      fi
+  fi
   echo "done"
-fi
 
-# get information about new repository
-load_repo_config $name
-local temp_dir="${CVMFS_SPOOL_DIR}/tmp"
-local rdonly_dir="${CVMFS_SPOOL_DIR}/rdonly"
-local scratch_dir="${CVMFS_SPOOL_DIR}/scratch/current"
+  echo -n "Mounting CernVM-FS Storage... "
+  setup_and_mount_new_repository $name || die "fail"
+  echo "done"
 
-# create the whitelist
-if [ x"$upstream_type" != xgw ]; then
-  create_whitelist $name $cvmfs_user $upstream $temp_dir
-fi
-
-echo -n "Creating Initial Repository... "
-local repoinfo_file=${temp_dir}/new_repoinfo
-touch $repoinfo_file
-create_repometa_skeleton $repoinfo_file
-sync
-if is_local_upstream $upstream && [ $configure_apache -eq 1 ]; then
-  reload_apache > /dev/null
-  wait_for_apache "${stratum0}/.cvmfswhitelist" || die "fail (Apache configuration)"
-fi
-
-local volatile_opt=
-if [ $volatile_content -eq 1 ]; then
-  volatile_opt="-v"
-  echo -n "(repository flagged volatile)... "
-fi
-local user_shell="$(get_user_shell $name)"
-if [ x"$upstream_type" != xgw ]; then
-  local create_cmd="$(__swissknife_cmd) create  \
-    -t $temp_dir                                \
-    -r $upstream                                \
-    -n $name                                    \
-    -a $hash_algo $volatile_opt                 \
-    -o ${temp_dir}/new_manifest                 \
-    -R $(get_reflog_checksum $name)"
-  if $garbage_collectable; then
-    create_cmd="$create_cmd -z"
-  fi
-  if [ "x$voms_authz" != "x" ]; then
-    echo -n "(repository will be accessible with VOMS credentials $voms_authz)... "
-    create_cmd="$create_cmd -V $voms_authz"
+  if [ $replicable -eq 1 ]; then
+    cvmfs_server_alterfs -m on $name
   fi
 
-  $user_shell "$create_cmd" > /dev/null                       || die "fail! (cannot init repo)"
-  sign_manifest $name ${temp_dir}/new_manifest $repoinfo_file || die "fail! (cannot sign repo)"
-else
-  local create_cmd="$(__swissknife_cmd) create  \
-    -t $temp_dir                                \
-    -n $name                                    \
-    -a $hash_algo $volatile_opt                 \
-    -o ${temp_dir}/new_manifest"
+  health_check $name || die "fail! (health check after mount)"
 
-  if $garbage_collectable; then
-    create_cmd="$create_cmd -z"
+  if [ x"$upstream_type" != xgw ]; then
+      echo -n "Initial commit... "
+      cvmfs_server_transaction $name > /dev/null || die "fail (transaction)"
+      echo "New CernVM-FS repository for $name" > /cvmfs/${name}/new_repository
+      chown $cvmfs_user /cvmfs/${name}/new_repository
+      cvmfs_server_publish $name > /dev/null || die "fail (publish)"
+      # When publishing an external repository, it is the user's responsibility to
+      # stage the actual data files to the web server - not the publication function.
+      # Hence, the following is guaranteed to not work.
+      if [ $external_data = "false" ]; then
+          cat $rdonly_dir/new_repository || die "fail (finish)"
+      fi
   fi
-  if [ "x$voms_authz" != "x" ]; then
-    echo -n "(repository will be accessible with VOMS credentials $voms_authz)... "
-    create_cmd="$create_cmd -V $voms_authz"
-  fi
-fi
-echo "done"
 
-echo -n "Mounting CernVM-FS Storage... "
-setup_and_mount_new_repository $name || die "fail"
-echo "done"
+  echo -n "Updating global JSON information... "
+  update_global_repository_info && echo "done" || echo "fail"
 
-if [ $replicable -eq 1 ]; then
-  cvmfs_server_alterfs -m on $name
-fi
-
-health_check $name || die "fail! (health check after mount)"
-
-if [ x"$upstream_type" != xgw ]; then
-  echo -n "Initial commit... "
-  cvmfs_server_transaction $name > /dev/null || die "fail (transaction)"
-  echo "New CernVM-FS repository for $name" > /cvmfs/${name}/new_repository
-  chown $cvmfs_user /cvmfs/${name}/new_repository
-  cvmfs_server_publish $name > /dev/null || die "fail (publish)"
-  # When publishing an external repository, it is the user's responsibility to
-  # stage the actual data files to the web server - not the publication function.
-  # Hence, the following is guaranteed to not work.
-  if [ $external_data = "false" ]; then
-    cat $rdonly_dir/new_repository || die "fail (finish)"
-  fi
-fi
-
-echo -n "Updating global JSON information... "
-update_global_repository_info && echo "done" || echo "fail"
-
-print_new_repository_notice $name $cvmfs_user $require_masterkeycard
+  print_new_repository_notice $name $cvmfs_user $require_masterkeycard
 }
 
 

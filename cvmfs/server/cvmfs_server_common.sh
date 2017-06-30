@@ -34,11 +34,11 @@ check_parameter_count_with_guessing() {
   fi
 
   if [ $provided_parameter_count -gt 1 ] && \
-    [ x"$allow_multiple_names" = x"" ]; then
-  usage "Too many arguments provided"
-fi
+     [ x"$allow_multiple_names" = x"" ]; then
+    usage "Too many arguments provided"
+  fi
 
-return 0
+  return 0
 }
 
 
@@ -179,13 +179,13 @@ repository_creator_version() {
   local version="$CVMFS_CREATOR_VERSION"
   if [ x"$version" = x ]; then
     version="2.1.6" # 2.1.6 was the last version, that did not store the creator
-    # version... therefore this has to be handled as "<= 2.1.6"
-    # Note: see also `mangle_version_string()`
+                    # version... therefore this has to be handled as "<= 2.1.6"
+                    # Note: see also `mangle_version_string()`
   elif [ x"$version" = x"2.2.0" ]; then
     version="2.2.0-0" # CernVM-FS 2.2.0-0 was a server-only pre-release which is
-    # incompatible with 2.2.0-1
-    # 2.2.0-0 marks itself as CVMFS_CREATOR_VERSION=2.2.0
-    # while 2.2.0-1 features  CVMFS_CREATOR_VERSION=2.2.0-1
+                      # incompatible with 2.2.0-1
+                      # 2.2.0-0 marks itself as CVMFS_CREATOR_VERSION=2.2.0
+                      # while 2.2.0-1 features  CVMFS_CREATOR_VERSION=2.2.0-1
   fi
   echo $version
 }
@@ -314,13 +314,13 @@ set_ro_root_hash() {
   local upstream_type=$(get_upstream_type $CVMFS_UPSTREAM_STORAGE)
 
   if [ x"$upstream_type" = xgw ]; then
-    sed -i -e "s/CVMFS_ROOT_HASH=.*//" $client_config
+      sed -i -e "s/CVMFS_ROOT_HASH=.*//" $client_config
   else
-    if grep -q ^CVMFS_ROOT_HASH= ${client_config}; then
-      sed -i -e "s/CVMFS_ROOT_HASH=.*/CVMFS_ROOT_HASH=${root_hash}/" $client_config
-    else
-      echo "CVMFS_ROOT_HASH=${root_hash}" >> $client_config
-    fi
+      if grep -q ^CVMFS_ROOT_HASH= ${client_config}; then
+          sed -i -e "s/CVMFS_ROOT_HASH=.*/CVMFS_ROOT_HASH=${root_hash}/" $client_config
+      else
+          echo "CVMFS_ROOT_HASH=${root_hash}" >> $client_config
+      fi
   fi
 }
 
@@ -616,13 +616,13 @@ sign_manifest() {
   local user_shell="$(get_user_shell $name)"
 
   local sign_command="$(__swissknife_cmd) sign \
-    -c /etc/cvmfs/keys/${name}.crt       \
-    -k /etc/cvmfs/keys/${name}.key       \
-    -n $name                             \
-    -u $CVMFS_STRATUM0                   \
-    -m $unsigned_manifest                \
-    -t ${CVMFS_SPOOL_DIR}/tmp            \
-    -r $CVMFS_UPSTREAM_STORAGE $return_early"
+          -c /etc/cvmfs/keys/${name}.crt       \
+          -k /etc/cvmfs/keys/${name}.key       \
+          -n $name                             \
+          -u $CVMFS_STRATUM0                   \
+          -m $unsigned_manifest                \
+          -t ${CVMFS_SPOOL_DIR}/tmp            \
+          -r $CVMFS_UPSTREAM_STORAGE $return_early"
 
   if [ x"$metainfo_file" != x"" ]; then
     sign_command="$sign_command -M $metainfo_file"
@@ -680,50 +680,50 @@ close_transaction() {
   # if not explicitly asked, try if umounting works without force
   if [ $use_fd_fallback -eq 0 ]; then
     if ! run_suid_helper rw_umount     $name || \
-      ! run_suid_helper rdonly_umount $name; then
-    use_fd_fallback=1
+       ! run_suid_helper rdonly_umount $name; then
+      use_fd_fallback=1
+    fi
   fi
-fi
 
-# if explicitly asked for or the normal umount failed we apply more force
-if [ $use_fd_fallback -ne 0 ]; then
-  if [ x"$CVMFS_FORCE_REMOUNT_WARNING" != x"false" ]; then
-    (
-    echo "$name is forcefully remounted in $force_grace_time seconds."
-    echo "Please close files on /cvmfs/$name"
-    ) | wall 2>/dev/null
-    sleep $force_grace_time
-    echo "$name is forcefully remounted NOW." | wall 2>/dev/null
+  # if explicitly asked for or the normal umount failed we apply more force
+  if [ $use_fd_fallback -ne 0 ]; then
+    if [ x"$CVMFS_FORCE_REMOUNT_WARNING" != x"false" ]; then
+      (
+        echo "$name is forcefully remounted in $force_grace_time seconds."
+        echo "Please close files on /cvmfs/$name"
+      ) | wall 2>/dev/null
+      sleep $force_grace_time
+      echo "$name is forcefully remounted NOW." | wall 2>/dev/null
+    fi
+    run_suid_helper rw_lazy_umount     $name
+    run_suid_helper kill_cvmfs         $name
+    run_suid_helper rdonly_lazy_umount $name
   fi
-  run_suid_helper rw_lazy_umount     $name
-  run_suid_helper kill_cvmfs         $name
-  run_suid_helper rdonly_lazy_umount $name
-fi
 
-# continue with the remounting
-local async_msg=""
-if [ x"$CVMFS_ASYNC_SCRATCH_CLEANUP" != x"false" ]; then
-  tmpdir=$(mktemp -d "${wastebin_scratch_dir}/waste.XXXXXX")
-  if mv $current_scratch_dir $tmpdir; then
-    mkdir -p $current_scratch_dir && chown $CVMFS_USER $current_scratch_dir
-    async_msg="(asynchronous scratch cleanup)"
-    run_suid_helper clear_scratch_async $name
+  # continue with the remounting
+  local async_msg=""
+  if [ x"$CVMFS_ASYNC_SCRATCH_CLEANUP" != x"false" ]; then
+    tmpdir=$(mktemp -d "${wastebin_scratch_dir}/waste.XXXXXX")
+    if mv $current_scratch_dir $tmpdir; then
+      mkdir -p $current_scratch_dir && chown $CVMFS_USER $current_scratch_dir
+      async_msg="(asynchronous scratch cleanup)"
+      run_suid_helper clear_scratch_async $name
+    else
+      to_syslog_for_repo $name \
+        "asynchronous cleanup failed, doing synchronous cleanup"
+      run_suid_helper clear_scratch $name
+    fi
   else
-    to_syslog_for_repo $name \
-      "asynchronous cleanup failed, doing synchronous cleanup"
     run_suid_helper clear_scratch $name
   fi
-else
-  run_suid_helper clear_scratch $name
-fi
-[ ! -z "$tmp_dir" ] && rm -fR "${tmp_dir}"/*
-run_suid_helper rdonly_mount $name > /dev/null
-run_suid_helper rw_mount $name
-release_lock "$tx_lock"
+  [ ! -z "$tmp_dir" ] && rm -fR "${tmp_dir}"/*
+  run_suid_helper rdonly_mount $name > /dev/null
+  run_suid_helper rw_mount $name
+  release_lock "$tx_lock"
 
-local fallback_msg=""
-[ $use_fd_fallback -eq 0 ] || fallback_msg="(using force)"
-to_syslog_for_repo $name "closed transaction $fallback_msg $async_msg"
+  local fallback_msg=""
+  [ $use_fd_fallback -eq 0 ] || fallback_msg="(using force)"
+  to_syslog_for_repo $name "closed transaction $fallback_msg $async_msg"
 }
 
 
@@ -811,19 +811,19 @@ file_descriptor_warning_and_question() {
   local name=$1
   echo "\
 
-    WARNING! There are open read-only file descriptors in /cvmfs/$name
+WARNING! There are open read-only file descriptors in /cvmfs/$name
   --> This is potentially harmful and might cause problems later on.
-  We can anyway perform the requested operation, but this will most likely
-  break other processes with open file descriptors on /cvmfs/$name!
+      We can anyway perform the requested operation, but this will most likely
+      break other processes with open file descriptors on /cvmfs/$name!
 
-  The following lsof report might show the processes with open file handles
-  "
+      The following lsof report might show the processes with open file handles
+      "
 
   generate_lsof_report_for_mountpoint "/cvmfs/${name}"
 
   echo -n "\
 
-    Do you want to proceed anyway? (y/N) "
+         Do you want to proceed anyway? (y/N) "
 
   local reply="n"
   read reply
@@ -886,31 +886,31 @@ create_config_files_for_new_repository() {
 
   mkdir -p $repo_cfg_dir
   cat > $server_conf << EOF
-  # Created by cvmfs_server.
-  CVMFS_CREATOR_VERSION=$(cvmfs_layout_revision)
-  CVMFS_REPOSITORY_NAME=$name
-  CVMFS_REPOSITORY_TYPE=stratum0
-  CVMFS_USER=$cvmfs_user
-  CVMFS_UNION_DIR=/cvmfs/$name
-  CVMFS_SPOOL_DIR=$spool_dir
-  CVMFS_STRATUM0=$stratum0
-  CVMFS_UPSTREAM_STORAGE=$upstream
-  CVMFS_USE_FILE_CHUNKING=$CVMFS_DEFAULT_USE_FILE_CHUNKING
-  CVMFS_MIN_CHUNK_SIZE=$CVMFS_DEFAULT_MIN_CHUNK_SIZE
-  CVMFS_AVG_CHUNK_SIZE=$CVMFS_DEFAULT_AVG_CHUNK_SIZE
-  CVMFS_MAX_CHUNK_SIZE=$CVMFS_DEFAULT_MAX_CHUNK_SIZE
-  CVMFS_CATALOG_ENTRY_WARN_THRESHOLD=$CVMFS_DEFAULT_CATALOG_ENTRY_WARN_THRESHOLD
-  CVMFS_UNION_FS_TYPE=$unionfs
-  CVMFS_HASH_ALGORITHM=$hash_algo
-  CVMFS_COMPRESSION_ALGORITHM=$compression_alg
-  CVMFS_EXTERNAL_DATA=$external_data
-  CVMFS_AUTO_TAG=$autotagging
-  CVMFS_AUTO_TAG_TIMESPAN="$auto_tag_timespan"
-  CVMFS_GARBAGE_COLLECTION=$garbage_collectable
-  CVMFS_AUTO_REPAIR_MOUNTPOINT=true
-  CVMFS_AUTOCATALOGS=false
-  CVMFS_ASYNC_SCRATCH_CLEANUP=true
-  EOF
+# Created by cvmfs_server.
+CVMFS_CREATOR_VERSION=$(cvmfs_layout_revision)
+CVMFS_REPOSITORY_NAME=$name
+CVMFS_REPOSITORY_TYPE=stratum0
+CVMFS_USER=$cvmfs_user
+CVMFS_UNION_DIR=/cvmfs/$name
+CVMFS_SPOOL_DIR=$spool_dir
+CVMFS_STRATUM0=$stratum0
+CVMFS_UPSTREAM_STORAGE=$upstream
+CVMFS_USE_FILE_CHUNKING=$CVMFS_DEFAULT_USE_FILE_CHUNKING
+CVMFS_MIN_CHUNK_SIZE=$CVMFS_DEFAULT_MIN_CHUNK_SIZE
+CVMFS_AVG_CHUNK_SIZE=$CVMFS_DEFAULT_AVG_CHUNK_SIZE
+CVMFS_MAX_CHUNK_SIZE=$CVMFS_DEFAULT_MAX_CHUNK_SIZE
+CVMFS_CATALOG_ENTRY_WARN_THRESHOLD=$CVMFS_DEFAULT_CATALOG_ENTRY_WARN_THRESHOLD
+CVMFS_UNION_FS_TYPE=$unionfs
+CVMFS_HASH_ALGORITHM=$hash_algo
+CVMFS_COMPRESSION_ALGORITHM=$compression_alg
+CVMFS_EXTERNAL_DATA=$external_data
+CVMFS_AUTO_TAG=$autotagging
+CVMFS_AUTO_TAG_TIMESPAN="$auto_tag_timespan"
+CVMFS_GARBAGE_COLLECTION=$garbage_collectable
+CVMFS_AUTO_REPAIR_MOUNTPOINT=true
+CVMFS_AUTOCATALOGS=false
+CVMFS_ASYNC_SCRATCH_CLEANUP=true
+EOF
 
   if [ x"$voms_authz" != x"" ]; then
     echo "CVMFS_VOMS_AUTHZ=$voms_authz" >> $server_conf
@@ -920,8 +920,8 @@ create_config_files_for_new_repository() {
   # append GC specific configuration
   if [ x"$garbage_collectable" = x"true" ]; then
     cat >> $server_conf << EOF
-    CVMFS_AUTO_GC=true
-    EOF
+CVMFS_AUTO_GC=true
+EOF
   fi
 
   if [ $configure_apache -eq 1 ] && is_local_upstream $upstream; then
@@ -933,23 +933,23 @@ create_config_files_for_new_repository() {
   fi
 
   cat > $client_conf << EOF
-  # Created by cvmfs_server.  Don't touch.
-  CVMFS_CACHE_BASE=$cache_dir
-  CVMFS_RELOAD_SOCKETS=$cache_dir
-  CVMFS_QUOTA_LIMIT=4000
-  CVMFS_MOUNT_DIR=/cvmfs
-  CVMFS_SERVER_URL=$stratum0
-  CVMFS_HTTP_PROXY=DIRECT
-  CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${name}.pub
-  CVMFS_TRUSTED_CERTS=${repo_cfg_dir}/trusted_certs
-  CVMFS_CHECK_PERMISSIONS=yes
-  CVMFS_IGNORE_SIGNATURE=no
-  CVMFS_AUTO_UPDATE=no
-  CVMFS_NFS_SOURCE=no
-  CVMFS_HIDE_MAGIC_XATTRS=yes
-  CVMFS_FOLLOW_REDIRECTS=yes
-  CVMFS_SERVER_CACHE_MODE=yes
-  EOF
+# Created by cvmfs_server.  Don't touch.
+CVMFS_CACHE_BASE=$cache_dir
+CVMFS_RELOAD_SOCKETS=$cache_dir
+CVMFS_QUOTA_LIMIT=4000
+CVMFS_MOUNT_DIR=/cvmfs
+CVMFS_SERVER_URL=$stratum0
+CVMFS_HTTP_PROXY=DIRECT
+CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${name}.pub
+CVMFS_TRUSTED_CERTS=${repo_cfg_dir}/trusted_certs
+CVMFS_CHECK_PERMISSIONS=yes
+CVMFS_IGNORE_SIGNATURE=no
+CVMFS_AUTO_UPDATE=no
+CVMFS_NFS_SOURCE=no
+CVMFS_HIDE_MAGIC_XATTRS=yes
+CVMFS_FOLLOW_REDIRECTS=yes
+CVMFS_SERVER_CACHE_MODE=yes
+EOF
 }
 
 
@@ -967,11 +967,11 @@ create_spool_area_for_new_repository() {
   local ofs_workdir="${spool_dir}/ofs_workdir"
 
   mkdir -p /cvmfs/$name          \
-    $current_scratch_dir  \
-    $wastebin_scratch_dir \
-    $rdonly_dir           \
-    $temp_dir             \
-    $cache_dir || return 1
+           $current_scratch_dir  \
+           $wastebin_scratch_dir \
+           $rdonly_dir           \
+           $temp_dir             \
+           $cache_dir || return 1
   if [ x"$CVMFS_UNION_FS_TYPE" = x"overlayfs" ]; then
     mkdir -p $ofs_workdir || return 2
   fi
@@ -1001,12 +1001,12 @@ create_global_info_skeleton() {
 
   _check_info_file "repositories" || echo "{}" | _write_info_file "repositories"
   _check_info_file "meta" || _write_info_file "meta" << EOF
-  {
-    "administrator" : "Your Name",
-    "email"         : "you@organisation.org",
-    "organisation"  : "Your Organisation",
+{
+  "administrator" : "Your Name",
+  "email"         : "you@organisation.org",
+  "organisation"  : "Your Organisation",
 
-    "custom" : {
+  "custom" : {
     "_comment" : "Put arbitrary structured data here"
   }
 }
@@ -1047,16 +1047,16 @@ create_repository_storage() {
 create_repometa_skeleton() {
   local json_file="$1"
   cat > "$json_file" << EOF
-  {
-    "administrator" : "Your Name",
-    "email"         : "you@organisation.org",
-    "organisation"  : "Your Organisation",
-    "description"   : "Repository content",
-    "url"           : "Project website",
-    "recommended-stratum0":  "stratum 0 url",
-    "recommended-stratum1s" : [ "stratum1 url", "stratum1 url" ],
+{
+  "administrator" : "Your Name",
+  "email"         : "you@organisation.org",
+  "organisation"  : "Your Organisation",
+  "description"   : "Repository content",
+  "url"           : "Project website",
+  "recommended-stratum0":  "stratum 0 url",
+  "recommended-stratum1s" : [ "stratum1 url", "stratum1 url" ],
 
-    "custom" : {
+  "custom" : {
     "_comment" : "Put arbitrary structured data here"
   }
 }
@@ -1078,18 +1078,18 @@ setup_and_mount_new_repository() {
   if [ x"$CVMFS_UNION_FS_TYPE" = x"overlayfs" ]; then
     echo -n "(overlayfs) "
     cat >> /etc/fstab << EOF
-    cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf:${CVMFS_SPOOL_DIR}/client.local,cvmfs_suid,noauto 0 0 # added by CernVM-FS for $name
-    overlay_$name /cvmfs/$name overlay upperdir=${scratch_dir},lowerdir=${rdonly_dir},workdir=$ofs_workdir,noauto,ro 0 0 # added by CernVM-FS for $name
-    EOF
+cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf:${CVMFS_SPOOL_DIR}/client.local,cvmfs_suid,noauto 0 0 # added by CernVM-FS for $name
+overlay_$name /cvmfs/$name overlay upperdir=${scratch_dir},lowerdir=${rdonly_dir},workdir=$ofs_workdir,noauto,ro 0 0 # added by CernVM-FS for $name
+EOF
   else
     echo -n "(aufs) "
     if has_selinux && try_mount_remount_cycle_aufs; then
       selinux_context=",context=\"system_u:object_r:default_t:s0\""
     fi
     cat >> /etc/fstab << EOF
-    cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf:${CVMFS_SPOOL_DIR}/client.local,cvmfs_suid,noauto 0 0 # added by CernVM-FS for $name
-    aufs_$name /cvmfs/$name aufs br=${scratch_dir}=rw:${rdonly_dir}=rr,udba=none,noauto,ro$selinux_context 0 0 # added by CernVM-FS for $name
-    EOF
+cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf:${CVMFS_SPOOL_DIR}/client.local,cvmfs_suid,noauto 0 0 # added by CernVM-FS for $name
+aufs_$name /cvmfs/$name aufs br=${scratch_dir}=rw:${rdonly_dir}=rr,udba=none,noauto,ro$selinux_context 0 0 # added by CernVM-FS for $name
+EOF
   fi
   local user_shell="$(get_user_shell $name)"
   $user_shell "touch ${CVMFS_SPOOL_DIR}/client.local"
@@ -1097,16 +1097,16 @@ setup_and_mount_new_repository() {
   # avoid racing against apache
   local waiting=0
   while ! curl -sIf ${CVMFS_STRATUM0}/.cvmfspublished > /dev/null && \
-    [ $http_timeout -gt 0 ]; do
-  [ $waiting -eq 1 ] || echo -n "waiting for apache... "
-  waiting=1
-  http_timeout=$(( $http_timeout - 1 ))
-  sleep 1
-done
-[ $http_timeout -gt 0 ] || return 1
+        [ $http_timeout -gt 0 ]; do
+    [ $waiting -eq 1 ] || echo -n "waiting for apache... "
+    waiting=1
+    http_timeout=$(( $http_timeout - 1 ))
+    sleep 1
+  done
+  [ $http_timeout -gt 0 ] || return 1
 
-mount $rdonly_dir > /dev/null || return 1
-mount /cvmfs/$name
+  mount $rdonly_dir > /dev/null || return 1
+  mount /cvmfs/$name
 }
 
 
@@ -1199,26 +1199,26 @@ foreclose_legacy_cvmfs() {
   fi
 
   if which cvmfs-sync     > /dev/null 2>&1 || \
-    which cvmfs_scrub    > /dev/null 2>&1 || \
-    which cvmfs_snapshot > /dev/null 2>&1 || \
-    which cvmfs_zpipe    > /dev/null 2>&1 || \
-    which cvmfs_pull     > /dev/null 2>&1 || \
-    which cvmfs_unsign   > /dev/null 2>&1; then
-  echo "found legacy CernVM-FS executables" 1>&2
-  found_something=1
-fi
+     which cvmfs_scrub    > /dev/null 2>&1 || \
+     which cvmfs_snapshot > /dev/null 2>&1 || \
+     which cvmfs_zpipe    > /dev/null 2>&1 || \
+     which cvmfs_pull     > /dev/null 2>&1 || \
+     which cvmfs_unsign   > /dev/null 2>&1; then
+    echo "found legacy CernVM-FS executables" 1>&2
+    found_something=1
+  fi
 
-if cvmfs_sys_file_is_regular /lib/modules/*/extra/cvmfsflt/cvmfsflt.ko ; then
-  echo "found CernVM-FS 2.0.x kernel module" 1>&2
-  found_something=1
-fi
+  if cvmfs_sys_file_is_regular /lib/modules/*/extra/cvmfsflt/cvmfsflt.ko ; then
+    echo "found CernVM-FS 2.0.x kernel module" 1>&2
+    found_something=1
+  fi
 
-if [ $found_something -ne 0 ]; then
-  echo "found traces of CernVM-FS 2.0.x! You should remove them before proceeding!"
-  exit 1
-fi
+  if [ $found_something -ne 0 ]; then
+    echo "found traces of CernVM-FS 2.0.x! You should remove them before proceeding!"
+    exit 1
+  fi
 
-return $found_something
+  return $found_something
 }
 
 
