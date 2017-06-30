@@ -79,7 +79,7 @@ if [ "x$CVMFS_CACHE_PLUGIN" != "x" ]; then
     plugin_pid="$($plugin $CVMFS_CACHE_CONFIG)"
     echo "cache plugin started as PID $plugin_pid"
     $CVMFS_CACHE_UNITTESTS $CVMFS_CACHE_LOCATOR \
-      --gtest_output=xml:${CVMFS_UNITTESTS_RESULT_LOCATION}.cache-plugin
+      --gtest_output=xml:${CVMFS_UNITTESTS_RESULT_LOCATION}.$(basename $plugin)
     /bin/kill $plugin_pid
   done
 fi
