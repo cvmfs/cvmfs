@@ -466,7 +466,7 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
                          (2.0 * slot_size));
     const unsigned mask_64 = ~((1 << 6) - 1);
 
-    LogCvmfs(kLogCache, kLogDebug | kLogStdout, "Allocating %" PRIu64
+    LogCvmfs(kLogCache, kLogDebug | kLogSyslog, "Allocating %" PRIu64
              "MB of memory for up to %" PRIu64 " objects",
              heap_size / (1024 * 1024), num_slots & mask_64);
 

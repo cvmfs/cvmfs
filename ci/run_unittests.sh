@@ -82,7 +82,6 @@ if [ "x$CVMFS_CACHE_PLUGIN" != "x" ]; then
       --gtest_output=xml:${CVMFS_UNITTESTS_RESULT_LOCATION}.cache-plugin
     /bin/kill $plugin_pid
   done
-  exit 1
 fi
 
 # run the unit tests
