@@ -232,8 +232,9 @@ bool Reactor::HandleCheckToken(const std::string& req, std::string* reply) {
       break;
     default:
       // Should not be reached
-      LogCvmfs(kLogReceiver, kLogCustom1,
-               "Reactor::HandleCheckToken - Unknown value received. Exiting.\n");
+      LogCvmfs(
+          kLogReceiver, kLogCustom1,
+          "Reactor::HandleCheckToken - Unknown value received. Exiting.\n");
       abort();
   }
 
