@@ -95,6 +95,12 @@ Vagrant.configure(2) do |config|
     ub.vm.provision "shell", path: "vagrant/provision_ubuntu.sh"
   end
 
+  config.vm.define "debian8" do |deb|
+    deb.vm.box = "debian/jessie64"
+    deb.vm.network "private_network", ip: "192.168.33.25"
+    deb.vm.provision "shell", path: "vagrant/provision_debian.sh"
+  end
+
   config.vm.define "ubuntu1204" do |ub|
     ub.vm.box = "ubuntu/precise64"
     ub.vm.network "private_network", ip: "192.168.33.16"
