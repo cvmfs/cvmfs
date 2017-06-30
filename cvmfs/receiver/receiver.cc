@@ -102,7 +102,7 @@ int main(int argc, char** argv) {
 
   if (!reactor.Run()) {
     LogCvmfs(kLogReceiver, kLogCustom1,
-             "Error running CVMFS Receiver event loop");
+             "Error running CVMFS Receiver event loop.\n");
     return 1;
   }
 

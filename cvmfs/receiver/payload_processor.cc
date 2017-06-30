@@ -45,7 +45,7 @@ PayloadProcessor::Result PayloadProcessor::Process(
     if (consumer_state != ObjectPackBuild::kStateContinue &&
         consumer_state != ObjectPackBuild::kStateDone) {
       LogCvmfs(kLogReceiver, kLogCustom1,
-               "Error %d encountered when consuming object pack.",
+               "Error %d encountered when consuming object pack.\n",
                consumer_state);
       break;
     }
@@ -68,13 +68,13 @@ void PayloadProcessor::ConsumerEventCallback(
   } else {
     // kEmpty - this is an error.
     LogCvmfs(kLogReceiver, kLogCustom1,
-             "Event received with unknown object.");
+             "Event received with unknown object.\n");
     num_errors_++;
     return;
   }
 
   LogCvmfs(kLogReceiver, kLogCustom0,
-           "PayloadProcessor - object unpacked: %s", path.c_str());
+           "PayloadProcessor - object unpacked: %s\n", path.c_str());
 
   const std::string hash_string = event.id.ToString(true);
 
@@ -85,7 +85,7 @@ void PayloadProcessor::ConsumerEventCallback(
   const std::string tmp_path = CreateTempPath(temp_dir, 0666);
   if (tmp_path.empty()) {
     LogCvmfs(kLogReceiver, kLogCustom1,
-             "Unable to create temporary path.");
+             "Unable to create temporary path.\n");
     num_errors_++;
     return;
   }
@@ -93,12 +93,12 @@ void PayloadProcessor::ConsumerEventCallback(
   int fdout = open(tmp_path.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0600);
   if (fdout == -1) {
     LogCvmfs(kLogReceiver, kLogCustom1,
-             "Unable to open temporary output file: %s", tmp_path.c_str());
+             "Unable to open temporary output file: %s\n", tmp_path.c_str());
     return;
   }
 
   if (!WriteFile(fdout, event.buf, event.buf_size)) {
-    LogCvmfs(kLogReceiver, kLogCustom1, "Unable to write %s",
+    LogCvmfs(kLogReceiver, kLogCustom1, "Unable to write %s\n",
              tmp_path.c_str());
     num_errors_++;
     unlink(tmp_path.c_str());
@@ -113,7 +113,7 @@ void PayloadProcessor::ConsumerEventCallback(
   const std::string dest = "/srv/cvmfs/" + current_repo_ + "/data/" + path;
   if (RenameFile(tmp_path.c_str(), dest.c_str())) {
     LogCvmfs(kLogReceiver, kLogCustom1,
-             "Unable to move file to final destination: %s", dest.c_str());
+             "Unable to move file to final destination: %s\n", dest.c_str());
     num_errors_++;
     return;
   }

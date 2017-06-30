@@ -119,11 +119,11 @@ bool Reactor::Run() {
     msg_body.clear();
     req = ReadRequest(fdin_, &msg_body);
     LogCvmfs(kLogReceiver, kLogCustom0,
-             "Reactor - handling request: %d, body: %s.", req,
+             "Reactor - handling request: %d, body: %s.\n", req,
              msg_body.c_str());
     if (!HandleRequest(req, msg_body)) {
       LogCvmfs(kLogReceiver, kLogCustom1,
-               "Reactor: could not handle request %d. Exiting", req);
+               "Reactor: could not handle request %d. Exiting.\n", req);
       return false;
     }
   } while (req != kQuit);
@@ -233,7 +233,7 @@ bool Reactor::HandleCheckToken(const std::string& req, std::string* reply) {
     default:
       // Should not be reached
       LogCvmfs(kLogReceiver, kLogCustom1,
-               "Reactor::HandleCheckToken - Unknown value received. Exiting.");
+               "Reactor::HandleCheckToken - Unknown value received. Exiting.\n");
       abort();
   }
 
@@ -287,7 +287,7 @@ bool Reactor::HandleSubmitPayload(int fdin, const std::string& req,
       break;
     default:
       LogCvmfs(kLogReceiver, kLogCustom1,
-               "Unknown value of PayloadProcessor::Result encountered.");
+               "Unknown value of PayloadProcessor::Result encountered.\n");
       abort();
       break;
   }
@@ -343,7 +343,7 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
       break;
     default:
       LogCvmfs(kLogReceiver, kLogCustom1,
-               "Unknown value of CommitProcessor::Result encountered.");
+               "Unknown value of CommitProcessor::Result encountered.\n");
       abort();
       break;
   }
@@ -393,7 +393,7 @@ bool Reactor::HandleRequest(Request req, const std::string& data) {
       break;
     case kError:
       LogCvmfs(kLogReceiver, kLogCustom1,
-               "Reactor: unknown command received.");
+               "Reactor: unknown command received.\n");
       ok = false;
       break;
     default:
