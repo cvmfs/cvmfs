@@ -69,7 +69,7 @@ fi
 if [ "x$CVMFS_CACHE_PLUGIN" != "x" ]; then
   CVMFS_CACHE_UNITTESTS="$(dirname $CVMFS_UNITTESTS_BINARY)/cvmfs_test_cache"
   CVMFS_CACHE_LOCATOR=tcp=127.0.0.1:4224
-  CVMFS_CACHE_CONFIG=${CVMFS_UNITTESTS_RESULT_LOCATION}.config
+  CVMFS_CACHE_CONFIG=$(mktemp)
   echo "CVMFS_CACHE_PLUGIN_LOCATOR=$CVMFS_CACHE_LOCATOR" > $CVMFS_CACHE_CONFIG
   echo "CVMFS_CACHE_PLUGIN_SIZE=1000" >> $CVMFS_CACHE_CONFIG
   echo "CVMFS_CACHE_PLUGIN_TEST=yes" >> $CVMFS_CACHE_CONFIG
@@ -86,6 +86,7 @@ if [ "x$CVMFS_CACHE_PLUGIN" != "x" ]; then
       echo "Warning: plugin $plugin not found, skipping"
     fi
   done
+  rm -f $CVMFS_CACHE_CONFIG
 fi
 
 # run the unit tests
