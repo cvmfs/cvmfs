@@ -349,20 +349,6 @@ cvmfs_server_mkfs() {
 
       $user_shell "$create_cmd" > /dev/null                       || die "fail! (cannot init repo)"
       sign_manifest $name ${temp_dir}/new_manifest $repoinfo_file || die "fail! (cannot sign repo)"
-  else
-      local create_cmd="$(__swissknife_cmd) create  \
-      -t $temp_dir                                \
-      -n $name                                    \
-      -a $hash_algo $volatile_opt                 \
-      -o ${temp_dir}/new_manifest"
-
-      if $garbage_collectable; then
-          create_cmd="$create_cmd -z"
-      fi
-      if [ "x$voms_authz" != "x" ]; then
-          echo -n "(repository will be accessible with VOMS credentials $voms_authz)... "
-          create_cmd="$create_cmd -V $voms_authz"
-      fi
   fi
   echo "done"
 
