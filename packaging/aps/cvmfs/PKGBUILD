@@ -98,7 +98,7 @@ _remove_devel() {
 _remove_unittests() {
   local pkgdir="$1"
 
-  rm -f "$pkgdir/usr/bin/cvmfs_unittests"
+  rm -f "$pkgdir/usr/bin/cvmfs_unittests" "$pkgdir/usr/bin/cvmfs_test_cache"
 }
 
 
