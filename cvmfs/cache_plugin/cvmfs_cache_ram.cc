@@ -7,8 +7,11 @@
 #define __STDC_FORMAT_MACROS
 
 #include <alloca.h>
+#include <fcntl.h>
 #include <inttypes.h>
 #include <stdint.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include <algorithm>
@@ -633,8 +636,11 @@ int main(int argc, char **argv) {
     cvmcache_options_fini(options);
     return 1;
   }
+  char *test_mode = cvmcache_options_get(options, "CVMFS_CACHE_PLUGIN_TEST");
 
-  cvmcache_spawn_watchdog(NULL);
+  if (!test_mode)
+    cvmcache_spawn_watchdog(NULL);
+
   PluginRamCache *plugin = PluginRamCache::Create(mem_size);
 
   struct cvmcache_callbacks callbacks;
@@ -659,12 +665,45 @@ int main(int argc, char **argv) {
     LogCvmfs(kLogCache, kLogStderr, "failed to listen on %s", locator);
     return 1;
   }
+
+  if (test_mode) {
+    // Daemonize, print out PID
+    pid_t pid;
+    int statloc;
+    if ((pid = fork()) == 0) {
+      if ((pid = fork()) == 0) {
+        int null_read = open("/dev/null", O_RDONLY);
+        int null_write = open("/dev/null", O_WRONLY);
+        assert((null_read >= 0) && (null_write >= 0));
+        int retval = dup2(null_read, 0);
+        assert(retval == 0);
+        retval = dup2(null_write, 1);
+        assert(retval == 1);
+        retval = dup2(null_write, 2);
+        assert(retval == 2);
+        close(null_read);
+        close(null_write);
+      } else {
+        assert(pid > 0);
+        printf("%d\n", pid);
+        fflush(stdout);
+        fsync(1);
+        _exit(0);
+      }
+    } else {
+      assert(pid > 0);
+      waitpid(pid, &statloc, 0);
+      _exit(0);
+    }
+  }
+
   LogCvmfs(kLogCache, kLogStdout, "Listening for cvmfs clients on %s"
            "NOTE: this process needs to run as user cvmfs\n",
            locator);
 
-
   cvmcache_process_requests(ctx, 0);
+  if (test_mode)
+    while (true) sleep(1);
   if (!cvmcache_is_supervised()) {
     LogCvmfs(kLogCache, kLogStdout, "Press <Ctrl+D> to quit\n");
     while (true) {
