@@ -74,13 +74,17 @@ if [ "x$CVMFS_CACHE_PLUGIN" != "x" ]; then
   echo "CVMFS_CACHE_PLUGIN_SIZE=1000" >> $CVMFS_CACHE_CONFIG
   echo "CVMFS_CACHE_PLUGIN_TEST=yes" >> $CVMFS_CACHE_CONFIG
   for plugin in $(echo $CVMFS_CACHE_PLUGIN | tr : " "); do
-    echo "running unit tests for cache plugin $plugin"
-    # All our plugins take a configuration file as a parameter
-    plugin_pid="$($plugin $CVMFS_CACHE_CONFIG)"
-    echo "cache plugin started as PID $plugin_pid"
-    $CVMFS_CACHE_UNITTESTS $CVMFS_CACHE_LOCATOR \
-      --gtest_output=xml:${CVMFS_UNITTESTS_RESULT_LOCATION}.$(basename $plugin)
-    /bin/kill $plugin_pid
+    if [ -x $plugin ]; then
+      echo "running unit tests for cache plugin $plugin"
+      # All our plugins take a configuration file as a parameter
+      plugin_pid="$($plugin $CVMFS_CACHE_CONFIG)"
+      echo "cache plugin started as PID $plugin_pid"
+      $CVMFS_CACHE_UNITTESTS $CVMFS_CACHE_LOCATOR \
+        --gtest_output=xml:${CVMFS_UNITTESTS_RESULT_LOCATION}.$(basename $plugin)
+      /bin/kill $plugin_pid
+    else
+      echo "Warning: plugin $plugin not found, skipping"
+    fi
   done
 fi
 
