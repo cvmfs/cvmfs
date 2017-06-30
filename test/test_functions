@@ -2417,7 +2417,7 @@ EOF'
     sudo bash -c 'echo "CVMFS_GATEWAY_KEYS=/etc/cvmfs/keys/gateway_key" >> /etc/cvmfs/repositories.d/test.repo.org/server.conf'
 
     echo "  Starting repository services application"
-    /opt/cvmfs_services/bin/cvmfs_services start
+    RUNNER_LOG_DIR=/tmp /opt/cvmfs_services/bin/cvmfs_services start
 
     # Waiting here is necessary in order to give the cvmfs_services application enough time to boot
     wait_for_app_start

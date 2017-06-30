@@ -166,29 +166,21 @@ cvmfs_run_test() {
   check_repository $CVMFS_TEST_REPO -i || return 73
 
   echo "--- (12) test identical nested catalogs at different spots"
-  sudo ls -lah /var/spool/cvmfs/$CVMFS_TEST_REPO/cache/$CVMFS_TEST_REPO/
   tree /cvmfs/$CVMFS_TEST_REPO || return 80
   tree /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots || return 81
-  local num_open_nested=$(sudo cvmfs_talk -p /var/spool/cvmfs/$CVMFS_TEST_REPO/cache/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO \
+  local cache_dir=$(cat /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/client.conf | \
+                    grep ^CVMFS_CACHE_BASE= | cut -d= -f2)
+  echo "cache dir is $cache_dir"
+  local num_open_nested=$(sudo cvmfs_talk -p $cache_dir/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO \
                           open catalogs | grep nested | wc -l)
   if [ "x$num_open_nested" != "x4" ]; then
     echo "expected $num_open_nested = 4"
-    sudo cvmfs_talk -p /var/spool/cvmfs/$CVMFS_TEST_REPO/cache/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO \
-                       open catalogs
-    sudo ls -lah /var/spool/cvmfs/$CVMFS_TEST_REPO/cache/$CVMFS_TEST_REPO/
-    sudo ls -lah /var/spool/cvmfs/$CVMFS_TEST_REPO/cache/
     sudo tail /var/log/messages
-    cat /proc/mounts
-    cat /etc/fstab
-    cat /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/client.conf
-    sudo cat /var/spool/cvmfs/$CVMFS_TEST_REPO/client.local
-    local client_pid=$(sudo attr -qg pid /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly)
-    sudo ls -lah /proc/$client_pid/fd
     return 82
   fi
-  sudo cvmfs_talk -p /var/spool/cvmfs/$CVMFS_TEST_REPO/cache/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO \
+  sudo cvmfs_talk -p $cache_dir/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO \
                   detach nested catalogs || return 83
-  local num_open_nested=$(sudo cvmfs_talk -p /var/spool/cvmfs/$CVMFS_TEST_REPO/cache/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO \
+  local num_open_nested=$(sudo cvmfs_talk -p $cache_dir/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO \
                           cache list pinned | grep nested | wc -l)
   if [ "x$num_open_nested" != "x0" ]; then
     return 84
