@@ -224,14 +224,18 @@ cvmfs_server_mkfs() {
   # check if the keychain for the repository to create is already in place
   local keys_location="/etc/cvmfs/keys"
   mkdir -p $keys_location
+  local upstream_type=$(get_upstream_type $upstream)
   local keys="${name}.key ${name}.crt ${name}.pub"
+  if [ x"$upstream_type" = xgw ]; then
+      keys="$keys ${name}.gw"
+  fi
   if [ $require_masterkeycard -eq 1 ]; then
-    local reason
-    reason="`masterkeycard_cert_available`" || die "masterkeycard not available: $reason"
+      local reason
+      reason="`masterkeycard_cert_available`" || die "masterkeycard not available: $reason"
   elif masterkeycard_cert_available >/dev/null; then
-    require_masterkeycard=1
+      require_masterkeycard=1
   else
-    keys="${name}.masterkey $keys"
+      keys="${name}.masterkey $keys"
   fi
   local keys_are_there=0
   for k in $keys; do
@@ -307,7 +311,9 @@ cvmfs_server_mkfs() {
   local scratch_dir="${CVMFS_SPOOL_DIR}/scratch/current"
 
   # create the whitelist
-  create_whitelist $name $cvmfs_user $upstream $temp_dir
+  if [ x"$upstream_type" != xgw ]; then
+      create_whitelist $name $cvmfs_user $upstream $temp_dir
+  fi
 
   echo -n "Creating Initial Repository... "
   local repoinfo_file=${temp_dir}/new_repoinfo
@@ -325,22 +331,25 @@ cvmfs_server_mkfs() {
     echo -n "(repository flagged volatile)... "
   fi
   local user_shell="$(get_user_shell $name)"
-  local create_cmd="$(__swissknife_cmd) create  \
-    -t $temp_dir                                \
-    -r $upstream                                \
-    -n $name                                    \
-    -a $hash_algo $volatile_opt                 \
-    -o ${temp_dir}/new_manifest                 \
-    -R $(get_reflog_checksum $name)"
-  if $garbage_collectable; then
-    create_cmd="$create_cmd -z"
+  if [ x"$upstream_type" != xgw ]; then
+      local create_cmd="$(__swissknife_cmd) create  \
+      -t $temp_dir                                \
+      -r $upstream                                \
+      -n $name                                    \
+      -a $hash_algo $volatile_opt                 \
+      -o ${temp_dir}/new_manifest                 \
+      -R $(get_reflog_checksum $name)"
+      if $garbage_collectable; then
+          create_cmd="$create_cmd -z"
+      fi
+      if [ "x$voms_authz" != "x" ]; then
+          echo -n "(repository will be accessible with VOMS credentials $voms_authz)... "
+          create_cmd="$create_cmd -V $voms_authz"
+      fi
+
+      $user_shell "$create_cmd" > /dev/null                       || die "fail! (cannot init repo)"
+      sign_manifest $name ${temp_dir}/new_manifest $repoinfo_file || die "fail! (cannot sign repo)"
   fi
-  if [ "x$voms_authz" != "x" ]; then
-    echo -n "(repository will be accessible with VOMS credentials $voms_authz)... "
-    create_cmd="$create_cmd -V $voms_authz"
-  fi
-  $user_shell "$create_cmd" > /dev/null                       || die "fail! (cannot init repo)"
-  sign_manifest $name ${temp_dir}/new_manifest $repoinfo_file || die "fail! (cannot sign repo)"
   echo "done"
 
   echo -n "Mounting CernVM-FS Storage... "
@@ -353,16 +362,18 @@ cvmfs_server_mkfs() {
 
   health_check $name || die "fail! (health check after mount)"
 
-  echo -n "Initial commit... "
-  cvmfs_server_transaction $name > /dev/null || die "fail (transaction)"
-  echo "New CernVM-FS repository for $name" > /cvmfs/${name}/new_repository
-  chown $cvmfs_user /cvmfs/${name}/new_repository
-  cvmfs_server_publish $name > /dev/null || die "fail (publish)"
-  # When publishing an external repository, it is the user's responsibility to
-  # stage the actual data files to the web server - not the publication function.
-  # Hence, the following is guaranteed to not work.
-  if [ $external_data = "false" ]; then
-    cat $rdonly_dir/new_repository || die "fail (finish)"
+  if [ x"$upstream_type" != xgw ]; then
+      echo -n "Initial commit... "
+      cvmfs_server_transaction $name > /dev/null || die "fail (transaction)"
+      echo "New CernVM-FS repository for $name" > /cvmfs/${name}/new_repository
+      chown $cvmfs_user /cvmfs/${name}/new_repository
+      cvmfs_server_publish $name > /dev/null || die "fail (publish)"
+      # When publishing an external repository, it is the user's responsibility to
+      # stage the actual data files to the web server - not the publication function.
+      # Hence, the following is guaranteed to not work.
+      if [ $external_data = "false" ]; then
+          cat $rdonly_dir/new_repository || die "fail (finish)"
+      fi
   fi
 
   echo -n "Updating global JSON information... "

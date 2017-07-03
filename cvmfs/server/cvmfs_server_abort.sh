@@ -8,7 +8,7 @@
 cvmfs_server_abort() {
   local names
   local user
-  local key_file
+  local gw_key_file
   local spool_dir
   local exact=0
   local force=0
@@ -57,7 +57,7 @@ cvmfs_server_abort() {
     # get repository information
     load_repo_config $name
     user=$CVMFS_USER
-    key_file=$CVMFS_GATEWAY_KEYS
+    gw_key_file=/etc/cvmfs/keys/${name}.gw
     spool_dir=$CVMFS_SPOOL_DIR
     local upstream_storage=$CVMFS_UPSTREAM_STORAGE
     local upstream_type=$(get_upstream_type $upstream_storage)
@@ -92,7 +92,7 @@ cvmfs_server_abort() {
     # the cvmfs_swissknife lease command needs to be used to drop the active lease
     if [ x"$upstream_type" = xgw ]; then
         local repo_services_url=$(echo $upstream_storage | cut -d',' -f3)
-        __swissknife lease -a drop -u $repo_services_url -k $key_file -p $name"/"$subpath || { echo "Could not drop active lease or lease does not exist for repository $name"; retcode=1; continue; }
+        __swissknife lease -a drop -u $repo_services_url -k $gw_key_file -p $name"/"$subpath || { echo "Could not drop active lease or lease does not exist for repository $name"; retcode=1; continue; }
     fi
     close_transaction $name $use_fd_fallback
 
