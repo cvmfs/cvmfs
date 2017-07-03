@@ -105,6 +105,7 @@ cvmfs_server_rmfs() {
             /etc/cvmfs/keys/$name.pub       \
             /etc/cvmfs/keys/$name.key       \
             /etc/cvmfs/keys/$name.crt || die "fail"
+      rm -f /etc/cvmfs/keys/$name.gw
       echo "done"
     fi
 

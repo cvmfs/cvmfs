@@ -71,10 +71,16 @@ if [ x"$(uname -m)" = x"x86_64" ]; then
                                 || retval=1
 fi
 
-echo "running CernVM-FS migration test cases..."
-CVMFS_TEST_CLASS_NAME=MigrationTests \
-./run.sh $MIGRATIONTEST_LOGFILE -o ${MIGRATIONTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
-                                   migration_tests/*                              \
-                                || retval=1
+# TODO: after the 2.4 release there will be distro specific "previous packages"
+if [ x"$(lsb_release -cs)" = x"precise" ]; then
+  # Ubuntu 12.04
+  echo "running CernVM-FS migration test cases..."
+  CVMFS_TEST_CLASS_NAME=MigrationTests \
+  ./run.sh $MIGRATIONTEST_LOGFILE -o ${MIGRATIONTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+                                     migration_tests/*                              \
+                                  || retval=1
+else
+  echo "no previous client package, skipping migration test"
+fi
 
 exit $retval

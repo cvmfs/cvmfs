@@ -309,10 +309,18 @@ set_ro_root_hash() {
   local root_hash=$2
   local client_config=/var/spool/cvmfs/${name}/client.local
 
-  if grep -q ^CVMFS_ROOT_HASH= ${client_config}; then
-    sed -i -e "s/CVMFS_ROOT_HASH=.*/CVMFS_ROOT_HASH=${root_hash}/" $client_config
+  load_repo_config $name
+
+  local upstream_type=$(get_upstream_type $CVMFS_UPSTREAM_STORAGE)
+
+  if [ x"$upstream_type" = xgw ]; then
+      sed -i -e "s/CVMFS_ROOT_HASH=.*//" $client_config
   else
-    echo "CVMFS_ROOT_HASH=${root_hash}" >> $client_config
+      if grep -q ^CVMFS_ROOT_HASH= ${client_config}; then
+          sed -i -e "s/CVMFS_ROOT_HASH=.*/CVMFS_ROOT_HASH=${root_hash}/" $client_config
+      else
+          echo "CVMFS_ROOT_HASH=${root_hash}" >> $client_config
+      fi
   fi
 }
 
