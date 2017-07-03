@@ -2394,11 +2394,11 @@ set_up_repository_services() {
     echo "  Writing configuration files"
     sudo bash -c 'cat <<EOF > /opt/cvmfs_services/etc/repo.config
 {repos, [{<<"test.repo.org">>, [<<"key1">>]}]}.
-{keys, [{file, "/etc/cvmfs/keys/gateway_key"}]}.
+{keys, [{file, "/etc/cvmfs/keys/test.repo.org.gw"}]}.
 EOF'
 
     echo "  Writing API key file"
-    sudo bash -c 'cat <<EOF > /etc/cvmfs/keys/gateway_key
+    sudo bash -c 'cat <<EOF > /etc/cvmfs/keys/test.repo.org.gw
 test key1 secret1
 EOF'
 
@@ -2414,7 +2414,6 @@ EOF'
     echo "  Modifying test repo configuration"
     sudo sed -i 's/local,/gw,/' /etc/cvmfs/repositories.d/test.repo.org/server.conf
     sudo sed -i 's/txn,\/srv\/cvmfs\/test.repo.org/txn,http:\/\/localhost:8080\/api\/v1/g' /etc/cvmfs/repositories.d/test.repo.org/server.conf
-    sudo bash -c 'echo "CVMFS_GATEWAY_KEYS=/etc/cvmfs/keys/gateway_key" >> /etc/cvmfs/repositories.d/test.repo.org/server.conf'
 
     echo "  Starting repository services application"
     RUNNER_LOG_DIR=/tmp /opt/cvmfs_services/bin/cvmfs_services start
