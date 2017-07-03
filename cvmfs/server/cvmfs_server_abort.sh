@@ -65,7 +65,9 @@ cvmfs_server_abort() {
     # more sanity checks
     is_owner_or_root $name || { echo "Permission denied: Repository $name is owned by $user"; retcode=1; continue; }
     check_repository_compatibility $name
-    is_in_transaction $name || { echo "Repository $name is not in a transaction"; retcode=1; continue; }
+    if [ x"$upstream_type" = xgw ]; then
+        is_in_transaction $name || { echo "Repository $name is not in a transaction"; retcode=1; continue; }
+    fi
     is_cwd_on_path "/cvmfs/$name" && { echo "Current working directory is in /cvmfs/$name.  Please release, e.g. by 'cd \$HOME'."; retcode=1; continue; } || true
 
     # better ask the user once again!
