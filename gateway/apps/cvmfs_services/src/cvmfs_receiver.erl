@@ -35,7 +35,7 @@
 -define(kError,7).
 
 %% Worker comm timeout
--define(WORKER_REPLY_TIMEOUT, 30000).
+-define(WORKER_REPLY_TIMEOUT, 7200000).
 
 
 %%%===================================================================
