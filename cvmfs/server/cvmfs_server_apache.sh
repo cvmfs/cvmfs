@@ -246,7 +246,7 @@ AddType application/json .json
 Alias /cvmfs/${name} ${storage_dir}
 <Directory "${storage_dir}">
     Options -MultiViews
-    AllowOverride Limit
+    AllowOverride Limit AuthConfig
     $(get_compatible_apache_allow_from_all_config)
 
     EnableMMAP Off
@@ -261,8 +261,9 @@ Alias /cvmfs/${name} ${storage_dir}
 
     ExpiresActive On
     ExpiresDefault "access plus 3 days"
-    ExpiresByType application/x-cvmfs "access plus 2 minutes"
-    ExpiresByType application/json    "access plus 2 minutes"
+    # 60 seconds and below is not cached at all by Squid default settings
+    ExpiresByType application/x-cvmfs "access plus 61 seconds"
+    ExpiresByType application/json    "access plus 61 seconds"
 </Directory>
 EOF
 }
