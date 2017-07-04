@@ -37,8 +37,9 @@ manifest::Reflog *ServerTool::FetchReflog(ObjectFetcherT *object_fetcher,
       abort();
 
     default:
-      LogCvmfs(kLogCvmfs, kLogStderr, "failed loading reflog in '%s' (%d - %s)",
-               repo_name.c_str(), f, Code2Ascii(f));
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "failed loading reflog from '%s' (%d - %s)",
+               object_fetcher->GetUrl(reflog_hash).c_str(), f, Code2Ascii(f));
       abort();
   }
 
