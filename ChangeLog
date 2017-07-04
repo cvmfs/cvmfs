@@ -36,7 +36,7 @@
   * Use built-in LibreSSL on macOS (CVM-1112)
   * Use -Os compiler flag
   * Use libcurl 7.51.0
-  * Use sqlite 3.15.2
+  * Use sqlite 3.19.3
   * Add CVMFS_VIRTUAL_DIR server parameter (CVM-1062)
   * Add catalog support for hidden files and bind mountpoint
   * Add CVMFS_IGNORE_SPECIAL_FILES server parameter
