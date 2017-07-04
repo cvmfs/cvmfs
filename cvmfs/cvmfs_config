@@ -640,16 +640,6 @@ cvmfs_chksetup() {
         fi
       done
 
-      # Check that autofs is not active when NFS export is
-      if [ "$sys_arch" = "Linux" ]; then
-        if check_is_on CVMFS_NFS_SOURCE; then
-          if cat /proc/mounts | grep -q "^/etc/auto.cvmfs /cvmfs "; then
-            echo "Error: autofs and NFS export are mutually exclusive ($fqrn)"
-            num_errors=$(($num_errors+1))
-          fi
-        fi
-      fi
-
       if [ ! -z "$CVMFS_NFS_SHARED" ]; then
         if ! check_is_on CVMFS_NFS_SOURCE; then
           echo "Warning: Setting CVMFS_NFS_SHARED has no effect without CVMFS_NFS_SOURCE."
