@@ -10,6 +10,12 @@
 # - cvmfs_server_common.sh
 
 
+_is_generated_apache_conf() {
+  local apache_conf="$1"
+
+  grep -q '^# Created by cvmfs_server.' $apache_conf
+}
+
 _migrate_2_1_6() {
   local name=$1
   local destination_version="2.1.7"
@@ -329,9 +335,23 @@ _migrate_137() {
   local name=$1
   local destination_version="137"
   local server_conf="/etc/cvmfs/repositories.d/${name}/server.conf"
+  local apache_conf="$(get_apache_conf_path)/$(get_apache_conf_filename $name)"
 
   load_repo_config $name
   echo "Migrating repository '$name' from layout revision $(mangle_version_string $CVMFS_CREATOR_VERSION) to revision $(mangle_version_string $destination_version)"
+
+  if is_local_upstream $CVMFS_UPSTREAM_STORAGE && cvmfs_sys_file_is_regular "$apache_conf"; then
+    if _is_generated_apache_conf "$apache_conf"; then
+      echo "--> updating apache config ($(basename $apache_conf))"
+      local storage_dir=$(get_upstream_config $CVMFS_UPSTREAM_STORAGE)
+      local wsgi=""
+      is_stratum1 $name && wsgi="enabled"
+      create_apache_config_for_endpoint $name $storage_dir $wsgi
+      reload_apache > /dev/null
+    else
+      echo "--> skipping foreign apache config ($(basename $apache_conf))"
+    fi
+  fi
 
   echo "--> updating server.conf"
   sed -i -e "s/^\(CVMFS_CREATOR_VERSION\)=.*/\1=$destination_version/" $server_conf
