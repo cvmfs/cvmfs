@@ -1188,40 +1188,6 @@ get_or_guess_repository_name() {
 }
 
 
-# looks for traces of CernVM-FS 2.0.x which is incompatible with CernVM-FS 2.1.x
-# and interferes with each other
-foreclose_legacy_cvmfs() {
-  local found_something=0
-
-  if cvmfs_sys_file_is_regular /etc/cvmfs/server.conf || cvmfs_sys_file_is_regular /etc/cvmfs/replica.conf ; then
-    echo "found legacy configuration files in /etc/cvmfs" 1>&2
-    found_something=1
-  fi
-
-  if which cvmfs-sync     > /dev/null 2>&1 || \
-     which cvmfs_scrub    > /dev/null 2>&1 || \
-     which cvmfs_snapshot > /dev/null 2>&1 || \
-     which cvmfs_zpipe    > /dev/null 2>&1 || \
-     which cvmfs_pull     > /dev/null 2>&1 || \
-     which cvmfs_unsign   > /dev/null 2>&1; then
-    echo "found legacy CernVM-FS executables" 1>&2
-    found_something=1
-  fi
-
-  if cvmfs_sys_file_is_regular /lib/modules/*/extra/cvmfsflt/cvmfsflt.ko ; then
-    echo "found CernVM-FS 2.0.x kernel module" 1>&2
-    found_something=1
-  fi
-
-  if [ $found_something -ne 0 ]; then
-    echo "found traces of CernVM-FS 2.0.x! You should remove them before proceeding!"
-    exit 1
-  fi
-
-  return $found_something
-}
-
-
 # get the configured timespan for removing old auto-generated tags.
 #
 # @param name  the name of the repository to be checked
