@@ -295,7 +295,7 @@ TEST_F(T_CachePlugin, Info) {
   EXPECT_TRUE(cache_mgr_->CommitFromMem(id, data, content.length(), "test"));
   int fd = cache_mgr_->Open(CacheManager::Bless(id));
   EXPECT_GE(fd, 0);
-  EXPECT_EQ(size_pinned + 3, quota_mgr_->GetSizePinned());
+  EXPECT_GT(quota_mgr_->GetSizePinned(), size_pinned);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
 }
 
@@ -308,6 +308,7 @@ TEST_F(T_CachePlugin, Shrink) {
 
   EXPECT_TRUE(quota_mgr_->Cleanup(0));
   EXPECT_TRUE(quota_mgr_->Cleanup(0));
+  uint64_t size_vanilla = quota_mgr_->GetSize();
   shash::Any id_vol(shash::kSha1);
   shash::Any id_reg(shash::kSha1);
   shash::Any id_clg(shash::kSha1);
@@ -327,26 +328,31 @@ TEST_F(T_CachePlugin, Shrink) {
   unsigned char *dat_clg = const_cast<unsigned char *>(
     reinterpret_cast<const unsigned char *>(str_clg.data()));
   EXPECT_TRUE(cache_mgr_->CommitFromMem(id_vol, dat_vol, str_vol.length(), ""));
+  uint64_t size_with1 = quota_mgr_->GetSize();
+  EXPECT_GT(size_with1, size_vanilla);
   EXPECT_TRUE(cache_mgr_->CommitFromMem(id_reg, dat_reg, str_reg.length(), ""));
+  uint64_t size_with2 = quota_mgr_->GetSize();
+  EXPECT_GT(size_with2, size_with1);
   EXPECT_TRUE(cache_mgr_->CommitFromMem(id_clg, dat_clg, str_clg.length(), ""));
+  uint64_t size_with3 = quota_mgr_->GetSize();
+  EXPECT_GT(size_with3, size_with2);
   void *txn = alloca(cache_mgr_->SizeOfTxn());
   EXPECT_EQ(0, cache_mgr_->StartTxn(id_txn, str_txn.length(), txn));
   EXPECT_EQ(static_cast<int>(str_txn.length()),
             cache_mgr_->Write(str_txn.data(), str_txn.length(), txn));
+  uint64_t size_with4 = quota_mgr_->GetSize();
+  EXPECT_GE(size_with4, size_with3);
 
-  EXPECT_EQ(str_vol.length() + str_reg.length() + str_clg.length(),
-            quota_mgr_->GetSize());
   int fd_clg = cache_mgr_->Open(CacheManager::Bless(id_clg));
   int fd_vol = cache_mgr_->Open(CacheManager::Bless(id_vol));
   EXPECT_GE(fd_clg, 0);
   EXPECT_GE(fd_vol, 0);
-  EXPECT_TRUE(quota_mgr_->Cleanup(str_clg.length() + str_vol.length()));
+  EXPECT_FALSE(quota_mgr_->Cleanup(0));
   EXPECT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::Bless(id_reg)));
   EXPECT_EQ(0, cache_mgr_->Close(fd_clg));
   EXPECT_EQ(0, cache_mgr_->Close(fd_vol));
-  EXPECT_TRUE(quota_mgr_->Cleanup(str_clg.length()));
-  EXPECT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::Bless(id_vol)));
   EXPECT_TRUE(quota_mgr_->Cleanup(0));
+  EXPECT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::Bless(id_vol)));
   EXPECT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::Bless(id_clg)));
 
   EXPECT_EQ(0, cache_mgr_->CommitTxn(txn));

@@ -115,7 +115,8 @@ static bool ParsePac(const char *pac_data, const size_t size,
     size_t hostname_len =
       (hostname_end == string::npos) ?
       string::npos : hostname_end-hostname_begin;
-    const string hostname = host_list[i].substr(hostname_begin, hostname_len);
+    const string hostname = (hostname_begin > host_list[i].length()) ?
+      "localhost" : host_list[i].substr(hostname_begin, hostname_len);
     const string url = host_list[i] + "/.cvmfspublished";
 
     // pac_proxy is freed by JavaScript GC

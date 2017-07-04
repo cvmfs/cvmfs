@@ -1,4 +1,8 @@
 2.4.0:
+  * Use "AllowOverride Limit AuthConfig" directive (CVM-1255)
+  * Set Apache manifest expiry period to 61 seconds
+  * Remove checks for conflicting cvmfs_server 2.0.x artifacts (CVM-1167) 
+  * Lift restriction on autofs in nfs mode (CVM-975)
   * Allow ext3 as spool file system on RHEL 7.3 / overlayfs (CVM-1186)
   * Add `cvmfs_server resign -p` command (CVM-1140)
   * Add `cvmfs_server check -r` command to repair reflog checksum (CVM-1240)
@@ -31,8 +35,10 @@
   * Update cern.ch master keys
   * Use built-in LibreSSL on macOS (CVM-1112)
   * Use -Os compiler flag
-  * Use libcurl 7.51.0
-  * Use sqlite 3.15.2
+  * Use zlib 1.2.11
+  * Use c-ares 1.13.0
+  * Use libcurl 7.54.1
+  * Use sqlite 3.19.3
   * Add CVMFS_VIRTUAL_DIR server parameter (CVM-1062)
   * Add catalog support for hidden files and bind mountpoint
   * Add CVMFS_IGNORE_SPECIAL_FILES server parameter

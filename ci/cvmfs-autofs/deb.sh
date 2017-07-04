@@ -11,7 +11,7 @@ SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
 
 usage() {
   echo "Build the Debian stretch autofs version for older deb based distros"
-  echo "Usage: $0 <work dir>"
+  echo "Usage: $0 <work dir> <result dir>"
   exit 1
 }
 
@@ -37,7 +37,15 @@ echo "done"
 
 echo -n "getting autofs source package"
 cd ${workdir}/src
-apt-get source autofs/stretch
+codename=$(lsb_release -sc)
+if [ "x$codename" = "xjessie" ]; then
+  apt-get source autofs/stretch
+elif [ "x$codename" = "xxenial" ]; then
+  apt-get source autofs/zesty
+else
+  echo "Distribution $codename not supported!"
+  exit 1
+fi
 srcdir=$(find . -mindepth 1 -maxdepth 1 -type d)
 cd $srcdir
 dpkg-checkbuilddeps
