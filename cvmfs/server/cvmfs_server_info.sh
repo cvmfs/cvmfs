@@ -24,6 +24,7 @@ cvmfs_server_info() {
   # get repository information
   load_repo_config $name
   stratum0=$CVMFS_STRATUM0
+  check_url "${CVMFS_STRATUM0}/.cvmfspublished" 20 || die "Repository unavailable under $CVMFS_STRATUM0"
 
   # do it!
   echo "Repository name: $name"

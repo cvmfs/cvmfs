@@ -191,6 +191,7 @@ __do_gc_cmd()
 
     # sanity checks
     check_repository_compatibility $name
+    check_url "${CVMFS_STRATUM0}/.cvmfspublished" 20 || die "Repository unavailable under $CVMFS_STRATUM0"
     if is_empty_repository $name; then
       echo "Repository $name is empty, nothing to do"
       continue

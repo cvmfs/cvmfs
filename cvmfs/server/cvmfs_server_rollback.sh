@@ -62,6 +62,7 @@ cvmfs_server_rollback() {
   # more sanity checks
   is_owner_or_root $name || die "Permission denied: Repository $name is owned by $user"
   check_repository_compatibility $name
+  check_url "${CVMFS_STRATUM0}/.cvmfspublished" 20 || die "Repository unavailable under $CVMFS_STRATUM0"
   check_expiry $name $stratum0  || die "Repository whitelist is expired!"
   is_in_transaction $name && die "Cannot rollback a repository in a transaction"
   is_cwd_on_path "/cvmfs/$name" && die "Current working directory is in /cvmfs/$name.  Please release, e.g. by 'cd \$HOME'." || true
