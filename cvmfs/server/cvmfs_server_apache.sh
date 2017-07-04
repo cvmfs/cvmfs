@@ -246,7 +246,7 @@ AddType application/json .json
 Alias /cvmfs/${name} ${storage_dir}
 <Directory "${storage_dir}">
     Options -MultiViews
-    AllowOverride Limit
+    AllowOverride Limit AuthConfig
     $(get_compatible_apache_allow_from_all_config)
 
     EnableMMAP Off
