@@ -1,4 +1,6 @@
 2.4.0:
+  * Use "AllowOverride Limit AuthConfig" directive (CVM-1255)
+  * Set Apache manifest expiry period to 61 seconds
   * Remove checks for conflicting cvmfs_server 2.0.x artifacts (CVM-1167) 
   * Lift restriction on autofs in nfs mode (CVM-975)
   * Allow ext3 as spool file system on RHEL 7.3 / overlayfs (CVM-1186)
