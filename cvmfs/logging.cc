@@ -440,6 +440,7 @@ void LogCvmfs(const LogSource source, const int mask, const char *format, ...) {
   if (mask & (kLogCustom0 | kLogCustom1 | kLogCustom2)) {
     string fmt_msg(msg);
     if (syslog_prefix) fmt_msg = "(" + string(syslog_prefix) + ") " + fmt_msg;
+    if (!(mask & kLogNoLinebreak)) fmt_msg += "\n";
     if (mask & kLogCustom0) LogCustom(0, fmt_msg);
     if (mask & kLogCustom1) LogCustom(1, fmt_msg);
     if (mask & kLogCustom2) LogCustom(2, fmt_msg);
