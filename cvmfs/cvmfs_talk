@@ -105,12 +105,18 @@ sub get_parameter {
 sub talk {
   my $instance = shift;
   my $pipe_path;
+  my $workspace;
   my $cache_dir;
   my $repository_name;
 
   if (!$pipe_path_arg) {
     $repository_name = get_parameter($instance, "CVMFS_REPOSITORY_NAME");
-    $cache_dir = get_parameter($instance, "CVMFS_CACHE_DIR");
+    $workspace = get_parameter($instance, "CVMFS_WORKSPACE");
+    if ($workspace eq "") {
+      $cache_dir = get_parameter($instance, "CVMFS_CACHE_DIR");
+    } else {
+      $cache_dir = $workspace
+    }
     return 1 if ($repository_name eq "") || ($cache_dir eq "");
     $pipe_path = "$cache_dir/cvmfs_io.$repository_name"
   } else {
