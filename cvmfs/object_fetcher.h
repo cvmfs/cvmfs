@@ -247,6 +247,10 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
     return failure;
   }
 
+  std::string GetUrl(const shash::Any &hash) const {
+    return static_cast<DerivedT*>(this)->GetUrl(hash);
+  }
+
   bool HasHistory() {
     shash::Any history_hash = GetHistoryHash();
     return !history_hash.IsNull();
@@ -354,6 +358,10 @@ class LocalObjectFetcher :
     *manifest = manifest::Manifest::LoadFile(path);
     return (*manifest != NULL) ? BaseTN::kFailOk
                                : BaseTN::kFailUnknown;
+  }
+
+  std::string GetUrl(const shash::Any &hash) const {
+    return "file://" + BuildPath(BuildRelativePath(hash));
   }
 
   Failures Fetch(const shash::Any &object_hash, std::string *file_path) {
@@ -519,6 +527,10 @@ class HttpObjectFetcher :
     *manifest = new manifest::Manifest(*manifest_ensemble.manifest);
     return (*manifest != NULL) ? BaseTN::kFailOk
                                : BaseTN::kFailUnknown;
+  }
+
+  std::string GetUrl(const shash::Any &hash) const {
+    return BuildUrl(BuildRelativeUrl(hash));
   }
 
   Failures Fetch(const shash::Any &object_hash, std::string *object_file) {

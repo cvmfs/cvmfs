@@ -77,6 +77,7 @@ cvmfs_server_transaction() {
     if [ $force -eq 0 ]; then
         is_in_transaction $name && { echo "Repository $name is already in a transaction"; retcode=1; continue; }
     fi
+    check_url "${CVMFS_STRATUM0}/.cvmfspublished" 20 || { echo "Repository unavailable under $CVMFS_STRATUM0!"; retcode=1; continue; }
     check_expiry $name $stratum0 || { echo "Repository whitelist for $name is expired!"; retcode=1; continue; }
     [ $(get_expiry $name $stratum0) -le $(( 12 * 60 * 60 )) ] && { echo "Warning: Repository whitelist stays valid for less than 12 hours!"; }
 

@@ -43,7 +43,6 @@ wait_for_apache() {
   local deadline=$(($now + 60))
   while [ $now -lt $deadline ]; do
     if curl -f -I --max-time 10 $(get_follow_http_redirects_flag) "$url" >/dev/null 2>&1; then
-      set +x
       return 0
     fi
     sleep 1
@@ -52,6 +51,14 @@ wait_for_apache() {
 
   # timeout
   return 1
+}
+
+
+check_url() {
+  local url="$1"
+  local timeout="$2"
+
+  curl -f -I --max-time $timeout $(get_follow_http_redirects_flag) "$url" >/dev/null 2>&1
 }
 
 
