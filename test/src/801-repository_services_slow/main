@@ -25,7 +25,7 @@ clean_up() {
     rm -rf /tmp/cvmfs_receiver_commit_processor*
 
     echo "  Removing test output data"
-    #rm -rf /tmp/cvmfs_out
+    rm -rf /tmp/cvmfs_out
 }
 
 check_status() {
@@ -75,9 +75,6 @@ run_transactions() {
 
     echo "  Publishing changes 1"
     cvmfs_server publish -e test.repo.org
-
-    echo "  Remounting test repository"
-    sudo cvmfs_server mount -a
 
     echo "  Copy the contents of the repository"
     save_repo_contents /tmp/cvmfs_out
