@@ -2412,8 +2412,9 @@ EOF'
     sudo -E cvmfs_server mkfs -o `whoami` test.repo.org
 
     echo "  Modifying test repo configuration"
-    sudo sed -i 's/local,/gw,/' /etc/cvmfs/repositories.d/test.repo.org/server.conf
-    sudo sed -i 's/txn,\/srv\/cvmfs\/test.repo.org/txn,http:\/\/localhost:8080\/api\/v1/g' /etc/cvmfs/repositories.d/test.repo.org/server.conf
+    sudo sed -i -e 's/local,/gw,/' /etc/cvmfs/repositories.d/test.repo.org/server.conf
+    sudo sed -i -e 's/txn,\/srv\/cvmfs\/test.repo.org/txn,http:\/\/localhost:8080\/api\/v1/g' /etc/cvmfs/repositories.d/test.repo.org/server.conf
+    sudo sed -i -e "s/CVMFS_ROOT_HASH=.*//" /var/spool/cvmfs/test.repo.org/client.local
 
     echo "  Starting repository services application"
     RUNNER_LOG_DIR=/tmp /opt/cvmfs_services/bin/cvmfs_services start
