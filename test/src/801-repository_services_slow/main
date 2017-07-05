@@ -1,6 +1,14 @@
 cvmfs_test_name="Repository services Slow"
 cvmfs_test_autofs_on_startup=false
 
+# A "stress test" variant of test #800 for the repository services application
+# The contents of /usr/bin are copied are published to a new CVMFS repository
+# configured with the GW backend. The contents are copied back out of the
+# repository into /tmp/cvmfs_out.
+# To do an integrity check, the SHA1 digest of each file is computed as well
+# as the SHA1 digest of the list of file digests - a root hash.
+# The root hash, thus computed, of /usr/bin and /tmp/cvmfs_out are compared.
+
 clean_up() {
     echo "Cleaning up"
 
@@ -8,17 +16,29 @@ clean_up() {
     /opt/cvmfs_services/bin/cvmfs_services stop
 
     echo "  Removing Mnesia directory"
-    rm -rf /opt/cvmfs_mnesia
+    sudo rm -rf /opt/cvmfs_mnesia
 
     echo "  Removing test repository"
     sudo -E cvmfs_server rmfs -f test.repo.org
 
     echo "  Removing test directories"
     rm -rf /tmp/cvmfs_receiver_commit_processor*
+
+    echo "  Removing test output data"
+    #rm -rf /tmp/cvmfs_out
 }
 
 check_status() {
     echo $(( $1 || 0 ))
+}
+
+# Poor man's Merkle tree
+#
+# Compute the SHA1 digest of each file in the $dir_name. The output of the function
+# is the SHA1 digest of the list of SHA1 file digests.
+compute_root_hash() {
+    local dir_name=$1
+    echo $(find $1 -type f -print | sort | xargs sha1sum | cut -d' ' -f1 | sha1sum | cut -d' ' -f1)
 }
 
 compare_file_checksum() {
@@ -50,6 +70,7 @@ run_transactions() {
     cvmfs_server transaction -e test.repo.org
 
     echo "  Copying the contents of /usr/bin into repository"
+    rm -v /cvmfs/test.repo.org/new_repository
     cp -rv /usr/bin/* /cvmfs/test.repo.org/
 
     echo "  Publishing changes 1"
@@ -61,15 +82,14 @@ run_transactions() {
     echo "  Copy the contents of the repository"
     save_repo_contents /tmp/cvmfs_out
 
-    ## Check results
-
-    # compare_file_checksum /tmp/cvmfs_out_1/new_file.txt d8e8fca2dc0f896fd7cb4cb0031ba249
-    # compare_file_checksum /tmp/cvmfs_out_1/new_repository e5747677debcb10cabe17d87a40e7fa4
-    # compare_file_checksum /tmp/cvmfs_out_2/new_repository/another_file.txt d8e8fca2dc0f896fd7cb4cb0031ba249
-    # if [ -d /tmp/cvmfs_out_3/new_repository ]; then
-    #     echo "/cvmfs/test/repo.org/new_repository should have been deleted in transaction 3"
-    #     exit 1
-    # fi
+    ## Check results with a poor man's Merkle tree
+    local hash_in=$(compute_root_hash /usr/bin)
+    local hash_out=$(compute_root_hash /tmp/cvmfs_out)
+    echo "Input hash  : $hash_in"
+    echo "Output hash : $hash_out"
+    if [ "$hash_in" != "$hash_out" ]; then
+        exit 1
+    fi
 
     clean_up
 }
