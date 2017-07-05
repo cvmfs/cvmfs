@@ -6,11 +6,18 @@
 #define CVMFS_RECEIVER_PAYLOAD_PROCESSOR_H_
 
 #include <stdint.h>
+#include <map>
 #include <string>
 
 #include "pack.h"
 
 namespace receiver {
+
+struct FileInfo {
+  std::string temp_path;
+  size_t total_size;
+  size_t current_size;
+};
 
 /**
  * This class is used in the `cvmfs_receiver` tool, on repository gateway
@@ -43,6 +50,8 @@ class PayloadProcessor {
                          const std::string& new_name);
 
  private:
+  typedef std::map<shash::Any, FileInfo>::iterator FileIterator;
+  std::map<shash::Any, FileInfo> pending_files_;
   std::string current_repo_;
   int num_errors_;
 };
