@@ -25,9 +25,6 @@ class SharedPtr {
 
   template <class Y>
   explicit SharedPtr(Y* p) {
-    if (static_cast<element_type*>(p) == value_) {
-      abort();
-    }
     value_ = static_cast<element_type*>(p);
     count_ = new atomic_int64;
     atomic_write64(count_, 1);

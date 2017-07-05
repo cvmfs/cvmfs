@@ -124,6 +124,7 @@ cvmfs_server_publish() {
     # more sanity checks
     is_owner_or_root $name || { echo "Permission denied: Repository $name is owned by $user"; retcode=1; continue; }
     check_repository_compatibility $name
+    check_url "${CVMFS_STRATUM0}/.cvmfspublished" 20 || { echo "Repository unavailable under $CVMFS_STRATUM0"; retcode=1; continue; }
     check_expiry $name $stratum0   || { echo "Repository whitelist for $name is expired!"; retcode=1; continue; }
     is_in_transaction $name        || { echo "Repository $name is not in a transaction"; retcode=1; continue; }
     [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || { echo "Open writable file descriptors on $name"; retcode=1; continue; }

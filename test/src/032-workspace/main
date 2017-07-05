@@ -16,11 +16,19 @@ cvmfs_run_test() {
   cvmfs_mount grid.cern.ch "CVMFS_WORKSPACE=$workspace" || return 3
   cat /cvmfs/grid.cern.ch/README || return 4
 
-  sudo cvmfs_talk -p $workspace/cvmfs_io.grid.cern.ch cache list || return 10
+  local pid_talk=$(sudo cvmfs_talk -i grid.cern.ch pid)
+  local pid_attr=$(get_xattr pid /cvmfs/grid.cern.ch)
+  if [ "x$pid_talk" != "x$pid_attr" ]; then
+    echo "Error: pid from cvmfs_talk is '$pid_talk'"
+    echo "pid from attributes is '$pid_attr'"
+    return 10
+  fi
+  sudo cvmfs_talk -i grid.cern.ch cache list || return 11
 
   local num_lock_files=$(sudo find $cache_dir -name 'lock*' | wc -l)
   local num_pipe_files=$(sudo find $cache_dir -name 'pipe*' | wc -l)
   if [ $num_lock_files -ne 0 ]; then
+    echo "found control files in $cache_dir which should be in $workspace"
     sudo ls $cache_dir
     return 20
   fi

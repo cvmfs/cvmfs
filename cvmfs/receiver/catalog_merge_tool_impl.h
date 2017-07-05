@@ -128,7 +128,7 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::CreateNewManifest(
     std::string* new_manifest_path) {
   if (!output_catalog_mgr_->Commit(false, 0, manifest_)) {
     LogCvmfs(kLogReceiver, kLogCustom1,
-             "CatalogMergeTool - Could not commit output catalog.\n");
+             "CatalogMergeTool - Could not commit output catalog");
     return false;
   }
 
@@ -137,7 +137,7 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::CreateNewManifest(
 
   if (!manifest_->Export(new_path)) {
     LogCvmfs(kLogReceiver, kLogCustom1,
-             "CatalogMergeTool - Could not export new manifest.\n");
+             "CatalogMergeTool - Could not export new manifest");
   }
 
   *new_manifest_path = new_path;

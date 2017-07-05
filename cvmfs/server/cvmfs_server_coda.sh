@@ -136,9 +136,6 @@ APACHE_CONF_MODE_CONFAVAIL=2 # *.conf goes to ${APACHE_CONF}/conf-available
 #                                                                              #
 ################################################################################
 
-# check that there are no traces of CernVM-FS 2.0.x which might interfere
-foreclose_legacy_cvmfs
-
 # check if there is at least a selected sub-command
 if [ $# -lt 1 ]; then
   usage
