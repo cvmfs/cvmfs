@@ -986,7 +986,8 @@ Supported Commands:
   resign          [ -w path to existing whitelist ]
                   [ -d days until expiration (default and maximum 30) ]
                   <fully qualified name>
-                  Re-sign the whitelist
+                  Re-sign the whitelist.
+                  Default expiration days goes down to 7 with masterkeycard.
   resign -p       <fully qualified name>
                   Re-sign .cvmfspublished
   masterkeycard   -a Checks if a smartcard is available
