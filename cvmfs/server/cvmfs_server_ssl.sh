@@ -68,9 +68,6 @@ create_whitelist() {
   whitelist=${temp_dir}/whitelist.$name
 
   local masterkey=/etc/cvmfs/keys/${name}.masterkey
-  if [ -n "$expire_days" ] && [ $expire_days -gt 30 ]; then
-    die "Maximum whitelist expiration is 30 days"
-  fi
   if cvmfs_sys_file_is_regular $masterkey; then
     if [ -z "$expire_days" ]; then
       expire_days=30
