@@ -9,13 +9,13 @@ clean_up() {
     /opt/cvmfs_services/bin/cvmfs_services stop
 
     echo "  Removing Mnesia directory"
-    rm -rf /opt/cvmfs_mnesia
+    sudo rm -rf /opt/cvmfs_mnesia
 
     echo "  Removing test repository"
     sudo -E cvmfs_server rmfs -f test.repo.org
 
     echo "  Removing output directories"
-    rm -rvf /tmp/cvmfs_out_{1,2,3}
+    rm -rvf /tmp/cvmfs_out_{1,2,3,4}
 
     echo "  Removing test directories"
     rm -rf /tmp/cvmfs_receiver_commit_processor*
@@ -48,7 +48,7 @@ run_transactions() {
 
     echo "Checking transaction + publish"
 
-    ## Transaction 1
+    ## Transaction 1 (Modifying existing file and creating a new one)
 
     echo "  Starting transaction 1"
     cvmfs_server transaction -e test.repo.org
@@ -62,13 +62,10 @@ run_transactions() {
     echo "  Publishing changes 1"
     cvmfs_server publish -e test.repo.org
 
-    echo "  Remounting test repository"
-    sudo cvmfs_server mount -a
-
     echo "  Copy the contents of the repository"
     save_repo_contents /tmp/cvmfs_out_1
 
-    ## Transaction 2
+    ## Transaction 2 (Deleting a file and creating a new directory with the same name)
 
     echo "  Starting transaction 2"
     cvmfs_server transaction -e test.repo.org
@@ -81,13 +78,10 @@ run_transactions() {
     echo "  Publishing changes 2"
     cvmfs_server publish -e test.repo.org
 
-    echo "  Remounting test repository"
-    sudo cvmfs_server mount -a
-
     echo "  Copy the contents of the repository"
     save_repo_contents /tmp/cvmfs_out_2
 
-    ## Transaction 3
+    ## Transaction 3 (Deleting the directory created in the previous transaction)
 
     echo "  Starting transaction 3"
     cvmfs_server transaction -e test.repo.org
@@ -98,11 +92,23 @@ run_transactions() {
     echo "  Publishing changes 3"
     cvmfs_server publish -e test.repo.org
 
-    echo "  Remounting test repository"
-    sudo cvmfs_server mount -a
-
     echo "  Copy the contents of the repository"
     save_repo_contents /tmp/cvmfs_out_3
+
+    ## Transaction 4 (Creating a new deep directory sub-tree)
+
+    echo "  Starting transaction 4"
+    cvmfs_server transaction -e test.repo.org
+
+    echo "  Create a deep directory hierarchy"
+    mkdir -p /cvmfs/test.repo.org/a/b
+    echo "New file" > /cvmfs/test.repo.org/a/b/new_file.txt
+
+    echo "  Publishing changes 3"
+    cvmfs_server publish -e test.repo.org
+
+    echo "  Copy the contents of the repository"
+    save_repo_contents /tmp/cvmfs_out_4
 
     ## Check results
 
@@ -113,6 +119,7 @@ run_transactions() {
         echo "/cvmfs/test/repo.org/new_repository should have been deleted in transaction 3"
         exit 1
     fi
+    compare_file_checksum /tmp/cvmfs_out_4/a/b/new_file.txt f1885b1a57c71cacbd923fc5e9aefef3
 
     clean_up
 }
