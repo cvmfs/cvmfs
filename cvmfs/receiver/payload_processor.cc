@@ -14,13 +14,14 @@
 
 namespace receiver {
 
-PayloadProcessor::PayloadProcessor() : pending_files_(), current_repo_(), num_errors_(0) {}
+PayloadProcessor::PayloadProcessor()
+    : pending_files_(), current_repo_(), num_errors_(0) {}
 
 PayloadProcessor::~PayloadProcessor() {}
 
 PayloadProcessor::Result PayloadProcessor::Process(
-  int fdin, const std::string& digest_base64, const std::string& path,
-  uint64_t header_size) {
+    int fdin, const std::string& digest_base64, const std::string& path,
+    uint64_t header_size) {
   const size_t first_slash_idx = path.find('/', 0);
 
   current_repo_ = path.substr(0, first_slash_idx);
@@ -61,7 +62,7 @@ PayloadProcessor::Result PayloadProcessor::Process(
 }
 
 void PayloadProcessor::ConsumerEventCallback(
-  const ObjectPackBuild::Event& event) {
+    const ObjectPackBuild::Event& event) {
   std::string path("");
 
   if (event.object_type == ObjectPack::kCas) {
@@ -70,8 +71,7 @@ void PayloadProcessor::ConsumerEventCallback(
     path = event.object_name;
   } else {
     // kEmpty - this is an error.
-    LogCvmfs(kLogReceiver, kLogCustom1,
-             "Event received with unknown object.");
+    LogCvmfs(kLogReceiver, kLogCustom1, "Event received with unknown object.");
     num_errors_++;
     return;
   }
@@ -83,8 +83,7 @@ void PayloadProcessor::ConsumerEventCallback(
     std::string temp_dir = "/srv/cvmfs/" + current_repo_ + "/data/txn";
     const std::string tmp_path = CreateTempPath(temp_dir, 0666);
     if (tmp_path.empty()) {
-      LogCvmfs(kLogReceiver, kLogCustom1,
-               "Unable to create temporary path.");
+      LogCvmfs(kLogReceiver, kLogCustom1, "Unable to create temporary path.");
       num_errors_++;
       return;
     }
@@ -102,7 +101,8 @@ void PayloadProcessor::ConsumerEventCallback(
   int fdout = open(info.temp_path.c_str(), O_CREAT | O_WRONLY | O_APPEND, 0600);
   if (fdout == -1) {
     LogCvmfs(kLogReceiver, kLogCustom1,
-             "Unable to open temporary output file: %s", info.temp_path.c_str());
+             "Unable to open temporary output file: %s",
+             info.temp_path.c_str());
     return;
   }
 
@@ -141,7 +141,10 @@ void PayloadProcessor::ConsumerEventCallback(
 
     if (file_hash != event.id) {
       LogCvmfs(kLogReceiver, kLogCustom0,
-               "PayloadProcessor - Hash mismatch for unpacked file: event size: %ld, file size: %ld, event hash: %s, file hash: %s", event.size, GetFileSize(dest), event.id.ToString(true).c_str(), file_hash.ToString(true).c_str());
+               "PayloadProcessor - Hash mismatch for unpacked file: event "
+               "size: %ld, file size: %ld, event hash: %s, file hash: %s",
+               event.size, GetFileSize(dest), event.id.ToString(true).c_str(),
+               file_hash.ToString(true).c_str());
       num_errors_++;
       return;
     }
