@@ -2363,34 +2363,33 @@ find_or_build_cvmfs_preload() {
 set_up_repository_services() {
     echo "Setting up repository services"
 
-    PACKAGE_URL_ROOT=http://ecsft.cern.ch/dist/cvmfs/cvmfs-services/cvmfs_services-$CVMFS_SERVICES_VERSION
-    CVMFS_SERVICES_PACKAGE=""
+    local package_url_root=http://ecsft.cern.ch/dist/cvmfs/cvmfs-services/cvmfs_services-$CVMFS_SERVICES_VERSION
+    local cvmfs_services_package_url=""
     # Choose which package to download and install based on platform
     if [ -f /etc/lsb-release ]; then
         if [ x"$(lsb_release -cs)" = x"xenial" ]; then
-            CVMFS_SERVICES_PACKAGE=${PACKAGE_URL_ROOT}-ubuntu1604-x86_64.tar.gz
-            echo "Using package: $CVMFS_SERVICES_PACKAGE"
+            cvmfs_services_package_url=${package_url_root}-ubuntu1604-x86_64.tar.gz
+            echo "Using package: $cvmfs_services_package_url"
         fi
     elif [ -f /etc/redhat-release ]; then
         rhver=$(cat /etc/redhat-release | awk {'print $(NF-1)'} | cut -d'.' -f1)
         if [ $((rhver == 6)) -o $((rhver == 7)) ]; then
-            CVMFS_SERVICES_PACKAGE=${PACKAGE_URL_ROOT}-centos${rhver}-x86_64.tar.gz
-            echo "Using package: $CVMFS_SERVICES_PACKAGE"
+            cvmfs_services_package_url=${package_url_root}-centos${rhver}-x86_64.tar.gz
+            echo "Using package: $cvmfs_services_package_url"
         fi
     fi
 
-    if [ x"$CVMFS_SERVICES_PACKAGE" = x"" ]; then
+    if [ x"$cvmfs_services_package_url" = x"" ]; then
         echo "Platform not supported. Exiting"
         exit 1
     fi
 
     echo "  Installing the cvmfs_services application"
     pushd /tmp
-    local current_hash=$(sha1sum /tmp/cvmfs_services.tar.gz | cut -d' ' -f1)
-    echo "Current package hash: $current_hash"
-    echo "Target package hash: $CVMFS_SERVICES_PACKAGE_HASH"
-    if [ "$current_hash" != "$CVMFS_SERVICES_PACKAGE_HASH" ]; then
-        curl -o cvmfs_services.tar.gz $CVMFS_SERVICES_PACKAGE
+    local cvmfs_services_package_file_name=$(echo $cvmfs_services_package_url | awk -F'/' {'print $NF'})
+
+    if [ ! -f "/tmp/$cvmfs_services_package_file_name" ]; then
+        curl -o $cvmfs_services_package_file_name $cvmfs_services_package_url
     fi
     sudo rm -rf /opt/cvmfs_services && sudo mkdir -p /opt/cvmfs_services && cd /opt/cvmfs_services
     sudo tar xzf /tmp/cvmfs_services.tar.gz
