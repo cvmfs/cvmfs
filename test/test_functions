@@ -2386,7 +2386,12 @@ set_up_repository_services() {
 
     echo "  Installing the cvmfs_services application"
     pushd /tmp
-    curl -o cvmfs_services.tar.gz $CVMFS_SERVICES_PACKAGE
+    local current_hash=$(sha1sum /tmp/cvmfs_services.tar.gz | cut -d' ' -f1)
+    echo "Current package hash: $current_hash"
+    echo "Target package hash: $CVMFS_SERVICES_PACKAGE_HASH"
+    if [ "$current_hash" != "$CVMFS_SERVICES_PACKAGE_HASH" ]; then
+        curl -o cvmfs_services.tar.gz $CVMFS_SERVICES_PACKAGE
+    fi
     sudo rm -rf /opt/cvmfs_services && sudo mkdir -p /opt/cvmfs_services && cd /opt/cvmfs_services
     sudo tar xzf /tmp/cvmfs_services.tar.gz
     popd
