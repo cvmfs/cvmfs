@@ -984,7 +984,8 @@ Supported Commands:
                   All snapshots between trunk and the target tag become
                   inaccessible.  Without a tag name, trunk-previous is used.
   resign          [ -w path to existing whitelist ]
-                  [ -d days until expiration (default and maximum 30) ]
+                  [ -d days until expiration (default 30) ]
+                  [ -f don't ask again ]
                   <fully qualified name>
                   Re-sign the whitelist.
                   Default expiration days goes down to 7 with masterkeycard.
