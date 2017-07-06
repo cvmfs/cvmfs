@@ -63,10 +63,28 @@
     "stdexcept": "cpp",
     "streambuf": "cpp",
     "tuple": "cpp",
-    "string_view": "cpp"
+    "string_view": "cpp",
+    "cmakeccompilerid.c": "cpp",
+    "tftp.c": "cpp",
+    "sqlite3.c": "cpp",
+    "md4.c": "cpp",
+    "md5.c": "cpp",
+    "lparser.c": "cpp",
+    "fopen.c": "cpp",
+    "mztools.c": "cpp",
+    "gzappend.c": "cpp",
+    "gzclose.c": "cpp",
+    "gzlib.c": "cpp",
+    "gzread.c": "cpp",
+    "gzwrite.c": "cpp",
+    "minigzip.c": "cpp",
+    "mongoose.c": "cpp",
+    "embedded_c.c": "cpp",
+    "civetweb.c": "cpp",
+    "upb.c": "cpp",
+    "gun.c": "cpp"
   },
   "python.linting.pylintEnabled": false,
   "python.formatting.provider": "yapf",
   "git.ignoreLimitWarning": true
 }
-

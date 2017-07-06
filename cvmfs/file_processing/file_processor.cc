@@ -55,6 +55,7 @@ void FileProcessor::Process(const std::string   &local_path,
   File *file = new File(local_path,
                         io_dispatcher_,
                         chunk_detector,
+                        generate_legacy_bulk_chunks_,
                         hash_algorithm_,
                         compression_alg_,
                         hash_suffix);
@@ -71,8 +72,10 @@ void FileProcessor::Process(const std::string   &local_path,
 void FileProcessor::FileDone(File *file) {
   assert(file != NULL);
   assert(!file->path().empty());
-  assert(file->bulk_chunk() != NULL);
-  assert(!file->bulk_chunk()->content_hash().IsNull());
+  assert(!generate_legacy_bulk_chunks_ || (file->bulk_chunk() != NULL));
+  assert(!file->bulk_chunk() || !file->bulk_chunk()->content_hash().IsNull());
+  assert((file->chunks().size() > 1) || (file->bulk_chunk() != NULL));
+  assert(file->chunks().size() != 1);
 
   // extract crucial information from the Chunk structures and wrap them into
   // the global FileChunk data structure
@@ -92,12 +95,12 @@ void FileProcessor::FileDone(File *file) {
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "File '%s' processed completely "
                                         "(bulk hash: %s suffix: %c)",
            file->path().c_str(),
-           file->bulk_chunk()->content_hash().ToString().c_str(),
+           file->GetBulkHash().ToString().c_str(),
            file->hash_suffix());
-  assert(file->hash_suffix() == file->bulk_chunk()->content_hash().suffix);
+  assert(file->hash_suffix() == file->GetBulkHash().suffix);
   NotifyListeners(SpoolerResult(0,
                                 file->path(),
-                                file->bulk_chunk()->content_hash(),
+                                file->GetBulkHash(),
                                 resulting_chunks,
                                 compression_alg_));
 }

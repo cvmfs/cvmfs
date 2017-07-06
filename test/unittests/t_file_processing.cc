@@ -313,24 +313,31 @@ class T_FileProcessing : public FileSandbox {
 
   void TestProcessFile(const std::string &file_path,
                        const ExpectedHashString &reference_hash,
-                       const bool use_chunking = true) {
+                       const bool generate_legacy_bulk_hashes = true,
+                       const bool use_chunking = true)
+  {
     ExpectedHashStrings reference_hash_strings;
     reference_hash_strings.push_back(reference_hash);
-    TestProcessFile(file_path, reference_hash_strings, use_chunking);
+    TestProcessFile(file_path, reference_hash_strings,
+                    generate_legacy_bulk_hashes, use_chunking);
   }
 
   void TestProcessFile(const std::string &file_path,
                        const ExpectedHashStrings &reference_hash_strings,
+                       const bool generate_legacy_bulk_hashes = true,
                        const bool use_chunking = true) {
     std::vector<std::string> file_pathes;
     file_pathes.push_back(file_path);
-    TestProcessFiles(file_pathes, reference_hash_strings, use_chunking);
+    TestProcessFiles(file_pathes, reference_hash_strings,
+                     generate_legacy_bulk_hashes, use_chunking);
   }
 
   void TestProcessFiles(const std::vector<std::string> &file_pathes,
                         const ExpectedHashStrings &reference_hash_strings,
+                        const bool generate_legacy_bulk_hashes = true,
                         const bool use_chunking = true) {
-    upload::FileProcessor processor(uploader_, MockSpoolerDefinition());
+    upload::FileProcessor processor(
+      uploader_, MockSpoolerDefinition(generate_legacy_bulk_hashes));
 
     std::vector<std::string>::const_iterator i = file_pathes.begin();
     std::vector<std::string>::const_iterator iend = file_pathes.end();
@@ -417,10 +424,32 @@ TEST_F(T_FileProcessing, ProcessSmallFile) {
   TestProcessFile(path, GetSmallFileBulkHash());
 }
 
+TEST_F(T_FileProcessing, ProcessSmallFileForcedBulk) {
+  // Only one chunk created, promoted to bulk chunk
+  TestProcessFile(GetSmallFile(), GetSmallFileBulkHash(),
+                  false,  /* legacy bulk hash */
+                  true   /* chunking */);
+}
+
 TEST_F(T_FileProcessing, ProcessBigFile) {
   ExpectedHashStrings hs = GetBigFileChunkHashes();
   hs.push_back(GetBigFileBulkHash());
   TestProcessFile(GetBigFile(), hs);
+}
+
+TEST_F(T_FileProcessing, ProcessBigFileForcedBulk) {
+  // No chunking, hence bulk chunk must be created
+  TestProcessFile(GetBigFile(), GetBigFileBulkHash(),
+                  false,  /* legacy bulk hash */
+                  false   /* chunking */);
+}
+
+TEST_F(T_FileProcessing, ProcessBigFileOnlyChunks) {
+  // No bulk hash in the reference list
+  ExpectedHashStrings hs = GetBigFileChunkHashes();
+  TestProcessFile(GetBigFile(), hs,
+                  false,  /* legacy bulk hash */
+                  true   /* chunking */);
 }
 
 TEST_F(T_FileProcessing, ProcessHugeFileSlow) {
@@ -430,7 +459,9 @@ TEST_F(T_FileProcessing, ProcessHugeFileSlow) {
 }
 
 TEST_F(T_FileProcessing, ProcessBigFileWithoutChunks) {
-  TestProcessFile(GetBigFile(), GetBigFileBulkHash(), false);
+  TestProcessFile(GetBigFile(), GetBigFileBulkHash(),
+                  true,  /* legacy bulk hash */
+                  false  /* chunking */);
 }
 
 TEST_F(T_FileProcessing, ProcessMultipleFilesSlow) {
@@ -490,7 +521,9 @@ TEST_F(T_FileProcessing, ProcessMultipeFilesWithoutChunkingSlow) {
   pathes.push_back(GetBigFile());
   hs.push_back(GetBigFileBulkHash());
 
-  TestProcessFiles(pathes, hs, false);
+  TestProcessFiles(pathes, hs,
+                   true,  /* legacy bulk */
+                   false  /* chunking */);
 }
 
 TEST_F(T_FileProcessing, ProcessMultipleFilesInSeparateWavesSlow) {

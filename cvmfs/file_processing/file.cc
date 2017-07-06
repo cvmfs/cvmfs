@@ -14,12 +14,14 @@ namespace upload {
 File::File(const std::string    &path,
            IoDispatcher         *io_dispatcher,
            ChunkDetector        *chunk_detector,
+           bool                  generate_legacy_bulk_chunk,
            shash::Algorithms     hash_algorithm,
            zlib::Algorithms      compression_alg,
            const shash::Suffix   hash_suffix) :
   AbstractFile(path, GetFileSize(path)),
   might_become_chunked_(chunk_detector != NULL &&
                         chunk_detector->MightFindChunks(size())),
+  generate_legacy_bulk_chunk_(generate_legacy_bulk_chunk),
   hash_algorithm_(hash_algorithm),
   hash_suffix_(hash_suffix),
   compression_alg_(compression_alg),
@@ -33,22 +35,13 @@ File::File(const std::string    &path,
 
 
 File::~File() {
-  if (HasBulkChunk()) {
-    delete bulk_chunk_;
-    bulk_chunk_ = NULL;
-  }
-
-  if (HasChunkDetector()) {
-    delete chunk_detector_;
-    chunk_detector_ = NULL;
-  }
+  delete bulk_chunk_;
+  delete chunk_detector_;
 
   ChunkVector::const_iterator i    = chunks_.begin();
   ChunkVector::const_iterator iend = chunks_.end();
-  for (; i != iend; ++i) {
+  for (; i != iend; ++i)
     delete *i;
-  }
-  chunks_.clear();
 }
 
 
@@ -62,6 +55,13 @@ void File::AddChunk(Chunk *chunk, const bool register_chunk) {
   } else {
     chunks_.push_back(chunk);
   }
+}
+
+
+shash::Any File::GetBulkHash() const {
+  if (bulk_chunk_ != NULL)
+    return bulk_chunk_->content_hash();
+  return shash::Any(hash_algorithm_, hash_suffix_);
 }
 
 
@@ -102,7 +102,7 @@ Chunk* File::CreateNextChunk(const off_t offset) {
   // copy the initially created Chunk as the bulk_chunk_ as soon as we create
   // a second Chunk, thus defining the file to be chunked in general
   // (see CreateInitialChunk())
-  if (!HasBulkChunk()) {
+  if (!HasBulkChunk() && generate_legacy_bulk_chunk_) {
     ForkOffBulkChunk();
   }
 
@@ -165,7 +165,8 @@ void File::FullyDefineLastChunk() {
   // only one Chunk was generated during the processing of this file, though it
   // was classified as possible chunked file --> re-define the file as not being
   // chunked and use the single generated Chunk as bulk Chunk
-  if (might_become_chunked_ && !HasBulkChunk()) {
+  if (might_become_chunked_ && (chunks_.size() == 1)) {
+    assert(!HasBulkChunk());
     PromoteSingleChunkAsBulkChunk();
   }
 }
@@ -195,10 +196,12 @@ void File::Finalize() {
 #endif
 
   // more sanity checks
-  assert(HasBulkChunk());
-  assert(bulk_chunk_->offset() == 0);
-  assert(bulk_chunk_->size()   == size());
-  assert(bulk_chunk_->IsFullyProcessed());
+  assert(!generate_legacy_bulk_chunk_ || HasBulkChunk());
+  if (HasBulkChunk()) {
+    assert(bulk_chunk_->offset() == 0);
+    assert(bulk_chunk_->size()   == size());
+    assert(bulk_chunk_->IsFullyProcessed());
+  }
 
   // notify about the finished file processing
   io_dispatcher_->CommitFile(this);
