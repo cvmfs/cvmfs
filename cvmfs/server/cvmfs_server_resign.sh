@@ -13,7 +13,7 @@ cvmfs_server_resign() {
   local names
   local retcode=0
   local expire_days
-  local allow_long_expire=0
+  local force=0
   local whitelist_path
   local sign_published=0
 
@@ -25,8 +25,7 @@ cvmfs_server_resign() {
         expire_days=$OPTARG
       ;;
       f)
-        # undocumented option to allow long expiration, for testing
-        allow_long_expire=1
+        force=1
       ;;
       p)
         sign_published=1
@@ -52,12 +51,16 @@ cvmfs_server_resign() {
   [ $sign_published -eq 0 ] || [ -z "$whitelist_path" ] || die "Cannot use both -w and -p"
   [ $sign_published -eq 1 ] || is_root || die "Only root can resign whitelists"
 
-  if [ -n "$expire_days" ] && [ $expire_days -gt 30 ]; then
-    if [ $allow_long_expire -eq 1 ]; then
-      echo "Warning: whitelist expiration is more than 30 days."
-      echo "  Long expirations increase risk from repository key compromises!"
-    else
-      die "Maximum whitelist expiration is 30 days"
+  if [ $sign_published -eq 0 ] && \
+        [ -n "$expire_days" ] && [ $expire_days -gt 30 ]; then
+    echo "Warning: whitelist expiration is more than 30 days."
+    echo "Long expirations increase risk from repository key compromises!"
+    if [ $force -ne 1 ]; then
+      local reply
+      read -p "Are you sure you want to do this (y/N)? " reply
+      if [ "$reply" != "y" ] && [ "$reply" != "Y" ]; then
+        return 1
+      fi
     fi
   fi
 
