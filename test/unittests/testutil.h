@@ -100,6 +100,7 @@ static inline upload::SpoolerDefinition MockSpoolerDefinition() {
                                    shash::kSha1,
                                    zlib::kZlibDefault,
                                    true,
+                                   true,
                                    min_chunk_size,
                                    avg_chunk_size,
                                    max_chunk_size);

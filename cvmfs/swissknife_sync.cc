@@ -605,10 +605,16 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 
   // Start spooler
   upload::SpoolerDefinition spooler_definition(
-      params.spooler_definition, hash_algorithm, params.compression_alg,
-      params.use_file_chunking, params.min_file_chunk_size,
-      params.avg_file_chunk_size, params.max_file_chunk_size,
-      params.session_token_file, params.key_file);
+      params.spooler_definition,
+      hash_algorithm,
+      params.compression_alg,
+      params.generate_legacy_bulk_chunks,
+      params.use_file_chunking,
+      params.min_file_chunk_size,
+      params.avg_file_chunk_size,
+      params.max_file_chunk_size,
+      params.session_token_file,
+      params.key_file);
   if (params.max_concurrent_write_jobs > 0) {
     spooler_definition.number_of_concurrent_uploads =
         params.max_concurrent_write_jobs;

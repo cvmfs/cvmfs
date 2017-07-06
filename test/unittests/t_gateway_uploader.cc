@@ -55,7 +55,7 @@ class T_GatewayUploader : public ::testing::Test {
 TEST_F(T_GatewayUploaderConfig, ParseSpoolerDefinitionBadArgs) {
   upload::SpoolerDefinition definition(
       "gw,/local/temp/dir,http://my.repo.address:8080/api/v1", shash::kSha1,
-      zlib::kZlibDefault, false, 0, 0, 0,
+      zlib::kZlibDefault, false, false, 0, 0, 0,
       "/var/spool/cvmfs/test.cern.ch/session_token_some_path", "some_key_file");
   EXPECT_FALSE(
       upload::GatewayUploader::ParseSpoolerDefinition(definition, NULL));
@@ -64,7 +64,7 @@ TEST_F(T_GatewayUploaderConfig, ParseSpoolerDefinitionBadArgs) {
 TEST_F(T_GatewayUploaderConfig, ParseSpoolerDefinitionGoodConfigString) {
   upload::SpoolerDefinition definition(
       "gw,/local/temp/dir,http://my.repo.address:8080/api/v1", shash::kSha1,
-      zlib::kZlibDefault, false, 0, 0, 0,
+      zlib::kZlibDefault, false, false, 0, 0, 0,
       "/var/spool/cvmfs/test.cern.ch/session_token_some_path", "some_key_file");
 
   EXPECT_TRUE(
@@ -87,7 +87,7 @@ TEST_F(T_GatewayUploaderConfig, ParseSpoolerDefinitionNoSessionTokenFile) {
 TEST_F(T_GatewayUploader, Construct) {
   upload::SpoolerDefinition definition(
       "gw,/local/temp/dir,http://my.repo.address:8080/api/v1", shash::kSha1,
-      zlib::kZlibDefault, false, 0, 0, 0,
+      zlib::kZlibDefault, false, false, 0, 0, 0,
       "/var/spool/cvmfs/test.cern.ch/session_token_some_path", "some_key_file");
   GatewayUploaderMocked uploader(definition);
   EXPECT_TRUE(uploader.Initialize());

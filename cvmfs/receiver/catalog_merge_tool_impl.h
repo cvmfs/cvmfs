@@ -36,8 +36,9 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::Run(
   if (needs_setup_) {
     upload::SpoolerDefinition definition(
         params.spooler_configuration, params.hash_alg, params.compression_alg,
-        params.use_file_chunking, params.min_chunk_size, params.avg_chunk_size,
-        params.max_chunk_size, "dummy_token", "dummy_key");
+        params.generate_legacy_bulk_chunks, params.use_file_chunking,
+        params.min_chunk_size, params.avg_chunk_size, params.max_chunk_size,
+        "dummy_token", "dummy_key");
     spooler = upload::Spooler::Construct(definition);
     const std::string temp_dir = CreateTempDir(temp_dir_prefix_);
     output_catalog_mgr_ = new RwCatalogMgr(
