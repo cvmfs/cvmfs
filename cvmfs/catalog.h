@@ -101,7 +101,7 @@ class Catalog : SingleCopy {
    * which is 5 minutes, because the config repo is accessed on every root
    * catalog refresh and we want to avoid thrashing that mountpoint.
    */
-  static const uint64_t kDefaultTTL = 320;  /**< 4 minutes default TTL */
+  static const uint64_t kDefaultTTL = 240;  /**< 4 minutes default TTL */
 
   /**
    * Note: is_nested only has an effect if parent == NULL otherwise being
