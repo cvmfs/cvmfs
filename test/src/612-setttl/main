@@ -30,7 +30,7 @@ cvmfs_run_test() {
 
   local ttl=$(attr -qg expires $TEST_612_MOUNTPOINT)
   echo "TTL is $ttl"
-  if [ $ttl -ne 15 -a $ttl -ne 14 ]; then
+  if [ $ttl -ne 4 -a $ttl -ne 3 ]; then
     return 20
   fi
 
