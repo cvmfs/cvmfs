@@ -15,7 +15,7 @@ clean_up() {
     sudo -E cvmfs_server rmfs -f test.repo.org
 
     echo "  Removing output directories"
-    rm -rvf /tmp/cvmfs_out_{1,2,3,4}
+    rm -rvf /tmp/cvmfs_out_{1,2,3,4,5}
 
     echo "  Removing test directories"
     rm -rf /tmp/cvmfs_receiver_commit_processor*
@@ -103,23 +103,45 @@ run_transactions() {
     echo "  Create a deep directory hierarchy"
     mkdir -p /cvmfs/test.repo.org/a/b
     echo "New file" > /cvmfs/test.repo.org/a/b/new_file.txt
+    echo "New file" > /cvmfs/test.repo.org/new
 
-    echo "  Publishing changes 3"
+    echo "  Publishing changes 4"
     cvmfs_server publish -e test.repo.org
 
     echo "  Copy the contents of the repository"
     save_repo_contents /tmp/cvmfs_out_4
 
+    ## Transaction 5 (Creating a new deep directory sub-tree in place of a former file)
+
+    echo "  Starting transaction 5"
+    cvmfs_server transaction -e test.repo.org
+
+    echo "  Create a deep directory hierarchy"
+    rm -rv /cvmfs/test.repo.org/new
+    mkdir -p /cvmfs/test.repo.org/new/c/d
+    echo "New file" > /cvmfs/test.repo.org/new/c/d/new_file.txt
+
+    echo "  Publishing changes 5"
+    cvmfs_server publish -e test.repo.org
+
+    echo "  Copy the contents of the repository"
+    save_repo_contents /tmp/cvmfs_out_5
+
     ## Check results
 
     compare_file_checksum /tmp/cvmfs_out_1/new_file.txt d8e8fca2dc0f896fd7cb4cb0031ba249
     compare_file_checksum /tmp/cvmfs_out_1/new_repository e5747677debcb10cabe17d87a40e7fa4
+
     compare_file_checksum /tmp/cvmfs_out_2/new_repository/another_file.txt d8e8fca2dc0f896fd7cb4cb0031ba249
+
     if [ -d /tmp/cvmfs_out_3/new_repository ]; then
         echo "/cvmfs/test/repo.org/new_repository should have been deleted in transaction 3"
         exit 1
     fi
+
     compare_file_checksum /tmp/cvmfs_out_4/a/b/new_file.txt f1885b1a57c71cacbd923fc5e9aefef3
+
+    compare_file_checksum /tmp/cvmfs_out_5/new/c/d/new_file.txt f1885b1a57c71cacbd923fc5e9aefef3
 
     clean_up
 }
