@@ -550,6 +550,9 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
       return 2;
     }
   }
+  if (args.find('O') != args.end()) {
+    params.generate_legacy_bulk_chunks = true;
+  }
   shash::Algorithms hash_algorithm = shash::kSha1;
   if (args.find('e') != args.end()) {
     hash_algorithm = shash::ParseHashAlgorithm(*args.find('e')->second);
