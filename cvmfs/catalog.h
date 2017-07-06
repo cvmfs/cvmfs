@@ -96,7 +96,12 @@ class Catalog : SingleCopy {
  public:
   typedef std::vector<shash::Any> HashVector;
 
-  static const uint64_t kDefaultTTL = 900;  /**< 15 minutes default TTL */
+  /**
+   * The default TTL should be shorter than the autofs idle unmount time
+   * which is 5 minutes, because the config repo is accessed on every root
+   * catalog refresh and we want to avoid thrashing that mountpoint.
+   */
+  static const uint64_t kDefaultTTL = 320;  /**< 4 minutes default TTL */
 
   /**
    * Note: is_nested only has an effect if parent == NULL otherwise being
