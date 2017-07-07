@@ -2392,7 +2392,7 @@ set_up_repository_services() {
         curl -o $cvmfs_services_package_file_name $cvmfs_services_package_url
     fi
     sudo rm -rf /opt/cvmfs_services && sudo mkdir -p /opt/cvmfs_services && cd /opt/cvmfs_services
-    sudo tar xzf /tmp/cvmfs_services.tar.gz
+    sudo tar xzf /tmp/$cvmfs_services_package_file_name
     popd
 
     echo "  Writing configuration files"
