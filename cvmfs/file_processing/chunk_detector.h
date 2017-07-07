@@ -90,13 +90,6 @@ class StaticOffsetDetector : public ChunkDetector {
 class Xor32Detector : public ChunkDetector {
   FRIEND_TEST(T_ChunkDetectors, Xor32);
 
- protected:
-  typedef std::pair<size_t, uint32_t> Threshold;
-  typedef std::vector<Threshold> Thresholds;
-
-  // xor32 only depends on a window of the last 32 bytes in the data stream
-  static const size_t xor32_influence = 32;
-
  public:
   Xor32Detector(const size_t minimal_chunk_size,
                 const size_t average_chunk_size,
@@ -125,10 +118,17 @@ class Xor32Detector : public ChunkDetector {
   }
 
   inline bool CheckThreshold() {
-    return abs(static_cast<int32_t>(xor32_) - magic_number_) < threshold_;
+    return abs(static_cast<int32_t>(xor32_) - kMagicNumber) < threshold_;
   }
 
  private:
+  typedef std::pair<size_t, uint32_t> Threshold;
+  typedef std::vector<Threshold> Thresholds;
+
+  // xor32 only depends on a window of the last 32 bytes in the data stream
+  static const size_t kXor32Window = 32;
+  static const int32_t kMagicNumber;
+
   const size_t minimal_chunk_size_;
   const size_t average_chunk_size_;
   const size_t maximal_chunk_size_;
@@ -136,7 +136,6 @@ class Xor32Detector : public ChunkDetector {
   off_t    xor32_ptr_;
   uint32_t xor32_;
 
-  static const int32_t magic_number_;
   const int32_t threshold_;
 };
 
