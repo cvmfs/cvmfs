@@ -1017,20 +1017,20 @@ bool MountPoint::CheckBlacklists() {
   string blacklist;
   if (!options_mgr_->GetValue("CVMFS_BLACKLIST", &blacklist))
     blacklist = kDefaultBlacklist;
+  bool append = false;
   if (FileExists(blacklist)) {
-    const bool append = false;
     if (!signature_mgr_->LoadBlacklist(blacklist, append)) {
       boot_error_ = "failed to load blacklist " + blacklist;
       boot_status_ = loader::kFailSignature;
       return false;
     }
+    append = true;
   }
 
   string config_repository_path;
   if (options_mgr_->HasConfigRepository(fqrn_, &config_repository_path)
       && FileExists(config_repository_path + "blacklist"))
   {
-    const bool append = true;
     if (!signature_mgr_->LoadBlacklist(config_repository_path + "blacklist",
                                        append))
     {
@@ -1136,6 +1136,12 @@ bool MountPoint::CreateCatalogManager() {
   if (!retval) {
     boot_error_ = "Failed to initialize root file catalog";
     boot_status_ = loader::kFailCatalog;
+    return false;
+  }
+
+  if (catalog_mgr_->IsRevisionBlacklisted()) {
+    boot_error_ = "repository revision blacklisted";
+    boot_status_ = loader::kFailRevisionBlacklisted;
     return false;
   }
 
