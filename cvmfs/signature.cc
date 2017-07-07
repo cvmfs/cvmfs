@@ -337,7 +337,7 @@ bool SignatureManager::LoadBlacklist(
   LogCvmfs(kLogSignature, kLogDebug, "reading from blacklist %s",
            path_blacklist.c_str());
   if (!append)
-    blacklisted_certificates_.clear();
+    blacklist_.clear();
 
   char *buffer;
   unsigned buffer_size;
@@ -349,10 +349,10 @@ bool SignatureManager::LoadBlacklist(
 
   unsigned num_bytes = 0;
   while (num_bytes < buffer_size) {
-    const string fingerprint = GetLineMem(buffer + num_bytes,
-                                          buffer_size - num_bytes);
-    blacklisted_certificates_.push_back(fingerprint);
-    num_bytes += fingerprint.length() + 1;
+    const string line = GetLineMem(buffer + num_bytes,
+                                   buffer_size - num_bytes);
+    blacklist_.push_back(line);
+    num_bytes += line.length() + 1;
   }
   free(buffer);
 
@@ -360,8 +360,8 @@ bool SignatureManager::LoadBlacklist(
 }
 
 
-vector<string> SignatureManager::GetBlacklistedCertificates() {
-  return blacklisted_certificates_;
+vector<string> SignatureManager::GetBlacklist() {
+  return blacklist_;
 }
 
 
