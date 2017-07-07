@@ -7,6 +7,7 @@
 
 #include <errno.h>
 
+#include <cstring>
 #include <string>
 #include <utility>
 
@@ -33,14 +34,30 @@ class FileSandbox : public ::testing::Test {
     return small_file_;
   }
 
+  const std::string GetSmallZeroFile() {
+    LazilyCreateDummyFile(sandbox_path_, 50, &small_zero_file_, uint64_t(-1));
+    return small_zero_file_;
+  }
+
   const std::string GetBigFile() {
     LazilyCreateDummyFile(sandbox_path_, 4*1024, &big_file_, 1337);
     return big_file_;
   }
 
+  const std::string GetBigZeroFile() {
+    LazilyCreateDummyFile(sandbox_path_, 4*1024, &big_zero_file_, uint64_t(-1));
+    return big_zero_file_;
+  }
+
   const std::string GetHugeFile() {
     LazilyCreateDummyFile(sandbox_path_, 100*1024, &huge_file_, 1);
     return huge_file_;
+  }
+
+  const std::string GetHugeZeroFile() {
+    LazilyCreateDummyFile(sandbox_path_, 100*1024, &huge_zero_file_,
+                          uint64_t(-1));
+    return huge_zero_file_;
   }
 
   template <class VectorT>
@@ -94,16 +111,26 @@ class FileSandbox : public ::testing::Test {
     FILE *file = CreateTempFile(sandbox_path + "/dummy", 0600, "r+", file_name);
     ASSERT_NE(static_cast<FILE*>(0), file) << "failed to create tmp file";
 
-    // file the temporary file with the requested number of (pseudo) random data
-    Prng rng;
-    rng.InitSeed(seed);
-    for (size_t i = 0; i < file_size_kb; ++i) {
-      typedef char buffer_type;
-      buffer_type buffer[kb];
-      CreateRandomBuffer(kb, buffer, &rng);
-      const size_t written = fwrite(buffer, sizeof(buffer_type), kb, file);
-      ASSERT_EQ(written, kb * sizeof(buffer_type))
-        << "failed to write to tmp (errno: " << errno << ")";
+    // fill the temporary file with the requested number of (pseudo) random data
+    // or zero bytes
+    if (seed == static_cast<uint64_t>(-1)) {
+      for (size_t i = 0; i < file_size_kb; ++i) {
+        unsigned char buf[kb];
+        memset(buf, 0, kb);
+        const size_t written = fwrite(buf, 1, kb, file);
+        ASSERT_EQ(written, kb);
+      }
+    } else {
+      Prng rng;
+      rng.InitSeed(seed);
+      for (size_t i = 0; i < file_size_kb; ++i) {
+        typedef char buffer_type;
+        buffer_type buffer[kb];
+        CreateRandomBuffer(kb, buffer, &rng);
+        const size_t written = fwrite(buffer, sizeof(buffer_type), kb, file);
+        ASSERT_EQ(written, kb * sizeof(buffer_type))
+          << "failed to write to tmp (errno: " << errno << ")";
+      }
     }
 
     // close the generated dummy file
@@ -116,8 +143,11 @@ class FileSandbox : public ::testing::Test {
 
   std::string       empty_file_;
   std::string       small_file_;
+  std::string       small_zero_file_;
   std::string       big_file_;
+  std::string       big_zero_file_;
   std::string       huge_file_;
+  std::string       huge_zero_file_;
 };
 
 #endif  // TEST_UNITTESTS_C_FILE_SANDBOX_H_
