@@ -114,5 +114,30 @@ cvmfs_run_test() {
   echo "*** md5sum of file from stratum 1: $md5_32mb_s1"
   [ "x$md5_32mb" = "x$md5_32mb_s1" ] || return 54
 
+
+  #-----------------------------------------------------------------------------
+
+
+  echo "*** Test grafting chunked files"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  dd if=/dev/urandom bs=$((1024*1024)) count=20 2>/dev/null | \
+    cvmfs_swissknife graft -i - -c 8 -o /cvmfs/$CVMFS_TEST_REPO/graft20m
+  dd if=/dev/urandom bs=$((1024*1024)) count=5 2>/dev/null | \
+    cvmfs_swissknife graft -i - -c 8 -o /cvmfs/$CVMFS_TEST_REPO/graft5m
+  dd if=/dev/urandom bs=$((1024*1024)) count=32 2>/dev/null | \
+    cvmfs_swissknife graft -i - -c 8 -b -o /cvmfs/$CVMFS_TEST_REPO/graftbulk
+  ls -lah /cvmfs/$CVMFS_TEST_REPO
+  publish_repo $CVMFS_TEST_REPO || return $?
+  ls -lah /cvmfs/$CVMFS_TEST_REPO
+  chunks=$(get_xattr chunks /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/graft20m)
+  echo "*** number of chunks is $chunks"
+  [ $chunks -gt 1 ] || return 60
+  get_xattr hash /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/graft20m && return 62
+  bulk_hash=$(get_xattr hash /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/graftbulk)
+  echo "*** bulk hash of grafted file is $bulk_hash"
+  [ "x$bulk_hash" != "x" ] || return 63
+  [ "x$bulk_hash" != "0000000000000000000000000000000000000000" ] || return 64
+  check_repository $CVMFS_TEST_REPO -c || return 65
+
   return 0
 }

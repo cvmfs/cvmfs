@@ -38,6 +38,7 @@ class CommandGraft : public Command {
     r.push_back(Parameter::Optional('c', "Chunk size (in MB; default: " +
                                     StringifyUint(kDefaultChunkSize) + ")"));
     r.push_back(Parameter::Optional('a', "hash algorithm (default: SHA-1)"));
+    r.push_back(Parameter::Switch('b', "Generate bulk hash for chunked file"));
     return r;
   }
 
@@ -66,6 +67,7 @@ class CommandGraft : public Command {
   zlib::Algorithms compression_alg_;
   shash::Algorithms hash_alg_;
   uint64_t chunk_size_;
+  bool generate_bulk_hash_;
 };
 
 }  // namespace swissknife
