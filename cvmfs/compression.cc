@@ -905,8 +905,8 @@ bool ZlibCompressor::Deflate(
   int retcode = 0;
 
   // TODO(jblomer) Figure out what exactly behaves differently with zlib 1.2.10
-  //if ((*inbufsize == 0) && !flush)
-  //  return true;
+  // if ((*inbufsize == 0) && !flush)
+  //   return true;
 
   stream_.avail_out = *outbufsize;
   stream_.next_out = *outbuf;
