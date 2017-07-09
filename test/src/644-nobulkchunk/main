@@ -1,12 +1,20 @@
 cvmfs_test_name="Omit bulk chunks"
 cvmfs_test_autofs_on_startup=false
 
+CVMFS_TEST_644_REPLICA_NAME=
+CVMFS_TEST_644_MOUNTPOINT=
+cleanup() {
+  [ -z $CVMFS_TEST_644_MOUNTPOINT ] || sudo umount $CVMFS_TEST_644_MOUNTPOINT > /dev/null 2>&1
+  [ -z $CVMFS_TEST_644_REPLICA_NAME ] || sudo cvmfs_server rmfs -f $CVMFS_TEST_644_REPLICA_NAME
+}
+
 cvmfs_run_test() {
   logfile=$1
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
 
-  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
-  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+  echo "*** create a gc-eneabled repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER "NO" -z -g || return $?
+  disable_auto_garbage_collection $CVMFS_TEST_REPO || return $?
 
   echo "*** create a chunked file"
   start_transaction $CVMFS_TEST_REPO || return $?
@@ -65,8 +73,46 @@ cvmfs_run_test() {
   echo "*** md5sum of new hard link read in chunks: $md5_ln_chunked"
   [ "x$md5_ln" = "x$md5_ln_chunked" ] || return 34
 
-  # TODO replication, gc, libcvmfs
+
+  #-----------------------------------------------------------------------------
+
+
+  echo "*** testing gc with omitted bulk hashes"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  rm -f /cvmfs/$CVMFS_TEST_REPO/hl*
+  publish_repo $CVMFS_TEST_REPO || return $?
+  echo "*** empty publish to remove objects from trunk-previous tag"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  publish_repo $CVMFS_TEST_REPO || return $?
+  cvmfs_server gc -r0 -lf $CVMFS_TEST_REPO || return 40
+  check_repository $CVMFS_TEST_REPO -i || return 41
+
+
+  #-----------------------------------------------------------------------------
+
+
+  echo "*** testing replication with omitted bulk hashes"
+  echo "*** install a cleanup function"
+  trap cleanup EXIT HUP INT TERM
+
+  load_repo_config $CVMFS_TEST_REPO
+  local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
+  CVMFS_TEST_644_REPLICA_NAME=$replica_name
+  create_stratum1 $replica_name                          \
+                  $CVMFS_TEST_USER                       \
+                  $CVMFS_STRATUM0                        \
+                  /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub || return 50
+  sudo cvmfs_server snapshot $replica_name || return 51
+  check_repository $replica_name -i || return 52
+
+  echo "*** mount the Stratum1 repository on a local mountpoint"
+  CVMFS_TEST_644_MOUNTPOINT="$(pwd)/mountpoint"
+  do_local_mount $CVMFS_TEST_644_MOUNTPOINT $CVMFS_TEST_REPO $(get_repo_url $replica_name) \
+   || return 53
+
+  local md5_32mb_s1=$(md5sum $CVMFS_TEST_644_MOUNTPOINT/32mb | awk '{print $1}')
+  echo "*** md5sum of file from stratum 1: $md5_32mb_s1"
+  [ "x$md5_32mb" = "x$md5_32mb_s1" ] || return 54
 
   return 0
 }
-
