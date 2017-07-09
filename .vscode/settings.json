@@ -116,7 +116,12 @@
     "numeric": "cpp",
     "optional": "cpp",
     "blast.c": "cpp",
-    "infcover.c": "cpp"
+    "infcover.c": "cpp",
+    "lib557.c": "cpp",
+    "unit1303.c": "cpp",
+    "unit1304.c": "cpp",
+    "unit1307.c": "cpp",
+    "jsregexp.c": "cpp"
   },
   "python.linting.pylintEnabled": false,
   "python.formatting.provider": "yapf",

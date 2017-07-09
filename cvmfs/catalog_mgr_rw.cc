@@ -396,14 +396,18 @@ void WritableCatalogManager::AddChunkedFile(
  */
 void WritableCatalogManager::AddHardlinkGroup(
   const DirectoryEntryBaseList &entries,
-  const XattrList        &xattrs,
-  const std::string &parent_directory)
+  const XattrList &xattrs,
+  const std::string &parent_directory,
+  const FileChunkList &file_chunks)
 {
   assert(entries.size() >= 1);
+  assert(file_chunks.IsEmpty() || entries[0].IsRegular());
   if (entries.size() == 1) {
     DirectoryEntry fix_linkcount(entries[0]);
     fix_linkcount.set_linkcount(1);
-    return AddFile(fix_linkcount, xattrs, parent_directory);
+    if (file_chunks.IsEmpty())
+      return AddFile(fix_linkcount, xattrs, parent_directory);
+    return AddChunkedFile(fix_linkcount, xattrs, parent_directory, file_chunks);
   }
 
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "adding hardlink group %s/%s",
@@ -441,8 +445,14 @@ void WritableCatalogManager::AddHardlinkGroup(
     DirectoryEntry hardlink(*i);
     hardlink.set_hardlink_group(new_group_id);
     hardlink.set_linkcount(entries.size());
+    hardlink.set_is_chunked_file(!file_chunks.IsEmpty());
 
     catalog->AddEntry(hardlink, xattrs, file_path, parent_path);
+    if (hardlink.IsChunkedFile()) {
+      for (unsigned i = 0; i < file_chunks.size(); ++i) {
+        catalog->AddFileChunk(file_path, *file_chunks.AtPtr(i));
+      }
+    }
   }
   SyncUnlock();
 }

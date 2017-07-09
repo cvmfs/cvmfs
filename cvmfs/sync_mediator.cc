@@ -601,6 +601,8 @@ void SyncMediator::PublishHardlinksCallback(
         j->second.SetContentHash(result.content_hash);
         j->second.SetCompressionAlgorithm(result.compression_alg);
       }
+      if (result.IsChunked())
+        hardlink_queue_[i].file_chunks = result.file_chunks;
 
       break;
     }
@@ -840,7 +842,8 @@ void SyncMediator::AddHardlinkGroup(const HardlinkGroup &group) {
   catalog_manager_->AddHardlinkGroup(
     hardlinks,
     *xattrs,
-    group.master.relative_parent_path());
+    group.master.relative_parent_path(),
+    group.file_chunks);
   if (xattrs != &default_xattrs)
     free(xattrs);
 }

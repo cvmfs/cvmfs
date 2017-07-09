@@ -36,10 +36,36 @@ cvmfs_run_test() {
   check_repository $CVMFS_TEST_REPO -i || return 21
 
   md5_32mb_chunked=$(md5sum /cvmfs/$CVMFS_TEST_REPO/32mb | awk '{print $1}')
-  echo "*** md5sum of file read in chunks: $md5_32mb"
-  [ "x$md5_sum" != "x$md5_32mb_chunked" ] || return 22
+  echo "*** md5sum of file read in chunks: $md5_32mb_chunked"
+  [ "x$md5_32mb" = "x$md5_32mb_chunked" ] || return 22
 
-  # TODO Hardlinks
+  echo "*** hardlinked, chunked files"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  dd if=/dev/urandom of=/cvmfs/$CVMFS_TEST_REPO/hl1 bs=$((1024*1024)) count=32
+  ln /cvmfs/$CVMFS_TEST_REPO/hl1 /cvmfs/$CVMFS_TEST_REPO/hl2
+  local md5_ln=$(md5sum /cvmfs/$CVMFS_TEST_REPO/hl1 | awk '{print $1}')
+  echo "*** md5sum of hard link: $md5_ln"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  chunks=$(get_xattr chunks /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/hl1)
+  echo "*** number of chunks is $chunks"
+  [ $chunks -gt 1 ] || return 30
+  get_xattr hash /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/ln && return 31
+  local md5_ln_chunked=$(md5sum /cvmfs/$CVMFS_TEST_REPO/hl1 | awk '{print $1}')
+  echo "*** md5sum of hard link read in chunks: $md5_ln_chunked"
+  [ "x$md5_ln" = "x$md5_ln_chunked" ] || return 32
+  md5_ln_chunked=$(md5sum /cvmfs/$CVMFS_TEST_REPO/hl2 | awk '{print $1}')
+  echo "*** md5sum of other hard link read in chunks: $md5_ln_chunked"
+  [ "x$md5_ln" = "x$md5_ln_chunked" ] || return 33
+
+  start_transaction $CVMFS_TEST_REPO || return $?
+  ln /cvmfs/$CVMFS_TEST_REPO/hl1 /cvmfs/$CVMFS_TEST_REPO/hl3
+  publish_repo $CVMFS_TEST_REPO || return $?
+  md5_ln_chunked=$(md5sum /cvmfs/$CVMFS_TEST_REPO/hl3 | awk '{print $1}')
+  echo "*** md5sum of new hard link read in chunks: $md5_ln_chunked"
+  [ "x$md5_ln" = "x$md5_ln_chunked" ] || return 34
+
+  # TODO replication, gc, libcvmfs
 
   return 0
 }
