@@ -7,7 +7,5 @@
 
 ,{cvmfs_services, [{enabled_services, [cvmfs_fe, cvmfs_be, cvmfs_auth, cvmfs_lease, cvmfs_receiver_pool]},
                    {repo_config, {file, "./config/ct_repo.config"}},
-                   {max_lease_time, 7200000},  % max lease time in milliseconds
-                   {receiver_config, [{size, 1}, {max_overflow, 1}]},
-                   {receiver_worker_config, [{executable_path, "/tmp/cvmfs_receiver"}]}]}
+                   {user_config, {file, "./config/ct_user.config"}}]}
 ].
