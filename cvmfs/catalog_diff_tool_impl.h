@@ -93,8 +93,6 @@ RoCatalogMgr* CatalogDiffTool<RoCatalogMgr>::OpenCatalogManager(
 
 template <typename RoCatalogMgr>
 void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
-  LogCvmfs(kLogReceiver, kLogCustom0,
-           "CatalogDiffTool::DiffRec(%s)", path.c_str());
   catalog::DirectoryEntryList old_listing;
   AppendFirstEntry(&old_listing);
   old_catalog_mgr_->Listing(path, &old_listing);
