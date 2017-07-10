@@ -1,4 +1,6 @@
 2.4.0:
+  * Add CVMFS_GENERATE_LEGACY_BULK_CHUNKS parameter to control creation of
+    bulk hashes for chunked files (CVM-640)
   * Assign port 8000 to httpd in selinux configuration during RPM post-install
     (CVM-1308)
   * Use "AllowOverride Limit AuthConfig" directive (CVM-1255)
