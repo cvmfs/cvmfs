@@ -27,8 +27,8 @@
 
 
 %% Constants
-% Timeout of asychronous request handling == 30min
--define(ASYNC_TIMEOUT, 1000 * 60 * 30).
+% Timeout of asychronous request handling == 2h
+-define(ASYNC_TIMEOUT, 7200000).
 
 
 %%%===================================================================
