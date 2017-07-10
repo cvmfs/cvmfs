@@ -8,6 +8,9 @@
 %define selinux_cvmfs 1
 %define selinux_variants mls strict targeted
 %endif
+%if 0%{?el7} || 0%{?fedora}
+%define selinux_cvmfs_server 1
+%endif
 %if 0%{?dist:1}
 %else
   %define redhat_major %(cat /etc/issue | head -n1 | tr -cd [0-9] | head -c1)
@@ -166,6 +169,10 @@ Requires: rsync
 Requires: usbutils
 %if 0%{?el6} || 0%{?el7} || 0%{?fedora} || 0%{?suse_version} >= 1300
 Requires: jq
+%endif
+%if 0%{?selinux_cvmfs_server}
+Requires(post): /usr/sbin/semanage
+Requires(postun): /usr/sbin/semanage
 %endif
 
 Conflicts: cvmfs-server < 2.1
@@ -351,6 +358,10 @@ fi
 
 %post server
 /usr/bin/cvmfs_server fix-permissions || :
+%if 0%{?selinux_cvmfs_server}
+# Port 8000 is also assigned to soundd (CVM-1308)
+/usr/sbin/semanage port -m -t http_port_t -p tcp 8000 || :
+%endif
 
 %preun
 if [ $1 = 0 ] ; then
@@ -371,6 +382,13 @@ if [ $1 -eq 0 ]; then
    fi
    rm -f /etc/systemd/system/autofs.service.d/cvmfs-autosetup.conf
 fi
+
+%postun server
+%if 0%{?selinux_cvmfs_server}
+if [ $1 -eq 0 ]; then
+  /usr/sbin/semanage port -d -t http_port_t -p tcp 8000 || :
+fi
+%endif
 
 %if 0%{?selinux_cvmfs}
 if [ $1 -eq 0 ]; then
@@ -454,6 +472,8 @@ fi
 %doc COPYING AUTHORS README.md ChangeLog
 
 %changelog
+* Wed Jul 05 2017 Jakob Blomer <jblomer@cern.ch> - 2.4.0
+- Assign port 8000 to httpd in selinux configuration - 2.4.0
 * Thu Jun 29 2017 Jakob Blomer <jblomer@cern.ch> - 2.4.0
 - Add cvmfs_test_cache to unittests sub package
 * Tue May 09 2017 Dave Dykstra <dwd@fnal.gov> - 2.4.0
