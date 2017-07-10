@@ -51,7 +51,7 @@ init_per_suite(Config) ->
     application:set_env(mnesia, schema_location, ram),
     application:ensure_all_started(mnesia),
 
-    MaxLeaseTime = 50, % milliseconds
+    MaxLeaseTime = 1, % seconds
     ok = application:load(cvmfs_services),
     ok = application:set_env(cvmfs_services, enabled_services, [cvmfs_lease]),
     ok = application:set_env(cvmfs_services, user_config, #{max_lease_time => MaxLeaseTime,
@@ -102,7 +102,7 @@ new_lease_expired(Config) ->
     Public = <<"public">>,
     Secret = <<"secret">>,
     ok = cvmfs_lease:request_lease(U, P, Public, Secret),
-    SleepTime = ?config(max_lease_time, Config) + 10,
+    SleepTime = ?config(max_lease_time, Config) * 1000 + 10,
     ct:sleep(SleepTime),
     ok = cvmfs_lease:request_lease(U, P, Public, Secret),
     [{lease, P, U, Public, Secret, _}] = cvmfs_lease:get_leases().
@@ -137,13 +137,13 @@ check_lease_valid(_Config) ->
     ok = cvmfs_lease:request_lease(U, P, Public, Secret),
     {ok, Secret} = cvmfs_lease:get_lease_secret(Public).
 
-check_lease_expired(_Config) ->
+check_lease_expired(Config) ->
     U = <<"user">>,
     P = <<"path">>,
     Public = <<"public">>,
     Secret = <<"secret">>,
     ok = cvmfs_lease:request_lease(U, P, Public, Secret),
-    SleepTime = 1500,
+    SleepTime = ?config(max_lease_time, Config) * 1000 + 10,
     ct:sleep(SleepTime),
     {error, lease_expired} = cvmfs_lease:get_lease_secret(Public).
 
@@ -159,13 +159,13 @@ get_lease_path_valid(_Config) ->
     ok = cvmfs_lease:request_lease(U, P, Public, Secret),
     {ok, <<"path">>} = cvmfs_lease:get_lease_path(Public).
 
-get_lease_path_expired(_Config) ->
+get_lease_path_expired(Config) ->
     U = <<"user">>,
     P = <<"path">>,
     Public = <<"public">>,
     Secret = <<"secret">>,
     ok = cvmfs_lease:request_lease(U, P, Public, Secret),
-    SleepTime = 1500,
+    SleepTime = ?config(max_lease_time, Config) * 1000 + 10,
     ct:sleep(SleepTime),
     {error, lease_expired} = cvmfs_lease:get_lease_path(Public).
 

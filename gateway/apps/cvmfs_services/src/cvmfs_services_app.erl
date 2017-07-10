@@ -20,11 +20,11 @@ start(_StartType, _StartArgs) ->
     RepoVars = read_vars(repo_config, #{repos => [], keys => []}),
 
     UserVars = read_vars(user_config,
-                         #{max_lease_time => 7200000,
+                         #{max_lease_time => 7200,
                            receiver_config => [{size, 1}, {max_overflow, 1}],
                            receiver_worker_config => [{executable_path, "/usr/bin/cvmfs_receiver"}]}),
 
-    application:set_env(cvmfs_services, max_lease_time, maps:get(max_lease_time, UserVars)),
+    application:set_env(cvmfs_services, max_lease_time, maps:get(max_lease_time, UserVars) * 1000),
 
     ReceiverPoolConfig1 = maps:get(receiver_config, UserVars),
     ReceiverPoolConfig2 = case lists:keyfind(worker_module, 1, ReceiverPoolConfig1) of

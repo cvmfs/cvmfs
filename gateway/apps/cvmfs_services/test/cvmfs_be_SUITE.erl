@@ -73,7 +73,7 @@ groups() ->
 
 %% Set up and tear down
 init_per_suite(Config) ->
-    MaxLeaseTime = 50, % milliseconds
+    MaxLeaseTime = 1, % seconds
 
     application:load(mnesia),
     application:set_env(mnesia, schema_location, ram),
@@ -199,7 +199,7 @@ submission_with_expired_token_fails(Config) ->
     Payload = <<"placeholder">>,
     Digest = base64:encode(<<"placeholder_for_the_digest_of_the_payload">>),
     {ok, Token} = cvmfs_be:new_lease(?TEST_UID, Key, Path),
-    ct:sleep(?config(max_lease_time, Config)),
+    ct:sleep(?config(max_lease_time, Config) * 1000),
     {error, lease_expired} = cvmfs_be:submit_payload(?TEST_UID, {Token, Payload, Digest, 1}).
 
 
