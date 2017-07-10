@@ -66,6 +66,9 @@ case $sys_arch in
     exit 1 ;;
 esac
 
+# This list of known parameters will be merged with all CVMFS_... environment
+# variable for cvmfs_config showconfig.  It is useful to keep this list to show
+# in cvmfs_config showconfig which known parameters are _not_ set.
 parm_list="CVMFS_USER CVMFS_NFILES CVMFS_CACHE_BASE CVMFS_CACHE_DIR CVMFS_MOUNT_DIR CVMFS_QUOTA_LIMIT \
           CVMFS_SERVER_URL CVMFS_DEBUGLOG CVMFS_HTTP_PROXY \
           CERNVM_GRID_UI_VERSION CVMFS_SYSLOG_LEVEL CVMFS_SYSLOG_FACILITY CVMFS_TRACEFILE \
@@ -77,7 +80,9 @@ parm_list="CVMFS_USER CVMFS_NFILES CVMFS_CACHE_BASE CVMFS_CACHE_DIR CVMFS_MOUNT_
           CVMFS_CONFIG_REPOSITORY CVMFS_LOW_SPEED_LIMIT CVMFS_FALLBACK_PROXY CVMFS_PROXY_TEMPLATE \
           CVMFS_FOLLOW_REDIRECTS CVMFS_MAX_IPADDR_PER_PROXY CVMFS_ALT_ROOT_PATH \
           CVMFS_IPFAMILY_PREFER CVMFS_DNS_RETRIES CVMFS_DNS_TIMEOUT \
-          CVMFS_AUTHZ_HELPER CVMFS_AUTHZ_SEARCH_PATH CVMFS_WORKSPACE"
+          CVMFS_AUTHZ_HELPER CVMFS_AUTHZ_SEARCH_PATH CVMFS_WORKSPACE \
+          CVMFS_EXTERNAL_SERVER_URL CVMFS_EXTERNAL_TIMEOUT CVMFS_EXTERNAL_TIMEOUT_DIRECT \
+          CVMFS_EXTERNAL_HTTP_PROXY CVMFS_EXTERNAL_FALLBACK_PROXY CVMFS_CACHE_PRIMARY"
 switch_list="CVMFS_IGNORE_SIGNATURE CVMFS_STRICT_MOUNT CVMFS_SHARED_CACHE \
           CVMFS_NFS_SOURCE CVMFS_NFS_SHARED CVMFS_CHECK_PERMISSIONS CVMFS_AUTO_UPDATE \
           CVMFS_MOUNT_RW CVMFS_SEND_INFO_HEADER CVMFS_USE_GEOAPI CVMFS_CLAIM_OWNERSHIP \
@@ -129,7 +134,7 @@ cvmfs_config_usage() {
  echo "Commands are"
  echo "  setup [nouser] [nocfgmod] [nostart]"
  echo "  chksetup"
- echo "  showconfig [<repository>]"
+ echo "  showconfig [-s(hort output, only non-empty parameters)] [<repository>]"
  echo "  stat [-v | <repository>]"
  echo "  status"
  echo "  probe [<repository list>]"
@@ -764,7 +769,15 @@ cvmfs_showconfig() {
   local fqrn
   local org
   local retval
+  local short_output=0
+  local short_opt=
   org=$1
+  if [ "x$org" = "x-s" ]; then
+    short_output=1
+    short_opt="-s "
+    shift 1
+    org=$1
+  fi
 
   cvmfs_readconfig || die "Failed to read CernVM-FS configuration"
   if [ -z "$org" ]; then
@@ -772,8 +785,8 @@ cvmfs_showconfig() {
     for entry in $list
     do
       echo
-      echo "Running $0 $entry:"
-      cvmfs_showconfig $entry
+      echo "Running $0 $short_opt$entry:"
+      cvmfs_showconfig $short_opt$entry
     done
     return 0
   fi
@@ -786,12 +799,22 @@ cvmfs_showconfig() {
     return $retval
   fi
 
+  local setting=
+  local all_vars=
+  while read setting; do
+    [ "x${setting:0:6}" != "xCVMFS_" ] && continue
+    var=$(echo "$setting" | cut -d= -f1)
+    all_vars="$all_vars $var"
+  done <<< "$CVMFS_PARMS"
+  all_vars="$(echo $all_vars $var_list | tr ' ' '\n' | sort -u)"
+
   echo "CVMFS_REPOSITORY_NAME=$fqrn"
-  local var
-  for var in $(echo $var_list | tr ' ' '\n'  | sort)
-  do
+  local var=
+  while read var; do
     if [ "x$var" = "xCVMFS_CACHE_DIR" ]; then
-      echo "CVMFS_CACHE_DIR=$CVMFS_CACHE_DIR"
+      if [ ! -z "$CVMFS_CACHE_DIR" -o $short_output -eq 0 ]; then
+        echo "CVMFS_CACHE_DIR=$CVMFS_CACHE_DIR"
+      fi
       continue
     fi
     line=$(echo "$CVMFS_PARMS" | grep "^${var}=")
@@ -804,9 +827,9 @@ cvmfs_showconfig() {
       fi
       echo "$line"
     else
-      echo "${var}="
+      [ $short_output -eq 0 ] && echo "${var}="
     fi
-  done
+  done <<< "$all_vars"
 }
 
 
