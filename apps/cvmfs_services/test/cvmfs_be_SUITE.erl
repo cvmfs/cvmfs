@@ -73,6 +73,8 @@ groups() ->
 
 %% Set up and tear down
 init_per_suite(Config) ->
+    MaxLeaseTime = 1, % seconds
+
     application:load(mnesia),
     application:set_env(mnesia, schema_location, ram),
     application:ensure_all_started(mnesia),
@@ -86,17 +88,16 @@ init_per_suite(Config) ->
                                                                 cvmfs_receiver_pool]),
     ok = application:set_env(cvmfs_services, repo_config, #{repos => ct:get_config(repos)
                                                            ,keys => ct:get_config(keys)}),
-    ok = application:set_env(cvmfs_services, receiver_config, [{size, 1},
-                                                               {max_overflow, 0},
-                                                               {worker_module, cvmfs_test_receiver}]),
-
-    MaxLeaseTime = 50, % milliseconds
-    ok = application:set_env(cvmfs_services, max_lease_time, MaxLeaseTime),
+    ok = application:set_env(cvmfs_services, user_config, #{max_lease_time => MaxLeaseTime,
+                                                            receiver_config => [{size, 1},
+                                                                                {max_overflow, 0},
+                                                                                {worker_module, cvmfs_test_receiver}],
+                                                            receiver_worker_config => []
+                                                           }),
 
     {ok, _} = application:ensure_all_started(cvmfs_services),
 
-    lists:flatten([[{max_lease_time, MaxLeaseTime}]
-                  ,Config]).
+    lists:flatten([[{max_lease_time, MaxLeaseTime}], Config]).
 
 end_per_suite(_Config) ->
     application:stop(cvmfs_services),
@@ -198,7 +199,7 @@ submission_with_expired_token_fails(Config) ->
     Payload = <<"placeholder">>,
     Digest = base64:encode(<<"placeholder_for_the_digest_of_the_payload">>),
     {ok, Token} = cvmfs_be:new_lease(?TEST_UID, Key, Path),
-    ct:sleep(?config(max_lease_time, Config)),
+    ct:sleep(?config(max_lease_time, Config) * 1000),
     {error, lease_expired} = cvmfs_be:submit_payload(?TEST_UID, {Token, Payload, Digest, 1}).
 
 
