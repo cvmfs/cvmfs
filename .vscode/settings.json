@@ -63,10 +63,18 @@
     "stdexcept": "cpp",
     "streambuf": "cpp",
     "tuple": "cpp",
-    "string_view": "cpp"
+    "string_view": "cpp",
+    "util.c": "cpp",
+    "sysunix.c": "cpp",
+    "jsfile.c": "cpp",
+    "jsj_javapackage.c": "cpp",
+    "gzlog.c": "cpp",
+    "gzlib.c": "cpp",
+    "minigzip.c": "cpp",
+    "smb.c": "cpp",
+    "main.c": "cpp"
   },
   "python.linting.pylintEnabled": false,
   "python.formatting.provider": "yapf",
   "git.ignoreLimitWarning": true
 }
-

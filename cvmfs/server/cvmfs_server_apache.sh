@@ -262,6 +262,9 @@ Alias /cvmfs/${name} ${storage_dir}
     <FilesMatch "^\.cvmfs">
         ForceType application/x-cvmfs
     </FilesMatch>
+    <FilesMatch "^[^.]*$">
+        ForceType application/octet-stream
+    </FilesMatch>
 
     Header unset Last-Modified
     FileETag None
