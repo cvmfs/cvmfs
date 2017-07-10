@@ -50,7 +50,7 @@ groups() ->
 %% Set up and tear down
 
 init_per_suite(Config) ->
-    MaxLeaseTime = 200, % milliseconds
+    MaxLeaseTime = 1, % second
 
     application:load(mnesia),
     application:set_env(mnesia, schema_location, ram),
