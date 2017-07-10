@@ -360,7 +360,7 @@ fi
 /usr/bin/cvmfs_server fix-permissions || :
 %if 0%{?selinux_cvmfs_server}
 # Port 8000 is also assigned to soundd (CVM-1308)
-/usr/sbin/semanage port -m -t http_port_t -p tcp 8000 || :
+/usr/sbin/semanage port -m -t http_port_t -p tcp 8000 2>/dev/null || :
 %endif
 
 %preun
@@ -394,7 +394,7 @@ fi
 %postun server
 %if 0%{?selinux_cvmfs_server}
 if [ $1 -eq 0 ]; then
-  /usr/sbin/semanage port -d -t http_port_t -p tcp 8000 || :
+  /usr/sbin/semanage port -d -t http_port_t -p tcp 8000 2>/dev/null || :
 fi
 %endif
 
