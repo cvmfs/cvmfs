@@ -65,10 +65,13 @@ run_transactions() {
     echo "  Copy the contents of the repository"
     save_repo_contents /tmp/cvmfs_out_1
 
+    ## Check results
     compare_file_checksum /tmp/cvmfs_out_1/a/b f1885b1a57c71cacbd923fc5e9aefef3
     if [ x"$(cvmfs_server check test.repo.org | grep /a)" = x"" ]; then
         echo "Nested catalog not created at /a"
         exit 1
+    else
+        echo "Nested catalog was successfully created at /a"
     fi
 
     ## Transaction 2
@@ -92,6 +95,38 @@ run_transactions() {
     if [ x"$(cvmfs_server check test.repo.org | grep /a/b)" = x"" ]; then
         echo "Nested catalog not created at /a/b"
         exit 1
+    else
+        echo "Nested catalog was successfully created at /a/b"
+    fi
+
+    ## Transaction 3
+    echo "  Starting transaction 3 (Remove nested catalogs)"
+    cvmfs_server transaction -e test.repo.org
+
+    echo "  Remove all the nested catalogs and have their contents merged into the root catalog"
+    rm -v /cvmfs/test.repo.org/a/.cvmfscatalog
+    rm -v /cvmfs/test.repo.org/a/b/.cvmfscatalog
+
+    echo "  Publishing changes 3"
+    cvmfs_server publish -v -e test.repo.org
+
+    echo "  Copy the contents of the repository"
+    save_repo_contents /tmp/cvmfs_out_3
+
+    ## Check results
+    compare_file_checksum /tmp/cvmfs_out_1/a/b f1885b1a57c71cacbd923fc5e9aefef3
+    compare_file_checksum /tmp/cvmfs_out_2/a/b/new_file.txt f1885b1a57c71cacbd923fc5e9aefef3
+    if [ x"$(cvmfs_server check test.repo.org | grep /a)" != x"" ]; then
+        echo "Nested catalog at /a should have been removed"
+        exit 1
+    else
+        echo "Nested catalog at /a was successfully removed"
+    fi
+    if [ x"$(cvmfs_server check test.repo.org | grep /a/b)" != x"" ]; then
+        echo "Nested catalog at /a/b should have been removed"
+        exit 1
+    else
+        echo "Nested catalog at /a/b was successfully removed"
     fi
 
     clean_up
