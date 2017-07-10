@@ -105,6 +105,8 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportModification(
     output_catalog_mgr_->TouchDirectory(*base_entry, rel_path.c_str());
     if (!entry1.IsNestedCatalogMountpoint() && entry2.IsNestedCatalogMountpoint()) {
       output_catalog_mgr_->CreateNestedCatalog(std::string(rel_path.c_str()));
+    } else if (entry1.IsNestedCatalogMountpoint() && !entry2.IsNestedCatalogMountpoint()) {
+      output_catalog_mgr_->RemoveNestedCatalog(std::string(rel_path.c_str()));
     }
   } else if ((entry1.IsRegular() || entry1.IsLink()) && entry2.IsDirectory()) {
     // From file to directory
