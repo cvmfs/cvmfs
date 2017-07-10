@@ -1,4 +1,5 @@
 2.4.0:
+  * Set Apache content-type of objects to application/octet-stream (CVM-1067)
   * Add CVMFS_GENERATE_LEGACY_BULK_CHUNKS parameter to control creation of
     bulk hashes for chunked files (CVM-640)
   * Assign port 8000 to httpd in selinux configuration during RPM post-install
