@@ -54,7 +54,11 @@ init_per_suite(Config) ->
     MaxLeaseTime = 50, % milliseconds
     ok = application:load(cvmfs_services),
     ok = application:set_env(cvmfs_services, enabled_services, [cvmfs_lease]),
-    ok = application:set_env(cvmfs_services, max_lease_time, MaxLeaseTime),
+    ok = application:set_env(cvmfs_services, user_config, #{max_lease_time => MaxLeaseTime,
+                                                            receiver_config => [{size,1},
+                                                                                {max_overflow, 0},
+                                                                                {worker_module, cvmfs_test_receiver}],
+                                                            receiver_worker_config => []}),
     {ok, _} = application:ensure_all_started(cvmfs_services),
     lists:flatten([{max_lease_time, MaxLeaseTime}, Config]).
 
