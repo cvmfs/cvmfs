@@ -562,8 +562,7 @@ SqlListContentHashes::SqlListContentHashes(const CatalogDatabase &database) {
       "  FROM catalog "
       "  LEFT JOIN chunks "
       "  ON catalog.md5path_1 = chunks.md5path_1 AND "
-      "     catalog.md5path_2 = chunks.md5path_2 "
-      "  WHERE length(catalog.hash) > 0;";
+      "     catalog.md5path_2 = chunks.md5path_2;";
 
   if (database.schema_version() < 2.4-CatalogDatabase::kSchemaEpsilon) {
     DeferredInit(database.sqlite_db(), stmt_lt_2_4);

@@ -34,6 +34,7 @@
 
 #include "catalog_mgr_rw.h"
 #include "compression.h"
+#include "file_chunk.h"
 #include "platform.h"
 #include "swissknife_sync.h"
 #include "sync_item.h"
@@ -62,6 +63,7 @@ struct HardlinkGroup {
 
   SyncItem master;
   SyncItemList hardlinks;
+  FileChunkList file_chunks;
 };
 
 /**

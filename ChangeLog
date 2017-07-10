@@ -37,7 +37,6 @@
   * Update cern.ch master keys
   * Use built-in LibreSSL on macOS (CVM-1112)
   * Use -Os compiler flag
-  * Use zlib 1.2.11
   * Use c-ares 1.13.0
   * Use libcurl 7.54.1
   * Use sqlite 3.19.3
@@ -47,14 +46,12 @@
   * Ignore special files with a warning on publish (CVM-1106)
   * Add support for Debian 8 (CVM-1104)
   * Add support for pluggable, external cache managers (CVM-1054)
-  * Update c-ares to 1.12.0
   * Keep debug symbols of libcurl and c-ares
   * Use default X509_CERT_DIR also if it is empty string (CVM-1083)
   * Add micro benchmark framework
   * Fix building on Arch Linux
   * Fix building on the Raspberry Pi
   * Add new initialization interface to libcvmfs (CVM-947)
-  * Use tbb version 4.4 update 5
   * Fix build with gcc 6 (CVM-1051)
   * Use cache for fetching history database on mount
   * Fix small memory leak during remount of root catalog

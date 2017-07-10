@@ -355,7 +355,9 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
     }
 
     // Check if checksum is not null
-    if (entries[i].IsRegular() && entries[i].checksum().IsNull()) {
+    if (entries[i].IsRegular() && !entries[i].IsChunkedFile() &&
+        entries[i].checksum().IsNull())
+    {
       LogCvmfs(kLogCvmfs, kLogStderr,
                "regular file pointing to zero-hash: '%s'", full_path.c_str());
       retval = false;

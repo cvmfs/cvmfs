@@ -34,7 +34,7 @@ off_t StaticOffsetDetector::FindNextCutMark(CharBuffer *buffer) {
 // queried. You should never change this number, since it affects the definition
 // of cut marks.
 // TODO(rmeusel): C++11 (constexpr (?))
-const int32_t Xor32Detector::magic_number_   =
+const int32_t Xor32Detector::kMagicNumber   =
   std::numeric_limits<uint32_t>::max() / 2;
 
 
@@ -54,7 +54,7 @@ Xor32Detector::Xor32Detector(const size_t minimal_chunk_size,
 
 
 off_t Xor32Detector::FindNextCutMark(CharBuffer *buffer) {
-  assert(minimal_chunk_size_ >= xor32_influence);
+  assert(minimal_chunk_size_ >= kXor32Window);
   const unsigned char *data = buffer->ptr();
 
   // get the offset where the next xor32 computation needs to be continued
@@ -64,7 +64,7 @@ off_t Xor32Detector::FindNextCutMark(CharBuffer *buffer) {
   const off_t global_offset =
     std::max(
            last_cut() +
-           static_cast<off_t>(minimal_chunk_size_ - xor32_influence),
+           static_cast<off_t>(minimal_chunk_size_ - kXor32Window),
            xor32_ptr_);
 
   // check if the next xor32 computation is taking place in the current buffer
@@ -87,7 +87,7 @@ off_t Xor32Detector::FindNextCutMark(CharBuffer *buffer) {
     std::min(precompute_end - buffer->base_offset(),
              static_cast<off_t>(buffer->used_bytes()));
   assert(internal_precompute_end - internal_offset <=
-         static_cast<off_t>(xor32_influence));
+         static_cast<off_t>(kXor32Window));
   for (; internal_offset < internal_precompute_end; ++internal_offset) {
     xor32(data[internal_offset]);
   }

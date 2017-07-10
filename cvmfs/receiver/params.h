@@ -16,6 +16,7 @@ struct Params {
   std::string spooler_configuration;
   shash::Algorithms hash_alg;
   zlib::Algorithms compression_alg;
+  bool generate_legacy_bulk_chunks;
   bool use_file_chunking;
   size_t min_chunk_size;
   size_t avg_chunk_size;

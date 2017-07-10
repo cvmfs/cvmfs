@@ -206,6 +206,9 @@ cvmfs_server_publish() {
     if [ "x$CVMFS_UNION_FS_TYPE" != "x" ]; then
       sync_command="$sync_command -f $CVMFS_UNION_FS_TYPE"
     fi
+    if [ "x$CVMFS_GENERATE_LEGACY_BULK_CHUNKS" = "xtrue" ]; then
+      sync_command="$sync_command -O"
+    fi
     if [ "x$CVMFS_USE_FILE_CHUNKING" = "xtrue" ]; then
       sync_command="$sync_command -p \
        -l $CVMFS_MIN_CHUNK_SIZE \

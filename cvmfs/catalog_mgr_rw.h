@@ -38,6 +38,7 @@
 
 #include "catalog_mgr_ro.h"
 #include "catalog_rw.h"
+#include "file_chunk.h"
 #include "upload_spooler_result.h"
 #include "util_concurrency.h"
 #include "xattr.h"
@@ -111,7 +112,8 @@ class WritableCatalogManager : public SimpleCatalogManager {
   // Hardlink group handling
   void AddHardlinkGroup(const DirectoryEntryBaseList &entries,
                         const XattrList &xattrs,
-                        const std::string &parent_directory);
+                        const std::string &parent_directory,
+                        const FileChunkList &file_chunks);
   void ShrinkHardlinkGroup(const std::string &remove_path);
 
   // Nested catalog handling

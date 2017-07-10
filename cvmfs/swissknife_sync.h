@@ -27,6 +27,7 @@ struct SyncParameters {
         dry_run(false),
         mucatalogs(false),
         use_file_chunking(false),
+        generate_legacy_bulk_chunks(false),
         ignore_xdir_hardlinks(false),
         stop_for_catalog_tweaks(false),
         include_xattrs(false),
@@ -67,6 +68,7 @@ struct SyncParameters {
   bool dry_run;
   bool mucatalogs;
   bool use_file_chunking;
+  bool generate_legacy_bulk_chunks;
   bool ignore_xdir_hardlinks;
   bool stop_for_catalog_tweaks;
   bool include_xattrs;
@@ -268,6 +270,7 @@ class CommandSync : public Command {
     r.push_back(Parameter::Switch('m', "create micro catalogs"));
     r.push_back(Parameter::Switch('n', "create new repository"));
     r.push_back(Parameter::Switch('p', "enable file chunking"));
+    r.push_back(Parameter::Switch('O', "generate legacy bulk chunks"));
     r.push_back(Parameter::Switch('x', "print change set"));
     r.push_back(Parameter::Switch('y', "dry run"));
     r.push_back(Parameter::Switch('A', "autocatalog enabled/disabled"));

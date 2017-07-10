@@ -1,0 +1,43 @@
+cvmfs_test_name="Zero-filled files"
+cvmfs_test_autofs_on_startup=false
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "*** create 1MiB file"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  dd if=/dev/zero of=/cvmfs/$CVMFS_TEST_REPO/1mb bs=$((1024*1024)) count=1
+  local md5_1mb="$(md5sum /cvmfs/$CVMFS_TEST_REPO/1mb | awk '{print $1}')"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  local md5_1mb_published="$(md5sum /cvmfs/$CVMFS_TEST_REPO/1mb | awk '{print $1}')"
+  echo "*** MD5 sums 1MB: $md5_1mb $md5_1mb_published"
+  [ "$md5_1mb" = "$md5_1mb_published" ] || return 10
+
+  echo "*** create 50MB file"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  dd if=/dev/zero of=/cvmfs/$CVMFS_TEST_REPO/50mb bs=$((1000*1000)) count=50
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "*** create 32MiB random file"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  dd if=/dev/random of=/cvmfs/$CVMFS_TEST_REPO/32mb-rnd bs=$((1024*1024)) count=32
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "*** create 32MiB file"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  dd if=/dev/zero of=/cvmfs/$CVMFS_TEST_REPO/32mb bs=$((1024*1024)) count=32
+  local md5_32mb="$(md5sum /cvmfs/$CVMFS_TEST_REPO/32mb | awk '{print $1}')"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  local md5_32mb_published="$(md5sum /cvmfs/$CVMFS_TEST_REPO/32mb | awk '{print $1}')"
+  echo "*** MD5 sums 32MB: $md5_32mb $md5_32mb_published"
+  [ "$md5_32mb" = "$md5_32mb_published" ] || return 20
+
+  return 0
+}
+

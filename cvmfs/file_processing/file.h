@@ -34,6 +34,7 @@ class File : public AbstractFile {
   File(const std::string    &path,
        IoDispatcher         *io_dispatcher,
        ChunkDetector        *chunk_detector,
+       bool                  generate_legacy_bulk_chunk,
        shash::Algorithms     hash_algorithm,
        zlib::Algorithms      compression_alg,
        const shash::Suffix   hash_suffix = shash::kSuffixNone);
@@ -69,6 +70,7 @@ class File : public AbstractFile {
   }
 
   bool HasBulkChunk()              const { return bulk_chunk_ != NULL;     }
+  shash::Any GetBulkHash() const;
   bool HasChunkDetector()          const { return chunk_detector_ != NULL; }
 
         Chunk*        bulk_chunk()        { return bulk_chunk_;  }
@@ -94,6 +96,11 @@ class File : public AbstractFile {
 
  private:
   const bool might_become_chunked_;  ///< Result of the chunkedness forecast
+  /**
+   * If chunks are generated, whether or not to generate the bulk chunk in
+   * addition
+   */
+  const bool generate_legacy_bulk_chunk_;
   /**
    * Secure hash algorithm creating content-addressable storage
    */

@@ -31,10 +31,11 @@ struct SpoolerDefinition {
    * @param definition_string   the spooler definition string to be inter-
    *                            preted by the constructor
    */
-  explicit SpoolerDefinition(
+  SpoolerDefinition(
       const std::string& definition_string,
       const shash::Algorithms hash_algorithm,
       const zlib::Algorithms compression_algorithm = zlib::kZlibDefault,
+      const bool generate_legacy_bulk_chunks = false,
       const bool use_file_chunking = false,
       const size_t min_file_chunk_size = 0,
       const size_t avg_file_chunk_size = 0,
@@ -62,6 +63,11 @@ struct SpoolerDefinition {
 
   shash::Algorithms hash_algorithm;
   zlib::Algorithms compression_alg;
+  /**
+   * If a file is chunked, clients >= 2.1.7 do not need the bulk chunk.  We can
+   * force creating the bulk chunks for backwards compatibility.
+   */
+  bool generate_legacy_bulk_chunks;
   bool use_file_chunking;
   size_t min_file_chunk_size;
   size_t avg_file_chunk_size;
