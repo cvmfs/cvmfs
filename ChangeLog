@@ -1,4 +1,6 @@
 2.4.0:
+  * Assign port 8000 to httpd in selinux configuration during RPM post-install
+    (CVM-1308)
   * Use "AllowOverride Limit AuthConfig" directive (CVM-1255)
   * Set Apache manifest expiry period to 61 seconds
   * Remove checks for conflicting cvmfs_server 2.0.x artifacts (CVM-1167) 
