@@ -12,18 +12,26 @@
 cvmfs_server_resign() {
   local names
   local retcode=0
+  local expire_days
+  local force=0
   local whitelist_path
   local sign_published=0
 
   # parameter handling
   OPTIND=1
-  while getopts "pw:" option; do
+  while getopts "d:fpw:" option; do
     case $option in
-      w)
-        whitelist_path=$OPTARG
+      d)
+        expire_days=$OPTARG
+      ;;
+      f)
+        force=1
       ;;
       p)
         sign_published=1
+      ;;
+      w)
+        whitelist_path=$OPTARG
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -39,8 +47,22 @@ cvmfs_server_resign() {
   [ -n "$whitelist_path" ] || check_multiple_repository_existence "$names"
 
   # sanity checks
+  [ $sign_published -eq 0 ] || [ -z "$expire_days" ]    || die "Cannot use -d with -p"
   [ $sign_published -eq 0 ] || [ -z "$whitelist_path" ] || die "Cannot use both -w and -p"
   [ $sign_published -eq 1 ] || is_root || die "Only root can resign whitelists"
+
+  if [ $sign_published -eq 0 ] && \
+        [ -n "$expire_days" ] && [ $expire_days -gt 30 ]; then
+    echo "Warning: whitelist expiration is more than 30 days."
+    echo "Long expirations increase risk from repository key compromises!"
+    if [ $force -ne 1 ]; then
+      local reply
+      read -p "Are you sure you want to do this (y/N)? " reply
+      if [ "$reply" != "y" ] && [ "$reply" != "Y" ]; then
+        return 1
+      fi
+    fi
+  fi
 
   for name in $names; do
 
@@ -78,8 +100,7 @@ cvmfs_server_resign() {
       else
 
         create_whitelist $name $CVMFS_USER \
-            ${CVMFS_UPSTREAM_STORAGE} \
-            ${CVMFS_SPOOL_DIR}/tmp
+            ${CVMFS_UPSTREAM_STORAGE} ${CVMFS_SPOOL_DIR}/tmp "$expire_days"
 
       fi
     else
@@ -91,7 +112,7 @@ cvmfs_server_resign() {
       tmpdir="`mktemp -d`"
       trap "rm -rf $tmpdir" EXIT HUP INT TERM
 
-      create_whitelist $name $user "" $tmpdir $whitelist_path
+      create_whitelist $name $user "" $tmpdir "$expire_days" $whitelist_path
 
       rm -rf $tmpdir
       trap - EXIT HUP INT TERM
