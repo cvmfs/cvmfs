@@ -62,6 +62,8 @@ CommitProcessor::Result CommitProcessor::Process(
   UniquePtr<ServerTool> server_tool(new ServerTool());
 
   if (!server_tool->InitDownloadManager(true)) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "Error: Could not initialize the download manager");
     return kIoError;
   }
 
@@ -69,6 +71,8 @@ CommitProcessor::Result CommitProcessor::Process(
   const std::string trusted_certs =
       "/etc/cvmfs/repositories.d/" + repo_name + "/trusted_certs";
   if (!server_tool->InitVerifyingSignatureManager(public_key, trusted_certs)) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "Error: Could not initialize the signature manager");
     return kIoError;
   }
 
@@ -79,7 +83,7 @@ CommitProcessor::Result CommitProcessor::Process(
   // Current catalog from the gateway machine
   if (!manifest.IsValid()) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
-             "Could not open repository manifest");
+             "Error: Could not open repository manifest");
     return kIoError;
   }
 
@@ -90,17 +94,21 @@ CommitProcessor::Result CommitProcessor::Process(
       merge_tool(stratum0, old_root_hash, new_root_hash, temp_dir_root,
                  server_tool->download_manager(), manifest.weak_ref());
   if (!merge_tool.Init()) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "Error: Could not initialize the catalog merge tool");
     return kIoError;
   }
 
   Params params;
   if (!GetParamsFromFile(repo_name, &params)) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "Error: Could not get configuration parameters.");
     return kIoError;
   }
 
   std::string new_manifest_path;
   if (!merge_tool.Run(params, &new_manifest_path)) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr, "Catalog merge failed");
+    LogCvmfs(kLogReceiver, kLogSyslogErr, "Error: Catalog merge failed");
     return kMergeError;
   }
 
