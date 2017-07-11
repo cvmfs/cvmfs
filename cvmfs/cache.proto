@@ -130,6 +130,8 @@ message MsgHandshakeAck {
   // The server might instruct the client to proceed in a certain mode of
   // operation in the future
   optional uint32 flags            = 7;
+  // The cache plugin may let the client know about its pid
+  optional uint64 pid              = 8;
 }
 
 message MsgQuit {

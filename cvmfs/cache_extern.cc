@@ -232,6 +232,8 @@ ExternalCacheManager *ExternalCacheManager::Create(
              cache_mgr->max_object_size_);
     return NULL;
   }
+  if (msg_ack->has_pid())
+    cache_mgr->pid_plugin_ = msg_ack->pid();
   return cache_mgr.Release();
 }
 
@@ -352,7 +354,8 @@ int ExternalCacheManager::Dup(int fd) {
 ExternalCacheManager::ExternalCacheManager(
   int fd_connection,
   unsigned max_open_fds)
-  : fd_table_(max_open_fds, ReadOnlyHandle())
+  : pid_plugin_(0)
+  , fd_table_(max_open_fds, ReadOnlyHandle())
   , transport_(fd_connection)
   , session_id_(-1)
   , max_object_size_(0)
