@@ -5,6 +5,8 @@
 #include "cvmfs_config.h"
 #include "catalog_mgr_client.h"
 
+#include <vector>
+
 #include "cache_posix.h"
 #include "download.h"
 #include "fetch.h"
@@ -277,7 +279,7 @@ bool ClientCatalogManager::IsRevisionBlacklisted() {
 
   LogCvmfs(kLogCache, kLogDebug, "checking if %s revision %u is blacklisted",
            repo_name_.c_str(), revision);
-  
+ 
   vector<string> blacklist = signature_mgr_->GetBlacklist();
   for (unsigned i = 0; i < blacklist.size(); ++i) {
     std::string line = blacklist[i];
@@ -291,7 +293,7 @@ bool ClientCatalogManager::IsRevisionBlacklisted() {
     if (line.substr(1, idx - 1) != repo_name_)
       continue;
     ++idx;
-    while((line[idx] == ' ') || (line[idx] == '\t'))
+    while ((line[idx] == ' ') || (line[idx] == '\t'))
       ++idx;
     if (idx >= line.length())
       continue;
