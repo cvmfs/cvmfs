@@ -36,8 +36,9 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::Run(
   if (needs_setup_) {
     upload::SpoolerDefinition definition(
         params.spooler_configuration, params.hash_alg, params.compression_alg,
-        params.use_file_chunking, params.min_chunk_size, params.avg_chunk_size,
-        params.max_chunk_size, "dummy_token", "dummy_key");
+        params.generate_legacy_bulk_chunks, params.use_file_chunking,
+        params.min_chunk_size, params.avg_chunk_size, params.max_chunk_size,
+        "dummy_token", "dummy_key");
     spooler = upload::Spooler::Construct(definition);
     const std::string temp_dir = CreateTempDir(temp_dir_prefix_);
     output_catalog_mgr_ = new RwCatalogMgr(
@@ -67,6 +68,9 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportAddition(
 
   if (entry.IsDirectory()) {
     output_catalog_mgr_->AddDirectory(entry, parent_path);
+    if (entry.IsNestedCatalogMountpoint()) {
+      output_catalog_mgr_->CreateNestedCatalog(std::string(rel_path.c_str()));
+    }
   } else if (entry.IsRegular() || entry.IsLink()) {
     const catalog::DirectoryEntryBase* base_entry =
         static_cast<const catalog::DirectoryEntryBase*>(&entry);
@@ -100,11 +104,20 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportModification(
     const catalog::DirectoryEntryBase* base_entry =
         static_cast<const catalog::DirectoryEntryBase*>(&entry2);
     output_catalog_mgr_->TouchDirectory(*base_entry, rel_path.c_str());
-
+    if (!entry1.IsNestedCatalogMountpoint() &&
+        entry2.IsNestedCatalogMountpoint()) {
+      output_catalog_mgr_->CreateNestedCatalog(std::string(rel_path.c_str()));
+    } else if (entry1.IsNestedCatalogMountpoint() &&
+               !entry2.IsNestedCatalogMountpoint()) {
+      output_catalog_mgr_->RemoveNestedCatalog(std::string(rel_path.c_str()));
+    }
   } else if ((entry1.IsRegular() || entry1.IsLink()) && entry2.IsDirectory()) {
     // From file to directory
     output_catalog_mgr_->RemoveFile(rel_path.c_str());
     output_catalog_mgr_->AddDirectory(entry2, parent_path);
+    if (entry2.IsNestedCatalogMountpoint()) {
+      output_catalog_mgr_->CreateNestedCatalog(std::string(rel_path.c_str()));
+    }
 
   } else if (entry1.IsDirectory() && (entry2.IsRegular() || entry2.IsLink())) {
     // From directory to file

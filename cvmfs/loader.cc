@@ -18,6 +18,7 @@
 
 #include <dlfcn.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <fuse/fuse_lowlevel.h>
 #include <fuse/fuse_opt.h>
 #include <openssl/crypto.h>
@@ -763,6 +764,23 @@ int main(int argc, char *argv[]) {
                "Failed to set maximum number of open files, "
                "insufficient permissions");
       return kFailPermission;
+    }
+  }
+
+  // Apply OOM score adjustment
+  if (options_manager->GetValue("CVMFS_OOM_SCORE_ADJ", &parameter)) {
+    string proc_path = "/proc/" + StringifyInt(getpid()) + "/oom_score_adj";
+    int fd_oom = open(proc_path.c_str(), O_WRONLY);
+    if (fd_oom < 0) {
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+               "failed to open %s", proc_path.c_str());
+    } else {
+      bool retval = SafeWrite(fd_oom, parameter.data(), parameter.length());
+      if (!retval) {
+        LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+                 "failed to set OOM score adjustment to %s", parameter.c_str());
+      }
+      close(fd_oom);
     }
   }
 

@@ -59,7 +59,8 @@ create_whitelist() {
   local user=$2
   local spooler_definition=$3
   local temp_dir=$4
-  local rewrite_path=$5
+  local expire_days=$5
+  local rewrite_path=$6
   local usemasterkeycard=0
   local hash_algorithm
 
@@ -68,15 +69,21 @@ create_whitelist() {
 
   local masterkey=/etc/cvmfs/keys/${name}.masterkey
   if cvmfs_sys_file_is_regular $masterkey; then
-    echo -n "Signing 30 day whitelist with master key... "
+    if [ -z "$expire_days" ]; then
+      expire_days=30
+    fi
+    echo -n "Signing $expire_days day whitelist with master key... "
   elif masterkeycard_cert_available >/dev/null; then
     usemasterkeycard=1
-    echo -n "Signing 30 day whitelist with masterkeycard... "
+    if [ -z "$expire_days" ]; then
+      expire_days=7
+    fi
+    echo -n "Signing $expire_days day whitelist with masterkeycard... "
   else
     die "Neither masterkey nor masterkeycard is available to sign whitelist!"
   fi
   echo `date -u "+%Y%m%d%H%M%S"` > ${whitelist}.unsigned
-  echo "E`date -u --date='+30 days' "+%Y%m%d%H%M%S"`" >> ${whitelist}.unsigned
+  echo "E`date -u --date="+$expire_days days" "+%Y%m%d%H%M%S"`" >> ${whitelist}.unsigned
   echo "N$name" >> ${whitelist}.unsigned
   if [ -n "$rewrite_path" ]; then
     local fingerprint

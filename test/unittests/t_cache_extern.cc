@@ -233,6 +233,7 @@ const unsigned T_ExternalCacheManager::nfiles = 128;
 
 TEST_F(T_ExternalCacheManager, Connection) {
   EXPECT_GE(cache_mgr_->session_id(), 0);
+  EXPECT_EQ(getpid(), cache_mgr_->quota_mgr()->GetPid());
 }
 
 

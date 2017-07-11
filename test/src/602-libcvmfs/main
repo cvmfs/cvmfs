@@ -29,6 +29,8 @@ cvmfs_run_test() {
 
     CVMFS_TEST_602_REPO_COUNT=$(( $CVMFS_TEST_602_REPO_COUNT + 1 ))
     create_empty_repo "$repo_name" $CVMFS_TEST_USER || return 2
+    echo "CVMFS_GENERATE_LEGACY_BULK_CHUNKS=false" | \
+      sudo tee -a /etc/cvmfs/repositories.d/$repo_name/server.conf || return 2
     start_transaction "$repo_name"                  || return 3
 
     mkdir "$repo_dir/main"                || return 4

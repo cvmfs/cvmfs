@@ -43,12 +43,14 @@ class ConsumerCallbacks {
 
 class PreserveContentCallbacks {
  public:
-  PreserveContentCallbacks() : hash_string_recovered_() {}
+  PreserveContentCallbacks() : num_calls_(0), hash_string_recovered_() {}
 
   void OnEvent(const ObjectPackBuild::Event &event) {
+    num_calls_++;
     hash_string_recovered_ = event.id.ToString(true);
   }
 
+  uint64_t num_calls_;
   std::string hash_string_recovered_;
 };
 
@@ -408,5 +410,39 @@ TEST_F(T_Pack, PreserveContentHash) {
   unsigned char buf[8192];
   unsigned nbytes = serializer.ProduceNext(8192, buf);
   EXPECT_EQ(ObjectPackBuild::kStateDone, deserializer.ConsumeNext(nbytes, buf));
+  EXPECT_EQ(hash_string_saved_, cb.hash_string_recovered_);
+}
+
+TEST_F(T_Pack, MultipleCallbacksPerFile) {
+  const size_t sample_size = 4 * 1024 * 1024;
+
+  shash::Any content_hash(shash::kSha1);
+  std::vector<uint8_t> buffer(sample_size, 6);
+  shash::HashMem(&buffer[0], buffer.size(), &content_hash);
+
+  hash_string_saved_ = content_hash.ToString(true);
+
+  ObjectPack pack;
+  ObjectPack::BucketHandle hd = pack.NewBucket();
+  ObjectPack::AddToBucket(&buffer[0], buffer.size(), hd);
+  pack.CommitBucket(ObjectPack::kCas, content_hash, hd, "");
+
+  ObjectPackProducer serializer(&pack);
+
+  shash::Any digest(shash::kSha1);
+  serializer.GetDigest(&digest);
+  ObjectPackConsumer deserializer(digest, serializer.GetHeaderSize());
+
+  PreserveContentCallbacks cb;
+  deserializer.RegisterListener(&PreserveContentCallbacks::OnEvent, &cb);
+
+  std::vector<unsigned char> buf(4096);
+  ObjectPackBuild::State ret = ObjectPackBuild::kStateContinue;
+  while (ret != ObjectPackBuild::kStateDone) {
+    unsigned nbytes = serializer.ProduceNext(4096, &buf[0]);
+    ret = deserializer.ConsumeNext(nbytes, &buf[0]);
+  }
+
+  EXPECT_EQ(sample_size / (128 * 1024), cb.num_calls_);
   EXPECT_EQ(hash_string_saved_, cb.hash_string_recovered_);
 }

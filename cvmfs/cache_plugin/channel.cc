@@ -35,7 +35,8 @@ void CachePlugin::AskToDetach() {
 
 
 CachePlugin::CachePlugin(uint64_t capabilities)
-  : capabilities_(capabilities)
+  : is_local_(false)
+  , capabilities_(capabilities)
   , fd_socket_(-1)
   , fd_socket_lock_(-1)
   , running_(0)
@@ -83,6 +84,8 @@ void CachePlugin::HandleHandshake(
   msg_ack.set_max_object_size(max_object_size_);
   msg_ack.set_session_id(session_id);
   msg_ack.set_capabilities(capabilities_);
+  if (is_local_)
+    msg_ack.set_pid(getpid());
   transport->SendFrame(&frame_send);
 }
 
@@ -502,6 +505,7 @@ bool CachePlugin::Listen(const string &locator) {
     }
     assert(fd_socket_lock_ >= 0);
     fd_socket_ = MakeSocket(tokens[1], 0600);
+    is_local_ = true;
   } else if (tokens[0] == "tcp") {
     vector<string> tcp_address = SplitString(tokens[1], ':');
     if (tcp_address.size() != 2) {
@@ -527,6 +531,7 @@ bool CachePlugin::Listen(const string &locator) {
                "failed to create endpoint %s (%d)", locator.c_str(), errno);
       NotifySupervisor(CacheTransport::kFailureNotification);
     }
+    is_local_ = false;
     return false;
   }
   int retval = listen(fd_socket_, 32);

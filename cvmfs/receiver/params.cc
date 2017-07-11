@@ -43,6 +43,17 @@ bool GetParamsFromFile(const std::string& repo_name, Params* params) {
   params->compression_alg =
       zlib::ParseCompressionAlgorithm(compression_algorithm_str);
 
+  std::string generate_legacy_bulk_chunks;
+  ret &= parser.GetValue("CVMFS_GENERATE_LEGACY_BULK_CHUNKS",
+                         &generate_legacy_bulk_chunks);
+  if (generate_legacy_bulk_chunks == "true") {
+    params->generate_legacy_bulk_chunks = true;
+  } else if (generate_legacy_bulk_chunks == "false") {
+    params->generate_legacy_bulk_chunks = false;
+  } else {
+    return false;
+  }
+
   std::string use_chunking_str;
   ret &= parser.GetValue("CVMFS_USE_FILE_CHUNKING", &use_chunking_str);
   if (use_chunking_str == "true") {

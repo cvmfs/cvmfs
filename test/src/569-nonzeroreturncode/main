@@ -109,6 +109,9 @@ cvmfs_run_test() {
   echo "resign whitelist without requiring repo config"
   sudo cvmfs_server resign -w .cvmfswhitelist $CVMFS_TEST_REPO || return $?
 
+  echo "try again with reduced expiration time"
+  sudo cvmfs_server resign -d 7 -w .cvmfswhitelist $CVMFS_TEST_REPO || return $?
+
   echo "attempt to resign published without full repo config (should fail)"
   sudo cvmfs_server resign -p $CVMFS_TEST_REPO && return 16
 

@@ -179,6 +179,7 @@ class T_Uploaders : public FileSandbox {
 
   SpoolerDefinition GetSpoolerDefinition() const {
     const std::string definition = GetSpoolerDefinition(type<UploadersT>());
+    const bool generate_legacy_bulk_chunks = true;
     const bool use_file_chunking = true;
     const size_t min_chunk_size  = 0;   // chunking does not matter here, we are
     const size_t avg_chunk_size  = 1;   // only testing the upload module.
@@ -187,6 +188,7 @@ class T_Uploaders : public FileSandbox {
     return SpoolerDefinition(definition,
                              shash::kSha1,
                              zlib::kZlibDefault,
+                             generate_legacy_bulk_chunks,
                              use_file_chunking,
                              min_chunk_size,
                              avg_chunk_size,

@@ -173,9 +173,12 @@ CommandTag::Environment *CommandTag::InitializeEnvironment(
   // to initialize the upload spooler for potential later history upload
   if (read_write) {
     const bool use_file_chunking = false;
+    const bool generate_legacy_bulk_chunks = false;
     const upload::SpoolerDefinition sd(spl_definition, hash_algo,
-                                       zlib::kZlibDefault, use_file_chunking, 0,
-                                       0, 0, session_token_file);
+                                       zlib::kZlibDefault,
+                                       generate_legacy_bulk_chunks,
+                                       use_file_chunking, 0, 0, 0,
+                                       session_token_file);
     env->spooler = upload::Spooler::Construct(sd);
     if (!env->spooler) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to initialize upload spooler");

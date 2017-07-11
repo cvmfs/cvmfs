@@ -90,7 +90,9 @@ class PolymorphicConstructionUnittestAdapter {
 
 static const char* g_sandbox_path    = "/tmp/cvmfs_mockuploader";
 static const char* g_sandbox_tmp_dir = "/tmp/cvmfs_mockuploader/tmp";
-static inline upload::SpoolerDefinition MockSpoolerDefinition() {
+static inline upload::SpoolerDefinition MockSpoolerDefinition(
+  bool generate_legacy_bulk_chunks = true)
+{
   const size_t      min_chunk_size   = 512000;
   const size_t      avg_chunk_size   = 2 * min_chunk_size;
   const size_t      max_chunk_size   = 4 * min_chunk_size;
@@ -99,6 +101,7 @@ static inline upload::SpoolerDefinition MockSpoolerDefinition() {
                                              std::string(g_sandbox_tmp_dir),
                                    shash::kSha1,
                                    zlib::kZlibDefault,
+                                   generate_legacy_bulk_chunks,
                                    true,
                                    min_chunk_size,
                                    avg_chunk_size,

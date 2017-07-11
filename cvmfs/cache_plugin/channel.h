@@ -147,6 +147,7 @@ class CachePlugin {
                        const std::string &msg);
   void LogSessionInfo(uint64_t session_id, const std::string &msg);
 
+  bool is_local_;
   uint64_t capabilities_;
   int fd_socket_;
   int fd_socket_lock_;

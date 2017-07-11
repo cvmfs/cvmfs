@@ -186,10 +186,17 @@ void *S3FanoutManager::MainUpload(void *data) {
   LogCvmfs(kLogS3Fanout, kLogDebug, "Upload I/O thread started");
   S3FanoutManager *s3fanout_mgr = static_cast<S3FanoutManager *>(data);
 
+  // Don't schedule more jobs into the multi handle than the maximum number of
+  // parallel connections.  This should prevent starvation and thus a timeout
+  // of the authorization header (CVM-1339).
+  unsigned jobs_in_flight = 0;
+
   while (s3fanout_mgr->thread_upload_run_) {
     JobInfo *info = NULL;
     pthread_mutex_lock(s3fanout_mgr->jobs_todo_lock_);
-    if (!s3fanout_mgr->jobs_todo_.empty()) {
+    if (!s3fanout_mgr->jobs_todo_.empty() &&
+        (jobs_in_flight < s3fanout_mgr->pool_max_handles_))
+    {
       info = s3fanout_mgr->jobs_todo_.back();
       s3fanout_mgr->jobs_todo_.pop_back();
     }
@@ -213,6 +220,7 @@ void *S3FanoutManager::MainUpload(void *data) {
       s3fanout_mgr->SetUrlOptions(info);
 
       curl_multi_add_handle(s3fanout_mgr->curl_multi_, handle);
+      jobs_in_flight++;
       int still_running = 0, retval = 0;
       retval = curl_multi_socket_action(s3fanout_mgr->curl_multi_,
                                         CURL_SOCKET_TIMEOUT,
@@ -290,6 +298,7 @@ void *S3FanoutManager::MainUpload(void *data) {
                                    &still_running);
         } else {
           // Return easy handle into pool and write result back
+          jobs_in_flight--;
           s3fanout_mgr->ReleaseCurlHandle(info, easy_handle);
           s3fanout_mgr->available_jobs_->Decrement();
 

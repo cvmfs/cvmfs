@@ -72,8 +72,13 @@ bool swissknife::CommandGraft::ChecksumFdWithChunks(
     size_t avail_out = zlib::kZChunk;
     compressor->Deflate(flush, &cur_in_buf, &avail_in, &cur_out_buf,
                         &avail_out);
-    shash::Update(out_buf, avail_out, file_hash_context);
-    if (do_chunk) shash::Update(out_buf, avail_out, chunk_hash_context);
+    if (do_chunk) {
+      shash::Update(out_buf, avail_out, chunk_hash_context);
+      if (generate_bulk_hash_)
+        shash::Update(out_buf, avail_out, file_hash_context);
+    } else {
+      shash::Update(out_buf, avail_out, file_hash_context);
+    }
 
     if (!avail_in) {
       // All bytes are consumed; set the buffer back to the beginning.
@@ -104,8 +109,12 @@ bool swissknife::CommandGraft::ChecksumFdWithChunks(
     chunk_checksums->pop_back();
   }
 
+  if (do_chunk && !generate_bulk_hash_)
+    file_hash->SetNull();
+
   // Do not chunk a file if it is under threshold.
   if (do_chunk && (chunk_offsets->size() == 1)) {
+    *file_hash = (*chunk_checksums)[0];
     chunk_offsets->clear();
     chunk_checksums->clear();
   }
@@ -149,6 +158,7 @@ int swissknife::CommandGraft::Main(const swissknife::ArgumentList &args) {
   const std::string output_file =
       (args.find('o') == args.end()) ? "" : *(args.find('o')->second);
   verbose_ = args.find('v') != args.end();
+  generate_bulk_hash_ = args.find('b') != args.end();
   hash_alg_ = (args.find('a') == args.end())
                   ? shash::kSha1
                   : shash::ParseHashAlgorithm(*args.find('a')->second);

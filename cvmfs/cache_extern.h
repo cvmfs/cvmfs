@@ -8,6 +8,7 @@
 
 #include <pthread.h>
 #include <stdint.h>
+#include <unistd.h>
 
 #include <cassert>
 #include <string>
@@ -92,6 +93,7 @@ class ExternalCacheManager : public CacheManager {
   int64_t session_id() const { return session_id_; }
   uint32_t max_object_size() const { return max_object_size_; }
   uint64_t capabilities() const { return capabilities_; }
+  pid_t pid_plugin() const { return pid_plugin_; }
 
  protected:
   virtual void *DoSaveState();
@@ -266,6 +268,7 @@ class ExternalCacheManager : public CacheManager {
   shash::Any GetHandle(int fd);
   int Flush(bool do_commit, Transaction *transaction);
 
+  pid_t pid_plugin_;
   FdTable<ReadOnlyHandle> fd_table_;
   CacheTransport transport_;
   int64_t session_id_;
@@ -324,7 +327,7 @@ class ExternalQuotaManager : public QuotaManager {
   virtual uint64_t GetCleanupRate(uint64_t period_s);
 
   virtual void Spawn() { }
-  virtual pid_t GetPid() { return getpid(); }
+  virtual pid_t GetPid() { return cache_mgr_->pid_plugin(); }
   virtual uint32_t GetProtocolRevision() { return 0; }
 
  private:

@@ -92,6 +92,7 @@ class FileProcessor : public Observable<SpoolerResult> {
 
   zlib::Algorithms   compression_alg_;
   shash::Algorithms  hash_algorithm_;
+  const bool         generate_legacy_bulk_chunks_;
   const bool         chunking_enabled_;
   const size_t       minimal_chunk_size_;
   const size_t       average_chunk_size_;

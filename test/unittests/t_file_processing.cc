@@ -7,6 +7,7 @@
 #include <openssl/sha.h>
 
 #include <cerrno>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -171,6 +172,11 @@ class T_FileProcessing : public FileSandbox {
     return std::make_pair("7935fe23e1f9959b176999d63f6b8ccacc7c6eff", suffix);
   }
 
+  ExpectedHashString GetSmallZeroFileBulkHash(
+      const shash::Suffix suffix = shash::kSuffixNone) const {
+    return std::make_pair("b05b2dd3d5336b9ef1e4ce01b70bc40a9b676754", suffix);
+  }
+
   ExpectedHashString GetBigFileBulkHash(
       const shash::Suffix suffix = shash::kSuffixNone) const {
     return std::make_pair("32f526af5fb573ee70925b108310447529d9b9eb", suffix);
@@ -184,6 +190,19 @@ class T_FileProcessing : public FileSandbox {
     h.push_back(std::make_pair("b928e5935b6a35278a81f9f859b13d3e83d88052", P));
     h.push_back(std::make_pair("bbd189584d78de0ad603ef5a7de3f770ab0bf3f8", P));
     h.push_back(std::make_pair("c8b7e7c3595244afe1cd946e4fd90ecbea34967f", P));
+    return h;
+  }
+
+  ExpectedHashString GetBigZeroFileBulkHash(
+      const shash::Suffix suffix = shash::kSuffixNone) const {
+    return std::make_pair("7bda09b8a07d28b293ff67a32b763d8c86d78a5c", suffix);
+  }
+
+  ExpectedHashStrings GetBigZeroFileChunkHashes() const {
+    ExpectedHashStrings h;
+    const shash::Suffix P = shash::kSuffixPartial;
+    h.push_back(std::make_pair("9a3cc4a3dd5f68bbd3a959359f213fda59b8c319", P));
+    h.push_back(std::make_pair("e5cb4b67a2f23f95ac6b55f2a9a265520abdcf77", P));
     return h;
   }
 
@@ -306,6 +325,20 @@ class T_FileProcessing : public FileSandbox {
     return h;
   }
 
+  ExpectedHashString GetHugeZeroFileBulkHash(
+      const shash::Suffix suffix = shash::kSuffixNone) const {
+    return std::make_pair("e80663bfedae90ad6a7b841ac915cb29223f8256", suffix);
+  }
+
+  ExpectedHashStrings GetHugeZeroFileChunkHashes() const {
+    ExpectedHashStrings h;
+    const shash::Suffix P = shash::kSuffixPartial;
+    h.push_back(std::make_pair("9a3cc4a3dd5f68bbd3a959359f213fda59b8c319", P));
+    h.push_back(std::make_pair("2bac39d388724bde92ec646e08f96f4a699e7ac4", P));
+    h.push_back(std::make_pair("f62536cf1fa2b38fcaf2d181a6d595feca0cd100", P));
+    return h;
+  }
+
   template <class VectorT>
   void AppendVectorToVector(const VectorT &appendee, VectorT *vector) const {
     vector->insert(vector->end(), appendee.begin(), appendee.end());
@@ -313,24 +346,31 @@ class T_FileProcessing : public FileSandbox {
 
   void TestProcessFile(const std::string &file_path,
                        const ExpectedHashString &reference_hash,
-                       const bool use_chunking = true) {
+                       const bool generate_legacy_bulk_hashes = true,
+                       const bool use_chunking = true)
+  {
     ExpectedHashStrings reference_hash_strings;
     reference_hash_strings.push_back(reference_hash);
-    TestProcessFile(file_path, reference_hash_strings, use_chunking);
+    TestProcessFile(file_path, reference_hash_strings,
+                    generate_legacy_bulk_hashes, use_chunking);
   }
 
   void TestProcessFile(const std::string &file_path,
                        const ExpectedHashStrings &reference_hash_strings,
+                       const bool generate_legacy_bulk_hashes = true,
                        const bool use_chunking = true) {
     std::vector<std::string> file_pathes;
     file_pathes.push_back(file_path);
-    TestProcessFiles(file_pathes, reference_hash_strings, use_chunking);
+    TestProcessFiles(file_pathes, reference_hash_strings,
+                     generate_legacy_bulk_hashes, use_chunking);
   }
 
   void TestProcessFiles(const std::vector<std::string> &file_pathes,
                         const ExpectedHashStrings &reference_hash_strings,
+                        const bool generate_legacy_bulk_hashes = true,
                         const bool use_chunking = true) {
-    upload::FileProcessor processor(uploader_, MockSpoolerDefinition());
+    upload::FileProcessor processor(
+      uploader_, MockSpoolerDefinition(generate_legacy_bulk_hashes));
 
     std::vector<std::string>::const_iterator i = file_pathes.begin();
     std::vector<std::string>::const_iterator iend = file_pathes.end();
@@ -353,7 +393,19 @@ class T_FileProcessing : public FileSandbox {
 
   void CheckHashes(const FP_MockUploader::Results &results,
                    const ExpectedHashStrings &reference_hash_strings) const {
-    EXPECT_EQ(reference_hash_strings.size(), results.size())
+    std::set<std::string> reference_set;
+    std::set<std::string> result_set;
+    for (ExpectedHashStrings::const_iterator i = reference_hash_strings.begin(),
+         i_end = reference_hash_strings.end(); i != i_end; ++i)
+    {
+      reference_set.insert(i->first);
+    }
+    for (FP_MockUploader::Results::const_iterator i = results.begin(),
+         i_end = results.end(); i != i_end; ++i)
+    {
+      result_set.insert(i->computed_content_hash.ToString());
+    }
+    EXPECT_EQ(reference_set.size(), result_set.size())
         << "number of generated chunks did not match";
 
     // convert hash strings into shash::Any structs
@@ -417,10 +469,43 @@ TEST_F(T_FileProcessing, ProcessSmallFile) {
   TestProcessFile(path, GetSmallFileBulkHash());
 }
 
+TEST_F(T_FileProcessing, ProcessSmallZeroFile) {
+  const std::string &path = GetSmallZeroFile();
+  TestProcessFile(path, GetSmallZeroFileBulkHash());
+}
+
+TEST_F(T_FileProcessing, ProcessSmallFileForcedBulk) {
+  // Only one chunk created, promoted to bulk chunk
+  TestProcessFile(GetSmallFile(), GetSmallFileBulkHash(),
+                  false,  /* legacy bulk hash */
+                  true   /* chunking */);
+}
+
 TEST_F(T_FileProcessing, ProcessBigFile) {
   ExpectedHashStrings hs = GetBigFileChunkHashes();
   hs.push_back(GetBigFileBulkHash());
   TestProcessFile(GetBigFile(), hs);
+}
+
+TEST_F(T_FileProcessing, ProcessBigZeroFile) {
+  ExpectedHashStrings hs = GetBigZeroFileChunkHashes();
+  hs.push_back(GetBigZeroFileBulkHash());
+  TestProcessFile(GetBigZeroFile(), hs);
+}
+
+TEST_F(T_FileProcessing, ProcessBigFileForcedBulk) {
+  // No chunking, hence bulk chunk must be created
+  TestProcessFile(GetBigFile(), GetBigFileBulkHash(),
+                  false,  /* legacy bulk hash */
+                  false   /* chunking */);
+}
+
+TEST_F(T_FileProcessing, ProcessBigFileOnlyChunks) {
+  // No bulk hash in the reference list
+  ExpectedHashStrings hs = GetBigFileChunkHashes();
+  TestProcessFile(GetBigFile(), hs,
+                  false,  /* legacy bulk hash */
+                  true   /* chunking */);
 }
 
 TEST_F(T_FileProcessing, ProcessHugeFileSlow) {
@@ -429,8 +514,16 @@ TEST_F(T_FileProcessing, ProcessHugeFileSlow) {
   TestProcessFile(GetHugeFile(), hs);
 }
 
+TEST_F(T_FileProcessing, ProcessHugeZeroFileSlow) {
+  ExpectedHashStrings hs = GetHugeZeroFileChunkHashes();
+  hs.push_back(GetHugeZeroFileBulkHash());
+  TestProcessFile(GetHugeZeroFile(), hs);
+}
+
 TEST_F(T_FileProcessing, ProcessBigFileWithoutChunks) {
-  TestProcessFile(GetBigFile(), GetBigFileBulkHash(), false);
+  TestProcessFile(GetBigFile(), GetBigFileBulkHash(),
+                  true,  /* legacy bulk hash */
+                  false  /* chunking */);
 }
 
 TEST_F(T_FileProcessing, ProcessMultipleFilesSlow) {
@@ -490,7 +583,9 @@ TEST_F(T_FileProcessing, ProcessMultipeFilesWithoutChunkingSlow) {
   pathes.push_back(GetBigFile());
   hs.push_back(GetBigFileBulkHash());
 
-  TestProcessFiles(pathes, hs, false);
+  TestProcessFiles(pathes, hs,
+                   true,  /* legacy bulk */
+                   false  /* chunking */);
 }
 
 TEST_F(T_FileProcessing, ProcessMultipleFilesInSeparateWavesSlow) {

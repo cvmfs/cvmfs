@@ -62,11 +62,9 @@
     "sstream": "cpp",
     "stdexcept": "cpp",
     "streambuf": "cpp",
-    "tuple": "cpp",
-    "string_view": "cpp"
+    "tuple": "cpp"
   },
   "python.linting.pylintEnabled": false,
   "python.formatting.provider": "yapf",
   "git.ignoreLimitWarning": true
 }
-
