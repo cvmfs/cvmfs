@@ -507,6 +507,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   params.public_keys = *args.find('K')->second;
   params.repo_name = *args.find('N')->second;
 
+  params.ttl_seconds = catalog::Catalog::kDefaultTTL;
+
   if (args.find('f') != args.end())
     params.union_fs_type = *args.find('f')->second;
   if (args.find('A') != args.end()) params.is_balanced = true;
