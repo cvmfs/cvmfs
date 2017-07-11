@@ -1,11 +1,14 @@
-[{lager, [{log_root, "log/"}
-         ,{crash_log, "crash.log"}
-         ,{handlers, [{lager_console_backend, info}
-                     ,{lager_syslog_backend, ["cvmfs_services", local1, info]}]}]}
+[
+ {lager, [{log_root, "/tmp"},
+          {crash_log, "crash.log"},
+          {handlers, [{lager_console_backend, info},
+                      {lager_syslog_backend, ["cvmfs_services", local1, info]}]},
+          {extra_sinks, [{error_logger_lager_event, [{handlers, [{lager_syslog_backend,
+                                                                  ["erlang_error_logger", local1, info]}]}]}]}]},
 
-,{mnesia, [{schema_location, disc}]}
+ {mnesia, [{schema_location, disc}]},
 
-,{cvmfs_services, [{enabled_services, [cvmfs_fe, cvmfs_be, cvmfs_auth, cvmfs_lease, cvmfs_receiver_pool]},
+ {cvmfs_services, [{enabled_services, [cvmfs_fe, cvmfs_be, cvmfs_auth, cvmfs_lease, cvmfs_receiver_pool]},
                    {repo_config, {file, "./config/ct_repo.config"}},
                    {user_config, {file, "./config/ct_user.config"}}]}
 ].
