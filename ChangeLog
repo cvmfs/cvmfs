@@ -1,4 +1,5 @@
 2.4.0:
+  * Add support for CVMFS_OOM_SCORE_ADJ (CVM-1092)
   * Show all CVMFS_... parameters in `cvmfs_config showconfig` (CVM-1180)
   * Limit number of concurrent S3 PUT operations (CVM-1339)
   * Set Apache content-type of objects to application/octet-stream (CVM-1067)
