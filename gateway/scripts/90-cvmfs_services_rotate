@@ -1,0 +1,8 @@
+/var/log/cvmfs_services/*.log {
+        size 10M
+        missingok
+        rotate 7
+        compress
+        notifempty
+	nocreate
+}
