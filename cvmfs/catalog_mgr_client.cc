@@ -279,7 +279,7 @@ bool ClientCatalogManager::IsRevisionBlacklisted() {
 
   LogCvmfs(kLogCache, kLogDebug, "checking if %s revision %u is blacklisted",
            repo_name_.c_str(), revision);
- 
+
   vector<string> blacklist = signature_mgr_->GetBlacklist();
   for (unsigned i = 0; i < blacklist.size(); ++i) {
     std::string line = blacklist[i];
