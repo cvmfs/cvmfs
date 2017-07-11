@@ -1,6 +1,6 @@
 {application, cvmfs_services,
  [{description, "CVMFS Repository Services"},
-  {vsn, "0.1.7"},
+  {vsn, "0.1.8"},
   {registered, [cvmfs_auth, cvmfs_be, cvmfs_fe, cvmfs_lease, cvmfs_receiver_pool]},
   {mod, {cvmfs_services_app, []}},
   {applications,
