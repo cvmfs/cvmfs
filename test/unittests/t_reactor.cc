@@ -90,7 +90,7 @@ TEST_F(T_Reactor, kEcho_kQuit) {
 
   std::string reply;
   ASSERT_TRUE(Reactor::ReadReply(from_reactor_[0], &reply));
-  ASSERT_EQ("Hey", reply);
+  ASSERT_EQ("PID", reply.substr(0, 3));
 
   ASSERT_TRUE(Reactor::WriteRequest(to_reactor_[1], Reactor::kQuit, ""));
 
