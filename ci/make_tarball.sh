@@ -13,8 +13,6 @@ fi
 CVMFS_BUILD_LOCATION="$1"
 shift 1
 
-export REBAR_CACHE_DIR=$WORKSPACE
-
 # run the build script
 echo "switching to $CVMFS_BUILD_LOCATION..."
 cd "$CVMFS_BUILD_LOCATION"
