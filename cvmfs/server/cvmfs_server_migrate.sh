@@ -373,12 +373,6 @@ _migrate_137() {
   fi
 
   echo "--> updating server.conf"
-  if is_stratum0 $name; then
-    if ! grep -q CVMFS_GENERATE_LEGACY_BULK_CHUNKS $server_conf; then
-      echo "--> set new option for legacy bulk chunks"
-      echo "CVMFS_GENERATE_LEGACY_BULK_CHUNKS=$CVMFS_DEFAULT_GENERATE_LEGACY_BULK_CHUNKS" >> $server_conf
-    fi
-  fi
   sed -i -e "s/^\(CVMFS_CREATOR_VERSION\)=.*/\1=$destination_version/" $server_conf
 
   # update repository information
