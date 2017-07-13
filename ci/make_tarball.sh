@@ -13,16 +13,16 @@ fi
 CVMFS_BUILD_LOCATION="$1"
 shift 1
 
+export REBAR_CACHE_DIR=$WORKSPACE
+
 # run the build script
 echo "switching to $CVMFS_BUILD_LOCATION..."
 cd "$CVMFS_BUILD_LOCATION"
-set +e
 rebar3 as prod compile
 cd _build/prod/lib/syslog
 ./rebar compile
 cd -
 rebar3 as prod release,tar
-set -e
 REPO_SERVICES_VERSION=$(grep -o "[0-9]\+\.[0-9]\+\.[0-9]\+" apps/cvmfs_services/src/cvmfs_services.app.src)
 mkdir -p $CVMFS_BUILD_LOCATION/tarballs
 cp -v _build/prod/rel/cvmfs_services/cvmfs_services-$REPO_SERVICES_VERSION.tar.gz \
