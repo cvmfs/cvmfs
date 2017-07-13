@@ -33,7 +33,10 @@ WritableCatalogManager::WritableCatalogManager(
   const string              &dir_temp,
   upload::Spooler           *spooler,
   download::DownloadManager *download_manager,
-  const uint64_t             catalog_entry_warn_threshold,
+  bool                       enforce_limits,
+  const uint64_t             nested_kcatalog_limit,
+  const uint64_t             root_kcatalog_limit,
+  const uint64_t             file_mbyte_limit,
   perf::Statistics          *statistics,
   bool                       is_balanceable,
   unsigned                   max_weight,
@@ -41,7 +44,10 @@ WritableCatalogManager::WritableCatalogManager(
   : SimpleCatalogManager(base_hash, stratum0, dir_temp, download_manager,
       statistics)
   , spooler_(spooler)
-  , catalog_entry_warn_threshold_(catalog_entry_warn_threshold)
+  , enforce_limits_(enforce_limits)
+  , nested_kcatalog_limit_(nested_kcatalog_limit)
+  , root_kcatalog_limit_(root_kcatalog_limit)
+  , file_mbyte_limit_(file_mbyte_limit)
   , is_balanceable_(is_balanceable)
   , max_weight_(max_weight)
   , min_weight_(min_weight)
@@ -351,6 +357,21 @@ void WritableCatalogManager::AddFile(
   assert(!entry.IsRegular() || entry.IsChunkedFile() ||
          !entry.checksum().IsNull());
   assert(entry.IsRegular() || !entry.IsExternalFile());
+
+  // check if file is too big
+  uint64_t mbytes = entry.size() / 1000000;
+  if ((file_mbyte_limit_ > 0) && (mbytes >= file_mbyte_limit_)) {
+    LogCvmfs(kLogCatalog, (enforce_limits_ ? kLogStderr : kLogStdout),
+             "%sfile at %s is larger or equal to %d megabytes (%d). "
+             "CVMFS does not work well with large files. "
+             "Remove the file or increase the limit.",
+             enforce_limits_ ? "" : "WARNING: ",
+             file_path.c_str(),
+             file_mbyte_limit_,
+             mbytes);
+    assert(!enforce_limits_);
+  }
+
   catalog->AddEntry(entry, xattrs, file_path, parent_path);
   SyncUnlock();
 }
@@ -838,14 +859,20 @@ void WritableCatalogManager::FinalizeCatalog(WritableCatalog *catalog,
   }
   catalog->Commit();
 
-  // print warning if catalog is considered too large
-  if (catalog->GetCounters().GetSelfEntries() > catalog_entry_warn_threshold_) {
-    LogCvmfs(kLogCatalog, kLogStdout,
-             "WARNING: catalog at %s has more than %d entries (%d). "
-             "Please consider to split it into nested catalogs.",
-             (catalog->IsRoot()) ? "/" : catalog->mountpoint().c_str(),
-             catalog_entry_warn_threshold_,
+  // check if catalog has too many entries
+  uint64_t catalog_limit = 1000 * (catalog->IsRoot() ? root_kcatalog_limit_
+                                                     : nested_kcatalog_limit_);
+  if ((catalog_limit > 0) &&
+      (catalog->GetCounters().GetSelfEntries() > catalog_limit)) {
+    LogCvmfs(kLogCatalog, (enforce_limits_ ? kLogStderr : kLogStdout),
+             "%scatalog at %s has more than %d entries (%d). "
+             "CVMFS does not work well with large catalogs. "
+             "Split it into nested catalogs or increase the limit.",
+             enforce_limits_ ? "" : "WARNING: ",
+             (catalog->IsRoot() ? "/" : catalog->mountpoint().c_str()),
+             catalog_limit,
              catalog->GetCounters().GetSelfEntries());
+    assert(!enforce_limits_);
   }
 
   // allow for manual adjustments in the catalog
