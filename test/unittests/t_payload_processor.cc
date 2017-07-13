@@ -26,7 +26,12 @@ class MockPayloadProcessor : public PayloadProcessor {
 class T_PayloadProcessor : public ::testing::Test {
  protected:
   T_PayloadProcessor()
-      : ready_(1, 1), serializer_(NULL), digest_(shash::kSha1) {}
+      : ready_(1, 1),
+        thread_(),
+        read_fd_(),
+        write_fd_(),
+        serializer_(NULL),
+        digest_(shash::kSha1) {}
 
   virtual void SetUp() {
     int fds[2];

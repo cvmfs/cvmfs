@@ -228,7 +228,10 @@ bool GatewayUploader::ReadSessionTokenFile(const std::string& token_file_name,
     return false;
   }
 
-  return GetLineFile(token_file, token);
+  bool ret = GetLineFile(token_file, token);
+  fclose(token_file);
+
+  return ret;
 }
 
 bool GatewayUploader::ReadKey(const std::string& key_file, std::string* key_id,

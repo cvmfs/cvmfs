@@ -136,6 +136,8 @@ int CommandLease::Main(const ArgumentList& args) {
         LogCvmfs(kLogCvmfs, kLogStderr, "Error making DELETE request");
         ret = kLeaseCurlReqError;
       }
+
+      fclose(token_file);
     } else {
       LogCvmfs(kLogCvmfs, kLogStderr, "Error reading session token from file");
       ret = kLeaseFileOpenError;
