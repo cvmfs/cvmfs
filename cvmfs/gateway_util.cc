@@ -26,8 +26,8 @@ bool ReadKeys(const std::string& key_file_name, std::string* key_id,
 
   std::string line;
   if (!GetLineFile(key_file_fd, &line)) {
-    return false;
     fclose(key_file_fd);
+    return false;
   }
 
   fclose(key_file_fd);
