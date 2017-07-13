@@ -33,7 +33,7 @@ sub usage {
   print "  evict <path>           removes <path> from the cache            \n";
   print "  pin <path>             pins <path> in the cache                 \n";
   print "  mountpoint             returns the mount point                  \n";
-  print "  remount                look for new catalogs                    \n";
+  print "  remount [sync]         look for new catalogs                    \n";
   print "  revision               gets the repository revision             \n";
   print "  max ttl info           gets the maximum ttl                     \n";
   print "  max ttl set <minutes>  sets the maximum ttl                     \n";
