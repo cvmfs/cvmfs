@@ -334,7 +334,6 @@ class T_FileProcessing : public FileSandbox {
     ExpectedHashStrings h;
     const shash::Suffix P = shash::kSuffixPartial;
     h.push_back(std::make_pair("9a3cc4a3dd5f68bbd3a959359f213fda59b8c319", P));
-    h.push_back(std::make_pair("2bac39d388724bde92ec646e08f96f4a699e7ac4", P));
     h.push_back(std::make_pair("f62536cf1fa2b38fcaf2d181a6d595feca0cd100", P));
     return h;
   }
