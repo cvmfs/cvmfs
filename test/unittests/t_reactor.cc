@@ -44,7 +44,7 @@ class MockedReactor : public Reactor {
 
 class T_Reactor : public ::testing::Test {
  protected:
-  T_Reactor() : ready_(1, 1) {}
+  T_Reactor() : ready_(1, 1), thread_() {}
 
   virtual void SetUp() {
     SetLogCustomFile(0, "/tmp/t_reactor_out.log");

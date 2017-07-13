@@ -62,7 +62,11 @@ int swissknife::CommandDiff::Main(const swissknife::ArgumentList &args) {
 
   bool retval = this->InitDownloadManager(follow_redirects);
   assert(retval);
-  InitVerifyingSignatureManager(pubkey_path);
+  if (!InitVerifyingSignatureManager(pubkey_path)) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "Error calling InitVerifyingSignatureManager");
+    return 1;
+  }
   UniquePtr<manifest::Manifest> manifest(FetchRemoteManifest(repository, fqrn));
   assert(manifest.IsValid());
 

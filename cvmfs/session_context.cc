@@ -72,7 +72,10 @@ SessionContextBase::SessionContextBase()
       max_pack_size_(ObjectPack::kDefaultLimit),
       active_handles_(),
       current_pack_(NULL),
-      current_pack_mtx_() {}
+      current_pack_mtx_(),
+      objects_dispatched_(0),
+      bytes_committed_(0),
+      bytes_dispatched_(0) {}
 
 SessionContextBase::~SessionContextBase() {}
 
@@ -241,7 +244,10 @@ void SessionContextBase::Dispatch() {
 }
 
 SessionContext::SessionContext()
-    : SessionContextBase(), upload_jobs_(1000, 900) {}
+    : SessionContextBase(),
+      upload_jobs_(1000, 900),
+      worker_terminate_(),
+      worker_() {}
 
 bool SessionContext::InitializeDerived() {
   // Start worker thread
