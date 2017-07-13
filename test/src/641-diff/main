@@ -80,6 +80,8 @@ S N 1
 M[TN] D /dir2
 A F /dir2/.cvmfscatalog
 A D /dir3
+A F /dir3/new_file
+A F /dir3/.cvmfscatalog
 M[STC] F /file
 R S /symlink
 M[T] D /directory
