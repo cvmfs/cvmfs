@@ -360,9 +360,9 @@ void WritableCatalogManager::AddFile(
 
   // check if file is too big
   uint64_t mbytes = entry.size() / 1000000;
-  if ((file_mbyte_limit_ > 0) && (mbytes >= file_mbyte_limit_)) {
+  if ((file_mbyte_limit_ > 0) && (mbytes > file_mbyte_limit_)) {
     LogCvmfs(kLogCatalog, (enforce_limits_ ? kLogStderr : kLogStdout),
-             "%sfile at %s is larger or equal to %d megabytes (%d). "
+             "%sfile at %s is larger than %d megabytes (%d). "
              "CVMFS does not work well with large files. "
              "Remove the file or increase the limit.",
              enforce_limits_ ? "" : "WARNING: ",
