@@ -13,8 +13,7 @@ fi
 CVMFS_BUILD_LOCATION="$1"
 shift 1
 
-echo "$(env)"
-
+export DEBUG=1
 # run the build script
 echo "switching to $CVMFS_BUILD_LOCATION..."
 cd "$CVMFS_BUILD_LOCATION"
