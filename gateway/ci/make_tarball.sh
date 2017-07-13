@@ -14,6 +14,8 @@ CVMFS_BUILD_LOCATION="$1"
 shift 1
 
 export DEBUG=1
+echo "Rebar cache dir: $REBAR_CACHE_DIR"
+
 # run the build script
 echo "switching to $CVMFS_BUILD_LOCATION..."
 cd "$CVMFS_BUILD_LOCATION"
