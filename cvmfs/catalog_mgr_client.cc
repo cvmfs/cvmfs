@@ -5,6 +5,8 @@
 #include "cvmfs_config.h"
 #include "catalog_mgr_client.h"
 
+#include <vector>
+
 #include "cache_posix.h"
 #include "download.h"
 #include "fetch.h"
@@ -13,6 +15,7 @@
 #include "signature.h"
 #include "statistics.h"
 #include "util/posix.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 
@@ -260,6 +263,48 @@ void ClientCatalogManager::UnloadCatalog(const Catalog *catalog) {
   mounted_catalogs_.erase(iter);
   const catalog::Counters &counters = catalog->GetCounters();
   loaded_inodes_ -= counters.GetSelfEntries();
+}
+
+
+/**
+ * Checks if the current repository revision is blacklisted.  The format
+ * of the blacklist lines is '<REPO N' where REPO is the repository name,
+ * N is the revision number, and the two parts are separated by whitespace.
+ * Any revision of REPO less than N is blacklisted.
+ * Note: no extra characters are allowed after N, not even whitespace.
+ * @return true if it is blacklisted, false otherwise
+ */
+bool ClientCatalogManager::IsRevisionBlacklisted() {
+  uint64_t revision = GetRevision();
+
+  LogCvmfs(kLogCache, kLogDebug, "checking if %s revision %u is blacklisted",
+           repo_name_.c_str(), revision);
+
+  vector<string> blacklist = signature_mgr_->GetBlacklist();
+  for (unsigned i = 0; i < blacklist.size(); ++i) {
+    std::string line = blacklist[i];
+    if (line[0] != '<')
+      continue;
+    unsigned idx = repo_name_.length() + 1;
+    if (line.length() <= idx)
+      continue;
+    if ((line[idx] != ' ') && (line[idx] != '\t'))
+      continue;
+    if (line.substr(1, idx - 1) != repo_name_)
+      continue;
+    ++idx;
+    while ((line[idx] == ' ') || (line[idx] == '\t'))
+      ++idx;
+    if (idx >= line.length())
+      continue;
+    uint64_t rev;
+    if (!String2Uint64Parse(line.substr(idx), &rev))
+      continue;
+    if (revision < rev)
+      return true;
+  }
+
+  return false;
 }
 
 

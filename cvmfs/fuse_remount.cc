@@ -35,6 +35,15 @@ FuseRemounter::Status FuseRemounter::Check() {
 
   LogCvmfs(kLogCvmfs, kLogDebug, "catalog TTL expired, remount");
   catalog::LoadError retval = mountpoint_->catalog_mgr()->Remount(true);
+
+  LogCvmfs(kLogCvmfs, kLogDebug, "checking revision against blacklists");
+  if (mountpoint_->CheckBlacklists() &&
+      mountpoint_->catalog_mgr()->IsRevisionBlacklisted()) {
+    LogCvmfs(kLogCatalog, kLogDebug | kLogSyslogErr,
+            "repository revision blacklisted, exiting");
+    exit(1);
+  }
+
   switch (retval) {
     case catalog::kLoadNew:
       if (atomic_cas32(&drainout_mode_, 0, 1)) {

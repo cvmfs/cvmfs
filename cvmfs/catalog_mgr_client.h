@@ -60,6 +60,8 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
 
   shash::Any GetRootHash();
 
+  bool IsRevisionBlacklisted();
+
   bool offline_mode() const { return offline_mode_; }
   uint64_t all_inodes() const { return all_inodes_; }
   uint64_t loaded_inodes() const { return loaded_inodes_; }
