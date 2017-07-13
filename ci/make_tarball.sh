@@ -13,6 +13,9 @@ fi
 CVMFS_BUILD_LOCATION="$1"
 shift 1
 
+export REBAR_CACHE_DIR=$CVMFS_BUILD_LOCATION/../
+mkdir -p $REBAR_CACHE_DIR
+
 export DEBUG=1
 echo "Rebar cache dir: $REBAR_CACHE_DIR"
 
