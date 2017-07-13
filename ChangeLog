@@ -35,6 +35,7 @@
   * Possibility to split cache dir and workspace, add CVMFS(_CACHE)_WORKSPACE
   * Trim trailing whitespaces from .cvmfsdirtab entries (CVM-1061)
   * Cache proxy settings in workspace directory (CVM-1156)
+  * Add `cvmfs_talk remount sync` command
   * Use active eviction of kernel caches with libfuse >= 2.9 (CVM-1041)
   * Add external and internal in-memory cache manager (CVM-1044)
   * Add tiered cache manager (CVM-1050, CVM-1183)
