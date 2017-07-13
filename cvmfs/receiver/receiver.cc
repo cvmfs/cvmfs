@@ -17,8 +17,6 @@ swissknife::ParameterList MakeParameterList() {
       swissknife::Parameter::Optional('i', "File descriptor to use for input"));
   params.push_back(swissknife::Parameter::Optional(
       'o', "File descriptor to use for output"));
-  params.push_back(
-      swissknife::Parameter::Optional('l', "Base name of the log file to use"));
   return params;
 }
 
@@ -50,10 +48,10 @@ bool ReadCmdLineArguments(int argc, char** argv,
     }
 
     if (!valid_option) {
-      LogCvmfs(kLogReceiver, kLogStdout,
+      LogCvmfs(kLogReceiver, kLogSyslog,
                "CVMFS gateway services receiver component. Usage:");
       for (size_t i = 0; i < params.size(); ++i) {
-        LogCvmfs(kLogReceiver, kLogStdout, "  \"%c\" - %s", params[i].key(),
+        LogCvmfs(kLogReceiver, kLogSyslog, "  \"%c\" - %s", params[i].key(),
                  params[i].description().c_str());
       }
       return false;
@@ -63,7 +61,7 @@ bool ReadCmdLineArguments(int argc, char** argv,
   for (size_t j = 0; j < params.size(); ++j) {
     if (!params[j].optional()) {
       if (arguments->find(params[j].key()) == arguments->end()) {
-        LogCvmfs(kLogReceiver, kLogStderr, "parameter -%c missing",
+        LogCvmfs(kLogReceiver, kLogSyslogErr, "parameter -%c missing",
                  params[j].key());
         return false;
       }
@@ -79,8 +77,9 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  std::string output_log_file = "/tmp/cvmfs_receiver.out";
-  std::string error_log_file = "/tmp/cvmfs_receiver.err";
+  SetLogSyslogFacility(1);
+  SetLogSyslogShowPID(true);
+
   int fdin = 0;
   int fdout = 1;
   if (arguments.find('i') != arguments.end()) {
@@ -89,22 +88,18 @@ int main(int argc, char** argv) {
   if (arguments.find('o') != arguments.end()) {
     fdout = std::atoi(arguments.find('o')->second->c_str());
   }
-  if (arguments.find('l') != arguments.end()) {
-    const std::string base_log_file = *(arguments.find('l')->second);
-    output_log_file = base_log_file + ".out";
-    error_log_file = base_log_file + ".err";
-  }
 
-  SetLogCustomFile(0, output_log_file);
-  SetLogCustomFile(1, error_log_file);
+  LogCvmfs(kLogReceiver, kLogSyslog, "CVMFS receiver started");
 
   receiver::Reactor reactor(fdin, fdout);
 
   if (!reactor.Run()) {
-    LogCvmfs(kLogReceiver, kLogCustom1,
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
              "Error running CVMFS Receiver event loop");
     return 1;
   }
+
+  LogCvmfs(kLogReceiver, kLogSyslog, "CVMFS receiver finished");
 
   return 0;
 }

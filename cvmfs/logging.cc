@@ -189,6 +189,10 @@ void SetLogSyslogPrefix(const std::string &prefix) {
   }
 }
 
+void SetLogSyslogShowPID(bool flag) {
+  openlog(NULL, flag ? LOG_PID : 0, GetLogSyslogFacility());
+}
+
 /**
  * Set the minimum verbosity level.  By default kLogNormal.
  */

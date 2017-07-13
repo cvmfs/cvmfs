@@ -45,7 +45,7 @@ PayloadProcessor::Result PayloadProcessor::Process(
     consumer_state = deserializer.ConsumeNext(nb, &buffer[0]);
     if (consumer_state != ObjectPackBuild::kStateContinue &&
         consumer_state != ObjectPackBuild::kStateDone) {
-      LogCvmfs(kLogReceiver, kLogCustom1,
+      LogCvmfs(kLogReceiver, kLogSyslogErr,
                "Error %d encountered when consuming object pack.",
                consumer_state);
       break;
@@ -71,7 +71,8 @@ void PayloadProcessor::ConsumerEventCallback(
     path = event.object_name;
   } else {
     // kEmpty - this is an error.
-    LogCvmfs(kLogReceiver, kLogCustom1, "Event received with unknown object.");
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "Event received with unknown object.");
     num_errors_++;
     return;
   }
@@ -83,7 +84,7 @@ void PayloadProcessor::ConsumerEventCallback(
     std::string temp_dir = "/srv/cvmfs/" + current_repo_ + "/data/txn";
     const std::string tmp_path = CreateTempPath(temp_dir, 0666);
     if (tmp_path.empty()) {
-      LogCvmfs(kLogReceiver, kLogCustom1, "Unable to create temporary path.");
+      LogCvmfs(kLogReceiver, kLogSyslogErr, "Unable to create temporary path.");
       num_errors_++;
       return;
     }
@@ -100,14 +101,14 @@ void PayloadProcessor::ConsumerEventCallback(
 
   int fdout = open(info.temp_path.c_str(), O_CREAT | O_WRONLY | O_APPEND, 0600);
   if (fdout == -1) {
-    LogCvmfs(kLogReceiver, kLogCustom1,
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
              "Unable to open temporary output file: %s",
              info.temp_path.c_str());
     return;
   }
 
   if (!WriteFile(fdout, event.buf, event.buf_size)) {
-    LogCvmfs(kLogReceiver, kLogCustom1, "Unable to write %s",
+    LogCvmfs(kLogReceiver, kLogSyslogErr, "Unable to write %s",
              info.temp_path.c_str());
     num_errors_++;
     unlink(info.temp_path.c_str());
@@ -128,7 +129,7 @@ void PayloadProcessor::ConsumerEventCallback(
       unlink(dest.c_str());
     }
     if (RenameFile(info.temp_path.c_str(), dest.c_str())) {
-      LogCvmfs(kLogReceiver, kLogCustom1,
+      LogCvmfs(kLogReceiver, kLogSyslogErr,
                "Unable to move file to final destination: %s", dest.c_str());
       num_errors_++;
       return;
@@ -140,7 +141,7 @@ void PayloadProcessor::ConsumerEventCallback(
     shash::HashFile(dest, &file_hash);
 
     if (file_hash != event.id) {
-      LogCvmfs(kLogReceiver, kLogCustom0,
+      LogCvmfs(kLogReceiver, kLogSyslogErr,
                "PayloadProcessor - Hash mismatch for unpacked file: event "
                "size: %ld, file size: %ld, event hash: %s, file hash: %s",
                event.size, GetFileSize(dest), event.id.ToString(true).c_str(),
