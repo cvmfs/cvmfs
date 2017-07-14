@@ -404,7 +404,7 @@ class MountPoint : SingleCopy, public BootFactory {
   cvmfs::Uuid *uuid() { return uuid_; }
 
   bool ReloadBlacklists();
- 
+
  private:
   /**
    * The maximum TTL can be used to cap a root catalogs registered ttl.  By
