@@ -21,7 +21,10 @@ struct Params {
   size_t min_chunk_size;
   size_t avg_chunk_size;
   size_t max_chunk_size;
-  size_t entry_warn_thresh;
+  bool enforce_limits;
+  size_t nested_kcatalog_limit;
+  size_t root_kcatalog_limit;
+  size_t file_mbyte_limit;
   bool use_autocatalogs;
   size_t max_weight;
   size_t min_weight;
