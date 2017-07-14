@@ -376,6 +376,7 @@ static int TranslateReturnValue(loader::Failures code) {
     case loader::kFailOtherMount:
     case loader::kFailDoubleMount:
     case loader::kFailHistory:
+    case loader::kFailRevisionBlacklisted:
       return unknown;
     case loader::kFailWpad:
       return LIBCVMFS_FAIL_INITCACHE;

@@ -50,6 +50,7 @@ enum Failures {
   kFailHistory,
   kFailWpad,
   kFailLockWorkspace,
+  kFailRevisionBlacklisted,
 
   kFailNumEntries
 };
@@ -81,7 +82,8 @@ inline const char *Code2Ascii(const Failures error) {
   texts[22] = "history init failure";
   texts[23] = "proxy auto-discovery failed";
   texts[24] = "workspace already locked";
-  texts[25] = "no text";
+  texts[25] = "revision blacklisted";
+  texts[26] = "no text";
   return texts[error];
 }
 

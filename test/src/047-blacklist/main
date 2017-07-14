@@ -1,5 +1,5 @@
 
-cvmfs_test_name="Certificate blacklist"
+cvmfs_test_name="Blacklist"
 
 cleanup_blacklist() {
   sudo rm -f /etc/cvmfs/blacklist
@@ -9,6 +9,7 @@ cvmfs_run_test() {
   logfile=$1
 
   local cache_dir=$(get_cvmfs_cachedir grid.cern.ch)
+  echo "mount grid.cern.ch"
   cvmfs_mount grid.cern.ch || return 1
   cvmfs_umount grid.cern.ch || return 2
   sudo rm -f ${cache_dir}/cvmfschecksum.grid.cern.ch
@@ -19,16 +20,41 @@ cvmfs_run_test() {
   cvmfs_umount grid.cern.ch || return 11
   sudo rm -f ${cache_dir}/cvmfschecksum.grid.cern.ch
 
-  sudo sh -c "cat > /etc/cvmfs/blacklist" <<EOF
-A7:D8:2A:0F:30:53:3C:60:4F:B0:3E:59:B6:D7:D1:97:9C:AA:EB:B4
-A0:1A:33:B5:C3:00:D5:D3:8F:C9:4A:4D:D4:A4:51:65:F4:20:A3:5B
-09:D9:09:04:9A:E2:1E:F3:9A:E2:EB:52:90:B6:17:9F:F3:F0:B3:57
-EOF
+  echo "blacklist the grid.cern.ch fingerprint(s)"
+  white="`curl -f -s http://cvmfs-stratum-one.cern.ch/cvmfs/grid.cern.ch/.cvmfswhitelist`" || return 10
 
-  cvmfs_mount grid.cern.ch
-  if [ $? -eq 0 ]; then
-    echo "BLACKLIST NOT EFFECTIVE"
+  echo "$white" | cat -v | awk '/^N/{ok=1;next} /^--/{exit} ok==1 {print}'| \
+    sed 's/ .*//' | sudo sh -c "tee /etc/cvmfs/blacklist"
+
+  echo "attempt to mount the blacklisted repo"
+  if cvmfs_mount grid.cern.ch; then
+    echo "CERTIFICATE BLACKLIST NOT EFFECTIVE"
     return 20
+  fi
+
+  echo "remove fingerprint blacklist and remount"
+  sudo rm -f /etc/cvmfs/blacklist
+  service_switch autofs restart || return 30
+  cvmfs_mount grid.cern.ch || return 31
+
+  echo "blacklist the grid.cern.ch revision"
+  pub="`curl -f -s http://cvmfs-stratum-one.cern.ch/cvmfs/grid.cern.ch/.cvmfspublished`" || return 32
+
+  echo "$pub" | cat -v | awk '/^S/{r=substr($1,2);print "<grid.cern.ch",r+1;}' \
+    | sudo sh -c "tee /etc/cvmfs/blacklist"
+
+  echo "force remount which should cause blacklisted repo to unmount"
+  sudo cvmfs_talk -i grid.cern.ch remount
+  sleep 2
+  if grep grid.cern.ch /proc/mounts; then
+    echo "REVISION BLACKLIST NOT EFFECTIVE FOR REMOUNT"
+    return 40
+  fi
+
+  echo "attempt another mount which should also fail"
+  if cvmfs_mount grid.cern.ch; then
+    echo "REVISION BLACKLIST NOT EFFECTIVE FOR MOUNT"
+    return 41
   fi
 
   return 0
