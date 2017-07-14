@@ -80,13 +80,6 @@ bool swissknife::CommandSync::CheckParams(const SyncParameters &p) {
     return false;
   }
 
-  if (p.catalog_entry_warn_threshold <= 10000) {
-    PrintError(
-        "catalog entry warning threshold is too low "
-        "(should be at least 10000)");
-    return false;
-  }
-
   if (HasPrefix(p.spooler_definition, "gw", false)) {
     if (p.session_token_file.empty()) {
       PrintError(
@@ -572,9 +565,21 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     params.trusted_certs = *args.find('C')->second;
   }
 
-  if (args.find('j') != args.end()) {
-    params.catalog_entry_warn_threshold =
-        String2Uint64(*args.find('j')->second);
+  if (args.find('E') != args.end()) params.enforce_limits = true;
+  if (args.find('Q') != args.end()) {
+    params.nested_kcatalog_limit = String2Uint64(*args.find('Q')->second);
+  } else {
+    params.nested_kcatalog_limit = SyncParameters::kDefaultNestedKcatalogLimit;
+  }
+  if (args.find('R') != args.end()) {
+    params.root_kcatalog_limit = String2Uint64(*args.find('R')->second);
+  } else {
+    params.root_kcatalog_limit = SyncParameters::kDefaultRootKcatalogLimit;
+  }
+  if (args.find('U') != args.end()) {
+    params.file_mbyte_limit = String2Uint64(*args.find('U')->second);
+  } else {
+    params.file_mbyte_limit = SyncParameters::kDefaultFileMbyteLimit;
   }
 
   if (args.find('v') != args.end()) {
@@ -661,7 +666,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 
   catalog::WritableCatalogManager catalog_manager(
       params.base_hash, params.stratum0, params.dir_temp, spooler_catalogs,
-      download_manager(), params.catalog_entry_warn_threshold, statistics(),
+      download_manager(), params.enforce_limits, params.nested_kcatalog_limit,
+      params.root_kcatalog_limit, params.file_mbyte_limit, statistics(),
       params.is_balanced, params.max_weight, params.min_weight);
   catalog_manager.Init();
 
