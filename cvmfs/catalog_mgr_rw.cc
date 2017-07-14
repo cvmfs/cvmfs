@@ -34,9 +34,9 @@ WritableCatalogManager::WritableCatalogManager(
   upload::Spooler           *spooler,
   download::DownloadManager *download_manager,
   bool                       enforce_limits,
-  const uint64_t             nested_kcatalog_limit,
-  const uint64_t             root_kcatalog_limit,
-  const uint64_t             file_mbyte_limit,
+  const unsigned             nested_kcatalog_limit,
+  const unsigned             root_kcatalog_limit,
+  const unsigned             file_mbyte_limit,
   perf::Statistics          *statistics,
   bool                       is_balanceable,
   unsigned                   max_weight,
@@ -359,10 +359,10 @@ void WritableCatalogManager::AddFile(
   assert(entry.IsRegular() || !entry.IsExternalFile());
 
   // check if file is too big
-  uint64_t mbytes = entry.size() / 1000000;
+  unsigned mbytes = entry.size() / (1024 * 1024);
   if ((file_mbyte_limit_ > 0) && (mbytes > file_mbyte_limit_)) {
     LogCvmfs(kLogCatalog, (enforce_limits_ ? kLogStderr : kLogStdout),
-             "%sfile at %s is larger than %d megabytes (%d). "
+             "%sfile at %s is larger than %u megabytes (%u). "
              "CVMFS does not work well with large files. "
              "Remove the file or increase the limit.",
              enforce_limits_ ? "" : "WARNING: ",
@@ -865,7 +865,7 @@ void WritableCatalogManager::FinalizeCatalog(WritableCatalog *catalog,
   if ((catalog_limit > 0) &&
       (catalog->GetCounters().GetSelfEntries() > catalog_limit)) {
     LogCvmfs(kLogCatalog, (enforce_limits_ ? kLogStderr : kLogStdout),
-             "%scatalog at %s has more than %d entries (%d). "
+             "%scatalog at %s has more than %u entries (%u). "
              "CVMFS does not work well with large catalogs. "
              "Split it into nested catalogs or increase the limit.",
              enforce_limits_ ? "" : "WARNING: ",
