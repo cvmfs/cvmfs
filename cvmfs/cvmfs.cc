@@ -61,6 +61,7 @@
 #include <ctime>
 #include <functional>
 #include <map>
+#include <new>
 #include <string>
 #include <vector>
 
@@ -2082,11 +2083,11 @@ static bool RestoreState(const int fd_progress,
 
     if (saved_states[i]->state_id == loader::kStateGlueBufferV4) {
       SendMsg2Socket(fd_progress, "Restoring inode tracker... ");
-      delete cvmfs::mount_point_->inode_tracker();
+      cvmfs::mount_point_->inode_tracker()->~InodeTracker();
       glue::InodeTracker *saved_inode_tracker =
         (glue::InodeTracker *)saved_states[i]->state;
-      cvmfs::mount_point_->set_inode_tracker(
-        new glue::InodeTracker(*saved_inode_tracker));
+      new (cvmfs::mount_point_->inode_tracker())
+        glue::InodeTracker(*saved_inode_tracker);
       SendMsg2Socket(fd_progress, " done\n");
     }
 
@@ -2121,11 +2122,10 @@ static bool RestoreState(const int fd_progress,
 
     if (saved_states[i]->state_id == loader::kStateOpenChunksV4) {
       SendMsg2Socket(fd_progress, "Restoring chunk tables... ");
-      delete chunk_tables;
+      chunk_tables->~ChunkTables();
       ChunkTables *saved_chunk_tables = reinterpret_cast<ChunkTables *>(
         saved_states[i]->state);
-      cvmfs::mount_point_->set_chunk_tables(
-        new ChunkTables(*saved_chunk_tables));
+      new (chunk_tables) ChunkTables(*saved_chunk_tables);
       SendMsg2Socket(fd_progress, " done\n");
     }
 

@@ -53,7 +53,8 @@ cvmfs_run_test() {
   create_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER "" -z || return $?
   local url="$(get_repo_url $CVMFS_TEST_REPO)"
   local xcvmfs="application/x-cvmfs"
-  local xcvmfs_maxage=120     # 2 minutes
+  local xbinary="application/octet-stream"
+  local xcvmfs_maxage=61      # 61 seconds
   local default_maxage=259200 # 3 days
 
   echo "check HTTP headers for .cvmfspublished"
@@ -83,6 +84,7 @@ cvmfs_run_test() {
   [ $(get_epoch "2 days 23 hour") -lt $(get_expiry_time $rurl) ] || return 14
   [ $(get_epoch "3 days  1 hour") -gt $(get_expiry_time $rurl) ] || return 15
   [ $(get_max_age $rurl)          -eq $default_maxage          ] || return 16
+  [ x"$(get_header $rurl "Content-Type")" = x"$xbinary"        ] || return 16
 
   echo "do a garbage collection on $CVMFS_TEST_REPO"
   cvmfs_server gc -f $CVMFS_TEST_REPO || return 17
@@ -146,6 +148,7 @@ cvmfs_run_test() {
   [ $(get_epoch "2 days 23 hour") -lt $(get_expiry_time $rurl) ] || return 44
   [ $(get_epoch "3 days  1 hour") -gt $(get_expiry_time $rurl) ] || return 45
   [ $(get_max_age $rurl)          -eq $default_maxage          ] || return 46
+  [ x"$(get_header $rurl "Content-Type")" = x"$xbinary"        ] || return 46
 
   echo "check timestamp in .cvmfs_last_snapshot"
   local last_snap="$(curl -s $surl)"
@@ -174,7 +177,7 @@ cvmfs_run_test() {
 
   url=$(get_repo_url info)
   local jsontype="application/json"
-  local jsonmaxage=120
+  local jsonmaxage=61
 
   echo "check HTTP headers for /cvmfs/info/v1/repositories.json"
   local irurl="${url}/v1/repositories.json"

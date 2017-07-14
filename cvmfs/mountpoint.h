@@ -402,12 +402,6 @@ class MountPoint : SingleCopy, public BootFactory {
   Tracer *tracer() { return tracer_; }
   cvmfs::Uuid *uuid() { return uuid_; }
 
-  /**
-   * Used by hotpatch procedure
-   */
-  void set_inode_tracker(glue::InodeTracker *val) { inode_tracker_ = val; }
-  void set_chunk_tables(ChunkTables *val) { chunk_tables_ = val; }
-
  private:
   /**
    * The maximum TTL can be used to cap a root catalogs registered ttl.  By
