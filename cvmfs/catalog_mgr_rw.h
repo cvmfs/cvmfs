@@ -80,9 +80,9 @@ class WritableCatalogManager : public SimpleCatalogManager {
                          upload::Spooler   *spooler,
                          download::DownloadManager *download_manager,
                          bool enforce_limits,
-                         const uint64_t nested_kcatalog_limit,
-                         const uint64_t root_kcatalog_limit,
-                         const uint64_t file_mbyte_limit,
+                         const unsigned nested_kcatalog_limit,
+                         const unsigned root_kcatalog_limit,
+                         const unsigned file_mbyte_limit,
                          perf::Statistics *statistics,
                          bool is_balanceable,
                          unsigned max_weight,
@@ -208,9 +208,9 @@ class WritableCatalogManager : public SimpleCatalogManager {
   std::map<std::string, WritableCatalog*>  catalog_processing_map_;
 
   bool enforce_limits_;
-  uint64_t nested_kcatalog_limit_;
-  uint64_t root_kcatalog_limit_;
-  uint64_t file_mbyte_limit_;
+  unsigned nested_kcatalog_limit_;
+  unsigned root_kcatalog_limit_;
+  unsigned file_mbyte_limit_;
 
   /**
    * Directories don't have extended attributes at this point.
