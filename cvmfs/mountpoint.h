@@ -13,6 +13,7 @@
 #include <ctime>
 #include <set>
 #include <string>
+#include <vector>
 
 #include "cache.h"
 #include "gtest/gtest_prod.h"
@@ -402,7 +403,7 @@ class MountPoint : SingleCopy, public BootFactory {
   Tracer *tracer() { return tracer_; }
   cvmfs::Uuid *uuid() { return uuid_; }
 
-  bool CheckBlacklists();
+  bool ReloadBlacklists();
 
   /**
    * Used by hotpatch procedure
@@ -461,6 +462,7 @@ class MountPoint : SingleCopy, public BootFactory {
   void CreateStatistics();
   void CreateAuthz();
   bool CreateSignatureManager();
+  bool CheckBlacklists();
   bool CreateDownloadManagers();
   void CreateFetchers();
   bool CreateCatalogManager();
@@ -514,6 +516,7 @@ class MountPoint : SingleCopy, public BootFactory {
   bool fixed_catalog_;
   bool hide_magic_xattrs_;
   std::string repository_tag_;
+  std::vector<std::string> blacklist_paths_;
 
   // TODO(jblomer): this should go in the catalog manager
   std::string membership_req_;

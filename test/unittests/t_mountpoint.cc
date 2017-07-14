@@ -744,12 +744,24 @@ TEST_F(T_MountPoint, Blacklist) {
     ASSERT_EQ(loader::kFailOk, fs->boot_status());
     UniquePtr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
     EXPECT_EQ(loader::kFailOk, mp->boot_status());
+    EXPECT_TRUE(mp->ReloadBlacklists());
   }
   RemoveTree("cvmfs_ut_cache");
 
-  string blacklist =
+  string bad_revision = "<keys.cern.ch 1000";
+  EXPECT_TRUE(SafeWriteToFile(bad_revision,
+                              repo_path_ + "/config.test/etc/cvmfs/blacklist",
+                              0600));
+  {
+    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    ASSERT_EQ(loader::kFailOk, fs->boot_status());
+    UniquePtr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
+    EXPECT_EQ(loader::kFailRevisionBlacklisted, mp->boot_status());
+  }
+
+  string bad_fingerprint =
     "00:7C:FA:EE:1A:2B:98:74:5D:14:A6:25:4E:C4:40:BC:BD:44:47:A3\n";
-  EXPECT_TRUE(SafeWriteToFile(blacklist,
+  EXPECT_TRUE(SafeWriteToFile(bad_fingerprint,
                               repo_path_ + "/config.test/etc/cvmfs/blacklist",
                               0600));
   {
@@ -766,6 +778,7 @@ TEST_F(T_MountPoint, Blacklist) {
     ASSERT_EQ(loader::kFailOk, fs->boot_status());
     UniquePtr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
     EXPECT_EQ(loader::kFailOk, mp->boot_status());
+    EXPECT_TRUE(mp->ReloadBlacklists());
   }
   RemoveTree("cvmfs_ut_cache");
 

@@ -5,6 +5,8 @@
 #ifndef CVMFS_SIGNATURE_H_
 #define CVMFS_SIGNATURE_H_
 
+#include <pthread.h>
+
 #include <openssl/bio.h>
 #include <openssl/engine.h>
 #include <openssl/err.h>
@@ -79,6 +81,7 @@ class SignatureManager {
   EVP_PKEY *private_key_;
   X509 *certificate_;
   std::vector<RSA *> public_keys_;  /**< Contains cvmfs public master keys */
+  pthread_mutex_t lock_blacklist_;
   std::vector<std::string> blacklist_;
   X509_STORE *x509_store_;
   X509_LOOKUP *x509_lookup_;

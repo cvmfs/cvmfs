@@ -1017,6 +1017,8 @@ bool MountPoint::CheckBlacklists() {
   string blacklist;
   if (!options_mgr_->GetValue("CVMFS_BLACKLIST", &blacklist))
     blacklist = kDefaultBlacklist;
+  blacklist_paths_.push_back(blacklist);
+
   bool append = false;
   if (FileExists(blacklist)) {
     if (!signature_mgr_->LoadBlacklist(blacklist, append)) {
@@ -1028,19 +1030,40 @@ bool MountPoint::CheckBlacklists() {
   }
 
   string config_repository_path;
-  if (options_mgr_->HasConfigRepository(fqrn_, &config_repository_path)
-      && FileExists(config_repository_path + "blacklist"))
-  {
-    if (!signature_mgr_->LoadBlacklist(config_repository_path + "blacklist",
-                                       append))
-    {
-      boot_error_ = "failed to load blacklist from config repository";
-      boot_status_ = loader::kFailSignature;
-      return false;
+  if (options_mgr_->HasConfigRepository(fqrn_, &config_repository_path)) {
+    blacklist = config_repository_path + "blacklist";
+    blacklist_paths_.push_back(blacklist);
+    if (FileExists(blacklist)) {
+      if (!signature_mgr_->LoadBlacklist(blacklist, append)) {
+        boot_error_ = "failed to load blacklist from config repository";
+        boot_status_ = loader::kFailSignature;
+        return false;
+      }
     }
   }
 
   return true;
+}
+
+
+/**
+ * Like CheckBlacklists but supposed to be used after bootstrap, possibly in
+ * multi-threaded context.
+ */
+bool MountPoint::ReloadBlacklists() {
+  bool result = true;
+  bool append = false;
+  for (unsigned i = 0; i < blacklist_paths_.size(); ++i) {
+    string blacklist = blacklist_paths_[i];
+    if (FileExists(blacklist)) {
+      bool retval = signature_mgr_->LoadBlacklist(blacklist, append);
+      // TODO(jblomer): this can leave us with a half-loaded blacklist
+      if (!retval)
+        return false;
+      append = true;
+    }
+  }
+  return result;
 }
 
 

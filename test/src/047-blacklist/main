@@ -45,7 +45,7 @@ cvmfs_run_test() {
 
   echo "force remount which should cause blacklisted repo to unmount"
   sudo cvmfs_talk -i grid.cern.ch remount
-  sleep 2
+  sleep 10
   if grep grid.cern.ch /proc/mounts; then
     echo "REVISION BLACKLIST NOT EFFECTIVE FOR REMOUNT"
     return 40

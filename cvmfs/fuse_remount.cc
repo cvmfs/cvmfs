@@ -7,6 +7,7 @@
 
 #include <errno.h>
 #include <poll.h>
+#include <unistd.h>
 
 #include <cassert>
 #include <cstdlib>
@@ -34,16 +35,17 @@ FuseRemounter::Status FuseRemounter::Check() {
     return kStatusMaintenance;
 
   LogCvmfs(kLogCvmfs, kLogDebug, "catalog TTL expired, remount");
-  catalog::LoadError retval = mountpoint_->catalog_mgr()->Remount(true);
 
   LogCvmfs(kLogCvmfs, kLogDebug, "checking revision against blacklists");
-  if (mountpoint_->CheckBlacklists() &&
-      mountpoint_->catalog_mgr()->IsRevisionBlacklisted()) {
+  if (mountpoint_->ReloadBlacklists() &&
+      mountpoint_->catalog_mgr()->IsRevisionBlacklisted())
+  {
     LogCvmfs(kLogCatalog, kLogDebug | kLogSyslogErr,
-            "repository revision blacklisted, exiting");
-    exit(1);
+            "repository revision blacklisted, aborting");
+    abort();
   }
 
+  catalog::LoadError retval = mountpoint_->catalog_mgr()->Remount(true);
   switch (retval) {
     case catalog::kLoadNew:
       if (atomic_cas32(&drainout_mode_, 0, 1)) {

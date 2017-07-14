@@ -5,6 +5,7 @@
 #include "cvmfs_config.h"
 #include "catalog_mgr_client.h"
 
+#include <string>
 #include <vector>
 
 #include "cache_posix.h"
