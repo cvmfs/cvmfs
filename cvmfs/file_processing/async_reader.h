@@ -22,10 +22,6 @@ class AbstractFile;
 
 class AbstractReader {
  public:
-  explicit AbstractReader(const unsigned int max_buffers_in_flight) :
-    buffers_in_flight_counter_(max_buffers_in_flight)
-  {}
-
   virtual ~AbstractReader() {}
 
   /**
@@ -45,10 +41,6 @@ class AbstractReader {
    * are currently processed, this method blocks until a Buffer slot gets free.
    */
   CharBuffer *CreateBuffer(const size_t size);
-
-
- private:
-  SynchronizingCounter<uint32_t> buffers_in_flight_counter_;
 };
 
 
@@ -105,7 +97,7 @@ class Reader : public AbstractReader,
  public:
   Reader(const size_t       max_buffer_size,
          const unsigned int max_files_in_flight) :
-    AbstractReader(max_files_in_flight * 5),
+    AbstractReader(),
     max_buffer_size_(max_buffer_size),
     draining_(false),
     files_in_flight_counter_(max_files_in_flight),
