@@ -30,7 +30,8 @@
 // 21: CernVM-FS 2.2.3
 // 22: CernVM-FS 2.3.0
 // 23: update initialization code
-#define LIBCVMFS_REVISION 23
+// 24: add LIBCVMFS_ERR_REVISION_BLACKLISTED
+#define LIBCVMFS_REVISION 24
 
 #include <sys/stat.h>
 #include <unistd.h>
@@ -86,6 +87,7 @@ typedef enum {
   LIBCVMFS_ERR_HISTORY,
   LIBCVMFS_ERR_WPAD,
   LIBCVMFS_ERR_LOCK_WORKSPACE,
+  LIBCVMFS_ERR_REVISION_BLACKLISTED,
 } cvmfs_errors;
 
 

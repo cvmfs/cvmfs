@@ -462,9 +462,9 @@ bool AbstractCatalogManager<CatalogT>::GetVOMSAuthz(std::string *authz) const {
 template <class CatalogT>
 uint64_t AbstractCatalogManager<CatalogT>::GetTTL() const {
   ReadLock();
-  const uint64_t revision = GetRootCatalog()->GetTTL();
+  const uint64_t ttl = GetRootCatalog()->GetTTL();
   Unlock();
-  return revision;
+  return ttl;
 }
 
 

@@ -33,6 +33,7 @@
 #include "platform.h"
 #include "smalloc.h"
 #include "util/string.h"
+#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 
@@ -68,6 +69,8 @@ SignatureManager::SignatureManager() {
   certificate_ = NULL;
   x509_store_ = NULL;
   x509_lookup_ = NULL;
+  int retval = pthread_mutex_init(&lock_blacklist_, NULL);
+  assert(retval == 0);
 }
 
 
@@ -334,10 +337,11 @@ bool SignatureManager::LoadBlacklist(
   const std::string &path_blacklist,
   bool append)
 {
+  MutexLockGuard lock_guard(&lock_blacklist_);
   LogCvmfs(kLogSignature, kLogDebug, "reading from blacklist %s",
            path_blacklist.c_str());
   if (!append)
-    blacklisted_certificates_.clear();
+    blacklist_.clear();
 
   char *buffer;
   unsigned buffer_size;
@@ -349,10 +353,10 @@ bool SignatureManager::LoadBlacklist(
 
   unsigned num_bytes = 0;
   while (num_bytes < buffer_size) {
-    const string fingerprint = GetLineMem(buffer + num_bytes,
-                                          buffer_size - num_bytes);
-    blacklisted_certificates_.push_back(fingerprint);
-    num_bytes += fingerprint.length() + 1;
+    const string line = GetLineMem(buffer + num_bytes,
+                                   buffer_size - num_bytes);
+    blacklist_.push_back(line);
+    num_bytes += line.length() + 1;
   }
   free(buffer);
 
@@ -360,8 +364,9 @@ bool SignatureManager::LoadBlacklist(
 }
 
 
-vector<string> SignatureManager::GetBlacklistedCertificates() {
-  return blacklisted_certificates_;
+vector<string> SignatureManager::GetBlacklist() {
+  MutexLockGuard lock_guard(&lock_blacklist_);
+  return blacklist_;
 }
 
 
