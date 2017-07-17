@@ -207,6 +207,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
   pthread_mutex_t                         *catalog_processing_lock_;
   std::map<std::string, WritableCatalog*>  catalog_processing_map_;
 
+  // TODO(jblomer): catalog limits should become its own struct
   bool enforce_limits_;
   unsigned nested_kcatalog_limit_;
   unsigned root_kcatalog_limit_;

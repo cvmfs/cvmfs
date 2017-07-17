@@ -361,11 +361,11 @@ void WritableCatalogManager::AddFile(
   // check if file is too big
   unsigned mbytes = entry.size() / (1024 * 1024);
   if ((file_mbyte_limit_ > 0) && (mbytes > file_mbyte_limit_)) {
-    LogCvmfs(kLogCatalog, (enforce_limits_ ? kLogStderr : kLogStdout),
-             "%sfile at %s is larger than %u megabytes (%u). "
-             "CVMFS does not work well with large files. "
-             "Remove the file or increase the limit.",
-             enforce_limits_ ? "" : "WARNING: ",
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "%s: file at %s is larger than %u megabytes (%u). "
+             "CernVM-FS works best with small files. "
+             "Please remove the file or increase the limit.",
+             enforce_limits_ ? "FATAL" : "WARNING"
              file_path.c_str(),
              file_mbyte_limit_,
              mbytes);
@@ -864,11 +864,11 @@ void WritableCatalogManager::FinalizeCatalog(WritableCatalog *catalog,
                                                      : nested_kcatalog_limit_);
   if ((catalog_limit > 0) &&
       (catalog->GetCounters().GetSelfEntries() > catalog_limit)) {
-    LogCvmfs(kLogCatalog, (enforce_limits_ ? kLogStderr : kLogStdout),
-             "%scatalog at %s has more than %u entries (%u). "
-             "CVMFS does not work well with large catalogs. "
-             "Split it into nested catalogs or increase the limit.",
-             enforce_limits_ ? "" : "WARNING: ",
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "%s: catalog at %s has more than %u entries (%u). "
+             "Large catalogs stress the CernVM-FS transport infrastructure. "
+             "Please split it into nested catalogs or increase the limit.",
+             enforce_limits_ ? "FATAL" : "WARNING",
              (catalog->IsRoot() ? "/" : catalog->mountpoint().c_str()),
              catalog_limit,
              catalog->GetCounters().GetSelfEntries());
