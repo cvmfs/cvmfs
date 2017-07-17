@@ -259,7 +259,8 @@ class CommandSync : public Command {
     r.push_back(Parameter::Optional('C', "trusted certificates"));
     r.push_back(Parameter::Optional('F', "Authz file listing (default: none)"));
     r.push_back(Parameter::Optional('M', "minimum weight of the autocatalogs"));
-    r.push_back(Parameter::Optional('Q', "nested catalog limit in kilo-entries"));
+    r.push_back(Parameter::Optional('Q',
+                                    "nested catalog limit in kilo-entries"));
     r.push_back(Parameter::Optional('R', "root catalog limit in kilo-entries"));
     r.push_back(Parameter::Optional('T', "Root catalog TTL in seconds"));
     r.push_back(Parameter::Optional('U', "file size limit in megabytes"));
