@@ -1014,6 +1014,7 @@ const char *MountPoint::kDefaultAuthzSearchPath = "/usr/libexec/cvmfs/authz";
 const char *MountPoint::kDefaultBlacklist = "/etc/cvmfs/blacklist";
 
 bool MountPoint::CheckBlacklists() {
+  blacklist_paths_.clear();
   string blacklist;
   if (!options_mgr_->GetValue("CVMFS_BLACKLIST", &blacklist))
     blacklist = kDefaultBlacklist;

@@ -34,9 +34,8 @@ FuseRemounter::Status FuseRemounter::Check() {
   if (IsInMaintenanceMode())
     return kStatusMaintenance;
 
-  LogCvmfs(kLogCvmfs, kLogDebug, "catalog TTL expired, remount");
-
-  LogCvmfs(kLogCvmfs, kLogDebug, "checking revision against blacklists");
+  LogCvmfs(kLogCvmfs, kLogDebug,
+           "catalog TTL expired, checking revision against blacklists");
   if (mountpoint_->ReloadBlacklists() &&
       mountpoint_->catalog_mgr()->IsRevisionBlacklisted())
   {
@@ -45,6 +44,7 @@ FuseRemounter::Status FuseRemounter::Check() {
     abort();
   }
 
+  LogCvmfs(kLogCvmfs, kLogDebug, "remounting root catalog");
   catalog::LoadError retval = mountpoint_->catalog_mgr()->Remount(true);
   switch (retval) {
     case catalog::kLoadNew:

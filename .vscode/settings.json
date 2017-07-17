@@ -64,7 +64,8 @@
     "streambuf": "cpp",
     "tuple": "cpp",
     "string_view": "cpp",
-    "valarray": "cpp"
+    "valarray": "cpp",
+    "sqlite3.c": "cpp"
   },
   "python.linting.pylintEnabled": false,
   "python.formatting.provider": "yapf",
