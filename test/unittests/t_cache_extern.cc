@@ -48,6 +48,7 @@ class MockCachePlugin : public CachePlugin {
     shash::HashString(known_object_content, &known_object);
     known_object_refcnt = 0;
     next_status = -1;
+    listing_nitems = 0;
   }
 
   virtual ~MockCachePlugin() { }

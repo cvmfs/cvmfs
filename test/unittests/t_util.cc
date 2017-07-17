@@ -724,8 +724,8 @@ TEST_F(T_Util, TcpEndpoints) {
   EXPECT_GE(fd_server, 0);
   EXPECT_EQ(0, listen(fd_server, 1));
   int fd_server2 = MakeTcpEndpoint("127.0.0.1", 12345);
+  EXPECT_LT(fd_server2, 0);
   EXPECT_NE(0, listen(fd_server2, 1));
-  close(fd_server2);
 
   EXPECT_EQ(-1, ConnectTcpEndpoint("foobar", 12345));
   EXPECT_EQ(-1, ConnectTcpEndpoint("127.0.0.1", 12346));
