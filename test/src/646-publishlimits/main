@@ -1,0 +1,72 @@
+cvmfs_test_name="Publish limits"
+cvmfs_test_autofs_on_startup=false
+
+addfiles() {
+  local path=$1
+  local nfiles=$2
+  local n=1
+  mkdir -p $path
+  while [ $n -le $2 ]; do
+    echo $n >$path/$n
+    let n+=1
+  done
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "add limit variables to server.conf"
+  (
+  echo "CVMFS_ENFORCE_LIMITS=true"
+  echo "CVMFS_ROOT_KCATALOG_LIMIT=1"
+  echo "CVMFS_NESTED_KCATALOG_LIMIT=2"
+  echo "CVMFS_FILE_MBYTE_LIMIT=3"
+  ) | sudo sh -c "cat >> /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf" || return 9
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "adding 1001 files"
+  local dir=/cvmfs/$CVMFS_TEST_REPO/dir
+  addfiles $dir 1001 || return 10
+
+  echo "attempting to publish, should fail"
+  publish_repo $CVMFS_TEST_REPO && return 11
+
+  echo "putting files in a nested catalog"
+  touch $dir/.cvmfscatalog || return 12
+
+  echo "publish should now succeed"
+  publish_repo $CVMFS_TEST_REPO || return 13
+
+  echo "starting another transaction"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "adding another 1001 files"
+  addfiles $dir/sub 1001 || return 20
+
+  echo "attempting to publish, should fail"
+  publish_repo $CVMFS_TEST_REPO && return 21
+
+  echo "putting new files in another nested catalog"
+  touch $dir/sub/.cvmfscatalog || return 22
+
+  echo "creating a too-big file"
+  dd if=/dev/zero of=$dir/file bs=1M count=4 || return 23
+
+  echo "attempting to publish, should fail"
+  publish_repo $CVMFS_TEST_REPO && return 24
+
+  echo "replacing file with a small enough file"
+  dd if=/dev/zero of=$dir/file bs=1M count=2 || return 25
+
+  echo "publish should now succeed"
+  publish_repo $CVMFS_TEST_REPO || return 26
+
+  return 0
+}
+
