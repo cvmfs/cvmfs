@@ -383,10 +383,6 @@ class AbstractUploader
     return spooler_definition_;
   }
 
-  const SynchronizingCounter<int32_t> &jobs_in_flight() const {
-    return jobs_in_flight_;
-  }
-
  private:
   JobStatus::State DispatchJob(const UploadJob &job);
 
