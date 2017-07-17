@@ -100,6 +100,7 @@ bool GetParamsFromFile(const std::string& repo_name, Params* params) {
 
   // TODO(dwd): the next 3 limit variables should take defaults from
   // SyncParameters
+  params->nested_kcatalog_limit = 0;
   std::string nested_kcatalog_limit_str;
   if (parser.GetValue("CVMFS_NESTED_KCATALOG_LIMIT",
       &nested_kcatalog_limit_str))
@@ -107,11 +108,13 @@ bool GetParamsFromFile(const std::string& repo_name, Params* params) {
     params->nested_kcatalog_limit = String2Uint64(nested_kcatalog_limit_str);
   }
 
+  params->root_kcatalog_limit = 0;
   std::string root_kcatalog_limit_str;
   if (parser.GetValue("CVMFS_ROOT_KCATALOG_LIMIT", &root_kcatalog_limit_str)) {
     params->root_kcatalog_limit = String2Uint64(root_kcatalog_limit_str);
   }
 
+  params->file_mbyte_limit = 0;
   std::string file_mbyte_limit_str;
   if (parser.GetValue("CVMFS_FILE_MBYTE_LIMIT", &file_mbyte_limit_str)) {
     params->file_mbyte_limit = String2Uint64(file_mbyte_limit_str);
