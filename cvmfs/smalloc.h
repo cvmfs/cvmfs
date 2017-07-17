@@ -28,7 +28,7 @@ namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
 // Checkerboard marker (binary 101010...)
-const unsigned char kMemMarker = 0xAA;
+const uint32_t kMemMarker = 0xAAAAAAAA;
 
 /**
  * Round up size to the next larger multiple of 8.  This is used to enforce
