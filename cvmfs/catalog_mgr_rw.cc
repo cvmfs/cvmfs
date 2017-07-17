@@ -365,7 +365,7 @@ void WritableCatalogManager::AddFile(
              "%s: file at %s is larger than %u megabytes (%u). "
              "CernVM-FS works best with small files. "
              "Please remove the file or increase the limit.",
-             enforce_limits_ ? "FATAL" : "WARNING"
+             enforce_limits_ ? "FATAL" : "WARNING",
              file_path.c_str(),
              file_mbyte_limit_,
              mbytes);
