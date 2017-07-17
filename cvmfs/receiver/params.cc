@@ -91,14 +91,11 @@ bool GetParamsFromFile(const std::string& repo_name, Params* params) {
     params->min_weight = String2Uint64(min_weight_str);
   }
 
+  params->enforce_limits = false;
   std::string enforce_limits_str;
   ret &= parser.GetValue("CVMFS_ENFORCE_LIMITS", &enforce_limits_str);
   if (enforce_limits_str == "true") {
     params->enforce_limits = true;
-  } else if (enforce_limits_str == "false") {
-    params->enforce_limits = false;
-  } else {
-    return false;
   }
 
   // TODO(dwd): the next 3 limit variables should take defaults from
