@@ -377,8 +377,12 @@ _migrate_137() {
   if [ -n "$warn_threshold" ]; then
     sed -i -e '/^CVMFS_CATALOG_ENTRY_WARN_THRESHOLD=/d' $server_conf
     local kcatalog_limit="$(($warn_threshold / 1000))"
-    echo "CVMFS_ROOT_KCATALOG_LIMIT=${kcatalog_limit}" >> $server_conf
-    echo "CVMFS_NESTED_KCATALOG_LIMIT=${kcatalog_limit}" >> $server_conf
+    # If the default was not changed, the new root catalog default of 200k
+    # entries is applied.
+    if [ "$kcatalog_limit" != 500 ]; then
+      echo "CVMFS_ROOT_KCATALOG_LIMIT=${kcatalog_limit}" >> $server_conf
+      echo "CVMFS_NESTED_KCATALOG_LIMIT=${kcatalog_limit}" >> $server_conf
+    fi
   fi
 
   sed -i -e "s/^\(CVMFS_CREATOR_VERSION\)=.*/\1=$destination_version/" $server_conf
