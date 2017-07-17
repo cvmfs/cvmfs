@@ -224,7 +224,8 @@ WritableCatalog *WritableCatalogManager::GetHostingCatalog(
   const std::string &path)
 {
   WritableCatalog *result = NULL;
-  FindCatalog(MakeRelativePath(path), &result, NULL);
+  bool retval = FindCatalog(MakeRelativePath(path), &result, NULL);
+  if (!retval) return NULL;
   return result;
 }
 

@@ -109,7 +109,7 @@ struct Listing {
  * Allows us to use a cvmcache_hash in (hash) maps.
  */
 struct ComparableHash {
-  ComparableHash() { }
+  ComparableHash() { memset(&hash, 0, sizeof(hash)); }
   explicit ComparableHash(const struct cvmcache_hash &h) : hash(h) { }
   bool operator ==(const ComparableHash &other) const {
     return cvmcache_hash_cmp(const_cast<cvmcache_hash *>(&(this->hash)),

@@ -11,6 +11,7 @@
 #include <cerrno>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <string>
 
 #include "atomic.h"
@@ -226,6 +227,7 @@ Tracer::Tracer()
   , ring_buffer_(NULL)
   , commit_buffer_(NULL)
 {
+  memset(&thread_flush_, 0, sizeof(thread_flush_));
   atomic_init32(&seq_no_);
   atomic_init32(&flushed_);
   atomic_init32(&terminate_flush_thread_);

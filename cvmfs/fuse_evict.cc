@@ -12,6 +12,7 @@
 
 #include <cassert>
 #include <cstdlib>
+#include <cstring>
 
 #include "glue_buffer.h"
 #include "logging.h"
@@ -71,6 +72,7 @@ FuseInvalidator::FuseInvalidator(
   , spawned_(false)
 {
   MakePipe(pipe_ctrl_);
+  memset(&thread_invalidator_, 0, sizeof(thread_invalidator_));
   atomic_init32(&terminated_);
 }
 

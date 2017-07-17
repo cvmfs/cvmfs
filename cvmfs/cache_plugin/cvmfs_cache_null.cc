@@ -41,7 +41,7 @@ struct TxnInfo {
 };
 
 struct Listing {
-  Listing() : pos(0) { }
+  Listing() : type(CVMCACHE_OBJECT_REGULAR), pos(0), elems(NULL) { }
   cvmcache_object_type type;
   uint64_t pos;
   vector<Object> *elems;
