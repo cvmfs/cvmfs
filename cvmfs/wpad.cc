@@ -228,13 +228,15 @@ string ResolveProxyDescription(
     if (use_cache) {
       string cached_proxies;
       int fd = open(path_fallback_cache.c_str(), O_RDONLY);
-      bool retval = (fd >= 0) && SafeReadToString(fd, &cached_proxies);
-      close(fd);
-      if (retval) {
-        LogCvmfs(kLogDownload, kLogSyslog | kLogDebug,
-                 "using cached proxy settings from %s",
-                 path_fallback_cache.c_str());
-        return cached_proxies;
+      if (fd >= 0) {
+        bool retval = SafeReadToString(fd, &cached_proxies);
+        close(fd);
+        if (retval) {
+          LogCvmfs(kLogDownload, kLogSyslog | kLogDebug,
+                   "using cached proxy settings from %s",
+                   path_fallback_cache.c_str());
+          return cached_proxies;
+        }
       }
     } else {
       bool retval =

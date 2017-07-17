@@ -100,6 +100,16 @@ void LocalUploader::StreamedUpload(UploadStreamHandle *handle,
   LocalStreamHandle *local_handle = static_cast<LocalStreamHandle *>(handle);
 
   const off_t offset = lseek(local_handle->file_descriptor, 0, SEEK_CUR);
+  if (offset < 0) {
+    int seek_err = errno;
+    LogCvmfs(kLogSpooler, kLogVerboseMsg,
+             "failed to seek in '%s' (errno: %d)",
+             local_handle->temporary_path.c_str(), seek_err);
+    atomic_inc32(&copy_errors_);
+    Respond(callback, UploaderResults(seek_err, buffer));
+    return;
+  }
+
   const size_t bytes_written =
       write(local_handle->file_descriptor, buffer->ptr(), buffer->used_bytes());
   if (bytes_written != buffer->used_bytes()) {

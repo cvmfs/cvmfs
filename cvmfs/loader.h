@@ -152,8 +152,13 @@ typedef std::vector<LoadEvent *> EventList;
 struct LoaderExports {
   LoaderExports() :
     version(4),
-    size(sizeof(LoaderExports)), boot_time(0), foreground(false),
-    disable_watchdog(false), simple_options_parsing(false) {}
+    size(sizeof(LoaderExports)),
+    boot_time(0),
+    foreground(false),
+    disable_watchdog(false),
+    simple_options_parsing(false),
+    fuse_channel(NULL)
+  { }
 
   ~LoaderExports() {
     for (unsigned i = 0; i < history.size(); ++i)

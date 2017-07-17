@@ -377,6 +377,7 @@ int ConnectTcpEndpoint(const std::string &ipv4_address, int portno) {
   if (retval != 0) {
     LogCvmfs(kLogCvmfs, kLogDebug, "failed to connect to TCP endpoint (%d)",
              errno);
+    close(socket_fd);
     return -1;
   }
   return socket_fd;

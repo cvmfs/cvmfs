@@ -69,7 +69,11 @@ const unsigned kCleanupInterval = 60;  // Scan job table every minute
  */
 struct RepositoryConfig : SingleCopy {
   RepositoryConfig()
-    : download_mgr(NULL), signature_mgr(NULL), options_mgr(NULL) { }
+    : download_mgr(NULL)
+    , signature_mgr(NULL)
+    , options_mgr(NULL)
+    , statistics(NULL)
+  { }
   ~RepositoryConfig() {
     if (download_mgr) download_mgr->Fini();
     if (signature_mgr) signature_mgr->Fini();
@@ -97,6 +101,7 @@ struct Job : SingleCopy {
           birth(platform_monotonic_time()), death(0), finish_timestamp(0),
           pid(0)
   {
+    memset(&thread_job, 0, sizeof(thread_job));
     int retval = pthread_mutex_init(&lock, NULL);
     assert(retval == 0);
   }

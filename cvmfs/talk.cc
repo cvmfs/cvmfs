@@ -26,6 +26,7 @@
 
 #include <cassert>
 #include <cstdlib>
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -619,7 +620,9 @@ TalkManager::TalkManager(
   , mount_point_(mount_point)
   , remounter_(remounter)
   , spawned_(false)
-{ }
+{
+  memset(&thread_talk_, 0, sizeof(thread_talk_));
+}
 
 
 TalkManager::~TalkManager() {

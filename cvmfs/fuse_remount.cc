@@ -128,6 +128,7 @@ FuseRemounter::FuseRemounter(
   , fence_(new Fence())
   , catalogs_valid_until_(MountPoint::kIndefiniteDeadline)
 {
+  memset(&thread_remount_trigger_, 0, sizeof(thread_remount_trigger_));
   pipe_remount_trigger_[0] = pipe_remount_trigger_[1] = -1;
   atomic_init32(&drainout_mode_);
   atomic_init32(&maintenance_mode_);

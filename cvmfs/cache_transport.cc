@@ -389,6 +389,8 @@ bool CacheTransport::RecvFrame(CacheTransport::Frame *frame) {
   uint32_t msg_size = size;
   if (has_attachment) {
     if (size < 2) {
+      // kMaxStackAlloc is > 2 (of course!) but we'll leave the condition here
+      // for consistency.
       if (size > kMaxStackAlloc) { free(buffer); }
       return false;
     }
@@ -495,6 +497,7 @@ void CacheTransport::SendData(
 }
 
 void CacheTransport::SendNonBlocking(struct iovec *iov, unsigned iovcnt) {
+  assert(iovcnt > 0);
   unsigned total_size = 0;
   for (unsigned i = 0; i < iovcnt; ++i)
     total_size += iov[i].iov_len;

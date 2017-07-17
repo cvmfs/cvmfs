@@ -127,6 +127,7 @@ class ExternalCacheManager : public CacheManager {
       , flushed(false)
       , committed(false)
       , object_info_modified(false)
+      , transaction_id(0)
       , id(id)
     { }
 

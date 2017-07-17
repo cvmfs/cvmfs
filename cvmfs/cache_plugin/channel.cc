@@ -12,6 +12,7 @@
 #include <unistd.h>
 
 #include <cassert>
+#include <cstring>
 #include <vector>
 
 #include "logging.h"
@@ -50,6 +51,7 @@ CachePlugin::CachePlugin(uint64_t capabilities)
   // Don't use listing id zero
   atomic_inc64(&next_lst_id_);
   txn_ids_.Init(128, UniqueRequest(), HashUniqueRequest);
+  memset(&thread_io_, 0, sizeof(thread_io_));
   MakePipe(pipe_ctrl_);
 }
 
