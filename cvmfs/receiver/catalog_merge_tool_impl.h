@@ -43,7 +43,8 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::Run(
     const std::string temp_dir = CreateTempDir(temp_dir_prefix_);
     output_catalog_mgr_ = new RwCatalogMgr(
         manifest_->catalog_hash(), repo_path_, temp_dir, spooler,
-        download_manager_, params.entry_warn_thresh, &stats,
+        download_manager_, params.enforce_limits, params.nested_kcatalog_limit,
+        params.root_kcatalog_limit, params.file_mbyte_limit, &stats,
         params.use_autocatalogs, params.max_weight, params.min_weight);
     output_catalog_mgr_->Init();
   }

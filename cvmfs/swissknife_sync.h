@@ -15,10 +15,12 @@
 struct SyncParameters {
   static const unsigned kDefaultMaxWeight = 100000;
   static const unsigned kDefaultMinWeight = 1000;
-  static const uint64_t kDefaultEntryWarnThreshold = 500000;
   static const size_t kDefaultMinFileChunkSize = 4 * 1024 * 1024;
   static const size_t kDefaultAvgFileChunkSize = 8 * 1024 * 1024;
   static const size_t kDefaultMaxFileChunkSize = 16 * 1024 * 1024;
+  static const unsigned kDefaultNestedKcatalogLimit = 500;
+  static const unsigned kDefaultRootKcatalogLimit = 200;
+  static const unsigned kDefaultFileMbyteLimit = 1024;
 
   SyncParameters()
       : spooler(NULL),
@@ -37,7 +39,10 @@ struct SyncParameters {
         ignore_special_files(false),
         branched_catalog(false),
         compression_alg(zlib::kZlibDefault),
-        catalog_entry_warn_threshold(kDefaultEntryWarnThreshold),
+        enforce_limits(false),
+        nested_kcatalog_limit(0),
+        root_kcatalog_limit(0),
+        file_mbyte_limit(0),
         min_file_chunk_size(kDefaultMinFileChunkSize),
         avg_file_chunk_size(kDefaultAvgFileChunkSize),
         max_file_chunk_size(kDefaultMaxFileChunkSize),
@@ -78,7 +83,10 @@ struct SyncParameters {
   bool ignore_special_files;
   bool branched_catalog;
   zlib::Algorithms compression_alg;
-  uint64_t catalog_entry_warn_threshold;
+  bool enforce_limits;
+  unsigned nested_kcatalog_limit;
+  unsigned root_kcatalog_limit;
+  unsigned file_mbyte_limit;
   size_t min_file_chunk_size;
   size_t avg_file_chunk_size;
   size_t max_file_chunk_size;
@@ -244,7 +252,6 @@ class CommandSync : public Command {
     r.push_back(Parameter::Optional('e', "hash algorithm (default: SHA-1)"));
     r.push_back(Parameter::Optional('f', "union filesystem type"));
     r.push_back(Parameter::Optional('h', "maximal file chunk size in bytes"));
-    r.push_back(Parameter::Optional('j', "catalog entry warning threshold"));
     r.push_back(Parameter::Optional('l', "minimal file chunk size in bytes"));
     r.push_back(Parameter::Optional('q', "number of concurrent write jobs"));
     r.push_back(Parameter::Optional('v', "manual revision number"));
@@ -252,7 +259,11 @@ class CommandSync : public Command {
     r.push_back(Parameter::Optional('C', "trusted certificates"));
     r.push_back(Parameter::Optional('F', "Authz file listing (default: none)"));
     r.push_back(Parameter::Optional('M', "minimum weight of the autocatalogs"));
+    r.push_back(Parameter::Optional('Q',
+                                    "nested catalog limit in kilo-entries"));
+    r.push_back(Parameter::Optional('R', "root catalog limit in kilo-entries"));
     r.push_back(Parameter::Optional('T', "Root catalog TTL in seconds"));
+    r.push_back(Parameter::Optional('U', "file size limit in megabytes"));
     r.push_back(Parameter::Optional('X', "maximum weight of the autocatalogs"));
     r.push_back(Parameter::Optional('Z',
                                     "compression algorithm "
@@ -274,6 +285,7 @@ class CommandSync : public Command {
     r.push_back(Parameter::Switch('x', "print change set"));
     r.push_back(Parameter::Switch('y', "dry run"));
     r.push_back(Parameter::Switch('A', "autocatalog enabled/disabled"));
+    r.push_back(Parameter::Switch('E', "enforce limits instead of warning"));
     r.push_back(Parameter::Switch('L', "enable HTTP redirects"));
     r.push_back(Parameter::Switch('V',
                                   "Publish format compatible with "

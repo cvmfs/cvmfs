@@ -79,7 +79,10 @@ class WritableCatalogManager : public SimpleCatalogManager {
                          const std::string &dir_temp,
                          upload::Spooler   *spooler,
                          download::DownloadManager *download_manager,
-                         uint64_t catalog_entry_warn_threshold,
+                         bool enforce_limits,
+                         const unsigned nested_kcatalog_limit,
+                         const unsigned root_kcatalog_limit,
+                         const unsigned file_mbyte_limit,
                          perf::Statistics *statistics,
                          bool is_balanceable,
                          unsigned max_weight,
@@ -204,7 +207,11 @@ class WritableCatalogManager : public SimpleCatalogManager {
   pthread_mutex_t                         *catalog_processing_lock_;
   std::map<std::string, WritableCatalog*>  catalog_processing_map_;
 
-  uint64_t catalog_entry_warn_threshold_;
+  // TODO(jblomer): catalog limits should become its own struct
+  bool enforce_limits_;
+  unsigned nested_kcatalog_limit_;
+  unsigned root_kcatalog_limit_;
+  unsigned file_mbyte_limit_;
 
   /**
    * Directories don't have extended attributes at this point.

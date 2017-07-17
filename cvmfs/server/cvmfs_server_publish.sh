@@ -230,8 +230,17 @@ cvmfs_server_publish() {
     if [ "x$CVMFS_INCLUDE_XATTRS" = "xtrue" ]; then
       sync_command="$sync_command -k"
     fi
-    if [ "x$CVMFS_CATALOG_ENTRY_WARN_THRESHOLD" != "x" ]; then
-      sync_command="$sync_command -j $CVMFS_CATALOG_ENTRY_WARN_THRESHOLD"
+    if [ "x${CVMFS_ENFORCE_LIMITS:-$CVMFS_DEFAULT_ENFORCE_LIMITS}" = "xtrue" ]; then
+      sync_command="$sync_command -E"
+    fi
+    if [ "x$CVMFS_NESTED_KCATALOG_LIMIT" != "x" ]; then
+      sync_command="$sync_command -Q $CVMFS_NESTED_KCATALOG_LIMIT"
+    fi
+    if [ "x$CVMFS_ROOT_KCATALOG_LIMIT" != "x" ]; then
+      sync_command="$sync_command -R $CVMFS_ROOT_KCATALOG_LIMIT"
+    fi
+    if [ "x$CVMFS_FILE_MBYTE_LIMIT" != "x" ]; then
+      sync_command="$sync_command -U $CVMFS_FILE_MBYTE_LIMIT"
     fi
     if [ "x$manual_revision" != "x" ]; then
       sync_command="$sync_command -v $manual_revision"

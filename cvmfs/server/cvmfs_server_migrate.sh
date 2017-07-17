@@ -373,6 +373,14 @@ _migrate_137() {
   fi
 
   echo "--> updating server.conf"
+  local warn_threshold="`sed -n -e 's/^CVMFS_CATALOG_ENTRY_WARN_THRESHOLD=//p' $server_conf`"
+  if [ -n "$warn_threshold" ]; then
+    sed -i -e '/^CVMFS_CATALOG_ENTRY_WARN_THRESHOLD=/d' $server_conf
+    local kcatalog_limit="$(($warn_threshold / 1000))"
+    echo "CVMFS_ROOT_KCATALOG_LIMIT=${kcatalog_limit}" >> $server_conf
+    echo "CVMFS_NESTED_KCATALOG_LIMIT=${kcatalog_limit}" >> $server_conf
+  fi
+
   sed -i -e "s/^\(CVMFS_CREATOR_VERSION\)=.*/\1=$destination_version/" $server_conf
 
   # update repository information
