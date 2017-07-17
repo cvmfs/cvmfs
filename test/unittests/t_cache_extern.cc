@@ -48,6 +48,7 @@ class MockCachePlugin : public CachePlugin {
     shash::HashString(known_object_content, &known_object);
     known_object_refcnt = 0;
     next_status = -1;
+    listing_nitems = 0;
   }
 
   virtual ~MockCachePlugin() { }
@@ -408,7 +409,7 @@ TEST_F(T_ExternalCacheManager, TransactionAbort) {
   uint64_t write_size = cache_mgr_->max_object_size_ * 4;
   unsigned char *write_buffer = static_cast<unsigned char *>(
     smalloc(write_size));
-  memset(write_buffer, kMemMarker, write_size);
+  memset(write_buffer, static_cast<unsigned char>(kMemMarker), write_size);
   HashMem(write_buffer, write_size, &id);
 
   void *txn = alloca(cache_mgr_->SizeOfTxn());
