@@ -1,4 +1,5 @@
 2.4.0:
+  * Add support for revision entries in balcklist (CVM-992)
   * Reduce default catalog TTL to 4 minutes (CVM-1336)
   * Add cvmfs_server resign -d option (CVM-1279)
   * Add support for CVMFS_OOM_SCORE_ADJ (CVM-1092)
