@@ -5,9 +5,9 @@ CVMFS_TEST_602_REPO_COUNT=0
 CVMFS_TEST_602_REPO_PREFIX="test.cern.ch.libcvmfs_"
 cleanup() {
   echo "running cleanup()"
-  #for i in $(seq 1 $CVMFS_TEST_602_REPO_COUNT); do
-  #  destroy_repo "$CVMFS_TEST_602_REPO_PREFIX$i"
-  #done
+  for i in $(seq 1 $CVMFS_TEST_602_REPO_COUNT); do
+    destroy_repo "$CVMFS_TEST_602_REPO_PREFIX$i"
+  done
 }
 
 cvmfs_run_test() {
