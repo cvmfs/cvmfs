@@ -5,12 +5,14 @@
 #ifndef CVMFS_INGESTION_TUBE_H_
 #define CVMFS_INGESTION_TUBE_H_
 
+#include <pthread.h>
 #include <stdint.h>
 
 #include <cassert>
 
 #include "util/single_copy.h"
 #include "util/pointer.h"
+#include "util_concurrency.h"
 
 template <class ItemT>
 class Tube : SingleCopy {
@@ -27,7 +29,7 @@ class Tube : SingleCopy {
     Link *prev_;
   };
 
-  Tube() : limit_(0), size_(0) { Init(); }
+  Tube() : limit_(uint64_t(-1)), size_(0) { Init(); }
   explicit Tube(uint64_t limit) : limit_(limit), size_(0) { Init(); }
   ~Tube() {
     Link *cursor = head_;
@@ -36,12 +38,22 @@ class Tube : SingleCopy {
       delete cursor;
       cursor = prev;
     } while (cursor != head_);
+    pthread_cond_destroy(&cond_populated_);
+    pthread_cond_destroy(&cond_capacious_);
+    pthread_mutex_destroy(&lock_);
   }
 
-  bool IsEmpty() { return tail_->item() == NULL; }
+  bool IsEmpty() {
+    MutexLockGuard lock_guard(&lock_);
+    return size_ == 0;
+  }
 
   Link *Enqueue(ItemT *item) {
     assert(item != NULL);
+    MutexLockGuard lock_guard(&lock_);
+    while (size_ == limit_)
+      pthread_cond_wait(&cond_capacious_, &lock_);
+
     Link *link = new Link(item);
     link->next_ = tail_;
     link->prev_ = tail_->prev_;
@@ -49,26 +61,27 @@ class Tube : SingleCopy {
     tail_->prev_ = link;
     tail_ = link;
     size_++;
+    int retval = pthread_cond_signal(&cond_populated_);
+    assert(retval == 0);
     return link;
   }
 
   ItemT *Slice(Link *link) {
-    link->prev_->next_ = link->next_;
-    link->next_->prev_ = link->prev_;
-    if (link == tail_)
-      tail_ = head_;
-    ItemT *item = link->item_;
-    delete link;
-    size_--;
-    return item;
+    MutexLockGuard lock_guard(&lock_);
+    return SliceUnlocked(link);
   }
 
   ItemT *Pop() {
-    assert(!IsEmpty());
-    return Slice(head_->prev_);
+    MutexLockGuard lock_guard(&lock_);
+    while (size_ == 0)
+      pthread_cond_wait(&cond_populated_, &lock_);
+    return SliceUnlocked(head_->prev_);
   }
 
-  uint64_t size() { return size_; }
+  uint64_t size() {
+    MutexLockGuard lock_guard(&lock_);
+    return size_;
+  }
 
  private:
   void Init() {
@@ -76,6 +89,26 @@ class Tube : SingleCopy {
     head_ = tail_ = sentinel;
     head_->next_ = head_->prev_ = sentinel;
     tail_->next_ = tail_->prev_ = sentinel;
+
+    int retval = pthread_mutex_init(&lock_, NULL);
+    assert(retval == 0);
+    retval = pthread_cond_init(&cond_populated_, NULL);
+    assert(retval == 0);
+    retval = pthread_cond_init(&cond_capacious_, NULL);
+    assert(retval == 0);
+  }
+
+  ItemT *SliceUnlocked(Link *link) {
+    link->prev_->next_ = link->next_;
+    link->next_->prev_ = link->prev_;
+    if (link == tail_)
+      tail_ = head_;
+    ItemT *item = link->item_;
+    delete link;
+    size_--;
+    int retval = pthread_cond_signal(&cond_capacious_);
+    assert(retval == 0);
+    return item;
   }
 
   uint64_t limit_;
@@ -88,6 +121,18 @@ class Tube : SingleCopy {
    * Points to the last inserted element
    */
   Link *tail_;
+  /**
+   * Protects all internal state
+   */
+  pthread_mutex_t lock_;
+  /**
+   * Signals if there are items enqueued
+   */
+  pthread_cond_t cond_populated_;
+  /**
+   * Signals if there is space to enqueue more items
+   */
+  pthread_cond_t cond_capacious_;
 };
 
 #endif  // CVMFS_INGESTION_TUBE_H_
