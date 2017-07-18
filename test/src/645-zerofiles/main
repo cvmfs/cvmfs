@@ -25,7 +25,7 @@ cvmfs_run_test() {
 
   echo "*** create 32MiB random file"
   start_transaction $CVMFS_TEST_REPO || return $?
-  dd if=/dev/random of=/cvmfs/$CVMFS_TEST_REPO/32mb-rnd bs=$((1024*1024)) count=32
+  dd if=/dev/urandom of=/cvmfs/$CVMFS_TEST_REPO/32mb-rnd bs=$((1024*1024)) count=32
   publish_repo $CVMFS_TEST_REPO || return $?
 
   echo "*** create 32MiB file"

@@ -36,12 +36,15 @@ File::File(const std::string    &path,
 
 File::~File() {
   delete bulk_chunk_;
+  bulk_chunk_ = NULL;
   delete chunk_detector_;
+  chunk_detector_ = NULL;
 
   ChunkVector::const_iterator i    = chunks_.begin();
   ChunkVector::const_iterator iend = chunks_.end();
   for (; i != iend; ++i)
     delete *i;
+  chunks_.clear();
 }
 
 
