@@ -861,8 +861,10 @@ void WritableCatalogManager::FinalizeCatalog(WritableCatalog *catalog,
   catalog->Commit();
 
   // check if catalog has too many entries
-  uint64_t catalog_limit = 1000 * (catalog->IsRoot() ? root_kcatalog_limit_
-                                                     : nested_kcatalog_limit_);
+  uint64_t catalog_limit = uint64_t(1000) *
+    uint64_t((catalog->IsRoot()
+              ? root_kcatalog_limit_
+              : nested_kcatalog_limit_));
   if ((catalog_limit > 0) &&
       (catalog->GetCounters().GetSelfEntries() > catalog_limit)) {
     LogCvmfs(kLogCatalog, kLogStderr,

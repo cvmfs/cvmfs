@@ -49,6 +49,7 @@ class MockCachePlugin : public CachePlugin {
     known_object_refcnt = 0;
     next_status = -1;
     listing_nitems = 0;
+    listing_type = cvmfs::OBJECT_REGULAR;
   }
 
   virtual ~MockCachePlugin() { }

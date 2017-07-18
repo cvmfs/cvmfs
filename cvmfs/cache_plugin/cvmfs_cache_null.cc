@@ -49,7 +49,9 @@ struct Listing {
 
 struct ComparableHash {
   ComparableHash() { }
-  explicit ComparableHash(const struct cvmcache_hash &h) : hash(h) { }
+  explicit ComparableHash(const struct cvmcache_hash &h) : hash(h) {
+    memset(&hash, 0, sizeof(hash));
+  }
   struct cvmcache_hash hash;
   bool operator <(const ComparableHash &other) const {
     return cvmcache_hash_cmp(const_cast<cvmcache_hash *>(&(this->hash)),
