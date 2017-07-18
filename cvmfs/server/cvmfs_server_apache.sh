@@ -245,7 +245,6 @@ create_apache_config_for_endpoint() {
 
   create_apache_config_file "$(get_apache_conf_filename $name)" << EOF
 # Created by cvmfs_server.  Don't touch.
-$(cat_wsgi_config $name $with_wsgi)
 
 KeepAlive On
 AddType application/json .json
@@ -276,6 +275,10 @@ Alias /cvmfs/${name} ${storage_dir}
     ExpiresByType application/json    "access plus 61 seconds"
 </Directory>
 EOF
+
+  if [ x"$with_wsgi" != x"" ]; then
+    create_apache_config_for_webapi
+  fi
 }
 
 
@@ -291,26 +294,28 @@ create_apache_config_for_global_info() {
 }
 
 
-# sends wsgi configuration to stdout
-#
-# @param name        the name of the repository
-# @param with_wsgi   if not set, this function is a NOOP
+has_apache_config_for_webapi() {
+  has_apache_config_file $(get_apache_conf_filename "webapi")
+}
+
+create_apache_config_for_webapi() {
+  ! has_apache_config_for_webapi || return 0
+  create_apache_config_file "$(get_apache_conf_filename webapi)" << 'EOF'
+# Created by cvmfs_server.  Don't touch.
+WSGIDaemonProcess cvmfsapi threads=64 display-name=%{GROUP} \
+  python-path=/usr/share/cvmfs-server/webapi
+<Location /cvmfs>
+  WSGIProcessGroup cvmfsapi
+</Location>
+WSGISocketPrefix /var/run/wsgi
+WSGIScriptAliasMatch /cvmfs/([^/]+)/api /var/www/wsgi-scripts/cvmfs-api.wsgi/$1
+EOF
+}
+
+# for migrate to 2.1.20 backward compatibility
 cat_wsgi_config() {
-  local name=$1
-  local with_wsgi="$2"
-
-  [ x"$with_wsgi" != x"" ] || return 0
-  echo "# Enable api functions
-WSGIPythonPath /usr/share/cvmfs-server/webapi
-Alias /cvmfs/$name/api /var/www/wsgi-scripts/cvmfs-api.wsgi/$name
-
-<Directory /var/www/wsgi-scripts>
-    Options ExecCGI
-    SetHandler wsgi-script
-    Order allow,deny
-    Allow from all
-</Directory>
-"
+  # do nothing
+  return
 }
 
 
