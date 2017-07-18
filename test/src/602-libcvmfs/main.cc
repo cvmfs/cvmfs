@@ -117,7 +117,7 @@ int main(int argc, char *argv[]) {
       off += nbytes;
     }
     if (nbytes < 0) {
-      printf("Error reading chunked file %s (%d), read so far %u\n",
+      printf("Error reading chunked file %s (%d), read so far %ld\n",
              largefile_path.c_str(), errno, off);
       return nbytes;
     }
