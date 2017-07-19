@@ -294,12 +294,8 @@ create_apache_config_for_global_info() {
 }
 
 
-has_apache_config_for_webapi() {
-  has_apache_config_file $(get_apache_conf_filename "webapi")
-}
-
 create_apache_config_for_webapi() {
-  ! has_apache_config_for_webapi || return 0
+  ! has_apache_config_file $(get_apache_conf_filename webapi) || return 0
   create_apache_config_file "$(get_apache_conf_filename webapi)" << 'EOF'
 # Created by cvmfs_server.  Don't touch.
 RewriteEngine on
@@ -329,13 +325,22 @@ remove_config_files() {
   local name=$1
   load_repo_config $name
 
+  rm -rf /etc/cvmfs/repositories.d/$name
   local apache_conf_file_name="$(get_apache_conf_filename $name)"
   if is_local_upstream $CVMFS_UPSTREAM_STORAGE &&
      has_apache_config_file "$apache_conf_file_name"; then
     remove_apache_config_file "$apache_conf_file_name"
+    if [ -z "$(get_or_guess_repository_name)" ]; then
+      # no repositories left, remove extra config files
+      for confname in webapi info; do 
+        apache_conf_file_name="$(get_apache_conf_filename $confname)"
+        if has_apache_config_file "$apache_conf_file_name"; then
+          remove_apache_config_file "$apache_conf_file_name"
+        fi
+      done
+    fi
     reload_apache > /dev/null
   fi
-  rm -rf /etc/cvmfs/repositories.d/$name
 }
 
 
