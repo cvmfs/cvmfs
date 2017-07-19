@@ -811,7 +811,7 @@ if (BUILD_SERVER)
 
   install(
     FILES      webapi/cvmfs-api.wsgi
-    DESTINATION    "/var/www/wsgi-scripts"
+    DESTINATION    "/var/www/wsgi-scripts/cvmfs-server"
     PERMISSIONS    OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
   )
 
