@@ -80,6 +80,7 @@ def addr_geoinfo(addr):
 # accesses to the shared cache.
 # Return geo info record or None if none found.
 def name_geoinfo(now, name):
+    global geo_cache
     if (len(name) > 256) or not addr_pattern.search(name):
         return None
 
@@ -115,8 +116,6 @@ def name_geoinfo(now, name):
     if gir == None and name in geo_cache:
         # reuse expired entry
         gir = geo_cache[name][1]
-        lock.release()
-        return 
 
     geo_cache[name] = (now, gir)
     lock.release()
