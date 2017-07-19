@@ -217,7 +217,7 @@ def api(path_info, repo_name, version, start_response, environ):
         pxysep = servers.index('+PXYSEP+')
         onegood, pxyindexes = geosort_servers(now, gir_rem, servers[pxysep+1:])
         if onegood:
-            gir_pxy = lookup_geoinfo(now, servers[pxysep+1+pxyindexes[0]])
+            gir_pxy = name_geoinfo(now, servers[pxysep+1+pxyindexes[0]])
             if not gir_pxy is None:
                 gir_rem = gir_pxy
         onegood, hostindexes = geosort_servers(now, gir_rem, servers[0:pxysep])
