@@ -100,6 +100,7 @@ set(CVMFS_UNITTEST_FILES
   t_swissknife_lease.cc
   t_synchronizing_counter.cc
   t_raii_temp_dir.cc
+  t_task.cc
   t_test_utils.cc
   t_tracer.cc
   t_tube.cc
@@ -168,6 +169,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/hash.cc
   ${CVMFS_SOURCE_DIR}/history_sql.cc
   ${CVMFS_SOURCE_DIR}/history_sqlite.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/task.cc
   ${CVMFS_SOURCE_DIR}/ingestion/tube.cc
   ${CVMFS_SOURCE_DIR}/json_document.cc
   ${CVMFS_SOURCE_DIR}/kvstore.cc

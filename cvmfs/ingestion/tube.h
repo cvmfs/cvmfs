@@ -53,6 +53,7 @@ class Tube : SingleCopy {
     } while (cursor != head_);
     pthread_cond_destroy(&cond_populated_);
     pthread_cond_destroy(&cond_capacious_);
+    pthread_cond_destroy(&cond_empty_);
     pthread_mutex_destroy(&lock_);
   }
 
@@ -97,6 +98,15 @@ class Tube : SingleCopy {
     return SliceUnlocked(head_->prev_);
   }
 
+  /**
+   * Blocks until the tube is empty
+   */
+  void Wait() {
+    MutexLockGuard lock_guard(&lock_);
+    while (size_ > 0)
+      pthread_cond_wait(&cond_empty_, &lock_);
+  }
+
   bool IsEmpty() {
     MutexLockGuard lock_guard(&lock_);
     return size_ == 0;
@@ -120,6 +130,8 @@ class Tube : SingleCopy {
     assert(retval == 0);
     retval = pthread_cond_init(&cond_capacious_, NULL);
     assert(retval == 0);
+    retval = pthread_cond_init(&cond_empty_, NULL);
+    assert(retval == 0);
   }
 
   ItemT *SliceUnlocked(Link *link) {
@@ -132,6 +144,10 @@ class Tube : SingleCopy {
     size_--;
     int retval = pthread_cond_signal(&cond_capacious_);
     assert(retval == 0);
+    if (size_ == 0) {
+      retval = pthread_cond_broadcast(&cond_empty_);
+      assert(retval == 0);
+    }
     return item;
   }
 
@@ -164,6 +180,10 @@ class Tube : SingleCopy {
    * Signals if there is space to enqueue more items
    */
   pthread_cond_t cond_capacious_;
+  /**
+   * Signals if the queue runs empty
+   */
+  pthread_cond_t cond_empty_;
 };
 
 #endif  // CVMFS_INGESTION_TUBE_H_
