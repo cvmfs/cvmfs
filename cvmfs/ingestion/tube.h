@@ -14,6 +14,19 @@
 #include "util/pointer.h"
 #include "util_concurrency.h"
 
+/**
+ * A thread-safe, doubly linked list of links containing pointers to ItemT.  The
+ * ItemT elements are not owned by the Tube.  FIFO semantics; items are pushed
+ * to the back and poped from the front.  Using Slice(), items at arbitrary
+ * locations in the tube can be removed, too.
+ *
+ * The tube links the steps in the file processing pipeline.  It connects
+ * multiple producers to multiple consumers and can throttle the producers if a
+ * limit for the tube size is set.
+ *
+ * Internally, uses conditional variables to block when threads try to pop from
+ * the empty tube or insert into the full tube.
+ */
 template <class ItemT>
 class Tube : SingleCopy {
  public:
@@ -111,7 +124,14 @@ class Tube : SingleCopy {
     return item;
   }
 
+
+  /**
+   * Adding new item blocks as long as limit_ == size_
+   */
   uint64_t limit_;
+  /**
+   * The current number of links in the list
+   */
   uint64_t size_;
   /**
    * In front of the first element (next in line for Pop())
