@@ -299,10 +299,10 @@ create_apache_config_for_webapi() {
   create_apache_config_file "$(get_apache_conf_filename webapi)" << 'EOF'
 # Created by cvmfs_server.  Don't touch.
 RewriteEngine on
-RewriteRule ^/cvmfs/([^/]+)/api/(.*)$ /var/www/wsgi-scripts/cvmfs-api.wsgi/$1/$2
+RewriteRule ^/cvmfs/([^/]+)/api/(.*)$ /var/www/wsgi-scripts/cvmfs-server/cvmfs-api.wsgi/$1/$2
 WSGIDaemonProcess cvmfsapi threads=64 display-name=%{GROUP} \
   python-path=/usr/share/cvmfs-server/webapi
-<Directory /var/www/wsgi-scripts>
+<Directory /var/www/wsgi-scripts/cvmfs-server>
   WSGIProcessGroup cvmfsapi
   WSGIApplicationGroup cvmfsapi
   Options ExecCGI
