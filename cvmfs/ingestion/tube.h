@@ -56,11 +56,9 @@ class Tube : SingleCopy {
     pthread_mutex_destroy(&lock_);
   }
 
-  bool IsEmpty() {
-    MutexLockGuard lock_guard(&lock_);
-    return size_ == 0;
-  }
-
+  /**
+   * Push an item to the back of the queue.  Block if queue is currently full.
+   */
   Link *Enqueue(ItemT *item) {
     assert(item != NULL);
     MutexLockGuard lock_guard(&lock_);
@@ -79,16 +77,29 @@ class Tube : SingleCopy {
     return link;
   }
 
+  /**
+   * Remove any link from the queue and return its item, including first/last
+   * element.
+   */
   ItemT *Slice(Link *link) {
     MutexLockGuard lock_guard(&lock_);
     return SliceUnlocked(link);
   }
 
+  /**
+   * Remove and return the first element from the queue.  Block if tube is
+   * empty.
+   */
   ItemT *Pop() {
     MutexLockGuard lock_guard(&lock_);
     while (size_ == 0)
       pthread_cond_wait(&cond_populated_, &lock_);
     return SliceUnlocked(head_->prev_);
+  }
+
+  bool IsEmpty() {
+    MutexLockGuard lock_guard(&lock_);
+    return size_ == 0;
   }
 
   uint64_t size() {
