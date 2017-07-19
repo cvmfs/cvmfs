@@ -74,7 +74,6 @@ CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
                                  src/5*                                       \
                                  src/6*                                       \
                                  src/7*                                       \
-                                 src/8*                                       \
                               || retval=1
 
 
