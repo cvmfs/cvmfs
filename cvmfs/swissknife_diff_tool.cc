@@ -22,13 +22,16 @@ DiffTool::DiffTool(const std::string &repo_path,
                    const history::History::Tag &new_tag,
                    const std::string &temp_dir,
                    download::DownloadManager *download_manager,
-                   bool machine_readable)
+                   bool machine_readable,
+                   bool ignore_timediff)
     : CatalogDiffTool<catalog::SimpleCatalogManager>(
           repo_path, old_tag.root_hash, new_tag.root_hash, temp_dir,
           download_manager),
       old_tag_(old_tag),
       new_tag_(new_tag),
-      machine_readable_(machine_readable) {}
+      machine_readable_(machine_readable),
+      ignore_timediff_(ignore_timediff)
+{ }
 
 DiffTool::~DiffTool() {}
 
@@ -128,6 +131,11 @@ void DiffTool::ReportModification(const PathString &path,
                                   const XattrList & /*xattrs*/) {
   catalog::DirectoryEntryBase::Differences diff =
       entry_from.CompareTo(entry_to);
+  if (ignore_timediff_) {
+    diff = diff & ~catalog::DirectoryEntryBase::Difference::kMtime;
+    if (diff == 0)
+      return;
+  }
 
   string type_from = PrintEntryType(entry_from);
   string type_to = PrintEntryType(entry_to);

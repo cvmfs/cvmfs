@@ -18,7 +18,8 @@ class DiffTool : public CatalogDiffTool<catalog::SimpleCatalogManager> {
  public:
   DiffTool(const std::string &repo_path, const history::History::Tag &old_tag,
            const history::History::Tag &new_tag, const std::string &temp_dir,
-           download::DownloadManager *download_manager, bool machine_readable);
+           download::DownloadManager *download_manager,
+           bool machine_readable, bool ignore_timediff);
 
   virtual ~DiffTool();
 
@@ -43,6 +44,7 @@ class DiffTool : public CatalogDiffTool<catalog::SimpleCatalogManager> {
   history::History::Tag old_tag_;
   history::History::Tag new_tag_;
   bool machine_readable_;
+  bool ignore_timediff_;
 };
 
 }  // namespace swissknife

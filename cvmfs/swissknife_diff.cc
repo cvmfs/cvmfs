@@ -41,6 +41,8 @@ ParameterList CommandDiff::GetParams() const {
   r.push_back(Parameter::Optional('d', "'to' tag name"));
   r.push_back(Parameter::Switch('m', "machine readable output"));
   r.push_back(Parameter::Switch('h', "show header"));
+  // Used for testing
+  r.push_back(Parameter::Switch('i', "ignore time stamp differences"));
   r.push_back(Parameter::Switch('L', "follow HTTP redirects"));
   return r;
 }
@@ -51,6 +53,7 @@ int swissknife::CommandDiff::Main(const swissknife::ArgumentList &args) {
   const string repository = MakeCanonicalPath(*args.find('r')->second);
   const bool show_header = args.count('h') > 0;
   const bool machine_readable = args.count('m') > 0;
+  const bool ignore_timediff = args.count('i') > 0;
   const bool follow_redirects = args.count('L') > 0;
   string pubkey_path = *args.find('k')->second;
   if (DirectoryExists(pubkey_path))
@@ -88,7 +91,7 @@ int swissknife::CommandDiff::Main(const swissknife::ArgumentList &args) {
   }
 
   DiffTool diff_tool(repository, tag_from, tag_to, tmp_dir, download_manager(),
-                     machine_readable);
+                     machine_readable, ignore_timediff);
   if (!diff_tool.Init()) {
     return 1;
   }
