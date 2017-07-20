@@ -16,6 +16,8 @@ positive_expire_secs = 60*60  # 1 hour
 
 geo_cache_secs = 5*60   # 5 minutes
 
+geo_cache_max_entries = 100000  # a ridiculously large but manageable number
+
 # geo_cache entries are indexed by name and contain a tuple of
 # (update time, geo record).  Caching DNS lookups is more important
 # than caching geo information but it's simpler and slightly more
@@ -95,6 +97,10 @@ def name_geoinfo(now, name):
         # update the timestamp so only one thread needs to wait
         #  when a lookup is slow
         geo_cache[name] = (now, gir)
+    elif len(geo_cache) >= geo_cache_max_entries:
+        # avoid denial of service by removing one random entry
+        #   before we add one
+        geo_cache.popitem()
     lock.release()
 
     ai = ()
