@@ -27,6 +27,7 @@ class TubeConsumerGroup;
 template <class ItemT>
 class TubeConsumer : SingleCopy {
   friend class TubeConsumerGroup<ItemT>;
+
  public:
   virtual ~TubeConsumer() { }
 
