@@ -92,6 +92,9 @@ def name_geoinfo(now, name):
             # still good, use it
             lock.release()
             return gir
+        # update the timestamp so only one thread needs to wait
+        #  when a lookup is slow
+        geo_cache[name] = (now, gir)
     lock.release()
 
     ai = ()
