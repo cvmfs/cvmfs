@@ -30,6 +30,8 @@
 template <class ItemT>
 class Tube : SingleCopy {
  public:
+  static const int32_t kMaxNstage = 4096;
+
   class Link : SingleCopy {
     friend class Tube<ItemT>;
    public:
@@ -42,8 +44,10 @@ class Tube : SingleCopy {
     Link *prev_;
   };
 
-  Tube() : limit_(uint64_t(-1)), size_(0) { Init(); }
-  explicit Tube(uint64_t limit) : limit_(limit), size_(0) { Init(); }
+  Tube() : limit_(uint64_t(-1)), size_(0), nstage_(0) { Init(); }
+  explicit Tube(uint64_t limit) : limit_(limit), size_(0), nstage_(0) {
+    Init();
+  }
   ~Tube() {
     Link *cursor = head_;
     do {
@@ -117,14 +121,16 @@ class Tube : SingleCopy {
     return size_;
   }
 
-  uint32_t seq_no() {
+  int32_t nstage() {
     MutexLockGuard lock_guard(&lock_);
-    return seq_no_;
+    return nstage_;
   }
 
-  void set_seq_no(uint32_t seq_no) {
+  void nstage(int32_t nstage) {
+    assert(nstage < kMaxNstage);
+
     MutexLockGuard lock_guard(&lock_);
-    seq_no_ = seq_no;
+    nstage_ = nstage;
   }
 
  private:
@@ -173,7 +179,7 @@ class Tube : SingleCopy {
   /**
    * If used in a pipline, stores the step number of this pipe
    */
-  uint32_t seq_no_;
+  int32_t nstage_;
   /**
    * In front of the first element (next in line for Pop())
    */
