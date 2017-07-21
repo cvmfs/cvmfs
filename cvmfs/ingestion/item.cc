@@ -17,7 +17,7 @@ BlockItem::BlockItem()
   , capacity_(0)
   , size_(0)
   , succ_item_(NULL)
-  , pred_nstage_(0)
+  , pred_nstage_(Tube<BlockItem>::kMaxNstage)
   , next_stage_(NULL)
 {
   int retval = pthread_mutex_init(&lock_, NULL);
@@ -67,6 +67,7 @@ void BlockItem::MakeData(uint32_t capacity, BlockItem *succ_item) {
   capacity_ = capacity_;
   data_ = reinterpret_cast<unsigned char *>(smalloc(capacity_));
   succ_item_ = succ_item;
+  succ_item_->Progress(0);
 }
 
 
@@ -86,6 +87,7 @@ void BlockItem::MakeData(
   capacity_ = size_ = size;
   data_ = data;
   succ_item_ = succ_item;
+  succ_item_->Progress(0);
 }
 
 
