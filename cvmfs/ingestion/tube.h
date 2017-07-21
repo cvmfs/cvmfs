@@ -117,6 +117,16 @@ class Tube : SingleCopy {
     return size_;
   }
 
+  uint32_t seq_no() {
+    MutexLockGuard lock_guard(&lock_);
+    return seq_no_;
+  }
+
+  void set_seq_no(uint32_t seq_no) {
+    MutexLockGuard lock_guard(&lock_);
+    seq_no_ = seq_no;
+  }
+
  private:
   void Init() {
     Link *sentinel = new Link(NULL);
@@ -160,6 +170,10 @@ class Tube : SingleCopy {
    * The current number of links in the list
    */
   uint64_t size_;
+  /**
+   * If used in a pipline, stores the step number of this pipe
+   */
+  uint32_t seq_no_;
   /**
    * In front of the first element (next in line for Pop())
    */
