@@ -172,6 +172,11 @@ TEST_F(T_Atomic, CompareAndSetAtomicInts) {
   const int32_t value2 = atomic_read32(&atomic32_);
   EXPECT_TRUE(res2);
   EXPECT_EQ(off3, value2);
+
+  const bool res3 = atomic_cas32(&atomic32_, off2, off1);
+  const int32_t value3 = atomic_read32(&atomic32_);
+  EXPECT_FALSE(res3);
+  EXPECT_EQ(off3, value3);
 }
 
 TEST_F(T_Atomic, TransactionalAssignment) {
