@@ -34,6 +34,7 @@ struct BlockItem : SingleCopy {
   ~BlockItem();
   void MakeStop();
   void MakeData(uint32_t capacity, BlockItem *succ_item);
+  void MakeData(unsigned char *data, uint32_t size, BlockItem *succ_item);
 
   uint32_t Write(void *buf, uint32_t count);
   void Progress(Tube<BlockItem> *next_stage);

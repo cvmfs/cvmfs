@@ -70,6 +70,25 @@ void BlockItem::MakeData(uint32_t capacity, BlockItem *succ_item) {
 }
 
 
+/**
+ * Move data from one block to another.
+ */
+void BlockItem::MakeData(
+  unsigned char *data,
+  uint32_t size,
+  BlockItem *succ_item)
+{
+  MutexLockGuard guard(&lock_);
+  assert(type_ == kBlockHollow);
+  assert(succ_item != NULL);
+
+  type_ = kBlockData;
+  capacity_ = size_ = size;
+  data_ = data;
+  succ_item_ = succ_item;
+}
+
+
 void BlockItem::Progress(Tube<BlockItem> *next_stage) {
   MutexLockGuard guard(&lock_);
   assert(type_ != kBlockHollow);
