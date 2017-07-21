@@ -77,20 +77,19 @@ S F 1
 S S 1
 S D 1
 S N 1
-M[TN] D /dir2
+M[N] D /dir2
 A F /dir2/.cvmfscatalog
 A D /dir3
 A F /dir3/new_file
 A F /dir3/.cvmfscatalog
-M[STC] F /file
+M[SC] F /file
 R S /symlink
-M[T] D /directory
-M[SMTLC] FS /directory/foo
-M[TN] D /directory/nested
+M[SMLC] FS /directory/foo
+M[N] D /directory/nested
 R F /directory/nested/.cvmfscatalog
 A S /other-symlink
 EOF
-  cvmfs_server diff -m $CVMFS_TEST_REPO > forward.output || return 21
+  cvmfs_server diff -im $CVMFS_TEST_REPO > forward.output || return 21
   diff forward.reference forward.output || return 22
 
   echo "*** check reverse changeset"
@@ -99,18 +98,17 @@ S F -1
 S S -1
 S D -1
 S N -1
-M[TN] D /dir2
+M[N] D /dir2
 R F /dir2/.cvmfscatalog
 R D /dir3
-M[STC] F /file
+M[SC] F /file
 A S /symlink
-M[T] D /directory
-M[SMTLC] SF /directory/foo
-M[TN] D /directory/nested
+M[SMLC] SF /directory/foo
+M[N] D /directory/nested
 A F /directory/nested/.cvmfscatalog
 R S /other-symlink
 EOF
-  cvmfs_server diff -m -s trunk -d trunk-previous $CVMFS_TEST_REPO \
+  cvmfs_server diff -im -s trunk -d trunk-previous $CVMFS_TEST_REPO \
     > reverse.output || return 31
   diff reverse.reference reverse.output || return 32
 

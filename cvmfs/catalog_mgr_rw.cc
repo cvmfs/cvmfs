@@ -439,6 +439,20 @@ void WritableCatalogManager::AddHardlinkGroup(
   // Therefore we only have one parent directory here
   const string parent_path = MakeRelativePath(parent_directory);
 
+  // check if hard link is too big
+  unsigned mbytes = entries[0].size() / (1024 * 1024);
+  if ((file_mbyte_limit_ > 0) && (mbytes > file_mbyte_limit_)) {
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "%s: hard link at %s is larger than %u megabytes (%u). "
+             "CernVM-FS works best with small files. "
+             "Please remove the file or increase the limit.",
+             enforce_limits_ ? "FATAL" : "WARNING",
+             (parent_path + entries[0].name().ToString()).c_str(),
+             file_mbyte_limit_,
+             mbytes);
+    assert(!enforce_limits_);
+  }
+
   SyncLock();
   WritableCatalog *catalog;
   if (!FindCatalog(parent_path, &catalog)) {
@@ -846,12 +860,16 @@ void WritableCatalogManager::FinalizeCatalog(WritableCatalog *catalog,
              base_hash().ToStringWithSuffix().c_str());
     catalog->SetPreviousRevision(base_hash());
   } else {
+    // Multiple catalogs might query the parent concurrently
+    SyncLock();
     shash::Any hash_previous;
     uint64_t size_previous;
     const bool retval =
       catalog->parent()->FindNested(catalog->mountpoint(),
                                     &hash_previous, &size_previous);
     assert(retval);
+    SyncUnlock();
+
     LogCvmfs(kLogCatalog, kLogVerboseMsg, "found '%s' as previous revision "
                                           "for nested catalog '%s'",
              hash_previous.ToStringWithSuffix().c_str(),
@@ -926,6 +944,7 @@ void WritableCatalogManager::CatalogUploadCallback(
   uint64_t catalog_size = GetFileSize(result.local_path);
   assert(catalog_size > 0);
 
+  SyncLock();
   if (catalog->HasParent()) {
     // finalized nested catalogs will update their parent's pointer and schedule
     // them for processing (continuation) if the 'dirty children count' == 0
@@ -940,6 +959,8 @@ void WritableCatalogManager::CatalogUploadCallback(
 
     const int remaining_dirty_children =
       catalog->GetWritableParent()->DecrementDirtyChildren();
+
+    SyncUnlock();
 
     // continuation of the dirty catalog tree traversal
     // see WritableCatalogManager::SnapshotCatalogs()
@@ -957,6 +978,7 @@ void WritableCatalogManager::CatalogUploadCallback(
     root_catalog_info.content_hash = result.content_hash;
     root_catalog_info.revision     = catalog->GetRevision();
     catalog_upload_context.root_catalog_info->Set(root_catalog_info);
+    SyncUnlock();
   } else {
     assert(false && "inconsistent state detected");
   }

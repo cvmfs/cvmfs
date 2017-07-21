@@ -15,7 +15,7 @@ cvmfs_server_diff() {
 
   # optional parameter handling
   OPTIND=1
-  while getopts "mhs:d:" option
+  while getopts "mihs:d:" option
   do
     case $option in
       m)
@@ -29,6 +29,9 @@ cvmfs_server_diff() {
       ;;
       d)
         param_list="$param_list -d $OPTARG"
+      ;;
+      i)
+        param_list="$param_list -i"
       ;;
       ?)
         shift $(($OPTIND-2))
