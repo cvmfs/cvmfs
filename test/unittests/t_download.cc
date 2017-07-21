@@ -56,7 +56,7 @@ class TestSink : public cvmfs::Sink {
     FILE *f = CreateTempFile("./cvmfs_ut_download", 0600, "w+", &path);
     assert(f);
     fd = dup(fileno(f));
-    assert(f >= 0);
+    assert(fd >= 0);
     fclose(f);
   }
 
