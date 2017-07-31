@@ -36,6 +36,8 @@ class TubeConsumer : SingleCopy {
   virtual void Process(ItemT *item) = 0;
   virtual void OnTerminate() { }
 
+  Tube<ItemT> *tube_;
+
  private:
   static void *MainConsumer(void *data) {
     TubeConsumer<ItemT> *consumer =
@@ -55,8 +57,6 @@ class TubeConsumer : SingleCopy {
       reinterpret_cast<TubeConsumer<ItemT> *>(data);
     consumer->OnTerminate();
   }
-
-  Tube<ItemT> *tube_;
 };
 
 

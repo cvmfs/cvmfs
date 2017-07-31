@@ -17,12 +17,17 @@
 template <class ItemT>
 class Tube;
 
-struct FileItem {
-  std::string path;
+class FileItem {
+ public:
+  explicit FileItem(const std::string &p) : path_(p) { }
+  std::string path() { return path_; }
+
+ private:
+  std::string path_;
 };
 
 
-struct BlockItem : SingleCopy {
+class BlockItem : SingleCopy {
  public:
   enum BlockType {
     kBlockHollow,

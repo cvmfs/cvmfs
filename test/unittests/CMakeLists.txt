@@ -171,6 +171,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/history_sqlite.cc
   ${CVMFS_SOURCE_DIR}/ingestion/item.cc
   ${CVMFS_SOURCE_DIR}/ingestion/task.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/task_read.cc
   ${CVMFS_SOURCE_DIR}/ingestion/tube.cc
   ${CVMFS_SOURCE_DIR}/json_document.cc
   ${CVMFS_SOURCE_DIR}/kvstore.cc
