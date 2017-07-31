@@ -1,4 +1,5 @@
 2.4.0:
+  * Fix cvmfs_config reload under root environment with cvmfs dependencies
   * Add support for CVMFS_{ROOT|NESTED}_KCATALOG_LIMIT, CVMFS_FILE_MBYTE_LIMIT,
     CVMFS_ENFORCE_LIMITS to set publish limits (CVM-1094, CVM-1123)
   * Add support for revision entries in blacklist (CVM-992)
