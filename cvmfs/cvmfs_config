@@ -970,6 +970,12 @@ cvmfs_status() {
 
 
 cvmfs_reload() {
+  # Run the reload command with clean environment to remove potential cvmfs
+  # dependencies
+  if [ "x$__CVMFS_CLEAN_ENV__" = "x" ]; then
+    exec env -i __CVMFS_CLEAN_ENV__=1 $0 reload $@
+  fi
+
   cvmfs_readconfig || die "Failed to read CernVM-FS configuration"
   local clean_cache; clean_cache=0
   local cache_directories=
