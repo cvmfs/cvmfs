@@ -5,7 +5,9 @@
 #include "gtest/gtest.h"
 
 #include "atomic.h"
+#include "ingestion/item.h"
 #include "ingestion/task.h"
+#include "ingestion/task_read.h"
 
 using namespace std;  // NOLINT
 
@@ -32,6 +34,7 @@ class TestTask : public TubeConsumer<DummyItem> {
 };
 atomic_int32 TestTask::cnt_terminate = 0;
 }
+
 
 class T_Task : public ::testing::Test {
  protected:
@@ -68,4 +71,22 @@ TEST_F(T_Task, Basic) {
   task_group_.Terminate();
   EXPECT_EQ(static_cast<int>(kNumTasks),
             atomic_read32(&TestTask::cnt_terminate));
+}
+
+
+TEST_F(T_Task, Read) {
+  Tube<FileItem> tube_in;
+  Tube<BlockItem> tube_out;
+
+  TubeConsumerGroup<FileItem> task_group;
+  task_group.TakeConsumer(new TaskRead(&tube_in, &tube_out));
+  task_group.Spawn();
+
+  FileItem file_null("/dev/null");
+  tube_in.Enqueue(&file_null);
+  BlockItem *item_stop = tube_out.Pop();
+  EXPECT_EQ(BlockItem::kBlockStop, item_stop->type());
+  delete item_stop;
+
+  task_group.Terminate();
 }

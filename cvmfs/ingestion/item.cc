@@ -21,7 +21,7 @@ BlockItem::BlockItem()
   , next_stage_(NULL)
 {
   int retval = pthread_mutex_init(&lock_, NULL);
-  assert(retval);
+  assert(retval == 0);
 }
 
 

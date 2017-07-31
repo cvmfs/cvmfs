@@ -51,6 +51,11 @@ class BlockItem : SingleCopy {
     return data_;
   }
 
+  BlockType type() {
+    MutexLockGuard guard(&lock_);
+    return type_;
+  }
+
  private:
   void DoProgress();
 
