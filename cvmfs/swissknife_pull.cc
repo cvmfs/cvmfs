@@ -492,7 +492,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   int retval;
   manifest::Failures m_retval;
   download::Failures dl_retval;
-  unsigned timeout = 10;
+  unsigned timeout = 60;
   int fd_lockfile = -1;
   string spooler_definition_str;
   manifest::ManifestEnsemble ensemble;
