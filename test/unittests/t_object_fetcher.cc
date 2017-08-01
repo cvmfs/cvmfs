@@ -796,7 +796,7 @@ TYPED_TEST(T_ObjectFetcher, FetchInvalidHistorySlow) {
   EXPECT_FALSE(history.IsValid());
   typename TypeParam::Failures expected_failure =
     (TestFixture::IsHttpObjectFetcher())
-      ? TypeParam::kFailUnknown    // HttpObjectFetcher is used via file://
+      ? TypeParam::kFailNetwork    // HttpObjectFetcher is used via file://
       : TypeParam::kFailNotFound;  // which doesn't support proper errors
                                    // TODO(rmeusel): fix me
   EXPECT_EQ(expected_failure, retval) << "code: " << Code2Ascii(retval);
@@ -889,7 +889,7 @@ TYPED_TEST(T_ObjectFetcher, FetchInvalidCatalogSlow) {
 
   typename TypeParam::Failures expected_failure =
     (TestFixture::IsHttpObjectFetcher())
-      ? TypeParam::kFailUnknown    // HttpObjectFetcher is used via file://
+      ? TypeParam::kFailNetwork    // HttpObjectFetcher is used via file://
       : TypeParam::kFailNotFound;  // which doesn't support proper errors
                                    // TODO(rmeusel): fix me
 
