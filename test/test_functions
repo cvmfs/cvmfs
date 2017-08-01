@@ -2363,29 +2363,33 @@ find_or_build_cvmfs_preload() {
 set_up_repository_services() {
     echo "Setting up repository services"
 
-    local package_url_root=http://ecsft.cern.ch/dist/cvmfs/cvmfs-services/cvmfs_services-$CVMFS_SERVICES_VERSION
-    local cvmfs_services_package_url=""
+    local package_url_root=$CVMFS_SERVICES_URL
+
     # Choose which package to download and install based on platform
     if [ -f /etc/lsb-release ]; then
         if [ x"$(lsb_release -cs)" = x"xenial" ]; then
-            cvmfs_services_package_url=${package_url_root}-ubuntu1604-x86_64.tar.gz
-            echo "Using package: $cvmfs_services_package_url"
+            package_map_url=${package_url_root}/pkgmap/pkgmap.ubuntu1604_x86_64
         fi
     elif [ -f /etc/redhat-release ]; then
         rhver=$(cat /etc/redhat-release | awk {'print $(NF-1)'} | cut -d'.' -f1)
         if [ $((rhver == 6)) -o $((rhver == 7)) ]; then
-            cvmfs_services_package_url=${package_url_root}-centos${rhver}-x86_64.tar.gz
-            echo "Using package: $cvmfs_services_package_url"
+            package_map_url=${package_url_root}/pkgmap/pkgmap.centos${rhver}_x86_64
         fi
     fi
 
-    if [ x"$cvmfs_services_package_url" = x"" ]; then
+    if [ x"$package_map_url" = x"" ]; then
         echo "Platform not supported. Exiting"
         exit 1
     fi
 
     echo "  Installing the cvmfs_services application"
     pushd /tmp
+
+    curl -o package_map $package_map_url
+
+    local cvmfs_services_package_url=${package_url_root}/$(tail -1 package_map | cut -d'=' -f2)
+    echo "    Using package: $cvmfs_services_package_url"
+    
     local cvmfs_services_package_file_name=$(echo $cvmfs_services_package_url | awk -F'/' {'print $NF'})
 
     if [ ! -f "/tmp/$cvmfs_services_package_file_name" ]; then
