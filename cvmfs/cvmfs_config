@@ -58,7 +58,7 @@ case $sys_arch in
 
   Darwin )
     fuser="/usr/bin/fuser"
-    fuse_fs_type="osxfusefs"
+    fuse_fs_type="osxfuse"
     ;;
 
   * )
@@ -973,7 +973,7 @@ cvmfs_reload() {
   # Run the reload command with clean environment to remove potential cvmfs
   # dependencies
   if [ "x$__CVMFS_CLEAN_ENV__" = "x" ]; then
-    exec env -i __CVMFS_CLEAN_ENV__=1 $0 reload $@
+    exec env -i __CVMFS_CLEAN_ENV__=1 $(get_minimal_path) $0 reload $@
   fi
 
   cvmfs_readconfig || die "Failed to read CernVM-FS configuration"
@@ -1810,6 +1810,25 @@ get_attr() {
       echo "Architecture $sys_arch is not supported"
       exit 1 ;;
    esac
+}
+
+# Ensures that binaries needed during reload are found. Reload creates itself
+# a clean environment before execution.
+get_minimal_path() {
+  case $sys_arch in
+    Linux)
+      # On Linux, all the binaries needed during reload are in the default
+      # search paths
+      echo ""
+    ;;
+    Darwin)
+      echo "PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+    ;;
+    *)
+      echo "Architecture $sys_arch is not supported"
+      exit 1
+    ;;
+  esac
 }
 
 
