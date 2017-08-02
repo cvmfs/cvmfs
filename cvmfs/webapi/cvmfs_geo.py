@@ -195,7 +195,7 @@ def api(path_info, repo_name, version, start_response, environ):
     caching_string = path_info[0:slash]
     servers = string.split(path_info[slash+1:], ",")
 
-    now = time.time()
+    now = int(time.time())
 
     gir_rem = None
     if caching_string.find('.'):
