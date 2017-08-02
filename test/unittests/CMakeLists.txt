@@ -94,6 +94,7 @@ set(CVMFS_UNITTEST_FILES
   t_statistics.cc
   t_swissknife_lease.cc
   t_synchronizing_counter.cc
+  t_temp_dir.cc
   t_test_utils.cc
   t_tracer.cc
   t_uid_map.cc
@@ -215,6 +216,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/util/mmap_file.cc
   ${CVMFS_SOURCE_DIR}/util/posix.cc
   ${CVMFS_SOURCE_DIR}/util/string.cc
+  ${CVMFS_SOURCE_DIR}/util/temp_dir.cc
   ${CVMFS_SOURCE_DIR}/util_concurrency.cc
   ${CVMFS_SOURCE_DIR}/uuid.cc
 	${CVMFS_SOURCE_DIR}/webapi/fcgi.cc
