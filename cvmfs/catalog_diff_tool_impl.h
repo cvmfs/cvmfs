@@ -45,17 +45,17 @@ template <typename RoCatalogMgr>
 bool CatalogDiffTool<RoCatalogMgr>::Init() {
   if (needs_setup_) {
     // Create a temp directory
-    const std::string temp_dir_old = CreateTempDir(temp_dir_prefix_);
-    const std::string temp_dir_new = CreateTempDir(temp_dir_prefix_);
+    old_raii_temp_dir_ = TempDir::Create(temp_dir_prefix_);
+    new_raii_temp_dir_ = TempDir::Create(temp_dir_prefix_);
 
     // Old catalog from release manager machine (before lease)
     old_catalog_mgr_ =
-        OpenCatalogManager(repo_path_, temp_dir_old, old_root_hash_,
+      OpenCatalogManager(repo_path_, old_raii_temp_dir_->dir(), old_root_hash_,
                            download_manager_, &stats_old_);
 
     // New catalog from release manager machine (before lease)
     new_catalog_mgr_ =
-        OpenCatalogManager(repo_path_, temp_dir_new, new_root_hash_,
+      OpenCatalogManager(repo_path_, new_raii_temp_dir_->dir(), new_root_hash_,
                            download_manager_, &stats_new_);
 
     if (!old_catalog_mgr_.IsValid()) {

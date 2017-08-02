@@ -22,6 +22,7 @@
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
+#include "util/temp_dir.h"
 
 namespace receiver {
 
@@ -87,7 +88,7 @@ CommitProcessor::Result CommitProcessor::Process(
     return kIoError;
   }
 
-  const std::string temp_dir_root = "/srv/cvmfs/" + repo_name + "/data/txn";
+  const std::string temp_dir_root = "/srv/cvmfs/" + repo_name + "/data/txn/commit_processor";
 
   CatalogMergeTool<catalog::WritableCatalogManager,
                    catalog::SimpleCatalogManager>
@@ -112,7 +113,8 @@ CommitProcessor::Result CommitProcessor::Process(
     return kMergeError;
   }
 
-  const std::string temp_dir = CreateTempDir(temp_dir_root);
+  UniquePtr<TempDir> raii_temp_dir(TempDir::Create(temp_dir_root));
+  const std::string temp_dir = raii_temp_dir->dir();
   const std::string certificate = "/etc/cvmfs/keys/" + repo_name + ".crt";
   const std::string private_key = "/etc/cvmfs/keys/" + repo_name + ".key";
 

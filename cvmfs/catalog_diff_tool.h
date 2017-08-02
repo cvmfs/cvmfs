@@ -11,6 +11,7 @@
 #include "shortstring.h"
 #include "statistics.h"
 #include "util/pointer.h"
+#include "util/temp_dir.h"
 #include "xattr.h"
 
 namespace download {
@@ -37,6 +38,8 @@ class CatalogDiffTool {
         new_root_hash_(new_root_hash),
         temp_dir_prefix_(temp_dir_prefix),
         download_manager_(download_manager),
+        old_raii_temp_dir_(),
+        new_raii_temp_dir_(),
         old_catalog_mgr_(),
         new_catalog_mgr_(),
         needs_setup_(true) {}
@@ -83,6 +86,9 @@ class CatalogDiffTool {
 
   perf::Statistics stats_old_;
   perf::Statistics stats_new_;
+
+  UniquePtr<TempDir> old_raii_temp_dir_;
+  UniquePtr<TempDir> new_raii_temp_dir_;
 
   UniquePtr<RoCatalogMgr> old_catalog_mgr_;
   UniquePtr<RoCatalogMgr> new_catalog_mgr_;
