@@ -14,7 +14,7 @@
 #include "options.h"
 #include "upload.h"
 #include "util/posix.h"
-#include "util/temp_dir.h"
+#include "util/raii_temp_dir.h"
 
 inline PathString MakeRelative(const PathString& path) {
   std::string rel_path;
@@ -34,7 +34,7 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::Run(
     const Params& params, std::string* new_manifest_path) {
   UniquePtr<upload::Spooler> spooler;
   perf::Statistics stats;
-  UniquePtr<TempDir> raii_temp_dir(TempDir::Create(temp_dir_prefix_));
+  UniquePtr<RaiiTempDir> raii_temp_dir(RaiiTempDir::Create(temp_dir_prefix_));
   if (needs_setup_) {
     upload::SpoolerDefinition definition(
         params.spooler_configuration, params.hash_alg, params.compression_alg,

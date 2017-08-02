@@ -16,16 +16,16 @@
  * The temporary directory is created using the given prefix string
  * ("prefix.<UNIQUE_SUFFIX>")
  */
-class TempDir {
+class RaiiTempDir {
  public:
-  static TempDir* Create(const std::string& prefix);
+  static RaiiTempDir* Create(const std::string& prefix);
 
   std::string dir() const { return dir_; }
 
-  ~TempDir();
+  ~RaiiTempDir();
 
 private:
-  TempDir(const std::string& prefix);
+  RaiiTempDir(const std::string& prefix);
 
   std::string dir_;
 };

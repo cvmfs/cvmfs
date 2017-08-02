@@ -45,8 +45,8 @@ template <typename RoCatalogMgr>
 bool CatalogDiffTool<RoCatalogMgr>::Init() {
   if (needs_setup_) {
     // Create a temp directory
-    old_raii_temp_dir_ = TempDir::Create(temp_dir_prefix_);
-    new_raii_temp_dir_ = TempDir::Create(temp_dir_prefix_);
+    old_raii_temp_dir_ = RaiiTempDir::Create(temp_dir_prefix_);
+    new_raii_temp_dir_ = RaiiTempDir::Create(temp_dir_prefix_);
 
     // Old catalog from release manager machine (before lease)
     old_catalog_mgr_ =

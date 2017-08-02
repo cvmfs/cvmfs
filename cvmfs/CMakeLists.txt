@@ -245,7 +245,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   util/mmap_file.cc
   util/posix.cc
   util/string.cc
-  util/temp_dir.cc
+  util/raii_temp_dir.cc
   util_concurrency.cc
   whitelist.cc
   xattr.cc
@@ -400,7 +400,7 @@ if(BUILD_RECEIVER)
     util/mmap_file.cc
     util/posix.cc
     util/string.cc
-    util/temp_dir.cc
+    util/raii_temp_dir.cc
     uuid.cc
     whitelist.cc
     xattr.cc

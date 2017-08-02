@@ -22,7 +22,7 @@
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
-#include "util/temp_dir.h"
+#include "util/raii_temp_dir.h"
 
 namespace receiver {
 
@@ -113,7 +113,7 @@ CommitProcessor::Result CommitProcessor::Process(
     return kMergeError;
   }
 
-  UniquePtr<TempDir> raii_temp_dir(TempDir::Create(temp_dir_root));
+  UniquePtr<RaiiTempDir> raii_temp_dir(RaiiTempDir::Create(temp_dir_root));
   const std::string temp_dir = raii_temp_dir->dir();
   const std::string certificate = "/etc/cvmfs/keys/" + repo_name + ".crt";
   const std::string private_key = "/etc/cvmfs/keys/" + repo_name + ".key";
