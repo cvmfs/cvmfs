@@ -115,6 +115,10 @@ Requires: util-linux
     %endif
   %endif
 %endif
+%if 0%{?fedora}
+# For cvmfs_talk, does not necessarily come with Fedora >= 25
+Requires: perl-Getopt-Long
+%endif
 Requires: cvmfs-config
 
 # SELinux integration
@@ -473,6 +477,8 @@ fi
 %doc COPYING AUTHORS README.md ChangeLog
 
 %changelog
+* Wed Aug 02 2017 Jakob Blomer <jblomer@cern.ch> - 2.4.0
+- Fix dependencies for Fedora >= 25
 * Wed Jul 05 2017 Jakob Blomer <jblomer@cern.ch> - 2.4.0
 - Assign port 8000 to httpd in selinux configuration - 2.4.0
 * Thu Jun 29 2017 Jakob Blomer <jblomer@cern.ch> - 2.4.0
