@@ -93,9 +93,10 @@ bool GetParamsFromFile(const std::string& repo_name, Params* params) {
 
   params->enforce_limits = false;
   std::string enforce_limits_str;
-  ret &= parser.GetValue("CVMFS_ENFORCE_LIMITS", &enforce_limits_str);
-  if (enforce_limits_str == "true") {
-    params->enforce_limits = true;
+  if (parser.GetValue("CVMFS_ENFORCE_LIMITS", &enforce_limits_str)) {
+    if (enforce_limits_str == "true") {
+      params->enforce_limits = true;
+    }
   }
 
   // TODO(dwd): the next 3 limit variables should take defaults from
