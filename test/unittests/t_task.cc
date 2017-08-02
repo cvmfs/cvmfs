@@ -88,5 +88,7 @@ TEST_F(T_Task, Read) {
   EXPECT_EQ(BlockItem::kBlockStop, item_stop->type());
   delete item_stop;
 
+
+
   task_group.Terminate();
 }

@@ -9,6 +9,8 @@
 
 class TaskRead : public TubeConsumer<FileItem> {
  public:
+  static const unsigned kBlockSize = kPageSize * 4;
+
   TaskRead(Tube<FileItem> *tube_in, Tube<BlockItem> *tube_out)
     : TubeConsumer<FileItem>(tube_in), tube_out_(tube_out) { }
 
@@ -16,7 +18,5 @@ class TaskRead : public TubeConsumer<FileItem> {
   virtual void Process(FileItem *item);
 
  private:
-  static const unsigned kBlockSize = kPageSize * 4;
-
   Tube<BlockItem> *tube_out_;
 };
