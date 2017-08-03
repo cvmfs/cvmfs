@@ -14,6 +14,7 @@
 #include "options.h"
 #include "upload.h"
 #include "util/posix.h"
+#include "util/raii_temp_dir.h"
 
 inline PathString MakeRelative(const PathString& path) {
   std::string rel_path;
@@ -33,6 +34,7 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::Run(
     const Params& params, std::string* new_manifest_path) {
   UniquePtr<upload::Spooler> spooler;
   perf::Statistics stats;
+  UniquePtr<RaiiTempDir> raii_temp_dir(RaiiTempDir::Create(temp_dir_prefix_));
   if (needs_setup_) {
     upload::SpoolerDefinition definition(
         params.spooler_configuration, params.hash_alg, params.compression_alg,
@@ -40,7 +42,7 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::Run(
         params.min_chunk_size, params.avg_chunk_size, params.max_chunk_size,
         "dummy_token", "dummy_key");
     spooler = upload::Spooler::Construct(definition);
-    const std::string temp_dir = CreateTempDir(temp_dir_prefix_);
+    const std::string temp_dir = raii_temp_dir->dir();
     output_catalog_mgr_ = new RwCatalogMgr(
         manifest_->catalog_hash(), repo_path_, temp_dir, spooler,
         download_manager_, params.enforce_limits, params.nested_kcatalog_limit,
@@ -146,8 +148,7 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::CreateNewManifest(
     return false;
   }
 
-  const std::string temp_dir = CreateTempDir(temp_dir_prefix_);
-  const std::string new_path = temp_dir + "/new_manifest";
+  const std::string new_path = CreateTempPath(temp_dir_prefix_, 0600);
 
   if (!manifest_->Export(new_path)) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
