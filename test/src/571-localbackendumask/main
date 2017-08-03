@@ -60,7 +60,7 @@ create_random_files() {
   local i=0
   while [ $i -lt $filecount ]; do
     local filename=$(mktemp $filename_dummy)
-    openssl rand -out $filename -base64 $bytes 2>/dev/null || return 1
+    cat /dev/urandom | base64 -w0 | head -c $bytes > $filename 2>/dev/null || return 1
     i=$(( $i + 1 ))
   done
 }
