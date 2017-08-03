@@ -194,7 +194,7 @@ __do_gc_cmd()
     check_url "${CVMFS_STRATUM0}/.cvmfspublished" 20 || die "Repository unavailable under $CVMFS_STRATUM0"
     if is_empty_repository $name; then
       echo "Repository $name is empty, nothing to do"
-      continue
+      return 0
     fi
     is_garbage_collectable $name || die "Garbage Collection is not enabled for $name"
     is_owner_or_root       $name || die "Permission denied: Repository $name is owned by $user"

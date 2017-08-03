@@ -41,6 +41,7 @@ install_from_repo nc
 install_from_repo wget
 install_from_repo bc
 install_from_repo tree
+install_from_repo sqlite
 
 # traffic shaping
 install_from_repo trickle
