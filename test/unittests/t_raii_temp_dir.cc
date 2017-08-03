@@ -4,8 +4,8 @@
 
 #include <gtest/gtest.h>
 
-#include <util/pointer.h>
-#include <util/raii_temp_dir.h>
+#include "util/pointer.h"
+#include "util/raii_temp_dir.h"
 
 #include "platform.h"
 #include "util/posix.h"
@@ -19,7 +19,7 @@ static bool DirExists(const std::string& dir) {
 class T_RaiiTempDir : public ::testing::Test {};
 
 TEST_F(T_RaiiTempDir, Basic) {
-  UniquePtr<RaiiTempDir> temp_dir(RaiiTempDir::Create("/tmp/test_dir"));
+  UniquePtr<RaiiTempDir> temp_dir(RaiiTempDir::Create(GetCurrentWorkingDirectory() + "/test_dir"));
   ASSERT_TRUE(temp_dir.IsValid());
 
   const std::string temp_path = temp_dir->dir();
@@ -30,7 +30,7 @@ TEST_F(T_RaiiTempDir, Basic) {
 }
 
 TEST_F(T_RaiiTempDir, DeletedExternally) {
-  UniquePtr<RaiiTempDir> temp_dir(RaiiTempDir::Create("/tmp/test_dir"));
+  UniquePtr<RaiiTempDir> temp_dir(RaiiTempDir::Create(GetCurrentWorkingDirectory() + "/test_dir"));
   ASSERT_TRUE(temp_dir.IsValid());
 
   const std::string temp_path = temp_dir->dir();
