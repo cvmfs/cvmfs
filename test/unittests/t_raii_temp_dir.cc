@@ -29,22 +29,13 @@ TEST_F(T_RaiiTempDir, Basic) {
   ASSERT_FALSE(DirExists(temp_path));
 }
 
-TEST_F(T_RaiiTempDir, DeleteWhileBusy) {
+TEST_F(T_RaiiTempDir, DeletedExternally) {
   UniquePtr<RaiiTempDir> temp_dir(RaiiTempDir::Create("/tmp/test_dir"));
   ASSERT_TRUE(temp_dir.IsValid());
 
   const std::string temp_path = temp_dir->dir();
 
-  const std::string test_file = temp_path + "/test_file";
-
-  CreateFile(test_file, 0600);
-  int fd = open(test_file.c_str(), O_APPEND);
-
-  temp_dir.Destroy();
+  RemoveTree(temp_path);
 
   ASSERT_FALSE(DirExists(temp_path));
-
-  int ret = close(fd);
-
-  ASSERT_EQ(0, ret);
 }
