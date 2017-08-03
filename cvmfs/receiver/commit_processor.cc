@@ -21,8 +21,8 @@
 #include "util/algorithm.h"
 #include "util/pointer.h"
 #include "util/posix.h"
-#include "util/string.h"
 #include "util/raii_temp_dir.h"
+#include "util/string.h"
 
 namespace receiver {
 
@@ -88,7 +88,8 @@ CommitProcessor::Result CommitProcessor::Process(
     return kIoError;
   }
 
-  const std::string temp_dir_root = "/srv/cvmfs/" + repo_name + "/data/txn/commit_processor";
+  const std::string temp_dir_root =
+      "/srv/cvmfs/" + repo_name + "/data/txn/commit_processor";
 
   CatalogMergeTool<catalog::WritableCatalogManager,
                    catalog::SimpleCatalogManager>

@@ -16,8 +16,7 @@ RaiiTempDir* RaiiTempDir::Create(const std::string& prefix) {
   }
 }
 
-RaiiTempDir::RaiiTempDir(const std::string& prefix) : dir_(CreateTempDir(prefix)) {}
+RaiiTempDir::RaiiTempDir(const std::string& prefix)
+    : dir_(CreateTempDir(prefix)) {}
 
-RaiiTempDir::~RaiiTempDir() {
-  RemoveTree(dir_);
-}
+RaiiTempDir::~RaiiTempDir() { RemoveTree(dir_); }

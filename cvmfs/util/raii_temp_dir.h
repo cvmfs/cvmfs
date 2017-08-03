@@ -2,8 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef CVMFS_UTIL_TEMP_DIR_H_
-#define CVMFS_UTIL_TEMP_DIR_H_
+#ifndef CVMFS_UTIL_RAII_TEMP_DIR_H_
+#define CVMFS_UTIL_RAII_TEMP_DIR_H_
 
 #include <string>
 
@@ -24,10 +24,10 @@ class RaiiTempDir {
 
   ~RaiiTempDir();
 
-private:
-  RaiiTempDir(const std::string& prefix);
+ private:
+  explicit RaiiTempDir(const std::string& prefix);
 
   std::string dir_;
 };
 
-#endif  // CVMFS_UTIL_TEMP_DIR_H_
+#endif  // CVMFS_UTIL_RAII_TEMP_DIR_H_
