@@ -187,7 +187,13 @@ int TieredCacheManager::CommitTxn(void *txn) {
     lower_result = lower_->CommitTxn(txn2);
   }
 
-  return (upper_result < 0) ? upper_result : lower_result;
+  // Transaction is successful as long as the storage was successful
+  // in the upper cache (which may have already handed out a FD via
+  // OpenFromTxn).
+  //
+  // If there wasn't the OpenFromTxn semantics, we could have this
+  // call succeed if *either* transaction was successful.
+  return upper_result;
 }
 
 
