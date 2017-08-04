@@ -8,6 +8,8 @@
 
 set -e
 
+SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
+
 # Setup Mnesia
 echo "Setting up the Mnesia"
 
@@ -17,12 +19,12 @@ sudo mkdir -p $cvmfs_mnesia_root
 sudo chown -R `whoami`:`whoami` $cvmfs_mnesia_root
 
 echo "  - creating Mnesia schema"
-bin/cvmfs_services escript scripts/setup_mnesia.escript $cvmfs_mnesia_root
+$SCRIPT_LOCATION/../bin/cvmfs_services escript scripts/setup_mnesia.escript $cvmfs_mnesia_root
 
 # Install syslog configuration file
 echo "Installing the syslog configuration file"
-sudo cp -v scripts/90-cvmfs_services.conf /etc/rsyslog.d/
-sudo cp -v scripts/90-cvmfs_services_rotate /etc/logrotate.d/
+sudo cp -v $SCRIPT_LOCATION/90-cvmfs_services.conf /etc/rsyslog.d/
+sudo cp -v $SCRIPT_LOCATION/90-cvmfs_services_rotate /etc/logrotate.d/
 
 echo "  - restarting rsyslog"
 if [ x"$(which systemctl)" != x"" ]; then
