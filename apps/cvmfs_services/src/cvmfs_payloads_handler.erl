@@ -29,9 +29,9 @@ init(Req0 = #{method := <<"GET">>}, State) ->
     {URI, T0} = cvmfs_fe_util:tick(Uid, <<"GET">>, Req0, micro_seconds),
 
     Req1 = cowboy_req:reply(405,
-                           #{<<"content-type">> => <<"application/plain-text">>},
-                           <<"">>,
-                           Req0),
+                            #{<<"content-type">> => <<"application/plain-text">>},
+                            <<"">>,
+                            Req0),
 
     cvmfs_fe_util:tock(Uid, <<"GET">>, URI, T0, micro_seconds),
     {ok, Req1, State};
