@@ -74,7 +74,7 @@ cvmfs_run_test() {
 
   # If we now don't resign whitelist before attempting to publish, the
   #  publish will actually succeed once.  In any case, at this point
-  #  both resigh for .cvmfswhitelist and resign -p for .cvmfspublished
+  #  both resign for .cvmfswhitelist and resign -p for .cvmfspublished
   #  are needed before the repo will fully recover.
   echo "resign whitelist"
   sudo cvmfs_server resign $CVMFS_TEST_REPO || return $?
@@ -83,8 +83,19 @@ cvmfs_run_test() {
   start_transaction $CVMFS_TEST_REPO || return 10
   publish_repo $CVMFS_TEST_REPO && return 11
 
+  echo "forcing the repo to look unhealthy"
+  # resign -p should work even if the repository isn't completely healthy
+  #  so force it to be unhealthy by unmounting /cvmfs/$CVMFS_TEST_REPO
+  sudo umount /cvmfs/$CVMFS_TEST_REPO || return $?
+
   echo "resign published"
   sudo cvmfs_server resign -p $CVMFS_TEST_REPO || return $?
+
+  echo "restore the transaction to health by aborting transaction"
+  abort_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "and restart the transaction"
+  start_transaction $CVMFS_TEST_REPO || return 10
 
   echo "make sure that a publish now works"
   publish_repo $CVMFS_TEST_REPO || return 12
