@@ -101,7 +101,7 @@ int cvmcache_hash_cmp(struct cvmcache_hash *a, struct cvmcache_hash *b);
 /**
  * The caller has to free the resulting string
  */
-char *cvmcache_hash_print(struct cvmcache_hash *h);
+char *cvmcache_hash_print(const struct cvmcache_hash *h);
 
 /**
  * According to capabilities, some of the callbacks can be NULL
