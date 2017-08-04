@@ -89,6 +89,7 @@ init_per_suite(Config) ->
     ok = application:set_env(cvmfs_services, repo_config, #{repos => ct:get_config(repos)
                                                            ,keys => ct:get_config(keys)}),
     ok = application:set_env(cvmfs_services, user_config, #{max_lease_time => MaxLeaseTime,
+                                                            fe_tcp_port => 8080,
                                                             receiver_config => [{size, 1},
                                                                                 {max_overflow, 0},
                                                                                 {worker_module, cvmfs_test_receiver}],

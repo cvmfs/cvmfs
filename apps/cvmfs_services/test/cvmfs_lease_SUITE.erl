@@ -55,6 +55,7 @@ init_per_suite(Config) ->
     ok = application:load(cvmfs_services),
     ok = application:set_env(cvmfs_services, enabled_services, [cvmfs_lease]),
     ok = application:set_env(cvmfs_services, user_config, #{max_lease_time => MaxLeaseTime,
+                                                            fe_tcp_port => 8080,
                                                             receiver_config => [{size,1},
                                                                                 {max_overflow, 0},
                                                                                 {worker_module, cvmfs_test_receiver}],
