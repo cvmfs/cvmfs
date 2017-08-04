@@ -8,7 +8,7 @@
 
 -module(cvmfs_fe).
 
--export([start_link/0, api_version/0]).
+-export([start_link/1, api_version/0]).
 
 -define(API_VERSION, 1).
 -define(API_ROOT, "/api/v" ++ integer_to_list(?API_VERSION)).
@@ -19,7 +19,7 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
-start_link() ->
+start_link([TcpPort]) ->
     %% Compile a routing table, for dispatching requests for different resources
     %% to a set of handler modules. The handler modules implement the init/2 callback
     %% required by Cowboy
@@ -33,7 +33,7 @@ start_link() ->
     %% TODO: Port and other parameters should not be hard-coded and should moved to
     %%       the release configuration file
     cowboy:start_clear(cvmfs_fe, 100,
-                       [{port, 8080}],
+                       [{port, TcpPort}],
                        #{env => #{dispatch => Dispatch}}).
 
 

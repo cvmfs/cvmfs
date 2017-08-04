@@ -21,6 +21,7 @@ start(_StartType, _StartArgs) ->
 
     UserVars = read_vars(user_config,
                          #{max_lease_time => 7200,
+                           fe_tcp_port => 8080, 
                            receiver_config => [{size, 1}, {max_overflow, 1}],
                            receiver_worker_config => [{executable_path, "/usr/bin/cvmfs_receiver"}]}),
 
@@ -37,9 +38,11 @@ start(_StartType, _StartArgs) ->
 
     {ok, Services} = application:get_env(enabled_services),
 
+    TcpPort = maps:get(fe_tcp_port, UserVars),
+
     case lists:member(cvmfs_fe, Services) of
         true ->
-            {ok, _} = cvmfs_fe:start_link();
+            {ok, _} = cvmfs_fe:start_link([TcpPort]);
         false ->
             ok
     end,
