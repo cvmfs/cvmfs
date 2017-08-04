@@ -73,7 +73,6 @@ groups() ->
 
 %% Set up and tear down
 init_per_suite(Config) ->
-    MaxLeaseTime = 1, % seconds
 
     application:load(mnesia),
     application:set_env(mnesia, schema_location, ram),
@@ -88,13 +87,10 @@ init_per_suite(Config) ->
                                                                 cvmfs_receiver_pool]),
     ok = application:set_env(cvmfs_services, repo_config, #{repos => ct:get_config(repos)
                                                            ,keys => ct:get_config(keys)}),
-    ok = application:set_env(cvmfs_services, user_config, #{max_lease_time => MaxLeaseTime,
-                                                            fe_tcp_port => 8080,
-                                                            receiver_config => [{size, 1},
-                                                                                {max_overflow, 0},
-                                                                                {worker_module, cvmfs_test_receiver}],
-                                                            receiver_worker_config => []
-                                                           }),
+
+    MaxLeaseTime = 1, % seconds
+    TestUserVars = cvmfs_test_util:make_test_user_vars(MaxLeaseTime),
+    ok = application:set_env(cvmfs_services, user_config, TestUserVars),
 
     {ok, _} = application:ensure_all_started(cvmfs_services),
 

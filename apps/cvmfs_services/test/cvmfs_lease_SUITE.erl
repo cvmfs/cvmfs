@@ -51,16 +51,15 @@ init_per_suite(Config) ->
     application:set_env(mnesia, schema_location, ram),
     application:ensure_all_started(mnesia),
 
-    MaxLeaseTime = 1, % seconds
     ok = application:load(cvmfs_services),
     ok = application:set_env(cvmfs_services, enabled_services, [cvmfs_lease]),
-    ok = application:set_env(cvmfs_services, user_config, #{max_lease_time => MaxLeaseTime,
-                                                            fe_tcp_port => 8080,
-                                                            receiver_config => [{size,1},
-                                                                                {max_overflow, 0},
-                                                                                {worker_module, cvmfs_test_receiver}],
-                                                            receiver_worker_config => []}),
+
+    MaxLeaseTime = 1, % seconds
+    TestUserVars = cvmfs_test_util:make_test_user_vars(MaxLeaseTime),
+    ok = application:set_env(cvmfs_services, user_config, TestUserVars),
+
     {ok, _} = application:ensure_all_started(cvmfs_services),
+
     lists:flatten([{max_lease_time, MaxLeaseTime}, Config]).
 
 end_per_suite(_Config) ->
