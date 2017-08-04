@@ -130,11 +130,15 @@ bool Reactor::Run() {
 
 bool Reactor::HandleGenerateToken(const std::string& req, std::string* reply) {
   if (reply == NULL) {
-    return false;
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "HandleGenerateToken: Invalid reply pointer.");
+    abort();
   }
 
   UniquePtr<JsonDocument> req_json(JsonDocument::Create(req));
   if (!req_json.IsValid()) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "HandleGenerateToken: Invalid JSON request.");
     return false;
   }
 
@@ -146,6 +150,8 @@ bool Reactor::HandleGenerateToken(const std::string& req, std::string* reply) {
       req_json->root(), "max_lease_time", JSON_INT);
 
   if (key_id == NULL || path == NULL || max_lease_time == NULL) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "HandleGenerateToken: Missing fields in request.");
     return false;
   }
 
@@ -156,6 +162,8 @@ bool Reactor::HandleGenerateToken(const std::string& req, std::string* reply) {
   if (!GenerateSessionToken(key_id->string_value, path->string_value,
                             max_lease_time->int_value, &session_token,
                             &public_token_id, &token_secret)) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "HandleGenerateToken: Could not generate session token.");
     return false;
   }
 
@@ -171,7 +179,9 @@ bool Reactor::HandleGenerateToken(const std::string& req, std::string* reply) {
 
 bool Reactor::HandleGetTokenId(const std::string& req, std::string* reply) {
   if (reply == NULL) {
-    return false;
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "HandleGetTokenId: Invalid reply pointer.");
+    abort();
   }
 
   std::string token_id;
@@ -190,11 +200,15 @@ bool Reactor::HandleGetTokenId(const std::string& req, std::string* reply) {
 
 bool Reactor::HandleCheckToken(const std::string& req, std::string* reply) {
   if (reply == NULL) {
-    return false;
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "HandleCheckToken: Invalid reply pointer.");
+    abort();
   }
 
   UniquePtr<JsonDocument> req_json(JsonDocument::Create(req));
   if (!req_json.IsValid()) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "HandleCheckToken: Invalid JSON request.");
     return false;
   }
 
@@ -204,6 +218,8 @@ bool Reactor::HandleCheckToken(const std::string& req, std::string* reply) {
       JsonDocument::SearchInObject(req_json->root(), "secret", JSON_STRING);
 
   if (token == NULL || secret == NULL) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "HandleCheckToken: Missing fields in request.");
     return false;
   }
 
@@ -230,7 +246,7 @@ bool Reactor::HandleCheckToken(const std::string& req, std::string* reply) {
     default:
       // Should not be reached
       LogCvmfs(kLogReceiver, kLogSyslogErr,
-               "Reactor::HandleCheckToken - Unknown value received. Exiting.");
+               "HandleCheckToken: Unknown value received. Exiting.");
       abort();
   }
 
@@ -243,13 +259,17 @@ bool Reactor::HandleCheckToken(const std::string& req, std::string* reply) {
 bool Reactor::HandleSubmitPayload(int fdin, const std::string& req,
                                   std::string* reply) {
   if (!reply) {
-    return false;
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "HandleSubmitPayload: Invalid reply pointer.");
+    abort();
   }
 
   // Extract the Path (used for verification), Digest and DigestSize from the
   // request JSON.
   UniquePtr<JsonDocument> req_json(JsonDocument::Create(req));
   if (!req_json.IsValid()) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "HandleSubmitPayload: Invalid JSON request.");
     return false;
   }
 
@@ -261,6 +281,8 @@ bool Reactor::HandleSubmitPayload(int fdin, const std::string& req,
       JsonDocument::SearchInObject(req_json->root(), "header_size", JSON_INT);
 
   if (path_json == NULL || digest_json == NULL || header_size_json == NULL) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "HandleSubmitPayload: Missing fields in request.");
     return false;
   }
 
@@ -284,7 +306,8 @@ bool Reactor::HandleSubmitPayload(int fdin, const std::string& req,
       break;
     default:
       LogCvmfs(kLogReceiver, kLogSyslogErr,
-               "Unknown value of PayloadProcessor::Result encountered.");
+               "HandleSubmitPayload: Unknown value of PayloadProcessor::Result "
+               "encountered.");
       abort();
       break;
   }
@@ -296,12 +319,16 @@ bool Reactor::HandleSubmitPayload(int fdin, const std::string& req,
 
 bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
   if (!reply) {
-    return false;
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "HandleCommit: Invalid reply pointer.");
+    abort();
   }
 
   // Extract the Path from the request JSON.
   UniquePtr<JsonDocument> req_json(JsonDocument::Create(req));
   if (!req_json.IsValid()) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "HandleCommit: Invalid JSON request.");
     return false;
   }
 
@@ -314,7 +341,9 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
 
   if (lease_path_json == NULL || old_root_hash_json == NULL ||
       new_root_hash_json == NULL)
-    return false;
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "HandleCommit: Missing fields in request.");
+  return false;
 
   // Here we use the path to commit the changes!
   UniquePtr<CommitProcessor> proc(MakeCommitProcessor());
