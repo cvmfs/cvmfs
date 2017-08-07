@@ -2370,10 +2370,12 @@ set_up_repository_services() {
         if [ x"$(lsb_release -cs)" = x"xenial" ]; then
             package_map_url=${package_url_root}/pkgmap/pkgmap.ubuntu1604_x86_64
         fi
-    elif [ -f /etc/redhat-release ]; then
+    elif is_redhat; then
         rhver=$(cat /etc/redhat-release | awk {'print $(NF-1)'} | cut -d'.' -f1)
-        if [ $((rhver == 6)) -o $((rhver == 7)) ]; then
-            package_map_url=${package_url_root}/pkgmap/pkgmap.centos${rhver}_x86_64
+        if [ $((rhver == 6)) ]; then
+           package_map_url=${package_url_root}/pkgmap/pkgmap.slc6_x86_64
+        elif [ $((rhver == 7)) ]; then
+            package_map_url=${package_url_root}/pkgmap/pkgmap.cc7_x86_64
         fi
     fi
 
@@ -2389,7 +2391,7 @@ set_up_repository_services() {
 
     local cvmfs_services_package_url=${package_url_root}/$(tail -1 package_map | cut -d'=' -f2)
     echo "    Using package: $cvmfs_services_package_url"
-    
+
     local cvmfs_services_package_file_name=$(echo $cvmfs_services_package_url | awk -F'/' {'print $NF'})
 
     if [ ! -f "/tmp/$cvmfs_services_package_file_name" ]; then
