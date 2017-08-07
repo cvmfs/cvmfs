@@ -201,7 +201,8 @@ cvmfs_server_publish() {
     # to the `cvmfs_swissknife sync` command: the username and the
     # subpath of the active lease
     if [ x"$upstream_type" = xgw ]; then
-      sync_command="$sync_command -P /var/spool/cvmfs/$name/session_token_$subpath -H $gw_key_file"
+      local session_token_file="/var/spool/cvmfs/$name/session_token_$(echo $subpath | sed -e "s:/:_:g")"
+      sync_command="$sync_command -P ${session_token_file} -H $gw_key_file"
     fi
     if [ "x$CVMFS_UNION_FS_TYPE" != "x" ]; then
       sync_command="$sync_command -f $CVMFS_UNION_FS_TYPE"
