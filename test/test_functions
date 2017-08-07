@@ -2372,9 +2372,9 @@ set_up_repository_services() {
         fi
     elif is_redhat; then
         rhver=$(cat /etc/redhat-release | awk {'print $(NF-1)'} | cut -d'.' -f1)
-        if [ $((rhver == 6)) ]; then
-           package_map_url=${package_url_root}/pkgmap/pkgmap.slc6_x86_64
-        elif [ $((rhver == 7)) ]; then
+        if [ x"$rhver" = x6 ]; then
+            package_map_url=${package_url_root}/pkgmap/pkgmap.slc6_x86_64
+        elif [ x"$rhver" = x7 ]; then
             package_map_url=${package_url_root}/pkgmap/pkgmap.cc7_x86_64
         fi
     fi
@@ -2387,6 +2387,7 @@ set_up_repository_services() {
     echo "  Installing the cvmfs_services application"
     pushd /tmp
 
+    echo "Package map URL: ${package_map_url}"
     curl -o package_map $package_map_url
 
     local cvmfs_services_package_url=${package_url_root}/$(tail -1 package_map | cut -d'=' -f2)
