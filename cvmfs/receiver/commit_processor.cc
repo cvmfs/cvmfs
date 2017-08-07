@@ -49,7 +49,7 @@ CommitProcessor::~CommitProcessor() {}
 CommitProcessor::Result CommitProcessor::Process(
     const std::string& lease_path, const shash::Any& old_root_hash,
     const shash::Any& new_root_hash) {
-  LogCvmfs(kLogReceiver, kLogSyslogErr,
+  LogCvmfs(kLogReceiver, kLogSyslog,
            "CommitProcessor - committing: %s, old hash: %s, new hash: %s",
            lease_path.c_str(), old_root_hash.ToString(true).c_str(),
            new_root_hash.ToString(true).c_str());
