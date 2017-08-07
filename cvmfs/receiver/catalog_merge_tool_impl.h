@@ -53,6 +53,14 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::Run(
 
   bool ret = CatalogDiffTool<RoCatalogMgr>::Run(PathString(""));
 
+  ret &= !invalid_path_encountered_;
+
+  if (invalid_path_encountered_) {
+    LogCvmfs(
+        kLogReceiver, kLogSyslogErr,
+        "CatalogMergeTool - Invalid path encountered for current lease path");
+  }
+
   ret &= CreateNewManifest(new_manifest_path);
 
   output_catalog_mgr_.Destroy();
@@ -65,6 +73,14 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportAddition(
     const PathString& path, const catalog::DirectoryEntry& entry,
     const XattrList& xattrs) {
   const PathString rel_path = MakeRelative(path);
+
+  invalid_path_encountered_ = !rel_path.StartsWith(lease_path_);
+  if (invalid_path_encountered_) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "CatalogMergeTool::ReportAddition - Invalid path %s, for lease "
+             "path: %s",
+             path.c_str(), lease_path_.c_str());
+  }
 
   const std::string parent_path =
       std::strchr(rel_path.c_str(), '/') ? GetParentPath(rel_path).c_str() : "";
@@ -86,6 +102,14 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportRemoval(
     const PathString& path, const catalog::DirectoryEntry& entry) {
   const PathString rel_path = MakeRelative(path);
 
+  invalid_path_encountered_ = !rel_path.StartsWith(lease_path_);
+  if (invalid_path_encountered_) {
+    LogCvmfs(
+        kLogReceiver, kLogSyslogErr,
+        "CatalogMergeTool::ReportRemoval - Invalid path %s, for lease path: %s",
+        path.c_str(), lease_path_.c_str());
+  }
+
   if (entry.IsDirectory()) {
     output_catalog_mgr_->RemoveDirectory(rel_path.c_str());
   } else if (entry.IsRegular() || entry.IsLink()) {
@@ -98,6 +122,14 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportModification(
     const PathString& path, const catalog::DirectoryEntry& entry1,
     const catalog::DirectoryEntry& entry2, const XattrList& xattrs) {
   const PathString rel_path = MakeRelative(path);
+
+  invalid_path_encountered_ = !rel_path.StartsWith(lease_path_);
+  if (invalid_path_encountered_) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "CatalogMergeTool::ReportModification - Invalid path %s, for "
+             "lease path: %s",
+             path.c_str(), lease_path_.c_str());
+  }
 
   const std::string parent_path =
       std::strchr(rel_path.c_str(), '/') ? GetParentPath(rel_path).c_str() : "";

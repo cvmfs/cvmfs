@@ -15,7 +15,7 @@ clean_up() {
     sudo -E cvmfs_server rmfs -f test.repo.org
 
     echo "  Removing output directories"
-    rm -rvf /tmp/cvmfs_out_{1,2,3,4,5}
+    rm -rvf /tmp/cvmfs_out_*
 
     echo "  Removing test directories"
     rm -rf /tmp/cvmfs_receiver_commit_processor*
@@ -127,6 +127,30 @@ run_transactions() {
     echo "  Copy the contents of the repository"
     save_repo_contents /tmp/cvmfs_out_5
 
+    ## Transaction 6 (Lease on a subpath - valid changes)
+
+    echo "  Starting transaction 6"
+    cvmfs_server transaction -e test.repo.org/new/c
+    echo "New file" > /cvmfs/test.repo.org/new/c/another_file.txt
+
+    echo "  Publishing changes 6"
+    cvmfs_server publish -e test.repo.org/new/c
+
+    echo "  Copy the contents of the repository"
+    save_repo_contents /tmp/cvmfs_out_6
+
+    ## Transaction 7 (Lease on a subpath - changes outside of lease)
+
+    echo "  Starting transaction 7"
+    cvmfs_server transaction -e test.repo.org/new/c
+    echo "New file" > /cvmfs/test.repo.org/new/invalid_file.txt
+
+    echo "  Publishing changes 7"
+    cvmfs_server publish -e test.repo.org/new/c
+
+    echo "  Copy the contents of the repository"
+    save_repo_contents /tmp/cvmfs_out_7
+
     ## Check results
 
     compare_file_checksum /tmp/cvmfs_out_1/new_file.txt d8e8fca2dc0f896fd7cb4cb0031ba249
@@ -135,13 +159,20 @@ run_transactions() {
     compare_file_checksum /tmp/cvmfs_out_2/new_repository/another_file.txt d8e8fca2dc0f896fd7cb4cb0031ba249
 
     if [ -d /tmp/cvmfs_out_3/new_repository ]; then
-        echo "/cvmfs/test/repo.org/new_repository should have been deleted in transaction 3"
+        echo "/cvmfs/test.repo.org/new_repository should have been deleted in transaction 3"
         exit 1
     fi
 
     compare_file_checksum /tmp/cvmfs_out_4/a/b/new_file.txt f1885b1a57c71cacbd923fc5e9aefef3
 
     compare_file_checksum /tmp/cvmfs_out_5/new/c/d/new_file.txt f1885b1a57c71cacbd923fc5e9aefef3
+
+    compare_file_checksum /tmp/cvmfs_out_6/new/c/another_file.txt f1885b1a57c71cacbd923fc5e9aefef3
+
+    if [ -f /tmp/cvmfs_out_7/new/invalid_file.txt ]; then
+        echo "/cvmfs/test.repo.org/new/invalid_file.txt should not have been create in transaction 7"
+        exit 1
+    fi
 
     clean_up
 }

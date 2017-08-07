@@ -24,6 +24,22 @@
 #include "util/raii_temp_dir.h"
 #include "util/string.h"
 
+namespace {
+
+PathString RemoveRepoName(const PathString& lease_path) {
+  std::string abs_path = lease_path.ToString();
+  std::string::const_iterator it =
+      std::find(abs_path.begin(), abs_path.end(), '/');
+  if (it != abs_path.end()) {
+    size_t idx = it - abs_path.begin() + 1;
+    return lease_path.Suffix(idx);
+  } else {
+    return lease_path;
+  }
+}
+
+}  // namespace
+
 namespace receiver {
 
 CommitProcessor::CommitProcessor() : num_errors_(0) {}
@@ -49,7 +65,7 @@ CommitProcessor::~CommitProcessor() {}
 CommitProcessor::Result CommitProcessor::Process(
     const std::string& lease_path, const shash::Any& old_root_hash,
     const shash::Any& new_root_hash) {
-  LogCvmfs(kLogReceiver, kLogSyslogErr,
+  LogCvmfs(kLogReceiver, kLogSyslog,
            "CommitProcessor - committing: %s, old hash: %s, new hash: %s",
            lease_path.c_str(), old_root_hash.ToString(true).c_str(),
            new_root_hash.ToString(true).c_str());
@@ -91,10 +107,13 @@ CommitProcessor::Result CommitProcessor::Process(
   const std::string temp_dir_root =
       "/srv/cvmfs/" + repo_name + "/data/txn/commit_processor";
 
+  const PathString relative_lease_path = RemoveRepoName(PathString(lease_path));
+
   CatalogMergeTool<catalog::WritableCatalogManager,
                    catalog::SimpleCatalogManager>
-      merge_tool(stratum0, old_root_hash, new_root_hash, temp_dir_root,
-                 server_tool->download_manager(), manifest.weak_ref());
+      merge_tool(stratum0, old_root_hash, new_root_hash, relative_lease_path,
+                 temp_dir_root, server_tool->download_manager(),
+                 manifest.weak_ref());
   if (!merge_tool.Init()) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "Error: Could not initialize the catalog merge tool");
