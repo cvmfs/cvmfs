@@ -76,10 +76,10 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportAddition(
 
   invalid_path_encountered_ = !rel_path.StartsWith(lease_path_);
   if (invalid_path_encountered_) {
-    LogCvmfs(
-        kLogReceiver, kLogSyslogErr,
-        "CatalogMergeTool::ReportAddition - Invalid path %s, for lease path: %s",
-        path.c_str(), lease_path_.c_str());
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "CatalogMergeTool::ReportAddition - Invalid path %s, for lease "
+             "path: %s",
+             path.c_str(), lease_path_.c_str());
   }
 
   const std::string parent_path =
@@ -125,10 +125,10 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportModification(
 
   invalid_path_encountered_ = !rel_path.StartsWith(lease_path_);
   if (invalid_path_encountered_) {
-    LogCvmfs(
-        kLogReceiver, kLogSyslogErr,
-        "CatalogMergeTool::ReportModification - Invalid path %s, for lease path: %s",
-        path.c_str(), lease_path_.c_str());
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "CatalogMergeTool::ReportModification - Invalid path %s, for "
+             "lease path: %s",
+             path.c_str(), lease_path_.c_str());
   }
 
   const std::string parent_path =

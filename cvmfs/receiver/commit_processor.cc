@@ -38,7 +38,7 @@ PathString RemoveRepoName(const PathString& lease_path) {
   }
 }
 
-}
+}  // namespace
 
 namespace receiver {
 
