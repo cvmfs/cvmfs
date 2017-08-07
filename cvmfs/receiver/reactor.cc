@@ -340,10 +340,11 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
       req_json->root(), "new_root_hash", JSON_STRING);
 
   if (lease_path_json == NULL || old_root_hash_json == NULL ||
-      new_root_hash_json == NULL)
+      new_root_hash_json == NULL) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "HandleCommit: Missing fields in request.");
-  return false;
+    return false;
+  }
 
   // Here we use the path to commit the changes!
   UniquePtr<CommitProcessor> proc(MakeCommitProcessor());
