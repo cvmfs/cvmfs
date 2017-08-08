@@ -11,7 +11,8 @@
 main([]) ->
     io:format("Node name: ~p.~n", [node()]),
     io:format("Clearing all active leases... "),
-    MainNodeAtom = list_to_atom("cvmfs_services@" ++ net_adm:localhost()),
+    [HostName | _] = string:split(net_adm:localhost(), "."),
+    MainNodeAtom = list_to_atom("cvmfs_services@" ++ HostName),
     ok = rpc:call(MainNodeAtom, cvmfs_lease, clear_leases, []),
     io:format("done.~n"),
     halt(0).
