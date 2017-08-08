@@ -1,4 +1,4 @@
-cvmfs_test_name="Repository services"
+cvmfs_test_name="Repository services nested catalogs"
 cvmfs_test_autofs_on_startup=false
 
 # This test covers the creation and deletion of nested catalogs when the repository
