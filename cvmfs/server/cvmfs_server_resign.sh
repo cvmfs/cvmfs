@@ -69,7 +69,6 @@ cvmfs_server_resign() {
     if [ -z "$whitelist_path" ]; then
       # sanity checks
       is_stratum0 $name  || { echo "Repository $name is not a stratum 0 repository"; retcode=1; continue; }
-      [ $sign_published -eq 1 ] || health_check $name || { echo "Repository $name is not healthy"; retcode=1; continue; }
 
       # get repository information
       load_repo_config $name
