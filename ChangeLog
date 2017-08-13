@@ -1,3 +1,6 @@
+2.4.1:
+  * Fix potential deadlock in parallel catalog processing (CVM-1360)
+
 2.4.0:
   * Fix `cvmfs_config reload` on macOS
   * Fix cvmfs_config reload under root environment with cvmfs deps (CVM-1352)
