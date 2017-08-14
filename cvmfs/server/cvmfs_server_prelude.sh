@@ -12,3 +12,5 @@ die() {
 # set default locale
 export LANG=C
 
+# Avoid deadlock in parallel catalog processing
+export _CVMFS_SERIALIZED_CATALOG_PROCESSING_=yes
