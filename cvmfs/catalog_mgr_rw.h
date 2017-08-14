@@ -197,6 +197,21 @@ class WritableCatalogManager : public SimpleCatalogManager {
   inline void SyncLock() { pthread_mutex_lock(sync_lock_); }
   inline void SyncUnlock() { pthread_mutex_unlock(sync_lock_); }
 
+  //****************************************************************************
+  // Workaround -- Serialized Catalog Committing
+  void GetModifiedCatalogs(WritableCatalogList *result) const {
+    const unsigned int number_of_dirty_catalogs =
+      GetModifiedCatalogsRecursively(GetRootCatalog(), result);
+    assert(number_of_dirty_catalogs <= result->size());
+  }
+  int GetModifiedCatalogsRecursively(const Catalog *catalog,
+                                     WritableCatalogList *result) const;
+  void CatalogUploadSerializedCallback(
+    const upload::SpoolerResult &result,
+    const CatalogUploadContext unused);
+  CatalogInfo SnapshotCatalogsSerialized(const bool stop_for_tweaks);
+  //****************************************************************************
+
   // defined in catalog_mgr_rw.cc
   static const std::string kCatalogFilename;
 
