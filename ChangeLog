@@ -1,3 +1,5 @@
+2.5.0:
+
 2.4.1:
   * Don't perform health check on resign (CVM-1358)
   * Fix potential deadlock in parallel catalog processing (CVM-1360)

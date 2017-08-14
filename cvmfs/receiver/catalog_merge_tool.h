@@ -34,11 +34,14 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
  public:
   CatalogMergeTool(RoCatalogMgr* old_catalog_mgr, RoCatalogMgr* new_catalog_mgr,
                    RwCatalogMgr* output_catalog_mgr,
+                   const PathString& lease_path,
                    const std::string& temp_dir_prefix,
                    manifest::Manifest* manifest)
       : CatalogDiffTool<RoCatalogMgr>(old_catalog_mgr, new_catalog_mgr),
         repo_path_(""),
+        lease_path_(lease_path),
         temp_dir_prefix_(temp_dir_prefix),
+        invalid_path_encountered_(false),
         download_manager_(NULL),
         manifest_(manifest),
         output_catalog_mgr_(output_catalog_mgr),
@@ -47,13 +50,16 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
   CatalogMergeTool(const std::string& repo_path,
                    const shash::Any& old_root_hash,
                    const shash::Any& new_root_hash,
+                   const PathString& lease_path,
                    const std::string& temp_dir_prefix,
                    download::DownloadManager* download_manager,
                    manifest::Manifest* manifest)
       : CatalogDiffTool<RoCatalogMgr>(repo_path, old_root_hash, new_root_hash,
                                       temp_dir_prefix, download_manager),
         repo_path_(repo_path),
+        lease_path_(lease_path),
         temp_dir_prefix_(temp_dir_prefix),
+        invalid_path_encountered_(false),
         download_manager_(download_manager),
         manifest_(manifest),
         needs_setup_(true) {}
@@ -77,7 +83,11 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
   bool CreateNewManifest(std::string* new_manifest_path);
 
   std::string repo_path_;
+
+  PathString lease_path_;
   std::string temp_dir_prefix_;
+
+  bool invalid_path_encountered_;
 
   download::DownloadManager* download_manager_;
 
