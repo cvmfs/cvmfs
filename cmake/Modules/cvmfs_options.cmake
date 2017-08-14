@@ -20,6 +20,7 @@ option (BUILD_SERVER_DEBUG      "Build writer's end programs with debug symbols 
 option (BUILD_UNITTESTS         "Build the CernVM-FS unit test set"                                OFF)
 option (BUILD_UNITTESTS_DEBUG   "Build the CernVM-FS unit test set with verbose output and -g"     OFF)
 option (BUILD_UBENCHMARKS       "Build the CernVM-FS micro benchmarks"                             OFF)
+option (BUILD_QC_TESTS          "Build the QuickCheck property random tests"                       OFF)
 option (BUILD_DOCUMENTATION     "Build the CerVM-FS documentation using Doxygen"                   OFF)
 option (BUILD_COVERAGE          "Compile to collect code coverage reports"                         OFF)
 option (BUILD_ALL               "Build client, server, lib, preload, octopus, unit tests"          OFF)

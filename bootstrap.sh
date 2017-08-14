@@ -15,6 +15,7 @@ LIBGEOIP_VERSION=1.6.0
 PYTHON_GEOIP_VERSION=1.3.1
 PROTOBUF_VERSION=2.6.1
 MONGOOSE_VERSION=3.8
+RAPIDCHECK_VERSION=0.0
 
 if [ x"$EXTERNALS_LIB_LOCATION" = x"" ]; then
   echo "Bootstrap - Missing environment variable: EXTERNALS_LIB_LOCATION"
@@ -72,7 +73,7 @@ do_extract() {
   fi
   mv $library_decompressed_dir $dest_dir
   cd $cdir
-  cp $library_dir/src/* $dest_dir
+  cp -r $library_dir/src/* $dest_dir
 }
 
 do_copy() {
@@ -234,6 +235,12 @@ build_lib() {
       patch_external "mongoose" "keep_sigchld.patch"
       do_build "mongoose"
       ;;
+    rapidcheck)
+      if [ x"BUILD_QC_TESTS" != x"" ]  ; then
+        do_extract "rapidcheck" "rapidcheck-${RAPIDCHECK_VERSION}.tar.gz"
+        do_build "rapidcheck"
+      fi
+      ;;
     *)
       echo "Unknown library name. Exiting."
       exit 1
@@ -244,7 +251,7 @@ build_lib() {
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 # Build a list of libs that need to be built
-missing_libs="libcurl pacparser zlib sparsehash leveldb googletest libgeoip tbb protobuf googlebench sqlite3 vjson sha2 sha3 mongoose"
+missing_libs="libcurl pacparser zlib sparsehash leveldb googletest libgeoip tbb protobuf googlebench sqlite3 vjson sha2 sha3 mongoose rapidcheck"
 
 if [ -f $externals_install_dir/.bootstrapDone ]; then
   existing_libs=$(cat $externals_install_dir/.bootstrapDone)
