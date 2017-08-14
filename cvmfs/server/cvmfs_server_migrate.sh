@@ -391,6 +391,31 @@ _migrate_137() {
   load_repo_config $name
 }
 
+# this is only run on stratum 1s with per-repo apache config file
+_migrate_138() {
+  local name=$1
+  local destination_version="138"
+  local apache_repo_conf="$(get_apache_conf_path)/$(get_apache_conf_filename $name)"
+
+  load_repo_config $name
+  echo "Migrating repository '$name' from layout revision $CVMFS_CREATOR_VERSION to revision $destination_version"
+
+  if _is_generated_apache_conf "$apache_repo_conf"; then
+    echo "--> updating apache config ($(basename $apache_repo_conf))"
+    local storage_dir=$(get_upstream_config $CVMFS_UPSTREAM_STORAGE)
+    create_apache_config_for_endpoint $name $storage_dir enabled
+    echo "--> reloading Apache"
+    reload_apache > /dev/null
+  else
+    echo "--> skipping foreign apache config ($(basename $apache_repo_conf))"
+  fi
+
+  sed -i -e "s/^\(CVMFS_CREATOR_VERSION\)=.*/\1=$destination_version/" $server_conf
+
+  # update repository information
+  load_repo_config $name
+}
+
 cvmfs_server_migrate() {
   local names
   local retcode=0
@@ -494,6 +519,15 @@ cvmfs_server_migrate() {
          x"$creator" = x"2.3.6-1" -o   \
          x"$creator" = x"2.4.0-1" ]; then
       _migrate_137 $name
+      creator="$(repository_creator_version $name)"
+    fi
+
+    local apache_conf="$(get_apache_conf_path)/$(get_apache_conf_filename $name)"
+    if [ "$creator" = "137" ] && \
+         is_stratum1 $name && \
+         is_local_upstream $CVMFS_UPSTREAM_STORAGE && \
+         cvmfs_sys_file_is_regular $apache_conf; then
+      _migrate_138 $name
       creator="$(repository_creator_version $name)"
     fi
 
