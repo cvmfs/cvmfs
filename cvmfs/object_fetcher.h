@@ -606,6 +606,14 @@ class HttpObjectFetcher :
         case download::kFailLocalIO:
           return BaseTN::kFailLocalIO;
 
+        case download::kFailBadUrl:
+        case download::kFailProxyResolve:
+        case download::kFailHostResolve:
+        case download::kFailProxyConnection:
+        case download::kFailHostConnection:
+        case download::kFailUnsupportedProtocol:
+          return BaseTN::kFailNetwork;
+
         case download::kFailProxyHttp:
         case download::kFailHostHttp:
           return (download_job.http_code == 404)

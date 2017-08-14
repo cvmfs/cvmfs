@@ -31,7 +31,8 @@
 // 22: CernVM-FS 2.3.0
 // 23: update initialization code
 // 24: add LIBCVMFS_ERR_REVISION_BLACKLISTED
-#define LIBCVMFS_REVISION 24
+// 25: CernVM-FS 2.4.0
+#define LIBCVMFS_REVISION 25
 
 #include <sys/stat.h>
 #include <unistd.h>

@@ -19,14 +19,14 @@ generate_files_in() {
 
 configure_catalog_size_warning() {
   local repo_name=$1
-  local warning_threshold=$2
+  local warning_threshold=$(($2 / 1000))
   local repo_conf_dir=/etc/cvmfs/repositories.d/$repo_name
   local server_conf=${repo_conf_dir}/server.conf
 
-  sudo mv ${server_conf} ${server_conf}.old || return 101
-  sed -e "s/^\(CVMFS_CATALOG_ENTRY_WARN_THRESHOLD\)=[0-9]*$/\1=$warning_threshold/" \
-    ${server_conf}.old | sudo tee ${server_conf} > /dev/null || return 102
-  cat ${server_conf} | grep -q "^CVMFS_CATALOG_ENTRY_WARN_THRESHOLD=$warning_threshold$" || return 103
+  echo CVMFS_NESTED_KCATALOG_LIMIT=$warning_threshold | \
+    sudo tee -a ${server_conf}
+  echo CVMFS_ROOT_KCATALOG_LIMIT=$warning_threshold | \
+    sudo tee -a ${server_conf}
 }
 
 cvmfs_run_test() {
@@ -53,7 +53,7 @@ cvmfs_run_test() {
 
   echo "creating CVMFS snapshot"
   local publish_log_1=publish_1.log
-  publish_repo $CVMFS_TEST_REPO > $publish_log_1 || return $?
+  publish_repo $CVMFS_TEST_REPO > $publish_log_1 2>&1 || return $?
 
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i  || return $?
@@ -78,7 +78,7 @@ cvmfs_run_test() {
 
   echo "creating CVMFS snapshot"
   local publish_log_2=publish_2.log
-  publish_repo $CVMFS_TEST_REPO > $publish_log_2 || return $?
+  publish_repo $CVMFS_TEST_REPO > $publish_log_2 2>&1 || return $?
 
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i  || return $?
@@ -88,7 +88,7 @@ cvmfs_run_test() {
   cat $publish_log_2 | grep                -q '^WARNING.*\/nested_2' || return 17 # nested catalog 2 was not touched in this publish...
   cat $publish_log_2 | grep --invert-match -q '^WARNING.*\/nested_3' || return 18
   cat $publish_log_2 | grep --invert-match -q '^WARNING.*\/more'     || return 19
-  cat $publish_log_2 | grep --invert-match -q '^WARNING.*\/ '        || return 20 # root catalog now contains less entries (since nested_3 is a nested catalog) 
+  cat $publish_log_2 | grep --invert-match -q '^WARNING.*\/ '        || return 20 # root catalog now contains less entries (since nested_3 is a nested catalog)
 
   echo "configure catalog size warning to fix warning for /nested2"
   configure_catalog_size_warning $CVMFS_TEST_REPO 15000 }} return 21
@@ -101,7 +101,7 @@ cvmfs_run_test() {
 
   echo "creating CVMFS snapshot"
   local publish_log_3=publish_3.log
-  publish_repo $CVMFS_TEST_REPO > $publish_log_3 || return $?
+  publish_repo $CVMFS_TEST_REPO > $publish_log_3 2>&1 || return $?
 
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i  || return $?
@@ -113,7 +113,7 @@ cvmfs_run_test() {
   cat $publish_log_3 | grep --invert-match -q '^WARNING.*\/more'     || return 25
   cat $publish_log_3 | grep --invert-match -q '^WARNING.*\/ '        || return 26
 
-  echo 
+  echo
 
   return 0
 }

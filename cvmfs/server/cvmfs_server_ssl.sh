@@ -44,7 +44,7 @@ create_cert() {
   fi
   cn="$cn CernVM-FS Release Managers"
   openssl genrsa -out $key 2048 > /dev/null 2>&1
-  openssl req -new -subj "/C=/ST=/L=/O=/OU=/CN=$cn" \
+  openssl req -new -subj "/CN=$cn" \
     -key $key -out $csr > /dev/null 2>&1
   openssl x509 -req -days 365 -in $csr -signkey $key -out $crt > /dev/null 2>&1
   rm -f $csr

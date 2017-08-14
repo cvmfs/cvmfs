@@ -439,6 +439,20 @@ void WritableCatalogManager::AddHardlinkGroup(
   // Therefore we only have one parent directory here
   const string parent_path = MakeRelativePath(parent_directory);
 
+  // check if hard link is too big
+  unsigned mbytes = entries[0].size() / (1024 * 1024);
+  if ((file_mbyte_limit_ > 0) && (mbytes > file_mbyte_limit_)) {
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "%s: hard link at %s is larger than %u megabytes (%u). "
+             "CernVM-FS works best with small files. "
+             "Please remove the file or increase the limit.",
+             enforce_limits_ ? "FATAL" : "WARNING",
+             (parent_path + entries[0].name().ToString()).c_str(),
+             file_mbyte_limit_,
+             mbytes);
+    assert(!enforce_limits_);
+  }
+
   SyncLock();
   WritableCatalog *catalog;
   if (!FindCatalog(parent_path, &catalog)) {
@@ -750,7 +764,11 @@ bool WritableCatalogManager::Commit(const bool           stop_for_tweaks,
   }
 
   // do the actual catalog snapshotting and upload
-  CatalogInfo root_catalog_info = SnapshotCatalogs(stop_for_tweaks);
+  CatalogInfo root_catalog_info;
+  if (getenv("_CVMFS_SERIALIZED_CATALOG_PROCESSING_") == NULL)
+    root_catalog_info = SnapshotCatalogs(stop_for_tweaks);
+  else
+    root_catalog_info = SnapshotCatalogsSerialized(stop_for_tweaks);
   if (spooler_->GetNumberOfErrors() > 0) {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to commit catalogs");
     return false;
@@ -846,12 +864,16 @@ void WritableCatalogManager::FinalizeCatalog(WritableCatalog *catalog,
              base_hash().ToStringWithSuffix().c_str());
     catalog->SetPreviousRevision(base_hash());
   } else {
+    // Multiple catalogs might query the parent concurrently
+    SyncLock();
     shash::Any hash_previous;
     uint64_t size_previous;
     const bool retval =
       catalog->parent()->FindNested(catalog->mountpoint(),
                                     &hash_previous, &size_previous);
     assert(retval);
+    SyncUnlock();
+
     LogCvmfs(kLogCatalog, kLogVerboseMsg, "found '%s' as previous revision "
                                           "for nested catalog '%s'",
              hash_previous.ToStringWithSuffix().c_str(),
@@ -926,6 +948,7 @@ void WritableCatalogManager::CatalogUploadCallback(
   uint64_t catalog_size = GetFileSize(result.local_path);
   assert(catalog_size > 0);
 
+  SyncLock();
   if (catalog->HasParent()) {
     // finalized nested catalogs will update their parent's pointer and schedule
     // them for processing (continuation) if the 'dirty children count' == 0
@@ -940,6 +963,8 @@ void WritableCatalogManager::CatalogUploadCallback(
 
     const int remaining_dirty_children =
       catalog->GetWritableParent()->DecrementDirtyChildren();
+
+    SyncUnlock();
 
     // continuation of the dirty catalog tree traversal
     // see WritableCatalogManager::SnapshotCatalogs()
@@ -957,6 +982,7 @@ void WritableCatalogManager::CatalogUploadCallback(
     root_catalog_info.content_hash = result.content_hash;
     root_catalog_info.revision     = catalog->GetRevision();
     catalog_upload_context.root_catalog_info->Set(root_catalog_info);
+    SyncUnlock();
   } else {
     assert(false && "inconsistent state detected");
   }
@@ -1029,6 +1055,111 @@ void WritableCatalogManager::FixWeight(WritableCatalog* catalog) {
     CatalogBalancer<WritableCatalogManager> catalog_balancer(this);
     catalog_balancer.Balance(catalog);
   }
+}
+
+
+//****************************************************************************
+// Workaround -- Serialized Catalog Committing
+
+int WritableCatalogManager::GetModifiedCatalogsRecursively(
+  const Catalog *catalog,
+  WritableCatalogList *result) const
+{
+  // A catalog must be snapshot, if itself or one of it's descendants is dirty.
+  // So we traverse the catalog tree recursively and look for dirty catalogs
+  // on the way.
+  const WritableCatalog *wr_catalog =
+    static_cast<const WritableCatalog *>(catalog);
+  // This variable will contain the number of dirty catalogs in the sub tree
+  // with *catalog as it's root.
+  int dirty_catalogs = (wr_catalog->IsDirty()) ? 1 : 0;
+
+  // Look for dirty catalogs in the descendants of *catalog
+  CatalogList children = wr_catalog->GetChildren();
+  for (CatalogList::const_iterator i = children.begin(), iEnd = children.end();
+       i != iEnd; ++i)
+  {
+    dirty_catalogs += GetModifiedCatalogsRecursively(*i, result);
+  }
+
+  // If we found a dirty catalog in the checked sub tree, the root (*catalog)
+  // must be snapshot and ends up in the result list
+  if (dirty_catalogs > 0)
+    result->push_back(const_cast<WritableCatalog *>(wr_catalog));
+
+  // tell the upper layer about number of catalogs
+  return dirty_catalogs;
+}
+
+
+void WritableCatalogManager::CatalogUploadSerializedCallback(
+  const upload::SpoolerResult &result,
+  const CatalogUploadContext unused)
+{
+  if (result.return_code != 0) {
+    LogCvmfs(kLogCatalog, kLogStderr, "failed to upload '%s' (retval: %d)",
+             result.local_path.c_str(), result.return_code);
+    assert(false);
+  }
+  unlink(result.local_path.c_str());
+}
+
+
+WritableCatalogManager::CatalogInfo
+WritableCatalogManager::SnapshotCatalogsSerialized(
+  const bool stop_for_tweaks)
+{
+  LogCvmfs(kLogCvmfs, kLogStdout, "Serialized committing of file catalogs...");
+  reinterpret_cast<WritableCatalog *>(GetRootCatalog())->SetDirty();
+  WritableCatalogList catalogs_to_snapshot;
+  GetModifiedCatalogs(&catalogs_to_snapshot);
+  CatalogUploadContext unused;
+  unused.root_catalog_info = NULL;
+  unused.stop_for_tweaks = false;
+  spooler_->RegisterListener(
+    &WritableCatalogManager::CatalogUploadSerializedCallback, this, unused);
+
+  CatalogInfo root_catalog_info;
+  WritableCatalogList::const_iterator i = catalogs_to_snapshot.begin();
+  const WritableCatalogList::const_iterator iend = catalogs_to_snapshot.end();
+  for (; i != iend; ++i) {
+    FinalizeCatalog(*i, stop_for_tweaks);
+
+    // Compress and upload catalog
+    shash::Any hash_catalog(spooler_->GetHashAlgorithm(),
+                            shash::kSuffixCatalog);
+    if (!zlib::CompressPath2Path((*i)->database_path(),
+                                 (*i)->database_path() + ".compressed",
+                                 &hash_catalog))
+    {
+      PrintError("could not compress catalog " + (*i)->mountpoint().ToString());
+      assert(false);
+    }
+    spooler_->Upload((*i)->database_path() + ".compressed",
+                     "data/" + hash_catalog.MakePath());
+
+    uint64_t catalog_size = GetFileSize((*i)->database_path());
+    assert(catalog_size > 0);
+
+    if ((*i)->HasParent()) {
+      LogCvmfs(kLogCatalog, kLogVerboseMsg, "updating nested catalog link");
+      WritableCatalog *parent = (*i)->GetWritableParent();
+      parent->UpdateNestedCatalog((*i)->mountpoint().ToString(), hash_catalog,
+                                  catalog_size, (*i)->delta_counters_);
+      (*i)->delta_counters_.SetZero();
+    } else if ((*i)->IsRoot()) {
+      root_catalog_info.size = catalog_size;
+      root_catalog_info.ttl = (*i)->GetTTL();
+      root_catalog_info.content_hash = hash_catalog;
+      root_catalog_info.revision = (*i)->GetRevision();
+    } else {
+      assert(false && "inconsistent state detected");
+    }
+  }
+  spooler_->WaitForUpload();
+
+  spooler_->UnregisterListeners();
+  return root_catalog_info;
 }
 
 }  // namespace catalog

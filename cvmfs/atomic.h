@@ -80,6 +80,8 @@ atomic_cas32(atomic_int32 *a, int32_t cmp, int32_t newval) {
 
 static bool inline __attribute__((used))
 atomic_cas64(atomic_int64 *a, int64_t cmp, int64_t newval) {
+  // Clang 3.5 has a bug in optimized __sync_bool_compare_and_swap:
+  // https://bugs.llvm.org//show_bug.cgi?format=multiple&id=21499
   return __sync_bool_compare_and_swap(a, cmp, newval);
 }
 

@@ -67,7 +67,6 @@ if [ x"$(uname -m)" = x"x86_64" ]; then
                                    src/5*                                       \
                                    src/6*                                       \
                                    src/7*                                       \
-                                   src/8*                                       \
                                 || retval=1
 fi
 
