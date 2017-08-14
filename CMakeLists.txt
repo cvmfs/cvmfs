@@ -448,6 +448,12 @@ if (BUILD_UBENCHMARKS)
   add_subdirectory (test/micro-benchmarks)
 endif (BUILD_UBENCHMARKS)
 
+if (BUILD_QC_TESTS)
+  find_package(RapidCheck REQUIRED)
+  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${RAPIDCHECK_INCLUDE_DIRS})
+  add_subdirectory (test/quickcheck)
+endif(BUILD_QC_TESTS)
+
 #
 # Documentation
 #
