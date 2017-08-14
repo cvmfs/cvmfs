@@ -13,7 +13,7 @@
 _is_generated_apache_conf() {
   local apache_conf="$1"
 
-  grep -q '^# Created by cvmfs_server.' $apache_conf
+  grep -q '^# Created by cvmfs_server.' $apache_conf 2>/dev/null
 }
 
 _migrate_2_1_6() {
