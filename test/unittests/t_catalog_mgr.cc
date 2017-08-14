@@ -12,7 +12,7 @@
 #include "catalog_mgr.h"
 #include "hash.h"
 #include "shortstring.h"
-#include "testutil.h"
+#include "../common/testutil.h"
 
 using namespace std;  // NOLINT
 

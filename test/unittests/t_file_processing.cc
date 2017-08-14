@@ -14,7 +14,7 @@
 #include "c_file_sandbox.h"
 #include "file_processing/char_buffer.h"
 #include "file_processing/file_processor.h"
-#include "testutil.h"
+#include "../common/testutil.h"
 #include "upload_spooler_result.h"
 
 struct MockStreamHandle : public upload::UploadStreamHandle {

@@ -11,7 +11,7 @@
 #include "compression.h"
 #include "history_sqlite.h"
 #include "prng.h"
-#include "testutil.h"
+#include "../common/testutil.h"
 
 using history::History;
 using history::SqliteHistory;

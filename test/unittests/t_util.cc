@@ -21,7 +21,7 @@
 
 #include "shortstring.h"
 #include "smalloc.h"
-#include "testutil.h"
+#include "../common/testutil.h"
 #include "util/algorithm.h"
 #include "util/file_guard.h"
 #include "util/mmap_file.h"

@@ -21,7 +21,7 @@
 #include "mountpoint.h"
 #include "options.h"
 #include "signature.h"
-#include "testutil.h"
+#include "../common/testutil.h"
 #include "upload.h"
 #include "upload_spooler_definition.h"
 #include "util/pointer.h"

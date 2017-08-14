@@ -8,7 +8,7 @@
 
 #include "file_processing/char_buffer.h"
 #include "hash.h"
-#include "testutil.h"
+#include "../common/testutil.h"
 
 namespace upload {
 

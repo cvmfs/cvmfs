@@ -20,7 +20,7 @@
 #include "c_file_sandbox.h"
 #include "file_processing/char_buffer.h"
 #include "hash.h"
-#include "testutil.h"
+#include "../common/testutil.h"
 #include "upload_s3.h"
 #include "upload_spooler_definition.h"
 #include "util.h"

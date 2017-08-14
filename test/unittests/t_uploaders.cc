@@ -14,7 +14,7 @@
 #include "c_file_sandbox.h"
 #include "file_processing/char_buffer.h"
 #include "hash.h"
-#include "testutil.h"
+#include "../common/testutil.h"
 #include "upload_facility.h"
 #include "upload_local.h"
 #include "upload_s3.h"

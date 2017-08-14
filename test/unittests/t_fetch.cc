@@ -14,7 +14,7 @@
 #include "fetch.h"
 #include "hash.h"
 #include "statistics.h"
-#include "testutil.h"
+#include "../common/testutil.h"
 
 using namespace std;  // NOLINT
 

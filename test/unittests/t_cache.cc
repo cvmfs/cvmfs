@@ -20,7 +20,7 @@
 #include "platform.h"
 #include "quota.h"
 #include "smalloc.h"
-#include "testutil.h"
+#include "../common/testutil.h"
 
 using namespace std;  // NOLINT
 

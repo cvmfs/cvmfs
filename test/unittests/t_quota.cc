@@ -16,7 +16,7 @@
 #include "fs_traversal.h"
 #include "hash.h"
 #include "quota_posix.h"
-#include "testutil.h"
+#include "../common/testutil.h"
 #include "util/algorithm.h"
 
 using namespace std;  // NOLINT

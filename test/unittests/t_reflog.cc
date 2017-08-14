@@ -5,7 +5,7 @@
 #include <gtest/gtest.h>
 
 #include "reflog.h"
-#include "testutil.h"
+#include "../common/testutil.h"
 
 template <class ReflogT>
 class T_Reflog : public ::testing::Test {

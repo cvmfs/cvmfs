@@ -14,8 +14,8 @@ set(CVMFS_UNITTEST_FILES
   main.cc
 
   # test utility functions
-  env.cc
-  testutil.cc
+  ../common/env.cc
+  ../common/testutil.cc
 
   t_async_reader.cc
   t_atomic.cc
