@@ -374,9 +374,9 @@ _migrate_138() {
     reload_apache > /dev/null
   fi
 
-  echo "--> updating server.conf"
   local warn_threshold="`sed -n -e 's/^CVMFS_CATALOG_ENTRY_WARN_THRESHOLD=//p' $server_conf`"
   if [ -n "$warn_threshold" ]; then
+    echo "--> updating server.conf"
     sed -i -e '/^CVMFS_CATALOG_ENTRY_WARN_THRESHOLD=/d' $server_conf
     local kcatalog_limit="$(($warn_threshold / 1000))"
     # If the default was not changed, the new root catalog default of 200k
