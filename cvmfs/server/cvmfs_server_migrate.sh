@@ -332,18 +332,20 @@ _migrate_2_3_0() {
   load_repo_config $name
 }
 
-_migrate_137() {
+_migrate_138() {
   local name=$1
-  local destination_version="137"
+  local destination_version="138"
   local server_conf="/etc/cvmfs/repositories.d/${name}/server.conf"
-  local apache_repo_conf="$(get_apache_conf_path)/$(get_apache_conf_filename $name)"
-  local apache_info_conf="$(get_apache_conf_path)/$(get_apache_conf_filename "info")"
+  local apache_conf_path="$(get_apache_conf_path)"
+  local apache_conf_file="$(get_apache_conf_filename $name)"
+  local apache_repo_conf="$apache_conf_path/$apache_conf_file"
+  local apache_info_conf="$apache_conf_path/$(get_apache_conf_filename "info")"
   local do_apache_reload=0
 
   load_repo_config $name
   echo "Migrating repository '$name' from layout revision $(mangle_version_string $CVMFS_CREATOR_VERSION) to revision $(mangle_version_string $destination_version)"
 
-  if is_local_upstream $CVMFS_UPSTREAM_STORAGE && cvmfs_sys_file_is_regular "$apache_conf"; then
+  if has_apache_config_file "$apache_conf_file"; then
     if _is_generated_apache_conf "$apache_repo_conf"; then
       echo "--> updating apache config ($(basename $apache_repo_conf))"
       local storage_dir=$(get_upstream_config $CVMFS_UPSTREAM_STORAGE)
@@ -383,31 +385,6 @@ _migrate_137() {
       echo "CVMFS_ROOT_KCATALOG_LIMIT=${kcatalog_limit}" >> $server_conf
       echo "CVMFS_NESTED_KCATALOG_LIMIT=${kcatalog_limit}" >> $server_conf
     fi
-  fi
-
-  sed -i -e "s/^\(CVMFS_CREATOR_VERSION\)=.*/\1=$destination_version/" $server_conf
-
-  # update repository information
-  load_repo_config $name
-}
-
-# this is only run on stratum 1s with per-repo apache config file
-_migrate_138() {
-  local name=$1
-  local destination_version="138"
-  local apache_repo_conf="$(get_apache_conf_path)/$(get_apache_conf_filename $name)"
-
-  load_repo_config $name
-  echo "Migrating repository '$name' from layout revision $CVMFS_CREATOR_VERSION to revision $destination_version"
-
-  if _is_generated_apache_conf "$apache_repo_conf"; then
-    echo "--> updating apache config ($(basename $apache_repo_conf))"
-    local storage_dir=$(get_upstream_config $CVMFS_UPSTREAM_STORAGE)
-    create_apache_config_for_endpoint $name $storage_dir enabled
-    echo "--> reloading Apache"
-    reload_apache > /dev/null
-  else
-    echo "--> skipping foreign apache config ($(basename $apache_repo_conf))"
   fi
 
   sed -i -e "s/^\(CVMFS_CREATOR_VERSION\)=.*/\1=$destination_version/" $server_conf
@@ -518,15 +495,16 @@ cvmfs_server_migrate() {
          x"$creator" = x"2.3.5-1" -o   \
          x"$creator" = x"2.3.6-1" -o   \
          x"$creator" = x"2.4.0-1" ]; then
-      _migrate_137 $name
+      # initially this was version 137 but it does everything needed by
+      #  138 so skip up to 138.
+      _migrate_138 $name
       creator="$(repository_creator_version $name)"
     fi
 
-    local apache_conf="$(get_apache_conf_path)/$(get_apache_conf_filename $name)"
     if [ "$creator" = "137" ] && \
          is_stratum1 $name && \
-         is_local_upstream $CVMFS_UPSTREAM_STORAGE && \
-         cvmfs_sys_file_is_regular $apache_conf; then
+         has_apache_config_file $(get_apache_conf_filename $name); then
+      # this does slightly more than needed but is close enough so reuse it
       _migrate_138 $name
       creator="$(repository_creator_version $name)"
     fi
