@@ -218,6 +218,7 @@ remove_apache_config_file() {
 # place, depending on the installed apache version.
 has_apache_config_file() {
   local file_name=$1
+  is_local_upstream $CVMFS_UPSTREAM_STORAGE || return false
   local conf_path
   conf_path="$(get_apache_conf_path)/${file_name}"
   cvmfs_sys_file_is_regular $conf_path
@@ -327,8 +328,7 @@ remove_config_files() {
 
   rm -rf /etc/cvmfs/repositories.d/$name
   local apache_conf_file_name="$(get_apache_conf_filename $name)"
-  if is_local_upstream $CVMFS_UPSTREAM_STORAGE &&
-     has_apache_config_file "$apache_conf_file_name"; then
+  if has_apache_config_file "$apache_conf_file_name"; then
     remove_apache_config_file "$apache_conf_file_name"
     if [ -z "$(get_or_guess_repository_name)" ]; then
       # no repositories left, remove extra config files
