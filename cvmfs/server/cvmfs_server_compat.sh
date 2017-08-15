@@ -149,21 +149,21 @@ Please upgrade CernVM-FS to manipulate this repository."
     return $?
   fi
 
-  # At the moment any numeric version other than the current one is
-  # only incompatible on stratum 1s with upstream storage and an
-  # automatically managed apache config file, but that criteria will
-  # undoubtedly change in future versions.  Perhaps we will want two
-  # variables indicating the minimum compatible stratum 0 and minimum
-  # compatible stratum 1 versions with apache config, and maybe a
-  # third indicating the minimum compatible version in general.
-  # Either that or we forget about being so selective and just force
-  # everybody to do a migrate even if it isn't relevant in their config.
+  # After this point all creator versions are numeric
 
-  local apache_conf="$(get_apache_conf_path)/$(get_apache_conf_filename $name)"
+  # At the moment any numeric version other than the current one is
+  # only incompatible on stratum 1s with an automatically managed
+  # apache config file, but that criteria will undoubtedly change in
+  # future versions.  Perhaps we will want two variables indicating
+  # the minimum compatible stratum 0 and minimum compatible stratum 1
+  # versions with apache config, and maybe a third indicating the
+  # minimum compatible version in general.  Either that or we forget
+  # about being so selective and just force everybody to do a migrate
+  # even if it isn't relevant in their config.
+
   if [ "$creator" -lt "$(cvmfs_layout_revision)" ] && \
        is_stratum1 $name && \
-       is_local_upstream $CVMFS_UPSTREAM_STORAGE && \
-       cvmfs_sys_file_is_regular $apache_conf; then
+       has_apache_config_file $(get_apache_conf_filename $name); then
     _repo_is_incompatible "$creator" $nokill
     return $?
   fi
