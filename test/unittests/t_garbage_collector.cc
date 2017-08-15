@@ -14,7 +14,7 @@
 #include "hash.h"
 #include "manifest.h"
 #include "prng.h"
-#include "../common/testutil.h"
+#include "testutil.h"
 
 using swissknife::CatalogTraversal;
 using upload::SpoolerDefinition;

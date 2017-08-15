@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-#include "../common/testutil.h"
+#include "testutil.h"
 
 // This is very meta!
 // We are testing the utility functions used for testing...

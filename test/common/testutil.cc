@@ -18,7 +18,7 @@
 #include "fs_traversal.h"
 #include "hash.h"
 #include "manifest.h"
-#include "../common/testutil.h"
+#include "testutil.h"
 
 
 #ifndef __APPLE__

@@ -11,7 +11,7 @@
 #include "catalog_rw.h"
 #include "hash.h"
 #include "shortstring.h"
-#include "../common/testutil.h"
+#include "testutil.h"
 
 using namespace std;  // NOLINT
 

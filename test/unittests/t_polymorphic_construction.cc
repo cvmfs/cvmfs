@@ -8,7 +8,7 @@
 #include <string>
 
 #include "prng.h"
-#include "../common/testutil.h"
+#include "testutil.h"
 #include "util/plugin.h"
 
 struct DecisionType {

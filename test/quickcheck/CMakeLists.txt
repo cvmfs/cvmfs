@@ -4,6 +4,9 @@
 #
 set (PROJECT_QC_NAME "cvmfs_qc")
 
+# Add the test/common directory to the include path
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../common)
+
 #
 # micro quickcheck files
 #

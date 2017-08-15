@@ -14,7 +14,7 @@
 #include "history_sqlite.h"
 #include "shortstring.h"
 #include "statistics.h"
-#include "../common/testutil.h"
+#include "testutil.h"
 
 using namespace std;  // NOLINT
 

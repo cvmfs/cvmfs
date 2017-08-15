@@ -13,7 +13,7 @@
 
 #include "encrypt.h"
 #include "hash.h"
-#include "../common/testutil.h"
+#include "testutil.h"
 
 using namespace std;  // NOLINT
 

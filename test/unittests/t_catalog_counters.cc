@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-#include "../common/testutil.h"
+#include "testutil.h"
 
 #include "catalog_counters.h"
 

@@ -6,7 +6,7 @@
 
 #include <cassert>
 
-#include "../common/env.h"
+#include "env.h"
 #include "monitor.h"
 
 int main(int argc, char **argv) {

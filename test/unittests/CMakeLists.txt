@@ -6,6 +6,9 @@ set (PROJECT_TEST_NAME "cvmfs_unittests")
 set (PROJECT_TEST_DEBUG_NAME ${PROJECT_TEST_NAME}_debug)
 set (PROJECT_TEST_CACHE_NAME "cvmfs_test_cache")
 
+# Add the test/common directory to the include path
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../common)
+
 #
 # unit test files
 #
@@ -33,6 +36,7 @@ set(CVMFS_UNITTEST_FILES
   t_callbacks.cc
   t_catalog.cc
   t_catalog_counters.cc
+  t_catalog_merge_tool.cc
   t_catalog_mgr.cc
   t_catalog_sql.cc
   t_catalog_traversal.cc
