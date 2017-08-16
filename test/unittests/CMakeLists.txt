@@ -19,6 +19,7 @@ set(CVMFS_UNITTEST_FILES
   # test utility functions
   ../common/env.cc
   ../common/testutil.cc
+  ../common/catalog_test_tools.cc
 
   t_async_reader.cc
   t_atomic.cc
@@ -223,9 +224,9 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/util/raii_temp_dir.cc
   ${CVMFS_SOURCE_DIR}/util_concurrency.cc
   ${CVMFS_SOURCE_DIR}/uuid.cc
-	${CVMFS_SOURCE_DIR}/webapi/fcgi.cc
+  ${CVMFS_SOURCE_DIR}/webapi/fcgi.cc
   ${CVMFS_SOURCE_DIR}/webapi/macaroon.cc
-	${CVMFS_SOURCE_DIR}/webapi/uri_map.cc
+  ${CVMFS_SOURCE_DIR}/webapi/uri_map.cc
   ${CVMFS_SOURCE_DIR}/whitelist.cc
   ${CVMFS_SOURCE_DIR}/wpad.cc
   ${CVMFS_SOURCE_DIR}/xattr.cc

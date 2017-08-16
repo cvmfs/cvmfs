@@ -15,6 +15,7 @@ set(CVMFS_QC_FILES
 
   ../common/env.cc
   ../common/testutil.cc
+  ../common/catalog_test_tools.cc
 
   qc_dummy.cc
 )
@@ -29,21 +30,56 @@ set (CVMFS_QC_SOURCES
 
   # dependencies
   ${CVMFS_SOURCE_DIR}/cache_transport.cc
+  ${CVMFS_SOURCE_DIR}/catalog.cc
+  ${CVMFS_SOURCE_DIR}/catalog_counters.cc
+  ${CVMFS_SOURCE_DIR}/catalog_mgr_ro.cc
+  ${CVMFS_SOURCE_DIR}/catalog_mgr_rw.cc
+  ${CVMFS_SOURCE_DIR}/catalog_rw.cc
+  ${CVMFS_SOURCE_DIR}/catalog_sql.cc
   ${CVMFS_SOURCE_DIR}/compression.cc
   ${CVMFS_SOURCE_DIR}/directory_entry.cc
+  ${CVMFS_SOURCE_DIR}/dns.cc
+  ${CVMFS_SOURCE_DIR}/download.cc
+  ${CVMFS_SOURCE_DIR}/file_processing/async_reader.cc
+  ${CVMFS_SOURCE_DIR}/file_processing/chunk.cc
+  ${CVMFS_SOURCE_DIR}/file_processing/chunk_detector.cc
+  ${CVMFS_SOURCE_DIR}/file_processing/file.cc
+  ${CVMFS_SOURCE_DIR}/file_processing/file_processor.cc
+  ${CVMFS_SOURCE_DIR}/file_processing/io_dispatcher.cc
+  ${CVMFS_SOURCE_DIR}/file_processing/processor.cc
+  ${CVMFS_SOURCE_DIR}/gateway_util.cc
+  ${CVMFS_SOURCE_DIR}/globals.cc
   ${CVMFS_SOURCE_DIR}/glue_buffer.cc
+  ${CVMFS_SOURCE_DIR}/hash.cc
+  ${CVMFS_SOURCE_DIR}/json_document.cc
   ${CVMFS_SOURCE_DIR}/logging.cc
   ${CVMFS_SOURCE_DIR}/malloc_arena.cc
   ${CVMFS_SOURCE_DIR}/manifest.cc
   ${CVMFS_SOURCE_DIR}/monitor.cc
-  ${CVMFS_SOURCE_DIR}/hash.cc
+  ${CVMFS_SOURCE_DIR}/options.cc
+  ${CVMFS_SOURCE_DIR}/pack.cc
   ${CVMFS_SOURCE_DIR}/reflog.cc
   ${CVMFS_SOURCE_DIR}/reflog_sql.cc
+  ${CVMFS_SOURCE_DIR}/upload_facility.cc
+  ${CVMFS_SOURCE_DIR}/upload_local.cc
+  ${CVMFS_SOURCE_DIR}/upload_gateway.cc
+  ${CVMFS_SOURCE_DIR}/upload_s3.cc
+  ${CVMFS_SOURCE_DIR}/upload_spooler_definition.cc
+  ${CVMFS_SOURCE_DIR}/sanitizer.cc
+  ${CVMFS_SOURCE_DIR}/session_context.cc
   ${CVMFS_SOURCE_DIR}/sql.cc
   ${CVMFS_SOURCE_DIR}/sqlitemem.cc
+  ${CVMFS_SOURCE_DIR}/statistics.cc
+  ${CVMFS_SOURCE_DIR}/swissknife_lease_json.cc
+  ${CVMFS_SOURCE_DIR}/swissknife_lease_curl.cc
+  ${CVMFS_SOURCE_DIR}/s3fanout.cc
+  ${CVMFS_SOURCE_DIR}/upload.cc
   ${CVMFS_SOURCE_DIR}/util/algorithm.cc
+  ${CVMFS_SOURCE_DIR}/util/mmap_file.cc
   ${CVMFS_SOURCE_DIR}/util/posix.cc
   ${CVMFS_SOURCE_DIR}/util/string.cc
+  ${CVMFS_SOURCE_DIR}/util_concurrency.cc
+  ${CVMFS_SOURCE_DIR}/xattr.cc
   cache.pb.cc cache.pb.h
 )
 
@@ -89,7 +125,9 @@ set_target_properties (${PROJECT_QC_NAME} PROPERTIES
 #
 set (QC_LINK_LIBRARIES
   ${RAPIDCHECK_LIBRARIES} ${GTEST_LIBRARIES} ${SQLITE3_LIBRARY}
-  ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${ZLIB_LIBRARIES}
-  ${RT_LIBRARY} ${SHA3_LIBRARIES} ${PROTOBUF_LITE_LIBRARY} pthread dl)
+  ${CURL_LIBRARIES} ${CARES_LIBRARIES} ${OPENSSL_LIBRARIES}
+  ${RT_LIBRARY} ${ZLIB_LIBRARIES} ${SHA3_LIBRARIES} ${PROTOBUF_LITE_LIBRARY}
+  ${VJSON_LIBRARIES} ${TBB_LIBRARIES}
+  pthread dl)
 
 target_link_libraries (${PROJECT_QC_NAME} ${QC_LINK_LIBRARIES})
