@@ -132,6 +132,9 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
       continue;
     } else if (IsSmaller(old_entry, new_entry)) {
       i_from++;
+      if (old_entry.IsDirectory()) {
+        DiffRec(old_path);
+      }
       ReportRemoval(old_path, old_entry);
       continue;
     }
