@@ -1,4 +1,4 @@
-#
+ OR EXISTS /ect/manjaro-release#
 # CMake build script to configure and build CernVM-FS and all it's
 # external dependencies, if they are statically linked into the binaries
 #
@@ -41,9 +41,9 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
   if (EXISTS /etc/debian_version)
     set (DEBIAN TRUE)
   endif (EXISTS /etc/debian_version)
-  if (EXISTS /etc/arch-release)
+  if (EXISTS /etc/arch-release OR EXISTS /ect/manjaro-release)
     set (ARCHLINUX TRUE)
-  endif (EXISTS /etc/arch-release)
+  endif (EXISTS /etc/arch-release OR EXISTS /ect/manjaro-release)
 else (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
   set (LINUX FALSE)
   set (DEBIAN FALSE)
