@@ -61,7 +61,7 @@ run_transactions() {
     echo "  Copying the payload into repository"
     rm -v /cvmfs/test.repo.org/new_repository
     if [ ! -d /tmp/linux-4.12.8 ]; then
-        curl -o /tmp/linux.tar.xz https://cdn.kernel.org/pub/linux/kernel/v4.x/linux-4.12.8.tar.xz
+        curl -o /tmp/linux.tar.xz http://ecsft.cern.ch/dist/cvmfs/test-data/linux-4.12.8.tar.xz
         cd /tmp/
         tar xf linux.tar.xz
         cd
