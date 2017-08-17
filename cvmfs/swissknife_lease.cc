@@ -124,7 +124,8 @@ int CommandLease::Main(const ArgumentList& args) {
         if (!buffer.data.empty() && ParseDropReply(buffer)) {
           std::fclose(token_file);
           if (unlink(token_file_name.c_str())) {
-            LogCvmfs(kLogCvmfs, kLogStderr, "Warning - Could not delete session token file.");
+            LogCvmfs(kLogCvmfs, kLogStderr,
+                     "Warning - Could not delete session token file.");
           }
           return kLeaseSuccess;
         } else {
