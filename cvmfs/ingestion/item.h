@@ -46,10 +46,8 @@ class BlockItem : SingleCopy {
   void Progress(int32_t pred_nstage);
   void Discharge();
 
-  unsigned char *data() {
-    MutexLockGuard guard(&lock_);
-    return data_;
-  }
+  unsigned char *data() { return data_; }
+  uint32_t size() { return size_; }
 
   BlockType type() {
     MutexLockGuard guard(&lock_);

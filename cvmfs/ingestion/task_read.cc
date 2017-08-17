@@ -30,7 +30,7 @@ void TaskRead::Process(FileItem *item) {
 
   ssize_t nbytes = -1;
   do {
-    ssize_t nbytes = SafeRead(fd, buffer, kBlockSize);
+    nbytes = SafeRead(fd, buffer, kBlockSize);
     if (nbytes < 0) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to read %s (%d)",
                item->path().c_str(), errno);

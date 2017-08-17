@@ -126,13 +126,6 @@ class Tube : SingleCopy {
     return nstage_;
   }
 
-  void nstage(int32_t nstage) {
-    assert(nstage < kMaxNstage);
-
-    MutexLockGuard lock_guard(&lock_);
-    nstage_ = nstage;
-  }
-
  private:
   void Init() {
     Link *sentinel = new Link(NULL);
