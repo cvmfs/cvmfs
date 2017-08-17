@@ -51,10 +51,10 @@ void TaskRead::Process(FileItem *item) {
       if (nbytes < kBlockSize) {
         block_next->MakeStop();
       }
-      tube_out_->Enqueue(block_current);
+      block_current->Progress(tube_out_);
     }
   } while (nbytes == kBlockSize);
-  tube_out_->Enqueue(block_next);
+  block_next->Progress(tube_out_);
 
   close(fd);
 }

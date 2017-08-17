@@ -26,14 +26,17 @@ BlockItem::BlockItem()
 
 
 BlockItem::~BlockItem() {
+  if (succ_item_ != NULL)
+    succ_item_->Progress(Tube<BlockItem>::kMaxNstage);
   free(data_);
   pthread_mutex_destroy(&lock_);
 }
 
 
 void BlockItem::Discharge() {
-  if (succ_item_ != NULL)
-    succ_item_->Progress(Tube<BlockItem>::kMaxNstage);
+  MutexLockGuard guard(&lock_);
+  data_ = NULL;
+  size_ = capacity_ = 0;
 }
 
 

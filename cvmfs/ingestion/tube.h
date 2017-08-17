@@ -30,6 +30,10 @@
 template <class ItemT>
 class Tube : SingleCopy {
  public:
+  /**
+   * In a pipeline, tubes have an order according to the different stages of the
+   * pipeline.
+   */
   static const int32_t kMaxNstage = 4096;
 
   class Link : SingleCopy {
@@ -44,8 +48,8 @@ class Tube : SingleCopy {
     Link *prev_;
   };
 
-  Tube() : limit_(uint64_t(-1)), size_(0), nstage_(0) { Init(); }
-  explicit Tube(uint64_t limit) : limit_(limit), size_(0), nstage_(0) {
+  Tube() : limit_(uint64_t(-1)), size_(0), nstage_(kMaxNstage) { Init(); }
+  explicit Tube(uint64_t limit) : limit_(limit), size_(0), nstage_(kMaxNstage) {
     Init();
   }
   ~Tube() {
@@ -124,6 +128,13 @@ class Tube : SingleCopy {
   int32_t nstage() {
     MutexLockGuard lock_guard(&lock_);
     return nstage_;
+  }
+
+  void set_nstage(int32_t nstage) {
+    assert((nstage >= 0) && (nstage < kMaxNstage));
+    MutexLockGuard lock_guard(&lock_);
+    assert(nstage_ == kMaxNstage);
+    nstage_ = nstage;
   }
 
  private:

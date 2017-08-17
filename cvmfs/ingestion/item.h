@@ -40,11 +40,11 @@ class BlockItem : SingleCopy {
   void MakeStop();
   void MakeData(uint32_t capacity, BlockItem *succ_item);
   void MakeData(unsigned char *data, uint32_t size, BlockItem *succ_item);
+  // remove pointer to the data
+  void Discharge();
 
   uint32_t Write(void *buf, uint32_t count);
   void Progress(Tube<BlockItem> *next_stage);
-  void Progress(int32_t pred_nstage);
-  void Discharge();
 
   unsigned char *data() { return data_; }
   uint32_t size() { return size_; }
@@ -55,6 +55,8 @@ class BlockItem : SingleCopy {
   }
 
  private:
+  // Only called by predecessor
+  void Progress(int32_t pred_nstage);
   void DoProgress();
 
   BlockType type_;

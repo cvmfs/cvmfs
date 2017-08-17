@@ -114,6 +114,8 @@ TEST_F(T_Task, Stress) {
 TEST_F(T_Task, Read) {
   Tube<FileItem> tube_in;
   Tube<BlockItem> tube_out;
+  tube_in.set_nstage(0);
+  tube_out.set_nstage(1);
 
   TubeConsumerGroup<FileItem> task_group;
   task_group.TakeConsumer(new TaskRead(&tube_in, &tube_out));
