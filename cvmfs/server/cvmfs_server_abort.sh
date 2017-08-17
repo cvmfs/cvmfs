@@ -94,7 +94,7 @@ cvmfs_server_abort() {
     # the cvmfs_swissknife lease command needs to be used to drop the active lease
     if [ x"$upstream_type" = xgw ]; then
         local repo_services_url=$(echo $upstream_storage | cut -d',' -f3)
-        __swissknife lease -a drop -u $repo_services_url -k $gw_key_file -p $name"/"$subpath || { echo "Could not drop active lease or lease does not exist for repository $name"; retcode=1; continue; }
+        __swissknife lease -a drop -u $repo_services_url -k $gw_key_file -p $name"/"$subpath || { echo "Could not drop active lease or lease does not exist for repository $name"; retcode=1; }
     fi
     close_transaction $name $use_fd_fallback
 

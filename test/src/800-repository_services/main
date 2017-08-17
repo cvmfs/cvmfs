@@ -46,6 +46,18 @@ save_repo_contents() {
 run_transactions() {
     set_up_repository_services
 
+    echo "Pre-checks"
+
+    ## Pre-checks: starting and aborting transactions should leave no trace
+    cvmfs_server transaction -e test.repo.org
+    cvmfs_server abort -f -e test.repo.org
+    cvmfs_server check test.repo.org
+
+    cvmfs_server transaction -e test.repo.org
+    cp -r /usr/bin /cvmfs/test.repo.org
+    cvmfs_server abort -f -e test.repo.org
+    cvmfs_server check test.repo.org
+
     echo "Checking transaction + publish"
 
     ## Transaction 1 (Modifying existing file and creating a new one)
@@ -61,6 +73,7 @@ run_transactions() {
 
     echo "  Publishing changes 1"
     cvmfs_server publish -e test.repo.org
+    cvmfs_server check test.repo.org
 
     echo "  Copy the contents of the repository"
     save_repo_contents /tmp/cvmfs_out_1
@@ -77,6 +90,7 @@ run_transactions() {
 
     echo "  Publishing changes 2"
     cvmfs_server publish -e test.repo.org
+    cvmfs_server check test.repo.org
 
     echo "  Copy the contents of the repository"
     save_repo_contents /tmp/cvmfs_out_2
@@ -91,6 +105,7 @@ run_transactions() {
 
     echo "  Publishing changes 3"
     cvmfs_server publish -e test.repo.org
+    cvmfs_server check test.repo.org
 
     echo "  Copy the contents of the repository"
     save_repo_contents /tmp/cvmfs_out_3
@@ -107,6 +122,7 @@ run_transactions() {
 
     echo "  Publishing changes 4"
     cvmfs_server publish -e test.repo.org
+    cvmfs_server check test.repo.org
 
     echo "  Copy the contents of the repository"
     save_repo_contents /tmp/cvmfs_out_4
@@ -123,6 +139,7 @@ run_transactions() {
 
     echo "  Publishing changes 5"
     cvmfs_server publish -e test.repo.org
+    cvmfs_server check test.repo.org
 
     echo "  Copy the contents of the repository"
     save_repo_contents /tmp/cvmfs_out_5
@@ -135,6 +152,7 @@ run_transactions() {
 
     echo "  Publishing changes 6"
     cvmfs_server publish -e test.repo.org/new/c
+    cvmfs_server check test.repo.org
 
     echo "  Copy the contents of the repository"
     save_repo_contents /tmp/cvmfs_out_6
@@ -147,6 +165,7 @@ run_transactions() {
 
     echo "  Publishing changes 7"
     cvmfs_server publish -e test.repo.org/new/c
+    cvmfs_server check test.repo.org
 
     echo "  Copy the contents of the repository"
     save_repo_contents /tmp/cvmfs_out_7

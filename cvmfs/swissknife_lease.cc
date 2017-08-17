@@ -29,14 +29,14 @@ bool CheckParams(const swissknife::CommandLease::Parameters& p) {
 namespace swissknife {
 
 enum LeaseError {
-  kLeaseSuccess = 0,
-  kLeaseUnused = 1,
-  kLeaseParamError = 2,
-  kLeaseCurlInitError = 3,
-  kLeaseFileOpenError = 4,
-  kLeaseFileDeleteError = 5,
-  kLeaseParseError = 6,
-  kLeaseCurlReqError = 7,
+  kLeaseSuccess,
+  kLeaseUnused,
+  kLeaseParamError,
+  kLeaseKeyParseError,
+  kLeaseCurlInitError,
+  kLeaseFileOpenError,
+  kLeaseParseError,
+  kLeaseCurlReqError,
 };
 
 CommandLease::~CommandLease() {}
@@ -80,7 +80,7 @@ int CommandLease::Main(const ArgumentList& args) {
   if (!gateway::ReadKeys(params.key_file, &key_id, &secret)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Error reading key file %s.",
              params.key_file.c_str());
-    return 1;
+    return kLeaseKeyParseError;
   }
 
   LeaseError ret = kLeaseSuccess;
@@ -121,13 +121,13 @@ int CommandLease::Main(const ArgumentList& args) {
       CurlBuffer buffer;
       if (MakeEndRequest("DELETE", key_id, secret, session_token,
                          params.repo_service_url, "", &buffer)) {
-        if (buffer.data.size() > 0 && ParseDropReply(buffer)) {
+        if (!buffer.data.empty() && ParseDropReply(buffer)) {
           std::fclose(token_file);
           if (unlink(token_file_name.c_str())) {
             LogCvmfs(kLogCvmfs, kLogStderr,
-                     "Error deleting session token file");
-            ret = kLeaseFileDeleteError;
+                     "Warning - Could not delete session token file.");
           }
+          return kLeaseSuccess;
         } else {
           LogCvmfs(kLogCvmfs, kLogStderr, "Could not drop active lease");
           ret = kLeaseParseError;
@@ -137,7 +137,7 @@ int CommandLease::Main(const ArgumentList& args) {
         ret = kLeaseCurlReqError;
       }
 
-      fclose(token_file);
+      std::fclose(token_file);
     } else {
       LogCvmfs(kLogCvmfs, kLogStderr, "Error reading session token from file");
       ret = kLeaseFileOpenError;
