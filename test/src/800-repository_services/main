@@ -46,6 +46,18 @@ save_repo_contents() {
 run_transactions() {
     set_up_repository_services
 
+    echo "Pre-checks"
+
+    ## Pre-checks: starting and aborting transactions should leave no trace
+    cvmfs_server transaction -e test.repo.org
+    cvmfs_server abort -f -e test.repo.org
+    cvmfs_server check test.repo.org
+
+    cvmfs_server transaction -e test.repo.org
+    cp -r /usr/bin /cvmfs/test.repo.org
+    cvmfs_server abort -f -e test.repo.org
+    cvmfs_server check test.repo.org
+
     echo "Checking transaction + publish"
 
     ## Transaction 1 (Modifying existing file and creating a new one)
