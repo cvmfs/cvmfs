@@ -61,6 +61,7 @@ run_transactions() {
 
     echo "  Publishing changes 1"
     cvmfs_server publish -e test.repo.org
+    cvmfs_server check test.repo.org
 
     echo "  Copy the contents of the repository"
     save_repo_contents /tmp/cvmfs_out_1
@@ -77,6 +78,7 @@ run_transactions() {
 
     echo "  Publishing changes 2"
     cvmfs_server publish -e test.repo.org
+    cvmfs_server check test.repo.org
 
     echo "  Copy the contents of the repository"
     save_repo_contents /tmp/cvmfs_out_2
@@ -91,6 +93,7 @@ run_transactions() {
 
     echo "  Publishing changes 3"
     cvmfs_server publish -e test.repo.org
+    cvmfs_server check test.repo.org
 
     echo "  Copy the contents of the repository"
     save_repo_contents /tmp/cvmfs_out_3
@@ -107,6 +110,7 @@ run_transactions() {
 
     echo "  Publishing changes 4"
     cvmfs_server publish -e test.repo.org
+    cvmfs_server check test.repo.org
 
     echo "  Copy the contents of the repository"
     save_repo_contents /tmp/cvmfs_out_4
@@ -123,6 +127,7 @@ run_transactions() {
 
     echo "  Publishing changes 5"
     cvmfs_server publish -e test.repo.org
+    cvmfs_server check test.repo.org
 
     echo "  Copy the contents of the repository"
     save_repo_contents /tmp/cvmfs_out_5
@@ -135,6 +140,7 @@ run_transactions() {
 
     echo "  Publishing changes 6"
     cvmfs_server publish -e test.repo.org/new/c
+    cvmfs_server check test.repo.org
 
     echo "  Copy the contents of the repository"
     save_repo_contents /tmp/cvmfs_out_6
@@ -147,6 +153,7 @@ run_transactions() {
 
     echo "  Publishing changes 7"
     cvmfs_server publish -e test.repo.org/new/c
+    cvmfs_server check test.repo.org
 
     echo "  Copy the contents of the repository"
     save_repo_contents /tmp/cvmfs_out_7

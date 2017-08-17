@@ -70,6 +70,7 @@ run_transactions() {
 
     echo "  Publishing changes 1"
     cvmfs_server publish -e test.repo.org
+    cvmfs_server check test.repo.org
 
     echo "  Copy the contents of the repository"
     save_repo_contents /tmp/cvmfs_out
