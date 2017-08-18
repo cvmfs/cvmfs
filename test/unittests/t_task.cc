@@ -4,6 +4,9 @@
 
 #include "gtest/gtest.h"
 
+#include <fcntl.h>
+#include <unistd.h>
+
 #include "atomic.h"
 #include "ingestion/item.h"
 #include "ingestion/task.h"
@@ -141,14 +144,21 @@ TEST_F(T_Task, Read) {
   delete item_stop;
   unlink("./abc");
 
-  string str_large(2 * TaskRead::kBlockSize, 42);
-  EXPECT_TRUE(SafeWriteToFile(str_large, "./large", 0600));
+  unsigned nblocks = 10;
+  int fd_tmp = open("./large", O_CREAT | O_TRUNC | O_WRONLY, 0600);
+  EXPECT_GT(fd_tmp, 0);
+  for (unsigned i = 0; i < nblocks; ++i) {
+    string str_block(TaskRead::kBlockSize, i);
+    EXPECT_TRUE(SafeWrite(fd_tmp, str_block.data(), str_block.size()));
+  }
+  close(fd_tmp);
+
   FileItem file_large("./large");
   tube_in.Enqueue(&file_large);
-  for (unsigned i = 0; i < 2; ++i) {
+  for (unsigned i = 0; i < nblocks; ++i) {
     item_data = tube_out.Pop();
     EXPECT_EQ(BlockItem::kBlockData, item_data->type());
-    EXPECT_EQ(string(TaskRead::kBlockSize, 42),
+    EXPECT_EQ(string(TaskRead::kBlockSize, i),
               string(reinterpret_cast<char *>(item_data->data()),
                                               item_data->size()));
     delete item_data;
