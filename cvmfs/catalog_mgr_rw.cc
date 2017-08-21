@@ -1128,15 +1128,13 @@ WritableCatalogManager::SnapshotCatalogsSerialized(
     // Compress and upload catalog
     shash::Any hash_catalog(spooler_->GetHashAlgorithm(),
                             shash::kSuffixCatalog);
-    if (!zlib::CompressPath2Path((*i)->database_path(),
-                                 (*i)->database_path() + ".compressed",
+    if (!zlib::CompressPath2Null((*i)->database_path(),
                                  &hash_catalog))
     {
       PrintError("could not compress catalog " + (*i)->mountpoint().ToString());
       assert(false);
     }
-    spooler_->Upload((*i)->database_path() + ".compressed",
-                     "data/" + hash_catalog.MakePath());
+    spooler_->ProcessCatalog((*i)->database_path());
 
     uint64_t catalog_size = GetFileSize((*i)->database_path());
     assert(catalog_size > 0);
