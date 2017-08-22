@@ -67,7 +67,7 @@ start_link(_) ->
                                               Path :: binary().
 new_lease(Uid, KeyId, Path) ->
     gen_server:call(?MODULE, {be_req, new_lease, Uid, KeyId, Path},
-                    cvmfs_app_util:get_max_lease_time(ms)).
+                    cvmfs_app_util:get_max_lease_time()).
 
 
 %%--------------------------------------------------------------------
@@ -82,7 +82,7 @@ new_lease(Uid, KeyId, Path) ->
                                              LeaseToken :: binary().
 cancel_lease(Uid, LeaseToken) ->
     gen_server:call(?MODULE, {be_req, cancel_lease, Uid, LeaseToken},
-                    cvmfs_app_util:get_max_lease_time(ms)).
+                    cvmfs_app_util:get_max_lease_time()).
 
 
 %%--------------------------------------------------------------------
@@ -98,7 +98,7 @@ cancel_lease(Uid, LeaseToken) ->
                                              RootHashes :: {binary(), binary()}.
 commit_lease(Uid, LeaseToken, {OldRootHash, NewRootHash}) ->
     gen_server:call(?MODULE, {be_req, commit_lease, Uid, LeaseToken, OldRootHash, NewRootHash},
-                    cvmfs_app_util:get_max_lease_time(ms)).
+                    cvmfs_app_util:get_max_lease_time()).
 
 
 %%--------------------------------------------------------------------
@@ -114,12 +114,12 @@ commit_lease(Uid, LeaseToken, {OldRootHash, NewRootHash}) ->
                                      SubmissionData :: cvmfs_receiver:payload_submission_data().
 submit_payload(Uid, SubmissionData) ->
     gen_server:call(?MODULE, {be_req, submit_payload, Uid, SubmissionData},
-                    cvmfs_app_util:get_max_lease_time(ms)).
+                    cvmfs_app_util:get_max_lease_time()).
 
 
 -spec get_repos(Uid :: binary()) -> [binary()].
 get_repos(Uid) ->
-    gen_server:call(?MODULE, {be_req, get_repos, Uid}, cvmfs_app_util:get_max_lease_time(ms)).
+    gen_server:call(?MODULE, {be_req, get_repos, Uid}, cvmfs_app_util:get_max_lease_time()).
 
 
 -spec check_hmac(Uid, Message, KeyId, HMAC) -> boolean()
@@ -129,12 +129,12 @@ get_repos(Uid) ->
                                                         HMAC :: binary().
 check_hmac(Uid, Message, KeyId, HMAC) ->
     gen_server:call(?MODULE, {be_req, check_hmac, Uid, Message, KeyId, HMAC},
-                    cvmfs_app_util:get_max_lease_time(ms)).
+                    cvmfs_app_util:get_max_lease_time()).
 
 
 -spec unique_id() -> binary().
 unique_id() ->
-    gen_server:call(?MODULE, {be_req, unique_id}, cvmfs_app_util:get_max_lease_time(ms)).
+    gen_server:call(?MODULE, {be_req, unique_id}, cvmfs_app_util:get_max_lease_time()).
 
 
 %%%===================================================================
@@ -187,7 +187,7 @@ handle_call({be_req, new_lease, Uid, KeyId, Path}, From,
                    end
            end,
     spawn_link(Task),
-    {noreply, State, cvmfs_app_util:get_max_lease_time(ms)};
+    {noreply, State, cvmfs_app_util:get_max_lease_time()};
 handle_call({be_req, cancel_lease, Uid, LeaseToken}, From, State) ->
     Task = fun() ->
                    Reply = p_cancel_lease(LeaseToken),
@@ -196,7 +196,7 @@ handle_call({be_req, cancel_lease, Uid, LeaseToken}, From, State) ->
                    gen_server:reply(From, Reply)
            end,
     spawn_link(Task),
-    {noreply, State, cvmfs_app_util:get_max_lease_time(ms)};
+    {noreply, State, cvmfs_app_util:get_max_lease_time()};
 handle_call({be_req, commit_lease, Uid, LeaseToken, OldRootHash, NewRootHash}, From, State) ->
     Task = fun() ->
                    Reply = p_commit_lease(LeaseToken, {OldRootHash, NewRootHash}),
@@ -205,7 +205,7 @@ handle_call({be_req, commit_lease, Uid, LeaseToken, OldRootHash, NewRootHash}, F
                    gen_server:reply(From, Reply)
            end,
     spawn_link(Task),
-    {noreply, State, cvmfs_app_util:get_max_lease_time(ms)};
+    {noreply, State, cvmfs_app_util:get_max_lease_time()};
 handle_call({be_req, submit_payload, Uid, SubmissionData}, From, State) ->
     Task = fun() ->
                    Reply = p_submit_payload(SubmissionData),
@@ -215,7 +215,7 @@ handle_call({be_req, submit_payload, Uid, SubmissionData}, From, State) ->
                    gen_server:reply(From, Reply)
            end,
     spawn_link(Task),
-    {noreply, State, cvmfs_app_util:get_max_lease_time(ms)};
+    {noreply, State, cvmfs_app_util:get_max_lease_time()};
 handle_call({be_req, get_repos, Uid}, From, State) ->
     Task = fun() ->
                    Reply = p_get_repos(),
@@ -224,7 +224,7 @@ handle_call({be_req, get_repos, Uid}, From, State) ->
                    gen_server:reply(From, Reply)
               end,
     spawn_link(Task),
-    {noreply, State, cvmfs_app_util:get_max_lease_time(ms)};
+    {noreply, State, cvmfs_app_util:get_max_lease_time()};
 handle_call({be_req, check_hmac, Uid, Message, KeyId, HMAC}, From, State) ->
     Task = fun() ->
                    Reply = p_check_hmac(Message, KeyId, HMAC),
@@ -233,7 +233,7 @@ handle_call({be_req, check_hmac, Uid, Message, KeyId, HMAC}, From, State) ->
                    gen_server:reply(From, Reply)
            end,
     spawn_link(Task),
-    {noreply, State, cvmfs_app_util:get_max_lease_time(ms)};
+    {noreply, State, cvmfs_app_util:get_max_lease_time()};
 handle_call({be_req, unique_id}, From, State) ->
     Task = fun() ->
                    Reply = p_unique_id(),
@@ -241,7 +241,7 @@ handle_call({be_req, unique_id}, From, State) ->
                    gen_server:reply(From,Reply)
            end,
     spawn_link(Task),
-    {noreply, State, cvmfs_app_util:get_max_lease_time(ms)}.
+    {noreply, State, cvmfs_app_util:get_max_lease_time()}.
 
 
 %%--------------------------------------------------------------------
