@@ -26,11 +26,6 @@
          terminate/2, code_change/3]).
 
 
-%% Constants
-% Timeout of asychronous request handling == 2h
--define(ASYNC_TIMEOUT, 7200000).
-
-
 %%%===================================================================
 %%% Type specifications
 %%%===================================================================
@@ -72,7 +67,7 @@ start_link(_) ->
                                               Path :: binary().
 new_lease(Uid, KeyId, Path) ->
     gen_server:call(?MODULE, {be_req, new_lease, Uid, KeyId, Path},
-                    ?ASYNC_TIMEOUT).
+                    cvmfs_app_util:get_max_lease_time(ms)).
 
 
 %%--------------------------------------------------------------------
@@ -87,7 +82,7 @@ new_lease(Uid, KeyId, Path) ->
                                              LeaseToken :: binary().
 cancel_lease(Uid, LeaseToken) ->
     gen_server:call(?MODULE, {be_req, cancel_lease, Uid, LeaseToken},
-                    ?ASYNC_TIMEOUT).
+                    cvmfs_app_util:get_max_lease_time(ms)).
 
 
 %%--------------------------------------------------------------------
@@ -103,7 +98,7 @@ cancel_lease(Uid, LeaseToken) ->
                                              RootHashes :: {binary(), binary()}.
 commit_lease(Uid, LeaseToken, {OldRootHash, NewRootHash}) ->
     gen_server:call(?MODULE, {be_req, commit_lease, Uid, LeaseToken, OldRootHash, NewRootHash},
-                    ?ASYNC_TIMEOUT).
+                    cvmfs_app_util:get_max_lease_time(ms)).
 
 
 %%--------------------------------------------------------------------
@@ -119,12 +114,12 @@ commit_lease(Uid, LeaseToken, {OldRootHash, NewRootHash}) ->
                                      SubmissionData :: cvmfs_receiver:payload_submission_data().
 submit_payload(Uid, SubmissionData) ->
     gen_server:call(?MODULE, {be_req, submit_payload, Uid, SubmissionData},
-                    ?ASYNC_TIMEOUT).
+                    cvmfs_app_util:get_max_lease_time(ms)).
 
 
 -spec get_repos(Uid :: binary()) -> [binary()].
 get_repos(Uid) ->
-    gen_server:call(?MODULE, {be_req, get_repos, Uid}, ?ASYNC_TIMEOUT).
+    gen_server:call(?MODULE, {be_req, get_repos, Uid}, cvmfs_app_util:get_max_lease_time(ms)).
 
 
 -spec check_hmac(Uid, Message, KeyId, HMAC) -> boolean()
@@ -134,12 +129,12 @@ get_repos(Uid) ->
                                                         HMAC :: binary().
 check_hmac(Uid, Message, KeyId, HMAC) ->
     gen_server:call(?MODULE, {be_req, check_hmac, Uid, Message, KeyId, HMAC},
-                    ?ASYNC_TIMEOUT).
+                    cvmfs_app_util:get_max_lease_time(ms)).
 
 
 -spec unique_id() -> binary().
 unique_id() ->
-    gen_server:call(?MODULE, {be_req, unique_id}, ?ASYNC_TIMEOUT).
+    gen_server:call(?MODULE, {be_req, unique_id}, cvmfs_app_util:get_max_lease_time(ms)).
 
 
 %%%===================================================================
@@ -155,8 +150,9 @@ unique_id() ->
 %%--------------------------------------------------------------------
 init([]) ->
     process_flag(trap_exit, true),
+    {ok, MaxLeaseTime} = application:get_env(cvmfs_services, max_lease_time),
     ok = quickrand:seed(),
-    {ok, #{}}.
+    {ok, #{max_lease_time => MaxLeaseTime}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -176,9 +172,10 @@ init([]) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-handle_call({be_req, new_lease, Uid, KeyId, Path}, From, State) ->
+handle_call({be_req, new_lease, Uid, KeyId, Path}, From,
+            #{max_lease_time := MaxLeaseTime} = State) ->
     Task = fun() ->
-                   case p_new_lease(KeyId, Path) of
+                   case p_new_lease(KeyId, Path, MaxLeaseTime) of
                        {ok, LeaseToken} ->
                            lager:info("Backend request: Uid: ~p - {new_lease, {~p, ~p}} -> Reply: ~p",
                                       [Uid, KeyId, Path, LeaseToken]),
@@ -190,7 +187,7 @@ handle_call({be_req, new_lease, Uid, KeyId, Path}, From, State) ->
                    end
            end,
     spawn_link(Task),
-    {noreply, State, ?ASYNC_TIMEOUT};
+    {noreply, State, cvmfs_app_util:get_max_lease_time(ms)};
 handle_call({be_req, cancel_lease, Uid, LeaseToken}, From, State) ->
     Task = fun() ->
                    Reply = p_cancel_lease(LeaseToken),
@@ -199,7 +196,7 @@ handle_call({be_req, cancel_lease, Uid, LeaseToken}, From, State) ->
                    gen_server:reply(From, Reply)
            end,
     spawn_link(Task),
-    {noreply, State, ?ASYNC_TIMEOUT};
+    {noreply, State, cvmfs_app_util:get_max_lease_time(ms)};
 handle_call({be_req, commit_lease, Uid, LeaseToken, OldRootHash, NewRootHash}, From, State) ->
     Task = fun() ->
                    Reply = p_commit_lease(LeaseToken, {OldRootHash, NewRootHash}),
@@ -208,7 +205,7 @@ handle_call({be_req, commit_lease, Uid, LeaseToken, OldRootHash, NewRootHash}, F
                    gen_server:reply(From, Reply)
            end,
     spawn_link(Task),
-    {noreply, State, ?ASYNC_TIMEOUT};
+    {noreply, State, cvmfs_app_util:get_max_lease_time(ms)};
 handle_call({be_req, submit_payload, Uid, SubmissionData}, From, State) ->
     Task = fun() ->
                    Reply = p_submit_payload(SubmissionData),
@@ -218,7 +215,7 @@ handle_call({be_req, submit_payload, Uid, SubmissionData}, From, State) ->
                    gen_server:reply(From, Reply)
            end,
     spawn_link(Task),
-    {noreply, State, ?ASYNC_TIMEOUT};
+    {noreply, State, cvmfs_app_util:get_max_lease_time(ms)};
 handle_call({be_req, get_repos, Uid}, From, State) ->
     Task = fun() ->
                    Reply = p_get_repos(),
@@ -227,7 +224,7 @@ handle_call({be_req, get_repos, Uid}, From, State) ->
                    gen_server:reply(From, Reply)
               end,
     spawn_link(Task),
-    {noreply, State, ?ASYNC_TIMEOUT};
+    {noreply, State, cvmfs_app_util:get_max_lease_time(ms)};
 handle_call({be_req, check_hmac, Uid, Message, KeyId, HMAC}, From, State) ->
     Task = fun() ->
                    Reply = p_check_hmac(Message, KeyId, HMAC),
@@ -236,7 +233,7 @@ handle_call({be_req, check_hmac, Uid, Message, KeyId, HMAC}, From, State) ->
                    gen_server:reply(From, Reply)
            end,
     spawn_link(Task),
-    {noreply, State, ?ASYNC_TIMEOUT};
+    {noreply, State, cvmfs_app_util:get_max_lease_time(ms)};
 handle_call({be_req, unique_id}, From, State) ->
     Task = fun() ->
                    Reply = p_unique_id(),
@@ -244,7 +241,7 @@ handle_call({be_req, unique_id}, From, State) ->
                    gen_server:reply(From,Reply)
            end,
     spawn_link(Task),
-    {noreply, State, ?ASYNC_TIMEOUT}.
+    {noreply, State, cvmfs_app_util:get_max_lease_time(ms)}.
 
 
 %%--------------------------------------------------------------------
@@ -300,16 +297,16 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
--spec p_new_lease(KeyId, Path) -> new_lease_result()
-                                      when KeyId :: binary(),
-                                           Path :: binary().
-p_new_lease(KeyId, Path) ->
+-spec p_new_lease(KeyId, Path, MaxLeaseTime) -> new_lease_result()
+                                                  when KeyId :: binary(),
+                                                       Path :: binary(),
+                                                       MaxLeaseTime :: integer().
+p_new_lease(KeyId, Path, MaxLeaseTime) ->
     % Check if user is registered with the cvmfs_auth service and
     % which paths he is allowed to modify
     [Repo | _]  = binary:split(Path, <<"/">>),
     case cvmfs_auth:check_keyid_for_repo(KeyId, Repo) of
         {ok, true} ->
-            {ok, MaxLeaseTime} = application:get_env(cvmfs_services, max_lease_time),
             {Public, Secret, Token} = cvmfs_receiver:generate_token(KeyId,
                                                                     Path,
                                                                     MaxLeaseTime),
@@ -413,5 +410,4 @@ p_request_wait_catalog_lease(Path) ->
             timer:sleep(TimeRemaining + 5),
             p_request_wait_catalog_lease(Path)
     end.
-
 
