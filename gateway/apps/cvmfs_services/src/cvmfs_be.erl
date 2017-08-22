@@ -71,7 +71,8 @@ start_link(_) ->
                                               KeyId :: binary(),
                                               Path :: binary().
 new_lease(Uid, KeyId, Path) ->
-    gen_server:call(?MODULE, {be_req, new_lease, Uid, KeyId, Path}).
+    gen_server:call(?MODULE, {be_req, new_lease, Uid, KeyId, Path},
+                    ?ASYNC_TIMEOUT).
 
 
 %%--------------------------------------------------------------------
@@ -85,7 +86,8 @@ new_lease(Uid, KeyId, Path) ->
                                         when Uid :: binary(),
                                              LeaseToken :: binary().
 cancel_lease(Uid, LeaseToken) ->
-    gen_server:call(?MODULE, {be_req, cancel_lease, Uid, LeaseToken}).
+    gen_server:call(?MODULE, {be_req, cancel_lease, Uid, LeaseToken},
+                    ?ASYNC_TIMEOUT).
 
 
 %%--------------------------------------------------------------------
@@ -100,7 +102,8 @@ cancel_lease(Uid, LeaseToken) ->
                                              LeaseToken :: binary(),
                                              RootHashes :: {binary(), binary()}.
 commit_lease(Uid, LeaseToken, {OldRootHash, NewRootHash}) ->
-    gen_server:call(?MODULE, {be_req, commit_lease, Uid, LeaseToken, OldRootHash, NewRootHash}).
+    gen_server:call(?MODULE, {be_req, commit_lease, Uid, LeaseToken, OldRootHash, NewRootHash},
+                    ?ASYNC_TIMEOUT).
 
 
 %%--------------------------------------------------------------------
@@ -115,12 +118,13 @@ commit_lease(Uid, LeaseToken, {OldRootHash, NewRootHash}) ->
                                 when Uid :: binary(),
                                      SubmissionData :: cvmfs_receiver:payload_submission_data().
 submit_payload(Uid, SubmissionData) ->
-    gen_server:call(?MODULE, {be_req, submit_payload, Uid, SubmissionData}).
+    gen_server:call(?MODULE, {be_req, submit_payload, Uid, SubmissionData},
+                    ?ASYNC_TIMEOUT).
 
 
 -spec get_repos(Uid :: binary()) -> [binary()].
 get_repos(Uid) ->
-    gen_server:call(?MODULE, {be_req, get_repos, Uid}).
+    gen_server:call(?MODULE, {be_req, get_repos, Uid}, ?ASYNC_TIMEOUT).
 
 
 -spec check_hmac(Uid, Message, KeyId, HMAC) -> boolean()
@@ -129,12 +133,13 @@ get_repos(Uid) ->
                                                         KeyId :: binary(),
                                                         HMAC :: binary().
 check_hmac(Uid, Message, KeyId, HMAC) ->
-    gen_server:call(?MODULE, {be_req, check_hmac, Uid, Message, KeyId, HMAC}).
+    gen_server:call(?MODULE, {be_req, check_hmac, Uid, Message, KeyId, HMAC},
+                    ?ASYNC_TIMEOUT).
 
 
 -spec unique_id() -> binary().
 unique_id() ->
-    gen_server:call(?MODULE, {be_req, unique_id}).
+    gen_server:call(?MODULE, {be_req, unique_id}, ?ASYNC_TIMEOUT).
 
 
 %%%===================================================================
