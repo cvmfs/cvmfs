@@ -80,7 +80,7 @@ start_link(Args) ->
 generate_token(KeyId, Path, MaxLeaseTime) ->
     WorkerPid = poolboy:checkout(cvmfs_receiver_pool),
     Result = gen_server:call(WorkerPid, {worker_req, generate_token, KeyId, Path, MaxLeaseTime},
-                             cvmfs_app_util:get_max_lease_time(ms)),
+                             cvmfs_app_util:get_max_lease_time()),
     poolboy:checkin(cvmfs_receiver_pool, WorkerPid),
     Result.
 
@@ -91,7 +91,7 @@ generate_token(KeyId, Path, MaxLeaseTime) ->
 get_token_id(Token) ->
     WorkerPid = poolboy:checkout(cvmfs_receiver_pool),
     Result = gen_server:call(WorkerPid, {worker_req, get_token_id, Token},
-                             cvmfs_app_util:get_max_lease_time(ms)),
+                             cvmfs_app_util:get_max_lease_time()),
     poolboy:checkin(cvmfs_receiver_pool, WorkerPid),
     Result.
 
@@ -102,7 +102,7 @@ get_token_id(Token) ->
 submit_payload(SubmissionData, Secret) ->
     WorkerPid = poolboy:checkout(cvmfs_receiver_pool),
     Result = gen_server:call(WorkerPid, {worker_req, submit_payload, SubmissionData, Secret},
-                             cvmfs_app_util:get_max_lease_time(ms)),
+                             cvmfs_app_util:get_max_lease_time()),
     poolboy:checkin(cvmfs_receiver_pool, WorkerPid),
     Result.
 
@@ -114,7 +114,7 @@ submit_payload(SubmissionData, Secret) ->
 commit(LeasePath, OldRootHash, NewRootHash) ->
     WorkerPid = poolboy:checkout(cvmfs_receiver_pool),
     Result = gen_server:call(WorkerPid, {worker_req, commit, LeasePath, OldRootHash, NewRootHash},
-                             cvmfs_app_util:get_max_lease_time(ms)),
+                             cvmfs_app_util:get_max_lease_time()),
     poolboy:checkin(cvmfs_receiver_pool, WorkerPid),
     Result.
 
@@ -150,7 +150,8 @@ init(Args) ->
     %% Send a kEcho request to the worker
     lager:info("Sending kEcho request to worker process."),
     p_write_request(WorkerPort, ?kEcho, <<"Ping">>),
-    MaxLeaseTime = cvmfs_app_util:get_max_lease_time(ms),
+    MaxLeaseTime = cvmfs_app_util:get_max_lease_time(),
+    lager:info("Max lease time: ~p", [MaxLeaseTime]),
     {ok, {Size, Msg}} = p_read_reply(WorkerPort, MaxLeaseTime),
     lager:info("Received kEcho reply from worker: size: ~p, msg: ~p", [Size, Msg]),
     {ok, #{worker => WorkerPort, max_lease_time => MaxLeaseTime}}.
