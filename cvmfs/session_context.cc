@@ -365,7 +365,11 @@ void* SessionContext::UploadLoop(void* data) {
   while (!ctx->ShouldTerminate()) {
     while (jobs_processed < ctx->NumJobsSubmitted()) {
       UploadJob* job = ctx->upload_jobs_.Dequeue();
-      ctx->DoUpload(job);
+      if (!ctx->DoUpload(job)) {
+        LogCvmfs(kLogUploadGateway, kLogStderr,
+                 "SessionContext: could not submit payload. Aborting.");
+        abort();
+      }
       job->result->Set(true);
       delete job->pack;
       delete job;
