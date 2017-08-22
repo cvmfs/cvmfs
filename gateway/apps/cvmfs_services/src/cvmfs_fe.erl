@@ -30,9 +30,7 @@ start_link([TcpPort]) ->
                                              {?API_ROOT ++ "/payloads/[:id]", cvmfs_payloads_handler, []}
                                             ]}]),
     %% Start the HTTP listener process configured with the routing table
-    %% TODO: Port and other parameters should not be hard-coded and should moved to
-    %%       the release configuration file
-    cowboy:start_clear(cvmfs_fe, 100,
+    cowboy:start_clear(cvmfs_fe,
                        [{port, TcpPort}],
                        #{env => #{dispatch => Dispatch}}).
 
