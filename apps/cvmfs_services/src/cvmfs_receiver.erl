@@ -82,7 +82,8 @@ start_link(Args) ->
                                                             Secret :: binary().
 generate_token(KeyId, Path, MaxLeaseTime) ->
     WorkerPid = poolboy:checkout(cvmfs_receiver_pool),
-    Result = gen_server:call(WorkerPid, {worker_req, generate_token, KeyId, Path, MaxLeaseTime}),
+    Result = gen_server:call(WorkerPid, {worker_req, generate_token, KeyId, Path, MaxLeaseTime},
+                             ?WORKER_REPLY_TIMEOUT),
     poolboy:checkin(cvmfs_receiver_pool, WorkerPid),
     Result.
 
@@ -92,7 +93,8 @@ generate_token(KeyId, Path, MaxLeaseTime) ->
                                       PublicId :: binary().
 get_token_id(Token) ->
     WorkerPid = poolboy:checkout(cvmfs_receiver_pool),
-    Result = gen_server:call(WorkerPid, {worker_req, get_token_id, Token}),
+    Result = gen_server:call(WorkerPid, {worker_req, get_token_id, Token},
+                             ?WORKER_REPLY_TIMEOUT),
     poolboy:checkin(cvmfs_receiver_pool, WorkerPid),
     Result.
 
@@ -102,7 +104,8 @@ get_token_id(Token) ->
                                                          Secret :: binary().
 submit_payload(SubmissionData, Secret) ->
     WorkerPid = poolboy:checkout(cvmfs_receiver_pool),
-    Result = gen_server:call(WorkerPid, {worker_req, submit_payload, SubmissionData, Secret}),
+    Result = gen_server:call(WorkerPid, {worker_req, submit_payload, SubmissionData, Secret},
+                             ?WORKER_REPLY_TIMEOUT),
     poolboy:checkin(cvmfs_receiver_pool, WorkerPid),
     Result.
 
@@ -113,7 +116,8 @@ submit_payload(SubmissionData, Secret) ->
                                                  NewRootHash :: binary().
 commit(LeasePath, OldRootHash, NewRootHash) ->
     WorkerPid = poolboy:checkout(cvmfs_receiver_pool),
-    Result = gen_server:call(WorkerPid, {worker_req, commit, LeasePath, OldRootHash, NewRootHash}),
+    Result = gen_server:call(WorkerPid, {worker_req, commit, LeasePath, OldRootHash, NewRootHash},
+                             ?WORKER_REPLY_TIMEOUT),
     poolboy:checkin(cvmfs_receiver_pool, WorkerPid),
     Result.
 
