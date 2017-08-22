@@ -34,9 +34,6 @@
 -define(kCommit,6).
 -define(kError,7).
 
-%% Worker comm timeout
--define(WORKER_REPLY_TIMEOUT, 7200000).
-
 
 %%%===================================================================
 %%% Type specifications
@@ -83,7 +80,7 @@ start_link(Args) ->
 generate_token(KeyId, Path, MaxLeaseTime) ->
     WorkerPid = poolboy:checkout(cvmfs_receiver_pool),
     Result = gen_server:call(WorkerPid, {worker_req, generate_token, KeyId, Path, MaxLeaseTime},
-                             ?WORKER_REPLY_TIMEOUT),
+                             cvmfs_app_util:get_max_lease_time(ms)),
     poolboy:checkin(cvmfs_receiver_pool, WorkerPid),
     Result.
 
@@ -94,7 +91,7 @@ generate_token(KeyId, Path, MaxLeaseTime) ->
 get_token_id(Token) ->
     WorkerPid = poolboy:checkout(cvmfs_receiver_pool),
     Result = gen_server:call(WorkerPid, {worker_req, get_token_id, Token},
-                             ?WORKER_REPLY_TIMEOUT),
+                             cvmfs_app_util:get_max_lease_time(ms)),
     poolboy:checkin(cvmfs_receiver_pool, WorkerPid),
     Result.
 
@@ -105,7 +102,7 @@ get_token_id(Token) ->
 submit_payload(SubmissionData, Secret) ->
     WorkerPid = poolboy:checkout(cvmfs_receiver_pool),
     Result = gen_server:call(WorkerPid, {worker_req, submit_payload, SubmissionData, Secret},
-                             ?WORKER_REPLY_TIMEOUT),
+                             cvmfs_app_util:get_max_lease_time(ms)),
     poolboy:checkin(cvmfs_receiver_pool, WorkerPid),
     Result.
 
@@ -117,7 +114,7 @@ submit_payload(SubmissionData, Secret) ->
 commit(LeasePath, OldRootHash, NewRootHash) ->
     WorkerPid = poolboy:checkout(cvmfs_receiver_pool),
     Result = gen_server:call(WorkerPid, {worker_req, commit, LeasePath, OldRootHash, NewRootHash},
-                             ?WORKER_REPLY_TIMEOUT),
+                             cvmfs_app_util:get_max_lease_time(ms)),
     poolboy:checkin(cvmfs_receiver_pool, WorkerPid),
     Result.
 
@@ -153,9 +150,10 @@ init(Args) ->
     %% Send a kEcho request to the worker
     lager:info("Sending kEcho request to worker process."),
     p_write_request(WorkerPort, ?kEcho, <<"Ping">>),
-    {ok, {Size, Msg}} = p_read_reply(WorkerPort),
+    MaxLeaseTime = cvmfs_app_util:get_max_lease_time(ms),
+    {ok, {Size, Msg}} = p_read_reply(WorkerPort, MaxLeaseTime),
     lager:info("Received kEcho reply from worker: size: ~p, msg: ~p", [Size, Msg]),
-    {ok, #{worker => WorkerPort}}.
+    {ok, #{worker => WorkerPort, max_lease_time => MaxLeaseTime}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -172,26 +170,27 @@ init(Args) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_call({worker_req, generate_token, KeyId, Path, MaxLeaseTime}, _From, State) ->
-    #{worker := WorkerPort} = State,
-    Reply = p_generate_token(KeyId, Path, MaxLeaseTime, WorkerPort),
+    #{worker := WorkerPort, max_lease_time := Timeout} = State,
+    Reply = p_generate_token(KeyId, Path, MaxLeaseTime, WorkerPort, Timeout),
     lager:info("Worker ~p request: {generate_token, {~p, ~p, ~p}} -> Reply: ~p",
                [self(), KeyId, Path, MaxLeaseTime, Reply]),
     {reply, Reply, State};
 handle_call({worker_req, get_token_id, Token}, _From, State) ->
-    #{worker := WorkerPort} = State,
-    Reply = p_get_token_id(Token, WorkerPort),
+    #{worker := WorkerPort, max_lease_time := Timeout} = State,
+    Reply = p_get_token_id(Token, WorkerPort, Timeout),
     lager:info("Worker ~p request: {get_token_id, ~p} -> Reply: ~p",
                [self(), Token, Reply]),
     {reply, Reply, State};
-handle_call({worker_req, submit_payload, {Token, _, Digest, HeaderSize} = SubmissionData, Secret}, _From, State) ->
-    #{worker := WorkerPort} = State,
-    Reply = p_submit_payload(SubmissionData, Secret, WorkerPort),
+handle_call({worker_req, submit_payload, {Token, _, Digest, HeaderSize} = SubmissionData,
+             Secret}, _From, State) ->
+    #{worker := WorkerPort, max_lease_time := Timeout} = State,
+    Reply = p_submit_payload(SubmissionData, Secret, WorkerPort, Timeout),
     lager:info("Worker ~p request: {submit_payload, {{~p, PAYLOAD_NOT_SHOWN, ~p, ~p} ~p}} -> Reply: ~p",
                [self(), Token, Digest, HeaderSize, Secret, Reply]),
     {reply, Reply, State};
 handle_call({worker_req, commit, LeasePath, OldRootHash, NewRootHash}, _From, State) ->
-    #{worker := WorkerPort} = State,
-    Reply = p_commit(WorkerPort, LeasePath, OldRootHash, NewRootHash),
+    #{worker := WorkerPort, max_lease_time := Timeout} = State,
+    Reply = p_commit(WorkerPort, LeasePath, OldRootHash, NewRootHash, Timeout),
     lager:info("Worker ~p request: {commit, ~p, ~p, ~p} -> Reply: ~p",
                [self(), LeasePath, OldRootHash, NewRootHash, Reply]),
     {reply, Reply, State}.
@@ -242,12 +241,12 @@ handle_info(Info, State) ->
 %% @spec terminate(Reason, State) -> void()
 %% @end
 %%--------------------------------------------------------------------
-terminate(Reason, State) ->
+terminate(Reason, #{max_lease_time := MaxLeaseTime} = State) ->
     #{worker := WorkerPort} = State,
 
     %% Send the kQuit request to the worker
     p_write_request(WorkerPort, ?kQuit, <<"">>),
-    {ok, {2, <<"ok">>}} = p_read_reply(WorkerPort),
+    {ok, {2, <<"ok">>}} = p_read_reply(WorkerPort, MaxLeaseTime),
     port_close(WorkerPort),
     lager:info("Terminating with reason: ~p", [Reason]),
     ok.
@@ -268,33 +267,35 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
--spec p_generate_token(KeyId, Path, MaxLeaseTime, WorkerPort)
+-spec p_generate_token(KeyId, Path, MaxLeaseTime, WorkerPort, Timeout)
                       -> {Token, Public, Secret}
                              when KeyId :: binary(),
                                   Path :: binary(),
                                   MaxLeaseTime :: integer(),
                                   WorkerPort :: port(),
+                                  Timeout :: integer(),
                                   Token :: binary(),
                                   Public :: binary(),
                                   Secret :: binary().
-p_generate_token(KeyId, Path, MaxLeaseTime, WorkerPort) ->
+p_generate_token(KeyId, Path, MaxLeaseTime, WorkerPort, Timeout) ->
     ReqBody = jsx:encode(#{<<"key_id">> => KeyId, <<"path">> => Path,
                           <<"max_lease_time">> => MaxLeaseTime}),
     p_write_request(WorkerPort, ?kGenerateToken, ReqBody),
-    {ok, {_Size, ReplyBody}} = p_read_reply(WorkerPort),
+    {ok, {_Size, ReplyBody}} = p_read_reply(WorkerPort, Timeout),
     #{<<"token">> := Token, <<"id">> := Public, <<"secret">> := Secret}
         = jsx:decode(ReplyBody, [return_maps]),
     {Public, Secret, Token}.
 
 
--spec p_get_token_id(Token, WorkerPort)
+-spec p_get_token_id(Token, WorkerPort, Timeout)
                     -> {ok, PublicId} | {error, invalid_macaroon}
                            when Token :: binary(),
                                 WorkerPort :: port(),
+                                Timeout :: integer(),
                                 PublicId :: binary().
-p_get_token_id(Token, WorkerPort) ->
+p_get_token_id(Token, WorkerPort, Timeout) ->
     p_write_request(WorkerPort, ?kGetTokenId, Token),
-    case p_read_reply(WorkerPort) of
+    case p_read_reply(WorkerPort, Timeout) of
         {ok, {_, Reply}} ->
             case jsx:decode(Reply, [return_maps]) of
                 #{<<"status">> := <<"ok">>, <<"id">> := PublicId} ->
@@ -307,14 +308,15 @@ p_get_token_id(Token, WorkerPort) ->
     end.
 
 
--spec p_submit_payload(SubmissionData, Secret, WorkerPort) -> submit_payload_result()
+-spec p_submit_payload(SubmissionData, Secret, WorkerPort, Timeout) -> submit_payload_result()
                                                     when SubmissionData :: payload_submission_data(),
                                                          Secret :: binary(),
-                                                         WorkerPort :: port().
-p_submit_payload({LeaseToken, Payload, Digest, HeaderSize}, Secret, WorkerPort) ->
+                                                         WorkerPort :: port(),
+                                                         Timeout :: integer().
+p_submit_payload({LeaseToken, Payload, Digest, HeaderSize}, Secret, WorkerPort, Timeout) ->
     Req1 = jsx:encode(#{<<"token">> => LeaseToken, <<"secret">> => Secret}),
     p_write_request(WorkerPort, ?kCheckToken, Req1),
-    case p_read_reply(WorkerPort) of
+    case p_read_reply(WorkerPort, Timeout) of
         {ok, {_, Reply1}} ->
             case jsx:decode(Reply1, [return_maps]) of
                 #{<<"status">> := <<"ok">>, <<"path">> := Path} ->
@@ -322,7 +324,7 @@ p_submit_payload({LeaseToken, Payload, Digest, HeaderSize}, Secret, WorkerPort) 
                                         <<"digest">> => Digest,
                                         <<"header_size">> => HeaderSize}),
                     p_write_request(WorkerPort, ?kSubmitPayload, Req2, Payload),
-                    case p_read_reply(WorkerPort) of
+                    case p_read_reply(WorkerPort, Timeout) of
                         {ok, {_, Reply2}} ->
                             case jsx:decode(Reply2, [return_maps]) of
                                 #{<<"status">> := <<"ok">>} ->
@@ -346,18 +348,19 @@ p_submit_payload({LeaseToken, Payload, Digest, HeaderSize}, Secret, WorkerPort) 
     end.
 
 
--spec p_commit(WorkerPort, LeasePath, OldRootHash, NewRootHash)
+-spec p_commit(WorkerPort, LeasePath, OldRootHash, NewRootHash, Timeout)
               -> ok | {error, merge_error | io_error | worker_timeout}
                                         when WorkerPort :: port(),
                                              LeasePath :: binary(),
                                              OldRootHash :: binary(),
-                                             NewRootHash :: binary().
-p_commit(WorkerPort, LeasePath, OldRootHash, NewRootHash) ->
+                                             NewRootHash :: binary(),
+                                             Timeout :: integer().
+p_commit(WorkerPort, LeasePath, OldRootHash, NewRootHash, Timeout) ->
     Req1 = jsx:encode(#{<<"lease_path">> => LeasePath,
                         <<"old_root_hash">> => OldRootHash,
                         <<"new_root_hash">> => NewRootHash}),
     p_write_request(WorkerPort, ?kCommit, Req1),
-    case p_read_reply(WorkerPort) of
+    case p_read_reply(WorkerPort, Timeout) of
         {ok, {_, Reply1}} ->
             case jsx:decode(Reply1, [return_maps]) of
                 #{<<"status">> := <<"ok">>} ->
@@ -383,11 +386,11 @@ p_write_request(Port, Request, Msg, Payload) ->
     Port ! {self(), {command, Buffer}},
     Port ! {self(), {command, Payload}}.
 
-p_read_reply(Port) ->
+p_read_reply(Port, Timeout) ->
     receive
         {Port, {data, <<Size:32/integer-signed-little,Msg/binary>>}} ->
             {ok, {Size, Msg}}
     after
-        ?WORKER_REPLY_TIMEOUT ->
+        Timeout ->
             {error, worker_timeout}
     end.
