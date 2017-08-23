@@ -151,7 +151,6 @@ init(Args) ->
     lager:info("Sending kEcho request to worker process."),
     p_write_request(WorkerPort, ?kEcho, <<"Ping">>),
     MaxLeaseTime = cvmfs_app_util:get_max_lease_time(),
-    lager:info("Max lease time: ~p", [MaxLeaseTime]),
     {ok, {Size, Msg}} = p_read_reply(WorkerPort, MaxLeaseTime),
     lager:info("Received kEcho reply from worker: size: ~p, msg: ~p", [Size, Msg]),
     {ok, #{worker => WorkerPort, max_lease_time => MaxLeaseTime}}.
