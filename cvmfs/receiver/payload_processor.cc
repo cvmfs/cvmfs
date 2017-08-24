@@ -28,28 +28,10 @@ PayloadProcessor::Result PayloadProcessor::Process(
 
   current_repo_ = path.substr(0, first_slash_idx);
 
-  Params params;
-  if (!GetParamsFromFile(current_repo_, &params)) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr,
-             "Error: Could not get configuration parameters.");
-    return kOtherError;
+  Result init_result = Initialize();
+  if (init_result != kSuccess) {
+    return init_result;
   }
-
-  const std::string spooler_temp_dir =
-      GetSpoolerTempDir(params.spooler_configuration);
-  assert(!spooler_temp_dir.empty());
-  UniquePtr<RaiiTempDir> raii_temp_dir(
-      RaiiTempDir::Create(spooler_temp_dir + "/payload_processor"));
-  temp_dir_ = raii_temp_dir->dir();
-
-  upload::SpoolerDefinition definition(
-      params.spooler_configuration, params.hash_alg, params.compression_alg,
-      params.generate_legacy_bulk_chunks, params.use_file_chunking,
-      params.min_chunk_size, params.avg_chunk_size, params.max_chunk_size,
-      "dummy_token", "dummy_key");
-
-  spooler_.Destroy();
-  spooler_ = upload::Spooler::Construct(definition);
 
   std::string header_digest;
   if (!Debase64(digest_base64, &header_digest)) {
@@ -83,7 +65,7 @@ PayloadProcessor::Result PayloadProcessor::Process(
 
   assert(pending_files_.empty());
 
-  spooler_->WaitForUpload();
+  Finalize();
 
   return kSuccess;
 }
@@ -159,20 +141,51 @@ void PayloadProcessor::ConsumerEventCallback(
       return;
     }
 
-    spooler_->Upload(info.temp_path, "data/" + path);
+    Upload(info.temp_path, "data/" + path);
 
     pending_files_.erase(event.id);
   }
 }
 
+PayloadProcessor::Result PayloadProcessor::Initialize() {
+  Params params;
+  if (!GetParamsFromFile(current_repo_, &params)) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "Error: Could not get configuration parameters.");
+    return kOtherError;
+  }
+
+  const std::string spooler_temp_dir =
+      GetSpoolerTempDir(params.spooler_configuration);
+  assert(!spooler_temp_dir.empty());
+  UniquePtr<RaiiTempDir> raii_temp_dir(
+      RaiiTempDir::Create(spooler_temp_dir + "/payload_processor"));
+  temp_dir_ = raii_temp_dir->dir();
+
+  upload::SpoolerDefinition definition(
+      params.spooler_configuration, params.hash_alg, params.compression_alg,
+      params.generate_legacy_bulk_chunks, params.use_file_chunking,
+      params.min_chunk_size, params.avg_chunk_size, params.max_chunk_size,
+      "dummy_token", "dummy_key");
+
+  spooler_.Destroy();
+  spooler_ = upload::Spooler::Construct(definition);
+
+  return kSuccess;
+}
+
+void PayloadProcessor::Finalize() {
+  spooler_->WaitForUpload();
+}
+
+void PayloadProcessor::Upload(const std::string& source,
+                              const std::string& dest) {
+    spooler_->Upload(source, dest);
+}
+
 bool PayloadProcessor::WriteFile(int fd, const void* const buf,
                                  size_t buf_size) {
   return SafeWrite(fd, buf, buf_size);
-}
-
-int PayloadProcessor::RenameFile(const std::string& old_name,
-                                 const std::string& new_name) {
-  return rename(old_name.c_str(), new_name.c_str());
 }
 
 }  // namespace receiver

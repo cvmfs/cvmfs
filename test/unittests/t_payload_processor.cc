@@ -16,6 +16,13 @@ class MockPayloadProcessor : public PayloadProcessor {
   MockPayloadProcessor() : PayloadProcessor(), num_files_received_(0) {}
   virtual ~MockPayloadProcessor() {}
 
+  virtual Result Initialize() { return kSuccess; }
+
+  virtual void Finalize() {}
+
+  virtual void Upload(const std::string& source,
+                      const std::string& dest) {}
+
   virtual void ConsumerEventCallback(const ObjectPackBuild::Event& /*event*/) {
     num_files_received_++;
   }

@@ -46,9 +46,11 @@ class PayloadProcessor {
  protected:
   // NOTE: These methods are made virtual such that they can be mocked for
   //       the purpose of unit testing
+  virtual Result Initialize();
+  virtual void Finalize();
+  virtual void Upload(const std::string& source,
+                      const std::string& dest);
   virtual bool WriteFile(int fd, const void* const buf, size_t buf_size);
-  virtual int RenameFile(const std::string& old_name,
-                         const std::string& new_name);
 
  private:
   typedef std::map<shash::Any, FileInfo>::iterator FileIterator;
