@@ -12,6 +12,7 @@
 #include "params.h"
 #include "util/posix.h"
 #include "util/string.h"
+#include "util/raii_temp_dir.h"
 
 namespace receiver {
 
@@ -27,24 +28,26 @@ PayloadProcessor::Result PayloadProcessor::Process(
 
   current_repo_ = path.substr(0, first_slash_idx);
 
-  {
-    Params params;
-    if (!GetParamsFromFile(current_repo_, &params)) {
-      LogCvmfs(kLogReceiver, kLogSyslogErr,
-               "Error: Could not get configuration parameters.");
-      return kOtherError;
-    }
-    spooler_temp_dir_ = GetSpoolerTempDir(params.spooler_configuration);
-
-    upload::SpoolerDefinition definition(
-      params.spooler_configuration, params.hash_alg, params.compression_alg,
-      params.generate_legacy_bulk_chunks, params.use_file_chunking,
-      params.min_chunk_size, params.avg_chunk_size, params.max_chunk_size,
-      "dummy_token", "dummy_key");
-
-    spooler_.Destroy();
-    spooler_ = upload::Spooler::Construct(definition);
+  Params params;
+  if (!GetParamsFromFile(current_repo_, &params)) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "Error: Could not get configuration parameters.");
+    return kOtherError;
   }
+
+  const std::string spooler_temp_dir = GetSpoolerTempDir(params.spooler_configuration);
+  assert(!spooler_temp_dir.empty());
+  UniquePtr<RaiiTempDir> raii_temp_dir(RaiiTempDir::Create(spooler_temp_dir + "/payload_processor"));
+  temp_dir_ = raii_temp_dir->dir();
+
+  upload::SpoolerDefinition definition(
+    params.spooler_configuration, params.hash_alg, params.compression_alg,
+    params.generate_legacy_bulk_chunks, params.use_file_chunking,
+    params.min_chunk_size, params.avg_chunk_size, params.max_chunk_size,
+    "dummy_token", "dummy_key");
+
+  spooler_.Destroy();
+  spooler_ = upload::Spooler::Construct(definition);
 
   std::string header_digest;
   if (!Debase64(digest_base64, &header_digest)) {
@@ -100,7 +103,7 @@ void PayloadProcessor::ConsumerEventCallback(
   FileIterator it = pending_files_.find(event.id);
   if (it == pending_files_.end()) {
     // New file to unpack
-    const std::string tmp_path = CreateTempPath(spooler_temp_dir_, 0666);
+    const std::string tmp_path = CreateTempPath(temp_dir_ + "/payload", 0666);
     if (tmp_path.empty()) {
       LogCvmfs(kLogReceiver, kLogSyslogErr, "Unable to create temporary path.");
       num_errors_++;

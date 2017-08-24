@@ -55,7 +55,7 @@ class PayloadProcessor {
   std::map<shash::Any, FileInfo> pending_files_;
   std::string current_repo_;
   UniquePtr<upload::Spooler> spooler_;
-  std::string spooler_temp_dir_;
+  std::string temp_dir_;
   int num_errors_;
 };
 
