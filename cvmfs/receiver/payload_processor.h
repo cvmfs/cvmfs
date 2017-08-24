@@ -7,6 +7,7 @@
 
 #include <stdint.h>
 #include <map>
+#include "upload.h"
 #include <string>
 
 #include "pack.h"
@@ -53,6 +54,8 @@ class PayloadProcessor {
   typedef std::map<shash::Any, FileInfo>::iterator FileIterator;
   std::map<shash::Any, FileInfo> pending_files_;
   std::string current_repo_;
+  UniquePtr<upload::Spooler> spooler_;
+  std::string spooler_temp_dir_;
   int num_errors_;
 };
 

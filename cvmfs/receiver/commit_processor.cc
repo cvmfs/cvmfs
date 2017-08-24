@@ -38,12 +38,6 @@ PathString RemoveRepoName(const PathString& lease_path) {
   }
 }
 
-std::string GetSpoolerTempDir(const std::string& spooler_config) {
-  const std::vector<std::string> tokens = SplitString(spooler_config, ',');
-  assert(tokens.size() == 3);
-  return tokens[1];
-}
-
 }  // namespace
 
 namespace receiver {

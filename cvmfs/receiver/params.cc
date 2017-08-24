@@ -11,6 +11,12 @@
 
 namespace receiver {
 
+std::string GetSpoolerTempDir(const std::string& spooler_config) {
+  const std::vector<std::string> tokens = SplitString(spooler_config, ',');
+  assert(tokens.size() == 3);
+  return tokens[1];
+}
+
 bool GetParamsFromFile(const std::string& repo_name, Params* params) {
   const std::string repo_config_file =
       "/etc/cvmfs/repositories.d/" + repo_name + "/server.conf";
