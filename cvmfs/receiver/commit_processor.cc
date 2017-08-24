@@ -110,7 +110,8 @@ CommitProcessor::Result CommitProcessor::Process(
     return kIoError;
   }
 
-  const std::string spooler_temp_dir = GetSpoolerTempDir(params.spooler_configuration);
+  const std::string spooler_temp_dir =
+      GetSpoolerTempDir(params.spooler_configuration);
   assert(!spooler_temp_dir.empty());
   const std::string temp_dir_root = spooler_temp_dir + "/commit_processor";
 
@@ -118,9 +119,9 @@ CommitProcessor::Result CommitProcessor::Process(
 
   CatalogMergeTool<catalog::WritableCatalogManager,
                    catalog::SimpleCatalogManager>
-      merge_tool(params.stratum0, old_root_hash, new_root_hash, relative_lease_path,
-                 temp_dir_root, server_tool->download_manager(),
-                 manifest.weak_ref());
+      merge_tool(params.stratum0, old_root_hash, new_root_hash,
+                 relative_lease_path, temp_dir_root,
+                 server_tool->download_manager(), manifest.weak_ref());
   if (!merge_tool.Init()) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "Error: Could not initialize the catalog merge tool");

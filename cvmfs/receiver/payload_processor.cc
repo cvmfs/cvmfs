@@ -11,8 +11,8 @@
 #include "logging.h"
 #include "params.h"
 #include "util/posix.h"
-#include "util/string.h"
 #include "util/raii_temp_dir.h"
+#include "util/string.h"
 
 namespace receiver {
 
@@ -35,16 +35,18 @@ PayloadProcessor::Result PayloadProcessor::Process(
     return kOtherError;
   }
 
-  const std::string spooler_temp_dir = GetSpoolerTempDir(params.spooler_configuration);
+  const std::string spooler_temp_dir =
+      GetSpoolerTempDir(params.spooler_configuration);
   assert(!spooler_temp_dir.empty());
-  UniquePtr<RaiiTempDir> raii_temp_dir(RaiiTempDir::Create(spooler_temp_dir + "/payload_processor"));
+  UniquePtr<RaiiTempDir> raii_temp_dir(
+      RaiiTempDir::Create(spooler_temp_dir + "/payload_processor"));
   temp_dir_ = raii_temp_dir->dir();
 
   upload::SpoolerDefinition definition(
-    params.spooler_configuration, params.hash_alg, params.compression_alg,
-    params.generate_legacy_bulk_chunks, params.use_file_chunking,
-    params.min_chunk_size, params.avg_chunk_size, params.max_chunk_size,
-    "dummy_token", "dummy_key");
+      params.spooler_configuration, params.hash_alg, params.compression_alg,
+      params.generate_legacy_bulk_chunks, params.use_file_chunking,
+      params.min_chunk_size, params.avg_chunk_size, params.max_chunk_size,
+      "dummy_token", "dummy_key");
 
   spooler_.Destroy();
   spooler_ = upload::Spooler::Construct(definition);
