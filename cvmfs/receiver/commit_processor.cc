@@ -38,6 +38,12 @@ PathString RemoveRepoName(const PathString& lease_path) {
   }
 }
 
+std::string GetSpoolerTempDir(const std::string& spooler_config) {
+  const std::vector<std::string> tokens = SplitString(spooler_config, ',');
+  assert(tokens.size() == 3);
+  return tokens[1];
+}
+
 }  // namespace
 
 namespace receiver {
@@ -110,8 +116,9 @@ CommitProcessor::Result CommitProcessor::Process(
     return kIoError;
   }
 
-  const std::string temp_dir_root =
-      "/srv/cvmfs/" + repo_name + "/data/txn/commit_processor";
+  const std::string spooler_temp_dir = GetSpoolerTempDir(params.spooler_configuration);
+  assert(!spooler_temp_dir.empty());
+  const std::string temp_dir_root = spooler_temp_dir + "/commit_processor";
 
   const PathString relative_lease_path = RemoveRepoName(PathString(lease_path));
 
