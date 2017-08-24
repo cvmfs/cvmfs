@@ -23,22 +23,33 @@ bool GetParamsFromFile(const std::string& repo_name, Params* params) {
     return false;
   }
 
-  if (!parser.GetValue("CVMFS_UPSTREAM_STORAGE",
-                       &params->spooler_configuration)) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr,
-             "Missing parameter %s in repository configuration file.",
-             "CVMFS_UPSTREAM_STORAGE");
-    return false;
+  // Note: TEST_CVMFS_RECEIVER_UPSTREAM_STORAGE is used to provide an
+  //       an overriding value for CVMFS_UPSTREAM_STORAGE, to be used
+  //       only by the cvmfs_receiver application. Useful for testing
+  //       when the release manager and the repository gateway are
+  //       running on the same machine.
+  if (parser.IsDefined("TEST_CVMFS_RECEIVER_UPSTREAM_STORAGE")) {
+    parser.GetValue("TEST_CVMFS_RECEIVER_UPSTREAM_STORAGE",
+                    &params->spooler_configuration);
+  } else {
+    if (!parser.GetValue("CVMFS_UPSTREAM_STORAGE",
+                         &params->spooler_configuration)) {
+      LogCvmfs(kLogReceiver, kLogSyslogErr,
+               "Missing parameter %s in repository configuration file.",
+               "CVMFS_UPSTREAM_STORAGE");
+      return false;
+    }
+
+    // Note: if upstream is gateway, we change it to local. This should be made to
+    // abort, but it's useful for testing on a single machine
+    if (HasPrefix(params->spooler_configuration, "gw", false)) {
+      std::vector<std::string> tokens = SplitString(repo_name, '/');
+      const std::string rname = tokens.back();
+      params->spooler_configuration =
+          "local,/srv/cvmfs/" + rname + "/data/txn,/srv/cvmfs/" + rname;
+    }
   }
 
-  // Note: if upstream is gateway, we change it to local. This should be made to
-  // abort, but it's useful for testing on a single machine
-  if (HasPrefix(params->spooler_configuration, "gw", false)) {
-    std::vector<std::string> tokens = SplitString(repo_name, '/');
-    const std::string rname = tokens.back();
-    params->spooler_configuration =
-        "local,/srv/cvmfs/" + rname + "/data/txn,/srv/cvmfs/" + rname;
-  }
 
   std::string hash_algorithm_str;
   if (!parser.GetValue("CVMFS_HASH_ALGORITHM", &hash_algorithm_str)) {
