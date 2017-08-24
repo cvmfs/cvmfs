@@ -81,6 +81,8 @@ PayloadProcessor::Result PayloadProcessor::Process(
 
   assert(pending_files_.empty());
 
+  spooler_->WaitForUpload();
+
   return kSuccess;
 }
 
