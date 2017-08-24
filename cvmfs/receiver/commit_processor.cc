@@ -74,7 +74,13 @@ CommitProcessor::Result CommitProcessor::Process(
       SplitString(lease_path, '/');
 
   const std::string repo_name = lease_path_tokens.front();
-  const std::string stratum0 = "file:///srv/cvmfs/" + repo_name;
+
+  Params params;
+  if (!GetParamsFromFile(repo_name, &params)) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "Error: Could not get configuration parameters.");
+    return kIoError;
+  }
 
   UniquePtr<ServerTool> server_tool(new ServerTool());
 
@@ -95,7 +101,7 @@ CommitProcessor::Result CommitProcessor::Process(
 
   shash::Any manifest_base_hash;
   UniquePtr<manifest::Manifest> manifest(server_tool->FetchRemoteManifest(
-      stratum0, repo_name, manifest_base_hash));
+      params.stratum0, repo_name, manifest_base_hash));
 
   // Current catalog from the gateway machine
   if (!manifest.IsValid()) {
@@ -111,19 +117,12 @@ CommitProcessor::Result CommitProcessor::Process(
 
   CatalogMergeTool<catalog::WritableCatalogManager,
                    catalog::SimpleCatalogManager>
-      merge_tool(stratum0, old_root_hash, new_root_hash, relative_lease_path,
+      merge_tool(params.stratum0, old_root_hash, new_root_hash, relative_lease_path,
                  temp_dir_root, server_tool->download_manager(),
                  manifest.weak_ref());
   if (!merge_tool.Init()) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "Error: Could not initialize the catalog merge tool");
-    return kIoError;
-  }
-
-  Params params;
-  if (!GetParamsFromFile(repo_name, &params)) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr,
-             "Error: Could not get configuration parameters.");
     return kIoError;
   }
 
@@ -143,7 +142,7 @@ CommitProcessor::Result CommitProcessor::Process(
   server_tool = new ServerTool();
 
   SigningTool signing_tool(server_tool.weak_ref());
-  if (signing_tool.Run(new_manifest_path, stratum0,
+  if (signing_tool.Run(new_manifest_path, params.stratum0,
                        params.spooler_configuration, temp_dir, certificate,
                        private_key, repo_name, "", "",
                        "/var/spool/cvmfs/" + repo_name + "/reflog.chksum")) {
