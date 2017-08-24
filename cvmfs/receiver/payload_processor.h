@@ -11,6 +11,7 @@
 
 #include "pack.h"
 #include "upload.h"
+#include "util/raii_temp_dir.h"
 
 namespace receiver {
 
@@ -57,7 +58,7 @@ class PayloadProcessor {
   std::map<shash::Any, FileInfo> pending_files_;
   std::string current_repo_;
   UniquePtr<upload::Spooler> spooler_;
-  std::string temp_dir_;
+  UniquePtr<RaiiTempDir> temp_dir_;
   int num_errors_;
 };
 

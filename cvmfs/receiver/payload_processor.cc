@@ -11,13 +11,13 @@
 #include "logging.h"
 #include "params.h"
 #include "util/posix.h"
-#include "util/raii_temp_dir.h"
 #include "util/string.h"
 
 namespace receiver {
 
 PayloadProcessor::PayloadProcessor()
-    : pending_files_(), current_repo_(), num_errors_(0) {}
+    : pending_files_(), current_repo_(), spooler_(), temp_dir_(),
+      num_errors_(0) {}
 
 PayloadProcessor::~PayloadProcessor() {}
 
@@ -67,6 +67,8 @@ PayloadProcessor::Result PayloadProcessor::Process(
 
   Finalize();
 
+  deserializer.UnregisterListeners();
+
   return kSuccess;
 }
 
@@ -89,7 +91,8 @@ void PayloadProcessor::ConsumerEventCallback(
   FileIterator it = pending_files_.find(event.id);
   if (it == pending_files_.end()) {
     // New file to unpack
-    const std::string tmp_path = CreateTempPath(temp_dir_ + "/payload", 0666);
+    const std::string tmp_path = CreateTempPath(temp_dir_->dir() + "/payload",
+                                                0666);
     if (tmp_path.empty()) {
       LogCvmfs(kLogReceiver, kLogSyslogErr, "Unable to create temporary path.");
       num_errors_++;
@@ -158,9 +161,7 @@ PayloadProcessor::Result PayloadProcessor::Initialize() {
   const std::string spooler_temp_dir =
       GetSpoolerTempDir(params.spooler_configuration);
   assert(!spooler_temp_dir.empty());
-  UniquePtr<RaiiTempDir> raii_temp_dir(
-      RaiiTempDir::Create(spooler_temp_dir + "/payload_processor"));
-  temp_dir_ = raii_temp_dir->dir();
+  temp_dir_ = RaiiTempDir::Create(spooler_temp_dir + "/payload_processor");
 
   upload::SpoolerDefinition definition(
       params.spooler_configuration, params.hash_alg, params.compression_alg,
@@ -176,6 +177,7 @@ PayloadProcessor::Result PayloadProcessor::Initialize() {
 
 void PayloadProcessor::Finalize() {
   spooler_->WaitForUpload();
+  temp_dir_.Destroy();
 }
 
 void PayloadProcessor::Upload(const std::string& source,

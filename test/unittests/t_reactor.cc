@@ -32,6 +32,9 @@ class MockedPayloadProcessor : public PayloadProcessor {
     // NO OP
     return true;
   }
+
+  virtual void ConsumerEventCallback(
+    const ObjectPackBuild::Event& /*event*/) {}
 };
 
 class MockedReactor : public Reactor {
