@@ -52,15 +52,6 @@ bool GetParamsFromFile(const std::string& repo_name, Params* params) {
                "CVMFS_UPSTREAM_STORAGE");
       return false;
     }
-
-    // Note: if upstream is gateway, we change it to local. This should be made to
-    // abort, but it's useful for testing on a single machine
-    if (HasPrefix(params->spooler_configuration, "gw", false)) {
-      std::vector<std::string> tokens = SplitString(repo_name, '/');
-      const std::string rname = tokens.back();
-      params->spooler_configuration =
-          "local,/srv/cvmfs/" + rname + "/data/txn,/srv/cvmfs/" + rname;
-    }
   }
 
 
