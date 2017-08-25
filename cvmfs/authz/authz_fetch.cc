@@ -448,6 +448,20 @@ bool AuthzExternalFetcher::ParsePermit(
     }
   }
 
+  json_token = JsonDocument::SearchInObject(json_authz, "bearer_token", JSON_STRING);
+  if (json_token != NULL) {
+    binary_msg->permit.token.type = kTokenSciToken;
+    
+    unsigned size = strlen(json_token->string_value);
+    binary_msg->permit.token.size = size;
+    if (size > 0) {
+      // The token is passed to the AuthzSessionManager, which takes care of
+      // freeing the memory
+      binary_msg->permit.token.data = smalloc(size);
+      memcpy(binary_msg->permit.token.data, json_token->string_value, size);
+    }
+  }
+
   return true;
 }
 
