@@ -221,7 +221,13 @@ handle_cast(Msg, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_info({Port, {exit_status, Status}}, State) ->
-    lager:info("Worker process ~p exited with status: ~p", [Port, Status]),
+    case Status of
+        0 ->
+            lager:info("Worker at port ~p exited with status: 0", [Port]);
+        _ ->
+            lager:info("Worker at port ~p crashed. Restarting.", [Port]),
+            exit(self(), kill)
+    end,
     {noreply, State};
 handle_info({'EXIT', Port, Reason}, State) ->
     lager:info("Port ~p exited with reason: ~p", [Port, Reason]),
