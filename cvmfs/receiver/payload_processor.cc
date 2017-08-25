@@ -9,13 +9,15 @@
 #include <vector>
 
 #include "logging.h"
+#include "params.h"
 #include "util/posix.h"
 #include "util/string.h"
 
 namespace receiver {
 
 PayloadProcessor::PayloadProcessor()
-    : pending_files_(), current_repo_(), num_errors_(0) {}
+    : pending_files_(), current_repo_(), spooler_(), temp_dir_(),
+      num_errors_(0) {}
 
 PayloadProcessor::~PayloadProcessor() {}
 
@@ -25,6 +27,11 @@ PayloadProcessor::Result PayloadProcessor::Process(
   const size_t first_slash_idx = path.find('/', 0);
 
   current_repo_ = path.substr(0, first_slash_idx);
+
+  Result init_result = Initialize();
+  if (init_result != kSuccess) {
+    return init_result;
+  }
 
   std::string header_digest;
   if (!Debase64(digest_base64, &header_digest)) {
@@ -58,6 +65,10 @@ PayloadProcessor::Result PayloadProcessor::Process(
 
   assert(pending_files_.empty());
 
+  Finalize();
+
+  deserializer.UnregisterListeners();
+
   return kSuccess;
 }
 
@@ -80,9 +91,8 @@ void PayloadProcessor::ConsumerEventCallback(
   FileIterator it = pending_files_.find(event.id);
   if (it == pending_files_.end()) {
     // New file to unpack
-    // Create a temporary path
-    std::string temp_dir = "/srv/cvmfs/" + current_repo_ + "/data/txn";
-    const std::string tmp_path = CreateTempPath(temp_dir, 0666);
+    const std::string tmp_path = CreateTempPath(temp_dir_->dir() + "/payload",
+                                                0666);
     if (tmp_path.empty()) {
       LogCvmfs(kLogReceiver, kLogSyslogErr, "Unable to create temporary path.");
       num_errors_++;
@@ -120,46 +130,64 @@ void PayloadProcessor::ConsumerEventCallback(
   info.current_size += event.buf_size;
 
   if (info.current_size == info.total_size) {
-    const std::string dest = "/srv/cvmfs/" + current_repo_ + "/data/" + path;
-
-    // Atomically move to final destination
-    // TODO(radu): It would be nice to hook this into the spooler/uploader
-    // components, allowing, for instance to upload from the gateway to S3
-    if (FileExists(dest)) {
-      unlink(dest.c_str());
-    }
-    if (RenameFile(info.temp_path.c_str(), dest.c_str())) {
-      LogCvmfs(kLogReceiver, kLogSyslogErr,
-               "Unable to move file to final destination: %s", dest.c_str());
-      num_errors_++;
-      return;
-    }
-
-    pending_files_.erase(event.id);
-
     shash::Any file_hash(shash::kSha1);
-    shash::HashFile(dest, &file_hash);
+    shash::HashFile(info.temp_path, &file_hash);
 
     if (file_hash != event.id) {
       LogCvmfs(kLogReceiver, kLogSyslogErr,
                "PayloadProcessor - Hash mismatch for unpacked file: event "
                "size: %ld, file size: %ld, event hash: %s, file hash: %s",
-               event.size, GetFileSize(dest), event.id.ToString(true).c_str(),
+               event.size, GetFileSize(info.temp_path),
+               event.id.ToString(true).c_str(),
                file_hash.ToString(true).c_str());
       num_errors_++;
       return;
     }
+
+    Upload(info.temp_path, "data/" + path);
+
+    pending_files_.erase(event.id);
   }
+}
+
+PayloadProcessor::Result PayloadProcessor::Initialize() {
+  Params params;
+  if (!GetParamsFromFile(current_repo_, &params)) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "Error: Could not get configuration parameters.");
+    return kOtherError;
+  }
+
+  const std::string spooler_temp_dir =
+      GetSpoolerTempDir(params.spooler_configuration);
+  assert(!spooler_temp_dir.empty());
+  temp_dir_ = RaiiTempDir::Create(spooler_temp_dir + "/payload_processor");
+
+  upload::SpoolerDefinition definition(
+      params.spooler_configuration, params.hash_alg, params.compression_alg,
+      params.generate_legacy_bulk_chunks, params.use_file_chunking,
+      params.min_chunk_size, params.avg_chunk_size, params.max_chunk_size,
+      "dummy_token", "dummy_key");
+
+  spooler_.Destroy();
+  spooler_ = upload::Spooler::Construct(definition);
+
+  return kSuccess;
+}
+
+void PayloadProcessor::Finalize() {
+  spooler_->WaitForUpload();
+  temp_dir_.Destroy();
+}
+
+void PayloadProcessor::Upload(const std::string& source,
+                              const std::string& dest) {
+    spooler_->Upload(source, dest);
 }
 
 bool PayloadProcessor::WriteFile(int fd, const void* const buf,
                                  size_t buf_size) {
   return SafeWrite(fd, buf, buf_size);
-}
-
-int PayloadProcessor::RenameFile(const std::string& old_name,
-                                 const std::string& new_name) {
-  return rename(old_name.c_str(), new_name.c_str());
 }
 
 }  // namespace receiver

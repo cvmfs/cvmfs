@@ -20,16 +20,21 @@ class MockedPayloadProcessor : public PayloadProcessor {
   MockedPayloadProcessor() : PayloadProcessor() {}
 
  protected:
+  virtual Result Initialize() { return kSuccess; }
+
+  virtual void Finalize() {}
+
+  virtual void Upload(const std::string& source,
+                      const std::string& dest) {}
+
   virtual bool WriteFile(int /*fd*/, const void* const /*buf*/,
                          size_t /*buf_size*/) {
     // NO OP
     return true;
   }
-  virtual int RenameFile(const std::string& /*old_name*/,
-                         const std::string& /*new_name*/) {
-    // NO OP
-    return 0;
-  }
+
+  virtual void ConsumerEventCallback(
+    const ObjectPackBuild::Event& /*event*/) {}
 };
 
 class MockedReactor : public Reactor {

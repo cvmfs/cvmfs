@@ -64,12 +64,6 @@ GatewayUploader::GatewayUploader(const SpoolerDefinition& spooler_definition)
   }
 
   atomic_init32(&num_errors_);
-
-  LogCvmfs(kLogUploadGateway, kLogStderr,
-           "HTTP uploader configuration:\n"
-           "  API URL: %s\n"
-           "  Session token file: %s\n",
-           config_.api_url.c_str(), config_.session_token_file.c_str());
 }
 
 GatewayUploader::~GatewayUploader() {

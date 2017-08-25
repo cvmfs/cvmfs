@@ -12,7 +12,10 @@
 
 namespace receiver {
 
+std::string GetSpoolerTempDir(const std::string& spooler_config);
+
 struct Params {
+  std::string stratum0;
   std::string spooler_configuration;
   shash::Algorithms hash_alg;
   zlib::Algorithms compression_alg;
