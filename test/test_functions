@@ -2366,7 +2366,7 @@ set_up_repository_services() {
     local package_url_root=$CVMFS_SERVICES_URL
 
     # Choose which package to download and install based on platform
-    if [ -f /etc/lsb-release ]; then
+    if [ -f /etc/debian_version ]; then
         if [ x"$(lsb_release -cs)" = x"xenial" ]; then
             package_map_url=${package_url_root}/pkgmap/pkgmap.ubuntu1604_x86_64
         fi
