@@ -218,7 +218,7 @@ remove_apache_config_file() {
 # place, depending on the installed apache version.
 has_apache_config_file() {
   local file_name=$1
-  is_local_upstream $CVMFS_UPSTREAM_STORAGE || return false
+  is_local_upstream $CVMFS_UPSTREAM_STORAGE || return 1
   local conf_path
   conf_path="$(get_apache_conf_path)/${file_name}"
   cvmfs_sys_file_is_regular $conf_path
