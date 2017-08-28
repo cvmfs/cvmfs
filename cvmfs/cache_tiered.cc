@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+#include "logging.h"
 #include "platform.h"
 #include "quota.h"
 
@@ -193,6 +194,10 @@ int TieredCacheManager::CommitTxn(void *txn) {
   //
   // If there wasn't the OpenFromTxn semantics, we could have this
   // call succeed if *either* transaction was successful.
+  if (!upper_result && lower_result) {
+    LogCvmfs(kLogCache, kLogSyslogWarn | kLogDebug, "Commit of transaction "
+             "failed in lower cache but succeeded in upper cache.");
+  }
   return upper_result;
 }
 
