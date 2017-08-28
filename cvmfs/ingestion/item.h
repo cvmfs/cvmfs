@@ -6,27 +6,71 @@
 #define CVMFS_INGESTION_ITEM_H_
 
 #include <pthread.h>
+#include <stdint.h>
 
 #include <cassert>
 #include <string>
 #include <vector>
 
+#include "compression.h"
+#include "hash.h"
 #include "util/single_copy.h"
 #include "util_concurrency.h"
+
+class FileItem;
 
 template <class ItemT>
 class Tube;
 
-class FileItem {
+/**
+ * A chunk stores the state of compression and hashing contexts as the blocks
+ * move through the pipeline.  A chunk can be a "bulk chunk" corresponding to
+ * the processed data of an entire file, or it can be a partial chunk of a
+ * (large) input file.
+ */
+class ChunkItem : SingleCopy {
  public:
-  explicit FileItem(const std::string &p) : path_(p) { }
-  std::string path() { return path_; }
+  ChunkItem(FileItem *file_item, uint64_t offset)
+    : file_item_(file_item), offset_(offset) { }
+
+  bool IsValid() { return file_item_ != NULL; }
 
  private:
-  std::string path_;
+  FileItem *file_item_;
+  uint64_t offset_;
+  zlib::Compressor *compressor_;
+  shash::ContextPtr hash_ctx_;
 };
 
 
+class FileItem {
+ public:
+  explicit FileItem(const std::string &p) : path_(p), bulk_chunk_(this, 0) { }
+  std::string path() { return path_; }
+
+ private:
+  struct Piece {
+    Piece() : offset(0) { }
+    shash::Any hash;
+    uint64_t offset;
+  };
+
+  std::string path_;
+
+  zlib::Algorithms compression_algorithm_;
+  shash::Algorithms hash_algorithm_;
+  bool may_have_chunks_;
+  bool has_legacy_bulk_chunk_;
+  ChunkItem bulk_chunk_;
+  std::vector<Piece> chunks_;
+};
+
+
+/**
+ * A block is an item of work in the pipeline.  A sequence of data blocks
+ * followed by a stop block constitutes a Chunk.  A sequence of Chunks in turn
+ * build constitute a file.
+ */
 class BlockItem : SingleCopy {
  public:
   enum BlockType {
@@ -60,6 +104,13 @@ class BlockItem : SingleCopy {
   void DoProgress();
 
   BlockType type_;
+
+  /**
+   * Blocks with the same tag need to be processed sequentially.  That is, no
+   * two threads of the same pipeline stage must operate on blocks of the same
+   * tag.  The tags roughly correspond to chunks.
+   */
+  uint64_t tag_;
 
   unsigned char *data_;
   uint32_t capacity_;
