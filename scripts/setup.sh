@@ -24,12 +24,13 @@ $SCRIPT_LOCATION/../bin/cvmfs_services escript scripts/setup_mnesia.escript $cvm
 # Install syslog configuration file
 echo "Installing the syslog configuration file"
 sudo cp -v $SCRIPT_LOCATION/90-cvmfs_services.conf /etc/rsyslog.d/
-sudo cp -v $SCRIPT_LOCATION/90-cvmfs_services_rotate /etc/logrotate.d/
 
 echo "  - restarting rsyslog"
 if [ x"$(which systemctl)" != x"" ]; then
     sudo systemctl restart rsyslog
+    sudo cp -v $SCRIPT_LOCATION/90-cvmfs_services_rotate_systemd /etc/logrotate.d/
 else
     sudo service rsyslog restart
+    sudo cp -v $SCRIPT_LOCATION/90-cvmfs_services_rotate /etc/logrotate.d/
 fi
 
