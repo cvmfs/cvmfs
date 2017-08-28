@@ -363,7 +363,8 @@ bool OptionsManager::GetSource(const string &key, string *value) {
 
 bool OptionsManager::IsOn(const std::string &param_value) {
   const string uppercase = ToUpper(param_value);
-  return ((uppercase == "YES") || (uppercase == "ON") || (uppercase == "1"));
+  return ((uppercase == "YES") || (uppercase == "ON") || (uppercase == "1") ||
+          (uppercase == "TRUE"));
 }
 
 
