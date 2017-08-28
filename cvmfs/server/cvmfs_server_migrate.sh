@@ -332,18 +332,20 @@ _migrate_2_3_0() {
   load_repo_config $name
 }
 
-_migrate_137() {
+_migrate_138() {
   local name=$1
-  local destination_version="137"
+  local destination_version="138"
   local server_conf="/etc/cvmfs/repositories.d/${name}/server.conf"
-  local apache_repo_conf="$(get_apache_conf_path)/$(get_apache_conf_filename $name)"
-  local apache_info_conf="$(get_apache_conf_path)/$(get_apache_conf_filename "info")"
+  local apache_conf_path="$(get_apache_conf_path)"
+  local apache_conf_file="$(get_apache_conf_filename $name)"
+  local apache_repo_conf="$apache_conf_path/$apache_conf_file"
+  local apache_info_conf="$apache_conf_path/$(get_apache_conf_filename "info")"
   local do_apache_reload=0
 
   load_repo_config $name
   echo "Migrating repository '$name' from layout revision $(mangle_version_string $CVMFS_CREATOR_VERSION) to revision $(mangle_version_string $destination_version)"
 
-  if is_local_upstream $CVMFS_UPSTREAM_STORAGE && cvmfs_sys_file_is_regular "$apache_conf"; then
+  if has_apache_config_file "$apache_conf_file"; then
     if _is_generated_apache_conf "$apache_repo_conf"; then
       echo "--> updating apache config ($(basename $apache_repo_conf))"
       local storage_dir=$(get_upstream_config $CVMFS_UPSTREAM_STORAGE)
@@ -372,9 +374,9 @@ _migrate_137() {
     reload_apache > /dev/null
   fi
 
-  echo "--> updating server.conf"
   local warn_threshold="`sed -n -e 's/^CVMFS_CATALOG_ENTRY_WARN_THRESHOLD=//p' $server_conf`"
   if [ -n "$warn_threshold" ]; then
+    echo "--> updating server.conf"
     sed -i -e '/^CVMFS_CATALOG_ENTRY_WARN_THRESHOLD=/d' $server_conf
     local kcatalog_limit="$(($warn_threshold / 1000))"
     # If the default was not changed, the new root catalog default of 200k
@@ -493,7 +495,17 @@ cvmfs_server_migrate() {
          x"$creator" = x"2.3.5-1" -o   \
          x"$creator" = x"2.3.6-1" -o   \
          x"$creator" = x"2.4.0-1" ]; then
-      _migrate_137 $name
+      # initially this was version 137 but it does everything needed by
+      #  138 so skip up to 138.
+      _migrate_138 $name
+      creator="$(repository_creator_version $name)"
+    fi
+
+    if [ "$creator" = "137" ] && \
+         is_stratum1 $name && \
+         has_apache_config_file $(get_apache_conf_filename $name); then
+      # this does slightly more than needed but is close enough so reuse it
+      _migrate_138 $name
       creator="$(repository_creator_version $name)"
     fi
 
