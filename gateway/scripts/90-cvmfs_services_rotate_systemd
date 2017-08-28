@@ -6,6 +6,6 @@
         notifempty
 	nocreate
         postrotate
-                service rsyslog restart > /dev/null 2> /dev/null || true
+                systemctl restart rsyslog > /dev/null 2> /dev/null || true
         endscript
 }
