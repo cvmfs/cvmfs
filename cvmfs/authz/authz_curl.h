@@ -7,8 +7,8 @@
 
 #include <string>
 
-#include "download.h"
 #include "authz.h"
+#include "download.h"
 
 class AuthzSessionManager;
 

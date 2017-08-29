@@ -448,10 +448,10 @@ bool AuthzExternalFetcher::ParsePermit(
     }
   }
 
-  json_token = JsonDocument::SearchInObject(json_authz, "bearer_token", JSON_STRING);
+  json_token = JsonDocument::SearchInObject(json_authz, "bearer_token",
+                                            JSON_STRING);
   if (json_token != NULL) {
     binary_msg->permit.token.type = kTokenBearer;
-    
     unsigned size = strlen(json_token->string_value);
     binary_msg->permit.token.size = size;
     if (size > 0) {
@@ -461,14 +461,13 @@ bool AuthzExternalFetcher::ParsePermit(
       memcpy(binary_msg->permit.token.data, json_token->string_value, size);
 
       LogCvmfs(kLogAuthz, kLogDebug,
-               "Got a bearer_token from authz_helper.  Setting token type to kTokenBearer");
-
-    }
-    else 
-    {
+               "Got a bearer_token from authz_helper. "
+               "Setting token type to kTokenBearer");
+    } else {
       // We got a bearer_token, but a size 0 (or negative?) string
       LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug,
-               "bearer_token was in returned JSON from Authz helper, but of size 0 from authz helper %s", 
+               "bearer_token was in returned JSON from Authz helper,"
+               " but of size 0 from authz helper %s",
                progname_.c_str());
     }
   }

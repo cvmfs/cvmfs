@@ -103,27 +103,29 @@ bool AuthzAttachment::ConfigureSciTokenCurl(
   const AuthzToken &token,
   void **info_data)
 {
-
   if (*info_data == NULL) {
     AuthzToken* saved_token = new AuthzToken();
     saved_token->type = kTokenBearer;
     saved_token->data = smalloc((sizeof(char) * token.size)+ 1);
     memcpy(saved_token->data, token.data, token.size);
-    ((char*)(saved_token->data))[token.size] = 0;
+    static_cast<char*>(saved_token->data)[token.size] = 0;
     *info_data = saved_token;
   }
 
-  LogCvmfs(kLogAuthz, kLogDebug, "Setting OAUTH bearer token to: %s", (char*)reinterpret_cast<AuthzToken*>(*info_data)->data);
+  AuthzToken* tmp_token = static_cast<AuthzToken*>(*info_data);
+
+  LogCvmfs(kLogAuthz, kLogDebug, "Setting OAUTH bearer token to: %s",
+           static_cast<char*>(tmp_token->data));
 
   // We only need to add the Bearer token for SciTokens, easy peasy!
-  int retval = curl_easy_setopt(curl_handle, CURLOPT_XOAUTH2_BEARER, (char*)reinterpret_cast<AuthzToken*>(*info_data)->data);
+  int retval = curl_easy_setopt(curl_handle, CURLOPT_XOAUTH2_BEARER,
+                                static_cast<char*>(tmp_token->data));
   if (retval != CURLE_OK) {
     LogCvmfs(kLogAuthz, kLogSyslogErr, "Failed to set Oauth2 Bearer Token");
     return false;
   }
 
   return true;
-
 }
 
 
@@ -148,9 +150,10 @@ bool AuthzAttachment::ConfigureCurlHandle(
     return false;
   }
 
-  switch(token->type) {
+  switch (token->type) {
     case kTokenBearer:
-      // If it's a scitoken, then just go to the private ConfigureSciTokenCurl function
+      // If it's a scitoken, then just go to the private
+      // ConfigureSciTokenCurl function
       return ConfigureSciTokenCurl(curl_handle, *token, info_data);
 
     case kTokenX509:
@@ -167,7 +170,8 @@ bool AuthzAttachment::ConfigureCurlHandle(
 
   // The calling layer is reusing data;
   if (*info_data) {
-    curl_easy_setopt(curl_handle, CURLOPT_SSL_CTX_DATA, reinterpret_cast<AuthzToken*>(*info_data)->data);
+    curl_easy_setopt(curl_handle, CURLOPT_SSL_CTX_DATA,
+                     static_cast<AuthzToken*>(*info_data)->data);
     return true;
   }
 
@@ -256,8 +260,9 @@ bool AuthzAttachment::ConfigureCurlHandle(
 
   AuthzToken* to_return = new AuthzToken();
   to_return->type = kTokenX509;
-  to_return->data = (void*)parm.Release();
-  curl_easy_setopt(curl_handle, CURLOPT_SSL_CTX_DATA, (sslctx_info*)to_return->data);
+  to_return->data = static_cast<void*>(parm.Release());
+  curl_easy_setopt(curl_handle, CURLOPT_SSL_CTX_DATA,
+                   static_cast<sslctx_info*>(to_return->data));
   *info_data = to_return;
   return true;
 }
@@ -276,12 +281,12 @@ void AuthzAttachment::LogOpenSSLErrors(const char *top_message) {
 
 
 void AuthzAttachment::ReleaseCurlHandle(CURL *curl_handle, void *info_data) {
-
   assert(info_data);
 
   AuthzToken* token = static_cast<AuthzToken*>(info_data);
   if (token->type == kTokenBearer) {
-    delete (char*)token->data;
+    // Compiler complains if we delete a void*
+    delete static_cast<char*>(token->data);
     token->data = NULL;
     delete token;
     curl_easy_setopt(curl_handle, CURLOPT_XOAUTH2_BEARER, 0);
@@ -302,7 +307,4 @@ void AuthzAttachment::ReleaseCurlHandle(CURL *curl_handle, void *info_data) {
     // to reuse cert chain we just freed.
     curl_easy_setopt(curl_handle, CURLOPT_SSL_CTX_DATA, 0);
   }
-
-  
-
 }
