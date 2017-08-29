@@ -278,8 +278,8 @@ void AuthzAttachment::LogOpenSSLErrors(const char *top_message) {
 void AuthzAttachment::ReleaseCurlHandle(CURL *curl_handle, void *info_data) {
 
   assert(info_data);
-  // How can we tell if info_data is OAuth or SSL?
-  AuthzToken* token = reinterpret_cast<AuthzToken*>(info_data);
+
+  AuthzToken* token = static_cast<AuthzToken*>(info_data);
   if (token->type == kTokenBearer) {
     delete (char*)token->data;
     token->data = NULL;
@@ -287,7 +287,7 @@ void AuthzAttachment::ReleaseCurlHandle(CURL *curl_handle, void *info_data) {
     curl_easy_setopt(curl_handle, CURLOPT_XOAUTH2_BEARER, 0);
 
   } else if (token->type == kTokenX509) {
-    sslctx_info *p = reinterpret_cast<sslctx_info *>(info_data);
+    sslctx_info *p = static_cast<sslctx_info *>(info_data);
     STACK_OF(X509) *chain = p->chain;
     EVP_PKEY *pkey = p->pkey;
     p->chain = NULL;
