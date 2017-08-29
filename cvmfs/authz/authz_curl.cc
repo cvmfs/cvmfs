@@ -118,7 +118,7 @@ bool AuthzAttachment::ConfigureSciTokenCurl(
   // We only need to add the Bearer token for SciTokens, easy peasy!
   int retval = curl_easy_setopt(curl_handle, CURLOPT_XOAUTH2_BEARER, (char*)reinterpret_cast<AuthzToken*>(*info_data)->data);
   if (retval != CURLE_OK) {
-    LogCvmfs(kLogAuthz, kLogDebug, "Failed to set Oauth2 Bearer Token");
+    LogCvmfs(kLogAuthz, kLogSyslogErr, "Failed to set Oauth2 Bearer Token");
     return false;
   }
 
@@ -147,14 +147,20 @@ bool AuthzAttachment::ConfigureCurlHandle(
     LogCvmfs(kLogAuthz, kLogDebug, "failed to get authz token for pid %d", pid);
     return false;
   }
-  if ((token->type != kTokenX509) && (token->type != kTokenBearer)) { // TODO: this can't be right
-    LogCvmfs(kLogAuthz, kLogDebug, "unknown token type: %d", token->type);
-    return false;
-  }
 
-  // If it's a scitoken, then just go to the private ConfigureSciTokenCurl function
-  if (token->type == kTokenBearer) {
-    return ConfigureSciTokenCurl(curl_handle, *token, info_data);
+  switch(token->type) {
+    case kTokenBearer:
+      // If it's a scitoken, then just go to the private ConfigureSciTokenCurl function
+      return ConfigureSciTokenCurl(curl_handle, *token, info_data);
+
+    case kTokenX509:
+      // The x509 code is below, so just break and go.
+      break;
+
+    default:
+      // Oh no, don't know the the token type, throw error and return
+      LogCvmfs(kLogAuthz, kLogDebug, "unknown token type: %d", token->type);
+      return false;
   }
 
   curl_easy_setopt(curl_handle, CURLOPT_SSL_CTX_DATA, NULL);
