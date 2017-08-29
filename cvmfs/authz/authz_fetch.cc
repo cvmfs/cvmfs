@@ -450,7 +450,7 @@ bool AuthzExternalFetcher::ParsePermit(
 
   json_token = JsonDocument::SearchInObject(json_authz, "bearer_token", JSON_STRING);
   if (json_token != NULL) {
-    binary_msg->permit.token.type = kTokenSciToken;
+    binary_msg->permit.token.type = kTokenBearer;
     
     unsigned size = strlen(json_token->string_value);
     binary_msg->permit.token.size = size;

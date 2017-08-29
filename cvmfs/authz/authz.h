@@ -18,7 +18,7 @@
 enum AuthzTokenType {
   kTokenUnknown = 0,
   kTokenX509,
-  kTokenSciToken,
+  kTokenBearer,
 };
 
 /**

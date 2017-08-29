@@ -106,7 +106,7 @@ bool AuthzAttachment::ConfigureSciTokenCurl(
 
   if (*info_data == NULL) {
     AuthzToken* saved_token = new AuthzToken();
-    saved_token->type = kTokenSciToken;
+    saved_token->type = kTokenBearer;
     saved_token->data = smalloc((sizeof(char) * token.size)+ 1);
     memcpy(saved_token->data, token.data, token.size);
     ((char*)(saved_token->data))[token.size] = 0;
@@ -147,13 +147,13 @@ bool AuthzAttachment::ConfigureCurlHandle(
     LogCvmfs(kLogAuthz, kLogDebug, "failed to get authz token for pid %d", pid);
     return false;
   }
-  if ((token->type != kTokenX509) && (token->type != kTokenSciToken)) { // TODO: this can't be right
+  if ((token->type != kTokenX509) && (token->type != kTokenBearer)) { // TODO: this can't be right
     LogCvmfs(kLogAuthz, kLogDebug, "unknown token type: %d", token->type);
     return false;
   }
 
   // If it's a scitoken, then just go to the private ConfigureSciTokenCurl function
-  if (token->type == kTokenSciToken) {
+  if (token->type == kTokenBearer) {
     return ConfigureSciTokenCurl(curl_handle, *token, info_data);
   }
 
@@ -274,7 +274,7 @@ void AuthzAttachment::ReleaseCurlHandle(CURL *curl_handle, void *info_data) {
   assert(info_data);
   // How can we tell if info_data is OAuth or SSL?
   AuthzToken* token = reinterpret_cast<AuthzToken*>(info_data);
-  if (token->type == kTokenSciToken) {
+  if (token->type == kTokenBearer) {
     delete (char*)token->data;
     token->data = NULL;
     delete token;
