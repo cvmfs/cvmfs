@@ -4,13 +4,13 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <vector>
 
-#include "file_processing/char_buffer.h"
-#include "file_processing/chunk_detector.h"
+#include "ingestion/chunk_detector.h"
+#include "ingestion/item.h"
 #include "prng.h"
 
-namespace upload {
 
 class T_ChunkDetectors : public ::testing::Test {
  protected:
@@ -25,16 +25,15 @@ class T_ChunkDetectors : public ::testing::Test {
     // produce some test data
     size_t i = 0;
     while (i < data_size()) {
-      CharBuffer * buffer = new CharBuffer(buffer_size);
-      buffer->SetUsedBytes(std::min(data_size() - i, buffer_size));
-      buffer->SetBaseOffset(i);
-
-      for (size_t j = 0; j < buffer->size(); ++j) {
-        *(buffer->ptr() + j) = static_cast<unsigned char>(rng_.Next(256));
+      BlockItem *buffer = new BlockItem();
+      buffer->MakeData(std::min(data_size() - i, buffer_size));
+      for (size_t j = 0; j < buffer->capacity(); ++j) {
+        *(buffer->data() + j) = static_cast<unsigned char>(rng_.Next(256));
       }
+      buffer->set_size(buffer->capacity());
 
       buffers_.push_back(buffer);
-      i += buffer->used_bytes();
+      i += buffer->size();
     }
   }
 
@@ -43,15 +42,13 @@ class T_ChunkDetectors : public ::testing::Test {
 
     size_t i = 0;
     while (i < data_size()) {
-      CharBuffer *buffer = new CharBuffer(buffer_size);
-      const size_t bytes_to_write = std::min(data_size() - i, buffer_size);
-
-      memset(buffer->free_space_ptr(), 0, bytes_to_write);
-      buffer->SetUsedBytes(bytes_to_write);
-      buffer->SetBaseOffset(i);
+      BlockItem *buffer = new BlockItem();
+      buffer->MakeData(std::min(data_size() - i, buffer_size));
+      memset(buffer->data(), 0, buffer->capacity());
+      buffer->set_size(buffer->capacity());
 
       buffers_.push_back(buffer);
-      i += buffer->used_bytes();
+      i += buffer->size();
     }
   }
 
@@ -72,7 +69,7 @@ class T_ChunkDetectors : public ::testing::Test {
   }
 
  protected:
-  typedef std::vector<CharBuffer*> Buffers;
+  typedef std::vector<BlockItem *> Buffers;
   Buffers buffers_;
 
  private:
@@ -80,47 +77,50 @@ class T_ChunkDetectors : public ::testing::Test {
 };
 
 TEST_F(T_ChunkDetectors, StaticOffsetChunkDetectorSlow) {
-  const size_t static_chunk_size = 1024;
+  const uint64_t static_chunk_size = 1024;
 
   StaticOffsetDetector static_offset_detector(static_chunk_size);
   EXPECT_FALSE(static_offset_detector.MightFindChunks(static_chunk_size));
   EXPECT_TRUE(static_offset_detector.MightFindChunks(static_chunk_size + 1));
 
-  CharBuffer buffer(static_chunk_size);
-  buffer.SetUsedBytes(static_chunk_size / 2);
+  unsigned char bytes[static_chunk_size / 2];
+  BlockItem buffer;
+  buffer.MakeData(bytes, static_chunk_size / 2);
 
-  off_t next_cut_mark = static_offset_detector.FindNextCutMark(&buffer);
-  EXPECT_EQ(0, next_cut_mark);
+  uint64_t next_cut_mark = static_offset_detector.FindNextCutMark(&buffer);
+  EXPECT_EQ(0U, next_cut_mark);
 
-  buffer.SetBaseOffset(buffer.used_bytes());
   next_cut_mark = static_offset_detector.FindNextCutMark(&buffer);
-  EXPECT_EQ(0, next_cut_mark);
+  EXPECT_EQ(0U, next_cut_mark);
 
-  buffer.SetBaseOffset(buffer.used_bytes() * 2);
   next_cut_mark = static_offset_detector.FindNextCutMark(&buffer);
-  EXPECT_EQ(static_cast<off_t>(static_chunk_size), next_cut_mark);
+  EXPECT_EQ(static_cast<uint64_t>(static_chunk_size), next_cut_mark);
 
-  buffer.SetBaseOffset(buffer.used_bytes() * 3);
   next_cut_mark = static_offset_detector.FindNextCutMark(&buffer);
-  EXPECT_EQ(0, next_cut_mark);
+  EXPECT_EQ(0U, next_cut_mark);
+
+  buffer.Discharge();
 
   CreateBuffers(1048576);
 
-  off_t next_cut = 0;
-  int   runs     = 2;
-  Buffers::const_iterator i    = buffers_.begin();
+  uint64_t next_cut = 0;
+  unsigned runs = 2;
+  Buffers::const_iterator i = buffers_.begin();
   Buffers::const_iterator iend = buffers_.end();
   for (; i != iend; ++i) {
     while ((next_cut = static_offset_detector.FindNextCutMark(*i)) != 0) {
-      EXPECT_EQ(static_cast<off_t>(static_chunk_size) * runs, next_cut);
+      EXPECT_EQ(static_cast<uint64_t>(static_chunk_size) * runs, next_cut);
       ++runs;
     }
   }
+  EXPECT_EQ(data_size_ / static_chunk_size, runs - 2);
 }
 
 
 TEST_F(T_ChunkDetectors, Xor32) {
-  Xor32Detector xor32_detector(1, 2, 4);  // chunk sizes are not important here!
+  // chunk sizes are not important here!
+  Xor32Detector xor32_detector(Xor32Detector::kXor32Window,
+    Xor32Detector::kXor32Window + 1, Xor32Detector::kXor32Window + 2);
 
   // table of test data:
   //   <input value> , <expected xor32 value>
@@ -218,7 +218,7 @@ TEST_F(T_ChunkDetectors, Xor32ChunkDetectorSlow) {
     97723756,  98618891,  99707336,  101755336, 103405168, 104269441
   };
 
-  std::vector<size_t> buffer_sizes;
+  std::vector<uint64_t> buffer_sizes;
   buffer_sizes.push_back(102400);    // 100kB
   buffer_sizes.push_back(base);      // same as minimal chunk size
   buffer_sizes.push_back(base * 2);  // same as average chunk size
@@ -237,9 +237,9 @@ TEST_F(T_ChunkDetectors, Xor32ChunkDetectorSlow) {
     off_t last_cut = 0;
     int   cut      = 0;
     bool  fail     = false;
+
     Buffers::const_iterator j    = buffers_.begin();
     Buffers::const_iterator jend = buffers_.end();
-
     for (; !fail && j != jend; ++j) {
       while ((next_cut = detector.FindNextCutMark(*j)) != 0) {
         // check that the chunk size lies in the legal boundaries
@@ -308,5 +308,3 @@ TEST_F(T_ChunkDetectors, Xor32ChunkDetectorZerosBufferPowerOfTwo) {
     }
   }
 }
-
-}  // namespace upload

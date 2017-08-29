@@ -82,8 +82,8 @@ class BlockItem : SingleCopy {
   BlockItem();
   ~BlockItem();
   void MakeStop();
-  void MakeData(uint32_t capacity, BlockItem *succ_item);
-  void MakeData(unsigned char *data, uint32_t size, BlockItem *succ_item);
+  void MakeData(uint32_t capacity);
+  void MakeData(unsigned char *data, uint32_t size);
   // remove pointer to the data
   void Discharge();
 
@@ -91,7 +91,9 @@ class BlockItem : SingleCopy {
   void Progress(Tube<BlockItem> *next_stage);
 
   unsigned char *data() { return data_; }
+  uint32_t capacity() { return capacity_; }
   uint32_t size() { return size_; }
+  void set_size(uint32_t val) { assert(val <= capacity_); size_ = val; }
 
   BlockType type() {
     MutexLockGuard guard(&lock_);

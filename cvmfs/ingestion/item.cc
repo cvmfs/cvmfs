@@ -61,16 +61,13 @@ void BlockItem::MakeStop() {
 }
 
 
-void BlockItem::MakeData(uint32_t capacity, BlockItem *succ_item) {
+void BlockItem::MakeData(uint32_t capacity) {
   MutexLockGuard guard(&lock_);
   assert(type_ == kBlockHollow);
-  assert(succ_item != NULL);
 
   type_ = kBlockData;
-  capacity_ = capacity_;
+  capacity_ = capacity;
   data_ = reinterpret_cast<unsigned char *>(smalloc(capacity_));
-  succ_item_ = succ_item;
-  succ_item_->Progress(0);
 }
 
 
@@ -79,18 +76,14 @@ void BlockItem::MakeData(uint32_t capacity, BlockItem *succ_item) {
  */
 void BlockItem::MakeData(
   unsigned char *data,
-  uint32_t size,
-  BlockItem *succ_item)
+  uint32_t size)
 {
   MutexLockGuard guard(&lock_);
   assert(type_ == kBlockHollow);
-  assert(succ_item != NULL);
 
   type_ = kBlockData;
   capacity_ = size_ = size;
   data_ = data;
-  succ_item_ = succ_item;
-  succ_item_->Progress(0);
 }
 
 

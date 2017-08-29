@@ -47,7 +47,7 @@ void TaskRead::Process(FileItem *item) {
       unsigned char *data_part =
         reinterpret_cast<unsigned char *>(smalloc(nbytes));
       memcpy(data_part, buffer, nbytes);
-      block_current->MakeData(data_part, nbytes, block_next);
+      //block_current->MakeData(data_part, nbytes, block_next);
       if (nbytes < kBlockSize) {
         block_next->MakeStop();
       }
