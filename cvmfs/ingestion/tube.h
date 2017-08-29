@@ -9,6 +9,7 @@
 #include <stdint.h>
 
 #include <cassert>
+#include <vector>
 
 #include "util/single_copy.h"
 #include "util/pointer.h"
@@ -208,6 +209,47 @@ class Tube : SingleCopy {
    * Signals if the queue runs empty
    */
   pthread_cond_t cond_empty_;
+};
+
+
+/**
+ * A tube group manages a fixed set of Tubes and dispatches items among them in
+ * such a way that items with the same tag (a positive integer) are all sent
+ * to the same tube.
+ */
+template <class ItemT>
+class TubeGroup : SingleCopy {
+ public:
+  TubeGroup() : is_active_(false) { }
+  ~TubeGroup() {
+    for (unsigned i = 0; i < tubes_.size(); ++i)
+      delete tubes_[i];
+  }
+
+  void TakeTube(Tube<ItemT> *t) {
+    assert(!is_active_);
+    tubes_.push_back(t);
+  }
+
+  void Activate() {
+    assert(!is_active_);
+    assert(!tubes_.empty());
+    is_active_ = true;
+  }
+
+  /**
+   * Like Tube::Enqueue(), but pick a tube according to ItemT::tag()
+   */
+  typename Tube<ItemT>::Link *Dispatch(ItemT *item) {
+    assert(is_active_);
+    unsigned tube_idx = (tubes_.size() == 1)
+                        ? 0 : (item->tag() % tubes_.size());
+    return tubes_[tube_idx]->Enqueue(item);
+  }
+
+ private:
+  bool is_active_;
+  std::vector<Tube<ItemT> *> tubes_;
 };
 
 #endif  // CVMFS_INGESTION_TUBE_H_

@@ -14,13 +14,52 @@
 
 #include "compression.h"
 #include "hash.h"
+#include "ingestion/chunk_detector.h"
 #include "util/single_copy.h"
-#include "util_concurrency.h"
 
 class FileItem;
 
-template <class ItemT>
-class Tube;
+
+/**
+ * Carries the information necessary to compress and checksum a file. During
+ * processing, the bulk chunk and the chunks_ vector are filled.
+ */
+class FileItem : SingleCopy {
+public:
+ explicit FileItem(
+   const std::string &p,
+   uint64_t min_chunk_size = 4 * 1024 * 1024,
+   uint64_t avg_chunk_size = 8 * 1024 * 1024,
+   uint64_t max_chunk_size = 16 * 1024 * 1024,
+   zlib::Algorithms compression_algorithm = zlib::kZlibDefault,
+   shash::Algorithms hash_algorithm = shash::kSha1,
+   shash::Suffix hash_suffix = shash::kSuffixNone,
+   bool may_have_chunks = true,
+   bool has_legacy_bulk_chunk = false
+  );
+ ~FileItem();
+ std::string path() { return path_; }
+
+private:
+ struct Piece {
+   Piece() : offset(0) { }
+   shash::Any hash;
+   uint64_t offset;
+ };
+
+ std::string path_;
+ Xor32Detector chunk_detector_;
+ zlib::Algorithms compression_algorithm_;
+ shash::Algorithms hash_algorithm_;
+ shash::Suffix hash_suffix_;
+ bool may_have_chunks_;
+ bool has_legacy_bulk_chunk_;
+
+ Piece bulk_chunk_;
+ std::vector<Piece> chunks_;
+ pthread_mutex_t *lock_;
+};
+
 
 /**
  * A chunk stores the state of compression and hashing contexts as the blocks
@@ -43,29 +82,6 @@ class ChunkItem : SingleCopy {
 };
 
 
-class FileItem {
- public:
-  explicit FileItem(const std::string &p) : path_(p), bulk_chunk_(this, 0) { }
-  std::string path() { return path_; }
-
- private:
-  struct Piece {
-    Piece() : offset(0) { }
-    shash::Any hash;
-    uint64_t offset;
-  };
-
-  std::string path_;
-
-  zlib::Algorithms compression_algorithm_;
-  shash::Algorithms hash_algorithm_;
-  bool may_have_chunks_;
-  bool has_legacy_bulk_chunk_;
-  ChunkItem bulk_chunk_;
-  std::vector<Piece> chunks_;
-};
-
-
 /**
  * A block is an item of work in the pipeline.  A sequence of data blocks
  * followed by a stop block constitutes a Chunk.  A sequence of Chunks in turn
@@ -80,49 +96,47 @@ class BlockItem : SingleCopy {
   };
 
   BlockItem();
+  explicit BlockItem(uint64_t tag);
   ~BlockItem();
   void MakeStop();
   void MakeData(uint32_t capacity);
   void MakeData(unsigned char *data, uint32_t size);
-  // remove pointer to the data
+  void SetChunkItem(ChunkItem *item);
+  // Forget pointer to the data
   void Discharge();
 
   uint32_t Write(void *buf, uint32_t count);
-  void Progress(Tube<BlockItem> *next_stage);
 
   unsigned char *data() { return data_; }
   uint32_t capacity() { return capacity_; }
   uint32_t size() { return size_; }
   void set_size(uint32_t val) { assert(val <= capacity_); size_ = val; }
 
-  BlockType type() {
-    MutexLockGuard guard(&lock_);
-    return type_;
-  }
+  BlockType type() { return type_; }
+  int64_t tag() { return tag_; }
 
  private:
-  // Only called by predecessor
-  void Progress(int32_t pred_nstage);
-  void DoProgress();
-
   BlockType type_;
 
   /**
    * Blocks with the same tag need to be processed sequentially.  That is, no
    * two threads of the same pipeline stage must operate on blocks of the same
    * tag.  The tags roughly correspond to chunks.
+   * Tags can (and should) be set exactly once in the life time of a block.
    */
-  uint64_t tag_;
+  int64_t tag_;
 
+  /**
+   * Can be set exactly once.
+   */
+  ChunkItem *chunk_item_;
+
+  /**
+   * The data block is owned and freed on destruction.
+   */
   unsigned char *data_;
   uint32_t capacity_;
   uint32_t size_;
-
-  BlockItem *succ_item_;
-  int32_t pred_nstage_;
-  Tube<BlockItem> *next_stage_;
-
-  pthread_mutex_t lock_;
 };
 
 

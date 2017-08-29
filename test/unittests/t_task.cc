@@ -116,17 +116,18 @@ TEST_F(T_Task, Stress) {
 
 TEST_F(T_Task, Read) {
   Tube<FileItem> tube_in;
-  Tube<BlockItem> tube_out;
-  tube_in.set_nstage(0);
-  tube_out.set_nstage(1);
+  Tube<BlockItem> *tube_out = new Tube<BlockItem>();
+  TubeGroup<BlockItem> tube_group_out;
+  tube_group_out.TakeTube(tube_out);
+  tube_group_out.Activate();
 
   TubeConsumerGroup<FileItem> task_group;
-  task_group.TakeConsumer(new TaskRead(&tube_in, &tube_out));
+  task_group.TakeConsumer(new TaskRead(&tube_in, &tube_group_out));
   task_group.Spawn();
 
   FileItem file_null("/dev/null");
   tube_in.Enqueue(&file_null);
-  BlockItem *item_stop = tube_out.Pop();
+  BlockItem *item_stop = tube_out->Pop();
   EXPECT_EQ(BlockItem::kBlockStop, item_stop->type());
   delete item_stop;
 
@@ -134,12 +135,12 @@ TEST_F(T_Task, Read) {
   EXPECT_TRUE(SafeWriteToFile(str_abc, "./abc", 0600));
   FileItem file_abc("./abc");
   tube_in.Enqueue(&file_abc);
-  BlockItem *item_data = tube_out.Pop();
+  BlockItem *item_data = tube_out->Pop();
   EXPECT_EQ(BlockItem::kBlockData, item_data->type());
   EXPECT_EQ(str_abc, string(reinterpret_cast<char *>(item_data->data()),
                             item_data->size()));
   delete item_data;
-  item_stop = tube_out.Pop();
+  item_stop = tube_out->Pop();
   EXPECT_EQ(BlockItem::kBlockStop, item_stop->type());
   delete item_stop;
   unlink("./abc");
@@ -156,14 +157,14 @@ TEST_F(T_Task, Read) {
   FileItem file_large("./large");
   tube_in.Enqueue(&file_large);
   for (unsigned i = 0; i < nblocks; ++i) {
-    item_data = tube_out.Pop();
+    item_data = tube_out->Pop();
     EXPECT_EQ(BlockItem::kBlockData, item_data->type());
     EXPECT_EQ(string(TaskRead::kBlockSize, i),
               string(reinterpret_cast<char *>(item_data->data()),
                                               item_data->size()));
     delete item_data;
   }
-  item_stop = tube_out.Pop();
+  item_stop = tube_out->Pop();
   EXPECT_EQ(BlockItem::kBlockStop, item_stop->type());
   delete item_stop;
   unlink("./large");

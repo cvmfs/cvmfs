@@ -10,6 +10,10 @@ using namespace std;  // NOLINT
 
 namespace {
 class DummyItem {
+ public:
+  DummyItem() : tag_(-1) { }
+  int64_t tag() { return tag_; }
+  int64_t tag_;
 };
 }
 
@@ -47,4 +51,41 @@ TEST_F(T_Tube, Fifo) {
   x = tube_.Pop();
   EXPECT_EQ(&c, x);
   EXPECT_TRUE(tube_.IsEmpty());
+}
+
+
+TEST_F(T_Tube, Group) {
+  DummyItem a1, a2, b, c;
+  a1.tag_ = a2.tag_ = 0;
+  b.tag_ = 1;
+  c.tag_ = 2;
+
+  TubeGroup<DummyItem> grp1;
+  Tube<DummyItem> *t1 = new Tube<DummyItem>();
+  grp1.TakeTube(t1);
+  grp1.Activate();
+  grp1.Dispatch(&a1);
+  grp1.Dispatch(&b);
+  EXPECT_EQ(2U, t1->size());
+  DummyItem *x = t1->Pop();
+  EXPECT_EQ(&a1, x);
+  x = t1->Pop();
+  EXPECT_EQ(&b, x);
+
+  TubeGroup<DummyItem> grp2;
+  Tube<DummyItem> *t2 = new Tube<DummyItem>();
+  Tube<DummyItem> *t3 = new Tube<DummyItem>();
+  grp2.TakeTube(t2);
+  grp2.TakeTube(t3);
+  grp2.Activate();
+  grp2.Dispatch(&a1);
+  grp2.Dispatch(&b);
+  grp2.Dispatch(&a2);
+  grp2.Dispatch(&c);
+  EXPECT_EQ(3U, t2->size());
+  EXPECT_EQ(1U, t3->size());
+  x = t2->Pop();  EXPECT_EQ(&a1, x);
+  x = t2->Pop();  EXPECT_EQ(&a2, x);
+  x = t2->Pop();  EXPECT_EQ(&c, x);
+  x = t3->Pop();  EXPECT_EQ(&b, x);
 }

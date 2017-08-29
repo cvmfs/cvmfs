@@ -7,6 +7,7 @@
 
 #include <pthread.h>
 
+#include <cassert>
 #include <vector>
 
 #include "ingestion/tube.h"
@@ -63,16 +64,20 @@ class TubeConsumer : SingleCopy {
 template <class ItemT>
 class TubeConsumerGroup : SingleCopy {
  public:
+  TubeConsumerGroup() : is_active_(false) { }
+
   ~TubeConsumerGroup() {
     for (unsigned i = 0; i < consumers_.size(); ++i)
       delete consumers_[i];
   }
 
   void TakeConsumer(TubeConsumer<ItemT> *consumer) {
+    assert(!is_active_);
     consumers_.push_back(consumer);
   }
 
   void Spawn() {
+    assert(!is_active_);
     unsigned N = consumers_.size();
     threads_.reserve(N);
     for (unsigned i = 0; i < N; ++i) {
@@ -80,6 +85,7 @@ class TubeConsumerGroup : SingleCopy {
         &threads_[i], NULL, TubeConsumer<ItemT>::MainConsumer, consumers_[i]);
       assert(retval == 0);
     }
+    is_active_ = true;
   }
 
   void Terminate() {
@@ -95,6 +101,7 @@ class TubeConsumerGroup : SingleCopy {
   }
 
  private:
+  bool is_active_;
   std::vector<TubeConsumer<ItemT> *> consumers_;
   std::vector<pthread_t> threads_;
 };

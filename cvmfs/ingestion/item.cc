@@ -5,64 +5,85 @@
 #include "item.h"
 
 #include <algorithm>
+#include <cassert>
+#include <cstdlib>
 #include <cstring>
 
-#include "ingestion/tube.h"
 #include "smalloc.h"
 #include "util_concurrency.h"
 
-BlockItem::BlockItem()
-  : type_(kBlockHollow)
-  , data_(NULL)
-  , capacity_(0)
-  , size_(0)
-  , succ_item_(NULL)
-  , pred_nstage_(Tube<BlockItem>::kMaxNstage)
-  , next_stage_(NULL)
+
+FileItem::FileItem(
+  const std::string &p,
+  uint64_t min_chunk_size,
+  uint64_t avg_chunk_size,
+  uint64_t max_chunk_size,
+  zlib::Algorithms compression_algorithm,
+  shash::Algorithms hash_algorithm,
+  shash::Suffix hash_suffix,
+  bool may_have_chunks,
+  bool has_legacy_bulk_chunk)
+  : path_(p)
+  , chunk_detector_(min_chunk_size, avg_chunk_size, max_chunk_size)
+  , compression_algorithm_(compression_algorithm)
+  , hash_algorithm_(hash_algorithm)
+  , hash_suffix_(hash_suffix)
+  , may_have_chunks_(may_have_chunks)
+  , has_legacy_bulk_chunk_(has_legacy_bulk_chunk)
 {
-  int retval = pthread_mutex_init(&lock_, NULL);
+  lock_ = reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+  int retval = pthread_mutex_init(lock_, NULL);
   assert(retval == 0);
 }
 
 
+FileItem::~FileItem() {
+  pthread_mutex_destroy(lock_);
+  free(lock_);
+}
+
+
+//------------------------------------------------------------------------------
+
+
+BlockItem::BlockItem()
+  : type_(kBlockHollow)
+  , tag_(-1)
+  , chunk_item_(0)
+  , data_(NULL)
+  , capacity_(0)
+  , size_(0)
+{ }
+
+
+BlockItem::BlockItem(uint64_t tag)
+  : type_(kBlockHollow)
+  , tag_(tag)
+  , chunk_item_(0)
+  , data_(NULL)
+  , capacity_(0)
+  , size_(0)
+{ }
+
+
 BlockItem::~BlockItem() {
-  if (succ_item_ != NULL)
-    succ_item_->Progress(Tube<BlockItem>::kMaxNstage);
   free(data_);
-  pthread_mutex_destroy(&lock_);
 }
 
 
 void BlockItem::Discharge() {
-  MutexLockGuard guard(&lock_);
   data_ = NULL;
   size_ = capacity_ = 0;
 }
 
 
-void BlockItem::DoProgress() {
-  if (next_stage_ == NULL)
-    return;
-  int32_t next_nstage = next_stage_->nstage();
-  if (next_nstage >= pred_nstage_)
-    return;
-
-  next_stage_->Enqueue(this);
-  if (succ_item_ != NULL)
-    succ_item_->Progress(next_nstage);
-  next_stage_ = NULL;
-}
-
-
 void BlockItem::MakeStop() {
-  MutexLockGuard guard(&lock_);
   assert(type_ == kBlockHollow);
   type_ = kBlockStop;
 }
 
 
 void BlockItem::MakeData(uint32_t capacity) {
-  MutexLockGuard guard(&lock_);
   assert(type_ == kBlockHollow);
 
   type_ = kBlockData;
@@ -78,7 +99,6 @@ void BlockItem::MakeData(
   unsigned char *data,
   uint32_t size)
 {
-  MutexLockGuard guard(&lock_);
   assert(type_ == kBlockHollow);
 
   type_ = kBlockData;
@@ -87,24 +107,14 @@ void BlockItem::MakeData(
 }
 
 
-void BlockItem::Progress(Tube<BlockItem> *next_stage) {
-  MutexLockGuard guard(&lock_);
-  assert(type_ != kBlockHollow);
-
-  next_stage_ = next_stage;
-  DoProgress();
-}
-
-
-void BlockItem::Progress(int32_t pred_nstage) {
-  MutexLockGuard guard(&lock_);
-  pred_nstage_ = pred_nstage;
-  DoProgress();
+void BlockItem::SetChunkItem(ChunkItem *value) {
+  assert(value != NULL);
+  assert(chunk_item_ == NULL);
+  chunk_item_ = value;
 }
 
 
 uint32_t BlockItem::Write(void *buf, uint32_t count) {
-  MutexLockGuard guard(&lock_);
   assert(type_ == kBlockData);
 
   uint32_t remaining = capacity_ - size_;

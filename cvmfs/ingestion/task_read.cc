@@ -15,12 +15,11 @@
 #include "util/posix.h"
 
 
+atomic_int64 TaskRead::tag_seq_ = 0;
+
+
 void TaskRead::Process(FileItem *item) {
   int fd = -1;
-  unsigned char *buffer[kBlockSize];
-  BlockItem *block_next = new BlockItem();
-  BlockItem *block_current = NULL;
-
   fd = open(item->path().c_str(), O_RDONLY);
   if (fd < 0) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to open %s (%d)",
@@ -28,6 +27,8 @@ void TaskRead::Process(FileItem *item) {
     abort();
   }
 
+  unsigned char *buffer[kBlockSize];
+  uint64_t tag = atomic_xadd64(&tag_seq_, 1);
   ssize_t nbytes = -1;
   do {
     nbytes = SafeRead(fd, buffer, kBlockSize);
@@ -37,24 +38,18 @@ void TaskRead::Process(FileItem *item) {
       abort();
     }
 
+    // TODO(jblomer): block on a maximum number of bytes in flight
+    BlockItem *block_item = new BlockItem(tag);
     if (nbytes == 0) {
-      block_next->MakeStop();
+      block_item->MakeStop();
     } else {
-      block_current = block_next;
-      // TODO(jblomer): block on a maximum number of bytes in flight
-      block_next = new BlockItem();
-
       unsigned char *data_part =
         reinterpret_cast<unsigned char *>(smalloc(nbytes));
       memcpy(data_part, buffer, nbytes);
-      //block_current->MakeData(data_part, nbytes, block_next);
-      if (nbytes < kBlockSize) {
-        block_next->MakeStop();
-      }
-      block_current->Progress(tube_out_);
+      block_item->MakeData(data_part, nbytes);
     }
-  } while (nbytes == kBlockSize);
-  block_next->Progress(tube_out_);
+    tubes_out_->Dispatch(block_item);
+  } while (nbytes > 0);
 
   close(fd);
 }
