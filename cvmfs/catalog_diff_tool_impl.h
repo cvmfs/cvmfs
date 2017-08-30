@@ -142,6 +142,19 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
     assert(old_path == new_path);
     i_from++;
     i_to++;
+
+    catalog::DirectoryEntryBase::Differences diff =
+        old_entry.CompareTo(new_entry);
+    if ((diff == catalog::DirectoryEntryBase::Difference::kIdentical) &&
+        old_entry.IsNestedCatalogMountpoint()) {
+      // Early recursion stop if nested catalogs are identical
+      shash::Any id_nested_from, id_nested_to;
+      id_nested_from = old_catalog_mgr_->GetNestedCatalogHash(old_path);
+      id_nested_to = new_catalog_mgr_->GetNestedCatalogHash(new_path);
+      assert(!id_nested_from.IsNull() && !id_nested_to.IsNull());
+      if (id_nested_from == id_nested_to) continue;
+    }
+
     if (old_entry.CompareTo(new_entry) > 0) {
       ReportModification(old_path, old_entry, new_entry, xattrs);
     }
@@ -155,18 +168,6 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
     }
 
     // Recursion
-    catalog::DirectoryEntryBase::Differences diff =
-        old_entry.CompareTo(new_entry);
-    if ((diff == catalog::DirectoryEntryBase::Difference::kIdentical) &&
-        old_entry.IsNestedCatalogMountpoint()) {
-      // Early recursion stop if nested catalogs are identical
-      shash::Any id_nested_from, id_nested_to;
-      id_nested_from = old_catalog_mgr_->GetNestedCatalogHash(old_path);
-      id_nested_to = new_catalog_mgr_->GetNestedCatalogHash(new_path);
-      assert(!id_nested_from.IsNull() && !id_nested_to.IsNull());
-      if (id_nested_from == id_nested_to) continue;
-    }
-
     DiffRec(old_path);
   }
 }
