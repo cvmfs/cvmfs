@@ -24,12 +24,12 @@ FileItem::FileItem(
   bool may_have_chunks,
   bool has_legacy_bulk_chunk)
   : path_(p)
-  , chunk_detector_(min_chunk_size, avg_chunk_size, max_chunk_size)
   , compression_algorithm_(compression_algorithm)
   , hash_algorithm_(hash_algorithm)
   , hash_suffix_(hash_suffix)
   , may_have_chunks_(may_have_chunks)
   , has_legacy_bulk_chunk_(has_legacy_bulk_chunk)
+  , chunk_detector_(min_chunk_size, avg_chunk_size, max_chunk_size)
 {
   lock_ = reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   int retval = pthread_mutex_init(lock_, NULL);
@@ -46,10 +46,26 @@ FileItem::~FileItem() {
 //------------------------------------------------------------------------------
 
 
+ChunkItem::ChunkItem(FileItem *file_item, uint64_t offset)
+  : file_item_(file_item)
+  , offset_(offset)
+  , compressor_(zlib::Compressor::Construct(file_item->compression_algorithm()))
+{
+  hash_ctx_.algorithm = file_item->hash_algorithm();
+  hash_ctx_.size = shash::GetContextSize(hash_ctx_.algorithm);
+  hash_ctx_buffer_ = smalloc(hash_ctx_.size);
+  hash_ctx_.buffer = hash_ctx_buffer_;
+}
+
+
+//------------------------------------------------------------------------------
+
+
 BlockItem::BlockItem()
   : type_(kBlockHollow)
   , tag_(-1)
-  , chunk_item_(0)
+  , file_item_(NULL)
+  , chunk_item_(NULL)
   , data_(NULL)
   , capacity_(0)
   , size_(0)
@@ -59,20 +75,16 @@ BlockItem::BlockItem()
 BlockItem::BlockItem(uint64_t tag)
   : type_(kBlockHollow)
   , tag_(tag)
-  , chunk_item_(0)
+  , file_item_(NULL)
+  , chunk_item_(NULL)
   , data_(NULL)
   , capacity_(0)
   , size_(0)
 { }
 
 
-BlockItem::~BlockItem() {
-  free(data_);
-}
-
-
 void BlockItem::Discharge() {
-  data_ = NULL;
+  data_.Release();
   size_ = capacity_ = 0;
 }
 
@@ -114,12 +126,19 @@ void BlockItem::SetChunkItem(ChunkItem *value) {
 }
 
 
+void BlockItem::SetFileItem(FileItem *value) {
+  assert(value != NULL);
+  assert(file_item_ == NULL);
+  file_item_ = value;
+}
+
+
 uint32_t BlockItem::Write(void *buf, uint32_t count) {
   assert(type_ == kBlockData);
 
   uint32_t remaining = capacity_ - size_;
   uint32_t nbytes = std::min(remaining, count);
-  memcpy(data_ + size_, buf, nbytes);
+  memcpy(data_.weak_ref() + size_, buf, nbytes);
   size_ += nbytes;
   return nbytes;
 }

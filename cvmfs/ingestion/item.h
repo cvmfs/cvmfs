@@ -15,6 +15,7 @@
 #include "compression.h"
 #include "hash.h"
 #include "ingestion/chunk_detector.h"
+#include "util/pointer.h"
 #include "util/single_copy.h"
 
 class FileItem;
@@ -25,39 +26,46 @@ class FileItem;
  * processing, the bulk chunk and the chunks_ vector are filled.
  */
 class FileItem : SingleCopy {
-public:
- explicit FileItem(
-   const std::string &p,
-   uint64_t min_chunk_size = 4 * 1024 * 1024,
-   uint64_t avg_chunk_size = 8 * 1024 * 1024,
-   uint64_t max_chunk_size = 16 * 1024 * 1024,
-   zlib::Algorithms compression_algorithm = zlib::kZlibDefault,
-   shash::Algorithms hash_algorithm = shash::kSha1,
-   shash::Suffix hash_suffix = shash::kSuffixNone,
-   bool may_have_chunks = true,
-   bool has_legacy_bulk_chunk = false
-  );
- ~FileItem();
- std::string path() { return path_; }
+ public:
+  explicit FileItem(
+    const std::string &p,
+    uint64_t min_chunk_size = 4 * 1024 * 1024,
+    uint64_t avg_chunk_size = 8 * 1024 * 1024,
+    uint64_t max_chunk_size = 16 * 1024 * 1024,
+    zlib::Algorithms compression_algorithm = zlib::kZlibDefault,
+    shash::Algorithms hash_algorithm = shash::kSha1,
+    shash::Suffix hash_suffix = shash::kSuffixNone,
+    bool may_have_chunks = true,
+    bool has_legacy_bulk_chunk = false
+   );
+  ~FileItem();
 
-private:
- struct Piece {
-   Piece() : offset(0) { }
-   shash::Any hash;
-   uint64_t offset;
- };
+  std::string path() { return path_; }
+  Xor32Detector *chunk_detector() { return &chunk_detector_; }
+  zlib::Algorithms compression_algorithm() { return compression_algorithm_; }
+  shash::Algorithms hash_algorithm() { return hash_algorithm_; }
+  shash::Suffix hash_suffix() { return hash_suffix_; }
+  bool may_have_chunks() { return may_have_chunks_; }
+  bool has_legacy_bulk_chunk() { return has_legacy_bulk_chunk_; }
 
- std::string path_;
- Xor32Detector chunk_detector_;
- zlib::Algorithms compression_algorithm_;
- shash::Algorithms hash_algorithm_;
- shash::Suffix hash_suffix_;
- bool may_have_chunks_;
- bool has_legacy_bulk_chunk_;
+ private:
+  struct Piece {
+    Piece() : offset(0) { }
+    shash::Any hash;
+    uint64_t offset;
+  };
 
- Piece bulk_chunk_;
- std::vector<Piece> chunks_;
- pthread_mutex_t *lock_;
+  const std::string path_;
+  const zlib::Algorithms compression_algorithm_;
+  const shash::Algorithms hash_algorithm_;
+  const shash::Suffix hash_suffix_;
+  const bool may_have_chunks_;
+  const bool has_legacy_bulk_chunk_;
+
+  Xor32Detector chunk_detector_;
+  Piece bulk_chunk_;
+  std::vector<Piece> chunks_;
+  pthread_mutex_t *lock_;
 };
 
 
@@ -69,16 +77,16 @@ private:
  */
 class ChunkItem : SingleCopy {
  public:
-  ChunkItem(FileItem *file_item, uint64_t offset)
-    : file_item_(file_item), offset_(offset) { }
+  ChunkItem(FileItem *file_item, uint64_t offset);
 
   bool IsValid() { return file_item_ != NULL; }
 
  private:
   FileItem *file_item_;
   uint64_t offset_;
-  zlib::Compressor *compressor_;
+  UniquePtr<zlib::Compressor> compressor_;
   shash::ContextPtr hash_ctx_;
+  UniquePtr<void> hash_ctx_buffer_;
 };
 
 
@@ -97,23 +105,25 @@ class BlockItem : SingleCopy {
 
   BlockItem();
   explicit BlockItem(uint64_t tag);
-  ~BlockItem();
   void MakeStop();
   void MakeData(uint32_t capacity);
   void MakeData(unsigned char *data, uint32_t size);
+  void SetFileItem(FileItem *item);
   void SetChunkItem(ChunkItem *item);
   // Forget pointer to the data
   void Discharge();
 
   uint32_t Write(void *buf, uint32_t count);
 
-  unsigned char *data() { return data_; }
+  unsigned char *data() { return data_.weak_ref(); }
   uint32_t capacity() { return capacity_; }
   uint32_t size() { return size_; }
   void set_size(uint32_t val) { assert(val <= capacity_); size_ = val; }
 
   BlockType type() { return type_; }
   int64_t tag() { return tag_; }
+  FileItem *file_item() { return file_item_; }
+  ChunkItem *chunk_item() { return chunk_item_; }
 
  private:
   BlockType type_;
@@ -129,12 +139,10 @@ class BlockItem : SingleCopy {
   /**
    * Can be set exactly once.
    */
+  FileItem *file_item_;
   ChunkItem *chunk_item_;
 
-  /**
-   * The data block is owned and freed on destruction.
-   */
-  unsigned char *data_;
+  UniquePtr<unsigned char> data_;
   uint32_t capacity_;
   uint32_t size_;
 };

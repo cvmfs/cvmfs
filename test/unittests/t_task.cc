@@ -11,6 +11,7 @@
 #include "ingestion/item.h"
 #include "ingestion/task.h"
 #include "ingestion/task_read.h"
+#include "ingestion/task_chunk.h"
 #include "smalloc.h"
 #include "util/posix.h"
 
@@ -129,6 +130,7 @@ TEST_F(T_Task, Read) {
   tube_in.Enqueue(&file_null);
   BlockItem *item_stop = tube_out->Pop();
   EXPECT_EQ(BlockItem::kBlockStop, item_stop->type());
+  EXPECT_EQ(&file_null, item_stop->file_item());
   delete item_stop;
 
   string str_abc = "abc";
@@ -168,6 +170,34 @@ TEST_F(T_Task, Read) {
   EXPECT_EQ(BlockItem::kBlockStop, item_stop->type());
   delete item_stop;
   unlink("./large");
+
+  task_group.Terminate();
+}
+
+
+TEST_F(T_Task, Chunk) {
+  Tube<BlockItem> tube_in;
+  Tube<BlockItem> *tube_out = new Tube<BlockItem>();
+  TubeGroup<BlockItem> tube_group_out;
+  tube_group_out.TakeTube(tube_out);
+  tube_group_out.Activate();
+
+  TubeConsumerGroup<BlockItem> task_group;
+  task_group.TakeConsumer(new TaskChunk(&tube_in, &tube_group_out));
+  task_group.Spawn();
+
+  FileItem file_null("/dev/null");
+  BlockItem *b1 = new BlockItem(0);
+  b1->SetFileItem(&file_null);
+  b1->MakeStop();
+  tube_in.Enqueue(b1);
+  BlockItem *item_stop = tube_out->Pop();
+  EXPECT_EQ(0U, tube_out->size());
+  EXPECT_EQ(BlockItem::kBlockStop, item_stop->type());
+  EXPECT_EQ(&file_null, item_stop->file_item());
+  EXPECT_EQ(2LL << 32, item_stop->tag());
+  delete item_stop->chunk_item();
+  delete item_stop;
 
   task_group.Terminate();
 }

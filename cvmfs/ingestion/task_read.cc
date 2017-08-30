@@ -40,6 +40,7 @@ void TaskRead::Process(FileItem *item) {
 
     // TODO(jblomer): block on a maximum number of bytes in flight
     BlockItem *block_item = new BlockItem(tag);
+    block_item->SetFileItem(item);
     if (nbytes == 0) {
       block_item->MakeStop();
     } else {
