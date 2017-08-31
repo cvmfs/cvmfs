@@ -79,11 +79,13 @@ class ChunkItem : SingleCopy {
  public:
   ChunkItem(FileItem *file_item, uint64_t offset);
 
-  bool IsValid() { return file_item_ != NULL; }
+  bool is_bulk_chunk() { return is_bulk_chunk_; }
+  void MakeBulkChunk() { is_bulk_chunk_ = true; }
 
  private:
   FileItem *file_item_;
   uint64_t offset_;
+  bool is_bulk_chunk_;
   UniquePtr<zlib::Compressor> compressor_;
   shash::ContextPtr hash_ctx_;
   UniquePtr<void> hash_ctx_buffer_;
@@ -94,6 +96,7 @@ class ChunkItem : SingleCopy {
  * A block is an item of work in the pipeline.  A sequence of data blocks
  * followed by a stop block constitutes a Chunk.  A sequence of Chunks in turn
  * build constitute a file.
+ * A block that carries data must have a non-zero-length payload.
  */
 class BlockItem : SingleCopy {
  public:
@@ -104,14 +107,18 @@ class BlockItem : SingleCopy {
   };
 
   BlockItem();
-  explicit BlockItem(uint64_t tag);
+  explicit BlockItem(int64_t tag);
+
   void MakeStop();
   void MakeData(uint32_t capacity);
   void MakeData(unsigned char *data, uint32_t size);
+  void MakeDataCopy(unsigned char *data, uint32_t size);
   void SetFileItem(FileItem *item);
   void SetChunkItem(ChunkItem *item);
   // Forget pointer to the data
   void Discharge();
+  // Free data and reset to hollow block
+  void Reset();
 
   uint32_t Write(void *buf, uint32_t count);
 

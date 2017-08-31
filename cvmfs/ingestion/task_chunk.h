@@ -22,15 +22,42 @@ class TaskChunk : public TubeConsumer<BlockItem> {
 
  private:
   /**
-   * State of a chunk under construction
+   * State of the chunk creation for a file
    */
   struct ChunkInfo {
-    ChunkInfo() : output_tag(-1), offset(-1) { }
-    ChunkInfo(int64_t tag, int64_t off) : output_tag(tag), offset(off) { }
-    int64_t output_tag;
-    int64_t offset;
+    ChunkInfo()
+      : offset(0)
+      , output_tag_chunk(-1)
+      , output_tag_bulk(-1)
+      , next_chunk(NULL)
+      , bulk_chunk(NULL)
+    { }
+    /**
+     * Sum of input block size of the file that has been processed so far
+     */
+    uint64_t offset;
+    /**
+     * Blocks of the current regular chunk get tagged consistently
+     */
+    int64_t output_tag_chunk;
+    /**
+     * Blocks of the corresponding bulk chunk get a unique tag
+     */
+    int64_t output_tag_bulk;
+    /**
+     * The current regular chunk that corresponds to the output block stream;
+     * may be NULL.
+     */
+    ChunkItem *next_chunk;
+    /**
+     * The whole file chunk attached to the file; may be NULL
+     */
+    ChunkItem *bulk_chunk;
   };
 
+  /**
+   * Maps input block tag (hence: file) to the state information on chunks.
+   */
   typedef std::map<int64_t, ChunkInfo> TagMap;
 
   /**

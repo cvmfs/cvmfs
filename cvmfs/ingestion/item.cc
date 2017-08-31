@@ -49,6 +49,7 @@ FileItem::~FileItem() {
 ChunkItem::ChunkItem(FileItem *file_item, uint64_t offset)
   : file_item_(file_item)
   , offset_(offset)
+  , is_bulk_chunk_(false)
   , compressor_(zlib::Compressor::Construct(file_item->compression_algorithm()))
 {
   hash_ctx_.algorithm = file_item->hash_algorithm();
@@ -72,7 +73,7 @@ BlockItem::BlockItem()
 { }
 
 
-BlockItem::BlockItem(uint64_t tag)
+BlockItem::BlockItem(int64_t tag)
   : type_(kBlockHollow)
   , tag_(tag)
   , file_item_(NULL)
@@ -80,7 +81,9 @@ BlockItem::BlockItem(uint64_t tag)
   , data_(NULL)
   , capacity_(0)
   , size_(0)
-{ }
+{
+  assert(tag_ >= 0);
+}
 
 
 void BlockItem::Discharge() {
@@ -97,6 +100,7 @@ void BlockItem::MakeStop() {
 
 void BlockItem::MakeData(uint32_t capacity) {
   assert(type_ == kBlockHollow);
+  assert(capacity > 0);
 
   type_ = kBlockData;
   capacity_ = capacity;
@@ -112,10 +116,37 @@ void BlockItem::MakeData(
   uint32_t size)
 {
   assert(type_ == kBlockHollow);
+  assert(size > 0);
 
   type_ = kBlockData;
   capacity_ = size_ = size;
   data_ = data;
+}
+
+
+/**
+ * Copy a piece of one block's data into a new block.
+ */
+void BlockItem::MakeDataCopy(
+  unsigned char *data,
+  uint32_t size)
+{
+  assert(type_ == kBlockHollow);
+  assert(size > 0);
+
+  type_ = kBlockData;
+  capacity_ = size_ = size;
+  data_ = reinterpret_cast<unsigned char *>(smalloc(capacity_));
+  memcpy(data_, data, size);
+}
+
+
+void BlockItem::Reset() {
+  assert(type_ == kBlockData);
+
+  data_.Destroy();
+  size_ = capacity_ = 0;
+  type_ = kBlockHollow;
 }
 
 

@@ -195,9 +195,14 @@ TEST_F(T_Task, Chunk) {
   EXPECT_EQ(0U, tube_out->size());
   EXPECT_EQ(BlockItem::kBlockStop, item_stop->type());
   EXPECT_EQ(&file_null, item_stop->file_item());
-  EXPECT_EQ(2LL << 32, item_stop->tag());
+  EXPECT_GE(2 << 28, item_stop->tag());
   delete item_stop->chunk_item();
   delete item_stop;
+
+  // TODO: more combinations
+  //BlockItem *b2 = new BlockItem(1);
+  //b2->SetFileItem(&file_null);
+  //BlockItem *b2 = new BlockItem(1);
 
   task_group.Terminate();
 }
