@@ -46,6 +46,7 @@ AuthzExternalFetcher::AuthzExternalFetcher(
   , pid_(-1)
   , fail_state_(false)
   , options_manager_(options_manager)
+  , next_start_(-1)
 {
   InitLock();
 }
@@ -60,6 +61,7 @@ AuthzExternalFetcher::AuthzExternalFetcher(
   , pid_(-1)
   , fail_state_(false)
   , options_manager_(NULL)
+  , next_start_(-1)
 {
   InitLock();
 }
@@ -77,12 +79,21 @@ AuthzExternalFetcher::~AuthzExternalFetcher() {
       "\"revision\":0}}");
   }
 
+  ReapHelper();
+}
+
+void AuthzExternalFetcher::ReapHelper() {
+  // If we are reaping the helper, we don't try to shut it down again.
+
   if (fd_send_ >= 0)
     close(fd_send_);
+  fd_send_ = -1;
   if (fd_recv_ >= 0)
     close(fd_recv_);
+  fd_recv_ = -1;
 
   if (pid_ > 0) {
+    int retval;
     uint64_t now = platform_monotonic_time();
     int statloc;
     do {
@@ -101,6 +112,7 @@ AuthzExternalFetcher::~AuthzExternalFetcher() {
         break;
       }
     } while (retval == 0);
+    pid_ = -1;
   }
 }
 
@@ -109,6 +121,9 @@ void AuthzExternalFetcher::EnterFailState() {
   LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug,
            "authz helper %s enters fail state, no more authorization",
            progname_.c_str());
+
+  ReapHelper();
+  next_start_ = platform_monotonic_time() + kChildTimeout;
   fail_state_ = true;
 }
 
@@ -179,8 +194,14 @@ AuthzStatus AuthzExternalFetcher::Fetch(
   *ttl = kDefaultTtl;
 
   MutexLockGuard lock_guard(lock_);
-  if (fail_state_)
-    return kAuthzNoHelper;
+  if (fail_state_) {
+    uint64_t now = platform_monotonic_time();
+    if (now > next_start_) {
+      fail_state_ = false;
+    } else {
+      return kAuthzNoHelper;
+    }
+  }
 
   bool retval;
 
