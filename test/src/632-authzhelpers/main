@@ -86,6 +86,23 @@ cvmfs_run_test() {
   secure_mount $mntpnt || return 70
   echo "Repo has open membership, this should work"
   sudo -u nobody /bin/sh -c "cat ${mntpnt}/hello_world" || return 71
+
+  echo "kill and restart secure mount"
+  local secure_mnt_pid=$(get_xattr pid $mntpnt)
+  echo "secure mount point has pid $secure_mnt_pid"
+  local authz_helper_pid=$(pgrep -P $secure_mnt_pid cvmfs_allow)
+  echo "authz helper has pid $authz_helper_pid; killing it."
+  sudo kill -SEGV $authz_helper_pid
+  echo "authz helper has died, access should fail"
+  sudo -u nobody setsid /bin/sh -c "cat ${mntpnt}/hello_world" && return 74
+  echo "Waiting for rate-limit timeout to pass"
+  sleep 11
+  echo "authz helper should be restarted on access"
+  sudo -u nobody setsid /bin/sh -c "cat ${mntpnt}/hello_world" || return 75
+  local authz_helper_pid_new=$(pgrep -P $secure_mnt_pid cvmfs_allow)
+  echo "new authz helper pid $authz_helper_pid_new"
+  [ "x$authz_helper_pid_new" = "x" ] && return 76
+  [ "x$authz_helper_pid" = "x$authz_helper_pid_new" ] && return 77
   
   echo "checking authz attribute"
   attr -l $mntpnt || return 72
