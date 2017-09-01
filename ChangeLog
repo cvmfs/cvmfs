@@ -3,6 +3,7 @@
   * Make `true` to be a valid boolean option
 
 2.4.2:
+  * Fix use of cached file catalog in cache plugins
   * Fix off-by-one error for chunk size when grafting files 
 
 2.4.1:
