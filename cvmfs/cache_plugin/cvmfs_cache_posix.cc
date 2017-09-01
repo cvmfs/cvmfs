@@ -76,7 +76,7 @@ map<uint64_t, Listing> listings;
 
 struct cvmcache_context *ctx;
 
-static int null_getpath(struct cvmcache_hash *id, string *urlpath) {
+static int posix_getpath(struct cvmcache_hash *id, string *urlpath) {
   shash::Digest<20, shash::kSha1> hash_calc(shash::kSha1, id->digest, shash::kSuffixNone);
   string suffix = hash_calc.MakePath();
 
@@ -86,7 +86,7 @@ static int null_getpath(struct cvmcache_hash *id, string *urlpath) {
   return CVMCACHE_STATUS_OK;
 }
 
-static int null_create_tmp(Object& partial_object, string *tmp_path) {
+static int posix_create_tmp(Object& partial_object, string *tmp_path) {
   char *char_path = tmpnam(const_cast<char*>(tmp_path->c_str()));
   string string_path(char_path);
   *tmp_path = string(g_directory) + char_path;
@@ -96,7 +96,7 @@ static int null_create_tmp(Object& partial_object, string *tmp_path) {
   return CVMCACHE_STATUS_OK;
 }
 
-static int null_assert_dir(string *dir_path) {
+static int posix_assert_dir(string *dir_path) {
   struct stat statbuffer;
   int rc = stat(dir_path->c_str(), &statbuffer);
   if (rc < 0 && errno != ENOENT) {
@@ -116,11 +116,11 @@ static int null_assert_dir(string *dir_path) {
   * Checks the validity of the hash and reference count associated with the
   * desired data.
   */
-static int null_chrefcnt(struct cvmcache_hash *id, int32_t change_by) {
+static int posix_chrefcnt(struct cvmcache_hash *id, int32_t change_by) {
   ComparableHash h(*id);
 
   string urlpath;
-  null_getpath(id, &urlpath);
+  posix_getpath(id, &urlpath);
 
   if (storage.find(h) == storage.end()) {
     Object obj;
@@ -159,7 +159,7 @@ static int null_chrefcnt(struct cvmcache_hash *id, int32_t change_by) {
   * Retrieves object information from the hash.
   * Implements the same "integrity" check as the previous function.
   */
-static int null_obj_info(
+static int posix_obj_info(
   struct cvmcache_hash *id,
   struct cvmcache_object_info *info)
 {
@@ -183,7 +183,7 @@ static int null_obj_info(
 
 
 // Copies the contents of the cache in the buffer (?)
-static int null_pread(struct cvmcache_hash *id,
+static int posix_pread(struct cvmcache_hash *id,
                     uint64_t offset,
                     uint32_t *size,
                     unsigned char *buffer)
@@ -212,7 +212,7 @@ static int null_pread(struct cvmcache_hash *id,
   * to be transferred to the cache. The transactions are then stored in an
   * array and identified by their id.
   */
-static int null_start_txn(
+static int posix_start_txn(
   struct cvmcache_hash *id,
   uint64_t txn_id,
   struct cvmcache_object_info *info)
@@ -246,7 +246,7 @@ static int null_start_txn(
   * Writes the content of the oject to be acquired in the general transactions
   * array.
   */
-static int null_write_txn(
+static int posix_write_txn(
   uint64_t txn_id,
   unsigned char *buffer,
   uint32_t size)
@@ -271,13 +271,13 @@ static int null_write_txn(
   * Tre transaction information is then erased from the general transactions
   * array and from the buffer.
   */
-static int null_commit_txn(uint64_t txn_id) {
+static int posix_commit_txn(uint64_t txn_id) {
   int flushed;
   int update_path;
   string urlpath;
   TxnInfo txn = transactions[txn_id];
   ComparableHash h(txn.id);
-  null_getpath(&(txn.partial_object.id), &urlpath);
+  posix_getpath(&(txn.partial_object.id), &urlpath);
   flushed = close(txn.partial_object.fd);
   if (flushed < 0)
     return -errno;
@@ -285,7 +285,7 @@ static int null_commit_txn(uint64_t txn_id) {
   if (pos == string::npos)
     return -EINVAL;
   string dir_path = urlpath.substr(0, pos);
-  int rc = null_assert_dir(&dir_path);
+  int rc = posix_assert_dir(&dir_path);
   if (rc < 0)
     return rc;
   update_path = rename(txn.path.c_str(), (&urlpath)->c_str());
@@ -303,7 +303,7 @@ static int null_commit_txn(uint64_t txn_id) {
 /**
   * Erases transaction information without committing it to memory.
   */
-static int null_abort_txn(uint64_t txn_id) {
+static int posix_abort_txn(uint64_t txn_id) {
   TxnInfo txn = transactions[txn_id];
   txn.partial_object.refcnt = 0;
   txn.partial_object.fd = close(txn.partial_object.fd);
@@ -317,7 +317,7 @@ static int null_abort_txn(uint64_t txn_id) {
   * Retrives informations regarding the cache, such as the number of pinned
   * bites.
   */
-static int null_info(struct cvmcache_info *info) {
+static int posix_info(struct cvmcache_info *info) {
   info->size_bytes = uint64_t(-1);
   info->used_bytes = info->pinned_bytes = 0;
   for (map<ComparableHash, Object>::const_iterator i = storage.begin(),
@@ -333,9 +333,9 @@ static int null_info(struct cvmcache_info *info) {
 }
 
 
-static int null_shrink(uint64_t shrink_to, uint64_t *used) {
+static int posix_shrink(uint64_t shrink_to, uint64_t *used) {
   struct cvmcache_info info;
-  null_info(&info);
+  posix_info(&info);
   *used = info.used_bytes;
   if (*used <= shrink_to)
     return CVMCACHE_STATUS_OK;
@@ -381,7 +381,7 @@ static int null_shrink(uint64_t shrink_to, uint64_t *used) {
   return CVMCACHE_STATUS_PARTIAL;
 }
 
-static int null_listing_begin(
+static int posix_listing_begin(
   uint64_t lst_id,
   enum cvmcache_object_type type)
 {
@@ -397,7 +397,7 @@ static int null_listing_begin(
   return CVMCACHE_STATUS_OK;
 }
 
-static int null_listing_next(
+static int posix_listing_next(
   int64_t listing_id,
   struct cvmcache_object_info *item)
 {
@@ -424,7 +424,7 @@ static int null_listing_next(
   return CVMCACHE_STATUS_OK;
 }
 
-static int null_listing_end(int64_t listing_id) {
+static int posix_listing_end(int64_t listing_id) {
   delete listings[listing_id].elems;
   listings.erase(listing_id);
   return CVMCACHE_STATUS_OK;
@@ -460,11 +460,11 @@ int main(int argc, char **argv) {
   }
 
   string g_str(g_directory);
-  int rc = null_assert_dir(&g_str);
+  int rc = posix_assert_dir(&g_str);
   if (rc < 0)
     return rc;
   g_str += "/txn";
-  rc = null_assert_dir(&g_str);
+  rc = posix_assert_dir(&g_str);
   if (rc < 0)
     return rc;
 
@@ -484,18 +484,18 @@ int main(int argc, char **argv) {
 
   struct cvmcache_callbacks callbacks;
   memset(&callbacks, 0, sizeof(callbacks));
-  callbacks.cvmcache_chrefcnt = null_chrefcnt;
-  callbacks.cvmcache_obj_info = null_obj_info;
-  callbacks.cvmcache_pread = null_pread;
-  callbacks.cvmcache_start_txn = null_start_txn;
-  callbacks.cvmcache_write_txn = null_write_txn;
-  callbacks.cvmcache_commit_txn = null_commit_txn;
-  callbacks.cvmcache_abort_txn = null_abort_txn;
-  callbacks.cvmcache_info = null_info;
-  callbacks.cvmcache_shrink = null_shrink;
-  callbacks.cvmcache_listing_begin = null_listing_begin;
-  callbacks.cvmcache_listing_next = null_listing_next;
-  callbacks.cvmcache_listing_end = null_listing_end;
+  callbacks.cvmcache_chrefcnt = posix_chrefcnt;
+  callbacks.cvmcache_obj_info = posix_obj_info;
+  callbacks.cvmcache_pread = posix_pread;
+  callbacks.cvmcache_start_txn = posix_start_txn;
+  callbacks.cvmcache_write_txn = posix_write_txn;
+  callbacks.cvmcache_commit_txn = posix_commit_txn;
+  callbacks.cvmcache_abort_txn = posix_abort_txn;
+  callbacks.cvmcache_info = posix_info;
+  callbacks.cvmcache_shrink = posix_shrink;
+  callbacks.cvmcache_listing_begin = posix_listing_begin;
+  callbacks.cvmcache_listing_next = posix_listing_next;
+  callbacks.cvmcache_listing_end = posix_listing_end;
   callbacks.capabilities = CVMCACHE_CAP_ALL_V1;
 
 
