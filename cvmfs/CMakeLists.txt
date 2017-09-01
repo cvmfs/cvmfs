@@ -149,6 +149,10 @@ set (CVMFS_CACHE_RAM_SOURCES
   util/string.cc
 )
 
+set (CVMFS_CACHE_POSIX_SOURCES
+  cache_plugin/cvmfs_cache_posix.cc
+)
+
 set (CVMFS_FSCK_SOURCES
   compression.cc
   cvmfs_fsck.cc
@@ -553,6 +557,15 @@ if (BUILD_LIBCVMFS_CACHE)
                         ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a
                         ${OPENSSL_LIBRARIES} ${RT_LIBRARY} pthread)
   add_dependencies(cvmfs_cache_ram libcvmfs_cache)
+
+  add_executable(cvmfs_cache_posix ${CVMFS_CACHE_POSIX_SOURCES})
+  set (CVMFS_CACHE_POSIX_CFLAGS "${CMAKE_CXX_FLAGS} -DDEBUGMSG")
+  set_target_properties (cvmfs_cache_posix PROPERTIES COMPILE_FLAGS
+                         "${CVMFS_CACHE_POSIX_CFLAGS}")
+  target_link_libraries(cvmfs_cache_posix
+                        ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a
+                        ${OPENSSL_LIBRARIES} ${RT_LIBRARY} pthread)
+  add_dependencies(cvmfs_cache_posix libcvmfs_cache)
 endif (BUILD_LIBCVMFS_CACHE)
 
 
@@ -756,6 +769,11 @@ if (BUILD_LIBCVMFS_CACHE)
   )
   install (
     TARGETS      cvmfs_cache_ram
+    RUNTIME
+    DESTINATION  ${CVMFS_LIBEXEC_DIR}/cache
+  )
+  install (
+    TARGETS      cvmfs_cache_posix
     RUNTIME
     DESTINATION  ${CVMFS_LIBEXEC_DIR}/cache
   )
