@@ -4,6 +4,8 @@
 
 #include "catalog_test_tools.h"
 
+#include <gtest/gtest.h>
+
 #include "catalog.h"
 #include "compression.h"
 #include "hash.h"
@@ -18,7 +20,6 @@ upload::Spooler* CreateSpooler(const std::string& config) {
   upload::SpoolerDefinition definition(config, shash::kSha1, zlib::kZlibDefault,
                                        false, true, 4194304, 8388608, 16777216,
                                        "dummy_token", "dummy_key");
-
   return upload::Spooler::Construct(definition);
 }
 
@@ -29,9 +30,8 @@ catalog::WritableCatalogManager* CreateInputCatalogMgr(
   UniquePtr<manifest::Manifest> manifest(
       catalog::WritableCatalogManager::CreateRepository(
           temp_dir, volatile_content, "", spooler));
-  if (spooler->GetNumberOfErrors() > 0) {
-    abort();
-  }
+  EXPECT_EQ(0, spooler->GetNumberOfErrors());
+
   return new catalog::WritableCatalogManager(manifest->catalog_hash(), stratum0,
                                              temp_dir, spooler, dl_mgr, false,
                                              0, 0, 0, stats, false, 0, 0);
@@ -46,42 +46,38 @@ CatalogTestTool::CatalogTestTool(const DirSpec& spec)
     : spec_(spec),
       old_spooler_(),
       new_spooler_(),
-      temp_dir_(),
       old_catalog_mgr_(),
       new_catalog_mgr_() {
-  InitDownloadManager(true);
+  EXPECT_TRUE(InitDownloadManager(true));
 
   shash::Any old_root_hash(shash::kSha1);
   shash::Any new_root_hash(shash::kSha1);
 
   const std::string sandbox_root = GetCurrentWorkingDirectory();
 
-  temp_dir_ = RaiiTempDir::Create(sandbox_root + "/catalog_test");
-
-  const std::string old_stratum0 = temp_dir_->dir() + "/old_stratum0";
+  const std::string old_stratum0 = sandbox_root + "/old_stratum0";
   MkdirDeep(old_stratum0 + "/data", 0777);
   MakeCacheDirectories(old_stratum0 + "/data", 0777);
-  const std::string old_cat_mgr_temp = old_stratum0 + "/data/txn";
+  const std::string old_temp_dir = old_stratum0 + "/data/txn";
 
-  const std::string new_stratum0 = temp_dir_->dir() + "/new_stratum0";
+  const std::string new_stratum0 = sandbox_root + "/new_stratum0";
   MkdirDeep(new_stratum0 + "/data", 0777);
   MakeCacheDirectories(new_stratum0 + "/data", 0777);
-  const std::string new_cat_mgr_temp = new_stratum0 + "/data/txn";
+  const std::string new_temp_dir = new_stratum0 + "/data/txn";
 
-  old_spooler_ = CreateSpooler("local," + old_cat_mgr_temp + "," + old_stratum0);
-  new_spooler_ = CreateSpooler("local," + new_cat_mgr_temp + "," + new_stratum0);
+  old_spooler_ = CreateSpooler("local," + old_temp_dir + "," + old_stratum0);
+  new_spooler_ = CreateSpooler("local," + new_temp_dir + "," + new_stratum0);
 
   old_catalog_mgr_ = CreateInputCatalogMgr(
-      "file://" + old_stratum0, old_cat_mgr_temp, false, old_spooler_.weak_ref(),
+      "file://" + old_stratum0, old_temp_dir, false, old_spooler_.weak_ref(),
       download_manager_.weak_ref(), &old_stats_);
 
   new_catalog_mgr_ = CreateInputCatalogMgr(
-      "file://" + new_stratum0, new_cat_mgr_temp, false, new_spooler_.weak_ref(),
+      "file://" + new_stratum0, new_temp_dir, false, new_spooler_.weak_ref(),
       download_manager_.weak_ref(), &new_stats_);
 
-
   old_catalog_mgr_->Init();
-  //new_catalog_mgr_->Init();
+  new_catalog_mgr_->Init();
 
   /*
   MockCatalog* root_catalog = catalog_mgr_->RetrieveRootCatalog();

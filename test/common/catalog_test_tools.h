@@ -13,7 +13,6 @@
 #include "server_tool.h"
 #include "statistics.h"
 #include "upload.h"
-#include "util/raii_temp_dir.h"
 #include "util/pointer.h"
 
 
@@ -50,8 +49,6 @@ class CatalogTestTool : public ServerTool {
 
   UniquePtr<upload::Spooler> old_spooler_;
   UniquePtr<upload::Spooler> new_spooler_;
-
-  UniquePtr<RaiiTempDir> temp_dir_;
 
   UniquePtr<catalog::WritableCatalogManager> old_catalog_mgr_;
   UniquePtr<catalog::WritableCatalogManager> new_catalog_mgr_;
