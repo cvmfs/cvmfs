@@ -37,13 +37,16 @@
 #include <cassert>
 #include <cstdio>
 #include <cstring>
+#include <map>
+#include <set>
 #include <string>
+#include <vector>
 
 #include "fs_traversal.h"
 #include "logging.h"
 #include "platform.h"
 
-using namespace std;  // NOLINT
+//using namespace std;  // NOLINT
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
@@ -55,7 +58,7 @@ static pthread_mutex_t getumask_mutex = PTHREAD_MUTEX_INITIALIZER;
 /**
  * Removes a trailing "/" from a path.
  */
-string MakeCanonicalPath(const string &path) {
+std::string MakeCanonicalPath(const std::string &path) {
   if (path.length() == 0) return path;
 
   if (path[path.length()-1] == '/')
@@ -89,9 +92,9 @@ void SplitPath(
 /**
  * Gets the directory part of a path.
  */
-string GetParentPath(const string &path) {
-  const string::size_type idx = path.find_last_of('/');
-  if (idx != string::npos)
+std::string GetParentPath(const std::string &path) {
+  const std::string::size_type idx = path.find_last_of('/');
+  if (idx != std::string::npos)
     return path.substr(0, idx);
   else
     return "";
@@ -119,9 +122,9 @@ PathString GetParentPath(const PathString &path) {
 /**
  * Gets the file name part of a path.
  */
-string GetFileName(const string &path) {
-  const string::size_type idx = path.find_last_of('/');
-  if (idx != string::npos)
+std::string GetFileName(const std::string &path) {
+  const std::string::size_type idx = path.find_last_of('/');
+  if (idx != std::string::npos)
     return path.substr(idx+1);
   else
     return path;
@@ -147,12 +150,12 @@ NameString GetFileName(const PathString &path) {
 }
 
 
-bool IsAbsolutePath(const string &path) {
+bool IsAbsolutePath(const std::string &path) {
   return (!path.empty() && path[0] == '/');
 }
 
 
-string GetAbsolutePath(const string &path) {
+std::string GetAbsolutePath(const std::string &path) {
   if (IsAbsolutePath(path))
     return path;
 
@@ -194,15 +197,15 @@ void CreateFile(
 /**
  * Symlinks /tmp/cvmfs.XYZ/l --> ParentPath(path) to make it shorter
  */
-static string MakeShortSocketLink(const string &path) {
+static std::string MakeShortSocketLink(const std::string &path) {
   struct sockaddr_un sock_addr;
   unsigned max_length = sizeof(sock_addr.sun_path);
 
-  string result;
-  string tmp_path = CreateTempDir("/tmp/cvmfs");
+  std::string result;
+  std::string tmp_path = CreateTempDir("/tmp/cvmfs");
   if (tmp_path.empty())
     return "";
-  string link = tmp_path + "/l";
+  std::string link = tmp_path + "/l";
   result = link + "/" + GetFileName(path);
   if (result.length() >= max_length) {
     rmdir(tmp_path.c_str());
@@ -216,8 +219,8 @@ static string MakeShortSocketLink(const string &path) {
   return result;
 }
 
-static void RemoveShortSocketLink(const string &short_path) {
-  string link = GetParentPath(short_path);
+static void RemoveShortSocketLink(const std::string &short_path) {
+  std::string link = GetParentPath(short_path);
   unlink(link.c_str());
   rmdir(GetParentPath(link).c_str());
 }
@@ -226,8 +229,8 @@ static void RemoveShortSocketLink(const string &short_path) {
 /**
  * Creates and binds to a named socket.
  */
-int MakeSocket(const string &path, const int mode) {
-  string short_path(path);
+int MakeSocket(const std::string &path, const int mode) {
+  std::string short_path(path);
   struct sockaddr_un sock_addr;
   if (path.length() >= sizeof(sock_addr.sun_path)) {
     // Socket paths are limited to 108 bytes (on some systems to 92 bytes),
@@ -322,8 +325,8 @@ int MakeTcpEndpoint(const std::string &ipv4_address, int portno) {
  *
  * \return socket file descriptor on success, -1 else
  */
-int ConnectSocket(const string &path) {
-  string short_path(path);
+int ConnectSocket(const std::string &path) {
+  std::string short_path(path);
   struct sockaddr_un sock_addr;
   if (path.length() >= sizeof(sock_addr.sun_path)) {
     // Socket paths are limited to 108 bytes (on some systems to 92 bytes),
@@ -466,7 +469,7 @@ void Block2Nonblock(int filedes) {
  * Drops the characters of string to a socket.  It doesn't matter
  * if the other side has hung up.
  */
-void SendMsg2Socket(const int fd, const string &msg) {
+void SendMsg2Socket(const int fd, const std::string &msg) {
   (void)send(fd, &msg[0], msg.length(), MSG_NOSIGNAL);
 }
 
@@ -516,7 +519,7 @@ bool SwitchCredentials(const uid_t uid, const gid_t gid,
 /**
  * Checks if the regular file path exists.
  */
-bool FileExists(const string &path) {
+bool FileExists(const std::string &path) {
   platform_stat64 info;
   return ((platform_lstat(path.c_str(), &info) == 0) &&
           S_ISREG(info.st_mode));
@@ -526,7 +529,7 @@ bool FileExists(const string &path) {
 /**
  * Returns -1 on failure.
  */
-int64_t GetFileSize(const string &path) {
+int64_t GetFileSize(const std::string &path) {
   platform_stat64 info;
   int retval = platform_stat(path.c_str(), &info);
   if (retval != 0)
@@ -548,7 +551,7 @@ bool DirectoryExists(const std::string &path) {
 /**
  * Checks if the symlink file path exists.
  */
-bool SymlinkExists(const string &path) {
+bool SymlinkExists(const std::string &path) {
   platform_stat64 info;
   return ((platform_lstat(path.c_str(), &info) == 0) &&
           S_ISLNK(info.st_mode));
@@ -607,10 +610,10 @@ bool MkdirDeep(
 /**
  * Creates the "hash cache" directory structure in path.
  */
-bool MakeCacheDirectories(const string &path, const mode_t mode) {
-  const string canonical_path = MakeCanonicalPath(path);
+bool MakeCacheDirectories(const std::string &path, const mode_t mode) {
+  const std::string canonical_path = MakeCanonicalPath(path);
 
-  string this_path = canonical_path + "/quarantaine";
+  std::string this_path = canonical_path + "/quarantaine";
   if (!MkdirDeep(this_path, mode, false)) return false;
 
   this_path = canonical_path + "/ff";
@@ -623,7 +626,7 @@ bool MakeCacheDirectories(const string &path, const mode_t mode) {
     for (int i = 0; i <= 0xff; i++) {
       char hex[4];
       snprintf(hex, sizeof(hex), "%02x", i);
-      this_path = canonical_path + "/" + string(hex);
+      this_path = canonical_path + "/" + std::string(hex);
       if (!MkdirDeep(this_path, mode, false))
         return false;
     }
@@ -730,8 +733,8 @@ void UnlockFile(const int filedes) {
 /**
  * Wrapper around mkstemp.
  */
-FILE *CreateTempFile(const string &path_prefix, const int mode,
-                     const char *open_flags, string *final_path)
+FILE *CreateTempFile(const std::string &path_prefix, const int mode,
+                     const char *open_flags, std::string *final_path)
 {
   *final_path = path_prefix + ".XXXXXX";
   char *tmp_file = strdupa(final_path->c_str());
@@ -759,8 +762,8 @@ FILE *CreateTempFile(const string &path_prefix, const int mode,
 /**
  * Create the file but don't open.  Use only in non-public tmp directories.
  */
-string CreateTempPath(const std::string &path_prefix, const int mode) {
-  string result;
+std::string CreateTempPath(const std::string &path_prefix, const int mode) {
+  std::string result;
   FILE *f = CreateTempFile(path_prefix, mode, "w", &result);
   if (!f)
     return "";
@@ -772,13 +775,13 @@ string CreateTempPath(const std::string &path_prefix, const int mode) {
 /**
  * Create a directory with a unique name.
  */
-string CreateTempDir(const std::string &path_prefix) {
-  string dir = path_prefix + ".XXXXXX";
+std::string CreateTempDir(const std::string &path_prefix) {
+  std::string dir = path_prefix + ".XXXXXX";
   char *tmp_dir = strdupa(dir.c_str());
   tmp_dir = mkdtemp(tmp_dir);
   if (tmp_dir == NULL)
     return "";
-  return string(tmp_dir);
+  return std::string(tmp_dir);
 }
 
 
@@ -800,12 +803,12 @@ class RemoveTreeHelper {
   RemoveTreeHelper() {
     success = true;
   }
-  void RemoveFile(const string &parent_path, const string &name) {
+  void RemoveFile(const std::string &parent_path, const std::string &name) {
     int retval = unlink((parent_path + "/" + name).c_str());
     if (retval != 0)
       success = false;
   }
-  void RemoveDir(const string &parent_path, const string &name) {
+  void RemoveDir(const std::string &parent_path, const std::string &name) {
     int retval = rmdir((parent_path + "/" + name).c_str());
     if (retval != 0)
       success = false;
@@ -816,7 +819,7 @@ class RemoveTreeHelper {
 /**
  * Does rm -rf on path.
  */
-bool RemoveTree(const string &path) {
+bool RemoveTree(const std::string &path) {
   platform_stat64 info;
   int retval = platform_lstat(path.c_str(), &info);
   if (retval != 0)
@@ -843,15 +846,15 @@ bool RemoveTree(const string &path) {
 /**
  * Returns ls $dir/GLOB$suffix
  */
-vector<string> FindFiles(const string &dir, const string &suffix) {
-  vector<string> result;
+std::vector<std::string> FindFiles(const std::string &dir, const std::string &suffix) {
+  std::vector<std::string> result;
   DIR *dirp = opendir(dir.c_str());
   if (!dirp)
     return result;
 
   platform_dirent64 *dirent;
   while ((dirent = platform_readdir(dirp))) {
-    const string name(dirent->d_name);
+    const std::string name(dirent->d_name);
     if ((name.length() >= suffix.length()) &&
         (name.substr(name.length()-suffix.length()) == suffix))
     {
@@ -868,18 +871,18 @@ vector<string> FindFiles(const string &dir, const string &suffix) {
  * Finds all direct subdirectories under parent_dir (except ., ..).  Used,
  * for instance, to parse /etc/cvmfs/repositories.d/<reponoame>
  */
-vector<string> FindDirectories(const string &parent_dir) {
-  vector<string> result;
+std::vector<std::string> FindDirectories(const std::string &parent_dir) {
+  std::vector<std::string> result;
   DIR *dirp = opendir(parent_dir.c_str());
   if (!dirp)
     return result;
 
   platform_dirent64 *dirent;
   while ((dirent = platform_readdir(dirp))) {
-    const string name(dirent->d_name);
+    const std::string name(dirent->d_name);
     if ((name == ".") || (name == ".."))
       continue;
-    const string path = parent_dir + "/" + name;
+    const std::string path = parent_dir + "/" + name;
 
     platform_stat64 info;
     int retval = platform_stat(path.c_str(), &info);
@@ -1099,15 +1102,15 @@ bool ExecuteBinary(
   MakePipe(pipe_stdout);
   MakePipe(pipe_stderr);
 
-  set<int> preserve_fildes;
+  std::set<int> preserve_fildes;
   preserve_fildes.insert(0);
   preserve_fildes.insert(1);
   preserve_fildes.insert(2);
-  map<int, int> map_fildes;
+  std::map<int, int> map_fildes;
   map_fildes[pipe_stdin[0]] = 0;  // Reading end of pipe_stdin
   map_fildes[pipe_stdout[1]] = 1;  // Writing end of pipe_stdout
   map_fildes[pipe_stderr[1]] = 2;  // Writing end of pipe_stderr
-  vector<string> cmd_line;
+  std::vector<std::string> cmd_line;
   cmd_line.push_back(binary_path);
   cmd_line.insert(cmd_line.end(), argv.begin(), argv.end());
 
@@ -1141,7 +1144,7 @@ bool ExecuteBinary(
 bool Shell(int *fd_stdin, int *fd_stdout, int *fd_stderr) {
   const bool double_fork = true;
   return ExecuteBinary(fd_stdin, fd_stdout, fd_stderr, "/bin/sh",
-                       vector<string>(), double_fork);
+                       std::vector<std::string>(), double_fork);
 }
 
 struct ForkFailures {  // TODO(rmeusel): C++11 (type safe enum)
@@ -1193,9 +1196,9 @@ struct ForkFailures {  // TODO(rmeusel): C++11 (type safe enum)
  * Using the optional parameter *pid it is possible to retrieve the process ID
  * of the spawned process.
  */
-bool ManagedExec(const vector<string>  &command_line,
-                 const set<int>        &preserve_fildes,
-                 const map<int, int>   &map_fildes,
+bool ManagedExec(const std::vector<std::string>  &command_line,
+                 const std::set<int>        &preserve_fildes,
+                 const std::map<int, int>   &map_fildes,
                  const bool             drop_credentials,
                  const bool             double_fork,
                        pid_t           *child_pid)
@@ -1217,7 +1220,7 @@ bool ManagedExec(const vector<string>  &command_line,
     argv[command_line.size()] = NULL;
 
     // Child, map file descriptors
-    for (map<int, int>::const_iterator i = map_fildes.begin(),
+    for (std::map<int, int>::const_iterator i = map_fildes.begin(),
          iEnd = map_fildes.end(); i != iEnd; ++i)
     {
       int retval = dup2(i->first, i->second);
@@ -1424,7 +1427,7 @@ bool SafeReadToString(int fd, std::string *final_result) {
   return true;
 }
 
-bool SafeWriteToFile(const string &content, const string &path, int mode) {
+bool SafeWriteToFile(const std::string &content, const std::string &path, int mode) {
   int fd = open(path.c_str(), O_WRONLY | O_CREAT, mode);
   if (fd < 0) return false;
   bool retval = SafeWrite(fd, content.data(), content.size());
