@@ -42,42 +42,29 @@ DirSpec::DirSpec(const DirSpecEntryList& entries) : entries_(entries) {}
 
 DirSpec::~DirSpec() {}
 
-CatalogTestTool::CatalogTestTool(const DirSpec& spec)
-    : spec_(spec),
-      old_spooler_(),
-      new_spooler_(),
-      old_catalog_mgr_(),
-      new_catalog_mgr_() {
+CatalogTestTool::CatalogTestTool(const std::string& name, const DirSpec& spec)
+    : name_(name),
+      spec_(spec),
+      spooler_(),
+      catalog_mgr_() {
   EXPECT_TRUE(InitDownloadManager(true));
 
-  shash::Any old_root_hash(shash::kSha1);
-  shash::Any new_root_hash(shash::kSha1);
+  shash::Any root_hash(shash::kSha1);
 
   const std::string sandbox_root = GetCurrentWorkingDirectory();
 
-  const std::string old_stratum0 = sandbox_root + "/old_stratum0";
-  MkdirDeep(old_stratum0 + "/data", 0777);
-  MakeCacheDirectories(old_stratum0 + "/data", 0777);
-  const std::string old_temp_dir = old_stratum0 + "/data/txn";
+  const std::string stratum0 = sandbox_root + "/" + name + "_stratum0";
+  MkdirDeep(stratum0 + "/data", 0777);
+  MakeCacheDirectories(stratum0 + "/data", 0777);
+  const std::string temp_dir = stratum0 + "/data/txn";
 
-  const std::string new_stratum0 = sandbox_root + "/new_stratum0";
-  MkdirDeep(new_stratum0 + "/data", 0777);
-  MakeCacheDirectories(new_stratum0 + "/data", 0777);
-  const std::string new_temp_dir = new_stratum0 + "/data/txn";
+  spooler_ = CreateSpooler("local," + temp_dir + "," + stratum0);
 
-  old_spooler_ = CreateSpooler("local," + old_temp_dir + "," + old_stratum0);
-  new_spooler_ = CreateSpooler("local," + new_temp_dir + "," + new_stratum0);
+  catalog_mgr_ = CreateInputCatalogMgr(
+      "file://" + stratum0, temp_dir, false, spooler_.weak_ref(),
+      download_manager(), &stats_);
 
-  old_catalog_mgr_ = CreateInputCatalogMgr(
-      "file://" + old_stratum0, old_temp_dir, false, old_spooler_.weak_ref(),
-      download_manager_.weak_ref(), &old_stats_);
-
-  new_catalog_mgr_ = CreateInputCatalogMgr(
-      "file://" + new_stratum0, new_temp_dir, false, new_spooler_.weak_ref(),
-      download_manager_.weak_ref(), &new_stats_);
-
-  old_catalog_mgr_->Init();
-  new_catalog_mgr_->Init();
+  catalog_mgr_->Init();
 
   /*
   MockCatalog* root_catalog = catalog_mgr_->RetrieveRootCatalog();

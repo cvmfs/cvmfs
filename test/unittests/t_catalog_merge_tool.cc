@@ -53,5 +53,5 @@ TEST_F(T_CatalogMergeTool, Basic) {
   entries.push_back(DirSpecEntry(empty_content, file_size, "/dir/dir", "dir"));
 
   DirSpec spec(entries);
-  CatalogTestTool tester(spec);
+  CatalogTestTool tester("old", spec);
 }

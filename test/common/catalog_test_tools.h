@@ -38,21 +38,19 @@ struct DirSpec {
 
 class CatalogTestTool : public ServerTool {
  public:
-  CatalogTestTool(const DirSpec& spec);
+  CatalogTestTool(const std::string& name,
+                  const DirSpec& spec);
   ~CatalogTestTool();
 
  private:
+  const std::string name_;
   DirSpec spec_;
 
-  perf::Statistics old_stats_;
-  perf::Statistics new_stats_;
+  perf::Statistics stats_;
 
-  UniquePtr<upload::Spooler> old_spooler_;
-  UniquePtr<upload::Spooler> new_spooler_;
+  UniquePtr<upload::Spooler> spooler_;
 
-  UniquePtr<catalog::WritableCatalogManager> old_catalog_mgr_;
-  UniquePtr<catalog::WritableCatalogManager> new_catalog_mgr_;
-
+  UniquePtr<catalog::WritableCatalogManager> catalog_mgr_;
 };
 
 #endif  //  CVMFS_CATALOG_TEST_TOOLS_H_
