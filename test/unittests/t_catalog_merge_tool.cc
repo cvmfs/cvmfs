@@ -54,6 +54,4 @@ TEST_F(T_CatalogMergeTool, Basic) {
 
   DirSpec spec(entries);
   CatalogTestTool tester(spec);
-
-  //MockCatalog* root_catalog = catalog_mgr_->RetrieveRootCatalog();
 }

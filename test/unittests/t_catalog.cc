@@ -45,7 +45,7 @@ class T_Catalog : public ::testing::Test {
     AddEntry(writable_root_catalog, "bar", "/dir/dir", S_IFREG,
              "448fa8e3d2b1a80d4f38727cd9a85eb2c0faf433");
     AddEntry(writable_root_catalog, "bar2", "/dir/dir", S_IFREG,
-             "1e12aecf3c6b0e9208cf5a22e3d5dec7edbd577e");
+             "1e12aecf3c6b0e9208cf5a22ecata3d5dec7edbd577e");
     AddEntry(writable_root_catalog, "link", "/dir/dir", S_IFLNK,
              "", "/foo");
 

@@ -55,6 +55,7 @@ set (CVMFS_QC_SOURCES
   ${CVMFS_SOURCE_DIR}/logging.cc
   ${CVMFS_SOURCE_DIR}/malloc_arena.cc
   ${CVMFS_SOURCE_DIR}/manifest.cc
+  ${CVMFS_SOURCE_DIR}/manifest_fetch.cc
   ${CVMFS_SOURCE_DIR}/monitor.cc
   ${CVMFS_SOURCE_DIR}/options.cc
   ${CVMFS_SOURCE_DIR}/pack.cc
@@ -66,7 +67,9 @@ set (CVMFS_QC_SOURCES
   ${CVMFS_SOURCE_DIR}/upload_s3.cc
   ${CVMFS_SOURCE_DIR}/upload_spooler_definition.cc
   ${CVMFS_SOURCE_DIR}/sanitizer.cc
+  ${CVMFS_SOURCE_DIR}/server_tool.cc
   ${CVMFS_SOURCE_DIR}/session_context.cc
+  ${CVMFS_SOURCE_DIR}/signature.cc
   ${CVMFS_SOURCE_DIR}/sql.cc
   ${CVMFS_SOURCE_DIR}/sqlitemem.cc
   ${CVMFS_SOURCE_DIR}/statistics.cc
@@ -77,8 +80,10 @@ set (CVMFS_QC_SOURCES
   ${CVMFS_SOURCE_DIR}/util/algorithm.cc
   ${CVMFS_SOURCE_DIR}/util/mmap_file.cc
   ${CVMFS_SOURCE_DIR}/util/posix.cc
+  ${CVMFS_SOURCE_DIR}/util/raii_temp_dir.cc
   ${CVMFS_SOURCE_DIR}/util/string.cc
   ${CVMFS_SOURCE_DIR}/util_concurrency.cc
+  ${CVMFS_SOURCE_DIR}/whitelist.cc
   ${CVMFS_SOURCE_DIR}/xattr.cc
   cache.pb.cc cache.pb.h
 )
