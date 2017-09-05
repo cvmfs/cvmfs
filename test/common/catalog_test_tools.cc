@@ -6,74 +6,104 @@
 
 #include <gtest/gtest.h>
 
-#include "catalog.h"
+#include "catalog_rw.h"
 #include "compression.h"
 #include "hash.h"
-#include "manifest.h"
-#include "receiver/params.h"
 #include "testutil.h"
 #include "util/posix.h"
 
-namespace {
+CatalogTestTool::CatalogTestTool(const std::string& name)
+    : name_(name), stats_(), manifest_(), spooler_(), history_() {}
 
-upload::Spooler* CreateSpooler(const std::string& config) {
+bool CatalogTestTool::Init() {
+  if (!InitDownloadManager(true)) {
+    return false;
+  }
+
+  const std::string sandbox_root = GetCurrentWorkingDirectory();
+
+  stratum0_ = sandbox_root + "/" + name_ + "_stratum0";
+  MkdirDeep(stratum0_ + "/data", 0777);
+  MakeCacheDirectories(stratum0_ + "/data", 0777);
+  temp_dir_ = stratum0_ + "/data/txn";
+
+  spooler_ = CreateSpooler("local," + temp_dir_ + "," + stratum0_);
+  if (!spooler_.IsValid()) {
+    return false;
+  }
+
+  manifest_ = CreateRepository(temp_dir_, spooler_);
+
+  if (!manifest_.IsValid()) {
+    return false;
+  }
+
+  return true;
+}
+
+bool CatalogTestTool::Update(const DirSpec& spec) {
+  UniquePtr<catalog::WritableCatalogManager> catalog_mgr(
+      CreateCatalogMgr(manifest_->catalog_hash(), "file://" + stratum0_,
+                       temp_dir_, spooler_, download_manager(), &stats_));
+
+  if (!catalog_mgr.IsValid()) {
+    return false;
+  }
+
+  for (size_t i = 0; i < spec.size(); ++i) {
+    const DirSpecItem& item = spec[i];
+    if (item.entry_.IsRegular()) {
+      catalog_mgr->AddFile(
+          static_cast<const catalog::DirectoryEntryBase&>(item.entry_),
+          item.xattrs_, item.parent_);
+    } else if (item.entry_.IsDirectory()) {
+      catalog_mgr->AddDirectory(
+          static_cast<const catalog::DirectoryEntryBase&>(item.entry_),
+          item.parent_);
+    }
+  }
+
+  history_.push_back(manifest_->catalog_hash());
+
+  if (!catalog_mgr->Commit(false, 0, manifest_)) {
+    return false;
+  }
+
+  history_.push_back(manifest_->catalog_hash());
+
+  return true;
+}
+
+CatalogTestTool::~CatalogTestTool() {}
+
+upload::Spooler* CatalogTestTool::CreateSpooler(const std::string& config) {
   upload::SpoolerDefinition definition(config, shash::kSha1, zlib::kZlibDefault,
                                        false, true, 4194304, 8388608, 16777216,
                                        "dummy_token", "dummy_key");
   return upload::Spooler::Construct(definition);
 }
 
-catalog::WritableCatalogManager* CreateInputCatalogMgr(
-    const std::string stratum0, const std::string& temp_dir,
-    const bool volatile_content, upload::Spooler* spooler,
-    download::DownloadManager* dl_mgr, perf::Statistics* stats) {
-  UniquePtr<manifest::Manifest> manifest(
-      catalog::WritableCatalogManager::CreateRepository(
-          temp_dir, volatile_content, "", spooler));
-  EXPECT_EQ(0, spooler->GetNumberOfErrors());
-
-  return new catalog::WritableCatalogManager(manifest->catalog_hash(), stratum0,
-                                             temp_dir, spooler, dl_mgr, false,
-                                             0, 0, 0, stats, false, 0, 0);
-}
-}
-
-DirSpec::DirSpec(const DirSpecEntryList& entries) : entries_(entries) {}
-
-DirSpec::~DirSpec() {}
-
-CatalogTestTool::CatalogTestTool(const std::string& name, const DirSpec& spec)
-    : name_(name),
-      spec_(spec),
-      spooler_(),
-      catalog_mgr_() {
-  EXPECT_TRUE(InitDownloadManager(true));
-
-  shash::Any root_hash(shash::kSha1);
-
-  const std::string sandbox_root = GetCurrentWorkingDirectory();
-
-  const std::string stratum0 = sandbox_root + "/" + name + "_stratum0";
-  MkdirDeep(stratum0 + "/data", 0777);
-  MakeCacheDirectories(stratum0 + "/data", 0777);
-  const std::string temp_dir = stratum0 + "/data/txn";
-
-  spooler_ = CreateSpooler("local," + temp_dir + "," + stratum0);
-
-  catalog_mgr_ = CreateInputCatalogMgr(
-      "file://" + stratum0, temp_dir, false, spooler_.weak_ref(),
-      download_manager(), &stats_);
-
-  catalog_mgr_->Init();
-
-  /*
-  MockCatalog* root_catalog = catalog_mgr_->RetrieveRootCatalog();
-  for (size_t i = 0; i < spec_.entries_.size(); ++i) {
-    const DirSpecEntry& entry = spec_.entries_[i];
-    root_catalog->AddFile(entry.hash_, entry.size_, entry.parent_,
-                         entry.name_);
+manifest::Manifest* CatalogTestTool::CreateRepository(
+    const std::string& dir, upload::Spooler* spooler) {
+  manifest::Manifest* manifest =
+      catalog::WritableCatalogManager::CreateRepository(dir, false, "",
+                                                        spooler);
+  if (spooler->GetNumberOfErrors() > 0) {
+    return NULL;
   }
-  */
+
+  return manifest;
 }
 
-CatalogTestTool::~CatalogTestTool() {}
+catalog::WritableCatalogManager* CatalogTestTool::CreateCatalogMgr(
+    const shash::Any& root_hash, const std::string stratum0,
+    const std::string& temp_dir, upload::Spooler* spooler,
+    download::DownloadManager* dl_mgr, perf::Statistics* stats) {
+  catalog::WritableCatalogManager* catalog_mgr =
+      new catalog::WritableCatalogManager(root_hash, stratum0, temp_dir,
+                                          spooler, dl_mgr, false, 0, 0, 0,
+                                          stats, false, 0, 0);
+  catalog_mgr->Init();
+
+  return catalog_mgr;
+}
