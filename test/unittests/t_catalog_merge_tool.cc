@@ -118,18 +118,18 @@ TEST_F(T_CatalogMergeTool, Basic) {
 
   manifest::Manifest original_manifest = *(tester.manifest());
 
-  EXPECT_TRUE(tester.Update(spec));
+  EXPECT_TRUE(tester.Apply("first", spec));
 
   UniquePtr<ServerTool> server_tool(new ServerTool());
   EXPECT_TRUE(server_tool->InitDownloadManager(true));
 
   receiver::Params params = MakeMergeToolParams("test");
 
-  std::vector<shash::Any> history = tester.history();
+  CatalogTestTool::History history = tester.history();
 
   receiver::CatalogMergeTool<catalog::WritableCatalogManager,
                              catalog::SimpleCatalogManager>
-      merge_tool(params.stratum0, history[0], history[1],
+      merge_tool(params.stratum0, history[0].second, history[1].second,
                  PathString(""), GetCurrentWorkingDirectory(),
                  server_tool->download_manager(),
                  &original_manifest);

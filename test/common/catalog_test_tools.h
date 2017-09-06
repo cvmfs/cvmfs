@@ -35,15 +35,17 @@ typedef std::vector<DirSpecItem> DirSpec;
 
 class CatalogTestTool : public ServerTool {
  public:
+  typedef std::vector<std::pair<std::string, shash::Any> > History;
+
   CatalogTestTool(const std::string& name);
   ~CatalogTestTool();
 
   bool Init();
-  bool Update(const DirSpec& spec);
+  bool Apply(const std::string& id, const DirSpec& spec);
 
   manifest::Manifest* manifest() { return manifest_.weak_ref(); }
 
-  std::vector<shash::Any> history() { return history_; }
+  History history() { return history_; }
 
  private:
   static upload::Spooler* CreateSpooler(const std::string& config);
@@ -64,7 +66,7 @@ class CatalogTestTool : public ServerTool {
   perf::Statistics stats_;
   UniquePtr<manifest::Manifest> manifest_;
   UniquePtr<upload::Spooler> spooler_;
-  std::vector<shash::Any> history_;
+  History history_;
 };
 
 #endif  //  CVMFS_CATALOG_TEST_TOOLS_H_

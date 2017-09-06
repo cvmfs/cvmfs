@@ -38,13 +38,18 @@ bool CatalogTestTool::Init() {
     return false;
   }
 
+  history_.clear();
+  history_.push_back(std::make_pair("initial", manifest_->catalog_hash()));
+
   return true;
 }
 
-bool CatalogTestTool::Update(const DirSpec& spec) {
+// Note: we always apply the dir spec to the revision corresponding to the original,
+//       empty repository.
+bool CatalogTestTool::Apply(const std::string& id, const DirSpec& spec) {
   UniquePtr<catalog::WritableCatalogManager> catalog_mgr(
-      CreateCatalogMgr(manifest_->catalog_hash(), "file://" + stratum0_,
-                       temp_dir_, spooler_, download_manager(), &stats_));
+    CreateCatalogMgr(history_.front().second, "file://" + stratum0_,
+                     temp_dir_, spooler_, download_manager(), &stats_));
 
   if (!catalog_mgr.IsValid()) {
     return false;
@@ -63,13 +68,11 @@ bool CatalogTestTool::Update(const DirSpec& spec) {
     }
   }
 
-  history_.push_back(manifest_->catalog_hash());
-
   if (!catalog_mgr->Commit(false, 0, manifest_)) {
     return false;
   }
 
-  history_.push_back(manifest_->catalog_hash());
+  history_.push_back(std::make_pair(id, manifest_->catalog_hash()));
 
   return true;
 }
