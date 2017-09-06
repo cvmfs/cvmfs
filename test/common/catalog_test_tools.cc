@@ -6,14 +6,66 @@
 
 #include <gtest/gtest.h>
 
+#include <sstream>
+
 #include "catalog_rw.h"
 #include "compression.h"
+#include "directory_entry.h"
 #include "hash.h"
 #include "testutil.h"
 #include "util/posix.h"
 
+namespace {
+
+bool ExportDirSpec(const std::string& path,
+                   catalog::WritableCatalogManager* mgr, DirSpec* spec) {
+  catalog::DirectoryEntryList listing;
+  if (!mgr->Listing(path, &listing)) {
+    return false;
+  }
+
+  for (size_t i = 0u; i < listing.size(); ++i) {
+    const catalog::DirectoryEntry& entry = listing[i];
+    const std::string entry_full_path = entry.GetFullPath(path);
+    XattrList xattrs;
+    if (entry.HasXattrs()) {
+      mgr->LookupXattrs(PathString(entry_full_path), &xattrs);
+    }
+    spec->push_back(DirSpecItem(entry, xattrs, path));
+    if (entry.IsDirectory()) {
+      if (!ExportDirSpec(entry_full_path, mgr, spec)) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
+}  // namespace
+
+void PrintDirSpecToString(const DirSpec& spec, std::string* out) {
+  std::ostringstream ostr;
+  for (size_t i = 0u; i < spec.size(); ++i) {
+    const DirSpecItem& item = spec[i];
+    char item_type = ' ';
+    if (item.entry_base().IsRegular()) {
+      item_type = 'F';
+    } else if (item.entry_base().IsDirectory()) {
+      item_type = 'D';
+    }
+    std::string parent = item.parent();
+    if (parent != "" && parent[0] != '/') {
+      parent.insert(0, 1, '/');
+    }
+
+    ostr << item_type << " " << item.entry_base().GetFullPath(parent).c_str() << std::endl;
+  }
+  *out = ostr.str();
+}
+
 CatalogTestTool::CatalogTestTool(const std::string& name)
-    : name_(name), stats_(), manifest_(), spooler_(), history_() {}
+    : name_(name), manifest_(), spooler_(), history_() {}
 
 bool CatalogTestTool::Init() {
   if (!InitDownloadManager(true)) {
@@ -44,12 +96,14 @@ bool CatalogTestTool::Init() {
   return true;
 }
 
-// Note: we always apply the dir spec to the revision corresponding to the original,
+// Note: we always apply the dir spec to the revision corresponding to the
+// original,
 //       empty repository.
 bool CatalogTestTool::Apply(const std::string& id, const DirSpec& spec) {
+  perf::Statistics stats;
   UniquePtr<catalog::WritableCatalogManager> catalog_mgr(
-    CreateCatalogMgr(history_.front().second, "file://" + stratum0_,
-                     temp_dir_, spooler_, download_manager(), &stats_));
+      CreateCatalogMgr(history_.front().second, "file://" + stratum0_,
+                       temp_dir_, spooler_, download_manager(), &stats));
 
   if (!catalog_mgr.IsValid()) {
     return false;
@@ -58,13 +112,9 @@ bool CatalogTestTool::Apply(const std::string& id, const DirSpec& spec) {
   for (size_t i = 0; i < spec.size(); ++i) {
     const DirSpecItem& item = spec[i];
     if (item.entry_.IsRegular()) {
-      catalog_mgr->AddFile(
-          static_cast<const catalog::DirectoryEntryBase&>(item.entry_),
-          item.xattrs_, item.parent_);
+      catalog_mgr->AddFile(item.entry_base(), item.xattrs(), item.parent());
     } else if (item.entry_.IsDirectory()) {
-      catalog_mgr->AddDirectory(
-          static_cast<const catalog::DirectoryEntryBase&>(item.entry_),
-          item.parent_);
+      catalog_mgr->AddDirectory(item.entry_base(), item.parent());
     }
   }
 
@@ -75,6 +125,20 @@ bool CatalogTestTool::Apply(const std::string& id, const DirSpec& spec) {
   history_.push_back(std::make_pair(id, manifest_->catalog_hash()));
 
   return true;
+}
+
+bool CatalogTestTool::DirSpecAtRootHash(const shash::Any& root_hash,
+                                        DirSpec* spec) {
+  perf::Statistics stats;
+  UniquePtr<catalog::WritableCatalogManager> catalog_mgr(
+      CreateCatalogMgr(root_hash, "file://" + stratum0_, temp_dir_, spooler_,
+                       download_manager(), &stats));
+
+  if (!catalog_mgr.IsValid()) {
+    return false;
+  }
+
+  return ExportDirSpec("", catalog_mgr.weak_ref(), spec);
 }
 
 CatalogTestTool::~CatalogTestTool() {}

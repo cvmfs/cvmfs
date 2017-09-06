@@ -34,24 +34,13 @@ DirSpec MakeBaseSpec() {
     spec.push_back(item);
   }
 
-  // adding "/file1"
+  // adding "/dir/file1"
   {
     hash =
         shash::Any(shash::kSha1,
                    reinterpret_cast<const unsigned char*>(hashes[0]), suffix);
     DirSpecItem item(catalog::DirectoryEntryTestFactory::RegularFile(
                          "file1", file_size, hash),
-                     XattrList(), "");
-    spec.push_back(item);
-  }
-
-  // adding "/dir/dir/file2"
-  {
-    hash =
-        shash::Any(shash::kSha1,
-                   reinterpret_cast<const unsigned char*>(hashes[1]), suffix);
-    DirSpecItem item(catalog::DirectoryEntryTestFactory::RegularFile(
-                         "file2", file_size, hash),
                      XattrList(), "dir");
     spec.push_back(item);
   }
@@ -68,10 +57,21 @@ DirSpec MakeBaseSpec() {
   {
     hash =
         shash::Any(shash::kSha1,
+                   reinterpret_cast<const unsigned char*>(hashes[1]), suffix);
+    DirSpecItem item(catalog::DirectoryEntryTestFactory::RegularFile(
+                         "file2", file_size, hash),
+                     XattrList(), "dir/dir");
+    spec.push_back(item);
+  }
+
+  // adding "/file3"
+  {
+    hash =
+        shash::Any(shash::kSha1,
                    reinterpret_cast<const unsigned char*>(hashes[2]), suffix);
     DirSpecItem item(catalog::DirectoryEntryTestFactory::RegularFile(
                          "file3", file_size, hash),
-                     XattrList(), "dir/dir");
+                     XattrList(), "");
     spec.push_back(item);
   }
 
@@ -109,16 +109,33 @@ receiver::Params MakeMergeToolParams(const std::string& name) {
 
 class T_CatalogMergeTool : public ::testing::Test {};
 
-TEST_F(T_CatalogMergeTool, Basic) {
-
-  DirSpec spec = MakeBaseSpec();
+TEST_F(T_CatalogMergeTool, BasicTwoCommits) {
+  DirSpec spec1 = MakeBaseSpec();
 
   CatalogTestTool tester("test");
   EXPECT_TRUE(tester.Init());
 
   manifest::Manifest original_manifest = *(tester.manifest());
 
-  EXPECT_TRUE(tester.Apply("first", spec));
+  EXPECT_TRUE(tester.Apply("first", spec1));
+
+  manifest::Manifest first_manifest = *(tester.manifest());
+
+  {
+    DirSpec spec2 = spec1;
+    // adding "/dir/dir/file4" to spec1
+
+    const size_t file_size = 4096;
+    shash::Any hash = shash::Any(
+        shash::kSha1, reinterpret_cast<const unsigned char*>(hashes[3]),
+        shash::kSha1);
+    DirSpecItem item(catalog::DirectoryEntryTestFactory::RegularFile(
+                         "file4", file_size, hash),
+                     XattrList(), "dir/dir");
+    spec2.push_back(item);
+
+    EXPECT_TRUE(tester.Apply("second", spec2));
+  }
 
   UniquePtr<ServerTool> server_tool(new ServerTool());
   EXPECT_TRUE(server_tool->InitDownloadManager(true));
@@ -129,12 +146,33 @@ TEST_F(T_CatalogMergeTool, Basic) {
 
   receiver::CatalogMergeTool<catalog::WritableCatalogManager,
                              catalog::SimpleCatalogManager>
-      merge_tool(params.stratum0, history[0].second, history[1].second,
+      merge_tool(params.stratum0, history[1].second, history[2].second,
                  PathString(""), GetCurrentWorkingDirectory(),
-                 server_tool->download_manager(),
-                 &original_manifest);
+                 server_tool->download_manager(), &first_manifest);
   EXPECT_TRUE(merge_tool.Init());
 
-  std::string new_manifest_path;
-  EXPECT_TRUE(merge_tool.Run(params, &new_manifest_path));
+  std::string output_manifest_path;
+  EXPECT_TRUE(merge_tool.Run(params, &output_manifest_path));
+
+  UniquePtr<manifest::Manifest> output_manifest(
+      manifest::Manifest::LoadFile(output_manifest_path));
+
+  EXPECT_TRUE(output_manifest.IsValid());
+
+  DirSpec output_spec;
+  EXPECT_TRUE(tester.DirSpecAtRootHash(output_manifest->catalog_hash(), &output_spec));
+
+  EXPECT_EQ(5u, spec1.size());
+  EXPECT_EQ(6u, output_spec.size());
+  EXPECT_EQ(0, strcmp("file4", output_spec[4].entry_base().name().c_str()));
+
+  /*
+  std::string spec_str1;
+  PrintDirSpecToString(spec1, &spec_str1);
+  std::string out_spec_str;
+  PrintDirSpecToString(output_spec, &out_spec_str);
+
+  LogCvmfs(kLogCvmfs, kLogStdout, "Spec1:\n%s", spec_str1.c_str());
+  LogCvmfs(kLogCvmfs, kLogStdout, "Output spec:\n%s", out_spec_str.c_str());
+  */
 }

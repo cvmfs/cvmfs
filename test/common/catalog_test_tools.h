@@ -24,6 +24,7 @@ struct DirSpecItem {
               const std::string& parent)
       : entry_(entry), xattrs_(xattrs), parent_(parent) {}
 
+
   const catalog::DirectoryEntryBase& entry_base() const {
     return static_cast<const catalog::DirectoryEntryBase&>(entry_);
   }
@@ -32,6 +33,8 @@ struct DirSpecItem {
 };
 
 typedef std::vector<DirSpecItem> DirSpec;
+
+void PrintDirSpecToString(const DirSpec& spec, std::string* out);
 
 class CatalogTestTool : public ServerTool {
  public:
@@ -42,6 +45,8 @@ class CatalogTestTool : public ServerTool {
 
   bool Init();
   bool Apply(const std::string& id, const DirSpec& spec);
+
+  bool DirSpecAtRootHash(const shash::Any& root_hash, DirSpec* spec);
 
   manifest::Manifest* manifest() { return manifest_.weak_ref(); }
 
@@ -63,7 +68,6 @@ class CatalogTestTool : public ServerTool {
   std::string stratum0_;
   std::string temp_dir_;
 
-  perf::Statistics stats_;
   UniquePtr<manifest::Manifest> manifest_;
   UniquePtr<upload::Spooler> spooler_;
   History history_;
