@@ -100,7 +100,7 @@ TEST_F(T_CatalogMergeTool, AddNewFile) {
   receiver::CatalogMergeTool<catalog::WritableCatalogManager,
                              catalog::SimpleCatalogManager>
       merge_tool(params.stratum0, history[1].second, history[2].second,
-                 PathString(""), GetCurrentWorkingDirectory(),
+                 PathString(""), GetCurrentWorkingDirectory() + "/merge_tool",
                  server_tool->download_manager(), &first_manifest);
   EXPECT_TRUE(merge_tool.Init());
 
@@ -168,7 +168,7 @@ TEST_F(T_CatalogMergeTool, EnlargeFile) {
   receiver::CatalogMergeTool<catalog::WritableCatalogManager,
                              catalog::SimpleCatalogManager>
       merge_tool(params.stratum0, history[1].second, history[2].second,
-                 PathString(""), GetCurrentWorkingDirectory(),
+                 PathString(""), GetCurrentWorkingDirectory() + "/merge_tool",
                  server_tool->download_manager(), &first_manifest);
   EXPECT_TRUE(merge_tool.Init());
 
@@ -218,7 +218,7 @@ TEST_F(T_CatalogMergeTool, RemoveDirWithFile) {
   receiver::CatalogMergeTool<catalog::WritableCatalogManager,
                              catalog::SimpleCatalogManager>
       merge_tool(params.stratum0, history[1].second, history[2].second,
-                 PathString(""), GetCurrentWorkingDirectory(),
+                 PathString(""), GetCurrentWorkingDirectory() + "/merge_tool",
                  server_tool->download_manager(), &first_manifest);
   EXPECT_TRUE(merge_tool.Init());
 
