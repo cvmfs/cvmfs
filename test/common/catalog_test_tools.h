@@ -32,9 +32,30 @@ struct DirSpecItem {
   const std::string& parent() const { return parent_; }
 };
 
-typedef std::vector<DirSpecItem> DirSpec;
+struct DirSpec {
+  void AddFile(const std::string& name,
+               const std::string& parent,
+               const std::string& digest,
+               const size_t size,
+               const XattrList& xattrs = XattrList(),
+               shash::Suffix suffix = shash::kSha1);
+  void AddDirectory(const std::string& name,
+                    const std::string& parent,
+                    const size_t size);
 
-void PrintDirSpecToString(const DirSpec& spec, std::string* out);
+  void AddDirectoryEntry(const catalog::DirectoryEntry& entry,
+                         const XattrList& xattrs,
+                         const std::string& parent);
+
+  void ToString(const DirSpec& spec, std::string* out);
+
+  size_t NumItems() const { return items_.size(); }
+
+  const DirSpecItem& Item(const size_t idx) const { return items_[idx]; }
+
+  std::vector<DirSpecItem> items_;
+};
+
 
 class CatalogTestTool : public ServerTool {
  public:

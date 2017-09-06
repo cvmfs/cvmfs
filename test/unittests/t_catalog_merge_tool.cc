@@ -22,58 +22,21 @@ DirSpec MakeBaseSpec() {
   DirSpec spec;
 
   const size_t file_size = 4096;
-  char suffix = shash::kSha1;
-  shash::Any hash;
-  const shash::Any empty_content;
 
   // adding "/dir"
-  {
-    DirSpecItem item(
-        catalog::DirectoryEntryTestFactory::Directory("dir", file_size),
-        XattrList(), "");
-    spec.push_back(item);
-  }
+  spec.AddDirectory("dir", "", file_size);
 
   // adding "/dir/file1"
-  {
-    hash =
-        shash::Any(shash::kSha1,
-                   reinterpret_cast<const unsigned char*>(hashes[0]), suffix);
-    DirSpecItem item(catalog::DirectoryEntryTestFactory::RegularFile(
-                         "file1", file_size, hash),
-                     XattrList(), "dir");
-    spec.push_back(item);
-  }
+  spec.AddFile("file1", "dir", hashes[0], file_size);
 
   // adding "/dir/dir"
-  {
-    DirSpecItem item(
-        catalog::DirectoryEntryTestFactory::Directory("dir", file_size),
-        XattrList(), "dir");
-    spec.push_back(item);
-  }
+  spec.AddDirectory("dir", "dir", file_size);
 
   // adding "/dir/dir/file2"
-  {
-    hash =
-        shash::Any(shash::kSha1,
-                   reinterpret_cast<const unsigned char*>(hashes[1]), suffix);
-    DirSpecItem item(catalog::DirectoryEntryTestFactory::RegularFile(
-                         "file2", file_size, hash),
-                     XattrList(), "dir/dir");
-    spec.push_back(item);
-  }
+  spec.AddFile("file2", "dir/dir", hashes[1], file_size);
 
   // adding "/file3"
-  {
-    hash =
-        shash::Any(shash::kSha1,
-                   reinterpret_cast<const unsigned char*>(hashes[2]), suffix);
-    DirSpecItem item(catalog::DirectoryEntryTestFactory::RegularFile(
-                         "file3", file_size, hash),
-                     XattrList(), "");
-    spec.push_back(item);
-  }
+  spec.AddFile("file3", "", hashes[2], file_size);
 
   return spec;
 }
@@ -123,16 +86,9 @@ TEST_F(T_CatalogMergeTool, BasicTwoCommits) {
 
   {
     DirSpec spec2 = spec1;
-    // adding "/dir/dir/file4" to spec1
 
-    const size_t file_size = 4096;
-    shash::Any hash = shash::Any(
-        shash::kSha1, reinterpret_cast<const unsigned char*>(hashes[3]),
-        shash::kSha1);
-    DirSpecItem item(catalog::DirectoryEntryTestFactory::RegularFile(
-                         "file4", file_size, hash),
-                     XattrList(), "dir/dir");
-    spec2.push_back(item);
+    // adding "/dir/dir/file4" to spec1
+    spec2.AddFile("file4", "dir/dir", hashes[3], 4096);
 
     EXPECT_TRUE(tester.Apply("second", spec2));
   }
@@ -162,9 +118,9 @@ TEST_F(T_CatalogMergeTool, BasicTwoCommits) {
   DirSpec output_spec;
   EXPECT_TRUE(tester.DirSpecAtRootHash(output_manifest->catalog_hash(), &output_spec));
 
-  EXPECT_EQ(5u, spec1.size());
-  EXPECT_EQ(6u, output_spec.size());
-  EXPECT_EQ(0, strcmp("file4", output_spec[4].entry_base().name().c_str()));
+  EXPECT_EQ(5u, spec1.NumItems());
+  EXPECT_EQ(6u, output_spec.NumItems());
+  EXPECT_EQ(0, strcmp("file4", output_spec.Item(4).entry_base().name().c_str()));
 
   /*
   std::string spec_str1;

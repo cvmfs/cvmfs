@@ -31,7 +31,7 @@ bool ExportDirSpec(const std::string& path,
     if (entry.HasXattrs()) {
       mgr->LookupXattrs(PathString(entry_full_path), &xattrs);
     }
-    spec->push_back(DirSpecItem(entry, xattrs, path));
+    spec->AddDirectoryEntry(entry, xattrs, path);
     if (entry.IsDirectory()) {
       if (!ExportDirSpec(entry_full_path, mgr, spec)) {
         return false;
@@ -44,10 +44,32 @@ bool ExportDirSpec(const std::string& path,
 
 }  // namespace
 
-void PrintDirSpecToString(const DirSpec& spec, std::string* out) {
+void DirSpec::AddFile(const std::string& name, const std::string& parent,
+                      const std::string& digest, const size_t size,
+                      const XattrList& xattrs, shash::Suffix suffix) {
+  shash::Any hash =
+        shash::Any(shash::kSha1,
+                   reinterpret_cast<const unsigned char*>(digest.c_str()), suffix);
+  items_.push_back(DirSpecItem(catalog::DirectoryEntryTestFactory::RegularFile(name, size, hash),
+                               xattrs, parent));
+}
+
+void DirSpec::AddDirectory(const std::string& name, const std::string& parent,
+                           const size_t size) {
+  items_.push_back(DirSpecItem(catalog::DirectoryEntryTestFactory::Directory(name, size),
+                               XattrList(), parent));
+}
+
+void DirSpec::AddDirectoryEntry(const catalog::DirectoryEntry& entry,
+                         const XattrList& xattrs,
+                                const std::string& parent) {
+  items_.push_back(DirSpecItem(entry, xattrs, parent));
+}
+
+void DirSpec::ToString(const DirSpec& spec, std::string* out) {
   std::ostringstream ostr;
-  for (size_t i = 0u; i < spec.size(); ++i) {
-    const DirSpecItem& item = spec[i];
+  for (size_t i = 0u; i < spec.NumItems(); ++i) {
+    const DirSpecItem& item = spec.Item(i);
     char item_type = ' ';
     if (item.entry_base().IsRegular()) {
       item_type = 'F';
@@ -59,7 +81,8 @@ void PrintDirSpecToString(const DirSpec& spec, std::string* out) {
       parent.insert(0, 1, '/');
     }
 
-    ostr << item_type << " " << item.entry_base().GetFullPath(parent).c_str() << std::endl;
+    ostr << item_type << " " << item.entry_base().GetFullPath(parent).c_str()
+         << std::endl;
   }
   *out = ostr.str();
 }
@@ -109,8 +132,8 @@ bool CatalogTestTool::Apply(const std::string& id, const DirSpec& spec) {
     return false;
   }
 
-  for (size_t i = 0; i < spec.size(); ++i) {
-    const DirSpecItem& item = spec[i];
+  for (size_t i = 0; i < spec.NumItems(); ++i) {
+    const DirSpecItem& item = spec.Item(i);
     if (item.entry_.IsRegular()) {
       catalog_mgr->AddFile(item.entry_base(), item.xattrs(), item.parent());
     } else if (item.entry_.IsDirectory()) {
