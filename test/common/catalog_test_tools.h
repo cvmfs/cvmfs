@@ -47,7 +47,7 @@ struct DirSpec {
                          const XattrList& xattrs,
                          const std::string& parent);
 
-  void ToString(const DirSpec& spec, std::string* out);
+  void ToString(std::string* out);
 
   size_t NumItems() const { return items_.size(); }
 

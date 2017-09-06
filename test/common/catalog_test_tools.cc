@@ -66,10 +66,10 @@ void DirSpec::AddDirectoryEntry(const catalog::DirectoryEntry& entry,
   items_.push_back(DirSpecItem(entry, xattrs, parent));
 }
 
-void DirSpec::ToString(const DirSpec& spec, std::string* out) {
+void DirSpec::ToString(std::string* out) {
   std::ostringstream ostr;
-  for (size_t i = 0u; i < spec.NumItems(); ++i) {
-    const DirSpecItem& item = spec.Item(i);
+  for (size_t i = 0u; i < NumItems(); ++i) {
+    const DirSpecItem& item = Item(i);
     char item_type = ' ';
     if (item.entry_base().IsRegular()) {
       item_type = 'F';

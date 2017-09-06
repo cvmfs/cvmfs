@@ -124,9 +124,9 @@ TEST_F(T_CatalogMergeTool, BasicTwoCommits) {
 
   /*
   std::string spec_str1;
-  PrintDirSpecToString(spec1, &spec_str1);
+  spec1.ToString(&spec_str1);
   std::string out_spec_str;
-  PrintDirSpecToString(output_spec, &out_spec_str);
+  output_spec.ToString(&out_spec_str);
 
   LogCvmfs(kLogCvmfs, kLogStdout, "Spec1:\n%s", spec_str1.c_str());
   LogCvmfs(kLogCvmfs, kLogStdout, "Output spec:\n%s", out_spec_str.c_str());
