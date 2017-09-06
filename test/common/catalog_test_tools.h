@@ -32,7 +32,8 @@ struct DirSpecItem {
   const std::string& parent() const { return parent_; }
 };
 
-struct DirSpec {
+class DirSpec {
+ public:
   void AddFile(const std::string& name,
                const std::string& parent,
                const std::string& digest,
@@ -53,6 +54,19 @@ struct DirSpec {
 
   const DirSpecItem& Item(const size_t idx) const { return items_[idx]; }
 
+  void SetItem(const DirSpecItem& item, const size_t idx) {
+    if (idx < NumItems()) {
+      items_[idx] = item;
+    }
+  }
+
+  void RemoveItem(const size_t idx) {
+    if (idx <NumItems()) {
+      items_.erase(items_.begin() + idx);
+    }
+  }
+
+ private:
   std::vector<DirSpecItem> items_;
 };
 
