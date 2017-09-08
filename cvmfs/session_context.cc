@@ -356,7 +356,7 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
 
   const bool ok = (reply == "{\"status\":\"ok\"}");
   if (!ok) {
-    LogCvmfs(kLogUploadGateway, kLogStdout,
+    LogCvmfs(kLogUploadGateway, kLogStderr,
              "SessionContext - curl_easy_perform reply: %s", reply.c_str());
   }
 
