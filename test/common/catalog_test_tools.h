@@ -66,6 +66,8 @@ class DirSpec {
     }
   }
 
+  void Sort();
+
  private:
   std::vector<DirSpecItem> items_;
 };

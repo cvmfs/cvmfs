@@ -87,6 +87,22 @@ void DirSpec::ToString(std::string* out) {
   *out = ostr.str();
 }
 
+static bool CompareFunction(const DirSpecItem& item1, const DirSpecItem& item2) {
+  std::string path1 = item1.entry_base().GetFullPath(item1.parent());
+  std::string path2 = item2.entry_base().GetFullPath(item2.parent());
+  if (path1[0] != '/') {
+    path1.insert(0, 1, '/');
+  }
+  if (path2[0] != '/') {
+    path2.insert(0, 1, '/');
+  }
+  return strcmp(path1.c_str(), path2.c_str()) < 0;
+}
+
+void DirSpec::Sort() {
+  std::sort(items_.begin(), items_.end(), CompareFunction);
+}
+
 CatalogTestTool::CatalogTestTool(const std::string& name)
     : name_(name), manifest_(), spooler_(), history_() {}
 
