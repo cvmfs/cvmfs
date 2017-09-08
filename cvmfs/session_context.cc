@@ -351,12 +351,14 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
   CURLcode ret = curl_easy_perform(h_curl);
   if (ret) {
         LogCvmfs(kLogUploadGateway, kLogStderr,
-                 "SessionContext: curl_easy_perform failed: %d", ret);
+                 "SessionContext - curl_easy_perform failed: %d", ret);
   }
 
   const bool ok = (reply == "{\"status\":\"ok\"}");
-  LogCvmfs(kLogUploadGateway, kLogStdout,
-           "SessionContext::DoUpload - reply: %s", reply.c_str());
+  if (!ok) {
+    LogCvmfs(kLogUploadGateway, kLogStdout,
+             "SessionContext - curl_easy_perform reply: %s", reply.c_str());
+  }
 
   curl_easy_cleanup(h_curl);
   h_curl = NULL;
