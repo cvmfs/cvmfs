@@ -108,7 +108,8 @@ void DiffTool::ReportAddition(const PathString &path,
     LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s +%" PRIu64, operation.c_str(),
              PrintEntryType(entry).c_str(), path.c_str(), entry.size());
   } else {
-    LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s +%" PRIu64 " bytes", path.c_str(), operation.c_str(),
+    LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s +%" PRIu64 " bytes", 
+             path.c_str(), operation.c_str(),
              PrintEntryType(entry).c_str(), entry.size());
   }
 }
@@ -120,7 +121,8 @@ void DiffTool::ReportRemoval(const PathString &path,
     LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s -%" PRIu64, operation.c_str(),
              PrintEntryType(entry).c_str(), path.c_str(), entry.size());
   } else {
-    LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s -%" PRIu64 " bytes", path.c_str(), operation.c_str(),
+    LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s -%" PRIu64 " bytes", 
+             path.c_str(), operation.c_str(),
              PrintEntryType(entry).c_str(), entry.size());
   }
 }
