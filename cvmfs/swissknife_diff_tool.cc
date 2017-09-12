@@ -105,11 +105,11 @@ void DiffTool::ReportAddition(const PathString &path,
                               const XattrList & /*xattrs*/) {
   string operation = machine_readable_ ? "A" : "add";
   if (machine_readable_) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s", operation.c_str(),
-             PrintEntryType(entry).c_str(), path.c_str());
+    LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s +%" PRIu64, operation.c_str(),
+             PrintEntryType(entry).c_str(), path.c_str(), entry.size());
   } else {
-    LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s", path.c_str(), operation.c_str(),
-             PrintEntryType(entry).c_str());
+    LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s +%" PRIu64 " bytes", path.c_str(), operation.c_str(),
+             PrintEntryType(entry).c_str(), entry.size());
   }
 }
 
@@ -117,11 +117,11 @@ void DiffTool::ReportRemoval(const PathString &path,
                              const catalog::DirectoryEntry &entry) {
   string operation = machine_readable_ ? "R" : "remove";
   if (machine_readable_) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s", operation.c_str(),
-             PrintEntryType(entry).c_str(), path.c_str());
+    LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s -%" PRIu64, operation.c_str(),
+             PrintEntryType(entry).c_str(), path.c_str(), entry.size());
   } else {
-    LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s", path.c_str(), operation.c_str(),
-             PrintEntryType(entry).c_str());
+    LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s -%" PRIu64 " bytes", path.c_str(), operation.c_str(),
+             PrintEntryType(entry).c_str(), entry.size());
   }
 }
 
