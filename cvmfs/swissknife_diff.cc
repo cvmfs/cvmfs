@@ -91,7 +91,7 @@ int swissknife::CommandDiff::Main(const swissknife::ArgumentList &args) {
   }
 
   DiffTool diff_tool(repository, tag_from, tag_to, tmp_dir, download_manager(),
-                     machine_readable, ignore_timediff);
+                     statistics(), machine_readable, ignore_timediff);
   if (!diff_tool.Init()) {
     return 1;
   }

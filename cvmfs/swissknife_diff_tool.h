@@ -12,6 +12,10 @@
 #include "history.h"
 #include "shortstring.h"
 
+namespace perf {
+class Statistics;
+}
+
 namespace swissknife {
 
 class DiffTool : public CatalogDiffTool<catalog::SimpleCatalogManager> {
@@ -19,6 +23,7 @@ class DiffTool : public CatalogDiffTool<catalog::SimpleCatalogManager> {
   DiffTool(const std::string &repo_path, const history::History::Tag &old_tag,
            const history::History::Tag &new_tag, const std::string &temp_dir,
            download::DownloadManager *download_manager,
+           perf::Statistics *statistics,
            bool machine_readable, bool ignore_timediff);
 
   virtual ~DiffTool();
@@ -45,6 +50,8 @@ class DiffTool : public CatalogDiffTool<catalog::SimpleCatalogManager> {
   history::History::Tag new_tag_;
   bool machine_readable_;
   bool ignore_timediff_;
+  perf::Counter *counter_total_added_;
+  perf::Counter *counter_total_removed_;
 };
 
 }  // namespace swissknife

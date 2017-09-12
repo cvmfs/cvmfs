@@ -72,6 +72,10 @@ typedef std::map<char, std::string *> ArgumentList;
 
 class Command : public ServerTool {
  public:
+  // TODO comment
+  static const char kGenericParam = '+';
+  static const char kGenericParamSeparator = ',';
+
   Command();
   virtual ~Command();
   virtual std::string GetName() const = 0;
