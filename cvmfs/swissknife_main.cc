@@ -160,7 +160,8 @@ int main(int argc, char **argv) {
     if (c == swissknife::Command::kGenericParam) {
       valid_option = true;
       vector<string> flags = SplitString(optarg,
-                                         swissknife::Command::kGenericParamSeparator);
+                                         swissknife::
+                                         Command::kGenericParamSeparator);
       for (unsigned i = 0; i < flags.size(); ++i) {
         if (flags[i] == "stats") {
           display_statistics = true;
@@ -187,7 +188,8 @@ int main(int argc, char **argv) {
   if (display_statistics) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Command statistics");
     LogCvmfs(kLogCvmfs, kLogStdout, "%s",
-             command->statistics()->PrintList(perf::Statistics::kPrintHeader).c_str());
+             command->statistics()
+             ->PrintList(perf::Statistics::kPrintHeader).c_str());
   }
 
   // delete the command list

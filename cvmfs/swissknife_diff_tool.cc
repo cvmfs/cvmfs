@@ -14,7 +14,6 @@
 
 #include "directory_entry.h"
 #include "download.h"
-#include "atomic.h"
 #include "statistics.h"
 
 namespace swissknife {
@@ -40,8 +39,8 @@ DiffTool::DiffTool(const std::string &repo_path,
     counter_total_added_ = statistics->Register("difftool.added_bytes",
                                                 "Total number of bytes added");
     counter_total_removed_ = statistics->Register("difftool.removed_bytes",
-                                                  "Total number of bytes removed");
-
+                                                  "Total number of bytes "
+                                                  "removed");
 }
 
 DiffTool::~DiffTool() {}
@@ -121,7 +120,7 @@ void DiffTool::ReportAddition(const PathString &path,
     LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s +%" PRIu64, operation.c_str(),
              PrintEntryType(entry).c_str(), path.c_str(), entry.size());
   } else {
-    LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s +%" PRIu64 " bytes", 
+    LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s +%" PRIu64 " bytes",
              path.c_str(), operation.c_str(),
              PrintEntryType(entry).c_str(), entry.size());
   }
@@ -129,7 +128,6 @@ void DiffTool::ReportAddition(const PathString &path,
 
 void DiffTool::ReportRemoval(const PathString &path,
                              const catalog::DirectoryEntry &entry) {
-
   // XXX careful we're casting silently from usint64 to int64 there...
   counter_total_removed_->Xadd(entry.size());
   string operation = machine_readable_ ? "R" : "remove";
@@ -137,7 +135,7 @@ void DiffTool::ReportRemoval(const PathString &path,
     LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s -%" PRIu64, operation.c_str(),
              PrintEntryType(entry).c_str(), path.c_str(), entry.size());
   } else {
-    LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s -%" PRIu64 " bytes", 
+    LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s -%" PRIu64 " bytes",
              path.c_str(), operation.c_str(),
              PrintEntryType(entry).c_str(), entry.size());
   }

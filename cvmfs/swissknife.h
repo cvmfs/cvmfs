@@ -72,7 +72,7 @@ typedef std::map<char, std::string *> ArgumentList;
 
 class Command : public ServerTool {
  public:
-  // TODO comment
+  // generic command parameters
   static const char kGenericParam = '+';
   static const char kGenericParamSeparator = ',';
 
