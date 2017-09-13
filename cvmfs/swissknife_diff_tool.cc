@@ -14,6 +14,7 @@
 
 #include "directory_entry.h"
 #include "download.h"
+#include "statistics.h"
 
 namespace swissknife {
 
@@ -22,6 +23,7 @@ DiffTool::DiffTool(const std::string &repo_path,
                    const history::History::Tag &new_tag,
                    const std::string &temp_dir,
                    download::DownloadManager *download_manager,
+                   perf::Statistics *statistics,
                    bool machine_readable,
                    bool ignore_timediff)
     : CatalogDiffTool<catalog::SimpleCatalogManager>(
@@ -31,7 +33,15 @@ DiffTool::DiffTool(const std::string &repo_path,
       new_tag_(new_tag),
       machine_readable_(machine_readable),
       ignore_timediff_(ignore_timediff)
-{ }
+{
+    // Created here but ownership goes to the Statistics class
+    // owned by the server tool.
+    counter_total_added_ = statistics->Register("difftool.added_bytes",
+                                                "Total number of bytes added");
+    counter_total_removed_ = statistics->Register("difftool.removed_bytes",
+                                                  "Total number of bytes "
+                                                  "removed");
+}
 
 DiffTool::~DiffTool() {}
 
@@ -103,25 +113,31 @@ void DiffTool::ReportHeader() {
 void DiffTool::ReportAddition(const PathString &path,
                               const catalog::DirectoryEntry &entry,
                               const XattrList & /*xattrs*/) {
+  // XXX careful we're casting silently from usint64 to int64 there...
+  counter_total_added_->Xadd(entry.size());
   string operation = machine_readable_ ? "A" : "add";
   if (machine_readable_) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s", operation.c_str(),
-             PrintEntryType(entry).c_str(), path.c_str());
+    LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s +%" PRIu64, operation.c_str(),
+             PrintEntryType(entry).c_str(), path.c_str(), entry.size());
   } else {
-    LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s", path.c_str(), operation.c_str(),
-             PrintEntryType(entry).c_str());
+    LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s +%" PRIu64 " bytes",
+             path.c_str(), operation.c_str(),
+             PrintEntryType(entry).c_str(), entry.size());
   }
 }
 
 void DiffTool::ReportRemoval(const PathString &path,
                              const catalog::DirectoryEntry &entry) {
+  // XXX careful we're casting silently from usint64 to int64 there...
+  counter_total_removed_->Xadd(entry.size());
   string operation = machine_readable_ ? "R" : "remove";
   if (machine_readable_) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s", operation.c_str(),
-             PrintEntryType(entry).c_str(), path.c_str());
+    LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s -%" PRIu64, operation.c_str(),
+             PrintEntryType(entry).c_str(), path.c_str(), entry.size());
   } else {
-    LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s", path.c_str(), operation.c_str(),
-             PrintEntryType(entry).c_str());
+    LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s -%" PRIu64 " bytes",
+             path.c_str(), operation.c_str(),
+             PrintEntryType(entry).c_str(), entry.size());
   }
 }
 

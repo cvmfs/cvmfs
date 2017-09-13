@@ -6,6 +6,8 @@
 
 #include "cvmfs_config.h"
 
+#include <cassert>
+
 #include "logging.h"
 #include "swissknife.h"
 
@@ -26,6 +28,7 @@
 #include "swissknife_sign.h"
 #include "swissknife_sync.h"
 #include "swissknife_zpipe.h"
+#include "util/string.h"
 
 
 using namespace std;  // NOLINT
@@ -124,6 +127,8 @@ int main(int argc, char **argv) {
     return 1;
   }
 
+  bool display_statistics = false;
+
   // parse the command line arguments for the Command
   swissknife::ArgumentList args;
   optind = 1;
@@ -134,11 +139,15 @@ int main(int argc, char **argv) {
     if (!params[j].switch_only())
       option_string.push_back(':');
   }
+  // Now adding the generic -+ extra option command
+  option_string.push_back(swissknife::Command::kGenericParam);
+  option_string.push_back(':');
   int c;
   while ((c = getopt(argc, argv, option_string.c_str())) != -1) {
     bool valid_option = false;
     for (unsigned j = 0; j < params.size(); ++j) {
       if (c == params[j].key()) {
+        assert(c != swissknife::Command::kGenericParam);
         valid_option = true;
         string *argument = NULL;
         if (!params[j].switch_only()) {
@@ -146,6 +155,17 @@ int main(int argc, char **argv) {
         }
         args[c] = argument;
         break;
+      }
+    }
+    if (c == swissknife::Command::kGenericParam) {
+      valid_option = true;
+      vector<string> flags = SplitString(optarg,
+                                         swissknife::
+                                         Command::kGenericParamSeparator);
+      for (unsigned i = 0; i < flags.size(); ++i) {
+        if (flags[i] == "stats") {
+          display_statistics = true;
+        }
       }
     }
     if (!valid_option) {
@@ -165,6 +185,12 @@ int main(int argc, char **argv) {
 
   // run the command
   const int retval = command->Main(args);
+  if (display_statistics) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "Command statistics");
+    LogCvmfs(kLogCvmfs, kLogStdout, "%s",
+             command->statistics()
+             ->PrintList(perf::Statistics::kPrintHeader).c_str());
+  }
 
   // delete the command list
         Commands::const_iterator i    = command_list.begin();
