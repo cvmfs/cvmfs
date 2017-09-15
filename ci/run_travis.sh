@@ -82,6 +82,7 @@ echo -n "RUNNING UNIT TESTS "
 if running_on_linux; then
   start_processing
   test/unittests/cvmfs_unittests --gtest_shuffle --gtest_filter="-*Slow:T_Dns.CaresResolverLocalhost:T_Dns.NormalResolverCombined:T_Dns.CaresResolverMany" > unittests.log 2>&1  || { UNITTESTS_FAILED=true; report_error "$(pwd)/unittests.log"; }
+  (cd cvmfs/webapi && python -m unittest test_cvmfs_geo) >> unittests.log 2>&1 || { UNITTESTS_FAILED=true; report_error "$(pwd)/unittests.log"; }
   stop_processing
   if ! $UNITTESTS_FAILED ; then
     echo "Done"

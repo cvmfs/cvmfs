@@ -16,6 +16,7 @@ etc/cvmfs/cvmfs_server_hooks.sh.demo
 var/www/wsgi-scripts/cvmfs-server/cvmfs-api.wsgi
 usr/share/cvmfs-server/webapi/cvmfs_api.py
 usr/share/cvmfs-server/webapi/cvmfs_geo.py
+usr/share/cvmfs-server/webapi/cvmfs_globals.py
 usr/share/cvmfs-server/webapi/GeoIP.so
 var/lib/cvmfs-server/geo/
 var/spool/cvmfs/README

@@ -6,11 +6,14 @@ import socket
 import cvmfs_api
 import time
 import threading
+import cvmfs_globals
 
-import GeoIP
-
-gi = GeoIP.open("/var/lib/cvmfs-server/geo/GeoLiteCity.dat", GeoIP.GEOIP_STANDARD)
-gi6 = GeoIP.open("/var/lib/cvmfs-server/geo/GeoLiteCityv6.dat", GeoIP.GEOIP_STANDARD)
+# TODO(jblomer): we should better sepearate the code that needs the GeoIP
+# dependency from the code that doesn't
+if not cvmfs_globals.CVMFS_UNITTESTS:
+    import GeoIP
+    gi = GeoIP.open("/var/lib/cvmfs-server/geo/GeoLiteCity.dat", GeoIP.GEOIP_STANDARD)
+    gi6 = GeoIP.open("/var/lib/cvmfs-server/geo/GeoLiteCityv6.dat", GeoIP.GEOIP_STANDARD)
 
 positive_expire_secs = 60*60  # 1 hour
 
@@ -30,31 +33,31 @@ def distance_on_unit_sphere(lat1, long1, lat2, long2):
     if (lat1 == lat2) and (long1 == long2):
         return 0.0
 
-    # Convert latitude and longitude to 
+    # Convert latitude and longitude to
     # spherical coordinates in radians.
     degrees_to_radians = math.pi/180.0
-        
+
     # phi = 90 - latitude
     phi1 = (90.0 - lat1)*degrees_to_radians
     phi2 = (90.0 - lat2)*degrees_to_radians
-        
+
     # theta = longitude
     theta1 = long1*degrees_to_radians
     theta2 = long2*degrees_to_radians
-        
+
     # Compute spherical distance from spherical coordinates.
-        
-    # For two locations in spherical coordinates 
+
+    # For two locations in spherical coordinates
     # (1, theta, phi) and (1, theta, phi)
-    # cosine( arc length ) = 
+    # cosine( arc length ) =
     #    sin phi sin phi' cos(theta-theta') + cos phi cos phi'
     # distance = rho * arc length
-    
-    cos = (math.sin(phi1)*math.sin(phi2)*math.cos(theta1 - theta2) + 
+
+    cos = (math.sin(phi1)*math.sin(phi2)*math.cos(theta1 - theta2) +
            math.cos(phi1)*math.cos(phi2))
     arc = math.acos( cos )
 
-    # Remember to multiply arc by the radius of the earth 
+    # Remember to multiply arc by the radius of the earth
     # in your favorite set of units to get length.
     return arc
 
@@ -175,10 +178,10 @@ def geosort_servers(now, gir_rem, servers):
 #   <path_info> is <caching_string>/<serverlist>
 #     <caching_string> can be anything to assist in ensuring that those
 #       clients wanting the same answer get responses cached together;
-#       typically the name of their shared proxy.  If this resolves to 
+#       typically the name of their shared proxy.  If this resolves to
 #       a valid IP address, attempt to use that address as the source
 #       IP rather than the address seen by the web server. The reason for
-#       that is so it isn't possible for someone to poison a cache by 
+#       that is so it isn't possible for someone to poison a cache by
 #       using a name for someone else's proxy.
 #     <serverlist> is a comma-separated list of N server names
 # response: a comma-separated list of numbers specifying the order of the N
