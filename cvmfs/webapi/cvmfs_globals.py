@@ -1,0 +1,1 @@
+CVMFS_UNITTESTS = False
