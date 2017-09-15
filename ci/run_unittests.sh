@@ -72,7 +72,7 @@ fi
 # run the Python unittests for the GeoAPI
 if [ "$CVMFS_GEOAPI_SOURCES" != "x" ]; then
   # TODO(jblomer): XML output
-  (cd $CVMFS_GEOAPI_SOURCES && python -m unittest test_cvmfs_geo)
+  (cd $CVMFS_GEOAPI_SOURCES && python test_cvmfs_geo.py)
 fi
 
 # run the cache plugin unittests
