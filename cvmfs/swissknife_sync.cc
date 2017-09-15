@@ -746,6 +746,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   }
 
   // finalize the spooler
+  LogCvmfs(kLogCvmfs, kLogStdout, "Wait for all uploads to finish");
   params.spooler->WaitForUpload();
   spooler_catalogs->WaitForUpload();
   params.spooler->FinalizeSession(false);
