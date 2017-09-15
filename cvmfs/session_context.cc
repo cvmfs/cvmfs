@@ -63,7 +63,7 @@ size_t RecvCB(void* buffer, size_t size, size_t nmemb, void* userp) {
 }
 
 SessionContextBase::SessionContextBase()
-    : upload_results_(1000, 1000),
+    : upload_results_(1000000, 1000000),
       api_url_(),
       session_token_(),
       key_id_(),
@@ -245,7 +245,7 @@ void SessionContextBase::Dispatch() {
 
 SessionContext::SessionContext()
     : SessionContextBase(),
-      upload_jobs_(1000, 900),
+      upload_jobs_(1000000, 1000000),
       worker_terminate_(),
       worker_() {}
 
