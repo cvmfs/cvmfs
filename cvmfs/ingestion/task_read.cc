@@ -11,6 +11,7 @@
 #include <cstring>
 
 #include "logging.h"
+#include "platform.h"
 #include "smalloc.h"
 #include "util/posix.h"
 
@@ -25,6 +26,19 @@ void TaskRead::Process(FileItem *item) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to open %s (%d)",
              item->path().c_str(), errno);
     abort();
+  }
+  platform_stat64 info;
+  int retval = platform_fstat(fd, &info);
+  if (retval != 0) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to fstat %s (%d)",
+             item->path().c_str(), errno);
+    abort();
+  }
+  item->set_size(info.st_size);
+
+  if (item->may_have_chunks()) {
+    item->set_may_have_chunks(
+      item->chunk_detector()->MightFindChunks(item->size()));
   }
 
   unsigned char *buffer[kBlockSize];

@@ -41,6 +41,7 @@ class FileItem : SingleCopy {
   ~FileItem();
 
   std::string path() { return path_; }
+  uint64_t size() { return size_; }
   Xor32Detector *chunk_detector() { return &chunk_detector_; }
   zlib::Algorithms compression_algorithm() { return compression_algorithm_; }
   shash::Algorithms hash_algorithm() { return hash_algorithm_; }
@@ -48,7 +49,12 @@ class FileItem : SingleCopy {
   bool may_have_chunks() { return may_have_chunks_; }
   bool has_legacy_bulk_chunk() { return has_legacy_bulk_chunk_; }
 
+  void set_size(uint64_t val) { size_ = val; }
+  void set_may_have_chunks(bool val) { may_have_chunks_ = val; }
+
  private:
+  static const uint64_t kSizeUnknown = uint64_t(-1);
+
   struct Piece {
     Piece() : offset(0) { }
     shash::Any hash;
@@ -59,8 +65,10 @@ class FileItem : SingleCopy {
   const zlib::Algorithms compression_algorithm_;
   const shash::Algorithms hash_algorithm_;
   const shash::Suffix hash_suffix_;
-  const bool may_have_chunks_;
   const bool has_legacy_bulk_chunk_;
+
+  uint64_t size_;
+  bool may_have_chunks_;
 
   Xor32Detector chunk_detector_;
   Piece bulk_chunk_;
@@ -81,6 +89,8 @@ class ChunkItem : SingleCopy {
 
   bool is_bulk_chunk() { return is_bulk_chunk_; }
   void MakeBulkChunk() { is_bulk_chunk_ = true; }
+
+  FileItem *file_item() { return file_item_; }
 
  private:
   FileItem *file_item_;

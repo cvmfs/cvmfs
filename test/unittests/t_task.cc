@@ -7,6 +7,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#include <cstring>
+
 #include "atomic.h"
 #include "ingestion/item.h"
 #include "ingestion/task.h"
@@ -127,8 +129,11 @@ TEST_F(T_Task, Read) {
   task_group.Spawn();
 
   FileItem file_null("/dev/null");
+  EXPECT_TRUE(file_null.may_have_chunks());
   tube_in.Enqueue(&file_null);
   BlockItem *item_stop = tube_out->Pop();
+  EXPECT_EQ(0U, file_null.size());
+  EXPECT_FALSE(file_null.may_have_chunks());
   EXPECT_EQ(BlockItem::kBlockStop, item_stop->type());
   EXPECT_EQ(&file_null, item_stop->file_item());
   delete item_stop;
@@ -138,6 +143,7 @@ TEST_F(T_Task, Read) {
   FileItem file_abc("./abc");
   tube_in.Enqueue(&file_abc);
   BlockItem *item_data = tube_out->Pop();
+  EXPECT_EQ(3U, file_abc.size());
   EXPECT_EQ(BlockItem::kBlockData, item_data->type());
   EXPECT_EQ(str_abc, string(reinterpret_cast<char *>(item_data->data()),
                             item_data->size()));
@@ -156,7 +162,8 @@ TEST_F(T_Task, Read) {
   }
   close(fd_tmp);
 
-  FileItem file_large("./large");
+  unsigned size = nblocks * TaskRead::kBlockSize;
+  FileItem file_large("./large", size - 1, size, size + 1);
   tube_in.Enqueue(&file_large);
   for (unsigned i = 0; i < nblocks; ++i) {
     item_data = tube_out->Pop();
@@ -166,10 +173,67 @@ TEST_F(T_Task, Read) {
                                               item_data->size()));
     delete item_data;
   }
+  EXPECT_EQ(size, file_large.size());
+  EXPECT_TRUE(file_large.may_have_chunks());
   item_stop = tube_out->Pop();
   EXPECT_EQ(BlockItem::kBlockStop, item_stop->type());
   delete item_stop;
   unlink("./large");
+
+  task_group.Terminate();
+}
+
+
+TEST_F(T_Task, ChunkDispatch) {
+  Tube<BlockItem> tube_in;
+  Tube<BlockItem> *tube_out = new Tube<BlockItem>();
+  TubeGroup<BlockItem> tube_group_out;
+  tube_group_out.TakeTube(tube_out);
+  tube_group_out.Activate();
+
+  TubeConsumerGroup<BlockItem> task_group;
+  task_group.TakeConsumer(new TaskChunk(&tube_in, &tube_group_out));
+  task_group.Spawn();
+
+  FileItem file_null("/dev/null");
+  BlockItem *b1 = new BlockItem(1);
+  b1->SetFileItem(&file_null);
+  b1->MakeStop();
+  tube_in.Enqueue(b1);
+  BlockItem *item_stop = tube_out->Pop();
+  EXPECT_EQ(0U, tube_out->size());
+  EXPECT_EQ(BlockItem::kBlockStop, item_stop->type());
+  EXPECT_GE(2 << 28, item_stop->tag());
+  EXPECT_EQ(&file_null, item_stop->file_item());
+  EXPECT_EQ(&file_null, item_stop->chunk_item()->file_item());
+  EXPECT_FALSE(item_stop->chunk_item()->is_bulk_chunk());
+  delete item_stop->chunk_item();
+  delete item_stop;
+
+  file_null.set_may_have_chunks(false);
+  BlockItem *b2 = new BlockItem(2);
+  b2->SetFileItem(&file_null);
+  b2->MakeStop();
+  tube_in.Enqueue(b2);
+  item_stop = tube_out->Pop();
+  EXPECT_TRUE(item_stop->chunk_item()->is_bulk_chunk());
+  delete item_stop->chunk_item();
+  delete item_stop;
+
+  FileItem file_null_legacy("/dev/null", 1024, 2048, 4096,
+    zlib::kZlibDefault, shash::kSha1, shash::kSuffixNone, true, true);
+  BlockItem *b3 = new BlockItem(3);
+  b3->SetFileItem(&file_null_legacy);
+  b3->MakeStop();
+  tube_in.Enqueue(b3);
+  BlockItem *item_stop_chunk = tube_out->Pop();
+  EXPECT_FALSE(item_stop_chunk->chunk_item()->is_bulk_chunk());
+  delete item_stop_chunk->chunk_item();
+  delete item_stop_chunk;
+  BlockItem *item_stop_bulk = tube_out->Pop();
+  EXPECT_TRUE(item_stop_bulk->chunk_item()->is_bulk_chunk());
+  delete item_stop_bulk->chunk_item();
+  delete item_stop_bulk;
 
   task_group.Terminate();
 }
@@ -186,23 +250,35 @@ TEST_F(T_Task, Chunk) {
   task_group.TakeConsumer(new TaskChunk(&tube_in, &tube_group_out));
   task_group.Spawn();
 
-  FileItem file_null("/dev/null");
-  BlockItem *b1 = new BlockItem(0);
-  b1->SetFileItem(&file_null);
-  b1->MakeStop();
-  tube_in.Enqueue(b1);
-  BlockItem *item_stop = tube_out->Pop();
-  EXPECT_EQ(0U, tube_out->size());
-  EXPECT_EQ(BlockItem::kBlockStop, item_stop->type());
-  EXPECT_EQ(&file_null, item_stop->file_item());
-  EXPECT_GE(2 << 28, item_stop->tag());
-  delete item_stop->chunk_item();
-  delete item_stop;
+  unsigned nblocks = 10;
+  unsigned size = nblocks * TaskRead::kBlockSize;
+  FileItem file_large("./large", size / 8, size / 4, size / 2,
+    zlib::kZlibDefault, shash::kSha1, shash::kSuffixNone,
+    true, true);
+  for (unsigned i = 0; i < nblocks; ++i) {
+    BlockItem *b = new BlockItem(1);
+    b->SetFileItem(&file_large);
+    b->MakeData(reinterpret_cast<unsigned char *>(
+                  strdup(string(TaskRead::kBlockSize, i).c_str())),
+                TaskRead::kBlockSize);
+    tube_in.Enqueue(b);
+  }
+  BlockItem *b_stop = new BlockItem(1);
+  b_stop->SetFileItem(&file_large);
+  b_stop->MakeStop();
+  tube_in.Enqueue(b_stop);
 
-  // TODO: more combinations
-  //BlockItem *b2 = new BlockItem(1);
-  //b2->SetFileItem(&file_null);
-  //BlockItem *b2 = new BlockItem(1);
+  /*for (unsigned i = 0; i < nblocks; ++i) {
+    BlockItem *b_chunk = tube_out->Pop();
+    EXPECT_FALSE(b_chunk->chunk_item()->is_bulk_chunk());
+    delete b_chunk->chunk_item();
+    delete b_chunk;
+    BlockItem *b_bulk = tube_out->Pop();
+    EXPECT_TRUE(b_bulk->chunk_item()->is_bulk_chunk());
+    delete b_bulk->chunk_item();
+    delete b_bulk;
+  }*/
 
+  unlink("./large");
   task_group.Terminate();
 }

@@ -28,7 +28,9 @@ void TaskChunk::Process(BlockItem *input_block) {
   // Do we see blocks of the file for the first time?
   TagMap::const_iterator iter_find = tag_map_.find(input_tag);
   if (iter_find == tag_map_.end()) {
-    // We may have only regular chunks, only a bulk chunk, or both
+    // We may have only regular chunks, only a bulk chunk, or both.  We may
+    // end up in a situation where we produced only a single non-bulk chunk.
+    // This needs to be fixed up by the write task later in the pipeline.
     if (file_item->may_have_chunks()) {
       chunk_info.next_chunk = new ChunkItem(file_item, 0);
       chunk_info.output_tag_chunk = atomic_xadd64(&tag_seq_, 1);
@@ -89,6 +91,7 @@ void TaskChunk::Process(BlockItem *input_block) {
           assert(cut_mark >= chunk_info.offset);
           uint64_t cut_mark_in_block = cut_mark - chunk_info.offset;
           assert(cut_mark_in_block >= offset_in_block);
+          assert(cut_mark_in_block < input_block->size());
           unsigned tail_size = cut_mark_in_block - offset_in_block;
 
           if (tail_size > 0) {
@@ -98,6 +101,7 @@ void TaskChunk::Process(BlockItem *input_block) {
             block_tail->MakeDataCopy(input_block->data() + offset_in_block,
                                      tail_size);
             tubes_out_->Dispatch(block_tail);
+            chunk_info.offset += tail_size;
           }
 
           BlockItem *block_stop = new BlockItem(chunk_info.output_tag_chunk);
@@ -111,26 +115,22 @@ void TaskChunk::Process(BlockItem *input_block) {
           offset_in_block = cut_mark_in_block;
         }
 
-        if (offset_in_block == 0) {
-          // Zero-copy
-          output_block_bulk->MakeData(input_block->data(), input_block->size());
-        } else {
-          assert(input_block->size() >= offset_in_block);
-          unsigned tail_size = input_block->size() - offset_in_block;
-          if (tail_size > 0) {
-            BlockItem *block_tail = new BlockItem(chunk_info.output_tag_chunk);
-            block_tail->SetFileItem(file_item);
-            block_tail->SetChunkItem(chunk_info.next_chunk);
-            block_tail->MakeDataCopy(input_block->data() + offset_in_block,
-                                     tail_size);
-            tubes_out_->Dispatch(block_tail);
-          }
-          // Delete data from incoming block
-          input_block->Reset();
+        assert(input_block->size() >= offset_in_block);
+        unsigned tail_size = input_block->size() - offset_in_block;
+        if (tail_size > 0) {
+          BlockItem *block_tail = new BlockItem(chunk_info.output_tag_chunk);
+          block_tail->SetFileItem(file_item);
+          block_tail->SetChunkItem(chunk_info.next_chunk);
+          block_tail->MakeDataCopy(input_block->data() + offset_in_block,
+                                   tail_size);
+          tubes_out_->Dispatch(block_tail);
+          chunk_info.offset += tail_size;
         }
+
+        // Delete data from incoming block
+        input_block->Reset();
       }
 
-      chunk_info.offset += input_block->size();
       tag_map_[input_tag] = chunk_info;
       input_block->Discharge();
       break;

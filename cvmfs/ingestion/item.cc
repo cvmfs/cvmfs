@@ -27,8 +27,9 @@ FileItem::FileItem(
   , compression_algorithm_(compression_algorithm)
   , hash_algorithm_(hash_algorithm)
   , hash_suffix_(hash_suffix)
-  , may_have_chunks_(may_have_chunks)
   , has_legacy_bulk_chunk_(has_legacy_bulk_chunk)
+  , size_(kSizeUnknown)
+  , may_have_chunks_(may_have_chunks)
   , chunk_detector_(min_chunk_size, avg_chunk_size, max_chunk_size)
 {
   lock_ = reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
