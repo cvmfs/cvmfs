@@ -3,10 +3,10 @@ Maintainer: Jakob Blomer <jblomer@cern.ch>
 Section: utils
 Priority: extra
 Standards-Version: 3.9.3.1
-Depends: lsb-release
 Build-Depends: debhelper (>= 9), make
 Homepage: http://cernvm.cern.ch/portal/filesystem
 
 Package: cvmfs-release
-Architecture: all 
+Architecture: all
+Depends: lsb-release
 Description: This package contains the apt configuration for the CernVM File System packages.
