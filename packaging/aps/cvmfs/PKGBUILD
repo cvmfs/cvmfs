@@ -79,7 +79,7 @@ _remove_server() {
   rm -rf "$pkgdir/usr/share/cvmfs-server" "$pkgdir/var/lib/cvmfs-server" \
     "$pkgdir/var/www" "$pkgdir/var/spool"
   for server_bin in cvmfs_server cvmfs_swissknife cvmfs_swissknife_debug \
-    cvmfs_suid_helper cvmfs_rsync
+    cvmfs_suid_helper cvmfs_rsync cvmfs_stratum_agent
   do
     rm -f "$pkgdir/usr/bin/$server_bin"
   done
