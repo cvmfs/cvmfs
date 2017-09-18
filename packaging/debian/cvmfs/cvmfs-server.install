@@ -18,6 +18,6 @@ var/www/wsgi-scripts/cvmfs-api.wsgi
 usr/share/cvmfs-server/webapi/cvmfs_api.py
 usr/share/cvmfs-server/webapi/cvmfs_geo.py
 usr/share/cvmfs-server/webapi/GeoIP.so
-usr/share/cvmfs-server/stratum_agent/cvmfs_stratum_agent.service
+usr/share/cvmfs-server/agent/cvmfs_stratum_agent.service
 var/lib/cvmfs-server/geo/
 var/spool/cvmfs/README
