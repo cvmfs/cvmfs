@@ -780,7 +780,6 @@ if (BUILD_SERVER)
 
   install(
     FILES        stratum_agent/cvmfs_stratum_agent.service
-    RUNTIME
     DESTINATION  "/usr/share/cvmfs-server/agent"
     PERMISSIONS  OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
