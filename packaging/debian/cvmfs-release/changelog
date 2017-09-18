@@ -1,6 +1,6 @@
 cvmfs-release (2.0-2) lucid; urgency=low
 
-  * Add lsb-release dependency
+  * Fix package control file
 
  -- Jakob Blomer <jblomer@cern.ch>  Mon, 18 September 2017 12:00:00 +0000
 
