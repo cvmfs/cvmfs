@@ -152,7 +152,12 @@ bool SessionContextBase::Finalize(bool commit, const std::string& old_root_hash,
     if (old_root_hash.empty() || new_root_hash.empty()) {
       return false;
     }
-    results &= Commit(old_root_hash, new_root_hash);
+    bool commit_result = Commit(old_root_hash, new_root_hash);
+    if (!commit_result) {
+      LogCvmfs(kLogUploadGateway, kLogStderr,
+               "SessionContext: could not commit session. Aborting.");
+      abort();
+    }
   }
 
   results &= FinalizeDerived() && (bytes_committed_ == bytes_dispatched_);
