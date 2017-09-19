@@ -300,7 +300,7 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
   serializer.GetDigest(&payload_digest);
   const std::string json_msg =
       "{\"session_token\" : \"" + session_token_ +
-      "\", \"payload_digest\" : \"" + Base64(payload_digest.ToString(false)) +
+      "\", \"payload_digest\" : \"" + payload_digest.ToString(false) +
       "\", \"header_size\" : \"" + StringifyInt(serializer.GetHeaderSize()) +
       "\", \"api_version\" : \"" + StringifyInt(gateway::APIVersion()) + "\"}";
 

@@ -22,8 +22,13 @@ PayloadProcessor::PayloadProcessor()
 PayloadProcessor::~PayloadProcessor() {}
 
 PayloadProcessor::Result PayloadProcessor::Process(
-    int fdin, const std::string& digest_base64, const std::string& path,
+    int fdin, const std::string& header_digest, const std::string& path,
     uint64_t header_size) {
+
+  LogCvmfs(kLogReceiver, kLogSyslog,
+           "PayloadProcessor - receiving path: %s, header digest: %s, header size: %ld",
+           path.c_str(), header_digest.c_str(), header_size);
+
   const size_t first_slash_idx = path.find('/', 0);
 
   current_repo_ = path.substr(0, first_slash_idx);
@@ -33,13 +38,9 @@ PayloadProcessor::Result PayloadProcessor::Process(
     return init_result;
   }
 
-  std::string header_digest;
-  if (!Debase64(digest_base64, &header_digest)) {
-    return kOtherError;
-  }
-
   // Set up object pack deserialization
   shash::Any digest = shash::MkFromHexPtr(shash::HexPtr(header_digest));
+
   ObjectPackConsumer deserializer(digest, header_size);
   deserializer.RegisterListener(&PayloadProcessor::ConsumerEventCallback, this);
 
