@@ -1,4 +1,5 @@
 2.5.0:
+  * Add stratum 1 agent for triggered replication 
   * Autmatically restart failed authz helper after a cool-off period
   * Make `true` to be a valid boolean option
 
