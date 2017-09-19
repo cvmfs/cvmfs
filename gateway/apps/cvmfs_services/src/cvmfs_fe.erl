@@ -13,6 +13,8 @@
 -define(API_VERSION, 1).
 -define(API_ROOT, "/api/v" ++ integer_to_list(?API_VERSION)).
 
+-define(REQUEST_TIMEOUT, 10800000).
+
 %%--------------------------------------------------------------------
 %% @doc
 %% Starts the front-end HTTP listener process.
@@ -32,7 +34,9 @@ start_link([TcpPort]) ->
     %% Start the HTTP listener process configured with the routing table
     cowboy:start_clear(cvmfs_fe,
                        [{port, TcpPort}],
-                       #{env => #{dispatch => Dispatch}}).
+                       #{env => #{dispatch => Dispatch},
+                         idle_timeout => ?REQUEST_TIMEOUT,
+                         inactivity_timeout => ?REQUEST_TIMEOUT}).
 
 
 -spec api_version() -> integer().
