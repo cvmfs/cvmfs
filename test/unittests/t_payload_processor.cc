@@ -107,7 +107,7 @@ TEST_F(T_PayloadProcessor, Basic) {
   MockPayloadProcessor proc;
   ASSERT_EQ(0, proc.num_files_received_);
   ASSERT_EQ(PayloadProcessor::kSuccess,
-            proc.Process(read_fd_, Base64(digest_.ToString(false)), "some_path",
+            proc.Process(read_fd_, digest_.ToString(false), "some_path",
                          serializer_->GetHeaderSize()));
   ASSERT_EQ(1, proc.num_files_received_);
 }
