@@ -76,10 +76,10 @@ bool MakeAcquireRequest(const std::string& key_id, const std::string& secret,
 
   ret = curl_easy_perform(h_curl);
   if (ret) {
-        LogCvmfs(kLogUploadGateway, kLogStderr,
-                 "Make lease acquire request failed: %d. Reply: %s", ret, buffer->data.c_str());
+    LogCvmfs(kLogUploadGateway, kLogStderr,
+             "Make lease acquire request failed: %d. Reply: %s", ret,
+             buffer->data.c_str());
   }
-
 
   curl_easy_cleanup(h_curl);
   h_curl = NULL;
@@ -123,8 +123,9 @@ bool MakeEndRequest(const std::string& method, const std::string& key_id,
 
   ret = curl_easy_perform(h_curl);
   if (ret) {
-        LogCvmfs(kLogUploadGateway, kLogStderr,
-                 "Make lease end request failed: %d. Reply: %s", ret, reply->data.c_str());
+    LogCvmfs(kLogUploadGateway, kLogStderr,
+             "Make lease end request failed: %d. Reply: %s", ret,
+             reply->data.c_str());
   }
 
   curl_easy_cleanup(h_curl);
