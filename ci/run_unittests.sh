@@ -11,7 +11,7 @@ SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
 
 usage() {
   echo "Usage: $0 [-q only quick tests] [-l preload library path] \\"
-  echo "          [-c cache plugin binary] \\"
+  echo "          [-c cache plugin binary] [-g GeoAPI sources] \\"
   echo "          <unittests binary> <XML output location>"
   echo "This script runs the CernVM-FS unit tests"
   exit 1
@@ -20,8 +20,9 @@ usage() {
 CVMFS_UNITTESTS_QUICK=0
 CVMFS_LIBRARY_PATH=
 CVMFS_CACHE_PLUGIN=
+CVMFS_GEOAPI_SOURCES=
 
-while getopts "ql:c:" option; do
+while getopts "ql:c:g:" option; do
   case $option in
     q)
       CVMFS_UNITTESTS_QUICK=1
@@ -31,6 +32,9 @@ while getopts "ql:c:" option; do
     ;;
     c)
       CVMFS_CACHE_PLUGIN=$OPTARG
+    ;;
+    g)
+      CVMFS_GEOAPI_SOURCES=$OPTARG
     ;;
     ?)
       usage
@@ -63,6 +67,12 @@ test_filter='-'
 if [ $CVMFS_UNITTESTS_QUICK = 1 ]; then
   echo "running only quick tests (without suffix 'Slow')"
   test_filter='-*Slow'
+fi
+
+# run the Python unittests for the GeoAPI
+if [ "$CVMFS_GEOAPI_SOURCES" != "x" ]; then
+  # TODO(jblomer): XML output
+  (cd $CVMFS_GEOAPI_SOURCES && python test_cvmfs_geo.py)
 fi
 
 # run the cache plugin unittests
