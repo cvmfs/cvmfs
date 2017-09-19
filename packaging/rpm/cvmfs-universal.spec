@@ -454,6 +454,7 @@ fi
 %{_bindir}/cvmfs_suid_helper
 %{_bindir}/cvmfs_server
 %{_bindir}/cvmfs_rsync
+%{_bindir}/cvmfs_stratum_agent
 %{_sysconfdir}/cvmfs/cvmfs_server_hooks.sh.demo
 %{_libdir}/libtbb_cvmfs.so
 %{_libdir}/libtbb_cvmfs.so.2
@@ -477,6 +478,8 @@ fi
 %doc COPYING AUTHORS README.md ChangeLog
 
 %changelog
+* Mon Sep 18 2017 Jakob Blomer <jblomer@cern.ch> - 2.5.0
+- Add cvmfs_stratum_agent to the cvmfs-server package
 * Wed Aug 02 2017 Jakob Blomer <jblomer@cern.ch> - 2.4.0
 - Fix dependencies for Fedora >= 25
 * Wed Jul 05 2017 Jakob Blomer <jblomer@cern.ch> - 2.4.0

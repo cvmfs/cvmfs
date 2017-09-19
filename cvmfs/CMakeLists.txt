@@ -773,9 +773,15 @@ endif(BUILD_RECEIVER)
 
 if (BUILD_SERVER)
   install (
-    TARGETS     cvmfs_swissknife
+    TARGETS     cvmfs_swissknife cvmfs_stratum_agent
     RUNTIME
     DESTINATION    bin
+  )
+
+  install(
+    FILES        stratum_agent/cvmfs_stratum_agent.service
+    DESTINATION  "/usr/share/cvmfs-server/agent"
+    PERMISSIONS  OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 
   install (
