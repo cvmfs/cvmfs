@@ -23,7 +23,6 @@ CURL* PrepareCurl(const std::string& method) {
     curl_easy_setopt(h_curl, CURLOPT_USERAGENT, user_agent_string);
     curl_easy_setopt(h_curl, CURLOPT_MAXREDIRS, 50L);
     curl_easy_setopt(h_curl, CURLOPT_CUSTOMREQUEST, method.c_str());
-    curl_easy_setopt(h_curl, CURLOPT_TCP_KEEPALIVE, 1L);
   }
 
   return h_curl;
