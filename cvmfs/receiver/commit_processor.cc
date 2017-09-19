@@ -117,6 +117,8 @@ CommitProcessor::Result CommitProcessor::Process(
 
   const PathString relative_lease_path = RemoveRepoName(PathString(lease_path));
 
+  LogCvmfs(kLogReceiver, kLogSyslog, "CommitProcessor - merging catalogs");
+
   CatalogMergeTool<catalog::WritableCatalogManager,
                    catalog::SimpleCatalogManager>
       merge_tool(params.stratum0, old_root_hash, new_root_hash,
@@ -143,6 +145,8 @@ CommitProcessor::Result CommitProcessor::Process(
   server_tool.Destroy();
   server_tool = new ServerTool();
 
+  LogCvmfs(kLogReceiver, kLogSyslog, "CommitProcessor - signing manifest");
+
   SigningTool signing_tool(server_tool.weak_ref());
   if (signing_tool.Run(new_manifest_path, params.stratum0,
                        params.spooler_configuration, temp_dir, certificate,
@@ -151,6 +155,8 @@ CommitProcessor::Result CommitProcessor::Process(
     LogCvmfs(kLogReceiver, kLogSyslogErr, "Error signing manifest");
     return kIoError;
   }
+
+  LogCvmfs(kLogReceiver, kLogSyslog, "CommitProcessor - success.");
 
   return kSuccess;
 }
