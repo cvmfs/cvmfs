@@ -24,7 +24,7 @@ using namespace std;  // NOLINT
 
 namespace {
 
-static shash::Any Chash2Cpphash(struct cvmcache_hash *h) {
+static shash::Any Chash2Cpphash(const struct cvmcache_hash *h) {
   shash::Any hash;
   memcpy(hash.digest, h->digest, sizeof(h->digest));
   hash.algorithm = static_cast<shash::Algorithms>(h->algorithm);
@@ -266,7 +266,7 @@ int cvmcache_hash_cmp(struct cvmcache_hash *a, struct cvmcache_hash *b) {
     return 1;
 }
 
-char *cvmcache_hash_print(struct cvmcache_hash *h) {
+char *cvmcache_hash_print(const struct cvmcache_hash *h) {
   const shash::Any hash = Chash2Cpphash(h);
   return strdup(hash.ToString().c_str());
 }
