@@ -502,7 +502,7 @@ check_overlayfs_version() {
         return 0
       fi
       if [ "x$scratch_fstype" = "xxfs" ] ; then
-        if [ "x$(xfs_info /var/spool/cvmfs | grep ftype=1)" != "x" ] ; then
+        if [ "x$(xfs_info /var/spool/cvmfs 2>/dev/null | grep ftype=1)" != "x" ] ; then
           return 0
         else
           echo "XFS with ftype=0 is not supported for /var/spool/cvmfs. XFS with ftype=1 is required"
