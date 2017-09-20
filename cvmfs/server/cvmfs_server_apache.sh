@@ -218,6 +218,7 @@ remove_apache_config_file() {
 # place, depending on the installed apache version.
 has_apache_config_file() {
   local file_name=$1
+  is_local_upstream $CVMFS_UPSTREAM_STORAGE || return 1
   local conf_path
   conf_path="$(get_apache_conf_path)/${file_name}"
   cvmfs_sys_file_is_regular $conf_path
@@ -245,7 +246,6 @@ create_apache_config_for_endpoint() {
 
   create_apache_config_file "$(get_apache_conf_filename $name)" << EOF
 # Created by cvmfs_server.  Don't touch.
-$(cat_wsgi_config $name $with_wsgi)
 
 KeepAlive On
 AddType application/json .json
@@ -276,6 +276,10 @@ Alias /cvmfs/${name} ${storage_dir}
     ExpiresByType application/json    "access plus 61 seconds"
 </Directory>
 EOF
+
+  if [ x"$with_wsgi" != x"" ]; then
+    create_apache_config_for_webapi
+  fi
 }
 
 
@@ -291,26 +295,29 @@ create_apache_config_for_global_info() {
 }
 
 
-# sends wsgi configuration to stdout
-#
-# @param name        the name of the repository
-# @param with_wsgi   if not set, this function is a NOOP
-cat_wsgi_config() {
-  local name=$1
-  local with_wsgi="$2"
-
-  [ x"$with_wsgi" != x"" ] || return 0
-  echo "# Enable api functions
-WSGIPythonPath /usr/share/cvmfs-server/webapi
-Alias /cvmfs/$name/api /var/www/wsgi-scripts/cvmfs-api.wsgi/$name
-
-<Directory /var/www/wsgi-scripts>
-    Options ExecCGI
-    SetHandler wsgi-script
-    Order allow,deny
-    Allow from all
+create_apache_config_for_webapi() {
+  ! has_apache_config_file $(get_apache_conf_filename webapi) || return 0
+  create_apache_config_file "$(get_apache_conf_filename webapi)" << EOF
+# Created by cvmfs_server.  Don't touch.
+RewriteEngine on
+RewriteRule ^/cvmfs/([^/]+)/api/(.*)\$ /var/www/wsgi-scripts/cvmfs-server/cvmfs-api.wsgi/\$1/\$2
+WSGIDaemonProcess cvmfsapi threads=64 display-name=%{GROUP} \
+  python-path=/usr/share/cvmfs-server/webapi
+<Directory /var/www/wsgi-scripts/cvmfs-server>
+  WSGIProcessGroup cvmfsapi
+  WSGIApplicationGroup cvmfsapi
+  Options ExecCGI
+  SetHandler wsgi-script
+  $(get_compatible_apache_allow_from_all_config)
 </Directory>
-"
+WSGISocketPrefix /var/run/wsgi
+EOF
+}
+
+# for migrate to 2.1.20 backward compatibility
+cat_wsgi_config() {
+  # do nothing
+  return
 }
 
 
@@ -318,13 +325,21 @@ remove_config_files() {
   local name=$1
   load_repo_config $name
 
+  rm -rf /etc/cvmfs/repositories.d/$name
   local apache_conf_file_name="$(get_apache_conf_filename $name)"
-  if is_local_upstream $CVMFS_UPSTREAM_STORAGE &&
-     has_apache_config_file "$apache_conf_file_name"; then
+  if has_apache_config_file "$apache_conf_file_name"; then
     remove_apache_config_file "$apache_conf_file_name"
+    if [ -z "$(get_or_guess_repository_name)" ]; then
+      # no repositories left, remove extra config files
+      for confname in webapi info; do
+        apache_conf_file_name="$(get_apache_conf_filename $confname)"
+        if has_apache_config_file "$apache_conf_file_name"; then
+          remove_apache_config_file "$apache_conf_file_name"
+        fi
+      done
+    fi
     reload_apache > /dev/null
   fi
-  rm -rf /etc/cvmfs/repositories.d/$name
 }
 
 
