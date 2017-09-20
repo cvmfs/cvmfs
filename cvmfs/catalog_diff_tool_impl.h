@@ -108,8 +108,14 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
   unsigned i_from = 0, size_from = old_listing.size();
   unsigned i_to = 0, size_to = new_listing.size();
   while ((i_from < size_from) || (i_to < size_to)) {
-    const catalog::DirectoryEntry old_entry = old_listing[i_from];
-    const catalog::DirectoryEntry new_entry = new_listing[i_to];
+    catalog::DirectoryEntry old_entry = old_listing[i_from];
+    catalog::DirectoryEntry new_entry = new_listing[i_to];
+
+    // Skip .cvmfs hidden directory
+    while (old_entry.IsHidden())
+      old_entry = old_listing[++i_from];
+    while (new_entry.IsHidden())
+      new_entry = new_listing[++i_to];
 
     PathString old_path(path);
     old_path.Append("/", 1);
