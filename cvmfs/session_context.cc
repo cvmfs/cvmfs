@@ -13,6 +13,10 @@
 #include "swissknife_lease_curl.h"
 #include "util/string.h"
 
+namespace {
+const size_t kMaxResultQueueSize = 1000000;
+}
+
 namespace upload {
 
 size_t SendCB(void* ptr, size_t size, size_t nmemb, void* userp) {
@@ -63,7 +67,7 @@ size_t RecvCB(void* buffer, size_t size, size_t nmemb, void* userp) {
 }
 
 SessionContextBase::SessionContextBase()
-    : upload_results_(1000000, 1000000),
+    : upload_results_(kMaxResultQueueSize, kMaxResultQueueSize),
       api_url_(),
       session_token_(),
       key_id_(),
