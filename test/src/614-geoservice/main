@@ -26,6 +26,7 @@ cvmfs_check_georesult() {
     local cern
     local fnal
     local ihep
+    local site
     local n=1
     for site in ${reqorder//,/ }; do
       eval $site=$n
@@ -158,6 +159,66 @@ cvmfs_run_test() {
   echo "checking ordering from FNAL fallback proxy"
   result="`curl -s http://localhost/$api/$other/$cern,$fnal,$ihep,$sep,$fnalbp|head -5`"
   cvmfs_check_geosepresult "$result" $fnalbp cern,fnal,ihep || return 13
+
+  echo "checking parallelism and cache limit (could take a couple of minutes)"
+  # The number of api processing threads is 64, and cache limit is 100k.
+  # We want to surpass each limit.  Surpass number of parallel threads
+  #  by a factor of 4, to 256.  Use IP addresses instead of dns names so
+  #  it doesn't actually contact the DNS.  There's 256*258 (65k) IPv4
+  #  addresses available in a class B network, so using two of them will
+  #  surpass the 100k limit.  Use the process number as part of the IP
+  #  address so only unique names are used.
+
+  local pids procn site classb expected subn addr urls
+  procn=0
+  while [ $procn -lt 256 ]; do
+    (
+      for site in cern fnal; do 
+        case $site in
+          cern)
+            classb=128.142
+            expected=1,2,3
+            ;;
+          fnal)
+            classb=131.225
+            expected=2,1,3
+            ;;
+        esac
+        subn=0
+        # send 256 urls at a time to curl; otherwise it is too slow
+        urls=""
+        while [ $subn -lt 256 ]; do
+          addr=$classb.$subn.$procn
+          urls="$urls http://localhost/$api/$addr/$cern,$fnal,$ihep"
+          let subn=$subn+1
+        done
+        curl -s $urls 2>&1 | \
+          (
+          subn=0
+          while read result; do
+            addr=$classb.$subn.$procn
+            if [ "$result" != "$expected" ]; then
+              echo "query on $addr failed! expected $expected, got $result"
+              return 1
+            fi
+            let subn=$subn+1
+          done
+          if [ $subn -ne 256 ]; then
+            echo "expected 256 results in proc $procn for $classb, got $subn"
+            return 1
+          fi
+          ) || return 1
+      done
+    ) &
+    pids="$pids $!"
+    let procn=$procn+1
+  done
+  local pid
+  for pid in $pids; do
+    # wait individually in order to check the return codes
+    wait $pid || return 14
+  done
+  echo "parallelism test completed successfully"
 
   return 0
 }

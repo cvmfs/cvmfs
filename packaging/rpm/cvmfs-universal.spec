@@ -465,7 +465,7 @@ fi
 %{_libdir}/libtbbmalloc_cvmfs_debug.so
 %{_libdir}/libtbbmalloc_cvmfs_debug.so.2
 %dir %{_sysconfdir}/cvmfs/repositories.d
-/var/www/wsgi-scripts/cvmfs-api.wsgi
+/var/www/wsgi-scripts/cvmfs-server/cvmfs-api.wsgi
 /usr/share/cvmfs-server/
 /var/lib/cvmfs-server/
 /var/spool/cvmfs/README

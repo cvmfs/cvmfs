@@ -4,6 +4,8 @@
   * Make `true` to be a valid boolean option
 
 2.4.2:
+  * Cache GeoAPI replies for 5 minutes, improve WSGI config (CVM-1349)
+  * Improve logging for cache plugins
   * Fix use of cached file catalog in cache plugins
   * Fix off-by-one error for chunk size when grafting files 
 

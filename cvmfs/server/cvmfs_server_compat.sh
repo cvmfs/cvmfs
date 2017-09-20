@@ -78,6 +78,10 @@ Please upgrade CernVM-FS to manipulate this repository."
   #     -> use an arbitrary server layout revision to decouple the creator
   #        version from the software version (CVM-1065)
   #
+  #   137 --> 138
+  #     -> update apache configs on relevant stratum 1s for better geo api
+  #        implementation (CVM-1349)
+  #
   # Note: I tried to make this code as verbose as possible
   #
   if [ "$creator" = "2.1.6" ] && version_greater_or_equal "2.1.7"; then
@@ -141,6 +145,25 @@ Please upgrade CernVM-FS to manipulate this repository."
   if [ "$creator" = "2.3.3-1" ] || [ "$creator" = "2.3.4-1" ] || \
      [ "$creator" = "2.3.5-1" ] || [ "$creator" = "2.3.6-1" ] || \
      [ "$creator" = "2.4.0-1" ]; then
+    _repo_is_incompatible "$creator" $nokill
+    return $?
+  fi
+
+  # After this point all creator versions are numeric
+
+  # At the moment any numeric version other than the current one is
+  # only incompatible on stratum 1s with an automatically managed
+  # apache config file, but that criteria will undoubtedly change in
+  # future versions.  Perhaps we will want two variables indicating
+  # the minimum compatible stratum 0 and minimum compatible stratum 1
+  # versions with apache config, and maybe a third indicating the
+  # minimum compatible version in general.  Either that or we forget
+  # about being so selective and just force everybody to do a migrate
+  # even if it isn't relevant in their config.
+
+  if [ "$creator" -lt "$(cvmfs_layout_revision)" ] && \
+       is_stratum1 $name && \
+       has_apache_config_file $(get_apache_conf_filename $name); then
     _repo_is_incompatible "$creator" $nokill
     return $?
   fi
