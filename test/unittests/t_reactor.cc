@@ -217,7 +217,7 @@ TEST_F(T_Reactor, FullCycle) {
     serializer.GetDigest(&digest);
 
     const std::string request = "{\"path\":\"some_path\",\"digest\":\"" +
-                                Base64(digest.ToString(false)) +
+                                digest.ToString(false) +
                                 "\",\"header_size\":" +
                                 StringifyInt(serializer.GetHeaderSize()) + "}";
 
