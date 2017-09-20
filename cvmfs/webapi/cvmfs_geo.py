@@ -198,6 +198,7 @@ def api(path_info, repo_name, version, start_response, environ):
     caching_string = path_info[0:slash]
     servers = string.split(path_info[slash+1:], ",")
 
+    # TODO(jblomer): Can this be switched to monotonic time?
     now = int(time.time())
 
     gir_rem = None
