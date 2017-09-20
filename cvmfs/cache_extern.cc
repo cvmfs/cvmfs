@@ -275,9 +275,11 @@ ExternalCacheManager::PluginHandle *ExternalCacheManager::CreatePlugin(
       plugin_handle->error_msg_ = "Invalid locator: " + locator;
       break;
     } else {
-      if (num_attempts > 1) LogCvmfs(kLogCache, kLogDebug | kLogStderr,
-                                     "Failed to connect to external cache manager: %d",
-                                     plugin_handle->fd_connection_);
+      if (num_attempts > 1) {
+        LogCvmfs(kLogCache, kLogDebug | kLogStderr,
+                 "Failed to connect to external cache manager: %d",
+                 plugin_handle->fd_connection_);
+      }
       plugin_handle->error_msg_ = "Failed to connect to external cache manager";
     }
 
@@ -691,7 +693,7 @@ bool ExternalCacheManager::SpawnPlugin(const vector<string> &cmd_line) {
   retval = ManagedExec(cmd_line,
                        preserve_filedes,
                        map_fildes,
-                       true,   // drop_credentials
+                       false,  // drop_credentials
                        true,   // double fork
                        &child_pid);
   unsetenv(CacheTransport::kEnvReadyNotifyFd);
