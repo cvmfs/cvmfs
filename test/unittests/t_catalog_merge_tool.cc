@@ -24,19 +24,19 @@ DirSpec MakeBaseSpec() {
   const size_t file_size = 4096;
 
   // adding "/dir"
-  spec.AddDirectory("dir", "", file_size);
+  EXPECT_TRUE(spec.AddDirectory("dir", "", file_size));
 
   // adding "/dir/file1"
-  spec.AddFile("file1", "dir", hashes[0], file_size);
+  EXPECT_TRUE(spec.AddFile("file1", "dir", hashes[0], file_size));
 
   // adding "/dir/dir"
-  spec.AddDirectory("dir", "dir", file_size);
+  EXPECT_TRUE(spec.AddDirectory("dir", "dir", file_size));
 
   // adding "/dir/dir/file2"
-  spec.AddFile("file2", "dir/dir", hashes[1], file_size);
+  EXPECT_TRUE(spec.AddFile("file2", "dir/dir", hashes[1], file_size));
 
   // adding "/file3"
-  spec.AddFile("file3", "", hashes[2], file_size);
+  EXPECT_TRUE(spec.AddFile("file3", "", hashes[2], file_size));
 
   return spec;
 }
@@ -85,8 +85,8 @@ TEST_F(T_CatalogMergeTool, CRUD) {
   DirSpec spec2 = spec1;
 
   // add "dir/new_dir" and "dir/new_dir/new_file.txt"
-  spec2.AddDirectory("new_dir", "dir", 4096);
-  spec2.AddFile("new_file.txt", "dir/new_dir", hashes[3], 1024);
+  EXPECT_TRUE(spec2.AddDirectory("new_dir", "dir", 4096));
+  EXPECT_TRUE(spec2.AddFile("new_file.txt", "dir/new_dir", hashes[3], 1024));
 
   // enlarge "/dir/file1" in spec2
   DirSpecItem item = spec2.Item(1);

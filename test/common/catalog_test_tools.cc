@@ -17,6 +17,17 @@
 
 namespace {
 
+void RemoveLeadingSlash(std::string* path) {
+  if ((*path)[0] == '/') {
+    path->erase(path->begin());
+  }
+}
+void AddLeadingSlash(std::string* path) {
+  if ((*path) != "" && (*path)[0] != '/') {
+    path->insert(0, 1, '/');
+  }
+}
+
 bool ExportDirSpec(const std::string& path,
                    catalog::WritableCatalogManager* mgr, DirSpec* spec) {
   catalog::DirectoryEntryList listing;
@@ -31,7 +42,9 @@ bool ExportDirSpec(const std::string& path,
     if (entry.HasXattrs()) {
       mgr->LookupXattrs(PathString(entry_full_path), &xattrs);
     }
-    spec->AddDirectoryEntry(entry, xattrs, path);
+    std::string path2 = path;
+    RemoveLeadingSlash(&path2);
+    spec->AddDirectoryEntry(entry, xattrs, path2);
     if (entry.IsDirectory()) {
       if (!ExportDirSpec(entry_full_path, mgr, spec)) {
         return false;
@@ -44,26 +57,52 @@ bool ExportDirSpec(const std::string& path,
 
 }  // namespace
 
-void DirSpec::AddFile(const std::string& name, const std::string& parent,
+DirSpec::DirSpec() : items_(), dirs_() {
+  dirs_.insert("");
+}
+
+bool DirSpec::AddFile(const std::string& name, const std::string& parent,
                       const std::string& digest, const size_t size,
                       const XattrList& xattrs, shash::Suffix suffix) {
-  shash::Any hash =
-        shash::Any(shash::kSha1,
-                   reinterpret_cast<const unsigned char*>(digest.c_str()), suffix);
-  items_.push_back(DirSpecItem(catalog::DirectoryEntryTestFactory::RegularFile(name, size, hash),
-                               xattrs, parent));
+  shash::Any hash = shash::Any(
+      shash::kSha1, reinterpret_cast<const unsigned char*>(digest.c_str()),
+      suffix);
+  if (!HasDir(parent)) {
+    return false;
+  }
+
+  items_.push_back(DirSpecItem(
+      catalog::DirectoryEntryTestFactory::RegularFile(name, size, hash), xattrs,
+      parent));
+  return true;
 }
 
-void DirSpec::AddDirectory(const std::string& name, const std::string& parent,
+bool DirSpec::AddDirectory(const std::string& name, const std::string& parent,
                            const size_t size) {
-  items_.push_back(DirSpecItem(catalog::DirectoryEntryTestFactory::Directory(name, size),
-                               XattrList(), parent));
+  if (!HasDir(parent)) {
+    return false;
+  }
+
+  bool ret = AddDir(name, parent);
+  items_.push_back(
+      DirSpecItem(catalog::DirectoryEntryTestFactory::Directory(name, size),
+                  XattrList(), parent));
+  return ret;
 }
 
-void DirSpec::AddDirectoryEntry(const catalog::DirectoryEntry& entry,
-                         const XattrList& xattrs,
+bool DirSpec::AddDirectoryEntry(const catalog::DirectoryEntry& entry,
+                                const XattrList& xattrs,
                                 const std::string& parent) {
+  if (!HasDir(parent)) {
+    return false;
+  }
+
+  bool ret = true;
+  if (entry.IsDirectory()) {
+    ret = AddDir(std::string(entry.name().c_str()), parent);
+  }
   items_.push_back(DirSpecItem(entry, xattrs, parent));
+  return true;
 }
 
 void DirSpec::ToString(std::string* out) {
@@ -77,9 +116,7 @@ void DirSpec::ToString(std::string* out) {
       item_type = 'D';
     }
     std::string parent = item.parent();
-    if (parent != "" && parent[0] != '/') {
-      parent.insert(0, 1, '/');
-    }
+    AddLeadingSlash(&parent);
 
     ostr << item_type << " " << item.entry_base().GetFullPath(parent).c_str()
          << std::endl;
@@ -87,20 +124,41 @@ void DirSpec::ToString(std::string* out) {
   *out = ostr.str();
 }
 
-static bool CompareFunction(const DirSpecItem& item1, const DirSpecItem& item2) {
+static bool CompareFunction(const DirSpecItem& item1,
+                            const DirSpecItem& item2) {
   std::string path1 = item1.entry_base().GetFullPath(item1.parent());
   std::string path2 = item2.entry_base().GetFullPath(item2.parent());
-  if (path1[0] != '/') {
-    path1.insert(0, 1, '/');
-  }
-  if (path2[0] != '/') {
-    path2.insert(0, 1, '/');
-  }
+  AddLeadingSlash(&path1);
+  AddLeadingSlash(&path2);
   return strcmp(path1.c_str(), path2.c_str()) < 0;
 }
 
 void DirSpec::Sort() {
   std::sort(items_.begin(), items_.end(), CompareFunction);
+}
+
+bool DirSpec::AddDir(const std::string& name, const std::string& parent) {
+  std::string full_path = parent + "/" + name;
+  RemoveLeadingSlash(&full_path);
+  if (HasDir(full_path)) {
+    return false;
+  }
+  dirs_.insert(full_path);
+  return true;
+}
+
+bool DirSpec::RmDir(const std::string& name, const std::string& parent) {
+  std::string full_path = parent + "/" + name;
+  AddLeadingSlash(&full_path);
+  if (!HasDir(full_path)) {
+    return false;
+  }
+  dirs_.erase(full_path);
+  return true;
+}
+
+bool DirSpec::HasDir(const std::string& name) const {
+  return dirs_.find(name) != dirs_.end();
 }
 
 CatalogTestTool::CatalogTestTool(const std::string& name)

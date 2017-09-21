@@ -5,6 +5,7 @@
 #ifndef CVMFS_CATALOG_TEST_TOOLS_H_
 #define CVMFS_CATALOG_TEST_TOOLS_H_
 
+#include <set>
 #include <string>
 #include <vector>
 
@@ -34,17 +35,19 @@ struct DirSpecItem {
 
 class DirSpec {
  public:
-  void AddFile(const std::string& name,
+  DirSpec();
+
+  bool AddFile(const std::string& name,
                const std::string& parent,
                const std::string& digest,
                const size_t size,
                const XattrList& xattrs = XattrList(),
                shash::Suffix suffix = shash::kSha1);
-  void AddDirectory(const std::string& name,
+  bool AddDirectory(const std::string& name,
                     const std::string& parent,
                     const size_t size);
 
-  void AddDirectoryEntry(const catalog::DirectoryEntry& entry,
+  bool AddDirectoryEntry(const catalog::DirectoryEntry& entry,
                          const XattrList& xattrs,
                          const std::string& parent);
 
@@ -61,15 +64,22 @@ class DirSpec {
   }
 
   void RemoveItem(const size_t idx) {
-    if (idx <NumItems()) {
+    if (idx < NumItems()) {
       items_.erase(items_.begin() + idx);
     }
   }
 
+  const std::set<std::string>& GetDirs() const { return dirs_; }
+
   void Sort();
 
  private:
+  bool AddDir(const std::string& name, const std::string& parent);
+  bool RmDir(const std::string& name, const std::string& parent);
+  bool HasDir(const std::string& name) const;
+
   std::vector<DirSpecItem> items_;
+  std::set<std::string> dirs_;
 };
 
 
