@@ -42,7 +42,7 @@ uint64_t StaticOffsetDetector::DoFindNextCutMark(BlockItem *buffer) {
 
 
 
-// this defines the center of the interval where the xor32 rolling checksum is
+// This defines the center of the interval where the xor32 rolling checksum is
 // queried. You should never change this number, since it affects the definition
 // of cut marks.
 const int32_t Xor32Detector::kMagicNumber =

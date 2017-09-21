@@ -250,11 +250,9 @@ TEST_F(T_Task, Chunk) {
   task_group.TakeConsumer(new TaskChunk(&tube_in, &tube_group_out));
   task_group.Spawn();
 
-  unsigned nblocks = 10;
+  unsigned nblocks = 10000;
   unsigned size = nblocks * TaskRead::kBlockSize;
-  FileItem file_large("./large", size / 8, size / 4, size / 2,
-    zlib::kZlibDefault, shash::kSha1, shash::kSuffixNone,
-    true, true);
+  FileItem file_large("./large", size / 8, size / 4, size / 2);
   for (unsigned i = 0; i < nblocks; ++i) {
     BlockItem *b = new BlockItem(1);
     b->SetFileItem(&file_large);
@@ -268,16 +266,33 @@ TEST_F(T_Task, Chunk) {
   b_stop->MakeStop();
   tube_in.Enqueue(b_stop);
 
-  /*for (unsigned i = 0; i < nblocks; ++i) {
-    BlockItem *b_chunk = tube_out->Pop();
-    EXPECT_FALSE(b_chunk->chunk_item()->is_bulk_chunk());
-    delete b_chunk->chunk_item();
-    delete b_chunk;
-    BlockItem *b_bulk = tube_out->Pop();
-    EXPECT_TRUE(b_bulk->chunk_item()->is_bulk_chunk());
-    delete b_bulk->chunk_item();
-    delete b_bulk;
-  }*/
+  unsigned consumed = 0;
+  unsigned chunk_size = 0;
+  int64_t tag = -1;
+  while (consumed < size) {
+    BlockItem *b = tube_out->Pop();
+    EXPECT_FALSE(b->chunk_item()->is_bulk_chunk());
+    if (tag == -1) {
+      tag = b->tag();
+    } else {
+      EXPECT_EQ(tag, b->tag());
+    }
+
+    if (b->size() == 0) {
+      EXPECT_EQ(BlockItem::kBlockStop, b->type());
+      EXPECT_GE(chunk_size, size / 8);
+      EXPECT_LE(chunk_size, size / 2);
+      chunk_size = 0;
+      tag = -1;
+      delete b->chunk_item();
+    } else {
+      EXPECT_EQ(BlockItem::kBlockData, b->type());
+      chunk_size += b->size();
+    }
+
+    consumed += b->size();
+    delete b;
+  }
 
   unlink("./large");
   task_group.Terminate();

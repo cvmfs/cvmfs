@@ -30,7 +30,7 @@ void TaskChunk::Process(BlockItem *input_block) {
   if (iter_find == tag_map_.end()) {
     // We may have only regular chunks, only a bulk chunk, or both.  We may
     // end up in a situation where we produced only a single non-bulk chunk.
-    // This needs to be fixed up by the write task later in the pipeline.
+    // This needs to be fixed up later in the pipeline by the write task.
     if (file_item->may_have_chunks()) {
       chunk_info.next_chunk = new ChunkItem(file_item, 0);
       chunk_info.output_tag_chunk = atomic_xadd64(&tag_seq_, 1);
@@ -88,7 +88,7 @@ void TaskChunk::Process(BlockItem *input_block) {
         unsigned offset_in_block = 0;
         uint64_t cut_mark = 0;
         while ((cut_mark = chunk_detector->FindNextCutMark(input_block)) != 0) {
-          assert(cut_mark >= chunk_info.offset);
+          assert(cut_mark >= chunk_info.offset + offset_in_block);
           uint64_t cut_mark_in_block = cut_mark - chunk_info.offset;
           assert(cut_mark_in_block >= offset_in_block);
           assert(cut_mark_in_block < input_block->size());
@@ -101,7 +101,6 @@ void TaskChunk::Process(BlockItem *input_block) {
             block_tail->MakeDataCopy(input_block->data() + offset_in_block,
                                      tail_size);
             tubes_out_->Dispatch(block_tail);
-            chunk_info.offset += tail_size;
           }
 
           BlockItem *block_stop = new BlockItem(chunk_info.output_tag_chunk);
@@ -114,6 +113,7 @@ void TaskChunk::Process(BlockItem *input_block) {
           chunk_info.output_tag_chunk = atomic_xadd64(&tag_seq_, 1);
           offset_in_block = cut_mark_in_block;
         }
+        chunk_info.offset += offset_in_block;
 
         assert(input_block->size() >= offset_in_block);
         unsigned tail_size = input_block->size() - offset_in_block;
