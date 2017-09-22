@@ -7,13 +7,17 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#include <cstdlib>
 #include <cstring>
 
 #include "atomic.h"
+#include "compression.h"
+#include "hash.h"
 #include "ingestion/item.h"
 #include "ingestion/task.h"
-#include "ingestion/task_read.h"
 #include "ingestion/task_chunk.h"
+#include "ingestion/task_compression.h"
+#include "ingestion/task_read.h"
 #include "smalloc.h"
 #include "util/posix.h"
 
@@ -250,15 +254,24 @@ TEST_F(T_Task, Chunk) {
   task_group.TakeConsumer(new TaskChunk(&tube_in, &tube_group_out));
   task_group.Spawn();
 
+  // Tuned for ~100ms test with many blocks
   unsigned nblocks = 10000;
   unsigned size = nblocks * TaskRead::kBlockSize;
-  FileItem file_large("./large", size / 8, size / 4, size / 2);
+  unsigned avg_chunk_size = 4 * TaskRead::kBlockSize;
+  // File does not exist
+  FileItem file_large("./large",
+                      avg_chunk_size / 2,
+                      avg_chunk_size,
+                      avg_chunk_size * 2);
   for (unsigned i = 0; i < nblocks; ++i) {
+    string str_content(TaskRead::kBlockSize, i);
+    unsigned char *content = reinterpret_cast<unsigned char *>(
+      smalloc(TaskRead::kBlockSize));
+    memcpy(content, str_content.data(), TaskRead::kBlockSize);
+
     BlockItem *b = new BlockItem(1);
     b->SetFileItem(&file_large);
-    b->MakeData(reinterpret_cast<unsigned char *>(
-                  strdup(string(TaskRead::kBlockSize, i).c_str())),
-                TaskRead::kBlockSize);
+    b->MakeData(content, TaskRead::kBlockSize);
     tube_in.Enqueue(b);
   }
   BlockItem *b_stop = new BlockItem(1);
@@ -269,6 +282,7 @@ TEST_F(T_Task, Chunk) {
   unsigned consumed = 0;
   unsigned chunk_size = 0;
   int64_t tag = -1;
+  uint64_t last_offset = 0;
   while (consumed < size) {
     BlockItem *b = tube_out->Pop();
     EXPECT_FALSE(b->chunk_item()->is_bulk_chunk());
@@ -280,20 +294,146 @@ TEST_F(T_Task, Chunk) {
 
     if (b->size() == 0) {
       EXPECT_EQ(BlockItem::kBlockStop, b->type());
-      EXPECT_GE(chunk_size, size / 8);
-      EXPECT_LE(chunk_size, size / 2);
+      EXPECT_GE(chunk_size, avg_chunk_size / 2);
+      EXPECT_LE(chunk_size, avg_chunk_size * 2);
+      EXPECT_EQ(consumed, last_offset + chunk_size);
       chunk_size = 0;
       tag = -1;
       delete b->chunk_item();
     } else {
       EXPECT_EQ(BlockItem::kBlockData, b->type());
       chunk_size += b->size();
+      last_offset = b->chunk_item()->offset();
     }
 
     consumed += b->size();
     delete b;
   }
+  EXPECT_EQ(size, consumed);
 
-  unlink("./large");
+  task_group.Terminate();
+}
+
+
+TEST_F(T_Task, CompressionNull) {
+  Tube<BlockItem> tube_in;
+  Tube<BlockItem> *tube_out = new Tube<BlockItem>();
+  TubeGroup<BlockItem> tube_group_out;
+  tube_group_out.TakeTube(tube_out);
+  tube_group_out.Activate();
+
+  TubeConsumerGroup<BlockItem> task_group;
+  task_group.TakeConsumer(new TaskCompression(&tube_in, &tube_group_out));
+  task_group.Spawn();
+
+  FileItem file_null("/dev/null");
+  ChunkItem chunk_null(&file_null, 0);
+  BlockItem *b1 = new BlockItem(1);
+  b1->SetFileItem(&file_null);
+  b1->SetChunkItem(&chunk_null);
+  b1->MakeStop();
+  tube_in.Enqueue(b1);
+
+  void *ptr_zlib_null;
+  uint64_t sz_zlib_null;
+  EXPECT_TRUE(zlib::CompressMem2Mem(NULL, 0, &ptr_zlib_null, &sz_zlib_null));
+
+  BlockItem *item_data = tube_out->Pop();
+  EXPECT_EQ(BlockItem::kBlockData, item_data->type());
+  EXPECT_EQ(sz_zlib_null, item_data->size());
+  EXPECT_EQ(0, memcmp(item_data->data(), ptr_zlib_null, sz_zlib_null));
+  free(ptr_zlib_null);
+  EXPECT_EQ(1, item_data->tag());
+  EXPECT_EQ(&file_null, item_data->file_item());
+  EXPECT_EQ(&chunk_null, item_data->chunk_item());
+  delete item_data;
+  BlockItem *item_stop = tube_out->Pop();
+  EXPECT_EQ(BlockItem::kBlockStop, item_stop->type());
+  EXPECT_EQ(1, item_stop->tag());
+  EXPECT_EQ(&file_null, item_stop->file_item());
+  EXPECT_EQ(&chunk_null, item_stop->chunk_item());
+  delete item_stop;
+  EXPECT_EQ(0U, tube_out->size());
+
+  task_group.Terminate();
+}
+
+
+TEST_F(T_Task, Compression) {
+  Tube<BlockItem> tube_in;
+  Tube<BlockItem> *tube_out = new Tube<BlockItem>();
+  TubeGroup<BlockItem> tube_group_out;
+  tube_group_out.TakeTube(tube_out);
+  tube_group_out.Activate();
+
+  TubeConsumerGroup<BlockItem> task_group;
+  task_group.TakeConsumer(new TaskCompression(&tube_in, &tube_group_out));
+  task_group.Spawn();
+
+  unsigned size = 16 * 1024 * 1024;
+  unsigned block_size = 32 * 1024;
+  unsigned nblocks = size / block_size;
+  EXPECT_EQ(0U, size % block_size);
+  BlockItem block_raw(42);
+  block_raw.MakeData(size);
+  unsigned char *buf = reinterpret_cast<unsigned char *>(smalloc(size));
+  // File does not exist
+  FileItem file_large("./large");
+  ChunkItem chunk_large(&file_large, 0);
+  for (unsigned i = 0; i < nblocks; ++i) {
+    string str_content(block_size, i);
+    for (unsigned j = 1; j < block_size; ++j)
+      str_content[j] = i * str_content[j-1] + j;
+    unsigned char *content = reinterpret_cast<unsigned char *>(
+      smalloc(block_size));
+    memcpy(content, str_content.data(), block_size);
+
+    BlockItem *b = new BlockItem(1);
+    b->SetFileItem(&file_large);
+    b->SetChunkItem(&chunk_large);
+    b->MakeData(content, block_size);
+    EXPECT_EQ(block_size, block_raw.Write(b->data(), b->size()));
+    tube_in.Enqueue(b);
+  }
+  EXPECT_EQ(size, block_raw.size());
+  BlockItem *b_stop = new BlockItem(1);
+  b_stop->SetFileItem(&file_large);
+  b_stop->SetChunkItem(&chunk_large);
+  b_stop->MakeStop();
+  tube_in.Enqueue(b_stop);
+
+  void *ptr_zlib_large = NULL;
+  uint64_t sz_zlib_large = 0;
+  EXPECT_TRUE(zlib::CompressMem2Mem(
+    block_raw.data(), block_raw.size(),
+    &ptr_zlib_large, &sz_zlib_large));
+  delete buf;
+
+  unsigned char *ptr_read_large = reinterpret_cast<unsigned char *>(
+    smalloc(sz_zlib_large));
+  unsigned read_pos = 0;
+
+  BlockItem *b = NULL;
+  do {
+    delete b;
+    b = tube_out->Pop();
+    EXPECT_EQ(1, b->tag());
+    EXPECT_EQ(&file_large, b->file_item());
+    EXPECT_EQ(&chunk_large, b->chunk_item());
+    EXPECT_LE(read_pos + b->size(), sz_zlib_large);
+    if (b->size() > 0) {
+      memcpy(ptr_read_large + read_pos, b->data(), b->size());
+      read_pos += b->size();
+    }
+  } while (b->type() == BlockItem::kBlockData);
+  EXPECT_EQ(BlockItem::kBlockStop, b->type());
+  delete b;
+  EXPECT_EQ(0U, tube_out->size());
+
+  EXPECT_EQ(sz_zlib_large, read_pos);
+  EXPECT_EQ(0, memcmp(ptr_zlib_large, ptr_read_large, sz_zlib_large));
+
+  free(ptr_read_large);
+  free(ptr_zlib_large);
   task_group.Terminate();
 }

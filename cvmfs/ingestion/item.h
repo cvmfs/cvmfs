@@ -91,6 +91,8 @@ class ChunkItem : SingleCopy {
   void MakeBulkChunk() { is_bulk_chunk_ = true; }
 
   FileItem *file_item() { return file_item_; }
+  uint64_t offset() { return offset_; }
+  zlib::Compressor *compressor() { return compressor_.weak_ref(); }
 
  private:
   FileItem *file_item_;
@@ -131,6 +133,9 @@ class BlockItem : SingleCopy {
   void Reset();
 
   uint32_t Write(void *buf, uint32_t count);
+
+  bool IsEmpty() { return size_ == 0; }
+  bool IsFull() { return size_ == capacity_; }
 
   unsigned char *data() { return data_.weak_ref(); }
   uint32_t capacity() { return capacity_; }
