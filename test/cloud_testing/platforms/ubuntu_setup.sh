@@ -95,7 +95,7 @@ install_from_repo jq || die "fail (installing jq)"
 if [ "x$(lsb_release -cs)" = "xxenial" ]; then
   install_from_repo wget || die "fail (installing wget)"
   wget https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release_2.0-2_all.deb
-  sudo dpkg -i cvmfs-release_2.0-1_all.deb || die "fail (installing cvmfs-release)"
+  sudo dpkg -i cvmfs-release_2.0-2_all.deb || die "fail (installing cvmfs-release)"
   sudo apt-get update
   sudo apt-get install autofs || die "fail installing backported autofs"
   sudo cvmfs_config setup || die "re-running cvmfs setup"
