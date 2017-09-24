@@ -133,6 +133,13 @@ static bool CompareFunction(const DirSpecItem& item1,
   return strcmp(path1.c_str(), path2.c_str()) < 0;
 }
 
+std::vector<std::string> DirSpec::GetDirs() const {
+  std::vector<std::string> out;
+  std::copy(dirs_.begin(), dirs_.end(), std::back_inserter(out));
+
+  return out;
+}
+
 void DirSpec::Sort() {
   std::sort(items_.begin(), items_.end(), CompareFunction);
 }

@@ -69,7 +69,7 @@ class DirSpec {
     }
   }
 
-  const std::set<std::string>& GetDirs() const { return dirs_; }
+  std::vector<std::string> GetDirs() const;
 
   void Sort();
 
