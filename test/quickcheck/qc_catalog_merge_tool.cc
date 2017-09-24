@@ -20,15 +20,34 @@ const char* hashes[] = {"b026324c6904b2a9cb4b88d6d61c81d1000000",
                         "1dcca23355272056f04fe8bf20edfce0000000",
                         "11111111111111111111111111111111111111"};
 
+enum class EntryType : int {
+  File,
+  Directory,
+};
+
 // Randomly generate a base dir spec
 DirSpec MakeBaseSpec() {
   DirSpec spec;
 
-  const auto num_entries = *rc::gen::arbitrary<uint64_t>();
+  // Choose number of entries to generate
+  const auto num_entries = *rc::gen::arbitrary<size_t>();
+
   for (auto i = 0u; i < num_entries; ++i) {
-    const auto file_name = "file" + std::to_string(i);
-    const auto file_size = *rc::gen::arbitrary<uint64_t>();
-    RC_ASSERT(spec.AddFile(file_name, "", hashes[0], file_size));
+    // Choose an existing directory as parent;
+    const auto dirs = spec.GetDirs();
+    const auto parent_index = *rc::gen::arbitrary<size_t>() % dirs.size();
+    const auto parent = dirs[parent_index];
+
+    // Are we generating a file or a directory?
+    const auto entry_type = *rc::gen::arbitrary<size_t>() % 2; // 0 == file, 1 == dir,
+    if (entry_type == static_cast<int>(EntryType::File)) {
+      const auto file_name = "file" + std::to_string(i);
+      const auto file_size = *rc::gen::arbitrary<size_t>();
+      RC_ASSERT(spec.AddFile(file_name, parent, hashes[0], file_size));
+    } else if (entry_type == static_cast<int>(EntryType::Directory)) {
+      const auto dir_name = "dir" + std::to_string(i);
+      RC_ASSERT(spec.AddDirectory(dir_name, parent, 1));
+    }
   }
 
   return spec;
