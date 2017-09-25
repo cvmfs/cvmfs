@@ -37,7 +37,7 @@ class PayloadProcessor {
   PayloadProcessor();
   virtual ~PayloadProcessor();
 
-  Result Process(int fdin, const std::string& digest_base64,
+  Result Process(int fdin, const std::string& header_digest,
                  const std::string& path, uint64_t header_size);
 
   virtual void ConsumerEventCallback(const ObjectPackBuild::Event& event);

@@ -13,6 +13,10 @@
 #include "swissknife_lease_curl.h"
 #include "util/string.h"
 
+namespace {
+const size_t kMaxResultQueueSize = 1000000;
+}
+
 namespace upload {
 
 size_t SendCB(void* ptr, size_t size, size_t nmemb, void* userp) {
@@ -63,7 +67,7 @@ size_t RecvCB(void* buffer, size_t size, size_t nmemb, void* userp) {
 }
 
 SessionContextBase::SessionContextBase()
-    : upload_results_(1000, 1000),
+    : upload_results_(kMaxResultQueueSize, kMaxResultQueueSize),
       api_url_(),
       session_token_(),
       key_id_(),
@@ -152,7 +156,12 @@ bool SessionContextBase::Finalize(bool commit, const std::string& old_root_hash,
     if (old_root_hash.empty() || new_root_hash.empty()) {
       return false;
     }
-    results &= Commit(old_root_hash, new_root_hash);
+    bool commit_result = Commit(old_root_hash, new_root_hash);
+    if (!commit_result) {
+      LogCvmfs(kLogUploadGateway, kLogStderr,
+               "SessionContext: could not commit session. Aborting.");
+      abort();
+    }
   }
 
   results &= FinalizeDerived() && (bytes_committed_ == bytes_dispatched_);
@@ -245,7 +254,7 @@ void SessionContextBase::Dispatch() {
 
 SessionContext::SessionContext()
     : SessionContextBase(),
-      upload_jobs_(1000, 900),
+      upload_jobs_(1000000, 1000000),
       worker_terminate_(),
       worker_() {}
 
@@ -300,7 +309,7 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
   serializer.GetDigest(&payload_digest);
   const std::string json_msg =
       "{\"session_token\" : \"" + session_token_ +
-      "\", \"payload_digest\" : \"" + Base64(payload_digest.ToString(false)) +
+      "\", \"payload_digest\" : \"" + payload_digest.ToString(false) +
       "\", \"header_size\" : \"" + StringifyInt(serializer.GetHeaderSize()) +
       "\", \"api_version\" : \"" + StringifyInt(gateway::APIVersion()) + "\"}";
 
@@ -337,7 +346,6 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
   curl_easy_setopt(h_curl, CURLOPT_USERAGENT, "cvmfs/" VERSION);
   curl_easy_setopt(h_curl, CURLOPT_MAXREDIRS, 50L);
   curl_easy_setopt(h_curl, CURLOPT_CUSTOMREQUEST, "POST");
-  curl_easy_setopt(h_curl, CURLOPT_TCP_KEEPALIVE, 1L);
   curl_easy_setopt(h_curl, CURLOPT_URL, (api_url_ + "/payloads").c_str());
   curl_easy_setopt(h_curl, CURLOPT_POSTFIELDS, NULL);
   curl_easy_setopt(h_curl, CURLOPT_POSTFIELDSIZE_LARGE,
@@ -349,8 +357,16 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
 
   // Perform the Curl POST request
   CURLcode ret = curl_easy_perform(h_curl);
+  if (ret) {
+        LogCvmfs(kLogUploadGateway, kLogStderr,
+                 "SessionContext - curl_easy_perform failed: %d", ret);
+  }
 
   const bool ok = (reply == "{\"status\":\"ok\"}");
+  if (!ok) {
+    LogCvmfs(kLogUploadGateway, kLogStderr,
+             "SessionContext - curl_easy_perform reply: %s", reply.c_str());
+  }
 
   curl_easy_cleanup(h_curl);
   h_curl = NULL;

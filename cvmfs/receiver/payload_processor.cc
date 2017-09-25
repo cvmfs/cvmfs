@@ -16,14 +16,22 @@
 namespace receiver {
 
 PayloadProcessor::PayloadProcessor()
-    : pending_files_(), current_repo_(), spooler_(), temp_dir_(),
+    : pending_files_(),
+      current_repo_(),
+      spooler_(),
+      temp_dir_(),
       num_errors_(0) {}
 
 PayloadProcessor::~PayloadProcessor() {}
 
 PayloadProcessor::Result PayloadProcessor::Process(
-    int fdin, const std::string& digest_base64, const std::string& path,
+    int fdin, const std::string& header_digest, const std::string& path,
     uint64_t header_size) {
+  LogCvmfs(kLogReceiver, kLogSyslog,
+           "PayloadProcessor - receiving path: %s, header digest: %s, header "
+           "size: %ld",
+           path.c_str(), header_digest.c_str(), header_size);
+
   const size_t first_slash_idx = path.find('/', 0);
 
   current_repo_ = path.substr(0, first_slash_idx);
@@ -33,13 +41,9 @@ PayloadProcessor::Result PayloadProcessor::Process(
     return init_result;
   }
 
-  std::string header_digest;
-  if (!Debase64(digest_base64, &header_digest)) {
-    return kOtherError;
-  }
-
   // Set up object pack deserialization
   shash::Any digest = shash::MkFromHexPtr(shash::HexPtr(header_digest));
+
   ObjectPackConsumer deserializer(digest, header_size);
   deserializer.RegisterListener(&PayloadProcessor::ConsumerEventCallback, this);
 
@@ -91,8 +95,8 @@ void PayloadProcessor::ConsumerEventCallback(
   FileIterator it = pending_files_.find(event.id);
   if (it == pending_files_.end()) {
     // New file to unpack
-    const std::string tmp_path = CreateTempPath(temp_dir_->dir() + "/payload",
-                                                0666);
+    const std::string tmp_path =
+        CreateTempPath(temp_dir_->dir() + "/payload", 0666);
     if (tmp_path.empty()) {
       LogCvmfs(kLogReceiver, kLogSyslogErr, "Unable to create temporary path.");
       num_errors_++;
@@ -182,7 +186,7 @@ void PayloadProcessor::Finalize() {
 
 void PayloadProcessor::Upload(const std::string& source,
                               const std::string& dest) {
-    spooler_->Upload(source, dest);
+  spooler_->Upload(source, dest);
 }
 
 bool PayloadProcessor::WriteFile(int fd, const void* const buf,
