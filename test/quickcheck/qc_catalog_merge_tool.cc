@@ -20,12 +20,21 @@ const char* hashes[] = {"b026324c6904b2a9cb4b88d6d61c81d1000000",
                         "1dcca23355272056f04fe8bf20edfce0000000",
                         "11111111111111111111111111111111111111"};
 
-enum class EntryType : int {
+enum class ItemType : int {
   File,
-  Directory,
+  Directory
+};
+
+enum class ChangeType : int {
+  AddFile,
+  AddDir,
+  RemoveItem,
+  ModifyFile
 };
 
 // Randomly generate a base dir spec
+// TODO(radu): this function can become a template specialization of
+//             Arbitrary for DirSpec
 DirSpec MakeBaseSpec() {
   DirSpec spec;
 
@@ -40,11 +49,11 @@ DirSpec MakeBaseSpec() {
 
     // Are we generating a file or a directory?
     const auto entry_type = *rc::gen::arbitrary<size_t>() % 2; // 0 == file, 1 == dir,
-    if (entry_type == static_cast<int>(EntryType::File)) {
+    if (entry_type == static_cast<int>(ItemType::File)) {
       const auto file_name = "file" + std::to_string(i);
       const auto file_size = *rc::gen::arbitrary<size_t>();
       RC_ASSERT(spec.AddFile(file_name, parent, hashes[0], file_size));
-    } else if (entry_type == static_cast<int>(EntryType::Directory)) {
+    } else if (entry_type == static_cast<int>(ItemType::Directory)) {
       const auto dir_name = "dir" + std::to_string(i);
       RC_ASSERT(spec.AddDirectory(dir_name, parent, 1));
     }
@@ -55,7 +64,58 @@ DirSpec MakeBaseSpec() {
 
 // TODO(radu): Randomly modify the input spec
 DirSpec ModifySpec(const DirSpec& in) {
-  return in;
+  DirSpec out(in);
+
+  // Choose number of changes to perform
+  const auto num_changes = *rc::gen::arbitrary<size_t>();
+
+  for (auto i = 0u; i < num_changes; ++i) {
+    const auto change_type = *rc::gen::arbitrary<size_t>() % 4; // 0 == AddFile , 1 == AddDir etc.
+    switch (static_cast<ChangeType>(change_type)) {
+      case ChangeType::AddFile:
+      {
+        const auto dirs = out.GetDirs();
+        const auto parent_index = *rc::gen::arbitrary<size_t>() % dirs.size();
+        const auto parent = dirs[parent_index];
+        const auto file_name = "new_file" + std::to_string(i);
+        const auto file_size = *rc::gen::arbitrary<size_t>();
+        RC_ASSERT(out.AddFile(file_name, parent, hashes[0], file_size));
+      }
+      break;
+      case ChangeType::AddDir:
+      {
+        const auto dirs = out.GetDirs();
+        const auto parent_index = *rc::gen::arbitrary<size_t>() % dirs.size();
+        const auto parent = dirs[parent_index];
+        const auto dir_name = "new_dir" + std::to_string(i);
+        RC_ASSERT(out.AddDirectory(dir_name, parent, 1));
+      }
+      break;
+      case ChangeType::RemoveItem:
+      {
+        if (out.NumItems() > 0) {
+          const auto item_index = *rc::gen::arbitrary<size_t>() % out.NumItems();
+          size_t idx = 0;
+          auto it = out.items().begin();
+          while (idx < item_index) {
+            ++it;
+            ++idx;
+          }
+          out.RemoveItemRec(it->first);
+        }
+      }
+      break;
+      case ChangeType::ModifyFile:
+        //LogCvmfs(kLogCvmfs, kLogStdout, "ModifyFile");
+        break;
+      default:
+        LogCvmfs(kLogCvmfs, kLogStderr, "Unknown change type. Aborting.");
+        abort();
+        break;
+    }
+  }
+
+  return out;
 }
 
 receiver::Params MakeMergeToolParams(const std::string& name) {
@@ -90,20 +150,18 @@ receiver::Params MakeMergeToolParams(const std::string& name) {
 class T_CatalogMergeTool : public ::testing::Test {};
 
 RC_GTEST_FIXTURE_PROP(T_CatalogMergeTool, InOut, ()) {
-  // "Initial commit"
-  DirSpec spec0;
-
   CatalogTestTool tester("test");
   RC_ASSERT(tester.Init());
 
-  RC_ASSERT(tester.Apply("initial", spec0));
+  // First actual commit
+  DirSpec spec1 = MakeBaseSpec();
+  RC_ASSERT(tester.Apply("first", spec1));
 
   manifest::Manifest first_manifest = *(tester.manifest());
 
-  // First actual commit
-  DirSpec spec1 = MakeBaseSpec();
-
-  RC_ASSERT(tester.Apply("second", spec1));
+  // Second commit with (target) modified director spec
+  DirSpec spec2 = ModifySpec(spec1);
+  RC_ASSERT(tester.Apply("target", spec2));
 
   UniquePtr<ServerTool> server_tool(new ServerTool());
   RC_ASSERT(server_tool->InitDownloadManager(true));
@@ -131,18 +189,16 @@ RC_GTEST_FIXTURE_PROP(T_CatalogMergeTool, InOut, ()) {
   RC_ASSERT(
       tester.DirSpecAtRootHash(output_manifest->catalog_hash(), &output_spec));
 
-  spec1.Sort();
-  std::string spec1_str;
-  spec1.ToString(&spec1_str);
-  output_spec.Sort();
+  std::string target_spec_str;
+  spec2.ToString(&target_spec_str);
   std::string out_spec_str;
   output_spec.ToString(&out_spec_str);
 
   /*
-  LogCvmfs(kLogCvmfs, kLogStdout, "Target spec:\n%s", spec1_str.c_str());
+  LogCvmfs(kLogCvmfs, kLogStdout, "Target spec:\n%s", target_spec_str.c_str());
   LogCvmfs(kLogCvmfs, kLogStdout, "Output spec:\n%s", out_spec_str.c_str());
   */
 
   // the printed form of the target and output dir specs should be the same
-  RC_ASSERT(0 == strcmp(spec1_str.c_str(), out_spec_str.c_str()));
+  RC_ASSERT(0 == strcmp(target_spec_str.c_str(), out_spec_str.c_str()));
 }

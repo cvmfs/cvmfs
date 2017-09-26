@@ -35,6 +35,8 @@ struct DirSpecItem {
 
 class DirSpec {
  public:
+  typedef std::map<std::string, DirSpecItem> ItemList;
+
   DirSpec();
 
   bool AddFile(const std::string& name,
@@ -53,32 +55,29 @@ class DirSpec {
 
   void ToString(std::string* out);
 
+  const ItemList& items() const { return items_; }
+
   size_t NumItems() const { return items_.size(); }
 
-  const DirSpecItem& Item(const size_t idx) const { return items_[idx]; }
+  const DirSpecItem* Item(const std::string& full_path) const;
 
-  void SetItem(const DirSpecItem& item, const size_t idx) {
-    if (idx < NumItems()) {
-      items_[idx] = item;
+  void SetItem(const DirSpecItem& item, const std::string& full_path) {
+    ItemList::iterator it = items_.find(full_path);
+    if (it != items_.end()) {
+      it->second = item;
     }
   }
 
-  void RemoveItem(const size_t idx) {
-    if (idx < NumItems()) {
-      items_.erase(items_.begin() + idx);
-    }
-  }
+  void RemoveItemRec(const std::string& full_path);
 
   std::vector<std::string> GetDirs() const;
-
-  void Sort();
 
  private:
   bool AddDir(const std::string& name, const std::string& parent);
   bool RmDir(const std::string& name, const std::string& parent);
   bool HasDir(const std::string& name) const;
 
-  std::vector<DirSpecItem> items_;
+  ItemList items_;
   std::set<std::string> dirs_;
 };
 

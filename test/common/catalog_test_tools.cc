@@ -71,9 +71,9 @@ bool DirSpec::AddFile(const std::string& name, const std::string& parent,
     return false;
   }
 
-  items_.push_back(DirSpecItem(
-      catalog::DirectoryEntryTestFactory::RegularFile(name, size, hash), xattrs,
-      parent));
+  const catalog::DirectoryEntry entry = catalog::DirectoryEntryTestFactory::RegularFile(name, size, hash);
+  const std::string full_path = entry.GetFullPath(parent);
+  items_.insert(std::make_pair(full_path, DirSpecItem(entry, xattrs, parent)));
   return true;
 }
 
@@ -84,9 +84,9 @@ bool DirSpec::AddDirectory(const std::string& name, const std::string& parent,
   }
 
   bool ret = AddDir(name, parent);
-  items_.push_back(
-      DirSpecItem(catalog::DirectoryEntryTestFactory::Directory(name, size),
-                  XattrList(), parent));
+  const catalog::DirectoryEntry entry = catalog::DirectoryEntryTestFactory::Directory(name, size);
+  const std::string full_path = entry.GetFullPath(parent);
+  items_.insert(std::make_pair(full_path, DirSpecItem(entry, XattrList(), parent)));
   return ret;
 }
 
@@ -101,14 +101,17 @@ bool DirSpec::AddDirectoryEntry(const catalog::DirectoryEntry& entry,
   if (entry.IsDirectory()) {
     ret = AddDir(std::string(entry.name().c_str()), parent);
   }
-  items_.push_back(DirSpecItem(entry, xattrs, parent));
-  return true;
+
+  const std::string full_path = entry.GetFullPath(parent);
+  items_.insert(std::make_pair(full_path, DirSpecItem(entry, xattrs, parent)));
+  return ret;
 }
 
 void DirSpec::ToString(std::string* out) {
   std::ostringstream ostr;
-  for (size_t i = 0u; i < NumItems(); ++i) {
-    const DirSpecItem& item = Item(i);
+  for (DirSpec::ItemList::const_iterator it = items_.begin();
+       it != items_.end(); ++it) {
+    const DirSpecItem& item = it->second;
     char item_type = ' ';
     if (item.entry_base().IsRegular()) {
       item_type = 'F';
@@ -124,13 +127,44 @@ void DirSpec::ToString(std::string* out) {
   *out = ostr.str();
 }
 
-static bool CompareFunction(const DirSpecItem& item1,
-                            const DirSpecItem& item2) {
-  std::string path1 = item1.entry_base().GetFullPath(item1.parent());
-  std::string path2 = item2.entry_base().GetFullPath(item2.parent());
-  AddLeadingSlash(&path1);
-  AddLeadingSlash(&path2);
-  return strcmp(path1.c_str(), path2.c_str()) < 0;
+const DirSpecItem* DirSpec::Item(const std::string& full_path) const {
+  ItemList::const_iterator it = items_.find(full_path);
+  if (it != items_.end()) {
+    return &it->second;
+  }
+  return NULL;
+}
+
+static void RemoveItemHelper(const DirSpec& spec, const std::string& full_path, std::vector<std::string>* acc) {
+  DirSpec::ItemList::const_iterator it = spec.items().find(full_path);
+  if (it != spec.items().end()) {
+    const DirSpecItem item = it->second;
+    acc->push_back(full_path);
+    if (item.entry_base().IsDirectory()) {
+      std::string rel_full_path(full_path);
+      RemoveLeadingSlash(&rel_full_path);
+      for (DirSpec::ItemList::const_iterator it = spec.items().begin();
+           it != spec.items().end(); ++it) {
+        if (it->second.parent() == rel_full_path) {
+          const std::string p = it->second.entry_base().GetFullPath(rel_full_path);
+          RemoveItemHelper(spec, p, acc);
+        }
+      }
+    }
+  }
+}
+
+void DirSpec::RemoveItemRec(const std::string& full_path) {
+  std::vector<std::string> acc(0);
+  RemoveItemHelper(*this, full_path, &acc);
+
+  for (size_t i = 0u; i < acc.size(); ++i) {
+    const DirSpecItem* item = Item(acc[i]);
+    if (item->entry_base().IsDirectory()) {
+      RmDir(std::string(item->entry_base().name().c_str()), item->parent());
+    }
+    items_.erase(acc[i]);
+  }
 }
 
 std::vector<std::string> DirSpec::GetDirs() const {
@@ -138,10 +172,6 @@ std::vector<std::string> DirSpec::GetDirs() const {
   std::copy(dirs_.begin(), dirs_.end(), std::back_inserter(out));
 
   return out;
-}
-
-void DirSpec::Sort() {
-  std::sort(items_.begin(), items_.end(), CompareFunction);
 }
 
 bool DirSpec::AddDir(const std::string& name, const std::string& parent) {
@@ -156,7 +186,7 @@ bool DirSpec::AddDir(const std::string& name, const std::string& parent) {
 
 bool DirSpec::RmDir(const std::string& name, const std::string& parent) {
   std::string full_path = parent + "/" + name;
-  AddLeadingSlash(&full_path);
+  RemoveLeadingSlash(&full_path);
   if (!HasDir(full_path)) {
     return false;
   }
@@ -213,8 +243,9 @@ bool CatalogTestTool::Apply(const std::string& id, const DirSpec& spec) {
     return false;
   }
 
-  for (size_t i = 0; i < spec.NumItems(); ++i) {
-    const DirSpecItem& item = spec.Item(i);
+  for (DirSpec::ItemList::const_iterator it = spec.items().begin();
+       it != spec.items().end(); ++it) {
+    const DirSpecItem& item = it->second;
     if (item.entry_.IsRegular()) {
       catalog_mgr->AddFile(item.entry_base(), item.xattrs(), item.parent());
     } else if (item.entry_.IsDirectory()) {

@@ -89,7 +89,7 @@ TEST_F(T_CatalogMergeTool, CRUD) {
   EXPECT_TRUE(spec2.AddFile("new_file.txt", "dir/new_dir", hashes[3], 1024));
 
   // enlarge "/dir/file1" in spec2
-  DirSpecItem item = spec2.Item(1);
+  const DirSpecItem item = *spec2.Item("dir/file1");
   catalog::DirectoryEntryBase entry = item.entry_base();
   XattrList xattrs = item.xattrs();
   const std::string parent = item.parent();
@@ -97,11 +97,10 @@ TEST_F(T_CatalogMergeTool, CRUD) {
   catalog::DirectoryEntry updated_entry =
       catalog::DirectoryEntryTestFactory::RegularFile(
         entry.name().c_str(), entry.size() * 2, entry.checksum());
-  spec2.SetItem(DirSpecItem(updated_entry, xattrs, parent), 1);
+  spec2.SetItem(DirSpecItem(updated_entry, xattrs, parent), "dir/file1");
 
   // remove "dir/dir" and "dir/dir/file2"
-  spec2.RemoveItem(3);
-  spec2.RemoveItem(2);
+  spec2.RemoveItemRec("dir/dir");
 
   EXPECT_TRUE(tester.Apply("second", spec2));
 
@@ -131,10 +130,8 @@ TEST_F(T_CatalogMergeTool, CRUD) {
   EXPECT_TRUE(
       tester.DirSpecAtRootHash(output_manifest->catalog_hash(), &output_spec));
 
-  spec2.Sort();
   std::string spec2_str;
   spec2.ToString(&spec2_str);
-  output_spec.Sort();
   std::string out_spec_str;
   output_spec.ToString(&out_spec_str);
 
@@ -147,8 +144,8 @@ TEST_F(T_CatalogMergeTool, CRUD) {
   EXPECT_EQ(0, strcmp(spec2_str.c_str(), out_spec_str.c_str()));
 
   // check size of "/dir/file1"
-  EXPECT_EQ(8192u, output_spec.Item(1).entry_base().size());
+  EXPECT_EQ(8192u, output_spec.Item("dir/file1")->entry_base().size());
 
   // check size of "/dir/new_dir/new_file.txt"
-  EXPECT_EQ(1024u, output_spec.Item(3).entry_base().size());
+  EXPECT_EQ(1024u, output_spec.Item("dir/new_dir/new_file.txt")->entry_base().size());
 }
