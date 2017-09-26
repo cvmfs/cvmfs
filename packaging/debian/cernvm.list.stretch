@@ -1,2 +1,2 @@
 deb http://cvmrepo.web.cern.ch/cvmrepo/apt stretch-prod main
-deb http://cvmrepo.web.cern.ch/cvmrepo/apt stretch-testing main
+# deb http://cvmrepo.web.cern.ch/cvmrepo/apt stretch-testing main
