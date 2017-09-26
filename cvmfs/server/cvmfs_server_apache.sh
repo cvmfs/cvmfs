@@ -296,11 +296,12 @@ create_apache_config_for_global_info() {
 
 
 create_apache_config_for_webapi() {
-  ! has_apache_config_file $(get_apache_conf_filename webapi) || return 0
-  create_apache_config_file "$(get_apache_conf_filename webapi)" << EOF
+  # start the name with a plus sign to make sure it is read by
+  #  apache before the configs for individual repositories
+  ! has_apache_config_file $(get_apache_conf_filename +webapi) || return 0
+  create_apache_config_file "$(get_apache_conf_filename +webapi)" << EOF
 # Created by cvmfs_server.  Don't touch.
-RewriteEngine on
-RewriteRule ^/cvmfs/([^/]+)/api/(.*)\$ /var/www/wsgi-scripts/cvmfs-server/cvmfs-api.wsgi/\$1/\$2
+AliasMatch ^/cvmfs/([^/]+)/api/(.*)\$ /var/www/wsgi-scripts/cvmfs-server/cvmfs-api.wsgi/\$1/\$2
 WSGIDaemonProcess cvmfsapi threads=64 display-name=%{GROUP} \
   python-path=/usr/share/cvmfs-server/webapi
 <Directory /var/www/wsgi-scripts/cvmfs-server>
@@ -331,7 +332,7 @@ remove_config_files() {
     remove_apache_config_file "$apache_conf_file_name"
     if [ -z "$(get_or_guess_repository_name)" ]; then
       # no repositories left, remove extra config files
-      for confname in webapi info; do
+      for confname in +webapi info; do
         apache_conf_file_name="$(get_apache_conf_filename $confname)"
         if has_apache_config_file "$apache_conf_file_name"; then
           remove_apache_config_file "$apache_conf_file_name"
