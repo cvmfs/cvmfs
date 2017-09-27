@@ -1,0 +1,24 @@
+cvmfs_test_name="Variant symlinks"
+cvmfs_test_autofs_on_startup=false
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "*** create variant symlink"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  ln -s '$(CVMFS_VAR_LINK)' /cvmfs/$CVMFS_TEST_REPO/varlink || return 10
+  publish_repo $CVMFS_TEST_REPO || return 11
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+  echo "*** raw link is $(readlink /cvmfs/$CVMFS_TEST_REPO/varlink)"
+  echo '$(CVMFS_VAR_LINK)' > varlink.reference
+  readlink /cvmfs/$CVMFS_TEST_REPO/varlink > varlink.published
+  diff varlink.reference varlink.published || return 20
+
+  return 0
+}
+

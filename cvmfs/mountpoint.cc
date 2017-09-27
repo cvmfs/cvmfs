@@ -349,7 +349,7 @@ FileSystem::FileSystem(const FileSystem::FileSystemInfo &fs_info)
   g_gid = getegid();
 
   string optarg;
-  if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_SERVER_CACHE",
+  if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_SERVER_MODE",
                                          kDefaultCacheMgrInstance),
                              &optarg)
       && options_mgr_->IsOn(optarg))
