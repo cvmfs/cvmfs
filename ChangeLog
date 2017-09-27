@@ -1,4 +1,5 @@
 2.4.2:
+  * Prevent diff viewer from recursing into hidden directories (CVM-1384)
   * Prevent overlayfs repositories on XFS ftype=0 spool directories (CVM-1385)
   * Cache GeoAPI replies for 5 minutes, improve WSGI config (CVM-1349)
   * Improve logging for cache plugins
