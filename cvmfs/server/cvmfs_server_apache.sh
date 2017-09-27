@@ -122,7 +122,7 @@ ensure_enabled_apache_modules() {
 
   local restart=0
   local retcode=0
-  local modules="headers expires rewrite"
+  local modules="headers expires"
 
   for module in $modules; do
     $apache2ctl_bin -M 2>/dev/null | grep -q "$module" && continue
