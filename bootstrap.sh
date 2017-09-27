@@ -236,7 +236,7 @@ build_lib() {
       do_build "mongoose"
       ;;
     rapidcheck)
-      if [ x"BUILD_QC_TESTS" != x"" ]  ; then
+      if [ x"$BUILD_QC_TESTS" != x"" ]; then
         do_extract "rapidcheck" "rapidcheck-${RAPIDCHECK_VERSION}.tar.gz"
         do_build "rapidcheck"
       fi
@@ -251,7 +251,10 @@ build_lib() {
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 # Build a list of libs that need to be built
-missing_libs="libcurl pacparser zlib sparsehash leveldb googletest libgeoip tbb protobuf googlebench sqlite3 vjson sha2 sha3 mongoose rapidcheck"
+missing_libs="libcurl pacparser zlib sparsehash leveldb googletest libgeoip tbb protobuf googlebench sqlite3 vjson sha2 sha3 mongoose"
+if [ x"$BUILD_QC_TESTS" != x"" ]; then
+    missing_libs="$missing_libs rapidcheck"
+fi
 
 if [ -f $externals_install_dir/.bootstrapDone ]; then
   existing_libs=$(cat $externals_install_dir/.bootstrapDone)
