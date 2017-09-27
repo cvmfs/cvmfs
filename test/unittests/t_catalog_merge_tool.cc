@@ -147,5 +147,6 @@ TEST_F(T_CatalogMergeTool, CRUD) {
   EXPECT_EQ(8192u, output_spec.Item("dir/file1")->entry_base().size());
 
   // check size of "/dir/new_dir/new_file.txt"
-  EXPECT_EQ(1024u, output_spec.Item("dir/new_dir/new_file.txt")->entry_base().size());
+  EXPECT_EQ(1024u,
+            output_spec.Item("dir/new_dir/new_file.txt")->entry_base().size());
 }

@@ -846,7 +846,8 @@ bool RemoveTree(const std::string &path) {
 /**
  * Returns ls $dir/GLOB$suffix
  */
-std::vector<std::string> FindFiles(const std::string &dir, const std::string &suffix) {
+std::vector<std::string> FindFiles(const std::string &dir,
+                                   const std::string &suffix) {
   std::vector<std::string> result;
   DIR *dirp = opendir(dir.c_str());
   if (!dirp)
@@ -1427,7 +1428,9 @@ bool SafeReadToString(int fd, std::string *final_result) {
   return true;
 }
 
-bool SafeWriteToFile(const std::string &content, const std::string &path, int mode) {
+bool SafeWriteToFile(const std::string &content,
+                     const std::string &path,
+                     int mode) {
   int fd = open(path.c_str(), O_WRONLY | O_CREAT, mode);
   if (fd < 0) return false;
   bool retval = SafeWrite(fd, content.data(), content.size());
