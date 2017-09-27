@@ -17,7 +17,7 @@ set(CVMFS_QC_FILES
   ../common/testutil.cc
   ../common/catalog_test_tools.cc
 
-  qc_dummy.cc
+  qc_example.cc
   qc_catalog_merge_tool.cc
 )
 

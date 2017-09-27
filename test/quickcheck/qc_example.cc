@@ -9,7 +9,7 @@
 #include <algorithm>
 #include <vector>
 
-class T_QcDummy : public ::testing::Test {};
+class T_QcExample : public ::testing::Test {};
 
 RC_GTEST_PROP(QC, ReverseVectorTwice, (const std::vector<int>& l0)) {
   auto l1 = l0;
@@ -18,7 +18,7 @@ RC_GTEST_PROP(QC, ReverseVectorTwice, (const std::vector<int>& l0)) {
   RC_ASSERT(l0 == l1);
 }
 
-RC_GTEST_FIXTURE_PROP(T_QcDummy, MapIsOrderedByKey, ()) {
+RC_GTEST_FIXTURE_PROP(T_QcExample, MapIsOrderedByKey, ()) {
   const auto non_empty_seq = *rc::gen::nonEmpty<std::vector<int>>();
   auto m0 = std::map<int, int>{};
   for (const auto& val : non_empty_seq) {
