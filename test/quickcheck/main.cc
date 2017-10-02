@@ -10,7 +10,7 @@
 #include "monitor.h"
 
 int main(int argc, char **argv) {
-  Watchdog *watchdog = Watchdog::Create("/tmp/stacktrace.cvmfs_unittests");
+  Watchdog *watchdog = Watchdog::Create("/tmp/stacktrace.cvmfs_qc");
   assert(watchdog != NULL);
   // watchdog->Spawn();
   CvmfsEnvironment* env = new CvmfsEnvironment(argc, argv);
