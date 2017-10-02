@@ -144,6 +144,22 @@ receiver::Params MakeMergeToolParams(const std::string& name) {
 
 class T_CatalogMergeTool : public ::testing::Test {};
 
+/**
+ * This is a basic "what goes in, must also come out" test, implemented with
+ * random data generation from RapidCheck:
+ *
+ * 1. A directory tree specification (DirSpec) is randomly generated in
+ *    the MakeBaseSpec function (state_1)
+ * 2. The DirSpec object created at the previous step is randomly modified
+ *    in the ModifySpec function (state_2)
+ * 3. The two DirSpec objects are applied to the CatalogTestTool as sequential "states" of
+ *    of the test repository. The CatalogTestTool object will create catalogs corresponding
+      to these states.
+ * 4. A CatalogMergeTool is created to merge the changes of state_2 - state_1 onto state_1
+ *    The resulting catalog, corresponding to state_3 should be equivalent to state_2.
+ *
+ * Note: This testing strategy can be later expanded to to a three-way merge.
+ */
 RC_GTEST_FIXTURE_PROP(T_CatalogMergeTool, InOut, ()) {
   CatalogTestTool tester("test");
   RC_ASSERT(tester.Init());
