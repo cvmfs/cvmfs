@@ -106,7 +106,7 @@ DirSpec ModifySpec(const DirSpec& in) {
       }
       break;
       case ChangeType::ModifyFile:
-        //LogCvmfs(kLogCvmfs, kLogStdout, "ModifyFile");
+        // TODO(radu): Implement file content modifications
         break;
       default:
         LogCvmfs(kLogCvmfs, kLogStderr, "Unknown change type. Aborting.");
