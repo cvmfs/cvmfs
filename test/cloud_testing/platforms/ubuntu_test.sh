@@ -34,7 +34,7 @@ fi
 if [ x"$(lsb_release -cs)" = x"precise" ]; then
   # Ubuntu 12.04
   # aufs, expected failure
-  CVMFS_EXCLUDE="src/700-overlayfs_validation src/800-repository_services"
+  CVMFS_EXCLUDE="src/614-geoservice src/700-overlayfs_validation src/800-repository_services"
 
   echo "Ubuntu 12.04... using aufs instead of overlayfs"
 fi
