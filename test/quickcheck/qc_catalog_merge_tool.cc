@@ -13,12 +13,7 @@
 #include "xattr.h"
 
 namespace {
-const char* hashes[] = {"b026324c6904b2a9cb4b88d6d61c81d1000000",
-                        "26ab0db90d72e28ad0ba1e22ee510510000000",
-                        "6d7fce9fee471194aa8b5b6e47267f03000000",
-                        "48a24b70a0b376535542b996af517398000000",
-                        "1dcca23355272056f04fe8bf20edfce0000000",
-                        "11111111111111111111111111111111111111"};
+const char* test_file_hash = "b026324c6904b2a9cb4b88d6d61c81d1000000";
 
 enum class ItemType : int {
   File,
@@ -52,7 +47,7 @@ DirSpec MakeBaseSpec() {
     if (entry_type == static_cast<int>(ItemType::File)) {
       const auto file_name = "file" + std::to_string(i);
       const auto file_size = *rc::gen::arbitrary<size_t>();
-      RC_ASSERT(spec.AddFile(file_name, parent, hashes[0], file_size));
+      RC_ASSERT(spec.AddFile(file_name, parent, test_file_hash, file_size));
     } else if (entry_type == static_cast<int>(ItemType::Directory)) {
       const auto dir_name = "dir" + std::to_string(i);
       RC_ASSERT(spec.AddDirectory(dir_name, parent, 1));
@@ -79,7 +74,7 @@ DirSpec ModifySpec(const DirSpec& in) {
         const auto parent = dirs[parent_index];
         const auto file_name = "new_file" + std::to_string(i);
         const auto file_size = *rc::gen::arbitrary<size_t>();
-        RC_ASSERT(out.AddFile(file_name, parent, hashes[0], file_size));
+        RC_ASSERT(out.AddFile(file_name, parent, test_file_hash, file_size));
       }
       break;
       case ChangeType::AddDir:
