@@ -52,9 +52,6 @@ class T_Reactor : public ::testing::Test {
   T_Reactor() : ready_(1, 1), thread_() {}
 
   virtual void SetUp() {
-    SetLogCustomFile(0, "/tmp/t_reactor_out.log");
-    SetLogCustomFile(1, "/tmp/t_reactor_err.log");
-
     ASSERT_NE(-1, pipe(to_reactor_));
     ASSERT_NE(-1, pipe(from_reactor_));
 
