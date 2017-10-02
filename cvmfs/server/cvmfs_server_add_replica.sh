@@ -161,6 +161,7 @@ EOF
   fi
 
   if is_local_upstream $upstream && [ $configure_apache -eq 1 ]; then
+    ensure_enabled_apache_modules
     create_apache_config_for_endpoint $alias_name $storage_dir "with wsgi"
     create_apache_config_for_global_info
     reload_apache > /dev/null

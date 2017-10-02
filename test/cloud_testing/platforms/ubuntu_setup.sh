@@ -94,8 +94,8 @@ install_from_repo jq || die "fail (installing jq)"
 # On Ubuntu 16.04 install backported autofs
 if [ "x$(lsb_release -cs)" = "xxenial" ]; then
   install_from_repo wget || die "fail (installing wget)"
-  wget https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release_2.0-1_all.deb
-  sudo dpkg -i cvmfs-release_2.0-1_all.deb || die "fail (installing cvmfs-release)"
+  wget https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release_2.0-3_all.deb
+  sudo dpkg -i cvmfs-release_2.0-3_all.deb || die "fail (installing cvmfs-release)"
   sudo apt-get update
   sudo apt-get install autofs || die "fail installing backported autofs"
   sudo cvmfs_config setup || die "re-running cvmfs setup"

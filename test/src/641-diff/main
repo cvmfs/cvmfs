@@ -112,6 +112,21 @@ EOF
     > reverse.output || return 31
   diff reverse.reference reverse.output || return 32
 
+  echo "*** check skipping of hidden .cvmfs directory"
+  echo "CVMFS_VIRTUAL_DIR=true" | \
+    sudo tee -a /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf || return 40
+  start_transaction $CVMFS_TEST_REPO || return $?
+  publish_repo $CVMFS_TEST_REPO || return $?
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+  cat << EOF > hiddencvmfs.reference
+S F 1
+S S 0
+S D 7
+S N 1
+EOF
+  cvmfs_server diff -m $CVMFS_TEST_REPO > hiddencvmfs.output || return 41
+  diff hiddencvmfs.reference hiddencvmfs.output || return 42
+
   return 0
 }
 

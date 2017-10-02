@@ -501,7 +501,15 @@ check_overlayfs_version() {
       if [ "x$scratch_fstype" = "xext3" ] || [ "x$scratch_fstype" = "xext4" ] ; then
         return 0
       fi
-      echo "overlayfs scratch /var/spool/cvmfs is type $scratch_fstype, but ext3 or ext4 required"
+      if [ "x$scratch_fstype" = "xxfs" ] ; then
+        if [ "x$(xfs_info /var/spool/cvmfs 2>/dev/null | grep ftype=1)" != "x" ] ; then
+          return 0
+        else
+          echo "XFS with ftype=0 is not supported for /var/spool/cvmfs. XFS with ftype=1 is required"
+          return 1
+        fi
+      fi
+      echo "overlayfs scratch /var/spool/cvmfs is type $scratch_fstype, but ext3, ext4 or xfs(ftype=1) required"
       return 1
     fi
   fi
