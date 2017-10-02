@@ -16,6 +16,12 @@
 #include "statistics.h"
 #include "upload.h"
 
+/**
+ * Multiple DirSpecItem objects make up a DirSpec object
+ *
+ * The DirSpecItem encapsulates the DirectoryEntry, XattrList and parent
+ * directory associated with a DirSpec item.
+ */
 struct DirSpecItem {
   catalog::DirectoryEntry entry_;
   XattrList xattrs_;
@@ -33,6 +39,17 @@ struct DirSpecItem {
   const std::string& parent() const { return parent_; }
 };
 
+/**
+ * Declarative specification of the state of a repository
+ *
+ * The DirSpec is used to specify the contents of a repository. Currently,
+ * the items of a DirSpec can either be directories or files.
+ *
+ * The DirSpec object is usually given as input to the CatalogTestTool, which
+ * will build a catalog with the specified contents. Additionally, the
+ * CatalogTestTool is also able to synthetise a DirSpec based on the contents
+ * of an arbitrary catalog, referenced by a root hash.
+ */
 class DirSpec {
  public:
   typedef std::map<std::string, DirSpecItem> ItemList;
@@ -81,7 +98,20 @@ class DirSpec {
   std::set<std::string> dirs_;
 };
 
-
+/**
+ * A helper class creating catalog instances for testing
+ *
+ * The CatalogTestTool is a helper class which can create create
+ * repository catalogs based on an input specification (DirSpec).
+ *
+ * A given DirSpec is realized with the Apply(...) method.
+ *
+ * The history() method returns a list of root hashes of all the
+ * realized catalogs.
+ *
+ * Finally, the class is also able to construct a DirSpec object
+ * based on the state at a given root hash.
+ */
 class CatalogTestTool : public ServerTool {
  public:
   typedef std::vector<std::pair<std::string, shash::Any> > History;
