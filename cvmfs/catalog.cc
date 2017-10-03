@@ -487,6 +487,14 @@ uint64_t Catalog::GetTTL() const {
 }
 
 
+bool Catalog::HasExplicitTTL() const {
+  pthread_mutex_lock(lock_);
+  const bool result = database().HasProperty("TTL");
+  pthread_mutex_unlock(lock_);
+  return result;
+}
+
+
 bool Catalog::GetVOMSAuthz(string *authz) const {
   bool result;
   pthread_mutex_lock(lock_);

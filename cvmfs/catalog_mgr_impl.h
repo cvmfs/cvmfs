@@ -460,6 +460,15 @@ bool AbstractCatalogManager<CatalogT>::GetVOMSAuthz(std::string *authz) const {
 
 
 template <class CatalogT>
+bool AbstractCatalogManager<CatalogT>::HasExplicitTTL() const {
+  ReadLock();
+  const bool result = GetRootCatalog()->HasExplicitTTL();
+  Unlock();
+  return result;
+}
+
+
+template <class CatalogT>
 uint64_t AbstractCatalogManager<CatalogT>::GetTTL() const {
   ReadLock();
   const uint64_t ttl = GetRootCatalog()->GetTTL();

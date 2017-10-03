@@ -675,8 +675,9 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 
   // Should be before the syncronization starts to avoid race of GetTTL with
   // other sqlite operations
-  if ((params.ttl_seconds > 0) &&
-      (params.ttl_seconds != catalog_manager.GetTTL()))
+  if ( (params.ttl_seconds > 0) &&
+       ((params.ttl_seconds != catalog_manager.GetTTL())
+        || !catalog_manager.HasExplicitTTL()) )
   {
     LogCvmfs(kLogCvmfs, kLogStdout, "Setting repository TTL to %" PRIu64 "s",
              params.ttl_seconds);
