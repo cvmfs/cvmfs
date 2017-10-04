@@ -7,6 +7,7 @@
 #include <pthread.h>
 #include <stdint.h>
 
+#include <cassert>
 #include <map>
 #include <set>
 #include <string>
@@ -17,6 +18,50 @@
 #include "hash.h"
 #include "murmur.h"
 #include "smallhash.h"
+#include "util/single_copy.h"
+
+/**
+ * A SessionCtx stores the session information related to the current cache
+ * plugin callback in thread-local-storage.  Singleton.
+ *
+ * TODO(jblomer): merge code with ClientCtx
+ */
+class SessionCtx : SingleCopy {
+ public:
+  struct ThreadLocalStorage {
+    ThreadLocalStorage(uint64_t id, char *reponame, char *client_instance)
+      : id(id)
+      , reponame(reponame)
+      , client_instance(client_instance)
+      , is_set(true)
+    { }
+
+    uint64_t id;
+    char *reponame;
+    char *client_instance;
+    bool is_set;  ///< either not yet set or deliberately unset
+  };
+
+  static SessionCtx *GetInstance();
+  static void CleanupInstance();
+  ~SessionCtx();
+
+  void Set(uint64_t id, char *reponame, char *client_instance);
+  void Unset();
+  void Get(uint64_t *id, char **reponame, char **client_instance);
+  bool IsSet();
+
+ private:
+  static SessionCtx *instance_;
+  static void TlsDestructor(void *data);
+
+  SessionCtx();
+
+  pthread_key_t thread_local_storage_;
+  pthread_mutex_t *lock_tls_blocks_;
+  std::vector<ThreadLocalStorage *> tls_blocks_;
+};
+
 
 class CachePlugin {
  public:
@@ -105,6 +150,48 @@ class CachePlugin {
     int64_t req_id;
   };
 
+  /**
+   * The char pointers are prepared on Handshake and removed when the session
+   * closes.  They are created to be consumed by the cvmcache_get_session() API.
+   */
+  struct SessionInfo {
+    SessionInfo() : id(0), reponame(NULL), client_instance(NULL) { }
+    SessionInfo(uint64_t id, const std::string &name);
+
+    uint64_t id;
+    std::string name;
+    char *reponame;
+    char *client_instance;
+  };
+
+  /**
+   * RAII form of the SessionCtx.  On construction, automatically sets the
+   * session context if the session id is found.  On destruction, unsets the
+   * session information.
+   */
+  class SessionCtxGuard {
+   public:
+    SessionCtxGuard(uint64_t session_id, CachePlugin *plugin) {
+      char *reponame = NULL;
+      char *client_instance = NULL;
+      std::map<uint64_t, SessionInfo>::const_iterator iter =
+        plugin->sessions_.find(session_id);
+      if (iter != plugin->sessions_.end()) {
+        reponame = iter->second.reponame;
+        client_instance = iter->second.client_instance;
+      }
+      SessionCtx *session_ctx = SessionCtx::GetInstance();
+      assert(session_ctx);
+      session_ctx->Set(session_id, reponame, client_instance);
+    }
+
+    ~SessionCtxGuard() {
+      SessionCtx *session_ctx = SessionCtx::GetInstance();
+      assert(session_ctx);
+      session_ctx->Unset();
+    }
+  };
+
   static void *MainProcessRequests(void *data);
 
   inline uint64_t NextSessionId() {
@@ -165,7 +252,7 @@ class CachePlugin {
   atomic_int64 next_lst_id_;
   SmallHashDynamic<UniqueRequest, uint64_t> txn_ids_;
   std::set<int> connections_;
-  std::map<uint64_t, std::string> sessions_;
+  std::map<uint64_t, SessionInfo> sessions_;
   pthread_t thread_io_;
   int pipe_ctrl_[2];
 };  // class CachePlugin

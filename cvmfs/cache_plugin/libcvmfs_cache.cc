@@ -10,6 +10,7 @@
 
 #include <unistd.h>
 
+#include <cassert>
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -309,6 +310,15 @@ void cvmcache_terminate(struct cvmcache_context *ctx) {
 
 uint32_t cvmcache_max_object_size(struct cvmcache_context *ctx) {
   return ctx->plugin->max_object_size();
+}
+
+void cvmcache_get_session(cvmcache_session *session) {
+  assert(session != NULL);
+  SessionCtx *session_ctx = SessionCtx::GetInstance();
+  assert(session_ctx);
+  session_ctx->Get(&(session->id),
+                   &(session->repository_name),
+                   &(session->client_instance));
 }
 
 void cvmcache_spawn_watchdog(const char *crash_dump_file) {

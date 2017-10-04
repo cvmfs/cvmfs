@@ -50,9 +50,18 @@ class MockCachePlugin : public CachePlugin {
     next_status = -1;
     listing_nitems = 0;
     listing_type = cvmfs::OBJECT_REGULAR;
+    last_id = 0;
+    last_reponame = NULL;
+    last_client_instance = NULL;
   }
 
   virtual ~MockCachePlugin() { }
+
+  void GetSession(uint64_t *id, char **reponame, char **client_instance) {
+    SessionCtx *session_ctx = SessionCtx::GetInstance();
+    assert(session_ctx);
+    session_ctx->Get(id, reponame, client_instance);
+  }
 
   string known_object_content;
   shash::Any known_object;
@@ -62,12 +71,16 @@ class MockCachePlugin : public CachePlugin {
   int next_status;
   unsigned listing_nitems;
   cvmfs::EnumObjectType listing_type;
+  uint64_t last_id;
+  char *last_reponame;
+  char *last_client_instance;
 
  protected:
   virtual cvmfs::EnumStatus ChangeRefcount(
     const shash::Any &id,
     int32_t change_by)
   {
+    GetSession(&last_id, &last_reponame, &last_client_instance);
     if (next_status >= 0)
       return static_cast<cvmfs::EnumStatus>(next_status);
     if (id == new_object)
@@ -106,6 +119,7 @@ class MockCachePlugin : public CachePlugin {
     uint32_t *size,
     unsigned char *buffer)
   {
+    GetSession(&last_id, &last_reponame, &last_client_instance);
     if (next_status >= 0)
       return static_cast<cvmfs::EnumStatus>(next_status);
     const char *data;
@@ -208,7 +222,8 @@ class T_ExternalCacheManager : public ::testing::Test {
 
     fd_client = ConnectSocket(socket_path_);
     ASSERT_GE(fd_client, 0);
-    cache_mgr_ = ExternalCacheManager::Create(fd_client, nfiles, "test");
+    cache_mgr_ =
+      ExternalCacheManager::Create(fd_client, nfiles, "test:instance");
     ASSERT_TRUE(cache_mgr_ != NULL);
     quota_mgr_ = ExternalQuotaManager::Create(cache_mgr_);
     ASSERT_TRUE(cache_mgr_ != NULL);
@@ -236,6 +251,15 @@ const unsigned T_ExternalCacheManager::nfiles = 128;
 TEST_F(T_ExternalCacheManager, Connection) {
   EXPECT_GE(cache_mgr_->session_id(), 0);
   EXPECT_EQ(getpid(), cache_mgr_->quota_mgr()->GetPid());
+
+  // Invalid query for session information outside callback
+  uint64_t id;
+  char *reponame;
+  char *client_instance;
+  mock_plugin_->GetSession(&id, &reponame, &client_instance);
+  EXPECT_EQ(0U, id);
+  EXPECT_EQ(NULL, reponame);
+  EXPECT_EQ(NULL, client_instance);
 }
 
 
@@ -244,12 +268,16 @@ TEST_F(T_ExternalCacheManager, OpenClose) {
   shash::Any rnd_id(shash::kSha1);
   rnd_id.Randomize();
   EXPECT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::Bless(rnd_id)));
+  uint64_t session_id = mock_plugin_->last_id;
+  EXPECT_EQ(0, strcmp(mock_plugin_->last_reponame, "test"));
+  EXPECT_EQ(0, strcmp(mock_plugin_->last_client_instance, "instance"));
 
   int fds[nfiles];
   for (unsigned i = 0; i < nfiles; ++i) {
     fds[i] = cache_mgr_->Open(CacheManager::Bless(mock_plugin_->known_object));
     EXPECT_GE(fds[i], 0);
   }
+  EXPECT_EQ(session_id, mock_plugin_->last_id);
   EXPECT_EQ(static_cast<int>(nfiles), mock_plugin_->known_object_refcnt);
   EXPECT_EQ(-ENFILE,
             cache_mgr_->Open(CacheManager::Bless(mock_plugin_->known_object)));
@@ -607,6 +635,7 @@ TEST_F(T_ExternalCacheManager, SaveState) {
 
   // Now with a new cache manager
   int fd = cache_mgr_->Open(CacheManager::Bless(mock_plugin_->known_object));
+  uint64_t old_session_id = mock_plugin_->last_id;
   EXPECT_GE(fd, 0);
   data = cache_mgr_->SaveState(-1);
   delete cache_mgr_;
@@ -624,4 +653,8 @@ TEST_F(T_ExternalCacheManager, SaveState) {
   EXPECT_EQ(static_cast<int>(mock_plugin_->known_object_content.length()), len);
   EXPECT_EQ(mock_plugin_->known_object_content, string(buffer, len));
   EXPECT_EQ(0, cache_mgr_->Close(fd));
+
+  EXPECT_NE(old_session_id, mock_plugin_->last_id);
+  EXPECT_EQ(0, strcmp(mock_plugin_->last_reponame, "test"));
+  EXPECT_EQ(NULL, mock_plugin_->last_client_instance);
 }
