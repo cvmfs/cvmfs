@@ -229,7 +229,7 @@ class PolymorphicConstructionImpl {
   }
 
   /**
-   * Friend class for testability (see test/unittests/testutil.h)
+   * Friend class for testability (see test/common/testutil.h)
    */
   friend class PolymorphicConstructionUnittestAdapter;
 

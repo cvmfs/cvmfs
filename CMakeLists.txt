@@ -181,6 +181,9 @@ if (BUILTIN_EXTERNALS)
     if (BUILD_SERVER OR BUILD_SERVER_DEBUG)
       set(ENV{BUILD_SERVER} "true")
     endif (BUILD_SERVER OR BUILD_SERVER_DEBUG)
+    if (BUILD_QC_TESTS)
+      set(ENV{BUILD_QC_TESTS} "true")
+    endif(BUILD_QC_TESTS)
 
     message (STATUS "running bootstrap.sh ...")
     execute_process (
@@ -200,6 +203,7 @@ if (BUILTIN_EXTERNALS)
     set(ENV{CVMFS_BASE_CXX_FLAGS} "")
     set(ENV{BUILD_UBENCHMARKS} "")
     set(ENV{BUILD_SERVER} "")
+    set(ENV{BUILD_QC_TESTS} "")
   endif (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
 
   # In the case of built-in external libraries, we need to set CMAKE_PREFIX_PATH to
@@ -447,6 +451,12 @@ endif (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
 if (BUILD_UBENCHMARKS)
   add_subdirectory (test/micro-benchmarks)
 endif (BUILD_UBENCHMARKS)
+
+if (BUILD_QC_TESTS)
+  find_package(RapidCheck REQUIRED)
+  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${RAPIDCHECK_INCLUDE_DIRS})
+  add_subdirectory (test/quickcheck)
+endif(BUILD_QC_TESTS)
 
 #
 # Documentation
