@@ -6,11 +6,11 @@
  #include "ingestion/task.h"
  #include "util/posix.h"
 
-class TaskCompression : public TubeConsumer<BlockItem> {
+class TaskCompress : public TubeConsumer<BlockItem> {
  public:
   static const unsigned kCompressedBlockSize = kPageSize * 2;
 
-  TaskCompression(Tube<BlockItem> *tube_in, TubeGroup<BlockItem> *tubes_out)
+  TaskCompress(Tube<BlockItem> *tube_in, TubeGroup<BlockItem> *tubes_out)
     : TubeConsumer<BlockItem>(tube_in), tubes_out_(tubes_out) { }
 
  protected:

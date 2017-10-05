@@ -16,7 +16,7 @@
 #include "ingestion/item.h"
 #include "ingestion/task.h"
 #include "ingestion/task_chunk.h"
-#include "ingestion/task_compression.h"
+#include "ingestion/task_compress.h"
 #include "ingestion/task_read.h"
 #include "smalloc.h"
 #include "util/posix.h"
@@ -315,7 +315,7 @@ TEST_F(T_Task, Chunk) {
 }
 
 
-TEST_F(T_Task, CompressionNull) {
+TEST_F(T_Task, CompressNull) {
   Tube<BlockItem> tube_in;
   Tube<BlockItem> *tube_out = new Tube<BlockItem>();
   TubeGroup<BlockItem> tube_group_out;
@@ -323,7 +323,7 @@ TEST_F(T_Task, CompressionNull) {
   tube_group_out.Activate();
 
   TubeConsumerGroup<BlockItem> task_group;
-  task_group.TakeConsumer(new TaskCompression(&tube_in, &tube_group_out));
+  task_group.TakeConsumer(new TaskCompress(&tube_in, &tube_group_out));
   task_group.Spawn();
 
   FileItem file_null("/dev/null");
@@ -359,7 +359,7 @@ TEST_F(T_Task, CompressionNull) {
 }
 
 
-TEST_F(T_Task, Compression) {
+TEST_F(T_Task, Compress) {
   Tube<BlockItem> tube_in;
   Tube<BlockItem> *tube_out = new Tube<BlockItem>();
   TubeGroup<BlockItem> tube_group_out;
@@ -367,7 +367,7 @@ TEST_F(T_Task, Compression) {
   tube_group_out.Activate();
 
   TubeConsumerGroup<BlockItem> task_group;
-  task_group.TakeConsumer(new TaskCompression(&tube_in, &tube_group_out));
+  task_group.TakeConsumer(new TaskCompress(&tube_in, &tube_group_out));
   task_group.Spawn();
 
   unsigned size = 16 * 1024 * 1024;

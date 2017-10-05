@@ -3,7 +3,7 @@
  */
 
 #include "cvmfs_config.h"
-#include "task_compression.h"
+#include "task_compress.h"
 
 #include <cstdlib>
 
@@ -17,7 +17,7 @@
  * The block tags stay the same.
  * TODO(jblomer): avoid memory copy with EchoCompressor
  */
-void TaskCompression::Process(BlockItem *input_block) {
+void TaskCompress::Process(BlockItem *input_block) {
   assert(input_block->chunk_item() != NULL);
 
   zlib::Compressor *compressor = input_block->chunk_item()->compressor();
