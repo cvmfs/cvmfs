@@ -106,4 +106,4 @@ class TubeConsumerGroup : SingleCopy {
   std::vector<pthread_t> threads_;
 };
 
-#endif
+#endif  // CVMFS_INGESTION_TASK_H_

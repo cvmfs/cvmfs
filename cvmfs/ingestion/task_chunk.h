@@ -2,6 +2,9 @@
  * This file is part of the CernVM File System.
  */
 
+#ifndef CVMFS_INGESTION_TASK_CHUNK_H_
+#define CVMFS_INGESTION_TASK_CHUNK_H_
+
 #include <stdint.h>
 
 #include <map>
@@ -69,3 +72,5 @@ class TaskChunk : public TubeConsumer<BlockItem> {
   TubeGroup<BlockItem> *tubes_out_;
   TagMap tag_map_;
 };
+
+#endif  // CVMFS_INGESTION_TASK_CHUNK_H_

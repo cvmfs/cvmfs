@@ -2,6 +2,9 @@
  * This file is part of the CernVM File System.
  */
 
+#ifndef CVMFS_INGESTION_TASK_READ_H_
+#define CVMFS_INGESTION_TASK_READ_H_
+
 #include "atomic.h"
 #include "ingestion/item.h"
 #include "ingestion/task.h"
@@ -27,3 +30,5 @@ class TaskRead : public TubeConsumer<FileItem> {
 
   TubeGroup<BlockItem> *tubes_out_;
 };
+
+#endif  // CVMFS_INGESTION_TASK_READ_H_

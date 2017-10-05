@@ -174,6 +174,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/ingestion/task.cc
   ${CVMFS_SOURCE_DIR}/ingestion/task_chunk.cc
   ${CVMFS_SOURCE_DIR}/ingestion/task_compress.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/task_hash.cc
   ${CVMFS_SOURCE_DIR}/ingestion/task_read.cc
   ${CVMFS_SOURCE_DIR}/ingestion/tube.cc
   ${CVMFS_SOURCE_DIR}/json_document.cc

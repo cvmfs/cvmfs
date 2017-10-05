@@ -2,6 +2,9 @@
  * This file is part of the CernVM File System.
  */
 
+#ifndef CVMFS_INGESTION_TASK_COMPRESS_H_
+#define CVMFS_INGESTION_TASK_COMPRESS_H_
+
  #include "ingestion/item.h"
  #include "ingestion/task.h"
  #include "util/posix.h"
@@ -26,3 +29,5 @@ class TaskCompress : public TubeConsumer<BlockItem> {
   TubeGroup<BlockItem> *tubes_out_;
   TagMap tag_map_;
 };
+
+#endif  // CVMFS_INGESTION_TASK_COMPRESS_H_
