@@ -57,6 +57,7 @@ ChunkItem::ChunkItem(FileItem *file_item, uint64_t offset)
   hash_ctx_.size = shash::GetContextSize(hash_ctx_.algorithm);
   hash_ctx_buffer_ = smalloc(hash_ctx_.size);
   hash_ctx_.buffer = hash_ctx_buffer_;
+  shash::Init(hash_ctx_);
 }
 
 

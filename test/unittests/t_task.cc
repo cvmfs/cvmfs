@@ -17,6 +17,7 @@
 #include "ingestion/task.h"
 #include "ingestion/task_chunk.h"
 #include "ingestion/task_compress.h"
+#include "ingestion/task_hash.h"
 #include "ingestion/task_read.h"
 #include "smalloc.h"
 #include "util/posix.h"
@@ -435,5 +436,62 @@ TEST_F(T_Task, Compress) {
 
   free(ptr_read_large);
   free(ptr_zlib_large);
+  task_group.Terminate();
+}
+
+
+TEST_F(T_Task, Hash) {
+  Tube<BlockItem> tube_in;
+  Tube<BlockItem> *tube_out = new Tube<BlockItem>();
+  TubeGroup<BlockItem> tube_group_out;
+  tube_group_out.TakeTube(tube_out);
+  tube_group_out.Activate();
+
+  TubeConsumerGroup<BlockItem> task_group;
+  task_group.TakeConsumer(new TaskHash(&tube_in, &tube_group_out));
+  task_group.Spawn();
+
+  FileItem file_null("/dev/null");
+  ChunkItem chunk_null(&file_null, 0);
+  BlockItem b1(1);
+  b1.SetFileItem(&file_null);
+  b1.SetChunkItem(&chunk_null);
+  b1.MakeStop();
+  tube_in.Enqueue(&b1);
+
+  BlockItem *item_stop = tube_out->Pop();
+  EXPECT_EQ(&b1, item_stop);
+  EXPECT_EQ("da39a3ee5e6b4b0d3255bfef95601890afd80709",
+            chunk_null.hash_ptr()->ToString());
+  EXPECT_EQ(0U, tube_out->size());
+
+  string str_abc = "abc";
+  EXPECT_TRUE(SafeWriteToFile(str_abc, "./abc", 0600));
+  FileItem file_abc("./abc");
+  ChunkItem chunk_abc(&file_abc, 0);
+  BlockItem b2_a(2);
+  b2_a.SetFileItem(&file_null);
+  b2_a.SetChunkItem(&chunk_abc);
+  b2_a.MakeData(const_cast<unsigned char *>(
+                  reinterpret_cast<const unsigned char *>(str_abc.data())),
+                str_abc.size());
+  BlockItem b2_b(2);
+  b2_b.SetFileItem(&file_null);
+  b2_b.SetChunkItem(&chunk_abc);
+  b2_b.MakeStop();
+  tube_in.Enqueue(&b2_a);
+  tube_in.Enqueue(&b2_b);
+
+  BlockItem *item_data = tube_out->Pop();
+  EXPECT_EQ(&b2_a, item_data);
+  item_stop = tube_out->Pop();
+  EXPECT_EQ(&b2_b, item_stop);
+  EXPECT_EQ("a9993e364706816aba3e25717850c26c9cd0d89d",
+            chunk_abc.hash_ptr()->ToString());
+  EXPECT_EQ(0U, tube_out->size());
+
+  b2_a.Discharge();
+  unlink("./abc");
+
   task_group.Terminate();
 }

@@ -93,6 +93,8 @@ class ChunkItem : SingleCopy {
   FileItem *file_item() { return file_item_; }
   uint64_t offset() { return offset_; }
   zlib::Compressor *compressor() { return compressor_.weak_ref(); }
+  shash::ContextPtr hash_ctx() { return hash_ctx_; }
+  shash::Any *hash_ptr() { return &hash_value; }
 
  private:
   FileItem *file_item_;
@@ -101,6 +103,7 @@ class ChunkItem : SingleCopy {
   UniquePtr<zlib::Compressor> compressor_;
   shash::ContextPtr hash_ctx_;
   UniquePtr<void> hash_ctx_buffer_;
+  shash::Any hash_value;
 };
 
 
@@ -168,6 +171,5 @@ class BlockItem : SingleCopy {
   uint32_t capacity_;
   uint32_t size_;
 };
-
 
 #endif  // CVMFS_INGESTION_ITEM_H_
