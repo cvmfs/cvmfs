@@ -9,7 +9,9 @@
 // Revision Changelog
 // 1 --> 2:
 //   - Add CVMCACHE_CAP_WRITE capability, adjust other capability constants
-#define LIBCVMFS_CACHE_REVISION 2
+// 2 --> 3:
+//   - Add cvmcache_get_session()
+#define LIBCVMFS_CACHE_REVISION 3
 
 #include <stdint.h>
 
@@ -93,6 +95,12 @@ struct cvmcache_info {
 };
 
 struct cvmcache_context;
+
+struct cvmcache_session {
+  uint64_t id;
+  char *repository_name;
+  char *client_instance;
+};
 
 /**
  * Returns -1, 0, or 1 like other C comparison functions
@@ -209,6 +217,13 @@ uint32_t cvmcache_max_object_size(struct cvmcache_context *ctx);
  */
 void cvmcache_spawn_watchdog(const char *crash_dump_file);
 void cvmcache_terminate_watchdog();
+
+/**
+ * Returns a static pointer to an origin struct that identifies the client
+ * connection that triggered a callback. Calling this function is only valid
+ * from within a callback.  Otherwise the function returns NULL values.
+ */
+void cvmcache_get_session(cvmcache_session *session);
 
 
 // Options parsing from libcvmfs without "libcvmfs legacy" support
