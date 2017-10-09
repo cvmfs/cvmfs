@@ -1,0 +1,5 @@
+cvmfs-config-graphdriver (1.0-1) lucid; urgency=low
+
+  * Initial packaging
+
+ -- Jakob Blomer <jblomer@cern.ch>  Mon, 09 Oct 2017 12:00:00 +0000
