@@ -182,6 +182,7 @@ class AbstractCatalogManager : public SingleCopy {
   bool volatile_flag() const { return volatile_flag_; }
   uint64_t GetRevision() const;
   uint64_t GetTTL() const;
+  bool HasExplicitTTL() const;
   bool GetVOMSAuthz(std::string *authz) const;
   int GetNumCatalogs() const;
   std::string PrintHierarchy() const;

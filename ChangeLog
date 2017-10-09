@@ -6,6 +6,8 @@
   * Make `true` to be a valid boolean option
 
 2.4.2:
+  * Add cvmcache_get_session() to cache plugin API (CVM-1368)
+  * Enforce explicit catalog TTL setting on publish (CVM-1388)
   * Fix variant symlink display on release manager machine (CVM-1383)
   * Prevent diff viewer from recursing into hidden directories (CVM-1384)
   * Prevent overlayfs repositories on XFS ftype=0 spool directories (CVM-1385)
