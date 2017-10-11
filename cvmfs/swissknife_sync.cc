@@ -646,6 +646,13 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     return 3;
   }
 
+  bool with_gateway = spooler_definition.driver_type == upload::SpoolerDefinition::Gateway;
+  /*
+   * Note: If the upstream is of type gateway, due to the possibility of concurrent
+   *       release managers, it's possible to have a different local and remote root
+   *       hashes. We proceed by loading the remote manifest but we give an empty base
+   *       hash.
+   */
   UniquePtr<manifest::Manifest> manifest;
   if (params.branched_catalog) {
     // Throw-away manifest
@@ -655,8 +662,13 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     manifest = this->OpenLocalManifest(params.manifest_path);
     params.base_hash = manifest->catalog_hash();
   } else {
-    manifest = FetchRemoteManifest(params.stratum0, params.repo_name,
-                                   params.base_hash);
+    if (with_gateway) {
+      manifest = FetchRemoteManifest(params.stratum0, params.repo_name,
+                                     shash::Any());
+    } else {
+      manifest = FetchRemoteManifest(params.stratum0, params.repo_name,
+                                     params.base_hash);
+    }
   }
   if (!manifest) {
     return 3;
