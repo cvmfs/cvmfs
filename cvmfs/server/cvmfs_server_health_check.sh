@@ -22,14 +22,18 @@
 #               otherwise 1 (or abort when -r is given and repair fails)
 health_check() {
   local name=""
+  local gateway=0
   local quiet=0
   local repair=0
   local repair_in_txn=0
   local force_repair=0
 
   OPTIND=0
-  while getopts "qrtf" option; do
+  while getopts "gqrtf" option; do
     case $option in
+      g)
+        gateway=1
+      ;;
       q)
         quiet=1
       ;;
@@ -107,12 +111,14 @@ health_check() {
   fi
 
   # did we detect any kind of problem?
-  if [ $((   $rdonly_broken       \
-           + $rdonly_outdated     \
-           + $rdonly_wronghash    \
-           + $rw_broken           \
-           + $rw_should_be_rdonly \
-           + $rw_should_be_rw )) -eq 0 ]; then
+  local ok=$(( $rdonly_broken       \
+             + $rw_broken           \
+             + $rw_should_be_rdonly \
+             + $rw_should_be_rw ))
+  if [ $gateway -eq 0 ]; then
+    ok=$(( $ok + $rdonly_wronghash + $rdonly_outdated ))
+  fi
+  if [ $ok -eq 0 ]; then
     return 0
   fi
 
