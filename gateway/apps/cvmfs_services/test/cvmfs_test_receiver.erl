@@ -13,11 +13,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/1,
-         generate_token/3,
-         get_token_id/1,
-         submit_payload/2,
-         commit/3]).
+-export([start_link/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -54,70 +50,6 @@
 %%--------------------------------------------------------------------
 start_link(Args) ->
     gen_server:start_link(?MODULE, Args, []).
-
-
--spec generate_token(KeyId, Path, MaxLeaseTime) -> {Token, Public, Secret}
-                                                       when KeyId :: binary(),
-                                                            Path :: binary(),
-                                                            MaxLeaseTime :: integer(),
-                                                            Token :: binary(),
-                                                            Public :: binary(),
-                                                            Secret :: binary().
-generate_token(KeyId, Path, MaxLeaseTime) ->
-    poolboy:transaction(cvmfs_receiver_pool,
-                        fun(WorkerPid) ->
-                                gen_server:call(WorkerPid,
-                                                {worker_req,
-                                                 generate_token,
-                                                 KeyId,
-                                                 Path,
-                                                 MaxLeaseTime})
-                        end,
-                        cvmfs_app_util:get_max_lease_time()).
-
-
--spec get_token_id(Token) -> {ok, PublicId} | {error, invalid_macaroon}
-                                 when Token :: binary(),
-                                      PublicId :: binary().
-get_token_id(Token) ->
-    poolboy:transaction(cvmfs_receiver_pool,
-                        fun(WorkerPid) ->
-                                gen_server:call(WorkerPid,
-                                                {worker_req,
-                                                 get_token_id,
-                                                 Token})
-                        end,
-                        cvmfs_app_util:get_max_lease_time()).
-
-
--spec submit_payload(SubmissionData, Secret) -> submit_payload_result()
-                                                    when SubmissionData :: payload_submission_data(),
-                                                         Secret :: binary().
-submit_payload(SubmissionData, Secret) ->
-    poolboy:transaction(cvmfs_receiver_pool,
-                        fun(WorkerPid) ->
-                                gen_server:call(WorkerPid,
-                                                {worker_req,
-                                                 submit_payload,
-                                                 SubmissionData,
-                                                 Secret})
-                        end,
-                        cvmfs_app_util:get_max_lease_time()).
-
-
--spec commit(LeasePath :: binary(), OldRootHash :: binary(), NewRootHash :: binary())
-            -> ok | {error, merge_error | io_error | worker_timeout}.
-commit(LeasePath, OldRootHash, NewRootHash) ->
-    poolboy:transaction(cvmfs_receiver_pool,
-                        fun(WorkerPid) ->
-                                gen_server:call(WorkerPid,
-                                                {worker_req,
-                                                 commit,
-                                                 LeasePath,
-                                                 OldRootHash,
-                                                 NewRootHash})
-                        end,
-                        cvmfs_app_util:get_max_lease_time()).
 
 
 %%%===================================================================
