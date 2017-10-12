@@ -41,7 +41,6 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
         repo_path_(""),
         lease_path_(lease_path),
         temp_dir_prefix_(temp_dir_prefix),
-        invalid_path_encountered_(false),
         download_manager_(NULL),
         manifest_(manifest),
         output_catalog_mgr_(output_catalog_mgr),
@@ -57,7 +56,6 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
         repo_path_(repo_path),
         lease_path_(lease_path),
         temp_dir_prefix_(temp_dir_prefix),
-        invalid_path_encountered_(false),
         download_manager_(download_manager),
         manifest_(manifest),
         needs_setup_(true) {}
@@ -74,7 +72,6 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
         repo_path_(repo_path),
         lease_path_(lease_path),
         temp_dir_prefix_(temp_dir_prefix),
-        invalid_path_encountered_(false),
         download_manager_(download_manager),
         manifest_(manifest),
         needs_setup_(true) {}
@@ -101,8 +98,6 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
 
   PathString lease_path_;
   std::string temp_dir_prefix_;
-
-  bool invalid_path_encountered_;
 
   download::DownloadManager* download_manager_;
 
