@@ -117,12 +117,13 @@ restart_apache() {
 ensure_enabled_apache_modules() {
   local a2enmod_bin=
   local apache2ctl_bin=
+  local extra_modules="$1"
   a2enmod_bin="$(find_sbin    a2enmod)"    || return 0
   apache2ctl_bin="$(find_sbin apache2ctl)" || return 0
 
   local restart=0
   local retcode=0
-  local modules="headers expires"
+  local modules="headers expires $extra_modules"
 
   for module in $modules; do
     $apache2ctl_bin -M 2>/dev/null | grep -q "$module" && continue
@@ -280,6 +281,23 @@ EOF
   if [ x"$with_wsgi" != x"" ]; then
     create_apache_config_for_webapi
   fi
+}
+
+
+# creates a standard Apache configuration file for a portal
+#
+# @param reponame     FQRN
+# @param portalname   The name of the portal in the given repository
+create_apache_config_for_portal() {
+  local reponame=$1
+  local portalname=$2
+  local port=$3
+
+  create_apache_config_file "$(portal_get_apache_conf $reponame $portalname)" << EOF
+# Created by cvmfs_server.  Don't touch.
+ProxyPass "/cvmfs/$reponame/portals/$portalname" "http://localhost:$port"
+ProxyPassReverse "/cvmfs/$reponame/portals/$portalname" "http://localhost:$port"
+EOF
 }
 
 

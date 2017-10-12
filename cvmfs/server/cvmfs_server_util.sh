@@ -776,7 +776,7 @@ has_reflog_checksum() {
 
 # Find the service binary (or detect systemd)
 minpidof() {
-  $PIDOF_BIN $1 | tr " " "\n" | sort --numeric-sort | head -n1
+  $PIDOF_BIN $@ | tr " " "\n" | sort --numeric-sort | head -n1
 }
 
 
@@ -936,7 +936,7 @@ is_subcommand() {
     resign list info tag list-tags lstags check transaction abort snapshot           \
     skeleton migrate list-catalogs diff checkout update-geodb gc catalog-chown \
     eliminate-hardlinks update-info update-repoinfo mount fix-permissions \
-    masterkeycard"
+    masterkeycard portal"
 
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
@@ -973,6 +973,7 @@ Supported Commands:
                   [-V VOMS authorization] [-X (external data)]
                   <fully qualified repository name>
                   Creates a new repository with a given name
+  portal          [-a new portal] [-r portal name] [-l]
   add-replica     [-u stratum1 upstream storage] [-o owner] [-w stratum1 url]
                   [-a silence apache warning] [-z enable garbage collection]
                   [-n alias name] [-s S3 config file] [-p no apache config]

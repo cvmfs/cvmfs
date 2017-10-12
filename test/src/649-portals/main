@@ -1,0 +1,15 @@
+cvmfs_test_name="Portals"
+cvmfs_test_autofs_on_startup=false
+
+
+cvmfs_run_test() {
+  logfile=$1
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+
+
+  return 0
+}
+

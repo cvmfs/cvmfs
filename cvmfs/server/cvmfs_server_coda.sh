@@ -68,7 +68,7 @@ else # RedHat based
 fi
 
 SERVICE_BIN="false"
-if ! $PIDOF_BIN systemd > /dev/null 2>&1 || [ $(minpidof systemd) -ne 1 ]; then
+if ! $PIDOF_BIN systemd /lib/systemd/systemd > /dev/null 2>&1 || [ $(minpidof systemd /lib/systemd/systemd) -ne 1 ]; then
   if cvmfs_sys_file_is_executable /sbin/service ; then
     SERVICE_BIN="/sbin/service"
   elif cvmfs_sys_file_is_executable /usr/sbin/service ; then
@@ -98,6 +98,8 @@ CVMFS_DEFAULT_ENFORCE_LIMITS=false
 CVMFS_SERVER_DEBUG=${CVMFS_SERVER_DEBUG:=0}
 CVMFS_SERVER_SWISSKNIFE="cvmfs_swissknife"
 CVMFS_SERVER_SWISSKNIFE_DEBUG=$CVMFS_SERVER_SWISSKNIFE
+
+CVMFS_PORTAL_SYSTEMD_TEMPLATE=/usr/lib/systemd/system/cvmfs-portal@.service
 
 ################################################################################
 #                                                                              #
