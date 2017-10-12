@@ -151,6 +151,26 @@ EOF
   ensure_enabled_apache_modules proxy
   create_apache_config_for_portal $reponame $portalname $port
   reload_apache
+
+  # Create bucket
+  local timeout=10
+  while true; do
+    if cat /dev/null | nc localhost $port 2>/dev/null; then
+      break;
+    fi
+    sleep 1
+    timeout=$(($timeout - 1))
+    [ $timeout -gt 0 ] || { echo "Failed to connect to Minio server" >&2; return 1; }
+  done
+  local bucket=/default/
+  local timestamp="$(date -R)"
+  local content="PUT\n\n\n${timestamp}\n${bucket}"
+  local signature=$(echo -en ${content} | openssl sha1 -hmac ${secret_key} \
+    -binary | base64)
+  curl --connect-timeout $timeout -X PUT \
+    -H "Date: ${timestamp}" \
+    -H "Authorization: AWS ${access_key}:${signature}" \
+    http://127.0.0.1:$port$bucket
 }
 
 
