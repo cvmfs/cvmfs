@@ -342,18 +342,19 @@ p_commit_lease(LeaseToken, {OldRootHash, NewRootHash}) when is_binary(OldRootHas
                                                                   is_binary(NewRootHash) ->
     Result = case cvmfs_receiver:get_token_id(LeaseToken) of
                  {ok, Public} ->
-                     case cvmfs_lease:get_lease_path(Public) of
-                         {ok, LeasePath} ->
-                             CatalogLeaseId = p_request_wait_catalog_lease(LeasePath),
-                             CommitResult = cvmfs_receiver:commit(LeasePath,
-                                                                  OldRootHash,
-                                                                  NewRootHash),
-                             cvmfs_lease:end_lease(CatalogLeaseId),
-                             CommitResult;
-                         ErrorReason ->
-                             ErrorReason
-                     end,
-                     cvmfs_lease:end_lease(Public);
+                     ResultInner = case cvmfs_lease:get_lease_path(Public) of
+                                       {ok, LeasePath} ->
+                                           CatalogLeaseId = p_request_wait_catalog_lease(LeasePath),
+                                           CommitResult = cvmfs_receiver:commit(LeasePath,
+                                                                                OldRootHash,
+                                                                                NewRootHash),
+                                           cvmfs_lease:end_lease(CatalogLeaseId),
+                                           CommitResult;
+                                       ErrorReason ->
+                                           ErrorReason
+                                   end,
+                     cvmfs_lease:end_lease(Public),
+                     ResultInner;
                  _ ->
                      {error, invalid_macaroon}
              end,
