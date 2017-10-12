@@ -646,7 +646,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     return 3;
   }
 
-  bool with_gateway = spooler_definition.driver_type == upload::SpoolerDefinition::Gateway;
+  bool with_gateway = spooler_definition.driver_type
+      == upload::SpoolerDefinition::Gateway;
   /*
    * Note: If the upstream is of type gateway, due to the possibility of concurrent
    *       release managers, it's possible to have a different local and remote root
