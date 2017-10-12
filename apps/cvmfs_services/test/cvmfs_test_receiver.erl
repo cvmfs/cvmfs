@@ -64,7 +64,8 @@ start_link(Args) ->
                                                             Public :: binary(),
                                                             Secret :: binary().
 generate_token(KeyId, Path, MaxLeaseTime) ->
-    WorkerPid = poolboy:checkout(cvmfs_receiver_pool),
+    WorkerPid = poolboy:checkout(cvmfs_receiver_pool, true,
+                                 cvmfs_app_util:get_max_lease_time()),
     Result = gen_server:call(WorkerPid, {worker_req, generate_token, KeyId, Path, MaxLeaseTime}),
     poolboy:checkin(cvmfs_receiver_pool, WorkerPid),
     Result.
@@ -74,7 +75,8 @@ generate_token(KeyId, Path, MaxLeaseTime) ->
                                  when Token :: binary(),
                                       PublicId :: binary().
 get_token_id(Token) ->
-    WorkerPid = poolboy:checkout(cvmfs_receiver_pool),
+    WorkerPid = poolboy:checkout(cvmfs_receiver_pool, true,
+                                 cvmfs_app_util:get_max_lease_time()),
     Result = gen_server:call(WorkerPid, {worker_req, get_token_id, Token}),
     poolboy:checkin(cvmfs_receiver_pool, WorkerPid),
     Result.
@@ -84,7 +86,8 @@ get_token_id(Token) ->
                                                     when SubmissionData :: payload_submission_data(),
                                                          Secret :: binary().
 submit_payload(SubmissionData, Secret) ->
-    WorkerPid = poolboy:checkout(cvmfs_receiver_pool),
+    WorkerPid = poolboy:checkout(cvmfs_receiver_pool, true,
+                                 cvmfs_app_util:get_max_lease_time()),
     Result = gen_server:call(WorkerPid, {worker_req, submit_payload, SubmissionData, Secret}),
     poolboy:checkin(cvmfs_receiver_pool, WorkerPid),
     Result.
@@ -93,7 +96,8 @@ submit_payload(SubmissionData, Secret) ->
 -spec commit(LeasePath :: binary(), OldRootHash :: binary(), NewRootHash :: binary())
             -> ok | {error, merge_error | io_error | worker_timeout}.
 commit(LeasePath, OldRootHash, NewRootHash) ->
-    WorkerPid = poolboy:checkout(cvmfs_receiver_pool),
+    WorkerPid = poolboy:checkout(cvmfs_receiver_pool, true,
+                                 cvmfs_app_util:get_max_lease_time()),
     Result = gen_server:call(WorkerPid, {worker_req, commit, LeasePath, OldRootHash, NewRootHash}),
     poolboy:checkin(cvmfs_receiver_pool, WorkerPid),
     Result.
