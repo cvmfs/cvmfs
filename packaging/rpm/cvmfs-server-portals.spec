@@ -71,7 +71,7 @@ install -d $RPM_BUILD_ROOT%{_bindir}
 install -d ${RPM_BUILD_ROOT}/usr/lib/systemd/system
 install -p cvmfs_minio $RPM_BUILD_ROOT%{_bindir}
 install -p cvmfs_charon $RPM_BUILD_ROOT%{_bindir}
-install -p %{charon_import_path}/cvmfs-portal@.service ${RPM_BUILD_ROOT}/usr/lib/systemd/system
+install -p "%{charon_import_path}/cvmfs-portal@.service" ${RPM_BUILD_ROOT}/usr/lib/systemd/system
 
 %clean
 rm -rf $RPM_BUILD_ROOT
