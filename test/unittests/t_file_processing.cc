@@ -117,7 +117,8 @@ class FP_MockUploader : public AbstractMockUploader<FP_MockUploader> {
     assert(local_handle != NULL);
     local_handle->Append(buffer);
 
-    Respond(callback, upload::UploaderResults(0, buffer));
+    Respond(callback,
+            upload::UploaderResults(upload::UploaderResults::kBufferUpload, 0));
   }
 
   void FinalizeStreamedUpload(upload::UploadStreamHandle *handle,
@@ -131,7 +132,8 @@ class FP_MockUploader : public AbstractMockUploader<FP_MockUploader> {
     // remove the stream handle and fire callback
     const CallbackTN *callback = local_handle->commit_callback;
     delete handle;
-    Respond(callback, upload::UploaderResults(0));
+    Respond(callback,
+            upload::UploaderResults(upload::UploaderResults::kChunkCommit, 0));
   }
 
  protected:

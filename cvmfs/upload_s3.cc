@@ -195,7 +195,7 @@ void S3Uploader::WorkerThread() {
       }
       if (info->origin == s3fanout::kOriginMem) {
         Respond(static_cast<CallbackTN*>(info->callback),
-                UploaderResults(reply_code));
+                UploaderResults(UploaderResults::kChunkCommit, reply_code));
       } else {
         Respond(static_cast<CallbackTN*>(info->callback),
                 UploaderResults(reply_code, info->origin_path));
@@ -425,11 +425,12 @@ void S3Uploader::StreamedUpload(UploadStreamHandle  *handle,
              local_handle->temporary_path.c_str(),
              cpy_errno);
     atomic_inc32(&copy_errors_);
-    Respond(callback, UploaderResults(cpy_errno, buffer));
+    Respond(callback,
+            UploaderResults(UploaderResults::kBufferUpload, cpy_errno));
     return;
   }
 
-  Respond(callback, UploaderResults(0, buffer));
+  Respond(callback, UploaderResults(UploaderResults::kBufferUpload, 0));
 }
 
 
@@ -445,7 +446,8 @@ void S3Uploader::FinalizeStreamedUpload(UploadStreamHandle  *handle,
              "(errno: %d)",
              local_handle->temporary_path.c_str(), cpy_errno);
     atomic_inc32(&copy_errors_);
-    Respond(handle->commit_callback, UploaderResults(cpy_errno));
+    Respond(handle->commit_callback,
+            UploaderResults(UploaderResults::kChunkCommit, cpy_errno));
     return;
   }
 

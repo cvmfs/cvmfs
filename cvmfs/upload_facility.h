@@ -26,25 +26,16 @@ struct UploaderResults {
   UploaderResults(const int return_code, const std::string &local_path)
       : type(kFileUpload),
         return_code(return_code),
-        local_path(local_path),
-        buffer(NULL) {}
+        local_path(local_path) {}
 
-  UploaderResults(const int return_code, CharBuffer *buffer)
-      : type(kBufferUpload),
+  explicit UploaderResults(Type t, const int return_code)
+      : type(t),
         return_code(return_code),
-        local_path(""),
-        buffer(buffer) {}
-
-  explicit UploaderResults(const int return_code)
-      : type(kChunkCommit),
-        return_code(return_code),
-        local_path(""),
-        buffer(NULL) {}
+        local_path("") {}
 
   const Type type;
   const int return_code;
   const std::string local_path;
-  CharBuffer *buffer;
 };
 
 struct UploadStreamHandle;

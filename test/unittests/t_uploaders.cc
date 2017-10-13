@@ -41,7 +41,6 @@ class UploadCallbacks {
   void SimpleUploadClosure(const UploaderResults &results,
                                  UploaderResults  expected) {
     EXPECT_EQ(UploaderResults::kFileUpload,   results.type);
-    EXPECT_EQ(static_cast<CharBuffer*>(NULL), results.buffer);
     EXPECT_EQ(expected.return_code,           results.return_code);
     EXPECT_EQ(expected.local_path,            results.local_path);
     ++simple_upload_invocations;
@@ -51,7 +50,6 @@ class UploadCallbacks {
                                     int              return_code) {
     EXPECT_EQ(UploaderResults::kChunkCommit,  results.type);
     EXPECT_EQ("",                             results.local_path);
-    EXPECT_EQ(static_cast<CharBuffer*>(NULL), results.buffer);
     EXPECT_EQ(return_code,                    results.return_code);
     ++streamed_upload_complete_invocations;
   }
@@ -60,7 +58,6 @@ class UploadCallbacks {
                                   UploaderResults  expected) {
     EXPECT_EQ(UploaderResults::kBufferUpload, results.type);
     EXPECT_EQ("",                             results.local_path);
-    EXPECT_EQ(expected.buffer,                results.buffer);
     EXPECT_EQ(expected.return_code,           results.return_code);
     ++buffer_upload_complete_invocations;
   }
@@ -813,11 +810,11 @@ TYPED_TEST(T_Uploaders, SingleStreamedUpload) {
   typename TestFixture::Buffers::const_iterator i    = buffers.begin();
   typename TestFixture::Buffers::const_iterator iend = buffers.end();
   for (; i != iend; ++i) {
-    this->uploader_->ScheduleUpload(handle, *i,
-                                    AbstractUploader::MakeClosure(
-                                        &UploadCallbacks::BufferUploadComplete,
-                                        &this->delegate_,
-                                        UploaderResults(0, *i)));
+    this->uploader_->ScheduleUpload(
+      handle, *i, AbstractUploader::MakeClosure(
+        &UploadCallbacks::BufferUploadComplete,
+        &this->delegate_,
+        UploaderResults(UploaderResults::kBufferUpload, 0)));
   }
   this->uploader_->WaitForUpload();
 
@@ -891,7 +888,7 @@ TYPED_TEST(T_Uploaders, MultipleStreamedUploadSlow) {
                    AbstractUploader::MakeClosure(
                      &UploadCallbacks::BufferUploadComplete,
                      &this->delegate_,
-                     UploaderResults(0, buffers.front())));
+                     UploaderResults(UploaderResults::kBufferUpload, 0)));
       buffers.erase(buffers.begin());
     } else {
       this->uploader_->ScheduleCommit(current_handle.handle,

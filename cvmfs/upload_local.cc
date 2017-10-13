@@ -106,7 +106,8 @@ void LocalUploader::StreamedUpload(UploadStreamHandle *handle,
              "failed to seek in '%s' (errno: %d)",
              local_handle->temporary_path.c_str(), seek_err);
     atomic_inc32(&copy_errors_);
-    Respond(callback, UploaderResults(seek_err, buffer));
+    Respond(callback,
+            UploaderResults(UploaderResults::kBufferUpload, seek_err));
     return;
   }
 
@@ -120,7 +121,8 @@ void LocalUploader::StreamedUpload(UploadStreamHandle *handle,
              buffer->used_bytes(), local_handle->temporary_path.c_str(),
              cpy_errno);
     atomic_inc32(&copy_errors_);
-    Respond(callback, UploaderResults(cpy_errno, buffer));
+    Respond(callback,
+            UploaderResults(UploaderResults::kBufferUpload, cpy_errno));
     return;
   }
 
@@ -129,7 +131,7 @@ void LocalUploader::StreamedUpload(UploadStreamHandle *handle,
   (void)platform_invalidate_kcache(local_handle->file_descriptor, offset,
                                    bytes_written);
 
-  Respond(callback, UploaderResults(0, buffer));
+  Respond(callback, UploaderResults(UploaderResults::kBufferUpload, 0));
 }
 
 void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
@@ -145,7 +147,8 @@ void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
              "(errno: %d)",
              local_handle->temporary_path.c_str(), cpy_errno);
     atomic_inc32(&copy_errors_);
-    Respond(handle->commit_callback, UploaderResults(cpy_errno));
+    Respond(handle->commit_callback,
+            UploaderResults(UploaderResults::kChunkCommit, cpy_errno));
     return;
   }
 
@@ -160,7 +163,8 @@ void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
                local_handle->temporary_path.c_str(), final_path.c_str(),
                cpy_errno);
       atomic_inc32(&copy_errors_);
-      Respond(handle->commit_callback, UploaderResults(cpy_errno));
+      Respond(handle->commit_callback,
+              UploaderResults(UploaderResults::kChunkCommit, cpy_errno));
       return;
     }
   } else {
@@ -176,7 +180,7 @@ void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
   const CallbackTN *callback = handle->commit_callback;
   delete local_handle;
 
-  Respond(callback, UploaderResults(0));
+  Respond(callback, UploaderResults(UploaderResults::kChunkCommit, 0));
 }
 
 bool LocalUploader::Remove(const std::string &file_to_delete) {
