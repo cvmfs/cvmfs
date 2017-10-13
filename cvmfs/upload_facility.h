@@ -18,8 +18,6 @@
 
 namespace upload {
 
-class CharBuffer;
-
 struct UploaderResults {
   enum Type { kFileUpload, kBufferUpload, kChunkCommit };
 
@@ -55,13 +53,21 @@ struct UploadStreamHandle;
 class AbstractUploader
     : public PolymorphicConstruction<AbstractUploader, SpoolerDefinition>,
       public Callbackable<UploaderResults> {
+ public:
+  struct UploadBuffer {
+    UploadBuffer() : size(0), data(NULL) { }
+    UploadBuffer(uint64_t s, void *d) : size(s), data(d) { }
+    uint64_t size;
+    void *data;
+  };
+
  protected:
   typedef Callbackable<UploaderResults>::CallbackTN *CallbackPtr;
 
   struct UploadJob {
     enum Type { Upload, Commit, Terminate };
 
-    UploadJob(UploadStreamHandle *handle, CharBuffer *buffer,
+    UploadJob(UploadStreamHandle *handle, UploadBuffer buffer,
               const CallbackTN *callback = NULL)
         : type(Upload),
           stream_handle(handle),
@@ -71,18 +77,18 @@ class AbstractUploader
     UploadJob(UploadStreamHandle *handle, const shash::Any &content_hash)
         : type(Commit),
           stream_handle(handle),
-          buffer(NULL),
+          buffer(),
           callback(NULL),
           content_hash(content_hash) {}
 
     UploadJob()
-        : type(Terminate), stream_handle(NULL), buffer(NULL), callback(NULL) {}
+        : type(Terminate), stream_handle(NULL), buffer(), callback(NULL) {}
 
     Type type;
     UploadStreamHandle *stream_handle;
 
     // type=Upload specific fields
-    CharBuffer *buffer;
+    UploadBuffer buffer;
     const CallbackTN *callback;
 
     // type=Commit specific fields
@@ -177,7 +183,7 @@ class AbstractUploader
    * @param callback  (optional) callback object to be invoked once the given
    *                  upload is finished (see AbstractUploader::Respond())
    */
-  void ScheduleUpload(UploadStreamHandle *handle, CharBuffer *buffer,
+  void ScheduleUpload(UploadStreamHandle *handle, UploadBuffer buffer,
                       const CallbackTN *callback = NULL) {
     ++jobs_in_flight_;
     upload_queue_.push(UploadJob(handle, buffer, callback));
@@ -280,7 +286,7 @@ class AbstractUploader
    * @param buffer     the CharBuffer to be uploaded to the stream
    * @param callback   callback to be called on completion
    */
-  virtual void StreamedUpload(UploadStreamHandle *handle, CharBuffer *buffer,
+  virtual void StreamedUpload(UploadStreamHandle *handle, UploadBuffer buffer,
                               const CallbackTN *callback) = 0;
 
   /**

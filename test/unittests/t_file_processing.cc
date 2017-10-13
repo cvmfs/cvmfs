@@ -44,13 +44,12 @@ struct MockStreamHandle : public upload::UploadStreamHandle {
     nbytes += bytes;
   }
 
-  void Append(const upload::CharBuffer *buffer) {
-    const size_t bytes = buffer->used_bytes();
-    Extend(bytes);
-    unsigned char *b_ptr = buffer->ptr();
+  void Append(upload::AbstractUploader::UploadBuffer buffer) {
+    Extend(buffer.size);
+    void *b_ptr = buffer.data;
     unsigned char *r_ptr = data + marker;
-    memcpy(r_ptr, b_ptr, bytes);
-    marker += bytes;
+    memcpy(r_ptr, b_ptr, buffer.size);
+    marker += buffer.size;
   }
 
   unsigned char *data;
@@ -111,7 +110,7 @@ class FP_MockUploader : public AbstractMockUploader<FP_MockUploader> {
   }
 
   void StreamedUpload(upload::UploadStreamHandle *handle,
-                      upload::CharBuffer *buffer,
+                      upload::AbstractUploader::UploadBuffer buffer,
                       const CallbackTN *callback = NULL) {
     MockStreamHandle *local_handle = dynamic_cast<MockStreamHandle *>(handle);
     assert(local_handle != NULL);

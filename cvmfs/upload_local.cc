@@ -94,9 +94,8 @@ UploadStreamHandle *LocalUploader::InitStreamedUpload(
 }
 
 void LocalUploader::StreamedUpload(UploadStreamHandle *handle,
-                                   CharBuffer *buffer,
+                                   UploadBuffer buffer,
                                    const CallbackTN *callback) {
-  assert(buffer->IsInitialized());
   LocalStreamHandle *local_handle = static_cast<LocalStreamHandle *>(handle);
 
   const off_t offset = lseek(local_handle->file_descriptor, 0, SEEK_CUR);
@@ -112,13 +111,13 @@ void LocalUploader::StreamedUpload(UploadStreamHandle *handle,
   }
 
   const size_t bytes_written =
-      write(local_handle->file_descriptor, buffer->ptr(), buffer->used_bytes());
-  if (bytes_written != buffer->used_bytes()) {
+      write(local_handle->file_descriptor, buffer.data, buffer.size);
+  if (bytes_written != buffer.size) {
     const int cpy_errno = errno;
     LogCvmfs(kLogSpooler, kLogVerboseMsg,
              "failed to write %d bytes to '%s' "
              "(errno: %d)",
-             buffer->used_bytes(), local_handle->temporary_path.c_str(),
+             buffer.size, local_handle->temporary_path.c_str(),
              cpy_errno);
     atomic_inc32(&copy_errors_);
     Respond(callback,

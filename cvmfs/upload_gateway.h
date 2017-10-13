@@ -70,7 +70,7 @@ class GatewayUploader : public AbstractUploader {
   virtual UploadStreamHandle* InitStreamedUpload(
       const CallbackTN* callback = NULL);
 
-  virtual void StreamedUpload(UploadStreamHandle* handle, CharBuffer* buffer,
+  virtual void StreamedUpload(UploadStreamHandle* handle, UploadBuffer buffer,
                               const CallbackTN* callback);
 
   virtual void FinalizeStreamedUpload(UploadStreamHandle* handle,

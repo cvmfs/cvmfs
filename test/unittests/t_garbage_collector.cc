@@ -34,8 +34,10 @@ class GC_MockUploader : public AbstractMockUploader<GC_MockUploader> {
     return NULL;
   }
 
-  void Upload(upload::UploadStreamHandle *abstract_handle,
-              upload::CharBuffer *buffer, const CallbackTN *callback = NULL) {
+  void StreamedUpload(upload::UploadStreamHandle *abstract_handle,
+                      upload::AbstractUploader::UploadBuffer buffer,
+                      const CallbackTN *callback = NULL)
+  {
     assert(AbstractMockUploader<GC_MockUploader>::not_implemented);
   }
 

@@ -166,9 +166,9 @@ class AbstractMockUploader : public upload::AbstractUploader {
     return NULL;
   }
 
-  virtual void StreamedUpload(upload::UploadStreamHandle  *handle,
-                              upload::CharBuffer          *buffer,
-                              const CallbackTN            *callback = NULL) {
+  virtual void StreamedUpload(upload::UploadStreamHandle *handle,
+                              upload::AbstractUploader::UploadBuffer buffer,
+                              const CallbackTN *callback = NULL) {
     assert(AbstractMockUploader::not_implemented);
   }
 

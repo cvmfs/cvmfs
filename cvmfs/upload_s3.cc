@@ -406,22 +406,21 @@ UploadStreamHandle *S3Uploader::InitStreamedUpload(const CallbackTN *callback) {
 
 
 void S3Uploader::StreamedUpload(UploadStreamHandle  *handle,
-                                CharBuffer          *buffer,
+                                UploadBuffer        buffer,
                                 const CallbackTN    *callback) {
-  assert(buffer->IsInitialized());
   S3StreamHandle *local_handle = static_cast<S3StreamHandle*>(handle);
 
   LogCvmfs(kLogUploadS3, kLogDebug, "Upload target = %s",
            local_handle->temporary_path.c_str());
 
   const size_t bytes_written = write(local_handle->file_descriptor,
-                                     buffer->ptr(),
-                                     buffer->used_bytes());
-  if (bytes_written != buffer->used_bytes()) {
+                                     buffer.data,
+                                     buffer.size);
+  if (bytes_written != buffer.size) {
     const int cpy_errno = errno;
     LogCvmfs(kLogUploadS3, kLogStderr, "failed to write %d bytes to '%s' "
              "(errno: %d)",
-             buffer->used_bytes(),
+             buffer.size,
              local_handle->temporary_path.c_str(),
              cpy_errno);
     atomic_inc32(&copy_errors_);

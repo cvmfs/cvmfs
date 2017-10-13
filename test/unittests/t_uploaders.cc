@@ -811,7 +811,9 @@ TYPED_TEST(T_Uploaders, SingleStreamedUpload) {
   typename TestFixture::Buffers::const_iterator iend = buffers.end();
   for (; i != iend; ++i) {
     this->uploader_->ScheduleUpload(
-      handle, *i, AbstractUploader::MakeClosure(
+      handle,
+      AbstractUploader::UploadBuffer((*i)->used_bytes(), (*i)->ptr()),
+      AbstractUploader::MakeClosure(
         &UploadCallbacks::BufferUploadComplete,
         &this->delegate_,
         UploaderResults(UploaderResults::kBufferUpload, 0)));
@@ -884,11 +886,15 @@ TYPED_TEST(T_Uploaders, MultipleStreamedUploadSlow) {
       CharBuffer *current_buffer = buffers.front();
       ASSERT_NE(static_cast<CharBuffer*>(NULL), current_buffer);
       ++number_of_buffers;
-      this->uploader_->ScheduleUpload(current_handle.handle, current_buffer,
-                   AbstractUploader::MakeClosure(
-                     &UploadCallbacks::BufferUploadComplete,
-                     &this->delegate_,
-                     UploaderResults(UploaderResults::kBufferUpload, 0)));
+      this->uploader_->ScheduleUpload(
+          current_handle.handle,
+          AbstractUploader::UploadBuffer(
+            current_buffer->used_bytes(),
+            current_buffer->ptr()),
+          AbstractUploader::MakeClosure(
+            &UploadCallbacks::BufferUploadComplete,
+            &this->delegate_,
+            UploaderResults(UploaderResults::kBufferUpload, 0)));
       buffers.erase(buffers.begin());
     } else {
       this->uploader_->ScheduleCommit(current_handle.handle,

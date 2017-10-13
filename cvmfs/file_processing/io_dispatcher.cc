@@ -43,7 +43,9 @@ void IoDispatcher::ScheduleWrite(Chunk       *chunk,
   }
 
   // Schedule the upload of the provided data Block into the chunk
-  uploader_->ScheduleUpload(chunk->upload_stream_handle(), buffer,
+  uploader_->ScheduleUpload(
+    chunk->upload_stream_handle(),
+    AbstractUploader::UploadBuffer(buffer->used_bytes(), buffer->ptr()),
     AbstractUploader::MakeClosure(&IoDispatcher::BufferUploadCompleteCallback,
                                   this,
                                   BufferUploadCompleteParam(chunk,

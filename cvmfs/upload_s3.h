@@ -50,7 +50,7 @@ class S3Uploader : public AbstractUploader {
                   const CallbackTN *callback = NULL);
 
   UploadStreamHandle *InitStreamedUpload(const CallbackTN *callback = NULL);
-  void StreamedUpload(UploadStreamHandle *handle, CharBuffer *buffer,
+  void StreamedUpload(UploadStreamHandle *handle, UploadBuffer buffer,
                       const CallbackTN *callback = NULL);
   void FinalizeStreamedUpload(UploadStreamHandle *handle,
                               const shash::Any &content_hash);
