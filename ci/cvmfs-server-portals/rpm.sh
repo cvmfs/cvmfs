@@ -51,9 +51,11 @@ minio_commitid=$(cd ${ALL_SOURCE_LOCATION}/minio && git rev-parse ${minio_tag})
 
 echo "Building!"
 cd $CVMFS_RESULT_LOCATION
-rpmbuild --define="_topdir $CVMFS_RESULT_LOCATION"        \
-         --define="_tmppath ${CVMFS_RESULT_LOCATION}/TMP" \
-	 --define="charon_commitid ${charon_commitid}"    \
-	 --define="minio_commitid ${minio_commitid}"      \
-         -ba ${rpm_src_dir}/$spec_file
+build_cmd="rpmbuild --define=\"_topdir $CVMFS_RESULT_LOCATION\"        \
+           --define=\"_tmppath ${CVMFS_RESULT_LOCATION}/TMP\" \
+	   --define=\"charon_commitid ${charon_commitid}\"    \
+	   --define=\"minio_commitid ${minio_commitid}\"      \
+           -ba ${rpm_src_dir}/$spec_file
+echo "$build_cmd"
+$build_cmd
 

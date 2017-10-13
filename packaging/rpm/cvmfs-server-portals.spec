@@ -2,11 +2,11 @@
 
 %define         minio_tag RELEASE.2017-09-29T19-16-56Z
 %define         minio_subver %(echo %{tag} | sed -e 's/[^0-9]//g')
-#  %define	  minio_commitid DEFINEME
+# define	  minio_commitid DEFINEME
 %define		minio_import_path github.com/minio/minio
 
 %define		charon_version 1.1
-#  %define	  charon_commitid DEFINEME
+# define	  charon_commitid DEFINEME
 %define		charon_import_path github.com/cvmfs/docker-graphdriver/publisher
 
 Summary:        CernVM-FS Server Portals Add-Ons
