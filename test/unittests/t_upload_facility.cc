@@ -57,6 +57,7 @@ class UF_MockUploader : public AbstractMockUploader<UF_MockUploader> {
     UF_MockStreamHandle *handle =
         static_cast<UF_MockStreamHandle *>(abstract_handle);
     handle->uploads++;
+    last_buffer = buffer;
     Respond(callback, UploaderResults(UploaderResults::kBufferUpload, 0));
   }
 
@@ -71,8 +72,11 @@ class UF_MockUploader : public AbstractMockUploader<UF_MockUploader> {
   }
 
  public:
+  static CharBuffer *last_buffer;
   bool initialize_called;
 };
+
+CharBuffer *UF_MockUploader::last_buffer = NULL;
 
 //------------------------------------------------------------------------------
 
@@ -106,9 +110,6 @@ void BufferUploadCompleteCallback_T_Callbacks(const UploaderResults &results) {
   EXPECT_EQ(UploaderResults::kBufferUpload, results.type);
   EXPECT_EQ(0, results.return_code);
   EXPECT_EQ("", results.local_path);
-  //EXPECT_NE(static_cast<CharBuffer *>(NULL), results.buffer);
-  //EXPECT_LT(size_t(0), results.buffer->used_bytes());
-  //EXPECT_LE(0, results.buffer->base_offset());
   ++buffer_upload_complete_callback_calls;
 }
 
@@ -181,12 +182,12 @@ void ChunkUploadCompleteCallback_T_Ordering(const UploaderResults &results) {
 
 void BufferUploadCompleteCallback_T_Ordering(const UploaderResults &results) {
   EXPECT_EQ(UploaderResults::kBufferUpload, results.type);
-  //ASSERT_NE(static_cast<CharBuffer *>(NULL), results.buffer);
-  //EXPECT_LT(size_t(0), results.buffer->used_bytes());
+  ASSERT_NE(static_cast<CharBuffer *>(NULL), UF_MockUploader::last_buffer);
+  EXPECT_LT(size_t(0), UF_MockUploader::last_buffer->used_bytes());
 
-  //EXPECT_EQ(static_cast<off_t>(overall_size_ordering),
-  //          results.buffer->base_offset());
-  //overall_size_ordering += results.buffer->used_bytes();
+  EXPECT_EQ(static_cast<off_t>(overall_size_ordering),
+            UF_MockUploader::last_buffer->base_offset());
+  overall_size_ordering += UF_MockUploader::last_buffer->used_bytes();
 }
 
 // Caveat: 'offset' it automatically updated!
