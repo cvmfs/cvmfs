@@ -47,7 +47,7 @@ minio_tag=$(cat ${rpm_src_dir}/${spec_file} | grep minio_tag | grep ^%define | a
 minio_commitid=$(cd ${ALL_SOURCE_LOCATION}/minio && git rev-parse ${minio_tag})
 (cd ${ALL_SOURCE_LOCATION}/minio && \
   git archive --format=tar --prefix=cvmfs-minio-${minio_tag}/ \
-    -o ../../build/${minio_tag}.tar.gz ${minio_tag})
+    -o ../../build/SOURCES/${minio_tag}.tar.gz ${minio_tag})
 
 echo "Building!"
 cd $CVMFS_RESULT_LOCATION
