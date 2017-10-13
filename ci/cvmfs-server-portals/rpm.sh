@@ -16,15 +16,16 @@ if [ $# -lt 2 ]; then
 fi
 
 CVMFS_SOURCE_LOCATION="$1"
+ALL_SOURCE_LOCATION="${CVMFS_SOURCE_LOCATION}/.."
 CVMFS_RESULT_LOCATION="$2"
 
 rpm_infra_dirs="BUILD RPMS SOURCES SRPMS TMP"
-rpm_src_dir="${CVMFS_SOURCE_LOCATION}/cvmfs/packaging/rpm"
+rpm_src_dir="${CVMFS_SOURCE_LOCATION}/packaging/rpm"
 spec_file="cvmfs-server-portals.spec"
 
 # sanity checks
-for d in cvmfs docker-graphdriver minio; do
-  [ -d ${CVMFS_SOURCE_LOCATION}/$d ] || die "sources $d missing"
+for d in docker-graphdriver minio; do
+  [ -d ${ALL_SOURCE_LOCATION}/$d ] || die "sources $d missing"
 done
 for d in $rpm_infra_dirs; do
   [ ! -d ${CVMFS_RESULT_LOCATION}/${d} ] || die "build directory seems to be used before (${CVMFS_RESULT_LOCATION}/${d} exists)"
@@ -38,13 +39,13 @@ done
 
 echo "preparing sources in '${CVMFS_RESULT_LOCATION}/SOURCES'..."
 charon_version=$(cat ${rpm_src_dir}/${spec_file} | grep charon_version | grep ^%define | awk '{print $3}')
-charon_commitid=$(cd ${CVMFS_SOURCE_LOCATION}/docker-graphdriver && git rev-parse HEAD)
-(${CVMFS_SOURCE_LOCATION}/docker-graphdriver && \
+charon_commitid=$(cd ${ALL_SOURCE_LOCATION}/docker-graphdriver && git rev-parse HEAD)
+(${ALL_SOURCE_LOCATION}/docker-graphdriver && \
   git archive --format=tar --prefix=docker-graphdriver-1.1/ \
     -o ../../build/SOURCES/docker-graphdriver-${charon_version}.tar.gz HEAD)
 minio_tag=$(cat ${rpm_src_dir}/${spec_file} | grep minio_tag | grep ^%define | awk '{print $3}')
-minio_commitid=$(cd ${CVMFS_SOURCE_LOCATION}/minio && git rev-parse ${minio_tag})
-(cd ${CVMFS_SOURCE_LOCATION}/minio && \
+minio_commitid=$(cd ${ALL_SOURCE_LOCATION}/minio && git rev-parse ${minio_tag})
+(cd ${ALL_SOURCE_LOCATION}/minio && \
   git archive --format=tar --prefix=cvmfs-minio-${minio_tag}/ \
     -o ../../build/${minio_tag}.tar.gz ${minio_tag})
 
