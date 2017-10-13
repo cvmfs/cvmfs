@@ -18,6 +18,10 @@
 #include "util/pointer.h"
 #include "util/single_copy.h"
 
+namespace upload {
+struct UploadStreamHandle;
+}
+
 class FileItem;
 
 
@@ -92,18 +96,27 @@ class ChunkItem : SingleCopy {
 
   FileItem *file_item() { return file_item_; }
   uint64_t offset() { return offset_; }
+  upload::UploadStreamHandle *upload_handle() { return upload_handle_; }
   zlib::Compressor *compressor() { return compressor_.weak_ref(); }
   shash::ContextPtr hash_ctx() { return hash_ctx_; }
-  shash::Any *hash_ptr() { return &hash_value; }
+  shash::Any *hash_ptr() { return &hash_value_; }
+
+  void set_upload_handle(upload::UploadStreamHandle *val) {
+    upload_handle_ = val;
+  }
 
  private:
   FileItem *file_item_;
   uint64_t offset_;
   bool is_bulk_chunk_;
+  /**
+   * Deleted by the uploader.
+   */
+  upload::UploadStreamHandle *upload_handle_;
   UniquePtr<zlib::Compressor> compressor_;
   shash::ContextPtr hash_ctx_;
   UniquePtr<void> hash_ctx_buffer_;
-  shash::Any hash_value;
+  shash::Any hash_value_;
 };
 
 

@@ -51,6 +51,7 @@ ChunkItem::ChunkItem(FileItem *file_item, uint64_t offset)
   : file_item_(file_item)
   , offset_(offset)
   , is_bulk_chunk_(false)
+  , upload_handle_(NULL)
   , compressor_(zlib::Compressor::Construct(file_item->compression_algorithm()))
 {
   hash_ctx_.algorithm = file_item->hash_algorithm();
