@@ -30,7 +30,7 @@ done
 for d in $rpm_infra_dirs; do
   [ ! -d ${CVMFS_RESULT_LOCATION}/${d} ] || die "build directory seems to be used before (${CVMFS_RESULT_LOCATION}/${d} exists)"
 done
-[ ! -f ${rpm_src_dir}/${spec_file} ] || die "source directory seemed to be built before $spec_file exists"
+[ -f ${rpm_src_dir}/${spec_file} ] || die "$spec_file missing"
 
 echo "preparing build environment in '${CVMFS_RESULT_LOCATION}'..."
 for d in $rpm_infra_dirs; do
@@ -55,5 +55,5 @@ rpmbuild --define="_topdir $CVMFS_RESULT_LOCATION"        \
          --define="_tmppath ${CVMFS_RESULT_LOCATION}/TMP" \
 	 --define="charon_commitid ${charon_commitid}"    \
 	 --define="minio_commitid ${minio_commitid}"      \
-         -ba $spec_file
+         -ba ${rpm_src_dir}/$spec_file
 
