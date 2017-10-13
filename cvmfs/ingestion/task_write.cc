@@ -78,6 +78,7 @@ void TaskWrite::Process(BlockItem *input_block) {
           &TaskWrite::OnBlockComplete, this, input_block));*/
       break;
     case BlockItem::kBlockStop:
+      // TODO: fixup files with one chunk (which should become bulk chunk)
       uploader_->ScheduleCommit(handle, *chunk_item->hash_ptr());
       break;
     default:
