@@ -40,7 +40,7 @@ done
 echo "preparing sources in '${CVMFS_RESULT_LOCATION}/SOURCES'..."
 charon_version=$(cat ${rpm_src_dir}/${spec_file} | grep charon_version | grep ^%define | awk '{print $3}')
 charon_commitid=$(cd ${ALL_SOURCE_LOCATION}/docker-graphdriver && git rev-parse HEAD)
-(${ALL_SOURCE_LOCATION}/docker-graphdriver && \
+(cd ${ALL_SOURCE_LOCATION}/docker-graphdriver && \
   git archive --format=tar --prefix=docker-graphdriver-1.1/ \
     -o ../../build/SOURCES/docker-graphdriver-${charon_version}.tar.gz HEAD)
 minio_tag=$(cat ${rpm_src_dir}/${spec_file} | grep minio_tag | grep ^%define | awk '{print $3}')
