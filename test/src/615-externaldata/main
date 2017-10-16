@@ -29,71 +29,76 @@ cvmfs_run_test() {
   local repo_dir="/cvmfs/${CVMFS_TEST_REPO}"
   local scratch_dir="$(pwd)"
 
-  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
-  echo "Note: cvmfs_server mkfs -X --> enabled external files"
-  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -X -Z none || return $?
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  echo "*** Note: cvmfs_server mkfs -X --> enabled external files"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -g -z -X -Z none || return $?
 
-  echo "get some global base paths and configs"
+  echo "*** Disable auto gc"
+  sudo sed -i -e /^CVMFS_AUTO_GC=/d /etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/server.conf
+  echo "CVMFS_AUTO_GC=false" | sudo tee -a /etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/server.conf
+
+  echo "*** get some global base paths and configs"
   load_repo_config $CVMFS_TEST_REPO
   local cvmfs_mnt="${CVMFS_SPOOL_DIR}/rdonly"
   local cvmfs_cache="${CVMFS_CACHE_BASE}/$CVMFS_TEST_REPO"
   local http_port=8615
   local external_http_base="http://localhost:$http_port"
   local client_config="/etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/client.conf"
+  local original_root_hash=$(attr -qg root_hash ${cvmfs_mnt})
 
-  echo "install a desaster cleanup"
+  echo "*** install a desaster cleanup"
   trap cleanup EXIT HUP INT TERM || return $?
 
-  echo "configure external data location"
+  echo "*** configure external data location"
   echo "CVMFS_EXTERNAL_URL=$external_http_base" | sudo tee --append $client_config
 
-  echo "fill repository with some files"
-  start_transaction $CVMFS_TEST_REPO                     || return $?
-  mkdir -p ${repo_dir}/external                          || return 1
-  mkdir -p ${repo_dir}/internal                          || return 2
-  echo "Hello World" > ${repo_dir}/external/file         || return 3
-  cp ${repo_dir}/external/file ${repo_dir}/internal/file || return 4
+  echo "*** fill repository with some files"
+  start_transaction $CVMFS_TEST_REPO                             || return $?
+  mkdir -p ${repo_dir}/external                                  || return 1
+  mkdir -p ${repo_dir}/internal                                  || return 2
+  echo "Hello World" > ${repo_dir}/external/file                 || return 3
+  cp ${repo_dir}/external/file ${repo_dir}/internal/file         || return 4
 
-  echo "create a large file to be chunked"
+  echo "*** create a large file to be chunked"
   dd if=/dev/urandom of=chunked_file bs=1M count=32 || return 5
   cp chunked_file ${repo_dir}/chunked_file          || return 6
 
-  echo "creating CVMFS snapshot"
+  echo "*** creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO -v || return $?
 
-  echo "Locating internal/file in backend storage"
+  echo "*** Locating internal/file in backend storage"
   local object_hash=$(get_content_hash ${cvmfs_mnt}/internal/file)
   local object_url="$(get_object_url $CVMFS_TEST_REPO $object_hash)"
   local object_file="${scratch_dir}/${object_hash}"
-  echo "File in backend is $object_url"
+  echo "*** File 'file' in backend is $object_url"
 
-  echo "downloading the file to local scratch space '$object_file'"
+  echo "*** downloading 'file' to local scratch space '$object_file'"
   download_from_backend $CVMFS_TEST_REPO $(make_path $object_hash) $object_file || return 7
 
   # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
   local external_storage="${scratch_dir}/external_files"
-  echo "Creating external storage directory '$external_storage'"
+  echo "*** Creating external storage directory '$external_storage'"
   mkdir -p $external_storage || return 35
 
-  echo "Make sure the file is NOT in the repository storage but instead in the external area"
+  echo "*** Make sure the file is NOT in the repository storage but instead in the external area"
   mkdir -p ${external_storage}/external
   delete_from_backend $CVMFS_TEST_REPO $(make_path $object_hash) || return 36
   cp "$object_file" ${external_storage}/external/file            || return 37
 
-  echo "Check the external file data (should fail to read - external storage not served yet)"
+  echo "*** Check the external file data (should fail to read - external storage not served yet)"
   is_external_file ${cvmfs_mnt}/external/file || return 20
   ! cat ${repo_dir}/external/file             || return 21
 
   local http_log="${scratch_dir}/http.log"
-  echo "start an HTTP server to serve external files (logging to $http_log)"
+  echo "*** Start an HTTP server to serve external files (logging to $http_log)"
   CVMFS_TEST_615_HTTP_PID="$(open_http_server $external_storage $http_port $http_log)"
   [ ! -z $CVMFS_TEST_615_HTTP_PID ] && kill -0 $CVMFS_TEST_615_HTTP_PID || { echo "fail"; return 8; }
-  echo "HTTP server running with PID $CVMFS_TEST_615_HTTP_PID"
+  echo "*** HTTP server running with PID $CVMFS_TEST_615_HTTP_PID"
 
   # Since CVMFS_EXTERNAL_HTTP_PROXY is the default DIRECT, setting
   #   CVMFS_EXTERNAL_FALLBACK_PROXY to an invalid address causes failure
-  echo "Setting CVMFS_EXTERNAL_FALLBACK_PROXY should also block access"
+  echo "*** Setting CVMFS_EXTERNAL_FALLBACK_PROXY should also block access"
   sudo umount ${repo_dir}                                || return 38
   sudo umount ${cvmfs_mnt}                               || return 39
   echo "CVMFS_EXTERNAL_FALLBACK_PROXY=http://example.com:3128" | sudo tee --append $client_config
@@ -101,19 +106,19 @@ cvmfs_run_test() {
 
   ! cat ${repo_dir}/external/file                        || return 22
 
-  echo "But setting CVMFS_FALLBACK_PROXY should work"
+  echo "*** But setting CVMFS_FALLBACK_PROXY should work"
   sudo umount ${repo_dir}                                || return 41
   sudo umount ${cvmfs_mnt}                               || return 42
   sudo sed -i 's/CVMFS_EXTERNAL_FALLBACK/CVMFS_FALLBACK/' $client_config || return 43
   sudo cvmfs_server mount $CVMFS_TEST_REPO               || return 44
 
-  echo "Check the external file data"
+  echo "*** Check the external file data"
   is_external_file ${cvmfs_mnt}/external/file               || return 23
   [ x"$(cat ${repo_dir}/external/file)" == x"Hello World" ] || return 24
 
   # CVMFS_FALLBACK_PROXY does however interfere with internal files
   #   because CVMFS_HTTP_PROXY=DIRECT
-  echo "Now deleting CVMFS_FALLBACK_PROXY"
+  echo "*** Now deleting CVMFS_FALLBACK_PROXY"
   sudo umount ${repo_dir}                                || return 45
   sudo umount ${cvmfs_mnt}                               || return 46
   sudo sed -i '/CVMFS_FALLBACK_PROXY/d' $client_config   || return 47
@@ -121,13 +126,13 @@ cvmfs_run_test() {
 
   # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
-  echo "Try reading chunked file (should fail - not served by external yet)"
+  echo "*** Try reading chunked file (should fail - not served by external yet)"
   cat ${repo_dir}/chunked_file > /dev/null && return 30
 
-  echo "copy chunked file into external storage"
+  echo "*** copy chunked file into external storage"
   cp chunked_file "${external_storage}/chunked_file" || return 52
 
-  echo "verify chunked files are really properly chunked and readable"
+  echo "*** verify chunked files are really properly chunked and readable"
   local chunked_true_hash=$(cat chunked_file | sha1sum | awk '{print $1;}')
   local chunked_cvmfs_hash=$(get_content_hash ${cvmfs_mnt}/chunked_file)
   local chunked_cvmfs_read=$(cat ${repo_dir}/chunked_file | sha1sum | awk '{print $1;}')
@@ -145,7 +150,7 @@ cvmfs_run_test() {
     echo "Correct hash is $chunked_cvmfs_hash but CVMFS output was $chunked_cvmfs_read"
     return 27
   fi
-  if [[ "$chunk_count" -lt 2 ]]; then
+  if [ "$chunk_count" -lt 2 ]; then
     echo "Chunk count is $chunk_count"
     return 28
   fi
@@ -153,70 +158,93 @@ cvmfs_run_test() {
   # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
   local cache_object="${cvmfs_cache}/$(get_hash_path $object_hash)"
-  echo "Verify the expected file ($cache_object) is in the cache."
+  echo "*** Verify the expected file ($cache_object) is in the cache."
   sudo test -f "$cache_object" || return 53
 
-  echo "check catalog and data integrity"
+  echo "*** Check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
 
   # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
-  echo "publish file that is NOT marked as external (cvmfs_server publish -N)"
+  echo "*** publish file that is NOT marked as external (cvmfs_server publish -N)"
   start_transaction $CVMFS_TEST_REPO                       || return $?
   echo "not external" > ${repo_dir}/native                 || return 61
   dd if=/dev/urandom of=chunked_file_native bs=1M count=32 || return 62
   cp chunked_file_native ${repo_dir}/chunked_file_native   || return 63
   publish_repo $CVMFS_TEST_REPO -v -N                      || return $?
 
-  echo "check that 'native' is NOT external"
+  echo "*** check that 'native' is NOT external"
   ! is_external_file ${cvmfs_mnt}/native              || return 31
   ! is_external_file ${cvmfs_mnt}/chunked_file_native || return 32
 
-  echo "Remove cached and external copy of the file; only copy"
-  echo "is in the backend storage, which should not be used."
+  echo "*** Remove cached and external copy of the file; only copy"
+  echo "***    is in the backend storage, which should not be used."
   upload_into_backend $CVMFS_TEST_REPO $object_file $(make_path $object_hash) || return 54
   rm -f ${external_storage}/external/file                                     || return 55
   sudo rm -f $cache_object                                                    || return 56
 
-  echo "disable HTTP server (stop serving external files)"
+  echo "*** disable HTTP server (stop serving external files)"
   sudo kill $CVMFS_TEST_615_HTTP_PID || return 70
   CVMFS_TEST_615_HTTP_PID=""
   sleep 1
 
-  echo "read and validate internal files"
+  echo "*** read and validate internal files"
   [ x"$(cat ${repo_dir}/native)" = x"not external" ] || return 71
   local chunked_file_native_hash="$(cat chunked_file_native | sha1sum)"
   local chunked_file_native_hash_cvmfs="$(cat ${repo_dir}/chunked_file_native | sha1sum)"
   [ x"$chunked_file_native_hash" = x"$chunked_file_native_hash_cvmfs" ] || return 72
 
-  echo "Make sure access fails without the external copy."
+  echo "*** Make sure access fails without the external copy."
   if cat ${repo_dir}/external/file; then
     echo "External file ${repo_dir}/external/file appears to be using internal data."
     return 57
   fi
 
+  ##############################################################################
+
+  # This part has to be second last
+
+  start_transaction $CVMFS_TEST_REPO || return $?
+  is_external_file ${cvmfs_mnt}/external/file || return 90
+  is_external_file ${repo_dir}/chunked_file || return 90
+  rm ${repo_dir}/external/file || return 91
+  rm ${repo_dir}/chunked_file || return 91
+  publish_repo $CVMFS_TEST_REPO -v || return 92
+  echo "*** Empty publication to remove deleted files from trunk-previous"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  publish_repo $CVMFS_TEST_REPO -v || return 92
+  echo "*** running garbage collection"
+  cvmfs_server gc -f -r0 -L gc.log $CVMFS_TEST_REPO || return 93
+  cat gc.log | grep -v '^#' | grep -v '^$' > gc-sanitized.log
+  echo "*** Objects removed by garbage-collection:"
+  cat gc-sanitized.log
+  echo "*** verify that original root catalog was removed"
+  grep "${original_root_hash}C" gc-sanitized.log || return 94
+  echo "*** verify that only file catalogs and histories were removed"
+  grep -v 'C\|H$' gc-sanitized.log && return 95
+
   # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
   # This part has to be last
 
-  echo "test cvmfs_talk external commands"
+  echo "*** test cvmfs_talk external commands"
   local test_dom="example.com"
   local test_dom2="cern.ch"
   local test_hosts="http://$test_dom:80;http://$test_dom2:80"
   local test_proxy="http://$test_dom:3128"
   local test_pipe="${cvmfs_cache}/cvmfs_io.$CVMFS_TEST_REPO"
 
-  echo "test external host set"
+  echo "*** test external host set"
   sudo cvmfs_talk -p $test_pipe external host set "$test_hosts"        || return 80
-  echo "test external host info"
+  echo "*** test external host info"
   sudo cvmfs_talk -p $test_pipe external host info                     || return 81
   sudo cvmfs_talk -p $test_pipe external host info | grep "$test_dom"  || return 82
-  echo "test external host switch"
+  echo "*** test external host switch"
   sudo cvmfs_talk -p $test_pipe external host switch                   || return 83
   sudo cvmfs_talk -p $test_pipe external host info | grep "Active.*$test_dom2"  || return 84
-  echo "test external proxy set"
+  echo "*** test external proxy set"
   sudo cvmfs_talk -p $test_pipe external proxy set "$test_proxy"       || return 85
-  echo "test external proxy info"
+  echo "*** test external proxy info"
   sudo cvmfs_talk -p $test_pipe external proxy info                    || return 86
   sudo cvmfs_talk -p $test_pipe external proxy info | grep "$test_dom" || return 87
 
