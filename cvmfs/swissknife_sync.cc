@@ -41,6 +41,7 @@
 #include "path_filters/dirtab.h"
 #include "platform.h"
 #include "reflog.h"
+#include "sanitizer.h"
 #include "sync_mediator.h"
 #include "sync_union.h"
 #include "util/string.h"
@@ -583,6 +584,11 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   }
 
   if (args.find('v') != args.end()) {
+    sanitizer::IntegerSanitizer sanitizer;
+    if (!sanitizer.IsValid(*args.find('v')->second)) {
+      PrintError("invalid revision number");
+      return 1;
+    }
     params.manual_revision = String2Uint64(*args.find('v')->second);
   }
 
