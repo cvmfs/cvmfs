@@ -73,9 +73,12 @@ void TaskWrite::Process(BlockItem *input_block) {
 
   switch (input_block->type()) {
     case BlockItem::kBlockData:
-      /*uploader_->ScheduleUpload(handle, buffer,
+      uploader_->ScheduleUpload(
+        handle,
+        upload::AbstractUploader::UploadBuffer(
+          input_block->size(), input_block->data()),
         upload::AbstractUploader::MakeClosure(
-          &TaskWrite::OnBlockComplete, this, input_block));*/
+          &TaskWrite::OnBlockComplete, this, input_block));
       break;
     case BlockItem::kBlockStop:
       // TODO: fixup files with one chunk (which should become bulk chunk)
