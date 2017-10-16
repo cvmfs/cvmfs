@@ -1,4 +1,5 @@
 2.4.2:
+  * Skip external files during garbage collection (CVM-1396)
   * Enforce numeric value when manually setting revision number (CVM-1372)
   * Add cvmcache_get_session() to cache plugin API (CVM-1368)
   * Enforce explicit catalog TTL setting on publish (CVM-1388)
