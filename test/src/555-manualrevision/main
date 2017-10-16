@@ -37,6 +37,9 @@ cvmfs_run_test() {
   echo "starting transaction to edit repository"
   start_transaction $CVMFS_TEST_REPO || return $?
 
+  echo "creating CVMFS snapshot (manually setting revision to non-numerical value), expecting failure"
+  publish_repo $CVMFS_TEST_REPO -n some-tag-foo && return 20
+
   echo "creating CVMFS snapshot (manually setting revision to 42 again) expecting failure"
   publish_repo $CVMFS_TEST_REPO -n 42 && return 3
 

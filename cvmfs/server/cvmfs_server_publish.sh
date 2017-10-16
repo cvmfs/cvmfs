@@ -131,6 +131,11 @@ cvmfs_server_publish() {
     is_cwd_on_path "/cvmfs/$name" && { echo "Current working directory is in /cvmfs/$name.  Please release, e.g. by 'cd \$HOME'."; retcode=1; continue; } || true
     gc_timespan="$(get_auto_garbage_collection_timespan $name)" || { retcode=1; continue; }
     if [ x"$manual_revision" != x"" ]; then
+      if [ "x$(echo "$manual_revision" | tr -cd 0-9)" != "x$manual_revision" ]; then
+        echo "Invalid revision number: $manual_revision"
+        retcode=1
+        continue
+      fi
       local revision_number=$(attr -qg revision /var/spool/cvmfs/${name}/rdonly)
       if [ $manual_revision -le $revision_number ]; then
         echo "Current revision '$revision_number' is ahead of manual revision number '$manual_revision'."
