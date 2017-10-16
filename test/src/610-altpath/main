@@ -52,6 +52,9 @@ cvmfs_run_test() {
 
   echo "put .cvmfsalt- symlinks back in place"
   sudo find $stash -maxdepth 1 -type l -exec mv -f {} $backend_dir \; || return 52
+  check_repository $CVMFS_TEST_REPO -i || return 53
+
+  return 0
 
   # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 

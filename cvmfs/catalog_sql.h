@@ -186,6 +186,7 @@ class SqlDirent : public SqlCatalog {
   /**
    * The file is not natively stored in cvmfs but on a different storage system,
    * for instance on HTTPS data federation services.
+   * NOTE: used as magic number in SqlListContentHashes::SqlListContentHashes
    */
   static const int kFlagFileExternal        = 128;
   // as of 2^8: 3 bit for hashes
