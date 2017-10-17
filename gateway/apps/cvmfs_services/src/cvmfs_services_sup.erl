@@ -58,7 +58,7 @@ init({EnabledWorkers, Repos, Keys, PoolConfig, WorkerConfig}) ->
       cvmfs_commit_sup => #{id => cvmfs_commit_sup,
                             start => {cvmfs_commit_sup, start_link, [Repos]},
                             restart => permanent,
-                            shutdown => 2000,
+                            shutdown => infinity,
                             type => supervisor,
                             modules => [cvmfs_commit_sup]}
      },

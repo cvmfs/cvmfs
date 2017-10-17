@@ -19,20 +19,21 @@
 
 -behaviour(gen_server).
 
--export([start_link/0, commit/4]).
+-export([start_link/1, commit/4]).
 
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2]).
 
 
-start_link() ->
-    gen_server:start_link(?MODULE, [], []).
+start_link(RepoName) ->
+    gen_server:start_link(?MODULE, RepoName, []).
 
 
 commit(Pid, LeasePath, OldRootHash, NewRootHash) ->
     gen_server:call(Pid, {commit, {LeasePath, OldRootHash, NewRootHash}}).
 
 
-init([]) ->
+init(RepoName) ->
+    ets:insert(commit_workers, {RepoName, self()}),
     {ok, []}.
 
 
