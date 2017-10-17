@@ -8,7 +8,12 @@
 
  {mnesia, [{schema_location, disc}]},
 
- {cvmfs_services, [{enabled_services, [cvmfs_fe, cvmfs_be, cvmfs_auth, cvmfs_lease, cvmfs_receiver_pool, cvmfs_commit_sup]},
+ {cvmfs_services, [{enabled_services, [cvmfs_fe,
+                                       cvmfs_be,
+                                       cvmfs_auth,
+                                       cvmfs_lease,
+                                       cvmfs_receiver_pool,
+                                       cvmfs_commit_sup]},
                    {repo_config, {file, "./config/ct_repo.config"}},
                    {user_config, {file, "./config/ct_user.config"}}]}
 ].
