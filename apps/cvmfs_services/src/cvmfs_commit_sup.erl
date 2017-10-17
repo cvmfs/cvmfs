@@ -26,34 +26,27 @@
 
 start_link(Repos) ->
     Sup = supervisor:start_link({local, ?MODULE}, ?MODULE, []),
-    lists:foreach(fun({RepoName, _RepoKeys}) -> add_manager(RepoName) end,
+    lists:foreach(fun({RepoName, _RepoKeys}) -> add_worker(RepoName) end,
                   Repos),
     Sup.
 
 
 init([]) ->
     ets:new(commit_workers, [set, named_table, public]),
-    SupervisorSpecs = #{strategy => simple_one_for_one,
+    SupervisorSpecs = #{strategy => one_for_one,
                         intensity => 5,
                         period => 5},
-    WorkerSpecs = #{ id => cvmfs_commit_worker,
-                     start => {cvmfs_commit_worker, start_link, []},
-                     restart => transient,
-                     shutdown => 2000,
-                     type => worker,
-                     modules => [cvmfs_commit_worker] },
-    {ok, {SupervisorSpecs, [WorkerSpecs]}}.
+    {ok, {SupervisorSpecs, []}}.
 
 
-add_manager(RepoName) ->
-    case ets:lookup(commit_workers, RepoName) of
-        [] ->
-            {ok, Pid} = supervisor:start_child(?MODULE, []),
-            ets:insert(commit_workers, {RepoName, Pid}),
-            Pid;
-        _Pid ->
-            {error, exists}
-    end.
+add_worker(RepoName) ->
+    ChildSpec = #{ id => RepoName,
+                   start => {cvmfs_commit_worker, start_link, [RepoName]},
+                   restart => transient,
+                   shutdown => 2000,
+                   type => worker,
+                   modules => [cvmfs_commit_worker] },
+    supervisor:start_child(?MODULE, ChildSpec).
 
 
 commit(LeasePath, OldRootHash, NewRootHash) ->
