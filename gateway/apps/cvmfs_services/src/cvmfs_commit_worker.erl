@@ -29,7 +29,8 @@ start_link(RepoName) ->
 
 
 commit(Pid, LeasePath, OldRootHash, NewRootHash) ->
-    gen_server:call(Pid, {commit, {LeasePath, OldRootHash, NewRootHash}}).
+    gen_server:call(Pid, {commit, {LeasePath, OldRootHash, NewRootHash}},
+                    cvmfs_app_util:get_max_lease_time()).
 
 
 init(RepoName) ->
