@@ -54,7 +54,13 @@ init({EnabledWorkers, Repos, Keys, PoolConfig, WorkerConfig}) ->
                        shutdown => 2000,
                        type => worker,
                        modules => [cvmfs_lease]},
-      cvmfs_receiver_pool => poolboy:child_spec(cvmfs_receiver_pool, ReceiverPoolConfig, WorkerConfig)
+      cvmfs_receiver_pool => poolboy:child_spec(cvmfs_receiver_pool, ReceiverPoolConfig, WorkerConfig),
+      cvmfs_commit_sup => #{id => cvmfs_commit_sup,
+                            start => {cvmfs_commit_sup, start_link, [Repos]},
+                            restart => permanent,
+                            shutdown => infinity,
+                            type => supervisor,
+                            modules => [cvmfs_commit_sup]}
      },
     {ok, {SupervisorSpecs, lists:foldr(fun(W, Acc) -> [maps:get(W, WorkerSpecs) | Acc] end,
                                        [],

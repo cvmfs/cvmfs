@@ -13,7 +13,6 @@
 -define(API_VERSION, 1).
 -define(API_ROOT, "/api/v" ++ integer_to_list(?API_VERSION)).
 
--define(REQUEST_TIMEOUT, 10800000).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -35,8 +34,8 @@ start_link([TcpPort]) ->
     cowboy:start_clear(cvmfs_fe,
                        [{port, TcpPort}],
                        #{env => #{dispatch => Dispatch},
-                         idle_timeout => ?REQUEST_TIMEOUT,
-                         inactivity_timeout => ?REQUEST_TIMEOUT}).
+                         idle_timeout => cvmfs_app_util:get_max_lease_time(),
+                         inactivity_timeout => cvmfs_app_util:get_max_lease_time()}).
 
 
 -spec api_version() -> integer().
