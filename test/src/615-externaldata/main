@@ -206,7 +206,7 @@ cvmfs_run_test() {
 
   start_transaction $CVMFS_TEST_REPO || return $?
   is_external_file ${cvmfs_mnt}/external/file || return 90
-  is_external_file ${repo_dir}/chunked_file || return 90
+  is_external_file ${cvmfs_mnt}/chunked_file || return 90
   rm ${repo_dir}/external/file || return 91
   rm ${repo_dir}/chunked_file || return 91
   publish_repo $CVMFS_TEST_REPO -v || return 92
