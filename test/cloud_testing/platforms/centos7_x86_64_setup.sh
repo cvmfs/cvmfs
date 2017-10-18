@@ -72,3 +72,6 @@ install_from_repo bzip2
 echo -n "increasing ulimit -n ... "
 set_nofile_limit 65536 || die "fail"
 echo "done"
+
+# Ensure Apache is up and running after package update
+sudo systemctl restart httpd || die "failure in final Apache restart"
