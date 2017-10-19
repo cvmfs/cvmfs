@@ -31,7 +31,7 @@ cvmfs_run_test() {
   if [ x"$pid_before" != x"$pid_after" ]; then
     echo "*** PID mismatch: pid before $pid_before, pid after $pid_after"
     echo "*** cat stacktrace file ($(date))"
-    cat "$(get_cvmfs_cachedir atlas.cern.ch)/stacktrace.atlas.cern.ch"
+    sudo cat "$(get_cvmfs_cachedir atlas.cern.ch)/stacktrace.atlas.cern.ch"
     RETVAL=2
   fi
 

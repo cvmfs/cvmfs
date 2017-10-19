@@ -556,13 +556,15 @@ SqlListContentHashes::SqlListContentHashes(const CatalogDatabase &database) {
   static const char *stmt_ge_2_4 =
       "SELECT hash, flags, 0 "
       "  FROM catalog "
-      "  WHERE length(catalog.hash) > 0 "
+      "  WHERE (length(catalog.hash) > 0) AND "
+      "        ((flags & 128) = 0) "  // kFlagFileExternal
       "UNION "
       "SELECT chunks.hash, catalog.flags, 1 "
       "  FROM catalog "
       "  LEFT JOIN chunks "
       "  ON catalog.md5path_1 = chunks.md5path_1 AND "
-      "     catalog.md5path_2 = chunks.md5path_2;";
+      "     catalog.md5path_2 = chunks.md5path_2 "
+      "  WHERE (catalog.flags & 128) = 0;";  // kFlagFileExternal
 
   if (database.schema_version() < 2.4-CatalogDatabase::kSchemaEpsilon) {
     DeferredInit(database.sqlite_db(), stmt_lt_2_4);
