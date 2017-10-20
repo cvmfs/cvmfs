@@ -9,12 +9,15 @@
 
 #include "catalog.h"
 #include "hash.h"
+#include "lease_path_util.h"
 #include "logging.h"
 #include "manifest.h"
 #include "options.h"
 #include "upload.h"
 #include "util/posix.h"
 #include "util/raii_temp_dir.h"
+
+namespace {
 
 inline PathString MakeRelative(const PathString& path) {
   std::string rel_path;
@@ -26,6 +29,8 @@ inline PathString MakeRelative(const PathString& path) {
   }
   return PathString(rel_path);
 }
+
+}  // namespace
 
 namespace receiver {
 
@@ -72,7 +77,7 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportAddition(
    *       by another writer running concurrently.
    *       The correct course of action is to ignore this change here.
    * */
-  if (!rel_path.StartsWith(lease_path_)) {
+  if (!IsPathInLease(lease_path_, rel_path)) {
     return;
   }
 
@@ -102,7 +107,7 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportRemoval(
    *       by another writer running concurrently.
    *       The correct course of action is to ignore this change here.
    * */
-  if (!rel_path.StartsWith(lease_path_)) {
+  if (!IsPathInLease(lease_path_, rel_path)) {
     return;
   }
 
@@ -128,7 +133,7 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportModification(
    *       by another writer running concurrently.
    *       The correct course of action is to ignore this change here.
    * */
-  if (!rel_path.StartsWith(lease_path_)) {
+  if (!IsPathInLease(lease_path_, rel_path)) {
     return;
   }
 
