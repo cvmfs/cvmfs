@@ -8,7 +8,7 @@ namespace receiver {
 
 bool IsPathInLease(const PathString& lease, const PathString& path) {
   // If lease is "", any path falls within item
-  if (!strcmp(lease.c_str(),"")) {
+  if (!strcmp(lease.c_str(), "")) {
     return true;
   }
 
@@ -18,8 +18,8 @@ bool IsPathInLease(const PathString& lease, const PathString& path) {
     return true;
   }
 
-  // If the path string is exactly the lease path return true (allow the creation
-  // of the leased directory during the lease itself)
+  // If the path string is exactly the lease path return true (allow the
+  // creation of the leased directory during the lease itself)
   if (lease == path) {
     return true;
   }
@@ -27,5 +27,4 @@ bool IsPathInLease(const PathString& lease, const PathString& path) {
   return false;
 }
 
-}
-
+}  // namespace receiver

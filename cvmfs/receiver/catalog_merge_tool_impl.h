@@ -17,8 +17,6 @@
 #include "util/posix.h"
 #include "util/raii_temp_dir.h"
 
-namespace {
-
 inline PathString MakeRelative(const PathString& path) {
   std::string rel_path;
   std::string abs_path = path.ToString();
@@ -29,8 +27,6 @@ inline PathString MakeRelative(const PathString& path) {
   }
   return PathString(rel_path);
 }
-
-}  // namespace
 
 namespace receiver {
 
