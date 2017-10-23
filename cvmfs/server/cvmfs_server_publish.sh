@@ -300,12 +300,6 @@ cvmfs_server_publish() {
         tag_command="$tag_command -P $(get_checked_out_previous_branch $name)"
       fi
     fi
-    # If the upstream type is "gw", we need to pass additional parameters
-    # to the `cvmfs_swissknife sync` command: the username and the
-    # subpath of the active lease
-    if [ x"$upstream_type" = xgw ]; then
-      tag_command="$tag_command -P /var/spool/cvmfs/$name/session_token_$subpath"
-    fi
     if [ ! -z "$tag_name" ]; then
       tag_command="$tag_command -a $tag_name"
     fi
