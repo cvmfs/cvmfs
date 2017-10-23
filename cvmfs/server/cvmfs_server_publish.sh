@@ -96,20 +96,26 @@ cvmfs_server_publish() {
     local subpath=$(echo $name | cut -d'/' -f2- -s)
     name=$(echo $name | cut -d'/' -f1)
 
+    load_repo_config $name
+    # We need the upstream type for configuring the health_check function
+    upstream=$CVMFS_UPSTREAM_STORAGE
+    upstream_type=$(get_upstream_type $upstream)
+
     # sanity checks
     is_stratum0 $name   || die "This is not a stratum 0 repository"
     is_publishing $name && die "Another publish process is active for $name"
-    health_check -r $name
+    if [ x"$upstream_type" = xgw ]; then
+        health_check -g -r $name
+    else
+        health_check -r $name
+    fi
 
     # get repository information
-    load_repo_config $name
     user=$CVMFS_USER
     gw_key_file=/etc/cvmfs/keys/${name}.gw
     spool_dir=$CVMFS_SPOOL_DIR
     scratch_dir="${spool_dir}/scratch/current"
     stratum0=$CVMFS_STRATUM0
-    upstream=$CVMFS_UPSTREAM_STORAGE
-    upstream_type=$(get_upstream_type $upstream)
     hash_algorithm="${CVMFS_HASH_ALGORITHM-sha1}"
     compression_alg="${CVMFS_COMPRESSION_ALGORITHM-default}"
     if [ x"$force_compression_algorithm" != "x" ]; then

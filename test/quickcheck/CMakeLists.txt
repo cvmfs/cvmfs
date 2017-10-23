@@ -60,6 +60,7 @@ set (CVMFS_QC_SOURCES
   ${CVMFS_SOURCE_DIR}/monitor.cc
   ${CVMFS_SOURCE_DIR}/options.cc
   ${CVMFS_SOURCE_DIR}/pack.cc
+  ${CVMFS_SOURCE_DIR}/receiver/lease_path_util.cc
   ${CVMFS_SOURCE_DIR}/reflog.cc
   ${CVMFS_SOURCE_DIR}/reflog_sql.cc
   ${CVMFS_SOURCE_DIR}/upload_facility.cc

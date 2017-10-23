@@ -66,7 +66,7 @@ CommitProcessor::Result CommitProcessor::Process(
     const std::string& lease_path, const shash::Any& old_root_hash,
     const shash::Any& new_root_hash) {
   LogCvmfs(kLogReceiver, kLogSyslog,
-           "CommitProcessor - committing: %s, old hash: %s, new hash: %s",
+           "CommitProcessor - lease_path: %s, old hash: %s, new hash: %s",
            lease_path.c_str(), old_root_hash.ToString(true).c_str(),
            new_root_hash.ToString(true).c_str());
 
@@ -77,16 +77,18 @@ CommitProcessor::Result CommitProcessor::Process(
 
   Params params;
   if (!GetParamsFromFile(repo_name, &params)) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr,
-             "Error: Could not get configuration parameters.");
+    LogCvmfs(
+        kLogReceiver, kLogSyslogErr,
+        "CommitProcessor - error: Could not get configuration parameters.");
     return kIoError;
   }
 
   UniquePtr<ServerTool> server_tool(new ServerTool());
 
   if (!server_tool->InitDownloadManager(true)) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr,
-             "Error: Could not initialize the download manager");
+    LogCvmfs(
+        kLogReceiver, kLogSyslogErr,
+        "CommitProcessor - error: Could not initialize the download manager");
     return kIoError;
   }
 
@@ -94,8 +96,9 @@ CommitProcessor::Result CommitProcessor::Process(
   const std::string trusted_certs =
       "/etc/cvmfs/repositories.d/" + repo_name + "/trusted_certs";
   if (!server_tool->InitVerifyingSignatureManager(public_key, trusted_certs)) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr,
-             "Error: Could not initialize the signature manager");
+    LogCvmfs(
+        kLogReceiver, kLogSyslogErr,
+        "CommitProcessor - error: Could not initialize the signature manager");
     return kIoError;
   }
 
@@ -106,9 +109,14 @@ CommitProcessor::Result CommitProcessor::Process(
   // Current catalog from the gateway machine
   if (!manifest.IsValid()) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
-             "Error: Could not open repository manifest");
+             "CommitProcessor - error: Could not open repository manifest");
     return kIoError;
   }
+
+  LogCvmfs(kLogReceiver, kLogSyslog,
+           "CommitProcessor - lease_path: %s, target root hash: %s",
+           lease_path.c_str(),
+           manifest->catalog_hash().ToString(false).c_str());
 
   const std::string spooler_temp_dir =
       GetSpoolerTempDir(params.spooler_configuration);
@@ -117,7 +125,9 @@ CommitProcessor::Result CommitProcessor::Process(
 
   const PathString relative_lease_path = RemoveRepoName(PathString(lease_path));
 
-  LogCvmfs(kLogReceiver, kLogSyslog, "CommitProcessor - merging catalogs");
+  LogCvmfs(kLogReceiver, kLogSyslog,
+           "CommitProcessor - lease_path: %s, merging catalogs",
+           lease_path.c_str());
 
   CatalogMergeTool<catalog::WritableCatalogManager,
                    catalog::SimpleCatalogManager>
@@ -132,7 +142,8 @@ CommitProcessor::Result CommitProcessor::Process(
 
   std::string new_manifest_path;
   if (!merge_tool.Run(params, &new_manifest_path)) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr, "Error: Catalog merge failed");
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "CommitProcessor - error: Catalog merge failed");
     return kMergeError;
   }
 
@@ -145,18 +156,53 @@ CommitProcessor::Result CommitProcessor::Process(
   server_tool.Destroy();
   server_tool = new ServerTool();
 
-  LogCvmfs(kLogReceiver, kLogSyslog, "CommitProcessor - signing manifest");
+  LogCvmfs(kLogReceiver, kLogSyslog,
+           "CommitProcessor - lease_path: %s, signing manifest",
+           lease_path.c_str());
 
   SigningTool signing_tool(server_tool.weak_ref());
   if (signing_tool.Run(new_manifest_path, params.stratum0,
                        params.spooler_configuration, temp_dir, certificate,
                        private_key, repo_name, "", "",
                        "/var/spool/cvmfs/" + repo_name + "/reflog.chksum")) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr, "Error signing manifest");
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "CommitProcessor - error: signing manifest");
     return kIoError;
   }
 
-  LogCvmfs(kLogReceiver, kLogSyslog, "CommitProcessor - success.");
+  LogCvmfs(kLogReceiver, kLogSyslog,
+           "CommitProcessor - lease_path: %s, success.", lease_path.c_str());
+
+  {
+    UniquePtr<ServerTool> server_tool(new ServerTool());
+
+    if (!server_tool->InitDownloadManager(true)) {
+      LogCvmfs(
+          kLogReceiver, kLogSyslogErr,
+          "CommitProcessor - error: Could not initialize the download manager");
+      return kIoError;
+    }
+
+    const std::string public_key = "/etc/cvmfs/keys/" + repo_name + ".pub";
+    const std::string trusted_certs =
+        "/etc/cvmfs/repositories.d/" + repo_name + "/trusted_certs";
+    if (!server_tool->InitVerifyingSignatureManager(public_key,
+                                                    trusted_certs)) {
+      LogCvmfs(kLogReceiver, kLogSyslogErr,
+               "CommitProcessor - error: Could not initialize the signature "
+               "manager");
+      return kIoError;
+    }
+
+    shash::Any manifest_base_hash;
+    UniquePtr<manifest::Manifest> manifest(server_tool->FetchRemoteManifest(
+        params.stratum0, repo_name, manifest_base_hash));
+
+    LogCvmfs(kLogReceiver, kLogSyslog,
+             "CommitProcessor - lease_path: %s, new root hash: %s",
+             lease_path.c_str(),
+             manifest->catalog_hash().ToString(false).c_str());
+  }
 
   return kSuccess;
 }
