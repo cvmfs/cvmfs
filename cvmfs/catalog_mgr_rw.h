@@ -121,7 +121,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
 
   // Nested catalog handling
   void CreateNestedCatalog(const std::string &mountpoint);
-  void RemoveNestedCatalog(const std::string &mountpoint);
+  void RemoveNestedCatalog(const std::string &mountpoint, const bool merge = true);
   bool IsTransitionPoint(const std::string &mountpoint);
   WritableCatalog *GetHostingCatalog(const std::string &path);
 

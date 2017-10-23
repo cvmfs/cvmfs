@@ -660,13 +660,18 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
 
 
 /**
- * Remove a nested catalog.
- * When you remove a nested catalog all entries currently held by it
- * will be merged into its parent catalog.
- * @param mountpoint the path of the nested catalog to be removed
- * @return true on success, false otherwise
+ * Remove a nested catalog
+ *
+ * If the merged parameter is true, when you remove a nested catalog
+ * all entries currently held by it will be merged into its parent
+ * catalog.
+ * @param mountpoint - the path of the nested catalog to be removed
+ * @param merge - merge the subtree associated with the nested catalog
+ *                into its parent catalog
+ * @return - true on success, false otherwise
  */
-void WritableCatalogManager::RemoveNestedCatalog(const string &mountpoint) {
+void WritableCatalogManager::RemoveNestedCatalog(const string &mountpoint,
+                                                 const bool merge) {
   const string nested_root_path = MakeRelativePath(mountpoint);
 
   SyncLock();
@@ -683,8 +688,10 @@ void WritableCatalogManager::RemoveNestedCatalog(const string &mountpoint) {
   assert(!nested_catalog->IsRoot() &&
          (nested_catalog->mountpoint().ToString() == nested_root_path));
 
-  // Merge all data from the nested catalog into it's parent
-  nested_catalog->MergeIntoParent();
+  if (merge) {
+    // Merge all data from the nested catalog into it's parent
+    nested_catalog->MergeIntoParent();
+  }
 
   // Delete the catalog database file from the working copy
   if (unlink(nested_catalog->database_path().c_str()) != 0) {
