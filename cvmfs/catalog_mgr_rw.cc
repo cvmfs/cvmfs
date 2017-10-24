@@ -691,6 +691,8 @@ void WritableCatalogManager::RemoveNestedCatalog(const string &mountpoint,
   if (merge) {
     // Merge all data from the nested catalog into it's parent
     nested_catalog->MergeIntoParent();
+  } else {
+    nested_catalog->RemoveFromParent();
   }
 
   // Delete the catalog database file from the working copy
