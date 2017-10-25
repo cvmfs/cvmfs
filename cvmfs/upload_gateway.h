@@ -48,7 +48,8 @@ class GatewayUploader : public AbstractUploader {
   virtual bool Initialize();
 
   virtual bool FinalizeSession(bool commit, const std::string& old_root_hash,
-                               const std::string& new_root_hash);
+                               const std::string& new_root_hash,
+                               const std::string& tag_name);
 
   virtual void WaitForUpload() const;
 

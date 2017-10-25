@@ -614,6 +614,10 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     params.key_file = *args.find('H')->second;
   }
 
+  if (args.find('W') != args.end()) {
+    params.tag_name = *args.find('W')->second;
+  }
+
   if (!CheckParams(params)) return 2;
 
   // Start spooler
@@ -779,7 +783,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   // Get the path of the new root catalog
   const std::string new_root_hash = manifest->catalog_hash().ToString(true);
 
-  spooler_catalogs->FinalizeSession(true, old_root_hash, new_root_hash);
+  spooler_catalogs->FinalizeSession(true, old_root_hash, new_root_hash,
+                                    params.tag_name);
   delete params.spooler;
 
   if (!manifest->Export(params.manifest_path)) {

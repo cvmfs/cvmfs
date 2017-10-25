@@ -44,7 +44,8 @@ bool AbstractUploader::Initialize() {
 
 bool AbstractUploader::FinalizeSession(bool /*commit*/,
                                        const std::string & /*old_root_hash*/,
-                                       const std::string & /*new_root_hash*/) {
+                                       const std::string & /*new_root_hash*/,
+                                       const std::string & /*tag_name*/) {
   return true;
 }
 

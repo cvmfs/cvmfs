@@ -130,7 +130,8 @@ class AbstractUploader
    * By default it is a noop and returns true;
    */
   virtual bool FinalizeSession(bool commit, const std::string &old_root_hash,
-                               const std::string &new_root_hash);
+                               const std::string &new_root_hash,
+                               const std::string &tag_name);
 
   /**
    * This must be called right before the destruction of the AbstractUploader!

@@ -44,7 +44,8 @@ class SessionContextBase {
                   const std::string& key_id, const std::string& secret,
                   uint64_t max_pack_size = ObjectPack::kDefaultLimit);
   bool Finalize(bool commit, const std::string& old_root_hash,
-                const std::string& new_root_hash);
+                const std::string& new_root_hash,
+                const std::string& tag_name);
 
   void WaitForUpload();
 
@@ -61,7 +62,8 @@ class SessionContextBase {
   virtual bool FinalizeDerived() = 0;
 
   virtual bool Commit(const std::string& old_root_hash,
-                      const std::string& new_root_hash) = 0;
+                      const std::string& new_root_hash,
+                      const std::string& tag_name) = 0;
 
   virtual Future<bool>* DispatchObjectPack(ObjectPack* pack) = 0;
 
@@ -106,7 +108,8 @@ class SessionContext : public SessionContextBase {
   virtual bool FinalizeDerived();
 
   virtual bool Commit(const std::string& old_root_hash,
-                      const std::string& new_root_hash);
+                      const std::string& new_root_hash,
+                      const std::string& tag_name);
 
   virtual Future<bool>* DispatchObjectPack(ObjectPack* pack);
 

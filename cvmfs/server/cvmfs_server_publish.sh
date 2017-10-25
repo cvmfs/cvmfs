@@ -204,6 +204,7 @@ cvmfs_server_publish() {
         -C $trusted_certs                              \
         -N $name                                       \
         -K $CVMFS_PUBLIC_KEY                           \
+        -W $tag_name                                   \
         $(get_follow_http_redirects_flag)              \
         $authz_file                                    \
         $log_level $tweaks_option $external_option $verbosity"
