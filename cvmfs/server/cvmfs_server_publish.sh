@@ -84,13 +84,12 @@ cvmfs_server_publish() {
     names=$@
   fi
 
-  # sanity checks
-  if [ ! -z "$tag_name" ]; then
-    echo $tag_name | grep -q -v " "       || die "Spaces are not allowed in tag names"
-    check_tag_existence $name "$tag_name" && die "Tag name '$tag_name' is already in use."
-  fi
-
   for name in $names; do
+    # sanity checks
+    if [ ! -z "$tag_name" ]; then
+      echo $tag_name | grep -q -v " "       || die "Spaces are not allowed in tag names"
+      check_tag_existence $name "$tag_name" && die "Tag name '$tag_name' is already in use."
+    fi
 
     # Check if the repo name contains a subpath for locking, e.g. repo.cern.ch/sub/path/for/locking
     local subpath=$(echo $name | cut -d'/' -f2- -s)
