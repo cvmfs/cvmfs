@@ -30,7 +30,7 @@ class CommitProcessor {
   virtual ~CommitProcessor();
 
   Result Process(const std::string& lease_path, const shash::Any& old_root_hash,
-                 const shash::Any& new_root_hash);
+                 const shash::Any& new_root_hash, const std::string& tag_name);
 
   int GetNumErrors() const { return num_errors_; }
 

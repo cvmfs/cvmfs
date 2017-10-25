@@ -64,11 +64,12 @@ CommitProcessor::~CommitProcessor() {}
  */
 CommitProcessor::Result CommitProcessor::Process(
     const std::string& lease_path, const shash::Any& old_root_hash,
-    const shash::Any& new_root_hash) {
+    const shash::Any& new_root_hash, const std::string& tag_name) {
   LogCvmfs(kLogReceiver, kLogSyslog,
-           "CommitProcessor - lease_path: %s, old hash: %s, new hash: %s",
+           "CommitProcessor - lease_path: %s, old hash: %s, new hash: %s, "
+           "tag_name: %s",
            lease_path.c_str(), old_root_hash.ToString(true).c_str(),
-           new_root_hash.ToString(true).c_str());
+           new_root_hash.ToString(true).c_str(), tag_name.c_str());
 
   const std::vector<std::string> lease_path_tokens =
       SplitString(lease_path, '/');
