@@ -14,7 +14,7 @@
 
 %% API
 -export([start_link/1
-        ,new_lease/3, cancel_lease/2, commit_lease/3
+        ,new_lease/3, cancel_lease/2, commit_lease/4
         ,submit_payload/2]).
 
 -export([get_repos/1
@@ -92,12 +92,20 @@ cancel_lease(Uid, LeaseToken) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec commit_lease(Uid, LeaseToken, RootHashes) -> ok | {error, invalid_macaroon | merge_error | io_error }
-                                        when Uid :: binary(),
-                                             LeaseToken :: binary(),
-                                             RootHashes :: {binary(), binary()}.
-commit_lease(Uid, LeaseToken, {OldRootHash, NewRootHash}) ->
-    gen_server:call(?MODULE, {be_req, commit_lease, Uid, LeaseToken, OldRootHash, NewRootHash},
+-spec commit_lease(Uid, LeaseToken, RootHashes, TagName) ->
+                          ok | {error, invalid_macaroon | merge_error | io_error }
+                              when Uid :: binary(),
+                                   LeaseToken :: binary(),
+                                   RootHashes :: {binary(), binary()},
+                                   TagName :: binary().
+commit_lease(Uid, LeaseToken, {OldRootHash, NewRootHash}, TagName) ->
+    gen_server:call(?MODULE, {be_req,
+                              commit_lease,
+                              Uid,
+                              LeaseToken,
+                              OldRootHash,
+                              NewRootHash,
+                              TagName},
                     cvmfs_app_util:get_max_lease_time()).
 
 
@@ -197,9 +205,9 @@ handle_call({be_req, cancel_lease, Uid, LeaseToken}, From, State) ->
            end,
     spawn_link(Task),
     {noreply, State, cvmfs_app_util:get_max_lease_time()};
-handle_call({be_req, commit_lease, Uid, LeaseToken, OldRootHash, NewRootHash}, From, State) ->
+handle_call({be_req, commit_lease, Uid, LeaseToken, OldRootHash, NewRootHash, TagName}, From, State) ->
     Task = fun() ->
-                   Reply = p_commit_lease(LeaseToken, {OldRootHash, NewRootHash}),
+                   Reply = p_commit_lease(LeaseToken, {OldRootHash, NewRootHash}, TagName),
                    lager:info("Backend request: Uid: ~p - {end_lease, ~p, ~p, ~p} -> Reply: ~p",
                               [Uid, LeaseToken, OldRootHash, NewRootHash, Reply]),
                    gen_server:reply(From, Reply)
@@ -335,16 +343,22 @@ p_cancel_lease(LeaseToken) ->
     Result.
 
 
--spec p_commit_lease(LeaseToken, RootHashes) -> ok | {error, invalid_macaroon | merge_error | io_error} | cvmfs_lease:lease_get_value()
-                                                      when LeaseToken :: binary(),
-                                                           RootHashes :: false | {binary(), binary()}.
-p_commit_lease(LeaseToken, {OldRootHash, NewRootHash}) when is_binary(OldRootHash),
-                                                                  is_binary(NewRootHash) ->
+-spec p_commit_lease(LeaseToken, RootHashes, TagName) ->
+                            ok
+                                | {error, invalid_macaroon | merge_error | io_error}
+                                | cvmfs_lease:lease_get_value()
+                                when LeaseToken :: binary(),
+                                     RootHashes :: {binary(), binary()},
+                                     TagName :: binary().
+p_commit_lease(LeaseToken, {OldRootHash, NewRootHash}, TagName) ->
     Result = case cvmfs_receiver:get_token_id(LeaseToken) of
                  {ok, Public} ->
                      ResultInner = case cvmfs_lease:get_lease_path(Public) of
                                        {ok, LeasePath} ->
-                                           cvmfs_commit_sup:commit(LeasePath, OldRootHash, NewRootHash);
+                                           cvmfs_commit_sup:commit(LeasePath,
+                                                                   OldRootHash,
+                                                                   NewRootHash,
+                                                                   TagName);
                                        ErrorReason ->
                                            ErrorReason
                                    end,

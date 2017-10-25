@@ -17,7 +17,7 @@
          generate_token/3,
          get_token_id/1,
          submit_payload/2,
-         commit/3]).
+         commit/4]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -122,11 +122,13 @@ submit_payload(SubmissionData, Secret) ->
                         cvmfs_app_util:get_max_lease_time()).
 
 
--spec commit(LeasePath, OldRootHash, NewRootHash) -> ok | {error, merge_error | io_error | worker_timeout}
-                                            when LeasePath :: binary(),
-                                                 OldRootHash :: binary(),
-                                                 NewRootHash :: binary().
-commit(LeasePath, OldRootHash, NewRootHash) ->
+-spec commit(LeasePath, OldRootHash, NewRootHash, TagName) ->
+                    ok | {error, merge_error | io_error | worker_timeout}
+                        when LeasePath :: binary(),
+                             OldRootHash :: binary(),
+                             NewRootHash :: binary(),
+                             TagName :: binary().
+commit(LeasePath, OldRootHash, NewRootHash, TagName) ->
     poolboy:transaction(cvmfs_receiver_pool,
                         fun(WorkerPid) ->
                                 gen_server:call(WorkerPid,
@@ -134,7 +136,8 @@ commit(LeasePath, OldRootHash, NewRootHash) ->
                                                  commit,
                                                  LeasePath,
                                                  OldRootHash,
-                                                 NewRootHash},
+                                                 NewRootHash,
+                                                 TagName},
                                                 cvmfs_app_util:get_max_lease_time())
                         end,
                         cvmfs_app_util:get_max_lease_time()).
@@ -209,11 +212,11 @@ handle_call({worker_req, submit_payload, {Token, _, Digest, HeaderSize} = Submis
     lager:info("Worker ~p request: {submit_payload, {{~p, PAYLOAD_NOT_SHOWN, ~p, ~p} ~p}} -> Reply: ~p",
                [self(), Token, Digest, HeaderSize, Secret, Reply]),
     {reply, Reply, State};
-handle_call({worker_req, commit, LeasePath, OldRootHash, NewRootHash}, _From, State) ->
+handle_call({worker_req, commit, LeasePath, OldRootHash, NewRootHash, TagName}, _From, State) ->
     #{worker := WorkerPort, max_lease_time := Timeout} = State,
-    Reply = p_commit(WorkerPort, LeasePath, OldRootHash, NewRootHash, Timeout),
-    lager:info("Worker ~p request: {commit, ~p, ~p, ~p} -> Reply: ~p",
-               [self(), LeasePath, OldRootHash, NewRootHash, Reply]),
+    Reply = p_commit(WorkerPort, LeasePath, OldRootHash, NewRootHash, TagName, Timeout),
+    lager:info("Worker ~p request: {commit, ~p, ~p, ~p, ~p} -> Reply: ~p",
+               [self(), LeasePath, OldRootHash, NewRootHash, TagName, Reply]),
     {reply, Reply, State}.
 
 
@@ -375,17 +378,19 @@ p_submit_payload({LeaseToken, Payload, Digest, HeaderSize}, Secret, WorkerPort, 
     end.
 
 
--spec p_commit(WorkerPort, LeasePath, OldRootHash, NewRootHash, Timeout)
+-spec p_commit(WorkerPort, LeasePath, OldRootHash, NewRootHash, TagName, Timeout)
               -> ok | {error, merge_error | io_error | worker_timeout}
                                         when WorkerPort :: port(),
                                              LeasePath :: binary(),
                                              OldRootHash :: binary(),
                                              NewRootHash :: binary(),
+                                             TagName :: binary(),
                                              Timeout :: integer().
-p_commit(WorkerPort, LeasePath, OldRootHash, NewRootHash, Timeout) ->
+p_commit(WorkerPort, LeasePath, OldRootHash, NewRootHash, TagName, Timeout) ->
     Req1 = jsx:encode(#{<<"lease_path">> => LeasePath,
                         <<"old_root_hash">> => OldRootHash,
-                        <<"new_root_hash">> => NewRootHash}),
+                        <<"new_root_hash">> => NewRootHash,
+                        <<"tag_name">> => TagName}),
     p_write_request(WorkerPort, ?kCommit, Req1),
     case p_read_reply(WorkerPort, Timeout) of
         {ok, {_, Reply1}} ->

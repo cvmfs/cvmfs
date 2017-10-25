@@ -146,7 +146,7 @@ end_valid_lease(_Config) ->
 % Commit valid lease
 commit_valid_lease(_Config) ->
     {ok, Token} = cvmfs_be:new_lease(?TEST_UID, <<"key1">>, <<"repo1.domain1.org">>),
-    ok = cvmfs_be:commit_lease(?TEST_UID, Token, {fake_bin(), fake_bin()}).
+    ok = cvmfs_be:commit_lease(?TEST_UID, Token, {fake_bin(), fake_bin()}, fake_bin()).
 
 % End invalid lease
 cancel_invalid_lease(_Config) ->
@@ -157,8 +157,11 @@ cancel_invalid_lease(_Config) ->
 % Commit invalid lease
 commit_invalid_lease(_Config) ->
     {ok, Token} = cvmfs_be:new_lease(?TEST_UID, <<"key1">>, <<"repo1.domain1.org">>),
-    ok = cvmfs_be:commit_lease(?TEST_UID, Token, {fake_bin(), fake_bin()}),
-    {error, invalid_lease} = cvmfs_be:commit_lease(?TEST_UID, Token, {fake_bin(), fake_bin()}).
+    ok = cvmfs_be:commit_lease(?TEST_UID, Token, {fake_bin(), fake_bin()}, fake_bin()),
+    {error, invalid_lease} = cvmfs_be:commit_lease(?TEST_UID,
+                                                   Token,
+                                                   {fake_bin(), fake_bin()},
+                                                   fake_bin()).
 
 % End lease invalid macaroon
 cancel_lease_invalid_macaroon(_Config) ->
@@ -168,8 +171,10 @@ cancel_lease_invalid_macaroon(_Config) ->
 % Commit lease invalid macaroon
 commit_lease_invalid_macaroon(_Config) ->
     Token = <<"fake_token">>,
-    {error, invalid_macaroon} = cvmfs_be:commit_lease(?TEST_UID, Token,
-                                                   {fake_bin(), fake_bin()}).
+    {error, invalid_macaroon} = cvmfs_be:commit_lease(?TEST_UID,
+                                                      Token,
+                                                      {fake_bin(), fake_bin()},
+                                                      fake_bin()).
 
 
 % Submit payload
@@ -184,7 +189,7 @@ lease_success(_Config) ->
     {ok, payload_added} = cvmfs_be:submit_payload(?TEST_UID, {Token, Payload, Digest, 1}),
     % Submit final payload and commit the lease
     {ok, payload_added} = cvmfs_be:submit_payload(?TEST_UID, {Token, Payload, Digest, 1}),
-    ok = cvmfs_be:commit_lease(?TEST_UID, Token, {fake_bin(), fake_bin()}),
+    ok = cvmfs_be:commit_lease(?TEST_UID, Token, {fake_bin(), fake_bin()}, fake_bin()),
     % After the lease has been closed, the token should be rejected
     {error, invalid_lease} = cvmfs_be:submit_payload(?TEST_UID, {Token, Payload, Digest, 1}).
 
@@ -211,12 +216,18 @@ multiple_commits(_Config) ->
     spawn_link(fun() ->
                   {Key, Path} = {<<"key1">>, <<"repo1.domain1.org/one">>},
                   {ok, Token} = cvmfs_be:new_lease(?TEST_UID, Key, Path),
-                  Parent ! cvmfs_be:commit_lease(?TEST_UID, Token, {<<"old_hash">>, <<"new_hash">>})
+                  Parent ! cvmfs_be:commit_lease(?TEST_UID,
+                                                 Token,
+                                                 {<<"old_hash">>, <<"new_hash">>},
+                                                 fake_bin())
           end),
     spawn_link(fun() ->
                   {Key, Path} = {<<"key1">>, <<"repo1.domain1.org/two">>},
                   {ok, Token} = cvmfs_be:new_lease(?TEST_UID, Key, Path),
-                  Parent ! cvmfs_be:commit_lease(?TEST_UID, Token, {<<"old_hash">>, <<"new_hash">>})
+                  Parent ! cvmfs_be:commit_lease(?TEST_UID,
+                                                 Token,
+                                                 {<<"old_hash">>, <<"new_hash">>},
+                                                 fake_bin())
           end),
     receive
         Res1 ->
