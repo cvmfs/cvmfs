@@ -120,8 +120,9 @@ inline bool platform_umount(const char *mountpoint, const bool lazy) {
     unlink(lockfile.c_str());
     if (retval != 0) return false;
     // Best effort
-    (void)chmod(_PATH_MOUNTED, mtab_info.st_mode);
-    (void)chown(_PATH_MOUNTED, mtab_info.st_uid, mtab_info.st_gid);
+    retval = chmod(_PATH_MOUNTED, mtab_info.st_mode);
+    retval = chown(_PATH_MOUNTED, mtab_info.st_uid, mtab_info.st_gid);
+    // We pickup these values only to silent warnings
   }
 
   int flags = lazy ? MNT_DETACH : 0;
