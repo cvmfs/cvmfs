@@ -658,12 +658,11 @@ void WritableCatalog::RemoveFromParent() {
 
   const Counters& child_counters = child_catalog->GetCounters();
 
-  parent->delta_counters_.subtree.directories = -1;
-  parent->delta_counters_.subtree.file_size =
-      -1 * child_counters.self.file_size;
-  parent->delta_counters_.subtree.regular_files =
-      -1 * child_counters.self.regular_files;
-  parent->delta_counters_.subtree.symlinks = -1 * child_counters.self.symlinks;
+  parent->delta_counters_.subtree.directories -= 1;
+  parent->delta_counters_.subtree.file_size -= child_counters.self.file_size;
+  parent->delta_counters_.subtree.regular_files -=
+      child_counters.self.regular_files;
+  parent->delta_counters_.subtree.symlinks -= child_counters.self.symlinks;
 }
 
 
