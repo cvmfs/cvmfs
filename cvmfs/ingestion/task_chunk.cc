@@ -17,7 +17,7 @@ atomic_int64 TaskChunk::tag_seq_ = 2 << 28;
 
 /**
  * Consumes the stream of input blocks and produces new output blocks according
- * to cut marks.  The input blocks correspond to chunks.
+ * to cut marks.  The output blocks correspond to chunks.
  */
 void TaskChunk::Process(BlockItem *input_block) {
   FileItem *file_item = input_block->file_item();
@@ -43,6 +43,7 @@ void TaskChunk::Process(BlockItem *input_block) {
 
     if (chunk_info.bulk_chunk != NULL) {
       chunk_info.bulk_chunk->MakeBulkChunk();
+      chunk_info.bulk_chunk->set_size(file_item->size());
       chunk_info.output_tag_bulk = atomic_xadd64(&tag_seq_, 1);
     }
     tag_map_[input_tag] = chunk_info;
@@ -63,6 +64,9 @@ void TaskChunk::Process(BlockItem *input_block) {
     case BlockItem::kBlockStop:
       if (output_block_bulk) output_block_bulk->MakeStop();
       if (chunk_info.next_chunk != NULL) {
+        assert(file_item->size() >= chunk_info.next_chunk->offset());
+        chunk_info.next_chunk->set_size(
+          file_item->size() - chunk_info.next_chunk->offset());
         BlockItem *block_stop = new BlockItem(chunk_info.output_tag_chunk);
         block_stop->SetFileItem(file_item);
         block_stop->SetChunkItem(chunk_info.next_chunk);
@@ -103,6 +107,9 @@ void TaskChunk::Process(BlockItem *input_block) {
             tubes_out_->Dispatch(block_tail);
           }
 
+          assert(cut_mark >= chunk_info.next_chunk->offset());
+          chunk_info.next_chunk->set_size(
+            cut_mark - chunk_info.next_chunk->offset());
           BlockItem *block_stop = new BlockItem(chunk_info.output_tag_chunk);
           block_stop->SetFileItem(file_item);
           block_stop->SetChunkItem(chunk_info.next_chunk);

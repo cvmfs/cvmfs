@@ -96,18 +96,26 @@ class ChunkItem : SingleCopy {
 
   FileItem *file_item() { return file_item_; }
   uint64_t offset() { return offset_; }
+  uint64_t size() { return size_; }
   upload::UploadStreamHandle *upload_handle() { return upload_handle_; }
   zlib::Compressor *compressor() { return compressor_.weak_ref(); }
   shash::ContextPtr hash_ctx() { return hash_ctx_; }
   shash::Any *hash_ptr() { return &hash_value_; }
 
+  void set_size(uint64_t val) { assert(size_ == 0); size_ = val; }
   void set_upload_handle(upload::UploadStreamHandle *val) {
+    assert((upload_handle_ == NULL) && (val != NULL));
     upload_handle_ = val;
   }
 
  private:
   FileItem *file_item_;
   uint64_t offset_;
+  /**
+   * The size of a chunk is not defined before the corresponding stop block
+   * has been dispatched.
+   */
+  uint64_t size_;
   bool is_bulk_chunk_;
   /**
    * Deleted by the uploader.

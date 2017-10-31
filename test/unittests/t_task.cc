@@ -201,6 +201,7 @@ TEST_F(T_Task, ChunkDispatch) {
   task_group.Spawn();
 
   FileItem file_null("/dev/null");
+  file_null.set_size(0);
   BlockItem *b1 = new BlockItem(1);
   b1->SetFileItem(&file_null);
   b1->MakeStop();
@@ -211,6 +212,7 @@ TEST_F(T_Task, ChunkDispatch) {
   EXPECT_GE(2 << 28, item_stop->tag());
   EXPECT_EQ(&file_null, item_stop->file_item());
   EXPECT_EQ(&file_null, item_stop->chunk_item()->file_item());
+  EXPECT_EQ(0U, item_stop->chunk_item()->size());
   EXPECT_FALSE(item_stop->chunk_item()->is_bulk_chunk());
   delete item_stop->chunk_item();
   delete item_stop;
@@ -221,6 +223,7 @@ TEST_F(T_Task, ChunkDispatch) {
   b2->MakeStop();
   tube_in.Enqueue(b2);
   item_stop = tube_out->Pop();
+  EXPECT_EQ(0U, item_stop->chunk_item()->size());
   EXPECT_TRUE(item_stop->chunk_item()->is_bulk_chunk());
   delete item_stop->chunk_item();
   delete item_stop;
@@ -298,6 +301,7 @@ TEST_F(T_Task, Chunk) {
       EXPECT_GE(chunk_size, avg_chunk_size / 2);
       EXPECT_LE(chunk_size, avg_chunk_size * 2);
       EXPECT_EQ(consumed, last_offset + chunk_size);
+      EXPECT_EQ(chunk_size, b->chunk_item()->size());
       chunk_size = 0;
       tag = -1;
       delete b->chunk_item();

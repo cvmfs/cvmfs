@@ -50,6 +50,7 @@ FileItem::~FileItem() {
 ChunkItem::ChunkItem(FileItem *file_item, uint64_t offset)
   : file_item_(file_item)
   , offset_(offset)
+  , size_(0)
   , is_bulk_chunk_(false)
   , upload_handle_(NULL)
   , compressor_(zlib::Compressor::Construct(file_item->compression_algorithm()))
