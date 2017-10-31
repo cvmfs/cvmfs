@@ -6,6 +6,9 @@
   * Autmatically restart failed authz helper after a cool-off period
   * Make `true` to be a valid boolean option
 
+2.4.3:
+  * Work around for alien cache on BeeGFS (CVM-1403)
+
 2.4.2:
   * Skip external files during garbage collection (CVM-1396)
   * Enforce numeric value when manually setting revision number (CVM-1372)
