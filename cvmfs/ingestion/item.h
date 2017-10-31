@@ -91,9 +91,12 @@ class ChunkItem : SingleCopy {
  public:
   ChunkItem(FileItem *file_item, uint64_t offset);
 
-  bool is_bulk_chunk() { return is_bulk_chunk_; }
   void MakeBulkChunk() { is_bulk_chunk_ = true; }
+  bool IsSolePiece() {
+    return !is_bulk_chunk_ && (offset_ == 0) && (size_ == file_item_->size());
+  }
 
+  bool is_bulk_chunk() { return is_bulk_chunk_; }
   FileItem *file_item() { return file_item_; }
   uint64_t offset() { return offset_; }
   uint64_t size() { return size_; }

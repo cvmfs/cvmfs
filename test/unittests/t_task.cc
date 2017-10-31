@@ -214,6 +214,7 @@ TEST_F(T_Task, ChunkDispatch) {
   EXPECT_EQ(&file_null, item_stop->chunk_item()->file_item());
   EXPECT_EQ(0U, item_stop->chunk_item()->size());
   EXPECT_FALSE(item_stop->chunk_item()->is_bulk_chunk());
+  EXPECT_TRUE(item_stop->chunk_item()->IsSolePiece());
   delete item_stop->chunk_item();
   delete item_stop;
 
@@ -225,21 +226,25 @@ TEST_F(T_Task, ChunkDispatch) {
   item_stop = tube_out->Pop();
   EXPECT_EQ(0U, item_stop->chunk_item()->size());
   EXPECT_TRUE(item_stop->chunk_item()->is_bulk_chunk());
+  EXPECT_FALSE(item_stop->chunk_item()->IsSolePiece());
   delete item_stop->chunk_item();
   delete item_stop;
 
   FileItem file_null_legacy("/dev/null", 1024, 2048, 4096,
     zlib::kZlibDefault, shash::kSha1, shash::kSuffixNone, true, true);
+  file_null_legacy.set_size(0);
   BlockItem *b3 = new BlockItem(3);
   b3->SetFileItem(&file_null_legacy);
   b3->MakeStop();
   tube_in.Enqueue(b3);
   BlockItem *item_stop_chunk = tube_out->Pop();
   EXPECT_FALSE(item_stop_chunk->chunk_item()->is_bulk_chunk());
+  EXPECT_TRUE(item_stop_chunk->chunk_item()->IsSolePiece());
   delete item_stop_chunk->chunk_item();
   delete item_stop_chunk;
   BlockItem *item_stop_bulk = tube_out->Pop();
   EXPECT_TRUE(item_stop_bulk->chunk_item()->is_bulk_chunk());
+  EXPECT_FALSE(item_stop_bulk->chunk_item()->IsSolePiece());
   delete item_stop_bulk->chunk_item();
   delete item_stop_bulk;
 
