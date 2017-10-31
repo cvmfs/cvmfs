@@ -52,6 +52,12 @@ class PosixCacheManager : public CacheManager {
     kCacheReadOnly,
   };
 
+  enum RenameWorkarounds {
+    kRenameNormal = 0,
+    kRenameLink,
+    kRenameSamedir
+  };
+
   /**
    * As of 25M, a file is considered a "big file", which means it is dangerous
    * to apply asynchronous semantics.  On start of a transaction with a big file
@@ -62,9 +68,10 @@ class PosixCacheManager : public CacheManager {
   virtual CacheManagerIds id() { return kPosixCacheManager; }
   virtual std::string Describe();
 
-  static PosixCacheManager *Create(const std::string &cache_path,
-                                   const bool alien_cache,
-                                   const bool workaround_rename_ = false);
+  static PosixCacheManager *Create(
+    const std::string &cache_path,
+    const bool alien_cache,
+    const RenameWorkarounds rename_workaround = kRenameNormal);
   virtual ~PosixCacheManager() { }
   virtual bool AcquireQuotaManager(QuotaManager *quota_mgr);
 
@@ -126,7 +133,7 @@ class PosixCacheManager : public CacheManager {
     : cache_path_(cache_path)
     , txn_template_path_(cache_path_ + "/txn/fetchXXXXXX")
     , alien_cache_(alien_cache)
-    , workaround_rename_(false)
+    , rename_workaround_(kRenameNormal)
     , cache_mode_(kCacheReadWrite)
     , reports_correct_filesize_(true)
   {
@@ -140,7 +147,7 @@ class PosixCacheManager : public CacheManager {
   std::string cache_path_;
   std::string txn_template_path_;
   bool alien_cache_;
-  bool workaround_rename_;
+  RenameWorkarounds rename_workaround_;
   CacheModes cache_mode_;
 
   /**

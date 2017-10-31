@@ -664,6 +664,16 @@ TEST_F(T_CacheManager, OpenFromTxn) {
   EXPECT_EQ(-EBADF, cache_mgr_->OpenFromTxn(txn));
 
   cache_mgr_->AbortTxn(txn);
+
+  cache_mgr_->rename_workaround_ = PosixCacheManager::kRenameSamedir;
+  EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, 1, txn), 0);
+  EXPECT_EQ(1U, cache_mgr_->Write(&buf, 1, txn));
+  fd = cache_mgr_->OpenFromTxn(txn);
+  EXPECT_GE(fd, 0);
+  EXPECT_EQ(1U, cache_mgr_->GetSize(fd));
+  EXPECT_EQ('A', buf);
+  EXPECT_EQ(0, cache_mgr_->Close(fd));
+  cache_mgr_->AbortTxn(txn);
 }
 
 
@@ -695,7 +705,7 @@ TEST_F(T_CacheManager, Rename) {
   EXPECT_EQ(-ENOENT, cache_mgr_->Rename(path_null.c_str(), path_one.c_str()));
 
   EXPECT_TRUE(CopyPath2Path(path_one, path_null));
-  cache_mgr_->workaround_rename_ = true;
+  cache_mgr_->rename_workaround_ = PosixCacheManager::kRenameLink;
   EXPECT_EQ(0, cache_mgr_->Rename(path_null.c_str(), path_one.c_str()));
   EXPECT_FALSE(FileExists(path_null));
   EXPECT_TRUE(FileExists(path_one));
@@ -771,6 +781,10 @@ TEST_F(T_CacheManager, StartTxn) {
 
   EXPECT_EQ(0, rmdir((tmp_path_ + "/txn").c_str()));
   EXPECT_EQ(-ENOENT, cache_mgr_->StartTxn(rnd_hash, 0, txn));
+  cache_mgr_->rename_workaround_ = PosixCacheManager::kRenameSamedir;
+  fd = cache_mgr_->StartTxn(rnd_hash, 0, txn);
+  EXPECT_GE(fd, 0);
+  EXPECT_EQ(0, cache_mgr_->AbortTxn(txn));
   MkdirDeep(tmp_path_ + "/txn", 0700);
 }
 
