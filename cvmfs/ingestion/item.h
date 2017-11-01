@@ -48,6 +48,7 @@ class FileItem : SingleCopy {
   std::string path() { return path_; }
   uint64_t size() { return size_; }
   Xor32Detector *chunk_detector() { return &chunk_detector_; }
+  shash::Any bulk_hash() { return bulk_hash_; }
   zlib::Algorithms compression_algorithm() { return compression_algorithm_; }
   shash::Algorithms hash_algorithm() { return hash_algorithm_; }
   shash::Suffix hash_suffix() { return hash_suffix_; }
@@ -59,6 +60,7 @@ class FileItem : SingleCopy {
   void set_is_fully_chunked() { atomic_inc32(&is_fully_chunked_); }
   bool is_fully_chunked() { return atomic_read32(&is_fully_chunked_) != 0; }
   uint64_t nchunks_in_fly() { return atomic_read64(&nchunks_in_fly_); }
+  uint64_t nchunks() { return chunks_.size(); }
 
   // Called by ChunkItem constructor, decremented when a chunk is registered
   void IncNchunksInFly() { atomic_inc64(&nchunks_in_fly_); }

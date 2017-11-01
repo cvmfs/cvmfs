@@ -19,7 +19,10 @@
 #include "ingestion/task_compress.h"
 #include "ingestion/task_hash.h"
 #include "ingestion/task_read.h"
+#include "ingestion/task_write.h"
 #include "smalloc.h"
+#include "testutil.h"
+#include "upload_facility.h"
 #include "util/posix.h"
 
 using namespace std;  // NOLINT
@@ -52,6 +55,114 @@ atomic_int32 TestTask::cnt_process = 0;
 }
 
 
+struct MockStreamHandle : public upload::UploadStreamHandle {
+  explicit MockStreamHandle(const CallbackTN *commit_callback)
+    : UploadStreamHandle(commit_callback)
+    , data(NULL)
+    , nbytes(0)
+    , marker(0)
+  { }
+
+  virtual ~MockStreamHandle() {
+    free(data);
+    data = NULL;
+    nbytes = 0;
+    marker = 0;
+  }
+
+  void Extend(const size_t bytes) {
+    if (data == NULL) {
+      data = reinterpret_cast<unsigned char *>(malloc(bytes));
+    } else {
+      data = reinterpret_cast<unsigned char *>(srealloc(data, nbytes + bytes));
+    }
+    nbytes += bytes;
+  }
+
+  void Append(upload::AbstractUploader::UploadBuffer buffer) {
+    Extend(buffer.size);
+    void *b_ptr = buffer.data;
+    unsigned char *r_ptr = data + marker;
+    memcpy(r_ptr, b_ptr, buffer.size);
+    marker += buffer.size;
+  }
+
+  unsigned char *data;
+  size_t nbytes;
+  off_t marker;
+};
+
+
+/**
+ * Mocked uploader that just keeps the processing results in memory for later
+ * inspection.
+ */
+class IngestionMockUploader
+  : public AbstractMockUploader<IngestionMockUploader> {
+ public:
+  struct Result {
+    Result(MockStreamHandle *handle, const shash::Any &computed_hash)
+      : computed_hash(computed_hash)
+    {
+      EXPECT_EQ(RecomputeContentHash(handle->data, handle->nbytes),
+                computed_hash)
+        << "returned content hash differs from recomputed content hash";
+    }
+
+    shash::Any RecomputeContentHash(unsigned char *data, const size_t sz) {
+      shash::Any recomputed_content_hash(computed_hash.algorithm);
+      HashMem(data, sz, &recomputed_content_hash);
+      return recomputed_content_hash;
+    }
+
+    shash::Any computed_hash;
+  };
+  typedef std::vector<Result> Results;
+
+ public:
+  explicit IngestionMockUploader(
+    const upload::SpoolerDefinition &spooler_definition)
+    : AbstractMockUploader<IngestionMockUploader>(spooler_definition)
+   { }
+
+  virtual std::string name() const { return "IngestionMockUploader"; }
+  void ClearResults() { results.clear(); }
+
+  upload::UploadStreamHandle *InitStreamedUpload(
+    const CallbackTN *callback = NULL)
+  {
+    return new MockStreamHandle(callback);
+  }
+
+  void StreamedUpload(
+    upload::UploadStreamHandle *handle,
+    upload::AbstractUploader::UploadBuffer buffer,
+    const CallbackTN *callback = NULL)
+  {
+    MockStreamHandle *local_handle = dynamic_cast<MockStreamHandle *>(handle);
+    assert(local_handle != NULL);
+    local_handle->Append(buffer);
+    Respond(callback,
+            upload::UploaderResults(upload::UploaderResults::kBufferUpload, 0));
+  }
+
+  void FinalizeStreamedUpload(
+    upload::UploadStreamHandle *handle,
+    const shash::Any &content_hash)
+  {
+    MockStreamHandle *local_handle = dynamic_cast<MockStreamHandle *>(handle);
+    assert(local_handle != NULL);
+    results.push_back(Result(local_handle, content_hash));
+    const CallbackTN *callback = local_handle->commit_callback;
+    delete handle;
+    Respond(callback,
+            upload::UploaderResults(upload::UploaderResults::kChunkCommit, 0));
+  }
+
+  Results results;
+};
+
+
 class T_Task : public ::testing::Test {
  protected:
   static const unsigned kNumTasks = 32;
@@ -62,13 +173,18 @@ class T_Task : public ::testing::Test {
     TestTask::cnt_process = 0;
     for (unsigned i = 0; i < kNumTasks; ++i)
       task_group_.TakeConsumer(new TestTask(&tube_));
+    uploader_ = IngestionMockUploader::MockConstruct();
+    ASSERT_TRUE(uploader_ != NULL);
   }
 
   virtual void TearDown() {
+    uploader_->TearDown();
+    delete uploader_;
   }
 
   Tube<DummyItem> tube_;
   TubeConsumerGroup<DummyItem> task_group_;
+  IngestionMockUploader *uploader_;
 };
 
 
@@ -520,6 +636,94 @@ TEST_F(T_Task, Hash) {
 
   b2_a.Discharge();
   unlink("./abc");
+
+  task_group.Terminate();
+}
+
+
+TEST_F(T_Task, WriteNull) {
+  Tube<BlockItem> tube_in;
+  Tube<FileItem> tube_out;
+
+  TubeConsumerGroup<BlockItem> task_group;
+  task_group.TakeConsumer(new TaskWrite(&tube_in, &tube_out, uploader_));
+  task_group.Spawn();
+
+  FileItem file_null("/dev/null");
+  file_null.set_size(0);
+  file_null.set_is_fully_chunked();
+  ChunkItem *chunk_null = new ChunkItem(&file_null, 0);
+  shash::Any hash_empty(shash::kSha1);
+  hash_empty.suffix = shash::kSuffixPartial;
+  shash::HashString("", &hash_empty);
+  *chunk_null->hash_ptr() = hash_empty;
+  BlockItem *b1 = new BlockItem(1);
+  b1->SetFileItem(&file_null);
+  b1->SetChunkItem(chunk_null);
+  b1->MakeStop();
+  tube_in.Enqueue(b1);
+  FileItem *file_processed = tube_out.Pop();
+  EXPECT_EQ(&file_null, file_processed);
+  EXPECT_EQ(0U, file_processed->nchunks());
+  EXPECT_EQ(hash_empty, file_processed->bulk_hash());
+  EXPECT_EQ(1U, uploader_->results.size());
+  EXPECT_EQ(hash_empty, uploader_->results[0].computed_hash);
+
+  task_group.Terminate();
+}
+
+TEST_F(T_Task, WriteLarge) {
+  Tube<BlockItem> tube_in;
+  Tube<FileItem> tube_out;
+
+  TubeConsumerGroup<BlockItem> task_group;
+  task_group.TakeConsumer(new TaskWrite(&tube_in, &tube_out, uploader_));
+  task_group.Spawn();
+
+  // File does not exist
+  FileItem file_large("./large");
+  unsigned nchunks = 32;
+  unsigned chunk_size = 1024 * 1024;
+  unsigned block_size = 1024;
+  ASSERT_EQ(0U, chunk_size % block_size);
+  file_large.set_size(nchunks * chunk_size);
+
+  shash::Any hash_zeros(shash::kSha1);
+  hash_zeros.suffix = shash::kSuffixPartial;
+  unsigned char *dummy_buffer = reinterpret_cast<unsigned char *>(
+    scalloc(1, chunk_size));
+  shash::HashMem(dummy_buffer, chunk_size, &hash_zeros);
+  free(dummy_buffer);
+
+  for (unsigned i = 0; i < nchunks; ++i) {
+    ChunkItem *chunk_item = new ChunkItem(&file_large, i * chunk_size);
+    unsigned nblocks = chunk_size / block_size;
+    unsigned char block_buffer[block_size];
+    memset(block_buffer, 0, block_size);
+    for (unsigned j = 0; j < nblocks; ++j) {
+      BlockItem *b = new BlockItem(i);
+      b->SetFileItem(&file_large);
+      b->SetChunkItem(chunk_item);
+      b->MakeDataCopy(block_buffer, block_size);
+      tube_in.Enqueue(b);
+    }
+    BlockItem *b_stop = new BlockItem(i);
+    b_stop->SetFileItem(&file_large);
+    b_stop->SetChunkItem(chunk_item);
+    b_stop->MakeStop();
+    tube_in.Enqueue(b_stop);
+
+    *chunk_item->hash_ptr() = hash_zeros;
+    if (i == (nchunks - 1)) {
+      file_large.set_is_fully_chunked();
+    }
+  }
+
+  FileItem *file_processed = tube_out.Pop();
+  EXPECT_EQ(&file_large, file_processed);
+  EXPECT_EQ(nchunks, file_processed->nchunks());
+  EXPECT_EQ(nchunks, uploader_->results.size());
+  EXPECT_EQ(shash::Any(), file_processed->bulk_hash());
 
   task_group.Terminate();
 }

@@ -28,32 +28,19 @@ void TaskWrite::OnChunkComplete(
   const upload::UploaderResults &results,
   ChunkItem *chunk_item)
 {
-  /*assert(chunk->IsFullyProcessed());
-  assert(chunk->HasUploadStreamHandle());
-  assert(chunk->bytes_written() == chunk->compressed_size());
-
-  if (results.return_code != 0) {
-    LogCvmfs(kLogSpooler, kLogStderr, "chunk upload failed (code: %d)",
-      results.return_code);
-    abort();
-  }
-
-  chunk->file()->ChunkCommitted(chunk);
-
-  pthread_mutex_lock(&processing_done_mutex_);
-  if (--chunks_in_flight_ == 0) {
-      pthread_cond_signal(&processing_done_condition_);
-  }
-  pthread_mutex_unlock(&processing_done_mutex_);*/
-
   if (results.return_code != 0) {
     LogCvmfs(kLogSpooler, kLogStderr, "chunk upload failed (code: %d)",
              results.return_code);
     abort();
   }
 
-  // register with file (needs to be thread-safe!)
+  FileItem *file_item = chunk_item->file_item();
+  file_item->RegisterChunk(*chunk_item->hash_ptr(), chunk_item->offset());
   delete chunk_item;
+
+  if (file_item->IsProcessed()) {
+    tube_out_->Enqueue(file_item);
+  }
 }
 
 

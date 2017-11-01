@@ -12,8 +12,12 @@
 
 class TaskWrite : public TubeConsumer<BlockItem> {
  public:
-  TaskWrite(Tube<BlockItem> *tube_in, upload::AbstractUploader *uploader)
+  TaskWrite(
+    Tube<BlockItem> *tube_in,
+    Tube<FileItem> *tube_out,
+    upload::AbstractUploader *uploader)
     : TubeConsumer<BlockItem>(tube_in)
+    , tube_out_(tube_out)
     , uploader_(uploader) { }
 
  protected:
@@ -25,6 +29,7 @@ class TaskWrite : public TubeConsumer<BlockItem> {
   void OnChunkComplete(const upload::UploaderResults &results,
                        ChunkItem *chunk_item);
 
+  Tube<FileItem> *tube_out_;
   upload::AbstractUploader *uploader_;
 };
 
