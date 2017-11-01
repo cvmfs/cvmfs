@@ -12,6 +12,7 @@
 #include <string>
 #include <vector>
 
+#include "atomic.h"
 #include "compression.h"
 #include "hash.h"
 #include "ingestion/chunk_detector.h"
@@ -55,12 +56,23 @@ class FileItem : SingleCopy {
 
   void set_size(uint64_t val) { size_ = val; }
   void set_may_have_chunks(bool val) { may_have_chunks_ = val; }
+  void set_is_fully_chunked() { atomic_inc32(&is_fully_chunked_); }
+  bool is_fully_chunked() { return atomic_read32(&is_fully_chunked_) != 0; }
+  uint64_t nchunks_in_fly() { return atomic_read64(&nchunks_in_fly_); }
+
+  // Called by ChunkItem constructor, decremented when a chunk is registered
+  void IncNchunksInFly() { atomic_inc64(&nchunks_in_fly_); }
+  void RegisterChunk(const shash::Any &hash, uint64_t offset);
+  bool IsProcessed() {
+    return is_fully_chunked() && (atomic_read64(&nchunks_in_fly_) == 0);
+  }
 
  private:
   static const uint64_t kSizeUnknown = uint64_t(-1);
 
   struct Piece {
     Piece() : offset(0) { }
+    Piece(const shash::Any &h, uint64_t o) : hash(h), offset(o) { }
     shash::Any hash;
     uint64_t offset;
   };
@@ -75,9 +87,18 @@ class FileItem : SingleCopy {
   bool may_have_chunks_;
 
   Xor32Detector chunk_detector_;
-  Piece bulk_chunk_;
+  shash::Any bulk_hash_;
   std::vector<Piece> chunks_;
-  pthread_mutex_t *lock_;
+  /**
+   * Number of chunks created but not yet uploaded and registered
+   */
+  atomic_int64 nchunks_in_fly_;
+  /**
+   * Switches to true once all of the file has been through the chunking
+   * stage
+   */
+  atomic_int32 is_fully_chunked_;
+  pthread_mutex_t lock_;
 };
 
 
@@ -91,7 +112,7 @@ class ChunkItem : SingleCopy {
  public:
   ChunkItem(FileItem *file_item, uint64_t offset);
 
-  void MakeBulkChunk() { is_bulk_chunk_ = true; }
+  void MakeBulkChunk();
   bool IsSolePiece() {
     return !is_bulk_chunk_ && (offset_ == 0) && (size_ == file_item_->size());
   }

@@ -202,6 +202,8 @@ TEST_F(T_Task, ChunkDispatch) {
 
   FileItem file_null("/dev/null");
   file_null.set_size(0);
+  EXPECT_FALSE(file_null.is_fully_chunked());
+  EXPECT_EQ(0U, file_null.nchunks_in_fly());
   BlockItem *b1 = new BlockItem(1);
   b1->SetFileItem(&file_null);
   b1->MakeStop();
@@ -215,6 +217,9 @@ TEST_F(T_Task, ChunkDispatch) {
   EXPECT_EQ(0U, item_stop->chunk_item()->size());
   EXPECT_FALSE(item_stop->chunk_item()->is_bulk_chunk());
   EXPECT_TRUE(item_stop->chunk_item()->IsSolePiece());
+  EXPECT_EQ(shash::kSuffixPartial, item_stop->chunk_item()->hash_ptr()->suffix);
+  EXPECT_TRUE(file_null.is_fully_chunked());
+  EXPECT_EQ(1U, file_null.nchunks_in_fly());
   delete item_stop->chunk_item();
   delete item_stop;
 
@@ -227,6 +232,7 @@ TEST_F(T_Task, ChunkDispatch) {
   EXPECT_EQ(0U, item_stop->chunk_item()->size());
   EXPECT_TRUE(item_stop->chunk_item()->is_bulk_chunk());
   EXPECT_FALSE(item_stop->chunk_item()->IsSolePiece());
+  EXPECT_EQ(shash::kSuffixNone, item_stop->chunk_item()->hash_ptr()->suffix);
   delete item_stop->chunk_item();
   delete item_stop;
 
@@ -245,6 +251,8 @@ TEST_F(T_Task, ChunkDispatch) {
   BlockItem *item_stop_bulk = tube_out->Pop();
   EXPECT_TRUE(item_stop_bulk->chunk_item()->is_bulk_chunk());
   EXPECT_FALSE(item_stop_bulk->chunk_item()->IsSolePiece());
+  EXPECT_TRUE(file_null_legacy.is_fully_chunked());
+  EXPECT_EQ(2U, file_null_legacy.nchunks_in_fly());
   delete item_stop_bulk->chunk_item();
   delete item_stop_bulk;
 
@@ -272,6 +280,7 @@ TEST_F(T_Task, Chunk) {
                       avg_chunk_size / 2,
                       avg_chunk_size,
                       avg_chunk_size * 2);
+  EXPECT_FALSE(file_large.is_fully_chunked());
   for (unsigned i = 0; i < nblocks; ++i) {
     string str_content(TaskRead::kBlockSize, i);
     unsigned char *content = reinterpret_cast<unsigned char *>(
@@ -290,12 +299,15 @@ TEST_F(T_Task, Chunk) {
 
   unsigned consumed = 0;
   unsigned chunk_size = 0;
+  unsigned n_recv_blocks = 0;
   int64_t tag = -1;
   uint64_t last_offset = 0;
   while (consumed < size) {
     BlockItem *b = tube_out->Pop();
     EXPECT_FALSE(b->chunk_item()->is_bulk_chunk());
+    EXPECT_FALSE(b->chunk_item()->IsSolePiece());
     if (tag == -1) {
+      n_recv_blocks++;
       tag = b->tag();
     } else {
       EXPECT_EQ(tag, b->tag());
@@ -319,7 +331,14 @@ TEST_F(T_Task, Chunk) {
     consumed += b->size();
     delete b;
   }
+  b_stop = tube_out->Pop();
+  EXPECT_EQ(BlockItem::kBlockStop, b_stop->type());
+  delete b_stop;
+  EXPECT_EQ(0U, tube_out->size());
+
   EXPECT_EQ(size, consumed);
+  EXPECT_TRUE(file_large.is_fully_chunked());
+  EXPECT_EQ(n_recv_blocks, file_large.nchunks_in_fly());
 
   task_group.Terminate();
 }

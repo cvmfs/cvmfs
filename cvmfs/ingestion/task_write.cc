@@ -81,8 +81,11 @@ void TaskWrite::Process(BlockItem *input_block) {
           &TaskWrite::OnBlockComplete, this, input_block));
       break;
     case BlockItem::kBlockStop:
-      // TODO: fixup files with one chunk (which should become bulk chunk)
-      // Either promote to bulk chunk or drop if there is a legacy bulk chunk
+      // If there is a sole piece and a legacy bulk chunk, two times the same
+      // chunk is being uploaded.  Well.  It doesn't hurt.
+      if (chunk_item->IsSolePiece()) {
+        chunk_item->MakeBulkChunk();
+      }
       uploader_->ScheduleCommit(handle, *chunk_item->hash_ptr());
       break;
     default:

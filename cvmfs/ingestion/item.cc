@@ -32,15 +32,35 @@ FileItem::FileItem(
   , may_have_chunks_(may_have_chunks)
   , chunk_detector_(min_chunk_size, avg_chunk_size, max_chunk_size)
 {
-  lock_ = reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
-  int retval = pthread_mutex_init(lock_, NULL);
+  int retval = pthread_mutex_init(&lock_, NULL);
   assert(retval == 0);
+  atomic_init64(&nchunks_in_fly_);
+  atomic_init32(&is_fully_chunked_);
 }
 
 
 FileItem::~FileItem() {
-  pthread_mutex_destroy(lock_);
-  free(lock_);
+  pthread_mutex_destroy(&lock_);
+}
+
+
+void FileItem::RegisterChunk(const shash::Any &hash, uint64_t offset) {
+  MutexLockGuard lock_guard(lock_);
+
+  switch (hash.suffix) {
+    case shash::kSuffixNone:
+      assert(offset == 0);
+      bulk_hash_ = hash;
+      break;
+
+    case shash::kSuffixPartial:
+      chunks_.push_back(Piece(hash, offset));
+      break;
+
+    default:
+      abort();
+  }
+  atomic_dec64(&nchunks_in_fly_);
 }
 
 
@@ -60,6 +80,14 @@ ChunkItem::ChunkItem(FileItem *file_item, uint64_t offset)
   hash_ctx_buffer_ = smalloc(hash_ctx_.size);
   hash_ctx_.buffer = hash_ctx_buffer_;
   shash::Init(hash_ctx_);
+  hash_value_.suffix = shash::kSuffixPartial;
+  file_item_->IncNchunksInFly();
+}
+
+
+void ChunkItem::MakeBulkChunk() {
+  is_bulk_chunk_ = true;
+  hash_value_.suffix = shash::kSuffixNone;
 }
 
 

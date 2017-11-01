@@ -62,6 +62,8 @@ void TaskChunk::Process(BlockItem *input_block) {
   ChunkDetector *chunk_detector = file_item->chunk_detector();
   switch (input_block->type()) {
     case BlockItem::kBlockStop:
+      // End of the file, no more new chunks
+      file_item->set_is_fully_chunked();
       if (output_block_bulk) output_block_bulk->MakeStop();
       if (chunk_info.next_chunk != NULL) {
         assert(file_item->size() >= chunk_info.next_chunk->offset());
