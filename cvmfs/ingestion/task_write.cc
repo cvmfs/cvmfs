@@ -36,7 +36,9 @@ void TaskWrite::OnChunkComplete(
   }
 
   FileItem *file_item = chunk_item->file_item();
-  file_item->RegisterChunk(*chunk_item->hash_ptr(), chunk_item->offset());
+  file_item->RegisterChunk(FileChunk(*chunk_item->hash_ptr(),
+                                     chunk_item->offset(),
+                                     chunk_item->size()));
   delete chunk_item;
 
   if (file_item->IsProcessed()) {

@@ -684,7 +684,7 @@ TEST_F(T_Ingestion, TaskWriteNull) {
   tube_in.Enqueue(b1);
   FileItem *file_processed = tube_out->Pop();
   EXPECT_EQ(&file_null, file_processed);
-  EXPECT_EQ(0U, file_processed->nchunks());
+  EXPECT_EQ(0U, file_processed->GetNumChunks());
   EXPECT_EQ(hash_empty, file_processed->bulk_hash());
   EXPECT_EQ(1U, uploader_->results.size());
   EXPECT_EQ(hash_empty, uploader_->results[0].computed_hash);
@@ -745,7 +745,7 @@ TEST_F(T_Ingestion, TaskWriteLarge) {
 
   FileItem *file_processed = tube_out->Pop();
   EXPECT_EQ(&file_large, file_processed);
-  EXPECT_EQ(nchunks, file_processed->nchunks());
+  EXPECT_EQ(nchunks, file_processed->GetNumChunks());
   EXPECT_EQ(nchunks, uploader_->results.size());
   EXPECT_EQ(shash::Any(), file_processed->bulk_hash());
 

@@ -31,6 +31,7 @@ FileItem::FileItem(
   , size_(kSizeUnknown)
   , may_have_chunks_(may_have_chunks)
   , chunk_detector_(min_chunk_size, avg_chunk_size, max_chunk_size)
+  , chunks_(1)
 {
   int retval = pthread_mutex_init(&lock_, NULL);
   assert(retval == 0);
@@ -44,17 +45,18 @@ FileItem::~FileItem() {
 }
 
 
-void FileItem::RegisterChunk(const shash::Any &hash, uint64_t offset) {
+void FileItem::RegisterChunk(const FileChunk &file_chunk) {
   MutexLockGuard lock_guard(lock_);
 
-  switch (hash.suffix) {
+  switch (file_chunk.content_hash().suffix) {
     case shash::kSuffixPartial:
-      chunks_.push_back(Piece(hash, offset));
+      chunks_.PushBack(file_chunk);
       break;
 
     default:
-      assert(offset == 0);
-      bulk_hash_ = hash;
+      assert(file_chunk.offset() == 0);
+      assert(file_chunk.size() == size_);
+      bulk_hash_ = file_chunk.content_hash();
       break;
   }
   atomic_dec64(&nchunks_in_fly_);

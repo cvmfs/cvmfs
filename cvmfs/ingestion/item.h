@@ -14,6 +14,7 @@
 
 #include "atomic.h"
 #include "compression.h"
+#include "file_chunk.h"
 #include "hash.h"
 #include "ingestion/chunk_detector.h"
 #include "util/pointer.h"
@@ -60,24 +61,19 @@ class FileItem : SingleCopy {
   void set_is_fully_chunked() { atomic_inc32(&is_fully_chunked_); }
   bool is_fully_chunked() { return atomic_read32(&is_fully_chunked_) != 0; }
   uint64_t nchunks_in_fly() { return atomic_read64(&nchunks_in_fly_); }
-  uint64_t nchunks() { return chunks_.size(); }
+
+  uint64_t GetNumChunks() { return chunks_.size(); }
+  FileChunkList *GetChunksPtr() { return &chunks_; }
 
   // Called by ChunkItem constructor, decremented when a chunk is registered
   void IncNchunksInFly() { atomic_inc64(&nchunks_in_fly_); }
-  void RegisterChunk(const shash::Any &hash, uint64_t offset);
+  void RegisterChunk(const FileChunk &file_chunk);
   bool IsProcessed() {
     return is_fully_chunked() && (atomic_read64(&nchunks_in_fly_) == 0);
   }
 
  private:
   static const uint64_t kSizeUnknown = uint64_t(-1);
-
-  struct Piece {
-    Piece() : offset(0) { }
-    Piece(const shash::Any &h, uint64_t o) : hash(h), offset(o) { }
-    shash::Any hash;
-    uint64_t offset;
-  };
 
   const std::string path_;
   const zlib::Algorithms compression_algorithm_;
@@ -90,7 +86,7 @@ class FileItem : SingleCopy {
 
   Xor32Detector chunk_detector_;
   shash::Any bulk_hash_;
-  std::vector<Piece> chunks_;
+  FileChunkList chunks_;
   /**
    * Number of chunks created but not yet uploaded and registered
    */
