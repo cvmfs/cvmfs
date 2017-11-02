@@ -165,6 +165,21 @@ class IngestionMockUploader
 };
 
 
+/**
+ * Collect results from the pipeline, what would normally enter entries in the
+ * file catalog.
+ */
+struct FnFileProcessed {
+  FnFileProcessed() { atomic_init64(&ncall); }
+
+  void OnFileProcessed(const upload::SpoolerResult &spooler_result) {
+    atomic_inc64(&ncall);
+  }
+
+  atomic_int64 ncall;
+};
+
+
 class T_Ingestion : public ::testing::Test {
  protected:
   static const unsigned kNumTasks = 32;
@@ -744,10 +759,14 @@ TEST_F(T_Ingestion, PipelineNull) {
 
   UniquePtr<IngestionPipeline> pipeline_straight(
     new IngestionPipeline(uploader_, spooler_definition));
+  FnFileProcessed fn_processed;
+  pipeline_straight->RegisterListener(
+    &FnFileProcessed::OnFileProcessed, &fn_processed);
   pipeline_straight->Spawn();
 
   pipeline_straight->Process("/dev/null", true);
   pipeline_straight->WaitFor();
+  EXPECT_EQ(1, atomic_read64(&fn_processed.ncall));
   EXPECT_EQ(1U, uploader_->results.size());
   shash::Any hash_null(spooler_definition.hash_algorithm);
   shash::HashString("", &hash_null);

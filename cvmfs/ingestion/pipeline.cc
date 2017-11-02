@@ -32,9 +32,11 @@ IngestionPipeline::IngestionPipeline(
   unsigned nfork_base = 1;
 
   for (unsigned i = 0; i < nfork_base * kNforkRegister; ++i) {
-    Tube<FileItem> *t = new Tube<FileItem>();
-    tubes_register_.TakeTube(t);
-    tasks_register_.TakeConsumer(new TaskRegister(t, &tube_counter_));
+    Tube<FileItem> *tube = new Tube<FileItem>();
+    tubes_register_.TakeTube(tube);
+    TaskRegister *task = new TaskRegister(tube, &tube_counter_);
+    task->RegisterListener(&IngestionPipeline::OnFileProcessed, this);
+    tasks_register_.TakeConsumer(task);
   }
   tubes_register_.Activate();
 
@@ -81,6 +83,13 @@ IngestionPipeline::~IngestionPipeline() {
     tasks_write_.Terminate();
     tasks_register_.Terminate();
   }
+}
+
+
+void IngestionPipeline::OnFileProcessed(
+  const upload::SpoolerResult &spooler_result)
+{
+  NotifyListeners(spooler_result);
 }
 
 

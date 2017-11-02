@@ -12,13 +12,15 @@
 #include "ingestion/item.h"
 #include "ingestion/task.h"
 #include "ingestion/tube.h"
+#include "upload_spooler_result.h"
+#include "util_concurrency.h"
 
 namespace upload {
 class AbstractUploader;
 struct SpoolerDefinition;
 }
 
-class IngestionPipeline {
+class IngestionPipeline : public Observable<upload::SpoolerResult> {
  public:
   explicit IngestionPipeline(
     upload::AbstractUploader *uploader,
@@ -29,6 +31,8 @@ class IngestionPipeline {
   void Process(const std::string &path, bool allow_chunking,
                shash::Suffix hash_suffix = shash::kSuffixNone);
   void WaitFor();
+
+  void OnFileProcessed(const upload::SpoolerResult &spooler_result);
 
  private:
   static const unsigned kNforkRegister = 1;
