@@ -64,6 +64,7 @@ set(CVMFS_UNITTEST_FILES
   t_hash_filters.cc
   t_header_lists.cc
   t_history.cc
+  t_ingestion.cc
   t_json.cc
   t_kvstore.cc
   t_libcvmfs.cc

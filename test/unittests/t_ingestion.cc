@@ -14,6 +14,7 @@
 #include "compression.h"
 #include "hash.h"
 #include "ingestion/item.h"
+#include "ingestion/pipeline.h"
 #include "ingestion/task.h"
 #include "ingestion/task_chunk.h"
 #include "ingestion/task_compress.h"
@@ -23,6 +24,7 @@
 #include "smalloc.h"
 #include "testutil.h"
 #include "upload_facility.h"
+#include "util/pointer.h"
 #include "util/posix.h"
 
 using namespace std;  // NOLINT
@@ -163,7 +165,7 @@ class IngestionMockUploader
 };
 
 
-class T_Task : public ::testing::Test {
+class T_Ingestion : public ::testing::Test {
  protected:
   static const unsigned kNumTasks = 32;
 
@@ -188,7 +190,7 @@ class T_Task : public ::testing::Test {
 };
 
 
-TEST_F(T_Task, Basic) {
+TEST_F(T_Ingestion, TaskBasic) {
   DummyItem i1(1);
   DummyItem i2(2);
   DummyItem i3(3);
@@ -212,7 +214,7 @@ TEST_F(T_Task, Basic) {
 }
 
 
-TEST_F(T_Task, Stress) {
+TEST_F(T_Ingestion, TaskStress) {
   DummyItem i1(1);
   DummyItem i2(2);
   DummyItem i3(3);
@@ -238,7 +240,7 @@ TEST_F(T_Task, Stress) {
 }
 
 
-TEST_F(T_Task, Read) {
+TEST_F(T_Ingestion, TaskRead) {
   Tube<FileItem> tube_in;
   Tube<BlockItem> *tube_out = new Tube<BlockItem>();
   TubeGroup<BlockItem> tube_group_out;
@@ -305,7 +307,7 @@ TEST_F(T_Task, Read) {
 }
 
 
-TEST_F(T_Task, ChunkDispatch) {
+TEST_F(T_Ingestion, TaskChunkDispatch) {
   Tube<BlockItem> tube_in;
   Tube<BlockItem> *tube_out = new Tube<BlockItem>();
   TubeGroup<BlockItem> tube_group_out;
@@ -376,7 +378,7 @@ TEST_F(T_Task, ChunkDispatch) {
 }
 
 
-TEST_F(T_Task, Chunk) {
+TEST_F(T_Ingestion, TaskChunk) {
   Tube<BlockItem> tube_in;
   Tube<BlockItem> *tube_out = new Tube<BlockItem>();
   TubeGroup<BlockItem> tube_group_out;
@@ -460,7 +462,7 @@ TEST_F(T_Task, Chunk) {
 }
 
 
-TEST_F(T_Task, CompressNull) {
+TEST_F(T_Ingestion, TaskCompressNull) {
   Tube<BlockItem> tube_in;
   Tube<BlockItem> *tube_out = new Tube<BlockItem>();
   TubeGroup<BlockItem> tube_group_out;
@@ -504,7 +506,7 @@ TEST_F(T_Task, CompressNull) {
 }
 
 
-TEST_F(T_Task, Compress) {
+TEST_F(T_Ingestion, TaskCompress) {
   Tube<BlockItem> tube_in;
   Tube<BlockItem> *tube_out = new Tube<BlockItem>();
   TubeGroup<BlockItem> tube_group_out;
@@ -584,7 +586,7 @@ TEST_F(T_Task, Compress) {
 }
 
 
-TEST_F(T_Task, Hash) {
+TEST_F(T_Ingestion, TaskHash) {
   Tube<BlockItem> tube_in;
   Tube<BlockItem> *tube_out = new Tube<BlockItem>();
   TubeGroup<BlockItem> tube_group_out;
@@ -641,12 +643,15 @@ TEST_F(T_Task, Hash) {
 }
 
 
-TEST_F(T_Task, WriteNull) {
+TEST_F(T_Ingestion, TaskWriteNull) {
   Tube<BlockItem> tube_in;
-  Tube<FileItem> tube_out;
+  Tube<FileItem> *tube_out = new Tube<FileItem>();
+  TubeGroup<FileItem> tube_group_out;
+  tube_group_out.TakeTube(tube_out);
+  tube_group_out.Activate();
 
   TubeConsumerGroup<BlockItem> task_group;
-  task_group.TakeConsumer(new TaskWrite(&tube_in, &tube_out, uploader_));
+  task_group.TakeConsumer(new TaskWrite(&tube_in, &tube_group_out, uploader_));
   task_group.Spawn();
 
   FileItem file_null("/dev/null");
@@ -662,7 +667,7 @@ TEST_F(T_Task, WriteNull) {
   b1->SetChunkItem(chunk_null);
   b1->MakeStop();
   tube_in.Enqueue(b1);
-  FileItem *file_processed = tube_out.Pop();
+  FileItem *file_processed = tube_out->Pop();
   EXPECT_EQ(&file_null, file_processed);
   EXPECT_EQ(0U, file_processed->nchunks());
   EXPECT_EQ(hash_empty, file_processed->bulk_hash());
@@ -672,12 +677,16 @@ TEST_F(T_Task, WriteNull) {
   task_group.Terminate();
 }
 
-TEST_F(T_Task, WriteLarge) {
+
+TEST_F(T_Ingestion, TaskWriteLarge) {
   Tube<BlockItem> tube_in;
-  Tube<FileItem> tube_out;
+  Tube<FileItem> *tube_out = new Tube<FileItem>();
+  TubeGroup<FileItem> tube_group_out;
+  tube_group_out.TakeTube(tube_out);
+  tube_group_out.Activate();
 
   TubeConsumerGroup<BlockItem> task_group;
-  task_group.TakeConsumer(new TaskWrite(&tube_in, &tube_out, uploader_));
+  task_group.TakeConsumer(new TaskWrite(&tube_in, &tube_group_out, uploader_));
   task_group.Spawn();
 
   // File does not exist
@@ -719,11 +728,49 @@ TEST_F(T_Task, WriteLarge) {
     }
   }
 
-  FileItem *file_processed = tube_out.Pop();
+  FileItem *file_processed = tube_out->Pop();
   EXPECT_EQ(&file_large, file_processed);
   EXPECT_EQ(nchunks, file_processed->nchunks());
   EXPECT_EQ(nchunks, uploader_->results.size());
   EXPECT_EQ(shash::Any(), file_processed->bulk_hash());
 
   task_group.Terminate();
+}
+
+
+TEST_F(T_Ingestion, PipelineNull) {
+  upload::SpoolerDefinition spooler_definition = MockSpoolerDefinition();
+  spooler_definition.compression_alg = zlib::kNoCompression;
+
+  UniquePtr<IngestionPipeline> pipeline_straight(
+    new IngestionPipeline(uploader_, spooler_definition));
+  pipeline_straight->Spawn();
+
+  pipeline_straight->Process("/dev/null", true);
+  pipeline_straight->WaitFor();
+  EXPECT_EQ(1U, uploader_->results.size());
+  shash::Any hash_null(spooler_definition.hash_algorithm);
+  shash::HashString("", &hash_null);
+  EXPECT_EQ(hash_null, uploader_->results[0].computed_hash);
+
+  uploader_->ClearResults();
+
+  spooler_definition.compression_alg = zlib::kZlibDefault;
+  spooler_definition.hash_algorithm = shash::kShake128;
+  UniquePtr<IngestionPipeline> pipeline_zlib(
+    new IngestionPipeline(uploader_, spooler_definition));
+  pipeline_zlib->Spawn();
+
+  pipeline_zlib->Process("/dev/null", true);
+  pipeline_zlib->WaitFor();
+  EXPECT_EQ(1U, uploader_->results.size());
+  void *compressed_null = NULL;
+  uint64_t sz_compressed_null;
+  EXPECT_TRUE(
+    zlib::CompressMem2Mem(NULL, 0, &compressed_null, &sz_compressed_null));
+  shash::Any hash_compressed_null(spooler_definition.hash_algorithm);
+  shash::HashMem(reinterpret_cast<unsigned char *>(compressed_null),
+                 sz_compressed_null, &hash_compressed_null);
+  free(compressed_null);
+  EXPECT_EQ(hash_compressed_null, uploader_->results[0].computed_hash);
 }

@@ -11,6 +11,7 @@
 #include <cassert>
 #include <vector>
 
+#include "atomic.h"
 #include "util/single_copy.h"
 #include "util/pointer.h"
 #include "util_concurrency.h"
@@ -220,7 +221,10 @@ class Tube : SingleCopy {
 template <class ItemT>
 class TubeGroup : SingleCopy {
  public:
-  TubeGroup() : is_active_(false) { }
+  TubeGroup() : is_active_(false) {
+    atomic_init32(&round_robin_);
+  }
+
   ~TubeGroup() {
     for (unsigned i = 0; i < tubes_.size(); ++i)
       delete tubes_[i];
@@ -247,9 +251,20 @@ class TubeGroup : SingleCopy {
     return tubes_[tube_idx]->Enqueue(item);
   }
 
+  /**
+   * Like Tube::Enqueue(), use tubes one after another
+   */
+  typename Tube<ItemT>::Link *DispatchAny(ItemT *item) {
+    assert(is_active_);
+    unsigned tube_idx = (tubes_.size() == 1)
+                        ? 0 : (atomic_xadd32(&round_robin_, 1) % tubes_.size());
+    return tubes_[tube_idx]->Enqueue(item);
+  }
+
  private:
   bool is_active_;
   std::vector<Tube<ItemT> *> tubes_;
+  atomic_int32 round_robin_;
 };
 
 #endif  // CVMFS_INGESTION_TUBE_H_

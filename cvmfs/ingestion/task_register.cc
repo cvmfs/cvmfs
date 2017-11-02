@@ -6,6 +6,7 @@
 #include "task_register.h"
 
 void TaskRegister::Process(FileItem *processed_file) {
-  // TODO(jblomer) run callback
+  // TODO(jakob) run callback
   delete processed_file;
+  tube_counter_->Pop();
 }

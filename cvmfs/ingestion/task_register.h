@@ -6,6 +6,7 @@
 #define CVMFS_INGESTION_TASK_REGISTER_H_
 
 #include "ingestion/item.h"
+#include "ingestion/tube.h"
 #include "ingestion/task.h"
 
 /**
@@ -15,10 +16,16 @@
  */
 class TaskRegister : public TubeConsumer<FileItem> {
  public:
-  TaskRegister(Tube<FileItem> *tube_in) : TubeConsumer<FileItem>(tube_in) { }
+  TaskRegister(Tube<FileItem> *tube_in, Tube<FileItem> *tube_counter)
+    : TubeConsumer<FileItem>(tube_in)
+    , tube_counter_(tube_counter)
+  { }
 
  protected:
   virtual void Process(FileItem *processed_file);
+
+ private:
+  Tube<FileItem> *tube_counter_;
 };  // class TaskRegister
 
 #endif  // CVMFS_INGESTION_TASK_REGISTER_H_

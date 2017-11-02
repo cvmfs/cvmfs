@@ -8,6 +8,7 @@
 #include <cstdlib>
 
 #include "logging.h"
+#include "upload_facility.h"
 
 
 void TaskWrite::OnBlockComplete(
@@ -39,7 +40,7 @@ void TaskWrite::OnChunkComplete(
   delete chunk_item;
 
   if (file_item->IsProcessed()) {
-    tube_out_->Enqueue(file_item);
+    tubes_out_->DispatchAny(file_item);
   }
 }
 
