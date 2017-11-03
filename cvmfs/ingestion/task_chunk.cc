@@ -97,7 +97,7 @@ void TaskChunk::Process(BlockItem *input_block) {
           assert(cut_mark >= chunk_info.offset + offset_in_block);
           uint64_t cut_mark_in_block = cut_mark - chunk_info.offset;
           assert(cut_mark_in_block >= offset_in_block);
-          assert(cut_mark_in_block < input_block->size());
+          assert(cut_mark_in_block <= input_block->size());
           unsigned tail_size = cut_mark_in_block - offset_in_block;
 
           if (tail_size > 0) {
