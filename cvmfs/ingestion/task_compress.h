@@ -5,9 +5,11 @@
 #ifndef CVMFS_INGESTION_TASK_COMPRESS_H_
 #define CVMFS_INGESTION_TASK_COMPRESS_H_
 
- #include "ingestion/item.h"
- #include "ingestion/task.h"
- #include "util/posix.h"
+#include <map>
+
+#include "ingestion/item.h"
+#include "ingestion/task.h"
+#include "util/posix.h"
 
 class TaskCompress : public TubeConsumer<BlockItem> {
  public:

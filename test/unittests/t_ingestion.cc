@@ -55,7 +55,7 @@ class TestTask : public TubeConsumer<DummyItem> {
 };
 atomic_int32 TestTask::cnt_terminate = 0;
 atomic_int32 TestTask::cnt_process = 0;
-}
+}  // anonymous namespace
 
 
 /**

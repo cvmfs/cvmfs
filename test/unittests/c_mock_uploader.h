@@ -8,6 +8,7 @@
 #include <cassert>
 #include <cstdlib>
 #include <string>
+#include <vector>
 
 #include "hash.h"
 #include "testutil.h"
@@ -80,7 +81,7 @@ class IngestionMockUploader
   explicit IngestionMockUploader(
     const upload::SpoolerDefinition &spooler_definition)
     : AbstractMockUploader<IngestionMockUploader>(spooler_definition)
-   { }
+  { }
 
   virtual std::string name() const { return "IngestionMockUploader"; }
   void ClearResults() { results.clear(); }

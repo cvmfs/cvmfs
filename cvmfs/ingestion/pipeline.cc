@@ -107,8 +107,7 @@ void IngestionPipeline::Process(
     hash_algorithm_,
     hash_suffix,
     allow_chunking && chunking_enabled_,
-    generate_legacy_bulk_chunks_
-  );
+    generate_legacy_bulk_chunks_);
   tube_counter_.Enqueue(file_item);
   tube_input_.Enqueue(file_item);
 }

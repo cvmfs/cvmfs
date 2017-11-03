@@ -42,8 +42,7 @@ class FileItem : SingleCopy {
     shash::Algorithms hash_algorithm = shash::kSha1,
     shash::Suffix hash_suffix = shash::kSuffixNone,
     bool may_have_chunks = true,
-    bool has_legacy_bulk_chunk = false
-   );
+    bool has_legacy_bulk_chunk = false);
   ~FileItem();
 
   std::string path() { return path_; }

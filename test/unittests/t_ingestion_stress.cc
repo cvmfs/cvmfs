@@ -24,8 +24,8 @@ class T_IngestionStress : public FileSandbox {
  public:
   typedef std::vector<ExpectedHashString> ExpectedHashStrings;
 
-   T_IngestionStress()
-     : FileSandbox(IngestionMockUploader::sandbox_path), uploader_(NULL) { }
+  T_IngestionStress()
+    : FileSandbox(IngestionMockUploader::sandbox_path), uploader_(NULL) { }
 
  protected:
   virtual void SetUp() {

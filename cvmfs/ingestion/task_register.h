@@ -6,8 +6,8 @@
 #define CVMFS_INGESTION_TASK_REGISTER_H_
 
 #include "ingestion/item.h"
-#include "ingestion/tube.h"
 #include "ingestion/task.h"
+#include "ingestion/tube.h"
 #include "upload_spooler_result.h"
 #include "util_concurrency.h"
 

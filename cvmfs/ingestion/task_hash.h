@@ -2,11 +2,11 @@
  * This file is part of the CernVM File System.
  */
 
- #ifndef CVMFS_INGESTION_TASK_HASH_H_
- #define CVMFS_INGESTION_TASK_HASH_H_
+#ifndef CVMFS_INGESTION_TASK_HASH_H_
+#define CVMFS_INGESTION_TASK_HASH_H_
 
- #include "ingestion/item.h"
- #include "ingestion/task.h"
+#include "ingestion/item.h"
+#include "ingestion/task.h"
 
 class TaskHash : public TubeConsumer<BlockItem> {
  public:
