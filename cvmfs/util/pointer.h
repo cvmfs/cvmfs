@@ -86,6 +86,24 @@ class UniquePtr<void> : public UniquePtrBase<void, UniquePtr<void> > {
   }
 };
 
+template <>
+class UniquePtr<unsigned char>
+  : public UniquePtrBase<unsigned char, UniquePtr<unsigned char> > {
+ private:
+  typedef UniquePtrBase<unsigned char, UniquePtr<unsigned char> > BaseT;
+ public:
+  friend class UniquePtrBase<unsigned char, UniquePtr<unsigned char> >;
+  using BaseT::operator=;
+  inline UniquePtr() : BaseT(NULL) { }
+  inline explicit UniquePtr(unsigned char *ref) : BaseT(ref) { }
+ protected:
+  void Free() {
+    if (IsValid()) {
+      free(BaseT::ref_);
+    }
+  }
+};
+
 
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD

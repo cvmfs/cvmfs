@@ -77,6 +77,7 @@ void TaskWrite::Process(BlockItem *input_block) {
         chunk_item->MakeBulkChunk();
       }
       uploader_->ScheduleCommit(handle, *chunk_item->hash_ptr());
+      delete input_block;
       break;
     default:
       abort();

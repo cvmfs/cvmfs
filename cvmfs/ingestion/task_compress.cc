@@ -64,6 +64,8 @@ void TaskCompress::Process(BlockItem *input_block) {
   if (flush) {
     if (output_block->size() > 0)
       tubes_out_->Dispatch(output_block);
+    else
+      delete output_block;
     tag_map_.erase(tag);
 
     BlockItem *stop_block = new BlockItem(tag);

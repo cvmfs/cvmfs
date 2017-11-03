@@ -362,6 +362,7 @@ TEST_F(T_Ingestion, TaskChunk) {
   }
   b_stop = tube_out->Pop();
   EXPECT_EQ(BlockItem::kBlockStop, b_stop->type());
+  delete b_stop->chunk_item();
   delete b_stop;
   EXPECT_EQ(0U, tube_out->size());
 
@@ -465,7 +466,7 @@ TEST_F(T_Ingestion, TaskCompress) {
   EXPECT_TRUE(zlib::CompressMem2Mem(
     block_raw.data(), block_raw.size(),
     &ptr_zlib_large, &sz_zlib_large));
-  delete buf;
+  free(buf);
 
   unsigned char *ptr_read_large = reinterpret_cast<unsigned char *>(
     smalloc(sz_zlib_large));
