@@ -45,6 +45,13 @@ class FileItem : SingleCopy {
     bool has_legacy_bulk_chunk = false);
   ~FileItem();
 
+  static FileItem *CreateQuitBeacon() {
+    return new FileItem(std::string(1, kQuitBeaconMarker));
+  }
+  bool IsQuitBeacon() {
+    return (path_.length() == 1) && (path_[0] == kQuitBeaconMarker);
+  }
+
   std::string path() { return path_; }
   uint64_t size() { return size_; }
   Xor32Detector *chunk_detector() { return &chunk_detector_; }
@@ -73,6 +80,7 @@ class FileItem : SingleCopy {
 
  private:
   static const uint64_t kSizeUnknown = uint64_t(-1);
+  static const char kQuitBeaconMarker = '\0';
 
   const std::string path_;
   const zlib::Algorithms compression_algorithm_;
@@ -165,6 +173,13 @@ class BlockItem : SingleCopy {
 
   BlockItem();
   explicit BlockItem(int64_t tag);
+
+  static BlockItem *CreateQuitBeacon() {
+    return new BlockItem();
+  }
+  bool IsQuitBeacon() {
+    return type_ == kBlockHollow;
+  }
 
   void MakeStop();
   void MakeData(uint32_t capacity);

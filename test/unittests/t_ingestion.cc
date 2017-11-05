@@ -33,6 +33,8 @@ using namespace std;  // NOLINT
 namespace {
 class DummyItem {
  public:
+  static DummyItem *CreateQuitBeacon() { return new DummyItem(-1); }
+  bool IsQuitBeacon() { return summand == -1; }
   explicit DummyItem(int s) : summand(s) { }
   int summand;
   static atomic_int32 sum;

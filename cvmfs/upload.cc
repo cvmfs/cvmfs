@@ -42,9 +42,10 @@ bool Spooler::Initialize() {
   }
 
   // configure the file processor context
-  file_processor_ =
-      new FileProcessor(uploader_.weak_ref(), spooler_definition_);
-  file_processor_->RegisterListener(&Spooler::ProcessingCallback, this);
+  ingestion_pipeline_ =
+      new IngestionPipeline(uploader_.weak_ref(), spooler_definition_);
+  ingestion_pipeline_->RegisterListener(&Spooler::ProcessingCallback, this);
+  ingestion_pipeline_->Spawn();
 
   // all done...
   return true;
@@ -52,23 +53,23 @@ bool Spooler::Initialize() {
 
 void Spooler::Process(const std::string &local_path,
                       const bool allow_chunking) {
-  file_processor_->Process(local_path, allow_chunking);
+  ingestion_pipeline_->Process(local_path, allow_chunking);
 }
 
 void Spooler::ProcessCatalog(const std::string &local_path) {
-  file_processor_->Process(local_path, false, shash::kSuffixCatalog);
+  ingestion_pipeline_->Process(local_path, false, shash::kSuffixCatalog);
 }
 
 void Spooler::ProcessHistory(const std::string &local_path) {
-  file_processor_->Process(local_path, false, shash::kSuffixHistory);
+  ingestion_pipeline_->Process(local_path, false, shash::kSuffixHistory);
 }
 
 void Spooler::ProcessCertificate(const std::string &local_path) {
-  file_processor_->Process(local_path, false, shash::kSuffixCertificate);
+  ingestion_pipeline_->Process(local_path, false, shash::kSuffixCertificate);
 }
 
 void Spooler::ProcessMetainfo(const std::string &local_path) {
-  file_processor_->Process(local_path, false, shash::kSuffixMetainfo);
+  ingestion_pipeline_->Process(local_path, false, shash::kSuffixMetainfo);
 }
 
 void Spooler::Upload(const std::string &local_path,
@@ -109,7 +110,7 @@ void Spooler::UploadingCallback(const UploaderResults &data) {
 
 void Spooler::WaitForUpload() const {
   uploader_->WaitForUpload();
-  file_processor_->WaitForProcessing();
+  ingestion_pipeline_->WaitFor();
 }
 
 void Spooler::FinalizeSession(bool commit, const std::string &old_root_hash,

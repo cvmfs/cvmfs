@@ -53,7 +53,7 @@ struct SpoolerDefinition {
   SpoolerDefinition Dup2DefaultCompression() const;
 
   DriverType driver_type;      //!< the type of the spooler driver
-  std::string temporary_path;  //!< scratch space for the FileProcessor
+  std::string temporary_path;  //!< scratch space for the IngestionPipeline
 
   /**
   * A driver specific spooler configuration string (interpreted by the concrete

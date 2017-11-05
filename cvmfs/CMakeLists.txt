@@ -186,6 +186,15 @@ set (CVMFS_SWISSKNIFE_SOURCES
   hash.cc
   history_sql.cc
   history_sqlite.cc
+  ingestion/chunk_detector.cc
+  ingestion/item.cc
+  ingestion/pipeline.cc
+  ingestion/task_chunk.cc
+  ingestion/task_compress.cc
+  ingestion/task_hash.cc
+  ingestion/task_read.cc
+  ingestion/task_register.cc
+  ingestion/task_write.cc
   json_document.cc
   letter.cc
   logging.cc
@@ -371,6 +380,15 @@ if(BUILD_RECEIVER)
     gateway_util.cc
     globals.cc
     hash.cc
+    ingestion/chunk_detector.cc
+    ingestion/item.cc
+    ingestion/pipeline.cc
+    ingestion/task_chunk.cc
+    ingestion/task_compress.cc
+    ingestion/task_hash.cc
+    ingestion/task_read.cc
+    ingestion/task_register.cc
+    ingestion/task_write.cc
     json_document.cc
     logging.cc
     malloc_arena.cc

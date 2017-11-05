@@ -55,18 +55,23 @@ Xor32Detector::Xor32Detector(const uint64_t minimal_chunk_size,
   : minimal_chunk_size_(minimal_chunk_size)
   , average_chunk_size_(average_chunk_size)
   , maximal_chunk_size_(maximal_chunk_size)
-  , threshold_(std::numeric_limits<uint32_t>::max() / average_chunk_size)
+  , threshold_((average_chunk_size > 0)
+               ? (std::numeric_limits<uint32_t>::max() / average_chunk_size)
+               : 0)
   , xor32_ptr_(0)
   , xor32_(0)
 {
-  assert(minimal_chunk_size_ > 0);
-  assert(minimal_chunk_size_ >= kXor32Window);
-  assert(minimal_chunk_size_ < average_chunk_size_);
-  assert(average_chunk_size_ < maximal_chunk_size_);
+  assert((average_chunk_size_ == 0) || (minimal_chunk_size_ > 0));
+  if (minimal_chunk_size_ > 0) {
+    assert(minimal_chunk_size_ >= kXor32Window);
+    assert(minimal_chunk_size_ < average_chunk_size_);
+    assert(average_chunk_size_ < maximal_chunk_size_);
+  }
 }
 
 
 uint64_t Xor32Detector::DoFindNextCutMark(BlockItem *buffer) {
+  assert(minimal_chunk_size_ > 0);
   const unsigned char *data = buffer->data();
 
   // Get the offset where the next xor32 computation needs to be continued

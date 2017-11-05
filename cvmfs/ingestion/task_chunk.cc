@@ -118,8 +118,12 @@ void TaskChunk::Process(BlockItem *input_block) {
           block_stop->MakeStop();
           tubes_out_->Dispatch(block_stop);
 
-          chunk_info.next_chunk = new ChunkItem(file_item, cut_mark);
-          chunk_info.output_tag_chunk = atomic_xadd64(&tag_seq_, 1);
+          // If the cut mark happens to at the end of file, don't create a new
+          // chunk
+          if (cut_mark < file_item->size()) {
+            chunk_info.next_chunk = new ChunkItem(file_item, cut_mark);
+            chunk_info.output_tag_chunk = atomic_xadd64(&tag_seq_, 1);
+          }
           offset_in_block = cut_mark_in_block;
         }
         chunk_info.offset += offset_in_block;

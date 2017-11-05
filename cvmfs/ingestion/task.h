@@ -44,19 +44,16 @@ class TubeConsumer : SingleCopy {
     TubeConsumer<ItemT> *consumer =
       reinterpret_cast<TubeConsumer<ItemT> *>(data);
 
-    pthread_cleanup_push(CleanupConsumer, consumer);
     while (true) {
       ItemT *item = consumer->tube_->Pop();
+      if (item->IsQuitBeacon()) {
+        delete item;
+        break;
+      }
       consumer->Process(item);
     }
-    pthread_cleanup_pop(1);
-    return NULL;
-  }
-
-  static void CleanupConsumer(void *data) {
-    TubeConsumer<ItemT> *consumer =
-      reinterpret_cast<TubeConsumer<ItemT> *>(data);
     consumer->OnTerminate();
+    return NULL;
   }
 };
 
@@ -91,8 +88,7 @@ class TubeConsumerGroup : SingleCopy {
   void Terminate() {
     unsigned N = consumers_.size();
     for (unsigned i = 0; i < N; ++i) {
-      int retval = pthread_cancel(threads_[i]);
-      assert(retval == 0);
+      consumers_[i]->tube_->Enqueue(ItemT::CreateQuitBeacon());
     }
     for (unsigned i = 0; i < N; ++i) {
       int retval = pthread_join(threads_[i], NULL);
