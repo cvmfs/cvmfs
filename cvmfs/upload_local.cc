@@ -170,8 +170,7 @@ void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
     const int retval = unlink(local_handle->temporary_path.c_str());
     if (retval != 0) {
       LogCvmfs(kLogSpooler, kLogVerboseMsg,
-               "failed to remove temporary '%s' "
-               "(errno: %d)",
+               "failed to remove temporary file '%s' (errno: %d)",
                local_handle->temporary_path.c_str(), errno);
     }
   }
