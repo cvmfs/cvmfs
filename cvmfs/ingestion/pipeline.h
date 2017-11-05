@@ -74,4 +74,67 @@ class IngestionPipeline : public Observable<upload::SpoolerResult> {
   TubeConsumerGroup<FileItem> tasks_register_;
 };  // class IngestionPipeline
 
+
+struct ScrubbingResult {
+  ScrubbingResult() { }
+  ScrubbingResult(const std::string &p, const shash::Any &h)
+    : path(p), hash(h) { }
+  std::string path;
+  shash::Any hash;
+};
+
+
+class TaskScrubbingCallback
+  : public TubeConsumer<BlockItem>
+  , public Observable<ScrubbingResult>
+{
+ public:
+  TaskScrubbingCallback(Tube<BlockItem> *tube_in,
+                        Tube<FileItem> *tube_counter)
+    : TubeConsumer<BlockItem>(tube_in)
+    , tube_counter_(tube_counter)
+  { }
+
+ protected:
+  virtual void Process(BlockItem *block_item);
+
+ private:
+  Tube<FileItem> *tube_counter_;
+};
+
+
+class ScrubbingPipeline : public Observable<ScrubbingResult> {
+ public:
+  ScrubbingPipeline();
+  ~ScrubbingPipeline();
+
+  void Spawn();
+  void Process(const std::string &path, shash::Algorithms hash_algorithm);
+  void WaitFor();
+
+  void OnFileProcessed(const ScrubbingResult &scrubbing_result);
+
+ private:
+  static const unsigned kNforkScrubbingCallback = 1;
+  static const unsigned kNforkHash = 2;
+  static const unsigned kNforkChunk = 1;
+  static const unsigned kNforkRead = 8;
+
+  bool spawned_;
+  Tube<FileItem> tube_input_;
+  // TODO(jblomer): a semaphore would be faster!
+  Tube<FileItem> tube_counter_;
+
+  TubeConsumerGroup<FileItem> tasks_read_;
+
+  TubeGroup<BlockItem> tubes_chunk_;
+  TubeConsumerGroup<BlockItem> tasks_chunk_;
+
+  TubeGroup<BlockItem> tubes_hash_;
+  TubeConsumerGroup<BlockItem> tasks_hash_;
+
+  TubeGroup<BlockItem> tubes_scrubbing_callback_;
+  TubeConsumerGroup<BlockItem> tasks_scrubbing_callback_;
+};
+
 #endif  // CVMFS_INGESTION_PIPELINE_H_

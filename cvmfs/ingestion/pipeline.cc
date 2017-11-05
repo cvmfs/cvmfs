@@ -127,3 +127,119 @@ void IngestionPipeline::Spawn() {
 void IngestionPipeline::WaitFor() {
   tube_counter_.Wait();
 }
+
+
+//------------------------------------------------------------------------------
+
+
+void TaskScrubbingCallback::Process(BlockItem *block_item) {
+  FileItem *file_item = block_item->file_item();
+  assert(file_item != NULL);
+  assert(!file_item->path().empty());
+  ChunkItem *chunk_item = block_item->chunk_item();
+  assert(chunk_item != NULL);
+  assert(chunk_item->is_bulk_chunk());
+
+  switch (block_item->type()) {
+    case BlockItem::kBlockData:
+      delete block_item;
+      break;
+
+    case BlockItem::kBlockStop:
+      assert(!chunk_item->hash_ptr()->IsNull());
+      NotifyListeners(ScrubbingResult(file_item->path(),
+                                      *chunk_item->hash_ptr()));
+      delete block_item;
+      delete chunk_item;
+      delete file_item;
+      tube_counter_->Pop();
+      break;
+
+    default:
+      abort();
+  }
+}
+
+
+//------------------------------------------------------------------------------
+
+
+ScrubbingPipeline::ScrubbingPipeline() : spawned_(false) {
+  // TODO(jakob): depends on number of cores
+  unsigned nfork_base = 1;
+
+  for (unsigned i = 0; i < nfork_base * kNforkScrubbingCallback; ++i) {
+    Tube<BlockItem> *tube = new Tube<BlockItem>();
+    tubes_scrubbing_callback_.TakeTube(tube);
+    TaskScrubbingCallback *task =
+      new TaskScrubbingCallback(tube, &tube_counter_);
+    task->RegisterListener(&ScrubbingPipeline::OnFileProcessed, this);
+    tasks_scrubbing_callback_.TakeConsumer(task);
+  }
+  tubes_scrubbing_callback_.Activate();
+
+  for (unsigned i = 0; i < nfork_base * kNforkHash; ++i) {
+    Tube<BlockItem> *t = new Tube<BlockItem>();
+    tubes_hash_.TakeTube(t);
+    tasks_hash_.TakeConsumer(new TaskHash(t, &tubes_scrubbing_callback_));
+  }
+  tubes_hash_.Activate();
+
+  for (unsigned i = 0; i < nfork_base * kNforkChunk; ++i) {
+    Tube<BlockItem> *t = new Tube<BlockItem>();
+    tubes_chunk_.TakeTube(t);
+    tasks_chunk_.TakeConsumer(new TaskChunk(t, &tubes_hash_));
+  }
+  tubes_chunk_.Activate();
+
+  for (unsigned i = 0; i < nfork_base * kNforkRead; ++i) {
+    tasks_read_.TakeConsumer(new TaskRead(&tube_input_, &tubes_chunk_));
+  }
+}
+
+
+ScrubbingPipeline::~ScrubbingPipeline() {
+  if (spawned_) {
+    tasks_read_.Terminate();
+    tasks_chunk_.Terminate();
+    tasks_hash_.Terminate();
+    tasks_scrubbing_callback_.Terminate();
+  }
+}
+
+
+void ScrubbingPipeline::OnFileProcessed(
+  const ScrubbingResult &scrubbing_result)
+{
+  NotifyListeners(scrubbing_result);
+}
+
+
+void ScrubbingPipeline::Process(
+  const std::string &path,
+  shash::Algorithms hash_algorithm)
+{
+  FileItem *file_item = new FileItem(
+    path,
+    0, 0, 0,
+    zlib::kNoCompression,
+    hash_algorithm,
+    false,
+    true);
+  tube_counter_.Enqueue(file_item);
+  tube_input_.Enqueue(file_item);
+}
+
+
+void ScrubbingPipeline::Spawn() {
+  tasks_scrubbing_callback_.Spawn();
+  tasks_hash_.Spawn();
+  tasks_chunk_.Spawn();
+  tasks_read_.Spawn();
+  spawned_ = true;
+}
+
+
+void ScrubbingPipeline::WaitFor() {
+  tube_counter_.Wait();
+}

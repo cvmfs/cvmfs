@@ -75,6 +75,19 @@ struct FnFileProcessed {
 };
 
 
+struct FnFileHashed {
+  FnFileHashed() { atomic_init64(&ncall); }
+
+  void OnFileProcessed(const ScrubbingResult &scrubbing_result) {
+    last_result = scrubbing_result;
+    atomic_inc64(&ncall);
+  }
+
+  ScrubbingResult last_result;
+  atomic_int64 ncall;
+};
+
+
 class T_Ingestion : public ::testing::Test {
  protected:
   static const unsigned kNumTasks = 32;
@@ -749,4 +762,21 @@ TEST_F(T_Ingestion, PipelineNull) {
                  sz_compressed_null, &hash_compressed_null);
   free(compressed_null);
   EXPECT_EQ(hash_compressed_null, uploader_->results[0].computed_hash);
+}
+
+
+TEST_F(T_Ingestion, Scrubbing) {
+  UniquePtr<ScrubbingPipeline> pipeline_scrubbing(new ScrubbingPipeline());
+  FnFileHashed fn_hashed;
+  pipeline_scrubbing->RegisterListener(
+    &FnFileHashed::OnFileProcessed, &fn_hashed);
+    pipeline_scrubbing->Spawn();
+
+  shash::Any null_hash(shash::kShake128);
+  HashString("", &null_hash);
+  pipeline_scrubbing->Process("/dev/null", shash::kShake128);
+  pipeline_scrubbing->WaitFor();
+  EXPECT_EQ(1, atomic_read64(&fn_hashed.ncall));
+  EXPECT_EQ("/dev/null", fn_hashed.last_result.path);
+  EXPECT_EQ(null_hash, fn_hashed.last_result.hash);
 }
