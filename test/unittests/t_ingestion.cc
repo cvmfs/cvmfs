@@ -376,6 +376,64 @@ TEST_F(T_Ingestion, TaskChunk) {
 }
 
 
+TEST_F(T_Ingestion, TaskChunkCornerCases) {
+  Tube<BlockItem> tube_in;
+  Tube<BlockItem> *tube_out = new Tube<BlockItem>();
+  TubeGroup<BlockItem> tube_group_out;
+  tube_group_out.TakeTube(tube_out);
+  tube_group_out.Activate();
+
+  TubeConsumerGroup<BlockItem> task_group;
+  task_group.TakeConsumer(new TaskChunk(&tube_in, &tube_group_out));
+  task_group.Spawn();
+
+  // File does not exist
+  FileItem file_large("./large", 1024, 2048, 4096);
+
+  file_large.set_size(8192);
+  // Ensure there is a chunking cut mark at EOF
+  unsigned block_size = 512;
+  assert((file_large.size() % block_size) == 0);
+  assert(((file_large.size() / 2) % block_size) == 0);
+  for (unsigned i = 0; i < (file_large.size() / block_size); ++i) {
+    unsigned char *buf =
+      reinterpret_cast<unsigned char *>(scalloc(1, block_size));
+    BlockItem *b = new BlockItem(1);
+    b->SetFileItem(&file_large);
+    b->MakeData(buf, block_size);
+    tube_in.Enqueue(b);
+  }
+  BlockItem *b_stop = new BlockItem(1);
+  b_stop->SetFileItem(&file_large);
+  b_stop->MakeStop();
+  tube_in.Enqueue(b_stop);
+
+  // Expect exactly two chunks of the same size
+  ChunkItem *chunk_item;
+  for (unsigned i = 0; i < 2; ++i) {
+    chunk_item = NULL;
+    for (unsigned j = 0; j < ((file_large.size() / 2) / block_size); ++j) {
+      BlockItem *b = tube_out->Pop();
+      EXPECT_FALSE(b->chunk_item()->is_bulk_chunk());
+      if (chunk_item == NULL)
+        chunk_item = b->chunk_item();
+      EXPECT_EQ(chunk_item, b->chunk_item());
+      delete b;
+    }
+    EXPECT_EQ(file_large.size() / 2, chunk_item->size());
+    b_stop = tube_out->Pop();
+    EXPECT_EQ(BlockItem::kBlockStop, b_stop->type());
+    delete b_stop;
+    delete chunk_item;
+  }
+  EXPECT_TRUE(tube_out->IsEmpty());
+  EXPECT_TRUE(file_large.is_fully_chunked());
+  EXPECT_EQ(2U, file_large.nchunks_in_fly());
+
+  task_group.Terminate();
+}
+
+
 TEST_F(T_Ingestion, TaskCompressNull) {
   Tube<BlockItem> tube_in;
   Tube<BlockItem> *tube_out = new Tube<BlockItem>();
