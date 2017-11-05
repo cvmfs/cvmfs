@@ -10,7 +10,6 @@
 #include <string>
 
 #include "compression.h"
-#include "file_processing/char_buffer.h"
 #include "logging.h"
 #include "platform.h"
 #include "util/posix.h"

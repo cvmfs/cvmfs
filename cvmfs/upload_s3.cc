@@ -17,7 +17,6 @@
 #include <vector>
 
 #include "compression.h"
-#include "file_processing/char_buffer.h"
 #include "logging.h"
 #include "options.h"
 #include "s3fanout.h"

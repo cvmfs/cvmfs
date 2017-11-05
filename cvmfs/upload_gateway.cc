@@ -7,7 +7,6 @@
 #include <limits>
 #include <vector>
 
-#include "file_processing/char_buffer.h"
 #include "gateway_util.h"
 #include "util/string.h"
 
