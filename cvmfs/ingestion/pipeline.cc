@@ -217,15 +217,17 @@ void ScrubbingPipeline::OnFileProcessed(
 
 void ScrubbingPipeline::Process(
   const std::string &path,
-  shash::Algorithms hash_algorithm)
+  shash::Algorithms hash_algorithm,
+  shash::Suffix hash_suffix)
 {
   FileItem *file_item = new FileItem(
     path,
     0, 0, 0,
     zlib::kNoCompression,
     hash_algorithm,
-    false,
-    true);
+    hash_suffix,
+    false,  /* may_have_chunks */
+    true  /* hash_legacy_bulk_chunk */);
   tube_counter_.Enqueue(file_item);
   tube_input_.Enqueue(file_item);
 }

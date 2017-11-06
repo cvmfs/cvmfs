@@ -10,14 +10,26 @@
 #include <cassert>
 #include <string>
 
-#include "file_processing/async_reader.h"
-#include "file_processing/file.h"
 #include "hash.h"
+#include "ingestion/pipeline.h"
 
 namespace swissknife {
 
 class CommandScrub : public Command {
- private:
+ public:
+  CommandScrub();
+  ~CommandScrub();
+  virtual std::string GetName() const { return "scrub"; }
+  virtual std::string GetDescription() const {
+    return "CernVM File System repository file storage checker. Finds silent "
+           "disk corruptions by recomputing all file content checksums in the "
+           "backend file storage.";
+  }
+  virtual ParameterList GetParams() const;
+  int Main(const ArgumentList &args);
+
+
+ protected:
   struct Alerts {
     enum Type {
       kUnexpectedFile = 1,
@@ -33,58 +45,6 @@ class CommandScrub : public Command {
     static const char* ToString(const Type t);
   };
 
- private:
-  class StoredFile : public upload::AbstractFile {
-   public:
-    StoredFile(const std::string &path, const std::string &expected_hash);
-    void Update(const unsigned char *data, const size_t nbytes);
-    void Finalize();
-
-    const shash::Any& content_hash() const {
-      assert(hash_done_); return content_hash_;
-    }
-    const shash::Any& expected_hash() const { return expected_hash_; }
-
-   private:
-    bool              hash_done_;
-    shash::ContextPtr hash_context_;
-
-    shash::Any        content_hash_;
-    shash::Any        expected_hash_;
-  };
-
-  class StoredFileScrubbingTask :
-                          public upload::AbstractFileScrubbingTask<StoredFile> {
-   public:
-    StoredFileScrubbingTask(StoredFile              *file,
-                            upload::CharBuffer      *buffer,
-                            const bool               is_last_piece,
-                            upload::AbstractReader  *reader) :
-      upload::AbstractFileScrubbingTask<StoredFile>(file,
-                                                    buffer,
-                                                    is_last_piece,
-                                                    reader) {}
-
-   protected:
-    tbb::task* execute();
-  };
-
-  typedef upload::Reader<StoredFileScrubbingTask, StoredFile> ScrubbingReader;
-
- public:
-  CommandScrub();
-  ~CommandScrub();
-  virtual std::string GetName() const { return "scrub"; }
-  virtual std::string GetDescription() const {
-    return "CernVM File System repository file storage checker. Finds silent "
-           "disk corruptions by recomputing all file content checksums in the "
-           "backend file storage.";
-  }
-  virtual ParameterList GetParams() const;
-  int Main(const ArgumentList &args);
-
-
- protected:
   void FileCallback(const std::string &relative_path,
                     const std::string &file_name);
   void DirCallback(const std::string &relative_path,
@@ -92,7 +52,7 @@ class CommandScrub : public Command {
   void SymlinkCallback(const std::string &relative_path,
                        const std::string &symlink_name);
 
-  void FileProcessedCallback(StoredFile* const& file);
+  void OnFileHashed(const ScrubbingResult &scrubbing_result);
 
   void PrintAlert(const Alerts::Type   type,
                   const std::string   &path,
@@ -108,11 +68,11 @@ class CommandScrub : public Command {
 
   std::string MakeFullPath(const std::string &relative_path,
                            const std::string &file_name) const;
+  std::string MakeRelativePath(const std::string &full_path);
 
- private:
+  ScrubbingPipeline             pipeline_scrubbing_;
   std::string                   repo_path_;
   bool                          machine_readable_output_;
-  ScrubbingReader              *reader_;
 
   mutable unsigned int          alerts_;
   mutable pthread_mutex_t       alerts_mutex_;

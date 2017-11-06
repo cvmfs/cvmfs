@@ -774,7 +774,8 @@ TEST_F(T_Ingestion, Scrubbing) {
 
   shash::Any null_hash(shash::kShake128);
   HashString("", &null_hash);
-  pipeline_scrubbing->Process("/dev/null", shash::kShake128);
+  pipeline_scrubbing->Process(
+    "/dev/null", shash::kShake128, shash::kSuffixNone);
   pipeline_scrubbing->WaitFor();
   EXPECT_EQ(1, atomic_read64(&fn_hashed.ncall));
   EXPECT_EQ("/dev/null", fn_hashed.last_result.path);

@@ -109,7 +109,9 @@ class ScrubbingPipeline : public Observable<ScrubbingResult> {
   ~ScrubbingPipeline();
 
   void Spawn();
-  void Process(const std::string &path, shash::Algorithms hash_algorithm);
+  void Process(const std::string &path,
+               shash::Algorithms hash_algorithm,
+               shash::Suffix hash_suffix);
   void WaitFor();
 
   void OnFileProcessed(const ScrubbingResult &scrubbing_result);
