@@ -93,6 +93,8 @@ void ChunkItem::MakeBulkChunk() {
 
 //------------------------------------------------------------------------------
 
+atomic_int64 BlockItem::managed_bytes_ = 0;
+
 
 BlockItem::BlockItem()
   : type_(kBlockHollow)
@@ -119,6 +121,7 @@ BlockItem::BlockItem(int64_t tag)
 
 
 void BlockItem::Discharge() {
+  atomic_xadd64(&managed_bytes_, -static_cast<int64_t>(capacity_));
   data_.Release();
   size_ = capacity_ = 0;
 }
@@ -137,6 +140,7 @@ void BlockItem::MakeData(uint32_t capacity) {
   type_ = kBlockData;
   capacity_ = capacity;
   data_ = reinterpret_cast<unsigned char *>(smalloc(capacity_));
+  atomic_xadd64(&managed_bytes_, static_cast<int64_t>(capacity_));
 }
 
 
@@ -153,6 +157,7 @@ void BlockItem::MakeData(
   type_ = kBlockData;
   capacity_ = size_ = size;
   data_ = data;
+  atomic_xadd64(&managed_bytes_, static_cast<int64_t>(capacity_));
 }
 
 
@@ -170,12 +175,14 @@ void BlockItem::MakeDataCopy(
   capacity_ = size_ = size;
   data_ = reinterpret_cast<unsigned char *>(smalloc(capacity_));
   memcpy(data_, data, size);
+  atomic_xadd64(&managed_bytes_, static_cast<int64_t>(capacity_));
 }
 
 
 void BlockItem::Reset() {
   assert(type_ == kBlockData);
 
+  atomic_xadd64(&managed_bytes_, -static_cast<int64_t>(capacity_));
   data_.Destroy();
   size_ = capacity_ = 0;
   type_ = kBlockHollow;

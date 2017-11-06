@@ -173,6 +173,9 @@ class BlockItem : SingleCopy {
 
   BlockItem();
   explicit BlockItem(int64_t tag);
+  ~BlockItem() {
+    atomic_xadd64(&managed_bytes_, -static_cast<int64_t>(capacity_));
+  }
 
   static BlockItem *CreateQuitBeacon() {
     return new BlockItem();
@@ -206,8 +209,13 @@ class BlockItem : SingleCopy {
   int64_t tag() { return tag_; }
   FileItem *file_item() { return file_item_; }
   ChunkItem *chunk_item() { return chunk_item_; }
+  static uint64_t managed_bytes() { return atomic_read64(&managed_bytes_); }
 
  private:
+  /**
+   * Total capacity of all BlockItem()
+   */
+  static atomic_int64 managed_bytes_;
   BlockType type_;
 
   /**

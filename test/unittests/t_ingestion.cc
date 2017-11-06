@@ -100,11 +100,13 @@ class T_Ingestion : public ::testing::Test {
       task_group_.TakeConsumer(new TestTask(&tube_));
     uploader_ = IngestionMockUploader::MockConstruct();
     ASSERT_TRUE(uploader_ != NULL);
+    EXPECT_EQ(0U, BlockItem::managed_bytes());
   }
 
   virtual void TearDown() {
     uploader_->TearDown();
     delete uploader_;
+    EXPECT_EQ(0U, BlockItem::managed_bytes());
   }
 
   Tube<DummyItem> tube_;
@@ -216,6 +218,9 @@ TEST_F(T_Ingestion, TaskRead) {
   tube_in.Enqueue(&file_large);
   for (unsigned i = 0; i < nblocks; ++i) {
     item_data = tube_out->Pop();
+    if (i == 0) {
+      EXPECT_GT(BlockItem::managed_bytes(), 0U);
+    }
     EXPECT_EQ(BlockItem::kBlockData, item_data->type());
     EXPECT_EQ(string(TaskRead::kBlockSize, i),
               string(reinterpret_cast<char *>(item_data->data()),
