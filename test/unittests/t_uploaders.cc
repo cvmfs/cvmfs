@@ -11,7 +11,6 @@
 
 #include "atomic.h"
 #include "c_file_sandbox.h"
-#include "file_processing/char_buffer.h"
 #include "hash.h"
 #include "testutil.h"
 #include "upload_facility.h"
@@ -89,7 +88,7 @@ class T_Uploaders : public FileSandbox {
     shash::Any          content_hash;
   };
 
-  typedef std::vector<CharBuffer*>                       Buffers;
+  typedef std::vector<std::string *>                     Buffers;
   typedef std::vector<std::pair<Buffers, StreamHandle> > BufferStreams;
 
   T_Uploaders() : FileSandbox(string(T_Uploaders::sandbox_path)),
@@ -220,14 +219,15 @@ class T_Uploaders : public FileSandbox {
     rng.InitSeed(rng_seed);
 
     for (unsigned int i = 0; i < buffer_count; ++i) {
+      // Was previously used with CharBuffer
       const size_t buffer_size  = rng.Next(1024 * 1024) + 10;
       const size_t bytes_to_use = rng.Next(buffer_size) +  5;
 
-      CharBuffer *buffer = new CharBuffer(buffer_size);
+      std::string *buffer = new std::string();
+      buffer->reserve(bytes_to_use);
       for (unsigned int i = 0; i < bytes_to_use; ++i) {
-        *(buffer->ptr() + i) = rng.Next(256);
+        buffer->push_back(rng.Next(256));
       }
-      buffer->SetUsedBytes(bytes_to_use);
 
       result.push_back(buffer);
     }
@@ -237,11 +237,8 @@ class T_Uploaders : public FileSandbox {
 
 
   void FreeBuffers(Buffers *buffers) const {
-    Buffers::iterator       i    = buffers->begin();
-    Buffers::const_iterator iend = buffers->end();
-    for (; i != iend; ++i) {
-      delete (*i);
-    }
+    for (unsigned i = 0; i < buffers->size(); ++i)
+      delete (*buffers)[i];
     buffers->clear();
   }
 
@@ -297,10 +294,8 @@ class T_Uploaders : public FileSandbox {
   void CompareBuffersAndFileContents(const Buffers     &buffers,
                                      const std::string &file_path) const {
     size_t buffers_size = 0;
-    Buffers::const_iterator i    = buffers.begin();
-    Buffers::const_iterator iend = buffers.end();
-    for (; i != iend; ++i) {
-      buffers_size += (*i)->used_bytes();
+    for (unsigned i = 0; i < buffers.size(); ++i) {
+      buffers_size += buffers[i]->length();
     }
     const size_t file_size = GetFileSize(file_path);
     EXPECT_EQ(file_size, buffers_size);
@@ -560,11 +555,9 @@ class T_Uploaders : public FileSandbox {
     ctx.buffer = alloca(ctx.size);
     shash::Init(ctx);
 
-    Buffers::const_iterator i    = buffers.begin();
-    Buffers::const_iterator iend = buffers.end();
-    for (; i != iend; ++i) {
-      CharBuffer *current_buffer = *i;
-      shash::Update(current_buffer->ptr(), current_buffer->used_bytes(), ctx);
+    for (unsigned i = 0; i < buffers.size(); ++i) {
+      shash::Update(reinterpret_cast<const unsigned char *>(buffers[i]->data()),
+                    buffers[i]->length(), ctx);
     }
 
     shash::Final(ctx, hash);
@@ -816,7 +809,8 @@ TYPED_TEST(T_Uploaders, SingleStreamedUpload) {
   for (; i != iend; ++i) {
     this->uploader_->ScheduleUpload(
       handle,
-      AbstractUploader::UploadBuffer((*i)->used_bytes(), (*i)->ptr()),
+      AbstractUploader::UploadBuffer((*i)->length(),
+                                     const_cast<char *>((*i)->data())),
       AbstractUploader::MakeClosure(
         &UploadCallbacks::BufferUploadComplete,
         &this->delegate_,
@@ -891,14 +885,14 @@ TYPED_TEST(T_Uploaders, MultipleStreamedUploadSlow) {
     const typename TestFixture::StreamHandle  &current_handle = j->second;
 
     if (!buffers.empty()) {
-      CharBuffer *current_buffer = buffers.front();
-      ASSERT_NE(static_cast<CharBuffer*>(NULL), current_buffer);
+      std::string *current_buffer = buffers.front();
+      ASSERT_FALSE(current_buffer->empty());
       ++number_of_buffers;
       this->uploader_->ScheduleUpload(
           current_handle.handle,
           AbstractUploader::UploadBuffer(
-            current_buffer->used_bytes(),
-            current_buffer->ptr()),
+            current_buffer->length(),
+            const_cast<char *>(current_buffer->data())),
           AbstractUploader::MakeClosure(
             &UploadCallbacks::BufferUploadComplete,
             &this->delegate_,
