@@ -5,7 +5,6 @@
 #include <gtest/gtest.h>
 
 #include <errno.h>
-#include <tbb/atomic.h>
 #include <unistd.h>
 
 #include <string>
@@ -33,9 +32,9 @@ namespace upload {
 class UploadCallbacks {
  public:
   UploadCallbacks() {
-    simple_upload_invocations            = 0;
-    streamed_upload_complete_invocations = 0;
-    buffer_upload_complete_invocations   = 0;
+    atomic_init32(&simple_upload_invocations);
+    atomic_init32(&streamed_upload_complete_invocations);
+    atomic_init32(&buffer_upload_complete_invocations);
   }
 
   void SimpleUploadClosure(const UploaderResults &results,
@@ -43,7 +42,7 @@ class UploadCallbacks {
     EXPECT_EQ(UploaderResults::kFileUpload,   results.type);
     EXPECT_EQ(expected.return_code,           results.return_code);
     EXPECT_EQ(expected.local_path,            results.local_path);
-    ++simple_upload_invocations;
+    atomic_inc32(&simple_upload_invocations);
   }
 
   void StreamedUploadComplete(const UploaderResults &results,
@@ -51,7 +50,7 @@ class UploadCallbacks {
     EXPECT_EQ(UploaderResults::kChunkCommit,  results.type);
     EXPECT_EQ("",                             results.local_path);
     EXPECT_EQ(return_code,                    results.return_code);
-    ++streamed_upload_complete_invocations;
+    atomic_inc32(&streamed_upload_complete_invocations);
   }
 
   void BufferUploadComplete(const UploaderResults &results,
@@ -59,13 +58,13 @@ class UploadCallbacks {
     EXPECT_EQ(UploaderResults::kBufferUpload, results.type);
     EXPECT_EQ("",                             results.local_path);
     EXPECT_EQ(expected.return_code,           results.return_code);
-    ++buffer_upload_complete_invocations;
+    atomic_inc32(&buffer_upload_complete_invocations);
   }
 
  public:
-  tbb::atomic<unsigned int> simple_upload_invocations;
-  tbb::atomic<unsigned int> streamed_upload_complete_invocations;
-  tbb::atomic<unsigned int> buffer_upload_complete_invocations;
+  atomic_int32 simple_upload_invocations;
+  atomic_int32 streamed_upload_complete_invocations;
+  atomic_int32 buffer_upload_complete_invocations;
 };
 
 
@@ -624,7 +623,7 @@ TYPED_TEST(T_Uploaders, SimpleFileUpload) {
 
   this->uploader_->WaitForUpload();
   EXPECT_TRUE(TestFixture::CheckFile(dest_name));
-  EXPECT_EQ(1u, this->delegate_.simple_upload_invocations);
+  EXPECT_EQ(1, atomic_read32(&(this->delegate_.simple_upload_invocations)));
   TestFixture::CompareFileContents(big_file_path,
                                    TestFixture::AbsoluteDestinationPath(
                                        dest_name));
@@ -646,7 +645,7 @@ TYPED_TEST(T_Uploaders, PeekIntoStorage) {
   this->uploader_->WaitForUpload();
 
   EXPECT_TRUE(TestFixture::CheckFile(dest_name));
-  EXPECT_EQ(1u, this->delegate_.simple_upload_invocations);
+  EXPECT_EQ(1, atomic_read32(&(this->delegate_.simple_upload_invocations)));
   TestFixture::CompareFileContents(small_file_path,
                                    TestFixture::AbsoluteDestinationPath(
                                        dest_name));
@@ -674,7 +673,7 @@ TYPED_TEST(T_Uploaders, RemoveFromStorage) {
   this->uploader_->WaitForUpload();
 
   EXPECT_TRUE(TestFixture::CheckFile(dest_name));
-  EXPECT_EQ(1u, this->delegate_.simple_upload_invocations);
+  EXPECT_EQ(1, atomic_read32(&(this->delegate_.simple_upload_invocations)));
   TestFixture::CompareFileContents(small_file_path,
                                    TestFixture::AbsoluteDestinationPath(
                                        dest_name));
@@ -708,7 +707,7 @@ TYPED_TEST(T_Uploaders, UploadEmptyFile) {
   this->uploader_->WaitForUpload();
 
   EXPECT_TRUE(TestFixture::CheckFile(dest_name));
-  EXPECT_EQ(1u, this->delegate_.simple_upload_invocations);
+  EXPECT_EQ(1, atomic_read32(&(this->delegate_.simple_upload_invocations)));
   TestFixture::CompareFileContents(empty_file_path,
                                    TestFixture::AbsoluteDestinationPath(
                                        dest_name));
@@ -731,7 +730,7 @@ TYPED_TEST(T_Uploaders, UploadHugeFileSlow) {
   this->uploader_->WaitForUpload();
 
   EXPECT_TRUE(TestFixture::CheckFile(dest_name));
-  EXPECT_EQ(1u, this->delegate_.simple_upload_invocations);
+  EXPECT_EQ(1, atomic_read32(&(this->delegate_.simple_upload_invocations)));
   TestFixture::CompareFileContents(huge_file_path,
                                    TestFixture::AbsoluteDestinationPath(
                                        dest_name));
@@ -742,11 +741,11 @@ TYPED_TEST(T_Uploaders, UploadHugeFileSlow) {
 
 
 TYPED_TEST(T_Uploaders, UploadManyFilesSlow) {
-  const unsigned int number_of_files = 500;
+  const int number_of_files = 500;
   typedef std::vector<std::pair<std::string, std::string> > Files;
 
   Files files;
-  for (unsigned int i = 0; i < number_of_files; ++i) {
+  for (int i = 0; i < number_of_files; ++i) {
     const std::string dest_name = "file" + StringifyInt(i);
     std::string file;
     switch (i % 3) {
@@ -777,7 +776,8 @@ TYPED_TEST(T_Uploaders, UploadManyFilesSlow) {
   }
   this->uploader_->WaitForUpload();
 
-  EXPECT_EQ(number_of_files, this->delegate_.simple_upload_invocations);
+  EXPECT_EQ(number_of_files,
+            atomic_read32(&(this->delegate_.simple_upload_invocations)));
   for (i = files.begin(); i != iend; ++i) {
     EXPECT_TRUE(TestFixture::CheckFile(i->second));
     TestFixture::CompareFileContents(i->first,
@@ -791,12 +791,14 @@ TYPED_TEST(T_Uploaders, UploadManyFilesSlow) {
 
 
 TYPED_TEST(T_Uploaders, SingleStreamedUpload) {
-  const unsigned int number_of_buffers = 10;
+  const int number_of_buffers = 10;
   typename TestFixture::Buffers buffers =
       TestFixture::MakeRandomizedBuffers(number_of_buffers, 1337);
 
-  EXPECT_EQ(0u, this->delegate_.buffer_upload_complete_invocations);
-  EXPECT_EQ(0u, this->delegate_.streamed_upload_complete_invocations);
+  EXPECT_EQ(0,
+    atomic_read32(&(this->delegate_.buffer_upload_complete_invocations)));
+  EXPECT_EQ(0,
+    atomic_read32(&(this->delegate_.streamed_upload_complete_invocations)));
 
   UploadStreamHandle *handle = this->uploader_->InitStreamedUpload(
       AbstractUploader::MakeClosure(&UploadCallbacks::StreamedUploadComplete,
@@ -804,8 +806,10 @@ TYPED_TEST(T_Uploaders, SingleStreamedUpload) {
                                     0));
   ASSERT_NE(static_cast<UploadStreamHandle*>(NULL), handle);
 
-  EXPECT_EQ(0u, this->delegate_.buffer_upload_complete_invocations);
-  EXPECT_EQ(0u, this->delegate_.streamed_upload_complete_invocations);
+  EXPECT_EQ(0,
+    atomic_read32(&(this->delegate_.buffer_upload_complete_invocations)));
+  EXPECT_EQ(0,
+    atomic_read32(&(this->delegate_.streamed_upload_complete_invocations)));
 
   typename TestFixture::Buffers::const_iterator i    = buffers.begin();
   typename TestFixture::Buffers::const_iterator iend = buffers.end();
@@ -821,9 +825,9 @@ TYPED_TEST(T_Uploaders, SingleStreamedUpload) {
   this->uploader_->WaitForUpload();
 
   EXPECT_EQ(number_of_buffers,
-            this->delegate_.buffer_upload_complete_invocations);
-  EXPECT_EQ(0u,
-            this->delegate_.streamed_upload_complete_invocations);
+    atomic_read32(&(this->delegate_.buffer_upload_complete_invocations)));
+  EXPECT_EQ(0,
+    atomic_read32(&(this->delegate_.streamed_upload_complete_invocations)));
 
   shash::Any content_hash(shash::kSha1, 'A');
   content_hash.Randomize(42);
@@ -831,9 +835,9 @@ TYPED_TEST(T_Uploaders, SingleStreamedUpload) {
   this->uploader_->WaitForUpload();
 
   EXPECT_EQ(number_of_buffers,
-            this->delegate_.buffer_upload_complete_invocations);
-  EXPECT_EQ(1u,
-            this->delegate_.streamed_upload_complete_invocations);
+    atomic_read32(&(this->delegate_.buffer_upload_complete_invocations)));
+  EXPECT_EQ(1,
+    atomic_read32(&(this->delegate_.streamed_upload_complete_invocations)));
 
   const std::string dest = "data/" + content_hash.MakePath();
   EXPECT_TRUE(TestFixture::CheckFile(dest));
@@ -849,15 +853,17 @@ TYPED_TEST(T_Uploaders, SingleStreamedUpload) {
 
 
 TYPED_TEST(T_Uploaders, MultipleStreamedUploadSlow) {
-  const unsigned int  number_of_files        = 100;
-  const unsigned int  max_buffers_per_stream = 15;
+  const int  number_of_files        = 100;
+  const int  max_buffers_per_stream = 15;
   typename TestFixture::BufferStreams streams =
       TestFixture::MakeRandomizedBufferStreams(number_of_files,
                                                max_buffers_per_stream,
                                                42);
 
-  EXPECT_EQ(0u, this->delegate_.buffer_upload_complete_invocations);
-  EXPECT_EQ(0u, this->delegate_.streamed_upload_complete_invocations);
+  EXPECT_EQ(0,
+    atomic_read32(&(this->delegate_.buffer_upload_complete_invocations)));
+  EXPECT_EQ(0,
+    atomic_read32(&(this->delegate_.streamed_upload_complete_invocations)));
 
   typename TestFixture::BufferStreams::iterator       i    = streams.begin();
   typename TestFixture::BufferStreams::const_iterator iend = streams.end();
@@ -870,14 +876,16 @@ TYPED_TEST(T_Uploaders, MultipleStreamedUploadSlow) {
     i->second.handle = handle;
   }
 
-  EXPECT_EQ(0u, this->delegate_.buffer_upload_complete_invocations);
-  EXPECT_EQ(0u, this->delegate_.streamed_upload_complete_invocations);
+  EXPECT_EQ(0,
+    atomic_read32(&(this->delegate_.buffer_upload_complete_invocations)));
+  EXPECT_EQ(0,
+    atomic_read32(&(this->delegate_.streamed_upload_complete_invocations)));
 
   // go through the handles and schedule buffers for them in a round robin
   // fashion --> we want to test concurrent streamed upload behaviour
   typename TestFixture::BufferStreams active_streams = streams;
   typename TestFixture::BufferStreams::iterator j    = active_streams.begin();
-  unsigned int number_of_buffers                     = 0;
+  int number_of_buffers                              = 0;
   while (!active_streams.empty()) {
     typename TestFixture::Buffers             &buffers        = j->first;
     const typename TestFixture::StreamHandle  &current_handle = j->second;
@@ -906,9 +914,9 @@ TYPED_TEST(T_Uploaders, MultipleStreamedUploadSlow) {
   this->uploader_->WaitForUpload();
 
   EXPECT_EQ(number_of_buffers,
-            this->delegate_.buffer_upload_complete_invocations);
+    atomic_read32(&(this->delegate_.buffer_upload_complete_invocations)));
   EXPECT_EQ(number_of_files,
-            this->delegate_.streamed_upload_complete_invocations);
+    atomic_read32(&(this->delegate_.streamed_upload_complete_invocations)));
 
   typename TestFixture::BufferStreams::const_iterator k    = streams.begin();
   typename TestFixture::BufferStreams::const_iterator kend = streams.end();
@@ -951,7 +959,7 @@ TYPED_TEST(T_Uploaders, PlaceBootstrappingShortcut) {
   this->uploader_->WaitForUpload();
   EXPECT_TRUE(TestFixture::CheckFile(dest_name));
 
-  EXPECT_EQ(1u, this->delegate_.simple_upload_invocations);
+  EXPECT_EQ(1, atomic_read32(&(this->delegate_.simple_upload_invocations)));
   TestFixture::CompareFileContents(big_file_path,
                                    TestFixture::AbsoluteDestinationPath(
                                        dest_name));
