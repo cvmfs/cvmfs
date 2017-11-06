@@ -6,8 +6,10 @@
 
 #include <unistd.h>
 
-#include "file_processing/char_buffer.h"
+#include <cstdlib>
+
 #include "hash.h"
+#include "smalloc.h"
 #include "testutil.h"
 
 namespace upload {
@@ -140,12 +142,10 @@ TEST(T_UploadFacility, CallbacksSlow) {
   EXPECT_EQ(0, chunk_upload_complete_callback_calls);
   EXPECT_EQ(0, buffer_upload_complete_callback_calls);
 
-  CharBuffer b1(1024);
-  b1.SetUsedBytes(1000);
-  b1.SetBaseOffset(0);
+  unsigned char b1[1000];
   uploader->ScheduleUpload(
     handle,
-    AbstractUploader::UploadBuffer(b1.used_bytes(), b1.ptr()),
+    AbstractUploader::UploadBuffer(1000, b1),
     AbstractUploader::MakeCallback(&BufferUploadCompleteCallback_T_Callbacks));
 
   sleep(1);
@@ -153,12 +153,10 @@ TEST(T_UploadFacility, CallbacksSlow) {
   EXPECT_EQ(0, chunk_upload_complete_callback_calls);
   EXPECT_EQ(1, buffer_upload_complete_callback_calls);
 
-  CharBuffer b2(1024);
-  b2.SetUsedBytes(1000);
-  b2.SetBaseOffset(1000);
+  unsigned char b2[1000];
   uploader->ScheduleUpload(
     handle,
-    AbstractUploader::UploadBuffer(b2.used_bytes(), b2.ptr()),
+    AbstractUploader::UploadBuffer(1000, b2),
     AbstractUploader::MakeCallback(&BufferUploadCompleteCallback_T_Callbacks));
 
   sleep(1);
@@ -196,16 +194,6 @@ void BufferUploadCompleteCallback_T_Ordering(const UploaderResults &results) {
   overall_size_ordering += UF_MockUploader::last_buffer.size;
 }
 
-// Caveat: 'offset' it automatically updated!
-static CharBuffer *MakeBuffer(const size_t buffer_size, const size_t used_bytes,
-                              size_t *offset) {
-  CharBuffer *buffer = new CharBuffer(buffer_size);
-  assert(buffer != NULL);
-  buffer->SetUsedBytes(used_bytes);
-  buffer->SetBaseOffset(static_cast<off_t>(*offset));
-  *offset += used_bytes;
-  return buffer;
-}
 
 TEST(T_UploadFacility, DataBlockBasicOrdering) {
   UF_MockUploader *uploader = UF_MockUploader::MockConstruct();
@@ -220,26 +208,29 @@ TEST(T_UploadFacility, DataBlockBasicOrdering) {
       AbstractUploader::MakeCallback(&ChunkUploadCompleteCallback_T_Ordering));
   ASSERT_NE(static_cast<void *>(NULL), handle);
 
-  std::vector<CharBuffer *> buffers;
+  std::vector<unsigned> sizes;
+  std::vector<unsigned char *> buffers;
+  sizes.push_back(384);
+  sizes.push_back(1024);
+  sizes.push_back(4096);
+  sizes.push_back(6172);
+  sizes.push_back(128);
+  sizes.push_back(1921);
+  sizes.push_back(9999);
+  sizes.push_back(10);
+  sizes.push_back(128);
+  sizes.push_back(1950);
   size_t overall_size = 0;
-  buffers.push_back(MakeBuffer(1024, 384, &overall_size));
-  buffers.push_back(MakeBuffer(2048, 1024, &overall_size));
-  buffers.push_back(MakeBuffer(4096, 4096, &overall_size));
-  buffers.push_back(MakeBuffer(8192, 6172, &overall_size));
-  buffers.push_back(MakeBuffer(768, 128, &overall_size));
-  buffers.push_back(MakeBuffer(2000, 1921, &overall_size));
-  buffers.push_back(MakeBuffer(9999, 9999, &overall_size));
-  buffers.push_back(MakeBuffer(100, 10, &overall_size));
-  buffers.push_back(MakeBuffer(4096, 128, &overall_size));
-  buffers.push_back(MakeBuffer(4627, 1950, &overall_size));
+  for (unsigned i = 0; i < 10; ++i) {
+    overall_size += sizes[i];
+    buffers.push_back(reinterpret_cast<unsigned char *>(smalloc(sizes[i])));
+  }
   ASSERT_EQ(size_t(25812), overall_size);
 
-  std::vector<CharBuffer *>::const_iterator i = buffers.begin();
-  std::vector<CharBuffer *>::const_iterator iend = buffers.end();
-  for (; i != iend; ++i) {
+  for (unsigned i = 0; i < 10; ++i) {
     uploader->ScheduleUpload(
       handle,
-      AbstractUploader::UploadBuffer((*i)->used_bytes(), (*i)->ptr()),
+      AbstractUploader::UploadBuffer(sizes[i], buffers[i]),
       AbstractUploader::MakeCallback(&BufferUploadCompleteCallback_T_Ordering));
   }
 
@@ -249,6 +240,9 @@ TEST(T_UploadFacility, DataBlockBasicOrdering) {
 
   EXPECT_EQ(overall_size, overall_size_ordering);
   EXPECT_TRUE(ordering_test_done);
+
+  for (unsigned i = 0; i < 10; ++i)
+    free(buffers[i]);
 
   delete uploader;
 }
