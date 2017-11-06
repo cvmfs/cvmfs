@@ -20,6 +20,13 @@ atomic_int64 TaskRead::tag_seq_ = 0;
 
 
 void TaskRead::Process(FileItem *item) {
+  if ((high_watermark_ > 0) && (BlockItem::managed_bytes() > high_watermark_)) {
+    atomic_inc64(&n_block_);
+    do {
+      SafeSleepMs(kBusyWaitMs);
+    } while (BlockItem::managed_bytes() > low_watermark_);
+  }
+
   int fd = -1;
   fd = open(item->path().c_str(), O_RDONLY);
   if (fd < 0) {
@@ -52,7 +59,6 @@ void TaskRead::Process(FileItem *item) {
       abort();
     }
 
-    // TODO(jblomer): block on a maximum number of bytes in flight
     BlockItem *block_item = new BlockItem(tag);
     block_item->SetFileItem(item);
     if (nbytes == 0) {
@@ -67,4 +73,12 @@ void TaskRead::Process(FileItem *item) {
   } while (nbytes > 0);
 
   close(fd);
+}
+
+
+void TaskRead::SetWatermarks(uint64_t low, uint64_t high) {
+  assert(high > low);
+  assert(low > 0);
+  low_watermark_ = low;
+  high_watermark_ = high;
 }

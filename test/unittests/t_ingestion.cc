@@ -238,6 +238,50 @@ TEST_F(T_Ingestion, TaskRead) {
 }
 
 
+TEST_F(T_Ingestion, TaskReadThrottle) {
+  Tube<FileItem> tube_in;
+  Tube<BlockItem> *tube_out = new Tube<BlockItem>();
+  TubeGroup<BlockItem> tube_group_out;
+  tube_group_out.TakeTube(tube_out);
+  tube_group_out.Activate();
+
+  TubeConsumerGroup<FileItem> task_group;
+  TaskRead *task_read = new TaskRead(&tube_in, &tube_group_out);
+  task_read->SetWatermarks(1, 2);
+  task_group.TakeConsumer(task_read);
+  task_group.Spawn();
+  EXPECT_EQ(0U, task_read->n_block());
+
+  string str_abc = "abc";
+  EXPECT_TRUE(SafeWriteToFile(str_abc, "./abc", 0600));
+  FileItem file_abc("./abc");
+  tube_in.Enqueue(&file_abc);
+
+  FileItem file_null("/dev/null");
+  tube_in.Enqueue(&file_null);
+
+  BlockItem *item_data = tube_out->Pop();
+  EXPECT_EQ(BlockItem::kBlockData, item_data->type());
+  BlockItem *item_stop = tube_out->Pop();
+  EXPECT_EQ(BlockItem::kBlockStop, item_stop->type());
+
+  if (task_read->n_block() == 0) {
+    SafeSleepMs(2 * TaskRead::kBusyWaitMs);
+  }
+  EXPECT_EQ(1U, task_read->n_block());
+
+  delete item_data;
+  delete item_stop;
+  unlink("./abc");
+
+  item_stop = tube_out->Pop();
+  EXPECT_EQ(BlockItem::kBlockStop, item_stop->type());
+  delete item_stop;
+
+  task_group.Terminate();
+}
+
+
 TEST_F(T_Ingestion, TaskChunkDispatch) {
   Tube<BlockItem> tube_in;
   Tube<BlockItem> *tube_out = new Tube<BlockItem>();
@@ -438,9 +482,9 @@ TEST_F(T_Ingestion, TaskChunkCornerCases) {
       EXPECT_EQ(chunk_item, b->chunk_item());
       delete b;
     }
-    EXPECT_EQ(file_large.size() / 2, chunk_item->size());
     b_stop = tube_out->Pop();
     EXPECT_EQ(BlockItem::kBlockStop, b_stop->type());
+    EXPECT_EQ(file_large.size() / 2, chunk_item->size());
     delete b_stop;
     delete chunk_item;
   }
