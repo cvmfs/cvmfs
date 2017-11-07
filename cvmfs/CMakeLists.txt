@@ -407,6 +407,7 @@ if(BUILD_RECEIVER)
     util/posix.cc
     util/string.cc
     util/raii_temp_dir.cc
+    util_concurrency.cc
     uuid.cc
     whitelist.cc
     xattr.cc

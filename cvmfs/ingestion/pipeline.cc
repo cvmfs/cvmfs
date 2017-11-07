@@ -11,9 +11,14 @@
 #include "ingestion/task_read.h"
 #include "ingestion/task_register.h"
 #include "ingestion/task_write.h"
+#include "platform.h"
 #include "upload_facility.h"
 #include "upload_spooler_definition.h"
+#include "util_concurrency.h"
 
+
+const double IngestionPipeline::kMemFractionLowWatermark = 0.5;
+const double IngestionPipeline::kMemFractionHighWatermark = 0.75;
 
 IngestionPipeline::IngestionPipeline(
   upload::AbstractUploader *uploader,
@@ -28,8 +33,7 @@ IngestionPipeline::IngestionPipeline(
   , spawned_(false)
   , uploader_(uploader)
 {
-  // TODO(jakob): depends on number of cores
-  unsigned nfork_base = 1;
+  unsigned nfork_base = GetNumberOfCpuCores();
 
   for (unsigned i = 0; i < nfork_base * kNforkRegister; ++i) {
     Tube<FileItem> *tube = new Tube<FileItem>();
@@ -69,6 +73,12 @@ IngestionPipeline::IngestionPipeline(
   tubes_chunk_.Activate();
 
   for (unsigned i = 0; i < nfork_base * kNforkRead; ++i) {
+    TaskRead *task_read = new TaskRead(&tube_input_, &tubes_chunk_);
+    uint64_t low = static_cast<uint64_t>(
+      static_cast<double>(platform_memsize()) * kMemFractionLowWatermark);
+    uint64_t high = static_cast<uint64_t>(
+      static_cast<double>(platform_memsize()) * kMemFractionHighWatermark);
+    task_read->SetWatermarks(low, high);
     tasks_read_.TakeConsumer(new TaskRead(&tube_input_, &tubes_chunk_));
   }
 }
@@ -165,8 +175,7 @@ void TaskScrubbingCallback::Process(BlockItem *block_item) {
 
 
 ScrubbingPipeline::ScrubbingPipeline() : spawned_(false) {
-  // TODO(jakob): depends on number of cores
-  unsigned nfork_base = 1;
+  unsigned nfork_base = GetNumberOfCpuCores();
 
   for (unsigned i = 0; i < nfork_base * kNforkScrubbingCallback; ++i) {
     Tube<BlockItem> *tube = new Tube<BlockItem>();
@@ -193,7 +202,9 @@ ScrubbingPipeline::ScrubbingPipeline() : spawned_(false) {
   tubes_chunk_.Activate();
 
   for (unsigned i = 0; i < nfork_base * kNforkRead; ++i) {
-    tasks_read_.TakeConsumer(new TaskRead(&tube_input_, &tubes_chunk_));
+    TaskRead *task_read = new TaskRead(&tube_input_, &tubes_chunk_);
+    task_read->SetWatermarks(kMemLowWatermark, kMemHighWatermark);
+    tasks_read_.TakeConsumer(task_read);
   }
 }
 
