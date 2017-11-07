@@ -102,7 +102,6 @@ set(CVMFS_UNITTEST_FILES
   t_swissknife_lease.cc
   t_synchronizing_counter.cc
   t_raii_temp_dir.cc
-  t_task.cc
   t_test_utils.cc
   t_tracer.cc
   t_tube.cc
