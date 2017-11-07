@@ -92,12 +92,7 @@ TEST(T_UploadFacility, InitializeAndTearDown) {
   ASSERT_NE(static_cast<UF_MockUploader *>(NULL), uploader);
   EXPECT_TRUE(uploader->initialize_called);
 
-  sleep(1);
-  EXPECT_TRUE(uploader->worker_thread_running);
-
   uploader->TearDown();
-  EXPECT_FALSE(uploader->worker_thread_running);
-
   delete uploader;
 }
 
@@ -127,9 +122,6 @@ TEST(T_UploadFacility, CallbacksSlow) {
   EXPECT_EQ(0, chunk_upload_complete_callback_calls);
   EXPECT_EQ(0, buffer_upload_complete_callback_calls);
   EXPECT_EQ(0, UF_MockStreamHandle::instances);
-
-  sleep(1);
-  EXPECT_TRUE(uploader->worker_thread_running);
 
   UploadStreamHandle *handle = uploader->InitStreamedUpload(
       AbstractUploader::MakeCallback(&ChunkUploadCompleteCallback_T_Callbacks));
@@ -200,9 +192,6 @@ TEST(T_UploadFacility, DataBlockBasicOrdering) {
 
   ASSERT_NE(static_cast<UF_MockUploader *>(NULL), uploader);
   EXPECT_TRUE(uploader->initialize_called);
-
-  sleep(1);
-  EXPECT_TRUE(uploader->worker_thread_running);
 
   UploadStreamHandle *handle = uploader->InitStreamedUpload(
       AbstractUploader::MakeCallback(&ChunkUploadCompleteCallback_T_Ordering));

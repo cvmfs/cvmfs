@@ -16,6 +16,7 @@
 #include <string>
 #include <vector>
 
+#include "atomic.h"
 #include "catalog_mgr.h"
 #include "directory_entry.h"
 #include "hash.h"
@@ -127,9 +128,7 @@ class AbstractMockUploader : public upload::AbstractUploader {
   explicit AbstractMockUploader(
     const upload::SpoolerDefinition &spooler_definition)
     : AbstractUploader(spooler_definition)
-  {
-    worker_thread_running = false;
-  }
+  { }
 
   static DerivedT* MockConstruct() {
     PolymorphicConstructionUnittestAdapter::RegisterPlugin<
@@ -144,14 +143,6 @@ class AbstractMockUploader : public upload::AbstractUploader {
 
   static bool WillHandle(const upload::SpoolerDefinition &spooler_definition) {
     return spooler_definition.driver_type == upload::SpoolerDefinition::Mock;
-  }
-
-  void WorkerThread() {
-    worker_thread_running = true;
-
-    AbstractUploader::WorkerThread();
-
-    worker_thread_running = false;
   }
 
   virtual void FileUpload(const std::string  &local_path,
@@ -197,9 +188,6 @@ class AbstractMockUploader : public upload::AbstractUploader {
   virtual unsigned int GetNumberOfErrors() const {
     assert(AbstractMockUploader::not_implemented);
   }
-
- public:
-  tbb::atomic<bool> worker_thread_running;
 };
 
 template <class DerivedT>

@@ -86,6 +86,7 @@ class TubeConsumerGroup : SingleCopy {
   }
 
   void Terminate() {
+    assert(is_active_);
     unsigned N = consumers_.size();
     for (unsigned i = 0; i < N; ++i) {
       consumers_[i]->tube_->Enqueue(ItemT::CreateQuitBeacon());
@@ -94,7 +95,10 @@ class TubeConsumerGroup : SingleCopy {
       int retval = pthread_join(threads_[i], NULL);
       assert(retval == 0);
     }
+    is_active_ = false;
   }
+
+  bool is_active() { return is_active_; }
 
  private:
   bool is_active_;

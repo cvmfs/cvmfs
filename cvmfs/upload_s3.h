@@ -5,10 +5,13 @@
 #ifndef CVMFS_UPLOAD_S3_H_
 #define CVMFS_UPLOAD_S3_H_
 
+#include <pthread.h>
+
 #include <string>
 #include <utility>
 #include <vector>
 
+#include "atomic.h"
 #include "s3fanout.h"
 #include "upload_facility.h"
 
@@ -65,10 +68,9 @@ class S3Uploader : public AbstractUploader {
    */
   unsigned int GetNumberOfErrors() const;
 
- protected:
-  void WorkerThread();
-
  private:
+  static void *MainCollectResults(void *data);
+
   bool ParseSpoolerDefinition(const SpoolerDefinition &spooler_definition);
   bool UploadJobInfo(s3fanout::JobInfo *info);
 
@@ -90,8 +92,12 @@ class S3Uploader : public AbstractUploader {
   std::vector<std::pair<std::string, std::string> > keys_;
 
   const std::string temporary_path_;
-  mutable atomic_int32 copy_errors_;  // counts the number of occured
-                                      // errors in Upload()
+  mutable atomic_int32 copy_errors_;
+  /**
+   * Signals the CollectResults thread to quit
+   */
+  atomic_int32 terminate_;
+  pthread_t thread_collect_results_;
 };
 
 }  // namespace upload
