@@ -11,7 +11,6 @@
 #include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/un.h>
-#include <tbb/tbb_thread.h>
 #include <unistd.h>
 
 #include <cstring>
@@ -29,23 +28,6 @@
 #include "util/string.h"
 
 using namespace std;  // NOLINT
-
-class ThreadDummy {
- public:
-  explicit ThreadDummy(int canary_value)
-    : result_value(0)
-    , value_(canary_value)
-  { }
-
-  void OtherThread() {
-    result_value = value_;
-  }
-
-  int result_value;
-
- private:
-  const int value_;
-};
 
 
 class T_Util : public ::testing::Test {
@@ -83,11 +65,6 @@ class T_Util : public ::testing::Test {
   }
 
  protected:
-  static void WriteBuffer(int fd, const string &text) {
-    int size = text.length();
-    EXPECT_EQ(size, write(fd, text.c_str(), size));
-  }
-
   static string GetDebugger() {
     // check if we have a GDB installed
     const std::string gdb = GetExecutablePath("gdb");
@@ -106,10 +83,6 @@ class T_Util : public ::testing::Test {
     fprintf(myfile, "%s", content.c_str());
     fclose(myfile);
     return complete_path;
-  }
-
-  static void LockFileTest(const string &filename, int *retval) {
-    *retval = LockFile(filename);
   }
 
   static string GetTimeString(time_t seconds, const bool utc) {
@@ -153,19 +126,6 @@ class T_Util : public ::testing::Test {
   std::string to_write_large;
 };
 
-
-
-TEST_F(T_Util, ThreadProxy) {
-  const int canary = 1337;
-
-  ThreadDummy dummy(canary);
-  tbb::tbb_thread thread(&ThreadProxy<ThreadDummy>,
-                         &dummy,
-                         &ThreadDummy::OtherThread);
-  thread.join();
-
-  EXPECT_EQ(canary, dummy.result_value);
-}
 
 TEST_F(T_Util, GetUidOf) {
   uid_t uid;
@@ -490,16 +450,19 @@ TEST_F(T_Util, ReadPipe) {
   ClosePipe(fd);
 }
 
+
+
 TEST_F(T_Util, ReadHalfPipe) {
   int fd[2];
   void *buffer_output = scalloc(20, sizeof(char));
   MakePipe(fd);
 
-  tbb::tbb_thread writer(WriteBuffer, fd[1], to_write);
+  int size = to_write.length();
+  EXPECT_EQ(size, write(fd[1], to_write.data(), size));
   ReadHalfPipe(fd[0], buffer_output, to_write.length());
-  writer.join();
 
-  EXPECT_STREQ(to_write.c_str(), static_cast<const char*>(buffer_output));
+  EXPECT_EQ(0,
+    memcmp(const_cast<char *>(to_write.data()), buffer_output, size));
   ASSERT_DEATH(ReadHalfPipe(-1, buffer_output, to_write.length()), ".*");
   free(buffer_output);
   ClosePipe(fd);
@@ -867,6 +830,14 @@ TEST_F(T_Util, WritePidFile) {
   UnlockFile(fd);
 }
 
+namespace {
+int g_test_lock_file_retval = -42;
+static void *MainTestLockFile(void *data) {
+  const char *path = reinterpret_cast<char *>(data);
+  g_test_lock_file_retval = LockFile(path);
+  return NULL;
+}
+}  // anonymous namespace
 
 TEST_F(T_Util, LockFile) {
   string filename = sandbox + "/lockfile.txt";
@@ -876,14 +847,17 @@ TEST_F(T_Util, LockFile) {
   EXPECT_EQ(-1, LockFile("/fakepath/fakefile.txt"));
   EXPECT_LE(0, fd = LockFile(filename));
 
-  tbb::tbb_thread thread(LockFileTest, filename, &retval);
+  pthread_t thread_lock;
+  retval = pthread_create(&thread_lock, NULL, MainTestLockFile,
+                          const_cast<char *>(filename.c_str()));
+  assert(retval == 0);
   SafeSleepMs(100);
   close(fd);  // releases the lock
-  thread.join();
-  close(retval);
+  pthread_join(thread_lock, NULL);
+  close(g_test_lock_file_retval);
 
-  EXPECT_LE(0, retval);
-  EXPECT_NE(fd, retval);
+  EXPECT_LE(0, g_test_lock_file_retval);
+  EXPECT_NE(fd, g_test_lock_file_retval);
 }
 
 TEST_F(T_Util, UnlockFile) {
