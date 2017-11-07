@@ -21,7 +21,6 @@ set(CVMFS_UNITTEST_FILES
   ../common/testutil.cc
   ../common/catalog_test_tools.cc
 
-  t_async_reader.cc
   t_atomic.cc
   t_authz_fetch.cc
   t_authz_session.cc
@@ -29,7 +28,6 @@ set(CVMFS_UNITTEST_FILES
   t_base64.cc
   t_bigvector.cc
   t_blocking_counter.cc
-  t_buffer.cc
   t_cache.cc
   t_cache_extern.cc
   t_cache_ram.cc
@@ -55,7 +53,6 @@ set(CVMFS_UNITTEST_FILES
   t_fetch.cc
   t_file_chunk.cc
   t_file_guard.cc
-  t_file_processing.cc
   t_file_sandbox.cc
   t_fs_traversal.cc
   t_fuse_evict.cc
@@ -156,13 +153,6 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/encrypt.cc
   ${CVMFS_SOURCE_DIR}/fetch.cc
   ${CVMFS_SOURCE_DIR}/file_chunk.cc
-  ${CVMFS_SOURCE_DIR}/file_processing/async_reader.cc
-  ${CVMFS_SOURCE_DIR}/file_processing/chunk.cc
-  ${CVMFS_SOURCE_DIR}/file_processing/chunk_detector.cc
-  ${CVMFS_SOURCE_DIR}/file_processing/file.cc
-  ${CVMFS_SOURCE_DIR}/file_processing/file_processor.cc
-  ${CVMFS_SOURCE_DIR}/file_processing/io_dispatcher.cc
-  ${CVMFS_SOURCE_DIR}/file_processing/processor.cc
   ${CVMFS_SOURCE_DIR}/fuse_evict.cc
   ${CVMFS_SOURCE_DIR}/gateway_util.cc
   ${CVMFS_SOURCE_DIR}/globals.cc

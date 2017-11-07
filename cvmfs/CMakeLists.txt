@@ -174,13 +174,6 @@ set (CVMFS_SWISSKNIFE_SOURCES
   dns.cc
   download.cc
   file_chunk.cc
-  file_processing/async_reader.cc
-  file_processing/chunk.cc
-  file_processing/chunk_detector.cc
-  file_processing/file.cc
-  file_processing/file_processor.cc
-  file_processing/io_dispatcher.cc
-  file_processing/processor.cc
   gateway_util.cc
   globals.cc
   hash.cc
@@ -274,18 +267,20 @@ set (CVMFS_PRELOADER_SOURCES
   compression.cc
   dns.cc
   download.cc
-  file_processing/async_reader.cc
-  file_processing/chunk.cc
-  file_processing/chunk_detector.cc
-  file_processing/file.cc
-  file_processing/file_processor.cc
-  file_processing/io_dispatcher.cc
-  file_processing/processor.cc
   gateway_util.cc
   globals.cc
   hash.cc
   history_sql.cc
   history_sqlite.cc
+  ingestion/chunk_detector.cc
+  ingestion/item.cc
+  ingestion/pipeline.cc
+  ingestion/task_chunk.cc
+  ingestion/task_compress.cc
+  ingestion/task_hash.cc
+  ingestion/task_read.cc
+  ingestion/task_register.cc
+  ingestion/task_write.cc
   json_document.cc
   logging.cc
   malloc_arena.cc
@@ -370,13 +365,6 @@ if(BUILD_RECEIVER)
     dns.cc
     download.cc
     encrypt.cc
-    file_processing/async_reader.cc
-    file_processing/chunk.cc
-    file_processing/chunk_detector.cc
-    file_processing/file.cc
-    file_processing/file_processor.cc
-    file_processing/io_dispatcher.cc
-    file_processing/processor.cc
     gateway_util.cc
     globals.cc
     hash.cc
