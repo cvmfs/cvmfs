@@ -20,6 +20,7 @@ namespace upload {
  *      to define a local spooler with upstream path /srv/cvmfs/dev.cern.ch
  */
 struct SpoolerDefinition {
+  static const unsigned kDefaultMaxConcurrentUploads = 512;
   enum DriverType { S3, Local, Gateway, Mock, Unknown };
 
   /**
@@ -73,7 +74,6 @@ struct SpoolerDefinition {
   size_t avg_file_chunk_size;
   size_t max_file_chunk_size;
 
-  const unsigned int number_of_threads;
   unsigned int number_of_concurrent_uploads;
 
   // The session_token_file parameter is only used for the HTTP driver

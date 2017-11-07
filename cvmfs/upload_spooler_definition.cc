@@ -4,7 +4,6 @@
 
 #include "upload_spooler_definition.h"
 
-#include <tbb/task_scheduler_init.h>
 #include <vector>
 
 #include "logging.h"
@@ -31,8 +30,7 @@ SpoolerDefinition::SpoolerDefinition(
       min_file_chunk_size(min_file_chunk_size),
       avg_file_chunk_size(avg_file_chunk_size),
       max_file_chunk_size(max_file_chunk_size),
-      number_of_threads(tbb::task_scheduler_init::default_num_threads()),
-      number_of_concurrent_uploads(number_of_threads * 100),
+      number_of_concurrent_uploads(kDefaultMaxConcurrentUploads),
       session_token_file(session_token_file),
       key_file(key_file),
       valid_(false) {
