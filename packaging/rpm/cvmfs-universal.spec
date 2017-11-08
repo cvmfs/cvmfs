@@ -187,7 +187,6 @@ CernVM-FS tools to maintain Stratum 0/1 repositories
 %package unittests
 Summary: CernVM-FS unit tests binary
 Group: Application/System
-Requires: cvmfs-server = %{version}
 %description unittests
 CernVM-FS unit tests binary.  This RPM is not required except for testing.
 
@@ -456,14 +455,6 @@ fi
 %{_bindir}/cvmfs_rsync
 %{_bindir}/cvmfs_stratum_agent
 %{_sysconfdir}/cvmfs/cvmfs_server_hooks.sh.demo
-%{_libdir}/libtbb_cvmfs.so
-%{_libdir}/libtbb_cvmfs.so.2
-%{_libdir}/libtbbmalloc_cvmfs.so
-%{_libdir}/libtbbmalloc_cvmfs.so.2
-%{_libdir}/libtbb_cvmfs_debug.so
-%{_libdir}/libtbb_cvmfs_debug.so.2
-%{_libdir}/libtbbmalloc_cvmfs_debug.so
-%{_libdir}/libtbbmalloc_cvmfs_debug.so.2
 %dir %{_sysconfdir}/cvmfs/repositories.d
 /var/www/wsgi-scripts/cvmfs-server/cvmfs-api.wsgi
 /usr/share/cvmfs-server/
