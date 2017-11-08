@@ -32,7 +32,6 @@
 template <class ItemT>
 class Tube : SingleCopy {
  public:
-
   class Link : SingleCopy {
     friend class Tube<ItemT>;
    public:
