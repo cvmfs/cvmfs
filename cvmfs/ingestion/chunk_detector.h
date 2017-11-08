@@ -8,6 +8,8 @@
 #include <gtest/gtest_prod.h>
 #include <stdint.h>
 
+#include <cstdlib>
+
 #include <algorithm>
 
 class BlockItem;
@@ -116,7 +118,7 @@ class Xor32Detector : public ChunkDetector {
   }
 
   inline bool CheckThreshold() {
-    return std::abs(static_cast<int32_t>(xor32_) - kMagicNumber) < threshold_;
+    return abs(static_cast<int32_t>(xor32_) - kMagicNumber) < threshold_;
   }
 
  private:
