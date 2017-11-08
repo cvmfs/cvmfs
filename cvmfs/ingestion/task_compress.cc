@@ -43,7 +43,7 @@ void TaskCompress::Process(BlockItem *input_block) {
   do {
     unsigned char *output_data = output_block->data() + output_block->size();
     assert(!output_block->IsFull());
-    uint64_t remaining_in_output =
+    size_t remaining_in_output =
       output_block->capacity() - output_block->size();
 
     done = compressor->Deflate(flush,
