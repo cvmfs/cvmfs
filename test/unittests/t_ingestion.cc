@@ -304,7 +304,7 @@ TEST_F(T_Ingestion, TaskChunkDispatch) {
   BlockItem *item_stop = tube_out->Pop();
   EXPECT_EQ(0U, tube_out->size());
   EXPECT_EQ(BlockItem::kBlockStop, item_stop->type());
-  EXPECT_GE(2 << 28, item_stop->tag());
+  EXPECT_GE(item_stop->tag(), 2 << 28);
   EXPECT_EQ(&file_null, item_stop->file_item());
   EXPECT_EQ(&file_null, item_stop->chunk_item()->file_item());
   EXPECT_EQ(0U, item_stop->chunk_item()->size());
