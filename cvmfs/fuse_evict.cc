@@ -60,7 +60,10 @@ bool FuseInvalidator::HasFuseNotifyInval() {
    * that doesn't support active invalidation?  How old does the kernel need
    * to be?  Probably that situation is never triggered in practice.
    */
-  return FUSE_VERSION >= 29;
+  // Invalidation of entries can silently remove mount points on top of cvmfs.
+  // Turning active evition off for the time being.
+  // return FUSE_VERSION >= 29;
+  return false;
 }
 
 
