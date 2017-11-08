@@ -587,6 +587,30 @@ void *TalkManager::MainResponder(void *data) {
           (*i)->so_version + ")\n";
       }
       talk_mgr->Answer(con_fd, history_str);
+    } else if (line == "vfs inodes") {
+      string result;
+      glue::InodeTracker::Cursor cursor(
+        mount_point->inode_tracker()->BeginEnumerate());
+      uint64_t inode;
+      while (mount_point->inode_tracker()->NextInode(&cursor, &inode)) {
+        result += StringifyInt(inode) + "\n";
+      }
+      mount_point->inode_tracker()->EndEnumerate(&cursor);
+      talk_mgr->Answer(con_fd, result);
+    } else if (line == "vfs entries") {
+      string result;
+      glue::InodeTracker::Cursor cursor(
+        mount_point->inode_tracker()->BeginEnumerate());
+      uint64_t inode_parent;
+      NameString name;
+      while (mount_point->inode_tracker()->NextEntry(
+        &cursor, &inode_parent, &name))
+      {
+        result += "<" + StringifyInt(inode_parent) + ">/" + name.ToString() +
+                  "\n";
+      }
+      mount_point->inode_tracker()->EndEnumerate(&cursor);
+      talk_mgr->Answer(con_fd, result);
     } else if (line == "version") {
       string version_str = string(VERSION) + " (CernVM-FS Fuse Module)\n" +
         cvmfs::loader_exports_->loader_version + " (Loader)\n";

@@ -13,11 +13,11 @@ extern "C" {
 // Empty structs have different sizes in C and C++, hence the dummy int
 struct fuse_chan { int dummy; };
 // Defined in t_fuse_evict.cc
-extern unsigned fuse_lowlevel_notify_inval_entry_cnt;
-static int __attribute__((used)) fuse_lowlevel_notify_inval_entry(
-  void *, unsigned long, const char *, size_t)  // NOLINT (ulong from fuse)
+extern unsigned fuse_lowlevel_notify_inval_inode_cnt;
+static int __attribute__((used)) fuse_lowlevel_notify_inval_inode(
+  void *, fuse_ino_t, off_t, off_t)  // NOLINT (ulong from fuse)
 {
-  fuse_lowlevel_notify_inval_entry_cnt++;
+  fuse_lowlevel_notify_inval_inode_cnt++;
   return -1;
 }
 }
