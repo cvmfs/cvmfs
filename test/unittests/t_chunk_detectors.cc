@@ -218,7 +218,7 @@ TEST_F(T_ChunkDetectors, Xor32ChunkDetectorSlow) {
     97723756,  98618891,  99707336,  101755336, 103405168, 104269441
   };
 
-  std::vector<uint64_t> buffer_sizes;
+  std::vector<size_t> buffer_sizes;
   buffer_sizes.push_back(102400);    // 100kB
   buffer_sizes.push_back(base);      // same as minimal chunk size
   buffer_sizes.push_back(base * 2);  // same as average chunk size
