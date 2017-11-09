@@ -32,6 +32,11 @@ static int __attribute__((used)) fuse_lowlevel_notify_inval_entry(
 {
   abort();
 }
+static int __attribute__((used)) fuse_lowlevel_notify_inval_inode(
+  void *, fuse_ino_t, off_t, off_t)  // NOLINT
+{
+  abort();
+}
 }
 #endif
 #endif
