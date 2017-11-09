@@ -148,7 +148,7 @@ void *FuseInvalidator::MainInvalidator(void *data) {
       // Can fail, e.g. the inode might be already evicted
       fuse_lowlevel_notify_inval_inode(
         *invalidator->fuse_channel_, inode, 0, 0);
-      LogCvmfs(kLogCvmfs, kLogDebug, "evicting inode %"PRIu64, inode);
+      LogCvmfs(kLogCvmfs, kLogDebug, "evicting inode %" PRIu64, inode);
 
       if ((++i % kCheckTimeoutFreqOps) == 0) {
         if (platform_monotonic_time() >= deadline) {
