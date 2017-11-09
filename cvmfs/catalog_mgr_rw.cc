@@ -1134,9 +1134,8 @@ WritableCatalogManager::SnapshotCatalogsSerialized(
       PrintError("could not compress catalog " + (*i)->mountpoint().ToString());
       assert(false);
     }
-    spooler_->ProcessCatalog((*i)->database_path());
 
-    uint64_t catalog_size = GetFileSize((*i)->database_path());
+    int64_t catalog_size = GetFileSize((*i)->database_path());
     assert(catalog_size > 0);
 
     if ((*i)->HasParent()) {
@@ -1153,6 +1152,8 @@ WritableCatalogManager::SnapshotCatalogsSerialized(
     } else {
       assert(false && "inconsistent state detected");
     }
+
+    spooler_->ProcessCatalog((*i)->database_path());
   }
   spooler_->WaitForUpload();
 

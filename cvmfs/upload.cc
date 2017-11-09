@@ -109,8 +109,8 @@ void Spooler::UploadingCallback(const UploaderResults &data) {
 }
 
 void Spooler::WaitForUpload() const {
-  uploader_->WaitForUpload();
   ingestion_pipeline_->WaitFor();
+  uploader_->WaitForUpload();
 }
 
 void Spooler::FinalizeSession(bool commit, const std::string &old_root_hash,
