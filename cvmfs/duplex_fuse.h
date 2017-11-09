@@ -15,7 +15,7 @@ struct fuse_chan { int dummy; };
 // Defined in t_fuse_evict.cc
 extern unsigned fuse_lowlevel_notify_inval_inode_cnt;
 static int __attribute__((used)) fuse_lowlevel_notify_inval_inode(
-  void *, fuse_ino_t, off_t, off_t)  // NOLINT (ulong from fuse)
+  void *, unsigned /*fuse_ino_t*/, off_t, off_t)  // NOLINT (ulong from fuse)
 {
   fuse_lowlevel_notify_inval_inode_cnt++;
   return -1;
