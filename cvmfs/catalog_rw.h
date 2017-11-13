@@ -77,6 +77,7 @@ class WritableCatalog : public Catalog {
   // Creation and removal of catalogs
   void Partition(WritableCatalog *new_nested_catalog);
   void MergeIntoParent();
+  void RemoveFromParent();
 
   // Nested catalog references
   void InsertNestedCatalog(const std::string &mountpoint,

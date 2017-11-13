@@ -109,7 +109,8 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportRemoval(
 
   if (entry.IsDirectory()) {
     if (entry.IsNestedCatalogMountpoint()) {
-      output_catalog_mgr_->RemoveNestedCatalog(std::string(rel_path.c_str()));
+      output_catalog_mgr_->RemoveNestedCatalog(std::string(rel_path.c_str()),
+                                               false);
     }
     output_catalog_mgr_->RemoveDirectory(rel_path.c_str());
   } else if (entry.IsRegular() || entry.IsLink()) {
