@@ -88,7 +88,7 @@ FuseInvalidator::~FuseInvalidator() {
 }
 
 
-void FuseInvalidator::InvalidateDentries(Handle *handle) {
+void FuseInvalidator::InvalidateInodes(Handle *handle) {
   assert(handle != NULL);
   char c = 'I';
   WritePipe(pipe_ctrl_[1], &c, 1);
@@ -130,30 +130,25 @@ void *FuseInvalidator::MainInvalidator(void *data) {
 
     // We must not hold a lock when calling fuse_lowlevel_notify_inval_entry.
     // Therefore, we first copy all the inodes into a temporary data structure.
-    EvictableObject evictable_object;
     glue::InodeTracker::Cursor cursor(
       invalidator->inode_tracker_->BeginEnumerate());
-    while (invalidator->inode_tracker_->Next(
-             &cursor, &evictable_object.inode, &evictable_object.name))
+    uint64_t inode;
+    while (invalidator->inode_tracker_->NextInode(&cursor, &inode))
     {
-      invalidator->evict_list_.PushBack(evictable_object);
+      invalidator->evict_list_.PushBack(inode);
     }
     invalidator->inode_tracker_->EndEnumerate(&cursor);
 
     unsigned i = 0;
     unsigned N = invalidator->evict_list_.size();
     while (i < N) {
-      evictable_object = invalidator->evict_list_.At(i);
-      if (evictable_object.inode == 0)
-        evictable_object.inode = FUSE_ROOT_ID;
-      // Can return non-zero value if parent entry was already evicted
-      fuse_lowlevel_notify_inval_entry(
-        *invalidator->fuse_channel_,
-        evictable_object.inode,
-        evictable_object.name.GetChars(),
-        evictable_object.name.GetLength());
-      LogCvmfs(kLogCvmfs, kLogDebug, "evicting <%" PRIu64 ">/%s",
-               evictable_object.inode, evictable_object.name.c_str());
+      uint64_t inode = invalidator->evict_list_.At(i);
+      if (inode == 0)
+        inode = FUSE_ROOT_ID;
+      // Can fail, e.g. the inode might be already evicted
+      fuse_lowlevel_notify_inval_inode(
+        *invalidator->fuse_channel_, inode, 0, 0);
+      LogCvmfs(kLogCvmfs, kLogDebug, "evicting inode %" PRIu64, inode);
 
       if ((++i % kCheckTimeoutFreqOps) == 0) {
         if (platform_monotonic_time() >= deadline) {

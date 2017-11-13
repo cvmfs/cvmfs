@@ -394,6 +394,14 @@ class InodeMap {
 
 class InodeReferences {
  public:
+  /**
+   * Used to enumerate all inodes
+   */
+  struct Cursor {
+    Cursor() : idx(0) { }
+    uint32_t idx;
+  };
+
   InodeReferences() {
     map_.Init(16, 0, hasher_inode);
   }
@@ -425,6 +433,24 @@ class InodeReferences {
     map_.Clear();
   }
 
+  Cursor BeginEnumerate() {
+    return Cursor();
+  }
+
+  bool Next(Cursor *cursor, uint64_t *inode) {
+    uint64_t empty_key = map_.empty_key();
+    while (cursor->idx < map_.capacity()) {
+      if (map_.keys()[cursor->idx] == empty_key) {
+        cursor->idx++;
+        continue;
+      }
+      *inode = map_.keys()[cursor->idx];
+      cursor->idx++;
+      return true;
+    }
+    return false;
+  }
+
  private:
   SmallHashDynamic<uint64_t, uint32_t> map_;
 };
@@ -442,8 +468,14 @@ class InodeTracker {
    * Used to actively evict all known paths from kernel caches
    */
   struct Cursor {
-    explicit Cursor(const PathStore::Cursor &c) : csr_paths(c) { }
+    explicit Cursor(
+      const PathStore::Cursor &p,
+      const InodeReferences::Cursor &i)
+      : csr_paths(p)
+      , csr_inos(i)
+    { }
     PathStore::Cursor csr_paths;
+    InodeReferences::Cursor csr_inos;
   };
 
   // Cannot be moved to the statistics manager because it has to survive
@@ -540,10 +572,11 @@ class InodeTracker {
 
   Cursor BeginEnumerate() {
     Lock();
-    return Cursor(path_map_.path_store()->BeginEnumerate());
+    return Cursor(path_map_.path_store()->BeginEnumerate(),
+                  inode_references_.BeginEnumerate());
   }
 
-  bool Next(Cursor *cursor, uint64_t *inode_parent, NameString *name) {
+  bool NextEntry(Cursor *cursor, uint64_t *inode_parent, NameString *name) {
     shash::Md5 parent_md5;
     StringRef name_ref;
     bool result = path_map_.path_store()->Next(
@@ -556,6 +589,10 @@ class InodeTracker {
       *inode_parent = path_map_.LookupInodeByMd5Path(parent_md5);
     name->Assign(name_ref.data(), name_ref.length());
     return true;
+  }
+
+  bool NextInode(Cursor *cursor, uint64_t *inode) {
+    return inode_references_.Next(&(cursor->csr_inos), inode);
   }
 
   void EndEnumerate(Cursor *cursor) {
