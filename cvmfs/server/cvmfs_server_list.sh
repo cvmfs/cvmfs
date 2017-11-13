@@ -21,6 +21,7 @@ cvmfs_server_list() {
       continue
     fi
     local name=$(basename $repository)
+    ! echo "$name" | grep -q : || continue  # skip portals
     load_repo_config $name
 
     # figure out the schema version of the repository
