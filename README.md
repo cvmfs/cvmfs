@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/cvmfs/cvmfs.svg?branch=devel)](https://travis-ci.org/cvmfs/cvmfs) [![Documentation Status](https://readthedocs.org/projects/cvmfs/badge/?version=latest)](http://cvmfs.readthedocs.org/en/latest/?badge=master) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.1010442.svg)](https://doi.org/10.5281/zenodo.1010442)
+[![Build Status](https://travis-ci.org/cvmfs/cvmfs.svg?branch=devel)](https://travis-ci.org/cvmfs/cvmfs) [![Documentation Status](https://readthedocs.org/projects/cvmfs/badge/?version=latest)](http://cvmfs.readthedocs.org/en/latest/?badge=master) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.1010441.svg)](https://doi.org/10.5281/zenodo.1010441)
 
 The CernVM-File System (CernVM-FS) provides a scalable, reliable and low-
 maintenance software distribution service. It was developed to assist High

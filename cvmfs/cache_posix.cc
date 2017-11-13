@@ -67,6 +67,9 @@
 #ifndef NFS_SUPER_MAGIC
 #define NFS_SUPER_MAGIC 0x6969
 #endif
+#ifndef BEEGFS_SUPER_MAGIC
+#define BEEGFS_SUPER_MAGIC 0x19830326
+#endif
 
 using namespace std;  // NOLINT
 
@@ -234,13 +237,13 @@ int PosixCacheManager::CommitTxn(void *txn) {
 PosixCacheManager *PosixCacheManager::Create(
   const string &cache_path,
   const bool alien_cache,
-  const bool workaround_rename)
+  const RenameWorkarounds rename_workaround)
 {
   UniquePtr<PosixCacheManager> cache_manager(
     new PosixCacheManager(cache_path, alien_cache));
   assert(cache_manager.IsValid());
 
-  cache_manager->workaround_rename_ = workaround_rename;
+  cache_manager->rename_workaround_ = rename_workaround;
   if (cache_manager->alien_cache_) {
     if (!MakeCacheDirectories(cache_path, 0770)) {
       return NULL;
@@ -248,12 +251,20 @@ PosixCacheManager *PosixCacheManager::Create(
     LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
              "Cache directory structure created.");
     struct statfs cache_buf;
-    if ((statfs(cache_path.c_str(), &cache_buf) == 0) &&
-        (cache_buf.f_type == NFS_SUPER_MAGIC))
-    {
-      cache_manager->workaround_rename_ = true;
-      LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
-             "Alien cache is on NFS.");
+    int retval = statfs(cache_path.c_str(), &cache_buf);
+    if (retval == 0) {
+      switch (cache_buf.f_type) {
+        case NFS_SUPER_MAGIC:
+          cache_manager->rename_workaround_ = kRenameLink;
+          LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
+               "Alien cache is on NFS.");
+          break;
+        case BEEGFS_SUPER_MAGIC:
+          cache_manager->rename_workaround_ = kRenameSamedir;
+          LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
+               "Alien cache is on BeeGFS.");
+          break;
+      }
     }
   } else {
     if (!MakeCacheDirectories(cache_path, 0700))
@@ -397,7 +408,7 @@ int64_t PosixCacheManager::Pread(
 
 int PosixCacheManager::Rename(const char *oldpath, const char *newpath) {
   int result;
-  if (workaround_rename_ == false) {
+  if (rename_workaround_ != kRenameLink) {
     result = rename(oldpath, newpath);
     if (result < 0)
       return -errno;
@@ -478,12 +489,23 @@ int PosixCacheManager::StartTxn(
     }
   }
 
-  Transaction *transaction = new (txn) Transaction(id, GetPathInCache(id));
-  const unsigned temp_path_len = txn_template_path_.length();
+  string path_in_cache = GetPathInCache(id);
+  Transaction *transaction = new (txn) Transaction(id, path_in_cache);
 
-  char template_path[temp_path_len + 1];
-  memcpy(template_path, &txn_template_path_[0], temp_path_len);
+  char *template_path = NULL;
+  unsigned temp_path_len = 0;
+  if (rename_workaround_ == kRenameSamedir) {
+    temp_path_len = path_in_cache.length() + 6;
+    template_path = reinterpret_cast<char *>(alloca(temp_path_len + 1));
+    memcpy(template_path, path_in_cache.data(), path_in_cache.length());
+    memset(template_path + path_in_cache.length(), 'X', 6);
+  } else {
+    temp_path_len = txn_template_path_.length();
+    template_path = reinterpret_cast<char *>(alloca(temp_path_len + 1));
+    memcpy(template_path, &txn_template_path_[0], temp_path_len);
+  }
   template_path[temp_path_len] = '\0';
+
   transaction->fd = mkstemp(template_path);
   if (transaction->fd == -1) {
     transaction->~Transaction();
