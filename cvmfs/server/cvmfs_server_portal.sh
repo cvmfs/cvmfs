@@ -95,7 +95,7 @@ __portal_add() {
   # sanity checks
   # TODO(jblomer): sanitize portal name
   __portal_exists $reponame $portalname && \
-    { echo "Portal $reponame:$portalname exists already" >&2; return 1; } || true
+    { echo "Portal $reponame:$portalname already exists" >&2; return 1; } || true
   __portal_check_system_requirements || return 1
   is_root || { echo "Only root can add a portal" >&2; return 1; }
   check_apache || { echo "Apache must be installed and running" >&2; return 1; }

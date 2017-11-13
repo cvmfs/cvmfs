@@ -68,7 +68,7 @@ else # RedHat based
 fi
 
 SERVICE_BIN="false"
-if ! $PIDOF_BIN systemd /lib/systemd/systemd > /dev/null 2>&1 || [ $(minpidof systemd /lib/systemd/systemd) -ne 1 ]; then
+if ! runs_systemd; then
   if cvmfs_sys_file_is_executable /sbin/service ; then
     SERVICE_BIN="/sbin/service"
   elif cvmfs_sys_file_is_executable /usr/sbin/service ; then

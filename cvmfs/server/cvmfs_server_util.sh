@@ -780,6 +780,17 @@ minpidof() {
 }
 
 
+runs_systemd() {
+  $PIDOF_BIN systemd /lib/systemd/systemd > /dev/null 2>&1 && \
+    [ $(minpidof systemd /lib/systemd/systemd) -eq 1 ] &&
+      return 0
+  [ -L /sbin/init -a "x$(basename $(readlink /sbin/init))" = "xsystemd" ] \
+    && return 0
+  return 1
+}
+
+
+# A quick check after runs_systemd() has been executed in the coda
 is_systemd() {
   [ x"$SERVICE_BIN" = x"false" ]
 }
