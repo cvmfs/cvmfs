@@ -1,5 +1,6 @@
 2.4.3:
-  * Work around for alien cache on BeeGFS (CVM-1403)
+  * Invalidate inodes instead of dentries on reload/remount (CVM-1423)
+  * Workaround for alien cache on BeeGFS (CVM-1403)
 
 2.4.2:
   * Skip external files during garbage collection (CVM-1396)
