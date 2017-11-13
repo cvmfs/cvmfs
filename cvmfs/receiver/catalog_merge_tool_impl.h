@@ -9,6 +9,7 @@
 
 #include "catalog.h"
 #include "hash.h"
+#include "lease_path_util.h"
 #include "logging.h"
 #include "manifest.h"
 #include "options.h"
@@ -53,14 +54,6 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::Run(
 
   bool ret = CatalogDiffTool<RoCatalogMgr>::Run(PathString(""));
 
-  ret &= !invalid_path_encountered_;
-
-  if (invalid_path_encountered_) {
-    LogCvmfs(
-        kLogReceiver, kLogSyslogErr,
-        "CatalogMergeTool - Invalid path encountered for current lease path");
-  }
-
   ret &= CreateNewManifest(new_manifest_path);
 
   output_catalog_mgr_.Destroy();
@@ -74,12 +67,14 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportAddition(
     const XattrList& xattrs) {
   const PathString rel_path = MakeRelative(path);
 
-  invalid_path_encountered_ = !rel_path.StartsWith(lease_path_);
-  if (invalid_path_encountered_) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr,
-             "CatalogMergeTool::ReportAddition - Invalid path %s, for lease "
-             "path: %s",
-             path.c_str(), lease_path_.c_str());
+  /*
+   * Note: If the addition of a file or directory outside of the lease
+   *       path is encountered here, this means that the item was deleted
+   *       by another writer running concurrently.
+   *       The correct course of action is to ignore this change here.
+   * */
+  if (!IsPathInLease(lease_path_, rel_path)) {
+    return;
   }
 
   const std::string parent_path =
@@ -102,12 +97,14 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportRemoval(
     const PathString& path, const catalog::DirectoryEntry& entry) {
   const PathString rel_path = MakeRelative(path);
 
-  invalid_path_encountered_ = !rel_path.StartsWith(lease_path_);
-  if (invalid_path_encountered_) {
-    LogCvmfs(
-        kLogReceiver, kLogSyslogErr,
-        "CatalogMergeTool::ReportRemoval - Invalid path %s, for lease path: %s",
-        path.c_str(), lease_path_.c_str());
+  /*
+   * Note: If the removal of a file or directory outside of the lease
+   *       path is encountered here, this means that the item was created
+   *       by another writer running concurrently.
+   *       The correct course of action is to ignore this change here.
+   * */
+  if (!IsPathInLease(lease_path_, rel_path)) {
+    return;
   }
 
   if (entry.IsDirectory()) {
@@ -126,12 +123,14 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportModification(
     const catalog::DirectoryEntry& entry2, const XattrList& xattrs) {
   const PathString rel_path = MakeRelative(path);
 
-  invalid_path_encountered_ = !rel_path.StartsWith(lease_path_);
-  if (invalid_path_encountered_) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr,
-             "CatalogMergeTool::ReportModification - Invalid path %s, for "
-             "lease path: %s",
-             path.c_str(), lease_path_.c_str());
+  /*
+   * Note: If the modification of a file or directory outside of the lease
+   *       path is encountered here, this means that the item was modified
+   *       by another writer running concurrently.
+   *       The correct course of action is to ignore this change here.
+   * */
+  if (!IsPathInLease(lease_path_, rel_path)) {
+    return;
   }
 
   const std::string parent_path =

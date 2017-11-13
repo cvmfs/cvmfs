@@ -28,7 +28,7 @@ PayloadProcessor::Result PayloadProcessor::Process(
     int fdin, const std::string& header_digest, const std::string& path,
     uint64_t header_size) {
   LogCvmfs(kLogReceiver, kLogSyslog,
-           "PayloadProcessor - receiving path: %s, header digest: %s, header "
+           "PayloadProcessor - lease_path: %s, header digest: %s, header "
            "size: %ld",
            path.c_str(), header_digest.c_str(), header_size);
 
@@ -57,7 +57,8 @@ PayloadProcessor::Result PayloadProcessor::Process(
     if (consumer_state != ObjectPackBuild::kStateContinue &&
         consumer_state != ObjectPackBuild::kStateDone) {
       LogCvmfs(kLogReceiver, kLogSyslogErr,
-               "Error %d encountered when consuming object pack.",
+               "PayloadProcessor - error: %d encountered when consuming object "
+               "pack.",
                consumer_state);
       break;
     }
@@ -87,7 +88,7 @@ void PayloadProcessor::ConsumerEventCallback(
   } else {
     // kEmpty - this is an error.
     LogCvmfs(kLogReceiver, kLogSyslogErr,
-             "Event received with unknown object.");
+             "PayloadProcessor - error: Event received with unknown object.");
     num_errors_++;
     return;
   }
@@ -98,7 +99,8 @@ void PayloadProcessor::ConsumerEventCallback(
     const std::string tmp_path =
         CreateTempPath(temp_dir_->dir() + "/payload", 0666);
     if (tmp_path.empty()) {
-      LogCvmfs(kLogReceiver, kLogSyslogErr, "Unable to create temporary path.");
+      LogCvmfs(kLogReceiver, kLogSyslogErr,
+               "PayloadProcessor - error: Unable to create temporary path.");
       num_errors_++;
       return;
     }
@@ -115,14 +117,16 @@ void PayloadProcessor::ConsumerEventCallback(
 
   int fdout = open(info.temp_path.c_str(), O_CREAT | O_WRONLY | O_APPEND, 0600);
   if (fdout == -1) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr,
-             "Unable to open temporary output file: %s",
-             info.temp_path.c_str());
+    LogCvmfs(
+        kLogReceiver, kLogSyslogErr,
+        "PayloadProcessor - error: Unable to open temporary output file: %s",
+        info.temp_path.c_str());
     return;
   }
 
   if (!WriteFile(fdout, event.buf, event.buf_size)) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr, "Unable to write %s",
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "PayloadProcessor - error: Unable to write %s",
              info.temp_path.c_str());
     num_errors_++;
     unlink(info.temp_path.c_str());
@@ -138,12 +142,12 @@ void PayloadProcessor::ConsumerEventCallback(
     shash::HashFile(info.temp_path, &file_hash);
 
     if (file_hash != event.id) {
-      LogCvmfs(kLogReceiver, kLogSyslogErr,
-               "PayloadProcessor - Hash mismatch for unpacked file: event "
-               "size: %ld, file size: %ld, event hash: %s, file hash: %s",
-               event.size, GetFileSize(info.temp_path),
-               event.id.ToString(true).c_str(),
-               file_hash.ToString(true).c_str());
+      LogCvmfs(
+          kLogReceiver, kLogSyslogErr,
+          "PayloadProcessor - error: Hash mismatch for unpacked file: event "
+          "size: %ld, file size: %ld, event hash: %s, file hash: %s",
+          event.size, GetFileSize(info.temp_path),
+          event.id.ToString(true).c_str(), file_hash.ToString(true).c_str());
       num_errors_++;
       return;
     }
@@ -157,8 +161,9 @@ void PayloadProcessor::ConsumerEventCallback(
 PayloadProcessor::Result PayloadProcessor::Initialize() {
   Params params;
   if (!GetParamsFromFile(current_repo_, &params)) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr,
-             "Error: Could not get configuration parameters.");
+    LogCvmfs(
+        kLogReceiver, kLogSyslogErr,
+        "PayloadProcessor - error: Could not get configuration parameters.");
     return kOtherError;
   }
 
