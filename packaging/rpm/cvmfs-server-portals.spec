@@ -3,11 +3,11 @@
 %define         minio_tag RELEASE.2017-09-29T19-16-56Z
 %define         minio_subver %(echo %{tag} | sed -e 's/[^0-9]//g')
 # define	  minio_commitid DEFINEME
-%define		minio_import_path github.com/minio/minio
+%define         minio_import_path github.com/minio/minio
 
-%define		charon_version 1.1
-# define	  charon_commitid DEFINEME
-%define		charon_import_path github.com/cvmfs/docker-graphdriver/publisher
+%define         shuttle_version 1.1
+# define        shuttle_commitid DEFINEME
+%define         shuttle_import_path github.com/cvmfs/docker-graphdriver/shuttle
 
 Summary:        CernVM-FS Server Portals Add-Ons
 Name:           cvmfs-server-portals
@@ -19,6 +19,7 @@ Group:          Applications/System
 License:        BSD
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
+BuildRequires: gcc
 BuildRequires: golang >= 1.8
 Requires: cvmfs-server
 
@@ -33,13 +34,17 @@ mkdir -p src/$(dirname %{minio_import_path})
 ln -s ../../../cvmfs-minio-%{minio_tag} src/%{minio_import_path}
 
 %setup -TDqa 1
-mkdir -p src/$(dirname $(dirname %{charon_import_path}))
-ln -s ../../../docker-graphdriver-%{charon_version} src/$(dirname %{charon_import_path})
+mkdir -p src/$(dirname $(dirname %{shuttle_import_path}))
+ln -s ../../../docker-graphdriver-%{shuttle_version} src/$(dirname %{shuttle_import_path})
 
 %build
+gcc -Wall -g -o cvmfs_runas src/$(dirname %{shuttle_import_path})/runas.c
+
 export GOPATH=$(pwd)
 
-go build -o cvmfs_charon %{charon_import_path}
+go build -v \
+  -ldflags="-X main.version=%{shuttle_version} -X main.git_hash=%{shuttle_commitid}" \
+  -o cvmfs_shuttle %{shuttle_import_path}
 
 minio_tag=%{minio_tag}
 minio_version=${minio_tag#RELEASE.}
@@ -70,8 +75,9 @@ rm -rf $RPM_BUILD_ROOT
 install -d $RPM_BUILD_ROOT%{_bindir}
 install -d ${RPM_BUILD_ROOT}/usr/lib/systemd/system
 install -p cvmfs_minio $RPM_BUILD_ROOT%{_bindir}
-install -p cvmfs_charon $RPM_BUILD_ROOT%{_bindir}
-install -p "src/%{charon_import_path}/cvmfs-portal@.service" ${RPM_BUILD_ROOT}/usr/lib/systemd/system
+install -p cvmfs_shuttle $RPM_BUILD_ROOT%{_bindir}
+install -p cvmfs_runas $RPM_BUILD_ROOT%{_bindir}
+install -p "src/%{shuttle_import_path}/cvmfs-portal@.service" ${RPM_BUILD_ROOT}/usr/lib/systemd/system
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -79,7 +85,8 @@ rm -rf $RPM_BUILD_ROOT
 %files
 %defattr(-,root,root)
 %{_bindir}/cvmfs_minio
-%{_bindir}/cvmfs_charon
+%{_bindir}/cvmfs_shuttle
+%{_bindir}/cvmfs_runas
 /usr/lib/systemd/system/cvmfs-portal@.service
 
 %changelog

@@ -100,6 +100,7 @@ CVMFS_SERVER_SWISSKNIFE="cvmfs_swissknife"
 CVMFS_SERVER_SWISSKNIFE_DEBUG=$CVMFS_SERVER_SWISSKNIFE
 
 CVMFS_PORTAL_SYSTEMD_TEMPLATE=/usr/lib/systemd/system/cvmfs-portal@.service
+CVMFS_SHUTTLE_SYSTEMD_TEMPLATE=/usr/lib/systemd/system/cvmfs-shuttle@.service
 
 ################################################################################
 #                                                                              #
