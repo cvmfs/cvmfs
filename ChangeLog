@@ -1,4 +1,5 @@
 2.4.3:
+  * Turn cvmfs-config into Debian virtual package (CVM-1420)
   * Invalidate inodes instead of dentries on reload/remount (CVM-1423)
   * Workaround for alien cache on BeeGFS (CVM-1403)
 
