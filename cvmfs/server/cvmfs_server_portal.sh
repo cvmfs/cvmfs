@@ -131,7 +131,7 @@ __portal_add() {
   load_repo_config $name
 
   # sanity checks
-  # TODO(jblomer): sanitize portal name
+  sanitize a-zA-Z0-9_- 80 "$portalname" || { echo "invalid portal name" >&2; return 1; }
   __portal_exists $reponame $portalname && \
     { echo "Portal $reponame:$portalname already exists" >&2; return 1; } || true
   __portal_check_system_requirements || return 1

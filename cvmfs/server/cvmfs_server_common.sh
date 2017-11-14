@@ -1268,3 +1268,15 @@ _run_catalog_migration() {
 }
 
 
+sanitize() {
+  local whitelist="$1"
+  local max_length="$2"
+  local input="$3"
+
+  [ "x$input" != "x" ] || return 1
+  local sanitized_input=$(echo -n "$input" | tr -Cd "$whitelist")
+  [ "x$input" = "x$sanitized_input" ] || return 2
+  [ ${#input} -le $max_length ] || return 3
+  return 0
+}
+
