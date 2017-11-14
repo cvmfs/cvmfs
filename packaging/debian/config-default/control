@@ -9,10 +9,9 @@ Homepage: http://cernvm.cern.ch/portal/filesystem
 Package: cvmfs-config-default
 Architecture: all
 Replaces: cvmfs-keys
-Conflicts: cvmfs-keys
+Conflicts: cvmfs-keys cvmfs-config
 Breaks: cvmfs-keys, cvmfs (<< 2.1.20), cvmfs-server (<< 2.1.20)
 Provides: cvmfs-config
-Conflicts: cvmfs-config
 Description: CernVM File System Default Configuration
  Defaulf configuration and public keys for mounting common CernVM-FS
  repositories.
