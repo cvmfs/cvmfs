@@ -67,15 +67,7 @@ _remove_client() {
 _remove_server() {
   local pkgdir="$1"
 
-  rm -f "$pkgdir/etc/cvmfs/cvmfs_server_hooks.sh.demo" \
-    "$pkgdir/usr/lib/libtbb_cvmfs.so" \
-    "$pkgdir/usr/lib/libtbb_cvmfs.so.2" \
-    "$pkgdir/usr/lib/libtbb_cvmfs_debug.so" \
-    "$pkgdir/usr/lib/libtbb_cvmfs_debug.so.2" \
-    "$pkgdir/usr/lib/libtbbmalloc_cvmfs.so" \
-    "$pkgdir/usr/lib/libtbbmalloc_cvmfs.so.2" \
-    "$pkgdir/usr/lib/libtbbmalloc_cvmfs_debug.so" \
-    "$pkgdir/usr/lib/libtbbmalloc_cvmfs_debug.so.2"
+  rm -f "$pkgdir/etc/cvmfs/cvmfs_server_hooks.sh.demo"
   rm -rf "$pkgdir/usr/share/cvmfs-server" "$pkgdir/var/lib/cvmfs-server" \
     "$pkgdir/var/www" "$pkgdir/var/spool"
   for server_bin in cvmfs_server cvmfs_swissknife cvmfs_swissknife_debug \

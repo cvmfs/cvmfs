@@ -174,18 +174,20 @@ set (CVMFS_SWISSKNIFE_SOURCES
   dns.cc
   download.cc
   file_chunk.cc
-  file_processing/async_reader.cc
-  file_processing/chunk.cc
-  file_processing/chunk_detector.cc
-  file_processing/file.cc
-  file_processing/file_processor.cc
-  file_processing/io_dispatcher.cc
-  file_processing/processor.cc
   gateway_util.cc
   globals.cc
   hash.cc
   history_sql.cc
   history_sqlite.cc
+  ingestion/chunk_detector.cc
+  ingestion/item.cc
+  ingestion/pipeline.cc
+  ingestion/task_chunk.cc
+  ingestion/task_compress.cc
+  ingestion/task_hash.cc
+  ingestion/task_read.cc
+  ingestion/task_register.cc
+  ingestion/task_write.cc
   json_document.cc
   letter.cc
   logging.cc
@@ -265,18 +267,20 @@ set (CVMFS_PRELOADER_SOURCES
   compression.cc
   dns.cc
   download.cc
-  file_processing/async_reader.cc
-  file_processing/chunk.cc
-  file_processing/chunk_detector.cc
-  file_processing/file.cc
-  file_processing/file_processor.cc
-  file_processing/io_dispatcher.cc
-  file_processing/processor.cc
   gateway_util.cc
   globals.cc
   hash.cc
   history_sql.cc
   history_sqlite.cc
+  ingestion/chunk_detector.cc
+  ingestion/item.cc
+  ingestion/pipeline.cc
+  ingestion/task_chunk.cc
+  ingestion/task_compress.cc
+  ingestion/task_hash.cc
+  ingestion/task_read.cc
+  ingestion/task_register.cc
+  ingestion/task_write.cc
   json_document.cc
   logging.cc
   malloc_arena.cc
@@ -362,16 +366,18 @@ if(BUILD_RECEIVER)
     dns.cc
     download.cc
     encrypt.cc
-    file_processing/async_reader.cc
-    file_processing/chunk.cc
-    file_processing/chunk_detector.cc
-    file_processing/file.cc
-    file_processing/file_processor.cc
-    file_processing/io_dispatcher.cc
-    file_processing/processor.cc
     gateway_util.cc
     globals.cc
     hash.cc
+    ingestion/chunk_detector.cc
+    ingestion/item.cc
+    ingestion/pipeline.cc
+    ingestion/task_chunk.cc
+    ingestion/task_compress.cc
+    ingestion/task_hash.cc
+    ingestion/task_read.cc
+    ingestion/task_register.cc
+    ingestion/task_write.cc
     json_document.cc
     logging.cc
     malloc_arena.cc
@@ -402,13 +408,17 @@ if(BUILD_RECEIVER)
     util/posix.cc
     util/string.cc
     util/raii_temp_dir.cc
+    util_concurrency.cc
     uuid.cc
     whitelist.cc
     xattr.cc
     )
 
   add_executable(cvmfs_receiver ${CVMFS_RECEIVER_SOURCES})
-  target_link_libraries(cvmfs_receiver ${CURL_LIBRARIES} ${TBB_LIBRARIES} ${CARES_LIBRARIES} ${SHA3_LIBRARIES} ${SQLITE3_LIBRARY} ${VJSON_LIBRARIES} ${OPENSSL_LIBRARIES} ${UUID_LIBRARIES} ${ZLIB_LIBRARIES} ${RT_LIBRARY} pthread dl)
+  target_link_libraries(cvmfs_receiver ${CURL_LIBRARIES} ${CARES_LIBRARIES}
+                        ${SHA3_LIBRARIES} ${SQLITE3_LIBRARY} ${VJSON_LIBRARIES}
+                        ${OPENSSL_LIBRARIES} ${UUID_LIBRARIES} ${ZLIB_LIBRARIES}
+                        ${RT_LIBRARY} pthread dl)
 
   set (CVMFS_RECEIVER_CFLAGS "${CMAKE_CXX_FLAGS} -D_FILE_OFFSET_BITS=64 -fexceptions")
   set_target_properties (cvmfs_receiver PROPERTIES COMPILE_FLAGS "${CVMFS_RECEIVER_CFLAGS}")
@@ -635,9 +645,8 @@ if (BUILD_SERVER)
   # link the stuff (*_LIBRARIES are dynamic link libraries)
   target_link_libraries (cvmfs_swissknife
                          ${SQLITE3_LIBRARY} ${CURL_LIBRARIES}
-                         ${CARES_LIBRARIES} ${TBB_LIBRARIES}
-                         ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES}
-                         ${RT_LIBRARY} ${VJSON_LIBRARIES}
+                         ${CARES_LIBRARIES} ${ZLIB_LIBRARIES}
+                         ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${VJSON_LIBRARIES}
                          ${SHA3_LIBRARIES} ${CAP_LIBRARIES} pthread dl)
 
   target_link_libraries(cvmfs_stratum_agent
@@ -652,16 +661,10 @@ if (BUILD_SERVER)
 
     set_target_properties (cvmfs_swissknife_debug PROPERTIES COMPILE_FLAGS "${CVMFS_SWISSKNIFE_DEBUG_CFLAGS}" LINK_FLAGS "${CVMFS_SWISSKNIFE_DEBUG_LD_FLAGS}")
 
-    # link the stuff (*_LIBRARIES are dynamic link libraries)
-    if (NOT TBB_DEBUG_LIBRARIES)
-      message (WARNING "Debug libraries of TBB were not found. Using the release versions instead.")
-      set (TBB_DEBUG_LIBRARIES ${TBB_LIBRARIES})
-    endif (NOT TBB_DEBUG_LIBRARIES)
     target_link_libraries (cvmfs_swissknife_debug
                            ${SQLITE3_LIBRARY}  ${CURL_LIBRARIES}
-                           ${CARES_LIBRARIES} ${TBB_DEBUG_LIBRARIES}
-                           ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES}
-                           ${RT_LIBRARY} ${VJSON_LIBRARIES}
+                           ${CARES_LIBRARIES} ${ZLIB_LIBRARIES}
+                           ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${VJSON_LIBRARIES}
                            ${SHA3_LIBRARIES} ${CAP_LIBRARIES} pthread dl)
   endif (BUILD_SERVER_DEBUG)
 endif (BUILD_SERVER)
@@ -669,8 +672,9 @@ endif (BUILD_SERVER)
 if (BUILD_PRELOADER)
   add_executable (cvmfs_preload_bin ${CVMFS_PRELOADER_SOURCES})
 
-  target_link_libraries(cvmfs_preload_bin ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${CARES_LIBRARIES} ${ZLIB_LIBRARIES}
-                        ${OPENSSL_LIBRARIES} ${CARES_LIBRARIS} ${TBB_LIBRARIES} ${RT_LIBRARY}
+  target_link_libraries(cvmfs_preload_bin ${SQLITE3_LIBRARY} ${CURL_LIBRARIES}
+                        ${CARES_LIBRARIES} ${ZLIB_LIBRARIES}
+                        ${OPENSSL_LIBRARIES} ${CARES_LIBRARIS} ${RT_LIBRARY}
                         ${UUID_LIBRARIES} ${VJSON_LIBRARIES} ${SHA3_LIBRARIES}
                         pthread dl)
 endif (BUILD_PRELOADER)
@@ -856,24 +860,6 @@ if (BUILD_SERVER)
   install(
     CODE  "FILE(MAKE_DIRECTORY \$ENV{DESTDIR}/var/lib/cvmfs-server/geo)"
     )
-
-  # If we built the third-party libraries ourselves, we should also install the TBB libraries
-  if (BUILTIN_EXTERNALS)
-    install(
-      FILES
-      ${EXTERNALS_INSTALL_LOCATION}/lib/libtbb_cvmfs.so
-      ${EXTERNALS_INSTALL_LOCATION}/lib/libtbb_cvmfs_debug.so
-      ${EXTERNALS_INSTALL_LOCATION}/lib/libtbb_cvmfs.so.2
-      ${EXTERNALS_INSTALL_LOCATION}/lib/libtbb_cvmfs_debug.so.2
-      ${EXTERNALS_INSTALL_LOCATION}/lib/libtbbmalloc_cvmfs.so
-      ${EXTERNALS_INSTALL_LOCATION}/lib/libtbbmalloc_cvmfs_debug.so
-      ${EXTERNALS_INSTALL_LOCATION}/lib/libtbbmalloc_cvmfs.so.2
-      ${EXTERNALS_INSTALL_LOCATION}/lib/libtbbmalloc_cvmfs_debug.so.2
-      DESTINATION ${CMAKE_INSTALL_LIBDIR}
-      PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
-      )
-  endif (BUILTIN_EXTERNALS)
-
 endif (BUILD_SERVER)
 
 if (BUILD_PRELOADER)

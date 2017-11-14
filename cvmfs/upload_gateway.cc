@@ -7,7 +7,6 @@
 #include <limits>
 #include <vector>
 
-#include "file_processing/char_buffer.h"
 #include "gateway_util.h"
 #include "util/string.h"
 
@@ -161,28 +160,20 @@ UploadStreamHandle* GatewayUploader::InitStreamedUpload(
 }
 
 void GatewayUploader::StreamedUpload(UploadStreamHandle* handle,
-                                     CharBuffer* buffer,
+                                     UploadBuffer buffer,
                                      const CallbackTN* callback) {
-  if (!buffer->IsInitialized()) {
-    LogCvmfs(kLogUploadGateway, kLogStderr,
-             "Streamed upload - input buffer is not initialized");
-    BumpErrors();
-    Respond(callback, UploaderResults(1, buffer));
-    return;
-  }
-
   GatewayStreamHandle* hd = dynamic_cast<GatewayStreamHandle*>(handle);
   if (!hd) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
              "Streamed upload - incompatible upload handle");
     BumpErrors();
-    Respond(callback, UploaderResults(2, buffer));
+    Respond(callback, UploaderResults(UploaderResults::kBufferUpload, 2));
     return;
   }
 
-  ObjectPack::AddToBucket(buffer->ptr(), buffer->used_bytes(), hd->bucket);
+  ObjectPack::AddToBucket(buffer.data, buffer.size, hd->bucket);
 
-  Respond(callback, UploaderResults(0, buffer));
+  Respond(callback, UploaderResults(UploaderResults::kBufferUpload, 0));
 }
 
 void GatewayUploader::FinalizeStreamedUpload(UploadStreamHandle* handle,
@@ -192,7 +183,8 @@ void GatewayUploader::FinalizeStreamedUpload(UploadStreamHandle* handle,
     LogCvmfs(kLogUploadGateway, kLogStderr,
              "Finalize streamed upload - incompatible upload handle");
     BumpErrors();
-    Respond(handle->commit_callback, UploaderResults(2));
+    Respond(handle->commit_callback,
+            UploaderResults(UploaderResults::kChunkCommit, 2));
     return;
   }
 
@@ -201,11 +193,13 @@ void GatewayUploader::FinalizeStreamedUpload(UploadStreamHandle* handle,
     LogCvmfs(kLogUploadGateway, kLogStderr,
              "Finalize streamed upload - could not commit bucket");
     BumpErrors();
-    Respond(handle->commit_callback, UploaderResults(4));
+    Respond(handle->commit_callback,
+            UploaderResults(UploaderResults::kChunkCommit, 4));
     return;
   }
 
-  Respond(handle->commit_callback, UploaderResults(0));
+  Respond(handle->commit_callback,
+          UploaderResults(UploaderResults::kChunkCommit, 0));
 }
 
 bool GatewayUploader::ReadSessionTokenFile(const std::string& token_file_name,

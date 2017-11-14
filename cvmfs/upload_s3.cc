@@ -17,7 +17,6 @@
 #include <vector>
 
 #include "compression.h"
-#include "file_processing/char_buffer.h"
 #include "logging.h"
 #include "options.h"
 #include "s3fanout.h"
@@ -27,8 +26,9 @@
 namespace upload {
 
 S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
-    : AbstractUploader(spooler_definition),
-      temporary_path_(spooler_definition.temporary_path) {
+  : AbstractUploader(spooler_definition)
+  , temporary_path_(spooler_definition.temporary_path)
+{
   if (!ParseSpoolerDefinition(spooler_definition)) {
     abort();
   }
@@ -40,10 +40,16 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
   s3fanout_mgr_.Spawn();
 
   atomic_init32(&copy_errors_);
+  atomic_init32(&terminate_);
+  int retval = pthread_create(
+    &thread_collect_results_, NULL, MainCollectResults, this);
+  assert(retval == 0);
 }
 
 S3Uploader::~S3Uploader() {
   s3fanout_mgr_.Fini();
+  atomic_inc32(&terminate_);
+  pthread_join(thread_collect_results_, NULL);
 }
 
 bool S3Uploader::ParseSpoolerDefinition(
@@ -163,23 +169,16 @@ unsigned int S3Uploader::GetNumberOfErrors() const {
 
 
 /**
- * Worker thread takes care of requesting new jobs and cleaning old
- * ones.
+ * Worker thread takes care of requesting new jobs and cleaning old ones.
  */
-void S3Uploader::WorkerThread() {
+void *S3Uploader::MainCollectResults(void *data) {
   LogCvmfs(kLogUploadS3, kLogDebug, "Upload_S3 WorkerThread started.");
+  S3Uploader *uploader = reinterpret_cast<S3Uploader *>(data);
 
-  bool running = true;
-  while (running) {
-    UploadJob job;
-
-    // Try to perform a new job
-    running = TryToPerformJob() != JobStatus::kTerminate;
-
-    // Get and report completed jobs
-    std::vector<s3fanout::JobInfo *> jobs;
+  std::vector<s3fanout::JobInfo *> jobs;
+  while (atomic_read32(&uploader->terminate_) == 0) {
     jobs.clear();
-    s3fanout_mgr_.PopCompletedJobs(&jobs);
+    uploader->s3fanout_mgr_.PopCompletedJobs(&jobs);
     std::vector<s3fanout::JobInfo*>::iterator             it    = jobs.begin();
     const std::vector<s3fanout::JobInfo*>::const_iterator itend = jobs.end();
     for (; it != itend; ++it) {
@@ -194,11 +193,12 @@ void S3Uploader::WorkerThread() {
         reply_code = 99;
       }
       if (info->origin == s3fanout::kOriginMem) {
-        Respond(static_cast<CallbackTN*>(info->callback),
-                UploaderResults(reply_code));
+        uploader->Respond(static_cast<CallbackTN*>(info->callback),
+                          UploaderResults(UploaderResults::kChunkCommit,
+                                          reply_code));
       } else {
-        Respond(static_cast<CallbackTN*>(info->callback),
-                UploaderResults(reply_code, info->origin_path));
+        uploader->Respond(static_cast<CallbackTN*>(info->callback),
+                          UploaderResults(reply_code, info->origin_path));
       }
       assert(info->mmf == NULL);
       assert(info->origin_file == NULL);
@@ -209,6 +209,7 @@ void S3Uploader::WorkerThread() {
   }
 
   LogCvmfs(kLogUploadS3, kLogDebug, "Upload_S3 WorkerThread finished.");
+  return NULL;
 }
 
 
@@ -406,30 +407,30 @@ UploadStreamHandle *S3Uploader::InitStreamedUpload(const CallbackTN *callback) {
 
 
 void S3Uploader::StreamedUpload(UploadStreamHandle  *handle,
-                                CharBuffer          *buffer,
+                                UploadBuffer        buffer,
                                 const CallbackTN    *callback) {
-  assert(buffer->IsInitialized());
   S3StreamHandle *local_handle = static_cast<S3StreamHandle*>(handle);
 
   LogCvmfs(kLogUploadS3, kLogDebug, "Upload target = %s",
            local_handle->temporary_path.c_str());
 
   const size_t bytes_written = write(local_handle->file_descriptor,
-                                     buffer->ptr(),
-                                     buffer->used_bytes());
-  if (bytes_written != buffer->used_bytes()) {
+                                     buffer.data,
+                                     buffer.size);
+  if (bytes_written != buffer.size) {
     const int cpy_errno = errno;
     LogCvmfs(kLogUploadS3, kLogStderr, "failed to write %d bytes to '%s' "
              "(errno: %d)",
-             buffer->used_bytes(),
+             buffer.size,
              local_handle->temporary_path.c_str(),
              cpy_errno);
     atomic_inc32(&copy_errors_);
-    Respond(callback, UploaderResults(cpy_errno, buffer));
+    Respond(callback,
+            UploaderResults(UploaderResults::kBufferUpload, cpy_errno));
     return;
   }
 
-  Respond(callback, UploaderResults(0, buffer));
+  Respond(callback, UploaderResults(UploaderResults::kBufferUpload, 0));
 }
 
 
@@ -445,7 +446,8 @@ void S3Uploader::FinalizeStreamedUpload(UploadStreamHandle  *handle,
              "(errno: %d)",
              local_handle->temporary_path.c_str(), cpy_errno);
     atomic_inc32(&copy_errors_);
-    Respond(handle->commit_callback, UploaderResults(cpy_errno));
+    Respond(handle->commit_callback,
+            UploaderResults(UploaderResults::kChunkCommit, cpy_errno));
     return;
   }
 

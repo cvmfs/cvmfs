@@ -21,7 +21,6 @@ set(CVMFS_UNITTEST_FILES
   ../common/testutil.cc
   ../common/catalog_test_tools.cc
 
-  t_async_reader.cc
   t_atomic.cc
   t_authz_fetch.cc
   t_authz_session.cc
@@ -29,7 +28,6 @@ set(CVMFS_UNITTEST_FILES
   t_base64.cc
   t_bigvector.cc
   t_blocking_counter.cc
-  t_buffer.cc
   t_cache.cc
   t_cache_extern.cc
   t_cache_ram.cc
@@ -55,7 +53,6 @@ set(CVMFS_UNITTEST_FILES
   t_fetch.cc
   t_file_chunk.cc
   t_file_guard.cc
-  t_file_processing.cc
   t_file_sandbox.cc
   t_fs_traversal.cc
   t_fuse_evict.cc
@@ -64,6 +61,8 @@ set(CVMFS_UNITTEST_FILES
   t_hash_filters.cc
   t_header_lists.cc
   t_history.cc
+  t_ingestion.cc
+  t_ingestion_stress.cc
   t_json.cc
   t_kvstore.cc
   t_lease_path_util.cc
@@ -103,6 +102,7 @@ set(CVMFS_UNITTEST_FILES
   t_raii_temp_dir.cc
   t_test_utils.cc
   t_tracer.cc
+  t_tube.cc
   t_uid_map.cc
   t_unique_ptr.cc
   t_upload_facility.cc
@@ -154,13 +154,6 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/encrypt.cc
   ${CVMFS_SOURCE_DIR}/fetch.cc
   ${CVMFS_SOURCE_DIR}/file_chunk.cc
-  ${CVMFS_SOURCE_DIR}/file_processing/async_reader.cc
-  ${CVMFS_SOURCE_DIR}/file_processing/chunk.cc
-  ${CVMFS_SOURCE_DIR}/file_processing/chunk_detector.cc
-  ${CVMFS_SOURCE_DIR}/file_processing/file.cc
-  ${CVMFS_SOURCE_DIR}/file_processing/file_processor.cc
-  ${CVMFS_SOURCE_DIR}/file_processing/io_dispatcher.cc
-  ${CVMFS_SOURCE_DIR}/file_processing/processor.cc
   ${CVMFS_SOURCE_DIR}/fuse_evict.cc
   ${CVMFS_SOURCE_DIR}/gateway_util.cc
   ${CVMFS_SOURCE_DIR}/globals.cc
@@ -168,6 +161,15 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/hash.cc
   ${CVMFS_SOURCE_DIR}/history_sql.cc
   ${CVMFS_SOURCE_DIR}/history_sqlite.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/chunk_detector.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/item.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/pipeline.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/task_chunk.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/task_compress.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/task_hash.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/task_read.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/task_register.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/task_write.cc
   ${CVMFS_SOURCE_DIR}/json_document.cc
   ${CVMFS_SOURCE_DIR}/kvstore.cc
   ${CVMFS_SOURCE_DIR}/libcvmfs.cc
@@ -325,11 +327,10 @@ endif (BUILD_LIBCVMFS_CACHE)
 #
 set (UNITTEST_LINK_LIBRARIES ${GTEST_LIBRARIES} ${OPENSSL_LIBRARIES} ${CURL_LIBRARIES}
                              ${CARES_LIBRARIES} ${OPENSSL_LIBRARIES}
-                             ${SQLITE3_LIBRARY} ${TBB_LIBRARIES}
-                             ${ZLIB_LIBRARIES} ${RT_LIBRARY} ${UUID_LIBRARIES}
-                             ${PACPARSER_LIBRARIES} ${SHA3_LIBRARIES}
-                             ${VJSON_LIBRARIES} ${PROTOBUF_LITE_LIBRARY}
-                             pthread dl)
+                             ${SQLITE3_LIBRARY} ${ZLIB_LIBRARIES} ${RT_LIBRARY}
+                             ${UUID_LIBRARIES} ${PACPARSER_LIBRARIES}
+                             ${SHA3_LIBRARIES} ${VJSON_LIBRARIES}
+                             ${PROTOBUF_LITE_LIBRARY} pthread dl)
 
 target_link_libraries (${PROJECT_TEST_NAME} ${UNITTEST_LINK_LIBRARIES})
 

@@ -2,77 +2,77 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef CVMFS_FILE_PROCESSING_CHUNK_DETECTOR_H_
-#define CVMFS_FILE_PROCESSING_CHUNK_DETECTOR_H_
+#ifndef CVMFS_INGESTION_CHUNK_DETECTOR_H_
+#define CVMFS_INGESTION_CHUNK_DETECTOR_H_
 
 #include <gtest/gtest_prod.h>
-#include <sys/types.h>
+#include <stdint.h>
+
+#include <cstdlib>
 
 #include <algorithm>
-#include <cstdlib>
-#include <utility>
-#include <vector>
 
-#include "file_processing/char_buffer.h"
-
-namespace upload {
+class BlockItem;
 
 /**
- * Abstract base class for a cutmark detector.
- * This decides on which file positions a File should be chunked.
+ * Abstract base class for a cutmark detector. This decides on which file
+ * positions a File should be chunked.
  */
 class ChunkDetector {
  public:
-  ChunkDetector() : last_cut_(0) {}
+  ChunkDetector() : last_cut_(0), offset_(0) {}
   virtual ~ChunkDetector() { }
-  virtual off_t FindNextCutMark(CharBuffer *buffer) = 0;
+  uint64_t FindNextCutMark(BlockItem *block);
 
-  virtual bool MightFindChunks(const size_t size) const = 0;
+  virtual bool MightFindChunks(uint64_t size) const = 0;
 
  protected:
+  virtual uint64_t DoFindNextCutMark(BlockItem *block) = 0;
+
   /**
    * When returning from an implemented FindNextCutMark call you must call this
    * function when a cut mark has been found.
    * Like: return DoCut(found_offset)
    */
-  virtual off_t DoCut(const off_t offset) {
+  virtual uint64_t DoCut(uint64_t offset) {
     last_cut_ = offset;
     return offset;
   }
 
   /**
-   * Same as DoCut() but if no cut mark has been found in the given Buffer in
+   * Same as DoCut() but if no cut mark has been found in the given buffer in
    * FindNextCutMark()
    */
-  virtual off_t NoCut(const off_t offset) { return 0; }
+  virtual uint64_t NoCut(uint64_t offset) { return 0; }
 
-  off_t last_cut() const { return last_cut_; }
+  uint64_t last_cut() const { return last_cut_; }
+  uint64_t offset() const { return offset_; }
 
  private:
-  off_t last_cut_;
+  uint64_t last_cut_;
+  uint64_t offset_;
 };
+
 
 /**
  * The StaticOffsetDetector cuts files on a hard threshold and generates
- * uniform size Chunks.
+ * uniform sized Chunks.
  */
 class StaticOffsetDetector : public ChunkDetector {
  public:
-  explicit StaticOffsetDetector(const size_t static_chunk_size) :
-    chunk_size_(static_chunk_size) {}
+  explicit StaticOffsetDetector(uint64_t s) : chunk_size_(s) { }
+  bool MightFindChunks(uint64_t size) const { return size > chunk_size_; }
 
-  bool MightFindChunks(const size_t size) const { return size > chunk_size_; }
-
-  off_t FindNextCutMark(CharBuffer *buffer);
+ protected:
+  virtual uint64_t DoFindNextCutMark(BlockItem *buffer);
 
  private:
-  const size_t chunk_size_;
+  const uint64_t chunk_size_;
 };
 
 
 /**
- * The xor32 rolling checksum was proposed by Kendy Kutzner who used it for
- * file chunking in Igor-FS [1].
+ * The xor32 rolling used in Igor-FS [1].
  *
  * It takes a byte stream and constantly computes a 32-bit checksum in a way
  * that the result is only dependent on the last read 32 bytes of the stream.
@@ -85,30 +85,30 @@ class StaticOffsetDetector : public ChunkDetector {
  *
  * [1]     "The Decentralized File System Igor-FS
  *          as an Application for Overlay-Networks"
- *     Dissertation of Dipl.-Ing. Kendy Kutzner - 14. Februar 2008
+ *     Dissertation of Dipl.-Ing. Kendy Kutzner (2008)
  */
 class Xor32Detector : public ChunkDetector {
   FRIEND_TEST(T_ChunkDetectors, Xor32);
 
  public:
-  Xor32Detector(const size_t minimal_chunk_size,
-                const size_t average_chunk_size,
-                const size_t maximal_chunk_size);
+  Xor32Detector(const uint64_t minimal_chunk_size,
+                const uint64_t average_chunk_size,
+                const uint64_t maximal_chunk_size);
 
-  bool MightFindChunks(const size_t size) const {
+  bool MightFindChunks(const uint64_t size) const {
     return size > minimal_chunk_size_;
   }
 
-  off_t FindNextCutMark(CharBuffer *buffer);
-
  protected:
-  virtual off_t DoCut(const off_t offset) {
+  virtual uint64_t DoFindNextCutMark(BlockItem *buffer);
+
+  virtual uint64_t DoCut(const uint64_t offset) {
     xor32_     = 0;
     xor32_ptr_ = offset;
     return ChunkDetector::DoCut(offset);
   }
 
-  virtual off_t NoCut(const off_t offset) {
+  virtual uint64_t NoCut(const uint64_t offset) {
     xor32_ptr_ = offset;
     return ChunkDetector::NoCut(offset);
   }
@@ -122,23 +122,17 @@ class Xor32Detector : public ChunkDetector {
   }
 
  private:
-  typedef std::pair<size_t, uint32_t> Threshold;
-  typedef std::vector<Threshold> Thresholds;
-
   // xor32 only depends on a window of the last 32 bytes in the data stream
-  static const size_t kXor32Window = 32;
+  static const unsigned kXor32Window = 32;
   static const int32_t kMagicNumber;
 
-  const size_t minimal_chunk_size_;
-  const size_t average_chunk_size_;
-  const size_t maximal_chunk_size_;
-
-  off_t    xor32_ptr_;
-  uint32_t xor32_;
-
+  const uint64_t minimal_chunk_size_;
+  const uint64_t average_chunk_size_;
+  const uint64_t maximal_chunk_size_;
   const int32_t threshold_;
+
+  uint64_t xor32_ptr_;
+  uint32_t xor32_;
 };
 
-}  // namespace upload
-
-#endif  // CVMFS_FILE_PROCESSING_CHUNK_DETECTOR_H_
+#endif  // CVMFS_INGESTION_CHUNK_DETECTOR_H_
