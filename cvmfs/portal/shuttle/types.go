@@ -31,8 +31,10 @@ func (p *WebhookPayload) Object() PublishingObject {
 }
 
 type PublisherConfig struct {
-	fqrn             string
-	localPayloadPath string
+	Fqrn             string  `json: "fqrn"`
+	Port             int     `json: "port"`
+	SpoolPath        string  `json: "spoolPath"`
+	CvmfsPathPrefix  string  `json: "cvmfsPathPrefix"`
 }
 
 type StatusRequest struct {

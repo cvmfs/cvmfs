@@ -17,8 +17,8 @@ func backendWorker() {
 			continue
 		}
 
-		filepath := path.Join(publisherConfig.localPayloadPath, obj.Bucket, obj.Key)
-		if err := cm.ImportTarball(filepath, obj.Key); err != nil {
+		filepath := path.Join(publisherConfig.SpoolPath, obj.Bucket, obj.Key)
+		if err := cm.ImportTarball(filepath); err != nil {
 			fmt.Println(err)
 			cm.AbortTransaction()
 			controlChan <- obj.Key
@@ -55,9 +55,9 @@ func frontendWorker() {
 			pos := sort.SearchStrings(buffer, req.Key)
 			if pos < len(buffer) && buffer[pos] == req.Key {
 				req.Status = "publishing"
-			} else if cm.LookupLayer(req.Key) {
+			/*} else if cm.LookupLayer(req.Key) {   TODO
 				fmt.Printf("Found published layer %v\n", req.Key)
-				req.Status = "done"
+				req.Status = "done"*/
 			} else {
 				fmt.Printf("layer %v lookup failed\n", req.Key)
 				req.Status = "unknown"

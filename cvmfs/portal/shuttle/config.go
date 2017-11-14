@@ -14,9 +14,5 @@ func LoadConfig(configPath string) (config PublisherConfig, err error) {
 	}
 
 	err = json.Unmarshal(f, &config)
-	if err != nil {
-		return config, err
-	}
-
-	return config, nil
+	return config, err
 }
