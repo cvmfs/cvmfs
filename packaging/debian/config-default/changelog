@@ -1,3 +1,9 @@
+cvmfs-config-default (1.6-1) lucid; urgency=low
+
+  * Turn into virtual package
+
+ -- Dave Dykstra <dwd@fnal.gov>  Tue, 14 Nov 2017 16:00:00 +0000
+
 cvmfs-config-default (1.5-1) lucid; urgency=low
 
   * Update comment on config repository
