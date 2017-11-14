@@ -45,7 +45,7 @@ export GOPATH=$(pwd)
 
 go build -v \
   -ldflags="-X main.version=%{shuttle_version} -X main.git_hash=%{shuttle_commitid}" \
-  -o cvmfs_shuttle %{shuttle_import_path}
+  -o cvmfs_shuttle %{shuttle_import_path}/shuttle
 
 minio_tag=%{minio_tag}
 minio_version=${minio_tag#RELEASE.}
