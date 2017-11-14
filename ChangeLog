@@ -1,4 +1,6 @@
 2.5.0:
+  * New file ingestion pipeline
+  * Drop tbb dependency
   * Add docker graph driver plugin configuration
   * Add RapidCheck for property based testing
   * Fix compilation on macOS 10.11+
