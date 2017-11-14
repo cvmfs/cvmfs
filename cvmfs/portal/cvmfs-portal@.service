@@ -11,7 +11,7 @@ Wants=network-online.target
 EnvironmentFile=/etc/cvmfs/repositories.d/%i/env.conf
 Type=simple
 ExecStart=/usr/bin/cvmfs_runas ${CVMFS_PORTAL_USER} \
-  /usr/bin/cvmfs_minio server \
+  /usr/bin/cvmfs_minio server --quiet \
   --config-dir /etc/cvmfs/repositories.d/%i \
   --address 127.0.0.1:${CVMFS_PORTAL_PORT} \
   ${CVMFS_PORTAL_SPOOL_DIR}
