@@ -1,0 +1,20 @@
+[Unit]
+Description=CernVM-FS Portal for %i
+Documentation=https://cvmfs.readthedocs.io
+Requires=cvmfs-shuttle@%i.service
+After=network-online.target cvmfs-shuttle@%i.service
+Wants=network-online.target
+# We can't use socket activation because we cannot template the port number
+# Requires=cvmfs-portal@%i.socket
+
+[Service]
+EnvironmentFile=/etc/cvmfs/repositories.d/%i/env.conf
+Type=simple
+ExecStart=/usr/bin/cvmfs_runas ${CVMFS_PORTAL_USER} \
+  /usr/bin/cvmfs_minio server \
+  --config-dir /etc/cvmfs/repositories.d/%i \
+  --address 127.0.0.1:${CVMFS_PORTAL_PORT} \
+  ${CVMFS_PORTAL_SPOOL_DIR}
+
+[Install]
+WantedBy=multi-user.target

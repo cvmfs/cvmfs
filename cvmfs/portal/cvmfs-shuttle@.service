@@ -1,0 +1,15 @@
+[Unit]
+Description=CernVM-FS Shuttle for %i
+Documentation=https://cvmfs.readthedocs.io
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+EnvironmentFile=/etc/cvmfs/repositories.d/%i/env.conf
+Type=simple
+ExecStart=/usr/bin/cvmfs_runas ${CVMFS_PORTAL_USER} \
+  /usr/bin/cvmfs_shuttle \
+  /etc/cvmfs/repositories.d/%i/shuttle.json
+
+[Install]
+WantedBy=multi-user.target

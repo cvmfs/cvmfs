@@ -2,18 +2,18 @@
 
 %define         minio_tag RELEASE.2017-09-29T19-16-56Z
 %define         minio_subver %(echo %{tag} | sed -e 's/[^0-9]//g')
-# define	  minio_commitid DEFINEME
+# define         minio_commitid DEFINEME
 %define         minio_import_path github.com/minio/minio
 
-%define         shuttle_version 1.1
+%define         portal_version 1.1
 # define        shuttle_commitid DEFINEME
-%define         shuttle_import_path github.com/cvmfs/docker-graphdriver/shuttle
+%define         shuttle_import_path github.com/cvmfs/cvmfs/cvmfs/portal
 
 Summary:        CernVM-FS Server Portals Add-Ons
 Name:           cvmfs-server-portals
 Version:        0.9
 Release:        1%{?dist}
-Source0:        https://ecsft.cern.ch/cvmfs/docker-graphdriver-%{charon_version}.tar.gz
+Source0:        https://ecsft.cern.ch/cvmfs/cvmfs-portal-%{portal_version}.tar.gz
 Source1:        https://github.com/cvmfs/minio/archive/%{minio_tag}.tar.gz
 Group:          Applications/System
 License:        BSD
@@ -43,7 +43,7 @@ gcc -Wall -g -o cvmfs_runas src/$(dirname %{shuttle_import_path})/runas.c
 export GOPATH=$(pwd)
 
 go build -v \
-  -ldflags="-X main.version=%{shuttle_version} -X main.git_hash=%{shuttle_commitid}" \
+  -ldflags="-X main.version=%{portal_version} -X main.git_hash=%{shuttle_commitid}" \
   -o cvmfs_shuttle %{shuttle_import_path}
 
 minio_tag=%{minio_tag}
@@ -78,6 +78,7 @@ install -p cvmfs_minio $RPM_BUILD_ROOT%{_bindir}
 install -p cvmfs_shuttle $RPM_BUILD_ROOT%{_bindir}
 install -p cvmfs_runas $RPM_BUILD_ROOT%{_bindir}
 install -p "src/%{shuttle_import_path}/cvmfs-portal@.service" ${RPM_BUILD_ROOT}/usr/lib/systemd/system
+install -p "src/%{shuttle_import_path}/cvmfs-shuttle@.service" ${RPM_BUILD_ROOT}/usr/lib/systemd/system
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -88,8 +89,8 @@ rm -rf $RPM_BUILD_ROOT
 %{_bindir}/cvmfs_shuttle
 %{_bindir}/cvmfs_runas
 /usr/lib/systemd/system/cvmfs-portal@.service
+/usr/lib/systemd/system/cvmfs-shuttle@.service
 
 %changelog
-* Tue Oct 10 2017 Jakob Blomer <jblomer@cern.ch> - 0.9
+* Tue Nov 14 2017 Jakob Blomer <jblomer@cern.ch> - 0.9
 - Initial packaging
-
