@@ -78,6 +78,15 @@ cvmfs_server_rmfs() {
       echo -n "Unmounting CernVM-FS Area... "
       unmount_and_teardown_repository $name || die "fail"
       echo "done"
+
+      for portal in /etc/cvmfs/repositories.d/$name/portals/*; do
+        if [ "x$portal" = "x/etc/cvmfs/repositories.d/$name/portals/*" ]; then
+          continue
+        fi
+        local portal="$(basename $portal)"
+        echo "Removing portal $portal..."
+        __portal_rm $name $portal >/dev/null
+      done
     fi
 
     echo -n "Removing Spool Area... "
