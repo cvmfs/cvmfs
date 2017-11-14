@@ -208,7 +208,7 @@ TEST_F(T_Ingestion, TaskRead) {
   int fd_tmp = open("./large", O_CREAT | O_TRUNC | O_WRONLY, 0600);
   EXPECT_GT(fd_tmp, 0);
   for (unsigned i = 0; i < nblocks; ++i) {
-    string str_block(TaskRead::kBlockSize, i);
+    string str_block(TaskRead::kBlockSize, static_cast<char>(i));
     EXPECT_TRUE(SafeWrite(fd_tmp, str_block.data(), str_block.size()));
   }
   close(fd_tmp);
@@ -222,7 +222,7 @@ TEST_F(T_Ingestion, TaskRead) {
       EXPECT_GT(BlockItem::managed_bytes(), 0U);
     }
     EXPECT_EQ(BlockItem::kBlockData, item_data->type());
-    EXPECT_EQ(string(TaskRead::kBlockSize, i),
+    EXPECT_EQ(string(TaskRead::kBlockSize, static_cast<char>(i)),
               string(reinterpret_cast<char *>(item_data->data()),
                                               item_data->size()));
     delete item_data;
@@ -375,7 +375,7 @@ TEST_F(T_Ingestion, TaskChunk) {
                       avg_chunk_size * 2);
   EXPECT_FALSE(file_large.is_fully_chunked());
   for (unsigned i = 0; i < nblocks; ++i) {
-    string str_content(TaskRead::kBlockSize, i);
+    string str_content(TaskRead::kBlockSize, static_cast<char>(i));
     unsigned char *content = reinterpret_cast<unsigned char *>(
       smalloc(TaskRead::kBlockSize));
     memcpy(content, str_content.data(), TaskRead::kBlockSize);
@@ -562,7 +562,7 @@ TEST_F(T_Ingestion, TaskCompress) {
   FileItem file_large("./large");
   ChunkItem chunk_large(&file_large, 0);
   for (unsigned i = 0; i < nblocks; ++i) {
-    string str_content(block_size, i);
+    string str_content(block_size, static_cast<char>(i));
     for (unsigned j = 1; j < block_size; ++j)
       str_content[j] = i * str_content[j-1] + j;
     unsigned char *content = reinterpret_cast<unsigned char *>(
