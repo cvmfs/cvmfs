@@ -24,9 +24,7 @@ rpm_src_dir="${CVMFS_SOURCE_LOCATION}/packaging/rpm"
 spec_file="cvmfs-server-portals.spec"
 
 # sanity checks
-for d in docker-graphdriver minio; do
-  [ -d ${ALL_SOURCE_LOCATION}/$d ] || die "sources $d missing"
-done
+[ -d ${ALL_SOURCE_LOCATION}/minio ] || die "minio sources missing"
 for d in $rpm_infra_dirs; do
   [ ! -d ${CVMFS_RESULT_LOCATION}/${d} ] || die "build directory seems to be used before (${CVMFS_RESULT_LOCATION}/${d} exists)"
 done
@@ -38,22 +36,22 @@ for d in $rpm_infra_dirs; do
 done
 
 echo "preparing sources in '${CVMFS_RESULT_LOCATION}/SOURCES'..."
-charon_version=$(cat ${rpm_src_dir}/${spec_file} | grep charon_version | grep ^%define | awk '{print $3}')
-charon_commitid=$(cd ${ALL_SOURCE_LOCATION}/docker-graphdriver && git rev-parse HEAD)
-(cd ${ALL_SOURCE_LOCATION}/docker-graphdriver && \
-  git archive --format=tar --prefix=docker-graphdriver-1.1/ \
-    -o ../../build/SOURCES/docker-graphdriver-${charon_version}.tar.gz HEAD)
+shuttle_version=$(cat ${rpm_src_dir}/${spec_file} | grep shuttle_version | grep ^%define | awk '{print $3}')
+shuttle_commitid=$(cd ${CVMFS_SOURCE_LOCATION} && git rev-parse HEAD)
+(cd ${CVMFS_SOURCE_LOCATION} && \
+  git archive --format=tar --prefix=cvmfs-shuttle-${shuttle_version}/ \
+    -o ${CVMFS_RESULT_LOCATION}/SOURCES/cvmfs-shuttle-${shuttle_version}.tar.gz HEAD)
 minio_tag=$(cat ${rpm_src_dir}/${spec_file} | grep minio_tag | grep ^%define | awk '{print $3}')
 minio_commitid=$(cd ${ALL_SOURCE_LOCATION}/minio && git rev-parse ${minio_tag})
 (cd ${ALL_SOURCE_LOCATION}/minio && \
   git archive --format=tar --prefix=cvmfs-minio-${minio_tag}/ \
-    -o ../../build/SOURCES/${minio_tag}.tar.gz ${minio_tag})
+    -o ${CVMFS_RESULT_LOCATION}/SOURCES/${minio_tag}.tar.gz ${minio_tag})
 
 echo "Building!"
 cd $CVMFS_RESULT_LOCATION
 rpmbuild --define="_topdir $CVMFS_RESULT_LOCATION"        \
          --define="_tmppath ${CVMFS_RESULT_LOCATION}/TMP" \
-         --define="charon_commitid ${charon_commitid}"    \
+         --define="shuttle_commitid ${shuttle_commitid}"    \
          --define="minio_commitid ${minio_commitid}"      \
          -ba ${rpm_src_dir}/$spec_file
 

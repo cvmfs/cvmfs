@@ -5,15 +5,16 @@
 # define         minio_commitid DEFINEME
 %define         minio_import_path github.com/minio/minio
 
-%define         portal_version 1.1
+%define         shuttle_version 1.1
 # define        shuttle_commitid DEFINEME
-%define         shuttle_import_path github.com/cvmfs/cvmfs/cvmfs/portal
+%define         shuttle_repo_path github.com/cvmfs/cvmfs
+%define         shuttle_import_path %{shuttle_repo_path}/cvmfs/portal
 
 Summary:        CernVM-FS Server Portals Add-Ons
 Name:           cvmfs-server-portals
 Version:        0.9
 Release:        1%{?dist}
-Source0:        https://ecsft.cern.ch/cvmfs/cvmfs-portal-%{portal_version}.tar.gz
+Source0:        https://ecsft.cern.ch/cvmfs/cvmfs-shuttle-%{shuttle_version}.tar.gz
 Source1:        https://github.com/cvmfs/minio/archive/%{minio_tag}.tar.gz
 Group:          Applications/System
 License:        BSD
@@ -34,16 +35,16 @@ mkdir -p src/$(dirname %{minio_import_path})
 ln -s ../../../cvmfs-minio-%{minio_tag} src/%{minio_import_path}
 
 %setup -TDqa 1
-mkdir -p src/$(dirname $(dirname %{shuttle_import_path}))
-ln -s ../../../docker-graphdriver-%{shuttle_version} src/$(dirname %{shuttle_import_path})
+mkdir -p src/$(dirname %{shuttle_repo_path})
+ln -s ../../../cvmfs-shuttle-%{shuttle_version} src/%{shuttle_repo_path}
 
 %build
-gcc -Wall -g -o cvmfs_runas src/$(dirname %{shuttle_import_path})/runas.c
+gcc -Wall -g -o cvmfs_runas src/%{shuttle_import_path}/runas.c
 
 export GOPATH=$(pwd)
 
 go build -v \
-  -ldflags="-X main.version=%{portal_version} -X main.git_hash=%{shuttle_commitid}" \
+  -ldflags="-X main.version=%{shuttle_version} -X main.git_hash=%{shuttle_commitid}" \
   -o cvmfs_shuttle %{shuttle_import_path}
 
 minio_tag=%{minio_tag}
