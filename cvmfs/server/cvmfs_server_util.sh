@@ -984,7 +984,7 @@ Supported Commands:
                   [-V VOMS authorization] [-X (external data)]
                   <fully qualified repository name>
                   Creates a new repository with a given name
-  portal          [-a new portal] [-r portal name] [-l]
+  portal          [-a portal name -p portal path] [-r portal name] [-l]
   add-replica     [-u stratum1 upstream storage] [-o owner] [-w stratum1 url]
                   [-a silence apache warning] [-z enable garbage collection]
                   [-n alias name] [-s S3 config file] [-p no apache config]

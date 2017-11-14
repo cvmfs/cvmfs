@@ -66,8 +66,15 @@ __portal_list() {
     fi
 
     local name=$(basename $portal)
-    echo "Portal $name"
-    # Todo: running (on port), base path
+    local path=$(jq .cvmfsPathPrefix $portal/shuttle.json)
+    local shuttle_port=$(jq .port $portal/shuttle.json)
+    . $portal/env.conf
+    echo "Portal $name@$path    port(s3): $CVMFS_PORTAL_PORT    port(shuttle): $shuttle_port"
+    if [ -r $portal/config.json ]; then
+      local access_key=$(jq .credential.accessKey $portal/config.json)
+      local secret_key=$(jq .credential.secretKey $portal/config.json)
+      echo "    key(access): $access_key    key(secret): $secret_key"
+    fi
   done
 }
 
@@ -120,6 +127,7 @@ __shuttle_get_systemd_unit() {
 __portal_add() {
   local reponame="$1"
   local portalname="$2"
+  local portalpath="$3"
   load_repo_config $name
 
   # sanity checks
@@ -127,6 +135,8 @@ __portal_add() {
   __portal_exists $reponame $portalname && \
     { echo "Portal $reponame:$portalname already exists" >&2; return 1; } || true
   __portal_check_system_requirements || return 1
+  [ -d /cvmfs/$reponame$portalpath ] || \
+    { echo "Directory $portalpath does not exist in the repository" >&2; return 1; }
   is_root || { echo "Only root can add a portal" >&2; return 1; }
   check_apache || { echo "Apache must be installed and running" >&2; return 1; }
 
@@ -153,7 +163,7 @@ EOF
   "fqrn": "$reponame",
   "port": $shuttle_port,
   "spoolPath": "$spool_dir",
-  "cvmfsPathPrefix": "TODO"
+  "cvmfsPathPrefix": "$portalpath"
 }
 EOF
   cat >$config_dir/config.json << EOF
@@ -264,12 +274,16 @@ cvmfs_server_portal() {
   local do_list=0
   local portal_add
   local portal_rm
+  local portal_path
 
   OPTIND=1
-  while getopts "a:r:l" option; do
+  while getopts "a:p:r:l" option; do
     case $option in
       a)
         portal_add="$OPTARG"
+      ;;
+      p)
+        portal_path="$OPTARG"
       ;;
       r)
         portal_rm="$OPTARG"
@@ -302,7 +316,11 @@ cvmfs_server_portal() {
     fi
 
     if [ "x$portal_add" != "x" ]; then
-      __portal_add $name $portal_add || return 1
+      if [ "x$portal_path" = "x" ]; then
+        echo "A portal requires a path to be associated with" >&2
+        return 1
+      fi
+      __portal_add $name $portal_add $portal_path || return 1
     fi
 
     if [ $do_list -eq 1 ]; then
