@@ -203,10 +203,15 @@ cvmfs_server_publish() {
         -C $trusted_certs                              \
         -N $name                                       \
         -K $CVMFS_PUBLIC_KEY                           \
-        -W $tag_name                                   \
+        -D $tag_name                                   \
+        -G $tag_channel                                \
         $(get_follow_http_redirects_flag)              \
         $authz_file                                    \
         $log_level $tweaks_option $external_option $verbosity"
+
+    if [ x"$tag_description" = x"" ]; then
+      sync_command="$sync_command -J $tag_description"
+    fi
 
     # If the upstream type is "gw", we need to pass additional parameters
     # to the `cvmfs_swissknife sync` command: the username and the

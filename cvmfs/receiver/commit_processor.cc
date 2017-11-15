@@ -41,6 +41,8 @@ PathString RemoveRepoName(const PathString& lease_path) {
 }
 
 bool CreateNewTag(const std::string& tag_name,
+                  const std::string& tag_channel,
+                  const std::string& tag_description,
                   const std::string& repo_name,
                   const receiver::Params& params,
                   const std::string& temp_dir,
@@ -55,6 +57,8 @@ bool CreateNewTag(const std::string& tag_name,
   args['f'] = new std::string(repo_name);
   args['e'] = new std::string(params.hash_alg_str);
   args['a'] = new std::string(tag_name);
+  args['c'] = new std::string(tag_channel);
+  args['D'] = new std::string(tag_description);
   args['x'] = NULL;
 
   UniquePtr<swissknife::CommandEditTag> edit_cmd(new swissknife::CommandEditTag());
@@ -100,7 +104,8 @@ CommitProcessor::~CommitProcessor() {}
  */
 CommitProcessor::Result CommitProcessor::Process(
     const std::string& lease_path, const shash::Any& old_root_hash,
-    const shash::Any& new_root_hash, const std::string& tag_name) {
+    const shash::Any& new_root_hash, const std::string& tag_name,
+    const std::string& tag_channel, const std::string& tag_description) {
 
   // If tag_name is a generic tag, update the time stamp
   std::string final_tag_name = tag_name;
@@ -116,9 +121,10 @@ CommitProcessor::Result CommitProcessor::Process(
 
   LogCvmfs(kLogReceiver, kLogSyslog,
            "CommitProcessor - lease_path: %s, old hash: %s, new hash: %s, "
-           "tag_name: %s",
+           "tag_name: %s, tag_channel: %s, tag_description: %s",
            lease_path.c_str(), old_root_hash.ToString(true).c_str(),
-           new_root_hash.ToString(true).c_str(), final_tag_name.c_str());
+           new_root_hash.ToString(true).c_str(), final_tag_name.c_str(),
+           tag_channel.c_str(), tag_description.c_str());
 
   const std::vector<std::string> lease_path_tokens =
       SplitString(lease_path, '/');
@@ -202,7 +208,8 @@ CommitProcessor::Result CommitProcessor::Process(
   const std::string certificate = "/etc/cvmfs/keys/" + repo_name + ".crt";
   const std::string private_key = "/etc/cvmfs/keys/" + repo_name + ".key";
 
-  if (!CreateNewTag(final_tag_name, repo_name, params, temp_dir,
+  if (!CreateNewTag(final_tag_name, tag_channel, tag_description,
+                    repo_name, params, temp_dir,
                     new_manifest_path, public_key)) {
     LogCvmfs(kLogReceiver, kLogSyslogErr, "Error creating tag: %s",
     tag_name.c_str());

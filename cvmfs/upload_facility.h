@@ -131,7 +131,9 @@ class AbstractUploader
    */
   virtual bool FinalizeSession(bool commit, const std::string &old_root_hash,
                                const std::string &new_root_hash,
-                               const std::string &tag_name);
+                               const std::string &tag_name,
+                               const std::string &tag_channel,
+                               const std::string &tag_description);
 
   /**
    * This must be called right before the destruction of the AbstractUploader!

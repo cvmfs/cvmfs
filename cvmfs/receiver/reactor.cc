@@ -340,7 +340,11 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
       req_json->root(), "new_root_hash", JSON_STRING);
   const JSON* tag_name_json = JsonDocument::SearchInObject(
       req_json->root(), "tag_name", JSON_STRING);
-
+  const JSON* tag_channel_json = JsonDocument::SearchInObject(
+    req_json->root(), "tag_channel", JSON_STRING);
+  const JSON* tag_description_json = JsonDocument::SearchInObject(
+    req_json->root(), "tag_message", JSON_STRING);
+      
   if (lease_path_json == NULL || old_root_hash_json == NULL ||
       new_root_hash_json == NULL) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
@@ -355,9 +359,11 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
   shash::Any new_root_hash = shash::MkFromSuffixedHexPtr(
       shash::HexPtr(new_root_hash_json->string_value));
   const std::string tag_name(tag_name_json->string_value);
-    CommitProcessor::Result res = proc->Process(lease_path_json->string_value,
-                                                old_root_hash, new_root_hash,
-                                                tag_name);
+  const std::string tag_channel(tag_channel_json->string_value);
+  const std::string tag_description(tag_description_json->string_value);
+  CommitProcessor::Result res = proc->Process(lease_path_json->string_value,
+                                              old_root_hash, new_root_hash,
+                                              tag_name, tag_channel, tag_description);
 
   JsonStringInput reply_input;
   switch (res) {

@@ -54,7 +54,9 @@ struct SyncParameters {
         min_weight(kDefaultMinWeight),
         session_token_file(),
         key_file(),
-        tag_name("") {}
+        tag_name(""),
+        tag_channel(""),
+        tag_description("") {}
 
   upload::Spooler *spooler;
   std::string repo_name;
@@ -102,6 +104,8 @@ struct SyncParameters {
   std::string session_token_file;
   std::string key_file;
   std::string tag_name;
+  std::string tag_channel;
+  std::string tag_description;
 };
 
 namespace catalog {
@@ -267,6 +271,8 @@ class CommandSync : public Command {
     r.push_back(Parameter::Optional('T', "Root catalog TTL in seconds"));
     r.push_back(Parameter::Optional('U', "file size limit in megabytes"));
     r.push_back(Parameter::Optional('W', "tag name (only used when upstream is GW)"));
+    r.push_back(Parameter::Optional('G', "tag channel (only used when upstream is GW)"));
+    r.push_back(Parameter::Optional('J', "tag description (only used when upstream is GW)"));
     r.push_back(Parameter::Optional('X', "maximum weight of the autocatalogs"));
     r.push_back(Parameter::Optional('Z',
                                     "compression algorithm "
