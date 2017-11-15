@@ -102,10 +102,10 @@ handle_call({worker_req, submit_payload, SubmissionData, Secret}, _From, State) 
     lager:info("Worker ~p request: {submit_payload, {~p, ~p}} -> Reply: ~p",
                [self(), SubmissionData, Secret, Reply]),
     {reply, Reply, State};
-handle_call({worker_req, commit, LeasePath, OldRootHash, NewRootHash, TagName}, _From, State) ->
-    Reply = p_commit(LeasePath, OldRootHash, NewRootHash, TagName),
-    lager:info("Worker ~p request: {commit, ~p, ~p, ~p, ~p} -> Reply: ~p",
-               [self(), LeasePath, OldRootHash, NewRootHash, Reply]),
+handle_call({worker_req, commit, LeasePath, OldRootHash, NewRootHash, TagName, TagChannel, TagMessage}, _From, State) ->
+    Reply = p_commit(LeasePath, OldRootHash, NewRootHash, TagName, TagChannel, TagMessage),
+    lager:info("Worker ~p request: {commit, ~p, ~p, ~p, ~p, ~p, ~p, ~p} -> Reply: ~p",
+               [self(), LeasePath, OldRootHash, NewRootHash, TagName, TagChannel, TagMessage, Reply]),
     {reply, Reply, State}.
 
 
@@ -247,9 +247,11 @@ p_submit_payload({LeaseToken, _Payload, _Digest, _HeaderSize}, Secret) ->
 -spec p_commit(LeasePath :: binary(),
                OldRootHash :: binary(),
                NewRootHash :: binary(),
-               TagName :: binary())
+               TagName :: binary(),
+               TagChannel :: binary(),
+               TagMessage :: binary())
               -> ok | {error, merge_error | io_error | worker_timeout}.
-p_commit(_Path, _OldRootHash, _NewRootHash, _TagName) ->
+p_commit(_Path, _OldRootHash, _NewRootHash, _TagName, _TagChannel, _TagMessage) ->
     timer:sleep(100),
     ok.
 
