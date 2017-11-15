@@ -92,20 +92,22 @@ cancel_lease(Uid, LeaseToken) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec commit_lease(Uid, LeaseToken, RootHashes, TagName) ->
+-spec commit_lease(Uid, LeaseToken, RootHashes, Tag) ->
                           ok | {error, invalid_macaroon | merge_error | io_error }
                               when Uid :: binary(),
                                    LeaseToken :: binary(),
                                    RootHashes :: {binary(), binary()},
-                                   TagName :: binary().
-commit_lease(Uid, LeaseToken, {OldRootHash, NewRootHash}, TagName) ->
+                                   Tag :: {binary(), binary(), binary()}.
+commit_lease(Uid, LeaseToken, {OldRootHash, NewRootHash}, {TagName, TagChannel, TagMessage}) ->
     gen_server:call(?MODULE, {be_req,
                               commit_lease,
                               Uid,
                               LeaseToken,
                               OldRootHash,
                               NewRootHash,
-                              TagName},
+                              TagName,
+                              TagChannel,
+                              TagMessage},
                     cvmfs_app_util:get_max_lease_time()).
 
 
@@ -205,11 +207,11 @@ handle_call({be_req, cancel_lease, Uid, LeaseToken}, From, State) ->
            end,
     spawn_link(Task),
     {noreply, State, cvmfs_app_util:get_max_lease_time()};
-handle_call({be_req, commit_lease, Uid, LeaseToken, OldRootHash, NewRootHash, TagName}, From, State) ->
+handle_call({be_req, commit_lease, Uid, LeaseToken, OldRootHash, NewRootHash, TagName, TagChannel, TagMessage}, From, State) ->
     Task = fun() ->
-                   Reply = p_commit_lease(LeaseToken, {OldRootHash, NewRootHash}, TagName),
-                   lager:info("Backend request: Uid: ~p - {end_lease, ~p, ~p, ~p} -> Reply: ~p",
-                              [Uid, LeaseToken, OldRootHash, NewRootHash, Reply]),
+                   Reply = p_commit_lease(LeaseToken, {OldRootHash, NewRootHash}, TagName, TagChannel, TagMessage),
+                   lager:info("Backend request: Uid: ~p - {commit_lease, ~p, ~p, ~p, ~p, ~p, ~p} -> Reply: ~p",
+                              [Uid, LeaseToken, OldRootHash, NewRootHash, TagName, TagChannel, TagMessage, Reply]),
                    gen_server:reply(From, Reply)
            end,
     spawn_link(Task),
@@ -343,14 +345,16 @@ p_cancel_lease(LeaseToken) ->
     Result.
 
 
--spec p_commit_lease(LeaseToken, RootHashes, TagName) ->
+-spec p_commit_lease(LeaseToken, RootHashes, TagName, TagChannel, TagMessage) ->
                             ok
                                 | {error, invalid_macaroon | merge_error | io_error}
                                 | cvmfs_lease:lease_get_value()
                                 when LeaseToken :: binary(),
                                      RootHashes :: {binary(), binary()},
-                                     TagName :: binary().
-p_commit_lease(LeaseToken, {OldRootHash, NewRootHash}, TagName) ->
+                                     TagName :: binary(),
+                                     TagChannel :: binary(),
+                                     TagMessage :: binary().
+p_commit_lease(LeaseToken, {OldRootHash, NewRootHash}, TagName, TagChannel, TagMessage) ->
     Result = case cvmfs_receiver:get_token_id(LeaseToken) of
                  {ok, Public} ->
                      ResultInner = case cvmfs_lease:get_lease_path(Public) of
@@ -358,7 +362,9 @@ p_commit_lease(LeaseToken, {OldRootHash, NewRootHash}, TagName) ->
                                            cvmfs_commit_sup:commit(LeasePath,
                                                                    OldRootHash,
                                                                    NewRootHash,
-                                                                   TagName);
+                                                                   TagName,
+                                                                   TagChannel,
+                                                                   TagMessage);
                                        ErrorReason ->
                                            ErrorReason
                                    end,

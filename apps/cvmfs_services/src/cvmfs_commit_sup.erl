@@ -21,7 +21,7 @@
 
 -behaviour(supervisor).
 
--export([start_link/1, init/1, commit/4]).
+-export([start_link/1, init/1, commit/6]).
 
 
 start_link(Repos) ->
@@ -48,14 +48,16 @@ add_worker(RepoName) ->
                    modules => [cvmfs_commit_worker] },
     supervisor:start_child(?MODULE, ChildSpec).
 
--spec commit(LeasePath, OldRootHash, NewRootHash, TagName) ->
+-spec commit(LeasePath, OldRootHash, NewRootHash, TagName, TagChannel, TagMessage) ->
                      ok | {error, merge_error | io_error | worker_timeout}
                         when LeasePath :: binary(),
                              OldRootHash :: binary(),
                              NewRootHash :: binary(),
-                             TagName :: binary().
-commit(LeasePath, OldRootHash, NewRootHash, TagName) ->
+                             TagName :: binary(),
+                             TagChannel :: binary(),
+                             TagMessage :: binary().
+commit(LeasePath, OldRootHash, NewRootHash, TagName, TagChannel, TagMessage) ->
     RepoName = hd(binary:split(LeasePath, <<"/">>)),
     {RepoName, Pid} = hd(ets:lookup(commit_workers, RepoName)),
-    cvmfs_commit_worker:commit(Pid, LeasePath, OldRootHash, NewRootHash, TagName).
+    cvmfs_commit_worker:commit(Pid, LeasePath, OldRootHash, NewRootHash, TagName, TagChannel, TagMessage).
 

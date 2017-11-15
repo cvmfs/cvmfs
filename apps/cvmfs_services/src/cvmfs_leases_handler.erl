@@ -194,12 +194,16 @@ p_handle_commit_lease(Req0, State, Uid) ->
             Reply = case jsx:decode(Data, [return_maps]) of
                         #{<<"old_root_hash">> := OldRootHash,
                           <<"new_root_hash">> := NewRootHash,
-                          <<"tag_name">> := TagName} ->
+                          <<"tag_name">> := TagName,
+                          <<"tag_channel">> := TagChannel,
+                          <<"tag_message">> := TagMessage} ->
                             case p_check_hmac(Uid, Token, KeyId, ClientHMAC) of
                                 true ->
                                     case cvmfs_be:commit_lease(Uid, Token, {OldRootHash,
                                                                             NewRootHash},
-                                                                            TagName) of
+                                                                           {TagName,
+                                                                            TagChannel,
+                                                                            TagMessage}) of
                                         ok ->
                                             #{<<"status">> => <<"ok">>};
                                         {error, invalid_macaroon} ->
