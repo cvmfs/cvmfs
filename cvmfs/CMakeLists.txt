@@ -372,6 +372,8 @@ if(BUILD_RECEIVER)
     gateway_util.cc
     globals.cc
     hash.cc
+    history_sql.cc
+    history_sqlite.cc
     json_document.cc
     logging.cc
     malloc_arena.cc
@@ -388,6 +390,8 @@ if(BUILD_RECEIVER)
     signature.cc
     signing_tool.cc
     statistics.cc
+    swissknife.cc
+    swissknife_history.cc
     swissknife_lease_curl.cc
     sql.cc
     sqlitemem.cc
