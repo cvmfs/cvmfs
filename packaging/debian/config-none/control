@@ -10,6 +10,7 @@ Package: cvmfs-config-none
 Architecture: all
 Breaks: cvmfs (<< 2.1.20), cvmfs-server (<< 2.1.20)
 Provides: cvmfs-config
+Conflicts: cvmfs-config
 Description:  CernVM File System Empty Configuration
  Empty package to fulfill the "cvmfs-config" dependency of cvmfs.  Can be used
  to provide custom configuration to CernVM-FS.
