@@ -29,7 +29,8 @@ echo "running CernVM-FS client test cases..."
 CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
 ./run.sh $CLIENT_TEST_LOGFILE -o ${CLIENT_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
                               -x src/001-chksetup                             \
-                                 src/026-tightcache                           \
+                                 src/010-du                                   \
+			         src/026-tightcache                           \
 				 src/032-workspace                            \
                                  src/040-aliencache                           \
 				 src/041-rocache                              \
