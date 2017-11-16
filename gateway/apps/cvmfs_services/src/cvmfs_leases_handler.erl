@@ -196,14 +196,14 @@ p_handle_commit_lease(Req0, State, Uid) ->
                           <<"new_root_hash">> := NewRootHash,
                           <<"tag_name">> := TagName,
                           <<"tag_channel">> := TagChannel,
-                          <<"tag_message">> := TagMessage} ->
+                          <<"tag_description">> := TagMessage} ->
+                            RepoTag = {TagName, TagChannel, TagMessage},
                             case p_check_hmac(Uid, Token, KeyId, ClientHMAC) of
                                 true ->
-                                    case cvmfs_be:commit_lease(Uid, Token, {OldRootHash,
-                                                                            NewRootHash},
-                                                                           {TagName,
-                                                                            TagChannel,
-                                                                            TagMessage}) of
+                                    case cvmfs_be:commit_lease(Uid,
+                                                               Token,
+                                                               {OldRootHash, NewRootHash},
+                                                               RepoTag) of
                                         ok ->
                                             #{<<"status">> => <<"ok">>};
                                         {error, invalid_macaroon} ->
