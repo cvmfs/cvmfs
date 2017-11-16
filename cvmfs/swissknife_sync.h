@@ -268,7 +268,7 @@ class CommandSync : public Command {
     r.push_back(Parameter::Optional('T', "Root catalog TTL in seconds"));
     r.push_back(Parameter::Optional('U', "file size limit in megabytes"));
     r.push_back(
-        Parameter::Optional('W', "tag name (only used when upstream is GW)"));
+        Parameter::Optional('D', "tag name (only used when upstream is GW)"));
     r.push_back(Parameter::Optional(
         'G', "tag channel (only used when upstream is GW)"));
     r.push_back(Parameter::Optional(

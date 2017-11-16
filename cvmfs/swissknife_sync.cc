@@ -614,8 +614,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     params.key_file = *args.find('H')->second;
   }
 
-  if (args.find('W') != args.end()) {
-    params.repo_tag.name_ = *args.find('W')->second;
+  if (args.find('D') != args.end()) {
+    params.repo_tag.name_ = *args.find('D')->second;
   }
 
   if (args.find('G') != args.end()) {
