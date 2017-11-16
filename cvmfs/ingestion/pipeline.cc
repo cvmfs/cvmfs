@@ -5,6 +5,8 @@
 #include "cvmfs_config.h"
 #include "pipeline.h"
 
+#include <algorithm>
+
 #include "ingestion/task_chunk.h"
 #include "ingestion/task_compress.h"
 #include "ingestion/task_hash.h"
@@ -33,7 +35,7 @@ IngestionPipeline::IngestionPipeline(
   , spawned_(false)
   , uploader_(uploader)
 {
-  unsigned nfork_base = GetNumberOfCpuCores();
+  unsigned nfork_base = std::max(1U, GetNumberOfCpuCores() / 8);
 
   for (unsigned i = 0; i < nfork_base * kNforkRegister; ++i) {
     Tube<FileItem> *tube = new Tube<FileItem>();
@@ -175,7 +177,7 @@ void TaskScrubbingCallback::Process(BlockItem *block_item) {
 
 
 ScrubbingPipeline::ScrubbingPipeline() : spawned_(false) {
-  unsigned nfork_base = GetNumberOfCpuCores();
+  unsigned nfork_base = std::max(1U, GetNumberOfCpuCores() / 8);
 
   for (unsigned i = 0; i < nfork_base * kNforkScrubbingCallback; ++i) {
     Tube<BlockItem> *tube = new Tube<BlockItem>();
