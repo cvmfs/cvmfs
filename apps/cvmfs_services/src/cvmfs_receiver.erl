@@ -17,7 +17,7 @@
          generate_token/3,
          get_token_id/1,
          submit_payload/2,
-         commit/6]).
+         commit/4]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -122,15 +122,13 @@ submit_payload(SubmissionData, Secret) ->
                         cvmfs_app_util:get_max_lease_time()).
 
 
--spec commit(LeasePath, OldRootHash, NewRootHash, TagName, TagChannel, TagMessage) ->
+-spec commit(LeasePath, OldRootHash, NewRootHash, RepoTag) ->
                     ok | {error, merge_error | io_error | worker_timeout}
                         when LeasePath :: binary(),
                              OldRootHash :: binary(),
                              NewRootHash :: binary(),
-                             TagName :: binary(),
-                             TagChannel :: binary(),
-                             TagMessage :: binary().
-commit(LeasePath, OldRootHash, NewRootHash, TagName, TagChannel, TagMessage) ->
+                             RepoTag :: cvmfs_common_types:repository_tag().
+commit(LeasePath, OldRootHash, NewRootHash, RepoTag) ->
     poolboy:transaction(cvmfs_receiver_pool,
                         fun(WorkerPid) ->
                                 gen_server:call(WorkerPid,
@@ -139,9 +137,7 @@ commit(LeasePath, OldRootHash, NewRootHash, TagName, TagChannel, TagMessage) ->
                                                  LeasePath,
                                                  OldRootHash,
                                                  NewRootHash,
-                                                 TagName,
-                                                 TagChannel,
-                                                 TagMessage},
+                                                 RepoTag},
                                                 cvmfs_app_util:get_max_lease_time())
                         end,
                         cvmfs_app_util:get_max_lease_time()).
@@ -216,11 +212,11 @@ handle_call({worker_req, submit_payload, {Token, _, Digest, HeaderSize} = Submis
     lager:info("Worker ~p request: {submit_payload, {{~p, PAYLOAD_NOT_SHOWN, ~p, ~p} ~p}} -> Reply: ~p",
                [self(), Token, Digest, HeaderSize, Secret, Reply]),
     {reply, Reply, State};
-handle_call({worker_req, commit, LeasePath, OldRootHash, NewRootHash, TagName, TagChannel, TagMessage}, _From, State) ->
+handle_call({worker_req, commit, LeasePath, OldRootHash, NewRootHash, RepoTag}, _From, State) ->
     #{worker := WorkerPort, max_lease_time := Timeout} = State,
-    Reply = p_commit(WorkerPort, LeasePath, OldRootHash, NewRootHash, TagName, TagChannel, TagMessage, Timeout),
-    lager:info("Worker ~p request: {commit, ~p, ~p, ~p, ~p, ~p, ~p, ~p} -> Reply: ~p",
-               [self(), LeasePath, OldRootHash, NewRootHash, TagName, TagChannel, TagMessage, Reply]),
+    Reply = p_commit(WorkerPort, LeasePath, OldRootHash, NewRootHash, RepoTag, Timeout),
+    lager:info("Worker ~p request: {commit, ~p, ~p, ~p, ~p, ~p} -> Reply: ~p",
+               [self(), LeasePath, OldRootHash, NewRootHash, RepoTag, Reply]),
     {reply, Reply, State}.
 
 
@@ -382,23 +378,22 @@ p_submit_payload({LeaseToken, Payload, Digest, HeaderSize}, Secret, WorkerPort, 
     end.
 
 
--spec p_commit(WorkerPort, LeasePath, OldRootHash, NewRootHash, TagName, TagChannel, TagMessage, Timeout)
+-spec p_commit(WorkerPort, LeasePath, OldRootHash, NewRootHash, RepoTag, Timeout)
               -> ok | {error, merge_error | io_error | worker_timeout}
                                         when WorkerPort :: port(),
                                              LeasePath :: binary(),
                                              OldRootHash :: binary(),
                                              NewRootHash :: binary(),
-                                             TagName :: binary(),
-                                             TagChannel :: binary(),
-                                             TagMessage :: binary(),
+                                             RepoTag :: cvmfs_common_types:repository_tag(),
                                              Timeout :: integer().
-p_commit(WorkerPort, LeasePath, OldRootHash, NewRootHash, TagName, TagChannel, TagMessage, Timeout) ->
+p_commit(WorkerPort, LeasePath, OldRootHash, NewRootHash, RepoTag, Timeout) ->
+    {TagName, TagChannel, TagDescription} = RepoTag,
     Req1 = jsx:encode(#{<<"lease_path">> => LeasePath,
                         <<"old_root_hash">> => OldRootHash,
                         <<"new_root_hash">> => NewRootHash,
                         <<"tag_name">> => TagName,
                         <<"tag_channel">> => TagChannel,
-                        <<"tag_message">> => TagMessage}),
+                        <<"tag_description">> => TagDescription}),
     p_write_request(WorkerPort, ?kCommit, Req1),
     case p_read_reply(WorkerPort, Timeout) of
         {ok, {_, Reply1}} ->

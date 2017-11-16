@@ -19,7 +19,7 @@
 
 -behaviour(gen_server).
 
--export([start_link/1, commit/7]).
+-export([start_link/1, commit/5]).
 
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2]).
 
@@ -28,17 +28,15 @@ start_link(RepoName) ->
     gen_server:start_link(?MODULE, RepoName, []).
 
 
--spec commit(Pid, LeasePath, OldRootHash, NewRootHash, TagName, TagChannel, TagMessage) ->
+-spec commit(Pid, LeasePath, OldRootHash, NewRootHash, RepoTag) ->
                      ok | {error, merge_error | io_error | worker_timeout}
                         when Pid :: pid(),
                              LeasePath :: binary(),
                              OldRootHash :: binary(),
                              NewRootHash :: binary(),
-                             TagName :: binary(),
-                             TagChannel :: binary(),
-                             TagMessage :: binary().
-commit(Pid, LeasePath, OldRootHash, NewRootHash, TagName, TagChannel, TagMessage) ->
-    gen_server:call(Pid, {commit, {LeasePath, OldRootHash, NewRootHash, TagName, TagChannel, TagMessage}},
+                             RepoTag :: cvmfs_common_types:repository_tag().
+commit(Pid, LeasePath, OldRootHash, NewRootHash, RepoTag) ->
+    gen_server:call(Pid, {commit, {LeasePath, OldRootHash, NewRootHash, RepoTag}},
                     cvmfs_app_util:get_max_lease_time()).
 
 
@@ -47,8 +45,8 @@ init(RepoName) ->
     {ok, []}.
 
 
-handle_call({commit, {LeasePath, OldRootHash, NewRootHash, TagName, TagChannel, TagMessage}}, _From, State) ->
-    Reply = cvmfs_receiver:commit(LeasePath, OldRootHash, NewRootHash, TagName, TagChannel, TagMessage),
+handle_call({commit, {LeasePath, OldRootHash, NewRootHash, RepoTag}}, _From, State) ->
+    Reply = cvmfs_receiver:commit(LeasePath, OldRootHash, NewRootHash, RepoTag),
     {reply, Reply, State}.
 
 
