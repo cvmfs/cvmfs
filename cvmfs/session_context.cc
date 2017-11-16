@@ -289,9 +289,12 @@ bool SessionContext::Commit(const std::string& old_root_hash,
       std::make_pair("old_root_hash", old_root_hash.c_str()));
   request_input.push_back(
       std::make_pair("new_root_hash", new_root_hash.c_str()));
-  request_input.push_back(std::make_pair("tag_name", tag.name_.c_str()));
-  request_input.push_back(std::make_pair("tag_channel", tag.channel_.c_str()));
-  request_input.push_back(std::make_pair("tag_description", tag.description_.c_str()));
+  request_input.push_back(std::make_pair("tag_name",
+                                         tag.name_.c_str()));
+  request_input.push_back(std::make_pair("tag_channel",
+                                         tag.channel_.c_str()));
+  request_input.push_back(std::make_pair("tag_description",
+                                         tag.description_.c_str()));
   ToJsonString(request_input, &request);
   CurlBuffer buffer;
   return MakeEndRequest("POST", key_id_, secret_, session_token_, api_url_,

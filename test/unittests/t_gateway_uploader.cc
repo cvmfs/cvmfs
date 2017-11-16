@@ -92,7 +92,8 @@ TEST_F(T_GatewayUploader, Construct) {
       "/var/spool/cvmfs/test.cern.ch/session_token_some_path", "some_key_file");
   GatewayUploaderMocked uploader(definition);
   EXPECT_TRUE(uploader.Initialize());
-  EXPECT_TRUE(uploader.FinalizeSession(false, "", "", RepositoryTag("new_tag", "trunk", "")));
+  EXPECT_TRUE(uploader.FinalizeSession(false, "", "",
+                                       RepositoryTag("new_tag", "trunk", "")));
   uploader.TearDown();
 }
 

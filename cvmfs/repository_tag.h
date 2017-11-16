@@ -13,10 +13,10 @@ struct RepositoryTag {
     RepositoryTag(const std::string& name,
                   const std::string& channel,
                   const std::string& description);
-            
+
     std::string name_;
     std::string channel_;
     std::string description_;
 };
- 
+
 #endif  // CVMFS_REPOSITORY_TAG_H_

@@ -59,7 +59,8 @@ bool CreateNewTag(const RepositoryTag& repo_tag,
   args['D'] = new std::string(repo_tag.description_);
   args['x'] = NULL;
 
-  UniquePtr<swissknife::CommandEditTag> edit_cmd(new swissknife::CommandEditTag());
+  UniquePtr<swissknife::CommandEditTag> edit_cmd(
+      new swissknife::CommandEditTag());
   const int ret = edit_cmd->Main(args);
 
   for (swissknife::ArgumentList::iterator it = args.begin();
@@ -211,7 +212,7 @@ CommitProcessor::Result CommitProcessor::Process(
     final_tag.name_.c_str());
     return kIoError;
   }
-  
+
   // We need to re-initialize the ServerTool component for signing
   server_tool.Destroy();
   server_tool = new ServerTool();

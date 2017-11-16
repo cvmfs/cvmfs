@@ -108,7 +108,7 @@ struct SyncParameters {
 namespace catalog {
 class Dirtab;
 class SimpleCatalogManager;
-}
+}  // namespace catalog
 
 namespace swissknife {
 
@@ -262,14 +262,17 @@ class CommandSync : public Command {
     r.push_back(Parameter::Optional('C', "trusted certificates"));
     r.push_back(Parameter::Optional('F', "Authz file listing (default: none)"));
     r.push_back(Parameter::Optional('M', "minimum weight of the autocatalogs"));
-    r.push_back(Parameter::Optional('Q',
-                                    "nested catalog limit in kilo-entries"));
+    r.push_back(
+        Parameter::Optional('Q', "nested catalog limit in kilo-entries"));
     r.push_back(Parameter::Optional('R', "root catalog limit in kilo-entries"));
     r.push_back(Parameter::Optional('T', "Root catalog TTL in seconds"));
     r.push_back(Parameter::Optional('U', "file size limit in megabytes"));
-    r.push_back(Parameter::Optional('W', "tag name (only used when upstream is GW)"));
-    r.push_back(Parameter::Optional('G', "tag channel (only used when upstream is GW)"));
-    r.push_back(Parameter::Optional('J', "tag description (only used when upstream is GW)"));
+    r.push_back(
+        Parameter::Optional('W', "tag name (only used when upstream is GW)"));
+    r.push_back(Parameter::Optional(
+        'G', "tag channel (only used when upstream is GW)"));
+    r.push_back(Parameter::Optional(
+        'J', "tag description (only used when upstream is GW)"));
     r.push_back(Parameter::Optional('X', "maximum weight of the autocatalogs"));
     r.push_back(Parameter::Optional('Z',
                                     "compression algorithm "
