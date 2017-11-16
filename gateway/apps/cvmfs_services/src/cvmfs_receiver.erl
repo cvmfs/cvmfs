@@ -215,7 +215,7 @@ handle_call({worker_req, submit_payload, {Token, _, Digest, HeaderSize} = Submis
 handle_call({worker_req, commit, LeasePath, OldRootHash, NewRootHash, RepoTag}, _From, State) ->
     #{worker := WorkerPort, max_lease_time := Timeout} = State,
     Reply = p_commit(WorkerPort, LeasePath, OldRootHash, NewRootHash, RepoTag, Timeout),
-    lager:info("Worker ~p request: {commit, ~p, ~p, ~p, ~p, ~p} -> Reply: ~p",
+    lager:info("Worker ~p request: {commit, ~p, ~p, ~p, ~p} -> Reply: ~p",
                [self(), LeasePath, OldRootHash, NewRootHash, RepoTag, Reply]),
     {reply, Reply, State}.
 
