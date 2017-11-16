@@ -244,10 +244,6 @@ cvmfs_setup() {
   fi
 
   if [ $nocfgmod -eq 0 ]; then
-    if ! configure_fuse; then
-      echo "Cannot configure fuse!"
-      exit 1
-    fi
     if ! configure_autofs; then
       echo "Cannot configure autofs!"
       exit 1
@@ -426,14 +422,6 @@ cvmfs_chksetup() {
     if ! check_is_on CVMFS_NFS_SOURCE; then
       echo "Warning: autofs service is not running"
       num_warnings=$(($num_warnings+1))
-    fi
-  fi
-
-  # Check fuse configuration
-  if [ "$CVMFS_USER" != "root" ]; then
-    if ! check_fuse_config; then
-      echo "Error: user_allow_other not set in /etc/fuse.conf"
-      num_errors=$(($num_errors+1))
     fi
   fi
 
@@ -1775,19 +1763,6 @@ cvmfs ALL= NOPASSWD: /usr/sbin/sysctl -w kern.maxfilesperproc=* kern.maxfiles=* 
 %everyone ALL= NOPASSWD: /bin/mkdir -p /var/run/cvmfs # added by CernVM-FS
 %everyone ALL= NOPASSWD: /usr/sbin/chown $CVMFS_USER /var/run/cvmfs # added by CernVM-FS
 EOF
-  fi
-}
-
-
-check_fuse_config() {
-  grep "^user_allow_other" /etc/fuse.conf >/dev/null 2>&1
-  return $?
-}
-
-
-configure_fuse() {
-  if ! $(grep "^user_allow_other" /etc/fuse.conf >/dev/null 2>&1); then
-    echo "user_allow_other # added by CernVM-FS" >> /etc/fuse.conf
   fi
 }
 
