@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "compression.h"
+#include "repository_tag.h"
 #include "swissknife.h"
 #include "upload.h"
 
@@ -54,9 +55,7 @@ struct SyncParameters {
         min_weight(kDefaultMinWeight),
         session_token_file(),
         key_file(),
-        tag_name(""),
-        tag_channel(""),
-        tag_description("") {}
+        repo_tag() {}
 
   upload::Spooler *spooler;
   std::string repo_name;
@@ -103,9 +102,7 @@ struct SyncParameters {
   // Parameters for when upstream type is HTTP
   std::string session_token_file;
   std::string key_file;
-  std::string tag_name;
-  std::string tag_channel;
-  std::string tag_description;
+  RepositoryTag repo_tag;
 };
 
 namespace catalog {

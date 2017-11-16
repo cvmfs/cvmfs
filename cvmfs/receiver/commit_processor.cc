@@ -40,9 +40,7 @@ PathString RemoveRepoName(const PathString& lease_path) {
   }
 }
 
-bool CreateNewTag(const std::string& tag_name,
-                  const std::string& tag_channel,
-                  const std::string& tag_description,
+bool CreateNewTag(const RepositoryTag& repo_tag,
                   const std::string& repo_name,
                   const receiver::Params& params,
                   const std::string& temp_dir,
@@ -56,9 +54,9 @@ bool CreateNewTag(const std::string& tag_name,
   args['p'] = new std::string(public_key_path);
   args['f'] = new std::string(repo_name);
   args['e'] = new std::string(params.hash_alg_str);
-  args['a'] = new std::string(tag_name);
-  args['c'] = new std::string(tag_channel);
-  args['D'] = new std::string(tag_description);
+  args['a'] = new std::string(repo_tag.name_);
+  args['c'] = new std::string(repo_tag.channel_);
+  args['D'] = new std::string(repo_tag.description_);
   args['x'] = NULL;
 
   UniquePtr<swissknife::CommandEditTag> edit_cmd(new swissknife::CommandEditTag());
@@ -71,7 +69,7 @@ bool CreateNewTag(const std::string& tag_name,
 
   if (ret) {
     LogCvmfs(kLogReceiver, kLogSyslogErr, "Error %d creating tag: %s", ret,
-             tag_name.c_str());
+             repo_tag.name_.c_str());
     return false;
   }
 
@@ -104,27 +102,26 @@ CommitProcessor::~CommitProcessor() {}
  */
 CommitProcessor::Result CommitProcessor::Process(
     const std::string& lease_path, const shash::Any& old_root_hash,
-    const shash::Any& new_root_hash, const std::string& tag_name,
-    const std::string& tag_channel, const std::string& tag_description) {
+    const shash::Any& new_root_hash, const RepositoryTag& tag) {
 
+  RepositoryTag final_tag = tag;
   // If tag_name is a generic tag, update the time stamp
-  std::string final_tag_name = tag_name;
-  if (HasPrefix(final_tag_name, "generic-", false)) {
+  if (HasPrefix(final_tag.name_, "generic-", false)) {
     // timestamp=$(date -u "+%Y-%m-%dT%H:%M:%SZ")
     char buf[32];
     time_t now = time(NULL);
     struct tm timestamp;
     gmtime_r(&now, &timestamp);
     strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &timestamp);
-    final_tag_name = std::string("generic-") + buf;
+    final_tag.name_ = std::string("generic-") + buf;
   }
 
   LogCvmfs(kLogReceiver, kLogSyslog,
            "CommitProcessor - lease_path: %s, old hash: %s, new hash: %s, "
            "tag_name: %s, tag_channel: %s, tag_description: %s",
            lease_path.c_str(), old_root_hash.ToString(true).c_str(),
-           new_root_hash.ToString(true).c_str(), final_tag_name.c_str(),
-           tag_channel.c_str(), tag_description.c_str());
+           new_root_hash.ToString(true).c_str(), final_tag.name_.c_str(),
+           final_tag.channel_.c_str(), final_tag.description_.c_str());
 
   const std::vector<std::string> lease_path_tokens =
       SplitString(lease_path, '/');
@@ -208,11 +205,10 @@ CommitProcessor::Result CommitProcessor::Process(
   const std::string certificate = "/etc/cvmfs/keys/" + repo_name + ".crt";
   const std::string private_key = "/etc/cvmfs/keys/" + repo_name + ".key";
 
-  if (!CreateNewTag(final_tag_name, tag_channel, tag_description,
-                    repo_name, params, temp_dir,
+  if (!CreateNewTag(final_tag, repo_name, params, temp_dir,
                     new_manifest_path, public_key)) {
     LogCvmfs(kLogReceiver, kLogSyslogErr, "Error creating tag: %s",
-    tag_name.c_str());
+    final_tag.name_.c_str());
     return kIoError;
   }
   

@@ -200,6 +200,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   pathspec/pathspec_pattern.cc
   reflog.cc
   reflog_sql.cc
+  repository_tag.cc
   s3fanout.cc
   sanitizer.cc
   server_tool.cc
@@ -383,6 +384,7 @@ if(BUILD_RECEIVER)
     pack.cc
     reflog.cc
     reflog_sql.cc
+    repository_tag.cc
     s3fanout.cc
     sanitizer.cc
     server_tool.cc

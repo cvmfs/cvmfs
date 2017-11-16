@@ -12,6 +12,7 @@
 
 #include <string>
 
+#include "repository_tag.h"
 #include "upload_spooler_definition.h"
 #include "util/posix.h"
 #include "util_concurrency.h"
@@ -131,9 +132,7 @@ class AbstractUploader
    */
   virtual bool FinalizeSession(bool commit, const std::string &old_root_hash,
                                const std::string &new_root_hash,
-                               const std::string &tag_name,
-                               const std::string &tag_channel,
-                               const std::string &tag_description);
+                               const RepositoryTag &tag);
 
   /**
    * This must be called right before the destruction of the AbstractUploader!

@@ -615,15 +615,15 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   }
 
   if (args.find('W') != args.end()) {
-    params.tag_name = *args.find('W')->second;
+    params.repo_tag.name_ = *args.find('W')->second;
   }
 
   if (args.find('G') != args.end()) {
-    params.tag_channel = *args.find('G')->second;
+    params.repo_tag.channel_ = *args.find('G')->second;
   }
 
   if (args.find('J') != args.end()) {
-    params.tag_description = *args.find('J')->second;
+    params.repo_tag.description_ = *args.find('J')->second;
   }
 
   if (!CheckParams(params)) return 2;
@@ -792,8 +792,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   const std::string new_root_hash = manifest->catalog_hash().ToString(true);
 
   spooler_catalogs->FinalizeSession(true, old_root_hash, new_root_hash,
-                                    params.tag_name, params.tag_channel,
-                                    params.tag_description);
+                                    params.repo_tag);
   delete params.spooler;
 
   if (!manifest->Export(params.manifest_path)) {

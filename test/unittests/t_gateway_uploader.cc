@@ -6,6 +6,7 @@
 
 #include <cstdlib>
 
+#include "repository_tag.h"
 #include "upload.h"
 #include "upload_gateway.h"
 #include "upload_spooler_definition.h"
@@ -91,7 +92,7 @@ TEST_F(T_GatewayUploader, Construct) {
       "/var/spool/cvmfs/test.cern.ch/session_token_some_path", "some_key_file");
   GatewayUploaderMocked uploader(definition);
   EXPECT_TRUE(uploader.Initialize());
-  EXPECT_TRUE(uploader.FinalizeSession(false, "", "", "", "", ""));
+  EXPECT_TRUE(uploader.FinalizeSession(false, "", "", RepositoryTag("new_tag", "trunk", "")));
   uploader.TearDown();
 }
 

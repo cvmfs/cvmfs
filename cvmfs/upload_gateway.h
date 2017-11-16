@@ -10,6 +10,7 @@
 #include <string>
 
 #include "pack.h"
+#include "repository_tag.h"
 #include "session_context.h"
 #include "upload_facility.h"
 
@@ -49,9 +50,7 @@ class GatewayUploader : public AbstractUploader {
 
   virtual bool FinalizeSession(bool commit, const std::string& old_root_hash,
                                const std::string& new_root_hash,
-                               const std::string& tag_name,
-                               const std::string& tag_channel,
-                               const std::string& tag_description);
+                               const RepositoryTag& tag);
 
   virtual void WaitForUpload() const;
 
