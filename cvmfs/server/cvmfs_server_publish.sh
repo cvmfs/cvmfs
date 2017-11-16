@@ -209,7 +209,7 @@ cvmfs_server_publish() {
         $authz_file                                    \
         $log_level $tweaks_option $external_option $verbosity"
 
-    if [ x"$tag_description" = x"" ]; then
+    if [ x"$tag_description" != x"" ]; then
       sync_command="$sync_command -J $tag_description"
     fi
 
