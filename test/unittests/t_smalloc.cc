@@ -108,3 +108,12 @@ TEST(T_Smalloc, XmmapAlign) {
     }
   }
 }
+
+
+TEST(T_Smalloc, Null) {
+  // Don't crash
+  free(smalloc(0));
+  free(scalloc(0, 1));
+  free(scalloc(1, 0));
+  free(srealloc(NULL, 0));
+}

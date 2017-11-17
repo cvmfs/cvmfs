@@ -1,4 +1,6 @@
 2.5.0:
+  * New file ingestion pipeline
+  * Drop tbb dependency
   * Add docker graph driver plugin configuration
   * Add RapidCheck for property based testing
   * Fix compilation on macOS 10.11+
@@ -7,7 +9,9 @@
   * Make `true` to be a valid boolean option
 
 2.4.3:
-  * Work around for alien cache on BeeGFS (CVM-1403)
+  * Turn cvmfs-config into Debian virtual package (CVM-1420)
+  * Invalidate inodes instead of dentries on reload/remount (CVM-1423)
+  * Workaround for alien cache on BeeGFS (CVM-1403)
 
 2.4.2:
   * Skip external files during garbage collection (CVM-1396)

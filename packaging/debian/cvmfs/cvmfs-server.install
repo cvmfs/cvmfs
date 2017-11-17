@@ -1,11 +1,3 @@
-usr/lib/libtbb_cvmfs.so
-usr/lib/libtbbmalloc_cvmfs.so
-usr/lib/libtbb_cvmfs.so.2
-usr/lib/libtbbmalloc_cvmfs.so.2
-usr/lib/libtbb_cvmfs_debug.so
-usr/lib/libtbbmalloc_cvmfs_debug.so
-usr/lib/libtbb_cvmfs_debug.so.2
-usr/lib/libtbbmalloc_cvmfs_debug.so.2
 usr/bin/cvmfs_receiver
 usr/bin/cvmfs_swissknife
 usr/bin/cvmfs_swissknife_debug

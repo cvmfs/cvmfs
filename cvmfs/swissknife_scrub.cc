@@ -11,6 +11,7 @@
 #include "logging.h"
 #include "smalloc.h"
 #include "util/posix.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 
@@ -20,56 +21,18 @@ const size_t kHashSubtreeLength = 2;
 const std::string kTxnDirectoryName = "txn";
 
 CommandScrub::CommandScrub()
-    : machine_readable_output_(false), reader_(NULL), alerts_(0) {
-  // initialize alert printer mutex
-  const bool mutex_init = (pthread_mutex_init(&alerts_mutex_, NULL) == 0);
-  assert(mutex_init);
+  : machine_readable_output_(false)
+  , alerts_(0)
+{
+  int retval = pthread_mutex_init(&alerts_mutex_, NULL);
+  assert(retval == 0);
 }
 
-CommandScrub::~CommandScrub() {
-  if (reader_ != NULL) {
-    delete reader_;
-    reader_ = NULL;
-  }
 
+CommandScrub::~CommandScrub() {
   pthread_mutex_destroy(&alerts_mutex_);
 }
 
-CommandScrub::StoredFile::StoredFile(const std::string &path,
-                                     const std::string &expected_hash)
-    : AbstractFile(path, GetFileSize(path)), hash_done_(false) {
-  expected_hash_ = shash::MkFromHexPtr(shash::HexPtr(expected_hash));
-  hash_context_.algorithm = expected_hash_.algorithm;
-  hash_context_.size = shash::GetContextSize(expected_hash_.algorithm);
-  hash_context_.buffer = smalloc(hash_context_.size);
-  shash::Init(hash_context_);
-}
-
-void CommandScrub::StoredFile::Update(const unsigned char *data,
-                                      const size_t nbytes) {
-  assert(!hash_done_);
-  shash::Update(data, nbytes, hash_context_);
-}
-
-void CommandScrub::StoredFile::Finalize() {
-  assert(!hash_done_);
-  shash::Final(hash_context_, &content_hash_);
-  free(hash_context_.buffer);
-  hash_context_.buffer = NULL;
-  hash_done_ = true;
-}
-
-tbb::task *CommandScrub::StoredFileScrubbingTask::execute() {
-  StoredFile *file = StoredFileScrubbingTask::file();
-  upload::CharBuffer *buffer = StoredFileScrubbingTask::buffer();
-
-  file->Update(buffer->ptr(), buffer->used_bytes());
-  if (IsLast()) {
-    file->Finalize();
-  }
-
-  return Finalize();
-}
 
 swissknife::ParameterList CommandScrub::GetParams() const {
   swissknife::ParameterList r;
@@ -99,8 +62,10 @@ const char *CommandScrub::Alerts::ToString(const CommandScrub::Alerts::Type t) {
   }
 }
 
-void CommandScrub::FileCallback(const std::string &relative_path,
-                                const std::string &file_name) {
+void CommandScrub::FileCallback(
+  const std::string &relative_path,
+  const std::string &file_name)
+{
   assert(!file_name.empty());
 
   if (relative_path.empty()) {
@@ -124,12 +89,19 @@ void CommandScrub::FileCallback(const std::string &relative_path,
     return;
   }
 
-  assert(reader_ != NULL);
-  reader_->ScheduleRead(new StoredFile(full_path, hash_string));
+  shash::Any hash_from_name =
+    shash::MkFromSuffixedHexPtr(shash::HexPtr(hash_string));
+  pipeline_scrubbing_.Process(
+    full_path,
+    hash_from_name.algorithm,
+    hash_from_name.suffix);
 }
 
-void CommandScrub::DirCallback(const std::string &relative_path,
-                               const std::string &dir_name) {
+
+void CommandScrub::DirCallback(
+  const std::string &relative_path,
+  const std::string &dir_name)
+{
   const string full_path = MakeFullPath(relative_path, dir_name);
   // Check for nested subdirs
   if (relative_path.size() > 0) {
@@ -150,16 +122,32 @@ void CommandScrub::SymlinkCallback(const std::string &relative_path,
   PrintAlert(Alerts::kUnexpectedSymlink, full_path);
 }
 
-void CommandScrub::FileProcessedCallback(StoredFile *const &file) {
-  if (file->content_hash() != file->expected_hash()) {
-    PrintAlert(Alerts::kContentHashMismatch, file->path(),
-               file->content_hash().ToString());
+void CommandScrub::OnFileHashed(const ScrubbingResult &scrubbing_result) {
+  const string full_path = scrubbing_result.path;
+  const string file_name = GetFileName(full_path);
+  const string parent_path = GetParentPath(full_path);
+  const string relative_path = MakeRelativePath(parent_path);
+  assert(!file_name.empty());
+
+  const std::string hash_string =
+    CheckPathAndExtractHash(relative_path, file_name, full_path);
+  assert(!hash_string.empty());
+  assert(shash::HexPtr(hash_string).IsValid());
+
+
+  if (scrubbing_result.hash !=
+      shash::MkFromSuffixedHexPtr(shash::HexPtr(hash_string)))
+  {
+    PrintAlert(Alerts::kContentHashMismatch, full_path,
+               scrubbing_result.hash.ToString());
   }
 }
 
 std::string CommandScrub::CheckPathAndExtractHash(
-    const std::string &relative_path, const std::string &file_name,
-    const std::string &full_path) const {
+    const std::string &relative_path,
+    const std::string &file_name,
+    const std::string &full_path) const
+{
   // check for a valid object modifier on the end of the file name
   const char last_character = *(file_name.end() - 1);
   bool has_object_modifier = false;
@@ -183,16 +171,13 @@ std::string CommandScrub::CheckPathAndExtractHash(
   return hash_string;
 }
 
+
 int CommandScrub::Main(const swissknife::ArgumentList &args) {
   repo_path_ = MakeCanonicalPath(*args.find('r')->second);
   machine_readable_output_ = (args.find('m') != args.end());
 
-  // initialize asynchronous reader
-  const size_t max_buffer_size = 512 * 1024;
-  const unsigned int max_files_in_flight = 100;
-  reader_ = new ScrubbingReader(max_buffer_size, max_files_in_flight);
-  reader_->RegisterListener(&CommandScrub::FileProcessedCallback, this);
-  reader_->Initialize();
+  pipeline_scrubbing_.RegisterListener(&CommandScrub::OnFileHashed, this);
+  pipeline_scrubbing_.Spawn();
 
   // initialize file system recursion engine
   FileSystemTraversal<CommandScrub> traverser(this, repo_path_, true);
@@ -202,14 +187,16 @@ int CommandScrub::Main(const swissknife::ArgumentList &args) {
   traverser.Recurse(repo_path_);
 
   // wait for reader to finish all jobs
-  reader_->Wait();
-  reader_->TearDown();
+  pipeline_scrubbing_.WaitFor();
 
   return (alerts_ == 0) ? 0 : 1;
 }
 
-void CommandScrub::PrintAlert(const Alerts::Type type, const std::string &path,
-                              const std::string &affected_hash) const {
+void CommandScrub::PrintAlert(
+  const Alerts::Type type,
+  const std::string &path,
+  const std::string &affected_hash) const
+{
   MutexLockGuard l(alerts_mutex_);
 
   const char *msg = Alerts::ToString(type);
@@ -229,6 +216,11 @@ std::string CommandScrub::MakeFullPath(const std::string &relative_path,
   return (relative_path.empty())
              ? repo_path_ + "/" + file_name
              : repo_path_ + "/" + relative_path + "/" + file_name;
+}
+
+std::string CommandScrub::MakeRelativePath(const std::string &full_path) {
+  assert(HasPrefix(full_path, repo_path_ + "/", false));
+  return full_path.substr(repo_path_.length() + 1);
 }
 
 void CommandScrub::ShowAlertsHelpMessage() const {

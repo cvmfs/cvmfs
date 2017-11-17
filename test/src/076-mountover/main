@@ -1,0 +1,22 @@
+
+cvmfs_test_name="Mount over a directory in cvmfs and reload"
+
+cleanup() {
+  sudo umount /cvmfs/cvmfs-config.cern.ch/etc/cvmfs
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  cvmfs_mount cvmfs-config.cern.ch || return 1
+  sudo mount -t proc none /cvmfs/cvmfs-config.cern.ch/etc/cvmfs || return 2
+  trap cleanup EXIT HUP INT TERM
+
+  ls /cvmfs/cvmfs-config.cern.ch/etc/cvmfs/self || return 10
+  sudo cvmfs_config reload cvmfs-config.cern.ch || return 11
+
+  ls /cvmfs/cvmfs-config.cern.ch/etc/cvmfs/self || return 20
+
+  return 0
+}
+

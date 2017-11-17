@@ -10,7 +10,6 @@ ZLIB_VERSION=1.2.8
 SPARSEHASH_VERSION=1.12
 LEVELDB_VERSION=1.18
 GOOGLETEST_VERSION=1.7.0
-TBB_VERSION=4.4-5
 LIBGEOIP_VERSION=1.6.0
 PYTHON_GEOIP_VERSION=1.3.1
 PROTOBUF_VERSION=2.6.1
@@ -194,15 +193,6 @@ build_lib() {
         do_build "python-geoip"
       fi
       ;;
-    tbb)
-      if [ x"BUILD_SERVER" != x"" ]; then
-        do_extract "tbb"          "tbb-${TBB_VERSION}.tar.gz"
-        patch_external "tbb"         "custom_library_suffix.patch"        \
-                                    "symlink_to_build_directories.patch" \
-                                    "32bit_mock.patch"
-        do_build "tbb"
-      fi
-      ;;
     protobuf)
       do_extract "protobuf"     "protobuf-${PROTOBUF_VERSION}.tar.bz2"
       do_build "protobuf"
@@ -251,7 +241,7 @@ build_lib() {
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 # Build a list of libs that need to be built
-missing_libs="libcurl pacparser zlib sparsehash leveldb googletest libgeoip tbb protobuf googlebench sqlite3 vjson sha2 sha3 mongoose"
+missing_libs="libcurl pacparser zlib sparsehash leveldb googletest libgeoip protobuf googlebench sqlite3 vjson sha2 sha3 mongoose"
 if [ x"$BUILD_QC_TESTS" != x"" ]; then
     missing_libs="$missing_libs rapidcheck"
 fi
