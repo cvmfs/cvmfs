@@ -115,8 +115,8 @@
 
 #include "file_chunk.h"
 #include "hash.h"
-#include "repository_tag.h"
 #include "ingestion/pipeline.h"
+#include "repository_tag.h"
 #include "upload_facility.h"
 #include "upload_spooler_definition.h"
 #include "upload_spooler_result.h"

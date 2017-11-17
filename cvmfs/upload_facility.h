@@ -9,9 +9,9 @@
 
 #include <string>
 
-#include "repository_tag.h"
 #include "ingestion/task.h"
 #include "ingestion/tube.h"
+#include "repository_tag.h"
 #include "upload_spooler_definition.h"
 #include "util/posix.h"
 #include "util_concurrency.h"
