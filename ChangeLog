@@ -1,4 +1,5 @@
 2.5.0:
+  * Don't enforce user_allow_other fuse option (CVM-1379)
   * New file ingestion pipeline
   * Drop tbb dependency
   * Add docker graph driver plugin configuration
