@@ -1,4 +1,5 @@
 2.4.3:
+  * Fix races in mtab handling of crash unmounter with writable mtab (CVM-1431)
   * Turn cvmfs-config into Debian virtual package (CVM-1420)
   * Invalidate inodes instead of dentries on reload/remount (CVM-1423)
   * Workaround for alien cache on BeeGFS (CVM-1403)
