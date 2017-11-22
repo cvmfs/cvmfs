@@ -1464,7 +1464,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     if (time == 0)
       attribute_value = "n/a";
     else
-      attribute_value = StringifyInt((rx/1024)/time);
+      attribute_value = StringifyInt((1000 * (rx/1024))/time);
   } else if (attr == "user.fqrn") {
     attribute_value = loader_exports_->repository_name;
   } else if (attr == "user.inode_max") {
