@@ -13,7 +13,11 @@ cvmfs_run_test() {
 
   cvmfs_umount atlas.cern.ch || return 4
   num_pinned2=$(sudo cvmfs_talk -i sft.cern.ch cache list pinned | wc -l)
-  [ $num_pinned -eq $(($num_pinned2 + 2)) ] || return 5
+  if [ $num_pinned -ne $(($num_pinned2 + 2)) ]; then
+    echo "$num_pinned $num_pinned2"
+    sudo cvmfs_talk -i sft.cern.ch cache list pinned
+    return 5
+  fi
 
   return 0
 }
