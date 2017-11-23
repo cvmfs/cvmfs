@@ -52,6 +52,7 @@ set(CVMFS_UNITTEST_FILES
   t_file_guard.cc
   t_file_processing.cc
   t_file_sandbox.cc
+  t_file_watcher.cc
   t_fs_traversal.cc
   t_fuse_evict.cc
   t_garbage_collector.cc
@@ -154,6 +155,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/file_processing/file_processor.cc
   ${CVMFS_SOURCE_DIR}/file_processing/io_dispatcher.cc
   ${CVMFS_SOURCE_DIR}/file_processing/processor.cc
+  ${CVMFS_SOURCE_DIR}/file_watcher.cc
   ${CVMFS_SOURCE_DIR}/fuse_evict.cc
   ${CVMFS_SOURCE_DIR}/gateway_util.cc
   ${CVMFS_SOURCE_DIR}/globals.cc
