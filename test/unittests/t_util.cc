@@ -936,30 +936,30 @@ TEST_F(T_Util, CreateTempDir) {
   EXPECT_TRUE(DirectoryExists(directory)) << errno;
 }
 
-TEST_F(T_Util, FindFiles) {
+TEST_F(T_Util, FindFilesBySuffix) {
   vector<string> result;
   string files[] = { "file1.txt", "file2.txt", "file3.conf" };
   const unsigned size = 3;
   for (unsigned i = 0; i < size; ++i)
     CreateFileWithContent(files[i], files[i]);
 
-  result = FindFiles("/fakepath/fakedir", "");
+  result = FindFilesBySuffix("/fakepath/fakedir", "");
   EXPECT_TRUE(result.empty());
 
-  result = FindFiles(sandbox, "");  // find them all
+  result = FindFilesBySuffix(sandbox, "");  // find them all
   // FindFiles includes . and .. and the precreated large directory
   EXPECT_EQ(size + 3, result.size());
   for (unsigned i = 0; i < size; ++i)
     EXPECT_EQ(sandbox + "/" + files[i], result[i + 2]);
 
-  result = FindFiles(sandbox, ".fake");
+  result = FindFilesBySuffix(sandbox, ".fake");
   EXPECT_EQ(0u, result.size());
 
-  result = FindFiles(sandbox, ".conf");
+  result = FindFilesBySuffix(sandbox, ".conf");
   EXPECT_EQ(1u, result.size());
   EXPECT_EQ(sandbox + "/" + files[2], result[0]);
 
-  result = FindFiles(sandbox, ".txt");
+  result = FindFilesBySuffix(sandbox, ".txt");
   EXPECT_EQ(2u, result.size());
   EXPECT_EQ(sandbox + "/" + files[0], result[0]);
   EXPECT_EQ(sandbox + "/" + files[1], result[1]);

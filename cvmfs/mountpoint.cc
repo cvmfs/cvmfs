@@ -1261,9 +1261,10 @@ bool MountPoint::CreateSignatureManager() {
     public_keys = optarg;
   } else if (options_mgr_->GetValue("CVMFS_KEYS_DIR", &optarg)) {
     // Collect .pub files from CVMFS_KEYS_DIR
-    public_keys = JoinStrings(FindFiles(optarg, ".pub"), ":");
+    public_keys = JoinStrings(FindFilesBySuffix(optarg, ".pub"), ":");
   } else {
-    public_keys = JoinStrings(FindFiles("/etc/cvmfs/keys", ".pub"), ":");
+    public_keys =
+      JoinStrings(FindFilesBySuffix("/etc/cvmfs/keys", ".pub"), ":");
   }
 
   if (!signature_mgr_->LoadPublicRsaKeys(public_keys)) {

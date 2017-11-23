@@ -83,8 +83,8 @@ int LockFile(const std::string &path);
 int WritePidFile(const std::string &path);
 void UnlockFile(const int filedes);
 bool RemoveTree(const std::string &path);
-std::vector<std::string> FindFiles(const std::string &dir,
-                                   const std::string &suffix);
+std::vector<std::string> FindFilesBySuffix(const std::string &dir,
+                                           const std::string &suffix);
 std::vector<std::string> FindDirectories(const std::string &parent_dir);
 
 bool GetUidOf(const std::string &username, uid_t *uid, gid_t *main_gid);

@@ -843,7 +843,7 @@ bool RemoveTree(const string &path) {
 /**
  * Returns ls $dir/GLOB$suffix
  */
-vector<string> FindFiles(const string &dir, const string &suffix) {
+vector<string> FindFilesBySuffix(const string &dir, const string &suffix) {
   vector<string> result;
   DIR *dirp = opendir(dir.c_str());
   if (!dirp)

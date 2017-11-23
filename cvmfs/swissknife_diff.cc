@@ -57,7 +57,7 @@ int swissknife::CommandDiff::Main(const swissknife::ArgumentList &args) {
   const bool follow_redirects = args.count('L') > 0;
   string pubkey_path = *args.find('k')->second;
   if (DirectoryExists(pubkey_path))
-    pubkey_path = JoinStrings(FindFiles(pubkey_path, ".pub"), ":");
+    pubkey_path = JoinStrings(FindFilesBySuffix(pubkey_path, ".pub"), ":");
   string tagname_from = "trunk-previous";
   string tagname_to = "trunk";
   if (args.count('s') > 0) tagname_from = *args.find('s')->second;
