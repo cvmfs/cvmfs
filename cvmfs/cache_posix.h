@@ -95,6 +95,8 @@ class PosixCacheManager : public CacheManager {
 
   virtual void Spawn() { }
 
+  virtual std::string GetBackingDirectory() { return cache_path_; }
+
   void TearDown2ReadOnly();
   CacheModes cache_mode() { return cache_mode_; }
   bool alien_cache() { return alien_cache_; }
