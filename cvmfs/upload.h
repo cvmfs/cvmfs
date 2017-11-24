@@ -116,6 +116,7 @@
 #include "file_chunk.h"
 #include "hash.h"
 #include "ingestion/pipeline.h"
+#include "repository_tag.h"
 #include "upload_facility.h"
 #include "upload_spooler_definition.h"
 #include "upload_spooler_result.h"
@@ -265,7 +266,8 @@ class Spooler : public Observable<SpoolerResult> {
   void WaitForUpload() const;
 
   void FinalizeSession(bool commit, const std::string &old_root_hash = "",
-                       const std::string &new_root_hash = "") const;
+                       const std::string &new_root_hash = "",
+                       const RepositoryTag &tag = RepositoryTag()) const;
 
   /**
    * Checks how many of the already processed jobs have failed.

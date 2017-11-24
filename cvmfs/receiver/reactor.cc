@@ -15,6 +15,7 @@
 #include "json_document.h"
 #include "logging.h"
 #include "payload_processor.h"
+#include "repository_tag.h"
 #include "session_token.h"
 #include "util/pointer.h"
 #include "util/posix.h"
@@ -338,6 +339,12 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
       req_json->root(), "old_root_hash", JSON_STRING);
   const JSON* new_root_hash_json = JsonDocument::SearchInObject(
       req_json->root(), "new_root_hash", JSON_STRING);
+  const JSON* tag_name_json = JsonDocument::SearchInObject(
+      req_json->root(), "tag_name", JSON_STRING);
+  const JSON* tag_channel_json = JsonDocument::SearchInObject(
+    req_json->root(), "tag_channel", JSON_STRING);
+  const JSON* tag_description_json = JsonDocument::SearchInObject(
+    req_json->root(), "tag_description", JSON_STRING);
 
   if (lease_path_json == NULL || old_root_hash_json == NULL ||
       new_root_hash_json == NULL) {
@@ -352,8 +359,12 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
       shash::HexPtr(old_root_hash_json->string_value));
   shash::Any new_root_hash = shash::MkFromSuffixedHexPtr(
       shash::HexPtr(new_root_hash_json->string_value));
+  RepositoryTag repo_tag(tag_name_json->string_value,
+                         tag_channel_json->string_value,
+                         tag_description_json->string_value);
   CommitProcessor::Result res = proc->Process(lease_path_json->string_value,
-                                              old_root_hash, new_root_hash);
+                                              old_root_hash, new_root_hash,
+                                              repo_tag);
 
   JsonStringInput reply_input;
   switch (res) {

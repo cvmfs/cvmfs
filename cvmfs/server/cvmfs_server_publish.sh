@@ -84,13 +84,12 @@ cvmfs_server_publish() {
     names=$@
   fi
 
-  # sanity checks
-  if [ ! -z "$tag_name" ]; then
-    echo $tag_name | grep -q -v " "       || die "Spaces are not allowed in tag names"
-    check_tag_existence $name "$tag_name" && die "Tag name '$tag_name' is already in use."
-  fi
-
   for name in $names; do
+    # sanity checks
+    if [ ! -z "$tag_name" ]; then
+      echo $tag_name | grep -q -v " "       || die "Spaces are not allowed in tag names"
+      check_tag_existence $name "$tag_name" && die "Tag name '$tag_name' is already in use."
+    fi
 
     # Check if the repo name contains a subpath for locking, e.g. repo.cern.ch/sub/path/for/locking
     local subpath=$(echo $name | cut -d'/' -f2- -s)
@@ -204,9 +203,15 @@ cvmfs_server_publish() {
         -C $trusted_certs                              \
         -N $name                                       \
         -K $CVMFS_PUBLIC_KEY                           \
+        -D $tag_name                                   \
+        -G $tag_channel                                \
         $(get_follow_http_redirects_flag)              \
         $authz_file                                    \
         $log_level $tweaks_option $external_option $verbosity"
+
+    if [ x"$tag_description" != x"" ]; then
+      sync_command="$sync_command -J $tag_description"
+    fi
 
     # If the upstream type is "gw", we need to pass additional parameters
     # to the `cvmfs_swissknife sync` command: the username and the
@@ -299,12 +304,6 @@ cvmfs_server_publish() {
       if [ "x$(get_checked_out_previous_branch $name)" != "x" ]; then
         tag_command="$tag_command -P $(get_checked_out_previous_branch $name)"
       fi
-    fi
-    # If the upstream type is "gw", we need to pass additional parameters
-    # to the `cvmfs_swissknife sync` command: the username and the
-    # subpath of the active lease
-    if [ x"$upstream_type" = xgw ]; then
-      tag_command="$tag_command -P /var/spool/cvmfs/$name/session_token_$subpath"
     fi
     if [ ! -z "$tag_name" ]; then
       tag_command="$tag_command -a $tag_name"

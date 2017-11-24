@@ -4,8 +4,15 @@
 
 #include <gtest/gtest.h>
 
-#include <session_context.h>
+#include "repository_tag.h"
+#include "session_context.h"
 #include "util/posix.h"
+
+namespace {
+  RepositoryTag TestRepositoryTag() {
+    return RepositoryTag("tag_name", "trunk", "");
+  }
+}
 
 class SessionContextMocked : public upload::SessionContext {
  public:
@@ -22,7 +29,8 @@ class SessionContextMocked : public upload::SessionContext {
   }
 
   virtual bool Commit(const std::string& /*old_catalog*/,
-                      const std::string& /*new_catalog*/) {
+                      const std::string& /*new_catalog*/,
+                      const RepositoryTag& /*tag_name*/) {
     return true;
   }
 
@@ -52,7 +60,8 @@ TEST_F(T_SessionContext, BasicLifeCycle) {
   EXPECT_TRUE(ctx.CommitBucket(ObjectPack::kCas, hash, hd, "", true));
   EXPECT_EQ(1, ctx.num_jobs_dispatched_);
 
-  EXPECT_TRUE(ctx.Finalize(true, "fake/old_root_hash", "fake/new_root_hash"));
+  EXPECT_TRUE(ctx.Finalize(true, "fake/old_root_hash", "fake/new_root_hash",
+                           TestRepositoryTag()));
   EXPECT_EQ(1, ctx.num_jobs_finished_);
 }
 
@@ -76,7 +85,8 @@ TEST_F(T_SessionContext, MultipleFiles) {
   }
   EXPECT_EQ(2, ctx.num_jobs_dispatched_);
 
-  EXPECT_TRUE(ctx.Finalize(true, "fake/old_root_hash", "fake/new_root_hash"));
+  EXPECT_TRUE(ctx.Finalize(true, "fake/old_root_hash", "fake/new_root_hash",
+                           TestRepositoryTag()));
   EXPECT_EQ(3, ctx.num_jobs_finished_);
 }
 
@@ -101,7 +111,8 @@ TEST_F(T_SessionContext, MultipleFilesForcedDispatchLast) {
   }
   EXPECT_EQ(3, ctx.num_jobs_dispatched_);
 
-  EXPECT_TRUE(ctx.Finalize(true, "fake/old_root_hash", "fake/new_root_hash"));
+  EXPECT_TRUE(ctx.Finalize(true, "fake/old_root_hash", "fake/new_root_hash",
+                           TestRepositoryTag()));
   EXPECT_EQ(3, ctx.num_jobs_finished_);
 }
 
@@ -125,7 +136,8 @@ TEST_F(T_SessionContext, MultipleFilesForcedDispatchEach) {
   }
   EXPECT_EQ(10, ctx.num_jobs_dispatched_);
 
-  EXPECT_TRUE(ctx.Finalize(true, "fake/old_root_hash", "fake/new_root_hash"));
+  EXPECT_TRUE(ctx.Finalize(true, "fake/old_root_hash", "fake/new_root_hash",
+                           TestRepositoryTag()));
   EXPECT_EQ(10, ctx.num_jobs_finished_);
 }
 
@@ -151,7 +163,8 @@ TEST_F(T_SessionContext, FirstAddAllThenCommit) {
     EXPECT_TRUE(ctx.CommitBucket(ObjectPack::kCas, hash, hds[i], ""));
   }
 
-  EXPECT_TRUE(ctx.Finalize(true, "fake/old_root_hash", "fake/new_root_hash"));
+  EXPECT_TRUE(ctx.Finalize(true, "fake/old_root_hash", "fake/new_root_hash",
+                           TestRepositoryTag()));
   EXPECT_EQ(3, ctx.num_jobs_dispatched_);
   EXPECT_EQ(3, ctx.num_jobs_finished_);
 }
@@ -174,7 +187,8 @@ TEST_F(T_SessionContext, EncounterFileWhichIsLargerThanExpected) {
   shash::Any hash(shash::kSha1);
   EXPECT_TRUE(ctx.CommitBucket(ObjectPack::kCas, hash, hd, "", true));
 
-  EXPECT_TRUE(ctx.Finalize(true, "fake/old_root_hash", "fake/new_root_hash"));
+  EXPECT_TRUE(ctx.Finalize(true, "fake/old_root_hash", "fake/new_root_hash",
+                           TestRepositoryTag()));
   EXPECT_EQ(1, ctx.num_jobs_dispatched_);
   EXPECT_EQ(1, ctx.num_jobs_finished_);
 }

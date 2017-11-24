@@ -170,6 +170,34 @@ run_transactions() {
     echo "  Copy the contents of the repository"
     save_repo_contents /tmp/cvmfs_out_7
 
+    ## Transaction 8 (Check creation of auto-tag)
+
+    echo "  Starting transaction 8"
+    num_tags_before=$(cvmfs_server tag -l test.repo.org | grep generic | wc -l)
+    cvmfs_server transaction -e test.repo.org
+    echo "New file" > /cvmfs/test.repo.org/marker
+
+    echo "  Publishing changes 8"
+    cvmfs_server publish -e test.repo.org
+    cvmfs_server check test.repo.org
+
+    echo "  Get list of tags"
+    num_tags_after=$(cvmfs_server tag -l test.repo.org | grep generic | wc -l)
+    num_generic_tags_created=$((num_tags_after - num_tags_before))
+
+    ## Transaction 8 (Check creation of named tag)
+
+    echo "  Starting transaction 9"
+    cvmfs_server transaction -e test.repo.org
+    echo "New file" > /cvmfs/test.repo.org/marker
+
+    echo "  Publishing changes 9"
+    cvmfs_server publish -a specialtag -e test.repo.org
+    cvmfs_server check test.repo.org
+
+    echo "  Check that the named tag has been created"
+    specialtag_line=$(cvmfs_server tag -l test.repo.org | grep specialtag)
+
     ## Check results
 
     compare_file_checksum /tmp/cvmfs_out_1/new_file.txt d8e8fca2dc0f896fd7cb4cb0031ba249
@@ -191,6 +219,16 @@ run_transactions() {
     if [ -f /tmp/cvmfs_out_7/new/invalid_file.txt ]; then
         echo "/cvmfs/test.repo.org/new/invalid_file.txt should not have been create in transaction 7"
         exit 1
+    fi
+
+    if [ $num_generic_tags_created -lt 1 ]; then
+      echo "Autotags were not created during transaction 8"
+      exit 1
+    fi
+
+    if [ x"$specialtag_line" = x"" ]; then
+      echo "Named tag was not created during transaction 9"
+      exit 1
     fi
 
     clean_up

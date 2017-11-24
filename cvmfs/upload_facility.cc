@@ -32,12 +32,10 @@ bool AbstractUploader::Initialize() {
   return true;
 }
 
-
-bool AbstractUploader::FinalizeSession(
-  bool /*commit*/,
-  const std::string & /*old_root_hash*/,
-  const std::string & /*new_root_hash*/)
-{
+bool AbstractUploader::FinalizeSession(bool /*commit*/,
+                                       const std::string & /*old_root_hash*/,
+                                       const std::string & /*new_root_hash*/,
+                                       const RepositoryTag & /*tag*/) {
   return true;
 }
 

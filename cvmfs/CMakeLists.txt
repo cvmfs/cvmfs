@@ -202,6 +202,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   pathspec/pathspec_pattern.cc
   reflog.cc
   reflog_sql.cc
+  repository_tag.cc
   s3fanout.cc
   sanitizer.cc
   server_tool.cc
@@ -369,6 +370,8 @@ if(BUILD_RECEIVER)
     gateway_util.cc
     globals.cc
     hash.cc
+    history_sql.cc
+    history_sqlite.cc
     ingestion/chunk_detector.cc
     ingestion/item.cc
     ingestion/pipeline.cc
@@ -387,6 +390,7 @@ if(BUILD_RECEIVER)
     pack.cc
     reflog.cc
     reflog_sql.cc
+    repository_tag.cc
     s3fanout.cc
     sanitizer.cc
     server_tool.cc
@@ -394,6 +398,8 @@ if(BUILD_RECEIVER)
     signature.cc
     signing_tool.cc
     statistics.cc
+    swissknife.cc
+    swissknife_history.cc
     swissknife_lease_curl.cc
     sql.cc
     sqlitemem.cc

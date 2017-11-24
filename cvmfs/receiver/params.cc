@@ -63,6 +63,7 @@ bool GetParamsFromFile(const std::string& repo_name, Params* params) {
     return false;
   }
   params->hash_alg = shash::ParseHashAlgorithm(hash_algorithm_str);
+  params->hash_alg_str = hash_algorithm_str;
 
   std::string compression_algorithm_str;
   if (!parser.GetValue("CVMFS_COMPRESSION_ALGORITHM",

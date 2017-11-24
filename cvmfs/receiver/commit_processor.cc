@@ -18,6 +18,8 @@
 #include "params.h"
 #include "signing_tool.h"
 #include "statistics.h"
+#include "swissknife.h"
+#include "swissknife_history.h"
 #include "util/algorithm.h"
 #include "util/pointer.h"
 #include "util/posix.h"
@@ -36,6 +38,43 @@ PathString RemoveRepoName(const PathString& lease_path) {
   } else {
     return lease_path;
   }
+}
+
+bool CreateNewTag(const RepositoryTag& repo_tag,
+                  const std::string& repo_name,
+                  const receiver::Params& params,
+                  const std::string& temp_dir,
+                  const std::string& manifest_path,
+                  const std::string& public_key_path) {
+  swissknife::ArgumentList args;
+  args['r'] = new std::string(params.spooler_configuration);
+  args['w'] = new std::string(params.stratum0);
+  args['t'] = new std::string(temp_dir);
+  args['m'] = new std::string(manifest_path);
+  args['p'] = new std::string(public_key_path);
+  args['f'] = new std::string(repo_name);
+  args['e'] = new std::string(params.hash_alg_str);
+  args['a'] = new std::string(repo_tag.name_);
+  args['c'] = new std::string(repo_tag.channel_);
+  args['D'] = new std::string(repo_tag.description_);
+  args['x'] = NULL;
+
+  UniquePtr<swissknife::CommandEditTag> edit_cmd(
+      new swissknife::CommandEditTag());
+  const int ret = edit_cmd->Main(args);
+
+  for (swissknife::ArgumentList::iterator it = args.begin();
+       it != args.end(); ++it) {
+    delete it->second;
+  }
+
+  if (ret) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr, "Error %d creating tag: %s", ret,
+             repo_tag.name_.c_str());
+    return false;
+  }
+
+  return true;
 }
 
 }  // namespace
@@ -64,11 +103,26 @@ CommitProcessor::~CommitProcessor() {}
  */
 CommitProcessor::Result CommitProcessor::Process(
     const std::string& lease_path, const shash::Any& old_root_hash,
-    const shash::Any& new_root_hash) {
+    const shash::Any& new_root_hash, const RepositoryTag& tag) {
+
+  RepositoryTag final_tag = tag;
+  // If tag_name is a generic tag, update the time stamp
+  if (HasPrefix(final_tag.name_, "generic-", false)) {
+    // timestamp=$(date -u "+%Y-%m-%dT%H:%M:%SZ")
+    char buf[32];
+    time_t now = time(NULL);
+    struct tm timestamp;
+    gmtime_r(&now, &timestamp);
+    strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &timestamp);
+    final_tag.name_ = std::string("generic-") + buf;
+  }
+
   LogCvmfs(kLogReceiver, kLogSyslog,
-           "CommitProcessor - lease_path: %s, old hash: %s, new hash: %s",
+           "CommitProcessor - lease_path: %s, old hash: %s, new hash: %s, "
+           "tag_name: %s, tag_channel: %s, tag_description: %s",
            lease_path.c_str(), old_root_hash.ToString(true).c_str(),
-           new_root_hash.ToString(true).c_str());
+           new_root_hash.ToString(true).c_str(), final_tag.name_.c_str(),
+           final_tag.channel_.c_str(), final_tag.description_.c_str());
 
   const std::vector<std::string> lease_path_tokens =
       SplitString(lease_path, '/');
@@ -152,13 +206,20 @@ CommitProcessor::Result CommitProcessor::Process(
   const std::string certificate = "/etc/cvmfs/keys/" + repo_name + ".crt";
   const std::string private_key = "/etc/cvmfs/keys/" + repo_name + ".key";
 
+  if (!CreateNewTag(final_tag, repo_name, params, temp_dir,
+                    new_manifest_path, public_key)) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr, "Error creating tag: %s",
+    final_tag.name_.c_str());
+    return kIoError;
+  }
+
   // We need to re-initialize the ServerTool component for signing
   server_tool.Destroy();
   server_tool = new ServerTool();
 
   LogCvmfs(kLogReceiver, kLogSyslog,
-           "CommitProcessor - lease_path: %s, signing manifest",
-           lease_path.c_str());
+    "CommitProcessor - lease_path: %s, signing manifest",
+    lease_path.c_str());
 
   SigningTool signing_tool(server_tool.weak_ref());
   if (signing_tool.Run(new_manifest_path, params.stratum0,

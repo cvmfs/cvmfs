@@ -132,7 +132,8 @@ bool SessionContextBase::Initialize(const std::string& api_url,
 }
 
 bool SessionContextBase::Finalize(bool commit, const std::string& old_root_hash,
-                                  const std::string& new_root_hash) {
+                                  const std::string& new_root_hash,
+                                  const RepositoryTag& tag) {
   assert(active_handles_.empty());
   {
     MutexLockGuard lock(current_pack_mtx_);
@@ -156,7 +157,7 @@ bool SessionContextBase::Finalize(bool commit, const std::string& old_root_hash,
     if (old_root_hash.empty() || new_root_hash.empty()) {
       return false;
     }
-    bool commit_result = Commit(old_root_hash, new_root_hash);
+    bool commit_result = Commit(old_root_hash, new_root_hash, tag);
     if (!commit_result) {
       LogCvmfs(kLogUploadGateway, kLogStderr,
                "SessionContext: could not commit session. Aborting.");
@@ -280,13 +281,20 @@ bool SessionContext::FinalizeDerived() {
 }
 
 bool SessionContext::Commit(const std::string& old_root_hash,
-                            const std::string& new_root_hash) {
+                            const std::string& new_root_hash,
+                            const RepositoryTag& tag) {
   std::string request;
   JsonStringInput request_input;
   request_input.push_back(
       std::make_pair("old_root_hash", old_root_hash.c_str()));
   request_input.push_back(
       std::make_pair("new_root_hash", new_root_hash.c_str()));
+  request_input.push_back(std::make_pair("tag_name",
+                                         tag.name_.c_str()));
+  request_input.push_back(std::make_pair("tag_channel",
+                                         tag.channel_.c_str()));
+  request_input.push_back(std::make_pair("tag_description",
+                                         tag.description_.c_str()));
   ToJsonString(request_input, &request);
   CurlBuffer buffer;
   return MakeEndRequest("POST", key_id_, secret_, session_token_, api_url_,
@@ -358,8 +366,8 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
   // Perform the Curl POST request
   CURLcode ret = curl_easy_perform(h_curl);
   if (ret) {
-        LogCvmfs(kLogUploadGateway, kLogStderr,
-                 "SessionContext - curl_easy_perform failed: %d", ret);
+    LogCvmfs(kLogUploadGateway, kLogStderr,
+             "SessionContext - curl_easy_perform failed: %d", ret);
   }
 
   const bool ok = (reply == "{\"status\":\"ok\"}");
