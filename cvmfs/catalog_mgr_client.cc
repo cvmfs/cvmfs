@@ -140,16 +140,9 @@ LoadError ClientCatalogManager::LoadCatalog(
   }
 
   // Happens only on init/remount, i.e. quota won't delete a cached catalog
-  string checksum_dir = ".";
-  // TODO(jblomer): find a way to remove this hack
-  if (!FileExists("cvmfschecksum." + repo_name_)) {
-    if (fetcher_->cache_mgr()->id() == kPosixCacheManager) {
-      PosixCacheManager *cache_mgr =
-        reinterpret_cast<PosixCacheManager *>(fetcher_->cache_mgr());
-      if (cache_mgr->alien_cache())
-        checksum_dir = cache_mgr->cache_path();
-    }
-  }
+  string checksum_dir = fetcher_->cache_mgr()->GetBackingDirectory();
+  if (checksum_dir.empty())
+    checksum_dir = ".";
   shash::Any cache_hash(shash::kSha1, shash::kSuffixCatalog);
   uint64_t cache_last_modified = 0;
 

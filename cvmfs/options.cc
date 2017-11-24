@@ -268,7 +268,8 @@ void OptionsManager::ParseDefault(const string &fqrn) {
   protected_parameters_.clear();
 
   ParsePath("/etc/cvmfs/default.conf", false);
-  vector<string> dist_defaults = FindFiles("/etc/cvmfs/default.d", ".conf");
+  vector<string> dist_defaults =
+    FindFilesBySuffix("/etc/cvmfs/default.d", ".conf");
   for (unsigned i = 0; i < dist_defaults.size(); ++i) {
     ParsePath(dist_defaults[i], false);
   }

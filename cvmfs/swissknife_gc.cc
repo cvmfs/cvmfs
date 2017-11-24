@@ -60,7 +60,7 @@ int CommandGc::Main(const ArgumentList &args) {
   std::string repo_keys = (args.count('k') > 0) ?
     *args.find('k')->second : "";
   if (DirectoryExists(repo_keys))
-    repo_keys = JoinStrings(FindFiles(repo_keys, ".pub"), ":");
+    repo_keys = JoinStrings(FindFilesBySuffix(repo_keys, ".pub"), ":");
   const bool dry_run = (args.count('d') > 0);
   const bool list_condemned_objects = (args.count('l') > 0);
   const std::string temp_directory = (args.count('t') > 0) ?

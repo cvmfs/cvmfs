@@ -843,7 +843,7 @@ bool RemoveTree(const string &path) {
 /**
  * Returns ls $dir/GLOB$suffix
  */
-vector<string> FindFiles(const string &dir, const string &suffix) {
+vector<string> FindFilesBySuffix(const string &dir, const string &suffix) {
   vector<string> result;
   DIR *dirp = opendir(dir.c_str());
   if (!dirp)
@@ -854,6 +854,30 @@ vector<string> FindFiles(const string &dir, const string &suffix) {
     const string name(dirent->d_name);
     if ((name.length() >= suffix.length()) &&
         (name.substr(name.length()-suffix.length()) == suffix))
+    {
+      result.push_back(dir + "/" + name);
+    }
+  }
+  closedir(dirp);
+  sort(result.begin(), result.end());
+  return result;
+}
+
+
+/**
+ * Returns ls $dir/$prefixGLOB
+ */
+vector<string> FindFilesByPrefix(const string &dir, const string &prefix) {
+  vector<string> result;
+  DIR *dirp = opendir(dir.c_str());
+  if (!dirp)
+    return result;
+
+  platform_dirent64 *dirent;
+  while ((dirent = platform_readdir(dirp))) {
+    const string name(dirent->d_name);
+    if ((name.length() >= prefix.length()) &&
+        (name.substr(0, prefix.length()) == prefix))
     {
       result.push_back(dir + "/" + name);
     }

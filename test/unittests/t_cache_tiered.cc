@@ -22,6 +22,7 @@ class T_TieredCacheManager : public ::testing::Test {
       new RamCacheManager(1024, 128, MemoryKvStore::kMallocLibc,
                           perf::StatisticsTemplate("test", &stats_lower_));
     tiered_cache_ = TieredCacheManager::Create(upper_cache_, lower_cache_);
+    EXPECT_TRUE(tiered_cache_->GetBackingDirectory().empty());
     buf_ = 'x';
     hash_one_.digest[1] = 1;
   }

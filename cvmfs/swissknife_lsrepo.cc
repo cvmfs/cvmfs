@@ -47,7 +47,7 @@ int CommandListCatalogs::Main(const ArgumentList &args) {
   std::string repo_keys =
     (args.count('k') > 0) ? *args.find('k')->second : "";
   if (DirectoryExists(repo_keys))
-    repo_keys = JoinStrings(FindFiles(repo_keys, ".pub"), ":");
+    repo_keys = JoinStrings(FindFilesBySuffix(repo_keys, ".pub"), ":");
   const std::string &tmp_dir   =
     (args.count('l') > 0) ? *args.find('l')->second : "/tmp";
   if (args.count('h') > 0) {
