@@ -81,7 +81,7 @@ IngestionPipeline::IngestionPipeline(
     uint64_t high = static_cast<uint64_t>(
       static_cast<double>(platform_memsize()) * kMemFractionHighWatermark);
     task_read->SetWatermarks(low, high);
-    tasks_read_.TakeConsumer(new TaskRead(&tube_input_, &tubes_chunk_));
+    tasks_read_.TakeConsumer(task_read);
   }
 }
 

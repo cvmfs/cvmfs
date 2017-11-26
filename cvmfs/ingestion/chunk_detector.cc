@@ -91,7 +91,6 @@ uint64_t Xor32Detector::DoFindNextCutMark(BlockItem *buffer) {
 
   // get the byte offset in the current buffer
   uint64_t internal_offset = global_offset - offset();
-  assert(internal_offset >= 0);
   assert(internal_offset < static_cast<uint64_t>(buffer->size()));
 
   // Precompute the xor32 rolling checksum for finding the next cut mark
