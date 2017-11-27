@@ -102,10 +102,10 @@ handle_call({worker_req, submit_payload, SubmissionData, Secret}, _From, State) 
     lager:info("Worker ~p request: {submit_payload, {~p, ~p}} -> Reply: ~p",
                [self(), SubmissionData, Secret, Reply]),
     {reply, Reply, State};
-handle_call({worker_req, commit, LeasePath, OldRootHash, NewRootHash}, _From, State) ->
-    Reply = p_commit(LeasePath, OldRootHash, NewRootHash),
-    lager:info("Worker ~p request: {commit, ~p, ~p, ~p} -> Reply: ~p",
-               [self(), LeasePath, OldRootHash, NewRootHash, Reply]),
+handle_call({worker_req, commit, LeasePath, OldRootHash, NewRootHash, RepoTag}, _From, State) ->
+    Reply = p_commit(LeasePath, OldRootHash, NewRootHash, RepoTag),
+    lager:info("Worker ~p request: {commit, ~p, ~p, ~p, ~p, ~p} -> Reply: ~p",
+               [self(), LeasePath, OldRootHash, NewRootHash, RepoTag, Reply]),
     {reply, Reply, State}.
 
 
@@ -244,9 +244,12 @@ p_submit_payload({LeaseToken, _Payload, _Digest, _HeaderSize}, Secret) ->
     end.
 
 
--spec p_commit(LeasePath :: binary(), OldRootHash :: binary(), NewRootHash :: binary())
+-spec p_commit(LeasePath :: binary(),
+               OldRootHash :: binary(),
+               NewRootHash :: binary(),
+               RepoTag :: cvmfs_common_types:repository_tag())
               -> ok | {error, merge_error | io_error | worker_timeout}.
-p_commit(_Path, _OldRootHash, _NewRootHash) ->
+p_commit(_Path, _OldRootHash, _NewRootHash, _RepoTag) ->
     timer:sleep(100),
     ok.
 
