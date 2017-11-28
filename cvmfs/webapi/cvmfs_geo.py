@@ -214,11 +214,10 @@ def api(path_info, repo_name, version, start_response, environ):
             if (start == 0):
                 start = string.rfind(forwarded_for, ',') + 1
             rem_addr = forwarded_for[start:]
-        else:
-            if 'REMOTE_ADDR' in environ:
-                rem_addr = environ['REMOTE_ADDR']
-
-        gir_rem = addr_geoinfo(rem_addr)
+            gir_rem = addr_geoinfo(rem_addr)
+        if gir_rem is None and 'REMOTE_ADDR' in environ:
+            rem_addr = environ['REMOTE_ADDR']
+            gir_rem = addr_geoinfo(rem_addr)
 
     if gir_rem is None:
         return cvmfs_api.bad_request(start_response, 'remote addr not found in database')
