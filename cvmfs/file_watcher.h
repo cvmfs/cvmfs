@@ -10,42 +10,53 @@
 #include <map>
 #include <string>
 
-enum FileWatcherEvent {
-  kCreated,
+namespace file_watcher {
+
+enum Event {
+  kModified,
+  kRenamed,
+  kAttributes,
+  kHardlinked,
   kDeleted,
-  kModified
+  kRecreated,
+  kInvalid
 };
 
-class FileWatcherEventHandler {
+class EventHandler {
 public:
-  FileWatcherEventHandler();
-  virtual ~FileWatcherEventHandler();
+  EventHandler();
+  virtual ~EventHandler();
 
   virtual bool Handle(const std::string& file_path,
-                      FileWatcherEvent event) = 0;
+                      Event event) = 0;
 };
 
 class FileWatcher {
 public:
+  typedef std::map<std::string, EventHandler*> HandlerMap;
+
   FileWatcher();
   virtual ~FileWatcher();
 
   void RegisterHandler(const std::string& file_path,
-                       FileWatcherEventHandler* handler);
+                       EventHandler* handler);
 
   bool Start();
 
 protected:
-  typedef std::map<std::string, FileWatcherEventHandler*> HandlerMap;
-  HandlerMap handler_map_;
-  int control_pipe_[2];
-
-  virtual void InitEventLoop() = 0;
+  virtual bool RunEventLoop(const HandlerMap& handler_map,
+                            int control_pipe) = 0;
 
 private:
   static void* BackgroundThread(void* d);
 
+  HandlerMap handler_map_;
+  int control_pipe_[2];
   pthread_t thread_;
+
+  bool started_;
 };
+
+}  // file_watcher
 
 #endif  // CVMFS_FILE_WATCHER_H_

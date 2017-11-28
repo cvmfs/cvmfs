@@ -7,15 +7,14 @@
 #include "file_watcher.h"
 #include "logging.h"
 #include "util/pointer.h"
-#include "util/posix.h"
 
-class TestEventHandler : public FileWatcherEventHandler {
+class TestEventHandler : public file_watcher::EventHandler {
 public:
   TestEventHandler() {}
   virtual ~TestEventHandler() {}
 
   virtual bool Handle(const std::string& file_path,
-                      FileWatcherEvent event) {
+                      file_watcher::Event event) {
     LogCvmfs(kLogCvmfs, kLogStdout,
              "Handling %d event for file: %s",
              event, file_path.c_str());
@@ -23,23 +22,23 @@ public:
   }
 };
 
-class TestFileWatcher : public FileWatcher {
+class TestFileWatcher : public file_watcher::FileWatcher {
 public:
   TestFileWatcher() : FileWatcher() {}
   virtual ~TestFileWatcher() {}
 
-  virtual void InitEventLoop() {
+  virtual bool RunEventLoop(const FileWatcher::HandlerMap&, int) {
+    return true;
   }
 };
 
 class T_FileWatcher : public ::testing::Test {};
 
 TEST_F(T_FileWatcher, Dummy) {
-  UniquePtr<FileWatcher> watcher(new TestFileWatcher());
+  UniquePtr<file_watcher::FileWatcher> watcher(new TestFileWatcher());
 
   TestEventHandler* hd = new TestEventHandler;
   watcher->RegisterHandler("/tmp/file_watcher_test.txt", hd);
 
   EXPECT_TRUE(watcher->Start());
-  SafeSleepMs(10);
 }

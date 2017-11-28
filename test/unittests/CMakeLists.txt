@@ -111,6 +111,10 @@ set(CVMFS_UNITTEST_FILES
   t_xattr.cc
 )
 
+if (APPLE)
+    list(APPEND CVMFS_UNITTEST_FILES t_file_watcher_kqueue.cc)
+endif(APPLE)
+
 #
 # unit test source files
 #
@@ -227,6 +231,10 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/xattr.cc
   cache.pb.cc cache.pb.h
 )
+
+if (APPLE)
+    list(APPEND CVMFS_UNITTEST_SOURCES ${CVMFS_SOURCE_DIR}/file_watcher_kqueue.cc)
+endif(APPLE)
 
 set (CVMFS_UNITTEST_DEBUG_SOURCES ${CVMFS_UNITTEST_SOURCES})
 
