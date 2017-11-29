@@ -846,8 +846,11 @@ bool RemoveTree(const std::string &path) {
 /**
  * Returns ls $dir/GLOB$suffix
  */
-vector<string> FindFilesBySuffix(const string &dir, const string &suffix) {
-  vector<string> result;
+std::vector<std::string> FindFilesBySuffix(
+  const std::string &dir,
+  const std::string &suffix)
+{
+  std::vector<std::string> result;
   DIR *dirp = opendir(dir.c_str());
   if (!dirp)
     return result;
@@ -862,7 +865,7 @@ vector<string> FindFilesBySuffix(const string &dir, const string &suffix) {
     }
   }
   closedir(dirp);
-  sort(result.begin(), result.end());
+  std::sort(result.begin(), result.end());
   return result;
 }
 
@@ -870,15 +873,18 @@ vector<string> FindFilesBySuffix(const string &dir, const string &suffix) {
 /**
  * Returns ls $dir/$prefixGLOB
  */
-vector<string> FindFilesByPrefix(const string &dir, const string &prefix) {
-  vector<string> result;
+std::vector<std::string> FindFilesByPrefix(
+  const std::string &dir,
+  const std::string &prefix)
+{
+  std::vector<std::string> result;
   DIR *dirp = opendir(dir.c_str());
   if (!dirp)
     return result;
 
   platform_dirent64 *dirent;
   while ((dirent = platform_readdir(dirp))) {
-    const string name(dirent->d_name);
+    const std::string name(dirent->d_name);
     if ((name.length() >= prefix.length()) &&
         (name.substr(0, prefix.length()) == prefix))
     {
@@ -886,7 +892,7 @@ vector<string> FindFilesByPrefix(const string &dir, const string &prefix) {
     }
   }
   closedir(dirp);
-  sort(result.begin(), result.end());
+  std::sort(result.begin(), result.end());
   return result;
 }
 
