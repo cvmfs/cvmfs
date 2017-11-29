@@ -71,6 +71,22 @@
 
 using namespace std;  // NOLINT
 
+namespace {
+
+class ResolvConfEventHandler : public file_watcher::EventHandler {
+public:
+  ResolvConfEventHandler() {}
+  virtual ~ResolvConfEventHandler() {}
+
+  virtual bool Handle(const std::string& file_path,
+                      file_watcher::Event event) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "Handling event: %d for file %s",
+             event, file_path.c_str());
+    return true;
+  }
+};
+
+}  // namespace
 
 bool FileSystem::g_alive = false;
 const char *FileSystem::kDefaultCacheBase = "/var/lib/cvmfs";
@@ -1199,6 +1215,14 @@ bool MountPoint::CreateDownloadManagers() {
   SetupDnsTuning(download_mgr_);
   SetupHttpTuning();
 
+  // Create a file watcher to update the DNS settings of the download
+  // managers when there are changes to /etc/resolv.conf
+  resolv_conf_watcher_ = platform_file_watcher();
+
+  ResolvConfEventHandler* handler = new ResolvConfEventHandler();
+  resolv_conf_watcher_->RegisterHandler("/etc/resolv.conf", handler);
+  resolv_conf_watcher_->Start();
+
   string forced_proxy_template;
   if (options_mgr_->GetValue("CVMFS_PROXY_TEMPLATE", &optarg))
     forced_proxy_template = optarg;
@@ -1510,6 +1534,7 @@ MountPoint::MountPoint(
   , md5path_cache_(NULL)
   , tracer_(NULL)
   , inode_tracker_(NULL)
+  , resolv_conf_watcher_(NULL)
   , max_ttl_sec_(kDefaultMaxTtlSec)
   , kcache_timeout_sec_(static_cast<double>(kDefaultKCacheTtlSec))
   , fixed_catalog_(false)

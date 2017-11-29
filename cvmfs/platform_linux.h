@@ -33,6 +33,7 @@
 #include <string>
 #include <vector>
 
+#include "file_watcher.h"
 #include "smalloc.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
@@ -318,6 +319,10 @@ inline uint64_t platform_monotonic_time() {
 inline uint64_t platform_memsize() {
   return static_cast<uint64_t>(sysconf(_SC_PHYS_PAGES)) *
          static_cast<uint64_t>(sysconf(_SC_PAGE_SIZE));
+}
+
+inline file_watcher::FileWatcher* platform_file_watcher() {
+  return NULL;
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD
