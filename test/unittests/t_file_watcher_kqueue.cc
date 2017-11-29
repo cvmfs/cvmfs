@@ -36,24 +36,34 @@ protected:
   Counters counters_;
 };
 
-TEST_F(T_FileWatcherKqueue, Dummy) {
-  SafeWriteToFile("test", "/tmp/file_watcher_test.txt", 0600);
+TEST_F(T_FileWatcherKqueue, ModifyThenDelete) {
+  const std::string watched_file_name =
+      GetCurrentWorkingDirectory() + "/file_watcher_test.txt";
+  SafeWriteToFile("test", watched_file_name, 0600);
 
   UniquePtr<file_watcher::FileWatcher> watcher(new file_watcher::FileWatcherKqueue());
 
   TestEventHandler* hd = new TestEventHandler(&counters_);
-  watcher->RegisterHandler("/tmp/file_watcher_test.txt", hd);
+  watcher->RegisterHandler(watched_file_name, hd);
 
   EXPECT_TRUE(watcher->Start());
 
   SafeSleepMs(100);
 
-  SafeWriteToFile("test", "/tmp/file_watcher_test.txt", 0600);
+  SafeWriteToFile("test", watched_file_name, 0600);
 
   SafeSleepMs(100);
 
-  Counters::const_iterator it = counters_.find(file_watcher::kModified);
-  const int num_modifications = it->second;
-  EXPECT_TRUE(num_modifications > 0);
+  Counters::const_iterator it_mod = counters_.find(file_watcher::kModified);
+  const int num_modifications = it_mod->second;
+  EXPECT_EQ(1, num_modifications);
+
+  unlink(watched_file_name.c_str());
+
+  SafeSleepMs(100);
+
+  Counters::const_iterator it_del = counters_.find(file_watcher::kDeleted);
+  const int num_deletions = it_del->second;
+  EXPECT_EQ(1, num_deletions);
 }
 
