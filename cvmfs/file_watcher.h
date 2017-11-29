@@ -18,7 +18,6 @@ enum Event {
   kAttributes,
   kHardlinked,
   kDeleted,
-  kRecreated,
   kInvalid
 };
 

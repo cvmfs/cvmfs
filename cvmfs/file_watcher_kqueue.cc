@@ -69,13 +69,7 @@ bool FileWatcherKqueue::RunEventLoop(const FileWatcher::HandlerMap& handlers,
           WatchRecord current_record = it->second;
           file_watcher::Event event = file_watcher::kInvalid;
           if (current_ev.fflags & NOTE_DELETE) {
-            if (current_ev.fflags & NOTE_LINK) {
-              // Recreated
-              event = file_watcher::kRecreated;
-            } else {
-              // Deleted
-              event = file_watcher::kDeleted;
-            }
+            event = file_watcher::kDeleted;
           } else if (current_ev.fflags & NOTE_LINK) {
             // Hardlinked
             event = file_watcher::kHardlinked;
@@ -97,8 +91,6 @@ bool FileWatcherKqueue::RunEventLoop(const FileWatcher::HandlerMap& handlers,
 
           // Perform post-handling actions (i.e. remove, reset filter)
           if (event == file_watcher::kDeleted) {
-            RemoveFilter(current_fd);
-          } else if (event == file_watcher::kRecreated) {
             RemoveFilter(current_fd);
             const std::string file_path = watch_records_[current_fd].file_path_;
             EventHandler* handler = watch_records_[current_fd].handler_;
