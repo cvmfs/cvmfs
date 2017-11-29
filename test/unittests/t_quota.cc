@@ -284,7 +284,7 @@ TEST_F(T_QuotaManager, Workspace) {
   string workspace = "./cvmfs_ut_quota_workspace";
   string cache_workspace = tmp_path_ + ":" + workspace;
   ASSERT_TRUE(MkdirDeep(workspace, 0700));
-  vector<string> dir_entries = FindFiles(workspace, "");
+  vector<string> dir_entries = FindFilesBySuffix(workspace, "");
   // Only ., ..
   EXPECT_EQ(2U, dir_entries.size());
   delete quota_mgr_;

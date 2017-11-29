@@ -520,7 +520,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   }
   string master_keys = *args.find('k')->second;
   if (DirectoryExists(master_keys))
-    master_keys = JoinStrings(FindFiles(master_keys, ".pub"), ":");
+    master_keys = JoinStrings(FindFilesBySuffix(master_keys, ".pub"), ":");
   const string repository_name = *args.find('m')->second;
   string trusted_certs;
   if (args.find('y') != args.end())

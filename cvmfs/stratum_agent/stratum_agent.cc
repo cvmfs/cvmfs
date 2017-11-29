@@ -199,7 +199,7 @@ static void ReadConfigurations() {
     signature_mgr->Init();
     options_mgr->GetValue("CVMFS_PUBLIC_KEY", &optarg);
     if (DirectoryExists(optarg))
-      optarg = JoinStrings(FindFiles(optarg, ".pub"), ":");
+      optarg = JoinStrings(FindFilesBySuffix(optarg, ".pub"), ":");
     if (!signature_mgr->LoadPublicRsaKeys(optarg)) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
                "(%s) could not load public key %s",
