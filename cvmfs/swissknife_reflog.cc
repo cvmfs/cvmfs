@@ -223,10 +223,10 @@ void RootChainWalker::WalkCatalogsInHistory(const HistoryTN *history) {
 
   CatalogList bin_hashes;
   const bool bin_success = history->ListRecycleBin(&bin_hashes);
+  assert(bin_success);
 
   WalkListedCatalogs(tag_hashes);
-  if (bin_success)
-    WalkListedCatalogs(bin_hashes);
+  WalkListedCatalogs(bin_hashes);
 }
 
 
