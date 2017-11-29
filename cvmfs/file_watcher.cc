@@ -27,8 +27,8 @@ FileWatcher::~FileWatcher() {
       LogCvmfs(kLogCvmfs, kLogDebug, "Could not join monitor thread: %d\n", ret);
     }
 
-  close(control_pipe_[1]);
-  close(control_pipe_[0]);
+    close(control_pipe_[1]);
+    close(control_pipe_[0]);
   }
 
   for (HandlerMap::iterator it = handler_map_.begin();

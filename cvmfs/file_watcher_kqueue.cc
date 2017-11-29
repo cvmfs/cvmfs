@@ -42,9 +42,9 @@ bool FileWatcherKqueue::RunEventLoop(const FileWatcher::HandlerMap& handlers,
     RegisterFilter(it->first, it->second);
   }
 
-  std::vector<struct kevent> triggered_events(handlers.size() + 1);
   bool stop = false;
   while (!stop) {
+    std::vector<struct kevent> triggered_events(handlers.size() + 1);
     int nev = kevent(kq_, NULL, 0, &triggered_events[0], triggered_events.size(), NULL);
     if (nev == -1) {
       LogCvmfs(kLogCvmfs, kLogDebug, "Could not poll events.");
@@ -53,8 +53,6 @@ bool FileWatcherKqueue::RunEventLoop(const FileWatcher::HandlerMap& handlers,
     if (nev == 0) {
       continue;
     }
-    std::vector<int> remove_fds(0);
-    LogCvmfs(kLogCvmfs, kLogDebug, "Received %d event(s).\n", nev);
     for (int i = 0; i < nev; ++i) {
       struct kevent& current_ev = triggered_events[i];
       if (current_ev.ident == static_cast<uint64_t>(control_pipe)) {
@@ -69,9 +67,6 @@ bool FileWatcherKqueue::RunEventLoop(const FileWatcher::HandlerMap& handlers,
         if (it != watch_records_.end()) {
           int current_fd = current_ev.ident;
           WatchRecord current_record = it->second;
-          LogCvmfs(kLogCvmfs, kLogStdout, "Recover: %d for %s",
-                   current_ev.ident, it->second.file_path_.c_str());
-          LogCvmfs(kLogCvmfs, kLogDebug, "File activity.");
           file_watcher::Event event = file_watcher::kInvalid;
           if (current_ev.fflags & NOTE_DELETE) {
             if (current_ev.fflags & NOTE_LINK) {
@@ -103,21 +98,16 @@ bool FileWatcherKqueue::RunEventLoop(const FileWatcher::HandlerMap& handlers,
           // Perform post-handling actions (i.e. remove, reset filter)
           if (event == file_watcher::kDeleted) {
             RemoveFilter(current_fd);
-            remove_fds.push_back(current_fd);
           } else if (event == file_watcher::kRecreated) {
             RemoveFilter(current_fd);
             const std::string file_path = watch_records_[current_fd].file_path_;
             EventHandler* handler = watch_records_[current_fd].handler_;
-            remove_fds.push_back(current_fd);
             RegisterFilter(file_path, handler);
           }
         } else {
           LogCvmfs(kLogCvmfs, kLogDebug, "Unknown kevent ident: %ld", current_ev.ident);
         }
       }
-    }
-    for (size_t i = 0; i < remove_fds.size(); ++i) {
-      watch_records_.erase(remove_fds[i]);
     }
   }
   return true;
@@ -131,6 +121,7 @@ void FileWatcherKqueue::RemoveFilter(int fd) {
     LogCvmfs(kLogCvmfs, kLogDebug, "Could not remove event filter from kqueue.");
   }
   close(fd);
+  watch_records_.erase(fd);
 }
 
 void FileWatcherKqueue::RegisterFilter(const std::string& file_path,
@@ -151,7 +142,6 @@ void FileWatcherKqueue::RegisterFilter(const std::string& file_path,
   }
 
   watch_records_[fd] = WatchRecord(file_path, handler);
-  LogCvmfs(kLogCvmfs, kLogStdout, "Register: %d for %s", fd, file_path.c_str());
 }
 
 }  // namespace file_watcher

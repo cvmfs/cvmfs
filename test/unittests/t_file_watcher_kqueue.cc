@@ -18,12 +18,9 @@ public:
   TestEventHandler(Counters* ctrs) : counters_(ctrs) {}
   virtual ~TestEventHandler() {}
 
-  virtual bool Handle(const std::string& file_path,
+  virtual bool Handle(const std::string& /*file_path*/,
                       file_watcher::Event event) {
-    LogCvmfs(kLogCvmfs, kLogStdout,
-             "Handling %d event for file: %s",
-             event, file_path.c_str());
-    ((*counters_)[event])++;
+    (*counters_)[event]++;
     return true;
   }
 
@@ -49,10 +46,14 @@ TEST_F(T_FileWatcherKqueue, Dummy) {
 
   EXPECT_TRUE(watcher->Start());
 
+  SafeSleepMs(100);
+
   SafeWriteToFile("test", "/tmp/file_watcher_test.txt", 0600);
 
-  for (Counters::const_iterator it = counters_.begin(); it != counters_.end(); ++it) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "Counters[%d] = %d", it->first, it->second);
-  }
+  SafeSleepMs(100);
+
+  Counters::const_iterator it = counters_.find(file_watcher::kModified);
+  const int num_modifications = it->second;
+  EXPECT_TRUE(num_modifications > 0);
 }
 
