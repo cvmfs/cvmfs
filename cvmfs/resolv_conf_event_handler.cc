@@ -63,7 +63,8 @@ ResolvConfEventHandler::ResolvConfEventHandler(
 ResolvConfEventHandler::~ResolvConfEventHandler() {}
 
 bool ResolvConfEventHandler::Handle(const std::string& file_path,
-                                    file_watcher::Event /*event*/) {
+                                    file_watcher::Event /*event*/,
+                                    bool* clear_handler) {
   std::vector<std::string> addresses;
   GetDnsAddresses(file_path, &addresses, NULL);
   if (!addresses.empty()) {
@@ -78,6 +79,7 @@ bool ResolvConfEventHandler::Handle(const std::string& file_path,
       external_download_manager_->SetDnsServer(addresses[0]);
     }
   }
+  *clear_handler = false;
   return true;
 }
 

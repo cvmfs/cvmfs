@@ -88,8 +88,10 @@ bool FileWatcherKqueue::RunEventLoop(const FileWatcher::HandlerMap& handlers,
             // Attributes
             event = file_watcher::kAttributes;
           }
+          bool clear_handler = true;
           if (event != file_watcher::kInvalid) {
-            current_record.handler_->Handle(current_record.file_path_, event);
+            current_record.handler_->Handle(current_record.file_path_, event,
+                                            &clear_handler);
           } else {
             LogCvmfs(kLogCvmfs, kLogDebug,
                      "FileWatcherKqueue - Unknown event 0x%x\n",
@@ -101,7 +103,9 @@ bool FileWatcherKqueue::RunEventLoop(const FileWatcher::HandlerMap& handlers,
             const std::string file_path = watch_records_[current_fd].file_path_;
             EventHandler* handler = watch_records_[current_fd].handler_;
             RemoveFilter(current_fd);
-            RegisterFilter(file_path, handler);
+            if (!clear_handler) {
+              RegisterFilter(file_path, handler);
+            }
           }
         } else {
           LogCvmfs(kLogCvmfs, kLogDebug,

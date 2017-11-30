@@ -19,8 +19,10 @@ class TestEventHandler : public file_watcher::EventHandler {
   virtual ~TestEventHandler() {}
 
   virtual bool Handle(const std::string& /*file_path*/,
-                      file_watcher::Event event) {
+                      file_watcher::Event event,
+                      bool* clear_handler) {
     (*counters_)[event]++;
+    *clear_handler = true;
     return true;
   }
 

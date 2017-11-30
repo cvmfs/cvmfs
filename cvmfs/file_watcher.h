@@ -26,8 +26,22 @@ class EventHandler {
   EventHandler();
   virtual ~EventHandler();
 
+  /**
+   * Handle function called per event
+   *
+   * @param file_path - the path of the file this event corresponds to
+   * @param event - the type of event
+   * @param clear_handler - (output) set this to true to have the event
+   *                        handler remove from the loop after this call
+   *
+   * Setting the clear_handler parameter to false means that the FileWatcher
+   * object will attempt to re-register the handler for the same file name
+   * in the case a file was delete - useful for continuously watching a file
+   * which may be deleted and recreated
+   */
   virtual bool Handle(const std::string& file_path,
-                      Event event) = 0;
+                      Event event,
+                      bool* clear_handler) = 0;
 };
 
 class FileWatcher {

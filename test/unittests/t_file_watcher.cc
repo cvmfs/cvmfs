@@ -14,10 +14,12 @@ class TestEventHandler : public file_watcher::EventHandler {
   virtual ~TestEventHandler() {}
 
   virtual bool Handle(const std::string& file_path,
-                      file_watcher::Event event) {
+                      file_watcher::Event event,
+                      bool* clear_handler) {
     LogCvmfs(kLogCvmfs, kLogStdout,
              "Handling %d event for file: %s",
              event, file_path.c_str());
+    *clear_handler = true;
     return true;
   }
 };

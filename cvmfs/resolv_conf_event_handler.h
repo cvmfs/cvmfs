@@ -23,7 +23,8 @@ class ResolvConfEventHandler : public file_watcher::EventHandler {
   virtual ~ResolvConfEventHandler();
 
   virtual bool Handle(const std::string& file_path,
-                      file_watcher::Event event);
+                      file_watcher::Event event,
+                      bool* clear_handler);
 
  private:
   download::DownloadManager* download_manager_;
