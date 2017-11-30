@@ -87,6 +87,7 @@ set(CVMFS_UNITTEST_FILES
   t_reactor.cc
   t_reflog.cc
   t_relaxed_path_filter.cc
+  t_s3fanout.cc
   t_sanitizer.cc
   t_session_context.cc
   t_session_token.cc
