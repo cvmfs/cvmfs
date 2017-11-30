@@ -1074,12 +1074,27 @@ TEST(T_Shash, Hmac256) {
 #ifdef OPENSSL_API_INTERFACE_V09
   printf("Skipping!\n");
 #else
-  /*const unsigned char *fox = reinterpret_cast<const unsigned char *>(
-    "The quick brown fox jumps over the lazy dog");
-  unsigned len_fox = strlen("The quick brown fox jumps over the lazy dog");*/
-
   string digest = shash::Hmac256("the shared secret key here",
                                  "the message to hash here");
   EXPECT_EQ("RkOXiWX/zsbm1zs2o5rkPOsV9++BMbgweGLrxWDn+Yg=", Base64(digest));
+#endif
+}
+
+
+TEST(T_Shash, Sha256) {
+#ifdef OPENSSL_API_INTERFACE_V09
+  printf("Skipping!\n");
+#else
+  string dog = "The quick brown fox jumps over the lazy dog";
+  string hash = shash::Sha256Mem(
+    reinterpret_cast<const unsigned char *>(dog.data()), dog.length());
+  EXPECT_STREQ(
+    "d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592",
+    hash.c_str());
+
+  hash = shash::Sha256File("/dev/null");
+  EXPECT_STREQ(
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    hash.c_str());
 #endif
 }

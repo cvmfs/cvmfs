@@ -439,6 +439,60 @@ Md5 Any::CastToMd5() {
   return result;
 }
 
+#ifndef OPENSSL_API_INTERFACE_V09
+static string HexFromSha256(unsigned char digest[SHA256_DIGEST_LENGTH]) {
+  string result;
+  result.reserve(2 * SHA256_DIGEST_LENGTH);
+  for (unsigned i = 0; i < SHA256_DIGEST_LENGTH; ++i) {
+    const char d1 = digest[i] / 16;
+    const char d2 = digest[i] % 16;
+    result[2*i] =  d1 + ((d1 <= 9) ? '0' : 'a' - 10);
+    result[2*i + 1] = d2 + ((d2 <= 9) ? '0' : 'a' - 10);
+  }
+  return result;
+}
+#endif
+
+string Sha256File(const string &filename) {
+#ifdef OPENSSL_API_INTERFACE_V09
+  abort();
+#else
+  int fd = open(filename.c_str(), O_RDONLY);
+  if (fd < 0)
+    return "";
+
+  SHA256_CTX ctx;
+  SHA256_Init(&ctx);
+
+  unsigned char io_buffer[4096];
+  int actual_bytes;
+  while ((actual_bytes = read(fd, io_buffer, 4096)) != 0) {
+    if (actual_bytes == -1) {
+      if (errno == EINTR)
+        continue;
+      close(fd);
+      return "";
+    }
+    SHA256_Update(&ctx, io_buffer, actual_bytes);
+  }
+  close(fd);
+
+  unsigned char digest[SHA256_DIGEST_LENGTH];
+  SHA256_Final(digest, &ctx);
+  return HexFromSha256(digest);
+#endif
+}
+
+string Sha256Mem(const unsigned char *buffer, const unsigned buffer_size) {
+#ifdef OPENSSL_API_INTERFACE_V09
+  abort();
+#else
+  unsigned char digest[SHA256_DIGEST_LENGTH];
+  SHA256(buffer, buffer_size, digest);
+  return HexFromSha256(digest);
+#endif
+}
+
 }  // namespace shash
 
 #ifdef CVMFS_NAMESPACE_GUARD
