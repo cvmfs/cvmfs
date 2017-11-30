@@ -509,6 +509,10 @@ inline void HmacString(const std::string &key, const std::string &content,
        any_digest);
 }
 
+/**
+ * Only used for AWS4 signature
+ */
+std::string Hmac256(const std::string &key, const std::string &content);
 
 Algorithms ParseHashAlgorithm(const std::string &algorithm_option);
 Any MkFromHexPtr(const HexPtr hex, const Suffix suffix = kSuffixNone);

@@ -7,13 +7,16 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <string>
 
+#include "duplex_ssl.h"
 #include "hash.h"
 #include "prng.h"
 #include "smalloc.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 
@@ -1064,4 +1067,19 @@ TEST(T_Shash, Hmac) {
   shash::HmacString("key", string(reinterpret_cast<const char *>(fox)),
                     &sha1_hmacstring);
   EXPECT_EQ(sha1_hmacstring, sha1);
+}
+
+
+TEST(T_Shash, Hmac256) {
+#ifdef OPENSSL_API_INTERFACE_V09
+  printf("Skipping!\n");
+#else
+  /*const unsigned char *fox = reinterpret_cast<const unsigned char *>(
+    "The quick brown fox jumps over the lazy dog");
+  unsigned len_fox = strlen("The quick brown fox jumps over the lazy dog");*/
+
+  string digest = shash::Hmac256("the shared secret key here",
+                                 "the message to hash here");
+  EXPECT_EQ("RkOXiWX/zsbm1zs2o5rkPOsV9++BMbgweGLrxWDn+Yg=", Base64(digest));
+#endif
 }

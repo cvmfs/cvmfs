@@ -8,13 +8,16 @@
 #include <alloca.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <openssl/hmac.h>
 #include <openssl/md5.h>
 #include <openssl/ripemd.h>
 #include <openssl/sha.h>
 #include <unistd.h>
 
 #include <cstdio>
+#include <cstring>
 
+#include "duplex_ssl.h"
 #include "KeccakHash.h"
 
 using namespace std;  // NOLINT
@@ -311,6 +314,52 @@ void Hmac(
   Update(hash_inner.digest, kDigestSizes[algorithm], context_outer);
 
   Final(context_outer, any_digest);
+}
+
+
+/**
+ * Returns the raw digest as string, not the hex version.  The user code passes
+ * the result into Base64.
+ */
+std::string Hmac256(const std::string &key, const std::string &content) {
+#ifdef OPENSSL_API_INTERFACE_V09
+  abort();
+#else
+  unsigned char digest[SHA256_DIGEST_LENGTH];
+  const unsigned block_size = 64;
+  const unsigned key_length = key.length();
+  unsigned char key_block[block_size];
+  memset(key_block, 0, block_size);
+  if (key_length > block_size) {
+    SHA256(reinterpret_cast<const unsigned char *>(key.data()), key_length,
+           key_block);
+  } else {
+    if (key.length() > 0)
+      memcpy(key_block, key.data(), key_length);
+  }
+
+  unsigned char pad_block[block_size];
+  // Inner hash
+  SHA256_CTX ctx_inner;
+  unsigned char digest_inner[SHA256_DIGEST_LENGTH];
+  SHA256_Init(&ctx_inner);
+  for (unsigned i = 0; i < block_size; ++i)
+    pad_block[i] = key_block[i] ^ 0x36;
+  SHA256_Update(&ctx_inner, pad_block, block_size);
+  SHA256_Update(&ctx_inner, content.data(), content.length());
+  SHA256_Final(digest_inner, &ctx_inner);
+
+  // Outer hash
+  SHA256_CTX ctx_outer;
+  SHA256_Init(&ctx_outer);
+  for (unsigned i = 0; i < block_size; ++i)
+    pad_block[i] = key_block[i] ^ 0x5c;
+  SHA256_Update(&ctx_outer, pad_block, block_size);
+  SHA256_Update(&ctx_outer, digest_inner, SHA256_DIGEST_LENGTH);
+
+  SHA256_Final(digest, &ctx_outer);
+  return string(reinterpret_cast<char *>(digest), SHA256_DIGEST_LENGTH);
+#endif
 }
 
 bool HashFd(int fd, Any *any_digest) {
