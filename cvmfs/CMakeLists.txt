@@ -58,6 +58,7 @@ set (CVMFS_CLIENT_SOURCES
   options.cc
   quota.cc
   quota_posix.cc
+  resolv_conf_event_handler.cc
   sanitizer.cc
   signature.cc
   sql.cc

@@ -57,6 +57,7 @@
 #include "options.h"
 #include "platform.h"
 #include "quota_posix.h"
+#include "resolv_conf_event_handler.h"
 #include "signature.h"
 #include "sqlitemem.h"
 #include "sqlitevfs.h"
@@ -71,22 +72,6 @@
 
 using namespace std;  // NOLINT
 
-namespace {
-
-class ResolvConfEventHandler : public file_watcher::EventHandler {
-public:
-  ResolvConfEventHandler() {}
-  virtual ~ResolvConfEventHandler() {}
-
-  virtual bool Handle(const std::string& file_path,
-                      file_watcher::Event event) {
-    LogCvmfs(kLogCvmfs, kLogDebug, "Handling event: %d for file %s",
-             event, file_path.c_str());
-    return true;
-  }
-};
-
-}  // namespace
 
 bool FileSystem::g_alive = false;
 const char *FileSystem::kDefaultCacheBase = "/var/lib/cvmfs";
@@ -1110,6 +1095,9 @@ MountPoint *MountPoint::Create(
     return mountpoint.Release();
   if (!mountpoint->CreateDownloadManagers())
     return mountpoint.Release();
+  if (!mountpoint->CreateResolvConfWatcher()) {
+    return mountpoint.Release();
+  }
   mountpoint->CreateFetchers();
   if (!mountpoint->CreateCatalogManager())
     return mountpoint.Release();
@@ -1215,14 +1203,6 @@ bool MountPoint::CreateDownloadManagers() {
   SetupDnsTuning(download_mgr_);
   SetupHttpTuning();
 
-  // Create a file watcher to update the DNS settings of the download
-  // managers when there are changes to /etc/resolv.conf
-  resolv_conf_watcher_ = platform_file_watcher();
-
-  ResolvConfEventHandler* handler = new ResolvConfEventHandler();
-  resolv_conf_watcher_->RegisterHandler("/etc/resolv.conf", handler);
-  resolv_conf_watcher_->Start();
-
   string forced_proxy_template;
   if (options_mgr_->GetValue("CVMFS_PROXY_TEMPLATE", &optarg))
     forced_proxy_template = optarg;
@@ -1255,6 +1235,21 @@ bool MountPoint::CreateDownloadManagers() {
   }
 
   return SetupExternalDownloadMgr(false);
+}
+
+
+bool MountPoint::CreateResolvConfWatcher() {
+  // Create a file watcher to update the DNS settings of the download
+  // managers when there are changes to /etc/resolv.conf
+  resolv_conf_watcher_ = platform_file_watcher();
+
+  if (resolv_conf_watcher_) {
+    ResolvConfEventHandler* handler = new ResolvConfEventHandler(download_mgr_,
+                                                                 external_download_mgr_);
+    resolv_conf_watcher_->RegisterHandler("/etc/resolv.conf", handler);
+    resolv_conf_watcher_->Start();
+  }
+  return true;
 }
 
 

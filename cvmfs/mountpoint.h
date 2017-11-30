@@ -459,6 +459,7 @@ class MountPoint : SingleCopy, public BootFactory {
   bool CreateSignatureManager();
   bool CheckBlacklists();
   bool CreateDownloadManagers();
+  bool CreateResolvConfWatcher();
   void CreateFetchers();
   bool CreateCatalogManager();
   void CreateTables();
