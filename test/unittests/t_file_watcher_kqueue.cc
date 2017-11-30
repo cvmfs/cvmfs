@@ -14,8 +14,8 @@
 typedef std::map<file_watcher::Event, int> Counters;
 
 class TestEventHandler : public file_watcher::EventHandler {
-public:
-  TestEventHandler(Counters* ctrs) : counters_(ctrs) {}
+ public:
+  explicit TestEventHandler(Counters* ctrs) : counters_(ctrs) {}
   virtual ~TestEventHandler() {}
 
   virtual bool Handle(const std::string& /*file_path*/,
@@ -28,10 +28,8 @@ public:
 };
 
 class T_FileWatcherKqueue : public ::testing::Test {
-protected:
-  void SetUp() {
-    counters_.clear();
-  }
+ protected:
+  void SetUp() { counters_.clear(); }
 
   Counters counters_;
 };
@@ -41,7 +39,8 @@ TEST_F(T_FileWatcherKqueue, ModifyThenDelete) {
       GetCurrentWorkingDirectory() + "/file_watcher_test.txt";
   SafeWriteToFile("test", watched_file_name, 0600);
 
-  UniquePtr<file_watcher::FileWatcher> watcher(new file_watcher::FileWatcherKqueue());
+  UniquePtr<file_watcher::FileWatcher> watcher(
+      new file_watcher::FileWatcherKqueue());
 
   TestEventHandler* hd = new TestEventHandler(&counters_);
   watcher->RegisterHandler(watched_file_name, hd);
@@ -66,4 +65,3 @@ TEST_F(T_FileWatcherKqueue, ModifyThenDelete) {
   const int num_deletions = it_del->second;
   EXPECT_EQ(1, num_deletions);
 }
-

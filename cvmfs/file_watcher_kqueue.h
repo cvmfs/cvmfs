@@ -8,6 +8,7 @@
 #include "file_watcher.h"
 
 #include <map>
+#include <string>
 
 namespace file_watcher {
 
@@ -34,15 +35,15 @@ struct WatchRecord {
 };
 
 class FileWatcherKqueue : public FileWatcher {
-public:
+ public:
   FileWatcherKqueue();
   virtual ~FileWatcherKqueue();
 
-protected:
+ protected:
   virtual bool RunEventLoop(const FileWatcher::HandlerMap& handler,
                             int control_pipe);
 
-private:
+ private:
   void RemoveFilter(int fd);
   void RegisterFilter(const std::string& file_path,
                       EventHandler* handler);

@@ -4,6 +4,7 @@
 
 #include "resolv_conf_event_handler.h"
 
+#include <string>
 #include <vector>
 
 #include "backoff.h"

@@ -1237,7 +1237,6 @@ bool MountPoint::CreateDownloadManagers() {
   return SetupExternalDownloadMgr(false);
 }
 
-
 bool MountPoint::CreateResolvConfWatcher() {
   if (!options_mgr_->IsDefined("CVMFS_DNS_ROAMING") ||
       options_mgr_->IsOn("CVMFS_DNS_ROAMING")) {
@@ -1248,8 +1247,8 @@ bool MountPoint::CreateResolvConfWatcher() {
     resolv_conf_watcher_ = platform_file_watcher();
 
     if (resolv_conf_watcher_) {
-      ResolvConfEventHandler* handler = new ResolvConfEventHandler(download_mgr_,
-                                                                   external_download_mgr_);
+      ResolvConfEventHandler *handler =
+          new ResolvConfEventHandler(download_mgr_, external_download_mgr_);
       resolv_conf_watcher_->RegisterHandler("/etc/resolv.conf", handler);
       resolv_conf_watcher_->Start();
     }
@@ -1259,7 +1258,6 @@ bool MountPoint::CreateResolvConfWatcher() {
   }
   return true;
 }
-
 
 void MountPoint::CreateFetchers() {
   fetcher_ = new cvmfs::Fetcher(

@@ -14,25 +14,23 @@ EventHandler::EventHandler() {}
 
 EventHandler::~EventHandler() {}
 
-FileWatcher::FileWatcher()
-    : handler_map_(),
-      control_pipe_(),
-      started_(false) {}
+FileWatcher::FileWatcher() : handler_map_(), control_pipe_(), started_(false) {}
 
 FileWatcher::~FileWatcher() {
   if (started_) {
     write(control_pipe_[1], "q", 1);
     int ret = pthread_join(thread_, NULL);
     if (ret != 0) {
-      LogCvmfs(kLogCvmfs, kLogDebug, "Could not join monitor thread: %d\n", ret);
+      LogCvmfs(kLogCvmfs, kLogDebug, "Could not join monitor thread: %d\n",
+               ret);
     }
 
     close(control_pipe_[1]);
     close(control_pipe_[0]);
   }
 
-  for (HandlerMap::iterator it = handler_map_.begin();
-       it != handler_map_.end(); ++it) {
+  for (HandlerMap::iterator it = handler_map_.begin(); it != handler_map_.end();
+       ++it) {
     delete it->second;
   }
 }
@@ -46,13 +44,15 @@ bool FileWatcher::Start() {
   if (!started_) {
     int ret = pipe(control_pipe_);
     if (ret != 0) {
-      LogCvmfs(kLogCvmfs, kLogDebug, "Could not create control pipe: %d\n", ret);
+      LogCvmfs(kLogCvmfs, kLogDebug, "Could not create control pipe: %d\n",
+               ret);
       return false;
     }
 
     ret = pthread_create(&thread_, NULL, &FileWatcher::BackgroundThread, this);
     if (ret != 0) {
-      LogCvmfs(kLogCvmfs, kLogDebug, "Could not create monitor thread: %d\n", ret);
+      LogCvmfs(kLogCvmfs, kLogDebug, "Could not create monitor thread: %d\n",
+               ret);
       return false;
     }
 

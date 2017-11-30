@@ -9,7 +9,7 @@
 #include "util/pointer.h"
 
 class TestEventHandler : public file_watcher::EventHandler {
-public:
+ public:
   TestEventHandler() {}
   virtual ~TestEventHandler() {}
 
@@ -23,7 +23,7 @@ public:
 };
 
 class TestFileWatcher : public file_watcher::FileWatcher {
-public:
+ public:
   TestFileWatcher() : FileWatcher() {}
   virtual ~TestFileWatcher() {}
 

@@ -22,7 +22,7 @@ enum Event {
 };
 
 class EventHandler {
-public:
+ public:
   EventHandler();
   virtual ~EventHandler();
 
@@ -31,7 +31,7 @@ public:
 };
 
 class FileWatcher {
-public:
+ public:
   typedef std::map<std::string, EventHandler*> HandlerMap;
 
   FileWatcher();
@@ -42,11 +42,11 @@ public:
 
   bool Start();
 
-protected:
+ protected:
   virtual bool RunEventLoop(const HandlerMap& handler_map,
                             int control_pipe) = 0;
 
-private:
+ private:
   static void* BackgroundThread(void* d);
 
   HandlerMap handler_map_;
@@ -56,6 +56,6 @@ private:
   bool started_;
 };
 
-}  // file_watcher
+}  // namespace file_watcher
 
 #endif  // CVMFS_FILE_WATCHER_H_
