@@ -121,7 +121,7 @@ void FileWatcherKqueue::RegisterFilter(const std::string& file_path,
                                        EventHandler* handler) {
   bool done = false;
   BackoffThrottle throttle(1000, 10000, 50000);
-  while ((!done)) {
+  while (!done) {
     int fd = open(file_path.c_str(), O_RDONLY);
     if (fd == -1) {
       LogCvmfs(kLogCvmfs, kLogDebug,
