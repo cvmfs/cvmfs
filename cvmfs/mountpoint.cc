@@ -1239,15 +1239,23 @@ bool MountPoint::CreateDownloadManagers() {
 
 
 bool MountPoint::CreateResolvConfWatcher() {
-  // Create a file watcher to update the DNS settings of the download
-  // managers when there are changes to /etc/resolv.conf
-  resolv_conf_watcher_ = platform_file_watcher();
+  if (!options_mgr_->IsDefined("CVMFS_DNS_ROAMING") ||
+      options_mgr_->IsOn("CVMFS_DNS_ROAMING")) {
+    LogCvmfs(kLogCvmfs, kLogDebug,
+             "DNS roaming is enabled for this repository.");
+    // Create a file watcher to update the DNS settings of the download
+    // managers when there are changes to /etc/resolv.conf
+    resolv_conf_watcher_ = platform_file_watcher();
 
-  if (resolv_conf_watcher_) {
-    ResolvConfEventHandler* handler = new ResolvConfEventHandler(download_mgr_,
-                                                                 external_download_mgr_);
-    resolv_conf_watcher_->RegisterHandler("/etc/resolv.conf", handler);
-    resolv_conf_watcher_->Start();
+    if (resolv_conf_watcher_) {
+      ResolvConfEventHandler* handler = new ResolvConfEventHandler(download_mgr_,
+                                                                   external_download_mgr_);
+      resolv_conf_watcher_->RegisterHandler("/etc/resolv.conf", handler);
+      resolv_conf_watcher_->Start();
+    }
+  } else {
+    LogCvmfs(kLogCvmfs, kLogDebug,
+             "DNS roaming is disabled for this repository.");
   }
   return true;
 }
