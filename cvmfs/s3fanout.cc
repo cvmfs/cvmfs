@@ -388,17 +388,18 @@ void S3FanoutManager::ReleaseCurlHandle(JobInfo *info, CURL *handle) const {
 
 
 /**
- * The Amazon authorization header according to
+ * The Amazon AWS 2 authorization header according to
  * http://docs.aws.amazon.com/AmazonS3/latest/dev/RESTAuthentication.html#ConstructingTheAuthenticationHeader
  */
-string S3FanoutManager::MkAuthoritzation(const string &access_key,
-                                         const string &secret_key,
-                                         const string &timestamp,
-                                         const string &content_type,
-                                         const string &request,
-                                         const string &content_md5_base64,
-                                         const string &bucket,
-                                         const string &object_key) const {
+string S3FanoutManager::MkV2Authz(const string &access_key,
+                                  const string &secret_key,
+                                  const string &timestamp,
+                                  const string &content_type,
+                                  const string &request,
+                                  const string &content_md5_base64,
+                                  const string &bucket,
+                                  const string &object_key) const
+{
   string to_sign = request + "\n" +
                    content_md5_base64 + "\n" +
                    content_type + "\n" +
@@ -417,6 +418,33 @@ string S3FanoutManager::MkAuthoritzation(const string &access_key,
   return "Authorization: AWS " + access_key + ":" +
       Base64(string(reinterpret_cast<char *>(hmac.digest),
                     hmac.GetDigestSize()));
+}
+
+
+/**
+ * The Amazon AWS4 authorization header according to
+ * http://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-auth-using-authorization-header.html
+ */
+string S3FanoutManager::MkV4Authz(const string &access_key,
+                                  const string &secret_key,
+                                  const string &region,
+                                  const string &host,
+                                  const string &timestamp,
+                                  const string &content_type,
+                                  const string &request,
+                                  const string &content_sha256,
+                                  const string &bucket,
+                                  const string &object_key) const
+{
+  return "";
+  /*string canonical_request =
+    request + "\n" +
+    bucket + "/" + object_key + "\n" +
+    "\n" +
+    "host:" + host + "\nx-amz-content-sha256:" + content_sha256 + "\n" +
+    "host;x-amz-content-sha256\n" +
+    content_sha256;*/
+
 }
 
 
@@ -542,13 +570,13 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
     std::string req = info->request == JobInfo::kReqHead ? "HEAD" : "DELETE";
     info->http_headers =
         curl_slist_append(info->http_headers,
-                          MkAuthoritzation(info->access_key,
-                                           info->secret_key,
-                                           timestamp, "",
-                                           req.c_str(),
-                                           "",
-                                           info->bucket,
-                                           info->object_key).c_str());
+                          MkV2Authz(info->access_key,
+                                    info->secret_key,
+                                    timestamp, "",
+                                    req.c_str(),
+                                    "",
+                                    info->bucket,
+                                    info->object_key).c_str());
     info->http_headers =
         curl_slist_append(info->http_headers, "Content-Length: 0");
 
@@ -611,12 +639,12 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
     timestamp = RfcTimestamp();
     info->http_headers =
         curl_slist_append(info->http_headers,
-                          MkAuthoritzation(info->access_key,
-                                           info->secret_key,
-                                           timestamp, "binary/octet-stream",
-                                           "PUT", content_md5_base64,
-                                           info->bucket,
-                                           (info->object_key)).c_str());
+                          MkV2Authz(info->access_key,
+                                    info->secret_key,
+                                    timestamp, "binary/octet-stream",
+                                    "PUT", content_md5_base64,
+                                    info->bucket,
+                                    (info->object_key)).c_str());
 
     info->http_headers =
         curl_slist_append(info->http_headers,
