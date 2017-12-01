@@ -62,7 +62,7 @@ bool FileWatcherKqueue::RunEventLoop(const FileWatcher::HandlerMap& handlers,
       struct kevent& current_ev = triggered_events[i];
       if (current_ev.ident == static_cast<uint64_t>(control_pipe)) {
         char buffer[1];
-        read(control_pipe, &buffer, 1);
+        ReadPipe(control_pipe, &buffer, 1);
         LogCvmfs(kLogCvmfs, kLogDebug, "FileWatcherKqueue - Stopping.\n");
         stop = true;
         continue;
