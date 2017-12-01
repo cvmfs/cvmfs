@@ -510,11 +510,16 @@ inline void HmacString(const std::string &key, const std::string &content,
 }
 
 /**
- * Only used for AWS4 signature
+ * Only used for AWS4 signature.
+ *
+ * Adding SHA-256 to the standard hash infrastructure would generally bloat the
+ * digets size to 32 bytes and require client data structure transformation
+ * during hotpatch.
  */
 std::string Hmac256(const std::string &key, const std::string &content);
 std::string Sha256File(const std::string &filename);
 std::string Sha256Mem(const unsigned char *buffer, const unsigned buffer_size);
+std::string Sha256String(const std::string &content);
 
 Algorithms ParseHashAlgorithm(const std::string &algorithm_option);
 Any MkFromHexPtr(const HexPtr hex, const Suffix suffix = kSuffixNone);

@@ -1086,8 +1086,7 @@ TEST(T_Shash, Sha256) {
   printf("Skipping!\n");
 #else
   string dog = "The quick brown fox jumps over the lazy dog";
-  string hash = shash::Sha256Mem(
-    reinterpret_cast<const unsigned char *>(dog.data()), dog.length());
+  string hash = shash::Sha256String(dog);
   EXPECT_STREQ(
     "d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592",
     hash.c_str());

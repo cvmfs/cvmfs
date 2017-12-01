@@ -493,6 +493,11 @@ string Sha256Mem(const unsigned char *buffer, const unsigned buffer_size) {
 #endif
 }
 
+string Sha256String(const string &content) {
+  return Sha256Mem(reinterpret_cast<const unsigned char *>(content.data()),
+                   content.length());
+}
+
 }  // namespace shash
 
 #ifdef CVMFS_NAMESPACE_GUARD
