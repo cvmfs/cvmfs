@@ -209,11 +209,11 @@ void *S3FanoutManager::MainUpload(void *data) {
         assert(handle != NULL);
       }
 
-      s3fanout::Failures init_failure = s3fanout_mgr->InitializeRequest(info,
-                                                                        handle);
+      s3fanout::Failures init_failure =
+        s3fanout_mgr->InitializeRequest(info, handle);
       if (init_failure != s3fanout::kFailOk) {
-        LogCvmfs(kLogS3Fanout, kLogStderr, "Failed to initialize CURL handle "
-                                           "(error: %d - %s | errno: %d)",
+        LogCvmfs(kLogS3Fanout, kLogStderr,
+                "Failed to initialize CURL handle (error: %d - %s | errno: %d)",
                  init_failure, Code2Ascii(init_failure), errno);
         abort();
       }
@@ -248,8 +248,8 @@ void *S3FanoutManager::MainUpload(void *data) {
         assert(retval == CURLM_OK);
       }
     } else if (retval < 0) {
-      LogCvmfs(kLogS3Fanout, kLogStderr, "Error, event poll failed: %d", errno);
-      assert(retval >= 0);
+      assert(errno == EINTR);
+      continue;
     }
 
     // Activity on curl sockets
@@ -310,11 +310,10 @@ void *S3FanoutManager::MainUpload(void *data) {
     }
   }
 
-  set<CURL *>::iterator             i    =
-      s3fanout_mgr->pool_handles_inuse_->begin();
-  const set<CURL *>::const_iterator iEnd =
-      s3fanout_mgr->pool_handles_inuse_->end();
-  for (; i != iEnd; ++i) {
+  set<CURL *>::iterator i = s3fanout_mgr->pool_handles_inuse_->begin();
+  const set<CURL *>::const_iterator i_end =
+    s3fanout_mgr->pool_handles_inuse_->end();
+  for (; i != i_end; ++i) {
     curl_multi_remove_handle(s3fanout_mgr->curl_multi_, *i);
     curl_easy_cleanup(*i);
   }
@@ -474,7 +473,7 @@ int S3FanoutManager::InitializeDnsSettings(
   }
 
   // Remove port number if such exists
-  if (host_with_port.compare(0, 7, "http://") != 0)
+  if (!HasPrefix(host_with_port, "http://", false /*ignore_case*/))
     host_with_port = "http://" + host_with_port;
   std::string remote_host = dns::ExtractHost(host_with_port);
   std::string remote_port = dns::ExtractPort(host_with_port);
@@ -493,7 +492,7 @@ int S3FanoutManager::InitializeDnsSettings(
   }
   if (useme != NULL) {
     curl_sharehandles_->insert(std::pair<CURL *,
-                              S3FanOutDnsEntry *>(handle, useme));
+                               S3FanOutDnsEntry *>(handle, useme));
     useme->counter++;
     InitializeDnsSettingsCurl(handle, useme->sharehandle, useme->clist);
     return 0;
@@ -531,8 +530,8 @@ int S3FanoutManager::InitializeDnsSettings(
     assert(dnse != NULL);
     return -1;
   }
-  curl_sharehandles_->insert(std::pair<CURL *,
-                             S3FanOutDnsEntry *>(handle, dnse));
+  curl_sharehandles_->insert(
+    std::pair<CURL *, S3FanOutDnsEntry *>(handle, dnse));
   dnse->counter++;
   InitializeDnsSettingsCurl(handle, dnse->sharehandle, dnse->clist);
 

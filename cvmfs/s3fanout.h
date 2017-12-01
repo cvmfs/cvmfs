@@ -118,10 +118,7 @@ struct JobInfo {
   void *callback;  // Callback to be called when job is finished
   MemoryMappedFile *mmf;
 
-  // One constructor per destination + head request
-  JobInfo(const AuthzMethods authz_method) : authz_method(authz_method) {
-    JobInfoInit();
-  }
+  // One constructor per destination
   JobInfo(
     const std::string access_key,
     const std::string secret_key,
@@ -205,6 +202,7 @@ struct S3FanOutDnsEntry {
   struct curl_slist *clist;
   CURLSH *sharehandle;
 };  // S3FanOutDnsEntry
+
 
 class S3FanoutManager : SingleCopy {
  protected:
