@@ -27,6 +27,7 @@ namespace upload {
 
 S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
   : AbstractUploader(spooler_definition)
+  , authz_method_(s3fanout::kAuthzAwsV2)
   , temporary_path_(spooler_definition.temporary_path)
 {
   if (!ParseSpoolerDefinition(spooler_definition)) {
@@ -186,9 +187,10 @@ void *S3Uploader::MainCollectResults(void *data) {
       s3fanout::JobInfo *info = *it;
       int reply_code = 0;
       if (info->error_code != s3fanout::kFailOk) {
-        LogCvmfs(kLogUploadS3, kLogStderr, "Upload job for '%s' failed. "
-                                           "(error code: %d - %s)",
-                 info->object_key.c_str(), info->error_code,
+        LogCvmfs(kLogUploadS3, kLogStderr,
+                 "Upload job for '%s' failed. (error code: %d - %s)",
+                 info->object_key.c_str(),
+                 info->error_code,
                  s3fanout::Code2Ascii(info->error_code));
         reply_code = 99;
       }
@@ -340,6 +342,7 @@ void S3Uploader::FileUpload(
   s3fanout::JobInfo *info =
       new s3fanout::JobInfo(access_key,
                             secret_key,
+                            authz_method_,
                             full_host_name_,
                             bucket_name,
                             mangled_filename,
@@ -474,6 +477,7 @@ void S3Uploader::FinalizeStreamedUpload(UploadStreamHandle  *handle,
   s3fanout::JobInfo *info =
       new s3fanout::JobInfo(access_key,
                             secret_key,
+                            authz_method_,
                             full_host_name_,
                             bucket_name,
                             mangled_filename,
@@ -505,6 +509,7 @@ s3fanout::JobInfo *S3Uploader::CreateJobInfo(const std::string& path) const {
 
   return new s3fanout::JobInfo(access_key,
                                secret_key,
+                               authz_method_,
                                full_host_name_,
                                bucket_name,
                                path,

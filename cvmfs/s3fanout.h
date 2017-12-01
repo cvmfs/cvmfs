@@ -31,6 +31,12 @@ enum Origin {
   kOriginPath,
 };  // Origin
 
+
+enum AuthzMethods {
+  kAuthzAwsV2 = 0,
+  kAuthzAwsV4
+};
+
 /**
  * Possible return values.
  */
@@ -59,7 +65,7 @@ inline const char *Code2Ascii(const Failures error) {
   texts[5] = "S3: host connection problem";
   texts[6] = "S3: not found";
   texts[7] = "S3: service not available";
-  texts[8] = "S3: unknown network error";
+  texts[8] = "S3: unknown service error, perhaps wrong authentication protocol";
   texts[9] = "no text";
   return texts[error];
 }
@@ -103,6 +109,7 @@ struct JobInfo {
 
   const std::string access_key;
   const std::string secret_key;
+  const AuthzMethods authz_method;
   const std::string hostname;
   const std::string bucket;
   const std::string object_key;
@@ -112,26 +119,47 @@ struct JobInfo {
   MemoryMappedFile *mmf;
 
   // One constructor per destination + head request
-  JobInfo() { JobInfoInit(); }
-  JobInfo(const std::string access_key, const std::string secret_key,
-          const std::string hostname,   const std::string bucket,
-          const std::string object_key, void *callback,
-          const std::string origin_path) :
-          access_key(access_key), secret_key(secret_key),
-          hostname(hostname), bucket(bucket),
-          object_key(object_key), origin_path(origin_path) {
+  JobInfo(const AuthzMethods authz_method) : authz_method(authz_method) {
+    JobInfoInit();
+  }
+  JobInfo(
+    const std::string access_key,
+    const std::string secret_key,
+    const AuthzMethods authz_method,
+    const std::string hostname,
+    const std::string bucket,
+    const std::string object_key,
+    void *callback,
+    const std::string origin_path)
+    : access_key(access_key)
+    , secret_key(secret_key)
+    , authz_method(authz_method)
+    , hostname(hostname)
+    , bucket(bucket)
+    , object_key(object_key)
+    , origin_path(origin_path)
+  {
     JobInfoInit();
     origin = kOriginPath;
     this->callback = callback;
   }
-  JobInfo(const std::string access_key, const std::string secret_key,
-          const std::string hostname,   const std::string bucket,
-          const std::string object_key, void *callback,
-          MemoryMappedFile  *mmf,
-          const unsigned char *buffer, size_t size) :
-          access_key(access_key), secret_key(secret_key),
-          hostname(hostname), bucket(bucket),
-          object_key(object_key) {
+  JobInfo(
+    const std::string access_key,
+    const std::string secret_key,
+    const AuthzMethods authz_method,
+    const std::string hostname,
+    const std::string bucket,
+    const std::string object_key,
+    void *callback,
+    MemoryMappedFile *mmf,
+    const unsigned char *buffer, size_t size)
+    : access_key(access_key)
+    , secret_key(secret_key)
+    , authz_method(authz_method)
+    , hostname(hostname)
+    , bucket(bucket)
+    , object_key(object_key)
+  {
     JobInfoInit();
     origin = kOriginMem;
     origin_mem.size = size;

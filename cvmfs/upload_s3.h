@@ -90,6 +90,7 @@ class S3Uploader : public AbstractUploader {
   int number_of_buckets_;
   int max_num_parallel_uploads_;
   std::vector<std::pair<std::string, std::string> > keys_;
+  s3fanout::AuthzMethods authz_method_;
 
   const std::string temporary_path_;
   mutable atomic_int32 copy_errors_;
