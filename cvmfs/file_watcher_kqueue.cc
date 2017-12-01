@@ -2,6 +2,7 @@
  * This file is part of the CernVM File System.
  */
 
+#include <errno.h>
 #include <fcntl.h>
 #include <sys/event.h>
 #include <sys/time.h>
@@ -45,8 +46,8 @@ bool FileWatcherKqueue::RunEventLoop(const FileWatcher::HandlerMap& handlers,
     int nev = kevent(kq_, NULL, 0, &triggered_events[0],
                      triggered_events.size(), NULL);
     if (nev == -1) {
-      LogCvmfs(kLogCvmfs, kLogDebug,
-               "FileWatcherKqueue - Could not poll events.");
+      LogCvmfs(kLogCvmfs, kLogSyslogErr,
+               "FileWatcherKqueue - Could not poll events. Errno: %d", errno);
       return false;
     }
     if (nev == 0) {
