@@ -8,6 +8,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <cassert>
 #include <string>
 #include <vector>
 
@@ -25,20 +26,13 @@ FileWatcherKqueue::~FileWatcherKqueue() {}
 bool FileWatcherKqueue::RunEventLoop(const FileWatcher::HandlerMap& handlers,
                                      int control_pipe) {
   kq_ = kqueue();
-  if (kq_ == -1) {
-    LogCvmfs(kLogCvmfs, kLogDebug, "FileWatcherKqueue - Cannot create kqueue.");
-    return false;
-  }
+  assert(kq_ != -1);
 
   // Control pipe sending the stop event.
   struct kevent watch_event;
   EV_SET(&watch_event, control_pipe, EVFILT_READ, EV_ADD | EV_ENABLE | EV_CLEAR,
          0, 0, 0);
-  if (kevent(kq_, &watch_event, 1, NULL, 0, NULL) == -1) {
-    LogCvmfs(kLogCvmfs, kLogDebug,
-             "FileWatcherKqueue - Could not register event with kqueue.");
-    return false;
-  }
+  assert(kevent(kq_, &watch_event, 1, NULL, 0, NULL) != -1);
 
   for (FileWatcher::HandlerMap::const_iterator it = handlers.begin();
        it != handlers.end(); ++it) {
@@ -121,10 +115,7 @@ bool FileWatcherKqueue::RunEventLoop(const FileWatcher::HandlerMap& handlers,
 void FileWatcherKqueue::RemoveFilter(int fd) {
   struct kevent remove_event;
   EV_SET(&remove_event, fd, EVFILT_VNODE, EV_DELETE, NULL, 0, 0);
-  if (kevent(kq_, &remove_event, 1, NULL, 0, NULL) == -1) {
-    LogCvmfs(kLogCvmfs, kLogDebug,
-             "FileWatcherKqueue - Could not remove event filter from kqueue.");
-  }
+  assert(kevent(kq_, &remove_event, 1, NULL, 0, NULL) != -1);
   close(fd);
   watch_records_.erase(fd);
 }
@@ -148,11 +139,7 @@ void FileWatcherKqueue::RegisterFilter(const std::string& file_path,
                NOTE_RENAME | NOTE_REVOKE,
            0, 0);
 
-    if (kevent(kq_, &watch_event, 1, NULL, 0, NULL) == -1) {
-      LogCvmfs(kLogCvmfs, kLogDebug,
-               "FileWatcherKqueue - Could not register event with kqueue.");
-      return;
-    }
+    assert(kevent(kq_, &watch_event, 1, NULL, 0, NULL) != -1);
 
     watch_records_[fd] = WatchRecord(file_path, handler);
 

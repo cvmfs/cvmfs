@@ -6,6 +6,8 @@
 
 #include <unistd.h>
 
+#include <cassert>
+
 #include "logging.h"
 #include "util/posix.h"
 
@@ -20,12 +22,7 @@ FileWatcher::FileWatcher() : handler_map_(), control_pipe_(), started_(false) {}
 FileWatcher::~FileWatcher() {
   if (started_) {
     WritePipe(control_pipe_[1], "q", 1);
-    int ret = pthread_join(thread_, NULL);
-    if (ret != 0) {
-      LogCvmfs(kLogCvmfs, kLogDebug, "Could not join monitor thread: %d\n",
-               ret);
-    }
-
+    assert(pthread_join(thread_, NULL) == 0);
     ClosePipe(control_pipe_);
   }
 
@@ -44,12 +41,8 @@ bool FileWatcher::Start() {
   if (!started_) {
     MakePipe(control_pipe_);
 
-    int ret = pthread_create(&thread_, NULL, &FileWatcher::BackgroundThread, this);
-    if (ret != 0) {
-      LogCvmfs(kLogCvmfs, kLogDebug, "Could not create monitor thread: %d\n",
-               ret);
-      return false;
-    }
+    assert(pthread_create(&thread_, NULL,
+                          &FileWatcher::BackgroundThread, this) == 0);
 
     // Before returning, wait for a start signal in the control pipe
     // from the background thread.
