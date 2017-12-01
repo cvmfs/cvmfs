@@ -11,7 +11,7 @@
 #include "logging.h"
 #include "util/string.h"
 
-/*
+/**
  * Returns any  nameserver IP addresses from file
  *
  * Reads a file, line by line. Returns the IP addresses corresponding
