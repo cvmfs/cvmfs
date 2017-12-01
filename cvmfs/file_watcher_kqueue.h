@@ -13,22 +13,12 @@
 namespace file_watcher {
 
 struct WatchRecord {
-  WatchRecord() : file_path_(), handler_() {}
+  WatchRecord() : file_path_(), handler_(NULL) {}
 
   WatchRecord(const std::string& path,
               file_watcher::EventHandler* h)
       : file_path_(path),
         handler_(h) {}
-
-  WatchRecord(const WatchRecord& other)
-      : file_path_(other.file_path_),
-        handler_(other.handler_) {}
-
-  WatchRecord& operator=(const WatchRecord& other) {
-    file_path_ = other.file_path_;
-    handler_ = other.handler_;
-    return *this;
-  }
 
   std::string file_path_;
   file_watcher::EventHandler* handler_;
