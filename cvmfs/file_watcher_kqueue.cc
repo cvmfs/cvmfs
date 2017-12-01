@@ -109,6 +109,14 @@ bool FileWatcherKqueue::RunEventLoop(const FileWatcher::HandlerMap& handlers,
       }
     }
   }
+
+  // Close all remaining open file descriptors
+  for (std::map<int, WatchRecord>::const_iterator it = watch_records_.begin();
+       it != watch_records_.end(); ++it) {
+    close(it->first);
+  }
+  close(kq_);
+
   return true;
 }
 
