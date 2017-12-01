@@ -17,9 +17,9 @@
  * Reads a file, line by line. Returns the IP addresses corresponding
  * to nameservers (i.e. from lines "nameserver <IP_ADDRESS>")
  */
-bool GetDnsAddresses(const std::string& resolv_file,
-                     std::vector<std::string>* ipv4_addresses,
-                     std::vector<std::string>* ipv6_addresses) {
+static bool GetDnsAddresses(const std::string& resolv_file,
+                            std::vector<std::string>* ipv4_addresses,
+                            std::vector<std::string>* ipv6_addresses) {
   bool done = false;
   BackoffThrottle throttle(100, 1000, 5000);
   while (!done) {
@@ -55,10 +55,10 @@ bool GetDnsAddresses(const std::string& resolv_file,
 }
 
 ResolvConfEventHandler::ResolvConfEventHandler(
-  download::DownloadManager* download_manager,
-  download::DownloadManager* external_download_manager)
-    : download_manager_(download_manager)
-    , external_download_manager_(external_download_manager) {}
+    download::DownloadManager* download_manager,
+    download::DownloadManager* external_download_manager)
+    : download_manager_(download_manager),
+      external_download_manager_(external_download_manager) {}
 
 ResolvConfEventHandler::~ResolvConfEventHandler() {}
 
@@ -82,4 +82,3 @@ bool ResolvConfEventHandler::Handle(const std::string& file_path,
   *clear_handler = false;
   return true;
 }
-
