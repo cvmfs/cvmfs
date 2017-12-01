@@ -53,7 +53,7 @@ bool FileWatcherKqueue::RunEventLoop(const FileWatcher::HandlerMap& handlers,
     if (nev == 0) {
       continue;
     }
-    for (int i = 0; i < nev; ++i) {
+    for (int i = 0; i < nev && !stop; ++i) {
       struct kevent& current_ev = triggered_events[i];
       if (current_ev.ident == static_cast<uint64_t>(control_pipe)) {
         char buffer[1];
@@ -61,52 +61,52 @@ bool FileWatcherKqueue::RunEventLoop(const FileWatcher::HandlerMap& handlers,
         LogCvmfs(kLogCvmfs, kLogDebug, "FileWatcherKqueue - Stopping.\n");
         stop = true;
         continue;
-      } else {
-        std::map<int, WatchRecord>::const_iterator it =
-            watch_records_.find(current_ev.ident);
-        if (it != watch_records_.end()) {
-          int current_fd = current_ev.ident;
-          WatchRecord current_record = it->second;
-          file_watcher::Event event = file_watcher::kInvalid;
-          if (current_ev.fflags & NOTE_DELETE) {
-            event = file_watcher::kDeleted;
-          } else if (current_ev.fflags & NOTE_LINK) {
-            // Hardlinked
-            event = file_watcher::kHardlinked;
-          } else if (current_ev.fflags & NOTE_WRITE) {
-            // Modified
-            event = file_watcher::kModified;
-          } else if (current_ev.fflags & NOTE_RENAME) {
-            // Renamed
-            event = file_watcher::kRenamed;
-          } else if (current_ev.fflags & NOTE_ATTRIB) {
-            // Attributes
-            event = file_watcher::kAttributes;
-          }
-          bool clear_handler = true;
-          if (event != file_watcher::kInvalid) {
-            current_record.handler_->Handle(current_record.file_path_, event,
-                                            &clear_handler);
-          } else {
-            LogCvmfs(kLogCvmfs, kLogDebug,
-                     "FileWatcherKqueue - Unknown event 0x%x\n",
-                     current_ev.fflags);
-          }
+      }
 
-          // Perform post-handling actions (i.e. remove, reset filter)
-          if (event == file_watcher::kDeleted) {
-            const std::string file_path = watch_records_[current_fd].file_path_;
-            EventHandler* handler = watch_records_[current_fd].handler_;
-            RemoveFilter(current_fd);
-            if (!clear_handler) {
-              RegisterFilter(file_path, handler);
-            }
-          }
+      std::map<int, WatchRecord>::const_iterator it =
+          watch_records_.find(current_ev.ident);
+      if (it != watch_records_.end()) {
+        int current_fd = current_ev.ident;
+        WatchRecord current_record = it->second;
+        file_watcher::Event event = file_watcher::kInvalid;
+        if (current_ev.fflags & NOTE_DELETE) {
+          event = file_watcher::kDeleted;
+        } else if (current_ev.fflags & NOTE_LINK) {
+          // Hardlinked
+          event = file_watcher::kHardlinked;
+        } else if (current_ev.fflags & NOTE_WRITE) {
+          // Modified
+          event = file_watcher::kModified;
+        } else if (current_ev.fflags & NOTE_RENAME) {
+          // Renamed
+          event = file_watcher::kRenamed;
+        } else if (current_ev.fflags & NOTE_ATTRIB) {
+          // Attributes
+          event = file_watcher::kAttributes;
+        }
+        bool clear_handler = true;
+        if (event != file_watcher::kInvalid) {
+          current_record.handler_->Handle(current_record.file_path_, event,
+                                          &clear_handler);
         } else {
           LogCvmfs(kLogCvmfs, kLogDebug,
-                   "FileWatcherKqueue - Unknown kevent ident: %ld",
-                   current_ev.ident);
+                   "FileWatcherKqueue - Unknown event 0x%x\n",
+                   current_ev.fflags);
         }
+
+        // Perform post-handling actions (i.e. remove, reset filter)
+        if (event == file_watcher::kDeleted) {
+          const std::string file_path = watch_records_[current_fd].file_path_;
+          EventHandler* handler = watch_records_[current_fd].handler_;
+          RemoveFilter(current_fd);
+          if (!clear_handler) {
+            RegisterFilter(file_path, handler);
+          }
+        }
+      } else {
+        LogCvmfs(kLogCvmfs, kLogDebug,
+                 "FileWatcherKqueue - Unknown kevent ident: %ld",
+                 current_ev.ident);
       }
     }
   }

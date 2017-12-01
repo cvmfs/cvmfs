@@ -38,22 +38,22 @@ void FileWatcher::RegisterHandler(const std::string& file_path,
 }
 
 bool FileWatcher::Start() {
-  if (!started_) {
-    MakePipe(control_pipe_);
-
-    assert(pthread_create(&thread_, NULL,
-                          &FileWatcher::BackgroundThread, this) == 0);
-
-    // Before returning, wait for a start signal in the control pipe
-    // from the background thread.
-    char buffer[1];
-    ReadHalfPipe(control_pipe_[0], buffer, 1);
-
-    started_ = true;
-    return true;
-  } else {
+  if (started_) {
     return false;
   }
+
+  MakePipe(control_pipe_);
+
+  assert(pthread_create(&thread_, NULL,
+                        &FileWatcher::BackgroundThread, this) == 0);
+
+  // Before returning, wait for a start signal in the control pipe
+  // from the background thread.
+  char buffer[1];
+  ReadHalfPipe(control_pipe_[0], buffer, 1);
+
+  started_ = true;
+  return true;
 }
 
 void* FileWatcher::BackgroundThread(void* d) {
