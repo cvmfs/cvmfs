@@ -1238,7 +1238,7 @@ bool MountPoint::CreateDownloadManagers() {
 }
 
 bool MountPoint::CreateResolvConfWatcher() {
-  if (!options_mgr_->IsDefined("CVMFS_DNS_ROAMING") ||
+  if (options_mgr_->IsDefined("CVMFS_DNS_ROAMING") &&
       options_mgr_->IsOn("CVMFS_DNS_ROAMING")) {
     LogCvmfs(kLogCvmfs, kLogDebug,
              "DNS roaming is enabled for this repository.");
