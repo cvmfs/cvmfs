@@ -218,7 +218,7 @@ class S3FanoutManager : SingleCopy {
   void Fini();
   void Spawn();
 
-  int PushNewJob(JobInfo *info);
+  void PushNewJob(JobInfo *info);
   int PopCompletedJobs(std::vector<s3fanout::JobInfo*> *jobs);
 
   const Statistics &GetStatistics();

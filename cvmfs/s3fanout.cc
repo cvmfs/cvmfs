@@ -1104,14 +1104,12 @@ int S3FanoutManager::PopCompletedJobs(std::vector<s3fanout::JobInfo*> *jobs) {
 /**
  * Push new job to be uploaded to the S3 cloud storage.
  */
-int S3FanoutManager::PushNewJob(JobInfo *info) {
+void S3FanoutManager::PushNewJob(JobInfo *info) {
   available_jobs_->Increment();
 
   pthread_mutex_lock(jobs_todo_lock_);
   jobs_todo_.push_back(info);
   pthread_mutex_unlock(jobs_todo_lock_);
-
-  return 0;
 }
 
 
