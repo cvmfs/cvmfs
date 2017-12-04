@@ -6,6 +6,7 @@
 #define CVMFS_RESOLV_CONF_EVENT_HANDLER_H_
 
 #include <string>
+#include <vector>
 
 #include "download.h"
 #include "file_watcher.h"
@@ -25,6 +26,10 @@ class ResolvConfEventHandler : public file_watcher::EventHandler {
   virtual bool Handle(const std::string& file_path,
                       file_watcher::Event event,
                       bool* clear_handler);
+
+  static void GetDnsAddresses(const std::string& resolv_file,
+                              std::vector<std::string>* ipv4_addresses,
+                              std::vector<std::string>* ipv6_addresses);
 
  private:
   download::DownloadManager* download_manager_;
