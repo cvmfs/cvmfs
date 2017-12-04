@@ -34,6 +34,8 @@ class EventHandler {
    * @param clear_handler - (output) set this to true to have the event
    *                        handler remove from the loop after this call
    *
+   * Should return false in case of failure.
+   *
    * Setting the clear_handler parameter to false means that the FileWatcher
    * object will attempt to re-register the handler for the same file name
    * in the case a file was delete - useful for continuously watching a file
