@@ -575,6 +575,34 @@ bool S3FanoutManager::MkPayloadHash(const JobInfo &info, string *hex_hash)
 }
 
 
+bool S3FanoutManager::MkPayloadSize(const JobInfo &info, uint64_t *size) const {
+  if ((info.request == JobInfo::kReqHead) ||
+      (info.request == JobInfo::kReqDelete))
+  {
+    *size = 0;
+    return true;
+  }
+
+  int64_t file_size;
+  switch (info.origin) {
+    case kOriginMem:
+      *size = info.origin_mem.size;
+      return true;
+    case kOriginPath:
+      file_size = GetFileSize(info.origin_path);
+      if (file_size < 0) {
+        LogCvmfs(kLogS3Fanout, kLogStderr, "failed to stat file %s (errno: %d)",
+                 info.origin_path.c_str(), errno);
+        return false;
+      }
+      *size = file_size;
+      return true;
+    default:
+      abort();
+  }
+}
+
+
 /**
  * Request parameters set the URL and other options such as timeout and
  * proxy.
@@ -589,8 +617,13 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
 
   InitializeDnsSettings(handle, info->hostname);
 
+  bool retval_b;
   string payload_hash;
-  bool retval_b = MkPayloadHash(*info, &payload_hash);
+  uint64_t payload_size;
+  retval_b = MkPayloadSize(*info, &payload_size);
+  if (!retval_b)
+    return kFailLocalIO;
+  retval_b = MkPayloadHash(*info, &payload_hash);
   if (!retval_b)
     return kFailLocalIO;
 
@@ -634,15 +667,9 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
     // MD5 content hash
     if (info->origin == kOriginMem) {
       retval = curl_easy_setopt(handle, CURLOPT_INFILESIZE_LARGE,
-                                static_cast<curl_off_t>(info->origin_mem.size));
+                                static_cast<curl_off_t>(payload_size));
       assert(retval == CURLE_OK);
     } else if (info->origin == kOriginPath) {
-      int64_t file_size = GetFileSize(info->origin_path);
-      if (file_size == -1) {
-        LogCvmfs(kLogS3Fanout, kLogStderr, "failed to stat file %s (errno: %d)",
-                 info->origin_path.c_str(), errno);
-        return kFailLocalIO;
-      }
       assert(info->origin_file == NULL);
       info->origin_file = fopen(info->origin_path.c_str(), "r");
       if (info->origin_file == NULL) {
@@ -651,7 +678,7 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
         return kFailLocalIO;
       }
       retval = curl_easy_setopt(handle, CURLOPT_INFILESIZE_LARGE,
-                                static_cast<curl_off_t>(file_size));
+                                static_cast<curl_off_t>(payload_size));
       assert(retval == CURLE_OK);
     }
     info->http_headers =
