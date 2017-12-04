@@ -250,6 +250,7 @@ class S3FanoutManager : SingleCopy {
   bool CanRetry(const JobInfo *info);
   void Backoff(JobInfo *info);
   bool VerifyAndFinalize(const int curl_error, JobInfo *info);
+  bool MkPayloadHash(const JobInfo &info, std::string *hex_hash) const;
   std::string MkV2Authz(const std::string &access_key,
                         const std::string &secret_key,
                         const std::string &timestamp,

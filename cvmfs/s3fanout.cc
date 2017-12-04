@@ -539,6 +539,42 @@ int S3FanoutManager::InitializeDnsSettings(
 }
 
 
+bool S3FanoutManager::MkPayloadHash(const JobInfo &info, string *hex_hash)
+  const
+{
+  if ((info.request == JobInfo::kReqHead) ||
+      (info.request == JobInfo::kReqDelete))
+  {
+    hex_hash->clear();
+    return true;
+  }
+
+  shash::Any payload_hash(shash::kMd5);
+  bool retval;
+
+  switch (info.origin) {
+    case kOriginMem:
+      shash::HashMem(info.origin_mem.data, info.origin_mem.size, &payload_hash);
+      *hex_hash = Base64(string(reinterpret_cast<char *>(payload_hash.digest),
+                                payload_hash.GetDigestSize()));
+      payload_hash.ToString();
+      return true;
+    case kOriginPath:
+      retval = shash::HashFile(info.origin_path, &payload_hash);
+      if (!retval) {
+        LogCvmfs(kLogS3Fanout, kLogStderr, "failed to hash file %s (errno: %d)",
+                 info.origin_path.c_str(), errno);
+        return false;
+      }
+      *hex_hash = Base64(string(reinterpret_cast<char *>(payload_hash.digest),
+                                payload_hash.GetDigestSize()));
+      return true;
+    default:
+      abort();
+  }
+}
+
+
 /**
  * Request parameters set the URL and other options such as timeout and
  * proxy.
@@ -553,9 +589,11 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
 
   InitializeDnsSettings(handle, info->hostname);
 
-  // HEAD or PUT
-  shash::Any content_md5;
-  content_md5.algorithm = shash::kMd5;
+  string payload_hash;
+  bool retval_b = MkPayloadHash(*info, &payload_hash);
+  if (!retval_b)
+    return kFailLocalIO;
+
   string timestamp;
   CURLcode retval;
   if (info->request == JobInfo::kReqHead ||
@@ -573,7 +611,7 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
                                     info->secret_key,
                                     timestamp, "",
                                     req.c_str(),
-                                    "",
+                                    payload_hash,
                                     info->bucket,
                                     info->object_key).c_str());
     info->http_headers =
@@ -598,16 +636,7 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
       retval = curl_easy_setopt(handle, CURLOPT_INFILESIZE_LARGE,
                                 static_cast<curl_off_t>(info->origin_mem.size));
       assert(retval == CURLE_OK);
-      shash::HashMem(info->origin_mem.data,
-                     info->origin_mem.size,
-                     &content_md5);
     } else if (info->origin == kOriginPath) {
-      bool hashretval = shash::HashFile(info->origin_path, &content_md5);
-      if (!hashretval) {
-        LogCvmfs(kLogS3Fanout, kLogStderr, "failed to hash file %s (errno: %d)",
-                 info->origin_path.c_str(), errno);
-        return kFailLocalIO;
-      }
       int64_t file_size = GetFileSize(info->origin_path);
       if (file_size == -1) {
         LogCvmfs(kLogS3Fanout, kLogStderr, "failed to stat file %s (errno: %d)",
@@ -625,14 +654,9 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
                                 static_cast<curl_off_t>(file_size));
       assert(retval == CURLE_OK);
     }
-    LogCvmfs(kLogS3Fanout, kLogDebug, "content hash: %s",
-             content_md5.ToString().c_str());
-    string content_md5_base64 =
-        Base64(string(reinterpret_cast<char *>(content_md5.digest),
-                      content_md5.GetDigestSize()));
     info->http_headers =
         curl_slist_append(info->http_headers,
-                          ("Content-MD5: " + content_md5_base64).c_str());
+                          ("Content-MD5: " + payload_hash).c_str());
 
     // Authorization
     timestamp = RfcTimestamp();
@@ -641,7 +665,7 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
                           MkV2Authz(info->access_key,
                                     info->secret_key,
                                     timestamp, "binary/octet-stream",
-                                    "PUT", content_md5_base64,
+                                    "PUT", payload_hash,
                                     info->bucket,
                                     (info->object_key)).c_str());
 
