@@ -1095,5 +1095,10 @@ TEST(T_Shash, Sha256) {
   EXPECT_STREQ(
     "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     hash.c_str());
+
+  hash = shash::Sha256Mem(NULL, 0);
+  EXPECT_STREQ(
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    hash.c_str());
 #endif
 }
