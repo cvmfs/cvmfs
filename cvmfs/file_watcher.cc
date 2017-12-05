@@ -17,13 +17,19 @@ EventHandler::EventHandler() {}
 
 EventHandler::~EventHandler() {}
 
-FileWatcher::FileWatcher() : handler_map_(), control_pipe_(), started_(false) {}
+FileWatcher::FileWatcher()
+    : handler_map_()
+    , control_pipe_to_back_()
+    , control_pipe_to_front_()
+    , started_(false) {}
 
 FileWatcher::~FileWatcher() {
   if (started_) {
-    WritePipe(control_pipe_[1], "q", 1);
+    WritePipe(control_pipe_to_back_[1], "q", 1);
     assert(pthread_join(thread_, NULL) == 0);
-    ClosePipe(control_pipe_);
+
+    ClosePipe(control_pipe_to_front_);
+    ClosePipe(control_pipe_to_back_);
   }
 
   for (HandlerMap::iterator it = handler_map_.begin(); it != handler_map_.end();
@@ -42,7 +48,8 @@ bool FileWatcher::Start() {
     return false;
   }
 
-  MakePipe(control_pipe_);
+  MakePipe(control_pipe_to_back_);
+  MakePipe(control_pipe_to_front_);
 
   assert(pthread_create(&thread_, NULL,
                         &FileWatcher::BackgroundThread, this) == 0);
@@ -50,7 +57,7 @@ bool FileWatcher::Start() {
   // Before returning, wait for a start signal in the control pipe
   // from the background thread.
   char buffer[1];
-  ReadHalfPipe(control_pipe_[0], buffer, 1);
+  ReadHalfPipe(control_pipe_to_front_[0], buffer, 1);
 
   started_ = true;
   return true;
@@ -59,12 +66,9 @@ bool FileWatcher::Start() {
 void* FileWatcher::BackgroundThread(void* d) {
   FileWatcher* watcher = reinterpret_cast<FileWatcher*>(d);
 
-  // Use the control pipe to signal readiness to the main thread,
-  // before continuing with the event loop.
-  WritePipe(watcher->control_pipe_[1], "s", 1);
-
   if (!watcher->RunEventLoop(watcher->handler_map_,
-                             watcher->control_pipe_[0])) {
+                             watcher->control_pipe_to_back_[0],
+                             watcher->control_pipe_to_front_[1])) {
     LogCvmfs(kLogCvmfs, kLogDebug, "Error running event loop.");
   }
 

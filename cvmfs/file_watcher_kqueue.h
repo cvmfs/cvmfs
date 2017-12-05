@@ -31,7 +31,7 @@ class FileWatcherKqueue : public FileWatcher {
 
  protected:
   virtual bool RunEventLoop(const FileWatcher::HandlerMap& handler,
-                            int control_pipe);
+                            int read_pipe, int write_pipe);
 
  private:
   void RemoveFilter(int fd);

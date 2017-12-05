@@ -25,13 +25,13 @@ FileWatcherKqueue::FileWatcherKqueue() {}
 FileWatcherKqueue::~FileWatcherKqueue() {}
 
 bool FileWatcherKqueue::RunEventLoop(const FileWatcher::HandlerMap& handlers,
-                                     int control_pipe) {
+                                     int read_pipe, int write_pipe) {
   kq_ = kqueue();
   assert(kq_ != -1);
 
   // Control pipe sending the stop event.
   struct kevent watch_event;
-  EV_SET(&watch_event, control_pipe, EVFILT_READ, EV_ADD | EV_ENABLE | EV_CLEAR,
+  EV_SET(&watch_event, read_pipe, EVFILT_READ, EV_ADD | EV_ENABLE | EV_CLEAR,
          0, 0, 0);
   assert(kevent(kq_, &watch_event, 1, NULL, 0, NULL) != -1);
 
@@ -39,6 +39,10 @@ bool FileWatcherKqueue::RunEventLoop(const FileWatcher::HandlerMap& handlers,
        it != handlers.end(); ++it) {
     RegisterFilter(it->first, it->second);
   }
+
+  // Use the control pipe to signal readiness to the main thread,
+  // before continuing with the event loop.
+  WritePipe(write_pipe, "s", 1);
 
   bool stop = false;
   while (!stop) {
@@ -55,9 +59,9 @@ bool FileWatcherKqueue::RunEventLoop(const FileWatcher::HandlerMap& handlers,
     }
     for (int i = 0; i < nev && !stop; ++i) {
       struct kevent& current_ev = triggered_events[i];
-      if (current_ev.ident == static_cast<uint64_t>(control_pipe)) {
+      if (current_ev.ident == static_cast<uint64_t>(read_pipe)) {
         char buffer[1];
-        ReadPipe(control_pipe, &buffer, 1);
+        ReadPipe(read_pipe, &buffer, 1);
         LogCvmfs(kLogCvmfs, kLogDebug, "FileWatcherKqueue - Stopping.\n");
         stop = true;
         continue;

@@ -60,13 +60,16 @@ class FileWatcher {
 
  protected:
   virtual bool RunEventLoop(const HandlerMap& handler_map,
-                            int control_pipe) = 0;
+                            int read_pipe, int write_pipe) = 0;
 
  private:
   static void* BackgroundThread(void* d);
 
   HandlerMap handler_map_;
-  int control_pipe_[2];
+
+  int control_pipe_to_back_[2];
+  int control_pipe_to_front_[2];
+
   pthread_t thread_;
 
   bool started_;

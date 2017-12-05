@@ -48,8 +48,6 @@ TEST_F(T_FileWatcher, ModifyThenDelete) {
 
   EXPECT_TRUE(watcher->Start());
 
-  SafeSleepMs(100);
-
   SafeWriteToFile("test", watched_file_name, 0600);
 
   SafeSleepMs(100);
