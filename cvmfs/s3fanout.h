@@ -111,6 +111,7 @@ struct JobInfo {
   const std::string secret_key;
   const AuthzMethods authz_method;
   const std::string hostname;
+  const std::string region;
   const std::string bucket;
   const std::string object_key;
   const std::string origin_path;
@@ -120,18 +121,20 @@ struct JobInfo {
 
   // One constructor per destination
   JobInfo(
-    const std::string access_key,
-    const std::string secret_key,
-    const AuthzMethods authz_method,
-    const std::string hostname,
-    const std::string bucket,
-    const std::string object_key,
+    const std::string &access_key,
+    const std::string &secret_key,
+    const AuthzMethods &authz_method,
+    const std::string &hostname,
+    const std::string &region,
+    const std::string &bucket,
+    const std::string &object_key,
     void *callback,
-    const std::string origin_path)
+    const std::string &origin_path)
     : access_key(access_key)
     , secret_key(secret_key)
     , authz_method(authz_method)
     , hostname(hostname)
+    , region(region)
     , bucket(bucket)
     , object_key(object_key)
     , origin_path(origin_path)
@@ -141,12 +144,13 @@ struct JobInfo {
     this->callback = callback;
   }
   JobInfo(
-    const std::string access_key,
-    const std::string secret_key,
-    const AuthzMethods authz_method,
-    const std::string hostname,
-    const std::string bucket,
-    const std::string object_key,
+    const std::string &access_key,
+    const std::string &secret_key,
+    const AuthzMethods &authz_method,
+    const std::string &hostname,
+    const std::string &region,
+    const std::string &bucket,
+    const std::string &object_key,
     void *callback,
     MemoryMappedFile *mmf,
     const unsigned char *buffer, size_t size)
@@ -154,6 +158,7 @@ struct JobInfo {
     , secret_key(secret_key)
     , authz_method(authz_method)
     , hostname(hostname)
+    , region(region)
     , bucket(bucket)
     , object_key(object_key)
   {

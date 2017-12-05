@@ -436,7 +436,7 @@ bool S3FanoutManager::MkV2Authz(const JobInfo &info, vector<string> *headers)
 bool S3FanoutManager::MkV4Authz(const JobInfo &info, vector<string> *headers)
   const
 {
-  return "";
+  return false;
   /*string canonical_request =
     request + "\n" +
     bucket + "/" + object_key + "\n" +

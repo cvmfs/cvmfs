@@ -118,6 +118,9 @@ bool S3Uploader::ParseSpoolerDefinition(
   {
     num_parallel_uploads_ = String2Uint64(parameter);
   }
+  if (options_manager.GetValue("CVMFS_S3_REGION", &region_)) {
+    authz_method_ = s3fanout::kAuthzAwsV4;
+  }
 
   return true;
 }
@@ -187,6 +190,7 @@ void S3Uploader::FileUpload(
                           secret_key_,
                           authz_method_,
                           host_name_port_,
+                          region_,
                           bucket_,
                           repository_alias_ + "/" + remote_path,
                           const_cast<void*>(
@@ -307,6 +311,7 @@ void S3Uploader::FinalizeStreamedUpload(
                             secret_key_,
                             authz_method_,
                             host_name_port_,
+                            region_,
                             bucket_,
                             final_path,
                             const_cast<void*>(
@@ -334,6 +339,7 @@ s3fanout::JobInfo *S3Uploader::CreateJobInfo(const std::string& path) const {
                                secret_key_,
                                authz_method_,
                                host_name_port_,
+                               region_,
                                bucket_,
                                path,
                                NULL,

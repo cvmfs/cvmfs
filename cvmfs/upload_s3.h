@@ -84,6 +84,7 @@ class S3Uploader : public AbstractUploader {
   std::string repository_alias_;
   std::string host_name_port_;
   std::string host_name_;
+  std::string region_;
   std::string bucket_;
   int num_parallel_uploads_;
   std::string access_key_;
