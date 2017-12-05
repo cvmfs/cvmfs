@@ -251,26 +251,13 @@ class S3FanoutManager : SingleCopy {
   void Backoff(JobInfo *info);
   bool VerifyAndFinalize(const int curl_error, JobInfo *info);
   std::string GetRequestString(const JobInfo &info) const;
+  std::string GetContentType(const JobInfo &info) const;
   bool MkPayloadHash(const JobInfo &info, std::string *hex_hash) const;
   bool MkPayloadSize(const JobInfo &info, uint64_t *size) const;
-  std::string MkV2Authz(const std::string &access_key,
-                        const std::string &secret_key,
-                        const std::string &timestamp,
-                        const std::string &content_type,
-                        const std::string &request,
-                        const std::string &content_md5_base64,
-                        const std::string &bucket,
-                        const std::string &object_key) const;
-  std::string MkV4Authz(const std::string &access_key,
-                        const std::string &secret_key,
-                        const std::string &region,
-                        const std::string &host,
-                        const std::string &timestamp,
-                        const std::string &content_type,
-                        const std::string &request,
-                        const std::string &content_sha256,
-                        const std::string &bucket,
-                        const std::string &object_key) const;
+  bool MkV2Authz(const JobInfo &info,
+                 std::vector<std::string> *headers) const;
+  bool MkV4Authz(const JobInfo &info,
+                 std::vector<std::string> *headers) const;
   std::string MkUrl(const std::string &host,
                     const std::string &bucket,
                     const std::string &objkey2) const {

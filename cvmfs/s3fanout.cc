@@ -390,33 +390,42 @@ void S3FanoutManager::ReleaseCurlHandle(JobInfo *info, CURL *handle) const {
  * The Amazon AWS 2 authorization header according to
  * http://docs.aws.amazon.com/AmazonS3/latest/dev/RESTAuthentication.html#ConstructingTheAuthenticationHeader
  */
-string S3FanoutManager::MkV2Authz(const string &access_key,
-                                  const string &secret_key,
-                                  const string &timestamp,
-                                  const string &content_type,
-                                  const string &request,
-                                  const string &content_md5_base64,
-                                  const string &bucket,
-                                  const string &object_key) const
+bool S3FanoutManager::MkV2Authz(const JobInfo &info, vector<string> *headers)
+  const
 {
+  string payload_hash;
+  bool retval = MkPayloadHash(info, &payload_hash);
+  if (!retval)
+    return false;
+  string content_type = GetContentType(info);
+  string request = GetRequestString(info);
+
+  string timestamp = RfcTimestamp();
   string to_sign = request + "\n" +
-                   content_md5_base64 + "\n" +
+                   payload_hash + "\n" +
                    content_type + "\n" +
                    timestamp + "\n" +
                    "x-amz-acl:public-read" + "\n" +  // default ACL
-                   "/" + bucket + "/" + object_key;
-  LogCvmfs(kLogS3Fanout, kLogDebug,
-           "%s string to sign for: %s", request.c_str(), object_key.c_str());
+                   "/" + info.bucket + "/" + info.object_key;
+  LogCvmfs(kLogS3Fanout, kLogDebug, "%s string to sign for: %s",
+           request.c_str(), info.object_key.c_str());
 
   shash::Any hmac;
   hmac.algorithm = shash::kSha1;
-  shash::Hmac(secret_key,
+  shash::Hmac(info.secret_key,
               reinterpret_cast<const unsigned char *>(to_sign.data()),
               to_sign.length(), &hmac);
 
-  return "Authorization: AWS " + access_key + ":" +
-      Base64(string(reinterpret_cast<char *>(hmac.digest),
-                    hmac.GetDigestSize()));
+  headers->push_back("Authorization: AWS " + info.access_key + ":" +
+                     Base64(string(reinterpret_cast<char *>(hmac.digest),
+                                   hmac.GetDigestSize())));
+  headers->push_back("Date: " + timestamp);
+  headers->push_back("x-amz-acl: public-read");
+  if (!payload_hash.empty())
+    headers->push_back("Content-MD5: " + payload_hash);
+  if (!content_type.empty())
+    headers->push_back("Content-Type: binary/octet-stream");
+  return true;
 }
 
 
@@ -424,16 +433,8 @@ string S3FanoutManager::MkV2Authz(const string &access_key,
  * The Amazon AWS4 authorization header according to
  * http://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-auth-using-authorization-header.html
  */
-string S3FanoutManager::MkV4Authz(const string &access_key,
-                                  const string &secret_key,
-                                  const string &region,
-                                  const string &host,
-                                  const string &timestamp,
-                                  const string &content_type,
-                                  const string &request,
-                                  const string &content_sha256,
-                                  const string &bucket,
-                                  const string &object_key) const
+bool S3FanoutManager::MkV4Authz(const JobInfo &info, vector<string> *headers)
+  const
 {
   return "";
   /*string canonical_request =
@@ -656,6 +657,22 @@ string S3FanoutManager::GetRequestString(const JobInfo &info) const {
 }
 
 
+string S3FanoutManager::GetContentType(const JobInfo &info) const {
+  switch (info.request) {
+    case JobInfo::kReqHead:
+      // fall through
+    case JobInfo::kReqDelete:
+      return "";
+    case JobInfo::kReqPut:
+      // fall through
+    case JobInfo::kReqPutNoCache:
+      return "binary/octet-stream";
+    default:
+      abort();
+  }
+}
+
+
 /**
  * Request parameters set the URL and other options such as timeout and
  * proxy.
@@ -671,16 +688,11 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
   InitializeDnsSettings(handle, info->hostname);
 
   bool retval_b;
-  string payload_hash;
   uint64_t payload_size;
   retval_b = MkPayloadSize(*info, &payload_size);
   if (!retval_b)
     return kFailLocalIO;
-  retval_b = MkPayloadHash(*info, &payload_hash);
-  if (!retval_b)
-    return kFailLocalIO;
 
-  string timestamp;
   CURLcode retval;
   if (info->request == JobInfo::kReqHead ||
       info->request == JobInfo::kReqDelete)
@@ -689,22 +701,12 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
     assert(retval == CURLE_OK);
     retval = curl_easy_setopt(handle, CURLOPT_NOBODY, 1);
     assert(retval == CURLE_OK);
-    timestamp = RfcTimestamp();
-    std::string req = GetRequestString(*info);
     info->http_headers =
-        curl_slist_append(info->http_headers,
-                          MkV2Authz(info->access_key,
-                                    info->secret_key,
-                                    timestamp, "",
-                                    req.c_str(),
-                                    payload_hash,
-                                    info->bucket,
-                                    info->object_key).c_str());
-    info->http_headers =
-        curl_slist_append(info->http_headers, "Content-Length: 0");
+      curl_slist_append(info->http_headers, "Content-Length: 0");
 
     if (info->request == JobInfo::kReqDelete) {
-      retval = curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST, req.c_str());
+      retval = curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST,
+                                GetRequestString(*info).c_str());
       assert(retval == CURLE_OK);
     } else {
       retval = curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST, NULL);
@@ -717,12 +719,10 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
     assert(retval == CURLE_OK);
     retval = curl_easy_setopt(handle, CURLOPT_NOBODY, 0);
     assert(retval == CURLE_OK);
-    // MD5 content hash
-    if (info->origin == kOriginMem) {
-      retval = curl_easy_setopt(handle, CURLOPT_INFILESIZE_LARGE,
-                                static_cast<curl_off_t>(payload_size));
-      assert(retval == CURLE_OK);
-    } else if (info->origin == kOriginPath) {
+    retval = curl_easy_setopt(handle, CURLOPT_INFILESIZE_LARGE,
+                              static_cast<curl_off_t>(payload_size));
+    assert(retval == CURLE_OK);
+    if (info->origin == kOriginPath) {
       assert(info->origin_file == NULL);
       info->origin_file = fopen(info->origin_path.c_str(), "r");
       if (info->origin_file == NULL) {
@@ -730,28 +730,7 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
                  info->origin_path.c_str(), errno);
         return kFailLocalIO;
       }
-      retval = curl_easy_setopt(handle, CURLOPT_INFILESIZE_LARGE,
-                                static_cast<curl_off_t>(payload_size));
-      assert(retval == CURLE_OK);
     }
-    info->http_headers =
-        curl_slist_append(info->http_headers,
-                          ("Content-MD5: " + payload_hash).c_str());
-
-    // Authorization
-    timestamp = RfcTimestamp();
-    info->http_headers =
-        curl_slist_append(info->http_headers,
-                          MkV2Authz(info->access_key,
-                                    info->secret_key,
-                                    timestamp, "binary/octet-stream",
-                                    "PUT", payload_hash,
-                                    info->bucket,
-                                    (info->object_key)).c_str());
-
-    info->http_headers =
-        curl_slist_append(info->http_headers,
-                          "Content-Type: binary/octet-stream");
 
     if (info->request == JobInfo::kReqPutNoCache) {
       std::string cache_control = "Cache-Control: no-cache";
@@ -760,12 +739,26 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
     }
   }
 
+  // Authorization
+  vector<string> authz_headers;
+  switch (info->authz_method) {
+    case kAuthzAwsV2:
+      retval_b = MkV2Authz(*info, &authz_headers);
+      break;
+    case kAuthzAwsV4:
+      retval_b = MkV2Authz(*info, &authz_headers);
+      break;
+    default:
+      abort();
+  }
+  if (!retval_b)
+    return kFailLocalIO;
+  for (unsigned i = 0; i < authz_headers.size(); ++i) {
+    info->http_headers =
+      curl_slist_append(info->http_headers, authz_headers[i].c_str());
+  }
+
   // Common headers
-  info->http_headers =
-      curl_slist_append(info->http_headers, ("Date: " + timestamp).c_str());
-  std::string acl = "x-amz-acl: public-read";
-  info->http_headers =
-      curl_slist_append(info->http_headers, acl.c_str());
   info->http_headers =
       curl_slist_append(info->http_headers, "Connection: Keep-Alive");
   info->http_headers = curl_slist_append(info->http_headers, "Pragma:");
