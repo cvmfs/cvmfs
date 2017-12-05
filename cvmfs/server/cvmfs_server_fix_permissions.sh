@@ -15,6 +15,8 @@ cvmfs_server_fix_permissions() {
     -exec grep "CVMFS_UNION_FS_TYPE=overlayfs" {} \; | wc -l)
   if [ $num_overlayfs -gt 0 ]; then
     ensure_swissknife_suid overlayfs
+  else
+    ensure_swissknife_suid other
   fi
 }
 
