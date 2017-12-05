@@ -112,10 +112,6 @@ set(CVMFS_UNITTEST_FILES
   t_xattr.cc
 )
 
-if (APPLE)
-    list(APPEND CVMFS_UNITTEST_FILES t_file_watcher_kqueue.cc)
-endif(APPLE)
-
 #
 # unit test source files
 #
