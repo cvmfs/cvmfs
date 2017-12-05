@@ -100,11 +100,10 @@ bool FileWatcherKqueue::RunEventLoop(const FileWatcher::HandlerMap& handlers,
 
         // Perform post-handling actions (i.e. remove, reset filter)
         if (event == file_watcher::kDeleted) {
-          const std::string file_path = watch_records_[current_fd].file_path_;
-          EventHandler* handler = watch_records_[current_fd].handler_;
           RemoveFilter(current_fd);
           if (!clear_handler) {
-            RegisterFilter(file_path, handler);
+            RegisterFilter(current_record.file_path_,
+                           current_record.handler_);
           }
         }
       } else {
@@ -120,6 +119,8 @@ bool FileWatcherKqueue::RunEventLoop(const FileWatcher::HandlerMap& handlers,
        it != watch_records_.end(); ++it) {
     close(it->first);
   }
+  watch_records_.clear();
+
   close(kq_);
 
   return true;
@@ -129,8 +130,8 @@ void FileWatcherKqueue::RemoveFilter(int fd) {
   struct kevent remove_event;
   EV_SET(&remove_event, fd, EVFILT_VNODE, EV_DELETE, NULL, 0, 0);
   assert(kevent(kq_, &remove_event, 1, NULL, 0, NULL) != -1);
-  close(fd);
   watch_records_.erase(fd);
+  close(fd);
 }
 
 void FileWatcherKqueue::RegisterFilter(const std::string& file_path,
