@@ -1074,9 +1074,11 @@ TEST(T_Shash, Hmac256) {
 #ifdef OPENSSL_API_INTERFACE_V09
   printf("Skipping!\n");
 #else
-  string digest = shash::Hmac256("the shared secret key here",
-                                 "the message to hash here");
-  EXPECT_EQ("RkOXiWX/zsbm1zs2o5rkPOsV9++BMbgweGLrxWDn+Yg=", Base64(digest));
+  string hash = shash::Hmac256("the shared secret key here",
+                               "the message to hash here");
+  EXPECT_STREQ(
+    "4643978965ffcec6e6d73b36a39ae43ceb15f7ef8131b8307862ebc560e7f988",
+    hash.c_str());
 #endif
 }
 

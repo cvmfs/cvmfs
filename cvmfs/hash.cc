@@ -317,51 +317,6 @@ void Hmac(
 }
 
 
-/**
- * Returns the raw digest as string, not the hex version.  The user code passes
- * the result into Base64.
- */
-std::string Hmac256(const std::string &key, const std::string &content) {
-#ifdef OPENSSL_API_INTERFACE_V09
-  abort();
-#else
-  unsigned char digest[SHA256_DIGEST_LENGTH];
-  const unsigned block_size = 64;
-  const unsigned key_length = key.length();
-  unsigned char key_block[block_size];
-  memset(key_block, 0, block_size);
-  if (key_length > block_size) {
-    SHA256(reinterpret_cast<const unsigned char *>(key.data()), key_length,
-           key_block);
-  } else {
-    if (key.length() > 0)
-      memcpy(key_block, key.data(), key_length);
-  }
-
-  unsigned char pad_block[block_size];
-  // Inner hash
-  SHA256_CTX ctx_inner;
-  unsigned char digest_inner[SHA256_DIGEST_LENGTH];
-  SHA256_Init(&ctx_inner);
-  for (unsigned i = 0; i < block_size; ++i)
-    pad_block[i] = key_block[i] ^ 0x36;
-  SHA256_Update(&ctx_inner, pad_block, block_size);
-  SHA256_Update(&ctx_inner, content.data(), content.length());
-  SHA256_Final(digest_inner, &ctx_inner);
-
-  // Outer hash
-  SHA256_CTX ctx_outer;
-  SHA256_Init(&ctx_outer);
-  for (unsigned i = 0; i < block_size; ++i)
-    pad_block[i] = key_block[i] ^ 0x5c;
-  SHA256_Update(&ctx_outer, pad_block, block_size);
-  SHA256_Update(&ctx_outer, digest_inner, SHA256_DIGEST_LENGTH);
-
-  SHA256_Final(digest, &ctx_outer);
-  return string(reinterpret_cast<char *>(digest), SHA256_DIGEST_LENGTH);
-#endif
-}
-
 bool HashFd(int fd, Any *any_digest) {
   Algorithms algorithm = any_digest->algorithm;
   ContextPtr context(algorithm);
@@ -446,8 +401,8 @@ static string HexFromSha256(unsigned char digest[SHA256_DIGEST_LENGTH]) {
   for (unsigned i = 0; i < SHA256_DIGEST_LENGTH; ++i) {
     const char d1 = digest[i] / 16;
     const char d2 = digest[i] % 16;
-    result[2*i] =  d1 + ((d1 <= 9) ? '0' : 'a' - 10);
-    result[2*i + 1] = d2 + ((d2 <= 9) ? '0' : 'a' - 10);
+    result.push_back(d1 + ((d1 <= 9) ? '0' : 'a' - 10));
+    result.push_back(d2 + ((d2 <= 9) ? '0' : 'a' - 10));
   }
   return result;
 }
@@ -496,6 +451,51 @@ string Sha256Mem(const unsigned char *buffer, const unsigned buffer_size) {
 string Sha256String(const string &content) {
   return Sha256Mem(reinterpret_cast<const unsigned char *>(content.data()),
                    content.length());
+}
+
+
+/**
+ * Returns the hex version of the digest
+ */
+std::string Hmac256(const std::string &key, const std::string &content) {
+#ifdef OPENSSL_API_INTERFACE_V09
+  abort();
+#else
+  unsigned char digest[SHA256_DIGEST_LENGTH];
+  const unsigned block_size = 64;
+  const unsigned key_length = key.length();
+  unsigned char key_block[block_size];
+  memset(key_block, 0, block_size);
+  if (key_length > block_size) {
+    SHA256(reinterpret_cast<const unsigned char *>(key.data()), key_length,
+           key_block);
+  } else {
+    if (key.length() > 0)
+      memcpy(key_block, key.data(), key_length);
+  }
+
+  unsigned char pad_block[block_size];
+  // Inner hash
+  SHA256_CTX ctx_inner;
+  unsigned char digest_inner[SHA256_DIGEST_LENGTH];
+  SHA256_Init(&ctx_inner);
+  for (unsigned i = 0; i < block_size; ++i)
+    pad_block[i] = key_block[i] ^ 0x36;
+  SHA256_Update(&ctx_inner, pad_block, block_size);
+  SHA256_Update(&ctx_inner, content.data(), content.length());
+  SHA256_Final(digest_inner, &ctx_inner);
+
+  // Outer hash
+  SHA256_CTX ctx_outer;
+  SHA256_Init(&ctx_outer);
+  for (unsigned i = 0; i < block_size; ++i)
+    pad_block[i] = key_block[i] ^ 0x5c;
+  SHA256_Update(&ctx_outer, pad_block, block_size);
+  SHA256_Update(&ctx_outer, digest_inner, SHA256_DIGEST_LENGTH);
+
+  SHA256_Final(digest, &ctx_outer);
+  return HexFromSha256(digest);
+#endif
 }
 
 }  // namespace shash
