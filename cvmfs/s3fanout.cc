@@ -424,8 +424,50 @@ bool S3FanoutManager::MkV2Authz(const JobInfo &info, vector<string> *headers)
   if (!payload_hash.empty())
     headers->push_back("Content-MD5: " + payload_hash);
   if (!content_type.empty())
-    headers->push_back("Content-Type: binary/octet-stream");
+    headers->push_back("Content-Type: " + content_type);
   return true;
+}
+
+
+string S3FanoutManager::GetUriEncode(const string &val, bool encode_slash)
+  const
+{
+  string result;
+  const unsigned len = val.length();
+  result.reserve(len);
+  for (unsigned i = 0; i < len; ++i) {
+    char c = val[i];
+    if ((c >= 'A' && c <= 'Z') ||
+        (c >= 'a' && c <= 'z') ||
+        (c >= '0' && c <= '9') ||
+        c == '_' || c == '-' || c == '~' || c == '.')
+    {
+      result.push_back(c);
+    } else if (c == '/') {
+      if (encode_slash) {
+        result += "%2F";
+      } else {
+        result.push_back(c);
+      }
+    } else {
+      result.push_back('%');
+      result.push_back((c / 16) + ((c / 16 <= 9) ? '0' : 'A'-10));
+      result.push_back((c % 16) + ((c % 16 <= 9) ? '0' : 'A'-10));
+    }
+  }
+  return result;
+}
+
+
+string S3FanoutManager::GetAwsV4SigningKey(
+  const JobInfo &info,
+  const string &date) const
+{
+  // TODO: cache
+  string date_key = shash::Hmac256("AWS4" + info.secret_key, date, true);
+  string date_region_key = shash::Hmac256(date_key, info.region, true);
+  string date_region_service_key = shash::Hmac256(date_region_key, "s3", true);
+  return shash::Hmac256(date_region_service_key, "aws4_request", true);
 }
 
 
@@ -436,15 +478,60 @@ bool S3FanoutManager::MkV2Authz(const JobInfo &info, vector<string> *headers)
 bool S3FanoutManager::MkV4Authz(const JobInfo &info, vector<string> *headers)
   const
 {
-  return false;
-  /*string canonical_request =
-    request + "\n" +
-    bucket + "/" + object_key + "\n" +
-    "\n" +
-    "host:" + host + "\nx-amz-content-sha256:" + content_sha256 + "\n" +
-    "host;x-amz-content-sha256\n" +
-    content_sha256;*/
+  string payload_hash;
+  bool retval = MkPayloadHash(info, &payload_hash);
+  if (!retval)
+    return false;
+  string content_type = GetContentType(info);
+  string timestamp = IsoTimestamp();
+  string date = timestamp.substr(0, 8);
+  vector<string> tokens = SplitString(info.hostname, ':');
+  string host_only = tokens[0];
 
+  string signed_headers;
+  string canonical_headers;
+  if (!content_type.empty()) {
+    signed_headers += "content-type;";
+    headers->push_back("Content-Type: " + content_type);
+    canonical_headers += "content-type:" + content_type + "\n";
+  }
+  signed_headers += "host;x-amz-acl;x-amz-content-sha256;x-amz-date";
+  canonical_headers +=
+    "host:" + host_only + "\n" +
+    "x-amz-acl:public-read\n"
+    "x-amz-content-sha256:" + payload_hash + "\n" +
+    "x-amz-date:" + timestamp + "\n";
+
+  string scope = date + "/" + info.region + "/s3/aws4_request";
+
+  string canonical_request =
+    GetRequestString(info) + "\n" +
+    GetUriEncode("/" + info.bucket + "/" + info.object_key, false) + "\n" +
+    "\n" +
+    canonical_headers + "\n" +
+    signed_headers + "\n" +
+    payload_hash;
+
+  string hash_request = shash::Sha256String(canonical_request.c_str());
+
+  string string_to_sign =
+    "AWS4-HMAC-SHA256\n" +
+    timestamp + "\n" +
+    scope + "\n" +
+    hash_request;
+
+  string signing_key = GetAwsV4SigningKey(info, date);
+  string signature = shash::Hmac256(signing_key, string_to_sign);
+
+  headers->push_back("x-amz-acl: public-read");
+  headers->push_back("x-amz-content-sha256: " + payload_hash);
+  headers->push_back("x-amz-date: " + timestamp);
+  headers->push_back(
+    "Authorization: AWS4-HMAC-SHA256 "
+    "Credential=" + info.access_key + "/" + scope + ","
+    "SignedHeaders=" + signed_headers + ","
+    "Signature=" + signature);
+  return true;
 }
 
 
@@ -746,7 +833,7 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
       retval_b = MkV2Authz(*info, &authz_headers);
       break;
     case kAuthzAwsV4:
-      retval_b = MkV2Authz(*info, &authz_headers);
+      retval_b = MkV4Authz(*info, &authz_headers);
       break;
     default:
       abort();

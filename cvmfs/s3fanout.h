@@ -257,6 +257,9 @@ class S3FanoutManager : SingleCopy {
   bool VerifyAndFinalize(const int curl_error, JobInfo *info);
   std::string GetRequestString(const JobInfo &info) const;
   std::string GetContentType(const JobInfo &info) const;
+  std::string GetUriEncode(const std::string &val, bool encode_slash) const;
+  std::string GetAwsV4SigningKey(const JobInfo &info,
+                                 const std::string &date) const;
   bool MkPayloadHash(const JobInfo &info, std::string *hex_hash) const;
   bool MkPayloadSize(const JobInfo &info, uint64_t *size) const;
   bool MkV2Authz(const JobInfo &info,

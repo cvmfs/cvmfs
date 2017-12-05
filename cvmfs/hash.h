@@ -516,7 +516,8 @@ inline void HmacString(const std::string &key, const std::string &content,
  * digets size to 32 bytes and require client data structure transformation
  * during hotpatch.
  */
-std::string Hmac256(const std::string &key, const std::string &content);
+std::string Hmac256(const std::string &key, const std::string &content,
+                    bool raw_output = false);
 std::string Sha256File(const std::string &filename);
 std::string Sha256Mem(const unsigned char *buffer, const unsigned buffer_size);
 std::string Sha256String(const std::string &content);

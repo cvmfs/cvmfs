@@ -454,10 +454,11 @@ string Sha256String(const string &content) {
 }
 
 
-/**
- * Returns the hex version of the digest
- */
-std::string Hmac256(const std::string &key, const std::string &content) {
+std::string Hmac256(
+  const std::string &key,
+  const std::string &content,
+  bool raw_output)
+{
 #ifdef OPENSSL_API_INTERFACE_V09
   abort();
 #else
@@ -494,6 +495,8 @@ std::string Hmac256(const std::string &key, const std::string &content) {
   SHA256_Update(&ctx_outer, digest_inner, SHA256_DIGEST_LENGTH);
 
   SHA256_Final(digest, &ctx_outer);
+  if (raw_output)
+    return string(reinterpret_cast<const char *>(digest), SHA256_DIGEST_LENGTH);
   return HexFromSha256(digest);
 #endif
 }

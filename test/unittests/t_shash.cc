@@ -1079,6 +1079,26 @@ TEST(T_Shash, Hmac256) {
   EXPECT_STREQ(
     "4643978965ffcec6e6d73b36a39ae43ceb15f7ef8131b8307862ebc560e7f988",
     hash.c_str());
+
+  EXPECT_EQ(
+    "9190a36badc1748978b7e6aece38aca4862012db8260009e1d055bd9abb69e31",
+    shash::Hmac256(
+      "a secret key that is very long: a secret key that is very long....",
+      "the message to hash here"));
+
+  string kdate = shash::Hmac256(
+    "AWS4wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", "20130524", true);
+  string kregion = shash::Hmac256(kdate, "us-east-1", true);
+  string kservice = shash::Hmac256(kregion, "s3", true);
+  string ksigning = shash::Hmac256(kservice, "aws4_request", true);
+  string signee =
+    "AWS4-HMAC-SHA256\n"
+    "20130524T000000Z\n"
+    "20130524/us-east-1/s3/aws4_request\n"
+    "7344ae5b7ee6c3e7e6b0fe0640412a37625d1fbfff95c48bbb2dc43964946972";
+  EXPECT_EQ(
+    "f0e8bdb87c964420e857bd35b5d6ed310bd44f0170aba48dd91039c6036bdb41",
+    shash::Hmac256(ksigning, signee));
 #endif
 }
 
