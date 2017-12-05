@@ -663,7 +663,8 @@ bool S3FanoutManager::MkPayloadHash(const JobInfo &info, string *hex_hash)
     case kOriginMem:
       switch (info.authz_method) {
         case kAuthzAwsV2:
-          shash::HashMem(info.origin_mem.data, info.origin_mem.size, &payload_hash);
+          shash::HashMem(info.origin_mem.data, info.origin_mem.size,
+                         &payload_hash);
           *hex_hash =
             Base64(string(reinterpret_cast<char *>(payload_hash.digest),
                           payload_hash.GetDigestSize()));
