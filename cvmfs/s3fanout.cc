@@ -463,11 +463,18 @@ string S3FanoutManager::GetAwsV4SigningKey(
   const JobInfo &info,
   const string &date) const
 {
-  // TODO: cache
+  string id = info.secret_key + info.region + date;
+  map<string, string>::const_iterator iter = signing_keys_.find(id);
+  if (iter != signing_keys_.end())
+    return iter->second;
+
   string date_key = shash::Hmac256("AWS4" + info.secret_key, date, true);
   string date_region_key = shash::Hmac256(date_key, info.region, true);
   string date_region_service_key = shash::Hmac256(date_region_key, "s3", true);
-  return shash::Hmac256(date_region_service_key, "aws4_request", true);
+  string signing_key =
+    shash::Hmac256(date_region_service_key, "aws4_request", true);
+  signing_keys_[id] = signing_key;
+  return signing_key;
 }
 
 

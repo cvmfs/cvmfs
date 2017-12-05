@@ -281,6 +281,11 @@ class S3FanoutManager : SingleCopy {
   uint32_t pool_max_handles_;
   CURLM *curl_multi_;
   std::string *user_agent_;
+  /**
+   * AWS4 signing keys are derived from the secret key, a region and a date.
+   * They can be cached.
+   */
+  mutable std::map<std::string, std::string> signing_keys_;
 
   pthread_t thread_upload_;
   bool thread_upload_run_;
