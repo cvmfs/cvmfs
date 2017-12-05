@@ -488,9 +488,9 @@ bool swissknife::CommandSync::ReadFileChunkingArgs(
 
 bool swissknife::CommandSync::ObtainDacReadSearchCapability() {
   cap_value_t cap = CAP_DAC_READ_SEARCH;
-  #ifdef CAP_IS_SUPPORTED
-  assert (CAP_IS_SUPPORTED(cap));
-  #endif
+#ifdef CAP_IS_SUPPORTED
+  assert(CAP_IS_SUPPORTED(cap));
+#endif
 
   cap_t caps_proc = cap_get_proc();
   assert(caps_proc != NULL);
