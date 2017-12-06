@@ -1067,6 +1067,21 @@ TEST_F(T_Util, RfcTimestamp) {
   setlocale(LC_TIME, curr_locale);
 }
 
+TEST_F(T_Util, IsoTimestamp) {
+  time_t now = time(NULL);
+  string timestamp = IsoTimestamp();
+  timestamp = timestamp.substr(0, 4) + "-" +
+              timestamp.substr(4, 2) + "-" +
+              timestamp.substr(6, 2) + "T" +
+              timestamp.substr(9, 2) + ":" +
+              timestamp.substr(11, 2) + ":" +
+              timestamp.substr(13, 2) + "Z";
+  time_t converted = IsoTimestamp2UtcTime(timestamp);
+  EXPECT_GT(converted, 0);
+  EXPECT_GE(converted, now - 5);
+  EXPECT_LE(converted, now + 5);
+}
+
 TEST_F(T_Util, StringifyTimeval) {
   timeval t1 = CreateTimeval(12, 3123123);
   timeval t2 = CreateTimeval(0, 0);

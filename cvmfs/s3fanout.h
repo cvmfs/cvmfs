@@ -31,6 +31,12 @@ enum Origin {
   kOriginPath,
 };  // Origin
 
+
+enum AuthzMethods {
+  kAuthzAwsV2 = 0,
+  kAuthzAwsV4
+};
+
 /**
  * Possible return values.
  */
@@ -59,7 +65,7 @@ inline const char *Code2Ascii(const Failures error) {
   texts[5] = "S3: host connection problem";
   texts[6] = "S3: not found";
   texts[7] = "S3: service not available";
-  texts[8] = "S3: unknown network error";
+  texts[8] = "S3: unknown service error, perhaps wrong authentication protocol";
   texts[9] = "no text";
   return texts[error];
 }
@@ -103,7 +109,9 @@ struct JobInfo {
 
   const std::string access_key;
   const std::string secret_key;
+  const AuthzMethods authz_method;
   const std::string hostname;
+  const std::string region;
   const std::string bucket;
   const std::string object_key;
   const std::string origin_path;
@@ -111,27 +119,49 @@ struct JobInfo {
   void *callback;  // Callback to be called when job is finished
   MemoryMappedFile *mmf;
 
-  // One constructor per destination + head request
-  JobInfo() { JobInfoInit(); }
-  JobInfo(const std::string access_key, const std::string secret_key,
-          const std::string hostname,   const std::string bucket,
-          const std::string object_key, void *callback,
-          const std::string origin_path) :
-          access_key(access_key), secret_key(secret_key),
-          hostname(hostname), bucket(bucket),
-          object_key(object_key), origin_path(origin_path) {
+  // One constructor per destination
+  JobInfo(
+    const std::string &access_key,
+    const std::string &secret_key,
+    const AuthzMethods &authz_method,
+    const std::string &hostname,
+    const std::string &region,
+    const std::string &bucket,
+    const std::string &object_key,
+    void *callback,
+    const std::string &origin_path)
+    : access_key(access_key)
+    , secret_key(secret_key)
+    , authz_method(authz_method)
+    , hostname(hostname)
+    , region(region)
+    , bucket(bucket)
+    , object_key(object_key)
+    , origin_path(origin_path)
+  {
     JobInfoInit();
     origin = kOriginPath;
     this->callback = callback;
   }
-  JobInfo(const std::string access_key, const std::string secret_key,
-          const std::string hostname,   const std::string bucket,
-          const std::string object_key, void *callback,
-          MemoryMappedFile  *mmf,
-          const unsigned char *buffer, size_t size) :
-          access_key(access_key), secret_key(secret_key),
-          hostname(hostname), bucket(bucket),
-          object_key(object_key) {
+  JobInfo(
+    const std::string &access_key,
+    const std::string &secret_key,
+    const AuthzMethods &authz_method,
+    const std::string &hostname,
+    const std::string &region,
+    const std::string &bucket,
+    const std::string &object_key,
+    void *callback,
+    MemoryMappedFile *mmf,
+    const unsigned char *buffer, size_t size)
+    : access_key(access_key)
+    , secret_key(secret_key)
+    , authz_method(authz_method)
+    , hostname(hostname)
+    , region(region)
+    , bucket(bucket)
+    , object_key(object_key)
+  {
     JobInfoInit();
     origin = kOriginMem;
     origin_mem.size = size;
@@ -178,6 +208,7 @@ struct S3FanOutDnsEntry {
   CURLSH *sharehandle;
 };  // S3FanOutDnsEntry
 
+
 class S3FanoutManager : SingleCopy {
  protected:
   typedef SynchronizingCounter<uint32_t> Semaphore;
@@ -190,7 +221,7 @@ class S3FanoutManager : SingleCopy {
   void Fini();
   void Spawn();
 
-  int PushNewJob(JobInfo *info);
+  void PushNewJob(JobInfo *info);
   int PopCompletedJobs(std::vector<s3fanout::JobInfo*> *jobs);
 
   const Statistics &GetStatistics();
@@ -224,14 +255,17 @@ class S3FanoutManager : SingleCopy {
   bool CanRetry(const JobInfo *info);
   void Backoff(JobInfo *info);
   bool VerifyAndFinalize(const int curl_error, JobInfo *info);
-  std::string MkAuthoritzation(const std::string &access_key,
-                               const std::string &secret_key,
-                               const std::string &timestamp,
-                               const std::string &content_type,
-                               const std::string &request,
-                               const std::string &content_md5_base64,
-                               const std::string &bucket,
-                               const std::string &object_key) const;
+  std::string GetRequestString(const JobInfo &info) const;
+  std::string GetContentType(const JobInfo &info) const;
+  std::string GetUriEncode(const std::string &val, bool encode_slash) const;
+  std::string GetAwsV4SigningKey(const JobInfo &info,
+                                 const std::string &date) const;
+  bool MkPayloadHash(const JobInfo &info, std::string *hex_hash) const;
+  bool MkPayloadSize(const JobInfo &info, uint64_t *size) const;
+  bool MkV2Authz(const JobInfo &info,
+                 std::vector<std::string> *headers) const;
+  bool MkV4Authz(const JobInfo &info,
+                 std::vector<std::string> *headers) const;
   std::string MkUrl(const std::string &host,
                     const std::string &bucket,
                     const std::string &objkey2) const {
@@ -247,6 +281,11 @@ class S3FanoutManager : SingleCopy {
   uint32_t pool_max_handles_;
   CURLM *curl_multi_;
   std::string *user_agent_;
+  /**
+   * AWS4 signing keys are derived from the secret key, a region and a date.
+   * They can be cached.
+   */
+  mutable std::map<std::string, std::string> signing_keys_;
 
   pthread_t thread_upload_;
   bool thread_upload_run_;

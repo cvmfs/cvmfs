@@ -138,6 +138,26 @@ std::string RfcTimestamp() {
   return string(buffer);
 }
 
+
+/**
+ * Current time in format YYYYMMDDTHHMMSSZ.  Used in AWS4 requests.
+ */
+std::string IsoTimestamp() {
+  struct tm timestamp;
+  time_t now = time(NULL);
+  gmtime_r(&now, &timestamp);
+
+  char buffer[17];
+  snprintf(buffer, sizeof(buffer), "%04d%02d%02dT%02d%02d%02dZ",
+           timestamp.tm_year + 1900,
+           timestamp.tm_mon + 1,
+           timestamp.tm_mday,
+           timestamp.tm_hour,
+           timestamp.tm_min,
+           timestamp.tm_sec);
+  return string(buffer);
+}
+
 string StringifyTimeval(const timeval value) {
   char buffer[64];
   int64_t msec = value.tv_sec * 1000;

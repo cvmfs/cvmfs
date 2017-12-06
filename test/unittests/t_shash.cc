@@ -7,13 +7,16 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <string>
 
+#include "duplex_ssl.h"
 #include "hash.h"
 #include "prng.h"
 #include "smalloc.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 
@@ -1064,4 +1067,60 @@ TEST(T_Shash, Hmac) {
   shash::HmacString("key", string(reinterpret_cast<const char *>(fox)),
                     &sha1_hmacstring);
   EXPECT_EQ(sha1_hmacstring, sha1);
+}
+
+
+TEST(T_Shash, Hmac256) {
+#ifdef OPENSSL_API_INTERFACE_V09
+  printf("Skipping!\n");
+#else
+  string hash = shash::Hmac256("the shared secret key here",
+                               "the message to hash here");
+  EXPECT_STREQ(
+    "4643978965ffcec6e6d73b36a39ae43ceb15f7ef8131b8307862ebc560e7f988",
+    hash.c_str());
+
+  EXPECT_EQ(
+    "9190a36badc1748978b7e6aece38aca4862012db8260009e1d055bd9abb69e31",
+    shash::Hmac256(
+      "a secret key that is very long: a secret key that is very long....",
+      "the message to hash here"));
+
+  string kdate = shash::Hmac256(
+    "AWS4wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", "20130524", true);
+  string kregion = shash::Hmac256(kdate, "us-east-1", true);
+  string kservice = shash::Hmac256(kregion, "s3", true);
+  string ksigning = shash::Hmac256(kservice, "aws4_request", true);
+  string signee =
+    "AWS4-HMAC-SHA256\n"
+    "20130524T000000Z\n"
+    "20130524/us-east-1/s3/aws4_request\n"
+    "7344ae5b7ee6c3e7e6b0fe0640412a37625d1fbfff95c48bbb2dc43964946972";
+  EXPECT_EQ(
+    "f0e8bdb87c964420e857bd35b5d6ed310bd44f0170aba48dd91039c6036bdb41",
+    shash::Hmac256(ksigning, signee));
+#endif
+}
+
+
+TEST(T_Shash, Sha256) {
+#ifdef OPENSSL_API_INTERFACE_V09
+  printf("Skipping!\n");
+#else
+  string dog = "The quick brown fox jumps over the lazy dog";
+  string hash = shash::Sha256String(dog);
+  EXPECT_STREQ(
+    "d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592",
+    hash.c_str());
+
+  hash = shash::Sha256File("/dev/null");
+  EXPECT_STREQ(
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    hash.c_str());
+
+  hash = shash::Sha256Mem(NULL, 0);
+  EXPECT_STREQ(
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    hash.c_str());
+#endif
 }
