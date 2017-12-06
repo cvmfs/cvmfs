@@ -68,6 +68,8 @@ TEST_F(T_FileWatcher, kModifiedEvent) {
   Counters::const_iterator it_mod = counters_.find(file_watcher::kModified);
   const int num_modifications = it_mod->second;
   EXPECT_EQ(1, num_modifications);
+
+  watcher->Stop();
 }
 
 TEST_F(T_FileWatcher, kDeletedEvent) {
@@ -89,6 +91,8 @@ TEST_F(T_FileWatcher, kDeletedEvent) {
   Counters::const_iterator it_del = counters_.find(file_watcher::kDeleted);
   const int num_deletions = it_del->second;
   EXPECT_EQ(1, num_deletions);
+
+  watcher->Stop();
 }
 
 TEST_F(T_FileWatcher, kModifiedThenDeletedEvent) {
@@ -121,4 +125,6 @@ TEST_F(T_FileWatcher, kModifiedThenDeletedEvent) {
   Counters::const_iterator it_del = counters_.find(file_watcher::kDeleted);
   const int num_deletions = it_del->second;
   EXPECT_EQ(1, num_deletions);
+
+  watcher->Stop();
 }

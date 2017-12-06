@@ -24,18 +24,7 @@ FileWatcher::FileWatcher()
     , started_(false) {}
 
 FileWatcher::~FileWatcher() {
-  if (started_) {
-    WritePipe(control_pipe_to_back_[1], "q", 1);
-    assert(pthread_join(thread_, NULL) == 0);
-
-    ClosePipe(control_pipe_to_front_);
-    ClosePipe(control_pipe_to_back_);
-  }
-
-  for (HandlerMap::iterator it = handler_map_.begin(); it != handler_map_.end();
-       ++it) {
-    delete it->second;
-  }
+    Stop();
 }
 
 void FileWatcher::RegisterHandler(const std::string& file_path,
@@ -61,6 +50,25 @@ bool FileWatcher::Start() {
 
   started_ = true;
   return true;
+}
+
+void FileWatcher::Stop() {
+  if (! started_) {
+    return;
+  }
+
+  WritePipe(control_pipe_to_back_[1], "q", 1);
+  assert(pthread_join(thread_, NULL) == 0);
+
+  ClosePipe(control_pipe_to_front_);
+  ClosePipe(control_pipe_to_back_);
+
+  for (HandlerMap::iterator it = handler_map_.begin(); it != handler_map_.end();
+       ++it) {
+    delete it->second;
+  }
+
+  started_ = false;
 }
 
 void* FileWatcher::BackgroundThread(void* d) {

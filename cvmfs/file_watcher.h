@@ -58,6 +58,8 @@ class FileWatcher {
 
   bool Start();
 
+  void Stop();
+
  protected:
   virtual bool RunEventLoop(const HandlerMap& handler_map,
                             int read_pipe, int write_pipe) = 0;
