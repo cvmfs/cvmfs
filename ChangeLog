@@ -1,4 +1,6 @@
 2.5.0:
+  * Remove S3 multi-bucket support
+  * Use AWSv4 S3 authorization if CVMFS_S3_REGION is set (CVM-988)
   * Add CAP_DAC_READ_SEARCH to swissknife to publish locked-down files
   * Don't enforce user_allow_other fuse option (CVM-1379)
   * New file ingestion pipeline
