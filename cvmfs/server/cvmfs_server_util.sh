@@ -552,9 +552,9 @@ EOF
 _setcap_if_needed() {
   local binary_path="$1"
   local capability="$2"
-  cvmfs_sys_file_is_executable $binary_path                                || return 0
-  $GETCAP_BIN "$binary_path" | grep -q "$capability" && return 0
-  $SETCAP_BIN "${capability}+p" "$binary_path"
+  cvmfs_sys_file_is_executable $binary_path || return 0
+  $SETCAP_BIN -v "${capability}" "$binary_path" >/dev/null 2>&1 && return 0
+  $SETCAP_BIN "${capability}" "$binary_path"
 }
 
 
@@ -565,15 +565,18 @@ ensure_swissknife_suid() {
   local unionfs="$1"
   local sk_bin="/usr/bin/$CVMFS_SERVER_SWISSKNIFE"
   local sk_dbg_bin="/usr/bin/${CVMFS_SERVER_SWISSKNIFE}_debug"
-  local cap="cap_sys_admin"
+  local cap_read="cap_dac_read_search"
+  local cap_overlay="cap_sys_admin"
 
-  # check if we need CAP_SYS_ADMIN for cvmfs_swissknife...
-  is_root || die "need to be root for granting CAP_SYS_ADMIN to $sk_bin"
-  [ x"$unionfs" = x"overlayfs" ] || return 0
+  is_root || die "need to be root for granting capabilities to $sk_bin"
 
-  # ... yes, obviously we need CAP_SYS_ADMIN for cvmfs_swissknife
-  _setcap_if_needed "$sk_bin"     "$cap" || return 1
-  _setcap_if_needed "$sk_dbg_bin" "$cap" || return 2
+  if [ x"$unionfs" = x"overlayfs" ]; then
+    _setcap_if_needed "$sk_bin"     "${cap_read},${cap_overlay}+p" || return 3
+    _setcap_if_needed "$sk_dbg_bin" "${cap_read},${cap_overlay}+p" || return 4
+  else
+    _setcap_if_needed "$sk_bin"     "${cap_read}+p" || return 1
+    _setcap_if_needed "$sk_dbg_bin" "${cap_read}+p" || return 2
+  fi
 }
 
 
