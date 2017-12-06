@@ -19,6 +19,14 @@ class DownloadManager;
 
 class ResolvConfEventHandler : public file_watcher::EventHandler {
  public:
+  /**
+   * List of IP addresses
+   *
+   * Each address is stored as a <TYPE, ADDRESS> pair, were TYPE is either
+   * 4 or 6.
+   */
+  typedef std::vector<std::pair<int, std::string> > AddressList;
+
   ResolvConfEventHandler(download::DownloadManager* download_manager,
                          download::DownloadManager* external_download_manager);
   virtual ~ResolvConfEventHandler();
@@ -28,8 +36,10 @@ class ResolvConfEventHandler : public file_watcher::EventHandler {
                       bool* clear_handler);
 
   static void GetDnsAddresses(const std::string& resolv_file,
-                              std::vector<std::string>* ipv4_addresses,
-                              std::vector<std::string>* ipv6_addresses);
+                              AddressList* addresses);
+
+  static void SetDnsAddress(download::DownloadManager* download_manager,
+                            const AddressList& addresses);
 
  private:
   download::DownloadManager* download_manager_;

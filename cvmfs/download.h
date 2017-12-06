@@ -409,6 +409,10 @@ class DownloadManager {
     return 0;
   }
 
+  dns::IpPreference opt_ip_preference() const {
+    return opt_ip_preference_;
+  }
+
  private:
   static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
                                 void *userp, void *socketp);

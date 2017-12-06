@@ -33,46 +33,39 @@ const char* rubbish =
 
 class T_ResolvConfEventHandler : public ::testing::Test {
  public:
-  virtual void SetUp() { ipv4_addresses.clear(); ipv6_addresses.clear(); }
+  virtual void SetUp() { addresses.clear(); }
 
   void TestWithContent(const std::string& content) {
     const std::string prefix = GetCurrentWorkingDirectory() + "/ip_input";
     const std::string input_file = CreateTempPath(prefix, 0600);
     SafeWriteToFile(content, input_file, 0600);
 
-    ResolvConfEventHandler::GetDnsAddresses(input_file,
-                                            &ipv4_addresses,
-                                            &ipv6_addresses);
+    ResolvConfEventHandler::GetDnsAddresses(input_file, &addresses);
   }
 
-  std::vector<std::string> ipv4_addresses;
-  std::vector<std::string> ipv6_addresses;
+  ResolvConfEventHandler::AddressList addresses;
 };
 
 TEST_F(T_ResolvConfEventHandler, IPv4_Only) {
   TestWithContent(ipv4_only);
 
-  EXPECT_EQ(1u, ipv4_addresses.size());
-  EXPECT_EQ(0u, ipv6_addresses.size());
+  EXPECT_EQ(1u, addresses.size());
 }
 
 TEST_F(T_ResolvConfEventHandler, IPv6_Only) {
   TestWithContent(ipv6_only);
 
-  EXPECT_EQ(0u, ipv4_addresses.size());
-  EXPECT_EQ(1u, ipv6_addresses.size());
+  EXPECT_EQ(1u, addresses.size());
 }
 
 TEST_F(T_ResolvConfEventHandler, IPv4_and_IPv6) {
   TestWithContent(ipv4_and_ipv6);
 
-  EXPECT_EQ(2u, ipv4_addresses.size());
-  EXPECT_EQ(1u, ipv6_addresses.size());
+  EXPECT_EQ(3u, addresses.size());
 }
 
 TEST_F(T_ResolvConfEventHandler, Rubbish) {
   TestWithContent(rubbish);
 
-  EXPECT_TRUE(ipv4_addresses.empty());
-  EXPECT_TRUE(ipv6_addresses.empty());
+  EXPECT_TRUE(addresses.empty());
 }
