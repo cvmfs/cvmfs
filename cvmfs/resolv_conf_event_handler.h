@@ -6,6 +6,7 @@
 #define CVMFS_RESOLV_CONF_EVENT_HANDLER_H_
 
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "download.h"

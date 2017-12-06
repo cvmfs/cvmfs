@@ -8,9 +8,9 @@
 
 #include "logging.h"
 #include "platform.h"
-#include "util_concurrency.h"
 #include "util/pointer.h"
 #include "util/posix.h"
+#include "util_concurrency.h"
 
 typedef std::map<file_watcher::Event, int> Counters;
 

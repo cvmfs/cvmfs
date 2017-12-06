@@ -53,7 +53,7 @@ bool FileWatcher::Start() {
 }
 
 void FileWatcher::Stop() {
-  if (! started_) {
+  if (!started_) {
     return;
   }
 
