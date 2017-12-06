@@ -1577,6 +1577,11 @@ MountPoint::~MountPoint() {
     delete signature_mgr_;
   }
 
+  if (resolv_conf_watcher_ != NULL) {
+    resolv_conf_watcher_->Stop();
+    delete resolv_conf_watcher_;
+  }
+
   delete backoff_throttle_;
   delete authz_attachment_;
   delete authz_session_mgr_;

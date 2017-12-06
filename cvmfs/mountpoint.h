@@ -506,7 +506,7 @@ class MountPoint : SingleCopy, public BootFactory {
   Tracer *tracer_;
   glue::InodeTracker *inode_tracker_;
 
-  UniquePtr<file_watcher::FileWatcher> resolv_conf_watcher_;
+  file_watcher::FileWatcher* resolv_conf_watcher_;
 
   unsigned max_ttl_sec_;
   pthread_mutex_t lock_max_ttl_;
