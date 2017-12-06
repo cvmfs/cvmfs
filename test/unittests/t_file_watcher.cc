@@ -19,7 +19,8 @@ class TestEventHandler : public file_watcher::EventHandler {
   explicit TestEventHandler(Counters* ctrs,
                             FifoChannel<bool>* chan)
       : counters_(ctrs)
-      , chan_(chan) {}
+      , chan_(chan)
+      , clear_(true) {}
 
   virtual ~TestEventHandler() {}
 
@@ -27,13 +28,14 @@ class TestEventHandler : public file_watcher::EventHandler {
                       file_watcher::Event event,
                       bool* clear_handler) {
     (*counters_)[event]++;
-    *clear_handler = true;
+    *clear_handler = clear_;
     chan_->Enqueue(true);
     return true;
   }
 
   Counters* counters_;
   FifoChannel<bool>* chan_;
+  bool clear_;
 };
 
 class T_FileWatcher : public ::testing::Test {
@@ -79,6 +81,38 @@ TEST_F(T_FileWatcher, kDeletedEvent) {
   watcher->RegisterHandler(watched_file_name, hd);
 
   EXPECT_TRUE(watcher->Start());
+
+  unlink(watched_file_name.c_str());
+
+  channel_->Dequeue();
+
+  Counters::const_iterator it_del = counters_.find(file_watcher::kDeleted);
+  const int num_deletions = it_del->second;
+  EXPECT_EQ(1, num_deletions);
+}
+
+TEST_F(T_FileWatcher, kModifiedThenDeletedEvent) {
+  const std::string watched_file_name =
+      GetCurrentWorkingDirectory() + "/file_watcher_test.txt";
+  SafeWriteToFile("test", watched_file_name, 0600);
+
+  UniquePtr<file_watcher::FileWatcher> watcher(platform_file_watcher());
+
+  TestEventHandler* hd(new TestEventHandler(&counters_, channel_.weak_ref()));
+  hd->clear_ = false;
+  watcher->RegisterHandler(watched_file_name, hd);
+
+  EXPECT_TRUE(watcher->Start());
+
+  SafeWriteToFile("test", watched_file_name, 0600);
+
+  channel_->Dequeue();
+
+  hd->clear_ = true;
+
+  Counters::const_iterator it_mod = counters_.find(file_watcher::kModified);
+  const int num_modifications = it_mod->second;
+  EXPECT_EQ(1, num_modifications);
 
   unlink(watched_file_name.c_str());
 
