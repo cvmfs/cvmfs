@@ -1238,8 +1238,10 @@ bool MountPoint::CreateDownloadManagers() {
 }
 
 bool MountPoint::CreateResolvConfWatcher() {
+  std::string roaming_value;
+  options_mgr_->GetValue("CVMFS_DNS_ROAMING", &roaming_value);
   if (options_mgr_->IsDefined("CVMFS_DNS_ROAMING") &&
-      options_mgr_->IsOn("CVMFS_DNS_ROAMING")) {
+      options_mgr_->IsOn(roaming_value)) {
     LogCvmfs(kLogCvmfs, kLogDebug,
              "DNS roaming is enabled for this repository.");
     // Create a file watcher to update the DNS settings of the download
