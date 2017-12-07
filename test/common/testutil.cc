@@ -220,6 +220,12 @@ DirectoryEntry DirectoryEntryTestFactory::ExternalFile() {
   return dirent;
 }
 
+DirectoryEntry DirectoryEntryTestFactory::SpecialFile() {
+  DirectoryEntry dirent;
+  dirent.mode_ = 4516;  // FIFO
+  return dirent;
+}
+
 DirectoryEntry DirectoryEntryTestFactory::Directory(
     const string &name,
     unsigned size,

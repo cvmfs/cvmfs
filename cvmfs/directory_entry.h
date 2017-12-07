@@ -108,6 +108,10 @@ class DirectoryEntryBase {
 
   inline bool IsRegular() const                 { return S_ISREG(mode_); }
   inline bool IsLink() const                    { return S_ISLNK(mode_); }
+  inline bool IsSpecial() const {
+    return S_ISCHR(mode_) || S_ISBLK(mode_) ||
+           S_ISSOCK(mode_) || S_ISFIFO(mode_);
+  }
   inline bool IsDirectory() const               { return S_ISDIR(mode_); }
   inline bool IsExternalFile() const            { return is_external_file_; }
   inline bool HasXattrs() const                 { return has_xattrs_;    }

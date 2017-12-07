@@ -67,6 +67,7 @@ class DirectoryEntryTestFactory {
   static catalog::DirectoryEntry ChunkedFile(
       shash::Any content_hash = shash::Any());
   static catalog::DirectoryEntry ExternalFile();
+  static catalog::DirectoryEntry SpecialFile();
   static catalog::DirectoryEntry Make(const Metadata &metadata);
 };
 

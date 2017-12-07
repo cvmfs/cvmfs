@@ -23,6 +23,7 @@ class CatalogDatabase;
 struct LegacyMode {
   enum Type {  // TODO(rmeusel): C++11 typed enum
     kNoLegacy,
+    kNoSpecials,
     kNoExternals,
     kNoXattrs,
     kLegacy
@@ -42,6 +43,7 @@ class TreeCountersBase {
     Fields()
       : regular_files(0)
       , symlinks(0)
+      , specials(0)
       , directories(0)
       , nested_catalogs(0)
       , chunked_files(0)
@@ -67,6 +69,7 @@ class TreeCountersBase {
     void Combine(const U &other) {
       regular_files      += factor * other.regular_files;
       symlinks           += factor * other.symlinks;
+      specials           += factor * other.specials;
       directories        += factor * other.directories;
       nested_catalogs    += factor * other.nested_catalogs;
       chunked_files      += factor * other.chunked_files;
@@ -81,6 +84,7 @@ class TreeCountersBase {
     void FillFieldsMap(const std::string &prefix, FieldsMap *map) const {
       (*map)[prefix + "regular"]            = &regular_files;
       (*map)[prefix + "symlink"]            = &symlinks;
+      (*map)[prefix + "special"]            = &specials;
       (*map)[prefix + "dir"]                = &directories;
       (*map)[prefix + "nested"]             = &nested_catalogs;
       (*map)[prefix + "chunked"]            = &chunked_files;
@@ -94,6 +98,7 @@ class TreeCountersBase {
 
     FieldT regular_files;
     FieldT symlinks;
+    FieldT specials;
     FieldT directories;
     FieldT nested_catalogs;
     FieldT chunked_files;
