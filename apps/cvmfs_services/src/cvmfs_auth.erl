@@ -313,14 +313,22 @@ p_check_hmac(Message, KeyId, HMAC) ->
 p_populate_keys(Keys) ->
     T = fun() ->
                 lists:foreach(fun({K, V}) ->
-                                      {KeyId, Secret} = case {K, V} of
-                                                            {file, FileName} when is_binary(FileName);
-                                                                                  is_list(FileName) ->
-                                                                p_parse_key_file(FileName);
-                                                            {Id, Val} when is_binary(Id), is_binary(Val) ->
-                                                                {Id, Val}
-                                                        end,
-                                      mnesia:write(#key{key_id = KeyId, secret = Secret})
+                                      {KeyType,
+                                       KeyId,
+                                       Secret} = case {K, V} of
+                                                     {file, FileName} when is_binary(FileName);
+                                                                           is_list(FileName) ->
+                                                         p_parse_key_file(FileName);
+                                                     {Id, Val} when is_binary(Id), is_binary(Val) ->
+                                                         {<<"plain_text">>, Id, Val}
+                                                 end,
+                                      case KeyType of
+                                          <<"plain_text">> ->
+                                              mnesia:write(#key{key_id = KeyId, secret = Secret});
+                                          _ ->
+                                              lager:warning("Ignoring invalid key ~p with key type ~p.",
+                                                            [KeyId, KeyType])
+                                      end
                               end,
                               Keys),
                 true
@@ -339,10 +347,12 @@ p_populate_repos(RepoList) ->
     Result.
 
 
--spec p_parse_key_file(FileName :: [list() | binary()]) -> {KeyId :: binary(), Secret :: binary()}.
+-spec p_parse_key_file(FileName :: [list() | binary()]) -> {KeyType :: binary(),
+                                                            KeyId :: binary(),
+                                                            Secret :: binary()}.
 p_parse_key_file(FileName) ->
     {ok, Body} = file:read_file(FileName),
     [Line | _] = [L || L <- binary:split(Body, <<"\n">>), L =/= <<>>],
-    [_Type, KeyId, Secret] = binary:split(Line, <<" ">>, [global]),
-    {KeyId, Secret}.
+    [KeyType, KeyId, Secret] = binary:split(Line, <<" ">>, [global]),
+    {KeyType, KeyId, Secret}.
 
