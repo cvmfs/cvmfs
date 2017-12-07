@@ -1,4 +1,5 @@
 2.4.4:
+  * React to a change of DNS server on macOS (CVM-496)
   * Have geoapi try $REMOTE_ADDR if $HTTP_X_FORWARDED_FOR has no geoinfo
     (CVM-1442)
 
