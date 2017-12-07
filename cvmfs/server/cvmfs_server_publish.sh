@@ -1,7 +1,6 @@
 cvmfs_server_publish() {
   local names
   local user
-  local exact=0
   local gw_key_file
   local spool_dir
   local stratum0
@@ -60,9 +59,6 @@ cvmfs_server_publish() {
       f)
         open_fd_dialog=0
       ;;
-      e)
-        exact=1
-      ;;
       ?)
         shift $(($OPTIND-2))
         usage "Command publish: Unrecognized option: $1"
@@ -77,12 +73,8 @@ cvmfs_server_publish() {
   shift $(($OPTIND-1))
   check_parameter_count_for_multiple_repositories $#
   # get repository names
-  if [ $exact -eq 0 ]; then
-    names=$(get_or_guess_multiple_repository_names "$@")
-    check_multiple_repository_existence "$names"
-  else
-    names=$@
-  fi
+  names=$(get_or_guess_multiple_repository_names "$@")
+  check_multiple_repository_existence "$names"
 
   for name in $names; do
     # sanity checks

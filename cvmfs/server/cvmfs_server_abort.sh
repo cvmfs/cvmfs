@@ -10,7 +10,6 @@ cvmfs_server_abort() {
   local user
   local gw_key_file
   local spool_dir
-  local exact=0
   local force=0
   local open_fd_dialog=1
   local retcode=0
@@ -24,9 +23,6 @@ cvmfs_server_abort() {
         force=1
         open_fd_dialog=0
       ;;
-      e) # Need this mode if passing repository subpaths: cvmfs_server transaction myrepo.cern.ch/some/subpath
-        exact=1
-      ;;
       ?)
         shift $(($OPTIND-2))
         usage "Command abort: Unrecognized option: $1"
@@ -37,12 +33,8 @@ cvmfs_server_abort() {
   shift $(($OPTIND-1))
   check_parameter_count_for_multiple_repositories $#
   # get repository names
-  if [ $exact -eq 0 ]; then
-      names=$(get_or_guess_multiple_repository_names "$@")
-      check_multiple_repository_existence "$names"
-  else
-      names=$@
-  fi
+  names=$(get_or_guess_multiple_repository_names "$@")
+  check_multiple_repository_existence "$names"
 
   for name in $names; do
 
