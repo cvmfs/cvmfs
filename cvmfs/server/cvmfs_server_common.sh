@@ -136,9 +136,12 @@ check_multiple_repository_existence() {
   local no_kill=$2
 
   for name in $given_names; do
-    if ! check_repository_existence $name; then
+    # If "name" contains a subpath (i.e. repo.cern.ch/sub/path) only
+    # the repository name should be kept
+    local repo_name=$(echo $name | cut -d'/' -f1)
+    if ! check_repository_existence $repo_name; then
       if [ x"$no_kill" = x"" ]; then
-        die "The repository $name does not exist."
+        die "The repository $repo_name does not exist."
       else
         return 1
       fi
