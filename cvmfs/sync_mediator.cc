@@ -369,6 +369,11 @@ void SyncMediator::CompleteHardlinks(const SyncItem &entry) {
   traversal.fn_new_file =
     &SyncMediator::LegacyRegularHardlinkCallback;
   traversal.fn_new_symlink = &SyncMediator::LegacySymlinkHardlinkCallback;
+  traversal.fn_new_character_dev =
+    &SyncMediator::LegacyCharacterDeviceHardlinkCallback;
+  traversal.fn_new_block_dev = &SyncMediator::LegacyBlockDeviceHardlinkCallback;
+  traversal.fn_new_fifo = &SyncMediator::LegacyFifoHardlinkCallback;
+  traversal.fn_new_socket = &SyncMediator::LegacySocketHardlinkCallback;
   traversal.Recurse(entry.GetUnionPath());
 }
 
@@ -385,6 +390,36 @@ void SyncMediator::LegacySymlinkHardlinkCallback(const string &parent_dir,
                                                   const string &file_name)
 {
   SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemSymlink);
+  InsertLegacyHardlink(entry);
+}
+
+void SyncMediator::LegacyCharacterDeviceHardlinkCallback(
+  const string &parent_dir,
+  const string &file_name)
+{
+  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemCharacterDevice);
+  InsertLegacyHardlink(entry);
+}
+
+void SyncMediator::LegacyBlockDeviceHardlinkCallback(
+  const string &parent_dir,
+  const string &file_name)
+{
+  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemBlockDevice);
+  InsertLegacyHardlink(entry);
+}
+
+void SyncMediator::LegacyFifoHardlinkCallback(const string &parent_dir,
+                                              const string &file_name)
+{
+  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemFifo);
+  InsertLegacyHardlink(entry);
+}
+
+void SyncMediator::LegacySocketHardlinkCallback(const string &parent_dir,
+                                                const string &file_name)
+{
+  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemSocket);
   InsertLegacyHardlink(entry);
 }
 

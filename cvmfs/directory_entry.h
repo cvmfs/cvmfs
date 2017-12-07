@@ -108,11 +108,14 @@ class DirectoryEntryBase {
 
   inline bool IsRegular() const                 { return S_ISREG(mode_); }
   inline bool IsLink() const                    { return S_ISLNK(mode_); }
-  inline bool IsSpecial() const {
-    return S_ISCHR(mode_) || S_ISBLK(mode_) ||
-           S_ISSOCK(mode_) || S_ISFIFO(mode_);
-  }
   inline bool IsDirectory() const               { return S_ISDIR(mode_); }
+  inline bool IsFifo() const                    { return S_ISFIFO(mode_); }
+  inline bool IsSocket() const                  { return S_ISSOCK(mode_); }
+  inline bool IsCharDev() const                 { return S_ISCHR(mode_); }
+  inline bool IsBlockDev() const                { return S_ISBLK(mode_); }
+  inline bool IsSpecial() const {
+    return IsFifo() || IsSocket() || IsCharDev() || IsBlockDev();
+  }
   inline bool IsExternalFile() const            { return is_external_file_; }
   inline bool HasXattrs() const                 { return has_xattrs_;    }
 
@@ -130,7 +133,16 @@ class DirectoryEntryBase {
     return checksum_.algorithm;
   }
   inline uint64_t size() const {
-    return (IsLink()) ? symlink().GetLength() : size_;
+    if (IsLink())
+      return symlink().GetLength();
+    if (IsBlockDev() || IsCharDev())
+      return 0;
+    return size_;
+  }
+  inline dev_t rdev() const {
+    if (IsBlockDev() || IsCharDev())
+      return size_;
+    return 1;
   }
   inline std::string GetFullPath(const std::string &parent_directory) const {
     std::string file_path = parent_directory + "/";
@@ -167,7 +179,7 @@ class DirectoryEntryBase {
     s.st_nlink = linkcount();
     s.st_uid = uid();
     s.st_gid = gid();
-    s.st_rdev = 1;
+    s.st_rdev = rdev();
     s.st_size = size();
     s.st_blksize = 4096;  // will be ignored by Fuse
     s.st_blocks = 1 + size() / 512;

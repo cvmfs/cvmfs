@@ -191,7 +191,15 @@ class SyncMediator {
   void LegacyRegularHardlinkCallback(const std::string &parent_dir,
                                      const std::string &file_name);
   void LegacySymlinkHardlinkCallback(const std::string &parent_dir,
-                                      const std::string &file_name);
+                                     const std::string &file_name);
+  void LegacyCharacterDeviceHardlinkCallback(const std::string &parent_dir,
+                                             const std::string &file_name);
+  void LegacyBlockDeviceHardlinkCallback(const std::string &parent_dir,
+                                         const std::string &file_name);
+  void LegacyFifoHardlinkCallback(const std::string &parent_dir,
+                                  const std::string &file_name);
+  void LegacySocketHardlinkCallback(const std::string &parent_dir,
+                                    const std::string &file_name);
   void InsertLegacyHardlink(const SyncItem &entry);
   uint64_t GetTemporaryHardlinkGroupNumber(const SyncItem &entry) const;
   void InsertHardlink(const SyncItem &entry);

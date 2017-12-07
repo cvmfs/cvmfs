@@ -5,6 +5,7 @@
 #include "sync_item.h"
 
 #include <cerrno>
+#include <sys/sysmacros.h>
 #include <vector>
 
 #include "sync_mediator.h"
@@ -194,6 +195,10 @@ catalog::DirectoryEntryBase SyncItem::CreateBasicCatalogDirent() const {
       readlink((this->GetUnionPath()).c_str(), slnk, PATH_MAX);
     assert(length >= 0);
     dirent.symlink_.Assign(slnk, length);
+  }
+
+  if (this->IsCharacterDevice() || this->IsBlockDevice()) {
+    dirent.size_ = makedev(GetRdevMajor(), GetRdevMinor());
   }
 
   return dirent;
