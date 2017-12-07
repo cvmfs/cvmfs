@@ -52,6 +52,7 @@ set(CVMFS_UNITTEST_FILES
   t_file_guard.cc
   t_file_processing.cc
   t_file_sandbox.cc
+  t_file_watcher.cc
   t_fs_traversal.cc
   t_fuse_evict.cc
   t_garbage_collector.cc
@@ -82,6 +83,7 @@ set(CVMFS_UNITTEST_FILES
   t_reactor.cc
   t_reflog.cc
   t_relaxed_path_filter.cc
+  t_resolv_conf_event_handler.cc
   t_sanitizer.cc
   t_session_context.cc
   t_session_token.cc
@@ -154,6 +156,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/file_processing/file_processor.cc
   ${CVMFS_SOURCE_DIR}/file_processing/io_dispatcher.cc
   ${CVMFS_SOURCE_DIR}/file_processing/processor.cc
+  ${CVMFS_SOURCE_DIR}/file_watcher.cc
   ${CVMFS_SOURCE_DIR}/fuse_evict.cc
   ${CVMFS_SOURCE_DIR}/gateway_util.cc
   ${CVMFS_SOURCE_DIR}/globals.cc
@@ -189,6 +192,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/receiver/session_token.cc
   ${CVMFS_SOURCE_DIR}/reflog.cc
   ${CVMFS_SOURCE_DIR}/reflog_sql.cc
+  ${CVMFS_SOURCE_DIR}/resolv_conf_event_handler.cc
   ${CVMFS_SOURCE_DIR}/s3fanout.cc
   ${CVMFS_SOURCE_DIR}/sanitizer.cc
   ${CVMFS_SOURCE_DIR}/server_tool.cc
@@ -225,6 +229,10 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/xattr.cc
   cache.pb.cc cache.pb.h
 )
+
+if (APPLE)
+    list(APPEND CVMFS_UNITTEST_SOURCES ${CVMFS_SOURCE_DIR}/file_watcher_kqueue.cc)
+endif(APPLE)
 
 set (CVMFS_UNITTEST_DEBUG_SOURCES ${CVMFS_UNITTEST_SOURCES})
 

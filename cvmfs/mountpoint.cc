@@ -57,6 +57,7 @@
 #include "options.h"
 #include "platform.h"
 #include "quota_posix.h"
+#include "resolv_conf_event_handler.h"
 #include "signature.h"
 #include "sqlitemem.h"
 #include "sqlitevfs.h"
@@ -1094,6 +1095,9 @@ MountPoint *MountPoint::Create(
     return mountpoint.Release();
   if (!mountpoint->CreateDownloadManagers())
     return mountpoint.Release();
+  if (!mountpoint->CreateResolvConfWatcher()) {
+    return mountpoint.Release();
+  }
   mountpoint->CreateFetchers();
   if (!mountpoint->CreateCatalogManager())
     return mountpoint.Release();
@@ -1233,6 +1237,29 @@ bool MountPoint::CreateDownloadManagers() {
   return SetupExternalDownloadMgr(false);
 }
 
+bool MountPoint::CreateResolvConfWatcher() {
+  std::string roaming_value;
+  options_mgr_->GetValue("CVMFS_DNS_ROAMING", &roaming_value);
+  if (options_mgr_->IsDefined("CVMFS_DNS_ROAMING") &&
+      options_mgr_->IsOn(roaming_value)) {
+    LogCvmfs(kLogCvmfs, kLogDebug,
+             "DNS roaming is enabled for this repository.");
+    // Create a file watcher to update the DNS settings of the download
+    // managers when there are changes to /etc/resolv.conf
+    resolv_conf_watcher_ = platform_file_watcher();
+
+    if (resolv_conf_watcher_) {
+      ResolvConfEventHandler *handler =
+          new ResolvConfEventHandler(download_mgr_, external_download_mgr_);
+      resolv_conf_watcher_->RegisterHandler("/etc/resolv.conf", handler);
+      resolv_conf_watcher_->Start();
+    }
+  } else {
+    LogCvmfs(kLogCvmfs, kLogDebug,
+             "DNS roaming is disabled for this repository.");
+  }
+  return true;
+}
 
 void MountPoint::CreateFetchers() {
   fetcher_ = new cvmfs::Fetcher(
@@ -1510,6 +1537,7 @@ MountPoint::MountPoint(
   , md5path_cache_(NULL)
   , tracer_(NULL)
   , inode_tracker_(NULL)
+  , resolv_conf_watcher_(NULL)
   , max_ttl_sec_(kDefaultMaxTtlSec)
   , kcache_timeout_sec_(static_cast<double>(kDefaultKCacheTtlSec))
   , fixed_catalog_(false)
@@ -1547,6 +1575,11 @@ MountPoint::~MountPoint() {
   if (signature_mgr_ != NULL) {
     signature_mgr_->Fini();
     delete signature_mgr_;
+  }
+
+  if (resolv_conf_watcher_ != NULL) {
+    resolv_conf_watcher_->Stop();
+    delete resolv_conf_watcher_;
   }
 
   delete backoff_throttle_;
