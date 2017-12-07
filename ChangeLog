@@ -1,3 +1,7 @@
+2.4.4:
+  * Have geoapi try $REMOTE_ADDR if $HTTP_X_FORWARDED_FOR has no geoinfo
+    (CVM-1442)
+
 2.4.3:
   * Fix location of cvmfschecksum file for tiered cache config (CVM-1436)
   * Fix throughput reporting in `cvmfs_config stat` (CVM-1432)
