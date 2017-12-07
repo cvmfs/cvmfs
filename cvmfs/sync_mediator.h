@@ -148,9 +148,13 @@ class SyncMediator {
   void AddFileCallback(const std::string &parent_dir,
                        const std::string &file_name);
   void AddCharacterDeviceCallback(const std::string &parent_dir,
-                       const std::string &file_name);
+                                  const std::string &file_name);
   void AddBlockDeviceCallback(const std::string &parent_dir,
+                              const std::string &file_name);
+  void AddFifoCallback(const std::string &parent_dir,
                        const std::string &file_name);
+  void AddSocketCallback(const std::string &parent_dir,
+                         const std::string &file_name);
   void AddSymlinkCallback(const std::string &parent_dir,
                           const std::string &link_name);
 
@@ -159,6 +163,14 @@ class SyncMediator {
                           const std::string &file_name);
   void RemoveSymlinkCallback(const std::string &parent_dir,
                              const std::string &link_name);
+  void RemoveCharacterDeviceCallback(const std::string &parent_dir,
+                                     const std::string &link_name);
+  void RemoveBlockDeviceCallback(const std::string &parent_dir,
+                                 const std::string &link_name);
+  void RemoveFifoCallback(const std::string &parent_dir,
+                          const std::string &link_name);
+  void RemoveSocketCallback(const std::string &parent_dir,
+                            const std::string &link_name);
   void RemoveDirectoryCallback(const std::string &parent_dir,
                                const std::string &dir_name);
 

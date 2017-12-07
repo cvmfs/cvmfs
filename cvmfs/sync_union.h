@@ -192,7 +192,7 @@ class SyncUnion {
                               const std::string &dir_name);
 
   /**
-   *Callback when a character device is found
+   * Callback when a character device is found
    * @param parent_dir the relative directory path
    * @param filename the filename
    */
@@ -200,12 +200,28 @@ class SyncUnion {
                               const std::string &filename);
 
   /**
-   *Callback when a block device is found
+   * Callback when a block device is found
    * @param parent_dir the relative directory path
    * @param filename the filename
    */
   void ProcessBlockDevice(const std::string &parent_dir,
                           const std::string &filename);
+
+  /**
+   * Callback when a named pipe is found.
+   * @param parent_dir the relative directory path
+   * @param filename the filename
+   */
+  void ProcessFifo(const std::string &parent_dir, const std::string &filename);
+
+
+  /**
+   * Callback when a unix domain socket is found.
+   * @param parent_dir the relative directory path
+   * @param filename the filename
+   */
+  void ProcessSocket(const std::string &parent_dir,
+                     const std::string &filename);
 
   /**
    * Called to actually process the file entry.

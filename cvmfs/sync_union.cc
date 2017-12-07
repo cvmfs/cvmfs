@@ -167,6 +167,26 @@ void SyncUnion::ProcessBlockDevice(const std::string &parent_dir,
   ProcessFile(entry);
 }
 
+void SyncUnion::ProcessFifo(const std::string &parent_dir,
+                            const std::string &filename)
+{
+  LogCvmfs(kLogUnionFs, kLogDebug,
+           "SyncUnionOverlayfs::ProcessFifo(%s, %s)",
+           parent_dir.c_str(), filename.c_str());
+  SyncItem entry = CreateSyncItem(parent_dir, filename, kItemFifo);
+  ProcessFile(entry);
+}
+
+void SyncUnion::ProcessSocket(const std::string &parent_dir,
+                              const std::string &filename)
+{
+  LogCvmfs(kLogUnionFs, kLogDebug,
+            "SyncUnionOverlayfs::ProcessSocket(%s, %s)",
+            parent_dir.c_str(), filename.c_str());
+  SyncItem entry = CreateSyncItem(parent_dir, filename, kItemSocket);
+  ProcessFile(entry);
+}
+
 //------------------------------------------------------------------------------
 
 
@@ -201,6 +221,8 @@ void SyncUnionAufs::Traverse() {
   traversal.fn_new_symlink        = &SyncUnionAufs::ProcessSymlink;
   traversal.fn_new_character_dev  = &SyncUnionAufs::ProcessCharacterDevice;
   traversal.fn_new_block_dev      = &SyncUnionAufs::ProcessBlockDevice;
+  traversal.fn_new_fifo           = &SyncUnionAufs::ProcessFifo;
+  traversal.fn_new_socket         = &SyncUnionAufs::ProcessSocket;
   LogCvmfs(kLogUnionFs, kLogVerboseMsg, "Aufs starting traversal "
            "recursion for scratch_path=[%s] with external data set to %d",
            scratch_path().c_str(),
@@ -382,6 +404,8 @@ void SyncUnionOverlayfs::Traverse() {
   traversal.fn_new_file           = &SyncUnionOverlayfs::ProcessRegularFile;
   traversal.fn_new_character_dev  = &SyncUnionOverlayfs::ProcessCharacterDevice;
   traversal.fn_new_block_dev      = &SyncUnionOverlayfs::ProcessBlockDevice;
+  traversal.fn_new_fifo           = &SyncUnionOverlayfs::ProcessFifo;
+  traversal.fn_new_socket         = &SyncUnionOverlayfs::ProcessSocket;
   traversal.fn_ignore_file        = &SyncUnionOverlayfs::IgnoreFilePredicate;
   traversal.fn_new_dir_prefix     = &SyncUnionOverlayfs::ProcessDirectory;
   traversal.fn_new_symlink        = &SyncUnionOverlayfs::ProcessSymlink;

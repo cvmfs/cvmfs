@@ -24,6 +24,8 @@ enum SyncItemType {
   kItemSymlink,
   kItemCharacterDevice,
   kItemBlockDevice,
+  kItemFifo,
+  kItemSocket,
   kItemNew,
   kItemMarker,
   kItemUnknown
@@ -61,6 +63,8 @@ class SyncItem {
   inline bool IsNew()             const { return WasType(kItemNew);            }
   inline bool IsCharacterDevice() const { return IsType(kItemCharacterDevice); }
   inline bool IsBlockDevice()     const { return IsType(kItemBlockDevice);     }
+  inline bool IsFifo()            const { return IsType(kItemFifo);            }
+  inline bool IsSocket()          const { return IsType(kItemSocket);            }
   inline bool IsGraftMarker()     const { return IsType(kItemMarker);          }
   inline bool IsExternalData()    const { return external_data_;               }
 
@@ -69,7 +73,7 @@ class SyncItem {
   inline bool IsOpaqueDirectory() const { return IsDirectory() && opaque_;     }
 
   inline bool IsSpecialFile()     const {
-    return IsCharacterDevice() || IsBlockDevice();
+    return IsCharacterDevice() || IsBlockDevice() || IsFifo() || IsSocket();
   }
 
   inline unsigned int GetRdevMajor()     const {
@@ -212,11 +216,13 @@ class SyncItem {
 
     inline SyncItemType GetSyncItemType() const {
       assert(obtained);
-      if (S_ISDIR(stat.st_mode)) return kItemDir;
-      if (S_ISCHR(stat.st_mode)) return kItemCharacterDevice;
-      if (S_ISBLK(stat.st_mode)) return kItemBlockDevice;
       if (S_ISREG(stat.st_mode)) return kItemFile;
       if (S_ISLNK(stat.st_mode)) return kItemSymlink;
+      if (S_ISDIR(stat.st_mode)) return kItemDir;
+      if (S_ISFIFO(stat.st_mode)) return kItemFifo;
+      if (S_ISSOCK(stat.st_mode)) return kItemSocket;
+      if (S_ISCHR(stat.st_mode)) return kItemCharacterDevice;
+      if (S_ISBLK(stat.st_mode)) return kItemBlockDevice;
       return kItemUnknown;
     }
 
