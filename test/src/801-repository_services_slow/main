@@ -56,7 +56,7 @@ run_transactions() {
     ## Transaction 1
 
     echo "  Starting transaction 1"
-    cvmfs_server transaction -e test.repo.org
+    cvmfs_server transaction test.repo.org
 
     echo "  Copying the payload into repository"
     rm -v /cvmfs/test.repo.org/new_repository
@@ -69,7 +69,7 @@ run_transactions() {
     cp -r /tmp/linux-4.12.8 /cvmfs/test.repo.org/
 
     echo "  Publishing changes 1"
-    cvmfs_server publish -e test.repo.org
+    cvmfs_server publish test.repo.org
     cvmfs_server check test.repo.org
 
     echo "  Copy the contents of the repository"
@@ -78,13 +78,13 @@ run_transactions() {
     ## Transaction 2 (remove all the files from the repo)
 
     echo "  Starting transaction 2"
-    cvmfs_server transaction -e test.repo.org
+    cvmfs_server transaction test.repo.org
 
     echo "  Removing all the files from the repository"
     rm -rf /cvmfs/test.repo.org/*
 
     echo "  Publishing changes 2"
-    cvmfs_server publish -e test.repo.org
+    cvmfs_server publish test.repo.org
     cvmfs_server check test.repo.org
 
     ## Check results with a poor man's Merkle tree
