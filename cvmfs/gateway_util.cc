@@ -37,7 +37,7 @@ bool ReadKeys(const std::string& key_file_name, std::string* key_id,
     return false;
   }
 
-  if (tokens[0] == "test") {
+  if (tokens[0] == "plain_text") {
     *key_id = tokens[1];
     *secret = tokens[2];
   } else {

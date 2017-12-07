@@ -2407,7 +2407,7 @@ EOF'
 
     echo "  Writing API key file"
     sudo bash -c 'cat <<EOF > /etc/cvmfs/keys/test.repo.org.gw
-test key1 secret1
+plain_text key1 secret1
 EOF'
 
     echo "  Creating Mnesia schema"
