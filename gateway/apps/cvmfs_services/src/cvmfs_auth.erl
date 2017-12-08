@@ -312,15 +312,17 @@ p_check_hmac(Message, KeyId, HMAC) ->
 -spec p_populate_keys(Keys :: [{KeyId :: binary, Secret :: binary()}]) -> boolean().
 p_populate_keys(Keys) ->
     T = fun() ->
-                lists:foreach(fun({K, V}) ->
+                lists:foreach(fun(KeyDesc) ->
                                       {KeyType,
                                        KeyId,
-                                       Secret} = case {K, V} of
+                                       Secret} = case KeyDesc of
                                                      {file, FileName} when is_binary(FileName);
                                                                            is_list(FileName) ->
                                                          p_parse_key_file(FileName);
-                                                     {Id, Val} when is_binary(Id), is_binary(Val) ->
-                                                         {<<"plain_text">>, Id, Val}
+                                                     {Type, Id, Val} when is_binary(Type),
+                                                                          is_binary(Id),
+                                                                          is_binary(Val) ->
+                                                         {Type, Id, Val}
                                                  end,
                                       case KeyType of
                                           <<"plain_text">> ->
