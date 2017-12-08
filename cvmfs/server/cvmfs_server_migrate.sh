@@ -393,6 +393,23 @@ _migrate_138() {
   load_repo_config $name
 }
 
+_migrate_139() {
+  local name=$1
+  local destination_version="139"
+  local server_conf="/etc/cvmfs/repositories.d/${name}/server.conf"
+
+  load_repo_config $name
+  echo "Migrating repository '$name' from layout revision $(mangle_version_string $CVMFS_CREATOR_VERSION) to revision $(mangle_version_string $destination_version)"
+
+  echo "--> adjusting /etc/fstab"
+  sed -i -e "s|\(.*\),noauto\(.*# added by CernVM-FS for ${CVMFS_REPOSITORY_NAME}\)|\1,noauto,nodev\2|" /etc/fstab
+
+  sed -i -e "s/^\(CVMFS_CREATOR_VERSION\)=.*/\1=$destination_version/" $server_conf
+
+  # update repository information
+  load_repo_config $name
+}
+
 cvmfs_server_migrate() {
   local names
   local retcode=0
@@ -506,6 +523,11 @@ cvmfs_server_migrate() {
          has_apache_config_file $(get_apache_conf_filename $name); then
       # this does slightly more than needed but is close enough so reuse it
       _migrate_138 $name
+      creator="$(repository_creator_version $name)"
+    fi
+
+    if [ $creator -lt 139 ]; then
+      _migrate_139 $name
       creator="$(repository_creator_version $name)"
     fi
 
