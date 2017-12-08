@@ -15,9 +15,10 @@
 -export([add_repo/1, remove_repo/1
         ,add_key/1, remove_key/1
         ,list_repos/1
-        ,valid_keyid_valid_paths/1
-        ,invalid_keyid_error/1
-        ,valid_keyid_invalid_paths/1]).
+        ,valid_key_valid_paths/1
+        ,invalid_key_error/1
+        ,valid_key_invalid_repo/1
+        ,valid_key_invalid_path/1]).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -30,9 +31,10 @@ all() ->
 
 groups() ->
     [{queries, [parallel], [list_repos
-                           ,valid_keyid_valid_paths
-                           ,invalid_keyid_error
-                           ,valid_keyid_invalid_paths]}
+                           ,valid_key_valid_paths
+                           ,invalid_key_error
+                           ,valid_key_invalid_repo
+                           ,valid_key_invalid_path]}
     ,{repo_operations, [], [add_repo, remove_repo]}
     ,{key_operations, [], [add_key, remove_key]}].
 
@@ -73,14 +75,17 @@ list_repos(_Config) ->
     Repos2 = lists:sort(lists:foldl(fun({N, _}, Acc) -> [N | Acc] end, [], ct:get_config(repos))),
     Repos1 = Repos2.
 
-valid_keyid_valid_paths(_Config) ->
+valid_key_valid_paths(_Config) ->
     {ok, true} = cvmfs_auth:check_key_for_repo_path(<<"key1">>, <<"repo1.domain1.org">>, <<"/">>).
 
-invalid_keyid_error(_Config) ->
+invalid_key_error(_Config) ->
     {ok, false} = cvmfs_auth:check_key_for_repo_path(<<"key2">>, <<"repo1.domain1.org">>, <<"/">>).
 
-valid_keyid_invalid_paths(_Config) ->
-    {error, invalid_path} = cvmfs_auth:check_key_for_repo_path(<<"key1">>, <<"bad_repo">>, <<"/">>).
+valid_key_invalid_repo(_Config) ->
+    {error, invalid_key} = cvmfs_auth:check_key_for_repo_path(<<"key1">>, <<"bad_repo">>, <<"/">>).
+
+valid_key_invalid_path(_Config) ->
+    {error, invalid_key} = cvmfs_auth:check_key_for_repo_path(<<"key1">>, <<"bad_repo">>, <<"/">>).
 
 add_repo(_Config) ->
     ok = cvmfs_auth:add_repo(<<"/new/repo/path">>, [<<"key">>]),
