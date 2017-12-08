@@ -313,7 +313,7 @@ p_new_lease(KeyId, Path, MaxLeaseTime) ->
     % Check if user is registered with the cvmfs_auth service and
     % which paths he is allowed to modify
     [Repo | _]  = binary:split(Path, <<"/">>),
-    case cvmfs_auth:check_keyid_for_repo(KeyId, Repo) of
+    case cvmfs_auth:check_key_for_repo_path(KeyId, Repo, Path) of
         {ok, true} ->
             {Public, Secret, Token} = cvmfs_receiver:generate_token(KeyId,
                                                                     Path,
