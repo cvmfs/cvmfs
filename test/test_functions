@@ -2402,7 +2402,7 @@ set_up_repository_services() {
     echo "  Writing configuration files"
     sudo bash -c 'cat <<EOF > /opt/cvmfs_services/etc/repo.config
 {repos, [{<<"test.repo.org">>, [<<"key1">>]}]}.
-{keys, [{file, "/etc/cvmfs/keys/test.repo.org.gw"}]}.
+{keys, [{file, <<"/etc/cvmfs/keys/test.repo.org.gw">>, <<"/">>}]}.
 EOF'
 
     echo "  Writing API key file"
