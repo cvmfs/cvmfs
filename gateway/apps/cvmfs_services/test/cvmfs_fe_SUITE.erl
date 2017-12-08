@@ -132,7 +132,7 @@ create_and_delete_session(Config) ->
 create_invalid_leases(Config) ->
     RequestReplies = [
                       {<<"bad_key">>, <<"repo1.domain1.org">>, <<"invalid_hmac">>},
-                      {<<"key1">>, <<"bad_path">>, <<"invalid_path">>}
+                      {<<"key1">>, <<"bad_repo">>, <<"invalid_key">>}
                      ],
     Check = fun({KeyId, Path, Reason}) ->
                     RequestBody = jsx:encode(#{<<"path">> => Path,

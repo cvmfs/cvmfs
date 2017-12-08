@@ -59,7 +59,8 @@ start_link(Args) ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, Args, []).
 
 
--spec check_key_for_repo_path(KeyId, Repo, Path) -> {ok, Allowed} | {error, invalid_path}
+-spec check_key_for_repo_path(KeyId, Repo, Path) -> {ok, Allowed}
+                                                        | {error, invalid_path | invalid_key}
                                                         when KeyId :: binary(),
                                                              Repo :: binary(),
                                                              Path :: binary(),
@@ -249,7 +250,7 @@ p_check_key_for_repo_path(KeyId, Repo, Path) ->
                                  {error, invalid_path}
                          end;
                      _ ->
-                         {error, invalid_path}
+                         {error, invalid_key}
                  end
          end,
     {atomic, Result} = mnesia:transaction(T1),
