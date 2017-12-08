@@ -1,12 +1,6 @@
 {"1.1.0",
-[{<<"cowboy">>,
-  {git,"https://github.com/ninenines/cowboy.git",
-       {ref,"d3f15cfd8b2bb4c0c697bd995dfa4546474235ad"}},
-  0},
- {<<"cowlib">>,
-  {git,"https://github.com/ninenines/cowlib",
-       {ref,"bd37be4d3b065600c3b76b492535e76e5d413fc1"}},
-  1},
+[{<<"cowboy">>,{pkg,<<"cowboy">>,<<"2.1.0">>},0},
+ {<<"cowlib">>,{pkg,<<"cowlib">>,<<"2.0.1">>},1},
  {<<"goldrush">>,{pkg,<<"goldrush">>,<<"0.1.8">>},1},
  {<<"jsx">>,{pkg,<<"jsx">>,<<"2.8.0">>},0},
  {<<"lager">>,{pkg,<<"lager">>,<<"3.2.1">>},0},
@@ -16,10 +10,7 @@
   0},
  {<<"poolboy">>,{pkg,<<"poolboy">>,<<"1.5.1">>},0},
  {<<"quickrand">>,{pkg,<<"quickrand">>,<<"1.6.0">>},1},
- {<<"ranch">>,
-  {git,"https://github.com/ninenines/ranch",
-       {ref,"55c2a9d623454f372a15e99721a37093d8773b48"}},
-  1},
+ {<<"ranch">>,{pkg,<<"ranch">>,<<"1.4.0">>},1},
  {<<"syslog">>,
   {git,"https://github.com/basho/erlang-syslog",
        {ref,"e24c9ee8f7bb3f066ec152c210af10c2c712759a"}},
@@ -27,10 +18,13 @@
  {<<"uuid">>,{pkg,<<"uuid_erl">>,<<"1.6.0">>},0}]}.
 [
 {pkg_hash,[
+ {<<"cowboy">>, <<"69F9DB3B23C24AB6B3A169A6357130C16B39CDA1A1F8C582F818883EE552589D">>},
+ {<<"cowlib">>, <<"4DFFFB1DB296EAB9F2E8B95EE3017007F674BC920CE30AEB5A53BBDA82FC38C0">>},
  {<<"goldrush">>, <<"2024BA375CEEA47E27EA70E14D2C483B2D8610101B4E852EF7F89163CDB6E649">>},
  {<<"jsx">>, <<"749BEC6D205C694AE1786D62CEA6CC45A390437E24835FD16D12D74F07097727">>},
  {<<"lager">>, <<"EEF4E18B39E4195D37606D9088EA05BF1B745986CF8EC84F01D332456FE88D17">>},
  {<<"poolboy">>, <<"6B46163901CFD0A1B43D692657ED9D7E599853B3B21B95AE5AE0A777CF9B6CA8">>},
  {<<"quickrand">>, <<"33A277A639C442D77AB5C1EEA4641A49E3F034FD13658BB57E192A6E083FE77D">>},
+ {<<"ranch">>, <<"10272F95DA79340FA7E8774BA7930B901713D272905D0012B06CA6D994F8826B">>},
  {<<"uuid">>, <<"1BA81515EEB37EEB7F1563B658E30CDF18BCAF1FD6A390BBF3838461753E69D8">>}]}
 ].
