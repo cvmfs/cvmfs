@@ -21,8 +21,7 @@
 -export([valid_key_valid_path/1
         ,valid_key_busy_path/1
         ,invalid_key_valid_path/1
-        ,valid_key_invalid_path/1
-        ,invalid_key_invalid_path/1]).
+        ,valid_key_invalid_path/1]).
 
 -export([end_valid_lease/1
         ,commit_valid_lease/1
@@ -67,8 +66,7 @@ groups() ->
     ,{new_lease, [], [valid_key_valid_path
                      ,valid_key_busy_path
                      ,invalid_key_valid_path
-                     ,valid_key_invalid_path
-                     ,invalid_key_invalid_path]}
+                     ,valid_key_invalid_path]}
     ,{end_lease, [], [end_valid_lease
                      ,commit_valid_lease
                      ,cancel_invalid_lease
@@ -137,10 +135,7 @@ invalid_key_valid_path(_Config) ->
     {error, invalid_key} = cvmfs_be:new_lease(?TEST_UID, <<"key2">>, <<"repo1.domain1.org">>).
 % Valid key and invalid path should be rejected
 valid_key_invalid_path(_Config) ->
-    {error, invalid_key} = cvmfs_be:new_lease(?TEST_UID, <<"key1">>, <<"repo1.domain1.com">>).
-% Invalid key and invalid path should be rejected with {error, invalid_key}
-invalid_key_invalid_path(_Config) ->
-    {error, invalid_key} = cvmfs_be:new_lease(?TEST_UID, <<"key2">>, <<"repo1.domain1.com">>).
+    {error, invalid_repo} = cvmfs_be:new_lease(?TEST_UID, <<"key1">>, <<"repo1.domain1.com">>).
 
 
 % End lease

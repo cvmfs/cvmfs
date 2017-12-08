@@ -59,12 +59,13 @@ start_link(Args) ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, Args, []).
 
 
--spec check_key_for_repo_path(KeyId, Repo, Path) -> {ok, Allowed}
-                                                        | {error, invalid_path | invalid_key}
+-spec check_key_for_repo_path(KeyId, Repo, Path) -> ok | {error,
+                                                          invalid_repo |
+                                                          invalid_path |
+                                                          invalid_key}
                                                         when KeyId :: binary(),
                                                              Repo :: binary(),
-                                                             Path :: binary(),
-                                                             Allowed :: boolean().
+                                                             Path :: binary().
 check_key_for_repo_path(KeyId, Repo, Path) ->
     gen_server:call(?MODULE, {auth_req, check_key_for_repo_path, {KeyId, Repo, Path}}).
 
@@ -231,26 +232,38 @@ code_change(OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
--spec p_check_key_for_repo_path(KeyId, Repo, Path) -> {ok, Allowed} | {error, invalid_path}
+-spec p_check_key_for_repo_path(KeyId, Repo, Path) -> ok | {error,
+                                                            invalid_repo |
+                                                            invalid_key |
+                                                            invalid_path}
                                    when KeyId :: binary(),
                                         Repo :: binary(),
-                                        Path :: binary(),
-                                        Allowed :: boolean().
+                                        Path :: binary().
 p_check_key_for_repo_path(KeyId, Repo, Path) ->
     T1 = fun() ->
                  case mnesia:read(repo, Repo) of
                      [#repo{key_ids = KeyIds} | _] ->
                          KeyValidForRepo = lists:member(KeyId, KeyIds),
-                         case mnesia:read(key, KeyId) of
-                             [#key{path = AllowedPath} | _] ->
-                                 Overlapping = cvmfs_path_util:are_overlapping(Path, AllowedPath),
-                                 IsSubPath = size(Path) >= size(AllowedPath),
-                                 {ok, KeyValidForRepo and Overlapping and IsSubPath};
-                             _ ->
-                                 {error, invalid_path}
+                         case KeyValidForRepo of
+                             true ->
+                                 case mnesia:read(key, KeyId) of
+                                     [#key{path = AllowedPath} | _] ->
+                                         Overlapping = cvmfs_path_util:are_overlapping(Path, AllowedPath),
+                                         IsSubPath = size(Path) >= size(AllowedPath),
+                                         case Overlapping and IsSubPath of
+                                             true ->
+                                                 ok;
+                                             false ->
+                                                 {error, invalid_path}
+                                         end;
+                                     _ ->
+                                         {error, invalid_path}
+                                 end;
+                             false ->
+                                 {error, invalid_key}
                          end;
                      _ ->
-                         {error, invalid_key}
+                         {error, invalid_repo}
                  end
          end,
     {atomic, Result} = mnesia:transaction(T1),
