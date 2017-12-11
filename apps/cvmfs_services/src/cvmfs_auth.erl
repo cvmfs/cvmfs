@@ -15,8 +15,8 @@
 
 %% API
 -export([start_link/1
-        ,check_keyid_for_repo/2
-        ,add_key/2, remove_key/1
+        ,check_key_for_repo_path/3
+        ,add_key/3, remove_key/1
         ,add_repo/2, remove_repo/1, get_repos/0
         ,check_hmac/3]).
 
@@ -37,7 +37,8 @@
 
 -record(key, {
           key_id :: binary(),
-          secret :: binary()
+          secret :: binary(),
+          path :: binary()
          }).
 
 
@@ -58,17 +59,20 @@ start_link(Args) ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, Args, []).
 
 
--spec check_keyid_for_repo(KeyId, Repo) -> {ok, Allowed} | {error, invalid_path}
-                                        when KeyId :: binary(),
-                                             Repo :: binary(),
-                                             Allowed :: boolean().
-check_keyid_for_repo(KeyId, Repo) ->
-    gen_server:call(?MODULE, {auth_req, check_keyid_for_repo, {KeyId, Repo}}).
+-spec check_key_for_repo_path(KeyId, Repo, Path) -> ok | {error,
+                                                          invalid_repo |
+                                                          invalid_path |
+                                                          invalid_key}
+                                                        when KeyId :: binary(),
+                                                             Repo :: binary(),
+                                                             Path :: binary().
+check_key_for_repo_path(KeyId, Repo, Path) ->
+    gen_server:call(?MODULE, {auth_req, check_key_for_repo_path, {KeyId, Repo, Path}}).
 
 
--spec add_key(KeyId :: binary(), Secret :: binary())-> ok.
-add_key(KeyId, Secret) ->
-    gen_server:call(?MODULE, {auth_req, add_key, {KeyId, Secret}}).
+-spec add_key(KeyId :: binary(), Secret :: binary(), Path :: binary())-> ok.
+add_key(KeyId, Secret, Path) ->
+    gen_server:call(?MODULE, {auth_req, add_key, {KeyId, Secret, Path}}).
 
 
 -spec remove_key(KeyId :: binary()) -> ok.
@@ -154,11 +158,11 @@ init({RepoList, Keys}) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-handle_call({auth_req, check_keyid_for_repo, {KeyId, Repo}}, _From, State) ->
-    Reply = p_check_keyid_for_repo(KeyId, Repo),
+handle_call({auth_req, check_key_for_repo_path, {KeyId, Repo, Path}}, _From, State) ->
+    Reply = p_check_key_for_repo_path(KeyId, Repo, Path),
     {reply, Reply, State};
-handle_call({auth_req, add_key, {KeyId, Secret}}, _From, State) ->
-    Reply = p_add_key(KeyId, Secret),
+handle_call({auth_req, add_key, {KeyId, Secret, Path}}, _From, State) ->
+    Reply = p_add_key(KeyId, Secret, Path),
     {reply, Reply, State};
 handle_call({auth_req, remove_key, Key}, _From, State) ->
     Reply = p_remove_key(Key),
@@ -228,27 +232,48 @@ code_change(OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
--spec p_check_keyid_for_repo(KeyId, Repo) -> {ok, Allowed} | {error, invalid_path}
+-spec p_check_key_for_repo_path(KeyId, Repo, Path) -> ok | {error,
+                                                            invalid_repo |
+                                                            invalid_key |
+                                                            invalid_path}
                                    when KeyId :: binary(),
                                         Repo :: binary(),
-                                        Allowed :: boolean().
-p_check_keyid_for_repo(KeyId, Repo) ->
+                                        Path :: binary().
+p_check_key_for_repo_path(KeyId, Repo, Path) ->
     T1 = fun() ->
                  case mnesia:read(repo, Repo) of
                      [#repo{key_ids = KeyIds} | _] ->
-                         {ok, lists:member(KeyId, KeyIds)};
+                         KeyValidForRepo = lists:member(KeyId, KeyIds),
+                         case KeyValidForRepo of
+                             true ->
+                                 case mnesia:read(key, KeyId) of
+                                     [#key{path = AllowedPath} | _] ->
+                                         Overlapping = cvmfs_path_util:are_overlapping(Path, AllowedPath),
+                                         IsSubPath = size(Path) >= size(AllowedPath),
+                                         case Overlapping and IsSubPath of
+                                             true ->
+                                                 ok;
+                                             false ->
+                                                 {error, invalid_path}
+                                         end;
+                                     _ ->
+                                         {error, invalid_path}
+                                 end;
+                             false ->
+                                 {error, invalid_key}
+                         end;
                      _ ->
-                         {error, invalid_path}
+                         {error, invalid_repo}
                  end
          end,
     {atomic, Result} = mnesia:transaction(T1),
     Result.
 
 
--spec p_add_key(KeyId :: binary(), Secret :: binary()) -> ok.
-p_add_key(KeyId, Secret) ->
+-spec p_add_key(KeyId :: binary(), Secret :: binary(), Path :: binary()) -> ok.
+p_add_key(KeyId, Secret, Path) ->
     T = fun() ->
-                mnesia:write(#key{key_id = KeyId, secret = Secret})
+                mnesia:write(#key{key_id = KeyId, secret = Secret, path = Path})
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
@@ -315,18 +340,21 @@ p_populate_keys(Keys) ->
                 lists:foreach(fun(KeyDesc) ->
                                       {KeyType,
                                        KeyId,
-                                       Secret} = case KeyDesc of
-                                                     {file, FileName} when is_binary(FileName);
-                                                                           is_list(FileName) ->
-                                                         p_parse_key_file(FileName);
-                                                     {Type, Id, Val} when is_binary(Type),
-                                                                          is_binary(Id),
-                                                                          is_binary(Val) ->
-                                                         {Type, Id, Val}
+                                       Secret,
+                                       Path} = case KeyDesc of
+                                                     {file, FileName, P} when is_binary(FileName);
+                                                                              is_list(FileName) ->
+                                                       {T, I, S} = p_parse_key_file(FileName),
+                                                       {T, I, S, P};
+                                                     {Type, Id, Val, P} when is_binary(Type),
+                                                                                is_binary(Id),
+                                                                                is_binary(Val),
+                                                                                is_binary(P) ->
+                                                         {Type, Id, Val, P}
                                                  end,
                                       case KeyType of
                                           <<"plain_text">> ->
-                                              mnesia:write(#key{key_id = KeyId, secret = Secret});
+                                              mnesia:write(#key{key_id = KeyId, secret = Secret, path = Path});
                                           _ ->
                                               lager:warning("Ignoring invalid key ~p with key type ~p.",
                                                             [KeyId, KeyType])

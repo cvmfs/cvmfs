@@ -132,7 +132,7 @@ create_and_delete_session(Config) ->
 create_invalid_leases(Config) ->
     RequestReplies = [
                       {<<"bad_key">>, <<"repo1.domain1.org">>, <<"invalid_hmac">>},
-                      {<<"key1">>, <<"bad_path">>, <<"invalid_path">>}
+                      {<<"key1">>, <<"bad_repo">>, <<"invalid_repo">>}
                      ],
     Check = fun({KeyId, Path, Reason}) ->
                     RequestBody = jsx:encode(#{<<"path">> => Path,
@@ -274,7 +274,7 @@ p_delete(ConnPid, Path, Headers) ->
 
 
 p_make_hmac(Body, Config) ->
-    {_, _, Secret} = lists:keyfind(<<"key1">>, 2, ?config(keys, Config)),
+    {_, _, Secret, _} = lists:keyfind(<<"key1">>, 2, ?config(keys, Config)),
     cvmfs_auth_util:compute_hmac(Secret, Body).
 
 
