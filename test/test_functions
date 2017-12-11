@@ -2218,7 +2218,7 @@ EOF
   if [ x"$as_root" != x"" ]; then
     sudo cvmfs2 -d -o allow_other,config=$config $repo_name $mountpoint >> $output 2>&1
   else
-    cvmfs2 -d -o allow_other,config=$config $repo_name $mountpoint >> $output 2>&1
+    cvmfs2 -d -o config=$config $repo_name $mountpoint >> $output 2>&1
   fi
 }
 
