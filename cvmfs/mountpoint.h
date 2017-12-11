@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "cache.h"
+#include "file_watcher.h"
 #include "gtest/gtest_prod.h"
 #include "hash.h"
 #include "loader.h"
@@ -458,6 +459,7 @@ class MountPoint : SingleCopy, public BootFactory {
   bool CreateSignatureManager();
   bool CheckBlacklists();
   bool CreateDownloadManagers();
+  bool CreateResolvConfWatcher();
   void CreateFetchers();
   bool CreateCatalogManager();
   void CreateTables();
@@ -503,6 +505,8 @@ class MountPoint : SingleCopy, public BootFactory {
   lru::Md5PathCache *md5path_cache_;
   Tracer *tracer_;
   glue::InodeTracker *inode_tracker_;
+
+  file_watcher::FileWatcher* resolv_conf_watcher_;
 
   unsigned max_ttl_sec_;
   pthread_mutex_t lock_max_ttl_;

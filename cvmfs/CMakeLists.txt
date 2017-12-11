@@ -40,6 +40,7 @@ set (CVMFS_CLIENT_SOURCES
   download.cc
   fetch.cc
   file_chunk.cc
+  file_watcher.cc
   globals.cc
   glue_buffer.cc
   hash.cc
@@ -57,6 +58,7 @@ set (CVMFS_CLIENT_SOURCES
   options.cc
   quota.cc
   quota_posix.cc
+  resolv_conf_event_handler.cc
   sanitizer.cc
   signature.cc
   sql.cc
@@ -72,7 +74,11 @@ set (CVMFS_CLIENT_SOURCES
   whitelist.cc
   wpad.cc
   xattr.cc
-)
+  )
+
+if (MACOSX)
+  list(APPEND CVMFS_CLIENT_SOURCES file_watcher_kqueue.cc)
+endif (MACOSX)
 
 # First .h then .cc is important to avoid races during the build process
 set_source_files_properties(cache.pb.h cache.pb.cc
