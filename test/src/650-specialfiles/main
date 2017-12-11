@@ -104,8 +104,21 @@ cvmfs_run_test() {
   publish_repo $CVMFS_TEST_REPO || return 60
   check_repository $CVMFS_TEST_REPO -i || return 61
 
+  echo "*** test IGNORE_SPECIAL_FILES"
+  destroy_repo $CVMFS_TEST_REPO || return 70
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return 71
+  echo "CVMFS_IGNORE_SPECIAL_FILES=true" | \
+    sudo tee -a /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf
+  start_transaction $CVMFS_TEST_REPO || return $?
+  create_special_files /cvmfs/$CVMFS_TEST_REPO || return 72
+  publish_repo $CVMFS_TEST_REPO || return 73
+  check_repository $CVMFS_TEST_REPO -i  || return 74
 
-  # merge with 439
+  [ x"$(cat /cvmfs/$CVMFS_TEST_REPO/regular)" = x"regular" ] || return 75
+  ls /cvmfs/$CVMFS_TEST_REPO/fifo && return 76
+  ls /cvmfs/$CVMFS_TEST_REPO/socket && return 77
+  ls /cvmfs/$CVMFS_TEST_REPO/null && return 78
+  ls /cvmfs/$CVMFS_TEST_REPO/loop0 && return 79
 
   return 0
 }
