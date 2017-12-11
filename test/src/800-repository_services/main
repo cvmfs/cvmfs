@@ -49,13 +49,13 @@ run_transactions() {
     echo "Pre-checks"
 
     ## Pre-checks: starting and aborting transactions should leave no trace
-    cvmfs_server transaction -e test.repo.org
-    cvmfs_server abort -f -e test.repo.org
+    cvmfs_server transaction test.repo.org
+    cvmfs_server abort -f test.repo.org
     cvmfs_server check test.repo.org
 
-    cvmfs_server transaction -e test.repo.org
+    cvmfs_server transaction test.repo.org
     cp -r /usr/bin /cvmfs/test.repo.org
-    cvmfs_server abort -f -e test.repo.org
+    cvmfs_server abort -f test.repo.org
     cvmfs_server check test.repo.org
 
     echo "Checking transaction + publish"
@@ -63,7 +63,7 @@ run_transactions() {
     ## Transaction 1 (Modifying existing file and creating a new one)
 
     echo "  Starting transaction 1"
-    cvmfs_server transaction -e test.repo.org
+    cvmfs_server transaction test.repo.org
 
     echo "  Writing to a new file"
     echo "test" >> /cvmfs/test.repo.org/new_file.txt
@@ -72,7 +72,7 @@ run_transactions() {
     echo "test" >> /cvmfs/test.repo.org/new_repository
 
     echo "  Publishing changes 1"
-    cvmfs_server publish -e test.repo.org
+    cvmfs_server publish test.repo.org
     cvmfs_server check test.repo.org
 
     echo "  Copy the contents of the repository"
@@ -81,7 +81,7 @@ run_transactions() {
     ## Transaction 2 (Deleting a file and creating a new directory with the same name)
 
     echo "  Starting transaction 2"
-    cvmfs_server transaction -e test.repo.org
+    cvmfs_server transaction test.repo.org
 
     echo "  Replacing a file with a directory"
     rm -v /cvmfs/test.repo.org/new_repository
@@ -89,7 +89,7 @@ run_transactions() {
     echo "test" >> /cvmfs/test.repo.org/new_repository/another_file.txt
 
     echo "  Publishing changes 2"
-    cvmfs_server publish -e test.repo.org
+    cvmfs_server publish test.repo.org
     cvmfs_server check test.repo.org
 
     echo "  Copy the contents of the repository"
@@ -98,13 +98,13 @@ run_transactions() {
     ## Transaction 3 (Deleting the directory created in the previous transaction)
 
     echo "  Starting transaction 3"
-    cvmfs_server transaction -e test.repo.org
+    cvmfs_server transaction test.repo.org
 
     echo "  Deleting a directory"
     rm -rv /cvmfs/test.repo.org/new_repository
 
     echo "  Publishing changes 3"
-    cvmfs_server publish -e test.repo.org
+    cvmfs_server publish test.repo.org
     cvmfs_server check test.repo.org
 
     echo "  Copy the contents of the repository"
@@ -113,7 +113,7 @@ run_transactions() {
     ## Transaction 4 (Creating a new deep directory sub-tree)
 
     echo "  Starting transaction 4"
-    cvmfs_server transaction -e test.repo.org
+    cvmfs_server transaction test.repo.org
 
     echo "  Create a deep directory hierarchy"
     mkdir -p /cvmfs/test.repo.org/a/b
@@ -121,7 +121,7 @@ run_transactions() {
     echo "New file" > /cvmfs/test.repo.org/new
 
     echo "  Publishing changes 4"
-    cvmfs_server publish -e test.repo.org
+    cvmfs_server publish test.repo.org
     cvmfs_server check test.repo.org
 
     echo "  Copy the contents of the repository"
@@ -130,7 +130,7 @@ run_transactions() {
     ## Transaction 5 (Creating a new deep directory sub-tree in place of a former file)
 
     echo "  Starting transaction 5"
-    cvmfs_server transaction -e test.repo.org
+    cvmfs_server transaction test.repo.org
 
     echo "  Create a deep directory hierarchy"
     rm -rv /cvmfs/test.repo.org/new
@@ -138,7 +138,7 @@ run_transactions() {
     echo "New file" > /cvmfs/test.repo.org/new/c/d/new_file.txt
 
     echo "  Publishing changes 5"
-    cvmfs_server publish -e test.repo.org
+    cvmfs_server publish test.repo.org
     cvmfs_server check test.repo.org
 
     echo "  Copy the contents of the repository"
@@ -147,11 +147,11 @@ run_transactions() {
     ## Transaction 6 (Lease on a subpath - valid changes)
 
     echo "  Starting transaction 6"
-    cvmfs_server transaction -e test.repo.org/new/c
+    cvmfs_server transaction test.repo.org/new/c
     echo "New file" > /cvmfs/test.repo.org/new/c/another_file.txt
 
     echo "  Publishing changes 6"
-    cvmfs_server publish -e test.repo.org/new/c
+    cvmfs_server publish test.repo.org/new/c
     cvmfs_server check test.repo.org
 
     echo "  Copy the contents of the repository"
@@ -160,11 +160,11 @@ run_transactions() {
     ## Transaction 7 (Lease on a subpath - changes outside of lease)
 
     echo "  Starting transaction 7"
-    cvmfs_server transaction -e test.repo.org/new/c
+    cvmfs_server transaction test.repo.org/new/c
     echo "New file" > /cvmfs/test.repo.org/new/invalid_file.txt
 
     echo "  Publishing changes 7"
-    cvmfs_server publish -e test.repo.org/new/c
+    cvmfs_server publish test.repo.org/new/c
     cvmfs_server check test.repo.org
 
     echo "  Copy the contents of the repository"
@@ -174,11 +174,11 @@ run_transactions() {
 
     echo "  Starting transaction 8"
     num_tags_before=$(cvmfs_server tag -l test.repo.org | grep generic | wc -l)
-    cvmfs_server transaction -e test.repo.org
+    cvmfs_server transaction test.repo.org
     echo "New file" > /cvmfs/test.repo.org/marker
 
     echo "  Publishing changes 8"
-    cvmfs_server publish -e test.repo.org
+    cvmfs_server publish test.repo.org
     cvmfs_server check test.repo.org
 
     echo "  Get list of tags"
@@ -188,11 +188,11 @@ run_transactions() {
     ## Transaction 8 (Check creation of named tag)
 
     echo "  Starting transaction 9"
-    cvmfs_server transaction -e test.repo.org
+    cvmfs_server transaction test.repo.org
     echo "New file" > /cvmfs/test.repo.org/marker
 
     echo "  Publishing changes 9"
-    cvmfs_server publish -a specialtag -e test.repo.org
+    cvmfs_server publish -a specialtag test.repo.org
     cvmfs_server check test.repo.org
 
     echo "  Check that the named tag has been created"
