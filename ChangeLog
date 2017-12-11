@@ -1,4 +1,6 @@
 2.4.4:
+  * Fix registration of chunk hashes without bulk hash and non-SHA1 hash
+    algorithm (CVM-1446)
   * React to a change of DNS server on macOS (CVM-496)
   * Have geoapi try $REMOTE_ADDR if $HTTP_X_FORWARDED_FOR has no geoinfo
     (CVM-1442)
