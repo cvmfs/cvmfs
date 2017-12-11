@@ -1,45 +1,109 @@
 cvmfs_test_name="Publish special files"
 cvmfs_test_autofs_on_startup=false
 
+
+create_socket() {
+  socket="$1"
+
+  python -c "import socket as s; sock = s.socket(s.AF_UNIX); sock.bind('$socket')" || return 1
+}
+
+create_special_files() {
+  local dest_dir="$1"
+
+  echo regular > ${dest_dir}/regular || return 1
+  mkfifo ${dest_dir}/fifo || return 1
+  create_socket ${dest_dir}/socket || return 1
+  # /dev/null
+  sudo mknod ${dest_dir}/null c 1 3 || return 1
+  # /dev/loop0
+  sudo mknod ${dest_dir}/loop0 b 7 0 || return 1
+}
+
+verify_socket() {
+  local socket="$1"
+
+  [ x"$(stat -c %F $socket)" = xsocket ] || return 1
+}
+
+verify_fifo() {
+  local fifo="$1"
+
+  echo testfifo > $fifo &
+  local string=$(cat $fifo)
+  [ x"$string" = x"testfifo" ] || return 1
+}
+
+verify_special_files() {
+  local dest_dir="$1"
+
+  [ x"$(cat ${dest_dir}/regular)" = x"regular" ] || return 1
+  verify_fifo ${dest_dir}/fifo || return 1
+  verify_socket ${dest_dir}/socket || return 1
+
+  # access to device nodes must be forbidden
+  sudo cat ${dest_dir}/null && return 1
+  sudo cat ${dest_dir}/loop0 && return 1
+  return 0
+}
+
+
 cvmfs_run_test() {
   logfile=$1
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
 
   echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+  echo "CVMFS_IGNORE_XDIR_HARDLINKS=true" | \
+    sudo tee -a /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf
 
   echo "*** create a set of special files"
   start_transaction $CVMFS_TEST_REPO || return $?
-  echo regular > /cvmfs/$CVMFS_TEST_REPO/regular || return 10
-  mkfifo /cvmfs/$CVMFS_TEST_REPO/fifo || return 10
-  python -c "import socket as s; sock = s.socket(s.AF_UNIX); sock.bind('/cvmfs/$CVMFS_TEST_REPO/socket')" || return 10
-  # /dev/null
-  sudo mknod /cvmfs/$CVMFS_TEST_REPO/null c 1 3 || return 10
-  # /dev/loop0
-  sudo mknod /cvmfs/$CVMFS_TEST_REPO/loop0 b 7 0 || return 10
+  create_special_files /cvmfs/$CVMFS_TEST_REPO || return 10
+  mkdir /cvmfs/$CVMFS_TEST_REPO/dir || return 11
+  create_special_files /cvmfs/$CVMFS_TEST_REPO/dir || return 12
+  publish_repo $CVMFS_TEST_REPO || return 13
+  check_repository $CVMFS_TEST_REPO -i  || return 14
 
-  # Same inside directory
+  echo "*** verify special files"
+  verify_special_files /cvmfs/$CVMFS_TEST_REPO || return 20
+  verify_special_files /cvmfs/$CVMFS_TEST_REPO/dir || return 21
 
-  publish_repo $CVMFS_TEST_REPO || return 20
-  check_repository $CVMFS_TEST_REPO -i  || return 21
+  echo "*** hard links and special files"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  ln /cvmfs/$CVMFS_TEST_REPO/fifo /cvmfs/$CVMFS_TEST_REPO/fifo_l1 || return 30
+  ln /cvmfs/$CVMFS_TEST_REPO/fifo /cvmfs/$CVMFS_TEST_REPO/dir/fifo_l2 || return 30
+  mkfifo /cvmfs/$CVMFS_TEST_REPO/new_fifo || return 30
+  ln /cvmfs/$CVMFS_TEST_REPO/new_fifo /cvmfs/$CVMFS_TEST_REPO/new_fifo_l1 || return 30
+  publish_repo $CVMFS_TEST_REPO || return 31
+  check_repository $CVMFS_TEST_REPO -i  || return 32
+  verify_fifo /cvmfs/$CVMFS_TEST_REPO/new_fifo || return 33
+  verify_fifo /cvmfs/$CVMFS_TEST_REPO/new_fifo_l1 || return 34
+  verify_fifo /cvmfs/$CVMFS_TEST_REPO/fifo_l1 || return 35
+  verify_fifo /cvmfs/$CVMFS_TEST_REPO/dir/fifo_l2 || return 36
 
-  [ x"$(cat /cvmfs/$CVMFS_TEST_REPO/regular)" = x"regular" ] || return 30
+  echo "*** touch special files"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  sudo touch /cvmfs/$CVMFS_TEST_REPO/* /cvmfs/$CVMFS_TEST_REPO/dir/* || return 40
+  publish_repo $CVMFS_TEST_REPO || return 41
+  check_repository $CVMFS_TEST_REPO -i  || return 42
+  verify_special_files /cvmfs/$CVMFS_TEST_REPO || return 43
+  verify_special_files /cvmfs/$CVMFS_TEST_REPO/dir || return 44
 
-  echo "*** FIFOs should work"
-  echo testfifo > /cvmfs/$CVMFS_TEST_REPO/fifo &
-  local string=$(cat /cvmfs/$CVMFS_TEST_REPO/fifo)
-  [ x"$string" = x"testfifo" ] || return 40
+  echo "*** change file type"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  sudo rm /cvmfs/$CVMFS_TEST_REPO/fifo_l1 || return 50
+  create_socket /cvmfs/$CVMFS_TEST_REPO/fifo_l1 || return 51
+  publish_repo $CVMFS_TEST_REPO || return 52
+  check_repository $CVMFS_TEST_REPO -i || return 53
+  verify_socket /cvmfs/$CVMFS_TEST_REPO/fifo_l1 || return 54
 
-  echo "*** access to device nodes must be forbidden"
-  sudo cat /cvmfs/$CVMFS_TEST_REPO/null && return 50
+  echo "*** remove special files"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  sudo rm -rf /cvmfs/$CVMFS_TEST_REPO/*
+  publish_repo $CVMFS_TEST_REPO || return 60
+  check_repository $CVMFS_TEST_REPO -i || return 61
 
-  # hardlink to file
-
-  # Touch
-
-  # change file type
-
-  # Remove
 
   # merge with 439
 

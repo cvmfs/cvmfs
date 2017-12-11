@@ -116,8 +116,8 @@ void SyncMediator::Add(const SyncItem &entry) {
     return;
   }
 
-  PrintWarning("'" + entry.GetRelativePath() + "' cannot be added. "
-               "Unrecognized file type.");
+  PrintWarning("'" + entry.GetRelativePath() +
+               "' cannot be added. Unrecognized file type.");
 }
 
 
@@ -133,13 +133,13 @@ void SyncMediator::Touch(const SyncItem &entry) {
     return;
   }
 
-  if (entry.IsRegularFile() || entry.IsSymlink()) {
+  if (entry.IsRegularFile() || entry.IsSymlink() || entry.IsSpecialFile()) {
     Replace(entry);  // This way, hardlink processing is correct
     return;
   }
 
-  PrintWarning("'" + entry.GetRelativePath() + "' cannot be touched. "
-               "Unrecognied file type.");
+  PrintWarning("'" + entry.GetRelativePath() +
+               "' cannot be touched. Unrecognied file type.");
 }
 
 
@@ -154,13 +154,13 @@ void SyncMediator::Remove(const SyncItem &entry) {
     return;
   }
 
-  if (entry.WasRegularFile() || entry.WasSymlink()) {
+  if (entry.WasRegularFile() || entry.WasSymlink() || entry.WasSpecialFile()) {
     RemoveFile(entry);
     return;
   }
 
-  PrintWarning("'" + entry.GetRelativePath() + "' cannot be deleted. "
-               "Unrecognized file type.");
+  PrintWarning("'" + entry.GetRelativePath() +
+               "' cannot be deleted. Unrecognized file type.");
 }
 
 
@@ -525,6 +525,10 @@ void SyncMediator::RemoveDirectoryRecursively(const SyncItem &entry) {
   traversal.fn_new_dir_postfix =
     &SyncMediator::RemoveDirectoryCallback;
   traversal.fn_new_symlink = &SyncMediator::RemoveSymlinkCallback;
+  traversal.fn_new_character_dev = &SyncMediator::RemoveCharacterDeviceCallback;
+  traversal.fn_new_block_dev = &SyncMediator::RemoveBlockDeviceCallback;
+  traversal.fn_new_fifo      = &SyncMediator::RemoveFifoCallback;
+  traversal.fn_new_socket    = &SyncMediator::RemoveSocketCallback;
   traversal.Recurse(entry.GetRdOnlyPath());
 
   // The given directory was emptied recursively and can now itself be deleted

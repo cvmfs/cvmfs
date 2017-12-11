@@ -75,6 +75,12 @@ class SyncItem {
   inline bool IsSpecialFile()     const {
     return IsCharacterDevice() || IsBlockDevice() || IsFifo() || IsSocket();
   }
+  inline bool WasSpecialFile()    const {
+    return WasType(kItemCharacterDevice) ||
+           WasType(kItemBlockDevice) ||
+           WasType(kItemFifo) ||
+           WasType(kItemSocket);
+  }
 
   inline unsigned int GetRdevMajor()     const {
     assert(IsSpecialFile());
