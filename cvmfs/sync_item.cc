@@ -4,8 +4,9 @@
 
 #include "sync_item.h"
 
-#include <cerrno>
+#include <errno.h>
 #include <sys/sysmacros.h>
+
 #include <vector>
 
 #include "sync_mediator.h"

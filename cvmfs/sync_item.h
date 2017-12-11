@@ -64,7 +64,7 @@ class SyncItem {
   inline bool IsCharacterDevice() const { return IsType(kItemCharacterDevice); }
   inline bool IsBlockDevice()     const { return IsType(kItemBlockDevice);     }
   inline bool IsFifo()            const { return IsType(kItemFifo);            }
-  inline bool IsSocket()          const { return IsType(kItemSocket);            }
+  inline bool IsSocket()          const { return IsType(kItemSocket);          }
   inline bool IsGraftMarker()     const { return IsType(kItemMarker);          }
   inline bool IsExternalData()    const { return external_data_;               }
 
