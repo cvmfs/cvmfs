@@ -465,7 +465,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
       }
       // Right size of symbolic link?
       if (entries[i].size() != entries[i].symlink().GetLength()) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "wrong synbolic link size for %s; ",
+        LogCvmfs(kLogCvmfs, kLogStderr, "wrong symbolic link size for %s; ",
                  "expected %s, got %s", full_path.c_str(),
                  entries[i].symlink().GetLength(), entries[i].size());
         retval = false;
@@ -473,6 +473,27 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
     } else if (entries[i].IsRegular()) {
       computed_counters->self.regular_files++;
       computed_counters->self.file_size += entries[i].size();
+    } else if (entries[i].IsSpecial()) {
+      computed_counters->self.specials++;
+      // Size zero for special files
+      if (entries[i].size() != 0) {
+        LogCvmfs(kLogCvmfs, kLogStderr,
+                 "unexpected non-zero special file size %s",
+                 full_path.c_str());
+        retval = false;
+      }
+      // No hash for special files
+      if (!entries[i].checksum().IsNull()) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "special file with hash at %s",
+                 full_path.c_str());
+        retval = false;
+      }
+      // No symlink
+      if (entries[i].symlink().GetLength() > 0) {
+        LogCvmfs(kLogCvmfs, kLogStderr,
+                 "special file with non-zero symlink at %s", full_path.c_str());
+        retval = false;
+      }
     } else {
       LogCvmfs(kLogCvmfs, kLogStderr, "unknown file type %s",
                full_path.c_str());
@@ -759,8 +780,12 @@ bool CommandCheck::InspectTree(const string                  &path,
   }
 
   // Check number of entries
-  const uint64_t num_found_entries = 1 + computed_counters->self.regular_files +
-    computed_counters->self.symlinks + computed_counters->self.directories;
+  const uint64_t num_found_entries =
+    1 +
+    computed_counters->self.regular_files +
+    computed_counters->self.symlinks +
+    computed_counters->self.specials +
+    computed_counters->self.directories;
   if (num_found_entries != catalog->GetNumEntries()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "dangling entries in catalog, "
              "expected %" PRIu64 ", got %" PRIu64,

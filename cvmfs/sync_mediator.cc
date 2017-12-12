@@ -107,17 +107,17 @@ void SyncMediator::Add(const SyncItem &entry) {
     if (params_->ignore_special_files) {
       PrintWarning("'" + entry.GetRelativePath() + "' "
                   "is a special file, ignoring.");
-      return;
     } else {
-      PrintError("'" + entry.GetRelativePath() + "' "
-                   "is a special file, stopping. "
-                   "Enable CVMFS_IGNORE_SPECIAL_FILES in the cvmfs config.");
-      abort();
+      if (entry.HasHardlinks())
+        InsertHardlink(entry);
+      else
+        AddFile(entry);
     }
+    return;
   }
 
-  PrintWarning("'" + entry.GetRelativePath() + "' cannot be added. "
-               "Unrecognized file type.");
+  PrintWarning("'" + entry.GetRelativePath() +
+               "' cannot be added. Unrecognized file type.");
 }
 
 
@@ -133,13 +133,13 @@ void SyncMediator::Touch(const SyncItem &entry) {
     return;
   }
 
-  if (entry.IsRegularFile() || entry.IsSymlink()) {
+  if (entry.IsRegularFile() || entry.IsSymlink() || entry.IsSpecialFile()) {
     Replace(entry);  // This way, hardlink processing is correct
     return;
   }
 
-  PrintWarning("'" + entry.GetRelativePath() + "' cannot be touched. "
-               "Unrecognied file type.");
+  PrintWarning("'" + entry.GetRelativePath() +
+               "' cannot be touched. Unrecognied file type.");
 }
 
 
@@ -154,13 +154,13 @@ void SyncMediator::Remove(const SyncItem &entry) {
     return;
   }
 
-  if (entry.WasRegularFile() || entry.WasSymlink()) {
+  if (entry.WasRegularFile() || entry.WasSymlink() || entry.WasSpecialFile()) {
     RemoveFile(entry);
     return;
   }
 
-  PrintWarning("'" + entry.GetRelativePath() + "' cannot be deleted. "
-               "Unrecognized file type.");
+  PrintWarning("'" + entry.GetRelativePath() +
+               "' cannot be deleted. Unrecognized file type.");
 }
 
 
@@ -369,6 +369,11 @@ void SyncMediator::CompleteHardlinks(const SyncItem &entry) {
   traversal.fn_new_file =
     &SyncMediator::LegacyRegularHardlinkCallback;
   traversal.fn_new_symlink = &SyncMediator::LegacySymlinkHardlinkCallback;
+  traversal.fn_new_character_dev =
+    &SyncMediator::LegacyCharacterDeviceHardlinkCallback;
+  traversal.fn_new_block_dev = &SyncMediator::LegacyBlockDeviceHardlinkCallback;
+  traversal.fn_new_fifo = &SyncMediator::LegacyFifoHardlinkCallback;
+  traversal.fn_new_socket = &SyncMediator::LegacySocketHardlinkCallback;
   traversal.Recurse(entry.GetUnionPath());
 }
 
@@ -388,6 +393,36 @@ void SyncMediator::LegacySymlinkHardlinkCallback(const string &parent_dir,
   InsertLegacyHardlink(entry);
 }
 
+void SyncMediator::LegacyCharacterDeviceHardlinkCallback(
+  const string &parent_dir,
+  const string &file_name)
+{
+  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemCharacterDevice);
+  InsertLegacyHardlink(entry);
+}
+
+void SyncMediator::LegacyBlockDeviceHardlinkCallback(
+  const string &parent_dir,
+  const string &file_name)
+{
+  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemBlockDevice);
+  InsertLegacyHardlink(entry);
+}
+
+void SyncMediator::LegacyFifoHardlinkCallback(const string &parent_dir,
+                                              const string &file_name)
+{
+  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemFifo);
+  InsertLegacyHardlink(entry);
+}
+
+void SyncMediator::LegacySocketHardlinkCallback(const string &parent_dir,
+                                                const string &file_name)
+{
+  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemSocket);
+  InsertLegacyHardlink(entry);
+}
+
 
 void SyncMediator::AddDirectoryRecursively(const SyncItem &entry) {
   AddDirectory(entry);
@@ -404,6 +439,8 @@ void SyncMediator::AddDirectoryRecursively(const SyncItem &entry) {
   traversal.fn_ignore_file    = &SyncMediator::IgnoreFileCallback;
   traversal.fn_new_character_dev = &SyncMediator::AddCharacterDeviceCallback;
   traversal.fn_new_block_dev = &SyncMediator::AddBlockDeviceCallback;
+  traversal.fn_new_fifo      = &SyncMediator::AddFifoCallback;
+  traversal.fn_new_socket    = &SyncMediator::AddSocketCallback;
   traversal.Recurse(entry.GetScratchPath());
 }
 
@@ -436,6 +473,20 @@ void SyncMediator::AddBlockDeviceCallback(const std::string &parent_dir,
                                     const std::string &file_name)
 {
   SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemBlockDevice);
+  Add(entry);
+}
+
+void SyncMediator::AddFifoCallback(const std::string &parent_dir,
+                                   const std::string &file_name)
+{
+  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemFifo);
+  Add(entry);
+}
+
+void SyncMediator::AddSocketCallback(const std::string &parent_dir,
+                                     const std::string &file_name)
+{
+  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemSocket);
   Add(entry);
 }
 
@@ -474,6 +525,10 @@ void SyncMediator::RemoveDirectoryRecursively(const SyncItem &entry) {
   traversal.fn_new_dir_postfix =
     &SyncMediator::RemoveDirectoryCallback;
   traversal.fn_new_symlink = &SyncMediator::RemoveSymlinkCallback;
+  traversal.fn_new_character_dev = &SyncMediator::RemoveCharacterDeviceCallback;
+  traversal.fn_new_block_dev = &SyncMediator::RemoveBlockDeviceCallback;
+  traversal.fn_new_fifo      = &SyncMediator::RemoveFifoCallback;
+  traversal.fn_new_socket    = &SyncMediator::RemoveSocketCallback;
   traversal.Recurse(entry.GetRdOnlyPath());
 
   // The given directory was emptied recursively and can now itself be deleted
@@ -496,6 +551,35 @@ void SyncMediator::RemoveSymlinkCallback(const std::string &parent_dir,
   Remove(entry);
 }
 
+void SyncMediator::RemoveCharacterDeviceCallback(
+  const std::string &parent_dir,
+  const std::string &link_name)
+{
+  SyncItem entry = CreateSyncItem(parent_dir, link_name, kItemCharacterDevice);
+  Remove(entry);
+}
+
+void SyncMediator::RemoveBlockDeviceCallback(
+  const std::string &parent_dir,
+  const std::string &link_name)
+{
+  SyncItem entry = CreateSyncItem(parent_dir, link_name, kItemBlockDevice);
+  Remove(entry);
+}
+
+void SyncMediator::RemoveFifoCallback(const std::string &parent_dir,
+                                      const std::string &link_name)
+{
+  SyncItem entry = CreateSyncItem(parent_dir, link_name, kItemFifo);
+  Remove(entry);
+}
+
+void SyncMediator::RemoveSocketCallback(const std::string &parent_dir,
+                                        const std::string &link_name)
+{
+  SyncItem entry = CreateSyncItem(parent_dir, link_name, kItemSocket);
+  Remove(entry);
+}
 
 void SyncMediator::RemoveDirectoryCallback(const std::string &parent_dir,
                                            const std::string &dir_name)
@@ -667,14 +751,14 @@ void SyncMediator::PrintChangesetNotice(const ChangesetAction  action,
 void SyncMediator::AddFile(const SyncItem &entry) {
   PrintChangesetNotice(kAdd, entry.GetUnionPath());
 
-  if (entry.IsSymlink() && !params_->dry_run) {
+  if ((entry.IsSymlink() || entry.IsSpecialFile()) && !params_->dry_run) {
     assert(!entry.HasGraftMarker());
-    // Symlinks are completely stored in the catalog
+    // Symlinks and special files are completely stored in the catalog
     catalog_manager_->AddFile(
       entry.CreateBasicCatalogDirent(),
       default_xattrs,
       entry.relative_parent_path());
-  } else if (entry.HasGraftMarker()) {
+  } else if (entry.HasGraftMarker() && !params_->dry_run) {
     if (entry.IsValidGraft()) {
       // Graft files are added to catalog immediately.
       if (entry.IsChunkedGraft()) {
@@ -816,7 +900,7 @@ void SyncMediator::AddLocalHardlinkGroups(const HardlinkGroupMap &hardlinks) {
     if (params_->dry_run)
       continue;
 
-    if (i->second.master.IsSymlink())
+    if (i->second.master.IsSymlink() || i->second.master.IsSpecialFile())
       AddHardlinkGroup(i->second);
     else
       hardlink_queue_.push_back(i->second);

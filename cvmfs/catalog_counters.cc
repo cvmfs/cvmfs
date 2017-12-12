@@ -22,6 +22,8 @@ void DeltaCounters::ApplyDelta(const DirectoryEntry &dirent, const int delta) {
     }
   } else if (dirent.IsLink()) {
     self.symlinks += delta;
+  } else if (dirent.IsSpecial()) {
+    self.specials += delta;
   } else if (dirent.IsDirectory()) {
     self.directories += delta;
   } else {
@@ -58,12 +60,13 @@ void Counters::MergeIntoParent(DeltaCounters *parent_delta) const {
 
 
 Counters_t Counters::GetSelfEntries() const {
-  return self.regular_files + self.symlinks + self.directories;
+  return self.regular_files + self.symlinks + self.specials + self.directories;
 }
 
 
 Counters_t Counters::GetSubtreeEntries() const {
-  return subtree.regular_files + subtree.symlinks + subtree.directories;
+  return subtree.regular_files + subtree.symlinks + subtree.specials +
+         subtree.directories;
 }
 
 

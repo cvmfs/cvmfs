@@ -67,7 +67,10 @@ const float CatalogDatabase::kLatestSupportedSchema = 2.5;  // + 1.X (r/o)
 //            * add kFlagDirBindMountpoint
 //            * add kFlagHidden
 //            * add table bind_mountpoints
-const unsigned CatalogDatabase::kLatestSchemaRevision = 4;
+//   4 --> 5: (Dec 07 2017):
+//            * add kFlagFileSpecial (rebranded unused kFlagFileStat)
+//            * add self_special and subtree_special statistics counters
+const unsigned CatalogDatabase::kLatestSchemaRevision = 5;
 
 bool CatalogDatabase::CheckSchemaCompatibility() {
   return !( (schema_version() >= 2.0-kSchemaEpsilon)                   &&
@@ -160,6 +163,28 @@ bool CatalogDatabase::LiveSchemaUpgradeIfNecessary() {
     }
 
     set_schema_revision(4);
+    if (!StoreSchemaRevision()) {
+      LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade schema revision");
+      return false;
+    }
+  }
+
+
+  if (IsEqualSchema(schema_version(), 2.5) && (schema_revision() == 4)) {
+    LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision (4 --> 5)");
+
+    SqlCatalog sql_upgrade9(*this,
+                            "INSERT INTO statistics (counter, value) VALUES "
+                            "('self_special', 0);");
+    SqlCatalog sql_upgrade10(*this,
+                             "INSERT INTO statistics (counter, value) VALUES "
+                             "('subtree_special', 0);");
+    if (!sql_upgrade9.Execute() || !sql_upgrade10.Execute()) {
+      LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade catalogs (4 --> 5)");
+      return false;
+    }
+
+    set_schema_revision(5);
     if (!StoreSchemaRevision()) {
       LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade schema revision");
       return false;
@@ -385,6 +410,8 @@ unsigned SqlDirent::CreateDatabaseFlags(const DirectoryEntry &entry) const {
     database_flags |= kFlagDir;
   } else if (entry.IsLink()) {
     database_flags |= kFlagFile | kFlagLink;
+  } else if (entry.IsSpecial()) {
+    database_flags |= kFlagFile | kFlagFileSpecial;
   } else {
     database_flags |= kFlagFile;
     database_flags |= entry.compression_algorithm() << kFlagPosCompression;
