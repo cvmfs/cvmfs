@@ -1,30 +1,30 @@
 {"1.1.0",
 [{<<"cowboy">>,{pkg,<<"cowboy">>,<<"2.1.0">>},0},
  {<<"cowlib">>,{pkg,<<"cowlib">>,<<"2.0.1">>},1},
- {<<"goldrush">>,{pkg,<<"goldrush">>,<<"0.1.8">>},1},
- {<<"jsx">>,{pkg,<<"jsx">>,<<"2.8.0">>},0},
- {<<"lager">>,{pkg,<<"lager">>,<<"3.2.1">>},0},
+ {<<"goldrush">>,{pkg,<<"goldrush">>,<<"0.1.9">>},1},
+ {<<"jsx">>,{pkg,<<"jsx">>,<<"2.8.3">>},0},
+ {<<"lager">>,{pkg,<<"lager">>,<<"3.5.2">>},0},
  {<<"lager_syslog">>,
   {git,"https://github.com/cvmfs/lager_syslog.git",
        {ref,"c59ccd421426a3d54b379e9b1f62f1f145dd5802"}},
   0},
  {<<"poolboy">>,{pkg,<<"poolboy">>,<<"1.5.1">>},0},
- {<<"quickrand">>,{pkg,<<"quickrand">>,<<"1.6.0">>},1},
+ {<<"quickrand">>,{pkg,<<"quickrand">>,<<"1.7.2">>},1},
  {<<"ranch">>,{pkg,<<"ranch">>,<<"1.4.0">>},1},
  {<<"syslog">>,
   {git,"https://github.com/basho/erlang-syslog",
        {ref,"e24c9ee8f7bb3f066ec152c210af10c2c712759a"}},
   1},
- {<<"uuid">>,{pkg,<<"uuid_erl">>,<<"1.6.0">>},0}]}.
+ {<<"uuid">>,{pkg,<<"uuid_erl">>,<<"1.7.2">>},0}]}.
 [
 {pkg_hash,[
  {<<"cowboy">>, <<"69F9DB3B23C24AB6B3A169A6357130C16B39CDA1A1F8C582F818883EE552589D">>},
  {<<"cowlib">>, <<"4DFFFB1DB296EAB9F2E8B95EE3017007F674BC920CE30AEB5A53BBDA82FC38C0">>},
- {<<"goldrush">>, <<"2024BA375CEEA47E27EA70E14D2C483B2D8610101B4E852EF7F89163CDB6E649">>},
- {<<"jsx">>, <<"749BEC6D205C694AE1786D62CEA6CC45A390437E24835FD16D12D74F07097727">>},
- {<<"lager">>, <<"EEF4E18B39E4195D37606D9088EA05BF1B745986CF8EC84F01D332456FE88D17">>},
+ {<<"goldrush">>, <<"F06E5D5F1277DA5C413E84D5A2924174182FB108DABB39D5EC548B27424CD106">>},
+ {<<"jsx">>, <<"A05252D381885240744D955FBE3CF810504EB2567164824E19303EA59EEF62CF">>},
+ {<<"lager">>, <<"614A8C8F67BF99B69EB264EA22121AD25511C055AAEC09B086773D5108C6767F">>},
  {<<"poolboy">>, <<"6B46163901CFD0A1B43D692657ED9D7E599853B3B21B95AE5AE0A777CF9B6CA8">>},
- {<<"quickrand">>, <<"33A277A639C442D77AB5C1EEA4641A49E3F034FD13658BB57E192A6E083FE77D">>},
+ {<<"quickrand">>, <<"E856F3C69FEC00D1ACCA8E56CB452B650E838D3A9720811410F439121EFAFE59">>},
  {<<"ranch">>, <<"10272F95DA79340FA7E8774BA7930B901713D272905D0012B06CA6D994F8826B">>},
- {<<"uuid">>, <<"1BA81515EEB37EEB7F1563B658E30CDF18BCAF1FD6A390BBF3838461753E69D8">>}]}
+ {<<"uuid">>, <<"D596C8DD01A4AE48B9D8D51832CCC8F8302BF67ACD01336AEC3FCFAE6B9D2BC2">>}]}
 ].
