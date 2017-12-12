@@ -5,7 +5,8 @@
 #ifndef CVMFS_SYNC_ITEM_H_
 #define CVMFS_SYNC_ITEM_H_
 
-#include <sys/sysmacros.h>
+#include <sys/types.h>
+#include <sys/sysmacros.h>  // NOLINT
 
 #include <cstring>
 #include <map>
