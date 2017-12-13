@@ -18,6 +18,7 @@ void TaskRegister::Process(FileItem *file_item) {
   assert((file_item->GetNumChunks() > 1) || !file_item->bulk_hash().IsNull());
   assert(file_item->GetNumChunks() != 1);
   assert(file_item->hash_suffix() == file_item->bulk_hash().suffix);
+  assert(file_item->bulk_hash().algorithm == file_item->hash_algorithm());
 
   LogCvmfs(kLogSpooler, kLogVerboseMsg,
            "File '%s' processed (bulk hash: %s suffix: %c)",

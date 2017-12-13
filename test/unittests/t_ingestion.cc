@@ -766,7 +766,7 @@ TEST_F(T_Ingestion, TaskWriteLarge) {
   EXPECT_EQ(&file_large, file_processed);
   EXPECT_EQ(nchunks, file_processed->GetNumChunks());
   EXPECT_EQ(nchunks, uploader_->results.size());
-  EXPECT_EQ(shash::Any(), file_processed->bulk_hash());
+  EXPECT_EQ(shash::Any(hash_zeros.algorithm), file_processed->bulk_hash());
 
   task_group.Terminate();
 }
