@@ -1,4 +1,6 @@
 2.5.0:
+  * Enable manual trigger to release nested catalogs in unsupervised memory
+    cache plugin
   * Add new server parameter CVMFS_IGNORE_SPECIAL_FILES
   * Add support for special files (CVM-1106)
   * Remove S3 multi-bucket support
