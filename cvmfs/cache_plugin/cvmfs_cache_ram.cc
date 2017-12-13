@@ -697,7 +697,7 @@ int main(int argc, char **argv) {
     }
   }
 
-  LogCvmfs(kLogCache, kLogStdout, "Listening for cvmfs clients on %s"
+  LogCvmfs(kLogCache, kLogStdout, "Listening for cvmfs clients on %s\n"
            "NOTE: this process needs to run as user cvmfs\n",
            locator);
 
@@ -705,12 +705,19 @@ int main(int argc, char **argv) {
   if (test_mode)
     while (true) sleep(1);
   if (!cvmcache_is_supervised()) {
-    LogCvmfs(kLogCache, kLogStdout, "Press <Ctrl+D> to quit\n");
+    LogCvmfs(kLogCache, kLogStdout, "Press <Ctrl+D> to quit");
+    LogCvmfs(kLogCache, kLogStdout,
+             "Press <R Enter> to ask clients to release nested catalogs");
     while (true) {
       char buf;
       retval = read(fileno(stdin), &buf, 1);
       if (retval != 1)
         break;
+      if (buf == 'R') {
+        LogCvmfs(kLogCache, kLogStdout,
+                 "  ... asking clients to release nested catalogs");
+        cvmcache_ask_detach(ctx);
+      }
     }
     cvmcache_terminate(ctx);
   } else {
