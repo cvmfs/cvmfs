@@ -434,6 +434,7 @@ unsigned SqlDirent::CreateDatabaseFlags(const DirectoryEntry &entry) const {
 void SqlDirent::StoreHashAlgorithm(const shash::Algorithms algo,
                                    unsigned *flags) const
 {
+  assert(algo != shash::kAny);
   // Md5 unusable for content hashes
   *flags |= (algo - 1) << kFlagPosHash;
 }

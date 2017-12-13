@@ -31,6 +31,7 @@ FileItem::FileItem(
   , size_(kSizeUnknown)
   , may_have_chunks_(may_have_chunks)
   , chunk_detector_(min_chunk_size, avg_chunk_size, max_chunk_size)
+  , bulk_hash_(hash_algorithm)
   , chunks_(1)
 {
   int retval = pthread_mutex_init(&lock_, NULL);
