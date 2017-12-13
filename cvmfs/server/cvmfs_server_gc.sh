@@ -142,7 +142,7 @@ cvmfs_server_gc() {
                   "$dry_run"                    \
                   "$list_deleted_objects"       \
                   "$preserve_revisions"         \
-                  "$preserve_timestamps"        \
+                  "$preserve_timestamp"         \
                   "$deletion_log"
     else
       local log=/var/log/cvmfs/gc.log
@@ -159,7 +159,7 @@ cvmfs_server_gc() {
                   "$dry_run"                    \
                   "$list_deleted_objects"       \
                   "$preserve_revisions"         \
-                  "$preserve_timestamps"        \
+                  "$preserve_timestamp"         \
                   "$deletion_log"
       )
       if [ $? != 0 ]; then
@@ -182,7 +182,7 @@ __do_gc_cmd()
   local dry_run="$2"
   local list_deleted_objects="$3"
   local preserve_revisions="$4"
-  local preserve_timestamps="$5"
+  local preserve_timestamp="$5"
   local deletion_log="$6"
 
   # leave extra layer of indent for now to better show diff with previous
