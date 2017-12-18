@@ -381,6 +381,9 @@ class MountPoint : SingleCopy, public BootFactory {
   download::DownloadManager *external_download_mgr() {
     return external_download_mgr_;
   }
+  file_watcher::FileWatcher* resolv_conf_watcher() {
+    return resolv_conf_watcher_;
+  }
   cvmfs::Fetcher *fetcher() { return fetcher_; }
   bool fixed_catalog() { return fixed_catalog_; }
   std::string fqrn() { return fqrn_; }

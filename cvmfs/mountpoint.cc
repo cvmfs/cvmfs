@@ -1252,7 +1252,6 @@ bool MountPoint::CreateResolvConfWatcher() {
       ResolvConfEventHandler *handler =
           new ResolvConfEventHandler(download_mgr_, external_download_mgr_);
       resolv_conf_watcher_->RegisterHandler("/etc/resolv.conf", handler);
-      resolv_conf_watcher_->Start();
     }
   } else {
     LogCvmfs(kLogCvmfs, kLogDebug,
