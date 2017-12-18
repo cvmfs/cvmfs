@@ -32,7 +32,7 @@ void FileWatcher::RegisterHandler(const std::string& file_path,
   handler_map_[file_path] = handler;
 }
 
-bool FileWatcher::Start() {
+bool FileWatcher::Spawn() {
   if (started_) {
     return false;
   }
