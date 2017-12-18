@@ -56,7 +56,7 @@ class FileWatcher {
   void RegisterHandler(const std::string& file_path,
                        EventHandler* handler);
 
-  bool Start();
+  bool Spawn();
 
   void Stop();
 

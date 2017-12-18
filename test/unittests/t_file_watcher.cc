@@ -61,7 +61,7 @@ TEST_F(T_FileWatcher, kModifiedEvent) {
     TestEventHandler* hd(new TestEventHandler(&counters_, channel_.weak_ref()));
     watcher->RegisterHandler(watched_file_name, hd);
 
-    EXPECT_TRUE(watcher->Start());
+    EXPECT_TRUE(watcher->Spawn());
 
     SafeWriteToFile("test", watched_file_name, 0600);
 
@@ -87,7 +87,7 @@ TEST_F(T_FileWatcher, kDeletedEvent) {
     TestEventHandler* hd(new TestEventHandler(&counters_, channel_.weak_ref()));
     watcher->RegisterHandler(watched_file_name, hd);
 
-    EXPECT_TRUE(watcher->Start());
+    EXPECT_TRUE(watcher->Spawn());
 
     unlink(watched_file_name.c_str());
 
@@ -114,7 +114,7 @@ TEST_F(T_FileWatcher, kModifiedThenDeletedEvent) {
     hd->clear_ = false;
     watcher->RegisterHandler(watched_file_name, hd);
 
-    EXPECT_TRUE(watcher->Start());
+    EXPECT_TRUE(watcher->Spawn());
 
     SafeWriteToFile("test", watched_file_name, 0600);
 

@@ -1864,6 +1864,7 @@ static void Spawn() {
 
   cvmfs::mount_point_->download_mgr()->Spawn();
   cvmfs::mount_point_->external_download_mgr()->Spawn();
+  cvmfs::mount_point_->resolv_conf_watcher()->Spawn();
   QuotaManager *quota_mgr = cvmfs::file_system_->cache_mgr()->quota_mgr();
   quota_mgr->Spawn();
   if (quota_mgr->HasCapability(QuotaManager::kCapListeners)) {
