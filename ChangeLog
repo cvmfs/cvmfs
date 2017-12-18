@@ -1,4 +1,6 @@
 2.4.5:
+  * Use CVMFS_MAX_IPADDR_PER_PROXY=2 by default on macOS
+  * Fix-up for reacting on DNS server change (CVM-496) 
 
 2.4.4:
   * Fix registration of chunk hashes without bulk hash and non-SHA1 hash
