@@ -31,7 +31,7 @@ class CommandDiff : public Command {
   ParameterList GetParams() const;
   int Main(const ArgumentList &args);
 
-private:
+ private:
   /**
    * Tag names beginning with @ are interpreted as raw hashes
    */
