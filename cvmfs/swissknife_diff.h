@@ -12,6 +12,7 @@
 #include "history.h"
 #include "shortstring.h"
 #include "swissknife.h"
+#include "util/pointer.h"
 
 namespace catalog {
 class SimpleCatalogManager;
@@ -29,6 +30,16 @@ class CommandDiff : public Command {
   }
   ParameterList GetParams() const;
   int Main(const ArgumentList &args);
+
+private:
+  /**
+   * Tag names beginning with @ are interpreted as raw hashes
+   */
+  static const char kRawHashSymbol = '@';
+
+  history::History::Tag GetTag(const std::string &tag_name);
+
+  UniquePtr<history::History> history_;
 };  // class CommandDiff
 
 }  // namespace swissknife
