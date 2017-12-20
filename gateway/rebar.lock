@@ -1,6 +1,6 @@
 {"1.1.0",
-[{<<"cowboy">>,{pkg,<<"cowboy">>,<<"2.1.0">>},0},
- {<<"cowlib">>,{pkg,<<"cowlib">>,<<"2.0.1">>},1},
+[{<<"cowboy">>,{pkg,<<"cowboy">>,<<"2.2.0">>},0},
+ {<<"cowlib">>,{pkg,<<"cowlib">>,<<"2.1.0">>},1},
  {<<"goldrush">>,{pkg,<<"goldrush">>,<<"0.1.9">>},1},
  {<<"jsx">>,{pkg,<<"jsx">>,<<"2.8.3">>},0},
  {<<"lager">>,{pkg,<<"lager">>,<<"3.5.2">>},0},
@@ -18,8 +18,8 @@
  {<<"uuid">>,{pkg,<<"uuid_erl">>,<<"1.7.2">>},0}]}.
 [
 {pkg_hash,[
- {<<"cowboy">>, <<"69F9DB3B23C24AB6B3A169A6357130C16B39CDA1A1F8C582F818883EE552589D">>},
- {<<"cowlib">>, <<"4DFFFB1DB296EAB9F2E8B95EE3017007F674BC920CE30AEB5A53BBDA82FC38C0">>},
+ {<<"cowboy">>, <<"5233ED78AFE96B19EFD33B7BBCAFD15E064B187C0C131C61D50FE69D88DC76FD">>},
+ {<<"cowlib">>, <<"F73658B93DD043AF40400C3E4FD997068EBD0C617F8C8F4CD003A1A78EBF94F5">>},
  {<<"goldrush">>, <<"F06E5D5F1277DA5C413E84D5A2924174182FB108DABB39D5EC548B27424CD106">>},
  {<<"jsx">>, <<"A05252D381885240744D955FBE3CF810504EB2567164824E19303EA59EEF62CF">>},
  {<<"lager">>, <<"614A8C8F67BF99B69EB264EA22121AD25511C055AAEC09B086773D5108C6767F">>},
