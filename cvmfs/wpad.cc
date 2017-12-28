@@ -136,7 +136,7 @@ static bool ParsePac(const char *pac_data, const size_t size,
     } else {
       const string alt_proxies = PacProxy2Cvmfs(pac_proxy, false);
       if (*proxies != alt_proxies) {
-        LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
+        LogCvmfs(kLogDownload, kLogDebug,
                  "proxy settings for host %s differ from proxy settings for "
                  "other hosts (%s / %s). Not using proxy setting %s.",
                  host_list[i].c_str(), proxies->c_str(), alt_proxies.c_str(),
