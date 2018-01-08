@@ -6,15 +6,12 @@
  {<<"lager">>,{pkg,<<"lager">>,<<"3.5.2">>},0},
  {<<"lager_syslog">>,
   {git,"https://github.com/cvmfs/lager_syslog.git",
-       {ref,"c59ccd421426a3d54b379e9b1f62f1f145dd5802"}},
+       {ref,"475292f65840355f71359bdbd9249a1fdad476ca"}},
   0},
  {<<"poolboy">>,{pkg,<<"poolboy">>,<<"1.5.1">>},0},
  {<<"quickrand">>,{pkg,<<"quickrand">>,<<"1.7.2">>},1},
  {<<"ranch">>,{pkg,<<"ranch">>,<<"1.4.0">>},1},
- {<<"syslog">>,
-  {git,"https://github.com/basho/erlang-syslog",
-       {ref,"e24c9ee8f7bb3f066ec152c210af10c2c712759a"}},
-  1},
+ {<<"syslog">>,{pkg,<<"syslog">>,<<"1.0.5">>},1},
  {<<"uuid">>,{pkg,<<"uuid_erl">>,<<"1.7.2">>},0}]}.
 [
 {pkg_hash,[
@@ -26,5 +23,6 @@
  {<<"poolboy">>, <<"6B46163901CFD0A1B43D692657ED9D7E599853B3B21B95AE5AE0A777CF9B6CA8">>},
  {<<"quickrand">>, <<"E856F3C69FEC00D1ACCA8E56CB452B650E838D3A9720811410F439121EFAFE59">>},
  {<<"ranch">>, <<"10272F95DA79340FA7E8774BA7930B901713D272905D0012B06CA6D994F8826B">>},
+ {<<"syslog">>, <<"26F26198D16C2F629E0E064B87B69700EF1A7225D5FBA9B0993CB9236B91317E">>},
  {<<"uuid">>, <<"D596C8DD01A4AE48B9D8D51832CCC8F8302BF67ACD01336AEC3FCFAE6B9D2BC2">>}]}
 ].
