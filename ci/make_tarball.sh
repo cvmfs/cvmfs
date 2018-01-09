@@ -20,9 +20,6 @@ mkdir -p $REBAR_CACHE_DIR
 echo "switching to $CVMFS_BUILD_LOCATION..."
 cd "$CVMFS_BUILD_LOCATION"
 rebar3 as prod compile
-cd _build/prod/lib/syslog
-./rebar compile
-cd -
 rebar3 as prod release,tar
 REPO_SERVICES_VERSION=$(grep -o "[0-9]\+\.[0-9]\+\.[0-9]\+" apps/cvmfs_services/src/cvmfs_services.app.src)
 TARBALL_NAME=cvmfs_services-${REPO_SERVICES_VERSION}-${CVMFS_BUILD_PLATFORM}-x86_64.tar.gz
