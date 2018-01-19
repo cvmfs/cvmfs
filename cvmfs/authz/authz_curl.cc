@@ -125,7 +125,7 @@ bool AuthzAttachment::ConfigureSciTokenCurl(
   std::string auth_header = auth_preamble + static_cast<char*>(tmp_token->data);
   list = curl_slist_append(list, auth_header.c_str());
   int retval = curl_easy_setopt(curl_handle, CURLOPT_HTTPHEADER, list);
-
+  
   if (retval != CURLE_OK) {
     LogCvmfs(kLogAuthz, kLogSyslogErr, "Failed to set Oauth2 Bearer Token");
     return false;
@@ -287,7 +287,6 @@ void AuthzAttachment::LogOpenSSLErrors(const char *top_message) {
 
 
 void AuthzAttachment::ReleaseCurlHandle(CURL *curl_handle, void *info_data) {
-
   assert(info_data);
 
   AuthzToken* token = static_cast<AuthzToken*>(info_data);
