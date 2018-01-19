@@ -7,8 +7,8 @@
 
 #include <string>
 
-#include "download.h"
 #include "authz.h"
+#include "download.h"
 
 class AuthzSessionManager;
 
@@ -27,7 +27,7 @@ class AuthzAttachment : public download::CredentialsAttachment {
  private:
   static void LogOpenSSLErrors(const char *top_message);
   static CURLcode CallbackSslCtx(CURL *curl, void *sslctx, void *parm);
-  static bool ConfigureSciTokenCurl(CURL *curl_handle,
+  bool ConfigureSciTokenCurl(CURL *curl_handle,
                                     const AuthzToken &token,
                                     void **info_data);
 
@@ -42,6 +42,12 @@ class AuthzAttachment : public download::CredentialsAttachment {
    * The required user group needs to be set on mount and remount by the client.
    */
   std::string membership_;
+
+  /**
+  * List of extra headers to put on the HTTP request.  This is required
+  * in order to add the "Authorization: Bearer XXXXX" header.
+  */ 
+  struct curl_slist *list;
 };
 
 #endif  // CVMFS_AUTHZ_AUTHZ_CURL_H_
