@@ -1,4 +1,5 @@
 2.5.0:
+  * Add support for diff snapshots based on root hash (CVM-1452)
   * Enable manual trigger to release nested catalogs in unsupervised memory
     cache plugin
   * Add new server parameter CVMFS_IGNORE_SPECIAL_FILES
