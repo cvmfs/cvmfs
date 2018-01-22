@@ -1,4 +1,6 @@
 2.5.0:
+  * Set default cache limit to 20G on macOS
+  * Fix statvfs for cache size >4G on macOS (CVM-1474)
   * Add support for diff snapshots based on root hash (CVM-1452)
   * Enable manual trigger to release nested catalogs in unsupervised memory
     cache plugin
