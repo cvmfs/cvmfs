@@ -1194,14 +1194,14 @@ static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
 
   if (capacity == (uint64_t)(-1)) {
     // Unknown capacity, set capacity = size
-    info.f_blocks = size;
+    info.f_blocks = size / info.f_bsize;
   } else {
     // Take values from LRU module
-    info.f_blocks = capacity;
+    info.f_blocks = capacity / info.f_bsize;
     available = capacity - size;
   }
 
-  info.f_bfree = info.f_bavail = available;
+  info.f_bfree = info.f_bavail = available / info.f_bsize;
 
   // Inodes / entries
   fuse_remounter_->fence()->Enter();
@@ -1211,9 +1211,6 @@ static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
   info.f_ffree = info.f_favail = all_inodes - loaded_inode;
   fuse_remounter_->fence()->Leave();
 
-  info.f_blocks /= info.f_bsize;
-  info.f_bfree /= info.f_bsize;
-  info.f_bavail /= info.f_bsize;
   fuse_reply_statfs(req, &info);
 }
 
