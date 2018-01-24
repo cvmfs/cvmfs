@@ -752,7 +752,7 @@ bool CommandMigrate::AbstractMigrationWorker<DerivedT>::CleanupNestedCatalogs(
  * both the catalog management and migration classes get updated.
  */
 const float    CommandMigrate::MigrationWorker_20x::kSchema         = 2.5;
-const unsigned CommandMigrate::MigrationWorker_20x::kSchemaRevision = 4;
+const unsigned CommandMigrate::MigrationWorker_20x::kSchemaRevision = 5;
 
 
 template<class DerivedT>
