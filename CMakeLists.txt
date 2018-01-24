@@ -18,8 +18,8 @@ message ("Running CMake version ${CMAKE_VERSION}")
 ## CVMFS_VERSION 2.5.0
 #---------------------
 set (CernVM-FS_VERSION_MAJOR 2)
-set (CernVM-FS_VERSION_MINOR 5)
-set (CernVM-FS_VERSION_PATCH 0)
+set (CernVM-FS_VERSION_MINOR 4)
+set (CernVM-FS_VERSION_PATCH 99)
 set (CernVM-FS_VERSION_STRING "${CernVM-FS_VERSION_MAJOR}.${CernVM-FS_VERSION_MINOR}.${CernVM-FS_VERSION_PATCH}")
 
 #
