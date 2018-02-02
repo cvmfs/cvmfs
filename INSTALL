@@ -1,8 +1,20 @@
 Installation Instructions
 =========================
 
-The CernVM-FS build system uses cmake.  In order to compile and
-install, run from the source directory
+The CernVM-FS build system uses cmake.  
+
+IN order to corerctly build the system several dependencies are necessary, in a 
+ubuntu based system you can get them using:
+
+ 	sudo apt-get install \ 
+		python-dev \
+		zlib1g-dev \
+		libssl-dev \
+		uuid-dev \
+		libfuse-dev \
+		libcap-dev 
+
+In order to compile and install, run from the source directory
 
     mkdir -p build
     cd build
