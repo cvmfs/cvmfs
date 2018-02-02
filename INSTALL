@@ -12,7 +12,20 @@ ubuntu based system you can get them using:
 		libssl-dev \
 		uuid-dev \
 		libfuse-dev \
-		libcap-dev 
+		libcap-dev \
+		libattr1-dev \
+		unzip
+
+On CentOS like system you can get them using
+
+	sudo yum install 
+		python-devel \
+		zlib-devel \
+		libattr-devel \
+		openssl-devel \
+		libuuid-devel
+		fuse-devel \
+		libcap-devel
 
 In order to compile and install, run from the source directory
 
