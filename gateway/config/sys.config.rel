@@ -14,7 +14,7 @@
                                        cvmfs_lease,
                                        cvmfs_receiver_pool,
                                        cvmfs_commit_sup]},
-                   {repo_config, {file, "./etc/repo.config"}},
-                   {user_config, {file, "./etc/user.config"}}]}
+                   {repo_config, {file, "./etc/repo.json"}},
+                   {user_config, {file, "./etc/user.json"}}]}
 ].
 
