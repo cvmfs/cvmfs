@@ -3,29 +3,12 @@ Installation Instructions
 
 The CernVM-FS build system uses cmake.  
 
-IN order to corerctly build the system several dependencies are necessary, in a 
-ubuntu based system you can get them using:
+In order to corerctly build the system several dependencies are necessary.
+The dependencies are listed inside the `packaging` directory.
 
- 	sudo apt-get install \ 
-		python-dev \
-		zlib1g-dev \
-		libssl-dev \
-		uuid-dev \
-		libfuse-dev \
-		libcap-dev \
-		libattr1-dev \
-		unzip
+For debian based system you can find the dependencies inside the `control` file under `packaging/debian/cvmfs`.
 
-On CentOS like system you can get them using
-
-	sudo yum install 
-		python-devel \
-		zlib-devel \
-		libattr-devel \
-		openssl-devel \
-		libuuid-devel
-		fuse-devel \
-		libcap-devel
+Similarly for CentOS you can find them inside `packagin/rpm/cvmfs-universal.spec`.
 
 In order to compile and install, run from the source directory
 
