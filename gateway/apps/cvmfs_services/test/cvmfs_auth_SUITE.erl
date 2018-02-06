@@ -73,7 +73,7 @@ end_per_testcase(_TestCase, _Config) ->
 list_repos(_Config) ->
     Repos1 = lists:sort(cvmfs_auth:get_repos()),
     #{ repos := TestRepos } = cvmfs_test_util:make_test_repo_config(),
-    Repos2 = lists:sort(lists:foldl(fun({N, _}, Acc) -> [N | Acc] end, [], TestRepos)),
+    Repos2 = lists:sort(lists:foldl(fun(#{domain := N}, Acc) -> [N | Acc] end, [], TestRepos)),
     Repos1 = Repos2.
 
 valid_key_valid_path(_Config) ->
