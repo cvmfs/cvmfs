@@ -87,15 +87,14 @@ init_per_suite(Config) ->
     application:ensure_all_started(mnesia),
 
     ok = application:load(cvmfs_services),
-    ok = ct:require(repos),
-    ok = ct:require(keys),
     ok = application:set_env(cvmfs_services, enabled_services, [cvmfs_auth,
                                                                 cvmfs_lease,
                                                                 cvmfs_be,
                                                                 cvmfs_receiver_pool,
                                                                 cvmfs_commit_sup]),
-    ok = application:set_env(cvmfs_services, repo_config, #{repos => ct:get_config(repos)
-                                                           ,keys => ct:get_config(keys)}),
+    ok = application:set_env(cvmfs_services, repo_config,
+                             cvmfs_test_util:make_test_repo_config()),
+
 
     MaxLeaseTime = 1, % seconds
     TestUserVars = cvmfs_test_util:make_test_user_vars(MaxLeaseTime),

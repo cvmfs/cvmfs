@@ -21,20 +21,24 @@ start(_StartType, _StartArgs) ->
 
     UserVars = read_vars(user_config,
                          #{max_lease_time => 7200,
-                           fe_tcp_port => 8080, 
-                           receiver_config => [{size, 1}, {max_overflow, 1}],
-                           receiver_worker_config => [{executable_path, "/usr/bin/cvmfs_receiver"}]}),
+                           fe_tcp_port => 8080,
+                           receiver_config => #{size => 1,
+                                                max_overflow => 1},
+                           receiver_worker_config =>
+                               #{executable_path => "/usr/bin/cvmfs_receiver"}}),
 
-    application:set_env(cvmfs_services, max_lease_time, maps:get(max_lease_time, UserVars) * 1000),
+    application:set_env(cvmfs_services, max_lease_time,
+                        maps:get(max_lease_time, UserVars) * 1000),
 
     ReceiverPoolConfig1 = maps:get(receiver_config, UserVars),
-    ReceiverPoolConfig2 = case lists:keyfind(worker_module, 1, ReceiverPoolConfig1) of
-                              false ->
-                                  [{worker_module, cvmfs_receiver} | ReceiverPoolConfig1];
-                              _ ->
-                                  ReceiverPoolConfig1
-                          end,
-    ReceiverWorkerConfig = maps:from_list(maps:get(receiver_worker_config, UserVars)),
+    ReceiverPoolConfig2 = maps:to_list(
+                            case maps:is_key(worker_module, ReceiverPoolConfig1) of
+                                false ->
+                                    maps:put(worker_module, cvmfs_receiver, ReceiverPoolConfig1);
+                                true ->
+                                    ReceiverPoolConfig1
+                            end),
+    ReceiverWorkerConfig = maps:get(receiver_worker_config, UserVars),
 
     {ok, Services} = application:get_env(enabled_services),
 
@@ -65,8 +69,12 @@ stop(_State) ->
 read_vars(VarName, Defaults) ->
     case application:get_env(VarName) of
         {ok, {file, ConfigFile}} ->
-            {ok, VarList} = file:consult(ConfigFile),
-            maps:from_list(VarList);
+            case file:read_file(ConfigFile) of
+                {ok, Data} ->
+                    jsx:decode(Data, [{labels, atom}, return_maps]);
+                {error, Reason} ->
+                    {error, Reason}
+            end;
         {ok, ConfigMap} ->
             ConfigMap;
         undefined ->

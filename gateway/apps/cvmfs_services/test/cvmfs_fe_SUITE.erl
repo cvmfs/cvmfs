@@ -54,19 +54,16 @@ init_per_suite(Config) ->
     application:load(mnesia),
     application:set_env(mnesia, schema_location, ram),
     application:ensure_all_started(mnesia),
-
     application:ensure_all_started(gun),
 
     ok = application:load(cvmfs_services),
-    ok = ct:require(repos),
-    ok = ct:require(keys),
     ok = application:set_env(cvmfs_services, enabled_services, [cvmfs_auth,
                                                                 cvmfs_lease,
                                                                 cvmfs_be,
                                                                 cvmfs_fe,
                                                                 cvmfs_receiver_pool]),
-    ok = application:set_env(cvmfs_services, repo_config, #{repos => ct:get_config(repos)
-                                                           ,keys => ct:get_config(keys)}),
+    ok = application:set_env(cvmfs_services, repo_config,
+                             cvmfs_test_util:make_test_repo_config()),
 
     MaxLeaseTime = 1, % second
     TestUserVars = cvmfs_test_util:make_test_user_vars(MaxLeaseTime),
@@ -75,7 +72,8 @@ init_per_suite(Config) ->
 
     {ok, _} = application:ensure_all_started(cvmfs_services),
 
-    [{max_lease_time, MaxLeaseTime}, {keys, ct:get_config(keys)}] ++ Config.
+    #{keys := Keys} = cvmfs_test_util:make_test_repo_config(),
+    [{max_lease_time, MaxLeaseTime}, {keys, Keys}] ++ Config.
 
 end_per_suite(_Config) ->
     application:stop(cvmfs_services),
@@ -117,12 +115,12 @@ check_leases(Config) ->
 create_and_delete_session(Config) ->
     RequestBody = jsx:encode(#{<<"path">> => <<"repo1.domain1.org">>,
                                <<"api_version">> => integer_to_binary(cvmfs_fe:api_version())}),
-    HMAC = p_make_hmac(RequestBody, Config),
+    HMAC = p_make_hmac(RequestBody),
     RequestHeaders = p_make_headers(RequestBody, <<"key1">>, HMAC),
     {ok, ReplyBody1} = p_post(conn_pid(Config), ?API_ROOT ++ "/leases", RequestHeaders, RequestBody),
     #{<<"session_token">> := Token} = jsx:decode(ReplyBody1, [return_maps]),
 
-    HMAC2 = p_make_hmac(Token, Config),
+    HMAC2 = p_make_hmac(Token),
     RequestHeaders2 = p_make_headers(<<"key1">>, HMAC2),
     {ok, ReplyBody2} = p_delete(conn_pid(Config), ?API_ROOT ++ "/leases/" ++ binary_to_list(Token),
                                 RequestHeaders2),
@@ -137,7 +135,7 @@ create_invalid_leases(Config) ->
     Check = fun({KeyId, Path, Reason}) ->
                     RequestBody = jsx:encode(#{<<"path">> => Path,
                                                <<"api_version">> => integer_to_binary(cvmfs_fe:api_version())}),
-                    HMAC = p_make_hmac(RequestBody, Config),
+                    HMAC = p_make_hmac(RequestBody),
                     RequestHeaders = p_make_headers(RequestBody, KeyId, HMAC),
                     {ok, ReplyBody} = p_post(conn_pid(Config), ?API_ROOT ++ "/leases", RequestHeaders, RequestBody),
                     #{<<"status">> := <<"error">>,
@@ -150,7 +148,7 @@ create_session_when_already_created(Config) ->
     % Create new lease
     RequestBody = jsx:encode(#{<<"path">> => <<"repo1.domain1.org">>,
                                <<"api_version">> => integer_to_binary(cvmfs_fe:api_version())}),
-    HMAC = p_make_hmac(RequestBody, Config),
+    HMAC = p_make_hmac(RequestBody),
     RequestHeaders = p_make_headers(RequestBody, <<"key1">>, HMAC),
     {ok, ReplyBody1} = p_post(conn_pid(Config), ?API_ROOT ++ "/leases", RequestHeaders, RequestBody),
     #{<<"session_token">> := Token} = jsx:decode(ReplyBody1, [return_maps]),
@@ -160,7 +158,7 @@ create_session_when_already_created(Config) ->
     #{<<"status">> := <<"path_busy">>} = jsx:decode(ReplyBody2, [return_maps]),
 
     % End lease
-    HMAC3 = p_make_hmac(Token, Config),
+    HMAC3 = p_make_hmac(Token),
     RequestHeaders3 = p_make_headers(<<"key1">>, HMAC3),
     {ok, ReplyBody3} = p_delete(conn_pid(Config), ?API_ROOT ++ "/leases/" ++ binary_to_list(Token),
                                RequestHeaders3),
@@ -169,7 +167,7 @@ create_session_when_already_created(Config) ->
 
 end_invalid_session(Config) ->
     Token = <<"NOT_A_PROPER_SESSION_TOKEN">>,
-    HMAC = p_make_hmac(Token, Config),
+    HMAC = p_make_hmac(Token),
     RequestHeaders = p_make_headers(<<"key1">>, HMAC),
     {ok, Body} = p_delete(conn_pid(Config), ?API_ROOT ++ "/leases/" ++ binary_to_list(Token), RequestHeaders),
     #{<<"status">> := <<"error">>,
@@ -180,7 +178,7 @@ normal_payload_submission(Config) ->
     % Create new lease
     RequestBody1 = jsx:encode(#{<<"path">> => <<"repo1.domain1.org">>,
                                 <<"api_version">> => integer_to_binary(cvmfs_fe:api_version())}),
-    HMAC1 = p_make_hmac(RequestBody1, Config),
+    HMAC1 = p_make_hmac(RequestBody1),
     RequestHeaders1 = p_make_headers(RequestBody1, <<"key1">>, HMAC1),
     {ok, ReplyBody1} = p_post(conn_pid(Config), ?API_ROOT ++ "/leases", RequestHeaders1, RequestBody1),
     #{<<"session_token">> := Token} = jsx:decode(ReplyBody1, [return_maps]),
@@ -194,13 +192,13 @@ normal_payload_submission(Config) ->
                                <<"api_version">> => integer_to_binary(cvmfs_fe:api_version())}),
     RequestBody2 = <<JSONMessage/binary,Payload/binary>>,
     MessageSize = size(JSONMessage),
-    MessageHMAC = p_make_hmac(JSONMessage, Config),
+    MessageHMAC = p_make_hmac(JSONMessage),
     RequestHeaders2 = p_make_headers(RequestBody2, <<"key1">>, MessageHMAC, MessageSize),
     {ok, ReplyBody2} = p_post(conn_pid(Config), ?API_ROOT ++ "/payloads", RequestHeaders2, RequestBody2),
     #{<<"status">> := <<"ok">>} = jsx:decode(ReplyBody2, [return_maps]),
 
     % End lease
-    HMAC3 = p_make_hmac(Token, Config),
+    HMAC3 = p_make_hmac(Token),
     RequestHeaders3 = p_make_headers(<<"key1">>, HMAC3),
     {ok, ReplyBody3} = p_delete(conn_pid(Config), ?API_ROOT ++ "/leases/" ++ binary_to_list(Token),
                                RequestHeaders3),
@@ -211,7 +209,7 @@ payload_submission_with_invalid_hmac(Config) ->
     % Create new lease
     RequestBody1 = jsx:encode(#{<<"path">> => <<"repo1.domain1.org">>,
                                 <<"api_version">> => integer_to_binary(cvmfs_fe:api_version())}),
-    HMAC1 = p_make_hmac(RequestBody1, Config),
+    HMAC1 = p_make_hmac(RequestBody1),
     RequestHeaders1 = p_make_headers(RequestBody1, <<"key1">>, HMAC1),
     {ok, ReplyBody1} = p_post(conn_pid(Config), ?API_ROOT ++ "/leases", RequestHeaders1, RequestBody1),
     #{<<"session_token">> := Token} = jsx:decode(ReplyBody1, [return_maps]),
@@ -225,14 +223,14 @@ payload_submission_with_invalid_hmac(Config) ->
                               ,<<"api_version">> => integer_to_binary(cvmfs_fe:api_version())}),
     RequestBody2 = <<JSONMessage/binary,Payload/binary>>,
     MessageSize = size(JSONMessage),
-    MessageHMAC = p_make_hmac(<<"SOME_RUBBISH">>, Config),
+    MessageHMAC = p_make_hmac(<<"SOME_RUBBISH">>),
     RequestHeaders2 = p_make_headers(RequestBody2, <<"key1">>, MessageHMAC, MessageSize),
     {ok, ReplyBody2} = p_post(conn_pid(Config), ?API_ROOT ++ "/payloads", RequestHeaders2, RequestBody2),
     #{<<"status">> := <<"error">>,
       <<"reason">> := <<"invalid_hmac">>} = jsx:decode(ReplyBody2, [return_maps]),
 
     % End lease
-    HMAC3 = p_make_hmac(Token, Config),
+    HMAC3 = p_make_hmac(Token),
     RequestHeaders3 = p_make_headers(<<"key1">>, HMAC3),
     {ok, ReplyBody3} = p_delete(conn_pid(Config), ?API_ROOT ++ "/leases/" ++ binary_to_list(Token),
                                RequestHeaders3),
@@ -273,8 +271,9 @@ p_delete(ConnPid, Path, Headers) ->
     p_wait(ConnPid, gun:delete(ConnPid, Path, Headers)).
 
 
-p_make_hmac(Body, Config) ->
-    {_, _, Secret, _} = lists:keyfind(<<"key1">>, 2, ?config(keys, Config)),
+p_make_hmac(Body) ->
+    #{ keys := Keys } = cvmfs_test_util:make_test_repo_config(),
+    [#{secret := Secret} | _] = lists:filter(fun(#{id := Id}) -> Id == <<"key1">> end, Keys),
     cvmfs_auth_util:compute_hmac(Secret, Body).
 
 
