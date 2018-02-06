@@ -2400,9 +2400,22 @@ set_up_repository_services() {
     popd
 
     echo "  Writing configuration files"
-    sudo bash -c 'cat <<EOF > /opt/cvmfs_services/etc/repo.config
-{repos, [{<<"test.repo.org">>, [<<"key1">>]}]}.
-{keys, [{file, <<"/etc/cvmfs/keys/test.repo.org.gw">>, <<"/">>}]}.
+    sudo bash -c 'cat <<EOF > /opt/cvmfs_services/etc/repo.json
+{
+    "repos" : [
+        {
+            "domain" : "test.repo.org",
+            "keys" : ["key1"]
+        }
+    ],
+    "keys" : [
+        {
+            "type" : "file",
+            "file_name" : "/etc/cvmfs/keys/test.repo.org.gw",
+            "repo_subpath" : "/"
+        }
+    ]
+}
 EOF'
 
     echo "  Writing API key file"
