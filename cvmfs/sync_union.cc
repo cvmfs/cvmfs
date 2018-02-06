@@ -5,9 +5,8 @@
 #define __STDC_FORMAT_MACROS
 
 #include "sync_union.h"
-#include "sync_mediator.h"
 
-using namespace std;  // NOLINT
+#include "sync_mediator.h"
 
 namespace publish {
 

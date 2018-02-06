@@ -4,13 +4,13 @@
 
 #define __STDC_FORMAT_MACROS
 
-#include "sync_union_aufs.h"
+#include <string>
+
 #include "sync_union.h"
+#include "sync_union_aufs.h"
 
 #include "fs_traversal.h"
 #include "sync_mediator.h"
-
-using namespace std;
 
 namespace publish {
 
@@ -72,4 +72,4 @@ bool SyncUnionAufs::IgnoreFilePredicate(const string &parent_dir,
   return SyncUnion::IgnoreFilePredicate(parent_dir, filename) ||
          (ignore_filenames_.find(filename) != ignore_filenames_.end());
 }
-}
+}  // namespace publish

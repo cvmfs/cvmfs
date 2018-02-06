@@ -11,6 +11,9 @@
 
 #include "sync_union.h"
 
+#include <set>
+#include <string>
+
 namespace publish {
 
 /**
@@ -51,6 +54,6 @@ class SyncUnionOverlayfs : public SyncUnion {
   std::set<std::string> hardlink_lower_files_;
   uint64_t hardlink_lower_inode_;
 };  // class SyncUnionOverlayfs
-}
+}  // namespace publish
 
 #endif  // CVMFS_SYNC_UNION_OVERLAYFS_H_

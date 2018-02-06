@@ -4,15 +4,15 @@
 
 #define __STDC_FORMAT_MACROS
 
-#include "sync_union_overlayfs.h"
 #include "sync_union.h"
+#include "sync_union_overlayfs.h"
 
 #include <sys/capability.h>
+#include <string>
+#include <vector>
 
 #include "fs_traversal.h"
 #include "sync_mediator.h"
-
-using namespace std;
 
 namespace publish {
 
@@ -277,4 +277,4 @@ bool SyncUnionOverlayfs::IsOpaqueDirPath(const string &path) const {
 string SyncUnionOverlayfs::UnwindWhiteoutFilename(const SyncItem &entry) const {
   return entry.filename();
 }
-}
+}  // namespace publish

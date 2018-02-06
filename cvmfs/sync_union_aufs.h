@@ -11,6 +11,9 @@
 
 #include "sync_union.h"
 
+#include <set>
+#include <string>
+
 namespace publish {
 /**
  * Syncing a cvmfs repository by the help of an overlayed AUFS
@@ -35,5 +38,5 @@ class SyncUnionAufs : public SyncUnion {
   std::set<std::string> ignore_filenames_;
   std::string whiteout_prefix_;
 };  // class SyncUnionAufs
-}
+}  // namespace publish
 #endif  // CVMFS_SYNC_UNION_AUFS_H_

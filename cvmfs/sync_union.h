@@ -31,10 +31,9 @@
 #define CVMFS_SYNC_UNION_H_
 
 #include <set>
+#include <string>
 
 #include "sync_item.h"
-
-using namespace std;
 
 namespace publish {
 
