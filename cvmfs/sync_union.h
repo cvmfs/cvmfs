@@ -30,13 +30,11 @@
 #ifndef CVMFS_SYNC_UNION_H_
 #define CVMFS_SYNC_UNION_H_
 
-#include <inttypes.h>
-
 #include <set>
-#include <string>
 
-#include "path_filters/dirtab.h"
 #include "sync_item.h"
+
+using namespace std;
 
 namespace publish {
 
@@ -56,10 +54,8 @@ class SyncUnion {
    * @param mediator a reference to a SyncMediator object used as bridge to
    *        the actual sync process
    */
-  SyncUnion(SyncMediator *mediator,
-            const std::string &rdonly_path,
-            const std::string &union_path,
-            const std::string &scratch_path);
+  SyncUnion(SyncMediator *mediator, const std::string &rdonly_path,
+            const std::string &union_path, const std::string &scratch_path);
   virtual ~SyncUnion() {}
 
   /**
@@ -83,9 +79,9 @@ class SyncUnion {
    * @param entry_type            type of the item in the union directory
    * @return                      a SyncItem object wrapping the dirent
    */
-  SyncItem CreateSyncItem(const std::string  &relative_parent_path,
-                          const std::string  &filename,
-                          const SyncItemType  entry_type) const;
+  SyncItem CreateSyncItem(const std::string &relative_parent_path,
+                          const std::string &filename,
+                          const SyncItemType entry_type) const;
 
   inline std::string rdonly_path() const { return rdonly_path_; }
   inline std::string union_path() const { return union_path_; }
@@ -183,7 +179,6 @@ class SyncUnion {
   virtual void EnterDirectory(const std::string &parent_dir,
                               const std::string &dir_name);
 
-
   /**
    * Called before the file system traversal leaves a processed directory.
    * @param parent_dir the relative directory path.
@@ -214,7 +209,6 @@ class SyncUnion {
    */
   void ProcessFifo(const std::string &parent_dir, const std::string &filename);
 
-
   /**
    * Callback when a unix domain socket is found.
    * @param parent_dir the relative directory path
@@ -232,74 +226,6 @@ class SyncUnion {
  private:
   bool initialized_;
 };  // class SyncUnion
-
-
-/**
- * Syncing a cvmfs repository by the help of an overlayed AUFS
- * read-write volume.
- */
-class SyncUnionAufs : public SyncUnion {
- public:
-  SyncUnionAufs(SyncMediator *mediator,
-                const std::string &rdonly_path,
-                const std::string &union_path,
-                const std::string &scratch_path);
-
-  void Traverse();
-  bool SupportsHardlinks() const { return true; }
-
- protected:
-  bool IsWhiteoutEntry(const SyncItem &entry) const;
-  bool IsOpaqueDirectory(const SyncItem &directory) const;
-  bool IgnoreFilePredicate(const std::string &parent_dir,
-                           const std::string &filename);
-  std::string UnwindWhiteoutFilename(const SyncItem &entry) const;
-
- private:
-  std::set<std::string> ignore_filenames_;
-  std::string whiteout_prefix_;
-};  // class SyncUnionAufs
-
-
-/**
- * Syncing a cvmfs repository by the help of an overlayed overlayfs
- * read-write volume.
- */
-class SyncUnionOverlayfs : public SyncUnion {
- public:
-  SyncUnionOverlayfs(SyncMediator *mediator,
-                     const std::string &rdonly_path,
-                     const std::string &union_path,
-                     const std::string &scratch_path);
-
-  bool Initialize();
-
-  void Traverse();
-  static bool ReadlinkEquals(std::string const &path,
-                             std::string const &compare_value);
-  static bool HasXattr(std::string const &path, std::string const &attr_name);
-
- protected:
-  void PreprocessSyncItem(SyncItem *entry) const;
-
-  bool IsWhiteoutEntry(const SyncItem &entry) const;
-  bool IsOpaqueDirectory(const SyncItem &directory) const;
-  bool IsWhiteoutSymlinkPath(const std::string &path) const;
-
-  std::string UnwindWhiteoutFilename(const SyncItem &entry) const;
-  std::set<std::string> GetIgnoreFilenames() const;
-
-  void CheckForBrokenHardlink(const SyncItem &entry) const;
-  void MaskFileHardlinks(SyncItem *entry) const;
-
-  bool ObtainSysAdminCapability() const;
-
- private:
-  bool IsOpaqueDirPath(const std::string &path) const;
-
-  std::set<std::string> hardlink_lower_files_;
-  uint64_t hardlink_lower_inode_;
-};  // class SyncUnionOverlayfs
 
 }  // namespace publish
 
