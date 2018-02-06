@@ -334,7 +334,7 @@ p_check_hmac(Message, KeyId, HMAC) ->
     end.
 
 
--spec p_populate_keys(Keys :: [{KeyId :: binary, Secret :: binary()}]) -> boolean().
+-spec p_populate_keys(Keys :: [#{binary() := binary()}]) -> boolean().
 p_populate_keys(Keys) ->
     T = fun() ->
                 lists:foreach(fun(KeyDesc) ->
@@ -342,16 +342,17 @@ p_populate_keys(Keys) ->
                                        KeyId,
                                        Secret,
                                        Path} = case KeyDesc of
-                                                     {file, FileName, P} when is_binary(FileName);
-                                                                              is_list(FileName) ->
+                                                   #{type := <<"file">>,
+                                                     file_name := FileName,
+                                                     repo_subpath := SubPath} ->
                                                        {T, I, S} = p_parse_key_file(FileName),
-                                                       {T, I, S, P};
-                                                     {Type, Id, Val, P} when is_binary(Type),
-                                                                                is_binary(Id),
-                                                                                is_binary(Val),
-                                                                                is_binary(P) ->
-                                                         {Type, Id, Val, P}
-                                                 end,
+                                                       {T, I, S, SubPath};
+                                                   #{type := <<"plain_text">>,
+                                                     id := Id,
+                                                     secret := Sec,
+                                                     repo_subpath := SubPath} ->
+                                                       {<<"plain_text">>, Id, Sec, SubPath}
+                                               end,
                                       case KeyType of
                                           <<"plain_text">> ->
                                               mnesia:write(#key{key_id = KeyId, secret = Secret, path = Path});
@@ -367,11 +368,13 @@ p_populate_keys(Keys) ->
     Result.
 
 
--spec p_populate_repos(RepoList :: [{Repo :: binary(), Fqdn :: binary()}]) -> boolean().
+-spec p_populate_repos(RepoList :: #{binary() => [binary()]}) -> boolean().
 p_populate_repos(RepoList) ->
     T = fun() ->
                 lists:all(fun(V) -> V =:= ok end,
-                          [mnesia:write(#repo{name = Repo, key_ids = KeyIds}) || {Repo, KeyIds} <- RepoList])
+                          [mnesia:write(
+                             #repo{name = Repo, key_ids = KeyIds}) || #{domain := Repo,
+                                                                        keys := KeyIds} <- RepoList])
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.

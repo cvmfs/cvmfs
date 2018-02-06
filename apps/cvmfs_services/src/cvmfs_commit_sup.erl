@@ -26,7 +26,7 @@
 
 start_link(Repos) ->
     Sup = supervisor:start_link({local, ?MODULE}, ?MODULE, []),
-    lists:foreach(fun({RepoName, _RepoKeys}) -> add_worker(RepoName) end,
+    lists:foreach(fun(#{domain := RepoName}) -> add_worker(RepoName) end,
                   Repos),
     Sup.
 

@@ -49,11 +49,9 @@ init_per_suite(Config) ->
     application:ensure_all_started(mnesia),
 
     ok = application:load(cvmfs_services),
-    ok = ct:require(repos),
-    ok = ct:require(keys),
     ok = application:set_env(cvmfs_services, enabled_services, [cvmfs_auth]),
-    ok = application:set_env(cvmfs_services, repo_config, #{repos => ct:get_config(repos)
-                                                           ,keys => ct:get_config(keys)}),
+    ok = application:set_env(cvmfs_services, repo_config,
+                             cvmfs_test_util:make_test_repo_config()),
     {ok, _} = application:ensure_all_started(cvmfs_services),
     Config.
 
@@ -74,7 +72,8 @@ end_per_testcase(_TestCase, _Config) ->
 
 list_repos(_Config) ->
     Repos1 = lists:sort(cvmfs_auth:get_repos()),
-    Repos2 = lists:sort(lists:foldl(fun({N, _}, Acc) -> [N | Acc] end, [], ct:get_config(repos))),
+    #{ repos := TestRepos } = cvmfs_test_util:make_test_repo_config(),
+    Repos2 = lists:sort(lists:foldl(fun(#{domain := N}, Acc) -> [N | Acc] end, [], TestRepos)),
     Repos1 = Repos2.
 
 valid_key_valid_path(_Config) ->
