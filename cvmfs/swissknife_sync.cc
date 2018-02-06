@@ -45,6 +45,8 @@
 #include "sanitizer.h"
 #include "sync_mediator.h"
 #include "sync_union.h"
+#include "sync_union_aufs.h"
+#include "sync_union_overlayfs.h"
 #include "util/string.h"
 
 using namespace std;  // NOLINT
@@ -485,7 +487,6 @@ bool swissknife::CommandSync::ReadFileChunkingArgs(
   return true;
 }
 
-
 bool swissknife::CommandSync::ObtainDacReadSearchCapability() {
   cap_value_t cap = CAP_DAC_READ_SEARCH;
 #ifdef CAP_IS_SUPPORTED
@@ -496,8 +497,7 @@ bool swissknife::CommandSync::ObtainDacReadSearchCapability() {
   assert(caps_proc != NULL);
 
   cap_flag_value_t cap_state;
-  int retval =
-    cap_get_flag(caps_proc, cap, CAP_EFFECTIVE, &cap_state);
+  int retval = cap_get_flag(caps_proc, cap, CAP_EFFECTIVE, &cap_state);
   assert(retval == 0);
 
   if (cap_state == CAP_SET) {
@@ -524,7 +524,8 @@ bool swissknife::CommandSync::ObtainDacReadSearchCapability() {
   if (retval != 0) {
     LogCvmfs(kLogCvmfs, kLogStderr,
              "Cannot reset capabilities for current process "
-             "(errno: %d)", errno);
+             "(errno: %d)",
+             errno);
     return false;
   }
 
@@ -678,16 +679,10 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 
   // Start spooler
   upload::SpoolerDefinition spooler_definition(
-      params.spooler_definition,
-      hash_algorithm,
-      params.compression_alg,
-      params.generate_legacy_bulk_chunks,
-      params.use_file_chunking,
-      params.min_file_chunk_size,
-      params.avg_file_chunk_size,
-      params.max_file_chunk_size,
-      params.session_token_file,
-      params.key_file);
+      params.spooler_definition, hash_algorithm, params.compression_alg,
+      params.generate_legacy_bulk_chunks, params.use_file_chunking,
+      params.min_file_chunk_size, params.avg_file_chunk_size,
+      params.max_file_chunk_size, params.session_token_file, params.key_file);
   if (params.max_concurrent_write_jobs > 0) {
     spooler_definition.number_of_concurrent_uploads =
         params.max_concurrent_write_jobs;
@@ -712,12 +707,15 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     return 3;
   }
 
-  bool with_gateway = spooler_definition.driver_type
-      == upload::SpoolerDefinition::Gateway;
+  bool with_gateway =
+      spooler_definition.driver_type == upload::SpoolerDefinition::Gateway;
   /*
-   * Note: If the upstream is of type gateway, due to the possibility of concurrent
-   *       release managers, it's possible to have a different local and remote root
-   *       hashes. We proceed by loading the remote manifest but we give an empty base
+   * Note: If the upstream is of type gateway, due to the possibility of
+   * concurrent
+   *       release managers, it's possible to have a different local and remote
+   * root
+   *       hashes. We proceed by loading the remote manifest but we give an
+   * empty base
    *       hash.
    */
   UniquePtr<manifest::Manifest> manifest;
@@ -730,8 +728,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     params.base_hash = manifest->catalog_hash();
   } else {
     if (with_gateway) {
-      manifest = FetchRemoteManifest(params.stratum0, params.repo_name,
-                                     shash::Any());
+      manifest =
+          FetchRemoteManifest(params.stratum0, params.repo_name, shash::Any());
     } else {
       manifest = FetchRemoteManifest(params.stratum0, params.repo_name,
                                      params.base_hash);
@@ -754,10 +752,9 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 
   // Should be before the syncronization starts to avoid race of GetTTL with
   // other sqlite operations
-  if ( (params.ttl_seconds > 0) &&
-       ((params.ttl_seconds != catalog_manager.GetTTL())
-        || !catalog_manager.HasExplicitTTL()) )
-  {
+  if ((params.ttl_seconds > 0) &&
+      ((params.ttl_seconds != catalog_manager.GetTTL()) ||
+       !catalog_manager.HasExplicitTTL())) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Setting repository TTL to %" PRIu64 "s",
              params.ttl_seconds);
     catalog_manager.SetTTL(params.ttl_seconds);
