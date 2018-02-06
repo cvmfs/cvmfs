@@ -72,7 +72,8 @@ init_per_suite(Config) ->
 
     {ok, _} = application:ensure_all_started(cvmfs_services),
 
-    [{max_lease_time, MaxLeaseTime}, {keys, ct:get_config(keys)}] ++ Config.
+    #{keys := Keys} = cvmfs_test_util:make_test_repo_config(),
+    [{max_lease_time, MaxLeaseTime}, {keys, Keys}] ++ Config.
 
 end_per_suite(_Config) ->
     application:stop(cvmfs_services),
@@ -272,7 +273,7 @@ p_delete(ConnPid, Path, Headers) ->
 
 p_make_hmac(Body) ->
     #{ keys := Keys } = cvmfs_test_util:make_test_repo_config(),
-    {_, _, Secret, _} = lists:keyfind(<<"key1">>, 2, Keys),
+    [#{secret := Secret} | _] = lists:filter(fun(#{id := Id}) -> Id == <<"key1">> end, Keys),
     cvmfs_auth_util:compute_hmac(Secret, Body).
 
 
