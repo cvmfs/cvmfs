@@ -68,11 +68,11 @@ bool SyncUnionTarball::Initialize() {
              "Impossible to chdir into the original dir. (errno %d)", errno);
   }
 
-  return result;
+  return result && SyncUnion::Initialize();
 }
 
 bool SyncUnionTarball::untarPath(const std::string &tarball_path) {
-  // struct archive *src;  // source of the archive
+  struct archive *src;  // source of the archive
   struct archive *dst;  // destination for the untar
   struct archive_entry *entry;
   int result;
@@ -86,7 +86,7 @@ bool SyncUnionTarball::untarPath(const std::string &tarball_path) {
   flags |= ARCHIVE_EXTRACT_MAC_METADATA;
   flags |= ARCHIVE_EXTRACT_SECURE_NOABSOLUTEPATHS;
 
-  struct archive *src = archive_read_new();
+  src = archive_read_new();
   assert(src);
 
   dst = archive_write_disk_new();
@@ -189,5 +189,18 @@ int SyncUnionTarball::copy_data(struct archive *src, struct archive *dst) {
 }
 
 void SyncUnionTarball::Traverse() {}
+
+std::string SyncUnionTarball::UnwindWhiteoutFilename(
+    const SyncItem &entry) const {
+  return entry.filename();
+}
+
+bool SyncUnionTarball::IsOpaqueDirectory(const SyncItem &directory) const {
+  return false;
+}
+
+bool SyncUnionTarball::IsWhiteoutEntry(const SyncItem &entry) const {
+  return false;
+}
 
 }  // namespace publish

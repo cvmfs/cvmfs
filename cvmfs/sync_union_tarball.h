@@ -40,6 +40,10 @@ class SyncUnionTarball : public SyncUnion {
    */
   void Traverse();
 
+  std::string UnwindWhiteoutFilename(const SyncItem &entry) const;
+  bool IsOpaqueDirectory(const SyncItem &directory) const;
+  bool IsWhiteoutEntry(const SyncItem &entry) const;
+
  private:
   const std::string tarball_path_;
   const std::string base_directory_;
