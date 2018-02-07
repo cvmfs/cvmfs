@@ -244,6 +244,8 @@ set (CVMFS_SWISSKNIFE_SOURCES
   sync_item.cc
   sync_mediator.cc
   sync_union.cc
+  sync_union_overlayfs.cc
+  sync_union_aufs.cc
   upload.cc
   upload_facility.cc
   upload_gateway.cc
