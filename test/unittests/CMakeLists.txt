@@ -102,6 +102,7 @@ set(CVMFS_UNITTEST_FILES
   t_statistics.cc
   t_swissknife_lease.cc
   t_synchronizing_counter.cc
+  t_sync_union_tarball.cc
   t_raii_temp_dir.cc
   t_test_utils.cc
   t_tracer.cc
@@ -220,6 +221,10 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/swissknife_history.cc
   ${CVMFS_SOURCE_DIR}/swissknife_lease_json.cc
   ${CVMFS_SOURCE_DIR}/swissknife_lease_curl.cc
+  ${CVMFS_SOURCE_DIR}/sync_union.cc
+  ${CVMFS_SOURCE_DIR}/sync_mediator.cc
+  ${CVMFS_SOURCE_DIR}/sync_item.cc
+  ${CVMFS_SOURCE_DIR}/sync_union_tarball.cc
   ${CVMFS_SOURCE_DIR}/tracer.cc
   ${CVMFS_SOURCE_DIR}/upload.cc
   ${CVMFS_SOURCE_DIR}/upload_facility.cc
@@ -340,7 +345,7 @@ set (UNITTEST_LINK_LIBRARIES ${GTEST_LIBRARIES} ${OPENSSL_LIBRARIES} ${CURL_LIBR
                              ${SQLITE3_LIBRARY} ${ZLIB_LIBRARIES} ${RT_LIBRARY}
                              ${UUID_LIBRARIES} ${PACPARSER_LIBRARIES}
                              ${SHA3_LIBRARIES} ${VJSON_LIBRARIES}
-                             ${PROTOBUF_LITE_LIBRARY} pthread dl)
+                             ${PROTOBUF_LITE_LIBRARY} ${LibArchive_LIBRARIES} pthread dl)
 
 target_link_libraries (${PROJECT_TEST_NAME} ${UNITTEST_LINK_LIBRARIES})
 
