@@ -5,29 +5,189 @@
 #define __STDC_FORMAT_MACROS
 
 #include "sync_union.h"
-#include "sync_union_overlayfs.h"
+#include "sync_union_tarball.h"
 
 #include <set>
 #include <string>
+
+#include <archive.h>
+
+#include <util/posix.h>
+
+#include "sync_mediator.h"
 
 namespace publish {
 /*
  * Still have to underastand how the madiator, scratch, read and union path
  * works together.
  */
-SyncUnionTarball::SlyncUnionTarball(SyncMediator *mediator,
-                                    const std::string &tarball_path,
-                                    const std::string &base_directory)
-    : tarball_path_(tarball_path), base_directory_(base_directory) {}
+SyncUnionTarball::SyncUnionTarball(SyncMediator *mediator,
+                                   const std::string &rdonly_path,
+                                   const std::string &union_path,
+                                   const std::string &scratch_path,
+                                   const std::string &tarball_path,
+                                   const std::string &base_directory)
+    : SyncUnion(mediator, rdonly_path, union_path, scratch_path),
+      tarball_path_(tarball_path),
+      base_directory_(base_directory){};
 
 /*
  * We traferse the tar and then we keep track (the path inside a set) of each
  * .tar we find, then we go back and repeat the procedure. Should we be worry by
  * tar-bombs? Maybe, we will think about it later.
  */
-bool SyncUnionTarball::Initialize() {}
+bool SyncUnionTarball::Initialize() {
+  bool result;
 
-std::set<std::string> untarPath(const std::string &tarball_path,
-                                const std::string &base_directory);
+  // We save the current working directory
+  std::string cwd = GetCurrentWorkingDirectory();
+  // Save the absolute path of the tarball
+  std::string tarball_absolute_path = GetAbsolutePath(tarball_path_);
+  // Create the actuall temp directory
+  std::string working_dir = CreateTempDir(base_directory_);
+  if (working_dir == "") {
+    LogCvmfs(kLogUnionFs, kLogStderr,
+             "Impossible to create the destination directory. (errno %d)",
+             errno);
+    return false;
+  }
+  // Move into the directory just created, from now on we need to go back to the
+  // previous working directory before to exit
+  if (chdir(working_dir.c_str()) != 0) {
+    LogCvmfs(kLogUnionFs, kLogStderr,
+             "Impossible to chdir into the destination dir. (errno %d)", errno);
+    return false;
+  }
+
+  // Actually untar the whole archive
+  result = untarPath(tarball_absolute_path);
+
+  // Move back to the main directory
+  if (chdir(cwd.c_str()) != 0) {
+    LogCvmfs(kLogUnionFs, kLogStderr,
+             "Impossible to chdir into the original dir. (errno %d)", errno);
+  }
+
+  return result;
+}
+
+bool SyncUnionTarball::untarPath(const std::string &tarball_path) {
+  // struct archive *src;  // source of the archive
+  struct archive *dst;  // destination for the untar
+  struct archive_entry *entry;
+  int result;
+  int flags;
+  flags = ARCHIVE_EXTRACT_TIME;
+  flags |= ARCHIVE_EXTRACT_PERM;
+  flags |= ARCHIVE_EXTRACT_ACL;
+  flags |= ARCHIVE_EXTRACT_FFLAGS;
+  flags |= ARCHIVE_EXTRACT_XATTR;
+  flags |= ARCHIVE_EXTRACT_OWNER;
+  flags |= ARCHIVE_EXTRACT_MAC_METADATA;
+  flags |= ARCHIVE_EXTRACT_SECURE_NOABSOLUTEPATHS;
+
+  struct archive *src = archive_read_new();
+  assert(src);
+
+  dst = archive_write_disk_new();
+  assert(dst);
+
+  // here we coule also accept _all instead of _tar, however it will require
+  // more memory and it will provide a way more open interface, maybe too open.
+  archive_read_support_format_tar(src);
+
+  archive_write_disk_set_options(dst, flags);
+  archive_write_disk_set_standard_lookup(dst);
+
+  result = archive_read_open_filename(src, tarball_path.c_str(), 4096);
+  if (result != ARCHIVE_OK) return false;
+
+  while (true) {
+    result = archive_read_next_header(src, &entry);
+
+    switch (result) {
+      case ARCHIVE_FATAL:
+        LogCvmfs(kLogUnionFs, kLogStderr,
+                 "Fatal error in reading the archive, abort.");
+        return false;
+        break;
+
+      case ARCHIVE_RETRY:
+        LogCvmfs(kLogUnionFs, kLogStderr,
+                 "Error in reading, possible to retry but it is not managed ",
+                 "yet, abort.");
+        return false;
+        break;
+
+      case ARCHIVE_EOF:
+        return true;
+        break;
+
+      case ARCHIVE_WARN:
+        LogCvmfs(kLogUnionFs, kLogStderr,
+                 "Warning in uncompression reading, going on. \n %s",
+                 archive_error_string(src));
+        break;
+
+      case ARCHIVE_OK: {
+        result = archive_write_header(dst, entry);
+
+        if (result == ARCHIVE_FATAL) {
+          LogCvmfs(kLogUnionFs, kLogStderr,
+                   "Fatal Error in writing the archive, abort.");
+          return false;
+        }
+
+        if (result == ARCHIVE_WARN) {
+          LogCvmfs(kLogUnionFs, kLogStderr,
+                   "Warning in uncompression reading, going on. \n %s",
+                   archive_error_string(dst));
+        }
+
+        if (result == ARCHIVE_RETRY) {
+          LogCvmfs(kLogUnionFs, kLogStderr,
+                   "Error in writing the archive, possible to retry, but it is "
+                   "not manages yet, abort.");
+          return false;
+        }
+
+        if (result == ARCHIVE_OK) {
+          result = copy_data(src, dst);
+          if (result != ARCHIVE_OK) return false;
+        }
+
+      } break;
+    }
+  }
+}
+
+int SyncUnionTarball::copy_data(struct archive *src, struct archive *dst) {
+  int result;
+  const void *buff;
+  size_t size;
+  la_int64_t offset;
+
+  while (true) {
+    result = archive_read_data_block(src, &buff, &size, &offset);
+    if (result == ARCHIVE_EOF) return ARCHIVE_OK;
+
+    if (result == ARCHIVE_RETRY || result == ARCHIVE_FATAL) {
+      LogCvmfs(kLogUnionFs, kLogStderr,
+               "Error in getting the data to extract the archive, abort.\n%s",
+               archive_error_string(src));
+      return result;
+    }
+
+    result = archive_write_data_block(dst, buff, size, offset);
+    if (result == ARCHIVE_RETRY || result == ARCHIVE_FATAL) {
+      LogCvmfs(kLogUnionFs, kLogStderr,
+               "Error in writing the data to extract the archive, abort.\n%s",
+               archive_error_string(src));
+      return result;
+    }
+  }
+}
+
+void SyncUnionTarball::Traverse() {}
 
 }  // namespace publish
