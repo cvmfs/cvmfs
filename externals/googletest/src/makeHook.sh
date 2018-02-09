@@ -1,7 +1,9 @@
 #!/bin/sh
 
 cd build 
-make 
+make clean
+
+make
 
 cp -rv googlemock/gtest/*.a $EXTERNALS_INSTALL_LOCATION/lib/
 cp -rv googlemock/*.a $EXTERNALS_INSTALL_LOCATION/lib/
