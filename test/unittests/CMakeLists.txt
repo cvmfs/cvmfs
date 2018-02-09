@@ -335,7 +335,8 @@ endif (BUILD_LIBCVMFS_CACHE)
 #
 # link the stuff (*_LIBRARIES are dynamic link libraries)
 #
-set (UNITTEST_LINK_LIBRARIES ${GTEST_LIBRARIES} ${OPENSSL_LIBRARIES} ${CURL_LIBRARIES}
+set (UNITTEST_LINK_LIBRARIES ${GTEST_LIBRARIES} ${GMOCK_LIBRARIES} 
+                             ${OPENSSL_LIBRARIES} ${CURL_LIBRARIES}
                              ${CARES_LIBRARIES} ${OPENSSL_LIBRARIES}
                              ${SQLITE3_LIBRARY} ${ZLIB_LIBRARIES} ${RT_LIBRARY}
                              ${UUID_LIBRARIES} ${PACPARSER_LIBRARIES}
@@ -350,7 +351,7 @@ endif (BUILD_UNITTESTS_DEBUG)
 
 if (BUILD_LIBCVMFS_CACHE)
   target_link_libraries (${PROJECT_TEST_CACHE_NAME}
-                         ${GTEST_LIBRARIES}
+                         ${GTEST_LIBRARIES} ${GMOCK_LIBRARIES}
                          ${OPENSSL_LIBRARIES} ${ZLIB_LIBRARIES}
                          ${RT_LIBRARY} ${SHA3_LIBRARIES}
                          ${PROTOBUF_LITE_LIBRARY} pthread)
