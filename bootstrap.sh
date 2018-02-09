@@ -177,8 +177,6 @@ build_lib() {
       ;;
     googletest)
         do_extract "googletest"   "googletest-release-${GOOGLETEST_VERSION}.tar.gz"
-        #replace_in_external "googletest"  "config.guess.latest" "build-aux/config.guess"
-        #replace_in_external "googletest"  "config.sub.latest" "build-aux/config.sub"
         do_build "googletest"
       ;;
     libgeoip)
