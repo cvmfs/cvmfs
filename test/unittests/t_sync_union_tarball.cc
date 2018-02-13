@@ -3,6 +3,7 @@
  */
 
 #include <gtest/gtest.h>
+#include "gmock/gmock.h"
 
 #include <fstream>
 #include <iostream>
@@ -10,6 +11,8 @@
 #include <sync_union_tarball.h>
 
 #include <util/string.h>
+
+#include "mock/m_sync_mediator.h"
 
 const std::string data =
     "dGFyL2FhYS8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
@@ -156,18 +159,52 @@ const std::string data =
     "AA"
     "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==";
 
-TEST(T_Sync_union_tarball, Init) {
-  std::ofstream tar;
-  std::string data_binary;
-  Debase64(data, &data_binary);
-  tar.open("/tmp/tar.tar", std::ios::binary);
-  tar << data_binary;
-  tar.close();
+namespace {
 
-  publish::SyncUnionTarball sync_union =
-      publish::SyncUnionTarball(NULL, "", "", "", "/tmp/tar.tar", "/tmp/lalal");
+class T_Sync_union_tarball : public ::testing::Test {
+ protected:
+  void SetUp() {
+    std::ofstream tar;
+    std::string data_binary;
+    Debase64(data, &data_binary);
 
+    tar.open("/tmp/tar.tar", std::ios::binary);
+    ASSERT_TRUE(tar.is_open());
+
+    ASSERT_TRUE(tar.write(data_binary.c_str(), data_binary.size()));
+    tar.close();
+    m_sync_mediator = new publish::MockSyncMediator();
+  }
+
+  virtual void TearDown() {
+    remove("/tmp/tar.tar");
+    delete m_sync_mediator;
+  }
+
+  publish::MockSyncMediator* m_sync_mediator;
+};
+}  // namespace
+
+TEST_F(T_Sync_union_tarball, Init) {
+  publish::SyncUnionTarball sync_union(m_sync_mediator, "", "", "",
+                                       "/tmp/tar.tar", "/tmp/lala");
+
+  EXPECT_CALL(*m_sync_mediator, RegisterUnionEngine(::testing::_)).Times(1);
+  EXPECT_TRUE(sync_union.Initialize());
+}
+
+TEST_F(T_Sync_union_tarball, Traverse) {
+  publish::SyncUnionTarball sync_union(m_sync_mediator, "", "", "",
+                                       "/tmp/tar.tar", "/tmp/lala");
+
+  EXPECT_CALL(*m_sync_mediator, RegisterUnionEngine(::testing::_)).Times(1);
   sync_union.Initialize();
 
-  EXPECT_EQ("a", "a");
+  // We enter the directory, check that it is a new directory, since it is a new
+  // directory we don't propagate down the recursion. Then we add the same
+  // directory and finally we leave the directory.
+  EXPECT_CALL(*m_sync_mediator, EnterDirectory(::testing::_)).Times(1);
+  EXPECT_CALL(*m_sync_mediator, Add(::testing::_)).Times(1);
+  EXPECT_CALL(*m_sync_mediator, LeaveDirectory(::testing::_)).Times(1);
+  sync_union.Traverse();
 }
