@@ -4,15 +4,15 @@
 
 #define __STDC_FORMAT_MACROS
 
-#include "sync_union.h"
 #include "sync_union_tarball.h"
+
+#include <archive.h>
+#include <util/posix.h>
 
 #include <set>
 #include <string>
 
-#include <archive.h>
-
-#include <util/posix.h>
+#include "sync_union.h"
 
 #include "fs_traversal.h"
 #include "sync_item.h"
@@ -36,7 +36,7 @@ SyncUnionTarball::SyncUnionTarball(AbstractSyncMediator *mediator,
       tarball_path_(tarball_path),
       base_directory_(base_directory) {
   working_dir_ = "";
-};
+}
 
 /*
 ~SyncUnionTarball::SyncUnionTarball() {
@@ -175,7 +175,6 @@ bool SyncUnionTarball::untarPath(const std::string &tarball_path) {
           result = copy_data(src, dst);
           if (result != ARCHIVE_OK) return false;
         }
-
       } break;
     }
   }
