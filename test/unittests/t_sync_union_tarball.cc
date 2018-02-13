@@ -2,15 +2,15 @@
  * This file is part of the CernVM File System.
  */
 
+#include <sync_union_tarball.h>
+
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
-#include "gmock/gmock.h"
+
+#include <util/string.h>
 
 #include <fstream>
 #include <iostream>
-
-#include <sync_union_tarball.h>
-
-#include <util/string.h>
 
 #include "mock/m_sync_mediator.h"
 

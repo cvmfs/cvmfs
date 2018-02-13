@@ -11,10 +11,10 @@
 
 #include "sync_union.h"
 
+#include <archive.h>
+
 #include <set>
 #include <string>
-
-#include <archive.h>
 
 #include "sync_mediator.h"
 
@@ -69,7 +69,6 @@ class SyncUnionTarball : public SyncUnion {
    * destination.
    */
   int copy_data(struct archive *src, struct archive *dst);
-
 };  // class SyncUnionTarball
 
 }  // namespace publish
