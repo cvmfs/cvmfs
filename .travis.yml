@@ -28,6 +28,7 @@ addons:
       - valgrind
       - voms-dev
       - gdb
+      - libarchive-dev
 
 before_script:
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update && brew cask install osxfuse; fi
