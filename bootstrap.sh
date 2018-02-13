@@ -9,7 +9,7 @@ PACPARSER_VERSION=1.3.5
 ZLIB_VERSION=1.2.8
 SPARSEHASH_VERSION=1.12
 LEVELDB_VERSION=1.18
-GOOGLETEST_VERSION=1.7.0
+GOOGLETEST_VERSION=1.8.0
 LIBGEOIP_VERSION=1.6.0
 PYTHON_GEOIP_VERSION=1.3.1
 PROTOBUF_VERSION=2.6.1
@@ -176,9 +176,7 @@ build_lib() {
       do_build "leveldb"
       ;;
     googletest)
-        do_extract "googletest"   "gtest-${GOOGLETEST_VERSION}.tar.gz"
-        replace_in_external "googletest"  "config.guess.latest" "build-aux/config.guess"
-        replace_in_external "googletest"  "config.sub.latest" "build-aux/config.sub"
+        do_extract "googletest"   "googletest-release-${GOOGLETEST_VERSION}.tar.gz"
         do_build "googletest"
       ;;
     libgeoip)
