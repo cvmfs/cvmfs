@@ -10,7 +10,7 @@
 
 namespace publish {
 
-SyncUnion::SyncUnion(SyncMediator *mediator, const std::string &rdonly_path,
+SyncUnion::SyncUnion(AbstractSyncMediator *mediator, const std::string &rdonly_path,
                      const std::string &union_path,
                      const std::string &scratch_path)
     : rdonly_path_(rdonly_path),
