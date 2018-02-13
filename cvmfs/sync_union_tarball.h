@@ -14,18 +14,27 @@
 #include <set>
 #include <string>
 
-//#include <archive.h>
+#include <archive.h>
+
+#include "sync_mediator.h"
+
 struct archive;
 
 namespace publish {
 
 class SyncUnionTarball : public SyncUnion {
  public:
-  SyncUnionTarball(SyncMediator *mediator, const std::string &rdonly_path,
+  SyncUnionTarball(AbstractSyncMediator *mediator,
+                   const std::string &rdonly_path,
                    const std::string &union_path,
                    const std::string &scratch_path,
                    const std::string &tarball_path,
                    const std::string &base_directory);
+
+  /*
+   * Delete the working directories, where the tar is being uncompressed.
+   */
+  // ~SyncUnionTarball();
 
   /*
    * Check that the tarball is actually valid and that can be open.
@@ -47,7 +56,7 @@ class SyncUnionTarball : public SyncUnion {
  private:
   const std::string tarball_path_;
   const std::string base_directory_;
-  std::set<std::string> to_recur_;
+  std::string working_dir_;
 
   /*
    * Actually untar the several elements in the tar inside the base directory,

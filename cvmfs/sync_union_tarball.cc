@@ -14,6 +14,8 @@
 
 #include <util/posix.h>
 
+#include "fs_traversal.h"
+#include "sync_item.h"
 #include "sync_mediator.h"
 
 namespace publish {
@@ -21,7 +23,10 @@ namespace publish {
  * Still have to underastand how the madiator, scratch, read and union path
  * works together.
  */
-SyncUnionTarball::SyncUnionTarball(SyncMediator *mediator,
+
+// SyncUnionTarball::SyncUnionTarball(VirtualSyncMed)
+
+SyncUnionTarball::SyncUnionTarball(AbstractSyncMediator *mediator,
                                    const std::string &rdonly_path,
                                    const std::string &union_path,
                                    const std::string &scratch_path,
@@ -29,7 +34,18 @@ SyncUnionTarball::SyncUnionTarball(SyncMediator *mediator,
                                    const std::string &base_directory)
     : SyncUnion(mediator, rdonly_path, union_path, scratch_path),
       tarball_path_(tarball_path),
-      base_directory_(base_directory){};
+      base_directory_(base_directory) {
+  working_dir_ = "";
+};
+
+/*
+~SyncUnionTarball::SyncUnionTarball() {
+  if (RemoveTree(working_dir_) != true) {
+    LogCvmfs(kLogUnionFs, kLogStderr,
+             "Impossible to remove the working directory. (errno %d)", errno);
+  }
+}
+*/
 
 /*
  * We traferse the tar and then we keep track (the path inside a set) of each
@@ -44,8 +60,8 @@ bool SyncUnionTarball::Initialize() {
   // Save the absolute path of the tarball
   std::string tarball_absolute_path = GetAbsolutePath(tarball_path_);
   // Create the actuall temp directory
-  std::string working_dir = CreateTempDir(base_directory_);
-  if (working_dir == "") {
+  working_dir_ = CreateTempDir(base_directory_);
+  if (working_dir_ == "") {
     LogCvmfs(kLogUnionFs, kLogStderr,
              "Impossible to create the destination directory. (errno %d)",
              errno);
@@ -53,7 +69,7 @@ bool SyncUnionTarball::Initialize() {
   }
   // Move into the directory just created, from now on we need to go back to the
   // previous working directory before to exit
-  if (chdir(working_dir.c_str()) != 0) {
+  if (chdir(working_dir_.c_str()) != 0) {
     LogCvmfs(kLogUnionFs, kLogStderr,
              "Impossible to chdir into the destination dir. (errno %d)", errno);
     return false;
@@ -100,7 +116,11 @@ bool SyncUnionTarball::untarPath(const std::string &tarball_path) {
   archive_write_disk_set_standard_lookup(dst);
 
   result = archive_read_open_filename(src, tarball_path.c_str(), 4096);
-  if (result != ARCHIVE_OK) return false;
+
+  if (result != ARCHIVE_OK) {
+    LogCvmfs(kLogUnionFs, kLogStderr, "Impossible to open the archive, abort.");
+    return false;
+  }
 
   while (true) {
     result = archive_read_next_header(src, &entry);
@@ -188,7 +208,29 @@ int SyncUnionTarball::copy_data(struct archive *src, struct archive *dst) {
   }
 }
 
-void SyncUnionTarball::Traverse() {}
+void SyncUnionTarball::Traverse() {
+  assert(this->IsInitialized());
+
+  FileSystemTraversal<SyncUnionTarball> traversal(this, working_dir_, true);
+
+  traversal.fn_enter_dir = &SyncUnionTarball::EnterDirectory;
+  traversal.fn_leave_dir = &SyncUnionTarball::LeaveDirectory;
+  traversal.fn_new_file = &SyncUnionTarball::ProcessRegularFile;
+  traversal.fn_new_character_dev = &SyncUnionTarball::ProcessCharacterDevice;
+  traversal.fn_new_block_dev = &SyncUnionTarball::ProcessBlockDevice;
+  traversal.fn_new_fifo = &SyncUnionTarball::ProcessFifo;
+  traversal.fn_new_socket = &SyncUnionTarball::ProcessSocket;
+  traversal.fn_ignore_file = &SyncUnionTarball::IgnoreFilePredicate;
+  traversal.fn_new_dir_prefix = &SyncUnionTarball::ProcessDirectory;
+  traversal.fn_new_symlink = &SyncUnionTarball::ProcessSymlink;
+
+  LogCvmfs(kLogUnionFs, kLogVerboseMsg,
+           "Tarball starting traversal "
+           "recursion for working directory=[%s]",
+           working_dir_.c_str());
+
+  traversal.Recurse(working_dir_);
+}
 
 std::string SyncUnionTarball::UnwindWhiteoutFilename(
     const SyncItem &entry) const {
