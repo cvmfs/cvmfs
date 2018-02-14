@@ -184,7 +184,7 @@ int SyncUnionTarball::copy_data(struct archive *src, struct archive *dst) {
   int result;
   const void *buff;
   size_t size;
-  la_int64_t offset;
+  off_t offset;
 
   while (true) {
     result = archive_read_data_block(src, &buff, &size, &offset);
