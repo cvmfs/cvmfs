@@ -293,6 +293,7 @@ else (NOT MACOSX)
   set (RT_LIBRARY "")
 endif (NOT MACOSX)
 
+
 # Required libraries depending on build target
 
 find_package (OpenSSL REQUIRED)
@@ -308,9 +309,19 @@ set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GMOCK_INCLUDE_DIRS})
 find_package (VJSON REQUIRED)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${VJSON_INCLUDE_DIRS})
 
+# This is the location where brew install libarchive
+if (MACOSX)
+  set (CMAKE_INCLUDE_PATH "/usr/local/opt/libarchive/include")
+  set (CMAKE_LIBRARY_PATH "/usr/local/opt/libarchive/lib")
+endif (MACOSX)
+
 find_package (LibArchive REQUIRED)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${LibArchive_INCLUDE_DIRS})
 
+if (MACOSX)
+  unset (CMAKE_INCLUDE_PATH)
+  unset (CMAKE_LIBRARY_PATH)
+endif (MACOSX)
 
 # Almost all build targets require zlib, sha2/3
 if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR
