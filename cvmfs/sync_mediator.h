@@ -68,6 +68,8 @@ struct HardlinkGroup {
 
 class AbstractSyncMediator {
  public:
+  virtual ~AbstractSyncMediator() = 0;
+
   virtual void RegisterUnionEngine(SyncUnion *engine) = 0;
 
   virtual void Add(const SyncItem &entry) = 0;
