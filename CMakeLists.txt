@@ -319,8 +319,8 @@ find_package (LibArchive REQUIRED)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${LibArchive_INCLUDE_DIRS})
 
 if (MACOSX)
-  unset (CMAKE_INCLUDE_PATH)
-  unset (CMAKE_LIBRARY_PATH)
+  set (CMAKE_INCLUDE_PATH)
+  set (CMAKE_LIBRARY_PATH)
 endif (MACOSX)
 
 # Almost all build targets require zlib, sha2/3
