@@ -42,8 +42,8 @@ if(LibArchive_INCLUDE_DIR AND EXISTS "${LibArchive_INCLUDE_DIR}/archive.h")
   if(_LibArchive_VERSION_STRING)
     string(REGEX REPLACE "${_LibArchive_VERSION_REGEX}" "\\2.\\3.\\4" LibArchive_VERSION "${_LibArchive_VERSION_STRING}")
   endif()
-  unset(_LibArchive_VERSION_REGEX)
-  unset(_LibArchive_VERSION_STRING)
+  set(_LibArchive_VERSION_REGEX)
+  set(_LibArchive_VERSION_STRING)
 endif()
 
 include(${CMAKE_CURRENT_LIST_DIR}/FindPackageHandleStandardArgs.cmake)
@@ -51,7 +51,7 @@ find_package_handle_standard_args(LibArchive
                                   REQUIRED_VARS LibArchive_LIBRARY LibArchive_INCLUDE_DIR
                                   VERSION_VAR LibArchive_VERSION
   )
-unset(LIBARCHIVE_FOUND)
+set(LIBARCHIVE_FOUND)
 
 if(LibArchive_FOUND)
   set(LibArchive_INCLUDE_DIRS ${LibArchive_INCLUDE_DIR})
