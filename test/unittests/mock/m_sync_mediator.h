@@ -22,6 +22,8 @@ class MockSyncMediator : public AbstractSyncMediator {
                    const SyncParameters *params)
       : AbstractSyncMediator() {}
 
+  ~MockSyncMediator() {}
+
   MOCK_METHOD1(RegisterUnionEngine, void(SyncUnion *engine));
   MOCK_METHOD1(Add, void(const SyncItem &entry));
   MOCK_METHOD1(Touch, void(const SyncItem &entry));
