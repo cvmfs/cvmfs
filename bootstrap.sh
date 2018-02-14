@@ -177,6 +177,7 @@ build_lib() {
       ;;
     googletest)
         do_extract "googletest"   "googletest-release-${GOOGLETEST_VERSION}.tar.gz"
+	patch_external "googletest"	"cmake_compatibility.patch"
         do_build "googletest"
       ;;
     libgeoip)
