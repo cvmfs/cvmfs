@@ -5,6 +5,7 @@
 #include "sync_item.h"
 
 #include <errno.h>
+#include <sys/sysmacros.h>
 
 #include <vector>
 
