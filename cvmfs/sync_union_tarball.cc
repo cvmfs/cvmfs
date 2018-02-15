@@ -99,8 +99,10 @@ bool SyncUnionTarball::untarPath(const std::string &tarball_path) {
   flags |= ARCHIVE_EXTRACT_FFLAGS;
   flags |= ARCHIVE_EXTRACT_XATTR;
   flags |= ARCHIVE_EXTRACT_OWNER;
-  flags |= ARCHIVE_EXTRACT_MAC_METADATA;
-  flags |= ARCHIVE_EXTRACT_SECURE_NOABSOLUTEPATHS;
+
+  // Not supported in libarchive 2.5 which is the one in sles11
+  // flags |= ARCHIVE_EXTRACT_MAC_METADATA;
+  // flags |= ARCHIVE_EXTRACT_SECURE_NOABSOLUTEPATHS;
 
   src = archive_read_new();
   assert(src);
