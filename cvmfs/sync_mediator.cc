@@ -29,7 +29,7 @@ using namespace std;  // NOLINT
 
 namespace publish {
 
-AbstractSyncMediator::~AbstractSyncMediator(){};
+AbstractSyncMediator::~AbstractSyncMediator() {}
 
 SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalog_manager,
                            const SyncParameters *params) :
