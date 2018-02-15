@@ -46,11 +46,11 @@ if(LibArchive_INCLUDE_DIR AND EXISTS "${LibArchive_INCLUDE_DIR}/archive.h")
   set(_LibArchive_VERSION_STRING)
 endif()
 
-include(${CMAKE_CURRENT_LIST_DIR}/FindPackageHandleStandardArgs.cmake)
-find_package_handle_standard_args(LibArchive
-                                  REQUIRED_VARS LibArchive_LIBRARY LibArchive_INCLUDE_DIR
-                                  VERSION_VAR LibArchive_VERSION
-  )
+include(FindPackageHandleStandardArgs)
+FIND_PACKAGE_HANDLE_STANDARD_ARGS(LibArchive 
+	DEFAULT_MSG LibArchive_LIBRARY 
+	LibArchive_INCLUDE_DIR)
+
 set(LIBARCHIVE_FOUND)
 
 if(LibArchive_FOUND)
