@@ -201,8 +201,10 @@ TEST_F(T_Sync_union_tarball, Traverse) {
   sync_union.Initialize();
 
   // We enter the directory, check that it is a new directory, since it is a new
-  // directory we don't propagate down the recursion. Then we add the same
-  // directory and finally we leave the directory.
+  // directory we don't propagate down the recursion.
+  // The down propagation is done by SyncMediator::AddDirectoryRecursively which
+  // uses privates methods.
+  // Then we add the same directory and finally we leave the directory.
   EXPECT_CALL(*m_sync_mediator, EnterDirectory(::testing::_)).Times(1);
   EXPECT_CALL(*m_sync_mediator, Add(::testing::_)).Times(1);
   EXPECT_CALL(*m_sync_mediator, LeaveDirectory(::testing::_)).Times(1);
