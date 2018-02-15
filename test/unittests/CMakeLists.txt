@@ -349,7 +349,7 @@ set (UNITTEST_LINK_LIBRARIES ${GTEST_LIBRARIES} ${GMOCK_LIBRARIES}
                              ${SQLITE3_LIBRARY} ${ZLIB_LIBRARIES} ${RT_LIBRARY}
                              ${UUID_LIBRARIES} ${PACPARSER_LIBRARIES}
                              ${SHA3_LIBRARIES} ${VJSON_LIBRARIES}
-                             ${PROTOBUF_LITE_LIBRARY} ${LibArchive_LIBRARIES} pthread dl)
+                             ${PROTOBUF_LITE_LIBRARY} ${LibArchive_LIBRARY} pthread dl)
 
 target_link_libraries (${PROJECT_TEST_NAME} ${UNITTEST_LINK_LIBRARIES})
 
