@@ -48,8 +48,9 @@ endif()
 
 include(FindPackageHandleStandardArgs)
 FIND_PACKAGE_HANDLE_STANDARD_ARGS(LibArchive 
-       DEFAULT_MSG LibArchive_LIBRARY 
-       LibArchive_INCLUDE_DIR)
+	DEFAULT_MSG LibArchive_LIBRARY 
+	LibArchive_INCLUDE_DIR)
+
 
 set(LIBARCHIVE_FOUND)
 
@@ -57,4 +58,3 @@ if(LibArchive_FOUND)
   set(LibArchive_INCLUDE_DIRS ${LibArchive_INCLUDE_DIR})
   set(LibArchive_LIBRARIES    ${LibArchive_LIBRARY})
 endif()
-
