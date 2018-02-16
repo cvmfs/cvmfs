@@ -5,7 +5,10 @@
 #include "sync_item.h"
 
 #include <errno.h>
-#include <sys/sysmacros.h>
+
+#if !defined(__APPLE__)
+  #include <sys/sysmacros.h>
+#endif  // __APPLE__
 
 #include <vector>
 

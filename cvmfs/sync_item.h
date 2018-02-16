@@ -6,7 +6,10 @@
 #define CVMFS_SYNC_ITEM_H_
 
 #include <sys/types.h>
-#include <sys/sysmacros.h>  // NOLINT
+
+#if !defined(__APPLE__)
+  #include <sys/sysmacros.h>
+#endif  // __APPLE__
 
 #include <cstring>
 #include <map>
