@@ -9,6 +9,14 @@
 
 #include <string>
 
+/*
+ * To construct these strings is sufficient to create the normale .tar archive, 
+ * then from any unix shell is enough to use the utility base64, as an example.
+ *
+ * $ base64 tar_file.tar 
+ *
+ */
+
 /* 4_empty_files
  * ├── [   0]  bar
  * ├── [   0]  baz
