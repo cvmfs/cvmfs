@@ -7,6 +7,7 @@
 #include "sync_union_tarball.h"
 
 #include <archive.h>
+#include <archive_entry.h>
 #include <util/posix.h>
 
 #include <set>
@@ -67,30 +68,20 @@ bool SyncUnionTarball::Initialize() {
              errno);
     return false;
   }
-  // Move into the directory just created, from now on we need to go back to the
-  // previous working directory before to exit
-  if (chdir(working_dir_.c_str()) != 0) {
-    LogCvmfs(kLogUnionFs, kLogStderr,
-             "Impossible to chdir into the destination dir. (errno %d)", errno);
-    return false;
-  }
 
   // Actually untar the whole archive
-  result = untarPath(tarball_absolute_path);
-
-  // Move back to the main directory
-  if (chdir(cwd.c_str()) != 0) {
-    LogCvmfs(kLogUnionFs, kLogStderr,
-             "Impossible to chdir into the original dir. (errno %d)", errno);
-  }
-
+  result = untarPath(working_dir_, tarball_absolute_path);
   return result && SyncUnion::Initialize();
 }
 
-bool SyncUnionTarball::untarPath(const std::string &tarball_path) {
+bool SyncUnionTarball::untarPath(const std::string &base_untar_directory_path,
+                                 const std::string &tarball_path) {
   struct archive *src;  // source of the archive
   struct archive *dst;  // destination for the untar
   struct archive_entry *entry;
+
+  std::string actuall_path;
+
   int result;
   int flags;
   flags = ARCHIVE_EXTRACT_TIME;
@@ -152,6 +143,12 @@ bool SyncUnionTarball::untarPath(const std::string &tarball_path) {
         break;
 
       case ARCHIVE_OK: {
+        // save the path of the file to extract
+        actuall_path.assign(archive_entry_pathname(entry));
+        // set the new path as base untar directory path + the path of the file
+        archive_entry_set_pathname(
+            entry, (base_untar_directory_path + "/" + actuall_path).c_str());
+
         result = archive_write_header(dst, entry);
 
         if (result == ARCHIVE_FATAL) {
