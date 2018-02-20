@@ -246,6 +246,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   sync_union.cc
   sync_union_overlayfs.cc
   sync_union_aufs.cc
+  sync_union_tarball.cc
   upload.cc
   upload_facility.cc
   upload_gateway.cc
@@ -661,7 +662,7 @@ if (BUILD_SERVER)
                          ${SQLITE3_LIBRARY} ${CURL_LIBRARIES}
                          ${CARES_LIBRARIES} ${ZLIB_LIBRARIES}
                          ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${VJSON_LIBRARIES}
-                         ${SHA3_LIBRARIES} ${CAP_LIBRARIES} pthread dl)
+                         ${SHA3_LIBRARIES} ${CAP_LIBRARIES} ${LibArchive_LIBRARY} pthread dl)
 
   target_link_libraries(cvmfs_stratum_agent
                         ${CURL_LIBRARIES} ${CARES_LIBRARIES}
