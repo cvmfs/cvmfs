@@ -28,11 +28,8 @@ PKGMAP_FILE=${CVMFS_BUILD_LOCATION}/pkgmap/pkgmap.${CVMFS_BUILD_PLATFORM}_x86_64
 # Create an RPM or DEB package from the tarball
 if [ x"${CVMFS_BUILD_PLATFORM}" = xubuntu1604 ]; then
     PACKAGE_TYPE=deb
-    PACKAGE_NAME_SUFFIX="+${CVMFS_BUILD_PLATFORM}_amd64"
-elif [ x"${CVMFS_BUILD_PLATFORM}" = xslc6 ]; then
-    PACKAGE_TYPE=rpm
-    PACKAGE_NAME_SUFFIX=".el6.x86_64"
-elif [ x"${CVMFS_BUILD_PLATFORM}" = xcc7 ]; then
+    PACKAGE_NAME_SUFFIX="+ubuntu16.06_amd64"
+elif [ x"${CVMFS_BUILD_PLATFORM}" = xslc6 ] || [ x"${CVMFS_BUILD_PLATFORM}" = xcc7 ]; then
     PACKAGE_TYPE=rpm
     PACKAGE_NAME_SUFFIX="$(rpm --eval "%{?dist}").x86_64"
 fi
@@ -43,18 +40,15 @@ mkdir -p ${CVMFS_BUILD_LOCATION}/packages
 cp -v _build/prod/rel/cvmfs_services/cvmfs_services-${REPO_SERVICES_VERSION}.tar.gz \
    ${CVMFS_BUILD_LOCATION}/packages/${TARBALL_NAME}
 
+# Create the distribution-specific package
+
+fpm -s tar \
+    -t ${PACKAGE_TYPE} \
+    --prefix /opt/cvmfs_services \
+    --package ${CVMFS_BUILD_LOCATION}/packages/${PACKAGE_NAME} \
+    ${CVMFS_BUILD_LOCATION}/packages/${TARBALL_NAME}
+
 mkdir -p ${CVMFS_BUILD_LOCATION}/pkgmap
 echo "[${CVMFS_BUILD_PLATFORM}_x86_64]" >> ${PKGMAP_FILE}
-
-# Create the distribution-specific package
-if [ x"${CVMFS_BUILD_PLATFORM}" = xcc7 ]; then
-    fpm -s tar \
-        -t ${PACKAGE_TYPE} \
-        --prefix /opt/cvmfs_services \
-        --package ${CVMFS_BUILD_LOCATION}/packages/${PACKAGE_NAME} \
-        ${CVMFS_BUILD_LOCATION}/packages/${TARBALL_NAME}
-    echo "services=${PACKAGE_NAME}" >> ${PKGMAP_FILE}
-else
-    echo "services=${TARBALL_NAME}" >> ${PKGMAP_FILE}
-fi
+echo "services=${PACKAGE_NAME}" >> ${PKGMAP_FILE}
 
