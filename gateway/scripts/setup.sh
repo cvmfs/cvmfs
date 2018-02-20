@@ -27,7 +27,10 @@ sudo cp -v $SCRIPT_LOCATION/90-cvmfs_services.conf /etc/rsyslog.d/
 
 # Symlink the configuration directory into /etc/cvmfs/gateway
 if [ ! -f /etc/cvmfs/gateway ]; then
+    echo "Symlinking configuration file directory to /etc/cvmfs/gateway"
     sudo ln -s $(readlink -f $SCRIPT_LOCATION/../etc) /etc/cvmfs/gateway
+else
+    echo "The file/symlink \"/etc/cvmfs/gateway\" already exists."
 fi
 
 echo "  - restarting rsyslog"
