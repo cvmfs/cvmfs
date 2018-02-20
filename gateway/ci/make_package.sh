@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 set -e
 
@@ -41,6 +41,10 @@ cp -v _build/prod/rel/cvmfs_services/cvmfs_services-${REPO_SERVICES_VERSION}.tar
    ${CVMFS_BUILD_LOCATION}/packages/${TARBALL_NAME}
 
 # Create the distribution-specific package
+
+if [ -e /etc/profile.d/rvm.sh ]; then
+    . /etc/profile.d/rvm.sh
+fi
 
 fpm -s tar \
     -t ${PACKAGE_TYPE} \
