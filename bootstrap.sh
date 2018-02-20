@@ -15,6 +15,7 @@ PYTHON_GEOIP_VERSION=1.3.1
 PROTOBUF_VERSION=2.6.1
 MONGOOSE_VERSION=3.8
 RAPIDCHECK_VERSION=0.0
+LIBARCHIVE_VERSION=3.3.2
 
 if [ x"$EXTERNALS_LIB_LOCATION" = x"" ]; then
   echo "Bootstrap - Missing environment variable: EXTERNALS_LIB_LOCATION"
@@ -231,6 +232,10 @@ build_lib() {
         do_build "rapidcheck"
       fi
       ;;
+    libarchive)
+      do_extract "libarchive" "libarchive-${LIBARCHIVE_VERSION}.tar.gz"
+      do_build "libarchive"
+      ;;
     *)
       echo "Unknown library name. Exiting."
       exit 1
@@ -241,7 +246,7 @@ build_lib() {
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 # Build a list of libs that need to be built
-missing_libs="libcurl pacparser zlib sparsehash leveldb googletest libgeoip protobuf googlebench sqlite3 vjson sha2 sha3 mongoose"
+missing_libs="libcurl pacparser zlib sparsehash leveldb googletest libgeoip protobuf googlebench sqlite3 vjson sha2 sha3 mongoose libarchive"
 if [ x"$BUILD_QC_TESTS" != x"" ]; then
     missing_libs="$missing_libs rapidcheck"
 fi
