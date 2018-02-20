@@ -50,6 +50,7 @@ fpm -s tar \
     -t ${PACKAGE_TYPE} \
     --prefix /opt/cvmfs_services \
     --package packages/${PACKAGE_NAME} \
+    --version ${REPO_SERVICES_VERSION} \
     packages/${TARBALL_NAME}
 
 mkdir -p ${CVMFS_BUILD_LOCATION}/pkgmap
