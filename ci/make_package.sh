@@ -45,8 +45,8 @@ cp -v _build/prod/rel/cvmfs_services/cvmfs_services-${REPO_SERVICES_VERSION}.tar
 fpm -s tar \
     -t ${PACKAGE_TYPE} \
     --prefix /opt/cvmfs_services \
-    --package ${CVMFS_BUILD_LOCATION}/packages/${PACKAGE_NAME} \
-    ${CVMFS_BUILD_LOCATION}/packages/${TARBALL_NAME}
+    --package packages/${PACKAGE_NAME} \
+    packages/${TARBALL_NAME}
 
 mkdir -p ${CVMFS_BUILD_LOCATION}/pkgmap
 echo "[${CVMFS_BUILD_PLATFORM}_x86_64]" >> ${PKGMAP_FILE}
