@@ -16,6 +16,7 @@
     --without-openssl \
     --without-xml2 \
     --without-expat \
+    --without-iconv \
     --disable-maintainer-mode \
     --prefix=$EXTERNALS_INSTALL_LOCATION/
 
