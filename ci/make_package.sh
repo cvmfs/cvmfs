@@ -28,7 +28,7 @@ PKGMAP_FILE=${CVMFS_BUILD_LOCATION}/pkgmap/pkgmap.${CVMFS_BUILD_PLATFORM}_x86_64
 # Create an RPM or DEB package from the tarball
 if [ x"${CVMFS_BUILD_PLATFORM}" = xubuntu1604 ]; then
     PACKAGE_TYPE=deb
-    PACKAGE_NAME_SUFFIX="+ubuntu16.06_amd64"
+    PACKAGE_NAME_SUFFIX="+ubuntu16.04_amd64"
 elif [ x"${CVMFS_BUILD_PLATFORM}" = xslc6 ] || [ x"${CVMFS_BUILD_PLATFORM}" = xcc7 ]; then
     PACKAGE_TYPE=rpm
     PACKAGE_NAME_SUFFIX="$(rpm --eval "%{?dist}").x86_64"
