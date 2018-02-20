@@ -51,6 +51,11 @@ fpm -s tar \
     --prefix /opt/cvmfs_services \
     --package packages/${PACKAGE_NAME} \
     --version ${REPO_SERVICES_VERSION} \
+    --name cvmfs_services \
+    --maintainer "Radu Popescu <radu.popescu@cern.ch>" \
+    --description "CernVM-FS Repository Gateway" \
+    --url "http://cernvm.cern.ch" \
+    --license "BSD-3-Clause" \
     packages/${TARBALL_NAME}
 
 mkdir -p ${CVMFS_BUILD_LOCATION}/pkgmap
