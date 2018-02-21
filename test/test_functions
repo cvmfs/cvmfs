@@ -2395,8 +2395,15 @@ set_up_repository_services() {
     if [ ! -f "/tmp/$cvmfs_services_package_file_name" ]; then
         curl -o $cvmfs_services_package_file_name $cvmfs_services_package_url
     fi
-    sudo rm -rf /opt/cvmfs_services && sudo mkdir -p /opt/cvmfs_services && cd /opt/cvmfs_services
-    sudo tar xzf /tmp/$cvmfs_services_package_file_name
+
+    if [ -f /etc/debian_version ]; then
+        if [ x"$(lsb_release -cs)" = x"xenial" ]; then
+            sudo dpkg -i /tmp/$cvmfs_services_package_file_name
+        fi
+    else
+        sudo yum install -y /tmp/$cvmfs_services_package_file_name
+    fi
+
     popd
 
     echo "  Writing configuration files"
