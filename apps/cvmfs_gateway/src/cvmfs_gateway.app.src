@@ -1,8 +1,8 @@
-{application, cvmfs_services,
- [{description, "CVMFS Repository Services"},
+{application, cvmfs_gateway,
+ [{description, "CVMFS Repository Gateway"},
   {vsn, "0.1.10"},
   {registered, [cvmfs_auth, cvmfs_be, cvmfs_commit_sup, cvmfs_fe, cvmfs_lease, cvmfs_receiver_pool]},
-  {mod, {cvmfs_services_app, []}},
+  {mod, {cvmfs_gateway_app, []}},
   {applications,
    [kernel,
     stdlib,
@@ -26,8 +26,8 @@
              cvmfs_receiver,
              cvmfs_repos_handler,
              cvmfs_root_handler,
-             cvmfs_services_app,
-             cvmfs_services_sup
+             cvmfs_gateway_app,
+             cvmfs_gateway_sup
             ]},
 
   {maintainers, []}

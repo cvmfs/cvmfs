@@ -256,7 +256,7 @@ code_change(OldVsn, State, _Extra) ->
                                                                  Secret :: binary(),
                                                                  State :: map().
 p_new_lease(KeyId, Path, Public, Secret, _State) ->
-    {ok, MaxLeaseTime} = application:get_env(cvmfs_services, max_lease_time),
+    {ok, MaxLeaseTime} = application:get_env(cvmfs_gateway, max_lease_time),
 
     %% Match statement that selects all rows with a given repo,
     %% returning a list of {Path, Time} pairs
@@ -298,7 +298,7 @@ p_new_lease(KeyId, Path, Public, Secret, _State) ->
 -spec p_get_lease(Public) -> lease_get_result()
                                  when Public :: binary().
 p_get_lease(Public) ->
-    {ok, MaxLeaseTime} = application:get_env(cvmfs_services, max_lease_time),
+    {ok, MaxLeaseTime} = application:get_env(cvmfs_gateway, max_lease_time),
 
     MS = ets:fun2ms(fun(#lease{public = P} = Lease) when P =:= Public ->
                             Lease

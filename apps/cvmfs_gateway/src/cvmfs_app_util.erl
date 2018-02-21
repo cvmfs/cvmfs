@@ -11,6 +11,6 @@
 -export([get_max_lease_time/0]).
 
 get_max_lease_time() ->
-    {ok, MaxLeaseTime} = application:get_env(cvmfs_services, max_lease_time),
+    {ok, MaxLeaseTime} = application:get_env(cvmfs_gateway, max_lease_time),
     MaxLeaseTime.
 
