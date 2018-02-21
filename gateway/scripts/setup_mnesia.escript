@@ -1,6 +1,6 @@
 #!/usr/bin/env escript
 %% -*- erlang -*-
-%%! -sname cvmfs_services -setcookie cvmfs
+%%! -sname cvmfs_gateway -setcookie cvmfs
 
 %%% -------------------------------------------------------------------
 %%%

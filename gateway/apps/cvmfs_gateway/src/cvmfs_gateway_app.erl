@@ -1,11 +1,11 @@
 %%%-------------------------------------------------------------------
 %%% This file is part of the CernVM File System.
 %%%
-%%% @doc cvmfs_services_app public API
+%%% @doc cvmfs_gateway_app public API
 %%% @end
 %%%-------------------------------------------------------------------
 
--module(cvmfs_services_app).
+-module(cvmfs_gateway_app).
 
 -behaviour(application).
 
@@ -27,7 +27,7 @@ start(_StartType, _StartArgs) ->
                            receiver_worker_config =>
                                #{executable_path => "/usr/bin/cvmfs_receiver"}}),
 
-    application:set_env(cvmfs_services, max_lease_time,
+    application:set_env(cvmfs_gateway, max_lease_time,
                         maps:get(max_lease_time, UserVars) * 1000),
 
     ReceiverPoolConfig1 = maps:get(receiver_config, UserVars),
@@ -53,7 +53,7 @@ start(_StartType, _StartArgs) ->
 
     Services2 = lists:delete(cvmfs_fe, Services),
 
-    cvmfs_services_sup:start_link({Services2,
+    cvmfs_gateway_sup:start_link({Services2,
                                    maps:get(repos, RepoVars),
                                    maps:get(keys, RepoVars),
                                    ReceiverPoolConfig2,

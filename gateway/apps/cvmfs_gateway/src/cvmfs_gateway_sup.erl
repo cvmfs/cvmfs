@@ -1,12 +1,12 @@
 %%%-------------------------------------------------------------------
 %%% This file is part of the CernVM File System.
 %%%
-%%% @doc cvmfs_services top level supervisor.
+%%% @doc cvmfs_gateway top level supervisor.
 %%%
 %%% @end
 %%%-------------------------------------------------------------------
 
--module(cvmfs_services_sup).
+-module(cvmfs_gateway_sup).
 
 -behaviour(supervisor).
 

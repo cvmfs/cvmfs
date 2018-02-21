@@ -1,7 +1,7 @@
 %%%-------------------------------------------------------------------
 %%% This file is part of the CernVM File System.
 %%%
-%%% @doc cvmfs_fe - CVMFS repo services HTTP front-end
+%%% @doc cvmfs_fe - CVMFS repository gateway HTTP front-end
 %%%
 %%% @end
 %%%-------------------------------------------------------------------
