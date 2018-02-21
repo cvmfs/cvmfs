@@ -5,7 +5,7 @@
 #define __STDC_FORMAT_MACROS
 
 #include "sync_union.h"
-#include "sync_union_overlayfs.h"
+#include "sync_union_tarball.h"
 
 #include <set>
 #include <string>

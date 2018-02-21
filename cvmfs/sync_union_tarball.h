@@ -45,7 +45,6 @@ class SyncUnionTarball : public SyncUnion {
    */
   std::set<std::string> untarPath(const std::string &tarball_path,
                                   const std::string &base_directory);
-
 };  // class SyncUnionTarball
 
 }  // namespace publish
