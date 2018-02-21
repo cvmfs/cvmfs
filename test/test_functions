@@ -2401,7 +2401,7 @@ set_up_repository_services() {
             sudo dpkg -i /tmp/$cvmfs_services_package_file_name
         fi
     else
-        sudo yum install /tmp/$cvmfs_services_package_file_name
+        sudo yum install -y /tmp/$cvmfs_services_package_file_name
     fi
 
     popd
