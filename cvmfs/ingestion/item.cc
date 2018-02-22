@@ -24,7 +24,8 @@ FileItem::FileItem(
   shash::Suffix hash_suffix,
   bool may_have_chunks,
   bool has_legacy_bulk_chunk)
-  : path_(p)
+  : BlockSplittable(0)
+  , path_(p)
   , compression_algorithm_(compression_algorithm)
   , hash_algorithm_(hash_algorithm)
   , hash_suffix_(hash_suffix)
@@ -62,6 +63,15 @@ void FileItem::RegisterChunk(const FileChunk &file_chunk) {
       break;
   }
   atomic_dec64(&nchunks_in_fly_);
+}
+
+
+BlockItem* FileItem::GetNextBlockItem(uint64_t tag) {
+  assert(block_size_ > 0);
+  BlockItem *block = new BlockItem(tag);
+  block->SetFileItem(this);
+  block->MakeStop();
+  return block;
 }
 
 
