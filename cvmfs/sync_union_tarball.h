@@ -32,11 +32,6 @@ class SyncUnionTarball : public SyncUnion {
                    const std::string &base_directory);
 
   /*
-   * Delete the working directories, where the tar is being uncompressed.
-   */
-  // ~SyncUnionTarball();
-
-  /*
    * Check that the tarball is actually valid and that can be open.
    * Similarly it creates the base directory or check that it has the ability to
    * write in it.
