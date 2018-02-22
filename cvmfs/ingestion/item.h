@@ -20,6 +20,8 @@
 #include "util/pointer.h"
 #include "util/single_copy.h"
 
+#include "ingestion/block_splittable.h"
+
 namespace upload {
 struct UploadStreamHandle;
 }
@@ -31,7 +33,7 @@ class FileItem;
  * Carries the information necessary to compress and checksum a file. During
  * processing, the bulk chunk and the chunks_ vector are filled.
  */
-class FileItem : SingleCopy {
+class FileItem : BlockSplittable {
  public:
   explicit FileItem(
     const std::string &p,
@@ -77,6 +79,10 @@ class FileItem : SingleCopy {
   bool IsProcessed() {
     return is_fully_chunked() && (atomic_read64(&nchunks_in_fly_) == 0);
   }
+
+  // Satisfy the BlockSplittable interface
+  void SetBlockSize(uint64_t block_size) { block_size_ = block_size;}
+  BlockItem* GetNextBlockItem(uint64_t tag);
 
  private:
   static const uint64_t kSizeUnknown = uint64_t(-1);
