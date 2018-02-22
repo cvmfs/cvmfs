@@ -62,14 +62,14 @@ class SyncUnionTarball : public SyncUnion {
    * Actually untar the several elements in the tar inside the base directory,
    * it returns all the recursive tars find in this operation
    */
-  bool untarPath(const std::string &base_untar_directory_path,
+  bool UntarPath(const std::string &base_untar_directory_path,
                  const std::string &tarball_path);
 
   /*
    * Helper function to phisically move the data from the source to the
    * destination.
    */
-  int copy_data(struct archive *src, struct archive *dst);
+  int CopyData(struct archive *src, struct archive *dst);
 };  // class SyncUnionTarball
 
 }  // namespace publish
