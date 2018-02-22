@@ -10,6 +10,7 @@
 #include <archive_entry.h>
 #include <util/posix.h>
 
+#include <cassert>
 #include <set>
 #include <string>
 
@@ -40,15 +41,6 @@ SyncUnionTarball::SyncUnionTarball(AbstractSyncMediator *mediator,
 }
 
 /*
-~SyncUnionTarball::SyncUnionTarball() {
-  if (RemoveTree(working_dir_) != true) {
-    LogCvmfs(kLogUnionFs, kLogStderr,
-             "Impossible to remove the working directory. (errno %d)", errno);
-  }
-}
-*/
-
-/*
  * We traferse the tar and then we keep track (the path inside a set) of each
  * .tar we find, then we go back and repeat the procedure. Should we be worry by
  * tar-bombs? Maybe, we will think about it later.
@@ -60,7 +52,7 @@ bool SyncUnionTarball::Initialize() {
   std::string cwd = GetCurrentWorkingDirectory();
   // Save the absolute path of the tarball
   std::string tarball_absolute_path = GetAbsolutePath(tarball_path_);
-  // Create the actuall temp directory
+  // Create the actual temp directory
   working_dir_ = CreateTempDir(base_directory_);
   if (working_dir_ == "") {
     LogCvmfs(kLogUnionFs, kLogStderr,
@@ -70,17 +62,17 @@ bool SyncUnionTarball::Initialize() {
   }
 
   // Actually untar the whole archive
-  result = untarPath(working_dir_, tarball_absolute_path);
+  result = UntarPath(working_dir_, tarball_absolute_path);
   return result && SyncUnion::Initialize();
 }
 
-bool SyncUnionTarball::untarPath(const std::string &base_untar_directory_path,
+bool SyncUnionTarball::UntarPath(const std::string &base_untar_directory_path,
                                  const std::string &tarball_path) {
   struct archive *src;  // source of the archive
   struct archive *dst;  // destination for the untar
   struct archive_entry *entry;
 
-  std::string actuall_path;
+  std::string actual_path;
 
   int result;
   int flags;
@@ -90,10 +82,10 @@ bool SyncUnionTarball::untarPath(const std::string &base_untar_directory_path,
   flags |= ARCHIVE_EXTRACT_FFLAGS;
   flags |= ARCHIVE_EXTRACT_XATTR;
   flags |= ARCHIVE_EXTRACT_OWNER;
+  flags |= ARCHIVE_EXTRACT_MAC_METADATA;
 
-  // Not supported in libarchive 2.5 which is the one in sles11
-  // flags |= ARCHIVE_EXTRACT_MAC_METADATA;
-  // flags |= ARCHIVE_EXTRACT_SECURE_NOABSOLUTEPATHS;
+  bool retry_write_header;
+  bool retry_read_header;
 
   src = archive_read_new();
   assert(src);
@@ -111,98 +103,157 @@ bool SyncUnionTarball::untarPath(const std::string &base_untar_directory_path,
   result = archive_read_open_filename(src, tarball_path.c_str(), 4096);
 
   if (result != ARCHIVE_OK) {
-    LogCvmfs(kLogUnionFs, kLogStderr, "Impossible to open the archive, abort.");
+    LogCvmfs(kLogUnionFs, kLogStderr, "Impossible to open the archive.");
     return false;
   }
 
   while (true) {
-    result = archive_read_next_header(src, &entry);
-
-    switch (result) {
-      case ARCHIVE_FATAL:
-        LogCvmfs(kLogUnionFs, kLogStderr,
-                 "Fatal error in reading the archive, abort.");
-        return false;
-        break;
-
-      case ARCHIVE_RETRY:
-        LogCvmfs(kLogUnionFs, kLogStderr,
-                 "Error in reading, possible to retry but it is not managed ",
-                 "yet, abort.");
-        return false;
-        break;
-
-      case ARCHIVE_EOF:
-        return true;
-        break;
-
-      case ARCHIVE_WARN:
-        LogCvmfs(kLogUnionFs, kLogStderr,
-                 "Warning in uncompression reading, going on. \n %s",
-                 archive_error_string(src));
-        break;
-
-      case ARCHIVE_OK: {
-        // save the path of the file to extract
-        actuall_path.assign(archive_entry_pathname(entry));
-        // set the new path as base untar directory path + the path of the file
-        archive_entry_set_pathname(
-            entry, (base_untar_directory_path + "/" + actuall_path).c_str());
-
-        result = archive_write_header(dst, entry);
-
-        if (result == ARCHIVE_FATAL) {
+    do {
+      retry_read_header = false;
+      result = archive_read_next_header(src, &entry);
+      switch (result) {
+        case ARCHIVE_FATAL: {
           LogCvmfs(kLogUnionFs, kLogStderr,
-                   "Fatal Error in writing the archive, abort.");
+                   "Fatal error in reading the archive.");
           return false;
+          break;
         }
 
-        if (result == ARCHIVE_WARN) {
+        case ARCHIVE_RETRY: {
+          LogCvmfs(kLogUnionFs, kLogStderr,
+                   "Error in reading the header, retrying. \n %s",
+                   archive_error_string(src));
+          retry_read_header = true;
+          break;
+        }
+
+        case ARCHIVE_EOF: {
+          return true;
+          break;
+        }
+
+        case ARCHIVE_WARN: {
           LogCvmfs(kLogUnionFs, kLogStderr,
                    "Warning in uncompression reading, going on. \n %s",
-                   archive_error_string(dst));
+                   archive_error_string(src));
+          break;
         }
 
-        if (result == ARCHIVE_RETRY) {
-          LogCvmfs(kLogUnionFs, kLogStderr,
-                   "Error in writing the archive, possible to retry, but it is "
-                   "not manages yet, abort.");
+        case ARCHIVE_OK: {
+          actual_path.assign(archive_entry_pathname(entry));
+          archive_entry_set_pathname(
+              entry, (base_untar_directory_path + "/" + actual_path).c_str());
+
+          do {
+            retry_write_header = false;
+            result = archive_write_header(dst, entry);
+
+            if (result == ARCHIVE_FATAL) {
+              LogCvmfs(kLogUnionFs, kLogStderr,
+                       "Fatal Error in writing the archive.");
+              return false;
+            }
+
+            if (result == ARCHIVE_WARN) {
+              LogCvmfs(kLogUnionFs, kLogStderr,
+                       "Warning in uncompression reading, going on. \n %s",
+                       archive_error_string(dst));
+            }
+
+            if (result == ARCHIVE_RETRY) {
+              LogCvmfs(kLogUnionFs, kLogStderr,
+                       "Error in writing the archive, retrying. \n "
+                       "%s",
+                       archive_error_string(dst));
+              retry_write_header = true;
+            }
+
+            if (result == ARCHIVE_OK) {
+              result = CopyData(src, dst);
+              if (result != ARCHIVE_OK) return false;
+            }
+          } while (retry_write_header);
+          break;
+        }
+        default:
           return false;
-        }
-
-        if (result == ARCHIVE_OK) {
-          result = copy_data(src, dst);
-          if (result != ARCHIVE_OK) return false;
-        }
-      } break;
-    }
+      }
+    } while (retry_read_header);
   }
 }
 
-int SyncUnionTarball::copy_data(struct archive *src, struct archive *dst) {
+int SyncUnionTarball::CopyData(struct archive *src, struct archive *dst) {
   int result;
   const void *buff;
   size_t size;
   off_t offset;
+  bool retry_read;
+  bool retry_write;
 
   while (true) {
-    result = archive_read_data_block(src, &buff, &size, &offset);
-    if (result == ARCHIVE_EOF) return ARCHIVE_OK;
+    retry_read = false;
+    do {
+      result = archive_read_data_block(src, &buff, &size, &offset);
 
-    if (result == ARCHIVE_RETRY || result == ARCHIVE_FATAL) {
-      LogCvmfs(kLogUnionFs, kLogStderr,
-               "Error in getting the data to extract the archive, abort.\n%s",
-               archive_error_string(src));
-      return result;
-    }
+      switch (result) {
+        case ARCHIVE_EOF: {
+          return ARCHIVE_OK;
+          break;
+        }
+        case ARCHIVE_FATAL: {
+          LogCvmfs(kLogUnionFs, kLogStderr,
+                   "Error in getting the data to extract the archive.\n%s",
+                   archive_error_string(src));
+          return ARCHIVE_FATAL;
+          break;
+        }
+        case ARCHIVE_RETRY: {
+          retry_read = true;
+          break;
+        }
+        case ARCHIVE_WARN: {
+          LogCvmfs(kLogUnionFs, kLogStderr,
+                   "Warning in reading the data from the archive, move on.\n%s",
+                   archive_error_string(src));
+          retry_read = false;
+          break;
+        }
+        case ARCHIVE_OK:
+        default: {
+          retry_read = false;
+          break;
+        }
+      }
+    } while (retry_read);
 
-    result = archive_write_data_block(dst, buff, size, offset);
-    if (result == ARCHIVE_RETRY || result == ARCHIVE_FATAL) {
-      LogCvmfs(kLogUnionFs, kLogStderr,
-               "Error in writing the data to extract the archive, abort.\n%s",
-               archive_error_string(src));
-      return result;
-    }
+    retry_write = false;
+    do {
+      result = archive_write_data_block(dst, buff, size, offset);
+
+      switch (result) {
+        case ARCHIVE_FATAL: {
+          LogCvmfs(kLogUnionFs, kLogStderr,
+                   "Error in writing the data to disk.\n%s",
+                   archive_error_string(src));
+          return ARCHIVE_FATAL;
+          break;
+        }
+        case ARCHIVE_RETRY: {
+          retry_write = true;
+          break;
+        }
+        case ARCHIVE_WARN: {
+          LogCvmfs(kLogUnionFs, kLogStderr,
+                   "Warning in reading the data from the archive, move on.\n%s",
+                   archive_error_string(src));
+          retry_write = false;
+          break;
+        }
+        default:
+          retry_write = false;
+          break;
+      }
+    } while (retry_write);
   }
 }
 
