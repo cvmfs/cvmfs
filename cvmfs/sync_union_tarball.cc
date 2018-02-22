@@ -19,11 +19,13 @@
 #include "sync_item.h"
 #include "sync_mediator.h"
 
+
 namespace publish {
 /*
  * Still have to underastand how the madiator, scratch, read and union path
  * works together.
  */
+
 
 // SyncUnionTarball::SyncUnionTarball(VirtualSyncMed)
 
@@ -47,6 +49,7 @@ SyncUnionTarball::SyncUnionTarball(AbstractSyncMediator *mediator,
   }
 }
 */
+
 
 /*
  * We traferse the tar and then we keep track (the path inside a set) of each
@@ -242,5 +245,6 @@ bool SyncUnionTarball::IsOpaqueDirectory(const SyncItem &directory) const {
 bool SyncUnionTarball::IsWhiteoutEntry(const SyncItem &entry) const {
   return false;
 }
+
 
 }  // namespace publish

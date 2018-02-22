@@ -37,6 +37,7 @@ class SyncUnionTarball : public SyncUnion {
   // ~SyncUnionTarball();
 
   /*
+
    * Check that the tarball is actually valid and that can be open.
    * Similarly it creates the base directory or check that it has the ability to
    * write in it.
@@ -58,6 +59,7 @@ class SyncUnionTarball : public SyncUnion {
   const std::string base_directory_;
   std::string working_dir_;
 
+
   /*
    * Actually untar the several elements in the tar inside the base directory,
    * it returns all the recursive tars find in this operation
@@ -70,6 +72,7 @@ class SyncUnionTarball : public SyncUnion {
    * destination.
    */
   int copy_data(struct archive *src, struct archive *dst);
+
 };  // class SyncUnionTarball
 
 }  // namespace publish

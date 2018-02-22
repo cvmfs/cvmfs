@@ -1,12 +1,12 @@
-cvmfs_test_name="Repository services"
+cvmfs_test_name="Repository gateway"
 cvmfs_test_autofs_on_startup=false
 
 
 clean_up() {
     echo "Cleaning up"
 
-    echo "  Stopping repository services application"
-    /opt/cvmfs_services/bin/cvmfs_services stop
+    echo "  Stopping repository gateway application"
+    /opt/cvmfs_gateway/bin/cvmfs_gateway stop
 
     echo "  Removing Mnesia directory"
     sudo rm -rf /opt/cvmfs_mnesia
@@ -44,7 +44,7 @@ save_repo_contents() {
 }
 
 run_transactions() {
-    set_up_repository_services
+    set_up_repository_gateway
 
     echo "Pre-checks"
 
