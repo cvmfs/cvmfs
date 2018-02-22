@@ -4,8 +4,8 @@
  * It provide a series of several tar files useful for test purposes.
  */
 
-#ifndef TEST_UNITTESTS_TAR_FILES_H_
-#define TEST_UNITTESTS_TAR_FILES_H_
+#ifndef TEST_UNITTESTS_AUX_TAR_FILES_H_
+#define TEST_UNITTESTS_AUX_TAR_FILES_H_
 
 #include <string>
 
@@ -265,4 +265,4 @@ const std::string complex_tar =
 "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 
 
-#endif  //  TEST_UNITTESTS_TAR_FILES_H_
+#endif  //  TEST_UNITTESTS_AUX_TAR_FILES_H_

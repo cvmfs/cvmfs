@@ -6,8 +6,6 @@
 
 #include "sync_union_tarball.h"
 
-#include <archive.h>
-#include <archive_entry.h>
 #include <util/posix.h>
 
 #include <cassert>
@@ -15,6 +13,9 @@
 #include <string>
 
 #include "sync_union.h"
+
+#include "archive.h"
+#include "archive_entry.h"
 
 #include "fs_traversal.h"
 #include "sync_item.h"

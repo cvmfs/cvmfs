@@ -11,12 +11,12 @@
 
 #include "sync_union.h"
 
-#include <archive.h>
-
 #include <set>
 #include <string>
 
 #include "sync_mediator.h"
+
+#include "archive.h"
 
 struct archive;
 
