@@ -6,8 +6,6 @@
 
 #include "sync_union_tarball.h"
 
-#include <util/posix.h>
-
 #include <cassert>
 #include <set>
 #include <string>
@@ -20,6 +18,8 @@
 #include "fs_traversal.h"
 #include "sync_item.h"
 #include "sync_mediator.h"
+
+#include "util/posix.h"
 
 namespace publish {
 /*
@@ -42,7 +42,7 @@ SyncUnionTarball::SyncUnionTarball(AbstractSyncMediator *mediator,
 }
 
 /*
- * We traferse the tar and then we keep track (the path inside a set) of each
+ * We traverse the tar and then we keep track (the path inside a set) of each
  * .tar we find, then we go back and repeat the procedure. Should we be worry by
  * tar-bombs? Maybe, we will think about it later.
  */

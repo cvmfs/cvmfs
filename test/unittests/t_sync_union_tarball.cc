@@ -8,7 +8,6 @@
 #include <gtest/gtest.h>
 
 #include <cassert>
-#include <fstream>
 #include <iostream>
 #include <string>
 
