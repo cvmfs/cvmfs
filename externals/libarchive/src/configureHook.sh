@@ -16,6 +16,7 @@
     --without-openssl \
     --without-xml2 \
     --without-expat \
+    --without-iconv \
     --prefix=$EXTERNALS_INSTALL_LOCATION/
 
 touch libarchive/test/test_foo.c tar/test/test_foo.c cpio/test/test_foo.c cat/test/test_foo.c
