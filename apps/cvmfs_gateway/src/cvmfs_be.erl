@@ -158,7 +158,7 @@ unique_id() ->
 %%--------------------------------------------------------------------
 init([]) ->
     process_flag(trap_exit, true),
-    {ok, MaxLeaseTime} = application:get_env(cvmfs_services, max_lease_time),
+    {ok, MaxLeaseTime} = application:get_env(cvmfs_gateway, max_lease_time),
     ok = quickrand:seed(),
     {ok, #{max_lease_time => MaxLeaseTime}}.
 

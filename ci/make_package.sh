@@ -21,8 +21,8 @@ echo "switching to $CVMFS_BUILD_LOCATION..."
 cd "$CVMFS_BUILD_LOCATION"
 rebar3 as prod compile
 rebar3 as prod release,tar
-REPO_SERVICES_VERSION=$(grep -o "[0-9]\+\.[0-9]\+\.[0-9]\+" apps/cvmfs_services/src/cvmfs_services.app.src)
-TARBALL_NAME=cvmfs_services_${REPO_SERVICES_VERSION}_${CVMFS_BUILD_PLATFORM}_x86_64.tar.gz
+REPO_GATEWAY_VERSION=$(grep -o "[0-9]\+\.[0-9]\+\.[0-9]\+" apps/cvmfs_gateway/src/cvmfs_gateway.app.src)
+TARBALL_NAME=cvmfs_gateway_${REPO_GATEWAY_VERSION}_${CVMFS_BUILD_PLATFORM}_x86_64.tar.gz
 PKGMAP_FILE=${CVMFS_BUILD_LOCATION}/pkgmap/pkgmap.${CVMFS_BUILD_PLATFORM}_x86_64
 
 # Create an RPM or DEB package from the tarball
@@ -33,11 +33,11 @@ elif [ x"${CVMFS_BUILD_PLATFORM}" = xslc6 ] || [ x"${CVMFS_BUILD_PLATFORM}" = xc
     PACKAGE_TYPE=rpm
     PACKAGE_NAME_SUFFIX="$(rpm --eval "%{?dist}").x86_64"
 fi
-PACKAGE_NAME=cvmfs_services_${REPO_SERVICES_VERSION}~1${PACKAGE_NAME_SUFFIX}.${PACKAGE_TYPE}
+PACKAGE_NAME=cvmfs_gateway_${REPO_GATEWAY_VERSION}~1${PACKAGE_NAME_SUFFIX}.${PACKAGE_TYPE}
 
 mkdir -p ${CVMFS_BUILD_LOCATION}/packages
 
-cp -v _build/prod/rel/cvmfs_services/cvmfs_services-${REPO_SERVICES_VERSION}.tar.gz \
+cp -v _build/prod/rel/cvmfs_gateway/cvmfs_gateway-${REPO_GATEWAY_VERSION}.tar.gz \
    ${CVMFS_BUILD_LOCATION}/packages/${TARBALL_NAME}
 
 # Create the distribution-specific package
@@ -48,10 +48,10 @@ fi
 
 fpm -s tar \
     -t ${PACKAGE_TYPE} \
-    --prefix /opt/cvmfs_services \
+    --prefix /opt/cvmfs_gateway \
     --package packages/${PACKAGE_NAME} \
-    --version ${REPO_SERVICES_VERSION} \
-    --name cvmfs_services \
+    --version ${REPO_GATEWAY_VERSION} \
+    --name cvmfs_gateway \
     --maintainer "Radu Popescu <radu.popescu@cern.ch>" \
     --description "CernVM-FS Repository Gateway" \
     --url "http://cernvm.cern.ch" \
@@ -60,5 +60,5 @@ fpm -s tar \
 
 mkdir -p ${CVMFS_BUILD_LOCATION}/pkgmap
 echo "[${CVMFS_BUILD_PLATFORM}_x86_64]" >> ${PKGMAP_FILE}
-echo "services=${PACKAGE_NAME}" >> ${PKGMAP_FILE}
+echo "gateway=${PACKAGE_NAME}" >> ${PKGMAP_FILE}
 

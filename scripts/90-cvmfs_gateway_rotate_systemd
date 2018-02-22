@@ -1,4 +1,4 @@
-/var/log/cvmfs_services/*.log {
+/var/log/cvmfs_gateway/*.log {
         size 50M
         missingok
         rotate 7
@@ -6,6 +6,6 @@
         notifempty
 	nocreate
         postrotate
-                service rsyslog restart > /dev/null 2> /dev/null || true
+                systemctl restart rsyslog > /dev/null 2> /dev/null || true
         endscript
 }

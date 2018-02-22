@@ -1,4 +1,4 @@
--sname cvmfs_services
+-sname cvmfs_gateway
 
 -setcookie cvmfs
 
