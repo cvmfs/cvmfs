@@ -86,27 +86,27 @@ init_per_suite(Config) ->
     application:set_env(mnesia, schema_location, ram),
     application:ensure_all_started(mnesia),
 
-    ok = application:load(cvmfs_services),
-    ok = application:set_env(cvmfs_services, enabled_services, [cvmfs_auth,
+    ok = application:load(cvmfs_gateway),
+    ok = application:set_env(cvmfs_gateway, enabled_services, [cvmfs_auth,
                                                                 cvmfs_lease,
                                                                 cvmfs_be,
                                                                 cvmfs_receiver_pool,
                                                                 cvmfs_commit_sup]),
-    ok = application:set_env(cvmfs_services, repo_config,
+    ok = application:set_env(cvmfs_gateway, repo_config,
                              cvmfs_test_util:make_test_repo_config()),
 
 
     MaxLeaseTime = 1, % seconds
     TestUserVars = cvmfs_test_util:make_test_user_vars(MaxLeaseTime),
-    ok = application:set_env(cvmfs_services, user_config, TestUserVars),
+    ok = application:set_env(cvmfs_gateway, user_config, TestUserVars),
 
-    {ok, _} = application:ensure_all_started(cvmfs_services),
+    {ok, _} = application:ensure_all_started(cvmfs_gateway),
 
     lists:flatten([[{max_lease_time, MaxLeaseTime}], Config]).
 
 end_per_suite(_Config) ->
-    application:stop(cvmfs_services),
-    application:unload(cvmfs_services),
+    application:stop(cvmfs_gateway),
+    application:unload(cvmfs_gateway),
     application:stop(mnesia),
     application:unload(mnesia),
     ok.

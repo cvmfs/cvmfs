@@ -1,6 +1,6 @@
 #!/usr/bin/env escript
 %% -*- erlang -*-
-%%! -sname cvmfs_services_ops -setcookie cvmfs
+%%! -sname cvmfs_gateway_ops -setcookie cvmfs
 
 %%% -------------------------------------------------------------------
 %%%
@@ -12,7 +12,7 @@ main([]) ->
     io:format("Node name: ~p.~n", [node()]),
     io:format("Clearing all active leases... "),
     [HostName | _] = string:split(net_adm:localhost(), "."),
-    MainNodeAtom = list_to_atom("cvmfs_services@" ++ HostName),
+    MainNodeAtom = list_to_atom("cvmfs_gateway@" ++ HostName),
     ok = rpc:call(MainNodeAtom, cvmfs_lease, clear_leases, []),
     io:format("done.~n"),
     halt(0).
