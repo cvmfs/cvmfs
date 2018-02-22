@@ -2355,15 +2355,15 @@ find_or_build_cvmfs_preload() {
 
 
 #####################################
-##### CVMFS Repository Services #####
+##### CVMFS Repository Gateway ######
 #####################################
 
 
-# Sets up the CVMFS repository services application
-set_up_repository_services() {
-    echo "Setting up repository services"
+# Sets up the CVMFS repository gateway application
+set_up_repository_gateway() {
+    echo "Setting up repository gateway"
 
-    local package_url_root=$CVMFS_SERVICES_URL
+    local package_url_root=$CVMFS_GATEWAY_URL
 
     # Choose which package to download and install based on platform
     if [ -f /etc/debian_version ]; then
@@ -2381,33 +2381,33 @@ set_up_repository_services() {
         exit 1
     fi
 
-    echo "  Installing the cvmfs_services application"
+    echo "  Installing the cvmfs_gateway application"
     pushd /tmp
 
     echo "Package map URL: ${package_map_url}"
     curl -o package_map $package_map_url
 
-    local cvmfs_services_package_url=${package_url_root}/$(tail -1 package_map | cut -d'=' -f2)
-    echo "    Using package: $cvmfs_services_package_url"
+    local cvmfs_gateway_package_url=${package_url_root}/$(tail -1 package_map | cut -d'=' -f2)
+    echo "    Using package: $cvmfs_gateway_package_url"
 
-    local cvmfs_services_package_file_name=$(echo $cvmfs_services_package_url | awk -F'/' {'print $NF'})
+    local cvmfs_gateway_package_file_name=$(echo $cvmfs_gateway_package_url | awk -F'/' {'print $NF'})
 
-    if [ ! -f "/tmp/$cvmfs_services_package_file_name" ]; then
-        curl -o $cvmfs_services_package_file_name $cvmfs_services_package_url
+    if [ ! -f "/tmp/$cvmfs_gateway_package_file_name" ]; then
+        curl -o $cvmfs_gateway_package_file_name $cvmfs_gateway_package_url
     fi
 
     if [ -f /etc/debian_version ]; then
         if [ x"$(lsb_release -cs)" = x"xenial" ]; then
-            sudo dpkg -i /tmp/$cvmfs_services_package_file_name
+            sudo dpkg -i /tmp/$cvmfs_gateway_package_file_name
         fi
     else
-        sudo yum install -y /tmp/$cvmfs_services_package_file_name
+        sudo yum install -y /tmp/$cvmfs_gateway_package_file_name
     fi
 
     popd
 
     echo "  Writing configuration files"
-    sudo bash -c 'cat <<EOF > /opt/cvmfs_services/etc/repo.json
+    sudo bash -c 'cat <<EOF > /opt/cvmfs_gateway/etc/repo.json
 {
     "repos" : [
         {
@@ -2433,7 +2433,7 @@ EOF'
     echo "  Creating Mnesia schema"
     sudo mkdir -p /opt/cvmfs_mnesia
     sudo chown `whoami`:`whoami` /opt/cvmfs_mnesia
-    cd /opt/cvmfs_services
+    cd /opt/cvmfs_gateway
     ./scripts/setup.sh
 
     echo "  Creating test repo"
@@ -2445,19 +2445,19 @@ EOF'
     sudo bash -c 'echo "TEST_CVMFS_RECEIVER_UPSTREAM_STORAGE=local,/srv/cvmfs/test.repo.org/data/txn,/srv/cvmfs/test.repo.org" >> /etc/cvmfs/repositories.d/test.repo.org/server.conf'
     sudo sed -i -e "s/CVMFS_ROOT_HASH=.*//" /var/spool/cvmfs/test.repo.org/client.local
 
-    echo "  Starting repository services application"
-    /opt/cvmfs_services/scripts/run_cvmfs_services.sh start
+    echo "  Starting repository gateway application"
+    /opt/cvmfs_gateway/scripts/run_cvmfs_gateway.sh start
 
-    # Waiting here is necessary in order to give the cvmfs_services application enough time to boot
+    # Waiting here is necessary in order to give the cvmfs_gateway application enough time to boot
     wait_for_app_start
 }
 
 wait_for_app_start() {
-    local reply=$(/opt/cvmfs_services/bin/cvmfs_services ping | awk {'print $1'})
+    local reply=$(/opt/cvmfs_gateway/bin/cvmfs_gateway ping | awk {'print $1'})
     local num_iter=1
     while [ $reply != "pong" ]; do
         sleep 1
-        reply=$(/opt/cvmfs_services/bin/cvmfs_services ping | awk {'print $1'})
+        reply=$(/opt/cvmfs_gateway/bin/cvmfs_gateway ping | awk {'print $1'})
         echo "Num iter: $num_iter"
         num_iter=$((num_iter + 1))
         if [ $num_iter -eq 10 ]; then
