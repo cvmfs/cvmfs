@@ -634,6 +634,12 @@ create_repo() {
     destroy_repo $repo || return 101
   fi
 
+  # Note: We need to do a non-graceful (brutal?) restart of Apache on Fedora 26+ to avoid
+  #       a timeout issue
+  if [ x"$(which apachectl)" != x"" ]; then
+    sudo apachectl restart
+  fi
+
   echo -n "Creating new repository $repo (with extra options "$@") ..."
   local s3_config=""
   local stratum0=""
