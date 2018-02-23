@@ -27,21 +27,18 @@ void TaskRead::Process(FileItem *item) {
     } while (BlockItem::managed_bytes() > low_watermark_);
   }
 
-  int fd = -1;
-  fd = open(item->path().c_str(), O_RDONLY);
-  if (fd < 0) {
+  if (item->Open() == false) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to open %s (%d)",
              item->path().c_str(), errno);
     abort();
   }
-  platform_stat64 info;
-  int retval = platform_fstat(fd, &info);
-  if (retval != 0) {
+  uint64_t size;
+  if (item->GetSize(&size) == false) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to fstat %s (%d)",
              item->path().c_str(), errno);
     abort();
   }
-  item->set_size(info.st_size);
+  item->set_size(size);
 
   if (item->may_have_chunks()) {
     item->set_may_have_chunks(
@@ -52,9 +49,9 @@ void TaskRead::Process(FileItem *item) {
   uint64_t tag = atomic_xadd64(&tag_seq_, 1);
   ssize_t nbytes = -1;
   do {
-    nbytes = SafeRead(fd, buffer, kBlockSize);
+    nbytes = item->Read(buffer, kBlockSize);
     if (nbytes < 0) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "failed to read %s (%d)",
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to read --- %s (%d)",
                item->path().c_str(), errno);
       abort();
     }
@@ -72,7 +69,7 @@ void TaskRead::Process(FileItem *item) {
     tubes_out_->Dispatch(block_item);
   } while (nbytes > 0);
 
-  close(fd);
+  item->Close();
 }
 
 

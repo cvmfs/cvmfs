@@ -23,8 +23,7 @@ FileItem::FileItem(
   shash::Suffix hash_suffix,
   bool may_have_chunks,
   bool has_legacy_bulk_chunk)
-  : BlockSplittable(0)
-  , path_(p)
+  : path_(p)
   , compression_algorithm_(compression_algorithm)
   , hash_algorithm_(hash_algorithm)
   , hash_suffix_(hash_suffix)
@@ -39,11 +38,13 @@ FileItem::FileItem(
   assert(retval == 0);
   atomic_init64(&nchunks_in_fly_);
   atomic_init32(&is_fully_chunked_);
+  source_ = new FileIngestionSource(path_);
 }
 
 
 FileItem::~FileItem() {
   pthread_mutex_destroy(&lock_);
+  delete source_;
 }
 
 
@@ -62,15 +63,6 @@ void FileItem::RegisterChunk(const FileChunk &file_chunk) {
       break;
   }
   atomic_dec64(&nchunks_in_fly_);
-}
-
-
-BlockItem* FileItem::GetNextBlockItem(uint64_t tag) {
-  assert(block_size_ > 0);
-  BlockItem *block = new BlockItem(tag);
-  block->SetFileItem(this);
-  block->MakeStop();
-  return block;
 }
 
 

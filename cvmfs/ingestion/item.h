@@ -17,10 +17,9 @@
 #include "file_chunk.h"
 #include "hash.h"
 #include "ingestion/chunk_detector.h"
+#include "ingestion/ingestion_source.h"
 #include "util/pointer.h"
 #include "util/single_copy.h"
-
-#include "ingestion/block_splittable.h"
 
 namespace upload {
 struct UploadStreamHandle;
@@ -28,12 +27,11 @@ struct UploadStreamHandle;
 
 class FileItem;
 
-
 /**
  * Carries the information necessary to compress and checksum a file. During
  * processing, the bulk chunk and the chunks_ vector are filled.
  */
-class FileItem : BlockSplittable {
+class FileItem : SingleCopy {
  public:
   explicit FileItem(
     const std::string &p,
@@ -73,6 +71,13 @@ class FileItem : BlockSplittable {
   uint64_t GetNumChunks() { return chunks_.size(); }
   FileChunkList *GetChunksPtr() { return &chunks_; }
 
+  bool Open() { return source_->Open(); }
+  ssize_t Read(void *buffer, size_t nbyte) {
+    return source_->Read(buffer, nbyte);
+  }
+  bool Close() { return source_->Close(); }
+  bool GetSize(uint64_t *size) { return source_->GetSize(size); };
+
   // Called by ChunkItem constructor, decremented when a chunk is registered
   void IncNchunksInFly() { atomic_inc64(&nchunks_in_fly_); }
   void RegisterChunk(const FileChunk &file_chunk);
@@ -80,15 +85,12 @@ class FileItem : BlockSplittable {
     return is_fully_chunked() && (atomic_read64(&nchunks_in_fly_) == 0);
   }
 
-  // Satisfy the BlockSplittable interface
-  void SetBlockSize(uint64_t block_size) { block_size_ = block_size;}
-  BlockItem* GetNextBlockItem(uint64_t tag);
-
  private:
   static const uint64_t kSizeUnknown = uint64_t(-1);
   static const char kQuitBeaconMarker = '\0';
 
   const std::string path_;
+  IngestionSource* source_;
   const zlib::Algorithms compression_algorithm_;
   const shash::Algorithms hash_algorithm_;
   const shash::Suffix hash_suffix_;
