@@ -83,11 +83,6 @@ void SyncMediator::EnsureAllowed(const SyncItem &entry) {
 void SyncMediator::Add(const SyncItem &entry) {
   EnsureAllowed(entry);
 
-  if (entry.IsDirectory()) {
-    AddDirectoryRecursively(entry);
-    return;
-  }
-
   if (entry.IsRegularFile() || entry.IsSymlink()) {
     // A file is a hard link if the link count is greater than 1
     if (entry.HasHardlinks())
