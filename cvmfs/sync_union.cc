@@ -58,12 +58,19 @@ bool SyncUnion::ProcessDirectory(const string &parent_dir,
            parent_dir.c_str(), dir_name.c_str());
   SyncItem entry = CreateSyncItem(parent_dir, dir_name, kItemDir);
 
-  if (entry.IsOpaqueDirectory()) {  // was directory completely overwritten?
-    mediator_->Replace(entry);
-    return false;  // <-- replace does not need any further recursion
-  } else {         // directory was just changed internally... only touch needed
-    mediator_->Touch(entry);
+  if (entry.IsNew()) {
+    mediator_->Add(entry);
+    // Recursion stops here. All content of new directory
+    // is added later by the SyncMediator
     return true;
+  } else {                            // directory already existed...
+    if (entry.IsOpaqueDirectory()) {  // was directory completely overwritten?
+      mediator_->Replace(entry);
+      return false;  // <-- replace does not need any further recursion
+    } else {  // directory was just changed internally... only touch needed
+      mediator_->Touch(entry);
+      return true;
+    }
   }
 }
 
