@@ -6,6 +6,8 @@
 
 #include "sync_mediator.h"
 
+#include "stdio.h"
+
 #include <fcntl.h>
 #include <inttypes.h>
 #include <unistd.h>
@@ -85,7 +87,7 @@ void SyncMediator::EnsureAllowed(const SyncItem &entry) {
 void SyncMediator::Add(const SyncItem &entry) {
   EnsureAllowed(entry);
 
-  PrintError("Not skipping anything.");
+  printf("==++==++==\n");
 
   if (entry.IsRegularFile() || entry.IsSymlink()) {
     // A file is a hard link if the link count is greater than 1
