@@ -46,7 +46,8 @@ SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalog_manager,
 
   params->spooler->RegisterListener(&SyncMediator::PublishFilesCallback, this);
 
-  LogCvmfs(kLogPublish, kLogStdout, "Processing changes...");
+  LogCvmfs(kLogPublish, kLogStdout, "||| Processing changes... |||");
+  printf("AAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n");
 }
 
 
@@ -86,8 +87,15 @@ void SyncMediator::EnsureAllowed(const SyncItem &entry) {
  */
 void SyncMediator::Add(const SyncItem &entry) {
   EnsureAllowed(entry);
+  
+  LogCvmfs(kLogPublish, kLogStdout, "Add entry");
 
   printf("==++==++==\n");
+
+  if (entry.IsDirectory()) {
+        AddDirectory(entry);
+        return;
+  }
 
   if (entry.IsRegularFile() || entry.IsSymlink()) {
     // A file is a hard link if the link count is greater than 1
