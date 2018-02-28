@@ -61,8 +61,6 @@ bool SyncUnion::ProcessDirectory(const string &parent_dir,
 
   if (entry.IsNew()) {
     mediator_->Add(entry);
-    // Recursion stops here. All content of new directory
-    // is added later by the SyncMediator
     return true;
   } else {                            // directory already existed...
     if (entry.IsOpaqueDirectory()) {  // was directory completely overwritten?
