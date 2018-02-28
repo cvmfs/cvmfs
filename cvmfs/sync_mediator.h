@@ -157,27 +157,6 @@ class SyncMediator : public virtual AbstractSyncMediator {
   void RemoveNestedCatalog(const SyncItem &directory);
 
   // Called by file system traversal
-  void EnterAddedDirectoryCallback(const std::string &parent_dir,
-                                   const std::string &dir_name);
-  void LeaveAddedDirectoryCallback(const std::string &parent_dir,
-                                   const std::string &dir_name);
-
-  void AddDirectoryRecursively(const SyncItem &entry);
-  bool AddDirectoryCallback(const std::string &parent_dir,
-                            const std::string &dir_name);
-  void AddFileCallback(const std::string &parent_dir,
-                       const std::string &file_name);
-  void AddCharacterDeviceCallback(const std::string &parent_dir,
-                                  const std::string &file_name);
-  void AddBlockDeviceCallback(const std::string &parent_dir,
-                              const std::string &file_name);
-  void AddFifoCallback(const std::string &parent_dir,
-                       const std::string &file_name);
-  void AddSocketCallback(const std::string &parent_dir,
-                         const std::string &file_name);
-  void AddSymlinkCallback(const std::string &parent_dir,
-                          const std::string &link_name);
-
   void RemoveDirectoryRecursively(const SyncItem &entry);
   void RemoveFileCallback(const std::string &parent_dir,
                           const std::string &file_name);
