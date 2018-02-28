@@ -1,6 +1,6 @@
 {application, cvmfs_gateway,
  [{description, "CVMFS Repository Gateway"},
-  {vsn, "0.1.10"},
+  {vsn, "0.2.0"},
   {registered, [cvmfs_auth, cvmfs_be, cvmfs_commit_sup, cvmfs_fe, cvmfs_lease, cvmfs_receiver_pool]},
   {mod, {cvmfs_gateway_app, []}},
   {applications,
