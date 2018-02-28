@@ -6,8 +6,6 @@
 
 #include "sync_mediator.h"
 
-#include "stdio.h"
-
 #include <fcntl.h>
 #include <inttypes.h>
 #include <unistd.h>
@@ -86,8 +84,6 @@ void SyncMediator::EnsureAllowed(const SyncItem &entry) {
  */
 void SyncMediator::Add(const SyncItem &entry) {
   EnsureAllowed(entry);
-  
-  LogCvmfs(kLogPublish, kLogStdout, "Add entry");
 
   if (entry.IsDirectory()) {
     AddDirectory(entry);
