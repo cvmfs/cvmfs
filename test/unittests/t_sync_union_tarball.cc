@@ -27,7 +27,7 @@ namespace {
 class T_SyncUnionTarball : public ::testing::Test {
  protected:
   void SetUp() {
-    zlib::Algorithms algo;
+    zlib::Algorithms algo = zlib::kZlibDefault;
     DefaultValue<zlib::Algorithms>::Set(algo);
 
     m_sync_mediator_ = new publish::MockSyncMediator();
