@@ -550,6 +550,10 @@ if (BUILD_LIBCVMFS_CACHE)
                          "${LIBCVMFS_CACHE_CFLAGS}")
   target_link_libraries(cvmfs_cache_only ${LIBCVMFS_CACHE_LIBS})
 
+  # Note: it would be a good idea to try to unify the next block for macOS and Linux.
+  #       It may be possible to use libtool on both platforms, including the ability
+  #       to hide private symbols in the library - which is currently done by the
+  #       `combine_libs` script, on Linux only.
   if (MACOSX)
     add_custom_command(
         OUTPUT libcvmfs_cache.a
