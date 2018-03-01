@@ -293,7 +293,6 @@ else (NOT MACOSX)
   set (RT_LIBRARY "")
 endif (NOT MACOSX)
 
-
 # Required libraries depending on build target
 
 find_package (OpenSSL REQUIRED)
