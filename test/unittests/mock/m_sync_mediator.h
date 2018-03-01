@@ -9,9 +9,14 @@
 
 #include <gmock/gmock.h>
 
+#include "hash.h"
 #include "sync_mediator.h"
 
-#include "hash.h"
+using ::testing::Invoke;
+using ::testing::_;
+using ::testing::DefaultValue;
+using ::testing::Return;
+using ::testing::Property;
 
 namespace publish {
 

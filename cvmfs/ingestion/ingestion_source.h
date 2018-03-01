@@ -2,11 +2,11 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef CVMFS_INGESTION_SOURCE_H_
-#define CVMFS_INGESTION_SOURCE_H_
+#ifndef CVMFS_INGESTION_INGESTION_SOURCE_H_
+#define CVMFS_INGESTION_INGESTION_SOURCE_H_
 
 #include <stdio.h>
-#include <string.h>
+#include <string>
 
 #include "platform.h"
 #include "util/posix.h"
@@ -23,7 +23,7 @@ class IngestionSource : SingleCopy {
 
 class FileIngestionSource : public IngestionSource {
  public:
-  FileIngestionSource(const std::string& path) : path_(path){};
+  explicit FileIngestionSource(const std::string& path) : path_(path) {}
   ~FileIngestionSource() {  // Close();
   }
 
@@ -70,4 +70,4 @@ class FileIngestionSource : public IngestionSource {
   int fd_;
 };
 
-#endif  // CVMFS_INGESTION_SOURCE_H_
+#endif  // CVMFS_INGESTION_INGESTION_SOURCE_H_
