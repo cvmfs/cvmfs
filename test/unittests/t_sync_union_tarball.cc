@@ -8,16 +8,12 @@
 #include <gtest/gtest.h>
 
 #include <cassert>
-#include <iostream>
 #include <string>
 
-#include "mock/m_sync_mediator.h"
-
-#include "util/string.h"
-
-#include "sync_item.h"
-
 #include "aux/tar_files.h"
+#include "mock/m_sync_mediator.h"
+#include "sync_item.h"
+#include "util/string.h"
 
 using ::testing::_;
 using ::testing::DefaultValue;

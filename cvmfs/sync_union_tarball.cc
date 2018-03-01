@@ -10,24 +10,15 @@
 #include <set>
 #include <string>
 
-#include "sync_union.h"
-
 #include "archive.h"
 #include "archive_entry.h"
-
 #include "fs_traversal.h"
 #include "sync_item.h"
 #include "sync_mediator.h"
-
+#include "sync_union.h"
 #include "util/posix.h"
 
 namespace publish {
-/*
- * Still have to underastand how the madiator, scratch, read and union path
- * works together.
- */
-
-// SyncUnionTarball::SyncUnionTarball(VirtualSyncMed)
 
 SyncUnionTarball::SyncUnionTarball(AbstractSyncMediator *mediator,
                                    const std::string &rdonly_path,
@@ -94,7 +85,7 @@ bool SyncUnionTarball::UntarPath(const std::string &base_untar_directory_path,
   dst = archive_write_disk_new();
   assert(dst);
 
-  // here we coule also accept _all instead of _tar, however it will require
+  // here we could also accept _all instead of _tar, however it will require
   // more memory and it will provide a way more open interface, maybe too open.
   archive_read_support_format_tar(src);
 

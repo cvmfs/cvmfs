@@ -14,9 +14,8 @@
 #include <set>
 #include <string>
 
-#include "sync_mediator.h"
-
 #include "archive.h"
+#include "sync_mediator.h"
 
 struct archive;
 

@@ -102,8 +102,8 @@ set(CVMFS_UNITTEST_FILES
   t_statistics.cc
   t_suid_util.cc
   t_swissknife_lease.cc
-  t_synchronizing_counter.cc
   t_sync_union_tarball.cc
+  t_synchronizing_counter.cc
   t_raii_temp_dir.cc
   t_test_utils.cc
   t_tracer.cc
@@ -224,9 +224,9 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/swissknife_history.cc
   ${CVMFS_SOURCE_DIR}/swissknife_lease_json.cc
   ${CVMFS_SOURCE_DIR}/swissknife_lease_curl.cc
-  ${CVMFS_SOURCE_DIR}/sync_union.cc
-  ${CVMFS_SOURCE_DIR}/sync_mediator.cc
   ${CVMFS_SOURCE_DIR}/sync_item.cc
+  ${CVMFS_SOURCE_DIR}/sync_mediator.cc
+  ${CVMFS_SOURCE_DIR}/sync_union.cc
   ${CVMFS_SOURCE_DIR}/sync_union_tarball.cc
   ${CVMFS_SOURCE_DIR}/tracer.cc
   ${CVMFS_SOURCE_DIR}/upload.cc
