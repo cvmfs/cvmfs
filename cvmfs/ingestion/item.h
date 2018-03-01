@@ -76,7 +76,7 @@ class FileItem : SingleCopy {
     return source_->Read(buffer, nbyte);
   }
   bool Close() { return source_->Close(); }
-  bool GetSize(uint64_t *size) { return source_->GetSize(size); };
+  bool GetSize(uint64_t *size) { return source_->GetSize(size); }
 
   // Called by ChunkItem constructor, decremented when a chunk is registered
   void IncNchunksInFly() { atomic_inc64(&nchunks_in_fly_); }

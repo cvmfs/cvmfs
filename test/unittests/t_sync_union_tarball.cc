@@ -84,12 +84,53 @@ TEST_F(T_SyncUnionTarball, Traverse) {
   // The down propagation is done by SyncMediator::AddDirectoryRecursively which
   // uses privates methods.
   // Then we add the same directory and finally we leave the directory.
-  EXPECT_CALL(*m_sync_mediator_, EnterDirectory(_)).Times(1);
+
+  EXPECT_CALL(*m_sync_mediator_,
+              EnterDirectory(AllOf(Property(&SyncItem::IsDirectory, true),
+                                   Property(&SyncItem::filename, ""))))
+      .Times(1);
+
+  EXPECT_CALL(*m_sync_mediator_,
+              EnterDirectory(AllOf(Property(&SyncItem::IsDirectory, true),
+                                   Property(&SyncItem::filename, "tar"))))
+      .Times(1);
+
   EXPECT_CALL(*m_sync_mediator_,
               Add(AllOf(Property(&SyncItem::IsDirectory, true),
                         Property(&SyncItem::filename, "tar"))))
       .Times(1);
-  EXPECT_CALL(*m_sync_mediator_, LeaveDirectory(_)).Times(1);
+
+  EXPECT_CALL(*m_sync_mediator_,
+              EnterDirectory(AllOf(Property(&SyncItem::IsDirectory, true),
+                                   Property(&SyncItem::filename, "aaa"))))
+      .Times(1);
+
+  EXPECT_CALL(*m_sync_mediator_,
+              Add(AllOf(Property(&SyncItem::IsDirectory, true),
+                        Property(&SyncItem::filename, "aaa"))))
+      .Times(1);
+
+  EXPECT_CALL(*m_sync_mediator_,
+              Add(AllOf(Property(&SyncItem::IsRegularFile, true),
+                        Property(&SyncItem::filename, "joker"))))
+      .Times(1);
+  EXPECT_CALL(*m_sync_mediator_,
+              LeaveDirectory(AllOf(Property(&SyncItem::IsDirectory, true),
+                                   Property(&SyncItem::filename, "aaa"))))
+      .Times(1);
+  EXPECT_CALL(*m_sync_mediator_,
+              Add(AllOf(Property(&SyncItem::IsRegularFile, true),
+                        Property(&SyncItem::filename, "hero"))))
+      .Times(1);
+  EXPECT_CALL(*m_sync_mediator_,
+              LeaveDirectory(AllOf(Property(&SyncItem::IsDirectory, true),
+                                   Property(&SyncItem::filename, "tar"))))
+      .Times(1);
+  EXPECT_CALL(*m_sync_mediator_,
+              LeaveDirectory(AllOf(Property(&SyncItem::IsDirectory, true),
+                                   Property(&SyncItem::filename, ""))))
+      .Times(1);
+
   sync_union.Traverse();
 }
 
@@ -102,6 +143,7 @@ TEST_F(T_SyncUnionTarball, Four_Empty_Files) {
   sync_union.Initialize();
 
   EXPECT_CALL(*m_sync_mediator_, EnterDirectory(_)).Times(1);
+
   EXPECT_CALL(*m_sync_mediator_, IsExternalData())
       .Times(4)
       .WillRepeatedly(Return(false));
@@ -136,34 +178,74 @@ TEST_F(T_SyncUnionTarball, Complex_Tar) {
   EXPECT_CALL(*m_sync_mediator_, RegisterUnionEngine(_)).Times(1);
   sync_union.Initialize();
 
-  EXPECT_CALL(*m_sync_mediator_, EnterDirectory(_)).Times(1);
+  EXPECT_CALL(*m_sync_mediator_,
+              EnterDirectory(AllOf(Property(&SyncItem::IsDirectory, true),
+                                   Property(&SyncItem::GetRelativePath, ""))))
+      .Times(1);
+
   // Once for each "Regular file", the one with entry_type == kItemFile
   EXPECT_CALL(*m_sync_mediator_, IsExternalData())
-      .Times(2)
+      .Times(3)
       .WillRepeatedly(Return(false));
 
   // Similarly as above, one call for each "Regular file", the one with
   // entry_type == kItemFile
-  EXPECT_CALL(*m_sync_mediator_, GetCompressionAlgorithm()).Times(2);
+  EXPECT_CALL(*m_sync_mediator_, GetCompressionAlgorithm()).Times(3);
 
   EXPECT_CALL(*m_sync_mediator_,
               Add(AllOf(Property(&SyncItem::IsRegularFile, true),
-                        Property(&SyncItem::filename, "bar"))))
+                        Property(&SyncItem::GetRelativePath, "bar"))))
       .Times(1);
+
   EXPECT_CALL(*m_sync_mediator_,
               Add(AllOf(Property(&SyncItem::IsDirectory, true),
-                        Property(&SyncItem::filename, "dir"))))
+                        Property(&SyncItem::GetRelativePath, "dir"))))
+      .Times(1);
+  EXPECT_CALL(
+      *m_sync_mediator_,
+      EnterDirectory(AllOf(Property(&SyncItem::IsDirectory, true),
+                           Property(&SyncItem::GetRelativePath, "dir"))))
+      .Times(1);
+
+  EXPECT_CALL(
+      *m_sync_mediator_,
+      Add(AllOf(Property(&SyncItem::IsDirectory, true),
+                Property(&SyncItem::GetRelativePath, "dir/inside_dir"))))
+      .Times(1);
+  EXPECT_CALL(*m_sync_mediator_,
+              EnterDirectory(AllOf(
+                  Property(&SyncItem::IsDirectory, true),
+                  Property(&SyncItem::GetRelativePath, "dir/inside_dir"))))
+      .Times(1);
+
+  EXPECT_CALL(
+      *m_sync_mediator_,
+      Add(AllOf(Property(&SyncItem::IsRegularFile, true),
+                Property(&SyncItem::GetRelativePath, "dir/inside_dir/foo"))))
+      .Times(1);
+  EXPECT_CALL(*m_sync_mediator_,
+              LeaveDirectory(AllOf(
+                  Property(&SyncItem::IsDirectory, true),
+                  Property(&SyncItem::GetRelativePath, "dir/inside_dir"))))
+      .Times(1);
+  EXPECT_CALL(
+      *m_sync_mediator_,
+      LeaveDirectory(AllOf(Property(&SyncItem::IsDirectory, true),
+                           Property(&SyncItem::GetRelativePath, "dir"))))
       .Times(1);
   EXPECT_CALL(*m_sync_mediator_,
               Add(AllOf(Property(&SyncItem::IsRegularFile, true),
-                        Property(&SyncItem::filename, "foo"))))
+                        Property(&SyncItem::GetRelativePath, "foo"))))
       .Times(1);
   EXPECT_CALL(*m_sync_mediator_,
               Add(AllOf(Property(&SyncItem::IsSymlink, true),
-                        Property(&SyncItem::filename, "foo_link"))))
+                        Property(&SyncItem::GetRelativePath, "foo_link"))))
+      .Times(1);
+  EXPECT_CALL(*m_sync_mediator_,
+              LeaveDirectory(AllOf(Property(&SyncItem::IsDirectory, true),
+                                   Property(&SyncItem::GetRelativePath, ""))))
       .Times(1);
 
-  EXPECT_CALL(*m_sync_mediator_, LeaveDirectory(_)).Times(1);
   sync_union.Traverse();
 }
 
