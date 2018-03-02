@@ -22,6 +22,7 @@ namespace publish {
 
 SyncItem::SyncItem() :
   union_engine_(NULL),
+  scratch_type_(static_cast<SyncItemType>(0)),
   whiteout_(false),
   opaque_(false),
   masked_hardlink_(false),
@@ -31,14 +32,12 @@ SyncItem::SyncItem() :
   external_data_(false),
   graft_chunklist_(NULL),
   graft_size_(-1),
-  scratch_type_(static_cast<SyncItemType>(0)),
   rdonly_type_(static_cast<SyncItemType>(0)),
   compression_algorithm_(zlib::kZlibDefault) {}
 
 SyncItem::SyncItem(const string       &relative_parent_path,
                    const string       &filename,
-                   const SyncUnion    *union_engine,
-                   const SyncItemType  entry_type) :
+                   const SyncUnion    *union_engine) :
   union_engine_(union_engine),
   whiteout_(false),
   opaque_(false),
@@ -51,7 +50,31 @@ SyncItem::SyncItem(const string       &relative_parent_path,
   filename_(filename),
   graft_chunklist_(NULL),
   graft_size_(-1),
+  rdonly_type_(kItemUnknown),
+  compression_algorithm_(zlib::kZlibDefault)
+{
+  content_hash_.algorithm = shash::kAny;
+  CheckMarkerFiles();
+}
+
+
+SyncItem::SyncItem(const string       &relative_parent_path,
+                   const string       &filename,
+                   const SyncUnion    *union_engine,
+                   const SyncItemType  entry_type) :
+  union_engine_(union_engine),
   scratch_type_(entry_type),
+  whiteout_(false),
+  opaque_(false),
+  masked_hardlink_(false),
+  has_catalog_marker_(false),
+  valid_graft_(false),
+  graft_marker_present_(false),
+  external_data_(false),
+  relative_parent_path_(relative_parent_path),
+  filename_(filename),
+  graft_chunklist_(NULL),
+  graft_size_(-1),
   rdonly_type_(kItemUnknown),
   compression_algorithm_(zlib::kZlibDefault)
 {
