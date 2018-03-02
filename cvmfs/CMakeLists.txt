@@ -152,6 +152,7 @@ set (CVMFS_CACHE_RAM_SOURCES
   malloc_heap.cc
   statistics.cc
   util_concurrency.cc
+  util/posix.cc
   util/string.cc
 )
 
