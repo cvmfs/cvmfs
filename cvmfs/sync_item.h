@@ -199,8 +199,11 @@ class SyncItem {
     }
     return rdonly_type_ == expected_type;
   }
+  
+  const SyncUnion *union_engine_;     /**< this SyncUnion created this object */
 
- private:
+  mutable SyncItemType scratch_type_;
+  
   /**
    * create a new SyncItem
    * Note: SyncItems cannot be created by any using code. SyncUnion will take
@@ -215,7 +218,13 @@ class SyncItem {
            const std::string  &filename,
            const SyncUnion    *union_engine,
            const SyncItemType  entry_type);
+  
+  SyncItem(const std::string  &relative_parent_path,
+           const std::string  &filename,
+           const SyncUnion    *union_engine);
 
+
+ private:
   /**
    * Structure to cache stat calls to the different file locations.
    */
@@ -250,8 +259,6 @@ class SyncItem {
   std::string GetGraftMarkerPath() const;
   void CheckGraft();
 
-  const SyncUnion *union_engine_;     /**< this SyncUnion created this object */
-
   mutable EntryStat rdonly_stat_;
   mutable EntryStat union_stat_;
   mutable EntryStat scratch_stat_;
@@ -273,7 +280,6 @@ class SyncItem {
   FileChunkList *graft_chunklist_;
   ssize_t graft_size_;
 
-  mutable SyncItemType scratch_type_;
   mutable SyncItemType rdonly_type_;
 
   // The hash of regular file's content

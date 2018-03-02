@@ -71,19 +71,21 @@ TEST_F(T_SyncUnionTarball, Init) {
   EXPECT_TRUE(sync_union.Initialize());
 }
 
+/*
+ * tar
+ * ├── [4.0K]  aaa
+ * │   └── [   7]  joker
+ * └── [   7]  hero
+ *
+ */
+
 TEST_F(T_SyncUnionTarball, Traverse) {
   std::string tar_filename = CreateTarFile("tar.tar", simple_tar);
-  publish::SyncUnionTarball sync_union(m_sync_mediator_, "", "", "",
-                                       tar_filename, "/tmp/lala");
+  publish::SyncUnionTarball sync_union(m_sync_mediator_, "/rdonly", "/union",
+                                       "/scratch", tar_filename, "tmp/lala");
 
   EXPECT_CALL(*m_sync_mediator_, RegisterUnionEngine(_)).Times(1);
   sync_union.Initialize();
-
-  // We enter the directory, check that it is a new directory, since it is a new
-  // directory we don't propagate down the recursion.
-  // The down propagation is done by SyncMediator::AddDirectoryRecursively which
-  // uses privates methods.
-  // Then we add the same directory and finally we leave the directory.
 
   EXPECT_CALL(*m_sync_mediator_,
               EnterDirectory(AllOf(Property(&SyncItem::IsDirectory, true),
@@ -142,12 +144,16 @@ TEST_F(T_SyncUnionTarball, Four_Empty_Files) {
   EXPECT_CALL(*m_sync_mediator_, RegisterUnionEngine(_)).Times(1);
   sync_union.Initialize();
 
+  /*
   EXPECT_CALL(*m_sync_mediator_, EnterDirectory(_)).Times(1);
 
   EXPECT_CALL(*m_sync_mediator_, IsExternalData())
       .Times(4)
       .WillRepeatedly(Return(false));
+
   EXPECT_CALL(*m_sync_mediator_, GetCompressionAlgorithm()).Times(4);
+  EXPECT_CALL(*m_sync_mediator_, LeaveDirectory(_)).Times(1);
+  */
 
   EXPECT_CALL(*m_sync_mediator_,
               Add(AllOf(Property(&SyncItem::IsRegularFile, true),
@@ -166,7 +172,6 @@ TEST_F(T_SyncUnionTarball, Four_Empty_Files) {
                         Property(&SyncItem::filename, "fuz"))))
       .Times(1);
 
-  EXPECT_CALL(*m_sync_mediator_, LeaveDirectory(_)).Times(1);
   sync_union.Traverse();
 }
 

@@ -14,9 +14,12 @@
 #include "archive_entry.h"
 #include "fs_traversal.h"
 #include "sync_item.h"
+#include "sync_item_tar.h"
 #include "sync_mediator.h"
 #include "sync_union.h"
 #include "util/posix.h"
+
+#include <stdio.h>
 
 namespace publish {
 
@@ -28,34 +31,164 @@ SyncUnionTarball::SyncUnionTarball(AbstractSyncMediator *mediator,
                                    const std::string &base_directory)
     : SyncUnion(mediator, rdonly_path, union_path, scratch_path),
       tarball_path_(tarball_path),
-      base_directory_(base_directory) {
-  working_dir_ = "";
-}
+      base_directory_(base_directory) {}
 
-/*
- * We traverse the tar and then we keep track (the path inside a set) of each
- * .tar we find, then we go back and repeat the procedure. Should we be worry by
- * tar-bombs? Maybe, we will think about it later.
- */
 bool SyncUnionTarball::Initialize() {
   bool result;
 
-  // We save the current working directory
-  std::string cwd = GetCurrentWorkingDirectory();
   // Save the absolute path of the tarball
   std::string tarball_absolute_path = GetAbsolutePath(tarball_path_);
-  // Create the actual temp directory
-  working_dir_ = CreateTempDir(base_directory_);
-  if (working_dir_ == "") {
-    LogCvmfs(kLogUnionFs, kLogStderr,
-             "Impossible to create the destination directory. (errno %d)",
-             errno);
+
+  src = archive_read_new();
+  archive_read_support_format_tar(src);
+
+  result = archive_read_open_filename(src, tarball_absolute_path.c_str(), 4096);
+
+  if (result != ARCHIVE_OK) {
+    LogCvmfs(kLogUnionFs, kLogStderr, "Impossible to open the archive.");
     return false;
   }
 
   // Actually untar the whole archive
-  result = UntarPath(working_dir_, tarball_absolute_path);
-  return result && SyncUnion::Initialize();
+  // result = UntarPath(working_dir_, tarball_absolute_path);
+  // return result && SyncUnion::Initialize();
+  return (result == ARCHIVE_OK) && SyncUnion::Initialize();
+}
+
+void SyncUnionTarball::Traverse() {
+  struct archive_entry *entry;
+  // when we find a directory we stack it up and call the EnterDirectory
+  // as soon as we find a file that does not belong to the directory we call
+  // LeaveDirectory
+  std::stack<std::string> directories_stacked;
+  std::string directory_traversing;
+
+  std::string archive_file_path;
+  std::string complete_path;
+  std::string parent_path;
+  std::string filename;
+  int result;
+  bool retry_read_header = false;
+
+  assert(this->IsInitialized());
+  while (true) {
+    do {
+      retry_read_header = false;
+      result = archive_read_next_header(src, &entry);
+
+      switch (result) {
+        case ARCHIVE_FATAL: {
+          LogCvmfs(kLogUnionFs, kLogStderr,
+                   "Fatal error in reading the archive.");
+          return;
+          break;
+        }
+
+        case ARCHIVE_RETRY: {
+          LogCvmfs(kLogUnionFs, kLogStderr,
+                   "Error in reading the header, retrying. \n %s",
+                   archive_error_string(src));
+          retry_read_header = true;
+          break;
+        }
+
+        case ARCHIVE_EOF: {
+          return;
+          break;
+        }
+
+        case ARCHIVE_WARN: {
+          LogCvmfs(kLogUnionFs, kLogStderr,
+                   "Warning in uncompression reading, going on. \n %s",
+                   archive_error_string(src));
+          break;
+        }
+
+        case ARCHIVE_OK: {
+          archive_file_path.assign(archive_entry_pathname(entry));
+          complete_path.assign(base_directory_ + "/" + archive_file_path);
+
+          if (*complete_path.rbegin() == '/') {
+            complete_path.erase(complete_path.size() - 1);
+          }
+
+          printf("\n\n");
+
+          SplitPath(complete_path, &parent_path, &filename);
+          printf("parent: %s\nfilename: %s\n", parent_path.c_str(),
+                 filename.c_str());
+
+          SyncItemTar sync_entry =
+              SyncItemTar(parent_path, filename, src, entry, this);
+
+          printf(
+              "complete_path: \t%s \ndirectory_traversing: "
+              "\t%s\n",
+              complete_path.c_str(), directory_traversing.c_str());
+          int64_t inode = archive_entry_ino64(entry);
+          int link_count = archive_entry_nlink(entry);
+          printf("inode: %" PRIu64 "\n", inode);
+          printf("link count %d\n", link_count);
+          if (sync_entry.IsDirectory()) {
+            directories_stacked.push(complete_path);
+            directory_traversing.assign(complete_path);
+            EnterDirectory(parent_path, filename);
+          } else {
+            if (complete_path.rfind(directory_traversing, 0) != 0) {
+              directory_traversing.assign(directories_stacked.top());
+              directories_stacked.pop();
+              std::string leave_parent, leave_filename;
+              SplitPath(directory_traversing, &leave_parent, &leave_filename);
+              printf("Leaving dir: %s / %s \n", leave_parent.c_str(),
+                     leave_filename.c_str());
+              LeaveDirectory(leave_parent, leave_filename);
+            }
+          }
+
+          printf("archive_file_path\t%s\n", archive_file_path.c_str());
+          printf("complete_path\t\t%s\n", complete_path.c_str());
+          printf("parent_path\t\t%s\n", parent_path.c_str());
+          printf("filename\t\t%s\n", filename.c_str());
+          printf("relative_parent_path:\t%s\n",
+                 sync_entry.relative_parent_path().c_str());
+          printf("WhiteOut:\t\t%d\n", sync_entry.IsWhiteout());
+          printf("New:\t\t\t%d\n", sync_entry.IsNew());
+          printf("RelativePath:\t\t%s\n", sync_entry.GetRelativePath().c_str());
+          printf("filename:\t\t%s\n", sync_entry.filename().c_str());
+          printf("RdOnlyPath:\t\t%s\n", sync_entry.GetRdOnlyPath().c_str());
+          printf("UnionPath:\t\t%s\n", sync_entry.GetUnionPath().c_str());
+          printf("ScratchPath:\t\t%s\n", sync_entry.GetScratchPath().c_str());
+
+          printf("\n\n");
+
+          ProcessFile(sync_entry);
+        }
+      }
+
+    } while (retry_read_header);
+  }
+
+  /*
+  FileSystemTraversal<SyncUnionTarball> traversal(this, working_dir_, true);
+
+  traversal.fn_enter_dir = &SyncUnionTarball::EnterDirectory;
+  traversal.fn_leave_dir = &SyncUnionTarball::LeaveDirectory;
+  traversal.fn_new_file = &SyncUnionTarball::ProcessRegularFile;
+  traversal.fn_new_character_dev = &SyncUnionTarball::ProcessCharacterDevice;
+  traversal.fn_new_block_dev = &SyncUnionTarball::ProcessBlockDevice;
+  traversal.fn_new_fifo = &SyncUnionTarball::ProcessFifo;
+  traversal.fn_new_socket = &SyncUnionTarball::ProcessSocket;
+  traversal.fn_ignore_file = &SyncUnionTarball::IgnoreFilePredicate;
+  traversal.fn_new_dir_prefix = &SyncUnionTarball::ProcessDirectory;
+  traversal.fn_new_symlink = &SyncUnionTarball::ProcessSymlink;
+
+  LogCvmfs(kLogUnionFs, kLogVerboseMsg,
+           "Tarball starting traversal "
+           "recursion for working directory=[%s]",
+           working_dir_.c_str());
+
+  traversal.Recurse(working_dir_);
+  */
 }
 
 bool SyncUnionTarball::UntarPath(const std::string &base_untar_directory_path,
@@ -248,31 +381,6 @@ int SyncUnionTarball::CopyData(struct archive *src, struct archive *dst) {
     } while (retry_write);
   }
 }
-
-void SyncUnionTarball::Traverse() {
-  assert(this->IsInitialized());
-
-  FileSystemTraversal<SyncUnionTarball> traversal(this, working_dir_, true);
-
-  traversal.fn_enter_dir = &SyncUnionTarball::EnterDirectory;
-  traversal.fn_leave_dir = &SyncUnionTarball::LeaveDirectory;
-  traversal.fn_new_file = &SyncUnionTarball::ProcessRegularFile;
-  traversal.fn_new_character_dev = &SyncUnionTarball::ProcessCharacterDevice;
-  traversal.fn_new_block_dev = &SyncUnionTarball::ProcessBlockDevice;
-  traversal.fn_new_fifo = &SyncUnionTarball::ProcessFifo;
-  traversal.fn_new_socket = &SyncUnionTarball::ProcessSocket;
-  traversal.fn_ignore_file = &SyncUnionTarball::IgnoreFilePredicate;
-  traversal.fn_new_dir_prefix = &SyncUnionTarball::ProcessDirectory;
-  traversal.fn_new_symlink = &SyncUnionTarball::ProcessSymlink;
-
-  LogCvmfs(kLogUnionFs, kLogVerboseMsg,
-           "Tarball starting traversal "
-           "recursion for working directory=[%s]",
-           working_dir_.c_str());
-
-  traversal.Recurse(working_dir_);
-}
-
 std::string SyncUnionTarball::UnwindWhiteoutFilename(
     const SyncItem &entry) const {
   return entry.filename();

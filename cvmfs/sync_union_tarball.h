@@ -53,9 +53,9 @@ class SyncUnionTarball : public SyncUnion {
   bool IsWhiteoutEntry(const SyncItem &entry) const;
 
  private:
+  struct archive *src;
   const std::string tarball_path_;
   const std::string base_directory_;
-  std::string working_dir_;
 
   /*
    * Actually untar the several elements in the tar inside the base directory,
