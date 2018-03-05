@@ -152,6 +152,7 @@ set (CVMFS_CACHE_RAM_SOURCES
   malloc_heap.cc
   statistics.cc
   util_concurrency.cc
+  util/posix.cc
   util/string.cc
 )
 
@@ -543,23 +544,35 @@ if (BUILD_LIBCVMFS_CACHE)
   add_library (cvmfs_cache_only STATIC ${LIBCVMFS_CACHE_SOURCES})
   add_dependencies (cvmfs_cache_only cache.pb.generated)
   set (LIBCVMFS_CACHE_LIBS ${SHA3_LIBRARIES} ${PROTOBUF_LITE_LIBRARY}
-                           ${LIBCVMFS_CACHE_LIBS}
-                           ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache_only.a)
+    ${LIBCVMFS_CACHE_LIBS} ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache_only.a)
+  if (MACOSX)
+    list(APPEND LIBCVMFS_CACHE_LIBS ${OPENSSL_LIBRARIES})
+  endif (MACOSX)
+
   set_target_properties (cvmfs_cache_only PROPERTIES COMPILE_FLAGS
                          "${LIBCVMFS_CACHE_CFLAGS}")
   target_link_libraries(cvmfs_cache_only ${LIBCVMFS_CACHE_LIBS})
-  if (NOT MACOSX)
-    # We do not (yet) have a recipe for localizing private symbols
-    # in Mac OS X, so skip that step on Mac
-    #set (LIBCVMFS_CACHE_PUBLIC_SYMS "-public" "${CMAKE_CURRENT_SOURCE_DIR}/cache_plugin/libcvmfs_cache_public_syms.txt")
-  endif (NOT MACOSX)
 
-  add_custom_command(
-      OUTPUT libcvmfs_cache.a
-      COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/combine_libs ${LIBCVMFS_CACHE_PUBLIC_SYMS} libcvmfs_cache.a ${LIBCVMFS_CACHE_LIBS}
-      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-      DEPENDS ${LIBCVMFS_CACHE_LIBS}
-    )
+  # Note: it would be a good idea to try to unify the next block for macOS and Linux.
+  #       It may be possible to use libtool on both platforms, including the ability
+  #       to hide private symbols in the library - which is currently done by the
+  #       `combine_libs` script, on Linux only.
+  if (MACOSX)
+    add_custom_command(
+        OUTPUT libcvmfs_cache.a
+        COMMAND libtool -static -o libcvmfs_cache.a ${LIBCVMFS_CACHE_LIBS}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        DEPENDS ${LIBCVMFS_CACHE_LIBS}
+      )
+  else (MACOSX)
+    set (LIBCVMFS_CACHE_PUBLIC_SYMS "-public" "${CMAKE_CURRENT_SOURCE_DIR}/cache_plugin/libcvmfs_cache_public_syms.txt")
+    add_custom_command(
+        OUTPUT libcvmfs_cache.a
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/combine_libs ${LIBCVMFS_CACHE_PUBLIC_SYMS} libcvmfs_cache.a ${LIBCVMFS_CACHE_LIBS}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        DEPENDS ${LIBCVMFS_CACHE_LIBS}
+      )
+  endif (MACOSX)
 
   # dummy target to cause merged libcvmfs_cache to be produced
   add_custom_target (libcvmfs_cache ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a)
