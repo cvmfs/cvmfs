@@ -1,4 +1,5 @@
 2.5.0:
+  * Create libcvmfs_cache.a on macOS
   * Set default cache limit to 20G on macOS
   * Fix statvfs for cache size >4G on macOS (CVM-1474)
   * Add support for diff snapshots based on root hash (CVM-1452)
