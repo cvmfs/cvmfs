@@ -12,10 +12,13 @@ if [ x"$action" = xstart ]; then
 elif [ x"$action" = xstop ]; then
     RUNNER_LOG_DIR=/tmp $SCRIPT_LOCATION/../bin/cvmfs_gateway stop
     echo "CVMFS repository gateway stopped."
+elif [ x"$action" = xrestart ]; then
+    RUNNER_LOG_DIR=/tmp $SCRIPT_LOCATION/../bin/cvmfs_gateway stopo
+    RUNNER_LOG_DIR=/tmp $SCRIPT_LOCATION/../bin/cvmfs_gateway start
 elif [ x"$action" = xstatus ]; then
     RUNNER_LOG_DIR=/tmp $SCRIPT_LOCATION/../bin/cvmfs_gateway status
 else
     echo "Unknown action: $action"
-    echo "Usage: run_cvmfs_gateway.sh <start|stop|status>"
+    echo "Usage: run_cvmfs_gateway.sh <start|stop|restart|status>"
     exit 1
 fi
