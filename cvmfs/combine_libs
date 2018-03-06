@@ -43,6 +43,10 @@ if [ "$PUBLIC_SYMS" != "" ]; then
   if ( mkdir $tmpdir &&
        ld -r ${OBJECTS} -o ${MERGED_OBJ} &&
        ( nm ${MERGED_OBJ} | awk ' $2 == "W" {print $3}' | sort | uniq > $tmpdir/W_syms ) &&
+       # On some older systems (SLES11, SLC5) the static data members of the ShortString class template
+       # appear as weak objects (V), not weak symbols (W). Unless they are explicitly kept around,
+       # they are localized and cause linking errors. The following line prevents this error.
+       ( nm ${MERGED_OBJ} | awk ' $2 == "V" {print $3}' | grep ShortString | sort | uniq >> $tmpdir/W_syms ) &&
        objcopy --keep-global-symbols=$PUBLIC_SYMS --keep-global-symbols=$tmpdir/W_syms $MERGED_OBJ $MERGED_PUBLIC_OBJ); then
 
     # we just need this one merged object file
