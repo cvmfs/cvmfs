@@ -610,18 +610,26 @@ if (BUILD_LIBCVMFS)
   set_target_properties (cvmfs_only PROPERTIES COMPILE_FLAGS "${LIBCVMFS_CFLAGS}")
   target_link_libraries(cvmfs_only ${LIBCVMFS_LIBS})
 
-  if (NOT MACOSX)
-    # We do not (yet) have a recipe for localizing private symbols
-    # in Mac OS X, so skip that step on Mac
+  # Note: it would be a good idea to try to unify the next block for macOS and Linux.
+  #       It may be possible to use libtool on both platforms, including the ability
+  #       to hide private symbols in the library - which is currently done by the
+  #       `combine_libs` script, on Linux only.
+  if (MACOSX)
+    add_custom_command(
+        OUTPUT libcvmfs.a
+        COMMAND libtool -static -o libcvmfs.a ${LIBCVMFS_LIBS}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        DEPENDS ${LIBCVMFS_LIBS}
+    )
+  else (MACOSX)
     set (LIBCVMFS_PUBLIC_SYMS "-public" "${CMAKE_CURRENT_SOURCE_DIR}/libcvmfs_public_syms.txt")
-  endif (NOT MACOSX)
-
-  add_custom_command(
-      OUTPUT libcvmfs.a
-      COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/combine_libs ${LIBCVMFS_PUBLIC_SYMS} libcvmfs.a ${LIBCVMFS_LIBS}
-      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-      DEPENDS ${LIBCVMFS_LIBS}
-  )
+    add_custom_command(
+        OUTPUT libcvmfs.a
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/combine_libs ${LIBCVMFS_PUBLIC_SYMS} libcvmfs.a ${LIBCVMFS_LIBS}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        DEPENDS ${LIBCVMFS_LIBS}
+    )
+  endif (MACOSX)
 
   # dummy target to cause merged libcvmfs to be produced
   add_custom_target (libcvmfs ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a)
