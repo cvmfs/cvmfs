@@ -14,7 +14,7 @@
 -export([all/0, groups/0, init_per_suite/1, end_per_suite/1, init_per_testcase/2, end_per_testcase/2]).
 -export([add_repo/1, remove_repo/1
         ,add_key/1, remove_key/1
-        ,list_repos/1
+        ,reload_config/1
         ,valid_key_valid_path/1
         ,valid_key_valid_subpath/1
         ,invalid_key_error/1
@@ -27,16 +27,17 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%
 all() ->
     [{group, queries}
+    ,{group, reload}
     ,{group, repo_operations}
     ,{group, key_operations}].
 
 groups() ->
-    [{queries, [parallel], [list_repos
-                           ,valid_key_valid_path
-                           ,valid_key_valid_subpath
-                           ,invalid_key_error
-                           ,valid_key_invalid_repo
-                           ,valid_key_invalid_path]}
+    [{queries, [], [valid_key_valid_path
+                   ,valid_key_valid_subpath
+                   ,invalid_key_error
+                   ,valid_key_invalid_repo
+                   ,valid_key_invalid_path]}
+    ,{reload, [], [reload_config]}
     ,{repo_operations, [], [add_repo, remove_repo]}
     ,{key_operations, [], [add_key, remove_key]}].
 
@@ -70,12 +71,6 @@ end_per_testcase(_TestCase, _Config) ->
 
 %% Test cases follow
 
-list_repos(_Config) ->
-    Repos1 = lists:sort(cvmfs_auth:get_repos()),
-    #{ repos := TestRepos } = cvmfs_test_util:make_test_repo_config(),
-    Repos2 = lists:sort(lists:foldl(fun(#{domain := N}, Acc) -> [N | Acc] end, [], TestRepos)),
-    Repos1 = Repos2.
-
 valid_key_valid_path(_Config) ->
     ok = cvmfs_auth:check_key_for_repo_path(<<"key1">>, <<"repo1.domain1.org">>, <<"/">>).
 
@@ -95,7 +90,7 @@ valid_key_invalid_path(_Config) ->
 
 add_repo(_Config) ->
     ok = cvmfs_auth:add_repo(<<"/new/repo/path">>, [<<"key">>]),
-    true = lists:member(<<"/new/repo/path">>, cvmfs_auth:get_repos()).
+    true = lists:member({<<"/new/repo/path">>, [<<"key">>]}, cvmfs_auth:get_repos()).
 
 remove_repo(_Config) ->
     cvmfs_auth:remove_repo(<<"repo3">>),
@@ -106,4 +101,10 @@ add_key(_Config) ->
 
 remove_key(_Config) ->
     ok = cvmfs_auth:remove_key(<<"key3">>).
+
+reload_config(_Config) ->
+    ok = cvmfs_auth:add_repo(<<"/new/repo/path">>, [<<"key">>]),
+    true = lists:member({<<"/new/repo/path">>, [<<"key">>]}, cvmfs_auth:get_repos()),
+    ok = cvmfs_auth:reload_repo_config(),
+    false = lists:member({<<"/new/repo/path">>, [<<"key">>]}, cvmfs_auth:get_repos()).
 
