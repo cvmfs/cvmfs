@@ -2,20 +2,43 @@
 
 set -e
 
+wait_for_app_start() {
+    local reply=$($SCRIPT_LOCATION/../bin/cvmfs_gateway ping | awk {'print $1'})
+    local num_iter=1
+    while [ $reply != "pong" ]; do
+        sleep 1
+        reply=$(/opt/cvmfs_gateway/bin/cvmfs_gateway ping | awk {'print $1'})
+        num_iter=$((num_iter + 1))
+        if [ $num_iter -eq 10 ]; then
+            echo "Error: Could not start cvmfs_gateway"
+            exit 1
+        fi
+    done
+    echo $reply
+}
+
 SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
 
 action=$1
 
 if [ x"$action" = xstart ]; then
-    RUNNER_LOG_DIR=/tmp $SCRIPT_LOCATION/../bin/cvmfs_gateway start
+    $SCRIPT_LOCATION/../bin/cvmfs_gateway start
+    wait_for_app_start
     echo "CVMFS repository gateway started."
 elif [ x"$action" = xstop ]; then
-    RUNNER_LOG_DIR=/tmp $SCRIPT_LOCATION/../bin/cvmfs_gateway stop
+    $SCRIPT_LOCATION/../bin/cvmfs_gateway stop
+    pkill epmd
     echo "CVMFS repository gateway stopped."
+elif [ x"$action" = xrestart ]; then
+    $SCRIPT_LOCATION/../bin/cvmfs_gateway stop
+    pkill epmd
+    $SCRIPT_LOCATION/../bin/cvmfs_gateway start
+    wait_for_app_start
+    echo "CVMFS repository gateway restarted."
 elif [ x"$action" = xstatus ]; then
-    RUNNER_LOG_DIR=/tmp $SCRIPT_LOCATION/../bin/cvmfs_gateway status
+    $SCRIPT_LOCATION/../bin/cvmfs_gateway ping
 else
     echo "Unknown action: $action"
-    echo "Usage: run_cvmfs_gateway.sh <start|stop|status>"
+    echo "Usage: run_cvmfs_gateway.sh <start|stop|restart|status>"
     exit 1
 fi
