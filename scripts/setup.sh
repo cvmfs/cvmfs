@@ -14,12 +14,11 @@ SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
 echo "Setting up the Mnesia"
 
 cvmfs_mnesia_root=/opt/cvmfs_mnesia
-echo "  - creating schema directory at $cvmfs_mnesia_root"
-sudo mkdir -p $cvmfs_mnesia_root
-sudo chown -R `whoami`:`whoami` $cvmfs_mnesia_root
+echo "  - (re)creating schema directory at $cvmfs_mnesia_root"
+sudo rm -rf $cvmfs_mnesia_root && sudo mkdir -p $cvmfs_mnesia_root
 
 echo "  - creating Mnesia schema"
-$SCRIPT_LOCATION/../bin/cvmfs_gateway escript scripts/setup_mnesia.escript $cvmfs_mnesia_root
+sudo $SCRIPT_LOCATION/../bin/cvmfs_gateway escript scripts/setup_mnesia.escript $cvmfs_mnesia_root
 
 # Install syslog configuration file
 echo "Installing the syslog configuration file"
@@ -42,3 +41,5 @@ else
     sudo cp -v $SCRIPT_LOCATION/90-cvmfs_gateway_rotate /etc/logrotate.d/
 fi
 
+echo "  - installing systemd service file"
+sudo cp -v $SCRIPT_LOCATION/cvmfs_gateway.service /etc/systemd/system/cvmfs_gateway.service
