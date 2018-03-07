@@ -125,7 +125,7 @@ submit_payload(Uid, SubmissionData) ->
                     cvmfs_app_util:get_max_lease_time()).
 
 
--spec get_repos(Uid :: binary()) -> [binary()].
+-spec get_repos(Uid :: binary()) -> [{binary(), [binary()]}].
 get_repos(Uid) ->
     gen_server:call(?MODULE, {be_req, get_repos, Uid}, cvmfs_app_util:get_max_lease_time()).
 
@@ -385,7 +385,7 @@ p_submit_payload({LeaseToken, _Payload, _Digest, _HeaderSize} = SubmissionData) 
     Result.
 
 
--spec p_get_repos() -> Repos :: [binary()].
+-spec p_get_repos() -> Repos :: [{binary(), [binary()]}].
 p_get_repos() ->
     cvmfs_auth:get_repos().
 
