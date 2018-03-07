@@ -12,20 +12,17 @@
 %% Application callbacks
 -export([start/2, stop/1]).
 
+
 %%====================================================================
 %% API
 %%====================================================================
 
 start(_StartType, _StartArgs) ->
-    RepoVars = read_vars(repo_config, #{repos => [], keys => []}),
+    RepoVars = cvmfs_app_util:read_vars(repo_config,
+                                        cvmfs_app_util:default_repo_config()),
 
-    UserVars = read_vars(user_config,
-                         #{max_lease_time => 7200,
-                           fe_tcp_port => 8080,
-                           receiver_config => #{size => 1,
-                                                max_overflow => 1},
-                           receiver_worker_config =>
-                               #{executable_path => "/usr/bin/cvmfs_receiver"}}),
+    UserVars = cvmfs_app_util:read_vars(user_config,
+                                        cvmfs_app_util:default_user_config()),
 
     application:set_env(cvmfs_gateway, max_lease_time,
                         maps:get(max_lease_time, UserVars) * 1000),
@@ -59,24 +56,7 @@ start(_StartType, _StartArgs) ->
                                    ReceiverPoolConfig2,
                                    ReceiverWorkerConfig}).
 
-%%--------------------------------------------------------------------
+
 stop(_State) ->
     ok.
 
-%%====================================================================
-%% Internal functions
-%%====================================================================
-read_vars(VarName, Defaults) ->
-    case application:get_env(VarName) of
-        {ok, {file, ConfigFile}} ->
-            case file:read_file(ConfigFile) of
-                {ok, Data} ->
-                    jsx:decode(Data, [{labels, atom}, return_maps]);
-                {error, Reason} ->
-                    {error, Reason}
-            end;
-        {ok, ConfigMap} ->
-            ConfigMap;
-        undefined ->
-            Defaults
-    end.
