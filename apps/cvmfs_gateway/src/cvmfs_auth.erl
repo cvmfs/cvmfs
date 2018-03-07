@@ -17,8 +17,10 @@
 -export([start_link/1
         ,check_key_for_repo_path/3
         ,add_key/3, remove_key/1
-        ,add_repo/2, remove_repo/1, get_repos/0
-        ,check_hmac/3]).
+        ,add_repo/2, remove_repo/1
+        ,get_repos/0, get_keys/0
+        ,check_hmac/3
+        ,reload_repo_config/0]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -90,16 +92,14 @@ remove_repo(Repo) ->
     gen_server:call(?MODULE, {auth_req, remove_repo, Repo}).
 
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Returns a list of all repo names in the `repo` table.
-%% Potentially expensive!
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec get_repos() -> Repos :: [binary()].
+-spec get_repos() -> Repos :: [{binary(), [binary()]}].
 get_repos() ->
     gen_server:call(?MODULE, {auth_req, get_repos}).
+
+
+-spec get_keys() -> Keys :: [{binary(), binary()}].
+get_keys() ->
+    gen_server:call(?MODULE, {auth_req, get_keys}).
 
 
 -spec check_hmac(Message, KeyId, HMAC) -> boolean()
@@ -109,6 +109,11 @@ get_repos() ->
 check_hmac(Message, KeyId, HMAC) ->
     gen_server:call(?MODULE, {auth_req, check_hmac, {Message, KeyId, HMAC}}).
 
+
+-spec reload_repo_config() -> ok | {error, Reason}
+                                  when Reason :: term().
+reload_repo_config() ->
+    gen_server:call(?MODULE, {auth_req, reload_repo_config}).
 
 
 %%%===================================================================
@@ -176,8 +181,14 @@ handle_call({auth_req, remove_repo, Repo}, _From, State) ->
 handle_call({auth_req, get_repos}, _From, State) ->
     Reply = p_get_repos(),
     {reply, Reply, State};
+handle_call({auth_req, get_keys}, _From, State) ->
+    Reply = p_get_keys(),
+    {reply, Reply, State};
 handle_call({auth_req, check_hmac, {Message, KeyId, HMAC}}, _From, State) ->
     Reply = p_check_hmac(Message, KeyId, HMAC),
+    {reply, Reply, State};
+handle_call({auth_req, reload_repo_config}, _From, State) ->
+    Reply = p_reload_repo_config(),
     {reply, Reply, State}.
 
 
@@ -306,10 +317,23 @@ p_remove_repo(Repo) ->
     Result.
 
 
--spec p_get_repos() -> Repos :: [binary()].
+-spec p_get_repos() -> Repos :: [{binary(), [binary()]}].
 p_get_repos() ->
     T = fun() ->
-                mnesia:foldl(fun(#repo{name = Repo}, Acc) -> [Repo | Acc] end, [], repo)
+                mnesia:foldl(fun(#repo{name = Repo, key_ids = KeyIds}, Acc) ->
+                                     [{Repo, KeyIds} | Acc]
+                             end, [], repo)
+        end,
+    {atomic, Result} = mnesia:transaction(T),
+    Result.
+
+
+-spec p_get_keys() -> Keys :: [{binary(), binary()}].
+p_get_keys() ->
+    T = fun() ->
+                mnesia:foldl(fun(#key{key_id = Id, path = Path}, Acc) ->
+                                     [{Id, Path} | Acc]
+                             end, [], key)
         end,
     {atomic, Result} = mnesia:transaction(T),
     Result.
@@ -389,3 +413,16 @@ p_parse_key_file(FileName) ->
     [KeyType, KeyId, Secret] = binary:split(Line, <<" ">>, [global]),
     {KeyType, KeyId, Secret}.
 
+
+-spec p_reload_repo_config() -> ok | {error, Reason}
+                                    when Reason :: term().
+p_reload_repo_config() ->
+    RepoVars = cvmfs_app_util:read_vars(repo_config,
+                                        cvmfs_app_util:default_repo_config()),
+    Repos = maps:get(repos, RepoVars),
+    {atomic, ok} = mnesia:clear_table(repo),
+    p_populate_repos(Repos),
+    Keys = maps:get(keys, RepoVars),
+    {atomic, ok} = mnesia:clear_table(key),
+    p_populate_keys(Keys),
+    ok.
