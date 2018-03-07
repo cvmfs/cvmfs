@@ -6,7 +6,7 @@ After=syslog.target network.target
 Type=forking
 ExecStart=/opt/cvmfs_gateway/scripts/run_cvmfs_gateway.sh start
 ExecStop=/opt/cvmfs_gateway/scripts/run_cvmfs_gateway.sh stop
-ExecReload=/opt/cvmfs_gateway/scripts/run_cvmfs_gateway.sh restart
+ExecReload=/opt/cvmfs_gateway/scripts/run_cvmfs_gateway.sh reload
 User=root
 
 [Install]
