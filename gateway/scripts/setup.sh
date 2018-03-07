@@ -32,14 +32,16 @@ else
     echo "The file/symlink \"/etc/cvmfs/gateway\" already exists."
 fi
 
-echo "  - restarting rsyslog"
 if [ x"$(which systemctl)" != x"" ]; then
+    echo "  - restarting rsyslog"
     sudo systemctl restart rsyslog
     sudo cp -v $SCRIPT_LOCATION/90-cvmfs_gateway_rotate_systemd /etc/logrotate.d/
+
+    echo "  - installing systemd service file"
+    sudo cp -v $SCRIPT_LOCATION/cvmfs_gateway.service /etc/systemd/system/cvmfs_gateway.service
 else
+    echo "  - restarting rsyslog"
     sudo service rsyslog restart
     sudo cp -v $SCRIPT_LOCATION/90-cvmfs_gateway_rotate /etc/logrotate.d/
 fi
 
-echo "  - installing systemd service file"
-sudo cp -v $SCRIPT_LOCATION/cvmfs_gateway.service /etc/systemd/system/cvmfs_gateway.service
