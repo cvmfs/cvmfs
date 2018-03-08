@@ -25,11 +25,10 @@ echo "Installing the syslog configuration file"
 sudo cp -v $SCRIPT_LOCATION/90-cvmfs_gateway.conf /etc/rsyslog.d/
 
 # Symlink the configuration directory into /etc/cvmfs/gateway
-if [ ! -f /etc/cvmfs/gateway ]; then
-    echo "Symlinking configuration file directory to /etc/cvmfs/gateway"
-    sudo ln -s $(readlink -f $SCRIPT_LOCATION/../etc) /etc/cvmfs/gateway
-else
-    echo "The file/symlink \"/etc/cvmfs/gateway\" already exists."
+if [ ! -e /etc/cvmfs/gateway ]; then
+    echo "Creating onfiguration file directory to /etc/cvmfs/gateway"
+    sudo mkdir /etc/cvmfs/gateway
+    sudo cp -v $SCRIPT_LOCATION/../etc/*.json /etc/cvmfs/gateway/
 fi
 
 if [ x"$(which systemctl)" != x"" ]; then
