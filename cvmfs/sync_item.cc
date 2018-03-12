@@ -19,6 +19,7 @@ using namespace std;  // NOLINT
 
 namespace publish {
 
+struct archive;
 
 SyncItem::SyncItem() :
   union_engine_(NULL),
@@ -37,7 +38,9 @@ SyncItem::SyncItem() :
 
 SyncItem::SyncItem(const string       &relative_parent_path,
                    const string       &filename,
-                   const SyncUnion    *union_engine) :
+                   const SyncUnion    *union_engine,
+                   const SyncItemType entry_type,
+                   const SyncItemClass entry_class) :
   union_engine_(union_engine),
   whiteout_(false),
   opaque_(false),
@@ -51,7 +54,8 @@ SyncItem::SyncItem(const string       &relative_parent_path,
   graft_chunklist_(NULL),
   graft_size_(-1),
   rdonly_type_(kItemUnknown),
-  compression_algorithm_(zlib::kZlibDefault)
+  compression_algorithm_(zlib::kZlibDefault),
+  class_(entry_class)
 {
   content_hash_.algorithm = shash::kAny;
   CheckMarkerFiles();
@@ -60,8 +64,11 @@ SyncItem::SyncItem(const string       &relative_parent_path,
 
 SyncItem::SyncItem(const string       &relative_parent_path,
                    const string       &filename,
+                   struct archive *archve,
+                   struct archive_entry *entry,
                    const SyncUnion    *union_engine,
-                   const SyncItemType  entry_type) :
+                   const SyncItemType entry_type,
+                   const SyncItemClass entry_class) :
   union_engine_(union_engine),
   scratch_type_(entry_type),
   whiteout_(false),
@@ -76,7 +83,8 @@ SyncItem::SyncItem(const string       &relative_parent_path,
   graft_chunklist_(NULL),
   graft_size_(-1),
   rdonly_type_(kItemUnknown),
-  compression_algorithm_(zlib::kZlibDefault)
+  compression_algorithm_(zlib::kZlibDefault),
+  class_(entry_class)
 {
   content_hash_.algorithm = shash::kAny;
   CheckMarkerFiles();

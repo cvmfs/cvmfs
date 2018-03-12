@@ -29,7 +29,7 @@ bool SyncUnion::Initialize() {
 SyncItem SyncUnion::CreateSyncItem(const std::string &relative_parent_path,
                                    const std::string &filename,
                                    const SyncItemType entry_type) const {
-  SyncItem entry(relative_parent_path, filename, this, entry_type);
+  SyncItem entry(relative_parent_path, filename, this, entry_type, kRegularFS);
   PreprocessSyncItem(&entry);
   if (entry_type == kItemFile) {
     entry.SetExternalData(mediator_->IsExternalData());

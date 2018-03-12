@@ -118,8 +118,8 @@ void SyncUnionTarball::Traverse() {
           printf("parent: %s\nfilename: %s\n", parent_path.c_str(),
                  filename.c_str());
 
-          SyncItemTar sync_entry =
-              SyncItemTar(parent_path, filename, src, entry, this);
+          SyncItem sync_entry =
+              SyncItem(parent_path, filename, src, entry, this, kTarball);
 
           printf(
               "complete_path: \t%s \ndirectory_traversing: "

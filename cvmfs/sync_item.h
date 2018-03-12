@@ -35,6 +35,11 @@ enum SyncItemType {
   kItemUnknown
 };
 
+enum SyncItemClass {
+  kRegularFS,
+  kTarball
+};
+
 class SyncUnion;
 
 /**
@@ -217,12 +222,18 @@ class SyncItem {
   SyncItem(const std::string  &relative_parent_path,
            const std::string  &filename,
            const SyncUnion    *union_engine,
-           const SyncItemType  entry_type);
+           const SyncItemType  entry_type,
+           const SyncItemClass entry_class = kRegularFS);
   
   SyncItem(const std::string  &relative_parent_path,
            const std::string  &filename,
-           const SyncUnion    *union_engine);
+           struct archive *archive,
+           struct archive_entry *entry,
+           const SyncUnion    *union_engine,
+           const SyncItemType entry_type,
+           const SyncItemClass entry_class = kTarball);
 
+  SyncItemClass class_;
 
  private:
   /**

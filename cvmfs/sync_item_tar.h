@@ -9,6 +9,8 @@
 
 namespace publish {
 
+struct archive;
+
 class SyncItemTar : public SyncItem {
  public:
   SyncItemTar(const string &relative_parent_path, const string &filename,
