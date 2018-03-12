@@ -92,7 +92,7 @@ class SyncUnion {
    * This method "unmangles" them and retrieves the original file name
    * @param filename the filename as in the scratch directory
    * @return the original filename of the scratched out file in CVMFS repository
-   */
+     */
   virtual std::string UnwindWhiteoutFilename(const SyncItem &entry) const = 0;
 
   /**

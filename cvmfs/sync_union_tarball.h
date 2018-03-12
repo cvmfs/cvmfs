@@ -17,8 +17,6 @@
 #include "archive.h"
 #include "sync_mediator.h"
 
-struct archive;
-
 namespace publish {
 
 class SyncUnionTarball : public SyncUnion {
