@@ -433,7 +433,7 @@ if(BUILD_RECEIVER)
   target_link_libraries(cvmfs_receiver ${CURL_LIBRARIES} ${CARES_LIBRARIES}
                         ${SHA3_LIBRARIES} ${SQLITE3_LIBRARY} ${VJSON_LIBRARIES}
                         ${OPENSSL_LIBRARIES} ${UUID_LIBRARIES} ${ZLIB_LIBRARIES}
-                        ${RT_LIBRARY} pthread dl)
+                        ${RT_LIBRARY} ${LibArchive_LIBRARY} pthread dl)
 
   set (CVMFS_RECEIVER_CFLAGS "${CMAKE_CXX_FLAGS} -D_FILE_OFFSET_BITS=64 -fexceptions")
   set_target_properties (cvmfs_receiver PROPERTIES COMPILE_FLAGS "${CVMFS_RECEIVER_CFLAGS}")
@@ -680,7 +680,7 @@ if (BUILD_SERVER)
                            ${SQLITE3_LIBRARY}  ${CURL_LIBRARIES}
                            ${CARES_LIBRARIES} ${ZLIB_LIBRARIES}
                            ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${VJSON_LIBRARIES}
-                           ${SHA3_LIBRARIES} ${CAP_LIBRARIES} pthread dl)
+                           ${SHA3_LIBRARIES} ${CAP_LIBRARIES} ${LibArchive_LIBRARY} pthread dl)
   endif (BUILD_SERVER_DEBUG)
 endif (BUILD_SERVER)
 
