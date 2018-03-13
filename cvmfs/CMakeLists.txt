@@ -421,6 +421,7 @@ if(BUILD_RECEIVER)
     swissknife_lease_curl.cc
     sql.cc
     sqlitemem.cc
+    sync_item.cc
     upload.cc
     upload_facility.cc
     upload_gateway.cc
