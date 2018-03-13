@@ -13,7 +13,7 @@ clean_up() {
     echo "Cleaning up"
 
     echo "  Stopping repository gateway application"
-    /opt/cvmfs_gateway/bin/cvmfs_gateway stop
+    sudo /opt/cvmfs_gateway/scripts/run_cvmfs_gateway.sh stop
 
     echo "  Removing Mnesia directory"
     sudo rm -rf /opt/cvmfs_mnesia
