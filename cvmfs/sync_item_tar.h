@@ -9,7 +9,7 @@
 
 namespace publish {
 
-struct archive;
+// struct archive;
 
 class SyncItemTar : public SyncItem {
  public:
@@ -32,7 +32,8 @@ SyncItemTar::SyncItemTar(const string &relative_parent_path,
                          const string &filename, struct archive *archive,
                          struct archive_entry *entry,
                          const SyncUnion *union_engine)
-    : SyncItem(relative_parent_path, filename, union_engine) {
+    : SyncItem(relative_parent_path, filename, union_engine, kItemUnknown,
+               kTarball) {
   switch (archive_entry_filetype(entry)) {
     case AE_IFREG: {
       scratch_type_ = kItemFile;

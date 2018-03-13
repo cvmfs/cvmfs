@@ -12,14 +12,14 @@
 
 #include <vector>
 
+#include "archive.h"
+#include "archive_entry.h"
 #include "sync_mediator.h"
 #include "sync_union.h"
 
 using namespace std;  // NOLINT
 
 namespace publish {
-
-struct archive;
 
 SyncItem::SyncItem() :
   union_engine_(NULL),
@@ -59,6 +59,11 @@ SyncItem::SyncItem(const string       &relative_parent_path,
 {
   content_hash_.algorithm = shash::kAny;
   CheckMarkerFiles();
+  if (kDummyDir == entry_class) {
+    union_stat_.obtained = true;
+    union_stat_.stat.st_mode = S_IFDIR;
+    scratch_type_ = kItemDir;
+  }
 }
 
 
@@ -84,10 +89,15 @@ SyncItem::SyncItem(const string       &relative_parent_path,
   graft_size_(-1),
   rdonly_type_(kItemUnknown),
   compression_algorithm_(zlib::kZlibDefault),
-  class_(entry_class)
+  class_(entry_class),
+  archive_entry_(entry),
+  entry_class_(entry_class)
 {
   content_hash_.algorithm = shash::kAny;
   CheckMarkerFiles();
+  if (kTarball == entry_class_) {
+    scratch_type_ = GetScratchFiletype();
+  }
 }
 
 
@@ -125,6 +135,9 @@ SyncItemType SyncItem::GetRdOnlyFiletype() const {
 
 
 SyncItemType SyncItem::GetScratchFiletype() const {
+  if (kTarball == entry_class_)
+    return GetScratchTypeFromArchiveEntry();
+
   StatScratch();
   if (scratch_stat_.error_code != 0) {
     PrintWarning("Failed to stat() '" + GetRelativePath() + "' in scratch. "
@@ -135,6 +148,54 @@ SyncItemType SyncItem::GetScratchFiletype() const {
   return GetGenericFiletype(scratch_stat_);
 }
 
+SyncItemType SyncItem::GetScratchTypeFromArchiveEntry() const {
+  assert(archive_entry_);
+  switch (archive_entry_filetype(archive_entry_)) {
+    case AE_IFREG: {
+      return kItemFile;
+      break;
+    }
+    case AE_IFLNK: {
+      return kItemSymlink;
+      break;
+    }
+    case AE_IFSOCK: {
+      return kItemSocket;
+      break;
+    }
+    case AE_IFCHR: {
+      return kItemCharacterDevice;
+      break;
+    }
+    case AE_IFBLK: {
+      return kItemBlockDevice;
+      break;
+    }
+    case AE_IFDIR: {
+      return kItemDir;
+      break;
+    }
+    case AE_IFIFO: {
+      return kItemFifo;
+      break;
+    }
+  }
+}
+
+platform_stat64 SyncItem::GetStatFromTar() const {
+  assert(archive_entry_);
+
+  const struct stat* entry_stat_  = archive_entry_stat(archive_entry_);
+  platform_stat64 stat;
+  
+  stat.st_mode = entry_stat_->st_mode;
+  stat.st_uid = entry_stat_->st_uid;
+  stat.st_gid = entry_stat_->st_gid;
+  stat.st_size = entry_stat_->st_size;
+  stat.st_mtime = entry_stat_->st_mtime;
+
+  return stat;
+}
 
 void SyncItem::MarkAsWhiteout(const std::string &actual_filename) {
   // Mark the file as whiteout entry and strip the whiteout prefix
@@ -236,8 +297,14 @@ catalog::DirectoryEntryBase SyncItem::CreateBasicCatalogDirent() const {
     dirent.size_ = makedev(GetRdevMajor(), GetRdevMinor());
   }
 
+  if (kTarball == entry_class_) {
+    platform_stat64 stat_ = GetStatFromTar();
+    dirent.mode_ = stat_.st_mode;
+  }
+
   return dirent;
 }
+
 
 std::string SyncItem::GetRdOnlyPath() const {
   const string relative_path = GetRelativePath().empty() ?
