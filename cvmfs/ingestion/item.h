@@ -18,6 +18,8 @@
 #include "hash.h"
 #include "ingestion/chunk_detector.h"
 #include "ingestion/ingestion_source.h"
+#include "ingestion/ingestion_source.h"
+#include "sync_item.h"
 #include "util/pointer.h"
 #include "util/single_copy.h"
 
@@ -33,6 +35,17 @@ class FileItem;
  */
 class FileItem : SingleCopy {
  public:
+  explicit FileItem(
+    const publish::SyncItem &entry,
+    uint64_t min_chunk_size = 4 * 1024 * 1024,
+    uint64_t avg_chunk_size = 8 * 1024 * 1024,
+    uint64_t max_chunk_size = 16 * 1024 * 1024,
+    zlib::Algorithms compression_algorithm = zlib::kZlibDefault,
+    shash::Algorithms hash_algorithm = shash::kSha1,
+    shash::Suffix hash_suffix = shash::kSuffixNone,
+    bool may_have_chunks = true,
+    bool has_legacy_bulk_chunk = false);
+   
   explicit FileItem(
     const std::string &p,
     uint64_t min_chunk_size = 4 * 1024 * 1024,

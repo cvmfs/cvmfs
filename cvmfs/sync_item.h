@@ -170,6 +170,8 @@ class SyncItem {
             (filename_ == other.filename_));
   }
 
+  struct archive* archive_;
+  struct archive_entry *archive_entry_;
  protected:
   inline platform_stat64 GetUnionStat() const {
     StatUnion();
@@ -234,7 +236,6 @@ class SyncItem {
            const SyncItemClass entry_class = kTarball);
   
   SyncItemClass class_;
-  struct archive_entry *archive_entry_;
   SyncItemClass entry_class_;
   platform_stat64 GetStatFromTar() const;
  

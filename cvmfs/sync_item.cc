@@ -69,7 +69,7 @@ SyncItem::SyncItem(const string       &relative_parent_path,
 
 SyncItem::SyncItem(const string       &relative_parent_path,
                    const string       &filename,
-                   struct archive *archve,
+                   struct archive *archive,
                    struct archive_entry *entry,
                    const SyncUnion    *union_engine,
                    const SyncItemType entry_type,
@@ -91,6 +91,7 @@ SyncItem::SyncItem(const string       &relative_parent_path,
   compression_algorithm_(zlib::kZlibDefault),
   class_(entry_class),
   archive_entry_(entry),
+  archive_(archive),
   entry_class_(entry_class)
 {
   content_hash_.algorithm = shash::kAny;

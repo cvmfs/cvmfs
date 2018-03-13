@@ -11,7 +11,7 @@
 
 #include "smalloc.h"
 #include "util_concurrency.h"
-
+#include "sync_item.h"
 
 FileItem::FileItem(
   const std::string &p,
@@ -41,6 +41,33 @@ FileItem::FileItem(
   source_ = new FileIngestionSource(path_);
 }
 
+FileItem::FileItem(
+  const publish::SyncItem &entry,
+  uint64_t min_chunk_size,
+  uint64_t avg_chunk_size,
+  uint64_t max_chunk_size,
+  zlib::Algorithms compression_algorithm,
+  shash::Algorithms hash_algorithm,
+  shash::Suffix hash_suffix,
+  bool may_have_chunks,
+  bool has_legacy_bulk_chunk)
+  : path_(entry.GetUnionPath())
+  , compression_algorithm_(compression_algorithm)
+  , hash_algorithm_(hash_algorithm)
+  , hash_suffix_(hash_suffix)
+  , has_legacy_bulk_chunk_(has_legacy_bulk_chunk)
+  , size_(kSizeUnknown)
+  , may_have_chunks_(may_have_chunks)
+  , chunk_detector_(min_chunk_size, avg_chunk_size, max_chunk_size)
+  , bulk_hash_(hash_algorithm)
+  , chunks_(1)
+{
+  int retval = pthread_mutex_init(&lock_, NULL);
+  assert(retval == 0);
+  atomic_init64(&nchunks_in_fly_);
+  atomic_init32(&is_fully_chunked_);
+  source_ = new TarIngestionSource(entry);
+}
 
 FileItem::~FileItem() {
   pthread_mutex_destroy(&lock_);

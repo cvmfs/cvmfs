@@ -8,7 +8,10 @@
 #include <stdio.h>
 #include <string>
 
+#include "archive.h"
+#include "archive_entry.h"
 #include "platform.h"
+#include "sync_item.h"
 #include "util/posix.h"
 #include "util/single_copy.h"
 
@@ -72,12 +75,26 @@ class FileIngestionSource : public IngestionSource {
 
 class TarIngestionSource : public IngestionSource {
  public:
+  TarIngestionSource(const publish::SyncItem& entry) : buffer_(NULL) {
+    const struct stat* stat_ = archive_entry_stat(entry.archive_entry_);
+    size_ = stat_->st_size;
+    while (NULL == buffer_) buffer_ = new char[size_];
+    buffer_seek_ptr_ = buffer_;
+    uint64_t read_so_far = archive_read_data(entry.archive_, buffer_, size_);
+    while (read_so_far < size_) {
+      uint64_t read =
+          archive_read_data(entry.archive_, buffer_ + read_so_far, size_);
+      if (read > 0) read_so_far += read;
+    }
+  }
+
   TarIngestionSource(char* buffer, uint64_t size, std::string filename)
       : buffer_(buffer),
         buffer_seek_ptr_(buffer),
         size_(size),
         offset_read_(0),
         filename_(filename) {}
+
   bool Open() {
     assert(buffer_);
     assert(size_);
