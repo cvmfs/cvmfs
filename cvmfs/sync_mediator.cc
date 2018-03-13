@@ -705,7 +705,7 @@ void SyncMediator::AddFile(const SyncItem &entry) {
     file_queue_[entry.GetUnionPath()] = entry;
     pthread_mutex_unlock(&lock_file_queue_);
     // Spool the file
-    params_->spooler->Process(entry.GetUnionPath());
+    params_->spooler->Process(entry);
   }
 }
 

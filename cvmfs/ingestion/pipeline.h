@@ -12,6 +12,7 @@
 #include "ingestion/item.h"
 #include "ingestion/task.h"
 #include "ingestion/tube.h"
+#include "sync_item.h"
 #include "upload_spooler_result.h"
 #include "util_concurrency.h"
 
@@ -29,6 +30,8 @@ class IngestionPipeline : public Observable<upload::SpoolerResult> {
 
   void Spawn();
   void Process(const std::string &path, bool allow_chunking,
+               shash::Suffix hash_suffix = shash::kSuffixNone);
+  void Process(const publish::SyncItem &entry, bool allow_chunking,
                shash::Suffix hash_suffix = shash::kSuffixNone);
   void WaitFor();
 
