@@ -15,10 +15,12 @@
 #include <map>
 #include <string>
 
+#include "archive.h"
 #include "directory_entry.h"
 #include "file_chunk.h"
 #include "hash.h"
 #include "platform.h"
+
 
 namespace publish {
 
@@ -37,7 +39,8 @@ enum SyncItemType {
 
 enum SyncItemClass {
   kRegularFS,
-  kTarball
+  kTarball,
+  kDummyDir
 };
 
 class SyncUnion;
@@ -58,6 +61,7 @@ class SyncUnion;
 class SyncItem {
   // only SyncUnion can create SyncItems (see SyncUnion::CreateSyncItem)
   friend class SyncUnion;
+  friend class SyncUnionTarball;
 
  public:
   SyncItem();
@@ -224,17 +228,16 @@ class SyncItem {
            const SyncUnion    *union_engine,
            const SyncItemType  entry_type,
            const SyncItemClass entry_class = kRegularFS);
-  
-  SyncItem(const std::string  &relative_parent_path,
-           const std::string  &filename,
-           struct archive *archive,
-           struct archive_entry *entry,
-           const SyncUnion    *union_engine,
-           const SyncItemType entry_type,
+  SyncItem(const std::string &relative_parent_path, const std::string &filename,
+           struct archive *archive, struct archive_entry *entry,
+           const SyncUnion *union_engine, const SyncItemType entry_type,
            const SyncItemClass entry_class = kTarball);
-
+  
   SyncItemClass class_;
-
+  struct archive_entry *archive_entry_;
+  SyncItemClass entry_class_;
+  platform_stat64 GetStatFromTar() const;
+ 
  private:
   /**
    * Structure to cache stat calls to the different file locations.
@@ -262,6 +265,7 @@ class SyncItem {
   };
 
   SyncItemType GetGenericFiletype(const EntryStat &stat) const;
+  SyncItemType GetScratchTypeFromArchiveEntry() const;     
 
   void CheckMarkerFiles();
 
