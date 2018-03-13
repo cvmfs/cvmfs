@@ -92,12 +92,14 @@ SyncItem::SyncItem(const string       &relative_parent_path,
   class_(entry_class),
   archive_entry_(entry),
   archive_(archive),
-  entry_class_(entry_class)
+  entry_class_(entry_class),
+  obtained_tar_stat_(false)
 {
   content_hash_.algorithm = shash::kAny;
   CheckMarkerFiles();
   if (kTarball == entry_class_) {
     scratch_type_ = GetScratchFiletype();
+    GetStatFromTar();
   }
 }
 
@@ -185,6 +187,8 @@ SyncItemType SyncItem::GetScratchTypeFromArchiveEntry() const {
 
 platform_stat64 SyncItem::GetStatFromTar() const {
   assert(archive_entry_);
+  if (obtained_tar_stat_)
+    return tar_stat_;
 
   const struct stat* entry_stat_  = archive_entry_stat(archive_entry_);
   platform_stat64 stat;
@@ -194,6 +198,9 @@ platform_stat64 SyncItem::GetStatFromTar() const {
   stat.st_gid = entry_stat_->st_gid;
   stat.st_size = entry_stat_->st_size;
   stat.st_mtime = entry_stat_->st_mtime;
+  
+  obtained_tar_stat_ = true;
+  tar_stat_ = stat;
 
   return stat;
 }

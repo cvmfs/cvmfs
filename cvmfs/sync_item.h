@@ -211,6 +211,11 @@ class SyncItem {
     return rdonly_type_ == expected_type;
   }
   
+  void AlreadyCreatedDir() const {
+    assert(kTarball == entry_class_);
+    rdonly_type_ = kItemDir;
+  }
+
   const SyncUnion *union_engine_;     /**< this SyncUnion created this object */
 
   mutable SyncItemType scratch_type_;
@@ -238,7 +243,9 @@ class SyncItem {
   SyncItemClass class_;
   SyncItemClass entry_class_;
   platform_stat64 GetStatFromTar() const;
- 
+  mutable platform_stat64 tar_stat_;
+  mutable bool obtained_tar_stat_;
+
  private:
   /**
    * Structure to cache stat calls to the different file locations.

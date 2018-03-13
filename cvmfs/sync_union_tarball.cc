@@ -164,6 +164,10 @@ void SyncUnionTarball::Traverse() {
           printf("\n\n");
 
           if (sync_entry.IsDirectory()) {
+            if (know_directories_.find(complete_path) !=
+                know_directories_.end()) {
+              sync_entry.AlreadyCreatedDir();
+            }
             ProcessDirectory(sync_entry);
             know_directories_.insert(complete_path);
           } else if (sync_entry.IsRegularFile()) {
