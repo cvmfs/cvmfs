@@ -15,11 +15,14 @@
 #include "ingestion/task_register.h"
 #include "ingestion/task_write.h"
 #include "platform.h"
+#include "sync_item.h"
 #include "upload_facility.h"
 #include "upload_spooler_definition.h"
 #include "util/string.h"
 #include "util_concurrency.h"
 
+const double IngestionPipeline::kMemFractionLowWatermark = 0.5;
+const double IngestionPipeline::kMemFractionHighWatermark = 0.75;
 
 IngestionPipeline::IngestionPipeline(
   upload::AbstractUploader *uploader,
@@ -118,6 +121,25 @@ void IngestionPipeline::Process(
 {
   FileItem *file_item = new FileItem(
     path,
+    minimal_chunk_size_,
+    average_chunk_size_,
+    maximal_chunk_size_,
+    compression_algorithm_,
+    hash_algorithm_,
+    hash_suffix,
+    allow_chunking && chunking_enabled_,
+    generate_legacy_bulk_chunks_);
+  tube_counter_.Enqueue(file_item);
+  tube_input_.Enqueue(file_item);
+}
+
+void IngestionPipeline::Process(
+  const publish::SyncItem &entry,
+  bool allow_chunking,
+  shash::Suffix hash_suffix)
+{
+  FileItem *file_item = new FileItem(
+    entry,
     minimal_chunk_size_,
     average_chunk_size_,
     maximal_chunk_size_,
