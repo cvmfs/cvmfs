@@ -70,4 +70,55 @@ class FileIngestionSource : public IngestionSource {
   int fd_;
 };
 
+class TarIngestionSource : public IngestionSource {
+ public:
+  TarIngestionSource(char* buffer, uint64_t size, std::string filename)
+      : buffer_(buffer),
+        buffer_seek_ptr_(buffer),
+        size_(size),
+        offset_read_(0),
+        filename_(filename) {}
+  bool Open() {
+    assert(buffer_);
+    assert(size_);
+    printf("TarIngestionSource::Open | Opening tar of file %s\n",
+           filename_.c_str());
+    return true;
+  }
+
+  ssize_t Read(void* external_buffer, size_t nbytes) {
+    printf("TarIngestionSource::Read | Reading from tar of file %s\n",
+           filename_.c_str());
+    uint64_t max_to_copy =
+        std::min(nbytes, size_ - (buffer_seek_ptr_ - buffer_));
+
+    memcpy(external_buffer, buffer_seek_ptr_, max_to_copy);
+    buffer_seek_ptr_ += max_to_copy;
+
+    assert(buffer_seek_ptr_ - buffer_ >= 0);
+    assert((buffer_seek_ptr_ - buffer_) - size_ <= 0);
+
+    return max_to_copy;
+  }
+
+  bool Close() {
+    printf("TarIngestionSource::Close | Closing tar file %s\n",
+           filename_.c_str());
+
+    return true;
+  }
+
+  bool GetSize(uint64_t* size) {
+    *size = size_;
+    return true;
+  }
+
+ private:
+  char* buffer_;
+  char* buffer_seek_ptr_;
+  uint64_t size_;
+  uint64_t offset_read_;
+  std::string filename_;
+};
+
 #endif  // CVMFS_INGESTION_INGESTION_SOURCE_H_
