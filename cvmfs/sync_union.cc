@@ -58,7 +58,10 @@ bool SyncUnion::ProcessDirectory(const string &parent_dir,
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessDirectory(%s, %s)",
            parent_dir.c_str(), dir_name.c_str());
   SyncItem entry = CreateSyncItem(parent_dir, dir_name, kItemDir);
+  return ProcessDirectory(entry);
+}
 
+bool SyncUnion::ProcessDirectory(SyncItem &entry) {
   if (entry.IsNew()) {
     mediator_->Add(entry);
     return true;

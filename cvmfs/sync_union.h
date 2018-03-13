@@ -163,6 +163,7 @@ class SyncUnion {
    */
   virtual bool ProcessDirectory(const std::string &parent_dir,
                                 const std::string &dir_name);
+  virtual bool ProcessDirectory(SyncItem &entry);
 
   /**
    * Callback when a symlink is found.
