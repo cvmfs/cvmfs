@@ -49,7 +49,9 @@ class SyncUnionTarball : public SyncUnion {
   struct archive *src;
   const std::string tarball_path_;
   const std::string base_directory_;
+  std::set<std::string> know_directories_;
 
+  void CreateDirectories(const std::string &target);
   /*
    * Actually untar the several elements in the tar inside the base directory,
    * it returns all the recursive tars find in this operation
