@@ -14,6 +14,7 @@
 #include "archive_entry.h"
 #include "fs_traversal.h"
 #include "sync_item.h"
+#include "sync_item_dummy.h"
 #include "sync_item_tar.h"
 #include "sync_mediator.h"
 #include "sync_union.h"
@@ -206,7 +207,7 @@ void SyncUnionTarball::CreateDirectories(const std::string &target) {
   if (dirname == ".") dirname = "";
   printf("\n\t\t\tCreateDirectories CREATING | dirname = %s, filename = '%s'\n",
          dirname.c_str(), filename.c_str());
-  SyncItem dummy = SyncItem(dirname, filename, this, kItemDir, kDummyDir);
+  SyncItemDummy dummy = SyncItemDummy(dirname, filename, this, kItemDir);
 
   catalog::DirectoryEntryBase dirent = dummy.CreateBasicCatalogDirent();
   printf("dummy is directory: %d\n", dirent.IsDirectory());
