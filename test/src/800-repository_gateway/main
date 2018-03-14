@@ -173,7 +173,7 @@ run_transactions() {
     ## Transaction 8 (Check creation of auto-tag)
 
     echo "  Starting transaction 8"
-    num_tags_before=$(cvmfs_server tag -l test.repo.org | grep generic | wc -l)
+    num_tags_before=$(cvmfs_server tag -l test.repo.org | grep -a generic | wc -l)
     cvmfs_server transaction test.repo.org
     echo "New file" > /cvmfs/test.repo.org/marker
 
@@ -182,7 +182,7 @@ run_transactions() {
     cvmfs_server check test.repo.org
 
     echo "  Get list of tags"
-    num_tags_after=$(cvmfs_server tag -l test.repo.org | grep generic | wc -l)
+    num_tags_after=$(cvmfs_server tag -l test.repo.org | grep -a generic | wc -l)
     num_generic_tags_created=$((num_tags_after - num_tags_before))
 
     ## Transaction 8 (Check creation of named tag)
