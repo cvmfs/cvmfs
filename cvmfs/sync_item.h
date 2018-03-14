@@ -20,7 +20,7 @@
 #include "file_chunk.h"
 #include "hash.h"
 #include "platform.h"
-
+#include "util/shared_ptr.h"
 
 namespace publish {
 
@@ -326,7 +326,7 @@ class SyncItem {
                           const bool          refresh);
 };
 
-typedef std::map<std::string, SyncItem> SyncItemList;
+typedef std::map<std::string, SharedPtr<SyncItem> > SyncItemList;
 
 }  // namespace publish
 
