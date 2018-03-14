@@ -329,7 +329,7 @@ void SyncMediator::InsertLegacyHardlink(const SyncItem &entry) {
     for (SyncItemList::const_iterator i = hl_group->second.hardlinks.begin(),
          iEnd = hl_group->second.hardlinks.end(); i != iEnd; ++i)
     {
-      if (i->second == entry) {
+      if (*(i->second) == entry) {
         found = true;
         break;
       }
@@ -541,7 +541,7 @@ void SyncMediator::PublishFilesCallback(const upload::SpoolerResult &result) {
 
   assert(itr != file_queue_.end());
 
-  SyncItem &item = itr->second;
+  SyncItem &item = *itr->second;
   item.SetContentHash(result.content_hash);
   item.SetCompressionAlgorithm(result.compression_alg);
 
@@ -593,8 +593,8 @@ void SyncMediator::PublishHardlinksCallback(
            jend = hardlink_queue_[i].hardlinks.end();
            j != jend; ++j)
       {
-        j->second.SetContentHash(result.content_hash);
-        j->second.SetCompressionAlgorithm(result.compression_alg);
+        j->second->SetContentHash(result.content_hash);
+        j->second->SetCompressionAlgorithm(result.compression_alg);
       }
       if (result.IsChunked())
         hardlink_queue_[i].file_chunks = result.file_chunks;
@@ -702,7 +702,7 @@ void SyncMediator::AddFile(const SyncItem &entry) {
   } else {
     // Push the file to the spooler, remember the entry for the path
     pthread_mutex_lock(&lock_file_queue_);
-    file_queue_[entry.GetUnionPath()] = entry;
+    file_queue_[entry.GetUnionPath()] = SharedPtr<SyncItem>((SyncItem*)&entry);
     pthread_mutex_unlock(&lock_file_queue_);
     // Spool the file
     params_->spooler->Process(entry);
@@ -803,7 +803,7 @@ void SyncMediator::AddLocalHardlinkGroups(const HardlinkGroupMap &hardlinks) {
       for (SyncItemList::const_iterator j = i->second.hardlinks.begin(),
            jEnd = i->second.hardlinks.end(); j != jEnd; ++j)
       {
-        changeset_notice += " " + j->second.filename();
+        changeset_notice += " " + j->second->filename();
       }
       PrintChangesetNotice(kAddHardlinks, changeset_notice);
     }
@@ -827,7 +827,7 @@ void SyncMediator::AddHardlinkGroup(const HardlinkGroup &group) {
   for (SyncItemList::const_iterator i = group.hardlinks.begin(),
        iEnd = group.hardlinks.end(); i != iEnd; ++i)
   {
-    hardlinks.push_back(i->second.CreateBasicCatalogDirent());
+    hardlinks.push_back(i->second->CreateBasicCatalogDirent());
   }
   XattrList *xattrs = &default_xattrs;
   if (params_->include_xattrs) {

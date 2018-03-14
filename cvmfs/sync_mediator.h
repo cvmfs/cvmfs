@@ -39,6 +39,7 @@
 #include "swissknife_sync.h"
 #include "sync_item.h"
 #include "xattr.h"
+#include "util/shared_ptr.h"
 
 namespace manifest {
 class Manifest;
@@ -54,11 +55,11 @@ namespace publish {
  */
 struct HardlinkGroup {
   explicit HardlinkGroup(const SyncItem &item) : master(item) {
-    hardlinks[master.GetRelativePath()] = master;
+    hardlinks[master.GetRelativePath()] = SharedPtr<SyncItem>((SyncItem*)&master);
   }
 
   void AddHardlink(const SyncItem &entry) {
-    hardlinks[entry.GetRelativePath()] = entry;
+    hardlinks[entry.GetRelativePath()] = SharedPtr<SyncItem>((SyncItem*)&entry);
   }
 
   SyncItem master;
