@@ -39,8 +39,7 @@ enum SyncItemType {
 
 enum SyncItemClass {
   kRegularFS,
-  kTarball,
-  kDummyDir
+  kTarball
 };
 
 class SyncUnion;
@@ -246,7 +245,6 @@ class SyncItem {
   mutable platform_stat64 tar_stat_;
   mutable bool obtained_tar_stat_;
 
- private:
   /**
    * Structure to cache stat calls to the different file locations.
    */
@@ -272,6 +270,12 @@ class SyncItem {
     platform_stat64 stat;
   };
 
+
+  mutable EntryStat rdonly_stat_;
+  mutable EntryStat union_stat_;
+  mutable EntryStat scratch_stat_;
+
+ private:
   SyncItemType GetGenericFiletype(const EntryStat &stat) const;
   SyncItemType GetScratchTypeFromArchiveEntry() const;     
 
@@ -281,10 +285,6 @@ class SyncItem {
 
   std::string GetGraftMarkerPath() const;
   void CheckGraft();
-
-  mutable EntryStat rdonly_stat_;
-  mutable EntryStat union_stat_;
-  mutable EntryStat scratch_stat_;
 
   bool whiteout_;                     /**< SyncUnion marked this as whiteout  */
   bool opaque_;                       /**< SyncUnion marked this as opaque dir*/
