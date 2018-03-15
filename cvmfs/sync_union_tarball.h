@@ -46,9 +46,9 @@ class SyncUnionTarball : public SyncUnion {
    */
   void Traverse();
 
-  std::string UnwindWhiteoutFilename(const SyncItem &entry) const;
-  bool IsOpaqueDirectory(const SyncItem &directory) const;
-  bool IsWhiteoutEntry(const SyncItem &entry) const;
+  std::string UnwindWhiteoutFilename(SharedPtr<SyncItem> entry) const;
+  bool IsOpaqueDirectory(SharedPtr<SyncItem> directory) const;
+  bool IsWhiteoutEntry(SharedPtr<SyncItem> entry) const;
 
  private:
   struct archive *src;

@@ -134,7 +134,7 @@ void IngestionPipeline::Process(
 }
 
 void IngestionPipeline::Process(
-  const publish::SyncItem &entry,
+  SharedPtr<publish::SyncItem> entry,
   bool allow_chunking,
   shash::Suffix hash_suffix)
 {

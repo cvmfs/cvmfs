@@ -14,6 +14,7 @@
 #include "mock/m_sync_mediator.h"
 #include "sync_item.h"
 #include "util/string.h"
+#include "util/shared_ptr.h"
 
 using ::testing::_;
 using ::testing::DefaultValue;
@@ -100,8 +101,8 @@ TEST_F(T_SyncUnionTarball, Traverse) {
   */
 
   EXPECT_CALL(*m_sync_mediator_,
-              Add(AllOf(Property(&SyncItem::IsDirectory, true),
-                        Property(&SyncItem::filename, "tar"))))
+              Add(Pointee(AllOf(Property(&SyncItem::IsDirectory, true),
+                                Property(&SyncItem::filename, "tar")))))
       .Times(1);
 
   /*
@@ -112,13 +113,13 @@ TEST_F(T_SyncUnionTarball, Traverse) {
   */
 
   EXPECT_CALL(*m_sync_mediator_,
-              Add(AllOf(Property(&SyncItem::IsDirectory, true),
-                        Property(&SyncItem::filename, "aaa"))))
+              Add(Pointee(AllOf(Property(&SyncItem::IsDirectory, true),
+                                Property(&SyncItem::filename, "aaa")))))
       .Times(1);
 
   EXPECT_CALL(*m_sync_mediator_,
-              Add(AllOf(Property(&SyncItem::IsRegularFile, true),
-                        Property(&SyncItem::filename, "joker"))))
+              Add(Pointee(AllOf(Property(&SyncItem::IsRegularFile, true),
+                                Property(&SyncItem::filename, "joker")))))
       .Times(1);
   /*
   EXPECT_CALL(*m_sync_mediator_,
@@ -127,8 +128,8 @@ TEST_F(T_SyncUnionTarball, Traverse) {
       .Times(1);
   */
   EXPECT_CALL(*m_sync_mediator_,
-              Add(AllOf(Property(&SyncItem::IsRegularFile, true),
-                        Property(&SyncItem::filename, "hero"))))
+              Add(Pointee(AllOf(Property(&SyncItem::IsRegularFile, true),
+                                Property(&SyncItem::filename, "hero")))))
       .Times(1);
   /*
   EXPECT_CALL(*m_sync_mediator_,
@@ -163,20 +164,20 @@ TEST_F(T_SyncUnionTarball, Four_Empty_Files) {
   */
 
   EXPECT_CALL(*m_sync_mediator_,
-              Add(AllOf(Property(&SyncItem::IsRegularFile, true),
-                        Property(&SyncItem::filename, "bar"))))
+              Add(Pointee(AllOf(Property(&SyncItem::IsRegularFile, true),
+                                Property(&SyncItem::filename, "bar")))))
       .Times(1);
   EXPECT_CALL(*m_sync_mediator_,
-              Add(AllOf(Property(&SyncItem::IsRegularFile, true),
-                        Property(&SyncItem::filename, "baz"))))
+              Add(Pointee(AllOf(Property(&SyncItem::IsRegularFile, true),
+                                Property(&SyncItem::filename, "baz")))))
       .Times(1);
   EXPECT_CALL(*m_sync_mediator_,
-              Add(AllOf(Property(&SyncItem::IsRegularFile, true),
-                        Property(&SyncItem::filename, "foo"))))
+              Add(Pointee(AllOf(Property(&SyncItem::IsRegularFile, true),
+                                Property(&SyncItem::filename, "foo")))))
       .Times(1);
   EXPECT_CALL(*m_sync_mediator_,
-              Add(AllOf(Property(&SyncItem::IsRegularFile, true),
-                        Property(&SyncItem::filename, "fuz"))))
+              Add(Pointee(AllOf(Property(&SyncItem::IsRegularFile, true),
+                                Property(&SyncItem::filename, "fuz")))))
       .Times(1);
 
   sync_union.Traverse();
@@ -207,13 +208,15 @@ TEST_F(T_SyncUnionTarball, Complex_Tar) {
   // EXPECT_CALL(*m_sync_mediator_, GetCompressionAlgorithm()).Times(3);
 
   EXPECT_CALL(*m_sync_mediator_,
-              Add(AllOf(Property(&SyncItem::IsRegularFile, true),
-                        Property(&SyncItem::GetRelativePath, "/tmp/lala/bar"))))
+              Add(Pointee(AllOf(
+                  Property(&SyncItem::IsRegularFile, true),
+                  Property(&SyncItem::GetRelativePath, "/tmp/lala/bar")))))
       .Times(1);
 
   EXPECT_CALL(*m_sync_mediator_,
-              Add(AllOf(Property(&SyncItem::IsDirectory, true),
-                        Property(&SyncItem::GetRelativePath, "/tmp/lala/dir"))))
+              Add(Pointee(AllOf(
+                  Property(&SyncItem::IsDirectory, true),
+                  Property(&SyncItem::GetRelativePath, "/tmp/lala/dir")))))
       .Times(1);
   /*
   EXPECT_CALL(
@@ -223,9 +226,9 @@ TEST_F(T_SyncUnionTarball, Complex_Tar) {
       .Times(1);
   */
   EXPECT_CALL(*m_sync_mediator_,
-              Add(AllOf(Property(&SyncItem::IsDirectory, true),
-                        Property(&SyncItem::GetRelativePath,
-                                 "/tmp/lala/dir/inside_dir"))))
+              Add(Pointee(AllOf(Property(&SyncItem::IsDirectory, true),
+                                Property(&SyncItem::GetRelativePath,
+                                         "/tmp/lala/dir/inside_dir")))))
       .Times(1);
   /*
   EXPECT_CALL(*m_sync_mediator_,
@@ -235,9 +238,9 @@ TEST_F(T_SyncUnionTarball, Complex_Tar) {
       .Times(1);
   */
   EXPECT_CALL(*m_sync_mediator_,
-              Add(AllOf(Property(&SyncItem::IsRegularFile, true),
-                        Property(&SyncItem::GetRelativePath,
-                                 "/tmp/lala/dir/inside_dir/foo"))))
+              Add(Pointee(AllOf(Property(&SyncItem::IsRegularFile, true),
+                                Property(&SyncItem::GetRelativePath,
+                                         "/tmp/lala/dir/inside_dir/foo")))))
       .Times(1);
   /*
   EXPECT_CALL(*m_sync_mediator_,
@@ -252,13 +255,14 @@ TEST_F(T_SyncUnionTarball, Complex_Tar) {
       .Times(1);
   */
   EXPECT_CALL(*m_sync_mediator_,
-              Add(AllOf(Property(&SyncItem::IsRegularFile, true),
-                        Property(&SyncItem::GetRelativePath, "/tmp/lala/foo"))))
+              Add(Pointee(AllOf(
+                  Property(&SyncItem::IsRegularFile, true),
+                  Property(&SyncItem::GetRelativePath, "/tmp/lala/foo")))))
       .Times(1);
-  EXPECT_CALL(
-      *m_sync_mediator_,
-      Add(AllOf(Property(&SyncItem::IsSymlink, true),
-                Property(&SyncItem::GetRelativePath, "/tmp/lala/foo_link"))))
+  EXPECT_CALL(*m_sync_mediator_,
+              Add(Pointee(AllOf(
+                  Property(&SyncItem::IsSymlink, true),
+                  Property(&SyncItem::GetRelativePath, "/tmp/lala/foo_link")))))
       .Times(1);
   /*
   EXPECT_CALL(*m_sync_mediator_,

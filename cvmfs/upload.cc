@@ -7,6 +7,7 @@
 
 #include <vector>
 
+#include "util/shared_ptr.h"
 #include "util_concurrency.h"
 
 namespace upload {
@@ -51,14 +52,14 @@ bool Spooler::Initialize() {
   return true;
 }
 
-void Spooler::Process(const publish::SyncItem &entry,
-                      const bool allow_chunking) {
-  ingestion_pipeline_->Process(entry, allow_chunking);
-}
-
 void Spooler::Process(const std::string &local_path,
                       const bool allow_chunking) {
   ingestion_pipeline_->Process(local_path, allow_chunking);
+}
+
+void Spooler::Process(SharedPtr<publish::SyncItem> entry,
+                      const bool allow_chunking) {
+  ingestion_pipeline_->Process(entry, allow_chunking);
 }
 
 void Spooler::ProcessCatalog(const std::string &local_path) {

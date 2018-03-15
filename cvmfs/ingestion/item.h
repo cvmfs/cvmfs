@@ -22,6 +22,7 @@
 #include "sync_item.h"
 #include "util/pointer.h"
 #include "util/single_copy.h"
+#include "util/shared_ptr.h"
 
 namespace upload {
 struct UploadStreamHandle;
@@ -36,7 +37,7 @@ class ItemAllocator;
 class FileItem : SingleCopy {
  public:
   explicit FileItem(
-    const publish::SyncItem &entry,
+    SharedPtr<publish::SyncItem> entry,
     uint64_t min_chunk_size = 4 * 1024 * 1024,
     uint64_t avg_chunk_size = 8 * 1024 * 1024,
     uint64_t max_chunk_size = 16 * 1024 * 1024,
