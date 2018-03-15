@@ -15,6 +15,7 @@
 #include "sync_item.h"
 #include "upload_spooler_result.h"
 #include "util_concurrency.h"
+#include "util/shared_ptr.h"
 
 namespace upload {
 class AbstractUploader;
@@ -31,7 +32,7 @@ class IngestionPipeline : public Observable<upload::SpoolerResult> {
   void Spawn();
   void Process(const std::string &path, bool allow_chunking,
                shash::Suffix hash_suffix = shash::kSuffixNone);
-  void Process(const publish::SyncItem &entry, bool allow_chunking,
+  void Process(SharedPtr<publish::SyncItem> entry, bool allow_chunking,
                shash::Suffix hash_suffix = shash::kSuffixNone);
   void WaitFor();
 

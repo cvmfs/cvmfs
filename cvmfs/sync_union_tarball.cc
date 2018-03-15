@@ -56,6 +56,7 @@ bool SyncUnionTarball::Initialize() {
 }
 
 void SyncUnionTarball::Traverse() {
+  printf("%s", union_path().c_str());
   struct archive_entry *entry;
   // when we find a directory we stack it up and call the EnterDirectory
   // as soon as we find a file that does not belong to the directory we call
@@ -120,8 +121,8 @@ void SyncUnionTarball::Traverse() {
 
           CreateDirectories(parent_path);
 
-          SyncItem sync_entry = SyncItem(parent_path, filename, src, entry,
-                                         this, kItemUnknown, kTarball);
+          SharedPtr<SyncItem> sync_entry = SharedPtr<SyncItem>(new SyncItem(
+              parent_path, filename, src, entry, this, kItemUnknown, kTarball));
 
           printf(
               "complete_path: \t%s \ndirectory_traversing: "
@@ -131,7 +132,7 @@ void SyncUnionTarball::Traverse() {
           int link_count = archive_entry_nlink(entry);
           printf("inode: %" PRIu64 "\n", inode);
           printf("link count %d\n", link_count);
-          if (sync_entry.IsDirectory()) {
+          if (sync_entry->IsDirectory()) {
             directories_stacked.push(complete_path);
             directory_traversing.assign(complete_path);
             EnterDirectory(parent_path, filename);
@@ -152,25 +153,26 @@ void SyncUnionTarball::Traverse() {
           printf("parent_path\t\t%s\n", parent_path.c_str());
           printf("filename\t\t%s\n", filename.c_str());
           printf("relative_parent_path:\t%s\n",
-                 sync_entry.relative_parent_path().c_str());
-          printf("WhiteOut:\t\t%d\n", sync_entry.IsWhiteout());
-          printf("New:\t\t\t%d\n", sync_entry.IsNew());
-          printf("RelativePath:\t\t%s\n", sync_entry.GetRelativePath().c_str());
-          printf("filename:\t\t%s\n", sync_entry.filename().c_str());
-          printf("RdOnlyPath:\t\t%s\n", sync_entry.GetRdOnlyPath().c_str());
-          printf("UnionPath:\t\t%s\n", sync_entry.GetUnionPath().c_str());
-          printf("ScratchPath:\t\t%s\n", sync_entry.GetScratchPath().c_str());
+                 sync_entry->relative_parent_path().c_str());
+          printf("WhiteOut:\t\t%d\n", sync_entry->IsWhiteout());
+          printf("New:\t\t\t%d\n", sync_entry->IsNew());
+          printf("RelativePath:\t\t%s\n",
+                 sync_entry->GetRelativePath().c_str());
+          printf("filename:\t\t%s\n", sync_entry->filename().c_str());
+          printf("RdOnlyPath:\t\t%s\n", sync_entry->GetRdOnlyPath().c_str());
+          printf("UnionPath:\t\t%s\n", sync_entry->GetUnionPath().c_str());
+          printf("ScratchPath:\t\t%s\n", sync_entry->GetScratchPath().c_str());
 
           printf("\n\n");
 
-          if (sync_entry.IsDirectory()) {
+          if (sync_entry->IsDirectory()) {
             if (know_directories_.find(complete_path) !=
                 know_directories_.end()) {
-              sync_entry.AlreadyCreatedDir();
+              sync_entry->AlreadyCreatedDir();
             }
             ProcessDirectory(sync_entry);
             know_directories_.insert(complete_path);
-          } else if (sync_entry.IsRegularFile()) {
+          } else if (sync_entry->IsRegularFile()) {
             ProcessFile(sync_entry);
           }
         }
@@ -181,15 +183,15 @@ void SyncUnionTarball::Traverse() {
 }
 
 std::string SyncUnionTarball::UnwindWhiteoutFilename(
-    const SyncItem &entry) const {
-  return entry.filename();
+    SharedPtr<SyncItem> entry) const {
+  return entry->filename();
 }
 
-bool SyncUnionTarball::IsOpaqueDirectory(const SyncItem &directory) const {
+bool SyncUnionTarball::IsOpaqueDirectory(SharedPtr<SyncItem> directory) const {
   return false;
 }
 
-bool SyncUnionTarball::IsWhiteoutEntry(const SyncItem &entry) const {
+bool SyncUnionTarball::IsWhiteoutEntry(SharedPtr<SyncItem> entry) const {
   return false;
 }
 
@@ -206,9 +208,10 @@ void SyncUnionTarball::CreateDirectories(const std::string &target) {
   if (dirname == ".") dirname = "";
   printf("\n\t\t\tCreateDirectories CREATING | dirname = %s, filename = '%s'\n",
          dirname.c_str(), filename.c_str());
-  SyncItem dummy = SyncItem(dirname, filename, this, kItemDir, kDummyDir);
+  SharedPtr<SyncItem> dummy = SharedPtr<SyncItem>(
+      new SyncItem(dirname, filename, this, kItemDir, kDummyDir));
 
-  catalog::DirectoryEntryBase dirent = dummy.CreateBasicCatalogDirent();
+  catalog::DirectoryEntryBase dirent = dummy->CreateBasicCatalogDirent();
   printf("dummy is directory: %d\n", dirent.IsDirectory());
 
   ProcessDirectory(dummy);

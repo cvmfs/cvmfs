@@ -11,6 +11,7 @@
 
 #include "hash.h"
 #include "sync_mediator.h"
+#include "util/shared_ptr.h"
 
 using ::testing::Invoke;
 using ::testing::_;
@@ -30,12 +31,12 @@ class MockSyncMediator : public AbstractSyncMediator {
   ~MockSyncMediator() {}
 
   MOCK_METHOD1(RegisterUnionEngine, void(SyncUnion *engine));
-  MOCK_METHOD1(Add, void(const SyncItem &entry));
-  MOCK_METHOD1(Touch, void(const SyncItem &entry));
-  MOCK_METHOD1(Remove, void(const SyncItem &entry));
-  MOCK_METHOD1(Replace, void(const SyncItem &entry));
-  MOCK_METHOD1(EnterDirectory, void(const SyncItem &entry));
-  MOCK_METHOD1(LeaveDirectory, void(const SyncItem &entry));
+  MOCK_METHOD1(Add, void(SharedPtr<SyncItem> entry));
+  MOCK_METHOD1(Touch, void(SharedPtr<SyncItem> entry));
+  MOCK_METHOD1(Remove, void(SharedPtr<SyncItem> entry));
+  MOCK_METHOD1(Replace, void(SharedPtr<SyncItem> entry));
+  MOCK_METHOD1(EnterDirectory, void(SharedPtr<SyncItem> entry));
+  MOCK_METHOD1(LeaveDirectory, void(SharedPtr<SyncItem> entry));
   MOCK_METHOD1(Commit, bool(manifest::Manifest *manifest));
   MOCK_CONST_METHOD0(IsExternalData, bool());
   MOCK_CONST_METHOD0(GetCompressionAlgorithm, zlib::Algorithms());

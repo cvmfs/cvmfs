@@ -53,17 +53,17 @@ void SyncUnionAufs::Traverse() {
   traversal.Recurse(scratch_path());
 }
 
-bool SyncUnionAufs::IsWhiteoutEntry(const SyncItem &entry) const {
-  return entry.filename().substr(0, whiteout_prefix_.length()) ==
+bool SyncUnionAufs::IsWhiteoutEntry(SharedPtr<SyncItem> entry) const {
+  return entry->filename().substr(0, whiteout_prefix_.length()) ==
          whiteout_prefix_;
 }
 
-bool SyncUnionAufs::IsOpaqueDirectory(const SyncItem &directory) const {
-  return FileExists(directory.GetScratchPath() + "/.wh..wh..opq");
+bool SyncUnionAufs::IsOpaqueDirectory(SharedPtr<SyncItem> directory) const {
+  return FileExists(directory->GetScratchPath() + "/.wh..wh..opq");
 }
 
-string SyncUnionAufs::UnwindWhiteoutFilename(const SyncItem &entry) const {
-  const std::string &filename = entry.filename();
+string SyncUnionAufs::UnwindWhiteoutFilename(SharedPtr<SyncItem> entry) const {
+  const std::string &filename = entry->filename();
   return filename.substr(whiteout_prefix_.length());
 }
 

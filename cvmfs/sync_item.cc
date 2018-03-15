@@ -42,6 +42,8 @@ SyncItem::SyncItem(const string       &relative_parent_path,
                    const SyncItemType entry_type,
                    const SyncItemClass entry_class) :
   union_engine_(union_engine),
+  class_(entry_class),
+  entry_class_(entry_class),
   whiteout_(false),
   opaque_(false),
   masked_hardlink_(false),
@@ -54,8 +56,7 @@ SyncItem::SyncItem(const string       &relative_parent_path,
   graft_chunklist_(NULL),
   graft_size_(-1),
   rdonly_type_(kItemUnknown),
-  compression_algorithm_(zlib::kZlibDefault),
-  class_(entry_class)
+  compression_algorithm_(zlib::kZlibDefault)
 {
   content_hash_.algorithm = shash::kAny;
   CheckMarkerFiles();
@@ -74,8 +75,13 @@ SyncItem::SyncItem(const string       &relative_parent_path,
                    const SyncUnion    *union_engine,
                    const SyncItemType entry_type,
                    const SyncItemClass entry_class) :
+  archive_(archive),
+  archive_entry_(entry),
   union_engine_(union_engine),
   scratch_type_(entry_type),
+  class_(entry_class),
+  entry_class_(entry_class),
+  obtained_tar_stat_(false),
   whiteout_(false),
   opaque_(false),
   masked_hardlink_(false),
@@ -88,12 +94,7 @@ SyncItem::SyncItem(const string       &relative_parent_path,
   graft_chunklist_(NULL),
   graft_size_(-1),
   rdonly_type_(kItemUnknown),
-  compression_algorithm_(zlib::kZlibDefault),
-  class_(entry_class),
-  archive_entry_(entry),
-  archive_(archive),
-  entry_class_(entry_class),
-  obtained_tar_stat_(false)
+  compression_algorithm_(zlib::kZlibDefault)
 {
   content_hash_.algorithm = shash::kAny;
   CheckMarkerFiles();
@@ -182,6 +183,9 @@ SyncItemType SyncItem::GetScratchTypeFromArchiveEntry() const {
       return kItemFifo;
       break;
     }
+    default:
+      return kItemUnknown;
+      break;
   }
 }
 

@@ -121,6 +121,7 @@
 #include "upload_spooler_definition.h"
 #include "upload_spooler_result.h"
 #include "util/pointer.h"
+#include "util/shared_ptr.h"
 
 namespace upload {
 
@@ -197,7 +198,7 @@ class Spooler : public Observable<SpoolerResult> {
    *                        chunks or uploaded at once
    */
   void Process(const std::string &local_path, const bool allow_chunking = true);
-  void Process(const publish::SyncItem &entry, const bool allow_chunking = true);
+  void Process(SharedPtr<publish::SyncItem> entry, const bool allow_chunking = true);
 
   /**
    * Convenience wrapper to process a catalog file. Please always use this

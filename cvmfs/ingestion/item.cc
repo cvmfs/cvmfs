@@ -12,6 +12,7 @@
 #include "smalloc.h"
 #include "util_concurrency.h"
 #include "sync_item.h"
+#include "util/shared_ptr.h"
 
 FileItem::FileItem(
   const std::string &p,
@@ -42,7 +43,7 @@ FileItem::FileItem(
 }
 
 FileItem::FileItem(
-  const publish::SyncItem &entry,
+  SharedPtr<publish::SyncItem> entry,
   uint64_t min_chunk_size,
   uint64_t avg_chunk_size,
   uint64_t max_chunk_size,
@@ -51,7 +52,7 @@ FileItem::FileItem(
   shash::Suffix hash_suffix,
   bool may_have_chunks,
   bool has_legacy_bulk_chunk)
-  : path_(entry.GetUnionPath())
+  : path_(entry->GetUnionPath())
   , compression_algorithm_(compression_algorithm)
   , hash_algorithm_(hash_algorithm)
   , hash_suffix_(hash_suffix)
