@@ -60,11 +60,6 @@ SyncItem::SyncItem(const string       &relative_parent_path,
 {
   content_hash_.algorithm = shash::kAny;
   CheckMarkerFiles();
-  if (kDummyDir == entry_class) {
-    union_stat_.obtained = true;
-    union_stat_.stat.st_mode = S_IFDIR;
-    scratch_type_ = kItemDir;
-  }
 }
 
 
