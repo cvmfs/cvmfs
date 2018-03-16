@@ -18,7 +18,6 @@
 #include "hash.h"
 #include "ingestion/chunk_detector.h"
 #include "ingestion/ingestion_source.h"
-#include "ingestion/ingestion_source.h"
 #include "sync_item.h"
 #include "util/pointer.h"
 #include "util/single_copy.h"
@@ -104,7 +103,7 @@ class FileItem : SingleCopy {
   static const char kQuitBeaconMarker = '\0';
 
   const std::string path_;
-  IngestionSource* source_;
+  IngestionSource *source_;
   const zlib::Algorithms compression_algorithm_;
   const shash::Algorithms hash_algorithm_;
   const shash::Suffix hash_suffix_;

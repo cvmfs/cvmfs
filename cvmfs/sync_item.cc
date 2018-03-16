@@ -14,6 +14,7 @@
 
 #include "archive.h"
 #include "archive_entry.h"
+#include "ingestion/ingestion_source.h"
 #include "sync_mediator.h"
 #include "sync_union.h"
 
@@ -39,11 +40,8 @@ SyncItem::SyncItem() :
 SyncItem::SyncItem(const string       &relative_parent_path,
                    const string       &filename,
                    const SyncUnion    *union_engine,
-                   const SyncItemType entry_type,
-                   const SyncItemClass entry_class) :
+                   const SyncItemType entry_type) :
   union_engine_(union_engine),
-  class_(entry_class),
-  entry_class_(entry_class),
   whiteout_(false),
   opaque_(false),
   masked_hardlink_(false),
@@ -68,15 +66,9 @@ SyncItem::SyncItem(const string       &relative_parent_path,
                    struct archive *archive,
                    struct archive_entry *entry,
                    const SyncUnion    *union_engine,
-                   const SyncItemType entry_type,
-                   const SyncItemClass entry_class) :
-  archive_(archive),
-  archive_entry_(entry),
+                   const SyncItemType entry_type) :
   union_engine_(union_engine),
   scratch_type_(entry_type),
-  class_(entry_class),
-  entry_class_(entry_class),
-  obtained_tar_stat_(false),
   whiteout_(false),
   opaque_(false),
   masked_hardlink_(false),
@@ -93,10 +85,6 @@ SyncItem::SyncItem(const string       &relative_parent_path,
 {
   content_hash_.algorithm = shash::kAny;
   CheckMarkerFiles();
-  if (kTarball == entry_class_) {
-    scratch_type_ = GetScratchFiletype();
-    GetStatFromTar();
-  }
 }
 
 
@@ -134,9 +122,6 @@ SyncItemType SyncItem::GetRdOnlyFiletype() const {
 
 
 SyncItemType SyncItem::GetScratchFiletype() const {
-  if (kTarball == entry_class_)
-    return GetScratchTypeFromArchiveEntry();
-
   StatScratch();
   if (scratch_stat_.error_code != 0) {
     PrintWarning("Failed to stat() '" + GetRelativePath() + "' in scratch. "
@@ -145,63 +130,6 @@ SyncItemType SyncItem::GetScratchFiletype() const {
   }
 
   return GetGenericFiletype(scratch_stat_);
-}
-
-SyncItemType SyncItem::GetScratchTypeFromArchiveEntry() const {
-  assert(archive_entry_);
-  switch (archive_entry_filetype(archive_entry_)) {
-    case AE_IFREG: {
-      return kItemFile;
-      break;
-    }
-    case AE_IFLNK: {
-      return kItemSymlink;
-      break;
-    }
-    case AE_IFSOCK: {
-      return kItemSocket;
-      break;
-    }
-    case AE_IFCHR: {
-      return kItemCharacterDevice;
-      break;
-    }
-    case AE_IFBLK: {
-      return kItemBlockDevice;
-      break;
-    }
-    case AE_IFDIR: {
-      return kItemDir;
-      break;
-    }
-    case AE_IFIFO: {
-      return kItemFifo;
-      break;
-    }
-    default:
-      return kItemUnknown;
-      break;
-  }
-}
-
-platform_stat64 SyncItem::GetStatFromTar() const {
-  assert(archive_entry_);
-  if (obtained_tar_stat_)
-    return tar_stat_;
-
-  const struct stat* entry_stat_  = archive_entry_stat(archive_entry_);
-  platform_stat64 stat;
-  
-  stat.st_mode = entry_stat_->st_mode;
-  stat.st_uid = entry_stat_->st_uid;
-  stat.st_gid = entry_stat_->st_gid;
-  stat.st_size = entry_stat_->st_size;
-  stat.st_mtime = entry_stat_->st_mtime;
-  
-  obtained_tar_stat_ = true;
-  tar_stat_ = stat;
-
-  return stat;
 }
 
 void SyncItem::MarkAsWhiteout(const std::string &actual_filename) {
@@ -259,6 +187,9 @@ uint64_t SyncItem::GetUnionInode() const {
   return union_stat_.stat.st_ino;
 }
 
+IngestionSource *SyncItem::GetIngestionSource() const {
+        return new FileIngestionSource(filename());
+}
 
 void SyncItem::StatGeneric(const string  &path,
                            EntryStat     *info,
@@ -302,11 +233,6 @@ catalog::DirectoryEntryBase SyncItem::CreateBasicCatalogDirent() const {
 
   if (this->IsCharacterDevice() || this->IsBlockDevice()) {
     dirent.size_ = makedev(GetRdevMajor(), GetRdevMinor());
-  }
-
-  if (kTarball == entry_class_) {
-    platform_stat64 stat_ = GetStatFromTar();
-    dirent.mode_ = stat_.st_mode;
   }
 
   return dirent;

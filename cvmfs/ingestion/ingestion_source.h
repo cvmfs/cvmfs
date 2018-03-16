@@ -75,15 +75,15 @@ class FileIngestionSource : public IngestionSource {
 
 class TarIngestionSource : public IngestionSource {
  public:
-  TarIngestionSource(SharedPtr<publish::SyncItem> entry) : buffer_(NULL) {
-    const struct stat* stat_ = archive_entry_stat(entry->archive_entry_);
+  TarIngestionSource(struct archive* archive, struct archive_entry* entry) : buffer_(NULL) {
+    const struct stat* stat_ = archive_entry_stat(entry);
     size_ = stat_->st_size;
     while (NULL == buffer_) buffer_ = new char[size_];
     buffer_seek_ptr_ = buffer_;
-    uint64_t read_so_far = archive_read_data(entry->archive_, buffer_, size_);
+    uint64_t read_so_far = archive_read_data(archive, buffer_, size_);
     while (read_so_far < size_) {
       uint64_t read =
-          archive_read_data(entry->archive_, buffer_ + read_so_far, size_);
+          archive_read_data(archive, buffer_ + read_so_far, size_);
       if (read > 0) read_so_far += read;
     }
   }

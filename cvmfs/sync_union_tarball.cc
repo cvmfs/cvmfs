@@ -122,8 +122,8 @@ void SyncUnionTarball::Traverse() {
 
           CreateDirectories(parent_path);
 
-          SharedPtr<SyncItem> sync_entry = SharedPtr<SyncItem>(new SyncItem(
-              parent_path, filename, src, entry, this, kItemUnknown, kTarball));
+          SharedPtr<SyncItem> sync_entry = SharedPtr<SyncItem>(new SyncItemTar(
+              parent_path, filename, src, entry, this));
 
           printf(
               "complete_path: \t%s \ndirectory_traversing: "
