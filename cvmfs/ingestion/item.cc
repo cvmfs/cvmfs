@@ -14,6 +14,7 @@
 #include "util_concurrency.h"
 #include "sync_item.h"
 #include "util/shared_ptr.h"
+#include "ingestion/ingestion_source.h"
 
 FileItem::FileItem(
   const std::string &p,
@@ -26,6 +27,7 @@ FileItem::FileItem(
   bool may_have_chunks,
   bool has_legacy_bulk_chunk)
   : path_(p)
+  , source_(new FileIngestionSource(path_))
   , compression_algorithm_(compression_algorithm)
   , hash_algorithm_(hash_algorithm)
   , hash_suffix_(hash_suffix)
@@ -40,7 +42,6 @@ FileItem::FileItem(
   assert(retval == 0);
   atomic_init64(&nchunks_in_fly_);
   atomic_init32(&is_fully_chunked_);
-  source_ = new FileIngestionSource(path_);
 }
 
 FileItem::FileItem(
@@ -54,6 +55,7 @@ FileItem::FileItem(
   bool may_have_chunks,
   bool has_legacy_bulk_chunk)
   : path_(entry->GetUnionPath())
+  , source_(entry->GetIngestionSource())
   , compression_algorithm_(compression_algorithm)
   , hash_algorithm_(hash_algorithm)
   , hash_suffix_(hash_suffix)
@@ -68,14 +70,12 @@ FileItem::FileItem(
   assert(retval == 0);
   atomic_init64(&nchunks_in_fly_);
   atomic_init32(&is_fully_chunked_);
-  source_ = new TarIngestionSource(entry);
 }
 
 FileItem::~FileItem() {
   pthread_mutex_destroy(&lock_);
   delete source_;
 }
-
 
 void FileItem::RegisterChunk(const FileChunk &file_chunk) {
   MutexLockGuard lock_guard(lock_);

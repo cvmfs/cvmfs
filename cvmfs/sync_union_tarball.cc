@@ -182,7 +182,6 @@ void SyncUnionTarball::Traverse() {
           SharedPtr<SyncItem> sync_entry = SharedPtr<SyncItem>(
               new SyncItemTar(parent_path, filename, src, entry, archive_lock_,
                               read_archive_cond_, can_read_archive_, this));
-
           if (sync_entry->IsDirectory()) {
             if (know_directories_.find(complete_path) !=
                 know_directories_.end()) {

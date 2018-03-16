@@ -19,8 +19,11 @@
 #include "directory_entry.h"
 #include "file_chunk.h"
 #include "hash.h"
+#include "ingestion/ingestion_source.h"
 #include "platform.h"
 #include "util/shared_ptr.h"
+
+class IngestionSource;
 
 namespace publish {
 
@@ -37,13 +40,7 @@ enum SyncItemType {
   kItemUnknown
 };
 
-enum SyncItemClass {
-  kRegularFS,
-  kTarball
-};
-
 class SyncUnion;
-
 /**
  * Every directory entry emitted by the FileSystemTraversal is wrapped in a
  * SyncItem structure by the factory method SyncUnion::CreateSyncItem().
@@ -64,7 +61,7 @@ class SyncItem {
 
  public:
   SyncItem();
-  ~SyncItem();
+  virtual ~SyncItem();
 
   inline bool IsDirectory()       const { return IsType(kItemDir);             }
   inline bool WasDirectory()      const { return WasType(kItemDir);            }
@@ -164,13 +161,15 @@ class SyncItem {
     return relative_parent_path_;
   }
 
+  virtual IngestionSource *GetIngestionSource() const;
+  
+  virtual void AlreadyCreatedDir() const { rdonly_type_ = kItemDir; }
+  
   bool operator==(const SyncItem &other) const {
     return ((relative_parent_path_ == other.relative_parent_path_) &&
             (filename_ == other.filename_));
   }
 
-  struct archive* archive_;
-  struct archive_entry *archive_entry_;
  protected:
   inline platform_stat64 GetUnionStat() const {
     StatUnion();
@@ -210,14 +209,10 @@ class SyncItem {
     return rdonly_type_ == expected_type;
   }
   
-  void AlreadyCreatedDir() const {
-    assert(kTarball == entry_class_);
-    rdonly_type_ = kItemDir;
-  }
-
   const SyncUnion *union_engine_;     /**< this SyncUnion created this object */
 
   mutable SyncItemType scratch_type_;
+  mutable SyncItemType rdonly_type_;
   
   /**
    * create a new SyncItem
@@ -232,19 +227,12 @@ class SyncItem {
   SyncItem(const std::string  &relative_parent_path,
            const std::string  &filename,
            const SyncUnion    *union_engine,
-           const SyncItemType  entry_type,
-           const SyncItemClass entry_class = kRegularFS);
+           const SyncItemType  entry_type);
   SyncItem(const std::string &relative_parent_path, const std::string &filename,
            struct archive *archive, struct archive_entry *entry,
-           const SyncUnion *union_engine, const SyncItemType entry_type,
-           const SyncItemClass entry_class = kTarball);
+           const SyncUnion *union_engine, const SyncItemType entry_type);
   
-  SyncItemClass class_;
-  SyncItemClass entry_class_;
   platform_stat64 GetStatFromTar() const;
-  mutable platform_stat64 tar_stat_;
-  mutable bool obtained_tar_stat_;
-
   /**
    * Structure to cache stat calls to the different file locations.
    */
@@ -302,8 +290,6 @@ class SyncItem {
    */
   FileChunkList *graft_chunklist_;
   ssize_t graft_size_;
-
-  mutable SyncItemType rdonly_type_;
 
   // The hash of regular file's content
   shash::Any content_hash_;

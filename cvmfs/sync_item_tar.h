@@ -20,54 +20,86 @@ class SyncItemTar : public SyncItem {
   SyncItemType GetScratchFiletype() const;
   catalog::DirectoryEntryBase CreateBasicCatalogDirent() const;
 
-  inline unsigned int GetRdevMajor() const { return major(stat_->st_rdev); }
+  inline unsigned int GetRdevMajor() const { return major(tar_stat_.st_rdev); }
+  inline unsigned int GetRdevMinor() const { return minor(tar_stat_.st_rdev); }
 
-  inline unsigned int GetRdevMinor() const { return minor(stat_->st_rdev); }
+  IngestionSource *GetIngestionSource() const;
+
+  struct archive *archive_;
+  struct archive_entry *archive_entry_;
 
  private:
-  const struct stat *stat_;
+  platform_stat64 GetStatFromTar() const;
+  mutable platform_stat64 tar_stat_;
+  mutable bool obtained_tar_stat_;
 };
 
 SyncItemTar::SyncItemTar(const string &relative_parent_path,
                          const string &filename, struct archive *archive,
                          struct archive_entry *entry,
                          const SyncUnion *union_engine)
-    : SyncItem(relative_parent_path, filename, union_engine, kItemUnknown,
-               kTarball) {
-  switch (archive_entry_filetype(entry)) {
+    : SyncItem(relative_parent_path, filename, union_engine, kItemUnknown),
+      archive_(archive),
+      archive_entry_(entry) {
+  scratch_type_ = GetScratchFiletype();
+  GetStatFromTar();
+}
+
+SyncItemType SyncItemTar::GetScratchFiletype() const {
+  assert(archive_entry_);
+  switch (archive_entry_filetype(archive_entry_)) {
     case AE_IFREG: {
-      scratch_type_ = kItemFile;
+      return kItemFile;
       break;
     }
     case AE_IFLNK: {
-      scratch_type_ = kItemSymlink;
+      return kItemSymlink;
       break;
     }
     case AE_IFSOCK: {
-      scratch_type_ = kItemSocket;
+      return kItemSocket;
       break;
     }
     case AE_IFCHR: {
-      scratch_type_ = kItemCharacterDevice;
+      return kItemCharacterDevice;
       break;
     }
     case AE_IFBLK: {
-      scratch_type_ = kItemBlockDevice;
+      return kItemBlockDevice;
       break;
     }
     case AE_IFDIR: {
-      scratch_type_ = kItemDir;
+      return kItemDir;
       break;
     }
     case AE_IFIFO: {
-      scratch_type_ = kItemFifo;
+      return kItemFifo;
       break;
     }
+    default:
+      return kItemUnknown;
+      break;
   }
-  stat_ = archive_entry_stat(entry);
 }
 
-SyncItemType SyncItemTar::GetScratchFiletype() const { return scratch_type_; }
+platform_stat64 SyncItemTar::GetStatFromTar() const {
+  assert(archive_entry_);
+  if (obtained_tar_stat_) return tar_stat_;
+
+  const struct stat *entry_stat_ = archive_entry_stat(archive_entry_);
+  platform_stat64 stat;
+
+  stat.st_mode = entry_stat_->st_mode;
+  stat.st_uid = entry_stat_->st_uid;
+  stat.st_gid = entry_stat_->st_gid;
+  stat.st_size = entry_stat_->st_size;
+  stat.st_mtime = entry_stat_->st_mtime;
+
+  obtained_tar_stat_ = true;
+  tar_stat_ = stat;
+
+  return stat;
+}
 
 catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
   catalog::DirectoryEntryBase dirent;
@@ -77,13 +109,13 @@ catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
 
   // this might mask the actual link count in case hardlinks are not supported
   // (i.e. on setups using OverlayFS)
-  dirent.linkcount_ = this->stat_->st_nlink;
+  dirent.linkcount_ = this->tar_stat_.st_nlink;
 
-  dirent.mode_ = this->stat_->st_mode;
-  dirent.uid_ = this->stat_->st_uid;
-  dirent.gid_ = this->stat_->st_gid;
-  dirent.size_ = this->stat_->st_size;
-  dirent.mtime_ = this->stat_->st_mtime;
+  dirent.mode_ = this->tar_stat_.st_mode;
+  dirent.uid_ = this->tar_stat_.st_uid;
+  dirent.gid_ = this->tar_stat_.st_gid;
+  dirent.size_ = this->tar_stat_.st_size;
+  dirent.mtime_ = this->tar_stat_.st_mtime;
   dirent.checksum_ = this->GetContentHash();
   dirent.is_external_file_ = this->IsExternalData();
   dirent.compression_algorithm_ = this->GetCompressionAlgorithm();
@@ -104,6 +136,10 @@ catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
 
   return dirent;
 }
+
+IngestionSource *SyncItemTar::GetIngestionSource() const {
+  return new TarIngestionSource(archive_, archive_entry_);
+};
 }
 
 #endif  // CVMFS_SYNC_ITEM_TAR_H_
