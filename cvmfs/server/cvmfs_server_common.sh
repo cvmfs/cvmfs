@@ -490,9 +490,9 @@ get_item() {
   load_repo_config $name
 
   if [ x"$noproxy" != x"" ]; then
-    unset http_proxy && curl $(get_follow_http_redirects_flag) "$url" 2>/dev/null
+    unset http_proxy && curl $(get_follow_http_redirects_flag) "$url" 2>/dev/null | tr -d '\0'
   else
-    curl $(get_follow_http_redirects_flag) "$url" 2>/dev/null
+    curl $(get_follow_http_redirects_flag) "$url" 2>/dev/null | tr -d '\0'
   fi
 }
 
