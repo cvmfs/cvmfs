@@ -7,6 +7,7 @@
 #include "sync_union_tarball.h"
 
 #include <pthread.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <cassert>
 #include <set>
@@ -35,6 +36,7 @@ SyncUnionTarball::SyncUnionTarball(AbstractSyncMediator *mediator,
                                    const std::string &to_delete)
     : SyncUnion(mediator, rdonly_path, union_path, scratch_path),
       tarball_path_(tarball_path),
+<<<<<<< 385ddd14b16c4b52816bea77468d0a313533f719
       base_directory_(base_directory),
       to_delete_(to_delete) {
   archive_lock_ =
@@ -57,6 +59,17 @@ SyncUnionTarball::~SyncUnionTarball() {
   pthread_cond_destroy(read_archive_cond_);
 
   delete can_read_archive_;
+=======
+      base_directory_(base_directory) {
+  archive_lock = (pthread_mutex_t *)smalloc(sizeof(pthread_mutex_t));
+  pthread_mutex_init(archive_lock, NULL);
+}
+
+SyncUnionTarball::~SyncUnionTarball() {
+  pthread_mutex_lock(archive_lock);
+  pthread_mutex_unlock(archive_lock);
+  pthread_mutex_destroy(archive_lock);
+>>>>>>> use lock to move big file, avoid in memory copy
 }
 
 bool SyncUnionTarball::Initialize() {
@@ -110,6 +123,7 @@ void SyncUnionTarball::Traverse() {
       retry_read_header = false;
 
       /* Get the lock, wait if lock is not available yet */
+<<<<<<< 385ddd14b16c4b52816bea77468d0a313533f719
       pthread_mutex_lock(archive_lock_);
       while (!*can_read_archive_) {
         pthread_cond_wait(read_archive_cond_, archive_lock_);
@@ -118,6 +132,10 @@ void SyncUnionTarball::Traverse() {
 
       int result = archive_read_next_header2(src, entry);
       *can_read_archive_ = false;
+=======
+      pthread_mutex_lock(archive_lock);
+      result = archive_read_next_header(src, &entry);
+>>>>>>> use lock to move big file, avoid in memory copy
 
       switch (result) {
         case ARCHIVE_FATAL: {

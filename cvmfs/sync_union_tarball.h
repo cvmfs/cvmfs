@@ -11,6 +11,7 @@
 
 #include "sync_union.h"
 
+#include <pthread.h>
 #include <set>
 #include <string>
 
@@ -27,6 +28,8 @@ class SyncUnionTarball : public SyncUnion {
                    const std::string &scratch_path,
                    const std::string &tarball_path,
                    const std::string &base_directory);
+
+  ~SyncUnionTarball();
 
   /*
    * Delete the working directories, where the tar is being uncompressed.
@@ -55,6 +58,7 @@ class SyncUnionTarball : public SyncUnion {
   const std::string tarball_path_;
   const std::string base_directory_;
   std::set<std::string> know_directories_;
+  pthread_mutex_t* archive_lock;
 
   void CreateDirectories(const std::string &target);
   /*

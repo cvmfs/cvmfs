@@ -7,6 +7,8 @@
 
 #include "sync_union.h"
 
+#include <pthread.h>
+
 namespace publish {
 
 // struct archive;
@@ -15,7 +17,7 @@ class SyncItemTar : public SyncItem {
  public:
   SyncItemTar(const string &relative_parent_path, const string &filename,
               struct archive *archive, struct archive_entry *entry,
-              const SyncUnion *union_engine);
+              pthread_mutex_t *archive_lock, const SyncUnion *union_engine);
 
   SyncItemType GetScratchFiletype() const;
   catalog::DirectoryEntryBase CreateBasicCatalogDirent() const;
@@ -32,15 +34,18 @@ class SyncItemTar : public SyncItem {
   platform_stat64 GetStatFromTar() const;
   mutable platform_stat64 tar_stat_;
   mutable bool obtained_tar_stat_;
+  pthread_mutex_t *archive_lock_;
 };
 
 SyncItemTar::SyncItemTar(const string &relative_parent_path,
                          const string &filename, struct archive *archive,
                          struct archive_entry *entry,
+                         pthread_mutex_t *archive_lock,
                          const SyncUnion *union_engine)
     : SyncItem(relative_parent_path, filename, union_engine, kItemUnknown),
       archive_(archive),
-      archive_entry_(entry) {
+      archive_entry_(entry),
+      archive_lock_(archive_lock) {
   scratch_type_ = GetScratchFiletype();
   GetStatFromTar();
 }
@@ -102,6 +107,8 @@ platform_stat64 SyncItemTar::GetStatFromTar() const {
 }
 
 catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
+  printf("SyncItemTar : CreateBasicCatalogDirent\n");
+
   catalog::DirectoryEntryBase dirent;
 
   // inode and parent inode is determined at runtime of client
@@ -138,7 +145,7 @@ catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
 }
 
 IngestionSource *SyncItemTar::GetIngestionSource() const {
-  return new TarIngestionSource(archive_, archive_entry_);
+  return new TarIngestionSource(archive_, archive_entry_, archive_lock_);
 };
 }
 
