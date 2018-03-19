@@ -5,6 +5,7 @@
 #ifndef CVMFS_INGESTION_INGESTION_SOURCE_H_
 #define CVMFS_INGESTION_INGESTION_SOURCE_H_
 
+#include <pthread.h>
 #include <stdio.h>
 #include <string>
 
@@ -75,53 +76,27 @@ class FileIngestionSource : public IngestionSource {
 
 class TarIngestionSource : public IngestionSource {
  public:
-  TarIngestionSource(struct archive* archive, struct archive_entry* entry) : buffer_(NULL) {
+  TarIngestionSource(struct archive* archive, struct archive_entry* entry,
+                     pthread_mutex_t* archive_lock)
+      : archive_(archive), archive_lock_(archive_lock) {
     const struct stat* stat_ = archive_entry_stat(entry);
     size_ = stat_->st_size;
-    while (NULL == buffer_) buffer_ = new char[size_];
-    buffer_seek_ptr_ = buffer_;
-    uint64_t read_so_far = archive_read_data(archive, buffer_, size_);
-    while (read_so_far < size_) {
-      uint64_t read =
-          archive_read_data(archive, buffer_ + read_so_far, size_);
-      if (read > 0) read_so_far += read;
-    }
   }
 
-  TarIngestionSource(char* buffer, uint64_t size, std::string filename)
-      : buffer_(buffer),
-        buffer_seek_ptr_(buffer),
-        size_(size),
-        offset_read_(0),
-        filename_(filename) {}
-
   bool Open() {
-    assert(buffer_);
     assert(size_);
-    printf("TarIngestionSource::Open | Opening tar of file %s\n",
-           filename_.c_str());
+    printf("TarIngestionSource::Open | Opening tar of file\n");
     return true;
   }
 
   ssize_t Read(void* external_buffer, size_t nbytes) {
-    printf("TarIngestionSource::Read | Reading from tar of file %s\n",
-           filename_.c_str());
-    uint64_t max_to_copy =
-        std::min(nbytes, size_ - (buffer_seek_ptr_ - buffer_));
-
-    memcpy(external_buffer, buffer_seek_ptr_, max_to_copy);
-    buffer_seek_ptr_ += max_to_copy;
-
-    assert(buffer_seek_ptr_ - buffer_ >= 0);
-    assert((buffer_seek_ptr_ - buffer_) - size_ <= 0);
-
-    return max_to_copy;
-  }
+    printf("TarIngestionSource::Read | Reading from tar of file\n");
+    return archive_read_data(archive_, external_buffer, nbytes);
+ }
 
   bool Close() {
-    printf("TarIngestionSource::Close | Closing tar file %s\n",
-           filename_.c_str());
-
+    printf("TarIngestionSource::Close | Closing tar file\n");
+    pthread_mutex_unlock(archive_lock_);
     return true;
   }
 
@@ -131,11 +106,9 @@ class TarIngestionSource : public IngestionSource {
   }
 
  private:
-  char* buffer_;
-  char* buffer_seek_ptr_;
+  struct archive* archive_;
   uint64_t size_;
-  uint64_t offset_read_;
-  std::string filename_;
+  pthread_mutex_t* archive_lock_;
 };
 
 #endif  // CVMFS_INGESTION_INGESTION_SOURCE_H_

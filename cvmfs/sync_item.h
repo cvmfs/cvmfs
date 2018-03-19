@@ -125,7 +125,7 @@ class SyncItem {
    *       count to 1 if MaskHardlink() has been called before (cf. OverlayFS)
    * @return  a DirectoryEntry structure to be written into a catalog
    */
-  catalog::DirectoryEntryBase CreateBasicCatalogDirent() const;
+  virtual catalog::DirectoryEntryBase CreateBasicCatalogDirent() const;
 
   inline std::string GetRelativePath() const {
     return (relative_parent_path_.empty()) ?

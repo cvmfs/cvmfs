@@ -7,12 +7,14 @@
 #include "sync_union_tarball.h"
 
 #include <cassert>
+#include <pthread.h>
 #include <set>
 #include <string>
 
 #include "archive.h"
 #include "archive_entry.h"
 #include "fs_traversal.h"
+#include "smalloc.h"
 #include "sync_item.h"
 #include "sync_item_dummy.h"
 #include "sync_item_tar.h"
@@ -32,7 +34,16 @@ SyncUnionTarball::SyncUnionTarball(AbstractSyncMediator *mediator,
                                    const std::string &base_directory)
     : SyncUnion(mediator, rdonly_path, union_path, scratch_path),
       tarball_path_(tarball_path),
-      base_directory_(base_directory) {}
+      base_directory_(base_directory) {
+  archive_lock = (pthread_mutex_t*)smalloc(sizeof(pthread_mutex_t));
+  pthread_mutex_init(archive_lock, NULL);
+}
+
+SyncUnionTarball::~SyncUnionTarball() {
+  pthread_mutex_lock(archive_lock);
+  pthread_mutex_unlock(archive_lock);
+  pthread_mutex_destroy(archive_lock);
+}
 
 bool SyncUnionTarball::Initialize() {
   bool result;
@@ -76,6 +87,9 @@ void SyncUnionTarball::Traverse() {
   while (true) {
     do {
       retry_read_header = false;
+
+      /* Get the lock, wait if lock is not available yet */
+      pthread_mutex_lock(archive_lock);
       result = archive_read_next_header(src, &entry);
 
       switch (result) {
@@ -122,8 +136,17 @@ void SyncUnionTarball::Traverse() {
 
           CreateDirectories(parent_path);
 
+          /* The archive (src) should be locked after the first read, so that it
+           * is possible to keep reading the data. We should have a single lock
+           * for each archive, I will associate the lock to the
+           * SyncUnionTarball, pass it to the SyncItemTar, which in turn will
+           * pass it to the TarIngestionSource.
+           * The SyncUnion will get the lock as just before to read the data
+           * (archive_read_next_header) and the TarIngestionSource will release
+           * it when it is closed.
+           */
           SharedPtr<SyncItem> sync_entry = SharedPtr<SyncItem>(new SyncItemTar(
-              parent_path, filename, src, entry, this));
+              parent_path, filename, src, entry, archive_lock, this));
 
           printf(
               "complete_path: \t%s \ndirectory_traversing: "
@@ -173,6 +196,7 @@ void SyncUnionTarball::Traverse() {
             }
             ProcessDirectory(sync_entry);
             know_directories_.insert(complete_path);
+            pthread_mutex_unlock(archive_lock);
           } else if (sync_entry->IsRegularFile()) {
             ProcessFile(sync_entry);
           }
