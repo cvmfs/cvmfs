@@ -143,7 +143,7 @@ def name_geoinfo(now, name):
 #   indexes - list of numbers specifying the order of the N given servers
 #    servers numbered 0 to N-1 from geographically closest to furthest
 #    away compared to gir_rem
-def geosort_servers(now, gir_rem, servers, trycdn):
+def geosort_servers(now, gir_rem, servers, trycdn=False):
     idx = 0
     arcs = []
     indexes = []
