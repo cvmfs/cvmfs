@@ -1151,16 +1151,21 @@ cvmfs_config_fsck() {
 
 cvmfs_umount() {
   local silent=$1
+  local force=$2
+  local umount_options=
+  if [ "x$force" != "x" ]; then
+    umount_options="-l"
+  fi
+
   local mount_list
   mount_list=`list_mounts | awk '{print $3}'`
 
   RETVAL=0
-
   local m
   for m in $mount_list
   do
     [ "x$silent" != "x" ] || echo -n "Unmounting ${m}: "
-    umount $m 2>/dev/null
+    umount $umount_options $m 2>/dev/null
     if [ $? -ne 0 ]; then
       RETVAL=1
       if [ "x$silent" = "x" ]; then
@@ -1210,8 +1215,11 @@ cvmfs_killall() {
   echo -n "Unmounting stale mount points... "
   cvmfs_umount silent
   if [ $? -ne 0 ]; then
-    echo "Failed!"
-    return 1
+    cvmfs_umount silent force
+    if [ $? -ne 0 ]; then
+      echo "Failed!"
+      return 1
+    fi
   fi
   echo "OK"
 
