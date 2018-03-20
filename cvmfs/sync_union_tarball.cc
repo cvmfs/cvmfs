@@ -79,6 +79,7 @@ bool SyncUnionTarball::Initialize() {
   assert(ARCHIVE_OK == archive_read_support_format_tar(src));
   assert(ARCHIVE_OK == archive_read_support_format_empty(src));
 
+<<<<<<< f1d36734861557ca4d90d3049a9dc0b0d49ad1e0
   if (tarball_path_ == "--") {
     result = archive_read_open_filename(src, NULL, 4096);
   } else {
@@ -86,6 +87,9 @@ bool SyncUnionTarball::Initialize() {
     result =
         archive_read_open_filename(src, tarball_absolute_path.c_str(), 4096);
   }
+=======
+  result = archive_read_open_filename(src, tarball_absolute_path.c_str(), 4096);
+>>>>>>> fix some bugs, now we can extract base ubuntu images
 
   if (result != ARCHIVE_OK) {
     LogCvmfs(kLogUnionFs, kLogStderr, "Impossible to open the archive.");
@@ -197,9 +201,52 @@ void SyncUnionTarball::Traverse() {
            * (archive_read_next_header) and the TarIngestionSource will release
            * it when it is closed.
            */
-          SharedPtr<SyncItem> sync_entry = SharedPtr<SyncItem>(
-              new SyncItemTar(parent_path, filename, src, entry, archive_lock_,
-                              read_archive_cond_, can_read_archive_, this));
+         SharedPtr<SyncItem> sync_entry = SharedPtr<SyncItem>(new SyncItemTar(
+              parent_path, filename, src, entry, archive_lock, this));
+
+          printf(
+              "complete_path: \t%s \ndirectory_traversing: "
+              "\t%s\n",
+              complete_path.c_str(), directory_traversing.c_str());
+          int64_t inode = archive_entry_ino64(entry);
+          int link_count = archive_entry_nlink(entry);
+          printf("inode: %" PRIu64 "\n", inode);
+          printf("link count %d\n", link_count);
+
+          /*
+          if (sync_entry->IsDirectory()) {
+            directories_stacked.push(complete_path);
+            directory_traversing.assign(complete_path);
+            EnterDirectory(parent_path, filename);
+          } else {
+            if (complete_path.rfind(directory_traversing, 0) != 0) {
+              directory_traversing.assign(directories_stacked.top());
+              directories_stacked.pop();
+              std::string leave_parent, leave_filename;
+              SplitPath(directory_traversing, &leave_parent, &leave_filename);
+              printf("Leaving dir: %s / %s \n", leave_parent.c_str(),
+                     leave_filename.c_str());
+              LeaveDirectory(leave_parent, leave_filename);
+            }
+          }
+                */
+          printf("archive_file_path\t%s\n", archive_file_path.c_str());
+          printf("complete_path\t\t%s\n", complete_path.c_str());
+          printf("parent_path\t\t%s\n", parent_path.c_str());
+          printf("filename\t\t%s\n", filename.c_str());
+          printf("relative_parent_path:\t%s\n",
+                 sync_entry->relative_parent_path().c_str());
+          printf("WhiteOut:\t\t%d\n", sync_entry->IsWhiteout());
+          printf("New:\t\t\t%d\n", sync_entry->IsNew());
+          printf("RelativePath:\t\t%s\n",
+                 sync_entry->GetRelativePath().c_str());
+          printf("filename:\t\t%s\n", sync_entry->filename().c_str());
+          printf("RdOnlyPath:\t\t%s\n", sync_entry->GetRdOnlyPath().c_str());
+          printf("UnionPath:\t\t%s\n", sync_entry->GetUnionPath().c_str());
+          printf("ScratchPath:\t\t%s\n", sync_entry->GetScratchPath().c_str());
+
+          printf("\n\n");
+
           if (sync_entry->IsDirectory()) {
             if (know_directories_.find(complete_path) !=
                 know_directories_.end()) {
@@ -213,12 +260,8 @@ void SyncUnionTarball::Traverse() {
 
           } else if (sync_entry->IsRegularFile()) {
             ProcessFile(sync_entry);
-            printf("Processing file stop on lock");
-            if (filename == ".cvmfscatalog") {
-              to_create_catalog_dirs_.insert(parent_path);
-            }
-          } else {
-            *can_read_archive_ = true;
+         } else {
+            pthread_mutex_unlock(archive_lock);
           }
         }
       }

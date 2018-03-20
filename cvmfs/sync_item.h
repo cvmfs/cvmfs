@@ -37,7 +37,8 @@ enum SyncItemType {
   kItemSocket,
   kItemNew,
   kItemMarker,
-  kItemUnknown
+  kItemUnknown,
+  kItemTarfile
 };
 
 class SyncUnion;
@@ -177,7 +178,7 @@ class SyncItem {
   }
 
   SyncItemType GetRdOnlyFiletype() const;
-  SyncItemType GetScratchFiletype() const;
+  virtual SyncItemType GetScratchFiletype() const;
 
   /**
    * Checks if the SyncItem _is_ the given file type (file, dir, symlink, ...)
