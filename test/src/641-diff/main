@@ -78,16 +78,16 @@ S S 1
 S D 1
 S N 1
 M[N] D /dir2
-A F /dir2/.cvmfscatalog
-A D /dir3
-A F /dir3/new_file
-A F /dir3/.cvmfscatalog
+A F /dir2/.cvmfscatalog +0
+A D /dir3 +4096
+A F /dir3/new_file +0
+A F /dir3/.cvmfscatalog +0
 M[SC] F /file
-R S /symlink
+R S /symlink -4
 M[SMLC] FS /directory/foo
 M[N] D /directory/nested
-R F /directory/nested/.cvmfscatalog
-A S /other-symlink
+R F /directory/nested/.cvmfscatalog -0
+A S /other-symlink +4
 EOF
   cvmfs_server diff -im $CVMFS_TEST_REPO > forward.output || return 21
   diff forward.reference forward.output || return 22
@@ -99,14 +99,14 @@ S S -1
 S D -1
 S N -1
 M[N] D /dir2
-R F /dir2/.cvmfscatalog
-R D /dir3
+R F /dir2/.cvmfscatalog -0
+R D /dir3 -4096
 M[SC] F /file
-A S /symlink
+A S /symlink +4
 M[SMLC] SF /directory/foo
 M[N] D /directory/nested
-A F /directory/nested/.cvmfscatalog
-R S /other-symlink
+A F /directory/nested/.cvmfscatalog +0
+R S /other-symlink -4
 EOF
   cvmfs_server diff -im -s trunk -d trunk-previous $CVMFS_TEST_REPO \
     > reverse.output || return 31
