@@ -1,4 +1,5 @@
 2.5.0:
+  * Add CloudFlare support to GeoAPI (CVM-1468)
   * Fix warnings in cvmfs_server on bash >= 4.4 (CVM-1401)
   * Create libcvmfs.a and libcvmfs_cache.a on macOS (CVM-1489)
   * Set default cache limit to 20G on macOS
