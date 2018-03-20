@@ -52,7 +52,8 @@ bool SyncUnionTarball::Initialize() {
   std::string tarball_absolute_path = GetAbsolutePath(tarball_path_);
 
   src = archive_read_new();
-  archive_read_support_format_tar(src);
+  assert(ARCHIVE_OK == archive_read_support_format_tar(src));
+  assert(ARCHIVE_OK == archive_read_support_format_empty(src));
 
   result = archive_read_open_filename(src, tarball_absolute_path.c_str(), 4096);
 
@@ -156,6 +157,8 @@ void SyncUnionTarball::Traverse() {
           int link_count = archive_entry_nlink(entry);
           printf("inode: %" PRIu64 "\n", inode);
           printf("link count %d\n", link_count);
+
+          /*
           if (sync_entry->IsDirectory()) {
             directories_stacked.push(complete_path);
             directory_traversing.assign(complete_path);
@@ -171,7 +174,7 @@ void SyncUnionTarball::Traverse() {
               LeaveDirectory(leave_parent, leave_filename);
             }
           }
-
+                */
           printf("archive_file_path\t%s\n", archive_file_path.c_str());
           printf("complete_path\t\t%s\n", complete_path.c_str());
           printf("parent_path\t\t%s\n", parent_path.c_str());
@@ -199,6 +202,8 @@ void SyncUnionTarball::Traverse() {
             pthread_mutex_unlock(archive_lock);
           } else if (sync_entry->IsRegularFile()) {
             ProcessFile(sync_entry);
+          } else {
+            pthread_mutex_unlock(archive_lock);
           }
         }
       }

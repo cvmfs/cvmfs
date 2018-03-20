@@ -42,9 +42,10 @@ SyncItemTar::SyncItemTar(const string &relative_parent_path,
                          struct archive_entry *entry,
                          pthread_mutex_t *archive_lock,
                          const SyncUnion *union_engine)
-    : SyncItem(relative_parent_path, filename, union_engine, kItemUnknown),
+    : SyncItem(relative_parent_path, filename, union_engine, kItemTarfile),
       archive_(archive),
       archive_entry_(entry),
+      obtained_tar_stat_(false),
       archive_lock_(archive_lock) {
   scratch_type_ = GetScratchFiletype();
   GetStatFromTar();
@@ -92,22 +93,22 @@ platform_stat64 SyncItemTar::GetStatFromTar() const {
   if (obtained_tar_stat_) return tar_stat_;
 
   const struct stat *entry_stat_ = archive_entry_stat(archive_entry_);
-  platform_stat64 stat;
 
-  stat.st_mode = entry_stat_->st_mode;
-  stat.st_uid = entry_stat_->st_uid;
-  stat.st_gid = entry_stat_->st_gid;
-  stat.st_size = entry_stat_->st_size;
-  stat.st_mtime = entry_stat_->st_mtime;
+  tar_stat_.st_mode = entry_stat_->st_mode;
+  tar_stat_.st_uid = entry_stat_->st_uid;
+  tar_stat_.st_gid = entry_stat_->st_gid;
+  tar_stat_.st_size = entry_stat_->st_size;
+  tar_stat_.st_mtime = entry_stat_->st_mtime;
 
   obtained_tar_stat_ = true;
-  tar_stat_ = stat;
 
-  return stat;
+  return tar_stat_;
 }
 
 catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
   printf("SyncItemTar : CreateBasicCatalogDirent\n");
+        
+  assert(obtained_tar_stat_);
 
   catalog::DirectoryEntryBase dirent;
 
@@ -140,6 +141,8 @@ catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
   if (this->IsCharacterDevice() || this->IsBlockDevice()) {
     dirent.size_ = makedev(GetRdevMajor(), GetRdevMinor());
   }
+
+  assert(dirent.IsRegular() || dirent.IsDirectory() || dirent.IsLink() || dirent.IsSpecial());
 
   return dirent;
 }

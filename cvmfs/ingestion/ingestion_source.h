@@ -84,7 +84,7 @@ class TarIngestionSource : public IngestionSource {
   }
 
   bool Open() {
-    assert(size_);
+    assert(size_ >= 0);
     printf("TarIngestionSource::Open | Opening tar of file\n");
     return true;
   }
