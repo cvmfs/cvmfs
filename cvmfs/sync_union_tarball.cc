@@ -6,8 +6,9 @@
 
 #include "sync_union_tarball.h"
 
-#include <cassert>
 #include <pthread.h>
+#include <stdio.h>
+#include <cassert>
 #include <set>
 #include <string>
 
@@ -22,7 +23,6 @@
 #include "sync_union.h"
 #include "util/posix.h"
 
-#include <stdio.h>
 
 namespace publish {
 
@@ -35,7 +35,8 @@ SyncUnionTarball::SyncUnionTarball(AbstractSyncMediator *mediator,
     : SyncUnion(mediator, rdonly_path, union_path, scratch_path),
       tarball_path_(tarball_path),
       base_directory_(base_directory) {
-  archive_lock = (pthread_mutex_t*)smalloc(sizeof(pthread_mutex_t));
+  archive_lock =
+      reinterpret_cast<pthread_mutex_t *> smalloc(sizeof(pthread_mutex_t));
   pthread_mutex_init(archive_lock, NULL);
 }
 
@@ -74,8 +75,8 @@ void SyncUnionTarball::Traverse() {
   // when we find a directory we stack it up and call the EnterDirectory
   // as soon as we find a file that does not belong to the directory we call
   // LeaveDirectory
-  std::stack<std::string> directories_stacked;
-  std::string directory_traversing;
+  // std::stack<std::string> directories_stacked;
+  // std::string directory_traversing;
 
   std::string archive_file_path;
   std::string complete_path;
@@ -149,10 +150,12 @@ void SyncUnionTarball::Traverse() {
           SharedPtr<SyncItem> sync_entry = SharedPtr<SyncItem>(new SyncItemTar(
               parent_path, filename, src, entry, archive_lock, this));
 
+          /*
           printf(
               "complete_path: \t%s \ndirectory_traversing: "
               "\t%s\n",
               complete_path.c_str(), directory_traversing.c_str());
+          */
           int64_t inode = archive_entry_ino64(entry);
           int link_count = archive_entry_nlink(entry);
           printf("inode: %" PRIu64 "\n", inode);
@@ -207,7 +210,6 @@ void SyncUnionTarball::Traverse() {
           }
         }
       }
-
     } while (retry_read_header);
   }
 }

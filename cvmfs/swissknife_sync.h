@@ -307,7 +307,7 @@ class CommandSync : public Command {
 
     r.push_back(Parameter::Optional('@', "tar extract dir"));
     r.push_back(Parameter::Optional('$', "tar file"));
-    
+
     return r;
   }
   int Main(const ArgumentList &args);

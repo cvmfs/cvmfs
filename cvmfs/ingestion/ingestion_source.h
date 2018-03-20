@@ -92,7 +92,7 @@ class TarIngestionSource : public IngestionSource {
   ssize_t Read(void* external_buffer, size_t nbytes) {
     printf("TarIngestionSource::Read | Reading from tar of file\n");
     return archive_read_data(archive_, external_buffer, nbytes);
- }
+  }
 
   bool Close() {
     printf("TarIngestionSource::Close | Closing tar file\n");

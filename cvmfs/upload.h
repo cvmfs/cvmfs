@@ -165,7 +165,7 @@ class Spooler : public Observable<SpoolerResult> {
    *                      backend storage
    */
   void Upload(const std::string &local_path, const std::string &remote_path);
-  
+
   /**
    * Convenience wrapper to upload the Manifest file into the backend storage
    *
@@ -198,7 +198,8 @@ class Spooler : public Observable<SpoolerResult> {
    *                        chunks or uploaded at once
    */
   void Process(const std::string &local_path, const bool allow_chunking = true);
-  void Process(SharedPtr<publish::SyncItem> entry, const bool allow_chunking = true);
+  void Process(SharedPtr<publish::SyncItem> entry,
+               const bool allow_chunking = true);
 
   /**
    * Convenience wrapper to process a catalog file. Please always use this

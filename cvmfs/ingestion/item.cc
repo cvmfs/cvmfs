@@ -9,11 +9,11 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "ingestion/ingestion_source.h"
 #include "smalloc.h"
-#include "util_concurrency.h"
 #include "sync_item.h"
 #include "util/shared_ptr.h"
-#include "ingestion/ingestion_source.h"
+#include "util_concurrency.h"
 
 FileItem::FileItem(
   const std::string &p,

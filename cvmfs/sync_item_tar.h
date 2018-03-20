@@ -8,6 +8,7 @@
 #include "sync_union.h"
 
 #include <pthread.h>
+#include <string>
 
 namespace publish {
 
@@ -107,7 +108,7 @@ platform_stat64 SyncItemTar::GetStatFromTar() const {
 
 catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
   printf("SyncItemTar : CreateBasicCatalogDirent\n");
-        
+
   assert(obtained_tar_stat_);
 
   catalog::DirectoryEntryBase dirent;
@@ -142,14 +143,15 @@ catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
     dirent.size_ = makedev(GetRdevMajor(), GetRdevMinor());
   }
 
-  assert(dirent.IsRegular() || dirent.IsDirectory() || dirent.IsLink() || dirent.IsSpecial());
+  assert(dirent.IsRegular() || dirent.IsDirectory() || dirent.IsLink() ||
+         dirent.IsSpecial());
 
   return dirent;
 }
 
 IngestionSource *SyncItemTar::GetIngestionSource() const {
   return new TarIngestionSource(archive_, archive_entry_, archive_lock_);
-};
 }
+}  // namespace publish
 
 #endif  // CVMFS_SYNC_ITEM_TAR_H_

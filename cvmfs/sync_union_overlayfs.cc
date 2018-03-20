@@ -121,7 +121,8 @@ void SyncUnionOverlayfs::PreprocessSyncItem(SharedPtr<SyncItem> entry) const {
   MaskFileHardlinks(entry);
 }
 
-void SyncUnionOverlayfs::CheckForBrokenHardlink(SharedPtr<SyncItem> entry) const {
+void SyncUnionOverlayfs::CheckForBrokenHardlink(
+    SharedPtr<SyncItem> entry) const {
   if (!entry->IsNew() && !entry->WasDirectory() &&
       entry->GetRdOnlyLinkcount() > 1) {
     LogCvmfs(kLogPublish, kLogStderr,
@@ -261,7 +262,8 @@ bool SyncUnionOverlayfs::IsWhiteoutSymlinkPath(const string &path) const {
   return is_whiteout;
 }
 
-bool SyncUnionOverlayfs::IsOpaqueDirectory(SharedPtr<SyncItem> directory) const {
+bool SyncUnionOverlayfs::IsOpaqueDirectory(
+    SharedPtr<SyncItem> directory) const {
   const std::string path = directory->GetScratchPath();
   return DirectoryExists(path) && IsOpaqueDirPath(path);
 }
@@ -275,7 +277,8 @@ bool SyncUnionOverlayfs::IsOpaqueDirPath(const string &path) const {
   return is_opaque;
 }
 
-string SyncUnionOverlayfs::UnwindWhiteoutFilename(SharedPtr<SyncItem> entry) const {
+string SyncUnionOverlayfs::UnwindWhiteoutFilename(
+    SharedPtr<SyncItem> entry) const {
   return entry->filename();
 }
 }  // namespace publish
