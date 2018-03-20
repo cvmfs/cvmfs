@@ -135,20 +135,26 @@ def name_geoinfo(now, name):
     return gir
 
 # geo-sort list of servers relative to gir_rem
+#   If trycdn is True, first try prepending "ip." to the name to get the
+#      real IP address instead of a Content Delivery Network front end.
 # return list of [onegood, indexes] where
 #   onegood - a boolean saying whether or not there was at least
 #      one valid looked up geolocation from the servers
 #   indexes - list of numbers specifying the order of the N given servers
 #    servers numbered 0 to N-1 from geographically closest to furthest
 #    away compared to gir_rem
-def geosort_servers(now, gir_rem, servers):
+def geosort_servers(now, gir_rem, servers, trycdn=False):
     idx = 0
     arcs = []
     indexes = []
 
     onegood = False
     for server in servers:
-        gir_server = name_geoinfo(now, server)
+        gir_server = None
+        if trycdn:
+            gir_server = name_geoinfo(now, "ip." + server)
+        if gir_server is None:
+            gir_server = name_geoinfo(now, server)
 
         if gir_server is None:
             # put it on the end of the list
@@ -206,14 +212,25 @@ def api(path_info, repo_name, version, start_response, environ):
         # might be a FQDN, use it if it resolves to a geo record
         gir_rem = name_geoinfo(now, caching_string)
 
+    trycdn = False
     if gir_rem is None:
-        if 'HTTP_X_FORWARDED_FOR' in environ:
+        if 'HTTP_CF_CONNECTING_IP' in environ:
+            # IP address of client connecting to Cloudflare
+            gir_rem = addr_geoinfo(environ['HTTP_CF_CONNECTING_IP'])
+            if gir_rem is not None:
+                # Servers probably using Cloudflare Content Delivery Network too
+                trycdn = True
+        if gir_rem is None and 'HTTP_X_FORWARDED_FOR' in environ:
+            # List of IP addresses forwarded through squid
+            # Try the last IP, in case there's a reverse proxy squid
+            #  in front of the web server.
             forwarded_for = environ['HTTP_X_FORWARDED_FOR']
             start = string.rfind(forwarded_for, ' ') + 1
             if (start == 0):
                 start = string.rfind(forwarded_for, ',') + 1
             gir_rem = addr_geoinfo(forwarded_for[start:])
         if gir_rem is None and 'REMOTE_ADDR' in environ:
+            # IP address connecting to web server
             gir_rem = addr_geoinfo(environ['REMOTE_ADDR'])
 
     if gir_rem is None:
@@ -224,19 +241,22 @@ def api(path_info, repo_name, version, start_response, environ):
         # is good, sort the hosts before the separator relative to that
         # proxy rather than the client
         pxysep = servers.index('+PXYSEP+')
-        onegood, pxyindexes = geosort_servers(now, gir_rem, servers[pxysep+1:])
+        # assume backup proxies will not be behind a CDN
+        onegood, pxyindexes = \
+            geosort_servers(now, gir_rem, servers[pxysep+1:], False)
         if onegood:
             gir_pxy = name_geoinfo(now, servers[pxysep+1+pxyindexes[0]])
             if not gir_pxy is None:
                 gir_rem = gir_pxy
-        onegood, hostindexes = geosort_servers(now, gir_rem, servers[0:pxysep])
+        onegood, hostindexes = \
+            geosort_servers(now, gir_rem, servers[0:pxysep], trycdn)
         indexes = hostindexes + list(pxysep+1+i for i in pxyindexes)
         # Append the index of the separator for backward compatibility,
         # so the client can always expect the same number of indexes as
         # the number of elements in the request.
         indexes.append(pxysep)
     else:
-        onegood, indexes = geosort_servers(now, gir_rem, servers)
+        onegood, indexes = geosort_servers(now, gir_rem, servers, trycdn)
 
     if not onegood:
         # return a bad request only if all the server names were bad

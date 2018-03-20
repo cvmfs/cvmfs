@@ -13,8 +13,10 @@ cvmfs_getaddr() {
 }
 
 # Check the results from an ordering of 3 servers.
-# When coming from *.cern.ch or *.fnal.gov, ihe reqorder should have the
-#  ordering of cern, fnal, and ihep.
+# When coming from *.cern.ch or *.fnal.gov, the reqorder should have the
+#  ordering of cern, fnal, and ihep that was in the request (literally 
+#  those short names).  Otherwise the reqorder should have the ording
+#  of the full dns names that were in the request.
 cvmfs_check_georesult() {
   local result=$1
   local from=$2
@@ -107,14 +109,18 @@ cvmfs_run_test() {
   local me="`uname -n`"
   local api="cvmfs/$replica_name/api/v1.0/geo"
   local sep="+PXYSEP+"
-  local fnal=cvmfs.fnal.gov
   local cern=cvmfs-stratum-one.cern.ch
+  local fnal=cvmfs.fnal.gov
   local ihep=cvmfs-stratum-one.ihep.ac.cn
-  local fnalbp=cvmfsbproxy.fnal.gov
+  local cerncdn=s1cern-cvmfs.openhtc.io
+  local fnalcdn=s1fnal-cvmfs.openhtc.io
+  local ihepcdn=s1ihep-cvmfs.openhtc.io
   local cernbp=cvmfsbproxy.cern.ch
+  local fnalbp=cvmfsbproxy.fnal.gov
   local ipv6=ipv6.cybernode.com  # has only ipv6 address
   local other=google.com # has both ipv4 and ipv6.  if multiple addresses,
                          #  should resolve to same or close-by geolocation.
+  local cdnheader="CF-Connecting-IP"
   local result
 
   # limit the output from curl to 5 lines so in case there's some kind
@@ -146,25 +152,35 @@ cvmfs_run_test() {
   result="`curl -s -H "x-forwarded-for: 127.0.0.1" http://$ipv4addr/$api/x/$cern,$ihep,$fnal|head -5`"
   cvmfs_check_georesult "$result" $me cern,ihep,fnal || return 9
 
+  echo "checking CDN IPv4"
+  result="`curl -s -H "$cdnheader: $ipv4addr" http://localhost/$api/x/$cerncdn,$fnalcdn,$ihepcdn|head -5`"
+  cvmfs_check_georesult "$result" $me cern,fnal,ihep || return 10
+
+  if [ -n "$ipv6addr" ]; then
+    echo "checking $CDN IPv6"
+    result="`curl -s -H "$cdnheader: $ipv6addr" http://localhost/$api/x/$ihepcdn,$cerncdn,$fnalcdn|head -5`"
+    cvmfs_check_georesult "$result" $me ihep,cern,fnal || return 11
+  fi
+
   echo "checking IPv6-only server"
   result="`curl -s http://$ipv4addr/$api/x/$ipv6,$cern,$fnal|head -5`"
-  cvmfs_check_georesult "$result" ipv6onlytest ipv6,cern,fnal || return 10
+  cvmfs_check_georesult "$result" ipv6onlytest ipv6,cern,fnal || return 12
 
   echo "checking proxy name IPv4"
   result="`curl -s http://localhost/$api/$other/$cern,$ipv6,$other|head -5`"
-  cvmfs_check_georesult "$result" $other $cern,$ipv6,$other || return 11
+  cvmfs_check_georesult "$result" $other $cern,$ipv6,$other || return 13
 
   echo "checking proxy name IPv6"
   result="`curl -s http://localhost/$api/$ipv6/$ipv6,$fnal,$other|head -5`"
-  cvmfs_check_georesult "$result" $ipv6 $ipv6,$fnal,$other || return 12
+  cvmfs_check_georesult "$result" $ipv6 $ipv6,$fnal,$other || return 14
 
   echo "checking ordering from CERN fallback proxy"
   result="`curl -s http://localhost/$api/$fnalbp/$fnal,$ihep,$cern,$sep,$cernbp|head -5`"
-  cvmfs_check_geosepresult "$result" $cernbp fnal,ihep,cern || return 13
+  cvmfs_check_geosepresult "$result" $cernbp fnal,ihep,cern || return 15
 
   echo "checking ordering from FNAL fallback proxy"
   result="`curl -s http://localhost/$api/$other/$cern,$fnal,$ihep,$sep,$fnalbp|head -5`"
-  cvmfs_check_geosepresult "$result" $fnalbp cern,fnal,ihep || return 14
+  cvmfs_check_geosepresult "$result" $fnalbp cern,fnal,ihep || return 16
 
   echo "checking parallelism and cache limit (could take a couple of minutes)"
   # The number of api processing threads is 64, and cache limit is 100k.
@@ -222,7 +238,7 @@ cvmfs_run_test() {
   local pid
   for pid in $pids; do
     # wait individually in order to check the return codes
-    wait $pid || return 15
+    wait $pid || return 17
   done
   echo "parallelism test completed successfully"
 
