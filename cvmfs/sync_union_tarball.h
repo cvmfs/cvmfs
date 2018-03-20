@@ -58,7 +58,9 @@ class SyncUnionTarball : public SyncUnion {
   const std::string tarball_path_;
   const std::string base_directory_;
   std::set<std::string> know_directories_;
-  pthread_mutex_t* archive_lock;
+  pthread_mutex_t* archive_lock_;
+  pthread_cond_t* read_archive_cond_;
+  bool* can_read_archive_;
 
   void CreateDirectories(const std::string &target);
   /*

@@ -179,8 +179,9 @@ void SyncUnionTarball::Traverse() {
            * (archive_read_next_header) and the TarIngestionSource will release
            * it when it is closed.
            */
-         SharedPtr<SyncItem> sync_entry = SharedPtr<SyncItem>(new SyncItemTar(
-              parent_path, filename, src, entry, archive_lock, this));
+          SharedPtr<SyncItem> sync_entry = SharedPtr<SyncItem>(
+              new SyncItemTar(parent_path, filename, src, entry, archive_lock_,
+                              read_archive_cond_, can_read_archive_, this));
 
           /*
           printf(
@@ -240,8 +241,10 @@ void SyncUnionTarball::Traverse() {
 
           } else if (sync_entry->IsRegularFile()) {
             ProcessFile(sync_entry);
-         } else {
-            pthread_mutex_unlock(archive_lock);
+          } else {
+
+            *can_read_archive_ = true;
+
           }
         }
       }
