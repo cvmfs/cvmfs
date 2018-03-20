@@ -77,8 +77,12 @@ class FileIngestionSource : public IngestionSource {
 class TarIngestionSource : public IngestionSource {
  public:
   TarIngestionSource(struct archive* archive, struct archive_entry* entry,
-                     pthread_mutex_t* archive_lock)
-      : archive_(archive), archive_lock_(archive_lock) {
+                     pthread_mutex_t* archive_lock,
+                     pthread_cond_t* read_archive_cond, bool* can_read_archive)
+      : archive_(archive),
+        archive_lock_(archive_lock),
+        read_archive_cond_(read_archive_cond),
+        can_read_archive_(can_read_archive) {
     const struct stat* stat_ = archive_entry_stat(entry);
     size_ = stat_->st_size;
   }
@@ -96,6 +100,9 @@ class TarIngestionSource : public IngestionSource {
 
   bool Close() {
     printf("TarIngestionSource::Close | Closing tar file\n");
+    pthread_mutex_lock(archive_lock_);
+    *can_read_archive_ = true;
+    pthread_cond_broadcast(read_archive_cond_);
     pthread_mutex_unlock(archive_lock_);
     return true;
   }
@@ -109,6 +116,8 @@ class TarIngestionSource : public IngestionSource {
   struct archive* archive_;
   uint64_t size_;
   pthread_mutex_t* archive_lock_;
+  pthread_cond_t* read_archive_cond_;
+  bool* can_read_archive_;
 };
 
 #endif  // CVMFS_INGESTION_INGESTION_SOURCE_H_

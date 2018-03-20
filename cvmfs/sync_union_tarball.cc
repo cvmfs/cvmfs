@@ -35,15 +35,27 @@ SyncUnionTarball::SyncUnionTarball(AbstractSyncMediator *mediator,
     : SyncUnion(mediator, rdonly_path, union_path, scratch_path),
       tarball_path_(tarball_path),
       base_directory_(base_directory) {
-  archive_lock =
-      reinterpret_cast<pthread_mutex_t *> smalloc(sizeof(pthread_mutex_t));
-  pthread_mutex_init(archive_lock, NULL);
+
+  archive_lock_ =
+      reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+  assert(pthread_mutex_init(archive_lock_, NULL));
+
+  read_archive_cond_ =
+      reinterpret_cast<pthread_cond_t *>(smalloc(sizeof(pthread_cond_t)));
+  assert(pthread_cond_init(read_archive_cond_, NULL));
+
+  can_read_archive_ = new bool;
+  *can_read_archive_ = true;
 }
 
 SyncUnionTarball::~SyncUnionTarball() {
-  pthread_mutex_lock(archive_lock);
-  pthread_mutex_unlock(archive_lock);
-  pthread_mutex_destroy(archive_lock);
+  pthread_mutex_lock(archive_lock_);
+  pthread_mutex_unlock(archive_lock_);
+
+  pthread_mutex_destroy(archive_lock_);
+  pthread_cond_destroy(read_archive_cond_);
+
+  delete can_read_archive_;
 }
 
 bool SyncUnionTarball::Initialize() {
@@ -91,8 +103,14 @@ void SyncUnionTarball::Traverse() {
       retry_read_header = false;
 
       /* Get the lock, wait if lock is not available yet */
-      pthread_mutex_lock(archive_lock);
+      pthread_mutex_lock(archive_lock_);
+      while (!*can_read_archive_) {
+        pthread_cond_wait(read_archive_cond_, archive_lock_);
+      }
+      pthread_mutex_unlock(archive_lock_);
+
       result = archive_read_next_header(src, &entry);
+      *can_read_archive_ = false;
 
       switch (result) {
         case ARCHIVE_FATAL: {
@@ -147,8 +165,9 @@ void SyncUnionTarball::Traverse() {
            * (archive_read_next_header) and the TarIngestionSource will release
            * it when it is closed.
            */
-          SharedPtr<SyncItem> sync_entry = SharedPtr<SyncItem>(new SyncItemTar(
-              parent_path, filename, src, entry, archive_lock, this));
+          SharedPtr<SyncItem> sync_entry = SharedPtr<SyncItem>(
+              new SyncItemTar(parent_path, filename, src, entry, archive_lock_,
+                              read_archive_cond_, can_read_archive_, this));
 
           /*
           printf(
@@ -202,11 +221,15 @@ void SyncUnionTarball::Traverse() {
             }
             ProcessDirectory(sync_entry);
             know_directories_.insert(complete_path);
-            pthread_mutex_unlock(archive_lock);
+
+            *can_read_archive_ = true;
+
           } else if (sync_entry->IsRegularFile()) {
             ProcessFile(sync_entry);
           } else {
-            pthread_mutex_unlock(archive_lock);
+            
+            *can_read_archive_ = true;
+          
           }
         }
       }
