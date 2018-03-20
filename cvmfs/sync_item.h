@@ -163,9 +163,8 @@ class SyncItem {
   }
 
   virtual IngestionSource *GetIngestionSource() const;
-  
   virtual void AlreadyCreatedDir() const { rdonly_type_ = kItemDir; }
-  
+
   bool operator==(const SyncItem &other) const {
     return ((relative_parent_path_ == other.relative_parent_path_) &&
             (filename_ == other.filename_));
@@ -209,12 +208,12 @@ class SyncItem {
     }
     return rdonly_type_ == expected_type;
   }
-  
-  const SyncUnion *union_engine_;     /**< this SyncUnion created this object */
+
+  const SyncUnion *union_engine_; /**< this SyncUnion created this object */
 
   mutable SyncItemType scratch_type_;
   mutable SyncItemType rdonly_type_;
-  
+
   /**
    * create a new SyncItem
    * Note: SyncItems cannot be created by any using code. SyncUnion will take
@@ -225,14 +224,12 @@ class SyncItem {
    * @param filename the name of the file ;-)
    * @param entryType well...
    */
-  SyncItem(const std::string  &relative_parent_path,
-           const std::string  &filename,
-           const SyncUnion    *union_engine,
-           const SyncItemType  entry_type);
+  SyncItem(const std::string &relative_parent_path, const std::string &filename,
+           const SyncUnion *union_engine, const SyncItemType entry_type);
   SyncItem(const std::string &relative_parent_path, const std::string &filename,
            struct archive *archive, struct archive_entry *entry,
            const SyncUnion *union_engine, const SyncItemType entry_type);
-  
+
   platform_stat64 GetStatFromTar() const;
   /**
    * Structure to cache stat calls to the different file locations.
@@ -266,7 +263,7 @@ class SyncItem {
 
  private:
   SyncItemType GetGenericFiletype(const EntryStat &stat) const;
-  SyncItemType GetScratchTypeFromArchiveEntry() const;     
+  SyncItemType GetScratchTypeFromArchiveEntry() const;
 
   void CheckMarkerFiles();
 

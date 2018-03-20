@@ -15,8 +15,8 @@
 #include "ingestion/tube.h"
 #include "sync_item.h"
 #include "upload_spooler_result.h"
-#include "util_concurrency.h"
 #include "util/shared_ptr.h"
+#include "util_concurrency.h"
 
 namespace upload {
 class AbstractUploader;

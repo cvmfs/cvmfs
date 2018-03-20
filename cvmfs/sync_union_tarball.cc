@@ -7,7 +7,6 @@
 #include "sync_union_tarball.h"
 
 #include <pthread.h>
-#include <pthread.h>
 #include <stdio.h>
 #include <cassert>
 #include <set>
@@ -36,7 +35,6 @@ SyncUnionTarball::SyncUnionTarball(AbstractSyncMediator *mediator,
                                    const std::string &to_delete)
     : SyncUnion(mediator, rdonly_path, union_path, scratch_path),
       tarball_path_(tarball_path),
-<<<<<<< 385ddd14b16c4b52816bea77468d0a313533f719
       base_directory_(base_directory),
       to_delete_(to_delete) {
   archive_lock_ =
@@ -59,17 +57,6 @@ SyncUnionTarball::~SyncUnionTarball() {
   pthread_cond_destroy(read_archive_cond_);
 
   delete can_read_archive_;
-=======
-      base_directory_(base_directory) {
-  archive_lock = (pthread_mutex_t *)smalloc(sizeof(pthread_mutex_t));
-  pthread_mutex_init(archive_lock, NULL);
-}
-
-SyncUnionTarball::~SyncUnionTarball() {
-  pthread_mutex_lock(archive_lock);
-  pthread_mutex_unlock(archive_lock);
-  pthread_mutex_destroy(archive_lock);
->>>>>>> use lock to move big file, avoid in memory copy
 }
 
 bool SyncUnionTarball::Initialize() {
@@ -79,7 +66,6 @@ bool SyncUnionTarball::Initialize() {
   assert(ARCHIVE_OK == archive_read_support_format_tar(src));
   assert(ARCHIVE_OK == archive_read_support_format_empty(src));
 
-<<<<<<< f1d36734861557ca4d90d3049a9dc0b0d49ad1e0
   if (tarball_path_ == "--") {
     result = archive_read_open_filename(src, NULL, 4096);
   } else {
@@ -87,9 +73,6 @@ bool SyncUnionTarball::Initialize() {
     result =
         archive_read_open_filename(src, tarball_absolute_path.c_str(), 4096);
   }
-=======
-  result = archive_read_open_filename(src, tarball_absolute_path.c_str(), 4096);
->>>>>>> fix some bugs, now we can extract base ubuntu images
 
   if (result != ARCHIVE_OK) {
     LogCvmfs(kLogUnionFs, kLogStderr, "Impossible to open the archive.");
@@ -127,7 +110,6 @@ void SyncUnionTarball::Traverse() {
       retry_read_header = false;
 
       /* Get the lock, wait if lock is not available yet */
-<<<<<<< 385ddd14b16c4b52816bea77468d0a313533f719
       pthread_mutex_lock(archive_lock_);
       while (!*can_read_archive_) {
         pthread_cond_wait(read_archive_cond_, archive_lock_);
@@ -136,10 +118,6 @@ void SyncUnionTarball::Traverse() {
 
       int result = archive_read_next_header2(src, entry);
       *can_read_archive_ = false;
-=======
-      pthread_mutex_lock(archive_lock);
-      result = archive_read_next_header(src, &entry);
->>>>>>> use lock to move big file, avoid in memory copy
 
       switch (result) {
         case ARCHIVE_FATAL: {
@@ -204,10 +182,12 @@ void SyncUnionTarball::Traverse() {
          SharedPtr<SyncItem> sync_entry = SharedPtr<SyncItem>(new SyncItemTar(
               parent_path, filename, src, entry, archive_lock, this));
 
+          /*
           printf(
               "complete_path: \t%s \ndirectory_traversing: "
               "\t%s\n",
               complete_path.c_str(), directory_traversing.c_str());
+          */
           int64_t inode = archive_entry_ino64(entry);
           int link_count = archive_entry_nlink(entry);
           printf("inode: %" PRIu64 "\n", inode);

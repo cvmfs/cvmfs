@@ -13,8 +13,8 @@
 #include "aux/tar_files.h"
 #include "mock/m_sync_mediator.h"
 #include "sync_item.h"
-#include "util/string.h"
 #include "util/shared_ptr.h"
+#include "util/string.h"
 
 using ::testing::_;
 using ::testing::DefaultValue;

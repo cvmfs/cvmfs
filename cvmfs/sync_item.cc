@@ -42,7 +42,7 @@ SyncItem::SyncItem(const string       &relative_parent_path,
                    const SyncUnion    *union_engine,
                    const SyncItemType entry_type) :
   union_engine_(union_engine),
-  scratch_type_(entry_type),  
+  scratch_type_(entry_type),
   rdonly_type_(kItemUnknown),
   whiteout_(false),
   opaque_(false),

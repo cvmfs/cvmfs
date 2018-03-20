@@ -38,8 +38,8 @@
 #include "platform.h"
 #include "swissknife_sync.h"
 #include "sync_item.h"
-#include "xattr.h"
 #include "util/shared_ptr.h"
+#include "xattr.h"
 
 namespace manifest {
 class Manifest;

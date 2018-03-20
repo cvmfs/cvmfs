@@ -20,8 +20,8 @@
 #include "ingestion/ingestion_source.h"
 #include "sync_item.h"
 #include "util/pointer.h"
-#include "util/single_copy.h"
 #include "util/shared_ptr.h"
+#include "util/single_copy.h"
 
 namespace upload {
 struct UploadStreamHandle;
@@ -45,7 +45,7 @@ class FileItem : SingleCopy {
     shash::Suffix hash_suffix = shash::kSuffixNone,
     bool may_have_chunks = true,
     bool has_legacy_bulk_chunk = false);
-   
+
   explicit FileItem(
     const std::string &p,
     uint64_t min_chunk_size = 4 * 1024 * 1024,
