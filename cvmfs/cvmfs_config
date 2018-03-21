@@ -1033,7 +1033,8 @@ cvmfs_reload() {
       continue
     fi
     echo "Pausing ${fqrn} on ${m}"
-    cd "$m" && rm -f ${CVMFS_RELOAD_SOCKETS}/cvmfs.pause/$(echo -n "$m" | base64_nowrap) && cvmfs2 __RELOAD__ ${CVMFS_RELOAD_SOCKETS}/cvmfs.$fqrn stop_and_go | \
+    cd "$m" && rm -f ${CVMFS_RELOAD_SOCKETS}/cvmfs.pause/$(echo -n "$m" | base64_nowrap) && \
+      cvmfs2 __RELOAD__ ${CVMFS_RELOAD_SOCKETS}/cvmfs.$fqrn stop_and_go | \
       awk -v PREFIX="$fqrn: " '{print PREFIX $0}' &
     cd /
     echo $pid > ${CVMFS_RELOAD_SOCKETS}/pid.cvmfs.${fqrn}.paused
