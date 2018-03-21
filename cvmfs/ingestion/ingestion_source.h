@@ -34,8 +34,8 @@ class FileIngestionSource : public IngestionSource {
   bool Open() {
     fd_ = open(path_.c_str(), O_RDONLY);
     if (fd_ < 0) {
-      printf("Err: Impossible to open the file. fd = %d -> errno = %d => %s\n",
-             fd_, errno, strerror(errno));
+      printf("Err: Impossible to open the file. path => %s fd = %d -> errno = %d => %s\n",
+             path_.c_str(), fd_, errno, strerror(errno));
       return false;
     }
     return true;

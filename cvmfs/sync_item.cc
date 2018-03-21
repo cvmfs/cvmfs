@@ -189,7 +189,7 @@ uint64_t SyncItem::GetUnionInode() const {
 }
 
 IngestionSource *SyncItem::GetIngestionSource() const {
-        return new FileIngestionSource(filename());
+        return new FileIngestionSource(GetUnionPath());
 }
 
 void SyncItem::StatGeneric(const string  &path,
