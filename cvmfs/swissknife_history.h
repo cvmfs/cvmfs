@@ -41,6 +41,7 @@ class CommandTag : public Command {
 
  protected:
   typedef std::vector<history::History::Tag> TagList;
+  typedef std::vector<history::History::Branch> BranchList;
 
   struct Environment {
     Environment(const std::string &repository_url,
@@ -143,8 +144,10 @@ class CommandListTags : public CommandTag {
   int Main(const ArgumentList &args);
 
  protected:
-  void PrintHumanReadableList(const TagList &tags) const;
-  void PrintMachineReadableList(const TagList &tags) const;
+  void PrintHumanReadableTagList(const TagList &tags) const;
+  void PrintMachineReadableTagList(const TagList &tags) const;
+  void PrintHumanReadableBranchList(const BranchList &branches) const;
+  void PrintMachineReadableBranchList(const BranchList &branches) const;
 };
 
 

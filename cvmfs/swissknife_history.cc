@@ -764,10 +764,11 @@ ParameterList CommandListTags::GetParams() const {
   ParameterList r;
   InsertCommonParameters(&r);
   r.push_back(Parameter::Switch('x', "machine readable output"));
+  r.push_back(Parameter::Switch('B', "print branch hierarchy"));
   return r;
 }
 
-void CommandListTags::PrintHumanReadableList(
+void CommandListTags::PrintHumanReadableTagList(
     const CommandListTags::TagList &tags) const {
   // go through the list of tags and figure out the column widths
   const std::string name_label = "Name";
@@ -842,7 +843,7 @@ void CommandListTags::PrintHumanReadableList(
   LogCvmfs(kLogCvmfs, kLogStdout, "listing contains %d tags", tags.size());
 }
 
-void CommandListTags::PrintMachineReadableList(const TagList &tags) const {
+void CommandListTags::PrintMachineReadableTagList(const TagList &tags) const {
   TagList::const_iterator i = tags.begin();
   const TagList::const_iterator iend = tags.end();
   for (; i != iend; ++i) {
@@ -850,8 +851,19 @@ void CommandListTags::PrintMachineReadableList(const TagList &tags) const {
   }
 }
 
+void CommandListTags::PrintHumanReadableBranchList(const BranchList &branches)
+  const
+{
+}
+
+void CommandListTags::PrintMachineReadableBranchList(const BranchList &branches)
+  const
+{
+}
+
 int CommandListTags::Main(const ArgumentList &args) {
   const bool machine_readable = (args.find('x') != args.end());
+  const bool branch_hierarchy = (args.find('B') != args.end());
 
   // initialize the Environment (taking ownership)
   const bool history_read_write = false;
@@ -861,17 +873,33 @@ int CommandListTags::Main(const ArgumentList &args) {
     return 1;
   }
 
-  // obtain a full list of all tags
-  TagList tags;
-  if (!env->history->List(&tags)) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to list tags in history database");
-    return 1;
-  }
+  if (branch_hierarchy) {
+    BranchList branches;
+    if (!env->history->ListBranches(&branches)) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "failed to list branches in history database");
+      return 1;
+    }
 
-  if (machine_readable) {
-    PrintMachineReadableList(tags);
+    if (machine_readable) {
+      PrintMachineReadableBranchList(branches);
+    } else {
+      PrintHumanReadableBranchList(branches);
+    }
   } else {
-    PrintHumanReadableList(tags);
+    // obtain a full list of all tags
+    TagList tags;
+    if (!env->history->List(&tags)) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "failed to list tags in history database");
+      return 1;
+    }
+
+    if (machine_readable) {
+      PrintMachineReadableTagList(tags);
+    } else {
+      PrintHumanReadableTagList(tags);
+    }
   }
 
   return 0;

@@ -1045,6 +1045,7 @@ Supported Commands:
                   [-a create tag <name>] [-c channel] [-m message] [-h hash]
                   [-r remove tag <name>] [-f don't ask again]
                   [-i inspect tag <name>] [-x machine readable]
+                  [-b list branch hierarchy] [-x machine readable]
                   [-l list tags] [-x machine readable]
                   <fully qualified name>
                   Print named tags (snapshots) of the repository

@@ -20,13 +20,14 @@ cvmfs_server_tag() {
   local tag_names=""
   local remove_tag_force=0
   local action_inspect=0
-  local action_list=0
+  local action_list_tags=0
+  local action_list_branches=0
   local machine_readable=0
   local silence_warnings=0
 
   # optional parameter handling
   OPTIND=1
-  while getopts "a:c:m:h:r:flxi:" option
+  while getopts "a:c:m:h:r:fblxi:" option
   do
     case $option in
       a)
@@ -52,7 +53,10 @@ cvmfs_server_tag() {
         remove_tag_force=1
         ;;
       l)
-        action_list=1
+        action_list_tags=1
+        ;;
+      b)
+        action_list_branches=1
         ;;
       x)
         machine_readable=1
@@ -75,8 +79,8 @@ cvmfs_server_tag() {
   name=$(get_or_guess_repository_name $1)
 
   # check for ambiguous action requests
-  local actions=$(( $action_remove+$action_list+$action_add+$action_inspect ))
-  [ $actions -gt 0 ] || { action_list=1; actions=$(( $actions + 1 )); } # listing is the default action
+  local actions=$(( $action_remove+$action_list_tags+$action_list_branches+$action_add+$action_inspect ))
+  [ $actions -gt 0 ] || { action_list_tags=1; actions=$(( $actions + 1 )); } # listing is the default action
   [ $actions -eq 1 ] || die "Ambiguous parameters. Please either add, remove, inspect or list tags."
 
   # sanity checks
@@ -91,8 +95,8 @@ cvmfs_server_tag() {
   local user_shell="$(get_user_shell $name)"
   local hash_algorithm="${CVMFS_HASH_ALGORITHM-sha1}"
 
-  # tag listing does not need an open repository transaction
-  if [ $action_list -eq 1 ] || [ $actions -eq 0 ]; then
+  # listing does not need an open repository transaction
+  if [ $action_list_tags -eq 1 ] || [ $action_list_branches -eq 1 ] || [ $actions -eq 0 ]; then
     local tag_list_command="$(__swissknife_cmd dbg) tag_list \
       -w $CVMFS_STRATUM0                                     \
       -t ${CVMFS_SPOOL_DIR}/tmp                              \
@@ -101,6 +105,9 @@ cvmfs_server_tag() {
       -f $name"
     if [ $machine_readable -ne 0 ]; then
       tag_list_command="$tag_list_command -x"
+    fi
+    if [ $action_list_branches -eq 1 ]; then
+      tag_list_command="$tag_list_command -B"
     fi
     $user_shell "$tag_list_command"
     return $?
