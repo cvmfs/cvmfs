@@ -183,51 +183,6 @@ void SyncUnionTarball::Traverse() {
               new SyncItemTar(parent_path, filename, src, entry, archive_lock_,
                               read_archive_cond_, can_read_archive_, this));
 
-          /*
-          printf(
-              "complete_path: \t%s \ndirectory_traversing: "
-              "\t%s\n",
-              complete_path.c_str(), directory_traversing.c_str());
-          */
-          int64_t inode = archive_entry_ino64(entry);
-          int link_count = archive_entry_nlink(entry);
-          printf("inode: %" PRIu64 "\n", inode);
-          printf("link count %d\n", link_count);
-
-          /*
-          if (sync_entry->IsDirectory()) {
-            directories_stacked.push(complete_path);
-            directory_traversing.assign(complete_path);
-            EnterDirectory(parent_path, filename);
-          } else {
-            if (complete_path.rfind(directory_traversing, 0) != 0) {
-              directory_traversing.assign(directories_stacked.top());
-              directories_stacked.pop();
-              std::string leave_parent, leave_filename;
-              SplitPath(directory_traversing, &leave_parent, &leave_filename);
-              printf("Leaving dir: %s / %s \n", leave_parent.c_str(),
-                     leave_filename.c_str());
-              LeaveDirectory(leave_parent, leave_filename);
-            }
-          }
-                */
-          printf("archive_file_path\t%s\n", archive_file_path.c_str());
-          printf("complete_path\t\t%s\n", complete_path.c_str());
-          printf("parent_path\t\t%s\n", parent_path.c_str());
-          printf("filename\t\t%s\n", filename.c_str());
-          printf("relative_parent_path:\t%s\n",
-                 sync_entry->relative_parent_path().c_str());
-          printf("WhiteOut:\t\t%d\n", sync_entry->IsWhiteout());
-          printf("New:\t\t\t%d\n", sync_entry->IsNew());
-          printf("RelativePath:\t\t%s\n",
-                 sync_entry->GetRelativePath().c_str());
-          printf("filename:\t\t%s\n", sync_entry->filename().c_str());
-          printf("RdOnlyPath:\t\t%s\n", sync_entry->GetRdOnlyPath().c_str());
-          printf("UnionPath:\t\t%s\n", sync_entry->GetUnionPath().c_str());
-          printf("ScratchPath:\t\t%s\n", sync_entry->GetScratchPath().c_str());
-
-          printf("\n\n");
-
           if (sync_entry->IsDirectory()) {
             if (know_directories_.find(complete_path) !=
                 know_directories_.end()) {
@@ -274,7 +229,13 @@ void SyncUnionTarball::CreateDirectories(const std::string &target) {
 
   if (dirname == ".") dirname = "";
   SharedPtr<SyncItem> dummy = SharedPtr<SyncItem>(
+<<<<<<< 4111dc489c3729234c345789b1bc57f685073d11
       new SyncItemDummyDir(dirname, filename, this, kItemDir));
+=======
+      new SyncItemDummy(dirname, filename, this, kItemDir));
+
+  catalog::DirectoryEntryBase dirent = dummy->CreateBasicCatalogDirent();
+>>>>>>> remove printf-s
 
   ProcessDirectory(dummy);
   know_directories_.insert(target);
