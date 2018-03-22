@@ -242,9 +242,7 @@ void SyncUnionTarball::Traverse() {
           } else if (sync_entry->IsRegularFile()) {
             ProcessFile(sync_entry);
           } else {
-
             *can_read_archive_ = true;
-
           }
         }
       }
