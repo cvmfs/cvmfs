@@ -416,13 +416,13 @@ int DownloadManager::CallbackCurlSocket(CURL *easy,
 
   switch (action) {
     case CURL_POLL_IN:
-      download_mgr->watch_fds_[index].events |= POLLIN | POLLPRI;
+      download_mgr->watch_fds_[index].events = POLLIN | POLLPRI;
       break;
     case CURL_POLL_OUT:
-      download_mgr->watch_fds_[index].events |= POLLOUT | POLLWRBAND;
+      download_mgr->watch_fds_[index].events = POLLOUT | POLLWRBAND;
       break;
     case CURL_POLL_INOUT:
-      download_mgr->watch_fds_[index].events |=
+      download_mgr->watch_fds_[index].events =
         POLLIN | POLLPRI | POLLOUT | POLLWRBAND;
       break;
     case CURL_POLL_REMOVE:
