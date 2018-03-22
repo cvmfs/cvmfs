@@ -34,7 +34,7 @@ class IngestTarball : public Command {
     r.push_back(Parameter::Mandatory('T', "tar file to extract"));
     r.push_back(Parameter::Mandatory(
         'B', "base directory where to extract the tarfile"));
-    r.push_back(Parameter::Mandatory(
+    r.push_back(Parameter::Optional(
         'D', "entity to delete before to extract the tar"));
 
     return r;
