@@ -63,6 +63,7 @@ COMPONENTS="\
     server/cvmfs_server_mount.sh
     server/cvmfs_server_skeleton.sh
     server/cvmfs_server_fix_permissions.sh
+    server/cvmfs_server_ingest_tarball.sh
     server/cvmfs_server_coda.sh
     "
 

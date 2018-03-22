@@ -939,7 +939,7 @@ is_subcommand() {
     resign list info tag list-tags lstags check transaction abort snapshot           \
     skeleton migrate list-catalogs diff checkout update-geodb gc catalog-chown \
     eliminate-hardlinks update-info update-repoinfo mount fix-permissions \
-    masterkeycard"
+    masterkeycard ingest-tarball"
 
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
@@ -1080,6 +1080,12 @@ Supported Commands:
   update-repoinfo [-f path to JSON file]
                   <fully qualified name>
                   Open repository meta info JSON file for editing
+  ingest-tarball  -t tarfile
+                  -b base directory
+                  [-d folder to delete]
+                  <fully qualified name>
+                  Extract the content of the tarfile inside the base directory,
+                  in the same transaction it also delete the required folders
 "
 
 

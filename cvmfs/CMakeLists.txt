@@ -228,6 +228,9 @@ set (CVMFS_SWISSKNIFE_SOURCES
   swissknife_hash.cc
   swissknife_history.cc
   swissknife_info.cc
+  swissknife_lease.cc
+  swissknife_lease_curl.cc
+  swissknife_lease_json.cc
   swissknife_letter.cc
   swissknife_lsrepo.cc
   swissknife_main.cc
@@ -237,10 +240,8 @@ set (CVMFS_SWISSKNIFE_SOURCES
   swissknife_scrub.cc
   swissknife_sign.cc
   swissknife_sync.cc
+  swissknife_tarball.cc
   swissknife_zpipe.cc
-  swissknife_lease.cc
-  swissknife_lease_curl.cc
-  swissknife_lease_json.cc
   sync_item.cc
   sync_mediator.cc
   sync_union.cc
