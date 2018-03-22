@@ -27,10 +27,19 @@ int swissknife::IngestTarball::Main(const swissknife::ArgumentList &args) {
 
   params.tar_file = *args.find('T')->second;
   params.base_directory = *args.find('B')->second;
-  params.to_delete = *args.find('D')->second;
+  
+  if (args.find('D') != args.end()) {
+    params.to_delete = *args.find('D')->second;
+  }
 
   shash::Algorithms hash_algorithm = shash::kSha1;
 
+  params.nested_kcatalog_limit = SyncParameters::kDefaultNestedKcatalogLimit;
+  params.root_kcatalog_limit = SyncParameters::kDefaultRootKcatalogLimit;
+  params.file_mbyte_limit = SyncParameters::kDefaultFileMbyteLimit;
+  
+  params.branched_catalog = false; // could be true?
+  
   upload::SpoolerDefinition spooler_definition(
       params.spooler_definition, hash_algorithm, params.compression_alg,
       params.generate_legacy_bulk_chunks, params.use_file_chunking,
@@ -49,6 +58,11 @@ int swissknife::IngestTarball::Main(const swissknife::ArgumentList &args) {
   UniquePtr<upload::Spooler> spooler_catalogs(
       upload::Spooler::Construct(spooler_definition_catalogs));
   if (!spooler_catalogs.IsValid()) return 3;
+  
+  const bool follow_redirects = (args.count('L') > 0);
+  if (!InitDownloadManager(follow_redirects)) {
+    return 3;
+  }
 
   if (!InitVerifyingSignatureManager(params.public_keys,
                                      params.trusted_certs)) {
@@ -93,11 +107,9 @@ int swissknife::IngestTarball::Main(const swissknife::ArgumentList &args) {
   if (params.virtual_dir_actions == catalog::VirtualCatalog::kActionNone) {
     publish::SyncUnion *sync;
 
-    const std::string extract_dir = *args.find('@')->second;
-    const std::string tar_file = *args.find('$')->second;
     sync = new publish::SyncUnionTarball(&mediator, params.dir_rdonly,
                                          params.dir_union, params.dir_scratch,
-                                         tar_file, extract_dir);
+                                         params.tar_file, params.base_directory);
     if (!sync->Initialize()) {
       LogCvmfs(kLogCvmfs, kLogStderr,
                "Initialization of the synchronisation "

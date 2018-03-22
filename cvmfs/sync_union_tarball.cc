@@ -38,11 +38,11 @@ SyncUnionTarball::SyncUnionTarball(AbstractSyncMediator *mediator,
 
   archive_lock_ =
       reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
-  assert(pthread_mutex_init(archive_lock_, NULL));
+  assert(0 == pthread_mutex_init(archive_lock_, NULL));
 
   read_archive_cond_ =
       reinterpret_cast<pthread_cond_t *>(smalloc(sizeof(pthread_cond_t)));
-  assert(pthread_cond_init(read_archive_cond_, NULL));
+  assert(0 == pthread_cond_init(read_archive_cond_, NULL));
 
   can_read_archive_ = new bool;
   *can_read_archive_ = true;
