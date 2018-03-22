@@ -34,7 +34,8 @@ class FileIngestionSource : public IngestionSource {
   bool Open() {
     fd_ = open(path_.c_str(), O_RDONLY);
     if (fd_ < 0) {
-      printf(
+      LogCvmfs(
+          kLogCvmfs, kLogStderr,
           "Err: Impossible to open the file. path => %s fd = %d -> errno = %d "
           "=> %s\n",
           path_.c_str(), fd_, errno, strerror(errno));
@@ -91,17 +92,14 @@ class TarIngestionSource : public IngestionSource {
 
   bool Open() {
     assert(size_ >= 0);
-    printf("TarIngestionSource::Open | Opening tar of file\n");
     return true;
   }
 
   ssize_t Read(void* external_buffer, size_t nbytes) {
-    printf("TarIngestionSource::Read | Reading from tar of file\n");
     return archive_read_data(archive_, external_buffer, nbytes);
   }
 
   bool Close() {
-    printf("TarIngestionSource::Close | Closing tar file\n");
     pthread_mutex_lock(archive_lock_);
     *can_read_archive_ = true;
     pthread_cond_broadcast(read_archive_cond_);

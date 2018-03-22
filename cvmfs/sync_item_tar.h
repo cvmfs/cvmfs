@@ -113,7 +113,6 @@ platform_stat64 SyncItemTar::GetStatFromTar() const {
 }
 
 catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
-  printf("SyncItemTar : CreateBasicCatalogDirent\n");
 
   assert(obtained_tar_stat_);
 
