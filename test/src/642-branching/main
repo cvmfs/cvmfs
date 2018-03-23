@@ -155,7 +155,16 @@ EOF
     || return 94
   check_repository $CVMFS_TEST_REPO -i || return $?
 
-  echo "*** (8) remove and recreate branch"
+  echo "*** (8) print branch hierarchy"
+  cat > branches_reference << EOF
+[0] (default) @0
+[1]  b_fix_version1 @6
+[2]   b_fix_version1-coda01 @8
+EOF
+  cvmfs_server tag -bx $CVMFS_TEST_REPO > branches_printed
+  diff branches_printed branches_reference || return 99
+
+  echo "*** (9) remove and recreate branch"
   cvmfs_server tag -lx $CVMFS_TEST_REPO | cut -d" " -f7 | grep '^b_fix_version1$' \
     || return 60
   cvmfs_server tag -r "v1-fix01 v1-fix01-coda01 v1-fix01-coda02" -f $CVMFS_TEST_REPO \
