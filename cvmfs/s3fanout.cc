@@ -148,13 +148,13 @@ int S3FanoutManager::CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
 
   switch (action) {
     case CURL_POLL_IN:
-      s3fanout_mgr->watch_fds_[index].events |= POLLIN | POLLPRI;
+      s3fanout_mgr->watch_fds_[index].events = POLLIN | POLLPRI;
       break;
     case CURL_POLL_OUT:
-      s3fanout_mgr->watch_fds_[index].events |= POLLOUT | POLLWRBAND;
+      s3fanout_mgr->watch_fds_[index].events = POLLOUT | POLLWRBAND;
       break;
     case CURL_POLL_INOUT:
-      s3fanout_mgr->watch_fds_[index].events |=
+      s3fanout_mgr->watch_fds_[index].events =
           POLLIN | POLLPRI | POLLOUT | POLLWRBAND;
       break;
     case CURL_POLL_REMOVE:
