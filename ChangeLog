@@ -1,4 +1,5 @@
 2.5.0:
+  * Improve CPU utilization when downloading with limited bandwidth (CVM-1480)
   * Use lazy unmount as a last resort in `cvmfs_config killall` (CVM-1465)
   * Add CloudFlare support to GeoAPI (CVM-1468)
   * Fix warnings in cvmfs_server on bash >= 4.4 (CVM-1401)
