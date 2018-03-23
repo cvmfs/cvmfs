@@ -1,0 +1,26 @@
+cvmfs_test_name="Garbage collect idle repositoriess"
+cvmfs_test_autofs_on_startup=false
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER and disabled auto-tagging"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -g -z || return $?
+
+  echo "*** generate garbage"
+  start_transaction $CVMFS_TEST_REPO || return 10
+  publish_repo $CVMFS_TEST_REPO || return 11
+  echo "*** sleeping 5 seconds"
+  sleep 5
+  echo "*** garbage collect all content older than 'now'"
+  cvmfs_server gc -f -l -t now $CVMFS_TEST_REPO || return 12
+
+  echo "*** ensure that HEAD revision is still there"
+  start_transaction $CVMFS_TEST_REPO || return 20
+  publish_repo $CVMFS_TEST_REPO || return 21
+  check_repository $CVMFS_TEST_REPO -i  || return 22
+
+  return 0
+}
+
