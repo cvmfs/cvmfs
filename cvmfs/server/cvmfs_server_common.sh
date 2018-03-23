@@ -719,7 +719,8 @@ close_transaction() {
   else
     run_suid_helper clear_scratch $name
   fi
-  [ ! -z "$tmp_dir" ] && rm -fR "${tmp_dir}"/*
+  # Prevent "argument too long" errors
+  [ ! -z "$tmp_dir" ] && find "${tmp_dir}" -mindepth 1 | xargs rm -fR
   run_suid_helper rdonly_mount $name > /dev/null
   run_suid_helper rw_mount $name
   release_lock "$tx_lock"
