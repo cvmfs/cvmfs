@@ -838,6 +838,23 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
       }
     }
 
+    // Create alternative bootstrapping symlinks for VOMS secured repos
+    if (ensemble.manifest->has_alt_catalog_path()) {
+      const bool success =
+        spooler->PlaceBootstrappingShortcut(ensemble.manifest->certificate()) &&
+        spooler->PlaceBootstrappingShortcut(ensemble.manifest->catalog_hash())
+          && (ensemble.manifest->history().IsNull() ||
+            spooler->PlaceBootstrappingShortcut(ensemble.manifest->history()))
+          && (meta_info_hash.IsNull() ||
+            spooler->PlaceBootstrappingShortcut(meta_info_hash));
+
+      if (!success) {
+        LogCvmfs(kLogCvmfs, kLogStderr,
+                 "failed to place root catalog bootstrapping symlinks");
+        return 1;
+      }
+    }
+
     // upload Reflog database
     if (!preload_cache && reflog != NULL) {
       reflog->CommitTransaction();
