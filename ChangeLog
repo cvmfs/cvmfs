@@ -1,4 +1,5 @@
 2.5.0:
+  * Fix transaction abort with many temporary files (CVM-1390)
   * Fix garbage collection of idle repositories (CVM-1460)
   * Place bootstrapping symlinks on replica storage (CVM-1366)
   * Improve CPU utilization when downloading with limited bandwidth (CVM-1480)
