@@ -158,8 +158,9 @@ catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
 }
 
 IngestionSource *SyncItemTar::GetIngestionSource() const {
-  return new TarIngestionSource(archive_, archive_entry_, archive_lock_,
-                                read_archive_cond_, can_read_archive_);
+  return new TarIngestionSource(GetUnionPath(), archive_, archive_entry_,
+                                archive_lock_, read_archive_cond_,
+                                can_read_archive_);
 }
 }  // namespace publish
 

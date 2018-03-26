@@ -19,6 +19,7 @@
 class IngestionSource : SingleCopy {
  public:
   virtual ~IngestionSource() {}
+  virtual std::string GetPath() const = 0;
   virtual bool Open() = 0;
   virtual ssize_t Read(void* buffer, size_t nbyte) = 0;
   virtual bool Close() = 0;
@@ -30,6 +31,8 @@ class FileIngestionSource : public IngestionSource {
   explicit FileIngestionSource(const std::string& path) : path_(path) {}
   ~FileIngestionSource() {  // Close();
   }
+
+  std::string GetPath() const { return path_; }
 
   bool Open() {
     fd_ = open(path_.c_str(), O_RDONLY);
@@ -79,16 +82,19 @@ class FileIngestionSource : public IngestionSource {
 
 class TarIngestionSource : public IngestionSource {
  public:
-  TarIngestionSource(struct archive* archive, struct archive_entry* entry,
-                     pthread_mutex_t* archive_lock,
+  TarIngestionSource(std::string path, struct archive* archive,
+                     struct archive_entry* entry, pthread_mutex_t* archive_lock,
                      pthread_cond_t* read_archive_cond, bool* can_read_archive)
-      : archive_(archive),
+      : path_(path),
+        archive_(archive),
         archive_lock_(archive_lock),
         read_archive_cond_(read_archive_cond),
         can_read_archive_(can_read_archive) {
     const struct stat* stat_ = archive_entry_stat(entry);
     size_ = stat_->st_size;
   }
+
+  std::string GetPath() const { return path_; }
 
   bool Open() {
     assert(size_ >= 0);
@@ -113,6 +119,7 @@ class TarIngestionSource : public IngestionSource {
   }
 
  private:
+  std::string path_;
   struct archive* archive_;
   uint64_t size_;
   pthread_mutex_t* archive_lock_;
