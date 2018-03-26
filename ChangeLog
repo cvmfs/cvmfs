@@ -1,4 +1,5 @@
 2.5.0:
+  * Add functionality to print the hierarchy of branches (CVM-1392)
   * Fix error message when trying to mount an already mounted repo (CVM-1477)
   * Fix transaction abort with many temporary files (CVM-1390)
   * Fix garbage collection of idle repositories (CVM-1460)
