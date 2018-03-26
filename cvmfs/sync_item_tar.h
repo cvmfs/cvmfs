@@ -54,7 +54,6 @@ SyncItemTar::SyncItemTar(const string &relative_parent_path,
       archive_lock_(archive_lock),
       read_archive_cond_(read_archive_cond),
       can_read_archive_(can_read_archive) {
-  scratch_type_ = GetScratchFiletype();
   GetStatFromTar();
 }
 
@@ -106,6 +105,10 @@ platform_stat64 SyncItemTar::GetStatFromTar() const {
   tar_stat_.st_gid = entry_stat_->st_gid;
   tar_stat_.st_size = entry_stat_->st_size;
   tar_stat_.st_mtime = entry_stat_->st_mtime;
+
+  if (kItemDir == scratch_type_) {
+    tar_stat_.st_size = 4096;
+  }
 
   obtained_tar_stat_ = true;
 

@@ -26,6 +26,7 @@ struct SyncParameters {
   SyncParameters()
       : spooler(NULL),
         union_fs_type("aufs"),
+        to_delete(""),
         print_changeset(false),
         dry_run(false),
         mucatalogs(false),

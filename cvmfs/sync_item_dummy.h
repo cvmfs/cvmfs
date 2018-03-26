@@ -22,8 +22,16 @@ class SyncItemDummy : public SyncItem {
                 const SyncItemType entry_type)
       : SyncItem(relative_parent_path, filename, union_engine, entry_type) {
     union_stat_.obtained = true;
-    union_stat_.stat.st_mode = S_IFDIR;
+    union_stat_.stat.st_mode = S_IFDIR | S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP | S_IROTH | S_IWOTH;
     union_stat_.stat.st_nlink = 1;
+    union_stat_.stat.st_uid = getuid();
+    union_stat_.stat.st_gid = getgid();
+    
+    scratch_stat_.obtained = true;
+    scratch_stat_.stat.st_mode = S_IFDIR | S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP | S_IROTH | S_IWOTH;
+    scratch_stat_.stat.st_nlink = 1;
+    scratch_stat_.stat.st_uid = getuid();
+    scratch_stat_.stat.st_gid = getgid();
     scratch_type_ = kItemDir;
   }
 };

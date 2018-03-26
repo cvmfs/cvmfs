@@ -27,7 +27,8 @@ class SyncUnionTarball : public SyncUnion {
                    const std::string &union_path,
                    const std::string &scratch_path,
                    const std::string &tarball_path,
-                   const std::string &base_directory);
+                   const std::string &base_directory,
+                   const std::string &to_delete);
 
   ~SyncUnionTarball();
 
@@ -57,6 +58,7 @@ class SyncUnionTarball : public SyncUnion {
   struct archive *src;
   const std::string tarball_path_;
   const std::string base_directory_;
+  const std::string to_delete_;
   std::set<std::string> know_directories_;
   pthread_mutex_t* archive_lock_;
   pthread_cond_t* read_archive_cond_;

@@ -61,34 +61,6 @@ SyncItem::SyncItem(const string       &relative_parent_path,
   CheckMarkerFiles();
 }
 
-
-SyncItem::SyncItem(const string       &relative_parent_path,
-                   const string       &filename,
-                   struct archive *archive,
-                   struct archive_entry *entry,
-                   const SyncUnion    *union_engine,
-                   const SyncItemType entry_type) :
-  union_engine_(union_engine),
-  scratch_type_(entry_type),
-  rdonly_type_(kItemUnknown),
-  whiteout_(false),
-  opaque_(false),
-  masked_hardlink_(false),
-  has_catalog_marker_(false),
-  valid_graft_(false),
-  graft_marker_present_(false),
-  external_data_(false),
-  relative_parent_path_(relative_parent_path),
-  filename_(filename),
-  graft_chunklist_(NULL),
-  graft_size_(-1),
-  compression_algorithm_(zlib::kZlibDefault)
-{
-  content_hash_.algorithm = shash::kAny;
-  CheckMarkerFiles();
-}
-
-
 SyncItem::~SyncItem() {
   delete graft_chunklist_;
 }

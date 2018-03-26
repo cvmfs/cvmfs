@@ -229,14 +229,7 @@ void SyncUnionTarball::CreateDirectories(const std::string &target) {
 
   if (dirname == ".") dirname = "";
   SharedPtr<SyncItem> dummy = SharedPtr<SyncItem>(
-<<<<<<< 4111dc489c3729234c345789b1bc57f685073d11
       new SyncItemDummyDir(dirname, filename, this, kItemDir));
-=======
-      new SyncItemDummy(dirname, filename, this, kItemDir));
-
-  catalog::DirectoryEntryBase dirent = dummy->CreateBasicCatalogDirent();
->>>>>>> remove printf-s
-
   ProcessDirectory(dummy);
   know_directories_.insert(target);
 }

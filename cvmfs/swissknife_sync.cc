@@ -776,7 +776,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
       const std::string tar_file = *args.find('$')->second;
       sync = new publish::SyncUnionTarball(&mediator, params.dir_rdonly,
                                            params.dir_union, params.dir_scratch,
-                                           tar_file, extract_dir);
+                                           tar_file, extract_dir, "");
     } else {
       LogCvmfs(kLogCvmfs, kLogStderr, "unknown union file system: %s",
                params.union_fs_type.c_str());
