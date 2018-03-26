@@ -306,7 +306,10 @@ cvmfs_server_ingest_tarball() {
   publish_after_hook $name
   publish_succeeded  $name
 
-
+  # force and health check with repeairs.
+  # it unmount and remount the fs making the new extracted file "appear"
+  # then it checks that everything is ok that doesn't hurt
+  health_check -r $name
 
 
 #  debug base_dir
