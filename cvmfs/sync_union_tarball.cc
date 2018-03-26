@@ -225,7 +225,7 @@ void SyncUnionTarball::CreateDirectories(const std::string &target) {
 
   if (dirname == ".") dirname = "";
   SharedPtr<SyncItem> dummy = SharedPtr<SyncItem>(
-      new SyncItemDummy(dirname, filename, this, kItemDir));
+      new SyncItemDummyDir(dirname, filename, this, kItemDir));
   
   ProcessDirectory(dummy);
   know_directories_.insert(target);
