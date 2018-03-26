@@ -174,6 +174,25 @@ is_mounted() {
 }
 
 
+# only certain characters are allowed in repository names
+#
+# @param repo_name the name to test
+is_valid_repo_name() {
+  local repo_name="$1"
+
+  [ ! -z "$1" ] || return 1
+  local length=$(echo -n "$repo_name" | wc -c)
+  [ $length -le 60 ] || return 1
+
+  local repo_head="$(echo "$repo_name" | head -c 1)"
+  local clean_head="$(echo "$repo_head" | tr -cd a-zA-Z0-9)"
+  [ "x$clean_head" = "x$repo_head" ] || return 1
+
+  local clean_name=$(echo "$repo_name" | tr -cd a-zA-Z0-9_.-)
+  [ "x$clean_name" = "x$repo_name" ]
+}
+
+
 # only certain characters are allowed in branch names
 #
 # @param branch_name the name to test
