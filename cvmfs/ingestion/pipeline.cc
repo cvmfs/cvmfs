@@ -106,31 +106,12 @@ void IngestionPipeline::OnFileProcessed(
 
 
 void IngestionPipeline::Process(
-  const std::string &path,
+  IngestionSource* source,
   bool allow_chunking,
   shash::Suffix hash_suffix)
 {
   FileItem *file_item = new FileItem(
-    path,
-    minimal_chunk_size_,
-    average_chunk_size_,
-    maximal_chunk_size_,
-    compression_algorithm_,
-    hash_algorithm_,
-    hash_suffix,
-    allow_chunking && chunking_enabled_,
-    generate_legacy_bulk_chunks_);
-  tube_counter_.Enqueue(file_item);
-  tube_input_.Enqueue(file_item);
-}
-
-void IngestionPipeline::Process(
-  SharedPtr<publish::SyncItem> entry,
-  bool allow_chunking,
-  shash::Suffix hash_suffix)
-{
-  FileItem *file_item = new FileItem(
-    entry,
+    source,
     minimal_chunk_size_,
     average_chunk_size_,
     maximal_chunk_size_,
@@ -248,12 +229,12 @@ void ScrubbingPipeline::OnFileProcessed(
 
 
 void ScrubbingPipeline::Process(
-  const std::string &path,
+  IngestionSource *source,
   shash::Algorithms hash_algorithm,
   shash::Suffix hash_suffix)
 {
   FileItem *file_item = new FileItem(
-    path,
+    source,
     0, 0, 0,
     zlib::kNoCompression,
     hash_algorithm,
