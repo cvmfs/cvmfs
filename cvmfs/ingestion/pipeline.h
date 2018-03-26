@@ -33,7 +33,7 @@ class IngestionPipeline : public Observable<upload::SpoolerResult> {
   void Spawn();
   void Process(const std::string &path, bool allow_chunking,
                shash::Suffix hash_suffix = shash::kSuffixNone);
-  void Process(SharedPtr<publish::SyncItem> entry, bool allow_chunking,
+  void Process(IngestionSource* source, bool allow_chunking,
                shash::Suffix hash_suffix = shash::kSuffixNone);
   void WaitFor();
 
@@ -119,7 +119,7 @@ class ScrubbingPipeline : public Observable<ScrubbingResult> {
   ~ScrubbingPipeline();
 
   void Spawn();
-  void Process(const std::string &path,
+  void Process(IngestionSource* source,
                shash::Algorithms hash_algorithm,
                shash::Suffix hash_suffix);
   void WaitFor();

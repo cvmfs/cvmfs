@@ -52,30 +52,26 @@ bool Spooler::Initialize() {
   return true;
 }
 
-void Spooler::Process(const std::string &local_path,
+void Spooler::Process(IngestionSource* source,
                       const bool allow_chunking) {
-  ingestion_pipeline_->Process(local_path, allow_chunking);
+  ingestion_pipeline_->Process(source, allow_chunking);
 }
 
-void Spooler::Process(SharedPtr<publish::SyncItem> entry,
-                      const bool allow_chunking) {
-  ingestion_pipeline_->Process(entry, allow_chunking);
+void Spooler::ProcessCatalog(IngestionSource *catalog_source) {
+  ingestion_pipeline_->Process(catalog_source, false, shash::kSuffixCatalog);
 }
 
-void Spooler::ProcessCatalog(const std::string &local_path) {
-  ingestion_pipeline_->Process(local_path, false, shash::kSuffixCatalog);
+void Spooler::ProcessHistory(IngestionSource* history_source) {
+  ingestion_pipeline_->Process(history_source, false, shash::kSuffixHistory);
 }
 
-void Spooler::ProcessHistory(const std::string &local_path) {
-  ingestion_pipeline_->Process(local_path, false, shash::kSuffixHistory);
+void Spooler::ProcessCertificate(IngestionSource* certificate_source) {
+  ingestion_pipeline_->Process(certificate_source, false,
+                               shash::kSuffixCertificate);
 }
 
-void Spooler::ProcessCertificate(const std::string &local_path) {
-  ingestion_pipeline_->Process(local_path, false, shash::kSuffixCertificate);
-}
-
-void Spooler::ProcessMetainfo(const std::string &local_path) {
-  ingestion_pipeline_->Process(local_path, false, shash::kSuffixMetainfo);
+void Spooler::ProcessMetainfo(IngestionSource* metainfo_source) {
+  ingestion_pipeline_->Process(metainfo_source, false, shash::kSuffixMetainfo);
 }
 
 void Spooler::Upload(const std::string &local_path,

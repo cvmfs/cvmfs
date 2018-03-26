@@ -36,18 +36,7 @@ class ItemAllocator;
 class FileItem : SingleCopy {
  public:
   explicit FileItem(
-    SharedPtr<publish::SyncItem> entry,
-    uint64_t min_chunk_size = 4 * 1024 * 1024,
-    uint64_t avg_chunk_size = 8 * 1024 * 1024,
-    uint64_t max_chunk_size = 16 * 1024 * 1024,
-    zlib::Algorithms compression_algorithm = zlib::kZlibDefault,
-    shash::Algorithms hash_algorithm = shash::kSha1,
-    shash::Suffix hash_suffix = shash::kSuffixNone,
-    bool may_have_chunks = true,
-    bool has_legacy_bulk_chunk = false);
-
-  explicit FileItem(
-    const std::string &p,
+    IngestionSource* source,
     uint64_t min_chunk_size = 4 * 1024 * 1024,
     uint64_t avg_chunk_size = 8 * 1024 * 1024,
     uint64_t max_chunk_size = 16 * 1024 * 1024,
@@ -59,7 +48,9 @@ class FileItem : SingleCopy {
   ~FileItem();
 
   static FileItem *CreateQuitBeacon() {
-    return new FileItem(std::string(1, kQuitBeaconMarker));
+    std::string quit_marker = std::string(1, kQuitBeaconMarker);
+    IngestionSource *source = new FileIngestionSource(quit_marker);
+    return new FileItem(source);
   }
   bool IsQuitBeacon() {
     return (path_.length() == 1) && (path_[0] == kQuitBeaconMarker);
