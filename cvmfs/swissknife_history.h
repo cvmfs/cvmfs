@@ -41,6 +41,7 @@ class CommandTag : public Command {
 
  protected:
   typedef std::vector<history::History::Tag> TagList;
+  typedef std::vector<history::History::Branch> BranchList;
 
   struct Environment {
     Environment(const std::string &repository_url,
@@ -143,8 +144,25 @@ class CommandListTags : public CommandTag {
   int Main(const ArgumentList &args);
 
  protected:
-  void PrintHumanReadableList(const TagList &tags) const;
-  void PrintMachineReadableList(const TagList &tags) const;
+  struct BranchLevel {
+    BranchLevel() : branch(), level(0) { }
+    BranchLevel(const history::History::Branch &b, unsigned l)
+      : branch(b), level(l) { }
+    history::History::Branch branch;
+    unsigned level;
+  };
+  typedef std::vector<BranchLevel> BranchHierarchy;
+
+  void SortBranchesRecursively(unsigned level,
+                               const std::string &parent_branch,
+                               const BranchList &branches,
+                               BranchHierarchy *hierarchy) const;
+  BranchHierarchy SortBranches(const BranchList &branches) const;
+
+  void PrintHumanReadableTagList(const TagList &tags) const;
+  void PrintMachineReadableTagList(const TagList &tags) const;
+  void PrintHumanReadableBranchList(const BranchHierarchy &branches) const;
+  void PrintMachineReadableBranchList(const BranchHierarchy &branches) const;
 };
 
 
