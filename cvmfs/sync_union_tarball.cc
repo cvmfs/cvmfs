@@ -226,20 +226,7 @@ void SyncUnionTarball::CreateDirectories(const std::string &target) {
   if (dirname == ".") dirname = "";
   SharedPtr<SyncItem> dummy = SharedPtr<SyncItem>(
       new SyncItemDummy(dirname, filename, this, kItemDir));
-  /*
-  SharedPtr<SyncItem> dummy =
-        CreateSyncItem(dirname, filename, kItemDir);
-  mkdir(dummy->GetScratchPath().c_str(),
-        S_IFDIR | S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
-  printf("path %s\n", dummy->GetScratchPath().c_str());
-  dummy->StatScratch(true);
-  dummy->StatUnion(true);
-  */
   
-  printf("CreateDirectory: %s\n", target.c_str());
-  SharedPtr<SyncItem> dummy =
-      SharedPtr<SyncItem>(new SyncItemDummy(dirname, filename, this, kItemDir));
-
   ProcessDirectory(dummy);
   know_directories_.insert(target);
 }
