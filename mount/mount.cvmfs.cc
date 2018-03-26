@@ -2,7 +2,7 @@
  * This file is part of the CernVM File System.
  *
  * Implements the mount helper.
- * Note: meaning of return codes is speficied by mount command.
+ * Note: meaning of return codes is specified by mount command.
  */
 
 #include <errno.h>
@@ -139,21 +139,25 @@ static bool CheckProxy() {
 }
 
 
-static bool CheckConcurrentMount(const string &fqrn, const string &workspace) {
+static bool CheckConcurrentMount(const string &fqrn,
+                                 const string &workspace,
+                                 string *mountpointp) {
   // Try connecting to cvmfs_io socket
   int socket_fd = ConnectSocket(workspace + "/cvmfs_io." + fqrn);
   if (socket_fd < 0)
-    return true;
+    return false;
 
   // There is a repository mounted, find out the mount point
   SendMsg2Socket(socket_fd, "mountpoint");
   string mountpoint;
   char buf;
   while (read(socket_fd, &buf, 1) == 1) {
-    mountpoint.push_back(buf);
+    if (buf != '\n')
+      mountpoint.push_back(buf);
   }
+  *mountpointp = mountpoint;
   close(socket_fd);
-  return false;
+  return true;
 }
 
 
@@ -348,21 +352,20 @@ int main(int argc, char **argv) {
   // If the same repository is mounted multiple times at the same time, there
   // is a race here.  Eventually, only one repository will be mounted while the
   // other cvmfs processes block on a file lock in the cache.
-  int output_flags = kLogStderr;
-  if (!mountpoint.empty() && (mountpoint[mountpoint.length()-1] == '\n'))
-    output_flags |= kLogNoLinebreak;
-  retval = CheckConcurrentMount(fqrn, workspace);
-  if (!retval) {
-    if (remount)
+  string prev_mountpoint;
+  retval = CheckConcurrentMount(fqrn, workspace, &prev_mountpoint);
+  if (retval) {
+    if (remount && (mountpoint == prev_mountpoint)) {
+      // Actually remounting is too hard, but pretend that it worked
       return 0;
-
-    LogCvmfs(kLogCvmfs, output_flags, "Repository %s is already mounted on %s",
-             fqrn.c_str(), mountpoint.c_str());
+    }
+    LogCvmfs(kLogCvmfs, kLogStderr, "Repository %s is already mounted on %s",
+             fqrn.c_str(), prev_mountpoint.c_str());
     return 1;
   } else {
     // No double mount
     if (remount) {
-      LogCvmfs(kLogCvmfs, output_flags, "Repository %s is not mounted on %s",
+      LogCvmfs(kLogCvmfs, kLogStderr, "Repository %s is not mounted on %s",
                fqrn.c_str(), mountpoint.c_str());
       return 1;
     }
