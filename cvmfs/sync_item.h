@@ -226,9 +226,6 @@ class SyncItem {
    */
   SyncItem(const std::string &relative_parent_path, const std::string &filename,
            const SyncUnion *union_engine, const SyncItemType entry_type);
-  SyncItem(const std::string &relative_parent_path, const std::string &filename,
-           struct archive *archive, struct archive_entry *entry,
-           const SyncUnion *union_engine, const SyncItemType entry_type);
 
   platform_stat64 GetStatFromTar() const;
   /**

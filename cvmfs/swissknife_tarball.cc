@@ -107,9 +107,9 @@ int swissknife::IngestTarball::Main(const swissknife::ArgumentList &args) {
   if (params.virtual_dir_actions == catalog::VirtualCatalog::kActionNone) {
     publish::SyncUnion *sync;
 
-    sync = new publish::SyncUnionTarball(&mediator, params.dir_rdonly,
-                                         params.dir_union, params.dir_scratch,
-                                         params.tar_file, params.base_directory);
+    sync = new publish::SyncUnionTarball(
+        &mediator, params.dir_rdonly, params.dir_union, params.dir_scratch,
+        params.tar_file, params.base_directory, params.to_delete);
     if (!sync->Initialize()) {
       LogCvmfs(kLogCvmfs, kLogStderr,
                "Initialization of the synchronisation "

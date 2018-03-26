@@ -31,11 +31,12 @@ SyncUnionTarball::SyncUnionTarball(AbstractSyncMediator *mediator,
                                    const std::string &union_path,
                                    const std::string &scratch_path,
                                    const std::string &tarball_path,
-                                   const std::string &base_directory)
+                                   const std::string &base_directory,
+                                   const std::string &to_delete)
     : SyncUnion(mediator, rdonly_path, union_path, scratch_path),
       tarball_path_(tarball_path),
-      base_directory_(base_directory) {
-
+      base_directory_(base_directory),
+      to_delete_(to_delete) {
   archive_lock_ =
       reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   assert(0 == pthread_mutex_init(archive_lock_, NULL));
@@ -82,19 +83,32 @@ bool SyncUnionTarball::Initialize() {
 }
 
 void SyncUnionTarball::Traverse() {
-  struct archive_entry *entry;
-  // when we find a directory we stack it up and call the EnterDirectory
-  // as soon as we find a file that does not belong to the directory we call
-  // LeaveDirectory
-  // std::stack<std::string> directories_stacked;
-  // std::string directory_traversing;
-
-  std::string archive_file_path;
-  std::string complete_path;
-  std::string parent_path;
-  std::string filename;
-  int result;
+  struct archive_entry *entry = archive_entry_new();
   bool retry_read_header = false;
+
+  /* 
+   * As first step we eliminate the directories we are request.
+   */
+  if (to_delete_ != "") {
+    vector<std::string> to_eliminate_vec = SplitString(to_delete_, ':');
+
+    for (vector<string>::iterator s = to_eliminate_vec.begin();
+         s != to_eliminate_vec.end(); ++s) {
+      std::string parent_path;
+      std::string filename;
+      SplitPath(*s, &parent_path, &filename);
+      SharedPtr<SyncItem> sync_entry =
+          CreateSyncItem(parent_path, filename, kItemDir);
+      sync_entry->MarkAsOpaqueDirectory();
+      ProcessDirectory(sync_entry);
+    }
+  }
+
+  /*
+   * Then we create the base directory or we check if is does exist already.
+   */
+
+  
 
   assert(this->IsInitialized());
   while (true) {
@@ -108,7 +122,7 @@ void SyncUnionTarball::Traverse() {
       }
       pthread_mutex_unlock(archive_lock_);
 
-      result = archive_read_next_header(src, &entry);
+      int result = archive_read_next_header2(src, entry);
       *can_read_archive_ = false;
 
       switch (result) {
@@ -140,13 +154,15 @@ void SyncUnionTarball::Traverse() {
         }
 
         case ARCHIVE_OK: {
-          archive_file_path.assign(archive_entry_pathname(entry));
-          complete_path.assign(base_directory_ + "/" + archive_file_path);
+          std::string archive_file_path(archive_entry_pathname(entry));
+          std::string complete_path(base_directory_ + "/" + archive_file_path);
 
           if (*complete_path.rbegin() == '/') {
             complete_path.erase(complete_path.size() - 1);
           }
 
+          std::string parent_path;
+          std::string filename;
           SplitPath(complete_path, &parent_path, &filename);
 
           CreateDirectories(parent_path);
@@ -210,8 +226,19 @@ void SyncUnionTarball::CreateDirectories(const std::string &target) {
   if (dirname == ".") dirname = "";
   SharedPtr<SyncItem> dummy = SharedPtr<SyncItem>(
       new SyncItemDummy(dirname, filename, this, kItemDir));
-
-  catalog::DirectoryEntryBase dirent = dummy->CreateBasicCatalogDirent();
+  /*
+  SharedPtr<SyncItem> dummy =
+        CreateSyncItem(dirname, filename, kItemDir);
+  mkdir(dummy->GetScratchPath().c_str(),
+        S_IFDIR | S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+  printf("path %s\n", dummy->GetScratchPath().c_str());
+  dummy->StatScratch(true);
+  dummy->StatUnion(true);
+  */
+  
+  printf("CreateDirectory: %s\n", target.c_str());
+  SharedPtr<SyncItem> dummy =
+      SharedPtr<SyncItem>(new SyncItemDummy(dirname, filename, this, kItemDir));
 
   ProcessDirectory(dummy);
   know_directories_.insert(target);
