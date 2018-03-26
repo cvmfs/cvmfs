@@ -200,9 +200,6 @@ __do_gc_cmd()
     is_owner_or_root       $name || die "Permission denied: Repository $name is owned by $user"
     is_in_transaction      $name && die "Cannot run garbage collection while in a transaction"
 
-    local head_timestamp="$(get_repo_info -t)"
-    [ $head_timestamp -gt $preserve_timestamp ] || die "Latest repository revision is older than given timestamp"
-
     # figure out the URL of the repository
     local repository_url="$CVMFS_STRATUM0"
     if is_stratum1 $name; then
