@@ -471,7 +471,7 @@ is_garbage_collectable() {
 #
 # @param name  the name of the repository to be checked
 # @return      0 if automatic garbage collection is enabled
-has_auto_garbage_collection_enabled() {
+is_due_auto_garbage_collection() {
   local name=$1
   load_repo_config $name
   is_garbage_collectable $name && [ x"$CVMFS_AUTO_GC" = x"true" ]
