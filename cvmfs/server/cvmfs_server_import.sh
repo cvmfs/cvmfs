@@ -125,6 +125,7 @@ cvmfs_server_import() {
   shift $(($OPTIND-1))
   check_parameter_count 1 $#
   name=$(get_repository_name $1)
+  is_valid_repo_name "$name" || die "invalid repository name: $name"
 
   # default values
   [ x"$stratum0" = x ] && stratum0="$(mangle_local_cvmfs_url $name)"

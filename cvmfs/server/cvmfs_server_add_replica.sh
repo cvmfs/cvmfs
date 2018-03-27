@@ -75,6 +75,7 @@ cvmfs_server_add_replica() {
   fi
 
   # sanity checks
+  is_valid_repo_name "$alias_name" || die "invalid repository name: $alias_name"
   is_master_replica $stratum0 || die "The repository URL $stratum0 does not point to a replicable master copy of $name"
   if check_repository_existence $alias_name; then
     if is_stratum0 $alias_name; then
