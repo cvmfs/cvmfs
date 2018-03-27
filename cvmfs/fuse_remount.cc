@@ -73,13 +73,16 @@ FuseRemounter::Status FuseRemounter::Check() {
       SetAlarm(MountPoint::kShortTermTTL);
       return (retval == catalog::kLoadFail) ?
              kStatusFailGeneral : kStatusFailNoSpace;
-    case catalog::kLoadUp2Date:
+    case catalog::kLoadUp2Date: {
       LogCvmfs(kLogCvmfs, kLogDebug,
-               "catalog up to date, applying effective TTL");
-      SetOfflineMode(false);
-      catalogs_valid_until_ = time(NULL) + mountpoint_->GetEffectiveTtlSec();
-      SetAlarm(mountpoint_->GetEffectiveTtlSec());
+               "catalog up to date (could be offline mode)");
+      SetOfflineMode(mountpoint_->catalog_mgr()->offline_mode());
+      unsigned ttl = offline_mode_ ?
+        MountPoint::kShortTermTTL : mountpoint_->GetEffectiveTtlSec();
+      catalogs_valid_until_ = time(NULL) + ttl;
+      SetAlarm(ttl);
       return kStatusUp2Date;
+    }
     default:
       abort();
   }
@@ -203,7 +206,10 @@ void *FuseRemounter::MainRemountTrigger(void *data) {
 
 
 void FuseRemounter::SetAlarm(int timeout) {
-  assert(HasRemountTrigger());
+  // Remounting could be called for a non auto-update repository
+  if (!HasRemountTrigger())
+    return;
+
   timeout *= 1000;  // timeout given in ms
   const unsigned buf_size = 1 + sizeof(int);
   char buf[buf_size];
@@ -220,8 +226,8 @@ void FuseRemounter::SetOfflineMode(bool value) {
 
   if (offline_mode_) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
-           "warning, could not apply updated catalog revision, "
-           "entering offline mode");
+             "warning, could not apply updated catalog revision, "
+             "entering offline mode");
     perf::Inc(mountpoint_->file_system()->n_io_error());
   } else {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "recovered from offline mode");
