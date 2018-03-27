@@ -24,10 +24,13 @@ class SyncItemTar : public SyncItem {
   SyncItemType GetScratchFiletype() const;
   catalog::DirectoryEntryBase CreateBasicCatalogDirent() const;
 
+  void StatScratch(const bool refresh = false) const;
+
   inline unsigned int GetRdevMajor() const { return major(tar_stat_.st_rdev); }
   inline unsigned int GetRdevMinor() const { return minor(tar_stat_.st_rdev); }
 
   IngestionSource *GetIngestionSource() const;
+  void SetCatalogMarker() { has_catalog_marker_ = true; }
 
   struct archive *archive_;
   struct archive_entry *archive_entry_;
@@ -55,6 +58,13 @@ SyncItemTar::SyncItemTar(const string &relative_parent_path,
       read_archive_cond_(read_archive_cond),
       can_read_archive_(can_read_archive) {
   GetStatFromTar();
+}
+
+void SyncItemTar::StatScratch(const bool refresh) const {
+  if (scratch_stat_.obtained && !refresh) return;
+  scratch_stat_.stat = GetStatFromTar();
+  scratch_stat_.error_code = 0;
+  scratch_stat_.obtained = true;
 }
 
 SyncItemType SyncItemTar::GetScratchFiletype() const {

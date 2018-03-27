@@ -86,7 +86,7 @@ void SyncUnionTarball::Traverse() {
   struct archive_entry *entry = archive_entry_new();
   bool retry_read_header = false;
 
-  /* 
+  /*
    * As first step we eliminate the directories we are request.
    */
   if (to_delete_ != "") {
@@ -107,8 +107,6 @@ void SyncUnionTarball::Traverse() {
   /*
    * Then we create the base directory or we check if is does exist already.
    */
-
-  
 
   assert(this->IsInitialized());
   while (true) {
@@ -142,6 +140,15 @@ void SyncUnionTarball::Traverse() {
         }
 
         case ARCHIVE_EOF: {
+          for (set<string>::iterator dir = to_create_catalog_dirs_.begin();
+               dir != to_create_catalog_dirs_.end(); ++dir) {
+            assert(dirs_.find(*dir) != dirs_.end());
+            SharedPtr<SyncItem> to_mark = dirs_[*dir];
+            assert(to_mark->IsDirectory());
+            to_mark->SetCatalogMarker();
+            to_mark->AlreadyCreatedDir();
+            ProcessDirectory(to_mark);
+          }
           return;
           break;
         }
@@ -186,12 +193,16 @@ void SyncUnionTarball::Traverse() {
               sync_entry->AlreadyCreatedDir();
             }
             ProcessDirectory(sync_entry);
+            dirs_[complete_path] = sync_entry;
             know_directories_.insert(complete_path);
 
             *can_read_archive_ = true;
 
           } else if (sync_entry->IsRegularFile()) {
             ProcessFile(sync_entry);
+            if (filename == ".cvmfscatalog") {
+              to_create_catalog_dirs_.insert(parent_path);
+            }
           } else {
             *can_read_archive_ = true;
           }
