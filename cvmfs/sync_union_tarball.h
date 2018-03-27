@@ -60,6 +60,8 @@ class SyncUnionTarball : public SyncUnion {
   const std::string base_directory_;
   const std::string to_delete_;
   std::set<std::string> know_directories_;
+  std::set<std::string> to_create_catalog_dirs_;
+  std::map<std::string, SharedPtr<SyncItem> > dirs_;
   pthread_mutex_t* archive_lock_;
   pthread_cond_t* read_archive_cond_;
   bool* can_read_archive_;

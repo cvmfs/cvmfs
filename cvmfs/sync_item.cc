@@ -58,7 +58,9 @@ SyncItem::SyncItem(const string       &relative_parent_path,
   compression_algorithm_(zlib::kZlibDefault)
 {
   content_hash_.algorithm = shash::kAny;
-  CheckMarkerFiles();
+  if (entry_type != kItemTarfile) {
+    CheckMarkerFiles();
+  }
 }
 
 SyncItem::~SyncItem() {

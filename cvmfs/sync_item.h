@@ -189,7 +189,7 @@ class SyncItem {
   inline bool IsType(const SyncItemType expected_type) const {
     if (filename_.substr(0, 12) == ".cvmfsgraft-") {
       scratch_type_ = kItemMarker;
-    } else if (scratch_type_ == kItemUnknown) {
+    } else if (scratch_type_ == kItemUnknown || scratch_type_ == kItemTarfile) {
       scratch_type_ = GetScratchFiletype();
     }
     return scratch_type_ == expected_type;
@@ -226,6 +226,7 @@ class SyncItem {
    */
   SyncItem(const std::string &relative_parent_path, const std::string &filename,
            const SyncUnion *union_engine, const SyncItemType entry_type);
+  void SetCatalogMarker() { has_catalog_marker_ = true; }
 
   platform_stat64 GetStatFromTar() const;
   /**
@@ -257,6 +258,8 @@ class SyncItem {
   mutable EntryStat rdonly_stat_;
   mutable EntryStat union_stat_;
   mutable EntryStat scratch_stat_;
+  
+  bool has_catalog_marker_;           /**< directory containing .cvmfscatalog */
 
  private:
   SyncItemType GetGenericFiletype(const EntryStat &stat) const;
@@ -272,7 +275,6 @@ class SyncItem {
   bool whiteout_;                     /**< SyncUnion marked this as whiteout  */
   bool opaque_;                       /**< SyncUnion marked this as opaque dir*/
   bool masked_hardlink_;              /**< SyncUnion masked out the linkcount */
-  bool has_catalog_marker_;           /**< directory containing .cvmfscatalog */
   bool valid_graft_;                  /**< checksum and size in graft marker */
   bool graft_marker_present_;         /**< .cvmfsgraft-$filename exists */
 
@@ -299,7 +301,7 @@ class SyncItem {
   inline void StatUnion(const bool refresh = false) const {
     StatGeneric(GetUnionPath(), &union_stat_, refresh);
   }
-  inline void StatScratch(const bool refresh = false) const {
+  virtual void StatScratch(const bool refresh = false) const {
     StatGeneric(GetScratchPath(), &scratch_stat_, refresh);
   }
   static void StatGeneric(const std::string  &path,

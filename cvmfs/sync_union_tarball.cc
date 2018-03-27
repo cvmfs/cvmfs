@@ -196,6 +196,9 @@ void SyncUnionTarball::Traverse() {
 
           } else if (sync_entry->IsRegularFile()) {
             ProcessFile(sync_entry);
+            if (filename == ".cvmfscatalog") {
+              to_create_catalog_dirs_.insert(parent_path);
+            }
           } else {
             *can_read_archive_ = true;
           }
