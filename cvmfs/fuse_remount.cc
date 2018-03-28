@@ -20,6 +20,7 @@
 #include "lru_md.h"
 #include "mountpoint.h"
 #include "platform.h"
+#include "statistics.h"
 #include "util/posix.h"
 
 using namespace std;  // NOLINT
@@ -48,6 +49,7 @@ FuseRemounter::Status FuseRemounter::Check() {
   catalog::LoadError retval = mountpoint_->catalog_mgr()->Remount(true);
   switch (retval) {
     case catalog::kLoadNew:
+      SetOfflineMode(false);
       if (atomic_cas32(&drainout_mode_, 0, 1)) {
         // As of this point, fuse callbacks return zero as cache timeout
         LogCvmfs(kLogCvmfs, kLogDebug,
@@ -66,16 +68,21 @@ FuseRemounter::Status FuseRemounter::Check() {
       LogCvmfs(kLogCvmfs, kLogDebug,
                "reload failed (%s), applying short term TTL",
                catalog::Code2Ascii(retval));
+      SetOfflineMode(true);
       catalogs_valid_until_ = time(NULL) + MountPoint::kShortTermTTL;
       SetAlarm(MountPoint::kShortTermTTL);
       return (retval == catalog::kLoadFail) ?
              kStatusFailGeneral : kStatusFailNoSpace;
-    case catalog::kLoadUp2Date:
+    case catalog::kLoadUp2Date: {
       LogCvmfs(kLogCvmfs, kLogDebug,
-               "catalog up to date, applying effective TTL");
-      catalogs_valid_until_ = time(NULL) + mountpoint_->GetEffectiveTtlSec();
-      SetAlarm(mountpoint_->GetEffectiveTtlSec());
+               "catalog up to date (could be offline mode)");
+      SetOfflineMode(mountpoint_->catalog_mgr()->offline_mode());
+      unsigned ttl = offline_mode_ ?
+        MountPoint::kShortTermTTL : mountpoint_->GetEffectiveTtlSec();
+      catalogs_valid_until_ = time(NULL) + ttl;
+      SetAlarm(ttl);
       return kStatusUp2Date;
+    }
     default:
       abort();
   }
@@ -126,6 +133,7 @@ FuseRemounter::FuseRemounter(
   , invalidator_(new FuseInvalidator(mountpoint->inode_tracker(), fuse_channel))
   , invalidator_handle_(mountpoint->kcache_timeout_sec())
   , fence_(new Fence())
+  , offline_mode_(false)
   , catalogs_valid_until_(MountPoint::kIndefiniteDeadline)
 {
   memset(&thread_remount_trigger_, 0, sizeof(thread_remount_trigger_));
@@ -198,13 +206,32 @@ void *FuseRemounter::MainRemountTrigger(void *data) {
 
 
 void FuseRemounter::SetAlarm(int timeout) {
-  assert(HasRemountTrigger());
+  // Remounting could be called for a non auto-update repository
+  if (!HasRemountTrigger())
+    return;
+
   timeout *= 1000;  // timeout given in ms
   const unsigned buf_size = 1 + sizeof(int);
   char buf[buf_size];
   buf[0] = 'T';
   memcpy(&buf[1], &timeout, sizeof(timeout));
   WritePipe(pipe_remount_trigger_[1], buf, buf_size);
+}
+
+
+void FuseRemounter::SetOfflineMode(bool value) {
+  if (value == offline_mode_)
+    return;
+  offline_mode_ = value;
+
+  if (offline_mode_) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+             "warning, could not apply updated catalog revision, "
+             "entering offline mode");
+    perf::Inc(mountpoint_->file_system()->n_io_error());
+  } else {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "recovered from offline mode");
+  }
 }
 
 
@@ -216,7 +243,8 @@ void FuseRemounter::Spawn() {
       &thread_remount_trigger_, NULL, MainRemountTrigger, this);
     assert(retval == 0);
 
-    unsigned ttl = mountpoint_->catalog_mgr()->offline_mode() ?
+    SetOfflineMode(mountpoint_->catalog_mgr()->offline_mode());
+    unsigned ttl = offline_mode_ ?
       MountPoint::kShortTermTTL : mountpoint_->GetEffectiveTtlSec();
     catalogs_valid_until_ = time(NULL) + ttl;
     SetAlarm(ttl);
@@ -276,10 +304,11 @@ void FuseRemounter::TryFinish() {
   if ((retval == catalog::kLoadFail) || (retval == catalog::kLoadNoSpace) ||
       mountpoint_->catalog_mgr()->offline_mode())
   {
-    LogCvmfs(kLogCvmfs, kLogDebug, "reload/finish failed, use short term TTL");
+    SetOfflineMode(true);
     catalogs_valid_until_ = time(NULL) + MountPoint::kShortTermTTL;
     SetAlarm(MountPoint::kShortTermTTL);
   } else {
+    SetOfflineMode(false);
     LogCvmfs(kLogCvmfs, kLogSyslog, "switched to catalog revision %d",
              mountpoint_->catalog_mgr()->GetRevision());
     catalogs_valid_until_ = time(NULL) + mountpoint_->GetEffectiveTtlSec();

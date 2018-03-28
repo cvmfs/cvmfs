@@ -1,0 +1,57 @@
+
+cvmfs_test_name="Offline mode"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  cvmfs_mount cvmfs-config.cern.ch "CVMFS_AUTO_UPDATE=false" || return 1
+
+  echo "*** mounting cvmfs, expecting no errors"
+  local n_io_err=$(get_xattr nioerr /cvmfs/cvmfs-config.cern.ch)
+  [ x"$n_io_err" = x0 ] || return 1
+  local n_offline_msg_before=$(cat_syslog | grep "entering offline mode" | wc -l)
+  local n_recovery_msg_before=$(cat_syslog | grep "recovered from offline mode" | wc -l)
+  echo "*** number of offline syslog messages: $n_offline_msg_before/$n_recovery_msg_before"
+  local host_before=$(get_xattr host /cvmfs/cvmfs-config.cern.ch)
+  local proxy_before=$(get_xattr proxy /cvmfs/cvmfs-config.cern.ch)
+  echo "*** network connection: $host_before via $proxy_before"
+
+  echo "*** cutting network connectivity, expecting a remount error"
+  sudo cvmfs_talk -i cvmfs-config.cern.ch proxy set DIRECT
+  sudo cvmfs_talk -i cvmfs-config.cern.ch host set http://127.0.0.1
+  sudo cvmfs_talk -i cvmfs-config.cern.ch remount sync
+  n_io_err=$(get_xattr nioerr /cvmfs/cvmfs-config.cern.ch)
+  [ $n_io_err -eq 1 ] || return 10
+  n_offline_msg=$(cat_syslog | grep "entering offline mode" | wc -l)
+  [ $n_offline_msg -eq $(($n_offline_msg_before + 1)) ] || return 11
+
+  echo "*** remount again, expect error number to remain constant"
+  sudo cvmfs_talk -i cvmfs-config.cern.ch remount sync
+  n_io_err=$(get_xattr nioerr /cvmfs/cvmfs-config.cern.ch)
+  [ $n_io_err -eq 1 ] || return 20
+  n_offline_msg=$(cat_syslog | grep "entering offline mode" | wc -l)
+  [ $n_offline_msg -eq $(($n_offline_msg_before + 1)) ] || return 21
+
+  echo "*** network recovery"
+  sudo cvmfs_talk -i cvmfs-config.cern.ch proxy set $proxy_before
+  sudo cvmfs_talk -i cvmfs-config.cern.ch host set $host_before
+  sudo cvmfs_talk -i cvmfs-config.cern.ch remount sync
+  n_io_err=$(get_xattr nioerr /cvmfs/cvmfs-config.cern.ch)
+  [ $n_io_err -eq 1 ] || return 30
+  n_offline_msg=$(cat_syslog | grep "entering offline mode" | wc -l)
+  [ $n_offline_msg -eq $(($n_offline_msg_before + 1)) ] || return 31
+  local n_recovery_msg=$(cat_syslog | grep "recovered from offline mode" | wc -l)
+  [ $n_recovery_msg -eq $(($n_recovery_msg_before + 1)) ] || return 32
+
+  echo "*** cutting network connectivity again, expecting more remount errors"
+  sudo cvmfs_talk -i cvmfs-config.cern.ch proxy set DIRECT
+  sudo cvmfs_talk -i cvmfs-config.cern.ch host set http://127.0.0.1
+  sudo cvmfs_talk -i cvmfs-config.cern.ch remount sync
+  n_io_err=$(get_xattr nioerr /cvmfs/cvmfs-config.cern.ch)
+  [ $n_io_err -eq 2 ] || return 40
+  n_offline_msg=$(cat_syslog | grep "entering offline mode" | wc -l)
+  [ $n_offline_msg -eq $(($n_offline_msg_before + 2)) ] || return 41
+
+  return 0
+}
+
