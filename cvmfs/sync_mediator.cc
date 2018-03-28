@@ -242,7 +242,9 @@ bool SyncMediator::Commit(manifest::Manifest *manifest) {
     {
       LogCvmfs(kLogPublish, kLogVerboseMsg, "Spooling hardlink group %s",
                i->master->GetUnionPath().c_str());
-      params_->spooler->Process(i->master->GetUnionPath());
+      IngestionSource *source =
+          new FileIngestionSource(i->master->GetUnionPath());
+      params_->spooler->Process(source);
     }
 
     params_->spooler->WaitForUpload();
@@ -272,7 +274,8 @@ bool SyncMediator::Commit(manifest::Manifest *manifest) {
     // Commit empty string to ensure that the "content" of the auto catalog
     // markers is present in the repository.
     string empty_file = CreateTempPath(params_->dir_temp + "/empty", 0600);
-    params_->spooler->Process(empty_file);
+    IngestionSource* source = new FileIngestionSource(empty_file);
+    params_->spooler->Process(source);
     params_->spooler->WaitForUpload();
     unlink(empty_file.c_str());
     if (params_->spooler->GetNumberOfErrors() > 0) {
@@ -689,7 +692,7 @@ void SyncMediator::AddFile(SharedPtr<SyncItem> entry) {
     file_queue_[entry->GetUnionPath()] = entry;
     pthread_mutex_unlock(&lock_file_queue_);
     // Spool the file
-    params_->spooler->Process(entry);
+    params_->spooler->Process(entry->GetIngestionSource());
   }
 }
 

@@ -425,7 +425,8 @@ void CommandMigrate::MigrationCallback(PendingCatalog *const &data) {
   data->new_catalog_size = new_catalog_size;
 
   // Schedule the compression and upload of the catalog
-  spooler_->ProcessCatalog(path);
+  IngestionSource* catalog = new FileIngestionSource(path);
+  spooler_->ProcessCatalog(catalog);
 }
 
 
@@ -1403,21 +1404,21 @@ const catalog::DirectoryEntry& CommandMigrate::GetNestedCatalogMarkerDirent() {
   return nested_catalog_marker_;
 }
 
-
 bool CommandMigrate::GenerateNestedCatalogMarkerChunk() {
   // Create an empty nested catalog marker file
   nested_catalog_marker_tmp_path_ =
-    CreateTempPath(temporary_directory_ + "/.cvmfscatalog", 0644);
+      CreateTempPath(temporary_directory_ + "/.cvmfscatalog", 0644);
   if (nested_catalog_marker_tmp_path_.empty()) {
     Error("Failed to create temp file for nested catalog marker dummy.");
     return false;
   }
 
   // Process and upload it to the backend storage
-  spooler_->Process(nested_catalog_marker_tmp_path_);
+  IngestionSource *source =
+      new FileIngestionSource(nested_catalog_marker_tmp_path_);
+  spooler_->Process(source);
   return true;
 }
-
 
 void CommandMigrate::CreateNestedCatalogMarkerDirent(
   const shash::Any &content_hash)
