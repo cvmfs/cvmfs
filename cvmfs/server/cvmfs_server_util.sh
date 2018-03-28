@@ -881,6 +881,8 @@ _update_geodb_install_1() {
     return 3
   fi
 
+  set_selinux_httpd_context_if_needed $CVMFS_GEOUPDATE_DIR
+
   _to_syslog_for_geoip "successfully updated from $dburl"
 
   return 0
