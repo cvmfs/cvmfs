@@ -1,4 +1,7 @@
 2.5.0:
+  * Fix use of short term TTL when the manifest cannot be downloaded
+  * Fix crash on `cvmfs_talk remount` with fixed catalogs
+  * Send offline mode enter/recover events to syslog (CVM-1497)
   * Sanitize repository names in cvmfs_server (CVM-1389)
   * Use /etc/auto.master.d/cvmfs.autofs if applicable (CVM-675)
   * Add functionality to print the hierarchy of branches (CVM-1392)
