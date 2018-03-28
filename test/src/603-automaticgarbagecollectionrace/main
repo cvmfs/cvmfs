@@ -83,7 +83,8 @@ cvmfs_run_test() {
 
   echo "configure repository to automatically delete revisions older than $thresh_seconds seconds"
   local server_conf="/etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/server.conf"
-  echo "CVMFS_AUTO_GC_TIMESPAN='$thresh_seconds seconds ago'" | sudo tee --append $server_conf || return 1
+  echo "CVMFS_AUTO_GC_TIMESPAN='$thresh_seconds seconds ago'" | sudo tee -a $server_conf || return 1
+  echo "CVMFS_AUTO_GC_LAPSE=tomorrow" | sudo tee -a $server_conf || return 1
   cat $server_conf || return 2
 
   echo "check if initial catalog is there"
