@@ -1110,6 +1110,13 @@ EOF
 
   mount $rdonly_dir > /dev/null || return 1
   mount /cvmfs/$name
+
+  # Make sure the systemd mount unit exists
+  if is_systemd; then
+    /usr/lib/systemd/system-generators/systemd-fstab-generator \
+      /run/systemd/generator '' '' 2>/dev/null
+    systemctl daemon-reload
+  fi
 }
 
 
