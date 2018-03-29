@@ -12,6 +12,10 @@ using namespace std;  // NOLINT
 
 namespace cvmfs_suid {
 
+/**
+ * Makes a systemd mount unit string from the given path, such as
+ * a-b-c.mount from /a/b/c
+ */
 string EscapeSystemdUnit(const string &path) {
   assert(!path.empty());
 
