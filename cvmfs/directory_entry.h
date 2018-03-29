@@ -24,6 +24,7 @@
 namespace publish {
 class SyncItem;
 class SyncItemTar;
+class SyncItemDummyDir;
 }
 namespace swissknife {
 class CommandMigrate;
@@ -61,6 +62,7 @@ class DirectoryEntryBase {
   // Simplify creation of DirectoryEntry objects for write back
   friend class publish::SyncItem;
   friend class publish::SyncItemTar;
+  friend class publish::SyncItemDummyDir;
   // Simplify file system like _touch_ of DirectoryEntry objects
   friend class SqlDirentTouch;
   // Allow creation of virtual directories and files

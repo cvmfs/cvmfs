@@ -21,6 +21,9 @@ namespace publish {
 class SyncItemDummyDir : public SyncItem {
   friend SyncUnionTarball;
 
+ public:
+  catalog::DirectoryEntryBase CreateBasicCatalogDirent() const;
+
  protected:
   SyncItemDummyDir(const std::string &relative_parent_path,
                    const std::string &filename, const SyncUnion *union_engine,
@@ -28,23 +31,41 @@ class SyncItemDummyDir : public SyncItem {
       : SyncItem(relative_parent_path, filename, union_engine, entry_type) {
     assert(kItemDir == entry_type);
 
-    union_stat_.obtained = true;
-    union_stat_.stat.st_mode = S_IFDIR | S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP |
-                               S_IWGRP | S_IXGRP | S_IROTH | S_IWOTH;
-    union_stat_.stat.st_nlink = 1;
-    union_stat_.stat.st_uid = getuid();
-    union_stat_.stat.st_gid = getgid();
-
     scratch_stat_.obtained = true;
     scratch_stat_.stat.st_mode = S_IFDIR | S_IRUSR | S_IWUSR | S_IXUSR |
                                  S_IRGRP | S_IWGRP | S_IXGRP | S_IROTH |
-                                 S_IWOTH;
+                                 S_IXOTH;
     scratch_stat_.stat.st_nlink = 1;
     scratch_stat_.stat.st_uid = getuid();
     scratch_stat_.stat.st_gid = getgid();
     scratch_type_ = kItemDir;
   }
 };
+
+catalog::DirectoryEntryBase SyncItemDummyDir::CreateBasicCatalogDirent() const {
+  catalog::DirectoryEntryBase dirent;
+
+  dirent.inode_ = catalog::DirectoryEntry::kInvalidInode;
+
+  dirent.linkcount_ = 1;
+
+  dirent.mode_ = S_IFDIR | S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP |
+                 S_IXGRP | S_IROTH | S_IXOTH;
+
+  dirent.uid_ = getuid();
+  dirent.gid_ = getgid();
+  dirent.size_ = 4096;
+  dirent.mtime_ = 0;
+  dirent.checksum_ = this->GetContentHash();
+  dirent.is_external_file_ = this->IsExternalData();
+  dirent.compression_algorithm_ = this->GetCompressionAlgorithm();
+
+  dirent.name_.Assign(this->filename().data(), this->filename().length());
+
+  assert(dirent.IsDirectory());
+
+  return dirent;
+}
 
 }  // namespace publish
 
