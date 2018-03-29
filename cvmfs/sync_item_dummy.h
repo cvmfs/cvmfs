@@ -8,6 +8,7 @@
 #include "sync_item.h"
 
 #include <string>
+#include <time.h>
 
 #include "sync_union_tarball.h"
 
@@ -55,7 +56,7 @@ catalog::DirectoryEntryBase SyncItemDummyDir::CreateBasicCatalogDirent() const {
   dirent.uid_ = getuid();
   dirent.gid_ = getgid();
   dirent.size_ = 4096;
-  dirent.mtime_ = 0;
+  dirent.mtime_ = time(NULL);
   dirent.checksum_ = this->GetContentHash();
   dirent.is_external_file_ = this->IsExternalData();
   dirent.compression_algorithm_ = this->GetCompressionAlgorithm();

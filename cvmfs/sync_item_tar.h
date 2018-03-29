@@ -161,6 +161,8 @@ catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
     dirent.size_ = makedev(GetRdevMajor(), GetRdevMinor());
   }
 
+  if (dirent.IsDirectory() && dirent.size_ == 0) dirent.size_ = 4096;
+
   assert(dirent.IsRegular() || dirent.IsDirectory() || dirent.IsLink() ||
          dirent.IsSpecial());
 
