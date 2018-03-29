@@ -59,6 +59,39 @@ static void ExecAsRoot(const char *binary,
 }
 
 
+/**
+ * Makes a systemd mount unit string from the given path.
+ */
+static string MakeSystemdUnit(const string &path) {
+  string normalized_path(path);
+  size_t pos;
+  while ((pos = normalized_path.find("//")) != string::npos) {
+    normalized_path.replace(pos, 2, "/");
+  }
+
+  if (normalized_path == "/")
+    return "-";
+
+  sanitizer::InputSanitizer sanitizer("az AZ 09 _ .");
+  unsigned length = normalized_path.length();
+  string result;
+  for (unsigned i = 0; i < length; ++i) {
+    char c = normalized_path[i];
+    if (c == '/') {
+      if ((i == 0) || (i == length - 1))
+        continue;
+      result.push_back('-');
+    } else if (sanitizer.IsValid(string(&c, 1))) {
+      result.push_back(c);
+    } else {
+
+    }
+  }
+
+  return result + ".mount";
+}
+
+
 static void Remount(const string &path, const RemountType how) {
   string remount_option = "remount,";
   switch (how) {
@@ -77,7 +110,14 @@ static void Remount(const string &path, const RemountType how) {
 }
 
 static void Mount(const string &path) {
-  ExecAsRoot("/bin/mount", path.c_str(), NULL, NULL);
+  platform_stat64 info;
+  int retval = platform_stat("/bin/systemctl", &info);
+  if (retval == 0) {
+    string systemd_unit = MakeSystemdUnit(path);
+    ExecAsRoot("/bin/systemctl", "start", systemd_unit.c_str(), NULL);
+  } else {
+    ExecAsRoot("/bin/mount", path.c_str(), NULL, NULL);
+  }
 }
 
 static void Umount(const string &path) {

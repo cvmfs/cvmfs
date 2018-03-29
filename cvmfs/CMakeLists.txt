@@ -268,7 +268,9 @@ set (CVMFS_SWISSKNIFE_DEBUG_SOURCES
 )
 
 set (CVMFS_SUID_HELPER_SOURCES
-  cvmfs_suid_helper.cc sanitizer.cc
+  cvmfs_suid_helper.cc
+  cvmfs_suid_util.cc
+  sanitizer.cc
 )
 
 set (CVMFS_PRELOADER_SOURCES
