@@ -529,7 +529,14 @@ void *DownloadManager::MainDownload(void *data) {
     }
 
     // Activity on curl sockets
-    for (unsigned i = 2; i < download_mgr->watch_fds_inuse_; ++i) {
+    // Within this loop the curl_multi_socket_action() may cause socket(s)
+    // to be removed from watch_fds_. If a socket is removed it is replaced
+    // by the socket at the end of the array and the inuse count is decreased.
+    // Therefore loop over the array in reverse order.
+    for (long i = download_mgr->watch_fds_inuse_-1; i >= 2; --i) {
+      if (i >= download_mgr->watch_fds_inuse_) {
+        continue;
+      }
       if (download_mgr->watch_fds_[i].revents) {
         int ev_bitmask = 0;
         if (download_mgr->watch_fds_[i].revents & (POLLIN | POLLPRI))
