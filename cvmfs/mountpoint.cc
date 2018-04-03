@@ -1142,8 +1142,7 @@ void MountPoint::CreateAuthz() {
 bool MountPoint::CreateCatalogManager() {
   string optarg;
 
-  catalog_mgr_ = new catalog::ClientCatalogManager(
-    fqrn_, fetcher_, signature_mgr_, statistics_);
+  catalog_mgr_ = new catalog::ClientCatalogManager(this);
 
   SetupInodeAnnotation();
   if (!SetupOwnerMaps())

@@ -21,6 +21,7 @@ class CacheManager;
 namespace cvmfs {
 class Fetcher;
 }
+class MountPoint;
 namespace perf {
 class Counter;
 class Statistics;
@@ -50,10 +51,7 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
   friend class CachedManifestEnsemble;
 
  public:
-  ClientCatalogManager(const std::string &repo_name,
-    cvmfs::Fetcher *fetcher,
-    signature::SignatureManager *signature_mgr,
-    perf::Statistics *statistics);
+  ClientCatalogManager(MountPoint *mountpoint);
   virtual ~ClientCatalogManager();
 
   bool InitFixed(const shash::Any &root_hash, bool alternative_path);
@@ -90,6 +88,7 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
   std::map<PathString, shash::Any> loaded_catalogs_;
   std::map<PathString, shash::Any> mounted_catalogs_;
 
+  MountPoint *mountpoint_;
   std::string repo_name_;
   cvmfs::Fetcher *fetcher_;
   signature::SignatureManager *signature_mgr_;
