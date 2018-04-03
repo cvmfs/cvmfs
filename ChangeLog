@@ -1,4 +1,5 @@
 2.5.0:
+  * Make CVMFS_GENERATE_LEGACY_BULK_CHUNKS=false the default (CVM-1429)
   * Run automatic garbage collection with frequency controlled by the
     CVMFS_AUTO_GC_LAPSE parameter (CVM-1400)
   * Fix use of short term TTL when the manifest cannot be downloaded
