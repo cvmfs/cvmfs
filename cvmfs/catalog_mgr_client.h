@@ -88,7 +88,6 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
   std::map<PathString, shash::Any> loaded_catalogs_;
   std::map<PathString, shash::Any> mounted_catalogs_;
 
-  MountPoint *mountpoint_;
   std::string repo_name_;
   cvmfs::Fetcher *fetcher_;
   signature::SignatureManager *signature_mgr_;

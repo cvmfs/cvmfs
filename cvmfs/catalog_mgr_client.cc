@@ -37,7 +37,6 @@ void ClientCatalogManager::ActivateCatalog(Catalog *catalog) {
 
 ClientCatalogManager::ClientCatalogManager(MountPoint *mountpoint)
   : AbstractCatalogManager<Catalog>(mountpoint->statistics())
-  , mountpoint_(mountpoint)
   , repo_name_(mountpoint->fqrn())
   , fetcher_(mountpoint->fetcher())
   , signature_mgr_(mountpoint->signature_mgr())
@@ -48,9 +47,9 @@ ClientCatalogManager::ClientCatalogManager(MountPoint *mountpoint)
   , fixed_alt_root_catalog_(false)
 {
   LogCvmfs(kLogCatalog, kLogDebug, "constructing client catalog manager");
-  n_certificate_hits_ = mountpoint_->statistics()->Register(
+  n_certificate_hits_ = mountpoint->statistics()->Register(
     "cache.n_certificate_hits", "Number of certificate hits");
-  n_certificate_misses_ = mountpoint_->statistics()->Register(
+  n_certificate_misses_ = mountpoint->statistics()->Register(
     "cache.n_certificate_misses", "Number of certificate misses");
 }
 
