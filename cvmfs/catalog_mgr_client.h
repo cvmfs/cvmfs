@@ -92,6 +92,7 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
   std::string repo_name_;
   cvmfs::Fetcher *fetcher_;
   signature::SignatureManager *signature_mgr_;
+  std::string workspace_;
   bool offline_mode_;  /**< cached copy used because there is no network */
   uint64_t all_inodes_;
   uint64_t loaded_inodes_;

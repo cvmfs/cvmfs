@@ -41,6 +41,7 @@ ClientCatalogManager::ClientCatalogManager(MountPoint *mountpoint)
   , repo_name_(mountpoint->fqrn())
   , fetcher_(mountpoint->fetcher())
   , signature_mgr_(mountpoint->signature_mgr())
+  , workspace_(mountpoint->file_system()->workspace())
   , offline_mode_(false)
   , all_inodes_(0)
   , loaded_inodes_(0)
@@ -218,7 +219,7 @@ LoadError ClientCatalogManager::LoadCatalog(
   fetcher_->cache_mgr()->CommitFromMem(ensemble.manifest->certificate(),
                                        ensemble.cert_buf, ensemble.cert_size,
                                        "certificate for " + repo_name_);
-  ensemble.manifest->ExportChecksum(checksum_dir, 0600);
+  ensemble.manifest->ExportChecksum(workspace_, 0600);
   return catalog::kLoadNew;
 }
 
