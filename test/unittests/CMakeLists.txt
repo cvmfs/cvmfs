@@ -100,6 +100,7 @@ set(CVMFS_UNITTEST_FILES
   t_sqlite_database.cc
   t_sqlitemem.cc
   t_statistics.cc
+  t_suid_util.cc
   t_swissknife_lease.cc
   t_synchronizing_counter.cc
   t_raii_temp_dir.cc
@@ -151,6 +152,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/catalog_virtual.cc
   ${CVMFS_SOURCE_DIR}/clientctx.cc
   ${CVMFS_SOURCE_DIR}/compression.cc
+  ${CVMFS_SOURCE_DIR}/cvmfs_suid_util.cc
   ${CVMFS_SOURCE_DIR}/dns.cc
   ${CVMFS_SOURCE_DIR}/download.cc
   ${CVMFS_SOURCE_DIR}/directory_entry.cc
@@ -335,7 +337,7 @@ endif (BUILD_LIBCVMFS_CACHE)
 #
 # link the stuff (*_LIBRARIES are dynamic link libraries)
 #
-set (UNITTEST_LINK_LIBRARIES ${GTEST_LIBRARIES} ${GMOCK_LIBRARIES} 
+set (UNITTEST_LINK_LIBRARIES ${GTEST_LIBRARIES} ${GMOCK_LIBRARIES}
                              ${OPENSSL_LIBRARIES} ${CURL_LIBRARIES}
                              ${CARES_LIBRARIES} ${OPENSSL_LIBRARIES}
                              ${SQLITE3_LIBRARY} ${ZLIB_LIBRARIES} ${RT_LIBRARY}
