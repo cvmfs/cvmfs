@@ -220,7 +220,7 @@ LoadError ClientCatalogManager::LoadCatalog(
   fetcher_->cache_mgr()->CommitFromMem(ensemble.manifest->certificate(),
                                        ensemble.cert_buf, ensemble.cert_size,
                                        "certificate for " + repo_name_);
-  ensemble.manifest->ExportChecksum(".", 0600);
+  ensemble.manifest->ExportChecksum(checksum_dir, 0600);
   return catalog::kLoadNew;
 }
 
