@@ -20,9 +20,9 @@
 #include <cstring>
 #include <string>
 
+#include "cvmfs_suid_util.h"
 #include "platform.h"
 #include "sanitizer.h"
-#include "cvmfs_suid_util.h"
 
 using namespace std;  // NOLINT
 
