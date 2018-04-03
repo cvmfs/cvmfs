@@ -1,4 +1,6 @@
 2.5.0:
+  * Run automatic garbage collection with frequency controlled by the
+    CVMFS_AUTO_GC_LAPSE parameter (CVM-1400)
   * Fix use of short term TTL when the manifest cannot be downloaded
   * Fix crash on `cvmfs_talk remount` with fixed catalogs
   * Send offline mode enter/recover events to syslog (CVM-1497)
