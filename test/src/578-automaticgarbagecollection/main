@@ -36,201 +36,153 @@ cvmfs_run_test() {
   local root_catalog4=""
   local root_catalog5=""
   local root_catalog6=""
+  local root_catalog7=""
 
-  local seconds=30
-  local thresh_seconds=60 # Potential Race: Publishing is not supposed to take
-                          #                 longer than thresh_seconds-seconds !
+  local seconds=5 # sleep before gc
 
-  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER and disabled auto-tagging ($(display_timestamp now))"
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER and disabled auto-tagging ($(display_timestamp now))"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -g -z || return $?
+  echo "*** GC should have run once"
+  peek_backend_raw $CVMFS_TEST_REPO .cvmfs_status.json || return 60
   root_catalog0="$(get_current_root_catalog $CVMFS_TEST_REPO)C"
 
-  echo "configure repository to automatically delete revisions older than $thresh_seconds seconds"
+  echo "*** configure repository to automatically delete revisions older than $thresh_seconds seconds"
   local server_conf="/etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/server.conf"
-  echo "CVMFS_AUTO_GC_TIMESPAN='$thresh_seconds seconds ago'" | sudo tee --append $server_conf || return 1
+  echo "CVMFS_AUTO_GC_TIMESPAN=now" | sudo tee --append $server_conf || return 1
 
   local gc_log="${scratch_dir}/gc.log"
-  echo "configure a deletion log ($gc_log) for $CVMFS_TEST_REPO"
+  echo "*** configure a deletion log ($gc_log) for $CVMFS_TEST_REPO"
   echo "CVMFS_GC_DELETION_LOG=$gc_log" | sudo tee --append $server_conf || return 1
   cat $server_conf || return 2
 
-  echo "check if initial catalog is there"
+  echo "*** check if initial catalog is there"
   peek_backend $CVMFS_TEST_REPO $root_catalog0 || return 3 # just created
-
-  echo "list named snapshots"
   cvmfs_server tag -l $CVMFS_TEST_REPO || return 3
 
-  echo "create revision 1 ($(display_timestamp now))"
+  echo "*** create revision 1 ($(display_timestamp now))"
   root_catalog1="$(create_revision $CVMFS_TEST_REPO)"
-
-  echo "list named snapshots"
   cvmfs_server tag -l $CVMFS_TEST_REPO || return 3
 
-  echo "check repository integrity"
+  echo "*** check repository integrity"
   check_repository $CVMFS_TEST_REPO -i || return 50
 
-  echo "check catalogs"
+  echo "*** check catalogs"
   peek_backend $CVMFS_TEST_REPO $root_catalog0 || return 4 # trunk-previous
   peek_backend $CVMFS_TEST_REPO $root_catalog1 || return 5 # trunk
 
-  echo "check GC log"
-  [ $(count_gc_events_in_log $gc_log) -eq 1 ] || return 101
-  peek_gc_log $gc_log $root_catalog0          && return 102
-  peek_gc_log $gc_log $root_catalog1          && return 103
-
-  echo "sleep $seconds seconds"
+  echo "*** gc should not have run yet"
+  [ ! -f $gc_log ] || return 61
+  echo "*** sleep $seconds seconds"
   sleep $seconds
-
-  echo "create revision 2 ($(display_timestamp now))"
+  echo "*** set lapse time to 'always' and create new revision"
+  echo "CVMFS_AUTO_GC_LAPSE='tomorrow'" | sudo tee -a $server_conf || return 62
   root_catalog2="$(create_revision $CVMFS_TEST_REPO)"
 
-  echo "list named snapshots"
-  cvmfs_server tag -l $CVMFS_TEST_REPO || return 3
-
-  echo "check repository integrity"
+  echo "*** check repository integrity"
   check_repository $CVMFS_TEST_REPO -i || return 50
 
-  echo "check catalogs"
-  peek_backend $CVMFS_TEST_REPO $root_catalog0 || return 6 # sentinel revision
-  peek_backend $CVMFS_TEST_REPO $root_catalog1 || return 7 # trunk-previous
-  peek_backend $CVMFS_TEST_REPO $root_catalog2 || return 8 # trunk
+  echo "*** check GC log"
+  [ $(count_gc_events_in_log $gc_log) -eq 1 ] || return 101
+  peek_gc_log $gc_log $root_catalog0          || return 102
+  peek_gc_log $gc_log $root_catalog1          && return 103
+  peek_gc_log $gc_log $root_catalog2          && return 104
 
-  echo "check GC log"
-  [ $(count_gc_events_in_log $gc_log) -eq 2 ] || return 104
-  peek_gc_log $gc_log $root_catalog0          && return 105
-  peek_gc_log $gc_log $root_catalog1          && return 106
-  peek_gc_log $gc_log $root_catalog2          && return 107
-
-  echo "sleep $seconds seconds"
+  echo "*** sleep $seconds seconds"
   sleep $seconds
 
-  echo "create revision 3 ($(display_timestamp now))"
+  echo "*** create revision 3 ($(display_timestamp now))"
   root_catalog3="$(create_revision $CVMFS_TEST_REPO)"
-
-  echo "list named snapshots"
   cvmfs_server tag -l $CVMFS_TEST_REPO || return 3
 
-  echo "check repository integrity"
+  echo "*** check repository integrity"
   check_repository $CVMFS_TEST_REPO -i || return 50
 
-  echo "check catalogs"
-  peek_backend $CVMFS_TEST_REPO $root_catalog0 && return 9  # GC'ed
-  peek_backend $CVMFS_TEST_REPO $root_catalog1 || return 10 # sentinel revision
-  peek_backend $CVMFS_TEST_REPO $root_catalog2 || return 11 # trunk-previous
-  peek_backend $CVMFS_TEST_REPO $root_catalog3 || return 12 # trunk
+  echo "*** check catalogs"
+  peek_backend $CVMFS_TEST_REPO $root_catalog0 && return 6 # GC'd
+  peek_backend $CVMFS_TEST_REPO $root_catalog1 && return 7 # GC'd
+  peek_backend $CVMFS_TEST_REPO $root_catalog2 || return 8 # trunk-previous
+  peek_backend $CVMFS_TEST_REPO $root_catalog3 || return 9 # trunk
 
-  echo "check GC log"
+  echo "*** check GC log"
+  [ $(count_gc_events_in_log $gc_log) -eq 2 ] || return 104
+  peek_gc_log $gc_log $root_catalog0          || return 105
+  peek_gc_log $gc_log $root_catalog1          || return 106
+  peek_gc_log $gc_log $root_catalog2          && return 107
+  peek_gc_log $gc_log $root_catalog3          && return 108
+
+  echo "*** sleep $seconds seconds"
+  sleep $seconds
+
+  echo "*** create revision 4 ($(display_timestamp now))"
+  root_catalog4="$(create_revision $CVMFS_TEST_REPO)"
+  cvmfs_server tag -l $CVMFS_TEST_REPO || return 3
+
+  echo "*** check repository integrity"
+  check_repository $CVMFS_TEST_REPO -i || return 50
+
+  echo "*** check catalogs"
+  peek_backend $CVMFS_TEST_REPO $root_catalog0 && return 9  # GC'ed
+  peek_backend $CVMFS_TEST_REPO $root_catalog1 && return 10 # GC'd
+  peek_backend $CVMFS_TEST_REPO $root_catalog2 && return 11 # GC'd
+  peek_backend $CVMFS_TEST_REPO $root_catalog3 || return 12 # trunk-previous
+  peek_backend $CVMFS_TEST_REPO $root_catalog4 || return 13 # trunk
+
+  echo "*** check GC log"
   [ $(count_gc_events_in_log $gc_log) -eq 3 ] || return 108
   peek_gc_log $gc_log $root_catalog0          || return 109
-  peek_gc_log $gc_log $root_catalog1          && return 110
-  peek_gc_log $gc_log $root_catalog2          && return 111
+  peek_gc_log $gc_log $root_catalog1          || return 110
+  peek_gc_log $gc_log $root_catalog2          || return 111
   peek_gc_log $gc_log $root_catalog3          && return 112
+  peek_gc_log $gc_log $root_catalog4          && return 113
 
-  echo "sleep $seconds seconds"
-  sleep $seconds
-
-  echo "create revision 4 ($(display_timestamp now))"
-  root_catalog4="$(create_revision $CVMFS_TEST_REPO)"
-
-  echo "list named snapshots"
-  cvmfs_server tag -l $CVMFS_TEST_REPO || return 3
-
-  echo "check repository integrity"
-  check_repository $CVMFS_TEST_REPO -i || return 50
-
-  echo "check catalogs"
-  peek_backend $CVMFS_TEST_REPO $root_catalog0 && return 13 # GC'ed
-  peek_backend $CVMFS_TEST_REPO $root_catalog1 && return 14 # GC'ed
-  peek_backend $CVMFS_TEST_REPO $root_catalog2 || return 15 # sentinel revision
-  peek_backend $CVMFS_TEST_REPO $root_catalog3 || return 16 # trunk-previous
-  peek_backend $CVMFS_TEST_REPO $root_catalog4 || return 17 # trunk
-
-  echo "check GC log"
-  [ $(count_gc_events_in_log $gc_log) -eq 4 ] || return 113
-  peek_gc_log $gc_log $root_catalog1          || return 114
-  peek_gc_log $gc_log $root_catalog2          && return 115
-  peek_gc_log $gc_log $root_catalog3          && return 116
-  peek_gc_log $gc_log $root_catalog4          && return 117
-
-  echo "sleep $seconds seconds"
-  sleep $seconds
-
-  echo "create revision 5 ($(display_timestamp now))"
-  root_catalog5="$(create_revision $CVMFS_TEST_REPO)"
-
-  echo "list named snapshots"
-  cvmfs_server tag -l $CVMFS_TEST_REPO || return 3
-
-  echo "check repository integrity"
-  check_repository $CVMFS_TEST_REPO -i || return 50
-
-  echo "check catalogs"
-  peek_backend $CVMFS_TEST_REPO $root_catalog0 && return 18 # GC'ed
-  peek_backend $CVMFS_TEST_REPO $root_catalog1 && return 19 # GC'ed
-  peek_backend $CVMFS_TEST_REPO $root_catalog2 && return 20 # GC'ed
-  peek_backend $CVMFS_TEST_REPO $root_catalog3 || return 21 # sentinel revision
-  peek_backend $CVMFS_TEST_REPO $root_catalog4 || return 22 # trunk-previous
-  peek_backend $CVMFS_TEST_REPO $root_catalog5 || return 23 # trunk
-
-  echo "check GC log"
-  [ $(count_gc_events_in_log $gc_log) -eq 5 ] || return 119
-  peek_gc_log $gc_log $root_catalog2          || return 120
-  peek_gc_log $gc_log $root_catalog3          && return 121
-  peek_gc_log $gc_log $root_catalog4          && return 122
-  peek_gc_log $gc_log $root_catalog5          && return 123
-
-  echo "disable automatic garbage collection"
+  echo "*** disable automatic garbage collection"
   disable_auto_garbage_collection $CVMFS_TEST_REPO || return $?
 
-  echo "sleep $seconds seconds"
+  echo "*** sleep $seconds seconds"
   sleep $seconds
 
-  echo "create revision 6 ($(display_timestamp now))"
-  root_catalog6="$(create_revision $CVMFS_TEST_REPO)"
-
-  echo "list named snapshots"
+  echo "*** create revision 5 ($(display_timestamp now))"
+  root_catalog5="$(create_revision $CVMFS_TEST_REPO)"
   cvmfs_server tag -l $CVMFS_TEST_REPO || return 3
 
-  echo "check repository integrity"
+  echo "*** check repository integrity"
   check_repository $CVMFS_TEST_REPO -i || return 50
 
-  echo "check catalogs"
+  echo "*** check catalogs"
   peek_backend $CVMFS_TEST_REPO $root_catalog0 && return 26 # GC'ed
   peek_backend $CVMFS_TEST_REPO $root_catalog1 && return 27 # GC'ed
-  peek_backend $CVMFS_TEST_REPO $root_catalog2 && return 28 # GC'ed
+  peek_backend $CVMFS_TEST_REPO $root_catalog2 && return 28 # GC'd
   peek_backend $CVMFS_TEST_REPO $root_catalog3 || return 29 # auto-GC disabled
-  peek_backend $CVMFS_TEST_REPO $root_catalog4 || return 30 # sentinel revision
-  peek_backend $CVMFS_TEST_REPO $root_catalog5 || return 31 # trunk-previous
-  peek_backend $CVMFS_TEST_REPO $root_catalog6 || return 32 # trunk
+  peek_backend $CVMFS_TEST_REPO $root_catalog4 || return 31 # trunk-previous
+  peek_backend $CVMFS_TEST_REPO $root_catalog5 || return 32 # trunk
 
-  echo "check GC log"
-  [ $(count_gc_events_in_log $gc_log) -eq 5 ] || return 124 # auto-GC disabled
-  peek_gc_log $gc_log $root_catalog3          && return 125
-  peek_gc_log $gc_log $root_catalog4          && return 126
-  peek_gc_log $gc_log $root_catalog5          && return 127
-  peek_gc_log $gc_log $root_catalog6          && return 101
+  echo "*** check GC log"
+  [ $(count_gc_events_in_log $gc_log) -eq 3 ] || return 124 # auto-GC disabled
+  peek_gc_log $gc_log $root_catalog2          || return 125
+  peek_gc_log $gc_log $root_catalog3          && return 126
+  peek_gc_log $gc_log $root_catalog4          && return 127
+  peek_gc_log $gc_log $root_catalog5          && return 101
 
-  echo "run a manual garbage collection (delete all but last two)"
+  echo "*** run a manual garbage collection (delete all but last two)"
   cvmfs_server gc -r0 -f $CVMFS_TEST_REPO || return 33
 
-  echo "check repository integrity"
+  echo "*** check repository integrity"
   check_repository $CVMFS_TEST_REPO -i || return 50
 
-  echo "check catalogs"
+  echo "*** check catalogs"
   peek_backend $CVMFS_TEST_REPO $root_catalog0 && return 34 # GC'ed
   peek_backend $CVMFS_TEST_REPO $root_catalog1 && return 35 # GC'ed
   peek_backend $CVMFS_TEST_REPO $root_catalog2 && return 36 # GC'ed
   peek_backend $CVMFS_TEST_REPO $root_catalog3 && return 37 # GC'ed
-  peek_backend $CVMFS_TEST_REPO $root_catalog4 && return 38 # GC'ed
-  peek_backend $CVMFS_TEST_REPO $root_catalog5 || return 39 # trunk-previous
-  peek_backend $CVMFS_TEST_REPO $root_catalog6 || return 40 # trunk
+  peek_backend $CVMFS_TEST_REPO $root_catalog4 || return 38 # trunk-previous
+  peek_backend $CVMFS_TEST_REPO $root_catalog5 || return 39 # trunk
 
-  echo "check GC log"
-  [ $(count_gc_events_in_log $gc_log) -eq 6 ] || return 41
-  peek_gc_log $gc_log $root_catalog3          || return 42
-  peek_gc_log $gc_log $root_catalog4          || return 43
-  peek_gc_log $gc_log $root_catalog5          && return 44
-  peek_gc_log $gc_log $root_catalog6          && return 45
+  echo "*** check GC log"
+  [ $(count_gc_events_in_log $gc_log) -eq 4 ] || return 41
+  peek_gc_log $gc_log $root_catalog2          || return 42
+  peek_gc_log $gc_log $root_catalog3          || return 43
+  peek_gc_log $gc_log $root_catalog4          && return 44
+  peek_gc_log $gc_log $root_catalog5          && return 45
 
   return 0
 }

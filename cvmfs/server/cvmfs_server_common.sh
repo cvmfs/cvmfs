@@ -9,6 +9,7 @@
 
 # This file depends on fuctions implemented in the following files:
 # - cvmfs_server_util.sh
+# - cvmfs_server_json.sh
 
 
 # checks the parameter count for a situation where we might be able to guess
@@ -467,14 +468,35 @@ is_garbage_collectable() {
 }
 
 
-# checks if a repository has automatic garbage collection enabled
+# checks if a repository has automatic garbage collection enabled and was
+# not garbage collected for long enough to justify an automatic run
 #
 # @param name  the name of the repository to be checked
-# @return      0 if automatic garbage collection is enabled
-has_auto_garbage_collection_enabled() {
+# @return      0 if automatic garbage collection should run
+is_due_auto_garbage_collection() {
   local name=$1
   load_repo_config $name
-  is_garbage_collectable $name && [ x"$CVMFS_AUTO_GC" = x"true" ]
+
+  is_garbage_collectable $name || return 1
+  [ x"$CVMFS_AUTO_GC" = x"true" ] || return 1
+
+  CVMFS_AUTO_GC_LAPSE="${CVMFS_AUTO_GC_LAPSE:-$CVMFS_DEFAULT_AUTO_GC_LAPSE}"
+  local gc_deadline=$(date --date "$CVMFS_AUTO_GC_LAPSE" +%s 2>/dev/null)
+  if [ -z "$gc_deadline" ]; then
+    echo "Failed to parse CVMFS_AUTO_GC_LAPSE: '$CVMFS_AUTO_GC_LAPSE'" >&2
+    return 0
+  fi
+
+  local gc_status="$(read_repo_item $name .cvmfs_status.json)"
+  local last_gc="$(get_json_field "$gc_status" last_gc)"
+  [ ! -z "$last_gc" ] || return 0
+  last_gc=$(date --date "$last_gc" +%s 2>/dev/null)
+  if [ -z "$last_gc" ]; then
+    echo "Failed to parse last gc timestamp: '$last_gc'" >&2
+    return 0
+  fi
+
+  [ $last_gc -lt $gc_deadline ]
 }
 
 

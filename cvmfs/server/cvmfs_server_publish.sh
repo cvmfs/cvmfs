@@ -411,7 +411,7 @@ cvmfs_server_publish() {
     fi
 
     # run the automatic garbage collection (if configured)
-    if has_auto_garbage_collection_enabled $name; then
+    if is_due_auto_garbage_collection $name; then
       echo "Running automatic garbage collection"
       local dry_run=0
       __run_gc $name       \
