@@ -15,6 +15,9 @@ cvmfs_run_test() {
   echo "*** create a gc-eneabled repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER "NO" -z -g || return $?
   disable_auto_garbage_collection $CVMFS_TEST_REPO || return $?
+  echo "*** enable legacy bulk chunks"
+  echo "CVMFS_GENERATE_LEGACY_BULK_CHUNKS=true" | \
+    sudo tee -a /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf
 
   echo "*** create a chunked file"
   start_transaction $CVMFS_TEST_REPO || return $?
