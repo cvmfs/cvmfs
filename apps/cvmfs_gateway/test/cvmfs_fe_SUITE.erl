@@ -84,7 +84,7 @@ end_per_suite(_Config) ->
     ok.
 
 init_per_testcase(_TestCase, Config) ->
-    {ok, ConnPid} = gun:open("localhost", 8080),
+    {ok, ConnPid} = gun:open("localhost", 4929),
     {ok, http} = gun:await_up(ConnPid),
     [{gun_connection, ConnPid} | Config].
 

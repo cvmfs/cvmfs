@@ -8,7 +8,7 @@ import base64
 import hashlib
 
 base_url = 'localhost'
-port = 8080
+port = 4929
 
 api_root = '/api/v1'
 

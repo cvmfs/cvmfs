@@ -46,7 +46,7 @@ default_repo_config() ->
 
 default_user_config() ->
     #{max_lease_time => 7200,
-      fe_tcp_port => 8080,
+      fe_tcp_port => 4929,
       receiver_config => #{size => 1,
                            max_overflow => 1},
       receiver_worker_config =>
