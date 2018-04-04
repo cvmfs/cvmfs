@@ -20,7 +20,7 @@ namespace publish {
  * random fashion.
  */
 class SyncItemDummyDir : public SyncItem {
-  friend SyncUnionTarball;
+  friend class SyncUnionTarball;
 
  public:
   catalog::DirectoryEntryBase CreateBasicCatalogDirent() const;
