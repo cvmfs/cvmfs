@@ -92,7 +92,7 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
 
   if (entry->IsRegularFile() || entry->IsSymlink()) {
     // A file is a hard link if the link count is greater than 1
-    if (entry->HasHardlinks())
+    if (entry->HasHardlinks() && handle_hardlinks_)
       InsertHardlink(entry);
     else
       AddFile(entry);
@@ -110,7 +110,7 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
       PrintWarning("'" + entry->GetRelativePath() + "' "
                   "is a special file, ignoring.");
     } else {
-      if (entry->HasHardlinks())
+      if (entry->HasHardlinks() && handle_hardlinks_)
         InsertHardlink(entry);
       else
         AddFile(entry);
