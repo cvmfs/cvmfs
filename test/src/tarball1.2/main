@@ -1,5 +1,5 @@
 
-cvmfs_test_name="Ingest tarball in a repo and while removing files"
+cvmfs_test_name="Ingest tarball in a repo and while removing base-dir's"
 cvmfs_test_autofs_on_startup=false
 
 produce_tarball() {
