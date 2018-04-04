@@ -51,7 +51,7 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
   friend class CachedManifestEnsemble;
 
  public:
-  ClientCatalogManager(MountPoint *mountpoint);
+  explicit ClientCatalogManager(MountPoint *mountpoint);
   virtual ~ClientCatalogManager();
 
   bool InitFixed(const shash::Any &root_hash, bool alternative_path);
