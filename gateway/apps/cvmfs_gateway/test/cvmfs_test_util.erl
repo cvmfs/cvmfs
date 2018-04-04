@@ -14,7 +14,7 @@
 
 make_test_user_vars(MaxLeaseTime) ->
     #{max_lease_time => MaxLeaseTime,
-      fe_tcp_port => 8080,
+      fe_tcp_port => 4929,
       receiver_config =>
           #{size => 1,
             max_overflow => 0,
