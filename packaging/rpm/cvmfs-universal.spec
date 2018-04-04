@@ -44,6 +44,7 @@ Group: Applications/System
 License: BSD
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
+BuildRequires: bzip2
 %if 0%{?el5}
 BuildRequires: buildsys-macros
 %endif
@@ -473,6 +474,8 @@ fi
 %doc COPYING AUTHORS README.md ChangeLog
 
 %changelog
+* Thu Mar 22 2018 Jakob Blomer <jblomer@cern.ch> - 2.5.0
+- Add missing bzip2 build requirement
 * Mon Sep 18 2017 Jakob Blomer <jblomer@cern.ch> - 2.5.0
 - Add cvmfs_stratum_agent to the cvmfs-server package
 * Wed Aug 02 2017 Jakob Blomer <jblomer@cern.ch> - 2.4.0
