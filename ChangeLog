@@ -1,3 +1,6 @@
+0.2.2:
+  * Changing default port to 4929 (GWAY)
+
 0.2.1:
   * Systemd integration
   * Adding ability to do repository configuration hot-reloading
