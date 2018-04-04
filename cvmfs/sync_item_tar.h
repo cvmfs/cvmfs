@@ -115,6 +115,7 @@ platform_stat64 SyncItemTar::GetStatFromTar() const {
   tar_stat_.st_gid = entry_stat_->st_gid;
   tar_stat_.st_size = entry_stat_->st_size;
   tar_stat_.st_mtime = entry_stat_->st_mtime;
+  tar_stat_.st_nlink = entry_stat_->st_nlink;      
 
   if (kItemDir == scratch_type_) {
     tar_stat_.st_size = 4096;
