@@ -62,23 +62,24 @@ SyncUnionTarball::~SyncUnionTarball() {
 bool SyncUnionTarball::Initialize() {
   bool result;
 
-  // Save the absolute path of the tarball
-  std::string tarball_absolute_path = GetAbsolutePath(tarball_path_);
 
   src = archive_read_new();
   assert(ARCHIVE_OK == archive_read_support_format_tar(src));
   assert(ARCHIVE_OK == archive_read_support_format_empty(src));
 
-  result = archive_read_open_filename(src, tarball_absolute_path.c_str(), 4096);
+  if (tarball_path_ == "--") {
+    result = archive_read_open_filename(src, NULL, 4096);
+  } else {
+    std::string tarball_absolute_path = GetAbsolutePath(tarball_path_);
+    result =
+        archive_read_open_filename(src, tarball_absolute_path.c_str(), 4096);
+  }
 
   if (result != ARCHIVE_OK) {
     LogCvmfs(kLogUnionFs, kLogStderr, "Impossible to open the archive.");
     return false;
   }
 
-  // Actually untar the whole archive
-  // result = UntarPath(working_dir_, tarball_absolute_path);
-  // return result && SyncUnion::Initialize();
   return (result == ARCHIVE_OK) && SyncUnion::Initialize();
 }
 
