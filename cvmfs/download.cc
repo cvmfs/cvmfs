@@ -533,7 +533,7 @@ void *DownloadManager::MainDownload(void *data) {
     // to be removed from watch_fds_. If a socket is removed it is replaced
     // by the socket at the end of the array and the inuse count is decreased.
     // Therefore loop over the array in reverse order.
-    for (long i = download_mgr->watch_fds_inuse_-1; i >= 2; --i) {
+    for (int64_t i = download_mgr->watch_fds_inuse_-1; i >= 2; --i) {
       if (i >= download_mgr->watch_fds_inuse_) {
         continue;
       }
