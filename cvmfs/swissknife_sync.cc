@@ -508,9 +508,9 @@ bool swissknife::CommandSync::ObtainDacReadSearchCapability() {
   retval = cap_get_flag(caps_proc, cap, CAP_PERMITTED, &cap_state);
   assert(retval == 0);
   if (cap_state != CAP_SET) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-             "CAP_DAC_READ_SEARCH cannot be obtained. "
-             "It's not in the process's permitted-set.");
+    LogCvmfs(kLogCvmfs, kLogStdout,
+             "Warning: CAP_DAC_READ_SEARCH cannot be obtained. "
+             "It's not in the process's permitted set.");
     cap_free(caps_proc);
     return false;
   }
@@ -675,7 +675,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   }
 
   if (!CheckParams(params)) return 2;
-  if (!ObtainDacReadSearchCapability()) return 2;
+  // This may fail, in which case a warning is printed and the process continues
+  ObtainDacReadSearchCapability();
 
   // Start spooler
   upload::SpoolerDefinition spooler_definition(
