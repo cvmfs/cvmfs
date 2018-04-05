@@ -83,7 +83,8 @@ TEST_F(T_SyncUnionTarball, Init) {
 TEST_F(T_SyncUnionTarball, Traverse) {
   std::string tar_filename = CreateTarFile("tar.tar", simple_tar);
   publish::SyncUnionTarball sync_union(m_sync_mediator_, "/rdonly", "/union",
-                                       "/scratch", tar_filename, "tmp/lala", "");
+                                       "/scratch", tar_filename, "tmp/lala",
+                                       "");
 
   EXPECT_CALL(*m_sync_mediator_, RegisterUnionEngine(_)).Times(1);
   sync_union.Initialize();
