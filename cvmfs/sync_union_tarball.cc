@@ -98,11 +98,11 @@ void SyncUnionTarball::Traverse() {
       std::string parent_path;
       std::string filename;
       SplitPath(*s, &parent_path, &filename);
+      if (parent_path == ".") parent_path = "";
       SharedPtr<SyncItem> sync_entry =
           CreateSyncItem(parent_path, filename, kItemDir);
-      sync_entry->MarkAsOpaqueDirectory();
-      ProcessDirectory(sync_entry);
-    }
+      mediator_->Remove(sync_entry);
+   }
   }
 
   /*
@@ -158,7 +158,7 @@ void SyncUnionTarball::Traverse() {
           LogCvmfs(kLogUnionFs, kLogStderr,
                    "Warning in uncompression reading, going on. \n %s",
                    archive_error_string(src));
-          break;
+        /* We actually want this to enter the ARCHIVE_OK case */
         }
 
         case ARCHIVE_OK: {
