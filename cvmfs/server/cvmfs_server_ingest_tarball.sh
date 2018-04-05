@@ -33,7 +33,14 @@ cvmfs_server_ingest_tarball() {
 
   name=$1
   name=$(echo $name | cut -d'/' -f1)
-  
+
+  if [ -z "$base_dir" ]; then
+    die "Please set the base directory where to extract the tarball, use -b \$BASE_DIR or --base_dir \$BASE_DIR"
+  fi
+  if [ -z "$tar_file" ]; then
+    die "Please provide the tarball to extract, use -t \$TARBALL_PATH or --tar_file \$TARBALL_PATH"
+  fi
+
   load_repo_config $name
 
   upstream=$CVMFS_UPSTREAM_STORAGE
