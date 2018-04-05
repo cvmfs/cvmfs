@@ -254,12 +254,11 @@ class SyncItem {
     platform_stat64 stat;
   };
 
-
   mutable EntryStat rdonly_stat_;
   mutable EntryStat union_stat_;
   mutable EntryStat scratch_stat_;
-  
-  bool has_catalog_marker_;           /**< directory containing .cvmfscatalog */
+
+  bool has_catalog_marker_; /**< directory containing .cvmfscatalog */
 
  private:
   SyncItemType GetGenericFiletype(const EntryStat &stat) const;

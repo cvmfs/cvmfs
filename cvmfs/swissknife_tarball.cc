@@ -11,7 +11,6 @@
 
 int swissknife::IngestTarball::Main(const swissknife::ArgumentList &args) {
   SyncParameters params;
-  // Initialization
   params.dir_union = MakeCanonicalPath(*args.find('u')->second);
   params.dir_scratch = MakeCanonicalPath(*args.find('s')->second);
   params.dir_rdonly = MakeCanonicalPath(*args.find('c')->second);
@@ -27,7 +26,7 @@ int swissknife::IngestTarball::Main(const swissknife::ArgumentList &args) {
 
   params.tar_file = *args.find('T')->second;
   params.base_directory = *args.find('B')->second;
-  
+
   if (args.find('D') != args.end()) {
     params.to_delete = *args.find('D')->second;
   }
@@ -37,9 +36,9 @@ int swissknife::IngestTarball::Main(const swissknife::ArgumentList &args) {
   params.nested_kcatalog_limit = SyncParameters::kDefaultNestedKcatalogLimit;
   params.root_kcatalog_limit = SyncParameters::kDefaultRootKcatalogLimit;
   params.file_mbyte_limit = SyncParameters::kDefaultFileMbyteLimit;
-  
-  params.branched_catalog = false; // could be true?
-  
+
+  params.branched_catalog = false;  // could be true?
+
   upload::SpoolerDefinition spooler_definition(
       params.spooler_definition, hash_algorithm, params.compression_alg,
       params.generate_legacy_bulk_chunks, params.use_file_chunking,
@@ -58,7 +57,7 @@ int swissknife::IngestTarball::Main(const swissknife::ArgumentList &args) {
   UniquePtr<upload::Spooler> spooler_catalogs(
       upload::Spooler::Construct(spooler_definition_catalogs));
   if (!spooler_catalogs.IsValid()) return 3;
-  
+
   const bool follow_redirects = (args.count('L') > 0);
   if (!InitDownloadManager(follow_redirects)) {
     return 3;

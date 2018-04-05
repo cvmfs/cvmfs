@@ -7,8 +7,8 @@
 
 #include "sync_item.h"
 
-#include <string>
 #include <time.h>
+#include <string>
 
 #include "sync_union_tarball.h"
 

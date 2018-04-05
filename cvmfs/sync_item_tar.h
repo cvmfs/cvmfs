@@ -127,7 +127,6 @@ platform_stat64 SyncItemTar::GetStatFromTar() const {
 }
 
 catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
-
   assert(obtained_tar_stat_);
 
   catalog::DirectoryEntryBase dirent;

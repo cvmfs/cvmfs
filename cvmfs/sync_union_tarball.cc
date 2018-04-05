@@ -11,6 +11,7 @@
 #include <cassert>
 #include <set>
 #include <string>
+#include <vector>
 
 #include "archive.h"
 #include "archive_entry.h"
@@ -22,7 +23,6 @@
 #include "sync_mediator.h"
 #include "sync_union.h"
 #include "util/posix.h"
-
 
 namespace publish {
 
@@ -61,7 +61,6 @@ SyncUnionTarball::~SyncUnionTarball() {
 
 bool SyncUnionTarball::Initialize() {
   bool result;
-
 
   src = archive_read_new();
   assert(ARCHIVE_OK == archive_read_support_format_tar(src));
@@ -102,12 +101,8 @@ void SyncUnionTarball::Traverse() {
       SharedPtr<SyncItem> sync_entry =
           CreateSyncItem(parent_path, filename, kItemDir);
       mediator_->Remove(sync_entry);
-   }
+    }
   }
-
-  /*
-   * Then we create the base directory or we check if is does exist already.
-   */
 
   assert(this->IsInitialized());
   while (true) {
@@ -158,7 +153,7 @@ void SyncUnionTarball::Traverse() {
           LogCvmfs(kLogUnionFs, kLogStderr,
                    "Warning in uncompression reading, going on. \n %s",
                    archive_error_string(src));
-        /* We actually want this to enter the ARCHIVE_OK case */
+          /* We actually want this to enter the ARCHIVE_OK case */
         }
 
         case ARCHIVE_OK: {
@@ -238,7 +233,7 @@ void SyncUnionTarball::CreateDirectories(const std::string &target) {
   if (dirname == ".") dirname = "";
   SharedPtr<SyncItem> dummy = SharedPtr<SyncItem>(
       new SyncItemDummyDir(dirname, filename, this, kItemDir));
-  
+
   ProcessDirectory(dummy);
   know_directories_.insert(target);
 }
