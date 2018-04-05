@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "item_mem.h"
 #include "smalloc.h"
 #include "util_concurrency.h"
 
@@ -122,8 +123,7 @@ BlockItem::BlockItem(int64_t tag)
 
 
 void BlockItem::Discharge() {
-  atomic_xadd64(&managed_bytes_, -static_cast<int64_t>(capacity_));
-  data_.Release();
+  data_ = NULL;
   size_ = capacity_ = 0;
 }
 
@@ -140,7 +140,8 @@ void BlockItem::MakeData(uint32_t capacity) {
 
   type_ = kBlockData;
   capacity_ = capacity;
-  data_ = reinterpret_cast<unsigned char *>(smalloc(capacity_));
+  data_ = reinterpret_cast<unsigned char *>(
+    ItemAllocator::GetInstance()->Malloc(capacity_));
   atomic_xadd64(&managed_bytes_, static_cast<int64_t>(capacity_));
 }
 
@@ -148,17 +149,16 @@ void BlockItem::MakeData(uint32_t capacity) {
 /**
  * Move data from one block to another.
  */
-void BlockItem::MakeData(
-  unsigned char *data,
-  uint32_t size)
-{
+void BlockItem::MakeDataMove(BlockItem *other) {
   assert(type_ == kBlockHollow);
-  assert(size > 0);
+  assert(other->type_ == kBlockData);
+  assert(other->size_ > 0);
 
   type_ = kBlockData;
-  capacity_ = size_ = size;
-  data_ = data;
-  atomic_xadd64(&managed_bytes_, static_cast<int64_t>(capacity_));
+  capacity_ = size_ = other->size_;
+  data_ = other->data_;
+
+  other->Discharge();
 }
 
 
@@ -166,7 +166,7 @@ void BlockItem::MakeData(
  * Copy a piece of one block's data into a new block.
  */
 void BlockItem::MakeDataCopy(
-  unsigned char *data,
+  const unsigned char *data,
   uint32_t size)
 {
   assert(type_ == kBlockHollow);
@@ -174,7 +174,8 @@ void BlockItem::MakeDataCopy(
 
   type_ = kBlockData;
   capacity_ = size_ = size;
-  data_ = reinterpret_cast<unsigned char *>(smalloc(capacity_));
+  data_ = reinterpret_cast<unsigned char *>(
+    ItemAllocator::GetInstance()->Malloc(capacity_));
   memcpy(data_, data, size);
   atomic_xadd64(&managed_bytes_, static_cast<int64_t>(capacity_));
 }
@@ -184,7 +185,8 @@ void BlockItem::Reset() {
   assert(type_ == kBlockData);
 
   atomic_xadd64(&managed_bytes_, -static_cast<int64_t>(capacity_));
-  data_.Destroy();
+  ItemAllocator::GetInstance()->Free(data_);
+  data_ = NULL;
   size_ = capacity_ = 0;
   type_ = kBlockHollow;
 }
@@ -209,7 +211,7 @@ uint32_t BlockItem::Write(void *buf, uint32_t count) {
 
   uint32_t remaining = capacity_ - size_;
   uint32_t nbytes = std::min(remaining, count);
-  memcpy(data_.weak_ref() + size_, buf, nbytes);
+  memcpy(data_ + size_, buf, nbytes);
   size_ += nbytes;
   return nbytes;
 }

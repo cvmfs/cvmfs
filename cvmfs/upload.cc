@@ -7,6 +7,7 @@
 
 #include <vector>
 
+#include "ingestion/item_mem.h"
 #include "util_concurrency.h"
 
 namespace upload {
@@ -27,6 +28,7 @@ Spooler::~Spooler() {
   if (uploader_) {
     uploader_->TearDown();
   }
+  ItemAllocator::CleanupInstance();
 }
 
 std::string Spooler::backend_name() const { return uploader_->name(); }

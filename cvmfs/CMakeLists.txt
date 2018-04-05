@@ -188,6 +188,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   history_sqlite.cc
   ingestion/chunk_detector.cc
   ingestion/item.cc
+  ingestion/item_mem.cc
   ingestion/pipeline.cc
   ingestion/task_chunk.cc
   ingestion/task_compress.cc
@@ -385,6 +386,7 @@ if(BUILD_RECEIVER)
     history_sqlite.cc
     ingestion/chunk_detector.cc
     ingestion/item.cc
+    ingestion/item_mem.cc
     ingestion/pipeline.cc
     ingestion/task_chunk.cc
     ingestion/task_compress.cc

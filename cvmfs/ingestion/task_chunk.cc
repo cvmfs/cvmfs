@@ -86,7 +86,7 @@ void TaskChunk::Process(BlockItem *input_block) {
                                           input_block->size());
         } else {
           // There is only the bulk chunk, zero copy
-          output_block_bulk->MakeData(input_block->data(), input_block->size());
+          output_block_bulk->MakeDataMove(input_block);
         }
       }
 
@@ -145,7 +145,6 @@ void TaskChunk::Process(BlockItem *input_block) {
       }
 
       tag_map_[input_tag] = chunk_info;
-      input_block->Discharge();
       break;
 
     default:

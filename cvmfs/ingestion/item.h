@@ -186,12 +186,10 @@ class BlockItem : SingleCopy {
 
   void MakeStop();
   void MakeData(uint32_t capacity);
-  void MakeData(unsigned char *data, uint32_t size);
-  void MakeDataCopy(unsigned char *data, uint32_t size);
+  void MakeDataMove(BlockItem *other);
+  void MakeDataCopy(const unsigned char *data, uint32_t size);
   void SetFileItem(FileItem *item);
   void SetChunkItem(ChunkItem *item);
-  // Forget pointer to the data
-  void Discharge();
   // Free data and reset to hollow block
   void Reset();
 
@@ -200,7 +198,7 @@ class BlockItem : SingleCopy {
   bool IsEmpty() { return size_ == 0; }
   bool IsFull() { return size_ == capacity_; }
 
-  unsigned char *data() { return data_.weak_ref(); }
+  unsigned char *data() { return data_; }
   uint32_t capacity() { return capacity_; }
   uint32_t size() { return size_; }
   void set_size(uint32_t val) { assert(val <= capacity_); size_ = val; }
@@ -212,6 +210,9 @@ class BlockItem : SingleCopy {
   static uint64_t managed_bytes() { return atomic_read64(&managed_bytes_); }
 
  private:
+  // Forget pointer to the data
+  void Discharge();
+
   /**
    * Total capacity of all BlockItem()
    */
@@ -232,7 +233,10 @@ class BlockItem : SingleCopy {
   FileItem *file_item_;
   ChunkItem *chunk_item_;
 
-  UniquePtr<unsigned char> data_;
+  /**
+   * Managed by ItemAllocator
+   */
+  unsigned char *data_;
   uint32_t capacity_;
   uint32_t size_;
 };

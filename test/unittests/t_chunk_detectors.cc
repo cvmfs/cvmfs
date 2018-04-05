@@ -9,6 +9,7 @@
 
 #include "ingestion/chunk_detector.h"
 #include "ingestion/item.h"
+#include "ingestion/item_mem.h"
 #include "prng.h"
 
 
@@ -54,6 +55,7 @@ class T_ChunkDetectors : public ::testing::Test {
 
   virtual void TearDown() {
     ClearBuffers();
+    ItemAllocator::CleanupInstance();
   }
 
   size_t data_size() const { return data_size_; }
@@ -85,7 +87,7 @@ TEST_F(T_ChunkDetectors, StaticOffsetChunkDetectorSlow) {
 
   unsigned char bytes[static_chunk_size / 2];
   BlockItem buffer;
-  buffer.MakeData(bytes, static_chunk_size / 2);
+  buffer.MakeDataCopy(bytes, static_chunk_size / 2);
 
   uint64_t next_cut_mark = static_offset_detector.FindNextCutMark(&buffer);
   EXPECT_EQ(0U, next_cut_mark);
@@ -98,8 +100,6 @@ TEST_F(T_ChunkDetectors, StaticOffsetChunkDetectorSlow) {
 
   next_cut_mark = static_offset_detector.FindNextCutMark(&buffer);
   EXPECT_EQ(0U, next_cut_mark);
-
-  buffer.Discharge();
 
   CreateBuffers(1048576);
 

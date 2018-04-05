@@ -15,6 +15,7 @@
 #include "compression.h"
 #include "hash.h"
 #include "ingestion/item.h"
+#include "ingestion/item_mem.h"
 #include "ingestion/pipeline.h"
 #include "ingestion/task.h"
 #include "ingestion/task_chunk.h"
@@ -107,6 +108,7 @@ class T_Ingestion : public ::testing::Test {
     uploader_->TearDown();
     delete uploader_;
     EXPECT_EQ(0U, BlockItem::managed_bytes());
+    ItemAllocator::CleanupInstance();
   }
 
   Tube<DummyItem> tube_;
@@ -376,13 +378,10 @@ TEST_F(T_Ingestion, TaskChunk) {
   EXPECT_FALSE(file_large.is_fully_chunked());
   for (unsigned i = 0; i < nblocks; ++i) {
     string str_content(TaskRead::kBlockSize, static_cast<char>(i));
-    unsigned char *content = reinterpret_cast<unsigned char *>(
-      smalloc(TaskRead::kBlockSize));
-    memcpy(content, str_content.data(), TaskRead::kBlockSize);
-
     BlockItem *b = new BlockItem(1);
     b->SetFileItem(&file_large);
-    b->MakeData(content, TaskRead::kBlockSize);
+    b->MakeDataCopy(reinterpret_cast<const unsigned char *>(str_content.data()),
+                    TaskRead::kBlockSize);
     tube_in.Enqueue(b);
   }
   BlockItem *b_stop = new BlockItem(1);
@@ -462,7 +461,8 @@ TEST_F(T_Ingestion, TaskChunkCornerCases) {
       reinterpret_cast<unsigned char *>(scalloc(1, block_size));
     BlockItem *b = new BlockItem(1);
     b->SetFileItem(&file_large);
-    b->MakeData(buf, block_size);
+    b->MakeDataCopy(buf, block_size);
+    free(buf);
     tube_in.Enqueue(b);
   }
   BlockItem *b_stop = new BlockItem(1);
@@ -565,14 +565,12 @@ TEST_F(T_Ingestion, TaskCompress) {
     string str_content(block_size, static_cast<char>(i));
     for (unsigned j = 1; j < block_size; ++j)
       str_content[j] = i * str_content[j-1] + j;
-    unsigned char *content = reinterpret_cast<unsigned char *>(
-      smalloc(block_size));
-    memcpy(content, str_content.data(), block_size);
 
     BlockItem *b = new BlockItem(1);
     b->SetFileItem(&file_large);
     b->SetChunkItem(&chunk_large);
-    b->MakeData(content, block_size);
+    b->MakeDataCopy(reinterpret_cast<const unsigned char *>(str_content.data()),
+                    block_size);
     EXPECT_EQ(block_size, block_raw.Write(b->data(), b->size()));
     tube_in.Enqueue(b);
   }
@@ -652,9 +650,8 @@ TEST_F(T_Ingestion, TaskHash) {
   BlockItem b2_a(2);
   b2_a.SetFileItem(&file_null);
   b2_a.SetChunkItem(&chunk_abc);
-  b2_a.MakeData(const_cast<unsigned char *>(
-                  reinterpret_cast<const unsigned char *>(str_abc.data())),
-                str_abc.size());
+  b2_a.MakeDataCopy(reinterpret_cast<const unsigned char *>(str_abc.data()),
+                    str_abc.size());
   BlockItem b2_b(2);
   b2_b.SetFileItem(&file_null);
   b2_b.SetChunkItem(&chunk_abc);
@@ -670,7 +667,6 @@ TEST_F(T_Ingestion, TaskHash) {
             chunk_abc.hash_ptr()->ToString());
   EXPECT_EQ(0U, tube_out->size());
 
-  b2_a.Discharge();
   unlink("./abc");
 
   task_group.Terminate();

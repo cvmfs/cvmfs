@@ -64,10 +64,8 @@ void TaskRead::Process(FileItem *item) {
     if (nbytes == 0) {
       block_item->MakeStop();
     } else {
-      unsigned char *data_part =
-        reinterpret_cast<unsigned char *>(smalloc(nbytes));
-      memcpy(data_part, buffer, nbytes);
-      block_item->MakeData(data_part, nbytes);
+      block_item->MakeDataCopy(
+        reinterpret_cast<unsigned char *>(buffer), nbytes);
     }
     tubes_out_->Dispatch(block_item);
   } while (nbytes > 0);

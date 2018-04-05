@@ -15,6 +15,7 @@
 #include "c_mock_uploader.h"
 #include "file_chunk.h"
 #include "hash.h"
+#include "ingestion/item_mem.h"
 #include "ingestion/pipeline.h"
 #include "smalloc.h"
 #include "testutil.h"
@@ -38,6 +39,7 @@ class T_IngestionStress : public FileSandbox {
     RemoveSandbox(IngestionMockUploader::sandbox_tmp_dir);
     uploader_->TearDown();
     delete uploader_;
+    ItemAllocator::CleanupInstance();
   }
 
   template <class VectorT>
