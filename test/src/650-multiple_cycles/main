@@ -1,0 +1,61 @@
+
+cvmfs_test_name="Multiple cycles of publish/transaction"
+cvmfs_test_autofs_on_startup=false
+
+cvmfs_run_test() {
+  logfile=$1
+  local scratch_dir=$(pwd)
+  local tarfile=$scratch_dir/tarball.tar
+  local dir=tar_dir
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $USER || return $?
+
+  # ============================================================================
+
+  echo "1.1 starting a transaction"
+  cvmfs_server transaction $CVMFS_TEST_REPO || return $?
+  
+  echo "1.2 creating files inside"
+  mkdir -p $repo_dir/foo/bar/
+  touch $repo_dir/foo/bar/fuz.txt
+  
+  echo "1.3 publishing"
+  cvmfs_server publish $CVMFS_TEST_REPO || return $?
+  
+  echo "2.1 starting remove transaction"
+  cvmfs_server transaction $CVMFS_TEST_REPO || return $?
+  
+  echo "2.2 remove files inside"
+  rm $repo_dir/foo/bar/fuz.txt
+  rm -rf $repo_dir/foo  
+  
+  echo "2.3 publishing"
+  cvmfs_server publish $CVMFS_TEST_REPO || return $?
+  
+  echo "repeating..."
+  
+  echo "3.1 starting a transaction"
+  cvmfs_server transaction $CVMFS_TEST_REPO || return $?
+  
+  echo "3.2 creating files inside"
+  mkdir -p $repo_dir/foo/bar/
+  touch $repo_dir/foo/bar/fuz.txt
+  
+  echo "3.3 publishing"
+  cvmfs_server publish $CVMFS_TEST_REPO || return $?
+  
+  echo "4.1 starting remove transaction"
+  cvmfs_server transaction $CVMFS_TEST_REPO || return $?
+  
+  echo "4.2 remove files inside"
+  rm $repo_dir/foo/bar/fuz.txt
+  rm -rf $repo_dir/foo  
+  
+  echo "4.3 publishing"
+  cvmfs_server publish $CVMFS_TEST_REPO || return $?  
+  
+  return 0
+}
+
