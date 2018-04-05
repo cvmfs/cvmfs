@@ -1085,7 +1085,8 @@ Supported Commands:
                   [-d folder to delete]
                   <fully qualified name>
                   Extract the content of the tarfile inside the base directory,
-                  in the same transaction it also delete the required folders
+                  in the same transaction it also delete the required folders.
+                  Use '--' as -t argument to read the tarball from STDIN.
 "
 
 
