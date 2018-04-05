@@ -122,6 +122,13 @@ BlockItem::BlockItem(int64_t tag)
 }
 
 
+BlockItem::~BlockItem() {
+  if (data_)
+    ItemAllocator::GetInstance()->Free(data_);
+  atomic_xadd64(&managed_bytes_, -static_cast<int64_t>(capacity_));
+}
+
+
 void BlockItem::Discharge() {
   data_ = NULL;
   size_ = capacity_ = 0;

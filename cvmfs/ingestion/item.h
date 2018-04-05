@@ -173,9 +173,7 @@ class BlockItem : SingleCopy {
 
   BlockItem();
   explicit BlockItem(int64_t tag);
-  ~BlockItem() {
-    atomic_xadd64(&managed_bytes_, -static_cast<int64_t>(capacity_));
-  }
+  ~BlockItem();
 
   static BlockItem *CreateQuitBeacon() {
     return new BlockItem();
