@@ -289,6 +289,7 @@ set (CVMFS_PRELOADER_SOURCES
   history_sqlite.cc
   ingestion/chunk_detector.cc
   ingestion/item.cc
+  ingestion/item_mem.cc
   ingestion/pipeline.cc
   ingestion/task_chunk.cc
   ingestion/task_compress.cc
