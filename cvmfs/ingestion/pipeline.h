@@ -30,8 +30,6 @@ class IngestionPipeline : public Observable<upload::SpoolerResult> {
   ~IngestionPipeline();
 
   void Spawn();
-  void Process(const std::string &path, bool allow_chunking,
-               shash::Suffix hash_suffix = shash::kSuffixNone);
   void Process(IngestionSource* source, bool allow_chunking,
                shash::Suffix hash_suffix = shash::kSuffixNone);
   void WaitFor();
