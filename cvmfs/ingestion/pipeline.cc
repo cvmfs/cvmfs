@@ -14,10 +14,10 @@
 #include "ingestion/task_register.h"
 #include "ingestion/task_write.h"
 #include "platform.h"
+#include "sync_item.h"
 #include "upload_facility.h"
 #include "upload_spooler_definition.h"
 #include "util_concurrency.h"
-
 
 const double IngestionPipeline::kMemFractionLowWatermark = 0.5;
 const double IngestionPipeline::kMemFractionHighWatermark = 0.75;
@@ -106,12 +106,12 @@ void IngestionPipeline::OnFileProcessed(
 
 
 void IngestionPipeline::Process(
-  const std::string &path,
+  IngestionSource* source,
   bool allow_chunking,
   shash::Suffix hash_suffix)
 {
   FileItem *file_item = new FileItem(
-    path,
+    source,
     minimal_chunk_size_,
     average_chunk_size_,
     maximal_chunk_size_,
@@ -229,12 +229,12 @@ void ScrubbingPipeline::OnFileProcessed(
 
 
 void ScrubbingPipeline::Process(
-  const std::string &path,
+  IngestionSource *source,
   shash::Algorithms hash_algorithm,
   shash::Suffix hash_suffix)
 {
   FileItem *file_item = new FileItem(
-    path,
+    source,
     0, 0, 0,
     zlib::kNoCompression,
     hash_algorithm,

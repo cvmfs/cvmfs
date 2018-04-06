@@ -27,9 +27,9 @@
 #include "swissknife_scrub.h"
 #include "swissknife_sign.h"
 #include "swissknife_sync.h"
+#include "swissknife_tarball.h"
 #include "swissknife_zpipe.h"
 #include "util/string.h"
-
 
 using namespace std;  // NOLINT
 
@@ -99,6 +99,7 @@ int main(int argc, char **argv) {
   command_list.push_back(new swissknife::CommandGc());
   command_list.push_back(new swissknife::CommandReconstructReflog());
   command_list.push_back(new swissknife::CommandLease());
+  command_list.push_back(new swissknife::IngestTarball());
 
   if (argc < 2) {
     Usage();

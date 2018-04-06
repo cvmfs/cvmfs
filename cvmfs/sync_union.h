@@ -34,6 +34,8 @@
 #include <string>
 
 #include "sync_item.h"
+#include "sync_mediator.h"
+#include "util/shared_ptr.h"
 
 namespace publish {
 
@@ -53,7 +55,7 @@ class SyncUnion {
    * @param mediator a reference to a SyncMediator object used as bridge to
    *        the actual sync process
    */
-  SyncUnion(SyncMediator *mediator, const std::string &rdonly_path,
+  SyncUnion(AbstractSyncMediator *mediator, const std::string &rdonly_path,
             const std::string &union_path, const std::string &scratch_path);
   virtual ~SyncUnion() {}
 
@@ -78,9 +80,9 @@ class SyncUnion {
    * @param entry_type            type of the item in the union directory
    * @return                      a SyncItem object wrapping the dirent
    */
-  SyncItem CreateSyncItem(const std::string &relative_parent_path,
-                          const std::string &filename,
-                          const SyncItemType entry_type) const;
+  SharedPtr<SyncItem> CreateSyncItem(const std::string &relative_parent_path,
+                                     const std::string &filename,
+                                     const SyncItemType entry_type) const;
 
   inline std::string rdonly_path() const { return rdonly_path_; }
   inline std::string union_path() const { return union_path_; }
@@ -92,7 +94,8 @@ class SyncUnion {
    * @param filename the filename as in the scratch directory
    * @return the original filename of the scratched out file in CVMFS repository
    */
-  virtual std::string UnwindWhiteoutFilename(const SyncItem &entry) const = 0;
+  virtual std::string UnwindWhiteoutFilename(
+      SharedPtr<SyncItem> entry) const = 0;
 
   /**
    * Union file systems use opaque directories to fully support rmdir
@@ -103,7 +106,7 @@ class SyncUnion {
    * @param directory the directory to check for opacity
    * @return true if directory is opaque, otherwise false
    */
-  virtual bool IsOpaqueDirectory(const SyncItem &directory) const = 0;
+  virtual bool IsOpaqueDirectory(SharedPtr<SyncItem> directory) const = 0;
 
   /**
    * Checks if given file is supposed to be whiteout.
@@ -111,7 +114,7 @@ class SyncUnion {
    * @param filename the filename to check
    * @return true if filename seems to be whiteout otherwise false
    */
-  virtual bool IsWhiteoutEntry(const SyncItem &entry) const = 0;
+  virtual bool IsWhiteoutEntry(SharedPtr<SyncItem> entry) const = 0;
 
   /**
    * Union file systems may use some special files for bookkeeping.
@@ -132,7 +135,7 @@ class SyncUnion {
   std::string scratch_path_;
   std::string union_path_;
 
-  SyncMediator *mediator_;
+  AbstractSyncMediator *mediator_;
 
   /**
    * Allow for preprocessing steps before emiting any SyncItems from SyncUnion.
@@ -143,7 +146,7 @@ class SyncUnion {
    * [1] https://google-styleguide.googlecode.com/svn/trunk/
    *             cppguide.html#Function_Parameter_Ordering
    */
-  virtual void PreprocessSyncItem(SyncItem *entry) const;
+  virtual void PreprocessSyncItem(SharedPtr<SyncItem> entry) const;
 
   /**
    * Callback when a regular file is found.
@@ -162,6 +165,7 @@ class SyncUnion {
    */
   virtual bool ProcessDirectory(const std::string &parent_dir,
                                 const std::string &dir_name);
+  virtual bool ProcessDirectory(SharedPtr<SyncItem> entry);
 
   /**
    * Callback when a symlink is found.
@@ -220,7 +224,7 @@ class SyncUnion {
    * Called to actually process the file entry.
    * @param entry the SyncItem corresponding to the union file to be processed
    */
-  void ProcessFile(const SyncItem &entry);
+  void ProcessFile(SharedPtr<SyncItem> entry);
 
  private:
   bool initialized_;

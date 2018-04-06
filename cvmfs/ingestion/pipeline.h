@@ -12,7 +12,9 @@
 #include "ingestion/item.h"
 #include "ingestion/task.h"
 #include "ingestion/tube.h"
+#include "sync_item.h"
 #include "upload_spooler_result.h"
+#include "util/shared_ptr.h"
 #include "util_concurrency.h"
 
 namespace upload {
@@ -28,7 +30,7 @@ class IngestionPipeline : public Observable<upload::SpoolerResult> {
   ~IngestionPipeline();
 
   void Spawn();
-  void Process(const std::string &path, bool allow_chunking,
+  void Process(IngestionSource* source, bool allow_chunking,
                shash::Suffix hash_suffix = shash::kSuffixNone);
   void WaitFor();
 
@@ -111,7 +113,7 @@ class ScrubbingPipeline : public Observable<ScrubbingResult> {
   ~ScrubbingPipeline();
 
   void Spawn();
-  void Process(const std::string &path,
+  void Process(IngestionSource* source,
                shash::Algorithms hash_algorithm,
                shash::Suffix hash_suffix);
   void WaitFor();

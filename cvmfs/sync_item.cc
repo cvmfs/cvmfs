@@ -5,10 +5,16 @@
 #include "sync_item.h"
 
 #include <errno.h>
+
+#if !defined(__APPLE__)
 #include <sys/sysmacros.h>
+#endif  // __APPLE__
 
 #include <vector>
 
+#include "archive.h"
+#include "archive_entry.h"
+#include "ingestion/ingestion_source.h"
 #include "sync_mediator.h"
 #include "sync_union.h"
 
@@ -16,31 +22,32 @@ using namespace std;  // NOLINT
 
 namespace publish {
 
-
 SyncItem::SyncItem() :
   union_engine_(NULL),
+  scratch_type_(static_cast<SyncItemType>(0)),
+  rdonly_type_(static_cast<SyncItemType>(0)),
+  has_catalog_marker_(false),
   whiteout_(false),
   opaque_(false),
   masked_hardlink_(false),
-  has_catalog_marker_(false),
   valid_graft_(false),
   graft_marker_present_(false),
   external_data_(false),
   graft_chunklist_(NULL),
   graft_size_(-1),
-  scratch_type_(static_cast<SyncItemType>(0)),
-  rdonly_type_(static_cast<SyncItemType>(0)),
   compression_algorithm_(zlib::kZlibDefault) {}
 
 SyncItem::SyncItem(const string       &relative_parent_path,
                    const string       &filename,
                    const SyncUnion    *union_engine,
-                   const SyncItemType  entry_type) :
+                   const SyncItemType entry_type) :
   union_engine_(union_engine),
+  scratch_type_(entry_type),
+  rdonly_type_(kItemUnknown),
+  has_catalog_marker_(false),
   whiteout_(false),
   opaque_(false),
   masked_hardlink_(false),
-  has_catalog_marker_(false),
   valid_graft_(false),
   graft_marker_present_(false),
   external_data_(false),
@@ -48,14 +55,13 @@ SyncItem::SyncItem(const string       &relative_parent_path,
   filename_(filename),
   graft_chunklist_(NULL),
   graft_size_(-1),
-  scratch_type_(entry_type),
-  rdonly_type_(kItemUnknown),
   compression_algorithm_(zlib::kZlibDefault)
 {
   content_hash_.algorithm = shash::kAny;
-  CheckMarkerFiles();
+  if (entry_type != kItemTarfile) {
+    CheckMarkerFiles();
+  }
 }
-
 
 SyncItem::~SyncItem() {
   delete graft_chunklist_;
@@ -100,7 +106,6 @@ SyncItemType SyncItem::GetScratchFiletype() const {
 
   return GetGenericFiletype(scratch_stat_);
 }
-
 
 void SyncItem::MarkAsWhiteout(const std::string &actual_filename) {
   // Mark the file as whiteout entry and strip the whiteout prefix
@@ -157,6 +162,9 @@ uint64_t SyncItem::GetUnionInode() const {
   return union_stat_.stat.st_ino;
 }
 
+IngestionSource *SyncItem::GetIngestionSource() const {
+        return new FileIngestionSource(GetUnionPath());
+}
 
 void SyncItem::StatGeneric(const string  &path,
                            EntryStat     *info,
@@ -204,6 +212,7 @@ catalog::DirectoryEntryBase SyncItem::CreateBasicCatalogDirent() const {
 
   return dirent;
 }
+
 
 std::string SyncItem::GetRdOnlyPath() const {
   const string relative_path = GetRelativePath().empty() ?

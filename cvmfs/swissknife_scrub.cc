@@ -91,8 +91,9 @@ void CommandScrub::FileCallback(
 
   shash::Any hash_from_name =
     shash::MkFromSuffixedHexPtr(shash::HexPtr(hash_string));
+  IngestionSource* full_path_source = new FileIngestionSource(full_path);
   pipeline_scrubbing_.Process(
-    full_path,
+    full_path_source,
     hash_from_name.algorithm,
     hash_from_name.suffix);
 }

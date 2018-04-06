@@ -47,6 +47,7 @@
 #include "sync_union.h"
 #include "sync_union_aufs.h"
 #include "sync_union_overlayfs.h"
+#include "sync_union_tarball.h"
 #include "util/string.h"
 
 using namespace std;  // NOLINT

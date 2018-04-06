@@ -7,10 +7,12 @@
 #include "sync_union.h"
 
 #include "sync_mediator.h"
+#include "util/shared_ptr.h"
 
 namespace publish {
 
-SyncUnion::SyncUnion(SyncMediator *mediator, const std::string &rdonly_path,
+SyncUnion::SyncUnion(AbstractSyncMediator *mediator,
+                     const std::string &rdonly_path,
                      const std::string &union_path,
                      const std::string &scratch_path)
     : rdonly_path_(rdonly_path),
@@ -25,24 +27,26 @@ bool SyncUnion::Initialize() {
   return true;
 }
 
-SyncItem SyncUnion::CreateSyncItem(const std::string &relative_parent_path,
-                                   const std::string &filename,
-                                   const SyncItemType entry_type) const {
-  SyncItem entry(relative_parent_path, filename, this, entry_type);
-  PreprocessSyncItem(&entry);
+SharedPtr<SyncItem> SyncUnion::CreateSyncItem(
+    const std::string &relative_parent_path, const std::string &filename,
+    const SyncItemType entry_type) const {
+  SharedPtr<SyncItem> entry = SharedPtr<SyncItem>(new SyncItem(
+      relative_parent_path, filename, this, entry_type));
+
+  PreprocessSyncItem(entry);
   if (entry_type == kItemFile) {
-    entry.SetExternalData(mediator_->IsExternalData());
-    entry.SetCompressionAlgorithm(mediator_->GetCompressionAlgorithm());
+    entry->SetExternalData(mediator_->IsExternalData());
+    entry->SetCompressionAlgorithm(mediator_->GetCompressionAlgorithm());
   }
   return entry;
 }
 
-void SyncUnion::PreprocessSyncItem(SyncItem *entry) const {
-  if (IsWhiteoutEntry(*entry)) {
-    entry->MarkAsWhiteout(UnwindWhiteoutFilename(*entry));
+void SyncUnion::PreprocessSyncItem(SharedPtr<SyncItem> entry) const {
+  if (IsWhiteoutEntry(entry)) {
+    entry->MarkAsWhiteout(UnwindWhiteoutFilename(entry));
   }
 
-  if (entry->IsDirectory() && IsOpaqueDirectory(*entry)) {
+  if (entry->IsDirectory() && IsOpaqueDirectory(entry)) {
     entry->MarkAsOpaqueDirectory();
   }
 }
@@ -56,15 +60,16 @@ bool SyncUnion::ProcessDirectory(const string &parent_dir,
                                  const string &dir_name) {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessDirectory(%s, %s)",
            parent_dir.c_str(), dir_name.c_str());
-  SyncItem entry = CreateSyncItem(parent_dir, dir_name, kItemDir);
+  SharedPtr<SyncItem> entry = CreateSyncItem(parent_dir, dir_name, kItemDir);
+  return ProcessDirectory(entry);
+}
 
-  if (entry.IsNew()) {
+bool SyncUnion::ProcessDirectory(SharedPtr<SyncItem> entry) {
+  if (entry->IsNew()) {
     mediator_->Add(entry);
-    // Recursion stops here. All content of new directory
-    // is added later by the SyncMediator
-    return false;
+    return true;
   } else {                            // directory already existed...
-    if (entry.IsOpaqueDirectory()) {  // was directory completely overwritten?
+    if (entry->IsOpaqueDirectory()) {  // was directory completely overwritten?
       mediator_->Replace(entry);
       return false;  // <-- replace does not need any further recursion
     } else {  // directory was just changed internally... only touch needed
@@ -78,7 +83,7 @@ void SyncUnion::ProcessRegularFile(const string &parent_dir,
                                    const string &filename) {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessRegularFile(%s, %s)",
            parent_dir.c_str(), filename.c_str());
-  SyncItem entry = CreateSyncItem(parent_dir, filename, kItemFile);
+  SharedPtr<SyncItem> entry = CreateSyncItem(parent_dir, filename, kItemFile);
   ProcessFile(entry);
 }
 
@@ -86,24 +91,25 @@ void SyncUnion::ProcessSymlink(const string &parent_dir,
                                const string &link_name) {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessSymlink(%s, %s)",
            parent_dir.c_str(), link_name.c_str());
-  SyncItem entry = CreateSyncItem(parent_dir, link_name, kItemSymlink);
+  SharedPtr<SyncItem> entry =
+      CreateSyncItem(parent_dir, link_name, kItemSymlink);
   ProcessFile(entry);
 }
 
-void SyncUnion::ProcessFile(const SyncItem &entry) {
+void SyncUnion::ProcessFile(SharedPtr<SyncItem> entry) {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessFile(%s)",
-           entry.filename().c_str());
-  if (entry.IsWhiteout()) {
+           entry->filename().c_str());
+  if (entry->IsWhiteout()) {
     mediator_->Remove(entry);
   } else {
-    if (entry.IsNew()) {
+    if (entry->IsNew()) {
       LogCvmfs(kLogUnionFs, kLogVerboseMsg, "processing file [%s] as new (add)",
-               entry.filename().c_str());
+               entry->filename().c_str());
       mediator_->Add(entry);
     } else {
       LogCvmfs(kLogUnionFs, kLogVerboseMsg,
                "processing file [%s] as existing (touch)",
-               entry.filename().c_str());
+               entry->filename().c_str());
       mediator_->Touch(entry);
     }
   }
@@ -111,13 +117,13 @@ void SyncUnion::ProcessFile(const SyncItem &entry) {
 
 void SyncUnion::EnterDirectory(const string &parent_dir,
                                const string &dir_name) {
-  SyncItem entry = CreateSyncItem(parent_dir, dir_name, kItemDir);
+  SharedPtr<SyncItem> entry = CreateSyncItem(parent_dir, dir_name, kItemDir);
   mediator_->EnterDirectory(entry);
 }
 
 void SyncUnion::LeaveDirectory(const string &parent_dir,
                                const string &dir_name) {
-  SyncItem entry = CreateSyncItem(parent_dir, dir_name, kItemDir);
+  SharedPtr<SyncItem> entry = CreateSyncItem(parent_dir, dir_name, kItemDir);
   mediator_->LeaveDirectory(entry);
 }
 
@@ -126,7 +132,8 @@ void SyncUnion::ProcessCharacterDevice(const std::string &parent_dir,
   LogCvmfs(kLogUnionFs, kLogDebug,
            "SyncUnionOverlayfs::ProcessCharacterDevice(%s, %s)",
            parent_dir.c_str(), filename.c_str());
-  SyncItem entry = CreateSyncItem(parent_dir, filename, kItemCharacterDevice);
+  SharedPtr<SyncItem> entry =
+      CreateSyncItem(parent_dir, filename, kItemCharacterDevice);
   ProcessFile(entry);
 }
 
@@ -135,7 +142,8 @@ void SyncUnion::ProcessBlockDevice(const std::string &parent_dir,
   LogCvmfs(kLogUnionFs, kLogDebug,
            "SyncUnionOverlayfs::ProcessBlockDevice(%s, %s)", parent_dir.c_str(),
            filename.c_str());
-  SyncItem entry = CreateSyncItem(parent_dir, filename, kItemBlockDevice);
+  SharedPtr<SyncItem> entry =
+      CreateSyncItem(parent_dir, filename, kItemBlockDevice);
   ProcessFile(entry);
 }
 
@@ -143,7 +151,7 @@ void SyncUnion::ProcessFifo(const std::string &parent_dir,
                             const std::string &filename) {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnionOverlayfs::ProcessFifo(%s, %s)",
            parent_dir.c_str(), filename.c_str());
-  SyncItem entry = CreateSyncItem(parent_dir, filename, kItemFifo);
+  SharedPtr<SyncItem> entry = CreateSyncItem(parent_dir, filename, kItemFifo);
   ProcessFile(entry);
 }
 
@@ -151,7 +159,7 @@ void SyncUnion::ProcessSocket(const std::string &parent_dir,
                               const std::string &filename) {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnionOverlayfs::ProcessSocket(%s, %s)",
            parent_dir.c_str(), filename.c_str());
-  SyncItem entry = CreateSyncItem(parent_dir, filename, kItemSocket);
+  SharedPtr<SyncItem> entry = CreateSyncItem(parent_dir, filename, kItemSocket);
   ProcessFile(entry);
 }
 

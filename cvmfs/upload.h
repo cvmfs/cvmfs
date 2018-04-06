@@ -121,6 +121,7 @@
 #include "upload_spooler_definition.h"
 #include "upload_spooler_result.h"
 #include "util/pointer.h"
+#include "util/shared_ptr.h"
 
 namespace upload {
 
@@ -191,43 +192,43 @@ class Spooler : public Observable<SpoolerResult> {
    *       callback for the whole job, that contains information about the
    *       generated chunks.
    *
-   * @param local_path      the location of the file to be processed and up-
-   *                        loaded into the backend storage
+   * @param source          the ingestion source of the file to be processed
+   *                        and uploaded into the backend storage
    * @param allow_chunking  (optional) controls if this file should be cut in
    *                        chunks or uploaded at once
    */
-  void Process(const std::string &local_path, const bool allow_chunking = true);
+  void Process(IngestionSource *source, const bool allow_chunking = true);
 
   /**
    * Convenience wrapper to process a catalog file. Please always use this
    * for catalog processing. It will add special flags and hash suffixes
    *
-   * @param local_path  the location of the catalog file to be processed
+   * @param catalo_source   the source of the catalog file to be processed
    */
-  void ProcessCatalog(const std::string &local_path);
+  void ProcessCatalog(IngestionSource* catalog_source);
 
   /**
    * Convenience wrapper to process a history database file. This sets the
    * processing parameters (like chunking and hash suffixes) accordingly.
    *
-   * @param local_path  the location of the history database file
+   * @param history_source  the source of the history database file
    */
-  void ProcessHistory(const std::string &local_path);
+  void ProcessHistory(IngestionSource* history_source);
 
   /**
    * Convenience wrapper to process a certificate file. This sets the
    * processing parameters (like chunking and hash suffixes) accordingly.
    *
-   * @param local_path  the location of the certificate file
+   * @param certificate_source  the source of the certificate file
    */
-  void ProcessCertificate(const std::string &local_path);
+  void ProcessCertificate(IngestionSource* certificate_source);
 
   /**
    * Convenience wrapper to process a meta info file.
    *
-   * @param local_path  the location of the meta info file
+   * @param metainfo_source  the source of the meta info file
    */
-  void ProcessMetainfo(const std::string &local_path);
+  void ProcessMetainfo(IngestionSource* metainfo_source);
 
   /**
    * Deletes the given file from the repository backend storage. This is done
