@@ -55,16 +55,14 @@ TEST_F(T_FileWatcher, NoEventStop) {
   SafeWriteToFile("test", watched_file_name, 0600);
 
   UniquePtr<file_watcher::FileWatcher> watcher(platform_file_watcher());
+  EXPECT_TRUE(watcher.IsValid());
 
-  // TODO(radu): Remove this check when the Linux inotify version is added
-  if (watcher.IsValid()) {
-    TestEventHandler* hd(new TestEventHandler(&counters_, channel_.weak_ref()));
-    watcher->RegisterHandler(watched_file_name, hd);
+  TestEventHandler* hd(new TestEventHandler(&counters_, channel_.weak_ref()));
+  watcher->RegisterHandler(watched_file_name, hd);
 
-    EXPECT_TRUE(watcher->Spawn());
+  EXPECT_TRUE(watcher->Spawn());
 
-    watcher->Stop();
-  }
+  watcher->Stop();
 }
 
 TEST_F(T_FileWatcher, ModifiedEvent) {
@@ -73,24 +71,22 @@ TEST_F(T_FileWatcher, ModifiedEvent) {
   SafeWriteToFile("test", watched_file_name, 0600);
 
   UniquePtr<file_watcher::FileWatcher> watcher(platform_file_watcher());
+  EXPECT_TRUE(watcher.IsValid());
 
-  // TODO(radu): Remove this check when the Linux inotify version is added
-  if (watcher.IsValid()) {
-    TestEventHandler* hd(new TestEventHandler(&counters_, channel_.weak_ref()));
-    watcher->RegisterHandler(watched_file_name, hd);
+  TestEventHandler* hd(new TestEventHandler(&counters_, channel_.weak_ref()));
+  watcher->RegisterHandler(watched_file_name, hd);
 
-    EXPECT_TRUE(watcher->Spawn());
+  EXPECT_TRUE(watcher->Spawn());
 
-    SafeWriteToFile("test", watched_file_name, 0600);
+  SafeWriteToFile("test", watched_file_name, 0600);
 
-    channel_->Dequeue();
+  channel_->Dequeue();
 
-    Counters::const_iterator it_mod = counters_.find(file_watcher::kModified);
-    const int num_modifications = it_mod->second;
-    EXPECT_EQ(1, num_modifications);
+  Counters::const_iterator it_mod = counters_.find(file_watcher::kModified);
+  const int num_modifications = it_mod->second;
+  EXPECT_EQ(1, num_modifications);
 
-    watcher->Stop();
-  }
+  watcher->Stop();
 }
 
 TEST_F(T_FileWatcher, DeletedEvent) {
@@ -99,24 +95,22 @@ TEST_F(T_FileWatcher, DeletedEvent) {
   SafeWriteToFile("test", watched_file_name, 0600);
 
   UniquePtr<file_watcher::FileWatcher> watcher(platform_file_watcher());
+  EXPECT_TRUE(watcher.IsValid());
 
-  // TODO(radu): Remove this check when the Linux inotify version is added
-  if (watcher.IsValid()) {
-    TestEventHandler* hd(new TestEventHandler(&counters_, channel_.weak_ref()));
-    watcher->RegisterHandler(watched_file_name, hd);
+  TestEventHandler* hd(new TestEventHandler(&counters_, channel_.weak_ref()));
+  watcher->RegisterHandler(watched_file_name, hd);
 
-    EXPECT_TRUE(watcher->Spawn());
+  EXPECT_TRUE(watcher->Spawn());
 
-    unlink(watched_file_name.c_str());
+  unlink(watched_file_name.c_str());
 
-    channel_->Dequeue();
+  channel_->Dequeue();
 
-    Counters::const_iterator it_del = counters_.find(file_watcher::kDeleted);
-    const int num_deletions = it_del->second;
-    EXPECT_EQ(1, num_deletions);
+  Counters::const_iterator it_del = counters_.find(file_watcher::kDeleted);
+  const int num_deletions = it_del->second;
+  EXPECT_EQ(1, num_deletions);
 
-    watcher->Stop();
-  }
+  watcher->Stop();
 }
 
 TEST_F(T_FileWatcher, ModifiedThenDeletedEvent) {
@@ -125,33 +119,31 @@ TEST_F(T_FileWatcher, ModifiedThenDeletedEvent) {
   SafeWriteToFile("test", watched_file_name, 0600);
 
   UniquePtr<file_watcher::FileWatcher> watcher(platform_file_watcher());
+  EXPECT_TRUE(watcher.IsValid());
 
-  // TODO(radu): Remove this check when the Linux inotify version is added
-  if (watcher.IsValid()) {
-    TestEventHandler* hd(new TestEventHandler(&counters_, channel_.weak_ref()));
-    hd->clear_ = false;
-    watcher->RegisterHandler(watched_file_name, hd);
+  TestEventHandler* hd(new TestEventHandler(&counters_, channel_.weak_ref()));
+  hd->clear_ = false;
+  watcher->RegisterHandler(watched_file_name, hd);
 
-    EXPECT_TRUE(watcher->Spawn());
+  EXPECT_TRUE(watcher->Spawn());
 
-    SafeWriteToFile("test", watched_file_name, 0600);
+  SafeWriteToFile("test", watched_file_name, 0600);
 
-    channel_->Dequeue();
+  channel_->Dequeue();
 
-    hd->clear_ = true;
+  hd->clear_ = true;
 
-    Counters::const_iterator it_mod = counters_.find(file_watcher::kModified);
-    const int num_modifications = it_mod->second;
-    EXPECT_EQ(1, num_modifications);
+  Counters::const_iterator it_mod = counters_.find(file_watcher::kModified);
+  const int num_modifications = it_mod->second;
+  EXPECT_EQ(1, num_modifications);
 
-    unlink(watched_file_name.c_str());
+  unlink(watched_file_name.c_str());
 
-    channel_->Dequeue();
+  channel_->Dequeue();
 
-    Counters::const_iterator it_del = counters_.find(file_watcher::kDeleted);
-    const int num_deletions = it_del->second;
-    EXPECT_EQ(1, num_deletions);
+  Counters::const_iterator it_del = counters_.find(file_watcher::kDeleted);
+  const int num_deletions = it_del->second;
+  EXPECT_EQ(1, num_deletions);
 
-    watcher->Stop();
-  }
+  watcher->Stop();
 }
