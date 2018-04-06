@@ -32,6 +32,10 @@ class ItemAllocator {
   static atomic_int64 total_allocated_;
 
   std::vector<MallocArena *> malloc_arenas_;
+  /**
+   * Where the last successful allocation took place.
+   */
+  unsigned idx_last_arena_;
   pthread_mutex_t lock_;
 };  // class ItemAllocator
 

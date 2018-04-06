@@ -25,6 +25,7 @@ void ItemAllocator::Free(void *ptr) {
         delete malloc_arenas_[i];
         atomic_xadd64(&total_allocated_, -static_cast<int>(kArenaSize));
         malloc_arenas_.erase(malloc_arenas_.begin() + i);
+        idx_last_arena_ = 0;
         return;
       }
     }
@@ -33,7 +34,7 @@ void ItemAllocator::Free(void *ptr) {
 }
 
 
-ItemAllocator::ItemAllocator() {
+ItemAllocator::ItemAllocator() : idx_last_arena_(0) {
   int retval = pthread_mutex_init(&lock_, NULL);
   assert(retval == 0);
 
@@ -54,16 +55,22 @@ ItemAllocator::~ItemAllocator() {
 void *ItemAllocator::Malloc(unsigned size) {
   MutexLockGuard guard(lock_);
 
-  // We expect that blocks are allocated and free'd roughly in FIFO order
+  void *p = malloc_arenas_[idx_last_arena_]->Malloc(size);
+  if (p != NULL)
+    return p;
   unsigned N = malloc_arenas_.size();
-  void *p = malloc_arenas_[N - 1]->Malloc(size);
-  if (p == NULL) {
-    MallocArena *M = new MallocArena(kArenaSize);
-    malloc_arenas_.push_back(M);
-    atomic_xadd64(&total_allocated_, kArenaSize);
-
-    p = M->Malloc(size);
-    assert(p != NULL);
+  for (unsigned i = 0; i < N; ++i) {
+    p = malloc_arenas_[i]->Malloc(size);
+    if (p != NULL) {
+      idx_last_arena_ = i;
+      return p;
+    }
   }
+  idx_last_arena_ = N;
+  MallocArena *M = new MallocArena(kArenaSize);
+  atomic_xadd64(&total_allocated_, kArenaSize);
+  malloc_arenas_.push_back(M);
+  p = M->Malloc(size);
+  assert(p != NULL);
   return p;
 }
