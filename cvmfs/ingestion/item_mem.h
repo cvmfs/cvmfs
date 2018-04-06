@@ -25,7 +25,7 @@ class ItemAllocator {
   void *Malloc(unsigned size);
   void Free(void *ptr);
 
-  int64_t total_allocated() { return atomic_read64(&total_allocated_); }
+  static int64_t total_allocated() { return atomic_read64(&total_allocated_); }
 
  private:
   static const unsigned kArenaSize = 128 * 1024 * 1024;  // 128 MB
