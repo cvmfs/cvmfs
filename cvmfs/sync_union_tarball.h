@@ -14,11 +14,17 @@
 #include <set>
 #include <string>
 
+//#include <archive.h>
+struct archive;
+
 namespace publish {
 
 class SyncUnionTarball : public SyncUnion {
  public:
-  SyncUnionTarball(SyncMediator *mediator, const std::string &tarball_path,
+  SyncUnionTarball(SyncMediator *mediator, const std::string &rdonly_path,
+                   const std::string &union_path,
+                   const std::string &scratch_path,
+                   const std::string &tarball_path,
                    const std::string &base_directory);
 
   /*
@@ -43,8 +49,14 @@ class SyncUnionTarball : public SyncUnion {
    * Actually untar the several elements in the tar inside the base directory,
    * it returns all the recursive tars find in this operation
    */
-  std::set<std::string> untarPath(const std::string &tarball_path,
-                                  const std::string &base_directory);
+ bool untarPath(const std::string &tarball_path);
+
+  /*
+   * Helper function to phisically move the data from the source to the
+   * destination.
+   */
+  int copy_data(struct archive *src, struct archive *dst);
+
 };  // class SyncUnionTarball
 
 }  // namespace publish
