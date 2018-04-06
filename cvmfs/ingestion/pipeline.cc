@@ -36,6 +36,7 @@ IngestionPipeline::IngestionPipeline(
   , maximal_chunk_size_(spooler_definition.max_file_chunk_size)
   , spawned_(false)
   , uploader_(uploader)
+  , tube_counter_(kMaxFilesInFlight)
 {
   unsigned nfork_base = std::max(1U, GetNumberOfCpuCores() / 8);
 
@@ -186,7 +187,10 @@ void TaskScrubbingCallback::Process(BlockItem *block_item) {
 //------------------------------------------------------------------------------
 
 
-ScrubbingPipeline::ScrubbingPipeline() : spawned_(false) {
+ScrubbingPipeline::ScrubbingPipeline()
+  : spawned_(false)
+  , tube_counter_(kMaxFilesInFlight)
+{
   unsigned nfork_base = std::max(1U, GetNumberOfCpuCores() / 8);
 
   for (unsigned i = 0; i < nfork_base * kNforkScrubbingCallback; ++i) {

@@ -38,6 +38,7 @@ class IngestionPipeline : public Observable<upload::SpoolerResult> {
  private:
   static const double kMemFractionLowWatermark;  // = 0.5
   static const double kMemFractionHighWatermark;  // = 0.75
+  static const unsigned kMaxFilesInFlight = 8000;
   static const unsigned kNforkRegister = 1;
   static const unsigned kNforkWrite = 1;
   static const unsigned kNforkHash = 2;
@@ -55,9 +56,9 @@ class IngestionPipeline : public Observable<upload::SpoolerResult> {
 
   bool spawned_;
   upload::AbstractUploader *uploader_;
-  Tube<FileItem> tube_input_;
   // TODO(jblomer): a semaphore would be faster!
   Tube<FileItem> tube_counter_;
+  Tube<FileItem> tube_input_;
 
   TubeConsumerGroup<FileItem> tasks_read_;
 
@@ -126,6 +127,7 @@ class ScrubbingPipeline : public Observable<ScrubbingResult> {
  private:
   static const uint64_t kMemLowWatermark = 384 * 1024 * 1024;
   static const uint64_t kMemHighWatermark = 512 * 1024 * 1024;
+  static const unsigned kMaxFilesInFlight = 8000;
   static const unsigned kNforkScrubbingCallback = 1;
   static const unsigned kNforkHash = 2;
   static const unsigned kNforkChunk = 1;
