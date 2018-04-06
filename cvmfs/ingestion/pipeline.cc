@@ -21,8 +21,6 @@
 #include "util/string.h"
 #include "util_concurrency.h"
 
-const double IngestionPipeline::kMemFractionLowWatermark = 0.5;
-const double IngestionPipeline::kMemFractionHighWatermark = 0.75;
 
 IngestionPipeline::IngestionPipeline(
   upload::AbstractUploader *uploader,
