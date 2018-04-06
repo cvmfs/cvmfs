@@ -33,7 +33,7 @@
 #include <string>
 #include <vector>
 
-#include "file_watcher.h"
+#include "file_watcher_inotify.h"
 #include "smalloc.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
@@ -323,7 +323,7 @@ inline uint64_t platform_memsize() {
 }
 
 inline file_watcher::FileWatcher* platform_file_watcher() {
-  return NULL;
+  return new file_watcher::FileWatcherInotify();
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD

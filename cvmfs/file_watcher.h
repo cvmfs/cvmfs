@@ -18,6 +18,7 @@ enum Event {
   kAttributes,
   kHardlinked,
   kDeleted,
+  kIgnored,
   kInvalid
 };
 
@@ -44,6 +45,18 @@ class EventHandler {
   virtual bool Handle(const std::string& file_path,
                       Event event,
                       bool* clear_handler) = 0;
+};
+
+struct WatchRecord {
+  WatchRecord() : file_path_(), handler_(NULL) {}
+
+  WatchRecord(const std::string& path,
+              file_watcher::EventHandler* h)
+      : file_path_(path),
+        handler_(h) {}
+
+  std::string file_path_;
+  file_watcher::EventHandler* handler_;
 };
 
 class FileWatcher {

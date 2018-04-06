@@ -76,9 +76,11 @@ set (CVMFS_CLIENT_SOURCES
   xattr.cc
   )
 
-if (MACOSX)
+if (APPLE)
   list(APPEND CVMFS_CLIENT_SOURCES file_watcher_kqueue.cc)
-endif (MACOSX)
+else(APPLE)
+  list(APPEND CVMFS_CLIENT_SOURCES file_watcher_inotify.cc)
+endif (APPLE)
 
 # First .h then .cc is important to avoid races during the build process
 set_source_files_properties(cache.pb.h cache.pb.cc

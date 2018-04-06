@@ -2,8 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef CVMFS_FILE_WATCHER_KQUEUE_H_
-#define CVMFS_FILE_WATCHER_KQUEUE_H_
+#ifndef CVMFS_FILE_WATCHER_INOTIFY_H_
+#define CVMFS_FILE_WATCHER_INOTIFY_H_
 
 #include "file_watcher.h"
 
@@ -12,24 +12,23 @@
 
 namespace file_watcher {
 
-class FileWatcherKqueue : public FileWatcher {
+class FileWatcherInotify : public FileWatcher {
  public:
-  FileWatcherKqueue();
-  virtual ~FileWatcherKqueue();
+  FileWatcherInotify();
+  virtual ~FileWatcherInotify();
 
  protected:
   virtual bool RunEventLoop(const FileWatcher::HandlerMap& handler,
                             int read_pipe, int write_pipe);
 
  private:
-  void RemoveFilter(int fd);
   void RegisterFilter(const std::string& file_path,
                       EventHandler* handler);
 
-  int kq_;
+  int inotify_fd_;
   std::map<int, WatchRecord> watch_records_;
 };
 
 }  // namespace file_watcher
 
-#endif  // CVMFS_FILE_WATCHER_KQUEUE_H_
+#endif  // CVMFS_FILE_WATCHER_INOTIFY_H_

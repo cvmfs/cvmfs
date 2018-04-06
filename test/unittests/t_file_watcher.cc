@@ -49,9 +49,27 @@ class T_FileWatcher : public ::testing::Test {
   UniquePtr<FifoChannel<bool> > channel_;
 };
 
-TEST_F(T_FileWatcher, kModifiedEvent) {
+TEST_F(T_FileWatcher, NoEventStop) {
   const std::string watched_file_name =
       GetCurrentWorkingDirectory() + "/file_watcher_test.txt";
+  SafeWriteToFile("test", watched_file_name, 0600);
+
+  UniquePtr<file_watcher::FileWatcher> watcher(platform_file_watcher());
+
+  // TODO(radu): Remove this check when the Linux inotify version is added
+  if (watcher.IsValid()) {
+    TestEventHandler* hd(new TestEventHandler(&counters_, channel_.weak_ref()));
+    watcher->RegisterHandler(watched_file_name, hd);
+
+    EXPECT_TRUE(watcher->Spawn());
+
+    watcher->Stop();
+  }
+}
+
+TEST_F(T_FileWatcher, ModifiedEvent) {
+  const std::string watched_file_name =
+    GetCurrentWorkingDirectory() + "/file_watcher_test.txt";
   SafeWriteToFile("test", watched_file_name, 0600);
 
   UniquePtr<file_watcher::FileWatcher> watcher(platform_file_watcher());
@@ -75,7 +93,7 @@ TEST_F(T_FileWatcher, kModifiedEvent) {
   }
 }
 
-TEST_F(T_FileWatcher, kDeletedEvent) {
+TEST_F(T_FileWatcher, DeletedEvent) {
   const std::string watched_file_name =
       GetCurrentWorkingDirectory() + "/file_watcher_test2.txt";
   SafeWriteToFile("test", watched_file_name, 0600);
@@ -101,7 +119,7 @@ TEST_F(T_FileWatcher, kDeletedEvent) {
   }
 }
 
-TEST_F(T_FileWatcher, kModifiedThenDeletedEvent) {
+TEST_F(T_FileWatcher, ModifiedThenDeletedEvent) {
   const std::string watched_file_name =
       GetCurrentWorkingDirectory() + "/file_watcher_test.txt";
   SafeWriteToFile("test", watched_file_name, 0600);
