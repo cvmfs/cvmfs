@@ -134,8 +134,6 @@ catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
   // inode and parent inode is determined at runtime of client
   dirent.inode_ = catalog::DirectoryEntry::kInvalidInode;
 
-  // this might mask the actual link count in case hardlinks are not supported
-  // (i.e. on setups using OverlayFS)
   dirent.linkcount_ = this->tar_stat_.st_nlink;
 
   dirent.mode_ = this->tar_stat_.st_mode;

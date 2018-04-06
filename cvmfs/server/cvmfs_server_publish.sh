@@ -20,12 +20,10 @@ cvmfs_server_publish() {
   local force_compression_algorithm=""
   local external_option=""
   local open_fd_dialog=1
-  local tar_extract_dir=""
-  local tar_file=""
 
   # optional parameter handling
   OPTIND=1
-  while getopts "F:NXZ:pa:c:m:vn:feQ:W:" option
+  while getopts "F:NXZ:pa:c:m:vn:fe" option
   do
     case $option in
       p)
@@ -60,12 +58,6 @@ cvmfs_server_publish() {
       ;;
       f)
         open_fd_dialog=0
-      ;;
-      Q)
-        tar_extract_dir="$OPTARG"
-      ;;
-      W)
-        tar_file="$OPTARG"
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -211,13 +203,6 @@ cvmfs_server_publish() {
 
     if [ x"$tag_description" != x"" ]; then
       sync_command="$sync_command -J $tag_description"
-    fi
-
-    if [ x"$tar_extract_dir" != x"" ]; then
-      sync_command="$sync_command -@ $tar_extract_dir"
-    fi
-    if [ x"$tar_file" != x"" ]; then
-      sync_command="$sync_command -$ $tar_file"
     fi
 
     # If the upstream type is "gw", we need to pass additional parameters
