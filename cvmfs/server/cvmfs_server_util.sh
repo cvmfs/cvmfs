@@ -205,18 +205,7 @@ is_valid_branch_name() {
 
 
 run_suid_helper() {
-  if is_systemd && [ "x$1" == "xrdonly_mount" ]; then
-    env -i /usr/bin/cvmfs_suid_helper $@ 2>/dev/null
-    if [ $? -ne 0 ]; then
-      # Generate mount unit from /etc/fstab if necessary
-      /usr/lib/systemd/system-generators/systemd-fstab-generator \
-        /run/systemd/generator '' '' 2>/dev/null
-      systemctl daemon-reload
-      env -i /usr/bin/cvmfs_suid_helper $@
-    fi
-  else
-    env -i /usr/bin/cvmfs_suid_helper $@
-  fi
+  env -i /usr/bin/cvmfs_suid_helper $@
 }
 
 
