@@ -71,7 +71,7 @@ TEST_F(T_SyncUnionTarball, Init) {
   EXPECT_CALL(*m_sync_mediator_, RegisterUnionEngine(_)).Times(1);
   EXPECT_TRUE(sync_union.Initialize());
 }
-//
+
 ///*
 // * tar
 // * ├── [4.0K]  aaa
@@ -183,4 +183,5 @@ TEST_F(T_SyncUnionTarball, Init) {
 //  sync_union.Traverse();
 //}
 //
+
 }  // namespace

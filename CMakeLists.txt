@@ -298,7 +298,6 @@ endif (NOT MACOSX)
 find_package (OpenSSL REQUIRED)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${OPENSSL_INCLUDE_DIR})
 
-
 find_package (GTest REQUIRED)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GTEST_INCLUDE_DIRS})
 
@@ -307,12 +306,6 @@ set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GMOCK_INCLUDE_DIRS})
 
 find_package (VJSON REQUIRED)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${VJSON_INCLUDE_DIRS})
-
-# This is the location where brew install libarchive
-if (MACOSX)
-  set (CMAKE_INCLUDE_PATH "/usr/local/opt/libarchive/include")
-  set (CMAKE_LIBRARY_PATH "/usr/local/opt/libarchive/lib")
-endif (MACOSX)
 
 find_package (LibArchive REQUIRED)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${LibArchive_INCLUDE_DIRS})
