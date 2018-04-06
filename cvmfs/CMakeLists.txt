@@ -168,6 +168,7 @@ set (CVMFS_FSCK_SOURCES
 
 
 set (CVMFS_SWISSKNIFE_SOURCES
+  backoff.cc
   catalog.cc
   catalog_counters.cc
   catalog_mgr_ro.cc
@@ -368,6 +369,7 @@ if(BUILD_RECEIVER)
     receiver/reactor.cc
     receiver/receiver.cc
     receiver/session_token.cc
+    backoff.cc
     catalog.cc
     catalog_rw.cc
     catalog_counters.cc

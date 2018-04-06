@@ -17,7 +17,9 @@ class ItemAllocator;
 
 class TaskRead : public TubeConsumer<FileItem> {
  public:
-  static const unsigned kBusyWaitMs = 50;
+  static const unsigned kThrottleInitMs = 50;
+  static const unsigned kThrottleMaxMs = 500;
+  static const unsigned kThrottleResetMs = 2000;
   static const unsigned kBlockSize = kPageSize * 4;
 
   TaskRead(

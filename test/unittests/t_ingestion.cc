@@ -268,7 +268,7 @@ TEST_F(T_Ingestion, TaskReadThrottle) {
   EXPECT_EQ(BlockItem::kBlockStop, item_stop->type());
 
   if (task_read->n_block() == 0) {
-    SafeSleepMs(2 * TaskRead::kBusyWaitMs);
+    SafeSleepMs(2 * TaskRead::kThrottleMaxMs);
   }
   EXPECT_EQ(1U, task_read->n_block());
 
