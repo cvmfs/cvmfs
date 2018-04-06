@@ -276,6 +276,7 @@ set (CVMFS_SUID_HELPER_SOURCES
 )
 
 set (CVMFS_PRELOADER_SOURCES
+  backoff.cc
   catalog.cc
   catalog_sql.cc
   compression.cc
