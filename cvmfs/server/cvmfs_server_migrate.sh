@@ -404,6 +404,13 @@ _migrate_139() {
   echo "--> adjusting /etc/fstab"
   sed -i -e "s|\(.*\),noauto\(.*# added by CernVM-FS for ${CVMFS_REPOSITORY_NAME}\)|\1,noauto,nodev\2|" /etc/fstab
 
+  # Make sure the systemd mount unit exists
+  if is_systemd; then
+    /usr/lib/systemd/system-generators/systemd-fstab-generator \
+      /run/systemd/generator '' '' 2>/dev/null
+    systemctl daemon-reload
+  fi
+
   sed -i -e "s/^\(CVMFS_CREATOR_VERSION\)=.*/\1=$destination_version/" $server_conf
 
   # update repository information
