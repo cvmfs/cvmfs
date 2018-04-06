@@ -6,6 +6,7 @@
 #include "pipeline.h"
 
 #include <algorithm>
+#include <cstdlib>
 
 #include "ingestion/task_chunk.h"
 #include "ingestion/task_compress.h"
@@ -16,6 +17,7 @@
 #include "platform.h"
 #include "upload_facility.h"
 #include "upload_spooler_definition.h"
+#include "util/string.h"
 #include "util_concurrency.h"
 
 
@@ -76,13 +78,18 @@ IngestionPipeline::IngestionPipeline(
   }
   tubes_chunk_.Activate();
 
+  uint64_t low = static_cast<uint64_t>(
+    static_cast<double>(platform_memsize()) * kMemFractionLowWatermark);
+  uint64_t high = static_cast<uint64_t>(
+    static_cast<double>(platform_memsize()) * kMemFractionHighWatermark);
+  char *fixed_limit_mb = getenv("_CVMFS_SERVER_PIPELINE_MB");
+  if (fixed_limit_mb != NULL) {
+    high = String2Uint64(fixed_limit_mb) * 1024 * 1024;
+    low = (high * 2) / 3;
+  }
   for (unsigned i = 0; i < nfork_base * kNforkRead; ++i) {
     TaskRead *task_read =
       new TaskRead(&tube_input_, &tubes_chunk_, &allocator_read_);
-    uint64_t low = static_cast<uint64_t>(
-      static_cast<double>(platform_memsize()) * kMemFractionLowWatermark);
-    uint64_t high = static_cast<uint64_t>(
-      static_cast<double>(platform_memsize()) * kMemFractionHighWatermark);
     task_read->SetWatermarks(low, high);
     tasks_read_.TakeConsumer(task_read);
   }
