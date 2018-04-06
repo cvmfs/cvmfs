@@ -42,9 +42,9 @@ cvmfs_run_test() {
 
   echo "generating a tarball $tarfile"
   produce_tarball $tarfile
- 
+
   echo "ingesting the tarball in the directory $to_remove_dir"
-  cvmfs_server ingest-tarball --base_dir $to_remove_dir --tar_file $tarfile $CVMFS_TEST_REPO 
+  cvmfs_server ingest-tarball --base_dir $to_remove_dir --tar_file $tarfile $CVMFS_TEST_REPO
 
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
@@ -56,7 +56,7 @@ cvmfs_run_test() {
 
   for d in a a/b a/b/c; do
     if [ ! -d $repo_dir/$to_remove_dir/tarball_foo/$d ]; then
-      echo "Error not found directory: $repo_dir/$to_remove_dir/tarball_foo/$d"      
+      echo "Error not found directory: $repo_dir/$to_remove_dir/tarball_foo/$d"
       return 1
     else
       echo "Ingested directory: $repo_dir/$to_remove_dir/tarball_foo/$d"
@@ -64,12 +64,12 @@ cvmfs_run_test() {
       for f in 1 2 3; do
         file=$repo_dir/$to_remove_dir/tarball_foo/$d/$f.txt
         if [ ! -f $file ] || [ $(wc -c <$file) -ne 2048 ]; then
-          echo "Error not found file: $file"          
+          echo "Error not found file: $file"
           return 1
         else
           echo "Ingested file of size 2048 bytes: $file"
         fi
-      done      
+      done
 
     fi
   done
@@ -77,7 +77,7 @@ cvmfs_run_test() {
   file=$repo_dir/$to_remove_dir/tarball_foo/d/e/f/foo.txt
   file_size=$(wc -c <$file)
   if [ ! -f $file ] || [ $file_size -ne 5120 ]; then
-    echo "Error not found file of size 5120: $file"      
+    echo "Error not found file of size 5120: $file"
     return 1
   else
     echo "Ingested file of size $file_size bytes: $file"
@@ -91,7 +91,7 @@ cvmfs_run_test() {
   #===========================================================================#
 
   echo "ingesting the tarball in the directory $to_keep_dir"
-  cvmfs_server ingest-tarball --base_dir $to_keep_dir --tar_file $tarfile -d $to_remove_dir/tarball_foo $CVMFS_TEST_REPO 
+  cvmfs_server ingest-tarball --base_dir $to_keep_dir --tar_file $tarfile -d $to_remove_dir/tarball_foo $CVMFS_TEST_REPO
 
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
@@ -103,7 +103,7 @@ cvmfs_run_test() {
 
   for d in a a/b a/b/c; do
     if [ ! -d $repo_dir/$to_keep_dir/tarball_foo/$d ]; then
-      echo "Error not found directory: $repo_dir/$to_keep_dir/tarball_foo/$d"      
+      echo "Error not found directory: $repo_dir/$to_keep_dir/tarball_foo/$d"
       return 1
     else
       echo "Ingested directory: $repo_dir/$to_keep_dir/tarball_foo/$d"
@@ -111,12 +111,12 @@ cvmfs_run_test() {
       for f in 1 2 3; do
         file=$repo_dir/$to_keep_dir/tarball_foo/$d/$f.txt
         if [ ! -f $file ] || [ $(wc -c <$file) -ne 2048 ]; then
-          echo "Error not found file: $file"          
+          echo "Error not found file: $file"
           return 1
         else
           echo "Ingested file of size 2048 bytes: $file"
         fi
-      done      
+      done
 
     fi
   done
@@ -124,12 +124,12 @@ cvmfs_run_test() {
   file=$repo_dir/$to_keep_dir/tarball_foo/d/e/f/foo.txt
   file_size=$(wc -c <$file)
   if [ ! -f $file ] || [ $file_size -ne 5120 ]; then
-    echo "Error not found file of size 5120: $file"      
+    echo "Error not found file of size 5120: $file"
     return 1
   else
     echo "Ingested file of size $file_size bytes: $file"
   fi
-  
+
   echo "checking that we have actually removed the $to_remove_dir/tarball_foo directory"
   if [ -d $repo_dir/to_remove_dir/tarball_foo ]; then
     echo "Error directory not removed $repo_dir/to_remove_dir/tarball_foo"

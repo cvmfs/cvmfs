@@ -10,10 +10,10 @@
 #include <string>
 
 /*
- * To construct these strings is sufficient to create the normale .tar archive, 
+ * To construct these strings is sufficient to create the normale .tar archive,
  * then from any unix shell is enough to use the utility base64, as an example.
  *
- * $ base64 tar_file.tar 
+ * $ base64 tar_file.tar
  *
  */
 
@@ -172,9 +172,9 @@ const std::string simple_tar =
  * │       └── [   0]  foo
  * ├── [   4]  foo
  * └── [  18]  foo_link -> ./foo
- * 
+ *
  * 2 directories, 4 files
- * $ cat foo_link 
+ * $ cat foo_link
  * baz
  * $ cat ./foo
  * baz

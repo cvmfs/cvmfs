@@ -26,7 +26,6 @@ struct SyncParameters {
   SyncParameters()
       : spooler(NULL),
         union_fs_type("aufs"),
-        to_delete(""),
         print_changeset(false),
         dry_run(false),
         mucatalogs(false),
@@ -72,9 +71,6 @@ struct SyncParameters {
   std::string public_keys;
   std::string trusted_certs;
   std::string authz_file;
-  std::string tar_file;
-  std::string base_directory;
-  std::string to_delete;
   bool print_changeset;
   bool dry_run;
   bool mucatalogs;
