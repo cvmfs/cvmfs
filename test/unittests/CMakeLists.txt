@@ -247,7 +247,7 @@ set (CVMFS_UNITTEST_SOURCES
 
 # Lower optimization level for this file. Xcode 9.3+ gives different results in Os and above
 if (CVMFS_BUGGY_XCODE)
-  set_property(SOURCE ingestion/chunk_detector.cc PROPERTY COMPILE_FLAGS -O0)
+  set_property(SOURCE ${CVMFS_SOURCE_DIR}/ingestion/chunk_detector.cc PROPERTY COMPILE_FLAGS -O0)
 endif(CVMFS_BUGGY_XCODE)
 
 if (APPLE)
