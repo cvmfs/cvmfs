@@ -63,19 +63,22 @@ IngestionPipeline::IngestionPipeline(
   for (unsigned i = 0; i < nfork_base * kNforkCompress; ++i) {
     Tube<BlockItem> *t = new Tube<BlockItem>();
     tubes_compress_.TakeTube(t);
-    tasks_compress_.TakeConsumer(new TaskCompress(t, &tubes_hash_));
+    tasks_compress_.TakeConsumer(
+      new TaskCompress(t, &tubes_hash_, &allocator_compress_));
   }
   tubes_compress_.Activate();
 
   for (unsigned i = 0; i < nfork_base * kNforkChunk; ++i) {
     Tube<BlockItem> *t = new Tube<BlockItem>();
     tubes_chunk_.TakeTube(t);
-    tasks_chunk_.TakeConsumer(new TaskChunk(t, &tubes_compress_));
+    tasks_chunk_.TakeConsumer(
+      new TaskChunk(t, &tubes_compress_, &allocator_chunk_));
   }
   tubes_chunk_.Activate();
 
   for (unsigned i = 0; i < nfork_base * kNforkRead; ++i) {
-    TaskRead *task_read = new TaskRead(&tube_input_, &tubes_chunk_);
+    TaskRead *task_read =
+      new TaskRead(&tube_input_, &tubes_chunk_, &allocator_read_);
     uint64_t low = static_cast<uint64_t>(
       static_cast<double>(platform_memsize()) * kMemFractionLowWatermark);
     uint64_t high = static_cast<uint64_t>(
@@ -199,12 +202,14 @@ ScrubbingPipeline::ScrubbingPipeline() : spawned_(false) {
   for (unsigned i = 0; i < nfork_base * kNforkChunk; ++i) {
     Tube<BlockItem> *t = new Tube<BlockItem>();
     tubes_chunk_.TakeTube(t);
-    tasks_chunk_.TakeConsumer(new TaskChunk(t, &tubes_hash_));
+    tasks_chunk_.TakeConsumer(
+      new TaskChunk(t, &tubes_hash_, &allocator_chunk_));
   }
   tubes_chunk_.Activate();
 
   for (unsigned i = 0; i < nfork_base * kNforkRead; ++i) {
-    TaskRead *task_read = new TaskRead(&tube_input_, &tubes_chunk_);
+    TaskRead *task_read =
+      new TaskRead(&tube_input_, &tubes_chunk_, &allocator_read_);
     task_read->SetWatermarks(kMemLowWatermark, kMemHighWatermark);
     tasks_read_.TakeConsumer(task_read);
   }

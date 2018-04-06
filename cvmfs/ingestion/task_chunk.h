@@ -15,10 +15,17 @@
 #include "ingestion/tube.h"
 #include "util/posix.h"
 
+class ItemAllocator;
+
 class TaskChunk : public TubeConsumer<BlockItem> {
  public:
-  TaskChunk(Tube<BlockItem> *tube_in, TubeGroup<BlockItem> *tubes_out)
-    : TubeConsumer<BlockItem>(tube_in), tubes_out_(tubes_out) { }
+  TaskChunk(Tube<BlockItem> *tube_in,
+            TubeGroup<BlockItem> *tubes_out,
+            ItemAllocator *allocator)
+    : TubeConsumer<BlockItem>(tube_in)
+    , tubes_out_(tubes_out)
+    , allocator_(allocator)
+  { }
 
  protected:
   virtual void Process(BlockItem *input_block);
@@ -70,6 +77,7 @@ class TaskChunk : public TubeConsumer<BlockItem> {
   static atomic_int64 tag_seq_;
 
   TubeGroup<BlockItem> *tubes_out_;
+  ItemAllocator *allocator_;
   TagMap tag_map_;
 };
 

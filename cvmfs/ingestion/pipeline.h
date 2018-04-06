@@ -10,6 +10,7 @@
 #include "compression.h"
 #include "hash.h"
 #include "ingestion/item.h"
+#include "ingestion/item_mem.h"
 #include "ingestion/task.h"
 #include "ingestion/tube.h"
 #include "upload_spooler_result.h"
@@ -74,6 +75,10 @@ class IngestionPipeline : public Observable<upload::SpoolerResult> {
 
   TubeGroup<FileItem> tubes_register_;
   TubeConsumerGroup<FileItem> tasks_register_;
+
+  ItemAllocator allocator_read_;
+  ItemAllocator allocator_chunk_;
+  ItemAllocator allocator_compress_;
 };  // class IngestionPipeline
 
 
@@ -141,6 +146,9 @@ class ScrubbingPipeline : public Observable<ScrubbingResult> {
 
   TubeGroup<BlockItem> tubes_scrubbing_callback_;
   TubeConsumerGroup<BlockItem> tasks_scrubbing_callback_;
+
+  ItemAllocator allocator_read_;
+  ItemAllocator allocator_chunk_;
 };
 
 #endif  // CVMFS_INGESTION_PIPELINE_H_

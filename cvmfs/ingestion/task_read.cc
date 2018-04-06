@@ -59,7 +59,7 @@ void TaskRead::Process(FileItem *item) {
       abort();
     }
 
-    BlockItem *block_item = new BlockItem(tag);
+    BlockItem *block_item = new BlockItem(tag, allocator_);
     block_item->SetFileItem(item);
     if (nbytes == 0) {
       block_item->MakeStop();

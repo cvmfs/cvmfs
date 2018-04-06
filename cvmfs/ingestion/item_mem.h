@@ -7,6 +7,7 @@
 
 #include <pthread.h>
 
+#include <cassert>
 #include <vector>
 
 #include "malloc_arena.h"
@@ -17,13 +18,7 @@
  */
 class ItemAllocator {
  public:
-  static ItemAllocator *GetInstance() {
-    if (instance_ == NULL)
-      instance_ = new ItemAllocator();
-    return instance_;
-  }
-  static void CleanupInstance();
-  static bool HasInstance() { return instance_ != NULL; }
+  ItemAllocator();
   ~ItemAllocator();
 
   void *Malloc(unsigned size);
@@ -31,9 +26,6 @@ class ItemAllocator {
 
  private:
   static const unsigned kArenaSize = 128 * 1024 * 1024;  // 128 MB
-  static ItemAllocator *instance_;
-
-  ItemAllocator();
 
   std::vector<MallocArena *> malloc_arenas_;
   pthread_mutex_t lock_;

@@ -98,8 +98,9 @@ void ChunkItem::MakeBulkChunk() {
 atomic_int64 BlockItem::managed_bytes_ = 0;
 
 
-BlockItem::BlockItem()
-  : type_(kBlockHollow)
+BlockItem::BlockItem(ItemAllocator *allocator)
+  : allocator_(allocator)
+  , type_(kBlockHollow)
   , tag_(-1)
   , file_item_(NULL)
   , chunk_item_(NULL)
@@ -109,8 +110,9 @@ BlockItem::BlockItem()
 { }
 
 
-BlockItem::BlockItem(int64_t tag)
-  : type_(kBlockHollow)
+BlockItem::BlockItem(int64_t tag, ItemAllocator *allocator)
+  : allocator_(allocator)
+  , type_(kBlockHollow)
   , tag_(tag)
   , file_item_(NULL)
   , chunk_item_(NULL)
@@ -124,7 +126,7 @@ BlockItem::BlockItem(int64_t tag)
 
 BlockItem::~BlockItem() {
   if (data_)
-    ItemAllocator::GetInstance()->Free(data_);
+    allocator_->Free(data_);
   atomic_xadd64(&managed_bytes_, -static_cast<int64_t>(capacity_));
 }
 
@@ -143,12 +145,12 @@ void BlockItem::MakeStop() {
 
 void BlockItem::MakeData(uint32_t capacity) {
   assert(type_ == kBlockHollow);
+  assert(allocator_ != NULL);
   assert(capacity > 0);
 
   type_ = kBlockData;
   capacity_ = capacity;
-  data_ = reinterpret_cast<unsigned char *>(
-    ItemAllocator::GetInstance()->Malloc(capacity_));
+  data_ = reinterpret_cast<unsigned char *>(allocator_->Malloc(capacity_));
   atomic_xadd64(&managed_bytes_, static_cast<int64_t>(capacity_));
 }
 
@@ -164,6 +166,7 @@ void BlockItem::MakeDataMove(BlockItem *other) {
   type_ = kBlockData;
   capacity_ = size_ = other->size_;
   data_ = other->data_;
+  allocator_ = other->allocator_;
 
   other->Discharge();
 }
@@ -177,12 +180,12 @@ void BlockItem::MakeDataCopy(
   uint32_t size)
 {
   assert(type_ == kBlockHollow);
+  assert(allocator_ != NULL);
   assert(size > 0);
 
   type_ = kBlockData;
   capacity_ = size_ = size;
-  data_ = reinterpret_cast<unsigned char *>(
-    ItemAllocator::GetInstance()->Malloc(capacity_));
+  data_ = reinterpret_cast<unsigned char *>(allocator_->Malloc(capacity_));
   memcpy(data_, data, size);
   atomic_xadd64(&managed_bytes_, static_cast<int64_t>(capacity_));
 }
@@ -192,7 +195,7 @@ void BlockItem::Reset() {
   assert(type_ == kBlockData);
 
   atomic_xadd64(&managed_bytes_, -static_cast<int64_t>(capacity_));
-  ItemAllocator::GetInstance()->Free(data_);
+  allocator_->Free(data_);
   data_ = NULL;
   size_ = capacity_ = 0;
   type_ = kBlockHollow;

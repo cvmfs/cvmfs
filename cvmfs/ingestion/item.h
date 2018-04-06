@@ -24,7 +24,7 @@ namespace upload {
 struct UploadStreamHandle;
 }
 
-class FileItem;
+class ItemAllocator;
 
 
 /**
@@ -171,12 +171,12 @@ class BlockItem : SingleCopy {
     kBlockStop,
   };
 
-  BlockItem();
-  explicit BlockItem(int64_t tag);
+  explicit BlockItem(ItemAllocator *allocator);
+  BlockItem(int64_t tag, ItemAllocator *allocator);
   ~BlockItem();
 
   static BlockItem *CreateQuitBeacon() {
-    return new BlockItem();
+    return new BlockItem(NULL);
   }
   bool IsQuitBeacon() {
     return type_ == kBlockHollow;
@@ -215,6 +215,8 @@ class BlockItem : SingleCopy {
    * Total capacity of all BlockItem()
    */
   static atomic_int64 managed_bytes_;
+
+  ItemAllocator *allocator_;
   BlockType type_;
 
   /**

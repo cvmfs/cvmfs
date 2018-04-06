@@ -10,14 +10,6 @@
 #include "util_concurrency.h"
 
 
-ItemAllocator *ItemAllocator::instance_ = NULL;
-
-void ItemAllocator::CleanupInstance() {
-  delete instance_;
-  instance_ = NULL;
-}
-
-
 void ItemAllocator::Free(void *ptr) {
   MutexLockGuard guard(lock_);
 
