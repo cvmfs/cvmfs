@@ -47,9 +47,9 @@ if(LibArchive_INCLUDE_DIR AND EXISTS "${LibArchive_INCLUDE_DIR}/archive.h")
 endif()
 
 include(FindPackageHandleStandardArgs)
-FIND_PACKAGE_HANDLE_STANDARD_ARGS(LibArchive 
-       DEFAULT_MSG LibArchive_LIBRARY 
-       LibArchive_INCLUDE_DIR)
+FIND_PACKAGE_HANDLE_STANDARD_ARGS(LibArchive
+	DEFAULT_MSG LibArchive_LIBRARY
+	LibArchive_INCLUDE_DIR)
 
 set(LIBARCHIVE_FOUND)
 

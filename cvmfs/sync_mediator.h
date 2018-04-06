@@ -157,7 +157,6 @@ class SyncMediator : public virtual AbstractSyncMediator {
   void CreateNestedCatalog(SharedPtr<SyncItem> directory);
   void RemoveNestedCatalog(SharedPtr<SyncItem> directory);
 
-  // Called by file system traversal
   void RemoveDirectoryRecursively(SharedPtr<SyncItem> entry);
   void RemoveFileCallback(const std::string &parent_dir,
                           const std::string &file_name);

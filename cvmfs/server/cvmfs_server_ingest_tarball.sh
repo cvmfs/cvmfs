@@ -6,10 +6,10 @@ cvmfs_server_ingest_tarball() {
   local tar_file=""
   local to_delete="" # directories or file to delete before the extraction
   local name="" #repository name
- 
+
   local force_native=0
   local force_external=0
-  
+
 
   while [ "$2" != "" ]; do
     case $1 in
@@ -24,7 +24,7 @@ cvmfs_server_ingest_tarball() {
         then
           to_delete=$2
         else
-          to_delete=$to_delete:$2  
+          to_delete=$to_delete:$2
         fi
         ;;
     esac
@@ -46,7 +46,7 @@ cvmfs_server_ingest_tarball() {
   upstream=$CVMFS_UPSTREAM_STORAGE
   upstream_type=$(get_upstream_type $upstream)
 
- 
+
   is_stratum0 $name   || die "This is not a stratum 0 repository"
   is_publishing $name && die "Another publish process is active for $name"
   if [ x"$upstream_type" = xgw ]; then
@@ -71,15 +71,15 @@ cvmfs_server_ingest_tarball() {
     fi
   fi
 
-  is_owner_or_root $name ||  die "Permission denied: Repository $name is owned by $user" 
+  is_owner_or_root $name ||  die "Permission denied: Repository $name is owned by $user"
 #  check_repository_compatibility $name
 #  check_url "${CVMFS_STRATUM0}/.cvmfspublished" 20 ||  die "Repository unavailable under $CVMFS_STRATUM0"
-  check_expiry $name $stratum0   || die "Repository whitelist for $name is expired!" 
-# # is_in_transaction $name        || die "Repository $name is not in a transaction" 
-# 
-  [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || die "Open writable file descriptors on $name" 
+  check_expiry $name $stratum0   || die "Repository whitelist for $name is expired!"
+# # is_in_transaction $name        || die "Repository $name is not in a transaction"
+#
+  [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || die "Open writable file descriptors on $name"
   is_cwd_on_path "/cvmfs/$name" && die "Current working directory is in /cvmfs/$name.  Please release, e.g. by 'cd \$HOME'." || true
-  gc_timespan="$(get_auto_garbage_collection_timespan $name)" || die 
+  gc_timespan="$(get_auto_garbage_collection_timespan $name)" || die
   if [ x"$manual_revision" != x"" ]; then
     if [ "x$(echo "$manual_revision" | tr -cd 0-9)" != "x$manual_revision" ]; then
       die "Invalid revision number: $manual_revision"
@@ -128,7 +128,7 @@ cvmfs_server_ingest_tarball() {
   [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-z $CVMFS_LOG_LEVEL"
 
   local trusted_certs="/etc/cvmfs/repositories.d/${name}/trusted_certs"
-  
+
   local tag_command="$(__swissknife_cmd dbg) tag_edit \
     -r $upstream                                      \
     -w $stratum0                                      \
@@ -190,7 +190,7 @@ cvmfs_server_ingest_tarball() {
   fi
 
   debug ingest_tarball_command
-  
+
 
   # ---> do it! (from here on we are changing things)
   publish_before_hook $name
@@ -201,11 +201,11 @@ cvmfs_server_ingest_tarball() {
   handle_read_only_file_descriptors_on_mount_point $name $open_fd_dialog || use_fd_fallback=1
 
   publish_starting $name
-  
+
   $user_shell "$ingest_tarball_command" || { publish_failed $name; die "Synchronization failed\n\nExecuted Command:\n$sync_command";   }
 
   cvmfs_sys_file_is_regular $manifest            || { publish_failed $name; die "Manifest creation failed\n\nExecuted Command:\n$sync_command"; }
-  
+
   local branch_hash=
   local trunk_hash=$(grep "^C" $manifest | tr -d C)
   if is_checked_out $name; then
@@ -318,19 +318,5 @@ cvmfs_server_ingest_tarball() {
   # then it checks that everything is ok that doesn't hurt
   health_check -r $name
 
-
-#  debug base_dir
-#  debug tar_file
-#  debug to_delete
-#  debug name
-#  debug base_hash
-#  debug upstream
-#  debug user
-#  debug spool_dir
-#  debug manifest
-#  debug stratum0
-#  debug auto_tag_cleanup_list
-#  debug log_level
-#  debug trusted_certs
 }
 
