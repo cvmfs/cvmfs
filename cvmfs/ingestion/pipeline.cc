@@ -64,7 +64,7 @@ IngestionPipeline::IngestionPipeline(
     Tube<BlockItem> *t = new Tube<BlockItem>();
     tubes_compress_.TakeTube(t);
     tasks_compress_.TakeConsumer(
-      new TaskCompress(t, &tubes_hash_, &allocator_compress_));
+      new TaskCompress(t, &tubes_hash_, &item_allocator_));
   }
   tubes_compress_.Activate();
 
@@ -72,7 +72,7 @@ IngestionPipeline::IngestionPipeline(
     Tube<BlockItem> *t = new Tube<BlockItem>();
     tubes_chunk_.TakeTube(t);
     tasks_chunk_.TakeConsumer(
-      new TaskChunk(t, &tubes_compress_, &allocator_chunk_));
+      new TaskChunk(t, &tubes_compress_, &item_allocator_));
   }
   tubes_chunk_.Activate();
 
@@ -85,7 +85,7 @@ IngestionPipeline::IngestionPipeline(
   }
   for (unsigned i = 0; i < nfork_base * kNforkRead; ++i) {
     TaskRead *task_read =
-      new TaskRead(&tube_input_, &tubes_chunk_, &allocator_read_);
+      new TaskRead(&tube_input_, &tubes_chunk_, &item_allocator_);
     task_read->SetWatermarks(low, high);
     tasks_read_.TakeConsumer(task_read);
   }
@@ -209,13 +209,13 @@ ScrubbingPipeline::ScrubbingPipeline()
     Tube<BlockItem> *t = new Tube<BlockItem>();
     tubes_chunk_.TakeTube(t);
     tasks_chunk_.TakeConsumer(
-      new TaskChunk(t, &tubes_hash_, &allocator_chunk_));
+      new TaskChunk(t, &tubes_hash_, &item_allocator_));
   }
   tubes_chunk_.Activate();
 
   for (unsigned i = 0; i < nfork_base * kNforkRead; ++i) {
     TaskRead *task_read =
-      new TaskRead(&tube_input_, &tubes_chunk_, &allocator_read_);
+      new TaskRead(&tube_input_, &tubes_chunk_, &item_allocator_);
     task_read->SetWatermarks(kMemLowWatermark, kMemHighWatermark);
     tasks_read_.TakeConsumer(task_read);
   }

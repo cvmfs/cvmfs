@@ -77,9 +77,7 @@ class IngestionPipeline : public Observable<upload::SpoolerResult> {
   TubeGroup<FileItem> tubes_register_;
   TubeConsumerGroup<FileItem> tasks_register_;
 
-  ItemAllocator allocator_read_;
-  ItemAllocator allocator_chunk_;
-  ItemAllocator allocator_compress_;
+  ItemAllocator item_allocator_;
 };  // class IngestionPipeline
 
 
@@ -149,8 +147,7 @@ class ScrubbingPipeline : public Observable<ScrubbingResult> {
   TubeGroup<BlockItem> tubes_scrubbing_callback_;
   TubeConsumerGroup<BlockItem> tasks_scrubbing_callback_;
 
-  ItemAllocator allocator_read_;
-  ItemAllocator allocator_chunk_;
+  ItemAllocator item_allocator_;
 };
 
 #endif  // CVMFS_INGESTION_PIPELINE_H_
