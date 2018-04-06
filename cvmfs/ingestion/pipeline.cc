@@ -21,9 +21,6 @@
 #include "util_concurrency.h"
 
 
-const double IngestionPipeline::kMemFractionLowWatermark = 0.5;
-const double IngestionPipeline::kMemFractionHighWatermark = 0.75;
-
 IngestionPipeline::IngestionPipeline(
   upload::AbstractUploader *uploader,
   const upload::SpoolerDefinition &spooler_definition)
@@ -79,10 +76,8 @@ IngestionPipeline::IngestionPipeline(
   }
   tubes_chunk_.Activate();
 
-  uint64_t low = static_cast<uint64_t>(
-    static_cast<double>(platform_memsize()) * kMemFractionLowWatermark);
-  uint64_t high = static_cast<uint64_t>(
-    static_cast<double>(platform_memsize()) * kMemFractionHighWatermark);
+  uint64_t low = kMemLowWatermark;
+  uint64_t high = kMemHighWatermark;
   char *fixed_limit_mb = getenv("_CVMFS_SERVER_PIPELINE_MB");
   if (fixed_limit_mb != NULL) {
     high = String2Uint64(fixed_limit_mb) * 1024 * 1024;
