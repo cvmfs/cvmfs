@@ -10,6 +10,7 @@
 #include <cassert>
 #include <vector>
 
+#include "atomic.h"
 #include "malloc_arena.h"
 
 /**
@@ -24,8 +25,11 @@ class ItemAllocator {
   void *Malloc(unsigned size);
   void Free(void *ptr);
 
+  int64_t total_allocated() { return atomic_read64(&total_allocated_); }
+
  private:
   static const unsigned kArenaSize = 128 * 1024 * 1024;  // 128 MB
+  static atomic_int64 total_allocated_;
 
   std::vector<MallocArena *> malloc_arenas_;
   pthread_mutex_t lock_;
