@@ -4,6 +4,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <linux/limits.h>
 #include <poll.h>
 #include <sys/inotify.h>
 #include <sys/time.h>
@@ -73,7 +74,8 @@ bool FileWatcherInotify::RunEventLoop(const FileWatcher::HandlerMap& handlers,
     }
 
     const size_t event_size = sizeof(struct inotify_event);
-    const size_t buffer_size = event_size + 100;
+    // We need a buffer large enough to accommodate an event for the largest path name
+    const size_t buffer_size = event_size + PATH_MAX + 1;
     char buffer[buffer_size];
     if (poll_set[1].revents & POLLIN) {
       int len = read(inotify_fd_, buffer, buffer_size);
