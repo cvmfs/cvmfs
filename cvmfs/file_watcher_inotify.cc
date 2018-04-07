@@ -52,6 +52,9 @@ bool FileWatcherInotify::RunEventLoop(const FileWatcher::HandlerMap& handlers,
   while (!stop) {
     int ready = poll(poll_set, 2, -1);
     if (ready == -1) {
+      if (errno == EINTR) {
+        continue;
+      }
       LogCvmfs(kLogCvmfs, kLogSyslogErr,
                "FileWatcherInotify - Could not poll events. Errno: %d", errno);
       return false;
