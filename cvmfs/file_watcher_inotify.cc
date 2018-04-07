@@ -99,11 +99,12 @@ bool FileWatcherInotify::RunEventLoop(const FileWatcher::HandlerMap& handlers,
             // Attributes
             event = file_watcher::kAttributes;
           } else if (inotify_event->mask & IN_IGNORED) {
-            // Attributes
+            // IN_IGNORED event is generated after a file is deleted and the watch is
+            // removed
             event = file_watcher::kIgnored;
           }
           bool clear_handler = true;
-          if (event != file_watcher::kInvalid ||
+          if (event != file_watcher::kInvalid &&
               event != file_watcher::kIgnored) {
             current_record.handler_->Handle(current_record.file_path_, event,
                                             &clear_handler);
