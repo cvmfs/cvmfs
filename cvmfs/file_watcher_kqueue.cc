@@ -137,7 +137,7 @@ void FileWatcherKqueue::RemoveFilter(int fd) {
 void FileWatcherKqueue::RegisterFilter(const std::string& file_path,
                                        EventHandler* handler) {
   bool done = false;
-  BackoffThrottle throttle(1000, 10000, 50000);
+  BackoffThrottle throttle(kInitialDelay, kMaxDelay, kResetDelay);
   while (!done) {
     int fd = open(file_path.c_str(), O_RDONLY);
     if (fd == -1) {

@@ -17,6 +17,10 @@ EventHandler::EventHandler() {}
 
 EventHandler::~EventHandler() {}
 
+const unsigned FileWatcher::kInitialDelay = 1000;
+const unsigned FileWatcher::kMaxDelay = 10000;
+const unsigned FileWatcher::kResetDelay = 50000;
+
 FileWatcher::FileWatcher()
     : handler_map_()
     , control_pipe_to_back_()

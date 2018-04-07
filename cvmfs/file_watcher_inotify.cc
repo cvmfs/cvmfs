@@ -143,7 +143,7 @@ bool FileWatcherInotify::RunEventLoop(const FileWatcher::HandlerMap& handlers,
 void FileWatcherInotify::RegisterFilter(const std::string& file_path,
                                         EventHandler* handler) {
   bool done = false;
-  BackoffThrottle throttle(1000, 10000, 50000);
+  BackoffThrottle throttle(kInitialDelay, kMaxDelay, kResetDelay);
   while (!done) {
     int wd = inotify_add_watch(
         inotify_fd_, file_path.c_str(),

@@ -74,6 +74,11 @@ class FileWatcher {
   void Stop();
 
  protected:
+  // Delays controlling the backoff throttle when registering new watches
+  const static unsigned kInitialDelay;
+  const static unsigned kMaxDelay;
+  const static unsigned kResetDelay;
+
   virtual bool RunEventLoop(const HandlerMap& handler_map,
                             int read_pipe, int write_pipe) = 0;
 
