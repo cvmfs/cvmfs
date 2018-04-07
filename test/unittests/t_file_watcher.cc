@@ -16,23 +16,35 @@ typedef std::map<file_watcher::Event, int> Counters;
 
 class TestEventHandler : public file_watcher::EventHandler {
  public:
+  typedef std::set<file_watcher::Event> EventMask;
+
   explicit TestEventHandler(Counters* ctrs,
                             FifoChannel<bool>* chan)
-      : counters_(ctrs)
+      : mask_()
+      , counters_(ctrs)
       , chan_(chan)
       , clear_(true) {}
 
   virtual ~TestEventHandler() {}
 
+  // The event mask contains the events which are of interest for the test
+  // By default, all events are considered to be of interest
+  void SetEventMask(const EventMask& mask) {
+    mask_ = mask;
+  }
+
   virtual bool Handle(const std::string& /*file_path*/,
                       file_watcher::Event event,
                       bool* clear_handler) {
-    (*counters_)[event]++;
-    *clear_handler = clear_;
-    chan_->Enqueue(true);
+    if (mask_.empty() || (mask_.count(event) == 1)) {
+      (*counters_)[event]++;
+      *clear_handler = clear_;
+      chan_->Enqueue(true);
+    }
     return true;
   }
 
+  EventMask mask_;
   Counters* counters_;
   FifoChannel<bool>* chan_;
   bool clear_;
@@ -74,6 +86,9 @@ TEST_F(T_FileWatcher, ModifiedEvent) {
   EXPECT_TRUE(watcher.IsValid());
 
   TestEventHandler* hd(new TestEventHandler(&counters_, channel_.weak_ref()));
+  TestEventHandler::EventMask mask;
+  mask.insert(file_watcher::kModified);
+  hd->SetEventMask(mask);
   watcher->RegisterHandler(watched_file_name, hd);
 
   EXPECT_TRUE(watcher->Spawn());
@@ -98,6 +113,9 @@ TEST_F(T_FileWatcher, DeletedEvent) {
   EXPECT_TRUE(watcher.IsValid());
 
   TestEventHandler* hd(new TestEventHandler(&counters_, channel_.weak_ref()));
+  TestEventHandler::EventMask mask;
+  mask.insert(file_watcher::kDeleted);
+  hd->SetEventMask(mask);
   watcher->RegisterHandler(watched_file_name, hd);
 
   EXPECT_TRUE(watcher->Spawn());
@@ -122,6 +140,10 @@ TEST_F(T_FileWatcher, ModifiedThenDeletedEvent) {
   EXPECT_TRUE(watcher.IsValid());
 
   TestEventHandler* hd(new TestEventHandler(&counters_, channel_.weak_ref()));
+  TestEventHandler::EventMask mask;
+  mask.insert(file_watcher::kModified);
+  mask.insert(file_watcher::kDeleted);
+  hd->SetEventMask(mask);
   hd->clear_ = false;
   watcher->RegisterHandler(watched_file_name, hd);
 
