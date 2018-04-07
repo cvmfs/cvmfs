@@ -75,12 +75,19 @@ class FileWatcher {
 
  protected:
   // Delays controlling the backoff throttle when registering new watches
-  const static unsigned kInitialDelay;
-  const static unsigned kMaxDelay;
-  const static unsigned kResetDelay;
+  static const unsigned kInitialDelay;
+  static const unsigned kMaxDelay;
+  static const unsigned kResetDelay;
+
+  void RegisterFilter(const std::string& file_path,
+                      EventHandler* handler);
 
   virtual bool RunEventLoop(const HandlerMap& handler_map,
                             int read_pipe, int write_pipe) = 0;
+
+  virtual int TryRegisterFilter(const std::string& file_path) = 0;
+
+  std::map<int, WatchRecord> watch_records_;
 
  private:
   static void* BackgroundThread(void* d);

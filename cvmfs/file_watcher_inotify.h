@@ -21,12 +21,10 @@ class FileWatcherInotify : public FileWatcher {
   virtual bool RunEventLoop(const FileWatcher::HandlerMap& handler,
                             int read_pipe, int write_pipe);
 
- private:
-  void RegisterFilter(const std::string& file_path,
-                      EventHandler* handler);
+  virtual int TryRegisterFilter(const std::string& file_path);
 
+ private:
   int inotify_fd_;
-  std::map<int, WatchRecord> watch_records_;
 };
 
 }  // namespace file_watcher

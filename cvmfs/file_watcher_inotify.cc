@@ -14,7 +14,6 @@
 #include <string>
 #include <vector>
 
-#include "backoff.h"
 #include "file_watcher_inotify.h"
 #include "logging.h"
 #include "util/posix.h"
@@ -140,28 +139,10 @@ bool FileWatcherInotify::RunEventLoop(const FileWatcher::HandlerMap& handlers,
   return true;
 }
 
-void FileWatcherInotify::RegisterFilter(const std::string& file_path,
-                                        EventHandler* handler) {
-  bool done = false;
-  BackoffThrottle throttle(kInitialDelay, kMaxDelay, kResetDelay);
-  while (!done) {
-    int wd = inotify_add_watch(
-        inotify_fd_, file_path.c_str(),
-        IN_ATTRIB | IN_MODIFY | IN_DELETE_SELF | IN_MOVE_SELF);
-    if (wd < 0) {
-      LogCvmfs(
-          kLogCvmfs, kLogDebug,
-          "FileWatcherInotify - Could not add watch for file %s. Retrying.",
-          file_path.c_str());
-      throttle.Throttle();
-      continue;
-    }
-
-    watch_records_[wd] = WatchRecord(file_path, handler);
-
-    done = true;
-  }
-  throttle.Reset();
+int FileWatcherInotify::TryRegisterFilter(const std::string& file_path) {
+  return inotify_add_watch(
+    inotify_fd_, file_path.c_str(),
+    IN_ATTRIB | IN_MODIFY | IN_DELETE_SELF | IN_MOVE_SELF);
 }
 
 }  // namespace file_watcher

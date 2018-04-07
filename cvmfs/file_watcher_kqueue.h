@@ -21,13 +21,12 @@ class FileWatcherKqueue : public FileWatcher {
   virtual bool RunEventLoop(const FileWatcher::HandlerMap& handler,
                             int read_pipe, int write_pipe);
 
+  virtual int TryRegisterFilter(const std::string& file_path);
+
  private:
   void RemoveFilter(int fd);
-  void RegisterFilter(const std::string& file_path,
-                      EventHandler* handler);
 
   int kq_;
-  std::map<int, WatchRecord> watch_records_;
 };
 
 }  // namespace file_watcher
