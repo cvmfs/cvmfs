@@ -9,6 +9,7 @@
 
 #include "ingestion/chunk_detector.h"
 #include "ingestion/item.h"
+#include "ingestion/item_mem.h"
 #include "prng.h"
 
 
@@ -25,7 +26,7 @@ class T_ChunkDetectors : public ::testing::Test {
     // produce some test data
     size_t i = 0;
     while (i < data_size()) {
-      BlockItem *buffer = new BlockItem();
+      BlockItem *buffer = new BlockItem(&item_allocator_);
       buffer->MakeData(std::min(data_size() - i, buffer_size));
       for (size_t j = 0; j < buffer->capacity(); ++j) {
         *(buffer->data() + j) = static_cast<unsigned char>(rng_.Next(256));
@@ -42,7 +43,7 @@ class T_ChunkDetectors : public ::testing::Test {
 
     size_t i = 0;
     while (i < data_size()) {
-      BlockItem *buffer = new BlockItem();
+      BlockItem *buffer = new BlockItem(&item_allocator_);
       buffer->MakeData(std::min(data_size() - i, buffer_size));
       memset(buffer->data(), 0, buffer->capacity());
       buffer->set_size(buffer->capacity());
@@ -74,6 +75,7 @@ class T_ChunkDetectors : public ::testing::Test {
 
  private:
   Prng rng_;
+  ItemAllocator item_allocator_;
 };
 
 TEST_F(T_ChunkDetectors, StaticOffsetChunkDetectorSlow) {
@@ -84,8 +86,9 @@ TEST_F(T_ChunkDetectors, StaticOffsetChunkDetectorSlow) {
   EXPECT_TRUE(static_offset_detector.MightFindChunks(static_chunk_size + 1));
 
   unsigned char bytes[static_chunk_size / 2];
-  BlockItem buffer;
-  buffer.MakeData(bytes, static_chunk_size / 2);
+  ItemAllocator allocator;
+  BlockItem buffer(&allocator);
+  buffer.MakeDataCopy(bytes, static_chunk_size / 2);
 
   uint64_t next_cut_mark = static_offset_detector.FindNextCutMark(&buffer);
   EXPECT_EQ(0U, next_cut_mark);
@@ -98,8 +101,6 @@ TEST_F(T_ChunkDetectors, StaticOffsetChunkDetectorSlow) {
 
   next_cut_mark = static_offset_detector.FindNextCutMark(&buffer);
   EXPECT_EQ(0U, next_cut_mark);
-
-  buffer.Discharge();
 
   CreateBuffers(1048576);
 

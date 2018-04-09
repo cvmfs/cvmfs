@@ -30,7 +30,7 @@ void TaskCompress::Process(BlockItem *input_block) {
   TagMap::iterator iter_find = tag_map_.find(tag);
   if (iter_find == tag_map_.end()) {
     // So far unseen chunk, start new stream of compressed blocks
-    output_block = new BlockItem(tag);
+    output_block = new BlockItem(tag, allocator_);
     output_block->SetFileItem(input_block->file_item());
     output_block->SetChunkItem(input_block->chunk_item());
     output_block->MakeData(kCompressedBlockSize);
@@ -53,7 +53,7 @@ void TaskCompress::Process(BlockItem *input_block) {
 
     if (output_block->IsFull()) {
       tubes_out_->Dispatch(output_block);
-      output_block = new BlockItem(tag);
+      output_block = new BlockItem(tag, allocator_);
       output_block->SetFileItem(input_block->file_item());
       output_block->SetChunkItem(input_block->chunk_item());
       output_block->MakeData(kCompressedBlockSize);
@@ -68,7 +68,7 @@ void TaskCompress::Process(BlockItem *input_block) {
       delete output_block;
     tag_map_.erase(tag);
 
-    BlockItem *stop_block = new BlockItem(tag);
+    BlockItem *stop_block = new BlockItem(tag, allocator_);
     stop_block->MakeStop();
     stop_block->SetFileItem(input_block->file_item());
     stop_block->SetChunkItem(input_block->chunk_item());

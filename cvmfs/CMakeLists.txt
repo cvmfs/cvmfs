@@ -168,6 +168,7 @@ set (CVMFS_FSCK_SOURCES
 
 
 set (CVMFS_SWISSKNIFE_SOURCES
+  backoff.cc
   catalog.cc
   catalog_counters.cc
   catalog_mgr_ro.cc
@@ -188,6 +189,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   history_sqlite.cc
   ingestion/chunk_detector.cc
   ingestion/item.cc
+  ingestion/item_mem.cc
   ingestion/pipeline.cc
   ingestion/task_chunk.cc
   ingestion/task_compress.cc
@@ -274,6 +276,7 @@ set (CVMFS_SUID_HELPER_SOURCES
 )
 
 set (CVMFS_PRELOADER_SOURCES
+  backoff.cc
   catalog.cc
   catalog_sql.cc
   compression.cc
@@ -286,6 +289,7 @@ set (CVMFS_PRELOADER_SOURCES
   history_sqlite.cc
   ingestion/chunk_detector.cc
   ingestion/item.cc
+  ingestion/item_mem.cc
   ingestion/pipeline.cc
   ingestion/task_chunk.cc
   ingestion/task_compress.cc
@@ -367,6 +371,7 @@ if(BUILD_RECEIVER)
     receiver/reactor.cc
     receiver/receiver.cc
     receiver/session_token.cc
+    backoff.cc
     catalog.cc
     catalog_rw.cc
     catalog_counters.cc
@@ -385,6 +390,7 @@ if(BUILD_RECEIVER)
     history_sqlite.cc
     ingestion/chunk_detector.cc
     ingestion/item.cc
+    ingestion/item_mem.cc
     ingestion/pipeline.cc
     ingestion/task_chunk.cc
     ingestion/task_compress.cc

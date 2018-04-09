@@ -54,7 +54,7 @@ void TaskChunk::Process(BlockItem *input_block) {
 
   BlockItem *output_block_bulk = NULL;
   if (chunk_info.bulk_chunk != NULL) {
-    output_block_bulk = new BlockItem(chunk_info.output_tag_bulk);
+    output_block_bulk = new BlockItem(chunk_info.output_tag_bulk, allocator_);
     output_block_bulk->SetFileItem(file_item);
     output_block_bulk->SetChunkItem(chunk_info.bulk_chunk);
   }
@@ -69,7 +69,8 @@ void TaskChunk::Process(BlockItem *input_block) {
         assert(file_item->size() >= chunk_info.next_chunk->offset());
         chunk_info.next_chunk->set_size(
           file_item->size() - chunk_info.next_chunk->offset());
-        BlockItem *block_stop = new BlockItem(chunk_info.output_tag_chunk);
+        BlockItem *block_stop =
+          new BlockItem(chunk_info.output_tag_chunk, allocator_);
         block_stop->SetFileItem(file_item);
         block_stop->SetChunkItem(chunk_info.next_chunk);
         block_stop->MakeStop();
@@ -86,7 +87,7 @@ void TaskChunk::Process(BlockItem *input_block) {
                                           input_block->size());
         } else {
           // There is only the bulk chunk, zero copy
-          output_block_bulk->MakeData(input_block->data(), input_block->size());
+          output_block_bulk->MakeDataMove(input_block);
         }
       }
 
@@ -101,7 +102,8 @@ void TaskChunk::Process(BlockItem *input_block) {
           unsigned tail_size = cut_mark_in_block - offset_in_block;
 
           if (tail_size > 0) {
-            BlockItem *block_tail = new BlockItem(chunk_info.output_tag_chunk);
+            BlockItem *block_tail =
+              new BlockItem(chunk_info.output_tag_chunk, allocator_);
             block_tail->SetFileItem(file_item);
             block_tail->SetChunkItem(chunk_info.next_chunk);
             block_tail->MakeDataCopy(input_block->data() + offset_in_block,
@@ -115,7 +117,8 @@ void TaskChunk::Process(BlockItem *input_block) {
           if (cut_mark < file_item->size()) {
             chunk_info.next_chunk->set_size(
               cut_mark - chunk_info.next_chunk->offset());
-            BlockItem *block_stop = new BlockItem(chunk_info.output_tag_chunk);
+            BlockItem *block_stop =
+              new BlockItem(chunk_info.output_tag_chunk, allocator_);
             block_stop->SetFileItem(file_item);
             block_stop->SetChunkItem(chunk_info.next_chunk);
             block_stop->MakeStop();
@@ -131,7 +134,8 @@ void TaskChunk::Process(BlockItem *input_block) {
         assert(input_block->size() >= offset_in_block);
         unsigned tail_size = input_block->size() - offset_in_block;
         if (tail_size > 0) {
-          BlockItem *block_tail = new BlockItem(chunk_info.output_tag_chunk);
+          BlockItem *block_tail =
+            new BlockItem(chunk_info.output_tag_chunk, allocator_);
           block_tail->SetFileItem(file_item);
           block_tail->SetChunkItem(chunk_info.next_chunk);
           block_tail->MakeDataCopy(input_block->data() + offset_in_block,
@@ -145,7 +149,6 @@ void TaskChunk::Process(BlockItem *input_block) {
       }
 
       tag_map_[input_tag] = chunk_info;
-      input_block->Discharge();
       break;
 
     default:

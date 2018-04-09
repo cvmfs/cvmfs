@@ -169,6 +169,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/history_sqlite.cc
   ${CVMFS_SOURCE_DIR}/ingestion/chunk_detector.cc
   ${CVMFS_SOURCE_DIR}/ingestion/item.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/item_mem.cc
   ${CVMFS_SOURCE_DIR}/ingestion/pipeline.cc
   ${CVMFS_SOURCE_DIR}/ingestion/task_chunk.cc
   ${CVMFS_SOURCE_DIR}/ingestion/task_compress.cc

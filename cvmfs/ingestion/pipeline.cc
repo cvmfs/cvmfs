@@ -6,6 +6,7 @@
 #include "pipeline.h"
 
 #include <algorithm>
+#include <cstdlib>
 
 #include "ingestion/task_chunk.h"
 #include "ingestion/task_compress.h"
@@ -16,11 +17,9 @@
 #include "platform.h"
 #include "upload_facility.h"
 #include "upload_spooler_definition.h"
+#include "util/string.h"
 #include "util_concurrency.h"
 
-
-const double IngestionPipeline::kMemFractionLowWatermark = 0.5;
-const double IngestionPipeline::kMemFractionHighWatermark = 0.75;
 
 IngestionPipeline::IngestionPipeline(
   upload::AbstractUploader *uploader,
@@ -34,6 +33,7 @@ IngestionPipeline::IngestionPipeline(
   , maximal_chunk_size_(spooler_definition.max_file_chunk_size)
   , spawned_(false)
   , uploader_(uploader)
+  , tube_counter_(kMaxFilesInFlight)
 {
   unsigned nfork_base = std::max(1U, GetNumberOfCpuCores() / 8);
 
@@ -63,23 +63,29 @@ IngestionPipeline::IngestionPipeline(
   for (unsigned i = 0; i < nfork_base * kNforkCompress; ++i) {
     Tube<BlockItem> *t = new Tube<BlockItem>();
     tubes_compress_.TakeTube(t);
-    tasks_compress_.TakeConsumer(new TaskCompress(t, &tubes_hash_));
+    tasks_compress_.TakeConsumer(
+      new TaskCompress(t, &tubes_hash_, &item_allocator_));
   }
   tubes_compress_.Activate();
 
   for (unsigned i = 0; i < nfork_base * kNforkChunk; ++i) {
     Tube<BlockItem> *t = new Tube<BlockItem>();
     tubes_chunk_.TakeTube(t);
-    tasks_chunk_.TakeConsumer(new TaskChunk(t, &tubes_compress_));
+    tasks_chunk_.TakeConsumer(
+      new TaskChunk(t, &tubes_compress_, &item_allocator_));
   }
   tubes_chunk_.Activate();
 
+  uint64_t low = kMemLowWatermark;
+  uint64_t high = kMemHighWatermark;
+  char *fixed_limit_mb = getenv("_CVMFS_SERVER_PIPELINE_MB");
+  if (fixed_limit_mb != NULL) {
+    high = String2Uint64(fixed_limit_mb) * 1024 * 1024;
+    low = (high * 2) / 3;
+  }
   for (unsigned i = 0; i < nfork_base * kNforkRead; ++i) {
-    TaskRead *task_read = new TaskRead(&tube_input_, &tubes_chunk_);
-    uint64_t low = static_cast<uint64_t>(
-      static_cast<double>(platform_memsize()) * kMemFractionLowWatermark);
-    uint64_t high = static_cast<uint64_t>(
-      static_cast<double>(platform_memsize()) * kMemFractionHighWatermark);
+    TaskRead *task_read =
+      new TaskRead(&tube_input_, &tubes_chunk_, &item_allocator_);
     task_read->SetWatermarks(low, high);
     tasks_read_.TakeConsumer(task_read);
   }
@@ -176,7 +182,10 @@ void TaskScrubbingCallback::Process(BlockItem *block_item) {
 //------------------------------------------------------------------------------
 
 
-ScrubbingPipeline::ScrubbingPipeline() : spawned_(false) {
+ScrubbingPipeline::ScrubbingPipeline()
+  : spawned_(false)
+  , tube_counter_(kMaxFilesInFlight)
+{
   unsigned nfork_base = std::max(1U, GetNumberOfCpuCores() / 8);
 
   for (unsigned i = 0; i < nfork_base * kNforkScrubbingCallback; ++i) {
@@ -199,12 +208,14 @@ ScrubbingPipeline::ScrubbingPipeline() : spawned_(false) {
   for (unsigned i = 0; i < nfork_base * kNforkChunk; ++i) {
     Tube<BlockItem> *t = new Tube<BlockItem>();
     tubes_chunk_.TakeTube(t);
-    tasks_chunk_.TakeConsumer(new TaskChunk(t, &tubes_hash_));
+    tasks_chunk_.TakeConsumer(
+      new TaskChunk(t, &tubes_hash_, &item_allocator_));
   }
   tubes_chunk_.Activate();
 
   for (unsigned i = 0; i < nfork_base * kNforkRead; ++i) {
-    TaskRead *task_read = new TaskRead(&tube_input_, &tubes_chunk_);
+    TaskRead *task_read =
+      new TaskRead(&tube_input_, &tubes_chunk_, &item_allocator_);
     task_read->SetWatermarks(kMemLowWatermark, kMemHighWatermark);
     tasks_read_.TakeConsumer(task_read);
   }

@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "item_mem.h"
 #include "smalloc.h"
 #include "util_concurrency.h"
 
@@ -97,8 +98,9 @@ void ChunkItem::MakeBulkChunk() {
 atomic_int64 BlockItem::managed_bytes_ = 0;
 
 
-BlockItem::BlockItem()
-  : type_(kBlockHollow)
+BlockItem::BlockItem(ItemAllocator *allocator)
+  : allocator_(allocator)
+  , type_(kBlockHollow)
   , tag_(-1)
   , file_item_(NULL)
   , chunk_item_(NULL)
@@ -108,8 +110,9 @@ BlockItem::BlockItem()
 { }
 
 
-BlockItem::BlockItem(int64_t tag)
-  : type_(kBlockHollow)
+BlockItem::BlockItem(int64_t tag, ItemAllocator *allocator)
+  : allocator_(allocator)
+  , type_(kBlockHollow)
   , tag_(tag)
   , file_item_(NULL)
   , chunk_item_(NULL)
@@ -121,9 +124,15 @@ BlockItem::BlockItem(int64_t tag)
 }
 
 
-void BlockItem::Discharge() {
+BlockItem::~BlockItem() {
+  if (data_)
+    allocator_->Free(data_);
   atomic_xadd64(&managed_bytes_, -static_cast<int64_t>(capacity_));
-  data_.Release();
+}
+
+
+void BlockItem::Discharge() {
+  data_ = NULL;
   size_ = capacity_ = 0;
 }
 
@@ -136,11 +145,12 @@ void BlockItem::MakeStop() {
 
 void BlockItem::MakeData(uint32_t capacity) {
   assert(type_ == kBlockHollow);
+  assert(allocator_ != NULL);
   assert(capacity > 0);
 
   type_ = kBlockData;
   capacity_ = capacity;
-  data_ = reinterpret_cast<unsigned char *>(smalloc(capacity_));
+  data_ = reinterpret_cast<unsigned char *>(allocator_->Malloc(capacity_));
   atomic_xadd64(&managed_bytes_, static_cast<int64_t>(capacity_));
 }
 
@@ -148,17 +158,17 @@ void BlockItem::MakeData(uint32_t capacity) {
 /**
  * Move data from one block to another.
  */
-void BlockItem::MakeData(
-  unsigned char *data,
-  uint32_t size)
-{
+void BlockItem::MakeDataMove(BlockItem *other) {
   assert(type_ == kBlockHollow);
-  assert(size > 0);
+  assert(other->type_ == kBlockData);
+  assert(other->size_ > 0);
 
   type_ = kBlockData;
-  capacity_ = size_ = size;
-  data_ = data;
-  atomic_xadd64(&managed_bytes_, static_cast<int64_t>(capacity_));
+  capacity_ = size_ = other->size_;
+  data_ = other->data_;
+  allocator_ = other->allocator_;
+
+  other->Discharge();
 }
 
 
@@ -166,15 +176,16 @@ void BlockItem::MakeData(
  * Copy a piece of one block's data into a new block.
  */
 void BlockItem::MakeDataCopy(
-  unsigned char *data,
+  const unsigned char *data,
   uint32_t size)
 {
   assert(type_ == kBlockHollow);
+  assert(allocator_ != NULL);
   assert(size > 0);
 
   type_ = kBlockData;
   capacity_ = size_ = size;
-  data_ = reinterpret_cast<unsigned char *>(smalloc(capacity_));
+  data_ = reinterpret_cast<unsigned char *>(allocator_->Malloc(capacity_));
   memcpy(data_, data, size);
   atomic_xadd64(&managed_bytes_, static_cast<int64_t>(capacity_));
 }
@@ -184,7 +195,8 @@ void BlockItem::Reset() {
   assert(type_ == kBlockData);
 
   atomic_xadd64(&managed_bytes_, -static_cast<int64_t>(capacity_));
-  data_.Destroy();
+  allocator_->Free(data_);
+  data_ = NULL;
   size_ = capacity_ = 0;
   type_ = kBlockHollow;
 }
@@ -209,7 +221,7 @@ uint32_t BlockItem::Write(void *buf, uint32_t count) {
 
   uint32_t remaining = capacity_ - size_;
   uint32_t nbytes = std::min(remaining, count);
-  memcpy(data_.weak_ref() + size_, buf, nbytes);
+  memcpy(data_ + size_, buf, nbytes);
   size_ += nbytes;
   return nbytes;
 }

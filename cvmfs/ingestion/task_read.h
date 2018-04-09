@@ -13,14 +13,22 @@
 #include "ingestion/tube.h"
 #include "util/posix.h"
 
+class ItemAllocator;
+
 class TaskRead : public TubeConsumer<FileItem> {
  public:
-  static const unsigned kBusyWaitMs = 50;
+  static const unsigned kThrottleInitMs = 50;
+  static const unsigned kThrottleMaxMs = 500;
+  static const unsigned kThrottleResetMs = 2000;
   static const unsigned kBlockSize = kPageSize * 4;
 
-  TaskRead(Tube<FileItem> *tube_in, TubeGroup<BlockItem> *tubes_out)
+  TaskRead(
+    Tube<FileItem> *tube_in,
+    TubeGroup<BlockItem> *tubes_out,
+    ItemAllocator *allocator)
     : TubeConsumer<FileItem>(tube_in)
     , tubes_out_(tubes_out)
+    , allocator_(allocator)
     , low_watermark_(0)
     , high_watermark_(0)
   { atomic_init64(&n_block_); }
@@ -40,6 +48,7 @@ class TaskRead : public TubeConsumer<FileItem> {
   static atomic_int64 tag_seq_;
 
   TubeGroup<BlockItem> *tubes_out_;
+  ItemAllocator *allocator_;
   /**
    * Continue reading once the amount of BlockItem managed bytes is back to
    * the given level.

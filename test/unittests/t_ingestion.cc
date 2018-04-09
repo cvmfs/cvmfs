@@ -15,6 +15,7 @@
 #include "compression.h"
 #include "hash.h"
 #include "ingestion/item.h"
+#include "ingestion/item_mem.h"
 #include "ingestion/pipeline.h"
 #include "ingestion/task.h"
 #include "ingestion/task_chunk.h"
@@ -112,6 +113,7 @@ class T_Ingestion : public ::testing::Test {
   Tube<DummyItem> tube_;
   TubeConsumerGroup<DummyItem> task_group_;
   IngestionMockUploader *uploader_;
+  ItemAllocator allocator_;
 };
 
 
@@ -176,7 +178,7 @@ TEST_F(T_Ingestion, TaskRead) {
   tube_group_out.Activate();
 
   TubeConsumerGroup<FileItem> task_group;
-  task_group.TakeConsumer(new TaskRead(&tube_in, &tube_group_out));
+  task_group.TakeConsumer(new TaskRead(&tube_in, &tube_group_out, &allocator_));
   task_group.Spawn();
 
   FileItem file_null("/dev/null");
@@ -246,7 +248,7 @@ TEST_F(T_Ingestion, TaskReadThrottle) {
   tube_group_out.Activate();
 
   TubeConsumerGroup<FileItem> task_group;
-  TaskRead *task_read = new TaskRead(&tube_in, &tube_group_out);
+  TaskRead *task_read = new TaskRead(&tube_in, &tube_group_out, &allocator_);
   task_read->SetWatermarks(1, 2);
   task_group.TakeConsumer(task_read);
   task_group.Spawn();
@@ -266,7 +268,7 @@ TEST_F(T_Ingestion, TaskReadThrottle) {
   EXPECT_EQ(BlockItem::kBlockStop, item_stop->type());
 
   if (task_read->n_block() == 0) {
-    SafeSleepMs(2 * TaskRead::kBusyWaitMs);
+    SafeSleepMs(2 * TaskRead::kThrottleMaxMs);
   }
   EXPECT_EQ(1U, task_read->n_block());
 
@@ -290,14 +292,15 @@ TEST_F(T_Ingestion, TaskChunkDispatch) {
   tube_group_out.Activate();
 
   TubeConsumerGroup<BlockItem> task_group;
-  task_group.TakeConsumer(new TaskChunk(&tube_in, &tube_group_out));
+  task_group.TakeConsumer(
+    new TaskChunk(&tube_in, &tube_group_out, &allocator_));
   task_group.Spawn();
 
   FileItem file_null("/dev/null");
   file_null.set_size(0);
   EXPECT_FALSE(file_null.is_fully_chunked());
   EXPECT_EQ(0U, file_null.nchunks_in_fly());
-  BlockItem *b1 = new BlockItem(1);
+  BlockItem *b1 = new BlockItem(1, &allocator_);
   b1->SetFileItem(&file_null);
   b1->MakeStop();
   tube_in.Enqueue(b1);
@@ -317,7 +320,7 @@ TEST_F(T_Ingestion, TaskChunkDispatch) {
   delete item_stop;
 
   file_null.set_may_have_chunks(false);
-  BlockItem *b2 = new BlockItem(2);
+  BlockItem *b2 = new BlockItem(2, &allocator_);
   b2->SetFileItem(&file_null);
   b2->MakeStop();
   tube_in.Enqueue(b2);
@@ -332,7 +335,7 @@ TEST_F(T_Ingestion, TaskChunkDispatch) {
   FileItem file_null_legacy("/dev/null", 1024, 2048, 4096,
     zlib::kZlibDefault, shash::kSha1, shash::kSuffixNone, true, true);
   file_null_legacy.set_size(0);
-  BlockItem *b3 = new BlockItem(3);
+  BlockItem *b3 = new BlockItem(3, &allocator_);
   b3->SetFileItem(&file_null_legacy);
   b3->MakeStop();
   tube_in.Enqueue(b3);
@@ -361,7 +364,8 @@ TEST_F(T_Ingestion, TaskChunk) {
   tube_group_out.Activate();
 
   TubeConsumerGroup<BlockItem> task_group;
-  task_group.TakeConsumer(new TaskChunk(&tube_in, &tube_group_out));
+  task_group.TakeConsumer(
+    new TaskChunk(&tube_in, &tube_group_out, &allocator_));
   task_group.Spawn();
 
   // Tuned for ~100ms test with many blocks
@@ -376,16 +380,13 @@ TEST_F(T_Ingestion, TaskChunk) {
   EXPECT_FALSE(file_large.is_fully_chunked());
   for (unsigned i = 0; i < nblocks; ++i) {
     string str_content(TaskRead::kBlockSize, static_cast<char>(i));
-    unsigned char *content = reinterpret_cast<unsigned char *>(
-      smalloc(TaskRead::kBlockSize));
-    memcpy(content, str_content.data(), TaskRead::kBlockSize);
-
-    BlockItem *b = new BlockItem(1);
+    BlockItem *b = new BlockItem(1, &allocator_);
     b->SetFileItem(&file_large);
-    b->MakeData(content, TaskRead::kBlockSize);
+    b->MakeDataCopy(reinterpret_cast<const unsigned char *>(str_content.data()),
+                    TaskRead::kBlockSize);
     tube_in.Enqueue(b);
   }
-  BlockItem *b_stop = new BlockItem(1);
+  BlockItem *b_stop = new BlockItem(1, &allocator_);
   b_stop->SetFileItem(&file_large);
   b_stop->MakeStop();
   tube_in.Enqueue(b_stop);
@@ -446,7 +447,8 @@ TEST_F(T_Ingestion, TaskChunkCornerCases) {
   tube_group_out.Activate();
 
   TubeConsumerGroup<BlockItem> task_group;
-  task_group.TakeConsumer(new TaskChunk(&tube_in, &tube_group_out));
+  task_group.TakeConsumer(
+    new TaskChunk(&tube_in, &tube_group_out, &allocator_));
   task_group.Spawn();
 
   // File does not exist
@@ -460,12 +462,13 @@ TEST_F(T_Ingestion, TaskChunkCornerCases) {
   for (unsigned i = 0; i < (file_large.size() / block_size); ++i) {
     unsigned char *buf =
       reinterpret_cast<unsigned char *>(scalloc(1, block_size));
-    BlockItem *b = new BlockItem(1);
+    BlockItem *b = new BlockItem(1, &allocator_);
     b->SetFileItem(&file_large);
-    b->MakeData(buf, block_size);
+    b->MakeDataCopy(buf, block_size);
+    free(buf);
     tube_in.Enqueue(b);
   }
-  BlockItem *b_stop = new BlockItem(1);
+  BlockItem *b_stop = new BlockItem(1, &allocator_);
   b_stop->SetFileItem(&file_large);
   b_stop->MakeStop();
   tube_in.Enqueue(b_stop);
@@ -504,12 +507,13 @@ TEST_F(T_Ingestion, TaskCompressNull) {
   tube_group_out.Activate();
 
   TubeConsumerGroup<BlockItem> task_group;
-  task_group.TakeConsumer(new TaskCompress(&tube_in, &tube_group_out));
+  task_group.TakeConsumer(
+    new TaskCompress(&tube_in, &tube_group_out, &allocator_));
   task_group.Spawn();
 
   FileItem file_null("/dev/null");
   ChunkItem chunk_null(&file_null, 0);
-  BlockItem *b1 = new BlockItem(1);
+  BlockItem *b1 = new BlockItem(1, &allocator_);
   b1->SetFileItem(&file_null);
   b1->SetChunkItem(&chunk_null);
   b1->MakeStop();
@@ -548,14 +552,15 @@ TEST_F(T_Ingestion, TaskCompress) {
   tube_group_out.Activate();
 
   TubeConsumerGroup<BlockItem> task_group;
-  task_group.TakeConsumer(new TaskCompress(&tube_in, &tube_group_out));
+  task_group.TakeConsumer(
+    new TaskCompress(&tube_in, &tube_group_out, &allocator_));
   task_group.Spawn();
 
   unsigned size = 16 * 1024 * 1024;
   unsigned block_size = 32 * 1024;
   unsigned nblocks = size / block_size;
   EXPECT_EQ(0U, size % block_size);
-  BlockItem block_raw(42);
+  BlockItem block_raw(42, &allocator_);
   block_raw.MakeData(size);
   unsigned char *buf = reinterpret_cast<unsigned char *>(smalloc(size));
   // File does not exist
@@ -565,19 +570,17 @@ TEST_F(T_Ingestion, TaskCompress) {
     string str_content(block_size, static_cast<char>(i));
     for (unsigned j = 1; j < block_size; ++j)
       str_content[j] = i * str_content[j-1] + j;
-    unsigned char *content = reinterpret_cast<unsigned char *>(
-      smalloc(block_size));
-    memcpy(content, str_content.data(), block_size);
 
-    BlockItem *b = new BlockItem(1);
+    BlockItem *b = new BlockItem(1, &allocator_);
     b->SetFileItem(&file_large);
     b->SetChunkItem(&chunk_large);
-    b->MakeData(content, block_size);
+    b->MakeDataCopy(reinterpret_cast<const unsigned char *>(str_content.data()),
+                    block_size);
     EXPECT_EQ(block_size, block_raw.Write(b->data(), b->size()));
     tube_in.Enqueue(b);
   }
   EXPECT_EQ(size, block_raw.size());
-  BlockItem *b_stop = new BlockItem(1);
+  BlockItem *b_stop = new BlockItem(1, &allocator_);
   b_stop->SetFileItem(&file_large);
   b_stop->SetChunkItem(&chunk_large);
   b_stop->MakeStop();
@@ -633,7 +636,7 @@ TEST_F(T_Ingestion, TaskHash) {
 
   FileItem file_null("/dev/null");
   ChunkItem chunk_null(&file_null, 0);
-  BlockItem b1(1);
+  BlockItem b1(1, &allocator_);
   b1.SetFileItem(&file_null);
   b1.SetChunkItem(&chunk_null);
   b1.MakeStop();
@@ -649,13 +652,12 @@ TEST_F(T_Ingestion, TaskHash) {
   EXPECT_TRUE(SafeWriteToFile(str_abc, "./abc", 0600));
   FileItem file_abc("./abc");
   ChunkItem chunk_abc(&file_abc, 0);
-  BlockItem b2_a(2);
+  BlockItem b2_a(2, &allocator_);
   b2_a.SetFileItem(&file_null);
   b2_a.SetChunkItem(&chunk_abc);
-  b2_a.MakeData(const_cast<unsigned char *>(
-                  reinterpret_cast<const unsigned char *>(str_abc.data())),
-                str_abc.size());
-  BlockItem b2_b(2);
+  b2_a.MakeDataCopy(reinterpret_cast<const unsigned char *>(str_abc.data()),
+                    str_abc.size());
+  BlockItem b2_b(2, &allocator_);
   b2_b.SetFileItem(&file_null);
   b2_b.SetChunkItem(&chunk_abc);
   b2_b.MakeStop();
@@ -670,7 +672,6 @@ TEST_F(T_Ingestion, TaskHash) {
             chunk_abc.hash_ptr()->ToString());
   EXPECT_EQ(0U, tube_out->size());
 
-  b2_a.Discharge();
   unlink("./abc");
 
   task_group.Terminate();
@@ -696,7 +697,7 @@ TEST_F(T_Ingestion, TaskWriteNull) {
   hash_empty.suffix = shash::kSuffixPartial;
   shash::HashString("", &hash_empty);
   *chunk_null->hash_ptr() = hash_empty;
-  BlockItem *b1 = new BlockItem(1);
+  BlockItem *b1 = new BlockItem(1, &allocator_);
   b1->SetFileItem(&file_null);
   b1->SetChunkItem(chunk_null);
   b1->MakeStop();
@@ -744,13 +745,13 @@ TEST_F(T_Ingestion, TaskWriteLarge) {
     unsigned char block_buffer[block_size];
     memset(block_buffer, 0, block_size);
     for (unsigned j = 0; j < nblocks; ++j) {
-      BlockItem *b = new BlockItem(i);
+      BlockItem *b = new BlockItem(i, &allocator_);
       b->SetFileItem(&file_large);
       b->SetChunkItem(chunk_item);
       b->MakeDataCopy(block_buffer, block_size);
       tube_in.Enqueue(b);
     }
-    BlockItem *b_stop = new BlockItem(i);
+    BlockItem *b_stop = new BlockItem(i, &allocator_);
     b_stop->SetFileItem(&file_large);
     b_stop->SetChunkItem(chunk_item);
     b_stop->MakeStop();

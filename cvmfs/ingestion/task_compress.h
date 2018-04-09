@@ -11,12 +11,20 @@
 #include "ingestion/task.h"
 #include "util/posix.h"
 
+class ItemAllocator;
+
 class TaskCompress : public TubeConsumer<BlockItem> {
  public:
   static const unsigned kCompressedBlockSize = kPageSize * 2;
 
-  TaskCompress(Tube<BlockItem> *tube_in, TubeGroup<BlockItem> *tubes_out)
-    : TubeConsumer<BlockItem>(tube_in), tubes_out_(tubes_out) { }
+  TaskCompress(
+    Tube<BlockItem> *tube_in,
+    TubeGroup<BlockItem> *tubes_out,
+    ItemAllocator *allocator)
+    : TubeConsumer<BlockItem>(tube_in)
+    , tubes_out_(tubes_out)
+    , allocator_(allocator)
+  { }
 
  protected:
   virtual void Process(BlockItem *input_block);
@@ -29,6 +37,7 @@ class TaskCompress : public TubeConsumer<BlockItem> {
   typedef std::map<int64_t, BlockItem *> TagMap;
 
   TubeGroup<BlockItem> *tubes_out_;
+  ItemAllocator *allocator_;
   TagMap tag_map_;
 };
 

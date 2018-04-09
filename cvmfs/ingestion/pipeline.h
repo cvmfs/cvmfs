@@ -10,6 +10,7 @@
 #include "compression.h"
 #include "hash.h"
 #include "ingestion/item.h"
+#include "ingestion/item_mem.h"
 #include "ingestion/task.h"
 #include "ingestion/tube.h"
 #include "upload_spooler_result.h"
@@ -35,8 +36,9 @@ class IngestionPipeline : public Observable<upload::SpoolerResult> {
   void OnFileProcessed(const upload::SpoolerResult &spooler_result);
 
  private:
-  static const double kMemFractionLowWatermark;  // = 0.5
-  static const double kMemFractionHighWatermark;  // = 0.75
+  static const uint64_t kMemLowWatermark = 786 * 1024 * 1024;
+  static const uint64_t kMemHighWatermark = 1024 * 1024 * 1024;
+  static const unsigned kMaxFilesInFlight = 8000;
   static const unsigned kNforkRegister = 1;
   static const unsigned kNforkWrite = 1;
   static const unsigned kNforkHash = 2;
@@ -54,9 +56,9 @@ class IngestionPipeline : public Observable<upload::SpoolerResult> {
 
   bool spawned_;
   upload::AbstractUploader *uploader_;
-  Tube<FileItem> tube_input_;
   // TODO(jblomer): a semaphore would be faster!
   Tube<FileItem> tube_counter_;
+  Tube<FileItem> tube_input_;
 
   TubeConsumerGroup<FileItem> tasks_read_;
 
@@ -74,6 +76,8 @@ class IngestionPipeline : public Observable<upload::SpoolerResult> {
 
   TubeGroup<FileItem> tubes_register_;
   TubeConsumerGroup<FileItem> tasks_register_;
+
+  ItemAllocator item_allocator_;
 };  // class IngestionPipeline
 
 
@@ -121,6 +125,7 @@ class ScrubbingPipeline : public Observable<ScrubbingResult> {
  private:
   static const uint64_t kMemLowWatermark = 384 * 1024 * 1024;
   static const uint64_t kMemHighWatermark = 512 * 1024 * 1024;
+  static const unsigned kMaxFilesInFlight = 8000;
   static const unsigned kNforkScrubbingCallback = 1;
   static const unsigned kNforkHash = 2;
   static const unsigned kNforkChunk = 1;
@@ -141,6 +146,8 @@ class ScrubbingPipeline : public Observable<ScrubbingResult> {
 
   TubeGroup<BlockItem> tubes_scrubbing_callback_;
   TubeConsumerGroup<BlockItem> tasks_scrubbing_callback_;
+
+  ItemAllocator item_allocator_;
 };
 
 #endif  // CVMFS_INGESTION_PIPELINE_H_
