@@ -14,11 +14,20 @@
 #include <set>
 #include <string>
 
+#include "archive.h"
+#include "sync_mediator.h"
+
+struct archive;
+
 namespace publish {
 
 class SyncUnionTarball : public SyncUnion {
  public:
-  SyncUnionTarball(SyncMediator *mediator, const std::string &tarball_path,
+  SyncUnionTarball(AbstractSyncMediator *mediator,
+                   const std::string &rdonly_path,
+                   const std::string &union_path,
+                   const std::string &scratch_path,
+                   const std::string &tarball_path,
                    const std::string &base_directory);
 
   /*
@@ -34,17 +43,27 @@ class SyncUnionTarball : public SyncUnion {
    */
   void Traverse();
 
+  std::string UnwindWhiteoutFilename(const SyncItem &entry) const;
+  bool IsOpaqueDirectory(const SyncItem &directory) const;
+  bool IsWhiteoutEntry(const SyncItem &entry) const;
+
  private:
   const std::string tarball_path_;
   const std::string base_directory_;
-  std::set<std::string> to_recur_;
+  std::string working_dir_;
 
   /*
    * Actually untar the several elements in the tar inside the base directory,
    * it returns all the recursive tars find in this operation
    */
-  std::set<std::string> untarPath(const std::string &tarball_path,
-                                  const std::string &base_directory);
+  bool UntarPath(const std::string &base_untar_directory_path,
+                 const std::string &tarball_path);
+
+  /*
+   * Helper function to phisically move the data from the source to the
+   * destination.
+   */
+  int CopyData(struct archive *src, struct archive *dst);
 };  // class SyncUnionTarball
 
 }  // namespace publish

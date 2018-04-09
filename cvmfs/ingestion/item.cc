@@ -38,11 +38,13 @@ FileItem::FileItem(
   assert(retval == 0);
   atomic_init64(&nchunks_in_fly_);
   atomic_init32(&is_fully_chunked_);
+  source_ = new FileIngestionSource(path_);
 }
 
 
 FileItem::~FileItem() {
   pthread_mutex_destroy(&lock_);
+  delete source_;
 }
 
 

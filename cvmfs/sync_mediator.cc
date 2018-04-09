@@ -29,6 +29,8 @@ using namespace std;  // NOLINT
 
 namespace publish {
 
+AbstractSyncMediator::~AbstractSyncMediator() {}
+
 SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalog_manager,
                            const SyncParameters *params) :
   catalog_manager_(catalog_manager),
@@ -84,7 +86,7 @@ void SyncMediator::Add(const SyncItem &entry) {
   EnsureAllowed(entry);
 
   if (entry.IsDirectory()) {
-    AddDirectoryRecursively(entry);
+    AddDirectory(entry);
     return;
   }
 
@@ -422,97 +424,6 @@ void SyncMediator::LegacySocketHardlinkCallback(const string &parent_dir,
   SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemSocket);
   InsertLegacyHardlink(entry);
 }
-
-
-void SyncMediator::AddDirectoryRecursively(const SyncItem &entry) {
-  AddDirectory(entry);
-
-  // Create a recursion engine, which recursively adds all entries in a newly
-  // created directory
-  FileSystemTraversal<SyncMediator> traversal(
-    this, union_engine_->scratch_path(), true);
-  traversal.fn_enter_dir      = &SyncMediator::EnterAddedDirectoryCallback;
-  traversal.fn_leave_dir      = &SyncMediator::LeaveAddedDirectoryCallback;
-  traversal.fn_new_file       = &SyncMediator::AddFileCallback;
-  traversal.fn_new_symlink    = &SyncMediator::AddSymlinkCallback;
-  traversal.fn_new_dir_prefix = &SyncMediator::AddDirectoryCallback;
-  traversal.fn_ignore_file    = &SyncMediator::IgnoreFileCallback;
-  traversal.fn_new_character_dev = &SyncMediator::AddCharacterDeviceCallback;
-  traversal.fn_new_block_dev = &SyncMediator::AddBlockDeviceCallback;
-  traversal.fn_new_fifo      = &SyncMediator::AddFifoCallback;
-  traversal.fn_new_socket    = &SyncMediator::AddSocketCallback;
-  traversal.Recurse(entry.GetScratchPath());
-}
-
-
-bool SyncMediator::AddDirectoryCallback(const std::string &parent_dir,
-                                        const std::string &dir_name)
-{
-  SyncItem entry = CreateSyncItem(parent_dir, dir_name, kItemDir);
-  AddDirectory(entry);
-  return true;  // The recursion engine should recurse deeper here
-}
-
-
-void SyncMediator::AddFileCallback(const std::string &parent_dir,
-                                   const std::string &file_name)
-{
-  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemFile);
-  Add(entry);
-}
-
-
-void SyncMediator::AddCharacterDeviceCallback(const std::string &parent_dir,
-                                    const std::string &file_name)
-{
-  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemCharacterDevice);
-  Add(entry);
-}
-
-void SyncMediator::AddBlockDeviceCallback(const std::string &parent_dir,
-                                    const std::string &file_name)
-{
-  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemBlockDevice);
-  Add(entry);
-}
-
-void SyncMediator::AddFifoCallback(const std::string &parent_dir,
-                                   const std::string &file_name)
-{
-  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemFifo);
-  Add(entry);
-}
-
-void SyncMediator::AddSocketCallback(const std::string &parent_dir,
-                                     const std::string &file_name)
-{
-  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemSocket);
-  Add(entry);
-}
-
-void SyncMediator::AddSymlinkCallback(const std::string &parent_dir,
-                                      const std::string &link_name)
-{
-  SyncItem entry = CreateSyncItem(parent_dir, link_name, kItemSymlink);
-  Add(entry);
-}
-
-
-void SyncMediator::EnterAddedDirectoryCallback(const std::string &parent_dir,
-                                               const std::string &dir_name)
-{
-  SyncItem entry = CreateSyncItem(parent_dir, dir_name, kItemDir);
-  EnterDirectory(entry);
-}
-
-
-void SyncMediator::LeaveAddedDirectoryCallback(const std::string &parent_dir,
-                                               const std::string &dir_name)
-{
-  SyncItem entry = CreateSyncItem(parent_dir, dir_name, kItemDir);
-  LeaveDirectory(entry);
-}
-
 
 void SyncMediator::RemoveDirectoryRecursively(const SyncItem &entry) {
   // Delete a directory AFTER it was emptied here,

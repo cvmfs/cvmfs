@@ -34,6 +34,7 @@
 #include <string>
 
 #include "sync_item.h"
+#include "sync_mediator.h"
 
 namespace publish {
 
@@ -53,7 +54,7 @@ class SyncUnion {
    * @param mediator a reference to a SyncMediator object used as bridge to
    *        the actual sync process
    */
-  SyncUnion(SyncMediator *mediator, const std::string &rdonly_path,
+  SyncUnion(AbstractSyncMediator *mediator, const std::string &rdonly_path,
             const std::string &union_path, const std::string &scratch_path);
   virtual ~SyncUnion() {}
 
@@ -132,7 +133,7 @@ class SyncUnion {
   std::string scratch_path_;
   std::string union_path_;
 
-  SyncMediator *mediator_;
+  AbstractSyncMediator *mediator_;
 
   /**
    * Allow for preprocessing steps before emiting any SyncItems from SyncUnion.

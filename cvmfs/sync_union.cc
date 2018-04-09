@@ -10,7 +10,8 @@
 
 namespace publish {
 
-SyncUnion::SyncUnion(SyncMediator *mediator, const std::string &rdonly_path,
+SyncUnion::SyncUnion(AbstractSyncMediator *mediator,
+                     const std::string &rdonly_path,
                      const std::string &union_path,
                      const std::string &scratch_path)
     : rdonly_path_(rdonly_path),
@@ -60,9 +61,7 @@ bool SyncUnion::ProcessDirectory(const string &parent_dir,
 
   if (entry.IsNew()) {
     mediator_->Add(entry);
-    // Recursion stops here. All content of new directory
-    // is added later by the SyncMediator
-    return false;
+    return true;
   } else {                            // directory already existed...
     if (entry.IsOpaqueDirectory()) {  // was directory completely overwritten?
       mediator_->Replace(entry);
