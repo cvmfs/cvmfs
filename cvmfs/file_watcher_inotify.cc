@@ -77,7 +77,7 @@ bool FileWatcherInotify::RunEventLoop(const FileWatcher::HandlerMap& handlers,
     }
 
     const size_t event_size = sizeof(struct inotify_event);
-    // We need a buffer large enough to accommodate an event for the largest path name
+    // We need a large enough buffer for an event with the largest path name
     const size_t buffer_size = event_size + PATH_MAX + 1;
     char buffer[buffer_size];
     if (poll_set[1].revents & POLLIN) {
@@ -104,8 +104,8 @@ bool FileWatcherInotify::RunEventLoop(const FileWatcher::HandlerMap& handlers,
             // Attributes
             event = file_watcher::kAttributes;
           } else if (inotify_event->mask & IN_IGNORED) {
-            // IN_IGNORED event is generated after a file is deleted and the watch is
-            // removed
+            // An IN_IGNORED event is generated after a file is deleted and the
+            // watch is removed
             event = file_watcher::kIgnored;
           }
           bool clear_handler = true;
@@ -147,8 +147,8 @@ bool FileWatcherInotify::RunEventLoop(const FileWatcher::HandlerMap& handlers,
 
 int FileWatcherInotify::TryRegisterFilter(const std::string& file_path) {
   return inotify_add_watch(
-    inotify_fd_, file_path.c_str(),
-    IN_ATTRIB | IN_MODIFY | IN_DELETE_SELF | IN_MOVE_SELF);
+      inotify_fd_, file_path.c_str(),
+      IN_ATTRIB | IN_MODIFY | IN_DELETE_SELF | IN_MOVE_SELF);
 }
 
 }  // namespace file_watcher
