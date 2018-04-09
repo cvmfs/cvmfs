@@ -13,6 +13,7 @@
 
 #include "fs_traversal.h"
 #include "sync_mediator.h"
+#include "util/shared_ptr.h"
 
 namespace publish {
 
@@ -109,20 +110,21 @@ bool SyncUnionOverlayfs::ObtainSysAdminCapability() const {
   return result;
 }
 
-void SyncUnionOverlayfs::PreprocessSyncItem(SyncItem *entry) const {
+void SyncUnionOverlayfs::PreprocessSyncItem(SharedPtr<SyncItem> entry) const {
   SyncUnion::PreprocessSyncItem(entry);
   if (entry->IsGraftMarker() || entry->IsWhiteout() || entry->IsDirectory() ||
       entry->IsSpecialFile()) {
     return;
   }
 
-  CheckForBrokenHardlink(*entry);
+  CheckForBrokenHardlink(entry);
   MaskFileHardlinks(entry);
 }
 
-void SyncUnionOverlayfs::CheckForBrokenHardlink(const SyncItem &entry) const {
-  if (!entry.IsNew() && !entry.WasDirectory() &&
-      entry.GetRdOnlyLinkcount() > 1) {
+void SyncUnionOverlayfs::CheckForBrokenHardlink(
+    SharedPtr<SyncItem> entry) const {
+  if (!entry->IsNew() && !entry->WasDirectory() &&
+      entry->GetRdOnlyLinkcount() > 1) {
     LogCvmfs(kLogPublish, kLogStderr,
              "OverlayFS has copied-up a file (%s) "
              "with existing hardlinks in lowerdir "
@@ -132,12 +134,12 @@ void SyncUnionOverlayfs::CheckForBrokenHardlink(const SyncItem &entry) const {
              "Consider running this command: \n"
              "  cvmfs_server eliminate-hardlinks\n\n"
              "Aborting...",
-             entry.GetUnionPath().c_str(), entry.GetRdOnlyLinkcount());
+             entry->GetUnionPath().c_str(), entry->GetRdOnlyLinkcount());
     abort();
   }
 }
 
-void SyncUnionOverlayfs::MaskFileHardlinks(SyncItem *entry) const {
+void SyncUnionOverlayfs::MaskFileHardlinks(SharedPtr<SyncItem> entry) const {
   assert(entry->IsRegularFile() || entry->IsSymlink());
   if (entry->GetUnionLinkcount() > 1) {
     LogCvmfs(kLogPublish, kLogStderr,
@@ -230,18 +232,18 @@ bool SyncUnionOverlayfs::HasXattr(string const &path, string const &attr_name) {
   return xattrs && xattrs->Has(attr_name);
 }
 
-bool SyncUnionOverlayfs::IsWhiteoutEntry(const SyncItem &entry) const {
+bool SyncUnionOverlayfs::IsWhiteoutEntry(SharedPtr<SyncItem> entry) const {
   /**
    * There seem to be two versions of overlayfs out there and in production:
    * 1. whiteouts are 'character device' files
    * 2. whiteouts are symlinks pointing to '(overlay-whiteout)'
    */
-  bool is_chardev_whiteout = entry.IsCharacterDevice() &&
-                             entry.GetRdevMajor() == 0 &&
-                             entry.GetRdevMinor() == 0;
+  bool is_chardev_whiteout = entry->IsCharacterDevice() &&
+                             entry->GetRdevMajor() == 0 &&
+                             entry->GetRdevMinor() == 0;
 
   bool is_symlink_whiteout =
-      entry.IsSymlink() && IsWhiteoutSymlinkPath(entry.GetScratchPath());
+      entry->IsSymlink() && IsWhiteoutSymlinkPath(entry->GetScratchPath());
 
   return is_chardev_whiteout || is_symlink_whiteout;
 }
@@ -260,8 +262,9 @@ bool SyncUnionOverlayfs::IsWhiteoutSymlinkPath(const string &path) const {
   return is_whiteout;
 }
 
-bool SyncUnionOverlayfs::IsOpaqueDirectory(const SyncItem &directory) const {
-  const std::string path = directory.GetScratchPath();
+bool SyncUnionOverlayfs::IsOpaqueDirectory(
+    SharedPtr<SyncItem> directory) const {
+  const std::string path = directory->GetScratchPath();
   return DirectoryExists(path) && IsOpaqueDirPath(path);
 }
 
@@ -274,7 +277,8 @@ bool SyncUnionOverlayfs::IsOpaqueDirPath(const string &path) const {
   return is_opaque;
 }
 
-string SyncUnionOverlayfs::UnwindWhiteoutFilename(const SyncItem &entry) const {
-  return entry.filename();
+string SyncUnionOverlayfs::UnwindWhiteoutFilename(
+    SharedPtr<SyncItem> entry) const {
+  return entry->filename();
 }
 }  // namespace publish

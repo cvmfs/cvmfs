@@ -14,6 +14,8 @@
 #include <set>
 #include <string>
 
+#include "util/shared_ptr.h"
+
 namespace publish {
 
 /**
@@ -34,17 +36,17 @@ class SyncUnionOverlayfs : public SyncUnion {
   static bool HasXattr(std::string const &path, std::string const &attr_name);
 
  protected:
-  void PreprocessSyncItem(SyncItem *entry) const;
+  void PreprocessSyncItem(SharedPtr<SyncItem> entry) const;
 
-  bool IsWhiteoutEntry(const SyncItem &entry) const;
-  bool IsOpaqueDirectory(const SyncItem &directory) const;
+  bool IsWhiteoutEntry(SharedPtr<SyncItem> entry) const;
+  bool IsOpaqueDirectory(SharedPtr<SyncItem> directory) const;
   bool IsWhiteoutSymlinkPath(const std::string &path) const;
 
-  std::string UnwindWhiteoutFilename(const SyncItem &entry) const;
+  std::string UnwindWhiteoutFilename(SharedPtr<SyncItem> entry) const;
   std::set<std::string> GetIgnoreFilenames() const;
 
-  void CheckForBrokenHardlink(const SyncItem &entry) const;
-  void MaskFileHardlinks(SyncItem *entry) const;
+  void CheckForBrokenHardlink(SharedPtr<SyncItem> entry) const;
+  void MaskFileHardlinks(SharedPtr<SyncItem> entry) const;
 
   bool ObtainSysAdminCapability() const;
 

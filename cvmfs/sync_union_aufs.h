@@ -28,11 +28,11 @@ class SyncUnionAufs : public SyncUnion {
   bool SupportsHardlinks() const { return true; }
 
  protected:
-  bool IsWhiteoutEntry(const SyncItem &entry) const;
-  bool IsOpaqueDirectory(const SyncItem &directory) const;
+  bool IsWhiteoutEntry(SharedPtr<SyncItem> entry) const;
+  bool IsOpaqueDirectory(SharedPtr<SyncItem> directory) const;
   bool IgnoreFilePredicate(const std::string &parent_dir,
                            const std::string &filename);
-  std::string UnwindWhiteoutFilename(const SyncItem &entry) const;
+  std::string UnwindWhiteoutFilename(SharedPtr<SyncItem> entry) const;
 
  private:
   std::set<std::string> ignore_filenames_;

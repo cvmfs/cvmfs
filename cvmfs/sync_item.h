@@ -6,16 +6,24 @@
 #define CVMFS_SYNC_ITEM_H_
 
 #include <sys/types.h>
-#include <sys/sysmacros.h>  // NOLINT
+
+#if !defined(__APPLE__)
+#include <sys/sysmacros.h>
+#endif  // __APPLE__
 
 #include <cstring>
 #include <map>
 #include <string>
 
+#include "archive.h"
 #include "directory_entry.h"
 #include "file_chunk.h"
 #include "hash.h"
+#include "ingestion/ingestion_source.h"
 #include "platform.h"
+#include "util/shared_ptr.h"
+
+class IngestionSource;
 
 namespace publish {
 
@@ -29,11 +37,11 @@ enum SyncItemType {
   kItemSocket,
   kItemNew,
   kItemMarker,
-  kItemUnknown
+  kItemUnknown,
+  kItemTarfile
 };
 
 class SyncUnion;
-
 /**
  * Every directory entry emitted by the FileSystemTraversal is wrapped in a
  * SyncItem structure by the factory method SyncUnion::CreateSyncItem().
@@ -50,10 +58,11 @@ class SyncUnion;
 class SyncItem {
   // only SyncUnion can create SyncItems (see SyncUnion::CreateSyncItem)
   friend class SyncUnion;
+  friend class SyncUnionTarball;
 
  public:
   SyncItem();
-  ~SyncItem();
+  virtual ~SyncItem();
 
   inline bool IsDirectory()       const { return IsType(kItemDir);             }
   inline bool WasDirectory()      const { return WasType(kItemDir);            }
@@ -117,7 +126,7 @@ class SyncItem {
    *       count to 1 if MaskHardlink() has been called before (cf. OverlayFS)
    * @return  a DirectoryEntry structure to be written into a catalog
    */
-  catalog::DirectoryEntryBase CreateBasicCatalogDirent() const;
+  virtual catalog::DirectoryEntryBase CreateBasicCatalogDirent() const;
 
   inline std::string GetRelativePath() const {
     return (relative_parent_path_.empty()) ?
@@ -153,6 +162,9 @@ class SyncItem {
     return relative_parent_path_;
   }
 
+  virtual IngestionSource *GetIngestionSource() const;
+  virtual void AlreadyCreatedDir() const { rdonly_type_ = kItemDir; }
+
   bool operator==(const SyncItem &other) const {
     return ((relative_parent_path_ == other.relative_parent_path_) &&
             (filename_ == other.filename_));
@@ -165,7 +177,7 @@ class SyncItem {
   }
 
   SyncItemType GetRdOnlyFiletype() const;
-  SyncItemType GetScratchFiletype() const;
+  virtual SyncItemType GetScratchFiletype() const;
 
   /**
    * Checks if the SyncItem _is_ the given file type (file, dir, symlink, ...)
@@ -177,7 +189,7 @@ class SyncItem {
   inline bool IsType(const SyncItemType expected_type) const {
     if (filename_.substr(0, 12) == ".cvmfsgraft-") {
       scratch_type_ = kItemMarker;
-    } else if (scratch_type_ == kItemUnknown) {
+    } else if (scratch_type_ == kItemUnknown || scratch_type_ == kItemTarfile) {
       scratch_type_ = GetScratchFiletype();
     }
     return scratch_type_ == expected_type;
@@ -197,7 +209,11 @@ class SyncItem {
     return rdonly_type_ == expected_type;
   }
 
- private:
+  const SyncUnion *union_engine_; /**< this SyncUnion created this object */
+
+  mutable SyncItemType scratch_type_;
+  mutable SyncItemType rdonly_type_;
+
   /**
    * create a new SyncItem
    * Note: SyncItems cannot be created by any using code. SyncUnion will take
@@ -208,11 +224,11 @@ class SyncItem {
    * @param filename the name of the file ;-)
    * @param entryType well...
    */
-  SyncItem(const std::string  &relative_parent_path,
-           const std::string  &filename,
-           const SyncUnion    *union_engine,
-           const SyncItemType  entry_type);
+  SyncItem(const std::string &relative_parent_path, const std::string &filename,
+           const SyncUnion *union_engine, const SyncItemType entry_type);
+  void SetCatalogMarker() { has_catalog_marker_ = true; }
 
+  platform_stat64 GetStatFromTar() const;
   /**
    * Structure to cache stat calls to the different file locations.
    */
@@ -238,7 +254,15 @@ class SyncItem {
     platform_stat64 stat;
   };
 
+  mutable EntryStat rdonly_stat_;
+  mutable EntryStat union_stat_;
+  mutable EntryStat scratch_stat_;
+
+  bool has_catalog_marker_; /**< directory containing .cvmfscatalog */
+
+ private:
   SyncItemType GetGenericFiletype(const EntryStat &stat) const;
+  SyncItemType GetScratchTypeFromArchiveEntry() const;
 
   void CheckMarkerFiles();
 
@@ -247,16 +271,9 @@ class SyncItem {
   std::string GetGraftMarkerPath() const;
   void CheckGraft();
 
-  const SyncUnion *union_engine_;     /**< this SyncUnion created this object */
-
-  mutable EntryStat rdonly_stat_;
-  mutable EntryStat union_stat_;
-  mutable EntryStat scratch_stat_;
-
   bool whiteout_;                     /**< SyncUnion marked this as whiteout  */
   bool opaque_;                       /**< SyncUnion marked this as opaque dir*/
   bool masked_hardlink_;              /**< SyncUnion masked out the linkcount */
-  bool has_catalog_marker_;           /**< directory containing .cvmfscatalog */
   bool valid_graft_;                  /**< checksum and size in graft marker */
   bool graft_marker_present_;         /**< .cvmfsgraft-$filename exists */
 
@@ -269,9 +286,6 @@ class SyncItem {
    */
   FileChunkList *graft_chunklist_;
   ssize_t graft_size_;
-
-  mutable SyncItemType scratch_type_;
-  mutable SyncItemType rdonly_type_;
 
   // The hash of regular file's content
   shash::Any content_hash_;
@@ -286,7 +300,7 @@ class SyncItem {
   inline void StatUnion(const bool refresh = false) const {
     StatGeneric(GetUnionPath(), &union_stat_, refresh);
   }
-  inline void StatScratch(const bool refresh = false) const {
+  virtual void StatScratch(const bool refresh = false) const {
     StatGeneric(GetScratchPath(), &scratch_stat_, refresh);
   }
   static void StatGeneric(const std::string  &path,
@@ -294,7 +308,7 @@ class SyncItem {
                           const bool          refresh);
 };
 
-typedef std::map<std::string, SyncItem> SyncItemList;
+typedef std::map<std::string, SharedPtr<SyncItem> > SyncItemList;
 
 }  // namespace publish
 

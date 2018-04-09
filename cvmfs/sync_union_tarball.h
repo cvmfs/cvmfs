@@ -11,15 +11,32 @@
 
 #include "sync_union.h"
 
+#include <pthread.h>
+#include <map>
 #include <set>
 #include <string>
+
+#include "archive.h"
+#include "sync_mediator.h"
 
 namespace publish {
 
 class SyncUnionTarball : public SyncUnion {
  public:
-  SyncUnionTarball(SyncMediator *mediator, const std::string &tarball_path,
-                   const std::string &base_directory);
+  SyncUnionTarball(AbstractSyncMediator *mediator,
+                   const std::string &rdonly_path,
+                   const std::string &union_path,
+                   const std::string &scratch_path,
+                   const std::string &tarball_path,
+                   const std::string &base_directory,
+                   const std::string &to_delete);
+
+  ~SyncUnionTarball();
+
+  /*
+   * Delete the working directories, where the tar is being uncompressed.
+   */
+  // ~SyncUnionTarball();
 
   /*
    * Check that the tarball is actually valid and that can be open.
@@ -34,17 +51,35 @@ class SyncUnionTarball : public SyncUnion {
    */
   void Traverse();
 
+  std::string UnwindWhiteoutFilename(SharedPtr<SyncItem> entry) const;
+  bool IsOpaqueDirectory(SharedPtr<SyncItem> directory) const;
+  bool IsWhiteoutEntry(SharedPtr<SyncItem> entry) const;
+
  private:
+  struct archive *src;
   const std::string tarball_path_;
   const std::string base_directory_;
-  std::set<std::string> to_recur_;
+  const std::string to_delete_;
+  std::set<std::string> know_directories_;
+  std::set<std::string> to_create_catalog_dirs_;
+  std::map<std::string, SharedPtr<SyncItem> > dirs_;
+  pthread_mutex_t* archive_lock_;
+  pthread_cond_t* read_archive_cond_;
+  bool* can_read_archive_;
 
+  void CreateDirectories(const std::string &target);
   /*
    * Actually untar the several elements in the tar inside the base directory,
    * it returns all the recursive tars find in this operation
    */
-  std::set<std::string> untarPath(const std::string &tarball_path,
-                                  const std::string &base_directory);
+  bool UntarPath(const std::string &base_untar_directory_path,
+                 const std::string &tarball_path);
+
+  /*
+   * Helper function to phisically move the data from the source to the
+   * destination.
+   */
+  int CopyData(struct archive *src, struct archive *dst);
 };  // class SyncUnionTarball
 
 }  // namespace publish
