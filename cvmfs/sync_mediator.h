@@ -66,11 +66,30 @@ struct HardlinkGroup {
   FileChunkList file_chunks;
 };
 
+class AbstractSyncMediator {
+ public:
+  virtual ~AbstractSyncMediator() = 0;
+
+  virtual void RegisterUnionEngine(SyncUnion *engine) = 0;
+
+  virtual void Add(const SyncItem &entry) = 0;
+  virtual void Touch(const SyncItem &entry) = 0;
+  virtual void Remove(const SyncItem &entry) = 0;
+  virtual void Replace(const SyncItem &entry) = 0;
+
+  virtual void EnterDirectory(const SyncItem &entry) = 0;
+  virtual void LeaveDirectory(const SyncItem &entry) = 0;
+
+  virtual bool Commit(manifest::Manifest *manifest) = 0;
+
+  virtual bool IsExternalData() const = 0;
+  virtual zlib::Algorithms GetCompressionAlgorithm() const = 0;
+};
+
 /**
  * Mapping of inode number to the related HardlinkGroup.
  */
 typedef std::map<uint64_t, HardlinkGroup> HardlinkGroupMap;
-
 
 /**
  * The SyncMediator refines the input received from a concrete UnionSync object.
@@ -81,14 +100,15 @@ typedef std::map<uint64_t, HardlinkGroup> HardlinkGroupMap;
  * Furthermore it sends new and modified files to the spooler for compression
  * and hashing.
  */
-class SyncMediator {
+class SyncMediator : public virtual AbstractSyncMediator {
  public:
   static const unsigned int processing_dot_interval = 100;
 
   SyncMediator(catalog::WritableCatalogManager *catalog_manager,
                const SyncParameters *params);
   void RegisterUnionEngine(SyncUnion *engine);
-  virtual ~SyncMediator();
+  // Final class, it is not meant to be derived any further
+  ~SyncMediator();
 
   void Add(const SyncItem &entry);
   void Touch(const SyncItem &entry);
@@ -177,9 +197,9 @@ class SyncMediator {
   bool IgnoreFileCallback(const std::string &parent_dir,
                           const std::string &file_name);
 
-  SyncItem CreateSyncItem(const std::string  &relative_parent_path,
-                          const std::string  &filename,
-                          const SyncItemType  entry_type) const;
+  SyncItem CreateSyncItem(const std::string &relative_parent_path,
+                          const std::string &filename,
+                          const SyncItemType entry_type) const;
 
   // Called by Upload Spooler
   void PublishFilesCallback(const upload::SpoolerResult &result);
