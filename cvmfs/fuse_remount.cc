@@ -185,22 +185,20 @@ void *FuseRemounter::MainRemountTrigger(void *data) {
       abort();
     }
 
-    if (retval == 1) {
-      assert(watch_ctrl.revents == 1);
-
-      ReadPipe(remounter->pipe_remount_trigger_[0], &c, 1);
-      if (c == 'Q')
-        break;
-      assert(c == 'T');
-      ReadPipe(remounter->pipe_remount_trigger_[0], &timeout_ms, sizeof(int));
-      deadline = platform_monotonic_time() + timeout_ms / 1000;
-    } else if (retval == 0) {
-      assert(watch_ctrl.revents == 0);
-
+    if (retval == 0) {
       remounter->Check();
       timeout_ms = -1;
       continue;
     }
+
+    assert(watch_ctrl.revents != 0);
+
+    ReadPipe(remounter->pipe_remount_trigger_[0], &c, 1);
+    if (c == 'Q')
+      break;
+    assert(c == 'T');
+    ReadPipe(remounter->pipe_remount_trigger_[0], &timeout_ms, sizeof(int));
+    deadline = platform_monotonic_time() + timeout_ms / 1000;
   }
   LogCvmfs(kLogCvmfs, kLogDebug, "stopping remount trigger");
   return NULL;
