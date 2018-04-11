@@ -32,6 +32,8 @@ cvmfs_run_test() {
   echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   echo "*** Note: cvmfs_server mkfs -X --> enabled external files"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -g -z -X -Z none || return $?
+  echo "CVMFS_GENERATE_LEGACY_BULK_CHUNKS=true" | \
+    sudo tee -a /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf
 
   echo "*** Disable auto gc"
   sudo sed -i -e /^CVMFS_AUTO_GC=/d /etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/server.conf

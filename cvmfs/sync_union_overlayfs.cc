@@ -111,8 +111,7 @@ bool SyncUnionOverlayfs::ObtainSysAdminCapability() const {
 
 void SyncUnionOverlayfs::PreprocessSyncItem(SyncItem *entry) const {
   SyncUnion::PreprocessSyncItem(entry);
-  if (entry->IsGraftMarker() || entry->IsWhiteout() || entry->IsDirectory() ||
-      entry->IsSpecialFile()) {
+  if (entry->IsGraftMarker() || entry->IsWhiteout() || entry->IsDirectory()) {
     return;
   }
 
@@ -138,7 +137,8 @@ void SyncUnionOverlayfs::CheckForBrokenHardlink(const SyncItem &entry) const {
 }
 
 void SyncUnionOverlayfs::MaskFileHardlinks(SyncItem *entry) const {
-  assert(entry->IsRegularFile() || entry->IsSymlink());
+  assert(entry->IsRegularFile() || entry->IsSymlink() ||
+         entry->IsSpecialFile());
   if (entry->GetUnionLinkcount() > 1) {
     LogCvmfs(kLogPublish, kLogStderr,
              "Warning: Found file with linkcount > 1 "

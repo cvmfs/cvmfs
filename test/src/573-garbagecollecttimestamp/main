@@ -319,9 +319,6 @@ cvmfs_run_test() {
   cvmfs_server gc -f -t 'later today'    $CVMFS_TEST_REPO 2>&1 | grep 'Cannot parse' || return 13
   cvmfs_server gc -f -t '13.12.'         $CVMFS_TEST_REPO 2>&1 | grep 'Cannot parse' || return 14
 
-  echo "try to provide a timestamp in the future (should fail)"
-  cvmfs_server gc -f -t 'tomorrow' $CVMFS_TEST_REPO && return 15
-
   # ============================================================================
 
   echo "perform garbage collection with initial time stamp (nothing to be deleted)"
