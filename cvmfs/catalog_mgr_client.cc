@@ -12,6 +12,7 @@
 #include "download.h"
 #include "fetch.h"
 #include "manifest.h"
+#include "mountpoint.h"
 #include "quota.h"
 #include "signature.h"
 #include "statistics.h"
@@ -34,25 +35,22 @@ void ClientCatalogManager::ActivateCatalog(Catalog *catalog) {
 }
 
 
-ClientCatalogManager::ClientCatalogManager(
-  const string &repo_name,
-  cvmfs::Fetcher *fetcher,
-  signature::SignatureManager *signature_mgr,
-  perf::Statistics *statistics)
-  : AbstractCatalogManager<Catalog>(statistics)
-  , repo_name_(repo_name)
-  , fetcher_(fetcher)
-  , signature_mgr_(signature_mgr)
+ClientCatalogManager::ClientCatalogManager(MountPoint *mountpoint)
+  : AbstractCatalogManager<Catalog>(mountpoint->statistics())
+  , repo_name_(mountpoint->fqrn())
+  , fetcher_(mountpoint->fetcher())
+  , signature_mgr_(mountpoint->signature_mgr())
+  , workspace_(mountpoint->file_system()->workspace())
   , offline_mode_(false)
   , all_inodes_(0)
   , loaded_inodes_(0)
   , fixed_alt_root_catalog_(false)
 {
   LogCvmfs(kLogCatalog, kLogDebug, "constructing client catalog manager");
-  n_certificate_hits_ = statistics->Register("cache.n_certificate_hits",
-    "Number of certificate hits");
-  n_certificate_misses_ = statistics->Register("cache.n_certificate_misses",
-    "Number of certificate misses");
+  n_certificate_hits_ = mountpoint->statistics()->Register(
+    "cache.n_certificate_hits", "Number of certificate hits");
+  n_certificate_misses_ = mountpoint->statistics()->Register(
+    "cache.n_certificate_misses", "Number of certificate misses");
 }
 
 
@@ -220,7 +218,7 @@ LoadError ClientCatalogManager::LoadCatalog(
   fetcher_->cache_mgr()->CommitFromMem(ensemble.manifest->certificate(),
                                        ensemble.cert_buf, ensemble.cert_size,
                                        "certificate for " + repo_name_);
-  ensemble.manifest->ExportChecksum(".", 0600);
+  ensemble.manifest->ExportChecksum(workspace_, 0600);
   return catalog::kLoadNew;
 }
 
