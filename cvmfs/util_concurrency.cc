@@ -47,6 +47,7 @@ void Signal::Wait() {
     int retval = pthread_cond_wait(&signal_, &lock_);
     assert(retval == 0);
   }
+  fired_ = false;
 }
 
 

@@ -16,6 +16,7 @@
 #include "sync_item.h"
 #include "util/posix.h"
 #include "util/single_copy.h"
+#include "util_concurrency.h"
 
 class IngestionSource : SingleCopy {
  public:
@@ -86,12 +87,13 @@ class TarIngestionSource : public IngestionSource {
  public:
   TarIngestionSource(std::string path, struct archive* archive,
                      struct archive_entry* entry, pthread_mutex_t* archive_lock,
-                     pthread_cond_t* read_archive_cond, bool* can_read_archive)
+                     pthread_cond_t* read_archive_cond, bool* can_read_archive, Signal* read_archive_signal)
       : path_(path),
         archive_(archive),
         archive_lock_(archive_lock),
         read_archive_cond_(read_archive_cond),
-        can_read_archive_(can_read_archive) {
+        can_read_archive_(can_read_archive),
+        read_archive_signal_(read_archive_signal) {
     const struct stat* stat_ = archive_entry_stat(entry);
     size_ = stat_->st_size;
   }
@@ -112,6 +114,7 @@ class TarIngestionSource : public IngestionSource {
     *can_read_archive_ = true;
     pthread_cond_broadcast(read_archive_cond_);
     pthread_mutex_unlock(archive_lock_);
+    read_archive_signal_->Wakeup();
     return true;
   }
 
@@ -127,6 +130,7 @@ class TarIngestionSource : public IngestionSource {
   pthread_mutex_t* archive_lock_;
   pthread_cond_t* read_archive_cond_;
   bool* can_read_archive_;
+  Signal* read_archive_signal_;
 };
 
 #endif  // CVMFS_INGESTION_INGESTION_SOURCE_H_

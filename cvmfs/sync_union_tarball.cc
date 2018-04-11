@@ -22,6 +22,7 @@
 #include "sync_mediator.h"
 #include "sync_union.h"
 #include "util/posix.h"
+#include "util_concurrency.h"
 
 namespace publish {
 
@@ -35,7 +36,8 @@ SyncUnionTarball::SyncUnionTarball(AbstractSyncMediator *mediator,
     : SyncUnion(mediator, rdonly_path, union_path, scratch_path),
       tarball_path_(tarball_path),
       base_directory_(base_directory),
-      to_delete_(to_delete) {
+      to_delete_(to_delete),
+      read_archive_signal_(new Signal) {
   archive_lock_ =
       reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   assert(0 == pthread_mutex_init(archive_lock_, NULL));
@@ -46,9 +48,12 @@ SyncUnionTarball::SyncUnionTarball(AbstractSyncMediator *mediator,
 
   can_read_archive_ = new bool;
   *can_read_archive_ = true;
+
+  read_archive_signal_->Wakeup();
 }
 
 SyncUnionTarball::~SyncUnionTarball() {
+  delete read_archive_signal_;
   pthread_mutex_lock(archive_lock_);
   pthread_mutex_unlock(archive_lock_);
 
@@ -104,11 +109,14 @@ void SyncUnionTarball::Traverse() {
     }
   }
 
+
   while (true) {
     do {
       retry_read_header = false;
 
       /* Get the lock, wait if lock is not available yet */
+      read_archive_signal_->Wait();
+
       pthread_mutex_lock(archive_lock_);
       while (!*can_read_archive_) {
         pthread_cond_wait(read_archive_cond_, archive_lock_);
@@ -185,7 +193,8 @@ void SyncUnionTarball::Traverse() {
            */
           SharedPtr<SyncItem> sync_entry = SharedPtr<SyncItem>(
               new SyncItemTar(parent_path, filename, src, entry, archive_lock_,
-                              read_archive_cond_, can_read_archive_, this));
+                              read_archive_cond_, can_read_archive_,
+                              read_archive_signal_, this));
 
           if (sync_entry->IsDirectory()) {
             if (know_directories_.find(complete_path) !=
@@ -197,15 +206,16 @@ void SyncUnionTarball::Traverse() {
             know_directories_.insert(complete_path);
 
             *can_read_archive_ = true;
+            read_archive_signal_->Wakeup();
 
           } else if (sync_entry->IsRegularFile()) {
             ProcessFile(sync_entry);
-            printf("Processing file stop on lock");
             if (filename == ".cvmfscatalog") {
               to_create_catalog_dirs_.insert(parent_path);
             }
           } else {
             *can_read_archive_ = true;
+            read_archive_signal_->Wakeup();
           }
         }
       }

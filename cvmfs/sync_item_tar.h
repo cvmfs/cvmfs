@@ -11,6 +11,7 @@
 #include <string>
 
 #include "duplex_libarchive.h"
+#include "util_concurrency.h"
 
 namespace publish {
 
@@ -21,7 +22,7 @@ class SyncItemTar : public SyncItem {
   SyncItemTar(const string &relative_parent_path, const string &filename,
               struct archive *archive, struct archive_entry *entry,
               pthread_mutex_t *archive_lock, pthread_cond_t *read_archive_cond,
-              bool *can_read_archive, const SyncUnion *union_engine);
+              bool *can_read_archive, Signal *read_archive_signal, const SyncUnion *union_engine);
 
   SyncItemType GetScratchFiletype() const;
   catalog::DirectoryEntryBase CreateBasicCatalogDirent() const;
@@ -44,6 +45,7 @@ class SyncItemTar : public SyncItem {
   pthread_mutex_t *archive_lock_;
   pthread_cond_t *read_archive_cond_;
   bool *can_read_archive_;
+  Signal *read_archive_signal_;
 };
 
 SyncItemTar::SyncItemTar(const string &relative_parent_path,
@@ -51,14 +53,16 @@ SyncItemTar::SyncItemTar(const string &relative_parent_path,
                          struct archive_entry *entry,
                          pthread_mutex_t *archive_lock,
                          pthread_cond_t *read_archive_cond,
-                         bool *can_read_archive, const SyncUnion *union_engine)
+                         bool *can_read_archive, Signal *read_archive_signal,
+                         const SyncUnion *union_engine)
     : SyncItem(relative_parent_path, filename, union_engine, kItemTarfile),
       archive_(archive),
       archive_entry_(entry),
       obtained_tar_stat_(false),
       archive_lock_(archive_lock),
       read_archive_cond_(read_archive_cond),
-      can_read_archive_(can_read_archive) {
+      can_read_archive_(can_read_archive),
+      read_archive_signal_(read_archive_signal) {
   GetStatFromTar();
 }
 
@@ -172,7 +176,7 @@ catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
 IngestionSource *SyncItemTar::GetIngestionSource() const {
   return new TarIngestionSource(GetUnionPath(), archive_, archive_entry_,
                                 archive_lock_, read_archive_cond_,
-                                can_read_archive_);
+                                can_read_archive_, read_archive_signal_);
 }
 }  // namespace publish
 

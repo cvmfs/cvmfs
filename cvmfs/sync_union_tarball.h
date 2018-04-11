@@ -18,6 +18,8 @@
 
 #include "duplex_libarchive.h"
 #include "sync_mediator.h"
+#include "util_concurrency.h"
+#include "util_concurrency.h"
 
 namespace publish {
 
@@ -63,6 +65,7 @@ class SyncUnionTarball : public SyncUnion {
   std::set<std::string> know_directories_;
   std::set<std::string> to_create_catalog_dirs_;
   std::map<std::string, SharedPtr<SyncItem> > dirs_;
+  Signal *read_archive_signal_;
   pthread_mutex_t* archive_lock_;
   pthread_cond_t* read_archive_cond_;
   bool* can_read_archive_;
