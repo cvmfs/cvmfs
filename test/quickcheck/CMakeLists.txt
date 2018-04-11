@@ -92,6 +92,11 @@ set (CVMFS_QC_SOURCES
   cache.pb.cc cache.pb.h
 )
 
+# Lower optimization level for this file. Xcode 9.3+ gives different results in Os and above
+if (CVMFS_BUGGY_XCODE)
+  set_property(SOURCE ${CVMFS_SOURCE_DIR}/ingestion/chunk_detector.cc PROPERTY COMPILE_FLAGS -O0)
+endif(CVMFS_BUGGY_XCODE)
+
 # First .h then .cc is important to avoid races during the build process
 set_source_files_properties(cache.pb.h cache.pb.cc
                             PROPERTIES GENERATED true)
