@@ -266,6 +266,9 @@ Alias /cvmfs/${name} ${storage_dir}
         ForceType application/octet-stream
     </FilesMatch>
 
+    Header always set Access-Control-Allow-Origin "*"
+    Header always set Access-Control-Allow-Headers "Cache-Control, Pragma"
+
     Header unset Last-Modified
     FileETag None
 
