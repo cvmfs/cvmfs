@@ -7,6 +7,8 @@
 
 #include <pthread.h>
 #include <stdio.h>
+
+#include <cerrno>
 #include <string>
 
 #include "duplex_libarchive.h"
@@ -27,7 +29,8 @@ class IngestionSource : SingleCopy {
 
 class FileIngestionSource : public IngestionSource {
  public:
-  explicit FileIngestionSource(const std::string& path) : path_(path) {}
+  explicit FileIngestionSource(const std::string& path)
+      : path_(path), fd_(-1) {}
   ~FileIngestionSource() {  // Close();
   }
 
