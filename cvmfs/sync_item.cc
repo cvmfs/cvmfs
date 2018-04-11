@@ -12,8 +12,7 @@
 
 #include <vector>
 
-#include "archive.h"
-#include "archive_entry.h"
+#include "duplex_libarchive.h"
 #include "ingestion/ingestion_source.h"
 #include "sync_mediator.h"
 #include "sync_union.h"

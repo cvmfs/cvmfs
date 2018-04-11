@@ -10,6 +10,8 @@
 #include <pthread.h>
 #include <string>
 
+#include "duplex_libarchive.h"
+
 namespace publish {
 
 // struct archive;

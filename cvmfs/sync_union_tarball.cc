@@ -13,8 +13,7 @@
 #include <string>
 #include <vector>
 
-#include "archive.h"
-#include "archive_entry.h"
+#include "duplex_libarchive.h"
 #include "fs_traversal.h"
 #include "smalloc.h"
 #include "sync_item.h"

@@ -16,7 +16,7 @@
 #include <set>
 #include <string>
 
-#include "archive.h"
+#include "duplex_libarchive.h"
 #include "sync_mediator.h"
 
 namespace publish {

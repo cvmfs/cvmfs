@@ -9,8 +9,7 @@
 #include <stdio.h>
 #include <string>
 
-#include "archive.h"
-#include "archive_entry.h"
+#include "duplex_libarchive.h"
 #include "platform.h"
 #include "sync_item.h"
 #include "util/posix.h"

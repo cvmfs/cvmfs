@@ -15,8 +15,8 @@
 #include <map>
 #include <string>
 
-#include "archive.h"
 #include "directory_entry.h"
+#include "duplex_libarchive.h"
 #include "file_chunk.h"
 #include "hash.h"
 #include "ingestion/ingestion_source.h"
