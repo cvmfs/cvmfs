@@ -46,7 +46,6 @@ FileItem::FileItem(
 
 FileItem::~FileItem() {
   pthread_mutex_destroy(&lock_);
-  delete source_;
 }
 
 void FileItem::RegisterChunk(const FileChunk &file_chunk) {

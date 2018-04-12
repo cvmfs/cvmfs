@@ -94,7 +94,7 @@ class FileItem : SingleCopy {
   static const char kQuitBeaconMarker = '\0';
 
   const std::string path_;
-  IngestionSource *source_;
+  UniquePtr<IngestionSource> source_;
   const zlib::Algorithms compression_algorithm_;
   const shash::Algorithms hash_algorithm_;
   const shash::Suffix hash_suffix_;
