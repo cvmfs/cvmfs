@@ -38,29 +38,11 @@ SyncUnionTarball::SyncUnionTarball(AbstractSyncMediator *mediator,
       base_directory_(base_directory),
       to_delete_(to_delete),
       read_archive_signal_(new Signal) {
-  archive_lock_ =
-      reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
-  assert(0 == pthread_mutex_init(archive_lock_, NULL));
-
-  read_archive_cond_ =
-      reinterpret_cast<pthread_cond_t *>(smalloc(sizeof(pthread_cond_t)));
-  assert(0 == pthread_cond_init(read_archive_cond_, NULL));
-
-  can_read_archive_ = new bool;
-  *can_read_archive_ = true;
-
   read_archive_signal_->Wakeup();
 }
 
 SyncUnionTarball::~SyncUnionTarball() {
   delete read_archive_signal_;
-  pthread_mutex_lock(archive_lock_);
-  pthread_mutex_unlock(archive_lock_);
-
-  pthread_mutex_destroy(archive_lock_);
-  pthread_cond_destroy(read_archive_cond_);
-
-  delete can_read_archive_;
 }
 
 bool SyncUnionTarball::Initialize() {
@@ -117,14 +99,7 @@ void SyncUnionTarball::Traverse() {
       /* Get the lock, wait if lock is not available yet */
       read_archive_signal_->Wait();
 
-      pthread_mutex_lock(archive_lock_);
-      while (!*can_read_archive_) {
-        pthread_cond_wait(read_archive_cond_, archive_lock_);
-      }
-      pthread_mutex_unlock(archive_lock_);
-
       int result = archive_read_next_header2(src, entry);
-      *can_read_archive_ = false;
 
       switch (result) {
         case ARCHIVE_FATAL: {
@@ -191,10 +166,8 @@ void SyncUnionTarball::Traverse() {
            * This whole process is not necessary for directories since we don't
            * actually need to read data from them.
            */
-          SharedPtr<SyncItem> sync_entry = SharedPtr<SyncItem>(
-              new SyncItemTar(parent_path, filename, src, entry, archive_lock_,
-                              read_archive_cond_, can_read_archive_,
-                              read_archive_signal_, this));
+          SharedPtr<SyncItem> sync_entry = SharedPtr<SyncItem>(new SyncItemTar(
+              parent_path, filename, src, entry, read_archive_signal_, this));
 
           if (sync_entry->IsDirectory()) {
             if (know_directories_.find(complete_path) !=
@@ -205,7 +178,6 @@ void SyncUnionTarball::Traverse() {
             dirs_[complete_path] = sync_entry;
             know_directories_.insert(complete_path);
 
-            *can_read_archive_ = true;
             read_archive_signal_->Wakeup();
 
           } else if (sync_entry->IsRegularFile()) {
@@ -214,7 +186,6 @@ void SyncUnionTarball::Traverse() {
               to_create_catalog_dirs_.insert(parent_path);
             }
           } else {
-            *can_read_archive_ = true;
             read_archive_signal_->Wakeup();
           }
         }
