@@ -44,7 +44,7 @@ class T_SessionContext : public ::testing::Test {};
 
 TEST_F(T_SessionContext, BasicLifeCycle) {
   SessionContextMocked ctx;
-  EXPECT_TRUE(ctx.Initialize("http://my.repo.address:8080/api/v1",
+  EXPECT_TRUE(ctx.Initialize("http://my.repo.address:4929/api/v1",
                              "/path/to/the/session_file", "some_key_id",
                              "some_secret"));
   EXPECT_EQ(0, ctx.num_jobs_dispatched_);
@@ -67,7 +67,7 @@ TEST_F(T_SessionContext, BasicLifeCycle) {
 
 TEST_F(T_SessionContext, MultipleFiles) {
   SessionContextMocked ctx;
-  EXPECT_TRUE(ctx.Initialize("http://my.repo.address:8080/api/v1",
+  EXPECT_TRUE(ctx.Initialize("http://my.repo.address:4929/api/v1",
                              "/path/to/the/session_file", "some_key_id",
                              "some_secret", 20000));
   EXPECT_EQ(0, ctx.num_jobs_dispatched_);
@@ -92,7 +92,7 @@ TEST_F(T_SessionContext, MultipleFiles) {
 
 TEST_F(T_SessionContext, MultipleFilesForcedDispatchLast) {
   SessionContextMocked ctx;
-  EXPECT_TRUE(ctx.Initialize("http://my.repo.address:8080/api/v1",
+  EXPECT_TRUE(ctx.Initialize("http://my.repo.address:4929/api/v1",
                              "/path/to/the/session_file", "some_key_id",
                              "some_secret", 20000));
   EXPECT_EQ(0, ctx.num_jobs_dispatched_);
@@ -118,7 +118,7 @@ TEST_F(T_SessionContext, MultipleFilesForcedDispatchLast) {
 
 TEST_F(T_SessionContext, MultipleFilesForcedDispatchEach) {
   SessionContextMocked ctx;
-  EXPECT_TRUE(ctx.Initialize("http://my.repo.address:8080/api/v1",
+  EXPECT_TRUE(ctx.Initialize("http://my.repo.address:4929/api/v1",
                              "/path/to/the/session_file", "some_key_id",
                              "some_secret", 20000));
   EXPECT_EQ(0, ctx.num_jobs_dispatched_);
@@ -143,7 +143,7 @@ TEST_F(T_SessionContext, MultipleFilesForcedDispatchEach) {
 
 TEST_F(T_SessionContext, FirstAddAllThenCommit) {
   SessionContextMocked ctx;
-  EXPECT_TRUE(ctx.Initialize("http://my.repo.address:8080/api/v1",
+  EXPECT_TRUE(ctx.Initialize("http://my.repo.address:4929/api/v1",
                              "/path/to/the/session_file", "some_key_id",
                              "some_secret", 20000));
   EXPECT_EQ(0, ctx.num_jobs_dispatched_);
@@ -172,7 +172,7 @@ TEST_F(T_SessionContext, FirstAddAllThenCommit) {
 TEST_F(T_SessionContext, EncounterFileWhichIsLargerThanExpected) {
   SessionContextMocked ctx;
 
-  EXPECT_TRUE(ctx.Initialize("http://my.repo.address:8080/api/v1",
+  EXPECT_TRUE(ctx.Initialize("http://my.repo.address:4929/api/v1",
                              "/path/to/the/session_file", "some_key_id",
                              "some_secret", 4000));
   EXPECT_EQ(0, ctx.num_jobs_dispatched_);

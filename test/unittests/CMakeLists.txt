@@ -251,6 +251,11 @@ set (CVMFS_UNITTEST_SOURCES
   cache.pb.cc cache.pb.h
 )
 
+# Lower optimization level for this file. Xcode 9.3+ gives different results in Os and above
+if (CVMFS_BUGGY_XCODE)
+  set_property(SOURCE ${CVMFS_SOURCE_DIR}/ingestion/chunk_detector.cc PROPERTY COMPILE_FLAGS -O0)
+endif(CVMFS_BUGGY_XCODE)
+
 if (APPLE)
     list(APPEND CVMFS_UNITTEST_SOURCES ${CVMFS_SOURCE_DIR}/file_watcher_kqueue.cc)
 endif(APPLE)
