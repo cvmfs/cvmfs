@@ -28,12 +28,10 @@ namespace publish {
 
 SyncUnionTarball::SyncUnionTarball(AbstractSyncMediator *mediator,
                                    const std::string &rdonly_path,
-                                   const std::string &union_path,
-                                   const std::string &scratch_path,
                                    const std::string &tarball_path,
                                    const std::string &base_directory,
                                    const std::string &to_delete)
-    : SyncUnion(mediator, rdonly_path, union_path, scratch_path),
+    : SyncUnion(mediator, rdonly_path, "", ""),
       tarball_path_(tarball_path),
       base_directory_(base_directory),
       to_delete_(to_delete),

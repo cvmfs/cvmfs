@@ -26,8 +26,6 @@ class SyncUnionTarball : public SyncUnion {
  public:
   SyncUnionTarball(AbstractSyncMediator *mediator,
                    const std::string &rdonly_path,
-                   const std::string &union_path,
-                   const std::string &scratch_path,
                    const std::string &tarball_path,
                    const std::string &base_directory,
                    const std::string &to_delete);

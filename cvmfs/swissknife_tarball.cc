@@ -11,8 +11,6 @@
 
 int swissknife::IngestTarball::Main(const swissknife::ArgumentList &args) {
   SyncParameters params;
-  params.dir_union = MakeCanonicalPath(*args.find('u')->second);
-  params.dir_scratch = MakeCanonicalPath(*args.find('s')->second);
   params.dir_rdonly = MakeCanonicalPath(*args.find('c')->second);
   params.dir_temp = MakeCanonicalPath(*args.find('t')->second);
   params.base_hash = shash::MkFromHexPtr(shash::HexPtr(*args.find('b')->second),
@@ -106,9 +104,9 @@ int swissknife::IngestTarball::Main(const swissknife::ArgumentList &args) {
   if (params.virtual_dir_actions == catalog::VirtualCatalog::kActionNone) {
     publish::SyncUnion *sync;
 
-    sync = new publish::SyncUnionTarball(
-        &mediator, params.dir_rdonly, params.dir_union, params.dir_scratch,
-        params.tar_file, params.base_directory, params.to_delete);
+    sync = new publish::SyncUnionTarball(&mediator, params.dir_rdonly,
+                                         params.tar_file, params.base_directory,
+                                         params.to_delete);
     if (!sync->Initialize()) {
       LogCvmfs(kLogCvmfs, kLogStderr,
                "Initialization of the synchronisation "
