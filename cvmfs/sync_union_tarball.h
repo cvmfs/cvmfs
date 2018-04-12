@@ -19,7 +19,6 @@
 #include "duplex_libarchive.h"
 #include "sync_mediator.h"
 #include "util_concurrency.h"
-#include "util_concurrency.h"
 
 namespace publish {
 
@@ -68,18 +67,6 @@ class SyncUnionTarball : public SyncUnion {
   Signal *read_archive_signal_;
 
   void CreateDirectories(const std::string &target);
-  /*
-   * Actually untar the several elements in the tar inside the base directory,
-   * it returns all the recursive tars find in this operation
-   */
-  bool UntarPath(const std::string &base_untar_directory_path,
-                 const std::string &tarball_path);
-
-  /*
-   * Helper function to phisically move the data from the source to the
-   * destination.
-   */
-  int CopyData(struct archive *src, struct archive *dst);
 };  // class SyncUnionTarball
 
 }  // namespace publish
