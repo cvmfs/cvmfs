@@ -138,7 +138,7 @@ void SyncUnionOverlayfs::CheckForBrokenHardlink(
   }
 }
 
-void SyncUnionOverlayfs::MaskFileHardlinks(SyncItem *entry) const {
+void SyncUnionOverlayfs::MaskFileHardlinks(SharedPtr<SyncItem> entry) const {
   assert(entry->IsRegularFile() || entry->IsSymlink() ||
          entry->IsSpecialFile());
   if (entry->GetUnionLinkcount() > 1) {
