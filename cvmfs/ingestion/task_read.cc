@@ -54,7 +54,7 @@ void TaskRead::Process(FileItem *item) {
   do {
     nbytes = item->Read(buffer, kBlockSize);
     if (nbytes < 0) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "failed to read --- %s (%d)",
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to read %s (%d)",
                item->path().c_str(), errno);
       abort();
     }
