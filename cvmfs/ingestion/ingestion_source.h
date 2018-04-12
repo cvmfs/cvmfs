@@ -6,9 +6,9 @@
 #define CVMFS_INGESTION_INGESTION_SOURCE_H_
 
 #include <pthread.h>
-#include <stdio.h>
 
 #include <cerrno>
+#include <cstdio>
 #include <string>
 
 #include "duplex_libarchive.h"

@@ -7,8 +7,9 @@
 #include "sync_union_tarball.h"
 
 #include <pthread.h>
-#include <stdio.h>
+
 #include <cassert>
+#include <cstdio>
 #include <set>
 #include <string>
 #include <vector>

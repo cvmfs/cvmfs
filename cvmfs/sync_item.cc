@@ -4,12 +4,12 @@
 
 #include "sync_item.h"
 
-#include <errno.h>
 
 #if !defined(__APPLE__)
 #include <sys/sysmacros.h>
 #endif  // __APPLE__
 
+#include <cerrno>
 #include <vector>
 
 #include "duplex_libarchive.h"

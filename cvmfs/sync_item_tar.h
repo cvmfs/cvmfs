@@ -8,6 +8,7 @@
 #include "sync_union.h"
 
 #include <pthread.h>
+
 #include <string>
 
 #include "duplex_libarchive.h"
