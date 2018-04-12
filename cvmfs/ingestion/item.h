@@ -18,7 +18,6 @@
 #include "hash.h"
 #include "ingestion/chunk_detector.h"
 #include "ingestion/ingestion_source.h"
-#include "sync_item.h"
 #include "util/pointer.h"
 #include "util/shared_ptr.h"
 #include "util/single_copy.h"

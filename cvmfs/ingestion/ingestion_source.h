@@ -13,7 +13,6 @@
 
 #include "duplex_libarchive.h"
 #include "platform.h"
-#include "sync_item.h"
 #include "util/posix.h"
 #include "util/single_copy.h"
 #include "util_concurrency.h"

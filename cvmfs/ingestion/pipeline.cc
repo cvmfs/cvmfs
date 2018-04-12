@@ -15,12 +15,10 @@
 #include "ingestion/task_register.h"
 #include "ingestion/task_write.h"
 #include "platform.h"
-#include "sync_item.h"
 #include "upload_facility.h"
 #include "upload_spooler_definition.h"
 #include "util/string.h"
 #include "util_concurrency.h"
-
 
 IngestionPipeline::IngestionPipeline(
   upload::AbstractUploader *uploader,
