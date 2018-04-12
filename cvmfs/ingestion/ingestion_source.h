@@ -31,19 +31,16 @@ class FileIngestionSource : public IngestionSource {
  public:
   explicit FileIngestionSource(const std::string& path)
       : path_(path), fd_(-1) {}
-  ~FileIngestionSource() {  // Close();
-  }
+  ~FileIngestionSource() {}
 
   std::string GetPath() const { return path_; }
 
   bool Open() {
     fd_ = open(path_.c_str(), O_RDONLY);
     if (fd_ < 0) {
-      LogCvmfs(
-          kLogCvmfs, kLogStderr,
-          "Err: Impossible to open the file. path => %s fd = %d -> errno = %d "
-          "=> %s\n",
-          path_.c_str(), fd_, errno, strerror(errno));
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "Err: Impossible to open the file: %s (%d)\n %s", path_.c_str(),
+               errno, strerror(errno));
       return false;
     }
     return true;
@@ -53,9 +50,8 @@ class FileIngestionSource : public IngestionSource {
     assert(fd_ >= 0);
     ssize_t read = SafeRead(fd_, buffer, nbyte);
     if (read < 0) {
-      LogCvmfs(kLogCvmfs, kLogStderr,
-               "failed to read fd = %d | path = %s (%d) %s", fd_, path_.c_str(),
-               errno, strerror(errno));
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to read the file: %s (%d)\n %s",
+               fd_, path_.c_str(), errno, strerror(errno));
     }
     return read;
   }
@@ -64,10 +60,7 @@ class FileIngestionSource : public IngestionSource {
     if (fd_ == -1) return true;
     int ret = close(fd_);
     fd_ = -1;
-    if (ret == 0) {
-      return true;
-    }
-    return false;
+    return (ret == 0);
   }
 
   bool GetSize(uint64_t* size) {
