@@ -66,6 +66,8 @@ class SyncUnionTarball : public SyncUnion {
   std::map<std::string, SharedPtr<SyncItem> > dirs_;
   Signal *read_archive_signal_;
 
+  static const size_t kBlockSize = 4096 * 4;
+
   void CreateDirectories(const std::string &target);
 };  // class SyncUnionTarball
 

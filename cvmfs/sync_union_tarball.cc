@@ -51,11 +51,11 @@ bool SyncUnionTarball::Initialize() {
   assert(ARCHIVE_OK == archive_read_support_format_empty(src));
 
   if (tarball_path_ == "--") {
-    result = archive_read_open_filename(src, NULL, 4096);
+    result = archive_read_open_filename(src, NULL, kBlockSize);
   } else {
     std::string tarball_absolute_path = GetAbsolutePath(tarball_path_);
     result =
-        archive_read_open_filename(src, tarball_absolute_path.c_str(), 4096);
+        archive_read_open_filename(src, tarball_absolute_path.c_str(), kBlockSize);
   }
 
   if (result != ARCHIVE_OK) {
