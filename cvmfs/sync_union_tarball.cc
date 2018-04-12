@@ -65,7 +65,7 @@ bool SyncUnionTarball::Initialize() {
     return false;
   }
 
-  return (result == ARCHIVE_OK) && SyncUnion::Initialize();
+  return SyncUnion::Initialize();
 }
 
 void SyncUnionTarball::Traverse() {
