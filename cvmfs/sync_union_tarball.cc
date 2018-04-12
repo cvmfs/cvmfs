@@ -104,7 +104,7 @@ void SyncUnionTarball::Traverse() {
       }
 
       case ARCHIVE_RETRY: {
-        LogCvmfs(kLogUnionFs, kLogStderr,
+        LogCvmfs(kLogUnionFs, kLogStdout,
                  "Error in reading the header, retrying. \n %s",
                  archive_error_string(src));
         continue;
