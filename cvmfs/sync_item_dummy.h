@@ -7,7 +7,7 @@
 
 #include "sync_item.h"
 
-#include <time.h>
+#include <ctime>
 #include <string>
 
 #include "sync_union_tarball.h"
@@ -33,14 +33,15 @@ class SyncItemDummyDir : public SyncItem {
     assert(kItemDir == entry_type);
 
     scratch_stat_.obtained = true;
-    scratch_stat_.stat.st_mode = S_IFDIR | S_IRUSR | S_IWUSR | S_IXUSR |
-                                 S_IRGRP | S_IWGRP | S_IXGRP | S_IROTH |
-                                 S_IXOTH;
+    scratch_stat_.stat.st_mode = kPermision;
     scratch_stat_.stat.st_nlink = 1;
     scratch_stat_.stat.st_uid = getuid();
     scratch_stat_.stat.st_gid = getgid();
     scratch_type_ = kItemDir;
   }
+
+ private:
+  mode_t kPermision = S_IFDIR | S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP;
 };
 
 catalog::DirectoryEntryBase SyncItemDummyDir::CreateBasicCatalogDirent() const {
@@ -50,8 +51,7 @@ catalog::DirectoryEntryBase SyncItemDummyDir::CreateBasicCatalogDirent() const {
 
   dirent.linkcount_ = 1;
 
-  dirent.mode_ = S_IFDIR | S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP |
-                 S_IXGRP | S_IROTH | S_IXOTH;
+  dirent.mode_ = kPermision;
 
   dirent.uid_ = getuid();
   dirent.gid_ = getgid();
