@@ -32,7 +32,7 @@ class SyncItemTar : public SyncItem {
   inline unsigned int GetRdevMajor() const { return major(tar_stat_.st_rdev); }
   inline unsigned int GetRdevMinor() const { return minor(tar_stat_.st_rdev); }
 
-  IngestionSource *GetIngestionSource() const;
+  IngestionSource *CreateIngestionSource() const;
   void SetCatalogMarker() { has_catalog_marker_ = true; }
 
   struct archive *archive_;
@@ -165,7 +165,7 @@ catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
   return dirent;
 }
 
-IngestionSource *SyncItemTar::GetIngestionSource() const {
+IngestionSource *SyncItemTar::CreateIngestionSource() const {
   return new TarIngestionSource(GetUnionPath(), archive_, archive_entry_,
                                 read_archive_signal_);
 }

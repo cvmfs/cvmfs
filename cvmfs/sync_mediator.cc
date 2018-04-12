@@ -692,7 +692,7 @@ void SyncMediator::AddFile(SharedPtr<SyncItem> entry) {
     file_queue_[entry->GetUnionPath()] = entry;
     pthread_mutex_unlock(&lock_file_queue_);
     // Spool the file
-    params_->spooler->Process(entry->GetIngestionSource());
+    params_->spooler->Process(entry->CreateIngestionSource());
   }
 }
 

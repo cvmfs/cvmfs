@@ -161,8 +161,8 @@ uint64_t SyncItem::GetUnionInode() const {
   return union_stat_.stat.st_ino;
 }
 
-IngestionSource *SyncItem::GetIngestionSource() const {
-        return new FileIngestionSource(GetUnionPath());
+IngestionSource *SyncItem::CreateIngestionSource() const {
+  return new FileIngestionSource(GetUnionPath());
 }
 
 void SyncItem::StatGeneric(const string  &path,

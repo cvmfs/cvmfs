@@ -162,7 +162,7 @@ class SyncItem {
     return relative_parent_path_;
   }
 
-  virtual IngestionSource *GetIngestionSource() const;
+  virtual IngestionSource *CreateIngestionSource() const;
   virtual void AlreadyCreatedDir() const { rdonly_type_ = kItemDir; }
 
   bool operator==(const SyncItem &other) const {
