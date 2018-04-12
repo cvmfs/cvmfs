@@ -54,8 +54,8 @@ bool SyncUnionTarball::Initialize() {
     result = archive_read_open_filename(src, NULL, kBlockSize);
   } else {
     std::string tarball_absolute_path = GetAbsolutePath(tarball_path_);
-    result =
-        archive_read_open_filename(src, tarball_absolute_path.c_str(), kBlockSize);
+    result = archive_read_open_filename(src, tarball_absolute_path.c_str(),
+                                        kBlockSize);
   }
 
   if (result != ARCHIVE_OK) {
@@ -89,7 +89,6 @@ void SyncUnionTarball::Traverse() {
   }
 
   while (true) {
-
     /* Get the lock, wait if lock is not available yet */
     read_archive_signal_->Wait();
 
