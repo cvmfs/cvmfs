@@ -44,7 +44,7 @@ cvmfs_run_test() {
   produce_tarball $tarfile
 
   echo "*** ingesting the tarball in the directory $to_remove_dir"
-  cvmfs_server ingest-tarball --base_dir $to_remove_dir --tar_file $tarfile $CVMFS_TEST_REPO
+  cvmfs_server ingest-tarball --base_dir $to_remove_dir --tar_file $tarfile $CVMFS_TEST_REPO || return $?
 
   echo "*** check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
@@ -91,7 +91,7 @@ cvmfs_run_test() {
   #===========================================================================#
 
   echo "*** ingesting the tarball in the directory $to_keep_dir"
-  cvmfs_server ingest-tarball --base_dir $to_keep_dir --tar_file $tarfile -d $to_remove_dir $CVMFS_TEST_REPO
+  cvmfs_server ingest-tarball --base_dir $to_keep_dir --tar_file $tarfile -d $to_remove_dir $CVMFS_TEST_REPO || return $?
 
   echo "*** check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
