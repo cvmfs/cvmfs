@@ -29,13 +29,36 @@ int swissknife::IngestTarball::Main(const swissknife::ArgumentList &args) {
     params.to_delete = *args.find('D')->second;
   }
 
+  if (args.find('O') != args.end()) {
+    params.generate_legacy_bulk_chunks = true;
+  }
   shash::Algorithms hash_algorithm = shash::kSha1;
+  if (args.find('e') != args.end()) {
+    hash_algorithm = shash::ParseHashAlgorithm(*args.find('e')->second);
+    if (hash_algorithm == shash::kAny) {
+      PrintError("unknown hash algorithm");
+      return 1;
+    }
+  }
+  if (args.find('Z') != args.end()) {
+    params.compression_alg =
+        zlib::ParseCompressionAlgorithm(*args.find('Z')->second);
+  }
 
   params.nested_kcatalog_limit = SyncParameters::kDefaultNestedKcatalogLimit;
   params.root_kcatalog_limit = SyncParameters::kDefaultRootKcatalogLimit;
   params.file_mbyte_limit = SyncParameters::kDefaultFileMbyteLimit;
 
   params.branched_catalog = false;  // could be true?
+
+  if (args.find('P') != args.end()) {
+    params.session_token_file = *args.find('P')->second;
+  }
+
+  if (args.find('H') != args.end()) {
+    params.key_file = *args.find('H')->second;
+  }
+
 
   upload::SpoolerDefinition spooler_definition(
       params.spooler_definition, hash_algorithm, params.compression_alg,
