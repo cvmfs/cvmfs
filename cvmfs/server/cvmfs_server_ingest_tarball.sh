@@ -1,5 +1,17 @@
+#
+# This file is part of the CernVM File System
+# This script takes care of creating, removing, and maintaining repositories
+# on a Stratum 0/1 server
+#
+# Implementation of the "cvmfs_server ingest-tarball" command
 
-debug() { echo "$1 => \"$(eval echo \$$1)\"" >&2; }
+# This file depends on fuctions implemented in the following files:
+# - cvmfs_server_util.sh
+# - cvmfs_server_common.sh
+
+
+# TODO Most of this code is replicated and shared between different scrips,
+# it would be a good idea to refactor common patterns into coherent functions.
 
 cvmfs_server_ingest_tarball() {
   local base_dir="" # where to extract the tar file
@@ -34,10 +46,10 @@ cvmfs_server_ingest_tarball() {
   name=$1
   name=$(echo $name | cut -d'/' -f1)
 
-  if [ -z "$base_dir" ]; then
+  if [ x"$base_dir" = "x" ]; then
     die "Please set the base directory where to extract the tarball, use -b \$BASE_DIR or --base_dir \$BASE_DIR"
   fi
-  if [ -z "$tar_file" ]; then
+  if [ x"$tar_file" = "x" ]; then
     die "Please provide the tarball to extract, use -t \$TARBALL_PATH or --tar_file \$TARBALL_PATH"
   fi
 
@@ -72,11 +84,11 @@ cvmfs_server_ingest_tarball() {
   fi
 
   is_owner_or_root $name ||  die "Permission denied: Repository $name is owned by $user"
-#  check_repository_compatibility $name
-#  check_url "${CVMFS_STRATUM0}/.cvmfspublished" 20 ||  die "Repository unavailable under $CVMFS_STRATUM0"
+  check_repository_compatibility $name
+  check_url "${CVMFS_STRATUM0}/.cvmfspublished" 20 ||  die "Repository unavailable under $CVMFS_STRATUM0"
   check_expiry $name $stratum0   || die "Repository whitelist for $name is expired!"
-# # is_in_transaction $name        || die "Repository $name is not in a transaction"
-#
+  is_in_transaction $name        && die "Repository $name is already in a transaction"
+
   [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || die "Open writable file descriptors on $name"
   is_cwd_on_path "/cvmfs/$name" && die "Current working directory is in /cvmfs/$name.  Please release, e.g. by 'cd \$HOME'." || true
   gc_timespan="$(get_auto_garbage_collection_timespan $name)" || die
@@ -188,8 +200,6 @@ cvmfs_server_ingest_tarball() {
   if [ ! -z "$to_delete" ]; then
     ingest_tarball_command="$ingest_tarball_command -D $to_delete"
   fi
-
-  debug ingest_tarball_command
 
 
   # ---> do it! (from here on we are changing things)
@@ -313,10 +323,4 @@ cvmfs_server_ingest_tarball() {
   publish_after_hook $name
   publish_succeeded  $name
 
-  # force and health check with repeairs.
-  # it unmount and remount the fs making the new extracted file "appear"
-  # then it checks that everything is ok that doesn't hurt
-  health_check -r $name
-
 }
-
