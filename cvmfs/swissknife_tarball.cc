@@ -117,6 +117,33 @@ int swissknife::IngestTarball::Main(const swissknife::ArgumentList &args) {
     sync->Traverse();
   }
 
+  if (!params.authz_file.empty()) {
+    LogCvmfs(kLogCvmfs, kLogDebug,
+             "Adding contents of authz file %s to"
+             " root catalog.",
+             params.authz_file.c_str());
+    int fd = open(params.authz_file.c_str(), O_RDONLY);
+    if (fd == -1) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "Unable to open authz file (%s)"
+               "from the publication process: %s",
+               params.authz_file.c_str(), strerror(errno));
+      return 7;
+    }
+
+    std::string new_authz;
+    const bool read_successful = SafeReadToString(fd, &new_authz);
+    close(fd);
+
+    if (!read_successful) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to read authz file (%s): %s",
+               params.authz_file.c_str(), strerror(errno));
+      return 8;
+    }
+
+    catalog_manager.SetVOMSAuthz(new_authz);
+  }
+
   if (!mediator.Commit(manifest.weak_ref())) {
     PrintError("something went wrong during sync");
     return 5;
