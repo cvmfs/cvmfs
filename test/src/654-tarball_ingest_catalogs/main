@@ -85,6 +85,25 @@ cvmfs_run_test() {
     echo "*** Ingested file of size $file_size bytes: $file"
   fi
 
+  echo "*** Checking catalogs been created"
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO
+
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$" || die "Not found catalog /"
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$dir/tarball_foo/a$" || die "Not found catalog /$dir/tarball_foo/a"
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$dir/tarball_foo/a/b$"  || die "Not found catalog /$dir/tarball_foo/a/b"
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/not/existing/catalog$"  && die "Found not existing catalog /not/existing/catalog"
+
+  local different_dir="different_dir"
+  echo "*** ingesting the same tarball in a different directory $dir"
+  cvmfs_server ingest-tarball --base_dir $different_dir --tar_file $tarfile --delete $dir $CVMFS_TEST_REPO || return $?
+
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$" || die "Not found catalog /"
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$different_dir/tarball_foo/a$" || die "Not found catalog /$different_dir/tarball_foo/a"
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$different_dir/tarball_foo/a/b$"  || die "Not found catalog /$different_dir/tarball_foo/a/b"
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$dir/tarball_foo/a$" && die "Found catalog /$dir/tarball_foo/a that should not be here"
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$dir/tarball_foo/a/b$"  && die "Found catalog /$dir/tarball_foo/a/b that should not be here"
+
+
   return 0
 }
 
