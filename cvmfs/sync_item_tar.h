@@ -34,6 +34,7 @@ class SyncItemTar : public SyncItem {
 
   IngestionSource *CreateIngestionSource() const;
   void SetCatalogMarker() { has_catalog_marker_ = true; }
+  void AlreadyCreatedDir() const { rdonly_type_ = kItemDir; }
 
   struct archive *archive_;
   struct archive_entry *archive_entry_;
