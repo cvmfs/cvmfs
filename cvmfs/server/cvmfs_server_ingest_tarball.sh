@@ -319,7 +319,7 @@ cvmfs_server_ingest_tarball() {
   fi
 
   # remount the repository
-  close_transaction  $name $use_fd_fallback
+  remount_repo  $name $use_fd_fallback
   publish_after_hook $name
   publish_succeeded  $name
 
