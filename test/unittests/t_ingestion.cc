@@ -568,7 +568,7 @@ TEST_F(T_Ingestion, TaskCompress) {
   BlockItem block_raw(42, &allocator_);
   block_raw.MakeData(size);
   unsigned char *buf = reinterpret_cast<unsigned char *>(smalloc(size));
-  
+
   // File does not exist
   FileItem file_large(new FileIngestionSource(std::string("./large")));
   ChunkItem chunk_large(&file_large, 0);
