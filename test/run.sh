@@ -152,6 +152,12 @@ setup_environment() {
     setup_benchmark_environment $workdir
   fi
 
+  # Avoid issues with modern Apache reload logic
+  echo "# Created by CVMFS integration tests" | sudo tee /etc/cvmfs/cvmfs_server_hooks.sh \
+    || return  105
+  echo "CVMFS_SERVER_APACHE_RELOAD_IS_RESTART=$CVMFS_SERVER_APACHE_RELOAD_IS_RESTART" | \
+    sudo tee -a /etc/cvmfs/cvmfs_server_hooks.sh || return 105
+
   # reset the test warning flags
   reset_test_warning_flags
 

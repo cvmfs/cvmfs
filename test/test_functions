@@ -8,6 +8,7 @@
 # `export CVMFS_TEST_SRVDEBUG=fail`    - for crash debugging with gdb
 # `export CVMFS_TEST_SRVDEBUG=startup` - for interactive debugging with gdb
 
+CVMFS_SERVER_APACHE_RELOAD_IS_RESTART=true
 
 CVMFS_TEST_DEBUGLOG=${CVMFS_TEST_DEBUGLOG:=}
 CVMFS_TEST_PROXY=${CVMFS_TEST_PROXY:=http://ca-proxy.cern.ch:3128}
