@@ -32,7 +32,7 @@ produce_tarball() {
   ln -s tarball_foo/a/b/another_empty.txt tarball_foo/to_empty_link.txt
   ln -s tarball_foo/a/b/c/4_change_owner.txt tarball_foo/to_different_owner.txt
 
-  echo "Generating a tarball in $tarball_name"
+  echo "*** Generating a tarball in $tarball_name"
   tar -cvf $tarball_name tarball_foo/
 
   rm -rf tarball_foo
@@ -46,42 +46,42 @@ cvmfs_run_test() {
 
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
 
-  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $USER || return $?
 
   # ============================================================================
 
-  echo "generating a tarball $tarfile"
+  echo "*** generating a tarball $tarfile"
   produce_tarball $tarfile
 
-  echo "ingesting the tarball in the directory $dir"
+  echo "*** ingesting the tarball in the directory $dir"
   cvmfs_server ingest-tarball --base_dir $dir --tar_file $tarfile $CVMFS_TEST_REPO
 
-  echo "check catalog and data integrity"
+  echo "*** check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
 
 
   local result_dir=$repo_dir/$dir/tarball_foo
 
-  echo "check that we actually put the files in $result_dir"
+  echo "*** check that we actually put the files in $result_dir"
   if [ ! -d $result_dir ]; then
     return 1
   fi
 
   for d in a a/b a/b/c; do
     if [ ! -d $result_dir/$d ]; then
-      echo "Error not found directory: $repo_dir/$dir/tarball_foo/$d"
+      echo "*** Error not found directory: $repo_dir/$dir/tarball_foo/$d"
       return 1
     else
-      echo "Ingested directory: $repo_dir/$dir/tarball_foo/$d"
+      echo "*** Ingested directory: $repo_dir/$dir/tarball_foo/$d"
 
       for f in 1 2 3; do
         file=$result_dir/$d/$f.txt
         if [ ! -f $file ] || [ $(wc -c <$file) -ne 2048 ]; then
-          echo "Error not found file: $file"
+          echo "*** Error not found file: $file"
           return 1
         else
-          echo "Ingested file of size 2048 bytes: $file"
+          echo "*** Ingested file of size 2048 bytes: $file"
         fi
       done
 
@@ -91,27 +91,27 @@ cvmfs_run_test() {
   file=$result_dir/d/e/f/foo.txt
   file_size=$(wc -c <$file)
   if [ ! -f $file ] || [ $file_size -ne 5120 ]; then
-    echo "Error not found file of size 5120: $file"
+    echo "*** Error not found file of size 5120: $file"
     return 1
   else
-    echo "Ingested file of size $file_size bytes: $file"
+    echo "*** Ingested file of size $file_size bytes: $file"
   fi
 
   for f in empty_file.txt a/b/another_empty.txt; do
     if [ ! -f $result_dir/$f ]; then
-      echo "Error not found empty file: $result_dir/$f"
+      echo "*** Error not found empty file: $result_dir/$f"
       return 1
     else
-      echo "Ingested also empty file: $result_dir/$f"
+      echo "*** Ingested also empty file: $result_dir/$f"
     fi
   done
 
   file=$result_dir/a/b/c/4_change_owner.txt
   if [ ! -f $file ]; then
-    echo "Error not found file with different owner: $file"
+    echo "*** Error not found file with different owner: $file"
     return 1
   else
-    echo "Found also file from different owner: $file"
+    echo "*** Found also file from different owner: $file"
   fi
 
   return 0
