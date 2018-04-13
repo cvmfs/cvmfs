@@ -8,6 +8,7 @@
 # `export CVMFS_TEST_SRVDEBUG=fail`    - for crash debugging with gdb
 # `export CVMFS_TEST_SRVDEBUG=startup` - for interactive debugging with gdb
 
+CVMFS_SERVER_APACHE_RELOAD_IS_RESTART=true
 
 CVMFS_TEST_DEBUGLOG=${CVMFS_TEST_DEBUGLOG:=}
 CVMFS_TEST_PROXY=${CVMFS_TEST_PROXY:=http://ca-proxy.cern.ch:3128}
@@ -212,17 +213,17 @@ service_request() {
   local request_verb=$2
   if is_systemd; then
     echo "using systemd"
+    # Prevent "service restarted too often" failures
+    sudo systemctl reset-failed $service_name
     if [ "x$request_verb" = "xrestart" ]; then
-      # Prevent "service restarted too often" failures
-      sudo systemctl reset-failed $service_name
       sudo systemctl stop $service_name
       if ! sudo systemctl start $service_name; then
-        sleep 10
+        sleep 20
         sudo systemctl start $service_name
       fi
     else
       if ! sudo systemctl $request_verb $service_name; then
-        sleep 10
+        sleep 20
         sudo systemctl $request_verb $service_name
       fi
     fi
