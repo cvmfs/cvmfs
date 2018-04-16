@@ -56,7 +56,7 @@ class SyncUnion;
  * the union file system and hides some interpretation details.
  */
 class SyncItem {
-  // only SyncUnion can create SyncItems (see SyncUnion::CreateSyncItem) directly.
+  // only SyncUnion can create SyncItems (see SyncUnion::CreateSyncItem).
   // SyncUnionTarball can create SyncItemTar and SyncItemDummyDir.
   friend class SyncUnion;
 
@@ -252,9 +252,8 @@ class SyncItem {
     platform_stat64 stat;
   };
 
-
-
   mutable EntryStat scratch_stat_;
+
  private:
   SyncItemType GetGenericFiletype(const EntryStat &stat) const;
 
