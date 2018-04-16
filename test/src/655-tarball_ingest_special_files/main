@@ -98,7 +98,7 @@ cvmfs_run_test() {
   fi
 
   for f in empty_file.txt a/b/another_empty.txt; do
-    if [ ! -f $result_dir/$f ]; then
+    if [ ! -f $result_dir/$f ] || [ $(wc -c <$result_dir/$f) -ne 0 ]; then
       echo "*** Error not found empty file: $result_dir/$f"
       return 1
     else
@@ -112,6 +112,15 @@ cvmfs_run_test() {
     return 1
   else
     echo "*** Found also file from different owner: $file"
+  fi
+
+  file=$result_dir/a/b/c/to_empty_link.txt
+  file_size=$(wc -c <$file)
+  if [ ! -f $file ] || [ $file_size -ne 0 ]; then
+    echo "*** Error not found link to empty file: $file"
+    return 1
+  else
+    echo "*** Found also link to empty file: $file"
   fi
 
   return 0

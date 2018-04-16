@@ -126,6 +126,7 @@ platform_stat64 SyncItemTar::GetStatFromTar() const {
 }
 
 catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
+  assert(archive_entry_);
   assert(obtained_tar_stat_);
 
   catalog::DirectoryEntryBase dirent;
@@ -146,14 +147,12 @@ catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
 
   dirent.name_.Assign(this->filename().data(), this->filename().length());
 
-  /* TODO manage case for symlinks in tar file */
+  /*
   if (this->IsSymlink()) {
-    char slnk[PATH_MAX + 1];
-    const ssize_t length =
-        readlink((this->GetUnionPath()).c_str(), slnk, PATH_MAX);
-    assert(length >= 0);
-    dirent.symlink_.Assign(slnk, length);
+    std::string symlink(archive_entry_symlink(archive_entry_));
+    dirent.symlink_.Assign(symlink.c_str(), symlink.length());
   }
+  */
 
   if (this->IsCharacterDevice() || this->IsBlockDevice()) {
     dirent.size_ = makedev(GetRdevMajor(), GetRdevMinor());
