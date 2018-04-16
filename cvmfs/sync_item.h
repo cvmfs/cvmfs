@@ -56,9 +56,9 @@ class SyncUnion;
  * the union file system and hides some interpretation details.
  */
 class SyncItem {
-  // only SyncUnion can create SyncItems (see SyncUnion::CreateSyncItem)
+  // only SyncUnion can create SyncItems (see SyncUnion::CreateSyncItem) directly.
+  // SyncUnionTarball can create SyncItemTar and SyncItemDummyDir.
   friend class SyncUnion;
-  friend class SyncUnionTarball;
 
  public:
   SyncItem();
@@ -164,6 +164,7 @@ class SyncItem {
 
   virtual IngestionSource *CreateIngestionSource() const;
   virtual void AlreadyCreatedDir() const { assert(false); }
+  void SetCatalogMarker() { has_catalog_marker_ = true; }
 
   bool operator==(const SyncItem &other) const {
     return ((relative_parent_path_ == other.relative_parent_path_) &&
@@ -209,9 +210,7 @@ class SyncItem {
     return rdonly_type_ == expected_type;
   }
 
-
   mutable SyncItemType rdonly_type_;
- void SetCatalogMarker() { has_catalog_marker_ = true; }
 
   /**
    * create a new SyncItem

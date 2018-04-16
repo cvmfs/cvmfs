@@ -17,11 +17,9 @@
 namespace publish {
 
 class SyncItemTar : public SyncItem {
- public:
-  SyncItemTar(const string &relative_parent_path, const string &filename,
-              struct archive *archive, struct archive_entry *entry,
-              Signal *read_archive_signal, const SyncUnion *union_engine);
+  friend class SyncUnionTarball;
 
+ public:
   SyncItemType GetScratchFiletype() const;
   catalog::DirectoryEntryBase CreateBasicCatalogDirent() const;
 
@@ -35,6 +33,11 @@ class SyncItemTar : public SyncItem {
 
   struct archive *archive_;
   struct archive_entry *archive_entry_;
+
+ protected:
+  SyncItemTar(const string &relative_parent_path, const string &filename,
+              struct archive *archive, struct archive_entry *entry,
+              Signal *read_archive_signal, const SyncUnion *union_engine);
 
  private:
   platform_stat64 GetStatFromTar() const;
