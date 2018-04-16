@@ -40,7 +40,7 @@ SyncItem::SyncItem(const string       &relative_parent_path,
                    const string       &filename,
                    const SyncUnion    *union_engine,
                    const SyncItemType entry_type) :
-  rdonly_type_(static_cast<SyncItemType>(0)),
+  rdonly_type_(kItemUnknown),
   union_engine_(union_engine),
   whiteout_(false),
   opaque_(false),
