@@ -34,20 +34,19 @@ class SyncUnionTarball : public SyncUnion {
   ~SyncUnionTarball();
 
   /*
-   * Delete the working directories, where the tar is being uncompressed.
-   */
-  // ~SyncUnionTarball();
-
-  /*
    * Check that the tarball is actually valid and that can be open.
-   * Similarly it creates the base directory or check that it has the ability to
-   * write in it.
-   * Finally it untar the tarball, recursively.
    */
   bool Initialize();
 
   /*
-   * Simply create the SyncItem from the basedirectory opened
+   * We start by deleting the entity that we are request to delete.
+   * Then we move on to extracting the tarball.
+   * For each directory we found we remember it associated with its SyncItem on
+   * the `dirs_` map.
+   * Similarly we remember where nested catalogs should be placed in
+   * `to_create_catalog_dirs_`.
+   * After we finish to uncompress the tarball we come back to iterate over
+   * `to_create_catalog_dirs_` and we created the nested catalogs.
    */
   void Traverse();
 
@@ -59,8 +58,9 @@ class SyncUnionTarball : public SyncUnion {
   struct archive *src;
   const std::string tarball_path_;
   const std::string base_directory_;
-  const std::string to_delete_;
-  std::set<std::string> know_directories_;
+  const std::string to_delete_; /* entity to delete */
+  std::set<std::string>
+      know_directories_; /* directory that we know already exist */
   std::set<std::string> to_create_catalog_dirs_;
   std::map<std::string, SharedPtr<SyncItem> > dirs_;
   Signal *read_archive_signal_;

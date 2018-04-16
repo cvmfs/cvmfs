@@ -146,6 +146,7 @@ catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
 
   dirent.name_.Assign(this->filename().data(), this->filename().length());
 
+  /* TODO manage case for symlinks in tar file */
   if (this->IsSymlink()) {
     char slnk[PATH_MAX + 1];
     const ssize_t length =
