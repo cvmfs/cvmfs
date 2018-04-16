@@ -24,6 +24,7 @@ class SyncItemDummyDir : public SyncItem {
 
  public:
   catalog::DirectoryEntryBase CreateBasicCatalogDirent() const;
+  SyncItemType GetScratchFiletype() const;
 
  protected:
   SyncItemDummyDir(const std::string &relative_parent_path,
@@ -37,7 +38,6 @@ class SyncItemDummyDir : public SyncItem {
     scratch_stat_.stat.st_nlink = 1;
     scratch_stat_.stat.st_uid = getuid();
     scratch_stat_.stat.st_gid = getgid();
-    scratch_type_ = kItemDir;
   }
 
  private:
@@ -66,6 +66,11 @@ catalog::DirectoryEntryBase SyncItemDummyDir::CreateBasicCatalogDirent() const {
   assert(dirent.IsDirectory());
 
   return dirent;
+}
+
+
+SyncItemType SyncItemDummyDir::GetScratchFiletype() const {
+  return kItemDir;
 }
 
 }  // namespace publish

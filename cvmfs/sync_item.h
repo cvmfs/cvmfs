@@ -209,10 +209,9 @@ class SyncItem {
     return rdonly_type_ == expected_type;
   }
 
-  const SyncUnion *union_engine_; /**< this SyncUnion created this object */
 
-  mutable SyncItemType scratch_type_;
   mutable SyncItemType rdonly_type_;
+ void SetCatalogMarker() { has_catalog_marker_ = true; }
 
   /**
    * create a new SyncItem
@@ -224,11 +223,11 @@ class SyncItem {
    * @param filename the name of the file ;-)
    * @param entryType well...
    */
-  SyncItem(const std::string &relative_parent_path, const std::string &filename,
-           const SyncUnion *union_engine, const SyncItemType entry_type);
-  void SetCatalogMarker() { has_catalog_marker_ = true; }
+  SyncItem(const std::string  &relative_parent_path,
+           const std::string  &filename,
+           const SyncUnion    *union_engine,
+           const SyncItemType  entry_type);
 
-  platform_stat64 GetStatFromTar() const;
   /**
    * Structure to cache stat calls to the different file locations.
    */
@@ -254,15 +253,11 @@ class SyncItem {
     platform_stat64 stat;
   };
 
-  mutable EntryStat rdonly_stat_;
-  mutable EntryStat union_stat_;
+
+
   mutable EntryStat scratch_stat_;
-
-  bool has_catalog_marker_; /**< directory containing .cvmfscatalog */
-
  private:
   SyncItemType GetGenericFiletype(const EntryStat &stat) const;
-  SyncItemType GetScratchTypeFromArchiveEntry() const;
 
   void CheckMarkerFiles();
 
@@ -271,9 +266,15 @@ class SyncItem {
   std::string GetGraftMarkerPath() const;
   void CheckGraft();
 
+  const SyncUnion *union_engine_;     /**< this SyncUnion created this object */
+
+  mutable EntryStat rdonly_stat_;
+  mutable EntryStat union_stat_;
+
   bool whiteout_;                     /**< SyncUnion marked this as whiteout  */
   bool opaque_;                       /**< SyncUnion marked this as opaque dir*/
   bool masked_hardlink_;              /**< SyncUnion masked out the linkcount */
+  bool has_catalog_marker_;           /**< directory containing .cvmfscatalog */
   bool valid_graft_;                  /**< checksum and size in graft marker */
   bool graft_marker_present_;         /**< .cvmfsgraft-$filename exists */
 
@@ -286,6 +287,8 @@ class SyncItem {
    */
   FileChunkList *graft_chunklist_;
   ssize_t graft_size_;
+
+  mutable SyncItemType scratch_type_;
 
   // The hash of regular file's content
   shash::Any content_hash_;

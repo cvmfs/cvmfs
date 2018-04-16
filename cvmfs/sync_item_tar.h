@@ -16,8 +16,6 @@
 
 namespace publish {
 
-// struct archive;
-
 class SyncItemTar : public SyncItem {
  public:
   SyncItemTar(const string &relative_parent_path, const string &filename,
@@ -33,7 +31,6 @@ class SyncItemTar : public SyncItem {
   inline unsigned int GetRdevMinor() const { return minor(tar_stat_.st_rdev); }
 
   IngestionSource *CreateIngestionSource() const;
-  void SetCatalogMarker() { has_catalog_marker_ = true; }
   void AlreadyCreatedDir() const { rdonly_type_ = kItemDir; }
 
   struct archive *archive_;
@@ -116,7 +113,7 @@ platform_stat64 SyncItemTar::GetStatFromTar() const {
   tar_stat_.st_mtime = entry_stat_->st_mtime;
   tar_stat_.st_nlink = entry_stat_->st_nlink;
 
-  if (kItemDir == scratch_type_) {
+  if (IsDirectory()) {
     tar_stat_.st_size = 4096;
   }
 
