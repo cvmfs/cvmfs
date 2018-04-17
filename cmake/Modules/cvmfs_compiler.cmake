@@ -95,11 +95,10 @@ if (APPLE AND ${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang" AND ${CMAKE_CXX_COMPILER
 endif()
 
 # Check for old Linux version that don't have a complete inotify implementation
-execute_process(
-  COMMAND ${PROJECT_SOURCE_DIR}/get_redhat_version.sh
-  OUTPUT_VARIABLE REDHAT_VERSION
-  ERROR_VARIABLE REDHAT_ERROR
-)
-if((NOT (${REDHAT_VERSION} STREQUAL "NOT_REDHAT")) AND (${REDHAT_VERSION} VERSION_LESS 6.0))
-  set(CVMFS_DISABLE_INOTIFY ON)
-endif()
+if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+  try_compile(HAS_INOTIFY_INIT1 ${CMAKE_BINARY_DIR} ${PROJECT_SOURCE_DIR}/cmake/check_inotify_init1.c)
+  if(HAS_INOTIFY_INIT1)
+    message("Enable inotify support")
+    set(CVMFS_ENABLE_INOTIFY ON)
+  endif(HAS_INOTIFY_INIT1)
+endif(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")

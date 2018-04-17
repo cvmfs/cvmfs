@@ -79,7 +79,10 @@ set (CVMFS_CLIENT_SOURCES
 if (APPLE)
   list(APPEND CVMFS_CLIENT_SOURCES file_watcher_kqueue.cc)
 else(APPLE)
-  list(APPEND CVMFS_CLIENT_SOURCES file_watcher_inotify.cc)
+  if (CVMFS_ENABLE_INOTIFY)
+    list(APPEND CVMFS_CLIENT_SOURCES file_watcher_inotify.cc)
+    add_definitions(-DCVMFS_ENABLE_INOTIFY)
+  endif(CVMFS_ENABLE_INOTIFY)
 endif (APPLE)
 
 # First .h then .cc is important to avoid races during the build process
