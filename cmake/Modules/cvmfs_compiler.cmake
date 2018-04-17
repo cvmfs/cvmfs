@@ -94,3 +94,12 @@ if (APPLE AND ${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang" AND ${CMAKE_CXX_COMPILER
   set (CVMFS_BUGGY_XCODE ON)
 endif()
 
+# Check for old Linux version that don't have a complete inotify implementation
+execute_process(
+  COMMAND ${PROJECT_SOURCE_DIR}/get_redhat_version.sh
+  OUTPUT_VARIABLE REDHAT_VERSION
+  ERROR_VARIABLE REDHAT_ERROR
+)
+if((NOT (${REDHAT_VERSION} STREQUAL "NOT_REDHAT")) AND (${REDHAT_VERSION} VERSION_LESS 6.0))
+  set(CVMFS_DISABLE_INOTIFY ON)
+endif()
