@@ -147,12 +147,11 @@ catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
 
   dirent.name_.Assign(this->filename().data(), this->filename().length());
 
-  /*
   if (this->IsSymlink()) {
     std::string symlink(archive_entry_symlink(archive_entry_));
     dirent.symlink_.Assign(symlink.c_str(), symlink.length());
+    if (dirent.linkcount_ < 1) dirent.linkcount_ = 1;
   }
-  */
 
   if (this->IsCharacterDevice() || this->IsBlockDevice()) {
     dirent.size_ = makedev(GetRdevMajor(), GetRdevMinor());

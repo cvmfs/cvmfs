@@ -29,8 +29,8 @@ produce_tarball() {
   dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/b/c/4_change_owner.txt
   chown $CVMFS_TEST_USER tarball_foo/a/b/c/4_change_owner.txt
 
-  ln -s tarball_foo/a/b/another_empty.txt tarball_foo/to_empty_link.txt
-  ln -s tarball_foo/a/b/c/4_change_owner.txt tarball_foo/to_different_owner.txt
+  ln -s empty_file.txt tarball_foo/to_empty_link.txt
+  ln -s a/b/c/4_change_owner.txt tarball_foo/to_different_owner.txt
 
   echo "*** Generating a tarball in $tarball_name"
   tar -cvf $tarball_name tarball_foo/
@@ -59,7 +59,6 @@ cvmfs_run_test() {
 
   echo "*** check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
-
 
   local result_dir=$repo_dir/$dir/tarball_foo
 
@@ -114,7 +113,7 @@ cvmfs_run_test() {
     echo "*** Found also file from different owner: $file"
   fi
 
-  file=$result_dir/a/b/c/to_empty_link.txt
+  file=$result_dir/to_empty_link.txt
   file_size=$(wc -c <$file)
   if [ ! -f $file ] || [ $file_size -ne 0 ]; then
     echo "*** Error not found link to empty file: $file"
@@ -122,6 +121,16 @@ cvmfs_run_test() {
   else
     echo "*** Found also link to empty file: $file"
   fi
+
+  file=$result_dir/to_different_owner.txt
+  file_size=$(wc -c <$file)
+  if [ ! -f $file ] || [ $file_size -ne 2048 ]; then
+    echo "*** Error not found link to different owner file: $file"
+    return 1
+  else
+    echo "*** Found also link to to different owner file: $file"
+  fi
+
 
   return 0
 }
