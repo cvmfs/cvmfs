@@ -18,6 +18,7 @@ enum Event {
   kAttributes,
   kHardlinked,
   kDeleted,
+  kIgnored,
   kInvalid
 };
 
@@ -46,6 +47,18 @@ class EventHandler {
                       bool* clear_handler) = 0;
 };
 
+struct WatchRecord {
+  WatchRecord() : file_path_(), handler_(NULL) {}
+
+  WatchRecord(const std::string& path,
+              file_watcher::EventHandler* h)
+      : file_path_(path),
+        handler_(h) {}
+
+  std::string file_path_;
+  file_watcher::EventHandler* handler_;
+};
+
 class FileWatcher {
  public:
   typedef std::map<std::string, EventHandler*> HandlerMap;
@@ -61,8 +74,20 @@ class FileWatcher {
   void Stop();
 
  protected:
+  // Delays controlling the backoff throttle when registering new watches
+  static const unsigned kInitialDelay;
+  static const unsigned kMaxDelay;
+  static const unsigned kResetDelay;
+
+  void RegisterFilter(const std::string& file_path,
+                      EventHandler* handler);
+
   virtual bool RunEventLoop(const HandlerMap& handler_map,
                             int read_pipe, int write_pipe) = 0;
+
+  virtual int TryRegisterFilter(const std::string& file_path) = 0;
+
+  std::map<int, WatchRecord> watch_records_;
 
  private:
   static void* BackgroundThread(void* d);
