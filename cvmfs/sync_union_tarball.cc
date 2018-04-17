@@ -178,7 +178,7 @@ void SyncUnionTarball::Traverse() {
           if (filename == ".cvmfscatalog") {
             to_create_catalog_dirs_.insert(parent_path);
           }
-        } else if (sync_entry->IsSymlink()) {
+        } else if (sync_entry->IsSymlink() || sync_entry->IsFifo() || sync_entry->IsSocket()) {
           ProcessFile(sync_entry);
           read_archive_signal_->Wakeup();
         } else {

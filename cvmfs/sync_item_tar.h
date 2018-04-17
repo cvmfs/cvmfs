@@ -135,6 +135,7 @@ catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
   dirent.inode_ = catalog::DirectoryEntry::kInvalidInode;
 
   dirent.linkcount_ = this->tar_stat_.st_nlink;
+  if (dirent.linkcount_ < 1) dirent.linkcount_ = 1;
 
   dirent.mode_ = this->tar_stat_.st_mode;
   dirent.uid_ = this->tar_stat_.st_uid;
@@ -150,7 +151,6 @@ catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
   if (this->IsSymlink()) {
     std::string symlink(archive_entry_symlink(archive_entry_));
     dirent.symlink_.Assign(symlink.c_str(), symlink.length());
-    if (dirent.linkcount_ < 1) dirent.linkcount_ = 1;
   }
 
   if (this->IsCharacterDevice() || this->IsBlockDevice()) {

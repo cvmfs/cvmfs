@@ -32,6 +32,8 @@ produce_tarball() {
   ln -s empty_file.txt tarball_foo/to_empty_link.txt
   ln -s a/b/c/4_change_owner.txt tarball_foo/to_different_owner.txt
 
+  mkfifo tarball_foo/fifo
+
   echo "*** Generating a tarball in $tarball_name"
   tar -cvf $tarball_name tarball_foo/
 
@@ -129,6 +131,14 @@ cvmfs_run_test() {
     return 1
   else
     echo "*** Found also link to to different owner file: $file"
+  fi
+
+  file=$result_dir/fifo
+  if [ ! -p $file ]; then
+    echo "*** Error not found fifo: $file"
+    return 1
+  else
+    echo "*** Found also fifo: $file"
   fi
 
 
