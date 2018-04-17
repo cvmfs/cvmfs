@@ -46,11 +46,15 @@ cvmfs_server_ingest_tarball() {
   name=$1
   name=$(echo $name | cut -d'/' -f1)
 
-  if [ x"$base_dir" = "x" ]; then
+  if [ x"$base_dir" = "x" ] && [ x"$to_delete" = "x" ]; then
     die "Please set the base directory where to extract the tarball, use -b \$BASE_DIR or --base_dir \$BASE_DIR"
   fi
-  if [ x"$tar_file" = "x" ]; then
+  if [ x"$tar_file" = "x" ] && [ x"$to_delete" = "x" ]; then
     die "Please provide the tarball to extract, use -t \$TARBALL_PATH or --tar_file \$TARBALL_PATH"
+  fi
+
+  if [ x"$base_dir" = "x" ] || [ x"$tar_file" = "x" ]; then
+    die "Please provide both \$BASE_DIR (using -b) AND the \$TARBALL_PATH or neither of them to just delete entity from the repo"
   fi
 
   load_repo_config $name
