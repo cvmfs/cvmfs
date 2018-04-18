@@ -22,9 +22,12 @@ int swissknife::IngestTarball::Main(const swissknife::ArgumentList &args) {
   params.public_keys = *args.find('K')->second;
   params.repo_name = *args.find('N')->second;
 
-  params.tar_file = *args.find('T')->second;
-  params.base_directory = *args.find('B')->second;
-
+  if (args.find('T') != args.end()) {
+    params.tar_file = *args.find('T')->second;
+  }
+  if (args.find('B') != args.end()) {
+    params.base_directory = *args.find('B')->second;
+  }
   if (args.find('D') != args.end()) {
     params.to_delete = *args.find('D')->second;
   }
