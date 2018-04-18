@@ -1,6 +1,6 @@
 2.5.0:
   * React on change of DNS server on Linux (CVM-496)
-  * Fix catalog checksum destination from cwd to workspace
+  * Fix catalog checksum destination from cwd to workspace (CVM-962)
   * Use `systemd start <mount unit>` in suid helper if applicable (CVM-1398)
   * Set httpd selinux label for GeoIP database (CVM-1454)
   * Make CVMFS_GENERATE_LEGACY_BULK_CHUNKS=false the default (CVM-1429)
