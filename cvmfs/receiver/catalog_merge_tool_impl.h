@@ -90,7 +90,8 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportAddition(
         static_cast<const catalog::DirectoryEntryBase*>(&entry);
     if (entry.IsChunkedFile()) {
       assert(!chunks.IsEmpty());
-      output_catalog_mgr_->AddChunkedFile(*base_entry, xattrs, parent_path, chunks);
+      output_catalog_mgr_->AddChunkedFile(*base_entry, xattrs, parent_path,
+                                          chunks);
     } else {
       output_catalog_mgr_->AddFile(*base_entry, xattrs, parent_path);
     }
