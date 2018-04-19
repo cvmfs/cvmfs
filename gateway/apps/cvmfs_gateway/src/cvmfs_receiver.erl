@@ -423,6 +423,9 @@ p_write_request(Port, Request, Msg, Payload) ->
 
 p_read_reply(Port, Timeout) ->
     receive
+        {Port, {exit_status, Status}} ->
+            lager:error("Worker process at port ~p died with status: ~p", [Port, Status]),
+            exit(worker_died);
         {Port, {data, <<Size:32/integer-signed-little,Msg/binary>>}} ->
             {ok, {Size, Msg}}
     after
