@@ -214,7 +214,10 @@ p_handle_commit_lease(Req0, State, Uid) ->
                                               <<"reason">> => <<"merge_error">>};
                                         {error, io_error} ->
                                             #{<<"status">> => <<"error">>,
-                                              <<"reason">> => <<"io_error">>}
+                                              <<"reason">> => <<"io_error">>};
+                                        {error, worker_died} ->
+                                            #{<<"status">> => <<"error">>,
+                                              <<"reason">> => <<"worker_died">>}
                                     end;
                                 false ->
                                     #{<<"status">> => <<"error">>,
