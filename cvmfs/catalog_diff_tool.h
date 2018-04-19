@@ -8,6 +8,7 @@
 #include <string>
 
 #include "directory_entry.h"
+#include "file_chunk.h"
 #include "shortstring.h"
 #include "statistics.h"
 #include "util/pointer.h"
@@ -53,7 +54,8 @@ class CatalogDiffTool {
  protected:
   virtual void ReportAddition(const PathString& path,
                               const catalog::DirectoryEntry& entry,
-                              const XattrList& xattrs) = 0;
+                              const XattrList& xattrs,
+                              const FileChunkList& chunks) = 0;
   virtual void ReportRemoval(const PathString& path,
                              const catalog::DirectoryEntry& entry) = 0;
   virtual void ReportModification(const PathString& path,

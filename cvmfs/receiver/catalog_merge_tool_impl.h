@@ -64,7 +64,7 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::Run(
 template <typename RwCatalogMgr, typename RoCatalogMgr>
 void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportAddition(
     const PathString& path, const catalog::DirectoryEntry& entry,
-    const XattrList& xattrs) {
+    const XattrList& xattrs, const FileChunkList& chunks) {
   const PathString rel_path = MakeRelative(path);
 
   /*
@@ -88,7 +88,12 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportAddition(
   } else if (entry.IsRegular() || entry.IsLink()) {
     const catalog::DirectoryEntryBase* base_entry =
         static_cast<const catalog::DirectoryEntryBase*>(&entry);
-    output_catalog_mgr_->AddFile(*base_entry, xattrs, parent_path);
+    if (entry.IsChunkedFile()) {
+      assert(!chunks.IsEmpty());
+      output_catalog_mgr_->AddChunkedFile(*base_entry, xattrs, parent_path, chunks);
+    } else {
+      output_catalog_mgr_->AddFile(*base_entry, xattrs, parent_path);
+    }
   }
 }
 
