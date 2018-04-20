@@ -112,7 +112,8 @@ void DiffTool::ReportHeader() {
 
 void DiffTool::ReportAddition(const PathString &path,
                               const catalog::DirectoryEntry &entry,
-                              const XattrList & /*xattrs*/) {
+                              const XattrList & /*xattrs*/,
+                              const FileChunkList& /*chunks*/) {
   // XXX careful we're casting silently from usint64 to int64 there...
   counter_total_added_->Xadd(entry.size());
   string operation = machine_readable_ ? "A" : "add";
@@ -144,7 +145,8 @@ void DiffTool::ReportRemoval(const PathString &path,
 void DiffTool::ReportModification(const PathString &path,
                                   const catalog::DirectoryEntry &entry_from,
                                   const catalog::DirectoryEntry &entry_to,
-                                  const XattrList & /*xattrs*/) {
+                                  const XattrList & /*xattrs*/,
+                                  const FileChunkList& /*chunks*/) {
   catalog::DirectoryEntryBase::Differences diff =
       entry_from.CompareTo(entry_to);
   if (ignore_timediff_) {

@@ -265,7 +265,7 @@ class Spooler : public Observable<SpoolerResult> {
    */
   void WaitForUpload() const;
 
-  void FinalizeSession(bool commit, const std::string &old_root_hash = "",
+  bool FinalizeSession(bool commit, const std::string &old_root_hash = "",
                        const std::string &new_root_hash = "",
                        const RepositoryTag &tag = RepositoryTag()) const;
 

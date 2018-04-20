@@ -1,0 +1,93 @@
+cvmfs_test_name="Repository gateway large files"
+cvmfs_test_autofs_on_startup=false
+
+# This test verifies the correct publication of large files
+# through a repository gateway
+
+clean_up() {
+    echo "Cleaning up"
+
+    echo "  Stopping repository gateway application"
+    sudo /opt/cvmfs_gateway/scripts/run_cvmfs_gateway.sh stop
+
+    echo "  Removing Mnesia directory"
+    sudo rm -rf /opt/cvmfs_mnesia
+
+    echo "  Removing test repository"
+    sudo -E cvmfs_server rmfs -f test.repo.org
+
+    echo "  Removing test directories"
+    rm -rf /tmp/cvmfs_receiver_commit_processor*
+
+    echo "  Removing test output data"
+    rm -rf /tmp/cvmfs_out
+}
+
+check_status() {
+    echo $(( $1 || 0 ))
+}
+
+run_transactions() {
+    set_up_repository_gateway
+
+    echo "Checking transaction + publish"
+
+    ## Transaction 1
+
+    echo "  Starting transaction 1"
+    cvmfs_server transaction test.repo.org
+
+    echo "  Copying the payload into repository"
+    rm -v /cvmfs/test.repo.org/new_repository
+    curl -o /tmp/linux.tar.xz http://ecsft.cern.ch/dist/cvmfs/test-data/linux-4.12.8.tar.xz
+    cp -v /tmp/linux.tar.xz /cvmfs/test.repo.org/
+    local hash_in_1=$(sha1sum /tmp/linux.tar.xz | cut -d' ' -f1)
+
+    echo "  Publishing changes 1"
+    cvmfs_server publish test.repo.org
+    cvmfs_server check test.repo.org
+
+    echo "  Computing hash of published file"
+    local hash_out_1=$(sha1sum /cvmfs/test.repo.org/linux.tar.xz | cut -d' ' -f1)
+
+
+    ## Transaction 2 (remove all the files from the repo)
+
+    echo "  Starting transaction 2"
+    cvmfs_server transaction test.repo.org
+
+    echo "  Copying the payload into repository"
+    curl -o /tmp/linux.tar.xz http://ecsft.cern.ch/dist/cvmfs/test-data/linux-4.9.20.tar.xz
+    cp -v /tmp/linux.tar.xz /cvmfs/test.repo.org/
+    local hash_in_2=$(sha1sum /tmp/linux.tar.xz | cut -d' ' -f1)
+
+    echo "  Publishing changes 2"
+    cvmfs_server publish test.repo.org
+    cvmfs_server check test.repo.org
+
+    echo "  Computing hash of published file"
+    local hash_out_2=$(sha1sum /cvmfs/test.repo.org/linux.tar.xz | cut -d' ' -f1)
+
+    ## Check results with a poor man's Merkle tree
+    echo "Checking results"
+
+    echo "Input hash 1  : $hash_in_1"
+    echo "Output hash 1 : $hash_out_1"
+    echo "Input hash 2  : $hash_in_2"
+    echo "Output hash 2 : $hash_out_2"
+    if [ x"$hash_in_1" != x"$hash_out_1" ] || [ x"$hash_in_2" != x"$hash_out_2" ]; then
+        exit 1
+    fi
+
+    clean_up
+}
+
+cvmfs_run_test() {
+    trap clean_up EXIT HUP INT TERM || return $?
+
+    run_transactions
+    local status=$?
+
+    return $(check_status $status)
+}
+
