@@ -130,12 +130,12 @@ bool MakeEndRequest(const std::string& method, const std::string& key_id,
   const bool ok = (reply->data == "{\"status\":\"ok\"}");
   if (!ok) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
-             "SessionContext - curl_easy_perform reply: %s",
+             "Lease end request - error reply: %s",
              reply->data.c_str());
   }
 
   curl_easy_cleanup(h_curl);
   h_curl = NULL;
 
-  return !ret;
+  return ok && !ret;
 }
