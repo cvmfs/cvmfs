@@ -30,6 +30,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  src/007-testjobs                             \
                                  src/024-reload-during-asetup                 \
                                  src/045-oasis                                \
+                                 src/079-dnsroaming                           \
                                  --                                           \
                                  src/0*                                       \
                               || retval=1
