@@ -43,6 +43,7 @@
                              invalid_lease |
                              invalid_key |
                              invalid_macaroon |
+                             worker_died |
                              worker_timeout |
                              path_violation |
                              other_error}.
@@ -70,7 +71,8 @@ start_link(Args) ->
     gen_server:start_link(?MODULE, Args, []).
 
 
--spec generate_token(KeyId, Path, MaxLeaseTime) -> {Token, Public, Secret}
+-spec generate_token(KeyId, Path, MaxLeaseTime) -> {Token, Public, Secret} |
+                                                   {error, worker_died}
                                                        when KeyId :: binary(),
                                                             Path :: binary(),
                                                             MaxLeaseTime :: integer(),
@@ -91,7 +93,8 @@ generate_token(KeyId, Path, MaxLeaseTime) ->
                         cvmfs_app_util:get_max_lease_time()).
 
 
--spec get_token_id(Token) -> {ok, PublicId} | {error, invalid_macaroon}
+-spec get_token_id(Token) -> {ok, PublicId} | {error, {invalid_macaroon,
+                                                       worker_died}}
                                  when Token :: binary(),
                                       PublicId :: binary().
 get_token_id(Token) ->
@@ -123,7 +126,7 @@ submit_payload(SubmissionData, Secret) ->
 
 
 -spec commit(LeasePath, OldRootHash, NewRootHash, RepoTag) ->
-                    ok | {error, merge_error | io_error | worker_timeout}
+                    ok | {error, merge_error | io_error | worker_died | worker_timeout}
                         when LeasePath :: binary(),
                              OldRootHash :: binary(),
                              NewRootHash :: binary(),
@@ -193,28 +196,28 @@ init(Args) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call({worker_req, generate_token, KeyId, Path, MaxLeaseTime}, _From, State) ->
+handle_call({worker_req, generate_token, KeyId, Path, MaxLeaseTime}, From, State) ->
     #{worker := WorkerPort, max_lease_time := Timeout} = State,
-    Reply = p_generate_token(KeyId, Path, MaxLeaseTime, WorkerPort, Timeout),
+    Reply = p_generate_token(KeyId, Path, MaxLeaseTime, WorkerPort, From, Timeout),
     lager:info("Worker ~p request: {generate_token, {~p, ~p, ~p}} -> Reply: ~p",
                [self(), KeyId, Path, MaxLeaseTime, Reply]),
     {reply, Reply, State};
-handle_call({worker_req, get_token_id, Token}, _From, State) ->
+handle_call({worker_req, get_token_id, Token}, From, State) ->
     #{worker := WorkerPort, max_lease_time := Timeout} = State,
-    Reply = p_get_token_id(Token, WorkerPort, Timeout),
+    Reply = p_get_token_id(Token, WorkerPort, From, Timeout),
     lager:info("Worker ~p request: {get_token_id, ~p} -> Reply: ~p",
                [self(), Token, Reply]),
     {reply, Reply, State};
 handle_call({worker_req, submit_payload, {Token, _, Digest, HeaderSize} = SubmissionData,
-             Secret}, _From, State) ->
+             Secret}, From, State) ->
     #{worker := WorkerPort, max_lease_time := Timeout} = State,
-    Reply = p_submit_payload(SubmissionData, Secret, WorkerPort, Timeout),
+    Reply = p_submit_payload(SubmissionData, Secret, WorkerPort, From, Timeout),
     lager:info("Worker ~p request: {submit_payload, {{~p, PAYLOAD_NOT_SHOWN, ~p, ~p} ~p}} -> Reply: ~p",
                [self(), Token, Digest, HeaderSize, Secret, Reply]),
     {reply, Reply, State};
-handle_call({worker_req, commit, LeasePath, OldRootHash, NewRootHash, RepoTag}, _From, State) ->
+handle_call({worker_req, commit, LeasePath, OldRootHash, NewRootHash, RepoTag}, From, State) ->
     #{worker := WorkerPort, max_lease_time := Timeout} = State,
-    Reply = p_commit(WorkerPort, LeasePath, OldRootHash, NewRootHash, RepoTag, Timeout),
+    Reply = p_commit(WorkerPort, LeasePath, OldRootHash, NewRootHash, RepoTag, From, Timeout),
     lager:info("Worker ~p request: {commit, ~p, ~p, ~p, ~p} -> Reply: ~p",
                [self(), LeasePath, OldRootHash, NewRootHash, RepoTag, Reply]),
     {reply, Reply, State}.
@@ -297,33 +300,40 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
--spec p_generate_token(KeyId, Path, MaxLeaseTime, WorkerPort, Timeout)
+-spec p_generate_token(KeyId, Path, MaxLeaseTime, WorkerPort, From, Timeout)
                       -> {Token, Public, Secret}
                              when KeyId :: binary(),
                                   Path :: binary(),
                                   MaxLeaseTime :: integer(),
                                   WorkerPort :: port(),
+                                  From :: pid(),
                                   Timeout :: integer(),
                                   Token :: binary(),
                                   Public :: binary(),
                                   Secret :: binary().
-p_generate_token(KeyId, Path, MaxLeaseTime, WorkerPort, Timeout) ->
+p_generate_token(KeyId, Path, MaxLeaseTime, WorkerPort, From, Timeout) ->
     ReqBody = jsx:encode(#{<<"key_id">> => KeyId, <<"path">> => Path,
                           <<"max_lease_time">> => MaxLeaseTime}),
     p_write_request(WorkerPort, ?kGenerateToken, ReqBody),
-    {ok, {_Size, ReplyBody}} = p_read_reply(WorkerPort, Timeout),
-    #{<<"token">> := Token, <<"id">> := Public, <<"secret">> := Secret}
-        = jsx:decode(ReplyBody, [return_maps]),
-    {Public, Secret, Token}.
+    case p_read_reply(WorkerPort, Timeout) of
+        {ok, {_Size, ReplyBody}} ->
+            #{<<"token">> := Token, <<"id">> := Public, <<"secret">> := Secret}
+                    = jsx:decode(ReplyBody, [return_maps]),
+            {Public, Secret, Token};
+        {error, worker_died} ->
+            gen_server:reply(From, {error, worker_died}),
+            exit(self(), kill)
+    end.
 
 
--spec p_get_token_id(Token, WorkerPort, Timeout)
+-spec p_get_token_id(Token, WorkerPort, From, Timeout)
                     -> {ok, PublicId} | {error, invalid_macaroon}
                            when Token :: binary(),
                                 WorkerPort :: port(),
+                                From :: pid(),
                                 Timeout :: integer(),
                                 PublicId :: binary().
-p_get_token_id(Token, WorkerPort, Timeout) ->
+p_get_token_id(Token, WorkerPort, From, Timeout) ->
     p_write_request(WorkerPort, ?kGetTokenId, Token),
     case p_read_reply(WorkerPort, Timeout) of
         {ok, {_, Reply}} ->
@@ -333,17 +343,21 @@ p_get_token_id(Token, WorkerPort, Timeout) ->
                 #{<<"status">> := <<"error">>, <<"reason">> := _Reason} ->
                     {error, invalid_macaroon}
             end;
+        {error, worker_died} ->
+            gen_server:reply(From, {error, worker_died}),
+            exit(self(), kill);
         {error, _} ->
             {error, invalid_macaroon}
     end.
 
 
--spec p_submit_payload(SubmissionData, Secret, WorkerPort, Timeout) -> submit_payload_result()
+-spec p_submit_payload(SubmissionData, Secret, WorkerPort, From, Timeout) -> submit_payload_result()
                                                     when SubmissionData :: payload_submission_data(),
                                                          Secret :: binary(),
                                                          WorkerPort :: port(),
+                                                         From :: pid(),
                                                          Timeout :: integer().
-p_submit_payload({LeaseToken, Payload, Digest, HeaderSize}, Secret, WorkerPort, Timeout) ->
+p_submit_payload({LeaseToken, Payload, Digest, HeaderSize}, Secret, WorkerPort, From, Timeout) ->
     Req1 = jsx:encode(#{<<"token">> => LeaseToken, <<"secret">> => Secret}),
     p_write_request(WorkerPort, ?kCheckToken, Req1),
     case p_read_reply(WorkerPort, Timeout) of
@@ -372,21 +386,25 @@ p_submit_payload({LeaseToken, Payload, Digest, HeaderSize}, Secret, WorkerPort, 
                 #{<<"status">> := <<"error">>, <<"reason">> := <<"invalid_token">>} ->
                     {error, invalid_lease}
             end;
+        {error, worker_died} ->
+            gen_server:reply(From, {error, worker_died}),
+            exit(self(), kill);
         {error, worker_timeout} ->
             lager:error("Timeout reached waiting for reply from worker ~p", [WorkerPort]),
             {error, worker_timeout}
     end.
 
 
--spec p_commit(WorkerPort, LeasePath, OldRootHash, NewRootHash, RepoTag, Timeout)
+-spec p_commit(WorkerPort, LeasePath, OldRootHash, NewRootHash, RepoTag, From, Timeout)
               -> ok | {error, merge_error | io_error | worker_timeout}
                                         when WorkerPort :: port(),
                                              LeasePath :: binary(),
                                              OldRootHash :: binary(),
                                              NewRootHash :: binary(),
                                              RepoTag :: cvmfs_common_types:repository_tag(),
+                                             From :: pid(),
                                              Timeout :: integer().
-p_commit(WorkerPort, LeasePath, OldRootHash, NewRootHash, RepoTag, Timeout) ->
+p_commit(WorkerPort, LeasePath, OldRootHash, NewRootHash, RepoTag, From, Timeout) ->
     {TagName, TagChannel, TagDescription} = RepoTag,
     Req1 = jsx:encode(#{<<"lease_path">> => LeasePath,
                         <<"old_root_hash">> => OldRootHash,
@@ -405,6 +423,9 @@ p_commit(WorkerPort, LeasePath, OldRootHash, NewRootHash, RepoTag, Timeout) ->
                 #{<<"status">> := <<"error">>, <<"reason">> := <<"io_error">>} ->
                     {error, io_error}
             end;
+        {error, worker_died} ->
+            gen_server:reply(From, {error, worker_died}),
+            exit(self(), kill);
         {error, worker_timeout} ->
             {error, worker_timeout}
     end.
@@ -423,6 +444,9 @@ p_write_request(Port, Request, Msg, Payload) ->
 
 p_read_reply(Port, Timeout) ->
     receive
+        {Port, {exit_status, Status}} ->
+            lager:error("Worker process at port ~p died with status: ~p", [Port, Status]),
+            {error, worker_died};
         {Port, {data, <<Size:32/integer-signed-little,Msg/binary>>}} ->
             {ok, {Size, Msg}}
     after

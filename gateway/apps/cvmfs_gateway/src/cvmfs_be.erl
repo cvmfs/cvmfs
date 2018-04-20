@@ -93,7 +93,10 @@ cancel_lease(Uid, LeaseToken) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec commit_lease(Uid, LeaseToken, RootHashes, RepoTag) ->
-                          ok | {error, invalid_macaroon | merge_error | io_error }
+                          ok | {error, invalid_macaroon
+                                       | merge_error
+                                       | io_error
+                                       | worker_died }
                               when Uid :: binary(),
                                    LeaseToken :: binary(),
                                    RootHashes :: {binary(), binary()},
