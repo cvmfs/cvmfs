@@ -124,11 +124,16 @@ bool MakeEndRequest(const std::string& method, const std::string& key_id,
   ret = curl_easy_perform(h_curl);
   if (ret) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
-             "Make lease end request failed: %d. Reply: %s", ret,
-             reply->data.c_str());
+             "Lease end request - curl_easy_perform failed: %d", ret);
   }
 
-  curl_easy_cleanup(h_curl);
+  const bool ok = (reply->data == "{\"status\":\"ok\"}");
+  if (!ok) {
+    LogCvmfs(kLogUploadGateway, kLogStderr,
+             "SessionContext - curl_easy_perform reply: %s", reply->data.c_str());
+  }
+
+curl_easy_cleanup(h_curl);
   h_curl = NULL;
 
   return !ret;
