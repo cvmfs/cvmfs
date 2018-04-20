@@ -1,3 +1,7 @@
+0.2.3:
+  * Fixing bug where the cvmfs_receiver process was not able to detect
+    that its worker process had died
+
 0.2.2:
   * Changing default port to 4929 (GWAY)
 
