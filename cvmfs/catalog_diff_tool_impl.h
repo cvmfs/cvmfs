@@ -165,7 +165,12 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
     }
 
     if (old_entry.CompareTo(new_entry) > 0) {
-      ReportModification(old_path, old_entry, new_entry, xattrs);
+      FileChunkList chunks;
+      if (new_entry.IsChunkedFile()) {
+        new_catalog_mgr_->ListFileChunks(new_path, new_entry.hash_algorithm(),
+                                         &chunks);
+      }
+      ReportModification(old_path, old_entry, new_entry, xattrs, chunks);
     }
     if (!old_entry.IsDirectory() || !new_entry.IsDirectory()) {
       if (old_entry.IsDirectory()) {

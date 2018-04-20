@@ -61,7 +61,8 @@ class CatalogDiffTool {
   virtual void ReportModification(const PathString& path,
                                   const catalog::DirectoryEntry& old_entry,
                                   const catalog::DirectoryEntry& new_entry,
-                                  const XattrList& xattrs) = 0;
+                                  const XattrList& xattrs,
+                                  const FileChunkList& chunks) = 0;
 
   const catalog::Catalog* GetOldCatalog() const {
     return old_catalog_mgr_->GetRootCatalog();

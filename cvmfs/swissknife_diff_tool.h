@@ -46,7 +46,8 @@ class DiffTool : public CatalogDiffTool<catalog::SimpleCatalogManager> {
   void ReportModification(const PathString &path,
                           const catalog::DirectoryEntry &entry_from,
                           const catalog::DirectoryEntry &entry_to,
-                          const XattrList & /*xattrs*/);
+                          const XattrList & /*xattrs*/,
+                          const FileChunkList& /*chunks*/);
 
   history::History::Tag old_tag_;
   history::History::Tag new_tag_;

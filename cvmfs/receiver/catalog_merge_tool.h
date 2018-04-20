@@ -91,7 +91,8 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
   virtual void ReportModification(const PathString& path,
                                   const catalog::DirectoryEntry& old_entry,
                                   const catalog::DirectoryEntry& new_entry,
-                                  const XattrList& xattrs);
+                                  const XattrList& xattrs,
+                                  const FileChunkList& chunks);
 
  private:
   bool CreateNewManifest(std::string* new_manifest_path);
