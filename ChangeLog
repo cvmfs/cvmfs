@@ -1,4 +1,5 @@
 2.5.0:
+  * Check for autofs in cvmfs_server rmfs only for stratum 0s (CVM-1490)
   * React on change of DNS server on Linux (CVM-496)
   * Fix catalog checksum destination from cwd to workspace (CVM-962)
   * Use `systemd start <mount unit>` in suid helper if applicable (CVM-1398)
