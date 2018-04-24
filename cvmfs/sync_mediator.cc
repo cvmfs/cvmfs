@@ -176,6 +176,10 @@ void SyncMediator::Replace(SharedPtr<SyncItem> entry) {
   Add(entry);
 }
 
+void SyncMediator::Link(SharedPtr<SyncItem> entry, const std::string &target) {
+  catalog_manager_->Link(entry->CreateBasicCatalogDirent(),
+                         entry->relative_parent_path(), target);
+}
 
 void SyncMediator::EnterDirectory(SharedPtr<SyncItem> entry) {
   if (!handle_hardlinks_) {

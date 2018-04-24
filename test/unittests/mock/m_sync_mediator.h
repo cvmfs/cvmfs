@@ -35,6 +35,7 @@ class MockSyncMediator : public AbstractSyncMediator {
   MOCK_METHOD1(Touch, void(SharedPtr<SyncItem> entry));
   MOCK_METHOD1(Remove, void(SharedPtr<SyncItem> entry));
   MOCK_METHOD1(Replace, void(SharedPtr<SyncItem> entry));
+  MOCK_METHOD2(Link, void(SharedPtr<SyncItem> entry, const std::string &to_link));
   MOCK_METHOD1(EnterDirectory, void(SharedPtr<SyncItem> entry));
   MOCK_METHOD1(LeaveDirectory, void(SharedPtr<SyncItem> entry));
   MOCK_METHOD1(Commit, bool(manifest::Manifest *manifest));

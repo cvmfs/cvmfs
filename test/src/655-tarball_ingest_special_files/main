@@ -34,6 +34,9 @@ produce_tarball() {
 
   mkfifo tarball_foo/fifo
 
+  ln tarball_foo/empty_file.txt tarball_foo/to_empty_hardlink.txt
+  ln tarball_foo/a/1.txt tarball_foo/a_1_hardlink.txt
+
   echo "*** Generating a tarball in $tarball_name"
   tar -cvf $tarball_name tarball_foo/
 
@@ -134,6 +137,14 @@ cvmfs_run_test() {
   fi
 
   file=$result_dir/fifo
+  if [ ! -p $file ]; then
+    echo "*** Error not found fifo: $file"
+    return 1
+  else
+    echo "*** Found also fifo: $file"
+  fi
+
+  file=$result_dir/to_empty_hardlink.txt
   if [ ! -p $file ]; then
     echo "*** Error not found fifo: $file"
     return 1

@@ -226,6 +226,8 @@ class SyncUnion {
    */
   void ProcessFile(SharedPtr<SyncItem> entry);
 
+  void Link(SharedPtr<SyncItem> entry, const std::string &target);
+
  private:
   bool initialized_;
 };  // class SyncUnion

@@ -68,6 +68,7 @@ class SyncUnionTarball : public SyncUnion {
   static const size_t kBlockSize = 4096 * 4;
 
   void CreateDirectories(const std::string &target);
+  bool ProcessArchiveEntry(struct archive_entry *entry);
 };  // class SyncUnionTarball
 
 }  // namespace publish

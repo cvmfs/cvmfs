@@ -408,6 +408,36 @@ void WritableCatalogManager::AddChunkedFile(
   SyncUnlock();
 }
 
+void WritableCatalogManager::Link(const DirectoryEntryBase &entry,
+                           const std::string &parent_path,
+                           const std::string target) {
+
+  
+  const string parent_directory = MakeRelativePath(target);
+  const string file_path   = entry.GetFullPath(parent_path);
+  
+  SyncLock();
+  /* Procedure
+   *    1. Find the target inside the catalog
+   *    2. change the entry to match the hash and algorith
+   *    3. Push
+   */
+
+  WritableCatalog *catalog;
+  if (!FindCatalog(parent_directory, &catalog)) {
+    LogCvmfs(kLogCatalog, kLogStderr, "catalog for file '%s' cannot be found",
+             target.c_str());
+    assert(false);
+  }
+  DirectoryEntry target_dirent;
+  assert(catalog->LookupPath(PathString(target), &target_dirent));
+
+  DirectoryEntry dirent(entry);
+
+  dirent.checksum_ = target_dirent.checksum();
+  
+  SyncUnlock();
+}
 
 /**
  * Add a hardlink group to the catalogs.
