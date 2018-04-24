@@ -13,6 +13,7 @@
 
 #include <pthread.h>
 
+#include <list>
 #include <map>
 #include <set>
 #include <string>
@@ -45,10 +46,14 @@ class SyncUnionTarball : public SyncUnion {
    * the `dirs_` map.
    * Similarly we remember where nested catalogs should be placed in
    * `to_create_catalog_dirs_`.
-   * After we finish to uncompress the tarball we come back to iterate over
+   * After we finish to explore the tarball we come back to iterate over
    * `to_create_catalog_dirs_` and we created the nested catalogs.
+   * While we explore the tarball we also keep track of every hardlink, we will
+   * fix them later, after the mediator commit in `FixHardlink`
    */
   void Traverse();
+
+  void PostUpload();
 
   std::string UnwindWhiteoutFilename(SharedPtr<SyncItem> entry) const;
   bool IsOpaqueDirectory(SharedPtr<SyncItem> directory) const;
@@ -63,12 +68,13 @@ class SyncUnionTarball : public SyncUnion {
       know_directories_; /* directory that we know already exist */
   std::set<std::string> to_create_catalog_dirs_;
   std::map<std::string, SharedPtr<SyncItem> > dirs_;
+  std::map<const std::string, std::list<SharedPtr<SyncItem> > > hardlinks_;
   Signal *read_archive_signal_;
 
   static const size_t kBlockSize = 4096 * 4;
 
   void CreateDirectories(const std::string &target);
-  bool ProcessArchiveEntry(struct archive_entry *entry);
+  void ProcessArchiveEntry(struct archive_entry *entry);
   void LogEntry(struct archive_entry *entry);
 };  // class SyncUnionTarball
 

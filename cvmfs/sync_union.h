@@ -130,6 +130,8 @@ class SyncUnion {
   bool IsInitialized() const { return initialized_; }
   virtual bool SupportsHardlinks() const { return false; }
 
+  virtual void PostUpload() {}
+
  protected:
   std::string rdonly_path_;
   std::string scratch_path_;

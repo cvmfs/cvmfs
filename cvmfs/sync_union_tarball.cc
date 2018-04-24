@@ -82,8 +82,6 @@ bool SyncUnionTarball::Initialize() {
 void SyncUnionTarball::Traverse() {
   assert(this->IsInitialized());
   struct archive_entry *entry = archive_entry_new();
-  struct archive_entry *sparse = archive_entry_new();
-  struct archive_entry_linkresolver *linker = archive_entry_linkresolver_new();
 
   /*
    * As first step we eliminate the directories we are request.
@@ -135,7 +133,6 @@ void SyncUnionTarball::Traverse() {
           to_mark->AlreadyCreatedDir();
           ProcessDirectory(to_mark);
         }
-        archive_entry_linkresolver_free(linker);
         return; /* Only successful exit point */
         break;
       }
@@ -148,30 +145,7 @@ void SyncUnionTarball::Traverse() {
       }
 
       case ARCHIVE_OK: {
-        archive_entry_linkify(linker, &entry, &sparse);
-
-        // We start in waiting status and at the end we must be in Wakeup
-        // Each Process need to start in Wait and will finish in Wake
-
-        if (NULL != entry) {
-          // if we process something we switch to Wakeup, however we may still
-          // need to process the sparse entry, so we wait again.
-          ProcessArchiveEntry(entry);
-          read_archive_signal_->Wait();
-          LogEntry(entry);
-        }
-
-        if (NULL != sparse) {
-          // Process must start in Wait, so we either didn't process the entry
-          // so we are already in Wait, or we did process the entry and then
-          // come back into Wait. Process will Wake.
-          ProcessArchiveEntry(sparse);
-          LogEntry(sparse);
-        } else {
-          // If we dind't process the sparse we are still in Wait so we need to
-          // Wake.
-          read_archive_signal_->Wakeup();
-        };
+        ProcessArchiveEntry(entry);
       }
     }
   }
@@ -186,7 +160,9 @@ void SyncUnionTarball::LogEntry(struct archive_entry *entry) {
   printf("\n");
 }
 
-bool SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
+void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
+  LogEntry(entry);
+
   std::string archive_file_path(archive_entry_pathname(entry));
   std::string complete_path(base_directory_ + "/" + archive_file_path);
 
@@ -203,6 +179,23 @@ bool SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
   SharedPtr<SyncItem> sync_entry = SharedPtr<SyncItem>(new SyncItemTar(
       parent_path, filename, src, entry, read_archive_signal_, this));
 
+  /* Placing all the hardlinks in a external container, we will come back to
+   * them later */
+  if (NULL != archive_entry_hardlink(entry)) {
+    const std::string hardlink =
+        base_directory_ + "/" + std::string(archive_entry_hardlink(entry));
+
+    if (hardlinks_.find(hardlink) != hardlinks_.end()) {
+      hardlinks_.find(hardlink)->second.push_back(sync_entry);
+    } else {
+      std::list<SharedPtr<SyncItem> > to_hardlink;
+      to_hardlink.push_back(sync_entry);
+      hardlinks_[hardlink] = to_hardlink;
+    }
+    read_archive_signal_->Wakeup();
+    return;
+  }
+
   if (sync_entry->IsDirectory()) {
     if (know_directories_.find(complete_path) != know_directories_.end()) {
       sync_entry->AlreadyCreatedDir();
@@ -213,23 +206,22 @@ bool SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
 
     read_archive_signal_->Wakeup();  // We don't need to read data and we
                                      // can read the next header
-    return true;
-
   } else if (sync_entry->IsRegularFile()) {
     ProcessFile(sync_entry);
     if (filename == ".cvmfscatalog") {
       to_create_catalog_dirs_.insert(parent_path);
     }
-    return false;
   } else if (sync_entry->IsSymlink() || sync_entry->IsFifo() ||
              sync_entry->IsSocket()) {
     ProcessFile(sync_entry);
     read_archive_signal_->Wakeup();
-    return true;
   } else {
     read_archive_signal_->Wakeup();
-    return true;
   }
+}
+
+void SyncUnionTarball::PostUpload() {
+  printf("Fixing hard links!");
 }
 
 std::string SyncUnionTarball::UnwindWhiteoutFilename(

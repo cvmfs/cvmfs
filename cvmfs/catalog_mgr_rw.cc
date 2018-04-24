@@ -409,13 +409,12 @@ void WritableCatalogManager::AddChunkedFile(
 }
 
 void WritableCatalogManager::Link(const DirectoryEntryBase &entry,
-                           const std::string &parent_path,
-                           const std::string target) {
+                                  const std::string &parent_directory,
+                                  const XattrList &xattrs,
+                                  const std::string target) {
+  const string parent_path = MakeRelativePath(parent_directory);
+  const string file_path = entry.GetFullPath(parent_path);
 
-  
-  const string parent_directory = MakeRelativePath(target);
-  const string file_path   = entry.GetFullPath(parent_path);
-  
   SyncLock();
   /* Procedure
    *    1. Find the target inside the catalog
@@ -435,7 +434,10 @@ void WritableCatalogManager::Link(const DirectoryEntryBase &entry,
   DirectoryEntry dirent(entry);
 
   dirent.checksum_ = target_dirent.checksum();
-  
+  dirent.set_linkcount(1);
+  dirent.set_is_chunked_file(!target_dirent.IsChunkedFile());
+
+  catalog->AddEntry(dirent, xattrs, file_path, parent_path);
   SyncUnlock();
 }
 

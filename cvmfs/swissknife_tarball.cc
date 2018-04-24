@@ -125,7 +125,7 @@ int swissknife::IngestTarball::Main(const swissknife::ArgumentList &args) {
   publish::SyncMediator mediator(&catalog_manager, &params);
 
   if (params.virtual_dir_actions == catalog::VirtualCatalog::kActionNone) {
-    publish::SyncUnion *sync;
+    publish::SyncUnionTarball *sync;
 
     sync = new publish::SyncUnionTarball(&mediator, params.dir_rdonly,
                                          params.tar_file, params.base_directory,
@@ -172,11 +172,18 @@ int swissknife::IngestTarball::Main(const swissknife::ArgumentList &args) {
     return 5;
   }
 
+
   // finalize the spooler
   LogCvmfs(kLogCvmfs, kLogStdout, "Wait for all uploads to finish");
   params.spooler->WaitForUpload();
   spooler_catalogs->WaitForUpload();
   params.spooler->FinalizeSession(false);
+
+  if (!mediator.Commit(manifest.weak_ref())) {
+    PrintError("something went wrong during sync after the fix of hardlinks");
+    return 7;
+  }
+
 
   LogCvmfs(kLogCvmfs, kLogStdout, "Exporting repository manifest");
 
