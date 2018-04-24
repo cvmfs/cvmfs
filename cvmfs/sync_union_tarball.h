@@ -69,6 +69,7 @@ class SyncUnionTarball : public SyncUnion {
 
   void CreateDirectories(const std::string &target);
   bool ProcessArchiveEntry(struct archive_entry *entry);
+  void LogEntry(struct archive_entry *entry);
 };  // class SyncUnionTarball
 
 }  // namespace publish

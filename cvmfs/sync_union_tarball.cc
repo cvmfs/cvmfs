@@ -149,15 +149,41 @@ void SyncUnionTarball::Traverse() {
 
       case ARCHIVE_OK: {
         archive_entry_linkify(linker, &entry, &sparse);
-        bool wake_entry = true, wake_sparse = true;
-        wake_entry = ProcessArchiveEntry(entry);
 
-        if (wake_entry) read_archive_signal_->Wait();
+        // We start in waiting status and at the end we must be in Wakeup
+        // Each Process need to start in Wait and will finish in Wake
 
+        if (NULL != entry) {
+          // if we process something we switch to Wakeup, however we may still
+          // need to process the sparse entry, so we wait again.
+          ProcessArchiveEntry(entry);
+          read_archive_signal_->Wait();
+          LogEntry(entry);
+        }
+
+        if (NULL != sparse) {
+          // Process must start in Wait, so we either didn't process the entry
+          // so we are already in Wait, or we did process the entry and then
+          // come back into Wait. Process will Wake.
           ProcessArchiveEntry(sparse);
+          LogEntry(sparse);
+        } else {
+          // If we dind't process the sparse we are still in Wait so we need to
+          // Wake.
+          read_archive_signal_->Wakeup();
+        };
       }
     }
   }
+}
+
+void SyncUnionTarball::LogEntry(struct archive_entry *entry) {
+  printf("Filename: %s\n", archive_entry_pathname(entry));
+  printf("inode: %ld\n", archive_entry_ino64(entry));
+  printf("device: %lu\n", archive_entry_dev(entry));
+  printf("nlink: %d\n", archive_entry_nlink(entry));
+  printf("link to: %s\n", archive_entry_hardlink(entry));
+  printf("\n");
 }
 
 bool SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
