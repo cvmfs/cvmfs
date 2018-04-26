@@ -29,6 +29,19 @@ struct sslctx_info {
   EVP_PKEY *pkey;
 };
 
+struct bearer_info {
+  /**
+  * List of extra headers to put on the HTTP request.  This is required
+  * in order to add the "Authorization: Bearer XXXXX" header.
+  */
+  struct curl_slist *list;
+
+  /**
+  * Actual text of the bearer token
+  */
+  char* token;
+
+};
 }  // anonymous namespace
 
 
@@ -41,7 +54,6 @@ AuthzAttachment::AuthzAttachment(AuthzSessionManager *sm)
   // Required for logging OpenSSL errors
   SSL_load_error_strings();
   ssl_strings_loaded_ = true;
-  list = NULL;
 }
 
 
@@ -107,24 +119,27 @@ bool AuthzAttachment::ConfigureSciTokenCurl(
   if (*info_data == NULL) {
     AuthzToken* saved_token = new AuthzToken();
     saved_token->type = kTokenBearer;
-    saved_token->data = smalloc((sizeof(char) * token.size)+ 1);
-    memcpy(saved_token->data, token.data, token.size);
-    static_cast<char*>(saved_token->data)[token.size] = 0;
+    saved_token->data = new bearer_info;
+    bearer_info* bearer = static_cast<bearer_info*>(saved_token->data);
+    bearer->token = (char*)smalloc((sizeof(char) * token.size)+ 1);
+    memcpy(bearer->token, token.data, token.size);
+    static_cast<char*>(bearer->token)[token.size] = 0;
     *info_data = saved_token;
   }
 
   AuthzToken* tmp_token = static_cast<AuthzToken*>(*info_data);
+  bearer_info* bearer = static_cast<bearer_info*>(tmp_token->data);
 
   LogCvmfs(kLogAuthz, kLogDebug, "Setting OAUTH bearer token to: %s",
-           static_cast<char*>(tmp_token->data));
+           static_cast<char*>(bearer->token));
 
   // Create the Bearer token
   // The CURLOPT_XOAUTH2_BEARER option only works "IMAP, POP3 and SMTP" protocols
   // Not HTTPS
   std::string auth_preamble = "Authorization: Bearer ";
-  std::string auth_header = auth_preamble + static_cast<char*>(tmp_token->data);
-  list = curl_slist_append(list, auth_header.c_str());
-  int retval = curl_easy_setopt(curl_handle, CURLOPT_HTTPHEADER, list);
+  std::string auth_header = auth_preamble + static_cast<char*>(bearer->token);
+  bearer->list = curl_slist_append(bearer->list, auth_header.c_str());
+  int retval = curl_easy_setopt(curl_handle, CURLOPT_HTTPHEADER, bearer->list);
   
   if (retval != CURLE_OK) {
     LogCvmfs(kLogAuthz, kLogSyslogErr, "Failed to set Oauth2 Bearer Token");
@@ -292,10 +307,12 @@ void AuthzAttachment::ReleaseCurlHandle(CURL *curl_handle, void *info_data) {
   AuthzToken* token = static_cast<AuthzToken*>(info_data);
   if (token->type == kTokenBearer) {
     // Compiler complains if we delete a void*
-    delete static_cast<char*>(token->data);
+    bearer_info* bearer = static_cast<bearer_info*>(token->data);
+    delete static_cast<char*>(bearer->token);
+    curl_slist_free_all(bearer->list);
+    delete static_cast<bearer_info*>(token->data);
     token->data = NULL;
     delete token;
-    curl_slist_free_all(list);
 
   } else if (token->type == kTokenX509) {
     sslctx_info *p = static_cast<sslctx_info *>(info_data);

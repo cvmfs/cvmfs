@@ -43,11 +43,6 @@ class AuthzAttachment : public download::CredentialsAttachment {
    */
   std::string membership_;
 
-  /**
-  * List of extra headers to put on the HTTP request.  This is required
-  * in order to add the "Authorization: Bearer XXXXX" header.
-  */ 
-  struct curl_slist *list;
 };
 
 #endif  // CVMFS_AUTHZ_AUTHZ_CURL_H_
