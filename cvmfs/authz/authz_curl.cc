@@ -40,7 +40,6 @@ struct bearer_info {
   * Actual text of the bearer token
   */
   char* token;
-
 };
 }  // anonymous namespace
 
@@ -121,7 +120,8 @@ bool AuthzAttachment::ConfigureSciTokenCurl(
     saved_token->type = kTokenBearer;
     saved_token->data = new bearer_info;
     bearer_info* bearer = static_cast<bearer_info*>(saved_token->data);
-    bearer->token = (char*)smalloc((sizeof(char) * token.size)+ 1);
+    bearer->list = NULL;
+    bearer->token = static_cast<char*>(smalloc((sizeof(char) * token.size)+ 1));
     memcpy(bearer->token, token.data, token.size);
     static_cast<char*>(bearer->token)[token.size] = 0;
     *info_data = saved_token;
@@ -134,13 +134,13 @@ bool AuthzAttachment::ConfigureSciTokenCurl(
            static_cast<char*>(bearer->token));
 
   // Create the Bearer token
-  // The CURLOPT_XOAUTH2_BEARER option only works "IMAP, POP3 and SMTP" protocols
-  // Not HTTPS
+  // The CURLOPT_XOAUTH2_BEARER option only works "IMAP, POP3 and SMTP"
+  // protocols. Not HTTPS
   std::string auth_preamble = "Authorization: Bearer ";
   std::string auth_header = auth_preamble + static_cast<char*>(bearer->token);
   bearer->list = curl_slist_append(bearer->list, auth_header.c_str());
   int retval = curl_easy_setopt(curl_handle, CURLOPT_HTTPHEADER, bearer->list);
-  
+
   if (retval != CURLE_OK) {
     LogCvmfs(kLogAuthz, kLogSyslogErr, "Failed to set Oauth2 Bearer Token");
     return false;
