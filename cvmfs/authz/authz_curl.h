@@ -42,7 +42,6 @@ class AuthzAttachment : public download::CredentialsAttachment {
    * The required user group needs to be set on mount and remount by the client.
    */
   std::string membership_;
-
 };
 
 #endif  // CVMFS_AUTHZ_AUTHZ_CURL_H_
