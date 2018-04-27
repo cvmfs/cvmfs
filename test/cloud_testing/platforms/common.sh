@@ -2,7 +2,19 @@
 
 export LC_ALL=C
 
-script_location=$(dirname $(readlink --canonicalize $0))
+
+canonicalize_path() {
+  local path_name=$1
+  local system_name=`uname -s`
+  if [ "x$system_name" = "xLinux" ]; then
+    echo $(readlink -f $(basename $path_name))
+  elif [ "x$system_name" = "xDarwin" ]; then
+    echo $(/usr/local/bin/greadlink -f $(basename $path_name))
+  fi
+}
+
+
+script_location=$(dirname $(canonicalize_path $0))
 . ${script_location}/../../test_functions
 
 # splits onelined CSV strings and prints the desired field offset
