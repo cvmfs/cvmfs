@@ -5,18 +5,35 @@
 #ifndef CVMFS_INGESTION_INGESTION_SOURCE_H_
 #define CVMFS_INGESTION_INGESTION_SOURCE_H_
 
+#include <fcntl.h>
 #include <pthread.h>
+#include <unistd.h>
 
+#include <cassert>
 #include <cerrno>
 #include <cstdio>
 #include <string>
 
 #include "duplex_libarchive.h"
+#include "logging.h"
 #include "platform.h"
 #include "util/posix.h"
 #include "util/single_copy.h"
 #include "util_concurrency.h"
 
+/*
+ * The purpose of this class is to add a common interface for object that are
+ * ingested by the pipeline. Hence the pipeline is able to ingest everything
+ * that implements this interface.
+ * The ownership of new IngestionSource objects is transfered from their creator
+ * directly to the pipeline itself that will take care of deallocating
+ * everything.
+ * The pipeline is multithreaded so it is very likely that the code implement in
+ * this interface will be called inside a different thread from the one that
+ * originally
+ * allocated the object, hence is necessary to take extra care in the use of
+ * locks, prefer conditional variables.
+ */
 class IngestionSource : SingleCopy {
  public:
   virtual ~IngestionSource() {}
@@ -30,7 +47,7 @@ class IngestionSource : SingleCopy {
 class FileIngestionSource : public IngestionSource {
  public:
   explicit FileIngestionSource(const std::string& path)
-      : path_(path), fd_(-1) {}
+      : path_(path), fd_(-1), stat_obtained_(false) {}
   ~FileIngestionSource() {}
 
   std::string GetPath() const { return path_; }
@@ -64,24 +81,34 @@ class FileIngestionSource : public IngestionSource {
   }
 
   bool GetSize(uint64_t* size) {
-    platform_stat64 info;
-    int ret = platform_fstat(fd_, &info);
-    *size = info.st_size;
-    return (ret == 0);
+    if (stat_obtained_) {
+      *size = stat_.st_size;
+      return true;
+    }
+    int ret = platform_fstat(fd_, &stat_);
+    if (ret == 0) {
+      *size = stat_.st_size;
+      stat_obtained_ = true;
+      return true;
+    }
+    return false;
   }
 
  private:
   const std::string path_;
   int fd_;
+  platform_stat64 stat_;
+  bool stat_obtained_;
 };
 
 class TarIngestionSource : public IngestionSource {
  public:
-  TarIngestionSource(std::string path, struct archive* archive,
+  TarIngestionSource(const std::string path, struct archive* archive,
                      struct archive_entry* entry, Signal* read_archive_signal)
       : path_(path),
         archive_(archive),
         read_archive_signal_(read_archive_signal) {
+    assert(read_archive_signal_->IsSleeping());
     const struct stat* stat_ = archive_entry_stat(entry);
     size_ = stat_->st_size;
   }

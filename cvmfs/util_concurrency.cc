@@ -58,6 +58,11 @@ void Signal::Wakeup() {
   assert(retval == 0);
 }
 
+bool Signal::IsSleeping() {
+  MutexLockGuard guard(lock_);
+  return fired_ == false;
+}
+
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD
 #endif
