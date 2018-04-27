@@ -222,6 +222,13 @@ void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
 
 void SyncUnionTarball::PostUpload() {
   printf("Fixing hard links!");
+  std::map<const std::string, std::list<SharedPtr<SyncItem> > >::iterator hardlink;
+  for (hardlink = hardlinks_.begin(); hardlink != hardlinks_.end(); ++hardlink ) {
+          std::list<SharedPtr<SyncItem> >::iterator entry;
+          for (entry = hardlink->second.begin(); entry != hardlink->second.end(); ++entry) {
+                  mediator_->Link(*entry, hardlink->first);
+          }
+  }
 }
 
 std::string SyncUnionTarball::UnwindWhiteoutFilename(

@@ -212,6 +212,9 @@ cvmfs_server_ingest_tarball() {
 
   publish_starting $name
 
+  echo "Command being run"
+  echo $ingest_tarball_command
+
   $user_shell "$ingest_tarball_command" || { publish_failed $name; die "Synchronization failed\n\nExecuted Command:\n$sync_command";   }
 
   cvmfs_sys_file_is_regular $manifest            || { publish_failed $name; die "Manifest creation failed\n\nExecuted Command:\n$sync_command"; }
