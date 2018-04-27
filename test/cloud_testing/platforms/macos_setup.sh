@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # source the common platform independent functionality and option parsing
-script_location=$(dirname $(/usr/local/bin/greadlink -f $0))
+script_location=$(cd "$(dirname "$0")"; pwd)
 . ${script_location}/common.sh
 
 CLIENT_PACKAGE=""
@@ -46,6 +46,7 @@ sudo cvmfs_config chksetup > /dev/null || die "fail (cvmfs_config chksetup)"
 echo "done"
 
 echo -n "Installing test dependencies from Homebrew ..."
+brew remove sqlite tree cmake jq
 brew install sqlite tree cmake jq \
     || die "fail (installing test dependencies from Homebrew)"
 echo "done"
