@@ -11,7 +11,7 @@ retval=0
 #cvmfs_unittests --gtest_shuffle \
 #                --gtest_death_test_use_fork || retval=1
 
-cd "$cvmfs_workspace"
+cd ${SOURCE_DIRECTORY}/test
 
 # everything will be placed in the home folder
 echo "running CernVM-FS client test cases..."

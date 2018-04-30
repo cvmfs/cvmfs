@@ -92,7 +92,7 @@ if [ "x$(uname -s)" != "xDarwin" ]; then
     if [ x$SERVER_PACKAGE        = "x" ] ||
        [ x$DEVEL_PACKAGE         = "x" ]; then
       echo "missing parameter(s), cannot run platform dependent test script"
-      exit 100
+      exit 200
     fi
 fi
 
