@@ -1,5 +1,7 @@
 #!/bin/bash
 
+export PATH=/usr/local/bin:$PATH
+
 # source the common platform independent functionality and option parsing
 script_location=$(cd "$(dirname "$0")"; pwd)
 . ${script_location}/common.sh
@@ -37,8 +39,6 @@ echo -n "Install client package: $CLIENT_PACKAGE ... "
 sudo installer -pkg "$CLIENT_PACKAGE" -target / \
     || die "fail (installing CernVM-FS client package)"
 echo "done"
-
-env
 
 echo -n "Setting up CernVM-FS environment... "
 sudo cvmfs_config setup || die "fail (cvmfs_config setup)"
