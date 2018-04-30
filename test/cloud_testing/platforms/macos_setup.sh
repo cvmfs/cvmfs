@@ -38,6 +38,8 @@ sudo installer -pkg "$CLIENT_PACKAGE" -target / \
     || die "fail (installing CernVM-FS client package)"
 echo "done"
 
+env
+
 echo -n "Setting up CernVM-FS environment... "
 sudo cvmfs_config setup || die "fail (cvmfs_config setup)"
 sudo mkdir -p /var/log/cvmfs-test || die "fail (mkdir /var/log/cvmfs-test)"
