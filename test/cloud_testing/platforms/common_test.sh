@@ -1,6 +1,14 @@
 #!/bin/sh
 
-script_location=$(dirname $(readlink --canonicalize $0))
+portable_dirname() {
+  if [ "x$(uname -s)" = "xDarwin" ]; then
+    echo $(dirname $(/usr/local/bin/greadlink --canonicalize $1))
+  else
+    echo $(dirname $(readlink --canonicalize $1))
+  fi
+}
+
+script_location=$(portable_dirname $0)
 . ${script_location}/common.sh
 
 #
@@ -76,11 +84,16 @@ done
 # check that all mandatory parameters are set
 if [ x$SOURCE_DIRECTORY      = "x" ] ||
    [ x$LOG_DIRECTORY         = "x" ] ||
-   [ x$SERVER_PACKAGE        = "x" ] ||
-   [ x$CLIENT_PACKAGE        = "x" ] ||
-   [ x$DEVEL_PACKAGE         = "x" ]; then
+   [ x$CLIENT_PACKAGE        = "x" ]; then
   echo "missing parameter(s), cannot run platform dependent test script"
   exit 100
+fi
+if [ "x$(uname -s)" != "xDarwin" ]; then
+    if [ x$SERVER_PACKAGE        = "x" ] ||
+       [ x$DEVEL_PACKAGE         = "x" ]; then
+      echo "missing parameter(s), cannot run platform dependent test script"
+      exit 100
+    fi
 fi
 
 sudo tee /etc/cvmfs/cvmfs_server_hooks.sh << EOF
@@ -99,7 +112,7 @@ MIGRATIONTEST_LOGFILE="${LOG_DIRECTORY}/migrationtest.log"
 XUNIT_OUTPUT_SUFFIX=".xunit.xml"
 
 # check that the script is running under the correct user account
-if [ $(id --user --name) != "sftnight" ]; then
+if [ $(id -u -n) != "sftnight" ]; then
   echo "test cases need to run under user 'sftnight'... aborting"
   exit 3
 fi

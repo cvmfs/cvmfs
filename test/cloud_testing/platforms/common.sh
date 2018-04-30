@@ -2,12 +2,7 @@
 
 export LC_ALL=C
 
-
-if [ "x$(uname -s)" = "xDarwin" ]; then
-  script_location=$(dirname $(/usr/local/bin/greadlink --canonicalize $0))
-else
-  script_location=$(dirname $(readlink --canonicalize $0))
-fi
+script_location=$(portable_dirname $0)
 . ${script_location}/../../test_functions
 
 # splits onelined CSV strings and prints the desired field offset
