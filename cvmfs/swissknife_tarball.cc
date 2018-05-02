@@ -4,10 +4,17 @@
 
 #include "swissknife_tarball.h"
 
+#include <fcntl.h>
+#include <unistd.h>
+
 #include "catalog_virtual.h"
+#include "logging.h"
+#include "manifest.h"
 #include "sync_mediator.h"
 #include "sync_union.h"
 #include "sync_union_tarball.h"
+#include "util/pointer.h"
+#include "util/posix.h"
 
 int swissknife::IngestTarball::Main(const swissknife::ArgumentList &args) {
   SyncParameters params;
@@ -96,10 +103,6 @@ int swissknife::IngestTarball::Main(const swissknife::ArgumentList &args) {
   if (params.branched_catalog) {
     // Throw-away manifest
     manifest = new manifest::Manifest(shash::Any(), 0, "");
-  } else if (params.virtual_dir_actions !=
-             catalog::VirtualCatalog::kActionNone) {
-    manifest = this->OpenLocalManifest(params.manifest_path);
-    params.base_hash = manifest->catalog_hash();
   } else {
     if (with_gateway) {
       manifest =
@@ -124,21 +127,19 @@ int swissknife::IngestTarball::Main(const swissknife::ArgumentList &args) {
 
   publish::SyncMediator mediator(&catalog_manager, &params);
 
-  if (params.virtual_dir_actions == catalog::VirtualCatalog::kActionNone) {
-    publish::SyncUnion *sync;
+  publish::SyncUnion *sync;
 
-    sync = new publish::SyncUnionTarball(&mediator, params.dir_rdonly,
-                                         params.tar_file, params.base_directory,
-                                         params.to_delete);
-    if (!sync->Initialize()) {
-      LogCvmfs(kLogCvmfs, kLogStderr,
-               "Initialization of the synchronisation "
-               "engine failed");
-      return 4;
-    }
-
-    sync->Traverse();
+  sync = new publish::SyncUnionTarball(&mediator, params.dir_rdonly,
+                                       params.tar_file, params.base_directory,
+                                       params.to_delete);
+  if (!sync->Initialize()) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "Initialization of the synchronisation "
+             "engine failed");
+    return 4;
   }
+
+  sync->Traverse();
 
   if (!params.authz_file.empty()) {
     LogCvmfs(kLogCvmfs, kLogDebug,
