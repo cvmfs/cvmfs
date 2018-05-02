@@ -146,7 +146,7 @@ catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
 
   dirent.name_.Assign(this->filename().data(), this->filename().length());
 
-  /* TODO manage case for symlinks in tar file */
+  /* TODO(simone) manage case for symlinks in tar file */
   if (this->IsSymlink()) {
     char slnk[PATH_MAX + 1];
     const ssize_t length =
@@ -158,8 +158,6 @@ catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
   if (this->IsCharacterDevice() || this->IsBlockDevice()) {
     dirent.size_ = makedev(GetRdevMajor(), GetRdevMinor());
   }
-
-  if (dirent.IsDirectory() && dirent.size_ == 0) dirent.size_ = 4096;
 
   assert(dirent.IsRegular() || dirent.IsDirectory() || dirent.IsLink() ||
          dirent.IsSpecial());
