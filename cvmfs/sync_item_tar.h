@@ -31,23 +31,22 @@ class SyncItemTar : public SyncItem {
   IngestionSource *CreateIngestionSource() const;
   void IsPlaceholderDirectory() const { rdonly_type_ = kItemDir; }
 
-  struct archive *archive_;
-  struct archive_entry *archive_entry_;
-
  protected:
-  SyncItemTar(const string &relative_parent_path, const string &filename,
+  SyncItemTar(const std::string &relative_parent_path, const std::string &filename,
               struct archive *archive, struct archive_entry *entry,
               Signal *read_archive_signal, const SyncUnion *union_engine);
 
  private:
+  struct archive *archive_;
+  struct archive_entry *archive_entry_;
   platform_stat64 GetStatFromTar() const;
   mutable platform_stat64 tar_stat_;
   mutable bool obtained_tar_stat_;
   Signal *read_archive_signal_;
 };
 
-SyncItemTar::SyncItemTar(const string &relative_parent_path,
-                         const string &filename, struct archive *archive,
+SyncItemTar::SyncItemTar(const std::string &relative_parent_path,
+                         const std::string &filename, struct archive *archive,
                          struct archive_entry *entry,
                          Signal *read_archive_signal,
                          const SyncUnion *union_engine)
