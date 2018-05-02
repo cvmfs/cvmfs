@@ -110,14 +110,15 @@ void SyncUnionTarball::Traverse() {
     switch (result) {
       case ARCHIVE_FATAL: {
         LogCvmfs(kLogUnionFs, kLogStderr,
-                 "Fatal error in reading the archive.");
-        return;
-        break; // Only exit point with error 
+                 "Fatal error in reading the archive.\n%s\n",
+                 archive_error_string(src));
+        abort();
+        break;  // Only exit point with error
       }
 
       case ARCHIVE_RETRY: {
         LogCvmfs(kLogUnionFs, kLogStdout,
-                 "Error in reading the header, retrying. \n %s",
+                 "Error in reading the header, retrying.\n%s\n",
                  archive_error_string(src));
         continue;
         break;
@@ -133,24 +134,21 @@ void SyncUnionTarball::Traverse() {
           to_mark->IsPlaceholderDirectory();
           ProcessDirectory(to_mark);
         }
-        return; // Only successful exit point
+        return;  // Only successful exit point
         break;
       }
 
       case ARCHIVE_WARN: {
         LogCvmfs(kLogUnionFs, kLogStderr,
-                 "Warning in uncompression reading, going on. \n %s",
+                 "Warning in uncompression reading, going on.\n %s",
                  archive_error_string(src));
         // We actually want this to enter the ARCHIVE_OK case
       }
 
       case ARCHIVE_OK: {
         std::string archive_file_path(archive_entry_pathname(entry));
-        std::string complete_path(base_directory_ + "/" + archive_file_path);
-
-        if (*complete_path.rbegin() == '/') {
-          complete_path.erase(complete_path.size() - 1);
-        }
+        std::string complete_path =
+            MakeCanonicalPath(base_directory_ + "/" + archive_file_path);
 
         std::string parent_path;
         std::string filename;
@@ -181,6 +179,17 @@ void SyncUnionTarball::Traverse() {
         } else {
           read_archive_signal_->Wakeup();
         }
+        break;
+      }
+
+      default: {
+        // We should never enter in this branch, but just for safeness we prefer
+        // to abort in case we hit a case we don't how to manage.
+        LogCvmfs(kLogUnionFs, kLogStderr,
+                 "Enter in unknow state. Aborting.\nError: %s\n", result,
+                 archive_error_string(src));
+
+        abort();
       }
     }
   }
