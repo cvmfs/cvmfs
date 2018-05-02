@@ -18,10 +18,11 @@
 #include <string>
 
 #include "duplex_libarchive.h"
-#include "sync_mediator.h"
 #include "util_concurrency.h"
 
 namespace publish {
+
+class AbstractSyncMediator;
 
 class SyncUnionTarball : public SyncUnion {
  public:

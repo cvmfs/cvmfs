@@ -13,6 +13,7 @@
 
 #include "duplex_libarchive.h"
 #include "util_concurrency.h"
+#include "ingestion/ingestion_source.h"
 
 namespace publish {
 
