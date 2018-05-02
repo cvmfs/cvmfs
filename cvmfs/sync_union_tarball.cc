@@ -130,7 +130,7 @@ void SyncUnionTarball::Traverse() {
           SharedPtr<SyncItem> to_mark = dirs_[*dir];
           assert(to_mark->IsDirectory());
           to_mark->SetCatalogMarker();
-          to_mark->AlreadyCreatedDir();
+          to_mark->IsPlaceholderDirectory();
           ProcessDirectory(to_mark);
         }
         return; /* Only successful exit point */
@@ -164,7 +164,7 @@ void SyncUnionTarball::Traverse() {
         if (sync_entry->IsDirectory()) {
           if (know_directories_.find(complete_path) !=
               know_directories_.end()) {
-            sync_entry->AlreadyCreatedDir();
+            sync_entry->IsPlaceholderDirectory();
           }
           ProcessDirectory(sync_entry);
           dirs_[complete_path] = sync_entry;

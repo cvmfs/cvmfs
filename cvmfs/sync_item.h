@@ -19,7 +19,6 @@
 #include "duplex_libarchive.h"
 #include "file_chunk.h"
 #include "hash.h"
-#include "ingestion/ingestion_source.h"
 #include "platform.h"
 #include "util/shared_ptr.h"
 
@@ -163,7 +162,7 @@ class SyncItem {
   }
 
   virtual IngestionSource *CreateIngestionSource() const;
-  virtual void AlreadyCreatedDir() const { assert(false); }
+  virtual void IsPlaceholderDirectory() const { assert(false); }
   void SetCatalogMarker() { has_catalog_marker_ = true; }
 
   bool operator==(const SyncItem &other) const {

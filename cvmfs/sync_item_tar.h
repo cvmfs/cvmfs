@@ -29,7 +29,7 @@ class SyncItemTar : public SyncItem {
   inline unsigned int GetRdevMinor() const { return minor(tar_stat_.st_rdev); }
 
   IngestionSource *CreateIngestionSource() const;
-  void AlreadyCreatedDir() const { rdonly_type_ = kItemDir; }
+  void IsPlaceholderDirectory() const { rdonly_type_ = kItemDir; }
 
   struct archive *archive_;
   struct archive_entry *archive_entry_;
