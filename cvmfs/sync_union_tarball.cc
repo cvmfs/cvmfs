@@ -81,10 +81,9 @@ bool SyncUnionTarball::Initialize() {
  */
 void SyncUnionTarball::Traverse() {
   assert(this->IsInitialized());
-  struct archive_entry *entry = archive_entry_new();
 
   /*
-   * As first step we eliminate the directories we are request.
+   * As first step we eliminate the requested directories.
    */
   if (to_delete_ != "") {
     vector<std::string> to_eliminate_vec = SplitString(to_delete_, ':');
@@ -101,8 +100,9 @@ void SyncUnionTarball::Traverse() {
     }
   }
 
+  struct archive_entry *entry = archive_entry_new();
   while (true) {
-    /* Get the lock, wait if lock is not available yet */
+    // Get the lock, wait if lock is not available yet
     read_archive_signal_->Wait();
 
     int result = archive_read_next_header2(src, entry);
@@ -112,7 +112,7 @@ void SyncUnionTarball::Traverse() {
         LogCvmfs(kLogUnionFs, kLogStderr,
                  "Fatal error in reading the archive.");
         return;
-        break; /* Only exit point with error */
+        break; // Only exit point with error 
       }
 
       case ARCHIVE_RETRY: {
@@ -133,7 +133,7 @@ void SyncUnionTarball::Traverse() {
           to_mark->IsPlaceholderDirectory();
           ProcessDirectory(to_mark);
         }
-        return; /* Only successful exit point */
+        return; // Only successful exit point
         break;
       }
 
@@ -141,7 +141,7 @@ void SyncUnionTarball::Traverse() {
         LogCvmfs(kLogUnionFs, kLogStderr,
                  "Warning in uncompression reading, going on. \n %s",
                  archive_error_string(src));
-        /* We actually want this to enter the ARCHIVE_OK case */
+        // We actually want this to enter the ARCHIVE_OK case
       }
 
       case ARCHIVE_OK: {
