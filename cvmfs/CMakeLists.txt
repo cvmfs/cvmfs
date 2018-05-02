@@ -246,6 +246,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   swissknife_tarball.cc
   swissknife_zpipe.cc
   sync_item.cc
+  sync_item_tar.cc
   sync_mediator.cc
   sync_union.cc
   sync_union_aufs.cc

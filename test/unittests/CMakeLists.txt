@@ -225,6 +225,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/swissknife_lease_json.cc
   ${CVMFS_SOURCE_DIR}/swissknife_lease_curl.cc
   ${CVMFS_SOURCE_DIR}/sync_item.cc
+  ${CVMFS_SOURCE_DIR}/sync_item_tar.cc
   ${CVMFS_SOURCE_DIR}/sync_mediator.cc
   ${CVMFS_SOURCE_DIR}/sync_union.cc
   ${CVMFS_SOURCE_DIR}/sync_union_tarball.cc
