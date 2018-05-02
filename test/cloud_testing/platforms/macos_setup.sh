@@ -19,8 +19,7 @@ sudo cvmfs_config chksetup > /dev/null || die "fail (cvmfs_config chksetup)"
 echo "done"
 
 echo -n "Installing test dependencies from Homebrew ..."
-brew remove sqlite tree cmake jq
-brew install sqlite tree cmake jq \
+install_homebrew sqlite tree cmake jq \
     || die "fail (installing test dependencies from Homebrew)"
 echo "done"
 

@@ -294,6 +294,16 @@ install_ruby_gem() {
 }
 
 
+install_homebrew() {
+  local pkgs="$@"
+  for pkg in $pkgs ; do
+    if [ "x$(brew info $pkg | grep 'Not installed' | wc -l | xargs)" == "x1" ]; then
+      brew install $pkg
+    fi
+  done
+}
+
+
 attach_user_group() {
   local groupname=$1
   local username
