@@ -106,14 +106,15 @@ platform_stat64 SyncItemTar::GetStatFromTar() const {
   assert(archive_entry_);
   if (obtained_tar_stat_) return tar_stat_;
 
-  const struct stat *entry_stat_ = archive_entry_stat(archive_entry_);
+  const struct stat *entry_stat = archive_entry_stat(archive_entry_);
+  assert(NULL != entry_stat);
 
-  tar_stat_.st_mode = entry_stat_->st_mode;
-  tar_stat_.st_uid = entry_stat_->st_uid;
-  tar_stat_.st_gid = entry_stat_->st_gid;
-  tar_stat_.st_size = entry_stat_->st_size;
-  tar_stat_.st_mtime = entry_stat_->st_mtime;
-  tar_stat_.st_nlink = entry_stat_->st_nlink;
+  tar_stat_.st_mode = entry_stat->st_mode;
+  tar_stat_.st_uid = entry_stat->st_uid;
+  tar_stat_.st_gid = entry_stat->st_gid;
+  tar_stat_.st_size = entry_stat->st_size;
+  tar_stat_.st_mtime = entry_stat->st_mtime;
+  tar_stat_.st_nlink = entry_stat->st_nlink;
 
   if (IsDirectory()) {
     tar_stat_.st_size = 4096;
