@@ -41,7 +41,7 @@ class SyncItemDummyDir : public SyncItem {
   }
 
  private:
-  mode_t kPermision = S_IFDIR | S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP;
+  mode_t kPermision = S_IFDIR | S_IRUSR | S_IWUSR | S_IXUSR;
 };
 
 catalog::DirectoryEntryBase SyncItemDummyDir::CreateBasicCatalogDirent() const {
@@ -53,8 +53,8 @@ catalog::DirectoryEntryBase SyncItemDummyDir::CreateBasicCatalogDirent() const {
 
   dirent.mode_ = kPermision;
 
-  dirent.uid_ = getuid();
-  dirent.gid_ = getgid();
+  dirent.uid_ = scratch_stat_.stat.st_uid;
+  dirent.gid_ = scratch_stat_.stat.st_gid;
   dirent.size_ = 4096;
   dirent.mtime_ = time(NULL);
   dirent.checksum_ = this->GetContentHash();
