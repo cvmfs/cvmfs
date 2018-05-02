@@ -12,8 +12,8 @@
 #include <string>
 
 #include "duplex_libarchive.h"
-#include "util_concurrency.h"
 #include "ingestion/ingestion_source.h"
+#include "util_concurrency.h"
 
 namespace publish {
 
@@ -33,9 +33,10 @@ class SyncItemTar : public SyncItem {
   void IsPlaceholderDirectory() const { rdonly_type_ = kItemDir; }
 
  protected:
-  SyncItemTar(const std::string &relative_parent_path, const std::string &filename,
-              struct archive *archive, struct archive_entry *entry,
-              Signal *read_archive_signal, const SyncUnion *union_engine);
+  SyncItemTar(const std::string &relative_parent_path,
+              const std::string &filename, struct archive *archive,
+              struct archive_entry *entry, Signal *read_archive_signal,
+              const SyncUnion *union_engine);
 
  private:
   struct archive *archive_;
