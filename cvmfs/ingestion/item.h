@@ -47,14 +47,14 @@ class FileItem : SingleCopy {
 
   static FileItem *CreateQuitBeacon() {
     std::string quit_marker = std::string(1, kQuitBeaconMarker);
-    IngestionSource *source = new FileIngestionSource(quit_marker);
-    return new FileItem(source);
+    UniquePtr<FileIngestionSource> source(new FileIngestionSource(quit_marker));
+    return new FileItem(source.Release());
   }
   bool IsQuitBeacon() {
-    return (path_.length() == 1) && (path_[0] == kQuitBeaconMarker);
+    return (path().length() == 1) && (path()[0] == kQuitBeaconMarker);
   }
 
-  std::string path() { return path_; }
+  std::string path() { return source_->GetPath(); }
   uint64_t size() { return size_; }
   Xor32Detector *chunk_detector() { return &chunk_detector_; }
   shash::Any bulk_hash() { return bulk_hash_; }
@@ -91,7 +91,6 @@ class FileItem : SingleCopy {
   static const uint64_t kSizeUnknown = uint64_t(-1);
   static const char kQuitBeaconMarker = '\0';
 
-  const std::string path_;
   UniquePtr<IngestionSource> source_;
   const zlib::Algorithms compression_algorithm_;
   const shash::Algorithms hash_algorithm_;
