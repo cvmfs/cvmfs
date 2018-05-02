@@ -19,7 +19,6 @@
 #include "ingestion/chunk_detector.h"
 #include "ingestion/ingestion_source.h"
 #include "util/pointer.h"
-#include "util/shared_ptr.h"
 #include "util/single_copy.h"
 
 namespace upload {

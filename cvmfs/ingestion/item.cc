@@ -12,7 +12,6 @@
 #include "ingestion/ingestion_source.h"
 #include "item_mem.h"
 #include "smalloc.h"
-#include "util/shared_ptr.h"
 #include "util_concurrency.h"
 
 FileItem::FileItem(
