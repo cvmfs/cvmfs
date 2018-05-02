@@ -32,7 +32,7 @@ cvmfs_server_ingest_tarball() {
         tar_file=$2
         ;;
       -d | --delete )
-        if [ "$to_delete" = "" ]
+        if [ "x$to_delete" = "x" ]
         then
           to_delete=$2
         else
