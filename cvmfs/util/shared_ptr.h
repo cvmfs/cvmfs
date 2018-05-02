@@ -120,8 +120,6 @@ class SharedPtr {
     return static_cast<void*>(value_);
   }
 
-  element_type* get() const { return Get(); }
-
  private:
   element_type* value_;
   atomic_int64* count_;
