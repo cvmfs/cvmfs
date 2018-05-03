@@ -2,8 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef CVMFS_SWISSKNIFE_TARBALL_H_
-#define CVMFS_SWISSKNIFE_TARBALL_H_
+#ifndef CVMFS_SWISSKNIFE_INGEST_H_
+#define CVMFS_SWISSKNIFE_INGEST_H_
 
 #include <string>
 
@@ -42,4 +42,4 @@ class IngestTarball : public Command {
 };
 }  // namespace swissknife
 
-#endif  // CVMFS_SWISSKNIFE_TARBALL_H_
+#endif  // CVMFS_SWISSKNIFE_INGEST_H_
