@@ -1136,7 +1136,7 @@ EOF
   # Make sure the systemd mount unit exists
   if is_systemd; then
     /usr/lib/systemd/system-generators/systemd-fstab-generator \
-      /run/systemd/generator '' '' 2>/dev/null
+      /run/systemd/generator '' '' 2>/dev/null || true
     systemctl daemon-reload
   fi
 }
