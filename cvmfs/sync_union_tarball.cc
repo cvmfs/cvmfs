@@ -49,7 +49,7 @@ bool SyncUnionTarball::Initialize() {
   assert(ARCHIVE_OK == archive_read_support_format_tar(src));
   assert(ARCHIVE_OK == archive_read_support_format_empty(src));
 
-  if (tarball_path_ == "--") {
+  if (tarball_path_ == "-") {
     result = archive_read_open_filename(src, NULL, kBlockSize);
   } else {
     std::string tarball_absolute_path = GetAbsolutePath(tarball_path_);
