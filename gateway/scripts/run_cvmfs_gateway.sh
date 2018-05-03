@@ -7,10 +7,10 @@ wait_for_app_start() {
     local num_iter=1
     while [ $reply != "pong" ]; do
         sleep 1
-        reply=$(/opt/cvmfs_gateway/bin/cvmfs_gateway ping | awk {'print $1'})
+        reply=$(/opt/cvmfs-gateway/bin/cvmfs_gateway ping | awk {'print $1'})
         num_iter=$((num_iter + 1))
         if [ $num_iter -eq 10 ]; then
-            echo "Error: Could not start cvmfs_gateway"
+            echo "Error: Could not start cvmfs-gateway"
             exit 1
         fi
     done
@@ -30,7 +30,7 @@ elif [ x"$action" = xstop ]; then
     pkill epmd
     echo "CVMFS repository gateway stopped."
 elif [ x"$action" = xreload ]; then
-    $SCRIPT_LOCATION/../bin/cvmfs_gateway escript scripts/reload_repo_config.escript
+    $SCRIPT_LOCATION/../bin/cvmfs_gateway escript scripts/reload-repo-config.escript
     echo "CVMFS repository gateway configuration reloaded."
 elif [ x"$action" = xrestart ]; then
     $SCRIPT_LOCATION/../bin/cvmfs_gateway stop
