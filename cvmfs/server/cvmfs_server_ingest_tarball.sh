@@ -184,7 +184,6 @@ cvmfs_server_ingest_tarball() {
   local ingest_tarball_command="$(__swissknife_cmd dbg) \
     ingest_tarball                                 \
     -u /cvmfs/$name                                \
-    -s ${scratch_dir}                              \
     -c ${spool_dir}/rdonly                         \
     -t ${spool_dir}/tmp                            \
     -b $base_hash                                  \

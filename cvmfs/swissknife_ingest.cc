@@ -2,7 +2,7 @@
  * This file is part of the CernVM File System
  */
 
-#include "swissknife_tarball.h"
+#include "swissknife_ingest.h"
 
 #include <fcntl.h>
 #include <unistd.h>
