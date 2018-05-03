@@ -62,17 +62,12 @@ class SyncUnionTarball : public SyncUnion {
   const std::string to_delete_;  ///< entity to delete before to extract the tar
   std::set<std::string>
       know_directories_;  ///< directory that we know already exist
-  std::set<std::string> to_create_catalog_dirs_;  ///< directories where we
-                                                  ///found catalog marker, after
-                                                  ///the main traverse we
-                                                  ///iterate through them and we
-                                                  ///add the catalog
-  std::map<std::string, SharedPtr<SyncItem> > dirs_;  ///< map of all
-                                                      ///directories found, we
-                                                      ///need them since we
-                                                      ///don't know, at priori,
-                                                      ///where the catalog files
-                                                      ///appears
+  std::set<std::string> to_create_catalog_dirs_;
+  ///< directories where we found catalog marker, after the main traverse we
+  ///< iterate through them and we add the catalog
+  std::map<std::string, SharedPtr<SyncItem> > dirs_;
+  ///< map of all directories found, we need them since we don't know, at
+  ///< priori, where the catalog files appears
   Signal *read_archive_signal_;  ///< Conditional variable to keep track of when
                                  ///< is possible to read the tar file
 
