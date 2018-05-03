@@ -24,7 +24,6 @@ class IngestTarball : public Command {
     r.push_back(Parameter::Mandatory('c', "r/o volume"));
     r.push_back(Parameter::Mandatory('o', "manifest output file"));
     r.push_back(Parameter::Mandatory('r', "spooler definition"));
-    r.push_back(Parameter::Mandatory('s', "scratch directory"));
     r.push_back(Parameter::Mandatory('t', "directory for tee"));
     r.push_back(Parameter::Mandatory('u', "union volume"));
     r.push_back(Parameter::Mandatory('w', "stratum 0 base url"));
