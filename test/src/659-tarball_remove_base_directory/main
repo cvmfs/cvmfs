@@ -57,7 +57,7 @@ cvmfs_run_test() {
   for d in a a/b a/b/c; do
     if [ ! -d $repo_dir/$to_remove_dir/tarball_foo/$d ]; then
       echo "*** Error not found directory: $repo_dir/$to_remove_dir/tarball_foo/$d"
-      return 1
+      return 2
     else
       echo "*** Ingested directory: $repo_dir/$to_remove_dir/tarball_foo/$d"
 
@@ -65,7 +65,7 @@ cvmfs_run_test() {
         file=$repo_dir/$to_remove_dir/tarball_foo/$d/$f.txt
         if [ ! -f $file ] || [ $(wc -c <$file) -ne 2048 ]; then
           echo "*** Error not found file: $file"
-          return 1
+          return 3
         else
           echo "*** Ingested file of size 2048 bytes: $file"
         fi
@@ -78,7 +78,7 @@ cvmfs_run_test() {
   file_size=$(wc -c <$file)
   if [ ! -f $file ] || [ $file_size -ne 5120 ]; then
     echo "*** Error not found file of size 5120: $file"
-    return 1
+    return 4
   else
     echo "*** Ingested file of size $file_size bytes: $file"
   fi
@@ -98,13 +98,13 @@ cvmfs_run_test() {
 
   echo "*** check that we actually put the files in $to_keep_dir"
   if [ ! -d $repo_dir/$to_keep_dir/tarball_foo ]; then
-    return 1
+    return 5
   fi
 
   for d in a a/b a/b/c; do
     if [ ! -d $repo_dir/$to_keep_dir/tarball_foo/$d ]; then
       echo "*** Error not found directory: $repo_dir/$to_keep_dir/tarball_foo/$d"
-      return 1
+      return 6
     else
       echo "*** Ingested directory: $repo_dir/$to_keep_dir/tarball_foo/$d"
 
@@ -112,7 +112,7 @@ cvmfs_run_test() {
         file=$repo_dir/$to_keep_dir/tarball_foo/$d/$f.txt
         if [ ! -f $file ] || [ $(wc -c <$file) -ne 2048 ]; then
           echo "*** Error not found file: $file"
-          return 1
+          return 7
         else
           echo "*** Ingested file of size 2048 bytes: $file"
         fi
@@ -125,7 +125,7 @@ cvmfs_run_test() {
   file_size=$(wc -c <$file)
   if [ ! -f $file ] || [ $file_size -ne 5120 ]; then
     echo "*** Error not found file of size 5120: $file"
-    return 1
+    return 8
   else
     echo "*** Ingested file of size $file_size bytes: $file"
   fi
@@ -133,9 +133,40 @@ cvmfs_run_test() {
   echo "*** checking that we have actually removed the $to_remove_dir directory"
   if [ -d $repo_dir/$to_remove_dir ]; then
     echo "*** Error directory not removed $repo_dir/$to_remove_dir"
-    return 1
+    return 9
   else
     echo "*** Directory actually removed $repo_dir/$to_remove_dir"
+  fi
+
+  #===========================================================================#
+
+  echo "*** we removed the base directory while ingesting another tar"
+  echo "*** trying to remove files and directory without ingesting anything"
+
+  #===========================================================================#
+
+	echo "*** trying to remove a non existing file"
+	cvmfs_server ingest-tarball -d $to_keep_dir/non_existing_file.tar $CVMFS_TEST_REPO || return $?
+
+	echo "*** trying to remove a single file"
+	file=$to_keep_dir/tarball_foo/a/b/c/3.txt
+	cvmfs_server ingest-tarball -d $file $CVMFS_TEST_REPO || return $?
+  if [ -f $file ]; then
+    echo "*** Error found file $file"
+    return 10
+  else
+    echo "*** Removed file: $file"
+  fi
+	
+	echo "*** trying to remove multiple file"
+	file1=$to_keep_dir/tarball_foo/a/b/c/1.txt
+	file2=$to_keep_dir/tarball_foo/a/b/c/2.txt
+	cvmfs_server ingest-tarball -d $file1 -d $file2 $CVMFS_TEST_REPO || return $?
+	if [ -f $file1 ] || [ -f $file2 ]; then
+    echo "*** Error found file $file1 or $file2"
+    return 11
+  else
+    echo "*** Removed files: $file1 and $file2"
   fi
 
   return 0
