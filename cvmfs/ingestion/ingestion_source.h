@@ -121,7 +121,14 @@ class TarIngestionSource : public IngestionSource {
   }
 
   ssize_t Read(void* external_buffer, size_t nbytes) {
-    return archive_read_data(archive_, external_buffer, nbytes);
+    ssize_t read = archive_read_data(archive_, external_buffer, nbytes);
+    if (read < 0) {
+      errno = archive_errno(archive_);
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "failed to read data from the tar entry: %s (%d)\n %s",
+               path_.c_str(), errno, archive_error_string(archive_));
+    }
+    return read;
   }
 
   bool Close() {
