@@ -22,7 +22,7 @@ cd "$CVMFS_BUILD_LOCATION"
 rebar3 as prod compile
 rebar3 as prod release,tar
 REPO_GATEWAY_VERSION=$(grep -o "[0-9]\+\.[0-9]\+\.[0-9]\+" apps/cvmfs_gateway/src/cvmfs_gateway.app.src)
-TARBALL_NAME=cvmfs_gateway-${REPO_GATEWAY_VERSION}-${CVMFS_BUILD_PLATFORM}-x86_64.tar.gz
+TARBALL_NAME=cvmfs-gateway-${REPO_GATEWAY_VERSION}-${CVMFS_BUILD_PLATFORM}-x86_64.tar.gz
 PKGMAP_FILE=${CVMFS_BUILD_LOCATION}/pkgmap/pkgmap.${CVMFS_BUILD_PLATFORM}_x86_64
 
 mkdir -p ${CVMFS_BUILD_LOCATION}/tarballs
