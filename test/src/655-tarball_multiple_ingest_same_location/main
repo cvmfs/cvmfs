@@ -43,9 +43,9 @@ cvmfs_run_test() {
   produce_tarball $tarfile
 
   echo "*** 1. ingesting the tarball in the directory $dir"
-  cvmfs_server ingest-tarball --base_dir $dir --tar_file $tarfile $CVMFS_TEST_REPO || return $?
+  cvmfs_server ingest --base_dir $dir --tar_file $tarfile $CVMFS_TEST_REPO || return $?
   echo "*** 2. ingesting the tarball in the directory $dir"
-  cvmfs_server ingest-tarball --base_dir $dir --tar_file $tarfile $CVMFS_TEST_REPO || return $?
+  cvmfs_server ingest --base_dir $dir --tar_file $tarfile $CVMFS_TEST_REPO || return $?
   
   echo "*** check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?

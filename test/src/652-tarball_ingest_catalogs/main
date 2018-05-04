@@ -46,7 +46,7 @@ cvmfs_run_test() {
   produce_tarball $tarfile
 
   echo "*** ingesting the tarball in the directory $dir"
-  cvmfs_server ingest-tarball --base_dir $dir --tar_file $tarfile $CVMFS_TEST_REPO || return $?
+  cvmfs_server ingest --base_dir $dir --tar_file $tarfile $CVMFS_TEST_REPO || return $?
 
   echo "*** check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
@@ -95,7 +95,7 @@ cvmfs_run_test() {
 
   local different_dir="different_dir"
   echo "*** ingesting the same tarball in a different directory $dir"
-  cvmfs_server ingest-tarball --base_dir $different_dir --tar_file $tarfile --delete $dir $CVMFS_TEST_REPO || return $?
+  cvmfs_server ingest --base_dir $different_dir --tar_file $tarfile --delete $dir $CVMFS_TEST_REPO || return $?
 
   cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$" || die "Not found catalog /"
   cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$different_dir/tarball_foo/a$" || return 9

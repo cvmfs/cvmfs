@@ -14,7 +14,7 @@ namespace swissknife {
 class IngestTarball : public Command {
  public:
   ~IngestTarball() {}
-  virtual std::string GetName() const { return "ingest_tarball"; }
+  virtual std::string GetName() const { return "ingest"; }
   virtual std::string GetDescription() const {
     return "Pushes the content of the tarball to the repository";
   }

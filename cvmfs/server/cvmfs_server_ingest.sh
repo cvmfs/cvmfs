@@ -13,7 +13,7 @@
 # TODO Most of this code is replicated and shared between different scrips,
 # it would be a good idea to refactor common patterns into coherent functions.
 
-cvmfs_server_ingest_tarball() {
+cvmfs_server_ingest() {
   local base_dir="" # where to extract the tar file
   local tar_file=""
   local to_delete="" # directories or file to delete before the extraction
@@ -170,23 +170,23 @@ cvmfs_server_ingest_tarball() {
     -x"
 
 
-  local ingest_tarball_command="$(__swissknife_cmd dbg) \
-    ingest_tarball                                 \
-    -u /cvmfs/$name                                \
-    -c ${spool_dir}/rdonly                         \
-    -t ${spool_dir}/tmp                            \
-    -b $base_hash                                  \
-    -r ${upstream}                                 \
-    -w $stratum0                                   \
-    -o $manifest                                   \
-    -K $CVMFS_PUBLIC_KEY                           \
-    -N $name                                       \
-    -T $tar_file                                   \
-    -B $base_dir                                   \
+  local ingest_command="$(__swissknife_cmd dbg) \
+    ingest                                      \
+    -u /cvmfs/$name                             \
+    -c ${spool_dir}/rdonly                      \
+    -t ${spool_dir}/tmp                         \
+    -b $base_hash                               \
+    -r ${upstream}                              \
+    -w $stratum0                                \
+    -o $manifest                                \
+    -K $CVMFS_PUBLIC_KEY                        \
+    -N $name                                    \
+    -T $tar_file                                \
+    -B $base_dir                                \
     "
 
   if [ ! -z "$to_delete" ]; then
-    ingest_tarball_command="$ingest_tarball_command -D $to_delete"
+    ingest_command="$ingest_command -D $to_delete"
   fi
 
 
@@ -200,7 +200,7 @@ cvmfs_server_ingest_tarball() {
 
   publish_starting $name
 
-  $user_shell "$ingest_tarball_command" || { publish_failed $name; cvmfs_server_abort -f $name; die "Synchronization failed\n\nExecuted Command:\n$sync_command";   }
+  $user_shell "$ingest_command" || { publish_failed $name; cvmfs_server_abort -f $name; die "Synchronization failed\n\nExecuted Command:\n$sync_command";   }
 
   cvmfs_sys_file_is_regular $manifest            || { publish_failed $name; cvmfs_server_abort -f $name; die "Manifest creation failed\n\nExecuted Command:\n$sync_command"; }
 
