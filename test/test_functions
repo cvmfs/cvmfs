@@ -2414,7 +2414,7 @@ set_up_repository_gateway() {
     popd
 
     echo "  Writing configuration files"
-    sudo bash -c 'cat <<EOF > /opt/cvmfs_gateway/etc/repo.json
+    sudo bash -c 'cat <<EOF > /opt/cvmfs-gateway/etc/repo.json
 {
     "repos" : [
         {
@@ -2438,7 +2438,7 @@ plain_text key1 secret1
 EOF'
 
     echo "  Creating Mnesia schema"
-    sudo /opt/cvmfs_gateway/scripts/setup.sh
+    sudo /opt/cvmfs-gateway/scripts/setup.sh
 
     echo "  Creating test repo"
     sudo -E cvmfs_server mkfs -o `whoami` test.repo.org
@@ -2450,5 +2450,5 @@ EOF'
     sudo sed -i -e "s/CVMFS_ROOT_HASH=.*//" /var/spool/cvmfs/test.repo.org/client.local
 
     echo "  Starting repository gateway application"
-    sudo /opt/cvmfs_gateway/scripts/run_cvmfs_gateway.sh start
+    sudo /opt/cvmfs-gateway/scripts/run_cvmfs_gateway.sh start
 }
