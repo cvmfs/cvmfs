@@ -425,8 +425,7 @@ void CommandMigrate::MigrationCallback(PendingCatalog *const &data) {
   data->new_catalog_size = new_catalog_size;
 
   // Schedule the compression and upload of the catalog
-  IngestionSource* catalog = new FileIngestionSource(path);
-  spooler_->ProcessCatalog(catalog);
+  spooler_->ProcessCatalog(path);
 }
 
 
