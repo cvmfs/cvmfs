@@ -171,6 +171,21 @@ class SyncItem {
   }
 
  protected:
+  /**
+   * create a new SyncItem
+   * Note: SyncItems cannot be created by any using code. SyncUnion will take
+   *       care of their creating through a factory method to make sure they
+   *       are initialised correctly (whiteout, hardlink handling, ...)
+   *
+   * @param dirPath the RELATIVE path to the file
+   * @param filename the name of the file ;-)
+   * @param entryType well...
+   */
+  SyncItem(const std::string  &relative_parent_path,
+           const std::string  &filename,
+           const SyncUnion    *union_engine,
+           const SyncItemType  entry_type);
+
   inline platform_stat64 GetUnionStat() const {
     StatUnion();
     return union_stat_.stat;
@@ -209,23 +224,6 @@ class SyncItem {
     return rdonly_type_ == expected_type;
   }
 
-  mutable SyncItemType rdonly_type_;
-
-  /**
-   * create a new SyncItem
-   * Note: SyncItems cannot be created by any using code. SyncUnion will take
-   *       care of their creating through a factory method to make sure they
-   *       are initialised correctly (whiteout, hardlink handling, ...)
-   *
-   * @param dirPath the RELATIVE path to the file
-   * @param filename the name of the file ;-)
-   * @param entryType well...
-   */
-  SyncItem(const std::string  &relative_parent_path,
-           const std::string  &filename,
-           const SyncUnion    *union_engine,
-           const SyncItemType  entry_type);
-
   /**
    * Structure to cache stat calls to the different file locations.
    */
@@ -251,6 +249,7 @@ class SyncItem {
     platform_stat64 stat;
   };
 
+  mutable SyncItemType rdonly_type_;
   mutable EntryStat scratch_stat_;
 
  private:
