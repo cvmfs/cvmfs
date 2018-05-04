@@ -1,7 +1,7 @@
 CVMFS Repository Gateway
 ========================
 
-Build status: [![build status](https://travis-ci.org/cvmfs/cvmfs_gateway.svg?branch=master)](https://travis-ci.org/cvmfs/cvmfs_gateway)
+Build status: [![build status](https://travis-ci.org/cvmfs/cvmfs-gateway.svg?branch=master)](https://travis-ci.org/cvmfs/cvmfs-gateway)
 
 The CVMFS repository gateway is part of the CernVM File System.
 
