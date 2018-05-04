@@ -47,28 +47,19 @@ cvmfs_server_ingest_tarball() {
   name=$(echo $name | cut -d'/' -f1)
 
   if [ x"$base_dir" = "x" ]; then
-    die "Please set the base directory where to extract the tarball, use -b \$BASE_DIR or --base_dir \$BASE_DIR"
+    { cvmfs_server_abort -f $name; \
+      die "Please set the base directory where to extract the tarball, use -b \$BASE_DIR or --base_dir \$BASE_DIR"; }
   fi
   if [ x"$tar_file" = "x" ]; then
-    die "Please provide the tarball to extract, use -t \$TARBALL_PATH or --tar_file \$TARBALL_PATH"
+    { cvmfs_server_abort -f $name; \
+      die "Please provide the tarball to extract, use -t \$TARBALL_PATH or --tar_file \$TARBALL_PATH"; }
   fi
 
-  load_repo_config $name
+
+  cvmfs_server_transaction $name || die "Impossible to start a transaction"
 
   upstream=$CVMFS_UPSTREAM_STORAGE
   upstream_type=$(get_upstream_type $upstream)
-
-
-  is_stratum0 $name   || die "This is not a stratum 0 repository"
-  is_publishing $name && die "Another publish process is active for $name"
-  if [ x"$upstream_type" = xgw ]; then
-      health_check -g -r $name
-  else
-      health_check -r $name
-  fi
-
-  user=$CVMFS_USER
-  gw_key_file=/etc/cvmfs/keys/${name}.gw
   spool_dir=$CVMFS_SPOOL_DIR
   scratch_dir="${spool_dir}/scratch/current"
   stratum0=$CVMFS_STRATUM0
@@ -83,27 +74,25 @@ cvmfs_server_ingest_tarball() {
     fi
   fi
 
-  is_owner_or_root $name ||  die "Permission denied: Repository $name is owned by $user"
-  check_repository_compatibility $name
-  check_url "${CVMFS_STRATUM0}/.cvmfspublished" 20 ||  die "Repository unavailable under $CVMFS_STRATUM0"
-  check_expiry $name $stratum0   || die "Repository whitelist for $name is expired!"
-  is_in_transaction $name        && die "Repository $name is already in a transaction"
 
-  [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || die "Open writable file descriptors on $name"
-  is_cwd_on_path "/cvmfs/$name" && die "Current working directory is in /cvmfs/$name.  Please release, e.g. by 'cd \$HOME'." || true
-  gc_timespan="$(get_auto_garbage_collection_timespan $name)" || die
+  [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || { cvmfs_server_abort -f $name; die "Open writable file descriptors on $name"; }
+  is_cwd_on_path "/cvmfs/$name" && { cvmfs_server_abort -f $name; die "Current working directory is in /cvmfs/$name.  Please release, e.g. by 'cd \$HOME'."; } || true
+  gc_timespan="$(get_auto_garbage_collection_timespan $name)" || { cvmfs_server_abort -f $name; die; }
   if [ x"$manual_revision" != x"" ]; then
     if [ "x$(echo "$manual_revision" | tr -cd 0-9)" != "x$manual_revision" ]; then
+      cvmfs_server_abort -f $name
       die "Invalid revision number: $manual_revision"
     fi
     local revision_number=$(attr -qg revision /var/spool/cvmfs/${name}/rdonly)
     if [ $manual_revision -le $revision_number ]; then
+      cvmfs_server_abort -f $name
       die "Current revision '$revision_number' is ahead of manual revision number '$manual_revision'."
     fi
   fi
 
   if is_checked_out $name; then
     if [ x"$tag_name" = "x" ]; then
+      cvmfs_server_abort -f $name
       die "Publishing a checked out revision requires a tag name"
     fi
   else
@@ -119,7 +108,7 @@ cvmfs_server_ingest_tarball() {
     fi
 
     local auto_tag_cleanup_list=
-    auto_tag_cleanup_list="$(filter_auto_tags $name)" || die "failed to determine outdated auto tags on $name"
+    auto_tag_cleanup_list="$(filter_auto_tags $name)" || { cvmfs_server_abort -f $name; die "failed to determine outdated auto tags on $name"; }
   fi
 
 
@@ -203,7 +192,7 @@ cvmfs_server_ingest_tarball() {
 
   # ---> do it! (from here on we are changing things)
   publish_before_hook $name
-  $user_shell "$dirtab_command" || die "Failed to apply .cvmfsdirtab"
+  $user_shell "$dirtab_command" || { cvmfs_server_abort -f $name; die "Failed to apply .cvmfsdirtab"; }
 
   # check if we have open file descriptors on /cvmfs/<name>
   local use_fd_fallback=0
@@ -211,9 +200,9 @@ cvmfs_server_ingest_tarball() {
 
   publish_starting $name
 
-  $user_shell "$ingest_tarball_command" || { publish_failed $name; die "Synchronization failed\n\nExecuted Command:\n$sync_command";   }
+  $user_shell "$ingest_tarball_command" || { publish_failed $name; cvmfs_server_abort -f $name; die "Synchronization failed\n\nExecuted Command:\n$sync_command";   }
 
-  cvmfs_sys_file_is_regular $manifest            || { publish_failed $name; die "Manifest creation failed\n\nExecuted Command:\n$sync_command"; }
+  cvmfs_sys_file_is_regular $manifest            || { publish_failed $name; cvmfs_server_abort -f $name; die "Manifest creation failed\n\nExecuted Command:\n$sync_command"; }
 
   local branch_hash=
   local trunk_hash=$(grep "^C" $manifest | tr -d C)
@@ -225,7 +214,7 @@ cvmfs_server_ingest_tarball() {
     sign_manifest $name $manifest "" true
     # Replace throw-away manifest with upstream copy
     get_raw_manifest $name > $manifest
-    cvmfs_sys_file_is_empty $manifest && die "failed to reload manifest"
+    cvmfs_sys_file_is_empty $manifest && { cvmfs_server_abort -f $name; die "failed to reload manifest"; }
   fi
 
   if [ x"$upstream_type" = xgw ]; then
@@ -263,8 +252,9 @@ cvmfs_server_ingest_tarball() {
     echo "Removing outdated automatically generated tags for $name..."
     /bin/sh $tag_remove_cmd_file || \
       { rm -f $tag_remove_cmd_file; publish_failed $name; \
-        die "Removing tags failed\n\nExecuted Command:\n/bin/sh \
-        $tag_remove_cmd_file"; }
+        cvmfs_server_abort -f $name; \
+        die "Removing tags failed\n\nExecuted Command:\n \
+        /bin/sh $tag_remove_cmd_file"; }
     rm -f $tag_remove_cmd_file
     # write intermediate history hash to reflog
     sign_manifest $name $manifest "" true
@@ -272,14 +262,14 @@ cvmfs_server_ingest_tarball() {
 
   # add a tag for the new revision
   echo "Tagging $name"
-  $user_shell "$tag_command" || { publish_failed $name; die "Tagging failed\n\nExecuted Command:\n$tag_command";  }
+  $user_shell "$tag_command" || { publish_failed $name; cvmfs_server_abort -f $name; die "Tagging failed\n\nExecuted Command:\n$tag_command";  }
 
   if [ "x$sync_command_virtual_dir" != "x" ]; then
     # write intermediate catalog hash and history to reflog
     sign_manifest $name $manifest "" true
-    $user_shell "$sync_command_virtual_dir" || { publish_failed $name; die "Editing .cvmfs failed\n\nExecuted Command:\n$sync_command_virtual_dir";  }
+    $user_shell "$sync_command_virtual_dir" || { publish_failed $name; cvmfs_server_abort -f $name; die "Editing .cvmfs failed\n\nExecuted Command:\n$sync_command_virtual_dir";  }
     local trunk_hash=$(grep "^C" $manifest | tr -d C)
-    $user_shell "$tag_command_undo_tags" || { publish_failed $name; die "Creating undo tags\n\nExecuted Command:\n$tag_command_undo_tags";  }
+    $user_shell "$tag_command_undo_tags" || { publish_failed $name; cvmfs_server_abort -f $name; die "Creating undo tags\n\nExecuted Command:\n$tag_command_undo_tags";  }
   fi
 
   # finalizing transaction
@@ -288,8 +278,8 @@ cvmfs_server_ingest_tarball() {
 
   # committing newly created revision
   echo "Signing new manifest"
-  sign_manifest $name $manifest      || { publish_failed $name; die "Signing failed"; }
-  set_ro_root_hash $name $trunk_hash || { publish_failed $name; die "Root hash update failed"; }
+  sign_manifest $name $manifest      || { publish_failed $name; cvmfs_server_abort -f $name; die "Signing failed"; }
+  set_ro_root_hash $name $trunk_hash || { publish_failed $name; cvmfs_server_abort -f $name; die "Root hash update failed"; }
   if is_checked_out $name; then
     rm -f /var/spool/cvmfs/${name}/checkout
     echo "Reset to trunk on default branch"
@@ -304,7 +294,7 @@ cvmfs_server_ingest_tarball() {
              $dry_run    \
              ""          \
              "0"         \
-             -z $gc_timespan      || { local err=$?; publish_failed $name; die "Garbage collection failed ($err)"; }
+             -z $gc_timespan      || { local err=$?; publish_failed $name; cvmfs_server_abort -f $name; die "Garbage collection failed ($err)"; }
   fi
 
   # check again for open file descriptors (potential race condition)
@@ -318,7 +308,7 @@ cvmfs_server_ingest_tarball() {
   fi
 
   # remount the repository
-  remount_repo  $name $use_fd_fallback
+  close_transaction $name $use_fd_fallback
   publish_after_hook $name
   publish_succeeded  $name
 
