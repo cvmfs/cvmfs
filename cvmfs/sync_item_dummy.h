@@ -41,7 +41,7 @@ class SyncItemDummyDir : public SyncItem {
   }
 
  private:
-  mode_t kPermision = S_IFDIR | S_IRUSR | S_IWUSR | S_IXUSR;
+  static const mode_t kPermision = S_IFDIR | S_IRUSR | S_IWUSR | S_IXUSR;
 };
 
 catalog::DirectoryEntryBase SyncItemDummyDir::CreateBasicCatalogDirent() const {
