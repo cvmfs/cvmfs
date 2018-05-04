@@ -30,7 +30,7 @@ elif [ x"$action" = xstop ]; then
     pkill epmd
     echo "CVMFS repository gateway stopped."
 elif [ x"$action" = xreload ]; then
-    $SCRIPT_LOCATION/../bin/cvmfs_gateway escript scripts/reload-repo-config.escript
+    $SCRIPT_LOCATION/../bin/cvmfs_gateway escript scripts/reload_repo_config.escript
     echo "CVMFS repository gateway configuration reloaded."
 elif [ x"$action" = xrestart ]; then
     $SCRIPT_LOCATION/../bin/cvmfs_gateway stop
