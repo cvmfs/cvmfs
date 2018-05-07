@@ -99,7 +99,7 @@ int main(int argc, char **argv) {
   command_list.push_back(new swissknife::CommandGc());
   command_list.push_back(new swissknife::CommandReconstructReflog());
   command_list.push_back(new swissknife::CommandLease());
-  command_list.push_back(new swissknife::IngestTarball());
+  command_list.push_back(new swissknife::Ingest());
 
   if (argc < 2) {
     Usage();
