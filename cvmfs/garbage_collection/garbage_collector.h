@@ -38,6 +38,7 @@
 
 #include "catalog_traversal.h"
 #include "garbage_collection/hash_filter.h"
+#include "statistics.h"
 #include "upload_facility.h"
 
 template<class CatalogTraversalT, class HashFilterT>
@@ -66,7 +67,8 @@ class GarbageCollector {
       , keep_history_timestamp(kNoTimestamp)
       , dry_run(false)
       , verbose(false)
-      , deleted_objects_logfile(NULL) {}
+      , deleted_objects_logfile(NULL)
+      , statistics(NULL) {}
 
     bool has_deletion_log() const { return deleted_objects_logfile != NULL; }
 
@@ -78,6 +80,7 @@ class GarbageCollector {
     bool                       dry_run;
     bool                       verbose;
     FILE                      *deleted_objects_logfile;
+    perf::Statistics          *statistics;
   };
 
  public:
