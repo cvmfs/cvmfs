@@ -1,3 +1,9 @@
+0.2.5:
+  * Renaming project to "cvmfs-gateway" - this name is now used in user facing
+    locations
+  * Package signing bug on Ubuntu is solved by updating signing tool
+    (dpkg-sig) to the latest stable version
+
 0.2.4:
   * Enable package signing for SLC6 and CC7 (currently the signing doesn't
     work on Ubuntu 16.04 - see CVM-1525)
