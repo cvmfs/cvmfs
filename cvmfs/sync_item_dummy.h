@@ -19,7 +19,7 @@ namespace publish {
  * tarball, where the files are not extracted in order (root to leaves) but in a
  * random fashion.
  */
-class SyncItemDummyDir : public SyncItem {
+class SyncItemDummyDir : public SyncItemNative {
   friend class SyncUnionTarball;
 
  public:
@@ -30,7 +30,8 @@ class SyncItemDummyDir : public SyncItem {
   SyncItemDummyDir(const std::string &relative_parent_path,
                    const std::string &filename, const SyncUnion *union_engine,
                    const SyncItemType entry_type)
-      : SyncItem(relative_parent_path, filename, union_engine, entry_type) {
+      : SyncItemNative(relative_parent_path, filename, union_engine,
+                       entry_type) {
     assert(kItemDir == entry_type);
 
     scratch_stat_.obtained = true;

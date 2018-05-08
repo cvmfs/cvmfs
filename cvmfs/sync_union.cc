@@ -31,7 +31,8 @@ SharedPtr<SyncItem> SyncUnion::CreateSyncItem(
     const std::string &relative_parent_path, const std::string &filename,
     const SyncItemType entry_type) const {
   SharedPtr<SyncItem> entry = SharedPtr<SyncItem>(
-      new SyncItem(relative_parent_path, filename, this, entry_type));
+      new SyncItemNative(relative_parent_path, filename, this, entry_type));
+
   PreprocessSyncItem(entry);
   if (entry_type == kItemFile) {
     entry->SetExternalData(mediator_->IsExternalData());
