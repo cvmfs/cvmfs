@@ -23,6 +23,8 @@ namespace publish {
 
 SyncItem::SyncItem() :
   rdonly_type_(static_cast<SyncItemType>(0)),
+  graft_size_(-1),
+  scratch_type_(static_cast<SyncItemType>(0)),
   union_engine_(NULL),
   whiteout_(false),
   opaque_(false),
@@ -32,15 +34,16 @@ SyncItem::SyncItem() :
   graft_marker_present_(false),
   external_data_(false),
   graft_chunklist_(NULL),
-  graft_size_(-1),
-  scratch_type_(static_cast<SyncItemType>(0)),
   compression_algorithm_(zlib::kZlibDefault) {}
 
-SyncItem::SyncItem(const string       &relative_parent_path,
-                   const string       &filename,
+SyncItem::SyncItem(const std::string  &relative_parent_path,
+                   const std::string  &filename,
                    const SyncUnion    *union_engine,
                    const SyncItemType entry_type) :
   rdonly_type_(kItemUnknown),
+  filename_(filename),
+  graft_size_(-1),
+  scratch_type_(entry_type),
   union_engine_(union_engine),
   whiteout_(false),
   opaque_(false),
@@ -50,16 +53,9 @@ SyncItem::SyncItem(const string       &relative_parent_path,
   graft_marker_present_(false),
   external_data_(false),
   relative_parent_path_(relative_parent_path),
-  filename_(filename),
   graft_chunklist_(NULL),
-  graft_size_(-1),
-  scratch_type_(entry_type),
-  compression_algorithm_(zlib::kZlibDefault)
-{
+  compression_algorithm_(zlib::kZlibDefault) {
   content_hash_.algorithm = shash::kAny;
-  if (entry_type != kItemTarfile) {
-    CheckMarkerFiles();
-  }
 }
 
 SyncItem::~SyncItem() {
@@ -95,7 +91,7 @@ SyncItemType SyncItem::GetRdOnlyFiletype() const {
 }
 
 
-SyncItemType SyncItem::GetScratchFiletype() const {
+SyncItemType SyncItemNative::GetScratchFiletype() const {
   StatScratch();
   if (scratch_stat_.error_code != 0) {
     PrintWarning("Failed to stat() '" + GetRelativePath() + "' in scratch. "
@@ -104,6 +100,15 @@ SyncItemType SyncItem::GetScratchFiletype() const {
   }
 
   return GetGenericFiletype(scratch_stat_);
+}
+
+bool SyncItemNative::IsType(const SyncItemType expected_type) const {
+  if (filename_.substr(0, 12) == ".cvmfsgraft-") {
+    scratch_type_ = kItemMarker;
+  } else if (scratch_type_ == kItemUnknown) {
+    scratch_type_ = GetScratchFiletype();
+  }
+  return scratch_type_ == expected_type;
 }
 
 void SyncItem::MarkAsWhiteout(const std::string &actual_filename) {
@@ -161,7 +166,7 @@ uint64_t SyncItem::GetUnionInode() const {
   return union_stat_.stat.st_ino;
 }
 
-IngestionSource *SyncItem::CreateIngestionSource() const {
+IngestionSource *SyncItemNative::CreateIngestionSource() const {
   return new FileIngestionSource(GetUnionPath());
 }
 
@@ -175,7 +180,7 @@ void SyncItem::StatGeneric(const string  &path,
 }
 
 
-catalog::DirectoryEntryBase SyncItem::CreateBasicCatalogDirent() const {
+catalog::DirectoryEntryBase SyncItemNative::CreateBasicCatalogDirent() const {
   catalog::DirectoryEntryBase dirent;
 
   // inode and parent inode is determined at runtime of client
