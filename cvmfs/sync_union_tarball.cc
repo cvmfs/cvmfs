@@ -37,7 +37,6 @@ SyncUnionTarball::SyncUnionTarball(AbstractSyncMediator *mediator,
       base_directory_(base_directory),
       to_delete_(to_delete),
       read_archive_signal_(new Signal) {
-  read_archive_signal_->Wakeup();
 }
 
 SyncUnionTarball::~SyncUnionTarball() { delete read_archive_signal_; }
@@ -80,6 +79,7 @@ bool SyncUnionTarball::Initialize() {
  * actually need to read data from them.
  */
 void SyncUnionTarball::Traverse() {
+  read_archive_signal_->Wakeup();
   assert(this->IsInitialized());
 
   /*
