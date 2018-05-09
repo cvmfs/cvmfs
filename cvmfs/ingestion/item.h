@@ -47,8 +47,8 @@ class FileItem : SingleCopy {
 
   static FileItem *CreateQuitBeacon() {
     std::string quit_marker = std::string(1, kQuitBeaconMarker);
-    UniquePtr<FileIngestionSource> source(new FileIngestionSource(quit_marker));
-    return new FileItem(source.Release());
+    FileIngestionSource* source = new FileIngestionSource(quit_marker);
+    return new FileItem(source);
   }
   bool IsQuitBeacon() {
     return (path().length() == 1) && (path()[0] == kQuitBeaconMarker);
