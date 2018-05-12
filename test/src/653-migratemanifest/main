@@ -33,9 +33,31 @@ EOF
   local mytag_before="$(cvmfs_server tag -lx $CVMFS_TEST_REPO | grep mytag)"
   local trunk_before="$(cvmfs_server tag -lx $CVMFS_TEST_REPO | grep HEAD)"
 
+  echo "*** add meta-info"
+  local json_file="meta-info.json"
+  cat >> $json_file << EOF
+{
+  "administrator" : "CernVM Admin",
+  "email"         : "dont.send.me.spam@cern.ch",
+  "organisation"  : "CERN",
+  "description"   : "This is just a test repository"
+}
+EOF
+  cvmfs_server update-repoinfo -f $json_file $CVMFS_TEST_REPO || return 40
+  cvmfs_swissknife info -r $(get_repo_url $CVMFS_TEST_REPO) -M > meta-info.before || return 41
+  diff $json_file meta-info.before || return 42
+
   echo -n "*** get root catalog hash before catalog-chown... "
   local root_clg_before="$(get_current_root_catalog $CVMFS_TEST_REPO)"
   echo "--> $root_clg_before"
+
+  echo -n "*** get revision before catalog-chown... "
+  local revision_before=$(cvmfs_swissknife info -v -r $(get_repo_url $CVMFS_TEST_REPO))
+  echo "--> $revision_before"
+
+  echo -n "*** get timestamp before catalog-chown... "
+  local timestamp_before=$(cvmfs_swissknife info -t -r $(get_repo_url $CVMFS_TEST_REPO))
+  echo "--> $timestamp_before"
 
   echo "*** run the chown on catalog level"
   sudo cvmfs_server catalog-chown -u uid_map -g gid_map $CVMFS_TEST_REPO || return 3
@@ -48,6 +70,20 @@ EOF
 
   echo "*** check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo -n "*** check revision... "
+  local revision_after=$(cvmfs_swissknife info -v -r $(get_repo_url $CVMFS_TEST_REPO))
+  echo "--> $revision_after"
+  [ $revision_after -gt $revision_before ] || return 37
+
+  echo -n "*** check timestamp... "
+  local timestamp_after=$(cvmfs_swissknife info -t -r $(get_repo_url $CVMFS_TEST_REPO))
+  echo "--> $timestamp_after"
+  [ $timestamp_after -gt $timestamp_before ] || return 38
+
+  echo "*** check meta-info"
+  cvmfs_swissknife info -r $(get_repo_url $CVMFS_TEST_REPO) -M > meta-info.after || return 35
+  diff meta-info.after meta-info.before || return 36
 
   echo "*** check tag list"
   cvmfs_server tag -lx $CVMFS_TEST_REPO
