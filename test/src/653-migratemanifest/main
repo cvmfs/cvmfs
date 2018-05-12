@@ -59,8 +59,14 @@ EOF
   local timestamp_before=$(cvmfs_swissknife info -t -r $(get_repo_url $CVMFS_TEST_REPO))
   echo "--> $timestamp_before"
 
+  echo "*** manifest before"
+  cvmfs_swissknife info -R -r $(get_repo_url $CVMFS_TEST_REPO)
+
   echo "*** run the chown on catalog level"
   sudo cvmfs_server catalog-chown -u uid_map -g gid_map $CVMFS_TEST_REPO || return 3
+
+  echo "*** manifest after"
+  cvmfs_swissknife info -R -r $(get_repo_url $CVMFS_TEST_REPO)
 
   echo -n "*** get root catalog hash after catalog-chown... "
   local root_clg_after="$(get_current_root_catalog $CVMFS_TEST_REPO)"
@@ -79,7 +85,7 @@ EOF
   echo -n "*** check timestamp... "
   local timestamp_after=$(cvmfs_swissknife info -t -r $(get_repo_url $CVMFS_TEST_REPO))
   echo "--> $timestamp_after"
-  [ $timestamp_after -gt $timestamp_before ] || return 38
+  [ $timestamp_after -ge $timestamp_before ] || return 38
 
   echo "*** check meta-info"
   cvmfs_swissknife info -r $(get_repo_url $CVMFS_TEST_REPO) -M > meta-info.after || return 35

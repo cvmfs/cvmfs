@@ -353,6 +353,13 @@ class CommandMigrate : public Command {
   bool GenerateNestedCatalogMarkerChunk();
   void CreateNestedCatalogMarkerDirent(const shash::Any &content_hash);
 
+  void UploadHistoryClosure(const upload::SpoolerResult &result,
+                            Future<shash::Any> *hash);
+  bool UpdateUndoTags(PendingCatalog *root_catalog,
+                      unsigned revision,
+                      time_t timestamp,
+                      shash::Any *history_hash);
+
  private:
   unsigned int           file_descriptor_limit_;
   CatalogStatisticsList  catalog_statistics_list_;
