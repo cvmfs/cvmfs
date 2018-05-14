@@ -70,11 +70,11 @@ PayloadProcessor::Result PayloadProcessor::Process(
 
   assert(pending_files_.empty());
 
-  Finalize();
+  Result res = Finalize();
 
   deserializer.UnregisterListeners();
 
-  return kSuccess;
+  return res;
 }
 
 void PayloadProcessor::ConsumerEventCallback(
@@ -184,9 +184,19 @@ PayloadProcessor::Result PayloadProcessor::Initialize() {
   return kSuccess;
 }
 
-void PayloadProcessor::Finalize() {
+PayloadProcessor::Result PayloadProcessor::Finalize() {
   spooler_->WaitForUpload();
   temp_dir_.Destroy();
+
+  const unsigned num_errors = spooler_->GetNumberOfErrors();
+  if (num_errors > 0) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "PayloadProcessor - error: Spooler - %d upload(s) failed.",
+             num_errors);
+    return kSpoolerError;
+  }
+
+  return kSuccess;
 }
 
 void PayloadProcessor::Upload(const std::string& source,
