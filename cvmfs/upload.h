@@ -121,6 +121,7 @@
 #include "upload_spooler_definition.h"
 #include "upload_spooler_result.h"
 #include "util/pointer.h"
+#include "util_concurrency.h"
 
 namespace upload {
 
