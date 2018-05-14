@@ -79,7 +79,6 @@ void TaskRead::Process(FileItem *item) {
       }
     }
   } while (nbytes > 0);
-
 }
 
 
