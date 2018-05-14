@@ -62,10 +62,11 @@ void TaskRead::Process(FileItem *item) {
     BlockItem *block_item = new BlockItem(tag, allocator_);
     block_item->SetFileItem(item);
     if (nbytes == 0) {
+      item->Close();
       block_item->MakeStop();
     } else {
-      block_item->MakeDataCopy(
-        reinterpret_cast<unsigned char *>(buffer), nbytes);
+      block_item->MakeDataCopy(reinterpret_cast<unsigned char *>(buffer),
+                               nbytes);
     }
     tubes_out_->Dispatch(block_item);
 
@@ -79,7 +80,6 @@ void TaskRead::Process(FileItem *item) {
     }
   } while (nbytes > 0);
 
-  item->Close();
 }
 
 
