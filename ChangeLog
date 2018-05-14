@@ -1,3 +1,6 @@
+2.5.1:
+  * Fix incomplete manifest after catalog migration operations (CVM-1534) 
+
 2.5.0:
   * Check for autofs in cvmfs_server rmfs only for stratum 0s (CVM-1490)
   * React on change of DNS server on Linux (CVM-496)
