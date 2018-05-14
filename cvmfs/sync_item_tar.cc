@@ -104,6 +104,7 @@ catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
   dirent.inode_ = catalog::DirectoryEntry::kInvalidInode;
 
   dirent.linkcount_ = this->tar_stat_.st_nlink;
+  if (dirent.linkcount_ < 1) dirent.linkcount_ = 1;
 
   dirent.mode_ = this->tar_stat_.st_mode;
   dirent.uid_ = this->tar_stat_.st_uid;
