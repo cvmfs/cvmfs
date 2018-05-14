@@ -146,6 +146,7 @@ class SqliteHistory : public History {
   bool OwnsDatabaseFile() const {
     return database_.IsValid() && database_->OwnsFile();
   }
+  std::string filename() const { return database_->filename(); }
 
  protected:
   static SqliteHistory* Open(const std::string &file_name,

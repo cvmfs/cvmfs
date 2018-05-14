@@ -1,0 +1,33 @@
+
+cvmfs_test_name="DNS roaming"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  echo "*** mounting sft.cern.ch"
+  cvmfs_mount sft.cern.ch "CVMFS_DNS_ROAMING=ON" || return 1
+
+  echo "*** getting default value of DNS server (should be unset)"
+  local dns_server_before=$(sudo cvmfs_talk -i sft.cern.ch nameserver get)
+  echo "    DNS server before: ${dns_server_before}"
+  [ x"${dns_server_before}" = x"DNS server not set." ] || return 2
+
+  echo "*** backing up /etc/resolv.conf"
+  sudo cp -v /etc/resolv.conf ./resolv.conf.bak
+
+  echo "*** setting new nameserver in /etc/resolv.conf"
+  sudo sh -c 'echo "nameserver 6.6.6.6" > /etc/resolv.conf'
+
+  echo "*** checking new DNS server address for CVMFS mount"
+  sleep 5
+  local dns_server_after=$(sudo cvmfs_talk -i sft.cern.ch nameserver get)
+  echo "    DNS server after: ${dns_server_after}"
+
+  echo "*** restore original resolv.conf"
+  sudo cp -v ./resolv.conf.bak /etc/resolv.conf
+
+  [ x"${dns_server_after}" = x"DNS server address: 6.6.6.6" ] || return 3
+
+  return 0
+}
+

@@ -37,6 +37,7 @@ sub usage {
   print "  revision               gets the repository revision             \n";
   print "  max ttl info           gets the maximum ttl                     \n";
   print "  max ttl set <minutes>  sets the maximum ttl                     \n";
+  print "  nameserver get         get the DNS server                       \n";
   print "  nameserver set <host>  sets a DNS server                        \n";
   print "  host info              get host chain and their rtt,            \n";
   print "                         if already probed                        \n";

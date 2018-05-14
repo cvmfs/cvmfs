@@ -330,6 +330,12 @@ void *TalkManager::MainResponder(void *data) {
         mount_point->SetMaxTtlMn(max_ttl);
         talk_mgr->Answer(con_fd, "OK\n");
       }
+    } else if (line.substr(0, 14) == "nameserver get") {
+      const string dns_server = mount_point->download_mgr()->GetDnsServer();
+      const string reply = !dns_server.empty() ?
+        std::string("DNS server address: ") + dns_server + "\n":
+        std::string("DNS server not set.\n");
+      talk_mgr->Answer(con_fd, reply);
     } else if (line.substr(0, 14) == "nameserver set") {
       if (line.length() < 16) {
         talk_mgr->Answer(con_fd, "Usage: nameserver set <host>\n");

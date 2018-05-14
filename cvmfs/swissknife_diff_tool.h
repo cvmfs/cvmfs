@@ -9,6 +9,7 @@
 
 #include "catalog_diff_tool.h"
 #include "catalog_mgr_ro.h"
+#include "file_chunk.h"
 #include "history.h"
 #include "shortstring.h"
 
@@ -38,13 +39,15 @@ class DiffTool : public CatalogDiffTool<catalog::SimpleCatalogManager> {
 
   void ReportAddition(const PathString &path,
                       const catalog::DirectoryEntry &entry,
-                      const XattrList & /*xattrs*/);
+                      const XattrList & /*xattrs*/,
+                      const FileChunkList& /*chunks*/);
   void ReportRemoval(const PathString &path,
                      const catalog::DirectoryEntry &entry);
   void ReportModification(const PathString &path,
                           const catalog::DirectoryEntry &entry_from,
                           const catalog::DirectoryEntry &entry_to,
-                          const XattrList & /*xattrs*/);
+                          const XattrList & /*xattrs*/,
+                          const FileChunkList& /*chunks*/);
 
   history::History::Tag old_tag_;
   history::History::Tag new_tag_;
