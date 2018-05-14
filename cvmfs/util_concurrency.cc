@@ -36,8 +36,9 @@ Signal::Signal() : fired_(false) {
 
 
 Signal::~Signal() {
-  pthread_cond_destroy(&signal_);
-  pthread_mutex_destroy(&lock_);
+  assert(IsSleeping());
+  assert(0 == pthread_cond_destroy(&signal_));
+  assert(0 == pthread_mutex_destroy(&lock_));
 }
 
 
