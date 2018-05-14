@@ -46,6 +46,7 @@
                              worker_died |
                              worker_timeout |
                              path_violation |
+                             spooler_error |
                              other_error}.
 -type submit_payload_result() :: {ok, payload_added} |
                                  {ok, payload_added, lease_ended} |
@@ -375,6 +376,8 @@ p_submit_payload({LeaseToken, Payload, Digest, HeaderSize}, Secret, WorkerPort, 
                                     {ok, payload_added};
                                 #{<<"status">> := <<"error">>, <<"reason">> := <<"path_violation">>} ->
                                     {error, path_violation};
+                                #{<<"status">> := <<"error">>, <<"reason">> := <<"spooler_error">>} ->
+                                    {error, spooler_error};
                                 #{<<"status">> := <<"error">>, <<"reason">> := <<"other_error">>} ->
                                     {error, other_error}
                             end;
