@@ -187,15 +187,15 @@ cvmfs_server_ingest() {
     "
 
   if [ ! x"$tar_file" = "x" ]; then
-    ingest_tarball_command="$ingest_tarball_command -T $tar_file"
+    ingest_command="$ingest_command -T $tar_file"
   fi
 
   if [ ! x"$base_dir" = "x" ]; then
-    ingest_tarball_command="$ingest_tarball_command -B $base_dir"
+    ingest_command="$ingest_command -B $base_dir"
   fi
 
   if [ ! x"$to_delete" = "x" ]; then
-    ingest_tarball_command="$ingest_tarball_command -D $to_delete"
+    ingest_command="$ingest_command -D $to_delete"
   fi
 
 

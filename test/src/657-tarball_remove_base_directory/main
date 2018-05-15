@@ -146,11 +146,11 @@ cvmfs_run_test() {
   #===========================================================================#
 
 	echo "*** trying to remove a non existing file"
-	cvmfs_server ingest-tarball -d $to_keep_dir/non_existing_file.tar $CVMFS_TEST_REPO || return $?
+	cvmfs_server ingest -d $to_keep_dir/non_existing_file.tar $CVMFS_TEST_REPO || return $?
 
 	echo "*** trying to remove a single file"
 	file=$to_keep_dir/tarball_foo/a/b/c/3.txt
-	cvmfs_server ingest-tarball -d $file $CVMFS_TEST_REPO || return $?
+	cvmfs_server ingest -d $file $CVMFS_TEST_REPO || return $?
   if [ -f $file ]; then
     echo "*** Error found file $file"
     return 10
@@ -161,7 +161,7 @@ cvmfs_run_test() {
 	echo "*** trying to remove multiple file"
 	file1=$to_keep_dir/tarball_foo/a/b/c/1.txt
 	file2=$to_keep_dir/tarball_foo/a/b/c/2.txt
-	cvmfs_server ingest-tarball -d $file1 -d $file2 $CVMFS_TEST_REPO || return $?
+	cvmfs_server ingest -d $file1 -d $file2 $CVMFS_TEST_REPO || return $?
 	if [ -f $file1 ] || [ -f $file2 ]; then
     echo "*** Error found file $file1 or $file2"
     return 11
