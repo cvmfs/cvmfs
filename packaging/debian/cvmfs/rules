@@ -17,7 +17,7 @@ export DH_VERBOSE=1
 #DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
 #DEB_CONFIGURE_EXTRA_FLAGS += --libdir=\$${prefix}/lib/$(DEB_HOST_MULTIARCH)
 
-Makefile: 
+Makefile:
 	dh_testdir
 	dh_auto_configure -- -DBUILD_SERVER=yes -DBUILD_SERVER_DEBUG=yes -DBUILD_UNITTESTS=yes -DINSTALL_UNITTESTS=yes -DINSTALL_PUBLIC_KEYS=no -DBUILD_LIBCVMFS=yes -DBUILD_LIBCVMFS_CACHE=yes -DCMAKE_INSTALL_PREFIX:PATH=/usr
 
@@ -70,7 +70,7 @@ binary-arch: build install
 #       dh_installemacsen
 #       dh_installpam
 #       dh_installmime
-#	dh_installinit -- defaults 21 
+#	dh_installinit -- defaults 21
 	dh_installcron
 	dh_installman
 	dh_installinfo

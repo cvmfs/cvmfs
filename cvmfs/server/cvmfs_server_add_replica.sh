@@ -161,12 +161,6 @@ CVMFS_AUTO_GC=true
 EOF
   fi
 
-  if is_local_upstream $upstream && [ $configure_apache -eq 1 ]; then
-    ensure_enabled_apache_modules
-    create_apache_config_for_endpoint $alias_name $storage_dir "with wsgi"
-    create_apache_config_for_global_info
-    reload_apache > /dev/null
-  fi
   echo "done"
 
   if is_local_upstream $upstream; then
@@ -176,7 +170,20 @@ EOF
     echo -n "Create CernVM-FS Storage... "
     mkdir -p $storage_dir
     create_repository_skeleton $storage_dir $cvmfs_user > /dev/null
+    sync
     echo "done"
+
+    if [ $configure_apache -eq 1 ]; then
+      echo -n "Update Apache configuration... "
+      ensure_enabled_apache_modules
+      create_apache_config_for_endpoint $alias_name $storage_dir "with wsgi"
+      create_apache_config_for_global_info
+      reload_apache > /dev/null
+      touch $storage_dir/.cvmfsempty
+      wait_for_apache "${stratum1}/.cvmfsempty" || die "fail (Apache configuration)"
+      rm -f $storage_dir/.cvmfsempty
+      echo "done"
+    fi
   fi
 
   echo -n "Creating CernVM-FS Server Infrastructure... "

@@ -134,32 +134,19 @@ void FileWatcherKqueue::RemoveFilter(int fd) {
   close(fd);
 }
 
-void FileWatcherKqueue::RegisterFilter(const std::string& file_path,
-                                       EventHandler* handler) {
-  bool done = false;
-  BackoffThrottle throttle(1000, 10000, 50000);
-  while (!done) {
+int FileWatcherKqueue::TryRegisterFilter(const std::string& file_path) {
     int fd = open(file_path.c_str(), O_RDONLY);
-    if (fd == -1) {
-      LogCvmfs(kLogCvmfs, kLogDebug,
-               "FileWatcherKqueue - Cannot open file %s. Retrying.",
-               file_path.c_str());
-      throttle.Throttle();
-      continue;
+    if (fd > 0) {
+      struct kevent watch_event;
+      EV_SET(&watch_event, fd, EVFILT_VNODE, EV_ADD | EV_ENABLE | EV_CLEAR,
+             NOTE_DELETE | NOTE_WRITE | NOTE_EXTEND | NOTE_ATTRIB | NOTE_LINK |
+             NOTE_RENAME | NOTE_REVOKE,
+             0, 0);
+
+      assert(kevent(kq_, &watch_event, 1, NULL, 0, NULL) != -1);
     }
-    struct kevent watch_event;
-    EV_SET(&watch_event, fd, EVFILT_VNODE, EV_ADD | EV_ENABLE | EV_CLEAR,
-           NOTE_DELETE | NOTE_WRITE | NOTE_EXTEND | NOTE_ATTRIB | NOTE_LINK |
-               NOTE_RENAME | NOTE_REVOKE,
-           0, 0);
 
-    assert(kevent(kq_, &watch_event, 1, NULL, 0, NULL) != -1);
-
-    watch_records_[fd] = WatchRecord(file_path, handler);
-
-    done = true;
-  }
-  throttle.Reset();
+    return fd;
 }
 
 }  // namespace file_watcher

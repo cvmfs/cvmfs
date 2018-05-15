@@ -8,6 +8,7 @@
 #include <string>
 
 #include "catalog_diff_tool.h"
+#include "file_chunk.h"
 #include "params.h"
 #include "util/pointer.h"
 
@@ -83,13 +84,15 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
  protected:
   virtual void ReportAddition(const PathString& path,
                               const catalog::DirectoryEntry& entry,
-                              const XattrList& xattrs);
+                              const XattrList& xattrs,
+                              const FileChunkList& chunks);
   virtual void ReportRemoval(const PathString& path,
                              const catalog::DirectoryEntry& entry);
   virtual void ReportModification(const PathString& path,
                                   const catalog::DirectoryEntry& old_entry,
                                   const catalog::DirectoryEntry& new_entry,
-                                  const XattrList& xattrs);
+                                  const XattrList& xattrs,
+                                  const FileChunkList& chunks);
 
  private:
   bool CreateNewManifest(std::string* new_manifest_path);

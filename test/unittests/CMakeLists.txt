@@ -54,7 +54,6 @@ set(CVMFS_UNITTEST_FILES
   t_file_chunk.cc
   t_file_guard.cc
   t_file_sandbox.cc
-  t_file_watcher.cc
   t_fs_traversal.cc
   t_fuse_evict.cc
   t_garbage_collector.cc
@@ -257,8 +256,14 @@ if (CVMFS_BUGGY_XCODE)
   set_property(SOURCE ${CVMFS_SOURCE_DIR}/ingestion/chunk_detector.cc PROPERTY COMPILE_FLAGS -O0)
 endif(CVMFS_BUGGY_XCODE)
 
+# The FileWatcher unit test only makes sense on macOS or on Linux versions which support inotify (inotify)
 if (APPLE)
-    list(APPEND CVMFS_UNITTEST_SOURCES ${CVMFS_SOURCE_DIR}/file_watcher_kqueue.cc)
+  list(APPEND CVMFS_UNITTEST_SOURCES ${CVMFS_SOURCE_DIR}/file_watcher_kqueue.cc t_file_watcher.cc)
+else (APPLE)
+  if (CVMFS_ENABLE_INOTIFY)
+    list(APPEND CVMFS_UNITTEST_SOURCES ${CVMFS_SOURCE_DIR}/file_watcher_inotify.cc t_file_watcher.cc)
+    add_definitions(-DCVMFS_ENABLE_INOTIFY)
+  endif(CVMFS_ENABLE_INOTIFY)
 endif(APPLE)
 
 set (CVMFS_UNITTEST_DEBUG_SOURCES ${CVMFS_UNITTEST_SOURCES})
