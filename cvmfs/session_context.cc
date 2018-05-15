@@ -14,7 +14,7 @@
 #include "util/string.h"
 
 namespace {
-const size_t kMaxResultQueueSize = 1000000;
+const size_t kMaxQueueSize = 10;
 }
 
 namespace upload {
@@ -67,7 +67,7 @@ size_t RecvCB(void* buffer, size_t size, size_t nmemb, void* userp) {
 }
 
 SessionContextBase::SessionContextBase()
-    : upload_results_(kMaxResultQueueSize, kMaxResultQueueSize),
+    : upload_results_(kMaxQueueSize, kMaxQueueSize),
       api_url_(),
       session_token_(),
       key_id_(),
@@ -255,7 +255,7 @@ void SessionContextBase::Dispatch() {
 
 SessionContext::SessionContext()
     : SessionContextBase(),
-      upload_jobs_(1000000, 1000000),
+      upload_jobs_(kMaxQueueSize, kMaxQueueSize),
       worker_terminate_(),
       worker_() {}
 

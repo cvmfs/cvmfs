@@ -70,11 +70,11 @@ PayloadProcessor::Result PayloadProcessor::Process(
 
   assert(pending_files_.empty());
 
-  Finalize();
+  Result res = Finalize();
 
   deserializer.UnregisterListeners();
 
-  return kSuccess;
+  return res;
 }
 
 void PayloadProcessor::ConsumerEventCallback(
@@ -170,7 +170,9 @@ PayloadProcessor::Result PayloadProcessor::Initialize() {
   const std::string spooler_temp_dir =
       GetSpoolerTempDir(params.spooler_configuration);
   assert(!spooler_temp_dir.empty());
-  temp_dir_ = RaiiTempDir::Create(spooler_temp_dir + "/payload_processor");
+  assert(MkdirDeep(spooler_temp_dir + "/receiver", 0666, true));
+  temp_dir_ =
+      RaiiTempDir::Create(spooler_temp_dir + "/receiver/payload_processor");
 
   upload::SpoolerDefinition definition(
       params.spooler_configuration, params.hash_alg, params.compression_alg,
@@ -184,9 +186,19 @@ PayloadProcessor::Result PayloadProcessor::Initialize() {
   return kSuccess;
 }
 
-void PayloadProcessor::Finalize() {
+PayloadProcessor::Result PayloadProcessor::Finalize() {
   spooler_->WaitForUpload();
   temp_dir_.Destroy();
+
+  const unsigned num_errors = spooler_->GetNumberOfErrors();
+  if (num_errors > 0) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "PayloadProcessor - error: Spooler - %d upload(s) failed.",
+             num_errors);
+    return kSpoolerError;
+  }
+
+  return kSuccess;
 }
 
 void PayloadProcessor::Upload(const std::string& source,

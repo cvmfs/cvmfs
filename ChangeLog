@@ -2,6 +2,9 @@
   * Fix debian packaging warnings and errors
 
 2.5.1:
+  * Limit queue size of the gateway spooler to 2G
+  * Store gateway receiver's temp files in $SPOOLER_TMP/receiver (CVM-1540)
+  * Handle spooler failures gracefully in the gateway receiver (CVM-1545)
   * Fix incomplete manifest after catalog migration operations (CVM-1534) 
 
 2.5.0:
