@@ -57,7 +57,7 @@ cvmfs_run_test() {
   for d in a a/b a/b/c; do
     if [ ! -d $repo_dir/$to_remove_dir/tarball_foo/$d ]; then
       echo "*** Error not found directory: $repo_dir/$to_remove_dir/tarball_foo/$d"
-      return 1
+      return 2
     else
       echo "*** Ingested directory: $repo_dir/$to_remove_dir/tarball_foo/$d"
 
@@ -65,7 +65,7 @@ cvmfs_run_test() {
         file=$repo_dir/$to_remove_dir/tarball_foo/$d/$f.txt
         if [ ! -f $file ] || [ $(wc -c <$file) -ne 2048 ]; then
           echo "*** Error not found file: $file"
-          return 1
+          return 3
         else
           echo "*** Ingested file of size 2048 bytes: $file"
         fi
@@ -78,7 +78,7 @@ cvmfs_run_test() {
   file_size=$(wc -c <$file)
   if [ ! -f $file ] || [ $file_size -ne 5120 ]; then
     echo "*** Error not found file of size 5120: $file"
-    return 1
+    return 4
   else
     echo "*** Ingested file of size $file_size bytes: $file"
   fi
@@ -99,7 +99,7 @@ cvmfs_run_test() {
   echo "*** checking that we have actually removed the $to_remove_dir directory"
   if [ -d $repo_dir/$to_remove_dir ]; then
     echo "*** Error directory not removed $repo_dir/$to_remove_dir"
-    return 1
+    return 5
   else
     echo "*** Directory actually removed $repo_dir/$to_remove_dir"
   fi
