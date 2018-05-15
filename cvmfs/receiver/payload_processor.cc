@@ -171,7 +171,8 @@ PayloadProcessor::Result PayloadProcessor::Initialize() {
       GetSpoolerTempDir(params.spooler_configuration);
   assert(!spooler_temp_dir.empty());
   assert(MkdirDeep(spooler_temp_dir + "/receiver", 0666, true));
-  temp_dir_ = RaiiTempDir::Create(spooler_temp_dir + "/receiver/payload_processor");
+  temp_dir_ =
+      RaiiTempDir::Create(spooler_temp_dir + "/receiver/payload_processor");
 
   upload::SpoolerDefinition definition(
       params.spooler_configuration, params.hash_alg, params.compression_alg,

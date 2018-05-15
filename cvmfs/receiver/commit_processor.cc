@@ -176,7 +176,8 @@ CommitProcessor::Result CommitProcessor::Process(
       GetSpoolerTempDir(params.spooler_configuration);
   assert(!spooler_temp_dir.empty());
   assert(MkdirDeep(spooler_temp_dir + "/receiver", 0666, true));
-  const std::string temp_dir_root = spooler_temp_dir + "/receiver/commit_processor";
+  const std::string temp_dir_root =
+      spooler_temp_dir + "/receiver/commit_processor";
 
   const PathString relative_lease_path = RemoveRepoName(PathString(lease_path));
 
