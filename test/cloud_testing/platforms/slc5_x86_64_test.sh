@@ -77,6 +77,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                               -x src/004-davinci                              \
                                  src/005-asetup                               \
                                  src/007-testjobs                             \
+                                 src/079-dnsroaming                           \
                                  --                                           \
                                  src/0*                                       \
                               || retval=1

@@ -12,7 +12,6 @@
 #include "ingestion/ingestion_source.h"
 #include "item_mem.h"
 #include "smalloc.h"
-#include "util/shared_ptr.h"
 #include "util_concurrency.h"
 
 FileItem::FileItem(
@@ -25,8 +24,7 @@ FileItem::FileItem(
   shash::Suffix hash_suffix,
   bool may_have_chunks,
   bool has_legacy_bulk_chunk)
-  : path_(source->GetPath())
-  , source_(source)
+  : source_(source)
   , compression_algorithm_(compression_algorithm)
   , hash_algorithm_(hash_algorithm)
   , hash_suffix_(hash_suffix)

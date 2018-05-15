@@ -1,5 +1,5 @@
 
-cvmfs_test_name="Ingest tarball in a repo"
+cvmfs_test_name="Ingest same tarball in same location multiple times"
 cvmfs_test_autofs_on_startup=false
 
 produce_tarball() {
@@ -42,9 +42,11 @@ cvmfs_run_test() {
   echo "*** generating a tarball $tarfile"
   produce_tarball $tarfile
 
-  echo "*** ingesting the tarball in the directory $dir"
-  cvmfs_server ingest-tarball --base_dir $dir --tar_file $tarfile $CVMFS_TEST_REPO || return $?
-
+  echo "*** 1. ingesting the tarball in the directory $dir"
+  cvmfs_server ingest --base_dir $dir --tar_file $tarfile $CVMFS_TEST_REPO || return $?
+  echo "*** 2. ingesting the tarball in the directory $dir"
+  cvmfs_server ingest --base_dir $dir --tar_file $tarfile $CVMFS_TEST_REPO || return $?
+  
   echo "*** check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
 
@@ -55,7 +57,7 @@ cvmfs_run_test() {
   for d in a a/b a/b/c; do
     if [ ! -d $repo_dir/$dir/tarball_foo/$d ]; then
       echo "*** Error not found directory: $repo_dir/$dir/tarball_foo/$d"
-      return 1
+      return 2
     else
       echo "*** Ingested directory: $repo_dir/$dir/tarball_foo/$d"
 
@@ -63,7 +65,7 @@ cvmfs_run_test() {
         file=$repo_dir/$dir/tarball_foo/$d/$f.txt
         if [ ! -f $file ] || [ $(wc -c <$file) -ne 2048 ]; then
           echo "*** Error not found file: $file"
-          return 1
+          return 3
         else
           echo "*** Ingested file of size 2048 bytes: $file"
         fi
@@ -76,7 +78,7 @@ cvmfs_run_test() {
   file_size=$(wc -c <$file)
   if [ ! -f $file ] || [ $file_size -ne 5120 ]; then
     echo "*** Error not found file of size 5120: $file"
-    return 1
+    return 4
   else
     echo "*** Ingested file of size $file_size bytes: $file"
   fi

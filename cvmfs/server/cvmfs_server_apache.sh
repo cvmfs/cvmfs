@@ -29,7 +29,11 @@ request_apache_service() {
 
 reload_apache() {
   echo -n "Reloading Apache... "
-  request_apache_service reload > /dev/null || die "fail"
+  local verb=reload
+  if [ "x$CVMFS_SERVER_APACHE_RELOAD_IS_RESTART" = "xtrue" ]; then
+    verb=restart
+  fi
+  request_apache_service $verb > /dev/null || die "fail"
   echo "done"
 }
 

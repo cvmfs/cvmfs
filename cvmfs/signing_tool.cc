@@ -96,8 +96,7 @@ int SigningTool::Run(const std::string &manifest_path,
       spooler->RegisterListener(&SigningTool::CertificateUploadCallback, this);
 
   // Safe certificate (and wait for the upload through a Future)
-  IngestionSource* cert_source = new FileIngestionSource(certificate);
-  spooler->ProcessCertificate(cert_source);
+  spooler->ProcessCertificate(certificate);
   const shash::Any certificate_hash = certificate_hash_.Get();
   spooler->UnregisterListener(callback);
 
@@ -111,8 +110,7 @@ int SigningTool::Run(const std::string &manifest_path,
   if (!meta_info.empty()) {
     upload::Spooler::CallbackPtr callback =
         spooler->RegisterListener(&SigningTool::MetainfoUploadCallback, this);
-    IngestionSource* metainfo_source = new FileIngestionSource(meta_info);
-    spooler->ProcessMetainfo(metainfo_source);
+    spooler->ProcessMetainfo(meta_info);
     metainfo_hash = metainfo_hash_.Get();
     spooler->UnregisterListener(callback);
 

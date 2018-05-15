@@ -1,5 +1,5 @@
 
-cvmfs_test_name="Ingest tarball in a repo from STDIN"
+cvmfs_test_name="Ingest special files with nested catalog"
 cvmfs_test_autofs_on_startup=false
 
 produce_tarball() {
@@ -12,9 +12,11 @@ produce_tarball() {
   dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/1.txt
   dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/2.txt
   dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/3.txt
+  touch tarball_foo/a/.cvmfscatalog
   dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/b/1.txt
   dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/b/2.txt
   dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/b/3.txt
+  touch tarball_foo/a/b/.cvmfscatalog
   dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/b/c/1.txt
   dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/b/c/2.txt
   dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/b/c/3.txt
@@ -32,6 +34,7 @@ cvmfs_run_test() {
   local scratch_dir=$(pwd)
   local tarfile=$scratch_dir/tarball.tar
   local dir=tar_dir
+
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
 
   echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
@@ -43,11 +46,12 @@ cvmfs_run_test() {
   produce_tarball $tarfile
 
   echo "*** ingesting the tarball in the directory $dir"
-  cat $tarfile | cvmfs_server ingest-tarball --base_dir $dir --tar_file -- $CVMFS_TEST_REPO || return $?
+  cvmfs_server ingest --base_dir $dir --tar_file $tarfile $CVMFS_TEST_REPO || return $?
 
   echo "*** check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
 
+  echo "*** check that we actually put the files in $dir"
   if [ ! -d $repo_dir/$dir/tarball_foo ]; then
     return 1
   fi
@@ -55,7 +59,7 @@ cvmfs_run_test() {
   for d in a a/b a/b/c; do
     if [ ! -d $repo_dir/$dir/tarball_foo/$d ]; then
       echo "*** Error not found directory: $repo_dir/$dir/tarball_foo/$d"
-      return 1
+      return 2
     else
       echo "*** Ingested directory: $repo_dir/$dir/tarball_foo/$d"
 
@@ -63,7 +67,7 @@ cvmfs_run_test() {
         file=$repo_dir/$dir/tarball_foo/$d/$f.txt
         if [ ! -f $file ] || [ $(wc -c <$file) -ne 2048 ]; then
           echo "*** Error not found file: $file"
-          return 1
+          return 3
         else
           echo "*** Ingested file of size 2048 bytes: $file"
         fi
@@ -76,14 +80,29 @@ cvmfs_run_test() {
   file_size=$(wc -c <$file)
   if [ ! -f $file ] || [ $file_size -ne 5120 ]; then
     echo "*** Error not found file of size 5120: $file"
-    return 1
+    return 4
   else
     echo "*** Ingested file of size $file_size bytes: $file"
   fi
 
-  if [ $file_size -eq 5120 ]; then
-    echo "*** It compare well"
-  fi
+  echo "*** Checking catalogs been created"
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO
+
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$" || return 5
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$dir/tarball_foo/a$" || return 6
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$dir/tarball_foo/a/b$"  || return 7
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/not/existing/catalog$"  && return 8
+
+  local different_dir="different_dir"
+  echo "*** ingesting the same tarball in a different directory $dir"
+  cvmfs_server ingest --base_dir $different_dir --tar_file $tarfile --delete $dir $CVMFS_TEST_REPO || return $?
+
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$" || die "Not found catalog /"
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$different_dir/tarball_foo/a$" || return 9
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$different_dir/tarball_foo/a/b$"  || return 10
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$dir/tarball_foo/a$" && return 11
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$dir/tarball_foo/a/b$"  && return 12
+
 
   return 0
 }

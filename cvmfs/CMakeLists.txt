@@ -76,9 +76,14 @@ set (CVMFS_CLIENT_SOURCES
   xattr.cc
   )
 
-if (MACOSX)
+if (APPLE)
   list(APPEND CVMFS_CLIENT_SOURCES file_watcher_kqueue.cc)
-endif (MACOSX)
+else(APPLE)
+  if (CVMFS_ENABLE_INOTIFY)
+    list(APPEND CVMFS_CLIENT_SOURCES file_watcher_inotify.cc)
+    add_definitions(-DCVMFS_ENABLE_INOTIFY)
+  endif(CVMFS_ENABLE_INOTIFY)
+endif (APPLE)
 
 # First .h then .cc is important to avoid races during the build process
 set_source_files_properties(cache.pb.h cache.pb.cc
@@ -231,6 +236,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   swissknife_hash.cc
   swissknife_history.cc
   swissknife_info.cc
+  swissknife_ingest.cc
   swissknife_lease.cc
   swissknife_lease_curl.cc
   swissknife_lease_json.cc
@@ -243,9 +249,9 @@ set (CVMFS_SWISSKNIFE_SOURCES
   swissknife_scrub.cc
   swissknife_sign.cc
   swissknife_sync.cc
-  swissknife_tarball.cc
   swissknife_zpipe.cc
   sync_item.cc
+  sync_item_tar.cc
   sync_mediator.cc
   sync_union.cc
   sync_union_aufs.cc
