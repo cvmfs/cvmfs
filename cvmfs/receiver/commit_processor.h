@@ -36,7 +36,6 @@ class CommitProcessor {
   int GetNumErrors() const { return num_errors_; }
 
  private:
-  std::string temp_dir_;
   int num_errors_;
 };
 
