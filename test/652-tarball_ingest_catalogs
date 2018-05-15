@@ -1,0 +1,517 @@
+Start test suite for cvmfs CernVM-FS version 2.6.0
+Tue May 15 11:39:05 CEST 2018
+
+
+
+
+
+
+
+
+
+
+-- Testing Ingest tarball in a repo from STDIN (Tue May 15 11:39:05 CEST 2018 / test number 653)
+restarting autofs...
+using traditional service binary
+stopping autofs...
+using traditional service binary
+# Created by CVMFS integration tests
+CVMFS_SERVER_APACHE_RELOAD_IS_RESTART=true
+*** create a fresh repository named test.cern.ch with user sftnight
+Shutting down autofs for the cvmfs mounts
+Repository test.cern.ch is already present... removing it
+Unmounting CernVM-FS Area... done
+Removing Spool Area... done
+Removing Configuration... done
+Removing Repository Storage... done
+Removing Keys and Certificate... done
+Updating global JSON information... done
+CernVM-FS repository test.cern.ch wiped out!
+AH00558: apache2: Could not reliably determine the server's fully qualified domain name, using 127.0.1.1. Set the 'ServerName' directive globally to suppress this message
+Creating new repository test.cern.ch (with extra options ) ...Creating Configuration Files... done
+Creating CernVM-FS Master Key and Self-Signed Certificate... done
+Creating CernVM-FS Server Infrastructure... done
+Creating Backend Storage... done
+Signing 30 day whitelist with master key... done
+Creating Initial Repository... done
+Mounting CernVM-FS Storage... (aufs) done
+Allowing Replication of this Repository... done
+Initial commit... New CernVM-FS repository for test.cern.ch
+Updating global JSON information... done
+
+Before you can install anything, call `cvmfs_server transaction`
+to enable write access on your repository. Then install your
+software in /cvmfs/test.cern.ch as user simo.
+Once you're happy, publish using `cvmfs_server publish`
+
+For client configuration, have a look at 'cvmfs_server info'
+
+If you go for production, backup your masterkey from /etc/cvmfs/keys/!
+Using auto tag 'generic-2018-05-15T09:39:17Z'
+Processing changes...
+Waiting for upload of files before committing...
+Committing file catalogs...
+Wait for all uploads to finish
+Exporting repository manifest
+Tagging test.cern.ch
+Flushing file system buffers
+Signing new manifest
+Remounting newly created repository revision
+*** generating a tarball /tmp/cvmfs-test/workdir/653-tarball_ingest_from_stdin/tarball.tar
+*** Generating a tarball in /tmp/cvmfs-test/workdir/653-tarball_ingest_from_stdin/tarball.tar
+tarball_foo/
+tarball_foo/d/
+tarball_foo/d/e/
+tarball_foo/d/e/f/
+tarball_foo/d/e/f/foo.txt
+tarball_foo/a/
+tarball_foo/a/3.txt
+tarball_foo/a/b/
+tarball_foo/a/b/c/
+tarball_foo/a/b/c/3.txt
+tarball_foo/a/b/c/1.txt
+tarball_foo/a/b/c/2.txt
+tarball_foo/a/b/3.txt
+tarball_foo/a/b/1.txt
+tarball_foo/a/b/2.txt
+tarball_foo/a/1.txt
+tarball_foo/a/2.txt
+*** ingesting the tarball in the directory tar_dir
+Using auto tag 'generic-2018-05-15T09:39:21Z'
+Processing changes...
+Waiting for upload of files before committing...
+Committing file catalogs...
+Wait for all uploads to finish
+Exporting repository manifest
+Tagging test.cern.ch
+Flushing file system buffers
+Signing new manifest
+/usr/bin/cvmfs_server: 8660: eval: has_auto_garbage_collection_enabled: not found
+Remounting newly created repository revision
+*** check catalog and data integrity
+
+Checking Storage Integrity of test.cern.ch ... (may take a while)
+Verifying integrity of test.cern.ch...
+Inspecting log of references
+Inspecting tag database
+[inspecting catalog] 002b84e6f563821c2991ff96f3200fc888164db6 at /
+no problems found
+execution took 18.702 seconds
+Testcase failed with RETVAL 1
+
+
+
+
+
+
+
+
+
+
+-- Testing Ingest weird and complex files (Tue May 15 11:39:24 CEST 2018 / test number 654)
+restarting autofs...
+using traditional service binary
+stopping autofs...
+using traditional service binary
+# Created by CVMFS integration tests
+CVMFS_SERVER_APACHE_RELOAD_IS_RESTART=true
+*** create a fresh repository named test.cern.ch with user sftnight
+Shutting down autofs for the cvmfs mounts
+Repository test.cern.ch is already present... removing it
+Unmounting CernVM-FS Area... done
+Removing Spool Area... done
+Removing Configuration... done
+Removing Repository Storage... done
+Removing Keys and Certificate... done
+Updating global JSON information... done
+CernVM-FS repository test.cern.ch wiped out!
+AH00558: apache2: Could not reliably determine the server's fully qualified domain name, using 127.0.1.1. Set the 'ServerName' directive globally to suppress this message
+Creating new repository test.cern.ch (with extra options ) ...Creating Configuration Files... done
+Creating CernVM-FS Master Key and Self-Signed Certificate... done
+Creating CernVM-FS Server Infrastructure... done
+Creating Backend Storage... done
+Signing 30 day whitelist with master key... done
+Creating Initial Repository... done
+Mounting CernVM-FS Storage... (aufs) done
+Allowing Replication of this Repository... done
+Initial commit... New CernVM-FS repository for test.cern.ch
+Updating global JSON information... done
+
+Before you can install anything, call `cvmfs_server transaction`
+to enable write access on your repository. Then install your
+software in /cvmfs/test.cern.ch as user simo.
+Once you're happy, publish using `cvmfs_server publish`
+
+For client configuration, have a look at 'cvmfs_server info'
+
+If you go for production, backup your masterkey from /etc/cvmfs/keys/!
+Using auto tag 'generic-2018-05-15T09:39:36Z'
+Processing changes...
+Waiting for upload of files before committing...
+Committing file catalogs...
+Wait for all uploads to finish
+Exporting repository manifest
+Tagging test.cern.ch
+Flushing file system buffers
+Signing new manifest
+Remounting newly created repository revision
+*** generating a tarball /tmp/cvmfs-test/workdir/654-tarball_ingest_special_files/tarball.tar
+chown: changing ownership of 'tarball_foo/a/b/c/4_change_owner.txt': Operation not permitted
+*** Generating a tarball in /tmp/cvmfs-test/workdir/654-tarball_ingest_special_files/tarball.tar
+tarball_foo/
+tarball_foo/d/
+tarball_foo/d/e/
+tarball_foo/d/e/f/
+tarball_foo/d/e/f/foo.txt
+tarball_foo/empty_file.txt
+tarball_foo/to_different_owner.txt
+tarball_foo/a/
+tarball_foo/a/3.txt
+tarball_foo/a/b/
+tarball_foo/a/b/c/
+tarball_foo/a/b/c/4_change_owner.txt
+tarball_foo/a/b/c/3.txt
+tarball_foo/a/b/c/1.txt
+tarball_foo/a/b/c/2.txt
+tarball_foo/a/b/3.txt
+tarball_foo/a/b/another_empty.txt
+tarball_foo/a/b/1.txt
+tarball_foo/a/b/.cvmfscatalog
+tarball_foo/a/b/2.txt
+tarball_foo/a/1.txt
+tarball_foo/a/.cvmfscatalog
+tarball_foo/a/2.txt
+tarball_foo/to_empty_link.txt
+*** ingesting the tarball in the directory tar_dir
+Using auto tag 'generic-2018-05-15T09:39:40Z'
+Processing changes...
+Waiting for upload of files before committing...
+Committing file catalogs...
+Wait for all uploads to finish
+Exporting repository manifest
+Tagging test.cern.ch
+Flushing file system buffers
+Signing new manifest
+/usr/bin/cvmfs_server: 8660: eval: has_auto_garbage_collection_enabled: not found
+Remounting newly created repository revision
+*** check catalog and data integrity
+
+Checking Storage Integrity of test.cern.ch ... (may take a while)
+Verifying integrity of test.cern.ch...
+Inspecting log of references
+Inspecting tag database
+[inspecting catalog] 8754d0b03e17f5a7542830b965296924d8e9c03f at /
+no problems found
+*** check that we actually put the files in /cvmfs/test.cern.ch/tar_dir/tarball_foo
+execution took 17.854 seconds
+Testcase failed with RETVAL 1
+
+
+
+
+
+
+
+
+
+
+-- Testing Ingest same tarball in same location multiple times (Tue May 15 11:39:43 CEST 2018 / test number 655)
+restarting autofs...
+using traditional service binary
+stopping autofs...
+using traditional service binary
+# Created by CVMFS integration tests
+CVMFS_SERVER_APACHE_RELOAD_IS_RESTART=true
+*** create a fresh repository named test.cern.ch with user sftnight
+Shutting down autofs for the cvmfs mounts
+Repository test.cern.ch is already present... removing it
+Unmounting CernVM-FS Area... done
+Removing Spool Area... done
+Removing Configuration... done
+Removing Repository Storage... done
+Removing Keys and Certificate... done
+Updating global JSON information... done
+CernVM-FS repository test.cern.ch wiped out!
+AH00558: apache2: Could not reliably determine the server's fully qualified domain name, using 127.0.1.1. Set the 'ServerName' directive globally to suppress this message
+Creating new repository test.cern.ch (with extra options ) ...Creating Configuration Files... done
+Creating CernVM-FS Master Key and Self-Signed Certificate... done
+Creating CernVM-FS Server Infrastructure... done
+Creating Backend Storage... done
+Signing 30 day whitelist with master key... done
+Creating Initial Repository... done
+Mounting CernVM-FS Storage... (aufs) done
+Allowing Replication of this Repository... done
+Initial commit... New CernVM-FS repository for test.cern.ch
+Updating global JSON information... done
+
+Before you can install anything, call `cvmfs_server transaction`
+to enable write access on your repository. Then install your
+software in /cvmfs/test.cern.ch as user simo.
+Once you're happy, publish using `cvmfs_server publish`
+
+For client configuration, have a look at 'cvmfs_server info'
+
+If you go for production, backup your masterkey from /etc/cvmfs/keys/!
+Using auto tag 'generic-2018-05-15T09:39:54Z'
+Processing changes...
+Waiting for upload of files before committing...
+Committing file catalogs...
+Wait for all uploads to finish
+Exporting repository manifest
+Tagging test.cern.ch
+Flushing file system buffers
+Signing new manifest
+Remounting newly created repository revision
+*** generating a tarball /tmp/cvmfs-test/workdir/655-tarball_multiple_ingest_same_location/tarball.tar
+*** Generating a tarball in /tmp/cvmfs-test/workdir/655-tarball_multiple_ingest_same_location/tarball.tar
+tarball_foo/
+tarball_foo/d/
+tarball_foo/d/e/
+tarball_foo/d/e/f/
+tarball_foo/d/e/f/foo.txt
+tarball_foo/a/
+tarball_foo/a/3.txt
+tarball_foo/a/b/
+tarball_foo/a/b/c/
+tarball_foo/a/b/c/3.txt
+tarball_foo/a/b/c/1.txt
+tarball_foo/a/b/c/2.txt
+tarball_foo/a/b/3.txt
+tarball_foo/a/b/1.txt
+tarball_foo/a/b/2.txt
+tarball_foo/a/1.txt
+tarball_foo/a/2.txt
+*** 1. ingesting the tarball in the directory tar_dir
+Using auto tag 'generic-2018-05-15T09:39:58Z'
+Processing changes...
+Waiting for upload of files before committing...
+Committing file catalogs...
+Wait for all uploads to finish
+Exporting repository manifest
+Tagging test.cern.ch
+Flushing file system buffers
+Signing new manifest
+/usr/bin/cvmfs_server: 8660: eval: has_auto_garbage_collection_enabled: not found
+Remounting newly created repository revision
+*** 2. ingesting the tarball in the directory tar_dir
+Using auto tag 'generic-2018-05-15T09:40:02Z'
+Processing changes...
+Waiting for upload of files before committing...
+Committing file catalogs...
+Wait for all uploads to finish
+Exporting repository manifest
+Tagging test.cern.ch
+Flushing file system buffers
+Signing new manifest
+/usr/bin/cvmfs_server: 8660: eval: has_auto_garbage_collection_enabled: not found
+Remounting newly created repository revision
+*** check catalog and data integrity
+
+Checking Storage Integrity of test.cern.ch ... (may take a while)
+Verifying integrity of test.cern.ch...
+Inspecting log of references
+Inspecting tag database
+[inspecting catalog] d4723888f70ef09e8cb7ea3a499dfede96dcb952 at /
+no problems found
+execution took 21.014 seconds
+Testcase failed with RETVAL 1
+
+
+
+
+
+
+
+
+
+
+-- Testing Ingest tarball in a repo and while removing files (Tue May 15 11:40:04 CEST 2018 / test number 656)
+restarting autofs...
+using traditional service binary
+stopping autofs...
+using traditional service binary
+# Created by CVMFS integration tests
+CVMFS_SERVER_APACHE_RELOAD_IS_RESTART=true
+*** create a fresh repository named test.cern.ch with user sftnight
+Shutting down autofs for the cvmfs mounts
+Repository test.cern.ch is already present... removing it
+Unmounting CernVM-FS Area... done
+Removing Spool Area... done
+Removing Configuration... done
+Removing Repository Storage... done
+Removing Keys and Certificate... done
+Updating global JSON information... done
+CernVM-FS repository test.cern.ch wiped out!
+AH00558: apache2: Could not reliably determine the server's fully qualified domain name, using 127.0.1.1. Set the 'ServerName' directive globally to suppress this message
+Creating new repository test.cern.ch (with extra options ) ...Creating Configuration Files... done
+Creating CernVM-FS Master Key and Self-Signed Certificate... done
+Creating CernVM-FS Server Infrastructure... done
+Creating Backend Storage... done
+Signing 30 day whitelist with master key... done
+Creating Initial Repository... done
+Mounting CernVM-FS Storage... (aufs) done
+Allowing Replication of this Repository... done
+Initial commit... New CernVM-FS repository for test.cern.ch
+Updating global JSON information... done
+
+Before you can install anything, call `cvmfs_server transaction`
+to enable write access on your repository. Then install your
+software in /cvmfs/test.cern.ch as user simo.
+Once you're happy, publish using `cvmfs_server publish`
+
+For client configuration, have a look at 'cvmfs_server info'
+
+If you go for production, backup your masterkey from /etc/cvmfs/keys/!
+Using auto tag 'generic-2018-05-15T09:40:16Z'
+Processing changes...
+Waiting for upload of files before committing...
+Committing file catalogs...
+Wait for all uploads to finish
+Exporting repository manifest
+Tagging test.cern.ch
+Flushing file system buffers
+Signing new manifest
+Remounting newly created repository revision
+*** generating a tarball /tmp/cvmfs-test/workdir/656-tarball_remove_directory/tarball.tar
+*** Generating a tarball in /tmp/cvmfs-test/workdir/656-tarball_remove_directory/tarball.tar
+tarball_foo/
+tarball_foo/d/
+tarball_foo/d/e/
+tarball_foo/d/e/f/
+tarball_foo/d/e/f/foo.txt
+tarball_foo/a/
+tarball_foo/a/3.txt
+tarball_foo/a/b/
+tarball_foo/a/b/c/
+tarball_foo/a/b/c/3.txt
+tarball_foo/a/b/c/1.txt
+tarball_foo/a/b/c/2.txt
+tarball_foo/a/b/3.txt
+tarball_foo/a/b/1.txt
+tarball_foo/a/b/2.txt
+tarball_foo/a/1.txt
+tarball_foo/a/2.txt
+*** ingesting the tarball in the directory tar_dir_remove
+Using auto tag 'generic-2018-05-15T09:40:20Z'
+Processing changes...
+Waiting for upload of files before committing...
+Committing file catalogs...
+Wait for all uploads to finish
+Exporting repository manifest
+Tagging test.cern.ch
+Flushing file system buffers
+Signing new manifest
+/usr/bin/cvmfs_server: 8660: eval: has_auto_garbage_collection_enabled: not found
+Remounting newly created repository revision
+*** check catalog and data integrity
+
+Checking Storage Integrity of test.cern.ch ... (may take a while)
+Verifying integrity of test.cern.ch...
+Inspecting log of references
+Inspecting tag database
+[inspecting catalog] 92e79dcb8a303ac613f89ba4959773e1d8c3b131 at /
+no problems found
+*** check that we actually put the files in tar_dir_remove
+execution took 17.692 seconds
+Testcase failed with RETVAL 1
+
+
+
+
+
+
+
+
+
+
+-- Testing Ingest tarball in a repo and while removing base-dir's (Tue May 15 11:40:23 CEST 2018 / test number 657)
+restarting autofs...
+using traditional service binary
+stopping autofs...
+using traditional service binary
+# Created by CVMFS integration tests
+CVMFS_SERVER_APACHE_RELOAD_IS_RESTART=true
+*** create a fresh repository named test.cern.ch with user sftnight
+Shutting down autofs for the cvmfs mounts
+Repository test.cern.ch is already present... removing it
+Unmounting CernVM-FS Area... done
+Removing Spool Area... done
+Removing Configuration... done
+Removing Repository Storage... done
+Removing Keys and Certificate... done
+Updating global JSON information... done
+CernVM-FS repository test.cern.ch wiped out!
+AH00558: apache2: Could not reliably determine the server's fully qualified domain name, using 127.0.1.1. Set the 'ServerName' directive globally to suppress this message
+Creating new repository test.cern.ch (with extra options ) ...Creating Configuration Files... done
+Creating CernVM-FS Master Key and Self-Signed Certificate... done
+Creating CernVM-FS Server Infrastructure... done
+Creating Backend Storage... done
+Signing 30 day whitelist with master key... done
+Creating Initial Repository... done
+Mounting CernVM-FS Storage... (aufs) done
+Allowing Replication of this Repository... done
+Initial commit... New CernVM-FS repository for test.cern.ch
+Updating global JSON information... done
+
+Before you can install anything, call `cvmfs_server transaction`
+to enable write access on your repository. Then install your
+software in /cvmfs/test.cern.ch as user simo.
+Once you're happy, publish using `cvmfs_server publish`
+
+For client configuration, have a look at 'cvmfs_server info'
+
+If you go for production, backup your masterkey from /etc/cvmfs/keys/!
+Using auto tag 'generic-2018-05-15T09:40:34Z'
+Processing changes...
+Waiting for upload of files before committing...
+Committing file catalogs...
+Wait for all uploads to finish
+Exporting repository manifest
+Tagging test.cern.ch
+Flushing file system buffers
+Signing new manifest
+Remounting newly created repository revision
+*** generating a tarball /tmp/cvmfs-test/workdir/657-tarball_remove_base_directory/tarball.tar
+*** Generating a tarball in /tmp/cvmfs-test/workdir/657-tarball_remove_base_directory/tarball.tar
+tarball_foo/
+tarball_foo/d/
+tarball_foo/d/e/
+tarball_foo/d/e/f/
+tarball_foo/d/e/f/foo.txt
+tarball_foo/a/
+tarball_foo/a/3.txt
+tarball_foo/a/b/
+tarball_foo/a/b/c/
+tarball_foo/a/b/c/3.txt
+tarball_foo/a/b/c/1.txt
+tarball_foo/a/b/c/2.txt
+tarball_foo/a/b/3.txt
+tarball_foo/a/b/1.txt
+tarball_foo/a/b/2.txt
+tarball_foo/a/1.txt
+tarball_foo/a/2.txt
+*** ingesting the tarball in the directory tar_dir_remove
+Using auto tag 'generic-2018-05-15T09:40:38Z'
+Processing changes...
+Waiting for upload of files before committing...
+Committing file catalogs...
+Wait for all uploads to finish
+Exporting repository manifest
+Tagging test.cern.ch
+Flushing file system buffers
+Signing new manifest
+/usr/bin/cvmfs_server: 8660: eval: has_auto_garbage_collection_enabled: not found
+Remounting newly created repository revision
+*** check catalog and data integrity
+
+Checking Storage Integrity of test.cern.ch ... (may take a while)
+Verifying integrity of test.cern.ch...
+Inspecting log of references
+Inspecting tag database
+[inspecting catalog] b21e7b0bc3515a1fce5ac32d7ed0190262841800 at /
+no problems found
+*** check that we actually put the files in tar_dir_remove
+execution took 17.710 seconds
+Testcase failed with RETVAL 1
+Tue May 15 11:40:41 CEST 2018
+Finished test suite in 1 minutes 35.912 seconds
