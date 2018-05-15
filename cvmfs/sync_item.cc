@@ -91,26 +91,6 @@ SyncItemType SyncItem::GetRdOnlyFiletype() const {
 }
 
 
-SyncItemType SyncItemNative::GetScratchFiletype() const {
-  StatScratch();
-  if (scratch_stat_.error_code != 0) {
-    PrintWarning("Failed to stat() '" + GetRelativePath() + "' in scratch. "
-                 "(errno: " + StringifyInt(scratch_stat_.error_code) + ")");
-    abort();
-  }
-
-  return GetGenericFiletype(scratch_stat_);
-}
-
-bool SyncItemNative::IsType(const SyncItemType expected_type) const {
-  if (filename_.substr(0, 12) == ".cvmfsgraft-") {
-    scratch_type_ = kItemMarker;
-  } else if (scratch_type_ == kItemUnknown) {
-    scratch_type_ = GetScratchFiletype();
-  }
-  return scratch_type_ == expected_type;
-}
-
 void SyncItem::MarkAsWhiteout(const std::string &actual_filename) {
   // Mark the file as whiteout entry and strip the whiteout prefix
   whiteout_ = true;
@@ -166,9 +146,6 @@ uint64_t SyncItem::GetUnionInode() const {
   return union_stat_.stat.st_ino;
 }
 
-IngestionSource *SyncItemNative::CreateIngestionSource() const {
-  return new FileIngestionSource(GetUnionPath());
-}
 
 void SyncItem::StatGeneric(const string  &path,
                            EntryStat     *info,
@@ -178,45 +155,6 @@ void SyncItem::StatGeneric(const string  &path,
   info->error_code = (retval != 0) ? errno : 0;
   info->obtained = true;
 }
-
-
-catalog::DirectoryEntryBase SyncItemNative::CreateBasicCatalogDirent() const {
-  catalog::DirectoryEntryBase dirent;
-
-  // inode and parent inode is determined at runtime of client
-  dirent.inode_          = catalog::DirectoryEntry::kInvalidInode;
-
-  // this might mask the actual link count in case hardlinks are not supported
-  // (i.e. on setups using OverlayFS)
-  dirent.linkcount_      = HasHardlinks() ? this->GetUnionStat().st_nlink : 1;
-
-  dirent.mode_           = this->GetUnionStat().st_mode;
-  dirent.uid_            = this->GetUnionStat().st_uid;
-  dirent.gid_            = this->GetUnionStat().st_gid;
-  dirent.size_           = graft_size_ > -1 ? graft_size_ :
-                           this->GetUnionStat().st_size;
-  dirent.mtime_          = this->GetUnionStat().st_mtime;
-  dirent.checksum_       = this->GetContentHash();
-  dirent.is_external_file_ = this->IsExternalData();
-  dirent.compression_algorithm_ = this->GetCompressionAlgorithm();
-
-  dirent.name_.Assign(filename_.data(), filename_.length());
-
-  if (this->IsSymlink()) {
-    char slnk[PATH_MAX+1];
-    const ssize_t length =
-      readlink((this->GetUnionPath()).c_str(), slnk, PATH_MAX);
-    assert(length >= 0);
-    dirent.symlink_.Assign(slnk, length);
-  }
-
-  if (this->IsCharacterDevice() || this->IsBlockDevice()) {
-    dirent.size_ = makedev(GetRdevMajor(), GetRdevMinor());
-  }
-
-  return dirent;
-}
-
 
 std::string SyncItem::GetRdOnlyPath() const {
   const string relative_path = GetRelativePath().empty() ?
@@ -394,6 +332,70 @@ void SyncItem::CheckGraft() {
   graft_chunklist_->PushBack(FileChunk(chunk_checksums.back(),
                                         last_offset,
                                         graft_size_ - last_offset));
+}
+
+catalog::DirectoryEntryBase SyncItemNative::CreateBasicCatalogDirent() const {
+  catalog::DirectoryEntryBase dirent;
+
+  // inode and parent inode is determined at runtime of client
+  dirent.inode_          = catalog::DirectoryEntry::kInvalidInode;
+
+  // this might mask the actual link count in case hardlinks are not supported
+  // (i.e. on setups using OverlayFS)
+  dirent.linkcount_      = HasHardlinks() ? this->GetUnionStat().st_nlink : 1;
+
+  dirent.mode_           = this->GetUnionStat().st_mode;
+  dirent.uid_            = this->GetUnionStat().st_uid;
+  dirent.gid_            = this->GetUnionStat().st_gid;
+  dirent.size_           = graft_size_ > -1 ? graft_size_ :
+                           this->GetUnionStat().st_size;
+  dirent.mtime_          = this->GetUnionStat().st_mtime;
+  dirent.checksum_       = this->GetContentHash();
+  dirent.is_external_file_ = this->IsExternalData();
+  dirent.compression_algorithm_ = this->GetCompressionAlgorithm();
+
+  dirent.name_.Assign(filename_.data(), filename_.length());
+
+  if (this->IsSymlink()) {
+    char slnk[PATH_MAX+1];
+    const ssize_t length =
+      readlink((this->GetUnionPath()).c_str(), slnk, PATH_MAX);
+    assert(length >= 0);
+    dirent.symlink_.Assign(slnk, length);
+  }
+
+  if (this->IsCharacterDevice() || this->IsBlockDevice()) {
+    dirent.size_ = makedev(GetRdevMajor(), GetRdevMinor());
+  }
+
+  return dirent;
+}
+
+
+IngestionSource *SyncItemNative::CreateIngestionSource() const {
+  return new FileIngestionSource(GetUnionPath());
+}
+
+
+SyncItemType SyncItemNative::GetScratchFiletype() const {
+  StatScratch();
+  if (scratch_stat_.error_code != 0) {
+    PrintWarning("Failed to stat() '" + GetRelativePath() + "' in scratch. "
+                 "(errno: " + StringifyInt(scratch_stat_.error_code) + ")");
+    abort();
+  }
+
+  return GetGenericFiletype(scratch_stat_);
+}
+
+
+bool SyncItemNative::IsType(const SyncItemType expected_type) const {
+  if (filename_.substr(0, 12) == ".cvmfsgraft-") {
+    scratch_type_ = kItemMarker;
+  } else if (scratch_type_ == kItemUnknown) {
+    scratch_type_ = GetScratchFiletype();
+  }
+  return scratch_type_ == expected_type;
 }
 
 }  // namespace publish

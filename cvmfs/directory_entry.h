@@ -61,7 +61,6 @@ class DirectoryEntryBase {
   // Create .cvmfscatalog and .cvmfsautocatalog files
   friend class CatalogBalancer<WritableCatalogManager>;
   // Simplify creation of DirectoryEntry objects for write back
-  friend class publish::SyncItem;
   friend class publish::SyncItemNative;
   friend class publish::SyncItemTar;
   friend class publish::SyncItemDummyDir;
