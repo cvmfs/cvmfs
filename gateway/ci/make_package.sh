@@ -5,13 +5,19 @@ set -e
 SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
 
 if [ $# -lt 1 ]; then
-  echo "Usage: $0 <CernVM-FS source directory (the same as the build directory)>"
+  echo "Usage: $0 <CernVM-FS source directory (the same as the build directory)> [NIGHTLY_NUMBER]"
   echo "This script builds packages for the current platform."
   exit 1
 fi
 
 CVMFS_BUILD_LOCATION="$1"
 shift 1
+
+NIGHTLY_NUMBER=
+if [ $# -gt 0 ]; then
+  NIGHTLY_NUMBER=$1
+  shift 1
+fi
 
 export REBAR_CACHE_DIR=$CVMFS_BUILD_LOCATION/../
 mkdir -p $REBAR_CACHE_DIR
@@ -25,17 +31,22 @@ REPO_GATEWAY_VERSION=$(grep -o "[0-9]\+\.[0-9]\+\.[0-9]\+" apps/cvmfs_gateway/sr
 TARBALL_NAME=cvmfs-gateway_${REPO_GATEWAY_VERSION}_${CVMFS_BUILD_PLATFORM}_x86_64.tar.gz
 PKGMAP_FILE=${CVMFS_BUILD_LOCATION}/pkgmap/pkgmap.${CVMFS_BUILD_PLATFORM}_x86_64
 
+PACKAGE_VERSION=1
+if [ ! -z "$NIGHTLY_NUMBER" ]; then
+    PACKAGE_VERSION=0.$NIGHTLY_NUMBER
+fi
+
 # Create an RPM or DEB package from the tarball
 if [ x"${CVMFS_BUILD_PLATFORM}" = xubuntu1604 ]; then
     PACKAGE_TYPE=deb
     PACKAGE_NAME_SUFFIX="+ubuntu16.04_amd64"
     PACKAGE_LOCATION=DEBS
-    PACKAGE_NAME=cvmfs-gateway_${REPO_GATEWAY_VERSION}~1${PACKAGE_NAME_SUFFIX}.${PACKAGE_TYPE}
+    PACKAGE_NAME=cvmfs-gateway_${REPO_GATEWAY_VERSION}~${PACKAGE_VERSION}${PACKAGE_NAME_SUFFIX}.${PACKAGE_TYPE}
 elif [ x"${CVMFS_BUILD_PLATFORM}" = xslc6 ] || [ x"${CVMFS_BUILD_PLATFORM}" = xcc7 ]; then
     PACKAGE_TYPE=rpm
     PACKAGE_NAME_SUFFIX="$(rpm --eval "%{?dist}").x86_64"
     PACKAGE_LOCATION=RPMS
-    PACKAGE_NAME=cvmfs-gateway-${REPO_GATEWAY_VERSION}-1${PACKAGE_NAME_SUFFIX}.${PACKAGE_TYPE}
+    PACKAGE_NAME=cvmfs-gateway-${REPO_GATEWAY_VERSION}-${PACKAGE_VERSION}${PACKAGE_NAME_SUFFIX}.${PACKAGE_TYPE}
 fi
 
 mkdir -p ${CVMFS_BUILD_LOCATION}/$PACKAGE_LOCATION
