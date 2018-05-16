@@ -3,6 +3,7 @@
     the client is notified, aborting the publication process (CVM-1545)
   * Package names now include a package version number which is either 1,
     for final builds, or 0.$NIGHTLY_NUMBER, for nightly builds (CVM-1546)
+  * Setup script now checks the existence of individual config files (CVM-1532)
 
 0.2.5:
   * Renaming project to "cvmfs-gateway" - this name is now used in user facing
