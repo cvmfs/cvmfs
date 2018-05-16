@@ -28,7 +28,14 @@ sudo cp -v $SCRIPT_LOCATION/90-cvmfs-gateway.conf /etc/rsyslog.d/
 if [ ! -e /etc/cvmfs/gateway ]; then
     echo "Creating onfiguration file directory to /etc/cvmfs/gateway"
     sudo mkdir /etc/cvmfs/gateway
-    sudo cp -v $SCRIPT_LOCATION/../etc/*.json /etc/cvmfs/gateway/
+fi
+if [ ! -e /etc/cvmfs/gateway/repo.json ]; then
+    echo "Copying repo.json to /etc/cvmfs/gateway"
+    sudo cp -v $SCRIPT_LOCATION/../etc/repo.json /etc/cvmfs/gateway/
+fi
+if [ ! -e /etc/cvmfs/gateway/user.json ]; then
+    echo "Copying user.json to /etc/cvmfs/gateway"
+    sudo cp -v $SCRIPT_LOCATION/../etc/user.json /etc/cvmfs/gateway/
 fi
 
 if [ x"$(which systemctl)" != x"" ]; then
