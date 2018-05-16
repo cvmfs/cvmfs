@@ -5,22 +5,19 @@ set -e
 SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
 
 if [ $# -lt 1 ]; then
-  echo "Usage: $0 <CernVM-FS source directory (the same as the build directory)>"
+  echo "Usage: $0 <CernVM-FS source directory (the same as the build directory)> [NIGHTLY_NUMBER]"
   echo "This script builds packages for the current platform."
   exit 1
 fi
 
-if [ -z $BUILD_NUMBER ]; then
-  echo "BUILD_NUMBER not defined"
-  exit 2
-fi
-if [ -z $CVMFS_NIGHTLY_BUILD ]; then
-  echo "CVMFS_NIGHTLY_BUILD not defined"
-  exit 2
-fi
-
 CVMFS_BUILD_LOCATION="$1"
 shift 1
+
+NIGHTLY_NUMBER=
+if [ $# -gt 0 ]; then
+  NIGHTLY_NUMBER=$1
+  shift 1
+fi
 
 export REBAR_CACHE_DIR=$CVMFS_BUILD_LOCATION/../
 mkdir -p $REBAR_CACHE_DIR
@@ -35,8 +32,8 @@ TARBALL_NAME=cvmfs-gateway_${REPO_GATEWAY_VERSION}_${CVMFS_BUILD_PLATFORM}_x86_6
 PKGMAP_FILE=${CVMFS_BUILD_LOCATION}/pkgmap/pkgmap.${CVMFS_BUILD_PLATFORM}_x86_64
 
 PACKAGE_VERSION=1
-if [ x"$CVMFS_NIGHTLY_BUILD" = x"true" ]; then
-    PACKAGE_VERSION=0.$BUILD_NUMBER
+if [ ! -z "$NIGHTLY_NUMBER" ]; then
+    PACKAGE_VERSION=0.$NIGHTLY_NUMBER
 fi
 
 # Create an RPM or DEB package from the tarball
