@@ -7,7 +7,7 @@ wait_for_app_start() {
     local num_iter=1
     while [ $reply != "pong" ]; do
         sleep 1
-        reply=$(/opt/cvmfs-gateway/bin/cvmfs_gateway ping | awk {'print $1'})
+        reply=$(/usr/libexec/cvmfs-gateway/bin/cvmfs_gateway ping | awk {'print $1'})
         num_iter=$((num_iter + 1))
         if [ $num_iter -eq 10 ]; then
             echo "Error: Could not start cvmfs-gateway"
