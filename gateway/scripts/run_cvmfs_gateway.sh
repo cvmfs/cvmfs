@@ -2,6 +2,8 @@
 
 set -e
 
+export RUNNER_LOG_DIR=/var/log/cvmfs-gateway
+
 wait_for_app_start() {
     local reply=$($SCRIPT_LOCATION/../bin/cvmfs_gateway ping | awk {'print $1'})
     local num_iter=1
