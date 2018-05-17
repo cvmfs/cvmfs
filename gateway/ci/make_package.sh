@@ -62,7 +62,7 @@ fi
 
 fpm -s tar \
     -t ${PACKAGE_TYPE} \
-    --prefix /opt/cvmfs-gateway \
+    --prefix /usr/libexec/cvmfs-gateway \
     --package $PACKAGE_LOCATION/${PACKAGE_NAME} \
     --version ${REPO_GATEWAY_VERSION} \
     --name cvmfs-gateway \
