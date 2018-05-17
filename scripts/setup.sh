@@ -10,6 +10,8 @@ set -e
 
 SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
 
+export RUNNER_LOG_DIR=/var/log/cvmfs-gateway
+
 # Setup Mnesia
 echo "Setting up the Mnesia"
 
