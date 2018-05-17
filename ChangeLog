@@ -1,4 +1,5 @@
 2.5.1:
+  * Check for link count > 0 in swissknife check (CVM-1549)
   * Linkcount is set to 1 for hardlinked files published through GW (CVM-1542)
   * Limit queue size of the gateway spooler to 2G
   * Store gateway receiver's temp files in $SPOOLER_TMP/receiver (CVM-1540)
