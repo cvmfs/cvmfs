@@ -10,7 +10,7 @@ set -e
 
 SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
 
-export RUNNER_LOG_DIR=/var/log/cvmfs-gateway
+export RUNNER_LOG_DIR=/var/log/cvmfs-gateway-runner
 
 # Install syslog configuration file
 echo "Installing the syslog configuration file"
@@ -18,15 +18,16 @@ sudo cp -v $SCRIPT_LOCATION/90-cvmfs-gateway.conf /etc/rsyslog.d/
 
 if [ x"$(which systemctl)" != x"" ]; then
     echo "  - restarting rsyslog"
-    sudo systemctl restart rsyslog
     sudo cp -v $SCRIPT_LOCATION/90-cvmfs-gateway-rotate-systemd /etc/logrotate.d/
+    sudo systemctl restart rsyslog
 
     echo "  - installing systemd service file"
     sudo cp -v $SCRIPT_LOCATION/cvmfs-gateway.service /etc/systemd/system/cvmfs-gateway.service
+    sudo systemctl daemon-reload
 else
     echo "  - restarting rsyslog"
-    sudo service rsyslog restart
     sudo cp -v $SCRIPT_LOCATION/90-cvmfs-gateway-rotate /etc/logrotate.d/
+    sudo service rsyslog restart
 fi
 
 # Symlink the configuration directory into /etc/cvmfs/gateway
