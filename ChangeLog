@@ -1,8 +1,9 @@
 2.5.1:
+  * Linkcount is set to 1 for hardlinked files published through GW (CVM-1542)
   * Limit queue size of the gateway spooler to 2G
   * Store gateway receiver's temp files in $SPOOLER_TMP/receiver (CVM-1540)
   * Handle spooler failures gracefully in the gateway receiver (CVM-1545)
-  * Fix incomplete manifest after catalog migration operations (CVM-1534) 
+  * Fix incomplete manifest after catalog migration operations (CVM-1534)
 
 2.5.0:
   * Check for autofs in cvmfs_server rmfs only for stratum 0s (CVM-1490)
