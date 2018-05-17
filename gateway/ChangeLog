@@ -1,9 +1,11 @@
 0.2.6:
-  * Spooler errors are now detected in the cvmfs_receiver worker process and
-    the client is notified, aborting the publication process (CVM-1545)
+  * Application is now installed in /usr/libexec/cvmfs-gateway while
+    the Mnesia database is created under /var/lib/cvmfs-gateway (CVM-1538)
+  * Setup script now checks the existence of individual config files (CVM-1532)
   * Package names now include a package version number which is either 1,
     for final builds, or 0.$NIGHTLY_NUMBER, for nightly builds (CVM-1546)
-  * Setup script now checks the existence of individual config files (CVM-1532)
+  * Spooler errors are now detected in the cvmfs_receiver worker process and
+    the client is notified, aborting the publication process (CVM-1545)
 
 0.2.5:
   * Renaming project to "cvmfs-gateway" - this name is now used in user facing
