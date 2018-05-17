@@ -13,7 +13,7 @@ SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
 # Setup Mnesia
 echo "Setting up the Mnesia"
 
-cvmfs_mnesia_root=/opt/cvmfs-mnesia
+cvmfs_mnesia_root=/var/lib/cvmfs-gateway
 echo "  - (re)creating schema directory at $cvmfs_mnesia_root"
 sudo rm -rf $cvmfs_mnesia_root && sudo mkdir -p $cvmfs_mnesia_root
 

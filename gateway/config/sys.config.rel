@@ -5,7 +5,7 @@
           {extra_sinks, [{error_logger_lager_event, [{handlers, [{lager_syslog_backend,
                                                                   ["erlang_error_logger", local1, info]}]}]}]}]},
 
- {mnesia, [{dir, "/opt/cvmfs-mnesia"},
+ {mnesia, [{dir, "/var/lib/cvmfs-gateway"},
            {schema_location, disc}]},
 
  {cvmfs_gateway, [{enabled_services, [cvmfs_fe,
