@@ -19,6 +19,7 @@ struct FileInfo {
   std::string temp_path;
   size_t total_size;
   size_t current_size;
+  bool skip;
 };
 
 /**
