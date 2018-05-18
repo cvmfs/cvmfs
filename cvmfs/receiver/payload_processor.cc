@@ -21,6 +21,49 @@ const size_t kConsumerBuffer = 10 * 1024 * 1024; //  10 MB
 
 namespace receiver {
 
+FileInfo::FileInfo()
+  : total_size(0),
+    current_size(0),
+    hash_context(),
+    hash_buffer(),
+    skip(false)
+{}
+
+FileInfo::FileInfo(const ObjectPackBuild::Event& event)
+  : temp_path(),
+    total_size(event.size),
+    current_size(0),
+    hash_context(shash::ContextPtr(event.id.algorithm)),
+    hash_buffer(hash_context.size, 0),
+    skip(false)
+{
+  hash_context.buffer = &hash_buffer[0];
+  shash::Init(hash_context);
+}
+
+FileInfo::FileInfo(const FileInfo& other)
+  : temp_path(other.temp_path),
+    total_size(other.total_size),
+    current_size(other.current_size),
+    hash_context(other.hash_context),
+    hash_buffer(other.hash_buffer),
+    skip(other.skip)
+{
+  hash_context.buffer = &hash_buffer[0];
+}
+
+FileInfo& FileInfo::operator=(const FileInfo& other) {
+  temp_path = other.temp_path;
+  total_size = other.total_size;
+  current_size = other.current_size;
+  hash_context = other.hash_context;
+  hash_buffer = other.hash_buffer;
+  hash_context.buffer = &hash_buffer[0];
+  skip = other.skip;
+
+  return *this;
+}
+
 PayloadProcessor::PayloadProcessor()
     : pending_files_(),
       current_repo_(),
@@ -96,10 +139,7 @@ void PayloadProcessor::ConsumerEventCallback(
 
   FileIterator it = pending_files_.find(event.id);
   if (it == pending_files_.end()) {
-    FileInfo info;
-    info.total_size = event.size;
-    info.current_size = 0;
-    info.skip = false;
+    FileInfo info(event);
 
     // If the file already exists in the repository, don't create a temp file,
     // mark it to be skipped in the FileInfo, but keep track of the number of
@@ -150,6 +190,10 @@ void PayloadProcessor::ConsumerEventCallback(
       return;
     }
     close(fdout);
+
+    shash::Update(static_cast<const unsigned char*>(event.buf),
+                  event.buf_size,
+                  info.hash_context);
   }
 
   info.current_size += event.buf_size;
@@ -157,7 +201,7 @@ void PayloadProcessor::ConsumerEventCallback(
   if (info.current_size == info.total_size) {
     if (!info.skip) {
       shash::Any file_hash(event.id.algorithm);
-      shash::HashFile(info.temp_path, &file_hash);
+      shash::Final(info.hash_context, &file_hash);
 
       if (file_hash != event.id) {
         LogCvmfs(

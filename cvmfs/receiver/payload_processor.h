@@ -16,9 +16,16 @@
 namespace receiver {
 
 struct FileInfo {
+  FileInfo();
+  explicit FileInfo(const ObjectPackBuild::Event& event);
+  FileInfo(const FileInfo& other);
+  FileInfo& operator=(const FileInfo& other);
+
   std::string temp_path;
   size_t total_size;
   size_t current_size;
+  shash::ContextPtr hash_context;
+  std::vector<unsigned char> hash_buffer;
   bool skip;
 };
 
