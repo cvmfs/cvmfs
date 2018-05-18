@@ -138,7 +138,7 @@ void PayloadProcessor::ConsumerEventCallback(
   info.current_size += event.buf_size;
 
   if (info.current_size == info.total_size) {
-    shash::Any file_hash(shash::kSha1);
+    shash::Any file_hash(event.id.algorithm);
     shash::HashFile(info.temp_path, &file_hash);
 
     if (file_hash != event.id) {
