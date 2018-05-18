@@ -15,7 +15,7 @@
 
 namespace {
 
-const size_t kConsumerBuffer = 10 * 1024 * 1024; //  10 MB
+const size_t kConsumerBuffer = 10 * 1024 * 1024;  // 10 MB
 
 }
 
