@@ -13,6 +13,12 @@
 #include "util/posix.h"
 #include "util/string.h"
 
+namespace {
+
+const size_t kConsumerBuffer = 10 * 1024 * 1024; //  10 MB
+
+}
+
 namespace receiver {
 
 PayloadProcessor::PayloadProcessor()
@@ -49,9 +55,8 @@ PayloadProcessor::Result PayloadProcessor::Process(
 
   int nb = 0;
   ObjectPackBuild::State consumer_state = ObjectPackBuild::kStateContinue;
+  std::vector<unsigned char> buffer(kConsumerBuffer, 0);
   do {
-    std::vector<unsigned char> buffer(4096, 0);
-
     nb = read(fdin, &buffer[0], buffer.size());
     consumer_state = deserializer.ConsumeNext(nb, &buffer[0]);
     if (consumer_state != ObjectPackBuild::kStateContinue &&
