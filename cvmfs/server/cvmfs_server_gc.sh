@@ -208,7 +208,7 @@ __do_gc_cmd()
     fi
 
     # generate the garbage collection configuration
-    local additional_switches=""
+    local additional_switches="${CVMFS_SERVER_FLAGS}"
     [ $list_deleted_objects -ne 0 ] && additional_switches="$additional_switches -l"
     [ $dry_run              -ne 0 ] && additional_switches="$additional_switches -d"
     [ $preserve_revisions   -ge 0 ] && additional_switches="$additional_switches -h $preserve_revisions"
