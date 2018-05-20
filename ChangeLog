@@ -1,4 +1,5 @@
 2.6.0:
+  * Optionally print GC stats with CVMFS_SERVER_FLAGS=-+stats
   * Fix debian packaging warnings and errors
 
 2.5.1:
