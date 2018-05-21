@@ -146,7 +146,7 @@ void PayloadProcessor::ConsumerEventCallback(
     // bytes currently written
     if (spooler_->Peek("data/" + path)) {
       LogCvmfs(
-          kLogReceiver, kLogSyslog,
+          kLogReceiver, kLogDebug,
           "PayloadProcessor - file %s already exists at destination. "
           "Marking it to be skipped.",
           path.c_str());
