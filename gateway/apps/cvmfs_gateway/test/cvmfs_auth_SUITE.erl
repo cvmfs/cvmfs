@@ -19,7 +19,9 @@
         ,valid_key_valid_subpath/1
         ,invalid_key_error/1
         ,valid_key_invalid_repo/1
-        ,valid_key_invalid_path/1]).
+        ,valid_key_invalid_path/1
+        ,normal/1, whitespace/1
+        ,tabs/1, everything/1]).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -29,7 +31,8 @@ all() ->
     [{group, queries}
     ,{group, reload}
     ,{group, repo_operations}
-    ,{group, key_operations}].
+    ,{group, key_operations}
+    ,{group, key_parsing}].
 
 groups() ->
     [{queries, [], [valid_key_valid_path
@@ -39,7 +42,8 @@ groups() ->
                    ,valid_key_invalid_path]}
     ,{reload, [], [reload_config]}
     ,{repo_operations, [], [add_repo, remove_repo]}
-    ,{key_operations, [], [add_key, remove_key]}].
+    ,{key_operations, [], [add_key, remove_key]}
+    ,{key_parsing, [], [normal, whitespace, tabs, everything]}].
 
 
 %% Set up, tear down
@@ -108,3 +112,18 @@ reload_config(_Config) ->
     ok = cvmfs_auth:reload_repo_config(),
     false = lists:member({<<"/new/repo/path">>, [<<"key">>]}, cvmfs_auth:get_repos()).
 
+normal(_Config) ->
+    Data = <<"plain_text id secret">>,
+    {<<"plain_text">>, <<"id">>, <<"secret">>} = cvmfs_auth_util:parse_key_binary(Data).
+
+whitespace(_Config) ->
+    Data = <<"    plain_text   id   secret    ">>,
+    {<<"plain_text">>, <<"id">>, <<"secret">>} = cvmfs_auth_util:parse_key_binary(Data).
+
+tabs(_Config) ->
+    Data = <<"\tplain_text\tid\tsecret\t">>,
+    {<<"plain_text">>, <<"id">>, <<"secret">>} = cvmfs_auth_util:parse_key_binary(Data).
+
+everything(_Config) ->
+    Data = <<" \t   plain_text \t  id \t  secret \t \n  ">>,
+    {<<"plain_text">>, <<"id">>, <<"secret">>} = cvmfs_auth_util:parse_key_binary(Data).
