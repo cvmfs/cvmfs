@@ -410,7 +410,8 @@ p_populate_repos(RepoList) ->
 p_parse_key_file(FileName) ->
     {ok, Body} = file:read_file(FileName),
     [Line | _] = [L || L <- binary:split(Body, <<"\n">>), L =/= <<>>],
-    [KeyType, KeyId, Secret] = binary:split(Line, <<" ">>, [global]),
+    [KeyType, KeyId, Secret] = lists:filter(fun(B) -> B =/= <<"">> end,
+                                            binary:split(Line, <<" ">>, [global])),
     {KeyType, KeyId, Secret}.
 
 
