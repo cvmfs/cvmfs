@@ -27,29 +27,24 @@ bool SyncUnion::Initialize() {
   return true;
 }
 
-SharedPtr<SyncItem> SyncUnion::CreateSyncItem(
-    const std::string &relative_parent_path, const std::string &filename,
-    const SyncItemType entry_type) const {
-  
-        printf("\tCreateSyncItem: %s/%s\n", relative_parent_path.c_str(), filename.c_str());
-
-  SharedPtr<SyncItem> entry = SharedPtr<SyncItem>(new SyncItem(
-      relative_parent_path, filename, this, entry_type));
-
-  PreprocessSyncItem(entry);
+SyncItem SyncUnion::CreateSyncItem(const std::string &relative_parent_path,
+                                   const std::string &filename,
+                                   const SyncItemType entry_type) const {
+  SyncItem entry(relative_parent_path, filename, this, entry_type);
+  PreprocessSyncItem(&entry);
   if (entry_type == kItemFile) {
-    entry->SetExternalData(mediator_->IsExternalData());
-    entry->SetCompressionAlgorithm(mediator_->GetCompressionAlgorithm());
+    entry.SetExternalData(mediator_->IsExternalData());
+    entry.SetCompressionAlgorithm(mediator_->GetCompressionAlgorithm());
   }
   return entry;
 }
 
-void SyncUnion::PreprocessSyncItem(SharedPtr<SyncItem> entry) const {
-  if (IsWhiteoutEntry(entry)) {
-    entry->MarkAsWhiteout(UnwindWhiteoutFilename(entry));
+void SyncUnion::PreprocessSyncItem(SyncItem *entry) const {
+  if (IsWhiteoutEntry(*entry)) {
+    entry->MarkAsWhiteout(UnwindWhiteoutFilename(*entry));
   }
 
-  if (entry->IsDirectory() && IsOpaqueDirectory(entry)) {
+  if (entry->IsDirectory() && IsOpaqueDirectory(*entry)) {
     entry->MarkAsOpaqueDirectory();
   }
 }
@@ -67,24 +62,19 @@ bool SyncUnion::ProcessDirectory(const string &parent_dir,
   return ProcessDirectory(entry);
 }
 
-
-bool SyncUnion::ProcessDirectory(SharedPtr<SyncItem> entry) {
-  printf("\t\tProcessDirectory: %s\n", entry->filename().c_str());
   if (entry->IsNew()) {
     mediator_->Add(entry);
-    return true;
-  } else if (entry->IsOpaqueDirectory()) {
-    printf("\t\tReplacing directory %s\n", entry->filename().c_str());
-    mediator_->Replace(entry);
+    // Recursion stops here. All content of new directory
+    // is added later by the SyncMediator
     return false;
-  }
-  else if (entry->IsTouched()) {
-    printf("\t\tTouching directory %s\n", entry->filename().c_str());
-    mediator_->Touch(entry);
-    return true;
-  } else {
-    mediator_->Replace(entry);
-    return true;
+  } else {                            // directory already existed...
+    if (entry->IsOpaqueDirectory()) {  // was directory completely overwritten?
+      mediator_->Replace(entry);
+      return false;  // <-- replace does not need any further recursion
+    } else {  // directory was just changed internally... only touch needed
+      mediator_->Touch(entry);
+      return true;
+    }
   }
 }
 
