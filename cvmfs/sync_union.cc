@@ -30,6 +30,9 @@ bool SyncUnion::Initialize() {
 SharedPtr<SyncItem> SyncUnion::CreateSyncItem(
     const std::string &relative_parent_path, const std::string &filename,
     const SyncItemType entry_type) const {
+  
+        printf("\tCreateSyncItem: %s/%s\n", relative_parent_path.c_str(), filename.c_str());
+
   SharedPtr<SyncItem> entry = SharedPtr<SyncItem>(new SyncItem(
       relative_parent_path, filename, this, entry_type));
 
@@ -64,18 +67,24 @@ bool SyncUnion::ProcessDirectory(const string &parent_dir,
   return ProcessDirectory(entry);
 }
 
+
 bool SyncUnion::ProcessDirectory(SharedPtr<SyncItem> entry) {
+  printf("\t\tProcessDirectory: %s\n", entry->filename().c_str());
   if (entry->IsNew()) {
     mediator_->Add(entry);
     return true;
-  } else {                            // directory already existed...
-    if (entry->IsOpaqueDirectory()) {  // was directory completely overwritten?
-      mediator_->Replace(entry);
-      return false;  // <-- replace does not need any further recursion
-    } else {  // directory was just changed internally... only touch needed
-      mediator_->Touch(entry);
-      return true;
-    }
+  } else if (entry->IsOpaqueDirectory()) {
+    printf("\t\tReplacing directory %s\n", entry->filename().c_str());
+    mediator_->Replace(entry);
+    return false;
+  }
+  else if (entry->IsTouched()) {
+    printf("\t\tTouching directory %s\n", entry->filename().c_str());
+    mediator_->Touch(entry);
+    return true;
+  } else {
+    mediator_->Replace(entry);
+    return true;
   }
 }
 
@@ -97,6 +106,7 @@ void SyncUnion::ProcessSymlink(const string &parent_dir,
 }
 
 void SyncUnion::ProcessFile(SharedPtr<SyncItem> entry) {
+  printf("\t\tProcessFile: %s\n", entry->filename().c_str());
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessFile(%s)",
            entry->filename().c_str());
   if (entry->IsWhiteout()) {

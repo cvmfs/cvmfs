@@ -157,6 +157,13 @@ class SyncMediator : public virtual AbstractSyncMediator {
   void CreateNestedCatalog(SharedPtr<SyncItem> directory);
   void RemoveNestedCatalog(SharedPtr<SyncItem> directory);
 
+  void TouchDirectoryRecursively(SharedPtr<SyncItem> entry);
+  void TouchingFileCallback(const std::string &parent_dir,
+                          const std::string &file_name);
+  void TouchingSymlinkCallback(const std::string &parent_dir,
+                             const std::string &link_name);
+  void TouchDirectoryCallback(const std::string &parent_dir,
+                               const std::string &dir_name);
   void RemoveDirectoryRecursively(SharedPtr<SyncItem> entry);
   void RemoveFileCallback(const std::string &parent_dir,
                           const std::string &file_name);
@@ -172,10 +179,28 @@ class SyncMediator : public virtual AbstractSyncMediator {
                             const std::string &link_name);
   void RemoveDirectoryCallback(const std::string &parent_dir,
                                const std::string &dir_name);
-
   bool IgnoreFileCallback(const std::string &parent_dir,
                           const std::string &file_name);
-
+  // Called by file system traversal
+  void EnterAddedDirectoryCallback(const std::string &parent_dir,
+                                   const std::string &dir_name);
+  void LeaveAddedDirectoryCallback(const std::string &parent_dir,
+                                   const std::string &dir_name);  
+  void AddDirectoryRecursively(const SharedPtr<SyncItem> &entry);
+  bool AddDirectoryCallback(const std::string &parent_dir,
+                            const std::string &dir_name);
+  void AddFileCallback(const std::string &parent_dir,
+                       const std::string &file_name);
+  void AddCharacterDeviceCallback(const std::string &parent_dir,
+                                  const std::string &file_name);
+  void AddBlockDeviceCallback(const std::string &parent_dir,
+                              const std::string &file_name);
+  void AddFifoCallback(const std::string &parent_dir,
+                       const std::string &file_name);
+  void AddSocketCallback(const std::string &parent_dir,
+                         const std::string &file_name);
+  void AddSymlinkCallback(const std::string &parent_dir,
+                          const std::string &link_name);
   SharedPtr<SyncItem> CreateSyncItem(const std::string &relative_parent_path,
                                      const std::string &filename,
                                      const SyncItemType entry_type) const;

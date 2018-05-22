@@ -97,65 +97,65 @@ cvmfs_run_test() {
   mkdir reference_dir
   local reference_dir=$scratch_dir/reference_dir
 
-  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  echo "*** 1 create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
-  echo "starting transaction to edit repository"
+  echo "*** 1 starting transaction to edit repository"
   start_transaction $CVMFS_TEST_REPO || return $?
 
-  echo "putting some stuff in the new repository"
+  echo "*** 1 putting some stuff in the new repository"
   produce_files_in $repo_dir || return 3
 
-  echo "putting exactly the same stuff in the scratch space for comparison"
+  echo "*** 1 putting exactly the same stuff in the scratch space for comparison"
   produce_files_in $reference_dir || return 4
 
-  echo "creating CVMFS snapshot (initial)"
+  echo "*** 1 creating CVMFS snapshot (initial)"
   publish_repo $CVMFS_TEST_REPO || return $?
 
-  echo "compare the results of cvmfs to our reference copy"
+  echo "*** 1 compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir || return $?
 
-  echo "check catalog and data integrity"
+  echo "*** 1 check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-  echo "starting transaction to edit repository"
+  echo "*** 2 starting transaction to edit repository"
   start_transaction $CVMFS_TEST_REPO || return $?
 
-  echo "putting some stuff in the new repository"
+  echo "*** 2 putting some stuff in the new repository"
   replace_symlink_by_directory $repo_dir || return 3
 
-  echo "putting exactly the same stuff in the scratch space for comparison"
+  echo "*** 2 putting exactly the same stuff in the scratch space for comparison"
   replace_symlink_by_directory $reference_dir || return 4
 
-  echo "creating CVMFS snapshot (replace symlink by directory)"
+  echo "*** 2 creating CVMFS snapshot (replace symlink by directory)"
   publish_repo $CVMFS_TEST_REPO || return $?
 
-  echo "check catalog and data integrity"
+  echo "*** 2 check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
 
-  echo "compare the results of cvmfs to our reference copy"
+  echo "*** 2 compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir || return $?
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-  echo "starting transaction to edit repository"
+  echo "*** 3 starting transaction to edit repository"
   start_transaction $CVMFS_TEST_REPO || return $?
 
-  echo "putting some stuff in the new repository"
+  echo "*** 3 putting some stuff in the new repository"
   replace_regular_file_by_directory $repo_dir || return 3
 
-  echo "putting exactly the same stuff in the scratch space for comparison"
+  echo "*** 3 putting exactly the same stuff in the scratch space for comparison"
   replace_regular_file_by_directory $reference_dir || return 4
 
-  echo "creating CVMFS snapshot (replace regular file by directory)"
+  echo "*** 3 creating CVMFS snapshot (replace regular file by directory)"
   publish_repo $CVMFS_TEST_REPO || return $?
 
-  echo "check catalog and data integrity"
+  echo "*** 3 check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
 
-  echo "compare the results of cvmfs to our reference copy"
+  echo "*** 3 compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir || return $?
 
   return 0

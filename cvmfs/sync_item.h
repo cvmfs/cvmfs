@@ -69,7 +69,21 @@ class SyncItem {
   inline bool WasRegularFile()    const { return WasType(kItemFile);           }
   inline bool IsSymlink()         const { return IsType(kItemSymlink);         }
   inline bool WasSymlink()        const { return WasType(kItemSymlink);        }
-  inline bool IsNew()             const { return WasType(kItemNew);            }
+  inline bool IsNew() const {
+    bool result = WasType(kItemNew);
+    printf("\t\tIsNew: %s : %d\n", filename().c_str(), result);
+    return result;
+  }
+  inline bool IsTouched() const {
+    return (GetRdOnlyFiletype() == GetUnionFiletype()) &&
+           (GetRdOnlyFiletype() == GetScratchFiletype()) &&
+           (GetUnionFiletype() == GetScratchFiletype());
+    /*
+    return (GetRdOnlyFiletype() != kItemUnknown) &&
+           (GetScratchFiletype() != kItemUnknown) &&
+           (GetUnionFiletype() != kItemUnknown);
+    */
+  }
   inline bool IsCharacterDevice() const { return IsType(kItemCharacterDevice); }
   inline bool IsBlockDevice()     const { return IsType(kItemBlockDevice);     }
   inline bool IsFifo()            const { return IsType(kItemFifo);            }
@@ -192,6 +206,7 @@ class SyncItem {
   }
 
   SyncItemType GetRdOnlyFiletype() const;
+  SyncItemType GetUnionFiletype() const;
   virtual SyncItemType GetScratchFiletype() const;
 
   /**
