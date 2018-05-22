@@ -1,4 +1,5 @@
 0.2.6:
+  * Key file parsing is more robust w.r.t whitespace and tabs (CVM-1535)
   * Application is now installed in /usr/libexec/cvmfs-gateway while
     the Mnesia database is created under /var/lib/cvmfs-gateway (CVM-1538)
   * Setup script now checks the existence of individual config files (CVM-1532)
