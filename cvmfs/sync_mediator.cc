@@ -128,12 +128,12 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
 /**
  * Touch an entry in the repository.
  */
-void SyncMediator::Touch(SharedPtr<SyncItem> entry) {
+void SyncMediator::Touch(const SyncItem &entry) {
   EnsureAllowed(entry);
 
   if (entry->IsGraftMarker()) {return;}
   if (entry->IsDirectory()) {
-    TouchDirectoryRecursively(entry);
+    TouchDirectory(entry);
     return;
   }
 
@@ -150,17 +150,15 @@ void SyncMediator::Touch(SharedPtr<SyncItem> entry) {
 /**
  * Remove an entry from the repository. Directories will be recursively removed.
  */
-void SyncMediator::Remove(SharedPtr<SyncItem> entry) {
+void SyncMediator::Remove(const SyncItem &entry) {
   EnsureAllowed(entry);
 
   if (entry->WasDirectory()) {
-    printf("\t\tRemove Directory: %s\n", entry->filename().c_str());
     RemoveDirectoryRecursively(entry);
     return;
   }
 
-  if (entry->WasRegularFile() || entry->WasSymlink() ||
-      entry->WasSpecialFile()) {
+  if (entry->WasRegularFile() || entry->WasSymlink() || entry->WasSpecialFile()) {
     RemoveFile(entry);
     return;
   }
@@ -169,20 +167,18 @@ void SyncMediator::Remove(SharedPtr<SyncItem> entry) {
                "' cannot be deleted. Unrecognized file type.");
 }
 
+
 /**
  * Remove the old entry and add the new one.
  */
-void SyncMediator::Replace(SharedPtr<SyncItem> entry) {
+void SyncMediator::Replace(const SyncItem &entry) {
   // EnsureAllowed(entry); <-- Done by Remove() and Add()
   Remove(entry);
-  if (entry->IsDirectory()) {
-    AddDirectoryRecursively(entry);
-  } else {
-    Add(entry);
-  }
+  Add(entry);
 }
 
-void SyncMediator::EnterDirectory(SharedPtr<SyncItem> entry) {
+
+void SyncMediator::EnterDirectory(const SyncItem &entry) {
   if (!handle_hardlinks_) {
     return;
   }
@@ -350,12 +346,13 @@ void SyncMediator::InsertLegacyHardlink(SharedPtr<SyncItem> entry) {
       // replaced.  Here, we remove an untouched hardlink and add it to its
       // hardlink group for re-adding later
       LogCvmfs(kLogPublish, kLogVerboseMsg, "Picked up legacy hardlink %s",
-               entry->GetUnionPath().c_str());
+               entry.GetUnionPath().c_str());
       Remove(entry);
       hl_group->second.AddHardlink(entry);
     }
   }
 }
+
 
 /**
  * Create a recursion engine which DOES NOT recurse into directories.
@@ -363,92 +360,168 @@ void SyncMediator::InsertLegacyHardlink(SharedPtr<SyncItem> entry) {
  * searches for legacy hardlinks which has to be connected to the new
  * or edited ones.
  */
-void SyncMediator::CompleteHardlinks(SharedPtr<SyncItem> entry) {
+void SyncMediator::CompleteHardlinks(const SyncItem &entry) {
   assert(handle_hardlinks_);
 
   // If no hardlink in this directory was changed, we can skip this
-  if (GetHardlinkMap().empty()) return;
+  if (GetHardlinkMap().empty())
+    return;
 
   LogCvmfs(kLogPublish, kLogVerboseMsg, "Post-processing hard links in %s",
-           entry->GetUnionPath().c_str());
+           entry.GetUnionPath().c_str());
 
   // Look for legacy hardlinks
   FileSystemTraversal<SyncMediator> traversal(this, union_engine_->union_path(),
                                               false);
-  traversal.fn_new_file = &SyncMediator::LegacyRegularHardlinkCallback;
+  traversal.fn_new_file =
+    &SyncMediator::LegacyRegularHardlinkCallback;
   traversal.fn_new_symlink = &SyncMediator::LegacySymlinkHardlinkCallback;
   traversal.fn_new_character_dev =
-      &SyncMediator::LegacyCharacterDeviceHardlinkCallback;
+    &SyncMediator::LegacyCharacterDeviceHardlinkCallback;
   traversal.fn_new_block_dev = &SyncMediator::LegacyBlockDeviceHardlinkCallback;
   traversal.fn_new_fifo = &SyncMediator::LegacyFifoHardlinkCallback;
   traversal.fn_new_socket = &SyncMediator::LegacySocketHardlinkCallback;
-  traversal.Recurse(entry->GetUnionPath());
+  traversal.Recurse(entry.GetUnionPath());
 }
 
+
 void SyncMediator::LegacyRegularHardlinkCallback(const string &parent_dir,
-                                                 const string &file_name) {
-  SharedPtr<SyncItem> entry = CreateSyncItem(parent_dir, file_name, kItemFile);
+                                                 const string &file_name)
+{
+  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemFile);
   InsertLegacyHardlink(entry);
 }
 
+
 void SyncMediator::LegacySymlinkHardlinkCallback(const string &parent_dir,
-                                                 const string &file_name) {
-  SharedPtr<SyncItem> entry =
-      CreateSyncItem(parent_dir, file_name, kItemSymlink);
+                                                  const string &file_name)
+{
+  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemSymlink);
   InsertLegacyHardlink(entry);
 }
 
 void SyncMediator::LegacyCharacterDeviceHardlinkCallback(
-    const string &parent_dir, const string &file_name) {
-  SharedPtr<SyncItem> entry =
-      CreateSyncItem(parent_dir, file_name, kItemCharacterDevice);
+  const string &parent_dir,
+  const string &file_name)
+{
+  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemCharacterDevice);
   InsertLegacyHardlink(entry);
 }
 
-void SyncMediator::LegacyBlockDeviceHardlinkCallback(const string &parent_dir,
-                                                     const string &file_name) {
-  SharedPtr<SyncItem> entry =
-      CreateSyncItem(parent_dir, file_name, kItemBlockDevice);
+void SyncMediator::LegacyBlockDeviceHardlinkCallback(
+  const string &parent_dir,
+  const string &file_name)
+{
+  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemBlockDevice);
   InsertLegacyHardlink(entry);
 }
 
 void SyncMediator::LegacyFifoHardlinkCallback(const string &parent_dir,
-                                              const string &file_name) {
-  SharedPtr<SyncItem> entry = CreateSyncItem(parent_dir, file_name, kItemFifo);
+                                              const string &file_name)
+{
+  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemFifo);
   InsertLegacyHardlink(entry);
 }
 
 void SyncMediator::LegacySocketHardlinkCallback(const string &parent_dir,
-                                                const string &file_name) {
-  SharedPtr<SyncItem> entry =
-      CreateSyncItem(parent_dir, file_name, kItemSocket);
+                                                const string &file_name)
+{
+  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemSocket);
   InsertLegacyHardlink(entry);
 }
 
 
-void SyncMediator::TouchDirectoryRecursively(SharedPtr<SyncItem> entry) {
-  assert(entry->IsDirectory());
+void SyncMediator::AddDirectoryRecursively(const SyncItem &entry) {
+  AddDirectory(entry);
 
-  const bool recurse = false;
+  // Create a recursion engine, which recursively adds all entries in a newly
+  // created directory
   FileSystemTraversal<SyncMediator> traversal(
-      this, union_engine_->rdonly_path(), recurse);
-  traversal.fn_new_file = &SyncMediator::TouchingFileCallback;
-  traversal.fn_new_dir_postfix = &SyncMediator::TouchDirectoryCallback;
-  traversal.fn_new_symlink = &SyncMediator::TouchingSymlinkCallback;
-  traversal.fn_new_character_dev = &SyncMediator::RemoveCharacterDeviceCallback;
-  traversal.fn_new_block_dev = &SyncMediator::RemoveBlockDeviceCallback;
-  traversal.fn_new_fifo = &SyncMediator::RemoveFifoCallback;
-  traversal.fn_new_socket = &SyncMediator::RemoveSocketCallback;
-  traversal.Recurse(entry->GetRdOnlyPath());
-
-  assert(entry->IsDirectory());
-  printf("\t\t\tTouching: %s => (%d, %d)\n", entry->filename().c_str(),
-         entry->IsDirectory(),
-         entry->CreateBasicCatalogDirent().IsDirectory());
-  TouchDirectory(entry);
+    this, union_engine_->scratch_path(), true);
+  traversal.fn_enter_dir      = &SyncMediator::EnterAddedDirectoryCallback;
+  traversal.fn_leave_dir      = &SyncMediator::LeaveAddedDirectoryCallback;
+  traversal.fn_new_file       = &SyncMediator::AddFileCallback;
+  traversal.fn_new_symlink    = &SyncMediator::AddSymlinkCallback;
+  traversal.fn_new_dir_prefix = &SyncMediator::AddDirectoryCallback;
+  traversal.fn_ignore_file    = &SyncMediator::IgnoreFileCallback;
+  traversal.fn_new_character_dev = &SyncMediator::AddCharacterDeviceCallback;
+  traversal.fn_new_block_dev = &SyncMediator::AddBlockDeviceCallback;
+  traversal.fn_new_fifo      = &SyncMediator::AddFifoCallback;
+  traversal.fn_new_socket    = &SyncMediator::AddSocketCallback;
+  traversal.Recurse(entry.GetScratchPath());
 }
 
-void SyncMediator::RemoveDirectoryRecursively(SharedPtr<SyncItem> entry) {
+
+bool SyncMediator::AddDirectoryCallback(const std::string &parent_dir,
+                                        const std::string &dir_name)
+{
+  SyncItem entry = CreateSyncItem(parent_dir, dir_name, kItemDir);
+  AddDirectory(entry);
+  return true;  // The recursion engine should recurse deeper here
+}
+
+
+void SyncMediator::AddFileCallback(const std::string &parent_dir,
+                                   const std::string &file_name)
+{
+  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemFile);
+  Add(entry);
+}
+
+
+void SyncMediator::AddCharacterDeviceCallback(const std::string &parent_dir,
+                                    const std::string &file_name)
+{
+  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemCharacterDevice);
+  Add(entry);
+}
+
+void SyncMediator::AddBlockDeviceCallback(const std::string &parent_dir,
+                                    const std::string &file_name)
+{
+  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemBlockDevice);
+  Add(entry);
+}
+
+void SyncMediator::AddFifoCallback(const std::string &parent_dir,
+                                   const std::string &file_name)
+{
+  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemFifo);
+  Add(entry);
+}
+
+void SyncMediator::AddSocketCallback(const std::string &parent_dir,
+                                     const std::string &file_name)
+{
+  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemSocket);
+  Add(entry);
+}
+
+void SyncMediator::AddSymlinkCallback(const std::string &parent_dir,
+                                      const std::string &link_name)
+{
+  SyncItem entry = CreateSyncItem(parent_dir, link_name, kItemSymlink);
+  Add(entry);
+}
+
+
+void SyncMediator::EnterAddedDirectoryCallback(const std::string &parent_dir,
+                                               const std::string &dir_name)
+{
+  SyncItem entry = CreateSyncItem(parent_dir, dir_name, kItemDir);
+  EnterDirectory(entry);
+}
+
+
+void SyncMediator::LeaveAddedDirectoryCallback(const std::string &parent_dir,
+                                               const std::string &dir_name)
+{
+  SyncItem entry = CreateSyncItem(parent_dir, dir_name, kItemDir);
+  LeaveDirectory(entry);
+}
+
+
+void SyncMediator::RemoveDirectoryRecursively(const SyncItem &entry) {
   // Delete a directory AFTER it was emptied here,
   // because it would start up another recursion
 
@@ -463,109 +536,62 @@ void SyncMediator::RemoveDirectoryRecursively(SharedPtr<SyncItem> entry) {
   traversal.fn_new_block_dev = &SyncMediator::RemoveBlockDeviceCallback;
   traversal.fn_new_fifo      = &SyncMediator::RemoveFifoCallback;
   traversal.fn_new_socket    = &SyncMediator::RemoveSocketCallback;
-  traversal.Recurse(entry->GetRdOnlyPath());
+  traversal.Recurse(entry.GetRdOnlyPath());
 
   // The given directory was emptied recursively and can now itself be deleted
-
-    RemoveDirectory(entry);
+  RemoveDirectory(entry);
 }
+
 
 void SyncMediator::RemoveFileCallback(const std::string &parent_dir,
-                                      const std::string &file_name) {
-  SharedPtr<SyncItem> entry = CreateSyncItem(parent_dir, file_name, kItemFile);
+                                      const std::string &file_name)
+{
+  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemFile);
   Remove(entry);
 }
 
-void SyncMediator::TouchingFileCallback(const std::string &parent_dir,
-                                      const std::string &file_name) {
-  SharedPtr<SyncItem> entry = CreateSyncItem(parent_dir, file_name, kItemFile);
-  
-  if (entry->IsTouched()) {
-    Touch(entry);
-  } else if (entry->IsNew()) {
-    Add(entry);
-  } else {
-    Remove(entry);
-  }
-}
 
 void SyncMediator::RemoveSymlinkCallback(const std::string &parent_dir,
-                                         const std::string &link_name) {
-  SharedPtr<SyncItem> entry =
-      CreateSyncItem(parent_dir, link_name, kItemSymlink);
+                                         const std::string &link_name)
+{
+  SyncItem entry = CreateSyncItem(parent_dir, link_name, kItemSymlink);
   Remove(entry);
 }
 
-void SyncMediator::TouchingSymlinkCallback(const std::string &parent_dir,
-                                         const std::string &link_name) {
-  SharedPtr<SyncItem> entry =
-      CreateSyncItem(parent_dir, link_name, kItemSymlink);
-  if (entry->IsTouched()) {
-    Touch(entry);
-  } else if (entry->IsNew()) {
-    Add(entry);
-  } else {
-    Remove(entry);
-  }
+void SyncMediator::RemoveCharacterDeviceCallback(
+  const std::string &parent_dir,
+  const std::string &link_name)
+{
+  SyncItem entry = CreateSyncItem(parent_dir, link_name, kItemCharacterDevice);
+  Remove(entry);
 }
 
-void SyncMediator::RemoveCharacterDeviceCallback(const std::string &parent_dir,
-                                                 const std::string &link_name) {
-  SharedPtr<SyncItem> entry =
-      CreateSyncItem(parent_dir, link_name, kItemCharacterDevice);
-  if (entry->IsTouched()) {
-    Touch(entry);
-  } else {
-    Remove(entry);
-  }
-}
-
-void SyncMediator::RemoveBlockDeviceCallback(const std::string &parent_dir,
-                                             const std::string &link_name) {
-  SharedPtr<SyncItem> entry =
-      CreateSyncItem(parent_dir, link_name, kItemBlockDevice);
-  if (entry->IsTouched()) {
-    Touch(entry);
-  } else {
-    Remove(entry);
-  }
+void SyncMediator::RemoveBlockDeviceCallback(
+  const std::string &parent_dir,
+  const std::string &link_name)
+{
+  SyncItem entry = CreateSyncItem(parent_dir, link_name, kItemBlockDevice);
+  Remove(entry);
 }
 
 void SyncMediator::RemoveFifoCallback(const std::string &parent_dir,
                                       const std::string &link_name)
 {
-  SharedPtr<SyncItem> entry = CreateSyncItem(parent_dir, link_name, kItemFifo);
-  if (entry->IsTouched()) {
-    Touch(entry);
-  } else {
-    Remove(entry);
-  }
+  SyncItem entry = CreateSyncItem(parent_dir, link_name, kItemFifo);
+  Remove(entry);
 }
 
 void SyncMediator::RemoveSocketCallback(const std::string &parent_dir,
                                         const std::string &link_name)
 {
-  SharedPtr<SyncItem> entry =
-      CreateSyncItem(parent_dir, link_name, kItemSocket);
-  if (entry->IsTouched()) {
-    Touch(entry);
-  } else {
-    Remove(entry);
-  }
+  SyncItem entry = CreateSyncItem(parent_dir, link_name, kItemSocket);
+  Remove(entry);
 }
-
-void SyncMediator::TouchDirectoryCallback(const std::string &parent_dir,
-                                           const std::string &dir_name)
-{
-  SharedPtr<SyncItem> entry = CreateSyncItem(parent_dir, dir_name, kItemDir);
-  TouchDirectoryRecursively(entry);
-}
-
 
 void SyncMediator::RemoveDirectoryCallback(const std::string &parent_dir,
                                            const std::string &dir_name)
 {
-  SharedPtr<SyncItem> entry = CreateSyncItem(parent_dir, dir_name, kItemDir);
+  SyncItem entry = CreateSyncItem(parent_dir, dir_name, kItemDir);
   RemoveDirectoryRecursively(entry);
 }
 
