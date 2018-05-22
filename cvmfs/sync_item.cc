@@ -89,9 +89,6 @@ SyncItemType SyncItem::GetRdOnlyFiletype() const {
   // r/w:
   //    /foo/bar/regular_file/
   //    /foo/bar/regular_file/is_dir_now
-  if (rdonly_stat_.error_code == ENOENT) printf("\tENOENT\n");
-  if (rdonly_stat_.error_code == ENOTDIR) printf("\tENOTDIR\n");
-  
   if (rdonly_stat_.error_code == ENOENT ||
       rdonly_stat_.error_code == ENOTDIR) return kItemNew;
   return GetGenericFiletype(rdonly_stat_);

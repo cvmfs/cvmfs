@@ -77,7 +77,7 @@ class AbstractSyncMediator {
   virtual void Touch(SharedPtr<SyncItem> entry) = 0;
   virtual void Remove(SharedPtr<SyncItem> entry) = 0;
   virtual void Replace(SharedPtr<SyncItem> entry) = 0;
-  
+
   virtual void AddUnmaterializedDirectory(SharedPtr<SyncItem> entry) = 0;
 
   virtual void EnterDirectory(SharedPtr<SyncItem> entry) = 0;
@@ -117,12 +117,12 @@ class SyncMediator : public virtual AbstractSyncMediator {
   void Touch(SharedPtr<SyncItem> entry);
   void Remove(SharedPtr<SyncItem> entry);
   void Replace(SharedPtr<SyncItem> entry);
-  
+
   void AddUnmaterializedDirectory(SharedPtr<SyncItem> entry);
 
   void EnterDirectory(SharedPtr<SyncItem> entry);
   void LeaveDirectory(SharedPtr<SyncItem> entry);
-  
+
   bool Commit(manifest::Manifest *manifest);
 
   // The sync union engine uses this information to create properly initialized
@@ -189,7 +189,7 @@ class SyncMediator : public virtual AbstractSyncMediator {
   void EnterAddedDirectoryCallback(const std::string &parent_dir,
                                    const std::string &dir_name);
   void LeaveAddedDirectoryCallback(const std::string &parent_dir,
-                                   const std::string &dir_name);  
+                                   const std::string &dir_name);
   void AddDirectoryRecursively(SharedPtr<SyncItem> entry);
   bool AddDirectoryCallback(const std::string &parent_dir,
                             const std::string &dir_name);

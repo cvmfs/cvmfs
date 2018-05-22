@@ -27,9 +27,9 @@ bool SyncUnion::Initialize() {
   return true;
 }
 
-SharedPtr<SyncItem> SyncUnion::CreateSyncItem(const std::string &relative_parent_path,
-                                   const std::string &filename,
-                                   const SyncItemType entry_type) const {
+SharedPtr<SyncItem> SyncUnion::CreateSyncItem(
+    const std::string &relative_parent_path, const std::string &filename,
+    const SyncItemType entry_type) const {
   SharedPtr<SyncItem> entry = SharedPtr<SyncItem>(
       new SyncItem(relative_parent_path, filename, this, entry_type));
   PreprocessSyncItem(entry);
@@ -110,7 +110,6 @@ void SyncUnion::ProcessSymlink(const string &parent_dir,
 }
 
 void SyncUnion::ProcessFile(SharedPtr<SyncItem> entry) {
-  printf("\t\tProcessFile: %s\n", entry->filename().c_str());
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessFile(%s)",
            entry->filename().c_str());
   if (entry->IsWhiteout()) {
