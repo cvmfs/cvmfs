@@ -27,24 +27,25 @@ bool SyncUnion::Initialize() {
   return true;
 }
 
-SyncItem SyncUnion::CreateSyncItem(const std::string &relative_parent_path,
+SharedPtr<SyncItem> SyncUnion::CreateSyncItem(const std::string &relative_parent_path,
                                    const std::string &filename,
                                    const SyncItemType entry_type) const {
-  SyncItem entry(relative_parent_path, filename, this, entry_type);
-  PreprocessSyncItem(&entry);
+  SharedPtr<SyncItem> entry = SharedPtr<SyncItem>(
+      new SyncItem(relative_parent_path, filename, this, entry_type));
+  PreprocessSyncItem(entry);
   if (entry_type == kItemFile) {
-    entry.SetExternalData(mediator_->IsExternalData());
-    entry.SetCompressionAlgorithm(mediator_->GetCompressionAlgorithm());
+    entry->SetExternalData(mediator_->IsExternalData());
+    entry->SetCompressionAlgorithm(mediator_->GetCompressionAlgorithm());
   }
   return entry;
 }
 
-void SyncUnion::PreprocessSyncItem(SyncItem *entry) const {
-  if (IsWhiteoutEntry(*entry)) {
-    entry->MarkAsWhiteout(UnwindWhiteoutFilename(*entry));
+void SyncUnion::PreprocessSyncItem(SharedPtr<SyncItem> entry) const {
+  if (IsWhiteoutEntry(entry)) {
+    entry->MarkAsWhiteout(UnwindWhiteoutFilename(entry));
   }
 
-  if (entry->IsDirectory() && IsOpaqueDirectory(*entry)) {
+  if (entry->IsDirectory() && IsOpaqueDirectory(entry)) {
     entry->MarkAsOpaqueDirectory();
   }
 }
@@ -62,12 +63,13 @@ bool SyncUnion::ProcessDirectory(const string &parent_dir,
   return ProcessDirectory(entry);
 }
 
+bool SyncUnion::ProcessDirectory(SharedPtr<SyncItem> entry) {
   if (entry->IsNew()) {
     mediator_->Add(entry);
     // Recursion stops here. All content of new directory
     // is added later by the SyncMediator
     return false;
-  } else {                            // directory already existed...
+  } else {                             // directory already existed...
     if (entry->IsOpaqueDirectory()) {  // was directory completely overwritten?
       mediator_->Replace(entry);
       return false;  // <-- replace does not need any further recursion
@@ -76,6 +78,18 @@ bool SyncUnion::ProcessDirectory(const string &parent_dir,
       return true;
     }
   }
+}
+
+// We don't have the directory that we are processing in the fs, we
+// cannot recurse inside the directory.
+// If the directory already exists, we simply remove it and we put it back the
+// new one (some attributes may change)
+// If it does not exists we simply add it.
+bool SyncUnion::ProcessUnmaterializedDirectory(SharedPtr<SyncItem> entry) {
+  if (entry->IsNew()) {
+    mediator_->AddUnmaterializedDirectory(entry);
+  }
+  return true;
 }
 
 void SyncUnion::ProcessRegularFile(const string &parent_dir,
