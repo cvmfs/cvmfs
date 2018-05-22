@@ -409,10 +409,7 @@ p_populate_repos(RepoList) ->
                                                             Secret :: binary()}.
 p_parse_key_file(FileName) ->
     {ok, Body} = file:read_file(FileName),
-    [Line | _] = [L || L <- binary:split(Body, <<"\n">>), L =/= <<>>],
-    [KeyType, KeyId, Secret] = lists:filter(fun(B) -> B =/= <<"">> end,
-                                            binary:split(Line, <<" ">>, [global])),
-    {KeyType, KeyId, Secret}.
+    cvmfs_auth_util:parse_key_binary(Body).
 
 
 -spec p_reload_repo_config() -> ok | {error, Reason}
