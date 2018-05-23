@@ -37,7 +37,6 @@ SyncUnionTarball::SyncUnionTarball(AbstractSyncMediator *mediator,
       base_directory_(base_directory),
       to_delete_(to_delete),
       read_archive_signal_(new Signal) {
-  read_archive_signal_->Wakeup();
 }
 
 SyncUnionTarball::~SyncUnionTarball() { delete read_archive_signal_; }
@@ -49,7 +48,7 @@ bool SyncUnionTarball::Initialize() {
   assert(ARCHIVE_OK == archive_read_support_format_tar(src));
   assert(ARCHIVE_OK == archive_read_support_format_empty(src));
 
-  if (tarball_path_ == "--") {
+  if (tarball_path_ == "-") {
     result = archive_read_open_filename(src, NULL, kBlockSize);
   } else {
     std::string tarball_absolute_path = GetAbsolutePath(tarball_path_);
@@ -80,11 +79,11 @@ bool SyncUnionTarball::Initialize() {
  * actually need to read data from them.
  */
 void SyncUnionTarball::Traverse() {
+  read_archive_signal_->Wakeup();
   assert(this->IsInitialized());
-  struct archive_entry *entry = archive_entry_new();
 
   /*
-   * As first step we eliminate the directories we are request.
+   * As first step we eliminate the requested directories.
    */
   if (to_delete_ != "") {
     vector<std::string> to_eliminate_vec = SplitString(to_delete_, ':');
@@ -101,8 +100,9 @@ void SyncUnionTarball::Traverse() {
     }
   }
 
+  struct archive_entry *entry = archive_entry_new();
   while (true) {
-    /* Get the lock, wait if lock is not available yet */
+    // Get the lock, wait if lock is not available yet
     read_archive_signal_->Wait();
 
     int result = archive_read_next_header2(src, entry);
@@ -110,14 +110,15 @@ void SyncUnionTarball::Traverse() {
     switch (result) {
       case ARCHIVE_FATAL: {
         LogCvmfs(kLogUnionFs, kLogStderr,
-                 "Fatal error in reading the archive.");
-        return;
-        break; /* Only exit point with error */
+                 "Fatal error in reading the archive.\n%s\n",
+                 archive_error_string(src));
+        abort();
+        break;  // Only exit point with error
       }
 
       case ARCHIVE_RETRY: {
         LogCvmfs(kLogUnionFs, kLogStdout,
-                 "Error in reading the header, retrying. \n %s",
+                 "Error in reading the header, retrying.\n%s\n",
                  archive_error_string(src));
         continue;
         break;
@@ -130,27 +131,24 @@ void SyncUnionTarball::Traverse() {
           SharedPtr<SyncItem> to_mark = dirs_[*dir];
           assert(to_mark->IsDirectory());
           to_mark->SetCatalogMarker();
-          to_mark->AlreadyCreatedDir();
+          to_mark->IsPlaceholderDirectory();
           ProcessDirectory(to_mark);
         }
-        return; /* Only successful exit point */
+        return;  // Only successful exit point
         break;
       }
 
       case ARCHIVE_WARN: {
         LogCvmfs(kLogUnionFs, kLogStderr,
-                 "Warning in uncompression reading, going on. \n %s",
+                 "Warning in uncompression reading, going on.\n %s",
                  archive_error_string(src));
-        /* We actually want this to enter the ARCHIVE_OK case */
+        // We actually want this to enter the ARCHIVE_OK case
       }
 
       case ARCHIVE_OK: {
         std::string archive_file_path(archive_entry_pathname(entry));
-        std::string complete_path(base_directory_ + "/" + archive_file_path);
-
-        if (*complete_path.rbegin() == '/') {
-          complete_path.erase(complete_path.size() - 1);
-        }
+        std::string complete_path =
+            MakeCanonicalPath(base_directory_ + "/" + archive_file_path);
 
         std::string parent_path;
         std::string filename;
@@ -164,7 +162,7 @@ void SyncUnionTarball::Traverse() {
         if (sync_entry->IsDirectory()) {
           if (know_directories_.find(complete_path) !=
               know_directories_.end()) {
-            sync_entry->AlreadyCreatedDir();
+            sync_entry->IsPlaceholderDirectory();
           }
           ProcessDirectory(sync_entry);
           dirs_[complete_path] = sync_entry;
@@ -184,6 +182,17 @@ void SyncUnionTarball::Traverse() {
         } else {
           read_archive_signal_->Wakeup();
         }
+        break;
+      }
+
+      default: {
+        // We should never enter in this branch, but just for safeness we prefer
+        // to abort in case we hit a case we don't how to manage.
+        LogCvmfs(kLogUnionFs, kLogStderr,
+                 "Enter in unknow state. Aborting.\nError: %s\n", result,
+                 archive_error_string(src));
+
+        abort();
       }
     }
   }

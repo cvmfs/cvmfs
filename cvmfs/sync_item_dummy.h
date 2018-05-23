@@ -19,7 +19,7 @@ namespace publish {
  * tarball, where the files are not extracted in order (root to leaves) but in a
  * random fashion.
  */
-class SyncItemDummyDir : public SyncItem {
+class SyncItemDummyDir : public SyncItemNative {
   friend class SyncUnionTarball;
 
  public:
@@ -30,7 +30,8 @@ class SyncItemDummyDir : public SyncItem {
   SyncItemDummyDir(const std::string &relative_parent_path,
                    const std::string &filename, const SyncUnion *union_engine,
                    const SyncItemType entry_type)
-      : SyncItem(relative_parent_path, filename, union_engine, entry_type) {
+      : SyncItemNative(relative_parent_path, filename, union_engine,
+                       entry_type) {
     assert(kItemDir == entry_type);
 
     scratch_stat_.obtained = true;
@@ -41,7 +42,7 @@ class SyncItemDummyDir : public SyncItem {
   }
 
  private:
-  mode_t kPermision = S_IFDIR | S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP;
+  static const mode_t kPermision = S_IFDIR | S_IRUSR | S_IWUSR | S_IXUSR;
 };
 
 catalog::DirectoryEntryBase SyncItemDummyDir::CreateBasicCatalogDirent() const {
@@ -53,8 +54,8 @@ catalog::DirectoryEntryBase SyncItemDummyDir::CreateBasicCatalogDirent() const {
 
   dirent.mode_ = kPermision;
 
-  dirent.uid_ = getuid();
-  dirent.gid_ = getgid();
+  dirent.uid_ = scratch_stat_.stat.st_uid;
+  dirent.gid_ = scratch_stat_.stat.st_gid;
   dirent.size_ = 4096;
   dirent.mtime_ = time(NULL);
   dirent.checksum_ = this->GetContentHash();

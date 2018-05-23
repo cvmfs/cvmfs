@@ -30,8 +30,8 @@ bool SyncUnion::Initialize() {
 SharedPtr<SyncItem> SyncUnion::CreateSyncItem(
     const std::string &relative_parent_path, const std::string &filename,
     const SyncItemType entry_type) const {
-  SharedPtr<SyncItem> entry = SharedPtr<SyncItem>(new SyncItem(
-      relative_parent_path, filename, this, entry_type));
+  SharedPtr<SyncItem> entry = SharedPtr<SyncItem>(
+      new SyncItemNative(relative_parent_path, filename, this, entry_type));
 
   PreprocessSyncItem(entry);
   if (entry_type == kItemFile) {

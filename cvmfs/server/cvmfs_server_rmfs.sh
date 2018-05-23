@@ -35,7 +35,6 @@ cvmfs_server_rmfs() {
 
   # sanity checks
   is_root               || die "Only root can remove a repository"
-  check_autofs_on_cvmfs && die "Autofs on /cvmfs has to be disabled"
   ensure_enabled_apache_modules
 
   # get repository names
@@ -75,6 +74,7 @@ cvmfs_server_rmfs() {
 
     # do it!
     if [ "$CVMFS_REPOSITORY_TYPE" = "stratum0" ]; then
+      check_autofs_on_cvmfs && die "Autofs on /cvmfs has to be disabled"
       echo -n "Unmounting CernVM-FS Area... "
       unmount_and_teardown_repository $name || die "fail"
       echo "done"

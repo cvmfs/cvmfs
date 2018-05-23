@@ -204,9 +204,7 @@ bool CommandTag::CloseAndPublishHistory(Environment *env) {
   Future<shash::Any> history_hash;
   upload::Spooler::CallbackPtr callback = env->spooler->RegisterListener(
       &CommandTag::UploadClosure, this, &history_hash);
-  IngestionSource *history_source =
-      new FileIngestionSource(env->history_path.path());
-  env->spooler->ProcessHistory(history_source);
+  env->spooler->ProcessHistory(env->history_path.path());
   env->spooler->WaitForUpload();
   const shash::Any new_history_hash = history_hash.Get();
   env->spooler->UnregisterListener(callback);
@@ -254,8 +252,7 @@ bool CommandTag::UploadCatalogAndUpdateManifest(
   Future<shash::Any> catalog_hash;
   upload::Spooler::CallbackPtr callback = env->spooler->RegisterListener(
       &CommandTag::UploadClosure, this, &catalog_hash);
-  IngestionSource* catalog_source = new FileIngestionSource(catalog_path);
-  env->spooler->ProcessCatalog(catalog_source);
+  env->spooler->ProcessCatalog(catalog_path);
   env->spooler->WaitForUpload();
   const shash::Any new_catalog_hash = catalog_hash.Get();
   env->spooler->UnregisterListener(callback);

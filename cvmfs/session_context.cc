@@ -161,7 +161,7 @@ bool SessionContextBase::Finalize(bool commit, const std::string& old_root_hash,
     if (!commit_result) {
       LogCvmfs(kLogUploadGateway, kLogStderr,
                "SessionContext: could not commit session. Aborting.");
-      abort();
+      return false;
     }
   }
 
@@ -367,13 +367,15 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
   CURLcode ret = curl_easy_perform(h_curl);
   if (ret) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
-             "SessionContext - curl_easy_perform failed: %d", ret);
+             "SessionContext::DoUpload - curl_easy_perform failed: %d",
+             ret);
   }
 
   const bool ok = (reply == "{\"status\":\"ok\"}");
   if (!ok) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
-             "SessionContext - curl_easy_perform reply: %s", reply.c_str());
+             "SessionContext::DoUpload - error reply: %s",
+             reply.c_str());
   }
 
   curl_easy_cleanup(h_curl);

@@ -387,6 +387,7 @@ _migrate_138() {
     fi
   fi
 
+  echo "--> updating server.conf"
   sed -i -e "s/^\(CVMFS_CREATOR_VERSION\)=.*/\1=$destination_version/" $server_conf
 
   # update repository information
@@ -401,16 +402,19 @@ _migrate_139() {
   load_repo_config $name
   echo "Migrating repository '$name' from layout revision $(mangle_version_string $CVMFS_CREATOR_VERSION) to revision $(mangle_version_string $destination_version)"
 
-  echo "--> adjusting /etc/fstab"
-  sed -i -e "s|\(.*\),noauto\(.*# added by CernVM-FS for ${CVMFS_REPOSITORY_NAME}\)|\1,noauto,nodev\2|" /etc/fstab
+  if is_stratum0 $name; then
+    echo "--> adjusting /etc/fstab"
+    sed -i -e "s|\(.*\),noauto\(.*# added by CernVM-FS for ${CVMFS_REPOSITORY_NAME}\)|\1,noauto,nodev\2|" /etc/fstab
 
-  # Make sure the systemd mount unit exists
-  if is_systemd; then
-    /usr/lib/systemd/system-generators/systemd-fstab-generator \
-      /run/systemd/generator '' '' 2>/dev/null
-    systemctl daemon-reload
+    # Make sure the systemd mount unit exists
+    if is_systemd; then
+      /usr/lib/systemd/system-generators/systemd-fstab-generator \
+        /run/systemd/generator '' '' 2>/dev/null || true
+      systemctl daemon-reload
+    fi
   fi
 
+  echo "--> updating server.conf"
   sed -i -e "s/^\(CVMFS_CREATOR_VERSION\)=.*/\1=$destination_version/" $server_conf
 
   # update repository information

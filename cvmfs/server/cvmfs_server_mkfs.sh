@@ -172,6 +172,7 @@ cvmfs_server_mkfs() {
   name=$(get_repository_name $1)
 
   is_valid_repo_name "$name" || die "invalid repository name: $name"
+  is_root                    || die "Only root can create a new repository"
 
   # default values
   [ x"$unionfs"   = x"" ] && unionfs="$(get_available_union_fs)"
@@ -197,7 +198,6 @@ cvmfs_server_mkfs() {
 
   # sanity checks
   check_repository_existence $name  && die "The repository $name already exists"
-  is_root                           || die "Only root can create a new repository"
   check_upstream_validity $upstream
   if [ $unionfs = "overlayfs" ]; then
     local msg

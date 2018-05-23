@@ -26,7 +26,7 @@ case "$1" in
         getent group cvmfs >/dev/null || getent passwd cvmfs > /dev/null || \
         adduser --system --group --no-create-home --home /cvmfs cvmfs
         if [ -d /var/run/cvmfs ]; then
-          /usr/bin/cvmfs_config reload
+          cvmfs_config reload
         fi
     ;;
 

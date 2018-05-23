@@ -423,6 +423,7 @@ class Signal : SingleCopy {
   ~Signal();
   void Wakeup();
   void Wait();
+  bool IsSleeping();
 
  private:
   bool fired_;

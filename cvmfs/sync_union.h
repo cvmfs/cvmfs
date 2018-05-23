@@ -34,11 +34,11 @@
 #include <string>
 
 #include "sync_item.h"
-#include "sync_mediator.h"
 #include "util/shared_ptr.h"
 
 namespace publish {
 
+class AbstractSyncMediator;
 class SyncMediator;
 
 /**

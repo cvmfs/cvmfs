@@ -1,5 +1,5 @@
 
-cvmfs_test_name="Ingest weird and complex files"
+cvmfs_test_name="Ingest special files with nested catalog"
 cvmfs_test_autofs_on_startup=false
 
 produce_tarball() {
@@ -22,17 +22,6 @@ produce_tarball() {
   dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/b/c/3.txt
 
   dd bs=1024 count=5 2>/dev/null  </dev/urandom >tarball_foo/d/e/f/foo.txt
-
-  touch tarball_foo/empty_file.txt
-  touch tarball_foo/a/b/another_empty.txt
-
-  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/b/c/4_change_owner.txt
-  chown $CVMFS_TEST_USER tarball_foo/a/b/c/4_change_owner.txt
-
-  ln -s empty_file.txt tarball_foo/to_empty_link.txt
-  ln -s a/b/c/4_change_owner.txt tarball_foo/to_different_owner.txt
-
-  mkfifo tarball_foo/fifo
 
   echo "*** Generating a tarball in $tarball_name"
   tar -cvf $tarball_name tarball_foo/
@@ -57,30 +46,28 @@ cvmfs_run_test() {
   produce_tarball $tarfile
 
   echo "*** ingesting the tarball in the directory $dir"
-  cvmfs_server ingest-tarball --base_dir $dir --tar_file $tarfile $CVMFS_TEST_REPO || return $?
+  cvmfs_server ingest --base_dir $dir --tar_file $tarfile $CVMFS_TEST_REPO || return $?
 
   echo "*** check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
 
-  local result_dir=$repo_dir/$dir/tarball_foo
-
-  echo "*** check that we actually put the files in $result_dir"
-  if [ ! -d $result_dir ]; then
+  echo "*** check that we actually put the files in $dir"
+  if [ ! -d $repo_dir/$dir/tarball_foo ]; then
     return 1
   fi
 
   for d in a a/b a/b/c; do
-    if [ ! -d $result_dir/$d ]; then
+    if [ ! -d $repo_dir/$dir/tarball_foo/$d ]; then
       echo "*** Error not found directory: $repo_dir/$dir/tarball_foo/$d"
-      return 1
+      return 2
     else
       echo "*** Ingested directory: $repo_dir/$dir/tarball_foo/$d"
 
       for f in 1 2 3; do
-        file=$result_dir/$d/$f.txt
+        file=$repo_dir/$dir/tarball_foo/$d/$f.txt
         if [ ! -f $file ] || [ $(wc -c <$file) -ne 2048 ]; then
           echo "*** Error not found file: $file"
-          return 1
+          return 3
         else
           echo "*** Ingested file of size 2048 bytes: $file"
         fi
@@ -89,57 +76,32 @@ cvmfs_run_test() {
     fi
   done
 
-  file=$result_dir/d/e/f/foo.txt
+  file=$repo_dir/$dir/tarball_foo/d/e/f/foo.txt
   file_size=$(wc -c <$file)
   if [ ! -f $file ] || [ $file_size -ne 5120 ]; then
     echo "*** Error not found file of size 5120: $file"
-    return 1
+    return 4
   else
     echo "*** Ingested file of size $file_size bytes: $file"
   fi
 
-  for f in empty_file.txt a/b/another_empty.txt; do
-    if [ ! -f $result_dir/$f ] || [ $(wc -c <$result_dir/$f) -ne 0 ]; then
-      echo "*** Error not found empty file: $result_dir/$f"
-      return 1
-    else
-      echo "*** Ingested also empty file: $result_dir/$f"
-    fi
-  done
+  echo "*** Checking catalogs been created"
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO
 
-  file=$result_dir/a/b/c/4_change_owner.txt
-  if [ ! -f $file ]; then
-    echo "*** Error not found file with different owner: $file"
-    return 1
-  else
-    echo "*** Found also file from different owner: $file"
-  fi
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$" || return 5
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$dir/tarball_foo/a$" || return 6
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$dir/tarball_foo/a/b$"  || return 7
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/not/existing/catalog$"  && return 8
 
-  file=$result_dir/to_empty_link.txt
-  file_size=$(wc -c <$file)
-  if [ ! -f $file ] || [ $file_size -ne 0 ]; then
-    echo "*** Error not found link to empty file: $file"
-    return 1
-  else
-    echo "*** Found also link to empty file: $file"
-  fi
+  local different_dir="different_dir"
+  echo "*** ingesting the same tarball in a different directory $dir"
+  cvmfs_server ingest --base_dir $different_dir --tar_file $tarfile --delete $dir $CVMFS_TEST_REPO || return $?
 
-  file=$result_dir/to_different_owner.txt
-  file_size=$(wc -c <$file)
-  if [ ! -f $file ] || [ $file_size -ne 2048 ]; then
-    echo "*** Error not found link to different owner file: $file"
-    return 1
-  else
-    echo "*** Found also link to to different owner file: $file"
-  fi
-
-  file=$result_dir/fifo
-  if [ ! -p $file ]; then
-    echo "*** Error not found fifo: $file"
-    return 1
-  else
-    echo "*** Found also fifo: $file"
-  fi
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$" || die "Not found catalog /"
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$different_dir/tarball_foo/a$" || return 9
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$different_dir/tarball_foo/a/b$"  || return 10
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$dir/tarball_foo/a$" && return 11
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$dir/tarball_foo/a/b$"  && return 12
 
 
   return 0

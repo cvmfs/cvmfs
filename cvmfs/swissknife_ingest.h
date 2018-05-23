@@ -2,8 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef CVMFS_SWISSKNIFE_TARBALL_H_
-#define CVMFS_SWISSKNIFE_TARBALL_H_
+#ifndef CVMFS_SWISSKNIFE_INGEST_H_
+#define CVMFS_SWISSKNIFE_INGEST_H_
 
 #include <string>
 
@@ -11,10 +11,10 @@
 #include "swissknife_sync.h"
 
 namespace swissknife {
-class IngestTarball : public Command {
+class Ingest : public Command {
  public:
-  ~IngestTarball() {}
-  virtual std::string GetName() const { return "ingest_tarball"; }
+  ~Ingest() {}
+  virtual std::string GetName() const { return "ingest"; }
   virtual std::string GetDescription() const {
     return "Pushes the content of the tarball to the repository";
   }
@@ -24,7 +24,6 @@ class IngestTarball : public Command {
     r.push_back(Parameter::Mandatory('c', "r/o volume"));
     r.push_back(Parameter::Mandatory('o', "manifest output file"));
     r.push_back(Parameter::Mandatory('r', "spooler definition"));
-    r.push_back(Parameter::Mandatory('s', "scratch directory"));
     r.push_back(Parameter::Mandatory('t', "directory for tee"));
     r.push_back(Parameter::Mandatory('u', "union volume"));
     r.push_back(Parameter::Mandatory('w', "stratum 0 base url"));
@@ -43,4 +42,4 @@ class IngestTarball : public Command {
 };
 }  // namespace swissknife
 
-#endif  // CVMFS_SWISSKNIFE_TARBALL_H_
+#endif  // CVMFS_SWISSKNIFE_INGEST_H_
