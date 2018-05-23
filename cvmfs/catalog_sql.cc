@@ -472,6 +472,7 @@ uint32_t SqlDirent::Hardlinks2HardlinkGroup(const uint64_t hardlinks) const {
 uint64_t SqlDirent::MakeHardlinks(const uint32_t hardlink_group,
                                   const uint32_t linkcount) const
 {
+  assert(linkcount > 0);
   return (static_cast<uint64_t>(hardlink_group) << 32) | linkcount;
 }
 

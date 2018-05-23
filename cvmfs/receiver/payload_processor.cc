@@ -13,7 +13,56 @@
 #include "util/posix.h"
 #include "util/string.h"
 
+namespace {
+
+const size_t kConsumerBuffer = 10 * 1024 * 1024;  // 10 MB
+
+}
+
 namespace receiver {
+
+FileInfo::FileInfo()
+  : total_size(0),
+    current_size(0),
+    hash_context(),
+    hash_buffer(),
+    skip(false)
+{}
+
+FileInfo::FileInfo(const ObjectPackBuild::Event& event)
+  : temp_path(),
+    total_size(event.size),
+    current_size(0),
+    hash_context(shash::ContextPtr(event.id.algorithm)),
+    hash_buffer(hash_context.size, 0),
+    skip(false)
+{
+  hash_context.buffer = &hash_buffer[0];
+  shash::Init(hash_context);
+}
+
+FileInfo::FileInfo(const FileInfo& other)
+  : temp_path(other.temp_path),
+    total_size(other.total_size),
+    current_size(other.current_size),
+    hash_context(other.hash_context),
+    hash_buffer(other.hash_buffer),
+    skip(other.skip)
+{
+  hash_context.buffer = &hash_buffer[0];
+}
+
+FileInfo& FileInfo::operator=(const FileInfo& other) {
+  temp_path = other.temp_path;
+  total_size = other.total_size;
+  current_size = other.current_size;
+  hash_context = other.hash_context;
+  hash_buffer = other.hash_buffer;
+  hash_context.buffer = &hash_buffer[0];
+  skip = other.skip;
+
+  return *this;
+}
 
 PayloadProcessor::PayloadProcessor()
     : pending_files_(),
@@ -49,9 +98,8 @@ PayloadProcessor::Result PayloadProcessor::Process(
 
   int nb = 0;
   ObjectPackBuild::State consumer_state = ObjectPackBuild::kStateContinue;
+  std::vector<unsigned char> buffer(kConsumerBuffer, 0);
   do {
-    std::vector<unsigned char> buffer(4096, 0);
-
     nb = read(fdin, &buffer[0], buffer.size());
     consumer_state = deserializer.ConsumeNext(nb, &buffer[0]);
     if (consumer_state != ObjectPackBuild::kStateContinue &&
@@ -64,17 +112,13 @@ PayloadProcessor::Result PayloadProcessor::Process(
     }
   } while (nb > 0 && consumer_state != ObjectPackBuild::kStateDone);
 
-  if (GetNumErrors() > 0) {
-    return kOtherError;
-  }
-
   assert(pending_files_.empty());
 
-  Finalize();
+  Result res = Finalize();
 
   deserializer.UnregisterListeners();
 
-  return kSuccess;
+  return res;
 }
 
 void PayloadProcessor::ConsumerEventCallback(
@@ -95,64 +139,83 @@ void PayloadProcessor::ConsumerEventCallback(
 
   FileIterator it = pending_files_.find(event.id);
   if (it == pending_files_.end()) {
-    // New file to unpack
-    const std::string tmp_path =
-        CreateTempPath(temp_dir_->dir() + "/payload", 0666);
-    if (tmp_path.empty()) {
-      LogCvmfs(kLogReceiver, kLogSyslogErr,
-               "PayloadProcessor - error: Unable to create temporary path.");
-      num_errors_++;
-      return;
-    }
+    FileInfo info(event);
 
-    FileInfo info;
-    info.temp_path = tmp_path;
-    info.total_size = event.size;
-    info.current_size = 0;
+    // If the file already exists in the repository, don't create a temp file,
+    // mark it to be skipped in the FileInfo, but keep track of the number of
+    // bytes currently written
+    if (spooler_->Peek("data/" + path)) {
+      LogCvmfs(
+          kLogReceiver, kLogDebug,
+          "PayloadProcessor - file %s already exists at destination. "
+          "Marking it to be skipped.",
+          path.c_str());
+      info.skip = true;
+    } else {
+      // New file to unpack
+      const std::string tmp_path =
+          CreateTempPath(temp_dir_->dir() + "/payload", 0666);
+      if (tmp_path.empty()) {
+        LogCvmfs(kLogReceiver, kLogSyslogErr,
+                "PayloadProcessor - error: Unable to create temporary path.");
+        num_errors_++;
+        return;
+      }
+      info.temp_path = tmp_path;
+    }
 
     pending_files_[event.id] = info;
   }
 
   FileInfo& info = pending_files_[event.id];
 
-  int fdout = open(info.temp_path.c_str(), O_CREAT | O_WRONLY | O_APPEND, 0600);
-  if (fdout == -1) {
-    LogCvmfs(
-        kLogReceiver, kLogSyslogErr,
-        "PayloadProcessor - error: Unable to open temporary output file: %s",
-        info.temp_path.c_str());
-    return;
-  }
+  if (!info.skip) {
+    int fdout =
+        open(info.temp_path.c_str(), O_CREAT | O_WRONLY | O_APPEND, 0600);
+    if (fdout == -1) {
+      LogCvmfs(
+          kLogReceiver, kLogSyslogErr,
+          "PayloadProcessor - error: Unable to open temporary output file: %s",
+          info.temp_path.c_str());
+      return;
+    }
 
-  if (!WriteFile(fdout, event.buf, event.buf_size)) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr,
-             "PayloadProcessor - error: Unable to write %s",
-             info.temp_path.c_str());
-    num_errors_++;
-    unlink(info.temp_path.c_str());
+    if (!WriteFile(fdout, event.buf, event.buf_size)) {
+      LogCvmfs(kLogReceiver, kLogSyslogErr,
+               "PayloadProcessor - error: Unable to write %s",
+               info.temp_path.c_str());
+      num_errors_++;
+      unlink(info.temp_path.c_str());
+      close(fdout);
+      return;
+    }
     close(fdout);
-    return;
+
+    shash::Update(static_cast<const unsigned char*>(event.buf),
+                  event.buf_size,
+                  info.hash_context);
   }
-  close(fdout);
 
   info.current_size += event.buf_size;
 
   if (info.current_size == info.total_size) {
-    shash::Any file_hash(shash::kSha1);
-    shash::HashFile(info.temp_path, &file_hash);
+    if (!info.skip) {
+      shash::Any file_hash(event.id.algorithm);
+      shash::Final(info.hash_context, &file_hash);
 
-    if (file_hash != event.id) {
-      LogCvmfs(
-          kLogReceiver, kLogSyslogErr,
-          "PayloadProcessor - error: Hash mismatch for unpacked file: event "
-          "size: %ld, file size: %ld, event hash: %s, file hash: %s",
-          event.size, GetFileSize(info.temp_path),
-          event.id.ToString(true).c_str(), file_hash.ToString(true).c_str());
-      num_errors_++;
-      return;
+      if (file_hash != event.id) {
+        LogCvmfs(
+            kLogReceiver, kLogSyslogErr,
+            "PayloadProcessor - error: Hash mismatch for unpacked file: event "
+            "size: %ld, file size: %ld, event hash: %s, file hash: %s",
+            event.size, GetFileSize(info.temp_path),
+            event.id.ToString(true).c_str(), file_hash.ToString(true).c_str());
+        num_errors_++;
+        return;
+      }
+
+      Upload(info.temp_path, "data/" + path);
     }
-
-    Upload(info.temp_path, "data/" + path);
 
     pending_files_.erase(event.id);
   }
@@ -170,7 +233,9 @@ PayloadProcessor::Result PayloadProcessor::Initialize() {
   const std::string spooler_temp_dir =
       GetSpoolerTempDir(params.spooler_configuration);
   assert(!spooler_temp_dir.empty());
-  temp_dir_ = RaiiTempDir::Create(spooler_temp_dir + "/payload_processor");
+  assert(MkdirDeep(spooler_temp_dir + "/receiver", 0666, true));
+  temp_dir_ =
+      RaiiTempDir::Create(spooler_temp_dir + "/receiver/payload_processor");
 
   upload::SpoolerDefinition definition(
       params.spooler_configuration, params.hash_alg, params.compression_alg,
@@ -184,9 +249,25 @@ PayloadProcessor::Result PayloadProcessor::Initialize() {
   return kSuccess;
 }
 
-void PayloadProcessor::Finalize() {
+PayloadProcessor::Result PayloadProcessor::Finalize() {
   spooler_->WaitForUpload();
   temp_dir_.Destroy();
+
+  const unsigned num_spooler_errors = spooler_->GetNumberOfErrors();
+  if (num_spooler_errors > 0) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "PayloadProcessor - error: Spooler - %d upload(s) failed.",
+             num_spooler_errors);
+    return kSpoolerError;
+  }
+
+  if (GetNumErrors() > 0) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "PayloadProcessor - error: % unpacking error(s).", GetNumErrors());
+    return kOtherError;
+  }
+
+  return kSuccess;
 }
 
 void PayloadProcessor::Upload(const std::string& source,

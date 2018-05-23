@@ -15,9 +15,13 @@
 #include "catalog.h"
 #include "catalog_traversal.h"
 #include "hash.h"
+#include "history_sqlite.h"
+#include "logging.h"
+#include "manifest.h"
 #include "uid_map.h"
 #include "upload.h"
 #include "util/algorithm.h"
+#include "util/pointer.h"
 #include "util_concurrency.h"
 
 namespace catalog {
@@ -294,6 +298,22 @@ class CommandMigrate : public Command {
   bool LoadCatalogs(const shash::Any &manual_root_hash,
                     ObjectFetcherT *object_fetcher)
   {
+    ObjectFetcherFailures::Failures retval;
+    retval = object_fetcher->FetchManifest(&manifest_upstream_);
+    if (retval != ObjectFetcherFailures::kFailOk) {
+      LogCvmfs(kLogCvmfs, kLogStdout, "could not get manifest (%d)", retval);
+      return false;
+    }
+
+    if (!manifest_upstream_->history().IsNull()) {
+      retval = object_fetcher->FetchHistory(
+        &history_upstream_, manifest_upstream_->history());
+      if (retval != ObjectFetcherFailures::kFailOk) {
+        LogCvmfs(kLogCvmfs, kLogStdout, "could not get history (%d)", retval);
+        return false;
+      }
+    }
+
     typename CatalogTraversal<ObjectFetcherT>::Parameters params;
     const bool generate_full_catalog_tree = true;
     params.no_close       = generate_full_catalog_tree;
@@ -333,6 +353,13 @@ class CommandMigrate : public Command {
   bool GenerateNestedCatalogMarkerChunk();
   void CreateNestedCatalogMarkerDirent(const shash::Any &content_hash);
 
+  void UploadHistoryClosure(const upload::SpoolerResult &result,
+                            Future<shash::Any> *hash);
+  bool UpdateUndoTags(PendingCatalog *root_catalog,
+                      unsigned revision,
+                      time_t timestamp,
+                      shash::Any *history_hash);
+
  private:
   unsigned int           file_descriptor_limit_;
   CatalogStatisticsList  catalog_statistics_list_;
@@ -347,6 +374,8 @@ class CommandMigrate : public Command {
   std::string                     nested_catalog_marker_tmp_path_;
   static catalog::DirectoryEntry  nested_catalog_marker_;
 
+  UniquePtr<manifest::Manifest> manifest_upstream_;
+  UniquePtr<history::SqliteHistory> history_upstream_;
   catalog::Catalog const*     root_catalog_;
   UniquePtr<upload::Spooler>  spooler_;
   PendingCatalogMap           pending_catalogs_;
