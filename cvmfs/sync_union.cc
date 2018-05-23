@@ -67,8 +67,10 @@ bool SyncUnion::ProcessDirectory(const string &parent_dir,
 bool SyncUnion::ProcessDirectory(SharedPtr<SyncItem> entry) {
   if (entry->IsNew()) {
     mediator_->Add(entry);
-    return true;
-  } else {                            // directory already existed...
+    // Recursion stops here. All content of new directory
+    // is added later by the SyncMediator
+    return false;
+  } else {                             // directory already existed...
     if (entry->IsOpaqueDirectory()) {  // was directory completely overwritten?
       mediator_->Replace(entry);
       return false;  // <-- replace does not need any further recursion
@@ -77,6 +79,18 @@ bool SyncUnion::ProcessDirectory(SharedPtr<SyncItem> entry) {
       return true;
     }
   }
+}
+
+// We don't have the directory that we are processing in the fs, we
+// cannot recurse inside the directory.
+// If the directory already exists, we simply remove it and we put it back the
+// new one (some attributes may change)
+// If it does not exists we simply add it.
+bool SyncUnion::ProcessUnmaterializedDirectory(SharedPtr<SyncItem> entry) {
+  if (entry->IsNew()) {
+    mediator_->AddUnmaterializedDirectory(entry);
+  }
+  return true;
 }
 
 void SyncUnion::ProcessRegularFile(const string &parent_dir,

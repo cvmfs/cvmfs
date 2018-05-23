@@ -68,6 +68,11 @@ class SyncItem {
   inline bool IsSymlink()         const { return IsType(kItemSymlink);         }
   inline bool WasSymlink()        const { return WasType(kItemSymlink);        }
   inline bool IsNew()             const { return WasType(kItemNew);            }
+  inline bool IsTouched() const {
+    return (GetRdOnlyFiletype() == GetUnionFiletype()) &&
+           (GetRdOnlyFiletype() == GetScratchFiletype()) &&
+           (GetUnionFiletype() == GetScratchFiletype());
+  }
   inline bool IsCharacterDevice() const { return IsType(kItemCharacterDevice); }
   inline bool IsBlockDevice()     const { return IsType(kItemBlockDevice);     }
   inline bool IsFifo()            const { return IsType(kItemFifo);            }
@@ -190,7 +195,8 @@ class SyncItem {
   }
 
   SyncItemType GetRdOnlyFiletype() const;
-  virtual SyncItemType GetScratchFiletype() const = 0;
+  SyncItemType GetUnionFiletype() const;
+  virtual SyncItemType GetScratchFiletype() const;
 
   /**
    * Checks if the SyncItem _is_ the given file type (file, dir, symlink, ...)
