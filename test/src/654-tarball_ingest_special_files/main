@@ -119,7 +119,7 @@ cvmfs_run_test() {
   file_size=$(wc -c <$file)
   if [ ! -f $file ] || [ $file_size -ne 0 ]; then
     echo "*** Error not found link to empty file: $file"
-    return 1
+    return 7
   else
     echo "*** Found also link to empty file: $file"
   fi
@@ -128,7 +128,7 @@ cvmfs_run_test() {
   file_size=$(wc -c <$file)
   if [ ! -f $file ] || [ $file_size -ne 2048 ]; then
     echo "*** Error not found link to different owner file: $file"
-    return 1
+    return 8
   else
     echo "*** Found also link to to different owner file: $file"
   fi
@@ -136,7 +136,7 @@ cvmfs_run_test() {
   file=$result_dir/fifo
   if [ ! -p $file ]; then
     echo "*** Error not found fifo: $file"
-    return 1
+    return 9
   else
     echo "*** Found also fifo: $file"
   fi
