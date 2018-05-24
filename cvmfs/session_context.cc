@@ -5,6 +5,7 @@
 #include "session_context.h"
 
 #include <algorithm>
+#include <limits>
 
 #include "curl/curl.h"
 #include "cvmfs_config.h"
@@ -14,7 +15,13 @@
 #include "util/string.h"
 
 namespace {
+// Maximum number of queued jobs is limited to 10,
+// representing 10 * 200 MB = 2GB max memory used by the queue
 const size_t kMaxQueueSize = 10;
+
+// Maximum number of jobs during a session. No limit, for practical
+// purposes.
+const size_t kMaxNumJobs = std::numeric_limits<size_t>::max();
 }
 
 namespace upload {
@@ -67,7 +74,7 @@ size_t RecvCB(void* buffer, size_t size, size_t nmemb, void* userp) {
 }
 
 SessionContextBase::SessionContextBase()
-    : upload_results_(kMaxQueueSize, kMaxQueueSize),
+    : upload_results_(kMaxNumJobs, kMaxNumJobs),
       api_url_(),
       session_token_(),
       key_id_(),
@@ -262,7 +269,6 @@ SessionContext::SessionContext()
 bool SessionContext::InitializeDerived() {
   // Start worker thread
   atomic_init32(&worker_terminate_);
-  atomic_write32(&worker_terminate_, 0);
 
   upload_jobs_.Drop();
 
