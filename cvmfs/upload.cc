@@ -7,6 +7,7 @@
 
 #include <vector>
 
+#include "util/shared_ptr.h"
 #include "util_concurrency.h"
 
 namespace upload {
@@ -51,25 +52,28 @@ bool Spooler::Initialize() {
   return true;
 }
 
-void Spooler::Process(const std::string &local_path,
-                      const bool allow_chunking) {
-  ingestion_pipeline_->Process(local_path, allow_chunking);
+void Spooler::Process(IngestionSource *source, const bool allow_chunking) {
+  ingestion_pipeline_->Process(source, allow_chunking);
 }
 
 void Spooler::ProcessCatalog(const std::string &local_path) {
-  ingestion_pipeline_->Process(local_path, false, shash::kSuffixCatalog);
+  ingestion_pipeline_->Process(new FileIngestionSource(local_path), false,
+                               shash::kSuffixCatalog);
 }
 
 void Spooler::ProcessHistory(const std::string &local_path) {
-  ingestion_pipeline_->Process(local_path, false, shash::kSuffixHistory);
+  ingestion_pipeline_->Process(new FileIngestionSource(local_path), false,
+                               shash::kSuffixHistory);
 }
 
 void Spooler::ProcessCertificate(const std::string &local_path) {
-  ingestion_pipeline_->Process(local_path, false, shash::kSuffixCertificate);
+  ingestion_pipeline_->Process(new FileIngestionSource(local_path), false,
+                               shash::kSuffixCertificate);
 }
 
 void Spooler::ProcessMetainfo(const std::string &local_path) {
-  ingestion_pipeline_->Process(local_path, false, shash::kSuffixMetainfo);
+  ingestion_pipeline_->Process(new FileIngestionSource(local_path), false,
+                               shash::kSuffixMetainfo);
 }
 
 void Spooler::Upload(const std::string &local_path,

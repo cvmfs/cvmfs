@@ -236,6 +236,10 @@ set (CVMFS_SWISSKNIFE_SOURCES
   swissknife_hash.cc
   swissknife_history.cc
   swissknife_info.cc
+  swissknife_ingest.cc
+  swissknife_lease.cc
+  swissknife_lease_curl.cc
+  swissknife_lease_json.cc
   swissknife_letter.cc
   swissknife_lsrepo.cc
   swissknife_main.cc
@@ -246,14 +250,13 @@ set (CVMFS_SWISSKNIFE_SOURCES
   swissknife_sign.cc
   swissknife_sync.cc
   swissknife_zpipe.cc
-  swissknife_lease.cc
-  swissknife_lease_curl.cc
-  swissknife_lease_json.cc
   sync_item.cc
+  sync_item_tar.cc
   sync_mediator.cc
   sync_union.cc
-  sync_union_overlayfs.cc
   sync_union_aufs.cc
+  sync_union_overlayfs.cc
+  sync_union_tarball.cc
   upload.cc
   upload_facility.cc
   upload_gateway.cc
@@ -430,6 +433,7 @@ if(BUILD_RECEIVER)
     swissknife_lease_curl.cc
     sql.cc
     sqlitemem.cc
+    sync_item.cc
     upload.cc
     upload_facility.cc
     upload_gateway.cc
@@ -451,7 +455,7 @@ if(BUILD_RECEIVER)
   target_link_libraries(cvmfs_receiver ${CURL_LIBRARIES} ${CARES_LIBRARIES}
                         ${SHA3_LIBRARIES} ${SQLITE3_LIBRARY} ${VJSON_LIBRARIES}
                         ${OPENSSL_LIBRARIES} ${UUID_LIBRARIES} ${ZLIB_LIBRARIES}
-                        ${RT_LIBRARY} pthread dl)
+                        ${RT_LIBRARY} ${LibArchive_LIBRARY} pthread dl)
 
   set (CVMFS_RECEIVER_CFLAGS "${CMAKE_CXX_FLAGS} -D_FILE_OFFSET_BITS=64 -fexceptions")
   set_target_properties (cvmfs_receiver PROPERTIES COMPILE_FLAGS "${CVMFS_RECEIVER_CFLAGS}")
@@ -700,7 +704,7 @@ if (BUILD_SERVER)
                          ${SQLITE3_LIBRARY} ${CURL_LIBRARIES}
                          ${CARES_LIBRARIES} ${ZLIB_LIBRARIES}
                          ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${VJSON_LIBRARIES}
-                         ${SHA3_LIBRARIES} ${CAP_LIBRARIES} pthread dl)
+                         ${SHA3_LIBRARIES} ${CAP_LIBRARIES} ${LibArchive_LIBRARY} pthread dl)
 
   target_link_libraries(cvmfs_stratum_agent
                         ${CURL_LIBRARIES} ${CARES_LIBRARIES}
@@ -718,7 +722,7 @@ if (BUILD_SERVER)
                            ${SQLITE3_LIBRARY}  ${CURL_LIBRARIES}
                            ${CARES_LIBRARIES} ${ZLIB_LIBRARIES}
                            ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${VJSON_LIBRARIES}
-                           ${SHA3_LIBRARIES} ${CAP_LIBRARIES} pthread dl)
+                           ${SHA3_LIBRARIES} ${CAP_LIBRARIES} ${LibArchive_LIBRARY} pthread dl)
   endif (BUILD_SERVER_DEBUG)
 endif (BUILD_SERVER)
 

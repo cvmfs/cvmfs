@@ -260,7 +260,7 @@ class T_IngestionStress : public FileSandbox {
     pipeline.Spawn();
 
     for (unsigned i = 0; i < file_paths.size(); ++i) {
-      pipeline.Process(file_paths[i], use_chunking);
+      pipeline.Process(new FileIngestionSource(file_paths[i]), use_chunking);
     }
     pipeline.WaitFor();
 
@@ -467,7 +467,7 @@ TEST_F(T_IngestionStress, ProcessMultipleFilesInSeparateWavesSlow) {
   pipeline.Spawn();
 
   // first wave...
-  pipeline.Process(GetEmptyFile(), true);
+  pipeline.Process(new FileIngestionSource(GetEmptyFile()), true);
   pipeline.WaitFor();
   CheckHash(uploader_->results, GetEmptyFileBulkHash());
   uploader_->ClearResults();
@@ -475,10 +475,11 @@ TEST_F(T_IngestionStress, ProcessMultipleFilesInSeparateWavesSlow) {
   // second wave...
   // some small and medium sized files with file chunking enabled
   // one big file without file chunking
-  pipeline.Process(GetEmptyFile(), true);
-  pipeline.Process(GetSmallFile(), true);
-  pipeline.Process(GetBigFile(), true);
-  pipeline.Process(GetHugeFile(), false, shash::kSuffixCatalog);
+  pipeline.Process(new FileIngestionSource(GetEmptyFile()), true);
+  pipeline.Process(new FileIngestionSource(GetSmallFile()), true);
+  pipeline.Process(new FileIngestionSource(GetBigFile()), true);
+  pipeline.Process(new FileIngestionSource(GetHugeFile()), false,
+                   shash::kSuffixCatalog);
   ExpectedHashStrings hs;
   hs.push_back(GetEmptyFileBulkHash());
   hs.push_back(GetSmallFileBulkHash());
@@ -491,7 +492,8 @@ TEST_F(T_IngestionStress, ProcessMultipleFilesInSeparateWavesSlow) {
   uploader_->ClearResults();
 
   // third wave...
-  pipeline.Process(GetSmallFile(), true, shash::kSuffixCertificate);
+  pipeline.Process(new FileIngestionSource(GetSmallFile()), true,
+                   shash::kSuffixCertificate);
   pipeline.WaitFor();
   CheckHash(uploader_->results,
             GetSmallFileBulkHash(shash::kSuffixCertificate));
@@ -522,7 +524,8 @@ TEST_F(T_IngestionStress, ProcessingCallbackForSmallFile) {
   pipeline.Spawn();
   pipeline.RegisterListener(&CallbackTest::CallbackFn);
 
-  pipeline.Process(GetSmallFile(), true, shash::kSuffixHistory);
+  pipeline.Process(new FileIngestionSource(GetSmallFile()), true,
+                   shash::kSuffixHistory);
   pipeline.WaitFor();
 
   shash::Any expected_content_hash(shash::kSha1,
@@ -537,7 +540,8 @@ TEST_F(T_IngestionStress, ProcessingCallbackForBigFile) {
   pipeline.Spawn();
   pipeline.RegisterListener(&CallbackTest::CallbackFn);
 
-  pipeline.Process(GetBigFile(), true, shash::kSuffixCatalog);
+  pipeline.Process(new FileIngestionSource(GetBigFile()), true,
+                   shash::kSuffixCatalog);
   pipeline.WaitFor();
 
   shash::Any expected_content_hash(shash::kSha1,
@@ -547,4 +551,3 @@ TEST_F(T_IngestionStress, ProcessingCallbackForBigFile) {
   EXPECT_EQ(GetBigFile(), CallbackTest::result_local_path);
   EXPECT_EQ(number_of_chunks, CallbackTest::result_chunk_list.size());
 }
-

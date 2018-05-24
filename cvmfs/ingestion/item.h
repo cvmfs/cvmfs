@@ -17,6 +17,7 @@
 #include "file_chunk.h"
 #include "hash.h"
 #include "ingestion/chunk_detector.h"
+#include "ingestion/ingestion_source.h"
 #include "util/pointer.h"
 #include "util/single_copy.h"
 
@@ -26,7 +27,6 @@ struct UploadStreamHandle;
 
 class ItemAllocator;
 
-
 /**
  * Carries the information necessary to compress and checksum a file. During
  * processing, the bulk chunk and the chunks_ vector are filled.
@@ -34,7 +34,7 @@ class ItemAllocator;
 class FileItem : SingleCopy {
  public:
   explicit FileItem(
-    const std::string &p,
+    IngestionSource* source,
     uint64_t min_chunk_size = 4 * 1024 * 1024,
     uint64_t avg_chunk_size = 8 * 1024 * 1024,
     uint64_t max_chunk_size = 16 * 1024 * 1024,
@@ -46,13 +46,15 @@ class FileItem : SingleCopy {
   ~FileItem();
 
   static FileItem *CreateQuitBeacon() {
-    return new FileItem(std::string(1, kQuitBeaconMarker));
+    std::string quit_marker = std::string(1, kQuitBeaconMarker);
+    UniquePtr<FileIngestionSource> source(new FileIngestionSource(quit_marker));
+    return new FileItem(source.Release());
   }
   bool IsQuitBeacon() {
-    return (path_.length() == 1) && (path_[0] == kQuitBeaconMarker);
+    return (path().length() == 1) && (path()[0] == kQuitBeaconMarker);
   }
 
-  std::string path() { return path_; }
+  std::string path() { return source_->GetPath(); }
   uint64_t size() { return size_; }
   Xor32Detector *chunk_detector() { return &chunk_detector_; }
   shash::Any bulk_hash() { return bulk_hash_; }
@@ -71,6 +73,13 @@ class FileItem : SingleCopy {
   uint64_t GetNumChunks() { return chunks_.size(); }
   FileChunkList *GetChunksPtr() { return &chunks_; }
 
+  bool Open() { return source_->Open(); }
+  ssize_t Read(void *buffer, size_t nbyte) {
+    return source_->Read(buffer, nbyte);
+  }
+  bool Close() { return source_->Close(); }
+  bool GetSize(uint64_t *size) { return source_->GetSize(size); }
+
   // Called by ChunkItem constructor, decremented when a chunk is registered
   void IncNchunksInFly() { atomic_inc64(&nchunks_in_fly_); }
   void RegisterChunk(const FileChunk &file_chunk);
@@ -82,7 +91,7 @@ class FileItem : SingleCopy {
   static const uint64_t kSizeUnknown = uint64_t(-1);
   static const char kQuitBeaconMarker = '\0';
 
-  const std::string path_;
+  UniquePtr<IngestionSource> source_;
   const zlib::Algorithms compression_algorithm_;
   const shash::Algorithms hash_algorithm_;
   const shash::Suffix hash_suffix_;

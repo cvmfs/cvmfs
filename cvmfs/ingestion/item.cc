@@ -9,13 +9,13 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "ingestion/ingestion_source.h"
 #include "item_mem.h"
 #include "smalloc.h"
 #include "util_concurrency.h"
 
-
 FileItem::FileItem(
-  const std::string &p,
+  IngestionSource* source,
   uint64_t min_chunk_size,
   uint64_t avg_chunk_size,
   uint64_t max_chunk_size,
@@ -24,7 +24,7 @@ FileItem::FileItem(
   shash::Suffix hash_suffix,
   bool may_have_chunks,
   bool has_legacy_bulk_chunk)
-  : path_(p)
+  : source_(source)
   , compression_algorithm_(compression_algorithm)
   , hash_algorithm_(hash_algorithm)
   , hash_suffix_(hash_suffix)
@@ -41,11 +41,9 @@ FileItem::FileItem(
   atomic_init32(&is_fully_chunked_);
 }
 
-
 FileItem::~FileItem() {
   pthread_mutex_destroy(&lock_);
 }
-
 
 void FileItem::RegisterChunk(const FileChunk &file_chunk) {
   MutexLockGuard lock_guard(lock_);

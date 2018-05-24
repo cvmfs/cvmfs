@@ -181,7 +181,7 @@ TEST_F(T_Ingestion, TaskRead) {
   task_group.TakeConsumer(new TaskRead(&tube_in, &tube_group_out, &allocator_));
   task_group.Spawn();
 
-  FileItem file_null("/dev/null");
+  FileItem file_null(new FileIngestionSource(std::string("/dev/null")));
   EXPECT_TRUE(file_null.may_have_chunks());
   tube_in.Enqueue(&file_null);
   BlockItem *item_stop = tube_out->Pop();
@@ -193,7 +193,8 @@ TEST_F(T_Ingestion, TaskRead) {
 
   string str_abc = "abc";
   EXPECT_TRUE(SafeWriteToFile(str_abc, "./abc", 0600));
-  FileItem file_abc("./abc");
+
+  FileItem file_abc(new FileIngestionSource(std::string("./abc")));
   tube_in.Enqueue(&file_abc);
   BlockItem *item_data = tube_out->Pop();
   EXPECT_EQ(3U, file_abc.size());
@@ -216,7 +217,9 @@ TEST_F(T_Ingestion, TaskRead) {
   close(fd_tmp);
 
   unsigned size = nblocks * TaskRead::kBlockSize;
-  FileItem file_large("./large", size - 1, size, size + 1);
+
+  FileItem file_large(new FileIngestionSource(std::string("./large")), size - 1,
+                      size, size + 1);
   tube_in.Enqueue(&file_large);
   for (unsigned i = 0; i < nblocks; ++i) {
     item_data = tube_out->Pop();
@@ -256,10 +259,11 @@ TEST_F(T_Ingestion, TaskReadThrottle) {
 
   string str_abc = "abc";
   EXPECT_TRUE(SafeWriteToFile(str_abc, "./abc", 0600));
-  FileItem file_abc("./abc");
+
+  FileItem file_abc(new FileIngestionSource(std::string("./abc")));
   tube_in.Enqueue(&file_abc);
 
-  FileItem file_null("/dev/null");
+  FileItem file_null(new FileIngestionSource(std::string("/dev/null")));
   tube_in.Enqueue(&file_null);
 
   BlockItem *item_data = tube_out->Pop();
@@ -296,7 +300,7 @@ TEST_F(T_Ingestion, TaskChunkDispatch) {
     new TaskChunk(&tube_in, &tube_group_out, &allocator_));
   task_group.Spawn();
 
-  FileItem file_null("/dev/null");
+  FileItem file_null(new FileIngestionSource(std::string("/dev/null")));
   file_null.set_size(0);
   EXPECT_FALSE(file_null.is_fully_chunked());
   EXPECT_EQ(0U, file_null.nchunks_in_fly());
@@ -332,8 +336,9 @@ TEST_F(T_Ingestion, TaskChunkDispatch) {
   delete item_stop->chunk_item();
   delete item_stop;
 
-  FileItem file_null_legacy("/dev/null", 1024, 2048, 4096,
-    zlib::kZlibDefault, shash::kSha1, shash::kSuffixNone, true, true);
+  FileItem file_null_legacy(new FileIngestionSource(std::string("/dev/null")),
+                            1024, 2048, 4096, zlib::kZlibDefault, shash::kSha1,
+                            shash::kSuffixNone, true, true);
   file_null_legacy.set_size(0);
   BlockItem *b3 = new BlockItem(3, &allocator_);
   b3->SetFileItem(&file_null_legacy);
@@ -373,10 +378,9 @@ TEST_F(T_Ingestion, TaskChunk) {
   unsigned size = nblocks * TaskRead::kBlockSize;
   unsigned avg_chunk_size = 4 * TaskRead::kBlockSize;
   // File does not exist
-  FileItem file_large("./large",
-                      avg_chunk_size / 2,
-                      avg_chunk_size,
-                      avg_chunk_size * 2);
+  FileItem file_large(new FileIngestionSource(std::string("./large")),
+                      avg_chunk_size / 2, avg_chunk_size, avg_chunk_size * 2);
+
   EXPECT_FALSE(file_large.is_fully_chunked());
   for (unsigned i = 0; i < nblocks; ++i) {
     string str_content(TaskRead::kBlockSize, static_cast<char>(i));
@@ -452,7 +456,8 @@ TEST_F(T_Ingestion, TaskChunkCornerCases) {
   task_group.Spawn();
 
   // File does not exist
-  FileItem file_large("./large", 1024, 2048, 4096);
+  FileItem file_large(new FileIngestionSource(std::string("./large")), 1024,
+                      2048, 4096);
 
   file_large.set_size(8192);
   // Ensure there is a chunking cut mark at EOF
@@ -511,7 +516,7 @@ TEST_F(T_Ingestion, TaskCompressNull) {
     new TaskCompress(&tube_in, &tube_group_out, &allocator_));
   task_group.Spawn();
 
-  FileItem file_null("/dev/null");
+  FileItem file_null(new FileIngestionSource(std::string("/dev/null")));
   ChunkItem chunk_null(&file_null, 0);
   BlockItem *b1 = new BlockItem(1, &allocator_);
   b1->SetFileItem(&file_null);
@@ -563,8 +568,9 @@ TEST_F(T_Ingestion, TaskCompress) {
   BlockItem block_raw(42, &allocator_);
   block_raw.MakeData(size);
   unsigned char *buf = reinterpret_cast<unsigned char *>(smalloc(size));
+
   // File does not exist
-  FileItem file_large("./large");
+  FileItem file_large(new FileIngestionSource(std::string("./large")));
   ChunkItem chunk_large(&file_large, 0);
   for (unsigned i = 0; i < nblocks; ++i) {
     string str_content(block_size, static_cast<char>(i));
@@ -634,7 +640,7 @@ TEST_F(T_Ingestion, TaskHash) {
   task_group.TakeConsumer(new TaskHash(&tube_in, &tube_group_out));
   task_group.Spawn();
 
-  FileItem file_null("/dev/null");
+  FileItem file_null(new FileIngestionSource(std::string("/dev/null")));
   ChunkItem chunk_null(&file_null, 0);
   BlockItem b1(1, &allocator_);
   b1.SetFileItem(&file_null);
@@ -650,7 +656,8 @@ TEST_F(T_Ingestion, TaskHash) {
 
   string str_abc = "abc";
   EXPECT_TRUE(SafeWriteToFile(str_abc, "./abc", 0600));
-  FileItem file_abc("./abc");
+
+  FileItem file_abc(new FileIngestionSource(std::string("./abc")));
   ChunkItem chunk_abc(&file_abc, 0);
   BlockItem b2_a(2, &allocator_);
   b2_a.SetFileItem(&file_null);
@@ -689,7 +696,7 @@ TEST_F(T_Ingestion, TaskWriteNull) {
   task_group.TakeConsumer(new TaskWrite(&tube_in, &tube_group_out, uploader_));
   task_group.Spawn();
 
-  FileItem file_null("/dev/null");
+  FileItem file_null(new FileIngestionSource(std::string("/dev/null")));
   file_null.set_size(0);
   file_null.set_is_fully_chunked();
   ChunkItem *chunk_null = new ChunkItem(&file_null, 0);
@@ -725,7 +732,7 @@ TEST_F(T_Ingestion, TaskWriteLarge) {
   task_group.Spawn();
 
   // File does not exist
-  FileItem file_large("./large");
+  FileItem file_large(new FileIngestionSource(std::string("./large")));
   unsigned nchunks = 32;
   unsigned chunk_size = 1024 * 1024;
   unsigned block_size = 1024;
@@ -784,7 +791,8 @@ TEST_F(T_Ingestion, PipelineNull) {
     &FnFileProcessed::OnFileProcessed, &fn_processed);
   pipeline_straight->Spawn();
 
-  pipeline_straight->Process("/dev/null", true);
+  pipeline_straight->Process(new FileIngestionSource(std::string("/dev/null")),
+                             true);
   pipeline_straight->WaitFor();
   EXPECT_EQ(1, atomic_read64(&fn_processed.ncall));
   EXPECT_EQ(1U, uploader_->results.size());
@@ -797,10 +805,11 @@ TEST_F(T_Ingestion, PipelineNull) {
   spooler_definition.compression_alg = zlib::kZlibDefault;
   spooler_definition.hash_algorithm = shash::kShake128;
   UniquePtr<IngestionPipeline> pipeline_zlib(
-    new IngestionPipeline(uploader_, spooler_definition));
+      new IngestionPipeline(uploader_, spooler_definition));
   pipeline_zlib->Spawn();
 
-  pipeline_zlib->Process("/dev/null", true);
+  pipeline_zlib->Process(new FileIngestionSource(std::string("/dev/null")),
+                         true);
   pipeline_zlib->WaitFor();
   EXPECT_EQ(1U, uploader_->results.size());
   void *compressed_null = NULL;
@@ -818,14 +827,15 @@ TEST_F(T_Ingestion, PipelineNull) {
 TEST_F(T_Ingestion, Scrubbing) {
   UniquePtr<ScrubbingPipeline> pipeline_scrubbing(new ScrubbingPipeline());
   FnFileHashed fn_hashed;
-  pipeline_scrubbing->RegisterListener(
-    &FnFileHashed::OnFileProcessed, &fn_hashed);
-    pipeline_scrubbing->Spawn();
+  pipeline_scrubbing->RegisterListener(&FnFileHashed::OnFileProcessed,
+                                       &fn_hashed);
+  pipeline_scrubbing->Spawn();
 
   shash::Any null_hash(shash::kShake128);
   HashString("", &null_hash);
-  pipeline_scrubbing->Process(
-    "/dev/null", shash::kShake128, shash::kSuffixNone);
+
+  pipeline_scrubbing->Process(new FileIngestionSource(std::string("/dev/null")),
+                              shash::kShake128, shash::kSuffixNone);
   pipeline_scrubbing->WaitFor();
   EXPECT_EQ(1, atomic_read64(&fn_hashed.ncall));
   EXPECT_EQ("/dev/null", fn_hashed.last_result.path);

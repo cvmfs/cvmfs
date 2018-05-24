@@ -121,6 +121,7 @@
 #include "upload_spooler_definition.h"
 #include "upload_spooler_result.h"
 #include "util/pointer.h"
+#include "util/shared_ptr.h"
 #include "util_concurrency.h"
 
 namespace upload {
@@ -192,12 +193,12 @@ class Spooler : public Observable<SpoolerResult> {
    *       callback for the whole job, that contains information about the
    *       generated chunks.
    *
-   * @param local_path      the location of the file to be processed and up-
-   *                        loaded into the backend storage
+   * @param source          the ingestion source of the file to be processed
+   *                        and uploaded into the backend storage
    * @param allow_chunking  (optional) controls if this file should be cut in
    *                        chunks or uploaded at once
    */
-  void Process(const std::string &local_path, const bool allow_chunking = true);
+  void Process(IngestionSource *source, const bool allow_chunking = true);
 
   /**
    * Convenience wrapper to process a catalog file. Please always use this
@@ -219,7 +220,7 @@ class Spooler : public Observable<SpoolerResult> {
    * Convenience wrapper to process a certificate file. This sets the
    * processing parameters (like chunking and hash suffixes) accordingly.
    *
-   * @param local_path  the location of the certificate file
+   * @param local_path  the location of the source of the certificate file
    */
   void ProcessCertificate(const std::string &local_path);
 
