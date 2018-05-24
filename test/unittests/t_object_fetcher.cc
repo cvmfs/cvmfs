@@ -334,6 +334,8 @@ class T_ObjectFetcher : public ::testing::Test {
     localtime_r(&timestamp, &ti);
 
     char result[15];
+#pragma GCC diagnostic ignored "-Wformat-truncation"
+#pragma GCC diagnostic push
     snprintf(result, sizeof(result), "%04d%02d%02d%02d%02d%02d",
              ti.tm_year + 1900,
              ti.tm_mon + 1,
@@ -341,6 +343,7 @@ class T_ObjectFetcher : public ::testing::Test {
              ti.tm_hour,
              ti.tm_min,
              ti.tm_sec);
+#pragma GCC diagnostic pop
 
     return string(result);
   }
