@@ -90,6 +90,31 @@ TEST_F(T_SessionContext, MultipleFiles) {
   EXPECT_EQ(3, ctx.num_jobs_finished_);
 }
 
+TEST_F(T_SessionContext, MultipleFilesQueueSizeOne) {
+  SessionContextMocked ctx;
+  EXPECT_TRUE(ctx.Initialize("http://my.repo.address:4929/api/v1",
+                             "/path/to/the/session_file", "some_key_id",
+                             "some_secret", 5000, 1));
+  EXPECT_EQ(0, ctx.num_jobs_dispatched_);
+  EXPECT_EQ(0, ctx.num_jobs_finished_);
+
+  for (int i = 0; i < 10; ++i) {
+    ObjectPack::BucketHandle hd = ctx.NewBucket();
+
+    unsigned char buffer[4096];
+    memset(buffer, 0, 4096);
+    ObjectPack::AddToBucket(buffer, 4096, hd);
+
+    shash::Any hash(shash::kSha1);
+    EXPECT_TRUE(ctx.CommitBucket(ObjectPack::kCas, hash, hd, ""));
+  }
+  EXPECT_EQ(9, ctx.num_jobs_dispatched_);
+
+  EXPECT_TRUE(ctx.Finalize(true, "fake/old_root_hash", "fake/new_root_hash",
+                           TestRepositoryTag()));
+  EXPECT_EQ(10, ctx.num_jobs_finished_);
+}
+
 TEST_F(T_SessionContext, MultipleFilesForcedDispatchLast) {
   SessionContextMocked ctx;
   EXPECT_TRUE(ctx.Initialize("http://my.repo.address:4929/api/v1",

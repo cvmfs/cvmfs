@@ -13,10 +13,10 @@ clean_up() {
     echo "Cleaning up"
 
     echo "  Stopping repository gateway application"
-    sudo /opt/cvmfs-gateway/scripts/run_cvmfs_gateway.sh stop
+    sudo /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh stop
 
     echo "  Removing Mnesia directory"
-    sudo rm -rf /opt/cvmfs_mnesia
+    sudo rm -rf /var/lib/cvmfs-gateway
 
     echo "  Removing test repository"
     sudo -E cvmfs_server rmfs -f test.repo.org

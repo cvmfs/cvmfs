@@ -3,6 +3,7 @@
   * Fix debian packaging warnings and errors
 
 2.5.1:
+  * Fix potential deadlock when uploading files to repository GW (CVM-1555)
   * Reduce number of temporary files when publishing through GW (CVM-1548)
   * Check for link count > 0 in swissknife check (CVM-1549)
   * Linkcount is set to 1 for hardlinked files published through GW (CVM-1542)
