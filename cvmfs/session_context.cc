@@ -15,13 +15,9 @@
 #include "util/string.h"
 
 namespace {
-// Maximum number of queued jobs is limited to 10,
-// representing 10 * 200 MB = 2GB max memory used by the queue
-const size_t kMaxQueueSize = 10;
-
 // Maximum number of jobs during a session. No limit, for practical
 // purposes.
-const size_t kMaxNumJobs = std::numeric_limits<size_t>::max();
+const uint64_t kMaxNumJobs = std::numeric_limits<uint64_t>::max();
 }
 
 namespace upload {
@@ -94,7 +90,8 @@ bool SessionContextBase::Initialize(const std::string& api_url,
                                     const std::string& session_token,
                                     const std::string& key_id,
                                     const std::string& secret,
-                                    uint64_t max_pack_size) {
+                                    uint64_t max_pack_size,
+                                    uint64_t max_queue_size) {
   bool ret = true;
 
   // Initialize session context lock
@@ -133,7 +130,7 @@ bool SessionContextBase::Initialize(const std::string& api_url,
     ret = false;
   }
 
-  ret = InitializeDerived() && ret;
+  ret = InitializeDerived(max_queue_size) && ret;
 
   return ret;
 }
@@ -262,15 +259,16 @@ void SessionContextBase::Dispatch() {
 
 SessionContext::SessionContext()
     : SessionContextBase(),
-      upload_jobs_(kMaxQueueSize, kMaxQueueSize),
+      upload_jobs_(),
       worker_terminate_(),
       worker_() {}
 
-bool SessionContext::InitializeDerived() {
+bool SessionContext::InitializeDerived(uint64_t max_queue_size) {
   // Start worker thread
   atomic_init32(&worker_terminate_);
 
-  upload_jobs_.Drop();
+  upload_jobs_ = new FifoChannel<UploadJob*>(max_queue_size, max_queue_size);
+  upload_jobs_->Drop();
 
   int retval =
       pthread_create(&worker_, NULL, UploadLoop, reinterpret_cast<void*>(this));
@@ -311,7 +309,7 @@ Future<bool>* SessionContext::DispatchObjectPack(ObjectPack* pack) {
   UploadJob* job = new UploadJob;
   job->pack = pack;
   job->result = new Future<bool>();
-  upload_jobs_.Enqueue(job);
+  upload_jobs_->Enqueue(job);
   return job->result;
 }
 
@@ -396,7 +394,7 @@ void* SessionContext::UploadLoop(void* data) {
   int64_t jobs_processed = 0;
   while (!ctx->ShouldTerminate()) {
     while (jobs_processed < ctx->NumJobsSubmitted()) {
-      UploadJob* job = ctx->upload_jobs_.Dequeue();
+      UploadJob* job = ctx->upload_jobs_->Dequeue();
       if (!ctx->DoUpload(job)) {
         LogCvmfs(kLogUploadGateway, kLogStderr,
                  "SessionContext: could not submit payload. Aborting.");
