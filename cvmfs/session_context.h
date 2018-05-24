@@ -10,6 +10,7 @@
 
 #include "pack.h"
 #include "repository_tag.h"
+#include "util/pointer.h"
 #include "util_concurrency.h"
 
 namespace upload {
@@ -41,9 +42,12 @@ class SessionContextBase {
 
   virtual ~SessionContextBase();
 
-  bool Initialize(const std::string& api_url, const std::string& session_token,
+// By default, the maximum number of queued jobs is limited to 10,
+// representing 10 * 200 MB = 2GB max memory used by the queue
+bool Initialize(const std::string& api_url, const std::string& session_token,
                   const std::string& key_id, const std::string& secret,
-                  uint64_t max_pack_size = ObjectPack::kDefaultLimit);
+                  uint64_t max_pack_size = ObjectPack::kDefaultLimit,
+                  uint64_t max_queue_size = 10);
   bool Finalize(bool commit, const std::string& old_root_hash,
                 const std::string& new_root_hash,
                 const RepositoryTag& tag);
@@ -58,7 +62,7 @@ class SessionContextBase {
                     const bool force_dispatch = false);
 
  protected:
-  virtual bool InitializeDerived() = 0;
+  virtual bool InitializeDerived(uint64_t max_queue_size) = 0;
 
   virtual bool FinalizeDerived() = 0;
 
@@ -104,7 +108,7 @@ class SessionContext : public SessionContextBase {
     Future<bool>* result;
   };
 
-  virtual bool InitializeDerived();
+  virtual bool InitializeDerived(uint64_t max_queue_size);
 
   virtual bool FinalizeDerived();
 
@@ -121,7 +125,7 @@ class SessionContext : public SessionContextBase {
 
   bool ShouldTerminate();
 
-  FifoChannel<UploadJob*> upload_jobs_;
+  UniquePtr<FifoChannel<UploadJob*> > upload_jobs_;
 
   atomic_int32 worker_terminate_;
   pthread_t worker_;
