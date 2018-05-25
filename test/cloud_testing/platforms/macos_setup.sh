@@ -4,7 +4,7 @@ export PATH=/usr/local/bin:$PATH
 
 # source the common platform independent functionality and option parsing
 script_location=$(cd "$(dirname "$0")"; pwd)
-. ${script_location}/common_test.sh
+. ${script_location}/common_setup.sh
 
 echo -n "Install client package: $CLIENT_PACKAGE ... "
 sudo installer -pkg "$CLIENT_PACKAGE" -target / \
