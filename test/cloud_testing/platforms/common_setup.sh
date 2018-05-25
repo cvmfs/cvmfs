@@ -81,7 +81,7 @@ if [ "x$(uname -s)" != "xDarwin" ]; then
 fi
 
 # check that the script is running under the correct user account
-if [ $(id --user --name) != "sftnight" ]; then
+if [ $(id -u -n) != "sftnight" ]; then
   echo "test cases need to run under user 'sftnight'... aborting"
   exit 3
 fi
